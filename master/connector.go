@@ -11,8 +11,10 @@ import (
 
 // A bidirectional pub/sub connector, used to connect to a master.
 type Connector struct {
-	InSocket  mangos.Socket
-	OutSocket mangos.Socket
+	InSocket   mangos.Socket
+	OutSocket  mangos.Socket
+	InChannel  chan string
+	OutChannel chan string
 }
 
 // Creates a bare, unconnected connector.
@@ -24,6 +26,9 @@ func NewBareConnector() (conn Connector, err error) {
 	if conn.InSocket, err = sub.NewSocket(); err != nil {
 		return conn, err
 	}
+
+	conn.InChannel = make(chan string)
+	conn.OutChannel = make(chan string)
 
 	return conn, nil
 }
@@ -88,29 +93,36 @@ func setupAndDial(sock mangos.Socket, addr string) error {
 }
 
 func (c *Connector) Run() (chan string, <-chan error) {
-	ch := make(chan string)
 	errors := make(chan error)
 
 	// Start a read loop
 	go func() {
-		log.Debug("-> Connector Read Loop")
-		msg, err := c.InSocket.Recv()
-		if err != nil {
-			errors <- err
+		for {
+			log.Debug("-> Connector Read Loop")
+			msg, err := c.InSocket.Recv()
+			if err != nil {
+				errors <- err
+			}
+			c.InChannel <- string(msg)
+			log.Debug("<- Connector Read Loop")
 		}
-		ch <- string(msg)
-		log.Debug("<- Connector Read Loop")
 	}()
 
 	// // Start a write loop
 	go func() {
-		log.Debug("-> Connector Write Loop")
-		msg := <-ch
-		if err := c.OutSocket.Send([]byte(msg)); err != nil {
-			errors <- err
+		for {
+			log.Debug("-> Connector Write Loop")
+			msg := <-c.OutChannel
+			if err := c.OutSocket.Send([]byte(msg)); err != nil {
+				errors <- err
+			}
+			log.Debug("<- Connector Write Loop")
 		}
-		log.Debug("<- Connector Write Loop")
 	}()
 
-	return ch, errors
+	return c.InChannel, errors
+}
+
+func (c *Connector) Send(msg string) {
+	c.OutChannel <- msg
 }
