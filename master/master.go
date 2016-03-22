@@ -25,17 +25,16 @@ func New(outAddr string, inAddr string) (m Master, err error) {
 // Runs the main loop for a master.
 func (m *Master) Run() {
 	ch, errors := m.Connector.Run()
-	msg := "Test"
 	for {
 		select {
-		case ch <- msg:
+		case msg := <-ch:
 			log.WithFields(log.Fields{
 				"msg": msg,
-			}).Info("Master: Message sent")
+			}).Info("Master: Message received")
 		case err := <-errors:
 			log.WithFields(log.Fields{
 				"error": err,
-			}).Error("Master: Error sending")
+			}).Error("Master: Error")
 		}
 	}
 }
