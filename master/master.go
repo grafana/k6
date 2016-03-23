@@ -2,12 +2,13 @@ package master
 
 import (
 	log "github.com/Sirupsen/logrus"
+	"github.com/loadimpact/speedboat/message"
 )
 
 // A Master serves as a semi-intelligent message bus between clients and workers.
 type Master struct {
 	Connector Connector
-	Handlers  []func(*Master, Message, chan Message) bool
+	Handlers  []func(*Master, message.Message, chan message.Message) bool
 }
 
 // Creates a new Master, listening on the given in/out addresses.

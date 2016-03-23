@@ -5,6 +5,7 @@ import (
 	"github.com/codegangsta/cli"
 	"github.com/loadimpact/speedboat/client"
 	"github.com/loadimpact/speedboat/master"
+	"github.com/loadimpact/speedboat/message"
 	"github.com/loadimpact/speedboat/worker"
 	"time"
 )
@@ -25,10 +26,10 @@ func init() {
 	registerProcessor(processPing)
 }
 
-func processPing(w *worker.Worker, msg master.Message, out chan master.Message) bool {
+func processPing(w *worker.Worker, msg message.Message, out chan message.Message) bool {
 	switch msg.Type {
 	case "ping.worker.ping":
-		out <- master.Message{
+		out <- message.Message{
 			Type: "ping.worker.pong",
 			Body: msg.Body,
 		}
@@ -38,10 +39,10 @@ func processPing(w *worker.Worker, msg master.Message, out chan master.Message) 
 	}
 }
 
-func handlePing(m *master.Master, msg master.Message, out chan master.Message) bool {
+func handlePing(m *master.Master, msg message.Message, out chan message.Message) bool {
 	switch msg.Type {
 	case "ping.ping":
-		out <- master.Message{
+		out <- message.Message{
 			Type: "ping.pong",
 			Body: msg.Body,
 		}
@@ -59,15 +60,15 @@ func actionPing(c *cli.Context) {
 	in, out, errors := client.Connector.Run()
 
 	// Send a bunch of noise to filter through
-	out <- master.Message{Type: "ping.noise"}
-	out <- master.Message{Type: "ping.noise"}
+	out <- message.Message{Type: "ping.noise"}
+	out <- message.Message{Type: "ping.noise"}
 
 	// Send a ping message, target should reply with a pong
 	msgType := "ping.ping"
 	if c.Bool("worker") {
 		msgType = "ping.worker.ping"
 	}
-	out <- master.Message{
+	out <- message.Message{
 		Type: msgType,
 		Body: time.Now().Format("15:04:05 2006-01-02 MST"),
 	}

@@ -7,6 +7,7 @@ import (
 	"github.com/go-mangos/mangos/protocol/sub"
 	"github.com/go-mangos/mangos/transport/inproc"
 	"github.com/go-mangos/mangos/transport/tcp"
+	"github.com/loadimpact/speedboat/message"
 )
 
 // A bidirectional pub/sub connector, used to connect to a master.
@@ -28,7 +29,7 @@ func NewBareConnector() (conn Connector, err error) {
 	return conn, nil
 }
 
-func NewClientConnector(inAddr string, outAddr string) (conn Connector, err error) {
+func NewClientConnector(topic string, inAddr string, outAddr string) (conn Connector, err error) {
 	if conn, err = NewBareConnector(); err != nil {
 		return conn, err
 	}
@@ -39,7 +40,7 @@ func NewClientConnector(inAddr string, outAddr string) (conn Connector, err erro
 		return conn, err
 	}
 
-	err = conn.InSocket.SetOption(mangos.OptionSubscribe, []byte(""))
+	err = conn.InSocket.SetOption(mangos.OptionSubscribe, []byte(topic))
 	if err != nil {
 		return conn, err
 	}
@@ -88,10 +89,10 @@ func setupAndDial(sock mangos.Socket, addr string) error {
 }
 
 // Provides a channel-based interface around the underlying socket API.
-func (c *Connector) Run() (<-chan Message, chan Message, <-chan error) {
+func (c *Connector) Run() (<-chan message.Message, chan message.Message, <-chan error) {
 	errors := make(chan error)
-	in := make(chan Message)
-	out := make(chan Message)
+	in := make(chan message.Message)
+	out := make(chan message.Message)
 
 	// Read incoming messages
 	go func() {
@@ -120,13 +121,13 @@ func (c *Connector) Run() (<-chan Message, chan Message, <-chan error) {
 	return in, out, errors
 }
 
-func (c *Connector) Read() (msg Message, err error) {
+func (c *Connector) Read() (msg message.Message, err error) {
 	data, err := c.InSocket.Recv()
 	if err != nil {
 		return msg, err
 	}
 	log.WithField("data", string(data)).Debug("Read data")
-	err = DecodeMessage(data, &msg)
+	err = message.Decode(data, &msg)
 	if err != nil {
 		return msg, err
 	}
@@ -137,7 +138,7 @@ func (c *Connector) Read() (msg Message, err error) {
 	return msg, nil
 }
 
-func (c *Connector) Write(msg Message) (err error) {
+func (c *Connector) Write(msg message.Message) (err error) {
 	data, err := msg.Encode()
 	if err != nil {
 		return err
