@@ -3,18 +3,17 @@ package registry
 import (
 	"github.com/codegangsta/cli"
 	"github.com/loadimpact/speedboat/master"
-	"github.com/loadimpact/speedboat/message"
 	"github.com/loadimpact/speedboat/worker"
 )
 
 // All registered cli commands.
 var GlobalCommands []cli.Command
 
-// All registered master handlers.
-var GlobalHandlers []func(*master.Master, message.Message, chan message.Message) bool
+// All registered master processors.
+var GlobalMasterProcessors []func(*master.Master) master.Processor
 
 // All registered worker processors.
-var GlobalProcessors []func(*worker.Worker, message.Message, chan message.Message) bool
+var GlobalProcessors []func(*worker.Worker) master.Processor
 
 // Register an application subcommand.
 func RegisterCommand(cmd cli.Command) {
@@ -22,11 +21,11 @@ func RegisterCommand(cmd cli.Command) {
 }
 
 // Register a master handler.
-func RegisterHandler(handler func(*master.Master, message.Message, chan message.Message) bool) {
-	GlobalHandlers = append(GlobalHandlers, handler)
+func RegisterMasterProcessor(factory func(*master.Master) master.Processor) {
+	GlobalMasterProcessors = append(GlobalMasterProcessors, factory)
 }
 
 // Register a worker processor.
-func RegisterProcessor(proc func(*worker.Worker, message.Message, chan message.Message) bool) {
-	GlobalProcessors = append(GlobalProcessors, proc)
+func RegisterProcessor(factory func(*worker.Worker) master.Processor) {
+	GlobalProcessors = append(GlobalProcessors, factory)
 }

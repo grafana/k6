@@ -7,8 +7,10 @@ import (
 
 // A Master serves as a semi-intelligent message bus between clients and workers.
 type Master struct {
-	Connector Connector
-	Handlers  []func(*Master, message.Message, chan message.Message) bool
+	Connector  Connector
+	Processors []func(*Master) Processor
+
+	pInstances []Processor
 }
 
 // Creates a new Master, listening on the given in/out addresses.
@@ -26,6 +28,7 @@ func New(outAddr string, inAddr string) (m Master, err error) {
 
 // Runs the main loop for a master.
 func (m *Master) Run() {
+	m.createProcessors()
 	in, out, errors := m.Connector.Run()
 	for {
 		select {
@@ -41,14 +44,19 @@ func (m *Master) Run() {
 				break
 			}
 
-			// Call handlers until we find one that responds
-			for _, handler := range m.Handlers {
-				if handler(m, msg, out) {
-					break
-				}
+			// Let master processors have a stab at them instead
+			for m := range Process(m.pInstances, msg) {
+				out <- m
 			}
 		case err := <-errors:
 			log.WithError(err).Error("Error")
 		}
+	}
+}
+
+func (m *Master) createProcessors() {
+	m.pInstances = []Processor{}
+	for _, fn := range m.Processors {
+		m.pInstances = append(m.pInstances, fn(m))
 	}
 }
