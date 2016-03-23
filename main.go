@@ -3,15 +3,24 @@ package main
 import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
+	"github.com/loadimpact/speedboat/master"
 	"os"
 )
 
 // All registered commands.
 var globalCommands []cli.Command
 
+// All registered master handlers.
+var globalHandlers []func(*master.Master, master.Message, chan master.Message) bool
+
 // Register an application subcommand.
 func registerCommand(cmd cli.Command) {
 	globalCommands = append(globalCommands, cmd)
+}
+
+// Register a master handler
+func registerHandler(handler func(*master.Master, master.Message, chan master.Message) bool) {
+	globalHandlers = append(globalHandlers, handler)
 }
 
 // Configure the global logger.

@@ -13,6 +13,20 @@ func init() {
 		Usage:  "Test command, will be removed",
 		Action: actionPing,
 	})
+	registerHandler(handlePing)
+}
+
+func handlePing(m *master.Master, msg master.Message, out chan master.Message) bool {
+	switch msg.Type {
+	case "ping.ping":
+		out <- master.Message{
+			Type: "ping.pong",
+			Body: msg.Body,
+		}
+		return true
+	default:
+		return false
+	}
 }
 
 func actionPing(c *cli.Context) {
