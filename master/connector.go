@@ -126,7 +126,14 @@ func (c *Connector) Read() (msg Message, err error) {
 		return msg, err
 	}
 	log.WithField("data", string(data)).Debug("Read data")
-	msg, err = DecodeMessage(data)
+	err = DecodeMessage(data, &msg)
+	if err != nil {
+		return msg, err
+	}
+	log.WithFields(log.Fields{
+		"type": msg.Type,
+		"body": msg.Body,
+	}).Debug("Decoded message")
 	return msg, nil
 }
 

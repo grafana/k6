@@ -9,9 +9,8 @@ type Message struct {
 	Body string `json:"body"`
 }
 
-func DecodeMessage(data []byte) (msg Message, err error) {
-	err = json.Unmarshal(data, msg)
-	return msg, err
+func DecodeMessage(data []byte, msg interface{}) (err error) {
+	return json.Unmarshal(data, msg)
 }
 
 func (msg *Message) Encode() ([]byte, error) {
