@@ -35,12 +35,18 @@ func (m *Master) Run() {
 			}).Info("Message Received")
 
 			// Call handlers until we find one that responds
+			handled := false
 			for _, handler := range m.Handlers {
 				if handler(m, msg, out) {
+					handled = true
 					break
 				}
 			}
 
+			// If it's not intended for the master, rebroadcast
+			if !handled {
+				out <- msg
+			}
 		case err := <-errors:
 			log.WithError(err).Error("Error")
 		}
