@@ -1,8 +1,9 @@
-package main
+package actions
 
 import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
+	"github.com/loadimpact/speedboat/actions/registry"
 	"github.com/loadimpact/speedboat/common"
 	"github.com/loadimpact/speedboat/worker"
 )
@@ -10,7 +11,7 @@ import (
 func init() {
 	desc := "A worker executes distributed tasks, and reports back to its master."
 
-	registerCommand(cli.Command{
+	registry.RegisterCommand(cli.Command{
 		Name:        "worker",
 		Usage:       "Runs a worker server for distributed tests",
 		Description: desc,
@@ -39,6 +40,6 @@ func actionWorker(c *cli.Context) {
 		"master": inAddr,
 	}).Info("Worker running")
 
-	worker.Processors = globalProcessors
+	worker.Processors = registry.GlobalProcessors
 	worker.Run()
 }

@@ -1,9 +1,10 @@
-package main
+package actions
 
 import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
+	"github.com/loadimpact/speedboat/actions/registry"
 	"github.com/loadimpact/speedboat/master"
 )
 
@@ -14,7 +15,7 @@ func init() {
 		"must allow access to both of these, or clients will not be able to communicate " +
 		"properly with the master."
 
-	registerCommand(cli.Command{
+	registry.RegisterCommand(cli.Command{
 		Name:        "master",
 		Usage:       "Runs a master server for distributed tests",
 		Description: desc,
@@ -50,6 +51,6 @@ func actionMaster(c *cli.Context) {
 		"pub":  port,
 		"sub":  port + 1,
 	}).Info("Master running")
-	master.Handlers = globalHandlers
+	master.Handlers = registry.GlobalHandlers
 	master.Run()
 }
