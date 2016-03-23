@@ -1,7 +1,7 @@
 package master
 
 import (
-	log "github.com/Sirupsen/logrus"
+	// log "github.com/Sirupsen/logrus"
 	"github.com/go-mangos/mangos"
 	"github.com/go-mangos/mangos/protocol/pub"
 	"github.com/go-mangos/mangos/protocol/sub"
@@ -11,10 +11,8 @@ import (
 
 // A bidirectional pub/sub connector, used to connect to a master.
 type Connector struct {
-	InSocket   mangos.Socket
-	OutSocket  mangos.Socket
-	InChannel  chan string
-	OutChannel chan string
+	InSocket  mangos.Socket
+	OutSocket mangos.Socket
 }
 
 // Creates a bare, unconnected connector.
@@ -26,9 +24,6 @@ func NewBareConnector() (conn Connector, err error) {
 	if conn.InSocket, err = sub.NewSocket(); err != nil {
 		return conn, err
 	}
-
-	conn.InChannel = make(chan string)
-	conn.OutChannel = make(chan string)
 
 	return conn, nil
 }
@@ -92,37 +87,56 @@ func setupAndDial(sock mangos.Socket, addr string) error {
 	return nil
 }
 
-func (c *Connector) Run() (chan string, <-chan error) {
+// Provides a channel-based interface around the underlying socket API.
+func (c *Connector) Run() (<-chan Message, chan Message, <-chan error) {
 	errors := make(chan error)
+	in := make(chan Message)
+	out := make(chan Message)
 
-	// Start a read loop
+	// Read incoming messages
 	go func() {
 		for {
-			log.Debug("-> Connector Read Loop")
-			msg, err := c.InSocket.Recv()
+			msg, err := c.Read()
 			if err != nil {
 				errors <- err
+				continue
 			}
-			c.InChannel <- string(msg)
-			log.Debug("<- Connector Read Loop")
+			in <- msg
 		}
 	}()
 
-	// // Start a write loop
+	// Write outgoing messages
 	go func() {
 		for {
-			log.Debug("-> Connector Write Loop")
-			msg := <-c.OutChannel
-			if err := c.OutSocket.Send([]byte(msg)); err != nil {
+			msg := <-out
+			err := c.Write(msg)
+			if err != nil {
 				errors <- err
+				continue
 			}
-			log.Debug("<- Connector Write Loop")
 		}
 	}()
 
-	return c.InChannel, errors
+	return in, out, errors
 }
 
-func (c *Connector) Send(msg string) {
-	c.OutChannel <- msg
+func (c *Connector) Read() (msg Message, err error) {
+	data, err := c.InSocket.Recv()
+	if err != nil {
+		return msg, err
+	}
+	msg, err = DecodeMessage(data)
+	return msg, nil
+}
+
+func (c *Connector) Write(msg Message) (err error) {
+	body, err := msg.Encode()
+	if err != nil {
+		return err
+	}
+	err = c.OutSocket.Send(body)
+	if err != nil {
+		return err
+	}
+	return nil
 }
