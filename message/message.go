@@ -11,7 +11,7 @@ const WorkerTopic string = "worker" // Subscription topic for workers
 
 // A directed message.
 type Message struct {
-	Topic string `json:"topic"`
+	Topic string `json:"-"`
 	Type  string `json:"type"`
 	Body  string `json:"body"`
 }
@@ -44,8 +44,9 @@ func NewToWorker(t string, b string) Message {
 }
 
 // Decodes a message from wire format.
-func Decode(data []byte, msg interface{}) (err error) {
+func Decode(data []byte, msg *Message) (err error) {
 	nullIndex := bytes.IndexByte(data, 0)
+	msg.Topic = string(data[:nullIndex])
 	return json.Unmarshal(data[nullIndex+1:], msg)
 }
 
