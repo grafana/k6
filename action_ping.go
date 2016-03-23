@@ -35,20 +35,31 @@ func actionPing(c *cli.Context) {
 	if err != nil {
 		log.WithError(err).Fatal("Couldn't create a client")
 	}
-
 	in, out, errors := client.Connector.Run()
+
+	// Send a bunch of noise to filter through
+	out <- master.Message{Type: "ping.noise"}
+	out <- master.Message{Type: "ping.noise"}
+
+	// Send a ping message, server should reply with a pong
 	out <- master.Message{
 		Type: "ping.ping",
 		Body: time.Now().Format("15:04:05 2006-01-02 MST"),
 	}
 
-	select {
-	case reply := <-in:
-		log.WithFields(log.Fields{
-			"type": reply.Type,
-			"body": reply.Body,
-		}).Info("Reply")
-	case err := <-errors:
-		log.WithError(err).Error("Ping failed")
+readLoop:
+	for {
+		select {
+		case msg := <-in:
+			switch msg.Type {
+			case "ping.pong":
+				log.WithFields(log.Fields{
+					"body": msg.Body,
+				}).Info("Pong!")
+				break readLoop
+			}
+		case err := <-errors:
+			log.WithError(err).Error("Ping failed")
+		}
 	}
 }
