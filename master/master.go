@@ -35,18 +35,17 @@ func (m *Master) Run() {
 				"body": msg.Body,
 			}).Info("Message Received")
 
-			// Call handlers until we find one that responds
-			handled := false
-			for _, handler := range m.Handlers {
-				if handler(m, msg, out) {
-					handled = true
-					break
-				}
+			// If it's not intended for the master, rebroadcast
+			if msg.Topic != message.MasterTopic {
+				out <- msg
+				break
 			}
 
-			// If it's not intended for the master, rebroadcast
-			if !handled {
-				out <- msg
+			// Call handlers until we find one that responds
+			for _, handler := range m.Handlers {
+				if handler(m, msg, out) {
+					break
+				}
 			}
 		case err := <-errors:
 			log.WithError(err).Error("Error")

@@ -28,11 +28,8 @@ func init() {
 
 func processPing(w *worker.Worker, msg message.Message, out chan message.Message) bool {
 	switch msg.Type {
-	case "ping.worker.ping":
-		out <- message.Message{
-			Type: "ping.worker.pong",
-			Body: msg.Body,
-		}
+	case "ping.ping":
+		out <- message.NewToClient("ping.pong", msg.Body)
 		return true
 	default:
 		return false
@@ -42,10 +39,7 @@ func processPing(w *worker.Worker, msg message.Message, out chan message.Message
 func handlePing(m *master.Master, msg message.Message, out chan message.Message) bool {
 	switch msg.Type {
 	case "ping.ping":
-		out <- message.Message{
-			Type: "ping.pong",
-			Body: msg.Body,
-		}
+		out <- message.NewToClient("ping.pong", msg.Body)
 		return true
 	default:
 		return false
@@ -64,13 +58,14 @@ func actionPing(c *cli.Context) {
 	out <- message.Message{Type: "ping.noise"}
 
 	// Send a ping message, target should reply with a pong
-	msgType := "ping.ping"
+	msgTopic := message.MasterTopic
 	if c.Bool("worker") {
-		msgType = "ping.worker.ping"
+		msgTopic = message.WorkerTopic
 	}
 	out <- message.Message{
-		Type: msgType,
-		Body: time.Now().Format("15:04:05 2006-01-02 MST"),
+		Topic: msgTopic,
+		Type:  "ping.ping",
+		Body:  time.Now().Format("15:04:05 2006-01-02 MST"),
 	}
 
 readLoop:
@@ -82,11 +77,6 @@ readLoop:
 				log.WithFields(log.Fields{
 					"body": msg.Body,
 				}).Info("Pong!")
-				break readLoop
-			case "ping.worker.pong":
-				log.WithFields(log.Fields{
-					"body": msg.Body,
-				}).Info("Worker Pong!")
 				break readLoop
 			}
 		case err := <-errors:
