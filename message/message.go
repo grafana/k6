@@ -40,7 +40,7 @@ func NewToClient(t string, f Fields) Message {
 // Creates a message directed to workers.
 func NewToWorker(t string, f Fields) Message {
 	return Message{
-		Topic:  ClientTopic,
+		Topic:  WorkerTopic,
 		Type:   t,
 		Fields: f,
 	}
