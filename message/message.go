@@ -11,35 +11,38 @@ const WorkerTopic string = "worker" // Subscription topic for workers
 
 // A directed message.
 type Message struct {
-	Topic string `json:"-"`
-	Type  string `json:"type"`
-	Body  string `json:"body"`
+	Topic  string `json:"-"`
+	Type   string `json:"type"`
+	Fields Fields `json:"fields"`
 }
 
+// A set of fields in a message.
+type Fields map[string]interface{}
+
 // Creates a message directed to the master server.
-func NewToMaster(t string, b string) Message {
+func NewToMaster(t string, f Fields) Message {
 	return Message{
-		Topic: MasterTopic,
-		Type:  t,
-		Body:  b,
+		Topic:  MasterTopic,
+		Type:   t,
+		Fields: f,
 	}
 }
 
 // Creates a message directed to clients.
-func NewToClient(t string, b string) Message {
+func NewToClient(t string, f Fields) Message {
 	return Message{
-		Topic: ClientTopic,
-		Type:  t,
-		Body:  b,
+		Topic:  ClientTopic,
+		Type:   t,
+		Fields: f,
 	}
 }
 
 // Creates a message directed to workers.
-func NewToWorker(t string, b string) Message {
+func NewToWorker(t string, f Fields) Message {
 	return Message{
-		Topic: ClientTopic,
-		Type:  t,
-		Body:  b,
+		Topic:  ClientTopic,
+		Type:   t,
+		Fields: f,
 	}
 }
 

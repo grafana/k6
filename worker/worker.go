@@ -29,8 +29,8 @@ func (w *Worker) Run() {
 		select {
 		case msg := <-in:
 			log.WithFields(log.Fields{
-				"type": msg.Type,
-				"body": msg.Body,
+				"type":   msg.Type,
+				"fields": msg.Fields,
 			}).Info("Message Received")
 
 			// Call handlers until we find one that responds

@@ -141,8 +141,8 @@ func (c *Connector) Read() (msg message.Message, err error) {
 		return msg, err
 	}
 	log.WithFields(log.Fields{
-		"type": msg.Type,
-		"body": msg.Body,
+		"type":   msg.Type,
+		"fields": msg.Fields,
 	}).Debug("Decoded message")
 	return msg, nil
 }
