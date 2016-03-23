@@ -34,7 +34,7 @@ func (w *Worker) Run() {
 			log.WithFields(log.Fields{
 				"type":   msg.Type,
 				"fields": msg.Fields,
-			}).Info("Message Received")
+			}).Debug("Worker Received")
 
 			for m := range master.Process(w.pInstances, msg) {
 				out <- m

@@ -36,7 +36,7 @@ func (m *Master) Run() {
 			log.WithFields(log.Fields{
 				"type":   msg.Type,
 				"fields": msg.Fields,
-			}).Info("Message Received")
+			}).Debug("Master Received")
 
 			// If it's not intended for the master, rebroadcast
 			if msg.Topic != message.MasterTopic {
