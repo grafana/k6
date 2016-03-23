@@ -20,7 +20,7 @@ func main() {
 	cli.VersionFlag.Name = "version"
 	cli.HelpFlag.Name = "help, ?"
 
-	// Bootstrap using commandline flags
+	// Bootstrap using action-registered commandline flags
 	app := cli.NewApp()
 	app.Name = "speedboat"
 	app.Usage = "A next-generation load generator"

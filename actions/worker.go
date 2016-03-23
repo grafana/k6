@@ -23,6 +23,7 @@ func init() {
 	})
 }
 
+// Runs a standalone worker.
 func actionWorker(c *cli.Context) {
 	inAddr, outAddr, local := common.ParseMasterParams(c)
 

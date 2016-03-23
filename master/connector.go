@@ -10,7 +10,7 @@ import (
 	"github.com/loadimpact/speedboat/message"
 )
 
-// A bidirectional pub/sub connector, used to connect to a master.
+// A bidirectional pub/sub connector, used for master-based communication.
 type Connector struct {
 	InSocket  mangos.Socket
 	OutSocket mangos.Socket
@@ -29,6 +29,8 @@ func NewBareConnector() (conn Connector, err error) {
 	return conn, nil
 }
 
+// Creates a connection to the specified master address. It will subscribe to a certain topic and
+// filter out anything unrelated to it, and handles reconnections automatically under the hood.
 func NewClientConnector(topic string, inAddr string, outAddr string) (conn Connector, err error) {
 	if conn, err = NewBareConnector(); err != nil {
 		return conn, err
@@ -48,6 +50,7 @@ func NewClientConnector(topic string, inAddr string, outAddr string) (conn Conne
 	return conn, nil
 }
 
+// Creates a listening connector for a master server. It will accept any incoming messages.
 func NewServerConnector(outAddr string, inAddr string) (conn Connector, err error) {
 	if conn, err = NewBareConnector(); err != nil {
 		return conn, err
@@ -67,11 +70,13 @@ func NewServerConnector(outAddr string, inAddr string) (conn Connector, err erro
 	return conn, nil
 }
 
+// Common setup for a Mangos socket.
 func setupSocket(sock mangos.Socket) {
 	sock.AddTransport(inproc.NewTransport())
 	sock.AddTransport(tcp.NewTransport())
 }
 
+// Performs standard setup and listens on the specified address.
 func setupAndListen(sock mangos.Socket, addr string) error {
 	setupSocket(sock)
 	if err := sock.Listen(addr); err != nil {
@@ -80,6 +85,7 @@ func setupAndListen(sock mangos.Socket, addr string) error {
 	return nil
 }
 
+// Performs standard setup and dials the specified address.
 func setupAndDial(sock mangos.Socket, addr string) error {
 	setupSocket(sock)
 	if err := sock.Dial(addr); err != nil {
@@ -121,6 +127,9 @@ func (c *Connector) Run() (<-chan message.Message, chan message.Message, <-chan 
 	return in, out, errors
 }
 
+// Reads a single message from a connector; CANNOT be used together with Run().
+// Run() will call this by itself under the hood, and if you call it outside as well, you'll create
+// a race condition where only one of Run() and Read() will receive a message.
 func (c *Connector) Read() (msg message.Message, err error) {
 	data, err := c.InSocket.Recv()
 	if err != nil {
@@ -138,6 +147,7 @@ func (c *Connector) Read() (msg message.Message, err error) {
 	return msg, nil
 }
 
+// Writes a single message to a connector.
 func (c *Connector) Write(msg message.Message) (err error) {
 	data, err := msg.Encode()
 	if err != nil {

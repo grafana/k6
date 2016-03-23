@@ -35,6 +35,7 @@ func init() {
 	})
 }
 
+// Runs a master.
 func actionMaster(c *cli.Context) {
 	host := c.String("host")
 	port := c.Int("port")

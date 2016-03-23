@@ -7,7 +7,7 @@ import (
 	"github.com/loadimpact/speedboat/worker"
 )
 
-// All registered commands.
+// All registered cli commands.
 var GlobalCommands []cli.Command
 
 // All registered master handlers.
@@ -21,12 +21,12 @@ func RegisterCommand(cmd cli.Command) {
 	GlobalCommands = append(GlobalCommands, cmd)
 }
 
-// Register a master handler
+// Register a master handler.
 func RegisterHandler(handler func(*master.Master, message.Message, chan message.Message) bool) {
 	GlobalHandlers = append(GlobalHandlers, handler)
 }
 
 // Register a worker processor.
-func RegisterProcessor(processor func(*worker.Worker, message.Message, chan message.Message) bool) {
-	GlobalProcessors = append(GlobalProcessors, processor)
+func RegisterProcessor(proc func(*worker.Worker, message.Message, chan message.Message) bool) {
+	GlobalProcessors = append(GlobalProcessors, proc)
 }

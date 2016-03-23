@@ -33,6 +33,7 @@ func init() {
 	registry.RegisterProcessor(processPing)
 }
 
+// Processes worker pings.
 func processPing(w *worker.Worker, msg message.Message, out chan message.Message) bool {
 	switch msg.Type {
 	case "ping.ping":
@@ -43,6 +44,7 @@ func processPing(w *worker.Worker, msg message.Message, out chan message.Message
 	}
 }
 
+// Handles master pings.
 func handlePing(m *master.Master, msg message.Message, out chan message.Message) bool {
 	switch msg.Type {
 	case "ping.ping":
@@ -53,6 +55,7 @@ func handlePing(m *master.Master, msg message.Message, out chan message.Message)
 	}
 }
 
+// Pings a master or specified workers.
 func actionPing(c *cli.Context) {
 	client, local := common.MustGetClient(c)
 	if local && !c.Bool("local") {
