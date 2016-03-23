@@ -4,6 +4,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
 	"github.com/loadimpact/speedboat/client"
+	"github.com/loadimpact/speedboat/common"
 	"github.com/loadimpact/speedboat/master"
 	"github.com/loadimpact/speedboat/message"
 	"github.com/loadimpact/speedboat/worker"
@@ -13,13 +14,15 @@ import (
 func init() {
 	registerCommand(cli.Command{
 		Name:   "ping",
-		Usage:  "Test command, will be removed",
+		Usage:  "Tests master connectivity",
 		Action: actionPing,
 		Flags: []cli.Flag{
 			cli.BoolFlag{
 				Name:  "worker",
 				Usage: "Pings a worker instead of the master",
 			},
+			common.MasterHostFlag,
+			common.MasterPortFlag,
 		},
 	})
 	registerHandler(handlePing)
@@ -53,11 +56,6 @@ func actionPing(c *cli.Context) {
 	}
 	in, out, errors := client.Connector.Run()
 
-	// Send a bunch of noise to filter through
-	out <- message.Message{Type: "ping.noise"}
-	out <- message.Message{Type: "ping.noise"}
-
-	// Send a ping message, target should reply with a pong
 	msgTopic := message.MasterTopic
 	if c.Bool("worker") {
 		msgTopic = message.WorkerTopic
