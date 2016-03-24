@@ -18,7 +18,7 @@ type LogEntry struct {
 
 type Runner interface {
 	Load(filename, src string) error
-	RunVU() <-chan interface{}
+	RunVU(duration time.Duration) <-chan interface{}
 }
 
 func NewError(err error) interface{} {
@@ -33,7 +33,7 @@ func NewMetric(start time.Time, duration time.Duration) interface{} {
 	return Metric{Start: start, Duration: duration}
 }
 
-func Run(r Runner, vus int) <-chan interface{} {
+func Run(r Runner, vus int, duration time.Duration) <-chan interface{} {
 	ch := make(chan interface{})
 
 	go func() {
@@ -42,7 +42,7 @@ func Run(r Runner, vus int) <-chan interface{} {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				for res := range r.RunVU() {
+				for res := range r.RunVU(duration) {
 					ch <- res
 				}
 			}()
