@@ -100,10 +100,13 @@ readLoop:
 		select {
 		case msg := <-in:
 			switch msg.Type {
-			case "ping.pong":
+			case "run.log":
 				log.WithFields(log.Fields{
 					"time": msg.Fields["time"],
-				}).Info("Pong!")
+					"text": msg.Fields["text"],
+				}).Info("Test Log")
+			case "run.end":
+				log.Info("-- Test End --")
 				break readLoop
 			}
 		case err := <-errors:
