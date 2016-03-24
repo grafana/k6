@@ -3,6 +3,7 @@ package js
 import (
 	"github.com/loadimpact/speedboat/runner"
 	"github.com/robertkrimen/otto"
+	"time"
 )
 
 type JSRunner struct {
@@ -16,7 +17,8 @@ func New() (r *JSRunner, err error) {
 	// Create a base VM
 	r.BaseVM = otto.New()
 
-	// TODO: Bridge functions here
+	// Bridge basic functions
+	r.BaseVM.Set("sleep", jsSleepFactory(time.Sleep))
 
 	return r, nil
 }
@@ -30,13 +32,6 @@ func (r *JSRunner) RunVU() <-chan runner.Result {
 	out := make(chan runner.Result)
 
 	go func() {
-		// out <- runner.Result{
-		// 	Type: "log",
-		// 	LogEntry: runner.LogEntry{
-		// 		Time: time.Now(),
-		// 		Text: "AaaaaaA",
-		// 	},
-		// }
 		vm := r.BaseVM.Copy()
 		vm.Run(r.Script)
 		close(out)
