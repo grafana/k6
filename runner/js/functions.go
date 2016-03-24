@@ -15,3 +15,14 @@ func jsSleepFactory(impl func(time.Duration)) func(otto.FunctionCall) otto.Value
 		return otto.UndefinedValue()
 	}
 }
+
+func jsLogFactory(impl func(string)) func(otto.FunctionCall) otto.Value {
+	return func(call otto.FunctionCall) otto.Value {
+		text, err := call.Argument(0).ToString()
+		if err != nil {
+			text = "[ERROR]"
+		}
+		impl(text)
+		return otto.UndefinedValue()
+	}
+}

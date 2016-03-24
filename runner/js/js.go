@@ -49,6 +49,17 @@ func (r *JSRunner) RunIteration(vm *otto.Otto) <-chan runner.Result {
 	go func() {
 		defer close(out)
 
+		// Log has to be bridged here, as it needs a reference to the channel
+		vm.Set("log", jsLogFactory(func(text string) {
+			out <- runner.Result{
+				Type: "log",
+				LogEntry: runner.LogEntry{
+					Time: time.Now(),
+					Text: text,
+				},
+			}
+		}))
+
 		startTime := time.Now()
 		vm.Run(r.Script)
 		duration := time.Since(startTime)
