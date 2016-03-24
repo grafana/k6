@@ -17,33 +17,25 @@ type LogEntry struct {
 	Text string
 }
 
-// An envelope for a result.
-type Result struct {
-	Type     string
-	Error    error
-	LogEntry LogEntry
-	Metric   Metric
-}
-
 type Runner interface {
 	Load(filename, src string) error
-	RunVU() <-chan Result
+	RunVU() <-chan interface{}
 }
 
-func NewError(err error) {
-	return Result{Type: "error", Error: err}
+func NewError(err error) interface{} {
+	return err
 }
 
-func NewLogEntry(entry LogEntry) {
-	return Result{Type: "log", LogEntry: entry}
+func NewLogEntry(entry LogEntry) interface{} {
+	return entry
 }
 
-func NewMetric(metric Metric) {
-	return Result{Type: "metric", Metric: metric}
+func NewMetric(metric Metric) interface{} {
+	return metric
 }
 
-func Run(r Runner, vus int) <-chan Result {
-	ch := make(chan Result)
+func Run(r Runner, vus int) <-chan interface{} {
+	ch := make(chan interface{})
 
 	go func() {
 		wg := sync.WaitGroup{}

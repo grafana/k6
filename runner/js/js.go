@@ -30,8 +30,8 @@ func (r *JSRunner) Load(filename, src string) (err error) {
 	return err
 }
 
-func (r *JSRunner) RunVU() <-chan runner.Result {
-	out := make(chan runner.Result)
+func (r *JSRunner) RunVU() <-chan interface{} {
+	out := make(chan interface{})
 
 	go func() {
 		defer close(out)
@@ -45,8 +45,8 @@ func (r *JSRunner) RunVU() <-chan runner.Result {
 	return out
 }
 
-func (r *JSRunner) RunIteration(vm *otto.Otto) <-chan runner.Result {
-	out := make(chan runner.Result)
+func (r *JSRunner) RunIteration(vm *otto.Otto) <-chan interface{} {
+	out := make(chan interface{})
 
 	go func() {
 		defer close(out)
