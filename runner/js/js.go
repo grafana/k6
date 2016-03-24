@@ -58,7 +58,7 @@ func (r *JSRunner) RunIteration(vm *otto.Otto) <-chan interface{} {
 
 		// Log has to be bridged here, as it needs a reference to the channel
 		vm.Set("log", jsLogFactory(func(text string) {
-			out <- runner.NewLogEntry(runner.LogEntry{Time: time.Now(), Text: text})
+			out <- runner.NewLogEntry(text)
 		}))
 
 		startTime := time.Now()
@@ -69,7 +69,7 @@ func (r *JSRunner) RunIteration(vm *otto.Otto) <-chan interface{} {
 			out <- runner.NewError(err)
 		}
 
-		out <- runner.NewMetric(runner.Metric{Time: time.Now(), Duration: duration})
+		out <- runner.NewMetric(startTime, duration)
 	}()
 
 	return out

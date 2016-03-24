@@ -7,13 +7,12 @@ import (
 
 // A single metric for a test execution.
 type Metric struct {
-	Time     time.Time
+	Start    time.Time
 	Duration time.Duration
 }
 
 // A user-printed log message.
 type LogEntry struct {
-	Time time.Time
 	Text string
 }
 
@@ -26,12 +25,12 @@ func NewError(err error) interface{} {
 	return err
 }
 
-func NewLogEntry(entry LogEntry) interface{} {
-	return entry
+func NewLogEntry(text string) interface{} {
+	return LogEntry{Text: text}
 }
 
-func NewMetric(metric Metric) interface{} {
-	return metric
+func NewMetric(start time.Time, duration time.Duration) interface{} {
+	return Metric{Start: start, Duration: duration}
 }
 
 func Run(r Runner, vus int) <-chan interface{} {
