@@ -9,8 +9,6 @@ import (
 type Master struct {
 	Connector  Connector
 	Processors []func(*Master) Processor
-
-	pInstances []Processor
 }
 
 // Creates a new Master, listening on the given in/out addresses.
@@ -28,8 +26,8 @@ func New(outAddr string, inAddr string) (m Master, err error) {
 
 // Runs the main loop for a master.
 func (m *Master) Run() {
-	m.createProcessors()
 	in, out, errors := m.Connector.Run()
+	pInstances := m.createProcessors()
 	for {
 		select {
 		case msg := <-in:
@@ -46,7 +44,7 @@ func (m *Master) Run() {
 			}
 
 			// Let master processors have a stab at them instead
-			for m := range Process(m.pInstances, msg) {
+			for m := range Process(pInstances, msg) {
 				out <- m
 			}
 		case err := <-errors:
@@ -55,9 +53,10 @@ func (m *Master) Run() {
 	}
 }
 
-func (m *Master) createProcessors() {
-	m.pInstances = []Processor{}
+func (m *Master) createProcessors() []Processor {
+	pInstances := []Processor{}
 	for _, fn := range m.Processors {
-		m.pInstances = append(m.pInstances, fn(m))
+		pInstances = append(pInstances, fn(m))
 	}
+	return pInstances
 }

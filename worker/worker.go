@@ -10,8 +10,6 @@ import (
 type Worker struct {
 	Connector  master.Connector
 	Processors []func(*Worker) master.Processor
-
-	pInstances []master.Processor
 }
 
 // Creates a new Worker, connecting to a master listening on the given in/out addresses.
@@ -26,8 +24,8 @@ func New(inAddr string, outAddr string) (w Worker, err error) {
 
 // Runs the main loop for a worker.
 func (w *Worker) Run() {
-	w.createProcessors()
 	in, out, errors := w.Connector.Run()
+	pInstances := w.createProcessors()
 	for {
 		select {
 		case msg := <-in:
@@ -36,7 +34,7 @@ func (w *Worker) Run() {
 				"fields": msg.Fields,
 			}).Debug("Worker Received")
 
-			for m := range master.Process(w.pInstances, msg) {
+			for m := range master.Process(pInstances, msg) {
 				out <- m
 			}
 
@@ -46,9 +44,10 @@ func (w *Worker) Run() {
 	}
 }
 
-func (w *Worker) createProcessors() {
-	w.pInstances = []master.Processor{}
+func (w *Worker) createProcessors() []master.Processor {
+	pInstances := []master.Processor{}
 	for _, fn := range w.Processors {
-		w.pInstances = append(w.pInstances, fn(w))
+		pInstances = append(pInstances, fn(w))
 	}
+	return pInstances
 }
