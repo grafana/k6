@@ -71,8 +71,15 @@ func (r *JSRunner) RunIteration(vm *otto.Otto) <-chan runner.Result {
 		}))
 
 		startTime := time.Now()
-		vm.Run(r.Script)
+		_, err := vm.Run(r.Script)
 		duration := time.Since(startTime)
+
+		if err != nil {
+			out <- runner.Result{
+				Type:  "error",
+				Error: err,
+			}
+		}
 
 		out <- runner.Result{
 			Type: "metric",
