@@ -3,6 +3,7 @@ package js
 import (
 	"github.com/loadimpact/speedboat/runner"
 	"github.com/robertkrimen/otto"
+	"net/http"
 	"time"
 )
 
@@ -19,6 +20,7 @@ func New() (r *JSRunner, err error) {
 
 	// Bridge basic functions
 	r.BaseVM.Set("sleep", jsSleepFactory(time.Sleep))
+	r.BaseVM.Set("get", jsHTTPGetFactory(r.BaseVM, http.Get))
 
 	return r, nil
 }
