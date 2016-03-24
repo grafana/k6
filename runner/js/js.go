@@ -32,9 +32,34 @@ func (r *JSRunner) RunVU() <-chan runner.Result {
 	out := make(chan runner.Result)
 
 	go func() {
+		defer close(out)
+
 		vm := r.BaseVM.Copy()
+		for res := range r.RunIteration(vm) {
+			out <- res
+		}
+	}()
+
+	return out
+}
+
+func (r *JSRunner) RunIteration(vm *otto.Otto) <-chan runner.Result {
+	out := make(chan runner.Result)
+
+	go func() {
+		defer close(out)
+
+		startTime := time.Now()
 		vm.Run(r.Script)
-		close(out)
+		duration := time.Since(startTime)
+
+		out <- runner.Result{
+			Type: "metric",
+			Metric: runner.Metric{
+				Time:     time.Now(),
+				Duration: duration,
+			},
+		}
 	}()
 
 	return out
