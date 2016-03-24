@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"sync"
 	"time"
 )
 
@@ -26,5 +27,30 @@ type Result struct {
 }
 
 type Runner interface {
-	Run(filename, src string) <-chan Result
+	Load(filename, src string) error
+	RunVU() <-chan Result
+}
+
+func Run(r Runner, vus int) <-chan Result {
+	ch := make(chan Result)
+
+	go func() {
+		wg := sync.WaitGroup{}
+		for i := 0; i < vus; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for res := range r.RunVU() {
+					ch <- res
+				}
+			}()
+		}
+
+		go func() {
+			wg.Done()
+			close(ch)
+		}()
+	}()
+
+	return ch
 }

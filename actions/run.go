@@ -36,7 +36,10 @@ func (p *RunProcessor) Process(msg message.Message) <-chan message.Message {
 	ch := make(chan message.Message)
 
 	go func() {
-		defer close(ch)
+		defer func() {
+			ch <- message.NewToClient("run.end", message.Fields{})
+			close(ch)
+		}()
 
 		switch msg.Type {
 		case "run.run":
@@ -53,11 +56,16 @@ func (p *RunProcessor) Process(msg message.Message) <-chan message.Message {
 			r, err := js.New()
 			if err != nil {
 				ch <- message.NewToClient("run.error", message.Fields{"error": err})
-				ch <- message.NewToClient("run.end", message.Fields{})
 				break
 			}
 
-			for res := range r.Run(filename, src) {
+			err = r.Load(filename, src)
+			if err != nil {
+				ch <- message.NewToClient("run.error", message.Fields{"error": err})
+				break
+			}
+
+			for res := range runner.Run(r, 1) {
 				switch res.Type {
 				case "log":
 					ch <- message.NewToClient("run.log", message.Fields{
@@ -66,7 +74,6 @@ func (p *RunProcessor) Process(msg message.Message) <-chan message.Message {
 					})
 				}
 			}
-			ch <- message.NewToClient("run.end", message.Fields{})
 		}
 	}()
 
@@ -105,6 +112,10 @@ readLoop:
 					"time": msg.Fields["time"],
 					"text": msg.Fields["text"],
 				}).Info("Test Log")
+			case "run.error":
+				log.WithFields(log.Fields{
+					"error": msg.Fields["error"],
+				}).Error("Script Error")
 			case "run.end":
 				log.Info("-- Test End --")
 				break readLoop

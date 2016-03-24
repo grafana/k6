@@ -35,6 +35,7 @@ func (m *Master) Run() {
 		case msg := <-in:
 			log.WithFields(log.Fields{
 				"type":   msg.Type,
+				"topic":  msg.Topic,
 				"fields": msg.Fields,
 			}).Debug("Master Received")
 
