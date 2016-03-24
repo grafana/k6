@@ -8,7 +8,9 @@ func TestEncodeDecode(t *testing.T) {
 	msg1 := Message{
 		Topic: "test",
 		Type:  "test",
-		Body:  "Abc123",
+		Fields: Fields{
+			"key": "Abc123",
+		},
 	}
 	data, err := msg1.Encode()
 	msg2 := &Message{}
@@ -23,7 +25,7 @@ func TestEncodeDecode(t *testing.T) {
 	if msg2.Type != msg1.Type {
 		t.Errorf("Type mismatch: %s != %s", msg2.Type, msg1.Type)
 	}
-	if msg2.Body != msg2.Body {
-		t.Errorf("Body mismatch: \"%s\" != \"%s\"", msg2.Body, msg1.Body)
+	if msg2.Fields["key"] != msg2.Fields["key"] {
+		t.Errorf("Fields mismatch: \"%s\" != \"%s\"", msg2.Fields, msg1.Fields)
 	}
 }
