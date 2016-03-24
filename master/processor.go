@@ -16,6 +16,7 @@ func Process(processors []Processor, msg message.Message) <-chan message.Message
 	// Dispatch processing across a number of processors, using a WaitGroup to record the
 	// completion of each one
 	for _, processor := range processors {
+		processor := processor
 		wg.Add(1)
 		go func() {
 			// No matter what happens, mark this processor as done once this goroutine returns
