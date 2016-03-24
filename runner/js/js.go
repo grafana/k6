@@ -52,22 +52,13 @@ func (r *JSRunner) RunIteration(vm *otto.Otto) <-chan runner.Result {
 		defer close(out)
 		defer func() {
 			if err := recover(); err != nil {
-				out <- runner.Result{
-					Type:  "error",
-					Error: err.(error),
-				}
+				out <- runner.NewError(err.(error))
 			}
 		}()
 
 		// Log has to be bridged here, as it needs a reference to the channel
 		vm.Set("log", jsLogFactory(func(text string) {
-			out <- runner.Result{
-				Type: "log",
-				LogEntry: runner.LogEntry{
-					Time: time.Now(),
-					Text: text,
-				},
-			}
+			out <- runner.NewLogEntry(runner.LogEntry{Time: time.Now(), Text: text})
 		}))
 
 		startTime := time.Now()
@@ -75,19 +66,10 @@ func (r *JSRunner) RunIteration(vm *otto.Otto) <-chan runner.Result {
 		duration := time.Since(startTime)
 
 		if err != nil {
-			out <- runner.Result{
-				Type:  "error",
-				Error: err,
-			}
+			out <- runner.NewError(err)
 		}
 
-		out <- runner.Result{
-			Type: "metric",
-			Metric: runner.Metric{
-				Time:     time.Now(),
-				Duration: duration,
-			},
-		}
+		out <- runner.NewMetric(runner.Metric{Time: time.Now(), Duration: duration})
 	}()
 
 	return out

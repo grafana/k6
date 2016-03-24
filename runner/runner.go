@@ -30,6 +30,18 @@ type Runner interface {
 	RunVU() <-chan Result
 }
 
+func NewError(err error) {
+	return Result{Type: "error", Error: err}
+}
+
+func NewLogEntry(entry LogEntry) {
+	return Result{Type: "log", LogEntry: entry}
+}
+
+func NewMetric(metric Metric) {
+	return Result{Type: "metric", Metric: metric}
+}
+
 func Run(r Runner, vus int) <-chan Result {
 	ch := make(chan Result)
 
