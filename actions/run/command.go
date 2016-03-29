@@ -18,6 +18,8 @@ func init() {
 		Usage:  "Runs a load test",
 		Action: actionRun,
 		Flags: []cli.Flag{
+			common.MasterHostFlag,
+			common.MasterPortFlag,
 			cli.StringFlag{
 				Name:  "script, s",
 				Usage: "Script file to run",
