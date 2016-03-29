@@ -8,7 +8,6 @@ import (
 	"github.com/loadimpact/speedboat/runner"
 	"github.com/loadimpact/speedboat/runner/js"
 	"github.com/loadimpact/speedboat/worker"
-	"time"
 )
 
 func init() {
@@ -17,28 +16,28 @@ func init() {
 	})
 }
 
-type RunProcessor struct{}
+type RunProcessor struct {
+	// Close this channel to stop the currently running test
+	stopChannel chan interface{}
+}
 
 func (p *RunProcessor) Process(msg message.Message) <-chan message.Message {
 	ch := make(chan message.Message)
 
 	go func() {
-		defer func() {
-			ch <- message.NewToClient("run.end", message.Fields{})
-			close(ch)
-		}()
+		defer close(ch)
 
 		switch msg.Type {
 		case "run.run":
+			p.stopChannel = make(chan interface{})
+
 			filename := msg.Fields["filename"].(string)
 			src := msg.Fields["src"].(string)
 			vus := int(msg.Fields["vus"].(float64))
-			duration := time.Duration(msg.Fields["duration"].(float64)) * time.Millisecond
 
 			log.WithFields(log.Fields{
 				"filename": filename,
 				"vus":      vus,
-				"duration": duration,
 			}).Debug("Running script")
 
 			var r runner.Runner = nil
@@ -55,7 +54,7 @@ func (p *RunProcessor) Process(msg message.Message) <-chan message.Message {
 				break
 			}
 
-			for res := range runner.Run(r, vus, duration) {
+			for res := range runner.Run(r, vus, p.stopChannel) {
 				switch res := res.(type) {
 				case runner.LogEntry:
 					ch <- message.NewToClient("run.log", message.Fields{
@@ -72,6 +71,8 @@ func (p *RunProcessor) Process(msg message.Message) <-chan message.Message {
 					})
 				}
 			}
+		case "run.stop":
+			close(p.stopChannel)
 		}
 	}()
 

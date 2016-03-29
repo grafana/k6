@@ -42,6 +42,8 @@ func actionRun(c *cli.Context) {
 		log.Fatal("No script file specified!")
 	}
 
+	duration := c.Duration("duration")
+
 	filename := c.String("script")
 	srcb, err := ioutil.ReadFile(filename)
 	src := string(srcb)
@@ -55,10 +57,9 @@ func actionRun(c *cli.Context) {
 		"filename": c.String("script"),
 		"src":      src,
 		"vus":      c.Int("vus"),
-		"duration": int64(c.Duration("duration")) / int64(time.Millisecond),
 	})
 
-readLoop:
+	startTime := time.Now()
 	for {
 		select {
 		case msg := <-in:
@@ -76,12 +77,15 @@ readLoop:
 				log.WithFields(log.Fields{
 					"error": msg.Fields["error"],
 				}).Error("Script Error")
-			case "run.end":
-				log.Info("-- Test End --")
-				break readLoop
 			}
 		case err := <-errors:
 			log.WithError(err).Error("Ping failed")
+		}
+
+		if startTime.Add(duration).Before(time.Now()) {
+			out <- message.NewToWorker("run.stop", message.Fields{})
+			log.Info("Test Ended")
+			break
 		}
 	}
 }
