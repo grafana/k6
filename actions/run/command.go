@@ -1,11 +1,13 @@
 package run
 
 import (
+	"errors"
 	log "github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
 	"github.com/loadimpact/speedboat/actions/registry"
 	"github.com/loadimpact/speedboat/common"
 	"github.com/loadimpact/speedboat/message"
+	"github.com/loadimpact/speedboat/runner"
 	"io/ioutil"
 	"time"
 )
@@ -34,6 +36,16 @@ func init() {
 	})
 }
 
+func parseMetric(msg message.Message) (m runner.Metric, err error) {
+	duration, ok := msg.Fields["duration"].(float64)
+	if !ok {
+		return m, errors.New("Duration is not a float64")
+	}
+
+	m.Duration = time.Duration(int64(duration))
+	return m, nil
+}
+
 func actionRun(c *cli.Context) {
 	client, _ := common.MustGetClient(c)
 	in, out, errors := client.Connector.Run()
@@ -60,6 +72,7 @@ func actionRun(c *cli.Context) {
 	})
 
 	startTime := time.Now()
+	sequencer := runner.NewSequencer()
 	for {
 		select {
 		case msg := <-in:
@@ -69,10 +82,18 @@ func actionRun(c *cli.Context) {
 					"text": msg.Fields["text"],
 				}).Info("Test Log")
 			case "run.metric":
+				m, err := parseMetric(msg)
+				if err != nil {
+					log.WithError(err).Error("Couldn't parse metric")
+					break
+				}
+
 				log.WithFields(log.Fields{
-					"start":    msg.Fields["start"],
-					"duration": msg.Fields["duration"],
-				}).Info("Test Metric")
+					"start":    m.Start,
+					"duration": m.Duration,
+				}).Debug("Test Metric")
+
+				sequencer.Add(m)
 			case "run.error":
 				log.WithFields(log.Fields{
 					"error": msg.Fields["error"],
@@ -88,4 +109,13 @@ func actionRun(c *cli.Context) {
 			break
 		}
 	}
+
+	stats := sequencer.Stats()
+	log.WithField("count", sequencer.Count()).Info("Results")
+	log.WithFields(log.Fields{
+		"min": stats.Duration.Min,
+		"max": stats.Duration.Max,
+		"avg": stats.Duration.Avg,
+		"med": stats.Duration.Med,
+	}).Info("Duration")
 }
