@@ -4,10 +4,7 @@ import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
-	"github.com/loadimpact/speedboat/actions/registry"
 	"github.com/loadimpact/speedboat/client"
-	"github.com/loadimpact/speedboat/master"
-	"github.com/loadimpact/speedboat/worker"
 )
 
 // Common flag for specifying a master host.
@@ -40,28 +37,6 @@ func ParseMasterParams(c *cli.Context) (inAddr, outAddr string, local bool) {
 		local = true
 	}
 	return inAddr, outAddr, local
-}
-
-// Runs a local, in-process Master, using all globally registered handlers.
-func RunLocalMaster(inAddr, outAddr string) error {
-	m, err := master.New(inAddr, outAddr)
-	if err != nil {
-		return err
-	}
-	m.Processors = registry.GlobalMasterProcessors
-	go m.Run()
-	return nil
-}
-
-// Runs a local, in-process Worker, using all globally registered processors.
-func RunLocalWorker(inAddr, outAddr string) error {
-	w, err := worker.New(inAddr, outAddr)
-	if err != nil {
-		return err
-	}
-	w.Processors = registry.GlobalProcessors
-	go w.Run()
-	return nil
 }
 
 // MustGetClient returns a connected client, or terminates the program if this fails. It will run
