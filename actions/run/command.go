@@ -50,7 +50,7 @@ func parseMetric(msg message.Message) (m runner.Metric, err error) {
 
 func actionRun(c *cli.Context) {
 	client, _ := common.MustGetClient(c)
-	in, out, errors := client.Connector.Run()
+	in, out, errors := client.Run()
 
 	if !c.IsSet("script") {
 		log.Fatal("No script file specified!")
