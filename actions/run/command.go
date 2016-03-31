@@ -30,10 +30,10 @@ func init() {
 				Usage: "Virtual Users to simulate",
 				Value: 2,
 			},
-			cli.DurationFlag{
+			cli.StringFlag{
 				Name:  "duration, d",
 				Usage: "Duration of the test",
-				Value: time.Duration(10) * time.Second,
+				Value: "10s",
 			},
 		},
 	})
@@ -53,10 +53,6 @@ func actionRun(c *cli.Context) {
 	// client, _ := common.MustGetClient(c)
 	// in, out, errors := client.Run()
 
-	if !c.IsSet("script") && len(c.Args()) == 0 {
-		log.Fatal("No test definitions given!")
-	}
-
 	// duration := c.Duration("duration")
 	// filename := c.String("script")
 
@@ -68,8 +64,24 @@ func actionRun(c *cli.Context) {
 		}
 
 		loadtest.ParseConfig(data, &conf)
-		log.WithField("conf", conf).Info("Config")
 	}
+
+	if c.IsSet("script") {
+		conf.Script = c.String("script")
+	}
+	if c.IsSet("duration") {
+		conf.Duration = c.String("duration")
+	}
+	if c.IsSet("vus") {
+		conf.VUs = c.Int("vus")
+	}
+
+	log.WithField("conf", conf).Info("Config")
+	test, err := conf.Compile()
+	if err != nil {
+		log.WithError(err).Fatal("Invalid test")
+	}
+	log.WithField("test", test).Info("Test")
 
 	// srcb, err := ioutil.ReadFile(filename)
 	// src := string(srcb)
