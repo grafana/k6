@@ -1,3 +1,4 @@
 /speedboat
 
 *.sublime-workspace
+.vagrant
