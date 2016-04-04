@@ -88,10 +88,12 @@ func (t *LoadTest) Run(in <-chan message.Message, out chan message.Message, erro
 					close(oin)
 					break runLoop
 				}
-				out <- message.NewToWorker("run.vus", message.Fields{
-					"vus": vus,
-				})
-				t.currentVUs = vus
+				if vus != t.currentVUs {
+					out <- message.NewToWorker("run.vus", message.Fields{
+						"vus": vus,
+					})
+					t.currentVUs = vus
+				}
 			}
 		}
 	}()
