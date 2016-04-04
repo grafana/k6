@@ -31,9 +31,6 @@ func (p *LoadTestProcessor) Process(msg message.Message) <-chan message.Message 
 		case "test.run":
 			p.stopChannel = make(chan interface{})
 
-			// filename := msg.Fields["filename"].(string)
-			// src := msg.Fields["src"].(string)
-			// vus := int(msg.Fields["vus"].(float64))
 			data := MessageTestRun{}
 			if err := msg.Take(&data); err != nil {
 				ch <- message.ToClient("error").WithError(err)
