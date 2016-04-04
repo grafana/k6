@@ -76,7 +76,7 @@ func (p *LoadTestProcessor) Process(msg message.Message) <-chan message.Message 
 					})
 				}
 			}
-		case "run.stop":
+		case "test.stop":
 			close(p.stopChannel)
 		}
 	}()
