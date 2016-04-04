@@ -32,9 +32,9 @@ func (m *Master) Run() {
 		select {
 		case msg := <-in:
 			log.WithFields(log.Fields{
-				"type":   msg.Type,
-				"topic":  msg.Topic,
-				"fields": msg.Fields,
+				"type":    msg.Type,
+				"topic":   msg.Topic,
+				"payload": msg.Payload,
 			}).Debug("Master Received")
 
 			// If it's not intended for the master, rebroadcast
