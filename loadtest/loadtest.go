@@ -3,6 +3,7 @@ package loadtest
 import (
 	"github.com/loadimpact/speedboat/message"
 	"io/ioutil"
+	"path"
 	"time"
 )
 
@@ -28,8 +29,8 @@ type LoadTest struct {
 	currentVUs   int
 }
 
-func (t *LoadTest) Load() error {
-	srcb, err := ioutil.ReadFile(t.Script)
+func (t *LoadTest) Load(base string) error {
+	srcb, err := ioutil.ReadFile(path.Join(base, t.Script))
 	if err != nil {
 		return err
 	}

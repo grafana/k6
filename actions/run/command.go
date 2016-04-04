@@ -10,6 +10,7 @@ import (
 	"github.com/loadimpact/speedboat/message"
 	"github.com/loadimpact/speedboat/runner"
 	"io/ioutil"
+	"path"
 	"time"
 )
 
@@ -53,9 +54,10 @@ func actionRun(c *cli.Context) {
 	client, _ := common.MustGetClient(c)
 	in, out, errors := client.Run()
 
+	filename := c.Args()[0]
 	conf := loadtest.NewConfig()
 	if len(c.Args()) > 0 {
-		data, err := ioutil.ReadFile(c.Args()[0])
+		data, err := ioutil.ReadFile(filename)
 		if err != nil {
 			log.WithError(err).Fatal("Couldn't read test file")
 		}
@@ -80,7 +82,7 @@ func actionRun(c *cli.Context) {
 	}
 	log.WithField("test", test).Info("Test")
 
-	if err = test.Load(); err != nil {
+	if err = test.Load(path.Dir(filename)); err != nil {
 		log.WithError(err).Fatal("Couldn't load script")
 	}
 
