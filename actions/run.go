@@ -7,11 +7,9 @@ import (
 	"github.com/loadimpact/speedboat/actions/registry"
 	"github.com/loadimpact/speedboat/common"
 	"github.com/loadimpact/speedboat/loadtest"
-	"github.com/loadimpact/speedboat/message"
 	"github.com/loadimpact/speedboat/runner"
 	"io/ioutil"
 	"path"
-	"time"
 )
 
 func init() {
@@ -38,16 +36,6 @@ func init() {
 			},
 		},
 	})
-}
-
-func runParseMetric(msg message.Message) (m runner.Metric, err error) {
-	duration, ok := msg.Fields["duration"].(float64)
-	if !ok {
-		return m, errors.New("Duration is not a float64")
-	}
-
-	m.Duration = time.Duration(int64(duration))
-	return m, nil
 }
 
 func actionRun(c *cli.Context) {
@@ -98,23 +86,28 @@ runLoop:
 			}
 
 			switch msg.Type {
-			case "run.log":
+			case "test.log":
+				entry := runner.LogEntry{}
+				if err := msg.Take(&entry); err != nil {
+					log.WithError(err).Error("Couldn't decode log entry")
+					break
+				}
 				log.WithFields(log.Fields{
-					"text": msg.Fields["text"],
+					"text": entry.Text,
 				}).Info("Test Log")
-			case "run.metric":
-				m, err := runParseMetric(msg)
-				if err != nil {
-					log.WithError(err).Error("Couldn't parse metric")
+			case "test.metric":
+				metric := runner.Metric{}
+				if err := msg.Take(&metric); err != nil {
+					log.WithError(err).Error("Couldn't decode metric")
 					break
 				}
 
 				log.WithFields(log.Fields{
-					"start":    m.Start,
-					"duration": m.Duration,
+					"start":    metric.Start,
+					"duration": metric.Duration,
 				}).Debug("Test Metric")
 
-				sequencer.Add(m)
+				sequencer.Add(metric)
 			case "error":
 				var text string
 				if err := msg.Take(&text); err != nil {
