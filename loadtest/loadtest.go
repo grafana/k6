@@ -37,25 +37,30 @@ func (t *LoadTest) Load() error {
 	return nil
 }
 
-func (t *LoadTest) StageAt(d time.Duration) (stage Stage, stop bool) {
+func (t *LoadTest) StageAt(d time.Duration) (start time.Duration, stage Stage, stop bool) {
 	at := time.Duration(0)
 	for i := range t.Stages {
 		stage = t.Stages[i]
 		if d > at+stage.Duration {
 			at += stage.Duration
 		} else if d < at+stage.Duration {
-			return stage, false
+			return at, stage, false
 		}
 	}
-	return stage, true
+	return at, stage, true
 }
 
 func (t *LoadTest) VUsAt(at time.Duration) (vus int, stop bool) {
-	stage, stop := t.StageAt(at)
+	start, stage, stop := t.StageAt(at)
 	if stop {
 		return 0, true
 	}
-	return stage.VUs.Start, false
+
+	stageElapsed := at - start
+	percentage := (stageElapsed.Seconds() / stage.Duration.Seconds())
+	vus = stage.VUs.Start + int(float64(stage.VUs.End-stage.VUs.Start)*percentage)
+
+	return vus, false
 }
 
 func (t *LoadTest) Run(in <-chan message.Message, out chan message.Message, errors <-chan error) (<-chan message.Message, chan message.Message, <-chan error) {
