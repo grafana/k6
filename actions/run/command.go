@@ -50,11 +50,8 @@ func parseMetric(msg message.Message) (m runner.Metric, err error) {
 }
 
 func actionRun(c *cli.Context) {
-	// client, _ := common.MustGetClient(c)
-	// in, out, errors := client.Run()
-
-	// duration := c.Duration("duration")
-	// filename := c.String("script")
+	client, _ := common.MustGetClient(c)
+	in, out, errors := client.Run()
 
 	conf := loadtest.NewConfig()
 	if len(c.Args()) > 0 {
@@ -83,64 +80,55 @@ func actionRun(c *cli.Context) {
 	}
 	log.WithField("test", test).Info("Test")
 
-	// srcb, err := ioutil.ReadFile(filename)
-	// src := string(srcb)
-	// if err != nil {
-	// 	log.WithError(err).WithFields(log.Fields{
-	// 		"filename": filename,
-	// 	}).Fatal("Couldn't read script")
-	// }
+	if err = test.Load(); err != nil {
+		log.WithError(err).Fatal("Couldn't load script")
+	}
 
-	// 	out <- message.NewToWorker("run.run", message.Fields{
-	// 		"filename": c.String("script"),
-	// 		"src":      src,
-	// 		"vus":      c.Int("vus"),
-	// 	})
+	in, out, errors = test.Run(in, out, errors)
+	sequencer := runner.NewSequencer()
+runLoop:
+	for {
+		select {
+		case msg, ok := <-in:
+			// ok is false if in is closed
+			if !ok {
+				break runLoop
+			}
 
-	// 	timeout := time.After(duration)
-	// 	sequencer := runner.NewSequencer()
-	// runLoop:
-	// 	for {
-	// 		select {
-	// 		case msg := <-in:
-	// 			switch msg.Type {
-	// 			case "run.log":
-	// 				log.WithFields(log.Fields{
-	// 					"text": msg.Fields["text"],
-	// 				}).Info("Test Log")
-	// 			case "run.metric":
-	// 				m, err := parseMetric(msg)
-	// 				if err != nil {
-	// 					log.WithError(err).Error("Couldn't parse metric")
-	// 					break
-	// 				}
+			switch msg.Type {
+			case "run.log":
+				log.WithFields(log.Fields{
+					"text": msg.Fields["text"],
+				}).Info("Test Log")
+			case "run.metric":
+				m, err := parseMetric(msg)
+				if err != nil {
+					log.WithError(err).Error("Couldn't parse metric")
+					break
+				}
 
-	// 				log.WithFields(log.Fields{
-	// 					"start":    m.Start,
-	// 					"duration": m.Duration,
-	// 				}).Debug("Test Metric")
+				log.WithFields(log.Fields{
+					"start":    m.Start,
+					"duration": m.Duration,
+				}).Debug("Test Metric")
 
-	// 				sequencer.Add(m)
-	// 			case "run.error":
-	// 				log.WithFields(log.Fields{
-	// 					"error": msg.Fields["error"],
-	// 				}).Error("Script Error")
-	// 			}
-	// 		case err := <-errors:
-	// 			log.WithError(err).Error("Ping failed")
-	// 		case <-timeout:
-	// 			out <- message.NewToWorker("run.stop", message.Fields{})
-	// 			log.Info("Test Ended")
-	// 			break runLoop
-	// 		}
-	// 	}
+				sequencer.Add(m)
+			case "run.error":
+				log.WithFields(log.Fields{
+					"error": msg.Fields["error"],
+				}).Error("Script Error")
+			}
+		case err := <-errors:
+			log.WithError(err).Error("Error")
+		}
+	}
 
-	// 	stats := sequencer.Stats()
-	// 	log.WithField("count", sequencer.Count()).Info("Results")
-	// 	log.WithFields(log.Fields{
-	// 		"min": stats.Duration.Min,
-	// 		"max": stats.Duration.Max,
-	// 		"avg": stats.Duration.Avg,
-	// 		"med": stats.Duration.Med,
-	// 	}).Info("Duration")
+	stats := sequencer.Stats()
+	log.WithField("count", sequencer.Count()).Info("Results")
+	log.WithFields(log.Fields{
+		"min": stats.Duration.Min,
+		"max": stats.Duration.Max,
+		"avg": stats.Duration.Avg,
+		"med": stats.Duration.Med,
+	}).Info("Duration")
 }

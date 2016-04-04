@@ -2,7 +2,7 @@
 duration: 15s
 
 # Script to run; overridden by the --script CLI flag
-script: google.js
+script: samples/google.js
 
 # Stages allow for more granular control of the test execution
 stages:
