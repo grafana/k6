@@ -25,6 +25,7 @@ type LoadTest struct {
 	Stages []Stage // Test stages.
 
 	scriptSource string
+	currentVUs   int
 }
 
 func (t *LoadTest) Load() error {
@@ -34,6 +35,27 @@ func (t *LoadTest) Load() error {
 	}
 	t.scriptSource = string(srcb)
 	return nil
+}
+
+func (t *LoadTest) StageAt(d time.Duration) (stage Stage, stop bool) {
+	at := time.Duration(0)
+	for i := range t.Stages {
+		stage = t.Stages[i]
+		if d > at+stage.Duration {
+			at += stage.Duration
+		} else if d < at+stage.Duration {
+			return stage, false
+		}
+	}
+	return stage, true
+}
+
+func (t *LoadTest) VUsAt(at time.Duration) (vus int, stop bool) {
+	stage, stop := t.StageAt(at)
+	if stop {
+		return 0, true
+	}
+	return stage.VUs.Start, false
 }
 
 func (t *LoadTest) Run(in <-chan message.Message, out chan message.Message, errors <-chan error) (<-chan message.Message, chan message.Message, <-chan error) {
@@ -46,21 +68,25 @@ func (t *LoadTest) Run(in <-chan message.Message, out chan message.Message, erro
 			"vus":      t.Stages[0].VUs.Start,
 		})
 
-		duration := time.Duration(0)
-		for i := range t.Stages {
-			duration += t.Stages[i].Duration
-		}
-
-		timeout := time.After(duration)
+		startTime := time.Now()
+		intervene := time.Tick(time.Duration(1) * time.Second)
 	runLoop:
 		for {
 			select {
 			case msg := <-in:
 				oin <- msg
-			case <-timeout:
-				out <- message.NewToWorker("run.stop", message.Fields{})
-				close(oin)
-				break runLoop
+			case <-intervene:
+				vus, stop := t.VUsAt(time.Since(startTime))
+				if stop {
+					out <- message.NewToWorker("run.stop", message.Fields{})
+					close(oin)
+					break runLoop
+				}
+				out <- message.NewToWorker("run.vus", message.Fields{
+					"vus": vus,
+				})
+				t.currentVUs = vus
+				println(t.currentVUs)
 			}
 		}
 	}()
