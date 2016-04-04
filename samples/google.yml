@@ -11,7 +11,6 @@ stages:
     vus: [1, 5]
   # Plateau for 100% of the non-fixed duration
   - duration: 100
-    vus: 10
   # Ramp back down again over 5s
   - duration: 5s
     vus: [5, 1]

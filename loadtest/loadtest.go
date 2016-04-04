@@ -91,7 +91,6 @@ func (t *LoadTest) Run(in <-chan message.Message, out chan message.Message, erro
 					"vus": vus,
 				})
 				t.currentVUs = vus
-				println(t.currentVUs)
 			}
 		}
 	}()
