@@ -11,9 +11,10 @@ const WorkerTopic string = "worker" // Subscription topic for workers
 
 // A directed message.
 type Message struct {
-	Topic  string `json:"-"`
-	Type   string `json:"type"`
-	Fields Fields `json:"fields"`
+	Topic   string `json:"-"`
+	Type    string `json:"type"`
+	Fields  Fields `json:"fields,omitempty"`
+	Payload []byte `json:"payload,omitempty"`
 }
 
 // A set of fields in a message.
@@ -44,6 +45,43 @@ func NewToWorker(t string, f Fields) Message {
 		Type:   t,
 		Fields: f,
 	}
+}
+
+func (msg Message) WithPayload(src interface{}) (Message, error) {
+	payload, err := json.Marshal(src)
+	if err != nil {
+		return msg, err
+	}
+	msg.Payload = payload
+	return msg, nil
+}
+
+func (msg Message) With(src interface{}) Message {
+	msg, err := msg.WithPayload(src)
+	if err != nil {
+		panic(err)
+	}
+	return msg
+}
+
+func (msg Message) Take(dst interface{}) error {
+	return json.Unmarshal(msg.Payload, dst)
+}
+
+func To(topic, t string) Message {
+	return Message{Topic: topic, Type: t}
+}
+
+func ToClient(t string) Message {
+	return To(ClientTopic, t)
+}
+
+func ToMaster(t string) Message {
+	return To(MasterTopic, t)
+}
+
+func ToWorker(t string) Message {
+	return To(WorkerTopic, t)
 }
 
 // Decodes a message from wire format.

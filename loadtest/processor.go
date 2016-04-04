@@ -1,4 +1,4 @@
-package run
+package loadtest
 
 import (
 	log "github.com/Sirupsen/logrus"
@@ -12,32 +12,37 @@ import (
 
 func init() {
 	registry.RegisterProcessor(func(*worker.Worker) master.Processor {
-		return &RunProcessor{}
+		return &LoadTestProcessor{}
 	})
 }
 
-type RunProcessor struct {
+type LoadTestProcessor struct {
 	// Close this channel to stop the currently running test
 	stopChannel chan interface{}
 }
 
-func (p *RunProcessor) Process(msg message.Message) <-chan message.Message {
+func (p *LoadTestProcessor) Process(msg message.Message) <-chan message.Message {
 	ch := make(chan message.Message)
 
 	go func() {
 		defer close(ch)
 
 		switch msg.Type {
-		case "run.run":
+		case "test.run":
 			p.stopChannel = make(chan interface{})
 
-			filename := msg.Fields["filename"].(string)
-			src := msg.Fields["src"].(string)
-			vus := int(msg.Fields["vus"].(float64))
+			// filename := msg.Fields["filename"].(string)
+			// src := msg.Fields["src"].(string)
+			// vus := int(msg.Fields["vus"].(float64))
+			data := MessageTestRun{}
+			if err := msg.Take(&data); err != nil {
+				log.WithError(err).Error("Couldn't decode test.run")
+				return
+			}
 
 			log.WithFields(log.Fields{
-				"filename": filename,
-				"vus":      vus,
+				"filename": data.Filename,
+				"vus":      data.VUs,
 			}).Debug("Running script")
 
 			var r runner.Runner = nil
@@ -48,13 +53,13 @@ func (p *RunProcessor) Process(msg message.Message) <-chan message.Message {
 				break
 			}
 
-			err = r.Load(filename, src)
+			err = r.Load(data.Filename, data.Source)
 			if err != nil {
 				ch <- message.NewToClient("run.error", message.Fields{"error": err})
 				break
 			}
 
-			for res := range runner.Run(r, vus, p.stopChannel) {
+			for res := range runner.Run(r, data.VUs, p.stopChannel) {
 				switch res := res.(type) {
 				case runner.LogEntry:
 					ch <- message.NewToClient("run.log", message.Fields{
