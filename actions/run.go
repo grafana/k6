@@ -52,7 +52,7 @@ func runParseMetric(msg message.Message) (m runner.Metric, err error) {
 
 func actionRun(c *cli.Context) {
 	client, _ := common.MustGetClient(c)
-	in, out, errors := client.Run()
+	in, out, errs := client.Run()
 
 	filename := c.Args()[0]
 	conf := loadtest.NewConfig()
@@ -86,7 +86,7 @@ func actionRun(c *cli.Context) {
 		log.WithError(err).Fatal("Couldn't load script")
 	}
 
-	in, out, errors = test.Run(in, out, errors)
+	in, out, errs = test.Run(in, out, errs)
 	sequencer := runner.NewSequencer()
 runLoop:
 	for {
@@ -115,12 +115,15 @@ runLoop:
 				}).Debug("Test Metric")
 
 				sequencer.Add(m)
-			case "run.error":
-				log.WithFields(log.Fields{
-					"error": msg.Fields["error"],
-				}).Error("Script Error")
+			case "error":
+				var text string
+				if err := msg.Take(&text); err != nil {
+					log.WithError(err).Error("Failed to decode error?!")
+				} else {
+					log.WithError(errors.New(text)).Error("Script Error")
+				}
 			}
-		case err := <-errors:
+		case err := <-errs:
 			log.WithError(err).Error("Error")
 		}
 	}

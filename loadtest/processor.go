@@ -36,7 +36,7 @@ func (p *LoadTestProcessor) Process(msg message.Message) <-chan message.Message 
 			// vus := int(msg.Fields["vus"].(float64))
 			data := MessageTestRun{}
 			if err := msg.Take(&data); err != nil {
-				log.WithError(err).Error("Couldn't decode test.run")
+				ch <- message.ToClient("error").WithError(err)
 				return
 			}
 
@@ -49,13 +49,13 @@ func (p *LoadTestProcessor) Process(msg message.Message) <-chan message.Message 
 
 			r, err := js.New()
 			if err != nil {
-				ch <- message.NewToClient("run.error", message.Fields{"error": err})
+				ch <- message.ToClient("error").WithError(err)
 				break
 			}
 
 			err = r.Load(data.Filename, data.Source)
 			if err != nil {
-				ch <- message.NewToClient("run.error", message.Fields{"error": err})
+				ch <- message.ToClient("error").WithError(err)
 				break
 			}
 

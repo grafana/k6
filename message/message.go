@@ -64,6 +64,11 @@ func (msg Message) With(src interface{}) Message {
 	return msg
 }
 
+func (msg Message) WithError(err error) Message {
+	msg.Payload, _ = json.Marshal(err.Error())
+	return msg
+}
+
 func (msg Message) Take(dst interface{}) error {
 	return json.Unmarshal(msg.Payload, dst)
 }
