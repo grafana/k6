@@ -73,45 +73,34 @@ func actionRun(c *cli.Context) {
 		log.WithError(err).Fatal("Couldn't load script")
 	}
 
-	in, out, errs = test.Run(in, out, errs)
+	in, out, _ = test.Run(in, out, errs)
 	sequencer := runner.NewSequencer()
-runLoop:
-	for {
-		select {
-		case msg, ok := <-in:
-			// ok is false if in is closed
-			if !ok {
-				break runLoop
+	for msg := range in {
+		switch msg.Type {
+		case "test.log":
+			entry := runner.LogEntry{}
+			if err := msg.Take(&entry); err != nil {
+				log.WithError(err).Error("Couldn't decode log entry")
+				break
+			}
+			log.WithFields(log.Fields{
+				"text": entry.Text,
+			}).Info("Test Log")
+		case "test.metric":
+			metric := runner.Metric{}
+			if err := msg.Take(&metric); err != nil {
+				log.WithError(err).Error("Couldn't decode metric")
+				break
 			}
 
-			switch msg.Type {
-			case "test.log":
-				entry := runner.LogEntry{}
-				if err := msg.Take(&entry); err != nil {
-					log.WithError(err).Error("Couldn't decode log entry")
-					break
-				}
-				log.WithFields(log.Fields{
-					"text": entry.Text,
-				}).Info("Test Log")
-			case "test.metric":
-				metric := runner.Metric{}
-				if err := msg.Take(&metric); err != nil {
-					log.WithError(err).Error("Couldn't decode metric")
-					break
-				}
+			log.WithFields(log.Fields{
+				"start":    metric.Start,
+				"duration": metric.Duration,
+			}).Debug("Test Metric")
 
-				log.WithFields(log.Fields{
-					"start":    metric.Start,
-					"duration": metric.Duration,
-				}).Debug("Test Metric")
-
-				sequencer.Add(metric)
-			case "error":
-				log.WithError(msg.TakeError()).Error("Test Error")
-			}
-		case err := <-errs:
-			log.WithError(err).Error("Error")
+			sequencer.Add(metric)
+		case "error":
+			log.WithError(msg.TakeError()).Error("Test Error")
 		}
 	}
 
