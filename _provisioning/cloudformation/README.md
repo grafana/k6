@@ -24,7 +24,7 @@ Now you get to enter your access key details.
 aws cloudformation create-stack --stack-name "SpeedboatTest1" --template-body 'file:///Users/ragnarlonn/Downloads/speedboat-test1.json'
 ```
 
-The creation takes about 3 minutes. You can view the progress of the stack creation at https://eu-west-1.console.aws.amazon.com/cloudformation/home?region=eu-west-1#/stacks?stackId=arn:aws:cloudformation:eu-west-1:841028731407:stack%2FSpeedboatTest1%2Fb898d590-fb1f-11e5-80b3-50faeb53b42a&filter=active
+The creation takes about 3 minutes. You can view the progress of the stack creation at https://eu-west-1.console.aws.amazon.com/cloudformation/home?region=eu-west-1#/stacks?filter=active
 
 The public and private IPs for the created servers are returned as Output data from the stack creation. In the above UI you can click the "Outputs" tab to see all output variables from the stack creation. You can also use the CLI:
 
@@ -68,4 +68,8 @@ aws cloudformation describe-stacks --stack-name "SpeedboatTest1"
 }
 
 ```
+
+
+Note that we can only have a certain number of stacks at any one time so even if you e.g. shut down servers or whatnot it is important to also delete the stacks. The simplest thing is to always delete a stack when shutting things down.
+
 
