@@ -24,22 +24,16 @@ func New(inAddr string, outAddr string) (w Worker, err error) {
 
 // Runs the main loop for a worker.
 func (w *Worker) Run() {
-	in, out, errors := w.Connector.Run()
+	in, out, _ := w.Connector.Run()
 	pInstances := w.createProcessors()
-	for {
-		select {
-		case msg := <-in:
-			log.WithFields(log.Fields{
-				"type":    msg.Type,
-				"payload": string(msg.Payload),
-			}).Debug("Worker Received")
+	for msg := range in {
+		log.WithFields(log.Fields{
+			"type":    msg.Type,
+			"payload": string(msg.Payload),
+		}).Debug("Worker Received")
 
-			for m := range master.Process(pInstances, msg) {
-				out <- m
-			}
-
-		case err := <-errors:
-			log.WithError(err).Error("Error")
+		for m := range master.Process(pInstances, msg) {
+			out <- m
 		}
 	}
 }
