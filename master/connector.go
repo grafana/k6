@@ -94,8 +94,7 @@ func setupAndDial(sock mangos.Socket, addr string) error {
 }
 
 // Provides a channel-based interface around the underlying socket API.
-func (c *Connector) Run() (<-chan message.Message, chan message.Message, <-chan error) {
-	errors := make(chan error)
+func (c *Connector) Run() (<-chan message.Message, chan message.Message) {
 	in := make(chan message.Message)
 	out := make(chan message.Message)
 
@@ -123,7 +122,7 @@ func (c *Connector) Run() (<-chan message.Message, chan message.Message, <-chan 
 		}
 	}()
 
-	return in, out, errors
+	return in, out
 }
 
 // Reads a single message from a connector; CANNOT be used together with Run().

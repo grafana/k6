@@ -26,7 +26,7 @@ func New(outAddr string, inAddr string) (m Master, err error) {
 
 // Runs the main loop for a master.
 func (m *Master) Run() {
-	in, out, _ := m.Connector.Run()
+	in, out := m.Connector.Run()
 	pInstances := m.createProcessors()
 	for msg := range in {
 		log.WithFields(log.Fields{

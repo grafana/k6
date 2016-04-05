@@ -64,7 +64,7 @@ func (t *LoadTest) VUsAt(at time.Duration) (vus int, stop bool) {
 	return vus, false
 }
 
-func (t *LoadTest) Run(in <-chan message.Message, out chan message.Message, errors <-chan error) (<-chan message.Message, chan message.Message, <-chan error) {
+func (t *LoadTest) Run(in <-chan message.Message, out chan message.Message) (<-chan message.Message, chan message.Message) {
 	oin := make(chan message.Message)
 
 	go func() {
@@ -96,5 +96,5 @@ func (t *LoadTest) Run(in <-chan message.Message, out chan message.Message, erro
 		}
 	}()
 
-	return oin, out, errors
+	return oin, out
 }

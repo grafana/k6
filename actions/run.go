@@ -39,7 +39,7 @@ func init() {
 
 func actionRun(c *cli.Context) {
 	client, _ := common.MustGetClient(c)
-	in, out, errs := client.Run()
+	in, out := client.Run()
 
 	filename := c.Args()[0]
 	conf := loadtest.NewConfig()
@@ -73,7 +73,7 @@ func actionRun(c *cli.Context) {
 		log.WithError(err).Fatal("Couldn't load script")
 	}
 
-	in, out, _ = test.Run(in, out, errs)
+	in, out = test.Run(in, out)
 	sequencer := runner.NewSequencer()
 	for msg := range in {
 		switch msg.Type {

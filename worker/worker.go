@@ -24,7 +24,7 @@ func New(inAddr string, outAddr string) (w Worker, err error) {
 
 // Runs the main loop for a worker.
 func (w *Worker) Run() {
-	in, out, _ := w.Connector.Run()
+	in, out := w.Connector.Run()
 	pInstances := w.createProcessors()
 	for msg := range in {
 		log.WithFields(log.Fields{

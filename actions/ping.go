@@ -70,7 +70,7 @@ func actionPing(c *cli.Context) {
 		log.Fatal("You're about to ping an in-process system, which doesn't make a lot of sense. You probably want to specify --master=..., or use --local if this is actually what you want.")
 	}
 
-	in, out, _ := client.Connector.Run()
+	in, out := client.Connector.Run()
 
 	topic := message.MasterTopic
 	if c.Bool("worker") {
