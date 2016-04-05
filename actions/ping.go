@@ -70,7 +70,7 @@ func actionPing(c *cli.Context) {
 		log.Fatal("You're about to ping an in-process system, which doesn't make a lot of sense. You probably want to specify --master=..., or use --local if this is actually what you want.")
 	}
 
-	in, out, errors := client.Connector.Run()
+	in, out, _ := client.Connector.Run()
 
 	topic := message.MasterTopic
 	if c.Bool("worker") {
@@ -81,21 +81,16 @@ func actionPing(c *cli.Context) {
 	})
 
 readLoop:
-	for {
-		select {
-		case msg := <-in:
-			switch msg.Type {
-			case "ping.pong":
-				data := PingMessage{}
-				if err := msg.Take(&data); err != nil {
-					log.WithError(err).Error("Couldn't decode pong")
-					break
-				}
-				log.WithField("time", data.Time).Info("Pong!")
-				break readLoop
+	for msg := range in {
+		switch msg.Type {
+		case "ping.pong":
+			data := PingMessage{}
+			if err := msg.Take(&data); err != nil {
+				log.WithError(err).Error("Couldn't decode pong")
+				break
 			}
-		case err := <-errors:
-			log.WithError(err).Error("Ping failed")
+			log.WithField("time", data.Time).Info("Pong!")
+			break readLoop
 		}
 	}
 }
