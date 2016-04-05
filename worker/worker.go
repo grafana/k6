@@ -31,7 +31,7 @@ func (w *Worker) Run() {
 		case msg := <-in:
 			log.WithFields(log.Fields{
 				"type":    msg.Type,
-				"payload": msg.Payload,
+				"payload": string(msg.Payload),
 			}).Debug("Worker Received")
 
 			for m := range master.Process(pInstances, msg) {
