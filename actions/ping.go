@@ -30,15 +30,19 @@ func init() {
 		},
 	})
 	registry.RegisterMasterProcessor(func(*master.Master) master.Processor {
-		return &PingMasterProcessor{}
+		return &PingProcessor{}
 	})
 	registry.RegisterProcessor(func(*worker.Worker) master.Processor {
 		return &PingProcessor{}
 	})
 }
 
-// Processes worker pings.
+// Processes pings, on both master and worker.
 type PingProcessor struct{}
+
+type PingMessage struct {
+	Time time.Time
+}
 
 func (*PingProcessor) Process(msg message.Message) <-chan message.Message {
 	out := make(chan message.Message)
@@ -47,24 +51,12 @@ func (*PingProcessor) Process(msg message.Message) <-chan message.Message {
 		defer close(out)
 		switch msg.Type {
 		case "ping.ping":
-			out <- message.NewToClient("ping.pong", msg.Fields)
-		}
-	}()
-
-	return out
-}
-
-// Processes master pings.
-type PingMasterProcessor struct{}
-
-func (*PingMasterProcessor) Process(msg message.Message) <-chan message.Message {
-	out := make(chan message.Message)
-
-	go func() {
-		defer close(out)
-		switch msg.Type {
-		case "ping.ping":
-			out <- message.NewToClient("ping.pong", msg.Fields)
+			data := PingMessage{}
+			if err := msg.Take(&data); err != nil {
+				out <- message.ToClient("error").WithError(err)
+				break
+			}
+			out <- message.ToClient("ping.pong").With(data)
 		}
 	}()
 
@@ -80,17 +72,13 @@ func actionPing(c *cli.Context) {
 
 	in, out, errors := client.Connector.Run()
 
-	msgTopic := message.MasterTopic
+	topic := message.MasterTopic
 	if c.Bool("worker") {
-		msgTopic = message.WorkerTopic
+		topic = message.WorkerTopic
 	}
-	out <- message.Message{
-		Topic: msgTopic,
-		Type:  "ping.ping",
-		Fields: message.Fields{
-			"time": time.Now().Format("15:04:05 2006-01-02 MST"),
-		},
-	}
+	out <- message.To(topic, "ping.ping").With(PingMessage{
+		Time: time.Now(),
+	})
 
 readLoop:
 	for {
@@ -98,9 +86,12 @@ readLoop:
 		case msg := <-in:
 			switch msg.Type {
 			case "ping.pong":
-				log.WithFields(log.Fields{
-					"time": msg.Fields["time"],
-				}).Info("Pong!")
+				data := PingMessage{}
+				if err := msg.Take(&data); err != nil {
+					log.WithError(err).Error("Couldn't decode pong")
+					break
+				}
+				log.WithField("time", data.Time).Info("Pong!")
 				break readLoop
 			}
 		case err := <-errors:

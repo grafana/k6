@@ -30,8 +30,8 @@ func (w *Worker) Run() {
 		select {
 		case msg := <-in:
 			log.WithFields(log.Fields{
-				"type":   msg.Type,
-				"fields": msg.Fields,
+				"type":    msg.Type,
+				"payload": string(msg.Payload),
 			}).Debug("Worker Received")
 
 			for m := range master.Process(pInstances, msg) {
