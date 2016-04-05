@@ -68,6 +68,7 @@ func (t *LoadTest) Run(in <-chan message.Message, out chan message.Message) (<-c
 	oin := make(chan message.Message)
 
 	go func() {
+		defer close(oin)
 		out <- message.ToWorker("test.run").With(MessageTestRun{
 			Filename: t.Script,
 			Source:   t.scriptSource,
@@ -85,7 +86,6 @@ func (t *LoadTest) Run(in <-chan message.Message, out chan message.Message) (<-c
 				vus, stop := t.VUsAt(time.Since(startTime))
 				if stop {
 					out <- message.ToWorker("test.stop")
-					close(oin)
 					break runLoop
 				}
 				if vus != t.currentVUs {
@@ -94,6 +94,8 @@ func (t *LoadTest) Run(in <-chan message.Message, out chan message.Message) (<-c
 				}
 			}
 		}
+
+		oin <- message.ToClient("test.end")
 	}()
 
 	return oin, out

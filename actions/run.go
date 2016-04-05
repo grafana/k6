@@ -75,6 +75,8 @@ func actionRun(c *cli.Context) {
 
 	in, out = test.Run(in, out)
 	sequencer := runner.NewSequencer()
+
+runLoop:
 	for msg := range in {
 		switch msg.Type {
 		case "test.log":
@@ -99,6 +101,8 @@ func actionRun(c *cli.Context) {
 			}).Debug("Test Metric")
 
 			sequencer.Add(metric)
+		case "test.end":
+			break runLoop
 		case "error":
 			log.WithError(msg.TakeError()).Error("Test Error")
 		}
