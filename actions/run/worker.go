@@ -36,39 +36,8 @@ func (p *LoadTestProcessor) Process(msg comm.Message) <-chan comm.Message {
 				ch <- comm.ToClient("error").WithError(err)
 				return
 			}
-
-			p.controlChannel = make(chan int, 1)
-			p.currentVUs = data.VUs
-
-			log.WithFields(log.Fields{
-				"filename": data.Filename,
-				"vus":      data.VUs,
-			}).Debug("Running script")
-
-			var r runner.Runner = nil
-
-			r, err := js.New()
-			if err != nil {
-				ch <- comm.ToClient("error").WithError(err)
-				break
-			}
-
-			err = r.Load(data.Filename, data.Source)
-			if err != nil {
-				ch <- comm.ToClient("error").WithError(err)
-				break
-			}
-
-			p.controlChannel <- data.VUs
-			for res := range runner.Run(r, p.controlChannel) {
-				switch res := res.(type) {
-				case runner.LogEntry:
-					ch <- comm.ToClient("test.log").With(res)
-				case runner.Metric:
-					ch <- comm.ToClient("test.metric").With(res)
-				case error:
-					ch <- comm.ToClient("error").WithError(res)
-				}
+			for res := range p.ProcessRun(data) {
+				ch <- res
 			}
 		case "test.scale":
 			data := MessageTestScale{}
@@ -76,18 +45,87 @@ func (p *LoadTestProcessor) Process(msg comm.Message) <-chan comm.Message {
 				ch <- comm.ToClient("error").WithError(err)
 				return
 			}
-
-			delta := data.VUs - p.currentVUs
-			log.WithFields(log.Fields{
-				"from":  p.currentVUs,
-				"to":    data.VUs,
-				"delta": delta,
-			}).Debug("Scaling")
-			p.controlChannel <- delta
-			p.currentVUs = data.VUs
+			for res := range p.ProcessScale(data) {
+				ch <- res
+			}
 		case "test.stop":
-			close(p.controlChannel)
+			p.ProcessStop()
 		}
+	}()
+
+	return ch
+}
+
+func (p *LoadTestProcessor) ProcessRun(data MessageTestRun) <-chan comm.Message {
+	ch := make(chan comm.Message)
+
+	go func() {
+		defer close(ch)
+
+		p.controlChannel = make(chan int, 1)
+		p.currentVUs = data.VUs
+
+		log.WithFields(log.Fields{
+			"filename": data.Filename,
+			"vus":      data.VUs,
+		}).Debug("Running script")
+
+		var r runner.Runner = nil
+
+		r, err := js.New()
+		if err != nil {
+			ch <- comm.ToClient("error").WithError(err)
+			break
+		}
+
+		err = r.Load(data.Filename, data.Source)
+		if err != nil {
+			ch <- comm.ToClient("error").WithError(err)
+			break
+		}
+
+		p.controlChannel <- data.VUs
+		for res := range runner.Run(r, p.controlChannel) {
+			switch res := res.(type) {
+			case runner.LogEntry:
+				ch <- comm.ToClient("test.log").With(res)
+			case runner.Metric:
+				ch <- comm.ToClient("test.metric").With(res)
+			case error:
+				ch <- comm.ToClient("error").WithError(res)
+			}
+		}
+	}()
+
+	return ch
+}
+
+func (p *LoadTestProcessor) ProcessScale(data MessageTestScale) <-chan comm.Message {
+	ch := make(chan comm.Message)
+
+	go func() {
+		defer close(ch)
+
+		delta := data.VUs - p.currentVUs
+
+		log.WithFields(log.Fields{
+			"from":  p.currentVUs,
+			"to":    data.VUs,
+			"delta": delta,
+		}).Debug("Scaling")
+
+		p.controlChannel <- delta
+		p.currentVUs = data.VUs
+	}()
+
+	return ch
+}
+
+func (p *LoadTestProcessor) ProcessStop(data MessageTestStop) <-chan comm.Message {
+	ch := make(chan comm.Message)
+
+	go func() {
+		close(p.controlChannel)
 	}()
 
 	return ch

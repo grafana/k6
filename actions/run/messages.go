@@ -9,3 +9,6 @@ type MessageTestRun struct {
 type MessageTestScale struct {
 	VUs int
 }
+
+type MessageTestStop struct {
+}
