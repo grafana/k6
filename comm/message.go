@@ -1,4 +1,4 @@
-package message
+package comm
 
 import (
 	"bytes"
@@ -11,7 +11,7 @@ const ClientTopic string = "client" // Subscription topic for clients
 const MasterTopic string = "master" // Subscription topic for masters
 const WorkerTopic string = "worker" // Subscription topic for workers
 
-// A directed message.
+// A directed comm.
 type Message struct {
 	Topic   string `json:"-"`
 	Type    string `json:"type"`

@@ -2,21 +2,21 @@ package master
 
 import (
 	log "github.com/Sirupsen/logrus"
-	"github.com/loadimpact/speedboat/message"
+	"github.com/loadimpact/speedboat/comm"
 )
 
 // A Master serves as a semi-intelligent message bus between clients and workers.
 type Master struct {
-	Connector  Connector
+	Connector  comm.Connector
 	Processors []func(*Master) Processor
 }
 
 // Creates a new Master, listening on the given in/out addresses.
 // The in/out addresses may be tcp:// or inproc:// addresses.
 // Note that positions of the in/out parameters are swapped compared to client.New(), to make
-// `client.New(a, b)` connect to a master created with `master.New(a, b)`.
+// `client.New(a, b)` connect to a master created with `comm.New(a, b)`.
 func New(outAddr string, inAddr string) (m Master, err error) {
-	m.Connector, err = NewServerConnector(outAddr, inAddr)
+	m.Connector, err = comm.NewServerConnector(outAddr, inAddr)
 	if err != nil {
 		return m, err
 	}
@@ -36,7 +36,7 @@ func (m *Master) Run() {
 		}).Debug("Master Received")
 
 		// If it's not intended for the master, rebroadcast
-		if msg.Topic != message.MasterTopic {
+		if msg.Topic != comm.MasterTopic {
 			out <- msg
 			continue
 		}

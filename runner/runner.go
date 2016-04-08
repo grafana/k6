@@ -11,7 +11,7 @@ type Metric struct {
 	Duration time.Duration
 }
 
-// A user-printed log message.
+// A user-printed log comm.
 type LogEntry struct {
 	Text string
 }

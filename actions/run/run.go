@@ -4,9 +4,9 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
 	"github.com/loadimpact/speedboat/client"
+	"github.com/loadimpact/speedboat/comm"
 	"github.com/loadimpact/speedboat/common"
 	"github.com/loadimpact/speedboat/loadtest"
-	"github.com/loadimpact/speedboat/message"
 	"github.com/loadimpact/speedboat/runner"
 	"io/ioutil"
 	"path"
@@ -75,7 +75,7 @@ func actionRun(c *cli.Context) {
 		log.WithError(err).Fatal("Couldn't load script")
 	}
 
-	out <- message.ToWorker("test.run").With(MessageTestRun{
+	out <- comm.ToWorker("test.run").With(MessageTestRun{
 		Filename: test.Script,
 		Source:   test.Source,
 		VUs:      test.Stages[0].VUs.Start,
@@ -118,11 +118,11 @@ runLoop:
 		case <-intervene:
 			vus, stop := test.VUsAt(time.Since(startTime))
 			if stop {
-				out <- message.ToWorker("test.stop")
+				out <- comm.ToWorker("test.stop")
 				break runLoop
 			}
 			if vus != currentVUs {
-				out <- message.ToWorker("test.scale").With(MessageTestScale{VUs: vus})
+				out <- comm.ToWorker("test.scale").With(MessageTestScale{VUs: vus})
 				currentVUs = vus
 			}
 		}

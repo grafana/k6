@@ -2,20 +2,19 @@ package client
 
 import (
 	// log "github.com/Sirupsen/logrus"
-	"github.com/loadimpact/speedboat/master"
-	"github.com/loadimpact/speedboat/message"
+	"github.com/loadimpact/speedboat/comm"
 )
 
 // A Client controls load test execution.
 type Client struct {
-	Connector master.Connector
+	Connector comm.Connector
 }
 
 // Creates a new Client, connecting to a Master listening on the given in/out addresses.
 // The in/out addresses may be tcp:// or inproc:// addresses; see the documentation for
 // mangos/nanomsg for more information.
 func New(inAddr string, outAddr string) (c Client, err error) {
-	c.Connector, err = master.NewClientConnector(message.ClientTopic, inAddr, outAddr)
+	c.Connector, err = comm.NewClientConnector(comm.ClientTopic, inAddr, outAddr)
 	if err != nil {
 		return c, err
 	}
@@ -23,6 +22,6 @@ func New(inAddr string, outAddr string) (c Client, err error) {
 	return c, err
 }
 
-func (c *Client) Run() (<-chan message.Message, chan message.Message) {
+func (c *Client) Run() (<-chan comm.Message, chan comm.Message) {
 	return c.Connector.Run()
 }

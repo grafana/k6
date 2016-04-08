@@ -1,16 +1,16 @@
 package master
 
 import (
-	"github.com/loadimpact/speedboat/message"
+	"github.com/loadimpact/speedboat/comm"
 	"sync"
 )
 
 type Processor interface {
-	Process(msg message.Message) <-chan message.Message
+	Process(msg comm.Message) <-chan comm.Message
 }
 
-func Process(processors []Processor, msg message.Message) <-chan message.Message {
-	ch := make(chan message.Message)
+func Process(processors []Processor, msg comm.Message) <-chan comm.Message {
+	ch := make(chan comm.Message)
 	wg := sync.WaitGroup{}
 
 	// Dispatch processing across a number of processors, using a WaitGroup to record the

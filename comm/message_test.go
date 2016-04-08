@@ -1,4 +1,4 @@
-package message
+package comm
 
 import (
 	"testing"

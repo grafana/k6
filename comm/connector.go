@@ -1,4 +1,4 @@
-package master
+package comm
 
 import (
 	"github.com/go-mangos/mangos"
@@ -6,7 +6,6 @@ import (
 	"github.com/go-mangos/mangos/protocol/sub"
 	"github.com/go-mangos/mangos/transport/inproc"
 	"github.com/go-mangos/mangos/transport/tcp"
-	"github.com/loadimpact/speedboat/message"
 )
 
 // A bidirectional pub/sub connector, used for master-based communication.
@@ -94,16 +93,16 @@ func setupAndDial(sock mangos.Socket, addr string) error {
 }
 
 // Provides a channel-based interface around the underlying socket API.
-func (c *Connector) Run() (<-chan message.Message, chan message.Message) {
-	in := make(chan message.Message)
-	out := make(chan message.Message)
+func (c *Connector) Run() (<-chan Message, chan Message) {
+	in := make(chan Message)
+	out := make(chan Message)
 
 	// Read incoming messages
 	go func() {
 		for {
 			msg, err := c.Read()
 			if err != nil {
-				in <- message.ToClient("error").WithError(err)
+				in <- ToClient("error").WithError(err)
 				continue
 			}
 			in <- msg
@@ -116,7 +115,7 @@ func (c *Connector) Run() (<-chan message.Message, chan message.Message) {
 			msg := <-out
 			err := c.Write(msg)
 			if err != nil {
-				in <- message.ToClient("error").WithError(err)
+				in <- ToClient("error").WithError(err)
 				continue
 			}
 		}
@@ -127,13 +126,13 @@ func (c *Connector) Run() (<-chan message.Message, chan message.Message) {
 
 // Reads a single message from a connector; CANNOT be used together with Run().
 // Run() will call this by itself under the hood, and if you call it outside as well, you'll create
-// a race condition where only one of Run() and Read() will receive a message.
-func (c *Connector) Read() (msg message.Message, err error) {
+// a race condition where only one of Run() and Read() will receive a comm.
+func (c *Connector) Read() (msg Message, err error) {
 	data, err := c.InSocket.Recv()
 	if err != nil {
 		return msg, err
 	}
-	err = message.Decode(data, &msg)
+	err = Decode(data, &msg)
 	if err != nil {
 		return msg, err
 	}
@@ -141,7 +140,7 @@ func (c *Connector) Read() (msg message.Message, err error) {
 }
 
 // Writes a single message to a connector.
-func (c *Connector) Write(msg message.Message) (err error) {
+func (c *Connector) Write(msg Message) (err error) {
 	data, err := msg.Encode()
 	if err != nil {
 		return err

@@ -2,8 +2,8 @@ package run
 
 import (
 	log "github.com/Sirupsen/logrus"
+	"github.com/loadimpact/speedboat/comm"
 	"github.com/loadimpact/speedboat/master"
-	"github.com/loadimpact/speedboat/message"
 	"github.com/loadimpact/speedboat/runner"
 	"github.com/loadimpact/speedboat/runner/js"
 	"github.com/loadimpact/speedboat/worker"
@@ -24,8 +24,8 @@ type LoadTestProcessor struct {
 	currentVUs int
 }
 
-func (p *LoadTestProcessor) Process(msg message.Message) <-chan message.Message {
-	ch := make(chan message.Message)
+func (p *LoadTestProcessor) Process(msg comm.Message) <-chan comm.Message {
+	ch := make(chan comm.Message)
 
 	go func() {
 		defer close(ch)
@@ -34,7 +34,7 @@ func (p *LoadTestProcessor) Process(msg message.Message) <-chan message.Message 
 		case "test.run":
 			data := MessageTestRun{}
 			if err := msg.Take(&data); err != nil {
-				ch <- message.ToClient("error").WithError(err)
+				ch <- comm.ToClient("error").WithError(err)
 				return
 			}
 
@@ -50,13 +50,13 @@ func (p *LoadTestProcessor) Process(msg message.Message) <-chan message.Message 
 
 			r, err := js.New()
 			if err != nil {
-				ch <- message.ToClient("error").WithError(err)
+				ch <- comm.ToClient("error").WithError(err)
 				break
 			}
 
 			err = r.Load(data.Filename, data.Source)
 			if err != nil {
-				ch <- message.ToClient("error").WithError(err)
+				ch <- comm.ToClient("error").WithError(err)
 				break
 			}
 
@@ -64,17 +64,17 @@ func (p *LoadTestProcessor) Process(msg message.Message) <-chan message.Message 
 			for res := range runner.Run(r, p.controlChannel) {
 				switch res := res.(type) {
 				case runner.LogEntry:
-					ch <- message.ToClient("test.log").With(res)
+					ch <- comm.ToClient("test.log").With(res)
 				case runner.Metric:
-					ch <- message.ToClient("test.metric").With(res)
+					ch <- comm.ToClient("test.metric").With(res)
 				case error:
-					ch <- message.ToClient("error").WithError(res)
+					ch <- comm.ToClient("error").WithError(res)
 				}
 			}
 		case "test.scale":
 			data := MessageTestScale{}
 			if err := msg.Take(&data); err != nil {
-				ch <- message.ToClient("error").WithError(err)
+				ch <- comm.ToClient("error").WithError(err)
 				return
 			}
 
