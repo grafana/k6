@@ -17,8 +17,12 @@ func init() {
 }
 
 type LoadTestProcessor struct {
-	// Close this channel to stop the currently running test
-	stopChannel chan interface{}
+	// Write a positive number to this to spawn so many VUs, negative to kill
+	// that many. Close it to kill all VUs and end the running test.
+	controlChannel chan int
+
+	// Counter for how many VUs we currently have running.
+	currentVUs int
 }
 
 func (p *LoadTestProcessor) Process(msg message.Message) <-chan message.Message {
@@ -29,13 +33,14 @@ func (p *LoadTestProcessor) Process(msg message.Message) <-chan message.Message 
 
 		switch msg.Type {
 		case "test.run":
-			p.stopChannel = make(chan interface{})
-
 			data := MessageTestRun{}
 			if err := msg.Take(&data); err != nil {
 				ch <- message.ToClient("error").WithError(err)
 				return
 			}
+
+			p.controlChannel = make(chan int, 1)
+			p.currentVUs = data.VUs
 
 			log.WithFields(log.Fields{
 				"filename": data.Filename,
@@ -56,7 +61,8 @@ func (p *LoadTestProcessor) Process(msg message.Message) <-chan message.Message 
 				break
 			}
 
-			for res := range runner.Run(r, data.VUs, p.stopChannel) {
+			p.controlChannel <- data.VUs
+			for res := range runner.Run(r, p.controlChannel) {
 				switch res := res.(type) {
 				case runner.LogEntry:
 					ch <- message.ToClient("test.log").With(res)
@@ -66,8 +72,23 @@ func (p *LoadTestProcessor) Process(msg message.Message) <-chan message.Message 
 					ch <- message.ToClient("error").WithError(res)
 				}
 			}
+		case "test.scale":
+			data := MessageTestScale{}
+			if err := msg.Take(&data); err != nil {
+				ch <- message.ToClient("error").WithError(err)
+				return
+			}
+
+			delta := data.VUs - p.currentVUs
+			log.WithFields(log.Fields{
+				"from":  p.currentVUs,
+				"to":    data.VUs,
+				"delta": delta,
+			}).Debug("Scaling")
+			p.controlChannel <- delta
+			p.currentVUs = data.VUs
 		case "test.stop":
-			close(p.stopChannel)
+			close(p.controlChannel)
 		}
 	}()
 
