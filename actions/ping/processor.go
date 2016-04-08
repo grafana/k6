@@ -1,7 +1,6 @@
 package ping
 
 import (
-	"github.com/codegangsta/cli"
 	"github.com/loadimpact/speedboat/comm"
 	"github.com/loadimpact/speedboat/master"
 	"github.com/loadimpact/speedboat/worker"
@@ -19,7 +18,7 @@ func init() {
 // Processes pings, on both master and worker.
 type PingProcessor struct{}
 
-func (*PingProcessor) Process(msg comm.Message) <-chan comm.Message {
+func (p *PingProcessor) Process(msg comm.Message) <-chan comm.Message {
 	out := make(chan comm.Message)
 
 	go func() {
@@ -31,9 +30,23 @@ func (*PingProcessor) Process(msg comm.Message) <-chan comm.Message {
 				out <- comm.ToClient("error").WithError(err)
 				break
 			}
-			out <- comm.ToClient("ping.pong").With(data)
+			for res := range p.ProcessPing(data) {
+				out <- res
+			}
 		}
 	}()
 
 	return out
+}
+
+func (p *PingProcessor) ProcessPing(data PingMessage) <-chan comm.Message {
+	ch := make(chan comm.Message)
+
+	go func() {
+		defer close(ch)
+
+		ch <- comm.ToClient("ping.pong").With(data)
+	}()
+
+	return ch
 }
