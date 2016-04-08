@@ -5,9 +5,9 @@ import (
 	"github.com/codegangsta/cli"
 	"github.com/loadimpact/speedboat/client"
 	"github.com/loadimpact/speedboat/comm"
-	"github.com/loadimpact/speedboat/common"
 	"github.com/loadimpact/speedboat/loadtest"
 	"github.com/loadimpact/speedboat/runner"
+	"github.com/loadimpact/speedboat/util"
 	"io/ioutil"
 	"path"
 	"time"
@@ -19,8 +19,8 @@ func init() {
 		Usage:  "Runs a load test",
 		Action: actionRun,
 		Flags: []cli.Flag{
-			common.MasterHostFlag,
-			common.MasterPortFlag,
+			util.MasterHostFlag,
+			util.MasterPortFlag,
 			cli.StringFlag{
 				Name:  "script, s",
 				Usage: "Script file to run",
@@ -40,7 +40,7 @@ func init() {
 }
 
 func actionRun(c *cli.Context) {
-	ct, _ := common.MustGetClient(c)
+	ct, _ := util.MustGetClient(c)
 	in, out := ct.Run()
 
 	base := ""

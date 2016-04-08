@@ -4,7 +4,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
 	"github.com/loadimpact/speedboat/client"
-	"github.com/loadimpact/speedboat/common"
+	"github.com/loadimpact/speedboat/util"
 	"github.com/loadimpact/speedboat/worker"
 )
 
@@ -16,8 +16,8 @@ func init() {
 		Usage:       "Runs a worker server for distributed tests",
 		Description: desc,
 		Flags: []cli.Flag{
-			common.MasterHostFlag,
-			common.MasterPortFlag,
+			util.MasterHostFlag,
+			util.MasterPortFlag,
 		},
 		Action: actionWorker,
 	})
@@ -25,7 +25,7 @@ func init() {
 
 // Runs a standalone worker.
 func actionWorker(c *cli.Context) {
-	inAddr, outAddr, local := common.ParseMasterParams(c)
+	inAddr, outAddr, local := util.ParseMasterParams(c)
 
 	// Running a standalone worker without a master doesn't make any sense
 	if local {

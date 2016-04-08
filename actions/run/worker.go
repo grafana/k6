@@ -3,8 +3,8 @@ package run
 import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/speedboat/comm"
-	"github.com/loadimpact/speedboat/common"
 	"github.com/loadimpact/speedboat/runner"
+	"github.com/loadimpact/speedboat/util"
 	"github.com/loadimpact/speedboat/worker"
 )
 
@@ -74,7 +74,7 @@ func (p *LoadTestProcessor) ProcessRun(data MessageTestRun) <-chan comm.Message 
 
 		var r runner.Runner = nil
 
-		r, err := common.GetRunner(data.Filename)
+		r, err := util.GetRunner(data.Filename)
 		if err != nil {
 			ch <- comm.ToClient("error").WithError(err)
 			return

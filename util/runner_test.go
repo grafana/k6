@@ -1,4 +1,4 @@
-package common
+package util
 
 import (
 	"github.com/loadimpact/speedboat/runner/js"
