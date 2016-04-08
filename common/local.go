@@ -1,7 +1,6 @@
 package common
 
 import (
-	"github.com/loadimpact/speedboat/actions/registry"
 	"github.com/loadimpact/speedboat/master"
 	"github.com/loadimpact/speedboat/worker"
 )
@@ -12,7 +11,7 @@ func RunLocalMaster(inAddr, outAddr string) error {
 	if err != nil {
 		return err
 	}
-	m.Processors = registry.GlobalMasterProcessors
+	m.Processors = master.GlobalProcessors
 	go m.Run()
 	return nil
 }
@@ -23,7 +22,7 @@ func RunLocalWorker(inAddr, outAddr string) error {
 	if err != nil {
 		return err
 	}
-	w.Processors = registry.GlobalProcessors
+	w.Processors = worker.GlobalProcessors
 	go w.Run()
 	return nil
 }

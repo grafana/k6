@@ -4,7 +4,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
 	_ "github.com/loadimpact/speedboat/actions"
-	"github.com/loadimpact/speedboat/actions/registry"
+	"github.com/loadimpact/speedboat/client"
 	"os"
 )
 
@@ -31,7 +31,7 @@ func main() {
 			Usage: "More verbose output",
 		},
 	}
-	app.Commands = registry.GlobalCommands
+	app.Commands = client.GlobalCommands
 	app.Before = func(c *cli.Context) error {
 		configureLogging(c)
 		return nil

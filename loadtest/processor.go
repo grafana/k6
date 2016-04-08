@@ -2,7 +2,6 @@ package loadtest
 
 import (
 	log "github.com/Sirupsen/logrus"
-	"github.com/loadimpact/speedboat/actions/registry"
 	"github.com/loadimpact/speedboat/master"
 	"github.com/loadimpact/speedboat/message"
 	"github.com/loadimpact/speedboat/runner"
@@ -11,7 +10,7 @@ import (
 )
 
 func init() {
-	registry.RegisterProcessor(func(*worker.Worker) master.Processor {
+	worker.RegisterProcessor(func(*worker.Worker) master.Processor {
 		return &LoadTestProcessor{}
 	})
 }

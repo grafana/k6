@@ -3,7 +3,7 @@ package run
 import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
-	"github.com/loadimpact/speedboat/actions/registry"
+	"github.com/loadimpact/speedboat/client"
 	"github.com/loadimpact/speedboat/common"
 	"github.com/loadimpact/speedboat/loadtest"
 	"github.com/loadimpact/speedboat/runner"
@@ -12,7 +12,7 @@ import (
 )
 
 func init() {
-	registry.RegisterCommand(cli.Command{
+	client.RegisterCommand(cli.Command{
 		Name:   "run",
 		Usage:  "Runs a load test",
 		Action: actionRun,
@@ -38,8 +38,8 @@ func init() {
 }
 
 func actionRun(c *cli.Context) {
-	client, _ := common.MustGetClient(c)
-	in, out := client.Run()
+	ct, _ := common.MustGetClient(c)
+	in, out := ct.Run()
 
 	filename := c.Args()[0]
 	conf := loadtest.NewConfig()
