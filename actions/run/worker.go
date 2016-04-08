@@ -1,4 +1,4 @@
-package loadtest
+package run
 
 import (
 	log "github.com/Sirupsen/logrus"

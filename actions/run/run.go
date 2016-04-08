@@ -6,9 +6,11 @@ import (
 	"github.com/loadimpact/speedboat/client"
 	"github.com/loadimpact/speedboat/common"
 	"github.com/loadimpact/speedboat/loadtest"
+	"github.com/loadimpact/speedboat/message"
 	"github.com/loadimpact/speedboat/runner"
 	"io/ioutil"
 	"path"
+	"time"
 )
 
 func init() {
@@ -73,38 +75,56 @@ func actionRun(c *cli.Context) {
 		log.WithError(err).Fatal("Couldn't load script")
 	}
 
-	in, out = test.Run(in, out)
+	out <- message.ToWorker("test.run").With(MessageTestRun{
+		Filename: test.Script,
+		Source:   test.Source,
+		VUs:      test.Stages[0].VUs.Start,
+	})
+
+	startTime := time.Now()
+	intervene := time.Tick(time.Duration(1) * time.Second)
 	sequencer := runner.NewSequencer()
-
+	currentVUs := 0
 runLoop:
-	for msg := range in {
-		switch msg.Type {
-		case "test.log":
-			entry := runner.LogEntry{}
-			if err := msg.Take(&entry); err != nil {
-				log.WithError(err).Error("Couldn't decode log entry")
-				break
-			}
-			log.WithFields(log.Fields{
-				"text": entry.Text,
-			}).Info("Test Log")
-		case "test.metric":
-			metric := runner.Metric{}
-			if err := msg.Take(&metric); err != nil {
-				log.WithError(err).Error("Couldn't decode metric")
-				break
-			}
+	for {
+		select {
+		case msg := <-in:
+			switch msg.Type {
+			case "test.log":
+				entry := runner.LogEntry{}
+				if err := msg.Take(&entry); err != nil {
+					log.WithError(err).Error("Couldn't decode log entry")
+					break
+				}
+				log.WithFields(log.Fields{
+					"text": entry.Text,
+				}).Info("Test Log")
+			case "test.metric":
+				metric := runner.Metric{}
+				if err := msg.Take(&metric); err != nil {
+					log.WithError(err).Error("Couldn't decode metric")
+					break
+				}
 
-			log.WithFields(log.Fields{
-				"start":    metric.Start,
-				"duration": metric.Duration,
-			}).Debug("Test Metric")
+				log.WithFields(log.Fields{
+					"start":    metric.Start,
+					"duration": metric.Duration,
+				}).Debug("Test Metric")
 
-			sequencer.Add(metric)
-		case "test.end":
-			break runLoop
-		case "error":
-			log.WithError(msg.TakeError()).Error("Test Error")
+				sequencer.Add(metric)
+			case "error":
+				log.WithError(msg.TakeError()).Error("Test Error")
+			}
+		case <-intervene:
+			vus, stop := test.VUsAt(time.Since(startTime))
+			if stop {
+				out <- message.ToWorker("test.stop")
+				break runLoop
+			}
+			if vus != currentVUs {
+				out <- message.ToWorker("test.scale").With(MessageTestScale{VUs: vus})
+				currentVUs = vus
+			}
 		}
 	}
 

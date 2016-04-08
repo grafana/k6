@@ -1,4 +1,4 @@
-package loadtest
+package run
 
 type MessageTestRun struct {
 	Filename string

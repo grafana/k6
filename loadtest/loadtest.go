@@ -1,7 +1,6 @@
 package loadtest
 
 import (
-	"github.com/loadimpact/speedboat/message"
 	"io/ioutil"
 	"path"
 	"time"
@@ -25,8 +24,7 @@ type LoadTest struct {
 	URL    string  // URL for simple tests.
 	Stages []Stage // Test stages.
 
-	scriptSource string
-	currentVUs   int
+	Source string // Script source
 }
 
 func (t *LoadTest) Load(base string) error {
@@ -34,7 +32,7 @@ func (t *LoadTest) Load(base string) error {
 	if err != nil {
 		return err
 	}
-	t.scriptSource = string(srcb)
+	t.Source = string(srcb)
 	return nil
 }
 
@@ -62,41 +60,4 @@ func (t *LoadTest) VUsAt(at time.Duration) (vus int, stop bool) {
 	vus = stage.VUs.Start + int(float64(stage.VUs.End-stage.VUs.Start)*percentage)
 
 	return vus, false
-}
-
-func (t *LoadTest) Run(in <-chan message.Message, out chan message.Message) (<-chan message.Message, chan message.Message) {
-	oin := make(chan message.Message)
-
-	go func() {
-		defer close(oin)
-		out <- message.ToWorker("test.run").With(MessageTestRun{
-			Filename: t.Script,
-			Source:   t.scriptSource,
-			VUs:      t.Stages[0].VUs.Start,
-		})
-
-		startTime := time.Now()
-		intervene := time.Tick(time.Duration(1) * time.Second)
-	runLoop:
-		for {
-			select {
-			case msg := <-in:
-				oin <- msg
-			case <-intervene:
-				vus, stop := t.VUsAt(time.Since(startTime))
-				if stop {
-					out <- message.ToWorker("test.stop")
-					break runLoop
-				}
-				if vus != t.currentVUs {
-					out <- message.ToWorker("test.scale").With(MessageTestScale{VUs: vus})
-					t.currentVUs = vus
-				}
-			}
-		}
-
-		oin <- message.ToClient("test.end")
-	}()
-
-	return oin, out
 }
