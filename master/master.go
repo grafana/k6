@@ -42,9 +42,11 @@ func (m *Master) Run() {
 		}
 
 		// Let master processors have a stab at them instead
-		for m := range Process(pInstances, msg) {
-			out <- m
-		}
+		go func() {
+			for m := range Process(pInstances, msg) {
+				out <- m
+			}
+		}()
 	}
 }
 

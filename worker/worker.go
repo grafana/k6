@@ -32,9 +32,11 @@ func (w *Worker) Run() {
 			"payload": string(msg.Payload),
 		}).Debug("Worker Received")
 
-		for m := range master.Process(pInstances, msg) {
-			out <- m
-		}
+		go func() {
+			for m := range master.Process(pInstances, msg) {
+				out <- m
+			}
+		}()
 	}
 }
 
