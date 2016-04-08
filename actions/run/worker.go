@@ -3,8 +3,8 @@ package run
 import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/speedboat/comm"
+	"github.com/loadimpact/speedboat/common"
 	"github.com/loadimpact/speedboat/runner"
-	"github.com/loadimpact/speedboat/runner/js"
 	"github.com/loadimpact/speedboat/worker"
 )
 
@@ -49,7 +49,9 @@ func (p *LoadTestProcessor) Process(msg comm.Message) <-chan comm.Message {
 				ch <- res
 			}
 		case "test.stop":
-			p.ProcessStop()
+			for res := range p.ProcessStop(MessageTestStop{}) {
+				ch <- res
+			}
 		}
 	}()
 
@@ -72,16 +74,16 @@ func (p *LoadTestProcessor) ProcessRun(data MessageTestRun) <-chan comm.Message 
 
 		var r runner.Runner = nil
 
-		r, err := runner.Get(data.Filename)
+		r, err := common.GetRunner(data.Filename)
 		if err != nil {
 			ch <- comm.ToClient("error").WithError(err)
-			break
+			return
 		}
 
 		err = r.Load(data.Filename, data.Source)
 		if err != nil {
 			ch <- comm.ToClient("error").WithError(err)
-			break
+			return
 		}
 
 		p.controlChannel <- data.VUs
@@ -125,6 +127,8 @@ func (p *LoadTestProcessor) ProcessStop(data MessageTestStop) <-chan comm.Messag
 	ch := make(chan comm.Message)
 
 	go func() {
+		defer close(ch)
+
 		close(p.controlChannel)
 	}()
 

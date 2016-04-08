@@ -43,9 +43,11 @@ func actionRun(c *cli.Context) {
 	ct, _ := common.MustGetClient(c)
 	in, out := ct.Run()
 
-	filename := c.Args()[0]
+	base := ""
 	conf := loadtest.NewConfig()
 	if len(c.Args()) > 0 {
+		filename := c.Args()[0]
+		base = path.Dir(filename)
 		data, err := ioutil.ReadFile(filename)
 		if err != nil {
 			log.WithError(err).Fatal("Couldn't read test file")
@@ -56,6 +58,7 @@ func actionRun(c *cli.Context) {
 
 	if c.IsSet("script") {
 		conf.Script = c.String("script")
+		base = "."
 	}
 	if c.IsSet("duration") {
 		conf.Duration = c.String("duration")
@@ -71,7 +74,7 @@ func actionRun(c *cli.Context) {
 	}
 	log.WithField("test", test).Info("Test")
 
-	if err = test.Load(path.Dir(filename)); err != nil {
+	if err = test.Load(base); err != nil {
 		log.WithError(err).Fatal("Couldn't load script")
 	}
 
