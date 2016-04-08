@@ -72,7 +72,7 @@ func (p *LoadTestProcessor) ProcessRun(data MessageTestRun) <-chan comm.Message 
 
 		var r runner.Runner = nil
 
-		r, err := js.New()
+		r, err := runner.Get(data.Filename)
 		if err != nil {
 			ch <- comm.ToClient("error").WithError(err)
 			break
