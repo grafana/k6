@@ -3,14 +3,13 @@ package run
 import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/speedboat/comm"
-	"github.com/loadimpact/speedboat/master"
 	"github.com/loadimpact/speedboat/runner"
 	"github.com/loadimpact/speedboat/runner/js"
 	"github.com/loadimpact/speedboat/worker"
 )
 
 func init() {
-	worker.RegisterProcessor(func(*worker.Worker) master.Processor {
+	worker.RegisterProcessor(func(*worker.Worker) comm.Processor {
 		return &LoadTestProcessor{}
 	})
 }

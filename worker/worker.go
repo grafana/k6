@@ -3,13 +3,12 @@ package worker
 import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/speedboat/comm"
-	"github.com/loadimpact/speedboat/master"
 )
 
 // A Worker executes distributed tasks, communicating over a Master.
 type Worker struct {
 	Connector  comm.Connector
-	Processors []func(*Worker) master.Processor
+	Processors []func(*Worker) comm.Processor
 }
 
 // Creates a new Worker, connecting to a master listening on the given in/out addresses.
@@ -33,15 +32,15 @@ func (w *Worker) Run() {
 		}).Debug("Worker Received")
 
 		go func() {
-			for m := range master.Process(pInstances, msg) {
+			for m := range comm.Process(pInstances, msg) {
 				out <- m
 			}
 		}()
 	}
 }
 
-func (w *Worker) createProcessors() []master.Processor {
-	pInstances := []master.Processor{}
+func (w *Worker) createProcessors() []comm.Processor {
+	pInstances := []comm.Processor{}
 	for _, fn := range w.Processors {
 		pInstances = append(pInstances, fn(w))
 	}

@@ -29,10 +29,10 @@ func init() {
 			common.MasterPortFlag,
 		},
 	})
-	master.RegisterProcessor(func(*master.Master) master.Processor {
+	master.RegisterProcessor(func(*master.Master) comm.Processor {
 		return &PingProcessor{}
 	})
-	worker.RegisterProcessor(func(*worker.Worker) master.Processor {
+	worker.RegisterProcessor(func(*worker.Worker) comm.Processor {
 		return &PingProcessor{}
 	})
 }

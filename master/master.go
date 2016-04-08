@@ -8,7 +8,7 @@ import (
 // A Master serves as a semi-intelligent message bus between clients and workers.
 type Master struct {
 	Connector  comm.Connector
-	Processors []func(*Master) Processor
+	Processors []func(*Master) comm.Processor
 }
 
 // Creates a new Master, listening on the given in/out addresses.
@@ -43,15 +43,15 @@ func (m *Master) Run() {
 
 		// Let master processors have a stab at them instead
 		go func() {
-			for m := range Process(pInstances, msg) {
+			for m := range comm.Process(pInstances, msg) {
 				out <- m
 			}
 		}()
 	}
 }
 
-func (m *Master) createProcessors() []Processor {
-	pInstances := []Processor{}
+func (m *Master) createProcessors() []comm.Processor {
+	pInstances := []comm.Processor{}
 	for _, fn := range m.Processors {
 		pInstances = append(pInstances, fn(m))
 	}
