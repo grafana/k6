@@ -1,4 +1,4 @@
-package actions
+package ping
 
 import (
 	log "github.com/Sirupsen/logrus"
