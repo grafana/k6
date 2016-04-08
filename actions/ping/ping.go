@@ -29,6 +29,48 @@ func init() {
 	})
 }
 
+// Parses commandline arguments.
+//
+// topic - The topic (master or worker) to ping
+func Parse(c *cli.Context) (topic string) {
+	topic = comm.MasterTopic
+	if c.Bool("worker") {
+		topic = comm.WorkerTopic
+	}
+
+	return topic
+}
+
+// Runs the command.
+func Run(in <-chan comm.Message, topic string) <-chan comm.Message {
+	out := make(chan comm.Message)
+
+	go func() {
+		defer close(out)
+
+		// Send a ping
+		out <- comm.To(topic, "ping.ping").With(PingMessage{
+			Time: time.Now(),
+		})
+
+		// Wait for a reply
+		for msg := range in {
+			switch msg.Type {
+			case "ping.pong":
+				data := PingMessage{}
+				if err := msg.Take(&data); err != nil {
+					log.WithError(err).Error("Couldn't decode pong")
+					break
+				}
+				log.WithField("time", data.Time).Info("Pong!")
+				return
+			}
+		}
+	}()
+
+	return out
+}
+
 // Pings a master or specified workers.
 func actionPing(c *cli.Context) {
 	ct, local := util.MustGetClient(c)
@@ -37,26 +79,8 @@ func actionPing(c *cli.Context) {
 	}
 
 	in, out := ct.Connector.Run()
-
-	topic := comm.MasterTopic
-	if c.Bool("worker") {
-		topic = comm.WorkerTopic
-	}
-	out <- comm.To(topic, "ping.ping").With(PingMessage{
-		Time: time.Now(),
-	})
-
-readLoop:
-	for msg := range in {
-		switch msg.Type {
-		case "ping.pong":
-			data := PingMessage{}
-			if err := msg.Take(&data); err != nil {
-				log.WithError(err).Error("Couldn't decode pong")
-				break
-			}
-			log.WithField("time", data.Time).Info("Pong!")
-			break readLoop
-		}
+	topic := Parse(c)
+	for res := range Run(in, topic) {
+		out <- res
 	}
 }
