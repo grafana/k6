@@ -32,13 +32,15 @@ func init() {
 // Parses commandline arguments.
 //
 // topic - The topic (master or worker) to ping
-func Parse(c *cli.Context) (topic string, err error) {
+func Parse(c *cli.Context) (topic string, local bool, err error) {
 	topic = comm.MasterTopic
 	if c.Bool("worker") {
 		topic = comm.WorkerTopic
 	}
 
-	return topic, nil
+	local = c.Bool("local")
+
+	return topic, local, nil
 }
 
 // Runs the command.
@@ -73,13 +75,13 @@ func Run(in <-chan comm.Message, topic string) <-chan comm.Message {
 
 // Pings a master or specified workers.
 func actionPing(c *cli.Context) {
-	topic, err := Parse(c)
+	topic, local, err := Parse(c)
 	if err != nil {
 		log.WithError(err).Fatal("Couldn't parse arguments")
 	}
 
-	ct, local := util.MustGetClient(c)
-	if local && !c.Bool("local") {
+	ct, isLocal := util.MustGetClient(c)
+	if isLocal && !local {
 		log.Fatal("You're about to ping an in-process system, which doesn't make a lot of sense. You probably want to specify --master=..., or use --local if this is actually what you want.")
 	}
 
