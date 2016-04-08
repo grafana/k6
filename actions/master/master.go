@@ -35,13 +35,18 @@ func init() {
 	})
 }
 
+func MasterAddresses(host string, port int) (outAddr, inAddr string) {
+	outAddr = fmt.Sprintf("tcp://%s:%d", host, port)
+	inAddr = fmt.Sprintf("tcp://%s:%d", host, port+1)
+	return outAddr, inAddr
+}
+
 // Runs a master.
 func actionMaster(c *cli.Context) {
 	host := c.String("host")
 	port := c.Int("port")
 
-	outAddr := fmt.Sprintf("tcp://%s:%d", host, port)
-	inAddr := fmt.Sprintf("tcp://%s:%d", host, port+1)
+	outAddr, inAddr := MasterAddresses(host, port)
 	m, err := master.New(outAddr, inAddr)
 	if err != nil {
 		log.WithError(err).Fatal("Couldn't start master")
