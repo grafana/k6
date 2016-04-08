@@ -1,4 +1,4 @@
-package actions
+package run
 
 import (
 	log "github.com/Sirupsen/logrus"
