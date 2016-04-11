@@ -3,6 +3,6 @@ base:
     - common
     - docker
   
-  'role:target':
+  'target':
     - match: grain
     - nginx
