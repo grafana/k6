@@ -20,7 +20,10 @@ func New() (r *JSRunner, err error) {
 
 	// Bridge basic functions
 	r.BaseVM.Set("sleep", jsSleepFactory(time.Sleep))
-	r.BaseVM.Set("get", jsHTTPGetFactory(r.BaseVM, http.Get))
+	r.BaseVM.Set("get", jsHTTPGetFactory(r.BaseVM, func(url string) (*http.Response, error) {
+		client := &http.Client{}
+		return client.Get(url)
+	}))
 
 	return r, nil
 }
