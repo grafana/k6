@@ -4,5 +4,4 @@ base:
     - docker
   
   'target':
-    - match: grain
     - nginx
