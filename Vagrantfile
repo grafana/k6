@@ -26,7 +26,7 @@ Vagrant.configure(2) do |config|
       # Colorize output properly, overriding Vagrant's default
       salt.colorize = true
       # Required for Vagrant
-      salt.bootstrap_options = "-F -c /tmp -i default"
+      salt.bootstrap_options = "-F -c /tmp -i master"
       # Configure the salt minion
       salt.minion_config = "_provisioning/vagrant/default/salt_minion.yml"
       salt.minion_pub = "_provisioning/vagrant/default/default.pub"
