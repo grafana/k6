@@ -140,27 +140,3 @@ func main() {
 	app.Action = action
 	app.Run(os.Args)
 }
-
-// func main() {
-// 	// Free up -v and -h for our own flags
-// 	cli.VersionFlag.Name = "version"
-// 	cli.HelpFlag.Name = "help, ?"
-
-// 	// Bootstrap using action-registered commandline flags
-// 	app := cli.NewApp()
-// 	app.Name = "speedboat"
-// 	app.Usage = "A next-generation load generator"
-// 	app.Version = "0.0.1a1"
-// 	app.Flags = []cli.Flag{
-// 		cli.BoolFlag{
-// 			Name:  "verbose, v",
-// 			Usage: "More verbose output",
-// 		},
-// 	}
-// 	app.Commands = client.GlobalCommands
-// 	app.Before = func(c *cli.Context) error {
-// 		configureLogging(c)
-// 		return nil
-// 	}
-// 	app.Run(os.Args)
-// }
