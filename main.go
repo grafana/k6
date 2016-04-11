@@ -82,7 +82,7 @@ runLoop:
 			case runner.LogEntry:
 				log.WithField("text", res.Text).Info("Test Log")
 			case runner.Metric:
-				log.WithField("d", res.Duration).Info("Test Metric")
+				log.WithField("d", res.Duration).Debug("Test Metric")
 				sequencer.Add(res)
 			case error:
 				log.WithError(res).Error("Test Error")
