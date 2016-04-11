@@ -4,6 +4,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
 	"github.com/loadimpact/speedboat/loadtest"
+	"github.com/loadimpact/speedboat/runner"
 	"github.com/loadimpact/speedboat/util"
 	"io/ioutil"
 	"os"
@@ -58,6 +59,26 @@ func action(c *cli.Context) {
 		log.WithError(err).Fatal("Couldn't get a runner")
 	}
 	log.WithField("r", r).Info("Runner")
+
+	err = r.Load(test.Script, test.Source)
+	if err != nil {
+		log.WithError(err).Fatal("Couldn't load script")
+	}
+
+	controlChannel := make(chan int, 1)
+	currentVUs := test.Stages[0].VUs.Start
+	controlChannel <- currentVUs
+
+	for res := range runner.Run(r, controlChannel) {
+		switch res := res.(type) {
+		case runner.LogEntry:
+			log.WithField("text", res.Text).Info("Test Log")
+		case runner.Metric:
+			log.WithField("d", res.Duration).Info("Test Metric")
+		case error:
+			log.WithError(res).Error("Test Error")
+		}
+	}
 }
 
 // Configure the global logger.
