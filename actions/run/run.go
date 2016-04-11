@@ -58,7 +58,7 @@ func actionRun(c *cli.Context) {
 
 	if c.IsSet("script") {
 		conf.Script = c.String("script")
-		base = "."
+		base = ""
 	}
 	if c.IsSet("duration") {
 		conf.Duration = c.String("duration")
