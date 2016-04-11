@@ -6,7 +6,7 @@ docker:
       - vagrant
     {% endif %}
   pkgrepo.managed:
-    - name: deb https://apt.dockerproject.org/repo debian-jessie main
+    - name: deb https://apt.dockerproject.org/repo ubuntu-trusty main
     - keyserver: hkp://p80.pool.sks-keyservers.net:80
     - keyid: 58118E89F3A912897C070ADBF76221572C52609D
     - require:

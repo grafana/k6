@@ -1,6 +1,6 @@
 nginx:
   pkgrepo.managed:
-    - name: deb http://nginx.org/packages/debian/ jessie nginx
+    - name: deb http://nginx.org/packages/ubuntu/ trusty nginx
     - key_url: http://nginx.org/keys/nginx_signing.key
   pkg.installed:
     - require:

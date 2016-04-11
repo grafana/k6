@@ -15,7 +15,7 @@ end
 
 # Documentation: https://docs.vagrantup.com.
 Vagrant.configure(2) do |config|
-  config.vm.box = "boxcutter/debian82"
+  config.vm.box = "puppetlabs/ubuntu-14.04-64-nocm"
   
   # Default machine, used to run the load generator
   config.vm.define "default", primary: true do |default|
