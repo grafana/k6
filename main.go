@@ -31,7 +31,7 @@ func makeTest(c *cli.Context) (test loadtest.LoadTest, err error) {
 		base = ""
 	}
 	if c.IsSet("duration") {
-		conf.Duration = c.String("duration")
+		conf.Duration = c.Duration("duration").String()
 	}
 	if c.IsSet("vus") {
 		conf.VUs = c.Int("vus")
@@ -131,6 +131,20 @@ func main() {
 		cli.BoolFlag{
 			Name:  "verbose, v",
 			Usage: "More verbose output",
+		},
+		cli.StringFlag{
+			Name:  "script, s",
+			Usage: "Script to run",
+		},
+		cli.IntFlag{
+			Name:  "vus, u",
+			Usage: "Number of VUs to simulate",
+			Value: 10,
+		},
+		cli.DurationFlag{
+			Name:  "duration, d",
+			Usage: "Test duration",
+			Value: time.Duration(10) * time.Second,
 		},
 	}
 	app.Before = func(c *cli.Context) error {
