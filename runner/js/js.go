@@ -53,8 +53,7 @@ func (r *JSRunner) RunVU(stop <-chan interface{}) <-chan interface{} {
 			case <-stop:
 				break runLoop
 			default:
-				vm := r.BaseVM.Copy()
-				for res := range r.RunIteration(vm) {
+				for res := range r.RunIteration() {
 					out <- res
 				}
 			}
@@ -64,7 +63,7 @@ func (r *JSRunner) RunVU(stop <-chan interface{}) <-chan interface{} {
 	return out
 }
 
-func (r *JSRunner) RunIteration(vm *otto.Otto) <-chan interface{} {
+func (r *JSRunner) RunIteration() <-chan interface{} {
 	out := make(chan interface{})
 
 	go func() {
@@ -74,6 +73,9 @@ func (r *JSRunner) RunIteration(vm *otto.Otto) <-chan interface{} {
 				out <- runner.NewError(err.(JSError))
 			}
 		}()
+
+		// Make a copy of the base VM
+		vm := r.BaseVM.Copy()
 
 		// Log has to be bridged here, as it needs a reference to the channel
 		vm.Set("log", jsLogFactory(func(text string) {
