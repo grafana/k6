@@ -10,6 +10,8 @@ import (
 type JSRunner struct {
 	BaseVM *otto.Otto
 	Script *otto.Script
+
+	httpClient *http.Client
 }
 
 func New() (r *JSRunner, err error) {
@@ -20,9 +22,15 @@ func New() (r *JSRunner, err error) {
 
 	// Bridge basic functions
 	r.BaseVM.Set("sleep", jsSleepFactory(time.Sleep))
+
+	// Use a single HTTP client for this
+	r.httpClient = &http.Client{
+		Transport: &http.Transport{
+			DisableKeepAlives: true,
+		},
+	}
 	r.BaseVM.Set("get", jsHTTPGetFactory(r.BaseVM, func(url string) (*http.Response, error) {
-		client := &http.Client{}
-		return client.Get(url)
+		return r.httpClient.Get(url)
 	}))
 
 	return r, nil
