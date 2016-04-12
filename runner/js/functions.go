@@ -47,7 +47,7 @@ func jsHTTPGetFactory(vm *otto.Otto, impl func(url string) (*http.Response, erro
 		}
 		defer res.Body.Close()
 
-		obj, err := vm.Object("new Object()")
+		obj, err := call.Otto.Object("new Object()")
 		if err != nil {
 			panic(JSError(fmt.Sprintf("Couldn't create an Object(): %s", err)))
 		}
