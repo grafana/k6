@@ -29,7 +29,7 @@ func New() (r *JSRunner, err error) {
 			DisableKeepAlives: true,
 		},
 	}
-	r.BaseVM.Set("get", jsHTTPGetFactory(r.BaseVM, func(url string) (*http.Response, error) {
+	r.BaseVM.Set("get", jsHTTPGetFactory(func(url string) (*http.Response, error) {
 		return r.httpClient.Get(url)
 	}))
 
