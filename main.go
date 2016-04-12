@@ -42,9 +42,11 @@ func makeTest(c *cli.Context) (test loadtest.LoadTest, err error) {
 		return test, err
 	}
 
-	if err = test.Load(base); err != nil {
+	srcb, err := ioutil.ReadFile(path.Join(base, test.Script))
+	if err != nil {
 		return test, err
 	}
+	test.Source = string(srcb)
 
 	return test, nil
 }
