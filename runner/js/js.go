@@ -69,6 +69,11 @@ func (r *JSRunner) RunIteration(vm *otto.Otto) <-chan interface{} {
 
 	go func() {
 		defer close(out)
+		defer func() {
+			if err := recover(); err != nil {
+				out <- runner.NewError(err.(JSError))
+			}
+		}()
 
 		// Log has to be bridged here, as it needs a reference to the channel
 		vm.Set("log", jsLogFactory(func(text string) {
