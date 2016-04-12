@@ -59,7 +59,6 @@ func action(c *cli.Context) {
 	if err != nil {
 		log.WithError(err).Fatal("Couldn't get a runner")
 	}
-	log.WithField("r", r).Info("Runner")
 
 	err = r.Load(test.Script, test.Source)
 	if err != nil {
