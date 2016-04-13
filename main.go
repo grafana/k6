@@ -71,12 +71,16 @@ func action(c *cli.Context) {
 		timeout += stage.Duration
 	}
 
+	results := []runner.Result{}
+
 	ctx, _ := context.WithTimeout(context.Background(), timeout)
 	scale := make(chan int, 1)
 	scale <- test.Stages[0].VUs.Start
-	for t := range runner.Run(ctx, r, scale) {
-		log.WithField("t", t).Info("Test Metric")
+	for res := range runner.Run(ctx, r, scale) {
+		results = append(results, res)
 	}
+
+	log.WithField("results", len(results)).Info("Finished")
 }
 
 // Configure the global logger.
