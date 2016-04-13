@@ -24,10 +24,13 @@ func Run(ctx context.Context, r Runner, scale <-chan int) <-chan Result {
 	ch := make(chan Result)
 
 	go func() {
-		defer close(ch)
+		wg := sync.WaitGroup{}
+		defer func() {
+			wg.Wait()
+			close(ch)
+		}()
 
 		currentVUs := []VU{}
-		wg := sync.WaitGroup{}
 		for {
 			select {
 			case vus := <-scale:
@@ -50,8 +53,6 @@ func Run(ctx context.Context, r Runner, scale <-chan int) <-chan Result {
 				return
 			}
 		}
-
-		wg.Wait()
 	}()
 
 	return ch
