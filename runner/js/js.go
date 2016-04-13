@@ -76,7 +76,7 @@ func (r *JSRunner) RunIteration() <-chan interface{} {
 		}()
 
 		// Make a copy of the base VM
-		vm := r.BaseVM.Copy()
+		vm := r.BaseVM //.Copy()
 
 		// Log has to be bridged here, as it needs a reference to the channel
 		vm.Set("log", jsLogFactory(func(text string) {
