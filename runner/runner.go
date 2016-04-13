@@ -30,7 +30,7 @@ func Run(ctx context.Context, r Runner, scale <-chan int) <-chan Result {
 			close(ch)
 		}()
 
-		currentVUs := []VU{}
+		currentVUs := make([]VU, 0, 100)
 		for {
 			select {
 			case vus := <-scale:
