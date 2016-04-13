@@ -3,6 +3,7 @@ package main
 import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
+	"github.com/loadimpact/speedboat/aggregate"
 	"github.com/loadimpact/speedboat/loadtest"
 	"github.com/loadimpact/speedboat/runner"
 	"github.com/loadimpact/speedboat/runner/simple"
@@ -89,7 +90,8 @@ func action(c *cli.Context) {
 	r := simple.New()
 	r.URL = test.URL
 
-	for res := range run(test, r) {
+	stats := aggregate.Stats{}
+	for res := range aggregate.Aggregate(&stats, run(test, r)) {
 		switch {
 		case res.Error != nil:
 			l := log.WithError(res.Error)
@@ -107,6 +109,14 @@ func action(c *cli.Context) {
 			log.WithField("t", res.Time).Debug("Metric")
 		}
 	}
+
+	log.WithField("results", stats.Results).Info("Finished")
+	log.WithFields(log.Fields{
+		"min": stats.Time.Min,
+		"max": stats.Time.Max,
+		"med": stats.Time.Med,
+		"avg": stats.Time.Avg,
+	}).Info("Time")
 }
 
 // Configure the global logger.
