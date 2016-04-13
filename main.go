@@ -8,6 +8,7 @@ import (
 	"github.com/loadimpact/speedboat/runner"
 	"github.com/loadimpact/speedboat/runner/js"
 	"github.com/loadimpact/speedboat/runner/simple"
+	"golang.org/x/net/context"
 	"io/ioutil"
 	"os"
 	"path"
@@ -81,14 +82,14 @@ func action(c *cli.Context) {
 	r := simple.New()
 	r.URL = test.URL
 
-	stop := make(chan bool)
+	ctx, cancel := context.WithCancel(context.Background())
 	i := 0
-	for t := range r.Run(stop) {
+	for t := range r.Run(ctx) {
 		log.WithField("t", t).Info("Test Metric")
 
 		i++
 		if i >= 10 {
-			close(stop)
+			cancel()
 		}
 	}
 

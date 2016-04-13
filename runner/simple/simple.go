@@ -1,6 +1,7 @@
 package simple
 
 import (
+	"golang.org/x/net/context"
 	"net/http"
 	"time"
 )
@@ -20,7 +21,7 @@ func New() *SimpleRunner {
 	}
 }
 
-func (r *SimpleRunner) Run(stop <-chan bool) <-chan time.Duration {
+func (r *SimpleRunner) Run(ctx context.Context) <-chan time.Duration {
 	ch := make(chan time.Duration)
 
 	go func() {
@@ -35,7 +36,7 @@ func (r *SimpleRunner) Run(stop <-chan bool) <-chan time.Duration {
 			res.Body.Close()
 
 			select {
-			case <-stop:
+			case <-ctx.Done():
 				return
 			default:
 				ch <- duration
