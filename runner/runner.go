@@ -1,88 +1,58 @@
 package runner
 
 import (
+	"golang.org/x/net/context"
 	"sync"
 	"time"
 )
 
-// A single metric for a test execution.
-type Metric struct {
-	Start    time.Time
-	Duration time.Duration
-}
-
-// A user-printed log comm.
-type LogEntry struct {
-	Text string
-}
-
 type Runner interface {
-	Load(filename, src string) error
-	RunVU(stop <-chan interface{}) <-chan interface{}
+	Run(ctx context.Context) <-chan Result
 }
 
-func NewError(err error) interface{} {
-	return err
+type Result struct {
+	Text  string
+	Time  time.Duration
+	Error error
 }
 
-func NewLogEntry(text string) interface{} {
-	return LogEntry{Text: text}
+type VU struct {
+	Cancel context.CancelFunc
 }
 
-func NewMetric(start time.Time, duration time.Duration) interface{} {
-	return Metric{Start: start, Duration: duration}
-}
-
-func Run(r Runner, control <-chan int) <-chan interface{} {
-	ch := make(chan interface{})
-
-	// Control channel for VUs; VUs terminate upon reading anything from it, so
-	// write to it n times to kill n VUs, close it to kill all of them
-	vuControl := make(chan interface{})
-
-	// Currently active VUs; used to calculate how many VUs to spawn/kill.
-	currentVUs := 0
+func Run(ctx context.Context, r Runner, scale <-chan int) <-chan Result {
+	ch := make(chan Result)
 
 	go func() {
 		defer close(ch)
 
+		currentVUs := []VU{}
 		wg := sync.WaitGroup{}
-		start := func() {
-			wg.Add(1)
-			go func() {
-				defer func() {
-					currentVUs -= 1
-					wg.Done()
-				}()
-				for res := range r.RunVU(vuControl) {
-					ch <- res
+		for {
+			select {
+			case vus := <-scale:
+				for vus > len(currentVUs) {
+					wg.Add(1)
+					c, cancel := context.WithCancel(ctx)
+					currentVUs = append(currentVUs, VU{Cancel: cancel})
+					go func() {
+						defer wg.Done()
+						for res := range r.Run(c) {
+							ch <- res
+						}
+					}()
 				}
-			}()
-		}
-		stop := func() {
-			vuControl <- true
+				for vus < len(currentVUs) {
+					currentVUs[len(currentVUs)-1].Cancel()
+					currentVUs = currentVUs[:len(currentVUs)-1]
+				}
+			case <-ctx.Done():
+				return
+			}
 		}
 
-		for vus := range control {
-			scale(currentVUs, vus, start, stop)
-		}
-
-		close(vuControl)
 		wg.Wait()
 	}()
 
 	return ch
-}
-
-func scale(from, to int, start, stop func()) {
-	delta := to - from
-
-	// Start VUs for positive amounts
-	for i := 0; i < delta; i++ {
-		start()
-	}
-	// Stop VUs for negative amounts
-	for i := delta; i < 0; i++ {
-		stop()
-	}
 }
