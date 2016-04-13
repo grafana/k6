@@ -27,17 +27,18 @@ func (r *SimpleRunner) Run(ctx context.Context) <-chan runner.Result {
 
 	go func() {
 		defer close(ch)
+
+		req, err := http.NewRequest(http.MethodGet, r.URL, nil)
+		if err != nil {
+			ch <- runner.Result{Error: err}
+			return
+		}
+		req.Close = true
+
+		cancel := make(chan struct{})
+		req.Cancel = cancel
+
 		for {
-			req, err := http.NewRequest(http.MethodGet, r.URL, nil)
-			if err != nil {
-				ch <- runner.Result{Error: err}
-				continue
-			}
-			req.Close = true
-
-			cancel := make(chan struct{})
-			req.Cancel = cancel
-
 			go func() {
 				startTime := time.Now()
 				res, err := r.Client.Do(req)
