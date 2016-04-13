@@ -21,3 +21,9 @@ vm.swappiness:
 fs.file-max:
   sysctl.present:
     - value: 65535
+
+/etc/security/limits.d/unlimited-open-files.conf:
+  file.managed:
+    - contents:
+      - '* soft nofile 65535'
+      - '* hard nofile 65535'
