@@ -82,15 +82,14 @@ func action(c *cli.Context) {
 	r := simple.New()
 	r.URL = test.URL
 
-	ctx, cancel := context.WithCancel(context.Background())
-	i := 0
+	timeout := time.Duration(0)
+	for _, stage := range test.Stages {
+		timeout += stage.Duration
+	}
+
+	ctx, _ := context.WithTimeout(context.Background(), timeout)
 	for t := range r.Run(ctx) {
 		log.WithField("t", t).Info("Test Metric")
-
-		i++
-		if i >= 10 {
-			cancel()
-		}
 	}
 
 	// 	r, err := getRunner(test.Script, test.URL)
