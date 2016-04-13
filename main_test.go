@@ -6,7 +6,7 @@ import (
 )
 
 func GetRunnerJS(t *testing.T) {
-	r, err := getRunner("script.js")
+	r, err := getRunner("script.js", "")
 	if err != nil {
 		t.Error(err)
 	}
@@ -16,7 +16,7 @@ func GetRunnerJS(t *testing.T) {
 }
 
 func GetRunnerUnknown(t *testing.T) {
-	r, err := getRunner("test.doc")
+	r, err := getRunner("test.doc", "")
 	if err == nil {
 		t.Error("No error")
 	}

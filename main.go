@@ -13,7 +13,12 @@ import (
 	"time"
 )
 
-func getRunner(filename string) (runner.Runner, error) {
+func getRunner(filename, url string) (runner.Runner, error) {
+	// TODO: Implement a URL runner.
+	if url != "" {
+		return nil, nil
+	}
+
 	switch path.Ext(filename) {
 	case ".js":
 		return js.New()
@@ -40,6 +45,9 @@ func makeTest(c *cli.Context) (test loadtest.LoadTest, err error) {
 		conf.Script = c.String("script")
 		base = ""
 	}
+	if c.IsSet("url") {
+		conf.URL = c.String("url")
+	}
 	if c.IsSet("duration") {
 		conf.Duration = c.Duration("duration").String()
 	}
@@ -52,11 +60,13 @@ func makeTest(c *cli.Context) (test loadtest.LoadTest, err error) {
 		return test, err
 	}
 
-	srcb, err := ioutil.ReadFile(path.Join(base, test.Script))
-	if err != nil {
-		return test, err
+	if test.Script != "" {
+		srcb, err := ioutil.ReadFile(path.Join(base, test.Script))
+		if err != nil {
+			return test, err
+		}
+		test.Source = string(srcb)
 	}
-	test.Source = string(srcb)
 
 	return test, nil
 }
@@ -67,7 +77,7 @@ func action(c *cli.Context) {
 		log.WithError(err).Fatal("Configuration error")
 	}
 
-	r, err := getRunner(test.Script)
+	r, err := getRunner(test.Script, test.URL)
 	if err != nil {
 		log.WithError(err).Fatal("Couldn't get a runner")
 	}
@@ -150,7 +160,11 @@ func main() {
 		},
 		cli.StringFlag{
 			Name:  "script, s",
-			Usage: "Script to run",
+			Usage: "Script to run (do not use with --url)",
+		},
+		cli.StringFlag{
+			Name:  "url",
+			Usage: "URL to test (do not use with --script)",
 		},
 		cli.IntFlag{
 			Name:  "vus, u",
