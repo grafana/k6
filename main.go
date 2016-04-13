@@ -1,16 +1,26 @@
 package main
 
 import (
+	"errors"
 	log "github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
 	"github.com/loadimpact/speedboat/loadtest"
 	"github.com/loadimpact/speedboat/runner"
-	"github.com/loadimpact/speedboat/util"
+	"github.com/loadimpact/speedboat/runner/js"
 	"io/ioutil"
 	"os"
 	"path"
 	"time"
 )
+
+func getRunner(filename string) (runner.Runner, error) {
+	switch path.Ext(filename) {
+	case ".js":
+		return js.New()
+	default:
+		return nil, errors.New("No runner found")
+	}
+}
 
 func makeTest(c *cli.Context) (test loadtest.LoadTest, err error) {
 	base := ""
@@ -57,7 +67,7 @@ func action(c *cli.Context) {
 		log.WithError(err).Fatal("Configuration error")
 	}
 
-	r, err := util.GetRunner(test.Script)
+	r, err := getRunner(test.Script)
 	if err != nil {
 		log.WithError(err).Fatal("Couldn't get a runner")
 	}
