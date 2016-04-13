@@ -28,6 +28,8 @@ func (r *SimpleRunner) Run(ctx context.Context) <-chan runner.Result {
 	go func() {
 		defer close(ch)
 
+		// We can reuse the same request across multiple iterations; if something goes awry here,
+		// we abort the test, since it normally means a user failure (like a malformed URL).
 		req, err := http.NewRequest(http.MethodGet, r.URL, nil)
 		if err != nil {
 			ch <- runner.Result{Error: err}
@@ -35,8 +37,10 @@ func (r *SimpleRunner) Run(ctx context.Context) <-chan runner.Result {
 		}
 		req.Close = true
 
-		cancel := make(chan struct{})
-		req.Cancel = cancel
+		// Close this channel to abort the request on the spot. The old, transport-based way of
+		// doing this is deprecated, as it doesn't play nice with HTTP/2 requests.
+		cancelRequest := make(chan struct{})
+		req.Cancel = cancelRequest
 
 		for {
 			go func() {
@@ -55,7 +59,7 @@ func (r *SimpleRunner) Run(ctx context.Context) <-chan runner.Result {
 
 			_, keepGoing := <-ctx.Done()
 			if !keepGoing {
-				close(cancel)
+				close(cancelRequest)
 				return
 			}
 		}
