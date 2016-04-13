@@ -45,28 +45,29 @@ func Run(r Runner, control <-chan int) <-chan interface{} {
 
 	go func() {
 		defer close(ch)
-		defer close(vuControl)
 
 		wg := sync.WaitGroup{}
-		for vus := range control {
-			start := func() {
-				wg.Add(1)
-				go func() {
-					defer func() {
-						currentVUs -= 1
-						wg.Done()
-					}()
-					for res := range r.RunVU(vuControl) {
-						ch <- res
-					}
+		start := func() {
+			wg.Add(1)
+			go func() {
+				defer func() {
+					currentVUs -= 1
+					wg.Done()
 				}()
-			}
-			stop := func() {
-				vuControl <- true
-			}
+				for res := range r.RunVU(vuControl) {
+					ch <- res
+				}
+			}()
+		}
+		stop := func() {
+			vuControl <- true
+		}
+
+		for vus := range control {
 			scale(currentVUs, vus, start, stop)
 		}
 
+		close(vuControl)
 		wg.Wait()
 	}()
 

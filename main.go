@@ -67,17 +67,24 @@ func action(c *cli.Context) {
 		log.WithError(err).Fatal("Couldn't load script")
 	}
 
+	// Write a number to the control channel to make the test scale to that many
+	// VUs; close it to make the test terminate.
 	controlChannel := make(chan int, 1)
 	controlChannel <- test.Stages[0].VUs.Start
 
-	startTime := time.Now()
-	intervene := time.Tick(time.Duration(1) * time.Second)
 	sequencer := runner.NewSequencer()
+	startTime := time.Now()
+
+	intervene := time.NewTicker(time.Duration(1) * time.Second)
 	results := runner.Run(r, controlChannel)
 runLoop:
 	for {
 		select {
-		case res := <-results:
+		case res, ok := <-results:
+			// The results channel will be closed once all VUs are done.
+			if !ok {
+				break runLoop
+			}
 			switch res := res.(type) {
 			case runner.LogEntry:
 				log.WithField("text", res.Text).Info("Test Log")
@@ -87,11 +94,14 @@ runLoop:
 			case error:
 				log.WithError(res).Error("Test Error")
 			}
-		case <-intervene:
+		case <-intervene.C:
 			vus, stop := test.VUsAt(time.Since(startTime))
-			controlChannel <- vus
 			if stop {
-				break runLoop
+				// Stop the timer, and let VUs gracefully terminate.
+				intervene.Stop()
+				close(controlChannel)
+			} else {
+				controlChannel <- vus
 			}
 		}
 	}
