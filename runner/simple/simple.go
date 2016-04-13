@@ -42,6 +42,7 @@ func (r *SimpleRunner) Run(ctx context.Context) <-chan runner.Result {
 		cancelRequest := make(chan struct{})
 		req.Cancel = cancelRequest
 
+		results := make(chan runner.Result)
 		for {
 			go func() {
 				startTime := time.Now()
@@ -49,16 +50,18 @@ func (r *SimpleRunner) Run(ctx context.Context) <-chan runner.Result {
 				duration := time.Since(startTime)
 
 				if err != nil {
-					ch <- runner.Result{Error: err, Time: duration}
+					results <- runner.Result{Error: err, Time: duration}
 					return
 				}
 				res.Body.Close()
 
-				ch <- runner.Result{Time: duration}
+				results <- runner.Result{Time: duration}
 			}()
 
-			_, keepGoing := <-ctx.Done()
-			if !keepGoing {
+			select {
+			case res := <-results:
+				ch <- res
+			case <-ctx.Done():
 				close(cancelRequest)
 				return
 			}
