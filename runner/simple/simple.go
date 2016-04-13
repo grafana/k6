@@ -32,7 +32,7 @@ func (r *SimpleRunner) Run(ctx context.Context) <-chan runner.Result {
 			res, err := r.Client.Get(r.URL)
 			duration := time.Since(startTime)
 			if err != nil {
-				panic(err)
+				ch <- runner.Result{Error: err}
 			}
 			res.Body.Close()
 
