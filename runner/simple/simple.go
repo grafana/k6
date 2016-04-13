@@ -42,10 +42,13 @@ func (r *SimpleRunner) Run(ctx context.Context) <-chan runner.Result {
 				startTime := time.Now()
 				res, err := r.Client.Do(req)
 				duration := time.Since(startTime)
+
 				if err != nil {
-					ch <- runner.Result{Error: err}
+					ch <- runner.Result{Error: err, Time: duration}
+					return
 				}
 				res.Body.Close()
+
 				ch <- runner.Result{Time: duration}
 			}()
 
