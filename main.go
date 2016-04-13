@@ -57,6 +57,29 @@ func makeTest(c *cli.Context) (test loadtest.LoadTest, err error) {
 	return test, nil
 }
 
+func run(test loadtest.LoadTest, r runner.Runner) <-chan runner.Result {
+	ch := make(chan runner.Result)
+
+	go func() {
+		defer close(ch)
+
+		timeout := time.Duration(0)
+		for _, stage := range test.Stages {
+			timeout += stage.Duration
+		}
+
+		ctx, _ := context.WithTimeout(context.Background(), timeout)
+		scale := make(chan int, 1)
+		scale <- test.Stages[0].VUs.Start
+
+		for res := range runner.Run(ctx, r, scale) {
+			ch <- res
+		}
+	}()
+
+	return ch
+}
+
 func action(c *cli.Context) {
 	test, err := makeTest(c)
 	if err != nil {
@@ -66,21 +89,24 @@ func action(c *cli.Context) {
 	r := simple.New()
 	r.URL = test.URL
 
-	timeout := time.Duration(0)
-	for _, stage := range test.Stages {
-		timeout += stage.Duration
+	for res := range run(test, r) {
+		switch {
+		case res.Error != nil:
+			l := log.WithError(res.Error)
+			if res.Time != time.Duration(0) {
+				l = l.WithField("t", res.Time)
+			}
+			l.Error("Error")
+		case res.Text != "":
+			l := log.WithField("text", res.Text)
+			if res.Time != time.Duration(0) {
+				l = l.WithField("t", res.Time)
+			}
+			l.Info("Log")
+		default:
+			log.WithField("t", res.Time).Debug("Metric")
+		}
 	}
-
-	results := []runner.Result{}
-
-	ctx, _ := context.WithTimeout(context.Background(), timeout)
-	scale := make(chan int, 1)
-	scale <- test.Stages[0].VUs.Start
-	for res := range runner.Run(ctx, r, scale) {
-		results = append(results, res)
-	}
-
-	log.WithField("results", len(results)).Info("Finished")
 }
 
 // Configure the global logger.
