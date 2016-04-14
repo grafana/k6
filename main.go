@@ -91,7 +91,7 @@ func action(c *cli.Context) {
 	r.URL = test.URL
 
 	stats := aggregate.Stats{}
-	stats.Time.Values = make([]time.Duration, 30000000)
+	stats.Time.Values = make([]time.Duration, 30000000)[:0]
 	for res := range aggregate.Aggregate(&stats, run(test, r)) {
 		switch {
 		case res.Error != nil:
