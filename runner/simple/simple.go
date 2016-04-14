@@ -47,10 +47,10 @@ func (r *SimpleRunner) Run(ctx context.Context) <-chan runner.Result {
 			default:
 				if err != nil {
 					ch <- runner.Result{Error: err, Time: duration}
-				} else {
-					res.Body.Close()
-					ch <- runner.Result{Time: duration}
+					continue
 				}
+				res.Body.Close()
+				ch <- runner.Result{Time: duration}
 			}
 		}
 	}()
