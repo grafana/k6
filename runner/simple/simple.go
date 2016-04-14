@@ -47,16 +47,15 @@ func (r *SimpleRunner) Run(ctx context.Context) <-chan runner.Result {
 			startTime := time.Now()
 			res, err := r.Client.Do(req)
 			duration := time.Since(startTime)
-			if err != nil {
-				ch <- runner.Result{Error: err, Time: duration}
-				continue
-			}
-			res.Body.Close()
 
 			select {
 			case <-ctx.Done():
 				return
 			default:
+				if err != nil {
+					ch <- runner.Result{Error: err, Time: duration}
+				}
+				res.Body.Close()
 				ch <- runner.Result{Time: duration}
 			}
 			// go func() {
