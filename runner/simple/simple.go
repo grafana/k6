@@ -36,6 +36,8 @@ func (r *SimpleRunner) Run(ctx context.Context) <-chan runner.Result {
 				ch <- runner.Result{Error: err}
 				return
 			}
+			req.Close = true
+			req.Cancel = ctx.Done()
 
 			startTime := time.Now()
 			res, err := r.Client.Do(req)
