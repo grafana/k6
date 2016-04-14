@@ -2,22 +2,20 @@ package simple
 
 import (
 	"github.com/loadimpact/speedboat/runner"
+	"github.com/valyala/fasthttp"
 	"golang.org/x/net/context"
-	"net/http"
 	"time"
 )
 
 type SimpleRunner struct {
 	URL    string
-	Client *http.Client
+	Client *fasthttp.Client
 }
 
 func New() *SimpleRunner {
 	return &SimpleRunner{
-		Client: &http.Client{
-			Transport: &http.Transport{
-				DisableKeepAlives: true,
-			},
+		Client: &fasthttp.Client{
+		// MaxIdleConnDuration: time.Duration(0),
 		},
 	}
 }
@@ -28,31 +26,29 @@ func (r *SimpleRunner) Run(ctx context.Context) <-chan runner.Result {
 	go func() {
 		defer close(ch)
 
+		result := make(chan runner.Result, 1)
 		for {
-			// Note that we abort if we cannot create a request. This means we're either out of
-			// memory, or we have invalid user input, neither of which are recoverable.
-			req, err := http.NewRequest("GET", r.URL, nil)
-			if err != nil {
-				ch <- runner.Result{Error: err}
-				return
-			}
-			req.Close = true
-			req.Cancel = ctx.Done()
+			go func() {
+				req := fasthttp.AcquireRequest()
+				defer fasthttp.ReleaseRequest(req)
 
-			startTime := time.Now()
-			res, err := r.Client.Do(req)
-			duration := time.Since(startTime)
+				res := fasthttp.AcquireResponse()
+				defer fasthttp.ReleaseResponse(res)
+
+				req.SetRequestURI(r.URL)
+
+				startTime := time.Now()
+				err := r.Client.Do(req, res)
+				duration := time.Since(startTime)
+
+				result <- runner.Result{Error: err, Time: duration}
+			}()
 
 			select {
 			case <-ctx.Done():
 				return
-			default:
-				if err != nil {
-					ch <- runner.Result{Error: err, Time: duration}
-					continue
-				}
-				res.Body.Close()
-				ch <- runner.Result{Time: duration}
+			case res := <-result:
+				ch <- res
 			}
 		}
 	}()
