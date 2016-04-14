@@ -42,16 +42,18 @@ func (r *SimpleRunner) Run(ctx context.Context) <-chan runner.Result {
 
 			mem := runtime.MemStats{}
 			runtime.ReadMemStats(&mem)
-			gcTotal1 := mem.PauseTotalNs
+			oldNumGC := mem.NumGC
 
 			startTime := time.Now()
 			res, err := r.Client.Do(req)
 			duration := time.Since(startTime)
 
+			// Accounting for one less GC pause than what's actually reported, otherwise we seem
+			// to be getting timings with negative times taken... There needs to be a better way.
 			runtime.ReadMemStats(&mem)
-			gcTotal2 := mem.PauseTotalNs
-
-			duration -= time.Duration(gcTotal2-gcTotal1) * time.Nanosecond
+			for i := oldNumGC; i < mem.NumGC-1; i++ {
+				duration -= time.Duration(mem.PauseNs[(i+255)%256])
+			}
 
 			select {
 			case <-ctx.Done():
