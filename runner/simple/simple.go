@@ -4,7 +4,6 @@ import (
 	"github.com/loadimpact/speedboat/runner"
 	"golang.org/x/net/context"
 	"net/http"
-	"runtime"
 	"time"
 )
 
@@ -40,20 +39,9 @@ func (r *SimpleRunner) Run(ctx context.Context) <-chan runner.Result {
 			req.Close = true
 			req.Cancel = ctx.Done()
 
-			mem := runtime.MemStats{}
-			runtime.ReadMemStats(&mem)
-			oldNumGC := mem.NumGC
-
 			startTime := time.Now()
 			res, err := r.Client.Do(req)
 			duration := time.Since(startTime)
-
-			// Accounting for one less GC pause than what's actually reported, otherwise we seem
-			// to be getting timings with negative times taken... There needs to be a better way.
-			runtime.ReadMemStats(&mem)
-			for i := oldNumGC; i < mem.NumGC-1; i++ {
-				duration -= time.Duration(mem.PauseNs[(i+255)%256])
-			}
 
 			select {
 			case <-ctx.Done():
