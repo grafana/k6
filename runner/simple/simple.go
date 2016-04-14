@@ -39,32 +39,47 @@ func (r *SimpleRunner) Run(ctx context.Context) <-chan runner.Result {
 
 		// Close this channel to abort the request on the spot. The old, transport-based way of
 		// doing this is deprecated, as it doesn't play nice with HTTP/2 requests.
-		cancelRequest := make(chan struct{})
-		req.Cancel = cancelRequest
+		// cancelRequest := make(chan struct{})
+		// req.Cancel = cancelRequest
 
-		results := make(chan runner.Result, 1)
+		// results := make(chan runner.Result, 1)
 		for {
-			go func() {
-				startTime := time.Now()
-				res, err := r.Client.Do(req)
-				duration := time.Since(startTime)
-
-				if err != nil {
-					results <- runner.Result{Error: err, Time: duration}
-					return
-				}
-				res.Body.Close()
-
-				results <- runner.Result{Time: duration}
-			}()
+			startTime := time.Now()
+			res, err := r.Client.Do(req)
+			duration := time.Since(startTime)
+			if err != nil {
+				ch <- runner.Result{Error: err, Time: duration}
+				continue
+			}
+			res.Body.Close()
 
 			select {
-			case res := <-results:
-				ch <- res
 			case <-ctx.Done():
-				close(cancelRequest)
 				return
+			default:
+				ch <- runner.Result{Time: duration}
 			}
+			// go func() {
+			// 	startTime := time.Now()
+			// 	res, err := r.Client.Do(req)
+			// 	duration := time.Since(startTime)
+
+			// 	if err != nil {
+			// 		results <- runner.Result{Error: err, Time: duration}
+			// 		return
+			// 	}
+			// 	res.Body.Close()
+
+			// 	results <- runner.Result{Time: duration}
+			// }()
+
+			// select {
+			// case res := <-results:
+			// 	ch <- res
+			// case <-ctx.Done():
+			// 	close(cancelRequest)
+			// 	return
+			// }
 		}
 	}()
 
