@@ -39,8 +39,8 @@ func (r *SimpleRunner) Run(ctx context.Context) <-chan runner.Result {
 
 		// Close this channel to abort the request on the spot. The old, transport-based way of
 		// doing this is deprecated, as it doesn't play nice with HTTP/2 requests.
-		// cancelRequest := make(chan struct{})
-		// req.Cancel = cancelRequest
+		cancelRequest := make(chan struct{})
+		req.Cancel = cancelRequest
 
 		results := make(chan runner.Result, 1)
 		for {
@@ -62,7 +62,7 @@ func (r *SimpleRunner) Run(ctx context.Context) <-chan runner.Result {
 			case res := <-results:
 				ch <- res
 			case <-ctx.Done():
-				// close(cancelRequest)
+				close(cancelRequest)
 				return
 			}
 		}
