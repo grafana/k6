@@ -4,6 +4,7 @@ import (
 	"github.com/loadimpact/speedboat/runner"
 	"golang.org/x/net/context"
 	"net/http"
+	"runtime"
 	"time"
 )
 
@@ -39,9 +40,18 @@ func (r *SimpleRunner) Run(ctx context.Context) <-chan runner.Result {
 			req.Close = true
 			req.Cancel = ctx.Done()
 
+			mem := runtime.MemStats{}
+			runtime.ReadMemStats(&mem)
+			gcTotal1 := mem.PauseTotalNs
+
 			startTime := time.Now()
 			res, err := r.Client.Do(req)
 			duration := time.Since(startTime)
+
+			runtime.ReadMemStats(&mem)
+			gcTotal2 := mem.PauseTotalNs
+
+			duration -= time.Duration(gcTotal2-gcTotal1) * time.Nanosecond
 
 			select {
 			case <-ctx.Done():
