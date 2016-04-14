@@ -8,7 +8,7 @@ type DurationStat struct {
 	Min, Max, Avg, Med time.Duration
 
 	// TODO: Implement a rolling average/median algorithm instead.
-	values []time.Duration
+	Values []time.Duration
 }
 
 func (s *DurationStat) Ingest(d time.Duration) {
@@ -18,14 +18,14 @@ func (s *DurationStat) Ingest(d time.Duration) {
 	if d > s.Max {
 		s.Max = d
 	}
-	s.values = append(s.values, d)
+	s.Values = append(s.Values, d)
 }
 
 func (s *DurationStat) End() {
 	sum := time.Duration(0)
-	for _, d := range s.values {
+	for _, d := range s.Values {
 		sum += d
 	}
-	s.Avg = sum / time.Duration(len(s.values))
-	s.Med = s.values[len(s.values)/2]
+	s.Avg = sum / time.Duration(len(s.Values))
+	s.Med = s.Values[len(s.Values)/2]
 }
