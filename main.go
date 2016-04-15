@@ -5,6 +5,7 @@ import (
 	"github.com/codegangsta/cli"
 	"github.com/loadimpact/speedboat/aggregate"
 	"github.com/loadimpact/speedboat/loadtest"
+	"github.com/loadimpact/speedboat/report"
 	"github.com/loadimpact/speedboat/runner"
 	"github.com/loadimpact/speedboat/runner/simple"
 	"golang.org/x/net/context"
@@ -98,6 +99,21 @@ func action(c *cli.Context) {
 	stats.Time.Values = make([]time.Duration, 30000000)[:0]
 	pipeline = aggregate.Aggregate(&stats, pipeline)
 
+	// Log results to a file
+	outFilename := c.String("out-file")
+	if outFilename != "" {
+		reporter := report.CSVReporter{}
+		if outFilename != "-" {
+			f, err := os.Create("results.csv")
+			if err != nil {
+				log.WithError(err).Fatal("Couldn't open log file")
+			}
+			pipeline = report.Report(reporter, f, pipeline)
+		} else {
+			pipeline = report.Report(reporter, os.Stdout, pipeline)
+		}
+	}
+
 	for res := range pipeline {
 		switch {
 		case res.Error != nil:
@@ -165,6 +181,10 @@ func main() {
 			Name:  "duration, d",
 			Usage: "Test duration",
 			Value: time.Duration(10) * time.Second,
+		},
+		cli.StringFlag{
+			Name:  "out-file, o",
+			Usage: "Output raw metrics to a file",
 		},
 	}
 	app.Before = func(c *cli.Context) error {
