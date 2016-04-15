@@ -15,7 +15,7 @@ type SimpleRunner struct {
 func New() *SimpleRunner {
 	return &SimpleRunner{
 		Client: &fasthttp.Client{
-		// MaxIdleConnDuration: time.Duration(0),
+			MaxIdleConnDuration: time.Duration(0),
 		},
 	}
 }
