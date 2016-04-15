@@ -22,6 +22,10 @@ func (s *DurationStat) Ingest(d time.Duration) {
 }
 
 func (s *DurationStat) End() {
+	if len(s.Values) == 0 {
+		return
+	}
+
 	sum := time.Duration(0)
 	for _, d := range s.Values {
 		sum += d
