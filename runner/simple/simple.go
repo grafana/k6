@@ -12,8 +12,9 @@ type SimpleRunner struct {
 	Client *fasthttp.Client
 }
 
-func New() *SimpleRunner {
+func New(url string) *SimpleRunner {
 	return &SimpleRunner{
+		URL: url,
 		Client: &fasthttp.Client{
 			MaxIdleConnDuration: time.Duration(0),
 		},
