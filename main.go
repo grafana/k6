@@ -118,6 +118,22 @@ func action(c *cli.Context) {
 		"med": stats.Time.Med,
 		"avg": stats.Time.Avg,
 	}).Info("Time")
+
+	bucketInterval := time.Duration(100) * time.Millisecond
+	buckets := [][]time.Duration{}
+	for _, t := range stats.Time.Values {
+		b := int(t / bucketInterval)
+		for len(buckets) <= b {
+			buckets = append(buckets, []time.Duration{})
+		}
+		buckets[b] = append(buckets[b], t)
+	}
+	for i, bucket := range buckets {
+		log.WithFields(log.Fields{
+			"i":   i,
+			"len": len(bucket),
+		}).Info("Bucket")
+	}
 }
 
 // Configure the global logger.
