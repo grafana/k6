@@ -41,6 +41,8 @@ func (r *LuaRunner) Run(ctx context.Context) <-chan runner.Result {
 		L := lua.NewState()
 		defer L.Close()
 
+		L.SetGlobal("sleep", L.NewFunction(vu.Sleep))
+
 		L.PreloadModule("http", vu.HTTPLoader)
 
 		// Try to load the script, abort execution if it fails
