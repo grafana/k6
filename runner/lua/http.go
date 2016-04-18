@@ -25,7 +25,8 @@ func (vu *VUContext) HTTPGet(L *lua.LState) int {
 		res := fasthttp.AcquireResponse()
 		defer fasthttp.ReleaseResponse(res)
 
-		req.SetRequestURI("http://google.com")
+		url := L.ToString(1)
+		req.SetRequestURI(url)
 
 		startTime := time.Now()
 		err := vu.r.Client.Do(req, res)
