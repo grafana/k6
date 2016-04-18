@@ -14,7 +14,7 @@ type LuaRunner struct {
 	Client   *fasthttp.Client
 }
 
-type LuaVU struct {
+type VUContext struct {
 	r   *LuaRunner
 	ctx context.Context
 	ch  chan runner.Result
@@ -36,7 +36,7 @@ func (r *LuaRunner) Run(ctx context.Context) <-chan runner.Result {
 	go func() {
 		defer close(ch)
 
-		vu := LuaVU{r: r, ctx: ctx, ch: ch}
+		vu := VUContext{r: r, ctx: ctx, ch: ch}
 
 		L := lua.NewState()
 		defer L.Close()

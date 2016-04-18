@@ -7,16 +7,16 @@ import (
 	"time"
 )
 
-func (u *LuaVU) HTTPLoader(L *lua.LState) int {
+func (vu *VUContext) HTTPLoader(L *lua.LState) int {
 	mod := L.SetFuncs(L.NewTable(), map[string]lua.LGFunction{
-		"get": u.HTTPGet,
+		"get": vu.HTTPGet,
 	})
 	L.SetField(mod, "name", lua.LString("http"))
 	L.Push(mod)
 	return 1
 }
 
-func (u *LuaVU) HTTPGet(L *lua.LState) int {
+func (vu *VUContext) HTTPGet(L *lua.LState) int {
 	result := make(chan runner.Result, 1)
 	go func() {
 		req := fasthttp.AcquireRequest()
@@ -28,16 +28,16 @@ func (u *LuaVU) HTTPGet(L *lua.LState) int {
 		req.SetRequestURI("http://google.com")
 
 		startTime := time.Now()
-		err := u.r.Client.Do(req, res)
+		err := vu.r.Client.Do(req, res)
 		duration := time.Since(startTime)
 
 		result <- runner.Result{Error: err, Time: duration}
 	}()
 
 	select {
-	case <-u.ctx.Done():
+	case <-vu.ctx.Done():
 	case res := <-result:
-		u.ch <- res
+		vu.ch <- res
 	}
 
 	return 0
