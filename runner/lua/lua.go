@@ -26,6 +26,7 @@ func New(filename, src string) *LuaRunner {
 		Filename: filename,
 		Source:   src,
 		Client: &fasthttp.Client{
+			Dial:                fasthttp.Dial,
 			MaxIdleConnDuration: time.Duration(0),
 			MaxConnsPerHost:     math.MaxInt64,
 		},
