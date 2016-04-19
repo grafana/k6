@@ -7,6 +7,7 @@ import (
 	"github.com/loadimpact/speedboat/loadtest"
 	"github.com/loadimpact/speedboat/report"
 	"github.com/loadimpact/speedboat/runner"
+	"github.com/loadimpact/speedboat/runner/duktapejs"
 	"github.com/loadimpact/speedboat/runner/lua"
 	"github.com/loadimpact/speedboat/runner/ottojs"
 	"github.com/loadimpact/speedboat/runner/simple"
@@ -100,7 +101,16 @@ func action(c *cli.Context) {
 		case ".lua":
 			r = lua.New(test.Script, test.Source)
 		case ".js":
-			r = ottojs.New(test.Script, test.Source)
+			switch c.String("impl") {
+			case "otto":
+				r = ottojs.New(test.Script, test.Source)
+			case "duk":
+				r = duktapejs.New(test.Script, test.Source)
+			case "":
+				log.Fatal("No implementation specified; use --impl {otto,duk}")
+			default:
+				log.Fatal("Unknown implementation")
+			}
 		default:
 			log.WithField("ext", ext).Fatal("No runner found")
 		}
@@ -214,6 +224,10 @@ func main() {
 		cli.StringFlag{
 			Name:  "out-file, o",
 			Usage: "Output raw metrics to a file",
+		},
+		cli.StringFlag{
+			Name:  "impl, i",
+			Usage: "Specify a runner implementation",
 		},
 	}
 	app.Before = func(c *cli.Context) error {
