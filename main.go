@@ -12,6 +12,7 @@ import (
 	"golang.org/x/net/context"
 	"io/ioutil"
 	"os"
+	"os/signal"
 	"path"
 	"time"
 )
@@ -119,22 +120,36 @@ func action(c *cli.Context) {
 		}
 	}
 
-	for res := range pipeline {
-		switch {
-		case res.Error != nil:
-			l := log.WithError(res.Error)
-			if res.Time != time.Duration(0) {
-				l = l.WithField("t", res.Time)
+	// Listen for SIGINT (Ctrl+C)
+	stop := make(chan os.Signal)
+	signal.Notify(stop, os.Interrupt)
+
+runLoop:
+	for {
+		select {
+		case res, ok := <-pipeline:
+			if !ok {
+				break runLoop
 			}
-			l.Error("Error")
-		case res.Text != "":
-			l := log.WithField("text", res.Text)
-			if res.Time != time.Duration(0) {
-				l = l.WithField("t", res.Time)
+
+			switch {
+			case res.Error != nil:
+				l := log.WithError(res.Error)
+				if res.Time != time.Duration(0) {
+					l = l.WithField("t", res.Time)
+				}
+				l.Error("Error")
+			case res.Text != "":
+				l := log.WithField("text", res.Text)
+				if res.Time != time.Duration(0) {
+					l = l.WithField("t", res.Time)
+				}
+				l.Info("Log")
+			default:
+				// log.WithField("t", res.Time).Debug("Metric")
 			}
-			l.Info("Log")
-		default:
-			// log.WithField("t", res.Time).Debug("Metric")
+		case <-stop:
+			break runLoop
 		}
 	}
 
