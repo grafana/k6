@@ -1,2 +1,2 @@
-res = get("https://google.com/")
-log("Status: " + res.statusCode)
+get("http://google.com/")
+sleep(1)

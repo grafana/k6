@@ -8,6 +8,7 @@ import (
 	"github.com/loadimpact/speedboat/report"
 	"github.com/loadimpact/speedboat/runner"
 	"github.com/loadimpact/speedboat/runner/lua"
+	"github.com/loadimpact/speedboat/runner/ottojs"
 	"github.com/loadimpact/speedboat/runner/simple"
 	"golang.org/x/net/context"
 	"io/ioutil"
@@ -94,7 +95,15 @@ func action(c *cli.Context) {
 
 	// Start the pipeline by just running requests
 	if test.Script != "" {
-		r = lua.New(test.Script, test.Source)
+		ext := path.Ext(test.Script)
+		switch ext {
+		case ".lua":
+			r = lua.New(test.Script, test.Source)
+		case ".js":
+			r = ottojs.New(test.Script, test.Source)
+		default:
+			log.WithField("ext", ext).Fatal("No runner found")
+		}
 	} else {
 		r = simple.New(test.URL)
 	}

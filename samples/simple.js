@@ -1,3 +1,1 @@
-log("a")
-sleep(1)
-log("b")
+console.log("Test: " + __id)
