@@ -5,6 +5,7 @@ import (
 	"github.com/valyala/fasthttp"
 	"github.com/yuin/gopher-lua"
 	"golang.org/x/net/context"
+	"math"
 	"time"
 )
 
@@ -26,6 +27,7 @@ func New(filename, src string) *LuaRunner {
 		Source:   src,
 		Client: &fasthttp.Client{
 			MaxIdleConnDuration: time.Duration(0),
+			MaxConnsPerHost:     math.MaxInt32,
 		},
 	}
 }
