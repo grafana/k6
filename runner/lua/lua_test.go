@@ -11,6 +11,6 @@ func BenchmarkRunEmpty(b *testing.B) {
 
 	r := New("script.lua", "")
 	for i := 0; i < b.N; i++ {
-		r.Run(ctx)
+		r.Run(ctx, int64(i))
 	}
 }
