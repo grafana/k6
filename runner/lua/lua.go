@@ -32,7 +32,7 @@ func New(filename, src string) *LuaRunner {
 	}
 }
 
-func (r *LuaRunner) Run(ctx context.Context) <-chan runner.Result {
+func (r *LuaRunner) Run(ctx context.Context, id int64) <-chan runner.Result {
 	ch := make(chan runner.Result)
 
 	go func() {
@@ -42,6 +42,8 @@ func (r *LuaRunner) Run(ctx context.Context) <-chan runner.Result {
 
 		L := lua.NewState()
 		defer L.Close()
+
+		L.SetGlobal("__id", lua.LNumber(id))
 
 		L.SetGlobal("sleep", L.NewFunction(vu.Sleep))
 

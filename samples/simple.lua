@@ -1,1 +1,1 @@
-print("Test")
+print("Test: "..tostring(__id))

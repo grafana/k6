@@ -7,7 +7,7 @@ import (
 )
 
 type Runner interface {
-	Run(ctx context.Context) <-chan Result
+	Run(ctx context.Context, id int64) <-chan Result
 }
 
 type Result struct {
@@ -31,16 +31,19 @@ func Run(ctx context.Context, r Runner, scale <-chan int) <-chan Result {
 		}()
 
 		currentVUs := make([]VU, 0, 100)
+		currentID := int64(0)
 		for {
 			select {
 			case vus := <-scale:
 				for vus > len(currentVUs) {
+					currentID += 1
+					currentID := currentID
 					wg.Add(1)
 					c, cancel := context.WithCancel(ctx)
 					currentVUs = append(currentVUs, VU{Cancel: cancel})
 					go func() {
 						defer wg.Done()
-						for res := range r.Run(c) {
+						for res := range r.Run(c, currentID) {
 							ch <- res
 						}
 					}()
