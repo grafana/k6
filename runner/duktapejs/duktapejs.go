@@ -81,8 +81,9 @@ func (r *Runner) Run(ctx context.Context, id int64) <-chan runner.Result {
 		}
 
 		for {
+			c.PushGlobalObject()
 			c.PushString("__code__")
-			if code := c.PcallProp(globalIndex, 0); code != duktape.ExecSuccess {
+			if code := c.PcallProp(-2, 0); code != duktape.ExecSuccess {
 				e := c.SafeToString(-1)
 				c.Pop()
 				ch <- runner.Result{Error: errors.New(e)}
