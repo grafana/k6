@@ -43,14 +43,19 @@ func (r *Runner) Run(ctx context.Context, id int64) <-chan runner.Result {
 
 		c := duktape.New()
 
+		// Get a reference to the global object
 		c.PushGlobalObject()
+		globalIndex := c.RequireTopIndex()
+
+		// Set __id (key + val -> -)
 		c.PushString("__id")
 		c.PushInt(int(id))
-		if !c.PutProp(-3) {
+		if !c.PutProp(globalIndex) {
 			ch <- runner.Result{Error: errors.New("Couldn't push __id")}
 			return
 		}
 
+		// Bridge functions (no stack change)
 		if _, err := c.PushGlobalGoFunction("get", vu.HTTPGet); err != nil {
 			ch <- runner.Result{Error: err}
 			return
@@ -59,6 +64,7 @@ func (r *Runner) Run(ctx context.Context, id int64) <-chan runner.Result {
 			ch <- runner.Result{Error: err}
 		}
 
+		// Compile the script (source + filename -> func)
 		c.PushString(r.Source)
 		c.PushString(r.Filename)
 		if err := c.Pcompile(0); err != nil {
@@ -66,9 +72,17 @@ func (r *Runner) Run(ctx context.Context, id int64) <-chan runner.Result {
 			return
 		}
 
+		// Set it as the global __code__ (key + val -> -)
+		c.PushString("__code__")
+		c.Insert(-2)
+		if !c.PutProp(globalIndex) {
+			ch <- runner.Result{Error: errors.New("Couldn't push __code__")}
+			return
+		}
+
 		for {
-			c.DupTop()
-			if code := c.Pcall(0); code != duktape.ExecSuccess {
+			c.PushString("__code__")
+			if code := c.PcallProp(globalIndex, 0); code != duktape.ExecSuccess {
 				e := c.SafeToString(-1)
 				c.Pop()
 				ch <- runner.Result{Error: errors.New(e)}
