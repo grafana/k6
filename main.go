@@ -17,6 +17,7 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"runtime/debug"
 	"time"
 )
 
@@ -192,6 +193,9 @@ func configureLogging(c *cli.Context) {
 }
 
 func main() {
+	// Up the thread limit (default: 10.000)
+	debug.SetMaxThreads(100000)
+
 	// Free up -v and -h for our own flags
 	cli.VersionFlag.Name = "version"
 	cli.HelpFlag.Name = "help, ?"
