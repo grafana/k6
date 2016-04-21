@@ -91,6 +91,7 @@ func (r *Runner) Run(ctx context.Context, id int64) <-chan runner.Result {
 				c.Pop()
 				ch <- runner.Result{Error: errors.New(e)}
 			}
+			c.Pop()
 
 			c.Gc(0)
 			c.Gc(0)
