@@ -7,6 +7,7 @@ import (
 	"github.com/loadimpact/speedboat/loadtest"
 	"github.com/loadimpact/speedboat/report"
 	"github.com/loadimpact/speedboat/runner"
+	"github.com/loadimpact/speedboat/runner/ank"
 	"github.com/loadimpact/speedboat/runner/duktapejs"
 	"github.com/loadimpact/speedboat/runner/lua"
 	"github.com/loadimpact/speedboat/runner/ottojs"
@@ -115,6 +116,8 @@ func action(c *cli.Context) {
 			default:
 				log.Fatal("Unknown implementation")
 			}
+		case ".ank":
+			r = ank.New(test.Script, test.Source)
 		default:
 			log.WithField("ext", ext).Fatal("No runner found")
 		}
