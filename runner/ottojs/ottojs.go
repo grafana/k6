@@ -43,6 +43,7 @@ func New(filename, src string) *Runner {
 	}
 	return r
 }
+
 func (r *Runner) Run(ctx context.Context, id int64) <-chan runner.Result {
 	ch := make(chan runner.Result)
 
