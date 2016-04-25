@@ -2,20 +2,29 @@ package v8js
 
 import (
 	"fmt"
+	"github.com/GeertJohan/go.rice"
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/speedboat/runner"
 	"github.com/ry/v8worker"
 	"github.com/valyala/fasthttp"
 	"golang.org/x/net/context"
 	"math"
+	"os"
 	"strings"
 	"time"
 )
+
+type libFile struct {
+	Filename string
+	Source   string
+}
 
 type Runner struct {
 	Filename string
 	Source   string
 	Client   *fasthttp.Client
+
+	stdlib []libFile
 }
 
 type VUContext struct {
@@ -25,7 +34,7 @@ type VUContext struct {
 }
 
 func New(filename, src string) *Runner {
-	return &Runner{
+	r := &Runner{
 		Filename: filename,
 		Source:   src,
 		Client: &fasthttp.Client{
@@ -34,6 +43,24 @@ func New(filename, src string) *Runner {
 			MaxConnsPerHost:     math.MaxInt64,
 		},
 	}
+
+	// Load the standard library as a rice box; panic if any part of this fails
+	// (The only possible cause is a programming/developer error, not user error)
+	box := rice.MustFindBox("lib")
+	box.Walk("/", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			panic(err)
+		}
+		if !info.IsDir() {
+			r.stdlib = append(r.stdlib, libFile{
+				Filename: path,
+				Source:   box.MustString(path),
+			})
+		}
+		return nil
+	})
+
+	return r
 }
 func (r *Runner) Run(ctx context.Context, id int64) <-chan runner.Result {
 	ch := make(chan runner.Result)
@@ -55,39 +82,16 @@ func (r *Runner) Run(ctx context.Context, id int64) <-chan runner.Result {
 			}
 			return ""
 		})
-		w.Load(r.Filename, fmt.Sprintf(`
-		$recvSync(function(msg) {
-			if(msg == 'run') {
-				run()
-			}
-		})
-		function get(url) {
-			$sendSync('get;' + url)
-		}
-		function sleep(t) {
-			$sendSync('sleep;' + t)
-		}
-		function run() {
-			%s
-		}
-		`, r.Source))
 
-		// vm := otto.New()
-		// vm.Set("__id", id)
-		// vm.Set("get", vu.HTTPGet)
-		// vm.Set("sleep", vu.Sleep)
+		for _, f := range r.stdlib {
+			w.Load(f.Filename, f.Source)
+		}
 
-		// script, err := vm.Compile(r.Filename, r.Source)
-		// if err != nil {
-		// 	ch <- runner.Result{Error: err}
-		// 	return
-		// }
+		src := fmt.Sprintf("speedboat._internal.recv.run = function() {\n%s\n}", r.Source)
+		w.Load(r.Filename, src)
 
 		for {
-			// if _, err := vm.Run(script); err != nil {
-			// 	ch <- runner.Result{Error: err}
-			// }
-			w.SendSync("run")
+			w.SendSync("{\"call\": \"run\"}")
 
 			select {
 			case <-ctx.Done():
