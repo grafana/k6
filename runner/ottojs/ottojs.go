@@ -6,6 +6,7 @@ import (
 	"github.com/valyala/fasthttp"
 	"golang.org/x/net/context"
 	"math"
+	"sync"
 	"time"
 )
 
@@ -13,6 +14,7 @@ type Runner struct {
 	Filename string
 	Source   string
 	Client   *fasthttp.Client
+	VMs      sync.Pool
 }
 
 type VUContext struct {
@@ -22,7 +24,7 @@ type VUContext struct {
 }
 
 func New(filename, src string) *Runner {
-	return &Runner{
+	r := &Runner{
 		Filename: filename,
 		Source:   src,
 		Client: &fasthttp.Client{
@@ -30,7 +32,16 @@ func New(filename, src string) *Runner {
 			MaxIdleConnDuration: time.Duration(0),
 			MaxConnsPerHost:     math.MaxInt64,
 		},
+		VMs: sync.Pool{
+			New: func() interface{} {
+				return otto.New()
+			},
+		},
 	}
+	for i := 0; i < 10000; i++ {
+		r.VMs.Put(r.VMs.New())
+	}
+	return r
 }
 func (r *Runner) Run(ctx context.Context, id int64) <-chan runner.Result {
 	ch := make(chan runner.Result)
@@ -40,7 +51,9 @@ func (r *Runner) Run(ctx context.Context, id int64) <-chan runner.Result {
 
 		vu := VUContext{r: r, ctx: ctx, ch: ch}
 
-		vm := otto.New()
+		vm := r.VMs.Get().(*otto.Otto)
+		defer r.VMs.Put(vm)
+
 		vm.Set("__id", id)
 		vm.Set("get", vu.HTTPGet)
 		vm.Set("sleep", vu.Sleep)
