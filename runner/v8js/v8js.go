@@ -10,7 +10,6 @@ import (
 	"golang.org/x/net/context"
 	"math"
 	"os"
-	"strings"
 	"time"
 )
 
@@ -62,6 +61,7 @@ func New(filename, src string) *Runner {
 
 	return r
 }
+
 func (r *Runner) Run(ctx context.Context, id int64) <-chan runner.Result {
 	ch := make(chan runner.Result)
 
@@ -70,28 +70,24 @@ func (r *Runner) Run(ctx context.Context, id int64) <-chan runner.Result {
 
 		vu := VUContext{r: r, ctx: ctx, ch: ch}
 
-		w := v8worker.New(func(msg string) {}, func(msg string) string {
-			parts := strings.SplitN(msg, ";", 2)
-			switch parts[0] {
-			case "get":
-				vu.HTTPGet(parts[1])
-			case "sleep":
-				vu.Sleep(parts[1])
-			default:
-				log.WithField("call", parts[0]).Fatal("Unknown JS call")
-			}
-			return ""
-		})
+		w := v8worker.New(vu.Recv, vu.RecvSync)
 
 		for _, f := range r.stdlib {
-			w.Load(f.Filename, f.Source)
+			if err := w.Load(r.Filename, r.Source); err != nil {
+				log.WithError(err).WithField("file", f.Filename).Error("Couldn't load lib")
+			}
 		}
 
-		src := fmt.Sprintf("speedboat._internal.recv.run = function() {\n%s\n}", r.Source)
-		w.Load(r.Filename, src)
+		src := fmt.Sprintf("function __run__() {%s}; undefined", r.Source)
+		if err := w.Load(r.Filename, src); err != nil {
+			log.WithError(err).Error("Couldn't load JS")
+			return
+		}
 
 		for {
-			w.SendSync("{\"call\": \"run\"}")
+			log.Info("-> run")
+			w.Send("run")
+			log.Info("<- run")
 
 			select {
 			case <-ctx.Done():
@@ -102,4 +98,11 @@ func (r *Runner) Run(ctx context.Context, id int64) <-chan runner.Result {
 	}()
 
 	return ch
+}
+
+func (vu *VUContext) Recv(raw string) {
+}
+
+func (vu *VUContext) RecvSync(raw string) string {
+	return ""
 }
