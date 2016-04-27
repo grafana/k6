@@ -27,10 +27,15 @@ type Runner struct {
 }
 
 type VUContext struct {
-	r   *Runner
-	ctx context.Context
-	ch  chan runner.Result
+	r    *Runner
+	ctx  context.Context
+	ch   chan runner.Result
+	mods map[string]Module
 }
+
+type Module map[string]Member
+
+type Member interface{}
 
 func New(filename, src string) *Runner {
 	r := &Runner{
@@ -69,13 +74,17 @@ func (r *Runner) Run(ctx context.Context, id int64) <-chan runner.Result {
 		defer close(ch)
 
 		vu := VUContext{r: r, ctx: ctx, ch: ch}
-
 		w := v8worker.New(vu.Recv, vu.RecvSync)
 
 		for _, f := range r.stdlib {
 			if err := w.Load(f.Filename, f.Source); err != nil {
 				log.WithError(err).WithField("file", f.Filename).Error("Couldn't load lib")
 			}
+		}
+
+		if err := vu.RegisterModules(w); err != nil {
+			log.WithError(err).Error("Couldn't register bridged functions")
+			return
 		}
 
 		src := fmt.Sprintf("function __run__() {%s}; undefined", r.Source)
@@ -85,9 +94,9 @@ func (r *Runner) Run(ctx context.Context, id int64) <-chan runner.Result {
 		}
 
 		for {
-			log.Info("-> run")
-			w.Send("run")
-			log.Info("<- run")
+			// log.Info("-> run")
+			w.SendSync("run")
+			// log.Info("<- run")
 
 			select {
 			case <-ctx.Done():
@@ -98,11 +107,4 @@ func (r *Runner) Run(ctx context.Context, id int64) <-chan runner.Result {
 	}()
 
 	return ch
-}
-
-func (vu *VUContext) Recv(raw string) {
-}
-
-func (vu *VUContext) RecvSync(raw string) string {
-	return ""
 }

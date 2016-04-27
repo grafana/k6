@@ -1,0 +1,122 @@
+package v8js
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	log "github.com/Sirupsen/logrus"
+	"github.com/ry/v8worker"
+	"reflect"
+)
+
+func (vu *VUContext) RegisterModules(w *v8worker.Worker) error {
+	vu.mods = map[string]Module{
+		"global": Module{
+			"sleep": vu.Sleep,
+		},
+		"http": Module{
+			"get": vu.HTTPGet,
+		},
+	}
+
+	for modname, mod := range vu.mods {
+		jsMod := fmt.Sprintf(`
+		speedboat._modules["%s"] = {};
+		`, modname)
+		for name, mem := range mod {
+			t := reflect.TypeOf(mem)
+
+			if t.Kind() != reflect.Func {
+				return errors.New("Not a function: " + modname + "." + name)
+			}
+
+			jsFn := fmt.Sprintf(`
+			speedboat._modules["%s"]["%s"] = function() {
+				if (arguments.length != %d) {
+					throw new Error("wrong number of arguments");
+				}
+				var args = [];
+			`, modname, name, t.NumIn())
+
+			for i := 0; i < t.NumIn(); i++ {
+				aT := t.In(i)
+				jsFn += fmt.Sprintf("args.push(speedboat._require.%s(arguments[%d]));", aT.Kind().String(), i)
+			}
+
+			jsFn += `
+				$sendSync(JSON.stringify({
+					m: '` + modname + `',
+					f: '` + name + `',
+					a: args,
+				}));
+			}`
+			jsMod += "\n\n" + jsFn
+		}
+
+		if err := w.Load("module:"+modname, jsMod); err != nil {
+			return err
+		}
+	}
+
+	// Make functions in the "global" module global
+	makeGlobals := `
+	for (key in speedboat._modules['global']) {
+		eval(key + " = speedboat._modules['global']['" + key + "'];");
+	}`
+	if err := w.Load("internal:makeGlobals", makeGlobals); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (vu *VUContext) Recv(raw string) {
+}
+
+func (vu *VUContext) RecvSync(raw string) string {
+	call := struct {
+		Mod  string        `json:"m"`
+		Fn   string        `json:"f"`
+		Args []interface{} `json:"a"`
+	}{}
+	if err := json.Unmarshal([]byte(raw), &call); err != nil {
+		log.WithError(err).Error("Malformed call")
+		return ""
+	}
+	log.WithFields(log.Fields{
+		"mod":  call.Mod,
+		"fn":   call.Fn,
+		"args": call.Args,
+	}).Debug("Sync call")
+
+	mod, ok := vu.mods[call.Mod]
+	if !ok {
+		log.WithField("mod", call.Mod).Error("Unknown module")
+		return ""
+	}
+
+	fn, ok := mod[call.Fn]
+	if !ok {
+		log.WithFields(log.Fields{
+			"mod": call.Mod,
+			"fn":  call.Fn,
+		}).Error("Unknown function")
+		return ""
+	}
+
+	args := make([]reflect.Value, len(call.Args))
+	for i, arg := range call.Args {
+		args[i] = reflect.ValueOf(arg)
+	}
+
+	defer func() {
+		if err := recover(); err != nil {
+			log.WithField("error", err).Error("Go call panicked")
+		}
+	}()
+	fnV := reflect.ValueOf(fn)
+	log.WithField("T", fnV.Type().String()).Debug("Function")
+	reflect.ValueOf(fn).Call(args)
+
+	return ""
+}
