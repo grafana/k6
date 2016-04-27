@@ -62,8 +62,9 @@ func makeTest(c *cli.Context) (test loadtest.LoadTest, err error) {
 	return test, nil
 }
 
-func run(test loadtest.LoadTest, r runner.Runner) <-chan runner.Result {
+func run(test loadtest.LoadTest, r runner.Runner) (<-chan runner.Result, chan int) {
 	ch := make(chan runner.Result)
+	scale := make(chan int, 1)
 
 	go func() {
 		defer close(ch)
@@ -74,7 +75,6 @@ func run(test loadtest.LoadTest, r runner.Runner) <-chan runner.Result {
 		}
 
 		ctx, _ := context.WithTimeout(context.Background(), timeout)
-		scale := make(chan int, 1)
 		scale <- test.Stages[0].VUs.Start
 
 		for res := range runner.Run(ctx, r, scale) {
@@ -82,7 +82,7 @@ func run(test loadtest.LoadTest, r runner.Runner) <-chan runner.Result {
 		}
 	}()
 
-	return ch
+	return ch, scale
 }
 
 func action(c *cli.Context) {
@@ -105,7 +105,10 @@ func action(c *cli.Context) {
 	} else {
 		r = simple.New(test.URL)
 	}
-	pipeline := run(test, r)
+	pipeline, scale := run(test, r)
+
+	// Ramp VUs according to the test definition
+	pipeline = runner.Ramp(&test, scale, pipeline)
 
 	// Stick result aggregation onto it
 	stats := aggregate.Stats{}
