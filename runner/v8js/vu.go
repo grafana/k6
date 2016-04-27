@@ -30,17 +30,33 @@ func (vu *VUContext) RegisterModules(w *v8worker.Worker) error {
 				return errors.New("Not a function: " + modname + "." + name)
 			}
 
-			jsFn := fmt.Sprintf(`
-			speedboat._modules["%s"]["%s"] = function() {
-				if (arguments.length != %d) {
-					throw new Error("wrong number of arguments");
-				}
+			jsFn := fmt.Sprintf(`speedboat._modules["%s"]["%s"] = function() {
 				var args = [];
-			`, modname, name, t.NumIn())
+			`, modname, name)
 
-			for i := 0; i < t.NumIn(); i++ {
+			numArgs := t.NumIn()
+			if !t.IsVariadic() {
+				jsFn += fmt.Sprintf(`
+					if (arguments.length != %d) {
+						throw new Error("wrong number of arguments");
+					}
+				`, t.NumIn())
+			} else {
+				numArgs--
+			}
+
+			for i := 0; i < numArgs; i++ {
 				aT := t.In(i)
 				jsFn += fmt.Sprintf("args.push(speedboat._require.%s(arguments[%d]));", aT.Kind().String(), i)
+			}
+			if t.IsVariadic() {
+				varArg := t.In(numArgs)
+				eT := varArg.Elem()
+				jsFn += fmt.Sprintf(`
+					for (var i = %d; i < arguments.length; i++) {
+						args.push(speedboat._require.%s(arguments[i]));
+					}
+				`, numArgs, eT.Kind().String())
 			}
 
 			jsFn += `
