@@ -15,7 +15,9 @@ func (vu *VUContext) RegisterModules(w *v8worker.Worker) error {
 			"sleep": vu.Sleep,
 		},
 		"console": Module{
-			"log": vu.ConsoleLog,
+			"log":   vu.ConsoleLog,
+			"warn":  vu.ConsoleWarn,
+			"error": vu.ConsoleError,
 		},
 		"http": Module{
 			"get": vu.HTTPGet,
