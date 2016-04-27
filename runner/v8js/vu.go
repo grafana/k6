@@ -14,6 +14,9 @@ func (vu *VUContext) RegisterModules(w *v8worker.Worker) error {
 		"global": Module{
 			"sleep": vu.Sleep,
 		},
+		"console": Module{
+			"log": vu.ConsoleLog,
+		},
 		"http": Module{
 			"get": vu.HTTPGet,
 		},
@@ -74,12 +77,14 @@ func (vu *VUContext) RegisterModules(w *v8worker.Worker) error {
 		}
 	}
 
-	// Make functions in the "global" module global
+	// Make functions in the "global" module global, preimport console
 	makeGlobals := `
 	for (key in speedboat._modules['global']) {
 		eval(key + " = speedboat._modules['global']['" + key + "'];");
-	}`
-	if err := w.Load("internal:makeGlobals", makeGlobals); err != nil {
+	}
+	var console = speedboat._modules['console'];
+	`
+	if err := w.Load("internal:preload", makeGlobals); err != nil {
 		return err
 	}
 
