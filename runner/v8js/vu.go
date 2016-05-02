@@ -9,18 +9,24 @@ import (
 	"reflect"
 )
 
+type jsCallEnvelope struct {
+	Mod  string        `json:"m"`
+	Fn   string        `json:"f"`
+	Args []interface{} `json:"a"`
+}
+
 func (vu *VUContext) RegisterModules(w *v8worker.Worker) error {
 	vu.mods = map[string]Module{
 		"global": Module{
-			"sleep": vu.Sleep,
+			"sleep": Member{Func: vu.Sleep},
 		},
 		"console": Module{
-			"log":   vu.ConsoleLog,
-			"warn":  vu.ConsoleWarn,
-			"error": vu.ConsoleError,
+			"log":   Member{Func: vu.ConsoleLog, Async: true},
+			"warn":  Member{Func: vu.ConsoleWarn, Async: true},
+			"error": Member{Func: vu.ConsoleError, Async: true},
 		},
 		"http": Module{
-			"get": vu.HTTPGet,
+			"get": Member{Func: vu.HTTPGet},
 		},
 	}
 
@@ -29,7 +35,7 @@ func (vu *VUContext) RegisterModules(w *v8worker.Worker) error {
 		speedboat._modules["%s"] = {};
 		`, modname)
 		for name, mem := range mod {
-			t := reflect.TypeOf(mem)
+			t := reflect.TypeOf(mem.Func)
 
 			if t.Kind() != reflect.Func {
 				return errors.New("Not a function: " + modname + "." + name)
@@ -64,9 +70,9 @@ func (vu *VUContext) RegisterModules(w *v8worker.Worker) error {
 				`, numArgs, eT.Kind().String())
 			}
 
-			jsFn += `
-				return speedboat._invoke('` + modname + `', '` + name + `', args);
-			}`
+			jsFn += fmt.Sprintf(`
+				return speedboat._invoke('%s', '%s', args, %v);
+			}`, modname, name, mem.Async)
 			jsMod += "\n\n" + jsFn
 		}
 
@@ -90,14 +96,24 @@ func (vu *VUContext) RegisterModules(w *v8worker.Worker) error {
 }
 
 func (vu *VUContext) Recv(raw string) {
+	call := jsCallEnvelope{}
+	if err := json.Unmarshal([]byte(raw), &call); err != nil {
+		log.WithError(err).Error("Malformed host call")
+		return
+	}
+	log.WithFields(log.Fields{
+		"mod":  call.Mod,
+		"fn":   call.Fn,
+		"args": call.Args,
+	}).Debug("Async call")
+
+	if err := vu.invoke(call); err != nil {
+		log.WithError(err).Error("Couldn't invoke")
+	}
 }
 
 func (vu *VUContext) RecvSync(raw string) string {
-	call := struct {
-		Mod  string        `json:"m"`
-		Fn   string        `json:"f"`
-		Args []interface{} `json:"a"`
-	}{}
+	call := jsCallEnvelope{}
 	if err := json.Unmarshal([]byte(raw), &call); err != nil {
 		return jsThrow(fmt.Sprintf("malformed host call: %s", err))
 	}
@@ -107,14 +123,21 @@ func (vu *VUContext) RecvSync(raw string) string {
 		"args": call.Args,
 	}).Debug("Sync call")
 
+	if err := vu.invoke(call); err != nil {
+		return jsThrow(err.Error())
+	}
+	return ""
+}
+
+func (vu *VUContext) invoke(call jsCallEnvelope) error {
 	mod, ok := vu.mods[call.Mod]
 	if !ok {
-		return jsThrow(fmt.Sprintf("unknown module '%s'", call.Mod))
+		return errors.New(fmt.Sprintf("unknown module '%s'", call.Mod))
 	}
 
-	fn, ok := mod[call.Fn]
+	mem, ok := mod[call.Fn]
 	if !ok {
-		return jsThrow(fmt.Sprintf("unrecognized function call: '%s'.'%s'", call.Mod, call.Fn))
+		return errors.New(fmt.Sprintf("unrecognized function call: '%s'.'%s'", call.Mod, call.Fn))
 	}
 
 	args := make([]reflect.Value, len(call.Args))
@@ -127,9 +150,9 @@ func (vu *VUContext) RecvSync(raw string) string {
 			log.WithField("error", err).Error("Go call panicked")
 		}
 	}()
-	fnV := reflect.ValueOf(fn)
-	log.WithField("T", fnV.Type().String()).Debug("Function")
-	reflect.ValueOf(fn).Call(args)
+	fn := reflect.ValueOf(mem.Func)
+	log.WithField("T", fn.Type().String()).Debug("Function")
+	fn.Call(args)
 
-	return ""
+	return nil
 }

@@ -35,7 +35,10 @@ type VUContext struct {
 
 type Module map[string]Member
 
-type Member interface{}
+type Member struct {
+	Func  interface{}
+	Async bool
+}
 
 func New(filename, src string) *Runner {
 	r := &Runner{
