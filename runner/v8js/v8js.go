@@ -94,7 +94,7 @@ func (r *Runner) Run(ctx context.Context, id int64) <-chan runner.Result {
 			try {
 		%s
 			} catch (e) {
-				console.error(e);
+				console.error("Script Error", '' + e);
 			}
 		}
 		`, r.Source)
