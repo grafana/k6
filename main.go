@@ -85,7 +85,7 @@ func run(test loadtest.LoadTest, r runner.Runner) (<-chan runner.Result, chan in
 	return ch, scale
 }
 
-func action(c *cli.Context) {
+func action(c *cli.Context) error {
 	test, err := makeTest(c)
 	if err != nil {
 		log.WithError(err).Fatal("Configuration error")
@@ -170,6 +170,8 @@ runLoop:
 		"med": stats.Time.Med,
 		"avg": stats.Time.Avg,
 	}).Info("Time")
+
+	return nil
 }
 
 // Configure the global logger.
