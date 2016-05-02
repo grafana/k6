@@ -1,7 +1,6 @@
 package runner
 
 import (
-	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/speedboat/loadtest"
 	"golang.org/x/net/context"
 	"sync"
