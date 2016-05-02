@@ -89,7 +89,15 @@ func (r *Runner) Run(ctx context.Context, id int64) <-chan runner.Result {
 			return
 		}
 
-		src := fmt.Sprintf("function __run__() {%s}; undefined", r.Source)
+		src := fmt.Sprintf(`
+		function __run__() {
+			try {
+		%s
+			} catch (e) {
+				console.error(e);
+			}
+		}
+		`, r.Source)
 		if err := w.Load(r.Filename, src); err != nil {
 			log.WithError(err).Error("Couldn't load JS")
 			return
