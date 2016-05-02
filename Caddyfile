@@ -1,0 +1,5 @@
+localhost
+
+root _provisioning/salt/nginx/www
+browse
+ext .html
