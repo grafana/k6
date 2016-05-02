@@ -28,6 +28,17 @@ speedboat._require.interface = function(v) {
 	return v;
 }
 
+speedboat._invoke = function(mod, fn, args) {
+	res = $sendSync(JSON.stringify({ m: mod, f: fn, a: args }));
+	if (res) {
+		obj = JSON.parse(res);
+		if (obj._error) {
+			throw new Error(obj._error);
+		}
+		return obj;
+	}
+}
+
 $recvSync(function(raw) {
 	if (raw == 'run') {
 		__run__();
