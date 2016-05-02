@@ -15,27 +15,13 @@ type jsCallEnvelope struct {
 	Args []interface{} `json:"a"`
 }
 
-func (vu *VUContext) RegisterModules(w *v8worker.Worker) error {
-	vu.mods = map[string]Module{
-		"global": Module{
-			"sleep": Member{Func: vu.Sleep},
-		},
-		"console": Module{
-			"log":   Member{Func: vu.ConsoleLog, Async: true},
-			"warn":  Member{Func: vu.ConsoleWarn, Async: true},
-			"error": Member{Func: vu.ConsoleError, Async: true},
-		},
-		"http": Module{
-			"get": Member{Func: vu.HTTPGet},
-		},
-	}
-
-	for modname, mod := range vu.mods {
+func (vu *VUContext) BridgeAPI(w *v8worker.Worker) error {
+	for modname, mod := range vu.api {
 		jsMod := fmt.Sprintf(`
 		speedboat._modules["%s"] = {};
 		`, modname)
 		for name, mem := range mod {
-			t := reflect.TypeOf(mem.Func)
+			t := reflect.TypeOf(mem)
 
 			if t.Kind() != reflect.Func {
 				return errors.New("Not a function: " + modname + "." + name)
@@ -72,7 +58,7 @@ func (vu *VUContext) RegisterModules(w *v8worker.Worker) error {
 
 			jsFn += fmt.Sprintf(`
 				return speedboat._invoke('%s', '%s', args, %v);
-			}`, modname, name, mem.Async)
+			}`, modname, name, false)
 			jsMod += "\n\n" + jsFn
 		}
 
@@ -130,7 +116,7 @@ func (vu *VUContext) RecvSync(raw string) string {
 }
 
 func (vu *VUContext) invoke(call jsCallEnvelope) error {
-	mod, ok := vu.mods[call.Mod]
+	mod, ok := vu.api[call.Mod]
 	if !ok {
 		return errors.New(fmt.Sprintf("unknown module '%s'", call.Mod))
 	}
@@ -150,7 +136,7 @@ func (vu *VUContext) invoke(call jsCallEnvelope) error {
 			log.WithField("error", err).Error("Go call panicked")
 		}
 	}()
-	fn := reflect.ValueOf(mem.Func)
+	fn := reflect.ValueOf(mem)
 	log.WithField("T", fn.Type().String()).Debug("Function")
 	fn.Call(args)
 

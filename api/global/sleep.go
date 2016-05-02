@@ -1,9 +1,9 @@
-package v8js
+package global
 
 import (
 	"time"
 )
 
-func (vu *VUContext) Sleep(t float64) {
+func Sleep(t float64) {
 	time.Sleep(time.Duration(t) * time.Second)
 }
