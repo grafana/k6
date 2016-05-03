@@ -6,18 +6,10 @@ import (
 	"github.com/loadimpact/speedboat/api/http"
 )
 
-type RegisterFunc func() map[string]interface{}
-
-var API = map[string]RegisterFunc{
-	"global":  global.New,
-	"console": console.New,
-	"http":    http.New,
-}
-
 func New() map[string]map[string]interface{} {
-	res := make(map[string]map[string]interface{})
-	for name, factory := range API {
-		res[name] = factory()
+	return map[string]map[string]interface{}{
+		"global":  global.Members,
+		"console": console.Members,
+		"http":    http.New(),
 	}
-	return res
 }

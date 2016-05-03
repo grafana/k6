@@ -5,14 +5,10 @@ import (
 	"strconv"
 )
 
-var members = map[string]interface{}{
+var Members = map[string]interface{}{
 	"log":   Log,
 	"warn":  Warn,
 	"error": Error,
-}
-
-func New() map[string]interface{} {
-	return members
 }
 
 func consoleLogFields(args []interface{}) log.Fields {
