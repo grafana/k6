@@ -8,7 +8,7 @@ import (
 )
 
 type Runner interface {
-	Run(ctx context.Context, id int64) <-chan Result
+	Run(ctx context.Context, t loadtest.LoadTest, id int64) <-chan Result
 }
 
 type Result struct {
@@ -21,7 +21,7 @@ type VU struct {
 	Cancel context.CancelFunc
 }
 
-func Run(ctx context.Context, r Runner, scale <-chan int) <-chan Result {
+func Run(ctx context.Context, r Runner, t loadtest.LoadTest, scale <-chan int) <-chan Result {
 	ch := make(chan Result)
 
 	go func() {
@@ -44,7 +44,7 @@ func Run(ctx context.Context, r Runner, scale <-chan int) <-chan Result {
 					currentVUs = append(currentVUs, VU{Cancel: cancel})
 					go func() {
 						defer wg.Done()
-						for res := range r.Run(c, currentID) {
+						for res := range r.Run(c, t, currentID) {
 							ch <- res
 						}
 					}()

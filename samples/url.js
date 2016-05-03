@@ -1,3 +1,3 @@
 var http = require('http');
-http.get("http://10.20.30.20/");
+http.get(test.url);
 sleep(1);

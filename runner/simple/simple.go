@@ -1,6 +1,7 @@
 package simple
 
 import (
+	"github.com/loadimpact/speedboat/loadtest"
 	"github.com/loadimpact/speedboat/runner"
 	"github.com/valyala/fasthttp"
 	"golang.org/x/net/context"
@@ -8,20 +9,18 @@ import (
 )
 
 type SimpleRunner struct {
-	URL    string
 	Client *fasthttp.Client
 }
 
-func New(url string) *SimpleRunner {
+func New() *SimpleRunner {
 	return &SimpleRunner{
-		URL: url,
 		Client: &fasthttp.Client{
 			MaxIdleConnDuration: time.Duration(0),
 		},
 	}
 }
 
-func (r *SimpleRunner) Run(ctx context.Context, id int64) <-chan runner.Result {
+func (r *SimpleRunner) Run(ctx context.Context, t loadtest.LoadTest, id int64) <-chan runner.Result {
 	ch := make(chan runner.Result)
 
 	go func() {
@@ -36,7 +35,7 @@ func (r *SimpleRunner) Run(ctx context.Context, id int64) <-chan runner.Result {
 				res := fasthttp.AcquireResponse()
 				defer fasthttp.ReleaseResponse(res)
 
-				req.SetRequestURI(r.URL)
+				req.SetRequestURI(t.URL)
 
 				startTime := time.Now()
 				err := r.Client.Do(req, res)

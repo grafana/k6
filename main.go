@@ -77,7 +77,7 @@ func run(test loadtest.LoadTest, r runner.Runner) (<-chan runner.Result, chan in
 		ctx, _ := context.WithTimeout(context.Background(), timeout)
 		scale <- test.Stages[0].VUs.Start
 
-		for res := range runner.Run(ctx, r, scale) {
+		for res := range runner.Run(ctx, r, test, scale) {
 			ch <- res
 		}
 	}()
@@ -103,7 +103,7 @@ func action(c *cli.Context) error {
 			log.WithField("ext", ext).Fatal("No runner found")
 		}
 	} else {
-		r = simple.New(test.URL)
+		r = simple.New()
 	}
 	pipeline, scale := run(test, r)
 
@@ -203,11 +203,11 @@ func main() {
 		},
 		cli.StringFlag{
 			Name:  "script, s",
-			Usage: "Script to run (do not use with --url)",
+			Usage: "Script to run",
 		},
 		cli.StringFlag{
 			Name:  "url",
-			Usage: "URL to test (do not use with --script)",
+			Usage: "URL to test",
 		},
 		cli.IntFlag{
 			Name:  "vus, u",

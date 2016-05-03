@@ -64,9 +64,6 @@ func (c *Config) Compile() (t LoadTest, err error) {
 	if t.Script == "" && t.URL == "" {
 		return t, errors.New("Script or URL must be specified")
 	}
-	if t.Script != "" && t.URL != "" {
-		return t, errors.New("Use either Script or URL, not both")
-	}
 
 	// Root VU definitions
 	rootVUs, err := parseVUs(c.VUs)
