@@ -142,8 +142,6 @@ func (vu *VUContext) invoke(call jsCallEnvelope) error {
 
 	for _, val := range ret {
 		switch v := val.Interface().(type) {
-		case chan runner.Result:
-			fallthrough
 		case <-chan runner.Result:
 		readLoop:
 			for {
