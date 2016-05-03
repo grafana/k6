@@ -28,6 +28,13 @@ speedboat._require.interface = function(v) {
 	return v;
 }
 
+speedboat._require.struct = function(spec, v) {
+	for (key in Object.keys(v)) {
+		v[key] = speedboat._require[spec[v]];
+	}
+	return v;
+}
+
 speedboat._invoke = function(mod, fn, args, async) {
 	var send = async ? $send : $sendSync
 	var res = send(JSON.stringify({ m: mod, f: fn, a: args }));

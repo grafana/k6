@@ -1,6 +1,7 @@
 package http
 
 import (
+	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/speedboat/runner"
 	"github.com/valyala/fasthttp"
 	"math"
@@ -9,6 +10,11 @@ import (
 
 type context struct {
 	client *fasthttp.Client
+}
+
+type RequestArgs struct {
+	Follow bool `json:"follow"`
+	Report bool `json:"report"`
 }
 
 func New() map[string]interface{} {
@@ -20,11 +26,20 @@ func New() map[string]interface{} {
 		},
 	}
 	return map[string]interface{}{
-		"get": ctx.Get,
+		"get":     ctx.Get,
+		"request": ctx.Request,
 	}
 }
 
-func (ctx *context) Get(url string) <-chan runner.Result {
+func (ctx *context) Get(url string, args RequestArgs) <-chan runner.Result {
+	return ctx.Request("GET", url, args)
+}
+
+func (ctx *context) Request(method, url string, args RequestArgs) <-chan runner.Result {
+	log.WithFields(log.Fields{
+		"follow": args.Follow,
+		"report": args.Report,
+	}).Info("Aaaa")
 	ch := make(chan runner.Result, 1)
 	go func() {
 		defer close(ch)
@@ -36,6 +51,7 @@ func (ctx *context) Get(url string) <-chan runner.Result {
 		defer fasthttp.ReleaseResponse(res)
 
 		req.SetRequestURI(url)
+		req.Header.SetMethod(method)
 
 		startTime := time.Now()
 		err := ctx.client.Do(req, res)

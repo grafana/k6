@@ -8,6 +8,7 @@ import (
 	"github.com/loadimpact/speedboat/runner"
 	"github.com/ry/v8worker"
 	"reflect"
+	"strings"
 )
 
 type jsCallEnvelope struct {
@@ -16,6 +17,7 @@ type jsCallEnvelope struct {
 	Args []interface{} `json:"a"`
 }
 
+// Aaaaaa, this is awful, it needs restructuring BADLY x_x
 func (vu *VUContext) BridgeAPI(w *v8worker.Worker) error {
 	for modname, mod := range vu.api {
 		jsMod := fmt.Sprintf(`
@@ -45,7 +47,25 @@ func (vu *VUContext) BridgeAPI(w *v8worker.Worker) error {
 
 			for i := 0; i < numArgs; i++ {
 				aT := t.In(i)
-				jsFn += fmt.Sprintf("args.push(speedboat._require.%s(arguments[%d]));", aT.Kind().String(), i)
+				switch aT.Kind() {
+				case reflect.Struct:
+					types := make([]string, 0, aT.NumField())
+					for i := 0; i < aT.NumField(); i++ {
+						field := aT.Field(i)
+						if field.Anonymous {
+							continue
+						}
+						key := field.Tag.Get("json") // Does not handle comma params yet!
+						if key == "" {
+							key = field.Name
+						}
+						val := aT.Kind().String()
+						types = append(types, fmt.Sprintf(`"%s":"%s"`, key, val))
+					}
+					jsFn += fmt.Sprintf(`args.push(speedboat._require.struct({%s}, arguments[%d]));`, strings.Join(types, ","), i)
+				default:
+					jsFn += fmt.Sprintf("args.push(speedboat._require.%s(arguments[%d]));", aT.Kind().String(), i)
+				}
 			}
 			if t.IsVariadic() {
 				varArg := t.In(numArgs)
@@ -132,12 +152,42 @@ func (vu *VUContext) invoke(call jsCallEnvelope) error {
 		args[i] = reflect.ValueOf(arg)
 	}
 
+	fn := reflect.ValueOf(mem)
+	fnT := fn.Type()
+
+	for i := 0; i < fnT.NumIn(); i++ {
+		argT := fnT.In(i)
+		switch argT.Kind() {
+		case reflect.Struct:
+			mapv, ok := args[i].Interface().(map[string]interface{})
+			if !ok {
+				return errors.New("argument is not a dictionary")
+			}
+
+			v := reflect.New(argT)
+			for i := 0; i < argT.NumField(); i++ {
+				f := argT.Field(i)
+
+				key := f.Tag.Get("json")
+				if key == "" {
+					key = f.Name
+				}
+				val, ok := mapv[key]
+				if ok {
+					v.Elem().Field(i).Set(reflect.ValueOf(val))
+				}
+			}
+
+			args[i] = v.Elem()
+		default:
+		}
+	}
+
 	defer func() {
 		if err := recover(); err != nil {
 			log.WithField("error", err).Error("Go call panicked")
 		}
 	}()
-	fn := reflect.ValueOf(mem)
 	ret := fn.Call(args)
 
 	for _, val := range ret {
