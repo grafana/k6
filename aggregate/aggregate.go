@@ -10,6 +10,7 @@ func Aggregate(stats *Stats, in <-chan runner.Result) <-chan runner.Result {
 	go func() {
 		defer close(ch)
 
+		defer stats.End()
 		for res := range in {
 			if res.Abort {
 				continue
@@ -17,8 +18,6 @@ func Aggregate(stats *Stats, in <-chan runner.Result) <-chan runner.Result {
 			stats.Ingest(&res)
 			ch <- res
 		}
-
-		stats.End()
 	}()
 
 	return ch
