@@ -1,6 +1,7 @@
 package v8js
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/GeertJohan/go.rice"
 	log "github.com/Sirupsen/logrus"
@@ -36,6 +37,11 @@ type Module map[string]Member
 type Member struct {
 	Func  interface{}
 	Async bool
+}
+
+type workerData struct {
+	ID   int64
+	Test loadtest.LoadTest
 }
 
 func New(filename, src string) *Runner {
@@ -78,12 +84,16 @@ func (r *Runner) Run(ctx context.Context, t loadtest.LoadTest, id int64) <-chan 
 			}
 		}
 
-		w.Load("internal:constants", fmt.Sprintf(`
-		speedboat._data.client_id = %d;
-		speedboat._data.test = {
-			url: "%s",
-		};
-		`, id, t.URL))
+		wdata := workerData{
+			ID:   id,
+			Test: t,
+		}
+		wjson, err := json.Marshal(wdata)
+		if err != nil {
+			log.WithError(err).Error("Couldn't encode worker data")
+			return
+		}
+		w.Load("internal:constants", fmt.Sprintf(`speedboat._data = %s;`, wjson))
 
 		if err := vu.BridgeAPI(w); err != nil {
 			log.WithError(err).Error("Couldn't register bridged functions")
