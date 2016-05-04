@@ -15,6 +15,7 @@ type Result struct {
 	Text  string
 	Time  time.Duration
 	Error error
+	Abort bool
 }
 
 type VU struct {

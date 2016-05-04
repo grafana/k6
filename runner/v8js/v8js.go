@@ -40,8 +40,9 @@ type Member struct {
 }
 
 type workerData struct {
-	ID   int64
-	Test loadtest.LoadTest
+	ID        int64
+	Test      loadtest.LoadTest
+	Iteration int
 }
 
 func New(filename, src string) *Runner {
@@ -102,6 +103,7 @@ func (r *Runner) Run(ctx context.Context, t loadtest.LoadTest, id int64) <-chan 
 
 		src := fmt.Sprintf(`
 		function __run__() {
+			speedboat._data.Iteration++;
 			try {
 		%s
 			} catch (e) {

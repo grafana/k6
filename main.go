@@ -74,10 +74,13 @@ func run(test loadtest.LoadTest, r runner.Runner) (<-chan runner.Result, chan in
 			timeout += stage.Duration
 		}
 
-		ctx, _ := context.WithTimeout(context.Background(), timeout)
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		scale <- test.Stages[0].VUs.Start
 
 		for res := range runner.Run(ctx, r, test, scale) {
+			if res.Abort {
+				cancel()
+			}
 			ch <- res
 		}
 	}()
