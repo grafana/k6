@@ -1,6 +1,7 @@
 speedboat = {
 	_modules: {},
 	_require: {},
+	_data: {},
 };
 
 speedboat._require.float64 = function(v) {
