@@ -27,19 +27,26 @@ func New() map[string]interface{} {
 	}
 	return map[string]interface{}{
 		"get":     ctx.Get,
+		"post":    ctx.Post,
 		"request": ctx.Request,
 	}
 }
 
 func (ctx *context) Get(url string, args RequestArgs) <-chan runner.Result {
-	return ctx.Request("GET", url, args)
+	return ctx.Request("GET", url, "", args)
 }
 
-func (ctx *context) Request(method, url string, args RequestArgs) <-chan runner.Result {
+func (ctx *context) Post(url, body string, args RequestArgs) <-chan runner.Result {
+	return ctx.Request("POST", url, body, args)
+}
+
+func (ctx *context) Request(method, url, body string, args RequestArgs) <-chan runner.Result {
 	log.WithFields(log.Fields{
+		"method": method,
+		"url":    url,
 		"follow": args.Follow,
 		"report": args.Report,
-	}).Info("Aaaa")
+	}).Debug("Request")
 	ch := make(chan runner.Result, 1)
 	go func() {
 		defer close(ch)
@@ -52,6 +59,7 @@ func (ctx *context) Request(method, url string, args RequestArgs) <-chan runner.
 
 		req.SetRequestURI(url)
 		req.Header.SetMethod(method)
+		req.SetBodyString(body)
 
 		startTime := time.Now()
 		err := ctx.client.Do(req, res)
