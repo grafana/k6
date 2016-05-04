@@ -21,8 +21,8 @@ type jsCallEnvelope struct {
 func (vu *VUContext) BridgeAPI(w *v8worker.Worker) error {
 	for modname, mod := range vu.api {
 		jsMod := fmt.Sprintf(`
-		speedboat._modules["%s"] = {};
-		`, modname)
+		speedboat._modules["%s"] = (speedboat._modules["%s"] || {});
+		`, modname, modname)
 		for name, mem := range mod {
 			t := reflect.TypeOf(mem)
 
