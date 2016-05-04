@@ -116,15 +116,18 @@ func (r *Runner) Run(ctx context.Context, t loadtest.LoadTest, id int64) <-chan 
 			return
 		}
 
+		done := make(chan interface{})
 		for {
-			// log.Info("-> run")
-			w.SendSync("run")
-			// log.Info("<- run")
+			go func() {
+				w.SendSync("run")
+				done <- struct{}{}
+			}()
 
 			select {
+			case <-done:
 			case <-ctx.Done():
+				w.TerminateExecution()
 				return
-			default:
 			}
 		}
 	}()
