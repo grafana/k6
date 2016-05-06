@@ -189,3 +189,16 @@ See description of http.request() above.
 
 This setting is used to emulate browser behaviour better, where browsers tend to use multiple, concurrent connections when fetching >1 resource from the same host. Most modern browsers use 4-8 concurrent connections per host, by default.
 
+
+Planned additions to scripting API
+----------------------------------
+
+- dns.remap()
+- dns.lookup()
+- html support using goquery
+- http.auto_cookie_handling
+- http.force_sslv1/v2/v3
+- http.force_tlsv1/v2
+- xml.?
+
+
