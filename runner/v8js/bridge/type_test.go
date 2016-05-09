@@ -9,6 +9,8 @@ import (
 func TestBridgeType(t *testing.T) {
 	tp := BridgeType(reflect.TypeOf(""))
 	assert.Equal(t, reflect.String, tp.Kind)
+	assert.Equal(t, nil, tp.Spec)
+	assert.Equal(t, "", tp.JSONKey)
 }
 
 func TestBridgeTypeInvalid(t *testing.T) {
@@ -21,7 +23,11 @@ func TestBridgeTypeStruct(t *testing.T) {
 		F2 int    `json:"f2"`
 	}{}))
 	assert.Contains(t, tp.Spec, "F1")
+	assert.Equal(t, reflect.String, tp.Spec["F1"].Kind)
+	assert.Equal(t, "f1", tp.Spec["F1"].JSONKey)
 	assert.Contains(t, tp.Spec, "F2")
+	assert.Equal(t, reflect.Int, tp.Spec["F2"].Kind)
+	assert.Equal(t, "f2", tp.Spec["F2"].JSONKey)
 }
 
 func TestBridgeTypeStructNoTagExcluded(t *testing.T) {
