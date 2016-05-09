@@ -24,16 +24,13 @@ func BridgeType(raw reflect.Type) Type {
 		tp.Spec = make(map[string]Type)
 		for i := 0; i < raw.NumField(); i++ {
 			f := raw.Field(i)
-			if f.Anonymous {
+			tag := f.Tag.Get("json")
+			if tag == "" || tag == "-" {
 				continue
 			}
 
 			ftp := BridgeType(f.Type)
-
-			ftp.JSONKey = f.Name
-			if tag := f.Tag.Get("json"); tag != "" {
-				ftp.JSONKey = tag
-			}
+			ftp.JSONKey = tag
 			tp.Spec[f.Name] = ftp
 		}
 	}
