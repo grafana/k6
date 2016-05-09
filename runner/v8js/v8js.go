@@ -87,19 +87,14 @@ func (r *Runner) Run(ctx context.Context, t loadtest.LoadTest, id int64) <-chan 
 			log.WithError(err).Error("Couldn't encode worker data")
 			return
 		}
-		println("setting constants")
 		w.Load("internal:constants", fmt.Sprintf(`__internal__._data = %s;`, wjson))
 
-		println("bridging api")
 		if err := vu.bridgeAPI(w); err != nil {
 			log.WithError(err).Error("Couldn't register bridged functions")
 			return
 		}
 
-		println("screaming internally")
 		src := fmt.Sprintf(`function __run__(){var console=require('console');__internal__._data.Iteration++;try{%s}catch(e){console.error("Script Error",''+e);}}`, r.Source)
-		println("wtf lol")
-		println(src)
 		if err := w.Load(r.Filename, src); err != nil {
 			log.WithError(err).Error("Couldn't load JS")
 			return
