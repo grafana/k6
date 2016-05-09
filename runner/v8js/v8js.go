@@ -32,13 +32,6 @@ type VUContext struct {
 	api map[string]map[string]interface{}
 }
 
-type Module map[string]Member
-
-type Member struct {
-	Func  interface{}
-	Async bool
-}
-
 type workerData struct {
 	ID        int64
 	Test      loadtest.LoadTest
