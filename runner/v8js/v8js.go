@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"github.com/GeertJohan/go.rice"
 	log "github.com/Sirupsen/logrus"
-	"github.com/loadimpact/speedboat/api"
 	"github.com/loadimpact/speedboat/loadtest"
 	"github.com/loadimpact/speedboat/runner"
+	"github.com/loadimpact/speedboat/runner/v8js/bridge"
 	"github.com/ry/v8worker"
 	"golang.org/x/net/context"
 	"os"
@@ -29,7 +29,7 @@ type VUContext struct {
 	r   *Runner
 	ctx context.Context
 	ch  chan runner.Result
-	api map[string]map[string]interface{}
+	api map[string]bridge.Module
 }
 
 type workerData struct {
@@ -69,7 +69,7 @@ func (r *Runner) Run(ctx context.Context, t loadtest.LoadTest, id int64) <-chan 
 	go func() {
 		defer close(ch)
 
-		vu := VUContext{r: r, ctx: ctx, ch: ch, api: api.New()}
+		vu := VUContext{r: r, ctx: ctx, ch: ch}
 		w := v8worker.New(vu.Recv, vu.RecvSync)
 
 		for _, f := range r.stdlib {
@@ -87,23 +87,19 @@ func (r *Runner) Run(ctx context.Context, t loadtest.LoadTest, id int64) <-chan 
 			log.WithError(err).Error("Couldn't encode worker data")
 			return
 		}
-		w.Load("internal:constants", fmt.Sprintf(`speedboat._data = %s;`, wjson))
+		println("setting constants")
+		w.Load("internal:constants", fmt.Sprintf(`__internal__._data = %s;`, wjson))
 
-		if err := vu.BridgeAPI(w); err != nil {
+		println("bridging api")
+		if err := vu.bridgeAPI(w); err != nil {
 			log.WithError(err).Error("Couldn't register bridged functions")
 			return
 		}
 
-		src := fmt.Sprintf(`
-		function __run__() {
-			speedboat._data.Iteration++;
-			try {
-		%s
-			} catch (e) {
-				console.error("Script Error", '' + e);
-			}
-		}
-		`, r.Source)
+		println("screaming internally")
+		src := fmt.Sprintf(`function __run__(){var console=require('console');__internal__._data.Iteration++;try{%s}catch(e){console.error("Script Error",''+e);}}`, r.Source)
+		println("wtf lol")
+		println(src)
 		if err := w.Load(r.Filename, src); err != nil {
 			log.WithError(err).Error("Couldn't load JS")
 			return

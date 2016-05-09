@@ -1,8 +1,8 @@
-speedboat._modules.vu = {
+__internal__._register('vu', {
 	id: function() {
-		return speedboat._data.ID;
+		return __internal__._data.ID;
 	},
 	iteration: function() {
-		return speedboat._data.Iteration;
+		return __internal__._data.Iteration;
 	},
-};
+});

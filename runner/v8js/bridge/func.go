@@ -2,12 +2,17 @@ package bridge
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 )
 
 type Func struct {
 	Func    reflect.Value
 	In, Out []Type
+}
+
+func (f *Func) JS(mod, name string) string {
+	return fmt.Sprintf(`function() { __internal__._invoke('%s', '%s', arguments); }`, mod, name)
 }
 
 // Creates a bridged function.

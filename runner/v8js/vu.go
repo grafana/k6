@@ -2,13 +2,15 @@ package v8js
 
 import (
 	"encoding/json"
-	"errors"
+	// "errors"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
-	"github.com/loadimpact/speedboat/runner"
+	"github.com/loadimpact/speedboat/api"
+	// "github.com/loadimpact/speedboat/runner"
+	"github.com/loadimpact/speedboat/runner/v8js/bridge"
 	"github.com/ry/v8worker"
-	"reflect"
-	"strings"
+	// "reflect"
+	// "strings"
 )
 
 type jsCallEnvelope struct {
@@ -17,7 +19,23 @@ type jsCallEnvelope struct {
 	Args []interface{} `json:"a"`
 }
 
+func (vu *VUContext) bridgeAPI(w *v8worker.Worker) error {
+	base := api.New()
+	vu.api = make(map[string]bridge.Module)
+
+	for modname, mod := range base {
+		bmod := bridge.BridgeModule(modname, mod)
+		vu.api[modname] = bmod
+
+		js := bmod.JS()
+		println(js)
+	}
+
+	return nil
+}
+
 // Aaaaaa, this is awful, it needs restructuring BADLY x_x
+/*
 func (vu *VUContext) BridgeAPI(w *v8worker.Worker) error {
 	for modname, mod := range vu.api {
 		jsMod := fmt.Sprintf(`
@@ -101,6 +119,7 @@ func (vu *VUContext) BridgeAPI(w *v8worker.Worker) error {
 
 	return nil
 }
+*/
 
 func (vu *VUContext) Recv(raw string) {
 	call := jsCallEnvelope{}
@@ -136,6 +155,11 @@ func (vu *VUContext) RecvSync(raw string) string {
 	return ""
 }
 
+func (vu *VUContext) invoke(call jsCallEnvelope) error {
+	return nil
+}
+
+/*
 func (vu *VUContext) invoke(call jsCallEnvelope) error {
 	mod, ok := vu.api[call.Mod]
 	if !ok {
@@ -211,3 +235,4 @@ func (vu *VUContext) invoke(call jsCallEnvelope) error {
 
 	return nil
 }
+*/

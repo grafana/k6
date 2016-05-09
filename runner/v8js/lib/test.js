@@ -1,5 +1,5 @@
-speedboat._modules.test = {
+__internal__._register('test', {
 	url: function() {
-		return speedboat._data.Test.URL;
+		return __internal__._data.Test.URL;
 	},
-}
+});
