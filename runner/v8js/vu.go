@@ -2,6 +2,7 @@ package v8js
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/speedboat/api"
@@ -26,7 +27,6 @@ func (vu *VUContext) bridgeAPI(w *v8worker.Worker) error {
 		js := bmod.JS()
 		println(js)
 		if err := w.Load("internal:api:"+modname, js); err != nil {
-			log.WithError(err).WithField("mod", modname).Error("Couldn't bridge module")
 			return err
 		}
 	}
@@ -35,7 +35,22 @@ func (vu *VUContext) bridgeAPI(w *v8worker.Worker) error {
 }
 
 func (vu *VUContext) invoke(call jsCallEnvelope) error {
-	return nil
+	log.WithFields(log.Fields{
+		"mod":  call.Mod,
+		"fn":   call.Fn,
+		"args": call.Args,
+	}).Debug("Invoking")
+	mod, ok := vu.api[call.Mod]
+	if !ok {
+		return errors.New("Unknown module: " + call.Mod)
+	}
+
+	fn, ok := mod.Members[call.Fn]
+	if !ok {
+		return errors.New("Unknown function: " + call.Mod + "." + call.Fn)
+	}
+
+	return fn.Call(call.Args)
 }
 
 func (vu *VUContext) Recv(raw string) {
@@ -67,7 +82,8 @@ func (vu *VUContext) RecvSync(raw string) string {
 	}).Debug("Sync call")
 
 	if err := vu.invoke(call); err != nil {
-		return jsThrow(err.Error())
+		log.WithError(err).Error("Couldn't invoke")
+		// return jsThrow(err.Error())
 	}
 	return ""
 }
