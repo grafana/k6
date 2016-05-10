@@ -2,7 +2,7 @@ __internal__._register = function(mod, obj) {
 	if (!(mod in __internal__._modules)) {
 		__internal__._modules[mod] = {};
 	}
-	for (k in Object.keys(obj)) {
+	for (k in obj) {
 		__internal__._modules[mod][k] = obj[k];
 	}
 }

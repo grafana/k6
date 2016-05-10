@@ -12,7 +12,7 @@ type Func struct {
 }
 
 func (f *Func) JS(mod, name string) string {
-	return fmt.Sprintf(`function() { __internal__._invoke('%s', '%s', arguments); }`, mod, name)
+	return fmt.Sprintf(`function() { __internal__._invoke('%s', '%s', Array.prototype.slice.call(arguments)); }`, mod, name)
 }
 
 // Creates a bridged function.
