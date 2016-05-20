@@ -29,8 +29,11 @@ func (r *Runner) Run(ctx context.Context, t loadtest.LoadTest, id int64) <-chan 
 
 		c.PushObject() // __internal__
 
-		pushModules(c, t, id, ch)
+		pushModules(c, ch)
 		c.PutPropString(-2, "modules")
+
+		pushData(c, t, id)
+		c.PutPropString(-2, "data")
 
 		c.PutPropString(-2, "__internal__")
 
@@ -68,7 +71,21 @@ func (r *Runner) Run(ctx context.Context, t loadtest.LoadTest, id int64) <-chan 
 	return ch
 }
 
-func pushModules(c *duktape.Context, t loadtest.LoadTest, id int64, ch <-chan runner.Result) {
+func pushData(c *duktape.Context, t loadtest.LoadTest, id int64) {
+	c.PushObject()
+
+	c.PushInt(int(id))
+	c.PutPropString(-2, "id")
+
+	c.PushObject()
+	{
+		c.PushString(t.URL)
+		c.PutPropString(-2, "url")
+	}
+	c.PutPropString(-2, "test")
+}
+
+func pushModules(c *duktape.Context, ch <-chan runner.Result) {
 	api := map[string]map[string]apiFunc{
 		"http": map[string]apiFunc{
 			"get": apiHTTPGet,
