@@ -26,6 +26,7 @@ func (r *Runner) Run(ctx context.Context, t loadtest.LoadTest, id int64) <-chan 
 		defer c.Destroy()
 
 		c.PushGlobalObject()
+
 		c.PushObject() // __internal__
 
 		pushModules(c, t, id, ch)
@@ -53,7 +54,6 @@ func (r *Runner) Run(ctx context.Context, t loadtest.LoadTest, id int64) <-chan 
 			select {
 			default:
 				c.DupTop()
-
 				if c.PcallProp(-3, 0) != duktape.ErrNone {
 					err := errors.New(c.SafeToString(-1))
 					ch <- runner.Result{Error: err}
