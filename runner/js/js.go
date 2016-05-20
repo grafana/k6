@@ -21,34 +21,38 @@ func (r *Runner) Run(ctx context.Context, t loadtest.LoadTest, id int64) <-chan 
 	go func() {
 		defer close(ch)
 
-		api := map[string]map[string]apiFunc{
-			"http": map[string]apiFunc{
-				"get": apiHTTPGet,
-			},
-		}
-
 		c := duktape.New()
-		c.PushGlobalObject()
-
-		c.PushObject() // __internal__
-
-		c.PushObject() // __internal__.modules
-		for name, mod := range api {
-			pushModule(c, ch, mod)
-			c.PutPropString(-2, name)
-		}
-		c.PutPropString(-2, "modules")
-
-		c.PutPropString(-2, "__internal__")
-
-		c.Pop() // global object
-
-		if top := c.GetTopIndex(); !(top < 0) { // < 0 = invalid index = empty stack
-			panic("PROGRAMMING ERROR: Stack depth must be 0, is: " + strconv.Itoa(top+1))
-		}
+		setupInternals(c, t, id, ch)
 	}()
 
 	return ch
+}
+
+func setupInternals(c *duktape.Context, t loadtest.LoadTest, id int64, ch <-chan runner.Result) {
+	api := map[string]map[string]apiFunc{
+		"http": map[string]apiFunc{
+			"get": apiHTTPGet,
+		},
+	}
+
+	c.PushGlobalObject()
+
+	c.PushObject() // __internal__
+
+	c.PushObject() // __internal__.modules
+	for name, mod := range api {
+		pushModule(c, ch, mod)
+		c.PutPropString(-2, name)
+	}
+	c.PutPropString(-2, "modules")
+
+	c.PutPropString(-2, "__internal__")
+
+	c.Pop() // global object
+
+	if top := c.GetTopIndex(); !(top < 0) { // < 0 = invalid index = empty stack
+		panic("PROGRAMMING ERROR: Stack depth must be 0, is: " + strconv.Itoa(top+1))
+	}
 }
 
 func pushModule(c *duktape.Context, ch <-chan runner.Result, members map[string]apiFunc) int {
