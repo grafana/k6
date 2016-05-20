@@ -7,8 +7,8 @@ import (
 	"github.com/loadimpact/speedboat/loadtest"
 	"github.com/loadimpact/speedboat/report"
 	"github.com/loadimpact/speedboat/runner"
+	"github.com/loadimpact/speedboat/runner/js"
 	"github.com/loadimpact/speedboat/runner/simple"
-	"github.com/loadimpact/speedboat/runner/v8js"
 	"golang.org/x/net/context"
 	"io/ioutil"
 	"os"
@@ -96,7 +96,7 @@ func action(c *cli.Context) error {
 		ext := path.Ext(test.Script)
 		switch ext {
 		case ".js":
-			r = v8js.New(test.Script, test.Source)
+			r = js.New()
 		default:
 			log.WithField("ext", ext).Fatal("No runner found")
 		}
