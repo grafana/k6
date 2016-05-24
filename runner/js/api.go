@@ -5,8 +5,8 @@ import (
 	"gopkg.in/olebedev/go-duktape.v2"
 )
 
-type apiFunc func(c *duktape.Context, ch <-chan runner.Result) int
+type apiFunc func(c *duktape.Context, ch chan<- runner.Result) int
 
-func apiHTTPGet(c *duktape.Context, ch <-chan runner.Result) int {
+func apiHTTPGet(c *duktape.Context, ch chan<- runner.Result) int {
 	return 0
 }

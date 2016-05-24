@@ -101,7 +101,7 @@ func pushData(c *duktape.Context, t loadtest.LoadTest, id int64) {
 	c.PutPropString(-2, "test")
 }
 
-func pushModules(c *duktape.Context, ch <-chan runner.Result) {
+func pushModules(c *duktape.Context, ch chan<- runner.Result) {
 	c.PushObject()
 
 	api := map[string]map[string]apiFunc{
@@ -115,7 +115,7 @@ func pushModules(c *duktape.Context, ch <-chan runner.Result) {
 	}
 }
 
-func pushModule(c *duktape.Context, ch <-chan runner.Result, members map[string]apiFunc) {
+func pushModule(c *duktape.Context, ch chan<- runner.Result, members map[string]apiFunc) {
 	c.PushObject()
 
 	for name, fn := range members {
