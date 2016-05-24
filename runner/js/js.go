@@ -4,9 +4,11 @@ import (
 	"errors"
 	"github.com/loadimpact/speedboat/loadtest"
 	"github.com/loadimpact/speedboat/runner"
+	"github.com/valyala/fasthttp"
 	"golang.org/x/net/context"
 	"gopkg.in/olebedev/go-duktape.v2"
 	"strconv"
+	"time"
 )
 
 const srcRequire = `
@@ -20,10 +22,15 @@ function require(name) {
 `
 
 type Runner struct {
+	Client *fasthttp.Client
 }
 
 func New() *Runner {
-	return &Runner{}
+	return &Runner{
+		Client: &fasthttp.Client{
+			MaxIdleConnDuration: time.Duration(0),
+		},
+	}
 }
 
 func (r *Runner) Run(ctx context.Context, t loadtest.LoadTest, id int64) <-chan runner.Result {
@@ -39,7 +46,7 @@ func (r *Runner) Run(ctx context.Context, t loadtest.LoadTest, id int64) <-chan 
 
 		c.PushObject()
 		{
-			pushModules(c, ch)
+			pushModules(c, r, ch)
 			c.PutPropString(-2, "modules")
 
 			pushData(c, t, id)
@@ -52,6 +59,14 @@ func (r *Runner) Run(ctx context.Context, t loadtest.LoadTest, id int64) <-chan 
 			return
 		}
 		c.PutPropString(-2, "require")
+
+		// This will probably be moved to a module; global for compatibility
+		c.PushGoFunction(func(c *duktape.Context) int {
+			t := argNumber(c, 0)
+			time.Sleep(time.Duration(t) * time.Second)
+			return 0
+		})
+		c.PutPropString(-2, "sleep")
 
 		if top := c.GetTopIndex(); top != 0 {
 			panic("PROGRAMMING ERROR: Excess items on stack: " + strconv.Itoa(top+1))
@@ -101,7 +116,7 @@ func pushData(c *duktape.Context, t loadtest.LoadTest, id int64) {
 	c.PutPropString(-2, "test")
 }
 
-func pushModules(c *duktape.Context, ch chan<- runner.Result) {
+func pushModules(c *duktape.Context, r *Runner, ch chan<- runner.Result) {
 	c.PushObject()
 
 	api := map[string]map[string]apiFunc{
@@ -110,17 +125,17 @@ func pushModules(c *duktape.Context, ch chan<- runner.Result) {
 		},
 	}
 	for name, mod := range api {
-		pushModule(c, ch, mod)
+		pushModule(c, r, ch, mod)
 		c.PutPropString(-2, name)
 	}
 }
 
-func pushModule(c *duktape.Context, ch chan<- runner.Result, members map[string]apiFunc) {
+func pushModule(c *duktape.Context, r *Runner, ch chan<- runner.Result, members map[string]apiFunc) {
 	c.PushObject()
 
 	for name, fn := range members {
 		c.PushGoFunction(func(lc *duktape.Context) int {
-			return fn(lc, ch)
+			return fn(r, lc, ch)
 		})
 		c.PutPropString(-2, name)
 	}
