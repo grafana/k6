@@ -50,3 +50,12 @@ func apiHTTPDo(r *Runner, c *duktape.Context, ch chan<- runner.Result) int {
 
 	return 0
 }
+
+func apiHTTPSetMaxConnectionsPerHost(r *Runner, c *duktape.Context, ch chan<- runner.Result) int {
+	num := int(argNumber(c, 0))
+	if num < 1 {
+		ch <- runner.Result{Error: errors.New("Max connections per host must be at least 1")}
+	}
+	r.Client.MaxConnsPerHost = num
+	return 0
+}
