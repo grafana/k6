@@ -1,6 +1,7 @@
 package js
 
 import (
+	"encoding/json"
 	"gopkg.in/olebedev/go-duktape.v2"
 )
 
@@ -18,4 +19,14 @@ func argString(c *duktape.Context, index int) string {
 	}
 
 	return c.ToString(index)
+}
+
+func argJSON(c *duktape.Context, index int, out interface{}) error {
+	if c.GetTopIndex() < index {
+		return nil
+	}
+
+	c.JsonEncode(index)
+	str := c.GetString(index)
+	return json.Unmarshal([]byte(str), out)
 }
