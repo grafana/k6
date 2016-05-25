@@ -1,10 +1,14 @@
 package js
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/loadimpact/speedboat/runner"
 	"github.com/valyala/fasthttp"
 	"gopkg.in/olebedev/go-duktape.v2"
+	"net/url"
+	"strings"
 	"time"
 )
 
@@ -17,9 +21,21 @@ func apiHTTPDo(r *Runner, c *duktape.Context, ch chan<- runner.Result) int {
 		return 0
 	}
 
-	url := argString(c, 1)
-	if url == "" {
+	u := argString(c, 1)
+	if u == "" {
 		ch <- runner.Result{Error: errors.New("Missing URL in http call")}
+		return 0
+	}
+
+	body := ""
+	switch c.GetType(2) {
+	case duktape.TypeNone, duktape.TypeNull, duktape.TypeUndefined:
+	case duktape.TypeString, duktape.TypeNumber, duktape.TypeBoolean:
+		body = c.ToString(2)
+	case duktape.TypeObject:
+		body = c.JsonEncode(2)
+	default:
+		ch <- runner.Result{Error: errors.New("Unknown type for request body")}
 		return 0
 	}
 
@@ -27,7 +43,7 @@ func apiHTTPDo(r *Runner, c *duktape.Context, ch chan<- runner.Result) int {
 		Report  bool              `json:"report"`
 		Headers map[string]string `json:"headers"`
 	}{}
-	if err := argJSON(c, 2, &args); err != nil {
+	if err := argJSON(c, 3, &args); err != nil {
 		ch <- runner.Result{Error: errors.New("Invalid arguments to http call")}
 		return 0
 	}
@@ -39,7 +55,27 @@ func apiHTTPDo(r *Runner, c *duktape.Context, ch chan<- runner.Result) int {
 	defer fasthttp.ReleaseResponse(res)
 
 	req.Header.SetMethod(method)
-	req.SetRequestURI(url)
+
+	if method == "GET" {
+		if body != "" && body[0] == '{' {
+			rawItems := map[string]interface{}{}
+			if err := json.Unmarshal([]byte(body), &rawItems); err != nil {
+				ch <- runner.Result{Error: err}
+				return 0
+			}
+			parts := []string{}
+			for key, value := range rawItems {
+				value := url.QueryEscape(fmt.Sprint(value))
+				parts = append(parts, fmt.Sprintf("%s=%s", key, value))
+			}
+			req.SetRequestURI(u + "?" + strings.Join(parts, "&"))
+		} else {
+			req.SetRequestURI(u)
+		}
+	} else {
+		req.SetRequestURI(u)
+		req.SetBodyString(body)
+	}
 
 	for key, value := range args.Headers {
 		req.Header.Set(key, value)
