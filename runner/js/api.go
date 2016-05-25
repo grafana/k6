@@ -10,19 +10,24 @@ import (
 
 type apiFunc func(r *Runner, c *duktape.Context, ch chan<- runner.Result) int
 
-type apiHTTPArgs struct {
-	Report bool `json:"report"`
-}
-
-func apiHTTPGet(r *Runner, c *duktape.Context, ch chan<- runner.Result) int {
-	url := argString(c, 0)
-	if url == "" {
-		ch <- runner.Result{Error: errors.New("Missing URL in http.get()")}
+func apiHTTPDo(r *Runner, c *duktape.Context, ch chan<- runner.Result) int {
+	method := argString(c, 0)
+	if method == "" {
+		ch <- runner.Result{Error: errors.New("Missing method in http call")}
 		return 0
 	}
-	args := apiHTTPArgs{}
-	if err := argJSON(c, 1, &args); err != nil {
-		ch <- runner.Result{Error: errors.New("Invalid arguments to http.get()")}
+
+	url := argString(c, 1)
+	if url == "" {
+		ch <- runner.Result{Error: errors.New("Missing URL in http call")}
+		return 0
+	}
+
+	args := struct {
+		Report bool `json:"report"`
+	}{}
+	if err := argJSON(c, 2, &args); err != nil {
+		ch <- runner.Result{Error: errors.New("Invalid arguments to http call")}
 		return 0
 	}
 
@@ -32,6 +37,7 @@ func apiHTTPGet(r *Runner, c *duktape.Context, ch chan<- runner.Result) int {
 	res := fasthttp.AcquireResponse()
 	defer fasthttp.ReleaseResponse(res)
 
+	req.Header.SetMethod(method)
 	req.SetRequestURI(url)
 
 	startTime := time.Now()

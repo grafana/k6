@@ -51,7 +51,7 @@ func (r *Runner) Run(ctx context.Context, t loadtest.LoadTest, id int64) <-chan 
 		c.PutPropString(-2, "__internal__")
 
 		load := map[*rice.Box][]string{
-			r.lib:    []string{"require.js"},
+			r.lib:    []string{"require.js", "http.js"},
 			r.vendor: []string{"lodash/dist/lodash.min.js"},
 		}
 		for box, files := range load {
@@ -141,7 +141,7 @@ func pushModules(c *duktape.Context, r *Runner, ch chan<- runner.Result) {
 
 	api := map[string]map[string]apiFunc{
 		"http": map[string]apiFunc{
-			"get": apiHTTPGet,
+			"do": apiHTTPDo,
 		},
 	}
 	for name, mod := range api {
