@@ -2,6 +2,7 @@ package js
 
 import (
 	"errors"
+	"github.com/GeertJohan/go.rice"
 	"github.com/loadimpact/speedboat/loadtest"
 	"github.com/loadimpact/speedboat/runner"
 	"github.com/valyala/fasthttp"
@@ -11,18 +12,11 @@ import (
 	"time"
 )
 
-const srcRequire = `
-function require(name) {
-	var mod = __internal__.modules[name];
-	if (!mod) {
-		throw new Error("Unknown module: " + name);
-	}
-	return mod;
-}
-`
-
 type Runner struct {
 	Client *fasthttp.Client
+
+	lib    *rice.Box
+	vendor *rice.Box
 }
 
 func New() *Runner {
@@ -30,6 +24,8 @@ func New() *Runner {
 		Client: &fasthttp.Client{
 			MaxIdleConnDuration: time.Duration(0),
 		},
+		lib:    rice.MustFindBox("lib"),
+		vendor: rice.MustFindBox("vendor"),
 	}
 }
 
@@ -54,11 +50,23 @@ func (r *Runner) Run(ctx context.Context, t loadtest.LoadTest, id int64) <-chan 
 		}
 		c.PutPropString(-2, "__internal__")
 
-		if err := c.PcompileString(duktape.CompileFunction|duktape.CompileStrict, srcRequire); err != nil {
-			ch <- runner.Result{Error: err}
-			return
+		load := map[*rice.Box][]string{
+			r.lib:    []string{"require.js"},
+			r.vendor: []string{"lodash/dist/lodash.min.js"},
 		}
-		c.PutPropString(-2, "require")
+		for box, files := range load {
+			for _, name := range files {
+				src, err := box.String(name)
+				if err != nil {
+					ch <- runner.Result{Error: err}
+					return
+				}
+				if err = loadFile(c, name, src); err != nil {
+					ch <- runner.Result{Error: err}
+					return
+				}
+			}
+		}
 
 		// This will probably be moved to a module; global for compatibility
 		c.PushGoFunction(func(c *duktape.Context) int {
@@ -151,4 +159,14 @@ func pushModule(c *duktape.Context, r *Runner, ch chan<- runner.Result, members 
 		})
 		c.PutPropString(-2, name)
 	}
+}
+
+func loadFile(c *duktape.Context, name, src string) error {
+	c.PushString(name)
+	if err := c.PcompileStringFilename(0, src); err != nil {
+		return err
+	}
+	c.Pcall(0)
+	c.Pop()
+	return nil
 }
