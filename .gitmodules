@@ -1,0 +1,3 @@
+[submodule "runner/js/vendor/lodash"]
+	path = runner/js/vendor/lodash
+	url = https://github.com/lodash/lodash.git
