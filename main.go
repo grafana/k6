@@ -153,12 +153,14 @@ runLoop:
 				if res.Time != time.Duration(0) {
 					l = l.WithField("t", res.Time)
 				}
+				l = l.WithFields(res.Extra)
 				l.Error("Error")
 			case res.Text != "":
 				l := log.WithField("text", res.Text)
 				if res.Time != time.Duration(0) {
 					l = l.WithField("t", res.Time)
 				}
+				l = l.WithFields(res.Extra)
 				l.Info("Log")
 			default:
 				// log.WithField("t", res.Time).Debug("Metric")

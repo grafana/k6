@@ -77,7 +77,8 @@ func (r *Runner) Run(ctx context.Context, t loadtest.LoadTest, id int64) <-chan 
 		// the stack and duplicate the whole function every iteration; just make it ABUNDANTLY
 		// CLEAR that the script should NEVER touch that property or dumb things will happen
 		codeProp := "__!!__seriously__don't__touch__from__script__!!__"
-		if err := c.PcompileString(0, t.Source); err != nil {
+		c.PushString("script")
+		if err := c.PcompileStringFilename(0, t.Source); err != nil {
 			ch <- runner.Result{Error: err}
 			return
 		}
@@ -89,8 +90,19 @@ func (r *Runner) Run(ctx context.Context, t loadtest.LoadTest, id int64) <-chan 
 			default:
 				c.DupTop()
 				if c.PcallProp(-3, 0) != duktape.ErrNone {
+					c.GetPropString(-1, "fileName")
+					filename := c.SafeToString(-1)
+					c.Pop()
+
+					c.GetPropString(-1, "lineNumber")
+					line := c.ToNumber(-1)
+					c.Pop()
+
 					err := errors.New(c.SafeToString(-1))
-					ch <- runner.Result{Error: err}
+					ch <- runner.Result{Error: err, Extra: map[string]interface{}{
+						"file": filename,
+						"line": line,
+					}}
 				}
 				c.Pop() // Pop return value
 			case <-ctx.Done():

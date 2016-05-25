@@ -14,6 +14,7 @@ type Runner interface {
 type Result struct {
 	Text  string
 	Time  time.Duration
+	Extra map[string]interface{}
 	Error error
 	Abort bool
 }
