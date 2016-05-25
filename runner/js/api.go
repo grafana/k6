@@ -53,7 +53,23 @@ func apiHTTPDo(r *Runner, c *duktape.Context, ch chan<- runner.Result) int {
 		ch <- runner.Result{Error: err, Time: duration}
 	}
 
-	return 0
+	c.PushObject()
+	{
+		c.PushNumber(float64(res.StatusCode()))
+		c.PutPropString(-2, "status")
+
+		c.PushString(string(res.Body()))
+		c.PutPropString(-2, "body")
+
+		c.PushObject()
+		res.Header.VisitAll(func(key, value []byte) {
+			c.PushString(string(value))
+			c.PutPropString(-2, string(key))
+		})
+		c.PutPropString(-2, "headers")
+	}
+
+	return 1
 }
 
 func apiHTTPSetMaxConnectionsPerHost(r *Runner, c *duktape.Context, ch chan<- runner.Result) int {

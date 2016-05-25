@@ -1,3 +1,4 @@
 var http = require('http');
-http.get("http://google.com/", { report: true });
+var res = http.get("http://google.com/", { report: true });
+print(res.status);
 sleep(1);
