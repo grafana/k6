@@ -24,7 +24,8 @@ func apiHTTPDo(r *Runner, c *duktape.Context, ch chan<- runner.Result) int {
 	}
 
 	args := struct {
-		Report bool `json:"report"`
+		Report  bool              `json:"report"`
+		Headers map[string]string `json:"headers"`
 	}{}
 	if err := argJSON(c, 2, &args); err != nil {
 		ch <- runner.Result{Error: errors.New("Invalid arguments to http call")}
@@ -39,6 +40,10 @@ func apiHTTPDo(r *Runner, c *duktape.Context, ch chan<- runner.Result) int {
 
 	req.Header.SetMethod(method)
 	req.SetRequestURI(url)
+
+	for key, value := range args.Headers {
+		req.Header.Set(key, value)
+	}
 
 	startTime := time.Now()
 	err := r.Client.Do(req, res)
