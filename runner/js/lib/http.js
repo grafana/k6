@@ -1,5 +1,9 @@
 "use strict";
 
+var HTTPResponse = {
+	json: function() { return JSON.parse(this.body); },
+}
+
 __internal__.modules.http.get = function() {
 	return __internal__.modules.http.do.apply(this, _.concat(['GET'], arguments));
 }

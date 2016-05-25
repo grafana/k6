@@ -45,6 +45,9 @@ func (r *Runner) Run(ctx context.Context, t loadtest.LoadTest, id int64) <-chan 
 			pushModules(c, r, ch)
 			c.PutPropString(-2, "modules")
 
+			c.PushObject()
+			c.PutPropString(-2, "types")
+
 			pushData(c, t, id)
 			c.PutPropString(-2, "data")
 		}
