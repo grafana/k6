@@ -35,53 +35,14 @@ func (r *Runner) Run(ctx context.Context, t loadtest.LoadTest, id int64) <-chan 
 	go func() {
 		defer close(ch)
 
-		c := duktape.New()
+		c, err := r.newJSContext(t, id, ch)
+		if err != nil {
+			ch <- runner.Result{Error: err}
+			return
+		}
 		defer c.Destroy()
 
 		c.PushGlobalObject()
-
-		c.PushObject()
-		{
-			pushModules(c, r, ch)
-			c.PutPropString(-2, "modules")
-
-			c.PushObject()
-			c.PutPropString(-2, "types")
-
-			pushData(c, t, id)
-			c.PutPropString(-2, "data")
-		}
-		c.PutPropString(-2, "__internal__")
-
-		load := map[*rice.Box][]string{
-			r.lib:    []string{"require.js", "http.js"},
-			r.vendor: []string{"lodash/dist/lodash.min.js"},
-		}
-		for box, files := range load {
-			for _, name := range files {
-				src, err := box.String(name)
-				if err != nil {
-					ch <- runner.Result{Error: err}
-					return
-				}
-				if err = loadFile(c, name, src); err != nil {
-					ch <- runner.Result{Error: err}
-					return
-				}
-			}
-		}
-
-		// This will probably be moved to a module; global for compatibility
-		c.PushGoFunction(func(c *duktape.Context) int {
-			t := argNumber(c, 0)
-			time.Sleep(time.Duration(t) * time.Second)
-			return 0
-		})
-		c.PutPropString(-2, "sleep")
-
-		if top := c.GetTopIndex(); top != 0 {
-			panic("PROGRAMMING ERROR: Excess items on stack: " + strconv.Itoa(top+1))
-		}
 
 		// It should be cheaper memory-wise to keep the code on the global object (where it's
 		// safe from GC shenanigans) and duplicate the key every iteration, than to keep it on
@@ -123,6 +84,55 @@ func (r *Runner) Run(ctx context.Context, t loadtest.LoadTest, id int64) <-chan 
 	}()
 
 	return ch
+}
+
+func (r *Runner) newJSContext(t loadtest.LoadTest, id int64, ch chan<- runner.Result) (*duktape.Context, error) {
+	c := duktape.New()
+	c.PushGlobalObject()
+
+	c.PushObject()
+	{
+		pushModules(c, r, ch)
+		c.PutPropString(-2, "modules")
+
+		c.PushObject()
+		c.PutPropString(-2, "types")
+
+		pushData(c, t, id)
+		c.PutPropString(-2, "data")
+	}
+	c.PutPropString(-2, "__internal__")
+
+	load := map[*rice.Box][]string{
+		r.lib:    []string{"require.js", "http.js"},
+		r.vendor: []string{"lodash/dist/lodash.min.js"},
+	}
+	for box, files := range load {
+		for _, name := range files {
+			src, err := box.String(name)
+			if err != nil {
+				return nil, err
+			}
+			if err = loadFile(c, name, src); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	// This will probably be moved to a module; global for compatibility
+	c.PushGoFunction(func(c *duktape.Context) int {
+		t := argNumber(c, 0)
+		time.Sleep(time.Duration(t) * time.Second)
+		return 0
+	})
+	c.PutPropString(-2, "sleep")
+
+	if top := c.GetTopIndex(); top != 0 {
+		panic("PROGRAMMING ERROR: Excess items on stack: " + strconv.Itoa(top+1))
+	}
+
+	c.Pop() // Global object
+	return c, nil
 }
 
 func pushData(c *duktape.Context, t loadtest.LoadTest, id int64) {
