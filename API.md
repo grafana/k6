@@ -20,6 +20,15 @@ This file will be removed.
   
   This may be moved somewhere else later on.
 
+vu
+--
+
+Provides information about the currently executing VU.
+
+* `vu.id()`
+  
+  Returns the VU's numeric ID.
+
 http
 ----
 
@@ -54,3 +63,22 @@ http
 * `http.put(...)` - Alias for `http.do('PUT', ...)`
 
 * `http.delete(...)` - Alias for `http.do('DELETE', ...)`
+
+log
+---
+
+* `log.type(type, msg[, extra])`
+  
+  Writes out a log message.
+  
+  Type is one of `debug`, `info`, `warn` and `error`; messages to unknown channels will be ignored. Note that `debug` messages are only displayed when running speedboat with `-v` (`--verbose`).
+  
+  Extra is an object of extra data to be provided along with the message. It's considered good practice to have the message a fixed string, and use extra data to provide context information, rather than concatenating it with the message.
+  
+  ```js
+  var log = require('log');
+  // Don't do this
+  log.error("Something happened: " + error);
+  // Do this instead
+  log.error("Something happened", { error: error });
+  ```
