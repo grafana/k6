@@ -33,7 +33,6 @@ http
   
   * `quiet` - `bool`
     Do not report statistical information about this request.
-  
   * `headers` - `object`
     Headers to set on the request. Values will be turned into strings if they're not already.
   
