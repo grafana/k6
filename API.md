@@ -23,6 +23,9 @@ http
     Headers to set on the request. Values will be turned into strings if they're not already.
 
 * `http.get(...)` - Alias for `http.do('GET', ...)`
+
 * `http.post(...)` - Alias for `http.do('POST', ...)`
+
 * `http.put(...)` - Alias for `http.do('PUT', ...)`
+
 * `http.delete(...)` - Alias for `http.do('DELETE', ...)`
