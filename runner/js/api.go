@@ -147,3 +147,8 @@ func apiLogType(r *Runner, c *duktape.Context, ch chan<- runner.Result) int {
 
 	return 0
 }
+
+func apiTestAbort(r *Runner, c *duktape.Context, ch chan<- runner.Result) int {
+	ch <- runner.Result{Abort: true}
+	return 0
+}

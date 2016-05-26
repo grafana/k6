@@ -160,6 +160,9 @@ func pushModules(c *duktape.Context, r *Runner, ch chan<- runner.Result) {
 		"log": map[string]apiFunc{
 			"type": apiLogType,
 		},
+		"test": map[string]apiFunc{
+			"abort": apiTestAbort,
+		},
 		"vu": map[string]apiFunc{},
 	}
 	for name, mod := range api {
