@@ -43,11 +43,15 @@ func TestHTTPSetMaxConnectionsPerHostNegative(t *testing.T) {
 	if err := c.PevalString(src); err != nil {
 		t.Fatalf("Couldn't run script: %s", err)
 	}
-	res := <-ch
-	if res.Error == nil {
-		t.Error("No error reported!")
-	}
-	if r.Client.MaxConnsPerHost != before {
-		t.Errorf("Max connections changed! %d", r.Client.MaxConnsPerHost)
+	select {
+	case res := <-ch:
+		if res.Error == nil {
+			t.Error("No error reported!")
+		}
+		if r.Client.MaxConnsPerHost != before {
+			t.Errorf("Max connections changed! %d", r.Client.MaxConnsPerHost)
+		}
+	default:
+		t.Error("No results")
 	}
 }
