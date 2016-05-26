@@ -1,4 +1,6 @@
 var vu = require('vu');
-console.log("Log", vu.id());
-console.warn("Warning", vu.id());
-console.error("Error", vu.id());
+var log = require('log');
+log.debug("debug", {id: vu.id()});
+log.info("info", {id: vu.id()});
+log.warn("warn", {id: vu.id()});
+log.error("error", {id: vu.id()});

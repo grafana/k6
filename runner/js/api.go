@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/speedboat/runner"
 	"github.com/valyala/fasthttp"
 	"gopkg.in/olebedev/go-duktape.v2"
@@ -120,5 +121,29 @@ func apiHTTPSetMaxConnectionsPerHost(r *Runner, c *duktape.Context, ch chan<- ru
 		return 0
 	}
 	r.Client.MaxConnsPerHost = num
+	return 0
+}
+
+func apiLogType(r *Runner, c *duktape.Context, ch chan<- runner.Result) int {
+	kind := argString(c, 0)
+	text := argString(c, 1)
+	extra := map[string]interface{}{}
+	if err := argJSON(c, 2, &extra); err != nil {
+		ch <- runner.Result{Error: errors.New("Log context is not an object")}
+		return 0
+	}
+
+	l := log.WithFields(log.Fields(extra))
+	switch kind {
+	case "debug":
+		l.Debug(text)
+	case "info":
+		l.Info(text)
+	case "warn":
+		l.Warn(text)
+	case "error":
+		l.Error(text)
+	}
+
 	return 0
 }

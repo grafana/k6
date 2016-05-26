@@ -104,7 +104,7 @@ func (r *Runner) newJSContext(t loadtest.LoadTest, id int64, ch chan<- runner.Re
 	c.PutPropString(-2, "__internal__")
 
 	load := map[*rice.Box][]string{
-		r.lib:    []string{"require.js", "http.js"},
+		r.lib:    []string{"require.js", "http.js", "log.js", "vu.js"},
 		r.vendor: []string{"lodash/dist/lodash.min.js"},
 	}
 	for box, files := range load {
@@ -157,6 +157,10 @@ func pushModules(c *duktape.Context, r *Runner, ch chan<- runner.Result) {
 			"do": apiHTTPDo,
 			"setMaxConnectionsPerHost": apiHTTPSetMaxConnectionsPerHost,
 		},
+		"log": map[string]apiFunc{
+			"type": apiLogType,
+		},
+		"vu": map[string]apiFunc{},
 	}
 	for name, mod := range api {
 		pushModule(c, r, ch, mod)
