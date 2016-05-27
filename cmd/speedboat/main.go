@@ -105,11 +105,14 @@ func action(cc *cli.Context) error {
 	ctx, _ := context.WithTimeout(context.Background(), t.TotalDuration())
 	offset := time.Duration(0)
 	for _, stage := range t.Stages {
-		localOffset := offset
+		startOffset := offset
+		ctx, _ := context.WithTimeout(ctx, startOffset+stage.Duration)
 		go func() {
-			time.Sleep(localOffset)
-			c, _ := context.WithTimeout(ctx, stage.Duration)
-			runner.RunVU(c, t)
+			select {
+			case <-time.After(startOffset):
+				runner.RunVU(ctx, t)
+			case <-ctx.Done():
+			}
 		}()
 		offset += stage.Duration
 	}
