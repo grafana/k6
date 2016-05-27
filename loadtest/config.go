@@ -20,11 +20,7 @@ type Config struct {
 	Stages   []ConfigStage `yaml:"stages"`
 }
 
-func NewConfig() Config {
-	return Config{}
-}
-
-func ParseConfig(data []byte, conf *Config) (err error) {
+func (conf *Config) ParseYAML(data []byte) (err error) {
 	return yaml.Unmarshal(data, conf)
 }
 
