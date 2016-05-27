@@ -18,6 +18,14 @@ type Test struct {
 	Stages []TestStage // Test stages.
 }
 
+func (t *Test) TotalDuration() time.Duration {
+	var total time.Duration
+	for _, stage := range t.Stages {
+		total += stage.Duration
+	}
+	return total
+}
+
 /*func (t *LoadTest) StageAt(d time.Duration) (start time.Duration, stage TestStage, stop bool) {
 	at := time.Duration(0)
 	for i := range t.Stages {
