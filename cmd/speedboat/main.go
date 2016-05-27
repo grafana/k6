@@ -87,6 +87,7 @@ func action(cc *cli.Context) error {
 		return nil
 	}
 
+	// Inspect the test to find a suitable runner; additional ones can easily be added
 	var runner speedboat.Runner
 	switch {
 	case t.URL != "":
@@ -95,6 +96,12 @@ func action(cc *cli.Context) error {
 		log.Fatal("No suitable runner found!")
 	}
 
+	// Schedule all configured VUs. Because we know the VU curves ahead of time, we:
+	// - Make a context with the test's duration as timeout
+	// - Loop through all the stages of the test
+	// - Spawn VUs that:
+	//     - Sleep until they're scheduled to start
+	//     - Expire at the projected end of their lifecycles
 	ctx, _ := context.WithTimeout(context.Background(), t.TotalDuration())
 	offset := time.Duration(0)
 	for _, stage := range t.Stages {
@@ -107,6 +114,7 @@ func action(cc *cli.Context) error {
 		offset += stage.Duration
 	}
 
+	// Wait until the end of the test
 	<-ctx.Done()
 
 	return nil
