@@ -1,8 +1,10 @@
 package main
 
 import (
+	"errors"
 	log "github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
+	"github.com/loadimpact/speedboat"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"os"
@@ -17,26 +19,25 @@ func configureLogging(c *cli.Context) {
 	}
 }
 
-func action(cc *cli.Context) error {
-	conf := Config{}
-
+func parse(cc *cli.Context) (conf Config, err error) {
 	switch len(cc.Args()) {
 	case 0:
 		if !cc.IsSet("script") && !cc.IsSet("url") {
-			log.Fatal("No config file, script or URL provided; see --help for usage")
+			return conf, errors.New("No config file, script or URL")
 		}
 	case 1:
 		bytes, err := ioutil.ReadFile(cc.Args()[0])
 		if err != nil {
-			log.WithError(err).Fatal("Couldn't read config file")
+			return conf, errors.New("Couldn't read config file")
 		}
 		if err := yaml.Unmarshal(bytes, &conf); err != nil {
-			log.WithError(err).Fatal("Couldn't parse config file")
+			return conf, errors.New("Couldn't parse config file")
 		}
 	default:
-		log.Fatal("Too many arguments!")
+		return conf, errors.New("Too many arguments!")
 	}
 
+	// Let commandline flags override config files
 	if cc.IsSet("script") {
 		conf.Script = cc.String("script")
 	}
@@ -50,24 +51,38 @@ func action(cc *cli.Context) error {
 		conf.Duration = cc.Duration("duration").String()
 	}
 
+	return conf, nil
+}
+
+func dumpTest(t *speedboat.Test) {
+	log.WithFields(log.Fields{
+		"script": t.Script,
+		"url":    t.URL,
+	}).Info("General")
+	for i, stage := range t.Stages {
+		log.WithFields(log.Fields{
+			"#":        i,
+			"duration": stage.Duration,
+			"start":    stage.StartVUs,
+			"end":      stage.EndVUs,
+		}).Info("Stage")
+	}
+}
+
+func action(cc *cli.Context) error {
+	conf, err := parse(cc)
+	if err != nil {
+		log.WithError(err).Fatal("Invalid arguments; see --help")
+	}
+
 	t, err := conf.MakeTest()
 	if err != nil {
 		log.WithError(err).Fatal("Configuration error")
 	}
 
 	if cc.Bool("dump") {
-		log.WithFields(log.Fields{
-			"script": t.Script,
-			"url":    t.URL,
-		}).Info("General")
-		for i, stage := range t.Stages {
-			log.WithFields(log.Fields{
-				"#":        i,
-				"duration": stage.Duration,
-				"start":    stage.StartVUs,
-				"end":      stage.EndVUs,
-			}).Info("Stage")
-		}
+		dumpTest(&t)
+		return nil
 	}
 
 	return nil
