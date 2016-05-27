@@ -1,8 +1,7 @@
-package loadtest
+package main
 
 import (
 	"errors"
-	"gopkg.in/yaml.v2"
 	"time"
 )
 
@@ -20,11 +19,7 @@ type Config struct {
 	Stages   []ConfigStage `yaml:"stages"`
 }
 
-func (conf *Config) ParseYAML(data []byte) (err error) {
-	return yaml.Unmarshal(data, conf)
-}
-
-func parseVUs(vus interface{}) (VUSpec, error) {
+/*func parseVUs(vus interface{}) (VUSpec, error) {
 	switch v := vus.(type) {
 	case nil:
 		return VUSpec{}, nil
@@ -147,4 +142,4 @@ func (c *Config) Compile() (t LoadTest, err error) {
 	}
 
 	return t, nil
-}
+}*/
