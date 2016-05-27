@@ -102,6 +102,8 @@ func action(cc *cli.Context) error {
 	// - Spawn VUs that:
 	//     - Sleep until they're scheduled to start
 	//     - Expire at the projected end of their lifecycles
+	//
+	// TODO: Account for VU ramping in lifecycle projections!
 	ctx, _ := context.WithTimeout(context.Background(), t.TotalDuration())
 	offset := time.Duration(0)
 	for _, stage := range t.Stages {
