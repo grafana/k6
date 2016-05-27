@@ -64,6 +64,10 @@ http
 
 * `http.delete(...)` - Alias for `http.do('DELETE', ...)`
 
+* `http.patch(...)` - Alias for `http.do('PATCH', ...)`
+
+* `http.options(...)` - Alias for `http.do('OPTIONS', ...)`
+
 log
 ---
 
