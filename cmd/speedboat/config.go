@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"github.com/loadimpact/speedboat"
 	"time"
 )
 
@@ -19,127 +20,109 @@ type Config struct {
 	Stages   []ConfigStage `yaml:"stages"`
 }
 
-/*func parseVUs(vus interface{}) (VUSpec, error) {
+func parseVUs(vus interface{}) (int, int, error) {
 	switch v := vus.(type) {
-	case nil:
-		return VUSpec{}, nil
 	case int:
-		return VUSpec{Start: v, End: v}, nil
+		return v, v, nil
 	case []interface{}:
 		switch len(v) {
 		case 1:
-			v0, ok := v[0].(int)
+			n, ok := v[0].(int)
 			if !ok {
-				return VUSpec{}, errors.New("Item in VU declaration is not an int")
+				return 0, 0, errors.New("VU counts must be integers")
 			}
-			return VUSpec{Start: v0, End: v0}, nil
+			return n, n, nil
 		case 2:
-			v0, ok0 := v[0].(int)
-			v1, ok1 := v[1].(int)
-			if !ok0 || !ok1 {
-				return VUSpec{}, errors.New("Item in VU declaration is not an int")
+			n1, ok1 := v[0].(int)
+			n2, ok2 := v[1].(int)
+			if !ok1 || !ok2 {
+				return 0, 0, errors.New("VU counts must be integers")
 			}
-			return VUSpec{Start: v0, End: v1}, nil
+			return n1, n2, nil
 		default:
-			return VUSpec{}, errors.New("Wrong number of values in [start, end] VU ramp")
+			return 0, 0, errors.New("Only one or two VU steps allowed per stage")
 		}
+	case nil:
+		return 0, 0, nil
 	default:
-		return VUSpec{}, errors.New("VUs must be either a single int or [start, end]")
+		return 0, 0, errors.New("VUs must be either an integer or [integer, integer]")
 	}
 }
 
-func (c *Config) Compile() (t LoadTest, err error) {
-	// Script/URL
+func (c *Config) MakeTest() (t speedboat.Test, err error) {
 	t.Script = c.Script
 	t.URL = c.URL
 	if t.Script == "" && t.URL == "" {
-		return t, errors.New("Script or URL must be specified")
+		return t, errors.New("Neither script nor URL specified")
 	}
 
-	// Root VU definitions
-	rootVUs, err := parseVUs(c.VUs)
-	if err != nil {
-		return t, err
+	fullDuration := 10 * time.Second
+	if c.Duration != "" {
+		fullDuration, err = time.ParseDuration(c.Duration)
+		if err != nil {
+			return t, err
+		}
 	}
 
-	// Duration
-	rootDurationS := c.Duration
-	if rootDurationS == "" {
-		rootDurationS = "10s"
-	}
-	rootDuration, err := time.ParseDuration(rootDurationS)
-	if err != nil {
-		return t, err
-	}
-
-	// Stages
 	if len(c.Stages) > 0 {
-		// Figure out the scale for flexible durations
-		totalFluidDuration := 0
-		totalFixedDuration := time.Duration(0)
-		for i := 0; i < len(c.Stages); i++ {
-			switch v := c.Stages[i].Duration.(type) {
+		var totalFluid int
+		var totalFixed time.Duration
+
+		for _, stage := range c.Stages {
+			tStage := speedboat.TestStage{}
+
+			switch v := stage.Duration.(type) {
 			case int:
-				totalFluidDuration += v
+				totalFluid += v
 			case string:
-				duration, err := time.ParseDuration(v)
+				dur, err := time.ParseDuration(v)
 				if err != nil {
 					return t, err
 				}
-				totalFixedDuration += duration
+				tStage.Duration = dur
+				totalFixed += dur
+			default:
+				return t, errors.New("Stage durations must be integers or strings")
 			}
-		}
 
-		// Make sure the fixed segments don't exceed the test length
-		available := time.Duration(rootDuration.Nanoseconds() - totalFixedDuration.Nanoseconds())
-		if available.Nanoseconds() < 0 {
-			return t, errors.New("Fixed stages are exceeding the test duration")
-		}
-
-		// Compile stage definitions
-		for i := 0; i < len(c.Stages); i++ {
-			cStage := &c.Stages[i]
-			stage := Stage{}
-
-			// Stage duration
-			switch v := cStage.Duration.(type) {
-			case int:
-				claim := float64(v) / float64(totalFluidDuration)
-				stage.Duration = time.Duration(available.Seconds()*claim) * time.Second
-			case string:
-				stage.Duration, err = time.ParseDuration(v)
-			}
+			start, end, err := parseVUs(stage.VUs)
 			if err != nil {
 				return t, err
 			}
+			tStage.StartVUs = start
+			tStage.EndVUs = end
 
-			// VU curve
-			stage.VUs, err = parseVUs(cStage.VUs)
-			if err != nil {
-				return t, err
+			t.Stages = append(t.Stages, tStage)
+		}
+
+		if totalFixed > fullDuration {
+			if totalFluid == 0 {
+				fullDuration = totalFixed
+			} else {
+				return t, errors.New("Stages exceed test duration")
 			}
-			if stage.VUs.Start == 0 && stage.VUs.End == 0 {
-				if i > 0 {
-					stage.VUs = VUSpec{
-						Start: t.Stages[i-1].VUs.End,
-						End:   t.Stages[i-1].VUs.End,
-					}
-				} else {
-					stage.VUs = rootVUs
+		}
+
+		remainder := fullDuration - totalFixed
+		if remainder > 0 {
+			for i, stage := range c.Stages {
+				chunk, ok := stage.Duration.(int)
+				if !ok {
+					continue
 				}
+				t.Stages[i].Duration = time.Duration(chunk) / remainder
 			}
-
-			t.Stages = append(t.Stages, stage)
 		}
 	} else {
-		// Create an implicit, full-duration stage
-		t.Stages = []Stage{
-			Stage{
-				Duration: rootDuration,
-				VUs:      rootVUs,
-			},
+		start, end, err := parseVUs(c.VUs)
+		if err != nil {
+			return t, err
+		}
+
+		t.Stages = []speedboat.TestStage{
+			speedboat.TestStage{Duration: fullDuration, StartVUs: start, EndVUs: end},
 		}
 	}
 
 	return t, nil
-}*/
+}

@@ -3,7 +3,6 @@ package main
 import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
-	"github.com/loadimpact/speedboat"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"os"
@@ -36,6 +35,11 @@ func action(cc *cli.Context) error {
 		}
 	default:
 		log.Fatal("Too many arguments!")
+	}
+
+	_, err := conf.MakeTest()
+	if err != nil {
+		log.WithError(err).Fatal("Configuration error")
 	}
 
 	return nil
