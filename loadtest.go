@@ -16,8 +16,6 @@ type Test struct {
 	Script string      // Script filename.
 	URL    string      // URL for simple tests.
 	Stages []TestStage // Test stages.
-
-	Source string // Script source
 }
 
 /*func (t *LoadTest) StageAt(d time.Duration) (start time.Duration, stage TestStage, stop bool) {
