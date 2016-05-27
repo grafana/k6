@@ -37,9 +37,24 @@ func action(cc *cli.Context) error {
 		log.Fatal("Too many arguments!")
 	}
 
-	_, err := conf.MakeTest()
+	t, err := conf.MakeTest()
 	if err != nil {
 		log.WithError(err).Fatal("Configuration error")
+	}
+
+	if cc.Bool("dump") {
+		log.WithFields(log.Fields{
+			"script": t.Script,
+			"url":    t.URL,
+		}).Info("General")
+		for i, stage := range t.Stages {
+			log.WithFields(log.Fields{
+				"#":        i,
+				"duration": stage.Duration,
+				"start":    stage.StartVUs,
+				"end":      stage.EndVUs,
+			}).Info("Stage")
+		}
 	}
 
 	return nil
@@ -81,6 +96,10 @@ func main() {
 		cli.StringFlag{
 			Name:  "out-file, o",
 			Usage: "Output raw metrics to a file",
+		},
+		cli.BoolFlag{
+			Name:  "dump",
+			Usage: "Dump parsed test and exit",
 		},
 	}
 	app.Before = func(c *cli.Context) error {
