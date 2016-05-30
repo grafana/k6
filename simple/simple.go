@@ -21,7 +21,7 @@ func New() *Runner {
 	}
 }
 
-func (r *Runner) RunVU(ctx context.Context, t speedboat.Test) {
+func (r *Runner) RunVU(ctx context.Context, t speedboat.Test, id int) {
 	mDuration := metrics.NewRegisteredHistogram("duration", speedboat.Registry, metrics.NewUniformSample(1024))
 	for {
 		req := fasthttp.AcquireRequest()

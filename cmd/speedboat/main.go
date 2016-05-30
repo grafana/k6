@@ -139,7 +139,7 @@ func action(cc *cli.Context) error {
 			log.WithField("id", i).Debug("Spawning VU")
 			vuCtx, cancel := context.WithCancel(ctx)
 			vus = append(vus, cancel)
-			go runner.RunVU(vuCtx, t)
+			go runner.RunVU(vuCtx, t, len(vus))
 		}
 		for i := len(vus); i > scale; i-- {
 			log.WithField("id", i-1).Debug("Dropping VU")
