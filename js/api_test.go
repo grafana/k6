@@ -1,33 +1,30 @@
 package js
 
 import (
-	"github.com/loadimpact/speedboat/loadtest"
-	"github.com/loadimpact/speedboat/runner"
+	"github.com/loadimpact/speedboat"
 	"gopkg.in/olebedev/go-duktape.v2"
 	"testing"
 	"time"
 )
 
-func testJSContext() (*Runner, *duktape.Context, chan runner.Result) {
-	ch := make(chan runner.Result, 100)
-	r := New()
-	c, err := r.newJSContext(loadtest.LoadTest{
+func testJSContext() (*Runner, *duktape.Context) {
+	r := New("")
+	c, err := r.newJSContext(speedboat.Test{
 		URL:    "http://example.com",
 		Script: "script.js",
-		Source: "~ not actually valid JS ~",
-		Stages: []loadtest.Stage{
-			loadtest.Stage{VUs: loadtest.VUSpec{Start: 10, End: 100}, Duration: 10 * time.Second},
+		Stages: []speedboat.TestStage{
+			speedboat.TestStage{StartVUs: 10, EndVUs: 100, Duration: 10 * time.Second},
 		},
-	}, 1, ch)
+	}, 1)
 	if err != nil {
 		panic(err)
 	}
-	return r, c, ch
+	return r, c
 }
 
 func TestHTTPSetMaxConnectionsPerHost(t *testing.T) {
 	src := `require('http').setMaxConnectionsPerHost(200);`
-	r, c, _ := testJSContext()
+	r, c := testJSContext()
 	if err := c.PevalString(src); err != nil {
 		t.Fatalf("Couldn't run script: %s", err)
 	}
@@ -38,20 +35,12 @@ func TestHTTPSetMaxConnectionsPerHost(t *testing.T) {
 
 func TestHTTPSetMaxConnectionsPerHostNegative(t *testing.T) {
 	src := `require('http').setMaxConnectionsPerHost(-1);`
-	r, c, ch := testJSContext()
+	r, c := testJSContext()
 	before := r.Client.MaxConnsPerHost
 	if err := c.PevalString(src); err != nil {
 		t.Fatalf("Couldn't run script: %s", err)
 	}
-	select {
-	case res := <-ch:
-		if res.Error == nil {
-			t.Error("No error reported!")
-		}
-		if r.Client.MaxConnsPerHost != before {
-			t.Errorf("Max connections changed! %d", r.Client.MaxConnsPerHost)
-		}
-	default:
-		t.Error("No results")
+	if r.Client.MaxConnsPerHost != before {
+		t.Errorf("Max connections changed! %d", r.Client.MaxConnsPerHost)
 	}
 }
