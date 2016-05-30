@@ -4,8 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/GeertJohan/go.rice"
-	"github.com/loadimpact/speedboat/loadtest"
-	"github.com/loadimpact/speedboat/runner"
+	log "github.com/Sirupsen/logrus"
+	"github.com/loadimpact/speedboat"
+	"github.com/rcrowley/go-metrics"
 	"github.com/valyala/fasthttp"
 	"golang.org/x/net/context"
 	"gopkg.in/olebedev/go-duktape.v2"
@@ -16,88 +17,85 @@ import (
 type Runner struct {
 	Client *fasthttp.Client
 
+	source string
 	lib    *rice.Box
 	vendor *rice.Box
+
+	mDuration metrics.Histogram
 }
 
-func New() *Runner {
+func New(src string) *Runner {
 	return &Runner{
 		Client: &fasthttp.Client{
 			MaxIdleConnDuration: time.Duration(0),
 		},
-		lib:    rice.MustFindBox("lib"),
-		vendor: rice.MustFindBox("vendor"),
+		source:    src,
+		lib:       rice.MustFindBox("lib"),
+		vendor:    rice.MustFindBox("vendor"),
+		mDuration: metrics.NewRegisteredHistogram("duration", speedboat.Registry, metrics.NewUniformSample(1024)),
 	}
 }
 
-func (r *Runner) Run(ctx context.Context, t loadtest.LoadTest, id int64) <-chan runner.Result {
-	ch := make(chan runner.Result)
+func (r *Runner) RunVU(ctx context.Context, t speedboat.Test, id int) {
+	c, err := r.newJSContext(t, id)
+	if err != nil {
+		log.WithError(err).Error("Couldn't create JS context")
+		return
+	}
+	defer c.Destroy()
 
-	go func() {
-		defer close(ch)
+	c.PushGlobalObject()
 
-		c, err := r.newJSContext(t, id, ch)
-		if err != nil {
-			ch <- runner.Result{Error: err}
-			return
-		}
-		defer c.Destroy()
+	// It should be cheaper memory-wise to keep the code on the global object (where it's
+	// safe from GC shenanigans) and duplicate the key every iteration, than to keep it on
+	// the stack and duplicate the whole function every iteration; just make it ABUNDANTLY
+	// CLEAR that the script should NEVER touch that property or dumb things will happen
+	codeProp := "__!!__seriously__don't__touch__from__script__!!__"
+	c.PushString("script")
+	if err := c.PcompileStringFilename(0, r.source); err != nil {
+		log.WithError(err).Error("Couldn't compile script")
+		return
+	}
+	c.PutPropString(-2, codeProp)
 
-		c.PushGlobalObject()
+	iteration := 1
+	c.PushString(codeProp)
+	for {
+		select {
+		default:
+			setIterationCounter(c, iteration)
+			c.DupTop()
+			if c.PcallProp(-3, 0) != duktape.ErrNone {
+				c.GetPropString(-1, "fileName")
+				filename := c.SafeToString(-1)
+				c.Pop()
 
-		// It should be cheaper memory-wise to keep the code on the global object (where it's
-		// safe from GC shenanigans) and duplicate the key every iteration, than to keep it on
-		// the stack and duplicate the whole function every iteration; just make it ABUNDANTLY
-		// CLEAR that the script should NEVER touch that property or dumb things will happen
-		codeProp := "__!!__seriously__don't__touch__from__script__!!__"
-		c.PushString("script")
-		if err := c.PcompileStringFilename(0, t.Source); err != nil {
-			ch <- runner.Result{Error: err}
-			return
-		}
-		c.PutPropString(-2, codeProp)
+				c.GetPropString(-1, "lineNumber")
+				line := c.ToNumber(-1)
+				c.Pop()
 
-		iteration := 1
-		c.PushString(codeProp)
-		for {
-			select {
-			default:
-				setIterationCounter(c, iteration)
-				c.DupTop()
-				if c.PcallProp(-3, 0) != duktape.ErrNone {
-					c.GetPropString(-1, "fileName")
-					filename := c.SafeToString(-1)
-					c.Pop()
-
-					c.GetPropString(-1, "lineNumber")
-					line := c.ToNumber(-1)
-					c.Pop()
-
-					err := errors.New(c.SafeToString(-1))
-					ch <- runner.Result{Error: err, Extra: map[string]interface{}{
-						"file": filename,
-						"line": line,
-					}}
-				}
-				c.Pop() // Pop return value
-			case <-ctx.Done():
-				return
+				err := errors.New(c.SafeToString(-1))
+				log.WithError(err).WithFields(log.Fields{
+					"file": filename,
+					"line": line,
+				}).Error("Script Error")
 			}
-
-			iteration++
+			c.Pop() // Pop return value
+		case <-ctx.Done():
+			return
 		}
-	}()
 
-	return ch
+		iteration++
+	}
 }
 
-func (r *Runner) newJSContext(t loadtest.LoadTest, id int64, ch chan<- runner.Result) (*duktape.Context, error) {
+func (r *Runner) newJSContext(t speedboat.Test, id int) (*duktape.Context, error) {
 	c := duktape.New()
 	c.PushGlobalObject()
 
 	c.PushObject()
 	{
-		pushModules(c, r, ch)
+		pushModules(c, r)
 		c.PutPropString(-2, "modules")
 
 		c.PushObject()
@@ -153,7 +151,7 @@ func setIterationCounter(c *duktape.Context, i int) {
 	c.Pop()
 }
 
-func pushData(c *duktape.Context, t loadtest.LoadTest, id int64) {
+func pushData(c *duktape.Context, t speedboat.Test, id int) {
 	c.PushObject()
 
 	c.PushInt(int(id))
@@ -167,7 +165,7 @@ func pushData(c *duktape.Context, t loadtest.LoadTest, id int64) {
 	c.PutPropString(-2, "test")
 }
 
-func pushModules(c *duktape.Context, r *Runner, ch chan<- runner.Result) {
+func pushModules(c *duktape.Context, r *Runner) {
 	c.PushObject()
 
 	api := map[string]map[string]apiFunc{
@@ -184,18 +182,18 @@ func pushModules(c *duktape.Context, r *Runner, ch chan<- runner.Result) {
 		"vu": map[string]apiFunc{},
 	}
 	for name, mod := range api {
-		pushModule(c, r, ch, mod)
+		pushModule(c, r, mod)
 		c.PutPropString(-2, name)
 	}
 }
 
-func pushModule(c *duktape.Context, r *Runner, ch chan<- runner.Result, members map[string]apiFunc) {
+func pushModule(c *duktape.Context, r *Runner, members map[string]apiFunc) {
 	c.PushObject()
 
 	for name, fn := range members {
 		fn := fn
 		c.PushGoFunction(func(lc *duktape.Context) int {
-			return fn(r, lc, ch)
+			return fn(r, lc)
 		})
 		c.PutPropString(-2, name)
 	}

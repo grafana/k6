@@ -1,24 +1,22 @@
 package js
 
 import (
-	"errors"
 	log "github.com/Sirupsen/logrus"
-	"github.com/loadimpact/speedboat/runner"
 	"gopkg.in/olebedev/go-duktape.v2"
 )
 
-type apiFunc func(r *Runner, c *duktape.Context, ch chan<- runner.Result) int
+type apiFunc func(r *Runner, c *duktape.Context) int
 
-func apiHTTPDo(r *Runner, c *duktape.Context, ch chan<- runner.Result) int {
+func apiHTTPDo(r *Runner, c *duktape.Context) int {
 	method := argString(c, 0)
 	if method == "" {
-		ch <- runner.Result{Error: errors.New("Missing method in http call")}
+		log.Error("Missing method in http call")
 		return 0
 	}
 
 	url := argString(c, 1)
 	if url == "" {
-		ch <- runner.Result{Error: errors.New("Missing URL in http call")}
+		log.Error("Missing URL in http call")
 		return 0
 	}
 
@@ -30,19 +28,22 @@ func apiHTTPDo(r *Runner, c *duktape.Context, ch chan<- runner.Result) int {
 	case duktape.TypeObject:
 		body = c.JsonEncode(2)
 	default:
-		ch <- runner.Result{Error: errors.New("Unknown type for request body")}
+		log.Error("Unknown type for request body")
 		return 0
 	}
 
 	args := httpArgs{}
 	if err := argJSON(c, 3, &args); err != nil {
-		ch <- runner.Result{Error: errors.New("Invalid arguments to http call")}
+		log.Error("Invalid arguments to http call")
 		return 0
 	}
 
 	res, duration, err := httpDo(r.Client, method, url, body, args)
+	if err != nil {
+		log.WithError(err).Error("Request error")
+	}
 	if !args.Quiet {
-		ch <- runner.Result{Error: err, Time: duration}
+		r.mDuration.Update(duration.Nanoseconds())
 	}
 
 	pushInstance(c, res, "HTTPResponse")
@@ -50,22 +51,22 @@ func apiHTTPDo(r *Runner, c *duktape.Context, ch chan<- runner.Result) int {
 	return 1
 }
 
-func apiHTTPSetMaxConnectionsPerHost(r *Runner, c *duktape.Context, ch chan<- runner.Result) int {
+func apiHTTPSetMaxConnectionsPerHost(r *Runner, c *duktape.Context) int {
 	num := int(argNumber(c, 0))
 	if num < 1 {
-		ch <- runner.Result{Error: errors.New("Max connections per host must be at least 1")}
+		log.Error("Max connections per host must be at least 1")
 		return 0
 	}
 	r.Client.MaxConnsPerHost = num
 	return 0
 }
 
-func apiLogType(r *Runner, c *duktape.Context, ch chan<- runner.Result) int {
+func apiLogType(r *Runner, c *duktape.Context) int {
 	kind := argString(c, 0)
 	text := argString(c, 1)
 	extra := map[string]interface{}{}
 	if err := argJSON(c, 2, &extra); err != nil {
-		ch <- runner.Result{Error: errors.New("Log context is not an object")}
+		log.Error("Log context is not an object")
 		return 0
 	}
 
@@ -84,7 +85,8 @@ func apiLogType(r *Runner, c *duktape.Context, ch chan<- runner.Result) int {
 	return 0
 }
 
-func apiTestAbort(r *Runner, c *duktape.Context, ch chan<- runner.Result) int {
-	ch <- runner.Result{Abort: true}
+func apiTestAbort(r *Runner, c *duktape.Context) int {
+	// TODO: Do this some better way.
+	log.Fatal("Test aborted")
 	return 0
 }

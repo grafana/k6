@@ -20,7 +20,7 @@ type httpResponse struct {
 }
 
 func httpDo(c *fasthttp.Client, method, url, body string, args httpArgs) (httpResponse, time.Duration, error) {
-	if method == "GET" {
+	if method == "GET" && body != "" {
 		u, err := neturl.Parse(url)
 		if err != nil {
 			return httpResponse{}, 0, err
