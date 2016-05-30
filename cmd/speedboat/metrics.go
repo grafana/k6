@@ -2,25 +2,21 @@ package main
 
 import (
 	"fmt"
-	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/speedboat/sampler"
+	stdlog "log"
 	"time"
 )
 
-func printMetrics() {
-	for name, metric := range sampler.DefaultSampler.Metrics {
-		text := fmt.Sprintf("Metric: %s", name)
-		switch metric.Type {
+func printMetrics(l *stdlog.Logger) {
+	for name, m := range sampler.DefaultSampler.Metrics {
+		l.Printf("%s\n", name)
+		switch m.Type {
 		case sampler.CounterType:
-			last := metric.Entries[len(metric.Entries)-1]
-			log.WithField("val", applyIntent(metric, last.Value)).Info(text)
+			last := m.Entries[len(m.Entries)-1]
+			l.Printf("  value=%s\n", applyIntent(m, last.Value))
 		case sampler.StatsType:
-			log.WithFields(log.Fields{
-				"min": applyIntent(metric, metric.Min()),
-				"max": applyIntent(metric, metric.Max()),
-				"avg": applyIntent(metric, metric.Avg()),
-				"med": applyIntent(metric, metric.Med()),
-			}).Info(text)
+			l.Printf("  min=%-15s max=%s\n", applyIntent(m, m.Min()), applyIntent(m, m.Max()))
+			l.Printf("  avg=%-15s med=%s\n", applyIntent(m, m.Avg()), applyIntent(m, m.Med()))
 		}
 	}
 }
@@ -29,5 +25,5 @@ func applyIntent(m *sampler.Metric, v int64) interface{} {
 	if m.Intent == sampler.TimeIntent {
 		return time.Duration(v)
 	}
-	return v
+	return fmt.Sprint(v)
 }

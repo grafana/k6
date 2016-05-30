@@ -11,6 +11,7 @@ import (
 	"golang.org/x/net/context"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
+	stdlog "log"
 	"os"
 	"strings"
 	"time"
@@ -139,12 +140,13 @@ func action(cc *cli.Context) error {
 	ctx, _ := context.WithTimeout(context.Background(), t.TotalDuration())
 
 	// Output metrics appropriately
+	metricsLogger := stdlog.New(os.Stderr, "metrics: ", stdlog.Lmicroseconds)
 	go func() {
 		ticker := time.NewTicker(1 * time.Second)
 		for {
 			select {
 			case <-ticker.C:
-				printMetrics()
+				printMetrics(metricsLogger)
 			case <-ctx.Done():
 				return
 			}
@@ -172,7 +174,7 @@ func action(cc *cli.Context) error {
 	<-ctx.Done()
 
 	// Print final metrics
-	printMetrics()
+	printMetrics(metricsLogger)
 
 	return nil
 }
