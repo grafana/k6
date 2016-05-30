@@ -3,6 +3,7 @@ package simple
 import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/speedboat"
+	"github.com/rcrowley/go-metrics"
 	"github.com/valyala/fasthttp"
 	"golang.org/x/net/context"
 	"time"
@@ -21,6 +22,7 @@ func New() *Runner {
 }
 
 func (r *Runner) RunVU(ctx context.Context, t speedboat.Test) {
+	mDuration := metrics.NewRegisteredHistogram("duration", speedboat.Registry, metrics.NewUniformSample(1024))
 	for {
 		req := fasthttp.AcquireRequest()
 		defer fasthttp.ReleaseRequest(req)
@@ -36,7 +38,7 @@ func (r *Runner) RunVU(ctx context.Context, t speedboat.Test) {
 		}
 		duration := time.Since(startTime)
 
-		log.WithField("duration", duration).Info("Duration")
+		mDuration.Update(duration.Nanoseconds())
 
 		select {
 		case <-ctx.Done():

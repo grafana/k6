@@ -6,9 +6,11 @@ import (
 	"github.com/codegangsta/cli"
 	"github.com/loadimpact/speedboat"
 	"github.com/loadimpact/speedboat/simple"
+	"github.com/rcrowley/go-metrics"
 	"golang.org/x/net/context"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
+	stdlog "log"
 	"os"
 	"time"
 )
@@ -123,6 +125,12 @@ func action(cc *cli.Context) error {
 		log.Fatal("No suitable runner found!")
 	}
 
+	// Global metrics
+	mVUs := metrics.NewRegisteredGauge("vus", speedboat.Registry)
+
+	// Output metrics appropriately
+	go metrics.Log(speedboat.Registry, time.Second, stdlog.New(os.Stderr, "metrics: ", stdlog.Lmicroseconds))
+
 	// Use a "headless controller" to scale VUs by polling the test ramp
 	ctx, _ := context.WithTimeout(context.Background(), t.TotalDuration())
 	vus := []context.CancelFunc{}
@@ -138,6 +146,7 @@ func action(cc *cli.Context) error {
 			vus[i-1]()
 			vus = vus[:i-1]
 		}
+		mVUs.Update(int64(len(vus)))
 	}
 
 	// Wait until the end of the test
