@@ -43,7 +43,7 @@ func apiHTTPDo(r *Runner, c *duktape.Context) int {
 		log.WithError(err).Error("Request error")
 	}
 	if !args.Quiet {
-		r.mDuration.Update(duration.Nanoseconds())
+		r.mDuration.Duration(duration)
 	}
 
 	pushInstance(c, res, "HTTPResponse")

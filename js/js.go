@@ -6,7 +6,7 @@ import (
 	"github.com/GeertJohan/go.rice"
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/speedboat"
-	"github.com/rcrowley/go-metrics"
+	"github.com/loadimpact/speedboat/sampler"
 	"github.com/valyala/fasthttp"
 	"golang.org/x/net/context"
 	"gopkg.in/olebedev/go-duktape.v2"
@@ -21,7 +21,7 @@ type Runner struct {
 	lib    *rice.Box
 	vendor *rice.Box
 
-	mDuration metrics.Histogram
+	mDuration *sampler.Metric
 }
 
 func New(src string) *Runner {
@@ -32,7 +32,7 @@ func New(src string) *Runner {
 		source:    src,
 		lib:       rice.MustFindBox("lib"),
 		vendor:    rice.MustFindBox("vendor"),
-		mDuration: metrics.NewRegisteredHistogram("duration", speedboat.Registry, metrics.NewUniformSample(1024)),
+		mDuration: sampler.Stats("duration"),
 	}
 }
 
