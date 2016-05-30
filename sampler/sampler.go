@@ -114,6 +114,10 @@ func (m *Metric) Max() int64 {
 }
 
 func (m *Metric) Avg() int64 {
+	if len(m.Entries) == 0 {
+		return 0
+	}
+
 	var sum int64
 	for _, e := range m.Entries {
 		sum += e.Value
