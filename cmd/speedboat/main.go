@@ -71,6 +71,33 @@ func dumpTest(t *speedboat.Test) {
 	}
 }
 
+func headlessController(c context.Context, t *speedboat.Test) <-chan int {
+	ch := make(chan int)
+
+	go func() {
+		defer close(ch)
+
+		select {
+		case ch <- t.VUsAt(0):
+		case <-c.Done():
+			return
+		}
+
+		startTime := time.Now()
+		ticker := time.NewTicker(100 * time.Millisecond)
+		for {
+			select {
+			case <-ticker.C:
+				ch <- t.VUsAt(time.Since(startTime))
+			case <-c.Done():
+				return
+			}
+		}
+	}()
+
+	return ch
+}
+
 func action(cc *cli.Context) error {
 	conf, err := parse(cc)
 	if err != nil {
@@ -96,27 +123,21 @@ func action(cc *cli.Context) error {
 		log.Fatal("No suitable runner found!")
 	}
 
-	// Schedule all configured VUs. Because we know the VU curves ahead of time, we:
-	// - Make a context with the test's duration as timeout
-	// - Loop through all the stages of the test
-	// - Spawn VUs that:
-	//     - Sleep until they're scheduled to start
-	//     - Expire at the projected end of their lifecycles
-	//
-	// TODO: Account for VU ramping in lifecycle projections!
+	// Use a "headless controller" to scale VUs by polling the test ramp
 	ctx, _ := context.WithTimeout(context.Background(), t.TotalDuration())
-	offset := time.Duration(0)
-	for _, stage := range t.Stages {
-		startOffset := offset
-		ctx, _ := context.WithTimeout(ctx, startOffset+stage.Duration)
-		go func() {
-			select {
-			case <-time.After(startOffset):
-				runner.RunVU(ctx, t)
-			case <-ctx.Done():
-			}
-		}()
-		offset += stage.Duration
+	vus := []context.CancelFunc{}
+	for scale := range headlessController(ctx, &t) {
+		for i := len(vus); i < scale; i++ {
+			log.WithField("id", i).Debug("Spawning VU")
+			vuCtx, cancel := context.WithCancel(ctx)
+			vus = append(vus, cancel)
+			go runner.RunVU(vuCtx, t)
+		}
+		for i := len(vus); i > scale; i-- {
+			log.WithField("id", i-1).Debug("Dropping VU")
+			vus[i-1]()
+			vus = vus[:i-1]
+		}
 	}
 
 	// Wait until the end of the test
