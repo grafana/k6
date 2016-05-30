@@ -31,9 +31,11 @@ func httpDo(c *fasthttp.Client, method, url, body string, args httpArgs) (httpRe
 			return httpResponse{}, 0, err
 		}
 
+		q := u.Query()
 		for key, val := range params {
-			u.Query().Set(key, fmt.Sprint(val))
+			q.Set(key, fmt.Sprint(val))
 		}
+		u.RawQuery = q.Encode()
 		url = u.String()
 	}
 
