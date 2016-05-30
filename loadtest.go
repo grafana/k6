@@ -26,28 +26,15 @@ func (t *Test) TotalDuration() time.Duration {
 	return total
 }
 
-/*func (t *LoadTest) StageAt(d time.Duration) (start time.Duration, stage TestStage, stop bool) {
-	at := time.Duration(0)
-	for i := range t.Stages {
-		stage = t.Stages[i]
-		if d > at+stage.Duration {
-			at += stage.Duration
-		} else if d < at+stage.Duration {
-			return at, stage, false
+func (t *Test) VUsAt(at time.Duration) int {
+	stageStart := time.Duration(0)
+	for _, stage := range t.Stages {
+		if stageStart+stage.Duration < at {
+			stageStart += stage.Duration
+			continue
 		}
+		progress := float64(at-stageStart) / float64(stage.Duration)
+		return stage.StartVUs + int(float64(stage.EndVUs-stage.StartVUs)*progress)
 	}
-	return at, stage, true
+	return 0
 }
-
-func (t *LoadTest) VUsAt(at time.Duration) (vus int, stop bool) {
-	start, stage, stop := t.StageAt(at)
-	if stop {
-		return 0, true
-	}
-
-	stageElapsed := at - start
-	percentage := (stageElapsed.Seconds() / stage.Duration.Seconds())
-	vus = stage.VUs.Start + int(float64(stage.EndVUs-stage.StartVUs)*percentage)
-
-	return vus, false
-}*/
