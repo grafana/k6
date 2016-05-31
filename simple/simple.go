@@ -38,7 +38,7 @@ func (r *Runner) RunVU(ctx context.Context, t speedboat.Test, id int) {
 		}
 		duration := time.Since(startTime)
 
-		mDuration.Duration(duration)
+		mDuration.WithField("url", t.URL).Duration(duration)
 
 		select {
 		case <-ctx.Done():

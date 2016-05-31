@@ -7,6 +7,7 @@ import (
 	"github.com/loadimpact/speedboat"
 	"github.com/loadimpact/speedboat/js"
 	"github.com/loadimpact/speedboat/sampler"
+	"github.com/loadimpact/speedboat/sampler/influxdb"
 	"github.com/loadimpact/speedboat/simple"
 	"golang.org/x/net/context"
 	"gopkg.in/yaml.v2"
@@ -22,6 +23,28 @@ func configureLogging(c *cli.Context) {
 	log.SetLevel(log.InfoLevel)
 	if c.GlobalBool("verbose") {
 		log.SetLevel(log.DebugLevel)
+	}
+}
+
+// Configure the global sampler.
+func configureSampler(c *cli.Context) {
+	output := c.String("output")
+	if output == "" {
+		return
+	}
+
+	sampler.DefaultSampler.OnError = func(err error) {
+		log.WithError(err).Error("[Sampler error]")
+	}
+
+	parts := strings.SplitN(output, "+", 2)
+	switch parts[0] {
+	case "influxdb":
+		out, err := influxdb.NewFromURL(parts[1])
+		if err != nil {
+			log.WithError(err).Fatal("Couldn't create InfluxDB client")
+		}
+		sampler.DefaultSampler.Outputs = append(sampler.DefaultSampler.Outputs, out)
 	}
 }
 
@@ -140,13 +163,17 @@ func action(cc *cli.Context) error {
 	ctx, _ := context.WithTimeout(context.Background(), t.TotalDuration())
 
 	// Output metrics appropriately
-	metricsLogger := stdlog.New(os.Stderr, "metrics: ", stdlog.Lmicroseconds)
+	logMetrics := cc.Bool("log")
+	metricsLogger := stdlog.New(os.Stdout, "metrics: ", stdlog.Lmicroseconds)
 	go func() {
 		ticker := time.NewTicker(1 * time.Second)
 		for {
 			select {
 			case <-ticker.C:
-				printMetrics(metricsLogger)
+				if logMetrics {
+					printMetrics(metricsLogger)
+				}
+				commitMetrics()
 			case <-ctx.Done():
 				return
 			}
@@ -175,6 +202,7 @@ func action(cc *cli.Context) error {
 
 	// Print final metrics
 	printMetrics(metricsLogger)
+	commitMetrics()
 
 	return nil
 }
@@ -213,8 +241,12 @@ func main() {
 			Value: time.Duration(10) * time.Second,
 		},
 		cli.StringFlag{
-			Name:  "out-file, o",
-			Usage: "Output raw metrics to a file",
+			Name:  "output, o",
+			Usage: "Output metrics to a file or database",
+		},
+		cli.BoolFlag{
+			Name:  "log, l",
+			Usage: "Log metrics to stdout",
 		},
 		cli.BoolFlag{
 			Name:  "dump",
@@ -223,6 +255,7 @@ func main() {
 	}
 	app.Before = func(c *cli.Context) error {
 		configureLogging(c)
+		configureSampler(c)
 		return nil
 	}
 	app.Action = action
