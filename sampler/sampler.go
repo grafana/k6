@@ -12,7 +12,7 @@ const (
 
 const (
 	StatsType = iota
-	CounterType
+	GaugeType
 )
 
 type Fields map[string]interface{}
@@ -173,8 +173,8 @@ func (s *Sampler) Stats(name string) *Metric {
 	return s.GetAs(name, StatsType)
 }
 
-func (s *Sampler) Counter(name string) *Metric {
-	return s.GetAs(name, CounterType)
+func (s *Sampler) Gauge(name string) *Metric {
+	return s.GetAs(name, GaugeType)
 }
 
 func (s *Sampler) Write(m *Metric, e *Entry) {

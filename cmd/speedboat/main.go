@@ -157,7 +157,7 @@ func action(cc *cli.Context) error {
 	}
 
 	// Global metrics
-	mVUs := sampler.Counter("vus")
+	mVUs := sampler.Gauge("vus")
 
 	// Context that expires at the end of the test
 	ctx, _ := context.WithTimeout(context.Background(), t.TotalDuration())
