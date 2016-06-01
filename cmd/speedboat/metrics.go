@@ -13,8 +13,7 @@ func printMetrics(l *stdlog.Logger) {
 		l.Printf("%s\n", name)
 		switch m.Type {
 		case sampler.CounterType:
-			last := m.Entries[len(m.Entries)-1]
-			l.Printf("  value=%s\n", applyIntent(m, last.Value))
+			l.Printf("  value=%s\n", applyIntent(m, m.Last()))
 		case sampler.StatsType:
 			l.Printf("  min=%-15s max=%s\n", applyIntent(m, m.Min()), applyIntent(m, m.Max()))
 			l.Printf("  avg=%-15s med=%s\n", applyIntent(m, m.Avg()), applyIntent(m, m.Med()))

@@ -55,12 +55,12 @@ func (e *Entry) Duration(d time.Duration) {
 type Metric struct {
 	Name    string
 	Sampler *Sampler
-	Entries []*Entry
 
 	Type   int
 	Intent int
 
-	entryMutex sync.Mutex
+	values     []int64
+	valueMutex sync.Mutex
 }
 
 func (m *Metric) Entry() *Entry {
@@ -88,18 +88,18 @@ func (m *Metric) Duration(d time.Duration) {
 }
 
 func (m *Metric) Write(e *Entry) {
-	m.entryMutex.Lock()
-	defer m.entryMutex.Unlock()
+	m.valueMutex.Lock()
+	defer m.valueMutex.Unlock()
 
-	m.Entries = append(m.Entries, e)
+	m.values = append(m.values, e.Value)
 	m.Sampler.Write(m, e)
 }
 
 func (m *Metric) Min() int64 {
 	var min int64
-	for _, e := range m.Entries {
-		if min == 0 || e.Value < min {
-			min = e.Value
+	for _, v := range m.values {
+		if min == 0 || v < min {
+			min = v
 		}
 	}
 	return min
@@ -107,28 +107,32 @@ func (m *Metric) Min() int64 {
 
 func (m *Metric) Max() int64 {
 	var max int64
-	for _, e := range m.Entries {
-		if e.Value > max {
-			max = e.Value
+	for _, v := range m.values {
+		if v > max {
+			max = v
 		}
 	}
 	return max
 }
 
 func (m *Metric) Avg() int64 {
-	if len(m.Entries) == 0 {
+	if len(m.values) == 0 {
 		return 0
 	}
 
 	var sum int64
-	for _, e := range m.Entries {
-		sum += e.Value
+	for _, v := range m.values {
+		sum += v
 	}
-	return sum / int64(len(m.Entries))
+	return sum / int64(len(m.values))
 }
 
 func (m *Metric) Med() int64 {
-	return m.Entries[(len(m.Entries)/2)-1].Value
+	return m.values[(len(m.values)/2)-1]
+}
+
+func (m *Metric) Last() int64 {
+	return m.values[len(m.values)-1]
 }
 
 type Sampler struct {
