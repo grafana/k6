@@ -10,17 +10,18 @@ import (
 
 func printMetrics(l *stdlog.Logger) {
 	for name, m := range sampler.DefaultSampler.Metrics {
-		l.Printf("%s\n", name)
 		switch m.Type {
 		case sampler.GaugeType:
-			l.Printf("  value=%s\n", applyIntent(m, m.Last()))
+			l.Printf("%s val=%v\n", name, applyIntent(m, m.Last()))
 		case sampler.CounterType:
-			l.Printf("  num=%s\n", applyIntent(m, m.Sum()))
+			l.Printf("%s num=%v\n", name, applyIntent(m, m.Sum()))
 		case sampler.StatsType:
-			l.Printf("  min=%s\n", applyIntent(m, m.Min()))
-			l.Printf("  max=%s\n", applyIntent(m, m.Max()))
-			l.Printf("  avg=%s\n", applyIntent(m, m.Avg()))
-			l.Printf("  med=%s\n", applyIntent(m, m.Med()))
+			l.Printf("%s min=%v max=%v avg=%v med=%v\n", name,
+				applyIntent(m, m.Min()),
+				applyIntent(m, m.Max()),
+				applyIntent(m, m.Avg()),
+				applyIntent(m, m.Med()),
+			)
 		}
 	}
 }
