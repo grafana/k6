@@ -14,6 +14,8 @@ func printMetrics(l *stdlog.Logger) {
 		switch m.Type {
 		case sampler.GaugeType:
 			l.Printf("  value=%s\n", applyIntent(m, m.Last()))
+		case sampler.CounterType:
+			l.Printf("  num=%s\n", applyIntent(m, m.Sum()))
 		case sampler.StatsType:
 			l.Printf("  min=%-15s max=%s\n", applyIntent(m, m.Min()), applyIntent(m, m.Max()))
 			l.Printf("  avg=%-15s med=%s\n", applyIntent(m, m.Avg()), applyIntent(m, m.Med()))
