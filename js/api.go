@@ -43,6 +43,9 @@ func apiHTTPDo(r *Runner, c *duktape.Context) int {
 		log.WithError(err).Error("Request error")
 	}
 	if !args.Quiet {
+		if err != nil {
+			r.mErrors.WithField("url", url).Int(1)
+		}
 		r.mDuration.WithField("url", url).Duration(duration)
 	}
 

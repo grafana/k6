@@ -22,6 +22,7 @@ type Runner struct {
 	vendor *rice.Box
 
 	mDuration *sampler.Metric
+	mErrors   *sampler.Metric
 }
 
 func New(src string) *Runner {
@@ -33,6 +34,7 @@ func New(src string) *Runner {
 		lib:       rice.MustFindBox("lib"),
 		vendor:    rice.MustFindBox("vendor"),
 		mDuration: sampler.Stats("duration"),
+		mErrors:   sampler.Counter("errors"),
 	}
 }
 

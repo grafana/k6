@@ -23,6 +23,7 @@ func New() *Runner {
 
 func (r *Runner) RunVU(ctx context.Context, t speedboat.Test, id int) {
 	mDuration := sampler.Stats("duration")
+	mErrors := sampler.Counter("errors")
 	for {
 		req := fasthttp.AcquireRequest()
 		defer fasthttp.ReleaseRequest(req)
@@ -35,6 +36,7 @@ func (r *Runner) RunVU(ctx context.Context, t speedboat.Test, id int) {
 		startTime := time.Now()
 		if err := r.Client.Do(req, res); err != nil {
 			log.WithError(err).Error("Request error")
+			mErrors.WithField("url", t.URL).Int(1)
 		}
 		duration := time.Since(startTime)
 
