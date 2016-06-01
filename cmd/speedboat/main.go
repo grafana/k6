@@ -3,12 +3,12 @@ package main
 import (
 	"errors"
 	log "github.com/Sirupsen/logrus"
-	"github.com/codegangsta/cli"
 	"github.com/loadimpact/speedboat"
 	"github.com/loadimpact/speedboat/js"
 	"github.com/loadimpact/speedboat/sampler"
 	"github.com/loadimpact/speedboat/sampler/influxdb"
 	"github.com/loadimpact/speedboat/simple"
+	"github.com/urfave/cli"
 	"golang.org/x/net/context"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
