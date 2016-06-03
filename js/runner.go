@@ -23,7 +23,6 @@ func New(filename, src string) *Runner {
 
 func (r *Runner) RunVU(ctx context.Context, t speedboat.Test, id int) {
 	js := duktape.New()
-	defer js.Destroy()
 
 	if err := putScript(js, r.Filename, r.Source); err != nil {
 		log.WithError(err).Error("Couldn't compile script")
