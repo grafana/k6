@@ -23,7 +23,7 @@ func New(filename, src string) *Runner {
 
 func (r *Runner) RunVU(ctx context.Context, t speedboat.Test, id int) {
 	js := duktape.New()
-	setupGlobalObject(js, id)
+	setupGlobalObject(js, t, id)
 	bridgeAPI(js, contextForAPI(ctx))
 
 	if err := putScript(js, r.Filename, r.Source); err != nil {
