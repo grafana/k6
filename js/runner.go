@@ -102,9 +102,21 @@ func bridgeAPI(js *duktape.Context, ctx context.Context) {
 			"do": apiHTTPDo,
 		},
 	}
+	global := map[string]APIFunc{
+		"sleep": apiSleep,
+	}
 
 	js.PushGlobalObject()
 	defer js.Pop()
+
+	for fname, fn := range global {
+		fn := fn
+		js.PushGoFunction(func(js *duktape.Context) int {
+			return fn(js, ctx)
+		})
+		js.PutPropString(-2, fname)
+	}
+
 	js.GetPropString(-1, "__modules__")
 	defer js.Pop()
 
