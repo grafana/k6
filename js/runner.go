@@ -44,6 +44,7 @@ func (r *Runner) RunVU(ctx context.Context, t speedboat.Test, id int) {
 		}
 		if err := loadScript(js, filename, src); err != nil {
 			log.WithError(err).Error("Couldn't load dependency")
+			return
 		}
 	}
 
@@ -63,6 +64,7 @@ func (r *Runner) RunVU(ctx context.Context, t speedboat.Test, id int) {
 		return loadScript(js, path, src)
 	}); err != nil {
 		log.WithError(err).Error("Couldn't load support file")
+		return
 	}
 
 	js.PushGlobalObject()
