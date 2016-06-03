@@ -33,6 +33,17 @@ func getJSError(js *duktape.Context) JSError {
 	return JSError{Message: msg, Filename: filename, Line: line}
 }
 
+func setupGlobalObject(js *duktape.Context) {
+	js.PushGlobalObject()
+	defer js.Pop()
+
+	js.PushObject()
+	js.PutPropString(-2, "__modules__")
+
+	js.PushObject()
+	js.PutPropString(-2, "__data__")
+}
+
 func putScript(js *duktape.Context, filename, src string) error {
 	js.PushGlobalObject()
 	defer js.Pop()
