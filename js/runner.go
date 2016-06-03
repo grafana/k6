@@ -4,6 +4,7 @@ import (
 	"github.com/GeertJohan/go.rice"
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/speedboat"
+	"github.com/loadimpact/speedboat/js/http"
 	"golang.org/x/net/context"
 	"gopkg.in/olebedev/go-duktape.v2"
 	"os"
@@ -24,6 +25,7 @@ func New(filename, src string) *Runner {
 func (r *Runner) RunVU(ctx context.Context, t speedboat.Test, id int) {
 	js := duktape.New()
 	setupGlobalObject(js)
+	bridgeAPI(js, contextForAPI(ctx))
 
 	if err := putScript(js, r.Filename, r.Source); err != nil {
 		log.WithError(err).Error("Couldn't compile script")
@@ -86,5 +88,35 @@ func (r *Runner) RunVU(ctx context.Context, t speedboat.Test, id int) {
 			return
 		default:
 		}
+	}
+}
+
+func contextForAPI(ctx context.Context) context.Context {
+	ctx = http.WithDefaultClient(ctx)
+	return ctx
+}
+
+func bridgeAPI(js *duktape.Context, ctx context.Context) {
+	api := map[string]map[string]APIFunc{
+		"http": map[string]APIFunc{
+			"do": apiHTTPDo,
+		},
+	}
+
+	js.PushGlobalObject()
+	defer js.Pop()
+	js.GetPropString(-1, "__modules__")
+	defer js.Pop()
+
+	for modname, mod := range api {
+		js.PushObject()
+		for fname, fn := range mod {
+			fn := fn
+			js.PushGoFunction(func(js *duktape.Context) int {
+				return fn(js, ctx)
+			})
+			js.PutPropString(-2, fname)
+		}
+		js.PutPropString(-2, modname)
 	}
 }
