@@ -1,5 +1,7 @@
 "use strict";
 
+__modules__.http = __modules__.http || {};
+
 __modules__.http.get = function() {
 	return __modules__.http.do.apply(this, _.concat(['GET'], arguments));
 }

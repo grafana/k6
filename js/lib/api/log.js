@@ -1,5 +1,7 @@
 "use strict";
 
+__modules__.log = __modules__.log || {};
+
 __modules__.log.debug = function() {
 	return __modules__.log.type.apply(this, _.concat(['debug'], arguments));
 }
