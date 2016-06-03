@@ -3,9 +3,9 @@
 __modules__.vu = __modules__.vu || {};
 
 __modules__.vu.id = function() {
-	return __internal__.data.id;
+	return __data__.id;
 }
 
 __modules__.vu.iteration = function() {
-	return __internal__.iteration;
+	return __data__.iteration;
 }
