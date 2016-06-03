@@ -1,9 +1,9 @@
 "use strict";
 
-__internal__.modules.vu.id = function() {
+__modules__.vu.id = function() {
 	return __internal__.data.id;
 }
 
-__internal__.modules.vu.iteration = function() {
+__modules__.vu.iteration = function() {
 	return __internal__.iteration;
 }
