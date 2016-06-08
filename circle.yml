@@ -4,7 +4,7 @@ machine:
 
 dependencies:
   post:
-    - mkdir ~/.docker && echo "{\"https://index.docker.io/v1/\":{\"auth\":\"$DOCKER_AUTH\",\"email\":\"$DOCKER_EMAIL\"}}" >~/.docker/config.json
+    - echo "{\"https://index.docker.io/v1/\":{\"auth\":\"$DOCKER_AUTH\",\"email\":\"$DOCKER_EMAIL\"}}" >~/.dockercfg
 
 checkout:
   post:
