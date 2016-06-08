@@ -209,7 +209,17 @@ func (s *Sampler) Commit() error {
 	return nil
 }
 
+func (s *Sampler) Close() error {
+	for _, out := range s.Outputs {
+		if err := out.Close(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 type Output interface {
 	Write(m *Metric, e *Entry) error
 	Commit() error
+	Close() error
 }

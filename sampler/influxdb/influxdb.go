@@ -96,3 +96,7 @@ func (o *Output) Commit() error {
 	o.currentBatch = nil
 	return err
 }
+
+func (o *Output) Close() error {
+	return o.Client.Close()
+}

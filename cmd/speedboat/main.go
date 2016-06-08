@@ -7,10 +7,12 @@ import (
 	"github.com/loadimpact/speedboat/js"
 	"github.com/loadimpact/speedboat/sampler"
 	"github.com/loadimpact/speedboat/sampler/influxdb"
+	"github.com/loadimpact/speedboat/sampler/stream"
 	"github.com/loadimpact/speedboat/simple"
 	"github.com/urfave/cli"
 	"golang.org/x/net/context"
 	"gopkg.in/yaml.v2"
+	"io"
 	"io/ioutil"
 	stdlog "log"
 	"os"
@@ -46,11 +48,29 @@ func configureSampler(c *cli.Context) {
 				log.WithError(err).Fatal("Couldn't create InfluxDB client")
 			}
 			sampler.DefaultSampler.Outputs = append(sampler.DefaultSampler.Outputs, out)
-		case "stdout":
-			out := &LogMetricsOutput{Writer: os.Stdout}
-			sampler.DefaultSampler.Outputs = append(sampler.DefaultSampler.Outputs, out)
 		default:
-			log.WithField("type", parts[0]).Fatal("Unrecognized metric output")
+			var writer io.WriteCloser
+			switch output {
+			case "stdout", "-":
+				writer = os.Stdout
+			default:
+				file, err := os.Create(output)
+				if err != nil {
+					log.WithError(err).Fatal("Couldn't create output file")
+				}
+				writer = file
+			}
+
+			var out sampler.Output
+			switch c.GlobalString("format") {
+			case "json":
+				out = &stream.JSONOutput{Output: writer}
+			case "csv":
+				out = &stream.CSVOutput{Output: writer}
+			default:
+				log.Fatal("Unknown output format")
+			}
+			sampler.DefaultSampler.Outputs = append(sampler.DefaultSampler.Outputs, out)
 		}
 	}
 }
@@ -245,6 +265,7 @@ func action(cc *cli.Context) error {
 		metricsMutex.Unlock()
 	}
 	commitMetrics()
+	closeMetrics()
 
 	return nil
 }
@@ -285,6 +306,11 @@ func main() {
 		cli.StringSliceFlag{
 			Name:  "output, o",
 			Usage: "Output metrics to a file or database",
+		},
+		cli.StringFlag{
+			Name:  "format, f",
+			Usage: "Metric output format (json or csv)",
+			Value: "json",
 		},
 		cli.BoolFlag{
 			Name:  "log, l",
