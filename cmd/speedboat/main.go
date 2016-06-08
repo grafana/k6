@@ -168,7 +168,7 @@ func action(cc *cli.Context) error {
 
 	// Configure the VU logger
 	logger := &log.Logger{
-		Out:       os.Stdout,
+		Out:       os.Stderr,
 		Level:     log.DebugLevel,
 		Formatter: &log.TextFormatter{},
 	}
