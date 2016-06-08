@@ -239,9 +239,11 @@ func action(cc *cli.Context) error {
 	<-ctx.Done()
 
 	// Print final metrics
-	metricsMutex.Lock()
-	printMetrics(metricsLogger)
-	metricsMutex.Unlock()
+	if logMetrics {
+		metricsMutex.Lock()
+		printMetrics(metricsLogger)
+		metricsMutex.Unlock()
+	}
 	commitMetrics()
 
 	return nil
