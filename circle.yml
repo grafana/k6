@@ -15,6 +15,7 @@ deployment:
     branch: master
     owner: loadimpact
     commands:
+      - docker info
       - docker build -t loadimpact/speedboat --rm .
       - docker push loadimpact/speedboat
 
@@ -22,5 +23,6 @@ deployment:
     branch: develop
     owner: loadimpact
     commands:
+      - docker info
       - docker build -t loadimpact/speedboat:develop --rm .
       - docker push loadimpact/speedboat:develop
