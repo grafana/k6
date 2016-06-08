@@ -98,6 +98,9 @@ func bridgeAPI(js *duktape.Context, ctx context.Context) {
 		"log": map[string]APIFunc{
 			"log": apiLogLog,
 		},
+		"test": map[string]APIFunc{
+			"abort": apiTestAbort,
+		},
 	}
 	global := map[string]APIFunc{
 		"sleep": apiSleep,

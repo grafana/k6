@@ -2,6 +2,7 @@ package js
 
 import (
 	log "github.com/Sirupsen/logrus"
+	"github.com/loadimpact/speedboat"
 	"github.com/loadimpact/speedboat/js/http"
 	jslog "github.com/loadimpact/speedboat/js/log"
 	"golang.org/x/net/context"
@@ -73,5 +74,10 @@ func apiLogLog(js *duktape.Context, ctx context.Context) int {
 
 	jslog.Log(ctx, t, msg, fields)
 
+	return 0
+}
+
+func apiTestAbort(js *duktape.Context, ctx context.Context) int {
+	panic(speedboat.AbortTest)
 	return 0
 }

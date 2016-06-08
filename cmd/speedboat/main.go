@@ -161,7 +161,7 @@ func action(cc *cli.Context) error {
 	mVUs := sampler.Gauge("vus")
 
 	// Context that expires at the end of the test
-	ctx, _ := context.WithTimeout(context.Background(), t.TotalDuration())
+	ctx, cancel := context.WithTimeout(context.Background(), t.TotalDuration())
 
 	// Output metrics appropriately; use a mutex to prevent garbled output
 	logMetrics := cc.Bool("log")
@@ -189,9 +189,28 @@ func action(cc *cli.Context) error {
 	for scale := range headlessController(ctx, &t) {
 		for i := len(vus); i < scale; i++ {
 			log.WithField("id", i).Debug("Spawning VU")
-			vuCtx, cancel := context.WithCancel(ctx)
-			vus = append(vus, cancel)
-			go runner.RunVU(vuCtx, t, len(vus))
+			vuCtx, vuCancel := context.WithCancel(ctx)
+			vus = append(vus, vuCancel)
+			go func() {
+				defer func() {
+					if v := recover(); v != nil {
+						switch err := v.(type) {
+						case speedboat.FlowControl:
+							switch err {
+							case speedboat.AbortTest:
+								log.Error("Test aborted")
+								cancel()
+							}
+						default:
+							log.WithFields(log.Fields{
+								"id":    i,
+								"error": err,
+							}).Error("VU crashed!")
+						}
+					}
+				}()
+				runner.RunVU(vuCtx, t, len(vus))
+			}()
 		}
 		for i := len(vus); i > scale; i-- {
 			log.WithField("id", i-1).Debug("Dropping VU")
