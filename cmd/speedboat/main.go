@@ -171,7 +171,7 @@ func action(cc *cli.Context) error {
 	// Inspect the test to find a suitable runner; additional ones can easily be added
 	var runner speedboat.Runner
 	switch {
-	case t.URL != "":
+	case t.Script == "":
 		runner = simple.New()
 	case strings.HasSuffix(t.Script, ".js"):
 		src, err := ioutil.ReadFile(t.Script)
