@@ -1,12 +1,31 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/speedboat/sampler"
+	"io"
 	stdlog "log"
 	"time"
 )
+
+type LogMetricsOutput struct {
+	Writer io.Writer
+
+	encoder *json.Encoder
+}
+
+func (o *LogMetricsOutput) Write(m *sampler.Metric, e *sampler.Entry) error {
+	if o.encoder == nil {
+		o.encoder = json.NewEncoder(o.Writer)
+	}
+	return o.encoder.Encode(e)
+}
+
+func (o *LogMetricsOutput) Commit() error {
+	return nil
+}
 
 func printMetrics(l *stdlog.Logger) {
 	for name, m := range sampler.DefaultSampler.Metrics {
