@@ -64,6 +64,11 @@ func apiHTTPDo(js *duktape.Context, ctx context.Context) int {
 	return 1
 }
 
+func apiHTTPSetMaxConnsPerHost(js *duktape.Context, ctx context.Context) int {
+	http.GetClient(ctx).MaxConnsPerHost = int(argNumber(js, 0))
+	return 0
+}
+
 func apiLogLog(js *duktape.Context, ctx context.Context) int {
 	t := argString(js, 0)
 	msg := argString(js, 1)
