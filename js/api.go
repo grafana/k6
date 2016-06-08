@@ -14,7 +14,6 @@ type APIFunc func(js *duktape.Context, ctx context.Context) int
 
 func contextForAPI(ctx context.Context) context.Context {
 	ctx = http.WithDefaultClient(ctx)
-	ctx = jslog.WithDefaultLogger(ctx)
 	return ctx
 }
 
@@ -77,7 +76,8 @@ func apiLogLog(js *duktape.Context, ctx context.Context) int {
 		log.WithError(err).Error("Couldn't parse log fields")
 	}
 
-	jslog.Log(ctx, t, msg, fields)
+	logger := speedboat.GetLogger(ctx)
+	jslog.Log(logger, t, msg, fields)
 
 	return 0
 }

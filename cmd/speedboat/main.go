@@ -25,6 +25,10 @@ func configureLogging(c *cli.Context) {
 	if c.GlobalBool("verbose") {
 		log.SetLevel(log.DebugLevel)
 	}
+
+	if c.GlobalBool("json") {
+		log.SetFormatter(&log.JSONFormatter{})
+	}
 }
 
 // Configure the global sampler.
@@ -163,6 +167,17 @@ func action(cc *cli.Context) error {
 	// Context that expires at the end of the test
 	ctx, cancel := context.WithTimeout(context.Background(), t.TotalDuration())
 
+	// Configure the VU logger
+	logger := &log.Logger{
+		Out:       os.Stdout,
+		Level:     log.DebugLevel,
+		Formatter: &log.TextFormatter{},
+	}
+	if cc.GlobalBool("json") {
+		logger.Formatter = &log.JSONFormatter{}
+	}
+	ctx = speedboat.WithLogger(ctx, logger)
+
 	// Output metrics appropriately; use a mutex to prevent garbled output
 	logMetrics := cc.Bool("log")
 	metricsLogger := stdlog.New(os.Stdout, "metrics: ", stdlog.Lmicroseconds)
@@ -272,6 +287,10 @@ func main() {
 		cli.BoolFlag{
 			Name:  "log, l",
 			Usage: "Log metrics to stdout",
+		},
+		cli.BoolFlag{
+			Name:  "json",
+			Usage: "Format log messages as JSON",
 		},
 		cli.BoolFlag{
 			Name:  "dump",
