@@ -163,9 +163,6 @@ func action(cc *cli.Context) error {
 		log.Fatal("No suitable runner found!")
 	}
 
-	// Global metrics
-	mVUs := sampler.Gauge("vus")
-
 	// Context that expires at the end of the test
 	ctx, cancel := context.WithTimeout(context.Background(), t.TotalDuration())
 
@@ -202,6 +199,7 @@ func action(cc *cli.Context) error {
 	}()
 
 	// Use a "headless controller" to scale VUs by polling the test ramp
+	mVUs := sampler.Gauge("vus")
 	vus := []context.CancelFunc{}
 	for scale := range headlessController(ctx, &t) {
 		for i := len(vus); i < scale; i++ {
