@@ -22,8 +22,8 @@ func New() *Runner {
 }
 
 func (r *Runner) RunVU(ctx context.Context, t speedboat.Test, id int) {
-	mDuration := sampler.Stats("duration")
-	mErrors := sampler.Counter("errors")
+	mDuration := sampler.Stats("request.duration")
+	mErrors := sampler.Counter("request.error")
 	for {
 		req := fasthttp.AcquireRequest()
 		defer fasthttp.ReleaseRequest(req)
