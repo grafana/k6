@@ -16,9 +16,7 @@ type Runner struct {
 
 func New() *Runner {
 	return &Runner{
-		Client: &fasthttp.Client{
-			MaxIdleConnDuration: time.Duration(0),
-		},
+		Client: &fasthttp.Client{},
 	}
 }
 
