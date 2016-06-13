@@ -49,7 +49,7 @@ func (r *Runner) RunVU(ctx context.Context, t speedboat.Test, id int) {
 		case <-ctx.Done():
 			return
 		default:
-			time.Sleep(rand.Int63n(100) * time.Millisecond)
+			time.Sleep(time.Duration(rand.Int63n(100)) * time.Millisecond)
 		}
 	}
 }
