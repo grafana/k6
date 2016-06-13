@@ -26,11 +26,6 @@ func (r *Runner) RunVU(ctx context.Context, t speedboat.Test, id int) {
 	setupGlobalObject(js, t, id)
 	bridgeAPI(js, contextForAPI(ctx))
 
-	if err := putScript(js, r.Filename, r.Source); err != nil {
-		log.WithError(err).Error("Couldn't compile script")
-		return
-	}
-
 	vendor, err := rice.FindBox("vendor")
 	if err != nil {
 		log.WithError(err).Error("Script vendor files missing; try `git submodule update --init`")
@@ -68,11 +63,17 @@ func (r *Runner) RunVU(ctx context.Context, t speedboat.Test, id int) {
 		return
 	}
 
-	js.PushGlobalObject()
-	js.PushString(scriptProp)
+	if err := pushScript(js, r.Filename, r.Source); err != nil {
+		log.WithError(err).Error("Couldn't compile script")
+		return
+	}
+
+	// js.PushGlobalObject()
+	// js.PushString(scriptProp)
 	for {
 		js.DupTop()
-		if js.PcallProp(-3, 0) != duktape.ErrNone {
+		// if js.PcallProp(-3, 0) != duktape.ErrNone {
+		if js.Pcall(0) != duktape.ErrNone {
 			err := getJSError(js)
 			log.WithFields(log.Fields{
 				"file":  err.Filename,
