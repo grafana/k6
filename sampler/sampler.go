@@ -96,7 +96,9 @@ func (m *Metric) Write(e *Entry) {
 	m.valueMutex.Lock()
 	defer m.valueMutex.Unlock()
 
-	m.values = append(m.values, e.Value)
+	if m.Sampler.Accumulate {
+		m.values = append(m.values, e.Value)
+	}
 	m.Sampler.Write(m, e)
 }
 
@@ -156,6 +158,10 @@ type Sampler struct {
 	Metrics map[string]*Metric
 	Outputs []Output
 	OnError func(error)
+
+	// Accumulate entry values; allows summary functions on Metrics for some rudimentary summary
+	// output. Note that entry metadata is not preserved, only values.
+	Accumulate bool
 
 	MetricMutex sync.Mutex
 }
