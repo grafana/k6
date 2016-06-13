@@ -48,6 +48,7 @@ func (r *Runner) RunVU(ctx context.Context, t speedboat.Test, id int) {
 		case <-ctx.Done():
 			return
 		default:
+			time.Sleep(1 * time.Second)
 		}
 	}
 }
