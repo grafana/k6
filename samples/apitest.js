@@ -49,7 +49,7 @@ var data = { 'a':'1', 'b':'2' };
 var headers = { 'X-Myheader' : 'Myheadervalue', 'X-Myheader2' : 'Myheadervalue2' };
 var params = { 'headers' : headers, 'quiet' : false }
 
-print("8. Testing http.do(\"GET\"");
+print("8. Testing http.do(\"GET\", \"http://httpbin.org/get\")");
 var jsondata = http.do("GET", "http://httpbin.org/get", data, params).json();
 if (!subsetof(data, jsondata.args)) {
   log.debug("ERROR!  I sent: " + JSON.stringify(data) + " but got back: " + JSON.stringify(jsondata.args))
@@ -58,7 +58,7 @@ if (!subsetof(headers, jsondata.headers)) {
   log.debug("ERROR!  I sent: " + JSON.stringify(headers) + " but got back: " + JSON.stringify(jsondata.headers))
 }
 
-print("9. Testing http.get()");
+print("9. Testing http.get(\"http://httpbin.org/get\")");
 var jsondata = http.get("http://httpbin.org/get", data, params).json();
 if (!subsetof(data, jsondata.args)) {
   log.debug("ERROR!  I sent: " + JSON.stringify(data) + " but got back: " + JSON.stringify(jsondata.args))
@@ -67,8 +67,9 @@ if (!subsetof(headers, jsondata.headers)) {
   log.debug("ERROR!  I sent: " + JSON.stringify(headers) + " but got back: " + JSON.stringify(jsondata.headers))
 }
 
-log.debug("10. Testing http.do(\"POST\", \"http://httpbin.org/post\")");
+print("10. Testing http.do(\"POST\", \"http://httpbin.org/post\")");
 var jsondata = http.do("POST", "http://httpbin.org/post", data, params).json();
+// XXX TODO: verify that post data is returned
 //if (!subsetof(data, jsondata.form)) {
 //  print("ERROR!  I sent: " + JSON.stringify(data) + " but got back: " + JSON.stringify(jsondata))
 //}
