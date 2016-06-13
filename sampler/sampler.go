@@ -65,7 +65,11 @@ type Metric struct {
 }
 
 func (m *Metric) Entry() *Entry {
-	return &Entry{Metric: m, Fields: make(map[string]interface{})}
+	return &Entry{
+		Metric: m,
+		Time:   time.Now(),
+		Fields: make(map[string]interface{}),
+	}
 }
 
 func (m *Metric) WithField(key string, value interface{}) *Entry {
