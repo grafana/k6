@@ -93,7 +93,7 @@ func (r *Runner) RunVU(ctx context.Context, t speedboat.Test, id int) {
 func bridgeAPI(js *duktape.Context, ctx context.Context) {
 	api := map[string]map[string]APIFunc{
 		"http": map[string]APIFunc{
-			"do":                 apiHTTPDo,
+			"request":            apiHTTPRequest,
 			"setMaxConnsPerHost": apiHTTPSetMaxConnsPerHost,
 		},
 		"log": map[string]APIFunc{
