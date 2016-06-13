@@ -50,7 +50,7 @@ func GetClient(ctx context.Context) *fasthttp.Client {
 	return ctx.Value(clientKey).(*fasthttp.Client)
 }
 
-func Do(ctx context.Context, method, url, body string, args Args) (Response, error) {
+func Request(ctx context.Context, method, url, body string, args Args) (Response, error) {
 	client := GetClient(ctx)
 	if client == nil {
 		return Response{}, ErrNoClient
