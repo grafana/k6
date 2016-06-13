@@ -6,6 +6,7 @@ import (
 	"github.com/loadimpact/speedboat/sampler"
 	"github.com/valyala/fasthttp"
 	"golang.org/x/net/context"
+	"math/rand"
 	"time"
 )
 
@@ -48,7 +49,7 @@ func (r *Runner) RunVU(ctx context.Context, t speedboat.Test, id int) {
 		case <-ctx.Done():
 			return
 		default:
-			time.Sleep(10 * time.Millisecond)
+			time.Sleep(rand.Int63n(100) * time.Millisecond)
 		}
 	}
 }
