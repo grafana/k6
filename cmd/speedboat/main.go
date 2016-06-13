@@ -199,6 +199,9 @@ func action(cc *cli.Context) error {
 
 	// Output metrics appropriately; use a mutex to prevent garbled output
 	logMetrics := cc.Bool("log")
+	if logMetrics {
+		sampler.DefaultSampler.Accumulate = true
+	}
 	metricsLogger := stdlog.New(os.Stdout, "metrics: ", stdlog.Lmicroseconds)
 	metricsMutex := sync.Mutex{}
 	go func() {
