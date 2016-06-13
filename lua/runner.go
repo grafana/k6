@@ -63,6 +63,7 @@ func (r *Runner) RunVU(ctx context.Context, t speedboat.Test, id int) {
 		}).Duration(duration)
 
 		if err != nil {
+			log.WithError(err).Error("Request error")
 			mErrors.WithFields(sampler.Fields{
 				"url":    url,
 				"method": "GET",
