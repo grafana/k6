@@ -20,9 +20,7 @@ func New(filename, src string) *Runner {
 	return &Runner{
 		Filename: filename,
 		Source:   src,
-		Client: &fasthttp.Client{
-			MaxIdleConnDuration: time.Duration(0),
-		},
+		Client:   &fasthttp.Client{},
 	}
 }
 
