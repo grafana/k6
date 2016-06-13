@@ -19,6 +19,14 @@ const (
 
 var ErrNoClient = errors.New("No client in context")
 
+var mDuration *sampler.Metric
+var mErrors *sampler.Metric
+
+func init() {
+	mDuration = sampler.Stats("request.duration")
+	mErrors = sampler.Counter("request.error")
+}
+
 type Args struct {
 	Quiet   bool              `json:"quiet"`
 	Headers map[string]string `json:"headers"`
@@ -89,7 +97,7 @@ func Do(ctx context.Context, method, url, body string, args Args) (Response, err
 	duration := time.Since(startTime)
 
 	if !args.Quiet {
-		sampler.Stats("request.duration").WithFields(sampler.Fields{
+		mDuration.WithFields(sampler.Fields{
 			"url":    url,
 			"method": method,
 			"status": res.StatusCode(),
@@ -98,7 +106,7 @@ func Do(ctx context.Context, method, url, body string, args Args) (Response, err
 
 	if err != nil {
 		if !args.Quiet {
-			sampler.Counter("request.error").WithFields(sampler.Fields{
+			mErrors.WithFields(sampler.Fields{
 				"url":    url,
 				"method": method,
 				"error":  err,
