@@ -201,15 +201,13 @@ func (s *Sampler) Counter(name string) *Metric {
 }
 
 func (s *Sampler) Write(m *Metric, e *Entry) {
-	go func() {
-		for _, out := range s.Outputs {
-			if err := out.Write(m, e); err != nil {
-				if s.OnError != nil {
-					s.OnError(err)
-				}
+	for _, out := range s.Outputs {
+		if err := out.Write(m, e); err != nil {
+			if s.OnError != nil {
+				s.OnError(err)
 			}
 		}
-	}()
+	}
 }
 
 func (s *Sampler) Commit() error {
