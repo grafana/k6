@@ -7,6 +7,7 @@ import (
 	"github.com/loadimpact/speedboat/sampler"
 	"github.com/valyala/fasthttp"
 	"golang.org/x/net/context"
+	"math"
 	neturl "net/url"
 	"time"
 )
@@ -39,7 +40,9 @@ type Response struct {
 }
 
 func WithDefaultClient(ctx context.Context) context.Context {
-	return WithClient(ctx, &fasthttp.Client{})
+	return WithClient(ctx, &fasthttp.Client{
+		MaxConnsPerHost: math.MaxInt32,
+	})
 }
 
 func WithClient(ctx context.Context, c *fasthttp.Client) context.Context {
