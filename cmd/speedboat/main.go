@@ -21,6 +21,12 @@ import (
 	"time"
 )
 
+const (
+	typeURL = "url"
+	typeYML = "yml"
+	typeJS  = "js"
+)
+
 // Configure the global logger.
 func configureLogging(c *cli.Context) {
 	log.SetLevel(log.InfoLevel)
@@ -75,13 +81,34 @@ func configureSampler(c *cli.Context) {
 	}
 }
 
+func guessType(arg string) string {
+	switch {
+	case strings.Contains(arg, "://"):
+		return typeURL
+	case strings.HasSuffix(arg, ".js"):
+		return typeJS
+	case strings.HasSuffix(arg, ".yml"):
+		return typeYML
+	}
+	return ""
+}
+
 func parse(cc *cli.Context) (conf Config, err error) {
-	switch len(cc.Args()) {
-	case 0:
-		if !cc.IsSet("script") && !cc.IsSet("url") {
-			return conf, errors.New("No config file, script or URL")
-		}
-	case 1:
+	if len(cc.Args()) == 0 {
+		return conf, errors.New("Nothing to do!")
+	}
+
+	conf.VUs = cc.Int("vus")
+	conf.Duration = cc.Duration("duration").String()
+
+	arg := cc.Args()[0]
+	argType := cc.String("type")
+	if argType == "" {
+		argType = guessType(arg)
+	}
+
+	switch argType {
+	case typeYML:
 		bytes, err := ioutil.ReadFile(cc.Args()[0])
 		if err != nil {
 			return conf, errors.New("Couldn't read config file")
@@ -89,22 +116,12 @@ func parse(cc *cli.Context) (conf Config, err error) {
 		if err := yaml.Unmarshal(bytes, &conf); err != nil {
 			return conf, errors.New("Couldn't parse config file")
 		}
+	case typeURL:
+		conf.URL = arg
+	case typeJS:
+		conf.Script = arg
 	default:
-		return conf, errors.New("Too many arguments!")
-	}
-
-	// Let commandline flags override config files
-	if cc.IsSet("script") {
-		conf.Script = cc.String("script")
-	}
-	if cc.IsSet("url") {
-		conf.URL = cc.String("url")
-	}
-	if cc.IsSet("vus") {
-		conf.VUs = cc.Int("vus")
-	}
-	if cc.IsSet("duration") {
-		conf.Duration = cc.Duration("duration").String()
+		return conf, errors.New("Unsure of what to do, try specifying --type")
 	}
 
 	return conf, nil
@@ -153,6 +170,11 @@ func headlessController(c context.Context, t *speedboat.Test) <-chan int {
 }
 
 func action(cc *cli.Context) error {
+	if len(cc.Args()) == 0 {
+		cli.ShowAppHelp(cc)
+		return nil
+	}
+
 	conf, err := parse(cc)
 	if err != nil {
 		log.WithError(err).Fatal("Invalid arguments; see --help")
@@ -284,17 +306,9 @@ func main() {
 	app.Usage = "A next-generation load generator"
 	app.Version = "0.0.1a1"
 	app.Flags = []cli.Flag{
-		cli.BoolFlag{
-			Name:  "verbose, v",
-			Usage: "More verbose output",
-		},
 		cli.StringFlag{
-			Name:  "script, s",
-			Usage: "Script to run",
-		},
-		cli.StringFlag{
-			Name:  "url",
-			Usage: "URL to test",
+			Name:  "type, t",
+			Usage: "Input file type, if not evident (url, yml or js)",
 		},
 		cli.IntFlag{
 			Name:  "vus, u",
@@ -305,6 +319,10 @@ func main() {
 			Name:  "duration, d",
 			Usage: "Test duration",
 			Value: time.Duration(10) * time.Second,
+		},
+		cli.BoolFlag{
+			Name:  "verbose, v",
+			Usage: "More verbose output",
 		},
 		cli.StringSliceFlag{
 			Name:  "output, o",
