@@ -59,7 +59,7 @@ func Request(ctx context.Context, method, url, body string, args Args) (Response
 		return Response{}, ErrNoClient
 	}
 
-	if method == "GET" && body != "" {
+	if (method == "GET" || method == "HEAD") && body != "" {
 		u, err := neturl.Parse(url)
 		if err != nil {
 			return Response{}, err
@@ -84,7 +84,7 @@ func Request(ctx context.Context, method, url, body string, args Args) (Response
 	req.Header.SetMethod(method)
 	req.SetRequestURI(url)
 
-	if method != "GET" {
+	if method != "GET" && method != "HEAD" {
 		req.SetBodyString(body)
 	}
 
