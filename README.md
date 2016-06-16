@@ -96,4 +96,4 @@ bin/
 
 This is because Go doesn't have a separate package manager, like `pip` or `npm` - instead, package names are repo URLs.
 
-The `go get` command then scans your code for imports, and recursively grabs dependencies using these URLs. In other words, *package management is built into the language itself*!
+The `go get` command then scans your code for imports, and recursively grabs dependencies using these URLs. In other words, package management is built into the language itself!
