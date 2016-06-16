@@ -23,10 +23,11 @@ func printMetrics() {
 			log.WithField("num", applyIntent(m, sum)).Infof("Metric: %s", name)
 		case sampler.StatsType:
 			log.WithFields(log.Fields{
-				"min": applyIntent(m, m.Min()),
-				"max": applyIntent(m, m.Max()),
-				"avg": applyIntent(m, m.Avg()),
-				"med": applyIntent(m, m.Med()),
+				"min":   applyIntent(m, m.Min()),
+				"max":   applyIntent(m, m.Max()),
+				"avg":   applyIntent(m, m.Avg()),
+				"med":   applyIntent(m, m.Med()),
+				"count": m.Count(),
 			}).Infof("Metric: %s", name)
 		}
 	}
