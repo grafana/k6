@@ -1,3 +1,0 @@
-[submodule "js/vendor/lodash"]
-	path = js/vendor/lodash
-	url = https://github.com/lodash/lodash.git
