@@ -94,6 +94,6 @@ bin/
    speedboat
 ```
 
-This is because Go doesn't have a separate package manager, like `pip` or `npm`.
+This is because Go doesn't have a separate package manager, like `pip` or `npm` - instead, package names are repo URLs.
 
-Instead, package names *are the URLs to their repositories*, and the `go get` command recursively grabs dependencies - package management is built into the language itself!
+The `go get` command then scans your code for imports, and recursively grabs dependencies using these URLs. In other words, *package management is built into the language itself*!
