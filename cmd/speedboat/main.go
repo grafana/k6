@@ -5,9 +5,6 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/speedboat"
 	"github.com/loadimpact/speedboat/js"
-	"github.com/loadimpact/speedboat/js2"
-	"github.com/loadimpact/speedboat/js3"
-	"github.com/loadimpact/speedboat/lua"
 	"github.com/loadimpact/speedboat/sampler"
 	"github.com/loadimpact/speedboat/sampler/influxdb"
 	"github.com/loadimpact/speedboat/sampler/stream"
@@ -182,24 +179,6 @@ func action(cc *cli.Context) error {
 			log.WithError(err).Fatal("Couldn't read script")
 		}
 		runner = js.New(t.Script, string(src))
-	case strings.HasSuffix(t.Script, ".js2"):
-		src, err := ioutil.ReadFile(t.Script)
-		if err != nil {
-			log.WithError(err).Fatal("Couldn't read script")
-		}
-		runner = js2.New(t.Script, string(src))
-	case strings.HasSuffix(t.Script, ".js3"):
-		src, err := ioutil.ReadFile(t.Script)
-		if err != nil {
-			log.WithError(err).Fatal("Couldn't read script")
-		}
-		runner = js3.New(t.Script, string(src))
-	case strings.HasSuffix(t.Script, ".lua"):
-		src, err := ioutil.ReadFile(t.Script)
-		if err != nil {
-			log.WithError(err).Fatal("Couldn't read script")
-		}
-		runner = lua.New(t.Script, string(src))
 	default:
 		log.Fatal("No suitable runner found!")
 	}
