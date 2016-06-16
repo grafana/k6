@@ -31,10 +31,6 @@ func configureLogging(c *cli.Context) {
 	if c.GlobalBool("verbose") {
 		log.SetLevel(log.DebugLevel)
 	}
-
-	if c.GlobalBool("json") {
-		log.SetFormatter(&log.JSONFormatter{})
-	}
 }
 
 // Configure the global sampler.
@@ -212,9 +208,6 @@ func action(cc *cli.Context) error {
 		Level:     log.DebugLevel,
 		Formatter: &log.TextFormatter{},
 	}
-	if cc.GlobalBool("json") {
-		logger.Formatter = &log.JSONFormatter{}
-	}
 	ctx = speedboat.WithLogger(ctx, logger)
 
 	// Store metrics unless the --quiet flag is specified
@@ -325,10 +318,6 @@ func main() {
 			Name:  "format, f",
 			Usage: "Metric output format (json or csv)",
 			Value: "json",
-		},
-		cli.BoolFlag{
-			Name:  "json",
-			Usage: "Format log messages as JSON",
 		},
 		cli.BoolFlag{
 			Name:  "dump",
