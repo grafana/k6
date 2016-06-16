@@ -30,7 +30,7 @@ This is a tl;dr version of ["How to Write Go Code"](https://golang.org/doc/code.
 
 ### Quick Installation
 
-1. Install Go 1.6 or later
+1. **Install Go 1.6 or later**
    
    On OSX, you can use [Homebrew](http://brew.sh):
    
@@ -52,7 +52,7 @@ This is a tl;dr version of ["How to Write Go Code"](https://golang.org/doc/code.
    sudo apt-get install golang
    ```
 
-2. Create a Go Workspace
+2. **Create a Go Workspace**
    
    Just make an empty directory, anywhere you like. This will hold all your Go code. Yes, all of it. See below for an explanation.
    
@@ -68,7 +68,7 @@ This is a tl;dr version of ["How to Write Go Code"](https://golang.org/doc/code.
    
    I'd recommend putting this in your `.profile` or similar.
 
-3. (Optional) Add `$GOPATH/bin` to your `$PATH`
+3. ***(Optional)* Add `$GOPATH/bin` to your `$PATH`**
    
    You probably want to put this in your `.profile` as well.
    
@@ -94,4 +94,6 @@ bin/
    speedboat
 ```
 
-Note that Go doesn't have a separate package manager, like `pip` or `npm`. Instead, package names *are the URLs to their repositories*, and the `go get` command recursively grabs dependencies - package management is built into the language itself!
+This is because Go doesn't have a separate package manager, like `pip` or `npm`.
+
+Instead, package names *are the URLs to their repositories*, and the `go get` command recursively grabs dependencies - package management is built into the language itself!
