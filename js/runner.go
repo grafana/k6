@@ -93,33 +93,22 @@ func (r *Runner) RunVU(ctx context.Context, t speedboat.Test, id int) {
 
 func bridgeAPI(js *duktape.Context, ctx context.Context) {
 	api := map[string]map[string]APIFunc{
-		"http": map[string]APIFunc{
+		"$http": map[string]APIFunc{
 			"request":            apiHTTPRequest,
 			"setMaxConnsPerHost": apiHTTPSetMaxConnsPerHost,
 		},
-		"log": map[string]APIFunc{
+		"$log": map[string]APIFunc{
 			"log": apiLogLog,
 		},
-		"test": map[string]APIFunc{
+		"$test": map[string]APIFunc{
 			"abort": apiTestAbort,
 		},
-	}
-	global := map[string]APIFunc{
-		"sleep": apiSleep,
+		"$vu": map[string]APIFunc{
+			"sleep": apiSleep,
+		},
 	}
 
 	js.PushGlobalObject()
-	defer js.Pop()
-
-	for fname, fn := range global {
-		fn := fn
-		js.PushGoFunction(func(js *duktape.Context) int {
-			return fn(js, ctx)
-		})
-		js.PutPropString(-2, fname)
-	}
-
-	js.GetPropString(-1, "__modules__")
 	defer js.Pop()
 
 	for modname, mod := range api {

@@ -1,27 +1,27 @@
 "use strict";
 
-__modules__.http = __modules__.http || {};
+$http = $http || {};
 
-__modules__.http.get = function() {
-	return __modules__.http.request.apply(this, _.concat(['GET'], arguments));
+$http.get = function() {
+	return $http.request.apply(this, _.concat(['GET'], arguments));
 }
 
-__modules__.http.post = function() {
-	return __modules__.http.request.apply(this, _.concat(['POST'], arguments));
+$http.post = function() {
+	return $http.request.apply(this, _.concat(['POST'], arguments));
 }
 
-__modules__.http.put = function() {
-	return __modules__.http.request.apply(this, _.concat(['PUT'], arguments));
+$http.put = function() {
+	return $http.request.apply(this, _.concat(['PUT'], arguments));
 }
 
-__modules__.http.delete = function() {
-	return __modules__.http.request.apply(this, _.concat(['DELETE'], arguments));
+$http.delete = function() {
+	return $http.request.apply(this, _.concat(['DELETE'], arguments));
 }
 
-__modules__.http.patch = function() {
-	return __modules__.http.request.apply(this, _.concat(['PATCH'], arguments));
+$http.patch = function() {
+	return $http.request.apply(this, _.concat(['PATCH'], arguments));
 }
 
-__modules__.http.options = function() {
-	return __modules__.http.request.apply(this, _.concat(['OPTIONS'], arguments));
+$http.options = function() {
+	return $http.request.apply(this, _.concat(['OPTIONS'], arguments));
 }

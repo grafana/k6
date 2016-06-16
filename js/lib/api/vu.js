@@ -1,11 +1,11 @@
 "use strict";
 
-__modules__.vu = __modules__.vu || {};
+$vu = $vu || {};
 
-__modules__.vu.id = function() {
+$vu.id = function() {
 	return __data__.id;
 }
 
-__modules__.vu.iteration = function() {
+$vu.iteration = function() {
 	return __data__.iteration;
 }
