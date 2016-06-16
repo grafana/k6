@@ -14,10 +14,8 @@ import (
 	"gopkg.in/yaml.v2"
 	"io"
 	"io/ioutil"
-	stdlog "log"
 	"os"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -219,23 +217,16 @@ func action(cc *cli.Context) error {
 	}
 	ctx = speedboat.WithLogger(ctx, logger)
 
-	// Output metrics appropriately; use a mutex to prevent garbled output
-	logMetrics := cc.Bool("log")
-	if logMetrics {
-		sampler.DefaultSampler.Accumulate = true
-	}
-	metricsLogger := stdlog.New(os.Stdout, "metrics: ", stdlog.Lmicroseconds)
-	metricsMutex := sync.Mutex{}
+	// Store metrics unless the --quiet flag is specified
+	quiet := cc.Bool("quiet")
+	sampler.DefaultSampler.Accumulate = !quiet
+
+	// Commit metrics to any configured backends once per second
 	go func() {
 		ticker := time.NewTicker(1 * time.Second)
 		for {
 			select {
 			case <-ticker.C:
-				if logMetrics {
-					metricsMutex.Lock()
-					printMetrics(metricsLogger)
-					metricsMutex.Unlock()
-				}
 				commitMetrics()
 			case <-ctx.Done():
 				return
@@ -283,11 +274,9 @@ func action(cc *cli.Context) error {
 	// Wait until the end of the test
 	<-ctx.Done()
 
-	// Print final metrics
-	if logMetrics {
-		metricsMutex.Lock()
-		printMetrics(metricsLogger)
-		metricsMutex.Unlock()
+	// Print and commit final metrics
+	if !quiet {
+		printMetrics()
 	}
 	commitMetrics()
 	closeMetrics()
@@ -324,6 +313,10 @@ func main() {
 			Name:  "verbose, v",
 			Usage: "More verbose output",
 		},
+		cli.BoolFlag{
+			Name:  "quiet, q",
+			Usage: "Suppress the summary at the end of a test",
+		},
 		cli.StringSliceFlag{
 			Name:  "output, o",
 			Usage: "Output metrics to a file or database",
@@ -332,10 +325,6 @@ func main() {
 			Name:  "format, f",
 			Usage: "Metric output format (json or csv)",
 			Value: "json",
-		},
-		cli.BoolFlag{
-			Name:  "log, l",
-			Usage: "Log metrics to stdout",
 		},
 		cli.BoolFlag{
 			Name:  "json",
