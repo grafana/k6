@@ -11,41 +11,60 @@ import (
 )
 
 type Runner struct {
+	Test speedboat.Test
+
+	mDuration *sampler.Metric
+	mErrors   *sampler.Metric
 }
 
-func New() *Runner {
-	return &Runner{}
+type VU struct {
+	Runner  *Runner
+	Client  fasthttp.Client
+	Request fasthttp.Request
 }
 
-func (r *Runner) RunVU(ctx context.Context, t speedboat.Test, id int) {
-	mDuration := sampler.Stats("request.duration")
-	mErrors := sampler.Counter("request.error")
+func New(t speedboat.Test) *Runner {
+	return &Runner{
+		Test:      t,
+		mDuration: sampler.Stats("request.duration"),
+		mErrors:   sampler.Counter("request.error"),
+	}
+}
 
-	req := fasthttp.AcquireRequest()
-	defer fasthttp.ReleaseRequest(req)
+func (r *Runner) NewVU() (speedboat.VU, error) {
+	vu := &VU{
+		Runner: r,
+		Client: fasthttp.Client{MaxConnsPerHost: math.MaxInt32},
+	}
+
+	vu.Request.SetRequestURI(r.Test.URL)
+
+	return vu, nil
+}
+
+func (u *VU) Reconfigure(id int64) error {
+	return nil
+}
+
+func (u *VU) RunOnce(ctx context.Context) error {
 	res := fasthttp.AcquireResponse()
 	defer fasthttp.ReleaseResponse(res)
 
-	client := fasthttp.Client{MaxConnsPerHost: math.MaxInt32}
+	startTime := time.Now()
+	err := u.Client.Do(&u.Request, res)
+	duration := time.Since(startTime)
 
-	for {
-		req.Reset()
-		req.SetRequestURI(t.URL)
-		res.Reset()
+	u.Runner.mDuration.WithFields(sampler.Fields{
+		"url":    u.Runner.Test.URL,
+		"method": "GET",
+		"status": res.StatusCode(),
+	}).Duration(duration)
 
-		startTime := time.Now()
-		if err := client.Do(req, res); err != nil {
-			log.WithError(err).Error("Request error")
-			mErrors.WithField("url", t.URL).Int(1)
-		}
-		duration := time.Since(startTime)
-
-		mDuration.WithField("url", t.URL).Duration(duration)
-
-		select {
-		case <-ctx.Done():
-			return
-		default:
-		}
+	if err != nil {
+		log.WithError(err).Error("Request error")
+		u.Runner.mErrors.WithField("url", u.Runner.Test.URL).Int(1)
+		return err
 	}
+
+	return nil
 }
