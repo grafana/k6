@@ -17,8 +17,7 @@ Make sure you have Go 1.6 or later installed. It will be installed to `$GOPATH/b
 ### Using Docker
 
 ```
-# In this repository
-docker build -t loadimpact/speedboat .
+docker pull loadimpact/speedboat
 ```
 
 You can now run speedboat using `docker run loadimpact/speedboat [...]`.
