@@ -12,15 +12,6 @@ go get github.com/loadimpact/speedboat/cmd/speedboat
 
 Requires [a working Go environment](#setting-up-go), version 1.6 or later. If you prefer not to set up a Go environment yourself, you can also [use Docker](#using-docker) if you prefer.
 
-Using Docker
-------------
-
-Speedboat is also available as a Docker container, if you prefer to run it as one.
-
-```
-docker run -v $PWD/script.js:/script.js:ro loadimpact/speedboat /script.js
-```
-
 Usage
 -----
 
@@ -33,6 +24,16 @@ speedboat myscript.js
 
 # Run with 50 VUs for 30 seconds
 speedboat -u 50 -d 30s http://example.com/
+```
+
+Using Docker
+------------
+
+Speedboat is also available as a Docker container, if you prefer to run it as one.
+
+```
+docker run loadimpact/speedboat http://example.com
+docker run -v $PWD/script.js:/script.js:ro loadimpact/speedboat /script.js
 ```
 
 Setting up Go
@@ -74,23 +75,16 @@ This is a tl;dr version of ["How to Write Go Code"](https://golang.org/doc/code.
    mkdir $HOME/go
    ```
    
-   Then export an environment variable called `GOPATH` to point to it.
+   Then export an environment variable called `GOPATH` to point to it, and add `$GOPATH/bin` to your `$PATH`.
    
    ```
    export GOPATH=$HOME/go
+   export PATH=$PATH:$GOPATH/bin
    ```
    
    I'd recommend putting this in your `.profile` or similar.
 
-3. ***(Optional)* Add `$GOPATH/bin` to your `$PATH`**
-   
-   You probably want to put this in your `.profile` as well.
-   
-   ```
-   export PATH=$PATH:$GOPATH/bin
-   ```
-
-Now you can run `go get github.com/loadimpact/speedboat`!
+Now you can run `go get github.com/loadimpact/speedboat`, and start using it as simply `speedboat`!
 
 ### Understanding `$GOPATH`
 
