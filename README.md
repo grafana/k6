@@ -84,8 +84,6 @@ This is a tl;dr version of ["How to Write Go Code"](https://golang.org/doc/code.
    
    I'd recommend putting this in your `.profile` or similar.
 
-Now you can run `go get github.com/loadimpact/speedboat`, and start using it as simply `speedboat`!
-
 ### Understanding `$GOPATH`
 
 Unlike most languages, Go has strong opinions on how your sources should be structured. Rather than having each project in its own, isolated workspace, you have a single workspace for all your Go code.
