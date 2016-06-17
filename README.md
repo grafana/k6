@@ -21,6 +21,20 @@ Speedboat is also available as a Docker container, if you prefer to run it as on
 docker run -v $PWD/script.js:/script.js:ro loadimpact/speedboat /script.js
 ```
 
+Usage
+-----
+
+```
+# Run a test against a URL
+speedboat http://example.com/
+
+# Run a script
+speedboat myscript.js
+
+# Run with 50 VUs for 30 seconds
+speedboat -u 50 -d 30s http://example.com/
+```
+
 Setting up Go
 -------------
 
