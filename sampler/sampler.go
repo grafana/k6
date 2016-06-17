@@ -135,11 +135,14 @@ func (m *Metric) Avg() int64 {
 }
 
 func (m *Metric) Med() int64 {
-	idx := len(m.values) / 2
-	if idx >= len(m.values) {
-		idx = len(m.values) - 1
+	switch len(m.values) {
+	case 0:
+		return 0
+	case 1:
+		return m.values[0]
+	default:
+		return m.values[len(m.values)/2]
 	}
-	return m.values[idx]
 }
 
 func (m *Metric) Sum() int64 {
