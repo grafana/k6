@@ -7,10 +7,7 @@ Installation
 ------------
 
 ```
-go get github.com/loadimpact/speedboat
-go build github.com/loadimpact/speedboat/cmd/speedboat
-# Stress Google with a small test
-$GOPATH/src/github.com/loadimpact/speedboat/speedboat http://google.com
+go get github.com/loadimpact/speedboat/cmd/speedboat
 ```
 
 Requires [a working Go environment](#setting-up-go), version 1.6 or later. If you prefer not to set up a Go environment yourself, you can also [use Docker](#using-docker) if you prefer.
