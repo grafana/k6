@@ -3,14 +3,27 @@ Speedboat
 
 Speedboat is the codename for the next generation of Load Impact's load generator.
 
-Installation
-------------
+Getting started
+---------------
+
+#### Using Docker
+
+Speedboat is available as a public Docker container for instant execution:
+
+```
+docker run loadimpact/speedboat http://example.com
+docker run -v $PWD/script.js:/script.js:ro loadimpact/speedboat /script.js
+```
+
+#### Compiling from Go source
+
+You can also download and compile the sources:
 
 ```
 go get github.com/loadimpact/speedboat/cmd/speedboat
 ```
 
-Requires [a working Go environment](#setting-up-go), version 1.6 or later. If you prefer not to set up a Go environment yourself, you can also [use Docker](#using-docker) if you prefer.
+Requires [a working Go environment](#for-go-beginners---how-to-set-up-go), version 1.6 or later. Will place the speedboat binary in $GOPATH/bin so you need to have that in your $PATH.
 
 Usage
 -----
@@ -26,18 +39,9 @@ speedboat myscript.js
 speedboat -u 50 -d 30s http://example.com/
 ```
 
-Using Docker
-------------
 
-Speedboat is also available as a Docker container, if you prefer to run it as one.
-
-```
-docker run loadimpact/speedboat http://example.com
-docker run -v $PWD/script.js:/script.js:ro loadimpact/speedboat /script.js
-```
-
-Setting up Go
--------------
+For Go beginners - how to set up Go
+-----------------------------------
 
 If you have never worked with Go before, you'll have to follow some steps to get a dev environment going.
 
