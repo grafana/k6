@@ -30,10 +30,10 @@ print("4. Testing log.error()");
 $log.error("   log.error() WORKS");
 
 // test sleep() with float parameter
-print("5. Testing sleep(0.1)");
+print("5. Testing vu.sleep(0.1)");
 $vu.sleep(0.1);
 // test sleep with int parameter
-print("6. Testing sleep(1)");
+print("6. Testing vu.sleep(1)");
 $vu.sleep(1);
 
 print("7. Testing http.setMaxConnsPerHost()");
