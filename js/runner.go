@@ -17,6 +17,8 @@ type Runner struct {
 	filename string
 	source   string
 
+	logger *log.Logger
+
 	mDuration *sampler.Metric
 	mErrors   *sampler.Metric
 }
@@ -33,9 +35,15 @@ type VU struct {
 
 func New(t speedboat.Test, filename, source string) *Runner {
 	return &Runner{
-		Test:      t,
-		filename:  filename,
-		source:    source,
+		Test:     t,
+		filename: filename,
+		source:   source,
+		logger: &log.Logger{
+			Out:       os.Stderr,
+			Formatter: &log.TextFormatter{},
+			Hooks:     make(log.LevelHooks),
+			Level:     log.DebugLevel,
+		},
 		mDuration: sampler.Stats("request.duration"),
 		mErrors:   sampler.Counter("request.error"),
 	}
@@ -117,6 +125,36 @@ func (r *Runner) NewVU() (speedboat.VU, error) {
 			return otto.UndefinedValue()
 		},
 	})
+	vm.Set("$log", map[string]interface{}{
+		"log": func(call otto.FunctionCall) otto.Value {
+			level, err := call.Argument(0).ToString()
+			if err != nil {
+				panic(vm.MakeTypeError("level must be a string"))
+			}
+
+			msg, err := call.Argument(1).ToString()
+			if err != nil {
+				panic(vm.MakeTypeError("message must be a string"))
+			}
+
+			fields := make(map[string]interface{})
+			fieldsObj := call.Argument(2).Object()
+			if fieldsObj != nil {
+				for _, key := range fieldsObj.Keys() {
+					valObj, _ := fieldsObj.Get(key)
+					val, err := valObj.Export()
+					if err != nil {
+						panic(err)
+					}
+					fields[key] = val
+				}
+			}
+
+			vu.Log(level, msg, fields)
+
+			return otto.UndefinedValue()
+		},
+	})
 
 	init := `
 	$http.get = function(url, data, params) { return $http.request('GET', url, data, params); };
@@ -126,6 +164,11 @@ func (r *Runner) NewVU() (speedboat.VU, error) {
 	$http.patch = function(url, data, params) { return $http.request('PATCH', url, data, params); };
 	$http.options = function(url, data, params) { return $http.request('OPTIONS', url, data, params); };
 	$http.head = function(url, data, params) { return $http.request('HEAD', url, data, params); };
+	
+	$log.debug = function(msg, fields) { $log.log('debug', msg, fields); };
+	$log.info = function(msg, fields) { $log.log('info', msg, fields); };
+	$log.warn = function(msg, fields) { $log.log('warn', msg, fields); };
+	$log.error = function(msg, fields) { $log.log('error', msg, fields); };
 	`
 	if _, err := vm.Eval(init); err != nil {
 		return nil, err

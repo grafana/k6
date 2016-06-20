@@ -1,6 +1,7 @@
 package js
 
 import (
+	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/speedboat/sampler"
 	"github.com/robertkrimen/otto"
 	"github.com/valyala/fasthttp"
@@ -68,4 +69,19 @@ func (u *VU) HTTPRequest(method, url, body string, params HTTPParams) (HTTPRespo
 
 func (u *VU) Sleep(t float64) {
 	time.Sleep(time.Duration(t * float64(time.Second)))
+}
+
+func (u *VU) Log(level, msg string, fields map[string]interface{}) {
+	e := u.Runner.logger.WithFields(log.Fields(fields))
+
+	switch level {
+	case "debug":
+		e.Debug(msg)
+	case "info":
+		e.Info(msg)
+	case "warn":
+		e.Warn(msg)
+	case "error":
+		e.Error(msg)
+	}
 }
