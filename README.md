@@ -23,7 +23,7 @@ You can also download and compile the sources:
 go get github.com/loadimpact/speedboat/cmd/speedboat
 ```
 
-Requires [a working Go environment](#setting-up-go), version 1.6 or later. Will place the speedboat binary in $GOPATH/bin so you need to have that in your $PATH.
+Requires [a working Go environment](#for-go-beginners---how-to-set-up-go), version 1.6 or later. Will place the speedboat binary in $GOPATH/bin so you need to have that in your $PATH.
 
 Usage
 -----
