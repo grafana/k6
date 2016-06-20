@@ -8,6 +8,7 @@ import (
 	"github.com/robertkrimen/otto"
 	"github.com/valyala/fasthttp"
 	"golang.org/x/net/context"
+	"math"
 	"os"
 )
 
@@ -111,6 +112,22 @@ func (r *Runner) NewVU() (speedboat.VU, error) {
 			}
 
 			return val
+		},
+		"setMaxConnsPerHost": func(call otto.FunctionCall) otto.Value {
+			num, err := call.Argument(0).ToInteger()
+			if err != nil {
+				panic(vm.MakeTypeError("argument must be an integer"))
+			}
+			if num <= 0 {
+				panic(vm.MakeRangeError("argument must be >= 1"))
+			}
+			if num > math.MaxInt32 {
+				num = math.MaxInt32
+			}
+
+			vu.Client.MaxConnsPerHost = int(num)
+
+			return otto.UndefinedValue()
 		},
 	})
 	vm.Set("$vu", map[string]interface{}{
