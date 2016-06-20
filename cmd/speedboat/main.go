@@ -244,7 +244,9 @@ func action(cc *cli.Context) error {
 					case <-ctx.Done():
 						return
 					default:
-						vu.RunOnce(ctx)
+						if err := vu.RunOnce(ctx); err != nil {
+							log.WithError(err).Error("Script error")
+						}
 					}
 				}
 			}(vuCtx)
