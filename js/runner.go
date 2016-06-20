@@ -81,13 +81,9 @@ func (r *Runner) NewVU() (speedboat.VU, error) {
 				panic(vm.MakeTypeError("url must be a string"))
 			}
 
-			var body string
-			bodyArg := call.Argument(2)
-			if !bodyArg.IsUndefined() && !bodyArg.IsNull() {
-				body, err = bodyArg.ToString()
-				if err != nil {
-					panic(vm.MakeTypeError("body must be a string"))
-				}
+			body, err := bodyFromValue(call.Argument(2))
+			if err != nil {
+				panic(vm.MakeTypeError("invalid body"))
 			}
 
 			params, err := paramsFromObject(call.Argument(3).Object())

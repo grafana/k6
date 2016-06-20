@@ -32,8 +32,11 @@ func (u *VU) HTTPRequest(method, url, body string, params HTTPParams) (HTTPRespo
 	defer fasthttp.ReleaseRequest(req)
 
 	req.Header.SetMethod(method)
-	req.SetRequestURI(url)
-	if body != "" {
+
+	if method == "GET" || method == "HEAD" {
+		req.SetRequestURI(putBodyInURL(url, body))
+	} else if body != "" {
+		req.SetRequestURI(url)
 		req.SetBodyString(body)
 	}
 
