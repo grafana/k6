@@ -99,6 +99,10 @@ func Make(vm *otto.Otto, t string) (*otto.Object, error) {
 	return val.Object(), nil
 }
 
+func jsCustomError(vm *otto.Otto, t string, err error) otto.Value {
+	return vm.MakeCustomError(t, err.Error())
+}
+
 func jsError(vm *otto.Otto, err error) otto.Value {
-	return vm.MakeCustomError("Error", err.Error())
+	return jsCustomError(vm, "Error", err)
 }
