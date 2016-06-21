@@ -31,7 +31,8 @@ type VU struct {
 
 	Client fasthttp.Client
 
-	ID int64
+	ID        int64
+	Iteration int64
 }
 
 func New(t speedboat.Test, filename, source string) *Runner {
@@ -137,6 +138,20 @@ func (r *Runner) NewVU() (speedboat.VU, error) {
 
 			return otto.UndefinedValue()
 		},
+		"id": func(call otto.FunctionCall) otto.Value {
+			val, err := call.Otto.ToValue(vu.ID)
+			if err != nil {
+				panic(jsError(vm, err))
+			}
+			return val
+		},
+		"iteration": func(call otto.FunctionCall) otto.Value {
+			val, err := call.Otto.ToValue(vu.Iteration)
+			if err != nil {
+				panic(jsError(vm, err))
+			}
+			return val
+		},
 	})
 	vm.Set("$log", map[string]interface{}{
 		"log": func(call otto.FunctionCall) otto.Value {
@@ -198,10 +213,12 @@ func (r *Runner) NewVU() (speedboat.VU, error) {
 
 func (u *VU) Reconfigure(id int64) error {
 	u.ID = id
+	u.Iteration = 0
 	return nil
 }
 
 func (u *VU) RunOnce(ctx context.Context) error {
+	u.Iteration++
 	if _, err := u.VM.Run(u.Script); err != nil {
 		return err
 	}
