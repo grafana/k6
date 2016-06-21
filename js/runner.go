@@ -153,6 +153,19 @@ func (r *Runner) NewVU() (speedboat.VU, error) {
 			return val
 		},
 	})
+	vu.VM.Set("$test", map[string]interface{}{
+		"url": func(call otto.FunctionCall) otto.Value {
+			val, err := call.Otto.ToValue(vu.Runner.Test.URL)
+			if err != nil {
+				panic(jsError(call.Otto, err))
+			}
+			return val
+		},
+		"abort": func(call otto.FunctionCall) otto.Value {
+			panic(speedboat.AbortTest)
+			return otto.UndefinedValue()
+		},
+	})
 	vu.VM.Set("$log", map[string]interface{}{
 		"log": func(call otto.FunctionCall) otto.Value {
 			level, err := call.Argument(0).ToString()
