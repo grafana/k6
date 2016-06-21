@@ -3,8 +3,8 @@ package main
 import (
 	"errors"
 	log "github.com/Sirupsen/logrus"
-	"github.com/loadimpact/speedboat"
 	"github.com/loadimpact/speedboat/js"
+	"github.com/loadimpact/speedboat/lib"
 	"github.com/loadimpact/speedboat/sampler"
 	"github.com/loadimpact/speedboat/sampler/influxdb"
 	"github.com/loadimpact/speedboat/sampler/stream"
@@ -121,7 +121,7 @@ func parse(cc *cli.Context) (conf Config, err error) {
 	return conf, nil
 }
 
-func headlessController(c context.Context, t *speedboat.Test) <-chan int {
+func headlessController(c context.Context, t *lib.Test) <-chan int {
 	ch := make(chan int)
 
 	go func() {
@@ -165,7 +165,7 @@ func action(cc *cli.Context) error {
 	}
 
 	// Inspect the test to find a suitable runner; additional ones can easily be added
-	var runner speedboat.Runner
+	var runner lib.Runner
 	switch {
 	case t.Script == "":
 		runner = simple.New(t)
@@ -188,7 +188,7 @@ func action(cc *cli.Context) error {
 		Level:     log.DebugLevel,
 		Formatter: &log.TextFormatter{},
 	}
-	ctx = speedboat.WithLogger(ctx, logger)
+	ctx = lib.WithLogger(ctx, logger)
 
 	// Store metrics unless the --quiet flag is specified
 	quiet := cc.Bool("quiet")
@@ -220,9 +220,9 @@ func action(cc *cli.Context) error {
 				defer func() {
 					if v := recover(); v != nil {
 						switch err := v.(type) {
-						case speedboat.FlowControl:
+						case lib.FlowControl:
 							switch err {
-							case speedboat.AbortTest:
+							case lib.AbortTest:
 								log.Error("Test aborted")
 								cancel()
 							}

@@ -1,4 +1,4 @@
-package speedboat
+package lib
 
 import (
 	"testing"
