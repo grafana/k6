@@ -8,30 +8,30 @@ import (
 
 func TestBodyFromValueUndefined(t *testing.T) {
 	body, err := bodyFromValue(otto.UndefinedValue())
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "", body)
 }
 
 func TestBodyFromValueNull(t *testing.T) {
 	body, err := bodyFromValue(otto.NullValue())
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "", body)
 }
 
 func TestBodyFromValueString(t *testing.T) {
 	val, err := otto.ToValue("abc123")
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	body, err := bodyFromValue(val)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "abc123", body)
 }
 
 func TestBodyFromValueObject(t *testing.T) {
 	vm := otto.New()
 	val, err := vm.ToValue(map[string]string{"a": "b"})
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	body, err := bodyFromValue(val)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "a=b", body)
 }
 
