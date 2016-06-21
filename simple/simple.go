@@ -62,7 +62,11 @@ func (u *VU) RunOnce(ctx context.Context) error {
 
 	if err != nil {
 		log.WithError(err).Error("Request error")
-		u.Runner.mErrors.WithField("url", u.Runner.Test.URL).Int(1)
+		u.Runner.mErrors.WithFields(sampler.Fields{
+			"url":    u.Runner.Test.URL,
+			"method": "GET",
+			"status": res.StatusCode(),
+		}).Int(1)
 		return err
 	}
 
