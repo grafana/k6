@@ -104,7 +104,7 @@ func (r *Runner) NewVU() (speedboat.VU, error) {
 
 			val, err := res.ToValue(vm)
 			if err != nil {
-				panic(err)
+				panic(vm.MakeCustomError("Error", err.Error()))
 			}
 
 			return val
@@ -170,6 +170,12 @@ func (r *Runner) NewVU() (speedboat.VU, error) {
 	})
 
 	init := `
+	function HTTPResponse() {
+		this.json = function() {
+			return JSON.parse(this.body);
+		};
+	}
+	
 	$http.get = function(url, data, params) { return $http.request('GET', url, data, params); };
 	$http.post = function(url, data, params) { return $http.request('POST', url, data, params); };
 	$http.put = function(url, data, params) { return $http.request('PUT', url, data, params); };
