@@ -22,6 +22,22 @@ const (
 	typeJS  = "js"
 )
 
+// Help text template
+const (
+	helpTemplate = `NAME:
+   {{.Name}} - {{.Usage}}
+
+USAGE:
+   {{if .UsageText}}{{.UsageText}}{{else}}{{.HelpName}} {{if .VisibleFlags}}[options] {{end}}filename|url{{end}}
+   {{if .Version}}{{if not .HideVersion}}
+VERSION:
+   {{.Version}}
+   {{end}}{{end}}{{if .VisibleFlags}}
+OPTIONS:
+   {{range .VisibleFlags}}{{.}}
+   {{end}}{{end}}`
+)
+
 func pollVURamping(ctx context.Context, t lib.Test) <-chan int {
 	ch := make(chan int)
 	startTime := time.Now()
@@ -228,7 +244,7 @@ func main() {
 	// Free up -v and -h for our own flags
 	cli.VersionFlag.Name = "version"
 	cli.HelpFlag.Name = "help, ?"
-
+	cli.AppHelpTemplate = helpTemplate
 	// Bootstrap the app from commandline flags
 	app := cli.NewApp()
 	app.Name = "speedboat"
