@@ -16,8 +16,7 @@ var (
 )
 
 type Runner struct {
-	Test lib.Test
-	URL  string
+	URL string
 }
 
 type VU struct {
@@ -27,10 +26,9 @@ type VU struct {
 	Collector *stats.Collector
 }
 
-func New(t lib.Test, url string) *Runner {
+func New(url string) *Runner {
 	return &Runner{
-		Test: t,
-		URL:  url,
+		URL: url,
 	}
 }
 

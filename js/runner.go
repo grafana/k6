@@ -13,8 +13,6 @@ import (
 )
 
 type Runner struct {
-	Test lib.Test
-
 	filename string
 	source   string
 
@@ -34,9 +32,8 @@ type VU struct {
 	Iteration int64
 }
 
-func New(t lib.Test, filename, source string) *Runner {
+func New(filename, source string) *Runner {
 	return &Runner{
-		Test:     t,
 		filename: filename,
 		source:   source,
 		logger: &log.Logger{
