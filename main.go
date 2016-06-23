@@ -276,9 +276,22 @@ func main() {
 	// Free up -v and -h for our own flags
 	cli.VersionFlag.Name = "version"
 	cli.HelpFlag.Name = "help, ?"
+	cli.AppHelpTemplate = `NAME:
+   {{.Name}} - {{.Usage}}
+
+USAGE:
+   {{if .UsageText}}{{.UsageText}}{{else}}{{.HelpName}} {{if .VisibleFlags}}[options] {{end}}filename|url{{end}}
+   {{if .Version}}{{if not .HideVersion}}
+VERSION:
+   {{.Version}}
+   {{end}}{{end}}{{if .VisibleFlags}}
+OPTIONS:
+   {{range .VisibleFlags}}{{.}}
+   {{end}}{{end}}`
 
 	// Bootstrap using action-registered commandline flags
 	app := cli.NewApp()
+	app.Commands = nil
 	app.Name = "speedboat"
 	app.Usage = "A next-generation load generator"
 	app.Version = "1.0.0-mvp1"
