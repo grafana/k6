@@ -4,7 +4,7 @@ import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/speedboat/lib"
-	"github.com/loadimpact/speedboat/sampler"
+	"github.com/loadimpact/speedboat/stats"
 	"github.com/robertkrimen/otto"
 	"github.com/valyala/fasthttp"
 	"golang.org/x/net/context"
@@ -19,15 +19,14 @@ type Runner struct {
 	source   string
 
 	logger *log.Logger
-
-	mDuration *sampler.Metric
-	mErrors   *sampler.Metric
 }
 
 type VU struct {
 	Runner *Runner
 	VM     *otto.Otto
 	Script *otto.Script
+
+	Collector *stats.Collector
 
 	Client fasthttp.Client
 
@@ -46,8 +45,6 @@ func New(t lib.Test, filename, source string) *Runner {
 			Hooks:     make(log.LevelHooks),
 			Level:     log.DebugLevel,
 		},
-		mDuration: sampler.Stats("request.duration"),
-		mErrors:   sampler.Counter("request.error"),
 	}
 }
 
@@ -63,6 +60,8 @@ func (r *Runner) NewVU() (lib.VU, error) {
 		Runner: r,
 		VM:     vuVM,
 		Script: script,
+
+		Collector: stats.NewCollector(),
 	}
 
 	vu.VM.Set("print", func(call otto.FunctionCall) otto.Value {

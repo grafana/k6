@@ -5,10 +5,9 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/speedboat/js"
 	"github.com/loadimpact/speedboat/lib"
-	"github.com/loadimpact/speedboat/sampler"
-	"github.com/loadimpact/speedboat/sampler/influxdb"
-	"github.com/loadimpact/speedboat/sampler/stream"
 	"github.com/loadimpact/speedboat/simple"
+	"github.com/loadimpact/speedboat/stats"
+	"github.com/loadimpact/speedboat/stats/influxdb"
 	"github.com/urfave/cli"
 	"golang.org/x/net/context"
 	"io/ioutil"
@@ -44,10 +43,10 @@ func pollVURamping(ctx context.Context, t lib.Test) <-chan int {
 	return ch
 }
 
-func parseOutput(out, format string) (sampler.Output, error) {
+func parseBackend(out string) (stats.Backend, error) {
 	switch {
 	case out == "-":
-		return stream.New(format, os.Stdout)
+		return stats.NewJSONBackend(os.Stdout), nil
 	case strings.HasPrefix(out, "influxdb+"):
 		url := strings.TrimPrefix(out, "influxdb+")
 		return influxdb.NewFromURL(url)
@@ -56,7 +55,7 @@ func parseOutput(out, format string) (sampler.Output, error) {
 		if err != nil {
 			return nil, err
 		}
-		return stream.New(format, f)
+		return stats.NewJSONBackend(f), nil
 	}
 }
 
@@ -93,17 +92,12 @@ func action(cc *cli.Context) error {
 		log.SetLevel(log.DebugLevel)
 	}
 
-	sampler.DefaultSampler.OnError = func(err error) {
-		log.WithError(err).Error("[Sampler error]")
-	}
-
-	outFormat := cc.String("format")
 	for _, out := range cc.StringSlice("metrics") {
-		output, err := parseOutput(out, outFormat)
+		backend, err := parseBackend(out)
 		if err != nil {
 			return cli.NewExitError(err.Error(), 1)
 		}
-		sampler.DefaultSampler.Outputs = append(sampler.DefaultSampler.Outputs, output)
+		stats.DefaultRegistry.Backends = append(stats.DefaultRegistry.Backends, backend)
 	}
 
 	var t lib.Test
@@ -176,17 +170,36 @@ func action(cc *cli.Context) error {
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), t.TotalDuration())
-	vus.Start(ctx)
+
+	go func() {
+		ticker := time.NewTicker(1 * time.Second)
+		for {
+			select {
+			case <-ticker.C:
+				if err := stats.Submit(); err != nil {
+					log.WithError(err).Error("[Couldn't submit stats]")
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
 
 	quit := make(chan os.Signal)
 	signal.Notify(quit)
 
+	vus.Start(ctx)
 	scaleTo := pollVURamping(ctx, t)
+	mVUs := stats.Stat{Name: "vus", Type: stats.GaugeType}
 mainLoop:
 	for {
 		select {
 		case num := <-scaleTo:
 			vus.Scale(num)
+			stats.Add(stats.Point{
+				Stat:   &mVUs,
+				Values: stats.Value(float64(num)),
+			})
 		case <-quit:
 			cancel()
 		case <-ctx.Done():
@@ -235,11 +248,6 @@ func main() {
 		cli.StringSliceFlag{
 			Name:  "metrics, m",
 			Usage: "Write metrics to a file or database",
-		},
-		cli.StringFlag{
-			Name:  "format, f",
-			Usage: "Metric output format (json or csv)",
-			Value: "json",
 		},
 	}
 	app.Action = action
