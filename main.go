@@ -69,12 +69,20 @@ func guessType(arg string) string {
 	return ""
 }
 
+func readAll(filename string) ([]byte, error) {
+	if filename == "-" {
+		return ioutil.ReadAll(os.Stdin)
+	}
+
+	return ioutil.ReadFile(filename)
+}
+
 func makeRunner(t lib.Test, filename, typ string) (lib.Runner, error) {
 	if typ == typeURL {
 		return simple.New(t), nil
 	}
 
-	bytes, err := ioutil.ReadFile(filename)
+	bytes, err := readAll(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -115,6 +123,10 @@ func action(cc *cli.Context) error {
 		typ := cc.String("type")
 		if typ == "" {
 			typ = guessType(filename)
+		}
+
+		if filename == "-" && typ == "" {
+			return cli.NewExitError("Reading from stdin requires a -t/--type flag", 1)
 		}
 
 		switch typ {
