@@ -13,8 +13,6 @@ type TestStage struct {
 
 // A load test definition.
 type Test struct {
-	Script string      // Script filename.
-	URL    string      // URL for simple tests.
 	Stages []TestStage // Test stages.
 }
 

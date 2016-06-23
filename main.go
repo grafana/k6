@@ -95,7 +95,7 @@ func readAll(filename string) ([]byte, error) {
 
 func makeRunner(t lib.Test, filename, typ string) (lib.Runner, error) {
 	if typ == typeURL {
-		return simple.New(t), nil
+		return simple.New(t, filename), nil
 	}
 
 	bytes, err := readAll(filename)
@@ -107,7 +107,7 @@ func makeRunner(t lib.Test, filename, typ string) (lib.Runner, error) {
 	case typeJS:
 		return js.New(t, filename, string(bytes)), nil
 	default:
-		return nil, errors.New("Unknown type specified")
+		return nil, errors.New("Type ambiguous, please specify -t/--type")
 	}
 }
 
@@ -124,17 +124,22 @@ func action(cc *cli.Context) error {
 		stats.DefaultRegistry.Backends = append(stats.DefaultRegistry.Backends, backend)
 	}
 
-	var t lib.Test
-	var r lib.Runner
+	t := lib.Test{
+		Stages: []lib.TestStage{
+			lib.TestStage{
+				Duration: cc.Duration("duration"),
+				StartVUs: cc.Int("vus"),
+				EndVUs:   cc.Int("vus"),
+			},
+		},
+	}
 
-	// TODO: Majorly simplify this, along with the Test structure; the URL field is going
-	// away in favor of environment variables (or something of the sort), which means 90%
-	// of this code goes out the window - once things elsewhere stop depending on it >_>
+	var r lib.Runner
 	switch len(cc.Args()) {
 	case 0:
 		cli.ShowAppHelp(cc)
 		return nil
-	case 1, 2:
+	case 1:
 		filename := cc.Args()[0]
 		typ := cc.String("type")
 		if typ == "" {
@@ -145,37 +150,13 @@ func action(cc *cli.Context) error {
 			return cli.NewExitError("Reading from stdin requires a -t/--type flag", 1)
 		}
 
-		switch typ {
-		case typeJS:
-			t.Script = filename
-		case typeURL:
-			t.URL = filename
-		case "":
-			return cli.NewExitError("Ambiguous argument, please specify -t/--type", 1)
-		default:
-			return cli.NewExitError("Unknown type specified", 1)
-		}
-
-		if typ != typeURL && len(cc.Args()) > 1 {
-			t.URL = cc.Args()[1]
-		}
-
-		r_, err := makeRunner(t, filename, typ)
+		runner, err := makeRunner(t, filename, typ)
 		if err != nil {
 			return cli.NewExitError(err.Error(), 1)
 		}
-		r = r_
-
+		r = runner
 	default:
 		return cli.NewExitError("Too many arguments!", 1)
-	}
-
-	t.Stages = []lib.TestStage{
-		lib.TestStage{
-			Duration: cc.Duration("duration"),
-			StartVUs: cc.Int("vus"),
-			EndVUs:   cc.Int("vus"),
-		},
 	}
 
 	vus := lib.VUGroup{

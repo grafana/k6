@@ -1,2 +1,2 @@
-$http.get($test.url(), { report: true });
+$http.get($test.env('URL'), { report: true });
 $vu.sleep(1);
