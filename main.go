@@ -25,6 +25,22 @@ const (
 	typeJS  = "js"
 )
 
+// Help text template
+const (
+	helpTemplate = `NAME:
+   {{.Name}} - {{.Usage}}
+
+USAGE:
+   {{if .UsageText}}{{.UsageText}}{{else}}{{.HelpName}} {{if .VisibleFlags}}[options] {{end}}filename|url{{end}}
+   {{if .Version}}{{if not .HideVersion}}
+VERSION:
+   {{.Version}}
+   {{end}}{{end}}{{if .VisibleFlags}}
+OPTIONS:
+   {{range .VisibleFlags}}{{.}}
+   {{end}}{{end}}`
+)
+
 // Configure the global logger.
 func configureLogging(c *cli.Context) {
 	log.SetLevel(log.InfoLevel)
@@ -276,19 +292,7 @@ func main() {
 	// Free up -v and -h for our own flags
 	cli.VersionFlag.Name = "version"
 	cli.HelpFlag.Name = "help, ?"
-	cli.AppHelpTemplate = `NAME:
-   {{.Name}} - {{.Usage}}
-
-USAGE:
-   {{if .UsageText}}{{.UsageText}}{{else}}{{.HelpName}} {{if .VisibleFlags}}[options] {{end}}filename|url{{end}}
-   {{if .Version}}{{if not .HideVersion}}
-VERSION:
-   {{.Version}}
-   {{end}}{{end}}{{if .VisibleFlags}}
-OPTIONS:
-   {{range .VisibleFlags}}{{.}}
-   {{end}}{{end}}`
-
+	cli.AppHelpTemplate = helpTemplate
 	// Bootstrap using action-registered commandline flags
 	app := cli.NewApp()
 	app.Commands = nil
