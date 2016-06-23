@@ -1,7 +1,6 @@
 package influxdb
 
 import (
-	"fmt"
 	"github.com/influxdata/influxdb/client/v2"
 	"github.com/loadimpact/speedboat/stats"
 )
@@ -41,19 +40,10 @@ func (b *Backend) Submit(batches [][]stats.Point) error {
 
 	for _, batch := range batches {
 		for _, p := range batch {
-			tags := make(map[string]string)
-			for key, val := range p.Tags {
-				tags[key] = fmt.Sprint(val)
-			}
-			fields := make(map[string]interface{})
-			for key, val := range p.Values {
-				fields[key] = val
-			}
-			pt, err := client.NewPoint(p.Stat.Name, tags, fields, p.Time)
+			pt, err := makeInfluxPoint(p)
 			if err != nil {
 				return err
 			}
-
 			pb.AddPoint(pt)
 		}
 	}
