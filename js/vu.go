@@ -2,10 +2,15 @@ package js
 
 import (
 	log "github.com/Sirupsen/logrus"
-	"github.com/loadimpact/speedboat/sampler"
+	"github.com/loadimpact/speedboat/stats"
 	"github.com/robertkrimen/otto"
 	"github.com/valyala/fasthttp"
 	"time"
+)
+
+var (
+	mRequests = stats.Stat{Name: "requests", Type: stats.HistogramType}
+	mErrors   = stats.Stat{Name: "errors", Type: stats.CounterType}
 )
 
 type HTTPParams struct {
@@ -52,14 +57,23 @@ func (u *VU) HTTPRequest(method, url, body string, params HTTPParams) (HTTPRespo
 	err := u.Client.Do(req, resp)
 	duration := time.Since(startTime)
 
-	u.Runner.mDuration.WithFields(sampler.Fields{
-		"url":    u.Runner.Test.URL,
-		"method": "GET",
+	tags := stats.Tags{
+		"url":    url,
+		"method": method,
 		"status": resp.StatusCode(),
-	}).Duration(duration)
+	}
+	u.Collector.Add(stats.Point{
+		Stat:   &mRequests,
+		Tags:   tags,
+		Values: stats.Values{"duration": float64(duration)},
+	})
 
 	if err != nil {
-		u.Runner.mErrors.WithField("url", u.Runner.Test.URL).Int(1)
+		u.Collector.Add(stats.Point{
+			Stat:   &mErrors,
+			Tags:   tags,
+			Values: stats.Value(1),
+		})
 		return HTTPResponse{}, err
 	}
 
