@@ -7,6 +7,7 @@ import (
 	"github.com/loadimpact/speedboat/lib"
 	"github.com/loadimpact/speedboat/simple"
 	"github.com/loadimpact/speedboat/stats"
+	"github.com/loadimpact/speedboat/stats/accumulate"
 	"github.com/loadimpact/speedboat/stats/influxdb"
 	"github.com/urfave/cli"
 	"golang.org/x/net/context"
@@ -124,6 +125,12 @@ func action(cc *cli.Context) error {
 		stats.DefaultRegistry.Backends = append(stats.DefaultRegistry.Backends, backend)
 	}
 
+	var accumulator *accumulate.Backend
+	if !cc.Bool("quiet") {
+		accumulator = accumulate.New()
+		stats.DefaultRegistry.Backends = append(stats.DefaultRegistry.Backends, accumulator)
+	}
+
 	t := lib.Test{
 		Stages: []lib.TestStage{
 			lib.TestStage{
@@ -217,6 +224,53 @@ mainLoop:
 	}
 
 	vus.Stop()
+
+	stats.Add(stats.Point{Stat: &mVUs, Values: stats.Value(0)})
+	stats.Submit()
+
+	if accumulator != nil {
+		for stat, dimensions := range accumulator.Data {
+			switch stat.Type {
+			case stats.CounterType:
+				for dname, dim := range dimensions {
+					e := log.WithField("count", stats.ApplyIntent(dim.Sum(), stat.Intent))
+					if len(dimensions) == 1 {
+						e.Infof("Metric: %s", stat.Name)
+					} else {
+						e.Infof("Metric: %s.%s", stat.Name, *dname)
+					}
+				}
+			case stats.GaugeType:
+				for dname, dim := range dimensions {
+					last := dim.Last
+					if last == 0 {
+						continue
+					}
+
+					e := log.WithField("val", stats.ApplyIntent(last, stat.Intent))
+					if len(dimensions) == 1 {
+						e.Infof("Metric: %s", stat.Name)
+					} else {
+						e.Infof("Metric: %s.%s", stat.Name, *dname)
+					}
+				}
+			case stats.HistogramType:
+				first := true
+				for dname, dim := range dimensions {
+					if first {
+						log.WithField("count", len(dim.Values)).Infof("Metric: %s", stat.Name)
+						first = false
+					}
+					log.WithFields(log.Fields{
+						"min": stats.ApplyIntent(dim.Min(), stat.Intent),
+						"max": stats.ApplyIntent(dim.Max(), stat.Intent),
+						"avg": stats.ApplyIntent(dim.Avg(), stat.Intent),
+						"med": stats.ApplyIntent(dim.Med(), stat.Intent),
+					}).Infof("  - %s", *dname)
+				}
+			}
+		}
+	}
 
 	return nil
 }

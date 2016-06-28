@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	mRequests = stats.Stat{Name: "requests", Type: stats.HistogramType}
+	mRequests = stats.Stat{Name: "requests", Type: stats.HistogramType, Intent: stats.TimeIntent}
 	mErrors   = stats.Stat{Name: "errors", Type: stats.CounterType}
 )
 

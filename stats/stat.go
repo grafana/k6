@@ -1,5 +1,9 @@
 package stats
 
+import (
+	"time"
+)
+
 type StatType int
 type StatIntent int
 
@@ -18,4 +22,13 @@ type Stat struct {
 	Name   string
 	Type   StatType
 	Intent StatIntent
+}
+
+func ApplyIntent(v float64, intent StatIntent) interface{} {
+	switch intent {
+	case TimeIntent:
+		return time.Duration(v)
+	default:
+		return v
+	}
 }
