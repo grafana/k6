@@ -25,8 +25,7 @@ const (
 )
 
 // Help text template
-const (
-	helpTemplate = `NAME:
+const helpTemplate = `NAME:
    {{.Name}} - {{.Usage}}
 
 USAGE:
@@ -37,8 +36,8 @@ VERSION:
    {{end}}{{end}}{{if .VisibleFlags}}
 OPTIONS:
    {{range .VisibleFlags}}{{.}}
-   {{end}}{{end}}`
-)
+   {{end}}{{end}}
+`
 
 func pollVURamping(ctx context.Context, t lib.Test) <-chan int {
 	ch := make(chan int)
