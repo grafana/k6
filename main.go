@@ -14,6 +14,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -76,6 +77,70 @@ func parseBackend(out string) (stats.Backend, error) {
 	}
 }
 
+func parseStages(vus []string, total time.Duration) (stages []lib.TestStage, err error) {
+	accountedTime := time.Duration(0)
+	fluidStages := []int{}
+	for i, spec := range vus {
+		parts := strings.SplitN(spec, ":", 2)
+		countParts := strings.SplitN(parts[0], "-", 2)
+
+		stage := lib.TestStage{}
+
+		// An absent first part means keep going from the last stage's end
+		// If it's the first stage, just start with 0
+		if countParts[0] == "" {
+			if i > 0 {
+				stage.StartVUs = stages[i-1].EndVUs
+			}
+		} else {
+			start, err := strconv.ParseInt(countParts[0], 10, 64)
+			if err != nil {
+				return stages, err
+			}
+			stage.StartVUs = int(start)
+		}
+
+		// If an end is specified, use that, otherwise keep the VU level constant
+		if len(countParts) > 1 && countParts[1] != "" {
+			end, err := strconv.ParseInt(countParts[1], 10, 64)
+			if err != nil {
+				return stages, err
+			}
+			stage.EndVUs = int(end)
+		} else {
+			stage.EndVUs = stage.StartVUs
+		}
+
+		// If a time is specified, use that, otherwise mark the stage as "fluid", allotting it an
+		// even slice of what time remains after all fixed stages are accounted for (may be 0)
+		if len(parts) > 1 {
+			duration, err := time.ParseDuration(parts[1])
+			if err != nil {
+				return stages, err
+			}
+			stage.Duration = duration
+			accountedTime += duration
+		} else {
+			fluidStages = append(fluidStages, i)
+		}
+
+		stages = append(stages, stage)
+	}
+
+	// We're ignoring fluid stages if the fixed stages already take up all the allotted time
+	// Otherwise, evenly divide the test's remaining time between all fluid stages
+	if len(fluidStages) > 0 && accountedTime < total {
+		fluidDuration := (total - accountedTime) / time.Duration(len(fluidStages))
+		for _, i := range fluidStages {
+			stage := stages[i]
+			stage.Duration = fluidDuration
+			stages[i] = stage
+		}
+	}
+
+	return stages, nil
+}
+
 func guessType(arg string) string {
 	switch {
 	case strings.Contains(arg, "://"):
@@ -131,15 +196,11 @@ func action(cc *cli.Context) error {
 		stats.DefaultRegistry.Backends = append(stats.DefaultRegistry.Backends, accumulator)
 	}
 
-	t := lib.Test{
-		Stages: []lib.TestStage{
-			lib.TestStage{
-				Duration: cc.Duration("duration"),
-				StartVUs: cc.Int("vus"),
-				EndVUs:   cc.Int("vus"),
-			},
-		},
+	stages, err := parseStages(cc.StringSlice("vus"), cc.Duration("duration"))
+	if err != nil {
+		return cli.NewExitError(err.Error(), 1)
 	}
+	t := lib.Test{Stages: stages}
 
 	var r lib.Runner
 	switch len(cc.Args()) {
@@ -290,10 +351,10 @@ func main() {
 			Name:  "type, t",
 			Usage: "Input file type, if not evident (url or js)",
 		},
-		cli.IntFlag{
+		cli.StringSliceFlag{
 			Name:  "vus, u",
 			Usage: "Number of VUs to simulate",
-			Value: 10,
+			Value: &cli.StringSlice{"10"},
 		},
 		cli.DurationFlag{
 			Name:  "duration, d",
