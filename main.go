@@ -154,7 +154,7 @@ func action(cc *cli.Context) error {
 		}
 
 		if filename == "-" && typ == "" {
-			return cli.NewExitError("Reading from stdin requires a -t/--type flag", 1)
+			typ = typeJS
 		}
 
 		runner, err := makeRunner(t, filename, typ)
