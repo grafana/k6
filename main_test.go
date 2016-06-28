@@ -119,27 +119,27 @@ func TestParseStagesFixedFluidNoTimeLeft(t *testing.T) {
 }
 
 func TestParseStagesInvalid(t *testing.T) {
-	stages, err := parseStages([]string{"a"}, 10*time.Second)
+	_, err := parseStages([]string{"a"}, 10*time.Second)
 	assert.Error(t, err)
 }
 
 func TestParseStagesInvalidStart(t *testing.T) {
-	stages, err := parseStages([]string{"a-15"}, 10*time.Second)
+	_, err := parseStages([]string{"a-15"}, 10*time.Second)
 	assert.Error(t, err)
 }
 
 func TestParseStagesInvalidEnd(t *testing.T) {
-	stages, err := parseStages([]string{"15-a"}, 10*time.Second)
+	_, err := parseStages([]string{"15-a"}, 10*time.Second)
 	assert.Error(t, err)
 }
 
 func TestParseStagesInvalidTime(t *testing.T) {
-	stages, err := parseStages([]string{"15:a"}, 10*time.Second)
+	_, err := parseStages([]string{"15:a"}, 10*time.Second)
 	assert.Error(t, err)
 }
 
 func TestParseStagesInvalidTimeMissingUnit(t *testing.T) {
-	stages, err := parseStages([]string{"15:10"}, 10*time.Second)
+	_, err := parseStages([]string{"15:10"}, 10*time.Second)
 	assert.Error(t, err)
 }
 
