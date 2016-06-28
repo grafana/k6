@@ -22,6 +22,9 @@ func (r *Registry) NewCollector() *Collector {
 }
 
 func (r *Registry) Submit() error {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
 	batches := make([][]Point, 0, len(r.collectors))
 	for _, collector := range r.collectors {
 		batch := collector.drain()
