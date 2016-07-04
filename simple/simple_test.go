@@ -37,7 +37,7 @@ func TestRunOnceReportsStats(t *testing.T) {
 	assert.Error(t, err)
 
 	mRequestsFound := false
-	mErrrosFound := false
+	mErrorsFound := false
 	for _, p := range vu.(*VU).Collector.Batch {
 		switch p.Stat {
 		case &mRequests:
@@ -47,7 +47,7 @@ func TestRunOnceReportsStats(t *testing.T) {
 			assert.Contains(t, p.Tags, "status")
 			assert.Contains(t, p.Values, "duration")
 		case &mErrors:
-			mErrrosFound = true
+			mErrorsFound = true
 			assert.Contains(t, p.Tags, "url")
 			assert.Contains(t, p.Tags, "method")
 			assert.Contains(t, p.Tags, "status")
@@ -55,5 +55,5 @@ func TestRunOnceReportsStats(t *testing.T) {
 		}
 	}
 	assert.True(t, mRequestsFound)
-	assert.True(t, mErrrosFound)
+	assert.True(t, mErrorsFound)
 }
