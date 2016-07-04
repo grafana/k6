@@ -42,3 +42,11 @@ func TestRunOnceIncreasesIterations(t *testing.T) {
 	vu.RunOnce(context.Background())
 	assert.Equal(t, int64(1), vu.Iteration)
 }
+
+func TestRunOnceInvalidJS(t *testing.T) {
+	r := New("script", "diyfsybfbub")
+	vu, err := r.NewVU()
+	assert.NoError(t, err)
+	err = vu.RunOnce(context.Background())
+	assert.Error(t, err)
+}
