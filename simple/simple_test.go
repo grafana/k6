@@ -29,12 +29,36 @@ func TestReconfigure(t *testing.T) {
 }
 
 func TestRunOnceReportsStats(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
+	r := New("http://httpbin.org/get")
+	vu, err := r.NewVU()
+	assert.NoError(t, err)
+	assert.NoError(t, vu.RunOnce(context.Background()))
+
+	mRequestsFound := false
+	for _, p := range vu.(*VU).Collector.Batch {
+		switch p.Stat {
+		case &mRequests:
+			mRequestsFound = true
+			assert.Contains(t, p.Tags, "url")
+			assert.Contains(t, p.Tags, "method")
+			assert.Contains(t, p.Tags, "status")
+			assert.Contains(t, p.Values, "duration")
+		case &mErrors:
+			assert.Fail(t, "Errors found")
+		}
+	}
+	assert.True(t, mRequestsFound)
+}
+
+func TestRunOnceErrorReportsStats(t *testing.T) {
 	r := New("http://255.255.255.255/")
 	vu, err := r.NewVU()
 	assert.NoError(t, err)
-
-	err = vu.RunOnce(context.Background())
-	assert.Error(t, err)
+	assert.Error(t, vu.RunOnce(context.Background()))
 
 	mRequestsFound := false
 	mErrorsFound := false
