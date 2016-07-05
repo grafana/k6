@@ -118,13 +118,8 @@ func (r *Runner) NewVU() (lib.VU, error) {
 	})
 	vu.VM.Set("$vu", map[string]interface{}{
 		"sleep": func(call otto.FunctionCall) otto.Value {
-			t, err := call.Argument(0).ToFloat()
-			if err != nil {
-				panic(call.Otto.MakeTypeError("time must be a number"))
-			}
-
+			t, _ := call.Argument(0).ToFloat()
 			vu.Sleep(t)
-
 			return otto.UndefinedValue()
 		},
 		"id": func(call otto.FunctionCall) otto.Value {
