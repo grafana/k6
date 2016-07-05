@@ -242,6 +242,10 @@ func TestAPIHTTPSetMaxConnsPerHostInvalid(t *testing.T) {
 }
 
 func TestAPIHTTPRequestReportsStats(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
 	r := New("script", "$http.get('http://httpbin.org/get');")
 	vu, err := r.NewVU()
 	assert.NoError(t, err)
@@ -291,4 +295,216 @@ func TestAPIHTTPRequestErrorReportsStats(t *testing.T) {
 	}
 	assert.True(t, mRequestsFound)
 	assert.True(t, mErrorsFound)
+}
+
+func TestAPIHTTPRequestQuietReportsNoStats(t *testing.T) {
+	r := New("script", "$http.get('http://255.255.255.255/', null, { quiet: true });")
+	vu, err := r.NewVU()
+	assert.NoError(t, err)
+	assert.Error(t, vu.RunOnce(context.Background()))
+	assert.Len(t, vu.(*VU).Collector.Batch, 0)
+}
+
+func TestAPIHTTPRequestGET(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
+	r := New("script", `
+	res = $http.get("http://httpbin.org/get")
+	if (res.status !== 200) {
+		throw new Error("invalid status: " + res.status);
+	}
+	`)
+	vu, err := r.NewVU()
+	assert.NoError(t, err)
+	assert.NoError(t, vu.RunOnce(context.Background()))
+}
+
+func TestAPIHTTPRequestGETArgs(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
+	r := New("script", `
+	data = $http.get("http://httpbin.org/get", {a: 'b', b: 2}).json()
+	if (data.args.a !== 'b') {
+		throw new Error("invalid args.a: " + data.args.a);
+	}
+	if (data.args.b !== '2') {
+		throw new Error("invalid args.b: " + data.args.b);
+	}
+	`)
+	vu, err := r.NewVU()
+	assert.NoError(t, err)
+	assert.NoError(t, vu.RunOnce(context.Background()))
+}
+
+func TestAPIHTTPRequestGETHeaders(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
+	r := New("script", `
+	data = $http.get("http://httpbin.org/get", null, { headers: { 'X-Test': 'hi' } }).json()
+	if (data.headers['X-Test'] !== 'hi') {
+		throw new Error("invalid X-Test header: " + data.headers['X-Test'])
+	}
+	`)
+	vu, err := r.NewVU()
+	assert.NoError(t, err)
+	assert.NoError(t, vu.RunOnce(context.Background()))
+}
+
+func TestAPIHTTPRequestHEAD(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
+	r := New("script", `
+	res = $http.head("http://httpbin.org/get")
+	if (res.status !== 200) {
+		throw new Error("invalid status: " + res.status);
+	}
+	if (res.body !== "") {
+		throw new Error("body not empty")
+	}
+	`)
+	vu, err := r.NewVU()
+	assert.NoError(t, err)
+	assert.NoError(t, vu.RunOnce(context.Background()))
+}
+
+func TestAPIHTTPRequestHEADWithArgsDoesntStickThemInTheBodyAndFail(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
+	r := New("script", `
+	res = $http.head("http://httpbin.org/get", { a: 'b' })
+	if (res.status !== 200) {
+		throw new Error("invalid status: " + res.status);
+	}
+	if (res.body !== "") {
+		throw new Error("body not empty")
+	}
+	`)
+	vu, err := r.NewVU()
+	assert.NoError(t, err)
+	assert.NoError(t, vu.RunOnce(context.Background()))
+}
+
+func TestAPIHTTPRequestPOST(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
+	r := New("script", `
+	res = $http.post("http://httpbin.org/post")
+	if (res.status !== 200) {
+		throw new Error("invalid status: " + res.status);
+	}
+	`)
+	vu, err := r.NewVU()
+	assert.NoError(t, err)
+	assert.NoError(t, vu.RunOnce(context.Background()))
+}
+
+func TestAPIHTTPRequestPOSTArgs(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
+	r := New("script", `
+	data = $http.post("http://httpbin.org/post", { a: 'b' }).json()
+	if (data.form.a !== 'b') {
+		throw new Error("invalid form.a: " + data.form.a);
+	}
+	`)
+	vu, err := r.NewVU()
+	assert.NoError(t, err)
+	assert.NoError(t, vu.RunOnce(context.Background()))
+}
+
+func TestAPIHTTPRequestPOSTBody(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
+	r := New("script", `
+	data = $http.post("http://httpbin.org/post", 'a=b').json()
+	if (data.form.a !== 'b') {
+		throw new Error("invalid form.a: " + data.form.a);
+	}
+	`)
+	vu, err := r.NewVU()
+	assert.NoError(t, err)
+	assert.NoError(t, vu.RunOnce(context.Background()))
+}
+
+func TestAPIHTTPRequestPUT(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
+	r := New("script", `
+	res = $http.put("http://httpbin.org/put")
+	if (res.status !== 200) {
+		throw new Error("invalid status: " + res.status);
+	}
+	`)
+	vu, err := r.NewVU()
+	assert.NoError(t, err)
+	assert.NoError(t, vu.RunOnce(context.Background()))
+}
+
+func TestAPIHTTPRequestPATCH(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
+	r := New("script", `
+	res = $http.patch("http://httpbin.org/patch")
+	if (res.status !== 200) {
+		throw new Error("invalid status: " + res.status);
+	}
+	`)
+	vu, err := r.NewVU()
+	assert.NoError(t, err)
+	assert.NoError(t, vu.RunOnce(context.Background()))
+}
+
+func TestAPIHTTPRequestDELETE(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
+	r := New("script", `
+	res = $http.delete("http://httpbin.org/delete")
+	if (res.status !== 200) {
+		throw new Error("invalid status: " + res.status);
+	}
+	`)
+	vu, err := r.NewVU()
+	assert.NoError(t, err)
+	assert.NoError(t, vu.RunOnce(context.Background()))
+}
+
+func TestAPIHTTPRequestOPTIONS(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
+	r := New("script", `
+	res = $http.options("http://httpbin.org/")
+	if (res.status !== 200) {
+		throw new Error("invalid status: " + res.status);
+	}
+	if (res.body !== "") {
+		throw new Error("non-empty body: " + res.body);
+	}
+	`)
+	vu, err := r.NewVU()
+	assert.NoError(t, err)
+	assert.NoError(t, vu.RunOnce(context.Background()))
 }
