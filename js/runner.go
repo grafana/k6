@@ -191,7 +191,7 @@ func (r *Runner) NewVU() (lib.VU, error) {
 					valObj, _ := fieldsObj.Get(key)
 					val, err := valObj.Export()
 					if err != nil {
-						panic(err)
+						panic(jsError(call.Otto, err))
 					}
 					fields[key] = val
 				}
