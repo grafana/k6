@@ -5,6 +5,9 @@ import (
 	logtest "github.com/Sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
+	"math"
+	"os"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -115,7 +118,26 @@ func TestAPILogError(t *testing.T) {
 	assert.Len(t, e.Data, 0)
 }
 
+func TestAPILogWithData(t *testing.T) {
+	r := New("script", `$log.info("test", { a: 'hi', b: 123 });`)
+	logger, hook := logtest.NewNullLogger()
+	r.logger = logger
+
+	vu, _ := r.NewVU()
+	assert.NoError(t, vu.RunOnce(context.Background()))
+
+	e := hook.LastEntry()
+	assert.NotNil(t, e)
+	assert.Equal(t, log.InfoLevel, e.Level)
+	assert.Equal(t, "test", e.Message)
+	assert.Equal(t, log.Fields{"a": "hi", "b": int64(123)}, e.Data)
+}
+
 func TestAPIVUSleep1s(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
 	r := New("script", `$vu.sleep(1);`)
 	vu, _ := r.NewVU()
 
@@ -133,6 +155,10 @@ func TestAPIVUSleep1s(t *testing.T) {
 }
 
 func TestAPIVUSleep01s(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
 	r := New("script", `$vu.sleep(0.1);`)
 	vu, _ := r.NewVU()
 
@@ -147,6 +173,72 @@ func TestAPIVUSleep01s(t *testing.T) {
 	if duration < target || duration > target+(50*time.Millisecond) {
 		t.Fatalf("Incorrect sleep duration: %s", duration)
 	}
+}
+
+func TestAPIVUID(t *testing.T) {
+	r := New("script", `if ($vu.id() !== 100) { throw new Error("invalid ID"); }`)
+	vu, _ := r.NewVU()
+	vu.Reconfigure(100)
+	assert.NoError(t, vu.RunOnce(context.Background()))
+}
+
+func TestAPIVUIteration(t *testing.T) {
+	r := New("script", `if ($vu.iteration() !== 1) { throw new Error("invalid iteration"); }`)
+	vu, _ := r.NewVU()
+	vu.Reconfigure(100)
+	assert.NoError(t, vu.RunOnce(context.Background()))
+}
+
+func TestAPITestEnv(t *testing.T) {
+	os.Setenv("TEST_VAR", "hi")
+	r := New("script", `if ($test.env("TEST_VAR") !== "hi") { throw new Error("assertion failed"); }`)
+	vu, _ := r.NewVU()
+	assert.NoError(t, vu.RunOnce(context.Background()))
+}
+
+func TestAPITestEnvUndefined(t *testing.T) {
+	os.Unsetenv("NOT_SET_VAR") // Just in case...
+	r := New("script", `if ($test.env("NOT_SET_VAR") !== undefined) { throw new Error("assertion failed"); }`)
+	vu, _ := r.NewVU()
+	assert.NoError(t, vu.RunOnce(context.Background()))
+}
+
+func TestAPITestAbort(t *testing.T) {
+	r := New("script", `$test.abort();`)
+	vu, _ := r.NewVU()
+	assert.Panics(t, func() { vu.RunOnce(context.Background()) })
+}
+
+func TestAPIHTTPSetMaxConnsPerHost(t *testing.T) {
+	r := New("script", `$http.setMaxConnsPerHost(100);`)
+	vu, _ := r.NewVU()
+	assert.NoError(t, vu.RunOnce(context.Background()))
+	assert.Equal(t, 100, vu.(*VU).Client.MaxConnsPerHost)
+}
+
+func TestAPIHTTPSetMaxConnsPerHostOverflow(t *testing.T) {
+	r := New("script", `$http.setMaxConnsPerHost(`+strconv.FormatInt(math.MaxInt64, 10)+`);`)
+	vu, _ := r.NewVU()
+	assert.NoError(t, vu.RunOnce(context.Background()))
+	assert.Equal(t, math.MaxInt32, vu.(*VU).Client.MaxConnsPerHost)
+}
+
+func TestAPIHTTPSetMaxConnsPerHostZero(t *testing.T) {
+	r := New("script", `$http.setMaxConnsPerHost(0);`)
+	vu, _ := r.NewVU()
+	assert.Error(t, vu.RunOnce(context.Background()))
+}
+
+func TestAPIHTTPSetMaxConnsPerHostNegative(t *testing.T) {
+	r := New("script", `$http.setMaxConnsPerHost(-1);`)
+	vu, _ := r.NewVU()
+	assert.Error(t, vu.RunOnce(context.Background()))
+}
+
+func TestAPIHTTPSetMaxConnsPerHostInvalid(t *testing.T) {
+	r := New("script", `$http.setMaxConnsPerHost("qwerty");`)
+	vu, _ := r.NewVU()
+	assert.Error(t, vu.RunOnce(context.Background()))
 }
 
 func TestAPIHTTPRequestReportsStats(t *testing.T) {
