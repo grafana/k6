@@ -45,7 +45,7 @@ func (u *VU) HTTPRequest(method, url, body string, params HTTPParams) (HTTPRespo
 
 	if method == "GET" || method == "HEAD" {
 		req.SetRequestURI(putBodyInURL(url, body))
-	} else if body != "" {
+	} else {
 		req.SetRequestURI(url)
 		req.SetBodyString(body)
 	}
