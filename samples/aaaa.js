@@ -1,1 +1,1 @@
-print('aaaa');
+$log.info('aaaa');
