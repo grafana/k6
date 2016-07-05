@@ -91,3 +91,18 @@ func TestSubmitKeepsLast(t *testing.T) {
 	})
 	assert.Equal(t, float64(2), b.Get(&stat, "value").Last)
 }
+
+func TestSubmitIgnoresExcluded(t *testing.T) {
+	b := New()
+	stat1 := stats.Stat{Name: "test"}
+	stat2 := stats.Stat{Name: "test2"}
+	b.Exclude["test2"] = true
+	b.Submit([][]stats.Point{
+		[]stats.Point{
+			stats.Point{Stat: &stat1, Values: stats.Values{"value": 3}},
+			stats.Point{Stat: &stat1, Values: stats.Values{"value": 1}},
+			stats.Point{Stat: &stat2, Values: stats.Values{"value": 2}},
+		},
+	})
+	assert.Len(t, b.Data, 1)
+}
