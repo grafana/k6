@@ -8,6 +8,7 @@ import (
 
 type Backend struct {
 	Data    map[*stats.Stat]map[*string]*Dimension
+	Only    map[string]bool
 	Exclude map[string]bool
 
 	interned    map[string]*string
@@ -18,6 +19,7 @@ func New() *Backend {
 	return &Backend{
 		Data:     make(map[*stats.Stat]map[*string]*Dimension),
 		Exclude:  make(map[string]bool),
+		Only:     make(map[string]bool),
 		interned: make(map[string]*string),
 	}
 }
@@ -34,8 +36,14 @@ func (b *Backend) Get(stat *stats.Stat, dname string) *Dimension {
 func (b *Backend) Submit(batches [][]stats.Point) error {
 	b.submitMutex.Lock()
 
+	hasOnly := len(b.Only) > 0
+
 	for _, batch := range batches {
 		for _, p := range batch {
+			if hasOnly && !b.Only[p.Stat.Name] {
+				continue
+			}
+
 			if b.Exclude[p.Stat.Name] {
 				continue
 			}

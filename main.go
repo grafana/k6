@@ -192,6 +192,13 @@ func action(cc *cli.Context) error {
 	var accumulator *accumulate.Backend
 	if !cc.Bool("quiet") {
 		accumulator = accumulate.New()
+		for _, stat := range cc.StringSlice("select") {
+			if stat == "*" {
+				accumulator.Only = make(map[string]bool)
+				break
+			}
+			accumulator.Only[stat] = true
+		}
 		for _, stat := range cc.StringSlice("exclude") {
 			accumulator.Exclude[stat] = true
 		}
@@ -375,6 +382,10 @@ func main() {
 		cli.StringSliceFlag{
 			Name:  "metrics, m",
 			Usage: "Write metrics to a file or database",
+		},
+		cli.StringSliceFlag{
+			Name:  "select, s",
+			Usage: "Include only named metrics",
 		},
 		cli.StringSliceFlag{
 			Name:  "exclude, e",
