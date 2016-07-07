@@ -121,3 +121,43 @@ func TestSubmitIgnoresNotInOnly(t *testing.T) {
 	})
 	assert.Len(t, b.Data, 1)
 }
+
+func TestGetVStatDefault(t *testing.T) {
+	b := New()
+	stat := stats.Stat{Name: "test"}
+	assert.Equal(t, &stat, b.getVStat(&stat, stats.Tags{}))
+}
+
+func TestGetVStatNoMatch(t *testing.T) {
+	b := New()
+	b.GroupBy = []string{"no-match"}
+	stat := stats.Stat{Name: "test"}
+	assert.Equal(t, &stat, b.getVStat(&stat, stats.Tags{}))
+}
+
+func TestGetVStatOneTag(t *testing.T) {
+	b := New()
+	b.GroupBy = []string{"tag"}
+	stat := stats.Stat{Name: "test"}
+	vstat := b.getVStat(&stat, stats.Tags{"tag": "value"})
+	assert.NotNil(t, vstat)
+	assert.Equal(t, "test{tag: value}", vstat.Name)
+}
+
+func TestGetVStatTwoTags(t *testing.T) {
+	b := New()
+	b.GroupBy = []string{"tag", "blah"}
+	stat := stats.Stat{Name: "test"}
+	vstat := b.getVStat(&stat, stats.Tags{"tag": "value", "blah": 12345})
+	assert.NotNil(t, vstat)
+	assert.Equal(t, "test{tag: value, blah: 12345}", vstat.Name)
+}
+
+func TestGetVStatTwoTagsOneMiss(t *testing.T) {
+	b := New()
+	b.GroupBy = []string{"tag", "weh", "blah"}
+	stat := stats.Stat{Name: "test"}
+	vstat := b.getVStat(&stat, stats.Tags{"tag": "value", "blah": 12345})
+	assert.NotNil(t, vstat)
+	assert.Equal(t, "test{tag: value, blah: 12345}", vstat.Name)
+}

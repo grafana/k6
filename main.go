@@ -202,6 +202,9 @@ func action(cc *cli.Context) error {
 		for _, stat := range cc.StringSlice("exclude") {
 			accumulator.Exclude[stat] = true
 		}
+		for _, tag := range cc.StringSlice("group-by") {
+			accumulator.GroupBy = append(accumulator.GroupBy, tag)
+		}
 		stats.DefaultRegistry.Backends = append(stats.DefaultRegistry.Backends, accumulator)
 	}
 
@@ -390,6 +393,10 @@ func main() {
 		cli.StringSliceFlag{
 			Name:  "exclude, e",
 			Usage: "Exclude named metrics",
+		},
+		cli.StringSliceFlag{
+			Name:  "group-by, g",
+			Usage: "Group metrics by tags",
 		},
 	}
 	app.Action = action
