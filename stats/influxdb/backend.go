@@ -39,8 +39,8 @@ func (b *Backend) Submit(batches [][]stats.Sample) error {
 	}
 
 	for _, batch := range batches {
-		for _, p := range batch {
-			pt, err := makeInfluxPoint(p)
+		for _, s := range batch {
+			pt, err := makeInfluxPoint(s)
 			if err != nil {
 				return err
 			}
