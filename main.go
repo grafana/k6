@@ -64,17 +64,11 @@ func pollVURamping(ctx context.Context, t lib.Test) <-chan int {
 
 func parseBackend(out string) (stats.Backend, error) {
 	switch {
-	case out == "-":
-		return stats.NewJSONBackend(os.Stdout), nil
 	case strings.HasPrefix(out, "influxdb+"):
 		url := strings.TrimPrefix(out, "influxdb+")
 		return influxdb.NewFromURL(url)
 	default:
-		f, err := os.Create(out)
-		if err != nil {
-			return nil, err
-		}
-		return stats.NewJSONBackend(f), nil
+		return nil, errors.New("Unknown output destination")
 	}
 }
 
@@ -183,7 +177,7 @@ func action(cc *cli.Context) error {
 		log.SetLevel(log.DebugLevel)
 	}
 
-	for _, out := range cc.StringSlice("metrics") {
+	for _, out := range cc.StringSlice("out") {
 		backend, err := parseBackend(out)
 		if err != nil {
 			return cli.NewExitError(err.Error(), 1)
@@ -376,8 +370,8 @@ func main() {
 			Value: "yaml",
 		},
 		cli.StringSliceFlag{
-			Name:  "metrics, m",
-			Usage: "Write metrics to a file or database",
+			Name:  "out, o",
+			Usage: "Write metrics to a database",
 		},
 		cli.StringSliceFlag{
 			Name:  "select, s",
