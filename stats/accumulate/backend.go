@@ -22,8 +22,7 @@ type StatTreeNode struct {
 
 type Backend struct {
 	Data    map[*stats.Stat]map[string]*Dimension
-	Only    map[string]bool
-	Exclude map[string]bool
+	Filter  stats.Filter
 	GroupBy []string
 
 	vstats      map[*stats.Stat]*StatTree
@@ -32,10 +31,8 @@ type Backend struct {
 
 func New() *Backend {
 	return &Backend{
-		Data:    make(map[*stats.Stat]map[string]*Dimension),
-		Exclude: make(map[string]bool),
-		Only:    make(map[string]bool),
-		vstats:  make(map[*stats.Stat]*StatTree),
+		Data:   make(map[*stats.Stat]map[string]*Dimension),
+		vstats: make(map[*stats.Stat]*StatTree),
 	}
 }
 
@@ -93,15 +90,9 @@ func (b *Backend) getVStat(stat *stats.Stat, tags stats.Tags) *stats.Stat {
 func (b *Backend) Submit(batches [][]stats.Sample) error {
 	b.submitMutex.Lock()
 
-	hasOnly := len(b.Only) > 0
-
 	for _, batch := range batches {
 		for _, s := range batch {
-			if hasOnly && !b.Only[s.Stat.Name] {
-				continue
-			}
-
-			if b.Exclude[s.Stat.Name] {
+			if !b.Filter.Check(s) {
 				continue
 			}
 

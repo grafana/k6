@@ -11,9 +11,7 @@ type Formatter interface {
 }
 
 type Backend struct {
-	Only    map[string]bool
-	Exclude map[string]bool
-
+	Filter    stats.Filter
 	Writer    io.Writer
 	Formatter Formatter
 
@@ -24,14 +22,9 @@ func (b Backend) Submit(batches [][]stats.Sample) error {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
-	hasOnly := len(b.Only) > 0
-
 	for _, batch := range batches {
 		for _, s := range batch {
-			if hasOnly && !b.Only[s.Stat.Name] {
-				continue
-			}
-			if b.Exclude[s.Stat.Name] {
+			if !b.Filter.Check(s) {
 				continue
 			}
 

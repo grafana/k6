@@ -76,26 +76,11 @@ func TestSubmitKeepsLast(t *testing.T) {
 	assert.Equal(t, float64(2), b.Data[&stat]["value"].Last)
 }
 
-func TestSubmitIgnoresExcluded(t *testing.T) {
+func TestSubmitRespectsFilter(t *testing.T) {
 	b := New()
 	stat1 := stats.Stat{Name: "test"}
 	stat2 := stats.Stat{Name: "test2"}
-	b.Exclude["test2"] = true
-	b.Submit([][]stats.Sample{
-		[]stats.Sample{
-			stats.Sample{Stat: &stat1, Values: stats.Values{"value": 3}},
-			stats.Sample{Stat: &stat1, Values: stats.Values{"value": 1}},
-			stats.Sample{Stat: &stat2, Values: stats.Values{"value": 2}},
-		},
-	})
-	assert.Len(t, b.Data, 1)
-}
-
-func TestSubmitIgnoresNotInOnly(t *testing.T) {
-	b := New()
-	stat1 := stats.Stat{Name: "test"}
-	stat2 := stats.Stat{Name: "test2"}
-	b.Only["test2"] = true
+	b.Filter = stats.MakeFilter([]string{"test"}, nil)
 	b.Submit([][]stats.Sample{
 		[]stats.Sample{
 			stats.Sample{Stat: &stat1, Values: stats.Values{"value": 3}},
