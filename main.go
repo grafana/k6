@@ -279,6 +279,13 @@ func action(cc *cli.Context) error {
 	quit := make(chan os.Signal)
 	signal.Notify(quit)
 
+	if !cc.Bool("quiet") {
+		log.WithFields(log.Fields{
+			"at":     time.Now(),
+			"length": t.TotalDuration(),
+		}).Info("Starting test...")
+	}
+
 	vus.Start(ctx)
 	scaleTo := pollVURamping(ctx, t)
 mainLoop:
