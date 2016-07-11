@@ -305,8 +305,16 @@ func action(cc *cli.Context) error {
 		}()
 	}
 
-	quit := make(chan os.Signal)
-	signal.Notify(quit)
+	go func() {
+		quit := make(chan os.Signal)
+		signal.Notify(quit)
+
+		select {
+		case <-quit:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
 
 	if !cc.Bool("quiet") {
 		log.WithFields(log.Fields{
@@ -326,8 +334,6 @@ mainLoop:
 				Stat:   &mVUs,
 				Values: stats.Value(float64(num)),
 			})
-		case <-quit:
-			cancel()
 		case <-ctx.Done():
 			break mainLoop
 		}
