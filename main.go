@@ -191,9 +191,22 @@ func action(cc *cli.Context) error {
 		stats.DefaultRegistry.Backends = append(stats.DefaultRegistry.Backends, backend)
 	}
 
-	var accumulator *accumulate.Backend
-	if !cc.Bool("quiet") {
-		accumulator = accumulate.New()
+	var formatter Formatter
+	switch cc.String("format") {
+	case "":
+	case "json":
+		formatter = JSONFormatter{}
+	case "prettyjson":
+		formatter = PrettyJSONFormatter{}
+	case "yaml":
+		formatter = YAMLFormatter{}
+	default:
+		return cli.NewExitError("Unknown output format", 1)
+	}
+
+	var summarizer *Summarizer
+	if formatter != nil {
+		accumulator := accumulate.New()
 		for _, stat := range cc.StringSlice("select") {
 			if stat == "*" {
 				accumulator.Only = make(map[string]bool)
@@ -208,6 +221,11 @@ func action(cc *cli.Context) error {
 			accumulator.GroupBy = append(accumulator.GroupBy, tag)
 		}
 		stats.DefaultRegistry.Backends = append(stats.DefaultRegistry.Backends, accumulator)
+
+		summarizer = &Summarizer{
+			Accumulator: accumulator,
+			Formatter:   formatter,
+		}
 	}
 
 	stages, err := parseStages(cc.StringSlice("vus"), cc.Duration("duration"))
@@ -309,47 +327,9 @@ mainLoop:
 	stats.Add(stats.Sample{Stat: &mVUs, Values: stats.Value(0)})
 	stats.Submit()
 
-	if accumulator != nil {
-		for stat, dimensions := range accumulator.Data {
-			switch stat.Type {
-			case stats.CounterType:
-				for dname, dim := range dimensions {
-					e := log.WithField("count", stats.ApplyIntent(dim.Sum(), stat.Intent))
-					if len(dimensions) == 1 {
-						e.Infof("Metric: %s", stat.Name)
-					} else {
-						e.Infof("Metric: %s.%s", stat.Name, dname)
-					}
-				}
-			case stats.GaugeType:
-				for dname, dim := range dimensions {
-					last := dim.Last
-					if last == 0 {
-						continue
-					}
-
-					e := log.WithField("val", stats.ApplyIntent(last, stat.Intent))
-					if len(dimensions) == 1 {
-						e.Infof("Metric: %s", stat.Name)
-					} else {
-						e.Infof("Metric: %s.%s", stat.Name, dname)
-					}
-				}
-			case stats.HistogramType:
-				first := true
-				for dname, dim := range dimensions {
-					if first {
-						log.WithField("count", len(dim.Values)).Infof("Metric: %s", stat.Name)
-						first = false
-					}
-					log.WithFields(log.Fields{
-						"min": stats.ApplyIntent(dim.Min(), stat.Intent),
-						"max": stats.ApplyIntent(dim.Max(), stat.Intent),
-						"avg": stats.ApplyIntent(dim.Avg(), stat.Intent),
-						"med": stats.ApplyIntent(dim.Med(), stat.Intent),
-					}).Infof("  - %s", dname)
-				}
-			}
+	if summarizer != nil {
+		if err := summarizer.Print(os.Stdout); err != nil {
+			log.WithError(err).Error("Couldn't print statistics!")
 		}
 	}
 
@@ -389,6 +369,11 @@ func main() {
 		cli.BoolFlag{
 			Name:  "quiet, q",
 			Usage: "Suppress the summary at the end of a test",
+		},
+		cli.StringFlag{
+			Name:  "format, f",
+			Usage: "Format for printed metrics (yaml, json, prettyjson)",
+			Value: "yaml",
 		},
 		cli.StringSliceFlag{
 			Name:  "metrics, m",
