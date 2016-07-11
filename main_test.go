@@ -1,17 +1,10 @@
 package main
 
 import (
-	"github.com/loadimpact/speedboat/stats"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
 )
-
-func TestParseBackendStdout(t *testing.T) {
-	output, err := parseBackend("-")
-	assert.NoError(t, err)
-	assert.IsType(t, &stats.JSONBackend{}, output)
-}
 
 func TestParseStagesSimple(t *testing.T) {
 	stages, err := parseStages([]string{"10"}, 10*time.Second)

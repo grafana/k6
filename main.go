@@ -9,6 +9,7 @@ import (
 	"github.com/loadimpact/speedboat/stats"
 	"github.com/loadimpact/speedboat/stats/accumulate"
 	"github.com/loadimpact/speedboat/stats/influxdb"
+	"github.com/loadimpact/speedboat/stats/writer"
 	"github.com/urfave/cli"
 	"golang.org/x/net/context"
 	"io/ioutil"
@@ -185,40 +186,59 @@ func action(cc *cli.Context) error {
 		stats.DefaultRegistry.Backends = append(stats.DefaultRegistry.Backends, backend)
 	}
 
-	var formatter Formatter
+	var formatter writer.Formatter
 	switch cc.String("format") {
 	case "":
 	case "json":
-		formatter = JSONFormatter{}
+		formatter = writer.JSONFormatter{}
 	case "prettyjson":
-		formatter = PrettyJSONFormatter{}
+		formatter = writer.PrettyJSONFormatter{}
 	case "yaml":
-		formatter = YAMLFormatter{}
+		formatter = writer.YAMLFormatter{}
 	default:
 		return cli.NewExitError("Unknown output format", 1)
 	}
 
 	var summarizer *Summarizer
 	if formatter != nil {
-		accumulator := accumulate.New()
+		only := make(map[string]bool)
 		for _, stat := range cc.StringSlice("select") {
 			if stat == "*" {
-				accumulator.Only = make(map[string]bool)
+				only = make(map[string]bool)
 				break
 			}
-			accumulator.Only[stat] = true
+			only[stat] = true
 		}
-		for _, stat := range cc.StringSlice("exclude") {
-			accumulator.Exclude[stat] = true
-		}
-		for _, tag := range cc.StringSlice("group-by") {
-			accumulator.GroupBy = append(accumulator.GroupBy, tag)
-		}
-		stats.DefaultRegistry.Backends = append(stats.DefaultRegistry.Backends, accumulator)
 
-		summarizer = &Summarizer{
-			Accumulator: accumulator,
-			Formatter:   formatter,
+		exclude := make(map[string]bool)
+		for _, stat := range cc.StringSlice("exclude") {
+			exclude[stat] = true
+		}
+
+		groupBy := []string{}
+		for _, tag := range cc.StringSlice("group-by") {
+			groupBy = append(groupBy, tag)
+		}
+
+		if cc.Bool("raw") {
+			backend := &writer.Backend{
+				Writer:    os.Stdout,
+				Formatter: formatter,
+			}
+			backend.Only = only
+			backend.Exclude = exclude
+			stats.DefaultRegistry.Backends = append(stats.DefaultRegistry.Backends, backend)
+		} else {
+			accumulator := accumulate.New()
+			accumulator.Only = only
+			accumulator.Exclude = exclude
+			accumulator.GroupBy = groupBy
+			stats.DefaultRegistry.Backends = append(stats.DefaultRegistry.Backends, accumulator)
+
+			summarizer = &Summarizer{
+				Accumulator: accumulator,
+				Formatter:   formatter,
+			}
 		}
 	}
 
@@ -372,6 +392,10 @@ func main() {
 		cli.StringSliceFlag{
 			Name:  "out, o",
 			Usage: "Write metrics to a database",
+		},
+		cli.BoolFlag{
+			Name:  "raw",
+			Usage: "Instead of summaries, dump raw samples to stdout",
 		},
 		cli.StringSliceFlag{
 			Name:  "select, s",
