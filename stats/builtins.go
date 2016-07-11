@@ -13,10 +13,10 @@ func NewJSONBackend(w io.Writer) Backend {
 	return &JSONBackend{encoder: json.NewEncoder(w)}
 }
 
-func (b *JSONBackend) Submit(batches [][]Point) error {
+func (b *JSONBackend) Submit(batches [][]Sample) error {
 	for _, batch := range batches {
-		for _, p := range batch {
-			if err := b.encoder.Encode(b.format(&p)); err != nil {
+		for _, s := range batch {
+			if err := b.encoder.Encode(b.format(&s)); err != nil {
 				return err
 			}
 		}
@@ -25,14 +25,14 @@ func (b *JSONBackend) Submit(batches [][]Point) error {
 	return nil
 }
 
-func (JSONBackend) format(p *Point) map[string]interface{} {
+func (JSONBackend) format(s *Sample) map[string]interface{} {
 	data := map[string]interface{}{
-		"time":   p.Time,
-		"stat":   p.Stat.Name,
-		"tags":   p.Tags,
-		"values": p.Values,
+		"time":   s.Time,
+		"stat":   s.Stat.Name,
+		"tags":   s.Tags,
+		"values": s.Values,
 	}
-	if p.Tags == nil {
+	if s.Tags == nil {
 		data["tags"] = Tags{}
 	}
 	return data

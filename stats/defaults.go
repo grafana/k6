@@ -11,6 +11,6 @@ func Submit() error {
 	return DefaultRegistry.Submit()
 }
 
-func Add(p Point) {
-	DefaultCollector.Add(p)
+func Add(s Sample) {
+	DefaultCollector.Add(s)
 }

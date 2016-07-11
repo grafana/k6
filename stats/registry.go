@@ -25,7 +25,7 @@ func (r *Registry) Submit() error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	batches := make([][]Point, 0, len(r.collectors))
+	batches := make([][]Sample, 0, len(r.collectors))
 	for _, collector := range r.collectors {
 		batch := collector.drain()
 		batches = append(batches, batch)

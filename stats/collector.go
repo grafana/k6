@@ -6,24 +6,24 @@ import (
 )
 
 type Collector struct {
-	Batch []Point
+	Batch []Sample
 	mutex sync.Mutex
 }
 
-func (c *Collector) Add(p Point) {
-	if p.Stat == nil || len(p.Values) == 0 {
+func (c *Collector) Add(s Sample) {
+	if s.Stat == nil || len(s.Values) == 0 {
 		return
 	}
-	if p.Time.IsZero() {
-		p.Time = time.Now()
+	if s.Time.IsZero() {
+		s.Time = time.Now()
 	}
 
 	c.mutex.Lock()
-	c.Batch = append(c.Batch, p)
+	c.Batch = append(c.Batch, s)
 	c.mutex.Unlock()
 }
 
-func (c *Collector) drain() []Point {
+func (c *Collector) drain() []Sample {
 	c.mutex.Lock()
 	oldBatch := c.Batch
 	c.Batch = nil

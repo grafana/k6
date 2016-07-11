@@ -101,29 +101,29 @@ func (b *Backend) Get(stat *stats.Stat, dname string) *Dimension {
 	return dimensions[b.interned[dname]]
 }
 
-func (b *Backend) Submit(batches [][]stats.Point) error {
+func (b *Backend) Submit(batches [][]stats.Sample) error {
 	b.submitMutex.Lock()
 
 	hasOnly := len(b.Only) > 0
 
 	for _, batch := range batches {
-		for _, p := range batch {
-			if hasOnly && !b.Only[p.Stat.Name] {
+		for _, s := range batch {
+			if hasOnly && !b.Only[s.Stat.Name] {
 				continue
 			}
 
-			if b.Exclude[p.Stat.Name] {
+			if b.Exclude[s.Stat.Name] {
 				continue
 			}
 
-			stat := b.getVStat(p.Stat, p.Tags)
+			stat := b.getVStat(s.Stat, s.Tags)
 			dimensions, ok := b.Data[stat]
 			if !ok {
 				dimensions = make(map[*string]*Dimension)
 				b.Data[stat] = dimensions
 			}
 
-			for dname, val := range p.Values {
+			for dname, val := range s.Values {
 				interned, ok := b.interned[dname]
 				if !ok {
 					interned = &dname

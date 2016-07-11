@@ -7,7 +7,7 @@ import (
 type Tags map[string]interface{}
 type Values map[string]float64
 
-type Point struct {
+type Sample struct {
 	Stat   *Stat
 	Time   time.Time
 	Tags   Tags

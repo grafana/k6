@@ -15,9 +15,9 @@ func TestGetNonexistent(t *testing.T) {
 func TestGet(t *testing.T) {
 	b := New()
 	stat := stats.Stat{Name: "test"}
-	b.Submit([][]stats.Point{
-		[]stats.Point{
-			stats.Point{Stat: &stat, Values: stats.Values{"value": 1}},
+	b.Submit([][]stats.Sample{
+		[]stats.Sample{
+			stats.Sample{Stat: &stat, Values: stats.Values{"value": 1}},
 		},
 	})
 
@@ -27,11 +27,11 @@ func TestGet(t *testing.T) {
 func TestSubmitInternsNames(t *testing.T) {
 	b := New()
 	stat := stats.Stat{Name: "test"}
-	b.Submit([][]stats.Point{
-		[]stats.Point{
-			stats.Point{Stat: &stat, Values: stats.Values{"value": 1}},
-			stats.Point{Stat: &stat, Values: stats.Values{"value": 2}},
-			stats.Point{Stat: &stat, Values: stats.Values{"value": 3}},
+	b.Submit([][]stats.Sample{
+		[]stats.Sample{
+			stats.Sample{Stat: &stat, Values: stats.Values{"value": 1}},
+			stats.Sample{Stat: &stat, Values: stats.Values{"value": 2}},
+			stats.Sample{Stat: &stat, Values: stats.Values{"value": 3}},
 		},
 	})
 	assert.Len(t, b.interned, 1)
@@ -43,11 +43,11 @@ func TestSubmitInternsNames(t *testing.T) {
 func TestSubmitSortsValues(t *testing.T) {
 	b := New()
 	stat := stats.Stat{Name: "test"}
-	b.Submit([][]stats.Point{
-		[]stats.Point{
-			stats.Point{Stat: &stat, Values: stats.Values{"value": 3}},
-			stats.Point{Stat: &stat, Values: stats.Values{"value": 1}},
-			stats.Point{Stat: &stat, Values: stats.Values{"value": 2}},
+	b.Submit([][]stats.Sample{
+		[]stats.Sample{
+			stats.Sample{Stat: &stat, Values: stats.Values{"value": 3}},
+			stats.Sample{Stat: &stat, Values: stats.Values{"value": 1}},
+			stats.Sample{Stat: &stat, Values: stats.Values{"value": 2}},
 		},
 	})
 
@@ -59,18 +59,18 @@ func TestSubmitSortsValues(t *testing.T) {
 func TestSubmitSortsValuesContinously(t *testing.T) {
 	b := New()
 	stat := stats.Stat{Name: "test"}
-	b.Submit([][]stats.Point{
-		[]stats.Point{
-			stats.Point{Stat: &stat, Values: stats.Values{"value": 3}},
-			stats.Point{Stat: &stat, Values: stats.Values{"value": 1}},
-			stats.Point{Stat: &stat, Values: stats.Values{"value": 2}},
+	b.Submit([][]stats.Sample{
+		[]stats.Sample{
+			stats.Sample{Stat: &stat, Values: stats.Values{"value": 3}},
+			stats.Sample{Stat: &stat, Values: stats.Values{"value": 1}},
+			stats.Sample{Stat: &stat, Values: stats.Values{"value": 2}},
 		},
 	})
-	b.Submit([][]stats.Point{
-		[]stats.Point{
-			stats.Point{Stat: &stat, Values: stats.Values{"value": 6}},
-			stats.Point{Stat: &stat, Values: stats.Values{"value": 5}},
-			stats.Point{Stat: &stat, Values: stats.Values{"value": 4}},
+	b.Submit([][]stats.Sample{
+		[]stats.Sample{
+			stats.Sample{Stat: &stat, Values: stats.Values{"value": 6}},
+			stats.Sample{Stat: &stat, Values: stats.Values{"value": 5}},
+			stats.Sample{Stat: &stat, Values: stats.Values{"value": 4}},
 		},
 	})
 
@@ -82,11 +82,11 @@ func TestSubmitSortsValuesContinously(t *testing.T) {
 func TestSubmitKeepsLast(t *testing.T) {
 	b := New()
 	stat := stats.Stat{Name: "test"}
-	b.Submit([][]stats.Point{
-		[]stats.Point{
-			stats.Point{Stat: &stat, Values: stats.Values{"value": 3}},
-			stats.Point{Stat: &stat, Values: stats.Values{"value": 1}},
-			stats.Point{Stat: &stat, Values: stats.Values{"value": 2}},
+	b.Submit([][]stats.Sample{
+		[]stats.Sample{
+			stats.Sample{Stat: &stat, Values: stats.Values{"value": 3}},
+			stats.Sample{Stat: &stat, Values: stats.Values{"value": 1}},
+			stats.Sample{Stat: &stat, Values: stats.Values{"value": 2}},
 		},
 	})
 	assert.Equal(t, float64(2), b.Get(&stat, "value").Last)
@@ -97,11 +97,11 @@ func TestSubmitIgnoresExcluded(t *testing.T) {
 	stat1 := stats.Stat{Name: "test"}
 	stat2 := stats.Stat{Name: "test2"}
 	b.Exclude["test2"] = true
-	b.Submit([][]stats.Point{
-		[]stats.Point{
-			stats.Point{Stat: &stat1, Values: stats.Values{"value": 3}},
-			stats.Point{Stat: &stat1, Values: stats.Values{"value": 1}},
-			stats.Point{Stat: &stat2, Values: stats.Values{"value": 2}},
+	b.Submit([][]stats.Sample{
+		[]stats.Sample{
+			stats.Sample{Stat: &stat1, Values: stats.Values{"value": 3}},
+			stats.Sample{Stat: &stat1, Values: stats.Values{"value": 1}},
+			stats.Sample{Stat: &stat2, Values: stats.Values{"value": 2}},
 		},
 	})
 	assert.Len(t, b.Data, 1)
@@ -112,11 +112,11 @@ func TestSubmitIgnoresNotInOnly(t *testing.T) {
 	stat1 := stats.Stat{Name: "test"}
 	stat2 := stats.Stat{Name: "test2"}
 	b.Only["test2"] = true
-	b.Submit([][]stats.Point{
-		[]stats.Point{
-			stats.Point{Stat: &stat1, Values: stats.Values{"value": 3}},
-			stats.Point{Stat: &stat1, Values: stats.Values{"value": 1}},
-			stats.Point{Stat: &stat2, Values: stats.Values{"value": 2}},
+	b.Submit([][]stats.Sample{
+		[]stats.Sample{
+			stats.Sample{Stat: &stat1, Values: stats.Values{"value": 3}},
+			stats.Sample{Stat: &stat1, Values: stats.Values{"value": 1}},
+			stats.Sample{Stat: &stat2, Values: stats.Values{"value": 2}},
 		},
 	})
 	assert.Len(t, b.Data, 1)

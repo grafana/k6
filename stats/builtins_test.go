@@ -8,7 +8,7 @@ import (
 
 func TestFormat(t *testing.T) {
 	stat := Stat{Name: "test"}
-	v := (JSONBackend{}).format(&Point{
+	v := (JSONBackend{}).format(&Sample{
 		Stat:   &stat,
 		Tags:   Tags{"a": "b"},
 		Values: Values{"value": 12345.0},
@@ -28,7 +28,7 @@ func TestFormat(t *testing.T) {
 
 func TestFormatNilTagsBecomeEmptyMap(t *testing.T) {
 	stat := Stat{Name: "test"}
-	v := (JSONBackend{}).format(&Point{
+	v := (JSONBackend{}).format(&Sample{
 		Stat:   &stat,
 		Values: Values{"value": 12345.0},
 	})

@@ -285,7 +285,7 @@ mainLoop:
 		select {
 		case num := <-scaleTo:
 			vus.Scale(num)
-			stats.Add(stats.Point{
+			stats.Add(stats.Sample{
 				Stat:   &mVUs,
 				Values: stats.Value(float64(num)),
 			})
@@ -298,7 +298,7 @@ mainLoop:
 
 	vus.Stop()
 
-	stats.Add(stats.Point{Stat: &mVUs, Values: stats.Value(0)})
+	stats.Add(stats.Sample{Stat: &mVUs, Values: stats.Value(0)})
 	stats.Submit()
 
 	if accumulator != nil {

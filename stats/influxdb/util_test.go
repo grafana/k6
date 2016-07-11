@@ -30,7 +30,7 @@ func TestParseURLNoDB(t *testing.T) {
 
 func TestMakeInfluxPoint(t *testing.T) {
 	now := time.Now()
-	pt, err := makeInfluxPoint(stats.Point{
+	pt, err := makeInfluxPoint(stats.Sample{
 		Stat:   &stats.Stat{Name: "test"},
 		Time:   now,
 		Tags:   stats.Tags{"a": "b"},

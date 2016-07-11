@@ -61,7 +61,7 @@ func (u *VU) RunOnce(ctx context.Context) error {
 		"method": "GET",
 		"status": res.StatusCode(),
 	}
-	u.Collector.Add(stats.Point{
+	u.Collector.Add(stats.Sample{
 		Stat:   &mRequests,
 		Tags:   tags,
 		Values: stats.Values{"duration": float64(duration)},
@@ -69,7 +69,7 @@ func (u *VU) RunOnce(ctx context.Context) error {
 
 	if err != nil {
 		log.WithError(err).Error("Request error")
-		u.Collector.Add(stats.Point{
+		u.Collector.Add(stats.Sample{
 			Stat:   &mErrors,
 			Tags:   tags,
 			Values: stats.Value(1),

@@ -6,13 +6,13 @@ import (
 )
 
 type testBackend struct {
-	submitted []Point
+	submitted []Sample
 }
 
-func (b *testBackend) Submit(batches [][]Point) error {
+func (b *testBackend) Submit(batches [][]Sample) error {
 	for _, batch := range batches {
-		for _, p := range batch {
-			b.submitted = append(b.submitted, p)
+		for _, s := range batch {
+			b.submitted = append(b.submitted, s)
 		}
 	}
 
@@ -34,12 +34,12 @@ func TestSubmit(t *testing.T) {
 	stat := Stat{Name: "test"}
 
 	c1 := r.NewCollector()
-	c1.Add(Point{Stat: &stat, Values: Value(1)})
-	c1.Add(Point{Stat: &stat, Values: Value(2)})
+	c1.Add(Sample{Stat: &stat, Values: Value(1)})
+	c1.Add(Sample{Stat: &stat, Values: Value(2)})
 
 	c2 := r.NewCollector()
-	c2.Add(Point{Stat: &stat, Values: Value(3)})
-	c2.Add(Point{Stat: &stat, Values: Value(4)})
+	c2.Add(Sample{Stat: &stat, Values: Value(3)})
+	c2.Add(Sample{Stat: &stat, Values: Value(4)})
 
 	err := r.Submit()
 	assert.NoError(t, err)
