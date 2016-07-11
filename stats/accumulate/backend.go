@@ -21,23 +21,21 @@ type StatTreeNode struct {
 }
 
 type Backend struct {
-	Data    map[*stats.Stat]map[*string]*Dimension
+	Data    map[*stats.Stat]map[string]*Dimension
 	Only    map[string]bool
 	Exclude map[string]bool
 	GroupBy []string
 
-	interned    map[string]*string
 	vstats      map[*stats.Stat]*StatTree
 	submitMutex sync.Mutex
 }
 
 func New() *Backend {
 	return &Backend{
-		Data:     make(map[*stats.Stat]map[*string]*Dimension),
-		Exclude:  make(map[string]bool),
-		Only:     make(map[string]bool),
-		interned: make(map[string]*string),
-		vstats:   make(map[*stats.Stat]*StatTree),
+		Data:    make(map[*stats.Stat]map[string]*Dimension),
+		Exclude: make(map[string]bool),
+		Only:    make(map[string]bool),
+		vstats:  make(map[*stats.Stat]*StatTree),
 	}
 }
 
@@ -92,15 +90,6 @@ func (b *Backend) getVStat(stat *stats.Stat, tags stats.Tags) *stats.Stat {
 	return ret
 }
 
-func (b *Backend) Get(stat *stats.Stat, dname string) *Dimension {
-	dimensions, ok := b.Data[stat]
-	if !ok {
-		return nil
-	}
-
-	return dimensions[b.interned[dname]]
-}
-
 func (b *Backend) Submit(batches [][]stats.Sample) error {
 	b.submitMutex.Lock()
 
@@ -119,21 +108,15 @@ func (b *Backend) Submit(batches [][]stats.Sample) error {
 			stat := b.getVStat(s.Stat, s.Tags)
 			dimensions, ok := b.Data[stat]
 			if !ok {
-				dimensions = make(map[*string]*Dimension)
+				dimensions = make(map[string]*Dimension)
 				b.Data[stat] = dimensions
 			}
 
 			for dname, val := range s.Values {
-				interned, ok := b.interned[dname]
-				if !ok {
-					interned = &dname
-					b.interned[dname] = interned
-				}
-
-				dim, ok := dimensions[interned]
+				dim, ok := dimensions[dname]
 				if !ok {
 					dim = &Dimension{}
-					dimensions[interned] = dim
+					dimensions[dname] = dim
 				}
 
 				dim.Values = append(dim.Values, val)

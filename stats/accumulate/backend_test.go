@@ -9,7 +9,7 @@ import (
 func TestGetNonexistent(t *testing.T) {
 	b := New()
 	stat := stats.Stat{Name: "test"}
-	assert.Nil(t, b.Get(&stat, "value"))
+	assert.Nil(t, b.Data[&stat]["value"])
 }
 
 func TestGet(t *testing.T) {
@@ -21,23 +21,7 @@ func TestGet(t *testing.T) {
 		},
 	})
 
-	assert.NotNil(t, b.Get(&stat, "value"))
-}
-
-func TestSubmitInternsNames(t *testing.T) {
-	b := New()
-	stat := stats.Stat{Name: "test"}
-	b.Submit([][]stats.Sample{
-		[]stats.Sample{
-			stats.Sample{Stat: &stat, Values: stats.Values{"value": 1}},
-			stats.Sample{Stat: &stat, Values: stats.Values{"value": 2}},
-			stats.Sample{Stat: &stat, Values: stats.Values{"value": 3}},
-		},
-	})
-	assert.Len(t, b.interned, 1)
-	assert.Len(t, b.Data, 1)
-	assert.Len(t, b.Data[&stat], 1)
-	assert.Contains(t, b.Data[&stat], b.interned["value"])
+	assert.NotNil(t, b.Data[&stat]["value"])
 }
 
 func TestSubmitSortsValues(t *testing.T) {
@@ -51,7 +35,7 @@ func TestSubmitSortsValues(t *testing.T) {
 		},
 	})
 
-	dim := b.Get(&stat, "value")
+	dim := b.Data[&stat]["value"]
 	assert.EqualValues(t, []float64{1, 2, 3}, dim.Values)
 	assert.False(t, dim.dirty)
 }
@@ -74,7 +58,7 @@ func TestSubmitSortsValuesContinously(t *testing.T) {
 		},
 	})
 
-	dim := b.Get(&stat, "value")
+	dim := b.Data[&stat]["value"]
 	assert.EqualValues(t, []float64{1, 2, 3, 4, 5, 6}, dim.Values)
 	assert.False(t, dim.dirty)
 }
@@ -89,7 +73,7 @@ func TestSubmitKeepsLast(t *testing.T) {
 			stats.Sample{Stat: &stat, Values: stats.Values{"value": 2}},
 		},
 	})
-	assert.Equal(t, float64(2), b.Get(&stat, "value").Last)
+	assert.Equal(t, float64(2), b.Data[&stat]["value"].Last)
 }
 
 func TestSubmitIgnoresExcluded(t *testing.T) {
