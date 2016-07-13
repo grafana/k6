@@ -1,6 +1,7 @@
 package js
 
 import (
+	"errors"
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/speedboat/stats"
 	"github.com/robertkrimen/otto"
@@ -11,9 +12,12 @@ import (
 var (
 	mRequests = stats.Stat{Name: "requests", Type: stats.HistogramType, Intent: stats.TimeIntent}
 	mErrors   = stats.Stat{Name: "errors", Type: stats.CounterType}
+
+	ErrTooManyRedirects = errors.New("too many redirects")
 )
 
 type HTTPParams struct {
+	Follow  bool
 	Quiet   bool
 	Headers map[string]string
 }
@@ -37,7 +41,7 @@ func (res HTTPResponse) ToValue(vm *otto.Otto) (otto.Value, error) {
 	return vm.ToValue(obj)
 }
 
-func (u *VU) HTTPRequest(method, url, body string, params HTTPParams) (HTTPResponse, error) {
+func (u *VU) HTTPRequest(method, url, body string, params HTTPParams, redirects int) (HTTPResponse, error) {
 	req := fasthttp.AcquireRequest()
 	defer fasthttp.ReleaseRequest(req)
 
@@ -86,6 +90,34 @@ func (u *VU) HTTPRequest(method, url, body string, params HTTPParams) (HTTPRespo
 			})
 		}
 		return HTTPResponse{}, err
+	}
+
+	status := resp.StatusCode()
+	switch status {
+	case 301, 302, 303, 307, 308:
+		if !params.Follow {
+			break
+		}
+		if redirects >= u.FollowDepth {
+			return HTTPResponse{}, ErrTooManyRedirects
+		}
+
+		redirectURL := url
+		resp.Header.VisitAll(func(key, value []byte) {
+			if string(key) != "Location" {
+				return
+			}
+
+			redirectURL = resolveRedirect(url, string(value))
+		})
+
+		redirectMethod := method
+		redirectBody := body
+		if status == 301 || status == 302 || status == 303 {
+			redirectMethod = "GET"
+			redirectBody = ""
+		}
+		return u.HTTPRequest(redirectMethod, redirectURL, redirectBody, params, redirects+1)
 	}
 
 	headers := make(map[string]string)
