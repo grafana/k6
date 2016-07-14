@@ -354,6 +354,33 @@ mainLoop:
 }
 
 func main() {
+	// Submit usage statistics for the closed beta
+	invocation := Invocation{}
+	invocationError := make(chan error, 1)
+
+	go func() {
+		// Set SUBMIT=false to prevent stat collection
+		submitURL := os.Getenv("SUBMIT")
+		switch submitURL {
+		case "false", "no":
+			return
+		case "":
+			submitURL = "http://127.0.0.1:8080"
+		}
+
+		// Wait at most 2s for an invocation error to be reported
+		select {
+		case err := <-invocationError:
+			invocation.Error = err.Error()
+		case <-time.After(2 * time.Second):
+		}
+
+		// Submit stats to a specified server
+		if err := invocation.Submit(submitURL); err != nil {
+			log.WithError(err).Fatal("Couldn't submit statistics")
+		}
+	}()
+
 	// Free up -v and -h for our own flags
 	cli.VersionFlag.Name = "version"
 	cli.HelpFlag.Name = "help, ?"
@@ -417,6 +444,10 @@ func main() {
 			Usage: "Group metrics by tags",
 		},
 	}
+	app.Before = func(cc *cli.Context) error {
+		invocation.PopulateWithContext(cc)
+		return nil
+	}
 	app.Action = action
-	app.Run(os.Args)
+	invocationError <- app.Run(os.Args)
 }
