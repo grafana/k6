@@ -12,6 +12,7 @@ import (
 	"github.com/loadimpact/speedboat/stats/writer"
 	"github.com/urfave/cli"
 	"golang.org/x/net/context"
+	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"os"
 	"os/signal"
@@ -74,6 +75,12 @@ func parseBackend(out string) (stats.Backend, error) {
 }
 
 func parseStages(vus []string, total time.Duration) (stages []lib.TestStage, err error) {
+	if len(vus) == 0 {
+		return []lib.TestStage{
+			lib.TestStage{Duration: total, StartVUs: 10, EndVUs: 10},
+		}, nil
+	}
+
 	accountedTime := time.Duration(0)
 	fluidStages := []int{}
 	for i, spec := range vus {
@@ -253,6 +260,17 @@ func action(cc *cli.Context) error {
 		return cli.NewExitError("Too many arguments!", 1)
 	}
 
+	if cc.Bool("plan") {
+		data, err := yaml.Marshal(map[string]interface{}{
+			"stages": stages,
+		})
+		if err != nil {
+			return cli.NewExitError(err.Error(), 1)
+		}
+		os.Stdout.Write(data)
+		return nil
+	}
+
 	vus := lib.VUGroup{
 		Pool: lib.VUPool{
 			New: r.NewVU,
@@ -392,6 +410,10 @@ func main() {
 	app.Usage = "A next-generation load generator"
 	app.Version = "1.0.0-mvp1"
 	app.Flags = []cli.Flag{
+		cli.BoolFlag{
+			Name:  "plan",
+			Usage: "Don't run anything, just show the test plan",
+		},
 		cli.StringFlag{
 			Name:  "type, t",
 			Usage: "Input file type, if not evident (url or js)",
@@ -399,7 +421,6 @@ func main() {
 		cli.StringSliceFlag{
 			Name:  "vus, u",
 			Usage: "Number of VUs to simulate",
-			Value: &cli.StringSlice{"10"},
 		},
 		cli.DurationFlag{
 			Name:  "duration, d",
