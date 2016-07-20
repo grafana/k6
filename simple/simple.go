@@ -4,9 +4,8 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/speedboat/lib"
 	"github.com/loadimpact/speedboat/stats"
-	"github.com/valyala/fasthttp"
 	"golang.org/x/net/context"
-	"math"
+	"net/http"
 	"time"
 )
 
@@ -21,8 +20,8 @@ type Runner struct {
 
 type VU struct {
 	Runner    *Runner
-	Client    fasthttp.Client
-	Request   fasthttp.Request
+	Client    *http.Client
+	Request   *http.Request
 	Collector *stats.Collector
 }
 
@@ -33,15 +32,17 @@ func New(url string) *Runner {
 }
 
 func (r *Runner) NewVU() (lib.VU, error) {
-	vu := &VU{
-		Runner:    r,
-		Client:    fasthttp.Client{MaxConnsPerHost: math.MaxInt32},
-		Collector: stats.NewCollector(),
+	req, err := http.NewRequest("GET", r.URL, nil)
+	if err != nil {
+		return nil, err
 	}
 
-	vu.Request.SetRequestURI(r.URL)
-
-	return vu, nil
+	return &VU{
+		Runner:    r,
+		Client:    &http.Client{},
+		Request:   req,
+		Collector: stats.NewCollector(),
+	}, nil
 }
 
 func (u *VU) Reconfigure(id int64) error {
@@ -49,17 +50,14 @@ func (u *VU) Reconfigure(id int64) error {
 }
 
 func (u *VU) RunOnce(ctx context.Context) error {
-	res := fasthttp.AcquireResponse()
-	defer fasthttp.ReleaseResponse(res)
-
 	startTime := time.Now()
-	err := u.Client.Do(&u.Request, res)
+	res, err := u.Client.Do(u.Request)
 	duration := time.Since(startTime)
 
 	tags := stats.Tags{
 		"url":    u.Runner.URL,
 		"method": "GET",
-		"status": res.StatusCode(),
+		"status": res.StatusCode,
 	}
 	u.Collector.Add(stats.Sample{
 		Stat:   &mRequests,
