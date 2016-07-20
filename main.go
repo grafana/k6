@@ -75,6 +75,12 @@ func parseBackend(out string) (stats.Backend, error) {
 }
 
 func parseStages(vus []string, total time.Duration) (stages []lib.TestStage, err error) {
+	if len(vus) == 0 {
+		return []lib.TestStage{
+			lib.TestStage{Duration: total, StartVUs: 10, EndVUs: 10},
+		}, nil
+	}
+
 	accountedTime := time.Duration(0)
 	fluidStages := []int{}
 	for i, spec := range vus {
@@ -388,7 +394,6 @@ func main() {
 		cli.StringSliceFlag{
 			Name:  "vus, u",
 			Usage: "Number of VUs to simulate",
-			Value: &cli.StringSlice{"10"},
 		},
 		cli.DurationFlag{
 			Name:  "duration, d",
