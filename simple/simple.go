@@ -20,8 +20,8 @@ type Runner struct {
 
 type VU struct {
 	Runner    *Runner
-	Client    *http.Client
-	Request   *http.Request
+	Client    http.Client
+	Request   http.Request
 	Collector *stats.Collector
 }
 
@@ -39,8 +39,8 @@ func (r *Runner) NewVU() (lib.VU, error) {
 
 	return &VU{
 		Runner:    r,
-		Client:    &http.Client{},
-		Request:   req,
+		Client:    http.Client{},
+		Request:   *req,
 		Collector: stats.NewCollector(),
 	}, nil
 }
@@ -50,8 +50,10 @@ func (u *VU) Reconfigure(id int64) error {
 }
 
 func (u *VU) RunOnce(ctx context.Context) error {
+	req := u.Request
+
 	startTime := time.Now()
-	res, err := u.Client.Do(u.Request)
+	res, err := u.Client.Do(&req)
 	duration := time.Since(startTime)
 
 	status := 0
