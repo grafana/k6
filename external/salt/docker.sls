@@ -20,3 +20,6 @@ docker:
     - enable: True
     - require:
       - pkg: docker
+
+docker-py:
+  pip.installed

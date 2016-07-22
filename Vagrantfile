@@ -1,58 +1,72 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
-# Helper for boilerplate involved with setting resource limits across providers
-def set_limits(box, cpus: 1, memory: 512)
-  box.vm.provider "virtualbox" do |vb|
-    vb.memory = memory
-    vb.cpus = cpus
-  end
-  box.vm.provider "vmware_fusion" do |vw|
-    vw.vmx["memsize"] = memory
-    vw.vmx["numvcpus"] = cpus
-  end
-end
-
-# Documentation: https://docs.vagrantup.com.
 Vagrant.configure(2) do |config|
-  config.vm.box = "puppetlabs/ubuntu-14.04-64-nocm"
-  
-  # Default machine, used to run the load generator
-  config.vm.define "default", primary: true do |default|
-    set_limits default, cpus: 2, memory: 512
-    default.vm.network "private_network", ip: "10.20.30.10"
+  config.vm.box = "debian/jessie64"
+  config.vm.synced_folder ".", "/vagrant", disabled: true
+
+  config.vm.define "loadgen", primary: true do |loadgen|
+    loadgen.vm.provider "virtualbox" do |vb|
+      vb.memory = 2048
+      vb.cpus = 2
+    end
     
-    default.vm.provision "salt" do |salt|
-      # Colorize output properly, overriding Vagrant's default
-      salt.colorize = true
-      # Required for Vagrant
-      salt.bootstrap_options = "-F -c /tmp -i master"
-      # Configure the salt minion
-      salt.minion_config = "_provisioning/vagrant/default/salt_minion.yml"
-      salt.minion_pub = "_provisioning/vagrant/default/default.pub"
-      salt.minion_key = "_provisioning/vagrant/default/default.pem"
-      # Install the salt-master
+    loadgen.vm.hostname = "loadgen"
+    loadgen.vm.network "private_network", ip: "172.16.0.2"
+
+    loadgen.vm.synced_folder "external/salt", "/srv/salt"
+    loadgen.vm.synced_folder "external/pillar", "/srv/pillar"
+    loadgen.vm.synced_folder ".", "/home/vagrant/go/src/github.com/loadimpact/speedboat"
+
+    loadgen.vm.provision :salt do |salt|
+      salt.bootstrap_options = "-F -c /tmp"
+      salt.grains_config = "external/vagrant/loadgen_grains.yml"
+      salt.minion_config = "external/vagrant/salt_minion.yml"
+      salt.minion_key = "external/vagrant/loadgen.pem"
+      salt.minion_pub = "external/vagrant/loadgen.pub"
       salt.install_master = true
-      salt.master_config = "_provisioning/vagrant/default/salt_master.yml"
-      # Preseed our own key, this master is set to naively auto-accept
-      salt.seed_master = { default: salt.minion_pub }
-      # Run a highstate when provisioning
-      salt.run_highstate = true
+      salt.master_config = "external/vagrant/salt_master.yml"
+      salt.seed_master = {
+        loadgen: "external/vagrant/loadgen.pub",
+        influx:  "external/vagrant/influx.pub",
+        web:     "external/vagrant/web.pub",
+      }
     end
   end
-  
-  # Target machine, hosts servers that can be tested
-  config.vm.define "target" do |target|
-    set_limits target, cpus: 2, memory: 512
-    target.vm.network "private_network", ip: "10.20.30.20"
+
+  config.vm.define "influx" do |influx|
+    influx.vm.provider "virtualbox" do |vb|
+      vb.memory = 2048
+      vb.cpus = 2
+    end
     
-    target.vm.provision "salt" do |salt|
-      salt.colorize = true
-      salt.bootstrap_options = "-F -c /tmp -i target"
-      salt.minion_config = "_provisioning/vagrant/target/salt_minion.yml"
-      salt.minion_pub = "_provisioning/vagrant/target/target.pub"
-      salt.minion_key = "_provisioning/vagrant/target/target.pem"
-      salt.run_highstate = true
+    influx.vm.hostname = "influx"
+    influx.vm.network "private_network", ip: "172.16.0.3"
+
+    influx.vm.provision :salt do |salt|
+      salt.bootstrap_options = "-F -c /tmp"
+      salt.grains_config = "external/vagrant/influx_grains.yml"
+      salt.minion_config = "external/vagrant/salt_minion.yml"
+      salt.minion_key = "external/vagrant/influx.pem"
+      salt.minion_pub = "external/vagrant/influx.pub"
+    end
+  end
+
+  config.vm.define "web" do |web|
+    web.vm.provider "virtualbox" do |vb|
+      vb.memory = 2048
+      vb.cpus = 2
+    end
+    
+    web.vm.hostname = "web"
+    web.vm.network "private_network", ip: "172.16.0.4"
+
+    web.vm.provision :salt do |salt|
+      salt.bootstrap_options = "-F -c /tmp"
+      salt.grains_config = "external/vagrant/web_grains.yml"
+      salt.minion_config = "external/vagrant/salt_minion.yml"
+      salt.minion_key = "external/vagrant/web.pem"
+      salt.minion_pub = "external/vagrant/web.pub"
     end
   end
 end

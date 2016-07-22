@@ -1,5 +1,0 @@
-master: 10.20.30.10
-state_verbose: False
-grains:
-  vagrant: true
-  role: target
