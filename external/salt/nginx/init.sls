@@ -6,6 +6,7 @@
 /etc/nginx/nginx.conf:
   file.managed:
     - source: salt://nginx/nginx.conf
+    - makedirs: True
 
 /etc/telegraf.d/nginx.conf:
   file.managed:
@@ -15,7 +16,7 @@
 
 nginx:
   pkgrepo.managed:
-    - name: deb http://nginx.org/packages/ubuntu/ trusty nginx
+    - name: deb http://nginx.org/packages/ubuntu/ xenial nginx
     - key_url: http://nginx.org/keys/nginx_signing.key
   pkg.installed:
     - require:

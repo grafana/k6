@@ -1,0 +1,9 @@
+hash_type: sha256
+auto_accept: True
+state_verbose: False
+file_roots:
+  base:
+    - /home/ubuntu/go/src/github.com/loadimpact/speedboat/external/salt
+pillar_roots:
+  base:
+    - /home/ubuntu/go/src/github.com/loadimpact/speedboat/external/pillar
