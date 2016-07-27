@@ -4,6 +4,7 @@ base:
     - tuning
     - docker
     - telegraf
+    - hosts
   
   'role:loadgen':
     - match: grain
