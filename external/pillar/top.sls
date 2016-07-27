@@ -4,4 +4,5 @@ base:
     - telegraf
     - grafana
     - golang
+    - cfssl
     - mine

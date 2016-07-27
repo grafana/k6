@@ -2,6 +2,7 @@ base:
   '*':
     - common
     - tuning
+    - cfssl
     - docker
     - telegraf
     - hosts

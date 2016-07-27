@@ -1,0 +1,13 @@
+{
+	"CN": "speedboat-test root CA",
+	"key": {
+		"algo": "rsa",
+		"size": 2048
+	},
+	"names": [{
+		"C": "SE",
+		"L": "Stockholm",
+		"O": "Load Impact",
+		"OU": "speedboat"
+	}]
+}
