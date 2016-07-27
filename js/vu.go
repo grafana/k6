@@ -70,19 +70,18 @@ func (u *VU) HTTPRequest(method, url, body string, params HTTPParams, redirects 
 	resp, err := u.Client.Do(&req)
 	duration := time.Since(startTime)
 
-	var status int
-	var respBody []byte
-	if err == nil {
-		status = resp.StatusCode
-		respBody, _ = ioutil.ReadAll(resp.Body)
-		resp.Body.Close()
-	}
-
 	tags := stats.Tags{
 		"url":    url,
 		"method": method,
-		"status": status,
-		"proto":  resp.Proto,
+		"status": 0,
+	}
+
+	var respBody []byte
+	if err == nil {
+		tags["status"] = resp.StatusCode
+		tags["proto"] = resp.Proto
+		respBody, _ = ioutil.ReadAll(resp.Body)
+		resp.Body.Close()
 	}
 
 	if !params.Quiet {
