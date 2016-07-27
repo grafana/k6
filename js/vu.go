@@ -82,6 +82,7 @@ func (u *VU) HTTPRequest(method, url, body string, params HTTPParams, redirects 
 		"url":    url,
 		"method": method,
 		"status": status,
+		"proto":  resp.Proto,
 	}
 
 	if !params.Quiet {
