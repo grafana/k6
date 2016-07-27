@@ -1,8 +1,0 @@
-auto_accept: True
-state_verbose: False
-file_roots:
-  base:
-    - /vagrant/_provisioning/salt
-pillar_roots:
-  base:
-    - /vagrant/_provisioning/pillar
