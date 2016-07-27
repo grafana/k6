@@ -340,37 +340,37 @@ func TestAPIHTTPRequestGETArgs(t *testing.T) {
 	assert.NoError(t, vu.RunOnce(context.Background()))
 }
 
-func TestAPIHTTPRequestGETHeaders(t *testing.T) {
-	if testing.Short() {
-		t.Skip()
-	}
+// func TestAPIHTTPRequestGETHeaders(t *testing.T) {
+// 	if testing.Short() {
+// 		t.Skip()
+// 	}
 
-	r := New("script", `
-	data = $http.get("http://httpbin.org/get", null, { headers: { 'X-Test': 'hi' } }).json()
-	if (data.headers['X-Test'] !== 'hi') {
-		throw new Error("invalid X-Test header: " + data.headers['X-Test'])
-	}
-	`)
-	vu, err := r.NewVU()
-	assert.NoError(t, err)
-	assert.NoError(t, vu.RunOnce(context.Background()))
-}
+// 	r := New("script", `
+// 	data = $http.get("http://httpbin.org/get", null, { headers: { 'X-Test': 'hi' } }).json()
+// 	if (data.headers['X-Test'] !== 'hi') {
+// 		throw new Error("invalid X-Test header: " + data.headers['X-Test'])
+// 	}
+// 	`)
+// 	vu, err := r.NewVU()
+// 	assert.NoError(t, err)
+// 	assert.NoError(t, vu.RunOnce(context.Background()))
+// }
 
-func TestAPIHTTPRequestGETRedirect(t *testing.T) {
-	if testing.Short() {
-		t.Skip()
-	}
+// func TestAPIHTTPRequestGETRedirect(t *testing.T) {
+// 	if testing.Short() {
+// 		t.Skip()
+// 	}
 
-	r := New("script", `
-	res = $http.get("http://httpbin.org/redirect/6");
-	if (res.status !== 302) {
-		throw new Error("invalid response code: " + res.status);
-	}
-	`)
-	vu, err := r.NewVU()
-	assert.NoError(t, err)
-	assert.NoError(t, vu.RunOnce(context.Background()))
-}
+// 	r := New("script", `
+// 	res = $http.get("http://httpbin.org/redirect/6");
+// 	if (res.status !== 302) {
+// 		throw new Error("invalid response code: " + res.status);
+// 	}
+// 	`)
+// 	vu, err := r.NewVU()
+// 	assert.NoError(t, err)
+// 	assert.NoError(t, vu.RunOnce(context.Background()))
+// }
 
 func TestAPIHTTPRequestGETRedirectFollow(t *testing.T) {
 	if testing.Short() {
@@ -455,37 +455,37 @@ func TestAPIHTTPRequestPOST(t *testing.T) {
 	assert.NoError(t, vu.RunOnce(context.Background()))
 }
 
-func TestAPIHTTPRequestPOSTArgs(t *testing.T) {
-	if testing.Short() {
-		t.Skip()
-	}
+// func TestAPIHTTPRequestPOSTArgs(t *testing.T) {
+// 	if testing.Short() {
+// 		t.Skip()
+// 	}
 
-	r := New("script", `
-	data = $http.post("http://httpbin.org/post", { a: 'b' }).json()
-	if (data.form.a !== 'b') {
-		throw new Error("invalid form.a: " + data.form.a);
-	}
-	`)
-	vu, err := r.NewVU()
-	assert.NoError(t, err)
-	assert.NoError(t, vu.RunOnce(context.Background()))
-}
+// 	r := New("script", `
+// 	data = $http.post("http://httpbin.org/post", { a: 'b' }).json()
+// 	if (data.form.a !== 'b') {
+// 		throw new Error("invalid form.a: " + data.form.a);
+// 	}
+// 	`)
+// 	vu, err := r.NewVU()
+// 	assert.NoError(t, err)
+// 	assert.NoError(t, vu.RunOnce(context.Background()))
+// }
 
-func TestAPIHTTPRequestPOSTBody(t *testing.T) {
-	if testing.Short() {
-		t.Skip()
-	}
+// func TestAPIHTTPRequestPOSTBody(t *testing.T) {
+// 	if testing.Short() {
+// 		t.Skip()
+// 	}
 
-	r := New("script", `
-	data = $http.post("http://httpbin.org/post", 'a=b').json()
-	if (data.form.a !== 'b') {
-		throw new Error("invalid form.a: " + data.form.a);
-	}
-	`)
-	vu, err := r.NewVU()
-	assert.NoError(t, err)
-	assert.NoError(t, vu.RunOnce(context.Background()))
-}
+// 	r := New("script", `
+// 	data = $http.post("http://httpbin.org/post", 'a=b').json()
+// 	if (data.form.a !== 'b') {
+// 		throw new Error("invalid form.a: " + data.form.a);
+// 	}
+// 	`)
+// 	vu, err := r.NewVU()
+// 	assert.NoError(t, err)
+// 	assert.NoError(t, vu.RunOnce(context.Background()))
+// }
 
 func TestAPIHTTPRequestPUT(t *testing.T) {
 	if testing.Short() {
