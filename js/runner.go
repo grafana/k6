@@ -5,9 +5,9 @@ import (
 	"github.com/loadimpact/speedboat/lib"
 	"github.com/loadimpact/speedboat/stats"
 	"github.com/robertkrimen/otto"
-	"github.com/valyala/fasthttp"
 	"golang.org/x/net/context"
 	"math"
+	"net/http"
 	"os"
 )
 
@@ -25,7 +25,7 @@ type VU struct {
 
 	Collector *stats.Collector
 
-	Client      fasthttp.Client
+	Client      http.Client
 	FollowDepth int
 
 	ID        int64
@@ -60,6 +60,11 @@ func (r *Runner) NewVU() (lib.VU, error) {
 
 		Collector: stats.NewCollector(),
 
+		Client: http.Client{
+			Transport: &http.Transport{
+				MaxIdleConnsPerHost: math.MaxInt32,
+			},
+		},
 		FollowDepth: 10,
 	}
 
@@ -96,22 +101,22 @@ func (r *Runner) NewVU() (lib.VU, error) {
 
 			return val
 		},
-		"setMaxConnsPerHost": func(call otto.FunctionCall) otto.Value {
-			num, err := call.Argument(0).ToInteger()
-			if err != nil {
-				panic(call.Otto.MakeTypeError("argument must be an integer"))
-			}
-			if num <= 0 {
-				panic(call.Otto.MakeRangeError("argument must be >= 1"))
-			}
-			if num > math.MaxInt32 {
-				num = math.MaxInt32
-			}
+		// "setMaxConnsPerHost": func(call otto.FunctionCall) otto.Value {
+		// 	num, err := call.Argument(0).ToInteger()
+		// 	if err != nil {
+		// 		panic(call.Otto.MakeTypeError("argument must be an integer"))
+		// 	}
+		// 	if num <= 0 {
+		// 		panic(call.Otto.MakeRangeError("argument must be >= 1"))
+		// 	}
+		// 	if num > math.MaxInt32 {
+		// 		num = math.MaxInt32
+		// 	}
 
-			vu.Client.MaxConnsPerHost = int(num)
+		// 	vu.Client.MaxConnsPerHost = int(num)
 
-			return otto.UndefinedValue()
-		},
+		// 	return otto.UndefinedValue()
+		// },
 	})
 	vu.VM.Set("$vu", map[string]interface{}{
 		"sleep": func(call otto.FunctionCall) otto.Value {

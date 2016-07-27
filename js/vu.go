@@ -5,7 +5,9 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/speedboat/stats"
 	"github.com/robertkrimen/otto"
-	"github.com/valyala/fasthttp"
+	"io/ioutil"
+	"net/http"
+	neturl "net/url"
 	"time"
 )
 
@@ -42,37 +44,50 @@ func (res HTTPResponse) ToValue(vm *otto.Otto) (otto.Value, error) {
 }
 
 func (u *VU) HTTPRequest(method, url, body string, params HTTPParams, redirects int) (HTTPResponse, error) {
-	req := fasthttp.AcquireRequest()
-	defer fasthttp.ReleaseRequest(req)
+	parsedURL, err := neturl.Parse(url)
+	if err != nil {
+		return HTTPResponse{}, err
+	}
 
-	req.Header.SetMethod(method)
+	req := http.Request{
+		Method: method,
+		URL:    parsedURL,
+		Header: make(http.Header),
+	}
 
 	if method == "GET" || method == "HEAD" {
-		req.SetRequestURI(putBodyInURL(url, body))
+		req.URL.RawQuery = body
 	} else {
-		req.SetRequestURI(url)
-		req.SetBodyString(body)
+		// NOT IMPLEMENTED! I'm just testing stuff out.
+		// req.SetBodyString(body)
 	}
 
 	for key, value := range params.Headers {
-		req.Header.Set(key, value)
+		req.Header[key] = []string{value}
 	}
 
-	resp := fasthttp.AcquireResponse()
-	defer fasthttp.ReleaseResponse(resp)
-
 	startTime := time.Now()
-	err := u.Client.Do(req, resp)
+	resp, err := u.Client.Do(&req)
 	duration := time.Since(startTime)
+
+	var status int
+	var respBody []byte
+	if err == nil {
+		status = resp.StatusCode
+		respBody, _ = ioutil.ReadAll(resp.Body)
+		resp.Body.Close()
+	}
+
+	tags := stats.Tags{
+		"url":    url,
+		"method": method,
+		"status": status,
+	}
 
 	if !params.Quiet {
 		u.Collector.Add(stats.Sample{
-			Stat: &mRequests,
-			Tags: stats.Tags{
-				"url":    url,
-				"method": method,
-				"status": resp.StatusCode(),
-			},
+			Stat:   &mRequests,
+			Tags:   tags,
 			Values: stats.Values{"duration": float64(duration)},
 		})
 	}
@@ -80,55 +95,50 @@ func (u *VU) HTTPRequest(method, url, body string, params HTTPParams, redirects 
 	if err != nil {
 		if !params.Quiet {
 			u.Collector.Add(stats.Sample{
-				Stat: &mErrors,
-				Tags: stats.Tags{
-					"url":    url,
-					"method": method,
-					"status": resp.StatusCode(),
-				},
+				Stat:   &mErrors,
+				Tags:   tags,
 				Values: stats.Value(1),
 			})
 		}
 		return HTTPResponse{}, err
 	}
 
-	status := resp.StatusCode()
-	switch status {
-	case 301, 302, 303, 307, 308:
-		if !params.Follow {
-			break
-		}
-		if redirects >= u.FollowDepth {
-			return HTTPResponse{}, ErrTooManyRedirects
-		}
+	// switch resp.StatusCode {
+	// case 301, 302, 303, 307, 308:
+	// 	if !params.Follow {
+	// 		break
+	// 	}
+	// 	if redirects >= u.FollowDepth {
+	// 		return HTTPResponse{}, ErrTooManyRedirects
+	// 	}
 
-		redirectURL := url
-		resp.Header.VisitAll(func(key, value []byte) {
-			if string(key) != "Location" {
-				return
-			}
+	// 	redirectURL := url
+	// 	resp.Header.VisitAll(func(key, value []byte) {
+	// 		if string(key) != "Location" {
+	// 			return
+	// 		}
 
-			redirectURL = resolveRedirect(url, string(value))
-		})
+	// 		redirectURL = resolveRedirect(url, string(value))
+	// 	})
 
-		redirectMethod := method
-		redirectBody := body
-		if status == 301 || status == 302 || status == 303 {
-			redirectMethod = "GET"
-			redirectBody = ""
-		}
-		return u.HTTPRequest(redirectMethod, redirectURL, redirectBody, params, redirects+1)
-	}
+	// 	redirectMethod := method
+	// 	redirectBody := body
+	// 	if status == 301 || status == 302 || status == 303 {
+	// 		redirectMethod = "GET"
+	// 		redirectBody = ""
+	// 	}
+	// 	return u.HTTPRequest(redirectMethod, redirectURL, redirectBody, params, redirects+1)
+	// }
 
 	headers := make(map[string]string)
-	resp.Header.VisitAll(func(key []byte, value []byte) {
-		headers[string(key)] = string(value)
-	})
+	for key, vals := range resp.Header {
+		headers[key] = vals[0]
+	}
 
 	return HTTPResponse{
-		Status:  resp.StatusCode(),
+		Status:  resp.StatusCode,
 		Headers: headers,
-		Body:    string(resp.Body()),
+		Body:    string(respBody),
 	}, nil
 }
 
