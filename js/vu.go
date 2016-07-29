@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	neturl "net/url"
+	"strings"
 	"time"
 )
 
@@ -16,6 +17,8 @@ var (
 	mErrors   = stats.Stat{Name: "errors", Type: stats.CounterType}
 
 	ErrTooManyRedirects = errors.New("too many redirects")
+
+	errInternalHandleRedirect = errors.New("[internal] handle redirect")
 )
 
 type HTTPParams struct {
@@ -43,6 +46,12 @@ func (res HTTPResponse) ToValue(vm *otto.Otto) (otto.Value, error) {
 	return vm.ToValue(obj)
 }
 
+type stringReadCloser struct {
+	*strings.Reader
+}
+
+func (stringReadCloser) Close() error { return nil }
+
 func (u *VU) HTTPRequest(method, url, body string, params HTTPParams, redirects int) (HTTPResponse, error) {
 	parsedURL, err := neturl.Parse(url)
 	if err != nil {
@@ -58,8 +67,7 @@ func (u *VU) HTTPRequest(method, url, body string, params HTTPParams, redirects 
 	if method == "GET" || method == "HEAD" {
 		req.URL.RawQuery = body
 	} else {
-		// NOT IMPLEMENTED! I'm just testing stuff out.
-		// req.SetBodyString(body)
+		req.Body = stringReadCloser{strings.NewReader(body)}
 	}
 
 	for key, value := range params.Headers {
@@ -77,7 +85,7 @@ func (u *VU) HTTPRequest(method, url, body string, params HTTPParams, redirects 
 	}
 
 	var respBody []byte
-	if err == nil {
+	if resp != nil {
 		tags["status"] = resp.StatusCode
 		tags["proto"] = resp.Proto
 		respBody, _ = ioutil.ReadAll(resp.Body)
@@ -92,43 +100,42 @@ func (u *VU) HTTPRequest(method, url, body string, params HTTPParams, redirects 
 		})
 	}
 
-	if err != nil {
+	switch e := err.(type) {
+	case nil:
+		// Do nothing
+	case *neturl.Error:
+		if e.Err != errInternalHandleRedirect {
+			if !params.Quiet {
+				u.Collector.Add(stats.Sample{Stat: &mErrors, Tags: tags, Values: stats.Value(1)})
+			}
+			return HTTPResponse{}, err
+		}
+
+		if !params.Follow {
+			break
+		}
+
+		if redirects >= u.FollowDepth {
+			return HTTPResponse{}, ErrTooManyRedirects
+		}
+
+		redirectURL := resolveRedirect(url, resp.Header.Get("Location"))
+		redirectMethod := method
+		redirectBody := ""
+		if resp.StatusCode == 301 || resp.StatusCode == 302 || resp.StatusCode == 303 {
+			redirectMethod = "GET"
+			if redirectMethod != method {
+				redirectBody = ""
+			}
+		}
+
+		return u.HTTPRequest(redirectMethod, redirectURL, redirectBody, params, redirects+1)
+	default:
 		if !params.Quiet {
-			u.Collector.Add(stats.Sample{
-				Stat:   &mErrors,
-				Tags:   tags,
-				Values: stats.Value(1),
-			})
+			u.Collector.Add(stats.Sample{Stat: &mErrors, Tags: tags, Values: stats.Value(1)})
 		}
 		return HTTPResponse{}, err
 	}
-
-	// switch resp.StatusCode {
-	// case 301, 302, 303, 307, 308:
-	// 	if !params.Follow {
-	// 		break
-	// 	}
-	// 	if redirects >= u.FollowDepth {
-	// 		return HTTPResponse{}, ErrTooManyRedirects
-	// 	}
-
-	// 	redirectURL := url
-	// 	resp.Header.VisitAll(func(key, value []byte) {
-	// 		if string(key) != "Location" {
-	// 			return
-	// 		}
-
-	// 		redirectURL = resolveRedirect(url, string(value))
-	// 	})
-
-	// 	redirectMethod := method
-	// 	redirectBody := body
-	// 	if status == 301 || status == 302 || status == 303 {
-	// 		redirectMethod = "GET"
-	// 		redirectBody = ""
-	// 	}
-	// 	return u.HTTPRequest(redirectMethod, redirectURL, redirectBody, params, redirects+1)
-	// }
 
 	headers := make(map[string]string)
 	for key, vals := range resp.Header {

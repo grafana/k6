@@ -64,6 +64,9 @@ func (r *Runner) NewVU() (lib.VU, error) {
 			Transport: &http.Transport{
 				MaxIdleConnsPerHost: math.MaxInt32,
 			},
+			CheckRedirect: func(*http.Request, []*http.Request) error {
+				return errInternalHandleRedirect
+			},
 		},
 		FollowDepth: 10,
 	}
