@@ -76,7 +76,7 @@ func (r *Runner) NewVU() (lib.VU, error) {
 			method, _ := call.Argument(0).ToString()
 			url, _ := call.Argument(1).ToString()
 
-			body, err := bodyFromValue(call.Argument(2))
+			body, isForm, err := bodyFromValue(call.Argument(2))
 			if err != nil {
 				panic(call.Otto.MakeTypeError("invalid body"))
 			}
@@ -85,6 +85,17 @@ func (r *Runner) NewVU() (lib.VU, error) {
 			if err != nil {
 				panic(err)
 			}
+
+			headers := make(map[string]string, len(params.Headers))
+			for key, val := range params.Headers {
+				headers[http.CanonicalHeaderKey(key)] = val
+			}
+			if _, ok := headers["Content-Type"]; !ok {
+				if isForm {
+					headers["Content-Type"] = "application/x-www-form-urlencoded"
+				}
+			}
+			params.Headers = headers
 
 			log.WithFields(log.Fields{
 				"method": method,

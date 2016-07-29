@@ -455,37 +455,37 @@ func TestAPIHTTPRequestPOST(t *testing.T) {
 	assert.NoError(t, vu.RunOnce(context.Background()))
 }
 
-// func TestAPIHTTPRequestPOSTArgs(t *testing.T) {
-// 	if testing.Short() {
-// 		t.Skip()
-// 	}
+func TestAPIHTTPRequestPOSTArgs(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
 
-// 	r := New("script", `
-// 	data = $http.post("http://httpbin.org/post", { a: 'b' }).json()
-// 	if (data.form.a !== 'b') {
-// 		throw new Error("invalid form.a: " + data.form.a);
-// 	}
-// 	`)
-// 	vu, err := r.NewVU()
-// 	assert.NoError(t, err)
-// 	assert.NoError(t, vu.RunOnce(context.Background()))
-// }
+	r := New("script", `
+	data = $http.post("http://httpbin.org/post", { a: 'b' }).json()
+	if (data.form.a !== 'b') {
+		throw new Error("invalid form.a: " + data.form.a);
+	}
+	`)
+	vu, err := r.NewVU()
+	assert.NoError(t, err)
+	assert.NoError(t, vu.RunOnce(context.Background()))
+}
 
-// func TestAPIHTTPRequestPOSTBody(t *testing.T) {
-// 	if testing.Short() {
-// 		t.Skip()
-// 	}
+func TestAPIHTTPRequestPOSTBody(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
 
-// 	r := New("script", `
-// 	data = $http.post("http://httpbin.org/post", 'a=b').json()
-// 	if (data.form.a !== 'b') {
-// 		throw new Error("invalid form.a: " + data.form.a);
-// 	}
-// 	`)
-// 	vu, err := r.NewVU()
-// 	assert.NoError(t, err)
-// 	assert.NoError(t, vu.RunOnce(context.Background()))
-// }
+	r := New("script", `
+	data = $http.post("http://httpbin.org/post", 'a=b').json()
+	if (data.data !== 'a=b') {
+		throw new Error("invalid data: " + data.data);
+	}
+	`)
+	vu, err := r.NewVU()
+	assert.NoError(t, err)
+	assert.NoError(t, vu.RunOnce(context.Background()))
+}
 
 func TestAPIHTTPRequestPUT(t *testing.T) {
 	if testing.Short() {
