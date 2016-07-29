@@ -5,7 +5,8 @@ import (
 )
 
 type Registry struct {
-	Backends []Backend
+	Backends  []Backend
+	ExtraTags Tags
 
 	collectors []*Collector
 	mutex      sync.Mutex
@@ -29,6 +30,21 @@ func (r *Registry) Submit() error {
 	for _, collector := range r.collectors {
 		batch := collector.drain()
 		batches = append(batches, batch)
+	}
+
+	if len(r.ExtraTags) > 0 {
+		for _, batch := range batches {
+			for i, p := range batch {
+				if p.Tags == nil {
+					p.Tags = r.ExtraTags
+					batch[i] = p
+				} else {
+					for key, val := range r.ExtraTags {
+						p.Tags[key] = val
+					}
+				}
+			}
+		}
 	}
 
 	for _, backend := range r.Backends {

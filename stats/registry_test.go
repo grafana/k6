@@ -45,3 +45,25 @@ func TestSubmit(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, backend.submitted, 4)
 }
+
+func TestSubmitExtraTagsNilTags(t *testing.T) {
+	backend := &testBackend{}
+	r := Registry{Backends: []Backend{backend}, ExtraTags: Tags{"key": "value"}}
+	stat := Stat{Name: "test"}
+
+	c1 := r.NewCollector()
+	c1.Add(Sample{Stat: &stat, Values: Value(1)})
+	assert.NoError(t, r.Submit())
+	assert.Equal(t, "value", backend.submitted[0].Tags["key"])
+}
+
+func TestSubmitExtraTags(t *testing.T) {
+	backend := &testBackend{}
+	r := Registry{Backends: []Backend{backend}, ExtraTags: Tags{"key": "value"}}
+	stat := Stat{Name: "test"}
+
+	c1 := r.NewCollector()
+	c1.Add(Sample{Stat: &stat, Values: Value(1), Tags: Tags{"a": "b"}})
+	assert.NoError(t, r.Submit())
+	assert.Equal(t, "value", backend.submitted[0].Tags["key"])
+}

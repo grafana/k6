@@ -136,6 +136,36 @@ func TestParseStagesInvalidTimeMissingUnit(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestParseTagsColon(t *testing.T) {
+	tags := parseTags([]string{"key:value"})
+	assert.Len(t, tags, 1)
+	assert.Equal(t, "value", tags["key"])
+}
+
+func TestParseTagsEquals(t *testing.T) {
+	tags := parseTags([]string{"key=value"})
+	assert.Len(t, tags, 1)
+	assert.Equal(t, "value", tags["key"])
+}
+
+func TestParseTagsMissingValue(t *testing.T) {
+	tags := parseTags([]string{"key="})
+	assert.Len(t, tags, 1)
+	assert.Contains(t, tags, "key")
+}
+
+func TestParseTagsMissingKey(t *testing.T) {
+	tags := parseTags([]string{"=value"})
+	assert.Len(t, tags, 1)
+	assert.Equal(t, "value", tags["value"])
+}
+
+func TestParseTagsMissingBoth(t *testing.T) {
+	tags := parseTags([]string{"value"})
+	assert.Len(t, tags, 1)
+	assert.Contains(t, tags, "value")
+}
+
 func TestGuessTypeURL(t *testing.T) {
 	assert.Equal(t, typeURL, guessType("http://example.com/"))
 }
