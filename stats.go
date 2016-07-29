@@ -54,6 +54,10 @@ func (s *Summarizer) Codify() map[string]interface{} {
 					"max": stats.ApplyIntent(dim.Max(), stat.Intent),
 					"avg": stats.ApplyIntent(dim.Avg(), stat.Intent),
 					"med": stats.ApplyIntent(dim.Med(), stat.Intent),
+					"pct": map[int]interface{}{
+						90: stats.ApplyIntent(dim.Pct(0.90), stat.Intent),
+						95: stats.ApplyIntent(dim.Pct(0.95), stat.Intent),
+					},
 				}
 			}
 

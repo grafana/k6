@@ -72,3 +72,13 @@ func (d Dimension) Med() float64 {
 		return d.Values[l/2]
 	}
 }
+
+func (d Dimension) Pct(pct float64) float64 {
+	l := len(d.Values)
+	if l == 0 {
+		return 0
+	}
+
+	idx := int(math.Ceil(float64(l)*pct)) - 1
+	return d.Values[idx]
+}
