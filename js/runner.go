@@ -9,6 +9,7 @@ import (
 	"math"
 	"net/http"
 	"os"
+	"sync"
 )
 
 type Runner struct {
@@ -97,12 +98,6 @@ func (r *Runner) NewVU() (lib.VU, error) {
 			}
 			params.Headers = headers
 
-			log.WithFields(log.Fields{
-				"method": method,
-				"url":    url,
-				"body":   body,
-				"params": params,
-			}).Debug("Request")
 			res, err := vu.HTTPRequest(method, url, body, params, 0)
 			if err != nil {
 				panic(jsCustomError(call.Otto, "HTTPError", err))
@@ -114,6 +109,89 @@ func (r *Runner) NewVU() (lib.VU, error) {
 			}
 
 			return val
+		},
+		"batch": func(call otto.FunctionCall) otto.Value {
+			obj := call.Argument(0).Object()
+			if obj == nil {
+				panic(call.Otto.MakeTypeError("first argument must be an object/array"))
+			}
+
+			wg := sync.WaitGroup{}
+			mutex := sync.Mutex{}
+			for _, key := range obj.Keys() {
+				v, _ := obj.Get(key)
+
+				var method string
+				var url string
+				var body string
+				var params HTTPParams
+
+				switch {
+				case v.IsString():
+					method = "GET"
+					url = v.String()
+				case v.IsObject():
+					o := v.Object()
+
+					keys := o.Keys()
+					if len(keys) == 1 {
+						method = "GET"
+						urlV, _ := o.Get(keys[0])
+						url = urlV.String()
+						break
+					}
+
+					for _, key := range keys {
+						switch key {
+						case "0":
+							v, _ := o.Get(key)
+							method = v.String()
+						case "1":
+							v, _ := o.Get(key)
+							url = v.String()
+						case "2":
+							v, _ := o.Get(key)
+							body = v.String()
+						case "3":
+							v, _ := o.Get(key)
+							paramsObj := v.Object()
+							if paramsObj == nil {
+								panic(call.Otto.MakeTypeError("params must be an object"))
+							}
+							params, err = paramsFromObject(paramsObj)
+							if err != nil {
+								panic(jsError(call.Otto, err))
+							}
+						}
+					}
+				}
+
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+
+					res, err := vu.HTTPRequest(method, url, body, params, 0)
+
+					mutex.Lock()
+					defer mutex.Unlock()
+
+					if err != nil {
+						obj.Set(key, jsError(call.Otto, err))
+						return
+					}
+
+					val, err := res.ToValue(call.Otto)
+					if err != nil {
+						obj.Set(key, jsError(call.Otto, err))
+						return
+					}
+
+					obj.Set(key, val)
+				}()
+			}
+			wg.Wait()
+
+			return obj.Value()
 		},
 		// "setMaxConnsPerHost": func(call otto.FunctionCall) otto.Value {
 		// 	num, err := call.Argument(0).ToInteger()

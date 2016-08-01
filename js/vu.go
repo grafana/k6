@@ -53,6 +53,8 @@ type stringReadCloser struct {
 func (stringReadCloser) Close() error { return nil }
 
 func (u *VU) HTTPRequest(method, url, body string, params HTTPParams, redirects int) (HTTPResponse, error) {
+	log.WithFields(log.Fields{"method": method, "url": url, "body": body, "params": params}).Debug("Request")
+
 	parsedURL, err := neturl.Parse(url)
 	if err != nil {
 		return HTTPResponse{}, err
