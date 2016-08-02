@@ -256,6 +256,12 @@ func action(cc *cli.Context) error {
 	}
 	t := lib.Test{Stages: stages}
 
+	if cc.Bool("once") {
+		t.Stages = []lib.TestStage{
+			lib.TestStage{Duration: 0, StartVUs: 1, EndVUs: 1},
+		}
+	}
+
 	var r lib.Runner
 	switch len(cc.Args()) {
 	case 0:
@@ -362,23 +368,32 @@ func action(cc *cli.Context) error {
 		}).Info("Starting test...")
 	}
 
-	vus.Start(ctx)
-	scaleTo := pollVURamping(ctx, t)
-mainLoop:
-	for {
-		select {
-		case num := <-scaleTo:
-			vus.Scale(num)
-			stats.Add(stats.Sample{
-				Stat:   &mVUs,
-				Values: stats.Value(float64(num)),
-			})
-		case <-ctx.Done():
-			break mainLoop
-		}
-	}
+	if cc.Bool("once") {
+		stats.Add(stats.Sample{Stat: &mVUs, Values: stats.Value(1)})
 
-	vus.Stop()
+		vu, _ := vus.Pool.Get()
+		if err := vu.RunOnce(ctx); err != nil {
+			log.WithError(err).Error("Uncaught Error")
+		}
+	} else {
+		vus.Start(ctx)
+		scaleTo := pollVURamping(ctx, t)
+	mainLoop:
+		for {
+			select {
+			case num := <-scaleTo:
+				vus.Scale(num)
+				stats.Add(stats.Sample{
+					Stat:   &mVUs,
+					Values: stats.Value(float64(num)),
+				})
+			case <-ctx.Done():
+				break mainLoop
+			}
+		}
+
+		vus.Stop()
+	}
 
 	stats.Add(stats.Sample{Stat: &mVUs, Values: stats.Value(0)})
 	stats.Submit()
@@ -434,6 +449,10 @@ func main() {
 		cli.BoolFlag{
 			Name:  "plan",
 			Usage: "Don't run anything, just show the test plan",
+		},
+		cli.BoolFlag{
+			Name:  "once",
+			Usage: "Run only a single test iteration, with one VU",
 		},
 		cli.StringFlag{
 			Name:  "type, t",
