@@ -12,6 +12,7 @@ import (
 type Invocation struct {
 	Args  []string `json:"args"`
 	Flags struct {
+		Plan     bool          `json:"plan"`
 		Type     string        `json:"type"`
 		VUs      []string      `json:"vus"`
 		Duration time.Duration `json:"duration"`
@@ -24,12 +25,14 @@ type Invocation struct {
 		Select   []string      `json:"select"`
 		Exclude  []string      `json:"exclude"`
 		GroupBy  []string      `json:"group_by"`
+		Tag      []string      `json:"tag"`
 	} `json:"flags"`
 	Error string `json:"error"`
 }
 
 func (i *Invocation) PopulateWithContext(cc *cli.Context) {
 	i.Args = []string(cc.Args())
+	i.Flags.Plan = cc.GlobalBool("plan")
 	i.Flags.Type = cc.GlobalString("type")
 	i.Flags.VUs = cc.GlobalStringSlice("vus")
 	i.Flags.Duration = cc.GlobalDuration("duration")
@@ -42,6 +45,7 @@ func (i *Invocation) PopulateWithContext(cc *cli.Context) {
 	i.Flags.Select = cc.GlobalStringSlice("select")
 	i.Flags.Exclude = cc.GlobalStringSlice("exclude")
 	i.Flags.GroupBy = cc.GlobalStringSlice("group-by")
+	i.Flags.Tag = cc.GlobalStringSlice("tag")
 }
 
 func (i *Invocation) Submit(url string) error {
