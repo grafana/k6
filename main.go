@@ -419,7 +419,7 @@ func main() {
 		case "false", "no":
 			return
 		case "":
-			submitURL = "http://127.0.0.1:8080"
+			submitURL = "http://52.209.216.227:8080"
 		}
 
 		// Wait at most 2s for an invocation error to be reported
