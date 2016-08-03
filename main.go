@@ -414,7 +414,7 @@ func main() {
 
 	go func() {
 		// Set SUBMIT=false to prevent stat collection
-		submitURL := os.Getenv("SUBMIT")
+		submitURL := os.Getenv("SB_SUBMIT")
 		switch submitURL {
 		case "false", "no":
 			return
