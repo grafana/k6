@@ -283,6 +283,14 @@ func (r *Runner) NewVU() (lib.VU, error) {
 		};
 	}
 	
+	$assert = {
+		equal: function(a, b, msg) {
+			if (a !== b) {
+				throw new Error((msg || "Assertion Error") + ": " + a + " !== " + b);
+			}
+		}
+	}
+	
 	$http.get = function(url, data, params) { return $http.request('GET', url, data, params); };
 	$http.head = function(url, data, params) { return $http.request('HEAD', url, data, params); };
 	$http.post = function(url, data, params) { return $http.request('POST', url, data, params); };
