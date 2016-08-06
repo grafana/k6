@@ -8,6 +8,7 @@ import (
 	"golang.org/x/net/context"
 	"math"
 	"net/http"
+	"net/http/cookiejar"
 	"os"
 	"sync"
 )
@@ -305,6 +306,13 @@ func (r *Runner) NewVU() (lib.VU, error) {
 func (u *VU) Reconfigure(id int64) error {
 	u.ID = id
 	u.Iteration = 0
+
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		return err
+	}
+	u.Client.Jar = jar
+
 	return nil
 }
 
