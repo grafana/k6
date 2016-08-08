@@ -254,13 +254,12 @@ func action(cc *cli.Context) error {
 	if err != nil {
 		return cli.NewExitError(err.Error(), 1)
 	}
-	t := lib.Test{Stages: stages}
-
 	if cc.Bool("once") {
-		t.Stages = []lib.TestStage{
+		stages = []lib.TestStage{
 			lib.TestStage{Duration: 0, StartVUs: 1, EndVUs: 1},
 		}
 	}
+	t := lib.Test{Stages: stages}
 
 	var r lib.Runner
 	switch len(cc.Args()) {
