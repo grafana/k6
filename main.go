@@ -38,9 +38,21 @@ USAGE:
 VERSION:
    {{.Version}}
    {{end}}{{end}}{{if .VisibleFlags}}
-OPTIONS:
-   {{range .VisibleFlags}}{{.}}
-   {{end}}{{end}}
+BASIC OPTIONS:{{range $index, $flag := .VisibleFlags}}{{if eq $index 3}}
+
+OUTPUT OPTIONS:{{end}}{{if eq $index 8}}
+
+MISC OPTIONS:{{end}}
+   {{$flag}}{{end}}{{end}}
+
+EXAMPLES:
+   # 5-minute and 30 second test with 100 VUs hitting a single URL
+   speedboat --vus 100 --duration 5m30s http://127.0.0.1/path
+   # 1.5 hour test ramping up VUs from 0 to 1000, executing a script and reporting every 30s
+   speedboat --vus 0-1000 --duration 1h30m --interval 30s myscript.js
+   # 100 VU for 5 minutes, then 200 VU for 10 min, store results in influxdb
+   speedboat --vus 100,200 --duration 5m,10m --out influxdb+http://user:pass@127.0.0.1:8086/dbname myscript.js
+
 `
 
 var mVUs = stats.Stat{Name: "vus", Type: stats.GaugeType}
@@ -451,18 +463,6 @@ func main() {
 	app.Usage = "A next-generation load generator"
 	app.Version = "1.0.0-mvp1"
 	app.Flags = []cli.Flag{
-		cli.BoolFlag{
-			Name:  "plan",
-			Usage: "Don't run anything, just show the test plan",
-		},
-		cli.BoolFlag{
-			Name:  "once",
-			Usage: "Run only a single test iteration, with one VU",
-		},
-		cli.StringFlag{
-			Name:  "type, t",
-			Usage: "Input file type, if not evident (url, js or postman)",
-		},
 		cli.StringSliceFlag{
 			Name:  "vus, u",
 			Usage: "Number of VUs to simulate",
@@ -472,26 +472,14 @@ func main() {
 			Usage: "Test duration",
 			Value: time.Duration(10) * time.Second,
 		},
-		cli.BoolFlag{
-			Name:  "verbose, v",
-			Usage: "More verbose output",
-		},
-		cli.BoolFlag{
-			Name:  "quiet, q",
-			Usage: "Suppress the summary at the end of a test",
+		cli.DurationFlag{
+			Name:  "interval, i",
+			Usage: "Write periodic summaries",
 		},
 		cli.StringFlag{
 			Name:  "format, f",
 			Usage: "Format for printed metrics (yaml, json, prettyjson)",
 			Value: "yaml",
-		},
-		cli.DurationFlag{
-			Name:  "interval, i",
-			Usage: "Write periodic summaries",
-		},
-		cli.StringSliceFlag{
-			Name:  "out, o",
-			Usage: "Write metrics to a database",
 		},
 		cli.BoolFlag{
 			Name:  "raw",
@@ -511,7 +499,31 @@ func main() {
 		},
 		cli.StringSliceFlag{
 			Name:  "tag",
-			Usage: "Additional metric tags",
+			Usage: "Add a custom tag to all metrics",
+		},
+		cli.StringSliceFlag{
+			Name:  "out, o",
+			Usage: "Write all measurements to a database",
+		},
+		cli.BoolFlag{
+			Name:  "plan",
+			Usage: "Don't run anything, just show the test plan",
+		},
+		cli.BoolFlag{
+			Name:  "once",
+			Usage: "Run only a single test iteration, with one VU",
+		},
+		cli.BoolFlag{
+			Name:  "verbose, v",
+			Usage: "Enable debug output",
+		},
+		cli.StringFlag{
+			Name:  "type, t",
+			Usage: "Input file type, if not evident (url, js or postman)",
+		},
+		cli.BoolFlag{
+			Name:  "quiet, q",
+			Usage: "Suppress the summary at the end of a test",
 		},
 	}
 	app.Before = func(cc *cli.Context) error {
