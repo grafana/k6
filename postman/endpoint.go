@@ -18,6 +18,37 @@ type Endpoint struct {
 	URL    *url.URL
 	Header http.Header
 	Body   []byte
+
+	URLString string
+}
+
+func MakeEndpoints(c Collection) ([]Endpoint, error) {
+	eps := make([]Endpoint, 0)
+	for _, item := range c.Item {
+		if err := makeEndpointsFrom(item, &eps); err != nil {
+			return eps, err
+		}
+	}
+
+	return eps, nil
+}
+
+func makeEndpointsFrom(i Item, eps *[]Endpoint) error {
+	if i.Request.URL != "" {
+		ep, err := MakeEndpoint(i)
+		if err != nil {
+			return err
+		}
+		*eps = append(*eps, ep)
+	}
+
+	for _, item := range i.Item {
+		if err := makeEndpointsFrom(item, eps); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func MakeEndpoint(i Item) (Endpoint, error) {
@@ -62,14 +93,15 @@ func MakeEndpoint(i Item) (Endpoint, error) {
 		}
 	}
 
-	return Endpoint{i.Request.Method, u, header, body}, nil
+	return Endpoint{i.Request.Method, u, header, body, i.Request.URL}, nil
 }
 
 func (ep Endpoint) Request() http.Request {
 	return http.Request{
-		Method: ep.Method,
-		URL:    ep.URL,
-		Header: ep.Header,
-		Body:   ioutil.NopCloser(bytes.NewBuffer(ep.Body)),
+		Method:        ep.Method,
+		URL:           ep.URL,
+		Header:        ep.Header,
+		Body:          ioutil.NopCloser(bytes.NewBuffer(ep.Body)),
+		ContentLength: int64(len(ep.Body)),
 	}
 }

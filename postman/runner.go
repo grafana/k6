@@ -31,6 +31,7 @@ func (e ErrorWithLineNumber) Error() string {
 
 type Runner struct {
 	Collection Collection
+	Endpoints  []Endpoint
 }
 
 type VU struct {
@@ -55,8 +56,14 @@ func New(source []byte) (*Runner, error) {
 		return nil, err
 	}
 
+	eps, err := MakeEndpoints(collection)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Runner{
 		Collection: collection,
+		Endpoints:  eps,
 	}, nil
 }
 
@@ -77,26 +84,7 @@ func (u *VU) Reconfigure(id int64) error {
 }
 
 func (u *VU) RunOnce(ctx context.Context) error {
-	for _, item := range u.Runner.Collection.Item {
-		if err := u.runItem(item, u.Runner.Collection.Auth); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (u *VU) runItem(i Item, a Auth) error {
-	if i.Auth.Type != "" {
-		a = i.Auth
-	}
-
-	if i.Request.URL != "" {
-		ep, err := MakeEndpoint(i)
-		if err != nil {
-			return err
-		}
-
+	for _, ep := range u.Runner.Endpoints {
 		req := ep.Request()
 
 		startTime := time.Now()
@@ -110,7 +98,7 @@ func (u *VU) runItem(i Item, a Auth) error {
 			res.Body.Close()
 		}
 
-		tags := stats.Tags{"method": i.Request.Method, "url": i.Request.URL, "status": status}
+		tags := stats.Tags{"method": ep.Method, "url": ep.URLString, "status": status}
 		u.Collector.Add(stats.Sample{
 			Stat:   &mRequests,
 			Tags:   tags,
@@ -124,12 +112,6 @@ func (u *VU) runItem(i Item, a Auth) error {
 				Tags:   tags,
 				Values: stats.Value(1),
 			})
-			return err
-		}
-	}
-
-	for _, item := range i.Item {
-		if err := u.runItem(item, a); err != nil {
 			return err
 		}
 	}
