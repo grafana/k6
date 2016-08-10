@@ -1,7 +1,6 @@
 package postman
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
@@ -11,9 +10,7 @@ import (
 	"io"
 	"io/ioutil"
 	"math"
-	"mime/multipart"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 )
@@ -95,40 +92,15 @@ func (u *VU) runItem(i Item, a Auth) error {
 	}
 
 	if i.Request.URL != "" {
-		var buffer *bytes.Buffer
-		switch i.Request.Body.Mode {
-		case "raw":
-			buffer = bytes.NewBufferString(i.Request.Body.Raw)
-		case "formdata":
-			buffer = &bytes.Buffer{}
-			w := multipart.NewWriter(buffer)
-			for _, field := range i.Request.Body.FormData {
-				if !field.Enabled {
-					continue
-				}
-
-				if err := w.WriteField(field.Key, field.Value); err != nil {
-					return err
-				}
-			}
-		case "urlencoded":
-			v := make(url.Values)
-			for _, field := range i.Request.Body.URLEncoded {
-				if !field.Enabled {
-					continue
-				}
-				v[field.Key] = append(v[field.Key], field.Value)
-			}
-			buffer = bytes.NewBufferString(v.Encode())
-		}
-
-		req, err := http.NewRequest(i.Request.Method, i.Request.URL, buffer)
+		ep, err := MakeEndpoint(i)
 		if err != nil {
 			return err
 		}
 
+		req := ep.Request()
+
 		startTime := time.Now()
-		res, err := u.Client.Do(req)
+		res, err := u.Client.Do(&req)
 		duration := time.Since(startTime)
 
 		status := 0
