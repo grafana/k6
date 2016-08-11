@@ -3,6 +3,7 @@ package postman
 import (
 	"bytes"
 	"errors"
+	"github.com/robertkrimen/otto"
 	"io/ioutil"
 	"mime/multipart"
 	"net/http"
@@ -19,13 +20,16 @@ type Endpoint struct {
 	Header http.Header
 	Body   []byte
 
+	Tests      []*otto.Script
+	PreRequest []*otto.Script
+
 	URLString string
 }
 
-func MakeEndpoints(c Collection) ([]Endpoint, error) {
+func MakeEndpoints(c Collection, vm *otto.Otto) ([]Endpoint, error) {
 	eps := make([]Endpoint, 0)
 	for _, item := range c.Item {
-		if err := makeEndpointsFrom(item, &eps); err != nil {
+		if err := makeEndpointsFrom(item, vm, &eps); err != nil {
 			return eps, err
 		}
 	}
@@ -33,9 +37,9 @@ func MakeEndpoints(c Collection) ([]Endpoint, error) {
 	return eps, nil
 }
 
-func makeEndpointsFrom(i Item, eps *[]Endpoint) error {
+func makeEndpointsFrom(i Item, vm *otto.Otto, eps *[]Endpoint) error {
 	if i.Request.URL != "" {
-		ep, err := MakeEndpoint(i)
+		ep, err := MakeEndpoint(i, vm)
 		if err != nil {
 			return err
 		}
@@ -43,7 +47,7 @@ func makeEndpointsFrom(i Item, eps *[]Endpoint) error {
 	}
 
 	for _, item := range i.Item {
-		if err := makeEndpointsFrom(item, eps); err != nil {
+		if err := makeEndpointsFrom(item, vm, eps); err != nil {
 			return err
 		}
 	}
@@ -51,25 +55,30 @@ func makeEndpointsFrom(i Item, eps *[]Endpoint) error {
 	return nil
 }
 
-func MakeEndpoint(i Item) (Endpoint, error) {
+func MakeEndpoint(i Item, vm *otto.Otto) (Endpoint, error) {
 	if i.Request.URL == "" {
 		return Endpoint{}, ErrItemHasNoRequest
 	}
 
+	endpoint := Endpoint{
+		Method:    i.Request.Method,
+		URLString: i.Request.URL,
+	}
+
 	u, err := url.Parse(i.Request.URL)
 	if err != nil {
-		return Endpoint{}, err
+		return endpoint, err
 	}
+	endpoint.URL = u
 
-	header := make(http.Header)
+	endpoint.Header = make(http.Header)
 	for _, item := range i.Request.Header {
-		header[item.Key] = append(header[item.Key], item.Value)
+		endpoint.Header[item.Key] = append(endpoint.Header[item.Key], item.Value)
 	}
 
-	var body []byte
 	switch i.Request.Body.Mode {
 	case "raw":
-		body = []byte(i.Request.Body.Raw)
+		endpoint.Body = []byte(i.Request.Body.Raw)
 	case "urlencoded":
 		values := make(url.Values)
 		for _, field := range i.Request.Body.URLEncoded {
@@ -78,22 +87,42 @@ func MakeEndpoint(i Item) (Endpoint, error) {
 			}
 			values[field.Key] = append(values[field.Key], field.Value)
 		}
-		body = []byte(values.Encode())
+		endpoint.Body = []byte(values.Encode())
 	case "formdata":
-		body = make([]byte, 0)
-		w := multipart.NewWriter(bytes.NewBuffer(body))
+		endpoint.Body = make([]byte, 0)
+		w := multipart.NewWriter(bytes.NewBuffer(endpoint.Body))
 		for _, field := range i.Request.Body.FormData {
 			if !field.Enabled {
 				continue
 			}
 
 			if err := w.WriteField(field.Key, field.Value); err != nil {
-				return Endpoint{}, err
+				return endpoint, err
 			}
 		}
 	}
 
-	return Endpoint{i.Request.Method, u, header, body, i.Request.URL}, nil
+	if vm != nil {
+		for _, event := range i.Event {
+			if event.Disabled {
+				continue
+			}
+
+			script, err := vm.Compile("event", string(event.Script.Exec))
+			if err != nil {
+				return endpoint, err
+			}
+
+			switch event.Listen {
+			case "test":
+				endpoint.Tests = append(endpoint.Tests, script)
+			case "prerequest":
+				endpoint.PreRequest = append(endpoint.PreRequest, script)
+			}
+		}
+	}
+
+	return endpoint, nil
 }
 
 func (ep Endpoint) Request() http.Request {

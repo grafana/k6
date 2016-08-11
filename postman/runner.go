@@ -6,6 +6,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/speedboat/lib"
 	"github.com/loadimpact/speedboat/stats"
+	"github.com/robertkrimen/otto"
 	"golang.org/x/net/context"
 	"io"
 	"io/ioutil"
@@ -20,6 +21,12 @@ var (
 	mErrors   = stats.Stat{Name: "errors", Type: stats.CounterType}
 )
 
+const SETUP_SRC = `
+// Scripts populate this with test resultks; keys are strings, values are bools,
+// or just something truthy/falsy, because this is javascript.
+var tests = {};
+`
+
 type ErrorWithLineNumber struct {
 	Wrapped error
 	Line    int
@@ -30,12 +37,14 @@ func (e ErrorWithLineNumber) Error() string {
 }
 
 type Runner struct {
+	VM         *otto.Otto
 	Collection Collection
 	Endpoints  []Endpoint
 }
 
 type VU struct {
 	Runner    *Runner
+	VM        *otto.Otto
 	Client    http.Client
 	Collector *stats.Collector
 }
@@ -56,7 +65,12 @@ func New(source []byte) (*Runner, error) {
 		return nil, err
 	}
 
-	eps, err := MakeEndpoints(collection)
+	vm := otto.New()
+	if _, err := vm.Eval(SETUP_SRC); err != nil {
+		return nil, err
+	}
+
+	eps, err := MakeEndpoints(collection, vm)
 	if err != nil {
 		return nil, err
 	}
@@ -64,12 +78,14 @@ func New(source []byte) (*Runner, error) {
 	return &Runner{
 		Collection: collection,
 		Endpoints:  eps,
+		VM:         vm,
 	}, nil
 }
 
 func (r *Runner) NewVU() (lib.VU, error) {
 	return &VU{
 		Runner: r,
+		VM:     r.VM.Copy(),
 		Client: http.Client{
 			Transport: &http.Transport{
 				MaxIdleConnsPerHost: math.MaxInt32,
@@ -113,6 +129,12 @@ func (u *VU) RunOnce(ctx context.Context) error {
 				Values: stats.Value(1),
 			})
 			return err
+		}
+
+		for _, script := range ep.Tests {
+			if _, err := u.VM.Run(script); err != nil {
+				return err
+			}
 		}
 	}
 
