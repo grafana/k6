@@ -1,0 +1,3 @@
+[submodule "postman/lib/sugar"]
+	path = postman/lib/sugar
+	url = https://github.com/andrewplummer/Sugar

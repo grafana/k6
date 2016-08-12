@@ -2,13 +2,15 @@ package postman
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/GeertJohan/go.rice"
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/speedboat/lib"
 	"github.com/loadimpact/speedboat/stats"
 	"github.com/robertkrimen/otto"
+	_ "github.com/robertkrimen/otto/underscore"
 	"golang.org/x/net/context"
-	"io"
 	"io/ioutil"
 	"math"
 	"net/http"
@@ -21,11 +23,69 @@ var (
 	mErrors   = stats.Stat{Name: "errors", Type: stats.CounterType}
 )
 
-const SETUP_SRC = `
-// Scripts populate this with test resultks; keys are strings, values are bools,
-// or just something truthy/falsy, because this is javascript.
-var tests = {};
+const vuSetupScript = `
+	var globals = {};
+	var environment = {};
+	
+	var postman = {};
+	
+	postman.setEnvironmentVariable = function(name, value) {
+		environment[name] = value;
+	}
+	postman.setGlobalVariable = function(name, value) {
+		globals[name] = value;
+	}
+	postman.clearEnvironmentVariable = function(name) {
+		delete environment[name];
+	}
+	postman.clearGlobalVariable = function(name) {
+		delete globals[name];
+	}
+	postman.clearEnvironmentVariables = function() {
+		environment = {};
+	}
+	postman.clearGlobalVariables = function() {
+		globals = {};
+	}
+	
+	postman.getResponseHeader = function(name) {
+		// Normalize captialization; "content-type"/"CONTENT-TYPE" -> "Content-Type"
+		return responseHeaders[name.toLowerCase().replace(/(?:^|-)(\w)/g, function(txt) {
+			return txt.toUpperCase();
+		})];
+	}
 `
+
+var libFiles = []string{
+	"sugar/release/sugar.js",
+	"lodash/dist/lodash.js",
+}
+
+var libPatches = map[string]map[string]string{
+	"sugar/release/sugar.js": map[string]string{
+		// Patch out functions using unsupported regex features.
+		`function cleanDateInput(str) {
+      str = str.trim().replace(/^just (?=now)|\.+$/i, '');
+      return convertAsianDigits(str);
+    }`: "",
+		`function truncateOnWord(str, limit, fromLeft) {
+      if (fromLeft) {
+        return reverseString(truncateOnWord(reverseString(str), limit));
+      }
+      var reg = RegExp('(?=[' + getTrimmableCharacters() + '])');
+      var words = str.split(reg);
+      var count = 0;
+      return words.filter(function(word) {
+        count += word.length;
+        return count <= limit;
+      }).join('');
+    }`: "",
+		// We don't need to fully patch out this one, we just have to drop support for -昨 (last...)
+		// This regex is only used to tell whether a character with multiple meanings is used as a
+		// number or as a word, which is not something we're expecting people to do here anyways.
+		`AsianDigitReg = RegExp('([期週周])?([' + KanjiDigits + FullWidthDigits + ']+)(?!昨)', 'g');`: `AsianDigitReg = RegExp('([期週周])?([' + KanjiDigits + FullWidthDigits + ']+)', 'g');`,
+	},
+}
 
 type ErrorWithLineNumber struct {
 	Wrapped error
@@ -47,6 +107,7 @@ type VU struct {
 	VM        *otto.Otto
 	Client    http.Client
 	Collector *stats.Collector
+	Iteration int64
 }
 
 func New(source []byte) (*Runner, error) {
@@ -66,8 +127,21 @@ func New(source []byte) (*Runner, error) {
 	}
 
 	vm := otto.New()
-	if _, err := vm.Eval(SETUP_SRC); err != nil {
-		return nil, err
+	lib, err := rice.FindBox("lib")
+	if err != nil {
+		return nil, errors.New(fmt.Sprintf("couldn't find postman lib files; this can happen if you run from the wrong working directory with a non-boxed binary: %s", err.Error()))
+	}
+	for _, filename := range libFiles {
+		src, err := lib.String(filename)
+		if err != nil {
+			return nil, errors.New(fmt.Sprintf("couldn't load lib file (%s): %s", filename, err.Error()))
+		}
+		for find, repl := range libPatches[filename] {
+			src = strings.Replace(src, find, repl, 1)
+		}
+		if _, err := vm.Eval(src); err != nil {
+			return nil, errors.New(fmt.Sprintf("couldn't eval lib file (%s): %s", filename, err.Error()))
+		}
 	}
 
 	eps, err := MakeEndpoints(collection, vm)
@@ -96,10 +170,19 @@ func (r *Runner) NewVU() (lib.VU, error) {
 }
 
 func (u *VU) Reconfigure(id int64) error {
+	u.Iteration = 0
+
 	return nil
 }
 
 func (u *VU) RunOnce(ctx context.Context) error {
+	u.Iteration++
+	u.VM.Set("iteration", u.Iteration)
+
+	if _, err := u.VM.Run(vuSetupScript); err != nil {
+		return err
+	}
+
 	for _, ep := range u.Runner.Endpoints {
 		req := ep.Request()
 
@@ -107,10 +190,15 @@ func (u *VU) RunOnce(ctx context.Context) error {
 		res, err := u.Client.Do(&req)
 		duration := time.Since(startTime)
 
-		status := 0
+		var status int
+		var body []byte
 		if err == nil {
 			status = res.StatusCode
-			io.Copy(ioutil.Discard, res.Body)
+			body, err = ioutil.ReadAll(res.Body)
+			if err != nil {
+				res.Body.Close()
+				return err
+			}
 			res.Body.Close()
 		}
 
@@ -131,9 +219,31 @@ func (u *VU) RunOnce(ctx context.Context) error {
 			return err
 		}
 
-		for _, script := range ep.Tests {
-			if _, err := u.VM.Run(script); err != nil {
-				return err
+		if len(ep.Tests) > 0 {
+			u.VM.Set("request", map[string]interface{}{
+				"data":    ep.BodyMap,
+				"headers": ep.HeaderMap,
+				"method":  ep.Method,
+				"url":     ep.URLString,
+			})
+			responseHeaders := make(map[string]string)
+			for key, values := range res.Header {
+				responseHeaders[key] = strings.Join(values, ", ")
+			}
+			u.VM.Set("responseHeaders", responseHeaders)
+			u.VM.Set("responseBody", string(body))
+			u.VM.Set("responseTime", duration/time.Millisecond)
+			u.VM.Set("responseCode", map[string]interface{}{
+				"code":   res.StatusCode,
+				"name":   res.Status,
+				"detail": res.Status, // The docs are vague on this one
+			})
+			u.VM.Set("tests", map[string]interface{}{})
+
+			for _, script := range ep.Tests {
+				if _, err := u.VM.Run(script); err != nil {
+					return err
+				}
 			}
 		}
 	}

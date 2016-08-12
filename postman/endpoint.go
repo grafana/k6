@@ -24,6 +24,8 @@ type Endpoint struct {
 	PreRequest []*otto.Script
 
 	URLString string
+	BodyMap   map[string]string
+	HeaderMap map[string]string
 }
 
 func MakeEndpoints(c Collection, vm *otto.Otto) ([]Endpoint, error) {
@@ -72,24 +74,30 @@ func MakeEndpoint(i Item, vm *otto.Otto) (Endpoint, error) {
 	endpoint.URL = u
 
 	endpoint.Header = make(http.Header)
+	endpoint.HeaderMap = make(map[string]string)
 	for _, item := range i.Request.Header {
 		endpoint.Header[item.Key] = append(endpoint.Header[item.Key], item.Value)
+		endpoint.HeaderMap[item.Key] = item.Value
 	}
 
 	switch i.Request.Body.Mode {
 	case "raw":
 		endpoint.Body = []byte(i.Request.Body.Raw)
+		endpoint.BodyMap = make(map[string]string)
 	case "urlencoded":
 		values := make(url.Values)
+		endpoint.BodyMap = make(map[string]string)
 		for _, field := range i.Request.Body.URLEncoded {
 			if !field.Enabled {
 				continue
 			}
 			values[field.Key] = append(values[field.Key], field.Value)
+			endpoint.BodyMap[field.Key] = field.Value
 		}
 		endpoint.Body = []byte(values.Encode())
 	case "formdata":
 		endpoint.Body = make([]byte, 0)
+		endpoint.BodyMap = make(map[string]string)
 		w := multipart.NewWriter(bytes.NewBuffer(endpoint.Body))
 		for _, field := range i.Request.Body.FormData {
 			if !field.Enabled {
@@ -99,6 +107,7 @@ func MakeEndpoint(i Item, vm *otto.Otto) (Endpoint, error) {
 			if err := w.WriteField(field.Key, field.Value); err != nil {
 				return endpoint, err
 			}
+			endpoint.BodyMap[field.Key] = field.Value
 		}
 	}
 
