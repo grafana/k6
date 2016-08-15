@@ -58,7 +58,6 @@ const vuSetupScript = `
 
 var libFiles = []string{
 	"sugar/release/sugar.js",
-	"lodash/dist/lodash.js",
 }
 
 var libPatches = map[string]map[string]string{
