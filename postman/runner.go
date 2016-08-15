@@ -225,12 +225,23 @@ func (u *VU) RunOnce(ctx context.Context) error {
 				"method":  ep.Method,
 				"url":     ep.URLString,
 			})
+
 			responseHeaders := make(map[string]string)
 			for key, values := range res.Header {
 				responseHeaders[key] = strings.Join(values, ", ")
 			}
 			u.VM.Set("responseHeaders", responseHeaders)
-			u.VM.Set("responseBody", string(body))
+
+			// JSON seems to be geting automatically decoded by Postman? Is it decided by
+			// Content-Type? Always attempted? We don't know, because it's nowhere in the docs!
+			var obj interface{}
+			if err := json.Unmarshal(body, &obj); err != nil {
+				u.VM.Set("responseBody", string(body))
+			} else {
+				log.WithField("body", obj).Info("Body")
+				u.VM.Set("responseBody", obj)
+			}
+
 			u.VM.Set("responseTime", duration/time.Millisecond)
 			u.VM.Set("responseCode", map[string]interface{}{
 				"code":   res.StatusCode,
