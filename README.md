@@ -20,7 +20,7 @@ docker run -v $PWD/script.js:/script.js:ro loadimpact/speedboat /script.js
 You can also download and compile the sources:
 
 ```
-go get github.com/loadimpact/speedboat/cmd/speedboat
+go get github.com/loadimpact/speedboat
 ```
 
 Requires [a working Go environment](#for-go-beginners---how-to-set-up-go), version 1.6 or later. Will place the speedboat binary in $GOPATH/bin so you need to have that in your $PATH.
