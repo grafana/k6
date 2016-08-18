@@ -3,13 +3,11 @@ package simple
 import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/speedboat/lib"
+	"github.com/loadimpact/speedboat/proto/httpwrap"
 	"github.com/loadimpact/speedboat/stats"
 	"golang.org/x/net/context"
-	"io"
-	"io/ioutil"
 	"math"
 	"net/http"
-	"time"
 )
 
 var (
@@ -58,34 +56,14 @@ func (u *VU) Reconfigure(id int64) error {
 
 func (u *VU) RunOnce(ctx context.Context) error {
 	req := u.Request
-
-	startTime := time.Now()
-	res, err := u.Client.Do(&req)
-	duration := time.Since(startTime)
-
-	status := 0
-	if err == nil {
-		status = res.StatusCode
-		io.Copy(ioutil.Discard, res.Body)
-		res.Body.Close()
-	}
-
-	tags := stats.Tags{"method": "GET", "url": u.Runner.URL, "status": status}
-	u.Collector.Add(stats.Sample{
-		Stat:   &mRequests,
-		Tags:   tags,
-		Values: stats.Values{"duration": float64(duration)},
-	})
-
+	_, _, sample, err := httpwrap.Do(ctx, &u.Client, &req, httpwrap.Params{TakeSample: true})
 	if err != nil {
-		log.WithError(err).Error("Request error")
-		u.Collector.Add(stats.Sample{
-			Stat:   &mErrors,
-			Tags:   tags,
-			Values: stats.Value(1),
-		})
-		return err
+		log.WithError(err).Error("Request Error")
+		return nil
 	}
+
+	sample.Stat = &mRequests
+	u.Collector.Add(sample)
 
 	return nil
 }
