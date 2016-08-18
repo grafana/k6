@@ -60,7 +60,7 @@ func (s *Summarizer) Codify() map[string]interface{} {
 				}
 			}
 
-			statData["count"] = count
+			statData["_count"] = count
 		}
 
 		if len(statData) > 0 {
