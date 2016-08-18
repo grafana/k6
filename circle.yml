@@ -14,7 +14,7 @@ dependencies:
 
 test:
   override:
-    - docker run loadimpact/speedboat --entrypoint /bin/bash go test ./...
+    - docker run --entrypoint /bin/bash loadimpact/speedboat go test ./...
 
 deployment:
   release:
