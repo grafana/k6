@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/speedboat/js"
@@ -12,7 +13,6 @@ import (
 	"github.com/loadimpact/speedboat/stats/influxdb"
 	"github.com/loadimpact/speedboat/stats/writer"
 	"github.com/urfave/cli"
-	"golang.org/x/net/context"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"os"

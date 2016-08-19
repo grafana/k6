@@ -1,8 +1,8 @@
 package lib
 
 import (
+	"context"
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/net/context"
 	"testing"
 )
 

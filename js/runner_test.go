@@ -1,10 +1,10 @@
 package js
 
 import (
+	"context"
 	log "github.com/Sirupsen/logrus"
 	logtest "github.com/Sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/net/context"
 	// "math"
 	"os"
 	// "strconv"

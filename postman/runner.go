@@ -1,6 +1,7 @@
 package postman
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,7 +11,6 @@ import (
 	"github.com/loadimpact/speedboat/stats"
 	"github.com/robertkrimen/otto"
 	_ "github.com/robertkrimen/otto/underscore"
-	"golang.org/x/net/context"
 	"io/ioutil"
 	"math"
 	"net/http"

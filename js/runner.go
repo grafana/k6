@@ -1,11 +1,11 @@
 package js
 
 import (
+	"context"
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/speedboat/lib"
 	"github.com/loadimpact/speedboat/stats"
 	"github.com/robertkrimen/otto"
-	"golang.org/x/net/context"
 	"math"
 	"net/http"
 	"net/http/cookiejar"

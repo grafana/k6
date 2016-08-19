@@ -1,8 +1,8 @@
 package lib
 
 import (
+	"context"
 	"errors"
-	"golang.org/x/net/context"
 	"sync"
 )
 
