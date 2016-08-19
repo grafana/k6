@@ -1,11 +1,12 @@
 package js
 
 import (
+	"context"
 	"errors"
 	log "github.com/Sirupsen/logrus"
+	"github.com/loadimpact/speedboat/proto/httpwrap"
 	"github.com/loadimpact/speedboat/stats"
 	"github.com/robertkrimen/otto"
-	"io/ioutil"
 	"net/http"
 	neturl "net/url"
 	"strings"
@@ -77,39 +78,26 @@ func (u *VU) HTTPRequest(method, url, body string, params HTTPParams, redirects 
 		req.Header[key] = []string{value}
 	}
 
-	startTime := time.Now()
-	resp, err := u.Client.Do(&req)
-	duration := time.Since(startTime)
-
-	tags := stats.Tags{
-		"url":    url,
-		"method": method,
-		"status": 0,
-	}
-
-	var respBody []byte
-	if resp != nil {
-		tags["status"] = resp.StatusCode
-		tags["proto"] = resp.Proto
-		respBody, _ = ioutil.ReadAll(resp.Body)
-		resp.Body.Close()
-	}
-
-	if !params.Quiet {
-		u.Collector.Add(stats.Sample{
-			Stat:   &mRequests,
-			Tags:   tags,
-			Values: stats.Values{"duration": float64(duration)},
-		})
-	}
+	resp, respBody, sample, err := httpwrap.Do(context.Background(), &u.Client, &req, httpwrap.Params{TakeSample: !params.Quiet, KeepBody: true})
 
 	switch e := err.(type) {
 	case nil:
-		// Do nothing
+		if !params.Quiet {
+			sample.Stat = &mRequests
+			u.Collector.Add(sample)
+		}
 	case *neturl.Error:
 		if e.Err != errInternalHandleRedirect {
 			if !params.Quiet {
-				u.Collector.Add(stats.Sample{Stat: &mErrors, Tags: tags, Values: stats.Value(1)})
+				u.Collector.Add(stats.Sample{
+					Stat: &mErrors,
+					Tags: stats.Tags{
+						"method": req.Method,
+						"url":    req.URL.String(),
+						"error":  err.Error(),
+					},
+					Values: stats.Value(1),
+				})
 			}
 			return HTTPResponse{}, err
 		}
@@ -135,7 +123,15 @@ func (u *VU) HTTPRequest(method, url, body string, params HTTPParams, redirects 
 		return u.HTTPRequest(redirectMethod, redirectURL, redirectBody, params, redirects+1)
 	default:
 		if !params.Quiet {
-			u.Collector.Add(stats.Sample{Stat: &mErrors, Tags: tags, Values: stats.Value(1)})
+			u.Collector.Add(stats.Sample{
+				Stat: &mErrors,
+				Tags: stats.Tags{
+					"method": req.Method,
+					"url":    req.URL.String(),
+					"error":  err.Error(),
+				},
+				Values: stats.Value(1),
+			})
 		}
 		return HTTPResponse{}, err
 	}
