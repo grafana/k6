@@ -454,7 +454,7 @@ func main() {
 	app := cli.NewApp()
 	app.Name = "speedboat"
 	app.Usage = "A next-generation load generator"
-	app.Version = "1.0.0-mvp1"
+	app.Version = "1.0.0-beta1"
 	app.Flags = []cli.Flag{
 		cli.BoolFlag{
 			Name:  "plan",
