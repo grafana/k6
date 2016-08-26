@@ -26,6 +26,7 @@ func (e *Engine) Run(ctx context.Context) error {
 	}()
 
 	<-ctx.Done()
+	time.Sleep(1 * time.Second)
 
 	return nil
 }

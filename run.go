@@ -86,6 +86,7 @@ func actionRun(cc *cli.Context) error {
 		})
 		v1.POST("/state/abort", func(c *gin.Context) {
 			cancel()
+			wg.Wait()
 			c.JSON(202, gin.H{"success": true})
 		})
 		v1.POST("/state/scale", func(c *gin.Context) {
