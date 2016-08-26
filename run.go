@@ -81,15 +81,15 @@ func actionRun(cc *cli.Context) error {
 		v1.GET("/info", func(c *gin.Context) {
 			c.JSON(200, gin.H{"version": cc.App.Version})
 		})
-		v1.GET("/state", func(c *gin.Context) {
-			c.JSON(200, engine.State)
+		v1.GET("/status", func(c *gin.Context) {
+			c.JSON(200, engine.Status)
 		})
-		v1.POST("/state/abort", func(c *gin.Context) {
+		v1.POST("/abort", func(c *gin.Context) {
 			cancel()
 			wg.Wait()
 			c.JSON(202, gin.H{"success": true})
 		})
-		v1.POST("/state/scale", func(c *gin.Context) {
+		v1.POST("/scale", func(c *gin.Context) {
 			vus, err := strconv.ParseInt(c.Query("vus"), 10, 64)
 			if err != nil {
 				c.AbortWithError(http.StatusBadRequest, err)
