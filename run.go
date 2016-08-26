@@ -107,7 +107,7 @@ func actionRun(cc *cli.Context) error {
 	router.NoRoute(func(c *gin.Context) {
 		c.JSON(404, gin.H{"error": "Not Found"})
 	})
-	router.Run(cc.String("address"))
+	router.Run(cc.GlobalString("address"))
 
 	return nil
 }
