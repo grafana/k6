@@ -2,9 +2,13 @@ package main
 
 import (
 	"context"
+	"errors"
 	log "github.com/Sirupsen/logrus"
+	"github.com/loadimpact/speedboat/client"
 	"github.com/loadimpact/speedboat/lib"
+	"github.com/loadimpact/speedboat/simple"
 	"gopkg.in/urfave/cli.v1"
+	"math"
 	"os"
 	"os/signal"
 	"strings"
@@ -13,12 +17,23 @@ import (
 	"time"
 )
 
+const (
+	TypeAuto = "auto"
+	TypeURL  = "url"
+	TypeJS   = "js"
+)
+
+var (
+	ErrUnknownType = errors.New("Unable to infer type from argument; specify with -t/--type")
+	ErrInvalidType = errors.New("Invalid type specified, see --help")
+)
+
 var commandRun = cli.Command{
 	Name:      "run",
 	Usage:     "Starts running a load test",
 	ArgsUsage: "url|filename",
 	Flags: []cli.Flag{
-		cli.IntFlag{
+		cli.Int64Flag{
 			Name:  "vus, u",
 			Usage: "virtual users to simulate",
 			Value: 10,
@@ -40,19 +55,29 @@ var commandRun = cli.Command{
 func guessType(filename string) string {
 	switch {
 	case strings.Contains(filename, "://"):
-		return "url"
+		return TypeURL
 	case strings.HasSuffix(filename, ".js"):
-		return "js"
+		return TypeJS
 	default:
 		return ""
 	}
 }
 
 func makeRunner(filename, t string) (lib.Runner, error) {
-	if t == "auto" {
+	if t == TypeAuto {
 		t = guessType(filename)
 	}
-	return nil, nil
+
+	switch t {
+	case TypeAuto:
+		return makeRunner(filename, t)
+	case "":
+		return nil, ErrUnknownType
+	case TypeURL:
+		return simple.New(filename)
+	default:
+		return nil, ErrInvalidType
+	}
 }
 
 func actionRun(cc *cli.Context) error {
@@ -63,6 +88,7 @@ func actionRun(cc *cli.Context) error {
 		return cli.NewExitError("Wrong number of arguments!", 1)
 	}
 
+	// Make the Runner
 	filename := args[0]
 	runnerType := cc.String("type")
 	runner, err := makeRunner(filename, runnerType)
@@ -70,11 +96,13 @@ func actionRun(cc *cli.Context) error {
 		log.WithError(err).Error("Couldn't create a runner")
 	}
 
+	// Make the Engine
 	engine := &lib.Engine{
 		Runner: runner,
 	}
 	engineC, cancelEngine := context.WithCancel(context.Background())
 
+	// Make the API Server
 	api := &APIServer{
 		Engine: engine,
 		Cancel: cancelEngine,
@@ -84,11 +112,15 @@ func actionRun(cc *cli.Context) error {
 	}
 	apiC, cancelAPI := context.WithCancel(context.Background())
 
-	timeout := cc.Duration("duration")
-	if timeout > 0 {
-		engineC, _ = context.WithTimeout(engineC, timeout)
+	// Make the Client
+	addr := cc.GlobalString("address")
+	cl, err := client.New(addr)
+	if err != nil {
+		log.WithError(err).Error("Couldn't make a client; is the address valid?")
+		return err
 	}
 
+	// Run the engine and API server in the background
 	wg.Add(2)
 	go func() {
 		defer func() {
@@ -105,17 +137,53 @@ func actionRun(cc *cli.Context) error {
 			log.Debug("API Server terminated")
 			wg.Done()
 		}()
-
-		addr := cc.GlobalString("address")
 		log.WithField("addr", addr).Debug("API Server starting...")
 		api.Run(apiC, addr)
 	}()
 
+	// Wait for the API server to come online
+	startTime := time.Now()
+	for {
+		if err := cl.Ping(); err != nil {
+			if time.Since(startTime) < 1*time.Second {
+				log.WithError(err).Debug("Waiting for API server to start...")
+				time.Sleep(1 * time.Millisecond)
+			} else {
+				log.WithError(err).Warn("Connection to API server failed; retrying...")
+				time.Sleep(1 * time.Second)
+			}
+			continue
+		}
+		break
+	}
+
+	// Scale the test up to the desired VU count
+	vus := cc.Int64("vus")
+	if vus > 0 {
+		log.WithField("vus", vus).Debug("Scaling test...")
+		if err := cl.Scale(vus); err != nil {
+			log.WithError(err).Error("Couldn't scale test")
+		}
+	}
+
+	// Wait for a signal or timeout before shutting down
+	duration := cc.Duration("duration")
+	if duration == 0 {
+		duration = time.Duration(math.MaxInt64)
+	}
+
 	quit := make(chan os.Signal)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
-	sig := <-quit
-	log.WithField("signal", sig).Debug("Signal received; shutting down...")
 
+	log.Debug("Waiting for test to finish")
+	select {
+	case <-time.After(duration):
+		log.Debug("Duration expired; shutting down...")
+	case sig := <-quit:
+		log.WithField("signal", sig).Debug("Signal received; shutting down...")
+	}
+
+	// Shut down the API server and engine, wait for them to terminate before exiting
 	cancelAPI()
 	cancelEngine()
 	wg.Wait()

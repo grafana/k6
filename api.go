@@ -27,6 +27,9 @@ func (s *APIServer) Run(ctx context.Context, addr string) {
 	router.Use(s.logRequestsMiddleware)
 	router.Use(s.jsonErrorsMiddleware)
 
+	router.GET("/ping", func(c *gin.Context) {
+		c.Data(http.StatusNoContent, "", nil)
+	})
 	v1 := router.Group("/v1")
 	{
 		v1.GET("/info", func(c *gin.Context) {

@@ -67,6 +67,13 @@ func (c *Client) call(method string, relative url.URL, out interface{}) error {
 	return nil
 }
 
+func (c *Client) Ping() error {
+	if err := c.call("GET", url.URL{Path: "/ping"}, nil); err != nil {
+		return err
+	}
+	return nil
+}
+
 // Status returns the status of the currently running test.
 func (c *Client) Status() (lib.Status, error) {
 	var status lib.Status
