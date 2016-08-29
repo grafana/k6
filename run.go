@@ -73,6 +73,11 @@ func actionRun(cc *cli.Context) error {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
+	timeout := cc.Duration("duration")
+	if timeout > 0 {
+		ctx, _ = context.WithTimeout(ctx, timeout)
+	}
+
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
