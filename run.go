@@ -43,6 +43,11 @@ var commandRun = cli.Command{
 			Usage: "test duration, 0 to run until cancelled",
 			Value: 10 * time.Second,
 		},
+		cli.Int64Flag{
+			Name:  "prepare, p",
+			Usage: "VUs to prepare (but not start)",
+			Value: 0,
+		},
 		cli.StringFlag{
 			Name:  "type, t",
 			Usage: "input type, one of: auto, url, js",
@@ -88,6 +93,21 @@ func actionRun(cc *cli.Context) error {
 		return cli.NewExitError("Wrong number of arguments!", 1)
 	}
 
+	// Collect arguments
+	addr := cc.GlobalString("address")
+
+	duration := cc.Duration("duration")
+	if duration == 0 {
+		duration = time.Duration(math.MaxInt64)
+	}
+
+	vus := cc.Int64("vus")
+
+	prepared := cc.Int64("prepare")
+	if prepared == 0 {
+		prepared = vus
+	}
+
 	// Make the Runner
 	filename := args[0]
 	runnerType := cc.String("type")
@@ -113,7 +133,6 @@ func actionRun(cc *cli.Context) error {
 	apiC, cancelAPI := context.WithCancel(context.Background())
 
 	// Make the Client
-	addr := cc.GlobalString("address")
 	cl, err := client.New(addr)
 	if err != nil {
 		log.WithError(err).Error("Couldn't make a client; is the address valid?")
@@ -127,9 +146,9 @@ func actionRun(cc *cli.Context) error {
 			log.Debug("Engine terminated")
 			wg.Done()
 		}()
-		log.Debug("Starting engine...")
-		if err := engine.Run(engineC); err != nil {
-			log.WithError(err).Error("Runtime Error")
+		log.WithField("prepared", prepared).Debug("Starting engine...")
+		if err := engine.Run(engineC, prepared); err != nil {
+			log.WithError(err).Error("Engine Error")
 		}
 	}()
 	go func() {
@@ -158,7 +177,6 @@ func actionRun(cc *cli.Context) error {
 	}
 
 	// Scale the test up to the desired VU count
-	vus := cc.Int64("vus")
 	if vus > 0 {
 		log.WithField("vus", vus).Debug("Scaling test...")
 		if err := cl.Scale(vus); err != nil {
@@ -167,11 +185,6 @@ func actionRun(cc *cli.Context) error {
 	}
 
 	// Wait for a signal or timeout before shutting down
-	duration := cc.Duration("duration")
-	if duration == 0 {
-		duration = time.Duration(math.MaxInt64)
-	}
-
 	quit := make(chan os.Signal)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 
