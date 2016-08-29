@@ -3,13 +3,13 @@ package main
 import (
 	"context"
 	log "github.com/Sirupsen/logrus"
-	"github.com/gin-gonic/gin"
 	"github.com/loadimpact/speedboat/lib"
 	"gopkg.in/urfave/cli.v1"
-	"net/http"
-	"strconv"
+	"os"
+	"os/signal"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -56,6 +56,8 @@ func makeRunner(filename, t string) (lib.Runner, error) {
 }
 
 func actionRun(cc *cli.Context) error {
+	wg := sync.WaitGroup{}
+
 	args := cc.Args()
 	if len(args) != 1 {
 		return cli.NewExitError("Wrong number of arguments!", 1)
@@ -68,76 +70,55 @@ func actionRun(cc *cli.Context) error {
 		log.WithError(err).Error("Couldn't create a runner")
 	}
 
-	engine := lib.Engine{
+	engine := &lib.Engine{
 		Runner: runner,
 	}
+	engineC, cancelEngine := context.WithCancel(context.Background())
 
-	ctx, cancel := context.WithCancel(context.Background())
+	api := &APIServer{
+		Engine: engine,
+		Cancel: cancelEngine,
+		Info: lib.Info{
+			Version: cc.App.Version,
+		},
+	}
+	apiC, cancelAPI := context.WithCancel(context.Background())
+
 	timeout := cc.Duration("duration")
 	if timeout > 0 {
-		ctx, _ = context.WithTimeout(ctx, timeout)
+		engineC, _ = context.WithTimeout(engineC, timeout)
 	}
 
-	wg := sync.WaitGroup{}
-	wg.Add(1)
+	wg.Add(2)
 	go func() {
 		defer func() {
 			log.Debug("Engine terminated")
 			wg.Done()
 		}()
 		log.Debug("Starting engine...")
-		if err := engine.Run(ctx); err != nil {
+		if err := engine.Run(engineC); err != nil {
 			log.WithError(err).Error("Runtime Error")
 		}
 	}()
+	go func() {
+		defer func() {
+			log.Debug("API Server terminated")
+			wg.Done()
+		}()
 
-	gin.SetMode(gin.ReleaseMode)
+		addr := cc.GlobalString("address")
+		log.WithField("addr", addr).Debug("API Server starting...")
+		api.Run(apiC, addr)
+	}()
 
-	router := gin.New()
-	router.Use(gin.Recovery())
-	router.Use(func(c *gin.Context) {
-		path := c.Request.URL.Path
-		c.Next()
-		log.WithField("status", c.Writer.Status()).Debugf("%s %s", c.Request.Method, path)
-	})
-	router.Use(func(c *gin.Context) {
-		c.Next()
-		if c.Writer.Size() == 0 && len(c.Errors) > 0 {
-			c.JSON(c.Writer.Status(), c.Errors)
-		}
-	})
-	v1 := router.Group("/v1")
-	{
-		v1.GET("/info", func(c *gin.Context) {
-			c.JSON(200, gin.H{"version": cc.App.Version})
-		})
-		v1.GET("/status", func(c *gin.Context) {
-			c.JSON(200, engine.Status)
-		})
-		v1.POST("/abort", func(c *gin.Context) {
-			cancel()
-			wg.Wait()
-			c.JSON(202, gin.H{"success": true})
-		})
-		v1.POST("/scale", func(c *gin.Context) {
-			vus, err := strconv.ParseInt(c.Query("vus"), 10, 64)
-			if err != nil {
-				c.AbortWithError(http.StatusBadRequest, err)
-				return
-			}
+	quit := make(chan os.Signal)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	sig := <-quit
+	log.WithField("signal", sig).Debug("Signal received; shutting down...")
 
-			if err := engine.Scale(vus); err != nil {
-				c.AbortWithError(http.StatusInternalServerError, err)
-				return
-			}
-
-			c.JSON(202, gin.H{"success": true})
-		})
-	}
-	router.NoRoute(func(c *gin.Context) {
-		c.JSON(404, gin.H{"error": "Not Found"})
-	})
-	router.Run(cc.GlobalString("address"))
+	cancelAPI()
+	cancelEngine()
+	wg.Wait()
 
 	return nil
 }

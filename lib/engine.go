@@ -5,13 +5,6 @@ import (
 	"time"
 )
 
-type Status struct {
-	StartTime time.Time `json:"startTime" yaml:"startTime"`
-
-	Running bool  `json:"running" yaml:"running"`
-	VUs     int64 `json:"vus" yaml:"vus"`
-}
-
 type Engine struct {
 	Runner Runner
 	Status Status
