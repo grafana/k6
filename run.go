@@ -10,7 +10,32 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
+
+var commandRun = cli.Command{
+	Name:      "run",
+	Usage:     "Starts running a load test",
+	ArgsUsage: "url|filename",
+	Flags: []cli.Flag{
+		cli.IntFlag{
+			Name:  "vus, u",
+			Usage: "virtual users to simulate",
+			Value: 10,
+		},
+		cli.DurationFlag{
+			Name:  "duration, d",
+			Usage: "test duration, 0 to run until cancelled",
+			Value: 10 * time.Second,
+		},
+		cli.StringFlag{
+			Name:  "type, t",
+			Usage: "input type, one of: auto, url, js",
+			Value: "auto",
+		},
+	},
+	Action: actionRun,
+}
 
 func guessType(filename string) string {
 	switch {
