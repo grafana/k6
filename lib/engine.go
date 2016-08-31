@@ -3,18 +3,35 @@ package lib
 import (
 	"context"
 	log "github.com/Sirupsen/logrus"
+	"github.com/loadimpact/speedboat/stats"
+	"strconv"
 	"sync"
 	"time"
 )
 
+var (
+	MetricVUs    = &stats.Metric{Name: "vus", Type: stats.Gauge}
+	MetricErrors = &stats.Metric{Name: "errors", Type: stats.Counter}
+)
+
 type Engine struct {
-	Runner Runner
-	Status Status
+	Runner  Runner
+	Status  Status
+	Metrics map[*stats.Metric][]stats.Sample
 
 	ctx       context.Context
 	cancelers []context.CancelFunc
 	pool      []VU
-	mutex     sync.Mutex
+
+	vuMutex sync.Mutex
+	mMutex  sync.Mutex
+}
+
+func NewEngine(r Runner) *Engine {
+	return &Engine{
+		Runner:  r,
+		Metrics: make(map[*stats.Metric][]stats.Sample),
+	}
 }
 
 func (e *Engine) Run(ctx context.Context, prepared int64) error {
@@ -47,8 +64,8 @@ func (e *Engine) Run(ctx context.Context, prepared int64) error {
 }
 
 func (e *Engine) Scale(vus int64) error {
-	e.mutex.Lock()
-	defer e.mutex.Unlock()
+	e.vuMutex.Lock()
+	defer e.vuMutex.Unlock()
 
 	l := int64(len(e.cancelers))
 	switch {
@@ -59,18 +76,19 @@ func (e *Engine) Scale(vus int64) error {
 				return err
 			}
 
-			if err := vu.Reconfigure(i + 1); err != nil {
+			id := i + 1
+			if err := vu.Reconfigure(id); err != nil {
 				return err
 			}
 
 			ctx, cancel := context.WithCancel(e.ctx)
 			e.cancelers = append(e.cancelers, cancel)
 			go func() {
-				e.runVU(ctx, vu)
+				e.runVU(ctx, id, vu)
 
-				e.mutex.Lock()
+				e.vuMutex.Lock()
 				e.pool = append(e.pool, vu)
-				e.mutex.Unlock()
+				e.vuMutex.Unlock()
 			}()
 		}
 	case l > vus:
@@ -86,15 +104,32 @@ func (e *Engine) Scale(vus int64) error {
 	return nil
 }
 
-func (e *Engine) runVU(ctx context.Context, vu VU) {
+func (e *Engine) runVU(ctx context.Context, id int64, vu VU) {
+	idString := strconv.FormatInt(id, 10)
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
-			if err := vu.RunOnce(ctx); err != nil {
-				log.WithError(err).Error("Runtime Error")
+			samples, err := vu.RunOnce(ctx)
+			if err != nil {
+				log.WithField("vu", id).WithError(err).Error("Runtime Error")
+				samples = append(samples, stats.Sample{
+					Metric: MetricVUs,
+					Time:   time.Now(),
+					Tags: map[string]string{
+						"vu":    idString,
+						"error": err.Error(),
+					},
+					Value: float64(1),
+				})
 			}
+
+			e.mMutex.Lock()
+			for _, s := range samples {
+				e.Metrics[s.Metric] = append(e.Metrics[s.Metric], s)
+			}
+			e.mMutex.Unlock()
 		}
 	}
 }

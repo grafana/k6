@@ -123,9 +123,7 @@ func actionRun(cc *cli.Context) error {
 	}
 
 	// Make the Engine
-	engine := &lib.Engine{
-		Runner: runner,
-	}
+	engine := lib.NewEngine(runner)
 	engineC, cancelEngine := context.WithCancel(context.Background())
 
 	// Make the API Server
