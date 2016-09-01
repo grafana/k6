@@ -2,7 +2,6 @@ package simple
 
 import (
 	"context"
-	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/speedboat/lib"
 	"github.com/loadimpact/speedboat/stats"
 	"io"
