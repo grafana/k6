@@ -8,7 +8,6 @@ import (
 	"github.com/loadimpact/speedboat/lib"
 	"github.com/loadimpact/speedboat/simple"
 	"gopkg.in/urfave/cli.v1"
-	"math"
 	"os"
 	"os/signal"
 	"strings"
@@ -101,10 +100,6 @@ func actionRun(cc *cli.Context) error {
 	addr := cc.GlobalString("address")
 
 	duration := cc.Duration("duration")
-	if duration == 0 {
-		duration = time.Duration(math.MaxInt64)
-	}
-
 	vus := cc.Int64("vus")
 
 	prepared := cc.Int64("prepare")
@@ -120,11 +115,19 @@ func actionRun(cc *cli.Context) error {
 	runner, err := makeRunner(filename, runnerType)
 	if err != nil {
 		log.WithError(err).Error("Couldn't create a runner")
+		return err
 	}
 
 	// Make the Engine
-	engine := lib.NewEngine(runner)
+	engine, err := lib.NewEngine(runner, prepared)
+	if err != nil {
+		log.WithError(err).Error("Couldn't create the engine")
+		return err
+	}
 	engineC, cancelEngine := context.WithCancel(context.Background())
+	if duration > 0 {
+		engineC, cancelEngine = context.WithTimeout(context.Background(), duration)
+	}
 
 	// Make the API Server
 	api := &APIServer{
@@ -155,7 +158,7 @@ func actionRun(cc *cli.Context) error {
 			wg.Done()
 		}()
 		log.WithField("prepared", prepared).Debug("Starting engine...")
-		if err := engine.Run(engineC, prepared); err != nil {
+		if err := engine.Run(engineC); err != nil {
 			log.WithError(err).Error("Engine Error")
 		}
 	}()
@@ -198,8 +201,8 @@ func actionRun(cc *cli.Context) error {
 
 	log.Debug("Waiting for test to finish")
 	select {
-	case <-time.After(duration):
-		log.Debug("Duration expired; shutting down...")
+	case <-apiC.Done():
+		log.Debug("API server terminated; shutting down...")
 	case sig := <-signals:
 		log.WithField("signal", sig).Debug("Signal received; shutting down...")
 	}
