@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"errors"
 	log "github.com/Sirupsen/logrus"
 	"github.com/gin-gonic/gin"
+	"github.com/loadimpact/speedboat/client"
 	"github.com/loadimpact/speedboat/lib"
 	"gopkg.in/tylerb/graceful.v1"
 	"net/http"
@@ -37,6 +39,35 @@ func (s *APIServer) Run(ctx context.Context, addr string) {
 		})
 		v1.GET("/status", func(c *gin.Context) {
 			c.JSON(200, s.Engine.Status)
+		})
+		v1.GET("/metrics", func(c *gin.Context) {
+			metrics := make(map[string]client.Metric)
+			for m, samples := range s.Engine.Metrics {
+				metrics[m.Name] = client.Metric{
+					Name:     m.Name,
+					Type:     client.MetricType(m.Type),
+					Contains: client.ValueType(m.Contains),
+					Data:     m.Format(samples),
+				}
+			}
+			c.JSON(200, metrics)
+		})
+		v1.GET("/metrics/:name", func(c *gin.Context) {
+			name := c.Param("name")
+			for m, samples := range s.Engine.Metrics {
+				if m.Name != name {
+					continue
+				}
+
+				c.JSON(200, client.Metric{
+					Name:     m.Name,
+					Type:     client.MetricType(m.Type),
+					Contains: client.ValueType(m.Contains),
+					Data:     m.Format(samples),
+				})
+				return
+			}
+			c.AbortWithError(404, errors.New("No such metric"))
 		})
 		v1.POST("/abort", func(c *gin.Context) {
 			s.Cancel()
