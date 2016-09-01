@@ -112,22 +112,17 @@ func (e *Engine) runVU(ctx context.Context, id int64, vu VU) {
 			return
 		default:
 			samples, err := vu.RunOnce(ctx)
+			e.mMutex.Lock()
 			if err != nil {
 				log.WithField("vu", id).WithError(err).Error("Runtime Error")
-				samples = append(samples, stats.Sample{
-					Metric: MetricVUs,
-					Time:   time.Now(),
-					Tags: map[string]string{
-						"vu":    idString,
-						"error": err.Error(),
-					},
+				e.Metrics[MetricErrors] = append(e.Metrics[MetricErrors], stats.Sample{
+					Time:  time.Now(),
+					Tags:  map[string]string{"vu": idString, "error": err.Error()},
 					Value: float64(1),
 				})
 			}
-
-			e.mMutex.Lock()
 			for _, s := range samples {
-				e.Metrics[s.Metric] = append(e.Metrics[s.Metric], s)
+				e.Metrics[s.Metric] = append(e.Metrics[s.Metric], s.Sample)
 			}
 			e.mMutex.Unlock()
 		}

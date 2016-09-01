@@ -26,10 +26,15 @@ const (
 
 // A Sample is a single measurement.
 type Sample struct {
+	Time  time.Time
+	Tags  map[string]string
+	Value float64
+}
+
+// An MSample is a Sample tagged with a Metric, to make returning samples easier.
+type FatSample struct {
+	Sample
 	Metric *Metric
-	Time   time.Time
-	Tags   map[string]string
-	Value  float64
 }
 
 // A Metric defines the shape of a set of data.
