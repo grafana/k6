@@ -1,3 +1,0 @@
-[submodule "postman/lib/sugar"]
-	path = speedboat_old/postman/lib/sugar
-	url = https://github.com/andrewplummer/Sugar
