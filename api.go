@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	log "github.com/Sirupsen/logrus"
+	"github.com/gin-gonic/contrib/static"
 	"github.com/gin-gonic/gin"
 	"github.com/loadimpact/speedboat/client"
 	"github.com/loadimpact/speedboat/lib"
@@ -29,6 +30,7 @@ func (s *APIServer) Run(ctx context.Context, addr string) {
 	router.Use(s.logRequestsMiddleware)
 	router.Use(s.jsonErrorsMiddleware)
 
+	router.Use(static.Serve("/", static.LocalFile("web/dist", true)))
 	router.GET("/ping", func(c *gin.Context) {
 		c.Data(http.StatusNoContent, "", nil)
 	})

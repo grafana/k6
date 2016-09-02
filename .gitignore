@@ -1,4 +1,8 @@
 /speedboat
+/web/bower_components
+/web/node_modules
+/web/dist
+/web/tmp
 
 *.sublime-workspace
 .vagrant
