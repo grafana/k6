@@ -60,7 +60,7 @@ func (m *Metric) Format(samples []Sample) map[string]float64 {
 		for _, s := range samples {
 			total += s.Value
 		}
-		return map[string]float64{"value": total}
+		return map[string]float64{"count": total}
 	case Gauge:
 		l := len(samples)
 		if l == 0 {
