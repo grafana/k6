@@ -6,12 +6,16 @@
     </div>
 
     <ul class="list-group">
-      <li class="list-group-item metrics">
-        <span class="name">errors</span>
+      {{#each metrics as |metric|}}
+      <li class="list-group-item metrics clearfix">
+        <span class="name">{{metric.name}}</span>
         <span class="results pull-right">
-          <span class="key">count=</span><span class="value">500</span>
+          {{#each-in metric.data as |key value| }}
+          <span class="key">{{key}}=</span><span class="value">{{metric-format value metric.contains}}</span>
+          {{/each-in}}
         </span>
       </li>
+      {{/each}}
     </ul>
   </div>
   <div class="col-md-6 col-md-pull-6">

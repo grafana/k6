@@ -12,6 +12,8 @@ module.exports = function(defaults) {
     }
   });
 
+  app.import('bower_components/moment-duration-format/lib/moment-duration-format.js');
+
   app.import("bower_components/bootstrap/dist/fonts/glyphicons-halflings-regular.eot", { destDir: 'fonts' })
   app.import("bower_components/bootstrap/dist/fonts/glyphicons-halflings-regular.svg", { destDir: 'fonts' })
   app.import("bower_components/bootstrap/dist/fonts/glyphicons-halflings-regular.ttf", { destDir: 'fonts' })
