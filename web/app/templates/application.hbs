@@ -5,7 +5,7 @@
     </div>
     <div class="collapse navbar-collapse" id="navbar-collapse-1">
       <form class="navbar-form navbar-right">
-        <button class="btn btn-danger {{unless model.running 'disabled'}}" {{action 'abort'}}>{{if model.running "Abort" "Not Running"}}</button>
+        <button class="btn btn-danger {{unless running 'disabled'}}" {{action 'abort'}}>{{if running "Abort" "Not Running"}}</button>
       </form>
     </div>
   </div>
