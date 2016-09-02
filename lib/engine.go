@@ -72,6 +72,7 @@ loop:
 	e.Status.Running = false
 	e.Status.VUs = 0
 	e.Status.Pooled = 0
+	e.reportInternalStats()
 
 	return nil
 }
