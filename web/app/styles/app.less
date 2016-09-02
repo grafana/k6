@@ -1,1 +1,19 @@
 @import "bootstrap";
+@import "bootswatch/superhero/variables";
+@import "bootswatch/superhero/bootswatch";
+
+@key-color: lighten(#4E5D6C, 30%);
+
+.results {
+  font-size: 10pt;
+  line-height: 15pt;
+  .key {
+    color: @key-color;
+    margin-left: 5px;
+    &:first { margin-left: 0; }
+  }
+}
+
+.metrics {
+  .name { font-family: monospace; }
+}

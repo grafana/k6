@@ -6,7 +6,8 @@ module.exports = function(defaults) {
   var app = new EmberApp(defaults, {
     lessOptions: {
       paths: [
-        "bower_components/bootstrap/less"
+        "bower_components",
+        "bower_components/bootstrap/less",
       ]
     }
   });
