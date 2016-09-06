@@ -1,3 +1,8 @@
-/speedboat
-/samples
+speedboat
+samples
+web/dist
+web/tmp
+web/node_modules
+web/bower_components
 .vagrant
+.git
