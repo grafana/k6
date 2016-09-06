@@ -18,7 +18,7 @@ var (
 type Engine struct {
 	Runner  Runner
 	Status  Status
-	Metrics map[*stats.Metric][]stats.Sample
+	Metrics map[*stats.Metric]stats.Sink
 
 	ctx       context.Context
 	cancelers []context.CancelFunc
@@ -40,7 +40,7 @@ func NewEngine(r Runner, prepared int64) (*Engine, error) {
 
 	return &Engine{
 		Runner:  r,
-		Metrics: make(map[*stats.Metric][]stats.Sample),
+		Metrics: make(map[*stats.Metric]stats.Sink),
 		pool:    pool,
 	}, nil
 }
@@ -121,14 +121,8 @@ func (e *Engine) Scale(vus int64) error {
 func (e *Engine) reportInternalStats() {
 	e.mMutex.Lock()
 	t := time.Now()
-	e.Metrics[MetricVUs] = append(
-		e.Metrics[MetricVUs],
-		stats.Sample{Time: t, Tags: nil, Value: float64(len(e.cancelers))},
-	)
-	e.Metrics[MetricVUsPooled] = append(
-		e.Metrics[MetricVUsPooled],
-		stats.Sample{Time: t, Tags: nil, Value: float64(len(e.pool))},
-	)
+	e.getSink(MetricVUs).Add(stats.Sample{Time: t, Tags: nil, Value: float64(len(e.cancelers))})
+	e.getSink(MetricVUsPooled).Add(stats.Sample{Time: t, Tags: nil, Value: float64(len(e.pool))})
 	e.mMutex.Unlock()
 }
 
@@ -143,14 +137,14 @@ func (e *Engine) runVU(ctx context.Context, id int64, vu VU) {
 			e.mMutex.Lock()
 			if err != nil {
 				log.WithField("vu", id).WithError(err).Error("Runtime Error")
-				e.Metrics[MetricErrors] = append(e.Metrics[MetricErrors], stats.Sample{
+				e.getSink(MetricErrors).Add(stats.Sample{
 					Time:  time.Now(),
 					Tags:  map[string]string{"vu": idString, "error": err.Error()},
 					Value: float64(1),
 				})
 			}
 			for _, s := range samples {
-				e.Metrics[s.Metric] = append(e.Metrics[s.Metric], s)
+				e.getSink(s.Metric).Add(s)
 			}
 			e.mMutex.Unlock()
 		}
@@ -168,4 +162,21 @@ func (e *Engine) getVU() (VU, error) {
 
 	log.Warn("More VUs requested than what was prepared; instantiation during tests is costly and may skew results!")
 	return e.Runner.NewVU()
+}
+
+// Returns a value sink for a metric, created from the type if unavailable.
+func (e *Engine) getSink(m *stats.Metric) stats.Sink {
+	s, ok := e.Metrics[m]
+	if !ok {
+		switch m.Type {
+		case stats.Counter:
+			s = &stats.CounterSink{}
+		case stats.Gauge:
+			s = &stats.GaugeSink{}
+		case stats.Trend:
+			s = &stats.TrendSink{}
+		}
+		e.Metrics[m] = s
+	}
+	return s
 }

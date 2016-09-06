@@ -44,19 +44,19 @@ func (s *APIServer) Run(ctx context.Context, addr string) {
 		})
 		v1.GET("/metrics", func(c *gin.Context) {
 			metrics := make(map[string]client.Metric)
-			for m, samples := range s.Engine.Metrics {
+			for m, sink := range s.Engine.Metrics {
 				metrics[m.Name] = client.Metric{
 					Name:     m.Name,
 					Type:     client.MetricType(m.Type),
 					Contains: client.ValueType(m.Contains),
-					Data:     m.Format(samples),
+					Data:     sink.Format(),
 				}
 			}
 			c.JSON(200, metrics)
 		})
 		v1.GET("/metrics/:name", func(c *gin.Context) {
 			name := c.Param("name")
-			for m, samples := range s.Engine.Metrics {
+			for m, sink := range s.Engine.Metrics {
 				if m.Name != name {
 					continue
 				}
@@ -65,7 +65,7 @@ func (s *APIServer) Run(ctx context.Context, addr string) {
 					Name:     m.Name,
 					Type:     client.MetricType(m.Type),
 					Contains: client.ValueType(m.Contains),
-					Data:     m.Format(samples),
+					Data:     sink.Format(),
 				})
 				return
 			}
