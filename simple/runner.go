@@ -83,7 +83,7 @@ type VU struct {
 	cTrace *httptrace.ClientTrace
 }
 
-func (u *VU) RunOnce(ctx context.Context) ([]stats.FatSample, error) {
+func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 	resp, err := u.Client.Do(u.Request.WithContext(httptrace.WithClientTrace(ctx, u.cTrace)))
 	if err != nil {
 		u.tracer.Done()
@@ -101,39 +101,15 @@ func (u *VU) RunOnce(ctx context.Context) ([]stats.FatSample, error) {
 	}
 
 	t := time.Now()
-	return []stats.FatSample{
-		stats.FatSample{
-			Metric: MetricReqs,
-			Sample: stats.Sample{Time: t, Tags: tags, Value: 1},
-		},
-		stats.FatSample{
-			Metric: MetricReqDuration,
-			Sample: stats.Sample{Time: t, Tags: tags, Value: float64(trail.Duration)},
-		},
-		stats.FatSample{
-			Metric: MetricReqBlocked,
-			Sample: stats.Sample{Time: t, Tags: tags, Value: float64(trail.Blocked)},
-		},
-		stats.FatSample{
-			Metric: MetricReqLookingUp,
-			Sample: stats.Sample{Time: t, Tags: tags, Value: float64(trail.LookingUp)},
-		},
-		stats.FatSample{
-			Metric: MetricReqConnecting,
-			Sample: stats.Sample{Time: t, Tags: tags, Value: float64(trail.Connecting)},
-		},
-		stats.FatSample{
-			Metric: MetricReqSending,
-			Sample: stats.Sample{Time: t, Tags: tags, Value: float64(trail.Sending)},
-		},
-		stats.FatSample{
-			Metric: MetricReqWaiting,
-			Sample: stats.Sample{Time: t, Tags: tags, Value: float64(trail.Waiting)},
-		},
-		stats.FatSample{
-			Metric: MetricReqReceiving,
-			Sample: stats.Sample{Time: t, Tags: tags, Value: float64(trail.Receiving)},
-		},
+	return []stats.Sample{
+		stats.Sample{Metric: MetricReqs, Time: t, Tags: tags, Value: 1},
+		stats.Sample{Metric: MetricReqDuration, Time: t, Tags: tags, Value: float64(trail.Duration)},
+		stats.Sample{Metric: MetricReqBlocked, Time: t, Tags: tags, Value: float64(trail.Blocked)},
+		stats.Sample{Metric: MetricReqLookingUp, Time: t, Tags: tags, Value: float64(trail.LookingUp)},
+		stats.Sample{Metric: MetricReqConnecting, Time: t, Tags: tags, Value: float64(trail.Connecting)},
+		stats.Sample{Metric: MetricReqSending, Time: t, Tags: tags, Value: float64(trail.Sending)},
+		stats.Sample{Metric: MetricReqWaiting, Time: t, Tags: tags, Value: float64(trail.Waiting)},
+		stats.Sample{Metric: MetricReqReceiving, Time: t, Tags: tags, Value: float64(trail.Receiving)},
 	}, nil
 }
 
