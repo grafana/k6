@@ -48,7 +48,6 @@ func NewEngine(r Runner, prepared int64) (*Engine, error) {
 func (e *Engine) Run(ctx context.Context) error {
 	e.ctx = ctx
 
-	e.Status.ID = "default"
 	e.Status.Running = true
 	e.Status.ActiveVUs = int64(len(e.cancelers))
 	e.Status.InactiveVUs = int64(len(e.pool))

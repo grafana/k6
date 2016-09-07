@@ -7,9 +7,10 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/gin-gonic/contrib/static"
 	"github.com/gin-gonic/gin"
-	"github.com/google/jsonapi"
 	"github.com/loadimpact/speedboat/lib"
+	"github.com/manyminds/api2go/jsonapi"
 	"gopkg.in/tylerb/graceful.v1"
+	"io/ioutil"
 	"net/http"
 	// "strconv"
 	"time"
@@ -40,19 +41,23 @@ func (s *Server) Run(ctx context.Context, addr string) {
 	v1 := router.Group("/v1")
 	{
 		v1.GET("/info", func(c *gin.Context) {
-			if err := jsonapi.MarshalOnePayload(c.Writer, &s.Info); err != nil {
+			data, err := jsonapi.Marshal(s.Info)
+			if err != nil {
 				c.AbortWithError(500, err)
 				return
 			}
+			c.Data(200, contentType, data)
 		})
 		v1.GET("/error", func(c *gin.Context) {
 			c.AbortWithError(500, errors.New("This is an error"))
 		})
 		v1.GET("/status", func(c *gin.Context) {
-			if err := jsonapi.MarshalOnePayload(c.Writer, &s.Engine.Status); err != nil {
+			data, err := jsonapi.Marshal(s.Engine.Status)
+			if err != nil {
 				c.AbortWithError(500, err)
 				return
 			}
+			c.Data(200, contentType, data)
 		})
 		v1.GET("/metrics", func(c *gin.Context) {
 			metrics := make([]interface{}, 0, len(s.Engine.Metrics))
@@ -60,10 +65,12 @@ func (s *Server) Run(ctx context.Context, addr string) {
 				metric.Sample = sink.Format()
 				metrics = append(metrics, metric)
 			}
-			if err := jsonapi.MarshalManyPayload(c.Writer, metrics); err != nil {
+			data, err := jsonapi.Marshal(metrics)
+			if err != nil {
 				c.AbortWithError(500, err)
 				return
 			}
+			c.Data(200, contentType, data)
 		})
 		v1.GET("/metrics/:id", func(c *gin.Context) {
 			id := c.Param("id")
@@ -72,10 +79,12 @@ func (s *Server) Run(ctx context.Context, addr string) {
 					continue
 				}
 				metric.Sample = sink.Format()
-				if err := jsonapi.MarshalOnePayload(c.Writer, metric); err != nil {
+				data, err := jsonapi.Marshal(metric)
+				if err != nil {
 					c.AbortWithError(500, err)
 					return
 				}
+				c.Data(200, contentType, data)
 				return
 			}
 			c.AbortWithError(404, errors.New("Metric not found"))
