@@ -1,4 +1,4 @@
-package client
+package api
 
 import (
 	"errors"
@@ -18,6 +18,14 @@ const (
 	defaultString = `"default"`
 	timeString    = `"time"`
 )
+
+type Error struct {
+	Title string `json:"title"`
+}
+
+type ErrorResponse struct {
+	Errors []Error `json:"errors"`
+}
 
 type MetricType stats.MetricType
 

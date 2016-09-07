@@ -5,13 +5,16 @@ import (
 )
 
 type Status struct {
-	StartTime time.Time `json:"startTime" yaml:"startTime"`
+	ID string `json:"-" jsonapi:"primary,status"`
 
-	Running bool  `json:"running" yaml:"running"`
-	VUs     int64 `json:"vus" yaml:"vus"`
-	Pooled  int64 `json:"pooled" yaml:"pooled"`
+	StartTime time.Time `json:"startTime" jsonapi:"attr,startTime" yaml:"startTime"`
+
+	Running bool  `json:"running" jsonapi:"attr,running"`
+	VUs     int64 `json:"vus" jsonapi:"attr,vus"`
+	Pooled  int64 `json:"pooled" jsonapi:"attr,pooled"`
 }
 
 type Info struct {
-	Version string `json:"version"`
+	ID      string `json:"-" jsonapi:"primary,info"`
+	Version string `json:"version" jsonapi:"attr,version"`
 }

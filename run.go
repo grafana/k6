@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	log "github.com/Sirupsen/logrus"
-	"github.com/loadimpact/speedboat/client"
+	"github.com/loadimpact/speedboat/api"
 	"github.com/loadimpact/speedboat/lib"
 	"github.com/loadimpact/speedboat/simple"
 	"gopkg.in/urfave/cli.v1"
@@ -124,23 +124,24 @@ func actionRun(cc *cli.Context) error {
 		log.WithError(err).Error("Couldn't create the engine")
 		return err
 	}
-	engineC, cancelEngine := context.WithCancel(context.Background())
+	engineC, engineCancel := context.WithCancel(context.Background())
 	if duration > 0 {
-		engineC, cancelEngine = context.WithTimeout(context.Background(), duration)
+		engineC, engineCancel = context.WithTimeout(context.Background(), duration)
 	}
 
 	// Make the API Server
-	api := &APIServer{
+	srv := &api.Server{
 		Engine: engine,
-		Cancel: cancelEngine,
+		Cancel: engineCancel,
 		Info: lib.Info{
+			ID:      "default",
 			Version: cc.App.Version,
 		},
 	}
-	apiC, cancelAPI := context.WithCancel(context.Background())
+	srvC, srvCancel := context.WithCancel(context.Background())
 
 	// Make the Client
-	cl, err := client.New(addr)
+	cl, err := api.NewClient(addr)
 	if err != nil {
 		log.WithError(err).Error("Couldn't make a client; is the address valid?")
 		return err
@@ -153,7 +154,7 @@ func actionRun(cc *cli.Context) error {
 			log.Debug("Engine terminated")
 			if quit {
 				log.Debug("Quit requested; terminating API server...")
-				cancelAPI()
+				srvCancel()
 			}
 			wg.Done()
 		}()
@@ -168,7 +169,7 @@ func actionRun(cc *cli.Context) error {
 			wg.Done()
 		}()
 		log.WithField("addr", addr).Debug("API Server starting...")
-		api.Run(apiC, addr)
+		srv.Run(srvC, addr)
 	}()
 
 	// Wait for the API server to come online
@@ -201,15 +202,15 @@ func actionRun(cc *cli.Context) error {
 
 	log.Debug("Waiting for test to finish")
 	select {
-	case <-apiC.Done():
+	case <-srvC.Done():
 		log.Debug("API server terminated; shutting down...")
 	case sig := <-signals:
 		log.WithField("signal", sig).Debug("Signal received; shutting down...")
 	}
 
 	// Shut down the API server and engine, wait for them to terminate before exiting
-	cancelAPI()
-	cancelEngine()
+	srvCancel()
+	engineCancel()
 	wg.Wait()
 
 	return nil

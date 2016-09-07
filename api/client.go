@@ -1,10 +1,11 @@
-package client
+package api
 
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
+	"github.com/google/jsonapi"
 	"github.com/loadimpact/speedboat/lib"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -19,7 +20,7 @@ type Client struct {
 	Client  http.Client
 }
 
-func New(addr string) (*Client, error) {
+func NewClient(addr string) (*Client, error) {
 	if addr == "" {
 		return nil, errNoAddress
 	}
@@ -30,54 +31,55 @@ func New(addr string) (*Client, error) {
 	}, nil
 }
 
-func (c *Client) call(method string, relative url.URL, out interface{}) error {
+func (c *Client) call(method string, relative url.URL) (io.ReadCloser, error) {
 	req := http.Request{
 		Method: method,
 		URL:    c.BaseURL.ResolveReference(&relative),
 	}
 	res, err := c.Client.Do(&req)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	defer res.Body.Close()
 
 	if res.StatusCode >= 400 {
-		var envelope struct {
-			Error string `json:"error"`
-		}
 		body, _ := ioutil.ReadAll(res.Body)
+
+		var envelope ErrorResponse
 		if err := json.Unmarshal(body, &envelope); err != nil {
-			return err
+			return nil, err
 		}
-		if envelope.Error == "" {
-			envelope.Error = res.Status
+		if len(envelope.Errors) == 0 {
+			return nil, errors.New("Unknown error")
 		}
-		return errors.New(envelope.Error)
+		return nil, errors.New(envelope.Errors[0].Title)
 	}
 
-	if out == nil {
-		return nil
-	}
+	return res.Body, nil
+}
 
-	body, _ := ioutil.ReadAll(res.Body)
-	if err := json.Unmarshal(body, out); err != nil {
+func (c *Client) callSingle(method string, relative url.URL, out interface{}) error {
+	body, err := c.call(method, relative)
+	if err != nil {
 		return err
 	}
+	defer body.Close()
 
-	return nil
+	return jsonapi.UnmarshalPayload(body, out)
 }
 
 func (c *Client) Ping() error {
-	if err := c.call("GET", url.URL{Path: "/ping"}, nil); err != nil {
+	body, err := c.call("GET", url.URL{Path: "/ping"})
+	if err != nil {
 		return err
 	}
+	body.Close()
 	return nil
 }
 
 // Status returns the status of the currently running test.
 func (c *Client) Status() (lib.Status, error) {
 	var status lib.Status
-	if err := c.call("GET", url.URL{Path: "/v1/status"}, &status); err != nil {
+	if err := c.callSingle("GET", url.URL{Path: "/v1/status"}, &status); err != nil {
 		return status, err
 	}
 	return status, nil
@@ -85,17 +87,17 @@ func (c *Client) Status() (lib.Status, error) {
 
 // Scales the currently running test.
 func (c *Client) Scale(vus int64) error {
-	u := url.URL{Path: "/v1/scale", RawQuery: fmt.Sprintf("vus=%d", vus)}
-	if err := c.call("POST", u, nil); err != nil {
-		return err
-	}
+	// u := url.URL{Path: "/v1/scale", RawQuery: fmt.Sprintf("vus=%d", vus)}
+	// if err := c.call("POST", u, nil); err != nil {
+	// 	return err
+	// }
 	return nil
 }
 
 // Aborts the currently running test.
 func (c *Client) Abort() error {
-	if err := c.call("POST", url.URL{Path: "/v1/abort"}, nil); err != nil {
-		return err
-	}
+	// if err := c.call("POST", url.URL{Path: "/v1/abort"}, nil); err != nil {
+	// 	return err
+	// }
 	return nil
 }
