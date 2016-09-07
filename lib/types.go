@@ -1,9 +1,13 @@
 package lib
 
+import (
+	"gopkg.in/guregu/null.v3"
+)
+
 type Status struct {
-	Running     bool  `json:"running" yaml:"Running"`
-	ActiveVUs   int64 `json:"active-vus" yaml:"ActiveVUs"`
-	InactiveVUs int64 `json:"inactive-vus" yaml:"InactiveVUs"`
+	Running     null.Bool `json:"running" yaml:"Running"`
+	ActiveVUs   null.Int  `json:"active-vus" yaml:"ActiveVUs"`
+	InactiveVUs null.Int  `json:"inactive-vus" yaml:"InactiveVUs"`
 }
 
 func (s Status) GetName() string {

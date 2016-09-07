@@ -4,6 +4,7 @@ import (
 	"context"
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/speedboat/stats"
+	"gopkg.in/guregu/null.v3"
 	"strconv"
 	"sync"
 	"time"
@@ -48,9 +49,9 @@ func NewEngine(r Runner, prepared int64) (*Engine, error) {
 func (e *Engine) Run(ctx context.Context) error {
 	e.ctx = ctx
 
-	e.Status.Running = true
-	e.Status.ActiveVUs = int64(len(e.cancelers))
-	e.Status.InactiveVUs = int64(len(e.pool))
+	e.Status.Running = null.BoolFrom(true)
+	e.Status.ActiveVUs = null.IntFrom(int64(len(e.cancelers)))
+	e.Status.InactiveVUs = null.IntFrom(int64(len(e.pool)))
 
 	e.reportInternalStats()
 	ticker := time.NewTicker(1 * time.Second)
@@ -68,9 +69,9 @@ loop:
 	e.cancelers = nil
 	e.pool = nil
 
-	e.Status.Running = false
-	e.Status.ActiveVUs = 0
-	e.Status.InactiveVUs = 0
+	e.Status.Running = null.BoolFrom(false)
+	e.Status.ActiveVUs = null.IntFrom(0)
+	e.Status.InactiveVUs = null.IntFrom(0)
 	e.reportInternalStats()
 
 	return nil
@@ -111,8 +112,8 @@ func (e *Engine) Scale(vus int64) error {
 		e.cancelers = e.cancelers[:vus]
 	}
 
-	e.Status.ActiveVUs = int64(len(e.cancelers))
-	e.Status.InactiveVUs = int64(len(e.pool))
+	e.Status.ActiveVUs = null.IntFrom(int64(len(e.cancelers)))
+	e.Status.InactiveVUs = null.IntFrom(int64(len(e.pool)))
 
 	return nil
 }
