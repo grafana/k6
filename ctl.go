@@ -3,6 +3,8 @@ package main
 import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/speedboat/api"
+	"github.com/loadimpact/speedboat/lib"
+	"gopkg.in/guregu/null.v3"
 	"gopkg.in/urfave/cli.v1"
 	"gopkg.in/yaml.v2"
 	"os"
@@ -30,6 +32,16 @@ var commandAbort = cli.Command{
 	Action:    actionAbort,
 }
 
+func dumpYAML(v interface{}) error {
+	bytes, err := yaml.Marshal(v)
+	if err != nil {
+		log.WithError(err).Error("Serialization Error")
+		return err
+	}
+	_, _ = os.Stdout.Write(bytes)
+	return nil
+}
+
 func actionStatus(cc *cli.Context) error {
 	client, err := api.NewClient(cc.GlobalString("address"))
 	if err != nil {
@@ -42,15 +54,7 @@ func actionStatus(cc *cli.Context) error {
 		log.WithError(err).Error("Error")
 		return err
 	}
-
-	bytes, err := yaml.Marshal(status)
-	if err != nil {
-		log.WithError(err).Error("Serialization Error")
-		return err
-	}
-	_, _ = os.Stdout.Write(bytes)
-
-	return nil
+	return dumpYAML(status)
 }
 
 func actionScale(cc *cli.Context) error {
@@ -70,10 +74,12 @@ func actionScale(cc *cli.Context) error {
 		return err
 	}
 
-	if err := client.Scale(vus); err != nil {
+	status, err := client.UpdateStatus(lib.Status{ActiveVUs: null.IntFrom(vus)})
+	if err != nil {
 		log.WithError(err).Error("Error")
+		return err
 	}
-	return nil
+	return dumpYAML(status)
 }
 
 func actionAbort(cc *cli.Context) error {
@@ -83,8 +89,10 @@ func actionAbort(cc *cli.Context) error {
 		return err
 	}
 
-	if err := client.Abort(); err != nil {
+	status, err := client.UpdateStatus(lib.Status{Running: null.BoolFrom(false)})
+	if err != nil {
 		log.WithError(err).Error("Error")
+		return err
 	}
-	return nil
+	return dumpYAML(status)
 }
