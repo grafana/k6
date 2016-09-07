@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/contrib/static"
 	"github.com/gin-gonic/gin"
 	"github.com/loadimpact/speedboat/lib"
+	"github.com/manyminds/api2go"
 	"github.com/manyminds/api2go/jsonapi"
 	"gopkg.in/tylerb/graceful.v1"
 	"io/ioutil"
@@ -142,9 +143,9 @@ func (s *Server) jsonErrorsMiddleware(c *gin.Context) {
 	c.Header("Content-Type", contentType)
 	c.Next()
 	if len(c.Errors) > 0 {
-		var errors ErrorResponse
+		var errors api2go.HTTPError
 		for _, err := range c.Errors {
-			errors.Errors = append(errors.Errors, Error{
+			errors.Errors = append(errors.Errors, api2go.Error{
 				Title: err.Error(),
 			})
 		}

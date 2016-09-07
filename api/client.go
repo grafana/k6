@@ -3,9 +3,9 @@ package api
 import (
 	"encoding/json"
 	"errors"
-	"github.com/google/jsonapi"
 	"github.com/loadimpact/speedboat/lib"
-	"io"
+	"github.com/manyminds/api2go"
+	"github.com/manyminds/api2go/jsonapi"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -31,7 +31,8 @@ func NewClient(addr string) (*Client, error) {
 	}, nil
 }
 
-func (c *Client) call(method string, relative url.URL) (io.ReadCloser, error) {
+func (c *Client) request(method, path string) ([]byte, error) {
+	relative := url.URL{Path: path}
 	req := http.Request{
 		Method: method,
 		URL:    c.BaseURL.ResolveReference(&relative),
@@ -41,10 +42,11 @@ func (c *Client) call(method string, relative url.URL) (io.ReadCloser, error) {
 		return nil, err
 	}
 
-	if res.StatusCode >= 400 {
-		body, _ := ioutil.ReadAll(res.Body)
+	body, _ := ioutil.ReadAll(res.Body)
+	res.Body.Close()
 
-		var envelope ErrorResponse
+	if res.StatusCode >= 400 {
+		var envelope api2go.HTTPError
 		if err := json.Unmarshal(body, &envelope); err != nil {
 			return nil, err
 		}
@@ -54,32 +56,30 @@ func (c *Client) call(method string, relative url.URL) (io.ReadCloser, error) {
 		return nil, errors.New(envelope.Errors[0].Title)
 	}
 
-	return res.Body, nil
+	return body, nil
 }
 
-func (c *Client) callSingle(method string, relative url.URL, out interface{}) error {
-	body, err := c.call(method, relative)
+func (c *Client) call(method, path string, out interface{}) error {
+	body, err := c.request(method, path)
 	if err != nil {
 		return err
 	}
-	defer body.Close()
 
-	return jsonapi.UnmarshalPayload(body, out)
+	return jsonapi.Unmarshal(body, out)
 }
 
 func (c *Client) Ping() error {
-	body, err := c.call("GET", url.URL{Path: "/ping"})
+	_, err := c.request("GET", "/ping")
 	if err != nil {
 		return err
 	}
-	body.Close()
 	return nil
 }
 
 // Status returns the status of the currently running test.
 func (c *Client) Status() (lib.Status, error) {
 	var status lib.Status
-	if err := c.callSingle("GET", url.URL{Path: "/v1/status"}, &status); err != nil {
+	if err := c.call("GET", "/v1/status", &status); err != nil {
 		return status, err
 	}
 	return status, nil

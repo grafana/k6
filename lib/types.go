@@ -1,9 +1,9 @@
 package lib
 
 type Status struct {
-	Running     bool  `json:"running"`
-	ActiveVUs   int64 `json:"active-vus"`
-	InactiveVUs int64 `json:"inactive-vus"`
+	Running     bool  `json:"running" yaml:"Running"`
+	ActiveVUs   int64 `json:"active-vus" yaml:"ActiveVUs"`
+	InactiveVUs int64 `json:"inactive-vus" yaml:"InactiveVUs"`
 }
 
 func (s Status) GetName() string {
