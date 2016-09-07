@@ -11,12 +11,5 @@ export default Ember.Route.extend({
   }),
   model() {
     return this.get('store').findRecord('status', 'default');
-  },
-  actions: {
-    abort() {
-      return Ember.$.post("/v1/abort").then(()=> {
-        this.refresh();
-      });
-    },
-  },
+  }
 });
