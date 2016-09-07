@@ -10,7 +10,7 @@ export default Ember.Route.extend({
     }, 5000);
   }),
   model() {
-    return Ember.$.getJSON("/v1/status");
+    return this.get('store').findRecord('status', 'default');
   },
   actions: {
     abort() {

@@ -10,9 +10,9 @@ import (
 )
 
 var (
-	MetricVUs       = &stats.Metric{Name: "vus", Type: stats.Gauge}
-	MetricVUsPooled = &stats.Metric{Name: "vus_pooled", Type: stats.Gauge}
-	MetricErrors    = &stats.Metric{Name: "errors", Type: stats.Counter}
+	MetricActiveVUs   = &stats.Metric{Name: "vus_active", Type: stats.Gauge}
+	MetricInactiveVUs = &stats.Metric{Name: "vus_inactive", Type: stats.Gauge}
+	MetricErrors      = &stats.Metric{Name: "errors", Type: stats.Counter}
 )
 
 type Engine struct {
@@ -49,10 +49,9 @@ func (e *Engine) Run(ctx context.Context) error {
 	e.ctx = ctx
 
 	e.Status.ID = "default"
-	e.Status.StartTime = time.Now()
 	e.Status.Running = true
-	e.Status.VUs = int64(len(e.cancelers))
-	e.Status.Pooled = int64(len(e.pool))
+	e.Status.ActiveVUs = int64(len(e.cancelers))
+	e.Status.InactiveVUs = int64(len(e.pool))
 
 	e.reportInternalStats()
 	ticker := time.NewTicker(1 * time.Second)
@@ -71,8 +70,8 @@ loop:
 	e.pool = nil
 
 	e.Status.Running = false
-	e.Status.VUs = 0
-	e.Status.Pooled = 0
+	e.Status.ActiveVUs = 0
+	e.Status.InactiveVUs = 0
 	e.reportInternalStats()
 
 	return nil
@@ -113,8 +112,8 @@ func (e *Engine) Scale(vus int64) error {
 		e.cancelers = e.cancelers[:vus]
 	}
 
-	e.Status.VUs = int64(len(e.cancelers))
-	e.Status.Pooled = int64(len(e.pool))
+	e.Status.ActiveVUs = int64(len(e.cancelers))
+	e.Status.InactiveVUs = int64(len(e.pool))
 
 	return nil
 }
@@ -122,8 +121,8 @@ func (e *Engine) Scale(vus int64) error {
 func (e *Engine) reportInternalStats() {
 	e.mMutex.Lock()
 	t := time.Now()
-	e.getSink(MetricVUs).Add(stats.Sample{Time: t, Tags: nil, Value: float64(len(e.cancelers))})
-	e.getSink(MetricVUsPooled).Add(stats.Sample{Time: t, Tags: nil, Value: float64(len(e.pool))})
+	e.getSink(MetricActiveVUs).Add(stats.Sample{Time: t, Tags: nil, Value: float64(len(e.cancelers))})
+	e.getSink(MetricInactiveVUs).Add(stats.Sample{Time: t, Tags: nil, Value: float64(len(e.pool))})
 	e.mMutex.Unlock()
 }
 

@@ -2,15 +2,15 @@
   <div class="col-md-6 col-md-push-6">
     <h4>Active VUs <small>{{#if application.running}}<a href="#">click to scale</a>{{else}}<span class="text-muted">test ended</span>{{/if}}</small></h4>
     <div class="progress">
-      <div class="progress-bar" role="progressbar" arial-valuenow="{{ vus }}" aria-valuemin="0" aria-valuemax="{{ vus_max }}" style="width: {{ vus_pct }}%; white-space: nowrap;"><span style="padding-left: 15px;">{{ vus_label }}</span></div>
+      <div class="progress-bar" role="progressbar" arial-valuenow="{{ vusActive }}" aria-valuemin="0" aria-valuemax="{{ vusMax }}" style="width: {{ vusPercent }}%; white-space: nowrap;"><span style="padding-left: 15px;">{{ vusLabel }}</span></div>
     </div>
 
     <ul class="list-group">
-      {{#each metrics as |metric|}}
+      {{#each model.metrics as |metric|}}
       <li class="list-group-item metrics clearfix">
-        <span class="name">{{metric.name}}</span>
+        <span class="name">{{metric.id}}</span>
         <span class="results pull-right">
-          {{#each-in metric.data as |key value| }}
+          {{#each-in metric.sample as |key value| }}
           <span class="key">{{key}}=</span><span class="value">{{metric-format value metric.contains}}</span>
           {{/each-in}}
         </span>

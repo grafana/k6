@@ -54,35 +54,32 @@ func (s *Server) Run(ctx context.Context, addr string) {
 				return
 			}
 		})
-		// v1.GET("/metrics", func(c *gin.Context) {
-		// 	metrics := make(map[string]Metric)
-		// 	for m, sink := range s.Engine.Metrics {
-		// 		metrics[m.Name] = Metric{
-		// 			Name:     m.Name,
-		// 			Type:     MetricType(m.Type),
-		// 			Contains: ValueType(m.Contains),
-		// 			Data:     sink.Format(),
-		// 		}
-		// 	}
-		// 	c.JSON(200, metrics)
-		// })
-		// v1.GET("/metrics/:name", func(c *gin.Context) {
-		// 	name := c.Param("name")
-		// 	for m, sink := range s.Engine.Metrics {
-		// 		if m.Name != name {
-		// 			continue
-		// 		}
-
-		// 		c.JSON(200, Metric{
-		// 			Name:     m.Name,
-		// 			Type:     MetricType(m.Type),
-		// 			Contains: ValueType(m.Contains),
-		// 			Data:     sink.Format(),
-		// 		})
-		// 		return
-		// 	}
-		// 	c.AbortWithError(404, errors.New("No such metric"))
-		// })
+		v1.GET("/metrics", func(c *gin.Context) {
+			metrics := make([]interface{}, 0, len(s.Engine.Metrics))
+			for metric, sink := range s.Engine.Metrics {
+				metric.Sample = sink.Format()
+				metrics = append(metrics, metric)
+			}
+			if err := jsonapi.MarshalManyPayload(c.Writer, metrics); err != nil {
+				c.AbortWithError(500, err)
+				return
+			}
+		})
+		v1.GET("/metrics/:id", func(c *gin.Context) {
+			id := c.Param("id")
+			for metric, sink := range s.Engine.Metrics {
+				if metric.Name != id {
+					continue
+				}
+				metric.Sample = sink.Format()
+				if err := jsonapi.MarshalOnePayload(c.Writer, metric); err != nil {
+					c.AbortWithError(500, err)
+					return
+				}
+				return
+			}
+			c.AbortWithError(404, errors.New("Metric not found"))
+		})
 		// v1.POST("/abort", func(c *gin.Context) {
 		// 	s.Cancel()
 		// 	c.JSON(202, gin.H{"success": true})
