@@ -59,6 +59,36 @@ func (s *Server) Run(ctx context.Context, addr string) {
 			}
 			c.Data(200, contentType, data)
 		})
+		v1.PATCH("/status", func(c *gin.Context) {
+			// TODO: Allow full control of running/active/inactive VUs; stopping a test shouldn't
+			// be final, and shouldn't implicitly affect anything else.
+			if !s.Engine.Status.Running {
+				c.AbortWithError(http.StatusBadRequest, errors.New("Test is stopped"))
+				return
+			}
+
+			status := s.Engine.Status
+			data, _ := ioutil.ReadAll(c.Request.Body)
+			if err := jsonapi.Unmarshal(data, &status); err != nil {
+				c.AbortWithError(http.StatusBadRequest, err)
+				return
+			}
+
+			if status.ActiveVUs != s.Engine.Status.ActiveVUs {
+				s.Engine.Scale(status.ActiveVUs)
+			}
+			if !s.Engine.Status.Running {
+				s.Cancel()
+			}
+			s.Engine.Status = status
+
+			data, err := jsonapi.Marshal(s.Engine.Status)
+			if err != nil {
+				c.AbortWithError(http.StatusInternalServerError, err)
+				return
+			}
+			c.Data(200, contentType, data)
+		})
 		v1.GET("/metrics", func(c *gin.Context) {
 			metrics := make([]interface{}, 0, len(s.Engine.Metrics))
 			for metric, sink := range s.Engine.Metrics {
@@ -89,24 +119,6 @@ func (s *Server) Run(ctx context.Context, addr string) {
 			}
 			c.AbortWithError(404, errors.New("Metric not found"))
 		})
-		// v1.POST("/abort", func(c *gin.Context) {
-		// 	s.Cancel()
-		// 	c.JSON(202, gin.H{"success": true})
-		// })
-		// v1.POST("/scale", func(c *gin.Context) {
-		// 	vus, err := strconv.ParseInt(c.Query("vus"), 10, 64)
-		// 	if err != nil {
-		// 		c.AbortWithError(http.StatusBadRequest, err)
-		// 		return
-		// 	}
-
-		// 	if err := s.Engine.Scale(vus); err != nil {
-		// 		c.AbortWithError(http.StatusInternalServerError, err)
-		// 		return
-		// 	}
-
-		// 	c.JSON(202, gin.H{"success": true})
-		// })
 	}
 	router.NoRoute(func(c *gin.Context) {
 		c.JSON(404, gin.H{"error": "Not Found"})
