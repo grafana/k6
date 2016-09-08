@@ -25,11 +25,18 @@ var commandScale = cli.Command{
 	Action:    actionScale,
 }
 
-var commandAbort = cli.Command{
-	Name:      "abort",
-	Usage:     "Aborts a running test",
+var commandPause = cli.Command{
+	Name:      "pause",
+	Usage:     "Pauses a running test",
 	ArgsUsage: " ",
-	Action:    actionAbort,
+	Action:    actionPause,
+}
+
+var commandResume = cli.Command{
+	Name:      "resume",
+	Usage:     "Resumes a paused test",
+	ArgsUsage: " ",
+	Action:    actionResume,
 }
 
 func dumpYAML(v interface{}) error {
@@ -82,7 +89,7 @@ func actionScale(cc *cli.Context) error {
 	return dumpYAML(status)
 }
 
-func actionAbort(cc *cli.Context) error {
+func actionPause(cc *cli.Context) error {
 	client, err := api.NewClient(cc.GlobalString("address"))
 	if err != nil {
 		log.WithError(err).Error("Couldn't create a client")
@@ -90,6 +97,21 @@ func actionAbort(cc *cli.Context) error {
 	}
 
 	status, err := client.UpdateStatus(lib.Status{Running: null.BoolFrom(false)})
+	if err != nil {
+		log.WithError(err).Error("Error")
+		return err
+	}
+	return dumpYAML(status)
+}
+
+func actionResume(cc *cli.Context) error {
+	client, err := api.NewClient(cc.GlobalString("address"))
+	if err != nil {
+		log.WithError(err).Error("Couldn't create a client")
+		return err
+	}
+
+	status, err := client.UpdateStatus(lib.Status{Running: null.BoolFrom(true)})
 	if err != nil {
 		log.WithError(err).Error("Error")
 		return err

@@ -126,14 +126,10 @@ func actionRun(cc *cli.Context) error {
 		return err
 	}
 	engineC, engineCancel := context.WithCancel(context.Background())
-	if duration > 0 {
-		engineC, engineCancel = context.WithTimeout(context.Background(), duration)
-	}
 
 	// Make the API Server
 	srv := &api.Server{
 		Engine: engine,
-		Cancel: engineCancel,
 		Info: lib.Info{
 			ID:      "default",
 			Version: cc.App.Version,
@@ -153,10 +149,6 @@ func actionRun(cc *cli.Context) error {
 	go func() {
 		defer func() {
 			log.Debug("Engine terminated")
-			if quit {
-				log.Debug("Quit requested; terminating API server...")
-				srvCancel()
-			}
 			wg.Done()
 		}()
 		log.WithField("prepared", prepared).Debug("Starting engine...")
@@ -191,11 +183,32 @@ func actionRun(cc *cli.Context) error {
 
 	// Scale the test up to the desired VU count
 	if vus > 0 {
-		log.WithField("vus", vus).Debug("Scaling test...")
-		status := lib.Status{ActiveVUs: null.IntFrom(vus)}
+		log.WithField("vus", vus).Debug("Starting test...")
+		status := lib.Status{
+			Running:   null.BoolFrom(true),
+			ActiveVUs: null.IntFrom(vus),
+		}
 		if _, err := cl.UpdateStatus(status); err != nil {
 			log.WithError(err).Error("Couldn't scale test")
 		}
+	}
+
+	// Pause the test once the duration expires
+	if duration > 0 {
+		log.WithField("duration", duration).Debug("Test will pause after...")
+		go func() {
+			time.Sleep(duration)
+			log.Debug("Duration expired, pausing...")
+			status := lib.Status{Running: null.BoolFrom(false)}
+			if _, err := cl.UpdateStatus(status); err != nil {
+				log.WithError(err).Error("Couldn't pause test")
+			}
+
+			if quit {
+				log.Debug("Quit requested, terminating...")
+				srvCancel()
+			}
+		}()
 	}
 
 	// Wait for a signal or timeout before shutting down

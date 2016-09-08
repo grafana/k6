@@ -20,6 +20,7 @@ type Engine struct {
 	Runner  Runner
 	Status  Status
 	Metrics map[*stats.Metric]stats.Sink
+	Pause   sync.WaitGroup
 
 	ctx       context.Context
 	cancelers []context.CancelFunc
@@ -30,28 +31,31 @@ type Engine struct {
 }
 
 func NewEngine(r Runner, prepared int64) (*Engine, error) {
-	pool := make([]VU, prepared)
+	e := &Engine{
+		Runner:  r,
+		Metrics: make(map[*stats.Metric]stats.Sink),
+		pool:    make([]VU, prepared),
+	}
+
 	for i := int64(0); i < prepared; i++ {
 		vu, err := r.NewVU()
 		if err != nil {
 			return nil, err
 		}
-		pool[i] = vu
+		e.pool[i] = vu
 	}
 
-	return &Engine{
-		Runner:  r,
-		Metrics: make(map[*stats.Metric]stats.Sink),
-		pool:    pool,
-	}, nil
+	e.Status.Running = null.BoolFrom(false)
+	e.Pause.Add(1)
+
+	e.Status.ActiveVUs = null.IntFrom(0)
+	e.Status.InactiveVUs = null.IntFrom(int64(len(e.pool)))
+
+	return e, nil
 }
 
 func (e *Engine) Run(ctx context.Context) error {
 	e.ctx = ctx
-
-	e.Status.Running = null.BoolFrom(true)
-	e.Status.ActiveVUs = null.IntFrom(int64(len(e.cancelers)))
-	e.Status.InactiveVUs = null.IntFrom(int64(len(e.pool)))
 
 	e.reportInternalStats()
 	ticker := time.NewTicker(1 * time.Second)
@@ -118,6 +122,17 @@ func (e *Engine) Scale(vus int64) error {
 	return nil
 }
 
+func (e *Engine) SetRunning(running bool) {
+	if running && !e.Status.Running.Bool {
+		e.Pause.Done()
+		log.Debug("Engine Unpaused")
+	} else if !running && e.Status.Running.Bool {
+		e.Pause.Add(1)
+		log.Debug("Engine Paused")
+	}
+	e.Status.Running.Bool = running
+}
+
 func (e *Engine) reportInternalStats() {
 	e.mMutex.Lock()
 	t := time.Now()
@@ -128,6 +143,10 @@ func (e *Engine) reportInternalStats() {
 
 func (e *Engine) runVU(ctx context.Context, id int64, vu VU) {
 	idString := strconv.FormatInt(id, 10)
+
+waitForPause:
+	e.Pause.Wait()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -147,6 +166,10 @@ func (e *Engine) runVU(ctx context.Context, id int64, vu VU) {
 				e.getSink(s.Metric).Add(s)
 			}
 			e.mMutex.Unlock()
+
+			if !e.Status.Running.Bool {
+				goto waitForPause
+			}
 		}
 	}
 }

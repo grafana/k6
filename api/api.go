@@ -21,9 +21,7 @@ var contentType = "application/vnd.api+json"
 
 type Server struct {
 	Engine *lib.Engine
-	Cancel context.CancelFunc
-
-	Info lib.Info
+	Info   lib.Info
 }
 
 // Run runs the API server.
@@ -61,13 +59,6 @@ func (s *Server) Run(ctx context.Context, addr string) {
 			c.Data(200, contentType, data)
 		})
 		v1.PATCH("/status", func(c *gin.Context) {
-			// TODO: Allow full control of running/active/inactive VUs; stopping a test shouldn't
-			// be final, and shouldn't implicitly affect anything else.
-			if !s.Engine.Status.Running.Bool {
-				c.AbortWithError(http.StatusBadRequest, errors.New("Test is stopped"))
-				return
-			}
-
 			var status lib.Status
 			data, _ := ioutil.ReadAll(c.Request.Body)
 			if err := jsonapi.Unmarshal(data, &status); err != nil {
@@ -79,9 +70,8 @@ func (s *Server) Run(ctx context.Context, addr string) {
 				s.Engine.Status.ActiveVUs = status.ActiveVUs
 				s.Engine.Scale(status.ActiveVUs.Int64)
 			}
-			if status.Running.Valid && !status.Running.Bool {
-				s.Engine.Status.Running = status.Running
-				s.Cancel()
+			if status.Running.Valid {
+				s.Engine.SetRunning(status.Running.Bool)
 			}
 
 			data, err := jsonapi.Marshal(s.Engine.Status)
