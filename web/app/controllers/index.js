@@ -11,4 +11,7 @@ export default Ember.Controller.extend({
   vusLabel: Ember.computed('vus', 'vusMax', function() {
     return this.get('vus') + ' / ' + this.get('vusMax');
   }),
+
+  metricsSortedBy: ['id'],
+  metrics: Ember.computed.sort('model.metrics', 'metricsSortedBy'),
 });
