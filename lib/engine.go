@@ -2,6 +2,7 @@ package lib
 
 import (
 	"context"
+	"errors"
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/speedboat/stats"
 	"gopkg.in/guregu/null.v3"
@@ -11,10 +12,18 @@ import (
 )
 
 var (
-	MetricActiveVUs   = &stats.Metric{Name: "vus_active", Type: stats.Gauge}
-	MetricInactiveVUs = &stats.Metric{Name: "vus_inactive", Type: stats.Gauge}
-	MetricErrors      = &stats.Metric{Name: "errors", Type: stats.Counter}
+	MetricVUs    = &stats.Metric{Name: "vus", Type: stats.Gauge}
+	MetricVUsMax = &stats.Metric{Name: "vus_max", Type: stats.Gauge}
+	MetricErrors = &stats.Metric{Name: "errors", Type: stats.Counter}
+
+	ErrTooManyVUs = errors.New("More VUs than the maximum requested")
+	ErrMaxTooLow  = errors.New("Can't lower max below current VU count")
 )
+
+type vuEntry struct {
+	VU     VU
+	Cancel context.CancelFunc
+}
 
 type Engine struct {
 	Runner  Runner
@@ -22,40 +31,37 @@ type Engine struct {
 	Metrics map[*stats.Metric]stats.Sink
 	Pause   sync.WaitGroup
 
-	ctx       context.Context
-	cancelers []context.CancelFunc
-	pool      []VU
+	ctx    context.Context
+	vus    []*vuEntry
+	nextID int64
 
 	vuMutex sync.Mutex
 	mMutex  sync.Mutex
 }
 
-func NewEngine(r Runner, prepared int64) (*Engine, error) {
+func NewEngine(r Runner) (*Engine, error) {
 	e := &Engine{
-		Runner:  r,
+		Runner: r,
+		Status: Status{
+			Running: null.BoolFrom(false),
+			VUs:     null.IntFrom(0),
+			VUsMax:  null.IntFrom(0),
+		},
 		Metrics: make(map[*stats.Metric]stats.Sink),
-		pool:    make([]VU, prepared),
-	}
-
-	for i := int64(0); i < prepared; i++ {
-		vu, err := r.NewVU()
-		if err != nil {
-			return nil, err
-		}
-		e.pool[i] = vu
 	}
 
 	e.Status.Running = null.BoolFrom(false)
 	e.Pause.Add(1)
 
-	e.Status.ActiveVUs = null.IntFrom(0)
-	e.Status.InactiveVUs = null.IntFrom(int64(len(e.pool)))
+	e.Status.VUs = null.IntFrom(0)
+	e.Status.VUsMax = null.IntFrom(0)
 
 	return e, nil
 }
 
 func (e *Engine) Run(ctx context.Context) error {
 	e.ctx = ctx
+	e.nextID = 1
 
 	e.reportInternalStats()
 	ticker := time.NewTicker(1 * time.Second)
@@ -70,54 +76,12 @@ loop:
 		}
 	}
 
-	e.cancelers = nil
-	e.pool = nil
+	e.vus = nil
 
 	e.Status.Running = null.BoolFrom(false)
-	e.Status.ActiveVUs = null.IntFrom(0)
-	e.Status.InactiveVUs = null.IntFrom(0)
+	e.Status.VUs = null.IntFrom(0)
+	e.Status.VUsMax = null.IntFrom(0)
 	e.reportInternalStats()
-
-	return nil
-}
-
-func (e *Engine) Scale(vus int64) error {
-	e.vuMutex.Lock()
-	defer e.vuMutex.Unlock()
-
-	l := int64(len(e.cancelers))
-	switch {
-	case l < vus:
-		for i := int64(len(e.cancelers)); i < vus; i++ {
-			vu, err := e.getVU()
-			if err != nil {
-				return err
-			}
-
-			id := i + 1
-			if err := vu.Reconfigure(id); err != nil {
-				return err
-			}
-
-			ctx, cancel := context.WithCancel(e.ctx)
-			e.cancelers = append(e.cancelers, cancel)
-			go func() {
-				e.runVU(ctx, id, vu)
-
-				e.vuMutex.Lock()
-				e.pool = append(e.pool, vu)
-				e.vuMutex.Unlock()
-			}()
-		}
-	case l > vus:
-		for _, cancel := range e.cancelers[vus+1:] {
-			cancel()
-		}
-		e.cancelers = e.cancelers[:vus]
-	}
-
-	e.Status.ActiveVUs = null.IntFrom(int64(len(e.cancelers)))
-	e.Status.InactiveVUs = null.IntFrom(int64(len(e.pool)))
 
 	return nil
 }
@@ -133,11 +97,72 @@ func (e *Engine) SetRunning(running bool) {
 	e.Status.Running.Bool = running
 }
 
+func (e *Engine) SetVUs(v int64) error {
+	e.vuMutex.Lock()
+	defer e.vuMutex.Unlock()
+
+	if v > e.Status.VUsMax.Int64 {
+		return ErrTooManyVUs
+	}
+
+	current := e.Status.VUs.Int64
+	for i := current; i < v; i++ {
+		entry := e.vus[i]
+		if entry.Cancel != nil {
+			panic(errors.New("ATTEMPTED TO RESCHEDULE RUNNING VU"))
+		}
+
+		ctx, cancel := context.WithCancel(e.ctx)
+		entry.Cancel = cancel
+
+		if err := entry.VU.Reconfigure(e.nextID); err != nil {
+			return err
+		}
+		go e.runVU(ctx, e.nextID, entry.VU)
+		e.nextID++
+	}
+	for i := current - 1; i >= v; i-- {
+		entry := e.vus[i]
+		entry.Cancel()
+		entry.Cancel = nil
+	}
+
+	e.Status.VUs.Int64 = v
+	return nil
+}
+
+func (e *Engine) SetMaxVUs(v int64) error {
+	e.vuMutex.Lock()
+	defer e.vuMutex.Unlock()
+
+	if v < e.Status.VUs.Int64 {
+		return ErrMaxTooLow
+	}
+
+	current := e.Status.VUsMax.Int64
+	if v > current {
+		vus := e.vus
+		for i := current; i < v; i++ {
+			vu, err := e.Runner.NewVU()
+			if err != nil {
+				return err
+			}
+			vus = append(vus, &vuEntry{VU: vu})
+		}
+		e.vus = vus
+	} else if v < current {
+		e.vus = e.vus[:v]
+	}
+
+	e.Status.VUsMax.Int64 = v
+	return nil
+}
+
 func (e *Engine) reportInternalStats() {
 	e.mMutex.Lock()
 	t := time.Now()
-	e.getSink(MetricActiveVUs).Add(stats.Sample{Time: t, Tags: nil, Value: float64(len(e.cancelers))})
-	e.getSink(MetricInactiveVUs).Add(stats.Sample{Time: t, Tags: nil, Value: float64(len(e.pool))})
+	e.getSink(MetricVUs).Add(stats.Sample{Time: t, Tags: nil, Value: float64(e.Status.VUs.Int64)})
+	e.getSink(MetricVUsMax).Add(stats.Sample{Time: t, Tags: nil, Value: float64(e.Status.VUsMax.Int64)})
 	e.mMutex.Unlock()
 }
 
@@ -172,19 +197,6 @@ waitForPause:
 			}
 		}
 	}
-}
-
-// Returns a pooled VU if available, otherwise make a new one.
-func (e *Engine) getVU() (VU, error) {
-	l := len(e.pool)
-	if l > 0 {
-		vu := e.pool[l-1]
-		e.pool = e.pool[:l-1]
-		return vu, nil
-	}
-
-	log.Warn("More VUs requested than what was prepared; instantiation during tests is costly and may skew results!")
-	return e.Runner.NewVU()
 }
 
 // Returns a value sink for a metric, created from the type if unavailable.

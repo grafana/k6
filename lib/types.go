@@ -5,9 +5,9 @@ import (
 )
 
 type Status struct {
-	Running     null.Bool `json:"running"`
-	ActiveVUs   null.Int  `json:"active-vus"`
-	InactiveVUs null.Int  `json:"inactive-vus"`
+	Running null.Bool `json:"running"`
+	VUs     null.Int  `json:"vus"`
+	VUsMax  null.Int  `json:"vus-max"`
 }
 
 func (s Status) GetName() string {

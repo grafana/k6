@@ -38,15 +38,14 @@ var commandRun = cli.Command{
 			Usage: "virtual users to simulate",
 			Value: 10,
 		},
+		cli.Int64Flag{
+			Name:  "max, m",
+			Usage: "max number of virtual users, if more than --vus",
+		},
 		cli.DurationFlag{
 			Name:  "duration, d",
 			Usage: "test duration, 0 to run until cancelled",
 			Value: 10 * time.Second,
-		},
-		cli.Int64Flag{
-			Name:  "prepare, p",
-			Usage: "VUs to prepare (but not start)",
-			Value: 0,
 		},
 		cli.StringFlag{
 			Name:  "type, t",
@@ -102,10 +101,12 @@ func actionRun(cc *cli.Context) error {
 
 	duration := cc.Duration("duration")
 	vus := cc.Int64("vus")
-
-	prepared := cc.Int64("prepare")
-	if prepared == 0 {
-		prepared = vus
+	max := cc.Int64("max")
+	if max == 0 {
+		max = vus
+	}
+	if vus > max {
+		return cli.NewExitError(lib.ErrTooManyVUs.Error(), 1)
 	}
 
 	quit := cc.Bool("quit")
@@ -120,7 +121,7 @@ func actionRun(cc *cli.Context) error {
 	}
 
 	// Make the Engine
-	engine, err := lib.NewEngine(runner, prepared)
+	engine, err := lib.NewEngine(runner)
 	if err != nil {
 		log.WithError(err).Error("Couldn't create the engine")
 		return err
@@ -148,7 +149,7 @@ func actionRun(cc *cli.Context) error {
 			log.Debug("Engine terminated")
 			wg.Done()
 		}()
-		log.WithField("prepared", prepared).Debug("Starting engine...")
+		log.Debug("Starting engine...")
 		if err := engine.Run(engineC); err != nil {
 			log.WithError(err).Error("Engine Error")
 		}
@@ -178,16 +179,15 @@ func actionRun(cc *cli.Context) error {
 		break
 	}
 
-	// Scale the test up to the desired VU count
-	if vus > 0 {
-		log.WithField("vus", vus).Debug("Starting test...")
-		status := lib.Status{
-			Running:   null.BoolFrom(true),
-			ActiveVUs: null.IntFrom(vus),
-		}
-		if _, err := cl.UpdateStatus(status); err != nil {
-			log.WithError(err).Error("Couldn't scale test")
-		}
+	// Start the test with the desired state
+	log.WithField("vus", vus).Debug("Starting test...")
+	status := lib.Status{
+		Running: null.BoolFrom(true),
+		VUs:     null.IntFrom(vus),
+		VUsMax:  null.IntFrom(max),
+	}
+	if _, err := cl.UpdateStatus(status); err != nil {
+		log.WithError(err).Error("Couldn't scale test")
 	}
 
 	// Pause the test once the duration expires

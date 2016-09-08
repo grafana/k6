@@ -66,9 +66,17 @@ func (s *Server) Run(ctx context.Context, addr string) {
 				return
 			}
 
-			if status.ActiveVUs.Valid && status.ActiveVUs != s.Engine.Status.ActiveVUs {
-				s.Engine.Status.ActiveVUs = status.ActiveVUs
-				s.Engine.Scale(status.ActiveVUs.Int64)
+			if status.VUsMax.Valid {
+				if err := s.Engine.SetMaxVUs(status.VUsMax.Int64); err != nil {
+					c.AbortWithError(http.StatusInternalServerError, err)
+					return
+				}
+			}
+			if status.VUs.Valid {
+				if err := s.Engine.SetVUs(status.VUs.Int64); err != nil {
+					c.AbortWithError(http.StatusInternalServerError, err)
+					return
+				}
 			}
 			if status.Running.Valid {
 				s.Engine.SetRunning(status.Running.Bool)

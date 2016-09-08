@@ -81,7 +81,7 @@ func actionScale(cc *cli.Context) error {
 		return err
 	}
 
-	status, err := client.UpdateStatus(lib.Status{ActiveVUs: null.IntFrom(vus)})
+	status, err := client.UpdateStatus(lib.Status{VUs: null.IntFrom(vus)})
 	if err != nil {
 		log.WithError(err).Error("Error")
 		return err
