@@ -25,6 +25,13 @@ var commandScale = cli.Command{
 	Action:    actionScale,
 }
 
+var commandCap = cli.Command{
+	Name:      "cap",
+	Usage:     "Changes the VU cap for a running test",
+	ArgsUsage: "max",
+	Action:    actionCap,
+}
+
 var commandPause = cli.Command{
 	Name:      "pause",
 	Usage:     "Pauses a running test",
@@ -82,6 +89,31 @@ func actionScale(cc *cli.Context) error {
 	}
 
 	status, err := client.UpdateStatus(lib.Status{VUs: null.IntFrom(vus)})
+	if err != nil {
+		log.WithError(err).Error("Error")
+		return err
+	}
+	return dumpYAML(status)
+}
+
+func actionCap(cc *cli.Context) error {
+	args := cc.Args()
+	if len(args) != 1 {
+		return cli.NewExitError("Wrong number of arguments!", 1)
+	}
+	max, err := strconv.ParseInt(args[0], 10, 64)
+	if err != nil {
+		log.WithError(err).Error("Error")
+		return err
+	}
+
+	client, err := api.NewClient(cc.GlobalString("address"))
+	if err != nil {
+		log.WithError(err).Error("Couldn't create a client")
+		return err
+	}
+
+	status, err := client.UpdateStatus(lib.Status{VUsMax: null.IntFrom(max)})
 	if err != nil {
 		log.WithError(err).Error("Error")
 		return err

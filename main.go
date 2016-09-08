@@ -21,6 +21,7 @@ func main() {
 		commandRun,
 		commandStatus,
 		commandScale,
+		commandCap,
 		commandPause,
 		commandResume,
 	}
