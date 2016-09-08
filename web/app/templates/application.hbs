@@ -5,7 +5,12 @@
     </div>
     <div class="collapse navbar-collapse" id="navbar-collapse-1">
       <form class="navbar-form navbar-right">
-        <button class="btn btn-danger {{unless running 'disabled'}}" {{action 'abort'}}>{{if running "Abort" "Not Running"}}</button>
+      {{#if running}}
+        <button class="btn btn-danger" {{action 'pause'}}>Pause</button>
+      {{/if}}
+      {{#unless running}}
+        <button class="btn btn-success" {{action 'resume'}}>Resume</button>
+      {{/unless}}
       </form>
     </div>
   </div>
