@@ -3,15 +3,12 @@ import Ember from 'ember';
 export default Ember.Controller.extend({
   application: Ember.inject.controller(),
 
-  vusActive: Ember.computed.alias('application.model.activeVUs'),
-  vusInactive: Ember.computed.alias('application.model.inactiveVUs'),
-  vusMax: Ember.computed('vusActive', 'vusInactive', function() {
-    return this.get('vusActive') + this.get('vusInactive');
+  vus: Ember.computed.alias('application.model.vus'),
+  vusMax: Ember.computed.alias('application.model.vusMax'),
+  vusPercent: Ember.computed('vus', 'vusMax', function() {
+    return (this.get('vus') / this.get('vusMax')) * 100;
   }),
-  vusPercent: Ember.computed('vusActive', 'maxVUs', function() {
-    return (this.get('vusActive') / this.get('maxVUs')) * 100;
-  }),
-  vusLabel: Ember.computed('vusActive', 'maxVUs', function() {
-    return this.get('vusActive') + ' / ' + this.get('vusMax');
+  vusLabel: Ember.computed('vus', 'vusMax', function() {
+    return this.get('vus') + ' / ' + this.get('vusMax');
   }),
 });
