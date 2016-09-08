@@ -23,7 +23,6 @@ func (s Status) SetID(id string) error {
 }
 
 type Info struct {
-	ID      string `json:"-"`
 	Version string `json:"version"`
 }
 

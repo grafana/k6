@@ -130,10 +130,7 @@ func actionRun(cc *cli.Context) error {
 	// Make the API Server
 	srv := &api.Server{
 		Engine: engine,
-		Info: lib.Info{
-			ID:      "default",
-			Version: cc.App.Version,
-		},
+		Info:   lib.Info{Version: cc.App.Version},
 	}
 	srvC, srvCancel := context.WithCancel(context.Background())
 
