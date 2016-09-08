@@ -2,11 +2,11 @@ package main
 
 import (
 	log "github.com/Sirupsen/logrus"
+	"github.com/ghodss/yaml"
 	"github.com/loadimpact/speedboat/api"
 	"github.com/loadimpact/speedboat/lib"
 	"gopkg.in/guregu/null.v3"
 	"gopkg.in/urfave/cli.v1"
-	"gopkg.in/yaml.v2"
 	"os"
 	"strconv"
 )
