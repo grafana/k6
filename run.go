@@ -58,6 +58,18 @@ var commandRun = cli.Command{
 		},
 	},
 	Action: actionRun,
+	Description: `Run starts a load test.
+
+   This is the main entry point to Speedboat, and will do two things:
+   
+   - Construct an Engine and provide it with a Runner, depending on the first
+     argument and the --type flag, which is used to execute the test.
+   
+   - Start an a web server on the address specified by the global --address
+     flag, which serves a web interface and a REST API for remote control.
+   
+   For ease of use, you may also pass initial status parameters (vus, max,
+   duration) to 'run', which will be applied through a normal API call.`,
 }
 
 func guessType(filename string) string {

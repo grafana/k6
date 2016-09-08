@@ -16,6 +16,12 @@ var commandStatus = cli.Command{
 	Usage:     "Looks up the status of a running test",
 	ArgsUsage: " ",
 	Action:    actionStatus,
+	Description: `Status will print the status of a running test to stdout in YAML format.
+
+   Use the global --address/-a flag to specify the host to connect to; the
+   default is port 6565 on the local machine.
+
+   Endpoint: /v1/status`,
 }
 
 var commandScale = cli.Command{
@@ -23,6 +29,13 @@ var commandScale = cli.Command{
 	Usage:     "Scales a running test",
 	ArgsUsage: "vus",
 	Action:    actionScale,
+	Description: `Scale will change the number of active VUs of a running test.
+
+   It is an error to scale a test beyond vus-max; this is because instantiating
+   new VUs is a very expensive operation, which may skew test results if done
+   during a running test, and should thus be done deliberately.
+
+   Endpoint: /v1/status`,
 }
 
 var commandCap = cli.Command{
@@ -30,6 +43,16 @@ var commandCap = cli.Command{
 	Usage:     "Changes the VU cap for a running test",
 	ArgsUsage: "max",
 	Action:    actionCap,
+	Description: `Cap will change the maximum number of VUs for a test.
+
+   Because instantiating new VUs is a potentially very expensive operation,
+   both in terms of CPU and RAM, you should be aware that you may see a bump in
+   response times and skewed averages if you increase the cap during a running
+   test.
+   
+   It's recommended to pause the test before creating a large number of VUs.
+   
+   Endpoint: /v1/status`,
 }
 
 var commandPause = cli.Command{
@@ -37,6 +60,13 @@ var commandPause = cli.Command{
 	Usage:     "Pauses a running test",
 	ArgsUsage: " ",
 	Action:    actionPause,
+	Description: `Pause pauses a running test.
+
+   Running VUs will finish their current iterations, then suspend themselves
+   until woken by the test's resumption. A sleeping VU will consume no CPU
+   cycles, but will still occupy memory.
+
+   Endpoint: /v1/status`,
 }
 
 var commandResume = cli.Command{
@@ -44,6 +74,12 @@ var commandResume = cli.Command{
 	Usage:     "Resumes a paused test",
 	ArgsUsage: " ",
 	Action:    actionResume,
+	Description: `Resume resumes a previously paused test.
+
+   This is the opposite of the pause command, and will do nothing to an already
+   running test.
+
+   Endpoint: /v1/status`,
 }
 
 func dumpYAML(v interface{}) error {
