@@ -102,11 +102,15 @@ func (t *Tracer) GotFirstResponseByte() {
 // DNSStart hook.
 func (t *Tracer) DNSStart(info httptrace.DNSStartInfo) {
 	t.dnsStart = time.Now()
+	t.dnsDone = t.dnsStart
 }
 
 // DNSDone hook.
 func (t *Tracer) DNSDone(info httptrace.DNSDoneInfo) {
 	t.dnsDone = time.Now()
+	if t.dnsStart.IsZero() {
+		t.dnsStart = t.dnsDone
+	}
 }
 
 // ConnectStart hook.
