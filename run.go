@@ -47,6 +47,10 @@ var commandRun = cli.Command{
 			Usage: "test duration, 0 to run until cancelled",
 			Value: 10 * time.Second,
 		},
+		cli.BoolFlag{
+			Name:  "paused, p",
+			Usage: "start test in a paused state",
+		},
 		cli.StringFlag{
 			Name:  "type, t",
 			Usage: "input type, one of: auto, url, js",
@@ -111,6 +115,7 @@ func actionRun(cc *cli.Context) error {
 	// Collect arguments
 	addr := cc.GlobalString("address")
 
+	paused := cc.Bool("paused")
 	duration := cc.Duration("duration")
 	vus := cc.Int64("vus")
 	max := cc.Int64("max")
@@ -194,7 +199,7 @@ func actionRun(cc *cli.Context) error {
 	// Start the test with the desired state
 	log.WithField("vus", vus).Debug("Starting test...")
 	status := lib.Status{
-		Running: null.BoolFrom(true),
+		Running: null.BoolFrom(!paused),
 		VUs:     null.IntFrom(vus),
 		VUsMax:  null.IntFrom(max),
 	}
