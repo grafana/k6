@@ -67,12 +67,26 @@ func (s *Server) Run(ctx context.Context, addr string) {
 			}
 
 			if status.VUsMax.Valid {
+				if status.VUsMax.Int64 < s.Engine.Status.VUs.Int64 {
+					if status.VUsMax.Int64 >= status.VUs.Int64 {
+						s.Engine.SetVUs(status.VUs.Int64)
+					} else {
+						c.AbortWithError(http.StatusBadRequest, lib.ErrMaxTooLow)
+						return
+					}
+				}
+
 				if err := s.Engine.SetMaxVUs(status.VUsMax.Int64); err != nil {
 					c.AbortWithError(http.StatusInternalServerError, err)
 					return
 				}
 			}
 			if status.VUs.Valid {
+				if status.VUs.Int64 > s.Engine.Status.VUsMax.Int64 {
+					c.AbortWithError(http.StatusBadRequest, lib.ErrTooManyVUs)
+					return
+				}
+
 				if err := s.Engine.SetVUs(status.VUs.Int64); err != nil {
 					c.AbortWithError(http.StatusInternalServerError, err)
 					return
