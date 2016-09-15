@@ -19,6 +19,7 @@ func main() {
 	app.Version = "0.2.0"
 	app.Commands = []cli.Command{
 		commandRun,
+		commandInspect,
 		commandStatus,
 		commandScale,
 		commandCap,

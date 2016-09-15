@@ -3,6 +3,7 @@
 /web/node_modules
 /web/dist
 /web/tmp
+/js/node_modules
 
 *.sublime-workspace
 .vagrant

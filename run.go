@@ -5,6 +5,7 @@ import (
 	"errors"
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/speedboat/api"
+	"github.com/loadimpact/speedboat/js"
 	"github.com/loadimpact/speedboat/lib"
 	"github.com/loadimpact/speedboat/simple"
 	"gopkg.in/guregu/null.v3"
@@ -74,6 +75,34 @@ var commandRun = cli.Command{
    
    For ease of use, you may also pass initial status parameters (vus, max,
    duration) to 'run', which will be applied through a normal API call.`,
+}
+
+var commandInspect = cli.Command{
+	Name:      "inspect",
+	Aliases:   []string{"i"},
+	Usage:     "Merges and prints test configuration",
+	ArgsUsage: "url|filename",
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  "type, t",
+			Usage: "input type, one of: auto, url, js",
+			Value: "auto",
+		},
+		cli.Int64Flag{
+			Name:  "vus, u",
+			Usage: "override vus",
+			Value: 10,
+		},
+		cli.Int64Flag{
+			Name:  "max, m",
+			Usage: "override vus-max",
+		},
+		cli.DurationFlag{
+			Name:  "duration, d",
+			Usage: "override duration",
+		},
+	},
+	Action: actionInspect,
 }
 
 func guessType(filename string) string {
@@ -243,4 +272,32 @@ func actionRun(cc *cli.Context) error {
 	wg.Wait()
 
 	return nil
+}
+
+func actionInspect(cc *cli.Context) error {
+	args := cc.Args()
+	if len(args) != 1 {
+		return cli.NewExitError("Wrong number of arguments!", 1)
+	}
+	filename := args[0]
+
+	t := cc.String("type")
+	if t == TypeAuto {
+		t = guessType(filename)
+	}
+
+	var opts lib.Options
+	switch t {
+	case TypeJS:
+		r, err := js.New()
+		if err != nil {
+			return cli.NewExitError(err.Error(), 1)
+		}
+
+		if _, err := r.Load(filename); err != nil {
+			return cli.NewExitError(err.Error(), 1)
+		}
+	}
+
+	return dumpYAML(opts)
 }
