@@ -116,18 +116,31 @@ func guessType(filename string) string {
 	}
 }
 
-func makeRunner(filename, t string) (lib.Runner, error) {
+func makeRunner(filename, t string, opts *lib.Options) (lib.Runner, error) {
 	if t == TypeAuto {
 		t = guessType(filename)
 	}
 
 	switch t {
-	case TypeAuto:
-		return makeRunner(filename, t)
 	case "":
 		return nil, ErrUnknownType
 	case TypeURL:
 		return simple.New(filename)
+	case TypeJS:
+		rt, err := js.New()
+		if err != nil {
+			return nil, err
+		}
+
+		exports, err := rt.Load(filename)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := rt.ExtractOptions(exports, opts); err != nil {
+			return nil, err
+		}
+		return &js.Runner{Runtime: rt, Exports: exports}, nil
 	default:
 		return nil, ErrInvalidType
 	}
@@ -141,29 +154,41 @@ func actionRun(cc *cli.Context) error {
 		return cli.NewExitError("Wrong number of arguments!", 1)
 	}
 
-	// Collect arguments
-	addr := cc.GlobalString("address")
-
-	paused := cc.Bool("paused")
-	duration := cc.Duration("duration")
-	vus := cc.Int64("vus")
-	max := cc.Int64("max")
-	if max == 0 {
-		max = vus
-	}
-	if vus > max {
-		return cli.NewExitError(lib.ErrTooManyVUs.Error(), 1)
-	}
-
-	quit := cc.Bool("quit")
-
 	// Make the Runner
 	filename := args[0]
 	runnerType := cc.String("type")
-	runner, err := makeRunner(filename, runnerType)
+	opts := lib.Options{}
+	runner, err := makeRunner(filename, runnerType, &opts)
 	if err != nil {
 		log.WithError(err).Error("Couldn't create a runner")
 		return err
+	}
+
+	// Collect arguments
+	addr := cc.GlobalString("address")
+	paused := cc.Bool("paused")
+	quit := cc.Bool("quit")
+
+	duration := opts.Duration
+	if cc.IsSet("duration") {
+		duration = cc.Duration("duration")
+	}
+
+	vus := opts.VUs
+	if cc.IsSet("vus") {
+		vus = cc.Int64("vus")
+	}
+
+	max := opts.VUsMax
+	if cc.IsSet("max") {
+		max = cc.Int64("max")
+	}
+	if max == 0 {
+		max = vus
+	}
+
+	if vus > max {
+		return cli.NewExitError(lib.ErrTooManyVUs.Error(), 1)
 	}
 
 	// Make the Engine
