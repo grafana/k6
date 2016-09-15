@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"github.com/GeertJohan/go.rice"
 	log "github.com/Sirupsen/logrus"
-	// "github.com/loadimpact/speedboat/lib"
+	"github.com/loadimpact/speedboat/lib"
 	"github.com/robertkrimen/otto"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 const wrapper = "(function() { var e = {}; (function(exports) {%s\n})(e); return e; })();"
@@ -59,6 +60,52 @@ func (r *Runtime) Load(filename string) (otto.Value, error) {
 	defer r.VM.Set("require", nil)
 
 	return r.loadFile(filename)
+}
+
+func (r *Runtime) ExtractOptions(exports otto.Value, opts *lib.Options) error {
+	expObj := exports.Object()
+	if expObj == nil {
+		return nil
+	}
+
+	v, err := expObj.Get("options")
+	if err != nil {
+		return err
+	}
+	obj := v.Object()
+	if obj == nil {
+		return nil
+	}
+
+	for _, key := range obj.Keys() {
+		val, err := obj.Get(key)
+		if err != nil {
+			return err
+		}
+
+		switch key {
+		case "vus":
+			vus, err := val.ToInteger()
+			if err != nil {
+				return err
+			}
+			opts.VUs = vus
+		case "vusMax":
+			vusMax, err := val.ToInteger()
+			if err != nil {
+				return err
+			}
+			opts.VUsMax = vusMax
+		case "duration":
+			seconds, err := val.ToFloat()
+			if err != nil {
+				return err
+			}
+			opts.Duration = time.Duration(seconds * float64(time.Second))
+		}
+	}
+
+	return nil
 }
 
 func (r *Runtime) loadFile(filename string) (otto.Value, error) {
