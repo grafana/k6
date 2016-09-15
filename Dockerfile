@@ -7,7 +7,7 @@ ADD . .
 # Build the binary
 RUN go get ./... && go install ./... && rm -rf /go/lib
 
-# Build the web UI
+# Build the web UI + JS runner
 RUN curl -sL https://deb.nodesource.com/setup_6.x | bash && \
 	apt-get install -y nodejs && \
 	npm -g install ember-cli bower && \
@@ -15,8 +15,11 @@ RUN curl -sL https://deb.nodesource.com/setup_6.x | bash && \
 	npm install && \
 	bower install --allow-root && \
 	ember build --env production && \
-	rm -rf -- tmp node_modules bower_components /usr/lib/node_modules && \
+	rm -rf -- tmp node_modules bower_components && \
+	cd .. && \
+	cd js && \
+	npm install && \
 	apt-get purge -y nodejs && \
-	apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+	apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /usr/lib/node_modules
 
 ENTRYPOINT ["/go/bin/speedboat"]

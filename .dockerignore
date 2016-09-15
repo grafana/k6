@@ -4,5 +4,6 @@ web/dist
 web/tmp
 web/node_modules
 web/bower_components
+js/node_modules
 .vagrant
 .git
