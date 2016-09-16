@@ -2,6 +2,7 @@ package lib
 
 import (
 	"gopkg.in/guregu/null.v3"
+	"sync"
 	"time"
 )
 
@@ -47,4 +48,20 @@ func (o Options) GetName() string {
 
 func (o Options) GetID() string {
 	return "default"
+}
+
+type Group struct {
+	Parent *Group
+	Name   string
+	Tests  map[string]*Test
+
+	TestMutex sync.Mutex
+}
+
+type Test struct {
+	Group *Group
+	Name  string
+
+	Passes int64
+	Fails  int64
 }

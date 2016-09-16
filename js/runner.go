@@ -7,6 +7,8 @@ import (
 	"github.com/loadimpact/speedboat/lib"
 	"github.com/loadimpact/speedboat/stats"
 	"github.com/robertkrimen/otto"
+	"sync"
+	"sync/atomic"
 )
 
 var ErrDefaultExport = errors.New("you must export a 'default' function")
@@ -15,6 +17,10 @@ const entrypoint = "__$$entrypoint$$__"
 
 type Runner struct {
 	Runtime *Runtime
+
+	Groups       map[string]*lib.Group
+	DefaultGroup *lib.Group
+	GroupMutex   sync.Mutex
 }
 
 func NewRunner(runtime *Runtime, exports otto.Value) (*Runner, error) {
@@ -36,11 +42,22 @@ func NewRunner(runtime *Runtime, exports otto.Value) (*Runner, error) {
 		return nil, err
 	}
 
-	return &Runner{Runtime: runtime}, nil
+	return &Runner{
+		Runtime: runtime,
+		Groups:  make(map[string]*lib.Group),
+		DefaultGroup: &lib.Group{
+			Name:  "",
+			Tests: make(map[string]*lib.Test),
+		},
+	}, nil
 }
 
 func (r *Runner) NewVU() (lib.VU, error) {
-	u := &VU{runner: r, vm: r.Runtime.VM.Copy()}
+	u := &VU{
+		runner: r,
+		vm:     r.Runtime.VM.Copy(),
+		group:  r.DefaultGroup,
+	}
 
 	callable, err := u.vm.Get(entrypoint)
 	if err != nil {
@@ -83,11 +100,30 @@ func (u *VU) Reconfigure(id int64) error {
 
 func (u *VU) DoGroup(call otto.FunctionCall) otto.Value {
 	name := call.Argument(0).String()
+	group, ok := u.runner.Groups[name]
+	if !ok {
+		u.runner.GroupMutex.Lock()
+		group, ok = u.runner.Groups[name]
+		if !ok {
+			group = &lib.Group{
+				Parent: u.group,
+				Name:   name,
+				Tests:  make(map[string]*lib.Test),
+			}
+			u.runner.Groups[name] = group
+			log.WithField("name", name).Debug("Group created")
+		} else {
+			log.WithField("name", name).Debug("Race on group creation")
+		}
+		u.runner.GroupMutex.Unlock()
+	}
+	u.group = group
+	defer func() { u.group = group.Parent }()
+
 	fn := call.Argument(1)
 	if !fn.IsFunction() {
 		panic(call.Otto.MakeSyntaxError("fn must be a function"))
 	}
-	log.WithField("name", name).Info("Group")
 
 	val, err := fn.Call(call.This)
 	if err != nil {
@@ -101,14 +137,35 @@ func (u *VU) DoTest(call otto.FunctionCall) otto.Value {
 		return otto.UndefinedValue()
 	}
 
+	group := u.group
 	arg0 := call.Argument(0)
 	for _, v := range call.ArgumentList[1:] {
 		obj := v.Object()
 		if obj == nil {
 			panic(call.Otto.MakeTypeError("tests must be objects"))
 		}
-		for _, key := range obj.Keys() {
-			val, err := obj.Get(key)
+		for _, name := range obj.Keys() {
+			test, ok := group.Tests[name]
+			if !ok {
+				group.TestMutex.Lock()
+				test, ok = group.Tests[name]
+				if !ok {
+					test = &lib.Test{Group: group, Name: name}
+					group.Tests[name] = test
+					log.WithFields(log.Fields{
+						"name":  name,
+						"group": group.Name,
+					}).Debug("Test created")
+				} else {
+					log.WithFields(log.Fields{
+						"name":  name,
+						"group": group.Name,
+					}).Debug("Race on test creation")
+				}
+				group.TestMutex.Unlock()
+			}
+
+			val, err := obj.Get(name)
 			if err != nil {
 				panic(err)
 			}
@@ -148,11 +205,13 @@ func (u *VU) DoTest(call otto.FunctionCall) otto.Value {
 				break
 			}
 
-			log.WithFields(log.Fields{
-				"arg0": arg0,
-				"key":  key,
-				"res":  res,
-			}).Info("Test")
+			if res {
+				count := atomic.AddInt64(&(test.Passes), 1)
+				log.WithField("passes", count).Debug("Passes")
+			} else {
+				count := atomic.AddInt64(&(test.Fails), 1)
+				log.WithField("fails", count).Debug("Fails")
+			}
 		}
 	}
 	return otto.UndefinedValue()
