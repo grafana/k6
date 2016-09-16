@@ -1,0 +1,15 @@
+<div class="panel panel-default">
+  {{#if group.name}}
+  <div class="panel-heading">
+    <h3 class="panel-title">{{group.name}}</h3>
+  </div>
+  {{/if}}
+
+  {{sb-test-list tests=group.testsSorted}}
+</div>
+
+<div class="nesting">
+{{#each group.groups as |g|}}
+  {{sb-group group=g}}
+{{/each}}
+</div>

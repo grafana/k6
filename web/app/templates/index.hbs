@@ -19,22 +19,6 @@
     </ul>
   </div>
   <div class="col-md-6 col-md-pull-6">
-    <div class="panel panel-default">
-      <div class="panel-heading">
-        <h3 class="panel-title">
-          Group 1
-          <span class="pull-right results"><span class="key">count=</span><span class="value">550</span></span>
-        </h3>
-      </div>
-      <ul class="list-group">
-        <li class="list-group-item">
-          <span class="name">Test 1</span>
-          <span class="results pull-right">
-            <span class="key">pass=</span><span class="value text-success">500</span>
-            <span class="key">fail=</span><span class="value text-danger">50</span>
-          </span>
-        </li>
-      </ul>
-    </div>
+    {{sb-group group=model.defaultGroup}}
   </div>
 </div>

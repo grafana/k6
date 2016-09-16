@@ -11,8 +11,11 @@ type Runner interface {
 	// of prepared VUs to be used to quickly scale up and down.
 	NewVU() (VU, error)
 
-	// Returns all known test groups, if any.
+	// Returns all known groups.
 	GetGroups() []*Group
+
+	// Returns all known tests.
+	GetTests() []*Test
 }
 
 // A VU is a Virtual User.

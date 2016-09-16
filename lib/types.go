@@ -128,12 +128,20 @@ func (g Group) GetReferences() []jsonapi.Reference {
 }
 
 func (g Group) GetReferencedIDs() []jsonapi.ReferenceID {
-	ids := make([]jsonapi.ReferenceID, 0, len(g.Tests))
+	ids := make([]jsonapi.ReferenceID, 0, len(g.Tests)+len(g.Groups))
 	for _, test := range g.Tests {
 		ids = append(ids, jsonapi.ReferenceID{
 			ID:           test.GetID(),
 			Type:         "tests",
 			Name:         "tests",
+			Relationship: jsonapi.ToManyRelationship,
+		})
+	}
+	for _, group := range g.Groups {
+		ids = append(ids, jsonapi.ReferenceID{
+			ID:           group.GetID(),
+			Type:         "groups",
+			Name:         "groups",
 			Relationship: jsonapi.ToManyRelationship,
 		})
 	}
@@ -149,11 +157,14 @@ func (g Group) GetReferencedIDs() []jsonapi.ReferenceID {
 }
 
 func (g Group) GetReferencedStructs() []jsonapi.MarshalIdentifier {
-	// Note: we're not sideloading the parent; if you request a list of groups, it'll already be
-	// there, if you requested a single group, you very likely don't actually care about it.
-	refs := make([]jsonapi.MarshalIdentifier, 0, len(g.Tests))
+	// Note: we're not sideloading the parent, that snowballs into making requests for a single
+	// group return *every single known group* thanks to the common root group.
+	refs := make([]jsonapi.MarshalIdentifier, 0, len(g.Tests)+len(g.Groups))
 	for _, test := range g.Tests {
 		refs = append(refs, test)
+	}
+	for _, group := range g.Groups {
+		refs = append(refs, group)
 	}
 	return refs
 }
