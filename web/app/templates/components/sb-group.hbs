@@ -8,7 +8,7 @@
   {{sb-test-list tests=group.testsSorted}}
 </div>
 
-<div class="nesting">
+<div class="{{if group.name 'nesting'}}">
 {{#each group.groups as |g|}}
   {{sb-group group=g}}
 {{/each}}
