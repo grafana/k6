@@ -3,7 +3,7 @@ package js
 import (
 	"context"
 	"errors"
-	log "github.com/Sirupsen/logrus"
+	// log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/speedboat/lib"
 	"github.com/loadimpact/speedboat/stats"
 	"github.com/robertkrimen/otto"
@@ -16,11 +16,13 @@ var ErrDefaultExport = errors.New("you must export a 'default' function")
 const entrypoint = "__$$entrypoint$$__"
 
 type Runner struct {
-	Runtime *Runtime
-
-	Groups       map[string]*lib.Group
+	Runtime      *Runtime
 	DefaultGroup *lib.Group
-	GroupMutex   sync.Mutex
+	Groups       []*lib.Group
+
+	groupIDCounter int64
+	testIDCounter  int64
+	groupsMutex    sync.Mutex
 }
 
 func NewRunner(runtime *Runtime, exports otto.Value) (*Runner, error) {
@@ -42,14 +44,11 @@ func NewRunner(runtime *Runtime, exports otto.Value) (*Runner, error) {
 		return nil, err
 	}
 
-	return &Runner{
-		Runtime: runtime,
-		Groups:  make(map[string]*lib.Group),
-		DefaultGroup: &lib.Group{
-			Name:  "",
-			Tests: make(map[string]*lib.Test),
-		},
-	}, nil
+	r := &Runner{Runtime: runtime}
+	r.DefaultGroup = lib.NewGroup("", nil, nil)
+	r.Groups = []*lib.Group{r.DefaultGroup}
+
+	return r, nil
 }
 
 func (r *Runner) NewVU() (lib.VU, error) {
@@ -70,6 +69,10 @@ func (r *Runner) NewVU() (lib.VU, error) {
 	}
 
 	return u, nil
+}
+
+func (r *Runner) GetGroups() []*lib.Group {
+	return r.Groups
 }
 
 type VU struct {
@@ -100,22 +103,11 @@ func (u *VU) Reconfigure(id int64) error {
 
 func (u *VU) DoGroup(call otto.FunctionCall) otto.Value {
 	name := call.Argument(0).String()
-	group, ok := u.runner.Groups[name]
+	group, ok := u.group.Group(name, &(u.runner.groupIDCounter))
 	if !ok {
-		u.runner.GroupMutex.Lock()
-		group, ok = u.runner.Groups[name]
-		if !ok {
-			group = &lib.Group{
-				Parent: u.group,
-				Name:   name,
-				Tests:  make(map[string]*lib.Test),
-			}
-			u.runner.Groups[name] = group
-			log.WithField("name", name).Debug("Group created")
-		} else {
-			log.WithField("name", name).Debug("Race on group creation")
-		}
-		u.runner.GroupMutex.Unlock()
+		u.runner.groupsMutex.Lock()
+		u.runner.Groups = append(u.runner.Groups, group)
+		u.runner.groupsMutex.Unlock()
 	}
 	u.group = group
 	defer func() { u.group = group.Parent }()
@@ -137,7 +129,6 @@ func (u *VU) DoTest(call otto.FunctionCall) otto.Value {
 		return otto.UndefinedValue()
 	}
 
-	group := u.group
 	arg0 := call.Argument(0)
 	for _, v := range call.ArgumentList[1:] {
 		obj := v.Object()
@@ -145,32 +136,12 @@ func (u *VU) DoTest(call otto.FunctionCall) otto.Value {
 			panic(call.Otto.MakeTypeError("tests must be objects"))
 		}
 		for _, name := range obj.Keys() {
-			test, ok := group.Tests[name]
-			if !ok {
-				group.TestMutex.Lock()
-				test, ok = group.Tests[name]
-				if !ok {
-					test = &lib.Test{Group: group, Name: name}
-					group.Tests[name] = test
-					log.WithFields(log.Fields{
-						"name":  name,
-						"group": group.Name,
-					}).Debug("Test created")
-				} else {
-					log.WithFields(log.Fields{
-						"name":  name,
-						"group": group.Name,
-					}).Debug("Race on test creation")
-				}
-				group.TestMutex.Unlock()
-			}
-
 			val, err := obj.Get(name)
 			if err != nil {
 				panic(err)
 			}
 
-			var res bool
+			var result bool
 
 		typeSwitchLoop:
 			for {
@@ -182,35 +153,34 @@ func (u *VU) DoTest(call otto.FunctionCall) otto.Value {
 					}
 					continue typeSwitchLoop
 				case val.IsUndefined() || val.IsNull():
-					res = false
+					result = false
 				case val.IsBoolean():
 					b, err := val.ToBoolean()
 					if err != nil {
 						panic(err)
 					}
-					res = b
+					result = b
 				case val.IsNumber():
 					f, err := val.ToFloat()
 					if err != nil {
 						panic(err)
 					}
-					res = (f != 0)
+					result = (f != 0)
 				case val.IsString():
 					s, err := val.ToString()
 					if err != nil {
 						panic(err)
 					}
-					res = (s != "")
+					result = (s != "")
 				}
 				break
 			}
 
-			if res {
-				count := atomic.AddInt64(&(test.Passes), 1)
-				log.WithField("passes", count).Debug("Passes")
+			test, _ := u.group.Test(name, &(u.runner.testIDCounter))
+			if result {
+				atomic.AddInt64(&(test.Passes), 1)
 			} else {
-				count := atomic.AddInt64(&(test.Fails), 1)
-				log.WithField("fails", count).Debug("Fails")
+				atomic.AddInt64(&(test.Fails), 1)
 			}
 		}
 	}
