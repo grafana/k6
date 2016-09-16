@@ -9,3 +9,7 @@ export function group(name, fn, cond) {
 export function test(name, ...sets) {
 	return __vu_impl__.DoTest(name, ...sets);
 }
+
+export function sleep(secs) {
+	__vu_impl__.Sleep(secs);
+}

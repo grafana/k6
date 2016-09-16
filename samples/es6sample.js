@@ -1,4 +1,4 @@
-import { group, test } from "speedboat";
+import { group, test, sleep } from "speedboat";
 
 export let options = {
 	vus: 5,
@@ -10,4 +10,5 @@ export default function() {
 			"random value is < 0.5": (v) => v < 0.5
 		});
 	});
+	sleep(10 * Math.random());
 };
