@@ -1,13 +1,11 @@
 import Ember from 'ember';
 
 export default Ember.Route.extend({
-  _scheduleRefresh: Ember.on('init', function() {
+  _scheduleRefresh: Ember.on('init', function(delay = 5000) {
     Ember.run.later(()=> {
       this.refresh();
-      if (this.get('controller.model.running')) {
-        this._scheduleRefresh();
-      }
-    }, 5000);
+      this._scheduleRefresh(this.get('controller.model.running') ? 5000 : 15000);
+    }, delay);
   }),
   model() {
     return this.get('store').findRecord('status', 'default');
