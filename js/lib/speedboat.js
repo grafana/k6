@@ -13,3 +13,9 @@ export function test(name, ...sets) {
 export function sleep(secs) {
 	__jsapi__.Sleep(secs);
 }
+
+export default {
+	group: group,
+	test: test,
+	sleep: sleep,
+};
