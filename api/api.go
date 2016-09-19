@@ -4,21 +4,26 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/GeertJohan/go.rice"
 	log "github.com/Sirupsen/logrus"
-	"github.com/gin-gonic/contrib/static"
 	"github.com/gin-gonic/gin"
 	"github.com/loadimpact/speedboat/lib"
 	"github.com/manyminds/api2go"
 	"github.com/manyminds/api2go/jsonapi"
 	"gopkg.in/tylerb/graceful.v1"
 	"io/ioutil"
+	"mime"
 	"net/http"
+	"path"
 	"strconv"
 	// "strconv"
 	"time"
 )
 
-var contentType = "application/vnd.api+json"
+var (
+	contentType = "application/vnd.api+json"
+	webBox      = rice.MustFindBox("../web/dist")
+)
 
 type Server struct {
 	Engine *lib.Engine
@@ -28,13 +33,18 @@ type Server struct {
 // Run runs the API server.
 // I'm not sure how idiomatic this is, probably not particularly...
 func (s *Server) Run(ctx context.Context, addr string) {
+	indexData, err := webBox.Bytes("index.html")
+	if err != nil {
+		log.WithError(err).Error("Couldn't load index.html; web UI unavailable")
+	}
+
 	router := gin.New()
 
 	router.Use(gin.Recovery())
 	router.Use(s.logRequestsMiddleware)
 	router.Use(s.jsonErrorsMiddleware)
 
-	router.Use(static.Serve("/", static.LocalFile("web/dist", true)))
+	// router.Use(static.Serve("/", static.LocalFile("web/dist", true)))
 	router.GET("/ping", func(c *gin.Context) {
 		c.Data(http.StatusNoContent, "", nil)
 	})
@@ -196,7 +206,23 @@ func (s *Server) Run(ctx context.Context, addr string) {
 		})
 	}
 	router.NoRoute(func(c *gin.Context) {
-		c.JSON(404, gin.H{"error": "Not Found"})
+		requestPath := c.Request.URL.Path
+		bytes, err := webBox.Bytes(requestPath)
+		if err != nil {
+			log.WithError(err).Debug("Falling back to index.html")
+			if indexData == nil {
+				c.String(404, "Web UI is unavailable - see console output.")
+				return
+			}
+			c.Data(200, "text/html; charset=utf-8", indexData)
+			return
+		}
+
+		mimeType := mime.TypeByExtension(path.Ext(requestPath))
+		if mimeType == "" {
+			mimeType = "application/octet-stream"
+		}
+		c.Data(200, mimeType, bytes)
 	})
 
 	srv := graceful.Server{NoSignalHandling: true, Server: &http.Server{Addr: addr, Handler: router}}
