@@ -1,0 +1,42 @@
+export function request(method, url, body, params = {}) {
+	if (typeof body === "object") {
+		let newbody = "";
+		for (let entry of body) {
+			if (newbody !== "") {
+				newbody += "&";
+			}
+			newbody += entry[0] + "=" + encodeURIComponent(entry[1]);
+		}
+		body = newbody;
+	}
+	return __jsapi__.HTTPRequest(method, url, body, params);
+};
+
+export function get(url, body, params) {
+	return request("GET", url, body, params);
+};
+
+export function post(url, body, params) {
+	return request("POST", url, body, params);
+};
+
+export function put(url, body, params) {
+	return request("PUT", url, body, params);
+};
+
+export function delete_(url, body, params) {
+	return request("DELETE", url, body, params);
+};
+
+export function patch(url, body, params) {
+	return request("PATCH", url, body, params);
+};
+
+export default {
+	request: request,
+	get: get,
+	post: post,
+	put: put,
+	delete_: delete_,
+	patch: patch,
+};
