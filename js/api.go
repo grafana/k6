@@ -32,7 +32,7 @@ func (a JSAPI) DoGroup(call otto.FunctionCall) otto.Value {
 
 	val, err := fn.Call(call.This)
 	if err != nil {
-		panic(err)
+		throw(call.Otto, err)
 	}
 	return val
 }
@@ -51,12 +51,12 @@ func (a JSAPI) DoTest(call otto.FunctionCall) otto.Value {
 		for _, name := range obj.Keys() {
 			val, err := obj.Get(name)
 			if err != nil {
-				panic(err)
+				throw(call.Otto, err)
 			}
 
 			result, err := Test(val, arg0)
 			if err != nil {
-				panic(err)
+				throw(call.Otto, err)
 			}
 
 			test, ok := a.vu.group.Test(name, &(a.vu.runner.testIDCounter))
