@@ -15,9 +15,14 @@ export default function() {
 		});
 
 		group("http", function() {
-			test(http.get("http://localhost:8080"), {
-				"status is 200": (res) => res.status === 200,
+			let res = http.get("https://httpbin.org/get", null, {
+				headers: { "X-Test": "abc123" },
 			});
+			test(res, {
+				"status is 200": (res) => res.status === 200,
+				"X-Test header is correct": (res) => res.json().headers['X-Test'] === "abc123",
+			});
+			// console.log(res.body);
 		});
 
 		group("nested", function() {
