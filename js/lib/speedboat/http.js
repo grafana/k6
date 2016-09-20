@@ -1,3 +1,5 @@
+import { parseHTML } from "speedboat/html";
+
 export class Response {
 	constructor(data) {
 		Object.assign(this, data);
@@ -8,6 +10,16 @@ export class Response {
 			this._json = JSON.parse(this.body);
 		}
 		return this._json;
+	}
+
+	html(sel) {
+		if (!this._html) {
+			this._html = parseHTML(this.body);
+		}
+		if (sel) {
+			return this._html.find(sel);
+		}
+		return this._html;
 	}
 }
 

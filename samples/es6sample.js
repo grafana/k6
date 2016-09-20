@@ -14,7 +14,7 @@ export default function() {
 			"random value is < 0.5": (v) => v < 0.5
 		});
 
-		group("http", function() {
+		group("json", function() {
 			let res = http.get("https://httpbin.org/get", null, {
 				headers: { "X-Test": "abc123" },
 			});
@@ -23,6 +23,13 @@ export default function() {
 				"X-Test header is correct": (res) => res.json().headers['X-Test'] === "abc123",
 			});
 			// console.log(res.body);
+		});
+
+		group("html", function() {
+			test(http.get("http://test.loadimpact.com/"), {
+				"status is 200": (res) => res.status === 200,
+				"welcome message is correct": (res) => res.html("h2").text() === "Welcome to the LoadImpact.com demo site!",
+			});
 		});
 
 		group("nested", function() {
