@@ -22,6 +22,20 @@ func (a JSAPI) HTTPRequest(method, url, body string, params map[string]interface
 		throw(a.vu.vm, err)
 	}
 
+	if h, ok := params["headers"]; ok {
+		headers, ok := h.(map[string]interface{})
+		if !ok {
+			panic(a.vu.vm.MakeTypeError("headers must be an object"))
+		}
+		for key, v := range headers {
+			value, ok := v.(string)
+			if !ok {
+				panic(a.vu.vm.MakeTypeError("header values must be strings"))
+			}
+			req.Header.Set(key, value)
+		}
+	}
+
 	res, err := a.vu.HTTPClient.Do(req)
 	if err != nil {
 		throw(a.vu.vm, err)
