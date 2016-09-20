@@ -1,3 +1,16 @@
+export class Response {
+	constructor(data) {
+		Object.assign(this, data);
+	}
+
+	json() {
+		if (!this._json) {
+			this._json = JSON.parse(this.body);
+		}
+		return this._json;
+	}
+}
+
 export function request(method, url, body, params = {}) {
 	method = method.toUpperCase();
 	if (body) {
@@ -16,7 +29,7 @@ export function request(method, url, body, params = {}) {
 			body = "";
 		}
 	}
-	return __jsapi__.HTTPRequest(method, url, body, params);
+	return new Response(__jsapi__.HTTPRequest(method, url, body, params));
 };
 
 export function get(url, body, params) {
