@@ -2,6 +2,7 @@ package js
 
 import (
 	"github.com/kardianos/osext"
+	"os"
 	"path"
 )
 
@@ -11,8 +12,11 @@ var (
 )
 
 func init() {
-	if dir, err := osext.ExecutableFolder(); err == nil {
+	gopath := os.Getenv("GOPATH")
+	if gopath != "" {
+		babelDir = path.Join(gopath, "src", "github.com", "loadimpact", "speedboat", "js")
+	} else if dir, err := osext.ExecutableFolder(); err == nil {
 		babelDir = path.Join(dir, "js")
-		babel = path.Join(babelDir, "node_modules", ".bin", babel)
 	}
+	babel = path.Join(babelDir, "node_modules", ".bin", babel)
 }

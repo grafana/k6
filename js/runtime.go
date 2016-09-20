@@ -61,25 +61,27 @@ func (r *Runtime) Load(filename string) (otto.Value, error) {
 	// You can only require() modules during setup; doing it during runtime would sink your test's
 	// performance in potentially nonobvious ways. Only relative imports ("./*", "../*") are
 	// allowed for user code; absolute imports are used for system-provided libraries.
-	r.VM.Set("require", func(call otto.FunctionCall) otto.Value {
-		name := call.Argument(0).String()
-		if !strings.HasPrefix(name, ".") {
-			exports, err := r.loadLib(name + ".js")
-			if err != nil {
-				panic(call.Otto.MakeCustomError("ImportError", err.Error()))
-			}
-			return exports
-		}
+	r.VM.Set("require", r.require)
+	defer r.VM.Set("require", nil)
 
-		exports, err := r.loadFile(name + ".js")
+	return r.loadFile(filename)
+}
+
+func (r *Runtime) require(call otto.FunctionCall) otto.Value {
+	name := call.Argument(0).String()
+	if !strings.HasPrefix(name, ".") {
+		exports, err := r.loadLib(name + ".js")
 		if err != nil {
 			panic(call.Otto.MakeCustomError("ImportError", err.Error()))
 		}
 		return exports
-	})
-	defer r.VM.Set("require", nil)
+	}
 
-	return r.loadFile(filename)
+	exports, err := r.loadFile(name + ".js")
+	if err != nil {
+		panic(call.Otto.MakeCustomError("ImportError", err.Error()))
+	}
+	return exports
 }
 
 func (r *Runtime) ExtractOptions(exports otto.Value, opts *lib.Options) error {
