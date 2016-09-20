@@ -1,19 +1,20 @@
 export function request(method, url, body, params = {}) {
 	method = method.toUpperCase();
-	if (typeof body === "object") {
-		let formstring = "";
-		for (let entry of body) {
-			if (formstring !== "") {
-				formstring += "&";
+	if (body) {
+		if (typeof body === "object") {
+			let formstring = "";
+			for (let entry of body) {
+				if (formstring !== "") {
+					formstring += "&";
+				}
+				formstring += entry[0] + "=" + encodeURIComponent(entry[1]);
 			}
-			formstring += entry[0] + "=" + encodeURIComponent(entry[1]);
+			body = formstring;
 		}
-	}
-	if (method === "GET" || method === "HEAD") {
-		if (body) {
+		if (method === "GET" || method === "HEAD") {
 			url += (url.includes("?") ? "&" : "?") + body;
+			body = "";
 		}
-		body = "";
 	}
 	return __jsapi__.HTTPRequest(method, url, body, params);
 };
