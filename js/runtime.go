@@ -17,7 +17,10 @@ import (
 
 const wrapper = "(function() { var e = {}; (function(exports) {%s\n})(e); return e; })();"
 
-var libBox = rice.MustFindBox("lib")
+var (
+	libBox      = rice.MustFindBox("lib")
+	polyfillBox = rice.MustFindBox("node_modules/babel-polyfill")
+)
 
 type Runtime struct {
 	VM      *otto.Otto
@@ -32,8 +35,22 @@ func New() (*Runtime, error) {
 		return nil, err
 	}
 
+	vm := otto.New()
+
+	polyfillJS, err := polyfillBox.String("dist/polyfill.js")
+	if err != nil {
+		return nil, err
+	}
+	polyfill, err := vm.Compile("polyfill.js", polyfillJS)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := vm.Run(polyfill); err != nil {
+		return nil, err
+	}
+
 	return &Runtime{
-		VM:      otto.New(),
+		VM:      vm,
 		Root:    wd,
 		Exports: make(map[string]otto.Value),
 		Lib:     make(map[string]otto.Value),
