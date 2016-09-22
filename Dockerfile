@@ -19,7 +19,6 @@ RUN curl -sL https://deb.nodesource.com/setup_6.x | bash && \
 	cd .. && \
 	cd js && \
 	npm install && \
-	apt-get purge -y nodejs && \
-	apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /usr/lib/node_modules
+	apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 ENTRYPOINT ["/go/bin/speedboat"]
