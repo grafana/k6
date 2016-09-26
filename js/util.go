@@ -41,3 +41,19 @@ func throw(vm *otto.Otto, v interface{}) {
 	}
 	panic(v)
 }
+
+func newSnippetRunner(src string) (*Runner, error) {
+	rt, err := New()
+	if err != nil {
+		return nil, err
+	}
+	rt.VM.Set("require", rt.require)
+	defer rt.VM.Set("require", nil)
+
+	exp, err := rt.load("__snippet__", []byte(src))
+	if err != nil {
+		return nil, err
+	}
+
+	return NewRunner(rt, exp)
+}
