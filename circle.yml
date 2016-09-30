@@ -14,7 +14,7 @@ dependencies:
 
 test:
   override:
-    - docker run --entrypoint /bin/bash loadimpact/speedboat -c 'go get -t ./... && go test ./...'
+    - docker run --entrypoint /bin/bash loadimpact/speedboat -c 'cd $GOPATH/src/github.com/loadimpact/speedboat && go get -t ./... && go test ./...'
 
 deployment:
   release:
