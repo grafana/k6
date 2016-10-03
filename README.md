@@ -75,3 +75,5 @@ speedboat scale 50
 ```
 
 This is a quite powerful feature when combined with options like `-d 0` / `--duration 0`, which causes the test to run indefinitely until told otherwise. You're fully in control of how your test is executed!
+
+*For more information, see the included tutorials.*

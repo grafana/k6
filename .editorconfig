@@ -6,3 +6,7 @@ insert_final_newline = true
 trim_trailing_whitespace = true
 indent_style = tab
 indent_size = 4
+
+[*.md]
+indent_style = space
+trim_trailing_whitespace = false
