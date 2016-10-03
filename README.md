@@ -1,109 +1,77 @@
 Speedboat
 =========
 
-Speedboat is the codename for the next generation of Load Impact's load generator.
+Speedboat is the codename for the next generation of [Load Impact](https://loadimpact.com/)'s load generator.
 
-Getting started
----------------
+It features a modern codebase built on [Go](https://golang.org/) and integrates ES6, the latest iteration of Javascript, as a scripting language.
 
-#### Using Docker
+The simplest possible load script would be something along these lines:
 
-Speedboat is available as a public Docker container for instant execution:
+```es6
+// The script API is provided as ES6 modules, no global namespace pollution.
+// If you prefer the older style of doing things, you may also use require().
+import http from "speedboat/http";
 
-```
-docker run loadimpact/speedboat http://example.com
-docker run -v $PWD/script.js:/script.js:ro loadimpact/speedboat /script.js
-```
-
-#### Compiling from Go source
-
-You can also download and compile the sources:
-
-```
-go get github.com/loadimpact/speedboat
+// Export your test code as a 'default' function.
+export default function() {
+	// Make an HTTP request; this will yield a variety of metrics, eg. 'request_duration'.
+	http.get("http://test.loadimpact.com/");
+}
 ```
 
-Requires [a working Go environment](#for-go-beginners---how-to-set-up-go), version 1.6 or later. Will place the speedboat binary in $GOPATH/bin so you need to have that in your $PATH.
+To run it, simply do...
+
+```
+speedboat run script.js
+```
+
+Installation
+------------
+
+There are a couple of ways to set up Speedboat:
+
+1. The **recommended way** to get started is to grab a binary release from [the releases page](https://github.com/loadimpact/speedboat/releases). Either copy/link the `speedboat` binary somewhere in your `$PATH`, or use it as:
+
+   ```sh
+   ./speedboat run myscript.js
+   ```
+
+1. If you're comfortable using Docker, you may use that as well:
+
+   ```sh
+   docker pull loadimpact/speedboat
+   docker run --rm --net=host -v myscript.js:/myscript.js loadimpact/speedboat run /myscript.js
+   ```
+
+   It's recommended to run speedboat with `--net=host` as it slightly improves network throughput, and causes container ports to be accessible on the host without explicit exposure. Note that this means opting out of the network isolation normally provided to containers, refer to [the Docker manual](https://docs.docker.com/v1.8/articles/networking/#how-docker-networks-a-container) for more information.
+
+1. If you have a Go environment [set up](https://golang.org/doc/install), you may simply use `go get`:
+
+   ```sh
+   go get github.com/loadimpact/speedboat
+   ```
+
+   Use `go get -u` to pull down updates.
 
 Usage
 -----
 
-```
-# Run a test against a URL
-speedboat http://example.com/
+Speedboat works with the concept of "virtual users", or "VUs". A VU is essentially a glorified `while (true)` loop that runs a script over and over and reports stats or errors generated.
 
-# Run a script
-speedboat myscript.js
+Let's say you've written a script called `myscript.js` (you can copy the one from the top of this page), and you want to run it with 100 VUs for 30 seconds. You'd do something like this:
 
-# Run with 50 VUs for 30 seconds
-speedboat -u 50 -d 30s http://example.com/
+```sh
+speedboat run -u 100 -d 30s myscript.js
 ```
 
+The first thing you might notice is that the duration is written "30s", not "30". This is because we're using Go's duration notation, which means `90s`, `1m30s`, `24h` and `2d` are all valid durations, and much more readable than if you had to convert everything to seconds.
 
-For Go beginners - how to set up Go
------------------------------------
+The second thing you might notice (or maybe not, if you're just reading this) is that Speedboat doesn't actually exit immediately after the test finishes. There's a flag to make it (`-q`/`--quit`), but there's a reason for this: it exposes a full-fledged web UI on [http://localhost:6565/](http://localhost:6565/) (by default), which shows realtime statistics and errors.
 
-If you have never worked with Go before, you'll have to follow some steps to get a dev environment going.
+But that's not the only thing it does. It also exposes a REST API on the same port for controlling test execution, which you can call yourself with an HTTP client of your choice (curl, httpie, ...), or using the commandline wrappers - essentially every speedboat command aside from `run` wraps an API call. For example, this will scale the running test down to 50 VUs:
 
-This is a tl;dr version of ["How to Write Go Code"](https://golang.org/doc/code.html) from the official documentation - a highly recommended read if you'd like to get more acquainted with these things.
-
-### Quick Installation
-
-1. **Install Go 1.6 or later**
-   
-   On OSX, you can use [Homebrew](http://brew.sh):
-   
-   ```
-   brew install golang
-   ```
-   
-   On Ubuntu 16.04 or later, you can use the official package:
-   
-   ```
-   sudo apt-get install golang
-   ```
-   
-   On older Ubuntu systems, there's the [Ubuntu Containers Team's PPA](https://launchpad.net/%7Eubuntu-lxc/+archive/ubuntu/lxd-stable):
-   
-   ```
-   sudo add-apt-repository ppa:ubuntu-lxc/lxd-stable
-   sudo apt-get update
-   sudo apt-get install golang
-   ```
-
-2. **Create a Go Workspace**
-   
-   Just make an empty directory, anywhere you like. This will hold all your Go code. Yes, all of it. See below for an explanation.
-   
-   ```
-   mkdir $HOME/go
-   ```
-   
-   Then export an environment variable called `GOPATH` to point to it, and add `$GOPATH/bin` to your `$PATH`.
-   
-   ```
-   export GOPATH=$HOME/go
-   export PATH=$PATH:$GOPATH/bin
-   ```
-   
-   I'd recommend putting this in your `.profile` or similar.
-
-### Understanding `$GOPATH`
-
-Unlike most languages, Go has strong opinions on how your sources should be structured. Rather than having each project in its own, isolated workspace, you have a single workspace for all your Go code.
-
-It looks something like this:
-
-```
-src/
-   github.com/
-       loadimpact/
-           speedboat/
-               # ...sources...
-bin/
-   speedboat
+```sh
+speedboat scale 50
 ```
 
-This is because Go doesn't have a separate package manager, like `pip` or `npm` - instead, package names are repo URLs.
-
-The `go get` command then scans your code for imports, and recursively grabs dependencies using these URLs. In other words, package management is built into the language itself!
+This is a quite powerful feature when combined with options like `-d 0` / `--duration 0`, which causes the test to run indefinitely until told otherwise. You're fully in control of how your test is executed!
