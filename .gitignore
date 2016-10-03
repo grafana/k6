@@ -4,6 +4,7 @@
 /web/dist
 /web/tmp
 /js/node_modules
+/docs
 
 *.sublime-workspace
 .vagrant

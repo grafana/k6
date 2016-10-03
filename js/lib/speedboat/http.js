@@ -1,6 +1,13 @@
+/**
+ * @module speedboat/http
+ */
 import { parseHTML } from "speedboat/html";
 
 export class Response {
+	/**
+	 * Represents an HTTP response.
+	 * @memberOf module:speedboat/http
+	 */
 	constructor(data) {
 		Object.assign(this, data);
 	}
@@ -23,6 +30,14 @@ export class Response {
 	}
 }
 
+/**
+ * Makes an HTTP request.
+ * @param  {string} method      HTTP Method (eg. "GET")
+ * @param  {string} url         Request URL (eg. "http://example.com/")
+ * @param  {string|Object} body Request body (query for GET/HEAD); objects will be query encoded.
+ * @param  {Object} params      Additional parameters.
+ * @return {module:speedboat/http.Response}
+ */
 export function request(method, url, body, params = {}) {
 	method = method.toUpperCase();
 	if (body) {
@@ -44,22 +59,62 @@ export function request(method, url, body, params = {}) {
 	return new Response(__jsapi__.HTTPRequest(method, url, body, params));
 };
 
+/**
+ * Makes a GET request.
+ * @see    module:speedboat/http.request
+ * @param  {string} url         Request URL (eg. "http://example.com/")
+ * @param  {string|Object} body Request body (query for GET/HEAD); objects will be query encoded.
+ * @param  {Object} params      Additional parameters.
+ * @return {module:speedboat/http.Response}
+ */
 export function get(url, body, params) {
 	return request("GET", url, body, params);
 };
 
+/**
+ * Makes a POST request.
+ * @see    module:speedboat/http.request
+ * @param  {string} url         Request URL (eg. "http://example.com/")
+ * @param  {string|Object} body Request body (query for GET/HEAD); objects will be query encoded.
+ * @param  {Object} params      Additional parameters.
+ * @return {module:speedboat/http.Response}
+ */
 export function post(url, body, params) {
 	return request("POST", url, body, params);
 };
 
+/**
+ * Makes a PUT request.
+ * @see    module:speedboat/http.request
+ * @param  {string} url         Request URL (eg. "http://example.com/")
+ * @param  {string|Object} body Request body (query for GET/HEAD); objects will be query encoded.
+ * @param  {Object} params      Additional parameters.
+ * @return {module:speedboat/http.Response}
+ */
 export function put(url, body, params) {
 	return request("PUT", url, body, params);
 };
 
+/**
+ * Makes a DELETE request.
+ * @see    module:speedboat/http.request
+ * @param  {string} url         Request URL (eg. "http://example.com/")
+ * @param  {string|Object} body Request body (query for GET/HEAD); objects will be query encoded.
+ * @param  {Object} params      Additional parameters.
+ * @return {module:speedboat/http.Response}
+ */
 export function del(url, body, params) {
 	return request("DELETE", url, body, params);
 };
 
+/**
+ * Makes a PATCH request.
+ * @see    module:speedboat/http.request
+ * @param  {string} url         Request URL (eg. "http://example.com/")
+ * @param  {string|Object} body Request body (query for GET/HEAD); objects will be query encoded.
+ * @param  {Object} params      Additional parameters.
+ * @return {module:speedboat/http.Response}
+ */
 export function patch(url, body, params) {
 	return request("PATCH", url, body, params);
 };
