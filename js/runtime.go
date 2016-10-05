@@ -7,12 +7,12 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/speedboat/lib"
 	"github.com/robertkrimen/otto"
+	"gopkg.in/guregu/null.v3"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
 const wrapper = "(function() { var e = {}; (function(exports) {%s\n})(e); return e; })();"
@@ -111,19 +111,19 @@ func (r *Runtime) ExtractOptions(exports otto.Value, opts *lib.Options) error {
 			if err != nil {
 				return err
 			}
-			opts.VUs = vus
+			opts.VUs = null.IntFrom(vus)
 		case "vusMax":
 			vusMax, err := val.ToInteger()
 			if err != nil {
 				return err
 			}
-			opts.VUsMax = vusMax
+			opts.VUsMax = null.IntFrom(vusMax)
 		case "duration":
-			seconds, err := val.ToFloat()
+			duration, err := val.ToString()
 			if err != nil {
 				return err
 			}
-			opts.Duration = time.Duration(seconds * float64(time.Second))
+			opts.Duration = null.StringFrom(duration)
 		}
 	}
 
