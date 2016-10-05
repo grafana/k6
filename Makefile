@@ -1,3 +1,5 @@
+VERSION := 0.2.0
+
 all: build web docs
 
 .PHONY: build
@@ -20,3 +22,11 @@ web/bower_components:
 .PHONY: docs
 docs:
 	jsdoc -c jsdoc.json
+
+.PHONY: container
+container:
+	docker build --rm --pull --no-cache -t loadimpact/speedboat:$(VERSION) .
+
+.PHONY: push
+push:
+	docker push loadimpact/speedboat:$(VERSION)
