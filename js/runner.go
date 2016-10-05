@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strconv"
 	// log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/speedboat/lib"
 	"github.com/loadimpact/speedboat/stats"
@@ -104,7 +105,9 @@ func (r *Runner) GetTests() []*lib.Test {
 }
 
 type VU struct {
-	ID int64
+	ID       int64
+	IDString string
+	Samples  []stats.Sample
 
 	runner   *Runner
 	vm       *otto.Otto
@@ -123,10 +126,14 @@ func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 		return nil, err
 	}
 	u.ctx = nil
-	return nil, nil
+
+	samples := u.Samples
+	u.Samples = nil
+	return samples, nil
 }
 
 func (u *VU) Reconfigure(id int64) error {
 	u.ID = id
+	u.IDString = strconv.FormatInt(u.ID, 10)
 	return nil
 }
