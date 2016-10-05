@@ -250,6 +250,8 @@ func actionRun(cc *cli.Context) error {
 		break
 	}
 
+	log.Infof("Starting test - Web UI available at: http://%s/", addr)
+
 	// Start the test with the desired state
 	log.WithField("vus", vus).Debug("Starting test...")
 	status := lib.Status{
@@ -275,7 +277,10 @@ func actionRun(cc *cli.Context) error {
 			if quit {
 				log.Debug("Quit requested, terminating...")
 				srvCancel()
+				return
 			}
+
+			log.Info("Test finished, press Ctrl+C to exit")
 		}()
 	}
 
