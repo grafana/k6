@@ -86,3 +86,7 @@ func (a JSAPI) HTTPRequest(method, url, body string, params map[string]interface
 		"body":   string(resBody),
 	}
 }
+
+func (a JSAPI) HTTPSetMaxRedirects(n int) {
+	a.vu.MaxRedirects = n
+}

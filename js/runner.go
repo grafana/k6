@@ -3,6 +3,7 @@ package js
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	// log "github.com/Sirupsen/logrus"
@@ -13,6 +14,10 @@ import (
 	"net"
 	"sync"
 	"time"
+)
+
+const (
+	DefaultMaxRedirect = 10
 )
 
 var ErrDefaultExport = errors.New("you must export a 'default' function")
@@ -75,12 +80,12 @@ func (r *Runner) NewVU() (lib.VU, error) {
 	u := &VU{
 		runner: r,
 		vm:     r.Runtime.VM.Copy(),
+		group:  r.DefaultGroup,
+	}
 
-		HTTPClient: &http.Client{
-			Transport: r.HTTPTransport,
-		},
-
-		group: r.DefaultGroup,
+	u.HTTPClient = &http.Client{
+		Transport:     r.HTTPTransport,
+		CheckRedirect: u.checkRedirect,
 	}
 
 	callable, err := u.vm.Get(entrypoint)
@@ -113,13 +118,16 @@ type VU struct {
 	vm       *otto.Otto
 	callable otto.Value
 
-	HTTPClient *http.Client
+	HTTPClient   *http.Client
+	MaxRedirects int
 
 	ctx   context.Context
 	group *lib.Group
 }
 
 func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
+	u.MaxRedirects = DefaultMaxRedirect
+
 	u.ctx = ctx
 	if _, err := u.callable.Call(otto.UndefinedValue()); err != nil {
 		u.ctx = nil
@@ -135,5 +143,12 @@ func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 func (u *VU) Reconfigure(id int64) error {
 	u.ID = id
 	u.IDString = strconv.FormatInt(u.ID, 10)
+	return nil
+}
+
+func (u *VU) checkRedirect(req *http.Request, via []*http.Request) error {
+	if len(via) >= u.MaxRedirects {
+		return errors.New(fmt.Sprintf("stopped after %d redirects", u.MaxRedirects))
+	}
 	return nil
 }
