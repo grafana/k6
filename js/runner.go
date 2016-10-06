@@ -4,14 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
-	"strconv"
-	// log "github.com/Sirupsen/logrus"
+	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/speedboat/lib"
 	"github.com/loadimpact/speedboat/stats"
 	"github.com/robertkrimen/otto"
 	"math"
 	"net"
+	"net/http"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -147,6 +147,10 @@ func (u *VU) Reconfigure(id int64) error {
 }
 
 func (u *VU) checkRedirect(req *http.Request, via []*http.Request) error {
+	log.WithFields(log.Fields{
+		"from": via[len(via)-1].URL.String(),
+		"to":   req.URL.String(),
+	}).Debug("-> Redirect")
 	if len(via) >= u.MaxRedirects {
 		return errors.New(fmt.Sprintf("stopped after %d redirects", u.MaxRedirects))
 	}
