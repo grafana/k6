@@ -43,11 +43,11 @@ export function request(method, url, body, params = {}) {
 	if (body) {
 		if (typeof body === "object") {
 			let formstring = "";
-			for (let entry of body) {
+			for (let key in body) {
 				if (formstring !== "") {
 					formstring += "&";
 				}
-				formstring += entry[0] + "=" + encodeURIComponent(entry[1]);
+				formstring += key + "=" + encodeURIComponent(body[key]);
 			}
 			body = formstring;
 		}
