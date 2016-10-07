@@ -19,6 +19,17 @@ func (a JSAPI) Sleep(secs float64) {
 func (a JSAPI) Log(level int, msg string, args []otto.Value) {
 	fields := make(log.Fields, len(args))
 	for i, arg := range args {
+		if arg.IsObject() {
+			obj := arg.Object()
+			for _, key := range obj.Keys() {
+				v, err := obj.Get(key)
+				if err != nil {
+					throw(a.vu.vm, err)
+				}
+				fields[key] = v.String()
+			}
+			continue
+		}
 		fields["arg"+strconv.FormatInt(int64(i), 10)] = arg.String()
 	}
 
