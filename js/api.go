@@ -1,7 +1,9 @@
 package js
 
 import (
+	log "github.com/Sirupsen/logrus"
 	"github.com/robertkrimen/otto"
+	"strconv"
 	"sync/atomic"
 	"time"
 )
@@ -12,6 +14,25 @@ type JSAPI struct {
 
 func (a JSAPI) Sleep(secs float64) {
 	time.Sleep(time.Duration(secs * float64(time.Second)))
+}
+
+func (a JSAPI) Log(level int, msg string, args []otto.Value) {
+	fields := make(log.Fields, len(args))
+	for i, arg := range args {
+		fields["arg"+strconv.FormatInt(int64(i), 10)] = arg.String()
+	}
+
+	entry := log.WithFields(fields)
+	switch level {
+	case 0:
+		entry.Debug(msg)
+	case 1:
+		entry.Info(msg)
+	case 2:
+		entry.Warn(msg)
+	case 3:
+		entry.Error(msg)
+	}
 }
 
 func (a JSAPI) DoGroup(call otto.FunctionCall) otto.Value {

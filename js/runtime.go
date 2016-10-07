@@ -35,26 +35,30 @@ func New() (*Runtime, error) {
 		return nil, err
 	}
 
-	vm := otto.New()
+	rt := &Runtime{
+		VM:      otto.New(),
+		Root:    wd,
+		Exports: make(map[string]otto.Value),
+		Lib:     make(map[string]otto.Value),
+	}
 
 	polyfillJS, err := polyfillBox.String("dist/polyfill.js")
 	if err != nil {
 		return nil, err
 	}
-	polyfill, err := vm.Compile("polyfill.js", polyfillJS)
+	polyfill, err := rt.VM.Compile("polyfill.js", polyfillJS)
 	if err != nil {
 		return nil, err
 	}
-	if _, err := vm.Run(polyfill); err != nil {
+	if _, err := rt.VM.Run(polyfill); err != nil {
 		return nil, err
 	}
 
-	return &Runtime{
-		VM:      vm,
-		Root:    wd,
-		Exports: make(map[string]otto.Value),
-		Lib:     make(map[string]otto.Value),
-	}, nil
+	if _, err := rt.loadLib("_global.js"); err != nil {
+		return nil, err
+	}
+
+	return rt, nil
 }
 
 func (r *Runtime) Load(filename string) (otto.Value, error) {
