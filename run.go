@@ -8,8 +8,11 @@ import (
 	"github.com/loadimpact/speedboat/js"
 	"github.com/loadimpact/speedboat/lib"
 	"github.com/loadimpact/speedboat/simple"
+	"github.com/loadimpact/speedboat/stats"
+	"github.com/loadimpact/speedboat/stats/influxdb"
 	"gopkg.in/guregu/null.v3"
 	"gopkg.in/urfave/cli.v1"
+	"net/url"
 	"os"
 	"os/signal"
 	"strings"
@@ -60,6 +63,10 @@ var commandRun = cli.Command{
 		cli.BoolFlag{
 			Name:  "quit, q",
 			Usage: "quit immediately on test completion",
+		},
+		cli.StringFlag{
+			Name:  "out, o",
+			Usage: "output metrics to an external data store",
 		},
 	},
 	Action: actionRun,
@@ -146,6 +153,34 @@ func makeRunner(filename, t string, opts *lib.Options) (lib.Runner, error) {
 	}
 }
 
+func parseCollectorString(s string) (t string, u *url.URL, err error) {
+	parts := strings.SplitN(s, "=", 2)
+	if len(parts) != 2 {
+		return "", nil, errors.New("Malformed output; must be in the form 'type=url'")
+	}
+
+	u, err = url.Parse(parts[1])
+	if err != nil {
+		return "", nil, err
+	}
+
+	return parts[0], u, nil
+}
+
+func makeCollector(s string) (stats.Collector, error) {
+	t, u, err := parseCollectorString(s)
+	if err != nil {
+		return nil, err
+	}
+
+	switch t {
+	case "influxdb":
+		return influxdb.New(u)
+	default:
+		return nil, errors.New("Unknown output type: " + t)
+	}
+}
+
 func actionRun(cc *cli.Context) error {
 	wg := sync.WaitGroup{}
 
@@ -196,6 +231,19 @@ func actionRun(cc *cli.Context) error {
 		return cli.NewExitError(lib.ErrTooManyVUs.Error(), 1)
 	}
 
+	out := cc.String("out")
+
+	// Make the metric collector, if requested.
+	var collector stats.Collector
+	if out != "" {
+		c, err := makeCollector(out)
+		if err != nil {
+			log.WithError(err).Error("Couldn't create output")
+			return err
+		}
+		collector = c
+	}
+
 	// Make the Engine
 	engine, err := lib.NewEngine(runner)
 	if err != nil {
@@ -203,6 +251,7 @@ func actionRun(cc *cli.Context) error {
 		return err
 	}
 	engineC, engineCancel := context.WithCancel(context.Background())
+	engine.Collector = collector
 
 	// Make the API Server
 	srv := &api.Server{
