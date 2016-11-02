@@ -125,3 +125,8 @@ func New(name string, typ MetricType, t ...ValueType) *Metric {
 func (m Metric) GetID() string {
 	return m.Name
 }
+
+func (m *Metric) SetID(id string) error {
+	m.Name = id
+	return nil
+}

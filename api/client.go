@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/loadimpact/speedboat/lib"
+	"github.com/loadimpact/speedboat/stats"
 	"github.com/manyminds/api2go"
 	"github.com/manyminds/api2go/jsonapi"
 	"io/ioutil"
@@ -101,4 +102,13 @@ func (c *Client) UpdateStatus(status lib.Status) (lib.Status, error) {
 		return status, err
 	}
 	return status, nil
+}
+
+// Returns a snapshot of metrics for the currently running test.
+func (c *Client) Metrics() ([]stats.Metric, error) {
+	var metrics []stats.Metric
+	if err := c.call("GET", "/v1/metrics", nil, &metrics); err != nil {
+		return metrics, err
+	}
+	return metrics, nil
 }
