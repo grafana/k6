@@ -112,3 +112,11 @@ func (c *Client) Metrics() ([]stats.Metric, error) {
 	}
 	return metrics, nil
 }
+
+func (c *Client) Metric(name string) (stats.Metric, error) {
+	var metric stats.Metric
+	if err := c.call("GET", "/v1/metrics/"+name, nil, &metric); err != nil {
+		return metric, err
+	}
+	return metric, nil
+}

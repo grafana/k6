@@ -28,7 +28,7 @@ var commandStatus = cli.Command{
 var commandStats = cli.Command{
 	Name:      "stats",
 	Usage:     "Prints stats for a running test",
-	ArgsUsage: " ",
+	ArgsUsage: "[name]",
 	Action:    actionStats,
 }
 
@@ -109,6 +109,15 @@ func actionStats(cc *cli.Context) error {
 	if err != nil {
 		log.WithError(err).Error("Couldn't create a client")
 		return err
+	}
+
+	if len(cc.Args()) > 0 {
+		metric, err := client.Metric(cc.Args()[0])
+		if err != nil {
+			log.WithError(err).Error("Error")
+			return err
+		}
+		return dumpYAML(metric)
 	}
 
 	metricList, err := client.Metrics()
