@@ -28,30 +28,19 @@ var commandScale = cli.Command{
 	Name:      "scale",
 	Usage:     "Scales a running test",
 	ArgsUsage: "vus",
-	Action:    actionScale,
+	Flags: []cli.Flag{
+		cli.Int64Flag{
+			Name:  "max, m",
+			Usage: "update the max number of VUs allowed",
+		},
+	},
+	Action: actionScale,
 	Description: `Scale will change the number of active VUs of a running test.
 
    It is an error to scale a test beyond vus-max; this is because instantiating
    new VUs is a very expensive operation, which may skew test results if done
-   during a running test, and should thus be done deliberately.
+   during a running test. Use --max if you want to do this.
 
-   Endpoint: /v1/status`,
-}
-
-var commandCap = cli.Command{
-	Name:      "cap",
-	Usage:     "Changes the VU cap for a running test",
-	ArgsUsage: "max",
-	Action:    actionCap,
-	Description: `Cap will change the maximum number of VUs for a test.
-
-   Because instantiating new VUs is a potentially very expensive operation,
-   both in terms of CPU and RAM, you should be aware that you may see a bump in
-   response times and skewed averages if you increase the cap during a running
-   test.
-   
-   It's recommended to pause the test before creating a large number of VUs.
-   
    Endpoint: /v1/status`,
 }
 
@@ -124,7 +113,12 @@ func actionScale(cc *cli.Context) error {
 		return err
 	}
 
-	status, err := client.UpdateStatus(lib.Status{VUs: null.IntFrom(vus)})
+	update := lib.Status{VUs: null.IntFrom(vus)}
+	if cc.IsSet("max") {
+		update.VUsMax = null.IntFrom(cc.Int64("max"))
+	}
+
+	status, err := client.UpdateStatus(update)
 	if err != nil {
 		log.WithError(err).Error("Error")
 		return err

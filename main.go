@@ -22,7 +22,6 @@ func main() {
 		commandInspect,
 		commandStatus,
 		commandScale,
-		commandCap,
 		commandStart,
 		commandPause,
 	}
