@@ -69,12 +69,12 @@ var commandPause = cli.Command{
    Endpoint: /v1/status`,
 }
 
-var commandResume = cli.Command{
-	Name:      "resume",
-	Usage:     "Resumes a paused test",
+var commandStart = cli.Command{
+	Name:      "start",
+	Usage:     "Starts a paused test",
 	ArgsUsage: " ",
-	Action:    actionResume,
-	Description: `Resume resumes a previously paused test.
+	Action:    actionStart,
+	Description: `Start starts a paused test.
 
    This is the opposite of the pause command, and will do nothing to an already
    running test.
@@ -172,7 +172,7 @@ func actionPause(cc *cli.Context) error {
 	return dumpYAML(status)
 }
 
-func actionResume(cc *cli.Context) error {
+func actionStart(cc *cli.Context) error {
 	client, err := api.NewClient(cc.GlobalString("address"))
 	if err != nil {
 		log.WithError(err).Error("Couldn't create a client")

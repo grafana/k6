@@ -23,8 +23,8 @@ func main() {
 		commandStatus,
 		commandScale,
 		commandCap,
+		commandStart,
 		commandPause,
-		commandResume,
 	}
 	app.Flags = []cli.Flag{
 		cli.BoolFlag{
