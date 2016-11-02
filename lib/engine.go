@@ -30,6 +30,8 @@ type Engine struct {
 	Status    Status
 	Metrics   map[*stats.Metric]stats.Sink
 	Collector stats.Collector
+	Remaining time.Duration
+	Quit      bool
 	Pause     sync.WaitGroup
 
 	ctx    context.Context
@@ -65,7 +67,8 @@ func (e *Engine) Run(ctx context.Context) error {
 	e.nextID = 1
 
 	e.reportInternalStats()
-	ticker := time.NewTicker(1 * time.Second)
+	interval := 1 * time.Second
+	ticker := time.NewTicker(interval)
 
 	if e.Collector != nil {
 		go e.Collector.Run(ctx)
@@ -78,6 +81,21 @@ loop:
 		select {
 		case <-ticker.C:
 			e.reportInternalStats()
+
+			if e.Status.Running.Bool && e.Remaining != 0 {
+				e.Remaining -= interval
+				if e.Remaining <= 0 {
+					e.Remaining = 0
+					e.SetRunning(false)
+
+					if !e.Quit {
+						log.Info("Test expired, execution paused, pass --quit to exit here")
+					} else {
+						log.Info("Test ended, bye!")
+						break loop
+					}
+				}
+			}
 		case <-ctx.Done():
 			break loop
 		}

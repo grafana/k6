@@ -252,6 +252,8 @@ func actionRun(cc *cli.Context) error {
 	}
 	engineC, engineCancel := context.WithCancel(context.Background())
 	engine.Collector = collector
+	engine.Remaining = duration
+	engine.Quit = quit
 
 	// Make the API Server
 	srv := &api.Server{
@@ -278,6 +280,7 @@ func actionRun(cc *cli.Context) error {
 		if err := engine.Run(engineC); err != nil {
 			log.WithError(err).Error("Engine Error")
 		}
+		engineCancel()
 	}()
 	go func() {
 		defer func() {
@@ -286,6 +289,7 @@ func actionRun(cc *cli.Context) error {
 		}()
 		log.WithField("addr", addr).Debug("API Server starting...")
 		srv.Run(srvC, addr)
+		srvCancel()
 	}()
 
 	// Wait for the API server to come online
@@ -320,27 +324,6 @@ func actionRun(cc *cli.Context) error {
 		log.Info("Use `speedboat start` to start your test, or pass `--run` to autostart")
 	}
 
-	// Pause the test once the duration expires
-	if duration > 0 {
-		log.WithField("duration", duration).Debug("Test will pause after...")
-		go func() {
-			time.Sleep(duration)
-			log.Debug("Duration expired, pausing...")
-			status := lib.Status{Running: null.BoolFrom(false)}
-			if _, err := cl.UpdateStatus(status); err != nil {
-				log.WithError(err).Error("Couldn't pause test")
-			}
-
-			if quit {
-				log.Debug("Quit requested, terminating...")
-				srvCancel()
-				return
-			}
-
-			log.Info("Test finished, press Ctrl+C to exit")
-		}()
-	}
-
 	// Wait for a signal or timeout before shutting down
 	signals := make(chan os.Signal)
 	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
@@ -349,6 +332,8 @@ func actionRun(cc *cli.Context) error {
 	select {
 	case <-srvC.Done():
 		log.Debug("API server terminated; shutting down...")
+	case <-engineC.Done():
+		log.Debug("Engine terminated; shutting down...")
 	case sig := <-signals:
 		log.WithField("signal", sig).Debug("Signal received; shutting down...")
 	}
