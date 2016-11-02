@@ -30,6 +30,13 @@ var commandStats = cli.Command{
 	Usage:     "Prints stats for a running test",
 	ArgsUsage: "[name]",
 	Action:    actionStats,
+	Description: `Stats will print metrics about a running test to stdout in YAML format.
+
+   The result is a dictionary of metrics. If a name is specified, only that one
+   metric is fetched, otherwise every metric is printed in no particular order.
+
+   Endpoint: /v1/metrics
+             /v1/metrics/:id`,
 }
 
 var commandScale = cli.Command{
