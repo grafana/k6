@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/speedboat/api"
 	"github.com/loadimpact/speedboat/js"
@@ -15,6 +16,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"sort"
 	"strings"
 	"sync"
 	"syscall"
@@ -336,6 +338,35 @@ func actionRun(cc *cli.Context) error {
 		log.Debug("Engine terminated; shutting down...")
 	case sig := <-signals:
 		log.WithField("signal", sig).Debug("Signal received; shutting down...")
+	}
+
+	// If API server is still available, write final metrics to stdout.
+	// (An unavailable API server most likely means a port binding failure.)
+	select {
+	case <-srvC.Done():
+	default:
+		metricList, err := cl.Metrics()
+		if err != nil {
+			log.WithError(err).Error("Couldn't get metrics!")
+			break
+		}
+
+		// Poor man's object sort.
+		metrics := make(map[string]stats.Metric, len(metricList))
+		keys := make([]string, len(metricList))
+		for i, metric := range metricList {
+			metrics[metric.Name] = metric
+			keys[i] = metric.Name
+		}
+		sort.Strings(keys)
+
+		for _, key := range keys {
+			val := metrics[key].Humanize()
+			if val == "0" {
+				continue
+			}
+			fmt.Printf("%s: %s\n", key, val)
+		}
 	}
 
 	// Shut down the API server and engine, wait for them to terminate before exiting
