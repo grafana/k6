@@ -18,12 +18,12 @@ export function group(name, fn, cond) {
 }
 
 /**
- * Runs tests on a value.
+ * Runs checks on a value.
  * @param  {any}    val     Value to test.
  * @param  {...Object} sets Sets of tests.
  */
-export function test(val, ...sets) {
-	return __jsapi__.DoTest(val, ...sets);
+export function check(val, ...sets) {
+	return __jsapi__.DoCheck(val, ...sets);
 }
 
 /**
@@ -48,6 +48,6 @@ export function _assert(exp, err = "assertion failed") {
 
 export default {
 	group: group,
-	test: test,
+	check: check,
 	sleep: sleep,
 };

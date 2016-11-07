@@ -28,14 +28,14 @@ type Runner struct {
 	Runtime      *Runtime
 	DefaultGroup *lib.Group
 	Groups       []*lib.Group
-	Tests        []*lib.Test
+	Checks       []*lib.Check
 
 	HTTPTransport *http.Transport
 
 	groupIDCounter int64
 	groupsMutex    sync.Mutex
-	testIDCounter  int64
-	testsMutex     sync.Mutex
+	checkIDCounter int64
+	checksMutex    sync.Mutex
 }
 
 func NewRunner(runtime *Runtime, exports otto.Value) (*Runner, error) {
@@ -107,8 +107,8 @@ func (r *Runner) GetGroups() []*lib.Group {
 	return r.Groups
 }
 
-func (r *Runner) GetTests() []*lib.Test {
-	return r.Tests
+func (r *Runner) GetChecks() []*lib.Check {
+	return r.Checks
 }
 
 type VU struct {

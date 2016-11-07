@@ -77,8 +77,8 @@ func (r *Runner) GetGroups() []*lib.Group {
 	return []*lib.Group{}
 }
 
-func (r *Runner) GetTests() []*lib.Test {
-	return []*lib.Test{}
+func (r *Runner) GetChecks() []*lib.Check {
+	return []*lib.Check{}
 }
 
 type VU struct {

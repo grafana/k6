@@ -58,10 +58,10 @@ type Group struct {
 	Name   string            `json:"name"`
 	Parent *Group            `json:"-"`
 	Groups map[string]*Group `json:"-"`
-	Tests  map[string]*Test  `json:"-"`
+	Checks map[string]*Check `json:"-"`
 
 	groupMutex sync.Mutex `json:"-"`
-	testMutex  sync.Mutex `json:"-"`
+	checkMutex sync.Mutex `json:"-"`
 }
 
 func NewGroup(name string, parent *Group, idCounter *int64) *Group {
@@ -75,7 +75,7 @@ func NewGroup(name string, parent *Group, idCounter *int64) *Group {
 		Name:   name,
 		Parent: parent,
 		Groups: make(map[string]*Group),
-		Tests:  make(map[string]*Test),
+		Checks: make(map[string]*Check),
 	}
 }
 
@@ -94,19 +94,19 @@ func (g *Group) Group(name string, idCounter *int64) (*Group, bool) {
 	return group, ok
 }
 
-func (g *Group) Test(name string, idCounter *int64) (*Test, bool) {
-	snapshot := g.Tests
-	test, ok := snapshot[name]
+func (g *Group) Check(name string, idCounter *int64) (*Check, bool) {
+	snapshot := g.Checks
+	check, ok := snapshot[name]
 	if !ok {
-		g.testMutex.Lock()
-		test, ok = g.Tests[name]
+		g.checkMutex.Lock()
+		check, ok = g.Checks[name]
 		if !ok {
-			test = NewTest(name, g, idCounter)
-			g.Tests[name] = test
+			check = NewCheck(name, g, idCounter)
+			g.Checks[name] = check
 		}
-		g.testMutex.Unlock()
+		g.checkMutex.Unlock()
 	}
-	return test, ok
+	return check, ok
 }
 
 func (g Group) GetID() string {
@@ -121,20 +121,20 @@ func (g Group) GetReferences() []jsonapi.Reference {
 			Relationship: jsonapi.ToOneRelationship,
 		},
 		jsonapi.Reference{
-			Name:         "tests",
-			Type:         "tests",
+			Name:         "checks",
+			Type:         "checks",
 			Relationship: jsonapi.ToManyRelationship,
 		},
 	}
 }
 
 func (g Group) GetReferencedIDs() []jsonapi.ReferenceID {
-	ids := make([]jsonapi.ReferenceID, 0, len(g.Tests)+len(g.Groups))
-	for _, test := range g.Tests {
+	ids := make([]jsonapi.ReferenceID, 0, len(g.Checks)+len(g.Groups))
+	for _, check := range g.Checks {
 		ids = append(ids, jsonapi.ReferenceID{
-			ID:           test.GetID(),
-			Type:         "tests",
-			Name:         "tests",
+			ID:           check.GetID(),
+			Type:         "checks",
+			Name:         "checks",
 			Relationship: jsonapi.ToManyRelationship,
 		})
 	}
@@ -160,9 +160,9 @@ func (g Group) GetReferencedIDs() []jsonapi.ReferenceID {
 func (g Group) GetReferencedStructs() []jsonapi.MarshalIdentifier {
 	// Note: we're not sideloading the parent, that snowballs into making requests for a single
 	// group return *every single known group* thanks to the common root group.
-	refs := make([]jsonapi.MarshalIdentifier, 0, len(g.Tests)+len(g.Groups))
-	for _, test := range g.Tests {
-		refs = append(refs, test)
+	refs := make([]jsonapi.MarshalIdentifier, 0, len(g.Checks)+len(g.Groups))
+	for _, check := range g.Checks {
+		refs = append(refs, check)
 	}
 	for _, group := range g.Groups {
 		refs = append(refs, group)
@@ -170,7 +170,7 @@ func (g Group) GetReferencedStructs() []jsonapi.MarshalIdentifier {
 	return refs
 }
 
-type Test struct {
+type Check struct {
 	ID int64 `json:"-"`
 
 	Group *Group `json:"-"`
@@ -180,19 +180,19 @@ type Test struct {
 	Fails  int64 `json:"fails"`
 }
 
-func NewTest(name string, group *Group, idCounter *int64) *Test {
+func NewCheck(name string, group *Group, idCounter *int64) *Check {
 	var id int64
 	if idCounter != nil {
 		id = atomic.AddInt64(idCounter, 1)
 	}
-	return &Test{ID: id, Name: name, Group: group}
+	return &Check{ID: id, Name: name, Group: group}
 }
 
-func (t Test) GetID() string {
-	return strconv.FormatInt(t.ID, 10)
+func (c Check) GetID() string {
+	return strconv.FormatInt(c.ID, 10)
 }
 
-func (t Test) GetReferences() []jsonapi.Reference {
+func (c Check) GetReferences() []jsonapi.Reference {
 	return []jsonapi.Reference{
 		jsonapi.Reference{
 			Name:         "group",
@@ -202,16 +202,16 @@ func (t Test) GetReferences() []jsonapi.Reference {
 	}
 }
 
-func (t Test) GetReferencedIDs() []jsonapi.ReferenceID {
+func (c Check) GetReferencedIDs() []jsonapi.ReferenceID {
 	return []jsonapi.ReferenceID{
 		jsonapi.ReferenceID{
-			ID:   t.Group.GetID(),
+			ID:   c.Group.GetID(),
 			Type: "groups",
 			Name: "group",
 		},
 	}
 }
 
-func (t Test) GetReferencedStructs() []jsonapi.MarshalIdentifier {
-	return []jsonapi.MarshalIdentifier{t.Group}
+func (c Check) GetReferencedStructs() []jsonapi.MarshalIdentifier {
+	return []jsonapi.MarshalIdentifier{c.Group}
 }

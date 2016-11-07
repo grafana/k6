@@ -5,14 +5,14 @@ import (
 	"github.com/robertkrimen/otto"
 )
 
-func Test(val, arg0 otto.Value) (bool, error) {
+func Check(val, arg0 otto.Value) (bool, error) {
 	switch {
 	case val.IsFunction():
 		val, err := val.Call(otto.UndefinedValue(), arg0)
 		if err != nil {
 			return false, err
 		}
-		return Test(val, arg0)
+		return Check(val, arg0)
 	case val.IsBoolean():
 		b, err := val.ToBoolean()
 		if err != nil {

@@ -7,14 +7,14 @@ import (
 	"testing"
 )
 
-func TestTest(t *testing.T) {
+func TestCheck(t *testing.T) {
 	vm := otto.New()
 
 	t.Run("String", func(t *testing.T) {
 		t.Run("Something", func(t *testing.T) {
 			v, err := vm.Eval(`"test"`)
 			assert.NoError(t, err)
-			b, err := Test(v, otto.UndefinedValue())
+			b, err := Check(v, otto.UndefinedValue())
 			assert.NoError(t, err)
 			assert.True(t, b)
 		})
@@ -22,7 +22,7 @@ func TestTest(t *testing.T) {
 		t.Run("Empty", func(t *testing.T) {
 			v, err := vm.Eval(`""`)
 			assert.NoError(t, err)
-			b, err := Test(v, otto.UndefinedValue())
+			b, err := Check(v, otto.UndefinedValue())
 			assert.NoError(t, err)
 			assert.False(t, b)
 		})
@@ -32,21 +32,21 @@ func TestTest(t *testing.T) {
 		t.Run("Positive", func(t *testing.T) {
 			v, err := vm.Eval(`1`)
 			assert.NoError(t, err)
-			b, err := Test(v, otto.UndefinedValue())
+			b, err := Check(v, otto.UndefinedValue())
 			assert.NoError(t, err)
 			assert.True(t, b)
 		})
 		t.Run("Negative", func(t *testing.T) {
 			v, err := vm.Eval(`-1`)
 			assert.NoError(t, err)
-			b, err := Test(v, otto.UndefinedValue())
+			b, err := Check(v, otto.UndefinedValue())
 			assert.NoError(t, err)
 			assert.True(t, b)
 		})
 		t.Run("Zero", func(t *testing.T) {
 			v, err := vm.Eval(`0`)
 			assert.NoError(t, err)
-			b, err := Test(v, otto.UndefinedValue())
+			b, err := Check(v, otto.UndefinedValue())
 			assert.NoError(t, err)
 			assert.False(t, b)
 		})
@@ -56,14 +56,14 @@ func TestTest(t *testing.T) {
 		t.Run("True", func(t *testing.T) {
 			v, err := vm.Eval(`true`)
 			assert.NoError(t, err)
-			b, err := Test(v, otto.UndefinedValue())
+			b, err := Check(v, otto.UndefinedValue())
 			assert.NoError(t, err)
 			assert.True(t, b)
 		})
 		t.Run("False", func(t *testing.T) {
 			v, err := vm.Eval(`false`)
 			assert.NoError(t, err)
-			b, err := Test(v, otto.UndefinedValue())
+			b, err := Check(v, otto.UndefinedValue())
 			assert.NoError(t, err)
 			assert.False(t, b)
 		})
@@ -74,12 +74,12 @@ func TestTest(t *testing.T) {
 		assert.NoError(t, err)
 
 		t.Run("True", func(t *testing.T) {
-			b, err := Test(fn, otto.TrueValue())
+			b, err := Check(fn, otto.TrueValue())
 			assert.NoError(t, err)
 			assert.True(t, b)
 		})
 		t.Run("False", func(t *testing.T) {
-			b, err := Test(fn, otto.FalseValue())
+			b, err := Check(fn, otto.FalseValue())
 			assert.NoError(t, err)
 			assert.False(t, b)
 		})

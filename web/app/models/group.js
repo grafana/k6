@@ -5,8 +5,8 @@ export default DS.Model.extend({
   name: DS.attr('string'),
   parent: DS.belongsTo('group', { inverse: 'groups' }),
   groups: DS.hasMany('group', { inverse: 'parent' }),
-  tests: DS.hasMany('test'),
+  checks: DS.hasMany('check'),
 
-  testsSortedBy: ['id'],
-  testsSorted: Ember.computed.sort('tests', 'testsSortedBy')
+  checksSortedBy: ['id'],
+  checksSorted: Ember.computed.sort('checks', 'checksSortedBy')
 });

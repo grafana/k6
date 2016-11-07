@@ -91,11 +91,11 @@ func TestDoGroupReturnTrueByDefault(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestDoTest(t *testing.T) {
+func TestDoCheck(t *testing.T) {
 	r, err := newSnippetRunner(`
-	import { test } from "speedboat";
+	import { check } from "speedboat";
 	export default function() {
-		test(3, { "v === 3": (v) => v === 3 });
+		check(3, { "v === 3": (v) => v === 3 });
 	}`)
 	assert.NoError(t, err)
 
@@ -106,22 +106,22 @@ func TestDoTest(t *testing.T) {
 	_, err = vu.RunOnce(context.Background())
 	assert.NoError(t, err)
 
-	if !assert.Len(t, r.Tests, 1) {
+	if !assert.Len(t, r.Checks, 1) {
 		return
 	}
-	ts := r.Tests[0]
-	assert.Equal(t, "v === 3", ts.Name)
-	assert.Equal(t, r.DefaultGroup, ts.Group)
-	assert.Equal(t, int64(1), ts.Passes)
-	assert.Equal(t, int64(0), ts.Fails)
+	c := r.Checks[0]
+	assert.Equal(t, "v === 3", c.Name)
+	assert.Equal(t, r.DefaultGroup, c.Group)
+	assert.Equal(t, int64(1), c.Passes)
+	assert.Equal(t, int64(0), c.Fails)
 }
 
-func TestTestInGroup(t *testing.T) {
+func TestCheckInGroup(t *testing.T) {
 	r, err := newSnippetRunner(`
-	import { group, test } from "speedboat";
+	import { group, check } from "speedboat";
 	export default function() {
 		group("group", function() {
-			test(3, { "v === 3": (v) => v === 3 });
+			check(3, { "v === 3": (v) => v === 3 });
 		});
 	}`)
 	assert.NoError(t, err)
@@ -137,19 +137,19 @@ func TestTestInGroup(t *testing.T) {
 	g := r.Groups[1]
 	assert.Equal(t, "group", g.Name)
 
-	assert.Len(t, r.Tests, 1)
-	ts := r.Tests[0]
-	assert.Equal(t, "v === 3", ts.Name)
-	assert.Equal(t, g, ts.Group)
-	assert.Equal(t, int64(1), ts.Passes)
-	assert.Equal(t, int64(0), ts.Fails)
+	assert.Len(t, r.Checks, 1)
+	c := r.Checks[0]
+	assert.Equal(t, "v === 3", c.Name)
+	assert.Equal(t, g, c.Group)
+	assert.Equal(t, int64(1), c.Passes)
+	assert.Equal(t, int64(0), c.Fails)
 }
 
-func TestTestReturnTrueOnSuccess(t *testing.T) {
+func TestCheckReturnTrueOnSuccess(t *testing.T) {
 	r, err := newSnippetRunner(`
-	import { test, _assert } from "speedboat";
+	import { check, _assert } from "speedboat";
 	export default function() {
-		let succ = test(null, { "true": true });
+		let succ = check(null, { "true": true });
 		_assert(succ === true);
 	}`)
 	assert.NoError(t, err)
@@ -160,11 +160,11 @@ func TestTestReturnTrueOnSuccess(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestTestReturnFalseOnFailure(t *testing.T) {
+func TestCheckReturnFalseOnFailure(t *testing.T) {
 	r, err := newSnippetRunner(`
-	import { test, _assert } from "speedboat";
+	import { check, _assert } from "speedboat";
 	export default function() {
-		let succ = test(null, { "false": false });
+		let succ = check(null, { "false": false });
 		_assert(succ === false);
 	}`)
 	assert.NoError(t, err)
