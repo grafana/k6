@@ -2,6 +2,7 @@ package js
 
 import (
 	"context"
+	"github.com/loadimpact/speedboat/lib"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
@@ -30,7 +31,7 @@ func TestDoGroup(t *testing.T) {
 		assert.Equal(t, "test", vu.group.Name)
 	})
 
-	_, err = vu.RunOnce(context.Background())
+	_, err = vu.RunOnce(context.Background(), &lib.Status{})
 	assert.NoError(t, err)
 }
 
@@ -53,7 +54,7 @@ func TestDoGroupNested(t *testing.T) {
 		assert.Equal(t, "outer", vu.group.Parent.Name)
 	})
 
-	_, err = vu.RunOnce(context.Background())
+	_, err = vu.RunOnce(context.Background(), &lib.Status{})
 	assert.NoError(t, err)
 }
 
@@ -70,7 +71,7 @@ func TestDoGroupReturn(t *testing.T) {
 
 	vu, err := r.NewVU()
 	assert.NoError(t, err)
-	_, err = vu.RunOnce(context.Background())
+	_, err = vu.RunOnce(context.Background(), &lib.Status{})
 	assert.NoError(t, err)
 }
 
@@ -87,7 +88,7 @@ func TestDoGroupReturnTrueByDefault(t *testing.T) {
 
 	vu, err := r.NewVU()
 	assert.NoError(t, err)
-	_, err = vu.RunOnce(context.Background())
+	_, err = vu.RunOnce(context.Background(), &lib.Status{})
 	assert.NoError(t, err)
 }
 
@@ -103,7 +104,7 @@ func TestDoCheck(t *testing.T) {
 	assert.NoError(t, err)
 	vu := vu_.(*VU)
 
-	_, err = vu.RunOnce(context.Background())
+	_, err = vu.RunOnce(context.Background(), &lib.Status{})
 	assert.NoError(t, err)
 
 	if !assert.Len(t, r.Checks, 1) {
@@ -130,7 +131,7 @@ func TestCheckInGroup(t *testing.T) {
 	assert.NoError(t, err)
 	vu := vu_.(*VU)
 
-	_, err = vu.RunOnce(context.Background())
+	_, err = vu.RunOnce(context.Background(), &lib.Status{})
 	assert.NoError(t, err)
 
 	assert.Len(t, r.Groups, 2)
@@ -156,7 +157,7 @@ func TestCheckReturnTrueOnSuccess(t *testing.T) {
 
 	vu, err := r.NewVU()
 	assert.NoError(t, err)
-	_, err = vu.RunOnce(context.Background())
+	_, err = vu.RunOnce(context.Background(), &lib.Status{})
 	assert.NoError(t, err)
 }
 
@@ -171,6 +172,23 @@ func TestCheckReturnFalseOnFailure(t *testing.T) {
 
 	vu, err := r.NewVU()
 	assert.NoError(t, err)
-	_, err = vu.RunOnce(context.Background())
+	_, err = vu.RunOnce(context.Background(), &lib.Status{})
 	assert.NoError(t, err)
+}
+
+func TestTaint(t *testing.T) {
+	r, err := newSnippetRunner(`
+	import { taint } from "speedboat";
+	export default function() {
+		taint();
+	}`)
+	assert.NoError(t, err)
+
+	vu, err := r.NewVU()
+	assert.NoError(t, err)
+
+	status := lib.Status{}
+	_, err = vu.RunOnce(context.Background(), &status)
+	assert.NoError(t, err)
+	assert.True(t, status.Tainted.Bool)
 }

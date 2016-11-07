@@ -35,6 +35,14 @@ export function sleep(secs) {
 }
 
 /**
+ * Marks the test as "tainted", meaning it should exit with a nonzero status code. This is done
+ * automatically if any check fails, but you can use this to do it manually.
+ */
+export function taint() {
+	__jsapi__.Taint();
+}
+
+/**
  * Asserts that a value is truthy.
  * @param  {any}    exp   Expression result.
  * @param  {string} [err] Error message.

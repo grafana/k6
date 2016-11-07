@@ -374,6 +374,9 @@ func actionRun(cc *cli.Context) error {
 	engineCancel()
 	wg.Wait()
 
+	if engine.Status.Tainted.Bool {
+		return cli.NewExitError("", 99)
+	}
 	return nil
 }
 

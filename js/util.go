@@ -2,6 +2,7 @@ package js
 
 import (
 	"context"
+	"github.com/loadimpact/speedboat/lib"
 	"github.com/robertkrimen/otto"
 )
 
@@ -68,7 +69,7 @@ func runSnippet(src string) error {
 	if err != nil {
 		return err
 	}
-	_, err = vu.RunOnce(context.Background())
+	_, err = vu.RunOnce(context.Background(), &lib.Status{})
 	if err != nil {
 		return err
 	}

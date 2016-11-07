@@ -94,7 +94,7 @@ type VU struct {
 	cTrace *httptrace.ClientTrace
 }
 
-func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
+func (u *VU) RunOnce(ctx context.Context, status *lib.Status) ([]stats.Sample, error) {
 	resp, err := u.Client.Do(u.Request.WithContext(httptrace.WithClientTrace(ctx, u.cTrace)))
 	if err != nil {
 		u.tracer.Done()

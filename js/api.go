@@ -113,7 +113,12 @@ func (a JSAPI) DoCheck(call otto.FunctionCall) otto.Value {
 	}
 
 	if !success {
+		a.vu.Taint = true
 		return otto.FalseValue()
 	}
 	return otto.TrueValue()
+}
+
+func (a JSAPI) Taint() {
+	a.vu.Taint = true
 }

@@ -10,6 +10,7 @@ import (
 
 type Status struct {
 	Running null.Bool `json:"running"`
+	Tainted null.Bool `json:"tainted"`
 	VUs     null.Int  `json:"vus"`
 	VUsMax  null.Int  `json:"vus-max"`
 }

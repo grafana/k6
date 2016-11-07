@@ -8,6 +8,7 @@ import (
 	"github.com/loadimpact/speedboat/lib"
 	"github.com/loadimpact/speedboat/stats"
 	"github.com/robertkrimen/otto"
+	"gopkg.in/guregu/null.v3"
 	"math"
 	"net"
 	"net/http"
@@ -115,6 +116,7 @@ type VU struct {
 	ID       int64
 	IDString string
 	Samples  []stats.Sample
+	Taint    bool
 
 	runner   *Runner
 	vm       *otto.Otto
@@ -128,20 +130,22 @@ type VU struct {
 	group *lib.Group
 }
 
-func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
+func (u *VU) RunOnce(ctx context.Context, status *lib.Status) ([]stats.Sample, error) {
 	u.MaxRedirects = DefaultMaxRedirect
 	u.CookieJar.Clear()
 
 	u.ctx = ctx
-	if _, err := u.callable.Call(otto.UndefinedValue()); err != nil {
-		u.ctx = nil
-		return nil, err
-	}
+	_, err := u.callable.Call(otto.UndefinedValue())
 	u.ctx = nil
+
+	if u.Taint {
+		u.Taint = false
+		status.Tainted = null.BoolFrom(true)
+	}
 
 	samples := u.Samples
 	u.Samples = nil
-	return samples, nil
+	return samples, err
 }
 
 func (u *VU) Reconfigure(id int64) error {
