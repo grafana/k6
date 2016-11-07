@@ -66,6 +66,10 @@ func (a JSAPI) DoGroup(call otto.FunctionCall) otto.Value {
 	if err != nil {
 		throw(call.Otto, err)
 	}
+
+	if val.IsUndefined() {
+		return otto.TrueValue()
+	}
 	return val
 }
 
