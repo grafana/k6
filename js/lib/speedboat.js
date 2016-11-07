@@ -23,7 +23,7 @@ export function group(name, fn, cond) {
  * @param  {...Object} sets Sets of tests.
  */
 export function test(val, ...sets) {
-	__jsapi__.DoTest(val, ...sets);
+	return __jsapi__.DoTest(val, ...sets);
 }
 
 /**
