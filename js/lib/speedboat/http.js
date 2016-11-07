@@ -129,6 +129,7 @@ export function setMaxRedirects(n) {
 }
 
 export default {
+	Response: Response,
 	request: request,
 	get: get,
 	post: post,

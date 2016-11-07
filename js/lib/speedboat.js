@@ -58,4 +58,6 @@ export default {
 	group: group,
 	check: check,
 	sleep: sleep,
+	taint: taint,
+	_assert: _assert,
 };

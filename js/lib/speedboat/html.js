@@ -63,3 +63,8 @@ export class Selection {
 	 */
 	text() { return this.impl.Text(); }
 };
+
+export default {
+	parseHTML: parseHTML,
+	Selection: Selection,
+}
