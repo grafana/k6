@@ -21,25 +21,27 @@ var (
 )
 
 type vuEntry struct {
-	VU     VU
-	Cancel context.CancelFunc
+	VU        VU
+	Buffer    []stats.Sample
+	ExtBuffer stats.Buffer
+	Cancel    context.CancelFunc
 }
 
 type Engine struct {
 	Runner    Runner
 	Status    Status
-	Metrics   map[*stats.Metric]stats.Sink
 	Collector stats.Collector
 	Remaining time.Duration
 	Quit      bool
 	Pause     sync.WaitGroup
+
+	Metrics map[*stats.Metric]stats.Sink
 
 	ctx    context.Context
 	vus    []*vuEntry
 	nextID int64
 
 	vuMutex sync.Mutex
-	mMutex  sync.Mutex
 }
 
 func NewEngine(r Runner) (*Engine, error) {
@@ -67,7 +69,7 @@ func (e *Engine) Run(ctx context.Context) error {
 	e.ctx = ctx
 	e.nextID = 1
 
-	e.reportInternalStats()
+	e.consumeEngineStats()
 	interval := 1 * time.Second
 	ticker := time.NewTicker(interval)
 
@@ -81,8 +83,14 @@ loop:
 	for {
 		select {
 		case <-ticker.C:
-			e.reportInternalStats()
+			e.consumeEngineStats()
 
+			for _, vu := range e.vus {
+				e.consumeBuffer(vu.Buffer)
+				vu.Buffer = vu.Buffer[:0]
+			}
+
+			// Update the duration counter. This will be replaced with a proper timeline Soon(tm).
 			if e.Status.Running.Bool && e.Remaining != 0 {
 				e.Remaining -= interval
 				if e.Remaining <= 0 {
@@ -107,7 +115,7 @@ loop:
 	e.Status.Running = null.BoolFrom(false)
 	e.Status.VUs = null.IntFrom(0)
 	e.Status.VUsMax = null.IntFrom(0)
-	e.reportInternalStats()
+	e.consumeEngineStats()
 
 	return nil
 }
@@ -144,7 +152,7 @@ func (e *Engine) SetVUs(v int64) error {
 		if err := entry.VU.Reconfigure(e.nextID); err != nil {
 			return err
 		}
-		go e.runVU(ctx, e.nextID, entry.VU)
+		go e.runVU(ctx, e.nextID, entry)
 		e.nextID++
 	}
 	for i := current - 1; i >= v; i-- {
@@ -184,20 +192,12 @@ func (e *Engine) SetMaxVUs(v int64) error {
 	return nil
 }
 
-func (e *Engine) reportInternalStats() {
-	e.mMutex.Lock()
-	t := time.Now()
-	e.getSink(MetricVUs).Add(stats.Sample{Time: t, Tags: nil, Value: float64(e.Status.VUs.Int64)})
-	e.getSink(MetricVUsMax).Add(stats.Sample{Time: t, Tags: nil, Value: float64(e.Status.VUsMax.Int64)})
-	e.mMutex.Unlock()
-}
-
-func (e *Engine) runVU(ctx context.Context, id int64, vu VU) {
+func (e *Engine) runVU(ctx context.Context, id int64, vu *vuEntry) {
 	idString := strconv.FormatInt(id, 10)
 
-	var buffer stats.Buffer
+	var collectorBuffer stats.Buffer
 	if e.Collector != nil {
-		buffer = e.Collector.Buffer()
+		collectorBuffer = e.Collector.Buffer()
 	}
 
 waitForPause:
@@ -208,26 +208,20 @@ waitForPause:
 		case <-ctx.Done():
 			return
 		default:
-			samples, err := vu.RunOnce(ctx, &e.Status)
+			samples, err := vu.VU.RunOnce(ctx, &e.Status)
 
-			// TODO: Avoid global locks here; use a lazy pull architecture instead.
-			e.mMutex.Lock()
 			if err != nil {
 				log.WithField("vu", id).WithError(err).Error("Runtime Error")
-				e.getSink(MetricErrors).Add(stats.Sample{
+				samples = append(samples, stats.Sample{
 					Time:  time.Now(),
 					Tags:  map[string]string{"vu": idString, "error": err.Error()},
 					Value: float64(1),
 				})
 				e.Status.Tainted.Bool = true
 			}
-			for _, s := range samples {
-				e.getSink(s.Metric).Add(s)
-			}
-			e.mMutex.Unlock()
-
-			if buffer != nil {
-				buffer.Add(samples...)
+			vu.Buffer = append(vu.Buffer, samples...)
+			if collectorBuffer != nil {
+				collectorBuffer.Add(samples...)
 			}
 
 			if !e.Status.Running.Bool {
@@ -252,4 +246,18 @@ func (e *Engine) getSink(m *stats.Metric) stats.Sink {
 		e.Metrics[m] = s
 	}
 	return s
+}
+
+func (e *Engine) consumeBuffer(buffer []stats.Sample) {
+	for _, sample := range buffer {
+		e.getSink(sample.Metric).Add(sample)
+	}
+}
+
+func (e *Engine) consumeEngineStats() {
+	t := time.Now()
+	e.consumeBuffer([]stats.Sample{
+		stats.Sample{Metric: MetricVUs, Time: t, Value: float64(e.Status.VUs.Int64)},
+		stats.Sample{Metric: MetricVUsMax, Time: t, Value: float64(e.Status.VUsMax.Int64)},
+	})
 }
