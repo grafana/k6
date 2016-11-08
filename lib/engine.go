@@ -181,7 +181,11 @@ func (e *Engine) SetMaxVUs(v int64) error {
 			if err != nil {
 				return err
 			}
-			vus = append(vus, &vuEntry{VU: vu})
+			entry := &vuEntry{VU: vu}
+			if e.Collector != nil {
+				entry.ExtBuffer = e.Collector.Buffer()
+			}
+			vus = append(vus, entry)
 		}
 		e.vus = vus
 	} else if v < current {
@@ -195,11 +199,6 @@ func (e *Engine) SetMaxVUs(v int64) error {
 func (e *Engine) runVU(ctx context.Context, id int64, vu *vuEntry) {
 	idString := strconv.FormatInt(id, 10)
 
-	var collectorBuffer stats.Buffer
-	if e.Collector != nil {
-		collectorBuffer = e.Collector.Buffer()
-	}
-
 waitForPause:
 	e.Pause.Wait()
 
@@ -209,7 +208,6 @@ waitForPause:
 			return
 		default:
 			samples, err := vu.VU.RunOnce(ctx, &e.Status)
-
 			if err != nil {
 				log.WithField("vu", id).WithError(err).Error("Runtime Error")
 				samples = append(samples, stats.Sample{
@@ -219,9 +217,10 @@ waitForPause:
 				})
 				e.Status.Tainted.Bool = true
 			}
+
 			vu.Buffer = append(vu.Buffer, samples...)
-			if collectorBuffer != nil {
-				collectorBuffer.Add(samples...)
+			if vu.ExtBuffer != nil {
+				vu.ExtBuffer.Add(samples...)
 			}
 
 			if !e.Status.Running.Bool {
