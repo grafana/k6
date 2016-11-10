@@ -124,5 +124,5 @@ func (a JSAPI) Taint() {
 }
 
 func (a JSAPI) ElapsedMs() float64 {
-	return float64(time.Since(a.vu.started)) * float64(time.Millisecond)
+	return float64(time.Since(a.vu.started)) / float64(time.Millisecond)
 }
