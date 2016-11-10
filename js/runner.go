@@ -126,14 +126,16 @@ type VU struct {
 	CookieJar    *lib.CookieJar
 	MaxRedirects int
 
-	ctx   context.Context
-	group *lib.Group
+	started time.Time
+	ctx     context.Context
+	group   *lib.Group
 }
 
 func (u *VU) RunOnce(ctx context.Context, status *lib.Status) ([]stats.Sample, error) {
 	u.MaxRedirects = DefaultMaxRedirect
 	u.CookieJar.Clear()
 
+	u.started = time.Now()
 	u.ctx = ctx
 	_, err := u.callable.Call(otto.UndefinedValue())
 	u.ctx = nil
