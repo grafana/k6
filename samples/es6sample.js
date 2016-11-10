@@ -1,4 +1,4 @@
-import { group, test, sleep } from "speedboat";
+import { group, check, sleep } from "speedboat";
 import http from "speedboat/http";
 
 export let options = {
@@ -6,11 +6,11 @@ export let options = {
 };
 
 export default function() {
-	test(Math.random(), {
+	check(Math.random(), {
 		"top-level test": (v) => v < 1/3
 	});
 	group("my group", function() {
-		test(Math.random(), {
+		check(Math.random(), {
 			"random value is < 0.5": (v) => v < 0.5
 		});
 
@@ -18,7 +18,7 @@ export default function() {
 			let res = http.get("https://httpbin.org/get", null, {
 				headers: { "X-Test": "abc123" },
 			});
-			test(res, {
+			check(res, {
 				"status is 200": (res) => res.status === 200,
 				"X-Test header is correct": (res) => res.json().headers['X-Test'] === "abc123",
 			});
@@ -26,14 +26,15 @@ export default function() {
 		});
 
 		group("html", function() {
-			test(http.get("http://test.loadimpact.com/"), {
+			check(http.get("http://test.loadimpact.com/"), {
 				"status is 200": (res) => res.status === 200,
+				"content type is html": (res) => res.headers['Content-Type'] === "text/html",
 				"welcome message is correct": (res) => res.html("h2").text() === "Welcome to the LoadImpact.com demo site!",
 			});
 		});
 
 		group("nested", function() {
-			test(null, {
+			check(null, {
 				"always passes": true,
 				"always fails": false,
 			});
