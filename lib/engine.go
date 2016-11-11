@@ -19,6 +19,9 @@ var (
 
 	ErrTooManyVUs = errors.New("More VUs than the maximum requested")
 	ErrMaxTooLow  = errors.New("Can't lower max below current VU count")
+
+	// Special error used to taint a test, without printing an error.
+	ErrVUWantsTaint = errors.New("[ErrVUWantsTaint is never logged]")
 )
 
 type vuEntry struct {
@@ -204,12 +207,20 @@ waitForPause:
 	e.Pause.Wait()
 
 	for {
+		samples, err := vu.VU.RunOnce(ctx)
+
+		// If the context is cancelled, the iteration is likely to produce erroneous output
+		// due to cancelled HTTP requests and whatnot. Discard output from such runs.
 		select {
 		case <-ctx.Done():
 			return
 		default:
-			samples, err := vu.VU.RunOnce(ctx, &e.Status)
-			if err != nil {
+		}
+
+		if err != nil {
+			e.Status.Tainted.Bool = true
+
+			if err != ErrVUWantsTaint {
 				if s, ok := err.(fmt.Stringer); ok {
 					log.Error(s.String())
 				} else {
@@ -222,17 +233,16 @@ waitForPause:
 					Tags:   map[string]string{"vu": idString, "error": err.Error()},
 					Value:  float64(1),
 				})
-				e.Status.Tainted.Bool = true
 			}
+		}
 
-			vu.Buffer = append(vu.Buffer, samples...)
-			if vu.ExtBuffer != nil {
-				vu.ExtBuffer.Add(samples...)
-			}
+		vu.Buffer = append(vu.Buffer, samples...)
+		if vu.ExtBuffer != nil {
+			vu.ExtBuffer.Add(samples...)
+		}
 
-			if !e.Status.Running.Bool {
-				goto waitForPause
-			}
+		if !e.Status.Running.Bool {
+			goto waitForPause
 		}
 	}
 }

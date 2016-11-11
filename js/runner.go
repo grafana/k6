@@ -8,7 +8,6 @@ import (
 	"github.com/loadimpact/speedboat/lib"
 	"github.com/loadimpact/speedboat/stats"
 	"github.com/robertkrimen/otto"
-	"gopkg.in/guregu/null.v3"
 	"math"
 	"net"
 	"net/http"
@@ -131,7 +130,7 @@ type VU struct {
 	group   *lib.Group
 }
 
-func (u *VU) RunOnce(ctx context.Context, status *lib.Status) ([]stats.Sample, error) {
+func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 	u.MaxRedirects = DefaultMaxRedirect
 	u.CookieJar.Clear()
 
@@ -142,7 +141,9 @@ func (u *VU) RunOnce(ctx context.Context, status *lib.Status) ([]stats.Sample, e
 
 	if u.Taint {
 		u.Taint = false
-		status.Tainted = null.BoolFrom(true)
+		if err == nil {
+			err = lib.ErrVUWantsTaint
+		}
 	}
 
 	samples := u.Samples
