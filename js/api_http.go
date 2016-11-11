@@ -97,6 +97,15 @@ func (a JSAPI) HTTPRequest(method, url, body string, params map[string]interface
 		"status":  res.StatusCode,
 		"body":    string(resBody),
 		"headers": headers,
+		"timings": map[string]float64{
+			"duration":   float64(trail.Duration) / float64(time.Millisecond),
+			"blocked":    float64(trail.Blocked) / float64(time.Millisecond),
+			"looking_up": float64(trail.LookingUp) / float64(time.Millisecond),
+			"connecting": float64(trail.Connecting) / float64(time.Millisecond),
+			"sending":    float64(trail.Sending) / float64(time.Millisecond),
+			"waiting":    float64(trail.Waiting) / float64(time.Millisecond),
+			"receiving":  float64(trail.Receiving) / float64(time.Millisecond),
+		},
 	}
 }
 
