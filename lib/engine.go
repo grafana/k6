@@ -12,6 +12,8 @@ import (
 	"time"
 )
 
+const TickRate = 500 * time.Millisecond
+
 var (
 	MetricVUs    = &stats.Metric{Name: "vus", Type: stats.Gauge}
 	MetricVUsMax = &stats.Metric{Name: "vus_max", Type: stats.Gauge}
@@ -34,8 +36,8 @@ type vuEntry struct {
 type Engine struct {
 	Runner    Runner
 	Status    Status
+	Stages    []Stage
 	Collector stats.Collector
-	Remaining time.Duration
 	Quit      bool
 	Pause     sync.WaitGroup
 
@@ -56,6 +58,7 @@ func NewEngine(r Runner) (*Engine, error) {
 			Tainted: null.BoolFrom(false),
 			VUs:     null.IntFrom(0),
 			VUsMax:  null.IntFrom(0),
+			AtTime:  null.IntFrom(0),
 		},
 		Metrics: make(map[*stats.Metric]stats.Sink),
 	}
@@ -74,8 +77,7 @@ func (e *Engine) Run(ctx context.Context) error {
 	e.nextID = 1
 
 	e.consumeEngineStats()
-	interval := 1 * time.Second
-	ticker := time.NewTicker(interval)
+	ticker := time.NewTicker(TickRate)
 
 	if e.Collector != nil {
 		go e.Collector.Run(ctx)
@@ -94,11 +96,27 @@ loop:
 				vu.Buffer = vu.Buffer[:0]
 			}
 
-			// Update the duration counter. This will be replaced with a proper timeline Soon(tm).
-			if e.Status.Running.Bool && e.Remaining != 0 {
-				e.Remaining -= interval
-				if e.Remaining <= 0 {
-					e.Remaining = 0
+			if e.Status.Running.Bool {
+				e.Status.AtTime.Int64 += int64(TickRate)
+
+				stage, stageLeft, ok := StageAt(e.Stages, time.Duration(e.Status.AtTime.Int64))
+				if stage.VUTarget.Valid {
+					t := e.Status.AtTime.Int64
+					tx := t - int64(TickRate)
+					ty := t + int64(stageLeft)
+					x := e.Status.VUs.Int64
+					y := stage.VUTarget.Int64
+					vus := Ease(t, tx, ty, x, y)
+
+					if vus != e.Status.VUs.Int64 {
+						log.WithField("vus", vus).Debug("Engine: Interpolating VUs...")
+						if err := e.SetVUs(vus); err != nil {
+							log.WithError(err).WithField("vus", vus).Error("Engine: VU interpolation failed")
+						}
+					}
+				}
+
+				if !ok {
 					e.SetRunning(false)
 
 					if !e.Quit {

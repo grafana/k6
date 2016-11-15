@@ -254,7 +254,7 @@ func actionRun(cc *cli.Context) error {
 	}
 	engineC, engineCancel := context.WithCancel(context.Background())
 	engine.Collector = collector
-	engine.Remaining = duration
+	engine.Stages = []lib.Stage{lib.Stage{Duration: null.IntFrom(int64(duration))}}
 	engine.Quit = quit
 
 	// Make the API Server
