@@ -15,10 +15,11 @@ func StageAt(stages []Stage, offset time.Duration) (s Stage, stageLeft time.Dura
 			return stage, counter - offset, true
 		}
 	}
-	return Stage{}, 0, false
+	return stages[len(stages)-1], 0, false
 }
 
-// Ease eases a value x towards y over time, so that: f=f(t) : f(tx)=x, f(ty)=y.
-func Ease(t, tx, ty, x, y int64) int64 {
-	return x*(ty-t)/(ty-tx) + y*(t-tx)/(ty-tx)
+// Lerp is a linear interpolation between two values x and y, returning the value at the point t,
+// where t is a fraction in the range [0.0 - 1.0].
+func Lerp(x, y int64, t float64) int64 {
+	return x + int64(t*float64(y-x))
 }
