@@ -106,6 +106,10 @@ loop:
 				e.SetVUs(vus)
 			}
 
+			for _, vu := range e.vus {
+				e.consumeBuffer(vu.Buffer)
+			}
+
 			if !ok {
 				e.SetRunning(false)
 
