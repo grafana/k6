@@ -6,17 +6,17 @@ import (
 	"testing"
 )
 
-func TestEase(t *testing.T) {
-	// x[y][t] = x1, tx = 0, ty = 100
-	data := map[int64]map[int64]map[int64]int64{
-		0: map[int64]map[int64]int64{
-			0:   map[int64]int64{0: 0, 10: 0, 50: 0, 100: 0},
-			100: map[int64]int64{0: 0, 10: 10, 50: 50, 100: 100},
-			500: map[int64]int64{0: 0, 10: 50, 50: 250, 100: 500},
+func TestLerp(t *testing.T) {
+	// data[x][y][t] = v
+	data := map[int64]map[int64]map[float64]int64{
+		0: map[int64]map[float64]int64{
+			0:   map[float64]int64{0.0: 0, 0.10: 0, 0.5: 0, 1.0: 0},
+			100: map[float64]int64{0.0: 0, 0.10: 10, 0.5: 50, 1.0: 100},
+			500: map[float64]int64{0.0: 0, 0.10: 50, 0.5: 250, 1.0: 500},
 		},
-		100: map[int64]map[int64]int64{
-			200: map[int64]int64{0: 100, 10: 110, 50: 150, 100: 200},
-			0:   map[int64]int64{0: 100, 10: 90, 50: 50, 100: 0},
+		100: map[int64]map[float64]int64{
+			200: map[float64]int64{0.0: 100, 0.1: 110, 0.5: 150, 1.0: 200},
+			0:   map[float64]int64{0.0: 100, 0.1: 90, 0.5: 50, 1.0: 0},
 		},
 	}
 
@@ -24,9 +24,9 @@ func TestEase(t *testing.T) {
 		t.Run("x="+strconv.FormatInt(x, 10), func(t *testing.T) {
 			for y, data := range data {
 				t.Run("y="+strconv.FormatInt(y, 10), func(t *testing.T) {
-					for t0, x1 := range data {
-						t.Run("t="+strconv.FormatInt(t0, 10), func(t *testing.T) {
-							assert.Equal(t, x1, Ease(t0, 0, 100, x, y))
+					for t_, x1 := range data {
+						t.Run("t="+strconv.FormatFloat(t_, 'f', 2, 64), func(t *testing.T) {
+							assert.Equal(t, x1, Lerp(x, y, t_))
 						})
 					}
 				})
