@@ -70,6 +70,19 @@ func (t *MetricType) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+func (t Metric) String() string {
+	switch t.Type {
+	case Counter:
+		return counterString
+	case Gauge:
+		return gaugeString
+	case Trend:
+		return trendString
+	default:
+		return "[INVALID]"
+	}
+}
+
 // The type of values a metric contains.
 type ValueType int
 
