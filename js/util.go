@@ -48,8 +48,8 @@ func newSnippetRunner(src string) (*Runner, error) {
 	if err != nil {
 		return nil, err
 	}
-	rt.VM.Set("require", rt.require)
-	defer rt.VM.Set("require", nil)
+	rt.VM.Set("__initapi__", InitAPI{r: rt})
+	defer rt.VM.Set("__initapi__", nil)
 
 	exp, err := rt.load("__snippet__", []byte(src))
 	if err != nil {

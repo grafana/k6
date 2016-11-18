@@ -12,3 +12,10 @@ console = {
 performance = {
 	now() { return __jsapi__.ElapsedMs(); }
 };
+
+require = function(name) {
+	if (!__initapi__) {
+		throw new Error("imports are only permitted in the init context")
+	}
+	return __initapi__.Require(name);
+}
