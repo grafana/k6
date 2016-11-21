@@ -30,7 +30,7 @@ func (i InitAPI) NewMetric(it int, name string, isTime bool) *stats.Metric {
 		return m
 	}
 
-	m := stats.New(name, t)
+	m := stats.New(name, t, vt)
 	i.r.Metrics[name] = m
 	return m
 }
