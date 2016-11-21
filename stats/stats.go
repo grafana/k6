@@ -113,7 +113,7 @@ func (t *ValueType) UnmarshalJSON(data []byte) error {
 }
 
 func (t ValueType) String() string {
-	switch t.Type {
+	switch t {
 	case Default:
 		return defaultString
 	case Time:
