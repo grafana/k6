@@ -1,6 +1,7 @@
 export let CounterType = 1;
 export let GaugeType = 2;
 export let TrendType = 3;
+export let RateType = 4;
 
 export class Metric {
 	constructor(t, name, isTime=false) {
@@ -37,12 +38,20 @@ export class Trend extends Metric {
 	}
 }
 
+export class Rate extends Metric {
+	constructor(name, isTime=false) {
+		super(RateType, name, isTime);
+	}
+}
+
 export default {
 	CounterType: CounterType,
 	GaugeType: GaugeType,
 	TrendType: TrendType,
+	RateType: RateType,
 	Metric: Metric,
 	Counter: Counter,
 	Gauge: Gauge,
 	Trend: Trend,
+	Rate: Rate,
 }
