@@ -117,6 +117,8 @@ loop:
 					break loop
 				} else {
 					log.Info("Test finished, press Ctrl+C to exit")
+					<-ctx.Done()
+					break loop
 				}
 			}
 
@@ -282,6 +284,8 @@ func (e *Engine) getSink(m *stats.Metric) stats.Sink {
 			s = &stats.GaugeSink{}
 		case stats.Trend:
 			s = &stats.TrendSink{}
+		case stats.Rate:
+			s = &stats.RateSink{}
 		}
 		e.Metrics[m] = s
 	}
