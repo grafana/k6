@@ -70,8 +70,8 @@ func (t *MetricType) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (t Metric) String() string {
-	switch t.Type {
+func (t MetricType) String() string {
+	switch t {
 	case Counter:
 		return counterString
 	case Gauge:
@@ -110,6 +110,17 @@ func (t *ValueType) UnmarshalJSON(data []byte) error {
 	}
 
 	return nil
+}
+
+func (t ValueType) String() string {
+	switch t.Type {
+	case Default:
+		return defaultString
+	case Time:
+		return timeString
+	default:
+		return "[INVALID]"
+	}
 }
 
 // A Sample is a single measurement.
