@@ -12,14 +12,21 @@ type InitAPI struct {
 	r *Runtime
 }
 
-func (i InitAPI) NewMetric(it int, name string) *stats.Metric {
+func (i InitAPI) NewMetric(it int, name string, isTime bool) *stats.Metric {
 	t := stats.MetricType(it)
+	vt := stats.Default
+	if isTime {
+		vt = stats.Time
+	}
+
 	if m, ok := i.r.Metrics[name]; ok {
 		if m.Type != t {
 			throw(i.r.VM, errors.New(fmt.Sprintf("attempted to redeclare %s with a different type (%s != %s)", name, m.Type, t)))
 			return nil
 		}
-
+		if m.Contains != vt {
+			throw(i.r.VM, errors.New(fmt.Sprintf("attempted to redeclare %s with a different kind of value (%s != %s)", name, m.Contains, vt)))
+		}
 		return m
 	}
 
