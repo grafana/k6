@@ -1,5 +1,5 @@
 import { group, check, sleep } from "speedboat";
-import { Counter, Trend } from "speedboat/metrics";
+import { Counter, Rate } from "speedboat/metrics";
 import http from "speedboat/http";
 
 export let options = {
@@ -7,7 +7,7 @@ export let options = {
 };
 
 let mCounter = new Counter("my_counter");
-let mTrend = new Trend("my_trend");
+let mRate = new Rate("my_rate");
 
 export default function() {
 	check(Math.random(), {
@@ -17,7 +17,7 @@ export default function() {
 		mCounter.add(1, { tag: "test" });
 
 		check(Math.random(), {
-			"random value is < 0.5": (v) => mTrend.add(v < 0.5),
+			"random value is < 0.5": (v) => mRate.add(v < 0.5),
 		});
 
 		group("json", function() {
