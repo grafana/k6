@@ -2,7 +2,6 @@ package js
 
 import (
 	// "github.com/robertkrimen/otto"
-	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/speedboat/lib"
 	"github.com/loadimpact/speedboat/stats"
 	"io"
@@ -30,11 +29,6 @@ type HTTPResponse struct {
 }
 
 func (a JSAPI) HTTPRequest(method, url, body string, params map[string]interface{}) map[string]interface{} {
-	log.WithFields(log.Fields{
-		"method": method,
-		"url":    url,
-		"body":   body,
-	}).Debug("JS: Request")
 	bodyReader := io.Reader(nil)
 	if body != "" {
 		bodyReader = strings.NewReader(body)
