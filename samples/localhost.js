@@ -1,8 +1,20 @@
-import { check } from "speedboat";
+import { group, check } from "speedboat";
 import http from "speedboat/http";
 
 export default function() {
-	check(http.get("http://localhost:8080/"), {
-		"status is 200": (v) => v.status === 200,
+	group("front page", function() {
+		check(http.get("http://localhost:8080/"), {
+			"status is 200": (res) => res.status === 200,
+		});
+	});
+	group("stylesheet", function() {
+		check(http.get("http://localhost:8080/style.css"), {
+			"status is 200": (res) => res.status === 200,
+		});
+	});
+	group("image", function() {
+		check(http.get("http://localhost:8080/teddy.jpg"), {
+			"status is 200": (res) => res.status === 200,
+		});
 	});
 }
