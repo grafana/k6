@@ -76,4 +76,21 @@ func TestExtractOptions(t *testing.T) {
 		assert.True(t, opts.Duration.Valid)
 		assert.Equal(t, "2m", opts.Duration.String)
 	})
+	t.Run("thresholds", func(t *testing.T) {
+		exp, err := r.load("test.js", []byte(`
+			export let options = {
+				thresholds: {
+					my_metric: ["value<=1000"],
+				}
+			}
+		`))
+		assert.NoError(t, err)
+
+		var opts lib.Options
+		assert.NoError(t, r.ExtractOptions(exp, &opts))
+		assert.Contains(t, opts.Thresholds, "my_metric")
+		if assert.Len(t, opts.Thresholds["my_metric"], 1) {
+			assert.Equal(t, "value<=1000", opts.Thresholds["my_metric"][0])
+		}
+	})
 }

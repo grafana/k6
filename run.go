@@ -253,9 +253,15 @@ func actionRun(cc *cli.Context) error {
 		return err
 	}
 	engineC, engineCancel := context.WithCancel(context.Background())
+	engine.Quit = quit
 	engine.Collector = collector
 	engine.Stages = []lib.Stage{lib.Stage{Duration: null.IntFrom(int64(duration))}}
-	engine.Quit = quit
+
+	for metric, thresholds := range opts.Thresholds {
+		for _, src := range thresholds {
+			engine.AddThreshold(metric, src)
+		}
+	}
 
 	// Make the API Server
 	srv := &api.Server{

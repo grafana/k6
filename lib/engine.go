@@ -6,13 +6,17 @@ import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/speedboat/stats"
+	"github.com/robertkrimen/otto"
 	"gopkg.in/guregu/null.v3"
 	"strconv"
 	"sync"
 	"time"
 )
 
-const TickRate = 1 * time.Millisecond
+const (
+	TickRate          = 1 * time.Millisecond
+	ThresholdTickRate = 2 * time.Second
+)
 
 var (
 	MetricVUs    = &stats.Metric{Name: "vus", Type: stats.Gauge}
@@ -41,7 +45,10 @@ type Engine struct {
 	Quit      bool
 	Pause     sync.WaitGroup
 
-	Metrics map[*stats.Metric]stats.Sink
+	Metrics    map[*stats.Metric]stats.Sink
+	Thresholds map[string][]*otto.Script
+
+	thresholdVM *otto.Otto
 
 	ctx    context.Context
 	vus    []*vuEntry
@@ -60,7 +67,9 @@ func NewEngine(r Runner) (*Engine, error) {
 			VUsMax:  null.IntFrom(0),
 			AtTime:  null.IntFrom(0),
 		},
-		Metrics: make(map[*stats.Metric]stats.Sink),
+		Metrics:     make(map[*stats.Metric]stats.Sink),
+		Thresholds:  make(map[string][]*otto.Script),
+		thresholdVM: otto.New(),
 	}
 
 	e.Status.Running = null.BoolFrom(false)
@@ -85,6 +94,8 @@ func (e *Engine) Run(ctx context.Context) error {
 	} else {
 		log.Debug("Engine: No Collector")
 	}
+
+	go e.runThresholds(ctx)
 
 	e.consumeEngineStats()
 
@@ -226,6 +237,17 @@ func (e *Engine) SetMaxVUs(v int64) error {
 	return nil
 }
 
+func (e *Engine) AddThreshold(metric, src string) error {
+	script, err := e.thresholdVM.Compile("__threshold__", src)
+	if err != nil {
+		return err
+	}
+
+	e.Thresholds[metric] = append(e.Thresholds[metric], script)
+
+	return nil
+}
+
 func (e *Engine) runVU(ctx context.Context, id int64, vu *vuEntry) {
 	idString := strconv.FormatInt(id, 10)
 
@@ -269,6 +291,61 @@ waitForPause:
 
 		if !e.Status.Running.Bool {
 			goto waitForPause
+		}
+	}
+}
+
+func (e *Engine) runThresholds(ctx context.Context) {
+	ticker := time.NewTicker(ThresholdTickRate)
+	for {
+		select {
+		case <-ticker.C:
+			for m, sink := range e.Metrics {
+				scripts, ok := e.Thresholds[m.Name]
+				if !ok {
+					continue
+				}
+
+				sample := sink.Format()
+				for key, value := range sample {
+					if m.Contains == stats.Time {
+						value = value / float64(time.Millisecond)
+					}
+					// log.WithFields(log.Fields{"k": key, "v": value}).Debug("setting threshold data")
+					e.thresholdVM.Set(key, value)
+				}
+
+				taint := false
+				for _, script := range scripts {
+					v, err := e.thresholdVM.Run(script.String())
+					if err != nil {
+						log.WithError(err).WithField("metric", m.Name).Error("Threshold Error")
+						taint = true
+						continue
+					}
+					// log.WithFields(log.Fields{"metric": m.Name, "v": v, "s": sample}).Debug("threshold tick")
+					bV, err := v.ToBoolean()
+					if err != nil {
+						log.WithError(err).WithField("metric", m.Name).Error("Threshold result is invalid")
+						taint = true
+						continue
+					}
+					if !bV {
+						taint = true
+					}
+				}
+
+				for key, _ := range sample {
+					e.thresholdVM.Set(key, otto.UndefinedValue())
+				}
+
+				if taint {
+					m.Tainted = true
+					e.Status.Tainted.Bool = true
+				}
+			}
+		case <-ctx.Done():
+			return
 		}
 	}
 }

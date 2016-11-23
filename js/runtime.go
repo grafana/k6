@@ -2,6 +2,7 @@ package js
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"github.com/GeertJohan/go.rice"
 	log "github.com/Sirupsen/logrus"
@@ -112,6 +113,49 @@ func (r *Runtime) ExtractOptions(exports otto.Value, opts *lib.Options) error {
 				return err
 			}
 			opts.Duration = null.StringFrom(duration)
+		case "thresholds":
+			if val.IsUndefined() || val.IsNull() {
+				break
+			}
+
+			if opts.Thresholds == nil {
+				opts.Thresholds = make(map[string][]string)
+			}
+
+			obj := val.Object()
+			if obj == nil {
+				return errors.New("thresholds option must be an object")
+			}
+			for _, metric := range obj.Keys() {
+				val, err := obj.Get(metric)
+				if err != nil {
+					return err
+				}
+
+				if val.IsString() {
+					src, err := val.ToString()
+					if err != nil {
+						return err
+					}
+					opts.Thresholds[metric] = append(opts.Thresholds[metric], src)
+				} else if val.IsObject() {
+					obj := val.Object()
+					for _, key := range obj.Keys() {
+						val, err := obj.Get(key)
+						if err != nil {
+							return err
+						}
+
+						src, err := val.ToString()
+						if err != nil {
+							return err
+						}
+						opts.Thresholds[metric] = append(opts.Thresholds[metric], src)
+					}
+				} else {
+					return errors.New("threshold must be string or object")
+				}
+			}
 		}
 	}
 
