@@ -38,17 +38,14 @@ type vuEntry struct {
 }
 
 type Engine struct {
-	Runner      Runner
-	Status      Status
-	Stages      []Stage
-	Collector   stats.Collector
-	Quit        bool
-	QuitOnTaint bool
-	Pause       sync.WaitGroup
+	Runner    Runner
+	Status    Status
+	Stages    []Stage
+	Collector stats.Collector
+	Pause     sync.WaitGroup
+	Metrics   map[*stats.Metric]stats.Sink
 
-	Metrics    map[*stats.Metric]stats.Sink
-	Thresholds map[string][]*otto.Script
-
+	thresholds  map[string][]*otto.Script
 	thresholdVM *otto.Otto
 
 	ctx    context.Context
@@ -69,26 +66,64 @@ func NewEngine(r Runner) (*Engine, error) {
 			AtTime:  null.IntFrom(0),
 		},
 		Metrics:     make(map[*stats.Metric]stats.Sink),
-		Thresholds:  make(map[string][]*otto.Script),
+		thresholds:  make(map[string][]*otto.Script),
 		thresholdVM: otto.New(),
 	}
-
-	e.Status.Running = null.BoolFrom(false)
 	e.Pause.Add(1)
-
-	e.Status.VUs = null.IntFrom(0)
-	e.Status.VUsMax = null.IntFrom(0)
 
 	return e, nil
 }
 
-func (e *Engine) Run(ctx context.Context) error {
-	if len(e.Stages) == 0 {
-		return errors.New("Engine has no stages")
+func (e *Engine) Apply(opts Options) error {
+	if opts.Run.Valid {
+		e.SetRunning(opts.Run.Bool)
+	}
+	if opts.VUsMax.Valid {
+		if err := e.SetMaxVUs(opts.VUs.Int64); err != nil {
+			return err
+		}
+	}
+	if opts.VUs.Valid {
+		if !opts.VUsMax.Valid {
+			if err := e.SetMaxVUs(opts.VUs.Int64); err != nil {
+				return err
+			}
+		}
+		if err := e.SetVUs(opts.VUs.Int64); err != nil {
+			return err
+		}
+	}
+	if opts.Duration.Valid {
+		duration, err := time.ParseDuration(opts.Duration.String)
+		if err != nil {
+			return err
+		}
+		e.Stages = []Stage{Stage{Duration: null.IntFrom(int64(duration))}}
 	}
 
+	if opts.Quit.Valid {
+		e.Status.Quit = opts.Quit
+	}
+	if opts.QuitOnTaint.Valid {
+		e.Status.QuitOnTaint = opts.QuitOnTaint
+	}
+
+	for metric, thresholds := range opts.Thresholds {
+		for _, src := range thresholds {
+			if err := e.AddThreshold(metric, src); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (e *Engine) Run(ctx context.Context, opts Options) error {
 	e.ctx = ctx
 	e.nextID = 1
+
+	e.Apply(opts)
 
 	if e.Collector != nil {
 		go e.Collector.Run(ctx)
@@ -125,7 +160,7 @@ loop:
 			if !ok {
 				e.SetRunning(false)
 
-				if e.Quit {
+				if e.Status.Quit.Bool {
 					break loop
 				} else {
 					log.Info("Test finished, press Ctrl+C to exit")
@@ -134,7 +169,7 @@ loop:
 				}
 			}
 
-			if e.QuitOnTaint && e.Status.Tainted.Bool {
+			if e.Status.QuitOnTaint.Bool && e.Status.Tainted.Bool {
 				log.Warn("Test tainted, ending early...")
 				break loop
 			}
@@ -153,6 +188,10 @@ loop:
 	e.consumeEngineStats()
 
 	return nil
+}
+
+func (e *Engine) IsRunning() bool {
+	return e.ctx != nil
 }
 
 func (e *Engine) SetRunning(running bool) {
@@ -249,7 +288,7 @@ func (e *Engine) AddThreshold(metric, src string) error {
 		return err
 	}
 
-	e.Thresholds[metric] = append(e.Thresholds[metric], script)
+	e.thresholds[metric] = append(e.thresholds[metric], script)
 
 	return nil
 }
@@ -307,7 +346,7 @@ func (e *Engine) runThresholds(ctx context.Context) {
 		select {
 		case <-ticker.C:
 			for m, sink := range e.Metrics {
-				scripts, ok := e.Thresholds[m.Name]
+				scripts, ok := e.thresholds[m.Name]
 				if !ok {
 					continue
 				}

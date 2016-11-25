@@ -11,7 +11,6 @@ import (
 	"github.com/loadimpact/speedboat/simple"
 	"github.com/loadimpact/speedboat/stats"
 	"github.com/loadimpact/speedboat/stats/influxdb"
-	"gopkg.in/guregu/null.v3"
 	"gopkg.in/urfave/cli.v1"
 	"net/url"
 	"os"
@@ -195,50 +194,27 @@ func actionRun(cc *cli.Context) error {
 		return cli.NewExitError("Wrong number of arguments!", 1)
 	}
 
-	// Make the Runner
+	// Collect CLI arguments, most (not all) relating to options.
+	addr := cc.GlobalString("address")
+	out := cc.String("out")
+	cliOpts := lib.Options{
+		Run:         cliBool(cc, "run"),
+		VUs:         cliInt64(cc, "vus"),
+		VUsMax:      cliInt64(cc, "vus-max"),
+		Duration:    cliDuration(cc, "duration"),
+		Quit:        cliBool(cc, "quit"),
+		QuitOnTaint: cliBool(cc, "quit-on-taint"),
+	}
+
+	// Make the Runner, extract script-defined options.
 	filename := args[0]
 	runnerType := cc.String("type")
-	opts := lib.Options{}
-	runner, err := makeRunner(filename, runnerType, &opts)
+	runnerOpts := lib.Options{}
+	runner, err := makeRunner(filename, runnerType, &runnerOpts)
 	if err != nil {
 		log.WithError(err).Error("Couldn't create a runner")
 		return err
 	}
-
-	// Collect arguments
-	addr := cc.GlobalString("address")
-	run := cc.Bool("run")
-	quit := cc.Bool("quit")
-	quitOnTaint := cc.Bool("quit-on-taint")
-
-	duration := cc.Duration("duration")
-	if !cc.IsSet("duration") && opts.Duration.Valid {
-		d, err := time.ParseDuration(opts.Duration.String)
-		if err != nil {
-			log.WithError(err).Error("Script exports invalid duration")
-			return err
-		}
-		duration = d
-	}
-
-	vus := cc.Int64("vus")
-	if !cc.IsSet("vus") && opts.VUs.Valid {
-		vus = opts.VUs.Int64
-	}
-
-	max := cc.Int64("max")
-	if !cc.IsSet("max") {
-		if opts.VUsMax.Valid {
-			max = opts.VUsMax.Int64
-		} else {
-			max = vus
-		}
-	}
-	if vus > max {
-		return cli.NewExitError(lib.ErrTooManyVUs.Error(), 1)
-	}
-
-	out := cc.String("out")
 
 	// Make the metric collector, if requested.
 	var collector stats.Collector
@@ -251,6 +227,10 @@ func actionRun(cc *cli.Context) error {
 		collector = c
 	}
 
+	// Option predecence: CLI > Script.
+	// CLI has defaults, which are set as invalid, but have potentially nonzero values.
+	opts := cliOpts.Apply(runnerOpts).SetAllValid(true)
+
 	// Make the Engine
 	engine, err := lib.NewEngine(runner)
 	if err != nil {
@@ -258,16 +238,7 @@ func actionRun(cc *cli.Context) error {
 		return err
 	}
 	engineC, engineCancel := context.WithCancel(context.Background())
-	engine.Quit = quit
-	engine.QuitOnTaint = quitOnTaint
 	engine.Collector = collector
-	engine.Stages = []lib.Stage{lib.Stage{Duration: null.IntFrom(int64(duration))}}
-
-	for metric, thresholds := range opts.Thresholds {
-		for _, src := range thresholds {
-			engine.AddThreshold(metric, src)
-		}
-	}
 
 	// Make the API Server
 	srv := &api.Server{
@@ -291,7 +262,7 @@ func actionRun(cc *cli.Context) error {
 			wg.Done()
 		}()
 		log.Debug("Starting engine...")
-		if err := engine.Run(engineC); err != nil {
+		if err := engine.Run(engineC, opts); err != nil {
 			log.WithError(err).Error("Engine Error")
 		}
 		engineCancel()
@@ -306,37 +277,7 @@ func actionRun(cc *cli.Context) error {
 		srvCancel()
 	}()
 
-	// Wait for the API server to come online
-	startTime := time.Now()
-	for {
-		if err := cl.Ping(); err != nil {
-			if time.Since(startTime) < 1*time.Second {
-				log.WithError(err).Debug("Waiting for API server to start...")
-				time.Sleep(1 * time.Millisecond)
-			} else {
-				log.WithError(err).Warn("Connection to API server failed; retrying...")
-				time.Sleep(1 * time.Second)
-			}
-			continue
-		}
-		break
-	}
-
-	log.Infof("Starting test - Web UI available at: http://%s/", addr)
-
-	// Start the test with the desired state
-	log.WithField("vus", vus).Debug("Configuring test...")
-	status := lib.Status{
-		Running: null.BoolFrom(run),
-		VUs:     null.IntFrom(vus),
-		VUsMax:  null.IntFrom(max),
-	}
-	if _, err := cl.UpdateStatus(status); err != nil {
-		log.WithError(err).Error("Couldn't configure test")
-	}
-	if !run {
-		log.Info("Use `speedboat start` to start your test, or pass `--run` to autostart")
-	}
+	log.Infof("Web UI available at: http://%s/", addr)
 
 	// Wait for a signal or timeout before shutting down
 	signals := make(chan os.Signal)
