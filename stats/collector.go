@@ -10,17 +10,7 @@ type Collector interface {
 	// at regular intervals and when the context is terminated.
 	Run(ctx context.Context)
 
-	// Buffer returns a buffer belonging to this collector. The collector should track issued
-	// buffers in some way.
-	Buffer() Buffer
-}
-
-// A Buffer is a container for Samples. They are to be drained by a running Collector at regular
-// intervals.
-type Buffer interface {
-	// Adds a set of samples to the buffer.
-	Add(samples ...Sample)
-
-	// Drain empties the buffer and returns the previous contents.
-	Drain() []Sample
+	// Collect receives a set of samples. This method is never called concurrently, and only while
+	// the context for Run() is valid, but should defer as much work as possible to Run().
+	Collect(samples []Sample)
 }

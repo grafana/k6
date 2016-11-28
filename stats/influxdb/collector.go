@@ -6,7 +6,6 @@ import (
 	"github.com/influxdata/influxdb/client/v2"
 	"github.com/loadimpact/speedboat/stats"
 	"net/url"
-	"sync"
 	"time"
 )
 
@@ -15,9 +14,7 @@ const pushInterval = 1 * time.Millisecond
 type Collector struct {
 	client    client.Client
 	batchConf client.BatchPointsConfig
-
-	buffers      []*Buffer
-	buffersMutex sync.Mutex
+	buffer    []stats.Sample
 }
 
 func New(u *url.URL) (*Collector, error) {
@@ -46,26 +43,19 @@ func (c *Collector) Run(ctx context.Context) {
 	}
 }
 
-func (c *Collector) Buffer() stats.Buffer {
-	buf := &(Buffer{})
-	c.buffersMutex.Lock()
-	c.buffers = append(c.buffers, buf)
-	c.buffersMutex.Unlock()
-	return buf
+func (c *Collector) Collect(samples []stats.Sample) {
+	c.buffer = append(c.buffer, samples...)
 }
 
 func (c *Collector) commit() {
+	samples := c.buffer
+	c.buffer = nil
+
 	log.Debug("InfluxDB: Committing...")
 	batch, err := client.NewBatchPoints(c.batchConf)
 	if err != nil {
 		log.WithError(err).Error("InfluxDB: Couldn't make a batch")
 		return
-	}
-
-	buffers := c.buffers
-	samples := []stats.Sample{}
-	for _, buf := range buffers {
-		samples = append(samples, buf.Drain()...)
 	}
 
 	for _, sample := range samples {
@@ -82,20 +72,11 @@ func (c *Collector) commit() {
 		batch.AddPoint(p)
 	}
 
-	log.WithField("points", len(batch.Points())).Debug("InfluxDB: Writing points...")
+	log.WithField("points", len(batch.Points())).Debug("InfluxDB: Writing...")
+	startTime := time.Now()
 	if err := c.client.Write(batch); err != nil {
 		log.WithError(err).Error("InfluxDB: Couldn't write stats")
 	}
-}
-
-type Buffer []stats.Sample
-
-func (b *Buffer) Add(samples ...stats.Sample) {
-	*b = append(*b, samples...)
-}
-
-func (b *Buffer) Drain() []stats.Sample {
-	old := *b
-	*b = (*b)[:0]
-	return old
+	t := time.Since(startTime)
+	log.WithField("t", t).Debug("InfluxDB: Batch written!")
 }

@@ -31,10 +31,9 @@ var (
 )
 
 type vuEntry struct {
-	VU        VU
-	Buffer    []stats.Sample
-	ExtBuffer stats.Buffer
-	Cancel    context.CancelFunc
+	VU     VU
+	Buffer []stats.Sample
+	Cancel context.CancelFunc
 }
 
 type Engine struct {
@@ -137,8 +136,10 @@ func (e *Engine) Run(ctx context.Context, opts Options) error {
 
 	e.Apply(opts)
 
+	collectorCtx, collectorC := context.WithCancel(context.Background())
 	if e.Collector != nil {
-		go e.Collector.Run(ctx)
+		go e.Collector.Run(collectorCtx)
+		defer collectorC()
 	} else {
 		log.Debug("Engine: No Collector")
 	}
@@ -280,9 +281,6 @@ func (e *Engine) SetMaxVUs(v int64) error {
 				return err
 			}
 			entry := &vuEntry{VU: vu}
-			if e.Collector != nil {
-				entry.ExtBuffer = e.Collector.Buffer()
-			}
 			vus = append(vus, entry)
 		}
 		e.vus = vus
@@ -331,9 +329,6 @@ waitForPause:
 		}
 
 		vu.Buffer = append(vu.Buffer, samples...)
-		if vu.ExtBuffer != nil {
-			vu.ExtBuffer.Add(samples...)
-		}
 
 		if !e.Status.Running.Bool {
 			goto waitForPause
@@ -418,6 +413,9 @@ func (e *Engine) getSink(m *stats.Metric) stats.Sink {
 func (e *Engine) consumeBuffer(buffer []stats.Sample) {
 	for _, sample := range buffer {
 		e.getSink(sample.Metric).Add(sample)
+	}
+	if e.Collector != nil {
+		e.Collector.Collect(buffer)
 	}
 }
 
