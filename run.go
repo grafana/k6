@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
+	"github.com/ghodss/yaml"
 	"github.com/loadimpact/speedboat/api"
 	"github.com/loadimpact/speedboat/js"
 	"github.com/loadimpact/speedboat/lib"
@@ -12,6 +13,7 @@ import (
 	"github.com/loadimpact/speedboat/stats"
 	"github.com/loadimpact/speedboat/stats/influxdb"
 	"gopkg.in/urfave/cli.v1"
+	"io/ioutil"
 	"net/url"
 	"os"
 	"os/signal"
@@ -73,6 +75,10 @@ var commandRun = cli.Command{
 			Name:  "out, o",
 			Usage: "output metrics to an external data store",
 		},
+		cli.StringSliceFlag{
+			Name:  "config, c",
+			Usage: "read additional config files",
+		},
 	},
 	Action: actionRun,
 	Description: `Run starts a load test.
@@ -100,18 +106,9 @@ var commandInspect = cli.Command{
 			Usage: "input type, one of: auto, url, js",
 			Value: "auto",
 		},
-		cli.Int64Flag{
-			Name:  "vus, u",
-			Usage: "override vus",
-			Value: 10,
-		},
-		cli.Int64Flag{
-			Name:  "max, m",
-			Usage: "override vus-max",
-		},
-		cli.DurationFlag{
-			Name:  "duration, d",
-			Usage: "override duration",
+		cli.StringSliceFlag{
+			Name:  "config, c",
+			Usage: "read additional config files",
 		},
 	},
 	Action: actionInspect,
@@ -197,7 +194,7 @@ func actionRun(cc *cli.Context) error {
 	// Collect CLI arguments, most (not all) relating to options.
 	addr := cc.GlobalString("address")
 	out := cc.String("out")
-	cliOpts := lib.Options{
+	opts := lib.Options{
 		Run:         cliBool(cc, "run"),
 		VUs:         cliInt64(cc, "vus"),
 		VUsMax:      cliInt64(cc, "vus-max"),
@@ -215,6 +212,25 @@ func actionRun(cc *cli.Context) error {
 		log.WithError(err).Error("Couldn't create a runner")
 		return err
 	}
+	opts = opts.Apply(runnerOpts)
+
+	// Read config files.
+	for _, filename := range cc.StringSlice("config") {
+		data, err := ioutil.ReadFile(filename)
+		if err != nil {
+			return cli.NewExitError(err.Error(), 1)
+		}
+
+		var configOpts lib.Options
+		if err := yaml.Unmarshal(data, &configOpts); err != nil {
+			return cli.NewExitError(err.Error(), 1)
+		}
+		opts = opts.Apply(configOpts)
+	}
+
+	// CLI options have defaults, which are set as invalid, but have potentially nonzero values.
+	// Flipping the Valid flag for all invalid options thus applies all defaults.
+	opts = opts.SetAllValid(true)
 
 	// Make the metric collector, if requested.
 	var collector stats.Collector
@@ -226,10 +242,6 @@ func actionRun(cc *cli.Context) error {
 		}
 		collector = c
 	}
-
-	// Option predecence: CLI > Script.
-	// CLI has defaults, which are set as invalid, but have potentially nonzero values.
-	opts := cliOpts.Apply(runnerOpts).SetAllValid(true)
 
 	// Make the Engine
 	engine, err := lib.NewEngine(runner)
@@ -360,6 +372,19 @@ func actionInspect(cc *cli.Context) error {
 		if err := r.ExtractOptions(exports, &opts); err != nil {
 			return cli.NewExitError(err.Error(), 1)
 		}
+	}
+
+	for _, filename := range cc.StringSlice("config") {
+		data, err := ioutil.ReadFile(filename)
+		if err != nil {
+			return cli.NewExitError(err.Error(), 1)
+		}
+
+		var configOpts lib.Options
+		if err := yaml.Unmarshal(data, &configOpts); err != nil {
+			return cli.NewExitError(err.Error(), 1)
+		}
+		opts = opts.Apply(configOpts)
 	}
 
 	return dumpYAML(opts)
