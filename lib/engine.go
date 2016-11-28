@@ -238,6 +238,16 @@ func (e *Engine) IsRunning() bool {
 	return e.ctx != nil
 }
 
+func (e *Engine) TotalTime() (total time.Duration, finite bool) {
+	for _, stage := range e.Stages {
+		if stage.Duration.Valid {
+			total += time.Duration(stage.Duration.Int64)
+			finite = true
+		}
+	}
+	return total, finite
+}
+
 func (e *Engine) SetRunning(running bool) {
 	if running && !e.Status.Running.Bool {
 		e.Pause.Done()

@@ -12,6 +12,7 @@ import (
 	"github.com/loadimpact/speedboat/simple"
 	"github.com/loadimpact/speedboat/stats"
 	"github.com/loadimpact/speedboat/stats/influxdb"
+	"github.com/loadimpact/speedboat/ui"
 	"gopkg.in/urfave/cli.v1"
 	"io/ioutil"
 	"net/url"
@@ -234,6 +235,7 @@ func actionRun(cc *cli.Context) error {
 
 	// Make the metric collector, if requested.
 	var collector stats.Collector
+	collectorString := "-"
 	if out != "" {
 		c, err := makeCollector(out)
 		if err != nil {
@@ -241,6 +243,7 @@ func actionRun(cc *cli.Context) error {
 			return err
 		}
 		collector = c
+		collectorString = fmt.Sprint(collector)
 	}
 
 	// Make the Engine
@@ -289,21 +292,56 @@ func actionRun(cc *cli.Context) error {
 		srvCancel()
 	}()
 
-	log.Infof("Web UI available at: http://%s/", addr)
+	// Print the banner!
+	fmt.Printf("Welcome to Speedboat v%s!\n", cc.App.Version)
+	fmt.Printf("\n")
+	fmt.Printf("  execution: local\n")
+	fmt.Printf("     output: %s\n", collectorString)
+	fmt.Printf("     script: %s\n", filename)
+	fmt.Printf("             ↳ duration: %s\n", opts.Duration.String)
+	fmt.Printf("             ↳ vus: %d, max: %d\n", opts.VUs.Int64, opts.VUsMax.Int64)
+	fmt.Printf("\n")
+	fmt.Printf("  web ui: http://%s/\n", addr)
+	fmt.Printf("\n")
+
+	progressBar := ui.ProgressBar{Width: 60}
+	fmt.Printf(" starting %s -- / --\r", progressBar.String())
 
 	// Wait for a signal or timeout before shutting down
 	signals := make(chan os.Signal)
 	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
+	ticker := time.NewTicker(500 * time.Millisecond)
 
-	log.Debug("Waiting for test to finish")
-	select {
-	case <-srvC.Done():
-		log.Debug("API server terminated; shutting down...")
-	case <-engineC.Done():
-		log.Debug("Engine terminated; shutting down...")
-	case sig := <-signals:
-		log.WithField("signal", sig).Debug("Signal received; shutting down...")
+loop:
+	for {
+		select {
+		case <-ticker.C:
+			statusString := "running"
+			if !engine.Status.Running.Bool {
+				statusString = "paused"
+			}
+			atTime := time.Duration(engine.Status.AtTime.Int64)
+			totalTime, finite := engine.TotalTime()
+			progress := 0.0
+			if finite {
+				progress = float64(atTime) / float64(totalTime)
+			}
+			progressBar.Progress = progress
+			fmt.Printf("%10s %s %s / %s\r", statusString, progressBar.String(), time.Duration(atTime.Seconds())*time.Second, totalTime)
+		case <-srvC.Done():
+			log.Debug("API server terminated; shutting down...")
+			break loop
+		case <-engineC.Done():
+			log.Debug("Engine terminated; shutting down...")
+			break loop
+		case sig := <-signals:
+			log.WithField("signal", sig).Debug("Signal received; shutting down...")
+			break loop
+		}
 	}
+
+	progressBar.Progress = 1.0
+	fmt.Printf("      done %s %s\n", progressBar.String(), time.Duration(engine.Status.AtTime.Int64))
 
 	// If API server is still available, write final metrics to stdout.
 	// (An unavailable API server most likely means a port binding failure.)
