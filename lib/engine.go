@@ -214,6 +214,7 @@ loop:
 	e.SetMaxVUs(0)
 	e.consumeEngineStats()
 
+	e.ctx = nil
 	cancel()
 
 	log.Debug("Engine: Waiting for subsystem shutdown...")
