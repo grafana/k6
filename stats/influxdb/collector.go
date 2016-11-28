@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-const pushInterval = 1 * time.Millisecond
+const pushInterval = 1 * time.Second
 
 type Collector struct {
 	client    client.Client
