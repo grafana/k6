@@ -167,6 +167,10 @@ loop:
 			}
 
 			for _, vu := range e.vus {
+				if vu.Buffer == nil {
+					continue
+				}
+
 				buffer := vu.Buffer
 				vu.Buffer = nil
 				e.consumeBuffer(buffer)
