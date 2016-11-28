@@ -1,6 +1,8 @@
 package lib
 
 import (
+	"encoding/json"
+	"github.com/robertkrimen/otto"
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -13,8 +15,7 @@ type Options struct {
 	Quit        null.Bool `json:"quit"`
 	QuitOnTaint null.Bool `json:"quit-on-taint"`
 
-	// Thresholds are JS snippets keyed by metrics.
-	Thresholds map[string][]string `json:"thresholds"`
+	Thresholds map[string][]Threshold `json:"thresholds"`
 }
 
 func (o Options) Apply(opts Options) Options {
@@ -36,7 +37,7 @@ func (o Options) Apply(opts Options) Options {
 	if opts.QuitOnTaint.Valid {
 		o.QuitOnTaint = opts.QuitOnTaint
 	}
-	if len(opts.Thresholds) > 0 {
+	if opts.Thresholds != nil {
 		o.Thresholds = opts.Thresholds
 	}
 	return o
@@ -50,4 +51,27 @@ func (o Options) SetAllValid(valid bool) Options {
 	o.Quit.Valid = valid
 	o.QuitOnTaint.Valid = valid
 	return o
+}
+
+type Threshold struct {
+	Source string
+	Script *otto.Script
+}
+
+func (t Threshold) String() string {
+	return t.Source
+}
+
+func (t Threshold) MarshalJSON() ([]byte, error) {
+	return json.Marshal(t.Source)
+}
+
+func (t *Threshold) UnmarshalJSON(data []byte) error {
+	var src string
+	if err := json.Unmarshal(data, &src); err != nil {
+		return err
+	}
+	t.Source = src
+	t.Script = nil
+	return nil
 }

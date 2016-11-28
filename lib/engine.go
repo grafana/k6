@@ -45,7 +45,7 @@ type Engine struct {
 	Pause     sync.WaitGroup
 	Metrics   map[*stats.Metric]stats.Sink
 
-	thresholds  map[string][]*otto.Script
+	thresholds  map[string][]Threshold
 	thresholdVM *otto.Otto
 
 	ctx    context.Context
@@ -66,7 +66,7 @@ func NewEngine(r Runner) (*Engine, error) {
 			AtTime:  null.IntFrom(0),
 		},
 		Metrics:     make(map[*stats.Metric]stats.Sink),
-		thresholds:  make(map[string][]*otto.Script),
+		thresholds:  make(map[string][]Threshold),
 		thresholdVM: otto.New(),
 	}
 	e.Pause.Add(1)
@@ -108,10 +108,22 @@ func (e *Engine) Apply(opts Options) error {
 		e.Status.QuitOnTaint = opts.QuitOnTaint
 	}
 
-	for metric, thresholds := range opts.Thresholds {
-		for _, src := range thresholds {
-			if err := e.AddThreshold(metric, src); err != nil {
-				return err
+	if opts.Thresholds != nil {
+		e.thresholds = opts.Thresholds
+
+		// Make sure all scripts are compiled!
+		for m, scripts := range e.thresholds {
+			for i, script := range scripts {
+				if script.Script != nil {
+					continue
+				}
+
+				s, err := e.thresholdVM.Compile(fmt.Sprintf("threshold$%s:%i", m, i), script.Source)
+				if err != nil {
+					return err
+				}
+				script.Script = s
+				scripts[i] = script
 			}
 		}
 	}
@@ -282,17 +294,6 @@ func (e *Engine) SetMaxVUs(v int64) error {
 	return nil
 }
 
-func (e *Engine) AddThreshold(metric, src string) error {
-	script, err := e.thresholdVM.Compile("__threshold__", src)
-	if err != nil {
-		return err
-	}
-
-	e.thresholds[metric] = append(e.thresholds[metric], script)
-
-	return nil
-}
-
 func (e *Engine) runVU(ctx context.Context, id int64, vu *vuEntry) {
 	idString := strconv.FormatInt(id, 10)
 
@@ -362,7 +363,7 @@ func (e *Engine) runThresholds(ctx context.Context) {
 
 				taint := false
 				for _, script := range scripts {
-					v, err := e.thresholdVM.Run(script.String())
+					v, err := e.thresholdVM.Run(script.Script)
 					if err != nil {
 						log.WithError(err).WithField("metric", m.Name).Error("Threshold Error")
 						taint = true
