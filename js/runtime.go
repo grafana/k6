@@ -2,14 +2,13 @@ package js
 
 import (
 	"bytes"
-	"errors"
+	"encoding/json"
 	"fmt"
 	"github.com/GeertJohan/go.rice"
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/speedboat/lib"
 	"github.com/loadimpact/speedboat/stats"
 	"github.com/robertkrimen/otto"
-	"gopkg.in/guregu/null.v3"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -83,80 +82,17 @@ func (r *Runtime) ExtractOptions(exports otto.Value, opts *lib.Options) error {
 	if err != nil {
 		return err
 	}
-	obj := v.Object()
-	if obj == nil {
-		return nil
+	ev, err := v.Export()
+	if err != nil {
+		return err
 	}
 
-	for _, key := range obj.Keys() {
-		val, err := obj.Get(key)
-		if err != nil {
-			return err
-		}
-
-		switch key {
-		case "vus":
-			vus, err := val.ToInteger()
-			if err != nil {
-				return err
-			}
-			opts.VUs = null.IntFrom(vus)
-		case "vusMax":
-			vusMax, err := val.ToInteger()
-			if err != nil {
-				return err
-			}
-			opts.VUsMax = null.IntFrom(vusMax)
-		case "duration":
-			duration, err := val.ToString()
-			if err != nil {
-				return err
-			}
-			opts.Duration = null.StringFrom(duration)
-		case "thresholds":
-			if val.IsUndefined() || val.IsNull() {
-				break
-			}
-
-			if opts.Thresholds == nil {
-				opts.Thresholds = make(map[string][]string)
-			}
-
-			obj := val.Object()
-			if obj == nil {
-				return errors.New("thresholds option must be an object")
-			}
-			for _, metric := range obj.Keys() {
-				val, err := obj.Get(metric)
-				if err != nil {
-					return err
-				}
-
-				if val.IsString() {
-					src, err := val.ToString()
-					if err != nil {
-						return err
-					}
-					opts.Thresholds[metric] = append(opts.Thresholds[metric], src)
-				} else if val.IsObject() {
-					obj := val.Object()
-					for _, key := range obj.Keys() {
-						val, err := obj.Get(key)
-						if err != nil {
-							return err
-						}
-
-						src, err := val.ToString()
-						if err != nil {
-							return err
-						}
-						opts.Thresholds[metric] = append(opts.Thresholds[metric], src)
-					}
-				} else {
-					return errors.New("threshold must be string or object")
-				}
-			}
-		}
+	data, err := json.Marshal(ev)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(data, opts); err != nil {
+		return err
 	}
 
 	return nil
