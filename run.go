@@ -359,6 +359,51 @@ loop:
 	)
 	fmt.Printf("\n")
 
+	// Print groups.
+	var printGroup func(g *lib.Group, level int)
+	printGroup = func(g *lib.Group, level int) {
+		indent := strings.Repeat("  ", level)
+
+		if g.Name != "" && g.Parent != nil {
+			fmt.Printf("%s█ %s\n", indent, g.Name)
+		}
+
+		if len(g.Checks) > 0 {
+			if g.Name != "" && g.Parent != nil {
+				fmt.Printf("\n")
+			}
+			for _, check := range g.Checks {
+				icon := "✓"
+				if check.Fails > 0 {
+					icon = "✗"
+				}
+				fmt.Printf("%s  %s %2.2f%% - %s\n",
+					indent,
+					icon,
+					100*(float64(check.Passes)/float64(check.Passes+check.Fails)),
+					check.Name,
+				)
+			}
+			fmt.Printf("\n")
+		}
+		if len(g.Groups) > 0 {
+			if g.Name != "" && g.Parent != nil && len(g.Checks) > 0 {
+				fmt.Printf("\n")
+			}
+			for _, g := range g.Groups {
+				printGroup(g, level+1)
+			}
+		}
+	}
+
+	groups := engine.Runner.GetGroups()
+	for _, g := range groups {
+		if g.Parent != nil {
+			continue
+		}
+		printGroup(g, 1)
+	}
+
 	// Sort and print metrics.
 	metrics := make(map[string]*stats.Metric, len(engine.Metrics))
 	metricNames := make([]string, 0, len(engine.Metrics))
