@@ -365,9 +365,9 @@ waitForPause:
 			}
 		}
 
-		if samples != nil {
-			vu.Buffer = append(vu.Buffer, samples...)
-		}
+		buffer := vu.Buffer
+		buffer = append(buffer, samples...)
+		vu.Buffer = buffer
 
 		if !e.Status.Running.Bool {
 			goto waitForPause
