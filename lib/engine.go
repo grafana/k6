@@ -16,6 +16,7 @@ import (
 const (
 	TickRate          = 1 * time.Millisecond
 	ThresholdTickRate = 2 * time.Second
+	ShutdownTimeout   = 10 * time.Second
 )
 
 var (
@@ -217,7 +218,18 @@ loop:
 	cancel()
 
 	log.Debug("Engine: Waiting for subsystem shutdown...")
-	e.waitGroup.Wait()
+
+	done := make(chan interface{})
+	go func() {
+		e.waitGroup.Wait()
+		close(done)
+	}()
+	timeout := time.After(ShutdownTimeout)
+	select {
+	case <-done:
+	case <-timeout:
+		log.Warn("VUs took too long to finish, shutting down anyways")
+	}
 
 	return nil
 }
