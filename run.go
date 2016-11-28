@@ -310,7 +310,7 @@ func actionRun(cc *cli.Context) error {
 	// Wait for a signal or timeout before shutting down
 	signals := make(chan os.Signal)
 	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
-	ticker := time.NewTicker(500 * time.Millisecond)
+	ticker := time.NewTicker(10 * time.Millisecond)
 
 loop:
 	for {
@@ -318,16 +318,27 @@ loop:
 		case <-ticker.C:
 			statusString := "running"
 			if !engine.Status.Running.Bool {
-				statusString = "paused"
+				if engine.IsRunning() {
+					statusString = "paused"
+				} else {
+					statusString = "stopping"
+				}
 			}
+
 			atTime := time.Duration(engine.Status.AtTime.Int64)
 			totalTime, finite := engine.TotalTime()
 			progress := 0.0
 			if finite {
 				progress = float64(atTime) / float64(totalTime)
 			}
+
 			progressBar.Progress = progress
-			fmt.Printf("%10s %s %s / %s\r", statusString, progressBar.String(), time.Duration(atTime.Seconds())*time.Second, totalTime)
+			fmt.Printf("%10s %s %10s / %s\r",
+				statusString,
+				progressBar.String(),
+				atTime-(atTime%(100*time.Millisecond)),
+				totalTime-(totalTime%(100*time.Millisecond)),
+			)
 		case <-srvC.Done():
 			log.Debug("API server terminated; shutting down...")
 			break loop
@@ -340,8 +351,19 @@ loop:
 		}
 	}
 
+	// Shut down the API server and engine.
+	srvCancel()
+	engineCancel()
+	wg.Wait()
+
+	// Test done, leave that status as the final progress bar!
+	atTime := time.Duration(engine.Status.AtTime.Int64)
 	progressBar.Progress = 1.0
-	fmt.Printf("      done %s %s\n", progressBar.String(), time.Duration(engine.Status.AtTime.Int64))
+	fmt.Printf("      done %s %10s / %s\n",
+		progressBar.String(),
+		atTime-(atTime%(100*time.Millisecond)),
+		atTime-(atTime%(100*time.Millisecond)),
+	)
 
 	// If API server is still available, write final metrics to stdout.
 	// (An unavailable API server most likely means a port binding failure.)
@@ -371,11 +393,6 @@ loop:
 			fmt.Printf("%s: %s\n", key, val)
 		}
 	}
-
-	// Shut down the API server and engine, wait for them to terminate before exiting
-	srvCancel()
-	engineCancel()
-	wg.Wait()
 
 	if engine.Status.Tainted.Bool {
 		return cli.NewExitError("", 99)
