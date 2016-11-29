@@ -81,7 +81,9 @@ If you open up the web UI with this test running, you'll see that not only is it
 * **http_req_receiving** - min/max/avg/med  
   Time spent receiving a response.
 
-While the built-in web dashboard will only display aggregates of all data points, if you output data to InfluxDB or LoadImpact, you'll be able to filter and group the data on various dimensions (eg. URL, response code, etc). See the tutorial: {@tutorial influxdb}.
+While the built-in web dashboard will only display aggregates of all data points, if you output data to InfluxDB or LoadImpact, you'll be able to filter and group the data on various dimensions (eg. URL, response code, etc).
+In the case you have `influxdb server` locally installed with `speadboat` database you can pass `-o influxdb=http://localhost:8086/speedboat` option to feed it.
+
 
 Tests
 -----
