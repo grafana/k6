@@ -166,10 +166,12 @@ loop:
 	for {
 		select {
 		case now := <-ticker.C:
+			// Track time deltas to ensure smooth interpolation even in the face of latency.
 			timeDelta := now.Sub(lastTick)
 			e.Status.AtTime.Int64 += int64(timeDelta)
 			lastTick = now
 
+			// Handle stages and VU interpolation.
 			stage, left, ok := StageAt(e.Stages, time.Duration(e.Status.AtTime.Int64))
 			if stage.StartVUs.Valid && stage.EndVUs.Valid {
 				progress := (float64(stage.Duration.Int64-int64(left)) / float64(stage.Duration.Int64))
@@ -177,6 +179,8 @@ loop:
 				e.SetVUs(vus)
 			}
 
+			// Consume sample buffers. We use copies to avoid a race condition with runVU();
+			// concurrent append() calls on the same list will result in a crash.
 			for _, vu := range e.vus {
 				buffer := vu.Buffer
 				if buffer == nil {
@@ -186,6 +190,7 @@ loop:
 				e.consumeBuffer(buffer)
 			}
 
+			// If the test has ended, either pause or shut down.
 			if !ok {
 				e.SetRunning(false)
 
@@ -198,11 +203,13 @@ loop:
 				}
 			}
 
+			// If the test is tainted, and we've requested --quit-on-taint, shut down.
 			if e.Status.QuitOnTaint.Bool && e.Status.Tainted.Bool {
 				log.Warn("Test tainted, ending early...")
 				break loop
 			}
 
+			// Update internal metrics.
 			e.consumeEngineStats()
 		case <-ctx.Done():
 			break loop
