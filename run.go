@@ -420,7 +420,15 @@ loop:
 		if val == "0" {
 			continue
 		}
-		fmt.Printf("  ✣ %s: %s\n", name, val)
+		icon := "•"
+		for _, threshold := range engine.Thresholds[name] {
+			icon = "✓"
+			if threshold.Failed {
+				icon = "✗"
+				break
+			}
+		}
+		fmt.Printf("  %s %s: %s\n", icon, name, val)
 	}
 
 	if engine.Status.Tainted.Bool {
