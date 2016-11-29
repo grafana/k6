@@ -5,7 +5,7 @@ import http from "speedboat/http";
 export let options = {
 	vus: 5,
 	thresholds: {
-		my_rate: ["avg>=0.4"],
+		my_rate: ["rate>=0.4"],
 	}
 };
 
