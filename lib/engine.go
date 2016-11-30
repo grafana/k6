@@ -23,13 +23,14 @@ const (
 var (
 	MetricVUs    = &stats.Metric{Name: "vus", Type: stats.Gauge}
 	MetricVUsMax = &stats.Metric{Name: "vus_max", Type: stats.Gauge}
+	MetricRuns   = &stats.Metric{Name: "runs", Type: stats.Gauge}
 	MetricErrors = &stats.Metric{Name: "errors", Type: stats.Counter}
 
 	ErrTooManyVUs = errors.New("More VUs than the maximum requested")
 	ErrMaxTooLow  = errors.New("Can't lower max below current VU count")
 
 	// Special error used to taint a test, without printing an error.
-	ErrVUWantsTaint = errors.New("[ErrVUWantsTaint is never logged]")
+	ErrVUWantsTaint = errors.New("silent taint")
 )
 
 type vuEntry struct {
@@ -379,19 +380,19 @@ waitForPause:
 		if err != nil {
 			atomic.AddInt64(&e.Status.Taints, 1)
 
+			samples = append(samples, stats.Sample{
+				Metric: MetricErrors,
+				Time:   time.Now(),
+				Tags:   map[string]string{"vu": idString, "error": err.Error()},
+				Value:  float64(1),
+			})
+
 			if err != ErrVUWantsTaint {
 				if s, ok := err.(fmt.Stringer); ok {
 					log.Error(s.String())
 				} else {
 					log.WithError(err).Error("Runtime Error")
 				}
-
-				samples = append(samples, stats.Sample{
-					Metric: MetricErrors,
-					Time:   time.Now(),
-					Tags:   map[string]string{"vu": idString, "error": err.Error()},
-					Value:  float64(1),
-				})
 			}
 		}
 
@@ -499,5 +500,6 @@ func (e *Engine) consumeEngineStats() {
 	e.consumeBuffer([]stats.Sample{
 		stats.Sample{Metric: MetricVUs, Time: t, Value: float64(e.Status.VUs.Int64)},
 		stats.Sample{Metric: MetricVUsMax, Time: t, Value: float64(e.Status.VUsMax.Int64)},
+		stats.Sample{Metric: MetricRuns, Time: t, Value: float64(e.Status.Runs)},
 	})
 }
