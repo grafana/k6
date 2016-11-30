@@ -3,8 +3,10 @@ VERSION := 0.2.1
 all: build web docs
 
 .PHONY: build
-build: js/node_modules web
+build: js web
 	go build
+
+js: js/node_modules
 
 js/node_modules:
 	cd js && npm install
