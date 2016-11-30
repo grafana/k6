@@ -15,8 +15,13 @@ type Status struct {
 	VUsMax  null.Int  `json:"vus-max"`
 	AtTime  null.Int  `json:"at-time"`
 
-	Quit        null.Bool `json:"quit"`
-	QuitOnTaint null.Bool `json:"quit-on-taint"`
+	Quit        null.Bool  `json:"quit"`
+	QuitOnTaint null.Bool  `json:"quit-on-taint"`
+	Acceptance  null.Float `json:"acceptance"`
+
+	// Read-only, non-nullable.
+	Runs   int64 `json:"runs"`
+	Taints int64 `json:"taints"`
 }
 
 func (s Status) GetName() string {

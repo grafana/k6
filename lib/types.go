@@ -12,8 +12,9 @@ type Options struct {
 	VUsMax   null.Int    `json:"vus-max"`
 	Duration null.String `json:"duration"`
 
-	Quit        null.Bool `json:"quit"`
-	QuitOnTaint null.Bool `json:"quit-on-taint"`
+	Quit        null.Bool  `json:"quit"`
+	QuitOnTaint null.Bool  `json:"quit-on-taint"`
+	Acceptance  null.Float `json:"acceptance"`
 
 	Thresholds map[string][]*Threshold `json:"thresholds"`
 }
@@ -36,6 +37,9 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.QuitOnTaint.Valid {
 		o.QuitOnTaint = opts.QuitOnTaint
+	}
+	if opts.Acceptance.Valid {
+		o.Acceptance = opts.Acceptance
 	}
 	if opts.Thresholds != nil {
 		o.Thresholds = opts.Thresholds

@@ -10,6 +10,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -67,6 +68,7 @@ func NewEngine(r Runner) (*Engine, error) {
 			AtTime:      null.IntFrom(0),
 			Quit:        null.BoolFrom(false),
 			QuitOnTaint: null.BoolFrom(false),
+			Acceptance:  null.FloatFrom(0.0),
 		},
 		Metrics:     make(map[*stats.Metric]stats.Sink),
 		Thresholds:  make(map[string][]*Threshold),
@@ -109,6 +111,9 @@ func (e *Engine) Apply(opts Options) error {
 	}
 	if opts.QuitOnTaint.Valid {
 		e.Status.QuitOnTaint = opts.QuitOnTaint
+	}
+	if opts.Acceptance.Valid {
+		e.Status.Acceptance = opts.Acceptance
 	}
 
 	if opts.Thresholds != nil {
@@ -204,6 +209,10 @@ loop:
 					break loop
 				}
 			}
+
+			// Check the taint rate acceptance to decide taint status.
+			taintRate := float64(e.Status.Taints) / float64(e.Status.Runs)
+			e.Status.Tainted.Bool = taintRate > e.Status.Acceptance.Float64
 
 			// If the test is tainted, and we've requested --quit-on-taint, shut down.
 			if e.Status.QuitOnTaint.Bool && e.Status.Tainted.Bool {
@@ -365,8 +374,10 @@ waitForPause:
 		default:
 		}
 
+		atomic.AddInt64(&e.Status.Runs, 1)
+
 		if err != nil {
-			e.Status.Tainted.Bool = true
+			atomic.AddInt64(&e.Status.Taints, 1)
 
 			if err != ErrVUWantsTaint {
 				if s, ok := err.(fmt.Stringer); ok {
@@ -447,7 +458,6 @@ func (e *Engine) runThresholds(ctx context.Context) {
 
 				if taint {
 					m.Tainted = true
-					e.Status.Tainted.Bool = true
 				}
 			}
 		case <-ctx.Done():
