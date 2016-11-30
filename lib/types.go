@@ -7,21 +7,21 @@ import (
 )
 
 type Options struct {
-	Run      null.Bool   `json:"run"`
+	Paused   null.Bool   `json:"paused"`
 	VUs      null.Int    `json:"vus"`
 	VUsMax   null.Int    `json:"vus-max"`
 	Duration null.String `json:"duration"`
 
-	Quit        null.Bool  `json:"quit"`
-	QuitOnTaint null.Bool  `json:"quit-on-taint"`
-	Acceptance  null.Float `json:"acceptance"`
+	Linger       null.Bool  `json:"linger"`
+	AbortOnTaint null.Bool  `json:"abort-on-taint"`
+	Acceptance   null.Float `json:"acceptance"`
 
 	Thresholds map[string][]*Threshold `json:"thresholds"`
 }
 
 func (o Options) Apply(opts Options) Options {
-	if opts.Run.Valid {
-		o.Run = opts.Run
+	if opts.Paused.Valid {
+		o.Paused = opts.Paused
 	}
 	if opts.VUs.Valid {
 		o.VUs = opts.VUs
@@ -32,11 +32,11 @@ func (o Options) Apply(opts Options) Options {
 	if opts.Duration.Valid {
 		o.Duration = opts.Duration
 	}
-	if opts.Quit.Valid {
-		o.Quit = opts.Quit
+	if opts.Linger.Valid {
+		o.Linger = opts.Linger
 	}
-	if opts.QuitOnTaint.Valid {
-		o.QuitOnTaint = opts.QuitOnTaint
+	if opts.AbortOnTaint.Valid {
+		o.AbortOnTaint = opts.AbortOnTaint
 	}
 	if opts.Acceptance.Valid {
 		o.Acceptance = opts.Acceptance
@@ -48,12 +48,12 @@ func (o Options) Apply(opts Options) Options {
 }
 
 func (o Options) SetAllValid(valid bool) Options {
-	o.Run.Valid = valid
+	o.Paused.Valid = valid
 	o.VUs.Valid = valid
 	o.VUsMax.Valid = valid
 	o.Duration.Valid = valid
-	o.Quit.Valid = valid
-	o.QuitOnTaint.Valid = valid
+	o.Linger.Valid = valid
+	o.AbortOnTaint.Valid = valid
 	return o
 }
 

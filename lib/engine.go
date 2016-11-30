@@ -62,14 +62,14 @@ func NewEngine(r Runner) (*Engine, error) {
 	e := &Engine{
 		Runner: r,
 		Status: Status{
-			Running:     null.BoolFrom(false),
-			Tainted:     null.BoolFrom(false),
-			VUs:         null.IntFrom(0),
-			VUsMax:      null.IntFrom(0),
-			AtTime:      null.IntFrom(0),
-			Quit:        null.BoolFrom(false),
-			QuitOnTaint: null.BoolFrom(false),
-			Acceptance:  null.FloatFrom(0.0),
+			Running:      null.BoolFrom(false),
+			Tainted:      null.BoolFrom(false),
+			VUs:          null.IntFrom(0),
+			VUsMax:       null.IntFrom(0),
+			AtTime:       null.IntFrom(0),
+			Linger:       null.BoolFrom(false),
+			AbortOnTaint: null.BoolFrom(false),
+			Acceptance:   null.FloatFrom(0.0),
 		},
 		Metrics:     make(map[*stats.Metric]stats.Sink),
 		Thresholds:  make(map[string][]*Threshold),
@@ -81,8 +81,8 @@ func NewEngine(r Runner) (*Engine, error) {
 }
 
 func (e *Engine) Apply(opts Options) error {
-	if opts.Run.Valid {
-		e.SetRunning(opts.Run.Bool)
+	if opts.Paused.Valid {
+		e.SetRunning(!opts.Paused.Bool)
 	}
 	if opts.VUsMax.Valid {
 		if err := e.SetMaxVUs(opts.VUs.Int64); err != nil {
@@ -107,11 +107,11 @@ func (e *Engine) Apply(opts Options) error {
 		e.Stages = []Stage{Stage{Duration: null.IntFrom(int64(duration))}}
 	}
 
-	if opts.Quit.Valid {
-		e.Status.Quit = opts.Quit
+	if opts.Linger.Valid {
+		e.Status.Linger = opts.Linger
 	}
-	if opts.QuitOnTaint.Valid {
-		e.Status.QuitOnTaint = opts.QuitOnTaint
+	if opts.AbortOnTaint.Valid {
+		e.Status.AbortOnTaint = opts.AbortOnTaint
 	}
 	if opts.Acceptance.Valid {
 		e.Status.Acceptance = opts.Acceptance
@@ -202,21 +202,18 @@ loop:
 			if !ok {
 				e.SetRunning(false)
 
-				if e.Status.Quit.Bool {
-					break loop
-				} else {
-					log.Info("Test finished, press Ctrl+C to exit")
+				if e.Status.Linger.Bool {
 					<-ctx.Done()
-					break loop
 				}
+				break loop
 			}
 
 			// Check the taint rate acceptance to decide taint status.
 			taintRate := float64(e.Status.Taints) / float64(e.Status.Runs)
 			e.Status.Tainted.Bool = taintRate > e.Status.Acceptance.Float64
 
-			// If the test is tainted, and we've requested --quit-on-taint, shut down.
-			if e.Status.QuitOnTaint.Bool && e.Status.Tainted.Bool {
+			// If the test is tainted, and we've requested --abort-on-taint, shut down.
+			if e.Status.AbortOnTaint.Bool && e.Status.Tainted.Bool {
 				log.Warn("Test tainted, ending early...")
 				break loop
 			}

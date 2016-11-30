@@ -61,8 +61,8 @@ var commandRun = cli.Command{
 			Value: 0.0,
 		},
 		cli.BoolFlag{
-			Name:  "run, r",
-			Usage: "start test immediately",
+			Name:  "paused, p",
+			Usage: "start test in a paused state",
 		},
 		cli.StringFlag{
 			Name:  "type, t",
@@ -70,12 +70,12 @@ var commandRun = cli.Command{
 			Value: "auto",
 		},
 		cli.BoolFlag{
-			Name:  "quit, q",
-			Usage: "quit immediately on test completion",
+			Name:  "linger, l",
+			Usage: "linger after test completion",
 		},
 		cli.BoolFlag{
-			Name:  "quit-on-taint",
-			Usage: "quit immediately if the test gets tainted",
+			Name:  "abort-on-taint",
+			Usage: "abort immediately if the test gets tainted",
 		},
 		cli.StringFlag{
 			Name:  "out, o",
@@ -201,13 +201,13 @@ func actionRun(cc *cli.Context) error {
 	addr := cc.GlobalString("address")
 	out := cc.String("out")
 	opts := lib.Options{
-		Run:         cliBool(cc, "run"),
-		VUs:         cliInt64(cc, "vus"),
-		VUsMax:      cliInt64(cc, "vus-max"),
-		Duration:    cliDuration(cc, "duration"),
-		Quit:        cliBool(cc, "quit"),
-		QuitOnTaint: cliBool(cc, "quit-on-taint"),
-		Acceptance:  cliFloat64(cc, "acceptance"),
+		Paused:       cliBool(cc, "paused"),
+		VUs:          cliInt64(cc, "vus"),
+		VUsMax:       cliInt64(cc, "vus-max"),
+		Duration:     cliDuration(cc, "duration"),
+		Linger:       cliBool(cc, "linger"),
+		AbortOnTaint: cliBool(cc, "abort-on-taint"),
+		Acceptance:   cliFloat64(cc, "acceptance"),
 	}
 
 	// Make the Runner, extract script-defined options.
