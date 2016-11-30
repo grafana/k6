@@ -60,11 +60,13 @@ func NewEngine(r Runner) (*Engine, error) {
 	e := &Engine{
 		Runner: r,
 		Status: Status{
-			Running: null.BoolFrom(false),
-			Tainted: null.BoolFrom(false),
-			VUs:     null.IntFrom(0),
-			VUsMax:  null.IntFrom(0),
-			AtTime:  null.IntFrom(0),
+			Running:     null.BoolFrom(false),
+			Tainted:     null.BoolFrom(false),
+			VUs:         null.IntFrom(0),
+			VUsMax:      null.IntFrom(0),
+			AtTime:      null.IntFrom(0),
+			Quit:        null.BoolFrom(false),
+			QuitOnTaint: null.BoolFrom(false),
 		},
 		Metrics:     make(map[*stats.Metric]stats.Sink),
 		Thresholds:  make(map[string][]*Threshold),
