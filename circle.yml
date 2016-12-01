@@ -1,31 +1,31 @@
 machine:
-	services:
-		- docker
+  services:
+    - docker
 
 checkout:
-	post:
-		- git submodule update --init
+  post:
+    - git submodule update --init
 
 dependencies:
-	override:
-		- docker info
-		- docker build -t loadimpact/k6 .
-		- echo "{\"https://index.docker.io/v1/\":{\"auth\":\"$DOCKER_AUTH\",\"email\":\"$DOCKER_EMAIL\"}}" >~/.dockercfg
+  override:
+    - docker info
+    - docker build -t loadimpact/k6 .
+    - echo "{\"https://index.docker.io/v1/\":{\"auth\":\"$DOCKER_AUTH\",\"email\":\"$DOCKER_EMAIL\"}}" >~/.dockercfg
 
 test:
-	override:
-		- docker run --entrypoint /bin/bash loadimpact/k6 -c 'cd $GOPATH/src/github.com/loadimpact/k6 && go get -t ./... && go test ./...'
+  override:
+    - docker run --entrypoint /bin/bash loadimpact/k6 -c 'cd $GOPATH/src/github.com/loadimpact/k6 && go get -t ./... && go test ./...'
 
 deployment:
-	release:
-		branch: master
-		owner: loadimpact
-		commands:
-			- docker push loadimpact/k6
+  release:
+    branch: master
+    owner: loadimpact
+    commands:
+      - docker push loadimpact/k6
 
-	develop:
-		branch: develop
-		owner: loadimpact
-		commands:
-			- docker tag loadimpact/k6 loadimpact/k6:develop
-			- docker push loadimpact/k6:develop
+  develop:
+    branch: develop
+    owner: loadimpact
+    commands:
+      - docker tag loadimpact/k6 loadimpact/k6:develop
+      - docker push loadimpact/k6:develop
