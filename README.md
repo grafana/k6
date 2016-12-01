@@ -30,12 +30,6 @@ Installation
 
 There are a couple of ways to set up Speedboat:
 
-1. The **recommended way** to get started is to grab a binary release from [the releases page](https://github.com/loadimpact/speedboat/releases). Either copy/link the `speedboat` binary somewhere in your `$PATH`, or use it as:
-
-   ```sh
-   ./speedboat run myscript.js
-   ```
-
 1. If you're comfortable using Docker, you may use that as well:
 
    ```sh
@@ -48,10 +42,13 @@ There are a couple of ways to set up Speedboat:
 1. If you have a Go environment [set up](https://golang.org/doc/install), you may simply use `go get`:
 
    ```sh
-   go get github.com/loadimpact/speedboat
+   go get -u github.com/loadimpact/speedboat
+   cd $GOPATH/src/github.com/loadimpact/speedboat
+   make // running `make` require `npm` and `bower` installed
    ```
 
-   Use `go get -u` to pull down updates.
+   Use `go get -u ...` to pull down updates.
+   To use latest updates swith branch to `develop` and then run `go get -u ...` againg.
 
 Usage
 -----
