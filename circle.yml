@@ -17,7 +17,7 @@ test:
     - docker run --entrypoint /bin/bash loadimpact/k6 -c 'cd $GOPATH/src/github.com/loadimpact/k6 && go get -t ./... && go test ./...'
 
 deployment:
-  release:
+  latest:
     branch: master
     owner: loadimpact
     commands:
@@ -29,3 +29,10 @@ deployment:
     commands:
       - docker tag loadimpact/k6 loadimpact/k6:develop
       - docker push loadimpact/k6:develop
+
+  tag:
+    tag: /v[0-9]+(\.[0-9]+)*/
+    owner: loadimpact
+    commands:
+      - docker tag loadimpact/k6 loadimpact/k6:${CIRCLE_TAG:1}
+      - docker push loadimpact/k6:${CIRCLE_TAG:1}
