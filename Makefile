@@ -27,8 +27,8 @@ docs:
 
 .PHONY: container
 container:
-	docker build --rm --pull --no-cache -t loadimpact/speedboat:$(VERSION) .
+	docker build --rm --pull --no-cache -t loadimpact/k6:$(VERSION) .
 
 .PHONY: push
 push:
-	docker push loadimpact/speedboat:$(VERSION)
+	docker push loadimpact/k6:$(VERSION)

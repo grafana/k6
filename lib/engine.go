@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
-	"github.com/loadimpact/speedboat/stats"
+	"github.com/loadimpact/k6/stats"
 	"github.com/robertkrimen/otto"
 	"gopkg.in/guregu/null.v3"
 	"strconv"

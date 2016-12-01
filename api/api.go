@@ -7,7 +7,7 @@ import (
 	"github.com/GeertJohan/go.rice"
 	log "github.com/Sirupsen/logrus"
 	"github.com/gin-gonic/gin"
-	"github.com/loadimpact/speedboat/lib"
+	"github.com/loadimpact/k6/lib"
 	"github.com/manyminds/api2go"
 	"github.com/manyminds/api2go/jsonapi"
 	"gopkg.in/tylerb/graceful.v1"

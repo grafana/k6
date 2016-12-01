@@ -2,7 +2,7 @@ package js
 
 import (
 	"context"
-	"github.com/loadimpact/speedboat/lib"
+	"github.com/loadimpact/k6/lib"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
@@ -17,7 +17,7 @@ func TestSleep(t *testing.T) {
 
 func TestDoGroup(t *testing.T) {
 	r, err := newSnippetRunner(`
-	import { group } from "speedboat";
+	import { group } from "k6";
 	export default function() {
 		group("test", fn);
 	}`)
@@ -37,7 +37,7 @@ func TestDoGroup(t *testing.T) {
 
 func TestDoGroupNested(t *testing.T) {
 	r, err := newSnippetRunner(`
-	import { group } from "speedboat";
+	import { group } from "k6";
 	export default function() {
 		group("outer", function() {
 			group("inner", fn);
@@ -60,7 +60,7 @@ func TestDoGroupNested(t *testing.T) {
 
 func TestDoGroupReturn(t *testing.T) {
 	r, err := newSnippetRunner(`
-	import { group, _assert } from "speedboat";
+	import { group, _assert } from "k6";
 	export default function() {
 		let v = group("group", function() {
 			return 12345;
@@ -77,7 +77,7 @@ func TestDoGroupReturn(t *testing.T) {
 
 func TestDoGroupReturnTrueByDefault(t *testing.T) {
 	r, err := newSnippetRunner(`
-	import { group, _assert } from "speedboat";
+	import { group, _assert } from "k6";
 	export default function() {
 		let v = group("group", function() {
 			// no return
@@ -94,7 +94,7 @@ func TestDoGroupReturnTrueByDefault(t *testing.T) {
 
 func TestDoCheck(t *testing.T) {
 	r, err := newSnippetRunner(`
-	import { check } from "speedboat";
+	import { check } from "k6";
 	export default function() {
 		check(3, { "v === 3": (v) => v === 3 });
 	}`)
@@ -119,7 +119,7 @@ func TestDoCheck(t *testing.T) {
 
 func TestCheckInGroup(t *testing.T) {
 	r, err := newSnippetRunner(`
-	import { group, check } from "speedboat";
+	import { group, check } from "k6";
 	export default function() {
 		group("group", function() {
 			check(3, { "v === 3": (v) => v === 3 });
@@ -148,7 +148,7 @@ func TestCheckInGroup(t *testing.T) {
 
 func TestCheckReturnTrueOnSuccess(t *testing.T) {
 	r, err := newSnippetRunner(`
-	import { check, _assert } from "speedboat";
+	import { check, _assert } from "k6";
 	export default function() {
 		let succ = check(null, { "true": true });
 		_assert(succ === true);
@@ -163,7 +163,7 @@ func TestCheckReturnTrueOnSuccess(t *testing.T) {
 
 func TestCheckReturnFalseAndTaintsOnFailure(t *testing.T) {
 	r, err := newSnippetRunner(`
-	import { check, _assert } from "speedboat";
+	import { check, _assert } from "k6";
 	export default function() {
 		let succ = check(null, { "false": false });
 		_assert(succ === false);
@@ -178,7 +178,7 @@ func TestCheckReturnFalseAndTaintsOnFailure(t *testing.T) {
 
 func TestTaint(t *testing.T) {
 	r, err := newSnippetRunner(`
-	import { taint } from "speedboat";
+	import { taint } from "k6";
 	export default function() {
 		taint();
 	}`)

@@ -1,5 +1,5 @@
-import { group, check } from "speedboat";
-import http from "speedboat/http";
+import { group, check } from "k6";
+import http from "k6/http";
 
 export let options = {
 	thresholds: {

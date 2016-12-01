@@ -2,7 +2,7 @@ package lib
 
 import (
 	"context"
-	"github.com/loadimpact/speedboat/stats"
+	"github.com/loadimpact/k6/stats"
 )
 
 // A Runner is a factory for VUs.

@@ -1,5 +1,5 @@
 /**
- * @module speedboat
+ * @module k6
  */
 
 /**

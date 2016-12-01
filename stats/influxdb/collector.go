@@ -5,7 +5,7 @@ import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/influxdata/influxdb/client/v2"
-	"github.com/loadimpact/speedboat/stats"
+	"github.com/loadimpact/k6/stats"
 	"net/url"
 	"time"
 )

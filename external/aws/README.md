@@ -18,7 +18,7 @@ To set up a lab environment on Amazon AWS (on the `eu-west-1` region):
 
 3. **Prepare an access key**
    
-   Generate a key called `speedboat-test` on the IAM page for your user, and save it as `speedboat-test.pem` in this directory.
+   Generate a key called `k6-test` on the IAM page for your user, and save it as `k6-test.pem` in this directory.
    
    If you already have a different key you'd like to use, you can add the following to `terraform.tfvars` and save it as `YOUR_KEY_NAME.pem` instead:
    
@@ -38,7 +38,7 @@ To set up a lab environment on Amazon AWS (on the `eu-west-1` region):
 5. **Do the other thing**
    
    ```
-   ssh -i speedboat-test.pem ubuntu@LOADGEN_IP
+   ssh -i k6-test.pem ubuntu@LOADGEN_IP
    
    # on loadgen
    sudo salt '*' state.highstate

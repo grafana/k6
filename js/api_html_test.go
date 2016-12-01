@@ -7,7 +7,7 @@ import (
 
 func TestParseHTML(t *testing.T) {
 	assert.NoError(t, runSnippet(`
-	import { parseHTML } from "speedboat/html";
+	import { parseHTML } from "k6/html";
 	let html = "This is a <span id='what'>test snippet</span>.";
 	export default function() { parseHTML(html); }
 	`))
@@ -15,8 +15,8 @@ func TestParseHTML(t *testing.T) {
 
 func TestHTMLText(t *testing.T) {
 	assert.NoError(t, runSnippet(`
-	import { _assert } from "speedboat";
-	import { parseHTML } from "speedboat/html";
+	import { _assert } from "k6";
+	import { parseHTML } from "k6/html";
 	let html = "This is a <span id='what'>test snippet</span>.";
 	export default function() {
 		let doc = parseHTML(html);
@@ -27,8 +27,8 @@ func TestHTMLText(t *testing.T) {
 
 func TestHTMLFindText(t *testing.T) {
 	assert.NoError(t, runSnippet(`
-	import { _assert } from "speedboat";
-	import { parseHTML } from "speedboat/html";
+	import { _assert } from "k6";
+	import { parseHTML } from "k6/html";
 	let html = "This is a <span id='what'>test snippet</span>.";
 	export default function() {
 		let doc = parseHTML(html);
@@ -39,8 +39,8 @@ func TestHTMLFindText(t *testing.T) {
 
 func TestHTMLAddSelector(t *testing.T) {
 	assert.NoError(t, runSnippet(`
-	import { _assert } from "speedboat";
-	import { parseHTML } from "speedboat/html";
+	import { _assert } from "k6";
+	import { parseHTML } from "k6/html";
 	let html = "<span id='sub'>This</span> is a <span id='obj'>test snippet</span>.";
 	export default function() {
 		let doc = parseHTML(html);
@@ -51,8 +51,8 @@ func TestHTMLAddSelector(t *testing.T) {
 
 func TestHTMLAddSelection(t *testing.T) {
 	assert.NoError(t, runSnippet(`
-	import { _assert } from "speedboat";
-	import { parseHTML } from "speedboat/html";
+	import { _assert } from "k6";
+	import { parseHTML } from "k6/html";
 	let html = "<span id='sub'>This</span> is a <span id='obj'>test snippet</span>.";
 	export default function() {
 		let doc = parseHTML(html);

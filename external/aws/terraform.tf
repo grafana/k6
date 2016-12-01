@@ -2,7 +2,7 @@ variable "access_key" {}
 variable "secret_key" {}
 variable "region" { default = "eu-west-1" }
 variable "ami" { default = "ami-a4d44ed7" }
-variable "key_name" { default = "speedboat-test" }
+variable "key_name" { default = "k6-test" }
 
 output "loadgen_ip" {
 	value = "${aws_instance.loadgen.public_ip}"
@@ -21,8 +21,8 @@ provider "aws" {
 }
 
 resource "aws_security_group" "group" {
-	name = "speedboat-test"
-	description = "Security group for Speedboat test setups"
+	name = "k6-test"
+	description = "Security group for k6 test setups"
 	
 	ingress {
 		from_port = 0
@@ -40,7 +40,7 @@ resource "aws_security_group" "group" {
 }
 
 resource "aws_placement_group" "group" {
-	name = "speedboat-test"
+	name = "k6-test"
 	strategy = "cluster"
 }
 
@@ -61,17 +61,17 @@ resource "aws_instance" "loadgen" {
 	}
 	provisioner "remote-exec" {
 		inline = [
-			"mkdir -p /home/ubuntu/go/src/github.com/loadimpact/speedboat",
+			"mkdir -p /home/ubuntu/go/src/github.com/loadimpact/k6",
 			"echo 'export GOPATH=$HOME/go' >> /home/ubuntu/.profile",
 			"echo 'export PATH=$PATH:$GOPATH/bin' >> /home/ubuntu/.profile",
 			"sudo mkdir -p /etc/salt",
-			"sudo ln -s /home/ubuntu/go/src/github.com/loadimpact/speedboat/external/aws/salt/master.yml /etc/salt/master",
-			"sudo ln -s /home/ubuntu/go/src/github.com/loadimpact/speedboat/external/aws/salt/grains_loadgen.yml /etc/salt/grains",
+			"sudo ln -s /home/ubuntu/go/src/github.com/loadimpact/k6/external/aws/salt/master.yml /etc/salt/master",
+			"sudo ln -s /home/ubuntu/go/src/github.com/loadimpact/k6/external/aws/salt/grains_loadgen.yml /etc/salt/grains",
 		]
 	}
 	provisioner "file" {
 		source = "../../"
-		destination = "/home/ubuntu/go/src/github.com/loadimpact/speedboat"
+		destination = "/home/ubuntu/go/src/github.com/loadimpact/k6"
 	}
 	provisioner "remote-exec" {
 		inline = [

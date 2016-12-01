@@ -14,7 +14,7 @@ var (
 func init() {
 	gopath := os.Getenv("GOPATH")
 	if gopath != "" {
-		babelDir = path.Join(gopath, "src", "github.com", "loadimpact", "speedboat", "js")
+		babelDir = path.Join(gopath, "src", "github.com", "loadimpact", "k6", "js")
 	} else if dir, err := osext.ExecutableFolder(); err == nil {
 		babelDir = path.Join(dir, "js")
 	}

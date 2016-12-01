@@ -1,7 +1,7 @@
 {
-  "name": "speedboat",
+  "name": "k6",
   "version": "0.0.0",
-  "description": "Small description for speedboat goes here",
+  "description": "Small description for k6 goes here",
   "private": true,
   "directories": {
     "doc": "doc",

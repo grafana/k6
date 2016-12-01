@@ -11,7 +11,7 @@ Before we start...
 
 There's something very important you need to understand about load testing. Web servers, generally speaking, have a limit to how many concurrent connections it can handle. Handling a lot of connections at the same time typically makes responses slower and slower, until at some point the server starts to drop requests to cope with the load.
 
-Speedboat is a tool to measure the performance of your own servers, or others' servers, **with proper permission**. It's **not cool** to run load tests against servers that are not your own without asking first. That's a very good way to make a sysadmin somewhere rather grumpy, and grumpy sysadmins ban people.
+k6 is a tool to measure the performance of your own servers, or others' servers, **with proper permission**. It's **not cool** to run load tests against servers that are not your own without asking first. That's a very good way to make a sysadmin somewhere rather grumpy, and grumpy sysadmins ban people.
 
 tl;dr: **Thou shalt not point load generators at things that are not thine own, lest thy incur the wrath of `iptables -A INPUT -s $IP -j DROP`.**
 
@@ -28,7 +28,7 @@ export default function() {
 
 Think of this as your `main()` function in most other languages. Now, you might ask: "why do I need to do this, can't I just write my code outside of this function, like how JS normally works?", which is a perfectly valid question.
 
-The answer lies in how speedboat loads code. Your script is actually run in two phases:
+The answer lies in how k6 loads code. Your script is actually run in two phases:
 
 1.  The setup phase. This is run once as the script is being loaded.  
     In this phase, `import` and `export` statements are processed, but it's not run in a "VU context", which means APIs that need a VU (HTTP requests, etc) are not available.
@@ -45,10 +45,10 @@ But it's not just because compilation takes time: 5000 VUs all trying to load sc
 Making HTTP requests
 --------------------
 
-The most basic thing you'll probably want to do is make HTTP requests. Fortunately, we have {@link module:speedboat/http|an entire module} dedicated to that.
+The most basic thing you'll probably want to do is make HTTP requests. Fortunately, we have {@link module:k6/http|an entire module} dedicated to that.
 
 ```es6
-import http from "speedboat/http";
+import http from "k6/http";
 
 export default function() {
     http.get("http://test.loadimpact.com/");
@@ -91,8 +91,8 @@ Using HTTP requests and varying the number of VUs, you can measure how your serv
 So let's add some testing to our script.
 
 ```es6
-import { test } from "speedboat";
-import http from "speedboat/http";
+import { test } from "k6";
+import http from "k6/http";
 
 export default function() {
     test(http.get("http://test.loadimpact.com/"), {
@@ -101,7 +101,7 @@ export default function() {
 }
 ```
 
-The `test()` function takes a value, and any number of dictionaries of `{ name: fn }`, where `fn` is a function that (optionally) takes a single argument - the value being tested - and returns a truthy value if the test passed. All HTTP requests return a {@link module:speedboat/http.Response}, which among other things contains the response `status` and `body`.
+The `test()` function takes a value, and any number of dictionaries of `{ name: fn }`, where `fn` is a function that (optionally) takes a single argument - the value being tested - and returns a truthy value if the test passed. All HTTP requests return a {@link module:k6/http.Response}, which among other things contains the response `status` and `body`.
 
 The web UI and will report counters for passes and failures, but note that tests are not assertions - a failed test will not throw an error, and the script will continue regardless.
 
@@ -113,8 +113,8 @@ So far, all we've tested is a single URL. But most sites have a lot more than on
 You could simply write a bunch of `http.get()` in a sequence... but the test reports would get messy rather quickly - you couldn't tell which tests were for which request. This is when `group()` comes in handy.
 
 ```es6
-import { test, group } from "speedboat";
-import http from "speedboat/http";
+import { test, group } from "k6";
+import http from "k6/http";
 
 // You can reuse commonly used tests like this.
 let commonTests = {
@@ -141,11 +141,11 @@ So we heard there exist web services that serve HTML. People call them "web site
 
 A naive approach would be to use regular expressions to try to process their content, but... [let's not go there](http://stackoverflow.com/a/1732454/386580). Please. We've been there, and it was naught but misery, bugs and false positives.
 
-So we made the {@link module:speedboat/html|speedboat/html} module for this very task, closely mimicking the good ol' [jQuery](https://jquery.com/) API.
+So we made the {@link module:k6/html|k6/html} module for this very task, closely mimicking the good ol' [jQuery](https://jquery.com/) API.
 
 ```es6
-import { test } from "speedboat";
-import http from "speedboat/http";
+import { test } from "k6";
+import http from "k6/http";
 
 export default function() {
     let correctTitle = "Welcome to the LoadImpact.com demo site!";

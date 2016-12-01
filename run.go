@@ -6,13 +6,13 @@ import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/ghodss/yaml"
-	"github.com/loadimpact/speedboat/api"
-	"github.com/loadimpact/speedboat/js"
-	"github.com/loadimpact/speedboat/lib"
-	"github.com/loadimpact/speedboat/simple"
-	"github.com/loadimpact/speedboat/stats"
-	"github.com/loadimpact/speedboat/stats/influxdb"
-	"github.com/loadimpact/speedboat/ui"
+	"github.com/loadimpact/k6/api"
+	"github.com/loadimpact/k6/js"
+	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/simple"
+	"github.com/loadimpact/k6/stats"
+	"github.com/loadimpact/k6/stats/influxdb"
+	"github.com/loadimpact/k6/ui"
 	"gopkg.in/urfave/cli.v1"
 	"io/ioutil"
 	"net/url"
@@ -89,7 +89,7 @@ var commandRun = cli.Command{
 	Action: actionRun,
 	Description: `Run starts a load test.
 
-   This is the main entry point to Speedboat, and will do two things:
+   This is the main entry point to k6, and will do two things:
    
    - Construct an Engine and provide it with a Runner, depending on the first
      argument and the --type flag, which is used to execute the test.
@@ -292,7 +292,7 @@ func actionRun(cc *cli.Context) error {
 	}()
 
 	// Print the banner!
-	fmt.Printf("Welcome to Speedboat v%s!\n", cc.App.Version)
+	fmt.Printf("Welcome to k6 v%s!\n", cc.App.Version)
 	fmt.Printf("\n")
 	fmt.Printf("  execution: local\n")
 	fmt.Printf("     output: %s\n", collectorString)

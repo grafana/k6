@@ -3,7 +3,7 @@ package js
 import (
 	"errors"
 	"fmt"
-	"github.com/loadimpact/speedboat/stats"
+	"github.com/loadimpact/k6/stats"
 	"github.com/robertkrimen/otto"
 	"strings"
 )

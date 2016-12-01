@@ -75,7 +75,7 @@ log
   
   Writes out a log message.
   
-  Type is one of `debug`, `info`, `warn` and `error`; messages to unknown channels will be ignored. Note that `debug` messages are only displayed when running speedboat with `-v` (`--verbose`).
+  Type is one of `debug`, `info`, `warn` and `error`; messages to unknown channels will be ignored. Note that `debug` messages are only displayed when running k6 with `-v` (`--verbose`).
   
   Extra is an object of extra data to be provided along with the message. It's considered good practice to have the message a fixed string, and use extra data to provide context information, rather than concatenating it with the message.
   

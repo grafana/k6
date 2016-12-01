@@ -2,14 +2,14 @@ package js
 
 import (
 	"fmt"
-	"github.com/loadimpact/speedboat/stats"
+	"github.com/loadimpact/k6/stats"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestNewMetric(t *testing.T) {
 	tpl := `
-		import %s from "speedboat/metrics";
+		import %s from "k6/metrics";
 		let myMetric = new %s(%s"my_metric", %s);
 		export default function() {};
 	`

@@ -1,5 +1,5 @@
 {
-	"CN": "speedboat-test root CA",
+	"CN": "k6-test root CA",
 	"key": {
 		"algo": "rsa",
 		"size": 2048
@@ -8,6 +8,6 @@
 		"C": "SE",
 		"L": "Stockholm",
 		"O": "Load Impact",
-		"OU": "speedboat"
+		"OU": "k6"
 	}]
 }

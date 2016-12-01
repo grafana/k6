@@ -2,7 +2,7 @@
 
 module.exports = function(environment) {
   var ENV = {
-    modulePrefix: 'speedboat',
+    modulePrefix: 'k6',
     environment: environment,
     rootURL: '/',
     locationType: 'auto',

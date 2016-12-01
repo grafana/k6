@@ -2,8 +2,8 @@ package js
 
 import (
 	// "github.com/robertkrimen/otto"
-	"github.com/loadimpact/speedboat/lib"
-	"github.com/loadimpact/speedboat/stats"
+	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/stats"
 	"io"
 	"io/ioutil"
 	"net/http"

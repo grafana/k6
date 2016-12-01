@@ -1,4 +1,4 @@
-import { metricFormat } from 'speedboat/helpers/metric-format';
+import { metricFormat } from 'k6/helpers/metric-format';
 import { module, test } from 'qunit';
 
 module('Unit | Helper | metric format');

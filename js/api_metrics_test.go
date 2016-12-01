@@ -27,8 +27,8 @@ func TestMetricAdd(t *testing.T) {
 			for jsT, t_ := range tags {
 				t.Run("t="+jsT, func(t *testing.T) {
 					r, err := newSnippetRunner(fmt.Sprintf(`
-						import { _assert } from "speedboat";
-						import { Counter } from "speedboat/metrics";
+						import { _assert } from "k6";
+						import { Counter } from "k6/metrics";
 						let myMetric = new Counter("my_metric");
 						export default function() {
 							let v = %s;

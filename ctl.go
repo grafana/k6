@@ -3,9 +3,9 @@ package main
 import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/ghodss/yaml"
-	"github.com/loadimpact/speedboat/api"
-	"github.com/loadimpact/speedboat/lib"
-	"github.com/loadimpact/speedboat/stats"
+	"github.com/loadimpact/k6/api"
+	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/stats"
 	"gopkg.in/guregu/null.v3"
 	"gopkg.in/urfave/cli.v1"
 	"os"

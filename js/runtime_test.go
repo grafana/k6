@@ -1,7 +1,7 @@
 package js
 
 import (
-	"github.com/loadimpact/speedboat/lib"
+	"github.com/loadimpact/k6/lib"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -24,10 +24,10 @@ func TestLoad(t *testing.T) {
 
 	t.Run("Importing Libraries", func(t *testing.T) {
 		_, err := r.load("test.js", []byte(`
-			import "speedboat";
+			import "k6";
 		`))
 		assert.NoError(t, err)
-		assert.Contains(t, r.lib, "speedboat.js")
+		assert.Contains(t, r.lib, "k6.js")
 	})
 }
 

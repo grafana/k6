@@ -1,6 +1,6 @@
-import { group, check, sleep } from "speedboat";
-import { Counter, Rate } from "speedboat/metrics";
-import http from "speedboat/http";
+import { group, check, sleep } from "k6";
+import { Counter, Rate } from "k6/metrics";
+import http from "k6/http";
 
 export let options = {
 	vus: 5,
