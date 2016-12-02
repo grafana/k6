@@ -338,8 +338,8 @@ loop:
 			fmt.Printf("%10s %s %10s / %s\r",
 				statusString,
 				progressBar.String(),
-				atTime-(atTime%(100*time.Millisecond)),
-				totalTime-(totalTime%(100*time.Millisecond)),
+				roundDuration(atTime, 100*time.Millisecond),
+				roundDuration(totalTime, 100*time.Millisecond),
 			)
 		case <-srvC.Done():
 			log.Debug("API server terminated; shutting down...")
@@ -363,8 +363,8 @@ loop:
 	progressBar.Progress = 1.0
 	fmt.Printf("      done %s %10s / %s\n",
 		progressBar.String(),
-		atTime-(atTime%(100*time.Millisecond)),
-		atTime-(atTime%(100*time.Millisecond)),
+		roundDuration(atTime, 100*time.Millisecond),
+		roundDuration(atTime, 100*time.Millisecond),
 	)
 	fmt.Printf("\n")
 

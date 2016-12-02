@@ -3,6 +3,7 @@ package main
 import (
 	"gopkg.in/guregu/null.v3"
 	"gopkg.in/urfave/cli.v1"
+	"time"
 )
 
 // cliBool returns a CLI argument as a bool, which is invalid if not given.
@@ -23,4 +24,8 @@ func cliFloat64(cc *cli.Context, name string) null.Float {
 // cliDuration returns a CLI argument as a duration string, which is invalid if not given.
 func cliDuration(cc *cli.Context, name string) null.String {
 	return null.NewString(cc.Duration(name).String(), cc.IsSet(name))
+}
+
+func roundDuration(d, to time.Duration) time.Duration {
+	return d - (d % to)
 }
