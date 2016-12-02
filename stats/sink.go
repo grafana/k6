@@ -58,6 +58,23 @@ func (t *TrendSink) Add(s Sample) {
 	}
 }
 
+func (t *TrendSink) P(pct float64) float64 {
+	switch t.count {
+	case 0:
+		return 0
+	case 1:
+		return t.Values[0]
+	case 2:
+		if pct < 0.5 {
+			return t.Values[0]
+		} else {
+			return t.Values[1]
+		}
+	default:
+		return t.Values[int(float64(t.count)*pct)]
+	}
+}
+
 func (t *TrendSink) Format() map[string]float64 {
 	if t.jumbled {
 		sort.Float64s(t.Values)
@@ -69,7 +86,14 @@ func (t *TrendSink) Format() map[string]float64 {
 		}
 	}
 
-	return map[string]float64{"min": t.min, "max": t.max, "avg": t.avg, "med": t.med}
+	return map[string]float64{
+		"min": t.min,
+		"max": t.max,
+		"avg": t.avg,
+		"med": t.med,
+		"p90": t.P(0.90),
+		"p95": t.P(0.95),
+	}
 }
 
 type RateSink struct {
