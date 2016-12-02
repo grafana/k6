@@ -109,6 +109,7 @@ func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 		"vu":     u.IDString,
 		"method": "GET",
 		"url":    u.URLString,
+		"status": strconv.FormatInt(int64(resp.StatusCode), 10),
 	}
 
 	t := time.Now()
