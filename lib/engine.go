@@ -145,7 +145,9 @@ func (e *Engine) Run(ctx context.Context, opts Options) error {
 	e.ctx = subctx
 	e.nextID = 1
 
-	e.Apply(opts)
+	if err := e.Apply(opts); err != nil {
+		return err
+	}
 
 	if e.Collector != nil {
 		e.waitGroup.Add(1)
