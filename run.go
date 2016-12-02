@@ -237,6 +237,9 @@ func actionRun(cc *cli.Context) error {
 
 	// CLI options have defaults, which are set as invalid, but have potentially nonzero values.
 	// Flipping the Valid flag for all invalid options thus applies all defaults.
+	if !opts.VUsMax.Valid {
+		opts.VUsMax.Int64 = opts.VUs.Int64
+	}
 	opts = opts.SetAllValid(true)
 
 	// Make the metric collector, if requested.

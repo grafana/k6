@@ -90,11 +90,6 @@ func (e *Engine) Apply(opts Options) error {
 		}
 	}
 	if opts.VUs.Valid {
-		if !opts.VUsMax.Valid {
-			if err := e.SetMaxVUs(opts.VUs.Int64); err != nil {
-				return err
-			}
-		}
 		if err := e.SetVUs(opts.VUs.Int64); err != nil {
 			return err
 		}
