@@ -131,9 +131,8 @@ type VU struct {
 	vm       *otto.Otto
 	callable otto.Value
 
-	HTTPClient   *http.Client
-	CookieJar    *lib.CookieJar
-	MaxRedirects int
+	HTTPClient *http.Client
+	CookieJar  *lib.CookieJar
 
 	started time.Time
 	ctx     context.Context
@@ -141,7 +140,6 @@ type VU struct {
 }
 
 func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
-	u.MaxRedirects = DefaultMaxRedirect
 	u.CookieJar.Clear()
 
 	u.started = time.Now()
@@ -172,8 +170,8 @@ func (u *VU) checkRedirect(req *http.Request, via []*http.Request) error {
 		"from": via[len(via)-1].URL.String(),
 		"to":   req.URL.String(),
 	}).Debug("-> Redirect")
-	if len(via) >= u.MaxRedirects {
-		return errors.New(fmt.Sprintf("stopped after %d redirects", u.MaxRedirects))
+	if int64(len(via)) >= u.runner.Options.MaxRedirects.Int64 {
+		return errors.New(fmt.Sprintf("stopped after %d redirects", u.runner.Options.MaxRedirects.Int64))
 	}
 	return nil
 }

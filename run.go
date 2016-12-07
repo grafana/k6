@@ -77,6 +77,10 @@ var commandRun = cli.Command{
 			Name:  "abort-on-taint",
 			Usage: "abort immediately if the test gets tainted",
 		},
+		cli.Int64Flag{
+			Name:  "max-redirects",
+			Usage: "follow at most n redirects",
+		},
 		cli.StringFlag{
 			Name:  "out, o",
 			Usage: "output metrics to an external data store",
@@ -212,6 +216,7 @@ func actionRun(cc *cli.Context) error {
 		Linger:       cliBool(cc, "linger"),
 		AbortOnTaint: cliBool(cc, "abort-on-taint"),
 		Acceptance:   cliFloat64(cc, "acceptance"),
+		MaxRedirects: cliInt64(cc, "max-redirects"),
 	}
 
 	// Make the Runner, extract script-defined options.
