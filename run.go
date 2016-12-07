@@ -131,7 +131,7 @@ func guessType(filename string) string {
 	}
 }
 
-func makeRunner(filename, t string, opts *lib.Options) (lib.Runner, error) {
+func makeRunner(filename, t string) (lib.Runner, error) {
 	if t == TypeAuto {
 		t = guessType(filename)
 	}
@@ -140,7 +140,11 @@ func makeRunner(filename, t string, opts *lib.Options) (lib.Runner, error) {
 	case "":
 		return nil, ErrUnknownType
 	case TypeURL:
-		return simple.New(filename)
+		r, err := simple.New(filename)
+		if err != nil {
+			return nil, err
+		}
+		return r, err
 	case TypeJS:
 		rt, err := js.New()
 		if err != nil {
@@ -151,11 +155,11 @@ func makeRunner(filename, t string, opts *lib.Options) (lib.Runner, error) {
 		if err != nil {
 			return nil, err
 		}
-
-		if err := rt.ExtractOptions(exports, opts); err != nil {
+		r, err := js.NewRunner(rt, exports)
+		if err != nil {
 			return nil, err
 		}
-		return js.NewRunner(rt, exports)
+		return r, nil
 	default:
 		return nil, ErrInvalidType
 	}
@@ -213,13 +217,12 @@ func actionRun(cc *cli.Context) error {
 	// Make the Runner, extract script-defined options.
 	filename := args[0]
 	runnerType := cc.String("type")
-	runnerOpts := lib.Options{}
-	runner, err := makeRunner(filename, runnerType, &runnerOpts)
+	runner, err := makeRunner(filename, runnerType)
 	if err != nil {
 		log.WithError(err).Error("Couldn't create a runner")
 		return err
 	}
-	opts = opts.Apply(runnerOpts)
+	opts = opts.Apply(runner.GetOptions())
 
 	// Read config files.
 	for _, filename := range cc.StringSlice("config") {
@@ -241,6 +244,7 @@ func actionRun(cc *cli.Context) error {
 		opts.VUsMax.Int64 = opts.VUs.Int64
 	}
 	opts = opts.SetAllValid(true)
+	runner.ApplyOptions(opts)
 
 	// Make the metric collector, if requested.
 	var collector stats.Collector
@@ -279,7 +283,7 @@ func actionRun(cc *cli.Context) error {
 			wg.Done()
 		}()
 		log.Debug("Starting engine...")
-		if err := engine.Run(engineC, opts); err != nil {
+		if err := engine.Run(engineC); err != nil {
 			log.WithError(err).Error("Engine Error")
 		}
 		engineCancel()
@@ -466,13 +470,10 @@ func actionInspect(cc *cli.Context) error {
 			return cli.NewExitError(err.Error(), 1)
 		}
 
-		exports, err := r.Load(filename)
-		if err != nil {
+		if _, err := r.Load(filename); err != nil {
 			return cli.NewExitError(err.Error(), 1)
 		}
-		if err := r.ExtractOptions(exports, &opts); err != nil {
-			return cli.NewExitError(err.Error(), 1)
-		}
+		opts = opts.Apply(r.Options)
 	}
 
 	for _, filename := range cc.StringSlice("config") {

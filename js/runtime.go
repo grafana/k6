@@ -28,6 +28,7 @@ type Runtime struct {
 	Root    string
 	Exports map[string]otto.Value
 	Metrics map[string]*stats.Metric
+	Options lib.Options
 
 	lib map[string]otto.Value
 }
@@ -69,10 +70,15 @@ func (r *Runtime) Load(filename string) (otto.Value, error) {
 	r.VM.Set("__initapi__", InitAPI{r: r})
 	defer r.VM.Set("__initapi__", nil)
 
-	return r.loadFile(filename)
+	exp, err := r.loadFile(filename)
+	if err != nil {
+		return exp, err
+	}
+
+	return exp, nil
 }
 
-func (r *Runtime) ExtractOptions(exports otto.Value, opts *lib.Options) error {
+func (r *Runtime) extractOptions(exports otto.Value, opts *lib.Options) error {
 	expObj := exports.Object()
 	if expObj == nil {
 		return nil
@@ -169,6 +175,13 @@ func (r *Runtime) load(filename string, data []byte) (otto.Value, error) {
 	if err != nil {
 		return otto.UndefinedValue(), err
 	}
+
+	// Extract script-defined options.
+	var opts lib.Options
+	if err := r.extractOptions(exports, &opts); err != nil {
+		return exports, err
+	}
+	r.Options = r.Options.Apply(opts)
 
 	return exports, nil
 }

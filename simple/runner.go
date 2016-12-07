@@ -29,6 +29,7 @@ var (
 type Runner struct {
 	URL       *url.URL
 	Transport *http.Transport
+	Options   lib.Options
 
 	defaultGroup *lib.Group
 }
@@ -79,6 +80,14 @@ func (r *Runner) GetGroups() []*lib.Group {
 
 func (r *Runner) GetChecks() []*lib.Check {
 	return []*lib.Check{}
+}
+
+func (r Runner) GetOptions() lib.Options {
+	return r.Options
+}
+
+func (r *Runner) ApplyOptions(opts lib.Options) {
+	r.Options = r.Options.Apply(opts)
 }
 
 type VU struct {
