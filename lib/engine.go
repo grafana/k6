@@ -171,6 +171,11 @@ loop:
 	for {
 		select {
 		case now := <-ticker.C:
+			// Don't tick at all if the engine is paused.
+			if !e.Status.Running.Bool {
+				continue
+			}
+
 			// Track time deltas to ensure smooth interpolation even in the face of latency.
 			timeDelta := now.Sub(lastTick)
 			e.Status.AtTime.Int64 += int64(timeDelta)
