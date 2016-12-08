@@ -270,21 +270,21 @@ func actionRun(cc *cli.Context) error {
 		log.WithError(err).Error("Couldn't create the engine")
 		return err
 	}
-	engineC, engineCancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
 	engine.Collector = collector
 
 	// Run the engine.
-	wg.Add(2)
+	wg.Add(1)
 	go func() {
 		defer func() {
 			log.Debug("Engine terminated")
 			wg.Done()
 		}()
 		log.Debug("Starting engine...")
-		if err := engine.Run(engineC); err != nil {
+		if err := engine.Run(ctx); err != nil {
 			log.WithError(err).Error("Engine Error")
 		}
-		engineCancel()
+		cancel()
 	}()
 
 	// Start the API server in the background.
@@ -341,7 +341,7 @@ loop:
 				roundDuration(atTime, 100*time.Millisecond),
 				roundDuration(totalTime, 100*time.Millisecond),
 			)
-		case <-engineC.Done():
+		case <-ctx.Done():
 			log.Debug("Engine terminated; shutting down...")
 			break loop
 		case sig := <-signals:
@@ -351,7 +351,7 @@ loop:
 	}
 
 	// Shut down the API server and engine.
-	engineCancel()
+	cancel()
 	wg.Wait()
 
 	// Test done, leave that status as the final progress bar!

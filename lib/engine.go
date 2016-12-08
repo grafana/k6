@@ -199,8 +199,8 @@ loop:
 			if !ok {
 				e.SetRunning(false)
 
-				if e.Status.Linger.Bool {
-					<-ctx.Done()
+				if !e.Status.Linger.Bool {
+					continue
 				}
 				break loop
 			}
@@ -222,9 +222,14 @@ loop:
 		}
 	}
 
-	e.SetRunning(false)
+	// Without this, VUs will remain frozen and not shut down when asked.
+	if !e.Status.Running.Bool {
+		e.Pause.Done()
+	}
+
 	e.SetVUs(0)
 	e.SetMaxVUs(0)
+	e.SetRunning(false)
 	e.consumeEngineStats()
 
 	e.ctx = nil
@@ -300,8 +305,9 @@ func (e *Engine) SetVUs(v int64) error {
 			return err
 		}
 		e.waitGroup.Add(1)
+		id := e.nextID
 		go func() {
-			id := e.nextID
+			id := id
 			e.runVU(ctx, id, entry)
 			log.WithField("id", id).Debug("Engine: VU terminated")
 			e.waitGroup.Done()
@@ -309,9 +315,9 @@ func (e *Engine) SetVUs(v int64) error {
 		e.nextID++
 	}
 	for i := current - 1; i >= v; i-- {
+		log.WithField("id", i).Debug("Engine: Terminating VU...")
 		entry := e.vus[i]
 		entry.Cancel()
-		entry.Cancel = nil
 	}
 
 	e.Status.VUs.Int64 = v
