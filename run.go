@@ -273,14 +273,7 @@ func actionRun(cc *cli.Context) error {
 	engineC, engineCancel := context.WithCancel(context.Background())
 	engine.Collector = collector
 
-	// Make the API Server
-	srv := &api.Server{
-		Engine: engine,
-		Info:   lib.Info{Version: cc.App.Version},
-	}
-	srvC, srvCancel := context.WithCancel(context.Background())
-
-	// Run the engine and API server in the background
+	// Run the engine.
 	wg.Add(2)
 	go func() {
 		defer func() {
@@ -293,14 +286,12 @@ func actionRun(cc *cli.Context) error {
 		}
 		engineCancel()
 	}()
+
+	// Start the API server in the background.
 	go func() {
-		defer func() {
-			log.Debug("API Server terminated")
-			wg.Done()
-		}()
-		log.WithField("addr", addr).Debug("API Server starting...")
-		srv.Run(srvC, addr)
-		srvCancel()
+		if err := api.ListenAndServe(addr, engine); err != nil {
+			log.WithError(err).Error("Couldn't start API server!")
+		}
 	}()
 
 	// Print the banner!
@@ -350,9 +341,6 @@ loop:
 				roundDuration(atTime, 100*time.Millisecond),
 				roundDuration(totalTime, 100*time.Millisecond),
 			)
-		case <-srvC.Done():
-			log.Debug("API server terminated; shutting down...")
-			break loop
 		case <-engineC.Done():
 			log.Debug("Engine terminated; shutting down...")
 			break loop
@@ -363,7 +351,6 @@ loop:
 	}
 
 	// Shut down the API server and engine.
-	srvCancel()
 	engineCancel()
 	wg.Wait()
 

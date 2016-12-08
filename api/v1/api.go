@@ -1,57 +1,30 @@
-package api
+package v1
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
-	"github.com/GeertJohan/go.rice"
-	log "github.com/Sirupsen/logrus"
 	"github.com/gin-gonic/gin"
+	"github.com/loadimpact/k6/api/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/manyminds/api2go"
 	"github.com/manyminds/api2go/jsonapi"
-	"gopkg.in/tylerb/graceful.v1"
 	"io/ioutil"
-	"mime"
 	"net/http"
-	"path"
 	"strconv"
-	// "strconv"
-	"time"
 )
 
-var (
-	contentType = "application/vnd.api+json"
-	webBox      = rice.MustFindBox("../web/dist")
-)
+var contentType = "application/vnd.api+json"
 
-type Server struct {
-	Engine *lib.Engine
-	Info   lib.Info
-}
-
-// Run runs the API server.
-// I'm not sure how idiomatic this is, probably not particularly...
-func (s *Server) Run(ctx context.Context, addr string) {
-	indexData, err := webBox.Bytes("index.html")
-	if err != nil {
-		log.WithError(err).Error("Couldn't load index.html; web UI unavailable")
-	}
-
+func NewHandler() http.Handler {
 	router := gin.New()
 
 	router.Use(gin.Recovery())
-	router.Use(s.logRequestsMiddleware)
-	router.Use(s.jsonErrorsMiddleware)
+	router.Use(jsonErrorsMiddleware)
 
-	// router.Use(static.Serve("/", static.LocalFile("web/dist", true)))
-	router.GET("/ping", func(c *gin.Context) {
-		c.Data(http.StatusNoContent, "", nil)
-	})
 	v1 := router.Group("/v1")
 	{
 		v1.GET("/info", func(c *gin.Context) {
-			data, err := jsonapi.Marshal(s.Info)
+			data, err := jsonapi.Marshal(lib.Info{})
 			if err != nil {
 				c.AbortWithError(500, err)
 				return
@@ -62,7 +35,8 @@ func (s *Server) Run(ctx context.Context, addr string) {
 			c.AbortWithError(500, errors.New("This is an error"))
 		})
 		v1.GET("/status", func(c *gin.Context) {
-			data, err := jsonapi.Marshal(s.Engine.Status)
+			engine := common.GetEngine(c)
+			data, err := jsonapi.Marshal(engine.Status)
 			if err != nil {
 				c.AbortWithError(500, err)
 				return
@@ -70,6 +44,8 @@ func (s *Server) Run(ctx context.Context, addr string) {
 			c.Data(200, contentType, data)
 		})
 		v1.PATCH("/status", func(c *gin.Context) {
+			engine := common.GetEngine(c)
+
 			var status lib.Status
 			data, _ := ioutil.ReadAll(c.Request.Body)
 			if err := jsonapi.Unmarshal(data, &status); err != nil {
@@ -78,36 +54,36 @@ func (s *Server) Run(ctx context.Context, addr string) {
 			}
 
 			if status.VUsMax.Valid {
-				if status.VUsMax.Int64 < s.Engine.Status.VUs.Int64 {
+				if status.VUsMax.Int64 < engine.Status.VUs.Int64 {
 					if status.VUsMax.Int64 >= status.VUs.Int64 {
-						s.Engine.SetVUs(status.VUs.Int64)
+						engine.SetVUs(status.VUs.Int64)
 					} else {
 						c.AbortWithError(http.StatusBadRequest, lib.ErrMaxTooLow)
 						return
 					}
 				}
 
-				if err := s.Engine.SetMaxVUs(status.VUsMax.Int64); err != nil {
+				if err := engine.SetMaxVUs(status.VUsMax.Int64); err != nil {
 					c.AbortWithError(http.StatusInternalServerError, err)
 					return
 				}
 			}
 			if status.VUs.Valid {
-				if status.VUs.Int64 > s.Engine.Status.VUsMax.Int64 {
+				if status.VUs.Int64 > engine.Status.VUsMax.Int64 {
 					c.AbortWithError(http.StatusBadRequest, lib.ErrTooManyVUs)
 					return
 				}
 
-				if err := s.Engine.SetVUs(status.VUs.Int64); err != nil {
+				if err := engine.SetVUs(status.VUs.Int64); err != nil {
 					c.AbortWithError(http.StatusInternalServerError, err)
 					return
 				}
 			}
 			if status.Running.Valid {
-				s.Engine.SetRunning(status.Running.Bool)
+				engine.SetRunning(status.Running.Bool)
 			}
 
-			data, err := jsonapi.Marshal(s.Engine.Status)
+			data, err := jsonapi.Marshal(engine.Status)
 			if err != nil {
 				c.AbortWithError(http.StatusInternalServerError, err)
 				return
@@ -115,8 +91,9 @@ func (s *Server) Run(ctx context.Context, addr string) {
 			c.Data(200, contentType, data)
 		})
 		v1.GET("/metrics", func(c *gin.Context) {
-			metrics := make([]interface{}, 0, len(s.Engine.Metrics))
-			for metric, sink := range s.Engine.Metrics {
+			engine := common.GetEngine(c)
+			metrics := make([]interface{}, 0, len(engine.Metrics))
+			for metric, sink := range engine.Metrics {
 				metric.Sample = sink.Format()
 				metrics = append(metrics, metric)
 			}
@@ -128,8 +105,9 @@ func (s *Server) Run(ctx context.Context, addr string) {
 			c.Data(200, contentType, data)
 		})
 		v1.GET("/metrics/:id", func(c *gin.Context) {
+			engine := common.GetEngine(c)
 			id := c.Param("id")
-			for metric, sink := range s.Engine.Metrics {
+			for metric, sink := range engine.Metrics {
 				if metric.Name != id {
 					continue
 				}
@@ -145,7 +123,8 @@ func (s *Server) Run(ctx context.Context, addr string) {
 			c.AbortWithError(404, errors.New("Metric not found"))
 		})
 		v1.GET("/groups", func(c *gin.Context) {
-			data, err := jsonapi.Marshal(s.Engine.Runner.GetGroups())
+			engine := common.GetEngine(c)
+			data, err := jsonapi.Marshal(engine.Runner.GetGroups())
 			if err != nil {
 				c.AbortWithError(500, err)
 				return
@@ -153,13 +132,14 @@ func (s *Server) Run(ctx context.Context, addr string) {
 			c.Data(200, contentType, data)
 		})
 		v1.GET("/groups/:id", func(c *gin.Context) {
+			engine := common.GetEngine(c)
 			id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 			if err != nil {
 				c.AbortWithError(http.StatusBadRequest, err)
 				return
 			}
 
-			for _, group := range s.Engine.Runner.GetGroups() {
+			for _, group := range engine.Runner.GetGroups() {
 				if group.ID != id {
 					continue
 				}
@@ -175,7 +155,8 @@ func (s *Server) Run(ctx context.Context, addr string) {
 			c.AbortWithError(404, errors.New("Group not found"))
 		})
 		v1.GET("/checks", func(c *gin.Context) {
-			data, err := jsonapi.Marshal(s.Engine.Runner.GetChecks())
+			engine := common.GetEngine(c)
+			data, err := jsonapi.Marshal(engine.Runner.GetChecks())
 			if err != nil {
 				c.AbortWithError(500, err)
 				return
@@ -183,13 +164,14 @@ func (s *Server) Run(ctx context.Context, addr string) {
 			c.Data(200, contentType, data)
 		})
 		v1.GET("/checks/:id", func(c *gin.Context) {
+			engine := common.GetEngine(c)
 			id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 			if err != nil {
 				c.AbortWithError(http.StatusBadRequest, err)
 				return
 			}
 
-			for _, check := range s.Engine.Runner.GetChecks() {
+			for _, check := range engine.Runner.GetChecks() {
 				if check.ID != id {
 					continue
 				}
@@ -205,41 +187,11 @@ func (s *Server) Run(ctx context.Context, addr string) {
 			c.AbortWithError(404, errors.New("Group not found"))
 		})
 	}
-	router.NoRoute(func(c *gin.Context) {
-		requestPath := c.Request.URL.Path
-		bytes, err := webBox.Bytes(requestPath)
-		if err != nil {
-			log.WithError(err).Debug("Falling back to index.html")
-			if indexData == nil {
-				c.String(404, "Web UI is unavailable - see console output.")
-				return
-			}
-			c.Data(200, "text/html; charset=utf-8", indexData)
-			return
-		}
 
-		mimeType := mime.TypeByExtension(path.Ext(requestPath))
-		if mimeType == "" {
-			mimeType = "application/octet-stream"
-		}
-		c.Data(200, mimeType, bytes)
-	})
-
-	srv := graceful.Server{NoSignalHandling: true, Server: &http.Server{Addr: addr, Handler: router}}
-	go srv.ListenAndServe()
-
-	<-ctx.Done()
-	srv.Stop(10 * time.Second)
-	<-srv.StopChan()
+	return router
 }
 
-func (s *Server) logRequestsMiddleware(c *gin.Context) {
-	path := c.Request.URL.Path
-	c.Next()
-	log.WithField("status", c.Writer.Status()).Debugf("%s %s", c.Request.Method, path)
-}
-
-func (s *Server) jsonErrorsMiddleware(c *gin.Context) {
+func jsonErrorsMiddleware(c *gin.Context) {
 	c.Header("Content-Type", contentType)
 	c.Next()
 	if len(c.Errors) > 0 {
