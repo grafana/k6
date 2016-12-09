@@ -204,7 +204,7 @@ loop:
 			if !ok {
 				e.SetRunning(false)
 
-				if !e.Status.Linger.Bool {
+				if e.Status.Linger.Bool {
 					continue
 				}
 				break loop
