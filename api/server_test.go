@@ -4,6 +4,8 @@ import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	logtest "github.com/Sirupsen/logrus/hooks/test"
+	"github.com/loadimpact/k6/api/common"
+	"github.com/loadimpact/k6/lib"
 	"github.com/stretchr/testify/assert"
 	"github.com/urfave/negroni"
 	"net/http"
@@ -44,4 +46,17 @@ func TestLogger(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestWithEngine(t *testing.T) {
+	engine, err := lib.NewEngine(nil)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	rw := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "http://example.com/", nil)
+	WithEngine(engine)(rw, r, func(rw http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, engine, common.GetEngine(r.Context()))
+	})
 }
