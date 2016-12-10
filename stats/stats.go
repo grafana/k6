@@ -21,8 +21,7 @@ const (
 
 // Possible values for MetricType.
 const (
-	NoType  = MetricType(iota) // No type; metrics like this are ignored
-	Counter                    // A counter that sums its data points
+	Counter = MetricType(iota) // A counter that sums its data points
 	Gauge                      // A gauge that displays the latest value
 	Trend                      // A trend, min/max/avg/med are interesting
 	Rate                       // A rate, displays % of values that aren't 0
