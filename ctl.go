@@ -170,31 +170,6 @@ func actionScale(cc *cli.Context) error {
 	return dumpYAML(status)
 }
 
-func actionCap(cc *cli.Context) error {
-	args := cc.Args()
-	if len(args) != 1 {
-		return cli.NewExitError("Wrong number of arguments!", 1)
-	}
-	max, err := strconv.ParseInt(args[0], 10, 64)
-	if err != nil {
-		log.WithError(err).Error("Error")
-		return err
-	}
-
-	client, err := v1.NewClient(cc.GlobalString("address"))
-	if err != nil {
-		log.WithError(err).Error("Couldn't create a client")
-		return err
-	}
-
-	status, err := client.UpdateStatus(lib.Status{VUsMax: null.IntFrom(max)})
-	if err != nil {
-		log.WithError(err).Error("Error")
-		return err
-	}
-	return dumpYAML(status)
-}
-
 func actionPause(cc *cli.Context) error {
 	client, err := v1.NewClient(cc.GlobalString("address"))
 	if err != nil {

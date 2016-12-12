@@ -1,11 +1,41 @@
 package js
 
 import (
+	"context"
 	"errors"
 	"github.com/robertkrimen/otto"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
+
+func newSnippetRunner(src string) (*Runner, error) {
+	rt, err := New()
+	if err != nil {
+		return nil, err
+	}
+	rt.VM.Set("__initapi__", InitAPI{r: rt})
+	defer rt.VM.Set("__initapi__", nil)
+
+	exp, err := rt.load("__snippet__", []byte(src))
+	if err != nil {
+		return nil, err
+	}
+
+	return NewRunner(rt, exp)
+}
+
+func runSnippet(src string) error {
+	r, err := newSnippetRunner(src)
+	if err != nil {
+		return err
+	}
+	vu, err := r.NewVU()
+	if err != nil {
+		return err
+	}
+	_, err = vu.RunOnce(context.Background())
+	return err
+}
 
 func TestCheck(t *testing.T) {
 	vm := otto.New()
