@@ -85,3 +85,49 @@ func TestGetMetrics(t *testing.T) {
 		assert.Equal(t, stats.Time, metrics[0].Contains.Type)
 	})
 }
+
+func TestGetMetric(t *testing.T) {
+	engine, err := lib.NewEngine(nil)
+	assert.NoError(t, err)
+
+	engine.Metrics = map[*stats.Metric]stats.Sink{
+		&stats.Metric{
+			Name:     "my_metric",
+			Type:     stats.Trend,
+			Contains: stats.Time,
+		}: &stats.TrendSink{},
+	}
+
+	t.Run("nonexistent", func(t *testing.T) {
+		rw := httptest.NewRecorder()
+		NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "GET", "/v2/metrics/notreal", nil))
+		res := rw.Result()
+		assert.Equal(t, http.StatusNotFound, res.StatusCode)
+	})
+
+	t.Run("real", func(t *testing.T) {
+		rw := httptest.NewRecorder()
+		NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "GET", "/v2/metrics/my_metric", nil))
+		res := rw.Result()
+		assert.Equal(t, http.StatusOK, res.StatusCode)
+
+		t.Run("document", func(t *testing.T) {
+			var doc jsonapi.Document
+			assert.NoError(t, json.Unmarshal(rw.Body.Bytes(), &doc))
+			if !assert.NotNil(t, doc.Data.DataObject) {
+				return
+			}
+			assert.Equal(t, "metrics", doc.Data.DataObject.Type)
+		})
+
+		t.Run("metric", func(t *testing.T) {
+			var metric Metric
+			assert.NoError(t, jsonapi.Unmarshal(rw.Body.Bytes(), &metric))
+			assert.Equal(t, "my_metric", metric.Name)
+			assert.True(t, metric.Type.Valid)
+			assert.Equal(t, stats.Trend, metric.Type.Type)
+			assert.True(t, metric.Contains.Valid)
+			assert.Equal(t, stats.Time, metric.Contains.Type)
+		})
+	})
+}
