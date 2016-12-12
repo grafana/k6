@@ -8,7 +8,6 @@ import (
 	"github.com/loadimpact/k6/lib"
 	"github.com/stretchr/testify/assert"
 	"github.com/urfave/negroni"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -71,13 +70,5 @@ func TestPing(t *testing.T) {
 
 	res := rw.Result()
 	assert.Equal(t, http.StatusOK, res.StatusCode)
-
-	if !assert.NotNil(t, res.Body) {
-		return
-	}
-
-	body, err := ioutil.ReadAll(res.Body)
-	res.Body.Close()
-	assert.NoError(t, err)
-	assert.Equal(t, []byte{'o', 'k'}, body)
+	assert.Equal(t, []byte{'o', 'k'}, rw.Body.Bytes())
 }
