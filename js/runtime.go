@@ -71,11 +71,7 @@ func (r *Runtime) Load(filename string) (otto.Value, error) {
 	defer r.VM.Set("__initapi__", nil)
 
 	exp, err := r.loadFile(filename)
-	if err != nil {
-		return exp, err
-	}
-
-	return exp, nil
+	return exp, err
 }
 
 func (r *Runtime) extractOptions(exports otto.Value, opts *lib.Options) error {

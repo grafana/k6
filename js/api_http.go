@@ -70,7 +70,7 @@ func (a JSAPI) HTTPRequest(method, url, body string, params map[string]interface
 		"vu":       a.vu.IDString,
 		"method":   method,
 		"url":      url,
-		"status":   strconv.FormatInt(int64(res.StatusCode), 10),
+		"status":   strconv.Itoa(res.StatusCode),
 		"group_id": strconv.FormatInt(a.vu.group.ID, 10),
 	}
 	a.vu.Samples = append(a.vu.Samples,
