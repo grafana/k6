@@ -49,9 +49,18 @@ func (t *NullValueType) UnmarshalJSON(data []byte) error {
 }
 
 type Metric struct {
-	Name     string         `json:"-"`
+	Name string `json:"-"`
+
 	Type     NullMetricType `json:"type"`
 	Contains NullValueType  `json:"contains"`
+}
+
+func NewMetric(m stats.Metric) Metric {
+	return Metric{
+		Name:     m.Name,
+		Type:     NullMetricType{m.Type, true},
+		Contains: NullValueType{m.Contains, true},
+	}
 }
 
 func (m Metric) GetID() string {
