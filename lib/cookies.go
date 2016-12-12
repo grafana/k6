@@ -22,9 +22,6 @@ func NewCookieJar() *CookieJar {
 }
 
 func (j *CookieJar) SetCookies(u *url.URL, cookies []*http.Cookie) {
-	if len(cookies) == 0 {
-		return
-	}
 	if u.Scheme != "http" && u.Scheme != "https" {
 		return
 	}
