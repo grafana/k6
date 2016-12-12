@@ -50,7 +50,7 @@ func (c *Client) request(method, path string, body []byte) ([]byte, error) {
 	}
 
 	data, _ := ioutil.ReadAll(res.Body)
-	res.Body.Close()
+	_ = res.Body.Close()
 
 	if res.StatusCode >= 400 {
 		var envelope api2go.HTTPError

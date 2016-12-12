@@ -26,19 +26,19 @@ func NewHandler() http.Handler {
 		v1.GET("/info", func(c *gin.Context) {
 			data, err := jsonapi.Marshal(lib.Info{})
 			if err != nil {
-				c.AbortWithError(500, err)
+				_ = c.AbortWithError(500, err)
 				return
 			}
 			c.Data(200, contentType, data)
 		})
 		v1.GET("/error", func(c *gin.Context) {
-			c.AbortWithError(500, errors.New("This is an error"))
+			_ = c.AbortWithError(500, errors.New("This is an error"))
 		})
 		v1.GET("/status", func(c *gin.Context) {
 			engine := common.GetEngine(c)
 			data, err := jsonapi.Marshal(engine.Status)
 			if err != nil {
-				c.AbortWithError(500, err)
+				_ = c.AbortWithError(500, err)
 				return
 			}
 			c.Data(200, contentType, data)
@@ -49,33 +49,36 @@ func NewHandler() http.Handler {
 			var status lib.Status
 			data, _ := ioutil.ReadAll(c.Request.Body)
 			if err := jsonapi.Unmarshal(data, &status); err != nil {
-				c.AbortWithError(http.StatusBadRequest, err)
+				_ = c.AbortWithError(http.StatusBadRequest, err)
 				return
 			}
 
 			if status.VUsMax.Valid {
 				if status.VUsMax.Int64 < engine.Status.VUs.Int64 {
 					if status.VUsMax.Int64 >= status.VUs.Int64 {
-						engine.SetVUs(status.VUs.Int64)
+						if err := engine.SetVUs(status.VUs.Int64); err != nil {
+							_ = c.AbortWithError(http.StatusBadRequest, err)
+							return
+						}
 					} else {
-						c.AbortWithError(http.StatusBadRequest, lib.ErrMaxTooLow)
+						_ = c.AbortWithError(http.StatusBadRequest, lib.ErrMaxTooLow)
 						return
 					}
 				}
 
 				if err := engine.SetMaxVUs(status.VUsMax.Int64); err != nil {
-					c.AbortWithError(http.StatusInternalServerError, err)
+					_ = c.AbortWithError(http.StatusInternalServerError, err)
 					return
 				}
 			}
 			if status.VUs.Valid {
 				if status.VUs.Int64 > engine.Status.VUsMax.Int64 {
-					c.AbortWithError(http.StatusBadRequest, lib.ErrTooManyVUs)
+					_ = c.AbortWithError(http.StatusBadRequest, lib.ErrTooManyVUs)
 					return
 				}
 
 				if err := engine.SetVUs(status.VUs.Int64); err != nil {
-					c.AbortWithError(http.StatusInternalServerError, err)
+					_ = c.AbortWithError(http.StatusInternalServerError, err)
 					return
 				}
 			}
@@ -85,7 +88,7 @@ func NewHandler() http.Handler {
 
 			data, err := jsonapi.Marshal(engine.Status)
 			if err != nil {
-				c.AbortWithError(http.StatusInternalServerError, err)
+				_ = c.AbortWithError(http.StatusInternalServerError, err)
 				return
 			}
 			c.Data(200, contentType, data)
@@ -99,7 +102,7 @@ func NewHandler() http.Handler {
 			}
 			data, err := jsonapi.Marshal(metrics)
 			if err != nil {
-				c.AbortWithError(500, err)
+				_ = c.AbortWithError(500, err)
 				return
 			}
 			c.Data(200, contentType, data)
@@ -114,19 +117,19 @@ func NewHandler() http.Handler {
 				metric.Sample = sink.Format()
 				data, err := jsonapi.Marshal(metric)
 				if err != nil {
-					c.AbortWithError(500, err)
+					_ = c.AbortWithError(500, err)
 					return
 				}
 				c.Data(200, contentType, data)
 				return
 			}
-			c.AbortWithError(404, errors.New("Metric not found"))
+			_ = c.AbortWithError(404, errors.New("Metric not found"))
 		})
 		v1.GET("/groups", func(c *gin.Context) {
 			engine := common.GetEngine(c)
 			data, err := jsonapi.Marshal(engine.Runner.GetGroups())
 			if err != nil {
-				c.AbortWithError(500, err)
+				_ = c.AbortWithError(500, err)
 				return
 			}
 			c.Data(200, contentType, data)
@@ -135,7 +138,7 @@ func NewHandler() http.Handler {
 			engine := common.GetEngine(c)
 			id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 			if err != nil {
-				c.AbortWithError(http.StatusBadRequest, err)
+				_ = c.AbortWithError(http.StatusBadRequest, err)
 				return
 			}
 
@@ -146,19 +149,19 @@ func NewHandler() http.Handler {
 
 				data, err := jsonapi.Marshal(group)
 				if err != nil {
-					c.AbortWithError(http.StatusInternalServerError, err)
+					_ = c.AbortWithError(http.StatusInternalServerError, err)
 					return
 				}
 				c.Data(200, contentType, data)
 				return
 			}
-			c.AbortWithError(404, errors.New("Group not found"))
+			_ = c.AbortWithError(404, errors.New("Group not found"))
 		})
 		v1.GET("/checks", func(c *gin.Context) {
 			engine := common.GetEngine(c)
 			data, err := jsonapi.Marshal(engine.Runner.GetChecks())
 			if err != nil {
-				c.AbortWithError(500, err)
+				_ = c.AbortWithError(500, err)
 				return
 			}
 			c.Data(200, contentType, data)
@@ -167,7 +170,7 @@ func NewHandler() http.Handler {
 			engine := common.GetEngine(c)
 			id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 			if err != nil {
-				c.AbortWithError(http.StatusBadRequest, err)
+				_ = c.AbortWithError(http.StatusBadRequest, err)
 				return
 			}
 
@@ -178,13 +181,13 @@ func NewHandler() http.Handler {
 
 				data, err := jsonapi.Marshal(check)
 				if err != nil {
-					c.AbortWithError(http.StatusInternalServerError, err)
+					_ = c.AbortWithError(http.StatusInternalServerError, err)
 					return
 				}
 				c.Data(200, contentType, data)
 				return
 			}
-			c.AbortWithError(404, errors.New("Group not found"))
+			_ = c.AbortWithError(404, errors.New("Group not found"))
 		})
 	}
 

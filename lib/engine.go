@@ -186,7 +186,9 @@ loop:
 			if stage.StartVUs.Valid && stage.EndVUs.Valid {
 				progress := (float64(stage.Duration.Int64-int64(left)) / float64(stage.Duration.Int64))
 				vus := Lerp(stage.StartVUs.Int64, stage.EndVUs.Int64, progress)
-				e.SetVUs(vus)
+				if err := e.SetVUs(vus); err != nil {
+					log.WithError(err).Error("Engine: Couldn't interpolate")
+				}
 			}
 
 			// Consume sample buffers. We use copies to avoid a race condition with runVU();
@@ -232,8 +234,8 @@ loop:
 		e.Pause.Done()
 	}
 
-	e.SetVUs(0)
-	e.SetMaxVUs(0)
+	_ = e.SetVUs(0)
+	_ = e.SetMaxVUs(0)
 	e.SetRunning(false)
 	e.consumeEngineStats()
 
@@ -434,7 +436,10 @@ func (e *Engine) runThresholds(ctx context.Context) {
 						value = value / float64(time.Millisecond)
 					}
 					// log.WithFields(log.Fields{"k": key, "v": value}).Debug("setting threshold data")
-					e.thresholdVM.Set(key, value)
+					if err := e.thresholdVM.Set(key, value); err != nil {
+						log.WithError(err).Error("Threshold Context Error")
+						return
+					}
 				}
 
 				taint := false
@@ -459,7 +464,10 @@ func (e *Engine) runThresholds(ctx context.Context) {
 				}
 
 				for key, _ := range sample {
-					e.thresholdVM.Set(key, otto.UndefinedValue())
+					if err := e.thresholdVM.Set(key, otto.UndefinedValue()); err != nil {
+						log.WithError(err).Error("Threshold Teardown Error")
+						return
+					}
 				}
 
 				if taint {

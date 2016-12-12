@@ -13,10 +13,10 @@ func newSnippetRunner(src string) (*Runner, error) {
 	if err != nil {
 		return nil, err
 	}
-	rt.VM.Set("__initapi__", InitAPI{r: rt})
-	defer rt.VM.Set("__initapi__", nil)
 
+	_ = rt.VM.Set("__initapi__", InitAPI{r: rt})
 	exp, err := rt.load("__snippet__", []byte(src))
+	_ = rt.VM.Set("__initapi__", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -118,9 +118,9 @@ func TestCheck(t *testing.T) {
 
 func TestThrow(t *testing.T) {
 	vm := otto.New()
-	vm.Set("fn", func() {
+	assert.NoError(t, vm.Set("fn", func() {
 		throw(vm, errors.New("This is a test error"))
-	})
+	}))
 	_, err := vm.Eval(`fn()`)
 	assert.EqualError(t, err, "Error: This is a test error")
 }

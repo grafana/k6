@@ -111,7 +111,7 @@ func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 	}
 
 	_, _ = io.Copy(ioutil.Discard, resp.Body)
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	trail := u.tracer.Done()
 
 	tags := map[string]string{
