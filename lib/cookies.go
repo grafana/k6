@@ -5,13 +5,11 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"sync"
 )
 
 // CookieJar implements a simplified version of net/http/cookiejar, that most notably can be
 // cleared without reinstancing the whole thing.
 type CookieJar struct {
-	mutex   sync.Mutex
 	cookies map[string][]*http.Cookie
 }
 
