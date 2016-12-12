@@ -1,7 +1,7 @@
-export let CounterType = 1;
-export let GaugeType = 2;
-export let TrendType = 3;
-export let RateType = 4;
+export let CounterType = 0;
+export let GaugeType = 1;
+export let TrendType = 2;
+export let RateType = 3;
 
 export class Metric {
 	constructor(t, name, isTime=false) {
