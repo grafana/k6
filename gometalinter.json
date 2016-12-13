@@ -1,8 +1,7 @@
 {
 	"DisableAll": true,
 	"Enable": [
-		"gotype", "deadcode",
-		"varcheck", "structcheck", "errcheck",
+		"gotype", "deadcode", "errcheck",
 		"ineffassign", "interfacer", "unconvert",
 		"goconst", "gosimple", "staticcheck",
 		"misspell"
