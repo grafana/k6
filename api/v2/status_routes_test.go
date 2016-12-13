@@ -21,10 +21,12 @@
 package v2
 
 import (
+	"bytes"
 	"encoding/json"
 	"github.com/loadimpact/k6/lib"
 	"github.com/manyminds/api2go/jsonapi"
 	"github.com/stretchr/testify/assert"
+	"gopkg.in/guregu/null.v3"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -56,4 +58,53 @@ func TestGetStatus(t *testing.T) {
 		assert.True(t, status.VUsMax.Valid)
 		assert.False(t, status.Tainted)
 	})
+}
+
+func TestPatchStatus(t *testing.T) {
+	testdata := map[string]struct {
+		StatusCode int
+		Status     Status
+	}{
+		"nothing":      {200, Status{}},
+		"running":      {200, Status{Running: null.BoolFrom(true)}},
+		"max vus":      {200, Status{VUsMax: null.IntFrom(10)}},
+		"too many vus": {400, Status{VUs: null.IntFrom(10), VUsMax: null.IntFrom(0)}},
+
+		// PANICS DUE TO ENGINE BUG!
+		// "vus":          {200, Status{VUs: null.IntFrom(10), VUsMax: null.IntFrom(10)}},
+	}
+
+	for name, indata := range testdata {
+		t.Run(name, func(t *testing.T) {
+			engine, err := lib.NewEngine(nil)
+			assert.NoError(t, err)
+
+			body, err := jsonapi.Marshal(indata.Status)
+			if !assert.NoError(t, err) {
+				return
+			}
+
+			rw := httptest.NewRecorder()
+			NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "PATCH", "/v2/status", bytes.NewReader(body)))
+			res := rw.Result()
+
+			if !assert.Equal(t, indata.StatusCode, res.StatusCode) {
+				return
+			}
+			if indata.StatusCode != 200 {
+				return
+			}
+
+			status := NewStatus(engine)
+			if indata.Status.Running.Valid {
+				assert.Equal(t, indata.Status.Running, status.Running)
+			}
+			if indata.Status.VUs.Valid {
+				assert.Equal(t, indata.Status.VUs, status.VUs)
+			}
+			if indata.Status.VUsMax.Valid {
+				assert.Equal(t, indata.Status.VUsMax, status.VUsMax)
+			}
+		})
+	}
 }
