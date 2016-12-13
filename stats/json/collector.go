@@ -50,12 +50,10 @@ func (c *Collector) String() string {
 
 func (c *Collector) Run(ctx context.Context) {
 	log.WithField("filename", c.fname).Debug("JSON: Writing JSON metrics")
-	for {
-		select {
-		case <-ctx.Done():
-			c.outfile.Close()
-			return
-		}
+	<-ctx.Done()
+	err := c.outfile.Close()
+	if err == nil {
+		return
 	}
 }
 
@@ -67,7 +65,11 @@ func (c *Collector) Collect(samples []stats.Sample) {
 				row, err := json.Marshal(env)
 				if err == nil {
 					row = append(row, '\n')
-					c.outfile.Write(row)
+					_, err := c.outfile.Write(row)
+					if err != nil {
+						log.WithField("filename", c.fname).Error("JSON: Error writing to file")
+					}
+
 				}
 			}
 
@@ -80,6 +82,9 @@ func (c *Collector) Collect(samples []stats.Sample) {
 			continue
 		}
 		row = append(row, '\n')
-		c.outfile.Write(row)
+		_, err = c.outfile.Write(row)
+		if err != nil {
+			log.WithField("filename", c.fname).Error("JSON: Error writing to file")
+		}
 	}
 }
