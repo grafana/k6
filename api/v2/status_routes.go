@@ -33,9 +33,9 @@ func HandleGetStatus(rw http.ResponseWriter, r *http.Request, p httprouter.Param
 
 	status := Status{
 		Running: null.BoolFrom(engine.Status.Running.Bool),
-		Tainted: null.BoolFrom(engine.Status.Tainted.Bool),
 		VUs:     null.IntFrom(engine.Status.VUs.Int64),
 		VUsMax:  null.IntFrom(engine.Status.VUsMax.Int64),
+		Tainted: engine.Status.Tainted.Bool,
 	}
 	data, err := jsonapi.Marshal(status)
 	if err != nil {
