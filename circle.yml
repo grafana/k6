@@ -14,7 +14,7 @@ dependencies:
 
 test:
   override:
-    - docker run --entrypoint /bin/bash loadimpact/k6 -c 'cd $GOPATH/src/github.com/loadimpact/k6 && go get github.com/alecthomas/gometalinter && gometalinter --install && gometalinter --deadline 10m --config gometalinter.json ./...'
+    - docker run --entrypoint /bin/bash loadimpact/k6 -c 'cd $GOPATH/src/github.com/loadimpact/k6 go get -t ./... && go get github.com/alecthomas/gometalinter && gometalinter --install && gometalinter --deadline 10m --config gometalinter.json ./...'
     - docker run --entrypoint /bin/bash loadimpact/k6 -c 'cd $GOPATH/src/github.com/loadimpact/k6 && go get -t ./... && go test ./...'
 
 deployment:
