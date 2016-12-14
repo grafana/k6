@@ -437,7 +437,7 @@ loop:
 			continue
 		}
 		icon := " "
-		for _, threshold := range engine.Thresholds[name] {
+		for _, threshold := range engine.Thresholds[name].Thresholds {
 			icon = "✓"
 			if threshold.Failed {
 				icon = "✗"
