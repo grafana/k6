@@ -28,6 +28,10 @@ import (
 )
 
 func TestMetricAdd(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+
 	values := map[string]float64{
 		`1234`:   1234.0,
 		`1234.5`: 1234.5,

@@ -28,6 +28,10 @@ import (
 )
 
 func TestNewMetric(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+
 	tpl := `
 		import %s from "k6/metrics";
 		let myMetric = new %s(%s"my_metric", %s);

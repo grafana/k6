@@ -29,6 +29,10 @@ import (
 )
 
 func TestSleep(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+
 	start := time.Now()
 	JSAPI{}.Sleep(0.2)
 	assert.True(t, time.Since(start) > 200*time.Millisecond)
@@ -36,6 +40,10 @@ func TestSleep(t *testing.T) {
 }
 
 func TestDoGroup(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+
 	r, err := newSnippetRunner(`
 	import { group } from "k6";
 	export default function() {
@@ -56,6 +64,10 @@ func TestDoGroup(t *testing.T) {
 }
 
 func TestDoGroupNested(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+
 	r, err := newSnippetRunner(`
 	import { group } from "k6";
 	export default function() {
@@ -79,6 +91,10 @@ func TestDoGroupNested(t *testing.T) {
 }
 
 func TestDoGroupReturn(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+
 	r, err := newSnippetRunner(`
 	import { group, _assert } from "k6";
 	export default function() {
@@ -96,6 +112,10 @@ func TestDoGroupReturn(t *testing.T) {
 }
 
 func TestDoGroupReturnTrueByDefault(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+
 	r, err := newSnippetRunner(`
 	import { group, _assert } from "k6";
 	export default function() {
@@ -113,6 +133,10 @@ func TestDoGroupReturnTrueByDefault(t *testing.T) {
 }
 
 func TestDoCheck(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+
 	r, err := newSnippetRunner(`
 	import { check } from "k6";
 	export default function() {
@@ -138,6 +162,10 @@ func TestDoCheck(t *testing.T) {
 }
 
 func TestCheckInGroup(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+
 	r, err := newSnippetRunner(`
 	import { group, check } from "k6";
 	export default function() {
@@ -167,6 +195,10 @@ func TestCheckInGroup(t *testing.T) {
 }
 
 func TestCheckReturnTrueOnSuccess(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+
 	r, err := newSnippetRunner(`
 	import { check, _assert } from "k6";
 	export default function() {
@@ -182,6 +214,10 @@ func TestCheckReturnTrueOnSuccess(t *testing.T) {
 }
 
 func TestCheckReturnFalseAndTaintsOnFailure(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+
 	r, err := newSnippetRunner(`
 	import { check, _assert } from "k6";
 	export default function() {
@@ -197,6 +233,10 @@ func TestCheckReturnFalseAndTaintsOnFailure(t *testing.T) {
 }
 
 func TestTaint(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+
 	r, err := newSnippetRunner(`
 	import { taint } from "k6";
 	export default function() {

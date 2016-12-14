@@ -27,6 +27,10 @@ import (
 )
 
 func TestNew(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+
 	r, err := New()
 	assert.NoError(t, err)
 
@@ -38,6 +42,10 @@ func TestNew(t *testing.T) {
 }
 
 func TestLoad(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+
 	r, err := New()
 	assert.NoError(t, err)
 	assert.NoError(t, r.VM.Set("__initapi__", InitAPI{r: r}))
@@ -52,6 +60,10 @@ func TestLoad(t *testing.T) {
 }
 
 func TestExtractOptions(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+
 	r, err := New()
 	assert.NoError(t, err)
 
