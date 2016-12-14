@@ -21,7 +21,6 @@
 package js
 
 import (
-	"github.com/loadimpact/k6/lib"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
