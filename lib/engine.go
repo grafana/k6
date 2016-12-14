@@ -46,6 +46,7 @@ type Engine struct {
 
 	// Stubbing these out to pass tests.
 	running bool
+	paused  bool
 	vus     int64
 	vusMax  int64
 
@@ -82,6 +83,14 @@ func (e *Engine) SetRunning(v bool) {
 
 func (e *Engine) IsRunning() bool {
 	return e.running
+}
+
+func (e *Engine) SetPaused(v bool) {
+	e.paused = true
+}
+
+func (e *Engine) IsPaused() bool {
+	return e.paused
 }
 
 func (e *Engine) SetVUs(v int64) error {
