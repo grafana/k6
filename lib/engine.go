@@ -34,6 +34,9 @@ const (
 	ShutdownTimeout   = 10 * time.Second
 )
 
+// Special error used to signal that a VU wants a taint, without logging an error.
+var ErrVUWantsTaint = errors.New("test is tainted")
+
 // The Engine is the beating heart of K6.
 type Engine struct {
 	Runner  Runner
