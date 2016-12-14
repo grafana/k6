@@ -120,7 +120,7 @@ func TestExtractOptions(t *testing.T) {
 
 		assert.Contains(t, r.Options.Thresholds, "my_metric")
 		if assert.Len(t, r.Options.Thresholds["my_metric"], 1) {
-			assert.Equal(t, &lib.Threshold{Source: "value<=1000"}, r.Options.Thresholds["my_metric"][0])
+			assert.Equal(t, "value<=1000", r.Options.Thresholds["my_metric"][0])
 		}
 	})
 }
