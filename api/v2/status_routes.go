@@ -56,7 +56,7 @@ func HandlePatchStatus(rw http.ResponseWriter, r *http.Request, p httprouter.Par
 	}
 
 	if status.VUsMax.Valid {
-		if err := engine.SetMaxVUs(status.VUsMax.Int64); err != nil {
+		if err := engine.SetVUsMax(status.VUsMax.Int64); err != nil {
 			http.Error(rw, err.Error(), http.StatusBadRequest)
 			return
 		}

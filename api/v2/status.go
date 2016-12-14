@@ -36,10 +36,10 @@ type Status struct {
 
 func NewStatus(engine *lib.Engine) Status {
 	return Status{
-		Running: null.BoolFrom(engine.Status.Running.Bool),
-		VUs:     null.IntFrom(engine.Status.VUs.Int64),
-		VUsMax:  null.IntFrom(engine.Status.VUsMax.Int64),
-		Tainted: engine.Status.Tainted.Bool,
+		Running: null.BoolFrom(engine.IsRunning()),
+		VUs:     null.IntFrom(engine.GetVUs()),
+		VUsMax:  null.IntFrom(engine.GetVUsMax()),
+		Tainted: engine.IsTainted(),
 	}
 }
 

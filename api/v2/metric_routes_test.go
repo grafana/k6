@@ -32,7 +32,7 @@ import (
 )
 
 func TestGetMetrics(t *testing.T) {
-	engine, err := lib.NewEngine(nil)
+	engine, err := lib.NewEngine(nil, lib.Options{})
 	assert.NoError(t, err)
 
 	engine.Metrics = map[*stats.Metric]stats.Sink{
@@ -72,7 +72,7 @@ func TestGetMetrics(t *testing.T) {
 }
 
 func TestGetMetric(t *testing.T) {
-	engine, err := lib.NewEngine(nil)
+	engine, err := lib.NewEngine(nil, lib.Options{})
 	assert.NoError(t, err)
 
 	engine.Metrics = map[*stats.Metric]stats.Sink{
