@@ -40,7 +40,7 @@ type Engine struct {
 	Options Options
 
 	Metrics    map[*stats.Metric]stats.Sink
-	Thresholds map[string][]Threshold
+	Thresholds map[string]Thresholds
 
 	atTime time.Duration
 
@@ -57,7 +57,13 @@ type Engine struct {
 }
 
 func NewEngine(r Runner, o Options) (*Engine, error) {
-	e := &Engine{Runner: r}
+	e := &Engine{
+		Runner:  r,
+		Options: o,
+
+		Metrics:    make(map[*stats.Metric]stats.Sink),
+		Thresholds: make(map[string]Thresholds),
+	}
 	e.clearSubcontext()
 
 	return e, nil

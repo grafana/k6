@@ -21,8 +21,6 @@
 package lib
 
 import (
-	"encoding/json"
-	"github.com/robertkrimen/otto"
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -38,7 +36,7 @@ type Options struct {
 
 	MaxRedirects null.Int `json:"max-redirects"`
 
-	Thresholds map[string][]*Threshold `json:"thresholds"`
+	Thresholds map[string][]string `json:"thresholds"`
 }
 
 func (o Options) Apply(opts Options) Options {
@@ -80,29 +78,4 @@ func (o Options) SetAllValid(valid bool) Options {
 	o.Linger.Valid = valid
 	o.AbortOnTaint.Valid = valid
 	return o
-}
-
-type Threshold struct {
-	Source string
-	Script *otto.Script
-	Failed bool
-}
-
-func (t Threshold) String() string {
-	return t.Source
-}
-
-func (t Threshold) MarshalJSON() ([]byte, error) {
-	return json.Marshal(t.Source)
-}
-
-func (t *Threshold) UnmarshalJSON(data []byte) error {
-	var src string
-	if err := json.Unmarshal(data, &src); err != nil {
-		return err
-	}
-	t.Source = src
-	t.Script = nil
-	t.Failed = false
-	return nil
 }
