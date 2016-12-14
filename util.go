@@ -21,10 +21,23 @@
 package main
 
 import (
+	log "github.com/Sirupsen/logrus"
+	"github.com/ghodss/yaml"
 	"gopkg.in/guregu/null.v3"
 	"gopkg.in/urfave/cli.v1"
+	"os"
 	"time"
 )
+
+func dumpYAML(v interface{}) error {
+	bytes, err := yaml.Marshal(v)
+	if err != nil {
+		log.WithError(err).Error("Serialization Error")
+		return err
+	}
+	_, _ = os.Stdout.Write(bytes)
+	return nil
+}
 
 // cliBool returns a CLI argument as a bool, which is invalid if not given.
 func cliBool(cc *cli.Context, name string) null.Bool {
