@@ -69,9 +69,7 @@ func TestPatchStatus(t *testing.T) {
 		"paused":       {200, Status{Paused: null.BoolFrom(true)}},
 		"max vus":      {200, Status{VUsMax: null.IntFrom(10)}},
 		"too many vus": {400, Status{VUs: null.IntFrom(10), VUsMax: null.IntFrom(0)}},
-
-		// PANICS DUE TO ENGINE BUG!
-		// "vus":          {200, Status{VUs: null.IntFrom(10), VUsMax: null.IntFrom(10)}},
+		"vus":          {200, Status{VUs: null.IntFrom(10), VUsMax: null.IntFrom(10)}},
 	}
 
 	for name, indata := range testdata {
