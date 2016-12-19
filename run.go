@@ -35,7 +35,6 @@ import (
 	"github.com/loadimpact/k6/ui"
 	"gopkg.in/urfave/cli.v1"
 	"io/ioutil"
-	"net/url"
 	"os"
 	"os/signal"
 	"sort"
@@ -184,29 +183,24 @@ func makeRunner(filename, t string) (lib.Runner, error) {
 	}
 }
 
-func parseCollectorString(s string) (t string, u *url.URL, err error) {
+func parseCollectorString(s string) (t, p string, err error) {
 	parts := strings.SplitN(s, "=", 2)
 	if len(parts) != 2 {
-		return "", nil, errors.New("Malformed output; must be in the form 'type=url'")
+		return "", "", errors.New("Malformed output; must be in the form 'type=url'")
 	}
 
-	u, err = url.Parse(parts[1])
-	if err != nil {
-		return "", nil, err
-	}
-
-	return parts[0], u, nil
+	return parts[0], parts[1], nil
 }
 
 func makeCollector(s string) (stats.Collector, error) {
-	t, u, err := parseCollectorString(s)
+	t, p, err := parseCollectorString(s)
 	if err != nil {
 		return nil, err
 	}
 
 	switch t {
 	case "influxdb":
-		return influxdb.New(u)
+		return influxdb.New(p)
 	default:
 		return nil, errors.New("Unknown output type: " + t)
 	}
