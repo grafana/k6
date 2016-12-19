@@ -147,7 +147,7 @@ func TestEngineIsRunning(t *testing.T) {
 	e, err := NewEngine(nil, Options{})
 	assert.NoError(t, err)
 
-	go e.Run(ctx)
+	go func() { assert.NoError(t, e.Run(ctx)) }()
 	runtime.Gosched()
 	assert.True(t, e.IsRunning())
 
