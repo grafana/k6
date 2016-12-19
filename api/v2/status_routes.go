@@ -67,7 +67,7 @@ func HandlePatchStatus(rw http.ResponseWriter, r *http.Request, p httprouter.Par
 			return
 		}
 	}
-	if status.Running.Valid {
-		engine.SetRunning(status.Running.Bool)
+	if status.Paused.Valid {
+		engine.SetPaused(status.Paused.Bool)
 	}
 }

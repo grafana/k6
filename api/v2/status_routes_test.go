@@ -53,7 +53,7 @@ func TestGetStatus(t *testing.T) {
 	t.Run("status", func(t *testing.T) {
 		var status Status
 		assert.NoError(t, jsonapi.Unmarshal(rw.Body.Bytes(), &status))
-		assert.True(t, status.Running.Valid)
+		assert.True(t, status.Paused.Valid)
 		assert.True(t, status.VUs.Valid)
 		assert.True(t, status.VUsMax.Valid)
 		assert.False(t, status.Tainted)
@@ -66,7 +66,7 @@ func TestPatchStatus(t *testing.T) {
 		Status     Status
 	}{
 		"nothing":      {200, Status{}},
-		"running":      {200, Status{Running: null.BoolFrom(true)}},
+		"paused":       {200, Status{Paused: null.BoolFrom(true)}},
 		"max vus":      {200, Status{VUsMax: null.IntFrom(10)}},
 		"too many vus": {400, Status{VUs: null.IntFrom(10), VUsMax: null.IntFrom(0)}},
 
@@ -96,8 +96,8 @@ func TestPatchStatus(t *testing.T) {
 			}
 
 			status := NewStatus(engine)
-			if indata.Status.Running.Valid {
-				assert.Equal(t, indata.Status.Running, status.Running)
+			if indata.Status.Paused.Valid {
+				assert.Equal(t, indata.Status.Paused, status.Paused)
 			}
 			if indata.Status.VUs.Valid {
 				assert.Equal(t, indata.Status.VUs, status.VUs)
