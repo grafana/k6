@@ -70,18 +70,32 @@ func NewEngine(r Runner, o Options) (*Engine, error) {
 	}
 	e.clearSubcontext()
 
+	if o.VUsMax.Valid {
+		if err := e.SetVUsMax(o.VUsMax.Int64); err != nil {
+			return nil, err
+		}
+	}
+	if o.VUs.Valid {
+		if err := e.SetVUs(o.VUs.Int64); err != nil {
+			return nil, err
+		}
+	}
+	if o.Paused.Valid {
+		e.SetPaused(o.Paused.Bool)
+	}
+
 	return e, nil
 }
 
 func (e *Engine) Run(ctx context.Context) error {
+	e.running = true
 	<-ctx.Done()
+	e.running = false
+
 	e.clearSubcontext()
 	e.subwg.Wait()
-	return nil
-}
 
-func (e *Engine) SetRunning(v bool) {
-	e.running = true
+	return nil
 }
 
 func (e *Engine) IsRunning() bool {
@@ -89,7 +103,7 @@ func (e *Engine) IsRunning() bool {
 }
 
 func (e *Engine) SetPaused(v bool) {
-	e.paused = true
+	e.paused = v
 }
 
 func (e *Engine) IsPaused() bool {
@@ -97,8 +111,11 @@ func (e *Engine) IsPaused() bool {
 }
 
 func (e *Engine) SetVUs(v int64) error {
+	if v < 0 {
+		return errors.New("vus can't be negative")
+	}
 	if v > e.vusMax {
-		return errors.New("more VUs than allocated requested")
+		return errors.New("more vus than allocated requested")
 	}
 
 	e.vus = v
@@ -110,6 +127,13 @@ func (e *Engine) GetVUs() int64 {
 }
 
 func (e *Engine) SetVUsMax(v int64) error {
+	if v < 0 {
+		return errors.New("vus-max can't be negative")
+	}
+	if v < e.vus {
+		return errors.New("can't reduce vus-max below vus")
+	}
+
 	e.vusMax = v
 	return nil
 }
