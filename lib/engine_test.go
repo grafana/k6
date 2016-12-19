@@ -131,7 +131,7 @@ func TestEngineRun(t *testing.T) {
 
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
-		e.Run(ctx)
+		assert.NoError(t, e.Run(ctx))
 
 		assert.NotEqual(t, subctx, e.subctx, "subcontext not changed")
 		select {
