@@ -26,29 +26,21 @@ import (
 	"testing"
 )
 
-func TestWrapWithNilArg(t *testing.T) {
-	out := Wrap(nil)
+func TestWrapersWithNilArg(t *testing.T) {
+	out := WrapSample(nil)
+	assert.Equal(t, out, (*Envelope)(nil))
+	out = WrapMetric(nil)
 	assert.Equal(t, out, (*Envelope)(nil))
 }
 
-func TestWrapWithUnusedType(t *testing.T) {
-	out := Wrap(JSONSample{})
-	assert.Equal(t, out, (*Envelope)(nil))
-}
-
-func TestWrapWithSample(t *testing.T) {
-	out := Wrap(stats.Sample{
+func TestWrapSampleWithSamplePointer(t *testing.T) {
+	out := WrapSample(&stats.Sample{
 		Metric: &stats.Metric{},
 	})
 	assert.NotEqual(t, out, (*Envelope)(nil))
 }
 
-func TestWrapWithMetricPointer(t *testing.T) {
-	out := Wrap(&stats.Metric{})
+func TestWrapMetricWithMetricPointer(t *testing.T) {
+	out := WrapMetric(&stats.Metric{})
 	assert.NotEqual(t, out, (*Envelope)(nil))
-}
-
-func TestWrapWithMetric(t *testing.T) {
-	out := Wrap(stats.Metric{})
-	assert.Equal(t, out, (*Envelope)(nil))
 }
