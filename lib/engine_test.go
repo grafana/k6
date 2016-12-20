@@ -29,6 +29,23 @@ import (
 	"time"
 )
 
+// Helper for asserting the number of active/dead VUs.
+func assertActiveVUs(t *testing.T, e *Engine, active, dead int) {
+	var numActive, numDead int
+	var lastWasDead bool
+	for _, vu := range e.vuEntries {
+		if vu.Cancel != nil {
+			numActive++
+			assert.False(t, lastWasDead, "living vu in dead zone")
+		} else {
+			numDead++
+			lastWasDead = true
+		}
+	}
+	assert.Equal(t, active, numActive, "wrong number of active vus")
+	assert.Equal(t, dead, numDead, "wrong number of dead vus")
+}
+
 func TestNewEngine(t *testing.T) {
 	_, err := NewEngine(nil, Options{})
 	assert.NoError(t, err)
@@ -173,17 +190,41 @@ func TestEngineSetVUsMax(t *testing.T) {
 		e, err := NewEngine(nil, Options{})
 		assert.NoError(t, err)
 		assert.Equal(t, int64(0), e.GetVUsMax())
+		assert.Len(t, e.vuEntries, 0)
 	})
 	t.Run("set", func(t *testing.T) {
 		e, err := NewEngine(nil, Options{})
 		assert.NoError(t, err)
 		assert.NoError(t, e.SetVUsMax(10))
 		assert.Equal(t, int64(10), e.GetVUsMax())
+		assert.Len(t, e.vuEntries, 10)
+		for _, vu := range e.vuEntries {
+			assert.Nil(t, vu.Cancel)
+		}
+
+		t.Run("higher", func(t *testing.T) {
+			assert.NoError(t, e.SetVUsMax(15))
+			assert.Equal(t, int64(15), e.GetVUsMax())
+			assert.Len(t, e.vuEntries, 15)
+			for _, vu := range e.vuEntries {
+				assert.Nil(t, vu.Cancel)
+			}
+		})
+
+		t.Run("lower", func(t *testing.T) {
+			assert.NoError(t, e.SetVUsMax(5))
+			assert.Equal(t, int64(5), e.GetVUsMax())
+			assert.Len(t, e.vuEntries, 5)
+			for _, vu := range e.vuEntries {
+				assert.Nil(t, vu.Cancel)
+			}
+		})
 	})
 	t.Run("set negative", func(t *testing.T) {
 		e, err := NewEngine(nil, Options{})
 		assert.NoError(t, err)
 		assert.EqualError(t, e.SetVUsMax(-1), "vus-max can't be negative")
+		assert.Len(t, e.vuEntries, 0)
 	})
 	t.Run("set too low", func(t *testing.T) {
 		e, err := NewEngine(nil, Options{
@@ -192,6 +233,7 @@ func TestEngineSetVUsMax(t *testing.T) {
 		})
 		assert.NoError(t, err)
 		assert.EqualError(t, e.SetVUsMax(5), "can't reduce vus-max below vus")
+		assert.Len(t, e.vuEntries, 10)
 	})
 }
 
@@ -203,14 +245,34 @@ func TestEngineSetVUs(t *testing.T) {
 		assert.Equal(t, int64(0), e.GetVUs())
 	})
 	t.Run("set", func(t *testing.T) {
-		e, err := NewEngine(nil, Options{VUsMax: null.IntFrom(10)})
+		e, err := NewEngine(nil, Options{VUsMax: null.IntFrom(15)})
 		assert.NoError(t, err)
 		assert.NoError(t, e.SetVUs(10))
 		assert.Equal(t, int64(10), e.GetVUs())
-	})
-	t.Run("set too high", func(t *testing.T) {
-		e, err := NewEngine(nil, Options{VUsMax: null.IntFrom(10)})
-		assert.NoError(t, err)
-		assert.EqualError(t, e.SetVUs(20), "more vus than allocated requested")
+		assertActiveVUs(t, e, 10, 5)
+
+		t.Run("negative", func(t *testing.T) {
+			assert.EqualError(t, e.SetVUs(-1), "vus can't be negative")
+			assert.Equal(t, int64(10), e.GetVUs())
+			assertActiveVUs(t, e, 10, 5)
+		})
+
+		t.Run("too high", func(t *testing.T) {
+			assert.EqualError(t, e.SetVUs(20), "more vus than allocated requested")
+			assert.Equal(t, int64(10), e.GetVUs())
+			assertActiveVUs(t, e, 10, 5)
+		})
+
+		t.Run("lower", func(t *testing.T) {
+			assert.NoError(t, e.SetVUs(5))
+			assert.Equal(t, int64(5), e.GetVUs())
+			assertActiveVUs(t, e, 5, 10)
+		})
+
+		t.Run("higher", func(t *testing.T) {
+			assert.NoError(t, e.SetVUs(15))
+			assert.Equal(t, int64(15), e.GetVUs())
+			assertActiveVUs(t, e, 15, 0)
+		})
 	})
 }

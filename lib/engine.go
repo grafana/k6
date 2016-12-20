@@ -37,6 +37,11 @@ const (
 // Special error used to signal that a VU wants a taint, without logging an error.
 var ErrVUWantsTaint = errors.New("test is tainted")
 
+type vuEntry struct {
+	VU     VU
+	Cancel context.CancelFunc
+}
+
 // The Engine is the beating heart of K6.
 type Engine struct {
 	Runner  Runner
@@ -45,7 +50,9 @@ type Engine struct {
 	Metrics    map[*stats.Metric]stats.Sink
 	Thresholds map[string]Thresholds
 
-	atTime time.Duration
+	atTime    time.Duration
+	vuEntries []*vuEntry
+	vuMutex   sync.Mutex
 
 	// Stubbing these out to pass tests.
 	running bool
@@ -88,6 +95,8 @@ func NewEngine(r Runner, o Options) (*Engine, error) {
 }
 
 func (e *Engine) Run(ctx context.Context) error {
+	e.clearSubcontext()
+
 	e.running = true
 	<-ctx.Done()
 	e.running = false
@@ -118,6 +127,33 @@ func (e *Engine) SetVUs(v int64) error {
 		return errors.New("more vus than allocated requested")
 	}
 
+	e.vuMutex.Lock()
+	defer e.vuMutex.Unlock()
+
+	// Scale up
+	for i := e.vus; i < v; i++ {
+		vu := e.vuEntries[i]
+		if vu.Cancel != nil {
+			panic(errors.New("fatal miscalculation: attempted to re-schedule active VU"))
+		}
+
+		ctx, cancel := context.WithCancel(e.subctx)
+		vu.Cancel = cancel
+
+		e.subwg.Add(1)
+		go func() {
+			e.subwg.Done()
+			e.runVU(ctx, vu)
+		}()
+	}
+
+	// Scale down
+	for i := e.vus - 1; i >= v; i-- {
+		vu := e.vuEntries[i]
+		vu.Cancel()
+		vu.Cancel = nil
+	}
+
 	e.vus = v
 	return nil
 }
@@ -132,6 +168,27 @@ func (e *Engine) SetVUsMax(v int64) error {
 	}
 	if v < e.vus {
 		return errors.New("can't reduce vus-max below vus")
+	}
+
+	e.vuMutex.Lock()
+	defer e.vuMutex.Unlock()
+
+	// Scale up
+	for len(e.vuEntries) < int(v) {
+		var entry vuEntry
+		if e.Runner != nil {
+			vu, err := e.Runner.NewVU()
+			if err != nil {
+				return err
+			}
+			entry.VU = vu
+		}
+		e.vuEntries = append(e.vuEntries, &entry)
+	}
+
+	// Scale down
+	if len(e.vuEntries) > int(v) {
+		e.vuEntries = e.vuEntries[:int(v)]
 	}
 
 	e.vusMax = v
@@ -164,4 +221,22 @@ func (e *Engine) clearSubcontext() {
 	subctx, subcancel := context.WithCancel(context.Background())
 	e.subctx = subctx
 	e.subcancel = subcancel
+}
+
+func (e *Engine) runVU(ctx context.Context, vu *vuEntry) {
+	// nil runners that produce nil VUs are used for testing.
+	if vu.VU == nil {
+		<-ctx.Done()
+		return
+	}
+
+	for {
+		_, _ = vu.VU.RunOnce(ctx)
+
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+	}
 }
