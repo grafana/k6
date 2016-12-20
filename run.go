@@ -32,6 +32,7 @@ import (
 	"github.com/loadimpact/k6/simple"
 	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/stats/influxdb"
+	"github.com/loadimpact/k6/stats/json"
 	"github.com/loadimpact/k6/ui"
 	"gopkg.in/urfave/cli.v1"
 	"io/ioutil"
@@ -201,6 +202,8 @@ func makeCollector(s string) (stats.Collector, error) {
 	switch t {
 	case "influxdb":
 		return influxdb.New(p)
+	case "json":
+		return json.New(p)
 	default:
 		return nil, errors.New("Unknown output type: " + t)
 	}
