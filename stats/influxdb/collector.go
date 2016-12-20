@@ -39,7 +39,12 @@ type Collector struct {
 	buffer    []stats.Sample
 }
 
-func New(u *url.URL) (*Collector, error) {
+func New(s string) (*Collector, error) {
+	u, err := url.Parse(s)
+	if err != nil {
+		return nil, err
+	}
+
 	cl, batchConf, err := parseURL(u)
 	if err != nil {
 		return nil, err

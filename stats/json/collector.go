@@ -26,7 +26,6 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/k6/stats"
 	"io"
-	"net/url"
 	"os"
 )
 
@@ -45,12 +44,7 @@ func (c *Collector) HasSeenMetric(str string) bool {
 	return false
 }
 
-func New(u *url.URL) (*Collector, error) {
-	fname := u.Path
-	if u.Path == "" {
-		fname = u.String()
-	}
-
+func New(fname string) (*Collector, error) {
 	logfile, err := os.Create(fname)
 	if err != nil {
 		return nil, err

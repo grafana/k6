@@ -27,8 +27,12 @@ import (
 
 func NewHandler() http.Handler {
 	router := httprouter.New()
+
 	router.GET("/v2/status", HandleGetStatus)
+	router.PATCH("/v2/status", HandlePatchStatus)
+
 	router.GET("/v2/metrics", HandleGetMetrics)
 	router.GET("/v2/metrics/:id", HandleGetMetric)
+
 	return router
 }
