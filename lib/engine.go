@@ -30,6 +30,7 @@ import (
 
 const (
 	TickRate          = 1 * time.Millisecond
+	CollectRate       = 10 * time.Millisecond
 	ThresholdTickRate = 2 * time.Second
 	ShutdownTimeout   = 10 * time.Second
 )
@@ -40,6 +41,9 @@ var ErrVUWantsTaint = errors.New("test is tainted")
 type vuEntry struct {
 	VU     VU
 	Cancel context.CancelFunc
+
+	Samples []stats.Sample
+	lock    sync.Mutex
 }
 
 // The Engine is the beating heart of K6.
@@ -47,8 +51,9 @@ type Engine struct {
 	Runner  Runner
 	Options Options
 
-	Metrics    map[*stats.Metric]stats.Sink
-	Thresholds map[string]Thresholds
+	Thresholds  map[string]Thresholds
+	Metrics     map[*stats.Metric]stats.Sink
+	MetricsLock sync.Mutex
 
 	atTime    time.Duration
 	vuEntries []*vuEntry
@@ -95,8 +100,16 @@ func NewEngine(r Runner, o Options) (*Engine, error) {
 }
 
 func (e *Engine) Run(ctx context.Context) error {
+	go e.runCollection(ctx)
+
 	e.running = true
-	<-ctx.Done()
+loop:
+	for {
+		select {
+		case <-ctx.Done():
+			break loop
+		}
+	}
 	e.running = false
 
 	e.clearSubcontext()
@@ -229,7 +242,11 @@ func (e *Engine) runVU(ctx context.Context, vu *vuEntry) {
 	}
 
 	for {
-		_, _ = vu.VU.RunOnce(ctx)
+		samples, _ := vu.VU.RunOnce(ctx)
+
+		vu.lock.Lock()
+		vu.Samples = append(vu.Samples, samples...)
+		vu.lock.Unlock()
 
 		select {
 		case <-ctx.Done():
@@ -237,4 +254,44 @@ func (e *Engine) runVU(ctx context.Context, vu *vuEntry) {
 		default:
 		}
 	}
+}
+
+func (e *Engine) runCollection(ctx context.Context) {
+	ticker := time.NewTicker(CollectRate)
+	for {
+		select {
+		case <-ticker.C:
+			e.processSamples(e.collect()...)
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func (e *Engine) collect() []stats.Sample {
+	samples := []stats.Sample{}
+	for _, vu := range e.vuEntries {
+		if vu.Samples == nil {
+			continue
+		}
+
+		vu.lock.Lock()
+		samples = append(samples, vu.Samples...)
+		vu.Samples = nil
+		vu.lock.Unlock()
+	}
+	return samples
+}
+
+func (e *Engine) processSamples(samples ...stats.Sample) {
+	e.MetricsLock.Lock()
+	for _, sample := range samples {
+		sink := e.Metrics[sample.Metric]
+		if sink == nil {
+			sink = sample.Metric.NewSink()
+			e.Metrics[sample.Metric] = sink
+		}
+		sink.Add(sample)
+	}
+	e.MetricsLock.Unlock()
 }
