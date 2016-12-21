@@ -95,8 +95,6 @@ func NewEngine(r Runner, o Options) (*Engine, error) {
 }
 
 func (e *Engine) Run(ctx context.Context) error {
-	e.clearSubcontext()
-
 	e.running = true
 	<-ctx.Done()
 	e.running = false
