@@ -26,33 +26,26 @@ import (
 	"testing"
 )
 
-func TestNewWithInaccessibleFilename(t *testing.T) {
-	p := string("/this_should_not_exist/badplacetolog.log")
-	collector, err := New(p)
-	assert.NotEqual(t, err, error(nil))
-	assert.Equal(t, collector, (*Collector)(nil))
-}
+func TestNew(t *testing.T) {
+	testdata := map[string]bool{
+		"/nonexistent/badplacetolog.log":   false,
+		os.TempDir() + "/okplacetolog.log": true,
+		"./okplacetolog.log":               true,
+		"okplacetolog.log":                 true,
+	}
 
-func TestNewWithFileName(t *testing.T) {
-	p := string("/tmp/okplacetolog.log")
-	defer func() { _ = os.Remove(p) }()
-	collector, err := New(p)
-	assert.Equal(t, err, error(nil))
-	assert.NotEqual(t, collector, (*Collector)(nil))
-}
+	for path, succ := range testdata {
+		t.Run("path="+path, func(t *testing.T) {
+			defer func() { _ = os.Remove(path) }()
 
-func TestNewWithLocalFilename1(t *testing.T) {
-	p := string("./okplacetolog.log")
-	defer func() { _ = os.Remove(p) }()
-	collector, err := New(p)
-	assert.Equal(t, err, error(nil))
-	assert.NotEqual(t, collector, (*Collector)(nil))
-}
-
-func TestNewWithLocalFilename2(t *testing.T) {
-	p := string("okplacetolog.log")
-	defer func() { _ = os.Remove(p) }()
-	collector, err := New(p)
-	assert.Equal(t, err, error(nil))
-	assert.NotEqual(t, collector, (*Collector)(nil))
+			collector, err := New(path)
+			if succ {
+				assert.NoError(t, err)
+				assert.NotNil(t, collector)
+			} else {
+				assert.Error(t, err)
+				assert.Nil(t, collector)
+			}
+		})
+	}
 }
