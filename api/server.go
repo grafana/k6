@@ -22,6 +22,7 @@ package api
 
 import (
 	"fmt"
+	"github.com/GeertJohan/go.rice"
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/k6/api/common"
 	"github.com/loadimpact/k6/api/v1"
@@ -31,16 +32,23 @@ import (
 	"net/http"
 )
 
-func NewHandler() http.Handler {
+const (
+	staticRoot = "../web/dist"
+
+	notFoundText = "UI unavailable. If you're using a custom build of k6, please remember to run `make`."
+)
+
+func NewHandler(root string) http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("/v1/", v1.NewHandler())
 	mux.Handle("/v2/", v2.NewHandler())
 	mux.HandleFunc("/ping", HandlePing)
+	mux.Handle("/", HandleStatic(root))
 	return mux
 }
 
 func ListenAndServe(addr string, engine *lib.Engine) error {
-	mux := NewHandler()
+	mux := NewHandler(staticRoot)
 
 	n := negroni.New()
 	n.Use(negroni.NewRecovery())
@@ -70,4 +78,16 @@ func WithEngine(engine *lib.Engine) negroni.HandlerFunc {
 func HandlePing(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Add("Content-Type", "text/plain; charset=utf-8")
 	fmt.Fprint(rw, "ok")
+}
+
+func HandleStatic(root string) http.Handler {
+	box, err := rice.FindBox(root)
+	if err != nil {
+		return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+			rw.Header().Add("Content-Type", "text/plain; charset=utf-8")
+			rw.WriteHeader(http.StatusNotFound)
+			fmt.Fprint(rw, notFoundText)
+		})
+	}
+	return http.FileServer(box.HTTPBox())
 }
