@@ -35,6 +35,10 @@ import (
 
 var contentType = "application/vnd.api+json"
 
+func init() {
+	gin.SetMode(gin.ReleaseMode)
+}
+
 func NewHandler() http.Handler {
 	router := gin.New()
 
