@@ -21,7 +21,6 @@
 package lib
 
 import (
-	// "math"
 	"time"
 )
 
@@ -30,7 +29,7 @@ import (
 func StageAt(stages []Stage, offset time.Duration) (s Stage, stageLeft time.Duration, ok bool) {
 	var counter time.Duration
 	for _, stage := range stages {
-		counter += time.Duration(stage.Duration.Int64)
+		counter += stage.Duration
 		if counter >= offset {
 			return stage, counter - offset, true
 		}
