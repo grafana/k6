@@ -28,9 +28,8 @@ import (
 )
 
 type Stage struct {
-	Duration time.Duration
-	StartVUs null.Int
-	EndVUs   null.Int
+	Duration time.Duration `json:"duration"`
+	Target   null.Int      `json:"target"`
 }
 
 type Group struct {

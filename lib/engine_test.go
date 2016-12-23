@@ -157,6 +157,16 @@ func TestEngineRun(t *testing.T) {
 			assert.Fail(t, "context was not terminated")
 		}
 	})
+	t.Run("exits with stages", func(t *testing.T) {
+		e, err := NewEngine(nil, Options{})
+		assert.NoError(t, err)
+
+		d := 50 * time.Millisecond
+		e.Stages = []Stage{Stage{Duration: d}}
+		startTime := time.Now()
+		assert.NoError(t, e.Run(context.Background()))
+		assert.WithinDuration(t, startTime.Add(d), startTime.Add(e.AtTime()), 2*TickRate)
+	})
 }
 
 func TestEngineIsRunning(t *testing.T) {
@@ -173,6 +183,44 @@ func TestEngineIsRunning(t *testing.T) {
 	runtime.Gosched()
 	time.Sleep(1 * time.Millisecond)
 	assert.False(t, e.IsRunning())
+}
+
+func TestEngineTotalTime(t *testing.T) {
+	t.Run("Duration", func(t *testing.T) {
+		for _, d := range []time.Duration{0, 1 * time.Second, 10 * time.Second} {
+			t.Run(d.String(), func(t *testing.T) {
+				e, err := NewEngine(nil, Options{Duration: null.StringFrom(d.String())})
+				assert.NoError(t, err)
+
+				assert.Len(t, e.Stages, 1)
+				assert.Equal(t, Stage{Duration: d}, e.Stages[0])
+			})
+		}
+	})
+	t.Run("Stages", func(t *testing.T) {
+		// The lines get way too damn long if I have to write time.Second everywhere
+		sec := time.Second
+
+		testdata := map[string]struct {
+			Duration time.Duration
+			Stages   []Stage
+		}{
+			"nil":        {0, nil},
+			"empty":      {0, []Stage{}},
+			"1,infinite": {0, []Stage{Stage{}}},
+			"2,infinite": {0, []Stage{Stage{Duration: 10 * sec}, Stage{}}},
+			"1,finite":   {10 * sec, []Stage{Stage{Duration: 10 * sec}}},
+			"2,finite":   {15 * sec, []Stage{Stage{Duration: 10 * sec}, Stage{Duration: 5 * sec}}},
+		}
+		for name, data := range testdata {
+			t.Run(name, func(t *testing.T) {
+				e, err := NewEngine(nil, Options{})
+				assert.NoError(t, err)
+				e.Stages = data.Stages
+				assert.Equal(t, data.Duration, e.TotalTime())
+			})
+		}
+	})
 }
 
 func TestEngineAtTime(t *testing.T) {

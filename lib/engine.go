@@ -22,8 +22,8 @@ package lib
 
 import (
 	"context"
-	"errors"
 	"github.com/loadimpact/k6/stats"
+	"github.com/pkg/errors"
 	"sync"
 	"time"
 )
@@ -51,11 +51,16 @@ type Engine struct {
 	Runner  Runner
 	Options Options
 
+	Stages      []Stage
 	Thresholds  map[string]Thresholds
 	Metrics     map[*stats.Metric]stats.Sink
 	MetricsLock sync.Mutex
 
-	atTime    time.Duration
+	atTime          time.Duration
+	atStage         int
+	atStageSince    time.Duration
+	atStageStartVUs int64
+
 	vuEntries []*vuEntry
 	vuMutex   sync.Mutex
 
@@ -77,11 +82,22 @@ func NewEngine(r Runner, o Options) (*Engine, error) {
 		Runner:  r,
 		Options: o,
 
+		Stages:     []Stage{Stage{}},
 		Metrics:    make(map[*stats.Metric]stats.Sink),
 		Thresholds: make(map[string]Thresholds),
 	}
 	e.clearSubcontext()
 
+	if o.Duration.Valid {
+		d, err := time.ParseDuration(o.Duration.String)
+		if err != nil {
+			return nil, errors.Wrap(err, "options.duration")
+		}
+
+		stage0 := e.Stages[0]
+		stage0.Duration = d
+		e.Stages[0] = stage0
+	}
 	if o.VUsMax.Valid {
 		if err := e.SetVUsMax(o.VUsMax.Int64); err != nil {
 			return nil, err
@@ -102,18 +118,23 @@ func NewEngine(r Runner, o Options) (*Engine, error) {
 func (e *Engine) Run(ctx context.Context) error {
 	go e.runCollection(ctx)
 
+	e.atTime = 0
+	e.atStage = 0
+	e.atStageSince = 0
+	e.atStageStartVUs = e.vus
+
 	lastTick := time.Time{}
 	ticker := time.NewTicker(TickRate)
 
 	e.running = true
-loop:
-	for {
-		select {
-		case <-ctx.Done():
-			break loop
-		case <-ticker.C:
-		}
+	defer func() {
+		e.running = false
 
+		e.clearSubcontext()
+		e.subwg.Wait()
+	}()
+
+	for {
 		// Calculate the time delta between now and the last tick.
 		now := time.Now()
 		if lastTick.IsZero() {
@@ -122,13 +143,22 @@ loop:
 		dT := now.Sub(lastTick)
 		lastTick = now
 
-		// Update the time counter appropriately.
+		// Update state.
 		e.atTime += dT
-	}
-	e.running = false
+		keepRunning, err := e.processStages()
+		if err != nil {
+			return err
+		}
+		if !keepRunning {
+			return nil
+		}
 
-	e.clearSubcontext()
-	e.subwg.Wait()
+		select {
+		case <-ticker.C:
+		case <-ctx.Done():
+			return nil
+		}
+	}
 
 	return nil
 }
@@ -233,8 +263,15 @@ func (e *Engine) AtTime() time.Duration {
 	return e.atTime
 }
 
-func (e *Engine) TotalTime() (time.Duration, bool) {
-	return 0, false
+func (e *Engine) TotalTime() time.Duration {
+	var total time.Duration
+	for _, stage := range e.Stages {
+		if stage.Duration <= 0 {
+			return 0
+		}
+		total += stage.Duration
+	}
+	return total
 }
 
 func (e *Engine) clearSubcontext() {
@@ -247,6 +284,33 @@ func (e *Engine) clearSubcontext() {
 	subctx, subcancel := context.WithCancel(context.Background())
 	e.subctx = subctx
 	e.subcancel = subcancel
+}
+
+func (e *Engine) processStages() (bool, error) {
+	stage := e.Stages[e.atStage]
+	if stage.Duration > 0 && e.atTime > e.atStageSince+stage.Duration {
+		if e.atStage != len(e.Stages)-1 {
+			e.atStage++
+			e.atStageSince = e.atTime
+			e.atStageStartVUs = e.vus
+			stage = e.Stages[e.atStage]
+		} else {
+			return false, nil
+		}
+	}
+	if stage.Target.Valid {
+		from := e.atStageStartVUs
+		to := stage.Target.Int64
+		t := 1.0
+		if stage.Duration > 0 {
+			t = Clampf(float64(e.atTime)/float64(e.atStageSince+stage.Duration), 0.0, 1.0)
+		}
+		if err := e.SetVUs(Lerp(from, to, t)); err != nil {
+			return false, errors.Wrapf(err, "stage #%d", e.atStage+1)
+		}
+	}
+
+	return true, nil
 }
 
 func (e *Engine) runVU(ctx context.Context, vu *vuEntry) {
