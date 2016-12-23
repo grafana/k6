@@ -176,10 +176,12 @@ func TestEngineIsRunning(t *testing.T) {
 
 	go func() { assert.NoError(t, e.Run(ctx)) }()
 	runtime.Gosched()
+	time.Sleep(1 * time.Millisecond)
 	assert.True(t, e.IsRunning())
 
 	cancel()
 	runtime.Gosched()
+	time.Sleep(1 * time.Millisecond)
 	assert.False(t, e.IsRunning())
 }
 
