@@ -29,6 +29,7 @@ type Options struct {
 	VUs      null.Int    `json:"vus"`
 	VUsMax   null.Int    `json:"vus-max"`
 	Duration null.String `json:"duration"`
+	Stages   []Stage     `json:"stage"`
 
 	Linger       null.Bool  `json:"linger"`
 	AbortOnTaint null.Bool  `json:"abort-on-taint"`
@@ -51,6 +52,9 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.Duration.Valid {
 		o.Duration = opts.Duration
+	}
+	if opts.Stages != nil {
+		o.Stages = opts.Stages
 	}
 	if opts.Linger.Valid {
 		o.Linger = opts.Linger
