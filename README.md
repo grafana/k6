@@ -30,67 +30,73 @@ Installation
 
 There are a couple of ways to set up k6:
 
-1. The simplest way to get started is to use our Docker image:
+### The simplest way to get started is to use our Docker image
 
-   ```sh
-   docker pull loadimpact/k6
-   docker run --rm --net=host -v myscript.js:/myscript.js loadimpact/k6 run /myscript.js
-   ```
+```sh
+docker pull loadimpact/k6
+docker run --rm --net=host -v myscript.js:/myscript.js loadimpact/k6 run /myscript.js
+```
 
-   It's recommended to run k6 with `--net=host` as it slightly improves network throughput, and causes container ports to be accessible on the host without explicit exposure. Note that this means opting out of the network isolation normally provided to containers, refer to [the Docker manual](https://docs.docker.com/v1.8/articles/networking/#how-docker-networks-a-container) for more information.
+It's recommended to run k6 with `--net=host` as it slightly improves network throughput, and causes container ports to be accessible on the host without explicit exposure. Note that this means opting out of the network isolation normally provided to containers, refer to [the Docker manual](https://docs.docker.com/v1.8/articles/networking/#how-docker-networks-a-container) for more information.
 
-2. You can also build k6 from source. This requires a working Go environment (Go 1.7 or later - [set up](https://golang.org/doc/install) and you will also need node+npm+bower
 
-   ```sh
-   go get -d -u github.com/loadimpact/k6
-   cd $GOPATH/src/github.com/loadimpact/k6
-   make
-   ```
+### You can also build k6 from source
+
+This requires a working Go environment (Go 1.7 or later - [set up](https://golang.org/doc/install)) and you will also need node+npm+bower. When you have all prerequisites you can build k6 thus:
+
+```sh
+go get -d -u github.com/loadimpact/k6
+cd $GOPATH/src/github.com/loadimpact/k6
+make
+```
+
+
+#### Step-by-step guide to build k6, starting with a Ubuntu 14.04 Docker image
+
+Following the below steps exactly should result in a working k6 executable:
+
+```sh
+docker run -it ubuntu:14.04 /bin/bash
+apt-get update
+apt-get install git openssh-client make npm curl
+ln -s /usr/bin/nodejs /usr/bin/node
+npm install -g bower ember-cli@2.7.0
+curl https://storage.googleapis.com/golang/go1.7.4.linux-amd64.tar.gz | tar -C /usr/local -xzf -
+adduser myuser
+```
    
-   Here is a step-by-step guide to build k6, starting with a Ubuntu 14.04 Docker image:
+Then you have to create a .gitconfig to make it possible for go to fetch things from a private Github repo:
    
-   ```sh
-   docker run -it ubuntu:14.04 /bin/bash
-   apt-get update
-   apt-get install git openssh-client make npm curl
-   ln -s /usr/bin/nodejs /usr/bin/node
-   npm install -g bower ember-cli@2.7.0
-   curl https://storage.googleapis.com/golang/go1.7.4.linux-amd64.tar.gz | tar -C /usr/local -xzf -
-   adduser myuser
-   ```
+```sh
+su - myuser
+cat <<EOF >~/.gitconfig
+[url "git@github.com:"]
+        insteadOf = https://github.com/
+EOF
+```
    
-   Then you have to create a .gitconfig to make it possible for go to fetch things from a private Github repo:
+And then you need to make sure your user has an SSH key that has been authorized access to your Github account. First, create a key:
    
-   ```sh
-   su - myuser
-   cat <<EOF >~/.gitconfig
-   [url "git@github.com:"]
-           insteadOf = https://github.com/
-   EOF
-   ```
+```sh
+su - myuser
+ssh-keygen
+```
+
+Now go to https://github.com/settings/keys and add (the public part of) the new SSH key to your authorized keys.
    
-   And then you need to make sure your user has an SSH key that has been authorized access to your Github account:
+Finally, you're ready to build k6:
    
-   ```sh
-   su - myuser
-   ssh-keygen
-   ```
-  
-   < add the new key to the authorized keys for your Github account >
+```sh
+export GOROOT=/usr/local/go
+export PATH=$PATH:$GOROOT/bin
+export GOPATH=$HOME/go
+mkdir $GOPATH
+go get -d -u github.com/loadimpact/k6
+cd $GOPATH/src/github.com/loadimpact/k6
+make
+```
    
-   Finally, you're ready to build k6:
-   
-   ```sh
-   export GOROOT=/usr/local/go
-   export PATH=$PATH:$GOROOT/bin
-   export GOPATH=$HOME/go
-   mkdir $GOPATH
-   go get -d -u github.com/loadimpact/k6
-   cd $GOPATH/src/github.com/loadimpact/k6
-   make
-   ```
-   
-   You should now have a k6 binary in your current working directory.
+You should now have a k6 binary in your current working directory.
    
    
 Usage
