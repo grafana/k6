@@ -27,7 +27,7 @@ k6 run script.js
 
 Scripting
 ------------
-k6 bundles a number of useful APIs that allows you to manage custom metrics to control your flow of test execution, e.g.:
+k6 bundles a number of useful APIs that allows you to control flow of your scripts for both load and functional test execution, e.g.:
 
 ```es6
 import http from "k6/http";
