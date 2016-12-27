@@ -87,6 +87,7 @@ Now go to https://github.com/settings/keys and add (the public part of) the new 
 Finally, you're ready to build k6:
    
 ```sh
+su - myuser
 export GOROOT=/usr/local/go
 export PATH=$PATH:$GOROOT/bin
 export GOPATH=$HOME/go
