@@ -58,10 +58,9 @@ The above code can be run both as a load test or as a functional test, and will:
 
 * create a Trend metric named “request_duration” and referred to in the code using the variable name myTrend
 * define a threshold for the Trend metric. This threshold says that the load test should fail if the average value of the Trend metric goes below 100. This means that if at any time during the load test, the currently computed average of all sample values added to myTrend is less than 100, then the whole load test will be marked as failed.
-* create a default function that will be executed repeatedly by all VUs in the load test. This function makes an HTTP request and adds the HTTP duration (request time - response.timings.duration) to the Trend metric, while also asserting for HTTP 200 response (response.status) and expected size of HTTP body (response.body.length). 
+* create a default function that will be executed repeatedly by all VUs in the load test. This function makes an HTTP request and adds the HTTP duration (`response.timings.duration`) to the Trend metric, while also asserting for HTTP 200 response (`response.status`) and expected size of HTTP body (`response.body.length`). 
 
-<TODO: link to further details in tutorials section>
-*For more information, see the included tutorials.*
+*For more information on scripting and metrics management, see the included [tutorials](tutorials/getting-started.md)*
 
 Installation
 ------------
@@ -161,4 +160,5 @@ k6 scale 50
 
 This is a quite powerful feature when combined with options like `-d 0` / `--duration 0`, which causes the test to run indefinitely until told otherwise. You're fully in control of how your test is executed!
 
-*For more information, see the included tutorials.*
+*For more information, see the included [tutorials](tutorials/getting-started.md)*
+
