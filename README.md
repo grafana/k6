@@ -25,6 +25,44 @@ To run it, simply do...
 k6 run script.js
 ```
 
+Scripting
+------------
+k6 bundles a number of useful APIs that allows you to manage custom metrics to control your flow of test execution, e.g.:
+
+```es6
+import http from "k6/http";
+
+// define our threshold within a global options-structure
+export let options = {                                                     
+   thresholds: {                                                           
+      request_duration: ["avg<100"],                                       
+   }                                                                       
+};                                                                         
+
+// create our Trend metric
+var myTrend = new Trend(“request_duration”);                               
+ 
+// Export our test code as a 'default' function. 
+export default function() {                                                
+   var r = http.get("https://httpbin.org");                                
+   // add response time to our Trend-metric
+   myTrend.add(r.timings.duration);                                        
+   // assert for functional correctness
+   check(r, {                                                              
+      "status is 200": (r) => r.status === 200,                            
+      "body size 1234 bytes": (r) => r.body.length === 1234                
+   });                                                                     
+};                                                                         
+```
+The above code can be run both as a load test or as a functional test, and will:
+
+* create a Trend metric named “request_duration” and referred to in the code using the variable name myTrend
+* define a threshold for the Trend metric. This threshold says that the load test should fail if the average value of the Trend metric goes below 100. This means that if at any time during the load test, the currently computed average of all sample values added to myTrend is less than 100, then the whole load test will be marked as failed.
+* create a default function that will be executed repeatedly by all VUs in the load test. This function makes an HTTP request and adds the HTTP duration (request time - response.timings.duration) to the Trend metric, while also asserting for HTTP 200 response (response.status) and expected size of HTTP body (response.body.length). 
+
+<TODO: link to further details in tutorials section>
+*For more information, see the included tutorials.*
+
 Installation
 ------------
 
