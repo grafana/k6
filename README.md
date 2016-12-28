@@ -22,7 +22,29 @@ export default function() {
 To run it, simply do...
 
 ```
-k6 run script.js
+$ k6 run script.js
+Welcome to k6 v0.4.2!
+
+  execution: local
+     output: -
+     script: script.js
+             ↳ duration: 10s
+             ↳ vus: 10, max: 10
+
+  web ui: http://127.0.0.1:6565/
+
+      done [==========================================================]        10s / 10s
+
+    http_req_blocked: avg=19.57µs, max=14.9ms, med=1.28µs, min=808ns, p90=2.27µs, p95=7.1µs
+    http_req_connecting: avg=3.25µs, max=7.57ms, med=0s, min=0s, p90=0s, p95=0s
+    http_req_duration: avg=5.26ms, max=31.48ms, med=4.3ms, min=2.25ms, p90=7.69ms, p95=12.84ms
+    http_req_looking_up: avg=9.12µs, max=7.3ms, med=0s, min=0s, p90=0s, p95=0s
+    http_req_receiving: avg=121.95µs, max=13.84ms, med=69.3µs, min=38.57µs, p90=113.79µs, p95=140.04µs
+    http_req_sending: avg=18.27µs, max=4.92ms, med=12.09µs, min=6.12µs, p90=22.15µs, p95=28µs
+    http_req_waiting: avg=5.1ms, max=30.39ms, med=4.18ms, min=2.17ms, p90=7.33ms, p95=12.22ms
+    http_reqs: 17538
+    runs: 17538
+$
 ```
 
 Scripting
