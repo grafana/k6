@@ -81,7 +81,7 @@ var commandRun = cli.Command{
 		},
 		cli.StringFlag{
 			Name:  "type, t",
-			Usage: "input type, one of: auto, url, js. Mandatory when reading from stdin",
+			Usage: "input type, one of: auto, url, js",
 			Value: "auto",
 		},
 		cli.BoolFlag{

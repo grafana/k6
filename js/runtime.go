@@ -124,25 +124,27 @@ func (r *Runtime) extractOptions(exports otto.Value, opts *lib.Options) error {
 }
 
 func (r *Runtime) loadFile(filename string) (otto.Value, error) {
-	// To protect against directory traversal, prevent loading of files outside the root (pwd) dir
-	path, err := filepath.Abs(filename)
-	if err != nil {
-		return otto.UndefinedValue(), err
-	}
-	if !strings.HasPrefix(path, r.Root) {
-		return otto.UndefinedValue(), DirectoryTraversalError{Filename: filename, Root: r.Root}
-	}
-
-	// Don't re-compile repeated includes of the same module
-	if exports, ok := r.Exports[path]; ok {
-		return exports, nil
-	}
-
+	var path string
+	var data []byte
+	var err error
+	path = strings.TrimSpace(filename)
 	if path == "-" {
-		data, err := ioutil.ReadAll(os.Stdin)
-	}
-	else {
-		data, err := ioutil.ReadFile(path)
+		data, err = ioutil.ReadAll(os.Stdin)
+	} else {
+		var err error
+		// To protect against directory traversal, prevent loading of files outside the root (pwd) dir
+		path, err = filepath.Abs(filename)
+		if err != nil {
+			return otto.UndefinedValue(), err
+		}
+		if !strings.HasPrefix(path, r.Root) {
+			return otto.UndefinedValue(), DirectoryTraversalError{Filename: filename, Root: r.Root}
+		}
+		// Don't re-compile repeated includes of the same module
+		if exports, ok := r.Exports[path]; ok {
+			return exports, nil
+		}
+		data, err = ioutil.ReadFile(path)
 	}
 	if err != nil {
 		return otto.UndefinedValue(), err
