@@ -55,6 +55,12 @@ type Runner struct {
 }
 
 func New(rawurl string) (*Runner, error) {
+	if rawurl == "-" {
+		rawurl, err := ioutil.ReadAll(os.Stdin)
+		if err != nil {
+			return nil, err
+		}
+	}
 	u, err := url.Parse(rawurl)
 	if err != nil {
 		return nil, err
