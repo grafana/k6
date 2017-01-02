@@ -136,8 +136,12 @@ func (e *Engine) Run(ctx context.Context) error {
 	defer func() {
 		e.running = false
 
+		// Shut down subsystems, wait for graceful termination.
 		e.clearSubcontext()
 		e.subwg.Wait()
+
+		// Process any leftover samples.
+		e.processSamples(e.collect()...)
 	}()
 
 	for {
@@ -344,9 +348,7 @@ func (e *Engine) runVU(ctx context.Context, vu *vuEntry) {
 
 func (e *Engine) runVUOnce(ctx context.Context, vu *vuEntry) {
 	samples, err := vu.VU.RunOnce(ctx)
-	atomic.AddInt64(&e.numIterations, 1)
 	if err != nil {
-		atomic.AddInt64(&e.numTaints, 1)
 		if err != ErrVUWantsTaint {
 			if serr, ok := err.(fmt.Stringer); ok {
 				log.Error(serr.String())
@@ -359,6 +361,11 @@ func (e *Engine) runVUOnce(ctx context.Context, vu *vuEntry) {
 	vu.lock.Lock()
 	vu.Samples = append(vu.Samples, samples...)
 	vu.lock.Unlock()
+
+	atomic.AddInt64(&e.numIterations, 1)
+	if err != nil {
+		atomic.AddInt64(&e.numTaints, 1)
+	}
 }
 
 func (e *Engine) runCollection(ctx context.Context) {
