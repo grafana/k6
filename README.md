@@ -22,45 +22,30 @@ export default function() {
 To run it, simply do...
 
 ```
-k6 run script.js
+$ k6 run script.js
+Welcome to k6 v0.4.2!
+
+  execution: local
+     output: -
+     script: script.js
+             ↳ duration: 10s
+             ↳ vus: 10, max: 10
+
+  web ui: http://127.0.0.1:6565/
+
+      done [==========================================================]        10s / 10s
+
+    http_req_blocked: avg=19.57µs, max=14.9ms, med=1.28µs, min=808ns, p90=2.27µs, p95=7.1µs
+    http_req_connecting: avg=3.25µs, max=7.57ms, med=0s, min=0s, p90=0s, p95=0s
+    http_req_duration: avg=5.26ms, max=31.48ms, med=4.3ms, min=2.25ms, p90=7.69ms, p95=12.84ms
+    http_req_looking_up: avg=9.12µs, max=7.3ms, med=0s, min=0s, p90=0s, p95=0s
+    http_req_receiving: avg=121.95µs, max=13.84ms, med=69.3µs, min=38.57µs, p90=113.79µs, p95=140.04µs
+    http_req_sending: avg=18.27µs, max=4.92ms, med=12.09µs, min=6.12µs, p90=22.15µs, p95=28µs
+    http_req_waiting: avg=5.1ms, max=30.39ms, med=4.18ms, min=2.17ms, p90=7.33ms, p95=12.22ms
+    http_reqs: 17538
+    runs: 17538
+$
 ```
-
-Scripting
-------------
-k6 bundles a number of useful APIs that allows you to control flow of your scripts for both load and functional test execution, e.g.:
-
-```es6
-import http from "k6/http";
-
-// define our threshold within a global options-structure
-export let options = {                                                     
-   thresholds: {                                                           
-      request_duration: ["avg<100"],                                       
-   }                                                                       
-};                                                                         
-
-// create our Trend metric
-var myTrend = new Trend(“request_duration”);                               
- 
-// Export our test code as a 'default' function. 
-export default function() {                                                
-   var r = http.get("https://httpbin.org");                                
-   // add response time to our Trend-metric
-   myTrend.add(r.timings.duration);                                        
-   // assert for functional correctness
-   check(r, {                                                              
-      "status is 200": (r) => r.status === 200,                            
-      "body size 1234 bytes": (r) => r.body.length === 1234                
-   });                                                                     
-};                                                                         
-```
-The above code can be run both as a load test or as a functional test, and will:
-
-* create a Trend metric named “request_duration” and referred to in the code using the variable name myTrend
-* define a threshold for the Trend metric. This threshold says that the load test should fail if the average value of the Trend metric goes below 100. This means that if at any time during the load test, the currently computed average of all sample values added to myTrend is less than 100, then the whole load test will be marked as failed.
-* create a default function that will be executed repeatedly by all VUs in the load test. This function makes an HTTP request and adds the HTTP duration (`response.timings.duration`) to the Trend metric, while also asserting for HTTP 200 response (`response.status`) and expected size of HTTP body (`response.body.length`). 
-
-*For more information, see the [Getting Started Guide](tutorials/getting-started.md) and [Metrics Management Reference](tutorials/metrics-management.md)*
 
 Installation
 ------------
@@ -160,5 +145,4 @@ k6 scale 50
 
 This is a quite powerful feature when combined with options like `-d 0` / `--duration 0`, which causes the test to run indefinitely until told otherwise. You're fully in control of how your test is executed!
 
-*For more information, see the [tutorials](tutorials/getting-started.md)*
-
+*For more information, see the included tutorials.*
