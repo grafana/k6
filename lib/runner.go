@@ -53,3 +53,34 @@ type VU interface {
 	// Called when the VU's identity changes.
 	Reconfigure(id int64) error
 }
+
+// RunnerFunc adapts a function to be used as both a runner and a VU. NewVU() returns copies of
+// the function itself. Mainly useful for testing.
+type RunnerFunc func(ctx context.Context) ([]stats.Sample, error)
+
+func (fn RunnerFunc) NewVU() (VU, error) {
+	return fn, nil
+}
+
+func (fn RunnerFunc) GetGroups() []*Group {
+	return nil
+}
+
+func (fn RunnerFunc) GetChecks() []*Check {
+	return nil
+}
+
+func (fn RunnerFunc) GetOptions() Options {
+	return Options{}
+}
+
+func (fn RunnerFunc) ApplyOptions(opts Options) {
+}
+
+func (fn RunnerFunc) RunOnce(ctx context.Context) ([]stats.Sample, error) {
+	return fn(ctx)
+}
+
+func (fn RunnerFunc) Reconfigure(id int64) error {
+	return nil
+}

@@ -22,12 +22,21 @@ package lib
 
 import (
 	"context"
+	"fmt"
+	logtest "github.com/Sirupsen/logrus/hooks/test"
+	"github.com/loadimpact/k6/stats"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v3"
 	"runtime"
 	"testing"
 	"time"
 )
+
+type testErrorWithString string
+
+func (e testErrorWithString) Error() string  { return string(e) }
+func (e testErrorWithString) String() string { return string(e) }
 
 // Helper for asserting the number of active/dead VUs.
 func assertActiveVUs(t *testing.T, e *Engine, active, dead int) {
@@ -334,5 +343,102 @@ func TestEngineSetVUs(t *testing.T) {
 			assert.Equal(t, int64(15), e.GetVUs())
 			assertActiveVUs(t, e, 15, 0)
 		})
+	})
+}
+
+func TestEngineIsTainted(t *testing.T) {
+	testdata := []struct {
+		I      int64
+		T      int64
+		Expect bool
+	}{
+		{1, 0, false},
+		{1, 1, true},
+	}
+
+	for _, data := range testdata {
+		t.Run(fmt.Sprintf("i=%d,t=%d", data.I, data.T), func(t *testing.T) {
+			e, err := NewEngine(nil, Options{})
+			assert.NoError(t, err)
+
+			e.numIterations = data.I
+			e.numTaints = data.T
+			assert.Equal(t, data.Expect, e.IsTainted())
+		})
+	}
+}
+
+func TestEngine_runVUOnceKeepsCounters(t *testing.T) {
+	e, err := NewEngine(nil, Options{})
+	assert.NoError(t, err)
+	assert.Equal(t, int64(0), e.numIterations)
+	assert.Equal(t, int64(0), e.numTaints)
+
+	t.Run("success", func(t *testing.T) {
+		e.numIterations = 0
+		e.numTaints = 0
+		e.runVUOnce(context.Background(), &vuEntry{
+			VU: RunnerFunc(func(ctx context.Context) ([]stats.Sample, error) {
+				return nil, nil
+			}),
+		})
+		assert.Equal(t, int64(1), e.numIterations)
+		assert.Equal(t, int64(0), e.numTaints)
+		assert.False(t, e.IsTainted(), "test is tainted")
+	})
+	t.Run("error", func(t *testing.T) {
+		hook := logtest.NewGlobal()
+		defer hook.Reset()
+
+		e.numIterations = 0
+		e.numTaints = 0
+		e.runVUOnce(context.Background(), &vuEntry{
+			VU: RunnerFunc(func(ctx context.Context) ([]stats.Sample, error) {
+				return nil, errors.New("this is an error")
+			}),
+		})
+		assert.Equal(t, int64(1), e.numIterations)
+		assert.Equal(t, int64(1), e.numTaints)
+		assert.True(t, e.IsTainted(), "test is not tainted")
+
+		err := hook.LastEntry().Data["error"].(error)
+		assert.Equal(t, "this is an error", err.Error())
+	})
+	t.Run("error/string", func(t *testing.T) {
+		hook := logtest.NewGlobal()
+		defer hook.Reset()
+
+		e.numIterations = 0
+		e.numTaints = 0
+		e.runVUOnce(context.Background(), &vuEntry{
+			VU: RunnerFunc(func(ctx context.Context) ([]stats.Sample, error) {
+				return nil, testErrorWithString("this is an error")
+			}),
+		})
+		assert.Equal(t, int64(1), e.numIterations)
+		assert.Equal(t, int64(1), e.numTaints)
+		assert.True(t, e.IsTainted(), "test is not tainted")
+
+		entry := hook.LastEntry()
+		assert.Equal(t, "this is an error", entry.Message)
+		assert.Empty(t, entry.Data)
+	})
+	t.Run("taint", func(t *testing.T) {
+		hook := logtest.NewGlobal()
+		defer hook.Reset()
+
+		e.numIterations = 0
+		e.numTaints = 0
+		e.runVUOnce(context.Background(), &vuEntry{
+			VU: RunnerFunc(func(ctx context.Context) ([]stats.Sample, error) {
+				return nil, ErrVUWantsTaint
+			}),
+		})
+		assert.Equal(t, int64(1), e.numIterations)
+		assert.Equal(t, int64(1), e.numTaints)
+		assert.True(t, e.IsTainted(), "test is not tainted")
+
+		assert.Len(t, hook.Entries, 0)
+
 	})
 }
