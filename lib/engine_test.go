@@ -529,4 +529,69 @@ func TestEngine_runVUOnceKeepsCounters(t *testing.T) {
 
 		assert.Len(t, hook.Entries, 0)
 	})
+	t.Run("cancelled", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		t.Run("success", func(t *testing.T) {
+			e.numIterations = 0
+			e.numTaints = 0
+			e.runVUOnce(ctx, &vuEntry{
+				VU: RunnerFunc(func(ctx context.Context) ([]stats.Sample, error) {
+					return nil, nil
+				}),
+			})
+			assert.Equal(t, int64(0), e.numIterations)
+			assert.Equal(t, int64(0), e.numTaints)
+			assert.True(t, e.IsTainted(), "test is not tainted")
+		})
+		t.Run("error", func(t *testing.T) {
+			hook := logtest.NewGlobal()
+			defer hook.Reset()
+
+			e.numIterations = 0
+			e.numTaints = 0
+			e.runVUOnce(ctx, &vuEntry{
+				VU: RunnerFunc(func(ctx context.Context) ([]stats.Sample, error) {
+					return nil, errors.New("this is an error")
+				}),
+			})
+			assert.Equal(t, int64(1), e.numIterations)
+			assert.Equal(t, int64(1), e.numTaints)
+			assert.False(t, e.IsTainted(), "test is tainted")
+			assert.Nil(t, hook.LastEntry())
+
+			t.Run("string", func(t *testing.T) {
+				e.numIterations = 0
+				e.numTaints = 0
+				e.runVUOnce(ctx, &vuEntry{
+					VU: RunnerFunc(func(ctx context.Context) ([]stats.Sample, error) {
+						return nil, testErrorWithString("this is an error")
+					}),
+				})
+				assert.Equal(t, int64(0), e.numIterations)
+				assert.Equal(t, int64(0), e.numTaints)
+				assert.False(t, e.IsTainted(), "test is tainted")
+
+				assert.Nil(t, hook.LastEntry())
+			})
+		})
+		t.Run("taint", func(t *testing.T) {
+			hook := logtest.NewGlobal()
+			defer hook.Reset()
+
+			e.numIterations = 0
+			e.numTaints = 0
+			e.runVUOnce(ctx, &vuEntry{
+				VU: RunnerFunc(func(ctx context.Context) ([]stats.Sample, error) {
+					return nil, ErrVUWantsTaint
+				}),
+			})
+			assert.Equal(t, int64(0), e.numIterations)
+			assert.Equal(t, int64(0), e.numTaints)
+			assert.False(t, e.IsTainted(), "test is tainted")
+
+			assert.Len(t, hook.Entries, 0)
+		})
+	})
 }
