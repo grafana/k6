@@ -36,10 +36,6 @@ import (
 	"time"
 )
 
-const (
-	DefaultMaxRedirect = 10
-)
-
 var ErrDefaultExport = errors.New("you must export a 'default' function")
 
 const entrypoint = "__$$entrypoint$$__"
