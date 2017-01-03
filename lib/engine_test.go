@@ -198,7 +198,7 @@ func TestEngineRun(t *testing.T) {
 				}
 
 				sink := e.Metrics[testMetric].(*stats.TrendSink)
-				assert.Equal(t, int(e.numIterations), len(sink.Values))
+				assert.True(t, len(sink.Values) > int(float64(e.numIterations)*0.99), "more than 1%% of iterations missed")
 			})
 		}
 	})
