@@ -527,7 +527,7 @@ func TestEngine_runVUOnceKeepsCounters(t *testing.T) {
 		assert.Equal(t, int64(1), e.numTaints)
 		assert.True(t, e.IsTainted(), "test is not tainted")
 
-		assert.Len(t, hook.Entries, 0)
+		assert.Nil(t, hook.LastEntry())
 	})
 	t.Run("cancelled", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -591,7 +591,7 @@ func TestEngine_runVUOnceKeepsCounters(t *testing.T) {
 			assert.Equal(t, int64(0), e.numTaints)
 			assert.False(t, e.IsTainted(), "test is tainted")
 
-			assert.Len(t, hook.Entries, 0)
+			assert.Nil(t, hook.LastEntry())
 		})
 	})
 }
