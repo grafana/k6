@@ -137,6 +137,7 @@ func (e *Engine) Run(ctx context.Context) error {
 	close(e.vuStop)
 	e.vuStop = nil
 	defer func() {
+		e.SetPaused(false)
 		e.vuStop = make(chan interface{})
 
 		// Shut down subsystems, wait for graceful termination.
@@ -148,6 +149,15 @@ func (e *Engine) Run(ctx context.Context) error {
 	}()
 
 	for {
+		// Don't do anything while the engine is paused.
+		if e.vuPause != nil {
+			select {
+			case <-e.vuPause:
+			case <-ctx.Done():
+				return nil
+			}
+		}
+
 		// Calculate the time delta between now and the last tick.
 		now := time.Now()
 		if lastTick.IsZero() {
