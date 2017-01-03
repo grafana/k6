@@ -446,6 +446,10 @@ loop:
 		fmt.Printf("  %s %s: %s\n", icon, name, val)
 	}
 
+	if opts.Linger.Bool {
+		<-signals
+	}
+
 	if engine.IsTainted() {
 		return cli.NewExitError("", 99)
 	}
