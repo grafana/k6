@@ -332,6 +332,8 @@ loop:
 		case <-ticker.C:
 			statusString := "running"
 			if !engine.IsRunning() {
+				statusString = "stopping"
+			} else if engine.IsPaused() {
 				statusString = "paused"
 			}
 
