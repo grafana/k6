@@ -313,7 +313,7 @@ func TestEngineSetPaused(t *testing.T) {
 		// The iteration counter and time should increase over time when not paused...
 		iterationSampleA1 := e.numIterations
 		atTimeSampleA1 := e.AtTime()
-		time.Sleep(1 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 		iterationSampleA2 := e.numIterations
 		atTimeSampleA2 := e.AtTime()
 		assert.True(t, iterationSampleA2 > iterationSampleA1, "iteration counter did not increase")
@@ -325,7 +325,7 @@ func TestEngineSetPaused(t *testing.T) {
 		time.Sleep(1 * time.Millisecond)
 		iterationSampleB1 := e.numIterations
 		atTimeSampleB1 := e.AtTime()
-		time.Sleep(1 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 		iterationSampleB2 := e.numIterations
 		atTimeSampleB2 := e.AtTime()
 		assert.Equal(t, iterationSampleB1, iterationSampleB2, "iteration counter changed while paused")
@@ -336,7 +336,7 @@ func TestEngineSetPaused(t *testing.T) {
 		assert.False(t, e.IsPaused(), "engine did not unpause")
 		iterationSampleC1 := e.numIterations
 		atTimeSampleC1 := e.AtTime()
-		time.Sleep(1 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 		iterationSampleC2 := e.numIterations
 		atTimeSampleC2 := e.AtTime()
 		assert.True(t, iterationSampleC2 > iterationSampleC1, "iteration counter did not increase after unpause")
