@@ -176,6 +176,11 @@ func (e *Engine) Run(ctx context.Context) error {
 			return nil
 		}
 
+		// If AbortOnTaint is set, watch for taints.
+		if e.Options.AbortOnTaint.Bool && e.IsTainted() {
+			return errors.New("test is tainted")
+		}
+
 		select {
 		case <-ticker.C:
 		case <-ctx.Done():
@@ -288,6 +293,10 @@ func (e *Engine) GetVUsMax() int64 {
 }
 
 func (e *Engine) IsTainted() bool {
+	acceptance := e.Options.Acceptance.Float64
+	if acceptance > 0 {
+		return float64(e.numTaints)/float64(e.numIterations) > acceptance
+	}
 	return e.numTaints > 0
 }
 
