@@ -124,7 +124,11 @@ func NewEngine(r Runner, o Options) (*Engine, error) {
 }
 
 func (e *Engine) Run(ctx context.Context) error {
-	go e.runCollection(ctx)
+	e.subwg.Add(1)
+	go func() {
+		e.runCollection(e.subctx)
+		e.subwg.Done()
+	}()
 
 	e.atTime = 0
 	e.atStage = 0
