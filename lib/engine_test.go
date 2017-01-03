@@ -543,7 +543,7 @@ func TestEngine_runVUOnceKeepsCounters(t *testing.T) {
 			})
 			assert.Equal(t, int64(0), e.numIterations)
 			assert.Equal(t, int64(0), e.numTaints)
-			assert.True(t, e.IsTainted(), "test is not tainted")
+			assert.False(t, e.IsTainted(), "test is tainted")
 		})
 		t.Run("error", func(t *testing.T) {
 			hook := logtest.NewGlobal()
@@ -556,8 +556,8 @@ func TestEngine_runVUOnceKeepsCounters(t *testing.T) {
 					return nil, errors.New("this is an error")
 				}),
 			})
-			assert.Equal(t, int64(1), e.numIterations)
-			assert.Equal(t, int64(1), e.numTaints)
+			assert.Equal(t, int64(0), e.numIterations)
+			assert.Equal(t, int64(0), e.numTaints)
 			assert.False(t, e.IsTainted(), "test is tainted")
 			assert.Nil(t, hook.LastEntry())
 
