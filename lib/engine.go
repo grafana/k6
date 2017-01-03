@@ -59,23 +59,23 @@ type Engine struct {
 	Metrics     map[*stats.Metric]stats.Sink
 	MetricsLock sync.Mutex
 
+	// Stage tracking.
 	atTime          time.Duration
 	atStage         int
 	atStageSince    time.Duration
 	atStageStartVUs int64
 
+	// VU tracking.
+	vus       int64
+	vusMax    int64
 	vuEntries []*vuEntry
 	vuMutex   sync.Mutex
+	vuStop    chan interface{}
+	vuPause   chan interface{}
 
 	// Atomic counters.
 	numIterations int64
 	numTaints     int64
-
-	// Stubbing these out to pass tests.
-	running bool
-	paused  bool
-	vus     int64
-	vusMax  int64
 
 	// Subsystem-related.
 	subctx    context.Context
@@ -91,6 +91,8 @@ func NewEngine(r Runner, o Options) (*Engine, error) {
 
 		Metrics:    make(map[*stats.Metric]stats.Sink),
 		Thresholds: make(map[string]Thresholds),
+
+		vuStop: make(chan interface{}),
 	}
 	e.clearSubcontext()
 
@@ -132,9 +134,10 @@ func (e *Engine) Run(ctx context.Context) error {
 	lastTick := time.Time{}
 	ticker := time.NewTicker(TickRate)
 
-	e.running = true
+	close(e.vuStop)
+	e.vuStop = nil
 	defer func() {
-		e.running = false
+		e.vuStop = make(chan interface{})
 
 		// Shut down subsystems, wait for graceful termination.
 		e.clearSubcontext()
@@ -174,15 +177,24 @@ func (e *Engine) Run(ctx context.Context) error {
 }
 
 func (e *Engine) IsRunning() bool {
-	return e.running
+	return e.vuStop == nil
 }
 
 func (e *Engine) SetPaused(v bool) {
-	e.paused = v
+	if v && e.vuPause == nil {
+		e.vuMutex.Lock()
+		e.vuPause = make(chan interface{})
+		e.vuMutex.Unlock()
+	} else if !v && e.vuPause != nil {
+		e.vuMutex.Lock()
+		close(e.vuPause)
+		e.vuPause = nil
+		e.vuMutex.Unlock()
+	}
 }
 
 func (e *Engine) IsPaused() bool {
-	return e.paused
+	return e.vuPause != nil
 }
 
 func (e *Engine) SetVUs(v int64) error {
@@ -335,7 +347,17 @@ func (e *Engine) runVU(ctx context.Context, vu *vuEntry) {
 		return
 	}
 
+	// Sleep until the engine starts running.
+	if e.vuStop != nil {
+		<-e.vuStop
+	}
+
 	for {
+		// If the engine is paused, sleep until it resumes.
+		if e.vuPause != nil {
+			<-e.vuPause
+		}
+
 		select {
 		case <-ctx.Done():
 			return
