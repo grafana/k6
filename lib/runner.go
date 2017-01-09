@@ -25,17 +25,17 @@ import (
 	"github.com/loadimpact/k6/stats"
 )
 
+// Ensure RunnerFunc conforms to Runner.
+var _ Runner = RunnerFunc(nil)
+
 // A Runner is a factory for VUs.
 type Runner interface {
 	// Creates a new VU. As much as possible should be precomputed here, to allow a pool
 	// of prepared VUs to be used to quickly scale up and down.
 	NewVU() (VU, error)
 
-	// Returns all known groups.
-	GetGroups() []*Group
-
-	// Returns all known tests.
-	GetChecks() []*Check
+	// Returns the default (root) group.
+	GetDefaultGroup() *Group
 
 	// Returns the option set.
 	GetOptions() Options
@@ -62,11 +62,7 @@ func (fn RunnerFunc) NewVU() (VU, error) {
 	return fn, nil
 }
 
-func (fn RunnerFunc) GetGroups() []*Group {
-	return nil
-}
-
-func (fn RunnerFunc) GetChecks() []*Check {
+func (fn RunnerFunc) GetDefaultGroup() *Group {
 	return nil
 }
 

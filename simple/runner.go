@@ -94,12 +94,8 @@ func (r *Runner) NewVU() (lib.VU, error) {
 	}, nil
 }
 
-func (r *Runner) GetGroups() []*lib.Group {
-	return []*lib.Group{}
-}
-
-func (r *Runner) GetChecks() []*lib.Check {
-	return []*lib.Check{}
+func (r *Runner) GetDefaultGroup() *lib.Group {
+	return &lib.Group{}
 }
 
 func (r Runner) GetOptions() lib.Options {

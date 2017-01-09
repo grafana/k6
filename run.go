@@ -411,13 +411,7 @@ loop:
 		}
 	}
 
-	groups := engine.Runner.GetGroups()
-	for _, g := range groups {
-		if g.Parent != nil {
-			continue
-		}
-		printGroup(g, 1)
-	}
+	printGroup(engine.Runner.GetDefaultGroup(), 1)
 
 	// Sort and print metrics.
 	metrics := make(map[string]*stats.Metric, len(engine.Metrics))

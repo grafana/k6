@@ -18,46 +18,32 @@
  *
  */
 
-package js
+package dummy
 
 import (
 	"context"
+	"github.com/loadimpact/k6/stats"
 	"github.com/stretchr/testify/assert"
 	"testing"
+	"time"
 )
 
-func TestNewRunner(t *testing.T) {
-	if testing.Short() {
-		return
-	}
+func TestCollectorRun(t *testing.T) {
+	c := &Collector{}
+	assert.False(t, c.Running)
 
-	rt, err := New()
-	assert.NoError(t, err)
-	exp, err := rt.load("test.js", []byte(`export default function() {}`))
-	assert.NoError(t, err)
-	r, err := NewRunner(rt, exp)
-	assert.NoError(t, err)
-	if !assert.NotNil(t, r) {
-		return
-	}
+	ctx, cancel := context.WithCancel(context.Background())
+	go c.Run(ctx)
+	time.Sleep(1 * time.Millisecond)
+	assert.True(t, c.Running, "not marked as running")
 
-	t.Run("GetDefaultGroup", func(t *testing.T) {
-		assert.Equal(t, r.DefaultGroup, r.GetDefaultGroup())
-	})
+	cancel()
+	time.Sleep(1 * time.Millisecond)
+	assert.False(t, c.Running, "not marked as stopped")
+}
 
-	t.Run("VU", func(t *testing.T) {
-		vu_, err := r.NewVU()
-		assert.NoError(t, err)
-		vu := vu_.(*VU)
-
-		t.Run("Reconfigure", func(t *testing.T) {
-			assert.NoError(t, vu.Reconfigure(12345))
-			assert.Equal(t, int64(12345), vu.ID)
-		})
-
-		t.Run("RunOnce", func(t *testing.T) {
-			_, err := vu.RunOnce(context.Background())
-			assert.NoError(t, err)
-		})
-	})
+func TestCollectorCollect(t *testing.T) {
+	c := &Collector{}
+	c.Collect([]stats.Sample{stats.Sample{}})
+	assert.Len(t, c.Samples, 1)
 }

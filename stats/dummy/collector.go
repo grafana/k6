@@ -18,24 +18,24 @@
  *
  */
 
-package v2
+package dummy
 
 import (
-	"github.com/julienschmidt/httprouter"
-	"net/http"
+	"context"
+	"github.com/loadimpact/k6/stats"
 )
 
-func NewHandler() http.Handler {
-	router := httprouter.New()
+type Collector struct {
+	Samples []stats.Sample
+	Running bool
+}
 
-	router.GET("/v2/status", HandleGetStatus)
-	router.PATCH("/v2/status", HandlePatchStatus)
+func (c *Collector) Run(ctx context.Context) {
+	c.Running = true
+	<-ctx.Done()
+	c.Running = false
+}
 
-	router.GET("/v2/metrics", HandleGetMetrics)
-	router.GET("/v2/metrics/:id", HandleGetMetric)
-
-	router.GET("/v2/groups", HandleGetGroups)
-	router.GET("/v2/groups/:id", HandleGetGroup)
-
-	return router
+func (c *Collector) Collect(samples []stats.Sample) {
+	c.Samples = append(c.Samples, samples...)
 }
