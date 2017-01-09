@@ -25,6 +25,7 @@ import (
 	"fmt"
 	logtest "github.com/Sirupsen/logrus/hooks/test"
 	"github.com/loadimpact/k6/stats"
+	"github.com/loadimpact/k6/stats/dummy"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v3"
@@ -610,4 +611,30 @@ func TestEngine_runVUOnceKeepsCounters(t *testing.T) {
 			assert.Nil(t, hook.LastEntry())
 		})
 	})
+}
+
+func TestEngineCollector(t *testing.T) {
+	testMetric := stats.New("test_metric", stats.Trend)
+	c := &dummy.Collector{}
+
+	e, err := NewEngine(RunnerFunc(func(ctx context.Context) ([]stats.Sample, error) {
+		return []stats.Sample{stats.Sample{Metric: testMetric}}, nil
+	}), Options{VUs: null.IntFrom(1), VUsMax: null.IntFrom(1)})
+	assert.NoError(t, err)
+	e.Collector = c
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go e.Run(ctx)
+
+	time.Sleep(10 * time.Millisecond)
+	assert.True(t, e.IsRunning(), "engine not running")
+	assert.True(t, c.Running, "collector not running")
+
+	cancel()
+	time.Sleep(10 * time.Millisecond)
+	assert.False(t, e.IsRunning(), "engine still running")
+	assert.False(t, c.Running, "collector still running")
+
+	assert.True(t, len(e.Metrics[testMetric].(*stats.TrendSink).Values) > 0, "no samples")
+	assert.Equal(t, len(e.Metrics[testMetric].(*stats.TrendSink).Values), len(c.Samples))
 }

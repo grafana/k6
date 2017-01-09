@@ -283,7 +283,7 @@ func actionRun(cc *cli.Context) error {
 		return err
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	// engine.Collector = collector
+	engine.Collector = collector
 
 	// Run the engine.
 	wg.Add(1)

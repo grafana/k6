@@ -51,8 +51,9 @@ type vuEntry struct {
 
 // The Engine is the beating heart of K6.
 type Engine struct {
-	Runner  Runner
-	Options Options
+	Runner    Runner
+	Options   Options
+	Collector stats.Collector
 
 	Stages      []Stage
 	Thresholds  map[string]Thresholds
@@ -124,6 +125,14 @@ func NewEngine(r Runner, o Options) (*Engine, error) {
 }
 
 func (e *Engine) Run(ctx context.Context) error {
+	if e.Collector != nil {
+		e.subwg.Add(1)
+		go func() {
+			e.Collector.Run(e.subctx)
+			e.subwg.Done()
+		}()
+	}
+
 	e.subwg.Add(1)
 	go func() {
 		e.runCollection(e.subctx)
@@ -458,6 +467,9 @@ func (e *Engine) processSamples(samples ...stats.Sample) {
 			e.Metrics[sample.Metric] = sink
 		}
 		sink.Add(sample)
+	}
+	if e.Collector != nil {
+		e.Collector.Collect(samples)
 	}
 	e.MetricsLock.Unlock()
 }
