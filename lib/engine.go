@@ -71,7 +71,6 @@ type Engine struct {
 	vus       int64
 	vusMax    int64
 	vuEntries []*vuEntry
-	vuMutex   sync.Mutex
 	vuStop    chan interface{}
 	vuPause   chan interface{}
 
@@ -80,9 +79,9 @@ type Engine struct {
 	numTaints     int64
 
 	// Subsystem-related.
+	lock      sync.Mutex
 	subctx    context.Context
 	subcancel context.CancelFunc
-	submutex  sync.Mutex
 	subwg     sync.WaitGroup
 }
 
@@ -128,18 +127,22 @@ func NewEngine(r Runner, o Options) (*Engine, error) {
 
 func (e *Engine) Run(ctx context.Context) error {
 	if e.Collector != nil {
+		e.lock.Lock()
 		e.subwg.Add(1)
-		go func() {
-			e.Collector.Run(e.subctx)
+		go func(ctx context.Context) {
+			e.Collector.Run(ctx)
 			e.subwg.Done()
-		}()
+		}(e.subctx)
+		e.lock.Unlock()
 	}
 
+	e.lock.Lock()
 	e.subwg.Add(1)
-	go func() {
-		e.runCollection(e.subctx)
+	go func(ctx context.Context) {
+		e.runCollection(ctx)
 		e.subwg.Done()
-	}()
+	}(e.subctx)
+	e.lock.Unlock()
 
 	e.atTime = 0
 	e.atStage = 0
@@ -212,14 +215,14 @@ func (e *Engine) IsRunning() bool {
 
 func (e *Engine) SetPaused(v bool) {
 	if v && e.vuPause == nil {
-		e.vuMutex.Lock()
+		e.lock.Lock()
 		e.vuPause = make(chan interface{})
-		e.vuMutex.Unlock()
+		e.lock.Unlock()
 	} else if !v && e.vuPause != nil {
-		e.vuMutex.Lock()
+		e.lock.Lock()
 		close(e.vuPause)
 		e.vuPause = nil
-		e.vuMutex.Unlock()
+		e.lock.Unlock()
 	}
 }
 
@@ -235,8 +238,8 @@ func (e *Engine) SetVUs(v int64) error {
 		return errors.New("more vus than allocated requested")
 	}
 
-	e.vuMutex.Lock()
-	defer e.vuMutex.Unlock()
+	e.lock.Lock()
+	defer e.lock.Unlock()
 
 	// Scale up
 	for i := e.vus; i < v; i++ {
@@ -250,8 +253,8 @@ func (e *Engine) SetVUs(v int64) error {
 
 		e.subwg.Add(1)
 		go func() {
-			e.subwg.Done()
 			e.runVU(ctx, vu)
+			e.subwg.Done()
 		}()
 	}
 
@@ -278,8 +281,8 @@ func (e *Engine) SetVUsMax(v int64) error {
 		return errors.New("can't reduce vus-max below vus")
 	}
 
-	e.vuMutex.Lock()
-	defer e.vuMutex.Unlock()
+	e.lock.Lock()
+	defer e.lock.Unlock()
 
 	// Scale up
 	for len(e.vuEntries) < int(v) {
@@ -331,8 +334,8 @@ func (e *Engine) TotalTime() time.Duration {
 }
 
 func (e *Engine) clearSubcontext() {
-	e.submutex.Lock()
-	defer e.submutex.Unlock()
+	e.lock.Lock()
+	defer e.lock.Unlock()
 
 	if e.subcancel != nil {
 		e.subcancel()
