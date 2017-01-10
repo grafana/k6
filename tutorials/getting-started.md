@@ -91,29 +91,29 @@ Using HTTP requests and varying the number of VUs, you can measure how your serv
 So let's add some testing to our script.
 
 ```es6
-import { test } from "k6";
+import { check } from "k6";
 import http from "k6/http";
 
 export default function() {
-    test(http.get("http://test.loadimpact.com/"), {
+    check(http.get("http://test.loadimpact.com/"), {
         "status is 200": (res) => res.status === 200,
     });
 }
 ```
 
-The `test()` function takes a value, and any number of dictionaries of `{ name: fn }`, where `fn` is a function that (optionally) takes a single argument - the value being tested - and returns a truthy value if the test passed. All HTTP requests return a {@link module:k6/http.Response}, which among other things contains the response `status` and `body`.
+The `check()` function takes a value, and any number of dictionaries of `{ name: fn }`, where `fn` is a function that (optionally) takes a single argument - the value being tested - and returns a truthy value if the test passed. All HTTP requests return a {@link module:k6/http.Response}, which among other things contains the response `status` and `body`.
 
-The web UI and will report counters for passes and failures, but note that tests are not assertions - a failed test will not throw an error, and the script will continue regardless.
+The web UI and will report counters for passes and failures, but note that checks are not assertions - a failed check will not throw an error, and the script will continue regardless.
 
 Groups
 ------
 
 So far, all we've tested is a single URL. But most sites have a lot more than one page, and APIs typically have more than one endpoint.
 
-You could simply write a bunch of `http.get()` in a sequence... but the test reports would get messy rather quickly - you couldn't tell which tests were for which request. This is when `group()` comes in handy.
+You could simply write a bunch of `http.get()` in a sequence, along with checks... but the reporting would get messy rather quickly - you couldn't tell which checks were for which request. This is when `group()` comes in handy.
 
 ```es6
-import { test, group } from "k6";
+import { check, group } from "k6";
 import http from "k6/http";
 
 // You can reuse commonly used tests like this.
@@ -144,12 +144,12 @@ A naive approach would be to use regular expressions to try to process their con
 So we made the {@link module:k6/html|k6/html} module for this very task, closely mimicking the good ol' [jQuery](https://jquery.com/) API.
 
 ```es6
-import { test } from "k6";
+import { check } from "k6";
 import http from "k6/http";
 
 export default function() {
     let correctTitle = "Welcome to the LoadImpact.com demo site!";
-    test(http.get("http://test.loadimpact.com/"), {
+    check(http.get("http://test.loadimpact.com/"), {
         "status is 200": (res) => res.status === 200,
         "greeting is correct": (res) => res.html().find('h2').text() === correctTitle,
     });
