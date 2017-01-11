@@ -27,6 +27,7 @@ import (
 	"github.com/loadimpact/k6/api/v1"
 	"github.com/manyminds/api2go/jsonapi"
 	"gopkg.in/urfave/cli.v1"
+	"io"
 	"io/ioutil"
 	"net/http"
 )
@@ -111,41 +112,44 @@ func endpointURL(cc *cli.Context, endpoint string) string {
 	return fmt.Sprintf("http://%s%s", cc.GlobalString("address"), endpoint)
 }
 
-func actionStatus(cc *cli.Context) error {
-	res, err := http.Get(endpointURL(cc, "/v1/status"))
+func apiCall(cc *cli.Context, method, endpoint string, body []byte, dst interface{}) error {
+	var bodyReader io.Reader
+	if len(body) > 0 {
+		bodyReader = bytes.NewReader(body)
+	}
+
+	req, err := http.NewRequest(method, endpointURL(cc, endpoint), bodyReader)
 	if err != nil {
-		log.WithError(err).Error("Request error")
+		return err
+	}
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
 		return err
 	}
 	defer res.Body.Close()
+
+	if dst == nil {
+		return nil
+	}
+
 	data, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		log.WithError(err).Error("Couldn't read response")
 		return err
 	}
+	return jsonapi.Unmarshal(data, dst)
+}
+
+func actionStatus(cc *cli.Context) error {
 	var status v1.Status
-	if err := jsonapi.Unmarshal(data, &status); err != nil {
-		log.WithError(err).Error("Invalid response")
+	if err := apiCall(cc, "GET", "/v1/status", nil, &status); err != nil {
 		return err
 	}
 	return dumpYAML(status)
 }
 
 func actionStats(cc *cli.Context) error {
-	res, err := http.Get(endpointURL(cc, "/v1/metrics"))
-	if err != nil {
-		log.WithError(err).Error("Request error")
-		return err
-	}
-	defer res.Body.Close()
-	data, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		log.WithError(err).Error("Couldn't read response")
-		return err
-	}
 	var metrics []v1.Metric
-	if err := jsonapi.Unmarshal(data, &metrics); err != nil {
-		log.WithError(err).Error("Invalid response")
+	if err := apiCall(cc, "GET", "/v1/metrics", nil, &metrics); err != nil {
 		return err
 	}
 	output := make(map[string]v1.Metric)
@@ -171,31 +175,8 @@ func actionScale(cc *cli.Context) error {
 		return err
 	}
 
-	req, err := http.NewRequest(
-		http.MethodPatch,
-		endpointURL(cc, "/v1/status"),
-		bytes.NewReader(body),
-	)
-	if err != nil {
-		log.WithError(err).Error("Couldn't create request")
-		return err
-	}
-
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		log.WithError(err).Error("Request error")
-		return err
-	}
-	defer res.Body.Close()
-
-	data, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		log.WithError(err).Error("Couldn't read response")
-		return err
-	}
 	var status v1.Status
-	if err := jsonapi.Unmarshal(data, &status); err != nil {
-		log.WithError(err).Error("Invalid response")
+	if err := apiCall(cc, "PATCH", "/v1/status", body, &status); err != nil {
 		return err
 	}
 	return dumpYAML(status)
