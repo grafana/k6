@@ -42,8 +42,8 @@ func main() {
 		commandStatus,
 		commandStats,
 		commandScale,
-		commandStart,
 		commandPause,
+		commandResume,
 	}
 	app.Flags = []cli.Flag{
 		cli.BoolFlag{

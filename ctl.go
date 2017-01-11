@@ -27,6 +27,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/k6/api/v1"
 	"github.com/manyminds/api2go/jsonapi"
+	"gopkg.in/guregu/null.v3"
 	"gopkg.in/urfave/cli.v1"
 	"io"
 	"io/ioutil"
@@ -96,12 +97,12 @@ var commandPause = cli.Command{
    Endpoint: /v1/status`,
 }
 
-var commandStart = cli.Command{
-	Name:      "start",
-	Usage:     "Starts a paused test",
+var commandResume = cli.Command{
+	Name:      "resume",
+	Usage:     "Resumes a paused test",
 	ArgsUsage: " ",
-	Action:    actionStart,
-	Description: `Start starts a paused test.
+	Action:    actionResume,
+	Description: `Resume resumes a paused test.
 
    This is the opposite of the pause command, and will do nothing to an already
    running test.
@@ -189,9 +190,33 @@ func actionScale(cc *cli.Context) error {
 }
 
 func actionPause(cc *cli.Context) error {
-	return nil
+	body, err := jsonapi.Marshal(v1.Status{
+		Paused: null.BoolFrom(true),
+	})
+	if err != nil {
+		log.WithError(err).Error("Serialization error")
+		return err
+	}
+
+	var status v1.Status
+	if err := apiCall(cc, "PATCH", "/v1/status", body, &status); err != nil {
+		return err
+	}
+	return dumpYAML(status)
 }
 
-func actionStart(cc *cli.Context) error {
-	return nil
+func actionResume(cc *cli.Context) error {
+	body, err := jsonapi.Marshal(v1.Status{
+		Paused: null.BoolFrom(false),
+	})
+	if err != nil {
+		log.WithError(err).Error("Serialization error")
+		return err
+	}
+
+	var status v1.Status
+	if err := apiCall(cc, "PATCH", "/v1/status", body, &status); err != nil {
+		return err
+	}
+	return dumpYAML(status)
 }
