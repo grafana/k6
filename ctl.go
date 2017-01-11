@@ -108,7 +108,7 @@ var commandStart = cli.Command{
 }
 
 func endpointURL(cc *cli.Context, endpoint string) string {
-	return fmt.Sprintf("http://%s/%s", cc.GlobalString("address"), endpoint)
+	return fmt.Sprintf("http://%s%s", cc.GlobalString("address"), endpoint)
 }
 
 func actionStatus(cc *cli.Context) error {
