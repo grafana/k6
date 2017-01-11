@@ -21,7 +21,13 @@
 package main
 
 import (
+	"fmt"
+	log "github.com/Sirupsen/logrus"
+	"github.com/loadimpact/k6/api/v1"
+	"github.com/manyminds/api2go/jsonapi"
 	"gopkg.in/urfave/cli.v1"
+	"io/ioutil"
+	"net/http"
 )
 
 var commandStatus = cli.Command{
@@ -98,8 +104,28 @@ var commandStart = cli.Command{
    Endpoint: /v1/status`,
 }
 
+func endpointURL(cc *cli.Context, endpoint string) string {
+	return fmt.Sprintf("http://%s/%s", cc.GlobalString("address"), endpoint)
+}
+
 func actionStatus(cc *cli.Context) error {
-	return nil
+	res, err := http.Get(endpointURL(cc, "/v1/status"))
+	if err != nil {
+		log.WithError(err).Error("Request error")
+		return err
+	}
+	defer res.Body.Close()
+	data, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		log.WithError(err).Error("Couldn't read response")
+		return err
+	}
+	var status v1.Status
+	if err := jsonapi.Unmarshal(data, &status); err != nil {
+		log.WithError(err).Error("Invalid response")
+		return err
+	}
+	return dumpYAML(status)
 }
 
 func actionStats(cc *cli.Context) error {
