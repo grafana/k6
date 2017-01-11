@@ -18,22 +18,32 @@
  *
  */
 
-package lib
+package dummy
 
-// Lerp is a linear interpolation between two values x and y, returning the value at the point t,
-// where t is a fraction in the range [0.0 - 1.0].
-func Lerp(x, y int64, t float64) int64 {
-	return x + int64(t*float64(y-x))
+import (
+	"context"
+	"github.com/loadimpact/k6/stats"
+	"github.com/stretchr/testify/assert"
+	"testing"
+	"time"
+)
+
+func TestCollectorRun(t *testing.T) {
+	c := &Collector{}
+	assert.False(t, c.Running)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go c.Run(ctx)
+	time.Sleep(1 * time.Millisecond)
+	assert.True(t, c.Running, "not marked as running")
+
+	cancel()
+	time.Sleep(1 * time.Millisecond)
+	assert.False(t, c.Running, "not marked as stopped")
 }
 
-// Clampf returns the given value, "clamped" to the range [min, max].
-func Clampf(val, min, max float64) float64 {
-	switch {
-	case val < min:
-		return min
-	case val > max:
-		return max
-	default:
-		return val
-	}
+func TestCollectorCollect(t *testing.T) {
+	c := &Collector{}
+	c.Collect([]stats.Sample{stats.Sample{}})
+	assert.Len(t, c.Samples, 1)
 }

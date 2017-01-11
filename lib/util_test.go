@@ -21,6 +21,7 @@
 package lib
 
 import (
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"strconv"
 	"testing"
@@ -49,6 +50,53 @@ func TestLerp(t *testing.T) {
 							assert.Equal(t, x1, Lerp(x, y, t_))
 						})
 					}
+				})
+			}
+		})
+	}
+}
+
+func TestClampf(t *testing.T) {
+	testdata := map[float64]map[struct {
+		Min, Max float64
+	}]float64{
+		-1.0: {
+			{0.0, 1.0}: 0.0,
+			{0.5, 1.0}: 0.5,
+			{1.0, 1.0}: 1.0,
+			{0.0, 0.5}: 0.0,
+		},
+		0.0: {
+			{0.0, 1.0}: 0.0,
+			{0.5, 1.0}: 0.5,
+			{1.0, 1.0}: 1.0,
+			{0.0, 0.5}: 0.0,
+		},
+		0.5: {
+			{0.0, 1.0}: 0.5,
+			{0.5, 1.0}: 0.5,
+			{1.0, 1.0}: 1.0,
+			{0.0, 0.5}: 0.5,
+		},
+		1.0: {
+			{0.0, 1.0}: 1.0,
+			{0.5, 1.0}: 1.0,
+			{1.0, 1.0}: 1.0,
+			{0.0, 0.5}: 0.5,
+		},
+		2.0: {
+			{0.0, 1.0}: 1.0,
+			{0.5, 1.0}: 1.0,
+			{1.0, 1.0}: 1.0,
+			{0.0, 0.5}: 0.5,
+		},
+	}
+
+	for val, ranges := range testdata {
+		t.Run(fmt.Sprintf("val=%.1f", val), func(t *testing.T) {
+			for r, result := range ranges {
+				t.Run(fmt.Sprintf("min=%.1f,max=%.1f", r.Min, r.Max), func(t *testing.T) {
+					assert.Equal(t, result, Clampf(val, r.Min, r.Max))
 				})
 			}
 		})

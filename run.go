@@ -277,7 +277,7 @@ func actionRun(cc *cli.Context) error {
 	}
 
 	// Make the Engine
-	engine, err := lib.NewEngine(runner)
+	engine, err := lib.NewEngine(runner, opts)
 	if err != nil {
 		log.WithError(err).Error("Couldn't create the engine")
 		return err
@@ -331,18 +331,16 @@ loop:
 		select {
 		case <-ticker.C:
 			statusString := "running"
-			if !engine.Status.Running.Bool {
-				if engine.IsRunning() {
-					statusString = "paused"
-				} else {
-					statusString = "stopping"
-				}
+			if !engine.IsRunning() {
+				statusString = "stopping"
+			} else if engine.IsPaused() {
+				statusString = "paused"
 			}
 
-			atTime := time.Duration(engine.Status.AtTime.Int64)
-			totalTime, finite := engine.TotalTime()
+			atTime := engine.AtTime()
+			totalTime := engine.TotalTime()
 			progress := 0.0
-			if finite {
+			if totalTime > 0 {
 				progress = float64(atTime) / float64(totalTime)
 			}
 
@@ -367,7 +365,7 @@ loop:
 	wg.Wait()
 
 	// Test done, leave that status as the final progress bar!
-	atTime := time.Duration(engine.Status.AtTime.Int64)
+	atTime := engine.AtTime()
 	progressBar.Progress = 1.0
 	fmt.Printf("      done %s %10s / %s\n",
 		progressBar.String(),
@@ -413,13 +411,7 @@ loop:
 		}
 	}
 
-	groups := engine.Runner.GetGroups()
-	for _, g := range groups {
-		if g.Parent != nil {
-			continue
-		}
-		printGroup(g, 1)
-	}
+	printGroup(engine.Runner.GetDefaultGroup(), 1)
 
 	// Sort and print metrics.
 	metrics := make(map[string]*stats.Metric, len(engine.Metrics))
@@ -438,7 +430,7 @@ loop:
 			continue
 		}
 		icon := " "
-		for _, threshold := range engine.Thresholds[name] {
+		for _, threshold := range engine.Thresholds[name].Thresholds {
 			icon = "✓"
 			if threshold.Failed {
 				icon = "✗"
@@ -448,7 +440,11 @@ loop:
 		fmt.Printf("  %s %s: %s\n", icon, name, val)
 	}
 
-	if engine.Status.Tainted.Bool {
+	if opts.Linger.Bool {
+		<-signals
+	}
+
+	if engine.IsTainted() {
 		return cli.NewExitError("", 99)
 	}
 	return nil

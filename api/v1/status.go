@@ -18,23 +18,41 @@
  *
  */
 
-package v2
+package v1
 
 import (
-	"github.com/loadimpact/k6/api/common"
 	"github.com/loadimpact/k6/lib"
-	"github.com/stretchr/testify/assert"
-	"io"
-	"net/http"
-	"net/http/httptest"
-	"testing"
+	"gopkg.in/guregu/null.v3"
 )
 
-func newRequestWithEngine(engine *lib.Engine, method, target string, body io.Reader) *http.Request {
-	r := httptest.NewRequest(method, target, body)
-	return r.WithContext(common.WithEngine(r.Context(), engine))
+type Status struct {
+	Paused null.Bool `json:"paused"`
+	VUs    null.Int  `json:"vus"`
+	VUsMax null.Int  `json:"vus-max"`
+
+	// Readonly.
+	Running bool `json:"running"`
+	Tainted bool `json:"tainted"`
 }
 
-func TestNewHandler(t *testing.T) {
-	assert.NotNil(t, NewHandler())
+func NewStatus(engine *lib.Engine) Status {
+	return Status{
+		Paused:  null.BoolFrom(engine.IsPaused()),
+		VUs:     null.IntFrom(engine.GetVUs()),
+		VUsMax:  null.IntFrom(engine.GetVUsMax()),
+		Running: engine.IsRunning(),
+		Tainted: engine.IsTainted(),
+	}
+}
+
+func (s Status) GetName() string {
+	return "status"
+}
+
+func (s Status) GetID() string {
+	return "default"
+}
+
+func (s Status) SetID(id string) error {
+	return nil
 }

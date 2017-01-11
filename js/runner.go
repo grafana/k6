@@ -32,12 +32,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
-	"sync"
 	"time"
-)
-
-const (
-	DefaultMaxRedirect = 10
 )
 
 var ErrDefaultExport = errors.New("you must export a 'default' function")
@@ -47,16 +42,12 @@ const entrypoint = "__$$entrypoint$$__"
 type Runner struct {
 	Runtime      *Runtime
 	DefaultGroup *lib.Group
-	Groups       []*lib.Group
-	Checks       []*lib.Check
 	Options      lib.Options
 
 	HTTPTransport *http.Transport
 
 	groupIDCounter int64
-	groupsMutex    sync.Mutex
 	checkIDCounter int64
-	checksMutex    sync.Mutex
 }
 
 func NewRunner(runtime *Runtime, exports otto.Value) (*Runner, error) {
@@ -93,7 +84,6 @@ func NewRunner(runtime *Runtime, exports otto.Value) (*Runner, error) {
 		},
 	}
 	r.DefaultGroup = lib.NewGroup("", nil, nil)
-	r.Groups = []*lib.Group{r.DefaultGroup}
 
 	return r, nil
 }
@@ -125,12 +115,8 @@ func (r *Runner) NewVU() (lib.VU, error) {
 	return u, nil
 }
 
-func (r *Runner) GetGroups() []*lib.Group {
-	return r.Groups
-}
-
-func (r *Runner) GetChecks() []*lib.Check {
-	return r.Checks
+func (r *Runner) GetDefaultGroup() *lib.Group {
+	return r.DefaultGroup
 }
 
 func (r *Runner) GetOptions() lib.Options {

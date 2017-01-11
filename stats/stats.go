@@ -180,6 +180,21 @@ func New(name string, typ MetricType, t ...ValueType) *Metric {
 	return &Metric{Name: name, Type: typ, Contains: vt}
 }
 
+func (m Metric) NewSink() Sink {
+	switch m.Type {
+	case Counter:
+		return &CounterSink{}
+	case Gauge:
+		return &GaugeSink{}
+	case Trend:
+		return &TrendSink{}
+	case Rate:
+		return &RateSink{}
+	default:
+		return nil
+	}
+}
+
 func (m Metric) Humanize() string {
 	sample := m.Sample
 	switch len(sample) {

@@ -151,10 +151,8 @@ func TestDoCheck(t *testing.T) {
 	_, err = vu.RunOnce(context.Background())
 	assert.NoError(t, err)
 
-	if !assert.Len(t, r.Checks, 1) {
-		return
-	}
-	c := r.Checks[0]
+	c := r.DefaultGroup.Checks["v === 3"]
+	assert.NotNil(t, c)
 	assert.Equal(t, "v === 3", c.Name)
 	assert.Equal(t, r.DefaultGroup, c.Group)
 	assert.Equal(t, int64(1), c.Passes)
@@ -182,12 +180,12 @@ func TestCheckInGroup(t *testing.T) {
 	_, err = vu.RunOnce(context.Background())
 	assert.NoError(t, err)
 
-	assert.Len(t, r.Groups, 2)
-	g := r.Groups[1]
+	g := r.DefaultGroup.Groups["group"]
+	assert.NotNil(t, g)
 	assert.Equal(t, "group", g.Name)
 
-	assert.Len(t, r.Checks, 1)
-	c := r.Checks[0]
+	c := g.Checks["v === 3"]
+	assert.NotNil(t, c)
 	assert.Equal(t, "v === 3", c.Name)
 	assert.Equal(t, g, c.Group)
 	assert.Equal(t, int64(1), c.Passes)

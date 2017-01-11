@@ -18,39 +18,19 @@
  *
  */
 
-package v2
+package stats
 
 import (
-	"github.com/loadimpact/k6/lib"
-	"gopkg.in/guregu/null.v3"
+	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
-type Status struct {
-	Running null.Bool `json:"running"`
-	VUs     null.Int  `json:"vus"`
-	VUsMax  null.Int  `json:"vus-max"`
-
-	// Readonly.
-	Tainted bool `json:"tainted"`
+func TestDummySinkAddPanics(t *testing.T) {
+	assert.Panics(t, func() {
+		DummySink{}.Add(Sample{})
+	})
 }
 
-func NewStatus(engine *lib.Engine) Status {
-	return Status{
-		Running: null.BoolFrom(engine.Status.Running.Bool),
-		VUs:     null.IntFrom(engine.Status.VUs.Int64),
-		VUsMax:  null.IntFrom(engine.Status.VUsMax.Int64),
-		Tainted: engine.Status.Tainted.Bool,
-	}
-}
-
-func (s Status) GetName() string {
-	return "status"
-}
-
-func (s Status) GetID() string {
-	return "default"
-}
-
-func (s Status) SetID(id string) error {
-	return nil
+func TestDummySinkFormatReturnsItself(t *testing.T) {
+	assert.Equal(t, map[string]float64{"a": 1}, DummySink{"a": 1}.Format())
 }

@@ -41,14 +41,8 @@ func TestNewRunner(t *testing.T) {
 		return
 	}
 
-	t.Run("GetGroups", func(t *testing.T) {
-		g := r.GetGroups()
-		assert.Len(t, g, 1)
-		assert.Equal(t, r.DefaultGroup, g[0])
-	})
-
-	t.Run("GetTests", func(t *testing.T) {
-		assert.Len(t, r.GetChecks(), 0)
+	t.Run("GetDefaultGroup", func(t *testing.T) {
+		assert.Equal(t, r.DefaultGroup, r.GetDefaultGroup())
 	})
 
 	t.Run("VU", func(t *testing.T) {

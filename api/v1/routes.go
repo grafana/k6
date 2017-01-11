@@ -18,7 +18,7 @@
  *
  */
 
-package v2
+package v1
 
 import (
 	"github.com/julienschmidt/httprouter"
@@ -28,11 +28,14 @@ import (
 func NewHandler() http.Handler {
 	router := httprouter.New()
 
-	router.GET("/v2/status", HandleGetStatus)
-	router.PATCH("/v2/status", HandlePatchStatus)
+	router.GET("/v1/status", HandleGetStatus)
+	router.PATCH("/v1/status", HandlePatchStatus)
 
-	router.GET("/v2/metrics", HandleGetMetrics)
-	router.GET("/v2/metrics/:id", HandleGetMetric)
+	router.GET("/v1/metrics", HandleGetMetrics)
+	router.GET("/v1/metrics/:id", HandleGetMetric)
+
+	router.GET("/v1/groups", HandleGetGroups)
+	router.GET("/v1/groups/:id", HandleGetGroup)
 
 	return router
 }
