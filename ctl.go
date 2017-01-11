@@ -21,6 +21,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/k6/api/v1"
@@ -61,6 +62,10 @@ var commandScale = cli.Command{
 	ArgsUsage: "vus",
 	Flags: []cli.Flag{
 		cli.Int64Flag{
+			Name:  "vus, u",
+			Usage: "update the number of running VUs",
+		},
+		cli.Int64Flag{
 			Name:  "max, m",
 			Usage: "update the max number of VUs allowed",
 		},
@@ -70,7 +75,7 @@ var commandScale = cli.Command{
 
    It is an error to scale a test beyond vus-max; this is because instantiating
    new VUs is a very expensive operation, which may skew test results if done
-   during a running test. Use --max if you want to do this.
+   during a running test. To raise vus-max, use --max/-m.
 
    Endpoint: /v1/status`,
 }
@@ -151,7 +156,49 @@ func actionStats(cc *cli.Context) error {
 }
 
 func actionScale(cc *cli.Context) error {
-	return nil
+	patch := v1.Status{
+		VUs:    cliInt64(cc, "vus"),
+		VUsMax: cliInt64(cc, "max"),
+	}
+	if !patch.VUs.Valid && !patch.VUsMax.Valid {
+		log.Warn("Neither --vus/-u or --max/-m passed; doing doing nothing")
+		return nil
+	}
+
+	body, err := jsonapi.Marshal(patch)
+	if err != nil {
+		log.WithError(err).Error("Serialization error")
+		return err
+	}
+
+	req, err := http.NewRequest(
+		http.MethodPatch,
+		endpointURL(cc, "/v1/status"),
+		bytes.NewReader(body),
+	)
+	if err != nil {
+		log.WithError(err).Error("Couldn't create request")
+		return err
+	}
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.WithError(err).Error("Request error")
+		return err
+	}
+	defer res.Body.Close()
+
+	data, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		log.WithError(err).Error("Couldn't read response")
+		return err
+	}
+	var status v1.Status
+	if err := jsonapi.Unmarshal(data, &status); err != nil {
+		log.WithError(err).Error("Invalid response")
+		return err
+	}
+	return dumpYAML(status)
 }
 
 func actionPause(cc *cli.Context) error {
