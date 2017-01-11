@@ -46,15 +46,13 @@ var commandStatus = cli.Command{
 var commandStats = cli.Command{
 	Name:      "stats",
 	Usage:     "Prints stats for a running test",
-	ArgsUsage: "[name]",
+	ArgsUsage: " ",
 	Action:    actionStats,
 	Description: `Stats will print metrics about a running test to stdout in YAML format.
 
-   The result is a dictionary of metrics. If a name is specified, only that one
-   metric is fetched, otherwise every metric is printed in no particular order.
+   The result is a dictionary of metrics, in no particular order.
 
-   Endpoint: /v1/metrics
-             /v1/metrics/:id`,
+   Endpoint: /v1/metrics`,
 }
 
 var commandScale = cli.Command{
@@ -129,7 +127,27 @@ func actionStatus(cc *cli.Context) error {
 }
 
 func actionStats(cc *cli.Context) error {
-	return nil
+	res, err := http.Get(endpointURL(cc, "/v1/metrics"))
+	if err != nil {
+		log.WithError(err).Error("Request error")
+		return err
+	}
+	defer res.Body.Close()
+	data, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		log.WithError(err).Error("Couldn't read response")
+		return err
+	}
+	var metrics []v1.Metric
+	if err := jsonapi.Unmarshal(data, &metrics); err != nil {
+		log.WithError(err).Error("Invalid response")
+		return err
+	}
+	output := make(map[string]v1.Metric)
+	for _, m := range metrics {
+		output[m.GetID()] = m
+	}
+	return dumpYAML(output)
 }
 
 func actionScale(cc *cli.Context) error {
