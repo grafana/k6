@@ -37,7 +37,7 @@ func HandleGetMetrics(rw http.ResponseWriter, r *http.Request, p httprouter.Para
 
 	data, err := jsonapi.Marshal(metrics)
 	if err != nil {
-		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		apiError(rw, "Encoding error", err.Error(), http.StatusInternalServerError)
 		return
 	}
 	_, _ = rw.Write(data)
@@ -58,13 +58,13 @@ func HandleGetMetric(rw http.ResponseWriter, r *http.Request, p httprouter.Param
 	}
 
 	if !found {
-		http.Error(rw, "No such metric", http.StatusNotFound)
+		apiError(rw, "Not Found", "No metric with that ID was found", http.StatusNotFound)
 		return
 	}
 
 	data, err := jsonapi.Marshal(metric)
 	if err != nil {
-		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		apiError(rw, "Encoding error", err.Error(), http.StatusInternalServerError)
 		return
 	}
 	_, _ = rw.Write(data)

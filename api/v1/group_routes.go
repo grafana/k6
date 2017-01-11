@@ -36,7 +36,7 @@ func HandleGetGroups(rw http.ResponseWriter, r *http.Request, p httprouter.Param
 
 	data, err := jsonapi.Marshal(groups)
 	if err != nil {
-		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		apiError(rw, "Encoding error", err.Error(), http.StatusInternalServerError)
 		return
 	}
 	_, _ = rw.Write(data)
@@ -45,7 +45,7 @@ func HandleGetGroups(rw http.ResponseWriter, r *http.Request, p httprouter.Param
 func HandleGetGroup(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	id, err := strconv.ParseInt(p.ByName("id"), 10, 64)
 	if err != nil {
-		http.Error(rw, err.Error(), http.StatusBadRequest)
+		apiError(rw, "Invalid ID", err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -62,13 +62,13 @@ func HandleGetGroup(rw http.ResponseWriter, r *http.Request, p httprouter.Params
 		}
 	}
 	if group == nil {
-		http.Error(rw, "No such group", http.StatusNotFound)
+		apiError(rw, "Not Found", "No group with that ID was found", http.StatusNotFound)
 		return
 	}
 
 	data, err := jsonapi.Marshal(group)
 	if err != nil {
-		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		apiError(rw, "Encoding error", err.Error(), http.StatusInternalServerError)
 		return
 	}
 	_, _ = rw.Write(data)
