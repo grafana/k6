@@ -18,24 +18,21 @@
  *
  */
 
-package v2
+package v1
 
 import (
 	"github.com/julienschmidt/httprouter"
 	"github.com/loadimpact/k6/api/common"
 	"github.com/manyminds/api2go/jsonapi"
+	"io/ioutil"
 	"net/http"
 )
 
-func HandleGetMetrics(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
+func HandleGetStatus(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	engine := common.GetEngine(r.Context())
 
-	metrics := make([]Metric, 0)
-	for m, _ := range engine.Metrics {
-		metrics = append(metrics, NewMetric(*m))
-	}
-
-	data, err := jsonapi.Marshal(metrics)
+	status := NewStatus(engine)
+	data, err := jsonapi.Marshal(status)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
@@ -43,29 +40,34 @@ func HandleGetMetrics(rw http.ResponseWriter, r *http.Request, p httprouter.Para
 	_, _ = rw.Write(data)
 }
 
-func HandleGetMetric(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	id := p.ByName("id")
+func HandlePatchStatus(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	engine := common.GetEngine(r.Context())
 
-	var metric Metric
-	var found bool
-	for m, _ := range engine.Metrics {
-		if m.Name == id {
-			metric = NewMetric(*m)
-			found = true
-			break
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		http.Error(rw, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	var status Status
+	if err := jsonapi.Unmarshal(body, &status); err != nil {
+		http.Error(rw, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if status.VUsMax.Valid {
+		if err := engine.SetVUsMax(status.VUsMax.Int64); err != nil {
+			http.Error(rw, err.Error(), http.StatusBadRequest)
+			return
 		}
 	}
-
-	if !found {
-		http.Error(rw, "No such metric", http.StatusNotFound)
-		return
+	if status.VUs.Valid {
+		if err := engine.SetVUs(status.VUs.Int64); err != nil {
+			http.Error(rw, err.Error(), http.StatusBadRequest)
+			return
+		}
 	}
-
-	data, err := jsonapi.Marshal(metric)
-	if err != nil {
-		http.Error(rw, err.Error(), http.StatusInternalServerError)
-		return
+	if status.Paused.Valid {
+		engine.SetPaused(status.Paused.Bool)
 	}
-	_, _ = rw.Write(data)
 }

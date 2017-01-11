@@ -25,7 +25,7 @@ import (
 	"github.com/GeertJohan/go.rice"
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/k6/api/common"
-	"github.com/loadimpact/k6/api/v2"
+	"github.com/loadimpact/k6/api/v1"
 	"github.com/loadimpact/k6/lib"
 	"github.com/urfave/negroni"
 	"net/http"
@@ -39,7 +39,7 @@ const (
 
 func NewHandler(root string) http.Handler {
 	mux := http.NewServeMux()
-	mux.Handle("/v2/", v2.NewHandler())
+	mux.Handle("/v1/", v1.NewHandler())
 	mux.Handle("/ping", HandlePing())
 	mux.Handle("/", HandleStatic(root))
 	return mux

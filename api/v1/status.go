@@ -18,24 +18,41 @@
  *
  */
 
-package v2
+package v1
 
 import (
-	"github.com/julienschmidt/httprouter"
-	"net/http"
+	"github.com/loadimpact/k6/lib"
+	"gopkg.in/guregu/null.v3"
 )
 
-func NewHandler() http.Handler {
-	router := httprouter.New()
+type Status struct {
+	Paused null.Bool `json:"paused"`
+	VUs    null.Int  `json:"vus"`
+	VUsMax null.Int  `json:"vus-max"`
 
-	router.GET("/v2/status", HandleGetStatus)
-	router.PATCH("/v2/status", HandlePatchStatus)
+	// Readonly.
+	Running bool `json:"running"`
+	Tainted bool `json:"tainted"`
+}
 
-	router.GET("/v2/metrics", HandleGetMetrics)
-	router.GET("/v2/metrics/:id", HandleGetMetric)
+func NewStatus(engine *lib.Engine) Status {
+	return Status{
+		Paused:  null.BoolFrom(engine.IsPaused()),
+		VUs:     null.IntFrom(engine.GetVUs()),
+		VUsMax:  null.IntFrom(engine.GetVUsMax()),
+		Running: engine.IsRunning(),
+		Tainted: engine.IsTainted(),
+	}
+}
 
-	router.GET("/v2/groups", HandleGetGroups)
-	router.GET("/v2/groups/:id", HandleGetGroup)
+func (s Status) GetName() string {
+	return "status"
+}
 
-	return router
+func (s Status) GetID() string {
+	return "default"
+}
+
+func (s Status) SetID(id string) error {
+	return nil
 }

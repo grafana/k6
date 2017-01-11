@@ -18,23 +18,24 @@
  *
  */
 
-package v2
+package v1
 
 import (
 	"github.com/julienschmidt/httprouter"
 	"github.com/loadimpact/k6/api/common"
 	"github.com/manyminds/api2go/jsonapi"
 	"net/http"
-	"strconv"
 )
 
-func HandleGetGroups(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
+func HandleGetMetrics(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	engine := common.GetEngine(r.Context())
 
-	root := NewGroup(engine.Runner.GetDefaultGroup(), nil)
-	groups := FlattenGroup(root)
+	metrics := make([]Metric, 0)
+	for m, _ := range engine.Metrics {
+		metrics = append(metrics, NewMetric(*m))
+	}
 
-	data, err := jsonapi.Marshal(groups)
+	data, err := jsonapi.Marshal(metrics)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
@@ -42,31 +43,26 @@ func HandleGetGroups(rw http.ResponseWriter, r *http.Request, p httprouter.Param
 	_, _ = rw.Write(data)
 }
 
-func HandleGetGroup(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	id, err := strconv.ParseInt(p.ByName("id"), 10, 64)
-	if err != nil {
-		http.Error(rw, err.Error(), http.StatusBadRequest)
-		return
-	}
-
+func HandleGetMetric(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	id := p.ByName("id")
 	engine := common.GetEngine(r.Context())
 
-	root := NewGroup(engine.Runner.GetDefaultGroup(), nil)
-	groups := FlattenGroup(root)
-
-	var group *Group
-	for _, g := range groups {
-		if g.ID == id {
-			group = g
+	var metric Metric
+	var found bool
+	for m, _ := range engine.Metrics {
+		if m.Name == id {
+			metric = NewMetric(*m)
+			found = true
 			break
 		}
 	}
-	if group == nil {
-		http.Error(rw, "No such group", http.StatusNotFound)
+
+	if !found {
+		http.Error(rw, "No such metric", http.StatusNotFound)
 		return
 	}
 
-	data, err := jsonapi.Marshal(group)
+	data, err := jsonapi.Marshal(metric)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return

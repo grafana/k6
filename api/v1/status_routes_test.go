@@ -18,7 +18,7 @@
  *
  */
 
-package v2
+package v1
 
 import (
 	"bytes"
@@ -37,7 +37,7 @@ func TestGetStatus(t *testing.T) {
 	assert.NoError(t, err)
 
 	rw := httptest.NewRecorder()
-	NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "GET", "/v2/status", nil))
+	NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "GET", "/v1/status", nil))
 	res := rw.Result()
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 
@@ -83,7 +83,7 @@ func TestPatchStatus(t *testing.T) {
 			}
 
 			rw := httptest.NewRecorder()
-			NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "PATCH", "/v2/status", bytes.NewReader(body)))
+			NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "PATCH", "/v1/status", bytes.NewReader(body)))
 			res := rw.Result()
 
 			if !assert.Equal(t, indata.StatusCode, res.StatusCode) {

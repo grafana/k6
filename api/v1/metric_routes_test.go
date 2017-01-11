@@ -18,7 +18,7 @@
  *
  */
 
-package v2
+package v1
 
 import (
 	"encoding/json"
@@ -44,7 +44,7 @@ func TestGetMetrics(t *testing.T) {
 	}
 
 	rw := httptest.NewRecorder()
-	NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "GET", "/v2/metrics", nil))
+	NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "GET", "/v1/metrics", nil))
 	res := rw.Result()
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 
@@ -85,14 +85,14 @@ func TestGetMetric(t *testing.T) {
 
 	t.Run("nonexistent", func(t *testing.T) {
 		rw := httptest.NewRecorder()
-		NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "GET", "/v2/metrics/notreal", nil))
+		NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "GET", "/v1/metrics/notreal", nil))
 		res := rw.Result()
 		assert.Equal(t, http.StatusNotFound, res.StatusCode)
 	})
 
 	t.Run("real", func(t *testing.T) {
 		rw := httptest.NewRecorder()
-		NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "GET", "/v2/metrics/my_metric", nil))
+		NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "GET", "/v1/metrics/my_metric", nil))
 		res := rw.Result()
 		assert.Equal(t, http.StatusOK, res.StatusCode)
 
