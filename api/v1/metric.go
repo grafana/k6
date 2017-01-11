@@ -73,13 +73,16 @@ type Metric struct {
 
 	Type     NullMetricType `json:"type"`
 	Contains NullValueType  `json:"contains"`
+
+	Sample map[string]float64 `json:"sample"`
 }
 
-func NewMetric(m stats.Metric) Metric {
+func NewMetric(m stats.Metric, sink stats.Sink) Metric {
 	return Metric{
 		Name:     m.Name,
 		Type:     NullMetricType{m.Type, true},
 		Contains: NullValueType{m.Contains, true},
+		Sample:   sink.Format(),
 	}
 }
 

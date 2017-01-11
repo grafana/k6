@@ -31,8 +31,8 @@ func HandleGetMetrics(rw http.ResponseWriter, r *http.Request, p httprouter.Para
 	engine := common.GetEngine(r.Context())
 
 	metrics := make([]Metric, 0)
-	for m, _ := range engine.Metrics {
-		metrics = append(metrics, NewMetric(*m))
+	for m, s := range engine.Metrics {
+		metrics = append(metrics, NewMetric(*m, s))
 	}
 
 	data, err := jsonapi.Marshal(metrics)
@@ -49,9 +49,9 @@ func HandleGetMetric(rw http.ResponseWriter, r *http.Request, p httprouter.Param
 
 	var metric Metric
 	var found bool
-	for m, _ := range engine.Metrics {
+	for m, s := range engine.Metrics {
 		if m.Name == id {
-			metric = NewMetric(*m)
+			metric = NewMetric(*m, s)
 			found = true
 			break
 		}
