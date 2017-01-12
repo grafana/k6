@@ -58,6 +58,9 @@ func newTestEngine(r Runner, opts Options) (*Engine, error, *logtest.Hook) {
 
 // Helper for asserting the number of active/dead VUs.
 func assertActiveVUs(t *testing.T, e *Engine, active, dead int) {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
 	var numActive, numDead int
 	var lastWasDead bool
 	for _, vu := range e.vuEntries {
