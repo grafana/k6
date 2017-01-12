@@ -57,11 +57,13 @@ func TestGetGroups(t *testing.T) {
 		rw := httptest.NewRecorder()
 		NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "GET", "/v1/groups", nil))
 		res := rw.Result()
+		body := rw.Body.Bytes()
 		assert.Equal(t, http.StatusOK, res.StatusCode)
+		assert.NotEmpty(t, body)
 
 		t.Run("document", func(t *testing.T) {
 			var doc jsonapi.Document
-			assert.NoError(t, json.Unmarshal(rw.Body.Bytes(), &doc))
+			assert.NoError(t, json.Unmarshal(body, &doc))
 			assert.Nil(t, doc.Data.DataObject)
 			if assert.NotEmpty(t, doc.Data.DataArray) {
 				assert.Equal(t, "groups", doc.Data.DataArray[0].Type)
@@ -70,7 +72,7 @@ func TestGetGroups(t *testing.T) {
 
 		t.Run("groups", func(t *testing.T) {
 			var groups []Group
-			assert.NoError(t, jsonapi.Unmarshal(rw.Body.Bytes(), &groups))
+			assert.NoError(t, jsonapi.Unmarshal(body, &groups))
 			if assert.Len(t, groups, 3) {
 				for _, g := range groups {
 					switch g.ID {
