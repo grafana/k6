@@ -49,7 +49,7 @@ func TestOptionsApply(t *testing.T) {
 		assert.Equal(t, "2m", opts.Duration.String)
 	})
 	t.Run("Stages", func(t *testing.T) {
-		opts := Options{}.Apply(Options{Stages: []Stage{Stage{Duration: 1 * time.Second}}})
+		opts := Options{}.Apply(Options{Stages: []Stage{{Duration: 1 * time.Second}}})
 		assert.NotNil(t, opts.Stages)
 		assert.Len(t, opts.Stages, 1)
 		assert.Equal(t, 1*time.Second, opts.Stages[0].Duration)
@@ -76,7 +76,7 @@ func TestOptionsApply(t *testing.T) {
 	})
 	t.Run("Thresholds", func(t *testing.T) {
 		opts := Options{}.Apply(Options{Thresholds: map[string][]string{
-			"metric": []string{"1+1==2"},
+			"metric": {"1+1==2"},
 		}})
 		assert.NotNil(t, opts.Thresholds)
 		assert.NotEmpty(t, opts.Thresholds)

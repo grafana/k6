@@ -139,14 +139,14 @@ func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 
 	t := time.Now()
 	return []stats.Sample{
-		stats.Sample{Metric: MetricReqs, Time: t, Tags: tags, Value: 1},
-		stats.Sample{Metric: MetricReqDuration, Time: t, Tags: tags, Value: float64(trail.Duration)},
-		stats.Sample{Metric: MetricReqBlocked, Time: t, Tags: tags, Value: float64(trail.Blocked)},
-		stats.Sample{Metric: MetricReqLookingUp, Time: t, Tags: tags, Value: float64(trail.LookingUp)},
-		stats.Sample{Metric: MetricReqConnecting, Time: t, Tags: tags, Value: float64(trail.Connecting)},
-		stats.Sample{Metric: MetricReqSending, Time: t, Tags: tags, Value: float64(trail.Sending)},
-		stats.Sample{Metric: MetricReqWaiting, Time: t, Tags: tags, Value: float64(trail.Waiting)},
-		stats.Sample{Metric: MetricReqReceiving, Time: t, Tags: tags, Value: float64(trail.Receiving)},
+		{Metric: MetricReqs, Time: t, Tags: tags, Value: 1},
+		{Metric: MetricReqDuration, Time: t, Tags: tags, Value: float64(trail.Duration)},
+		{Metric: MetricReqBlocked, Time: t, Tags: tags, Value: float64(trail.Blocked)},
+		{Metric: MetricReqLookingUp, Time: t, Tags: tags, Value: float64(trail.LookingUp)},
+		{Metric: MetricReqConnecting, Time: t, Tags: tags, Value: float64(trail.Connecting)},
+		{Metric: MetricReqSending, Time: t, Tags: tags, Value: float64(trail.Sending)},
+		{Metric: MetricReqWaiting, Time: t, Tags: tags, Value: float64(trail.Waiting)},
+		{Metric: MetricReqReceiving, Time: t, Tags: tags, Value: float64(trail.Receiving)},
 	}, nil
 }
 

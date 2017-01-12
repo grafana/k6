@@ -189,7 +189,7 @@ func TestEngineRun(t *testing.T) {
 		assert.NoError(t, err)
 
 		d := 50 * time.Millisecond
-		e.Stages = []Stage{Stage{Duration: d}}
+		e.Stages = []Stage{{Duration: d}}
 		startTime := time.Now()
 		assert.NoError(t, e.Run(context.Background()))
 		assert.WithinDuration(t, startTime.Add(d), startTime.Add(e.AtTime()), 2*TickRate)
@@ -221,7 +221,7 @@ func TestEngineRun(t *testing.T) {
 		for name, reterr := range errors {
 			t.Run(name, func(t *testing.T) {
 				e, err, _ := newTestEngine(RunnerFunc(func(ctx context.Context) ([]stats.Sample, error) {
-					return []stats.Sample{stats.Sample{Metric: testMetric, Value: 1.0}}, reterr
+					return []stats.Sample{{Metric: testMetric, Value: 1.0}}, reterr
 				}), Options{VUsMax: null.IntFrom(1), VUs: null.IntFrom(1)})
 				assert.NoError(t, err)
 
@@ -276,10 +276,10 @@ func TestEngineTotalTime(t *testing.T) {
 		}{
 			"nil":        {0, nil},
 			"empty":      {0, []Stage{}},
-			"1,infinite": {0, []Stage{Stage{}}},
-			"2,infinite": {0, []Stage{Stage{Duration: 10 * sec}, Stage{}}},
-			"1,finite":   {10 * sec, []Stage{Stage{Duration: 10 * sec}}},
-			"2,finite":   {15 * sec, []Stage{Stage{Duration: 10 * sec}, Stage{Duration: 5 * sec}}},
+			"1,infinite": {0, []Stage{{}}},
+			"2,infinite": {0, []Stage{{Duration: 10 * sec}, {}}},
+			"1,finite":   {10 * sec, []Stage{{Duration: 10 * sec}}},
+			"2,finite":   {15 * sec, []Stage{{Duration: 10 * sec}, {Duration: 5 * sec}}},
 		}
 		for name, data := range testdata {
 			t.Run(name, func(t *testing.T) {
@@ -631,7 +631,7 @@ func TestEngineCollector(t *testing.T) {
 	c := &dummy.Collector{}
 
 	e, err, _ := newTestEngine(RunnerFunc(func(ctx context.Context) ([]stats.Sample, error) {
-		return []stats.Sample{stats.Sample{Metric: testMetric}}, nil
+		return []stats.Sample{{Metric: testMetric}}, nil
 	}), Options{VUs: null.IntFrom(1), VUsMax: null.IntFrom(1)})
 	assert.NoError(t, err)
 	e.Collector = c

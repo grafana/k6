@@ -94,12 +94,12 @@ func (g *Group) SetID(v string) error {
 
 func (g Group) GetReferences() []jsonapi.Reference {
 	return []jsonapi.Reference{
-		jsonapi.Reference{
+		{
 			Type:         "groups",
 			Name:         "parent",
 			Relationship: jsonapi.ToOneRelationship,
 		},
-		jsonapi.Reference{
+		{
 			Type:         "groups",
 			Name:         "groups",
 			Relationship: jsonapi.ToManyRelationship,

@@ -38,6 +38,11 @@ const (
 	ShutdownTimeout   = 10 * time.Second
 )
 
+var (
+	MetricVUs    = stats.New("vus", stats.Gauge)
+	MetricVUsMax = stats.New("vus_max", stats.Gauge)
+)
+
 // Special error used to signal that a VU wants a taint, without logging an error.
 var ErrVUWantsTaint = errors.New("test is tainted")
 
@@ -103,7 +108,7 @@ func NewEngine(r Runner, o Options) (*Engine, error) {
 		if err != nil {
 			return nil, errors.Wrap(err, "options.duration")
 		}
-		e.Stages = []Stage{Stage{Duration: d}}
+		e.Stages = []Stage{{Duration: d}}
 	}
 	if o.Stages != nil {
 		e.Stages = o.Stages

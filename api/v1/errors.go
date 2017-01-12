@@ -21,7 +21,7 @@ type ErrorResponse struct {
 func apiError(rw http.ResponseWriter, title, detail string, status int) {
 	doc := ErrorResponse{
 		Errors: []Error{
-			Error{
+			{
 				Status: strconv.Itoa(status),
 				Title:  title,
 				Detail: detail,
