@@ -149,17 +149,8 @@ func (e *Engine) Run(ctx context.Context) error {
 	}(e.subctx)
 	e.lock.Unlock()
 
-	e.atTime = 0
-	e.atStage = 0
-	e.atStageSince = 0
-	e.atStageStartVUs = e.vus
-
-	lastTick := time.Time{}
-	ticker := time.NewTicker(TickRate)
-
 	close(e.vuStop)
 	e.vuStop = nil
-
 	defer func() {
 		e.SetPaused(false)
 		e.vuStop = make(chan interface{})
@@ -171,6 +162,17 @@ func (e *Engine) Run(ctx context.Context) error {
 		// Process any leftover samples.
 		e.processSamples(e.collect()...)
 	}()
+
+	// Set tracking to defaults.
+	e.lock.Lock()
+	e.atTime = 0
+	e.atStage = 0
+	e.atStageSince = 0
+	e.atStageStartVUs = e.vus
+	e.lock.Unlock()
+
+	var lastTick time.Time
+	ticker := time.NewTicker(TickRate)
 
 	for {
 		// Don't do anything while the engine is paused.
@@ -192,8 +194,7 @@ func (e *Engine) Run(ctx context.Context) error {
 		lastTick = now
 
 		// Update state.
-		e.atTime += dT
-		keepRunning, err := e.processStages()
+		keepRunning, err := e.processStages(dT)
 		if err != nil {
 			return err
 		}
@@ -374,9 +375,11 @@ func (e *Engine) clearSubcontext() {
 	e.subcancel = subcancel
 }
 
-func (e *Engine) processStages() (bool, error) {
+func (e *Engine) processStages(dT time.Duration) (bool, error) {
 	e.lock.Lock()
 	defer e.lock.Unlock()
+
+	e.atTime += dT
 
 	// If there are no stages, just keep going indefinitely at a stable VU count.
 	if len(e.Stages) == 0 {
