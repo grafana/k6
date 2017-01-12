@@ -210,7 +210,7 @@ func TestEngineRun(t *testing.T) {
 		e.numTaints++
 		e.lock.Unlock()
 
-		assert.NoError(t, <-ch)
+		assert.EqualError(t, <-ch, "test is tainted")
 		assert.False(t, e.IsRunning())
 	})
 	t.Run("collects samples", func(t *testing.T) {
@@ -249,7 +249,8 @@ func TestEngineIsRunning(t *testing.T) {
 	e, err, _ := newTestEngine(nil, Options{})
 	assert.NoError(t, err)
 
-	go func() { assert.NoError(t, e.Run(ctx)) }()
+	ch := make(chan error)
+	go func() { ch <- e.Run(ctx) }()
 	runtime.Gosched()
 	time.Sleep(1 * time.Millisecond)
 	assert.True(t, e.IsRunning())
@@ -258,6 +259,8 @@ func TestEngineIsRunning(t *testing.T) {
 	runtime.Gosched()
 	time.Sleep(1 * time.Millisecond)
 	assert.False(t, e.IsRunning())
+
+	assert.NoError(t, <-ch)
 }
 
 func TestEngineTotalTime(t *testing.T) {
@@ -329,8 +332,8 @@ func TestEngineSetPaused(t *testing.T) {
 		assert.False(t, e.IsPaused())
 
 		ctx, cancel := context.WithCancel(context.Background())
-		go func() { assert.NoError(t, e.Run(ctx)) }()
-		defer cancel()
+		ch := make(chan error)
+		go func() { ch <- e.Run(ctx) }()
 		time.Sleep(1 * time.Millisecond)
 		assert.True(t, e.IsRunning())
 
@@ -365,6 +368,9 @@ func TestEngineSetPaused(t *testing.T) {
 		atTimeSampleC2 := e.AtTime()
 		assert.True(t, iterationSampleC2 > iterationSampleC1, "iteration counter did not increase after unpause")
 		assert.True(t, atTimeSampleC2 > atTimeSampleC1, "timer did not increase after unpause")
+
+		cancel()
+		assert.NoError(t, <-ch)
 	})
 
 	t.Run("exit", func(t *testing.T) {
@@ -374,7 +380,8 @@ func TestEngineSetPaused(t *testing.T) {
 		assert.NoError(t, err)
 
 		ctx, cancel := context.WithCancel(context.Background())
-		go func() { assert.NoError(t, e.Run(ctx)) }()
+		ch := make(chan error)
+		go func() { ch <- e.Run(ctx) }()
 		time.Sleep(1 * time.Millisecond)
 		assert.True(t, e.IsRunning())
 
@@ -384,6 +391,8 @@ func TestEngineSetPaused(t *testing.T) {
 		time.Sleep(1 * time.Millisecond)
 		assert.False(t, e.IsPaused())
 		assert.False(t, e.IsRunning())
+
+		assert.NoError(t, <-ch)
 	})
 }
 
