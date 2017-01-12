@@ -159,6 +159,7 @@ func (e *Engine) Run(ctx context.Context) error {
 
 	close(e.vuStop)
 	e.vuStop = nil
+
 	defer func() {
 		e.SetPaused(false)
 		e.vuStop = make(chan interface{})
@@ -173,9 +174,10 @@ func (e *Engine) Run(ctx context.Context) error {
 
 	for {
 		// Don't do anything while the engine is paused.
-		if e.vuPause != nil {
+		vuPause := e.vuPause
+		if vuPause != nil {
 			select {
-			case <-e.vuPause:
+			case <-vuPause:
 			case <-ctx.Done():
 				return nil
 			}
@@ -215,21 +217,28 @@ func (e *Engine) Run(ctx context.Context) error {
 }
 
 func (e *Engine) IsRunning() bool {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
 	return e.vuStop == nil
 }
 
 func (e *Engine) SetPaused(v bool) {
 	e.lock.Lock()
+	defer e.lock.Unlock()
+
 	if v && e.vuPause == nil {
 		e.vuPause = make(chan interface{})
 	} else if !v && e.vuPause != nil {
 		close(e.vuPause)
 		e.vuPause = nil
 	}
-	e.lock.Unlock()
 }
 
 func (e *Engine) IsPaused() bool {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
 	return e.vuPause != nil
 }
 
@@ -237,12 +246,13 @@ func (e *Engine) SetVUs(v int64) error {
 	if v < 0 {
 		return errors.New("vus can't be negative")
 	}
-	if v > e.vusMax {
-		return errors.New("more vus than allocated requested")
-	}
 
 	e.lock.Lock()
 	defer e.lock.Unlock()
+
+	if v > e.vusMax {
+		return errors.New("more vus than allocated requested")
+	}
 
 	// Scale up
 	for i := e.vus; i < v; i++ {
@@ -273,6 +283,9 @@ func (e *Engine) SetVUs(v int64) error {
 }
 
 func (e *Engine) GetVUs() int64 {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
 	return e.vus
 }
 
@@ -280,12 +293,13 @@ func (e *Engine) SetVUsMax(v int64) error {
 	if v < 0 {
 		return errors.New("vus-max can't be negative")
 	}
-	if v < e.vus {
-		return errors.New("can't reduce vus-max below vus")
-	}
 
 	e.lock.Lock()
 	defer e.lock.Unlock()
+
+	if v < e.vus {
+		return errors.New("can't reduce vus-max below vus")
+	}
 
 	// Scale up
 	for len(e.vuEntries) < int(v) {
@@ -310,10 +324,16 @@ func (e *Engine) SetVUsMax(v int64) error {
 }
 
 func (e *Engine) GetVUsMax() int64 {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
 	return e.vusMax
 }
 
 func (e *Engine) IsTainted() bool {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
 	acceptance := e.Options.Acceptance.Float64
 	if acceptance > 0 {
 		return float64(e.numTaints)/float64(e.numIterations) > acceptance
@@ -322,10 +342,16 @@ func (e *Engine) IsTainted() bool {
 }
 
 func (e *Engine) AtTime() time.Duration {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
 	return e.atTime
 }
 
 func (e *Engine) TotalTime() time.Duration {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
 	var total time.Duration
 	for _, stage := range e.Stages {
 		if stage.Duration <= 0 {
@@ -394,8 +420,9 @@ func (e *Engine) runVU(ctx context.Context, vu *vuEntry) {
 
 	for {
 		// If the engine is paused, sleep until it resumes.
-		if e.vuPause != nil {
-			<-e.vuPause
+		vuPause := e.vuPause
+		if vuPause != nil {
+			<-vuPause
 		}
 
 		select {

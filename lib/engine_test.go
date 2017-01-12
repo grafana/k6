@@ -637,16 +637,18 @@ func TestEngineCollector(t *testing.T) {
 	e.Collector = c
 
 	ctx, cancel := context.WithCancel(context.Background())
-	go func() { _ = e.Run(ctx) }()
+	ch := make(chan error)
+	go func() { ch <- e.Run(ctx) }()
 
 	time.Sleep(10 * time.Millisecond)
 	assert.True(t, e.IsRunning(), "engine not running")
-	assert.True(t, c.Running, "collector not running")
+	assert.True(t, c.IsRunning(), "collector not running")
 
 	cancel()
-	time.Sleep(10 * time.Millisecond)
+	assert.NoError(t, <-ch)
+
 	assert.False(t, e.IsRunning(), "engine still running")
-	assert.False(t, c.Running, "collector still running")
+	assert.False(t, c.IsRunning(), "collector still running")
 
 	assert.True(t, len(e.Metrics[testMetric].(*stats.TrendSink).Values) > 0, "no samples")
 	assert.Equal(t, len(e.Metrics[testMetric].(*stats.TrendSink).Values), len(c.Samples))

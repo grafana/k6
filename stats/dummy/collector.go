@@ -23,19 +23,34 @@ package dummy
 import (
 	"context"
 	"github.com/loadimpact/k6/stats"
+	"sync"
 )
 
 type Collector struct {
 	Samples []stats.Sample
-	Running bool
+	running bool
+
+	lock sync.Mutex
 }
 
 func (c *Collector) Run(ctx context.Context) {
-	c.Running = true
+	c.lock.Lock()
+	c.running = true
+	c.lock.Unlock()
+
 	<-ctx.Done()
-	c.Running = false
+
+	c.lock.Lock()
+	c.running = false
+	c.lock.Unlock()
 }
 
 func (c *Collector) Collect(samples []stats.Sample) {
 	c.Samples = append(c.Samples, samples...)
+}
+
+func (c *Collector) IsRunning() bool {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	return c.running
 }
