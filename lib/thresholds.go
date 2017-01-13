@@ -35,13 +35,13 @@ type Threshold struct {
 	vm     *otto.Otto
 }
 
-func NewThreshold(src string, vm *otto.Otto) (Threshold, error) {
+func NewThreshold(src string, vm *otto.Otto) (*Threshold, error) {
 	script, err := vm.Compile("__threshold__", src)
 	if err != nil {
-		return Threshold{}, err
+		return nil, err
 	}
 
-	return Threshold{
+	return &Threshold{
 		Source: src,
 		script: script,
 		vm:     vm,
@@ -66,12 +66,12 @@ func (t *Threshold) Run() (bool, error) {
 
 type Thresholds struct {
 	VM         *otto.Otto
-	Thresholds []Threshold
+	Thresholds []*Threshold
 }
 
 func NewThresholds(sources []string) (Thresholds, error) {
 	vm := otto.New()
-	ts := make([]Threshold, len(sources))
+	ts := make([]*Threshold, len(sources))
 	for i, src := range sources {
 		t, err := NewThreshold(src, vm)
 		if err != nil {
