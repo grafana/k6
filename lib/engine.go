@@ -32,10 +32,10 @@ import (
 )
 
 const (
-	TickRate          = 1 * time.Millisecond
-	CollectRate       = 10 * time.Millisecond
-	ThresholdTickRate = 2 * time.Second
-	ShutdownTimeout   = 10 * time.Second
+	TickRate        = 1 * time.Millisecond
+	CollectRate     = 10 * time.Millisecond
+	ThresholdsRate  = 2 * time.Second
+	ShutdownTimeout = 10 * time.Second
 )
 
 var (
@@ -127,6 +127,10 @@ func NewEngine(r Runner, o Options) (*Engine, error) {
 		e.SetPaused(o.Paused.Bool)
 	}
 
+	if o.Thresholds != nil {
+		e.Thresholds = o.Thresholds
+	}
+
 	return e, nil
 }
 
@@ -142,11 +146,21 @@ func (e *Engine) Run(ctx context.Context) error {
 	}
 
 	e.lock.Lock()
-	e.subwg.Add(1)
-	go func(ctx context.Context) {
-		e.runCollection(ctx)
-		e.subwg.Done()
-	}(e.subctx)
+	{
+		// Run metrics collection.
+		e.subwg.Add(1)
+		go func(ctx context.Context) {
+			e.runCollection(ctx)
+			e.subwg.Done()
+		}(e.subctx)
+
+		// Run thresholds.
+		e.subwg.Add(1)
+		go func(ctx context.Context) {
+			e.runThresholds(ctx)
+			e.subwg.Done()
+		}(e.subctx)
+	}
 	e.lock.Unlock()
 
 	close(e.vuStop)
@@ -469,6 +483,39 @@ func (e *Engine) runVUOnce(ctx context.Context, vu *vuEntry) {
 	atomic.AddInt64(&e.numIterations, 1)
 	if err != nil {
 		atomic.AddInt64(&e.numTaints, 1)
+	}
+}
+
+func (e *Engine) runThresholds(ctx context.Context) {
+	ticker := time.NewTicker(ThresholdsRate)
+	for {
+		select {
+		case <-ticker.C:
+			e.processThresholds()
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func (e *Engine) processThresholds() {
+	e.MetricsLock.Lock()
+	defer e.MetricsLock.Unlock()
+
+	for m, s := range e.Metrics {
+		ts, ok := e.Thresholds[m.Name]
+		if !ok {
+			continue
+		}
+		e.Logger.WithField("m", m.Name).Info("running thresholds")
+		succ, err := ts.Run(s)
+		if err != nil {
+			e.Logger.WithField("metric", m.Name).WithError(err).Error("Threshold Error")
+			continue
+		}
+		if !succ {
+			e.Logger.WithField("metric", m.Name).Debug("Thresholds failed")
+		}
 	}
 }
 
