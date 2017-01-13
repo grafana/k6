@@ -37,7 +37,7 @@ type Options struct {
 
 	MaxRedirects null.Int `json:"maxRedirects"`
 
-	Thresholds map[string][]string `json:"thresholds"`
+	Thresholds map[string]Thresholds `json:"thresholds"`
 }
 
 func (o Options) Apply(opts Options) Options {

@@ -21,6 +21,7 @@
 package lib
 
 import (
+	"encoding/json"
 	"github.com/loadimpact/k6/stats"
 	"github.com/robertkrimen/otto"
 	"github.com/stretchr/testify/assert"
@@ -167,4 +168,29 @@ func TestThresholdsRun(t *testing.T) {
 		assert.NoError(t, err)
 		assert.False(t, b)
 	})
+}
+
+func TestThresholdsJSON(t *testing.T) {
+	testdata := map[string][]string{
+		`[]`:                  {},
+		`["1+1==2"]`:          {"1+1==2"},
+		`["1+1==2","1+1==3"]`: {"1+1==2", "1+1==3"},
+	}
+
+	for data, srcs := range testdata {
+		t.Run(data, func(t *testing.T) {
+			var ts Thresholds
+			assert.NoError(t, json.Unmarshal([]byte(data), &ts))
+			assert.Equal(t, len(srcs), len(ts.Thresholds))
+			for i, src := range srcs {
+				assert.Equal(t, src, ts.Thresholds[i].Source)
+			}
+
+			t.Run("marshal", func(t *testing.T) {
+				data2, err := json.Marshal(ts)
+				assert.NoError(t, err)
+				assert.Equal(t, data, string(data2))
+			})
+		})
+	}
 }

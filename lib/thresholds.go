@@ -21,6 +21,7 @@
 package lib
 
 import (
+	"encoding/json"
 	"github.com/loadimpact/k6/stats"
 	"github.com/pkg/errors"
 	"github.com/robertkrimen/otto"
@@ -109,4 +110,26 @@ func (ts *Thresholds) Run(sink stats.Sink) (bool, error) {
 		return false, err
 	}
 	return ts.RunAll()
+}
+
+func (ts *Thresholds) UnmarshalJSON(data []byte) error {
+	var sources []string
+	if err := json.Unmarshal(data, &sources); err != nil {
+		return err
+	}
+
+	newts, err := NewThresholds(sources)
+	if err != nil {
+		return err
+	}
+	*ts = newts
+	return nil
+}
+
+func (ts Thresholds) MarshalJSON() ([]byte, error) {
+	sources := make([]string, len(ts.Thresholds))
+	for i, t := range ts.Thresholds {
+		sources[i] = t.Source
+	}
+	return json.Marshal(sources)
 }
