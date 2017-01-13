@@ -77,7 +77,7 @@ func TestOptionsApply(t *testing.T) {
 	t.Run("Thresholds", func(t *testing.T) {
 		opts := Options{}.Apply(Options{Thresholds: map[string]Thresholds{
 			"metric": Thresholds{
-				Thresholds: []Threshold{Threshold{}},
+				Thresholds: []*Threshold{&Threshold{}},
 			},
 		}})
 		assert.NotNil(t, opts.Thresholds)
