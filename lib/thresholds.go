@@ -25,7 +25,14 @@ import (
 	"github.com/loadimpact/k6/stats"
 	"github.com/pkg/errors"
 	"github.com/robertkrimen/otto"
+	"time"
 )
+
+const jsEnv = `
+function p(pct) {
+	return __sink__.P(pct);
+};
+`
 
 type Threshold struct {
 	Source string
@@ -71,6 +78,17 @@ type Thresholds struct {
 
 func NewThresholds(sources []string) (Thresholds, error) {
 	vm := otto.New()
+	_ = vm.Set("ns", time.Nanosecond)
+	_ = vm.Set("us", time.Microsecond)
+	_ = vm.Set("ms", time.Millisecond)
+	_ = vm.Set("s", time.Second)
+	_ = vm.Set("m", time.Minute)
+	_ = vm.Set("h", time.Hour)
+
+	if _, err := vm.Eval(jsEnv); err != nil {
+		return Thresholds{}, errors.Wrap(err, "builtin")
+	}
+
 	ts := make([]*Threshold, len(sources))
 	for i, src := range sources {
 		t, err := NewThreshold(src, vm)
@@ -83,6 +101,9 @@ func NewThresholds(sources []string) (Thresholds, error) {
 }
 
 func (ts *Thresholds) UpdateVM(sink stats.Sink) error {
+	if err := ts.VM.Set("__sink__", sink); err != nil {
+		return err
+	}
 	for k, v := range sink.Format() {
 		if err := ts.VM.Set(k, v); err != nil {
 			return errors.Wrapf(err, "%s", k)
