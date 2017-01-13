@@ -167,9 +167,6 @@ type Metric struct {
 
 	// Filled in by the API when requested, the server side cannot count on its presence.
 	Sample map[string]float64 `json:"sample"`
-
-	// Set to true if the metric has failed a threshold.
-	Tainted bool
 }
 
 func New(name string, typ MetricType, t ...ValueType) *Metric {
