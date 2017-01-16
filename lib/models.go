@@ -21,89 +21,26 @@
 package lib
 
 import (
-	"github.com/manyminds/api2go/jsonapi"
 	"gopkg.in/guregu/null.v3"
-	"strconv"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
-type Status struct {
-	Running null.Bool `json:"running"`
-	Tainted null.Bool `json:"tainted"`
-	VUs     null.Int  `json:"vus"`
-	VUsMax  null.Int  `json:"vus-max"`
-	AtTime  null.Int  `json:"at-time"`
-
-	Linger       null.Bool  `json:"quit"`
-	AbortOnTaint null.Bool  `json:"abort-on-taint"`
-	Acceptance   null.Float `json:"acceptance"`
-
-	// Read-only, non-nullable.
-	Runs   int64 `json:"runs"`
-	Taints int64 `json:"taints"`
-}
-
-func (s Status) GetName() string {
-	return "status"
-}
-
-func (s Status) GetID() string {
-	return "default"
-}
-
-func (s Status) SetID(id string) error {
-	return nil
-}
-
 type Stage struct {
-	ID int64 `json:"-"`
-
-	Order    null.Int `json:"order"`
-	Duration null.Int `json:"duration"`
-	StartVUs null.Int `json:"start-vus"`
-	EndVUs   null.Int `json:"end-vus"`
-}
-
-func (s Stage) GetName() string {
-	return "stage"
-}
-
-func (s Stage) GetID() string {
-	return strconv.FormatInt(s.ID, 10)
-}
-
-func (s *Stage) SetID(v string) error {
-	id, err := strconv.ParseInt(v, 10, 64)
-	if err != nil {
-		return err
-	}
-	s.ID = id
-	return nil
-}
-
-type Info struct {
-	Version string `json:"version"`
-}
-
-func (i Info) GetName() string {
-	return "info"
-}
-
-func (i Info) GetID() string {
-	return "default"
+	Duration time.Duration `json:"duration"`
+	Target   null.Int      `json:"target"`
 }
 
 type Group struct {
-	ID int64 `json:"-"`
-
+	ID     int64             `json:"id"`
 	Name   string            `json:"name"`
-	Parent *Group            `json:"-"`
-	Groups map[string]*Group `json:"-"`
-	Checks map[string]*Check `json:"-"`
+	Parent *Group            `json:"parent"`
+	Groups map[string]*Group `json:"groups"`
+	Checks map[string]*Check `json:"checks"`
 
-	groupMutex sync.Mutex `json:"-"`
-	checkMutex sync.Mutex `json:"-"`
+	groupMutex sync.Mutex
+	checkMutex sync.Mutex
 }
 
 func NewGroup(name string, parent *Group, idCounter *int64) *Group {
@@ -151,71 +88,9 @@ func (g *Group) Check(name string, idCounter *int64) (*Check, bool) {
 	return check, ok
 }
 
-func (g Group) GetID() string {
-	return strconv.FormatInt(g.ID, 10)
-}
-
-func (g Group) GetReferences() []jsonapi.Reference {
-	return []jsonapi.Reference{
-		jsonapi.Reference{
-			Name:         "parent",
-			Type:         "groups",
-			Relationship: jsonapi.ToOneRelationship,
-		},
-		jsonapi.Reference{
-			Name:         "checks",
-			Type:         "checks",
-			Relationship: jsonapi.ToManyRelationship,
-		},
-	}
-}
-
-func (g Group) GetReferencedIDs() []jsonapi.ReferenceID {
-	ids := make([]jsonapi.ReferenceID, 0, len(g.Checks)+len(g.Groups))
-	for _, check := range g.Checks {
-		ids = append(ids, jsonapi.ReferenceID{
-			ID:           check.GetID(),
-			Type:         "checks",
-			Name:         "checks",
-			Relationship: jsonapi.ToManyRelationship,
-		})
-	}
-	for _, group := range g.Groups {
-		ids = append(ids, jsonapi.ReferenceID{
-			ID:           group.GetID(),
-			Type:         "groups",
-			Name:         "groups",
-			Relationship: jsonapi.ToManyRelationship,
-		})
-	}
-	if g.Parent != nil {
-		ids = append(ids, jsonapi.ReferenceID{
-			ID:           g.Parent.GetID(),
-			Type:         "groups",
-			Name:         "parent",
-			Relationship: jsonapi.ToOneRelationship,
-		})
-	}
-	return ids
-}
-
-func (g Group) GetReferencedStructs() []jsonapi.MarshalIdentifier {
-	// Note: we're not sideloading the parent, that snowballs into making requests for a single
-	// group return *every single known group* thanks to the common root group.
-	refs := make([]jsonapi.MarshalIdentifier, 0, len(g.Checks)+len(g.Groups))
-	for _, check := range g.Checks {
-		refs = append(refs, check)
-	}
-	for _, group := range g.Groups {
-		refs = append(refs, group)
-	}
-	return refs
-}
-
 type Check struct {
-	ID int64 `json:"-"`
-
-	Group *Group `json:"-"`
+	ID    int64  `json:"id"`
+	Group *Group `json:"group"`
 	Name  string `json:"name"`
 
 	Passes int64 `json:"passes"`
@@ -228,32 +103,4 @@ func NewCheck(name string, group *Group, idCounter *int64) *Check {
 		id = atomic.AddInt64(idCounter, 1)
 	}
 	return &Check{ID: id, Name: name, Group: group}
-}
-
-func (c Check) GetID() string {
-	return strconv.FormatInt(c.ID, 10)
-}
-
-func (c Check) GetReferences() []jsonapi.Reference {
-	return []jsonapi.Reference{
-		jsonapi.Reference{
-			Name:         "group",
-			Type:         "groups",
-			Relationship: jsonapi.ToOneRelationship,
-		},
-	}
-}
-
-func (c Check) GetReferencedIDs() []jsonapi.ReferenceID {
-	return []jsonapi.ReferenceID{
-		jsonapi.ReferenceID{
-			ID:   c.Group.GetID(),
-			Type: "groups",
-			Name: "group",
-		},
-	}
-}
-
-func (c Check) GetReferencedStructs() []jsonapi.MarshalIdentifier {
-	return []jsonapi.MarshalIdentifier{c.Group}
 }

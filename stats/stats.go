@@ -167,9 +167,6 @@ type Metric struct {
 
 	// Filled in by the API when requested, the server side cannot count on its presence.
 	Sample map[string]float64 `json:"sample"`
-
-	// Set to true if the metric has failed a threshold.
-	Tainted bool
 }
 
 func New(name string, typ MetricType, t ...ValueType) *Metric {
@@ -178,6 +175,21 @@ func New(name string, typ MetricType, t ...ValueType) *Metric {
 		vt = t[0]
 	}
 	return &Metric{Name: name, Type: typ, Contains: vt}
+}
+
+func (m Metric) NewSink() Sink {
+	switch m.Type {
+	case Counter:
+		return &CounterSink{}
+	case Gauge:
+		return &GaugeSink{}
+	case Trend:
+		return &TrendSink{}
+	case Rate:
+		return &RateSink{}
+	default:
+		return nil
+	}
 }
 
 func (m Metric) Humanize() string {

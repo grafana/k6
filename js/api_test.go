@@ -29,6 +29,10 @@ import (
 )
 
 func TestSleep(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+
 	start := time.Now()
 	JSAPI{}.Sleep(0.2)
 	assert.True(t, time.Since(start) > 200*time.Millisecond)
@@ -36,6 +40,10 @@ func TestSleep(t *testing.T) {
 }
 
 func TestDoGroup(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+
 	r, err := newSnippetRunner(`
 	import { group } from "k6";
 	export default function() {
@@ -56,6 +64,10 @@ func TestDoGroup(t *testing.T) {
 }
 
 func TestDoGroupNested(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+
 	r, err := newSnippetRunner(`
 	import { group } from "k6";
 	export default function() {
@@ -79,6 +91,10 @@ func TestDoGroupNested(t *testing.T) {
 }
 
 func TestDoGroupReturn(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+
 	r, err := newSnippetRunner(`
 	import { group, _assert } from "k6";
 	export default function() {
@@ -96,6 +112,10 @@ func TestDoGroupReturn(t *testing.T) {
 }
 
 func TestDoGroupReturnTrueByDefault(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+
 	r, err := newSnippetRunner(`
 	import { group, _assert } from "k6";
 	export default function() {
@@ -113,6 +133,10 @@ func TestDoGroupReturnTrueByDefault(t *testing.T) {
 }
 
 func TestDoCheck(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+
 	r, err := newSnippetRunner(`
 	import { check } from "k6";
 	export default function() {
@@ -127,10 +151,8 @@ func TestDoCheck(t *testing.T) {
 	_, err = vu.RunOnce(context.Background())
 	assert.NoError(t, err)
 
-	if !assert.Len(t, r.Checks, 1) {
-		return
-	}
-	c := r.Checks[0]
+	c := r.DefaultGroup.Checks["v === 3"]
+	assert.NotNil(t, c)
 	assert.Equal(t, "v === 3", c.Name)
 	assert.Equal(t, r.DefaultGroup, c.Group)
 	assert.Equal(t, int64(1), c.Passes)
@@ -138,6 +160,10 @@ func TestDoCheck(t *testing.T) {
 }
 
 func TestCheckInGroup(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+
 	r, err := newSnippetRunner(`
 	import { group, check } from "k6";
 	export default function() {
@@ -154,12 +180,12 @@ func TestCheckInGroup(t *testing.T) {
 	_, err = vu.RunOnce(context.Background())
 	assert.NoError(t, err)
 
-	assert.Len(t, r.Groups, 2)
-	g := r.Groups[1]
+	g := r.DefaultGroup.Groups["group"]
+	assert.NotNil(t, g)
 	assert.Equal(t, "group", g.Name)
 
-	assert.Len(t, r.Checks, 1)
-	c := r.Checks[0]
+	c := g.Checks["v === 3"]
+	assert.NotNil(t, c)
 	assert.Equal(t, "v === 3", c.Name)
 	assert.Equal(t, g, c.Group)
 	assert.Equal(t, int64(1), c.Passes)
@@ -167,6 +193,10 @@ func TestCheckInGroup(t *testing.T) {
 }
 
 func TestCheckReturnTrueOnSuccess(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+
 	r, err := newSnippetRunner(`
 	import { check, _assert } from "k6";
 	export default function() {
@@ -182,6 +212,10 @@ func TestCheckReturnTrueOnSuccess(t *testing.T) {
 }
 
 func TestCheckReturnFalseAndTaintsOnFailure(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+
 	r, err := newSnippetRunner(`
 	import { check, _assert } from "k6";
 	export default function() {
@@ -197,6 +231,10 @@ func TestCheckReturnFalseAndTaintsOnFailure(t *testing.T) {
 }
 
 func TestTaint(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+
 	r, err := newSnippetRunner(`
 	import { taint } from "k6";
 	export default function() {

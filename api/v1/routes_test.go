@@ -18,22 +18,23 @@
  *
  */
 
-package lib
+package v1
 
-// Lerp is a linear interpolation between two values x and y, returning the value at the point t,
-// where t is a fraction in the range [0.0 - 1.0].
-func Lerp(x, y int64, t float64) int64 {
-	return x + int64(t*float64(y-x))
+import (
+	"github.com/loadimpact/k6/api/common"
+	"github.com/loadimpact/k6/lib"
+	"github.com/stretchr/testify/assert"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+)
+
+func newRequestWithEngine(engine *lib.Engine, method, target string, body io.Reader) *http.Request {
+	r := httptest.NewRequest(method, target, body)
+	return r.WithContext(common.WithEngine(r.Context(), engine))
 }
 
-// Clampf returns the given value, "clamped" to the range [min, max].
-func Clampf(val, min, max float64) float64 {
-	switch {
-	case val < min:
-		return min
-	case val > max:
-		return max
-	default:
-		return val
-	}
+func TestNewHandler(t *testing.T) {
+	assert.NotNil(t, NewHandler())
 }

@@ -26,7 +26,6 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/k6/api/common"
 	"github.com/loadimpact/k6/api/v1"
-	"github.com/loadimpact/k6/api/v2"
 	"github.com/loadimpact/k6/lib"
 	"github.com/urfave/negroni"
 	"net/http"
@@ -41,8 +40,7 @@ const (
 func NewHandler(root string) http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("/v1/", v1.NewHandler())
-	mux.Handle("/v2/", v2.NewHandler())
-	mux.HandleFunc("/ping", HandlePing)
+	mux.Handle("/ping", HandlePing())
 	mux.Handle("/", HandleStatic(root))
 	return mux
 }
@@ -75,9 +73,11 @@ func WithEngine(engine *lib.Engine) negroni.HandlerFunc {
 	})
 }
 
-func HandlePing(rw http.ResponseWriter, r *http.Request) {
-	rw.Header().Add("Content-Type", "text/plain; charset=utf-8")
-	fmt.Fprint(rw, "ok")
+func HandlePing() http.Handler {
+	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		rw.Header().Add("Content-Type", "text/plain; charset=utf-8")
+		fmt.Fprint(rw, "ok")
+	})
 }
 
 func HandleStatic(root string) http.Handler {

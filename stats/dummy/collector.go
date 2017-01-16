@@ -18,22 +18,39 @@
  *
  */
 
-package lib
+package dummy
 
-// Lerp is a linear interpolation between two values x and y, returning the value at the point t,
-// where t is a fraction in the range [0.0 - 1.0].
-func Lerp(x, y int64, t float64) int64 {
-	return x + int64(t*float64(y-x))
+import (
+	"context"
+	"github.com/loadimpact/k6/stats"
+	"sync"
+)
+
+type Collector struct {
+	Samples []stats.Sample
+	running bool
+
+	lock sync.Mutex
 }
 
-// Clampf returns the given value, "clamped" to the range [min, max].
-func Clampf(val, min, max float64) float64 {
-	switch {
-	case val < min:
-		return min
-	case val > max:
-		return max
-	default:
-		return val
-	}
+func (c *Collector) Run(ctx context.Context) {
+	c.lock.Lock()
+	c.running = true
+	c.lock.Unlock()
+
+	<-ctx.Done()
+
+	c.lock.Lock()
+	c.running = false
+	c.lock.Unlock()
+}
+
+func (c *Collector) Collect(samples []stats.Sample) {
+	c.Samples = append(c.Samples, samples...)
+}
+
+func (c *Collector) IsRunning() bool {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	return c.running
 }
