@@ -31,7 +31,7 @@ export function check(val, ...sets) {
  * @param  {Number} secs Duration, in seconds.
  */
 export function sleep(secs) {
-	__jsapi__.Sleep(secs);
+	__jsapi__.Sleep(secs * 1.0);
 }
 
 /**

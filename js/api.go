@@ -33,7 +33,13 @@ type JSAPI struct {
 }
 
 func (a JSAPI) Sleep(secs float64) {
-	time.Sleep(time.Duration(secs * float64(time.Second)))
+	d := time.Duration(secs * float64(time.Second))
+	t := time.NewTimer(d)
+	select {
+	case <-t.C:
+	case <-a.vu.ctx.Done():
+	}
+	t.Stop()
 }
 
 func (a JSAPI) Log(level int, msg string, args []otto.Value) {
