@@ -563,11 +563,11 @@ func (e *Engine) processThresholds() {
 		e.Logger.WithField("m", m.Name).Debug("running thresholds")
 		succ, err := ts.Run(s)
 		if err != nil {
-			e.Logger.WithField("metric", m.Name).WithError(err).Error("Threshold Error")
+			e.Logger.WithField("m", m.Name).WithError(err).Error("Threshold Error")
 			continue
 		}
 		if !succ {
-			e.Logger.WithField("metric", m.Name).Debug("Thresholds failed")
+			e.Logger.WithField("m", m.Name).Debug("Thresholds failed")
 		}
 	}
 }
