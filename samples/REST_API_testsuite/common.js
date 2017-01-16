@@ -10,10 +10,10 @@ import { Trend } from "k6/metrics";
 export let options = {
 	vus: 1,
 	duration: '5s',
-        thresholds: {
+	thresholds: {
 		transaction_time: ["avg<1000"], // Require transaction_time's average to be <1000ms
-                http_req_duration: ["avg<2000"], // Require http_req_duration's average to be <2000ms
-        }
+		http_req_duration: ["avg<2000"], // Require http_req_duration's average to be <2000ms
+	}
 };
 
 // Create a Trend metric to hold transaction time data samples from the HTTP calls to the various end points

@@ -33,14 +33,14 @@ export function v3_loadZones(org_id, token) {
 // This is the "run" function that every VU will call again and again during a load test, or it will be
 // called one single time when we're running a functional test (1 VU, 1 iteration).
 export default function() {
-        // The first VU iteration will always perform a login operation in order to get an API 
-        // token we need to access the /load-zones API end point that we want to test
+	// The first VU iteration will always perform a login operation in order to get an API 
+	// token we need to access the /load-zones API end point that we want to test
 	if (api_token === null) {
 		var res = v3_account_login(username, password);
 		var res_json = JSON.parse(res.body);
 		api_token = res_json['token']['key'];
 	}
-        // Below is the actual test case for the /load-zones API endpoint
+	// Below is the actual test case for the /load-zones API endpoint
 	group("v3_load-zones", function() {
 		var res = v3_loadZones(org_id, api_token);
 		check(res, {

@@ -31,7 +31,7 @@ export function v3_account_me(token) {
 // time when we're running a functional test (1 VU, 1 iteration).
 export default function() {
 	// The first VU iteration will always perform a login operation in order to get an API 
-        // token we need to access the /account/me API end point that we want to test
+	// token we need to access the /account/me API end point that we want to test
 	if (api_token === null) {
 		var res = v3_account_login(username, password);
 		var res_json = JSON.parse(res.body);
