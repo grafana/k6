@@ -175,10 +175,9 @@ func (e *Engine) Run(ctx context.Context) error {
 	e.lock.Unlock()
 
 	close(e.vuStop)
-	e.vuStop = nil
 	defer func() {
-		e.SetPaused(false)
 		e.vuStop = make(chan interface{})
+		e.SetPaused(false)
 
 		// Shut down subsystems, wait for graceful termination.
 		e.clearSubcontext()
@@ -250,10 +249,12 @@ func (e *Engine) Run(ctx context.Context) error {
 }
 
 func (e *Engine) IsRunning() bool {
-	e.lock.Lock()
-	defer e.lock.Unlock()
-
-	return e.vuStop == nil
+	select {
+	case <-e.vuStop:
+		return true
+	default:
+		return false
+	}
 }
 
 func (e *Engine) SetPaused(v bool) {
@@ -452,9 +453,7 @@ func (e *Engine) runVU(ctx context.Context, vu *vuEntry) {
 	}
 
 	// Sleep until the engine starts running.
-	if e.vuStop != nil {
-		<-e.vuStop
-	}
+	<-e.vuStop
 
 	for {
 		// If the engine is paused, sleep until it resumes.
