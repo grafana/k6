@@ -220,7 +220,7 @@ func actionRun(cc *cli.Context) error {
 	// Collect CLI arguments, most (not all) relating to options.
 	addr := cc.GlobalString("address")
 	out := cc.String("out")
-	opts := lib.Options{
+	cliOpts := lib.Options{
 		Paused:       cliBool(cc, "paused"),
 		VUs:          cliInt64(cc, "vus"),
 		VUsMax:       cliInt64(cc, "max"),
@@ -230,6 +230,7 @@ func actionRun(cc *cli.Context) error {
 		Acceptance:   cliFloat64(cc, "acceptance"),
 		MaxRedirects: cliInt64(cc, "max-redirects"),
 	}
+	opts := cliOpts
 
 	// Make the Runner, extract script-defined options.
 	filename := args[0]
@@ -255,12 +256,15 @@ func actionRun(cc *cli.Context) error {
 		opts = opts.Apply(configOpts)
 	}
 
-	// CLI options have defaults, which are set as invalid, but have potentially nonzero values.
-	// Flipping the Valid flag for all invalid options thus applies all defaults.
+	// CLI options override everything.
+	opts = opts.Apply(cliOpts)
+
+	// Make sure VUsMax defaults to VUs if not specified.
 	if !opts.VUsMax.Valid {
 		opts.VUsMax.Int64 = opts.VUs.Int64
 	}
-	opts = opts.SetAllValid(true)
+
+	// Update the runner's options.
 	runner.ApplyOptions(opts)
 
 	// Make the metric collector, if requested.
