@@ -41,6 +41,7 @@ func TestSleep(t *testing.T) {
 		"float,sub-1s": {`0.2`, 200 * time.Millisecond},
 		"float":        {`1.0`, 1 * time.Second},
 		"int":          {`1`, 1 * time.Second},
+		"exceeding":    {`5`, 2 * time.Second},
 	}
 	for name, data := range testdata {
 		t.Run(name, func(t *testing.T) {
@@ -54,9 +55,10 @@ func TestSleep(t *testing.T) {
 			vu, err := r.NewVU()
 			assert.NoError(t, err)
 
+			ctx, _ := context.WithTimeout(context.Background(), 2*time.Second)
 			start := time.Now()
 
-			_, err = vu.RunOnce(context.Background())
+			_, err = vu.RunOnce(ctx)
 			assert.NoError(t, err)
 			assert.True(t, time.Since(start) > data.min, "ran too short")
 			assert.True(t, time.Since(start) < data.min+1*time.Second, "ran too long")
