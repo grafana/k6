@@ -33,14 +33,17 @@ import (
 
 const (
 	TickRate        = 1 * time.Millisecond
+	MetricsRate     = 1 * time.Second
 	CollectRate     = 10 * time.Millisecond
 	ThresholdsRate  = 2 * time.Second
 	ShutdownTimeout = 10 * time.Second
 )
 
 var (
-	MetricVUs    = stats.New("vus", stats.Gauge)
-	MetricVUsMax = stats.New("vus_max", stats.Gauge)
+	MetricVUs        = stats.New("vus", stats.Gauge)
+	MetricVUsMax     = stats.New("vus_max", stats.Gauge)
+	MetricIterations = stats.New("iterations", stats.Gauge)
+	MetricTaints     = stats.New("taints", stats.Gauge)
 )
 
 // Special error used to signal that a VU wants a taint, without logging an error.
@@ -147,6 +150,13 @@ func (e *Engine) Run(ctx context.Context) error {
 
 	e.lock.Lock()
 	{
+		// Run metrics emission.
+		e.subwg.Add(1)
+		go func(ctx context.Context) {
+			e.runMetricsEmission(ctx)
+			e.subwg.Done()
+		}(e.subctx)
+
 		// Run metrics collection.
 		e.subwg.Add(1)
 		go func(ctx context.Context) {
@@ -175,6 +185,9 @@ func (e *Engine) Run(ctx context.Context) error {
 
 		// Process any leftover samples.
 		e.processSamples(e.collect()...)
+
+		// Emit final metrics.
+		e.emitMetrics()
 	}()
 
 	// Set tracking to defaults.
@@ -183,6 +196,8 @@ func (e *Engine) Run(ctx context.Context) error {
 	e.atStage = 0
 	e.atStageSince = 0
 	e.atStageStartVUs = e.vus
+	e.numIterations = 0
+	e.numTaints = 0
 	e.lock.Unlock()
 
 	var lastTick time.Time
@@ -484,6 +499,42 @@ func (e *Engine) runVUOnce(ctx context.Context, vu *vuEntry) {
 	if err != nil {
 		atomic.AddInt64(&e.numTaints, 1)
 	}
+}
+
+func (e *Engine) runMetricsEmission(ctx context.Context) {
+	ticker := time.NewTicker(MetricsRate)
+	for {
+		select {
+		case <-ticker.C:
+			e.emitMetrics()
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func (e *Engine) emitMetrics() {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
+	e.processSamples(
+		stats.Sample{
+			Metric: MetricVUs,
+			Value:  float64(e.vus),
+		},
+		stats.Sample{
+			Metric: MetricVUsMax,
+			Value:  float64(e.vusMax),
+		},
+		stats.Sample{
+			Metric: MetricIterations,
+			Value:  float64(atomic.LoadInt64(&e.numIterations)),
+		},
+		stats.Sample{
+			Metric: MetricTaints,
+			Value:  float64(atomic.LoadInt64(&e.numTaints)),
+		},
+	)
 }
 
 func (e *Engine) runThresholds(ctx context.Context) {
