@@ -22,6 +22,7 @@ package js
 
 import (
 	"context"
+	"fmt"
 	"github.com/loadimpact/k6/lib"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -33,10 +34,36 @@ func TestSleep(t *testing.T) {
 		return
 	}
 
-	start := time.Now()
-	JSAPI{}.Sleep(0.2)
-	assert.True(t, time.Since(start) > 200*time.Millisecond)
-	assert.True(t, time.Since(start) < 1*time.Second)
+	testdata := map[string]struct {
+		src string
+		min time.Duration
+	}{
+		"float,sub-1s": {`0.2`, 200 * time.Millisecond},
+		"float":        {`1.0`, 1 * time.Second},
+		"int":          {`1`, 1 * time.Second},
+		"exceeding":    {`5`, 2 * time.Second},
+	}
+	for name, data := range testdata {
+		t.Run(name, func(t *testing.T) {
+			r, err := newSnippetRunner(fmt.Sprintf(`
+			import { sleep } from "k6";
+			export default function() {
+				sleep(%s);
+			}`, data.src))
+			assert.NoError(t, err)
+
+			vu, err := r.NewVU()
+			assert.NoError(t, err)
+
+			ctx, _ := context.WithTimeout(context.Background(), 2*time.Second)
+			start := time.Now()
+
+			_, err = vu.RunOnce(ctx)
+			assert.NoError(t, err)
+			assert.True(t, time.Since(start) > data.min, "ran too short")
+			assert.True(t, time.Since(start) < data.min+1*time.Second, "ran too long")
+		})
+	}
 }
 
 func TestDoGroup(t *testing.T) {
