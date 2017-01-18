@@ -51,6 +51,7 @@ type HTTPResponse struct {
 
 type HTTPParams struct {
 	Headers map[string]string `json:"headers"`
+	Tags    map[string]string `json:"tags"`
 }
 
 func (a JSAPI) HTTPRequest(method, url, body string, paramData string) map[string]interface{} {
@@ -93,6 +94,10 @@ func (a JSAPI) HTTPRequest(method, url, body string, paramData string) map[strin
 		"status":   strconv.Itoa(res.StatusCode),
 		"group_id": strconv.FormatInt(a.vu.group.ID, 10),
 	}
+	for key, value := range params.Tags {
+		tags[key] = value
+	}
+
 	a.vu.Samples = append(a.vu.Samples,
 		stats.Sample{Metric: MetricReqs, Time: t, Tags: tags, Value: 1},
 		stats.Sample{Metric: MetricReqDuration, Time: t, Tags: tags, Value: float64(trail.Duration)},
