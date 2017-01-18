@@ -117,40 +117,19 @@ Following the below steps exactly should result in a working k6 executable:
 ```sh
 docker run -it ubuntu:14.04 /bin/bash
 apt-get update
-apt-get install git openssh-client make npm curl
+apt-get install git make npm curl
 ln -s /usr/bin/nodejs /usr/bin/node
 npm install -g bower ember-cli@2.7.0
 curl https://storage.googleapis.com/golang/go1.7.4.linux-amd64.tar.gz | tar -C /usr/local -xzf -
-adduser myuser
-```
-
-Then you have to create a .gitconfig to make it possible for go to fetch things from a private Github repo:
-
-```sh
-su - myuser
-cat <<EOF >~/.gitconfig
-[url "git@github.com:"]
-        insteadOf = https://github.com/
-EOF
-```
-
-And then you need to make sure your user has an SSH key that has been authorized access to your Github account. First, create a key:
-
-```sh
-su - myuser
-ssh-keygen
-```
-
-Now go to https://github.com/settings/keys and add (the public part of) the new SSH key to your authorized keys.
-
-Finally, you're ready to build k6:
-
-```sh
-su - myuser
 export GOROOT=/usr/local/go
 export PATH=$PATH:$GOROOT/bin
 export GOPATH=$HOME/go
 mkdir $GOPATH
+```
+
+Now you're ready to build k6:
+
+```sh
 go get -d -u github.com/loadimpact/k6
 cd $GOPATH/src/github.com/loadimpact/k6
 make
