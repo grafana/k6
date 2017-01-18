@@ -19,7 +19,7 @@ web/node_modules:
 	cd web && npm install
 
 web/bower_components:
-	cd web && bower install
+	cd web && bower install --allow-root
 
 .PHONY: docs
 docs:
