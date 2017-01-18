@@ -700,7 +700,7 @@ func TestEngineCollector(t *testing.T) {
 	ch := make(chan error)
 	go func() { ch <- e.Run(ctx) }()
 
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 	assert.True(t, e.IsRunning(), "engine not running")
 	assert.True(t, c.IsRunning(), "collector not running")
 
