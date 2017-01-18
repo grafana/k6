@@ -86,6 +86,8 @@ type Engine struct {
 	numIterations int64
 	numTaints     int64
 
+	thresholdsTainted bool
+
 	// Subsystem-related.
 	lock      sync.Mutex
 	subctx    context.Context
@@ -365,6 +367,10 @@ func (e *Engine) GetVUsMax() int64 {
 }
 
 func (e *Engine) IsTainted() bool {
+	if e.thresholdsTainted {
+		return true
+	}
+
 	e.lock.Lock()
 	defer e.lock.Unlock()
 
@@ -560,14 +566,16 @@ func (e *Engine) processThresholds() {
 		if !ok {
 			continue
 		}
+
 		e.Logger.WithField("m", m.Name).Debug("running thresholds")
 		succ, err := ts.Run(s)
 		if err != nil {
-			e.Logger.WithField("m", m.Name).WithError(err).Error("Threshold Error")
+			e.Logger.WithField("m", m.Name).WithError(err).Error("Threshold error")
 			continue
 		}
 		if !succ {
 			e.Logger.WithField("m", m.Name).Debug("Thresholds failed")
+			e.thresholdsTainted = true
 		}
 	}
 }
