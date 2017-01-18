@@ -55,32 +55,32 @@ k6 bundles a number of useful APIs that allows you to control flow of your scrip
 import http from "k6/http";
 
 // define our threshold within a global options-structure
-export let options = {                                                     
-   thresholds: {                                                           
-      request_duration: ["avg<100"],                                       
-   }                                                                       
-};                                                                         
+export let options = {
+   thresholds: {
+      request_duration: ["avg<100"],
+   }
+};
 
 // create our Trend metric
-var myTrend = new Trend(“request_duration”);                               
- 
-// Export our test code as a 'default' function. 
-export default function() {                                                
-   var r = http.get("https://httpbin.org");                                
+var myTrend = new Trend("request_duration");
+
+// Export our test code as a 'default' function.
+export default function() {
+   var r = http.get("https://httpbin.org");
    // add response time to our Trend-metric
-   myTrend.add(r.timings.duration);                                        
+   myTrend.add(r.timings.duration);
    // assert for functional correctness
-   check(r, {                                                              
-      "status is 200": (r) => r.status === 200,                            
-      "body size 1234 bytes": (r) => r.body.length === 1234                
-   });                                                                     
-};                                                                         
+   check(r, {
+      "status is 200": (r) => r.status === 200,
+      "body size 1234 bytes": (r) => r.body.length === 1234
+   });
+};
 ```
 The above code can be run both as a load test or as a functional test, and will:
 
 * create a Trend metric named “request_duration” and referred to in the code using the variable name myTrend
 * define a threshold for the Trend metric. This threshold says that the load test should fail if the average value of the Trend metric goes below 100. This means that if at any time during the load test, the currently computed average of all sample values added to myTrend is less than 100, then the whole load test will be marked as failed.
-* create a default function that will be executed repeatedly by all VUs in the load test. This function makes an HTTP request and adds the HTTP duration (`response.timings.duration`) to the Trend metric, while also asserting for HTTP 200 response (`response.status`) and expected size of HTTP body (`response.body.length`). 
+* create a default function that will be executed repeatedly by all VUs in the load test. This function makes an HTTP request and adds the HTTP duration (`response.timings.duration`) to the Trend metric, while also asserting for HTTP 200 response (`response.status`) and expected size of HTTP body (`response.body.length`).
 
 *For more information, see the [Getting Started Guide](tutorials/getting-started.md) and [Metrics Management Reference](tutorials/metrics-management.md)*
 
@@ -123,9 +123,9 @@ npm install -g bower ember-cli@2.7.0
 curl https://storage.googleapis.com/golang/go1.7.4.linux-amd64.tar.gz | tar -C /usr/local -xzf -
 adduser myuser
 ```
-   
+
 Then you have to create a .gitconfig to make it possible for go to fetch things from a private Github repo:
-   
+
 ```sh
 su - myuser
 cat <<EOF >~/.gitconfig
@@ -133,18 +133,18 @@ cat <<EOF >~/.gitconfig
         insteadOf = https://github.com/
 EOF
 ```
-   
+
 And then you need to make sure your user has an SSH key that has been authorized access to your Github account. First, create a key:
-   
+
 ```sh
 su - myuser
 ssh-keygen
 ```
 
 Now go to https://github.com/settings/keys and add (the public part of) the new SSH key to your authorized keys.
-   
+
 Finally, you're ready to build k6:
-   
+
 ```sh
 su - myuser
 export GOROOT=/usr/local/go
@@ -155,10 +155,10 @@ go get -d -u github.com/loadimpact/k6
 cd $GOPATH/src/github.com/loadimpact/k6
 make
 ```
-   
+
 You should now have a k6 binary in your current working directory.
-   
-   
+  
+
 Usage
 -----
 
@@ -183,4 +183,3 @@ k6 scale 50
 This is a quite powerful feature when combined with options like `-d 0` / `--duration 0`, which causes the test to run indefinitely until told otherwise. You're fully in control of how your test is executed!
 
 *For more information, see the [tutorials](tutorials/getting-started.md)*
-
