@@ -183,7 +183,7 @@ func TestNewEngineOptions(t *testing.T) {
 	t.Run("thresholds", func(t *testing.T) {
 		e, err, _ := newTestEngine(nil, Options{
 			Thresholds: map[string]Thresholds{
-				"my_metric": Thresholds{},
+				"my_metric": {},
 			},
 		})
 		assert.NoError(t, err)
@@ -192,7 +192,7 @@ func TestNewEngineOptions(t *testing.T) {
 		t.Run("submetrics", func(t *testing.T) {
 			e, err, _ := newTestEngine(nil, Options{
 				Thresholds: map[string]Thresholds{
-					"my_metric{tag:value}": Thresholds{},
+					"my_metric{tag:value}": {},
 				},
 			})
 			assert.NoError(t, err)
