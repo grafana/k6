@@ -259,8 +259,11 @@ func actionRun(cc *cli.Context) error {
 	// CLI options override everything.
 	opts = opts.Apply(cliOpts)
 
+	// Apply defaults.
+	opts = opts.SetAllValid(true)
+
 	// Make sure VUsMax defaults to VUs if not specified.
-	if !opts.VUsMax.Valid {
+	if opts.VUsMax.Int64 == 0 {
 		opts.VUsMax.Int64 = opts.VUs.Int64
 	}
 
