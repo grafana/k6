@@ -1,6 +1,6 @@
 VERSION := 0.2.1
 
-all: build web docs
+all: build web
 
 .PHONY: build
 build: js web
