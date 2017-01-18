@@ -61,7 +61,7 @@ type vuEntry struct {
 type submetric struct {
 	Name       string
 	Conditions map[string]string
-	Sink       stats.Sink
+	Metric     *stats.Metric
 }
 
 func parseSubmetric(name string) (string, map[string]string) {
@@ -633,30 +633,6 @@ func (e *Engine) processThresholds() {
 			e.thresholdsTainted = true
 		}
 	}
-
-	for _, sms := range e.submetrics {
-		for _, sm := range sms {
-			if sm.Sink == nil {
-				continue
-			}
-
-			ts, ok := e.Thresholds[sm.Name]
-			if !ok {
-				continue
-			}
-
-			e.Logger.WithField("m", sm.Name).Debug("running thresholds")
-			succ, err := ts.Run(sm.Sink)
-			if err != nil {
-				e.Logger.WithField("m", sm.Name).WithError(err).Error("Threshold error")
-				continue
-			}
-			if !succ {
-				e.Logger.WithField("m", sm.Name).Debug("Thresholds failed")
-				e.thresholdsTainted = true
-			}
-		}
-	}
 }
 
 func (e *Engine) runCollection(ctx context.Context) {
@@ -712,10 +688,11 @@ func (e *Engine) processSamples(samples ...stats.Sample) {
 				continue
 			}
 
-			if sm.Sink == nil {
-				sm.Sink = sample.Metric.NewSink()
+			if sm.Metric == nil {
+				sm.Metric = stats.New(sm.Name, sample.Metric.Type, sample.Metric.Contains)
+				e.Metrics[sm.Metric] = sm.Metric.NewSink()
 			}
-			sm.Sink.Add(sample)
+			e.Metrics[sm.Metric].Add(sample)
 		}
 	}
 
