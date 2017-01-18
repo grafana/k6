@@ -22,6 +22,7 @@ package js
 
 import (
 	// "github.com/robertkrimen/otto"
+	"encoding/json"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
 	"io"
@@ -48,7 +49,11 @@ type HTTPResponse struct {
 	Status int
 }
 
-func (a JSAPI) HTTPRequest(method, url, body string, params map[string]interface{}) map[string]interface{} {
+type HTTPParams struct {
+	Headers map[string]string `json:"headers"`
+}
+
+func (a JSAPI) HTTPRequest(method, url, body string, paramData string) map[string]interface{} {
 	bodyReader := io.Reader(nil)
 	if body != "" {
 		bodyReader = strings.NewReader(body)
@@ -58,18 +63,13 @@ func (a JSAPI) HTTPRequest(method, url, body string, params map[string]interface
 		throw(a.vu.vm, err)
 	}
 
-	if h, ok := params["headers"]; ok {
-		headers, ok := h.(map[string]interface{})
-		if !ok {
-			panic(a.vu.vm.MakeTypeError("headers must be an object"))
-		}
-		for key, v := range headers {
-			value, ok := v.(string)
-			if !ok {
-				panic(a.vu.vm.MakeTypeError("header values must be strings"))
-			}
-			req.Header.Set(key, value)
-		}
+	var params HTTPParams
+	if err := json.Unmarshal([]byte(paramData), &params); err != nil {
+		throw(a.vu.vm, err)
+	}
+
+	for key, value := range params.Headers {
+		req.Header.Set(key, value)
 	}
 
 	tracer := lib.Tracer{}

@@ -56,7 +56,7 @@ export function request(method, url, body, params = {}) {
 			body = "";
 		}
 	}
-	return new Response(__jsapi__.HTTPRequest(method, url, body, params));
+	return new Response(__jsapi__.HTTPRequest(method, url, body, JSON.stringify(params)));
 };
 
 /**
