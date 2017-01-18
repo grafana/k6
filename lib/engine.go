@@ -26,6 +26,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/k6/stats"
 	"github.com/pkg/errors"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -57,6 +58,39 @@ type vuEntry struct {
 	lock    sync.Mutex
 }
 
+type submetric struct {
+	Name       string
+	Conditions map[string]string
+	Sink       stats.Sink
+}
+
+func parseSubmetric(name string) (string, map[string]string) {
+	halves := strings.SplitN(strings.TrimSuffix(name, "}"), "{", 2)
+	if len(halves) != 2 {
+		return halves[0], nil
+	}
+
+	kvs := strings.Split(halves[1], ",")
+	conditions := make(map[string]string, len(kvs))
+	for _, kv := range kvs {
+		if kv == "" {
+			continue
+		}
+
+		parts := strings.SplitN(kv, ":", 2)
+
+		key := strings.TrimSpace(strings.Trim(parts[0], `"'`))
+		if len(parts) != 2 {
+			conditions[key] = ""
+			continue
+		}
+
+		value := strings.TrimSpace(strings.Trim(parts[1], `"'`))
+		conditions[key] = value
+	}
+	return halves[0], conditions
+}
+
 // The Engine is the beating heart of K6.
 type Engine struct {
 	Runner    Runner
@@ -68,6 +102,9 @@ type Engine struct {
 	Thresholds  map[string]Thresholds
 	Metrics     map[*stats.Metric]stats.Sink
 	MetricsLock sync.Mutex
+
+	// Submetrics, mapped from parent metric names.
+	submetrics map[string][]*submetric
 
 	// Stage tracking.
 	atTime          time.Duration
@@ -134,6 +171,19 @@ func NewEngine(r Runner, o Options) (*Engine, error) {
 
 	if o.Thresholds != nil {
 		e.Thresholds = o.Thresholds
+		e.submetrics = make(map[string][]*submetric)
+
+		for name := range e.Thresholds {
+			if !strings.Contains(name, "{") {
+				continue
+			}
+
+			parent, conds := parseSubmetric(name)
+			e.submetrics[parent] = append(e.submetrics[parent], &submetric{
+				Name:       name,
+				Conditions: conds,
+			})
+		}
 	}
 
 	return e, nil
@@ -578,6 +628,30 @@ func (e *Engine) processThresholds() {
 			e.thresholdsTainted = true
 		}
 	}
+
+	for _, sms := range e.submetrics {
+		for _, sm := range sms {
+			if sm.Sink == nil {
+				continue
+			}
+
+			ts, ok := e.Thresholds[sm.Name]
+			if !ok {
+				continue
+			}
+
+			e.Logger.WithField("m", sm.Name).Debug("running thresholds")
+			succ, err := ts.Run(sm.Sink)
+			if err != nil {
+				e.Logger.WithField("m", sm.Name).WithError(err).Error("Threshold error")
+				continue
+			}
+			if !succ {
+				e.Logger.WithField("m", sm.Name).Debug("Thresholds failed")
+				e.thresholdsTainted = true
+			}
+		}
+	}
 }
 
 func (e *Engine) runCollection(ctx context.Context) {
@@ -611,6 +685,8 @@ func (e *Engine) collect() []stats.Sample {
 
 func (e *Engine) processSamples(samples ...stats.Sample) {
 	e.MetricsLock.Lock()
+	defer e.MetricsLock.Unlock()
+
 	for _, sample := range samples {
 		sink := e.Metrics[sample.Metric]
 		if sink == nil {
@@ -618,9 +694,27 @@ func (e *Engine) processSamples(samples ...stats.Sample) {
 			e.Metrics[sample.Metric] = sink
 		}
 		sink.Add(sample)
+
+		for _, sm := range e.submetrics[sample.Metric.Name] {
+			passing := true
+			for k, v := range sm.Conditions {
+				if sample.Tags[k] != v {
+					passing = false
+					break
+				}
+			}
+			if !passing {
+				continue
+			}
+
+			if sm.Sink == nil {
+				sm.Sink = sample.Metric.NewSink()
+			}
+			sm.Sink.Add(sample)
+		}
 	}
+
 	if e.Collector != nil {
 		e.Collector.Collect(samples)
 	}
-	e.MetricsLock.Unlock()
 }
