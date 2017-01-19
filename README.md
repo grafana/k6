@@ -154,9 +154,13 @@ k6 run -u 100 -d 30s myscript.js
 
 The first thing you might notice is that the duration is written "30s", not "30". This is because we're using Go's duration notation, which means `90s`, `1m30s`, `24h` and `2d` are all valid durations, and much more readable than if you had to convert everything to seconds.
 
-The second thing you might notice (or maybe not, if you're just reading this) is that k6 doesn't actually exit immediately after the test finishes. There's a flag to make it (`-q`/`--quit`), but there's a reason for this: it exposes a full-fledged web UI on [http://localhost:6565/](http://localhost:6565/) (by default), which shows realtime statistics and errors.
+The second thing you might notice (or maybe not, if you're just reading this) is k6 saying this when it starts:
+```sh
+  web ui: http://127.0.0.1:6565/
+```
+This is the address to a built-in HTTP server serving a full-fledged web UI where you can view realtime statistics and errors. The default behaviour is to shut everything down (including the web UI) once a test execution has completed, but there is a -l/--linger flag you can pass to `k6 run` that will cause it to stay running until killed (e.g. with CTRL-C). This can be useful if you want to view the results of the test in the web UI.
 
-But that's not the only thing it does. It also exposes a REST API on the same port for controlling test execution, which you can call yourself with an HTTP client of your choice (curl, httpie, ...), or using the commandline wrappers - essentially every k6 command aside from `run` wraps an API call. For example, this will scale the running test down to 50 VUs:
+But the web UI is not the only thing this HTTP server does. It also exposes a REST API on the same port for controlling test execution, which you can call yourself with an HTTP client of your choice (curl, httpie, ...), or using the commandline wrappers - essentially every k6 command aside from `run` wraps an API call. For example, this will scale the running test down to 50 VUs:
 
 ```sh
 k6 scale 50
