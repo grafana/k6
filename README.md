@@ -53,6 +53,8 @@ k6 bundles a number of useful APIs that allows you to control flow of your scrip
 
 ```es6
 import http from "k6/http";
+import { check } from "k6";
+import { Trend } from "k6/metrics";
 
 // define our threshold within a global options-structure
 export let options = {
