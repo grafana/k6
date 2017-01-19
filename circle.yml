@@ -37,3 +37,4 @@ deployment:
     commands:
       - docker tag loadimpact/k6 loadimpact/k6:${CIRCLE_TAG:1}
       - docker push loadimpact/k6:${CIRCLE_TAG:1}
+      - make docs && echo "long list of command"
