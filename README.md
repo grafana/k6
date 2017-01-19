@@ -93,7 +93,7 @@ There are a couple of ways to set up k6:
 
 ```sh
 docker pull loadimpact/k6
-docker run --rm --net=host -v myscript.js:/myscript.js loadimpact/k6 run /myscript.js
+docker run --rm --net=host -v $(pwd)/myscript.js:/myscript.js loadimpact/k6 run /myscript.js
 ```
 
 It's recommended to run k6 with `--net=host` as it slightly improves network throughput, and causes container ports to be accessible on the host without explicit exposure. Note that this means opting out of the network isolation normally provided to containers, refer to [the Docker manual](https://docs.docker.com/v1.8/articles/networking/#how-docker-networks-a-container) for more information.
