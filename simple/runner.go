@@ -22,9 +22,7 @@ package simple
 
 import (
 	"context"
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/stats"
-	"os"
+	"errors"
 	"io"
 	"io/ioutil"
 	"math"
@@ -34,7 +32,9 @@ import (
 	"net/url"
 	"strconv"
 	"time"
-	"strings"
+
+	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/stats"
 )
 
 var (
@@ -46,31 +46,22 @@ var (
 	MetricReqSending    = stats.New("http_req_sending", stats.Trend, stats.Time)
 	MetricReqWaiting    = stats.New("http_req_waiting", stats.Trend, stats.Time)
 	MetricReqReceiving  = stats.New("http_req_receiving", stats.Trend, stats.Time)
+	ErrEmptyScheme      = errors.New("URL contained no scheme")
 )
 
 type Runner struct {
 	URL       *url.URL
+	SrcData   *lib.SourceData
 	Transport *http.Transport
 	Options   lib.Options
 
 	defaultGroup *lib.Group
 }
 
-func New(rawurl string) (*Runner, error) {
-	if rawurl == "-" {
-		urlbytes, err := ioutil.ReadAll(os.Stdin)
-		if err != nil {
-			return nil, err
-		}
-		rawurl = string(urlbytes)
-	}
-	u, err := url.Parse(strings.TrimSpace(rawurl))
-	if err != nil {
-		return nil, err
-	}
-
+func New(src *lib.SourceData, u *url.URL) (*Runner, error) {
 	return &Runner{
-		URL: u,
+		URL:     u,
+		SrcData: src,
 		Transport: &http.Transport{
 			Proxy: http.ProxyFromEnvironment,
 			DialContext: (&net.Dialer{
@@ -101,6 +92,10 @@ func (r *Runner) NewVU() (lib.VU, error) {
 		tracer: tracer,
 		cTrace: tracer.Trace(),
 	}, nil
+}
+
+func (r *Runner) GetSourceData() *lib.SourceData {
+	return r.SrcData
 }
 
 func (r *Runner) GetGroups() []*lib.Group {

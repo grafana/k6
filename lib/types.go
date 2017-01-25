@@ -22,6 +22,7 @@ package lib
 
 import (
 	"encoding/json"
+
 	"github.com/robertkrimen/otto"
 	"gopkg.in/guregu/null.v3"
 )
@@ -39,6 +40,12 @@ type Options struct {
 	MaxRedirects null.Int `json:"max-redirects"`
 
 	Thresholds map[string][]*Threshold `json:"thresholds"`
+}
+
+type SourceData struct {
+	SrcData  []byte
+	Filename string
+	SrcType  string
 }
 
 func (o Options) Apply(opts Options) Options {
