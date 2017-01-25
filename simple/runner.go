@@ -51,17 +51,15 @@ var (
 
 type Runner struct {
 	URL       *url.URL
-	SrcData   *lib.SourceData
 	Transport *http.Transport
 	Options   lib.Options
 
 	defaultGroup *lib.Group
 }
 
-func New(src *lib.SourceData, u *url.URL) (*Runner, error) {
+func New(u *url.URL) (*Runner, error) {
 	return &Runner{
-		URL:     u,
-		SrcData: src,
+		URL: u,
 		Transport: &http.Transport{
 			Proxy: http.ProxyFromEnvironment,
 			DialContext: (&net.Dialer{
@@ -92,10 +90,6 @@ func (r *Runner) NewVU() (lib.VU, error) {
 		tracer: tracer,
 		cTrace: tracer.Trace(),
 	}, nil
-}
-
-func (r *Runner) GetSourceData() *lib.SourceData {
-	return r.SrcData
 }
 
 func (r *Runner) GetGroups() []*lib.Group {

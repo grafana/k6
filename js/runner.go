@@ -51,7 +51,6 @@ type Runner struct {
 	Groups       []*lib.Group
 	Checks       []*lib.Check
 	Options      lib.Options
-	SrcData      *lib.SourceData
 
 	HTTPTransport *http.Transport
 
@@ -61,7 +60,7 @@ type Runner struct {
 	checksMutex    sync.Mutex
 }
 
-func NewRunner(runtime *Runtime, src *lib.SourceData, exports otto.Value) (*Runner, error) {
+func NewRunner(runtime *Runtime, exports otto.Value) (*Runner, error) {
 	expObj := exports.Object()
 	if expObj == nil {
 		return nil, ErrDefaultExport
@@ -83,7 +82,6 @@ func NewRunner(runtime *Runtime, src *lib.SourceData, exports otto.Value) (*Runn
 	r := &Runner{
 		Runtime: runtime,
 		Options: runtime.Options,
-		SrcData: src,
 		HTTPTransport: &http.Transport{
 			Proxy: http.ProxyFromEnvironment,
 			DialContext: (&net.Dialer{
@@ -142,10 +140,6 @@ func (r *Runner) GetOptions() lib.Options {
 
 func (r *Runner) ApplyOptions(opts lib.Options) {
 	r.Options = r.Options.Apply(opts)
-}
-
-func (r *Runner) GetSourceData() *lib.SourceData {
-	return r.SrcData
 }
 
 type VU struct {
