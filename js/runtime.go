@@ -24,16 +24,15 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"os"
-	"os/exec"
-	"path/filepath"
-
 	"github.com/GeertJohan/go.rice"
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
 	"github.com/robertkrimen/otto"
+	"io/ioutil"
+	"os"
+	"os/exec"
+	"path/filepath"
 )
 
 const wrapper = "(function() { var e = {}; (function(exports) {%s\n})(e); return e; })();"
@@ -90,7 +89,7 @@ func (r *Runtime) Load(src *lib.SourceData) (otto.Value, error) {
 	if err := r.VM.Set("__initapi__", InitAPI{r: r}); err != nil {
 		return otto.UndefinedValue(), err
 	}
-	exp, err := r.loadJSCode(src)
+	exp, err := r.loadSource(src)
 	if err := r.VM.Set("__initapi__", nil); err != nil {
 		return otto.UndefinedValue(), err
 	}
@@ -123,10 +122,8 @@ func (r *Runtime) extractOptions(exports otto.Value, opts *lib.Options) error {
 	return nil
 }
 
-func (r *Runtime) loadJSCode(src *lib.SourceData) (otto.Value, error) {
-	var path string
-	var err error
-	path, err = filepath.Abs(src.Filename)
+func (r *Runtime) loadSource(src *lib.SourceData) (otto.Value, error) {
+	path, err := filepath.Abs(src.Filename)
 	if err != nil {
 		return otto.UndefinedValue(), err
 	}
@@ -135,7 +132,7 @@ func (r *Runtime) loadJSCode(src *lib.SourceData) (otto.Value, error) {
 	if exports, ok := r.Exports[path]; ok {
 		return exports, nil
 	}
-	exports, err := r.load(path, src.SrcData)
+	exports, err := r.load(path, src.Data)
 	if err != nil {
 		return otto.UndefinedValue(), err
 	}
@@ -147,10 +144,7 @@ func (r *Runtime) loadJSCode(src *lib.SourceData) (otto.Value, error) {
 }
 
 func (r *Runtime) loadFile(filename string) (otto.Value, error) {
-	var path string
-	var data []byte
-	var err error
-	path, err = filepath.Abs(filename)
+	path, err := filepath.Abs(filename)
 	if err != nil {
 		return otto.UndefinedValue(), err
 	}
@@ -160,7 +154,7 @@ func (r *Runtime) loadFile(filename string) (otto.Value, error) {
 		return exports, nil
 	}
 
-	data, err = ioutil.ReadFile(path)
+	data, err := ioutil.ReadFile(path)
 	if err != nil {
 		return otto.UndefinedValue(), err
 	}

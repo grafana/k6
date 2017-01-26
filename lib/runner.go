@@ -22,7 +22,6 @@ package lib
 
 import (
 	"context"
-
 	"github.com/loadimpact/k6/stats"
 )
 

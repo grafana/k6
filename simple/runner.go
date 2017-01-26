@@ -22,7 +22,8 @@ package simple
 
 import (
 	"context"
-	"errors"
+	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/stats"
 	"io"
 	"io/ioutil"
 	"math"
@@ -32,9 +33,6 @@ import (
 	"net/url"
 	"strconv"
 	"time"
-
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/stats"
 )
 
 var (
@@ -46,7 +44,6 @@ var (
 	MetricReqSending    = stats.New("http_req_sending", stats.Trend, stats.Time)
 	MetricReqWaiting    = stats.New("http_req_waiting", stats.Trend, stats.Time)
 	MetricReqReceiving  = stats.New("http_req_receiving", stats.Trend, stats.Time)
-	ErrEmptyScheme      = errors.New("URL contained no scheme")
 )
 
 type Runner struct {

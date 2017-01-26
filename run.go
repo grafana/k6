@@ -24,16 +24,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"net/url"
-	"os"
-	"os/signal"
-	"sort"
-	"strings"
-	"sync"
-	"syscall"
-	"time"
-
 	log "github.com/Sirupsen/logrus"
 	"github.com/ghodss/yaml"
 	"github.com/loadimpact/k6/api"
@@ -45,6 +35,15 @@ import (
 	"github.com/loadimpact/k6/stats/json"
 	"github.com/loadimpact/k6/ui"
 	"gopkg.in/urfave/cli.v1"
+	"io/ioutil"
+	"net/url"
+	"os"
+	"os/signal"
+	"sort"
+	"strings"
+	"sync"
+	"syscall"
+	"time"
 )
 
 var commandRun = cli.Command{
@@ -148,14 +147,14 @@ func getSrcData(arg, t string) (*lib.SourceData, error) {
 	srcdata := []byte("")
 	srctype := t
 	filename := arg
-	var err error
 	const cmdline = "[cmdline]"
-	// special case name “-“ will always cause src data to be read from file STDIN
+	// special case name "-" will always cause src data to be read from file STDIN
 	if arg == "-" {
-		srcdata, err = ioutil.ReadAll(os.Stdin)
+		s, err := ioutil.ReadAll(os.Stdin)
 		if err != nil {
 			return nil, err
 		}
+		srcdata = s
 	} else {
 		// Deduce how to get src data
 		switch srctype {
@@ -166,7 +165,8 @@ func getSrcData(arg, t string) (*lib.SourceData, error) {
 				filename = cmdline
 			} else {
 				// Otherwise, check if it is a file name and we can load the file
-				srcdata, err = ioutil.ReadFile(arg)
+				s, err := ioutil.ReadFile(arg)
+				srcdata = s
 				if err != nil { // if we fail to open file, we assume the arg is JS code
 					srcdata = []byte(arg)
 					srctype = lib.TypeJS
@@ -179,18 +179,22 @@ func getSrcData(arg, t string) (*lib.SourceData, error) {
 				srcdata = []byte(arg)
 				filename = cmdline
 			} else { // if that didn’t work, we try to load a file with URLs
-				srcdata, err = ioutil.ReadFile(arg)
+				s, err := ioutil.ReadFile(arg)
 				if err != nil {
 					return nil, err
 				}
+				srcdata = s
 			}
 		case lib.TypeJS:
 			// lib.TypeJS args we try to use as file names first
-			srcdata, err = ioutil.ReadFile(arg)
+			s, err := ioutil.ReadFile(arg)
+			srcdata = s
 			if err != nil { // and if that didn’t work, we assume the arg itself is JS code
 				srcdata = []byte(arg)
 				filename = cmdline
 			}
+		default:
+			return nil, errors.New("Invalid type specified, see --help")
 		}
 	}
 	// Now we should have some src data and in most cases a type also. If we
@@ -204,19 +208,19 @@ func getSrcData(arg, t string) (*lib.SourceData, error) {
 		}
 	}
 	src := &lib.SourceData{
-		SrcData:  srcdata,
+		Data:     srcdata,
 		Filename: filename,
-		SrcType:  srctype,
+		Type:     srctype,
 	}
 	return src, nil
 }
 
 func makeRunner(srcdata *lib.SourceData) (lib.Runner, error) {
-	switch srcdata.SrcType {
+	switch srcdata.Type {
 	case "":
 		return nil, errors.New("Invalid type specified, see --help")
 	case lib.TypeURL:
-		u, err := url.Parse(strings.TrimSpace(string(srcdata.SrcData)))
+		u, err := url.Parse(strings.TrimSpace(string(srcdata.Data)))
 		if err != nil || u.Scheme == "" {
 			return nil, errors.New("Failed to parse URL")
 		}
@@ -296,7 +300,7 @@ func actionRun(cc *cli.Context) error {
 	runnerType := cc.String("type")
 	srcdata, err := getSrcData(arg, runnerType)
 	if err != nil {
-		log.WithError(err).Error("Couldn't create a runner")
+		log.WithError(err).Error("Failed to parse input data")
 		return err
 	}
 	runner, err := makeRunner(srcdata)
@@ -376,7 +380,7 @@ func actionRun(cc *cli.Context) error {
 	fmt.Printf("\n")
 	fmt.Printf("  execution: local\n")
 	fmt.Printf("     output: %s\n", collectorString)
-	fmt.Printf("     script: %s (%s)\n", srcdata.Filename, srcdata.SrcType)
+	fmt.Printf("     script: %s (%s)\n", srcdata.Filename, srcdata.Type)
 	fmt.Printf("             ↳ duration: %s\n", opts.Duration.String)
 	fmt.Printf("             ↳ vus: %d, max: %d\n", opts.VUs.Int64, opts.VUsMax.Int64)
 	fmt.Printf("\n")
@@ -532,7 +536,7 @@ func actionInspect(cc *cli.Context) error {
 	}
 
 	var opts lib.Options
-	switch srcdata.SrcType {
+	switch srcdata.Type {
 	case lib.TypeJS:
 		r, err := js.New()
 		if err != nil {
