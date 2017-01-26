@@ -5,6 +5,10 @@ set -e
 # To override the latest git tag as the version, pass something else as the first arg.
 VERSION=${1:-$(git describe --tags --abbrev=0)}
 
+# Fail early if external dependencies aren't installed.
+node --version > /dev/null || (echo "ERROR: node is not installed, bailing out."; exit 1)
+rice --help > /dev/null || (echo "ERROR: rice is not installed, run: go get github.com/GeertJohan/go.rice"; exit 1)
+
 make_archive() {
 	FMT=$1
 	DIR=$2
@@ -27,16 +31,24 @@ build_dist() {
 	SUFFIX=$5
 
 	echo "- Building platform: ${ALIAS} (${GOOS} ${GOARCH})"
-	DIR=dist/k6-${VERSION}-${ALIAS}
-	rm -rf $DIR
-	mkdir -p $DIR
+	DIR=k6-${VERSION}-${ALIAS}
+	BIN=k6${SUFFIX}
 
-	GOARCH=$GOARCH GOOS=$GOOS go build -i -o $DIR/k6${SUFFIX}
-	mkdir -p $DIR/web && cp -R web/dist $DIR/web
-	mkdir -p $DIR/js && cp -R js/lib js/node_modules $DIR/js
+	# Clean out any old remnants of failed builds.
+	rm -rf dist/$DIR
+	mkdir -p dist/$DIR
 
-	make_archive $FMT $DIR
-	rm -rf $DIR
+	# Build a binary, embed what we can by means of static assets inside it.
+	GOARCH=$GOARCH GOOS=$GOOS go build -i -o dist/$DIR/$BIN
+	rice append --exec=dist/$DIR/$BIN -i ./api -i ./js
+	mkdir -p dist/$DIR/js && cp -R js/node_modules dist/$DIR/js
+
+	# Archive it all, native format depends on the platform. Subshell to not mess with $PWD.
+	(
+		cd dist
+		make_archive $FMT $DIR
+		rm -rf $DIR
+	)
 }
 
 echo "--- Building Release: ${VERSION}"

@@ -82,7 +82,7 @@ func TestWithEngine(t *testing.T) {
 }
 
 func TestPing(t *testing.T) {
-	mux := NewHandler(staticRoot)
+	mux := NewHandler()
 
 	rw := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/ping", nil)
@@ -91,38 +91,4 @@ func TestPing(t *testing.T) {
 	res := rw.Result()
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 	assert.Equal(t, []byte{'o', 'k'}, rw.Body.Bytes())
-}
-
-func TestStatic(t *testing.T) {
-	var testdata = map[string]map[string]struct {
-		StatusCode  int
-		ContentType string
-		Body        string
-	}{
-		"nonexistent": {
-			"/":     {http.StatusNotFound, "text/plain; charset=utf-8", notFoundText},
-			"/test": {http.StatusNotFound, "text/plain; charset=utf-8", notFoundText},
-		},
-		staticRoot: {
-			"/":           {http.StatusOK, "text/html; charset=utf-8", "<!DOCTYPE html>"},
-			"/robots.txt": {http.StatusOK, "text/plain; charset=utf-8", "# http://www.robotstxt.org"},
-		},
-	}
-	for root, routes := range testdata {
-		t.Run("root="+root, func(t *testing.T) {
-			for path, data := range routes {
-				t.Run("path="+path, func(t *testing.T) {
-					rw := httptest.NewRecorder()
-					r := httptest.NewRequest("GET", path, nil)
-					NewHandler(root).ServeHTTP(rw, r)
-					res := rw.Result()
-					assert.Equal(t, data.StatusCode, res.StatusCode)
-					assert.Equal(t, data.ContentType, res.Header.Get("Content-Type"))
-					if data.Body != "" {
-						assert.Contains(t, string(rw.Body.Bytes()), data.Body)
-					}
-				})
-			}
-		})
-	}
 }
