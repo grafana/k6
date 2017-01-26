@@ -25,11 +25,12 @@ import (
 )
 
 type Options struct {
-	Paused   null.Bool   `json:"paused"`
-	VUs      null.Int    `json:"vus"`
-	VUsMax   null.Int    `json:"vusMax"`
-	Duration null.String `json:"duration"`
-	Stages   []Stage     `json:"stage"`
+	Paused     null.Bool   `json:"paused"`
+	VUs        null.Int    `json:"vus"`
+	VUsMax     null.Int    `json:"vusMax"`
+	Duration   null.String `json:"duration"`
+	Iterations null.Int    `json:"iterations"`
+	Stages     []Stage     `json:"stage"`
 
 	Linger       null.Bool  `json:"linger"`
 	AbortOnTaint null.Bool  `json:"abortOnTaint"`
@@ -52,6 +53,9 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.Duration.Valid {
 		o.Duration = opts.Duration
+	}
+	if opts.Iterations.Valid {
+		o.Iterations = opts.Iterations
 	}
 	if opts.Stages != nil {
 		o.Stages = opts.Stages

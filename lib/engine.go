@@ -54,8 +54,9 @@ type vuEntry struct {
 	VU     VU
 	Cancel context.CancelFunc
 
-	Samples []stats.Sample
-	lock    sync.Mutex
+	Samples    []stats.Sample
+	Iterations int64
+	lock       sync.Mutex
 }
 
 type submetric struct {
@@ -257,6 +258,7 @@ func (e *Engine) Run(ctx context.Context) error {
 	var lastTick time.Time
 	ticker := time.NewTicker(TickRate)
 
+	maxIterations := e.Options.Iterations.Int64
 	for {
 		// Don't do anything while the engine is paused.
 		vuPause := e.vuPause
@@ -266,6 +268,11 @@ func (e *Engine) Run(ctx context.Context) error {
 			case <-ctx.Done():
 				return nil
 			}
+		}
+
+		// If we have an iteration cap, exit once we hit it.
+		if maxIterations > 0 && e.numIterations == e.vusMax*maxIterations {
+			return nil
 		}
 
 		// Calculate the time delta between now and the last tick.
@@ -502,6 +509,8 @@ func (e *Engine) processStages(dT time.Duration) (bool, error) {
 }
 
 func (e *Engine) runVU(ctx context.Context, vu *vuEntry) {
+	maxIterations := e.Options.Iterations.Int64
+
 	// nil runners that produce nil VUs are used for testing.
 	if vu.VU == nil {
 		<-ctx.Done()
@@ -512,6 +521,11 @@ func (e *Engine) runVU(ctx context.Context, vu *vuEntry) {
 	<-e.vuStop
 
 	for {
+		// Exit if the VU has run all its intended iterations.
+		if maxIterations > 0 && vu.Iterations >= maxIterations {
+			return
+		}
+
 		// If the engine is paused, sleep until it resumes.
 		vuPause := e.vuPause
 		if vuPause != nil {
@@ -525,6 +539,7 @@ func (e *Engine) runVU(ctx context.Context, vu *vuEntry) {
 		}
 
 		e.runVUOnce(ctx, vu)
+		vu.Iterations++
 	}
 }
 
