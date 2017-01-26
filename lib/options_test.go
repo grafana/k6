@@ -48,6 +48,11 @@ func TestOptionsApply(t *testing.T) {
 		assert.True(t, opts.Duration.Valid)
 		assert.Equal(t, "2m", opts.Duration.String)
 	})
+	t.Run("Iterations", func(t *testing.T) {
+		opts := Options{}.Apply(Options{Iterations: null.IntFrom(1234)})
+		assert.True(t, opts.Iterations.Valid)
+		assert.Equal(t, int64(1234), opts.Iterations.Int64)
+	})
 	t.Run("Stages", func(t *testing.T) {
 		opts := Options{}.Apply(Options{Stages: []Stage{{Duration: 1 * time.Second}}})
 		assert.NotNil(t, opts.Stages)
