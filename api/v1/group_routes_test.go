@@ -27,7 +27,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"
-	"strconv"
 	"testing"
 )
 
@@ -44,13 +43,14 @@ func (r groupDummyRunner) GetOptions() lib.Options { return lib.Options{} }
 func (r groupDummyRunner) ApplyOptions(opts lib.Options) {}
 
 func TestGetGroups(t *testing.T) {
-	g := &lib.Group{}
-	g1 := &lib.Group{ID: 1, Name: "group 1", Parent: g}
-	g2 := &lib.Group{ID: 2, Name: "group 2", Parent: g1}
-	g.Groups = map[string]*lib.Group{g1.Name: g1}
-	g1.Groups = map[string]*lib.Group{g2.Name: g2}
+	g0, err := lib.NewGroup("", nil)
+	assert.NoError(t, err)
+	g1, err := g0.Group("group 1")
+	assert.NoError(t, err)
+	g2, err := g1.Group("group 2")
+	assert.NoError(t, err)
 
-	engine, err := lib.NewEngine(groupDummyRunner{g}, lib.Options{})
+	engine, err := lib.NewEngine(groupDummyRunner{g0}, lib.Options{})
 	assert.NoError(t, err)
 
 	t.Run("list", func(t *testing.T) {
@@ -76,33 +76,33 @@ func TestGetGroups(t *testing.T) {
 			if assert.Len(t, groups, 3) {
 				for _, g := range groups {
 					switch g.ID {
-					case 0:
+					case g0.ID:
 						assert.Equal(t, "", g.Name)
 						assert.Nil(t, g.Parent)
-						assert.Equal(t, int64(0), g.ParentID)
+						assert.Equal(t, "", g.ParentID)
 						assert.Len(t, g.GroupIDs, 1)
-						assert.Contains(t, g.GroupIDs, int64(1))
-					case 1:
+						assert.EqualValues(t, []string{g1.ID}, g.GroupIDs)
+					case g1.ID:
 						assert.Equal(t, "group 1", g.Name)
 						assert.Nil(t, g.Parent)
-						assert.Equal(t, int64(0), g.ParentID)
-						assert.EqualValues(t, []int64{2}, g.GroupIDs)
-					case 2:
+						assert.Equal(t, g0.ID, g.ParentID)
+						assert.EqualValues(t, []string{g2.ID}, g.GroupIDs)
+					case g2.ID:
 						assert.Equal(t, "group 2", g.Name)
 						assert.Nil(t, g.Parent)
-						assert.Equal(t, int64(1), g.ParentID)
-						assert.EqualValues(t, []int64{}, g.GroupIDs)
+						assert.Equal(t, g1.ID, g.ParentID)
+						assert.EqualValues(t, []string{}, g.GroupIDs)
 					default:
-						assert.Fail(t, "Unknown ID: %d", g.ID)
+						assert.Fail(t, "Unknown ID: "+g.ID)
 					}
 				}
 			}
 		})
 	})
-	for _, gp := range []*lib.Group{g, g1, g2} {
+	for _, gp := range []*lib.Group{g0, g1, g2} {
 		t.Run(gp.Name, func(t *testing.T) {
 			rw := httptest.NewRecorder()
-			NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "GET", "/v1/groups/"+strconv.FormatInt(gp.ID, 10), nil))
+			NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "GET", "/v1/groups/"+gp.ID, nil))
 			res := rw.Result()
 			assert.Equal(t, http.StatusOK, res.StatusCode)
 		})
