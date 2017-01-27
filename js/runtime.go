@@ -34,7 +34,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 )
 
 const wrapper = "(function() { var e = {}; (function(exports) {%s\n})(e); return e; })();"
@@ -46,7 +45,6 @@ var (
 
 type Runtime struct {
 	VM      *otto.Otto
-	Root    string
 	Exports map[string]otto.Value
 	Metrics map[string]*stats.Metric
 	Options lib.Options
@@ -55,14 +53,8 @@ type Runtime struct {
 }
 
 func New() (*Runtime, error) {
-	wd, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
-
 	rt := &Runtime{
 		VM:      otto.New(),
-		Root:    wd,
 		Exports: make(map[string]otto.Value),
 		Metrics: make(map[string]*stats.Metric),
 		lib:     make(map[string]otto.Value),
@@ -125,13 +117,9 @@ func (r *Runtime) extractOptions(exports otto.Value, opts *lib.Options) error {
 }
 
 func (r *Runtime) loadFile(filename string) (otto.Value, error) {
-	// To protect against directory traversal, prevent loading of files outside the root (pwd) dir
 	path, err := filepath.Abs(filename)
 	if err != nil {
 		return otto.UndefinedValue(), err
-	}
-	if !strings.HasPrefix(path, r.Root) {
-		return otto.UndefinedValue(), DirectoryTraversalError{Filename: filename, Root: r.Root}
 	}
 
 	// Don't re-compile repeated includes of the same module
