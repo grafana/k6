@@ -109,12 +109,13 @@ func (a JSAPI) DoCheck(call otto.FunctionCall) otto.Value {
 	success := true
 	arg0 := call.Argument(0)
 	for _, v := range call.ArgumentList[1:] {
-		samples := make([]stats.Sample, len(call.ArgumentList)-1)
 		obj := v.Object()
 		if obj == nil {
 			panic(call.Otto.MakeTypeError("checks must be objects"))
 		}
-		for i, name := range obj.Keys() {
+		keys := obj.Keys()
+		samples := make([]stats.Sample, len(keys))
+		for i, name := range keys {
 			val, err := obj.Get(name)
 			if err != nil {
 				throw(call.Otto, err)
