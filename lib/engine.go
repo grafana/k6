@@ -45,6 +45,8 @@ var (
 	MetricVUsMax     = stats.New("vus_max", stats.Gauge)
 	MetricIterations = stats.New("iterations", stats.Gauge)
 	MetricTaints     = stats.New("taints", stats.Gauge)
+
+	MetricChecks = stats.New("checks", stats.Rate)
 )
 
 // Special error used to signal that a VU wants a taint, without logging an error.

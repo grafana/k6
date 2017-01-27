@@ -134,5 +134,10 @@ func NewCheck(name string, group *Group) (*Check, error) {
 	hash := md5.Sum([]byte(path))
 	id := hex.EncodeToString(hash[:])
 
-	return &Check{ID: id, Path: path, Name: name, Group: group}, nil
+	return &Check{
+		ID:    id,
+		Path:  path,
+		Group: group,
+		Name:  name,
+	}, nil
 }
