@@ -47,9 +47,9 @@ import (
 )
 
 const (
-	TypeAuto = "auto"
-	TypeURL  = "url"
-	TypeJS   = "js"
+	TypeAuto 	= "auto"
+	TypeURL  	= "url"
+	TypeJS   	= "js"
 )
 
 var commandRun = cli.Command{
@@ -155,6 +155,9 @@ func guessType(filename string) string {
 }
 
 func makeRunner(filename, t string) (lib.Runner, error) {
+	if filename == "-" && t == TypeAuto {
+		return nil, errors.New("Unable to auto-detect type when reading from STDIN; please use -t/--type flag")
+	}
 	if t == TypeAuto {
 		t = guessType(filename)
 	}

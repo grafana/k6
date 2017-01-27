@@ -24,6 +24,7 @@ import (
 	"context"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
+	"os"
 	"io"
 	"io/ioutil"
 	"math"
@@ -33,6 +34,7 @@ import (
 	"net/url"
 	"strconv"
 	"time"
+	"strings"
 )
 
 var (
@@ -55,7 +57,14 @@ type Runner struct {
 }
 
 func New(rawurl string) (*Runner, error) {
-	u, err := url.Parse(rawurl)
+	if rawurl == "-" {
+		urlbytes, err := ioutil.ReadAll(os.Stdin)
+		if err != nil {
+			return nil, err
+		}
+		rawurl = string(urlbytes)
+	}
+	u, err := url.Parse(strings.TrimSpace(rawurl))
 	if err != nil {
 		return nil, err
 	}
