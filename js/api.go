@@ -74,7 +74,10 @@ func (a JSAPI) Log(level int, msg string, args []otto.Value) {
 
 func (a JSAPI) DoGroup(call otto.FunctionCall) otto.Value {
 	name := call.Argument(0).String()
-	group, _ := a.vu.group.Group(name, &(a.vu.runner.groupIDCounter))
+	group, err := a.vu.group.Group(name)
+	if err != nil {
+		throw(call.Otto, err)
+	}
 	a.vu.group = group
 	defer func() { a.vu.group = group.Parent }()
 
@@ -117,7 +120,10 @@ func (a JSAPI) DoCheck(call otto.FunctionCall) otto.Value {
 				throw(call.Otto, err)
 			}
 
-			check, _ := a.vu.group.Check(name, &(a.vu.runner.checkIDCounter))
+			check, err := a.vu.group.Check(name)
+			if err != nil {
+				throw(call.Otto, err)
+			}
 			if result {
 				atomic.AddInt64(&(check.Passes), 1)
 			} else {

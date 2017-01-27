@@ -24,11 +24,11 @@ import (
 	"github.com/loadimpact/k6/lib"
 	"github.com/manyminds/api2go/jsonapi"
 	"github.com/pkg/errors"
-	"strconv"
 )
 
 type Check struct {
-	ID     int64  `json:"id"`
+	ID     string `json:"id"`
+	Path   string `json:"path"`
 	Name   string `json:"name"`
 	Passes int64  `json:"passes"`
 	Fails  int64  `json:"fails"`
@@ -37,6 +37,7 @@ type Check struct {
 func NewCheck(c *lib.Check) Check {
 	return Check{
 		ID:     c.ID,
+		Path:   c.Path,
 		Name:   c.Name,
 		Passes: c.Passes,
 		Fails:  c.Fails,
@@ -44,19 +45,21 @@ func NewCheck(c *lib.Check) Check {
 }
 
 type Group struct {
-	ID     int64   `json:"-"`
+	ID     string  `json:"-"`
+	Path   string  `json:"path"`
 	Name   string  `json:"name"`
 	Checks []Check `json:"checks"`
 
 	Parent   *Group   `json:"-"`
-	ParentID int64    `json:"-"`
+	ParentID string   `json:"-"`
 	Groups   []*Group `json:"-"`
-	GroupIDs []int64  `json:"-"`
+	GroupIDs []string `json:"-"`
 }
 
 func NewGroup(g *lib.Group, parent *Group) *Group {
 	group := &Group{
 		ID:   g.ID,
+		Path: g.Path,
 		Name: g.Name,
 	}
 
@@ -80,15 +83,11 @@ func NewGroup(g *lib.Group, parent *Group) *Group {
 }
 
 func (g Group) GetID() string {
-	return strconv.FormatInt(g.ID, 10)
+	return g.ID
 }
 
 func (g *Group) SetID(v string) error {
-	id, err := strconv.ParseInt(v, 10, 64)
-	if err != nil {
-		return err
-	}
-	g.ID = id
+	g.ID = v
 	return nil
 }
 
@@ -128,17 +127,9 @@ func (g Group) GetReferencedIDs() []jsonapi.ReferenceID {
 	return refs
 }
 
-func (g *Group) SetToManyReferenceIDs(name string, IDs []string) error {
+func (g *Group) SetToManyReferenceIDs(name string, ids []string) error {
 	switch name {
 	case "groups":
-		ids := make([]int64, len(IDs))
-		for i, ID := range IDs {
-			id, err := strconv.ParseInt(ID, 10, 64)
-			if err != nil {
-				return err
-			}
-			ids[i] = id
-		}
 		g.Groups = nil
 		g.GroupIDs = ids
 		return nil
@@ -147,13 +138,9 @@ func (g *Group) SetToManyReferenceIDs(name string, IDs []string) error {
 	}
 }
 
-func (g *Group) SetToOneReferenceID(name, ID string) error {
+func (g *Group) SetToOneReferenceID(name, id string) error {
 	switch name {
 	case "parent":
-		id, err := strconv.ParseInt(ID, 10, 64)
-		if err != nil {
-			return err
-		}
 		g.Parent = nil
 		g.ParentID = id
 		return nil

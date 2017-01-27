@@ -21,7 +21,6 @@
 package js
 
 import (
-	// "github.com/robertkrimen/otto"
 	"encoding/json"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
@@ -92,7 +91,7 @@ func (a JSAPI) HTTPRequest(method, url, body string, paramData string) map[strin
 		"method":   method,
 		"url":      url,
 		"status":   strconv.Itoa(res.StatusCode),
-		"group_id": strconv.FormatInt(a.vu.group.ID, 10),
+		"group_id": a.vu.group.ID,
 	}
 	for key, value := range params.Tags {
 		tags[key] = value
