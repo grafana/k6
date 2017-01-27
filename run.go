@@ -229,6 +229,7 @@ func actionRun(cc *cli.Context) error {
 		VUs:          cliInt64(cc, "vus"),
 		VUsMax:       cliInt64(cc, "max"),
 		Duration:     cliDuration(cc, "duration"),
+		Iterations:   cliInt64(cc, "iterations"),
 		Linger:       cliBool(cc, "linger"),
 		AbortOnTaint: cliBool(cc, "abort-on-taint"),
 		Acceptance:   cliFloat64(cc, "acceptance"),
