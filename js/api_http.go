@@ -61,11 +61,11 @@ func (a JSAPI) HTTPRequest(method, url, body string, paramData string) map[strin
 	}
 
 	tags := map[string]string{
-		"vu":       a.vu.IDString,
-		"status":   "0",
-		"method":   method,
-		"url":      url,
-		"group_id": a.vu.group.ID,
+		"vu":     a.vu.IDString,
+		"status": "0",
+		"method": method,
+		"url":    url,
+		"group":  a.vu.group.Path,
 	}
 	for key, value := range params.Tags {
 		tags[key] = value

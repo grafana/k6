@@ -143,9 +143,8 @@ func (a JSAPI) DoCheck(call otto.FunctionCall) otto.Value {
 				Time:   t,
 				Metric: metrics.Checks,
 				Tags: map[string]string{
-					"group_id": check.Group.ID,
-					"check_id": check.ID,
-					"path":     check.Path, // Included for human readability.
+					"group": check.Group.Path,
+					"check": check.Name,
 				},
 				Value: sampleValue,
 			}
