@@ -47,6 +47,7 @@ import (
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/simple"
 	"github.com/loadimpact/k6/stats"
+	"github.com/loadimpact/k6/stats/cloud"
 	"github.com/loadimpact/k6/stats/influxdb"
 	"github.com/loadimpact/k6/stats/json"
 	"github.com/loadimpact/k6/ui"
@@ -235,6 +236,8 @@ func makeCollector(s string, src *lib.SourceData, opts lib.Options) (lib.Collect
 		return influxdb.New(p, opts)
 	case "json":
 		return json.New(p, afero.NewOsFs(), opts)
+	case "cloud":
+		return cloud.New(p, opts)
 	default:
 		return nil, errors.New("Unknown output type: " + t)
 	}
