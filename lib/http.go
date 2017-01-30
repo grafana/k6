@@ -51,14 +51,14 @@ type Trail struct {
 
 func (tr Trail) Samples(tags map[string]string) []stats.Sample {
 	return []stats.Sample{
-		stats.Sample{Metric: metrics.HTTPReqs, Time: tr.StartTime, Tags: tags, Value: 1},
-		stats.Sample{Metric: metrics.HTTPReqDuration, Time: tr.StartTime, Tags: tags, Value: float64(tr.Duration)},
-		stats.Sample{Metric: metrics.HTTPReqBlocked, Time: tr.StartTime, Tags: tags, Value: float64(tr.Blocked)},
-		stats.Sample{Metric: metrics.HTTPReqLookingUp, Time: tr.StartTime, Tags: tags, Value: float64(tr.LookingUp)},
-		stats.Sample{Metric: metrics.HTTPReqConnecting, Time: tr.StartTime, Tags: tags, Value: float64(tr.Connecting)},
-		stats.Sample{Metric: metrics.HTTPReqSending, Time: tr.StartTime, Tags: tags, Value: float64(tr.Sending)},
-		stats.Sample{Metric: metrics.HTTPReqWaiting, Time: tr.StartTime, Tags: tags, Value: float64(tr.Waiting)},
-		stats.Sample{Metric: metrics.HTTPReqReceiving, Time: tr.StartTime, Tags: tags, Value: float64(tr.Receiving)},
+		{Metric: metrics.HTTPReqs, Time: tr.StartTime, Tags: tags, Value: 1},
+		{Metric: metrics.HTTPReqDuration, Time: tr.StartTime, Tags: tags, Value: float64(tr.Duration)},
+		{Metric: metrics.HTTPReqBlocked, Time: tr.StartTime, Tags: tags, Value: float64(tr.Blocked)},
+		{Metric: metrics.HTTPReqLookingUp, Time: tr.StartTime, Tags: tags, Value: float64(tr.LookingUp)},
+		{Metric: metrics.HTTPReqConnecting, Time: tr.StartTime, Tags: tags, Value: float64(tr.Connecting)},
+		{Metric: metrics.HTTPReqSending, Time: tr.StartTime, Tags: tags, Value: float64(tr.Sending)},
+		{Metric: metrics.HTTPReqWaiting, Time: tr.StartTime, Tags: tags, Value: float64(tr.Waiting)},
+		{Metric: metrics.HTTPReqReceiving, Time: tr.StartTime, Tags: tags, Value: float64(tr.Receiving)},
 	}
 }
 
