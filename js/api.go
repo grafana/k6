@@ -22,7 +22,7 @@ package js
 
 import (
 	log "github.com/Sirupsen/logrus"
-	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/stats"
 	"github.com/robertkrimen/otto"
 	"strconv"
@@ -141,7 +141,7 @@ func (a JSAPI) DoCheck(call otto.FunctionCall) otto.Value {
 
 			samples[i] = stats.Sample{
 				Time:   t,
-				Metric: lib.MetricChecks,
+				Metric: metrics.Checks,
 				Tags: map[string]string{
 					"group_id": check.Group.ID,
 					"check_id": check.ID,
