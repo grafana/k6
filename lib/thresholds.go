@@ -25,7 +25,6 @@ import (
 	"github.com/loadimpact/k6/stats"
 	"github.com/pkg/errors"
 	"github.com/robertkrimen/otto"
-	"time"
 )
 
 const jsEnv = `
@@ -78,12 +77,6 @@ type Thresholds struct {
 
 func NewThresholds(sources []string) (Thresholds, error) {
 	vm := otto.New()
-	_ = vm.Set("ns", time.Nanosecond)
-	_ = vm.Set("us", time.Microsecond)
-	_ = vm.Set("ms", time.Millisecond)
-	_ = vm.Set("s", time.Second)
-	_ = vm.Set("m", time.Minute)
-	_ = vm.Set("h", time.Hour)
 
 	if _, err := vm.Eval(jsEnv); err != nil {
 		return Thresholds{}, errors.Wrap(err, "builtin")
