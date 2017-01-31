@@ -23,13 +23,13 @@ package js
 import (
 	"encoding/json"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/stats"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptrace"
 	"strconv"
 	"strings"
-	"time"
 )
 
 type HTTPResponse struct {
@@ -98,13 +98,13 @@ func (a JSAPI) HTTPRequest(method, url, body string, paramData string) map[strin
 		"body":    string(resBody),
 		"headers": headers,
 		"timings": map[string]float64{
-			"duration":   float64(trail.Duration) / float64(time.Millisecond),
-			"blocked":    float64(trail.Blocked) / float64(time.Millisecond),
-			"looking_up": float64(trail.LookingUp) / float64(time.Millisecond),
-			"connecting": float64(trail.Connecting) / float64(time.Millisecond),
-			"sending":    float64(trail.Sending) / float64(time.Millisecond),
-			"waiting":    float64(trail.Waiting) / float64(time.Millisecond),
-			"receiving":  float64(trail.Receiving) / float64(time.Millisecond),
+			"duration":   stats.D(trail.Duration),
+			"blocked":    stats.D(trail.Blocked),
+			"looking_up": stats.D(trail.LookingUp),
+			"connecting": stats.D(trail.Connecting),
+			"sending":    stats.D(trail.Sending),
+			"waiting":    stats.D(trail.Waiting),
+			"receiving":  stats.D(trail.Receiving),
 		},
 	}
 }
