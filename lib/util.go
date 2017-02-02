@@ -20,6 +20,19 @@
 
 package lib
 
+import (
+	"strings"
+)
+
+// Splits a string in the form "key=value".
+func SplitKV(s string) (key, value string) {
+	parts := strings.SplitN(s, "=", 2)
+	if len(parts) == 1 {
+		return parts[0], ""
+	}
+	return parts[0], parts[1]
+}
+
 // Lerp is a linear interpolation between two values x and y, returning the value at the point t,
 // where t is a fraction in the range [0.0 - 1.0].
 func Lerp(x, y int64, t float64) int64 {

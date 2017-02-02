@@ -27,9 +27,6 @@ import (
 
 func (a JSAPI) MetricAdd(m *stats.Metric, v float64, tags map[string]string) {
 	t := time.Now()
-	if m.Contains == stats.Time {
-		v *= 1000
-	}
 	s := stats.Sample{Metric: m, Time: t, Tags: tags, Value: v}
 	a.vu.Samples = append(a.vu.Samples, s)
 }

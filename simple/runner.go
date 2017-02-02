@@ -35,17 +35,6 @@ import (
 	"time"
 )
 
-var (
-	MetricReqs          = stats.New("http_reqs", stats.Counter)
-	MetricReqDuration   = stats.New("http_req_duration", stats.Trend, stats.Time)
-	MetricReqBlocked    = stats.New("http_req_blocked", stats.Trend, stats.Time)
-	MetricReqLookingUp  = stats.New("http_req_looking_up", stats.Trend, stats.Time)
-	MetricReqConnecting = stats.New("http_req_connecting", stats.Trend, stats.Time)
-	MetricReqSending    = stats.New("http_req_sending", stats.Trend, stats.Time)
-	MetricReqWaiting    = stats.New("http_req_waiting", stats.Trend, stats.Time)
-	MetricReqReceiving  = stats.New("http_req_receiving", stats.Trend, stats.Time)
-)
-
 type Runner struct {
 	URL       *url.URL
 	Transport *http.Transport
@@ -120,34 +109,25 @@ type VU struct {
 }
 
 func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
-	resp, err := u.Client.Do(u.Request.WithContext(httptrace.WithClientTrace(ctx, u.cTrace)))
-	if err != nil {
-		u.tracer.Done()
-		return nil, err
-	}
-
-	_, _ = io.Copy(ioutil.Discard, resp.Body)
-	_ = resp.Body.Close()
-	trail := u.tracer.Done()
-
 	tags := map[string]string{
 		"vu":     u.IDString,
+		"status": "0",
 		"method": "GET",
 		"url":    u.URLString,
-		"status": strconv.Itoa(resp.StatusCode),
 	}
 
-	t := time.Now()
-	return []stats.Sample{
-		{Metric: MetricReqs, Time: t, Tags: tags, Value: 1},
-		{Metric: MetricReqDuration, Time: t, Tags: tags, Value: float64(trail.Duration)},
-		{Metric: MetricReqBlocked, Time: t, Tags: tags, Value: float64(trail.Blocked)},
-		{Metric: MetricReqLookingUp, Time: t, Tags: tags, Value: float64(trail.LookingUp)},
-		{Metric: MetricReqConnecting, Time: t, Tags: tags, Value: float64(trail.Connecting)},
-		{Metric: MetricReqSending, Time: t, Tags: tags, Value: float64(trail.Sending)},
-		{Metric: MetricReqWaiting, Time: t, Tags: tags, Value: float64(trail.Waiting)},
-		{Metric: MetricReqReceiving, Time: t, Tags: tags, Value: float64(trail.Receiving)},
-	}, nil
+	resp, err := u.Client.Do(u.Request.WithContext(httptrace.WithClientTrace(ctx, u.cTrace)))
+	if err != nil {
+		return u.tracer.Done().Samples(tags), err
+	}
+	tags["status"] = strconv.Itoa(resp.StatusCode)
+
+	if _, err := io.Copy(ioutil.Discard, resp.Body); err != nil {
+		return u.tracer.Done().Samples(tags), err
+	}
+	_ = resp.Body.Close()
+
+	return u.tracer.Done().Samples(tags), nil
 }
 
 func (u *VU) Reconfigure(id int64) error {

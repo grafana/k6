@@ -22,6 +22,7 @@ package js
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
@@ -47,7 +48,7 @@ type Runner struct {
 	HTTPTransport *http.Transport
 }
 
-func NewRunner(runtime *Runtime, exports otto.Value) (*Runner, error) {
+func NewRunner(rt *Runtime, exports otto.Value) (*Runner, error) {
 	expObj := exports.Object()
 	if expObj == nil {
 		return nil, ErrDefaultExport
@@ -62,7 +63,7 @@ func NewRunner(runtime *Runtime, exports otto.Value) (*Runner, error) {
 	if !callable.IsFunction() {
 		return nil, ErrDefaultExport
 	}
-	if err := runtime.VM.Set(entrypoint, callable); err != nil {
+	if err := rt.VM.Set(entrypoint, callable); err != nil {
 		return nil, err
 	}
 
@@ -72,9 +73,9 @@ func NewRunner(runtime *Runtime, exports otto.Value) (*Runner, error) {
 	}
 
 	r := &Runner{
-		Runtime:      runtime,
+		Runtime:      rt,
 		DefaultGroup: defaultGroup,
-		Options:      runtime.Options,
+		Options:      rt.Options,
 		HTTPTransport: &http.Transport{
 			Proxy: http.ProxyFromEnvironment,
 			DialContext: (&net.Dialer{
@@ -82,6 +83,9 @@ func NewRunner(runtime *Runtime, exports otto.Value) (*Runner, error) {
 				KeepAlive: 60 * time.Second,
 				DualStack: true,
 			}).DialContext,
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: rt.Options.InsecureSkipTLSVerify.Bool,
+			},
 			MaxIdleConns:        math.MaxInt32,
 			MaxIdleConnsPerHost: math.MaxInt32,
 		},
@@ -110,7 +114,7 @@ func (r *Runner) NewVU() (lib.VU, error) {
 	}
 	u.callable = callable
 
-	if err := u.vm.Set("__jsapi__", JSAPI{u}); err != nil {
+	if err := u.vm.Set("__jsapi__", &JSAPI{u}); err != nil {
 		return nil, err
 	}
 

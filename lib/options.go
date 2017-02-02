@@ -32,11 +32,13 @@ type Options struct {
 	Iterations null.Int    `json:"iterations"`
 	Stages     []Stage     `json:"stage"`
 
-	Linger       null.Bool  `json:"linger"`
-	AbortOnTaint null.Bool  `json:"abortOnTaint"`
-	Acceptance   null.Float `json:"acceptance"`
+	Linger        null.Bool  `json:"linger"`
+	AbortOnTaint  null.Bool  `json:"abortOnTaint"`
+	NoUsageReport null.Bool  `json:"noUsageReport"`
+	Acceptance    null.Float `json:"acceptance"`
 
-	MaxRedirects null.Int `json:"maxRedirects"`
+	MaxRedirects          null.Int  `json:"maxRedirects"`
+	InsecureSkipTLSVerify null.Bool `json:"insecureSkipTLSVerify"`
 
 	Thresholds map[string]Thresholds `json:"thresholds"`
 }
@@ -69,8 +71,14 @@ func (o Options) Apply(opts Options) Options {
 	if opts.Acceptance.Valid {
 		o.Acceptance = opts.Acceptance
 	}
+	if opts.NoUsageReport.Valid {
+		o.NoUsageReport = opts.NoUsageReport
+	}
 	if opts.MaxRedirects.Valid {
 		o.MaxRedirects = opts.MaxRedirects
+	}
+	if opts.InsecureSkipTLSVerify.Valid {
+		o.InsecureSkipTLSVerify = opts.InsecureSkipTLSVerify
 	}
 	if opts.Thresholds != nil {
 		o.Thresholds = opts.Thresholds
@@ -85,5 +93,6 @@ func (o Options) SetAllValid(valid bool) Options {
 	o.Duration.Valid = valid
 	o.Linger.Valid = valid
 	o.AbortOnTaint.Valid = valid
+	o.NoUsageReport.Valid = valid
 	return o
 }
