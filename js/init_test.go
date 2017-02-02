@@ -24,6 +24,9 @@ import (
 	"fmt"
 	"github.com/loadimpact/k6/stats"
 	"github.com/stretchr/testify/assert"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -103,4 +106,37 @@ func TestNewMetric(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestOpen(t *testing.T) {
+	tmp := os.TempDir()
+	path := filepath.Join(tmp, "k6_init_test.json")
+	assert.NoError(t, ioutil.WriteFile(path, []byte(`{"a": 1}`), 0775))
+	defer func() { _ = os.Remove(path) }()
+
+	t.Run("existing", func(t *testing.T) {
+		assert.NoError(t, runSnippet(fmt.Sprintf(`
+		let data = open('%s');
+		export default function() {
+			if (data !== '{"a": 1}') { throw new Error(); }
+		}
+		`, path)))
+	})
+
+	t.Run("nonexistent", func(t *testing.T) {
+		assert.EqualError(t, runSnippet(`
+		// If you have a file called this, this test will fail.
+		// I will also have several questions for you.
+		let data = open('/dfghuibiuafeuieawfba.txt');
+		export default function() {}
+		`), "Error: open /dfghuibiuafeuieawfba.txt: no such file or directory")
+	})
+
+	t.Run("runtime prohibited", func(t *testing.T) {
+		assert.EqualError(t, runSnippet(fmt.Sprintf(`
+		export default function() {
+			let data = open('%s');
+		}
+		`, path)), "Error: open() is only permitted during initialization")
+	})
 }

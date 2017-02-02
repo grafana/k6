@@ -25,11 +25,15 @@ import (
 	"fmt"
 	"github.com/loadimpact/k6/stats"
 	"github.com/robertkrimen/otto"
+	"io/ioutil"
+	"path/filepath"
 	"strings"
 )
 
 type InitAPI struct {
 	r *Runtime
+
+	fileCache map[string]string
 }
 
 func (i *InitAPI) NewMetric(it int, name string, isTime bool) *stats.Metric {
@@ -69,4 +73,28 @@ func (i *InitAPI) Require(name string) otto.Value {
 		throw(i.r.VM, err)
 	}
 	return exports
+}
+
+func (i *InitAPI) Open(name string) string {
+	if i.fileCache == nil {
+		i.fileCache = make(map[string]string)
+	}
+
+	path, err := filepath.Abs(name)
+	if err != nil {
+		throw(i.r.VM, err)
+	}
+
+	if data, ok := i.fileCache[path]; ok {
+		return data
+	}
+
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		throw(i.r.VM, err)
+	}
+
+	s := string(data)
+	i.fileCache[path] = s
+	return s
 }
