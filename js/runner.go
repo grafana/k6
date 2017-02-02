@@ -83,9 +83,7 @@ func NewRunner(rt *Runtime, exports otto.Value) (*Runner, error) {
 				KeepAlive: 60 * time.Second,
 				DualStack: true,
 			}).DialContext,
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: rt.Options.InsecureSkipTLSVerify.Bool,
-			},
+			TLSClientConfig:     &tls.Config{},
 			MaxIdleConns:        math.MaxInt32,
 			MaxIdleConnsPerHost: math.MaxInt32,
 		},
@@ -131,6 +129,7 @@ func (r *Runner) GetOptions() lib.Options {
 
 func (r *Runner) ApplyOptions(opts lib.Options) {
 	r.Options = r.Options.Apply(opts)
+	r.HTTPTransport.TLSClientConfig.InsecureSkipVerify = opts.InsecureSkipTLSVerify.Bool
 }
 
 type VU struct {

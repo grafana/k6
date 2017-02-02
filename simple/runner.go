@@ -22,6 +22,7 @@ package simple
 
 import (
 	"context"
+	"crypto/tls"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
 	"io"
@@ -58,6 +59,7 @@ func New(rawurl string) (*Runner, error) {
 				KeepAlive: 60 * time.Second,
 				DualStack: true,
 			}).DialContext,
+			TLSClientConfig:     &tls.Config{},
 			MaxIdleConns:        math.MaxInt32,
 			MaxIdleConnsPerHost: math.MaxInt32,
 		},
@@ -93,6 +95,7 @@ func (r Runner) GetOptions() lib.Options {
 
 func (r *Runner) ApplyOptions(opts lib.Options) {
 	r.Options = r.Options.Apply(opts)
+	r.Transport.TLSClientConfig.InsecureSkipVerify = opts.InsecureSkipTLSVerify.Bool
 }
 
 type VU struct {
