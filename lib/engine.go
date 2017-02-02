@@ -90,7 +90,7 @@ func parseSubmetric(name string) (string, map[string]string) {
 type Engine struct {
 	Runner    Runner
 	Options   Options
-	Collector stats.Collector
+	Collector Collector
 	Logger    *log.Logger
 
 	Stages      []Stage

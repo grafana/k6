@@ -208,7 +208,7 @@ func parseCollectorString(s string) (t, p string, err error) {
 	return parts[0], parts[1], nil
 }
 
-func makeCollector(s string) (stats.Collector, error) {
+func makeCollector(s string) (lib.Collector, error) {
 	t, p, err := parseCollectorString(s)
 	if err != nil {
 		return nil, err
@@ -294,7 +294,7 @@ func actionRun(cc *cli.Context) error {
 	runner.ApplyOptions(opts)
 
 	// Make the metric collector, if requested.
-	var collector stats.Collector
+	var collector lib.Collector
 	collectorString := "-"
 	if out != "" {
 		c, err := makeCollector(out)

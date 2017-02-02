@@ -18,10 +18,11 @@
  *
  */
 
-package stats
+package lib
 
 import (
 	"context"
+	"github.com/loadimpact/k6/stats"
 )
 
 // A Collector abstracts away the details of a storage backend from the application.
@@ -32,5 +33,5 @@ type Collector interface {
 
 	// Collect receives a set of samples. This method is never called concurrently, and only while
 	// the context for Run() is valid, but should defer as much work as possible to Run().
-	Collect(samples []Sample)
+	Collect(samples []stats.Sample)
 }
