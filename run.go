@@ -102,6 +102,10 @@ var commandRun = cli.Command{
 			Usage: "follow at most n redirects",
 			Value: 10,
 		},
+		cli.BoolFlag{
+			Name:  "insecure-skip-tls-verify",
+			Usage: "INSECURE: skip verification of TLS certificates",
+		},
 		cli.StringFlag{
 			Name:  "out, o",
 			Usage: "output metrics to an external data store",
@@ -232,16 +236,17 @@ func actionRun(cc *cli.Context) error {
 	addr := cc.GlobalString("address")
 	out := cc.String("out")
 	cliOpts := lib.Options{
-		Paused:        cliBool(cc, "paused"),
-		VUs:           cliInt64(cc, "vus"),
-		VUsMax:        cliInt64(cc, "max"),
-		Duration:      cliDuration(cc, "duration"),
-		Iterations:    cliInt64(cc, "iterations"),
-		Linger:        cliBool(cc, "linger"),
-		AbortOnTaint:  cliBool(cc, "abort-on-taint"),
-		Acceptance:    cliFloat64(cc, "acceptance"),
-		MaxRedirects:  cliInt64(cc, "max-redirects"),
-		NoUsageReport: cliBool(cc, "no-usage-report"),
+		Paused:                cliBool(cc, "paused"),
+		VUs:                   cliInt64(cc, "vus"),
+		VUsMax:                cliInt64(cc, "max"),
+		Duration:              cliDuration(cc, "duration"),
+		Iterations:            cliInt64(cc, "iterations"),
+		Linger:                cliBool(cc, "linger"),
+		AbortOnTaint:          cliBool(cc, "abort-on-taint"),
+		Acceptance:            cliFloat64(cc, "acceptance"),
+		MaxRedirects:          cliInt64(cc, "max-redirects"),
+		InsecureSkipTLSVerify: cliBool(cc, "insecure-skip-tls-verify"),
+		NoUsageReport:         cliBool(cc, "no-usage-report"),
 	}
 	opts := cliOpts
 

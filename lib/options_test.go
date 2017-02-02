@@ -79,6 +79,11 @@ func TestOptionsApply(t *testing.T) {
 		assert.True(t, opts.MaxRedirects.Valid)
 		assert.Equal(t, int64(12345), opts.MaxRedirects.Int64)
 	})
+	t.Run("InsecureSkipTLSVerify", func(t *testing.T) {
+		opts := Options{}.Apply(Options{InsecureSkipTLSVerify: null.BoolFrom(true)})
+		assert.True(t, opts.InsecureSkipTLSVerify.Valid)
+		assert.True(t, opts.InsecureSkipTLSVerify.Bool)
+	})
 	t.Run("Thresholds", func(t *testing.T) {
 		opts := Options{}.Apply(Options{Thresholds: map[string]Thresholds{
 			"metric": {
