@@ -34,7 +34,7 @@ type Options struct {
 
 	Linger        null.Bool  `json:"linger"`
 	AbortOnTaint  null.Bool  `json:"abortOnTaint"`
-	NoUsageReport null.Bool  `json:"usageReports"`
+	NoUsageReport null.Bool  `json:"noUsageReport"`
 	Acceptance    null.Float `json:"acceptance"`
 
 	MaxRedirects null.Int `json:"maxRedirects"`

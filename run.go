@@ -112,6 +112,7 @@ var commandRun = cli.Command{
 		cli.BoolFlag{
 			Name:  "no-usage-report",
 			Usage: "don't send heartbeat to k6 project on test execution",
+			EnvVar: "K6_NO_USAGE_REPORT",
 		},
 	},
 	Action: actionRun,
@@ -309,11 +310,13 @@ func actionRun(cc *cli.Context) error {
 	engine.Collector = collector
 
 	// Send usage report, if we're allowed to
-	if opts.NoUsageReport.Valid && opts.NoUsageReport.Bool == false {
+	if opts.NoUsageReport.Valid && !opts.NoUsageReport.Bool	{
 		conn, err := net.Dial("udp", "k6reports.loadimpact.com:6565")
 		if err == nil {
-			conn.Write([]byte("nyoom"))
-			conn.Close()
+			// This is a best-effort attempt to send a usage report. We don't want
+			// to inconvenience users if this doesn't work, for whatever reason
+			_, _ = conn.Write([]byte("nyoom"))
+			_ = conn.Close()
 		}
 	}
 
