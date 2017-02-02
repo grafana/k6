@@ -110,7 +110,7 @@ func (r *Runner) NewVU() (lib.VU, error) {
 	}
 	u.callable = callable
 
-	if err := u.vm.Set("__jsapi__", JSAPI{u}); err != nil {
+	if err := u.vm.Set("__jsapi__", &JSAPI{u}); err != nil {
 		return nil, err
 	}
 

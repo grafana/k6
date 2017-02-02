@@ -32,7 +32,7 @@ type InitAPI struct {
 	r *Runtime
 }
 
-func (i InitAPI) NewMetric(it int, name string, isTime bool) *stats.Metric {
+func (i *InitAPI) NewMetric(it int, name string, isTime bool) *stats.Metric {
 	t := stats.MetricType(it)
 	vt := stats.Default
 	if isTime {
@@ -55,7 +55,7 @@ func (i InitAPI) NewMetric(it int, name string, isTime bool) *stats.Metric {
 	return m
 }
 
-func (i InitAPI) Require(name string) otto.Value {
+func (i *InitAPI) Require(name string) otto.Value {
 	if !strings.HasPrefix(name, ".") {
 		exports, err := i.r.loadLib(name + ".js")
 		if err != nil {
