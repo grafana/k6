@@ -25,6 +25,7 @@ import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/influxdata/influxdb/client/v2"
+	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
 	"net/url"
 	"time"
@@ -39,7 +40,7 @@ type Collector struct {
 	buffer    []stats.Sample
 }
 
-func New(s string) (*Collector, error) {
+func New(s string, opts lib.Options) (*Collector, error) {
 	u, err := url.Parse(s)
 	if err != nil {
 		return nil, err

@@ -208,7 +208,7 @@ func parseCollectorString(s string) (t, p string, err error) {
 	return parts[0], parts[1], nil
 }
 
-func makeCollector(s string) (lib.Collector, error) {
+func makeCollector(s string, opts lib.Options) (lib.Collector, error) {
 	t, p, err := parseCollectorString(s)
 	if err != nil {
 		return nil, err
@@ -216,9 +216,9 @@ func makeCollector(s string) (lib.Collector, error) {
 
 	switch t {
 	case "influxdb":
-		return influxdb.New(p)
+		return influxdb.New(p, opts)
 	case "json":
-		return json.New(p)
+		return json.New(p, opts)
 	default:
 		return nil, errors.New("Unknown output type: " + t)
 	}
@@ -297,7 +297,7 @@ func actionRun(cc *cli.Context) error {
 	var collector lib.Collector
 	collectorString := "-"
 	if out != "" {
-		c, err := makeCollector(out)
+		c, err := makeCollector(out, opts)
 		if err != nil {
 			log.WithError(err).Error("Couldn't create output")
 			return err
