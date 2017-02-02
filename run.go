@@ -37,6 +37,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 	"gopkg.in/urfave/cli.v1"
 	"io/ioutil"
+	"net"
 	"os"
 	"os/signal"
 	"sort"
@@ -44,7 +45,6 @@ import (
 	"sync"
 	"syscall"
 	"time"
-	"net"
 )
 
 const (
@@ -110,8 +110,8 @@ var commandRun = cli.Command{
 			Usage: "read additional config files",
 		},
 		cli.BoolFlag{
-			Name:  "no-usage-report",
-			Usage: "don't send heartbeat to k6 project on test execution",
+			Name:   "no-usage-report",
+			Usage:  "don't send heartbeat to k6 project on test execution",
 			EnvVar: "K6_NO_USAGE_REPORT",
 		},
 	},
@@ -310,7 +310,7 @@ func actionRun(cc *cli.Context) error {
 	engine.Collector = collector
 
 	// Send usage report, if we're allowed to
-	if opts.NoUsageReport.Valid && !opts.NoUsageReport.Bool	{
+	if opts.NoUsageReport.Valid && !opts.NoUsageReport.Bool {
 		conn, err := net.Dial("udp", "k6reports.loadimpact.com:6565")
 		if err == nil {
 			// This is a best-effort attempt to send a usage report. We don't want
