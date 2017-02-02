@@ -27,6 +27,26 @@ import (
 	"testing"
 )
 
+func TestSplitKV(t *testing.T) {
+	testdata := map[string]struct {
+		k string
+		v string
+	}{
+		"key=value":      {"key", "value"},
+		"key=value=blah": {"key", "value=blah"},
+		"key=":           {"key", ""},
+		"key":            {"key", ""},
+	}
+
+	for s, data := range testdata {
+		t.Run(s, func(t *testing.T) {
+			k, v := SplitKV(s)
+			assert.Equal(t, data.k, k)
+			assert.Equal(t, data.v, v)
+		})
+	}
+}
+
 func TestLerp(t *testing.T) {
 	// data[x][y][t] = v
 	data := map[int64]map[int64]map[float64]int64{
