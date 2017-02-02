@@ -37,6 +37,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 	"gopkg.in/urfave/cli.v1"
 	"io/ioutil"
+	"net"
 	"os"
 	"os/signal"
 	"sort"
@@ -107,6 +108,11 @@ var commandRun = cli.Command{
 		cli.StringSliceFlag{
 			Name:  "config, c",
 			Usage: "read additional config files",
+		},
+		cli.BoolFlag{
+			Name:   "no-usage-report",
+			Usage:  "don't send heartbeat to k6 project on test execution",
+			EnvVar: "K6_NO_USAGE_REPORT",
 		},
 	},
 	Action: actionRun,
@@ -225,15 +231,16 @@ func actionRun(cc *cli.Context) error {
 	addr := cc.GlobalString("address")
 	out := cc.String("out")
 	cliOpts := lib.Options{
-		Paused:       cliBool(cc, "paused"),
-		VUs:          cliInt64(cc, "vus"),
-		VUsMax:       cliInt64(cc, "max"),
-		Duration:     cliDuration(cc, "duration"),
-		Iterations:   cliInt64(cc, "iterations"),
-		Linger:       cliBool(cc, "linger"),
-		AbortOnTaint: cliBool(cc, "abort-on-taint"),
-		Acceptance:   cliFloat64(cc, "acceptance"),
-		MaxRedirects: cliInt64(cc, "max-redirects"),
+		Paused:        cliBool(cc, "paused"),
+		VUs:           cliInt64(cc, "vus"),
+		VUsMax:        cliInt64(cc, "max"),
+		Duration:      cliDuration(cc, "duration"),
+		Iterations:    cliInt64(cc, "iterations"),
+		Linger:        cliBool(cc, "linger"),
+		AbortOnTaint:  cliBool(cc, "abort-on-taint"),
+		Acceptance:    cliFloat64(cc, "acceptance"),
+		MaxRedirects:  cliInt64(cc, "max-redirects"),
+		NoUsageReport: cliBool(cc, "no-usage-report"),
 	}
 	opts := cliOpts
 
@@ -301,6 +308,17 @@ func actionRun(cc *cli.Context) error {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	engine.Collector = collector
+
+	// Send usage report, if we're allowed to
+	if opts.NoUsageReport.Valid && !opts.NoUsageReport.Bool {
+		conn, err := net.Dial("udp", "k6reports.loadimpact.com:6565")
+		if err == nil {
+			// This is a best-effort attempt to send a usage report. We don't want
+			// to inconvenience users if this doesn't work, for whatever reason
+			_, _ = conn.Write([]byte("nyoom"))
+			_ = conn.Close()
+		}
+	}
 
 	// Run the engine.
 	wg.Add(1)
