@@ -48,7 +48,7 @@ func TestLoad(t *testing.T) {
 
 	r, err := New()
 	assert.NoError(t, err)
-	assert.NoError(t, r.VM.Set("__initapi__", InitAPI{r: r}))
+	assert.NoError(t, r.VM.Set("__initapi__", &InitAPI{r: r}))
 
 	t.Run("Importing Libraries", func(t *testing.T) {
 		_, err := r.load("test.js", []byte(`
