@@ -126,7 +126,7 @@ func TestExtractOptions(t *testing.T) {
 }
 
 func TestRuntime__ENV(t *testing.T) {
-	os.Setenv("TEST_KEY", "abc123")
+	assert.NoError(t, os.Setenv("TEST_KEY", "abc123"))
 
 	rt, err := New()
 	assert.NoError(t, err)
