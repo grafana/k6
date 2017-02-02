@@ -100,6 +100,7 @@ var commandRun = cli.Command{
 		cli.Int64Flag{
 			Name:  "max-redirects",
 			Usage: "follow at most n redirects",
+			Value: 10,
 		},
 		cli.StringFlag{
 			Name:  "out, o",
