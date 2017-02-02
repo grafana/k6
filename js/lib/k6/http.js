@@ -34,27 +34,21 @@ export class Response {
  * Makes an HTTP request.
  * @param  {string} method      HTTP Method (eg. "GET")
  * @param  {string} url         Request URL (eg. "http://example.com/")
- * @param  {string|Object} body Request body (query for GET/HEAD); objects will be query encoded.
+ * @param  {string|Object} body Request body; objects will be query encoded.
  * @param  {Object} params      Additional parameters.
  * @return {module:k6/http.Response}
  */
 export function request(method, url, body, params = {}) {
 	method = method.toUpperCase();
-	if (body) {
-		if (typeof body === "object") {
-			let formstring = "";
-			for (let key in body) {
-				if (formstring !== "") {
-					formstring += "&";
-				}
-				formstring += key + "=" + encodeURIComponent(body[key]);
+	if (body && typeof body === "object") {
+		let formstring = "";
+		for (let key in body) {
+			if (formstring !== "") {
+				formstring += "&";
 			}
-			body = formstring;
+			formstring += key + "=" + encodeURIComponent(body[key]);
 		}
-		if (method === "GET" || method === "HEAD") {
-			url += (url.includes("?") ? "&" : "?") + body;
-			body = "";
-		}
+		body = formstring;
 	}
 	return new Response(__jsapi__.HTTPRequest(method, url, body, JSON.stringify(params)));
 };
@@ -63,12 +57,11 @@ export function request(method, url, body, params = {}) {
  * Makes a GET request.
  * @see    module:k6/http.request
  * @param  {string} url         Request URL (eg. "http://example.com/")
- * @param  {string|Object} body Request body (query for GET/HEAD); objects will be query encoded.
  * @param  {Object} params      Additional parameters.
  * @return {module:k6/http.Response}
  */
-export function get(url, body, params) {
-	return request("GET", url, body, params);
+export function get(url, params) {
+	return request("GET", url, null, params);
 };
 
 /**
