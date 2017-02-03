@@ -55,7 +55,8 @@ func TestSleep(t *testing.T) {
 			vu, err := r.NewVU()
 			assert.NoError(t, err)
 
-			ctx, _ := context.WithTimeout(context.Background(), 2*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
 			start := time.Now()
 
 			_, err = vu.RunOnce(ctx)
