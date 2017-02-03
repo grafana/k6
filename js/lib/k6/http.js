@@ -40,15 +40,19 @@ export class Response {
  */
 export function request(method, url, body, params = {}) {
 	method = method.toUpperCase();
-	if (body && typeof body === "object") {
-		let formstring = "";
-		for (let key in body) {
-			if (formstring !== "") {
-				formstring += "&";
+	if (body) {
+		if (typeof body === "object") {
+			let formstring = "";
+			for (let key in body) {
+				if (formstring !== "") {
+					formstring += "&";
+				}
+				formstring += key + "=" + encodeURIComponent(body[key]);
 			}
-			formstring += key + "=" + encodeURIComponent(body[key]);
+			body = formstring;
 		}
-		body = formstring;
+	} else {
+		body = ''
 	}
 	return new Response(__jsapi__.HTTPRequest(method, url, body, JSON.stringify(params)));
 };
