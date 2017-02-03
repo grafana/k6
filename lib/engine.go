@@ -524,7 +524,12 @@ func (e *Engine) runVU(ctx context.Context, vu *vuEntry) {
 		default:
 		}
 
-		if !e.runVUOnce(ctx, vu) {
+		succ := e.runVUOnce(ctx, vu)
+		atomic.AddInt64(&vu.Iterations, 1)
+		atomic.AddInt64(&e.numIterations, 1)
+		if !succ {
+			atomic.AddInt64(&e.numErrors, 1)
+
 			backoffCounter++
 			backoff += BackoffAmount * time.Duration(backoffCounter)
 			if backoff > BackoffMax {
@@ -571,13 +576,7 @@ func (e *Engine) runVUOnce(ctx context.Context, vu *vuEntry) bool {
 	vu.Samples = append(vu.Samples, samples...)
 	vu.lock.Unlock()
 
-	atomic.AddInt64(&vu.Iterations, 1)
-	atomic.AddInt64(&e.numIterations, 1)
-	if err != nil {
-		atomic.AddInt64(&e.numErrors, 1)
-		return false
-	}
-	return true
+	return err != nil
 }
 
 func (e *Engine) runMetricsEmission(ctx context.Context) {
