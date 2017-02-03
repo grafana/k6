@@ -9,7 +9,7 @@ var (
 	VUs        = stats.New("vus", stats.Gauge)
 	VUsMax     = stats.New("vus_max", stats.Gauge)
 	Iterations = stats.New("iterations", stats.Gauge)
-	Errors     = stats.New("errors", stats.Gauge)
+	Errors     = stats.New("errors", stats.Counter)
 
 	// Runner-emitted.
 	Checks = stats.New("checks", stats.Rate)
