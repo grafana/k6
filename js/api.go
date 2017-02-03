@@ -99,65 +99,47 @@ func (a JSAPI) DoGroup(call otto.FunctionCall) otto.Value {
 	return val
 }
 
-func (a JSAPI) DoCheck(call otto.FunctionCall) otto.Value {
-	if len(call.ArgumentList) < 2 {
-		return otto.UndefinedValue()
-	}
-
+func (a JSAPI) DoCheck(obj otto.Value, conds map[string]otto.Value, extraTags map[string]string) bool {
 	t := time.Now()
-
 	success := true
-	arg0 := call.Argument(0)
-	for _, v := range call.ArgumentList[1:] {
-		obj := v.Object()
-		if obj == nil {
-			panic(call.Otto.MakeTypeError("checks must be objects"))
+	for name, cond := range conds {
+		check, err := a.vu.group.Check(name)
+		if err != nil {
+			throw(a.vu.vm, err)
 		}
-		keys := obj.Keys()
-		samples := make([]stats.Sample, len(keys))
-		for i, name := range keys {
-			val, err := obj.Get(name)
-			if err != nil {
-				throw(call.Otto, err)
-			}
 
-			result, err := Check(val, arg0)
-			if err != nil {
-				throw(call.Otto, err)
-			}
-
-			check, err := a.vu.group.Check(name)
-			if err != nil {
-				throw(call.Otto, err)
-			}
-
-			sampleValue := 1.0
-			if result {
-				atomic.AddInt64(&(check.Passes), 1)
-			} else {
-				atomic.AddInt64(&(check.Fails), 1)
-				success = false
-				sampleValue = 0.0
-			}
-
-			samples[i] = stats.Sample{
-				Time:   t,
-				Metric: metrics.Checks,
-				Tags: map[string]string{
-					"group": check.Group.Path,
-					"check": check.Name,
-				},
-				Value: sampleValue,
-			}
+		result, err := Check(cond, obj)
+		if err != nil {
+			throw(a.vu.vm, err)
 		}
-		a.vu.Samples = append(a.vu.Samples, samples...)
+
+		tags := map[string]string{
+			"group": check.Group.Path,
+			"check": check.Name,
+		}
+		for k, v := range extraTags {
+			tags[k] = v
+		}
+
+		if result {
+			atomic.AddInt64(&check.Passes, 1)
+			a.vu.Samples = append(a.vu.Samples,
+				stats.Sample{Time: t, Metric: metrics.Checks, Value: 1},
+			)
+		} else {
+			success = false
+			atomic.AddInt64(&check.Fails, 1)
+			a.vu.Samples = append(a.vu.Samples,
+				stats.Sample{Time: t, Metric: metrics.Checks, Value: 0},
+			)
+		}
 	}
 
 	if !success {
 		a.vu.Taint = true
-		return otto.FalseValue()
+		return false
 	}
-	return otto.TrueValue()
+	return true
 }
 
 func (a JSAPI) Taint() {

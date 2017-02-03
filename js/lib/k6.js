@@ -19,11 +19,12 @@ export function group(name, fn, cond) {
 
 /**
  * Runs checks on a value.
- * @param  {any}    val     Value to test.
- * @param  {...Object} sets Sets of tests.
+ * @param  {any}    val  Value to test.
+ * @param  {Object} sets Tests to run on the value.
+ * @param  {Object} tags Extra tags for metrics emission.
  */
-export function check(val, ...sets) {
-	return __jsapi__.DoCheck(val, ...sets);
+export function check(val, conds={}, tags={}) {
+	return __jsapi__.DoCheck(val, conds, tags);
 }
 
 /**
