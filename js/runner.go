@@ -136,7 +136,6 @@ type VU struct {
 	ID       int64
 	IDString string
 	Samples  []stats.Sample
-	Taint    bool
 
 	runner   *Runner
 	vm       *otto.Otto
@@ -157,13 +156,6 @@ func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 	u.ctx = ctx
 	_, err := u.callable.Call(otto.UndefinedValue())
 	u.ctx = nil
-
-	if u.Taint {
-		u.Taint = false
-		if err == nil {
-			err = lib.ErrVUWantsTaint
-		}
-	}
 
 	samples := u.Samples
 	u.Samples = nil

@@ -41,9 +41,6 @@ const (
 	ShutdownTimeout = 10 * time.Second
 )
 
-// Special error used to signal that a VU wants a taint, without logging an error.
-var ErrVUWantsTaint = errors.New("test is tainted")
-
 type vuEntry struct {
 	VU     VU
 	Cancel context.CancelFunc
@@ -116,7 +113,7 @@ type Engine struct {
 
 	// Atomic counters.
 	numIterations int64
-	numTaints     int64
+	numErrors     int64
 
 	thresholdsTainted bool
 
@@ -246,7 +243,7 @@ func (e *Engine) Run(ctx context.Context) error {
 	e.atStageSince = 0
 	e.atStageStartVUs = e.vus
 	e.numIterations = 0
-	e.numTaints = 0
+	e.numErrors = 0
 	e.lock.Unlock()
 
 	var lastTick time.Time
@@ -416,18 +413,10 @@ func (e *Engine) GetVUsMax() int64 {
 }
 
 func (e *Engine) IsTainted() bool {
-	if e.thresholdsTainted {
-		return true
-	}
-
 	e.lock.Lock()
 	defer e.lock.Unlock()
 
-	acceptance := e.Options.Acceptance.Float64
-	if acceptance > 0 {
-		return float64(e.numTaints)/float64(e.numIterations) > acceptance
-	}
-	return e.numTaints > 0
+	return e.thresholdsTainted || e.numErrors > 0
 }
 
 func (e *Engine) AtTime() time.Duration {
@@ -547,13 +536,19 @@ func (e *Engine) runVUOnce(ctx context.Context, vu *vuEntry) {
 	}
 
 	if err != nil {
-		if err != ErrVUWantsTaint {
-			if serr, ok := err.(fmt.Stringer); ok {
-				e.Logger.Error(serr.String())
-			} else {
-				e.Logger.WithError(err).Error("VU Error")
-			}
+		if serr, ok := err.(fmt.Stringer); ok {
+			e.Logger.Error(serr.String())
+		} else {
+			e.Logger.WithError(err).Error("VU Error")
 		}
+		samples = append(samples,
+			stats.Sample{
+				Time:   time.Now(),
+				Metric: metrics.Errors,
+				Tags:   map[string]string{"error": err.Error()},
+				Value:  1,
+			},
+		)
 	}
 
 	vu.lock.Lock()
@@ -562,7 +557,7 @@ func (e *Engine) runVUOnce(ctx context.Context, vu *vuEntry) {
 
 	atomic.AddInt64(&e.numIterations, 1)
 	if err != nil {
-		atomic.AddInt64(&e.numTaints, 1)
+		atomic.AddInt64(&e.numErrors, 1)
 	}
 }
 
@@ -598,11 +593,6 @@ func (e *Engine) emitMetrics() {
 			Time:   t,
 			Metric: metrics.Iterations,
 			Value:  float64(atomic.LoadInt64(&e.numIterations)),
-		},
-		stats.Sample{
-			Time:   t,
-			Metric: metrics.Taints,
-			Value:  float64(atomic.LoadInt64(&e.numTaints)),
 		},
 	)
 }
