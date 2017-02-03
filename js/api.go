@@ -135,10 +135,7 @@ func (a JSAPI) DoCheck(obj otto.Value, conds map[string]otto.Value, extraTags ma
 		}
 	}
 
-	if !success {
-		return false
-	}
-	return true
+	return success
 }
 
 func (a JSAPI) ElapsedMs() float64 {
