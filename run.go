@@ -461,11 +461,11 @@ loop:
 			continue
 		}
 		icon := " "
-		for _, threshold := range engine.Thresholds[name].Thresholds {
-			icon = "✓"
-			if threshold.Failed {
+		if m.Tainted.Valid {
+			if !m.Tainted.Bool {
+				icon = "✓"
+			} else {
 				icon = "✗"
-				break
 			}
 		}
 		fmt.Printf("  %s %s: %s\n", icon, name, val)
