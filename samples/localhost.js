@@ -11,21 +11,21 @@ export let options = {
 
 export default function() {
 	group("front page", function() {
-		check(http.get("http://localhost:8080/", null, {
+		check(http.get("http://localhost:8080/", {
 			tags: {'kind': 'html' },
 		}), {
 			"status is 200": (res) => res.status === 200,
 		});
 	});
 	group("stylesheet", function() {
-		check(http.get("http://localhost:8080/style.css", null, {
+		check(http.get("http://localhost:8080/style.css", {
 			tags: {'kind': 'css' },
 		}), {
 			"status is 200": (res) => res.status === 200,
 		});
 	});
 	group("image", function() {
-		check(http.get("http://localhost:8080/teddy.jpg", null, {
+		check(http.get("http://localhost:8080/teddy.jpg", {
 			tags: {'kind': 'img' },
 		}), {
 			"status is 200": (res) => res.status === 200,
