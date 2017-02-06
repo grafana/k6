@@ -133,9 +133,10 @@ func (r *Runner) ApplyOptions(opts lib.Options) {
 }
 
 type VU struct {
-	ID       int64
-	IDString string
-	Samples  []stats.Sample
+	ID        int64
+	IDString  string
+	Iteration int64
+	Samples   []stats.Sample
 
 	runner   *Runner
 	vm       *otto.Otto
@@ -152,10 +153,14 @@ type VU struct {
 func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 	u.CookieJar.Clear()
 
+	_ = u.vm.Set("__ITER", u.Iteration)
+
 	u.started = time.Now()
 	u.ctx = ctx
 	_, err := u.callable.Call(otto.UndefinedValue())
 	u.ctx = nil
+
+	u.Iteration++
 
 	samples := u.Samples
 	u.Samples = nil
@@ -165,6 +170,7 @@ func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 func (u *VU) Reconfigure(id int64) error {
 	u.ID = id
 	u.IDString = strconv.FormatInt(u.ID, 10)
+	_ = u.vm.Set("__VU", id)
 	return nil
 }
 
