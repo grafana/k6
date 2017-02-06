@@ -124,13 +124,13 @@ func (a JSAPI) DoCheck(obj otto.Value, conds map[string]otto.Value, extraTags ma
 		if result {
 			atomic.AddInt64(&check.Passes, 1)
 			a.vu.Samples = append(a.vu.Samples,
-				stats.Sample{Time: t, Metric: metrics.Checks, Value: 1},
+				stats.Sample{Time: t, Metric: metrics.Checks, Tags: tags, Value: 1},
 			)
 		} else {
 			success = false
 			atomic.AddInt64(&check.Fails, 1)
 			a.vu.Samples = append(a.vu.Samples,
-				stats.Sample{Time: t, Metric: metrics.Checks, Value: 0},
+				stats.Sample{Time: t, Metric: metrics.Checks, Tags: tags, Value: 0},
 			)
 		}
 	}

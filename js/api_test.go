@@ -23,6 +23,7 @@ package js
 import (
 	"context"
 	"fmt"
+	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
@@ -175,7 +176,7 @@ func TestDoCheck(t *testing.T) {
 	assert.NoError(t, err)
 	vu := vu_.(*VU)
 
-	_, err = vu.RunOnce(context.Background())
+	samples, err := vu.RunOnce(context.Background())
 	assert.NoError(t, err)
 
 	c := r.DefaultGroup.Checks["v === 3"]
@@ -184,6 +185,16 @@ func TestDoCheck(t *testing.T) {
 	assert.Equal(t, r.DefaultGroup, c.Group)
 	assert.Equal(t, int64(1), c.Passes)
 	assert.Equal(t, int64(0), c.Fails)
+
+	assert.Len(t, samples, 1)
+	sample := samples[0]
+	assert.False(t, sample.Time.IsZero(), "sample time is zero")
+	assert.Equal(t, metrics.Checks, sample.Metric)
+	assert.Equal(t, 1.0, sample.Value)
+	assert.EqualValues(t, map[string]string{
+		"group": "",
+		"check": "v === 3",
+	}, sample.Tags)
 }
 
 func TestCheckInGroup(t *testing.T) {
@@ -204,7 +215,7 @@ func TestCheckInGroup(t *testing.T) {
 	assert.NoError(t, err)
 	vu := vu_.(*VU)
 
-	_, err = vu.RunOnce(context.Background())
+	samples, err := vu.RunOnce(context.Background())
 	assert.NoError(t, err)
 
 	g := r.DefaultGroup.Groups["group"]
@@ -217,6 +228,16 @@ func TestCheckInGroup(t *testing.T) {
 	assert.Equal(t, g, c.Group)
 	assert.Equal(t, int64(1), c.Passes)
 	assert.Equal(t, int64(0), c.Fails)
+
+	assert.Len(t, samples, 1)
+	sample := samples[0]
+	assert.False(t, sample.Time.IsZero(), "sample time is zero")
+	assert.Equal(t, metrics.Checks, sample.Metric)
+	assert.Equal(t, 1.0, sample.Value)
+	assert.EqualValues(t, map[string]string{
+		"group": "::group",
+		"check": "v === 3",
+	}, sample.Tags)
 }
 
 func TestCheckReturnTrueOnSuccess(t *testing.T) {
