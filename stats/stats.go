@@ -23,6 +23,7 @@ package stats
 import (
 	"errors"
 	"fmt"
+	"gopkg.in/guregu/null.v3"
 	"sort"
 	"strconv"
 	"strings"
@@ -164,7 +165,7 @@ type Metric struct {
 	Name     string     `json:"-"`
 	Type     MetricType `json:"type"`
 	Contains ValueType  `json:"contains"`
-	Tainted  bool       `json:"tainted"`
+	Tainted  null.Bool  `json:"tainted"`
 
 	// Filled in by the API when requested, the server side cannot count on its presence.
 	Sample map[string]float64 `json:"sample"`

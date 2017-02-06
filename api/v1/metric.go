@@ -84,7 +84,7 @@ func NewMetric(m stats.Metric, sink stats.Sink) Metric {
 		Name:     m.Name,
 		Type:     NullMetricType{m.Type, true},
 		Contains: NullValueType{m.Contains, true},
-		Tainted:  null.BoolFrom(m.Tainted),
+		Tainted:  m.Tainted,
 		Sample:   sink.Format(),
 	}
 }

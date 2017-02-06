@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"github.com/loadimpact/k6/stats"
 	"github.com/stretchr/testify/assert"
+	"gopkg.in/guregu/null.v3"
 	"testing"
 )
 
@@ -86,7 +87,7 @@ func TestNewMetric(t *testing.T) {
 		Name:     "name",
 		Type:     stats.Trend,
 		Contains: stats.Time,
-		Tainted:  true,
+		Tainted:  null.BoolFrom(true),
 	}
 	sink := old.NewSink()
 	m := NewMetric(old, sink)

@@ -26,6 +26,7 @@ import (
 	"github.com/loadimpact/k6/stats"
 	"github.com/manyminds/api2go/jsonapi"
 	"github.com/stretchr/testify/assert"
+	"gopkg.in/guregu/null.v3"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -40,7 +41,7 @@ func TestGetMetrics(t *testing.T) {
 			Name:     "my_metric",
 			Type:     stats.Trend,
 			Contains: stats.Time,
-			Tainted:  true,
+			Tainted:  null.BoolFrom(true),
 		}: &stats.TrendSink{},
 	}
 
@@ -83,7 +84,7 @@ func TestGetMetric(t *testing.T) {
 			Name:     "my_metric",
 			Type:     stats.Trend,
 			Contains: stats.Time,
-			Tainted:  true,
+			Tainted:  null.BoolFrom(true),
 		}: &stats.TrendSink{},
 	}
 
