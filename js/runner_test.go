@@ -64,7 +64,6 @@ func TestNewRunner(t *testing.T) {
 
 func TestVUSelfIdentity(t *testing.T) {
 	r, err := newSnippetRunner(`
-	import { _assert } from "k6";
 	export default function() {}
 	`)
 	assert.NoError(t, err)
@@ -74,20 +73,28 @@ func TestVUSelfIdentity(t *testing.T) {
 	vu := vu_.(*VU)
 
 	assert.NoError(t, vu.Reconfigure(1234))
-	_, err = vu.vm.Eval(`_assert(__VU == 1234)`)
-	_, err = vu.vm.Eval(`_assert(__ITER == 0)`)
+	_, err = vu.vm.Eval(`if(__VU != 1234) { throw new Error(__VU); }`)
+	assert.NoError(t, err)
+	_, err = vu.vm.Eval(`if(__ITER != 0) { throw new Error(__ITER); }`)
+	assert.NoError(t, err)
 
 	_, err = vu.RunOnce(context.Background())
 	assert.NoError(t, err)
-	_, err = vu.vm.Eval(`_assert(__VU == 1234)`)
-	_, err = vu.vm.Eval(`_assert(__ITER == 1)`)
+	_, err = vu.vm.Eval(`if(__VU != 1234) { throw new Error(__VU); }`)
+	assert.NoError(t, err)
+	_, err = vu.vm.Eval(`if(__ITER != 0) { throw new Error(__ITER); }`)
+	assert.NoError(t, err)
 
 	_, err = vu.RunOnce(context.Background())
 	assert.NoError(t, err)
-	_, err = vu.vm.Eval(`_assert(__VU == 1234)`)
-	_, err = vu.vm.Eval(`_assert(__ITER == 2)`)
+	_, err = vu.vm.Eval(`if(__VU != 1234) { throw new Error(__VU); }`)
+	assert.NoError(t, err)
+	_, err = vu.vm.Eval(`if(__ITER != 1) { throw new Error(__ITER); }`)
+	assert.NoError(t, err)
 
 	assert.NoError(t, vu.Reconfigure(1234))
-	_, err = vu.vm.Eval(`_assert(__VU == 1234)`)
-	_, err = vu.vm.Eval(`_assert(__ITER == 0)`)
+	_, err = vu.vm.Eval(`if(__VU != 1234) { throw new Error(__VU); }`)
+	assert.NoError(t, err)
+	_, err = vu.vm.Eval(`if(__ITER != 0) { throw new Error(__ITER); }`)
+	assert.NoError(t, err)
 }

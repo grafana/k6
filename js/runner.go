@@ -153,7 +153,9 @@ type VU struct {
 func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 	u.CookieJar.Clear()
 
-	_ = u.vm.Set("__ITER", u.Iteration)
+	if err := u.vm.Set("__ITER", u.Iteration); err != nil {
+		return nil, err
+	}
 
 	u.started = time.Now()
 	u.ctx = ctx
@@ -170,7 +172,15 @@ func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 func (u *VU) Reconfigure(id int64) error {
 	u.ID = id
 	u.IDString = strconv.FormatInt(u.ID, 10)
-	_ = u.vm.Set("__VU", id)
+	u.Iteration = 0
+
+	if err := u.vm.Set("__VU", u.ID); err != nil {
+		return err
+	}
+	if err := u.vm.Set("__ITER", u.Iteration); err != nil {
+		return err
+	}
+
 	return nil
 }
 
