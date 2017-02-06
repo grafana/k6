@@ -64,11 +64,6 @@ func TestOptionsApply(t *testing.T) {
 		assert.True(t, opts.Linger.Valid)
 		assert.True(t, opts.Linger.Bool)
 	})
-	t.Run("AbortOnTaint", func(t *testing.T) {
-		opts := Options{}.Apply(Options{AbortOnTaint: null.BoolFrom(true)})
-		assert.True(t, opts.AbortOnTaint.Valid)
-		assert.True(t, opts.AbortOnTaint.Bool)
-	})
 	t.Run("MaxRedirects", func(t *testing.T) {
 		opts := Options{}.Apply(Options{MaxRedirects: null.IntFrom(12345)})
 		assert.True(t, opts.MaxRedirects.Valid)

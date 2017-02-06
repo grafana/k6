@@ -88,10 +88,6 @@ var commandRun = cli.Command{
 			Name:  "linger, l",
 			Usage: "linger after test completion",
 		},
-		cli.BoolFlag{
-			Name:  "abort-on-taint",
-			Usage: "abort immediately if the test gets tainted",
-		},
 		cli.Int64Flag{
 			Name:  "max-redirects",
 			Usage: "follow at most n redirects",
@@ -237,7 +233,6 @@ func actionRun(cc *cli.Context) error {
 		Duration:              cliDuration(cc, "duration"),
 		Iterations:            cliInt64(cc, "iterations"),
 		Linger:                cliBool(cc, "linger"),
-		AbortOnTaint:          cliBool(cc, "abort-on-taint"),
 		MaxRedirects:          cliInt64(cc, "max-redirects"),
 		InsecureSkipTLSVerify: cliBool(cc, "insecure-skip-tls-verify"),
 		NoUsageReport:         cliBool(cc, "no-usage-report"),

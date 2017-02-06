@@ -33,7 +33,6 @@ type Options struct {
 	Stages     []Stage     `json:"stage"`
 
 	Linger        null.Bool `json:"linger"`
-	AbortOnTaint  null.Bool `json:"abortOnTaint"`
 	NoUsageReport null.Bool `json:"noUsageReport"`
 
 	MaxRedirects          null.Int  `json:"maxRedirects"`
@@ -64,9 +63,6 @@ func (o Options) Apply(opts Options) Options {
 	if opts.Linger.Valid {
 		o.Linger = opts.Linger
 	}
-	if opts.AbortOnTaint.Valid {
-		o.AbortOnTaint = opts.AbortOnTaint
-	}
 	if opts.NoUsageReport.Valid {
 		o.NoUsageReport = opts.NoUsageReport
 	}
@@ -88,7 +84,6 @@ func (o Options) SetAllValid(valid bool) Options {
 	o.VUsMax.Valid = valid
 	o.Duration.Valid = valid
 	o.Linger.Valid = valid
-	o.AbortOnTaint.Valid = valid
 	o.NoUsageReport.Valid = valid
 	return o
 }
