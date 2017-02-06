@@ -643,6 +643,7 @@ func (e *Engine) processThresholds() {
 		}
 		if !succ {
 			e.Logger.WithField("m", m.Name).Debug("Thresholds failed")
+			m.Tainted = true
 			e.thresholdsTainted = true
 		}
 	}

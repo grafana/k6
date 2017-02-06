@@ -40,6 +40,7 @@ func TestGetMetrics(t *testing.T) {
 			Name:     "my_metric",
 			Type:     stats.Trend,
 			Contains: stats.Time,
+			Tainted:  true,
 		}: &stats.TrendSink{},
 	}
 
@@ -68,6 +69,8 @@ func TestGetMetrics(t *testing.T) {
 		assert.Equal(t, stats.Trend, metrics[0].Type.Type)
 		assert.True(t, metrics[0].Contains.Valid)
 		assert.Equal(t, stats.Time, metrics[0].Contains.Type)
+		assert.True(t, metrics[0].Tainted.Valid)
+		assert.True(t, metrics[0].Tainted.Bool)
 	})
 }
 
@@ -80,6 +83,7 @@ func TestGetMetric(t *testing.T) {
 			Name:     "my_metric",
 			Type:     stats.Trend,
 			Contains: stats.Time,
+			Tainted:  true,
 		}: &stats.TrendSink{},
 	}
 
@@ -113,6 +117,8 @@ func TestGetMetric(t *testing.T) {
 			assert.Equal(t, stats.Trend, metric.Type.Type)
 			assert.True(t, metric.Contains.Valid)
 			assert.Equal(t, stats.Time, metric.Contains.Type)
+			assert.True(t, metric.Tainted.Valid)
+			assert.True(t, metric.Tainted.Bool)
 		})
 	})
 }

@@ -86,6 +86,7 @@ func TestNewMetric(t *testing.T) {
 		Name:     "name",
 		Type:     stats.Trend,
 		Contains: stats.Time,
+		Tainted:  true,
 	}
 	sink := old.NewSink()
 	m := NewMetric(old, sink)
@@ -93,6 +94,8 @@ func TestNewMetric(t *testing.T) {
 	assert.True(t, m.Type.Valid)
 	assert.Equal(t, stats.Trend, m.Type.Type)
 	assert.True(t, m.Contains.Valid)
+	assert.True(t, m.Tainted.Bool)
+	assert.True(t, m.Tainted.Valid)
 	assert.Equal(t, stats.Time, m.Contains.Type)
 	assert.NotEmpty(t, m.Sample)
 }
