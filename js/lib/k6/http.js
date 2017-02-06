@@ -72,7 +72,7 @@ export function get(url, params) {
  * Makes a POST request.
  * @see    module:k6/http.request
  * @param  {string} url         Request URL (eg. "http://example.com/")
- * @param  {string|Object} body Request body (query for GET/HEAD); objects will be query encoded.
+ * @param  {string|Object} body Request body; objects will be query encoded.
  * @param  {Object} params      Additional parameters.
  * @return {module:k6/http.Response}
  */
@@ -84,7 +84,7 @@ export function post(url, body, params) {
  * Makes a PUT request.
  * @see    module:k6/http.request
  * @param  {string} url         Request URL (eg. "http://example.com/")
- * @param  {string|Object} body Request body (query for GET/HEAD); objects will be query encoded.
+ * @param  {string|Object} body Request body; objects will be query encoded.
  * @param  {Object} params      Additional parameters.
  * @return {module:k6/http.Response}
  */
@@ -96,7 +96,7 @@ export function put(url, body, params) {
  * Makes a DELETE request.
  * @see    module:k6/http.request
  * @param  {string} url         Request URL (eg. "http://example.com/")
- * @param  {string|Object} body Request body (query for GET/HEAD); objects will be query encoded.
+ * @param  {string|Object} body Request body; objects will be query encoded.
  * @param  {Object} params      Additional parameters.
  * @return {module:k6/http.Response}
  */
@@ -108,7 +108,7 @@ export function del(url, body, params) {
  * Makes a PATCH request.
  * @see    module:k6/http.request
  * @param  {string} url         Request URL (eg. "http://example.com/")
- * @param  {string|Object} body Request body (query for GET/HEAD); objects will be query encoded.
+ * @param  {string|Object} body Request body; objects will be query encoded.
  * @param  {Object} params      Additional parameters.
  * @return {module:k6/http.Response}
  */
