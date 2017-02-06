@@ -116,6 +116,42 @@ export function patch(url, body, params) {
 	return request("PATCH", url, body, params);
 };
 
+/**
+ * Makes a CONNECT request.
+ * @see    module:k6/http.request
+ * @param  {string} url         Request URL (eg. "http://example.com/")
+ * @param  {string|Object} body Request body; objects will be query encoded.
+ * @param  {Object} params      Additional parameters.
+ * @return {module:k6/http.Response}
+ */
+export function connect(url, body, params) {
+	return request("CONNECT", url, body, params);
+};
+
+/**
+ * Makes a OPTIONS request.
+ * @see    module:k6/http.request
+ * @param  {string} url         Request URL (eg. "http://example.com/")
+ * @param  {string|Object} body Request body; objects will be query encoded.
+ * @param  {Object} params      Additional parameters.
+ * @return {module:k6/http.Response}
+ */
+export function options(url, body, params) {
+	return request("OPTIONS", url, body, params);
+};
+
+/**
+ * Makes a TRACE request.
+ * @see    module:k6/http.request
+ * @param  {string} url         Request URL (eg. "http://example.com/")
+ * @param  {string|Object} body Request body; objects will be query encoded.
+ * @param  {Object} params      Additional parameters.
+ * @return {module:k6/http.Response}
+ */
+export function trace(url, body, params) {
+	return request("TRACE", url, body, params);
+};
+
 export default {
 	Response: Response,
 	request: request,
