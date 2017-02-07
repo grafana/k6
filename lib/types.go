@@ -44,7 +44,6 @@ type Options struct {
 type SourceData struct {
 	Data     []byte
 	Filename string
-	Type     string
 }
 
 const (
