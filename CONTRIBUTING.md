@@ -5,7 +5,7 @@ Thank you for your interest in contributing to k6!
 
 (ﾉ◕ヮ◕)ﾉ*:・ﾟ✧
 
-Before you begin, make sure to familiarize yourself with the [Code of Conduct](CODE_OF_CONDUCT.md). If you've previously contributed to other open source project, you may recognize it as the classic [contributor covenant](http://contributor-covenant.org/).
+Before you begin, make sure to familiarize yourself with the [Code of Conduct](CODE_OF_CONDUCT.md). If you've previously contributed to other open source project, you may recognize it as the classic [Contributor Covenant](http://contributor-covenant.org/).
 
 If you want to chat with the team or the community, you can join our Slack team: [LINK GOES HERE].
 
@@ -14,14 +14,14 @@ Filing issues
 
 Don't be afraid to file issues! Nobody can fix a bug we don't know exists, or add a feature we didn't think of.
 
-The worst that can happen is that someone closes it right away and points you in the right direction.  
+The worst that can happen is that someone closes it and points you in the right direction.
 
 That said, "how do I..."-type questions are often more suited for Slack.
 
 Contributing code
 -----------------
 
-If you'd like to contribute code to k6, this is the basic procedure. Make sure to follow the **style guide** described below!
+If you'd like to contribute code to k6, this is the basic procedure. Make sure to follow the [style guide](#style-guide) described below!
 
 1. Find an issue you'd like to fix. If there is none already, or you'd like to add a feature, please open one and we can talk about how to do it.
    
@@ -31,7 +31,7 @@ If you'd like to contribute code to k6, this is the basic procedure. Make sure t
 
 3. Create a pull request - make sure you make it from your feature branch to develop!
 
-4. We well discuss implementation details until it's polished and perfect, then a maintainer will merge it.
+4. We will discuss implementation details until it's polished and perfect, then a maintainer will merge it.
 
 We use [git flow](http://nvie.com/posts/a-successful-git-branching-model/), so you may recognize our branching structure from, well, every other project that does this. If not, have a look at that post and you'll feel right at home in no time.
 
