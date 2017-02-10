@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
+	"github.com/fatih/color"
 	"github.com/ghodss/yaml"
 	"github.com/loadimpact/k6/api"
 	"github.com/loadimpact/k6/js"
@@ -405,6 +406,9 @@ loop:
 	)
 	fmt.Printf("\n")
 
+	red := color.New(color.FgRed).SprintFunc()
+	green := color.New(color.FgGreen).SprintFunc()
+
 	// Print groups.
 	var printGroup func(g *lib.Group, level int)
 	printGroup = func(g *lib.Group, level int) {
@@ -419,9 +423,9 @@ loop:
 				fmt.Printf("\n")
 			}
 			for _, check := range g.Checks {
-				icon := "✓"
+				icon := green("✓")
 				if check.Fails > 0 {
-					icon = "✗"
+					icon = red("✗")
 				}
 				fmt.Printf("%s  %s %2.2f%% - %s\n",
 					indent,
@@ -463,9 +467,9 @@ loop:
 		icon := " "
 		if m.Tainted.Valid {
 			if !m.Tainted.Bool {
-				icon = "✓"
+				icon = green("✓")
 			} else {
-				icon = "✗"
+				icon = red("✗")
 			}
 		}
 		fmt.Printf("  %s %s: %s\n", icon, name, val)
