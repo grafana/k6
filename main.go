@@ -51,9 +51,10 @@ func main() {
 			Usage: "show debug messages",
 		},
 		cli.StringFlag{
-			Name:  "address, a",
-			Usage: "address for the API",
-			Value: "127.0.0.1:6565",
+			Name:   "address, a",
+			Usage:  "address for the API",
+			Value:  "127.0.0.1:6565",
+			EnvVar: "K6_ADDRESS",
 		},
 	}
 	app.Before = func(cc *cli.Context) error {

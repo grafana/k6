@@ -9,4 +9,5 @@ RUN curl -sL https://deb.nodesource.com/setup_6.x | bash && \
 	go get . && go install . && rm -rf $GOPATH/lib && \
 	apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
+ENV K6_ADDRESS 0.0.0.0:6565
 ENTRYPOINT ["k6"]
