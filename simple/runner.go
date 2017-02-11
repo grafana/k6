@@ -44,12 +44,7 @@ type Runner struct {
 	defaultGroup *lib.Group
 }
 
-func New(rawurl string) (*Runner, error) {
-	u, err := url.Parse(rawurl)
-	if err != nil {
-		return nil, err
-	}
-
+func New(u *url.URL) (*Runner, error) {
 	return &Runner{
 		URL: u,
 		Transport: &http.Transport{

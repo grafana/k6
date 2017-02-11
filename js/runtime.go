@@ -88,11 +88,11 @@ func New() (*Runtime, error) {
 	return rt, nil
 }
 
-func (r *Runtime) Load(filename string) (otto.Value, error) {
-	if err := r.VM.Set("__initapi__", &InitAPI{r: r}); err != nil {
+func (r *Runtime) Load(src *lib.SourceData) (otto.Value, error) {
+	if err := r.VM.Set("__initapi__", InitAPI{r: r}); err != nil {
 		return otto.UndefinedValue(), err
 	}
-	exp, err := r.loadFile(filename)
+	exp, err := r.loadSource(src)
 	if err := r.VM.Set("__initapi__", nil); err != nil {
 		return otto.UndefinedValue(), err
 	}
@@ -123,6 +123,27 @@ func (r *Runtime) extractOptions(exports otto.Value, opts *lib.Options) error {
 	}
 
 	return nil
+}
+
+func (r *Runtime) loadSource(src *lib.SourceData) (otto.Value, error) {
+	path, err := filepath.Abs(src.Filename)
+	if err != nil {
+		return otto.UndefinedValue(), err
+	}
+
+	// Don't re-compile repeated includes of the same module
+	if exports, ok := r.Exports[path]; ok {
+		return exports, nil
+	}
+	exports, err := r.load(path, src.Data)
+	if err != nil {
+		return otto.UndefinedValue(), err
+	}
+	r.Exports[path] = exports
+
+	log.WithField("path", path).Debug("File loaded")
+
+	return exports, nil
 }
 
 func (r *Runtime) loadFile(filename string) (otto.Value, error) {
