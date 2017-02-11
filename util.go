@@ -21,10 +21,23 @@
 package main
 
 import (
+	"github.com/ghodss/yaml"
 	"gopkg.in/guregu/null.v3"
 	"gopkg.in/urfave/cli.v1"
+	"os"
 	"time"
 )
+
+func dumpYAML(v interface{}) error {
+	bytes, err := yaml.Marshal(v)
+	if err != nil {
+		return err
+	}
+	if _, err := os.Stdout.Write(bytes); err != nil {
+		return err
+	}
+	return nil
+}
 
 // cliBool returns a CLI argument as a bool, which is invalid if not given.
 func cliBool(cc *cli.Context, name string) null.Bool {
@@ -34,11 +47,6 @@ func cliBool(cc *cli.Context, name string) null.Bool {
 // cliInt64 returns a CLI argument as an int64, which is invalid if not given.
 func cliInt64(cc *cli.Context, name string) null.Int {
 	return null.NewInt(cc.Int64(name), cc.IsSet(name))
-}
-
-// cliFloat64 returns a CLI argument as a float64, which is invalid if not given.
-func cliFloat64(cc *cli.Context, name string) null.Float {
-	return null.NewFloat(cc.Float64(name), cc.IsSet(name))
 }
 
 // cliDuration returns a CLI argument as a duration string, which is invalid if not given.

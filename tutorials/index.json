@@ -1,3 +1,4 @@
 {
-	"getting-started": { "title": "Getting Started" }
+	"getting-started": { "title": "Getting Started" },
+	"metrics-management": { "title": "k6 Metrics Management" }
 }

@@ -22,6 +22,7 @@ package js
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
@@ -32,12 +33,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
-	"sync"
 	"time"
-)
-
-const (
-	DefaultMaxRedirect = 10
 )
 
 var ErrDefaultExport = errors.New("you must export a 'default' function")
@@ -47,19 +43,12 @@ const entrypoint = "__$$entrypoint$$__"
 type Runner struct {
 	Runtime      *Runtime
 	DefaultGroup *lib.Group
-	Groups       []*lib.Group
-	Checks       []*lib.Check
 	Options      lib.Options
 
 	HTTPTransport *http.Transport
-
-	groupIDCounter int64
-	groupsMutex    sync.Mutex
-	checkIDCounter int64
-	checksMutex    sync.Mutex
 }
 
-func NewRunner(runtime *Runtime, exports otto.Value) (*Runner, error) {
+func NewRunner(rt *Runtime, exports otto.Value) (*Runner, error) {
 	expObj := exports.Object()
 	if expObj == nil {
 		return nil, ErrDefaultExport
@@ -74,13 +63,19 @@ func NewRunner(runtime *Runtime, exports otto.Value) (*Runner, error) {
 	if !callable.IsFunction() {
 		return nil, ErrDefaultExport
 	}
-	if err := runtime.VM.Set(entrypoint, callable); err != nil {
+	if err := rt.VM.Set(entrypoint, callable); err != nil {
+		return nil, err
+	}
+
+	defaultGroup, err := lib.NewGroup("", nil)
+	if err != nil {
 		return nil, err
 	}
 
 	r := &Runner{
-		Runtime: runtime,
-		Options: runtime.Options,
+		Runtime:      rt,
+		DefaultGroup: defaultGroup,
+		Options:      rt.Options,
 		HTTPTransport: &http.Transport{
 			Proxy: http.ProxyFromEnvironment,
 			DialContext: (&net.Dialer{
@@ -88,12 +83,11 @@ func NewRunner(runtime *Runtime, exports otto.Value) (*Runner, error) {
 				KeepAlive: 60 * time.Second,
 				DualStack: true,
 			}).DialContext,
+			TLSClientConfig:     &tls.Config{},
 			MaxIdleConns:        math.MaxInt32,
 			MaxIdleConnsPerHost: math.MaxInt32,
 		},
 	}
-	r.DefaultGroup = lib.NewGroup("", nil, nil)
-	r.Groups = []*lib.Group{r.DefaultGroup}
 
 	return r, nil
 }
@@ -118,19 +112,15 @@ func (r *Runner) NewVU() (lib.VU, error) {
 	}
 	u.callable = callable
 
-	if err := u.vm.Set("__jsapi__", JSAPI{u}); err != nil {
+	if err := u.vm.Set("__jsapi__", &JSAPI{u}); err != nil {
 		return nil, err
 	}
 
 	return u, nil
 }
 
-func (r *Runner) GetGroups() []*lib.Group {
-	return r.Groups
-}
-
-func (r *Runner) GetChecks() []*lib.Check {
-	return r.Checks
+func (r *Runner) GetDefaultGroup() *lib.Group {
+	return r.DefaultGroup
 }
 
 func (r *Runner) GetOptions() lib.Options {
@@ -139,13 +129,14 @@ func (r *Runner) GetOptions() lib.Options {
 
 func (r *Runner) ApplyOptions(opts lib.Options) {
 	r.Options = r.Options.Apply(opts)
+	r.HTTPTransport.TLSClientConfig.InsecureSkipVerify = opts.InsecureSkipTLSVerify.Bool
 }
 
 type VU struct {
-	ID       int64
-	IDString string
-	Samples  []stats.Sample
-	Taint    bool
+	ID        int64
+	IDString  string
+	Iteration int64
+	Samples   []stats.Sample
 
 	runner   *Runner
 	vm       *otto.Otto
@@ -162,17 +153,16 @@ type VU struct {
 func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 	u.CookieJar.Clear()
 
+	if err := u.vm.Set("__ITER", u.Iteration); err != nil {
+		return nil, err
+	}
+
 	u.started = time.Now()
 	u.ctx = ctx
 	_, err := u.callable.Call(otto.UndefinedValue())
 	u.ctx = nil
 
-	if u.Taint {
-		u.Taint = false
-		if err == nil {
-			err = lib.ErrVUWantsTaint
-		}
-	}
+	u.Iteration++
 
 	samples := u.Samples
 	u.Samples = nil
@@ -182,6 +172,15 @@ func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 func (u *VU) Reconfigure(id int64) error {
 	u.ID = id
 	u.IDString = strconv.FormatInt(u.ID, 10)
+	u.Iteration = 0
+
+	if err := u.vm.Set("__VU", u.ID); err != nil {
+		return err
+	}
+	if err := u.vm.Set("__ITER", u.Iteration); err != nil {
+		return err
+	}
+
 	return nil
 }
 

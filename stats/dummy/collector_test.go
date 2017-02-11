@@ -18,17 +18,32 @@
  *
  */
 
-package js
+package dummy
 
 import (
-	"fmt"
+	"context"
+	"github.com/loadimpact/k6/stats"
+	"github.com/stretchr/testify/assert"
+	"testing"
+	"time"
 )
 
-type DirectoryTraversalError struct {
-	Filename string
-	Root     string
+func TestCollectorRun(t *testing.T) {
+	c := &Collector{}
+	assert.False(t, c.IsRunning())
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go c.Run(ctx)
+	time.Sleep(1 * time.Millisecond)
+	assert.True(t, c.IsRunning(), "not marked as running")
+
+	cancel()
+	time.Sleep(1 * time.Millisecond)
+	assert.False(t, c.IsRunning(), "not marked as stopped")
 }
 
-func (e DirectoryTraversalError) Error() string {
-	return fmt.Sprintf("loading files outside your working directory is prohibited, to protect against directory traversal attacks (%s is outside %s)", e.Filename, e.Root)
+func TestCollectorCollect(t *testing.T) {
+	c := &Collector{}
+	c.Collect([]stats.Sample{{}})
+	assert.Len(t, c.Samples, 1)
 }

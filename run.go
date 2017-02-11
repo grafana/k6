@@ -34,8 +34,10 @@ import (
 	"github.com/loadimpact/k6/stats/influxdb"
 	"github.com/loadimpact/k6/stats/json"
 	"github.com/loadimpact/k6/ui"
+	"gopkg.in/guregu/null.v3"
 	"gopkg.in/urfave/cli.v1"
 	"io/ioutil"
+	"net"
 	"net/url"
 	"os"
 	"os/signal"
@@ -61,7 +63,7 @@ var commandRun = cli.Command{
 		cli.Int64Flag{
 			Name:  "vus, u",
 			Usage: "virtual users to simulate",
-			Value: 10,
+			Value: 1,
 		},
 		cli.Int64Flag{
 			Name:  "max, m",
@@ -70,12 +72,10 @@ var commandRun = cli.Command{
 		cli.DurationFlag{
 			Name:  "duration, d",
 			Usage: "test duration, 0 to run until cancelled",
-			Value: 10 * time.Second,
 		},
-		cli.Float64Flag{
-			Name:  "acceptance, a",
-			Usage: "acceptable margin of error before failing the test",
-			Value: 0.0,
+		cli.Int64Flag{
+			Name:  "iterations, i",
+			Usage: "run a set number of iterations, multiplied by VU count",
 		},
 		cli.BoolFlag{
 			Name:  "paused, p",
@@ -90,13 +90,14 @@ var commandRun = cli.Command{
 			Name:  "linger, l",
 			Usage: "linger after test completion",
 		},
-		cli.BoolFlag{
-			Name:  "abort-on-taint",
-			Usage: "abort immediately if the test gets tainted",
-		},
 		cli.Int64Flag{
 			Name:  "max-redirects",
 			Usage: "follow at most n redirects",
+			Value: 10,
+		},
+		cli.BoolFlag{
+			Name:  "insecure-skip-tls-verify",
+			Usage: "INSECURE: skip verification of TLS certificates",
 		},
 		cli.StringFlag{
 			Name:  "out, o",
@@ -105,6 +106,11 @@ var commandRun = cli.Command{
 		cli.StringSliceFlag{
 			Name:  "config, c",
 			Usage: "read additional config files",
+		},
+		cli.BoolFlag{
+			Name:   "no-usage-report",
+			Usage:  "don't send heartbeat to k6 project on test execution",
+			EnvVar: "K6_NO_USAGE_REPORT",
 		},
 	},
 	Action: actionRun,
@@ -260,7 +266,7 @@ func parseCollectorString(s string) (t, p string, err error) {
 	return parts[0], parts[1], nil
 }
 
-func makeCollector(s string) (stats.Collector, error) {
+func makeCollector(s string, opts lib.Options) (lib.Collector, error) {
 	t, p, err := parseCollectorString(s)
 	if err != nil {
 		return nil, err
@@ -268,9 +274,9 @@ func makeCollector(s string) (stats.Collector, error) {
 
 	switch t {
 	case "influxdb":
-		return influxdb.New(p)
+		return influxdb.New(p, opts)
 	case "json":
-		return json.New(p)
+		return json.New(p, opts)
 	default:
 		return nil, errors.New("Unknown output type: " + t)
 	}
@@ -287,16 +293,18 @@ func actionRun(cc *cli.Context) error {
 	// Collect CLI arguments, most (not all) relating to options.
 	addr := cc.GlobalString("address")
 	out := cc.String("out")
-	opts := lib.Options{
-		Paused:       cliBool(cc, "paused"),
-		VUs:          cliInt64(cc, "vus"),
-		VUsMax:       cliInt64(cc, "max"),
-		Duration:     cliDuration(cc, "duration"),
-		Linger:       cliBool(cc, "linger"),
-		AbortOnTaint: cliBool(cc, "abort-on-taint"),
-		Acceptance:   cliFloat64(cc, "acceptance"),
-		MaxRedirects: cliInt64(cc, "max-redirects"),
+	cliOpts := lib.Options{
+		Paused:                cliBool(cc, "paused"),
+		VUs:                   cliInt64(cc, "vus"),
+		VUsMax:                cliInt64(cc, "max"),
+		Duration:              cliDuration(cc, "duration"),
+		Iterations:            cliInt64(cc, "iterations"),
+		Linger:                cliBool(cc, "linger"),
+		MaxRedirects:          cliInt64(cc, "max-redirects"),
+		InsecureSkipTLSVerify: cliBool(cc, "insecure-skip-tls-verify"),
+		NoUsageReport:         cliBool(cc, "no-usage-report"),
 	}
+	opts := cliOpts
 
 	// Make the Runner, extract script-defined options.
 	arg := args[0]
@@ -327,19 +335,30 @@ func actionRun(cc *cli.Context) error {
 		opts = opts.Apply(configOpts)
 	}
 
-	// CLI options have defaults, which are set as invalid, but have potentially nonzero values.
-	// Flipping the Valid flag for all invalid options thus applies all defaults.
-	if !opts.VUsMax.Valid {
+	// CLI options override everything.
+	opts = opts.Apply(cliOpts)
+
+	// Default to 1 iteration if no duration is specified.
+	if !opts.Duration.Valid && !opts.Iterations.Valid {
+		opts.Iterations = null.IntFrom(1)
+	}
+
+	// Apply defaults.
+	opts = opts.SetAllValid(true)
+
+	// Make sure VUsMax defaults to VUs if not specified.
+	if opts.VUsMax.Int64 == 0 {
 		opts.VUsMax.Int64 = opts.VUs.Int64
 	}
-	opts = opts.SetAllValid(true)
+
+	// Update the runner's options.
 	runner.ApplyOptions(opts)
 
 	// Make the metric collector, if requested.
-	var collector stats.Collector
+	var collector lib.Collector
 	collectorString := "-"
 	if out != "" {
-		c, err := makeCollector(out)
+		c, err := makeCollector(out, opts)
 		if err != nil {
 			log.WithError(err).Error("Couldn't create output")
 			return err
@@ -349,13 +368,24 @@ func actionRun(cc *cli.Context) error {
 	}
 
 	// Make the Engine
-	engine, err := lib.NewEngine(runner)
+	engine, err := lib.NewEngine(runner, opts)
 	if err != nil {
 		log.WithError(err).Error("Couldn't create the engine")
 		return err
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	engine.Collector = collector
+
+	// Send usage report, if we're allowed to
+	if opts.NoUsageReport.Valid && !opts.NoUsageReport.Bool {
+		conn, err := net.Dial("udp", "k6reports.loadimpact.com:6565")
+		if err == nil {
+			// This is a best-effort attempt to send a usage report. We don't want
+			// to inconvenience users if this doesn't work, for whatever reason
+			_, _ = conn.Write([]byte("nyoom"))
+			_ = conn.Close()
+		}
+	}
 
 	// Run the engine.
 	wg.Add(1)
@@ -385,6 +415,7 @@ func actionRun(cc *cli.Context) error {
 	fmt.Printf("     output: %s\n", collectorString)
 	fmt.Printf("     script: %s (%s)\n", srcdata.Filename, runnerType)
 	fmt.Printf("             ↳ duration: %s\n", opts.Duration.String)
+	fmt.Printf("             ↳ iterations: %d\n", opts.Iterations.Int64)
 	fmt.Printf("             ↳ vus: %d, max: %d\n", opts.VUs.Int64, opts.VUsMax.Int64)
 	fmt.Printf("\n")
 	fmt.Printf("  web ui: http://%s/\n", addr)
@@ -403,18 +434,16 @@ loop:
 		select {
 		case <-ticker.C:
 			statusString := "running"
-			if !engine.Status.Running.Bool {
-				if engine.IsRunning() {
-					statusString = "paused"
-				} else {
-					statusString = "stopping"
-				}
+			if !engine.IsRunning() {
+				statusString = "stopping"
+			} else if engine.IsPaused() {
+				statusString = "paused"
 			}
 
-			atTime := time.Duration(engine.Status.AtTime.Int64)
-			totalTime, finite := engine.TotalTime()
+			atTime := engine.AtTime()
+			totalTime := engine.TotalTime()
 			progress := 0.0
-			if finite {
+			if totalTime > 0 {
 				progress = float64(atTime) / float64(totalTime)
 			}
 
@@ -439,7 +468,7 @@ loop:
 	wg.Wait()
 
 	// Test done, leave that status as the final progress bar!
-	atTime := time.Duration(engine.Status.AtTime.Int64)
+	atTime := engine.AtTime()
 	progressBar.Progress = 1.0
 	fmt.Printf("      done %s %10s / %s\n",
 		progressBar.String(),
@@ -485,18 +514,12 @@ loop:
 		}
 	}
 
-	groups := engine.Runner.GetGroups()
-	for _, g := range groups {
-		if g.Parent != nil {
-			continue
-		}
-		printGroup(g, 1)
-	}
+	printGroup(engine.Runner.GetDefaultGroup(), 1)
 
 	// Sort and print metrics.
 	metrics := make(map[string]*stats.Metric, len(engine.Metrics))
 	metricNames := make([]string, 0, len(engine.Metrics))
-	for m, _ := range engine.Metrics {
+	for m := range engine.Metrics {
 		metrics[m.Name] = m
 		metricNames = append(metricNames, m.Name)
 	}
@@ -510,17 +533,21 @@ loop:
 			continue
 		}
 		icon := " "
-		for _, threshold := range engine.Thresholds[name] {
-			icon = "✓"
-			if threshold.Failed {
+		if m.Tainted.Valid {
+			if !m.Tainted.Bool {
+				icon = "✓"
+			} else {
 				icon = "✗"
-				break
 			}
 		}
 		fmt.Printf("  %s %s: %s\n", icon, name, val)
 	}
 
-	if engine.Status.Tainted.Bool {
+	if opts.Linger.Bool {
+		<-signals
+	}
+
+	if engine.IsTainted() {
 		return cli.NewExitError("", 99)
 	}
 	return nil

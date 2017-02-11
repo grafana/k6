@@ -18,7 +18,7 @@
  *
  */
 
-package v2
+package v1
 
 import (
 	"github.com/loadimpact/k6/api/common"

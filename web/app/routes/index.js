@@ -5,10 +5,9 @@ export default Ember.Route.extend({
     return Ember.RSVP.hash({
       "metrics": this.get('store').findAll('metric'),
       "groups": this.get('store').findAll('group'),
-      "checks": this.get('store').findAll('check'),
     });
   },
   afterModel(model) {
-    model["defaultGroup"] = this.get('store').peekRecord('group', 0);
+    model["defaultGroup"] = this.get('store').peekAll('group').findBy('name', '');
   },
 });

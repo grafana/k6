@@ -22,6 +22,7 @@ package simple
 
 import (
 	"context"
+	"crypto/tls"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
 	"io"
@@ -33,17 +34,6 @@ import (
 	"net/url"
 	"strconv"
 	"time"
-)
-
-var (
-	MetricReqs          = stats.New("http_reqs", stats.Counter)
-	MetricReqDuration   = stats.New("http_req_duration", stats.Trend, stats.Time)
-	MetricReqBlocked    = stats.New("http_req_blocked", stats.Trend, stats.Time)
-	MetricReqLookingUp  = stats.New("http_req_looking_up", stats.Trend, stats.Time)
-	MetricReqConnecting = stats.New("http_req_connecting", stats.Trend, stats.Time)
-	MetricReqSending    = stats.New("http_req_sending", stats.Trend, stats.Time)
-	MetricReqWaiting    = stats.New("http_req_waiting", stats.Trend, stats.Time)
-	MetricReqReceiving  = stats.New("http_req_receiving", stats.Trend, stats.Time)
 )
 
 type Runner struct {
@@ -64,6 +54,7 @@ func New(u *url.URL) (*Runner, error) {
 				KeepAlive: 60 * time.Second,
 				DualStack: true,
 			}).DialContext,
+			TLSClientConfig:     &tls.Config{},
 			MaxIdleConns:        math.MaxInt32,
 			MaxIdleConnsPerHost: math.MaxInt32,
 		},
@@ -89,12 +80,8 @@ func (r *Runner) NewVU() (lib.VU, error) {
 	}, nil
 }
 
-func (r *Runner) GetGroups() []*lib.Group {
-	return []*lib.Group{}
-}
-
-func (r *Runner) GetChecks() []*lib.Check {
-	return []*lib.Check{}
+func (r *Runner) GetDefaultGroup() *lib.Group {
+	return &lib.Group{}
 }
 
 func (r Runner) GetOptions() lib.Options {
@@ -103,6 +90,7 @@ func (r Runner) GetOptions() lib.Options {
 
 func (r *Runner) ApplyOptions(opts lib.Options) {
 	r.Options = r.Options.Apply(opts)
+	r.Transport.TLSClientConfig.InsecureSkipVerify = opts.InsecureSkipTLSVerify.Bool
 }
 
 type VU struct {
@@ -119,34 +107,25 @@ type VU struct {
 }
 
 func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
-	resp, err := u.Client.Do(u.Request.WithContext(httptrace.WithClientTrace(ctx, u.cTrace)))
-	if err != nil {
-		u.tracer.Done()
-		return nil, err
-	}
-
-	_, _ = io.Copy(ioutil.Discard, resp.Body)
-	_ = resp.Body.Close()
-	trail := u.tracer.Done()
-
 	tags := map[string]string{
 		"vu":     u.IDString,
+		"status": "0",
 		"method": "GET",
 		"url":    u.URLString,
-		"status": strconv.Itoa(resp.StatusCode),
 	}
 
-	t := time.Now()
-	return []stats.Sample{
-		stats.Sample{Metric: MetricReqs, Time: t, Tags: tags, Value: 1},
-		stats.Sample{Metric: MetricReqDuration, Time: t, Tags: tags, Value: float64(trail.Duration)},
-		stats.Sample{Metric: MetricReqBlocked, Time: t, Tags: tags, Value: float64(trail.Blocked)},
-		stats.Sample{Metric: MetricReqLookingUp, Time: t, Tags: tags, Value: float64(trail.LookingUp)},
-		stats.Sample{Metric: MetricReqConnecting, Time: t, Tags: tags, Value: float64(trail.Connecting)},
-		stats.Sample{Metric: MetricReqSending, Time: t, Tags: tags, Value: float64(trail.Sending)},
-		stats.Sample{Metric: MetricReqWaiting, Time: t, Tags: tags, Value: float64(trail.Waiting)},
-		stats.Sample{Metric: MetricReqReceiving, Time: t, Tags: tags, Value: float64(trail.Receiving)},
-	}, nil
+	resp, err := u.Client.Do(u.Request.WithContext(httptrace.WithClientTrace(ctx, u.cTrace)))
+	if err != nil {
+		return u.tracer.Done().Samples(tags), err
+	}
+	tags["status"] = strconv.Itoa(resp.StatusCode)
+
+	if _, err := io.Copy(ioutil.Discard, resp.Body); err != nil {
+		return u.tracer.Done().Samples(tags), err
+	}
+	_ = resp.Body.Close()
+
+	return u.tracer.Done().Samples(tags), nil
 }
 
 func (u *VU) Reconfigure(id int64) error {

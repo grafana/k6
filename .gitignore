@@ -1,4 +1,5 @@
 /k6
+/dist
 /web/bower_components
 /web/node_modules
 /web/dist/*

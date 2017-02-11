@@ -28,73 +28,73 @@ import (
 
 func TestMetricHumanizeValue(t *testing.T) {
 	data := map[*Metric]map[float64]string{
-		&Metric{Type: Counter, Contains: Default}: map[float64]string{
+		&Metric{Type: Counter, Contains: Default}: {
 			1.0:     "1",
 			1.5:     "1.5",
 			1.54321: "1.54321",
 		},
-		&Metric{Type: Gauge, Contains: Default}: map[float64]string{
+		&Metric{Type: Gauge, Contains: Default}: {
 			1.0:     "1",
 			1.5:     "1.5",
 			1.54321: "1.54321",
 		},
-		&Metric{Type: Trend, Contains: Default}: map[float64]string{
+		&Metric{Type: Trend, Contains: Default}: {
 			1.0:     "1",
 			1.5:     "1.5",
 			1.54321: "1.54321",
 		},
-		&Metric{Type: Counter, Contains: Time}: map[float64]string{
-			float64(1):               "1ns",
-			float64(12):              "12ns",
-			float64(123):             "123ns",
-			float64(1234):            "1.23µs",
-			float64(12345):           "12.34µs",
-			float64(123456):          "123.45µs",
-			float64(1234567):         "1.23ms",
-			float64(12345678):        "12.34ms",
-			float64(123456789):       "123.45ms",
-			float64(1234567890):      "1.23s",
-			float64(12345678901):     "12.34s",
-			float64(123456789012):    "2m3s",
-			float64(1234567890123):   "20m34s",
-			float64(12345678901234):  "3h25m45s",
-			float64(123456789012345): "34h17m36s",
+		&Metric{Type: Counter, Contains: Time}: {
+			D(1):               "1ns",
+			D(12):              "12ns",
+			D(123):             "123ns",
+			D(1234):            "1.23µs",
+			D(12345):           "12.34µs",
+			D(123456):          "123.45µs",
+			D(1234567):         "1.23ms",
+			D(12345678):        "12.34ms",
+			D(123456789):       "123.45ms",
+			D(1234567890):      "1.23s",
+			D(12345678901):     "12.34s",
+			D(123456789012):    "2m3s",
+			D(1234567890123):   "20m34s",
+			D(12345678901234):  "3h25m45s",
+			D(123456789012345): "34h17m36s",
 		},
-		&Metric{Type: Gauge, Contains: Time}: map[float64]string{
-			float64(1):               "1ns",
-			float64(12):              "12ns",
-			float64(123):             "123ns",
-			float64(1234):            "1.23µs",
-			float64(12345):           "12.34µs",
-			float64(123456):          "123.45µs",
-			float64(1234567):         "1.23ms",
-			float64(12345678):        "12.34ms",
-			float64(123456789):       "123.45ms",
-			float64(1234567890):      "1.23s",
-			float64(12345678901):     "12.34s",
-			float64(123456789012):    "2m3s",
-			float64(1234567890123):   "20m34s",
-			float64(12345678901234):  "3h25m45s",
-			float64(123456789012345): "34h17m36s",
+		&Metric{Type: Gauge, Contains: Time}: {
+			D(1):               "1ns",
+			D(12):              "12ns",
+			D(123):             "123ns",
+			D(1234):            "1.23µs",
+			D(12345):           "12.34µs",
+			D(123456):          "123.45µs",
+			D(1234567):         "1.23ms",
+			D(12345678):        "12.34ms",
+			D(123456789):       "123.45ms",
+			D(1234567890):      "1.23s",
+			D(12345678901):     "12.34s",
+			D(123456789012):    "2m3s",
+			D(1234567890123):   "20m34s",
+			D(12345678901234):  "3h25m45s",
+			D(123456789012345): "34h17m36s",
 		},
-		&Metric{Type: Trend, Contains: Time}: map[float64]string{
-			float64(1):               "1ns",
-			float64(12):              "12ns",
-			float64(123):             "123ns",
-			float64(1234):            "1.23µs",
-			float64(12345):           "12.34µs",
-			float64(123456):          "123.45µs",
-			float64(1234567):         "1.23ms",
-			float64(12345678):        "12.34ms",
-			float64(123456789):       "123.45ms",
-			float64(1234567890):      "1.23s",
-			float64(12345678901):     "12.34s",
-			float64(123456789012):    "2m3s",
-			float64(1234567890123):   "20m34s",
-			float64(12345678901234):  "3h25m45s",
-			float64(123456789012345): "34h17m36s",
+		&Metric{Type: Trend, Contains: Time}: {
+			D(1):               "1ns",
+			D(12):              "12ns",
+			D(123):             "123ns",
+			D(1234):            "1.23µs",
+			D(12345):           "12.34µs",
+			D(123456):          "123.45µs",
+			D(1234567):         "1.23ms",
+			D(12345678):        "12.34ms",
+			D(123456789):       "123.45ms",
+			D(1234567890):      "1.23s",
+			D(12345678901):     "12.34s",
+			D(123456789012):    "2m3s",
+			D(1234567890123):   "20m34s",
+			D(12345678901234):  "3h25m45s",
+			D(123456789012345): "34h17m36s",
 		},
-		&Metric{Type: Rate, Contains: Default}: map[float64]string{
+		&Metric{Type: Rate, Contains: Default}: {
 			0.0:      "0.00%",
 			0.01:     "1.00%",
 			0.02:     "2.00%",
@@ -120,6 +120,24 @@ func TestMetricHumanizeValue(t *testing.T) {
 					assert.Equal(t, s, m.HumanizeValue(v))
 				})
 			}
+		})
+	}
+}
+
+func TestNewSink(t *testing.T) {
+	testdata := map[string]struct {
+		Type     MetricType
+		SinkType Sink
+	}{
+		"Counter": {Counter, &CounterSink{}},
+		"Gauge":   {Gauge, &GaugeSink{}},
+		"Trend":   {Trend, &TrendSink{}},
+		"Rate":    {Rate, &RateSink{}},
+	}
+
+	for name, data := range testdata {
+		t.Run(name, func(t *testing.T) {
+			assert.IsType(t, data.SinkType, Metric{Type: data.Type}.NewSink())
 		})
 	}
 }

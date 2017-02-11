@@ -34,7 +34,7 @@ func newSnippetRunner(src string) (*Runner, error) {
 		return nil, err
 	}
 
-	_ = rt.VM.Set("__initapi__", InitAPI{r: rt})
+	_ = rt.VM.Set("__initapi__", &InitAPI{r: rt})
 	exp, err := rt.load("__snippet__", []byte(src))
 	_ = rt.VM.Set("__initapi__", nil)
 	if err != nil {

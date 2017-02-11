@@ -18,7 +18,7 @@
  *
  */
 
-package v2
+package v1
 
 import (
 	"github.com/julienschmidt/httprouter"
@@ -31,13 +31,13 @@ func HandleGetMetrics(rw http.ResponseWriter, r *http.Request, p httprouter.Para
 	engine := common.GetEngine(r.Context())
 
 	metrics := make([]Metric, 0)
-	for m, _ := range engine.Metrics {
-		metrics = append(metrics, NewMetric(*m))
+	for m, s := range engine.Metrics {
+		metrics = append(metrics, NewMetric(*m, s))
 	}
 
 	data, err := jsonapi.Marshal(metrics)
 	if err != nil {
-		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		apiError(rw, "Encoding error", err.Error(), http.StatusInternalServerError)
 		return
 	}
 	_, _ = rw.Write(data)
@@ -49,22 +49,22 @@ func HandleGetMetric(rw http.ResponseWriter, r *http.Request, p httprouter.Param
 
 	var metric Metric
 	var found bool
-	for m, _ := range engine.Metrics {
+	for m, s := range engine.Metrics {
 		if m.Name == id {
-			metric = NewMetric(*m)
+			metric = NewMetric(*m, s)
 			found = true
 			break
 		}
 	}
 
 	if !found {
-		http.Error(rw, "No such metric", http.StatusNotFound)
+		apiError(rw, "Not Found", "No metric with that ID was found", http.StatusNotFound)
 		return
 	}
 
 	data, err := jsonapi.Marshal(metric)
 	if err != nil {
-		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		apiError(rw, "Encoding error", err.Error(), http.StatusInternalServerError)
 		return
 	}
 	_, _ = rw.Write(data)

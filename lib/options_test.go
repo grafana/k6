@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v3"
 	"testing"
+	"time"
 )
 
 func TestOptionsApply(t *testing.T) {
@@ -47,31 +48,44 @@ func TestOptionsApply(t *testing.T) {
 		assert.True(t, opts.Duration.Valid)
 		assert.Equal(t, "2m", opts.Duration.String)
 	})
+	t.Run("Iterations", func(t *testing.T) {
+		opts := Options{}.Apply(Options{Iterations: null.IntFrom(1234)})
+		assert.True(t, opts.Iterations.Valid)
+		assert.Equal(t, int64(1234), opts.Iterations.Int64)
+	})
+	t.Run("Stages", func(t *testing.T) {
+		opts := Options{}.Apply(Options{Stages: []Stage{{Duration: 1 * time.Second}}})
+		assert.NotNil(t, opts.Stages)
+		assert.Len(t, opts.Stages, 1)
+		assert.Equal(t, 1*time.Second, opts.Stages[0].Duration)
+	})
 	t.Run("Linger", func(t *testing.T) {
 		opts := Options{}.Apply(Options{Linger: null.BoolFrom(true)})
 		assert.True(t, opts.Linger.Valid)
 		assert.True(t, opts.Linger.Bool)
-	})
-	t.Run("AbortOnTaint", func(t *testing.T) {
-		opts := Options{}.Apply(Options{AbortOnTaint: null.BoolFrom(true)})
-		assert.True(t, opts.AbortOnTaint.Valid)
-		assert.True(t, opts.AbortOnTaint.Bool)
-	})
-	t.Run("Acceptance", func(t *testing.T) {
-		opts := Options{}.Apply(Options{Acceptance: null.FloatFrom(12345.0)})
-		assert.True(t, opts.Acceptance.Valid)
-		assert.Equal(t, float64(12345.0), opts.Acceptance.Float64)
 	})
 	t.Run("MaxRedirects", func(t *testing.T) {
 		opts := Options{}.Apply(Options{MaxRedirects: null.IntFrom(12345)})
 		assert.True(t, opts.MaxRedirects.Valid)
 		assert.Equal(t, int64(12345), opts.MaxRedirects.Int64)
 	})
+	t.Run("InsecureSkipTLSVerify", func(t *testing.T) {
+		opts := Options{}.Apply(Options{InsecureSkipTLSVerify: null.BoolFrom(true)})
+		assert.True(t, opts.InsecureSkipTLSVerify.Valid)
+		assert.True(t, opts.InsecureSkipTLSVerify.Bool)
+	})
 	t.Run("Thresholds", func(t *testing.T) {
-		opts := Options{}.Apply(Options{Thresholds: map[string][]*Threshold{
-			"metric": []*Threshold{&Threshold{Source: "1+1==2"}},
+		opts := Options{}.Apply(Options{Thresholds: map[string]Thresholds{
+			"metric": {
+				Thresholds: []*Threshold{{}},
+			},
 		}})
 		assert.NotNil(t, opts.Thresholds)
 		assert.NotEmpty(t, opts.Thresholds)
+	})
+	t.Run("NoUsageReport", func(t *testing.T) {
+		opts := Options{}.Apply(Options{NoUsageReport: null.BoolFrom(true)})
+		assert.True(t, opts.NoUsageReport.Valid)
+		assert.True(t, opts.NoUsageReport.Bool)
 	})
 }

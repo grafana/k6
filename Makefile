@@ -1,6 +1,6 @@
 VERSION := 0.2.1
 
-all: build web docs
+all: build web
 
 .PHONY: build
 build: js web
@@ -19,7 +19,7 @@ web/node_modules:
 	cd web && npm install
 
 web/bower_components:
-	cd web && bower install
+	cd web && bower install --allow-root
 
 .PHONY: docs
 docs:

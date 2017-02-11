@@ -21,16 +21,16 @@
 package stats
 
 import (
-	"context"
+	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
-// A Collector abstracts away the details of a storage backend from the application.
-type Collector interface {
-	// Run is called in a goroutine and starts the collector. Should commit samples to the backend
-	// at regular intervals and when the context is terminated.
-	Run(ctx context.Context)
+func TestDummySinkAddPanics(t *testing.T) {
+	assert.Panics(t, func() {
+		DummySink{}.Add(Sample{})
+	})
+}
 
-	// Collect receives a set of samples. This method is never called concurrently, and only while
-	// the context for Run() is valid, but should defer as much work as possible to Run().
-	Collect(samples []Sample)
+func TestDummySinkFormatReturnsItself(t *testing.T) {
+	assert.Equal(t, map[string]float64{"a": 1}, DummySink{"a": 1}.Format())
 }

@@ -18,56 +18,53 @@
  *
  */
 
-package v2
+package v1
 
 import (
 	"github.com/julienschmidt/httprouter"
 	"github.com/loadimpact/k6/api/common"
 	"github.com/manyminds/api2go/jsonapi"
-	"io/ioutil"
 	"net/http"
 )
 
-func HandleGetStatus(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
+func HandleGetGroups(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	engine := common.GetEngine(r.Context())
 
-	status := NewStatus(engine)
-	data, err := jsonapi.Marshal(status)
+	root := NewGroup(engine.Runner.GetDefaultGroup(), nil)
+	groups := FlattenGroup(root)
+
+	data, err := jsonapi.Marshal(groups)
 	if err != nil {
-		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		apiError(rw, "Encoding error", err.Error(), http.StatusInternalServerError)
 		return
 	}
 	_, _ = rw.Write(data)
 }
 
-func HandlePatchStatus(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
+func HandleGetGroup(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	id := p.ByName("id")
+
 	engine := common.GetEngine(r.Context())
 
-	body, err := ioutil.ReadAll(r.Body)
+	root := NewGroup(engine.Runner.GetDefaultGroup(), nil)
+	groups := FlattenGroup(root)
+
+	var group *Group
+	for _, g := range groups {
+		if g.ID == id {
+			group = g
+			break
+		}
+	}
+	if group == nil {
+		apiError(rw, "Not Found", "No group with that ID was found", http.StatusNotFound)
+		return
+	}
+
+	data, err := jsonapi.Marshal(group)
 	if err != nil {
-		http.Error(rw, err.Error(), http.StatusBadRequest)
+		apiError(rw, "Encoding error", err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	var status Status
-	if err := jsonapi.Unmarshal(body, &status); err != nil {
-		http.Error(rw, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	if status.VUsMax.Valid {
-		if err := engine.SetMaxVUs(status.VUsMax.Int64); err != nil {
-			http.Error(rw, err.Error(), http.StatusBadRequest)
-			return
-		}
-	}
-	if status.VUs.Valid {
-		if err := engine.SetVUs(status.VUs.Int64); err != nil {
-			http.Error(rw, err.Error(), http.StatusBadRequest)
-			return
-		}
-	}
-	if status.Running.Valid {
-		engine.SetRunning(status.Running.Bool)
-	}
+	_, _ = rw.Write(data)
 }

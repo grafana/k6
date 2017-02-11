@@ -1,5 +1,6 @@
 k6
 samples
+dist
 web/dist
 web/tmp
 web/node_modules

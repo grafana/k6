@@ -21,24 +21,24 @@
 package lib
 
 import (
-	"encoding/json"
-	"github.com/robertkrimen/otto"
 	"gopkg.in/guregu/null.v3"
 )
 
 type Options struct {
-	Paused   null.Bool   `json:"paused"`
-	VUs      null.Int    `json:"vus"`
-	VUsMax   null.Int    `json:"vus-max"`
-	Duration null.String `json:"duration"`
+	Paused     null.Bool   `json:"paused"`
+	VUs        null.Int    `json:"vus"`
+	VUsMax     null.Int    `json:"vusMax"`
+	Duration   null.String `json:"duration"`
+	Iterations null.Int    `json:"iterations"`
+	Stages     []Stage     `json:"stage"`
 
-	Linger       null.Bool  `json:"linger"`
-	AbortOnTaint null.Bool  `json:"abort-on-taint"`
-	Acceptance   null.Float `json:"acceptance"`
+	Linger        null.Bool `json:"linger"`
+	NoUsageReport null.Bool `json:"noUsageReport"`
 
-	MaxRedirects null.Int `json:"max-redirects"`
+	MaxRedirects          null.Int  `json:"maxRedirects"`
+	InsecureSkipTLSVerify null.Bool `json:"insecureSkipTLSVerify"`
 
-	Thresholds map[string][]*Threshold `json:"thresholds"`
+	Thresholds map[string]Thresholds `json:"thresholds"`
 }
 
 type SourceData struct {
@@ -59,17 +59,23 @@ func (o Options) Apply(opts Options) Options {
 	if opts.Duration.Valid {
 		o.Duration = opts.Duration
 	}
+	if opts.Iterations.Valid {
+		o.Iterations = opts.Iterations
+	}
+	if opts.Stages != nil {
+		o.Stages = opts.Stages
+	}
 	if opts.Linger.Valid {
 		o.Linger = opts.Linger
 	}
-	if opts.AbortOnTaint.Valid {
-		o.AbortOnTaint = opts.AbortOnTaint
-	}
-	if opts.Acceptance.Valid {
-		o.Acceptance = opts.Acceptance
+	if opts.NoUsageReport.Valid {
+		o.NoUsageReport = opts.NoUsageReport
 	}
 	if opts.MaxRedirects.Valid {
 		o.MaxRedirects = opts.MaxRedirects
+	}
+	if opts.InsecureSkipTLSVerify.Valid {
+		o.InsecureSkipTLSVerify = opts.InsecureSkipTLSVerify
 	}
 	if opts.Thresholds != nil {
 		o.Thresholds = opts.Thresholds
@@ -83,31 +89,6 @@ func (o Options) SetAllValid(valid bool) Options {
 	o.VUsMax.Valid = valid
 	o.Duration.Valid = valid
 	o.Linger.Valid = valid
-	o.AbortOnTaint.Valid = valid
+	o.NoUsageReport.Valid = valid
 	return o
-}
-
-type Threshold struct {
-	Source string
-	Script *otto.Script
-	Failed bool
-}
-
-func (t Threshold) String() string {
-	return t.Source
-}
-
-func (t Threshold) MarshalJSON() ([]byte, error) {
-	return json.Marshal(t.Source)
-}
-
-func (t *Threshold) UnmarshalJSON(data []byte) error {
-	var src string
-	if err := json.Unmarshal(data, &src); err != nil {
-		return err
-	}
-	t.Source = src
-	t.Script = nil
-	t.Failed = false
-	return nil
 }

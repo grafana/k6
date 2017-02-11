@@ -1,0 +1,29 @@
+FROM loadimpact/k6
+
+# Influxdb
+RUN curl -sL https://repos.influxdata.com/influxdb.key | apt-key add -
+RUN echo "deb https://repos.influxdata.com/ubuntu trusty stable" | tee /etc/apt/sources.list.d/influxdb.list
+RUN apt-get update && apt-get install influxdb
+# Create a k6 db
+RUN /bin/bash -c "influxd run & sleep 5 && influx -execute 'CREATE DATABASE k6' && kill %1 && sleep 5"
+
+# Grafana
+RUN echo "deb https://packagecloud.io/grafana/stable/debian/ jessie main" >>/etc/apt/sources.list
+RUN curl https://packagecloud.io/gpg.key | apt-key add -
+RUN apt-get update
+RUN apt-get -y install grafana sqlite3
+# Init Grafana sqlite db and preconfigure our data source to be our influxdb k6 db
+RUN service grafana-server start && sleep 15 && service grafana-server stop
+RUN echo ".tables" |sqlite3 /var/lib/grafana/grafana.db && \
+    echo "INSERT INTO \"data_source\" VALUES(1,1,0,'influxdb','myinfluxdb','proxy','http://localhost:8086','','','k6',0,'','',1,X'7B7D','2016-12-29 15:19:32','2016-12-29 15:19:37',0,'{}');" |sqlite3 /var/lib/grafana/grafana.db
+
+# Start everything and provide shell prompt when launching container
+RUN echo "#!/bin/bash" >/start.sh
+RUN echo "/usr/bin/influxd run >/var/log/influxdb.log 2>&1 &" >>/start.sh
+RUN echo "service grafana-server start" >>/start.sh
+RUN echo "echo \"InfluxDB and Grafana started!  Use --out influxdb=http://localhost:8086/k6 when executing k6\"" >>/start.sh
+RUN echo "echo \"(i.e. k6 run --out influxdb=http://localhost:8086 myscript.js)\"" >>/start.sh
+RUN echo "/bin/bash" >>/start.sh
+RUN chmod 755 /start.sh
+
+ENTRYPOINT ["/start.sh"]

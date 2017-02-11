@@ -34,7 +34,7 @@ export class Response {
  * Makes an HTTP request.
  * @param  {string} method      HTTP Method (eg. "GET")
  * @param  {string} url         Request URL (eg. "http://example.com/")
- * @param  {string|Object} body Request body (query for GET/HEAD); objects will be query encoded.
+ * @param  {string|Object} body Request body; objects will be query encoded.
  * @param  {Object} params      Additional parameters.
  * @return {module:k6/http.Response}
  */
@@ -51,31 +51,28 @@ export function request(method, url, body, params = {}) {
 			}
 			body = formstring;
 		}
-		if (method === "GET" || method === "HEAD") {
-			url += (url.includes("?") ? "&" : "?") + body;
-			body = "";
-		}
+	} else {
+		body = ''
 	}
-	return new Response(__jsapi__.HTTPRequest(method, url, body, params));
+	return new Response(__jsapi__.HTTPRequest(method, url, body, JSON.stringify(params)));
 };
 
 /**
  * Makes a GET request.
  * @see    module:k6/http.request
  * @param  {string} url         Request URL (eg. "http://example.com/")
- * @param  {string|Object} body Request body (query for GET/HEAD); objects will be query encoded.
  * @param  {Object} params      Additional parameters.
  * @return {module:k6/http.Response}
  */
-export function get(url, body, params) {
-	return request("GET", url, body, params);
+export function get(url, params) {
+	return request("GET", url, null, params);
 };
 
 /**
  * Makes a POST request.
  * @see    module:k6/http.request
  * @param  {string} url         Request URL (eg. "http://example.com/")
- * @param  {string|Object} body Request body (query for GET/HEAD); objects will be query encoded.
+ * @param  {string|Object} body Request body; objects will be query encoded.
  * @param  {Object} params      Additional parameters.
  * @return {module:k6/http.Response}
  */
@@ -87,7 +84,7 @@ export function post(url, body, params) {
  * Makes a PUT request.
  * @see    module:k6/http.request
  * @param  {string} url         Request URL (eg. "http://example.com/")
- * @param  {string|Object} body Request body (query for GET/HEAD); objects will be query encoded.
+ * @param  {string|Object} body Request body; objects will be query encoded.
  * @param  {Object} params      Additional parameters.
  * @return {module:k6/http.Response}
  */
@@ -99,7 +96,7 @@ export function put(url, body, params) {
  * Makes a DELETE request.
  * @see    module:k6/http.request
  * @param  {string} url         Request URL (eg. "http://example.com/")
- * @param  {string|Object} body Request body (query for GET/HEAD); objects will be query encoded.
+ * @param  {string|Object} body Request body; objects will be query encoded.
  * @param  {Object} params      Additional parameters.
  * @return {module:k6/http.Response}
  */
@@ -111,12 +108,48 @@ export function del(url, body, params) {
  * Makes a PATCH request.
  * @see    module:k6/http.request
  * @param  {string} url         Request URL (eg. "http://example.com/")
- * @param  {string|Object} body Request body (query for GET/HEAD); objects will be query encoded.
+ * @param  {string|Object} body Request body; objects will be query encoded.
  * @param  {Object} params      Additional parameters.
  * @return {module:k6/http.Response}
  */
 export function patch(url, body, params) {
 	return request("PATCH", url, body, params);
+};
+
+/**
+ * Makes a CONNECT request.
+ * @see    module:k6/http.request
+ * @param  {string} url         Request URL (eg. "http://example.com/")
+ * @param  {string|Object} body Request body; objects will be query encoded.
+ * @param  {Object} params      Additional parameters.
+ * @return {module:k6/http.Response}
+ */
+export function connect(url, body, params) {
+	return request("CONNECT", url, body, params);
+};
+
+/**
+ * Makes a OPTIONS request.
+ * @see    module:k6/http.request
+ * @param  {string} url         Request URL (eg. "http://example.com/")
+ * @param  {string|Object} body Request body; objects will be query encoded.
+ * @param  {Object} params      Additional parameters.
+ * @return {module:k6/http.Response}
+ */
+export function options(url, body, params) {
+	return request("OPTIONS", url, body, params);
+};
+
+/**
+ * Makes a TRACE request.
+ * @see    module:k6/http.request
+ * @param  {string} url         Request URL (eg. "http://example.com/")
+ * @param  {string|Object} body Request body; objects will be query encoded.
+ * @param  {Object} params      Additional parameters.
+ * @return {module:k6/http.Response}
+ */
+export function trace(url, body, params) {
+	return request("TRACE", url, body, params);
 };
 
 export default {

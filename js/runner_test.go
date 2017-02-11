@@ -46,14 +46,8 @@ func TestNewRunner(t *testing.T) {
 		return
 	}
 
-	t.Run("GetGroups", func(t *testing.T) {
-		g := r.GetGroups()
-		assert.Len(t, g, 1)
-		assert.Equal(t, r.DefaultGroup, g[0])
-	})
-
-	t.Run("GetTests", func(t *testing.T) {
-		assert.Len(t, r.GetChecks(), 0)
+	t.Run("GetDefaultGroup", func(t *testing.T) {
+		assert.Equal(t, r.DefaultGroup, r.GetDefaultGroup())
 	})
 
 	t.Run("VU", func(t *testing.T) {
@@ -71,4 +65,41 @@ func TestNewRunner(t *testing.T) {
 			assert.NoError(t, err)
 		})
 	})
+}
+
+func TestVUSelfIdentity(t *testing.T) {
+	r, err := newSnippetRunner(`
+	export default function() {}
+	`)
+	assert.NoError(t, err)
+
+	vu_, err := r.NewVU()
+	assert.NoError(t, err)
+	vu := vu_.(*VU)
+
+	assert.NoError(t, vu.Reconfigure(1234))
+	_, err = vu.vm.Eval(`if(__VU != 1234) { throw new Error(__VU); }`)
+	assert.NoError(t, err)
+	_, err = vu.vm.Eval(`if(__ITER != 0) { throw new Error(__ITER); }`)
+	assert.NoError(t, err)
+
+	_, err = vu.RunOnce(context.Background())
+	assert.NoError(t, err)
+	_, err = vu.vm.Eval(`if(__VU != 1234) { throw new Error(__VU); }`)
+	assert.NoError(t, err)
+	_, err = vu.vm.Eval(`if(__ITER != 0) { throw new Error(__ITER); }`)
+	assert.NoError(t, err)
+
+	_, err = vu.RunOnce(context.Background())
+	assert.NoError(t, err)
+	_, err = vu.vm.Eval(`if(__VU != 1234) { throw new Error(__VU); }`)
+	assert.NoError(t, err)
+	_, err = vu.vm.Eval(`if(__ITER != 1) { throw new Error(__ITER); }`)
+	assert.NoError(t, err)
+
+	assert.NoError(t, vu.Reconfigure(1234))
+	_, err = vu.vm.Eval(`if(__VU != 1234) { throw new Error(__VU); }`)
+	assert.NoError(t, err)
+	_, err = vu.vm.Eval(`if(__ITER != 0) { throw new Error(__ITER); }`)
+	assert.NoError(t, err)
 }

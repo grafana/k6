@@ -21,6 +21,8 @@
 package lib
 
 import (
+	"github.com/loadimpact/k6/lib/metrics"
+	"github.com/loadimpact/k6/stats"
 	"net"
 	"net/http/httptrace"
 	"time"
@@ -29,6 +31,9 @@ import (
 // A Trail represents detailed information about an HTTP request.
 // You'd typically get one from a Tracer.
 type Trail struct {
+	// All metrics will be tagged with this timestamp.
+	StartTime time.Time
+
 	// Total request duration, excluding DNS lookup and connect time.
 	Duration time.Duration
 
@@ -42,6 +47,19 @@ type Trail struct {
 	// Detailed connection information.
 	ConnReused     bool
 	ConnRemoteAddr net.Addr
+}
+
+func (tr Trail) Samples(tags map[string]string) []stats.Sample {
+	return []stats.Sample{
+		{Metric: metrics.HTTPReqs, Time: tr.StartTime, Tags: tags, Value: 1},
+		{Metric: metrics.HTTPReqDuration, Time: tr.StartTime, Tags: tags, Value: stats.D(tr.Duration)},
+		{Metric: metrics.HTTPReqBlocked, Time: tr.StartTime, Tags: tags, Value: stats.D(tr.Blocked)},
+		{Metric: metrics.HTTPReqLookingUp, Time: tr.StartTime, Tags: tags, Value: stats.D(tr.LookingUp)},
+		{Metric: metrics.HTTPReqConnecting, Time: tr.StartTime, Tags: tags, Value: stats.D(tr.Connecting)},
+		{Metric: metrics.HTTPReqSending, Time: tr.StartTime, Tags: tags, Value: stats.D(tr.Sending)},
+		{Metric: metrics.HTTPReqWaiting, Time: tr.StartTime, Tags: tags, Value: stats.D(tr.Waiting)},
+		{Metric: metrics.HTTPReqReceiving, Time: tr.StartTime, Tags: tags, Value: stats.D(tr.Receiving)},
+	}
 }
 
 // A Tracer wraps "net/http/httptrace" to collect granular timings for HTTP requests.
@@ -81,6 +99,7 @@ func (t *Tracer) Trace() *httptrace.ClientTrace {
 func (t *Tracer) Done() Trail {
 	done := time.Now()
 	trail := Trail{
+		StartTime:  t.getConn,
 		Duration:   done.Sub(t.getConn),
 		Blocked:    t.gotConn.Sub(t.getConn),
 		LookingUp:  t.dnsDone.Sub(t.dnsStart),

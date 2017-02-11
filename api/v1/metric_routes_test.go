@@ -18,7 +18,7 @@
  *
  */
 
-package v2
+package v1
 
 import (
 	"encoding/json"
@@ -26,13 +26,14 @@ import (
 	"github.com/loadimpact/k6/stats"
 	"github.com/manyminds/api2go/jsonapi"
 	"github.com/stretchr/testify/assert"
+	"gopkg.in/guregu/null.v3"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 )
 
 func TestGetMetrics(t *testing.T) {
-	engine, err := lib.NewEngine(nil)
+	engine, err := lib.NewEngine(nil, lib.Options{})
 	assert.NoError(t, err)
 
 	engine.Metrics = map[*stats.Metric]stats.Sink{
@@ -40,11 +41,12 @@ func TestGetMetrics(t *testing.T) {
 			Name:     "my_metric",
 			Type:     stats.Trend,
 			Contains: stats.Time,
+			Tainted:  null.BoolFrom(true),
 		}: &stats.TrendSink{},
 	}
 
 	rw := httptest.NewRecorder()
-	NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "GET", "/v2/metrics", nil))
+	NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "GET", "/v1/metrics", nil))
 	res := rw.Result()
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 
@@ -68,11 +70,13 @@ func TestGetMetrics(t *testing.T) {
 		assert.Equal(t, stats.Trend, metrics[0].Type.Type)
 		assert.True(t, metrics[0].Contains.Valid)
 		assert.Equal(t, stats.Time, metrics[0].Contains.Type)
+		assert.True(t, metrics[0].Tainted.Valid)
+		assert.True(t, metrics[0].Tainted.Bool)
 	})
 }
 
 func TestGetMetric(t *testing.T) {
-	engine, err := lib.NewEngine(nil)
+	engine, err := lib.NewEngine(nil, lib.Options{})
 	assert.NoError(t, err)
 
 	engine.Metrics = map[*stats.Metric]stats.Sink{
@@ -80,19 +84,20 @@ func TestGetMetric(t *testing.T) {
 			Name:     "my_metric",
 			Type:     stats.Trend,
 			Contains: stats.Time,
+			Tainted:  null.BoolFrom(true),
 		}: &stats.TrendSink{},
 	}
 
 	t.Run("nonexistent", func(t *testing.T) {
 		rw := httptest.NewRecorder()
-		NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "GET", "/v2/metrics/notreal", nil))
+		NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "GET", "/v1/metrics/notreal", nil))
 		res := rw.Result()
 		assert.Equal(t, http.StatusNotFound, res.StatusCode)
 	})
 
 	t.Run("real", func(t *testing.T) {
 		rw := httptest.NewRecorder()
-		NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "GET", "/v2/metrics/my_metric", nil))
+		NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "GET", "/v1/metrics/my_metric", nil))
 		res := rw.Result()
 		assert.Equal(t, http.StatusOK, res.StatusCode)
 
@@ -113,6 +118,8 @@ func TestGetMetric(t *testing.T) {
 			assert.Equal(t, stats.Trend, metric.Type.Type)
 			assert.True(t, metric.Contains.Valid)
 			assert.Equal(t, stats.Time, metric.Contains.Type)
+			assert.True(t, metric.Tainted.Valid)
+			assert.True(t, metric.Tainted.Bool)
 		})
 	})
 }

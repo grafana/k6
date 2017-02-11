@@ -22,6 +22,8 @@ package js
 
 import (
 	log "github.com/Sirupsen/logrus"
+	"github.com/loadimpact/k6/lib/metrics"
+	"github.com/loadimpact/k6/stats"
 	"github.com/robertkrimen/otto"
 	"strconv"
 	"sync/atomic"
@@ -33,7 +35,13 @@ type JSAPI struct {
 }
 
 func (a JSAPI) Sleep(secs float64) {
-	time.Sleep(time.Duration(secs * float64(time.Second)))
+	d := time.Duration(secs * float64(time.Second))
+	t := time.NewTimer(d)
+	select {
+	case <-t.C:
+	case <-a.vu.ctx.Done():
+	}
+	t.Stop()
 }
 
 func (a JSAPI) Log(level int, msg string, args []otto.Value) {
@@ -68,11 +76,9 @@ func (a JSAPI) Log(level int, msg string, args []otto.Value) {
 
 func (a JSAPI) DoGroup(call otto.FunctionCall) otto.Value {
 	name := call.Argument(0).String()
-	group, ok := a.vu.group.Group(name, &(a.vu.runner.groupIDCounter))
-	if !ok {
-		a.vu.runner.groupsMutex.Lock()
-		a.vu.runner.Groups = append(a.vu.runner.Groups, group)
-		a.vu.runner.groupsMutex.Unlock()
+	group, err := a.vu.group.Group(name)
+	if err != nil {
+		throw(call.Otto, err)
 	}
 	a.vu.group = group
 	defer func() { a.vu.group = group.Parent }()
@@ -93,54 +99,43 @@ func (a JSAPI) DoGroup(call otto.FunctionCall) otto.Value {
 	return val
 }
 
-func (a JSAPI) DoCheck(call otto.FunctionCall) otto.Value {
-	if len(call.ArgumentList) < 2 {
-		return otto.UndefinedValue()
-	}
-
+func (a JSAPI) DoCheck(obj otto.Value, conds map[string]otto.Value, extraTags map[string]string) bool {
+	t := time.Now()
 	success := true
-	arg0 := call.Argument(0)
-	for _, v := range call.ArgumentList[1:] {
-		obj := v.Object()
-		if obj == nil {
-			panic(call.Otto.MakeTypeError("checks must be objects"))
+	for name, cond := range conds {
+		check, err := a.vu.group.Check(name)
+		if err != nil {
+			throw(a.vu.vm, err)
 		}
-		for _, name := range obj.Keys() {
-			val, err := obj.Get(name)
-			if err != nil {
-				throw(call.Otto, err)
-			}
 
-			result, err := Check(val, arg0)
-			if err != nil {
-				throw(call.Otto, err)
-			}
+		result, err := Check(cond, obj)
+		if err != nil {
+			throw(a.vu.vm, err)
+		}
 
-			check, ok := a.vu.group.Check(name, &(a.vu.runner.checkIDCounter))
-			if !ok {
-				a.vu.runner.checksMutex.Lock()
-				a.vu.runner.Checks = append(a.vu.runner.Checks, check)
-				a.vu.runner.checksMutex.Unlock()
-			}
+		tags := map[string]string{
+			"group": check.Group.Path,
+			"check": check.Name,
+		}
+		for k, v := range extraTags {
+			tags[k] = v
+		}
 
-			if result {
-				atomic.AddInt64(&(check.Passes), 1)
-			} else {
-				atomic.AddInt64(&(check.Fails), 1)
-				success = false
-			}
+		if result {
+			atomic.AddInt64(&check.Passes, 1)
+			a.vu.Samples = append(a.vu.Samples,
+				stats.Sample{Time: t, Metric: metrics.Checks, Tags: tags, Value: 1},
+			)
+		} else {
+			success = false
+			atomic.AddInt64(&check.Fails, 1)
+			a.vu.Samples = append(a.vu.Samples,
+				stats.Sample{Time: t, Metric: metrics.Checks, Tags: tags, Value: 0},
+			)
 		}
 	}
 
-	if !success {
-		a.vu.Taint = true
-		return otto.FalseValue()
-	}
-	return otto.TrueValue()
-}
-
-func (a JSAPI) Taint() {
-	a.vu.Taint = true
+	return success
 }
 
 func (a JSAPI) ElapsedMs() float64 {

@@ -18,7 +18,7 @@
  *
  */
 
-package v2
+package v1
 
 import (
 	"bytes"
@@ -33,11 +33,11 @@ import (
 )
 
 func TestGetStatus(t *testing.T) {
-	engine, err := lib.NewEngine(nil)
+	engine, err := lib.NewEngine(nil, lib.Options{})
 	assert.NoError(t, err)
 
 	rw := httptest.NewRecorder()
-	NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "GET", "/v2/status", nil))
+	NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "GET", "/v1/status", nil))
 	res := rw.Result()
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 
@@ -53,7 +53,7 @@ func TestGetStatus(t *testing.T) {
 	t.Run("status", func(t *testing.T) {
 		var status Status
 		assert.NoError(t, jsonapi.Unmarshal(rw.Body.Bytes(), &status))
-		assert.True(t, status.Running.Valid)
+		assert.True(t, status.Paused.Valid)
 		assert.True(t, status.VUs.Valid)
 		assert.True(t, status.VUsMax.Valid)
 		assert.False(t, status.Tainted)
@@ -66,17 +66,15 @@ func TestPatchStatus(t *testing.T) {
 		Status     Status
 	}{
 		"nothing":      {200, Status{}},
-		"running":      {200, Status{Running: null.BoolFrom(true)}},
+		"paused":       {200, Status{Paused: null.BoolFrom(true)}},
 		"max vus":      {200, Status{VUsMax: null.IntFrom(10)}},
 		"too many vus": {400, Status{VUs: null.IntFrom(10), VUsMax: null.IntFrom(0)}},
-
-		// PANICS DUE TO ENGINE BUG!
-		// "vus":          {200, Status{VUs: null.IntFrom(10), VUsMax: null.IntFrom(10)}},
+		"vus":          {200, Status{VUs: null.IntFrom(10), VUsMax: null.IntFrom(10)}},
 	}
 
 	for name, indata := range testdata {
 		t.Run(name, func(t *testing.T) {
-			engine, err := lib.NewEngine(nil)
+			engine, err := lib.NewEngine(nil, lib.Options{})
 			assert.NoError(t, err)
 
 			body, err := jsonapi.Marshal(indata.Status)
@@ -85,7 +83,7 @@ func TestPatchStatus(t *testing.T) {
 			}
 
 			rw := httptest.NewRecorder()
-			NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "PATCH", "/v2/status", bytes.NewReader(body)))
+			NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "PATCH", "/v1/status", bytes.NewReader(body)))
 			res := rw.Result()
 
 			if !assert.Equal(t, indata.StatusCode, res.StatusCode) {
@@ -96,8 +94,8 @@ func TestPatchStatus(t *testing.T) {
 			}
 
 			status := NewStatus(engine)
-			if indata.Status.Running.Valid {
-				assert.Equal(t, indata.Status.Running, status.Running)
+			if indata.Status.Paused.Valid {
+				assert.Equal(t, indata.Status.Paused, status.Paused)
 			}
 			if indata.Status.VUs.Valid {
 				assert.Equal(t, indata.Status.VUs, status.VUs)

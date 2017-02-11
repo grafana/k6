@@ -21,8 +21,8 @@
 package js
 
 import (
-	"github.com/loadimpact/k6/lib"
 	"github.com/stretchr/testify/assert"
+	"os"
 	"testing"
 )
 
@@ -48,7 +48,7 @@ func TestLoad(t *testing.T) {
 
 	r, err := New()
 	assert.NoError(t, err)
-	assert.NoError(t, r.VM.Set("__initapi__", InitAPI{r: r}))
+	assert.NoError(t, r.VM.Set("__initapi__", &InitAPI{r: r}))
 
 	t.Run("Importing Libraries", func(t *testing.T) {
 		_, err := r.load("test.js", []byte(`
@@ -81,9 +81,9 @@ func TestExtractOptions(t *testing.T) {
 		assert.True(t, r.Options.VUs.Valid)
 		assert.Equal(t, int64(12345), r.Options.VUs.Int64)
 	})
-	t.Run("vus-max", func(t *testing.T) {
+	t.Run("vusMax", func(t *testing.T) {
 		_, err := r.load("test.js", []byte(`
-			export let options = { "vus-max": 12345 };
+			export let options = { vusMax: 12345 };
 		`))
 		assert.NoError(t, err)
 
@@ -99,9 +99,9 @@ func TestExtractOptions(t *testing.T) {
 		assert.True(t, r.Options.Duration.Valid)
 		assert.Equal(t, "2m", r.Options.Duration.String)
 	})
-	t.Run("max-redirects", func(t *testing.T) {
+	t.Run("maxRedirects", func(t *testing.T) {
 		_, err := r.load("test.js", []byte(`
-			export let options = { "max-redirects": 12345 };
+			export let options = { maxRedirects: 12345 };
 		`))
 		assert.NoError(t, err)
 
@@ -119,8 +119,20 @@ func TestExtractOptions(t *testing.T) {
 		assert.NoError(t, err)
 
 		assert.Contains(t, r.Options.Thresholds, "my_metric")
-		if assert.Len(t, r.Options.Thresholds["my_metric"], 1) {
-			assert.Equal(t, &lib.Threshold{Source: "value<=1000"}, r.Options.Thresholds["my_metric"][0])
+		if assert.Len(t, r.Options.Thresholds["my_metric"].Thresholds, 1) {
+			assert.Equal(t, "value<=1000", r.Options.Thresholds["my_metric"].Thresholds[0].Source)
 		}
 	})
+}
+
+func TestRuntime__ENV(t *testing.T) {
+	assert.NoError(t, os.Setenv("TEST_KEY", "abc123"))
+
+	rt, err := New()
+	assert.NoError(t, err)
+	_, err = rt.VM.Eval(`
+	if (__ENV.TEST_KEY != "abc123") {
+		throw new Error("Wrong: " + __ENV.TEST_KEY)
+	}`)
+	assert.NoError(t, err)
 }

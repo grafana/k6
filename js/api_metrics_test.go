@@ -42,10 +42,10 @@ func TestMetricAdd(t *testing.T) {
 	for jsV, v := range values {
 		t.Run("v="+jsV, func(t *testing.T) {
 			tags := map[string]map[string]string{
-				`undefined`:     map[string]string{},
-				`{tag:"value"}`: map[string]string{"tag": "value"},
-				`{tag:1234}`:    map[string]string{"tag": "1234"},
-				`{tag:1234.5}`:  map[string]string{"tag": "1234.5"},
+				`undefined`:     {},
+				`{tag:"value"}`: {"tag": "value"},
+				`{tag:1234}`:    {"tag": "1234"},
+				`{tag:1234.5}`:  {"tag": "1234.5"},
 			}
 
 			for jsT, t_ := range tags {
