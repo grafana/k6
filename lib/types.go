@@ -46,12 +46,6 @@ type SourceData struct {
 	Filename string
 }
 
-const (
-	TypeAuto = "auto"
-	TypeURL  = "url"
-	TypeJS   = "js"
-)
-
 func (o Options) Apply(opts Options) Options {
 	if opts.Paused.Valid {
 		o.Paused = opts.Paused

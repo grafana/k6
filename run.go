@@ -47,6 +47,12 @@ import (
 	"time"
 )
 
+const (
+	TypeAuto = "auto"
+	TypeURL  = "url"
+	TypeJS   = "js"
+)
+
 var commandRun = cli.Command{
 	Name:      "run",
 	Usage:     "Starts running a load test",
@@ -156,10 +162,10 @@ func getSrcData(arg, t string) (*lib.SourceData, string, error) {
 	} else {
 		// Deduce how to get src data
 		switch t {
-		case lib.TypeAuto:
+		case TypeAuto:
 			if looksLikeURL([]byte(arg)) { // always try to parse as URL string first
 				srcdata = []byte(arg)
-				runnerType = lib.TypeURL
+				runnerType = TypeURL
 				filename = cmdline
 			} else {
 				// Otherwise, check if it is a file name and we can load the file
@@ -167,12 +173,12 @@ func getSrcData(arg, t string) (*lib.SourceData, string, error) {
 				srcdata = s
 				if err != nil { // if we fail to open file, we assume the arg is JS code
 					srcdata = []byte(arg)
-					runnerType = lib.TypeJS
+					runnerType = TypeJS
 					filename = cmdline
 				}
 			}
-		case lib.TypeURL:
-			// We try to use lib.TypeURL args as URLs directly first
+		case TypeURL:
+			// We try to use TypeURL args as URLs directly first
 			if looksLikeURL([]byte(arg)) {
 				srcdata = []byte(arg)
 				filename = cmdline
@@ -183,8 +189,8 @@ func getSrcData(arg, t string) (*lib.SourceData, string, error) {
 				}
 				srcdata = s
 			}
-		case lib.TypeJS:
-			// lib.TypeJS args we try to use as file names first
+		case TypeJS:
+			// TypeJS args we try to use as file names first
 			s, err := ioutil.ReadFile(arg)
 			srcdata = s
 			if err != nil { // and if that didn’t work, we assume the arg itself is JS code
@@ -197,12 +203,12 @@ func getSrcData(arg, t string) (*lib.SourceData, string, error) {
 	}
 	// Now we should have some src data and in most cases a type also. If we
 	// don’t have a type it means we read from STDIN or from a file and the user
-	// specified type == lib.TypeAuto. This means we need to try and auto-detect type
-	if runnerType == lib.TypeAuto {
+	// specified type == TypeAuto. This means we need to try and auto-detect type
+	if runnerType == TypeAuto {
 		if looksLikeURL(srcdata) {
-			runnerType = lib.TypeURL
+			runnerType = TypeURL
 		} else {
-			runnerType = lib.TypeJS
+			runnerType = TypeJS
 		}
 	}
 	src := &lib.SourceData{
@@ -216,7 +222,7 @@ func makeRunner(runnerType string, srcdata *lib.SourceData) (lib.Runner, error) 
 	switch runnerType {
 	case "":
 		return nil, errors.New("Invalid type specified, see --help")
-	case lib.TypeURL:
+	case TypeURL:
 		u, err := url.Parse(strings.TrimSpace(string(srcdata.Data)))
 		if err != nil || u.Scheme == "" {
 			return nil, errors.New("Failed to parse URL")
@@ -226,7 +232,7 @@ func makeRunner(runnerType string, srcdata *lib.SourceData) (lib.Runner, error) 
 			return nil, err
 		}
 		return r, err
-	case lib.TypeJS:
+	case TypeJS:
 		rt, err := js.New()
 		if err != nil {
 			return nil, err
@@ -534,7 +540,7 @@ func actionInspect(cc *cli.Context) error {
 
 	var opts lib.Options
 	switch runnerType {
-	case lib.TypeJS:
+	case TypeJS:
 		r, err := js.New()
 		if err != nil {
 			return cli.NewExitError(err.Error(), 1)
