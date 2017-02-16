@@ -37,8 +37,8 @@ import (
 const wrapper = "(function() { var e = {}; (function(exports) {%s\n})(e); return e; })();"
 
 var (
-	libBox      = rice.MustFindBox("lib")
-	polyfillBox = rice.MustFindBox("node_modules/babel-polyfill")
+	libBox     = rice.MustFindBox("lib")
+	polyfillJS = libBox.MustString("core-js/client/core.min.js")
 )
 
 type Runtime struct {
@@ -58,11 +58,7 @@ func New() (*Runtime, error) {
 		lib:     make(map[string]otto.Value),
 	}
 
-	polyfillJS, err := polyfillBox.String("dist/polyfill.js")
-	if err != nil {
-		return nil, err
-	}
-	polyfill, err := rt.VM.Compile("polyfill.js", polyfillJS)
+	polyfill, err := rt.VM.Compile("core.min.js", polyfillJS)
 	if err != nil {
 		return nil, err
 	}
