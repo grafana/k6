@@ -123,6 +123,20 @@ func TestExtractOptions(t *testing.T) {
 			assert.Equal(t, "value<=1000", r.Options.Thresholds["my_metric"].Thresholds[0].Source)
 		}
 	})
+	t.Run("stages", func(t *testing.T) {
+		_, err := r.load("test.js", []byte(`
+			export let options = {
+				stages: [
+					{},
+					{duration: "10s"},
+					{duration: "10s", target: 100},
+				]
+			}
+		`))
+		assert.NoError(t, err)
+
+		assert.Len(t, r.Options.Stages, 3)
+	})
 }
 
 func TestRuntime__ENV(t *testing.T) {
