@@ -27,13 +27,12 @@ If you'd like to contribute code to k6, this is the basic procedure. Make sure t
    
    Remember, there's more to software development than code; if it's not properly planned, stuff gets messy real fast.
 
-2. Create a fork and open a feature branch based off develop - `feature/my-cool-feature` is the classic way to name these, but it really doesn't matter, as long as you don't hack directly on develop.
+2. Create a fork and open a feature branch - `feature/my-cool-feature` is the classic way to name these, but it really doesn't matter, as long as you don't hack directly on develop.
 
-3. Create a pull request - make sure you make it from your feature branch to develop!
+3. Create a pull request!
 
-4. We will discuss implementation details until it's polished and perfect, then a maintainer will merge it.
+4. We will discuss implementation details until everyone is happy, then a maintainer will merge it.
 
-We use [git flow](http://nvie.com/posts/a-successful-git-branching-model/), so you may recognize our branching structure from, well, every other project that does this. If not, have a look at that post and you'll feel right at home in no time.
 
 Style guide
 -----------
@@ -50,34 +49,36 @@ Continous integration will catch all of this if you don't, and it's fine to just
 gometalinter --config gometalinter.json --deadline 10m ./...
 ```
 
+Comments in the source should wrap at 100 characters, but there's no maximum length or need to be brief here - please include anything one might need to know in order to understand the code, that you could reasonably expect any reader to not already know (you probably don't need to explain what a goroutine is).
+
 **Commit format**
 
-In order to keep the changelog easy to read, all commits must have one of the following prefixes:
-
-* `[feat]` - new features
-* `[fix]` - bug fixes
-* `[change]` - changed behavior
-* `[removed]` - something was removed
-* `[refactor]` - nothing added or removed
-* `[lint]` - fixed linter complaints
-* `[test]` - added or improved tests
-* `[test/fix]` - fixed broken tests
-* `[docs]` - docs and sample code
-* `[docs/fix]` - fixed doc or sample errors
+We don't have any explicit rules about commit message formatting, but try to write something that could be included as-is in a changelog.
 
 If your commit closes an issue, please [close it with your commit message](https://help.github.com/articles/closing-issues-via-commit-messages/), for example:
 
 ```
-[feat] Added this really rad feature
+Added this really rad feature
 
 Closes #420
 ```
 
 **Language and text formatting**
 
-Any human-readable text you add must be non-gendered (if applicable), and should be fairly concise without devolving into grammatical horrors, dropped words and shorthands. This isn't Twitter, but don't write a novel where a single sentence would suffice.
+Any human-readable text you add must be non-gendered, and should be fairly concise without devolving into grammatical horrors, dropped words and shorthands. This isn't Twitter, you don't have a character cap, but don't write a novel where a single sentence would suffice.
 
-If you're writing a longer block of text to a terminal, wrap it at 80 characters.
+If you're writing a longer block of text to a terminal, wrap it at 80 characters - this ensures it will display properly at the de facto default terminal size of 80x25. As an example, this is the help text of the `scale` subcommand:
+
+```
+   Scale will change the number of active VUs of a running test.
+
+   It is an error to scale a test beyond vus-max; this is because instantiating
+   new VUs is a very expensive operation, which may skew test results if done
+   during a running test. To raise vus-max, use --max/-m.
+
+   Endpoint: /v1/status
+```
+
 
 **License**
 
