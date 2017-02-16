@@ -27,7 +27,7 @@ If you'd like to contribute code to k6, this is the basic procedure. Make sure t
    
    Remember, there's more to software development than code; if it's not properly planned, stuff gets messy real fast.
 
-2. Create a fork and open a feature branch - `feature/my-cool-feature` is the classic way to name these, but it really doesn't matter, as long as you don't hack directly on develop.
+2. Create a fork and open a feature branch - `feature/my-cool-feature` is the classic way to name these, but it really doesn't matter.
 
 3. Create a pull request!
 
