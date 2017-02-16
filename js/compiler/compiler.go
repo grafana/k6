@@ -16,6 +16,7 @@ var (
 		"sourceMaps":    true,
 		"babelrc":       false,
 		"compact":       false,
+		"retainLines":   true,
 		"highlightCode": false,
 	}
 )
