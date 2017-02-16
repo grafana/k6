@@ -21,18 +21,16 @@
 package js
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/GeertJohan/go.rice"
 	log "github.com/Sirupsen/logrus"
+	"github.com/loadimpact/k6/js/compiler"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
-	"github.com/pkg/errors"
 	"github.com/robertkrimen/otto"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 )
 
@@ -193,34 +191,7 @@ func (r *Runtime) loadLib(filename string) (otto.Value, error) {
 }
 
 func (r *Runtime) load(filename string, data []byte) (otto.Value, error) {
-	nodeNames := []string{"node", "nodejs", "node.exe"}
-	var nodePath string
-	for _, name := range nodeNames {
-		path, err := exec.LookPath(name)
-		if err != nil {
-			if e, ok := err.(*exec.Error); ok && e.Err != exec.ErrNotFound {
-				return otto.UndefinedValue(), err
-			}
-			continue
-		}
-		nodePath = path
-		break
-	}
-	if nodePath == "" {
-		return otto.UndefinedValue(), errors.New(
-			"Couldn't find node, make sure it's in your PATH. " +
-				"This is a TEMPORARY dependency and will be removed. " +
-				"See: https://github.com/loadimpact/k6/issues/14",
-		)
-	}
-
-	// Compile the file with Babel; this subprocess invocation is TEMPORARY:
-	// https://github.com/robertkrimen/otto/pull/205
-	cmd := exec.Command(nodePath, babel, "--presets", "latest", "--no-babelrc")
-	cmd.Dir = babelDir
-	cmd.Stdin = bytes.NewReader(data)
-	cmd.Stderr = os.Stderr
-	src, err := cmd.Output()
+	src, _, err := compiler.Transform(string(data), filename)
 	if err != nil {
 		return otto.UndefinedValue(), err
 	}

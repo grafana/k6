@@ -8,14 +8,14 @@ import (
 
 var (
 	lib      = rice.MustFindBox("lib")
-	babelSrc = lib.MustString("babel-standalone-bower/babel.min.js")
+	babelSrc = lib.MustString("lib/babel-standalone-bower/babel.js")
 
 	DefaultOpts = map[string]interface{}{
 		"presets":       []string{"latest"},
 		"ast":           false,
 		"sourceMaps":    true,
 		"babelrc":       false,
-		"compact":       true,
+		"compact":       false,
 		"highlightCode": false,
 	}
 )
