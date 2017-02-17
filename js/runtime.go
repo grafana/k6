@@ -79,6 +79,11 @@ func New() (*Runtime, error) {
 		return nil, err
 	}
 
+	__console__ := &Console{log.StandardLogger()}
+	if err := rt.VM.Set("__console__", __console__); err != nil {
+		return nil, err
+	}
+
 	return rt, nil
 }
 
