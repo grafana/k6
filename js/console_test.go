@@ -18,12 +18,12 @@ func TestConsoleLog(t *testing.T) {
 		"error": log.ErrorLevel,
 	}
 	argsets := map[string]log.Fields{
-		`"a"`:       log.Fields{"arg0": "a"},
-		`"a","b"`:   log.Fields{"arg0": "a", "arg1": "b"},
-		`{a:1}`:     log.Fields{"a": "1"},
-		`{a:1,b:2}`: log.Fields{"a": "1", "b": "2"},
-		`"a",{a:1}`: log.Fields{"arg0": "a", "a": "1"},
-		`{a:1},"a"`: log.Fields{"a": "1", "arg1": "a"},
+		`"a"`:       {"arg0": "a"},
+		`"a","b"`:   {"arg0": "a", "arg1": "b"},
+		`{a:1}`:     {"a": "1"},
+		`{a:1,b:2}`: {"a": "1", "b": "2"},
+		`"a",{a:1}`: {"arg0": "a", "a": "1"},
+		`{a:1},"a"`: {"a": "1", "arg1": "a"},
 	}
 	for name, level := range levels {
 		t.Run(name, func(t *testing.T) {
