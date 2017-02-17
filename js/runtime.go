@@ -89,7 +89,7 @@ func New() (*Runtime, error) {
 }
 
 func (r *Runtime) Load(src *lib.SourceData) (otto.Value, error) {
-	if err := r.VM.Set("__initapi__", InitAPI{r: r}); err != nil {
+	if err := r.VM.Set("__initapi__", &InitAPI{r: r}); err != nil {
 		return otto.UndefinedValue(), err
 	}
 	exp, err := r.loadSource(src)
