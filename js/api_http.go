@@ -24,7 +24,9 @@ import (
 	"encoding/json"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
+	"github.com/robertkrimen/otto"
 	"io"
+	"sync"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptrace"
@@ -107,4 +109,37 @@ func (a JSAPI) HTTPRequest(method, url, body string, paramData string) map[strin
 			"receiving":  stats.D(trail.Receiving),
 		},
 	}
+}
+
+func (a JSAPI) BatchHTTPRequest(requests []otto.Value) []map[string]interface{} {
+	var result []map[string]interface{}
+
+	wg := sync.WaitGroup{}
+	mutex := sync.Mutex{}
+	for _, val := range requests {
+		obj := val.Object()
+		v, _ := obj.Get("method")
+		method := v.String()
+		v, _ = obj.Get("url")
+		url := v.String()
+		v, _ = obj.Get("body")
+		body := v.String()
+		v, _ = obj.Get("params")
+		params := v.String()
+		
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			res := a.HTTPRequest(method, url, body, params)
+
+			mutex.Lock()
+			defer mutex.Unlock()
+
+			result = append(result, res)
+		}()
+	}
+
+	wg.Wait()
+	return result
 }
