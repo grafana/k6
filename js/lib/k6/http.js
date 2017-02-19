@@ -179,15 +179,15 @@ export function batch(requests) {
 			}
 		} else {
 			res = e;
-			res.params = !res.params ? {} : res.params
+			res.params = !res.params ? {} : res.params;
 			res.body = parseBody(res.body);
 		}
-		res.params = JSON.stringify(res.params)
-		return res
+		res.params = JSON.stringify(res.params);
+		return res;
 	});
 	
 	let response = __jsapi__.BatchHTTPRequest(reqObjects);
-	return response.map(e => new Response(e))
+	return response.map(e => new Response(e));
 };
 
 export default {
