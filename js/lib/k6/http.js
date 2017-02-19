@@ -168,7 +168,9 @@ export function batch(requests) {
 		res.params = JSON.stringify(res.params)
 		return res
 	});
-	return __jsapi__.BatchHTTPRequest(reqObjects);
+	
+	let response = __jsapi__.BatchHTTPRequest(reqObjects);
+	return response.map(e => new Response(e))
 };
 
 export default {
