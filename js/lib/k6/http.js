@@ -30,6 +30,24 @@ export class Response {
 	}
 }
 
+function parseBody(body) {
+	if (body) {
+		if (typeof body === "object") {
+			let formstring = "";
+			for (let key in body) {
+				if (formstring !== "") {
+					formstring += "&";
+				}
+				formstring += key + "=" + encodeURIComponent(body[key]);
+			}
+			return formstring;
+		}
+		return body;
+	} else {
+		return '';
+	}
+}
+
 /**
  * Makes an HTTP request.
  * @param  {string} method      HTTP Method (eg. "GET")
@@ -40,20 +58,7 @@ export class Response {
  */
 export function request(method, url, body, params = {}) {
 	method = method.toUpperCase();
-	if (body) {
-		if (typeof body === "object") {
-			let formstring = "";
-			for (let key in body) {
-				if (formstring !== "") {
-					formstring += "&";
-				}
-				formstring += key + "=" + encodeURIComponent(body[key]);
-			}
-			body = formstring;
-		}
-	} else {
-		body = ''
-	}
+	body = parseBody(body);
 	return new Response(__jsapi__.HTTPRequest(method, url, body, JSON.stringify(params)));
 };
 
@@ -164,7 +169,19 @@ export function batch(requests) {
 	}
 
 	let reqObjects = requests.map(e => {
-		let res = typeof e === 'string' ? {"method": "GET", "url": e, "body": null, "params": {}} : e
+		let res;
+		if (typeof e === 'string') {
+			res = {
+				"method": "GET",
+				"url": e,
+				"body": null,
+				"params": {}
+			}
+		} else {
+			res = e;
+			res.params = !res.params ? {} : res.params
+			res.body = parseBody(res.body);
+		}
 		res.params = JSON.stringify(res.params)
 		return res
 	});
