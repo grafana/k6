@@ -3,13 +3,8 @@ VERSION := 0.2.1
 all: build web
 
 .PHONY: build
-build: js web
+build: web
 	go build
-
-js: js/node_modules
-
-js/node_modules:
-	cd js && npm install
 
 .PHONY: web
 web: web/node_modules web/bower_components
