@@ -164,10 +164,6 @@ export function trace(url, body, params) {
  * @return {Array.<module:k6/http.Response>}
  */
 export function batch(requests) {
-	if (!Array.isArray(requests)) {
-		throw new TypeError('first argument must be an array')
-	}
-
 	let reqObjects = requests.map(e => {
 		let res;
 		if (typeof e === 'string') {
@@ -187,7 +183,7 @@ export function batch(requests) {
 	});
 	
 	let response = __jsapi__.BatchHTTPRequest(reqObjects);
-	return response.map(e => new Response(e));
+	return response.map(e => new Response(e))
 };
 
 export default {

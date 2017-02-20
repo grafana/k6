@@ -111,24 +111,32 @@ func (a JSAPI) HTTPRequest(method, url, body string, paramData string) map[strin
 	}
 }
 
-func (a JSAPI) BatchHTTPRequest(requests []otto.Value) []map[string]interface{} {
-	var result []map[string]interface{}
+func (a JSAPI) BatchHTTPRequest(requests otto.Value) otto.Value {
+	obj := requests.Object()
 
 	wg := sync.WaitGroup{}
 	mutex := sync.Mutex{}
-	for _, val := range requests {
-		obj := val.Object()
-		v, _ := obj.Get("method")
-		method := v.String()
-		v, _ = obj.Get("url")
-		url := v.String()
-		v, _ = obj.Get("body")
-		body := v.String()
-		v, _ = obj.Get("params")
-		params := v.String()
-		
+	for _, key := range obj.Keys() {
+		v, _ := obj.Get(key)
+
+		var method string
+		var url string
+		var body string
+		var params string
+
+		o := v.Object()
+
+		v, _ = o.Get("method")
+		method = v.String()
+		v, _ = o.Get("url")
+		url = v.String()
+		v, _ = o.Get("body")
+		body = v.String()
+		v, _ = o.Get("params")
+		params = v.String()
+
 		wg.Add(1)
-		go func() {
+		go func(tkey string) {
 			defer wg.Done()
 
 			res := a.HTTPRequest(method, url, body, params)
@@ -136,10 +144,10 @@ func (a JSAPI) BatchHTTPRequest(requests []otto.Value) []map[string]interface{} 
 			mutex.Lock()
 			defer mutex.Unlock()
 
-			result = append(result, res)
-		}()
+			obj.Set(tkey, res)
+		}(key)
 	}
 
 	wg.Wait()
-	return result
+	return obj.Value()
 }
