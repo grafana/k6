@@ -5,7 +5,7 @@ ADD . .
 RUN curl -sL https://deb.nodesource.com/setup_6.x | bash && \
 	apt-get install -y nodejs && \
 	npm -g install ember-cli bower && \
-	make js && make web && rm -rf web/{node_modules,bower_components} && \
+	make web && rm -rf web/{node_modules,bower_components} && \
 	go get . && go install . && rm -rf $GOPATH/lib && \
 	apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
