@@ -103,7 +103,7 @@ It's recommended to run k6 with `--net=host` as it slightly improves network thr
 
 ### You can also build k6 from source
 
-This requires a working Go environment (Go 1.7 or later - [set up](https://golang.org/doc/install)) and you will also need git, make, node.js, npm and bower. When you have all prerequisites you can build k6 thus:
+This requires a working Go environment (Go 1.7 or later - [set up](https://golang.org/doc/install)) and you will also need git, make, node.js and a couple of other dependencies that you can install like this: `npm i -g bower ember-cli`. When you have all prerequisites, you can build k6:
 
 ```sh
 go get -d -u github.com/loadimpact/k6
