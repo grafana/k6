@@ -183,7 +183,7 @@ export function batch(requests) {
 	});
 	
 	let response = __jsapi__.BatchHTTPRequest(reqObjects);
-	return response.map(e => new Response(e))
+	return response.map(e => new Response(e));
 };
 
 export default {
