@@ -160,8 +160,8 @@ export function trace(url, body, params) {
 /**
  * Batches multiple requests together.
  * @see    module:k6/http.request
- * @param  {Array} requests	An array of requests, in string or object form.
- * @return {Array.<module:k6/http.Response>}
+ * @param  {Array|Object} requests	An array or object of requests, in string or object form.
+ * @return {Array.<module:k6/http.Response>|Object}
  */
 export function batch(requests) {
 	let reqObjects = requests.map(e => {
