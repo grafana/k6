@@ -115,6 +115,8 @@ type Engine struct {
 	vuStop    chan interface{}
 	vuPause   chan interface{}
 
+	nextVUID int64
+
 	// Atomic counters.
 	numIterations int64
 	numErrors     int64
@@ -246,6 +248,7 @@ func (e *Engine) Run(ctx context.Context) error {
 	e.atStage = 0
 	e.atStageSince = 0
 	e.atStageStartVUs = e.vus
+	e.nextVUID = 0
 	e.numIterations = 0
 	e.numErrors = 0
 	e.lock.Unlock()
@@ -340,6 +343,15 @@ func (e *Engine) SetVUs(v int64) error {
 		vu := e.vuEntries[i]
 		if vu.Cancel != nil {
 			panic(errors.New("fatal miscalculation: attempted to re-schedule active VU"))
+		}
+
+		id := atomic.AddInt64(&e.nextVUID, 1)
+
+		// nil runners are used for testing.
+		if vu.VU != nil {
+			if err := vu.VU.Reconfigure(id); err != nil {
+				return err
+			}
 		}
 
 		ctx, cancel := context.WithCancel(e.subctx)

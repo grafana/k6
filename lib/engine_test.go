@@ -427,6 +427,7 @@ func TestEngineSetPaused(t *testing.T) {
 }
 
 func TestEngineSetVUsMax(t *testing.T) {
+
 	t.Run("not set", func(t *testing.T) {
 		e, err, _ := newTestEngine(nil, Options{})
 		assert.NoError(t, err)
@@ -479,6 +480,14 @@ func TestEngineSetVUsMax(t *testing.T) {
 }
 
 func TestEngineSetVUs(t *testing.T) {
+	assertVUIDSequence := func(t *testing.T, e *Engine, ids []int64) {
+		actualIDs := make([]int64, len(ids))
+		for i := range ids {
+			actualIDs[i] = e.vuEntries[i].VU.(*RunnerFuncVU).ID
+		}
+		assert.Equal(t, ids, actualIDs)
+	}
+
 	t.Run("not set", func(t *testing.T) {
 		e, err, _ := newTestEngine(nil, Options{})
 		assert.NoError(t, err)
@@ -486,34 +495,39 @@ func TestEngineSetVUs(t *testing.T) {
 		assert.Equal(t, int64(0), e.GetVUs())
 	})
 	t.Run("set", func(t *testing.T) {
-		e, err, _ := newTestEngine(nil, Options{VUsMax: null.IntFrom(15)})
+		e, err, _ := newTestEngine(RunnerFunc(nil), Options{VUsMax: null.IntFrom(15)})
 		assert.NoError(t, err)
 		assert.NoError(t, e.SetVUs(10))
 		assert.Equal(t, int64(10), e.GetVUs())
 		assertActiveVUs(t, e, 10, 5)
+		assertVUIDSequence(t, e, []int64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
 
 		t.Run("negative", func(t *testing.T) {
 			assert.EqualError(t, e.SetVUs(-1), "vus can't be negative")
 			assert.Equal(t, int64(10), e.GetVUs())
 			assertActiveVUs(t, e, 10, 5)
+			assertVUIDSequence(t, e, []int64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
 		})
 
 		t.Run("too high", func(t *testing.T) {
 			assert.EqualError(t, e.SetVUs(20), "more vus than allocated requested")
 			assert.Equal(t, int64(10), e.GetVUs())
 			assertActiveVUs(t, e, 10, 5)
+			assertVUIDSequence(t, e, []int64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
 		})
 
 		t.Run("lower", func(t *testing.T) {
 			assert.NoError(t, e.SetVUs(5))
 			assert.Equal(t, int64(5), e.GetVUs())
 			assertActiveVUs(t, e, 5, 10)
+			assertVUIDSequence(t, e, []int64{1, 2, 3, 4, 5})
 		})
 
 		t.Run("higher", func(t *testing.T) {
 			assert.NoError(t, e.SetVUs(15))
 			assert.Equal(t, int64(15), e.GetVUs())
 			assertActiveVUs(t, e, 15, 0)
+			assertVUIDSequence(t, e, []int64{1, 2, 3, 4, 5, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20})
 		})
 	})
 }
@@ -531,7 +545,7 @@ func TestEngine_runVUOnceKeepsCounters(t *testing.T) {
 		e.runVUOnce(context.Background(), &vuEntry{
 			VU: RunnerFunc(func(ctx context.Context) ([]stats.Sample, error) {
 				return nil, nil
-			}),
+			}).VU(),
 		})
 		assert.Equal(t, int64(1), e.numIterations)
 		assert.Equal(t, int64(0), e.numErrors)
@@ -544,7 +558,7 @@ func TestEngine_runVUOnceKeepsCounters(t *testing.T) {
 		e.runVUOnce(context.Background(), &vuEntry{
 			VU: RunnerFunc(func(ctx context.Context) ([]stats.Sample, error) {
 				return nil, errors.New("this is an error")
-			}),
+			}).VU(),
 		})
 		assert.Equal(t, int64(1), e.numIterations)
 		assert.Equal(t, int64(1), e.numErrors)
@@ -557,7 +571,7 @@ func TestEngine_runVUOnceKeepsCounters(t *testing.T) {
 			e.runVUOnce(context.Background(), &vuEntry{
 				VU: RunnerFunc(func(ctx context.Context) ([]stats.Sample, error) {
 					return nil, testErrorWithString("this is an error")
-				}),
+				}).VU(),
 			})
 			assert.Equal(t, int64(1), e.numIterations)
 			assert.Equal(t, int64(1), e.numErrors)
@@ -578,7 +592,7 @@ func TestEngine_runVUOnceKeepsCounters(t *testing.T) {
 			e.runVUOnce(ctx, &vuEntry{
 				VU: RunnerFunc(func(ctx context.Context) ([]stats.Sample, error) {
 					return nil, nil
-				}),
+				}).VU(),
 			})
 			assert.Equal(t, int64(0), e.numIterations)
 			assert.Equal(t, int64(0), e.numErrors)
@@ -590,7 +604,7 @@ func TestEngine_runVUOnceKeepsCounters(t *testing.T) {
 			e.runVUOnce(ctx, &vuEntry{
 				VU: RunnerFunc(func(ctx context.Context) ([]stats.Sample, error) {
 					return nil, errors.New("this is an error")
-				}),
+				}).VU(),
 			})
 			assert.Equal(t, int64(0), e.numIterations)
 			assert.Equal(t, int64(0), e.numErrors)
@@ -603,7 +617,7 @@ func TestEngine_runVUOnceKeepsCounters(t *testing.T) {
 				e.runVUOnce(ctx, &vuEntry{
 					VU: RunnerFunc(func(ctx context.Context) ([]stats.Sample, error) {
 						return nil, testErrorWithString("this is an error")
-					}),
+					}).VU(),
 				})
 				assert.Equal(t, int64(0), e.numIterations)
 				assert.Equal(t, int64(0), e.numErrors)

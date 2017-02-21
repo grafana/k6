@@ -54,16 +54,20 @@ type VU interface {
 	Reconfigure(id int64) error
 }
 
-// RunnerFunc adapts a function to be used as both a runner and a VU. NewVU() returns copies of
-// the function itself. Mainly useful for testing.
+// RunnerFunc adapts a function to be used as both a runner and a VU.
+// Mainly useful for testing.
 type RunnerFunc func(ctx context.Context) ([]stats.Sample, error)
 
+func (fn RunnerFunc) VU() *RunnerFuncVU {
+	return &RunnerFuncVU{Fn: fn}
+}
+
 func (fn RunnerFunc) NewVU() (VU, error) {
-	return fn, nil
+	return fn.VU(), nil
 }
 
 func (fn RunnerFunc) GetDefaultGroup() *Group {
-	return nil
+	return &Group{}
 }
 
 func (fn RunnerFunc) GetOptions() Options {
@@ -73,10 +77,19 @@ func (fn RunnerFunc) GetOptions() Options {
 func (fn RunnerFunc) ApplyOptions(opts Options) {
 }
 
-func (fn RunnerFunc) RunOnce(ctx context.Context) ([]stats.Sample, error) {
-	return fn(ctx)
+type RunnerFuncVU struct {
+	Fn RunnerFunc
+	ID int64
 }
 
-func (fn RunnerFunc) Reconfigure(id int64) error {
+func (fn RunnerFuncVU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
+	if fn.Fn == nil {
+		return []stats.Sample{}, nil
+	}
+	return fn.Fn(ctx)
+}
+
+func (fn *RunnerFuncVU) Reconfigure(id int64) error {
+	fn.ID = id
 	return nil
 }
