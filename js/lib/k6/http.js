@@ -171,7 +171,7 @@ export function batch(requests) {
 				"method": "GET",
 				"url": e,
 				"body": null,
-				"params": {}
+				"params": {},
 			}
 		} else {
 			res = e;
@@ -187,12 +187,12 @@ export function batch(requests) {
 };
 
 export default {
-	Response: Response,
-	request: request,
-	get: get,
-	post: post,
-	put: put,
-	del: del,
-	patch: patch,
-	batch: batch,
+	Response,
+	request,
+	get,
+	post,
+	put,
+	del,
+	patch,
+	batch,
 };
