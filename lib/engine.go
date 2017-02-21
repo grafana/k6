@@ -235,11 +235,13 @@ func (e *Engine) Run(ctx context.Context) error {
 
 		// Process any leftover samples.
 		e.processSamples(e.collect()...)
-		collectorcancel()
-		<-collectorch
 
 		// Emit final metrics.
 		e.emitMetrics()
+
+		// Shut down collector
+		collectorcancel()
+		<-collectorch
 	}()
 
 	// Set tracking to defaults.
