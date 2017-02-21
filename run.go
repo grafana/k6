@@ -29,6 +29,7 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/loadimpact/k6/api"
 	"github.com/loadimpact/k6/js"
+	"github.com/loadimpact/k6/js2"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/simple"
 	"github.com/loadimpact/k6/stats"
@@ -54,6 +55,7 @@ const (
 	TypeAuto = "auto"
 	TypeURL  = "url"
 	TypeJS   = "js"
+	TypeJS2  = "js2"
 )
 
 var commandRun = cli.Command{
@@ -196,16 +198,14 @@ func getSrcData(arg, t string) (*lib.SourceData, string, error) {
 				}
 				srcdata = s
 			}
-		case TypeJS:
+		default:
 			// TypeJS args we try to use as file names first
 			s, err := ioutil.ReadFile(arg)
 			srcdata = s
-			if err != nil { // and if that didn’t work, we assume the arg itself is JS code
+			if err != nil { // and if that didn’t work, we assume the arg itself is code
 				srcdata = []byte(arg)
 				filename = cmdline
 			}
-		default:
-			return nil, "", errors.New("Invalid type specified, see --help")
 		}
 	}
 	// Now we should have some src data and in most cases a type also. If we
@@ -253,6 +253,8 @@ func makeRunner(runnerType string, srcdata *lib.SourceData) (lib.Runner, error) 
 			return nil, err
 		}
 		return r, nil
+	case TypeJS2:
+		return js2.New(srcdata)
 	default:
 		return nil, errors.New("Invalid type specified, see --help")
 	}
