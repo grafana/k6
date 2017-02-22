@@ -373,11 +373,11 @@ func actionRun(cc *cli.Context) error {
 
 	fmt.Println("")
 
-	color.Green(`        /\      |‾‾|  /‾‾/  /‾/   `)
-	color.Green(`   /\  /  \     |  |_/  /  / /   `)
-	color.Green(`  /  \/    \    |   _  |  /  ‾‾\  `)
-	color.Green(` /          \   |  | \  \ | (_) | `)
-	color.Green(`/ __________ \  |__|  \__\ \___/  Welcome to k6 v%s!`, cc.App.Version)
+	color.Green(`          /\      |‾‾|  /‾‾/  /‾/   `)
+	color.Green(`     /\  /  \     |  |_/  /  / /   `)
+	color.Green(`    /  \/    \    |   _  |  /  ‾‾\  `)
+	color.Green(`   /          \   |  | \  \ | (_) | `)
+	color.Green(`  / __________ \  |__|  \__\ \___/  Welcome to k6 v%s!`, cc.App.Version)
 
 	fmt.Println("")
 
