@@ -284,6 +284,9 @@ func makeCollector(s string, opts lib.Options) (lib.Collector, error) {
 }
 
 func actionRun(cc *cli.Context) error {
+	red := color.New(color.FgRed)
+	green := color.New(color.FgGreen)
+
 	wg := sync.WaitGroup{}
 
 	args := cc.Args()
@@ -368,6 +371,26 @@ func actionRun(cc *cli.Context) error {
 		collectorString = fmt.Sprint(collector)
 	}
 
+	fmt.Println("")
+
+	color.Green(`        /\      |‾‾|  /‾‾/  /‾/   `)
+	color.Green(`   /\  /  \     |  |_/  /  / /   `)
+	color.Green(`  /  \/    \    |   _  |  /  ‾‾\  `)
+	color.Green(` /          \   |  | \  \ | (_) | `)
+	color.Green(`/ __________ \  |__|  \__\ \___/  Welcome to k6 v%s!`, cc.App.Version)
+
+	fmt.Println("")
+
+	fmt.Printf("  execution: %s\n", color.CyanString("local"))
+	fmt.Printf("     output: %s\n", color.CyanString(collectorString))
+	fmt.Printf("     script: %s (%s)\n", color.CyanString(srcdata.Filename), color.CyanString(runnerType))
+	fmt.Printf("\n")
+	fmt.Printf("   duration: %s, iterations: %s\n", color.CyanString(opts.Duration.String), color.CyanString("%d", opts.Iterations.Int64))
+	fmt.Printf("        vus: %s, max: %s\n", color.CyanString("%d", opts.VUs.Int64), color.CyanString("%d", opts.VUsMax.Int64))
+	fmt.Printf("\n")
+	fmt.Printf("    web ui: %s\n", color.CyanString("http://%s/", addr))
+	fmt.Printf("\n")
+
 	// Make the Engine
 	engine, err := lib.NewEngine(runner, opts)
 	if err != nil {
@@ -410,19 +433,6 @@ func actionRun(cc *cli.Context) error {
 			log.WithError(err).Error("Couldn't start API server!")
 		}
 	}()
-
-	// Print the banner!
-	fmt.Printf("Welcome to k6 v%s!\n", cc.App.Version)
-	fmt.Printf("\n")
-	fmt.Printf("  execution: local\n")
-	fmt.Printf("     output: %s\n", collectorString)
-	fmt.Printf("     script: %s (%s)\n", srcdata.Filename, runnerType)
-	fmt.Printf("             ↳ duration: %s\n", opts.Duration.String)
-	fmt.Printf("             ↳ iterations: %d\n", opts.Iterations.Int64)
-	fmt.Printf("             ↳ vus: %d, max: %d\n", opts.VUs.Int64, opts.VUsMax.Int64)
-	fmt.Printf("\n")
-	fmt.Printf("  web ui: http://%s/\n", addr)
-	fmt.Printf("\n")
 
 	progressBar := ui.ProgressBar{Width: 60}
 	fmt.Printf(" starting %s -- / --\r", progressBar.String())
@@ -480,9 +490,6 @@ loop:
 	)
 	fmt.Printf("\n")
 
-	red := color.New(color.FgRed).SprintFunc()
-	green := color.New(color.FgGreen).SprintFunc()
-
 	// Print groups.
 	var printGroup func(g *lib.Group, level int)
 	printGroup = func(g *lib.Group, level int) {
@@ -497,11 +504,13 @@ loop:
 				fmt.Printf("\n")
 			}
 			for _, check := range g.Checks {
-				icon := green("✓")
+				icon := "✓"
+				statusColor := green
 				if check.Fails > 0 {
-					icon = red("✗")
+					icon = "✗"
+					statusColor = red
 				}
-				fmt.Printf("%s  %s %2.2f%% - %s\n",
+				statusColor.Printf("%s  %s %2.2f%% - %s\n",
 					indent,
 					icon,
 					100*(float64(check.Passes)/float64(check.Passes+check.Fails)),
@@ -525,9 +534,13 @@ loop:
 	// Sort and print metrics.
 	metrics := make(map[string]*stats.Metric, len(engine.Metrics))
 	metricNames := make([]string, 0, len(engine.Metrics))
+	metricNameWidth := 0
 	for m := range engine.Metrics {
 		metrics[m.Name] = m
 		metricNames = append(metricNames, m.Name)
+		if l := len(m.Name); l > metricNameWidth {
+			metricNameWidth = l
+		}
 	}
 	sort.Strings(metricNames)
 
@@ -541,12 +554,37 @@ loop:
 		icon := " "
 		if m.Tainted.Valid {
 			if !m.Tainted.Bool {
-				icon = green("✓")
+				icon = green.Sprint("✓")
 			} else {
-				icon = red("✗")
+				icon = red.Sprint("✗")
 			}
 		}
-		fmt.Printf("  %s %s: %s\n", icon, name, val)
+
+		// Hack some color in there.
+		parts := strings.Split(val, ", ")
+		newParts := make([]string, len(parts))
+		for i, part := range parts {
+			kv := strings.SplitN(part, "=", 2)
+			switch len(kv) {
+			case 1:
+				newParts[i] = color.CyanString(kv[0])
+			case 2:
+				newParts[i] = fmt.Sprintf(
+					"%s%s",
+					color.New(color.Reset).Sprint(kv[0]+"="),
+					color.New(color.FgCyan).Sprint(kv[1]),
+				)
+			}
+		}
+		val = strings.Join(newParts, ", ")
+
+		namePadding := strings.Repeat(".", metricNameWidth-len(name)+3)
+		fmt.Printf("  %s %s%s %s\n",
+			icon,
+			name,
+			color.New(color.Faint).Sprint(namePadding+":"),
+			color.New(color.FgCyan).Sprint(val),
+		)
 	}
 
 	if opts.Linger.Bool {
