@@ -164,26 +164,45 @@ export function trace(url, body, params) {
  * @return {Array.<module:k6/http.Response>|Object}
  */
 export function batch(requests) {
-	let reqObjects = requests.map(e => {
-		let res;
-		if (typeof e === 'string') {
-			res = {
-				"method": "GET",
-				"url": e,
-				"body": null,
-				"params": {},
+	let result
+	if (requests.length > 0) {
+		result = requests.map(e => {
+			if (typeof e === 'string') {
+				return {
+					"method": "GET",
+					"url": e,
+					"body": null,
+					"params": JSON.stringify({})
+				}
+			} else {
+				e.params = !e.params ? {} : e.params
+				e.body = parseBody(e.body)
+				e.params = JSON.stringify(e.params)
+				return e
 			}
-		} else {
-			res = e;
-			res.params = !res.params ? {} : res.params;
-			res.body = parseBody(res.body);
-		}
-		res.params = JSON.stringify(res.params);
-		return res;
-	});
+		})
+	} else {
+		result = {}
+		Object.keys(requests).map(e => {
+			let val = requests[e]
+			if (typeof val === 'string') {
+				result[e] = {
+					"method": "GET",
+					"url": val,
+					"body": null,
+					"params": JSON.stringify({})
+				}
+			} else {
+				val.params = !val.params ? {} : val.params
+				val.body = parseBody(val.body)
+				val.params = JSON.stringify(val.params)
+				result[e] = val
+			}
+		})
+	}
 	
-	let response = __jsapi__.BatchHTTPRequest(reqObjects);
-	return response.map(e => new Response(e));
+	let response = __jsapi__.BatchHTTPRequest(result);
+	return response
 };
 
 export default {
