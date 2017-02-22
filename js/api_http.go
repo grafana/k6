@@ -26,12 +26,12 @@ import (
 	"github.com/loadimpact/k6/stats"
 	"github.com/robertkrimen/otto"
 	"io"
-	"sync"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptrace"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 type HTTPResponse struct {
