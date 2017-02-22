@@ -8,5 +8,6 @@
 /js/node_modules
 /docs
 
+.vscode
 *.sublime-workspace
 .vagrant
