@@ -434,22 +434,33 @@ func actionRun(cc *cli.Context) error {
 		}
 	}()
 
+	// Progress bar for TTYs.
 	progressBar := ui.ProgressBar{Width: 60}
-	fmt.Printf(" starting %s -- / --\r", progressBar.String())
+	if isTTY {
+		fmt.Printf(" starting %s -- / --\r", progressBar.String())
+	}
 
 	// Wait for a signal or timeout before shutting down
 	signals := make(chan os.Signal)
 	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
-	ticker := time.NewTicker(10 * time.Millisecond)
+
+	// Print status at a set interval; less frequently on non-TTYs.
+	tickInterval := 10 * time.Millisecond
+	if !isTTY {
+		tickInterval = 1 * time.Second
+	}
+	ticker := time.NewTicker(tickInterval)
 
 loop:
 	for {
 		select {
 		case <-ticker.C:
-			statusString := "running"
 			if !engine.IsRunning() {
-				statusString = "stopping"
-			} else if engine.IsPaused() {
+				break loop
+			}
+
+			statusString := "running"
+			if engine.IsPaused() {
 				statusString = "paused"
 			}
 
@@ -460,13 +471,21 @@ loop:
 				progress = float64(atTime) / float64(totalTime)
 			}
 
-			progressBar.Progress = progress
-			fmt.Printf("%10s %s %10s / %s\r",
-				statusString,
-				progressBar.String(),
-				roundDuration(atTime, 100*time.Millisecond),
-				roundDuration(totalTime, 100*time.Millisecond),
-			)
+			if isTTY {
+				progressBar.Progress = progress
+				fmt.Printf("%10s %s %10s / %s\r",
+					statusString,
+					progressBar.String(),
+					roundDuration(atTime, 100*time.Millisecond),
+					roundDuration(totalTime, 100*time.Millisecond),
+				)
+			} else {
+				fmt.Printf("[%-10s] %s / %s\n",
+					statusString,
+					roundDuration(atTime, 100*time.Millisecond),
+					roundDuration(totalTime, 100*time.Millisecond),
+				)
+			}
 		case <-ctx.Done():
 			log.Debug("Engine terminated; shutting down...")
 			break loop
@@ -482,12 +501,20 @@ loop:
 
 	// Test done, leave that status as the final progress bar!
 	atTime := engine.AtTime()
-	progressBar.Progress = 1.0
-	fmt.Printf("      done %s %10s / %s\n",
-		progressBar.String(),
-		roundDuration(atTime, 100*time.Millisecond),
-		roundDuration(atTime, 100*time.Millisecond),
-	)
+	if isTTY {
+		progressBar.Progress = 1.0
+		fmt.Printf("      done %s %10s / %s\n",
+			progressBar.String(),
+			roundDuration(atTime, 100*time.Millisecond),
+			roundDuration(atTime, 100*time.Millisecond),
+		)
+	} else {
+		fmt.Printf("[%-10s] %s / %s\n",
+			"done",
+			roundDuration(atTime, 100*time.Millisecond),
+			roundDuration(atTime, 100*time.Millisecond),
+		)
+	}
 	fmt.Printf("\n")
 
 	// Print groups.
