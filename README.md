@@ -16,30 +16,15 @@ brew tap loadimpact/k6
 brew install k6
 ```
 
-[[ TODO: MAKE THIS ACTUALLY WORK]
-
-### Debian/Ubuntu
-
-```bash
-wget -qO- https://example.com/key.gpg | apt-key add -
-apt-add-repository "deb http://example.com/repo/ $(lsb_release -cs) main"
-apt-get update
-apt-get install k6
-```
-
-[[ TODO: ACTUALLY SET THIS UP ]]
-
-### Windows
-
-Grab a prebuilt binary from [the Releases page](https://github.com/loadimpact/k6/releases)
-
-[[ TODO: BUILD THESE FROM CI ]]
-
 ### Docker
 
 ```bash
 docker pull loadimpact/k6
 ```
+
+### Other Platforms
+
+Grab a prebuilt binary from [the Releases page](https://github.com/loadimpact/k6/releases). Packages for Ubuntu and Debian are in the works.
 
 Introduction
 ------------
