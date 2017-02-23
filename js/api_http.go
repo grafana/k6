@@ -144,7 +144,7 @@ func (a JSAPI) BatchHTTPRequest(requests otto.Value) otto.Value {
 			mutex.Lock()
 			defer mutex.Unlock()
 
-			obj.Set(tkey, res)
+			_ = obj.Set(tkey, res)
 		}(key)
 	}
 
