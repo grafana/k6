@@ -96,9 +96,10 @@ func (a JSAPI) HTTPRequest(method, url, body string, paramData string) map[strin
 		headers[k] = strings.Join(v, ", ")
 	}
 	return map[string]interface{}{
-		"status":  res.StatusCode,
-		"body":    string(resBody),
-		"headers": headers,
+		"effective_url": res.Request.URL.String(),
+		"status":        res.StatusCode,
+		"body":          string(resBody),
+		"headers":       headers,
 		"timings": map[string]float64{
 			"duration":   stats.D(trail.Duration),
 			"blocked":    stats.D(trail.Blocked),
