@@ -320,17 +320,17 @@ func TestEngineRun(t *testing.T) {
 				assert.NoError(t, err)
 
 				ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-				defer cancel()
 				assert.NoError(t, e.Run(ctx))
+				cancel()
 
 				e.lock.Lock()
+				defer e.lock.Unlock()
+
 				if !assert.True(t, e.numIterations > 0, "no iterations performed") {
-					e.lock.Unlock()
 					return
 				}
 				sink := e.Metrics[testMetric].(*stats.TrendSink)
 				assert.True(t, len(sink.Values) > int(float64(e.numIterations)*0.99), "more than 1%% of iterations missed")
-				e.lock.Unlock()
 			})
 		}
 	})
