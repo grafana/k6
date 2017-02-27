@@ -475,16 +475,19 @@ func (e *Engine) processStages(dT time.Duration) (bool, error) {
 	e.atTime += dT
 
 	if len(e.Stages) == 0 {
+		e.Logger.Debug("processStages: no stages")
 		return false, nil
 	}
 
 	stage := e.Stages[e.atStage]
 	if stage.Duration > 0 && e.atTime > e.atStageSince+stage.Duration {
+		e.Logger.Debug("processStages: stage expired")
 		stageIdx := -1
 		stageStart := 0 * time.Second
 		stageStartVUs := e.vus
 		for i, s := range e.Stages {
 			if stageStart+s.Duration > e.atTime || s.Duration == 0 {
+				e.Logger.WithField("idx", i).Debug("processStages: proceeding to next stage...")
 				stage = s
 				stageIdx = i
 				break
@@ -493,13 +496,17 @@ func (e *Engine) processStages(dT time.Duration) (bool, error) {
 			stageStartVUs = s.Target.Int64
 		}
 		if stageIdx == -1 {
+			e.Logger.Debug("processStages: end of test exceeded")
 			return false, nil
 		}
 
 		e.atStage = stageIdx
 		e.atStageSince = stageStart
 
-		e.setVUsNoLock(stageStartVUs)
+		e.Logger.WithField("vus", stageStartVUs).Debug("processStages: normalizing VU count...")
+		if err := e.setVUsNoLock(stageStartVUs); err != nil {
+			return false, errors.Wrapf(err, "stage #%d (normalization)", e.atStage)
+		}
 		e.atStageStartVUs = stageStartVUs
 	}
 	if stage.Target.Valid {
@@ -509,8 +516,12 @@ func (e *Engine) processStages(dT time.Duration) (bool, error) {
 		if stage.Duration > 0 {
 			t = Clampf(float64(e.atTime-e.atStageSince)/float64(stage.Duration), 0.0, 1.0)
 		}
-		if err := e.setVUsNoLock(Lerp(from, to, t)); err != nil {
-			return false, errors.Wrapf(err, "stage #%d", e.atStage+1)
+		vus := Lerp(from, to, t)
+		if e.vus != vus {
+			e.Logger.WithFields(log.Fields{"from": e.vus, "to": vus}).Debug("processStages: interpolating...")
+			if err := e.setVUsNoLock(vus); err != nil {
+				return false, errors.Wrapf(err, "stage #%d", e.atStage+1)
+			}
 		}
 	}
 
