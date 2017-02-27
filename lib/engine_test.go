@@ -109,6 +109,38 @@ func TestNewEngine(t *testing.T) {
 }
 
 func TestNewEngineOptions(t *testing.T) {
+	t.Run("Duration", func(t *testing.T) {
+		e, err, _ := newTestEngine(nil, Options{
+			Duration: null.StringFrom("10s"),
+		})
+		assert.NoError(t, err)
+		if assert.Len(t, e.Stages, 1) {
+			assert.Equal(t, e.Stages[0], Stage{Duration: 10 * time.Second})
+		}
+	})
+	t.Run("Stages", func(t *testing.T) {
+		e, err, _ := newTestEngine(nil, Options{
+			Stages: []Stage{
+				Stage{Duration: 10 * time.Second, Target: null.IntFrom(10)},
+			},
+		})
+		assert.NoError(t, err)
+		if assert.Len(t, e.Stages, 1) {
+			assert.Equal(t, e.Stages[0], Stage{Duration: 10 * time.Second, Target: null.IntFrom(10)})
+		}
+	})
+	t.Run("Stages/Duration", func(t *testing.T) {
+		e, err, _ := newTestEngine(nil, Options{
+			Duration: null.StringFrom("60s"),
+			Stages: []Stage{
+				Stage{Duration: 10 * time.Second, Target: null.IntFrom(10)},
+			},
+		})
+		assert.NoError(t, err)
+		if assert.Len(t, e.Stages, 1) {
+			assert.Equal(t, e.Stages[1], Stage{Duration: 10 * time.Second, Target: null.IntFrom(10)})
+		}
+	})
 	t.Run("VUsMax", func(t *testing.T) {
 		t.Run("not set", func(t *testing.T) {
 			e, err, _ := newTestEngine(nil, Options{})

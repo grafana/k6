@@ -143,15 +143,14 @@ func NewEngine(r Runner, o Options) (*Engine, error) {
 	}
 	e.clearSubcontext()
 
-	if o.Duration.Valid {
+	if o.Stages != nil {
+		e.Stages = o.Stages
+	} else if o.Duration.Valid {
 		d, err := time.ParseDuration(o.Duration.String)
 		if err != nil {
 			return nil, errors.Wrap(err, "options.duration")
 		}
 		e.Stages = []Stage{{Duration: d}}
-	}
-	if o.Stages != nil {
-		e.Stages = o.Stages
 	}
 	if o.VUsMax.Valid {
 		if err := e.SetVUsMax(o.VUsMax.Int64); err != nil {
