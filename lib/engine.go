@@ -538,7 +538,11 @@ func (e *Engine) runVU(ctx context.Context, vu *vuEntry) {
 	}
 
 	// Sleep until the engine starts running.
-	<-e.vuStop
+	select {
+	case <-e.vuStop:
+	case <-ctx.Done():
+		return
+	}
 
 	backoffCounter := 0
 	backoff := time.Duration(0)
