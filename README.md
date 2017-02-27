@@ -60,3 +60,26 @@ export default function() {
     counter++;
 }
 ```
+
+Development Setup
+-----------------
+
+```
+go get -u github.com/loadimpact/k6
+```
+
+The only catch is, if you want the web UI available, it has to be built separately. Requires a working NodeJS installation.
+
+First, install the `ember-cli` and `bower` tools if you don't have them already:
+
+```
+npm install -g ember-cli bower
+```
+
+Then build the UI:
+
+```
+cd $GOPATH/src/github.com/loadimpact/k6/web
+npm install && bower install
+ember build
+```
