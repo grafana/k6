@@ -268,14 +268,42 @@ func TestEngineRun(t *testing.T) {
 		}
 	})
 	t.Run("exits with stages", func(t *testing.T) {
-		e, err, _ := newTestEngine(nil, Options{})
-		assert.NoError(t, err)
+		testdata := map[string]struct {
+			Duration time.Duration
+			Stages   []Stage
+		}{
+			"none": {},
+			"one": {
+				1 * time.Second,
+				[]Stage{Stage{Duration: 1 * time.Second}},
+			},
+			"two": {
+				2 * time.Second,
+				[]Stage{Stage{Duration: 1 * time.Second}, Stage{Duration: 1 * time.Second}},
+			},
+			"two/targeted": {
+				2 * time.Second,
+				[]Stage{
+					Stage{Duration: 1 * time.Second, Target: null.IntFrom(5)},
+					Stage{Duration: 1 * time.Second, Target: null.IntFrom(10)},
+				},
+			},
+		}
+		for name, data := range testdata {
+			t.Run(name, func(t *testing.T) {
+				e, err, _ := newTestEngine(nil, Options{})
+				assert.NoError(t, err)
 
-		d := 50 * time.Millisecond
-		e.Stages = []Stage{{Duration: d}}
-		startTime := time.Now()
-		assert.NoError(t, e.Run(context.Background()))
-		assert.WithinDuration(t, startTime.Add(d), startTime.Add(e.AtTime()), 100*TickRate)
+				e.Stages = data.Stages
+				startTime := time.Now()
+				assert.NoError(t, e.Run(context.Background()))
+				assert.WithinDuration(t,
+					startTime.Add(data.Duration),
+					startTime.Add(e.AtTime()),
+					100*TickRate,
+				)
+			})
+		}
 	})
 	t.Run("collects samples", func(t *testing.T) {
 		testMetric := stats.New("test_metric", stats.Trend)
