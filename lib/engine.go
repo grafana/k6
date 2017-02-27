@@ -97,7 +97,7 @@ type Engine struct {
 	Stages      []Stage
 	Thresholds  map[string]Thresholds
 	Metrics     map[*stats.Metric]stats.Sink
-	MetricsLock sync.Mutex
+	MetricsLock sync.RWMutex
 
 	// Submetrics, mapped from parent metric names.
 	submetrics map[string][]*submetric
@@ -124,7 +124,7 @@ type Engine struct {
 	thresholdsTainted bool
 
 	// Subsystem-related.
-	lock      sync.Mutex
+	lock      sync.RWMutex
 	subctx    context.Context
 	subcancel context.CancelFunc
 	subwg     sync.WaitGroup
@@ -227,7 +227,9 @@ func (e *Engine) Run(ctx context.Context) error {
 
 	close(e.vuStop)
 	defer func() {
+		e.lock.Lock()
 		e.vuStop = make(chan interface{})
+		e.lock.Unlock()
 		e.SetPaused(false)
 
 		// Shut down subsystems, wait for graceful termination.
@@ -252,9 +254,10 @@ func (e *Engine) Run(ctx context.Context) error {
 	e.atStageSince = 0
 	e.atStageStartVUs = e.vus
 	e.nextVUID = 0
-	e.numIterations = 0
 	e.numErrors = 0
 	e.lock.Unlock()
+
+	atomic.StoreInt64(&e.numIterations, 0)
 
 	var lastTick time.Time
 	ticker := time.NewTicker(TickRate)
@@ -262,7 +265,9 @@ func (e *Engine) Run(ctx context.Context) error {
 	maxIterations := e.Options.Iterations.Int64
 	for {
 		// Don't do anything while the engine is paused.
+		e.lock.RLock()
 		vuPause := e.vuPause
+		e.lock.RUnlock()
 		if vuPause != nil {
 			select {
 			case <-vuPause:
@@ -273,7 +278,8 @@ func (e *Engine) Run(ctx context.Context) error {
 		}
 
 		// If we have an iteration cap, exit once we hit it.
-		if maxIterations > 0 && e.numIterations == e.vusMax*maxIterations {
+		numIterations := atomic.LoadInt64(&e.numIterations)
+		if maxIterations > 0 && numIterations >= atomic.LoadInt64(&e.vusMax)*maxIterations {
 			e.Logger.WithFields(log.Fields{
 				"total": e.numIterations,
 				"cap":   e.vusMax * maxIterations,
@@ -309,8 +315,12 @@ func (e *Engine) Run(ctx context.Context) error {
 }
 
 func (e *Engine) IsRunning() bool {
+	e.lock.RLock()
+	vuStop := e.vuStop
+	e.lock.RUnlock()
+
 	select {
-	case <-e.vuStop:
+	case <-vuStop:
 		return true
 	default:
 		return false
@@ -330,8 +340,8 @@ func (e *Engine) SetPaused(v bool) {
 }
 
 func (e *Engine) IsPaused() bool {
-	e.lock.Lock()
-	defer e.lock.Unlock()
+	e.lock.RLock()
+	defer e.lock.RUnlock()
 
 	return e.vuPause != nil
 }
@@ -390,8 +400,8 @@ func (e *Engine) setVUsNoLock(v int64) error {
 }
 
 func (e *Engine) GetVUs() int64 {
-	e.lock.Lock()
-	defer e.lock.Unlock()
+	e.lock.RLock()
+	defer e.lock.RUnlock()
 
 	return e.vus
 }
@@ -431,29 +441,29 @@ func (e *Engine) SetVUsMax(v int64) error {
 }
 
 func (e *Engine) GetVUsMax() int64 {
-	e.lock.Lock()
-	defer e.lock.Unlock()
+	e.lock.RLock()
+	defer e.lock.RUnlock()
 
 	return e.vusMax
 }
 
 func (e *Engine) IsTainted() bool {
-	e.MetricsLock.Lock()
-	defer e.MetricsLock.Unlock()
+	e.MetricsLock.RLock()
+	defer e.MetricsLock.RUnlock()
 
 	return e.thresholdsTainted
 }
 
 func (e *Engine) AtTime() time.Duration {
-	e.lock.Lock()
-	defer e.lock.Unlock()
+	e.lock.RLock()
+	defer e.lock.RUnlock()
 
 	return e.atTime
 }
 
 func (e *Engine) TotalTime() time.Duration {
-	e.lock.Lock()
-	defer e.lock.Unlock()
+	e.lock.RLock()
+	defer e.lock.RUnlock()
 
 	var total time.Duration
 	for _, stage := range e.Stages {
@@ -562,7 +572,9 @@ func (e *Engine) runVU(ctx context.Context, vu *vuEntry) {
 		}
 
 		// If the engine is paused, sleep until it resumes.
+		e.lock.RLock()
 		vuPause := e.vuPause
+		e.lock.RUnlock()
 		if vuPause != nil {
 			<-vuPause
 		}
@@ -643,8 +655,8 @@ func (e *Engine) runMetricsEmission(ctx context.Context) {
 }
 
 func (e *Engine) emitMetrics() {
-	e.lock.Lock()
-	defer e.lock.Unlock()
+	e.lock.RLock()
+	defer e.lock.RUnlock()
 
 	t := time.Now()
 	e.processSamples(
@@ -718,12 +730,11 @@ func (e *Engine) runCollection(ctx context.Context) {
 }
 
 func (e *Engine) collect() []stats.Sample {
-	e.lock.Lock()
-	entries := e.vuEntries
-	e.lock.Unlock()
+	e.lock.RLock()
+	defer e.lock.RUnlock()
 
 	samples := []stats.Sample{}
-	for _, vu := range entries {
+	for _, vu := range e.vuEntries {
 		vu.lock.Lock()
 		if len(vu.Samples) > 0 {
 			samples = append(samples, vu.Samples...)

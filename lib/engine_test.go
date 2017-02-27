@@ -29,6 +29,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v3"
 	"runtime"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -428,10 +429,10 @@ func TestEngineSetPaused(t *testing.T) {
 		assert.True(t, e.IsRunning())
 
 		// The iteration counter and time should increase over time when not paused...
-		iterationSampleA1 := e.numIterations
+		iterationSampleA1 := atomic.LoadInt64(&e.numIterations)
 		atTimeSampleA1 := e.AtTime()
 		time.Sleep(100 * time.Millisecond)
-		iterationSampleA2 := e.numIterations
+		iterationSampleA2 := atomic.LoadInt64(&e.numIterations)
 		atTimeSampleA2 := e.AtTime()
 		assert.True(t, iterationSampleA2 > iterationSampleA1, "iteration counter did not increase")
 		assert.True(t, atTimeSampleA2 > atTimeSampleA1, "timer did not increase")
@@ -440,10 +441,10 @@ func TestEngineSetPaused(t *testing.T) {
 		e.SetPaused(true)
 		assert.True(t, e.IsPaused(), "engine did not pause")
 		time.Sleep(1 * time.Millisecond)
-		iterationSampleB1 := e.numIterations
+		iterationSampleB1 := atomic.LoadInt64(&e.numIterations)
 		atTimeSampleB1 := e.AtTime()
 		time.Sleep(100 * time.Millisecond)
-		iterationSampleB2 := e.numIterations
+		iterationSampleB2 := atomic.LoadInt64(&e.numIterations)
 		atTimeSampleB2 := e.AtTime()
 		assert.Equal(t, iterationSampleB1, iterationSampleB2, "iteration counter changed while paused")
 		assert.Equal(t, atTimeSampleB1, atTimeSampleB2, "timer changed while paused")
@@ -451,10 +452,10 @@ func TestEngineSetPaused(t *testing.T) {
 		// ...and resume when you unpause.
 		e.SetPaused(false)
 		assert.False(t, e.IsPaused(), "engine did not unpause")
-		iterationSampleC1 := e.numIterations
+		iterationSampleC1 := atomic.LoadInt64(&e.numIterations)
 		atTimeSampleC1 := e.AtTime()
 		time.Sleep(100 * time.Millisecond)
-		iterationSampleC2 := e.numIterations
+		iterationSampleC2 := atomic.LoadInt64(&e.numIterations)
 		atTimeSampleC2 := e.AtTime()
 		assert.True(t, iterationSampleC2 > iterationSampleC1, "iteration counter did not increase after unpause")
 		assert.True(t, atTimeSampleC2 > atTimeSampleC1, "timer did not increase after unpause")
