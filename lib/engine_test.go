@@ -704,6 +704,44 @@ func TestEngine_processStages(t *testing.T) {
 				{1 * time.Second, false, 0},
 			},
 		},
+		"three": {
+			[]Stage{
+				{Duration: 5 * time.Second},
+				{Duration: 5 * time.Second},
+				{Duration: 5 * time.Second},
+			},
+			[]checkpoint{
+				{0 * time.Second, true, 0},
+				{1 * time.Second, true, 0},
+				{15 * time.Second, false, 0},
+			},
+		},
+		"three/targeted": {
+			[]Stage{
+				{Duration: 5 * time.Second, Target: null.IntFrom(50)},
+				{Duration: 5 * time.Second, Target: null.IntFrom(100)},
+				{Duration: 5 * time.Second, Target: null.IntFrom(0)},
+			},
+			[]checkpoint{
+				{0 * time.Second, true, 0},
+				{1 * time.Second, true, 10},
+				{1 * time.Second, true, 20},
+				{1 * time.Second, true, 30},
+				{1 * time.Second, true, 40},
+				{1 * time.Second, true, 50},
+				{1 * time.Second, true, 60},
+				{1 * time.Second, true, 70},
+				{1 * time.Second, true, 80},
+				{1 * time.Second, true, 90},
+				{1 * time.Second, true, 100},
+				{1 * time.Second, true, 80},
+				{1 * time.Second, true, 60},
+				{1 * time.Second, true, 40},
+				{1 * time.Second, true, 20},
+				{1 * time.Second, true, 0},
+				{1 * time.Second, false, 0},
+			},
+		},
 	}
 	for name, data := range testdata {
 		t.Run(name, func(t *testing.T) {
