@@ -387,7 +387,7 @@ func actionRun(cc *cli.Context) error {
 		collectorString = fmt.Sprint(collector)
 	}
 
-	fmt.Println("")
+	fmt.Fprintln(color.Output, "")
 
 	color.Green(`          /\      |‾‾|  /‾‾/  /‾/   `)
 	color.Green(`     /\  /  \     |  |_/  /  / /   `)
@@ -395,17 +395,17 @@ func actionRun(cc *cli.Context) error {
 	color.Green(`   /          \   |  |‾\  \ | (_) | `)
 	color.Green(`  / __________ \  |__|  \__\ \___/  Welcome to k6 v%s!`, cc.App.Version)
 
-	fmt.Println("")
+	fmt.Fprintln(color.Output, "")
 
-	fmt.Printf("  execution: %s\n", color.CyanString("local"))
-	fmt.Printf("     output: %s\n", color.CyanString(collectorString))
-	fmt.Printf("     script: %s (%s)\n", color.CyanString(srcdata.Filename), color.CyanString(runnerType))
-	fmt.Printf("\n")
-	fmt.Printf("   duration: %s, iterations: %s\n", color.CyanString(opts.Duration.String), color.CyanString("%d", opts.Iterations.Int64))
-	fmt.Printf("        vus: %s, max: %s\n", color.CyanString("%d", opts.VUs.Int64), color.CyanString("%d", opts.VUsMax.Int64))
-	fmt.Printf("\n")
-	fmt.Printf("    web ui: %s\n", color.CyanString("http://%s/", addr))
-	fmt.Printf("\n")
+	fmt.Fprintf(color.Output, "  execution: %s\n", color.CyanString("local"))
+	fmt.Fprintf(color.Output, "     output: %s\n", color.CyanString(collectorString))
+	fmt.Fprintf(color.Output, "     script: %s (%s)\n", color.CyanString(srcdata.Filename), color.CyanString(runnerType))
+	fmt.Fprintf(color.Output, "\n")
+	fmt.Fprintf(color.Output, "   duration: %s, iterations: %s\n", color.CyanString(opts.Duration.String), color.CyanString("%d", opts.Iterations.Int64))
+	fmt.Fprintf(color.Output, "        vus: %s, max: %s\n", color.CyanString("%d", opts.VUs.Int64), color.CyanString("%d", opts.VUsMax.Int64))
+	fmt.Fprintf(color.Output, "\n")
+	fmt.Fprintf(color.Output, "    web ui: %s\n", color.CyanString("http://%s/", addr))
+	fmt.Fprintf(color.Output, "\n")
 
 	// Make the Engine
 	engine, err := lib.NewEngine(runner, opts)
@@ -453,7 +453,7 @@ func actionRun(cc *cli.Context) error {
 	// Progress bar for TTYs.
 	progressBar := ui.ProgressBar{Width: 60}
 	if isTTY {
-		fmt.Printf(" starting %s -- / --\r", progressBar.String())
+		fmt.Fprintf(color.Output, " starting %s -- / --\r", progressBar.String())
 	}
 
 	// Wait for a signal or timeout before shutting down
@@ -489,14 +489,14 @@ loop:
 
 			if isTTY {
 				progressBar.Progress = progress
-				fmt.Printf("%10s %s %10s / %s\r",
+				fmt.Fprintf(color.Output, "%10s %s %10s / %s\r",
 					statusString,
 					progressBar.String(),
 					roundDuration(atTime, 100*time.Millisecond),
 					roundDuration(totalTime, 100*time.Millisecond),
 				)
 			} else {
-				fmt.Printf("[%-10s] %s / %s\n",
+				fmt.Fprintf(color.Output, "[%-10s] %s / %s\n",
 					statusString,
 					roundDuration(atTime, 100*time.Millisecond),
 					roundDuration(totalTime, 100*time.Millisecond),
@@ -519,19 +519,19 @@ loop:
 	atTime := engine.AtTime()
 	if isTTY {
 		progressBar.Progress = 1.0
-		fmt.Printf("      done %s %10s / %s\n",
+		fmt.Fprintf(color.Output, "      done %s %10s / %s\n",
 			progressBar.String(),
 			roundDuration(atTime, 100*time.Millisecond),
 			roundDuration(atTime, 100*time.Millisecond),
 		)
 	} else {
-		fmt.Printf("[%-10s] %s / %s\n",
+		fmt.Fprintf(color.Output, "[%-10s] %s / %s\n",
 			"done",
 			roundDuration(atTime, 100*time.Millisecond),
 			roundDuration(atTime, 100*time.Millisecond),
 		)
 	}
-	fmt.Printf("\n")
+	fmt.Fprintf(color.Output, "\n")
 
 	// Print groups.
 	var printGroup func(g *lib.Group, level int)
@@ -539,12 +539,12 @@ loop:
 		indent := strings.Repeat("  ", level)
 
 		if g.Name != "" && g.Parent != nil {
-			fmt.Printf("%s█ %s\n", indent, g.Name)
+			fmt.Fprintf(color.Output, "%s█ %s\n", indent, g.Name)
 		}
 
 		if len(g.Checks) > 0 {
 			if g.Name != "" && g.Parent != nil {
-				fmt.Printf("\n")
+				fmt.Fprintf(color.Output, "\n")
 			}
 			for _, check := range g.Checks {
 				icon := "✓"
@@ -553,18 +553,18 @@ loop:
 					icon = "✗"
 					statusColor = color.RedString
 				}
-				fmt.Print(statusColor("%s  %s %2.2f%% - %s\n",
+				fmt.Fprint(color.Output, statusColor("%s  %s %2.2f%% - %s\n",
 					indent,
 					icon,
 					100*(float64(check.Passes)/float64(check.Passes+check.Fails)),
 					check.Name,
 				))
 			}
-			fmt.Printf("\n")
+			fmt.Fprintf(color.Output, "\n")
 		}
 		if len(g.Groups) > 0 {
 			if g.Name != "" && g.Parent != nil && len(g.Checks) > 0 {
-				fmt.Printf("\n")
+				fmt.Fprintf(color.Output, "\n")
 			}
 			for _, g := range g.Groups {
 				printGroup(g, level+1)
@@ -622,7 +622,7 @@ loop:
 		val = strings.Join(newParts, ", ")
 
 		namePadding := strings.Repeat(".", metricNameWidth-len(name)+3)
-		fmt.Printf("  %s %s%s %s\n",
+		fmt.Fprintf(color.Output, "  %s %s%s %s\n",
 			icon,
 			name,
 			color.New(color.Faint).Sprint(namePadding+":"),
