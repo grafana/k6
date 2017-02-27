@@ -30,11 +30,11 @@ import (
 
 func TestNullMetricTypeJSON(t *testing.T) {
 	values := map[NullMetricType]string{
-		NullMetricType{}:                    `null`,
-		NullMetricType{stats.Counter, true}: `"counter"`,
-		NullMetricType{stats.Gauge, true}:   `"gauge"`,
-		NullMetricType{stats.Trend, true}:   `"trend"`,
-		NullMetricType{stats.Rate, true}:    `"rate"`,
+		{}: `null`,
+		{stats.Counter, true}: `"counter"`,
+		{stats.Gauge, true}:   `"gauge"`,
+		{stats.Trend, true}:   `"trend"`,
+		{stats.Rate, true}:    `"rate"`,
 	}
 	t.Run("Marshal", func(t *testing.T) {
 		for mt, val := range values {
@@ -58,9 +58,9 @@ func TestNullMetricTypeJSON(t *testing.T) {
 
 func TestNullValueTypeJSON(t *testing.T) {
 	values := map[NullValueType]string{
-		NullValueType{}:                    `null`,
-		NullValueType{stats.Default, true}: `"default"`,
-		NullValueType{stats.Time, true}:    `"time"`,
+		{}: `null`,
+		{stats.Default, true}: `"default"`,
+		{stats.Time, true}:    `"time"`,
 	}
 	t.Run("Marshal", func(t *testing.T) {
 		for mt, val := range values {

@@ -121,7 +121,7 @@ func TestNewEngineOptions(t *testing.T) {
 	t.Run("Stages", func(t *testing.T) {
 		e, err, _ := newTestEngine(nil, Options{
 			Stages: []Stage{
-				Stage{Duration: 10 * time.Second, Target: null.IntFrom(10)},
+				{Duration: 10 * time.Second, Target: null.IntFrom(10)},
 			},
 		})
 		assert.NoError(t, err)
@@ -133,7 +133,7 @@ func TestNewEngineOptions(t *testing.T) {
 		e, err, _ := newTestEngine(nil, Options{
 			Duration: null.StringFrom("60s"),
 			Stages: []Stage{
-				Stage{Duration: 10 * time.Second, Target: null.IntFrom(10)},
+				{Duration: 10 * time.Second, Target: null.IntFrom(10)},
 			},
 		})
 		assert.NoError(t, err)
@@ -275,17 +275,17 @@ func TestEngineRun(t *testing.T) {
 			"none": {},
 			"one": {
 				1 * time.Second,
-				[]Stage{Stage{Duration: 1 * time.Second}},
+				[]Stage{{Duration: 1 * time.Second}},
 			},
 			"two": {
 				2 * time.Second,
-				[]Stage{Stage{Duration: 1 * time.Second}, Stage{Duration: 1 * time.Second}},
+				[]Stage{{Duration: 1 * time.Second}, {Duration: 1 * time.Second}},
 			},
 			"two/targeted": {
 				2 * time.Second,
 				[]Stage{
-					Stage{Duration: 1 * time.Second, Target: null.IntFrom(5)},
-					Stage{Duration: 1 * time.Second, Target: null.IntFrom(10)},
+					{Duration: 1 * time.Second, Target: null.IntFrom(5)},
+					{Duration: 1 * time.Second, Target: null.IntFrom(10)},
 				},
 			},
 		}
