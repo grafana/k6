@@ -151,6 +151,8 @@ func NewEngine(r Runner, o Options) (*Engine, error) {
 			return nil, errors.Wrap(err, "options.duration")
 		}
 		e.Stages = []Stage{{Duration: d}}
+	} else {
+		e.Stages = []Stage{{Duration: 0}}
 	}
 	if o.VUsMax.Valid {
 		if err := e.SetVUsMax(o.VUsMax.Int64); err != nil {
