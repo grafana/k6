@@ -24,7 +24,7 @@ docker pull loadimpact/k6
 
 ### Other Platforms
 
-Grab a prebuilt binary from [the Releases page](https://github.com/loadimpact/k6/releases). Packages for Ubuntu and Debian are in the works.
+Grab a prebuilt binary from [the Releases page](https://github.com/loadimpact/k6/releases).
 
 Introduction
 ------------
