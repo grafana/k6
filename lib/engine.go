@@ -481,14 +481,23 @@ func (e *Engine) processStages(dT time.Duration) (bool, error) {
 
 	stage := e.Stages[e.atStage]
 	if stage.Duration > 0 && e.atTime > e.atStageSince+stage.Duration {
-		if e.atStage != len(e.Stages)-1 {
-			e.atStage++
-			e.atStageSince = e.atTime
-			e.atStageStartVUs = e.vus
-			stage = e.Stages[e.atStage]
-		} else {
+		stageStart := 0 * time.Second
+		stageIdx := -1
+		for i, s := range e.Stages {
+			if stageStart+s.Duration > e.atTime || s.Duration == 0 {
+				stage = s
+				stageIdx = i
+				break
+			}
+			stageStart += s.Duration
+		}
+		if stageIdx == -1 {
 			return false, nil
 		}
+
+		e.atStage = stageIdx
+		e.atStageSince = stageStart
+		e.atStageStartVUs = e.vus
 	}
 	if stage.Target.Valid {
 		from := e.atStageStartVUs
