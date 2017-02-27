@@ -138,7 +138,7 @@ func TestNewEngineOptions(t *testing.T) {
 		})
 		assert.NoError(t, err)
 		if assert.Len(t, e.Stages, 1) {
-			assert.Equal(t, e.Stages[1], Stage{Duration: 10 * time.Second, Target: null.IntFrom(10)})
+			assert.Equal(t, e.Stages[0], Stage{Duration: 10 * time.Second, Target: null.IntFrom(10)})
 		}
 	})
 	t.Run("VUsMax", func(t *testing.T) {
