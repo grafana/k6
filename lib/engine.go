@@ -336,6 +336,10 @@ func (e *Engine) SetVUs(v int64) error {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 
+	return e.setVUsNoLock(v)
+}
+
+func (e *Engine) setVUsNoLock(v int64) error {
 	if v > e.vusMax {
 		return errors.New("more vus than allocated requested")
 	}
@@ -494,7 +498,7 @@ func (e *Engine) processStages(dT time.Duration) (bool, error) {
 		if stage.Duration > 0 {
 			t = Clampf(float64(e.atTime)/float64(e.atStageSince+stage.Duration), 0.0, 1.0)
 		}
-		if err := e.SetVUs(Lerp(from, to, t)); err != nil {
+		if err := e.setVUsNoLock(Lerp(from, to, t)); err != nil {
 			return false, errors.Wrapf(err, "stage #%d", e.atStage+1)
 		}
 	}
