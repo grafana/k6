@@ -639,9 +639,69 @@ func TestEngine_processStages(t *testing.T) {
 		"none": {
 			[]Stage{},
 			[]checkpoint{
+				{0 * time.Second, false, 0},
+				{10 * time.Second, false, 0},
+				{24 * time.Hour, false, 0},
+			},
+		},
+		"one": {
+			[]Stage{
+				{Duration: 10 * time.Second},
+			},
+			[]checkpoint{
 				{0 * time.Second, true, 0},
-				{10 * time.Second, true, 0},
-				{24 * time.Hour, true, 0},
+				{1 * time.Second, true, 0},
+				{10 * time.Second, false, 0},
+			},
+		},
+		"one/targeted": {
+			[]Stage{
+				{Duration: 10 * time.Second, Target: null.IntFrom(100)},
+			},
+			[]checkpoint{
+				{0 * time.Second, true, 0},
+				{1 * time.Second, true, 10},
+				{1 * time.Second, true, 20},
+				{1 * time.Second, true, 30},
+				{1 * time.Second, true, 40},
+				{1 * time.Second, true, 50},
+				{1 * time.Second, true, 60},
+				{1 * time.Second, true, 70},
+				{1 * time.Second, true, 80},
+				{1 * time.Second, true, 90},
+				{1 * time.Second, true, 100},
+				{1 * time.Second, false, 100},
+			},
+		},
+		"two": {
+			[]Stage{
+				{Duration: 5 * time.Second},
+				{Duration: 5 * time.Second},
+			},
+			[]checkpoint{
+				{0 * time.Second, true, 0},
+				{1 * time.Second, true, 0},
+				{10 * time.Second, false, 0},
+			},
+		},
+		"two/targeted": {
+			[]Stage{
+				{Duration: 5 * time.Second, Target: null.IntFrom(100)},
+				{Duration: 5 * time.Second, Target: null.IntFrom(0)},
+			},
+			[]checkpoint{
+				{0 * time.Second, true, 0},
+				{1 * time.Second, true, 20},
+				{1 * time.Second, true, 40},
+				{1 * time.Second, true, 60},
+				{1 * time.Second, true, 80},
+				{1 * time.Second, true, 100},
+				{1 * time.Second, true, 80},
+				{1 * time.Second, true, 60},
+				{1 * time.Second, true, 40},
+				{1 * time.Second, true, 20},
+				{1 * time.Second, true, 0},
+				{1 * time.Second, false, 0},
 			},
 		},
 	}
@@ -649,7 +709,7 @@ func TestEngine_processStages(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			e, err, _ := newTestEngine(nil, Options{
 				VUs:    null.IntFrom(0),
-				VUsMax: null.IntFrom(10),
+				VUsMax: null.IntFrom(100),
 			})
 			assert.NoError(t, err)
 
@@ -658,7 +718,11 @@ func TestEngine_processStages(t *testing.T) {
 				t.Run((e.AtTime() + ckp.D).String(), func(t *testing.T) {
 					cont, err := e.processStages(ckp.D)
 					assert.NoError(t, err)
-					assert.Equal(t, ckp.Cont, cont)
+					if ckp.Cont {
+						assert.True(t, cont, "test stopped")
+					} else {
+						assert.False(t, cont, "test not stopped")
+					}
 					assert.Equal(t, ckp.VUs, e.GetVUs())
 				})
 			}

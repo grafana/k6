@@ -481,8 +481,9 @@ func (e *Engine) processStages(dT time.Duration) (bool, error) {
 
 	stage := e.Stages[e.atStage]
 	if stage.Duration > 0 && e.atTime > e.atStageSince+stage.Duration {
-		stageStart := 0 * time.Second
 		stageIdx := -1
+		stageStart := 0 * time.Second
+		stageStartVUs := e.vus
 		for i, s := range e.Stages {
 			if stageStart+s.Duration > e.atTime || s.Duration == 0 {
 				stage = s
@@ -490,6 +491,7 @@ func (e *Engine) processStages(dT time.Duration) (bool, error) {
 				break
 			}
 			stageStart += s.Duration
+			stageStartVUs = s.Target.Int64
 		}
 		if stageIdx == -1 {
 			return false, nil
@@ -497,14 +499,16 @@ func (e *Engine) processStages(dT time.Duration) (bool, error) {
 
 		e.atStage = stageIdx
 		e.atStageSince = stageStart
-		e.atStageStartVUs = e.vus
+
+		e.setVUsNoLock(stageStartVUs)
+		e.atStageStartVUs = stageStartVUs
 	}
 	if stage.Target.Valid {
 		from := e.atStageStartVUs
 		to := stage.Target.Int64
 		t := 1.0
 		if stage.Duration > 0 {
-			t = Clampf(float64(e.atTime)/float64(e.atStageSince+stage.Duration), 0.0, 1.0)
+			t = Clampf(float64(e.atTime-e.atStageSince)/float64(stage.Duration), 0.0, 1.0)
 		}
 		if err := e.setVUsNoLock(Lerp(from, to, t)); err != nil {
 			return false, errors.Wrapf(err, "stage #%d", e.atStage+1)
