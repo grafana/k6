@@ -475,9 +475,8 @@ func (e *Engine) processStages(dT time.Duration) (bool, error) {
 
 	e.atTime += dT
 
-	// If there are no stages, just keep going indefinitely at a stable VU count.
 	if len(e.Stages) == 0 {
-		return true, nil
+		return false, nil
 	}
 
 	stage := e.Stages[e.atStage]

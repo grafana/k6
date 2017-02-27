@@ -427,7 +427,6 @@ func TestEngineSetPaused(t *testing.T) {
 }
 
 func TestEngineSetVUsMax(t *testing.T) {
-
 	t.Run("not set", func(t *testing.T) {
 		e, err, _ := newTestEngine(nil, Options{})
 		assert.NoError(t, err)
@@ -625,6 +624,46 @@ func TestEngine_runVUOnceKeepsCounters(t *testing.T) {
 			})
 		})
 	})
+}
+
+func TestEngine_processStages(t *testing.T) {
+	type checkpoint struct {
+		D    time.Duration
+		Cont bool
+		VUs  int64
+	}
+	testdata := map[string]struct {
+		Stages      []Stage
+		Checkpoints []checkpoint
+	}{
+		"none": {
+			[]Stage{},
+			[]checkpoint{
+				{0 * time.Second, true, 0},
+				{10 * time.Second, true, 0},
+				{24 * time.Hour, true, 0},
+			},
+		},
+	}
+	for name, data := range testdata {
+		t.Run(name, func(t *testing.T) {
+			e, err, _ := newTestEngine(nil, Options{
+				VUs:    null.IntFrom(0),
+				VUsMax: null.IntFrom(10),
+			})
+			assert.NoError(t, err)
+
+			e.Stages = data.Stages
+			for _, ckp := range data.Checkpoints {
+				t.Run((e.AtTime() + ckp.D).String(), func(t *testing.T) {
+					cont, err := e.processStages(ckp.D)
+					assert.NoError(t, err)
+					assert.Equal(t, ckp.Cont, cont)
+					assert.Equal(t, ckp.VUs, e.GetVUs())
+				})
+			}
+		})
+	}
 }
 
 func TestEngineCollector(t *testing.T) {
