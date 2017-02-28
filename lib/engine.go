@@ -239,6 +239,9 @@ func (e *Engine) Run(ctx context.Context) error {
 		// Process any leftover samples.
 		e.processSamples(e.collect()...)
 
+		// Process final thresholds.
+		e.processThresholds()
+
 		// Emit final metrics.
 		e.emitMetrics()
 
