@@ -26,7 +26,11 @@ cacheheaders["If-Modified-Since"] = "Tue, 21 Feb 2017 14:24:11 GMT";
 // Read our username and password from the users.json file, which should have the following format:
 // [ { "username": "joe", "password": "secret" }, { "username": "anne", "password": "alsosecret" }, ... ]
 // Use our unique VU id number to index the contents of the file and find our particular user data
-let users = JSON.parse(open("users.json"));
+//
+//let users = JSON.parse(open("users.json"));
+let users = [ 
+    { "username": "testuser1", "password": "testuser1" }
+];
 
 // Base URL for the site
 let baseurl = "http://dev-li-david.pantheonsite.io";
@@ -152,7 +156,7 @@ function firstpage() {
         "1: first page content OK": (res) => res.html("title").text() === 'Welcome to David li commerce-test | David li commerce-test'
     }) || console.log("First page content invalid");
     // We always update the "Referer" header to contain the most recently accessed URL
-    defaultheaders["Referer"] = cacheheaders["Referer"] = response.effective_url;
+    defaultheaders["Referer"] = cacheheaders["Referer"] = response.url;
 }
 
 // This function loads the login page, where the login form is (wher you enter your
@@ -169,7 +173,7 @@ function loginpage() {
     // <input type="hidden" name="form_build_id" value="form-euqedAF5cQGec_Z9qqgjNMQsMzNAkiF37BGokRobLNg" />
     form_build_id = response.body.match('name="form_build_id" value="(.*)"')[1];
     form_id = response.body.match('name="form_id" value="(.*)"')[1];
-    defaultheaders["Referer"] = cacheheaders["Referer"] = response.effective_url;
+    defaultheaders["Referer"] = cacheheaders["Referer"] = response.url;
 }
 
 // This function performs a login POST operation to authenticate the user.
@@ -190,9 +194,9 @@ function do_login(username, password) {
     let response = http.post(url, formdata, params);
     // verify login succeeded
     check(response, {
-        "3: login succeeded": (res) => res.effective_url === ( baseurl + "/users/" + username)
-    }) || console.log("Login failed!  Effective URL was " + response.effective_url);
-    defaultheaders["Referer"] = cacheheaders["Referer"] = response.effective_url;
+        "3: login succeeded": (res) => res.url === ( baseurl + "/users/" + username)
+    }) || console.log("Login failed!  Effective URL was " + response.url);
+    defaultheaders["Referer"] = cacheheaders["Referer"] = response.url;
 }
 
 // This function loads the /collection/carry page
@@ -203,7 +207,7 @@ function carrypage() {
     check(response, {
         "4: carry page OK": (res) => res.html("title").text() === 'To carry | David li commerce-test'
     }) || console.log("Carry page content invalid");
-    defaultheaders["Referer"] = cacheheaders["Referer"] = response.effective_url;
+    defaultheaders["Referer"] = cacheheaders["Referer"] = response.url;
 }
 
 // And here we check out the "drupal bag", going to its product page
@@ -217,7 +221,7 @@ function drupalbag() {
     form_build_id = response.body.match('name="form_build_id" value="(.*)"')[1];
     form_id = response.body.match('name="form_id" value="(.*)"')[1];
     form_token = response.body.match('name="form_token" value="(.*)"')[1];
-    defaultheaders["Referer"] = cacheheaders["Referer"] = response.effective_url;
+    defaultheaders["Referer"] = cacheheaders["Referer"] = response.url;
 }
 
 // Then we add the Drupal bag to our shopping cart
@@ -240,7 +244,7 @@ function add_drupalbag() {
     check(response, {
         "6: add to cart succeeded": (res) => res.body.includes('Item successfully added to your cart')
     }) || console.log("Add to cart failed");
-    defaultheaders["Referer"] = cacheheaders["Referer"] = response.effective_url;
+    defaultheaders["Referer"] = cacheheaders["Referer"] = response.url;
 }
 
 // Then we click the checkout link to go to our shopping cart
@@ -254,8 +258,8 @@ function cartreview() {
     form_build_id = response.body.match('name="form_build_id" value="(.*)"')[1];
     form_token = response.body.match('name="form_token" value="(.*)"')[1];
     form_id = response.body.match('name="form_id" value="(.*)"')[1];
-    checkout_url = response.effective_url;
-    defaultheaders["Referer"] = cacheheaders["Referer"] = response.effective_url;
+    checkout_url = response.url;
+    defaultheaders["Referer"] = cacheheaders["Referer"] = response.url;
 }
 
 // Go to checkout
@@ -274,15 +278,15 @@ function cartsubmit() {
     };
     let response = http.post(url, formdata, params);
     check(response, {
-        "8: cart submit succeeded": (res) => res.effective_url.includes("/checkout/")
+        "8: cart submit succeeded": (res) => res.url.includes("/checkout/")
     }) || console.log("Cart submit failed");
     // This POST redirects to checkout page, which has a dynamic path, e.g "/checkout/7"
     // so we save the redirected URL in a global variable.
-    checkout_url = response.effective_url;
+    checkout_url = response.url;
     form_build_id = response.body.match('name="form_build_id" value="(.*)"')[1];
     form_token = response.body.match('name="form_token" value="(.*)"')[1];
     form_id = response.body.match('name="form_id" value="(.*)"')[1];
-    defaultheaders["Referer"] = cacheheaders["Referer"] = response.effective_url;
+    defaultheaders["Referer"] = cacheheaders["Referer"] = response.url;
 }
 
 // Enter billing address etc
@@ -308,12 +312,12 @@ function checkout() {
     let response = http.post(url, formdata, params);
     // verify checkout step 1 succeeded
     check(response, {
-        "9: checkout succeeded": (res) => res.effective_url === (checkout_url + "/shipping")
+        "9: checkout succeeded": (res) => res.url === (checkout_url + "/shipping")
     }) || console.log("Checkout failed!");
     form_build_id = response.body.match('name="form_build_id" value="(.*)"')[1];
     form_token = response.body.match('name="form_token" value="(.*)"')[1];     
     form_id = response.body.match('name="form_id" value="(.*)"')[1];
-    defaultheaders["Referer"] = cacheheaders["Referer"] = response.effective_url;
+    defaultheaders["Referer"] = cacheheaders["Referer"] = response.url;
 }
 
 // Checkout step 2: choose shipping option
@@ -332,12 +336,12 @@ function shipping() {
     let response = http.post(url, formdata, params);
     // verify checkout step 2 succeeded
     check(response, {
-        "10: select shipping succeeded": (res) => res.effective_url === (checkout_url + "/review")
+        "10: select shipping succeeded": (res) => res.url === (checkout_url + "/review")
     }) || console.log("Select shipping failed!");
     form_build_id = response.body.match('name="form_build_id" value="(.*)"')[1];
     form_token = response.body.match('name="form_token" value="(.*)"')[1];    
     form_id = response.body.match('name="form_id" value="(.*)"')[1];
-    defaultheaders["Referer"] = cacheheaders["Referer"] = response.effective_url;
+    defaultheaders["Referer"] = cacheheaders["Referer"] = response.url;
 }
 
 // Checkout step 3: review and submit order
@@ -363,7 +367,7 @@ function review_submit() {
     check(response, {
         "11: checkout complete": (res) => res.html("h1").text() === "Checkout complete"
     }) || console.log("Checkout review-submit failed");
-    defaultheaders["Referer"] = cacheheaders["Referer"] = response.effective_url;
+    defaultheaders["Referer"] = cacheheaders["Referer"] = response.url;
 }
 
 // Finally, we log out our user
