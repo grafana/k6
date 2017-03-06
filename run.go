@@ -61,6 +61,10 @@ var commandRun = cli.Command{
 	Usage:     "Starts running a load test",
 	ArgsUsage: "url|filename",
 	Flags: []cli.Flag{
+		cli.BoolFlag{
+			Name:  "quiet, q",
+			Usage: "hide the progress bar",
+		},
 		cli.Int64Flag{
 			Name:  "vus, u",
 			Usage: "virtual users to simulate",
@@ -298,6 +302,7 @@ func actionRun(cc *cli.Context) error {
 	// Collect CLI arguments, most (not all) relating to options.
 	addr := cc.GlobalString("address")
 	out := cc.String("out")
+	quiet := cc.Bool("quiet")
 	cliOpts := lib.Options{
 		Paused:                cliBool(cc, "paused"),
 		VUs:                   cliInt64(cc, "vus"),
@@ -452,7 +457,7 @@ func actionRun(cc *cli.Context) error {
 
 	// Progress bar for TTYs.
 	progressBar := ui.ProgressBar{Width: 60}
-	if isTTY {
+	if isTTY && !quiet {
 		fmt.Fprintf(color.Output, " starting %s -- / --\r", progressBar.String())
 	}
 
@@ -462,7 +467,7 @@ func actionRun(cc *cli.Context) error {
 
 	// Print status at a set interval; less frequently on non-TTYs.
 	tickInterval := 10 * time.Millisecond
-	if !isTTY {
+	if !isTTY || quiet {
 		tickInterval = 1 * time.Second
 	}
 	ticker := time.NewTicker(tickInterval)
@@ -487,7 +492,7 @@ loop:
 				progress = float64(atTime) / float64(totalTime)
 			}
 
-			if isTTY {
+			if isTTY && !quiet {
 				progressBar.Progress = progress
 				fmt.Fprintf(color.Output, "%10s %s %10s / %s\r",
 					statusString,
@@ -517,7 +522,7 @@ loop:
 
 	// Test done, leave that status as the final progress bar!
 	atTime := engine.AtTime()
-	if isTTY {
+	if isTTY && !quiet {
 		progressBar.Progress = 1.0
 		fmt.Fprintf(color.Output, "      done %s %10s / %s\n",
 			progressBar.String(),
