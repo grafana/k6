@@ -30,6 +30,24 @@ export class Response {
 	}
 }
 
+function parseBody(body) {
+	if (body) {
+		if (typeof body === "object") {
+			let formstring = "";
+			for (let key in body) {
+				if (formstring !== "") {
+					formstring += "&";
+				}
+				formstring += key + "=" + encodeURIComponent(body[key]);
+			}
+			return formstring;
+		}
+		return body;
+	} else {
+		return '';
+	}
+}
+
 /**
  * Makes an HTTP request.
  * @param  {string} method      HTTP Method (eg. "GET")
@@ -40,20 +58,7 @@ export class Response {
  */
 export function request(method, url, body, params = {}) {
 	method = method.toUpperCase();
-	if (body) {
-		if (typeof body === "object") {
-			let formstring = "";
-			for (let key in body) {
-				if (formstring !== "") {
-					formstring += "&";
-				}
-				formstring += key + "=" + encodeURIComponent(body[key]);
-			}
-			body = formstring;
-		}
-	} else {
-		body = ''
-	}
+	body = parseBody(body);
 	return new Response(__jsapi__.HTTPRequest(method, url, body, JSON.stringify(params)));
 };
 
@@ -152,12 +157,61 @@ export function trace(url, body, params) {
 	return request("TRACE", url, body, params);
 };
 
+/**
+ * Batches multiple requests together.
+ * @see    module:k6/http.request
+ * @param  {Array|Object} requests	An array or object of requests, in string or object form.
+ * @return {Array.<module:k6/http.Response>|Object}
+ */
+export function batch(requests) {
+	function stringToObject(str) {
+		return {
+			"method": "GET",
+			"url": str,
+			"body": null,
+			"params": JSON.stringify({})
+		}
+	}
+
+	function formatObject(obj) {
+		obj.params = !obj.params ? {} :obj.params
+		obj.body = parseBody(obj.body)
+		obj.params = JSON.stringify(obj.params)
+		return obj
+	}
+
+	let result
+	if (requests.length > 0) {
+		result = requests.map(e => {
+			if (typeof e === 'string') {
+				return stringToObject(e)
+			} else {
+				return formatObject(e)
+			}
+		})
+	} else {
+		result = {}
+		Object.keys(requests).map(e => {
+			let val = requests[e]
+			if (typeof val === 'string') {
+				result[e] = stringToObject(val)
+			} else {
+				result[e] = formatObject(val)
+			}
+		})
+	}
+	
+	let response = __jsapi__.BatchHTTPRequest(result);
+	return response
+};
+
 export default {
-	Response: Response,
-	request: request,
-	get: get,
-	post: post,
-	put: put,
-	del: del,
-	patch: patch,
+	Response,
+	request,
+	get,
+	post,
+	put,
+	del,
+	patch,
+	batch,
 };

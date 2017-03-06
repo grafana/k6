@@ -18,46 +18,30 @@
  *
  */
 
-package ui
+package main
 
 import (
-	"fmt"
-	"github.com/fatih/color"
-	"strings"
+	"github.com/loadimpact/k6/lib"
+	"github.com/stretchr/testify/assert"
+	"gopkg.in/guregu/null.v3"
+	"testing"
+	"time"
 )
 
-var (
-	faint = color.New(color.Faint)
-)
-
-type ProgressBar struct {
-	Width    int
-	Progress float64
-}
-
-func (b ProgressBar) String() string {
-	space := b.Width - 2
-	filled := int(float64(space) * b.Progress)
-
-	filling := ""
-	caret := ""
-	if filled > 0 {
-		if filled < space {
-			filling = strings.Repeat("=", filled-1)
-			caret = ">"
-		} else {
-			filling = strings.Repeat("=", filled)
-		}
+func TestParseStage(t *testing.T) {
+	testdata := map[string]lib.Stage{
+		"":        {},
+		":":       {},
+		"10s":     {Duration: 10 * time.Second},
+		"10s:":    {Duration: 10 * time.Second},
+		"10s:100": {Duration: 10 * time.Second, Target: null.IntFrom(100)},
+		":100":    {Target: null.IntFrom(100)},
 	}
-
-	padding := ""
-	filler := "="
-	if color.NoColor {
-		filler = " "
+	for s, st := range testdata {
+		t.Run(s, func(t *testing.T) {
+			parsed, err := ParseStage(s)
+			assert.NoError(t, err)
+			assert.Equal(t, st, parsed)
+		})
 	}
-	if space > filled {
-		padding = faint.Sprint(strings.Repeat(filler, space-filled))
-	}
-
-	return fmt.Sprintf("[%s%s%s]", filling, caret, padding)
 }

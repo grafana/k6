@@ -24,12 +24,14 @@ import (
 	"encoding/json"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
+	"github.com/robertkrimen/otto"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptrace"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 type HTTPResponse struct {
@@ -94,6 +96,7 @@ func (a JSAPI) HTTPRequest(method, url, body string, paramData string) map[strin
 		headers[k] = strings.Join(v, ", ")
 	}
 	return map[string]interface{}{
+		"url":     res.Request.URL.String(),
 		"status":  res.StatusCode,
 		"body":    string(resBody),
 		"headers": headers,
@@ -107,4 +110,45 @@ func (a JSAPI) HTTPRequest(method, url, body string, paramData string) map[strin
 			"receiving":  stats.D(trail.Receiving),
 		},
 	}
+}
+
+func (a JSAPI) BatchHTTPRequest(requests otto.Value) otto.Value {
+	obj := requests.Object()
+
+	wg := sync.WaitGroup{}
+	mutex := sync.Mutex{}
+	for _, key := range obj.Keys() {
+		v, _ := obj.Get(key)
+
+		var method string
+		var url string
+		var body string
+		var params string
+
+		o := v.Object()
+
+		v, _ = o.Get("method")
+		method = v.String()
+		v, _ = o.Get("url")
+		url = v.String()
+		v, _ = o.Get("body")
+		body = v.String()
+		v, _ = o.Get("params")
+		params = v.String()
+
+		wg.Add(1)
+		go func(tkey string) {
+			defer wg.Done()
+
+			res := a.HTTPRequest(method, url, body, params)
+
+			mutex.Lock()
+			defer mutex.Unlock()
+
+			_ = obj.Set(tkey, res)
+		}(key)
+	}
+
+	wg.Wait()
+	return obj.Value()
 }

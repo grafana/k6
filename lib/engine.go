@@ -97,7 +97,7 @@ type Engine struct {
 	Stages      []Stage
 	Thresholds  map[string]Thresholds
 	Metrics     map[*stats.Metric]stats.Sink
-	MetricsLock sync.Mutex
+	MetricsLock sync.RWMutex
 
 	// Submetrics, mapped from parent metric names.
 	submetrics map[string][]*submetric
@@ -115,6 +115,8 @@ type Engine struct {
 	vuStop    chan interface{}
 	vuPause   chan interface{}
 
+	nextVUID int64
+
 	// Atomic counters.
 	numIterations int64
 	numErrors     int64
@@ -122,7 +124,7 @@ type Engine struct {
 	thresholdsTainted bool
 
 	// Subsystem-related.
-	lock      sync.Mutex
+	lock      sync.RWMutex
 	subctx    context.Context
 	subcancel context.CancelFunc
 	subwg     sync.WaitGroup
@@ -141,15 +143,16 @@ func NewEngine(r Runner, o Options) (*Engine, error) {
 	}
 	e.clearSubcontext()
 
-	if o.Duration.Valid {
+	if o.Stages != nil {
+		e.Stages = o.Stages
+	} else if o.Duration.Valid {
 		d, err := time.ParseDuration(o.Duration.String)
 		if err != nil {
 			return nil, errors.Wrap(err, "options.duration")
 		}
 		e.Stages = []Stage{{Duration: d}}
-	}
-	if o.Stages != nil {
-		e.Stages = o.Stages
+	} else {
+		e.Stages = []Stage{{Duration: 0}}
 	}
 	if o.VUsMax.Valid {
 		if err := e.SetVUsMax(o.VUsMax.Int64); err != nil {
@@ -224,7 +227,9 @@ func (e *Engine) Run(ctx context.Context) error {
 
 	close(e.vuStop)
 	defer func() {
+		e.lock.Lock()
 		e.vuStop = make(chan interface{})
+		e.lock.Unlock()
 		e.SetPaused(false)
 
 		// Shut down subsystems, wait for graceful termination.
@@ -233,11 +238,16 @@ func (e *Engine) Run(ctx context.Context) error {
 
 		// Process any leftover samples.
 		e.processSamples(e.collect()...)
-		collectorcancel()
-		<-collectorch
+
+		// Process final thresholds.
+		e.processThresholds()
 
 		// Emit final metrics.
 		e.emitMetrics()
+
+		// Shut down collector
+		collectorcancel()
+		<-collectorch
 	}()
 
 	// Set tracking to defaults.
@@ -246,9 +256,11 @@ func (e *Engine) Run(ctx context.Context) error {
 	e.atStage = 0
 	e.atStageSince = 0
 	e.atStageStartVUs = e.vus
-	e.numIterations = 0
+	e.nextVUID = 0
 	e.numErrors = 0
 	e.lock.Unlock()
+
+	atomic.StoreInt64(&e.numIterations, 0)
 
 	var lastTick time.Time
 	ticker := time.NewTicker(TickRate)
@@ -256,17 +268,25 @@ func (e *Engine) Run(ctx context.Context) error {
 	maxIterations := e.Options.Iterations.Int64
 	for {
 		// Don't do anything while the engine is paused.
+		e.lock.RLock()
 		vuPause := e.vuPause
+		e.lock.RUnlock()
 		if vuPause != nil {
 			select {
 			case <-vuPause:
 			case <-ctx.Done():
+				e.Logger.Debug("run: context expired (paused); exiting...")
 				return nil
 			}
 		}
 
 		// If we have an iteration cap, exit once we hit it.
-		if maxIterations > 0 && e.numIterations == e.vusMax*maxIterations {
+		numIterations := atomic.LoadInt64(&e.numIterations)
+		if maxIterations > 0 && numIterations >= atomic.LoadInt64(&e.vusMax)*maxIterations {
+			e.Logger.WithFields(log.Fields{
+				"total": e.numIterations,
+				"cap":   e.vusMax * maxIterations,
+			}).Debug("run: hit iteration cap; exiting...")
 			return nil
 		}
 
@@ -284,20 +304,26 @@ func (e *Engine) Run(ctx context.Context) error {
 			return err
 		}
 		if !keepRunning {
+			e.Logger.Debug("run: processStages() returned false; exiting...")
 			return nil
 		}
 
 		select {
 		case <-ticker.C:
 		case <-ctx.Done():
+			e.Logger.Debug("run: context expired; exiting...")
 			return nil
 		}
 	}
 }
 
 func (e *Engine) IsRunning() bool {
+	e.lock.RLock()
+	vuStop := e.vuStop
+	e.lock.RUnlock()
+
 	select {
-	case <-e.vuStop:
+	case <-vuStop:
 		return true
 	default:
 		return false
@@ -317,8 +343,8 @@ func (e *Engine) SetPaused(v bool) {
 }
 
 func (e *Engine) IsPaused() bool {
-	e.lock.Lock()
-	defer e.lock.Unlock()
+	e.lock.RLock()
+	defer e.lock.RUnlock()
 
 	return e.vuPause != nil
 }
@@ -331,6 +357,10 @@ func (e *Engine) SetVUs(v int64) error {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 
+	return e.setVUsNoLock(v)
+}
+
+func (e *Engine) setVUsNoLock(v int64) error {
 	if v > e.vusMax {
 		return errors.New("more vus than allocated requested")
 	}
@@ -340,6 +370,15 @@ func (e *Engine) SetVUs(v int64) error {
 		vu := e.vuEntries[i]
 		if vu.Cancel != nil {
 			panic(errors.New("fatal miscalculation: attempted to re-schedule active VU"))
+		}
+
+		id := atomic.AddInt64(&e.nextVUID, 1)
+
+		// nil runners are used for testing.
+		if vu.VU != nil {
+			if err := vu.VU.Reconfigure(id); err != nil {
+				return err
+			}
 		}
 
 		ctx, cancel := context.WithCancel(e.subctx)
@@ -364,8 +403,8 @@ func (e *Engine) SetVUs(v int64) error {
 }
 
 func (e *Engine) GetVUs() int64 {
-	e.lock.Lock()
-	defer e.lock.Unlock()
+	e.lock.RLock()
+	defer e.lock.RUnlock()
 
 	return e.vus
 }
@@ -405,29 +444,29 @@ func (e *Engine) SetVUsMax(v int64) error {
 }
 
 func (e *Engine) GetVUsMax() int64 {
-	e.lock.Lock()
-	defer e.lock.Unlock()
+	e.lock.RLock()
+	defer e.lock.RUnlock()
 
 	return e.vusMax
 }
 
 func (e *Engine) IsTainted() bool {
-	e.MetricsLock.Lock()
-	defer e.MetricsLock.Unlock()
+	e.MetricsLock.RLock()
+	defer e.MetricsLock.RUnlock()
 
 	return e.thresholdsTainted
 }
 
 func (e *Engine) AtTime() time.Duration {
-	e.lock.Lock()
-	defer e.lock.Unlock()
+	e.lock.RLock()
+	defer e.lock.RUnlock()
 
 	return e.atTime
 }
 
 func (e *Engine) TotalTime() time.Duration {
-	e.lock.Lock()
-	defer e.lock.Unlock()
+	e.lock.RLock()
+	defer e.lock.RUnlock()
 
 	var total time.Duration
 	for _, stage := range e.Stages {
@@ -457,31 +496,54 @@ func (e *Engine) processStages(dT time.Duration) (bool, error) {
 
 	e.atTime += dT
 
-	// If there are no stages, just keep going indefinitely at a stable VU count.
 	if len(e.Stages) == 0 {
-		return true, nil
+		e.Logger.Debug("processStages: no stages")
+		return false, nil
 	}
 
 	stage := e.Stages[e.atStage]
 	if stage.Duration > 0 && e.atTime > e.atStageSince+stage.Duration {
-		if e.atStage != len(e.Stages)-1 {
-			e.atStage++
-			e.atStageSince = e.atTime
-			e.atStageStartVUs = e.vus
-			stage = e.Stages[e.atStage]
-		} else {
+		e.Logger.Debug("processStages: stage expired")
+		stageIdx := -1
+		stageStart := 0 * time.Second
+		stageStartVUs := e.vus
+		for i, s := range e.Stages {
+			if stageStart+s.Duration > e.atTime || s.Duration == 0 {
+				e.Logger.WithField("idx", i).Debug("processStages: proceeding to next stage...")
+				stage = s
+				stageIdx = i
+				break
+			}
+			stageStart += s.Duration
+			stageStartVUs = s.Target.Int64
+		}
+		if stageIdx == -1 {
+			e.Logger.Debug("processStages: end of test exceeded")
 			return false, nil
 		}
+
+		e.atStage = stageIdx
+		e.atStageSince = stageStart
+
+		e.Logger.WithField("vus", stageStartVUs).Debug("processStages: normalizing VU count...")
+		if err := e.setVUsNoLock(stageStartVUs); err != nil {
+			return false, errors.Wrapf(err, "stage #%d (normalization)", e.atStage)
+		}
+		e.atStageStartVUs = stageStartVUs
 	}
 	if stage.Target.Valid {
 		from := e.atStageStartVUs
 		to := stage.Target.Int64
 		t := 1.0
 		if stage.Duration > 0 {
-			t = Clampf(float64(e.atTime)/float64(e.atStageSince+stage.Duration), 0.0, 1.0)
+			t = Clampf(float64(e.atTime-e.atStageSince)/float64(stage.Duration), 0.0, 1.0)
 		}
-		if err := e.SetVUs(Lerp(from, to, t)); err != nil {
-			return false, errors.Wrapf(err, "stage #%d", e.atStage+1)
+		vus := Lerp(from, to, t)
+		if e.vus != vus {
+			e.Logger.WithFields(log.Fields{"from": e.vus, "to": vus}).Debug("processStages: interpolating...")
+			if err := e.setVUsNoLock(vus); err != nil {
+				return false, errors.Wrapf(err, "stage #%d", e.atStage+1)
+			}
 		}
 	}
 
@@ -498,7 +560,11 @@ func (e *Engine) runVU(ctx context.Context, vu *vuEntry) {
 	}
 
 	// Sleep until the engine starts running.
-	<-e.vuStop
+	select {
+	case <-e.vuStop:
+	case <-ctx.Done():
+		return
+	}
 
 	backoffCounter := 0
 	backoff := time.Duration(0)
@@ -509,7 +575,9 @@ func (e *Engine) runVU(ctx context.Context, vu *vuEntry) {
 		}
 
 		// If the engine is paused, sleep until it resumes.
+		e.lock.RLock()
 		vuPause := e.vuPause
+		e.lock.RUnlock()
 		if vuPause != nil {
 			<-vuPause
 		}
@@ -590,8 +658,8 @@ func (e *Engine) runMetricsEmission(ctx context.Context) {
 }
 
 func (e *Engine) emitMetrics() {
-	e.lock.Lock()
-	defer e.lock.Unlock()
+	e.lock.RLock()
+	defer e.lock.RUnlock()
 
 	t := time.Now()
 	e.processSamples(
@@ -665,12 +733,11 @@ func (e *Engine) runCollection(ctx context.Context) {
 }
 
 func (e *Engine) collect() []stats.Sample {
-	e.lock.Lock()
-	entries := e.vuEntries
-	e.lock.Unlock()
+	e.lock.RLock()
+	defer e.lock.RUnlock()
 
 	samples := []stats.Sample{}
-	for _, vu := range entries {
+	for _, vu := range e.vuEntries {
 		vu.lock.Lock()
 		if len(vu.Samples) > 0 {
 			samples = append(samples, vu.Samples...)

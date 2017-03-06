@@ -28,22 +28,22 @@ import (
 
 func TestMetricHumanizeValue(t *testing.T) {
 	data := map[*Metric]map[float64]string{
-		&Metric{Type: Counter, Contains: Default}: {
+		{Type: Counter, Contains: Default}: {
 			1.0:     "1",
 			1.5:     "1.5",
 			1.54321: "1.54321",
 		},
-		&Metric{Type: Gauge, Contains: Default}: {
+		{Type: Gauge, Contains: Default}: {
 			1.0:     "1",
 			1.5:     "1.5",
 			1.54321: "1.54321",
 		},
-		&Metric{Type: Trend, Contains: Default}: {
+		{Type: Trend, Contains: Default}: {
 			1.0:     "1",
 			1.5:     "1.5",
 			1.54321: "1.54321",
 		},
-		&Metric{Type: Counter, Contains: Time}: {
+		{Type: Counter, Contains: Time}: {
 			D(1):               "1ns",
 			D(12):              "12ns",
 			D(123):             "123ns",
@@ -60,7 +60,7 @@ func TestMetricHumanizeValue(t *testing.T) {
 			D(12345678901234):  "3h25m45s",
 			D(123456789012345): "34h17m36s",
 		},
-		&Metric{Type: Gauge, Contains: Time}: {
+		{Type: Gauge, Contains: Time}: {
 			D(1):               "1ns",
 			D(12):              "12ns",
 			D(123):             "123ns",
@@ -77,7 +77,7 @@ func TestMetricHumanizeValue(t *testing.T) {
 			D(12345678901234):  "3h25m45s",
 			D(123456789012345): "34h17m36s",
 		},
-		&Metric{Type: Trend, Contains: Time}: {
+		{Type: Trend, Contains: Time}: {
 			D(1):               "1ns",
 			D(12):              "12ns",
 			D(123):             "123ns",
@@ -94,7 +94,7 @@ func TestMetricHumanizeValue(t *testing.T) {
 			D(12345678901234):  "3h25m45s",
 			D(123456789012345): "34h17m36s",
 		},
-		&Metric{Type: Rate, Contains: Default}: {
+		{Type: Rate, Contains: Default}: {
 			0.0:      "0.00%",
 			0.01:     "1.00%",
 			0.02:     "2.00%",
