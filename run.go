@@ -56,6 +56,8 @@ const (
 	TypeJS   = "js"
 )
 
+var urlRegex = regexp.MustCompile(`(?i)^https?://`)
+
 var commandRun = cli.Command{
 	Name:      "run",
 	Usage:     "Starts running a load test",
@@ -156,89 +158,48 @@ var commandInspect = cli.Command{
 	Action: actionInspect,
 }
 
-func looksLikeURL(str []byte) bool {
-	s := strings.ToLower(strings.TrimSpace(string(str)))
-	match, _ := regexp.MatchString("^https?://", s)
-	return match
+func guessType(data []byte) string {
+	if urlRegex.Match(data) {
+		return TypeURL
+	}
+	return TypeJS
 }
 
-func getSrcData(arg, t string) (*lib.SourceData, string, error) {
-	srcdata := []byte("")
-	runnerType := t
-	filename := arg
-	const cmdline = "[cmdline]"
-	// special case name "-" will always cause src data to be read from file STDIN
-	if arg == "-" {
-		s, err := ioutil.ReadAll(os.Stdin)
+func getSrcData(filename string) (*lib.SourceData, error) {
+	reader := os.Stdin
+	if filename != "-" {
+		f, err := os.Open(filename)
 		if err != nil {
-			return nil, "", err
+			// If the file doesn't exist, but it looks like a URL, try using it as one.
+			if os.IsNotExist(err) && urlRegex.MatchString(filename) {
+				return &lib.SourceData{
+					Data:     []byte(filename),
+					Filename: filename,
+				}, nil
+			}
+
+			return nil, err
 		}
-		srcdata = s
-	} else {
-		// Deduce how to get src data
-		switch t {
-		case TypeAuto:
-			if looksLikeURL([]byte(arg)) { // always try to parse as URL string first
-				srcdata = []byte(arg)
-				runnerType = TypeURL
-				filename = cmdline
-			} else {
-				// Otherwise, check if it is a file name and we can load the file
-				s, err := ioutil.ReadFile(arg)
-				srcdata = s
-				if err != nil { // if we fail to open file, we assume the arg is JS code
-					srcdata = []byte(arg)
-					runnerType = TypeJS
-					filename = cmdline
-				}
-			}
-		case TypeURL:
-			// We try to use TypeURL args as URLs directly first
-			if looksLikeURL([]byte(arg)) {
-				srcdata = []byte(arg)
-				filename = cmdline
-			} else { // if that didn’t work, we try to load a file with URLs
-				s, err := ioutil.ReadFile(arg)
-				if err != nil {
-					return nil, "", err
-				}
-				srcdata = s
-			}
-		case TypeJS:
-			// TypeJS args we try to use as file names first
-			s, err := ioutil.ReadFile(arg)
-			srcdata = s
-			if err != nil { // and if that didn’t work, we assume the arg itself is JS code
-				srcdata = []byte(arg)
-				filename = cmdline
-			}
-		default:
-			return nil, "", errors.New("Invalid type specified, see --help")
-		}
+		reader = f
 	}
-	// Now we should have some src data and in most cases a type also. If we
-	// don’t have a type it means we read from STDIN or from a file and the user
-	// specified type == TypeAuto. This means we need to try and auto-detect type
-	if runnerType == TypeAuto {
-		if looksLikeURL(srcdata) {
-			runnerType = TypeURL
-		} else {
-			runnerType = TypeJS
-		}
+
+	data, err := ioutil.ReadAll(reader)
+	if err != nil {
+		return nil, err
 	}
-	src := &lib.SourceData{
-		Data:     srcdata,
+
+	return &lib.SourceData{
+		Data:     data,
 		Filename: filename,
-	}
-	return src, runnerType, nil
+	}, nil
 }
 
-func makeRunner(runnerType string, srcdata *lib.SourceData) (lib.Runner, error) {
+func makeRunner(runnerType string, src *lib.SourceData) (lib.Runner, error) {
 	switch runnerType {
-	case "":
-		return nil, errors.New("Invalid type specified, see --help")
+	case TypeAuto:
+		return makeRunner(guessType(src.Data), src)
 	case TypeURL:
-		u, err := url.Parse(strings.TrimSpace(string(srcdata.Data)))
+		u, err := url.Parse(strings.TrimSpace(string(src.Data)))
 		if err != nil || u.Scheme == "" {
 			return nil, errors.New("Failed to parse URL")
 		}
@@ -252,7 +213,7 @@ func makeRunner(runnerType string, srcdata *lib.SourceData) (lib.Runner, error) 
 		if err != nil {
 			return nil, err
 		}
-		exports, err := rt.Load(srcdata)
+		exports, err := rt.Load(src)
 		if err != nil {
 			return nil, err
 		}
@@ -326,13 +287,16 @@ func actionRun(cc *cli.Context) error {
 
 	// Make the Runner, extract script-defined options.
 	arg := args[0]
-	t := cc.String("type")
-	srcdata, runnerType, err := getSrcData(arg, t)
+	src, err := getSrcData(arg)
 	if err != nil {
 		log.WithError(err).Error("Failed to parse input data")
 		return err
 	}
-	runner, err := makeRunner(runnerType, srcdata)
+	runnerType := cc.String("type")
+	if runnerType == TypeAuto {
+		runnerType = guessType(src.Data)
+	}
+	runner, err := makeRunner(runnerType, src)
 	if err != nil {
 		log.WithError(err).Error("Couldn't create a runner")
 		return err
@@ -404,7 +368,7 @@ func actionRun(cc *cli.Context) error {
 
 	fmt.Fprintf(color.Output, "  execution: %s\n", color.CyanString("local"))
 	fmt.Fprintf(color.Output, "     output: %s\n", color.CyanString(collectorString))
-	fmt.Fprintf(color.Output, "     script: %s (%s)\n", color.CyanString(srcdata.Filename), color.CyanString(runnerType))
+	fmt.Fprintf(color.Output, "     script: %s (%s)\n", color.CyanString(src.Filename), color.CyanString(runnerType))
 	fmt.Fprintf(color.Output, "\n")
 	fmt.Fprintf(color.Output, "   duration: %s, iterations: %s\n", color.CyanString(opts.Duration.String), color.CyanString("%d", opts.Iterations.Int64))
 	fmt.Fprintf(color.Output, "        vus: %s, max: %s\n", color.CyanString("%d", opts.VUs.Int64), color.CyanString("%d", opts.VUsMax.Int64))
@@ -651,13 +615,18 @@ func actionInspect(cc *cli.Context) error {
 		return cli.NewExitError("Wrong number of arguments!", 1)
 	}
 	arg := args[0]
-	t := cc.String("type")
-	srcdata, runnerType, err := getSrcData(arg, t)
+
+	src, err := getSrcData(arg)
 	if err != nil {
 		return err
 	}
+	runnerType := cc.String("type")
+	if runnerType == TypeAuto {
+		runnerType = guessType(src.Data)
+	}
 
 	var opts lib.Options
+
 	switch runnerType {
 	case TypeJS:
 		r, err := js.New()
@@ -665,7 +634,7 @@ func actionInspect(cc *cli.Context) error {
 			return cli.NewExitError(err.Error(), 1)
 		}
 
-		if _, err := r.Load(srcdata); err != nil {
+		if _, err := r.Load(src); err != nil {
 			return cli.NewExitError(err.Error(), 1)
 		}
 		opts = opts.Apply(r.Options)
