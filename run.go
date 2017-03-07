@@ -35,8 +35,10 @@ import (
 	"github.com/loadimpact/k6/stats/influxdb"
 	"github.com/loadimpact/k6/stats/json"
 	"github.com/loadimpact/k6/ui"
+	"github.com/spf13/afero"
 	"gopkg.in/guregu/null.v3"
 	"gopkg.in/urfave/cli.v1"
+	"io"
 	"io/ioutil"
 	"net"
 	"net/url"
@@ -165,10 +167,10 @@ func guessType(data []byte) string {
 	return TypeJS
 }
 
-func getSrcData(filename string) (*lib.SourceData, error) {
-	reader := os.Stdin
+func getSrcData(filename string, fs afero.Fs) (*lib.SourceData, error) {
+	reader := io.Reader(os.Stdin)
 	if filename != "-" {
-		f, err := os.Open(filename)
+		f, err := fs.Open(filename)
 		if err != nil {
 			// If the file doesn't exist, but it looks like a URL, try using it as one.
 			if os.IsNotExist(err) && urlRegex.MatchString(filename) {
@@ -180,6 +182,7 @@ func getSrcData(filename string) (*lib.SourceData, error) {
 
 			return nil, err
 		}
+		defer func() { _ = f.Close() }()
 		reader = f
 	}
 
@@ -194,10 +197,10 @@ func getSrcData(filename string) (*lib.SourceData, error) {
 	}, nil
 }
 
-func makeRunner(runnerType string, src *lib.SourceData) (lib.Runner, error) {
+func makeRunner(runnerType string, src *lib.SourceData, fs afero.Fs) (lib.Runner, error) {
 	switch runnerType {
 	case TypeAuto:
-		return makeRunner(guessType(src.Data), src)
+		return makeRunner(guessType(src.Data), src, fs)
 	case TypeURL:
 		u, err := url.Parse(strings.TrimSpace(string(src.Data)))
 		if err != nil || u.Scheme == "" {
@@ -213,7 +216,7 @@ func makeRunner(runnerType string, src *lib.SourceData) (lib.Runner, error) {
 		if err != nil {
 			return nil, err
 		}
-		exports, err := rt.Load(src)
+		exports, err := rt.Load(src, fs)
 		if err != nil {
 			return nil, err
 		}
@@ -246,7 +249,7 @@ func makeCollector(s string, opts lib.Options) (lib.Collector, error) {
 	case "influxdb":
 		return influxdb.New(p, opts)
 	case "json":
-		return json.New(p, opts)
+		return json.New(p, afero.NewOsFs(), opts)
 	default:
 		return nil, errors.New("Unknown output type: " + t)
 	}
@@ -287,7 +290,8 @@ func actionRun(cc *cli.Context) error {
 
 	// Make the Runner, extract script-defined options.
 	arg := args[0]
-	src, err := getSrcData(arg)
+	fs := afero.NewOsFs()
+	src, err := getSrcData(arg, fs)
 	if err != nil {
 		log.WithError(err).Error("Failed to parse input data")
 		return err
@@ -296,7 +300,7 @@ func actionRun(cc *cli.Context) error {
 	if runnerType == TypeAuto {
 		runnerType = guessType(src.Data)
 	}
-	runner, err := makeRunner(runnerType, src)
+	runner, err := makeRunner(runnerType, src, fs)
 	if err != nil {
 		log.WithError(err).Error("Couldn't create a runner")
 		return err
@@ -305,7 +309,7 @@ func actionRun(cc *cli.Context) error {
 
 	// Read config files.
 	for _, filename := range cc.StringSlice("config") {
-		data, err := ioutil.ReadFile(filename)
+		data, err := afero.ReadFile(fs, filename)
 		if err != nil {
 			return cli.NewExitError(err.Error(), 1)
 		}
@@ -616,7 +620,8 @@ func actionInspect(cc *cli.Context) error {
 	}
 	arg := args[0]
 
-	src, err := getSrcData(arg)
+	fs := afero.NewOsFs()
+	src, err := getSrcData(arg, fs)
 	if err != nil {
 		return err
 	}
@@ -634,14 +639,14 @@ func actionInspect(cc *cli.Context) error {
 			return cli.NewExitError(err.Error(), 1)
 		}
 
-		if _, err := r.Load(src); err != nil {
+		if _, err := r.Load(src, fs); err != nil {
 			return cli.NewExitError(err.Error(), 1)
 		}
 		opts = opts.Apply(r.Options)
 	}
 
 	for _, filename := range cc.StringSlice("config") {
-		data, err := ioutil.ReadFile(filename)
+		data, err := afero.ReadFile(fs, filename)
 		if err != nil {
 			return cli.NewExitError(err.Error(), 1)
 		}

@@ -22,6 +22,7 @@ package json
 
 import (
 	"github.com/loadimpact/k6/lib"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
@@ -29,17 +30,16 @@ import (
 
 func TestNew(t *testing.T) {
 	testdata := map[string]bool{
-		"/nonexistent/badplacetolog.log":   false,
-		os.TempDir() + "/okplacetolog.log": true,
-		"./okplacetolog.log":               true,
-		"okplacetolog.log":                 true,
+		"/nonexistent/badplacetolog.log": false,
+		"./okplacetolog.log":             true,
+		"okplacetolog.log":               true,
 	}
 
 	for path, succ := range testdata {
 		t.Run("path="+path, func(t *testing.T) {
 			defer func() { _ = os.Remove(path) }()
 
-			collector, err := New(path, lib.Options{})
+			collector, err := New(path, afero.NewOsFs(), lib.Options{})
 			if succ {
 				assert.NoError(t, err)
 				assert.NotNil(t, collector)

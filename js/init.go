@@ -25,13 +25,14 @@ import (
 	"fmt"
 	"github.com/loadimpact/k6/stats"
 	"github.com/robertkrimen/otto"
-	"io/ioutil"
+	"github.com/spf13/afero"
 	"path/filepath"
 	"strings"
 )
 
 type InitAPI struct {
-	r *Runtime
+	r  *Runtime
+	fs afero.Fs
 
 	fileCache map[string]string
 }
@@ -68,7 +69,7 @@ func (i *InitAPI) Require(name string) otto.Value {
 		return exports
 	}
 
-	exports, err := i.r.loadFile(name + ".js")
+	exports, err := i.r.loadFile(name+".js", i.fs)
 	if err != nil {
 		throw(i.r.VM, err)
 	}
@@ -89,7 +90,7 @@ func (i *InitAPI) Open(name string) string {
 		return data
 	}
 
-	data, err := ioutil.ReadFile(path)
+	data, err := afero.ReadFile(i.fs, path)
 	if err != nil {
 		throw(i.r.VM, err)
 	}
