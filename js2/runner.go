@@ -5,6 +5,7 @@ import (
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
+	"github.com/spf13/afero"
 )
 
 type Runner struct {
@@ -13,7 +14,7 @@ type Runner struct {
 	defaultGroup *lib.Group
 }
 
-func New(src *lib.SourceData) (*Runner, error) {
+func New(src *lib.SourceData, fs afero.Fs) (*Runner, error) {
 	defaultGroup, err := lib.NewGroup("", nil)
 	if err != nil {
 		return nil, err

@@ -228,7 +228,7 @@ func makeRunner(runnerType string, src *lib.SourceData, fs afero.Fs) (lib.Runner
 		}
 		return r, nil
 	case TypeJS2:
-		return js2.New(srcdata)
+		return js2.New(src, fs)
 	default:
 		return nil, errors.New("Invalid type specified, see --help")
 	}
