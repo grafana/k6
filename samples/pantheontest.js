@@ -353,8 +353,8 @@ function review_submit() {
     formdata = {
         "commerce_payment[payment_method]": "commerce_payment_example|commerce_payment_commerce_payment_example",
         "commerce_payment[payment_details][credit_card][number]": "4111111111111111",
-        "commerce_payment[payment_details][credit_card][exp_month]": "02",
-        "commerce_payment[payment_details][credit_card][exp_year]": "2017",
+        "commerce_payment[payment_details][credit_card][exp_month]": "03",
+        "commerce_payment[payment_details][credit_card][exp_year]": "2019",
         "form_build_id": form_build_id,
         "form_token": form_token,
         "form_id": form_id,
