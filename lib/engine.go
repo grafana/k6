@@ -189,13 +189,13 @@ func NewEngine(r Runner, o Options) (*Engine, error) {
 }
 
 func (e *Engine) Run(ctx context.Context) error {
-	collectorctx, collectorcancel := context.WithCancel(ctx)
+	collectorctx, collectorcancel := context.WithCancel(context.Background())
 	collectorch := make(chan interface{})
 	if e.Collector != nil {
-		go func(ctx context.Context) {
-			e.Collector.Run(ctx)
+		go func() {
+			e.Collector.Run(collectorctx)
 			close(collectorch)
-		}(collectorctx)
+		}()
 	} else {
 		close(collectorch)
 	}
@@ -236,14 +236,14 @@ func (e *Engine) Run(ctx context.Context) error {
 		e.clearSubcontext()
 		e.subwg.Wait()
 
+		// Emit final metrics.
+		e.emitMetrics()
+
 		// Process any leftover samples.
 		e.processSamples(e.collect()...)
 
 		// Process final thresholds.
 		e.processThresholds()
-
-		// Emit final metrics.
-		e.emitMetrics()
 
 		// Shut down collector
 		collectorcancel()
@@ -616,6 +616,16 @@ func (e *Engine) runVUOnce(ctx context.Context, vu *vuEntry) bool {
 	default:
 	}
 
+	t := time.Now()
+
+	atomic.AddInt64(&vu.Iterations, 1)
+	atomic.AddInt64(&e.numIterations, 1)
+	samples = append(samples,
+		stats.Sample{
+			Time:   t,
+			Metric: metrics.Iterations,
+			Value:  1,
+		})
 	if err != nil {
 		if serr, ok := err.(fmt.Stringer); ok {
 			e.Logger.Error(serr.String())
@@ -624,25 +634,20 @@ func (e *Engine) runVUOnce(ctx context.Context, vu *vuEntry) bool {
 		}
 		samples = append(samples,
 			stats.Sample{
-				Time:   time.Now(),
+				Time:   t,
 				Metric: metrics.Errors,
 				Tags:   map[string]string{"error": err.Error()},
 				Value:  1,
 			},
 		)
+		atomic.AddInt64(&e.numErrors, 1)
 	}
 
 	vu.lock.Lock()
 	vu.Samples = append(vu.Samples, samples...)
 	vu.lock.Unlock()
 
-	atomic.AddInt64(&vu.Iterations, 1)
-	atomic.AddInt64(&e.numIterations, 1)
-	if err != nil {
-		atomic.AddInt64(&e.numErrors, 1)
-		return false
-	}
-	return true
+	return err != nil
 }
 
 func (e *Engine) runMetricsEmission(ctx context.Context) {
@@ -672,11 +677,6 @@ func (e *Engine) emitMetrics() {
 			Time:   t,
 			Metric: metrics.VUsMax,
 			Value:  float64(e.vusMax),
-		},
-		stats.Sample{
-			Time:   t,
-			Metric: metrics.Iterations,
-			Value:  float64(atomic.LoadInt64(&e.numIterations)),
 		},
 	)
 }
@@ -749,6 +749,10 @@ func (e *Engine) collect() []stats.Sample {
 }
 
 func (e *Engine) processSamples(samples ...stats.Sample) {
+	if len(samples) == 0 {
+		return
+	}
+
 	e.MetricsLock.Lock()
 	defer e.MetricsLock.Unlock()
 

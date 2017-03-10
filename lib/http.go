@@ -31,8 +31,8 @@ import (
 // A Trail represents detailed information about an HTTP request.
 // You'd typically get one from a Tracer.
 type Trail struct {
-	// All metrics will be tagged with this timestamp.
 	StartTime time.Time
+	EndTime   time.Time
 
 	// Total request duration, excluding DNS lookup and connect time.
 	Duration time.Duration
@@ -50,16 +50,15 @@ type Trail struct {
 }
 
 func (tr Trail) Samples(tags map[string]string) []stats.Sample {
-	t := tr.StartTime.Add(tr.Duration)
 	return []stats.Sample{
-		{Metric: metrics.HTTPReqs, Time: t, Tags: tags, Value: 1},
-		{Metric: metrics.HTTPReqDuration, Time: t, Tags: tags, Value: stats.D(tr.Duration)},
-		{Metric: metrics.HTTPReqBlocked, Time: t, Tags: tags, Value: stats.D(tr.Blocked)},
-		{Metric: metrics.HTTPReqLookingUp, Time: t, Tags: tags, Value: stats.D(tr.LookingUp)},
-		{Metric: metrics.HTTPReqConnecting, Time: t, Tags: tags, Value: stats.D(tr.Connecting)},
-		{Metric: metrics.HTTPReqSending, Time: t, Tags: tags, Value: stats.D(tr.Sending)},
-		{Metric: metrics.HTTPReqWaiting, Time: t, Tags: tags, Value: stats.D(tr.Waiting)},
-		{Metric: metrics.HTTPReqReceiving, Time: t, Tags: tags, Value: stats.D(tr.Receiving)},
+		{Metric: metrics.HTTPReqs, Time: tr.EndTime, Tags: tags, Value: 1},
+		{Metric: metrics.HTTPReqDuration, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Duration)},
+		{Metric: metrics.HTTPReqBlocked, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Blocked)},
+		{Metric: metrics.HTTPReqLookingUp, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.LookingUp)},
+		{Metric: metrics.HTTPReqConnecting, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Connecting)},
+		{Metric: metrics.HTTPReqSending, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Sending)},
+		{Metric: metrics.HTTPReqWaiting, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Waiting)},
+		{Metric: metrics.HTTPReqReceiving, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Receiving)},
 	}
 }
 
@@ -101,6 +100,7 @@ func (t *Tracer) Done() Trail {
 	done := time.Now()
 	trail := Trail{
 		StartTime:  t.getConn,
+		EndTime:    done,
 		Duration:   done.Sub(t.getConn),
 		Blocked:    t.gotConn.Sub(t.getConn),
 		LookingUp:  t.dnsDone.Sub(t.dnsStart),

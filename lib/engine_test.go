@@ -853,10 +853,15 @@ func TestEngineCollector(t *testing.T) {
 	assert.False(t, e.IsRunning(), "engine still running")
 	assert.False(t, c.IsRunning(), "collector still running")
 
-	// Allow 10% of samples to get lost; NOT OPTIMAL, but I can't figure out why they get lost.
-	numSamples := len(e.Metrics[testMetric].(*stats.TrendSink).Values)
-	assert.True(t, numSamples > 0, "no samples")
-	assert.True(t, numSamples > len(c.Samples)-(len(c.Samples)/10), "more than 10%% of samples omitted")
+	cSamples := []stats.Sample{}
+	for _, sample := range c.Samples {
+		if sample.Metric == testMetric {
+			cSamples = append(cSamples, sample)
+		}
+	}
+	numCollectorSamples := len(cSamples)
+	numEngineSamples := len(e.Metrics[testMetric].(*stats.TrendSink).Values)
+	assert.Equal(t, numEngineSamples, numCollectorSamples)
 }
 
 func TestEngine_processSamples(t *testing.T) {
