@@ -749,6 +749,10 @@ func (e *Engine) collect() []stats.Sample {
 }
 
 func (e *Engine) processSamples(samples ...stats.Sample) {
+	if len(samples) == 0 {
+		return
+	}
+
 	e.MetricsLock.Lock()
 	defer e.MetricsLock.Unlock()
 
