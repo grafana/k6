@@ -46,11 +46,18 @@ func (c *Collector) Run(ctx context.Context) {
 }
 
 func (c *Collector) Collect(samples []stats.Sample) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	if !c.running {
+		panic("attempted to collect while not running")
+	}
 	c.Samples = append(c.Samples, samples...)
 }
 
 func (c *Collector) IsRunning() bool {
 	c.lock.Lock()
 	defer c.lock.Unlock()
+
 	return c.running
 }
