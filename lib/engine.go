@@ -673,11 +673,6 @@ func (e *Engine) emitMetrics() {
 			Metric: metrics.VUsMax,
 			Value:  float64(e.vusMax),
 		},
-		stats.Sample{
-			Time:   t,
-			Metric: metrics.Iterations,
-			Value:  float64(atomic.LoadInt64(&e.numIterations)),
-		},
 	)
 }
 

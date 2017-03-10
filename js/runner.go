@@ -27,6 +27,7 @@ import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/stats"
 	"github.com/robertkrimen/otto"
 	"math"
@@ -158,6 +159,9 @@ func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 	}
 
 	u.started = time.Now()
+	u.Samples = []stats.Sample{
+		stats.Sample{Time: u.started, Metric: metrics.Iterations, Value: 1.0},
+	}
 	u.ctx = ctx
 	_, err := u.callable.Call(otto.UndefinedValue())
 	u.ctx = nil
