@@ -21,6 +21,7 @@
 package js2
 
 import (
+	"encoding/json"
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/compiler"
 	"github.com/loadimpact/k6/lib"
@@ -45,6 +46,7 @@ type Bundle struct {
 	Filename    string
 	Program     *goja.Program
 	InitContext *InitContext
+	Options     lib.Options
 }
 
 // Creates a new bundle from a source file and a filesystem.
@@ -89,6 +91,18 @@ func NewBundle(src *lib.SourceData, fs afero.Fs) (*Bundle, error) {
 	}
 	if def.ExportType().Kind() != reflect.Func {
 		return nil, errors.New("default export must be a function")
+	}
+
+	// Extract exported options.
+	optV := exports.Get("options")
+	if optV != nil && !goja.IsNull(optV) && !goja.IsUndefined(optV) {
+		optdata, err := json.Marshal(optV.Export())
+		if err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal(optdata, &bundle.Options); err != nil {
+			return nil, err
+		}
 	}
 
 	// Swap out the init context's filesystem for the in-memory cache.
