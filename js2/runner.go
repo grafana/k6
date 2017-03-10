@@ -29,18 +29,24 @@ import (
 )
 
 type Runner struct {
-	Options lib.Options
+	Bundle *Bundle
 
 	defaultGroup *lib.Group
 }
 
 func New(src *lib.SourceData, fs afero.Fs) (*Runner, error) {
+	bundle, err := NewBundle(src, fs)
+	if err != nil {
+		return nil, err
+	}
+
 	defaultGroup, err := lib.NewGroup("", nil)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Runner{
+		Bundle:       bundle,
 		defaultGroup: defaultGroup,
 	}, nil
 }
@@ -54,7 +60,23 @@ func (r *Runner) NewVU() (lib.VU, error) {
 }
 
 func (r *Runner) newVU() (*VU, error) {
-	return &VU{}, nil
+	// Instantiate a new bundle, make a VU out of it.
+	rt, err := r.Bundle.Instantiate()
+	if err != nil {
+		return nil, err
+	}
+
+	// Prepare the default callable.
+	exports := rt.Get("exports").ToObject(rt)
+	callable, _ := goja.AssertFunction(exports.Get("default"))
+
+	// Give the VU an initial sense of identity.
+	vu := &VU{Runtime: rt, callable: callable}
+	if err := vu.Reconfigure(0); err != nil {
+		return nil, err
+	}
+
+	return vu, nil
 }
 
 func (r *Runner) GetDefaultGroup() *lib.Group {
@@ -62,21 +84,34 @@ func (r *Runner) GetDefaultGroup() *lib.Group {
 }
 
 func (r *Runner) GetOptions() lib.Options {
-	return r.Options
+	return r.Bundle.Options
 }
 
 func (r *Runner) ApplyOptions(opts lib.Options) {
-	r.Options = r.Options.Apply(opts)
+	r.Bundle.Options = r.Bundle.Options.Apply(opts)
 }
 
 type VU struct {
-	VM *goja.Runtime
+	Runtime   *goja.Runtime
+	Samples   []stats.Sample
+	ID        int64
+	Iteration int64
+
+	callable goja.Callable
 }
 
 func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
-	return []stats.Sample{}, nil
+	u.Runtime.Set("__ITER", u.Iteration)
+
+	_, err := u.callable(goja.Undefined())
+	samples := u.Samples
+	u.Samples = nil
+	return samples, err
 }
 
 func (u *VU) Reconfigure(id int64) error {
+	u.ID = id
+	u.Iteration = 0
+	u.Runtime.Set("__VU", u.ID)
 	return nil
 }
