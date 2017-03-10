@@ -616,6 +616,13 @@ func (e *Engine) runVUOnce(ctx context.Context, vu *vuEntry) bool {
 	default:
 	}
 
+	t := time.Now()
+	samples = append(samples,
+		stats.Sample{
+			Time:   t,
+			Metric: metrics.Iterations,
+			Value:  1,
+		})
 	if err != nil {
 		if serr, ok := err.(fmt.Stringer); ok {
 			e.Logger.Error(serr.String())
@@ -624,7 +631,7 @@ func (e *Engine) runVUOnce(ctx context.Context, vu *vuEntry) bool {
 		}
 		samples = append(samples,
 			stats.Sample{
-				Time:   time.Now(),
+				Time:   t,
 				Metric: metrics.Errors,
 				Tags:   map[string]string{"error": err.Error()},
 				Value:  1,
