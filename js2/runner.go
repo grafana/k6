@@ -70,8 +70,11 @@ func (r *Runner) newVU() (*VU, error) {
 	exports := rt.Get("exports").ToObject(rt)
 	callable, _ := goja.AssertFunction(exports.Get("default"))
 
+	// Make a VU, apply the VU context.
+	vu := &VU{Runtime: rt, VUContext: NewVUContext(), callable: callable}
+	BindToGlobal(rt, vu.VUContext)
+
 	// Give the VU an initial sense of identity.
-	vu := &VU{Runtime: rt, callable: callable}
 	if err := vu.Reconfigure(0); err != nil {
 		return nil, err
 	}
@@ -93,6 +96,7 @@ func (r *Runner) ApplyOptions(opts lib.Options) {
 
 type VU struct {
 	Runtime   *goja.Runtime
+	VUContext *VUContext
 	Samples   []stats.Sample
 	ID        int64
 	Iteration int64
