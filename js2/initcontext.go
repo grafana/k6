@@ -28,11 +28,11 @@ import (
 // Provides APIs for use in the init context.
 type InitContext struct {
 	// Filesystem to load files and scripts from.
-	Fs  afero.Fs
-	Pwd string
+	Fs  afero.Fs `js:"-"`
+	Pwd string   `js:"-"`
 
 	// Cache of loaded modules.
-	Modules map[string]*goja.Program
+	Modules map[string]*goja.Program `js:"-"`
 }
 
 func (i *InitContext) Require(mod string) goja.Value {
