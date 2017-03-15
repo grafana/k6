@@ -34,6 +34,8 @@ type testModule struct {
 	Counter int
 }
 
+func (*testModule) unexported() bool { return true }
+
 func (*testModule) Func() {}
 
 func (*testModule) Error() error { return errors.New("error") }
@@ -73,6 +75,10 @@ func TestModuleExport(t *testing.T) {
 	rt := goja.New()
 	rt.Set("mod", mod.Export(rt))
 
+	t.Run("unexported", func(t *testing.T) {
+		_, err := rt.RunString(`mod.unexported()`)
+		assert.EqualError(t, err, "TypeError: Object has no member 'unexported'")
+	})
 	t.Run("Func", func(t *testing.T) {
 		_, err := rt.RunString(`mod.func()`)
 		assert.NoError(t, err)
