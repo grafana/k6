@@ -21,10 +21,11 @@
 package lib
 
 import (
-	"github.com/stretchr/testify/assert"
-	"gopkg.in/guregu/null.v3"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"gopkg.in/guregu/null.v3"
 )
 
 func TestOptionsApply(t *testing.T) {

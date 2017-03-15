@@ -22,8 +22,9 @@ package lib
 
 import (
 	"encoding/json"
-	"gopkg.in/guregu/null.v3"
 	"time"
+
+	"gopkg.in/guregu/null.v3"
 )
 
 type Duration time.Duration

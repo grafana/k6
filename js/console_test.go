@@ -3,10 +3,11 @@ package js
 import (
 	"context"
 	"fmt"
+	"testing"
+
 	log "github.com/Sirupsen/logrus"
 	logtest "github.com/Sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestConsoleLog(t *testing.T) {

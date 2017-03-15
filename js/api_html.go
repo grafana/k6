@@ -21,9 +21,10 @@
 package js
 
 import (
+	"strings"
+
 	"github.com/PuerkitoBio/goquery"
 	"github.com/robertkrimen/otto"
-	"strings"
 )
 
 func (a JSAPI) HTMLParse(src string) *goquery.Selection {

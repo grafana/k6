@@ -22,14 +22,15 @@ package v1
 
 import (
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
 	"github.com/manyminds/api2go/jsonapi"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v3"
-	"net/http"
-	"net/http/httptest"
-	"testing"
 )
 
 func TestGetMetrics(t *testing.T) {

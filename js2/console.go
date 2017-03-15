@@ -21,9 +21,10 @@
 package js2
 
 import (
+	"strconv"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/dop251/goja"
-	"strconv"
 )
 
 type Console struct {

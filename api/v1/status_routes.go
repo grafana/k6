@@ -21,11 +21,12 @@
 package v1
 
 import (
+	"io/ioutil"
+	"net/http"
+
 	"github.com/julienschmidt/httprouter"
 	"github.com/loadimpact/k6/api/common"
 	"github.com/manyminds/api2go/jsonapi"
-	"io/ioutil"
-	"net/http"
 )
 
 func HandleGetStatus(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {

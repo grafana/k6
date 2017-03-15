@@ -21,13 +21,14 @@
 package v1
 
 import (
-	"github.com/loadimpact/k6/api/common"
-	"github.com/loadimpact/k6/lib"
-	"github.com/stretchr/testify/assert"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/loadimpact/k6/api/common"
+	"github.com/loadimpact/k6/lib"
+	"github.com/stretchr/testify/assert"
 )
 
 func newRequestWithEngine(engine *lib.Engine, method, target string, body io.Reader) *http.Request {

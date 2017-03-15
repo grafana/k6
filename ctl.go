@@ -24,14 +24,15 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"net/http"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/k6/api/v1"
 	"github.com/manyminds/api2go/jsonapi"
 	"gopkg.in/guregu/null.v3"
 	"gopkg.in/urfave/cli.v1"
-	"io"
-	"io/ioutil"
-	"net/http"
 )
 
 var commandStatus = cli.Command{

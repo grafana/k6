@@ -22,13 +22,15 @@ package js2
 
 import (
 	"encoding/json"
+	"path/filepath"
+	"reflect"
+
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/compiler"
+	"github.com/loadimpact/k6/js2/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
-	"path/filepath"
-	"reflect"
 )
 
 func compile(src *lib.SourceData) (*goja.Program, error) {

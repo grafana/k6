@@ -23,15 +23,16 @@ package lib
 import (
 	"context"
 	"fmt"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/stats"
 	"github.com/pkg/errors"
 	"gopkg.in/guregu/null.v3"
-	"strings"
-	"sync"
-	"sync/atomic"
-	"time"
 )
 
 const (

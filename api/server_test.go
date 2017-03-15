@@ -22,15 +22,16 @@ package api
 
 import (
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
 	log "github.com/Sirupsen/logrus"
 	logtest "github.com/Sirupsen/logrus/hooks/test"
 	"github.com/loadimpact/k6/api/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/stretchr/testify/assert"
 	"github.com/urfave/negroni"
-	"net/http"
-	"net/http/httptest"
-	"testing"
 )
 
 func testHTTPHandler(rw http.ResponseWriter, r *http.Request) {

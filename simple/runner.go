@@ -23,8 +23,6 @@ package simple
 import (
 	"context"
 	"crypto/tls"
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/stats"
 	"io"
 	"io/ioutil"
 	"math"
@@ -34,6 +32,9 @@ import (
 	"net/url"
 	"strconv"
 	"time"
+
+	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/stats"
 )
 
 type Runner struct {

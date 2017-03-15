@@ -22,6 +22,7 @@ package common
 
 import (
 	"context"
+
 	"github.com/loadimpact/k6/lib"
 )
 

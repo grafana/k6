@@ -23,10 +23,11 @@ package js
 import (
 	"context"
 	"fmt"
-	"github.com/loadimpact/k6/lib/metrics"
-	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
+
+	"github.com/loadimpact/k6/lib/metrics"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestSleep(t *testing.T) {

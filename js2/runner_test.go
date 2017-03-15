@@ -22,11 +22,12 @@ package js2
 
 import (
 	"context"
+	"testing"
+
 	"github.com/loadimpact/k6/lib"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v3"
-	"testing"
 )
 
 func TestRunnerNew(t *testing.T) {

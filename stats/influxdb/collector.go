@@ -23,12 +23,13 @@ package influxdb
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"time"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/influxdata/influxdb/client/v2"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
-	"net/url"
-	"time"
 )
 
 const pushInterval = 1 * time.Second
