@@ -21,11 +21,12 @@
 package main
 
 import (
+	"os"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/fatih/color"
 	"github.com/mattn/go-isatty"
 	"gopkg.in/urfave/cli.v1"
-	"os"
 )
 
 var isTTY = isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsCygwinTerminal(os.Stdout.Fd())

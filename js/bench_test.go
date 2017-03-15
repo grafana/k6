@@ -21,8 +21,9 @@
 package js
 
 import (
-	"github.com/robertkrimen/otto"
 	"testing"
+
+	"github.com/robertkrimen/otto"
 )
 
 func BenchmarkOttoRun(b *testing.B) {

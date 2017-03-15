@@ -21,8 +21,9 @@
 package js
 
 import (
-	"github.com/loadimpact/k6/stats"
 	"time"
+
+	"github.com/loadimpact/k6/stats"
 )
 
 func (a JSAPI) MetricAdd(m *stats.Metric, v float64, tags map[string]string) {

@@ -23,11 +23,12 @@ package js
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
+	"strings"
+
 	"github.com/loadimpact/k6/stats"
 	"github.com/robertkrimen/otto"
 	"github.com/spf13/afero"
-	"path/filepath"
-	"strings"
 )
 
 type InitAPI struct {

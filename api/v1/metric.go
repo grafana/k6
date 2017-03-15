@@ -23,6 +23,7 @@ package v1
 import (
 	"bytes"
 	"encoding/json"
+
 	"github.com/loadimpact/k6/stats"
 	"gopkg.in/guregu/null.v3"
 )

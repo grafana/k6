@@ -22,12 +22,13 @@ package js
 
 import (
 	"fmt"
-	"github.com/loadimpact/k6/stats"
-	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/loadimpact/k6/stats"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewMetric(t *testing.T) {

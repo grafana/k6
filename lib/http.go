@@ -21,11 +21,12 @@
 package lib
 
 import (
-	"github.com/loadimpact/k6/lib/metrics"
-	"github.com/loadimpact/k6/stats"
 	"net"
 	"net/http/httptrace"
 	"time"
+
+	"github.com/loadimpact/k6/lib/metrics"
+	"github.com/loadimpact/k6/stats"
 )
 
 // A Trail represents detailed information about an HTTP request.

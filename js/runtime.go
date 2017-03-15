@@ -23,6 +23,9 @@ package js
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
+
 	"github.com/GeertJohan/go.rice"
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/k6/js/compiler"
@@ -30,8 +33,6 @@ import (
 	"github.com/loadimpact/k6/stats"
 	"github.com/robertkrimen/otto"
 	"github.com/spf13/afero"
-	"os"
-	"path/filepath"
 )
 
 const wrapper = "(function() { var e = {}; (function(exports) {%s\n})(e); return e; })();"

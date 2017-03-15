@@ -23,11 +23,12 @@ package stats
 import (
 	"errors"
 	"fmt"
-	"gopkg.in/guregu/null.v3"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	"gopkg.in/guregu/null.v3"
 )
 
 const (

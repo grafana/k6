@@ -22,8 +22,9 @@ package dummy
 
 import (
 	"context"
-	"github.com/loadimpact/k6/stats"
 	"sync"
+
+	"github.com/loadimpact/k6/stats"
 )
 
 type Collector struct {

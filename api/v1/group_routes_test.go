@@ -22,12 +22,13 @@ package v1
 
 import (
 	"encoding/json"
-	"github.com/loadimpact/k6/lib"
-	"github.com/manyminds/api2go/jsonapi"
-	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/loadimpact/k6/lib"
+	"github.com/manyminds/api2go/jsonapi"
+	"github.com/stretchr/testify/assert"
 )
 
 type groupDummyRunner struct {

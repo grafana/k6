@@ -23,8 +23,9 @@ package js
 import (
 	"context"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestMetricAdd(t *testing.T) {

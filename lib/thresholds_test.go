@@ -22,10 +22,11 @@ package lib
 
 import (
 	"encoding/json"
+	"testing"
+
 	"github.com/loadimpact/k6/stats"
 	"github.com/robertkrimen/otto"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestNewThreshold(t *testing.T) {

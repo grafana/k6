@@ -21,11 +21,12 @@
 package js
 
 import (
+	"sync/atomic"
+	"time"
+
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/stats"
 	"github.com/robertkrimen/otto"
-	"sync/atomic"
-	"time"
 )
 
 type JSAPI struct {
