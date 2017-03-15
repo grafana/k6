@@ -431,7 +431,7 @@ func actionRun(cc *cli.Context) error {
 	}
 
 	// Wait for a signal or timeout before shutting down
-	signals := make(chan os.Signal)
+	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
 	// Print status at a set interval; less frequently on non-TTYs.
