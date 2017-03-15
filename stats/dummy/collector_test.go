@@ -22,10 +22,11 @@ package dummy
 
 import (
 	"context"
-	"github.com/loadimpact/k6/stats"
-	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
+
+	"github.com/loadimpact/k6/stats"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestCollectorRun(t *testing.T) {

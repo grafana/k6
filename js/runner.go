@@ -25,15 +25,16 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	log "github.com/Sirupsen/logrus"
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/stats"
-	"github.com/robertkrimen/otto"
 	"math"
 	"net"
 	"net/http"
 	"strconv"
 	"time"
+
+	log "github.com/Sirupsen/logrus"
+	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/stats"
+	"github.com/robertkrimen/otto"
 )
 
 var ErrDefaultExport = errors.New("you must export a 'default' function")

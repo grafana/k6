@@ -21,14 +21,15 @@
 package main
 
 import (
-	"github.com/ghodss/yaml"
-	"github.com/loadimpact/k6/lib"
-	"gopkg.in/guregu/null.v3"
-	"gopkg.in/urfave/cli.v1"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/ghodss/yaml"
+	"github.com/loadimpact/k6/lib"
+	"gopkg.in/guregu/null.v3"
+	"gopkg.in/urfave/cli.v1"
 )
 
 func dumpYAML(v interface{}) error {

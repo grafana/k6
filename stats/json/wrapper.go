@@ -21,8 +21,9 @@
 package json
 
 import (
-	"github.com/loadimpact/k6/stats"
 	"time"
+
+	"github.com/loadimpact/k6/stats"
 )
 
 type Envelope struct {

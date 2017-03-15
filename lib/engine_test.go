@@ -22,16 +22,17 @@ package lib
 
 import (
 	"context"
+	"runtime"
+	"sync/atomic"
+	"testing"
+	"time"
+
 	logtest "github.com/Sirupsen/logrus/hooks/test"
 	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/stats/dummy"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v3"
-	"runtime"
-	"sync/atomic"
-	"testing"
-	"time"
 )
 
 type testErrorWithString string

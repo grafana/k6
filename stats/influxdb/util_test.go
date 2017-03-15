@@ -21,10 +21,11 @@
 package influxdb
 
 import (
-	"github.com/stretchr/testify/assert"
 	"net/url"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestMakeUDPConfigFromURL(t *testing.T) {

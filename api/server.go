@@ -22,13 +22,14 @@ package api
 
 import (
 	"fmt"
+	"net/http"
+
 	"github.com/GeertJohan/go.rice"
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/k6/api/common"
 	"github.com/loadimpact/k6/api/v1"
 	"github.com/loadimpact/k6/lib"
 	"github.com/urfave/negroni"
-	"net/http"
 )
 
 var static = rice.MustFindBox("../web/dist")

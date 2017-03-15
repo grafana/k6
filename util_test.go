@@ -21,11 +21,12 @@
 package main
 
 import (
+	"testing"
+	"time"
+
 	"github.com/loadimpact/k6/lib"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v3"
-	"testing"
-	"time"
 )
 
 func TestParseStage(t *testing.T) {

@@ -21,10 +21,11 @@
 package v1
 
 import (
+	"net/http"
+
 	"github.com/julienschmidt/httprouter"
 	"github.com/loadimpact/k6/api/common"
 	"github.com/manyminds/api2go/jsonapi"
-	"net/http"
 )
 
 func HandleGetGroups(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {

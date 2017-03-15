@@ -21,9 +21,10 @@
 package js
 
 import (
-	"github.com/kardianos/osext"
 	"os"
 	"path"
+
+	"github.com/kardianos/osext"
 )
 
 var (

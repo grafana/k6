@@ -1,9 +1,10 @@
 package js
 
 import (
+	"strconv"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/robertkrimen/otto"
-	"strconv"
 )
 
 type Console struct {

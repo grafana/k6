@@ -22,6 +22,7 @@ package lib
 
 import (
 	"encoding/json"
+
 	"github.com/loadimpact/k6/stats"
 	"github.com/pkg/errors"
 	"github.com/robertkrimen/otto"

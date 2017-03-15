@@ -21,9 +21,10 @@
 package v1
 
 import (
+	"testing"
+
 	"github.com/loadimpact/k6/lib"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestNewCheck(t *testing.T) {

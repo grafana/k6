@@ -23,13 +23,14 @@ package v1
 import (
 	"bytes"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
 	"github.com/loadimpact/k6/lib"
 	"github.com/manyminds/api2go/jsonapi"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v3"
-	"net/http"
-	"net/http/httptest"
-	"testing"
 )
 
 func TestGetStatus(t *testing.T) {

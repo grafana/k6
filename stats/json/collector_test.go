@@ -21,11 +21,12 @@
 package json
 
 import (
+	"os"
+	"testing"
+
 	"github.com/loadimpact/k6/lib"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
-	"os"
-	"testing"
 )
 
 func TestNew(t *testing.T) {
