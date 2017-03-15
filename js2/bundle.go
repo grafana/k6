@@ -66,17 +66,14 @@ func NewBundle(src *lib.SourceData, fs afero.Fs) (*Bundle, error) {
 	cachedFS := afero.NewCacheOnReadFs(fs, mirrorFS, 0)
 
 	// Make a bundle, instantiate it into a throwaway VM to populate caches.
+	rt := goja.New()
+	pwd := filepath.Dir(src.Filename)
 	bundle := Bundle{
-		Filename: src.Filename,
-		Program:  pgm,
-		InitContext: &InitContext{
-			Fs:      cachedFS,
-			Pwd:     filepath.Dir(src.Filename),
-			Modules: make(map[string]*goja.Program),
-		},
+		Filename:    src.Filename,
+		Program:     pgm,
+		InitContext: NewInitContext(rt, cachedFS, pwd),
 	}
-	rt, err := bundle.Instantiate()
-	if err != nil {
+	if err := bundle.instantiateInto(rt); err != nil {
 		return nil, err
 	}
 
@@ -108,7 +105,7 @@ func NewBundle(src *lib.SourceData, fs afero.Fs) (*Bundle, error) {
 	}
 
 	// Swap out the init context's filesystem for the in-memory cache.
-	bundle.InitContext.Fs = mirrorFS
+	bundle.InitContext.fs = mirrorFS
 
 	return &bundle, nil
 }
@@ -116,16 +113,25 @@ func NewBundle(src *lib.SourceData, fs afero.Fs) (*Bundle, error) {
 // Instantiates a new runtime from this bundle.
 func (b *Bundle) Instantiate() (*goja.Runtime, error) {
 	rt := goja.New()
-	rt.SetFieldNameMapper(FieldNameMapper{})
-	rt.Set("exports", rt.NewObject())
-
-	rt.SetRandSource(DefaultRandSource)
-	unbindInit := BindToGlobal(rt, b.InitContext)
-	if _, err := rt.RunProgram(b.Program); err != nil {
+	if err := b.instantiateInto(rt); err != nil {
 		return nil, err
 	}
-	unbindInit()
-	rt.SetRandSource(NewRandSource())
-
 	return rt, nil
+}
+
+// Instantiates the bundle into an existing runtime. Not public because it also messes with a bunch
+// of other things, will potentially thrash data and makes a mess in it if the operation fails.
+func (b *Bundle) instantiateInto(rt *goja.Runtime) error {
+	rt.SetFieldNameMapper(common.FieldNameMapper{})
+	rt.Set("exports", rt.NewObject())
+
+	rt.SetRandSource(common.DefaultRandSource)
+	unbindInit := common.BindToGlobal(rt, b.InitContext)
+	if _, err := rt.RunProgram(b.Program); err != nil {
+		return err
+	}
+	unbindInit()
+	rt.SetRandSource(common.NewRandSource())
+
+	return nil
 }

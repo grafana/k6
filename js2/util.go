@@ -21,19 +21,17 @@
 package js2
 
 import (
-	crand "crypto/rand"
-	"encoding/binary"
 	"github.com/dop251/goja"
-	"github.com/pkg/errors"
-	"math/rand"
+	"github.com/loadimpact/k6/lib"
+	"github.com/spf13/afero"
 )
 
-var DefaultRandSource = NewRandSource()
-
-func NewRandSource() goja.RandSource {
-	var seed int64
-	if err := binary.Read(crand.Reader, binary.LittleEndian, &seed); err != nil {
-		panic(errors.New("Couldn't read bytes for random seed"))
+// Shortcut to creating a bundle and instantiating a bundle right away.
+// Useful for writing tests, or when you just don't care about the bundle.
+func QuickInstance(src *lib.SourceData, fs afero.Fs) (*goja.Runtime, error) {
+	b, err := NewBundle(src, fs)
+	if err != nil {
+		return nil, err
 	}
-	return rand.New(rand.NewSource(seed)).Float64
+	return b.Instantiate()
 }

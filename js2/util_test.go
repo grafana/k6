@@ -20,13 +20,27 @@
 
 package js2
 
-// Provides APIs and state for use in a VU context.
-type VUContext struct {
-	Console *Console `js:"console"`
-}
+import (
+	"testing"
 
-func NewVUContext() *VUContext {
-	return &VUContext{
-		Console: NewConsole(),
-	}
+	"github.com/loadimpact/k6/lib"
+	"github.com/spf13/afero"
+	"github.com/stretchr/testify/assert"
+)
+
+func TestQuickInstance(t *testing.T) {
+	rt, err := QuickInstance(&lib.SourceData{
+		Filename: "/script.js",
+		Data:     []byte(`export default function() {}`),
+	}, afero.NewMemMapFs())
+	assert.NoError(t, err)
+	assert.NotNil(t, rt)
+
+	t.Run("invalid", func(t *testing.T) {
+		_, err := QuickInstance(&lib.SourceData{
+			Filename: "/script.js",
+			Data:     []byte(``),
+		}, afero.NewMemMapFs())
+		assert.Error(t, err)
+	})
 }

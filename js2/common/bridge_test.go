@@ -18,13 +18,14 @@
  *
  */
 
-package js2
+package common
 
 import (
-	"github.com/dop251/goja"
-	"github.com/stretchr/testify/assert"
 	"reflect"
 	"testing"
+
+	"github.com/dop251/goja"
+	"github.com/stretchr/testify/assert"
 )
 
 type bridgeTestType struct {
@@ -36,6 +37,9 @@ type bridgeTestType struct {
 
 func (bridgeTestType) ExportedFn()   {}
 func (bridgeTestType) unexportedFn() {}
+
+func (*bridgeTestType) ExportedPtrFn()   {}
+func (*bridgeTestType) unexportedPtrFn() {}
 
 func TestFieldNameMapper(t *testing.T) {
 	typ := reflect.TypeOf(bridgeTestType{})
@@ -70,34 +74,48 @@ func TestFieldNameMapper(t *testing.T) {
 }
 
 func TestBindToGlobal(t *testing.T) {
-	testdata := map[string]interface{}{
-		"Value":   bridgeTestType{},
-		"Pointer": &bridgeTestType{},
+	testdata := map[string]struct {
+		Obj  interface{}
+		Keys []string
+		Not  []string
+	}{
+		"Value": {
+			bridgeTestType{},
+			[]string{"exported", "renamed", "exportedFn"},
+			[]string{"exportedPtrFn"},
+		},
+		"Pointer": {
+			&bridgeTestType{},
+			[]string{"exported", "renamed", "exportedFn", "exportedPtrFn"},
+			[]string{},
+		},
 	}
-	for name, obj := range testdata {
+	for name, data := range testdata {
 		t.Run(name, func(t *testing.T) {
-			keys := []string{"exported", "renamed", "exportedFn"}
-			t.Run("Bridge", func(t *testing.T) {
-				rt := goja.New()
-				unbind := BindToGlobal(rt, obj)
-				for _, k := range keys {
-					t.Run(k, func(t *testing.T) {
-						v := rt.Get(k)
-						if assert.NotNil(t, v) {
-							assert.False(t, goja.IsUndefined(v), "value is undefined")
-						}
-					})
-				}
-
-				t.Run("Unbind", func(t *testing.T) {
-					unbind()
-					for _, k := range keys {
-						t.Run(k, func(t *testing.T) {
-							v := rt.Get(k)
-							assert.True(t, goja.IsUndefined(v), "value is not undefined")
-						})
+			rt := goja.New()
+			unbind := BindToGlobal(rt, data.Obj)
+			for _, k := range data.Keys {
+				t.Run(k, func(t *testing.T) {
+					v := rt.Get(k)
+					if assert.NotNil(t, v) {
+						assert.False(t, goja.IsUndefined(v), "value is undefined")
 					}
 				})
+			}
+			for _, k := range data.Not {
+				t.Run(k, func(t *testing.T) {
+					assert.Nil(t, rt.Get(k), "unexpected member bridged")
+				})
+			}
+
+			t.Run("Unbind", func(t *testing.T) {
+				unbind()
+				for _, k := range data.Keys {
+					t.Run(k, func(t *testing.T) {
+						v := rt.Get(k)
+						assert.True(t, goja.IsUndefined(v), "value is not undefined")
+					})
+				}
 			})
 		})
 	}

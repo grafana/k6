@@ -18,15 +18,20 @@
  *
  */
 
-package js2
+package common
 
-// Provides APIs and state for use in a VU context.
-type VUContext struct {
-	Console *Console `js:"console"`
+import (
+	"github.com/loadimpact/k6/lib"
+)
+
+// Provides volatile state; this is cleared on each VU iteration.
+type VolatileState struct {
+	// Current group. All emitted samples are tagged with this.
+	Group *lib.Group
 }
 
-func NewVUContext() *VUContext {
-	return &VUContext{
-		Console: NewConsole(),
-	}
+// Provides persistent state; this is cleared when the VU is Reconfigured.
+type State struct {
+	// Pointer to the current Volatile state.
+	Volatile *VolatileState
 }

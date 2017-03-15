@@ -18,15 +18,26 @@
  *
  */
 
-package js2
+package k6
 
-// Provides APIs and state for use in a VU context.
-type VUContext struct {
-	Console *Console `js:"console"`
+import (
+	"context"
+
+	log "github.com/Sirupsen/logrus"
+	"github.com/dop251/goja"
+)
+
+type K6 struct{}
+
+func (k6 *K6) Group(ctx context.Context, name string, fn goja.Callable) goja.Value {
+	log.WithField("name", name).Info("running group")
+	val, err := fn(goja.Undefined())
+	if err != nil {
+		panic(err)
+	}
+	return val
 }
 
-func NewVUContext() *VUContext {
-	return &VUContext{
-		Console: NewConsole(),
-	}
+func (K6 K6) TestFn() {
+	log.Info("aaaa")
 }

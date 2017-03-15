@@ -22,7 +22,9 @@ package js2
 
 import (
 	"context"
+
 	"github.com/dop251/goja"
+	"github.com/loadimpact/k6/js2/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
 	"github.com/spf13/afero"
@@ -71,8 +73,13 @@ func (r *Runner) newVU() (*VU, error) {
 	callable, _ := goja.AssertFunction(exports.Get("default"))
 
 	// Make a VU, apply the VU context.
-	vu := &VU{Runtime: rt, VUContext: NewVUContext(), callable: callable}
-	BindToGlobal(rt, vu.VUContext)
+	vu := &VU{
+		Runner:    r,
+		Runtime:   rt,
+		VUContext: NewVUContext(),
+		callable:  callable,
+	}
+	common.BindToGlobal(rt, vu.VUContext)
 
 	// Give the VU an initial sense of identity.
 	if err := vu.Reconfigure(0); err != nil {
@@ -95,17 +102,24 @@ func (r *Runner) ApplyOptions(opts lib.Options) {
 }
 
 type VU struct {
+	Runner    *Runner
 	Runtime   *goja.Runtime
-	VUContext *VUContext
-	Samples   []stats.Sample
 	ID        int64
 	Iteration int64
+
+	Samples   []stats.Sample
+	VUContext *VUContext
 
 	callable goja.Callable
 }
 
 func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
+	// ctx = WithState(ctx, &State{
+	// 	Group: u.Runner.defaultGroup,
+	// })
+
 	u.Runtime.Set("__ITER", u.Iteration)
+	u.Iteration++
 
 	_, err := u.callable(goja.Undefined())
 	samples := u.Samples

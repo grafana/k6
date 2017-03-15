@@ -18,15 +18,9 @@
  *
  */
 
-package js2
+package k6
 
-// Provides APIs and state for use in a VU context.
-type VUContext struct {
-	Console *Console `js:"console"`
-}
+import "testing"
 
-func NewVUContext() *VUContext {
-	return &VUContext{
-		Console: NewConsole(),
-	}
+func TestGroup(t *testing.T) {
 }
