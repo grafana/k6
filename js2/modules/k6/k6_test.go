@@ -20,7 +20,9 @@
 
 package k6
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestGroup(t *testing.T) {
 }

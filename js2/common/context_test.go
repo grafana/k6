@@ -18,14 +18,16 @@
  *
  */
 
-package modules
+package common
 
 import (
-	"github.com/loadimpact/k6/js2/common"
-	"github.com/loadimpact/k6/js2/modules/k6"
+	"context"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
-// Index of module implementations.
-var Index = map[string]common.Module{
-	"k6": k6.Module,
+func TestContextState(t *testing.T) {
+	st := &State{}
+	assert.Equal(t, st, GetState(WithState(context.Background(), st)))
 }

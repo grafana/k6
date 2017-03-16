@@ -23,21 +23,25 @@ package k6
 import (
 	"context"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/dop251/goja"
+	"github.com/loadimpact/k6/js2/common"
 )
+
+var Module = common.Module{Impl: &K6{}}
 
 type K6 struct{}
 
-func (k6 *K6) Group(ctx context.Context, name string, fn goja.Callable) goja.Value {
-	log.WithField("name", name).Info("running group")
-	val, err := fn(goja.Undefined())
-	if err != nil {
-		panic(err)
-	}
-	return val
-}
+func (impl *K6) Group(ctx context.Context, name string, fn goja.Callable) (goja.Value, error) {
+	state := common.GetState(ctx)
 
-func (K6 K6) TestFn() {
-	log.Info("aaaa")
+	g, err := state.Volatile.Group.Group(name)
+	if err != nil {
+		return goja.Undefined(), err
+	}
+
+	old := state.Volatile.Group
+	state.Volatile.Group = g
+	defer func() { state.Volatile.Group = old }()
+
+	return fn(goja.Undefined())
 }

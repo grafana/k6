@@ -25,6 +25,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/dop251/goja"
+	"github.com/loadimpact/k6/js2/common"
 	"github.com/loadimpact/k6/js2/modules"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
@@ -36,7 +37,7 @@ type InitContext struct {
 	runtime *goja.Runtime
 
 	// Index of all loaded modules.
-	Modules map[string]*modules.Module `js:"-"`
+	Modules map[string]*common.Module `js:"-"`
 
 	// Filesystem to load files and scripts from.
 	fs  afero.Fs
@@ -52,7 +53,7 @@ func NewInitContext(rt *goja.Runtime, fs afero.Fs, pwd string) *InitContext {
 		fs:      fs,
 		pwd:     pwd,
 
-		Modules: make(map[string]*modules.Module),
+		Modules: make(map[string]*common.Module),
 
 		Console: NewConsole(),
 	}

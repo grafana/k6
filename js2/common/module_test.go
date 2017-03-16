@@ -18,7 +18,7 @@
  *
  */
 
-package modules
+package common
 
 import (
 	"context"

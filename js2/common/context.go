@@ -18,14 +18,20 @@
  *
  */
 
-package modules
+package common
 
-import (
-	"github.com/loadimpact/k6/js2/common"
-	"github.com/loadimpact/k6/js2/modules/k6"
+import "context"
+
+type ctxKey int
+
+const (
+	ctxKeyState ctxKey = iota
 )
 
-// Index of module implementations.
-var Index = map[string]common.Module{
-	"k6": k6.Module,
+func WithState(ctx context.Context, state *State) context.Context {
+	return context.WithValue(ctx, ctxKeyState, state)
+}
+
+func GetState(ctx context.Context) *State {
+	return ctx.Value(ctxKeyState).(*State)
 }

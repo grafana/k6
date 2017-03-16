@@ -18,14 +18,13 @@
  *
  */
 
-package modules
+package common
 
 import (
 	"context"
 	"reflect"
 
 	"github.com/dop251/goja"
-	"github.com/loadimpact/k6/js2/common"
 	"github.com/pkg/errors"
 )
 
@@ -39,7 +38,7 @@ func (m *Module) Export(rt *goja.Runtime) goja.Value {
 	errorT := reflect.TypeOf((*error)(nil)).Elem()
 
 	exports := rt.NewObject()
-	mapper := common.FieldNameMapper{}
+	mapper := FieldNameMapper{}
 
 	val := reflect.ValueOf(m.Impl)
 	typ := val.Type()
