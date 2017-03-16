@@ -7,7 +7,7 @@ Thank you for your interest in contributing to k6!
 
 Before you begin, make sure to familiarize yourself with the [Code of Conduct](CODE_OF_CONDUCT.md). If you've previously contributed to other open source project, you may recognize it as the classic [Contributor Covenant](http://contributor-covenant.org/).
 
-If you want to chat with the team or the community, you can join our Slack team: [LINK GOES HERE].
+If you want to chat with the team or the community, you can [join our Slack team](https://slackin-defaimlmsd.now.sh/).
 
 Filing issues
 -------------

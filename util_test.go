@@ -18,35 +18,30 @@
  *
  */
 
-package json
+package main
 
 import (
 	"github.com/loadimpact/k6/lib"
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
-	"os"
+	"gopkg.in/guregu/null.v3"
 	"testing"
+	"time"
 )
 
-func TestNew(t *testing.T) {
-	testdata := map[string]bool{
-		"/nonexistent/badplacetolog.log": false,
-		"./okplacetolog.log":             true,
-		"okplacetolog.log":               true,
+func TestParseStage(t *testing.T) {
+	testdata := map[string]lib.Stage{
+		"":        {},
+		":":       {},
+		"10s":     {Duration: 10 * time.Second},
+		"10s:":    {Duration: 10 * time.Second},
+		"10s:100": {Duration: 10 * time.Second, Target: null.IntFrom(100)},
+		":100":    {Target: null.IntFrom(100)},
 	}
-
-	for path, succ := range testdata {
-		t.Run("path="+path, func(t *testing.T) {
-			defer func() { _ = os.Remove(path) }()
-
-			collector, err := New(path, afero.NewOsFs(), lib.Options{})
-			if succ {
-				assert.NoError(t, err)
-				assert.NotNil(t, collector)
-			} else {
-				assert.Error(t, err)
-				assert.Nil(t, collector)
-			}
+	for s, st := range testdata {
+		t.Run(s, func(t *testing.T) {
+			parsed, err := ParseStage(s)
+			assert.NoError(t, err)
+			assert.Equal(t, st, parsed)
 		})
 	}
 }

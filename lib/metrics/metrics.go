@@ -8,7 +8,7 @@ var (
 	// Engine-emitted.
 	VUs        = stats.New("vus", stats.Gauge)
 	VUsMax     = stats.New("vus_max", stats.Gauge)
-	Iterations = stats.New("iterations", stats.Gauge)
+	Iterations = stats.New("iterations", stats.Counter)
 	Errors     = stats.New("errors", stats.Counter)
 
 	// Runner-emitted.

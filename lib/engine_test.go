@@ -29,6 +29,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v3"
 	"runtime"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -109,6 +110,38 @@ func TestNewEngine(t *testing.T) {
 }
 
 func TestNewEngineOptions(t *testing.T) {
+	t.Run("Duration", func(t *testing.T) {
+		e, err, _ := newTestEngine(nil, Options{
+			Duration: null.StringFrom("10s"),
+		})
+		assert.NoError(t, err)
+		if assert.Len(t, e.Stages, 1) {
+			assert.Equal(t, e.Stages[0], Stage{Duration: 10 * time.Second})
+		}
+	})
+	t.Run("Stages", func(t *testing.T) {
+		e, err, _ := newTestEngine(nil, Options{
+			Stages: []Stage{
+				{Duration: 10 * time.Second, Target: null.IntFrom(10)},
+			},
+		})
+		assert.NoError(t, err)
+		if assert.Len(t, e.Stages, 1) {
+			assert.Equal(t, e.Stages[0], Stage{Duration: 10 * time.Second, Target: null.IntFrom(10)})
+		}
+	})
+	t.Run("Stages/Duration", func(t *testing.T) {
+		e, err, _ := newTestEngine(nil, Options{
+			Duration: null.StringFrom("60s"),
+			Stages: []Stage{
+				{Duration: 10 * time.Second, Target: null.IntFrom(10)},
+			},
+		})
+		assert.NoError(t, err)
+		if assert.Len(t, e.Stages, 1) {
+			assert.Equal(t, e.Stages[0], Stage{Duration: 10 * time.Second, Target: null.IntFrom(10)})
+		}
+	})
 	t.Run("VUsMax", func(t *testing.T) {
 		t.Run("not set", func(t *testing.T) {
 			e, err, _ := newTestEngine(nil, Options{})
@@ -236,14 +269,42 @@ func TestEngineRun(t *testing.T) {
 		}
 	})
 	t.Run("exits with stages", func(t *testing.T) {
-		e, err, _ := newTestEngine(nil, Options{})
-		assert.NoError(t, err)
+		testdata := map[string]struct {
+			Duration time.Duration
+			Stages   []Stage
+		}{
+			"none": {},
+			"one": {
+				1 * time.Second,
+				[]Stage{{Duration: 1 * time.Second}},
+			},
+			"two": {
+				2 * time.Second,
+				[]Stage{{Duration: 1 * time.Second}, {Duration: 1 * time.Second}},
+			},
+			"two/targeted": {
+				2 * time.Second,
+				[]Stage{
+					{Duration: 1 * time.Second, Target: null.IntFrom(5)},
+					{Duration: 1 * time.Second, Target: null.IntFrom(10)},
+				},
+			},
+		}
+		for name, data := range testdata {
+			t.Run(name, func(t *testing.T) {
+				e, err, _ := newTestEngine(nil, Options{VUsMax: null.IntFrom(10)})
+				assert.NoError(t, err)
 
-		d := 50 * time.Millisecond
-		e.Stages = []Stage{{Duration: d}}
-		startTime := time.Now()
-		assert.NoError(t, e.Run(context.Background()))
-		assert.WithinDuration(t, startTime.Add(d), startTime.Add(e.AtTime()), 100*TickRate)
+				e.Stages = data.Stages
+				startTime := time.Now()
+				assert.NoError(t, e.Run(context.Background()))
+				assert.WithinDuration(t,
+					startTime.Add(data.Duration),
+					startTime.Add(e.AtTime()),
+					100*TickRate,
+				)
+			})
+		}
 	})
 	t.Run("collects samples", func(t *testing.T) {
 		testMetric := stats.New("test_metric", stats.Trend)
@@ -260,17 +321,17 @@ func TestEngineRun(t *testing.T) {
 				assert.NoError(t, err)
 
 				ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-				defer cancel()
 				assert.NoError(t, e.Run(ctx))
+				cancel()
 
 				e.lock.Lock()
+				defer e.lock.Unlock()
+
 				if !assert.True(t, e.numIterations > 0, "no iterations performed") {
-					e.lock.Unlock()
 					return
 				}
 				sink := e.Metrics[testMetric].(*stats.TrendSink)
 				assert.True(t, len(sink.Values) > int(float64(e.numIterations)*0.99), "more than 1%% of iterations missed")
-				e.lock.Unlock()
 			})
 		}
 	})
@@ -368,10 +429,10 @@ func TestEngineSetPaused(t *testing.T) {
 		assert.True(t, e.IsRunning())
 
 		// The iteration counter and time should increase over time when not paused...
-		iterationSampleA1 := e.numIterations
+		iterationSampleA1 := atomic.LoadInt64(&e.numIterations)
 		atTimeSampleA1 := e.AtTime()
 		time.Sleep(100 * time.Millisecond)
-		iterationSampleA2 := e.numIterations
+		iterationSampleA2 := atomic.LoadInt64(&e.numIterations)
 		atTimeSampleA2 := e.AtTime()
 		assert.True(t, iterationSampleA2 > iterationSampleA1, "iteration counter did not increase")
 		assert.True(t, atTimeSampleA2 > atTimeSampleA1, "timer did not increase")
@@ -380,10 +441,10 @@ func TestEngineSetPaused(t *testing.T) {
 		e.SetPaused(true)
 		assert.True(t, e.IsPaused(), "engine did not pause")
 		time.Sleep(1 * time.Millisecond)
-		iterationSampleB1 := e.numIterations
+		iterationSampleB1 := atomic.LoadInt64(&e.numIterations)
 		atTimeSampleB1 := e.AtTime()
 		time.Sleep(100 * time.Millisecond)
-		iterationSampleB2 := e.numIterations
+		iterationSampleB2 := atomic.LoadInt64(&e.numIterations)
 		atTimeSampleB2 := e.AtTime()
 		assert.Equal(t, iterationSampleB1, iterationSampleB2, "iteration counter changed while paused")
 		assert.Equal(t, atTimeSampleB1, atTimeSampleB2, "timer changed while paused")
@@ -391,10 +452,10 @@ func TestEngineSetPaused(t *testing.T) {
 		// ...and resume when you unpause.
 		e.SetPaused(false)
 		assert.False(t, e.IsPaused(), "engine did not unpause")
-		iterationSampleC1 := e.numIterations
+		iterationSampleC1 := atomic.LoadInt64(&e.numIterations)
 		atTimeSampleC1 := e.AtTime()
 		time.Sleep(100 * time.Millisecond)
-		iterationSampleC2 := e.numIterations
+		iterationSampleC2 := atomic.LoadInt64(&e.numIterations)
 		atTimeSampleC2 := e.AtTime()
 		assert.True(t, iterationSampleC2 > iterationSampleC1, "iteration counter did not increase after unpause")
 		assert.True(t, atTimeSampleC2 > atTimeSampleC1, "timer did not increase after unpause")
@@ -427,7 +488,6 @@ func TestEngineSetPaused(t *testing.T) {
 }
 
 func TestEngineSetVUsMax(t *testing.T) {
-
 	t.Run("not set", func(t *testing.T) {
 		e, err, _ := newTestEngine(nil, Options{})
 		assert.NoError(t, err)
@@ -627,6 +687,148 @@ func TestEngine_runVUOnceKeepsCounters(t *testing.T) {
 	})
 }
 
+func TestEngine_processStages(t *testing.T) {
+	type checkpoint struct {
+		D    time.Duration
+		Cont bool
+		VUs  int64
+	}
+	testdata := map[string]struct {
+		Stages      []Stage
+		Checkpoints []checkpoint
+	}{
+		"none": {
+			[]Stage{},
+			[]checkpoint{
+				{0 * time.Second, false, 0},
+				{10 * time.Second, false, 0},
+				{24 * time.Hour, false, 0},
+			},
+		},
+		"one": {
+			[]Stage{
+				{Duration: 10 * time.Second},
+			},
+			[]checkpoint{
+				{0 * time.Second, true, 0},
+				{1 * time.Second, true, 0},
+				{10 * time.Second, false, 0},
+			},
+		},
+		"one/targeted": {
+			[]Stage{
+				{Duration: 10 * time.Second, Target: null.IntFrom(100)},
+			},
+			[]checkpoint{
+				{0 * time.Second, true, 0},
+				{1 * time.Second, true, 10},
+				{1 * time.Second, true, 20},
+				{1 * time.Second, true, 30},
+				{1 * time.Second, true, 40},
+				{1 * time.Second, true, 50},
+				{1 * time.Second, true, 60},
+				{1 * time.Second, true, 70},
+				{1 * time.Second, true, 80},
+				{1 * time.Second, true, 90},
+				{1 * time.Second, true, 100},
+				{1 * time.Second, false, 100},
+			},
+		},
+		"two": {
+			[]Stage{
+				{Duration: 5 * time.Second},
+				{Duration: 5 * time.Second},
+			},
+			[]checkpoint{
+				{0 * time.Second, true, 0},
+				{1 * time.Second, true, 0},
+				{10 * time.Second, false, 0},
+			},
+		},
+		"two/targeted": {
+			[]Stage{
+				{Duration: 5 * time.Second, Target: null.IntFrom(100)},
+				{Duration: 5 * time.Second, Target: null.IntFrom(0)},
+			},
+			[]checkpoint{
+				{0 * time.Second, true, 0},
+				{1 * time.Second, true, 20},
+				{1 * time.Second, true, 40},
+				{1 * time.Second, true, 60},
+				{1 * time.Second, true, 80},
+				{1 * time.Second, true, 100},
+				{1 * time.Second, true, 80},
+				{1 * time.Second, true, 60},
+				{1 * time.Second, true, 40},
+				{1 * time.Second, true, 20},
+				{1 * time.Second, true, 0},
+				{1 * time.Second, false, 0},
+			},
+		},
+		"three": {
+			[]Stage{
+				{Duration: 5 * time.Second},
+				{Duration: 5 * time.Second},
+				{Duration: 5 * time.Second},
+			},
+			[]checkpoint{
+				{0 * time.Second, true, 0},
+				{1 * time.Second, true, 0},
+				{15 * time.Second, false, 0},
+			},
+		},
+		"three/targeted": {
+			[]Stage{
+				{Duration: 5 * time.Second, Target: null.IntFrom(50)},
+				{Duration: 5 * time.Second, Target: null.IntFrom(100)},
+				{Duration: 5 * time.Second, Target: null.IntFrom(0)},
+			},
+			[]checkpoint{
+				{0 * time.Second, true, 0},
+				{1 * time.Second, true, 10},
+				{1 * time.Second, true, 20},
+				{1 * time.Second, true, 30},
+				{1 * time.Second, true, 40},
+				{1 * time.Second, true, 50},
+				{1 * time.Second, true, 60},
+				{1 * time.Second, true, 70},
+				{1 * time.Second, true, 80},
+				{1 * time.Second, true, 90},
+				{1 * time.Second, true, 100},
+				{1 * time.Second, true, 80},
+				{1 * time.Second, true, 60},
+				{1 * time.Second, true, 40},
+				{1 * time.Second, true, 20},
+				{1 * time.Second, true, 0},
+				{1 * time.Second, false, 0},
+			},
+		},
+	}
+	for name, data := range testdata {
+		t.Run(name, func(t *testing.T) {
+			e, err, _ := newTestEngine(nil, Options{
+				VUs:    null.IntFrom(0),
+				VUsMax: null.IntFrom(100),
+			})
+			assert.NoError(t, err)
+
+			e.Stages = data.Stages
+			for _, ckp := range data.Checkpoints {
+				t.Run((e.AtTime() + ckp.D).String(), func(t *testing.T) {
+					cont, err := e.processStages(ckp.D)
+					assert.NoError(t, err)
+					if ckp.Cont {
+						assert.True(t, cont, "test stopped")
+					} else {
+						assert.False(t, cont, "test not stopped")
+					}
+					assert.Equal(t, ckp.VUs, e.GetVUs())
+				})
+			}
+		})
+	}
+}
+
 func TestEngineCollector(t *testing.T) {
 	testMetric := stats.New("test_metric", stats.Trend)
 	c := &dummy.Collector{}
@@ -651,10 +853,15 @@ func TestEngineCollector(t *testing.T) {
 	assert.False(t, e.IsRunning(), "engine still running")
 	assert.False(t, c.IsRunning(), "collector still running")
 
-	// Allow 10% of samples to get lost; NOT OPTIMAL, but I can't figure out why they get lost.
-	numSamples := len(e.Metrics[testMetric].(*stats.TrendSink).Values)
-	assert.True(t, numSamples > 0, "no samples")
-	assert.True(t, numSamples > len(c.Samples)-(len(c.Samples)/10), "more than 10%% of samples omitted")
+	cSamples := []stats.Sample{}
+	for _, sample := range c.Samples {
+		if sample.Metric == testMetric {
+			cSamples = append(cSamples, sample)
+		}
+	}
+	numCollectorSamples := len(cSamples)
+	numEngineSamples := len(e.Metrics[testMetric].(*stats.TrendSink).Values)
+	assert.Equal(t, numEngineSamples, numCollectorSamples)
 }
 
 func TestEngine_processSamples(t *testing.T) {

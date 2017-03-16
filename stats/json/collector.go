@@ -26,8 +26,8 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
+	"github.com/spf13/afero"
 	"io"
-	"os"
 )
 
 type Collector struct {
@@ -45,8 +45,8 @@ func (c *Collector) HasSeenMetric(str string) bool {
 	return false
 }
 
-func New(fname string, opts lib.Options) (*Collector, error) {
-	logfile, err := os.Create(fname)
+func New(fname string, fs afero.Fs, opts lib.Options) (*Collector, error) {
+	logfile, err := fs.Create(fname)
 	if err != nil {
 		return nil, err
 	}
