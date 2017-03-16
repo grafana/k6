@@ -24,14 +24,7 @@ import (
 	"github.com/loadimpact/k6/lib"
 )
 
-// Provides volatile state; this is cleared on each VU iteration.
-type VolatileState struct {
-	// Current group. All emitted samples are tagged with this.
-	Group *lib.Group
-}
-
-// Provides persistent state; this is cleared when the VU is Reconfigured.
+// Provides volatile state for a VU.
 type State struct {
-	// Pointer to the current Volatile state.
-	Volatile *VolatileState
+	Group *lib.Group
 }

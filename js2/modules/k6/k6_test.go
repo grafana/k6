@@ -35,25 +35,21 @@ func TestGroup(t *testing.T) {
 
 	root, err := lib.NewGroup("", nil)
 	assert.NoError(t, err)
-	state := &common.State{
-		Volatile: &common.VolatileState{
-			Group: root,
-		},
-	}
+	state := &common.State{Group: root}
 
 	mod := Module
 	mod.Context = common.WithState(context.Background(), state)
 	rt.Set("mod", mod.Export(rt))
 
 	t.Run("Valid", func(t *testing.T) {
-		assert.Equal(t, state.Volatile.Group, root)
+		assert.Equal(t, state.Group, root)
 		rt.Set("fn", func() {
-			assert.Equal(t, state.Volatile.Group.Name, "my group")
-			assert.Equal(t, state.Volatile.Group.Parent, root)
+			assert.Equal(t, state.Group.Name, "my group")
+			assert.Equal(t, state.Group.Parent, root)
 		})
 		_, err = rt.RunString(`mod.group("my group", fn)`)
 		assert.NoError(t, err)
-		assert.Equal(t, state.Volatile.Group, root)
+		assert.Equal(t, state.Group, root)
 	})
 
 	t.Run("Invalid", func(t *testing.T) {

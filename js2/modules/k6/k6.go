@@ -31,18 +31,17 @@ var Module = common.Module{Impl: &K6{}}
 
 type K6 struct{}
 
-// Group pushes a group onto the stack, runs the provided function in it and resets it.
 func (*K6) Group(ctx context.Context, name string, fn goja.Callable) (goja.Value, error) {
 	state := common.GetState(ctx)
 
-	g, err := state.Volatile.Group.Group(name)
+	g, err := state.Group.Group(name)
 	if err != nil {
 		return goja.Undefined(), err
 	}
 
-	old := state.Volatile.Group
-	state.Volatile.Group = g
-	defer func() { state.Volatile.Group = old }()
+	old := state.Group
+	state.Group = g
+	defer func() { state.Group = old }()
 
 	return fn(goja.Undefined())
 }
