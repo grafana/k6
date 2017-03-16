@@ -28,6 +28,10 @@ import (
 
 // A Collector abstracts away the details of a storage backend from the application.
 type Collector interface {
+	// Init is called between the collector's creation and the call to Run(), right after the k6
+	// banner has been printed to stdout.
+	Init()
+
 	// Run is called in a goroutine and starts the collector. Should commit samples to the backend
 	// at regular intervals and when the context is terminated.
 	Run(ctx context.Context)

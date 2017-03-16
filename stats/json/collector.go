@@ -60,6 +60,9 @@ func New(fname string, fs afero.Fs, opts lib.Options) (*Collector, error) {
 	}, nil
 }
 
+func (c *Collector) Init() {
+}
+
 func (c *Collector) String() string {
 	return "JSON"
 }
