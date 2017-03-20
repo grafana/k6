@@ -1,4 +1,4 @@
-﻿/*
+/*
  *
  * This script is a user journey for http://loadimpactair.guldskeden.se
  * Copyright (C) 2017 Load Impact
@@ -19,6 +19,7 @@
  */
 
 import { group, sleep } from "k6";
+import { parseHTML } from "k6/html";
 import http from "k6/http";
 
 /**
@@ -32,34 +33,20 @@ function rnd(min, max) {
 }
 
 /**
- * Returns URL encoded string
- */
-function urlencode (str) {
-
-  str = (str + '')
-
-  return encodeURIComponent(str)
-    .replace(/!/g, '%21')
-    .replace(/'/g, '%27')
-    .replace(/\(/g, '%28')
-    .replace(/\)/g, '%29')
-    .replace(/\*/g, '%2A')
-    .replace(/%20/g, '+')
-}
-
-/**
  * Returns __VIEWSTATE found in body or empty string if not found
  */
 function findViewstate(body) {
 	var strViewstate = "";
-    var findVS = new RegExp('id="__VIEWSTATE" value="(.*?)"' )
-	var reMatch = findVS.exec(body);
-	if (reMatch != null) {
-    	strViewstate = reMatch[1];
+	var bExists = false;
+
+	[strViewstate, bExists] = parseHTML(body).find("#__VIEWSTATE").attr("value");
+
+	if (!bExists)
+	{
+		console.log("No viewstate");
+		strViewstate = "";
 	}
-	else {
-		console.log("No viewstate")
-	}
+
 	return strViewstate;
 }
 
@@ -67,14 +54,15 @@ function findViewstate(body) {
  * Returns __EVENTVALIDATION found in body or empty string if not found
  */
 function findEventvalidation(body) {
-	var strEventvalidation = "";
-    var findEV = new RegExp('id="__EVENTVALIDATION" value="(.*?)"' )
-	var reMatch = findEV.exec(body);
-	if (reMatch != null) {
-    	strEventvalidation = reMatch[1];
-	}
-	else {
-		console.log("No eventvalidation")
+	var strEVentvalidation = "";
+	var bExists = false;
+
+	[strEventvalidation, bExists] = parseHTML(body).find("#__EVENTVALIDATION").attr("value");
+
+	if (!bExists)
+	{
+		console.log("No eventvalidation");
+		strEventvalidation = "";
 	}
 
 	return strEventvalidation;
@@ -86,9 +74,9 @@ function findEventvalidation(body) {
  */
 function findPanelViewstate(body) {
 	var strViewstate = "";
-	var findVS = new RegExp('|__VIEWSTATE|(.*?)|');
+	var findVS = new RegExp("\\|__VIEWSTATE\\|(.*?)\\|");
 	var reMatch = findVS.exec(body);
-	if (reMatch != null)
+	if (reMatch)
 	{
 		strViewstate = reMatch[1];
 	}
@@ -97,6 +85,8 @@ function findPanelViewstate(body) {
 		console.log("No panel viewstate");
 		console.log(body);
 	}
+
+	return strViewstate;
 }
 
 
@@ -105,9 +95,9 @@ function findPanelViewstate(body) {
  */
 function findPanelEventvalidation(body) {
 	var strEventvalidation = "";
-	var findEV = new RegExp('|__EVENTVALIDATION|(.*?)|');
+	var findEV = new RegExp("\\|__EVENTVALIDATION\\|(.*?)\\|");
 	var reMatch = findEV.exec(body);
-	if (reMatch != null)
+	if (reMatch)
 	{
 		strEventvalidation = reMatch[1];
 	}
@@ -116,6 +106,8 @@ function findPanelEventvalidation(body) {
 		console.log("No panel eventvalidation");
 		console.log(body);
 	}
+
+	return strEventvalidation;
 }
 
 
@@ -207,12 +199,11 @@ export default function() {
 	// Third step - select departure location
 	// Put in group and name group something resaonable
 	// Use __VIEWSTATE and __EVENTVALIDATION from previous response in this request
-	// The header says x-www-form-urlencoded so we have to urlencode the content of the variables when we use them.
 	// Keep response of reqest in res variable
 	group ("03_departure", function () {
 		res = http.batch([
 			{"method" : "POST", 
-			 "url" : "http://loadimpactair.guldskeden.se/Pages/Booking", "body" :  "__EVENTTARGET=ctl00%24MainContent%24ddlDeparture&__EVENTARGUMENT=&__LASTFOCUS=&__VIEWSTATE=" + urlencode(strViewstate) + "&__VIEWSTATEGENERATOR=A4196A29&__EVENTVALIDATION=" + urlencode(strEventvalidation) + "&ctl00%24MainContent%24ddlDeparture=1&ctl00%24MainContent%24ddlDestination=-+Select+-", 
+			 "url" : "http://loadimpactair.guldskeden.se/Pages/Booking", "body" : {"__EVENTTARGET":"ctl00$MainContent$ddlDeparture","__EVENTARGUMENT":"","__LASTFOCUS":"","__VIEWSTATE":strViewstate, "__VIEWSTATEGENERATOR":"A4196A29","__EVENTVALIDATION":strEventvalidation,"ctl00$MainContent$ddlDeparture":"1","ctl00$MainContent$ddlDestination":"- Select -"},
 			 "params" : { headers: { "Content-Type" : "application/x-www-form-urlencoded"} }}
 		]);
 	});
@@ -227,14 +218,16 @@ export default function() {
 	// Fourth step - select destination location
 	// Put in group and name group something resaonable
 	// Use __VIEWSTATE and __EVENTVALIDATION from previous response in this request
-	// The header says x-www-form-urlencoded so we have to urlencode the content of the variables when we use them.
 	// Keep response of reqest in res variable
 	group ("04_destination", function () {
 		res = http.batch([
-			{"method" : "POST", "url" : "http://loadimpactair.guldskeden.se/Pages/Booking", "body" :  "__EVENTTARGET=ctl00%24MainContent%24ddlDestination&__EVENTARGUMENT=&__LASTFOCUS=&__VIEWSTATE=" + urlencode(strViewstate) +
-			"&__VIEWSTATEGENERATOR=A4196A29&__EVENTVALIDATION=" + urlencode(strEventvalidation) + "&ctl00%24MainContent%24ddlDeparture=1&ctl00%24MainContent%24ddlDestination=3", "params" : { headers: { "Content-Type" : "application/x-www-form-urlencoded"} }},
+			{"method" : "POST", 
+			 "url" : "http://loadimpactair.guldskeden.se/Pages/Booking", 
+			 "body" :  {"__EVENTTARGET":"ctl00$MainContent$ddlDestination","__EVENTARGUMENT":"","__LASTFOCUS":"","__VIEWSTATE" : strViewstate,"__VIEWSTATEGENERATOR":"A4196A29","__EVENTVALIDATION": strEventvalidation,"ctl00$MainContent$ddlDeparture":1,"ctl00$MainContent$ddlDestination":3},
+			 "params" : { headers: { "Content-Type" : "application/x-www-form-urlencoded"} }},
 		]);
 	});
+
 
 	// Sleep between 5-10 seconds (the amount of time an average user would read before the next step/action)
 	sleep(rnd(5, 10));
@@ -246,15 +239,14 @@ export default function() {
 	// Fifth step - select departure date
 	// Put in group and name group something resaonable
 	// Use __VIEWSTATE and __EVENTVALIDATION from previous response in this request
-	// The header says x-www-form-urlencoded so we have to urlencode the content of the variables when we use them.
 	// Use the header to set the user agent as well because some Ajax implementations are very picky on the user agent
 	// Keep response of reqest in res variable
 	group ("05_departdate", function () {
 		res = http.batch([
 			{"method" : "POST", "url" : "http://loadimpactair.guldskeden.se/Pages/Booking", 
-			 "body" :  "ctl00%24MainContent%24ctl00=ctl00%24MainContent%24ctl02%7Cctl00%24MainContent%24DateDeparture&__EVENTTARGET=ctl00%24MainContent%24DateDeparture&__EVENTARGUMENT=6266&__LASTFOCUS=&__VIEWSTATE=" + urlencode(strViewstate) + 
-			 "&__VIEWSTATEGENERATOR=A4196A29&__EVENTVALIDATION=" + urlencode(strEventvalidation) + "&ctl00%24MainContent%24ddlDeparture=1&ctl00%24MainContent%24ddlDestination=3&__ASYNCPOST=true&", 
-			"params" : { headers: { "Content-Type" : "application/x-www-form-urlencoded; charset=UTF-8"} }}
+			 "body" : {"ctl00$MainContent$ctl00":"ctl00$MainContent$ctl02|ctl00$MainContent$DateDeparture","__EVENTTARGET":"ctl00$MainContent$DateDeparture","__EVENTARGUMENT":"6294","__LASTFOCUS":"","__VIEWSTATE":strViewstate,"__VIEWSTATEGENERATOR":"A4196A29","__EVENTVALIDATION":strEventvalidation,"ctl00$MainContent$ddlDeparture":"1","ctl00$MainContent$ddlDestination":"3","__ASYNCPOST":"true","":""},
+			 "params" : { headers: { "Content-Type" : "application/x-www-form-urlencoded; charset=UTF-8",
+									"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.79 Safari/537.36 Edge/14.14393" } }}
 		]);
 	});
 
@@ -268,15 +260,15 @@ export default function() {
 	// Sixth step - select return date
 	// Put in group and name group something resaonable
 	// Use __VIEWSTATE and __EVENTVALIDATION from previous response in this request
-	// The header says x-www-form-urlencoded so we have to urlencode the content of the variables when we use them.
 	// Use the header to set the user agent as well because some Ajax implementations are very picky on the user agent
 	// Keep response of reqest in res variable
 	group ("06_returndate", function () {
 		res = http.batch([
 			{"method" : "POST", 
 			 "url" : "http://loadimpactair.guldskeden.se/Pages/Booking", 
-			 "body" :  "ctl00%24MainContent%24ctl00=ctl00%24MainContent%24ctl04%7Cctl00%24MainContent%24DateReturn&ctl00%24MainContent%24ddlDeparture=1&ctl00%24MainContent%24ddlDestination=3&__EVENTTARGET=ctl00%24MainContent%24DateReturn&__EVENTARGUMENT=6270&__LASTFOCUS=&__VIEWSTATE=" + urlencode(strViewstate) + "&__VIEWSTATEGENERATOR=A4196A29&__EVENTVALIDATION=" + urlencode(strEventvalidation) + "&__ASYNCPOST=true&", 
-			 "params" : { headers: { "Content-Type" : "application/x-www-form-urlencoded; charset=UTF-8"} }}
+			 "body" :  {"ctl00$MainContent$ctl00":"ctl00$MainContent$ctl04|ctl00$MainContent$DateReturn","ctl00$MainContent$ddlDeparture":"1","ctl00$MainContent$ddlDestination":"3","__EVENTTARGET":"ctl00$MainContent$DateReturn","__EVENTARGUMENT":"6298","__LASTFOCUS":"","__VIEWSTATE":strViewstate,"__VIEWSTATEGENERATOR":"A4196A29","__EVENTVALIDATION":strEventvalidation,"__ASYNCPOST":"true","":""},
+			 "params" : { headers: { "Content-Type" : "application/x-www-form-urlencoded; charset=UTF-8", 
+									 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.79 Safari/537.36 Edge/14.14393" } }}
 		]);
 	});
 
@@ -290,11 +282,11 @@ export default function() {
 	// Seventh step - search for available flights
 	// Put in group and name group something resaonable
 	// Use __VIEWSTATE and __EVENTVALIDATION from previous response in this request
-	// The header says x-www-form-urlencoded so we have to urlencode the content of the variables when we use them.
 	group ("07_doSearch", function () {
 		http.batch([
 			{"method" : "POST", 
-			 "url" : "http://loadimpactair.guldskeden.se/Pages/Booking", "body" :  "ctl00%24MainContent%24ctl00=ctl00%24MainContent%24ctl06%7Cctl00%24MainContent%24ctl08&ctl00%24MainContent%24ddlDeparture=1&ctl00%24MainContent%24ddlDestination=3&__EVENTTARGET=&__EVENTARGUMENT=&__LASTFOCUS=&__VIEWSTATE=" + urlencode(strViewstate) + "&__VIEWSTATEGENERATOR=A4196A29&__EVENTVALIDATION=" + urlencode(strEventvalidation) + "&__ASYNCPOST=true&ctl00%24MainContent%24ctl08=Search%20flights", 
+			 "url" : "http://loadimpactair.guldskeden.se/Pages/Booking", 
+			 "body" : {"ctl00$MainContent$ctl00":"ctl00$MainContent$ctl06|ctl00$MainContent$ctl08","ctl00$MainContent$ddlDeparture":"1","ctl00$MainContent$ddlDestination":"3","__EVENTTARGET":"","__EVENTARGUMENT":"","__LASTFOCUS":"","__VIEWSTATE":strViewstate,"__VIEWSTATEGENERATOR":"A4196A29","__EVENTVALIDATION":strEventvalidation,"__ASYNCPOST":"true","ctl00$MainContent$ctl08":"Search flights"},
 			 "params" : { headers: { "Content-Type" : "application/x-www-form-urlencoded; charset=UTF-8"} }},
 			{"method" : "GET", "url" : "http://loadimpactair.guldskeden.se/Pages/Flights.aspx"}
 		]);
