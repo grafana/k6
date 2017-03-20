@@ -76,7 +76,7 @@ func (m *Module) Export(rt *goja.Runtime) goja.Value {
 			meth = m.injectErrorHandler(in, out, methT, meth, rt)
 		}
 
-		exports.Set(name, meth.Interface())
+		_ = exports.Set(name, meth.Interface())
 	}
 
 	return rt.ToValue(exports)
