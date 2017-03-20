@@ -20,12 +20,17 @@
 
 package common
 
-import "context"
+import (
+	"context"
+
+	"github.com/dop251/goja"
+)
 
 type ctxKey int
 
 const (
 	ctxKeyState ctxKey = iota
+	ctxKeyRuntime
 )
 
 func WithState(ctx context.Context, state *State) context.Context {
@@ -34,4 +39,12 @@ func WithState(ctx context.Context, state *State) context.Context {
 
 func GetState(ctx context.Context) *State {
 	return ctx.Value(ctxKeyState).(*State)
+}
+
+func WithRuntime(ctx context.Context, rt *goja.Runtime) context.Context {
+	return context.WithValue(ctx, ctxKeyRuntime, rt)
+}
+
+func GetRuntime(ctx context.Context) *goja.Runtime {
+	return ctx.Value(ctxKeyRuntime).(*goja.Runtime)
 }
