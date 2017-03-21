@@ -62,8 +62,9 @@ func NewBundle(src *lib.SourceData, fs afero.Fs) (*Bundle, error) {
 	// We want to eliminate disk access at runtime, so we set up a memory mapped cache that's
 	// written every time something is read from the real filesystem. This cache is then used for
 	// successive spawns to read from (they have no access to the real disk).
-	mirrorFS := afero.NewMemMapFs()
-	cachedFS := afero.NewCacheOnReadFs(fs, mirrorFS, 0)
+	// CURRENTLY BROKEN: https://github.com/spf13/afero/issues/115
+	// mirrorFS := afero.NewMemMapFs()
+	// cachedFS := afero.NewCacheOnReadFs(fs, mirrorFS, 0)
 
 	// Make a bundle, instantiate it into a throwaway VM to populate caches.
 	rt := goja.New()
@@ -71,7 +72,7 @@ func NewBundle(src *lib.SourceData, fs afero.Fs) (*Bundle, error) {
 	bundle := Bundle{
 		Filename:    src.Filename,
 		Program:     pgm,
-		InitContext: NewInitContext(rt, cachedFS, pwd),
+		InitContext: NewInitContext(rt, fs, pwd),
 	}
 	if err := bundle.instantiateInto(rt); err != nil {
 		return nil, err
@@ -105,7 +106,7 @@ func NewBundle(src *lib.SourceData, fs afero.Fs) (*Bundle, error) {
 	}
 
 	// Swap out the init context's filesystem for the in-memory cache.
-	bundle.InitContext.fs = mirrorFS
+	// bundle.InitContext.fs = mirrorFS
 
 	return &bundle, nil
 }
