@@ -35,6 +35,7 @@ func TestInitContextRequire(t *testing.T) {
 			Filename: "/script.js",
 			Data: []byte(`
 				import k6 from "k6";
+				export let _k6 = k6;
 				export let dummy = "abc123";
 				export default function() {}
 			`),
@@ -56,11 +57,18 @@ func TestInitContextRequire(t *testing.T) {
 			assert.Equal(t, "abc123", exports.Get("dummy").String())
 		}
 
+		k6 := rt.Get("_k6").ToObject(rt)
+		if assert.NotNil(t, k6) {
+			_, groupOk := goja.AssertFunction(k6.Get("group"))
+			assert.True(t, groupOk, "k6.group is not a function")
+		}
+
 		t.Run("group", func(t *testing.T) {
 			b, err := NewBundle(&lib.SourceData{
 				Filename: "/script.js",
 				Data: []byte(`
 					import { group } from "k6";
+					export let _group = group;
 					export let dummy = "abc123";
 					export default function() {}
 				`),
@@ -81,6 +89,9 @@ func TestInitContextRequire(t *testing.T) {
 				assert.True(t, defaultOk, "default export is not a function")
 				assert.Equal(t, "abc123", exports.Get("dummy").String())
 			}
+
+			_, groupOk := goja.AssertFunction(exports.Get("_group"))
+			assert.True(t, groupOk, "{ group } is not a function")
 		})
 	})
 }
