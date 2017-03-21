@@ -32,6 +32,8 @@ import (
 
 type testModule struct {
 	Counter int
+	String  string
+	Renamed string `js:"renamed"`
 }
 
 func (testModule) unexported() bool { return true }
@@ -71,8 +73,8 @@ func (m *testModule) Count() int {
 
 func TestModuleProxy(t *testing.T) {
 	testdata := map[string]func() interface{}{
-		"Value":   func() interface{} { return testModule{} },
-		"Pointer": func() interface{} { return &testModule{} },
+		"Value":   func() interface{} { return testModule{0, "a", "b"} },
+		"Pointer": func() interface{} { return &testModule{0, "a", "b"} },
 	}
 	for vtype, vfn := range testdata {
 		t.Run(vtype, func(t *testing.T) {
@@ -204,6 +206,22 @@ func TestModuleProxy(t *testing.T) {
 							assert.EqualError(t, err, "TypeError: Object has no member 'count'")
 						})
 					}
+
+					t.Run("Counter", func(t *testing.T) {
+						v, err := RunString(rt, `mod.counter`)
+						assert.NoError(t, err)
+						assert.Equal(t, int64(0), v.Export())
+					})
+					t.Run("String", func(t *testing.T) {
+						v, err := RunString(rt, `mod.string`)
+						assert.NoError(t, err)
+						assert.Equal(t, "a", v.Export())
+					})
+					t.Run("Renamed", func(t *testing.T) {
+						v, err := RunString(rt, `mod.renamed`)
+						assert.NoError(t, err)
+						assert.Equal(t, "b", v.Export())
+					})
 				})
 			}
 		})
