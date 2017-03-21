@@ -34,15 +34,29 @@ type testModule struct {
 	Counter int
 }
 
-func (*testModule) unexported() bool { return true }
+func (testModule) unexported() bool { return true }
 
-func (*testModule) Func() {}
+func (testModule) Func() {}
 
-func (*testModule) Error() error { return errors.New("error") }
+func (testModule) Error() error { return errors.New("error") }
 
-func (*testModule) Add(a, b int) int { return a + b }
+func (testModule) Add(a, b int) int { return a + b }
 
-func (*testModule) AddWithError(a, b int) (int, error) {
+func (testModule) AddWithError(a, b int) (int, error) {
+	res := a + b
+	if res < 0 {
+		return 0, errors.New("answer is negative")
+	}
+	return res, nil
+}
+
+func (testModule) Context(ctx context.Context) {}
+
+func (testModule) ContextAdd(ctx context.Context, a, b int) int {
+	return a + b
+}
+
+func (testModule) ContextAddWithError(ctx context.Context, a, b int) (int, error) {
 	res := a + b
 	if res < 0 {
 		return 0, errors.New("answer is negative")
@@ -55,133 +69,143 @@ func (m *testModule) Count() int {
 	return m.Counter
 }
 
-func (*testModule) Context(ctx context.Context) {}
-
-func (*testModule) ContextAdd(ctx context.Context, a, b int) int {
-	return a + b
-}
-
-func (*testModule) ContextAddWithError(ctx context.Context, a, b int) (int, error) {
-	res := a + b
-	if res < 0 {
-		return 0, errors.New("answer is negative")
+func TestModuleProxy(t *testing.T) {
+	testdata := map[string]func() interface{}{
+		"Value":   func() interface{} { return testModule{} },
+		"Pointer": func() interface{} { return &testModule{} },
 	}
-	return res, nil
-}
+	for vtype, vfn := range testdata {
+		t.Run(vtype, func(t *testing.T) {
+			mod := Module{}
+			rt := goja.New()
 
-func TestModuleExport(t *testing.T) {
-	impl := &testModule{}
-	mod := Module{Impl: impl}
-	rt := goja.New()
-	rt.Set("mod", mod.Export(rt))
+			fns := map[string]func(interface{}){
+				"Export": func(v interface{}) { mod.Impl = v; rt.Set("mod", mod.Export(rt)) },
+				"Proxy":  func(v interface{}) { rt.Set("mod", mod.Proxy(rt, v)) },
+			}
+			for name, fn := range fns {
+				t.Run(name, func(t *testing.T) {
+					v := vfn()
+					fn(v)
 
-	t.Run("unexported", func(t *testing.T) {
-		_, err := RunString(rt, `mod.unexported()`)
-		assert.EqualError(t, err, "TypeError: Object has no member 'unexported'")
-	})
-	t.Run("Func", func(t *testing.T) {
-		_, err := RunString(rt, `mod.func()`)
-		assert.NoError(t, err)
-	})
-	t.Run("Error", func(t *testing.T) {
-		_, err := RunString(rt, `mod.error()`)
-		assert.EqualError(t, err, "GoError: error")
-	})
-	t.Run("Add", func(t *testing.T) {
-		v, err := RunString(rt, `mod.add(1, 2)`)
-		assert.NoError(t, err)
-		assert.Equal(t, int64(3), v.Export())
-	})
-	t.Run("AddWithError", func(t *testing.T) {
-		v, err := RunString(rt, `mod.addWithError(1, 2)`)
-		assert.NoError(t, err)
-		assert.Equal(t, int64(3), v.Export())
+					t.Run("unexported", func(t *testing.T) {
+						_, err := RunString(rt, `mod.unexported()`)
+						assert.EqualError(t, err, "TypeError: Object has no member 'unexported'")
+					})
+					t.Run("Func", func(t *testing.T) {
+						_, err := RunString(rt, `mod.func()`)
+						assert.NoError(t, err)
+					})
+					t.Run("Error", func(t *testing.T) {
+						_, err := RunString(rt, `mod.error()`)
+						assert.EqualError(t, err, "GoError: error")
+					})
+					t.Run("Add", func(t *testing.T) {
+						v, err := RunString(rt, `mod.add(1, 2)`)
+						assert.NoError(t, err)
+						assert.Equal(t, int64(3), v.Export())
+					})
+					t.Run("AddWithError", func(t *testing.T) {
+						v, err := RunString(rt, `mod.addWithError(1, 2)`)
+						assert.NoError(t, err)
+						assert.Equal(t, int64(3), v.Export())
 
-		t.Run("Negative", func(t *testing.T) {
-			_, err := RunString(rt, `mod.addWithError(0, -1)`)
-			assert.EqualError(t, err, "GoError: answer is negative")
+						t.Run("Negative", func(t *testing.T) {
+							_, err := RunString(rt, `mod.addWithError(0, -1)`)
+							assert.EqualError(t, err, "GoError: answer is negative")
+						})
+					})
+					t.Run("Context", func(t *testing.T) {
+						_, err := RunString(rt, `mod.context()`)
+						assert.EqualError(t, err, "GoError: Context needs a valid VU context")
+
+						t.Run("Valid", func(t *testing.T) {
+							mod.Context = context.Background()
+							defer func() { mod.Context = nil }()
+
+							_, err := RunString(rt, `mod.context()`)
+							assert.NoError(t, err)
+						})
+
+						t.Run("Expired", func(t *testing.T) {
+							ctx, cancel := context.WithCancel(context.Background())
+							cancel()
+							mod.Context = ctx
+							defer func() { mod.Context = nil }()
+
+							_, err := RunString(rt, `mod.context()`)
+							assert.EqualError(t, err, "GoError: test has ended")
+						})
+					})
+					t.Run("ContextAdd", func(t *testing.T) {
+						_, err := RunString(rt, `mod.contextAdd(1, 2)`)
+						assert.EqualError(t, err, "GoError: ContextAdd needs a valid VU context")
+
+						t.Run("Valid", func(t *testing.T) {
+							mod.Context = context.Background()
+							defer func() { mod.Context = nil }()
+
+							v, err := RunString(rt, `mod.contextAdd(1, 2)`)
+							assert.NoError(t, err)
+							assert.Equal(t, int64(3), v.Export())
+						})
+
+						t.Run("Expired", func(t *testing.T) {
+							ctx, cancel := context.WithCancel(context.Background())
+							cancel()
+							mod.Context = ctx
+							defer func() { mod.Context = nil }()
+
+							_, err := RunString(rt, `mod.contextAdd(1, 2)`)
+							assert.EqualError(t, err, "GoError: test has ended")
+						})
+					})
+					t.Run("ContextAddWithError", func(t *testing.T) {
+						_, err := RunString(rt, `mod.contextAddWithError(1, 2)`)
+						assert.EqualError(t, err, "GoError: ContextAddWithError needs a valid VU context")
+
+						t.Run("Valid", func(t *testing.T) {
+							mod.Context = context.Background()
+							defer func() { mod.Context = nil }()
+
+							v, err := RunString(rt, `mod.contextAddWithError(1, 2)`)
+							assert.NoError(t, err)
+							assert.Equal(t, int64(3), v.Export())
+
+							t.Run("Negative", func(t *testing.T) {
+								_, err := RunString(rt, `mod.contextAddWithError(0, -1)`)
+								assert.EqualError(t, err, "GoError: answer is negative")
+							})
+						})
+						t.Run("Expired", func(t *testing.T) {
+							ctx, cancel := context.WithCancel(context.Background())
+							cancel()
+							mod.Context = ctx
+							defer func() { mod.Context = nil }()
+
+							_, err := RunString(rt, `mod.contextAddWithError(1, 2)`)
+							assert.EqualError(t, err, "GoError: test has ended")
+						})
+					})
+					if impl, ok := v.(*testModule); ok {
+						t.Run("Count", func(t *testing.T) {
+							for i := 0; i < 10; i++ {
+								t.Run(strconv.Itoa(i), func(t *testing.T) {
+									v, err := RunString(rt, `mod.count()`)
+									assert.NoError(t, err)
+									assert.Equal(t, int64(i+1), v.Export())
+									assert.Equal(t, i+1, impl.Counter)
+								})
+							}
+						})
+					} else {
+						t.Run("Count", func(t *testing.T) {
+							_, err := RunString(rt, `mod.count()`)
+							assert.EqualError(t, err, "TypeError: Object has no member 'count'")
+						})
+					}
+				})
+			}
 		})
-	})
-	t.Run("Count", func(t *testing.T) {
-		for i := 0; i < 10; i++ {
-			t.Run(strconv.Itoa(i), func(t *testing.T) {
-				v, err := RunString(rt, `mod.count()`)
-				assert.NoError(t, err)
-				assert.Equal(t, int64(i+1), v.Export())
-				assert.Equal(t, i+1, impl.Counter)
-			})
-		}
-	})
-	t.Run("Context", func(t *testing.T) {
-		_, err := RunString(rt, `mod.context()`)
-		assert.EqualError(t, err, "GoError: Context needs a valid VU context")
-
-		t.Run("Valid", func(t *testing.T) {
-			mod.Context = context.Background()
-			defer func() { mod.Context = nil }()
-
-			_, err := RunString(rt, `mod.context()`)
-			assert.NoError(t, err)
-		})
-
-		t.Run("Expired", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			cancel()
-			mod.Context = ctx
-			defer func() { mod.Context = nil }()
-
-			_, err := RunString(rt, `mod.context()`)
-			assert.EqualError(t, err, "GoError: test has ended")
-		})
-	})
-	t.Run("ContextAdd", func(t *testing.T) {
-		_, err := RunString(rt, `mod.contextAdd(1, 2)`)
-		assert.EqualError(t, err, "GoError: ContextAdd needs a valid VU context")
-
-		t.Run("Valid", func(t *testing.T) {
-			mod.Context = context.Background()
-			defer func() { mod.Context = nil }()
-
-			v, err := RunString(rt, `mod.contextAdd(1, 2)`)
-			assert.NoError(t, err)
-			assert.Equal(t, int64(3), v.Export())
-		})
-
-		t.Run("Expired", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			cancel()
-			mod.Context = ctx
-			defer func() { mod.Context = nil }()
-
-			_, err := RunString(rt, `mod.contextAdd(1, 2)`)
-			assert.EqualError(t, err, "GoError: test has ended")
-		})
-	})
-	t.Run("ContextAddWithError", func(t *testing.T) {
-		_, err := RunString(rt, `mod.contextAddWithError(1, 2)`)
-		assert.EqualError(t, err, "GoError: ContextAddWithError needs a valid VU context")
-
-		t.Run("Valid", func(t *testing.T) {
-			mod.Context = context.Background()
-			defer func() { mod.Context = nil }()
-
-			v, err := RunString(rt, `mod.contextAddWithError(1, 2)`)
-			assert.NoError(t, err)
-			assert.Equal(t, int64(3), v.Export())
-
-			t.Run("Negative", func(t *testing.T) {
-				_, err := RunString(rt, `mod.contextAddWithError(0, -1)`)
-				assert.EqualError(t, err, "GoError: answer is negative")
-			})
-		})
-		t.Run("Expired", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			cancel()
-			mod.Context = ctx
-			defer func() { mod.Context = nil }()
-
-			_, err := RunString(rt, `mod.contextAddWithError(1, 2)`)
-			assert.EqualError(t, err, "GoError: test has ended")
-		})
-	})
+	}
 }

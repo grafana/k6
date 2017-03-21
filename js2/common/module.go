@@ -34,13 +34,17 @@ type Module struct {
 }
 
 func (m *Module) Export(rt *goja.Runtime) goja.Value {
+	return m.Proxy(rt, m.Impl)
+}
+
+func (m *Module) Proxy(rt *goja.Runtime, v interface{}) goja.Value {
 	ctxT := reflect.TypeOf((*context.Context)(nil)).Elem()
 	errorT := reflect.TypeOf((*error)(nil)).Elem()
 
 	exports := rt.NewObject()
 	mapper := FieldNameMapper{}
 
-	val := reflect.ValueOf(m.Impl)
+	val := reflect.ValueOf(v)
 	typ := val.Type()
 	for i := 0; i < typ.NumMethod(); i++ {
 		i := i
