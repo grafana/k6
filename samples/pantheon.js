@@ -14,7 +14,7 @@ export let options = {
 const baseURL = "https://dev-li-david.pantheonsite.io";
 
 // User think time in between page loads etc. (change this to 0 when debugging)
-const thinkTime = 0;
+const thinkTime = 30;
 
 // List of login usernames and passwords
 const credentials = [
@@ -110,7 +110,7 @@ const categories = {
 				title: "\"The Guy\" Mug  | David li commerce-test",
 				chance: 0.25,
 			},
-		}			
+		}
 	}
 };
 
@@ -193,19 +193,19 @@ function doProductPage(product) {
 // Add a product to our shopping cart
 function addProductToCart(url, productID, formID, formBuildID, formToken) {
 	let formdata = {
-       	product_id: productID,
-       	form_id: formID,
-       	form_build_id: formBuildID,
-       	form_token: formToken,
-       	quantity: 1,
-       	op: "Add to cart",
-    };
+		product_id: productID,
+		form_id: formID,
+		form_build_id: formBuildID,
+		form_token: formToken,
+		quantity: 1,
+		op: "Add to cart",
+	};
 	let headers = { "Content-Type": "application/x-www-form-urlencoded" };
-    let res = http.post(url, formdata, { headers: headers });
-    // verify add to cart succeeded
-    check(res, {
-       	"add to cart succeeded": (res) => res.body.includes('Item successfully added to your cart')
-    }) || fail("add to cart failed");
+	let res = http.post(url, formdata, { headers: headers });
+	// verify add to cart succeeded
+	check(res, {
+		"add to cart succeeded": (res) => res.body.includes('Item successfully added to your cart')
+	}) || fail("add to cart failed");
 }
 
 // Perform multi-step (multi-page) checkout
@@ -230,16 +230,16 @@ function doCheckout() {
 		let formToken = res.body.match('name="form_token" value="(.*)"')[1];
 		let formBuildID = res.body.match('name="form_build_id" value="(.*)"')[1];
 		let formdata = {
-        	"form_build_id": formBuildID,
-        	"form_token": formToken,
-        	"form_id": formID,
-        	"op": "Checkout"
-    	};
+			"form_build_id": formBuildID,
+			"form_token": formToken,
+			"form_id": formID,
+			"op": "Checkout"
+		};
 		let headers = { "Content-Type": "application/x-www-form-urlencoded" };
-    	res = http.post(baseURL + "/cart", formdata, { headers: headers });
-    	check(res, {
-        	"cart submit succeeded": (res) => res.url.includes("/checkout/")
-    	}) || fail("cart submit failed");
+		res = http.post(baseURL + "/cart", formdata, { headers: headers });
+		check(res, {
+			"cart submit succeeded": (res) => res.url.includes("/checkout/")
+		}) || fail("cart submit failed");
 	});
 
 	// The previous POST operation should get redirected to a dynamic URL that has a
@@ -255,22 +255,22 @@ function doCheckout() {
 		let formBuildID = res.body.match('name="form_build_id" value="(.*)"')[1];
 		// try without setting Referer
 		let formdata = {
-    	    "customer_profile_billing[commerce_customer_address][und][0][country]": "SE",
-    	    "customer_profile_billing[commerce_customer_address][und][0][name_line]": "Mr Test",
-    	    "customer_profile_billing[commerce_customer_address][und][0][thoroughfare]": "Gotgatan 14",
-    	    "customer_profile_billing[commerce_customer_address][und][0][premise]": "",
-    	    "customer_profile_billing[commerce_customer_address][und][0][postal_code]": "11846",
-    	    "customer_profile_billing[commerce_customer_address][und][0][locality]": "Stockholm",
-    	    "customer_profile_shipping[commerce_customer_profile_copy]": "1",
-    	    "form_build_id": formBuildID,
-    	    "form_token": formToken,
-    	    "form_id": formID,
-    	    "op": "Continue to next step"
-    	};
+			"customer_profile_billing[commerce_customer_address][und][0][country]": "SE",
+			"customer_profile_billing[commerce_customer_address][und][0][name_line]": "Mr Test",
+			"customer_profile_billing[commerce_customer_address][und][0][thoroughfare]": "Gotgatan 14",
+			"customer_profile_billing[commerce_customer_address][und][0][premise]": "",
+			"customer_profile_billing[commerce_customer_address][und][0][postal_code]": "11846",
+			"customer_profile_billing[commerce_customer_address][und][0][locality]": "Stockholm",
+			"customer_profile_shipping[commerce_customer_profile_copy]": "1",
+			"form_build_id": formBuildID,
+			"form_token": formToken,
+			"form_id": formID,
+			"op": "Continue to next step"
+		};
 		let headers = { "Content-Type": "application/x-www-form-urlencoded" };
 		res = http.post(checkoutBaseURL, formdata, { headers: headers });
 		check(res, {
-        	"billing details succeeded": (res) => res.url === (checkoutBaseURL + "/shipping")
+			"billing details succeeded": (res) => res.url === (checkoutBaseURL + "/shipping")
 		}) || fail("billing details failed"); 
 	});
 
@@ -279,17 +279,17 @@ function doCheckout() {
 		let formToken = res.body.match('name="form_token" value="(.*)"')[1];
 		let formBuildID = res.body.match('name="form_build_id" value="(.*)"')[1];
 		let formdata = {
-        	"commerce_shipping[shipping_service]": "express_shipping",
-        	"form_build_id": formBuildID,
-        	"form_token": formToken,
-        	"form_id": formID,
-        	"op": "Continue to next step"
-    	};
+			"commerce_shipping[shipping_service]": "express_shipping",
+			"form_build_id": formBuildID,
+			"form_token": formToken,
+			"form_id": formID,
+			"op": "Continue to next step"
+		};
 		let headers = { "Content-Type": "application/x-www-form-urlencoded" };
 		res = http.post(checkoutBaseURL + "/shipping", formdata, { headers: headers });
-    	check(res, {
-        	"shipping options succeeded": (res) => res.url === (checkoutBaseURL + "/review")
-    	}) || console.log("Select shipping failed!");
+		check(res, {
+			"shipping options succeeded": (res) => res.url === (checkoutBaseURL + "/review")
+		}) || console.log("Select shipping failed!");
 	});
 	
 	group("Checkout 5: review and submit", function() {
@@ -297,23 +297,23 @@ function doCheckout() {
 		let formToken = res.body.match('name="form_token" value="(.*)"')[1];
 		let formBuildID = res.body.match('name="form_build_id" value="(.*)"')[1];
 		let formdata = {
-        	"commerce_payment[payment_method]": "commerce_payment_example|commerce_payment_commerce_payment_example",
-        	"commerce_payment[payment_details][credit_card][number]": "4111111111111111",
-        	"commerce_payment[payment_details][credit_card][exp_month]": "03",
-        	"commerce_payment[payment_details][credit_card][exp_year]": "2019",
-        	"form_build_id": formBuildID,
-        	"form_token": formToken,
-        	"form_id": formID,
-        	"op": "Continue to next step"
-    	};
+			"commerce_payment[payment_method]": "commerce_payment_example|commerce_payment_commerce_payment_example",
+			"commerce_payment[payment_details][credit_card][number]": "4111111111111111",
+			"commerce_payment[payment_details][credit_card][exp_month]": "03",
+			"commerce_payment[payment_details][credit_card][exp_year]": "2019",
+			"form_build_id": formBuildID,
+			"form_token": formToken,
+			"form_id": formID,
+			"op": "Continue to next step"
+		};
 		let headers = { "Content-Type": "application/x-www-form-urlencoded" };
 		res = http.post(checkoutBaseURL + "/review", formdata, { headers: headers });
-	   	// if this POST succeeds, it will redirect to e.g. /checkout/7/payment
-    	// /checkout/7/payment, in turn, will redirect to /checkout/7/paypal_ec
-    	// /checkout/7/paypal_ec, in turn, will redirect to /checkout/7/complete
-    	check(res, {
-        	"Checkout 6: checkout complete": (res) => res.html("h1").text() === "Checkout complete"
-    	}) || fail("review and submit failed");
+		// if this POST succeeds, it will redirect to e.g. /checkout/7/payment
+		// /checkout/7/payment, in turn, will redirect to /checkout/7/paypal_ec
+		// /checkout/7/paypal_ec, in turn, will redirect to /checkout/7/complete
+		check(res, {
+			"Checkout 6: checkout complete": (res) => res.html("h1").text() === "Checkout complete"
+		}) || fail("review and submit failed");
 	});
 }
 
