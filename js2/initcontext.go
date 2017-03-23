@@ -21,10 +21,11 @@
 package js2
 
 import (
+	"path/filepath"
 	"strings"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/dop251/goja"
+	"github.com/loadimpact/k6/js/compiler"
 	"github.com/loadimpact/k6/js2/common"
 	"github.com/loadimpact/k6/js2/modules"
 	"github.com/pkg/errors"
@@ -37,7 +38,8 @@ type InitContext struct {
 	runtime *goja.Runtime
 
 	// Index of all loaded modules.
-	Modules map[string]*common.Module `js:"-"`
+	Modules  map[string]*common.Module `js:"-"`
+	Programs map[string]*goja.Program  `js:"-"`
 
 	// Filesystem to load files and scripts from.
 	fs  afero.Fs
@@ -47,13 +49,13 @@ type InitContext struct {
 	Console *Console
 }
 
-func NewInitContext(rt *goja.Runtime, fs afero.Fs, pwd string) *InitContext {
+func NewInitContext(fs afero.Fs, pwd string) *InitContext {
 	return &InitContext{
-		runtime: rt,
-		fs:      fs,
-		pwd:     pwd,
+		fs:  fs,
+		pwd: pwd,
 
-		Modules: make(map[string]*common.Module),
+		Modules:  make(map[string]*common.Module),
+		Programs: make(map[string]*goja.Program),
 
 		Console: NewConsole(),
 	}
@@ -69,12 +71,17 @@ func (i *InitContext) Require(arg string) goja.Value {
 			panic(i.runtime.NewGoError(err))
 		}
 		return v
+	default:
+		// Fall back to loading from the filesystem.
+		v, err := i.requireFile(arg)
+		if err != nil {
+			panic(i.runtime.NewGoError(err))
+		}
+		return v
 	}
-	return goja.Undefined()
 }
 
 func (i *InitContext) requireModule(name string) (goja.Value, error) {
-	log.WithField("name", name).Info("require module")
 	mod, ok := i.Modules[name]
 	if !ok {
 		mod_, ok := modules.Index[name]
@@ -87,18 +94,44 @@ func (i *InitContext) requireModule(name string) (goja.Value, error) {
 	return mod.Export(i.runtime), nil
 }
 
-// func (i *InitContext) requireProgram(pgm *goja.Program) (goja.Value, error) {
-// 	// Switch out the 'exports' global for a module-specific one.
-// 	oldExports := i.runtime.Get("exports")
-// 	i.runtime.Set("exports", i.runtime.NewObject())
-// 	defer i.runtime.Set("exports", oldExports)
+func (i *InitContext) requireFile(name string) (goja.Value, error) {
+	// Resolve the file path, push the target directory as pwd to make relative imports work.
+	pwd := i.pwd
+	filename := filepath.Join(pwd, name)
+	i.pwd = filepath.Dir(filename)
+	defer func() { i.pwd = pwd }()
 
-// 	// Run the program, this will populate the swapped-in exports.
-// 	if _, err := i.runtime.RunProgram(pgm); err != nil {
-// 		log.WithError(err).Error("couldn't run module program")
-// 		return goja.Undefined(), err
-// 	}
+	// Swap the importing scope's imports out, then put it back again.
+	oldExports := i.runtime.Get("exports")
+	i.runtime.Set("exports", i.runtime.NewObject())
+	defer i.runtime.Set("exports", oldExports)
 
-// 	// Return the current exports, before the defer'd Set swaps it back.
-// 	return i.runtime.Get("exports"), nil
-// }
+	// Read sources, transform into ES6 and cache the compiled program.
+	pgm, ok := i.Programs[filename]
+	if !ok {
+		data, err := afero.ReadFile(i.fs, filename)
+		if err != nil {
+			return goja.Undefined(), err
+		}
+		src, _, err := compiler.Transform(string(data), filename)
+		if err != nil {
+			return goja.Undefined(), err
+		}
+		pgm_, err := goja.Compile(filename, src, true)
+		if err != nil {
+			return goja.Undefined(), err
+		}
+		i.Programs[filename] = pgm_
+		pgm = pgm_
+	}
+
+	// Execute the program to populate exports. You may notice that this theoretically allows an
+	// imported file to access or overwrite globals defined outside of it. Please don't do anything
+	// stupid with this, consider *any* use of it undefined behavior >_>;;
+	if _, err := i.runtime.RunProgram(pgm); err != nil {
+		return goja.Undefined(), err
+	}
+
+	exports := i.runtime.Get("exports")
+	return exports, nil
+}
