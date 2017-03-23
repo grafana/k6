@@ -33,15 +33,6 @@ import (
 	"github.com/spf13/afero"
 )
 
-func compile(src *lib.SourceData) (*goja.Program, error) {
-	code, _, err := compiler.Transform(string(src.Data), src.Filename)
-	if err != nil {
-		return nil, err
-	}
-
-	return goja.Compile(src.Filename, code, true)
-}
-
 // A Bundle is a self-contained bundle of scripts and resources.
 // You can use this to produce identical VMs.
 type Bundle struct {
@@ -53,8 +44,12 @@ type Bundle struct {
 
 // Creates a new bundle from a source file and a filesystem.
 func NewBundle(src *lib.SourceData, fs afero.Fs) (*Bundle, error) {
-	// Compile the main program, use the script's dir as initial pwd.
-	pgm, err := compile(src)
+	// Compile the main program.
+	code, _, err := compiler.Transform(string(src.Data), src.Filename)
+	if err != nil {
+		return nil, err
+	}
+	pgm, err := goja.Compile(src.Filename, code, true)
 	if err != nil {
 		return nil, err
 	}
