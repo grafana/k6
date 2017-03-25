@@ -38,7 +38,17 @@ function parseBody(body) {
 				if (formstring !== "") {
 					formstring += "&";
 				}
-				formstring += key + "=" + encodeURIComponent(body[key]);
+				if (Array.isArray(body[key])) {
+					let l = body[key].length;
+					for (let i = 0; i < l; i++) {
+						formstring += key + "=" + encodeURIComponent(body[key][i]);
+						if (formstring !== "") {
+							formstring += "&";
+						}
+					}
+				} else {
+					formstring += key + "=" + encodeURIComponent(body[key]);
+				}
 			}
 			return formstring;
 		}
