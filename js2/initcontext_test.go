@@ -47,20 +47,21 @@ func TestInitContextRequire(t *testing.T) {
 				return
 			}
 
-			rt, err := b.Instantiate()
+			bi, err := b.Instantiate()
 			if !assert.NoError(t, err, "instance error") {
 				return
 			}
-			assert.Contains(t, b.InitContext.Modules, "k6")
+			assert.Contains(t, b.BaseInitContext.Modules, "k6")
+			assert.Contains(t, bi.Modules, "k6")
 
-			exports := rt.Get("exports").ToObject(rt)
+			exports := bi.Runtime.Get("exports").ToObject(bi.Runtime)
 			if assert.NotNil(t, exports) {
 				_, defaultOk := goja.AssertFunction(exports.Get("default"))
 				assert.True(t, defaultOk, "default export is not a function")
 				assert.Equal(t, "abc123", exports.Get("dummy").String())
 			}
 
-			k6 := rt.Get("_k6").ToObject(rt)
+			k6 := bi.Runtime.Get("_k6").ToObject(bi.Runtime)
 			if assert.NotNil(t, k6) {
 				_, groupOk := goja.AssertFunction(k6.Get("group"))
 				assert.True(t, groupOk, "k6.group is not a function")
@@ -80,13 +81,14 @@ func TestInitContextRequire(t *testing.T) {
 					return
 				}
 
-				rt, err := b.Instantiate()
+				bi, err := b.Instantiate()
 				if !assert.NoError(t, err) {
 					return
 				}
-				assert.Contains(t, b.InitContext.Modules, "k6")
+				assert.Contains(t, b.BaseInitContext.Modules, "k6")
+				assert.Contains(t, bi.Modules, "k6")
 
-				exports := rt.Get("exports").ToObject(rt)
+				exports := bi.Runtime.Get("exports").ToObject(bi.Runtime)
 				if assert.NotNil(t, exports) {
 					_, defaultOk := goja.AssertFunction(exports.Get("default"))
 					assert.True(t, defaultOk, "default export is not a function")

@@ -49,16 +49,26 @@ type InitContext struct {
 	Console *Console
 }
 
-func NewInitContext(fs afero.Fs, pwd string) *InitContext {
+func NewInitContext(rt *goja.Runtime, fs afero.Fs, pwd string) *InitContext {
 	return &InitContext{
-		fs:  fs,
-		pwd: pwd,
+		runtime: rt,
+		fs:      fs,
+		pwd:     pwd,
 
 		Modules:  make(map[string]*common.Module),
 		Programs: make(map[string]*goja.Program),
 
 		Console: NewConsole(),
 	}
+}
+
+func newBoundInitContext(base *InitContext, rt *goja.Runtime) *InitContext {
+	init := NewInitContext(rt, base.fs, base.pwd)
+	init.Modules = make(map[string]*common.Module, len(base.Modules))
+	for key, mod := range base.Modules {
+		init.Modules[key] = &*mod
+	}
+	return init
 }
 
 func (i *InitContext) Require(arg string) goja.Value {

@@ -24,7 +24,6 @@ import (
 	"encoding/json"
 	"path/filepath"
 	"reflect"
-	"sync"
 
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/compiler"
@@ -35,14 +34,20 @@ import (
 )
 
 // A Bundle is a self-contained bundle of scripts and resources.
-// You can use this to produce identical VMs.
+// You can use this to produce identical BundleInstance objects.
 type Bundle struct {
-	Filename    string
-	Program     *goja.Program
-	InitContext *InitContext
-	Options     lib.Options
+	Filename string
+	Program  *goja.Program
+	Options  lib.Options
 
-	initLock sync.Mutex
+	BaseInitContext *InitContext
+}
+
+// A BundleInstance is a self-contained instance of a Bundle.
+type BundleInstance struct {
+	Runtime *goja.Runtime
+	Modules map[string]*common.Module
+	Default goja.Callable
 }
 
 // Creates a new bundle from a source file and a filesystem.
@@ -66,13 +71,12 @@ func NewBundle(src *lib.SourceData, fs afero.Fs) (*Bundle, error) {
 
 	// Make a bundle, instantiate it into a throwaway VM to populate caches.
 	rt := goja.New()
-	pwd := filepath.Dir(src.Filename)
 	bundle := Bundle{
-		Filename:    src.Filename,
-		Program:     pgm,
-		InitContext: NewInitContext(fs, pwd),
+		Filename:        src.Filename,
+		Program:         pgm,
+		BaseInitContext: NewInitContext(rt, fs, filepath.Dir(src.Filename)),
 	}
-	if err := bundle.instantiateInto(rt); err != nil {
+	if err := bundle.instantiate(rt, bundle.BaseInitContext); err != nil {
 		return nil, err
 	}
 
@@ -110,33 +114,38 @@ func NewBundle(src *lib.SourceData, fs afero.Fs) (*Bundle, error) {
 }
 
 // Instantiates a new runtime from this bundle.
-func (b *Bundle) Instantiate() (*goja.Runtime, error) {
+func (b *Bundle) Instantiate() (*BundleInstance, error) {
+	// Instantiate the bundle into a new VM using a bound init context.
 	rt := goja.New()
-	if err := b.instantiateInto(rt); err != nil {
+	init := newBoundInitContext(b.BaseInitContext, rt)
+	if err := b.instantiate(rt, init); err != nil {
 		return nil, err
 	}
-	return rt, nil
+
+	// Grab the default function; type is already checked in NewBundle().
+	exports := rt.Get("exports").ToObject(rt)
+	def, _ := goja.AssertFunction(exports.Get("default"))
+
+	return &BundleInstance{
+		Runtime: rt,
+		Modules: init.Modules,
+		Default: def,
+	}, nil
 }
 
 // Instantiates the bundle into an existing runtime. Not public because it also messes with a bunch
 // of other things, will potentially thrash data and makes a mess in it if the operation fails.
-func (b *Bundle) instantiateInto(rt *goja.Runtime) error {
-	b.initLock.Lock()
-	b.InitContext.runtime = rt
-	defer func() {
-		b.InitContext.runtime = nil
-		b.initLock.Unlock()
-	}()
-
+func (b *Bundle) instantiate(rt *goja.Runtime, init *InitContext) error {
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
+	rt.SetRandSource(common.DefaultRandSource)
 	rt.Set("exports", rt.NewObject())
 
-	rt.SetRandSource(common.DefaultRandSource)
-	unbindInit := common.BindToGlobal(rt, b.InitContext)
+	unbindInit := common.BindToGlobal(rt, init)
 	if _, err := rt.RunProgram(b.Program); err != nil {
 		return err
 	}
 	unbindInit()
+
 	rt.SetRandSource(common.NewRandSource())
 
 	return nil

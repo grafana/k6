@@ -22,6 +22,7 @@ package js2
 
 // Provides APIs and state for use in a VU context.
 type VUContext struct {
+	// Console Object.
 	Console *Console `js:"console"`
 }
 
