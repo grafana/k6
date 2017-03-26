@@ -58,6 +58,12 @@ function parseBody(body) {
  */
 export function request(method, url, body, params = {}) {
 	method = method.toUpperCase();
+	if (typeof body === "object") {
+		if (typeof params["headers"] !== "object") {
+			params["headers"] = {};
+		}
+		params["headers"]["Content-Type"] = "application/x-www-form-urlencoded";
+	}
 	body = parseBody(body);
 	return new Response(__jsapi__.HTTPRequest(method, url, body, JSON.stringify(params)));
 };
