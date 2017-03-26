@@ -121,3 +121,22 @@ func TestHTTPFormURLEncodeHeader(t *testing.T) {
 
 	assert.NoError(t, runSnippet(snippet))
 }
+
+func TestHTTPFormURLEncodeList(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+
+	snippet := `
+	import { _assert } from "k6"
+	import http from "k6/http"
+
+	export default function() {
+		let response = http.post("http://httpbin.org/post", { field: ["value1", "value2", "value3"] }, { headers: {"Content-Type": "application/x-www-form-urlencoded"} })
+		_assert(response.json()["form"].hasOwnProperty("field"))
+		_assert(JSON.stringify(response.json()["form"]["field"]) === JSON.stringify(["value1", "value2", "value3"]))
+	}
+	`
+
+	assert.NoError(t, runSnippet(snippet))
+}
