@@ -105,12 +105,20 @@ type VU struct {
 
 	Samples   []stats.Sample
 	VUContext *VUContext
+
+	// Current/last run context, mainly used for testing.
+	ctx context.Context
 }
 
 func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
+	ctx = common.WithRuntime(ctx, u.Runtime)
 	ctx = common.WithState(ctx, &common.State{
 		Group: u.Runner.defaultGroup,
 	})
+	for _, mod := range u.Modules {
+		mod.Context = ctx
+	}
+	u.ctx = ctx
 
 	u.Runtime.Set("__ITER", u.Iteration)
 	u.Iteration++

@@ -24,6 +24,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/loadimpact/k6/js2/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
@@ -77,4 +78,31 @@ func TestRunnerOptions(t *testing.T) {
 	r.ApplyOptions(lib.Options{Paused: null.BoolFrom(false)})
 	assert.Equal(t, r.Bundle.Options, r.GetOptions())
 	assert.Equal(t, null.NewBool(false, true), r.Bundle.Options.Paused)
+}
+
+func TestVURunContext(t *testing.T) {
+	r, err := New(&lib.SourceData{
+		Filename: "/script.js",
+		Data:     []byte(`export default function() { fn(); }`),
+	}, afero.NewMemMapFs())
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	vu, err := r.newVU()
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	fnCalled := false
+	vu.Runtime.Set("fn", func() {
+		fnCalled = true
+		assert.Equal(t, vu.Runtime, common.GetRuntime(vu.ctx), "incorrect runtime in context")
+		assert.Equal(t, &common.State{
+			Group: r.GetDefaultGroup(),
+		}, common.GetState(vu.ctx), "incorrect state in context")
+	})
+	_, err = vu.RunOnce(context.Background())
+	assert.NoError(t, err)
+	assert.True(t, fnCalled, "fn() not called")
 }
