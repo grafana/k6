@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/lib"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
@@ -335,5 +336,38 @@ func TestNewBundle(t *testing.T) {
 				}
 			}
 		})
+	})
+}
+
+func TestBundleInstantiate(t *testing.T) {
+	b, err := NewBundle(&lib.SourceData{
+		Filename: "/script.js",
+		Data: []byte(`
+		let val = true;
+		export default function() { return val; }
+		`),
+	}, afero.NewMemMapFs())
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	bi, err := b.Instantiate()
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	t.Run("Run", func(t *testing.T) {
+		v, err := bi.Default(goja.Undefined())
+		if assert.NoError(t, err) {
+			assert.Equal(t, true, v.Export())
+		}
+	})
+
+	t.Run("SetAndRun", func(t *testing.T) {
+		bi.Runtime.Set("val", false)
+		v, err := bi.Default(goja.Undefined())
+		if assert.NoError(t, err) {
+			assert.Equal(t, false, v.Export())
+		}
 	})
 }
