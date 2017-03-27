@@ -106,3 +106,55 @@ func TestVURunContext(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, fnCalled, "fn() not called")
 }
+
+func TestVUIntegrationGroups(t *testing.T) {
+	r, err := New(&lib.SourceData{
+		Filename: "/script.js",
+		Data: []byte(`
+		import { group } from "k6";
+		export default function() {
+			fnOuter();
+			group("my group", function() {
+				fnInner();
+				group("nested group", function() {
+					fnNested();
+				})
+			});
+		}
+		`),
+	}, afero.NewMemMapFs())
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	vu, err := r.newVU()
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	fnOuterCalled := false
+	fnInnerCalled := false
+	fnNestedCalled := false
+	vu.Runtime.Set("fnOuter", func() {
+		fnOuterCalled = true
+		assert.Equal(t, r.GetDefaultGroup(), common.GetState(vu.ctx).Group)
+	})
+	vu.Runtime.Set("fnInner", func() {
+		fnInnerCalled = true
+		g := common.GetState(vu.ctx).Group
+		assert.Equal(t, "my group", g.Name)
+		assert.Equal(t, r.GetDefaultGroup(), g.Parent)
+	})
+	vu.Runtime.Set("fnNested", func() {
+		fnNestedCalled = true
+		g := common.GetState(vu.ctx).Group
+		assert.Equal(t, "nested group", g.Name)
+		assert.Equal(t, "my group", g.Parent.Name)
+		assert.Equal(t, r.GetDefaultGroup(), g.Parent.Parent)
+	})
+	_, err = vu.RunOnce(context.Background())
+	assert.NoError(t, err)
+	assert.True(t, fnOuterCalled, "fnOuter() not called")
+	assert.True(t, fnInnerCalled, "fnInner() not called")
+	assert.True(t, fnNestedCalled, "fnNested() not called")
+}
