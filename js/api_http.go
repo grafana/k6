@@ -96,11 +96,16 @@ func (a JSAPI) HTTPRequest(method, url, body string, paramData string) map[strin
 	for k, v := range res.Header {
 		headers[k] = strings.Join(v, ", ")
 	}
+	cookies := make(map[string]string)
+	for _, v := range a.vu.CookieJar.Cookies(res.Request.URL) {
+		cookies[v.Name] = v.Value
+	}
 	return map[string]interface{}{
 		"url":     res.Request.URL.String(),
 		"status":  res.StatusCode,
 		"body":    string(resBody),
 		"headers": headers,
+		"cookies": cookies,
 		"timings": map[string]float64{
 			"duration":   stats.D(trail.Duration),
 			"blocked":    stats.D(trail.Blocked),
