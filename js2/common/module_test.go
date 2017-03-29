@@ -22,7 +22,9 @@ package common
 
 import (
 	"context"
+	"fmt"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/dop251/goja"
@@ -69,6 +71,30 @@ func (testModule) ContextAddWithError(ctx context.Context, a, b int) (int, error
 func (m *testModule) Count() int {
 	m.Counter++
 	return m.Counter
+}
+
+func (testModule) Sum(nums ...int) int {
+	sum := 0
+	for v := range nums {
+		sum += v
+	}
+	return sum
+}
+
+func (m testModule) SumWithContext(ctx context.Context, nums ...int) int {
+	return m.Sum(nums...)
+}
+
+func (m testModule) SumWithError(nums ...int) (int, error) {
+	sum := m.Sum(nums...)
+	if sum < 0 {
+		return 0, errors.New("answer is negative")
+	}
+	return sum, nil
+}
+
+func (m testModule) SumWithContextAndError(ctx context.Context, nums ...int) (int, error) {
+	return m.SumWithError(nums...)
 }
 
 func TestModuleProxy(t *testing.T) {
@@ -204,6 +230,30 @@ func TestModuleProxy(t *testing.T) {
 						t.Run("Count", func(t *testing.T) {
 							_, err := RunString(rt, `mod.count()`)
 							assert.EqualError(t, err, "TypeError: Object has no member 'count'")
+						})
+					}
+					for name, fname := range map[string]string{
+						"Sum":                    "sum",
+						"SumWithContext":         "sumWithContext",
+						"SumWithError":           "sumWithError",
+						"SumWithContextAndError": "sumWithContextAndError",
+					} {
+						mod.Context = context.Background()
+						defer func() { mod.Context = nil }()
+
+						t.Run(name, func(t *testing.T) {
+							sum := 0
+							args := []string{}
+							for i := 0; i < 10; i++ {
+								args = append(args, strconv.Itoa(i))
+								sum += i
+								t.Run(strconv.Itoa(i), func(t *testing.T) {
+									code := fmt.Sprintf(`mod.%s(%s)`, fname, strings.Join(args, ", "))
+									v, err := RunString(rt, code)
+									assert.NoError(t, err)
+									assert.Equal(t, int64(sum), v.Export())
+								})
+							}
 						})
 					}
 

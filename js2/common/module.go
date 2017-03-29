@@ -115,8 +115,7 @@ func (m *Module) injectContext(in, out []reflect.Type, methT reflect.Method, met
 			default:
 			}
 
-			ctx := reflect.ValueOf(m.Context)
-			return meth.Call(append([]reflect.Value{ctx}, args...))
+			return m.call(methT, meth, append([]reflect.Value{reflect.ValueOf(m.Context)}, args...))
 		},
 	)
 }
@@ -125,7 +124,7 @@ func (m *Module) injectErrorHandler(in, out []reflect.Type, methT reflect.Method
 	return reflect.MakeFunc(
 		reflect.FuncOf(in, out, methT.Type.IsVariadic()),
 		func(args []reflect.Value) []reflect.Value {
-			ret := meth.Call(args)
+			ret := m.call(methT, meth, args)
 			err := ret[len(ret)-1]
 			if !err.IsNil() {
 				panic(rt.NewGoError(err.Interface().(error)))
@@ -133,4 +132,11 @@ func (m *Module) injectErrorHandler(in, out []reflect.Type, methT reflect.Method
 			return ret[:len(ret)-1]
 		},
 	)
+}
+
+func (m *Module) call(methT reflect.Method, meth reflect.Value, args []reflect.Value) []reflect.Value {
+	if methT.Type.IsVariadic() {
+		return meth.CallSlice(args)
+	}
+	return meth.Call(args)
 }
