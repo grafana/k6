@@ -55,13 +55,12 @@ func (*K6) Check(ctx context.Context, arg0, checks goja.Value, extras ...goja.Va
 	t := time.Now()
 
 	// Prepare tags, make sure the `group` tag can't be overwritten.
-	tags := make(map[string]string, 0)
-	for _, val := range extras {
-		obj := val.ToObject(rt)
+	tags := make(map[string]string)
+	if len(extras) > 0 {
+		obj := extras[0].ToObject(rt)
 		for _, k := range obj.Keys() {
 			tags[k] = obj.Get(k).String()
 		}
-		break
 	}
 	tags["group"] = state.Group.Path
 
