@@ -115,10 +115,11 @@ func (a JSAPI) HTTPRequest(method, url, body string, paramData string) map[strin
 
 func (a JSAPI) BatchHTTPRequest(requests otto.Value) otto.Value {
 	obj := requests.Object()
-
-	wg := sync.WaitGroup{}
 	mutex := sync.Mutex{}
-	for _, key := range obj.Keys() {
+
+	keys := obj.Keys()
+	errs := make(chan interface{}, len(keys))
+	for _, key := range keys {
 		v, _ := obj.Get(key)
 
 		var method string
@@ -137,19 +138,21 @@ func (a JSAPI) BatchHTTPRequest(requests otto.Value) otto.Value {
 		v, _ = o.Get("params")
 		params = v.String()
 
-		wg.Add(1)
 		go func(tkey string) {
-			defer wg.Done()
-
+			defer func() { errs <- recover() }()
 			res := a.HTTPRequest(method, url, body, params)
 
 			mutex.Lock()
-			defer mutex.Unlock()
-
 			_ = obj.Set(tkey, res)
+			mutex.Unlock()
 		}(key)
 	}
 
-	wg.Wait()
+	for i := 0; i < len(keys); i++ {
+		if err := <-errs; err != nil {
+			panic(err)
+		}
+	}
+
 	return obj.Value()
 }

@@ -79,6 +79,19 @@ func TestHTTPBatchLong(t *testing.T) {
 	assert.NoError(t, runSnippet(snippet))
 }
 
+func TestHTTPBatchError(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+
+	snippet := `
+	import http from "k6/http"
+	export default function() { http.batch([""]) }
+	`
+
+	assert.EqualError(t, runSnippet(snippet), "Error: Get : unsupported protocol scheme \"\"")
+}
+
 func TestHTTPBatchObject(t *testing.T) {
 	if testing.Short() {
 		return
@@ -97,6 +110,44 @@ func TestHTTPBatchObject(t *testing.T) {
 		_assert(responses.twohundred.status === 200)
 		_assert(responses.fourohfour.status === 404)
 		_assert(responses.fivehundred.status === 500)
+	}
+	`
+
+	assert.NoError(t, runSnippet(snippet))
+}
+
+func TestHTTPFormURLEncodeHeader(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+
+	snippet := `
+	import { _assert } from "k6"
+	import http from "k6/http"
+
+	export default function() {
+		let response = http.post("http://httpbin.org/post", { field: "value" })
+		_assert(response.json()["form"].hasOwnProperty("field"))
+		_assert(response.json()["form"]["field"] === "value")
+	}
+	`
+
+	assert.NoError(t, runSnippet(snippet))
+}
+
+func TestHTTPFormURLEncodeList(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+
+	snippet := `
+	import { _assert } from "k6"
+	import http from "k6/http"
+
+	export default function() {
+		let response = http.post("http://httpbin.org/post", { field: ["value1", "value2", "value3"] }, { headers: {"Content-Type": "application/x-www-form-urlencoded"} })
+		_assert(response.json()["form"].hasOwnProperty("field"))
+		_assert(JSON.stringify(response.json()["form"]["field"]) === JSON.stringify(["value1", "value2", "value3"]))
 	}
 	`
 

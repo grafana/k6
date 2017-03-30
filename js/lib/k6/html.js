@@ -62,6 +62,12 @@ export class Selection {
 	 * @return {string}
 	 */
 	text() { return this.impl.Text(); }
+
+	/**
+	 * Returns the value of the current selection
+	 * @return 
+	 */
+	attr(attrName) { return this.impl.Attr(attrName); }
 };
 
 export default {

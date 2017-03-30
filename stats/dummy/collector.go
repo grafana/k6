@@ -34,6 +34,9 @@ type Collector struct {
 	lock sync.Mutex
 }
 
+func (c *Collector) Init() {
+}
+
 func (c *Collector) Run(ctx context.Context) {
 	c.lock.Lock()
 	c.running = true

@@ -59,6 +59,9 @@ func New(s string, opts lib.Options) (*Collector, error) {
 	}, nil
 }
 
+func (c *Collector) Init() {
+}
+
 func (c *Collector) String() string {
 	return fmt.Sprintf("influxdb (%s)", c.u.Host)
 }

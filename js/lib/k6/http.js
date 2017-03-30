@@ -38,7 +38,17 @@ function parseBody(body) {
 				if (formstring !== "") {
 					formstring += "&";
 				}
-				formstring += key + "=" + encodeURIComponent(body[key]);
+				if (Array.isArray(body[key])) {
+					let l = body[key].length;
+					for (let i = 0; i < l; i++) {
+						formstring += key + "=" + encodeURIComponent(body[key][i]);
+						if (formstring !== "") {
+							formstring += "&";
+						}
+					}
+				} else {
+					formstring += key + "=" + encodeURIComponent(body[key]);
+				}
 			}
 			return formstring;
 		}
@@ -58,6 +68,12 @@ function parseBody(body) {
  */
 export function request(method, url, body, params = {}) {
 	method = method.toUpperCase();
+	if (typeof body === "object") {
+		if (typeof params["headers"] !== "object") {
+			params["headers"] = {};
+		}
+		params["headers"]["Content-Type"] = "application/x-www-form-urlencoded";
+	}
 	body = parseBody(body);
 	return new Response(__jsapi__.HTTPRequest(method, url, body, JSON.stringify(params)));
 };
