@@ -21,6 +21,7 @@
 package js2
 
 import (
+	"context"
 	"encoding/json"
 	"path/filepath"
 	"reflect"
@@ -46,7 +47,7 @@ type Bundle struct {
 // A BundleInstance is a self-contained instance of a Bundle.
 type BundleInstance struct {
 	Runtime *goja.Runtime
-	Modules map[string]*common.Module
+	Context *context.Context
 	Default goja.Callable
 }
 
@@ -115,9 +116,12 @@ func NewBundle(src *lib.SourceData, fs afero.Fs) (*Bundle, error) {
 
 // Instantiates a new runtime from this bundle.
 func (b *Bundle) Instantiate() (*BundleInstance, error) {
+	// Placeholder for a real context.
+	ctxPtr := new(context.Context)
+
 	// Instantiate the bundle into a new VM using a bound init context.
 	rt := goja.New()
-	init := newBoundInitContext(b.BaseInitContext, rt)
+	init := newBoundInitContext(b.BaseInitContext, ctxPtr, rt)
 	if err := b.instantiate(rt, init); err != nil {
 		return nil, err
 	}
@@ -128,7 +132,7 @@ func (b *Bundle) Instantiate() (*BundleInstance, error) {
 
 	return &BundleInstance{
 		Runtime: rt,
-		Modules: init.Modules,
+		Context: ctxPtr,
 		Default: def,
 	}, nil
 }

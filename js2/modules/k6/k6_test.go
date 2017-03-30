@@ -33,15 +33,16 @@ import (
 )
 
 func TestGroup(t *testing.T) {
-	rt := goja.New()
-
 	root, err := lib.NewGroup("", nil)
 	assert.NoError(t, err)
+
+	rt := goja.New()
 	state := &common.State{Group: root}
 
-	mod := Module
-	mod.Context = common.WithState(context.Background(), state)
-	rt.Set("mod", mod.Export(rt))
+	ctx := context.Background()
+	ctx = common.WithState(ctx, state)
+	ctx = common.WithRuntime(ctx, rt)
+	rt.Set("k6", common.Bind(rt, &K6{}, &ctx))
 
 	t.Run("Valid", func(t *testing.T) {
 		assert.Equal(t, state.Group, root)
@@ -49,13 +50,13 @@ func TestGroup(t *testing.T) {
 			assert.Equal(t, state.Group.Name, "my group")
 			assert.Equal(t, state.Group.Parent, root)
 		})
-		_, err = common.RunString(rt, `mod.group("my group", fn)`)
+		_, err = common.RunString(rt, `k6.group("my group", fn)`)
 		assert.NoError(t, err)
 		assert.Equal(t, state.Group, root)
 	})
 
 	t.Run("Invalid", func(t *testing.T) {
-		_, err := common.RunString(rt, `mod.group("::", function() { throw new Error("nooo") })`)
+		_, err := common.RunString(rt, `k6.group("::", function() { throw new Error("nooo") })`)
 		assert.EqualError(t, err, "GoError: group and check names may not contain '::'")
 	})
 }
@@ -66,16 +67,17 @@ func TestCheck(t *testing.T) {
 	root, err := lib.NewGroup("", nil)
 	assert.NoError(t, err)
 
-	mod := Module
-	mod.Context = context.Background()
-	mod.Context = common.WithRuntime(mod.Context, rt)
-	rt.Set("mod", mod.Export(rt))
+	baseCtx := common.WithRuntime(context.Background(), rt)
+
+	ctx := new(context.Context)
+	*ctx = baseCtx
+	rt.Set("k6", common.Bind(rt, &K6{}, ctx))
 
 	t.Run("Object", func(t *testing.T) {
 		state := &common.State{Group: root}
-		mod.Context = common.WithState(mod.Context, state)
+		*ctx = common.WithState(baseCtx, state)
 
-		_, err := common.RunString(rt, `mod.check(null, { "check": true })`)
+		_, err := common.RunString(rt, `k6.check(null, { "check": true })`)
 		assert.NoError(t, err)
 
 		if assert.Len(t, state.Samples, 1) {
@@ -90,9 +92,9 @@ func TestCheck(t *testing.T) {
 	})
 	t.Run("Array", func(t *testing.T) {
 		state := &common.State{Group: root}
-		mod.Context = common.WithState(mod.Context, state)
+		*ctx = common.WithState(baseCtx, state)
 
-		_, err := common.RunString(rt, `mod.check(null, [ true ])`)
+		_, err := common.RunString(rt, `k6.check(null, [ true ])`)
 		assert.NoError(t, err)
 
 		if assert.Len(t, state.Samples, 1) {
@@ -106,13 +108,13 @@ func TestCheck(t *testing.T) {
 		}
 	})
 	t.Run("Literal", func(t *testing.T) {
-		_, err := common.RunString(rt, `mod.check(null, null)`)
+		_, err := common.RunString(rt, `k6.check(null, null)`)
 		assert.EqualError(t, err, "TypeError: Cannot convert undefined or null to object")
 	})
 
 	t.Run("Throws", func(t *testing.T) {
 		_, err := common.RunString(rt, `
-		mod.check(null, {
+		k6.check(null, {
 			"a": function() { throw new Error("error A") },
 			"b": function() { throw new Error("error B") },
 		})
@@ -122,9 +124,9 @@ func TestCheck(t *testing.T) {
 
 	t.Run("Types", func(t *testing.T) {
 		templates := map[string]string{
-			"Literal":      `mod.check(null,{"check": %s})`,
-			"Callable":     `mod.check(null,{"check": ()=>%s})`,
-			"Callable/Arg": `mod.check(%s,{"check":(v)=>v})`,
+			"Literal":      `k6.check(null,{"check": %s})`,
+			"Callable":     `k6.check(null,{"check": ()=>%s})`,
+			"Callable/Arg": `k6.check(%s,{"check":(v)=>v})`,
 		}
 		testdata := map[string]bool{
 			`0`:         false,
@@ -143,7 +145,7 @@ func TestCheck(t *testing.T) {
 				for value, succ := range testdata {
 					t.Run(value, func(t *testing.T) {
 						state := &common.State{Group: root}
-						mod.Context = common.WithState(mod.Context, state)
+						*ctx = common.WithState(baseCtx, state)
 
 						v, err := common.RunString(rt, fmt.Sprintf(tpl, value))
 						if assert.NoError(t, err) {
@@ -171,9 +173,9 @@ func TestCheck(t *testing.T) {
 
 	t.Run("Tags", func(t *testing.T) {
 		state := &common.State{Group: root}
-		mod.Context = common.WithState(mod.Context, state)
+		*ctx = common.WithState(baseCtx, state)
 
-		v, err := common.RunString(rt, `mod.check(null, {"check": true}, {a: 1, b: "2"})`)
+		v, err := common.RunString(rt, `k6.check(null, {"check": true}, {a: 1, b: "2"})`)
 		if assert.NoError(t, err) {
 			assert.Equal(t, true, v.Export())
 		}

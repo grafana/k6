@@ -51,8 +51,6 @@ func TestInitContextRequire(t *testing.T) {
 			if !assert.NoError(t, err, "instance error") {
 				return
 			}
-			assert.Contains(t, b.BaseInitContext.Modules, "k6")
-			assert.Contains(t, bi.Modules, "k6")
 
 			exports := bi.Runtime.Get("exports").ToObject(bi.Runtime)
 			if assert.NotNil(t, exports) {
@@ -85,8 +83,6 @@ func TestInitContextRequire(t *testing.T) {
 				if !assert.NoError(t, err) {
 					return
 				}
-				assert.Contains(t, b.BaseInitContext.Modules, "k6")
-				assert.Contains(t, bi.Modules, "k6")
 
 				exports := bi.Runtime.Get("exports").ToObject(bi.Runtime)
 				if assert.NotNil(t, exports) {

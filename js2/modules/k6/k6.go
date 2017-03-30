@@ -32,8 +32,6 @@ import (
 	"github.com/loadimpact/k6/stats"
 )
 
-var Module = common.Module{Impl: &K6{}}
-
 type K6 struct{}
 
 func (*K6) Group(ctx context.Context, name string, fn goja.Callable) (goja.Value, error) {

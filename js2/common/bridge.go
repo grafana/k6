@@ -172,10 +172,10 @@ func bindContext(in, out []reflect.Type, methT reflect.Method, meth reflect.Valu
 	return reflect.MakeFunc(
 		reflect.FuncOf(in, out, methT.Type.IsVariadic()),
 		func(args []reflect.Value) []reflect.Value {
-			ctx := *ctxPtr
-			if ctx == nil {
+			if ctxPtr == nil || *ctxPtr == nil {
 				panic(rt.NewGoError(errors.Errorf("%s needs a valid VU context", methT.Name)))
 			}
+			ctx := *ctxPtr
 
 			select {
 			case <-ctx.Done():

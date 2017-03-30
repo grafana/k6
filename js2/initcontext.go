@@ -21,6 +21,7 @@
 package js2
 
 import (
+	"context"
 	"path/filepath"
 	"strings"
 
@@ -37,13 +38,15 @@ type InitContext struct {
 	// Bound runtime; used to instantiate objects.
 	runtime *goja.Runtime
 
-	// Index of all loaded modules.
-	Modules  map[string]*common.Module `js:"-"`
-	Programs map[string]*goja.Program  `js:"-"`
+	// Pointer to a context that bridged modules are invoked with.
+	ctxPtr *context.Context
 
 	// Filesystem to load files and scripts from.
 	fs  afero.Fs
 	pwd string
+
+	// Cache of loaded programs.
+	programs map[string]*goja.Program `js:"-"`
 
 	// Console object.
 	Console *Console
@@ -55,19 +58,15 @@ func NewInitContext(rt *goja.Runtime, fs afero.Fs, pwd string) *InitContext {
 		fs:      fs,
 		pwd:     pwd,
 
-		Modules:  make(map[string]*common.Module),
-		Programs: make(map[string]*goja.Program),
+		programs: make(map[string]*goja.Program),
 
 		Console: NewConsole(),
 	}
 }
 
-func newBoundInitContext(base *InitContext, rt *goja.Runtime) *InitContext {
+func newBoundInitContext(base *InitContext, ctxPtr *context.Context, rt *goja.Runtime) *InitContext {
 	init := NewInitContext(rt, base.fs, base.pwd)
-	init.Modules = make(map[string]*common.Module, len(base.Modules))
-	for key, mod := range base.Modules {
-		init.Modules[key] = &*mod
-	}
+	init.ctxPtr = ctxPtr
 	return init
 }
 
@@ -92,16 +91,11 @@ func (i *InitContext) Require(arg string) goja.Value {
 }
 
 func (i *InitContext) requireModule(name string) (goja.Value, error) {
-	mod, ok := i.Modules[name]
+	mod, ok := modules.Index[name]
 	if !ok {
-		mod_, ok := modules.Index[name]
-		if !ok {
-			panic(i.runtime.NewGoError(errors.Errorf("unknown builtin module: %s", name)))
-		}
-		mod = &mod_
-		i.Modules[name] = mod
+		panic(i.runtime.NewGoError(errors.Errorf("unknown builtin module: %s", name)))
 	}
-	return mod.Export(i.runtime), nil
+	return common.Bind(i.runtime, mod, i.ctxPtr), nil
 }
 
 func (i *InitContext) requireFile(name string) (goja.Value, error) {
@@ -117,7 +111,7 @@ func (i *InitContext) requireFile(name string) (goja.Value, error) {
 	defer i.runtime.Set("exports", oldExports)
 
 	// Read sources, transform into ES6 and cache the compiled program.
-	pgm, ok := i.Programs[filename]
+	pgm, ok := i.programs[filename]
 	if !ok {
 		data, err := afero.ReadFile(i.fs, filename)
 		if err != nil {
@@ -131,7 +125,7 @@ func (i *InitContext) requireFile(name string) (goja.Value, error) {
 		if err != nil {
 			return goja.Undefined(), err
 		}
-		i.Programs[filename] = pgm_
+		i.programs[filename] = pgm_
 		pgm = pgm_
 	}
 
