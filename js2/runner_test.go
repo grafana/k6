@@ -23,9 +23,11 @@ package js2
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/loadimpact/k6/js2/common"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/stats"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v3"
@@ -105,6 +107,32 @@ func TestVURunContext(t *testing.T) {
 	_, err = vu.RunOnce(context.Background())
 	assert.NoError(t, err)
 	assert.True(t, fnCalled, "fn() not called")
+}
+
+func TestVURunSamples(t *testing.T) {
+	r, err := New(&lib.SourceData{
+		Filename: "/script.js",
+		Data:     []byte(`export default function() { fn(); }`),
+	}, afero.NewMemMapFs())
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	vu, err := r.newVU()
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	metric := stats.New("my_metric", stats.Counter)
+	sample := stats.Sample{Time: time.Now(), Metric: metric, Value: 1}
+	vu.Runtime.Set("fn", func() {
+		state := common.GetState(vu.ctx)
+		state.Samples = append(state.Samples, sample)
+	})
+
+	_, err = vu.RunOnce(context.Background())
+	assert.NoError(t, err)
+	assert.Equal(t, []stats.Sample{sample}, common.GetState(vu.ctx).Samples)
 }
 
 func TestVUIntegrationGroups(t *testing.T) {

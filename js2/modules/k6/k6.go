@@ -22,9 +22,14 @@ package k6
 
 import (
 	"context"
+	"sync/atomic"
+
+	"time"
 
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js2/common"
+	"github.com/loadimpact/k6/lib/metrics"
+	"github.com/loadimpact/k6/stats"
 )
 
 var Module = common.Module{Impl: &K6{}}
@@ -46,14 +51,33 @@ func (*K6) Group(ctx context.Context, name string, fn goja.Callable) (goja.Value
 	return fn(goja.Undefined())
 }
 
-func (*K6) Check(ctx context.Context, arg0, checks goja.Value) (bool, error) {
-	// state := common.GetState(ctx)
+func (*K6) Check(ctx context.Context, arg0, checks goja.Value, extras ...goja.Value) (bool, error) {
+	state := common.GetState(ctx)
 	rt := common.GetRuntime(ctx)
+	t := time.Now()
+
+	// Prepare tags, make sure the `group` tag can't be overwritten.
+	tags := make(map[string]string, 0)
+	for _, val := range extras {
+		obj := val.ToObject(rt)
+		for _, k := range obj.Keys() {
+			tags[k] = obj.Get(k).String()
+		}
+		break
+	}
+	tags["group"] = state.Group.Path
 
 	succ := true
 	obj := checks.ToObject(rt)
-	for _, key := range obj.Keys() {
-		val := obj.Get(key)
+	for _, name := range obj.Keys() {
+		val := obj.Get(name)
+
+		// Resolve the check record.
+		check, err := state.Group.Check(name)
+		if err != nil {
+			return false, err
+		}
+		tags["check"] = check.Path
 
 		// Resolve callables into values.
 		fn, ok := goja.AssertFunction(val)
@@ -65,7 +89,19 @@ func (*K6) Check(ctx context.Context, arg0, checks goja.Value) (bool, error) {
 			val = val_
 		}
 
-		if !val.ToBoolean() {
+		// Emit!
+		if val.ToBoolean() {
+			atomic.AddInt64(&check.Passes, 1)
+			state.Samples = append(state.Samples,
+				stats.Sample{Time: t, Metric: metrics.Checks, Tags: tags, Value: 1},
+			)
+		} else {
+			atomic.AddInt64(&check.Fails, 1)
+			state.Samples = append(state.Samples,
+				stats.Sample{Time: t, Metric: metrics.Checks, Tags: tags, Value: 0},
+			)
+
+			// A single failure makes the return value false.
 			succ = false
 		}
 	}

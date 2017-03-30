@@ -103,7 +103,6 @@ type VU struct {
 	ID        int64
 	Iteration int64
 
-	Samples   []stats.Sample
 	VUContext *VUContext
 
 	// Current/last run context, mainly used for testing.
@@ -111,10 +110,12 @@ type VU struct {
 }
 
 func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
-	ctx = common.WithRuntime(ctx, u.Runtime)
-	ctx = common.WithState(ctx, &common.State{
+	state := &common.State{
 		Group: u.Runner.defaultGroup,
-	})
+	}
+
+	ctx = common.WithRuntime(ctx, u.Runtime)
+	ctx = common.WithState(ctx, state)
 	for _, mod := range u.Modules {
 		mod.Context = ctx
 	}
@@ -124,9 +125,7 @@ func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 	u.Iteration++
 
 	_, err := u.Default(goja.Undefined())
-	samples := u.Samples
-	u.Samples = nil
-	return samples, err
+	return state.Samples, err
 }
 
 func (u *VU) Reconfigure(id int64) error {

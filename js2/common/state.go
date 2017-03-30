@@ -22,9 +22,14 @@ package common
 
 import (
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/stats"
 )
 
 // Provides volatile state for a VU.
 type State struct {
+	// Current group; all emitted metrics are tagged with this.
 	Group *lib.Group
+
+	// Sample buffer, emitted at the end of the iteration.
+	Samples []stats.Sample
 }

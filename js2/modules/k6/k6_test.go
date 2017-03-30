@@ -28,6 +28,7 @@ import (
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js2/common"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -64,21 +65,45 @@ func TestCheck(t *testing.T) {
 
 	root, err := lib.NewGroup("", nil)
 	assert.NoError(t, err)
-	state := &common.State{Group: root}
 
 	mod := Module
 	mod.Context = context.Background()
-	mod.Context = common.WithState(mod.Context, state)
 	mod.Context = common.WithRuntime(mod.Context, rt)
 	rt.Set("mod", mod.Export(rt))
 
 	t.Run("Object", func(t *testing.T) {
+		state := &common.State{Group: root}
+		mod.Context = common.WithState(mod.Context, state)
+
 		_, err := common.RunString(rt, `mod.check(null, { "check": true })`)
 		assert.NoError(t, err)
+
+		if assert.Len(t, state.Samples, 1) {
+			assert.NotZero(t, state.Samples[0].Time)
+			assert.Equal(t, metrics.Checks, state.Samples[0].Metric)
+			assert.Equal(t, float64(1), state.Samples[0].Value)
+			assert.Equal(t, map[string]string{
+				"group": "",
+				"check": "::check",
+			}, state.Samples[0].Tags)
+		}
 	})
 	t.Run("Array", func(t *testing.T) {
+		state := &common.State{Group: root}
+		mod.Context = common.WithState(mod.Context, state)
+
 		_, err := common.RunString(rt, `mod.check(null, [ true ])`)
 		assert.NoError(t, err)
+
+		if assert.Len(t, state.Samples, 1) {
+			assert.NotZero(t, state.Samples[0].Time)
+			assert.Equal(t, metrics.Checks, state.Samples[0].Metric)
+			assert.Equal(t, float64(1), state.Samples[0].Value)
+			assert.Equal(t, map[string]string{
+				"group": "",
+				"check": "::0",
+			}, state.Samples[0].Tags)
+		}
 	})
 	t.Run("Literal", func(t *testing.T) {
 		_, err := common.RunString(rt, `mod.check(null, null)`)
@@ -117,13 +142,52 @@ func TestCheck(t *testing.T) {
 			t.Run(name, func(t *testing.T) {
 				for value, succ := range testdata {
 					t.Run(value, func(t *testing.T) {
+						state := &common.State{Group: root}
+						mod.Context = common.WithState(mod.Context, state)
+
 						v, err := common.RunString(rt, fmt.Sprintf(tpl, value))
 						if assert.NoError(t, err) {
 							assert.Equal(t, succ, v.Export())
 						}
+
+						if assert.Len(t, state.Samples, 1) {
+							assert.NotZero(t, state.Samples[0].Time)
+							assert.Equal(t, metrics.Checks, state.Samples[0].Metric)
+							if succ {
+								assert.Equal(t, float64(1), state.Samples[0].Value)
+							} else {
+								assert.Equal(t, float64(0), state.Samples[0].Value)
+							}
+							assert.Equal(t, map[string]string{
+								"group": "",
+								"check": "::check",
+							}, state.Samples[0].Tags)
+						}
 					})
 				}
 			})
+		}
+	})
+
+	t.Run("Tags", func(t *testing.T) {
+		state := &common.State{Group: root}
+		mod.Context = common.WithState(mod.Context, state)
+
+		v, err := common.RunString(rt, `mod.check(null, {"check": true}, {a: 1, b: "2"})`)
+		if assert.NoError(t, err) {
+			assert.Equal(t, true, v.Export())
+		}
+
+		if assert.Len(t, state.Samples, 1) {
+			assert.NotZero(t, state.Samples[0].Time)
+			assert.Equal(t, metrics.Checks, state.Samples[0].Metric)
+			assert.Equal(t, float64(1), state.Samples[0].Value)
+			assert.Equal(t, map[string]string{
+				"group": "",
+				"check": "::check",
+				"a":     "1",
+				"b":     "2",
+			}, state.Samples[0].Tags)
 		}
 	})
 }
