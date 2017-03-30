@@ -79,6 +79,19 @@ func TestHTTPBatchLong(t *testing.T) {
 	assert.NoError(t, runSnippet(snippet))
 }
 
+func TestHTTPBatchError(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+
+	snippet := `
+	import http from "k6/http"
+	export default function() { http.batch([""]) }
+	`
+
+	assert.EqualError(t, runSnippet(snippet), "Error: Get : unsupported protocol scheme \"\"")
+}
+
 func TestHTTPBatchObject(t *testing.T) {
 	if testing.Short() {
 		return
