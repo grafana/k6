@@ -23,19 +23,19 @@ let myTrend = new Trend("my_trend");
 let maxResponseTime = 0.0;
 
 export default function() {
-    let r = http.get("http://httpbin.org/");
-    let passed = check(r, { "status is 200": (r) => r.status === 200 });
+    let res = http.get("http://httpbin.org/");
+    let passed = check(res, { "status is 200": (r) => r.status === 200 });
 
     // Add one for number of requests
     myCounter.add(1);
 
     // Set max response time seen
-    maxResponseTime = Math.max(maxResponseTime, r.timings.duration);
+    maxResponseTime = Math.max(maxResponseTime, res.timings.duration);
     myGauge.add(maxResponseTime);
 
     // Add check success or failure to keep track of rate
     myRate.add(passed);
 
     // Keep track of DNS+TCP-connecting part of the response time
-    myTrend.add(r.timings.looking_up + r.timings.connecting);
+    myTrend.add(res.timings.looking_up + res.timings.connecting);
 }
