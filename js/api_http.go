@@ -29,6 +29,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
@@ -39,8 +40,20 @@ type HTTPResponse struct {
 	Status int
 }
 
+type HTTPCookie struct {
+	Key      string `json:"key"`
+	Value    string `json:"value"`
+	Domain   string `json:"domain"`
+	Path     string `json:"path"`
+	Expires  string `json:"expires"`
+	MaxAge   int    `json:"maxAge"`
+	Secure   bool   `json:"secure"`
+	HttpOnly bool   `json:"httpOnly"`
+}
+
 type HTTPParams struct {
 	Headers map[string]string `json:"headers"`
+	Cookies []HTTPCookie      `json:"cookies"`
 	Tags    map[string]string `json:"tags"`
 }
 
@@ -62,6 +75,29 @@ func (a JSAPI) HTTPRequest(method, url, body string, paramData string) map[strin
 	for key, value := range params.Headers {
 		req.Header.Set(key, value)
 	}
+
+	var cookiesList []*http.Cookie
+	for _, c := range params.Cookies {
+		var t time.Time
+		if c.Expires != "" {
+			t, err = time.Parse(time.RFC1123, c.Expires)
+			if err != nil {
+				throw(a.vu.vm, err)
+			}
+		}
+		cookie := &http.Cookie{
+			Name:     c.Key,
+			Value:    c.Value,
+			Path:     c.Path,
+			Domain:   c.Domain,
+			Expires:  t,
+			MaxAge:   c.MaxAge,
+			HttpOnly: c.HttpOnly,
+			Secure:   c.Secure,
+		}
+		cookiesList = append(cookiesList, cookie)
+	}
+	a.vu.CookieJar.SetCookies(req.URL, cookiesList)
 
 	tags := map[string]string{
 		"vu":     a.vu.IDString,

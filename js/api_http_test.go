@@ -153,3 +153,261 @@ func TestHTTPFormURLEncodeList(t *testing.T) {
 
 	assert.NoError(t, runSnippet(snippet))
 }
+
+func TestHTTPCookiesAccess(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+
+	snippet := `
+	import { _assert } from "k6"
+	import http from "k6/http"
+
+	export default function() {
+        let response = http.get("http://httpbin.org/cookies", { cookies: { key: "value" } });
+		_assert(response.cookies["key"] === "value")
+	}
+	`
+
+	assert.NoError(t, runSnippet(snippet))
+}
+
+func TestHTTPCookiesAccessNoCookie(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+
+	snippet := `
+	import { _assert } from "k6"
+	import http from "k6/http"
+
+	export default function() {
+        let response = http.get("http://httpbin.org/");
+		_assert(Object.keys(response.cookies).length === 0)
+	}
+	`
+
+	assert.NoError(t, runSnippet(snippet))
+}
+
+func TestHTTPCookiesSetSimple(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+
+	snippet := `
+	import { _assert } from "k6"
+	import http from "k6/http"
+
+	export default function() {
+        let response = http.get("http://httpbin.org/cookies", { cookies: { key: "value", key2: "value2" } });
+		_assert(response.cookies["key"] === "value")
+		_assert(response.cookies["key2"] === "value2")
+	}
+	`
+
+	assert.NoError(t, runSnippet(snippet))
+}
+
+func TestHTTPCookiesSetSimpleWithHeaderOverride(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+
+	snippet := `
+	import { _assert } from "k6"
+	import http from "k6/http"
+
+	export default function() {
+		let cookies = { key: "value", key2: "value2" };
+		let headers = { "Cookie": "key=overridden-value; key2=overridden-value2" }
+        let response = http.get("http://httpbin.org/cookies", { cookies: cookies, headers: headers });
+
+		// Cookies added through Cookie headers are not added to the jar...
+		_assert(response.cookies["key"] === "value")
+		_assert(response.cookies["key2"] === "value2")
+
+		// ...but they override the actual values being sent to the server
+		_assert(response.json().cookies.key === "overridden-value")
+		_assert(response.json().cookies.key2 === "overridden-value2")
+	}
+	`
+
+	assert.NoError(t, runSnippet(snippet))
+}
+
+func TestHTTPCookiesCookieJar(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+
+	snippet := `
+	import { _assert } from "k6"
+	import http from "k6/http"
+
+	export default function() {
+		let jar = new http.CookieJar();
+
+		// Date to RFC 1123
+		_assert(http.CookieJar.dateToRFC1123(new Date("Sun, 24 Jul 1983 17:01:02 GMT")) === "Sun, 24 Jul 1983 17:01:02 GMT", "dateToRFC1123 failed")
+
+		// Empty cookie jar
+		_assert(jar.cookies.length === 0)
+
+		// Set cookie without params
+		jar.set("key", "value");
+		_assert(jar.cookies[0]["key"] === "key")
+		_assert(jar.cookies[0]["value"] === "value")
+
+		// Set cookie with params
+		jar.set("key", "value", { domain: "example.com", path: "/", expires: "Sun, 24 Jul 1983 17:01:02 GMT", maxAge: 123456789, secure: true, httpOnly: true });
+		_assert(jar.cookies[1]["key"] === "key")
+		_assert(jar.cookies[1]["value"] === "value")
+		_assert(jar.cookies[1]["domain"] === "example.com")
+		_assert(jar.cookies[1]["path"] === "/")
+		_assert(jar.cookies[1]["expires"] === "Sun, 24 Jul 1983 17:01:02 GMT")
+		_assert(jar.cookies[1]["maxAge"] === 123456789)
+		_assert(jar.cookies[1]["secure"] === true)
+		_assert(jar.cookies[1]["httpOnly"] === true)
+
+		// Set cookie with Date expires
+		jar.set("key", "value", { expires: new Date("Sun, 24 Jul 1983 17:01:02 GMT") });
+		_assert(jar.cookies[2]["key"] === "key")
+		_assert(jar.cookies[2]["value"] === "value")
+		_assert(jar.cookies[2]["expires"] === "Sun, 24 Jul 1983 17:01:02 GMT", "cookie RFC1123 failed")
+	}
+	`
+
+	assert.NoError(t, runSnippet(snippet))
+}
+
+func TestHTTPCookiesSetCookieJar(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+
+	snippet := `
+	import { _assert } from "k6"
+	import http from "k6/http"
+
+	export default function() {
+		let jar = new http.CookieJar();
+		jar.set("key", "value");
+		jar.set("key2", "value2");
+        let response = http.get("http://httpbin.org/cookies", { cookies: jar });
+		_assert(response.cookies["key"] === "value")
+		_assert(response.cookies["key2"] === "value2")
+	}
+	`
+
+	assert.NoError(t, runSnippet(snippet))
+}
+
+func TestHTTPCookiesSetCookieJarDomain(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+
+	snippet := `
+	import { _assert } from "k6"
+	import http from "k6/http"
+
+	export default function() {
+		let jar = new http.CookieJar();
+
+		// Matching domain
+		jar.set("key", "value", { domain: "httpbin.org" });
+        let response = http.get("http://httpbin.org/cookies", { cookies: jar });
+		_assert(response.cookies["key"] === "value")
+
+		// Mismatching domain
+		jar.set("key2", "value2", { domain: "example.com" });
+        response = http.get("http://httpbin.org/cookies", { cookies: jar });
+		_assert(response.cookies["key"] === "value")
+		_assert(response.cookies["key2"] === undefined)
+	}
+	`
+
+	assert.NoError(t, runSnippet(snippet))
+}
+
+func TestHTTPCookiesSetCookieJarPath(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+
+	snippet := `
+	import { _assert } from "k6"
+	import http from "k6/http"
+
+	export default function() {
+		let jar = new http.CookieJar();
+
+		// Matching path
+		jar.set("key", "value", { path: "/cookies" });
+        let response = http.get("http://httpbin.org/cookies", { cookies: jar });
+		_assert(response.cookies["key"] === "value", "cookie 'key' not found")
+
+		// Mismatching path
+		jar.set("key2", "value2", { path: "/some-other-path" });
+        response = http.get("http://httpbin.org/cookies", { cookies: jar });
+		_assert(response.cookies["key"] === "value", "cookie 'key' not found")
+		_assert(response.cookies["key2"] === undefined, "cookie 'key2' unexpectedly found")
+	}
+	`
+
+	assert.NoError(t, runSnippet(snippet))
+}
+
+func TestHTTPCookiesSetCookieJarExpires(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+
+	snippet := `
+	import { _assert } from "k6"
+	import http from "k6/http"
+
+	export default function() {
+		let jar = new http.CookieJar();
+
+		// Cookie with expiry date in past
+		jar.set("key", "value", { expires: "Sun, 24 Jul 1983 17:01:02 GMT" });
+        let response = http.get("https://httpbin.org/cookies", { cookies: jar });
+		_assert(response.cookies["key"] === undefined, "cookie 'key' unexpectedly found")
+
+		// Cookie with expiry date in future
+		jar.set("key", "value", { expires: "Sat, 24 Jul 2083 17:01:02 GMT" });
+        response = http.get("https://httpbin.org/cookies", { cookies: jar });
+		_assert(response.cookies["key"] === "value", "cookie 'key' not found")
+	}
+	`
+
+	assert.NoError(t, runSnippet(snippet))
+}
+
+func TestHTTPCookiesSetCookieJarSecure(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+
+	snippet := `
+	import { _assert } from "k6"
+	import http from "k6/http"
+
+	export default function() {
+		let jar = new http.CookieJar();
+
+		// Secure cookie sent over TLS connection
+		jar.set("key", "value", { secure: true });
+        let response = http.get("https://httpbin.org/cookies", { cookies: jar });
+		_assert(response.cookies["key"] === "value", "cookie 'key' not found")
+
+		// Secure cookie NOT sent over non-TLS connection
+        response = http.get("http://httpbin.org/cookies", { cookies: jar });
+		_assert(response.cookies["key"] === undefined, "cookie 'key' unexpectedly found")
+	}
+	`
+
+	assert.NoError(t, runSnippet(snippet))
+}
