@@ -173,13 +173,13 @@ func bindContext(in, out []reflect.Type, methT reflect.Method, meth reflect.Valu
 		reflect.FuncOf(in, out, methT.Type.IsVariadic()),
 		func(args []reflect.Value) []reflect.Value {
 			if ctxPtr == nil || *ctxPtr == nil {
-				panic(rt.NewGoError(errors.Errorf("%s needs a valid VU context", methT.Name)))
+				Throw(rt, errors.Errorf("%s needs a valid VU context", methT.Name))
 			}
 			ctx := *ctxPtr
 
 			select {
 			case <-ctx.Done():
-				panic(rt.NewGoError(errors.Errorf("test has ended")))
+				Throw(rt, errors.Errorf("test has ended"))
 			default:
 			}
 
@@ -195,7 +195,7 @@ func bindErrorHandler(in, out []reflect.Type, methT reflect.Method, meth reflect
 			ret := callBound(methT, meth, args)
 			err := ret[len(ret)-1]
 			if !err.IsNil() {
-				panic(rt.NewGoError(err.Interface().(error)))
+				Throw(rt, err.Interface().(error))
 			}
 			return ret[:len(ret)-1]
 		},
