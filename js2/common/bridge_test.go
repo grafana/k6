@@ -39,6 +39,9 @@ type bridgeTestType struct {
 	unexported    string
 	unexportedTag string `js:"unexported"`
 
+	TwoWords string
+	URL      string
+
 	Counter int
 }
 
@@ -111,6 +114,8 @@ func TestFieldNameMapper(t *testing.T) {
 			"ExportedTag":   "renamed",
 			"unexported":    "",
 			"unexportedTag": "",
+			"TwoWords":      "two_words",
+			"URL":           "url",
 		}
 		for name, result := range names {
 			t.Run(name, func(t *testing.T) {
@@ -121,7 +126,7 @@ func TestFieldNameMapper(t *testing.T) {
 			})
 		}
 	})
-	t.Run("Exported", func(t *testing.T) {
+	t.Run("Methods", func(t *testing.T) {
 		t.Run("ExportedFn", func(t *testing.T) {
 			m, ok := typ.MethodByName("ExportedFn")
 			if assert.True(t, ok) {
@@ -184,9 +189,15 @@ func TestBindToGlobal(t *testing.T) {
 }
 
 func TestBind(t *testing.T) {
+	template := bridgeTestType{
+		Exported:      "a",
+		ExportedTag:   "b",
+		unexported:    "c",
+		unexportedTag: "d",
+	}
 	testdata := map[string]func() interface{}{
-		"Value":   func() interface{} { return bridgeTestType{"a", "b", "c", "d", 0} },
-		"Pointer": func() interface{} { return &bridgeTestType{"a", "b", "c", "d", 0} },
+		"Value":   func() interface{} { return template },
+		"Pointer": func() interface{} { tmp := template; return &tmp },
 	}
 	for vtype, vfn := range testdata {
 		t.Run(vtype, func(t *testing.T) {

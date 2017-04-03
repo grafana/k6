@@ -27,12 +27,13 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/pkg/errors"
+	"github.com/serenize/snaker"
 )
 
 // The field name mapper translates Go symbol names for bridging to JS.
 type FieldNameMapper struct{}
 
-// Bridge exported fields, camelCasing their names. A `js:"name"` tag overrides, `js:"-"` hides.
+// Bridge exported fields, snake_casing their names. A `js:"name"` tag overrides, `js:"-"` hides.
 func (FieldNameMapper) FieldName(t reflect.Type, f reflect.StructField) string {
 	// PkgPath is non-empty for unexported fields.
 	if f.PkgPath != "" {
@@ -49,7 +50,7 @@ func (FieldNameMapper) FieldName(t reflect.Type, f reflect.StructField) string {
 	}
 
 	// Default to lowercasing the first character of the field name.
-	return strings.ToLower(f.Name[0:1]) + f.Name[1:]
+	return snaker.CamelToSnake(f.Name)
 }
 
 // Bridge exported methods, but camelCase their names.
