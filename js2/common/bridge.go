@@ -30,6 +30,12 @@ import (
 	"github.com/serenize/snaker"
 )
 
+var (
+	ctxT   = reflect.TypeOf((*context.Context)(nil)).Elem()
+	errorT = reflect.TypeOf((*error)(nil)).Elem()
+	mapper = FieldNameMapper{}
+)
+
 // The field name mapper translates Go symbol names for bridging to JS.
 type FieldNameMapper struct{}
 
@@ -67,7 +73,6 @@ func (FieldNameMapper) MethodName(t reflect.Type, m reflect.Method) string {
 // Binds an object's members to the global scope. Returns a function that un-binds them.
 // Note that this will panic if passed something that isn't a struct; please don't do that.
 func BindToGlobal(rt *goja.Runtime, v interface{}) func() {
-	mapper := FieldNameMapper{}
 	keys := []string{}
 
 	val := reflect.ValueOf(v)
@@ -106,16 +111,10 @@ func BindToGlobal(rt *goja.Runtime, v interface{}) func() {
 }
 
 func Bind(rt *goja.Runtime, v interface{}, ctx *context.Context) goja.Value {
-	ctxT := reflect.TypeOf((*context.Context)(nil)).Elem()
-	errorT := reflect.TypeOf((*error)(nil)).Elem()
-
-	exports := rt.NewObject()
-	mapper := FieldNameMapper{}
-
 	val := reflect.ValueOf(v)
 	typ := val.Type()
+	exports := make(map[string]interface{})
 	for i := 0; i < typ.NumMethod(); i++ {
-		i := i
 		methT := typ.Method(i)
 		name := mapper.MethodName(typ, methT)
 		if name == "" {
@@ -148,7 +147,7 @@ func Bind(rt *goja.Runtime, v interface{}, ctx *context.Context) goja.Value {
 			meth = bindErrorHandler(in, out, methT, meth, rt)
 		}
 
-		_ = exports.Set(name, meth.Interface())
+		exports[name] = meth.Interface()
 	}
 
 	elem := val
@@ -163,7 +162,7 @@ func Bind(rt *goja.Runtime, v interface{}, ctx *context.Context) goja.Value {
 		if k == "" {
 			continue
 		}
-		_ = exports.Set(k, elem.Field(i).Interface())
+		exports[k] = elem.Field(i).Interface()
 	}
 
 	return rt.ToValue(exports)
