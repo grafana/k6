@@ -595,7 +595,7 @@ func BenchmarkProxy(b *testing.B) {
 			f, _ := goja.AssertFunction(fn.(goja.Value))
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				f(goja.Undefined())
+				_, _ = f(goja.Undefined())
 			}
 		}},
 	}
