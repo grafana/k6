@@ -95,7 +95,7 @@ func (i *InitContext) requireModule(name string) (goja.Value, error) {
 	if !ok {
 		panic(i.runtime.NewGoError(errors.Errorf("unknown builtin module: %s", name)))
 	}
-	return common.Bind(i.runtime, mod, i.ctxPtr), nil
+	return i.runtime.ToValue(common.Bind(i.runtime, mod, i.ctxPtr)), nil
 }
 
 func (i *InitContext) requireFile(name string) (goja.Value, error) {

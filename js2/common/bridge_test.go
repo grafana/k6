@@ -33,29 +33,37 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-type bridgeTestType struct {
+type bridgeTestFieldsType struct {
 	Exported      string
 	ExportedTag   string `js:"renamed"`
 	unexported    string
 	unexportedTag string `js:"unexported"`
-
-	TwoWords string
-	URL      string
-
-	Counter int
 }
 
-func (bridgeTestType) ExportedFn()   {}
-func (bridgeTestType) unexportedFn() {}
+type bridgeTestMethodsType struct{}
 
-func (*bridgeTestType) ExportedPtrFn()   {}
-func (*bridgeTestType) unexportedPtrFn() {}
+func (bridgeTestMethodsType) ExportedFn()   {}
+func (bridgeTestMethodsType) unexportedFn() {}
 
-func (bridgeTestType) Error() error { return errors.New("error") }
+func (*bridgeTestMethodsType) ExportedPtrFn()   {}
+func (*bridgeTestMethodsType) unexportedPtrFn() {}
 
-func (bridgeTestType) Add(a, b int) int { return a + b }
+type bridgeTestOddFieldsType struct {
+	TwoWords string
+	URL      string
+}
 
-func (bridgeTestType) AddWithError(a, b int) (int, error) {
+type bridgeTestErrorType struct{}
+
+func (bridgeTestErrorType) Error() error { return errors.New("error") }
+
+type bridgeTestAddType struct{}
+
+func (bridgeTestAddType) Add(a, b int) int { return a + b }
+
+type bridgeTestAddWithErrorType struct{}
+
+func (bridgeTestAddWithErrorType) AddWithError(a, b int) (int, error) {
 	res := a + b
 	if res < 0 {
 		return 0, errors.New("answer is negative")
@@ -63,13 +71,19 @@ func (bridgeTestType) AddWithError(a, b int) (int, error) {
 	return res, nil
 }
 
-func (bridgeTestType) Context(ctx context.Context) {}
+type bridgeTestContextType struct{}
 
-func (bridgeTestType) ContextAdd(ctx context.Context, a, b int) int {
+func (bridgeTestContextType) Context(ctx context.Context) {}
+
+type bridgeTestContextAddType struct{}
+
+func (bridgeTestContextAddType) ContextAdd(ctx context.Context, a, b int) int {
 	return a + b
 }
 
-func (bridgeTestType) ContextAddWithError(ctx context.Context, a, b int) (int, error) {
+type bridgeTestContextAddWithErrorType struct{}
+
+func (bridgeTestContextAddWithErrorType) ContextAddWithError(ctx context.Context, a, b int) (int, error) {
 	res := a + b
 	if res < 0 {
 		return 0, errors.New("answer is negative")
@@ -77,12 +91,9 @@ func (bridgeTestType) ContextAddWithError(ctx context.Context, a, b int) (int, e
 	return res, nil
 }
 
-func (m *bridgeTestType) Count() int {
-	m.Counter++
-	return m.Counter
-}
+type bridgeTestSumType struct{}
 
-func (bridgeTestType) Sum(nums ...int) int {
+func (bridgeTestSumType) Sum(nums ...int) int {
 	sum := 0
 	for v := range nums {
 		sum += v
@@ -90,54 +101,94 @@ func (bridgeTestType) Sum(nums ...int) int {
 	return sum
 }
 
-func (m bridgeTestType) SumWithContext(ctx context.Context, nums ...int) int {
-	return m.Sum(nums...)
+type bridgeTestSumWithContextType struct{}
+
+func (bridgeTestSumWithContextType) SumWithContext(ctx context.Context, nums ...int) int {
+	sum := 0
+	for v := range nums {
+		sum += v
+	}
+	return sum
 }
 
-func (m bridgeTestType) SumWithError(nums ...int) (int, error) {
-	sum := m.Sum(nums...)
+type bridgeTestSumWithErrorType struct{}
+
+func (bridgeTestSumWithErrorType) SumWithError(nums ...int) (int, error) {
+	sum := 0
+	for v := range nums {
+		sum += v
+	}
 	if sum < 0 {
 		return 0, errors.New("answer is negative")
 	}
 	return sum, nil
 }
 
-func (m bridgeTestType) SumWithContextAndError(ctx context.Context, nums ...int) (int, error) {
-	return m.SumWithError(nums...)
+type bridgeTestSumWithContextAndErrorType struct{}
+
+func (m bridgeTestSumWithContextAndErrorType) SumWithContextAndError(ctx context.Context, nums ...int) (int, error) {
+	sum := 0
+	for v := range nums {
+		sum += v
+	}
+	if sum < 0 {
+		return 0, errors.New("answer is negative")
+	}
+	return sum, nil
+}
+
+type bridgeTestCounterType struct {
+	Counter int
+}
+
+func (m *bridgeTestCounterType) Count() int {
+	m.Counter++
+	return m.Counter
 }
 
 func TestFieldNameMapper(t *testing.T) {
-	typ := reflect.TypeOf(bridgeTestType{})
-	t.Run("Fields", func(t *testing.T) {
-		names := map[string]string{
+	testdata := []struct {
+		Typ     reflect.Type
+		Fields  map[string]string
+		Methods map[string]string
+	}{
+		{reflect.TypeOf(bridgeTestFieldsType{}), map[string]string{
 			"Exported":      "exported",
 			"ExportedTag":   "renamed",
 			"unexported":    "",
 			"unexportedTag": "",
-			"TwoWords":      "two_words",
-			"URL":           "url",
-		}
-		for name, result := range names {
-			t.Run(name, func(t *testing.T) {
-				f, ok := typ.FieldByName(name)
-				if assert.True(t, ok) {
-					assert.Equal(t, result, (FieldNameMapper{}).FieldName(typ, f))
+		}, nil},
+		{reflect.TypeOf(bridgeTestMethodsType{}), nil, map[string]string{
+			"ExportedFn":   "exportedFn",
+			"unexportedFn": "",
+		}},
+		{reflect.TypeOf(bridgeTestOddFieldsType{}), map[string]string{
+			"TwoWords": "two_words",
+			"URL":      "url",
+		}, nil},
+	}
+	for _, data := range testdata {
+		for field, name := range data.Fields {
+			t.Run(field, func(t *testing.T) {
+				f, ok := data.Typ.FieldByName(field)
+				if assert.True(t, ok, "no such field") {
+					assert.Equal(t, name, (FieldNameMapper{}).FieldName(data.Typ, f))
 				}
 			})
 		}
-	})
-	t.Run("Methods", func(t *testing.T) {
-		t.Run("ExportedFn", func(t *testing.T) {
-			m, ok := typ.MethodByName("ExportedFn")
-			if assert.True(t, ok) {
-				assert.Equal(t, "exportedFn", (FieldNameMapper{}).MethodName(typ, m))
-			}
-		})
-		t.Run("unexportedFn", func(t *testing.T) {
-			_, ok := typ.MethodByName("unexportedFn")
-			assert.False(t, ok)
-		})
-	})
+		for meth, name := range data.Methods {
+			t.Run(meth, func(t *testing.T) {
+				m, ok := data.Typ.MethodByName(meth)
+				if name != "" {
+					if assert.True(t, ok, "no such method") {
+						assert.Equal(t, name, (FieldNameMapper{}).MethodName(data.Typ, m))
+					}
+				} else {
+					assert.False(t, ok, "exported by accident")
+				}
+			})
+		}
+	}
 }
 
 func TestBindToGlobal(t *testing.T) {
@@ -146,16 +197,10 @@ func TestBindToGlobal(t *testing.T) {
 		Keys []string
 		Not  []string
 	}{
-		"Value": {
-			bridgeTestType{},
-			[]string{"exported", "renamed", "exportedFn"},
-			[]string{"exportedPtrFn"},
-		},
-		"Pointer": {
-			&bridgeTestType{},
-			[]string{"exported", "renamed", "exportedFn", "exportedPtrFn"},
-			[]string{},
-		},
+		"Fields":          {bridgeTestFieldsType{}, []string{"exported", "renamed"}, []string{}},
+		"Fields/Pointer":  {&bridgeTestFieldsType{}, []string{"exported", "renamed"}, []string{}},
+		"Methods":         {bridgeTestMethodsType{}, []string{"exportedFn"}, []string{"exportedPtrFn"}},
+		"Methods/Pointer": {&bridgeTestMethodsType{}, []string{"exportedFn", "exportedPtrFn"}, []string{}},
 	}
 	for name, data := range testdata {
 		t.Run(name, func(t *testing.T) {
@@ -189,182 +234,13 @@ func TestBindToGlobal(t *testing.T) {
 }
 
 func TestBind(t *testing.T) {
-	template := bridgeTestType{
-		Exported:      "a",
-		ExportedTag:   "b",
-		unexported:    "c",
-		unexportedTag: "d",
-	}
-	testdata := map[string]func() interface{}{
-		"Value":   func() interface{} { return template },
-		"Pointer": func() interface{} { tmp := template; return &tmp },
-	}
-	for vtype, vfn := range testdata {
-		t.Run(vtype, func(t *testing.T) {
-			rt := goja.New()
-			v := vfn()
-			ctx := new(context.Context)
-			rt.Set("obj", Bind(rt, v, ctx))
-
-			t.Run("unexportedFn", func(t *testing.T) {
-				_, err := RunString(rt, `obj.unexportedFn()`)
-				assert.EqualError(t, err, "TypeError: Object has no member 'unexportedFn'")
-			})
-			t.Run("ExportedFn", func(t *testing.T) {
-				_, err := RunString(rt, `obj.exportedFn()`)
-				assert.NoError(t, err)
-			})
-			t.Run("unexportedPtrFn", func(t *testing.T) {
-				_, err := RunString(rt, `obj.unexportedPtrFn()`)
-				assert.EqualError(t, err, "TypeError: Object has no member 'unexportedPtrFn'")
-			})
-			t.Run("ExportedPtrFn", func(t *testing.T) {
-				_, err := RunString(rt, `obj.exportedPtrFn()`)
-				if vtype == "Pointer" {
-					assert.NoError(t, err)
-				} else {
-					assert.EqualError(t, err, "TypeError: Object has no member 'exportedPtrFn'")
-				}
-			})
-			t.Run("Error", func(t *testing.T) {
-				_, err := RunString(rt, `obj.error()`)
-				assert.EqualError(t, err, "GoError: error")
-			})
-			t.Run("Add", func(t *testing.T) {
-				v, err := RunString(rt, `obj.add(1, 2)`)
-				if assert.NoError(t, err) {
-					assert.Equal(t, int64(3), v.Export())
-				}
-			})
-			t.Run("AddWithError", func(t *testing.T) {
-				v, err := RunString(rt, `obj.addWithError(1, 2)`)
-				if assert.NoError(t, err) {
-					assert.Equal(t, int64(3), v.Export())
-				}
-
-				t.Run("Negative", func(t *testing.T) {
-					_, err := RunString(rt, `obj.addWithError(0, -1)`)
-					assert.EqualError(t, err, "GoError: answer is negative")
-				})
-			})
-			t.Run("Context", func(t *testing.T) {
-				_, err := RunString(rt, `obj.context()`)
-				assert.EqualError(t, err, "GoError: Context needs a valid VU context")
-
-				t.Run("Valid", func(t *testing.T) {
-					*ctx = context.Background()
-					defer func() { *ctx = nil }()
-
-					_, err := RunString(rt, `obj.context()`)
-					assert.NoError(t, err)
-				})
-
-				t.Run("Expired", func(t *testing.T) {
-					ctx_, cancel := context.WithCancel(context.Background())
-					cancel()
-					*ctx = ctx_
-					defer func() { *ctx = nil }()
-
-					_, err := RunString(rt, `obj.context()`)
-					assert.EqualError(t, err, "GoError: test has ended")
-				})
-			})
-			t.Run("ContextAdd", func(t *testing.T) {
-				_, err := RunString(rt, `obj.contextAdd(1, 2)`)
-				assert.EqualError(t, err, "GoError: ContextAdd needs a valid VU context")
-
-				t.Run("Valid", func(t *testing.T) {
-					*ctx = context.Background()
-					defer func() { *ctx = nil }()
-
-					v, err := RunString(rt, `obj.contextAdd(1, 2)`)
-					if assert.NoError(t, err) {
-						assert.Equal(t, int64(3), v.Export())
-					}
-				})
-
-				t.Run("Expired", func(t *testing.T) {
-					ctx_, cancel := context.WithCancel(context.Background())
-					cancel()
-					*ctx = ctx_
-					defer func() { *ctx = nil }()
-
-					_, err := RunString(rt, `obj.contextAdd(1, 2)`)
-					assert.EqualError(t, err, "GoError: test has ended")
-				})
-			})
-			t.Run("ContextAddWithError", func(t *testing.T) {
-				_, err := RunString(rt, `obj.contextAddWithError(1, 2)`)
-				assert.EqualError(t, err, "GoError: ContextAddWithError needs a valid VU context")
-
-				t.Run("Valid", func(t *testing.T) {
-					*ctx = context.Background()
-					defer func() { *ctx = nil }()
-
-					v, err := RunString(rt, `obj.contextAddWithError(1, 2)`)
-					if assert.NoError(t, err) {
-						assert.Equal(t, int64(3), v.Export())
-					}
-
-					t.Run("Negative", func(t *testing.T) {
-						_, err := RunString(rt, `obj.contextAddWithError(0, -1)`)
-						assert.EqualError(t, err, "GoError: answer is negative")
-					})
-				})
-				t.Run("Expired", func(t *testing.T) {
-					ctx_, cancel := context.WithCancel(context.Background())
-					cancel()
-					*ctx = ctx_
-					defer func() { *ctx = nil }()
-
-					_, err := RunString(rt, `obj.contextAddWithError(1, 2)`)
-					assert.EqualError(t, err, "GoError: test has ended")
-				})
-			})
-			if impl, ok := v.(*bridgeTestType); ok {
-				t.Run("Count", func(t *testing.T) {
-					for i := 0; i < 10; i++ {
-						t.Run(strconv.Itoa(i), func(t *testing.T) {
-							v, err := RunString(rt, `obj.count()`)
-							if assert.NoError(t, err) {
-								assert.Equal(t, int64(i+1), v.Export())
-								assert.Equal(t, i+1, impl.Counter)
-							}
-						})
-					}
-				})
-			} else {
-				t.Run("Count", func(t *testing.T) {
-					_, err := RunString(rt, `obj.count()`)
-					assert.EqualError(t, err, "TypeError: Object has no member 'count'")
-				})
-			}
-			for name, fname := range map[string]string{
-				"Sum":                    "sum",
-				"SumWithContext":         "sumWithContext",
-				"SumWithError":           "sumWithError",
-				"SumWithContextAndError": "sumWithContextAndError",
-			} {
-				*ctx = context.Background()
-				defer func() { *ctx = nil }()
-
-				t.Run(name, func(t *testing.T) {
-					sum := 0
-					args := []string{}
-					for i := 0; i < 10; i++ {
-						args = append(args, strconv.Itoa(i))
-						sum += i
-						t.Run(strconv.Itoa(i), func(t *testing.T) {
-							code := fmt.Sprintf(`obj.%s(%s)`, fname, strings.Join(args, ", "))
-							v, err := RunString(rt, code)
-							if assert.NoError(t, err) {
-								assert.Equal(t, int64(sum), v.Export())
-							}
-						})
-					}
-				})
-			}
-
+	ctxPtr := new(context.Context)
+	testdata := []struct {
+		Name string
+		V    interface{}
+		Fn   func(t *testing.T, obj interface{}, rt *goja.Runtime)
+	}{
+		{"Fields", bridgeTestFieldsType{"a", "b", "c", "d"}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
 			t.Run("Exported", func(t *testing.T) {
 				v, err := RunString(rt, `obj.exported`)
 				if assert.NoError(t, err) {
@@ -389,31 +265,361 @@ func TestBind(t *testing.T) {
 					assert.Equal(t, nil, v.Export())
 				}
 			})
-
-			t.Run("Counter", func(t *testing.T) {
-				v, err := RunString(rt, `obj.counter`)
-				if assert.NoError(t, err) {
-					assert.Equal(t, int64(0), v.Export())
+		}},
+		{"Methods", bridgeTestMethodsType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
+			t.Run("unexportedFn", func(t *testing.T) {
+				_, err := RunString(rt, `obj.unexportedFn()`)
+				assert.EqualError(t, err, "TypeError: Object has no member 'unexportedFn'")
+			})
+			t.Run("ExportedFn", func(t *testing.T) {
+				_, err := RunString(rt, `obj.exportedFn()`)
+				assert.NoError(t, err)
+			})
+			t.Run("unexportedPtrFn", func(t *testing.T) {
+				_, err := RunString(rt, `obj.unexportedPtrFn()`)
+				assert.EqualError(t, err, "TypeError: Object has no member 'unexportedPtrFn'")
+			})
+			t.Run("ExportedPtrFn", func(t *testing.T) {
+				_, err := RunString(rt, `obj.exportedPtrFn()`)
+				switch obj.(type) {
+				case *bridgeTestMethodsType:
+					assert.NoError(t, err)
+				case bridgeTestMethodsType:
+					assert.EqualError(t, err, "TypeError: Object has no member 'exportedPtrFn'")
+				default:
+					assert.Fail(t, "INVALID TYPE")
 				}
 			})
+		}},
+		{"Error", bridgeTestErrorType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
+			_, err := RunString(rt, `obj.error()`)
+			assert.EqualError(t, err, "GoError: error")
+		}},
+		{"Add", bridgeTestAddType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
+			v, err := RunString(rt, `obj.add(1, 2)`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, int64(3), v.Export())
+			}
+		}},
+		{"AddWithError", bridgeTestAddWithErrorType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
+			v, err := RunString(rt, `obj.addWithError(1, 2)`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, int64(3), v.Export())
+			}
+
+			t.Run("Negative", func(t *testing.T) {
+				_, err := RunString(rt, `obj.addWithError(0, -1)`)
+				assert.EqualError(t, err, "GoError: answer is negative")
+			})
+		}},
+		{"AddWithError", bridgeTestAddWithErrorType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
+			v, err := RunString(rt, `obj.addWithError(1, 2)`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, int64(3), v.Export())
+			}
+
+			t.Run("Negative", func(t *testing.T) {
+				_, err := RunString(rt, `obj.addWithError(0, -1)`)
+				assert.EqualError(t, err, "GoError: answer is negative")
+			})
+		}},
+		{"Context", bridgeTestContextType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
+			_, err := RunString(rt, `obj.context()`)
+			assert.EqualError(t, err, "GoError: Context needs a valid VU context")
+
+			t.Run("Valid", func(t *testing.T) {
+				*ctxPtr = context.Background()
+				defer func() { *ctxPtr = nil }()
+
+				_, err := RunString(rt, `obj.context()`)
+				assert.NoError(t, err)
+			})
+		}},
+		{"ContextAdd", bridgeTestContextAddType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
+			_, err := RunString(rt, `obj.contextAdd(1, 2)`)
+			assert.EqualError(t, err, "GoError: ContextAdd needs a valid VU context")
+
+			t.Run("Valid", func(t *testing.T) {
+				*ctxPtr = context.Background()
+				defer func() { *ctxPtr = nil }()
+
+				v, err := RunString(rt, `obj.contextAdd(1, 2)`)
+				if assert.NoError(t, err) {
+					assert.Equal(t, int64(3), v.Export())
+				}
+			})
+		}},
+		{"ContextAddWithError", bridgeTestContextAddWithErrorType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
+			_, err := RunString(rt, `obj.contextAddWithError(1, 2)`)
+			assert.EqualError(t, err, "GoError: ContextAddWithError needs a valid VU context")
+
+			t.Run("Valid", func(t *testing.T) {
+				*ctxPtr = context.Background()
+				defer func() { *ctxPtr = nil }()
+
+				v, err := RunString(rt, `obj.contextAddWithError(1, 2)`)
+				if assert.NoError(t, err) {
+					assert.Equal(t, int64(3), v.Export())
+				}
+
+				t.Run("Negative", func(t *testing.T) {
+					_, err := RunString(rt, `obj.contextAddWithError(0, -1)`)
+					assert.EqualError(t, err, "GoError: answer is negative")
+				})
+			})
+		}},
+		{"Count", bridgeTestCounterType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
+			switch impl := obj.(type) {
+			case *bridgeTestCounterType:
+				for i := 0; i < 10; i++ {
+					t.Run(strconv.Itoa(i), func(t *testing.T) {
+						v, err := RunString(rt, `obj.count()`)
+						if assert.NoError(t, err) {
+							assert.Equal(t, int64(i+1), v.Export())
+							assert.Equal(t, i+1, impl.Counter)
+						}
+					})
+				}
+			case bridgeTestCounterType:
+				_, err := RunString(rt, `obj.count()`)
+				assert.EqualError(t, err, "TypeError: Object has no member 'count'")
+			default:
+				assert.Fail(t, "UNKNOWN TYPE")
+			}
+		}},
+		{"Sum", bridgeTestSumType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
+			sum := 0
+			args := []string{}
+			for i := 0; i < 10; i++ {
+				args = append(args, strconv.Itoa(i))
+				sum += i
+				t.Run(strconv.Itoa(i), func(t *testing.T) {
+					code := fmt.Sprintf(`obj.sum(%s)`, strings.Join(args, ", "))
+					v, err := RunString(rt, code)
+					if assert.NoError(t, err) {
+						assert.Equal(t, int64(sum), v.Export())
+					}
+				})
+			}
+		}},
+		{"SumWithContext", bridgeTestSumWithContextType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
+			_, err := RunString(rt, `obj.sumWithContext(1, 2)`)
+			assert.EqualError(t, err, "GoError: SumWithContext needs a valid VU context")
+
+			t.Run("Valid", func(t *testing.T) {
+				*ctxPtr = context.Background()
+				defer func() { *ctxPtr = nil }()
+
+				sum := 0
+				args := []string{}
+				for i := 0; i < 10; i++ {
+					args = append(args, strconv.Itoa(i))
+					sum += i
+					t.Run(strconv.Itoa(i), func(t *testing.T) {
+						code := fmt.Sprintf(`obj.sumWithContext(%s)`, strings.Join(args, ", "))
+						v, err := RunString(rt, code)
+						if assert.NoError(t, err) {
+							assert.Equal(t, int64(sum), v.Export())
+						}
+					})
+				}
+			})
+		}},
+		{"SumWithError", bridgeTestSumWithErrorType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
+			sum := 0
+			args := []string{}
+			for i := 0; i < 10; i++ {
+				args = append(args, strconv.Itoa(i))
+				sum += i
+				t.Run(strconv.Itoa(i), func(t *testing.T) {
+					code := fmt.Sprintf(`obj.sumWithError(%s)`, strings.Join(args, ", "))
+					v, err := RunString(rt, code)
+					if assert.NoError(t, err) {
+						assert.Equal(t, int64(sum), v.Export())
+					}
+				})
+			}
+		}},
+		{"SumWithContextAndError", bridgeTestSumWithContextAndErrorType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
+			_, err := RunString(rt, `obj.sumWithContextAndError(1, 2)`)
+			assert.EqualError(t, err, "GoError: SumWithContextAndError needs a valid VU context")
+
+			t.Run("Valid", func(t *testing.T) {
+				*ctxPtr = context.Background()
+				defer func() { *ctxPtr = nil }()
+
+				sum := 0
+				args := []string{}
+				for i := 0; i < 10; i++ {
+					args = append(args, strconv.Itoa(i))
+					sum += i
+					t.Run(strconv.Itoa(i), func(t *testing.T) {
+						code := fmt.Sprintf(`obj.sumWithContextAndError(%s)`, strings.Join(args, ", "))
+						v, err := RunString(rt, code)
+						if assert.NoError(t, err) {
+							assert.Equal(t, int64(sum), v.Export())
+						}
+					})
+				}
+			})
+		}},
+	}
+
+	vfns := map[string]func(interface{}) interface{}{
+		"Value": func(v interface{}) interface{} { return v },
+		"Pointer": func(v interface{}) interface{} {
+			val := reflect.ValueOf(v)
+			ptr := reflect.New(val.Type())
+			ptr.Elem().Set(val)
+			return ptr.Interface()
+		},
+	}
+
+	for name, vfn := range vfns {
+		t.Run(name, func(t *testing.T) {
+			for _, data := range testdata {
+				t.Run(data.Name, func(t *testing.T) {
+					rt := goja.New()
+					rt.SetFieldNameMapper(FieldNameMapper{})
+					obj := vfn(data.V)
+					rt.Set("obj", Bind(rt, obj, ctxPtr))
+					data.Fn(t, obj, rt)
+				})
+			}
 		})
 	}
 }
 
 func BenchmarkProxy(b *testing.B) {
-	var v bridgeTestType
-	rt := goja.New()
-	b.ResetTimer()
+	types := []struct {
+		Name, FnName string
+		Value        interface{}
+		Fn           func(b *testing.B, fn interface{})
+	}{
+		{"Fields", "", bridgeTestFieldsType{}, nil},
+		{"Methods", "exportedFn", bridgeTestMethodsType{}, func(b *testing.B, fn interface{}) {
+			f := fn.(func())
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				f()
+			}
+		}},
+		{"Error", "", bridgeTestErrorType{}, nil},
+		{"Add", "add", bridgeTestAddType{}, func(b *testing.B, fn interface{}) {
+			f := fn.(func(int, int) int)
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				f(1, 2)
+			}
+		}},
+		{"AddError", "addWithError", bridgeTestAddWithErrorType{}, func(b *testing.B, fn interface{}) {
+			f := fn.(func(int, int) int)
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				f(1, 2)
+			}
+		}},
+		{"Context", "context", bridgeTestContextType{}, func(b *testing.B, fn interface{}) {
+			f := fn.(func())
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				f()
+			}
+		}},
+		{"ContextAdd", "contextAdd", bridgeTestContextAddType{}, func(b *testing.B, fn interface{}) {
+			f := fn.(func(int, int) int)
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				f(1, 2)
+			}
+		}},
+		{"ContextAddError", "contextAddWithError", bridgeTestContextAddWithErrorType{}, func(b *testing.B, fn interface{}) {
+			f := fn.(func(int, int) int)
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				f(1, 2)
+			}
+		}},
+		{"Sum", "sum", bridgeTestSumType{}, func(b *testing.B, fn interface{}) {
+			f := fn.(func(...int) int)
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				f(1, 2, 3)
+			}
+		}},
+		{"SumContext", "sumWithContext", bridgeTestSumWithContextType{}, func(b *testing.B, fn interface{}) {
+			f := fn.(func(...int) int)
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				f(1, 2, 3)
+			}
+		}},
+		{"SumError", "sumWithError", bridgeTestSumWithErrorType{}, func(b *testing.B, fn interface{}) {
+			f := fn.(func(...int) int)
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				f(1, 2, 3)
+			}
+		}},
+		{"SumContextError", "sumWithContextAndError", bridgeTestSumWithContextAndErrorType{}, func(b *testing.B, fn interface{}) {
+			f := fn.(func(...int) int)
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				f(1, 2, 3)
+			}
+		}},
+	}
+	vfns := []struct {
+		Name string
+		Fn   func(interface{}) interface{}
+	}{
+		{"Value", func(v interface{}) interface{} { return v }},
+		{"Pointer", func(v interface{}) interface{} {
+			val := reflect.ValueOf(v)
+			ptr := reflect.New(val.Type())
+			ptr.Elem().Set(val)
+			return ptr.Interface()
+		}},
+	}
 
-	b.Run("ToValue", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			_ = rt.ToValue(v)
-		}
-	})
+	for _, vfn := range vfns {
+		b.Run(vfn.Name, func(b *testing.B) {
+			for _, typ := range types {
+				b.Run(typ.Name, func(b *testing.B) {
+					v := vfn.Fn(typ.Value)
 
-	b.Run("Bind", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			_ = Bind(rt, v, nil)
-		}
-	})
+					b.Run("ToValue", func(b *testing.B) {
+						rt := goja.New()
+						rt.SetFieldNameMapper(FieldNameMapper{})
+						b.ResetTimer()
+
+						for i := 0; i < b.N; i++ {
+							rt.ToValue(v)
+						}
+					})
+
+					b.Run("Bridge", func(b *testing.B) {
+						rt := goja.New()
+						rt.SetFieldNameMapper(FieldNameMapper{})
+						ctx := context.Background()
+						b.ResetTimer()
+
+						for i := 0; i < b.N; i++ {
+							Bind(rt, v, &ctx)
+						}
+					})
+
+					if typ.FnName != "" {
+						b.Run("Call", func(b *testing.B) {
+							rt := goja.New()
+							rt.SetFieldNameMapper(FieldNameMapper{})
+							ctx := context.Background()
+							fn := Bind(rt, v, &ctx)[typ.FnName]
+							typ.Fn(b, fn)
+						})
+					}
+				})
+			}
+		})
+	}
 }

@@ -22,25 +22,23 @@ package common
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 
 	"github.com/dop251/goja"
-	"github.com/pkg/errors"
 	"github.com/serenize/snaker"
 )
 
 var (
 	ctxT   = reflect.TypeOf((*context.Context)(nil)).Elem()
 	errorT = reflect.TypeOf((*error)(nil)).Elem()
-	mapper = FieldNameMapper{}
 )
 
-// The field name mapper translates Go symbol names for bridging to JS.
-type FieldNameMapper struct{}
-
-// Bridge exported fields, snake_casing their names. A `js:"name"` tag overrides, `js:"-"` hides.
-func (FieldNameMapper) FieldName(t reflect.Type, f reflect.StructField) string {
+// Returns the JS name for an exported struct field. The name is snake_cased, with respect for
+// certain common initialisms (URL, ID, HTTP, etc).
+func FieldName(t reflect.Type, f reflect.StructField) string {
 	// PkgPath is non-empty for unexported fields.
 	if f.PkgPath != "" {
 		return ""
@@ -59,8 +57,9 @@ func (FieldNameMapper) FieldName(t reflect.Type, f reflect.StructField) string {
 	return snaker.CamelToSnake(f.Name)
 }
 
-// Bridge exported methods, but camelCase their names.
-func (FieldNameMapper) MethodName(t reflect.Type, m reflect.Method) string {
+// Returns the JS name for an exported method. The first letter of the method's name is
+// lowercased, otherwise it is unaltered.
+func MethodName(t reflect.Type, m reflect.Method) string {
 	// PkgPath is non-empty for unexported methods.
 	if m.PkgPath != "" {
 		return ""
@@ -69,6 +68,13 @@ func (FieldNameMapper) MethodName(t reflect.Type, m reflect.Method) string {
 	// Lowercase the first character of the method name.
 	return strings.ToLower(m.Name[0:1]) + m.Name[1:]
 }
+
+// FieldNameMapper for goja.Runtime.SetFieldNameMapper()
+type FieldNameMapper struct{}
+
+func (FieldNameMapper) FieldName(t reflect.Type, f reflect.StructField) string { return FieldName(t, f) }
+
+func (FieldNameMapper) MethodName(t reflect.Type, m reflect.Method) string { return MethodName(t, m) }
 
 // Binds an object's members to the global scope. Returns a function that un-binds them.
 // Note that this will panic if passed something that isn't a struct; please don't do that.
@@ -79,7 +85,7 @@ func BindToGlobal(rt *goja.Runtime, v interface{}) func() {
 	typ := val.Type()
 	for i := 0; i < typ.NumMethod(); i++ {
 		m := typ.Method(i)
-		k := mapper.MethodName(typ, m)
+		k := MethodName(typ, m)
 		if k != "" {
 			fn := val.Method(i).Interface()
 			keys = append(keys, k)
@@ -95,7 +101,7 @@ func BindToGlobal(rt *goja.Runtime, v interface{}) func() {
 	}
 	for i := 0; i < elemTyp.NumField(); i++ {
 		f := elemTyp.Field(i)
-		k := mapper.FieldName(elemTyp, f)
+		k := FieldName(elemTyp, f)
 		if k != "" {
 			v := elem.Field(i).Interface()
 			keys = append(keys, k)
@@ -110,101 +116,94 @@ func BindToGlobal(rt *goja.Runtime, v interface{}) func() {
 	}
 }
 
-func Bind(rt *goja.Runtime, v interface{}, ctx *context.Context) goja.Value {
+func Bind(rt *goja.Runtime, v interface{}, ctxPtr *context.Context) map[string]interface{} {
+	exports := make(map[string]interface{})
+
 	val := reflect.ValueOf(v)
 	typ := val.Type()
-	exports := make(map[string]interface{})
 	for i := 0; i < typ.NumMethod(); i++ {
-		methT := typ.Method(i)
-		name := mapper.MethodName(typ, methT)
+		meth := typ.Method(i)
+		name := MethodName(typ, meth)
 		if name == "" {
 			continue
 		}
-		meth := val.Method(i)
+		fn := val.Method(i)
 
-		in := make([]reflect.Type, methT.Type.NumIn())
-		for i := 0; i < len(in); i++ {
-			in[i] = methT.Type.In(i)
+		// Figure out if we want to do any wrapping of it.
+		fnT := fn.Type()
+		numIn := fnT.NumIn()
+		numOut := fnT.NumOut()
+		wantsContext := (numIn > 0 && fnT.In(0) == ctxT)
+		hasError := (numOut > 1 && fnT.Out(1) == errorT)
+		if wantsContext || hasError {
+			// Varadic functions are called a bit differently.
+			varadic := fnT.IsVariadic()
+
+			// Collect input types, but skip the context (if any).
+			var in []reflect.Type
+			if numIn > 0 {
+				inOffset := 0
+				if wantsContext {
+					inOffset = 1
+				}
+				in = make([]reflect.Type, numIn-inOffset)
+				for i := inOffset; i < numIn; i++ {
+					in[i-inOffset] = fnT.In(i)
+				}
+			}
+
+			// Collect the output type (if any). JS functions can only return a single value, but
+			// allow returning an error, which will be thrown as a JS exception.
+			var out []reflect.Type
+			if numOut != 0 {
+				out = []reflect.Type{fnT.Out(0)}
+			}
+
+			wrappedFn := fn
+			fn = reflect.MakeFunc(
+				reflect.FuncOf(in, out, varadic),
+				func(args []reflect.Value) []reflect.Value {
+					if wantsContext {
+						if ctxPtr == nil || *ctxPtr == nil {
+							Throw(rt, errors.New(fmt.Sprintf("%s needs a valid VU context", meth.Name)))
+						}
+						args = append([]reflect.Value{reflect.ValueOf(*ctxPtr)}, args...)
+					}
+
+					var res []reflect.Value
+					if varadic {
+						res = wrappedFn.CallSlice(args)
+					} else {
+						res = wrappedFn.Call(args)
+					}
+
+					if hasError {
+						if !res[1].IsNil() {
+							Throw(rt, res[1].Interface().(error))
+						}
+						res = res[:1]
+					}
+
+					return res
+				},
+			)
 		}
-		out := make([]reflect.Type, methT.Type.NumOut())
-		for i := 0; i < len(out); i++ {
-			out[i] = methT.Type.Out(i)
-		}
 
-		// Skip over the first input arg; it'll be the bound object.
-		in = in[1:]
-
-		// If the first argument is a context.Context, inject the given context.
-		// The function will error if called outside of a valid context.
-		if len(in) > 0 && in[0].Implements(ctxT) {
-			in = in[1:]
-			meth = bindContext(in, out, methT, meth, rt, ctx)
-		}
-
-		// If the last return value is an error, turn it into a JS throw.
-		if len(out) > 0 && out[len(out)-1] == errorT {
-			out = out[:len(out)-1]
-			meth = bindErrorHandler(in, out, methT, meth, rt)
-		}
-
-		exports[name] = meth.Interface()
+		exports[name] = fn.Interface()
 	}
 
-	elem := val
-	elemTyp := typ
+	// If v is a pointer, we need to indirect it to access fields.
 	if typ.Kind() == reflect.Ptr {
-		elem = val.Elem()
-		elemTyp = elem.Type()
+		val = val.Elem()
+		typ = val.Type()
 	}
-	for i := 0; i < elemTyp.NumField(); i++ {
-		f := elemTyp.Field(i)
-		k := mapper.FieldName(elemTyp, f)
-		if k == "" {
-			continue
+	for i := 0; i < typ.NumField(); i++ {
+		field := typ.Field(i)
+		name := FieldName(typ, field)
+		if name != "" {
+			exports[name] = val.Field(i).Interface()
 		}
-		exports[k] = elem.Field(i).Interface()
 	}
 
-	return rt.ToValue(exports)
-}
-
-func bindContext(in, out []reflect.Type, methT reflect.Method, meth reflect.Value, rt *goja.Runtime, ctxPtr *context.Context) reflect.Value {
-	return reflect.MakeFunc(
-		reflect.FuncOf(in, out, methT.Type.IsVariadic()),
-		func(args []reflect.Value) []reflect.Value {
-			if ctxPtr == nil || *ctxPtr == nil {
-				Throw(rt, errors.Errorf("%s needs a valid VU context", methT.Name))
-			}
-			ctx := *ctxPtr
-
-			select {
-			case <-ctx.Done():
-				Throw(rt, errors.Errorf("test has ended"))
-			default:
-			}
-
-			return callBound(methT, meth, append([]reflect.Value{reflect.ValueOf(ctx)}, args...))
-		},
-	)
-}
-
-func bindErrorHandler(in, out []reflect.Type, methT reflect.Method, meth reflect.Value, rt *goja.Runtime) reflect.Value {
-	return reflect.MakeFunc(
-		reflect.FuncOf(in, out, methT.Type.IsVariadic()),
-		func(args []reflect.Value) []reflect.Value {
-			ret := callBound(methT, meth, args)
-			err := ret[len(ret)-1]
-			if !err.IsNil() {
-				Throw(rt, err.Interface().(error))
-			}
-			return ret[:len(ret)-1]
-		},
-	)
-}
-
-func callBound(methT reflect.Method, meth reflect.Value, args []reflect.Value) []reflect.Value {
-	if methT.Type.IsVariadic() {
-		return meth.CallSlice(args)
-	}
-	return meth.Call(args)
+	return exports
 }
