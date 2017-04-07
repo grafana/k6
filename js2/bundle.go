@@ -75,7 +75,7 @@ func NewBundle(src *lib.SourceData, fs afero.Fs) (*Bundle, error) {
 	bundle := Bundle{
 		Filename:        src.Filename,
 		Program:         pgm,
-		BaseInitContext: NewInitContext(rt, fs, filepath.Dir(src.Filename)),
+		BaseInitContext: NewInitContext(rt, new(context.Context), fs, filepath.Dir(src.Filename)),
 	}
 	if err := bundle.instantiate(rt, bundle.BaseInitContext); err != nil {
 		return nil, err
@@ -122,12 +122,10 @@ func (b *Bundle) Instantiate() (*BundleInstance, error) {
 	// Instantiate the bundle into a new VM using a bound init context. This uses a context with a
 	// runtime, but no state, to allow module-provided types to function within the init context.
 	rt := goja.New()
-	*ctxPtr = common.WithRuntime(context.Background(), rt)
 	init := newBoundInitContext(b.BaseInitContext, ctxPtr, rt)
 	if err := b.instantiate(rt, init); err != nil {
 		return nil, err
 	}
-	*ctxPtr = nil
 
 	// Grab the default function; type is already checked in NewBundle().
 	exports := rt.Get("exports").ToObject(rt)
@@ -147,11 +145,13 @@ func (b *Bundle) instantiate(rt *goja.Runtime, init *InitContext) error {
 	rt.SetRandSource(common.DefaultRandSource)
 	rt.Set("exports", rt.NewObject())
 
+	*init.ctxPtr = common.WithRuntime(context.Background(), rt)
 	unbindInit := common.BindToGlobal(rt, common.Bind(rt, init, init.ctxPtr))
 	if _, err := rt.RunProgram(b.Program); err != nil {
 		return err
 	}
 	unbindInit()
+	*init.ctxPtr = nil
 
 	rt.SetRandSource(common.NewRandSource())
 
