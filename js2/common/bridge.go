@@ -66,6 +66,12 @@ func MethodName(t reflect.Type, m reflect.Method) string {
 		return ""
 	}
 
+	// If the name begins with an "X"; strip the X and return the rest verbatim.
+	// This is mostly to allow you to make functions with uppercase names.
+	if m.Name[0] == 'X' {
+		return m.Name[1:]
+	}
+
 	// Lowercase the first character of the method name.
 	return strings.ToLower(m.Name[0:1]) + m.Name[1:]
 }

@@ -53,6 +53,10 @@ type bridgeTestOddFieldsType struct {
 	URL      string
 }
 
+type bridgeTestUppercaseMethodType struct{}
+
+func (bridgeTestUppercaseMethodType) XUppercaseMethod() {}
+
 type bridgeTestErrorType struct{}
 
 func (bridgeTestErrorType) Error() error { return errors.New("error") }
@@ -178,6 +182,9 @@ func TestFieldNameMapper(t *testing.T) {
 			"TwoWords": "two_words",
 			"URL":      "url",
 		}, nil},
+		{reflect.TypeOf(bridgeTestUppercaseMethodType{}), nil, map[string]string{
+			"XUppercaseMethod": "UppercaseMethod",
+		}},
 	}
 	for _, data := range testdata {
 		for field, name := range data.Fields {
