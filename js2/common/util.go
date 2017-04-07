@@ -25,6 +25,15 @@ import (
 	"github.com/loadimpact/k6/js/compiler"
 )
 
+// Panic if the provided source can't be compiled.
+func MustCompile(filename, src string, strict bool) *goja.Program {
+	pgm, err := goja.Compile(filename, src, strict)
+	if err != nil {
+		panic(err)
+	}
+	return pgm
+}
+
 // Runs an ES6 string in the given runtime. Use this rather than writing ES5 in tests.
 func RunString(rt *goja.Runtime, src string) (goja.Value, error) {
 	src, _, err := compiler.Transform(src, "__string__")

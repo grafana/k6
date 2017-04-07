@@ -53,10 +53,6 @@ type bridgeTestOddFieldsType struct {
 	URL      string
 }
 
-type bridgeTestUppercaseMethodType struct{}
-
-func (bridgeTestUppercaseMethodType) XUppercaseMethod() {}
-
 type bridgeTestErrorType struct{}
 
 func (bridgeTestErrorType) Error() error { return errors.New("error") }
@@ -162,6 +158,14 @@ func (m *bridgeTestCounterType) Count() int {
 	return m.Counter
 }
 
+type bridgeTestConstructorType struct{}
+
+type bridgeTestConstructorSpawnedType struct{}
+
+func (bridgeTestConstructorType) XConstructor() bridgeTestConstructorSpawnedType {
+	return bridgeTestConstructorSpawnedType{}
+}
+
 func TestFieldNameMapper(t *testing.T) {
 	testdata := []struct {
 		Typ     reflect.Type
@@ -182,8 +186,8 @@ func TestFieldNameMapper(t *testing.T) {
 			"TwoWords": "two_words",
 			"URL":      "url",
 		}, nil},
-		{reflect.TypeOf(bridgeTestUppercaseMethodType{}), nil, map[string]string{
-			"XUppercaseMethod": "UppercaseMethod",
+		{reflect.TypeOf(bridgeTestConstructorType{}), nil, map[string]string{
+			"XConstructor": "Constructor",
 		}},
 	}
 	for _, data := range testdata {
@@ -477,6 +481,11 @@ func TestBind(t *testing.T) {
 				}
 			})
 		}},
+		{"Constructor", bridgeTestConstructorType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
+			v, err := RunString(rt, `new obj.Constructor()`)
+			assert.NoError(t, err)
+			assert.IsType(t, bridgeTestConstructorSpawnedType{}, v.Export())
+		}},
 	}
 
 	vfns := map[string]func(interface{}) interface{}{
@@ -580,6 +589,13 @@ func BenchmarkProxy(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				f(1, 2, 3)
+			}
+		}},
+		{"Constructor", "Constructor", bridgeTestConstructorType{}, func(b *testing.B, fn interface{}) {
+			f, _ := goja.AssertFunction(fn.(goja.Value))
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				f(goja.Undefined())
 			}
 		}},
 	}

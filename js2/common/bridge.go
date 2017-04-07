@@ -35,6 +35,12 @@ var (
 	ctxPtrT = reflect.TypeOf((*context.Context)(nil))
 	ctxT    = reflect.TypeOf((*context.Context)(nil)).Elem()
 	errorT  = reflect.TypeOf((*error)(nil)).Elem()
+
+	constructWrap = MustCompile(
+		"__constructor__",
+		`(function(impl) { return function() { return impl.apply(this, arguments); } })`,
+		true,
+	)
 )
 
 // Returns the JS name for an exported struct field. The name is snake_cased, with respect for
@@ -66,8 +72,8 @@ func MethodName(t reflect.Type, m reflect.Method) string {
 		return ""
 	}
 
-	// If the name begins with an "X"; strip the X and return the rest verbatim.
-	// This is mostly to allow you to make functions with uppercase names.
+	// A field with a name beginning with an X is a constructor, and just gets the prefix stripped.
+	// Note: They also get some special treatment from Bridge(), see further down.
 	if m.Name[0] == 'X' {
 		return m.Name[1:]
 	}
@@ -186,7 +192,16 @@ func Bind(rt *goja.Runtime, v interface{}, ctxPtr *context.Context) map[string]i
 			)
 		}
 
-		exports[name] = fn.Interface()
+		// X-Prefixed methods are assumed to be constructors; use a closure to wrap them in a
+		// pure-JS function to allow them to be `new`d. (This is an awful hack...)
+		if meth.Name[0] == 'X' {
+			wrapperV, _ := rt.RunProgram(constructWrap)
+			wrapper, _ := goja.AssertFunction(wrapperV)
+			v, _ := wrapper(goja.Undefined(), rt.ToValue(fn.Interface()))
+			exports[name] = v
+		} else {
+			exports[name] = fn.Interface()
+		}
 	}
 
 	// If v is a pointer, we need to indirect it to access fields.
