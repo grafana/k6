@@ -91,6 +91,18 @@ func (bridgeTestContextAddWithErrorType) ContextAddWithError(ctx context.Context
 	return res, nil
 }
 
+type bridgeTestContextInjectType struct {
+	ctx context.Context
+}
+
+func (t *bridgeTestContextInjectType) ContextInject(ctx context.Context) { t.ctx = ctx }
+
+type bridgeTestContextInjectPtrType struct {
+	ctxPtr *context.Context
+}
+
+func (t *bridgeTestContextInjectPtrType) ContextInjectPtr(ctxPtr *context.Context) { t.ctxPtr = ctxPtr }
+
 type bridgeTestSumType struct{}
 
 func (bridgeTestSumType) Sum(nums ...int) int {
@@ -333,6 +345,35 @@ func TestBind(t *testing.T) {
 					assert.EqualError(t, err, "GoError: answer is negative")
 				})
 			})
+		}},
+		{"ContextInject", bridgeTestContextInjectType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
+			_, err := RunString(rt, `obj.contextInject()`)
+			switch impl := obj.(type) {
+			case bridgeTestContextInjectType:
+				assert.EqualError(t, err, "TypeError: Object has no member 'contextInject'")
+			case *bridgeTestContextInjectType:
+				assert.EqualError(t, err, "GoError: ContextInject needs a valid VU context")
+				assert.Equal(t, nil, impl.ctx)
+
+				t.Run("Valid", func(t *testing.T) {
+					*ctxPtr = context.Background()
+					defer func() { *ctxPtr = nil }()
+
+					_, err := RunString(rt, `obj.contextInject()`)
+					assert.NoError(t, err)
+					assert.Equal(t, *ctxPtr, impl.ctx)
+				})
+			}
+		}},
+		{"ContextInjectPtr", bridgeTestContextInjectPtrType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
+			_, err := RunString(rt, `obj.contextInjectPtr()`)
+			switch impl := obj.(type) {
+			case bridgeTestContextInjectPtrType:
+				assert.EqualError(t, err, "TypeError: Object has no member 'contextInjectPtr'")
+			case *bridgeTestContextInjectPtrType:
+				assert.NoError(t, err)
+				assert.Equal(t, ctxPtr, impl.ctxPtr)
+			}
 		}},
 		{"Count", bridgeTestCounterType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
 			switch impl := obj.(type) {
