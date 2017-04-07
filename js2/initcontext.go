@@ -66,7 +66,9 @@ func NewInitContext(rt *goja.Runtime, ctxPtr *context.Context, fs afero.Fs, pwd 
 }
 
 func newBoundInitContext(base *InitContext, ctxPtr *context.Context, rt *goja.Runtime) *InitContext {
-	return NewInitContext(rt, ctxPtr, base.fs, base.pwd)
+	init := NewInitContext(rt, ctxPtr, nil, base.pwd)
+	init.programs = base.programs
+	return init
 }
 
 func (i *InitContext) Require(arg string) goja.Value {
