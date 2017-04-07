@@ -126,6 +126,12 @@ func TestInitContextRequire(t *testing.T) {
 				"../const.js":  "/path/to/const.js",
 				"sub/const.js": "/path/to/dir/sub/const.js",
 			}},
+			"/path/to/lib.js": {"/path/to/lib.js", map[string]string{
+				"":             "",
+				"const.js":     "/path/to/const.js",
+				"../const.js":  "/path/const.js",
+				"sub/const.js": "/path/to/sub/const.js",
+			}},
 		}
 		for libName, data := range imports {
 			t.Run("lib=\""+libName+"\"", func(t *testing.T) {
