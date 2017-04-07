@@ -119,12 +119,15 @@ func (b *Bundle) Instantiate() (*BundleInstance, error) {
 	// Placeholder for a real context.
 	ctxPtr := new(context.Context)
 
-	// Instantiate the bundle into a new VM using a bound init context.
+	// Instantiate the bundle into a new VM using a bound init context. This uses a context with a
+	// runtime, but no state, to allow module-provided types to function within the init context.
 	rt := goja.New()
+	*ctxPtr = common.WithRuntime(context.Background(), rt)
 	init := newBoundInitContext(b.BaseInitContext, ctxPtr, rt)
 	if err := b.instantiate(rt, init); err != nil {
 		return nil, err
 	}
+	*ctxPtr = nil
 
 	// Grab the default function; type is already checked in NewBundle().
 	exports := rt.Get("exports").ToObject(rt)
