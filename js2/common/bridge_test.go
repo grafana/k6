@@ -192,45 +192,11 @@ func TestFieldNameMapper(t *testing.T) {
 }
 
 func TestBindToGlobal(t *testing.T) {
-	testdata := map[string]struct {
-		Obj  interface{}
-		Keys []string
-		Not  []string
-	}{
-		"Fields":          {bridgeTestFieldsType{}, []string{"exported", "renamed"}, []string{}},
-		"Fields/Pointer":  {&bridgeTestFieldsType{}, []string{"exported", "renamed"}, []string{}},
-		"Methods":         {bridgeTestMethodsType{}, []string{"exportedFn"}, []string{"exportedPtrFn"}},
-		"Methods/Pointer": {&bridgeTestMethodsType{}, []string{"exportedFn", "exportedPtrFn"}, []string{}},
-	}
-	for name, data := range testdata {
-		t.Run(name, func(t *testing.T) {
-			rt := goja.New()
-			unbind := BindToGlobal(rt, data.Obj)
-			for _, k := range data.Keys {
-				t.Run(k, func(t *testing.T) {
-					v := rt.Get(k)
-					if assert.NotNil(t, v) {
-						assert.False(t, goja.IsUndefined(v), "value is undefined")
-					}
-				})
-			}
-			for _, k := range data.Not {
-				t.Run(k, func(t *testing.T) {
-					assert.Nil(t, rt.Get(k), "unexpected member bridged")
-				})
-			}
-
-			t.Run("Unbind", func(t *testing.T) {
-				unbind()
-				for _, k := range data.Keys {
-					t.Run(k, func(t *testing.T) {
-						v := rt.Get(k)
-						assert.True(t, goja.IsUndefined(v), "value is not undefined")
-					})
-				}
-			})
-		})
-	}
+	rt := goja.New()
+	unbind := BindToGlobal(rt, map[string]interface{}{"a": 1})
+	assert.Equal(t, int64(1), rt.Get("a").Export())
+	unbind()
+	assert.Nil(t, rt.Get("a").Export())
 }
 
 func TestBind(t *testing.T) {

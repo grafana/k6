@@ -32,8 +32,9 @@ import (
 )
 
 var (
-	ctxT   = reflect.TypeOf((*context.Context)(nil)).Elem()
-	errorT = reflect.TypeOf((*error)(nil)).Elem()
+	ctxPtrT = reflect.TypeOf((*context.Context)(nil))
+	ctxT    = reflect.TypeOf((*context.Context)(nil)).Elem()
+	errorT  = reflect.TypeOf((*error)(nil)).Elem()
 )
 
 // Returns the JS name for an exported struct field. The name is snake_cased, with respect for
@@ -78,35 +79,13 @@ func (FieldNameMapper) MethodName(t reflect.Type, m reflect.Method) string { ret
 
 // Binds an object's members to the global scope. Returns a function that un-binds them.
 // Note that this will panic if passed something that isn't a struct; please don't do that.
-func BindToGlobal(rt *goja.Runtime, v interface{}) func() {
-	keys := []string{}
-
-	val := reflect.ValueOf(v)
-	typ := val.Type()
-	for i := 0; i < typ.NumMethod(); i++ {
-		m := typ.Method(i)
-		k := MethodName(typ, m)
-		if k != "" {
-			fn := val.Method(i).Interface()
-			keys = append(keys, k)
-			rt.Set(k, fn)
-		}
-	}
-
-	elem := val
-	elemTyp := typ
-	if typ.Kind() == reflect.Ptr {
-		elem = val.Elem()
-		elemTyp = elem.Type()
-	}
-	for i := 0; i < elemTyp.NumField(); i++ {
-		f := elemTyp.Field(i)
-		k := FieldName(elemTyp, f)
-		if k != "" {
-			v := elem.Field(i).Interface()
-			keys = append(keys, k)
-			rt.Set(k, v)
-		}
+func BindToGlobal(rt *goja.Runtime, data map[string]interface{}) func() {
+	keys := make([]string, len(data))
+	i := 0
+	for k, v := range data {
+		rt.Set(k, v)
+		keys[i] = k
+		i++
 	}
 
 	return func() {

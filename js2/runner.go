@@ -74,7 +74,7 @@ func (r *Runner) newVU() (*VU, error) {
 		Runner:         r,
 		VUContext:      NewVUContext(),
 	}
-	common.BindToGlobal(vu.Runtime, vu.VUContext)
+	common.BindToGlobal(vu.Runtime, common.Bind(vu.Runtime, vu.VUContext, vu.Context))
 
 	// Give the VU an initial sense of identity.
 	if err := vu.Reconfigure(0); err != nil {

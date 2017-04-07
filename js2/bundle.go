@@ -144,7 +144,7 @@ func (b *Bundle) instantiate(rt *goja.Runtime, init *InitContext) error {
 	rt.SetRandSource(common.DefaultRandSource)
 	rt.Set("exports", rt.NewObject())
 
-	unbindInit := common.BindToGlobal(rt, init)
+	unbindInit := common.BindToGlobal(rt, common.Bind(rt, init, init.ctxPtr))
 	if _, err := rt.RunProgram(b.Program); err != nil {
 		return err
 	}
