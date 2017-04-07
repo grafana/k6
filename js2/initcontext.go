@@ -22,6 +22,8 @@ package js2
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"path/filepath"
 	"strings"
 
@@ -29,7 +31,6 @@ import (
 	"github.com/loadimpact/k6/js/compiler"
 	"github.com/loadimpact/k6/js2/common"
 	"github.com/loadimpact/k6/js2/modules"
-	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 )
 
@@ -89,14 +90,14 @@ func (i *InitContext) Require(arg string) goja.Value {
 		// filesystem. This intentionally shadows attempts to name your own modules this.
 		v, err := i.requireModule(arg)
 		if err != nil {
-			panic(i.runtime.NewGoError(err))
+			common.Throw(i.runtime, err)
 		}
 		return v
 	default:
 		// Fall back to loading from the filesystem.
 		v, err := i.requireFile(arg)
 		if err != nil {
-			panic(i.runtime.NewGoError(err))
+			common.Throw(i.runtime, err)
 		}
 		return v
 	}
@@ -105,7 +106,7 @@ func (i *InitContext) Require(arg string) goja.Value {
 func (i *InitContext) requireModule(name string) (goja.Value, error) {
 	mod, ok := modules.Index[name]
 	if !ok {
-		panic(i.runtime.NewGoError(errors.Errorf("unknown builtin module: %s", name)))
+		return nil, errors.New(fmt.Sprintf("unknown builtin module: %s", name))
 	}
 	return i.runtime.ToValue(common.Bind(i.runtime, mod, i.ctxPtr)), nil
 }

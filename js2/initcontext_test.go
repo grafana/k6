@@ -33,15 +33,23 @@ import (
 
 func TestInitContextRequire(t *testing.T) {
 	t.Run("Modules", func(t *testing.T) {
+		t.Run("Nonexistent", func(t *testing.T) {
+			_, err := NewBundle(&lib.SourceData{
+				Filename: "/script.js",
+				Data:     []byte(`import "k6/NONEXISTENT";`),
+			}, afero.NewMemMapFs())
+			assert.EqualError(t, err, "GoError: unknown builtin module: k6/NONEXISTENT")
+		})
+
 		t.Run("k6", func(t *testing.T) {
 			b, err := NewBundle(&lib.SourceData{
 				Filename: "/script.js",
 				Data: []byte(`
-				import k6 from "k6";
-				export let _k6 = k6;
-				export let dummy = "abc123";
-				export default function() {}
-			`),
+					import k6 from "k6";
+					export let _k6 = k6;
+					export let dummy = "abc123";
+					export default function() {}
+				`),
 			}, afero.NewMemMapFs())
 			if !assert.NoError(t, err, "bundle error") {
 				return
@@ -69,11 +77,11 @@ func TestInitContextRequire(t *testing.T) {
 				b, err := NewBundle(&lib.SourceData{
 					Filename: "/script.js",
 					Data: []byte(`
-					import { group } from "k6";
-					export let _group = group;
-					export let dummy = "abc123";
-					export default function() {}
-				`),
+						import { group } from "k6";
+						export let _group = group;
+						export let dummy = "abc123";
+						export default function() {}
+					`),
 				}, afero.NewMemMapFs())
 				if !assert.NoError(t, err) {
 					return
@@ -98,6 +106,32 @@ func TestInitContextRequire(t *testing.T) {
 	})
 
 	t.Run("Files", func(t *testing.T) {
+		t.Run("Nonexistent", func(t *testing.T) {
+			_, err := NewBundle(&lib.SourceData{
+				Filename: "/script.js",
+				Data:     []byte(`import "/nonexistent.js"; export default function() {}`),
+			}, afero.NewMemMapFs())
+			assert.EqualError(t, err, "GoError: open /nonexistent.js: file does not exist")
+		})
+		t.Run("Invalid", func(t *testing.T) {
+			fs := afero.NewMemMapFs()
+			assert.NoError(t, afero.WriteFile(fs, "/file.js", []byte{0x00}, 0755))
+			_, err := NewBundle(&lib.SourceData{
+				Filename: "/script.js",
+				Data:     []byte(`import "/file.js"; export default function() {}`),
+			}, fs)
+			assert.EqualError(t, err, "SyntaxError: /file.js: Unexpected character '\x00' (1:0)\n> 1 | \x00\n    | ^")
+		})
+		t.Run("Error", func(t *testing.T) {
+			fs := afero.NewMemMapFs()
+			assert.NoError(t, afero.WriteFile(fs, "/file.js", []byte(`throw new Error("aaaa")`), 0755))
+			_, err := NewBundle(&lib.SourceData{
+				Filename: "/script.js",
+				Data:     []byte(`import "/file.js"; export default function() {}`),
+			}, fs)
+			assert.EqualError(t, err, "Error: aaaa")
+		})
+
 		imports := map[string]struct {
 			LibPath    string
 			ConstPaths map[string]string
@@ -216,4 +250,12 @@ func TestInitContextOpen(t *testing.T) {
 			assert.Equal(t, "hi!", bi.Runtime.Get("data").Export())
 		})
 	}
+
+	t.Run("Nonexistent", func(t *testing.T) {
+		_, err := NewBundle(&lib.SourceData{
+			Filename: "/script.js",
+			Data:     []byte(`open("/nonexistent.txt"); export default function() {}`),
+		}, fs)
+		assert.EqualError(t, err, "GoError: open /nonexistent.txt: file does not exist")
+	})
 }

@@ -35,25 +35,36 @@ import (
 )
 
 func TestRunnerNew(t *testing.T) {
-	r, err := New(&lib.SourceData{
-		Filename: "/script.js",
-		Data: []byte(`
+	t.Run("Valid", func(t *testing.T) {
+		r, err := New(&lib.SourceData{
+			Filename: "/script.js",
+			Data: []byte(`
 			let counter = 0;
 			export default function() { counter++; }
 		`),
-	}, afero.NewMemMapFs())
-	assert.NoError(t, err)
-
-	t.Run("NewVU", func(t *testing.T) {
-		vu, err := r.newVU()
+		}, afero.NewMemMapFs())
 		assert.NoError(t, err)
-		assert.Equal(t, int64(0), vu.Runtime.Get("counter").Export())
 
-		t.Run("RunOnce", func(t *testing.T) {
-			_, err = vu.RunOnce(context.Background())
+		t.Run("NewVU", func(t *testing.T) {
+			vu_, err := r.NewVU()
 			assert.NoError(t, err)
-			assert.Equal(t, int64(1), vu.Runtime.Get("counter").Export())
+			vu := vu_.(*VU)
+			assert.Equal(t, int64(0), vu.Runtime.Get("counter").Export())
+
+			t.Run("RunOnce", func(t *testing.T) {
+				_, err = vu.RunOnce(context.Background())
+				assert.NoError(t, err)
+				assert.Equal(t, int64(1), vu.Runtime.Get("counter").Export())
+			})
 		})
+	})
+
+	t.Run("Invalid", func(t *testing.T) {
+		_, err := New(&lib.SourceData{
+			Filename: "/script.js",
+			Data:     []byte(`blarg`),
+		}, afero.NewMemMapFs())
+		assert.EqualError(t, err, "ReferenceError: blarg is not defined")
 	})
 }
 

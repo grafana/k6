@@ -56,11 +56,11 @@ func NewBundle(src *lib.SourceData, fs afero.Fs) (*Bundle, error) {
 	// Compile the main program.
 	code, _, err := compiler.Transform(string(src.Data), src.Filename)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "Transform")
 	}
 	pgm, err := goja.Compile(src.Filename, code, true)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "Compile")
 	}
 
 	// We want to eliminate disk access at runtime, so we set up a memory mapped cache that's
@@ -82,10 +82,11 @@ func NewBundle(src *lib.SourceData, fs afero.Fs) (*Bundle, error) {
 	}
 
 	// Validate exports.
-	exports := rt.Get("exports").ToObject(rt)
-	if exports == nil {
+	exportsV := rt.Get("exports")
+	if goja.IsNull(exportsV) || goja.IsUndefined(exportsV) {
 		return nil, errors.New("exports must be an object")
 	}
+	exports := exportsV.ToObject(rt)
 
 	// Validate the default function.
 	def := exports.Get("default")

@@ -21,6 +21,7 @@
 package js2
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -38,6 +39,27 @@ func TestNewBundle(t *testing.T) {
 			Data:     []byte(``),
 		}, afero.NewMemMapFs())
 		assert.EqualError(t, err, "script must export a default function")
+	})
+	t.Run("Invalid", func(t *testing.T) {
+		_, err := NewBundle(&lib.SourceData{
+			Filename: "/script.js",
+			Data:     []byte{0x00},
+		}, afero.NewMemMapFs())
+		assert.EqualError(t, err, "Transform: SyntaxError: /script.js: Unexpected character '\x00' (1:0)\n> 1 | \x00\n    | ^")
+	})
+	t.Run("Error", func(t *testing.T) {
+		_, err := NewBundle(&lib.SourceData{
+			Filename: "/script.js",
+			Data:     []byte(`throw new Error("aaaa");`),
+		}, afero.NewMemMapFs())
+		assert.EqualError(t, err, "Error: aaaa")
+	})
+	t.Run("InvalidExports", func(t *testing.T) {
+		_, err := NewBundle(&lib.SourceData{
+			Filename: "/script.js",
+			Data:     []byte(`exports = null`),
+		}, afero.NewMemMapFs())
+		assert.EqualError(t, err, "exports must be an object")
 	})
 	t.Run("DefaultUndefined", func(t *testing.T) {
 		_, err := NewBundle(&lib.SourceData{
@@ -76,14 +98,36 @@ func TestNewBundle(t *testing.T) {
 		assert.NoError(t, err)
 	})
 	t.Run("Options", func(t *testing.T) {
-		_, err := NewBundle(&lib.SourceData{
-			Filename: "/script.js",
-			Data: []byte(`
+		t.Run("Empty", func(t *testing.T) {
+			_, err := NewBundle(&lib.SourceData{
+				Filename: "/script.js",
+				Data: []byte(`
 					export let options = {};
 					export default function() {};
 				`),
-		}, afero.NewMemMapFs())
-		assert.NoError(t, err)
+			}, afero.NewMemMapFs())
+			assert.NoError(t, err)
+		})
+		t.Run("Invalid", func(t *testing.T) {
+			invalidOptions := map[string]struct {
+				Expr, Error string
+			}{
+				"Array":    {`[]`, "json: cannot unmarshal array into Go value of type lib.Options"},
+				"Function": {`function(){}`, "json: unsupported type: func(goja.FunctionCall) goja.Value"},
+			}
+			for name, data := range invalidOptions {
+				t.Run(name, func(t *testing.T) {
+					_, err := NewBundle(&lib.SourceData{
+						Filename: "/script.js",
+						Data: []byte(fmt.Sprintf(`
+							export let options = %s;
+							export default function() {};
+						`, data.Expr)),
+					}, afero.NewMemMapFs())
+					assert.EqualError(t, err, data.Error)
+				})
+			}
+		})
 
 		t.Run("Paused", func(t *testing.T) {
 			b, err := NewBundle(&lib.SourceData{
