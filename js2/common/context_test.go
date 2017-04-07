@@ -24,10 +24,24 @@ import (
 	"context"
 	"testing"
 
+	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestContextState(t *testing.T) {
 	st := &State{}
 	assert.Equal(t, st, GetState(WithState(context.Background(), st)))
+}
+
+func TestContextStateNil(t *testing.T) {
+	assert.Nil(t, GetState(context.Background()))
+}
+
+func TestContextRuntime(t *testing.T) {
+	rt := goja.New()
+	assert.Equal(t, rt, GetRuntime(WithRuntime(context.Background(), rt)))
+}
+
+func TestContextRuntimeNil(t *testing.T) {
+	assert.Nil(t, GetRuntime(context.Background()))
 }
