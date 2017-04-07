@@ -45,8 +45,9 @@ type InitContext struct {
 	fs  afero.Fs
 	pwd string
 
-	// Cache of loaded programs.
-	programs map[string]*goja.Program `js:"-"`
+	// Cache of loaded programs and files.
+	programs map[string]*goja.Program
+	files    map[string][]byte
 
 	// Console object.
 	Console *Console
@@ -60,15 +61,25 @@ func NewInitContext(rt *goja.Runtime, ctxPtr *context.Context, fs afero.Fs, pwd 
 		pwd:     pwd,
 
 		programs: make(map[string]*goja.Program),
+		files:    make(map[string][]byte),
 
 		Console: NewConsole(),
 	}
 }
 
 func newBoundInitContext(base *InitContext, ctxPtr *context.Context, rt *goja.Runtime) *InitContext {
-	init := NewInitContext(rt, ctxPtr, nil, base.pwd)
-	init.programs = base.programs
-	return init
+	return &InitContext{
+		runtime: rt,
+		ctxPtr:  ctxPtr,
+
+		fs:  nil,
+		pwd: base.pwd,
+
+		programs: base.programs,
+		files:    base.files,
+
+		Console: base.Console,
+	}
 }
 
 func (i *InitContext) Require(arg string) goja.Value {
@@ -142,4 +153,23 @@ func (i *InitContext) requireFile(name string) (goja.Value, error) {
 
 	exports := i.runtime.Get("exports")
 	return exports, nil
+}
+
+func (i *InitContext) Open(name string) (string, error) {
+	pwd := i.pwd
+	filename := name
+	if !filepath.IsAbs(filename) {
+		filename = filepath.Join(pwd, name)
+	}
+
+	data, ok := i.files[filename]
+	if !ok {
+		data_, err := afero.ReadFile(i.fs, filename)
+		if err != nil {
+			return "", err
+		}
+		i.files[filename] = data_
+		data = data_
+	}
+	return string(data), nil
 }

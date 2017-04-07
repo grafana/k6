@@ -185,3 +185,35 @@ func TestInitContextRequire(t *testing.T) {
 		}
 	})
 }
+
+func TestInitContextOpen(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	assert.NoError(t, fs.MkdirAll("/path/to", 0755))
+	assert.NoError(t, afero.WriteFile(fs, "/path/to/file.txt", []byte("hi!"), 0644))
+
+	testdata := map[string]string{
+		"Absolute": "/path/to/file.txt",
+		"Relative": "./file.txt",
+	}
+	for name, loadPath := range testdata {
+		t.Run(name, func(t *testing.T) {
+			b, err := NewBundle(&lib.SourceData{
+				Filename: "/path/to/script.js",
+				Data: []byte(fmt.Sprintf(`
+				export let data = open("%s");
+				export default function() {}
+				`, loadPath)),
+			}, fs)
+			if !assert.NoError(t, err) {
+				return
+			}
+
+			bi, err := b.Instantiate()
+			if !assert.NoError(t, err) {
+				return
+			}
+
+			assert.Equal(t, "hi!", bi.Runtime.Get("data").Export())
+		})
+	}
+}
