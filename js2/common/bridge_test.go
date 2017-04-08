@@ -34,10 +34,11 @@ import (
 )
 
 type bridgeTestFieldsType struct {
-	Exported      string
-	ExportedTag   string `js:"renamed"`
-	unexported    string
-	unexportedTag string `js:"unexported"`
+	Exported       string
+	ExportedTag    string `js:"renamed"`
+	ExportedHidden string `js:"-"`
+	unexported     string
+	unexportedTag  string `js:"unexported"`
 }
 
 type bridgeTestMethodsType struct{}
@@ -173,10 +174,11 @@ func TestFieldNameMapper(t *testing.T) {
 		Methods map[string]string
 	}{
 		{reflect.TypeOf(bridgeTestFieldsType{}), map[string]string{
-			"Exported":      "exported",
-			"ExportedTag":   "renamed",
-			"unexported":    "",
-			"unexportedTag": "",
+			"Exported":       "exported",
+			"ExportedTag":    "renamed",
+			"ExportedHidden": "",
+			"unexported":     "",
+			"unexportedTag":  "",
 		}, nil},
 		{reflect.TypeOf(bridgeTestMethodsType{}), nil, map[string]string{
 			"ExportedFn":   "exportedFn",
@@ -229,7 +231,7 @@ func TestBind(t *testing.T) {
 		V    interface{}
 		Fn   func(t *testing.T, obj interface{}, rt *goja.Runtime)
 	}{
-		{"Fields", bridgeTestFieldsType{"a", "b", "c", "d"}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
+		{"Fields", bridgeTestFieldsType{"a", "b", "c", "d", "e"}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
 			t.Run("Exported", func(t *testing.T) {
 				v, err := RunString(rt, `obj.exported`)
 				if assert.NoError(t, err) {

@@ -89,6 +89,11 @@ func TestCheck(t *testing.T) {
 				"check": "::check",
 			}, state.Samples[0].Tags)
 		}
+
+		t.Run("Invalid", func(t *testing.T) {
+			_, err := common.RunString(rt, `k6.check(null, { "::": true })`)
+			assert.EqualError(t, err, "GoError: group and check names may not contain '::'")
+		})
 	})
 	t.Run("Array", func(t *testing.T) {
 		state := &common.State{Group: root}
