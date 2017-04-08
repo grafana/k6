@@ -67,11 +67,6 @@ func FieldName(t reflect.Type, f reflect.StructField) string {
 // Returns the JS name for an exported method. The first letter of the method's name is
 // lowercased, otherwise it is unaltered.
 func MethodName(t reflect.Type, m reflect.Method) string {
-	// PkgPath is non-empty for unexported methods.
-	if m.PkgPath != "" {
-		return ""
-	}
-
 	// A field with a name beginning with an X is a constructor, and just gets the prefix stripped.
 	// Note: They also get some special treatment from Bridge(), see further down.
 	if m.Name[0] == 'X' {
@@ -115,9 +110,6 @@ func Bind(rt *goja.Runtime, v interface{}, ctxPtr *context.Context) map[string]i
 	for i := 0; i < typ.NumMethod(); i++ {
 		meth := typ.Method(i)
 		name := MethodName(typ, meth)
-		if name == "" {
-			continue
-		}
 		fn := val.Method(i)
 
 		// Figure out if we want to do any wrapping of it.
