@@ -34,6 +34,7 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js2/common"
+	"github.com/loadimpact/k6/js2/modules/k6/html"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
 )
@@ -43,13 +44,14 @@ type HTTPResponseTimings struct {
 }
 
 type HTTPResponse struct {
+	ctx context.Context
+
 	URL     string
 	Status  int
 	Headers map[string]string
 	Body    string
 	Timings HTTPResponseTimings
 
-	runtime    *goja.Runtime
 	cachedJSON goja.Value
 }
 
@@ -57,11 +59,22 @@ func (res *HTTPResponse) Json() goja.Value {
 	if res.cachedJSON == nil {
 		var v interface{}
 		if err := json.Unmarshal([]byte(res.Body), &v); err != nil {
-			common.Throw(res.runtime, err)
+			common.Throw(common.GetRuntime(res.ctx), err)
 		}
-		res.cachedJSON = res.runtime.ToValue(v)
+		res.cachedJSON = common.GetRuntime(res.ctx).ToValue(v)
 	}
 	return res.cachedJSON
+}
+
+func (res *HTTPResponse) Html(selector ...string) html.Selection {
+	sel, err := html.HTML{}.ParseHTML(res.ctx, res.Body)
+	if err != nil {
+		common.Throw(common.GetRuntime(res.ctx), err)
+	}
+	if len(selector) > 0 {
+		sel = sel.Find(selector[0])
+	}
+	return sel
 }
 
 type HTTP struct{}
@@ -160,6 +173,8 @@ func (*HTTP) Request(ctx context.Context, method, url string, args ...goja.Value
 		headers[k] = strings.Join(vs, ", ")
 	}
 	return &HTTPResponse{
+		ctx: ctx,
+
 		URL:     res.Request.URL.String(),
 		Status:  res.StatusCode,
 		Headers: headers,
@@ -173,8 +188,6 @@ func (*HTTP) Request(ctx context.Context, method, url string, args ...goja.Value
 			Waiting:    stats.D(trail.Waiting),
 			Receiving:  stats.D(trail.Receiving),
 		},
-
-		runtime: rt,
 	}, nil
 }
 

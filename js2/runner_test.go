@@ -95,7 +95,13 @@ func TestRunnerOptions(t *testing.T) {
 }
 
 func TestRunnerIntegrationImports(t *testing.T) {
-	for _, mod := range []string{"k6", "k6/http", "k6/metrics"} {
+	modules := []string{
+		"k6",
+		"k6/http",
+		"k6/metrics",
+		"k6/html",
+	}
+	for _, mod := range modules {
 		t.Run(mod, func(t *testing.T) {
 			_, err := New(&lib.SourceData{
 				Filename: "/script.js",
