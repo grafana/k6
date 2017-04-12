@@ -42,6 +42,7 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/loadimpact/k6/api"
 	"github.com/loadimpact/k6/js"
+	"github.com/loadimpact/k6/js2"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/simple"
 	"github.com/loadimpact/k6/stats"
@@ -57,6 +58,7 @@ const (
 	TypeAuto = "auto"
 	TypeURL  = "url"
 	TypeJS   = "js"
+	TypeJS2  = "js2"
 )
 
 var urlRegex = regexp.MustCompile(`(?i)^https?://`)
@@ -226,6 +228,8 @@ func makeRunner(runnerType string, src *lib.SourceData, fs afero.Fs) (lib.Runner
 			return nil, err
 		}
 		return r, nil
+	case TypeJS2:
+		return js2.New(src, fs)
 	default:
 		return nil, errors.New("Invalid type specified, see --help")
 	}
