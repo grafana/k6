@@ -44,6 +44,19 @@ var loaders = []struct {
 	{"github", github, regexp.MustCompile(`^github.com/([^/]+)/([^/]+)/(.*)$`)},
 }
 
+// Resolves a relative path to an absolute one.
+func Resolve(pwd, name string) string {
+	if name[0] == '.' {
+		return filepath.Join(pwd, name)
+	}
+	return name
+}
+
+// Returns the directory for the path.
+func Dir(name string) string {
+	return filepath.Dir(name)
+}
+
 func Load(fs afero.Fs, pwd, name string) (*lib.SourceData, error) {
 	// We just need to make sure `import ""` doesn't crash the loader.
 	if name == "" {
@@ -61,9 +74,7 @@ func Load(fs afero.Fs, pwd, name string) (*lib.SourceData, error) {
 	}
 
 	// If the file starts with ".", resolve it as a relative path.
-	if name[0] == '.' {
-		name = filepath.Join(pwd, name)
-	}
+	name = Resolve(pwd, name)
 
 	// If the resolved path starts with a "/", it's a local file.
 	if name[0] == '/' {
