@@ -24,7 +24,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net"
 	"net/url"
@@ -44,6 +43,7 @@ import (
 	"github.com/loadimpact/k6/js"
 	"github.com/loadimpact/k6/js2"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/simple"
 	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/stats/influxdb"
@@ -171,33 +171,27 @@ func guessType(data []byte) string {
 }
 
 func getSrcData(filename string, fs afero.Fs) (*lib.SourceData, error) {
-	reader := io.Reader(os.Stdin)
-	if filename != "-" {
-		f, err := fs.Open(filename)
+	if filename == "-" {
+		data, err := ioutil.ReadAll(os.Stdin)
 		if err != nil {
-			// If the file doesn't exist, but it looks like a URL, try using it as one.
-			if os.IsNotExist(err) && urlRegex.MatchString(filename) {
-				return &lib.SourceData{
-					Data:     []byte(filename),
-					Filename: filename,
-				}, nil
-			}
-
 			return nil, err
 		}
-		defer func() { _ = f.Close() }()
-		reader = f
+		return &lib.SourceData{Filename: "-", Data: data}, nil
 	}
 
-	data, err := ioutil.ReadAll(reader)
+	if ok, _ := afero.Exists(fs, filename); ok {
+		data, err := afero.ReadFile(fs, filename)
+		if err != nil {
+			return nil, err
+		}
+		return &lib.SourceData{Filename: filename, Data: data}, nil
+	}
+
+	pwd, err := os.Getwd()
 	if err != nil {
-		return nil, err
+		pwd = "/"
 	}
-
-	return &lib.SourceData{
-		Data:     data,
-		Filename: filename,
-	}, nil
+	return loader.Load(fs, pwd, filename)
 }
 
 func makeRunner(runnerType string, src *lib.SourceData, fs afero.Fs) (lib.Runner, error) {
