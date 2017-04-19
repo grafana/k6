@@ -1,0 +1,22 @@
+version: '3'
+services:
+  influxdb:
+    build:
+      context: .
+      dockerfile: Dockerfile.influxdb
+    ports:
+      - "8086:8086"
+  grafana:
+    build:
+      context: .
+      dockerfile: Dockerfile.grafana
+    links:
+      - influxdb
+    ports:
+      - "3000:3000"
+  k6:
+    build: .
+    ports:
+      - "6565:6565"
+    environment:
+      - K6_OUT=influxdb=http://influxdb:8086/k6
