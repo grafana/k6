@@ -92,4 +92,12 @@ func TestLoad(t *testing.T) {
 			}
 		})
 	})
+
+	t.Run("No _k6=1 Fallback", func(t *testing.T) {
+		src, err := Load(nil, "/", "pastebin.com/raw/zngdRRDT")
+		if assert.NoError(t, err) {
+			assert.Equal(t, src.Filename, "pastebin.com/raw/zngdRRDT")
+			assert.Equal(t, "export function fn() {\r\n    return 1234;\r\n}", string(src.Data))
+		}
+	})
 }

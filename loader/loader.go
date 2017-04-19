@@ -101,7 +101,8 @@ func Load(fs afero.Fs, pwd, name string) (*lib.SourceData, error) {
 
 	// If not, load it and have a look. HTTPS is enforced, because it's 2017, HTTPS is easy,
 	// running arbitrary, trivially MitM'd code (even sandboxed) is very, very bad.
-	url := "https://" + name
+	origURL := "https://" + name
+	url := origURL
 	if !strings.ContainsRune(url, '?') {
 		url += "?"
 	} else {
@@ -109,8 +110,15 @@ func Load(fs afero.Fs, pwd, name string) (*lib.SourceData, error) {
 	}
 	url += "_k6=1"
 	data, err := fetch(url)
+
+	// If this fails, try to fetch without ?_k6=1 - some sources act weird around unknown GET args.
 	if err != nil {
-		return nil, err
+		data2, err2 := fetch(origURL)
+		if err2 != nil {
+			return nil, err
+		}
+		data = data2
+		err = nil
 	}
 
 	// TODO: Parse the HTML, look for meta tags!!
