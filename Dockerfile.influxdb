@@ -1,18 +1,6 @@
-FROM buildpack-deps:trusty
-
-RUN apt-get update && apt-get -y install apt-transport-https
-
-# Influxdb
-RUN curl -sL https://repos.influxdata.com/influxdb.key | apt-key add -
-RUN echo "deb https://repos.influxdata.com/ubuntu trusty stable" | tee /etc/apt/sources.list.d/influxdb.list
-RUN apt-get update && apt-get -y install influxdb
+FROM influxdb:1.2.2
 
 # Create a k6 db
 RUN /bin/bash -c "influxd run & sleep 5 && influx -execute 'CREATE DATABASE k6' && kill %1 && sleep 5"
 
-RUN echo "#!/bin/bash" >/start.sh
-RUN echo "/usr/bin/influxd run >/var/log/influxdb.log 2>&1 &" >>/start.sh
-RUN echo "tail -f /dev/null" >>/start.sh
-RUN chmod 755 /start.sh
-
-ENTRYPOINT ["/start.sh"]
+CMD ["influxd"]
