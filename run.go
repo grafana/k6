@@ -118,6 +118,7 @@ var commandRun = cli.Command{
 		cli.StringFlag{
 			Name:  "out, o",
 			Usage: "output metrics to an external data store",
+			EnvVar: "K6_OUT",
 		},
 		cli.StringSliceFlag{
 			Name:  "config, c",
