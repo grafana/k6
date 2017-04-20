@@ -16,7 +16,7 @@ var (
 	DefaultOpts = map[string]interface{}{
 		"presets":       []string{"latest"},
 		"ast":           false,
-		"sourceMaps":    true,
+		"sourceMaps":    false,
 		"babelrc":       false,
 		"compact":       false,
 		"retainLines":   true,
