@@ -119,7 +119,6 @@ func Load(fs afero.Fs, pwd, name string) (*lib.SourceData, error) {
 			return nil, err
 		}
 		data = data2
-		err = nil
 	}
 
 	// TODO: Parse the HTML, look for meta tags!!

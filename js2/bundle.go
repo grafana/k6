@@ -148,7 +148,7 @@ func (b *Bundle) instantiate(rt *goja.Runtime, init *InitContext) error {
 	exports := rt.NewObject()
 	rt.Set("exports", exports)
 	module := rt.NewObject()
-	module.Set("exports", exports)
+	_ = module.Set("exports", exports)
 	rt.Set("module", module)
 
 	*init.ctxPtr = common.WithRuntime(context.Background(), rt)

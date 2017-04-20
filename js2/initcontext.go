@@ -127,7 +127,7 @@ func (i *InitContext) requireFile(name string) (goja.Value, error) {
 	exports := i.runtime.NewObject()
 	i.runtime.Set("exports", exports)
 	module := i.runtime.NewObject()
-	module.Set("exports", exports)
+	_ = module.Set("exports", exports)
 	i.runtime.Set("module", module)
 
 	// Read sources, transform into ES6 and cache the compiled program.
