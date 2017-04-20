@@ -136,35 +136,29 @@ func TestInitContextRequire(t *testing.T) {
 			LibPath    string
 			ConstPaths map[string]string
 		}{
-			"lib.js": {"/path/to/lib.js", map[string]string{
-				"":             "",
-				"const.js":     "/path/to/const.js",
-				"../const.js":  "/path/const.js",
-				"sub/const.js": "/path/to/sub/const.js",
-			}},
 			"./lib.js": {"/path/to/lib.js", map[string]string{
-				"":             "",
-				"const.js":     "/path/to/const.js",
-				"../const.js":  "/path/const.js",
-				"sub/const.js": "/path/to/sub/const.js",
+				"":               "",
+				"./const.js":     "/path/to/const.js",
+				"../const.js":    "/path/const.js",
+				"./sub/const.js": "/path/to/sub/const.js",
 			}},
 			"../lib.js": {"/path/lib.js", map[string]string{
-				"":             "",
-				"const.js":     "/path/const.js",
-				"../const.js":  "/const.js",
-				"sub/const.js": "/path/sub/const.js",
+				"":               "",
+				"./const.js":     "/path/const.js",
+				"../const.js":    "/const.js",
+				"./sub/const.js": "/path/sub/const.js",
 			}},
-			"dir/lib.js": {"/path/to/dir/lib.js", map[string]string{
-				"":             "",
-				"const.js":     "/path/to/dir/const.js",
-				"../const.js":  "/path/to/const.js",
-				"sub/const.js": "/path/to/dir/sub/const.js",
+			"./dir/lib.js": {"/path/to/dir/lib.js", map[string]string{
+				"":               "",
+				"./const.js":     "/path/to/dir/const.js",
+				"../const.js":    "/path/to/const.js",
+				"./sub/const.js": "/path/to/dir/sub/const.js",
 			}},
 			"/path/to/lib.js": {"/path/to/lib.js", map[string]string{
-				"":             "",
-				"const.js":     "/path/to/const.js",
-				"../const.js":  "/path/const.js",
-				"sub/const.js": "/path/to/sub/const.js",
+				"":               "",
+				"./const.js":     "/path/to/const.js",
+				"../const.js":    "/path/const.js",
+				"./sub/const.js": "/path/to/sub/const.js",
 			}},
 		}
 		for libName, data := range imports {

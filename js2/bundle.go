@@ -144,7 +144,12 @@ func (b *Bundle) Instantiate() (*BundleInstance, error) {
 func (b *Bundle) instantiate(rt *goja.Runtime, init *InitContext) error {
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 	rt.SetRandSource(common.DefaultRandSource)
-	rt.Set("exports", rt.NewObject())
+
+	exports := rt.NewObject()
+	rt.Set("exports", exports)
+	module := rt.NewObject()
+	module.Set("exports", exports)
+	rt.Set("module", module)
 
 	*init.ctxPtr = common.WithRuntime(context.Background(), rt)
 	unbindInit := common.BindToGlobal(rt, common.Bind(rt, init, init.ctxPtr))
