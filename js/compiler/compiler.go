@@ -1,7 +1,10 @@
 package compiler
 
 import (
+	"time"
+
 	"github.com/GeertJohan/go.rice"
+	log "github.com/Sirupsen/logrus"
 	"github.com/dop251/goja"
 	"github.com/mitchellh/mapstructure"
 )
@@ -53,10 +56,12 @@ func (c *Compiler) Transform(src, filename string) (code string, srcmap SourceMa
 	}
 	opts["filename"] = filename
 
+	startTime := time.Now()
 	v, err := c.transform(c.this, c.vm.ToValue(src), c.vm.ToValue(opts))
 	if err != nil {
 		return code, srcmap, err
 	}
+	log.WithField("t", time.Since(startTime)).Debug("Babel: Transformed")
 	vO := v.ToObject(c.vm)
 
 	if err := c.vm.ExportTo(vO.Get("code"), &code); err != nil {
