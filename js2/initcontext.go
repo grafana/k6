@@ -120,8 +120,15 @@ func (i *InitContext) requireFile(name string) (goja.Value, error) {
 
 	// Swap the importing scope's imports out, then put it back again.
 	oldExports := i.runtime.Get("exports")
-	i.runtime.Set("exports", i.runtime.NewObject())
 	defer i.runtime.Set("exports", oldExports)
+	oldModule := i.runtime.Get("module")
+	defer i.runtime.Set("module", oldModule)
+
+	exports := i.runtime.NewObject()
+	i.runtime.Set("exports", exports)
+	module := i.runtime.NewObject()
+	module.Set("exports", exports)
+	i.runtime.Set("module", module)
 
 	// Read sources, transform into ES6 and cache the compiled program.
 	pgm, ok := i.programs[filename]
@@ -149,8 +156,7 @@ func (i *InitContext) requireFile(name string) (goja.Value, error) {
 		return goja.Undefined(), err
 	}
 
-	exports := i.runtime.Get("exports")
-	return exports, nil
+	return module.Get("exports"), nil
 }
 
 func (i *InitContext) Open(name string) (string, error) {
