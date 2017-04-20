@@ -1,13 +1,15 @@
 FROM grafana/grafana
 
-RUN apt-get update && apt-get -y install sqlite3
+RUN apt-get update && apt-get -y install curl
 
 # Change the default data directory (otherwise grafana.db won't persist)
 RUN mkdir /var/lib/grafanadb
 ENV GF_PATHS_DATA /var/lib/grafanadb
-RUN bash -c "/run.sh & sleep 15 && kill -SIGINT %%"
 
 # Init Grafana sqlite db and preconfigure our data source to be our influxdb k6 db
-RUN echo "INSERT INTO \"data_source\" VALUES(1,1,0,'influxdb','myinfluxdb','proxy','http://influxdb:8086','','','k6',0,'','',1,X'7B7D','2016-12-29 15:19:32','2016-12-29 15:19:37',0,'{}');" |sqlite3 /var/lib/grafanadb/grafana.db
+RUN bash -c '/run.sh & sleep 15 && curl -s -X POST \
+    --data "name=myinfluxdb&type=influxdb&access=proxy&url=http://influxdb:8086&database=k6&isDefault=true" http://admin:admin@localhost:3000/api/datasources \
+    && kill -SIGINT %%'
+
 
 CMD ["/run.sh"]
