@@ -239,7 +239,7 @@ func parseCollectorString(s string) (t, p string, err error) {
 	return parts[0], parts[1], nil
 }
 
-func makeCollector(s string, opts lib.Options) (lib.Collector, error) {
+func makeCollector(s string, src *lib.SourceData, opts lib.Options) (lib.Collector, error) {
 	t, p, err := parseCollectorString(s)
 	if err != nil {
 		return nil, err
@@ -354,7 +354,7 @@ func actionRun(cc *cli.Context) error {
 	// Make the metric collector, if requested.
 	var collector lib.Collector
 	if out != "" {
-		c, err := makeCollector(out, opts)
+		c, err := makeCollector(out, src, opts)
 		if err != nil {
 			log.WithError(err).Error("Couldn't create output")
 			return err
