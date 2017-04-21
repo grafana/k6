@@ -804,6 +804,49 @@ func TestEngine_processStages(t *testing.T) {
 				{1 * time.Second, false, 0},
 			},
 		},
+		"mix": {
+			[]Stage{
+				{Duration: 5 * time.Second, Target: null.IntFrom(20)},
+				{Duration: 5 * time.Second, Target: null.IntFrom(10)},
+				{Duration: 2 * time.Second},
+				{Duration: 5 * time.Second, Target: null.IntFrom(20)},
+				{Duration: 2 * time.Second},
+				{Duration: 5 * time.Second, Target: null.IntFrom(10)},
+			},
+			[]checkpoint{
+				{0 * time.Second, true, 0},
+
+				{1 * time.Second, true, 4},
+				{1 * time.Second, true, 8},
+				{1 * time.Second, true, 12},
+				{1 * time.Second, true, 16},
+				{1 * time.Second, true, 20},
+
+				{1 * time.Second, true, 18},
+				{1 * time.Second, true, 16},
+				{1 * time.Second, true, 14},
+				{1 * time.Second, true, 12},
+				{1 * time.Second, true, 10},
+
+				{1 * time.Second, true, 10},
+				{1 * time.Second, true, 10},
+
+				{1 * time.Second, true, 12},
+				{1 * time.Second, true, 14},
+				{1 * time.Second, true, 16},
+				{1 * time.Second, true, 18},
+				{1 * time.Second, true, 20},
+
+				{1 * time.Second, true, 20},
+				{1 * time.Second, true, 20},
+
+				{1 * time.Second, true, 18},
+				{1 * time.Second, true, 16},
+				{1 * time.Second, true, 14},
+				{1 * time.Second, true, 12},
+				{1 * time.Second, true, 10},
+			},
+		},
 	}
 	for name, data := range testdata {
 		t.Run(name, func(t *testing.T) {
