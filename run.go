@@ -364,11 +364,11 @@ func actionRun(cc *cli.Context) error {
 
 	fmt.Fprintln(color.Output, "")
 
-	color.Green(`          /\      |‾‾|  /‾‾/  /‾/   `)
-	color.Green(`     /\  /  \     |  |_/  /  / /   `)
-	color.Green(`    /  \/    \    |      |  /  ‾‾\  `)
-	color.Green(`   /          \   |  |‾\  \ | (_) | `)
-	color.Green(`  / __________ \  |__|  \__\ \___/  Welcome to k6 v%s!`, cc.App.Version)
+	color.Cyan(`          /\      |‾‾|  /‾‾/  /‾/   `)
+	color.Cyan(`     /\  /  \     |  |_/  /  / /   `)
+	color.Cyan(`    /  \/    \    |      |  /  ‾‾\  `)
+	color.Cyan(`   /          \   |  |‾\  \ | (_) | `)
+	color.Cyan(`  / __________ \  |__|  \__\ \___/  Welcome to k6 v%s!`, cc.App.Version)
 
 	collectorString := "-"
 	if collector != nil {
