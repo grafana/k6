@@ -90,14 +90,16 @@ type TestRun struct {
 	Name        string              `json:"name"`
 	ProjectID   int                 `json:"project_id,omitempty"`
 	Threasholds map[string][]string `json:"thresholds"`
+	// Duration of test in seconds. -1 for unknown length, 0 for continuous running.
+	Duration int64 `json:"duration"`
 }
 
 type CreateTestRunResponse struct {
 	ReferenceID string `json:"reference_id"`
 }
 
-func (c *Client) CreateTestRun(name string, thresholds map[string][]string) *CreateTestRunResponse {
-	testRun := TestRun{Name: name, Threasholds: thresholds}
+func (c *Client) CreateTestRun(name string, thresholds map[string][]string, duration int64) *CreateTestRunResponse {
+	testRun := TestRun{Name: name, Threasholds: thresholds, Duration: duration}
 
 	url := fmt.Sprintf("%s/tests", c.baseURL)
 	req, err := c.NewRequest("POST", url, testRun)
