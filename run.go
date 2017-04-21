@@ -116,8 +116,8 @@ var commandRun = cli.Command{
 			Usage: "INSECURE: skip verification of TLS certificates",
 		},
 		cli.StringFlag{
-			Name:  "out, o",
-			Usage: "output metrics to an external data store",
+			Name:   "out, o",
+			Usage:  "output metrics to an external data store",
 			EnvVar: "K6_OUT",
 		},
 		cli.StringSliceFlag{
