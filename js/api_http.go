@@ -96,11 +96,14 @@ func (a JSAPI) HTTPRequest(method, url, body string, paramData string) map[strin
 	for k, v := range res.Header {
 		headers[k] = strings.Join(v, ", ")
 	}
+	remoteAddr := strings.Split(trail.ConnRemoteAddr.String(), ":")
 	return map[string]interface{}{
-		"url":     res.Request.URL.String(),
-		"status":  res.StatusCode,
-		"body":    string(resBody),
-		"headers": headers,
+		"remote_ip":   remoteAddr[0],
+		"remote_port": remoteAddr[1],
+		"url":         res.Request.URL.String(),
+		"status":      res.StatusCode,
+		"body":        string(resBody),
+		"headers":     headers,
 		"timings": map[string]float64{
 			"duration":   stats.D(trail.Duration),
 			"blocked":    stats.D(trail.Blocked),
