@@ -609,7 +609,7 @@ loop:
 			icon,
 			name,
 			color.New(color.Faint).Sprint(namePadding+":"),
-			color.CyanString(val),
+			val,
 		)
 	}
 
