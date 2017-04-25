@@ -175,7 +175,7 @@ func (*HTTP) Request(ctx context.Context, method, url string, args ...goja.Value
 		headers[k] = strings.Join(vs, ", ")
 	}
 	remoteAddr := strings.Split(trail.ConnRemoteAddr.String(), ":")
-	remotePort, err := strconv.Atoi(remoteAddr[1])
+	remotePort, _ := strconv.Atoi(remoteAddr[1])
 	return &HTTPResponse{
 		ctx: ctx,
 
