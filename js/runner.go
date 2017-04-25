@@ -33,6 +33,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
 	"github.com/robertkrimen/otto"
 )
@@ -79,11 +80,11 @@ func NewRunner(rt *Runtime, exports otto.Value) (*Runner, error) {
 		Options:      rt.Options,
 		HTTPTransport: &http.Transport{
 			Proxy: http.ProxyFromEnvironment,
-			DialContext: (&net.Dialer{
+			DialContext: (netext.Dialer{Dialer: net.Dialer{
 				Timeout:   10 * time.Second,
 				KeepAlive: 60 * time.Second,
 				DualStack: true,
-			}).DialContext,
+			}}).DialContext,
 			TLSClientConfig:     &tls.Config{},
 			MaxIdleConns:        math.MaxInt32,
 			MaxIdleConnsPerHost: math.MaxInt32,

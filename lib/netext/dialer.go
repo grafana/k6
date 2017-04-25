@@ -18,23 +18,44 @@
  *
  */
 
-package common
+package netext
 
 import (
-	"net/http"
-
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/stats"
+	"context"
+	"net"
+	"sync/atomic"
 )
 
-// Provides volatile state for a VU.
-type State struct {
-	// Current group; all emitted metrics are tagged with this.
-	Group *lib.Group
+type Dialer struct {
+	net.Dialer
+}
 
-	// Networking equipment.
-	HTTPTransport http.RoundTripper
+func (d Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn, error) {
+	conn, err := d.Dialer.DialContext(ctx, proto, addr)
+	if err != nil {
+		return nil, err
+	}
+	if v := ctx.Value(ctxKeyTracer); v != nil {
+		tracer := v.(*Tracer)
+		return &Conn{conn, &tracer.bytesRead, &tracer.bytesWritten}, nil
+	}
+	return conn, err
+}
 
-	// Sample buffer, emitted at the end of the iteration.
-	Samples []stats.Sample
+type Conn struct {
+	net.Conn
+
+	BytesRead, BytesWritten *int64
+}
+
+func (c *Conn) Read(b []byte) (int, error) {
+	n, err := c.Conn.Read(b)
+	atomic.AddInt64(c.BytesRead, int64(n))
+	return n, err
+}
+
+func (c *Conn) Write(b []byte) (int, error) {
+	n, err := c.Conn.Write(b)
+	atomic.AddInt64(c.BytesWritten, int64(n))
+	return n, err
 }

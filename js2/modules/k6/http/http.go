@@ -27,7 +27,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"net/http/httptrace"
 	neturl "net/url"
 	"strconv"
 	"strings"
@@ -35,7 +34,7 @@ import (
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js2/common"
 	"github.com/loadimpact/k6/js2/modules/k6/html"
-	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
 )
 
@@ -149,9 +148,9 @@ func (*HTTP) Request(ctx context.Context, method, url string, args ...goja.Value
 		}
 	}
 
-	client := http.Client{}
-	tracer := lib.Tracer{}
-	res, err := client.Do(req.WithContext(httptrace.WithClientTrace(ctx, tracer.Trace())))
+	client := http.Client{Transport: state.HTTPTransport}
+	tracer := netext.Tracer{}
+	res, err := client.Do(req.WithContext(netext.WithTracer(ctx, &tracer)))
 	if err != nil {
 		state.Samples = append(state.Samples, tracer.Done().Samples(tags)...)
 		return nil, err

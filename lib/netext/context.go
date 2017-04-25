@@ -18,23 +18,21 @@
  *
  */
 
-package common
+package netext
 
 import (
-	"net/http"
-
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/stats"
+	"context"
+	"net/http/httptrace"
 )
 
-// Provides volatile state for a VU.
-type State struct {
-	// Current group; all emitted metrics are tagged with this.
-	Group *lib.Group
+type ctxKey int
 
-	// Networking equipment.
-	HTTPTransport http.RoundTripper
+const (
+	ctxKeyTracer ctxKey = iota
+)
 
-	// Sample buffer, emitted at the end of the iteration.
-	Samples []stats.Sample
+func WithTracer(ctx context.Context, tracer *Tracer) context.Context {
+	ctx = httptrace.WithClientTrace(ctx, tracer.Trace())
+	ctx = context.WithValue(ctx, ctxKeyTracer, tracer)
+	return ctx
 }
