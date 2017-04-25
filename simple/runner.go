@@ -28,12 +28,12 @@ import (
 	"math"
 	"net"
 	"net/http"
-	"net/http/httptrace"
 	"net/url"
 	"strconv"
 	"time"
 
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
 )
 
@@ -50,11 +50,11 @@ func New(u *url.URL) (*Runner, error) {
 		URL: u,
 		Transport: &http.Transport{
 			Proxy: http.ProxyFromEnvironment,
-			DialContext: (&net.Dialer{
+			DialContext: (netext.Dialer{Dialer: net.Dialer{
 				Timeout:   10 * time.Second,
 				KeepAlive: 60 * time.Second,
 				DualStack: true,
-			}).DialContext,
+			}}).DialContext,
 			TLSClientConfig:     &tls.Config{},
 			MaxIdleConns:        math.MaxInt32,
 			MaxIdleConnsPerHost: math.MaxInt32,
@@ -64,8 +64,6 @@ func New(u *url.URL) (*Runner, error) {
 }
 
 func (r *Runner) NewVU() (lib.VU, error) {
-	tracer := &lib.Tracer{}
-
 	return &VU{
 		Runner:    r,
 		URLString: r.URL.String(),
@@ -76,8 +74,7 @@ func (r *Runner) NewVU() (lib.VU, error) {
 		Client: &http.Client{
 			Transport: r.Transport,
 		},
-		tracer: tracer,
-		cTrace: tracer.Trace(),
+		tracer: &netext.Tracer{},
 	}, nil
 }
 
@@ -103,8 +100,7 @@ type VU struct {
 	Request   *http.Request
 	Client    *http.Client
 
-	tracer *lib.Tracer
-	cTrace *httptrace.ClientTrace
+	tracer *netext.Tracer
 }
 
 func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
@@ -115,7 +111,7 @@ func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 		"url":    u.URLString,
 	}
 
-	resp, err := u.Client.Do(u.Request.WithContext(httptrace.WithClientTrace(ctx, u.cTrace)))
+	resp, err := u.Client.Do(u.Request.WithContext(netext.WithTracer(ctx, u.tracer)))
 	if err != nil {
 		return u.tracer.Done().Samples(tags), err
 	}

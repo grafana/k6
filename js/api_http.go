@@ -25,12 +25,11 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"net/http/httptrace"
 	"strconv"
 	"strings"
 	"sync"
 
-	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
 	"github.com/robertkrimen/otto"
 )
@@ -74,8 +73,8 @@ func (a JSAPI) HTTPRequest(method, url, body string, paramData string) map[strin
 		tags[key] = value
 	}
 
-	tracer := lib.Tracer{}
-	res, err := a.vu.HTTPClient.Do(req.WithContext(httptrace.WithClientTrace(a.vu.ctx, tracer.Trace())))
+	tracer := netext.Tracer{}
+	res, err := a.vu.HTTPClient.Do(req.WithContext(netext.WithTracer(a.vu.ctx, &tracer)))
 	if err != nil {
 		a.vu.Samples = append(a.vu.Samples, tracer.Done().Samples(tags)...)
 		throw(a.vu.vm, err)

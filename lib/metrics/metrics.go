@@ -23,4 +23,8 @@ var (
 	HTTPReqSending    = stats.New("http_req_sending", stats.Trend, stats.Time)
 	HTTPReqWaiting    = stats.New("http_req_waiting", stats.Trend, stats.Time)
 	HTTPReqReceiving  = stats.New("http_req_receiving", stats.Trend, stats.Time)
+
+	// Network-related; used for future protocols as well.
+	DataSent     = stats.New("data_sent", stats.Counter, stats.Data)
+	DataReceived = stats.New("data_received", stats.Counter, stats.Data)
 )

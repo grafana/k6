@@ -23,14 +23,18 @@ package http
 import (
 	"context"
 	"fmt"
+	"net"
+	"net/http"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js2/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
+	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
 	"github.com/stretchr/testify/assert"
 )
@@ -82,7 +86,16 @@ func TestRequest(t *testing.T) {
 
 	rt := goja.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
-	state := &common.State{Group: root}
+	state := &common.State{
+		Group: root,
+		HTTPTransport: &http.Transport{
+			DialContext: (netext.Dialer{Dialer: net.Dialer{
+				Timeout:   10 * time.Second,
+				KeepAlive: 60 * time.Second,
+				DualStack: true,
+			}}).DialContext,
+		},
+	}
 
 	ctx := context.Background()
 	ctx = common.WithState(ctx, state)

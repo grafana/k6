@@ -28,6 +28,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dustin/go-humanize"
+
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -39,6 +41,7 @@ const (
 
 	defaultString = `"default"`
 	timeString    = `"time"`
+	dataString    = `"data"`
 )
 
 // Possible values for MetricType.
@@ -53,6 +56,7 @@ const (
 const (
 	Default = ValueType(iota) // Values are presented as-is
 	Time                      // Values are timestamps (nanoseconds)
+	Data                      // Values are data amounts (bytes)
 )
 
 // The serialized metric type is invalid.
@@ -123,6 +127,8 @@ func (t ValueType) MarshalJSON() ([]byte, error) {
 		return []byte(defaultString), nil
 	case Time:
 		return []byte(timeString), nil
+	case Data:
+		return []byte(dataString), nil
 	default:
 		return nil, ErrInvalidValueType
 	}
@@ -135,6 +141,8 @@ func (t *ValueType) UnmarshalJSON(data []byte) error {
 		*t = Default
 	case timeString:
 		*t = Time
+	case dataString:
+		*t = Data
 	default:
 		return ErrInvalidValueType
 	}
@@ -148,6 +156,8 @@ func (t ValueType) String() string {
 		return defaultString
 	case Time:
 		return timeString
+	case Data:
+		return dataString
 	default:
 		return "[INVALID]"
 	}
@@ -234,6 +244,8 @@ func (m Metric) HumanizeValue(v float64) string {
 				d -= d % (10 * time.Nanosecond)
 			}
 			return d.String()
+		case Data:
+			return humanize.Bytes(uint64(v))
 		default:
 			return strconv.FormatFloat(v, 'f', -1, 64)
 		}
