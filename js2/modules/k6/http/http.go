@@ -46,11 +46,13 @@ type HTTPResponseTimings struct {
 type HTTPResponse struct {
 	ctx context.Context
 
-	URL     string
-	Status  int
-	Headers map[string]string
-	Body    string
-	Timings HTTPResponseTimings
+	RemoteIP   string
+	RemotePort int
+	URL        string
+	Status     int
+	Headers    map[string]string
+	Body       string
+	Timings    HTTPResponseTimings
 
 	cachedJSON goja.Value
 }
@@ -172,13 +174,17 @@ func (*HTTP) Request(ctx context.Context, method, url string, args ...goja.Value
 	for k, vs := range res.Header {
 		headers[k] = strings.Join(vs, ", ")
 	}
+	remoteAddr := strings.Split(trail.ConnRemoteAddr.String(), ":")
+	remotePort, err := strconv.Atoi(remoteAddr[1])
 	return &HTTPResponse{
 		ctx: ctx,
 
-		URL:     res.Request.URL.String(),
-		Status:  res.StatusCode,
-		Headers: headers,
-		Body:    string(body),
+		RemoteIP:   remoteAddr[0],
+		RemotePort: remotePort,
+		URL:        res.Request.URL.String(),
+		Status:     res.StatusCode,
+		Headers:    headers,
+		Body:       string(body),
 		Timings: HTTPResponseTimings{
 			Duration:   stats.D(trail.Duration),
 			Blocked:    stats.D(trail.Blocked),
