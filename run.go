@@ -570,11 +570,31 @@ loop:
 
 	for _, name := range metricNames {
 		m := metrics[name]
-		m.Sample = engine.Metrics[m].Format()
-		val := metrics[name].Humanize()
+		sample := engine.Metrics[m].Format()
+
+		var val string
+		switch len(sample) {
+		case 0:
+			continue
+		case 1:
+			for _, v := range sample {
+				val = color.CyanString(m.HumanizeValue(v))
+				if atTime > 1*time.Second && m.Type == stats.Counter && m.Contains != stats.Time {
+					perS := m.HumanizeValue(v / float64(atTime/time.Second))
+					val += " " + color.New(color.Faint, color.FgCyan).Sprintf("(%s/s)", perS)
+				}
+			}
+		default:
+			var parts []string
+			for k, v := range sample {
+				parts = append(parts, fmt.Sprintf("%s=%s", k, color.CyanString(m.HumanizeValue(v))))
+			}
+			val = strings.Join(parts, " ")
+		}
 		if val == "0" {
 			continue
 		}
+
 		icon := " "
 		if m.Tainted.Valid {
 			if !m.Tainted.Bool {
@@ -583,24 +603,6 @@ loop:
 				icon = color.RedString("✗")
 			}
 		}
-
-		// Hack some color in there.
-		parts := strings.Split(val, ", ")
-		newParts := make([]string, len(parts))
-		for i, part := range parts {
-			kv := strings.SplitN(part, "=", 2)
-			switch len(kv) {
-			case 1:
-				newParts[i] = color.CyanString(kv[0])
-			case 2:
-				newParts[i] = fmt.Sprintf(
-					"%s%s",
-					color.New(color.Reset).Sprint(kv[0]+"="),
-					color.CyanString(kv[1]),
-				)
-			}
-		}
-		val = strings.Join(newParts, ", ")
 
 		namePadding := strings.Repeat(".", metricNameWidth-len(name)+3)
 		fmt.Fprintf(color.Output, "  %s %s%s %s\n",
