@@ -26,6 +26,7 @@ import (
 	"encoding/json"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httptrace"
 	neturl "net/url"
@@ -174,12 +175,12 @@ func (*HTTP) Request(ctx context.Context, method, url string, args ...goja.Value
 	for k, vs := range res.Header {
 		headers[k] = strings.Join(vs, ", ")
 	}
-	remoteAddr := strings.Split(trail.ConnRemoteAddr.String(), ":")
-	remotePort, _ := strconv.Atoi(remoteAddr[1])
+	remoteHost, remotePortStr, _ := net.SplitHostPort(trail.ConnRemoteAddr.String())
+	remotePort, _ := strconv.Atoi(remotePortStr)
 	return &HTTPResponse{
 		ctx: ctx,
 
-		RemoteIP:   remoteAddr[0],
+		RemoteIP:   remoteHost,
 		RemotePort: remotePort,
 		URL:        res.Request.URL.String(),
 		Status:     res.StatusCode,
