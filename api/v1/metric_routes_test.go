@@ -30,21 +30,17 @@ import (
 	"github.com/loadimpact/k6/stats"
 	"github.com/manyminds/api2go/jsonapi"
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/guregu/null.v3"
+	null "gopkg.in/guregu/null.v3"
 )
 
 func TestGetMetrics(t *testing.T) {
 	engine, err := lib.NewEngine(nil, lib.Options{})
 	assert.NoError(t, err)
 
-	engine.Metrics = map[*stats.Metric]stats.Sink{
-		{
-			Name:     "my_metric",
-			Type:     stats.Trend,
-			Contains: stats.Time,
-			Tainted:  null.BoolFrom(true),
-		}: &stats.TrendSink{},
+	engine.Metrics = map[string]*stats.Metric{
+		"my_metric": stats.New("my_metric", stats.Trend, stats.Time),
 	}
+	engine.Metrics["my_metric"].Tainted = null.BoolFrom(true)
 
 	rw := httptest.NewRecorder()
 	NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "GET", "/v1/metrics", nil))
@@ -80,14 +76,10 @@ func TestGetMetric(t *testing.T) {
 	engine, err := lib.NewEngine(nil, lib.Options{})
 	assert.NoError(t, err)
 
-	engine.Metrics = map[*stats.Metric]stats.Sink{
-		{
-			Name:     "my_metric",
-			Type:     stats.Trend,
-			Contains: stats.Time,
-			Tainted:  null.BoolFrom(true),
-		}: &stats.TrendSink{},
+	engine.Metrics = map[string]*stats.Metric{
+		"my_metric": stats.New("my_metric", stats.Trend, stats.Time),
 	}
+	engine.Metrics["my_metric"].Tainted = null.BoolFrom(true)
 
 	t.Run("nonexistent", func(t *testing.T) {
 		rw := httptest.NewRecorder()

@@ -125,7 +125,7 @@ func TestMetricHumanizeValue(t *testing.T) {
 	}
 }
 
-func TestNewSink(t *testing.T) {
+func TestNew(t *testing.T) {
 	testdata := map[string]struct {
 		Type     MetricType
 		SinkType Sink
@@ -138,7 +138,9 @@ func TestNewSink(t *testing.T) {
 
 	for name, data := range testdata {
 		t.Run(name, func(t *testing.T) {
-			assert.IsType(t, data.SinkType, Metric{Type: data.Type}.NewSink())
+			m := New("my_metric", data.Type)
+			assert.Equal(t, "my_metric", m.Name)
+			assert.IsType(t, data.SinkType, m.Sink)
 		})
 	}
 }

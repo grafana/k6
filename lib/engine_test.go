@@ -331,7 +331,7 @@ func TestEngineRun(t *testing.T) {
 				if !assert.True(t, e.numIterations > 0, "no iterations performed") {
 					return
 				}
-				sink := e.Metrics[testMetric].(*stats.TrendSink)
+				sink := e.Metrics["test_metric"].Sink.(*stats.TrendSink)
 				assert.True(t, len(sink.Values) > int(float64(e.numIterations)*0.99), "more than 1%% of iterations missed")
 			})
 		}
@@ -904,7 +904,7 @@ func TestEngineCollector(t *testing.T) {
 		}
 	}
 	numCollectorSamples := len(cSamples)
-	numEngineSamples := len(e.Metrics[testMetric].(*stats.TrendSink).Values)
+	numEngineSamples := len(e.Metrics["test_metric"].Sink.(*stats.TrendSink).Values)
 	assert.Equal(t, numEngineSamples, numCollectorSamples)
 }
 
@@ -919,7 +919,7 @@ func TestEngine_processSamples(t *testing.T) {
 			stats.Sample{Metric: metric, Value: 1.25, Tags: map[string]string{"a": "1"}},
 		)
 
-		assert.IsType(t, &stats.GaugeSink{}, e.Metrics[metric])
+		assert.IsType(t, &stats.GaugeSink{}, e.Metrics["my_metric"].Sink)
 	})
 
 	t.Run("submetric", func(t *testing.T) {
@@ -942,10 +942,10 @@ func TestEngine_processSamples(t *testing.T) {
 			stats.Sample{Metric: metric, Value: 1.25, Tags: map[string]string{"a": "1"}},
 		)
 
-		assert.IsType(t, &stats.GaugeSink{}, e.Metrics[metric])
+		assert.IsType(t, &stats.GaugeSink{}, e.Metrics["my_metric"].Sink)
 
 		sms = e.submetrics["my_metric"]
-		assert.IsType(t, &stats.GaugeSink{}, e.Metrics[sms[0].Metric])
+		assert.IsType(t, &stats.GaugeSink{}, e.Metrics["my_metric{a:1}"].Sink)
 	})
 }
 

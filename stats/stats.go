@@ -173,6 +173,7 @@ type Metric struct {
 	Type     MetricType `json:"type"`
 	Contains ValueType  `json:"contains"`
 	Tainted  null.Bool  `json:"tainted"`
+	Sink     Sink       `json:"sink"`
 }
 
 func New(name string, typ MetricType, t ...ValueType) *Metric {
@@ -180,22 +181,20 @@ func New(name string, typ MetricType, t ...ValueType) *Metric {
 	if len(t) > 0 {
 		vt = t[0]
 	}
-	return &Metric{Name: name, Type: typ, Contains: vt}
-}
-
-func (m Metric) NewSink() Sink {
-	switch m.Type {
+	var sink Sink
+	switch typ {
 	case Counter:
-		return &CounterSink{}
+		sink = &CounterSink{}
 	case Gauge:
-		return &GaugeSink{}
+		sink = &GaugeSink{}
 	case Trend:
-		return &TrendSink{}
+		sink = &TrendSink{}
 	case Rate:
-		return &RateSink{}
+		sink = &RateSink{}
 	default:
 		return nil
 	}
+	return &Metric{Name: name, Type: typ, Contains: vt, Sink: sink}
 }
 
 func (m Metric) HumanizeValue(v float64) string {
