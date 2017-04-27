@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/dustin/go-humanize"
-
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -174,9 +173,6 @@ type Metric struct {
 	Type     MetricType `json:"type"`
 	Contains ValueType  `json:"contains"`
 	Tainted  null.Bool  `json:"tainted"`
-
-	// Filled in by the API when requested, the server side cannot count on its presence.
-	Sample map[string]float64 `json:"sample"`
 }
 
 func New(name string, typ MetricType, t ...ValueType) *Metric {
