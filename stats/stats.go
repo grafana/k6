@@ -25,6 +25,8 @@ import (
 	"strconv"
 	"time"
 
+	"strings"
+
 	"github.com/dustin/go-humanize"
 	"gopkg.in/guregu/null.v3"
 )
@@ -169,12 +171,13 @@ type Sample struct {
 
 // A Metric defines the shape of a set of data.
 type Metric struct {
-	Name       string     `json:"-"`
-	Type       MetricType `json:"type"`
-	Contains   ValueType  `json:"contains"`
-	Tainted    null.Bool  `json:"tainted"`
-	Sink       Sink       `json:"sink"`
-	Thresholds Thresholds `json:"thresholds"`
+	Name       string      `json:"-"`
+	Type       MetricType  `json:"type"`
+	Contains   ValueType   `json:"contains"`
+	Tainted    null.Bool   `json:"tainted"`
+	Sink       Sink        `json:"sink"`
+	Thresholds Thresholds  `json:"thresholds"`
+	Submetrics []Submetric `json:"submetrics"`
 }
 
 func New(name string, typ MetricType, t ...ValueType) *Metric {
@@ -223,4 +226,38 @@ func (m Metric) HumanizeValue(v float64) string {
 			return strconv.FormatFloat(v, 'f', -1, 64)
 		}
 	}
+}
+
+// A Submetric represents a filtered dataset based on a parent metric.
+type Submetric struct {
+	Name   string            `json:"name"`
+	Tags   map[string]string `json:"tags"`
+	Metric *Metric           `json:"metric"`
+}
+
+// Creates a submetric from a name.
+func NewSubmetric(name string) (parentName string, sm Submetric) {
+	parts := strings.SplitN(strings.TrimSuffix(name, "}"), "{", 2)
+	if len(parts) == 1 {
+		return parts[0], Submetric{Name: name}
+	}
+
+	kvs := strings.Split(parts[1], ",")
+	tags := make(map[string]string, len(kvs))
+	for _, kv := range kvs {
+		if kv == "" {
+			continue
+		}
+		parts := strings.SplitN(kv, ":", 2)
+
+		key := strings.TrimSpace(strings.Trim(parts[0], `"'`))
+		if len(parts) != 2 {
+			tags[key] = ""
+			continue
+		}
+
+		value := strings.TrimSpace(strings.Trim(parts[1], `"'`))
+		tags[key] = value
+	}
+	return parts[0], Submetric{Name: name, Tags: tags}
 }

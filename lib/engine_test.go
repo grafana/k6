@@ -77,34 +77,6 @@ func assertActiveVUs(t *testing.T, e *Engine, active, dead int) {
 	assert.Equal(t, dead, numDead, "wrong number of dead vus")
 }
 
-func Test_parseSubmetric(t *testing.T) {
-	testdata := map[string]struct {
-		parent string
-		conds  map[string]string
-	}{
-		"my_metric":                 {"my_metric", nil},
-		"my_metric{}":               {"my_metric", map[string]string{}},
-		"my_metric{a}":              {"my_metric", map[string]string{"a": ""}},
-		"my_metric{a:1}":            {"my_metric", map[string]string{"a": "1"}},
-		"my_metric{ a : 1 }":        {"my_metric", map[string]string{"a": "1"}},
-		"my_metric{a,b}":            {"my_metric", map[string]string{"a": "", "b": ""}},
-		"my_metric{a:1,b:2}":        {"my_metric", map[string]string{"a": "1", "b": "2"}},
-		"my_metric{ a : 1, b : 2 }": {"my_metric", map[string]string{"a": "1", "b": "2"}},
-	}
-
-	for name, data := range testdata {
-		t.Run(name, func(t *testing.T) {
-			parent, conds := parseSubmetric(name)
-			assert.Equal(t, data.parent, parent)
-			if data.conds != nil {
-				assert.EqualValues(t, data.conds, conds)
-			} else {
-				assert.Nil(t, conds)
-			}
-		})
-	}
-}
-
 func TestNewEngine(t *testing.T) {
 	_, err, _ := newTestEngine(nil, Options{})
 	assert.NoError(t, err)
@@ -921,7 +893,6 @@ func TestEngine_processSamples(t *testing.T) {
 
 		assert.IsType(t, &stats.GaugeSink{}, e.Metrics["my_metric"].Sink)
 	})
-
 	t.Run("submetric", func(t *testing.T) {
 		ths, err := stats.NewThresholds([]string{`1+1==2`})
 		assert.NoError(t, err)
@@ -936,7 +907,7 @@ func TestEngine_processSamples(t *testing.T) {
 		sms := e.submetrics["my_metric"]
 		assert.Len(t, sms, 1)
 		assert.Equal(t, "my_metric{a:1}", sms[0].Name)
-		assert.EqualValues(t, map[string]string{"a": "1"}, sms[0].Conditions)
+		assert.EqualValues(t, map[string]string{"a": "1"}, sms[0].Tags)
 
 		e.processSamples(
 			stats.Sample{Metric: metric, Value: 1.25, Tags: map[string]string{"a": "1"}},

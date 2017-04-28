@@ -55,39 +55,6 @@ type vuEntry struct {
 	lock       sync.Mutex
 }
 
-type submetric struct {
-	Name       string
-	Conditions map[string]string
-	Metric     *stats.Metric
-}
-
-func parseSubmetric(name string) (string, map[string]string) {
-	halves := strings.SplitN(strings.TrimSuffix(name, "}"), "{", 2)
-	if len(halves) != 2 {
-		return halves[0], nil
-	}
-
-	kvs := strings.Split(halves[1], ",")
-	conditions := make(map[string]string, len(kvs))
-	for _, kv := range kvs {
-		if kv == "" {
-			continue
-		}
-
-		parts := strings.SplitN(kv, ":", 2)
-
-		key := strings.TrimSpace(strings.Trim(parts[0], `"'`))
-		if len(parts) != 2 {
-			conditions[key] = ""
-			continue
-		}
-
-		value := strings.TrimSpace(strings.Trim(parts[1], `"'`))
-		conditions[key] = value
-	}
-	return halves[0], conditions
-}
-
 // The Engine is the beating heart of K6.
 type Engine struct {
 	Runner    Runner
@@ -101,8 +68,7 @@ type Engine struct {
 
 	// Assigned to metrics upon first received sample.
 	thresholds map[string]stats.Thresholds
-	// Submetrics, mapped from parent metric names.
-	submetrics map[string][]*submetric
+	submetrics map[string][]stats.Submetric
 
 	// Stage tracking.
 	atTime          time.Duration
@@ -170,17 +136,14 @@ func NewEngine(r Runner, o Options) (*Engine, error) {
 	}
 	if o.Thresholds != nil {
 		e.thresholds = o.Thresholds
-		e.submetrics = make(map[string][]*submetric)
+		e.submetrics = make(map[string][]stats.Submetric)
 		for name := range e.thresholds {
 			if !strings.Contains(name, "{") {
 				continue
 			}
 
-			parent, conds := parseSubmetric(name)
-			e.submetrics[parent] = append(e.submetrics[parent], &submetric{
-				Name:       name,
-				Conditions: conds,
-			})
+			parent, sm := stats.NewSubmetric(name)
+			e.submetrics[parent] = append(e.submetrics[parent], sm)
 		}
 	}
 
@@ -760,13 +723,14 @@ func (e *Engine) processSamples(samples ...stats.Sample) {
 		if !ok {
 			m = sample.Metric
 			m.Thresholds = e.thresholds[m.Name]
+			m.Submetrics = e.submetrics[m.Name]
 			e.Metrics[m.Name] = m
 		}
 		m.Sink.Add(sample)
 
-		for _, sm := range e.submetrics[sample.Metric.Name] {
+		for _, sm := range m.Submetrics {
 			passing := true
-			for k, v := range sm.Conditions {
+			for k, v := range sm.Tags {
 				if sample.Tags[k] != v {
 					passing = false
 					break

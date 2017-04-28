@@ -144,3 +144,31 @@ func TestNew(t *testing.T) {
 		})
 	}
 }
+
+func TestNewSubmetric(t *testing.T) {
+	testdata := map[string]struct {
+		parent string
+		tags   map[string]string
+	}{
+		"my_metric":                 {"my_metric", nil},
+		"my_metric{}":               {"my_metric", map[string]string{}},
+		"my_metric{a}":              {"my_metric", map[string]string{"a": ""}},
+		"my_metric{a:1}":            {"my_metric", map[string]string{"a": "1"}},
+		"my_metric{ a : 1 }":        {"my_metric", map[string]string{"a": "1"}},
+		"my_metric{a,b}":            {"my_metric", map[string]string{"a": "", "b": ""}},
+		"my_metric{a:1,b:2}":        {"my_metric", map[string]string{"a": "1", "b": "2"}},
+		"my_metric{ a : 1, b : 2 }": {"my_metric", map[string]string{"a": "1", "b": "2"}},
+	}
+
+	for name, data := range testdata {
+		t.Run(name, func(t *testing.T) {
+			parent, sm := NewSubmetric(name)
+			assert.Equal(t, data.parent, parent)
+			if data.tags != nil {
+				assert.EqualValues(t, data.tags, sm.Tags)
+			} else {
+				assert.Nil(t, sm.Tags)
+			}
+		})
+	}
+}
