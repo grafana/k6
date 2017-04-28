@@ -26,7 +26,7 @@ import (
 
 	"github.com/loadimpact/k6/stats"
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/guregu/null.v3"
+	null "gopkg.in/guregu/null.v3"
 )
 
 func TestNullMetricTypeJSON(t *testing.T) {
@@ -84,14 +84,9 @@ func TestNullValueTypeJSON(t *testing.T) {
 }
 
 func TestNewMetric(t *testing.T) {
-	old := stats.Metric{
-		Name:     "name",
-		Type:     stats.Trend,
-		Contains: stats.Time,
-		Tainted:  null.BoolFrom(true),
-	}
-	sink := old.NewSink()
-	m := NewMetric(old, sink)
+	old := stats.New("name", stats.Trend, stats.Time)
+	old.Tainted = null.BoolFrom(true)
+	m := NewMetric(old)
 	assert.Equal(t, "name", m.Name)
 	assert.True(t, m.Type.Valid)
 	assert.Equal(t, stats.Trend, m.Type.Type)

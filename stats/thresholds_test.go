@@ -18,13 +18,12 @@
  *
  */
 
-package lib
+package stats
 
 import (
 	"encoding/json"
 	"testing"
 
-	"github.com/loadimpact/k6/stats"
 	"github.com/robertkrimen/otto"
 	"github.com/stretchr/testify/assert"
 )
@@ -104,7 +103,7 @@ func TestNewThresholds(t *testing.T) {
 func TestThresholdsUpdateVM(t *testing.T) {
 	ts, err := NewThresholds(nil)
 	assert.NoError(t, err)
-	assert.NoError(t, ts.UpdateVM(stats.DummySink{"a": 1234.5}))
+	assert.NoError(t, ts.UpdateVM(DummySink{"a": 1234.5}))
 
 	v, err := ts.VM.Get("a")
 	assert.NoError(t, err)
@@ -153,19 +152,19 @@ func TestThresholdsRun(t *testing.T) {
 	assert.NoError(t, err)
 
 	t.Run("error", func(t *testing.T) {
-		b, err := ts.Run(stats.DummySink{})
+		b, err := ts.Run(DummySink{})
 		assert.Error(t, err)
 		assert.False(t, b)
 	})
 
 	t.Run("pass", func(t *testing.T) {
-		b, err := ts.Run(stats.DummySink{"a": 1234.5})
+		b, err := ts.Run(DummySink{"a": 1234.5})
 		assert.NoError(t, err)
 		assert.True(t, b)
 	})
 
 	t.Run("fail", func(t *testing.T) {
-		b, err := ts.Run(stats.DummySink{"a": 0})
+		b, err := ts.Run(DummySink{"a": 0})
 		assert.NoError(t, err)
 		assert.False(t, b)
 	})

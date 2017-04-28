@@ -24,6 +24,8 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/loadimpact/k6/stats"
+
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -59,7 +61,7 @@ type Options struct {
 	MaxRedirects          null.Int  `json:"maxRedirects"`
 	InsecureSkipTLSVerify null.Bool `json:"insecureSkipTLSVerify"`
 
-	Thresholds map[string]Thresholds `json:"thresholds"`
+	Thresholds map[string]stats.Thresholds `json:"thresholds"`
 
 	// These values are for third party collectors' benefit.
 	External map[string]interface{} `json:"ext"`

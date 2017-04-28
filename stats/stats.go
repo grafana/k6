@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/dustin/go-humanize"
-
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -170,13 +169,12 @@ type Sample struct {
 
 // A Metric defines the shape of a set of data.
 type Metric struct {
-	Name     string     `json:"-"`
-	Type     MetricType `json:"type"`
-	Contains ValueType  `json:"contains"`
-	Tainted  null.Bool  `json:"tainted"`
-
-	// Filled in by the API when requested, the server side cannot count on its presence.
-	Sample map[string]float64 `json:"sample"`
+	Name       string     `json:"-"`
+	Type       MetricType `json:"type"`
+	Contains   ValueType  `json:"contains"`
+	Tainted    null.Bool  `json:"tainted"`
+	Sink       Sink       `json:"sink"`
+	Thresholds Thresholds `json:"thresholds"`
 }
 
 func New(name string, typ MetricType, t ...ValueType) *Metric {
@@ -184,22 +182,20 @@ func New(name string, typ MetricType, t ...ValueType) *Metric {
 	if len(t) > 0 {
 		vt = t[0]
 	}
-	return &Metric{Name: name, Type: typ, Contains: vt}
-}
-
-func (m Metric) NewSink() Sink {
-	switch m.Type {
+	var sink Sink
+	switch typ {
 	case Counter:
-		return &CounterSink{}
+		sink = &CounterSink{}
 	case Gauge:
-		return &GaugeSink{}
+		sink = &GaugeSink{}
 	case Trend:
-		return &TrendSink{}
+		sink = &TrendSink{}
 	case Rate:
-		return &RateSink{}
+		sink = &RateSink{}
 	default:
 		return nil
 	}
+	return &Metric{Name: name, Type: typ, Contains: vt, Sink: sink}
 }
 
 func (m Metric) HumanizeValue(v float64) string {

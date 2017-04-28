@@ -96,10 +96,11 @@ type Engine struct {
 	Logger    *log.Logger
 
 	Stages      []Stage
-	Thresholds  map[string]Thresholds
-	Metrics     map[*stats.Metric]stats.Sink
+	Metrics     map[string]*stats.Metric
 	MetricsLock sync.RWMutex
 
+	// Assigned to metrics upon first received sample.
+	thresholds map[string]stats.Thresholds
 	// Submetrics, mapped from parent metric names.
 	submetrics map[string][]*submetric
 
@@ -137,8 +138,7 @@ func NewEngine(r Runner, o Options) (*Engine, error) {
 		Options: o,
 		Logger:  log.StandardLogger(),
 
-		Metrics:    make(map[*stats.Metric]stats.Sink),
-		Thresholds: make(map[string]Thresholds),
+		Metrics: make(map[string]*stats.Metric),
 
 		vuStop: make(chan interface{}),
 	}
@@ -168,12 +168,10 @@ func NewEngine(r Runner, o Options) (*Engine, error) {
 	if o.Paused.Valid {
 		e.SetPaused(o.Paused.Bool)
 	}
-
 	if o.Thresholds != nil {
-		e.Thresholds = o.Thresholds
+		e.thresholds = o.Thresholds
 		e.submetrics = make(map[string][]*submetric)
-
-		for name := range e.Thresholds {
+		for name := range e.thresholds {
 			if !strings.Contains(name, "{") {
 				continue
 			}
@@ -701,16 +699,14 @@ func (e *Engine) processThresholds() {
 	defer e.MetricsLock.Unlock()
 
 	e.thresholdsTainted = false
-	for m, s := range e.Metrics {
-		ts, ok := e.Thresholds[m.Name]
-		if !ok {
+	for _, m := range e.Metrics {
+		if len(m.Thresholds.Thresholds) == 0 {
 			continue
 		}
-
 		m.Tainted = null.BoolFrom(false)
 
 		e.Logger.WithField("m", m.Name).Debug("running thresholds")
-		succ, err := ts.Run(s)
+		succ, err := m.Thresholds.Run(m.Sink)
 		if err != nil {
 			e.Logger.WithField("m", m.Name).WithError(err).Error("Threshold error")
 			continue
@@ -760,12 +756,13 @@ func (e *Engine) processSamples(samples ...stats.Sample) {
 	defer e.MetricsLock.Unlock()
 
 	for _, sample := range samples {
-		sink := e.Metrics[sample.Metric]
-		if sink == nil {
-			sink = sample.Metric.NewSink()
-			e.Metrics[sample.Metric] = sink
+		m, ok := e.Metrics[sample.Metric.Name]
+		if !ok {
+			m = sample.Metric
+			m.Thresholds = e.thresholds[m.Name]
+			e.Metrics[m.Name] = m
 		}
-		sink.Add(sample)
+		m.Sink.Add(sample)
 
 		for _, sm := range e.submetrics[sample.Metric.Name] {
 			passing := true
@@ -781,9 +778,10 @@ func (e *Engine) processSamples(samples ...stats.Sample) {
 
 			if sm.Metric == nil {
 				sm.Metric = stats.New(sm.Name, sample.Metric.Type, sample.Metric.Contains)
-				e.Metrics[sm.Metric] = sm.Metric.NewSink()
+				sm.Metric.Thresholds = e.thresholds[sm.Name]
+				e.Metrics[sm.Name] = sm.Metric
 			}
-			e.Metrics[sm.Metric].Add(sample)
+			sm.Metric.Sink.Add(sample)
 		}
 	}
 
