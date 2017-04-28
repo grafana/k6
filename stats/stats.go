@@ -224,12 +224,3 @@ func (m Metric) HumanizeValue(v float64) string {
 		}
 	}
 }
-
-func (m Metric) GetID() string {
-	return m.Name
-}
-
-func (m *Metric) SetID(id string) error {
-	m.Name = id
-	return nil
-}
