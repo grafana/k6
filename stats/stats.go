@@ -169,11 +169,12 @@ type Sample struct {
 
 // A Metric defines the shape of a set of data.
 type Metric struct {
-	Name     string     `json:"-"`
-	Type     MetricType `json:"type"`
-	Contains ValueType  `json:"contains"`
-	Tainted  null.Bool  `json:"tainted"`
-	Sink     Sink       `json:"sink"`
+	Name       string     `json:"-"`
+	Type       MetricType `json:"type"`
+	Contains   ValueType  `json:"contains"`
+	Tainted    null.Bool  `json:"tainted"`
+	Sink       Sink       `json:"sink"`
+	Thresholds Thresholds `json:"thresholds"`
 }
 
 func New(name string, typ MetricType, t ...ValueType) *Metric {

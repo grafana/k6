@@ -215,21 +215,21 @@ func TestNewEngineOptions(t *testing.T) {
 	})
 	t.Run("thresholds", func(t *testing.T) {
 		e, err, _ := newTestEngine(nil, Options{
-			Thresholds: map[string]Thresholds{
+			Thresholds: map[string]stats.Thresholds{
 				"my_metric": {},
 			},
 		})
 		assert.NoError(t, err)
-		assert.Contains(t, e.Thresholds, "my_metric")
+		assert.Contains(t, e.thresholds, "my_metric")
 
 		t.Run("submetrics", func(t *testing.T) {
 			e, err, _ := newTestEngine(nil, Options{
-				Thresholds: map[string]Thresholds{
+				Thresholds: map[string]stats.Thresholds{
 					"my_metric{tag:value}": {},
 				},
 			})
 			assert.NoError(t, err)
-			assert.Contains(t, e.Thresholds, "my_metric{tag:value}")
+			assert.Contains(t, e.thresholds, "my_metric{tag:value}")
 			assert.Contains(t, e.submetrics, "my_metric")
 		})
 	})
@@ -923,11 +923,11 @@ func TestEngine_processSamples(t *testing.T) {
 	})
 
 	t.Run("submetric", func(t *testing.T) {
-		ths, err := NewThresholds([]string{`1+1==2`})
+		ths, err := stats.NewThresholds([]string{`1+1==2`})
 		assert.NoError(t, err)
 
 		e, err, _ := newTestEngine(nil, Options{
-			Thresholds: map[string]Thresholds{
+			Thresholds: map[string]stats.Thresholds{
 				"my_metric{a:1}": ths,
 			},
 		})
@@ -967,9 +967,9 @@ func TestEngine_processThresholds(t *testing.T) {
 
 	for name, data := range testdata {
 		t.Run(name, func(t *testing.T) {
-			thresholds := make(map[string]Thresholds, len(data.ths))
+			thresholds := make(map[string]stats.Thresholds, len(data.ths))
 			for m, srcs := range data.ths {
-				ths, err := NewThresholds(srcs)
+				ths, err := stats.NewThresholds(srcs)
 				assert.NoError(t, err)
 				thresholds[m] = ths
 			}
