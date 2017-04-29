@@ -6,7 +6,7 @@
 
 import http from "k6/http";
 import { group, sleep, check } from "k6";
-import { rtt_rate, options, urlbase, thinktime1, thinktime2 } from "./common";
+import { myTrend, options, urlbase, thinktime1, thinktime2 } from "./common";
 import { v3_account_login } from "./v3_account_login";
 
 // Export options object so k6 can access it
@@ -27,7 +27,7 @@ let api_token = null;
 // We export it in case another test wants to use this end point also
 export function v3_loadZones(org_id, token) {
 	var url = urlbase + "/v3/load-zones?organization_id=" + String(org_id);
-	return http.get(url, null, { headers: { "Authorization": "Token " + token, "Content-Type": "application/json" } });
+	return http.get(url, { headers: { "Authorization": "Token " + token, "Content-Type": "application/json" } });
 };
 
 // This is the "run" function that every VU will call again and again during a load test, or it will be
@@ -48,7 +48,7 @@ export default function() {
 			"content-type is application/json": (res) => res.headers['Content-Type'] === "application/json",
 			"Content OK": (res) => JSON.parse(res.body).hasOwnProperty('load_zones')
 		});
-		rtt_rate.add(res.timings.duration);
+		myTrend.add(res.timings.duration);
 		sleep(thinktime1);
 	});
 	sleep(thinktime2);

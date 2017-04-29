@@ -21,7 +21,7 @@ export let options = {
 export let myTrend = new Trend("transaction_time");
 
 // Base URL that we prepend to all URLs we use
-export let urlbase = "https://api.staging.loadimpact.com/";
+export let urlbase = "https://api.staging.loadimpact.com";
 
 // Think times, to slow down execution somewhat
 export let thinktime1 = 0.1;
