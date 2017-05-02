@@ -26,7 +26,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/dop251/goja"
-	"github.com/loadimpact/k6/js2/common"
+	"github.com/loadimpact/k6/js/common"
 )
 
 type HTML struct{}

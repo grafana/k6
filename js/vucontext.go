@@ -18,7 +18,7 @@
  *
  */
 
-package js2
+package js
 
 // Provides APIs and state for use in a VU context.
 type VUContext struct {

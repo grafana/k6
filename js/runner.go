@@ -22,50 +22,27 @@ package js
 
 import (
 	"context"
-	"crypto/tls"
-	"errors"
-	"fmt"
-	"math"
 	"net"
 	"net/http"
-	"strconv"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/dop251/goja"
+	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
-	"github.com/robertkrimen/otto"
+	"github.com/spf13/afero"
 )
 
-var ErrDefaultExport = errors.New("you must export a 'default' function")
-
-const entrypoint = "__$$entrypoint$$__"
-
 type Runner struct {
-	Runtime      *Runtime
-	DefaultGroup *lib.Group
-	Options      lib.Options
+	Bundle *Bundle
 
-	HTTPTransport *http.Transport
+	defaultGroup *lib.Group
 }
 
-func NewRunner(rt *Runtime, exports otto.Value) (*Runner, error) {
-	expObj := exports.Object()
-	if expObj == nil {
-		return nil, ErrDefaultExport
-	}
-
-	// Values "remember" which VM they belong to, so to get a callable that works across VM copies,
-	// we have to stick it in the global scope, then retrieve it again from the new instance.
-	callable, err := expObj.Get("default")
+func New(src *lib.SourceData, fs afero.Fs) (*Runner, error) {
+	bundle, err := NewBundle(src, fs)
 	if err != nil {
-		return nil, err
-	}
-	if !callable.IsFunction() {
-		return nil, ErrDefaultExport
-	}
-	if err := rt.VM.Set(entrypoint, callable); err != nil {
 		return nil, err
 	}
 
@@ -74,125 +51,96 @@ func NewRunner(rt *Runtime, exports otto.Value) (*Runner, error) {
 		return nil, err
 	}
 
-	r := &Runner{
-		Runtime:      rt,
-		DefaultGroup: defaultGroup,
-		Options:      rt.Options,
-		HTTPTransport: &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-			DialContext: (netext.Dialer{Dialer: net.Dialer{
-				Timeout:   10 * time.Second,
-				KeepAlive: 60 * time.Second,
-				DualStack: true,
-			}}).DialContext,
-			TLSClientConfig:     &tls.Config{},
-			MaxIdleConns:        math.MaxInt32,
-			MaxIdleConnsPerHost: math.MaxInt32,
-		},
-	}
-
-	return r, nil
+	return &Runner{
+		Bundle:       bundle,
+		defaultGroup: defaultGroup,
+	}, nil
 }
 
 func (r *Runner) NewVU() (lib.VU, error) {
-	u := &VU{
-		runner: r,
-		vm:     r.Runtime.VM.Copy(),
-		group:  r.DefaultGroup,
-	}
-
-	u.CookieJar = lib.NewCookieJar()
-	u.HTTPClient = &http.Client{
-		Transport:     r.HTTPTransport,
-		CheckRedirect: u.checkRedirect,
-		Jar:           u.CookieJar,
-	}
-
-	callable, err := u.vm.Get(entrypoint)
+	vu, err := r.newVU()
 	if err != nil {
 		return nil, err
 	}
-	u.callable = callable
+	return lib.VU(vu), nil
+}
 
-	if err := u.vm.Set("__jsapi__", &JSAPI{u}); err != nil {
+func (r *Runner) newVU() (*VU, error) {
+	// Instantiate a new bundle, make a VU out of it.
+	bi, err := r.Bundle.Instantiate()
+	if err != nil {
 		return nil, err
 	}
 
-	return u, nil
+	// Make a VU, apply the VU context.
+	vu := &VU{
+		BundleInstance: *bi,
+		Runner:         r,
+		VUContext:      NewVUContext(),
+	}
+	common.BindToGlobal(vu.Runtime, common.Bind(vu.Runtime, vu.VUContext, vu.Context))
+
+	// Give the VU an initial sense of identity.
+	if err := vu.Reconfigure(0); err != nil {
+		return nil, err
+	}
+
+	return vu, nil
 }
 
 func (r *Runner) GetDefaultGroup() *lib.Group {
-	return r.DefaultGroup
+	return r.defaultGroup
 }
 
 func (r *Runner) GetOptions() lib.Options {
-	return r.Options
+	return r.Bundle.Options
 }
 
 func (r *Runner) ApplyOptions(opts lib.Options) {
-	r.Options = r.Options.Apply(opts)
-	r.HTTPTransport.TLSClientConfig.InsecureSkipVerify = opts.InsecureSkipTLSVerify.Bool
+	r.Bundle.Options = r.Bundle.Options.Apply(opts)
 }
 
 type VU struct {
+	BundleInstance
+
+	Runner    *Runner
 	ID        int64
-	IDString  string
 	Iteration int64
-	Samples   []stats.Sample
 
-	runner   *Runner
-	vm       *otto.Otto
-	callable otto.Value
-
-	HTTPClient *http.Client
-	CookieJar  *lib.CookieJar
-
-	started time.Time
-	ctx     context.Context
-	group   *lib.Group
+	VUContext *VUContext
 }
 
 func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
-	u.CookieJar.Clear()
-
-	if err := u.vm.Set("__ITER", u.Iteration); err != nil {
-		return nil, err
+	transport := &http.Transport{
+		DialContext: (netext.Dialer{
+			Dialer: net.Dialer{
+				Timeout:   30 * time.Second,
+				KeepAlive: 30 * time.Second,
+				DualStack: true,
+			},
+		}).DialContext,
+	}
+	state := &common.State{
+		Group:         u.Runner.defaultGroup,
+		HTTPTransport: transport,
 	}
 
-	u.started = time.Now()
-	u.ctx = ctx
-	_, err := u.callable.Call(otto.UndefinedValue())
-	u.ctx = nil
+	ctx = common.WithRuntime(ctx, u.Runtime)
+	ctx = common.WithState(ctx, state)
+	*u.Context = ctx
 
+	u.Runtime.Set("__ITER", u.Iteration)
 	u.Iteration++
 
-	samples := u.Samples
-	u.Samples = nil
-	return samples, err
+	_, err := u.Default(goja.Undefined())
+
+	transport.CloseIdleConnections()
+	return state.Samples, err
 }
 
 func (u *VU) Reconfigure(id int64) error {
 	u.ID = id
-	u.IDString = strconv.FormatInt(u.ID, 10)
 	u.Iteration = 0
-
-	if err := u.vm.Set("__VU", u.ID); err != nil {
-		return err
-	}
-	if err := u.vm.Set("__ITER", u.Iteration); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (u *VU) checkRedirect(req *http.Request, via []*http.Request) error {
-	log.WithFields(log.Fields{
-		"from": via[len(via)-1].URL.String(),
-		"to":   req.URL.String(),
-	}).Debug("-> Redirect")
-	if int64(len(via)) >= u.runner.Options.MaxRedirects.Int64 {
-		return errors.New(fmt.Sprintf("stopped after %d redirects", u.runner.Options.MaxRedirects.Int64))
-	}
+	u.Runtime.Set("__VU", u.ID)
 	return nil
 }

@@ -18,7 +18,7 @@
  *
  */
 
-package js2
+package js
 
 import (
 	"fmt"

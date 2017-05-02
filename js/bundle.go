@@ -18,7 +18,7 @@
  *
  */
 
-package js2
+package js
 
 import (
 	"context"
@@ -27,8 +27,8 @@ import (
 	"reflect"
 
 	"github.com/dop251/goja"
+	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/js/compiler"
-	"github.com/loadimpact/k6/js2/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
