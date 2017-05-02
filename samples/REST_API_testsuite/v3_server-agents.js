@@ -27,7 +27,7 @@ let api_token = null;
 // We export it in case another test wants to use this end point also
 export function v3_serverAgents(org_id, token) {
 	var url = urlbase + "/v3/server-agents?organization_id=" + String(org_id);
-	return http.get(url, null, { headers: { "Authorization": "Token " + token, "Content-Type": "application/json" } });
+	return http.get(url, { headers: { "Authorization": "Token " + token, "Content-Type": "application/json" } });
 };
 
 // This is the "run" function that k6 will call again and again during a load test, or one single
