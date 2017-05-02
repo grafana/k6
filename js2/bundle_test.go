@@ -45,14 +45,14 @@ func TestNewBundle(t *testing.T) {
 			Filename: "/script.js",
 			Data:     []byte{0x00},
 		}, afero.NewMemMapFs())
-		assert.EqualError(t, err, "Transform: SyntaxError: /script.js: Unexpected character '\x00' (1:0)\n> 1 | \x00\n    | ^")
+		assert.EqualError(t, err, "Transform: SyntaxError: /script.js: Unexpected character '\x00' (1:0)\n> 1 | \x00\n    | ^ at <eval>:2:26853(114)")
 	})
 	t.Run("Error", func(t *testing.T) {
 		_, err := NewBundle(&lib.SourceData{
 			Filename: "/script.js",
 			Data:     []byte(`throw new Error("aaaa");`),
 		}, afero.NewMemMapFs())
-		assert.EqualError(t, err, "Error: aaaa")
+		assert.EqualError(t, err, "Error: aaaa at /script.js:1:20(3)")
 	})
 	t.Run("InvalidExports", func(t *testing.T) {
 		_, err := NewBundle(&lib.SourceData{

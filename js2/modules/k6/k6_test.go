@@ -124,7 +124,7 @@ func TestCheck(t *testing.T) {
 			"b": function() { throw new Error("error B") },
 		})
 		`)
-		assert.EqualError(t, err, "Error: error A")
+		assert.EqualError(t, err, "Error: error A at a (<eval>:3:27(6))")
 	})
 
 	t.Run("Types", func(t *testing.T) {

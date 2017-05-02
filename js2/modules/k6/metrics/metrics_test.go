@@ -77,7 +77,7 @@ func TestMetrics(t *testing.T) {
 					t.Run("ExitInit", func(t *testing.T) {
 						*ctxPtr = common.WithState(*ctxPtr, state)
 						_, err := common.RunString(rt, fmt.Sprintf(`new metrics.%s("my_metric")`, fn))
-						assert.EqualError(t, err, "GoError: Metrics must be declared in the init context")
+						assert.EqualError(t, err, "GoError: Metrics must be declared in the init context at apply (native)")
 					})
 
 					groups := map[string]*lib.Group{
