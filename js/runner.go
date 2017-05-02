@@ -35,9 +35,10 @@ import (
 )
 
 type Runner struct {
-	Bundle *Bundle
-
+	Bundle       *Bundle
 	defaultGroup *lib.Group
+
+	HTTPTransport *http.Transport
 }
 
 func New(src *lib.SourceData, fs afero.Fs) (*Runner, error) {
@@ -54,6 +55,15 @@ func New(src *lib.SourceData, fs afero.Fs) (*Runner, error) {
 	return &Runner{
 		Bundle:       bundle,
 		defaultGroup: defaultGroup,
+		HTTPTransport: &http.Transport{
+			DialContext: (netext.Dialer{
+				Dialer: net.Dialer{
+					Timeout:   30 * time.Second,
+					KeepAlive: 0,
+					DualStack: true,
+				},
+			}).DialContext,
+		},
 	}, nil
 }
 
@@ -111,18 +121,9 @@ type VU struct {
 }
 
 func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
-	transport := &http.Transport{
-		DialContext: (netext.Dialer{
-			Dialer: net.Dialer{
-				Timeout:   30 * time.Second,
-				KeepAlive: 30 * time.Second,
-				DualStack: true,
-			},
-		}).DialContext,
-	}
 	state := &common.State{
 		Group:         u.Runner.defaultGroup,
-		HTTPTransport: transport,
+		HTTPTransport: u.Runner.HTTPTransport,
 	}
 
 	ctx = common.WithRuntime(ctx, u.Runtime)
@@ -134,7 +135,6 @@ func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 
 	_, err := u.Default(goja.Undefined())
 
-	transport.CloseIdleConnections()
 	return state.Samples, err
 }
 
