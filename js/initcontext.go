@@ -27,8 +27,8 @@ import (
 	"strings"
 
 	"github.com/dop251/goja"
-	"github.com/loadimpact/k6/js/compiler"
 	"github.com/loadimpact/k6/js/common"
+	"github.com/loadimpact/k6/js/compiler"
 	"github.com/loadimpact/k6/js/modules"
 	"github.com/loadimpact/k6/loader"
 	"github.com/spf13/afero"
