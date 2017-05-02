@@ -74,7 +74,7 @@ func (*K6) Check(ctx context.Context, arg0, checks goja.Value, extras ...goja.Va
 		if err != nil {
 			return false, err
 		}
-		tags["check"] = check.Path
+		tags["check"] = check.Name
 
 		// Resolve callables into values.
 		fn, ok := goja.AssertFunction(val)

@@ -86,7 +86,7 @@ func TestCheck(t *testing.T) {
 			assert.Equal(t, float64(1), state.Samples[0].Value)
 			assert.Equal(t, map[string]string{
 				"group": "",
-				"check": "::check",
+				"check": "check",
 			}, state.Samples[0].Tags)
 		}
 
@@ -108,7 +108,7 @@ func TestCheck(t *testing.T) {
 			assert.Equal(t, float64(1), state.Samples[0].Value)
 			assert.Equal(t, map[string]string{
 				"group": "",
-				"check": "::0",
+				"check": "0",
 			}, state.Samples[0].Tags)
 		}
 	})
@@ -167,7 +167,7 @@ func TestCheck(t *testing.T) {
 							}
 							assert.Equal(t, map[string]string{
 								"group": "",
-								"check": "::check",
+								"check": "check",
 							}, state.Samples[0].Tags)
 						}
 					})
@@ -191,7 +191,7 @@ func TestCheck(t *testing.T) {
 			assert.Equal(t, float64(1), state.Samples[0].Value)
 			assert.Equal(t, map[string]string{
 				"group": "",
-				"check": "::check",
+				"check": "check",
 				"a":     "1",
 				"b":     "2",
 			}, state.Samples[0].Tags)
