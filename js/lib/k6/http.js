@@ -3,6 +3,67 @@
  */
 import { parseHTML } from "k6/html";
 
+const RFC1123_WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const RFC1123_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+export class CookieJar {
+	/**
+	 * Represents a HTTP CookieJar.
+	 * @memberOf module:k6/http
+	 */
+	constructor() {
+		this.cookies = [];
+	}
+
+	static dateToRFC1123(date) {
+		// Construct RFC 1123 date string: "ddd, dd mmm yyyy HH:MM:ss Z"
+		let weekday = RFC1123_WEEKDAYS[date.getUTCDay()];
+		let dayOfMonth = date.getUTCDate();
+		if (dayOfMonth < 10) {
+			dayOfMonth = `0${dayOfMonth}`;
+		}
+		let month = RFC1123_MONTHS[date.getUTCMonth()];
+		let year = date.getUTCFullYear();
+		let hour = date.getUTCHours();
+		if (hour < 10) {
+			hour = `0${hour}`;
+		}
+		let minutes = date.getUTCMinutes();
+		if (minutes < 10) {
+			minutes = `0${minutes}`;
+		}
+		let seconds = date.getUTCSeconds();
+		if (seconds < 10) {
+			seconds = `0${seconds}`;
+		}
+		return `${weekday}, ${dayOfMonth} ${month} ${year} ${hour}:${minutes}:${seconds} GMT`;
+	}
+
+	set(key, value, params) {
+		if (params === undefined) {
+			params = {}
+		}
+		let expires = params.expires;
+		if (expires instanceof Date) {
+			expires = CookieJar.dateToRFC1123(expires);
+		}
+		this.cookies.push({
+			"key": key,
+			"value": value,
+			"domain": params.domain === undefined ? null : params.domain,
+			"path": params.path === undefined ? null : params.path,
+			"expires": expires === undefined ? null : expires,
+			"maxAge": params.maxAge === undefined ? 0 : params.maxAge,
+			"secure": params.secure === undefined ? false : params.secure,
+			"httpOnly": params.httpOnly === undefined ? false : params.httpOnly
+		});
+	}
+
+	toString () {
+		return "[object CookieJar]";
+	}
+};
+
 export class Response {
 	/**
 	 * Represents an HTTP response.
@@ -75,6 +136,17 @@ export function request(method, url, body, params = {}) {
 		params["headers"]["Content-Type"] = "application/x-www-form-urlencoded";
 	}
 	body = parseBody(body);
+	if (params.hasOwnProperty("cookies")) {
+		cookies = [];
+		if (typeof params["cookies"] === "object" && params["cookies"] instanceof CookieJar) {
+			cookies = params["cookies"].cookies;
+		} else if (typeof params["cookies"] === "object") {
+			for (let key in params["cookies"]) {
+				cookies.push({ "key": key, "value": params["cookies"][key] });
+			}
+		}
+		params["cookies"] = cookies
+	}
 	return new Response(__jsapi__.HTTPRequest(method, url, body, JSON.stringify(params)));
 };
 
@@ -222,6 +294,7 @@ export function batch(requests) {
 };
 
 export default {
+	CookieJar,
 	Response,
 	request,
 	get,

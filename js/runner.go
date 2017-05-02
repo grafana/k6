@@ -28,8 +28,11 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"net/http/cookiejar"
 	"strconv"
 	"time"
+
+	"golang.org/x/net/publicsuffix"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/k6/lib"
@@ -101,7 +104,11 @@ func (r *Runner) NewVU() (lib.VU, error) {
 		group:  r.DefaultGroup,
 	}
 
-	u.CookieJar = lib.NewCookieJar()
+	jar, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
+	if err != nil {
+		return nil, err
+	}
+	u.CookieJar = jar
 	u.HTTPClient = &http.Client{
 		Transport:     r.HTTPTransport,
 		CheckRedirect: u.checkRedirect,
@@ -145,7 +152,7 @@ type VU struct {
 	callable otto.Value
 
 	HTTPClient *http.Client
-	CookieJar  *lib.CookieJar
+	CookieJar  *cookiejar.Jar
 
 	started time.Time
 	ctx     context.Context
@@ -153,7 +160,11 @@ type VU struct {
 }
 
 func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
-	u.CookieJar.Clear()
+	jar, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
+	if err != nil {
+		return nil, err
+	}
+	u.CookieJar = jar
 
 	if err := u.vm.Set("__ITER", u.Iteration); err != nil {
 		return nil, err
@@ -161,7 +172,7 @@ func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 
 	u.started = time.Now()
 	u.ctx = ctx
-	_, err := u.callable.Call(otto.UndefinedValue())
+	_, err = u.callable.Call(otto.UndefinedValue())
 	u.ctx = nil
 
 	u.Iteration++
