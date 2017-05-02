@@ -304,4 +304,52 @@ func TestRequest(t *testing.T) {
 			})
 		})
 	}
+
+	t.Run("Batch", func(t *testing.T) {
+		t.Run("GET", func(t *testing.T) {
+			_, err := common.RunString(rt, `
+			let reqs = [
+				["GET", "https://httpbin.org/"],
+				["GET", "https://example.com/"],
+			];
+			let res = http.batch(reqs);
+			for (var key in res) {
+				if (res[key].status != 200) { throw new Error("wrong status: " + res[key].status); }
+				if (res[key].url != reqs[key][1]) { throw new Error("wrong url: " + res[key].url); }
+			}`)
+			assert.NoError(t, err)
+
+			t.Run("Shorthand", func(t *testing.T) {
+				_, err := common.RunString(rt, `
+				let reqs = [
+					"https://httpbin.org/",
+					"https://example.com/",
+				];
+				let res = http.batch(reqs);
+				for (var key in res) {
+					if (res[key].status != 200) { throw new Error("wrong status: " + res[key].status); }
+					if (res[key].url != reqs[key]) { throw new Error("wrong url: " + res[key].url); }
+				}`)
+				assert.NoError(t, err)
+			})
+		})
+		t.Run("POST", func(t *testing.T) {
+			_, err := common.RunString(rt, `
+			let res = http.batch([ ["POST", "https://httpbin.org/post", { key: "value" }] ]);
+			for (var key in res) {
+				if (res[key].status != 200) { throw new Error("wrong status: " + res[key].status); }
+				if (res[key].json().form.key != "value") { throw new Error("wrong form: " + JSON.stringify(res[key].json().form)); }
+			}`)
+			assert.NoError(t, err)
+		})
+		t.Run("PUT", func(t *testing.T) {
+			_, err := common.RunString(rt, `
+			let res = http.batch([ ["PUT", "https://httpbin.org/put", { key: "value" }] ]);
+			for (var key in res) {
+				if (res[key].status != 200) { throw new Error("wrong status: " + res[key].status); }
+				if (res[key].json().form.key != "value") { throw new Error("wrong form: " + JSON.stringify(res[key].json().form)); }
+			}`)
+			assert.NoError(t, err)
+		})
+	})
 }
