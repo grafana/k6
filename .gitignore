@@ -10,4 +10,5 @@
 
 .vscode
 *.sublime-workspace
+.idea
 .vagrant
