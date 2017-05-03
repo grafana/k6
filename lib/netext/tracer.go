@@ -86,6 +86,8 @@ type Tracer struct {
 	connReused     bool
 	connRemoteAddr net.Addr
 
+	protoError error
+
 	bytesRead, bytesWritten int64
 }
 
@@ -106,6 +108,12 @@ func (t *Tracer) Trace() *httptrace.ClientTrace {
 // Call when the request is finished. Calculates metrics and resets the tracer.
 func (t *Tracer) Done() Trail {
 	done := time.Now()
+
+	// Cover for if the server closed the connection without a response.
+	if t.gotFirstResponseByte.IsZero() {
+		t.gotFirstResponseByte = done
+	}
+
 	trail := Trail{
 		StartTime:  t.getConn,
 		EndTime:    done,
@@ -122,6 +130,47 @@ func (t *Tracer) Done() Trail {
 
 		BytesRead:    t.bytesRead,
 		BytesWritten: t.bytesWritten,
+	}
+
+	// If the connection failed, we'll never get any data for these.
+	if t.protoError != nil {
+		trail.Sending = 0
+		trail.Waiting = 0
+		trail.Receiving = 0
+	}
+
+	if trail.StartTime.IsZero() {
+		panic("no start time")
+	}
+	if trail.EndTime.IsZero() {
+		panic("no end time")
+	}
+	if trail.Duration < 0 {
+		panic("impossible duration")
+	}
+	if trail.Blocked < 0 {
+		panic("impossible block time")
+	}
+	if trail.LookingUp < 0 {
+		panic("impossible lookup time")
+	}
+	if trail.Connecting < 0 {
+		panic("impossible connection time")
+	}
+	if trail.Sending < 0 {
+		panic("impossible send time")
+	}
+	if trail.Waiting < 0 {
+		panic("impossible wait time")
+	}
+	if trail.Receiving < 0 {
+		panic("impossible read time time")
+	}
+	if trail.BytesRead <= 0 && trail.Receiving > 0 {
+		panic("impossible read bytes")
+	}
+	if trail.BytesWritten <= 0 && t.protoError == nil {
+		panic("impossible written bytes")
 	}
 
 	*t = Tracer{}
@@ -168,6 +217,9 @@ func (t *Tracer) DNSDone(info httptrace.DNSDoneInfo) {
 	if t.dnsStart.IsZero() {
 		t.dnsStart = t.dnsDone
 	}
+	if info.Err != nil {
+		t.protoError = info.Err
+	}
 }
 
 // ConnectStart hook.
@@ -185,10 +237,21 @@ func (t *Tracer) ConnectDone(network, addr string, err error) {
 	if !t.connectDone.IsZero() {
 		return
 	}
+
 	t.connectDone = time.Now()
+	if t.gotConn.IsZero() {
+		t.gotConn = t.connectDone
+	}
+
+	if err != nil {
+		t.protoError = err
+	}
 }
 
 // WroteRequest hook.
 func (t *Tracer) WroteRequest(info httptrace.WroteRequestInfo) {
 	t.wroteRequest = time.Now()
+	if info.Err != nil {
+		t.protoError = info.Err
+	}
 }
