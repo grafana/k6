@@ -108,16 +108,7 @@ func (t *Tracer) Trace() *httptrace.ClientTrace {
 // Call when the request is finished. Calculates metrics and resets the tracer.
 func (t *Tracer) Done() Trail {
 	done := time.Now()
-
-	// Cover for if the server closed the connection without a response.
-	if t.gotFirstResponseByte.IsZero() {
-		t.gotFirstResponseByte = done
-	}
-
 	trail := Trail{
-		StartTime:  t.getConn,
-		EndTime:    done,
-		Duration:   done.Sub(t.getConn),
 		Blocked:    t.gotConn.Sub(t.getConn),
 		LookingUp:  t.dnsDone.Sub(t.dnsStart),
 		Connecting: t.connectDone.Sub(t.connectStart),
@@ -132,21 +123,35 @@ func (t *Tracer) Done() Trail {
 		BytesWritten: t.bytesWritten,
 	}
 
-	// If the connection failed, we'll never get any data for these.
+	// If the connection was reused, it never blocked.
+	if t.connReused {
+		trail.Blocked = 0
+		trail.LookingUp = 0
+		trail.Connecting = 0
+	}
+
+	// If the connection failed, we'll never get any (meaningful) data for these.
 	if t.protoError != nil {
 		trail.Sending = 0
 		trail.Waiting = 0
 		trail.Receiving = 0
+
+		// URL is invalid/unroutable.
+		if trail.Blocked < 0 {
+			trail.Blocked = 0
+		}
 	}
+
+	// Calculate total times using adjusted values.
+	trail.EndTime = done
+	trail.Duration = trail.Blocked + trail.LookingUp + trail.Connecting + trail.Sending + trail.Waiting + trail.Receiving
+	trail.StartTime = trail.EndTime.Add(-trail.Duration)
 
 	if trail.StartTime.IsZero() {
 		panic("no start time")
 	}
 	if trail.EndTime.IsZero() {
 		panic("no end time")
-	}
-	if trail.Duration < 0 {
-		panic("impossible duration")
 	}
 	if trail.Blocked < 0 {
 		panic("impossible block time")
@@ -166,10 +171,13 @@ func (t *Tracer) Done() Trail {
 	if trail.Receiving < 0 {
 		panic("impossible read time time")
 	}
-	if trail.BytesRead <= 0 && trail.Receiving > 0 {
+	if trail.Duration < 0 {
+		panic("impossible duration")
+	}
+	if trail.BytesRead < 0 {
 		panic("impossible read bytes")
 	}
-	if trail.BytesWritten <= 0 && t.protoError == nil {
+	if trail.BytesWritten < 0 {
 		panic("impossible written bytes")
 	}
 
