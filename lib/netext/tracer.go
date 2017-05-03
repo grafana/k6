@@ -114,6 +114,11 @@ func (t *Tracer) Done() Trail {
 		t.gotFirstResponseByte = done
 	}
 
+	// GotConn is not guaranteed to be called in all cases.
+	if t.gotConn.IsZero() {
+		t.gotConn = t.getConn
+	}
+
 	trail := Trail{
 		Blocked:    t.gotConn.Sub(t.getConn),
 		LookingUp:  t.dnsDone.Sub(t.dnsStart),
