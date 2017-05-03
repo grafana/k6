@@ -108,6 +108,12 @@ func (t *Tracer) Trace() *httptrace.ClientTrace {
 // Call when the request is finished. Calculates metrics and resets the tracer.
 func (t *Tracer) Done() Trail {
 	done := time.Now()
+
+	// Cover for if the server closed the connection without a response.
+	if t.gotFirstResponseByte.IsZero() {
+		t.gotFirstResponseByte = done
+	}
+
 	trail := Trail{
 		Blocked:    t.gotConn.Sub(t.getConn),
 		LookingUp:  t.dnsDone.Sub(t.dnsStart),
