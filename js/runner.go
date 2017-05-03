@@ -37,8 +37,6 @@ import (
 type Runner struct {
 	Bundle       *Bundle
 	defaultGroup *lib.Group
-
-	HTTPTransport *http.Transport
 }
 
 func New(src *lib.SourceData, fs afero.Fs) (*Runner, error) {
@@ -55,15 +53,6 @@ func New(src *lib.SourceData, fs afero.Fs) (*Runner, error) {
 	return &Runner{
 		Bundle:       bundle,
 		defaultGroup: defaultGroup,
-		HTTPTransport: &http.Transport{
-			DialContext: (netext.Dialer{
-				Dialer: net.Dialer{
-					Timeout:   30 * time.Second,
-					KeepAlive: 0,
-					DualStack: true,
-				},
-			}).DialContext,
-		},
 	}, nil
 }
 
@@ -86,7 +75,16 @@ func (r *Runner) newVU() (*VU, error) {
 	vu := &VU{
 		BundleInstance: *bi,
 		Runner:         r,
-		VUContext:      NewVUContext(),
+		HTTPTransport: &http.Transport{
+			DialContext: (netext.Dialer{
+				Dialer: net.Dialer{
+					Timeout:   30 * time.Second,
+					KeepAlive: 30 * time.Second,
+					DualStack: true,
+				},
+			}).DialContext,
+		},
+		VUContext: NewVUContext(),
 	}
 	common.BindToGlobal(vu.Runtime, common.Bind(vu.Runtime, vu.VUContext, vu.Context))
 
@@ -113,9 +111,10 @@ func (r *Runner) ApplyOptions(opts lib.Options) {
 type VU struct {
 	BundleInstance
 
-	Runner    *Runner
-	ID        int64
-	Iteration int64
+	Runner        *Runner
+	HTTPTransport *http.Transport
+	ID            int64
+	Iteration     int64
 
 	VUContext *VUContext
 }
@@ -123,7 +122,7 @@ type VU struct {
 func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 	state := &common.State{
 		Group:         u.Runner.defaultGroup,
-		HTTPTransport: u.Runner.HTTPTransport,
+		HTTPTransport: u.HTTPTransport,
 	}
 
 	ctx = common.WithRuntime(ctx, u.Runtime)
