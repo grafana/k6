@@ -37,6 +37,8 @@ import (
 type Runner struct {
 	Bundle       *Bundle
 	defaultGroup *lib.Group
+
+	Dialer *netext.Dialer
 }
 
 func New(src *lib.SourceData, fs afero.Fs) (*Runner, error) {
@@ -53,6 +55,11 @@ func New(src *lib.SourceData, fs afero.Fs) (*Runner, error) {
 	return &Runner{
 		Bundle:       bundle,
 		defaultGroup: defaultGroup,
+		Dialer: netext.NewDialer(net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+			DualStack: true,
+		}),
 	}, nil
 }
 
@@ -75,16 +82,8 @@ func (r *Runner) newVU() (*VU, error) {
 	vu := &VU{
 		BundleInstance: *bi,
 		Runner:         r,
-		HTTPTransport: &http.Transport{
-			DialContext: (netext.Dialer{
-				Dialer: net.Dialer{
-					Timeout:   30 * time.Second,
-					KeepAlive: 30 * time.Second,
-					DualStack: true,
-				},
-			}).DialContext,
-		},
-		VUContext: NewVUContext(),
+		HTTPTransport:  &http.Transport{DialContext: r.Dialer.DialContext},
+		VUContext:      NewVUContext(),
 	}
 	common.BindToGlobal(vu.Runtime, common.Bind(vu.Runtime, vu.VUContext, vu.Context))
 

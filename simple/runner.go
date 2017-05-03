@@ -50,11 +50,11 @@ func New(u *url.URL) (*Runner, error) {
 		URL: u,
 		Transport: &http.Transport{
 			Proxy: http.ProxyFromEnvironment,
-			DialContext: (netext.Dialer{Dialer: net.Dialer{
+			DialContext: netext.NewDialer(net.Dialer{
 				Timeout:   10 * time.Second,
 				KeepAlive: 60 * time.Second,
 				DualStack: true,
-			}}).DialContext,
+			}).DialContext,
 			TLSClientConfig:     &tls.Config{},
 			MaxIdleConns:        math.MaxInt32,
 			MaxIdleConnsPerHost: math.MaxInt32,

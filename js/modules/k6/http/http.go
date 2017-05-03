@@ -191,7 +191,6 @@ func (*HTTP) Request(ctx context.Context, method, url string, args ...goja.Value
 		Timings: HTTPResponseTimings{
 			Duration:   stats.D(trail.Duration),
 			Blocked:    stats.D(trail.Blocked),
-			LookingUp:  stats.D(trail.LookingUp),
 			Connecting: stats.D(trail.Connecting),
 			Sending:    stats.D(trail.Sending),
 			Waiting:    stats.D(trail.Waiting),

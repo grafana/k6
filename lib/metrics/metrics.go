@@ -18,7 +18,6 @@ var (
 	HTTPReqs          = stats.New("http_reqs", stats.Counter)
 	HTTPReqDuration   = stats.New("http_req_duration", stats.Trend, stats.Time)
 	HTTPReqBlocked    = stats.New("http_req_blocked", stats.Trend, stats.Time)
-	HTTPReqLookingUp  = stats.New("http_req_looking_up", stats.Trend, stats.Time)
 	HTTPReqConnecting = stats.New("http_req_connecting", stats.Trend, stats.Time)
 	HTTPReqSending    = stats.New("http_req_sending", stats.Trend, stats.Time)
 	HTTPReqWaiting    = stats.New("http_req_waiting", stats.Trend, stats.Time)
