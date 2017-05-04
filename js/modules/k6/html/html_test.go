@@ -40,7 +40,7 @@ const testHTML = `
 	<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec ac dui erat. Pellentesque eu euismod odio, eget fringilla ante. In vitae nulla at est tincidunt gravida sit amet maximus arcu. Sed accumsan tristique massa, blandit sodales quam malesuada eu. Morbi vitae luctus augue. Nunc nec ligula quam. Cras fringilla nulla leo, at dignissim enim accumsan vitae. Sed eu cursus sapien, a rhoncus lorem. Etiam sed massa egestas, bibendum quam sit amet, eleifend ipsum. Maecenas mi ante, consectetur at tincidunt id, suscipit nec sem. Integer congue elit vel ligula commodo ultricies. Suspendisse condimentum laoreet ligula at aliquet.</p>
 	<p>Nullam id nisi eget ex pharetra imperdiet. Maecenas augue ligula, aliquet sit amet maximus ut, vestibulum et magna. Nam in arcu sed tortor volutpat porttitor sed eget dolor. Duis rhoncus est id dui porttitor, id molestie ex imperdiet. Proin purus ligula, pretium eleifend felis a, tempor feugiat mi. Cras rutrum pulvinar neque, eu dictum arcu. Cras purus metus, fermentum eget malesuada sit amet, dignissim non dui.</p>
 
-	<form>
+	<form id="form1">
 		<input id="text_input" type="text" value="input-text-value"/>
 		<select id="select_one">
 			<option value="not this option">no</option>
@@ -180,5 +180,12 @@ func TestParseHTML(t *testing.T) {
 				assert.Equal(t, "Lorem ipsum dolor sit amet", v.Export())
 			}
 		})
+	})
+
+	t.Run("Closest", func(t *testing.T) {
+		v, err := common.RunString(rt, `doc.find("textarea").closest("form").attr("id")`)
+		if assert.NoError(t, err) {
+			assert.Equal(t, "form1", v.Export())
+		}
 	})
 }
