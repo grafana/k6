@@ -85,11 +85,11 @@ func TestRequest(t *testing.T) {
 	state := &common.State{
 		Group: root,
 		HTTPTransport: &http.Transport{
-			DialContext: (netext.Dialer{Dialer: net.Dialer{
+			DialContext: (netext.NewDialer(net.Dialer{
 				Timeout:   10 * time.Second,
 				KeepAlive: 60 * time.Second,
 				DualStack: true,
-			}}).DialContext,
+			})).DialContext,
 		},
 	}
 
