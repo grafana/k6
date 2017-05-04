@@ -23,7 +23,6 @@ package k6
 import (
 	"context"
 	"sync/atomic"
-
 	"time"
 
 	"github.com/dop251/goja"
@@ -33,6 +32,15 @@ import (
 )
 
 type K6 struct{}
+
+func (*K6) Sleep(ctx context.Context, secs float64) {
+	timer := time.NewTimer(time.Duration(secs * float64(time.Second)))
+	select {
+	case <-timer.C:
+	case <-ctx.Done():
+		timer.Stop()
+	}
+}
 
 func (*K6) Group(ctx context.Context, name string, fn goja.Callable) (goja.Value, error) {
 	state := common.GetState(ctx)

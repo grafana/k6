@@ -23,7 +23,9 @@ package k6
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"testing"
+	"time"
 
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
@@ -31,6 +33,46 @@ import (
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestSleep(t *testing.T) {
+	rt := goja.New()
+	ctx, cancel := context.WithCancel(context.Background())
+	rt.Set("k6", common.Bind(rt, &K6{}, &ctx))
+
+	testdata := map[string]time.Duration{
+		"1":   1 * time.Second,
+		"1.0": 1 * time.Second,
+		"0.5": 500 * time.Millisecond,
+	}
+	for name, d := range testdata {
+		t.Run(name, func(t *testing.T) {
+			startTime := time.Now()
+			_, err := common.RunString(rt, `k6.sleep(1)`)
+			endTime := time.Now()
+			assert.NoError(t, err)
+			assert.True(t, endTime.Sub(startTime) > d, "did not sleep long enough")
+		})
+	}
+
+	t.Run("Cancel", func(t *testing.T) {
+		dch := make(chan time.Duration)
+		go func() {
+			startTime := time.Now()
+			_, err := common.RunString(rt, `k6.sleep(10)`)
+			endTime := time.Now()
+			assert.NoError(t, err)
+			dch <- endTime.Sub(startTime)
+		}()
+		runtime.Gosched()
+		time.Sleep(1 * time.Second)
+		runtime.Gosched()
+		cancel()
+		runtime.Gosched()
+		d := <-dch
+		assert.True(t, d > 500*time.Millisecond, "did not sleep long enough")
+		assert.True(t, d < 2*time.Second, "slept for too long!!")
+	})
+}
 
 func TestGroup(t *testing.T) {
 	root, err := lib.NewGroup("", nil)
