@@ -237,7 +237,7 @@ func makeCollector(s string, src *lib.SourceData, opts lib.Options) (lib.Collect
 	case "json":
 		return json.New(p, afero.NewOsFs(), opts)
 	case "cloud":
-		return cloud.New(p, opts)
+		return cloud.New(p, src, opts)
 	default:
 		return nil, errors.New("Unknown output type: " + t)
 	}
