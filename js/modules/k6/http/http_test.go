@@ -42,7 +42,6 @@ import (
 func assertRequestMetricsEmitted(t *testing.T, samples []stats.Sample, method, url string, status int, group string) {
 	seenDuration := false
 	seenBlocked := false
-	seenLookingUp := false
 	seenConnecting := false
 	seenSending := false
 	seenWaiting := false
@@ -54,8 +53,6 @@ func assertRequestMetricsEmitted(t *testing.T, samples []stats.Sample, method, u
 				seenDuration = true
 			case metrics.HTTPReqBlocked:
 				seenBlocked = true
-			case metrics.HTTPReqLookingUp:
-				seenLookingUp = true
 			case metrics.HTTPReqConnecting:
 				seenConnecting = true
 			case metrics.HTTPReqSending:
@@ -73,7 +70,6 @@ func assertRequestMetricsEmitted(t *testing.T, samples []stats.Sample, method, u
 	}
 	assert.True(t, seenDuration, "url %s didn't emit Duration", url)
 	assert.True(t, seenBlocked, "url %s didn't emit Blocked", url)
-	assert.True(t, seenLookingUp, "url %s didn't emit LookingUp", url)
 	assert.True(t, seenConnecting, "url %s didn't emit Connecting", url)
 	assert.True(t, seenSending, "url %s didn't emit Sending", url)
 	assert.True(t, seenWaiting, "url %s didn't emit Waiting", url)
