@@ -40,6 +40,24 @@ const testHTML = `
 	<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec ac dui erat. Pellentesque eu euismod odio, eget fringilla ante. In vitae nulla at est tincidunt gravida sit amet maximus arcu. Sed accumsan tristique massa, blandit sodales quam malesuada eu. Morbi vitae luctus augue. Nunc nec ligula quam. Cras fringilla nulla leo, at dignissim enim accumsan vitae. Sed eu cursus sapien, a rhoncus lorem. Etiam sed massa egestas, bibendum quam sit amet, eleifend ipsum. Maecenas mi ante, consectetur at tincidunt id, suscipit nec sem. Integer congue elit vel ligula commodo ultricies. Suspendisse condimentum laoreet ligula at aliquet.</p>
 	<p>Nullam id nisi eget ex pharetra imperdiet. Maecenas augue ligula, aliquet sit amet maximus ut, vestibulum et magna. Nam in arcu sed tortor volutpat porttitor sed eget dolor. Duis rhoncus est id dui porttitor, id molestie ex imperdiet. Proin purus ligula, pretium eleifend felis a, tempor feugiat mi. Cras rutrum pulvinar neque, eu dictum arcu. Cras purus metus, fermentum eget malesuada sit amet, dignissim non dui.</p>
 
+	<form>
+		<input id="text_input" type="text" value="input-text-value"/>
+		<select id="select_one">
+			<option value="not this option">no</option>
+			<option value="yes this option" selected>yes</option>
+		</select>
+		<select id="select_text">
+			<option>no text</option>
+			<option selected>yes text</option>
+		</select>
+		<select id="select_multi" multiple>
+			<option>option 1</option>
+			<option selected>option 2</option>
+			<option selected>option 3</option>
+		</select>
+		<textarea id="textarea" multiple>Lorem ipsum dolor sit amet</textarea>
+	</form>
+
 	<footer>This is the footer.</footer>
 </body>
 `
@@ -125,5 +143,42 @@ func TestParseHTML(t *testing.T) {
 		if assert.NoError(t, err) {
 			assert.Equal(t, "Lorem ipsum", v.Export())
 		}
+	})
+
+	t.Run("Val", func(t *testing.T) {
+		t.Run("Input", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("#text_input").val()`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, "input-text-value", v.Export())
+			}
+		})
+		t.Run("Select Option Attr", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("#select_one").val()`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, "yes this option", v.Export())
+			}
+		})
+		t.Run("Select Option Text", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("#select_text").val()`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, "yes text", v.Export())
+			}
+		})
+		t.Run("Select Option Multiple", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("#select_multi").val()`)
+			if assert.NoError(t, err) {
+				var opts[] string
+				rt.ExportTo(v, &opts)
+				assert.Equal(t, 2, len(opts))
+				assert.Equal(t, "option 2", opts[0])
+				assert.Equal(t, "option 3", opts[1])
+			}
+		})
+		t.Run("TextArea", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("#textarea").val()`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, "Lorem ipsum dolor sit amet", v.Export())
+			}
+		})
 	})
 }

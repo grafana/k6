@@ -76,10 +76,55 @@ func (s Selection) Attr(name string, def ...goja.Value) goja.Value {
 	return s.rt.ToValue(val)
 }
 
-func (s Selection) Html() goja.Value{
+func (s Selection) Html() goja.Value {
 	val, err := s.sel.Html()
 	if err != nil {
 		return goja.Undefined()
 	}
 	return s.rt.ToValue(val)
+}
+
+func optionVal(s *goquery.Selection) string {
+	val, exists := s.Attr("value")
+
+	if exists {
+		return val
+	}
+
+	val, err := s.Html()
+
+	if err != nil {
+		return ""
+	}
+
+	return val
+}
+
+func(s Selection) Val() goja.Value {
+	switch goquery.NodeName(s.sel) {
+		case "input":
+			return s.Attr("value")
+
+		case "textarea":
+			return s.Html()
+
+		case "button":
+			return s.Attr("value")
+
+		case "select":
+			selected := s.sel.First().Find("option[selected]")
+
+			_, exists := s.sel.Attr("multiple")
+
+			if exists {
+				return s.rt.ToValue(selected.Map(func(idx int, opt *goquery.Selection) string { return optionVal(opt) }))
+			} else {
+				return s.rt.ToValue(optionVal(selected))
+			}
+
+		case "":
+			return goja.Undefined()
+		default:
+			return goja.Undefined()
+	}
 }
