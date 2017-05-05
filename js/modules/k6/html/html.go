@@ -86,13 +86,11 @@ func (s Selection) Html() goja.Value {
 
 func optionVal(s *goquery.Selection) string {
 	val, exists := s.Attr("value")
-
 	if exists {
 		return val
 	}
 
 	val, err := s.Html()
-
 	if err != nil {
 		return ""
 	}
@@ -114,16 +112,12 @@ func(s Selection) Val() goja.Value {
 		case "select":
 			selected := s.sel.First().Find("option[selected]")
 
-			_, exists := s.sel.Attr("multiple")
-
-			if exists {
+			if _, exists := s.sel.Attr("multiple"); exists {
 				return s.rt.ToValue(selected.Map(func(idx int, opt *goquery.Selection) string { return optionVal(opt) }))
 			} else {
 				return s.rt.ToValue(optionVal(selected))
 			}
 
-		case "":
-			return goja.Undefined()
 		default:
 			return goja.Undefined()
 	}
