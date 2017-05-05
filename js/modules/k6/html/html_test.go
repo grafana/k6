@@ -304,5 +304,13 @@ func TestParseHTML(t *testing.T) {
 		}
 	})
 
+	t.Run("Map", func(t *testing.T) {
+		v, err := common.RunString(rt, `doc.find("#select_multi option").map(function(idx, val) { return val.text() })`)
+		if assert.NoError(t, err) {
+			mapped := v.Export().([]string)
+			assert.Equal(t, 3, len(mapped))
+			assert.Equal(t, [] string{"option 1", "option 2", "option 3"}, mapped)
+		}
+	})
 
 }
