@@ -313,4 +313,77 @@ func TestParseHTML(t *testing.T) {
 		}
 	})
 
+	t.Run("Next", func(t *testing.T) {
+		t.Run("No arg", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("h1").next()`)
+			if assert.NoError(t, err) {
+				sel := v.Export().(Selection).sel
+				assert.Equal(t, 1, sel.Length())
+				assert.Equal(t, true, sel.Is("p"))
+			}
+		})
+
+		t.Run("Filter arg", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("p").next("form")`)
+			if assert.NoError(t, err) {
+				sel := v.Export().(Selection).sel
+				assert.Equal(t, 1, sel.Length())
+			}
+		})
+	})
+
+	t.Run("NextAll", func(t *testing.T) {
+		t.Run("No arg", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("h1").nextAll()`)
+			if assert.NoError(t, err) {
+				sel := v.Export().(Selection).sel
+				assert.Equal(t, 4, sel.Length())
+			}
+		})
+
+		t.Run("Filter arg", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("h1").nextAll("p")`)
+			if assert.NoError(t, err) {
+				sel := v.Export().(Selection).sel
+				assert.Equal(t, 2, sel.Length())
+			}
+		})
+	})
+
+
+	t.Run("Prev", func(t *testing.T) {
+		t.Run("No arg", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("footer").prev()`)
+			if assert.NoError(t, err) {
+				sel := v.Export().(Selection).sel
+				assert.Equal(t, true, sel.Is("form"))
+			}
+		})
+
+		t.Run("Filter arg", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("footer").prev("form")`)
+			if assert.NoError(t, err) {
+				sel := v.Export().(Selection).sel
+				assert.Equal(t, 1, sel.Length())
+			}
+		})
+	})
+
+	t.Run("PrevAll", func(t *testing.T) {
+		t.Run("No arg", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("form").prevAll()`)
+			if assert.NoError(t, err) {
+				sel := v.Export().(Selection).sel
+				assert.Equal(t, 3, sel.Length())
+			}
+		})
+
+		t.Run("Filter arg", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("form").prevAll("p")`)
+			if assert.NoError(t, err) {
+				sel := v.Export().(Selection).sel
+				assert.Equal(t, 2, sel.Length())
+			}
+		})
+	})
 }
