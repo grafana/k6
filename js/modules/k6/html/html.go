@@ -409,3 +409,33 @@ func (s Selection) Map(v goja.Value) (result [] string) {
 		return nil
 	}
 }
+
+func (s Selection) adjacent(unfiltered func () *goquery.Selection,
+							filtered func(string) *goquery.Selection,
+							def ...string) Selection {
+	if(len(def) == 0) {
+		return Selection{s.rt, unfiltered()}
+	} else {
+		return Selection{s.rt, filtered(def[0])}
+	}
+}
+
+func (s Selection) Next(def ...string) Selection {
+	return s.adjacent(s.sel.Next, s.sel.NextFiltered, def...)
+}
+
+
+func (s Selection) NextAll(def ...string) Selection {
+	return s.adjacent(s.sel.NextAll, s.sel.NextAllFiltered, def...)
+}
+
+
+func (s Selection) Prev(def ...string) Selection {
+	return s.adjacent(s.sel.Prev, s.sel.PrevFiltered, def...)
+}
+
+
+func (s Selection) PrevAll(def ...string) Selection {
+	return s.adjacent(s.sel.PrevAll, s.sel.PrevAllFiltered, def...)
+}
+
