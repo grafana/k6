@@ -224,7 +224,7 @@ func TestParseHTML(t *testing.T) {
 	})
 
 	t.Run("Each", func(t *testing.T) {
-		t.Run("func arg", func(t *testing.T) {
+		t.Run("Func arg", func(t *testing.T) {
 			v, err := common.RunString(rt, `{ var elems = []; doc.find("#select_multi option").each(function(idx, gqval) { elems[idx] = gqval.text() }); elems }`)
 			if assert.NoError(t, err) {
 				var elems[] string
@@ -240,5 +240,38 @@ func TestParseHTML(t *testing.T) {
 				assert.IsType(t, &goja.InterruptedError{}, err)
 			}
 		})
+	})
+
+	t.Run("Is", func(t *testing.T) {
+		v, err := common.RunString(rt, `doc.find("h1").is("h1")`)
+		if assert.NoError(t, err) {
+			assert.Equal(t, true, v.Export())
+		}
+	})
+
+	t.Run("Filter", func(t *testing.T) {
+		t.Run("String", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("body").children().filter("p")`)
+			if assert.NoError(t, err) {
+				sel := v.Export().(Selection).sel
+				assert.Equal(t, 2, sel.Length())
+			}
+		})
+
+		t.Run("Function", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("body").children().filter(function(idx, val){ return val.is("p") })`)
+			if assert.NoError(t, err) {
+				sel := v.Export().(Selection).sel
+				assert.Equal(t, 2, sel.Length())
+ 			}
+		})
+	})
+
+	t.Run("End", func(t *testing.T) {
+		v, err := common.RunString(rt, `doc.find("body").children().filter("p").end()`)
+		if assert.NoError(t, err) {
+			sel := v.Export().(Selection).sel
+			assert.Equal(t, 5, sel.Length())
+		}
 	})
 }
