@@ -333,10 +333,9 @@ func (s Selection) Contents() Selection {
 	return Selection{s.rt, s.sel.Contents()}
 }
 
-
 func (s Selection) Each(v goja.Value) Selection {
-	gojaFn, ok := goja.AssertFunction(v)
-	if ok {
+	gojaFn, isFn := goja.AssertFunction(v)
+	if isFn {
 		fn := func(idx int, sel *goquery.Selection) {
 			gojaFn(v, s.rt.ToValue(idx), s.rt.ToValue(sel))
 		}
@@ -344,5 +343,34 @@ func (s Selection) Each(v goja.Value) Selection {
 	} else {
 		s.rt.Interrupt("Argument to each() must be a function")
 		return s
+	}
+}
+
+func (s Selection) End() Selection {
+	return Selection{s.rt, s.sel.End()}
+}
+
+func (s Selection) buildMatcher(v goja.Value, gojaFn goja.Callable) func (int, *goquery.Selection) bool {
+	return func(idx int, sel *goquery.Selection) bool {
+		fnRes, fnErr := gojaFn(v, s.rt.ToValue(idx), s.rt.ToValue(sel))
+		return fnErr == nil && fnRes.ToBoolean()
+	}
+}
+
+func (s Selection) Filter(v goja.Value) Selection {
+	gojaFn, isFn := goja.AssertFunction(v)
+	if isFn {
+		return Selection{s.rt, s.sel.FilterFunction(s.buildMatcher(v, gojaFn))}
+	} else {
+		return Selection{s.rt, s.sel.Filter(v.String())}
+	}
+}
+
+func (s Selection) Is(v goja.Value) bool {
+	gojaFn, isFn := goja.AssertFunction(v)
+	if isFn {
+		return s.sel.IsFunction(s.buildMatcher(v, gojaFn))
+	} else {
+		return s.sel.Is(v.String())
 	}
 }
