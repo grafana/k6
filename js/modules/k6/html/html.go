@@ -138,7 +138,20 @@ func (s Selection) Children(def ...string) Selection {
 	}
 }
 
-
 func (s Selection) Contents() Selection {
 	return Selection{s.rt, s.sel.Contents()}
+}
+
+
+func (s Selection) Each(v goja.Value) Selection {
+	gojaFn, ok := goja.AssertFunction(v)
+	if ok {
+		fn := func(idx int, sel *goquery.Selection) {
+			gojaFn(v, s.rt.ToValue(idx), s.rt.ToValue(sel))
+		}
+		return Selection{s.rt, s.sel.Each(fn)}
+	} else {
+		s.rt.Interrupt("Argument to each() must be a function")
+		return s
+	}
 }

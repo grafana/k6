@@ -222,4 +222,23 @@ func TestParseHTML(t *testing.T) {
 			assert.Equal(t, "\n\t", sel.First().Text())
 		}
 	})
+
+	t.Run("Each", func(t *testing.T) {
+		t.Run("func arg", func(t *testing.T) {
+			v, err := common.RunString(rt, `{ var elems = []; doc.find("#select_multi option").each(function(idx, gqval) { elems[idx] = gqval.text() }); elems }`)
+			if assert.NoError(t, err) {
+				var elems[] string
+				rt.ExportTo(v, &elems)
+				assert.Equal(t, 3, len(elems))
+				assert.Equal(t, "option 1", elems[0])
+			}
+		})
+
+		t.Run("Invalid arg", func(t *testing.T) {
+			_, err := common.RunString(rt, `doc.find("#select_multi option").each("");`)
+			if assert.Error(t, err) {
+				assert.IsType(t, &goja.InterruptedError{}, err)
+			}
+		})
+	})
 }
