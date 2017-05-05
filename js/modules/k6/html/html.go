@@ -145,6 +145,7 @@ func (s Selection) Contents() Selection {
 func (s Selection) Each(v goja.Value) Selection {
 	gojaFn, isFn := goja.AssertFunction(v)
 	if isFn {
+		// TODO change goquery.Selection arg to html.Node
 		fn := func(idx int, sel *goquery.Selection) {
 			gojaFn(v, s.rt.ToValue(idx), s.rt.ToValue(sel))
 		}
@@ -182,4 +183,21 @@ func (s Selection) Is(v goja.Value) bool {
 	} else {
 		return s.sel.Is(v.String())
 	}
+}
+
+func (s Selection) Eq(idx int) Selection {
+	return Selection{s.rt, s.sel.Eq(idx)}
+}
+
+func (s Selection) First() Selection {
+	return Selection{s.rt, s.sel.First()}
+}
+
+func (s Selection) Last() Selection {
+	return Selection{s.rt, s.sel.Last()}
+}
+
+func (s Selection) Has(v goja.Value) Selection {
+	// TODO match against Dom/Node items
+	return Selection{s.rt, s.sel.Has(v.String())}
 }
