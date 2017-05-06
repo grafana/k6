@@ -237,7 +237,8 @@ func TestParseHTML(t *testing.T) {
 		t.Run("Invalid arg", func(t *testing.T) {
 			_, err := common.RunString(rt, `doc.find("#select_multi option").each("");`)
 			if assert.Error(t, err) {
-				assert.IsType(t, &goja.InterruptedError{}, err)
+				assert.IsType(t, &goja.Exception{}, err)
+				assert.Contains(t, err.Error(), "must be a function")
 			}
 		})
 	})
@@ -305,12 +306,22 @@ func TestParseHTML(t *testing.T) {
 	})
 
 	t.Run("Map", func(t *testing.T) {
-		v, err := common.RunString(rt, `doc.find("#select_multi option").map(function(idx, val) { return val.text() })`)
-		if assert.NoError(t, err) {
-			mapped := v.Export().([]string)
-			assert.Equal(t, 3, len(mapped))
-			assert.Equal(t, [] string{"option 1", "option 2", "option 3"}, mapped)
-		}
+		t.Run("Valid", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("#select_multi option").map(function(idx, val) { return val.text() })`)
+			if assert.NoError(t, err) {
+				mapped := v.Export().([]string)
+				assert.Equal(t, 3, len(mapped))
+				assert.Equal(t, [] string{"option 1", "option 2", "option 3"}, mapped)
+			}
+		})
+
+		t.Run("Invalid arg", func(t *testing.T) {
+			_, err := common.RunString(rt, `doc.find("#select_multi option").map("");`)
+			if assert.Error(t, err) {
+				assert.IsType(t, &goja.Exception{}, err)
+				assert.Contains(t, err.Error(), "must be a function")
+			}
+		})
 	})
 
 	t.Run("Next", func(t *testing.T) {
