@@ -440,3 +440,90 @@ func (s Selection) PrevAll(def ...string) Selection {
 	return s.adjacent(s.sel.PrevAll, s.sel.PrevAllFiltered, def...)
 }
 
+
+func (s Selection) Parent(def ...string) Selection {
+	return s.adjacent(s.sel.Parent, s.sel.ParentFiltered, def...)
+}
+
+func (s Selection) Parents(def ...string) Selection {
+	return s.adjacent(s.sel.Parents, s.sel.ParentsFiltered, def...)
+}
+
+func (s Selection) adjacentUntil(until func (string) *goquery.Selection,
+								 untilSelection func(*goquery.Selection) *goquery.Selection,
+								 filteredUntil func(string, string) *goquery.Selection,
+								 filteredUntilSelection func(string, *goquery.Selection) *goquery.Selection,
+								 def ...goja.Value) Selection {
+	// empty selector to nextuntil and prevuntil matches jquery api and has same effect as prevAll and nextAll
+	// relies on goquery.compileMatcher retrning a matcher which fails all matches when invalid selector given to cascadia.compile
+	if(len(def) == 0) {
+		return Selection{s.rt, until("")}
+	}
+
+	selector := def[0].Export()
+
+	if(len(def) == 1) {
+		switch selector.(type) {
+			case string:
+				return Selection{s.rt, until(selector.(string))}
+
+			case Selection:
+				return Selection{s.rt, untilSelection(selector.(Selection).sel)}
+
+			default:
+				return Selection{s.rt, until("")}
+		}
+	}
+
+	filter := def[1].String()
+
+	switch selector.(type) {
+		case string:
+			return Selection{s.rt, filteredUntil(filter, selector.(string))}
+
+		case Selection:
+			return Selection{s.rt, filteredUntilSelection(filter, selector.(Selection).sel)}
+
+		default:
+			return Selection{s.rt, filteredUntil(filter, "")}
+	}
+}
+
+// prevUntil, nextUntil and parentsUntil support two args based on jquery api
+// 1st arg is either a selector string or goquery.selection.
+// 2nd arg is filter selector
+// if 1st arg is nil or blank string then behaviour is similar to prevAll or nextAll
+func (s Selection) PrevUntil(def ...goja.Value) Selection {
+	return s.adjacentUntil(
+		s.sel.PrevUntil,
+		s.sel.PrevUntilSelection,
+		s.sel.PrevFilteredUntil,
+		s.sel.PrevFilteredUntilSelection,
+		def...
+	)
+}
+
+func (s Selection) NextUntil(def ...goja.Value) Selection {
+	return s.adjacentUntil(
+		s.sel.NextUntil,
+		s.sel.NextUntilSelection,
+		s.sel.NextFilteredUntil,
+		s.sel.NextFilteredUntilSelection,
+		def...
+	)
+}
+
+func (s Selection) ParentsUntil(def ...goja.Value) Selection {
+	return s.adjacentUntil(
+		s.sel.ParentsUntil,
+		s.sel.ParentsUntilSelection,
+		s.sel.ParentsFilteredUntil,
+		s.sel.ParentsFilteredUntilSelection,
+		def...
+	)
+}
+
+
+func (s Selection) Size() int {
+	return s.sel.Length()
+}
