@@ -562,4 +562,28 @@ func TestParseHTML(t *testing.T) {
 		})
 	})
 
+
+	t.Run("Not", func(t *testing.T) {
+		t.Run("String selector", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("body").children().not("p").size()`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, int64(3), v.Export())
+			}
+		})
+
+		t.Run("Selection selector", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("body").children().not(doc.find("p")).size()`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, int64(3), v.Export())
+			}
+		})
+
+		t.Run("Function selector", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("body").children().not(function(idx, val){ return val.is("p") }).size()`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, int64(3), v.Export())
+			}
+		})
+	})
+
 }
