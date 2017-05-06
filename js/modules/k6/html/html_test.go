@@ -244,10 +244,26 @@ func TestParseHTML(t *testing.T) {
 	})
 
 	t.Run("Is", func(t *testing.T) {
-		v, err := common.RunString(rt, `doc.find("h1").is("h1")`)
-		if assert.NoError(t, err) {
-			assert.Equal(t, true, v.Export())
-		}
+		t.Run("String selector", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("h1").is("h1")`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, true, v.Export())
+			}
+		})
+
+		t.Run("Function selector", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("h1").is(function(idx, val){ return val.text() == "Lorem ipsum" })`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, true, v.Export())
+			}
+		})
+
+		t.Run("Selection selector", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("body").children().first().is(doc.find("h1"))`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, true, v.Export())
+			}
+		})
 	})
 
 	t.Run("Filter", func(t *testing.T) {
@@ -261,6 +277,14 @@ func TestParseHTML(t *testing.T) {
 
 		t.Run("Function", func(t *testing.T) {
 			v, err := common.RunString(rt, `doc.find("body").children().filter(function(idx, val){ return val.is("p") })`)
+			if assert.NoError(t, err) {
+				sel := v.Export().(Selection).sel
+				assert.Equal(t, 2, sel.Length())
+ 			}
+		})
+
+		t.Run("Selection", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("body").children().filter(doc.find("p"))`)
 			if assert.NoError(t, err) {
 				sel := v.Export().(Selection).sel
 				assert.Equal(t, 2, sel.Length())
@@ -298,11 +322,19 @@ func TestParseHTML(t *testing.T) {
 	})
 
 	t.Run("Has", func(t *testing.T) {
-		v, err := common.RunString(rt, `doc.find("body").children().has("input")`)
-		if assert.NoError(t, err) {
-			sel := v.Export().(Selection).sel
-			assert.Equal(t, 1, sel.Length())
-		}
+		t.Run("String selector", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("body").children().has("input").size()`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, int64(1), v.Export())
+			}
+		})
+
+		t.Run("Selection selector", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("body").children().has(doc.find("input")).size()`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, int64(1), v.Export())
+			}
+		})
 	})
 
 	t.Run("Map", func(t *testing.T) {
