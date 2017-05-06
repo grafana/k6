@@ -363,6 +363,8 @@ func (s Selection) Filter(v goja.Value) Selection {
 	gojaFn, isFn := goja.AssertFunction(v)
 	if isFn {
 		return Selection{s.rt, s.sel.FilterFunction(s.buildMatcher(v, gojaFn))}
+	} else if filSel, isSel := v.Export().(Selection); isSel {
+		return Selection{s.rt, s.sel.FilterSelection(filSel.sel)}
 	} else {
 		return Selection{s.rt, s.sel.Filter(v.String())}
 	}
@@ -372,6 +374,8 @@ func (s Selection) Is(v goja.Value) bool {
 	gojaFn, isFn := goja.AssertFunction(v)
 	if isFn {
 		return s.sel.IsFunction(s.buildMatcher(v, gojaFn))
+	} else if cmpSel, isSel := v.Export().(Selection); isSel {
+		return s.sel.IsSelection(cmpSel.sel)
 	} else {
 		return s.sel.Is(v.String())
 	}
@@ -390,8 +394,11 @@ func (s Selection) Last() Selection {
 }
 
 func (s Selection) Has(v goja.Value) Selection {
-	// TODO match against Dom/Node items
-	return Selection{s.rt, s.sel.Has(v.String())}
+	if hasSel, isSel := v.Export().(Selection); isSel {
+		return Selection{s.rt, s.sel.HasSelection(hasSel.sel)}
+	} else {
+		return Selection{s.rt, s.sel.Has(v.String())}
+	}
 }
 
 func (s Selection) Map(v goja.Value) (result [] string) {
