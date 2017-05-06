@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"errors"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/dop251/goja"
@@ -342,7 +343,7 @@ func (s Selection) Each(v goja.Value) Selection {
 		}
 		return Selection{s.rt, s.sel.Each(fn)}
 	} else {
-		s.rt.Interrupt("Argument to each() must be a function")
+		panic(s.rt.NewGoError(errors.New("Argument to each() must be a function")))
 		return s
 	}
 }
@@ -405,7 +406,7 @@ func (s Selection) Map(v goja.Value) (result [] string) {
 		}
 		return s.sel.Map(fn)
 	} else {
-		s.rt.Interrupt("Argument to map() must be a function")
+		panic(s.rt.NewGoError(errors.New("Argument to map() must be a function")))
 		return nil
 	}
 }
