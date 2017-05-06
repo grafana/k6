@@ -586,4 +586,40 @@ func TestParseHTML(t *testing.T) {
 		})
 	})
 
+	t.Run("Siblings", func(t *testing.T) {
+		t.Run("No filter", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("form").siblings().size()`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, int64(4), v.Export())
+			}
+		})
+
+		t.Run("Filtered", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("form").siblings("p").size()`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, int64(2), v.Export())
+			}
+		})
+	})
+
+	t.Run("Slice", func(t *testing.T) {
+		t.Run("No filter", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("body").children().slice(1, 2)`)
+			if assert.NoError(t, err) {
+				sel := v.Export().(Selection).sel
+				assert.Equal(t, 1, sel.Length())
+				assert.Equal(t, true, sel.Is("p"))
+				assert.Contains(t, sel.Text(), "Lorem ipsum dolor")
+			}
+		})
+
+		t.Run("Filtered", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("body").children().slice(3)`)
+			if assert.NoError(t, err) {
+				sel := v.Export().(Selection).sel
+				assert.Equal(t, 2, sel.Length())
+				assert.Equal(t, true, sel.Eq(0).Is("form"))
+			}
+		})
+	})
 }

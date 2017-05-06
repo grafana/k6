@@ -351,6 +351,18 @@ func (s Selection) ParentsUntil(def ...goja.Value) Selection {
 	)
 }
 
+func (s Selection) Siblings(def ...string) Selection {
+	return s.adjacent(s.sel.Siblings, s.sel.SiblingsFiltered, def...)
+}
+
+func (s Selection) Slice(start int, def ...int) Selection {
+	if len(def) > 0 {
+		return Selection{s.rt, s.sel.Slice(start, def[0])}
+	} else {
+		return Selection{s.rt, s.sel.Slice(start, s.sel.Length())}
+	}
+}
+
 func (s Selection) Size() int {
 	return s.sel.Length()
 }
