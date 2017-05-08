@@ -21,6 +21,7 @@
 package main
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/spf13/afero"
@@ -48,6 +49,14 @@ func Test_getSrcData(t *testing.T) {
 					assert.Equal(t, "hi!", string(src.Data))
 				}
 			})
+		}
+	})
+
+	t.Run("stdin", func(t *testing.T) {
+		src, err := getSrcData("-", "/path/to", strings.NewReader(`hi!`), nil)
+		if assert.NoError(t, err) {
+			assert.Equal(t, "-", src.Filename)
+			assert.Equal(t, "hi!", string(src.Data))
 		}
 	})
 }

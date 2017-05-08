@@ -55,6 +55,9 @@ func Resolve(pwd, name string) string {
 
 // Returns the directory for the path.
 func Dir(name string) string {
+	if name == "-" {
+		return "/"
+	}
 	return filepath.Dir(name)
 }
 

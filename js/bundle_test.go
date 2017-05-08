@@ -91,11 +91,19 @@ func TestNewBundle(t *testing.T) {
 	t.Run("Minimal", func(t *testing.T) {
 		_, err := NewBundle(&lib.SourceData{
 			Filename: "/script.js",
-			Data: []byte(`
-				export default function() {};
-			`),
+			Data:     []byte(`export default function() {};`),
 		}, afero.NewMemMapFs())
 		assert.NoError(t, err)
+	})
+	t.Run("stdin", func(t *testing.T) {
+		b, err := NewBundle(&lib.SourceData{
+			Filename: "-",
+			Data:     []byte(`export default function() {};`),
+		}, afero.NewMemMapFs())
+		if assert.NoError(t, err) {
+			assert.Equal(t, "-", b.Filename)
+			assert.Equal(t, "/", b.BaseInitContext.pwd)
+		}
 	})
 	t.Run("Options", func(t *testing.T) {
 		t.Run("Empty", func(t *testing.T) {
