@@ -24,6 +24,8 @@ import (
 	"context"
 	"strings"
 	"errors"
+	"encoding/json"
+	"strconv"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/dop251/goja"
@@ -370,6 +372,131 @@ func (s Selection) Slice(start int, def ...int) Selection {
 	}
 }
 
+func (s Selection) Get(def ...int) goja.Value {
+	if len(def) == 0 {
+		return s.rt.ToValue(s.ToArray())
+	} else if def[0] < s.sel.Length() && def[0] > -s.sel.Length() {
+		return s.rt.ToValue(Selection{s.rt, s.sel.Eq(def[0])})
+	} else {
+		return goja.Undefined()
+	}
+}
+
+func (s Selection) ToArray() (items [] Selection) {
+	for i := range s.sel.Nodes {
+		items = append(items, Selection{s.rt, s.sel.Eq(i)})
+	}
+	return
+}
+
 func (s Selection) Size() int {
 	return s.sel.Length()
+}
+
+func (s Selection) Index(def ...goja.Value) int {
+	if(len(def) == 0) {
+		return s.sel.Index()
+	}
+
+	v := def[0].Export()
+	switch v.(type) {
+		case Selection:
+			return s.sel.IndexOfSelection(v.(Selection).sel)
+
+		case string:
+			return s.sel.IndexSelector(v.(string))
+
+		default:
+			panic(s.rt.NewGoError(errors.New("The argument to index() be a string or a selection")))
+			return -1
+	}
+}
+
+
+const (
+	lowAlpha = "abcdefghijklmnopqrstuvwxyz"
+	highAlpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+)
+
+func makeReplacerArray(prefixFrom, from, prefixTo, to string) (vals[]string) {
+	for idx, _ := range from {
+		vals = append(vals, prefixFrom + string(from[idx]), prefixTo + string(to[idx]))
+	}
+	return
+}
+
+func makeNameReplacer(prefixFrom, from, prefixTo, to string) *strings.Replacer {
+	return strings.NewReplacer(makeReplacerArray(prefixFrom, from, prefixTo, to)...)
+}
+
+var attrToDataName = makeNameReplacer("-", lowAlpha, "", highAlpha)
+var dataToAttrName = makeNameReplacer("", highAlpha, "-", lowAlpha)
+
+func toAttrName(dataName string) string {
+	return dataToAttrName.Replace(dataName)
+}
+
+func toDataName(attrName string) string {
+	return attrToDataName.Replace(attrName)
+}
+
+func convert(val string) interface{} {
+	if val[0] == '{' || val[0] == '[' {
+		var subdata interface{}
+
+		err := json.Unmarshal([]byte(val), &subdata)
+		if err == nil {
+			return subdata
+		} else {
+			return val
+		}
+	} else {
+		switch val {
+			case "true":
+				return true
+
+			case "false":
+				return false
+
+			case "null":
+				return goja.Undefined()
+
+			case "undefined":
+				return goja.Undefined()
+
+			default:
+				if intVal, err := strconv.ParseInt(val, 0, 64); err == nil {
+					return intVal
+				} else {
+					return val
+				}
+		}
+	}
+}
+
+func (s Selection) Data(def ...string) goja.Value {
+	if s.sel.Length() == 0 {
+		return goja.Undefined()
+	}
+
+	if len(def) > 0 {
+		val, exists := s.sel.Attr("data-" + def[0])
+		if exists {
+			return s.rt.ToValue(convert(val))
+		} else {
+			return goja.Undefined()
+		}
+	}
+
+	if len(s.sel.Nodes[0].Attr) == 0 {
+		return goja.Undefined()
+	}
+
+	data := make(map[string]interface{})
+	for _, attr := range s.sel.Nodes[0].Attr {
+		if strings.HasPrefix(attr.Key, "data-") && len(attr.Key) > 6 {
+			data[toDataName(attr.Key[5:])] = convert(attr.Val)
+		}
+	}
+	return s.rt.ToValue(data)
 }

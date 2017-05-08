@@ -35,9 +35,9 @@ const testHTML = `
 	<title>This is the title</title>
 </head>
 <body>
-	<h1 id="top">Lorem ipsum</h1>
+	<h1 id="top" data-test="dataval" data-int-val="123">Lorem ipsum</h1>
 
-	<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec ac dui erat. Pellentesque eu euismod odio, eget fringilla ante. In vitae nulla at est tincidunt gravida sit amet maximus arcu. Sed accumsan tristique massa, blandit sodales quam malesuada eu. Morbi vitae luctus augue. Nunc nec ligula quam. Cras fringilla nulla leo, at dignissim enim accumsan vitae. Sed eu cursus sapien, a rhoncus lorem. Etiam sed massa egestas, bibendum quam sit amet, eleifend ipsum. Maecenas mi ante, consectetur at tincidunt id, suscipit nec sem. Integer congue elit vel ligula commodo ultricies. Suspendisse condimentum laoreet ligula at aliquet.</p>
+	<p data-test-2="true" data-opts='{"id":101}'>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec ac dui erat. Pellentesque eu euismod odio, eget fringilla ante. In vitae nulla at est tincidunt gravida sit amet maximus arcu. Sed accumsan tristique massa, blandit sodales quam malesuada eu. Morbi vitae luctus augue. Nunc nec ligula quam. Cras fringilla nulla leo, at dignissim enim accumsan vitae. Sed eu cursus sapien, a rhoncus lorem. Etiam sed massa egestas, bibendum quam sit amet, eleifend ipsum. Maecenas mi ante, consectetur at tincidunt id, suscipit nec sem. Integer congue elit vel ligula commodo ultricies. Suspendisse condimentum laoreet ligula at aliquet.</p>
 	<p>Nullam id nisi eget ex pharetra imperdiet. Maecenas augue ligula, aliquet sit amet maximus ut, vestibulum et magna. Nam in arcu sed tortor volutpat porttitor sed eget dolor. Duis rhoncus est id dui porttitor, id molestie ex imperdiet. Proin purus ligula, pretium eleifend felis a, tempor feugiat mi. Cras rutrum pulvinar neque, eu dictum arcu. Cras purus metus, fermentum eget malesuada sit amet, dignissim non dui.</p>
 
 	<form id="form1">
@@ -651,6 +651,124 @@ func TestParseHTML(t *testing.T) {
 				sel := v.Export().(Selection).sel
 				assert.Equal(t, 2, sel.Length())
 				assert.Equal(t, true, sel.Eq(0).Is("form"))
+			}
+		})
+	})
+
+	t.Run("Get", func(t *testing.T) {
+		t.Run("No args", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("body").children().get()`)
+			if assert.NoError(t, err) {
+				arr := v.Export().([]Selection)
+				assert.Equal(t, 5, len(arr))
+				assert.True(t, arr[0].sel.Is("h1"))
+				assert.True(t, arr[1].sel.Is("p"))
+				assert.True(t, arr[4].sel.Is("footer"))
+			}
+		})
+
+		t.Run("+ve index", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("body").children().get(1)`)
+			if assert.NoError(t, err) {
+				sel := v.Export().(Selection).sel
+				assert.True(t, sel.Is("p"))
+				assert.Contains(t, sel.Text(), "Lorem ipsum dolor sit amet")
+			}
+		})
+
+		t.Run("-ve index", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("body").children().get(-1)`)
+			if assert.NoError(t, err) {
+				sel := v.Export().(Selection).sel
+				assert.Equal(t, 1, sel.Length())
+				assert.True(t, sel.Is("footer"))
+			}
+		})
+	})
+
+
+	t.Run("ToArray", func(t *testing.T) {
+		v, err := common.RunString(rt, `doc.find("p").toArray()`)
+		if assert.NoError(t, err) {
+			arr := v.Export().([]Selection)
+			assert.Equal(t, 2, len(arr))
+			assert.Equal(t, 1, arr[0].sel.Length())
+			assert.Equal(t, 1, arr[1].sel.Length())
+			assert.Contains(t, arr[0].sel.Text(), "Lorem ipsum dolor sit amet")
+			assert.Contains(t, arr[1].sel.Text(), "Nullam id nisi eget")
+		}
+	})
+
+	t.Run("Index", func(t *testing.T) {
+		t.Run("No args", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("p").index()`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, int64(1), v.Export())
+			}
+		})
+
+		t.Run("String selector", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("form").index("body > *")`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, int64(3), v.Export())
+			}
+		})
+
+		t.Run("Selection selector", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("body").children().index(doc.find("footer"))`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, int64(4), v.Export())
+			}
+		})
+	})
+
+	t.Run("Data 1", func(t *testing.T) {
+		t.Run("Named string", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("h1").data("test")`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, "dataval", v.Export())
+			}
+		})
+
+		t.Run("Named int", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("h1").data("int-val")`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, int64(123), v.Export())
+			}
+		})
+
+
+		t.Run("Unamed obj 1", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("h1").data()`)
+			if assert.NoError(t, err) {
+				data := v.Export().(map[string]interface{})
+				assert.Equal(t, "dataval", data["test"])
+				assert.Equal(t, int64(123), data["intVal"])
+			}
+		})
+	})
+
+	t.Run("Data 2", func(t *testing.T) {
+		t.Run("Named bool", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("p").data("test-2")`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, true, v.Export())
+			}
+		})
+
+		t.Run("Named obj", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("p").data("opts").id`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, float64(101), v.Export())
+			}
+		})
+
+		t.Run("Unamed obj", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("p").data()`)
+			if assert.NoError(t, err) {
+				data := v.Export().(map[string]interface{})
+				assert.Equal(t, true, data["test-2"])
+				assert.Equal(t, float64(101), data["opts"].(map[string]interface{})["id"])
 			}
 		})
 	})
