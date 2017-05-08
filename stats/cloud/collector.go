@@ -29,7 +29,7 @@ type Collector struct {
 	project_id int
 
 	duration   int64
-	thresholds map[string][]string
+	thresholds map[string][]*stats.Threshold
 	client     *Client
 }
 
@@ -38,18 +38,18 @@ func New(fname string, src *lib.SourceData, opts lib.Options) (*Collector, error
 	token := os.Getenv("K6CLOUD_TOKEN")
 
 	var extConfig loadimpactConfig
-	if val, ok := opts.External["loadimpact"]; ok == true {
+	if val, ok := opts.External["loadimpact"]; ok {
 		err := mapstructure.Decode(val, &extConfig)
 		if err != nil {
 			// For now we ignore if loadimpact section is malformed
 		}
 	}
 
-	thresholds := make(map[string][]string)
+	thresholds := make(map[string][]*stats.Threshold)
 
 	for name, t := range opts.Thresholds {
 		for _, threshold := range t.Thresholds {
-			thresholds[name] = append(thresholds[name], threshold.Source)
+			thresholds[name] = append(thresholds[name], threshold)
 		}
 	}
 
@@ -76,9 +76,18 @@ func New(fname string, src *lib.SourceData, opts lib.Options) (*Collector, error
 }
 
 func (c *Collector) Init() {
+
+	thresholds := make(map[string][]string)
+
+	for name, t := range c.thresholds {
+		for _, threshold := range t {
+			thresholds[name] = append(thresholds[name], threshold.Source)
+		}
+	}
+
 	testRun := &TestRun{
 		Name:       c.name,
-		Thresholds: c.thresholds,
+		Thresholds: thresholds,
 		Duration:   c.duration,
 		ProjectID:  c.project_id,
 	}
@@ -106,8 +115,20 @@ func (c *Collector) String() string {
 func (c *Collector) Run(ctx context.Context) {
 	<-ctx.Done()
 
-	if c.referenceID != "" {
-		c.client.TestFinished(c.referenceID)
+	testTainted := false
+	thresholdResults := make(ThresholdResult)
+	for name, thresholds := range c.thresholds {
+		thresholdResults[name] = make(map[string]bool)
+		for _, t := range thresholds {
+			thresholdResults[name][t.Source] = t.Failed
+			if t.Failed {
+				testTainted = true
+			}
+		}
+	}
+
+	if c.referenceID == "" {
+		c.client.TestFinished(c.referenceID, thresholdResults, testTainted)
 	}
 }
 

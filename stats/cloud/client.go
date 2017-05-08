@@ -86,6 +86,8 @@ func (c *Client) Do(req *http.Request, v interface{}) error {
 	return err
 }
 
+type ThresholdResult map[string]map[string]bool
+
 type TestRun struct {
 	Name       string              `json:"name"`
 	ProjectID  int                 `json:"project_id,omitempty"`
@@ -128,13 +130,21 @@ func (c *Client) PushMetric(referenceID string, samples []*Sample) {
 	}
 }
 
-func (c *Client) TestFinished(referenceID string) {
+func (c *Client) TestFinished(referenceID string, thresholds ThresholdResult, tained bool) {
 	url := fmt.Sprintf("%s/tests/%s", c.baseURL, referenceID)
 
+	status := 1
+
+	if tained {
+		status = 2
+	}
+
 	data := struct {
-		Status int `json:"status"`
+		Status     int             `json:"status"`
+		Thresholds ThresholdResult `json:"thresholds"`
 	}{
-		1,
+		status,
+		thresholds,
 	}
 
 	req, err := c.NewRequest("POST", url, data)
