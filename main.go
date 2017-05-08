@@ -40,7 +40,7 @@ func main() {
 	app := cli.NewApp()
 	app.Name = "k6"
 	app.Usage = "a next generation load generator"
-	app.Version = "0.12.2"
+	app.Version = "0.13.0"
 	app.Commands = []cli.Command{
 		commandRun,
 		commandInspect,
