@@ -24,6 +24,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"net/url"
@@ -35,6 +36,8 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"path"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/fatih/color"
@@ -169,27 +172,27 @@ func guessType(data []byte) string {
 	return TypeJS
 }
 
-func getSrcData(filename string, fs afero.Fs) (*lib.SourceData, error) {
+func getSrcData(filename, pwd string, stdin io.Reader, fs afero.Fs) (*lib.SourceData, error) {
 	if filename == "-" {
-		data, err := ioutil.ReadAll(os.Stdin)
+		data, err := ioutil.ReadAll(stdin)
 		if err != nil {
 			return nil, err
 		}
 		return &lib.SourceData{Filename: "-", Data: data}, nil
 	}
 
-	if ok, _ := afero.Exists(fs, filename); ok {
-		data, err := afero.ReadFile(fs, filename)
+	abspath := filename
+	if !path.IsAbs(abspath) {
+		abspath = path.Join(pwd, abspath)
+	}
+	if ok, _ := afero.Exists(fs, abspath); ok {
+		data, err := afero.ReadFile(fs, abspath)
 		if err != nil {
 			return nil, err
 		}
-		return &lib.SourceData{Filename: filename, Data: data}, nil
+		return &lib.SourceData{Filename: abspath, Data: data}, nil
 	}
 
-	pwd, err := os.Getwd()
-	if err != nil {
-		pwd = "/"
-	}
 	return loader.Load(fs, pwd, filename)
 }
 
@@ -247,6 +250,11 @@ func actionRun(cc *cli.Context) error {
 		return cli.NewExitError("Wrong number of arguments!", 1)
 	}
 
+	pwd, err := os.Getwd()
+	if err != nil {
+		pwd = "/"
+	}
+
 	// Collect CLI arguments, most (not all) relating to options.
 	addr := cc.GlobalString("address")
 	out := cc.String("out")
@@ -275,7 +283,7 @@ func actionRun(cc *cli.Context) error {
 	// Make the Runner, extract script-defined options.
 	arg := args[0]
 	fs := afero.NewOsFs()
-	src, err := getSrcData(arg, fs)
+	src, err := getSrcData(arg, pwd, os.Stdin, fs)
 	if err != nil {
 		log.WithError(err).Error("Failed to parse input data")
 		return err
@@ -617,8 +625,13 @@ func actionInspect(cc *cli.Context) error {
 	}
 	arg := args[0]
 
+	pwd, err := os.Getwd()
+	if err != nil {
+		pwd = "/"
+	}
+
 	fs := afero.NewOsFs()
-	src, err := getSrcData(arg, fs)
+	src, err := getSrcData(arg, pwd, os.Stdin, fs)
 	if err != nil {
 		return err
 	}

@@ -95,21 +95,59 @@ func TestRunnerOptions(t *testing.T) {
 }
 
 func TestRunnerIntegrationImports(t *testing.T) {
-	modules := []string{
-		"k6",
-		"k6/http",
-		"k6/metrics",
-		"k6/html",
-	}
-	for _, mod := range modules {
-		t.Run(mod, func(t *testing.T) {
-			_, err := New(&lib.SourceData{
-				Filename: "/script.js",
-				Data:     []byte(fmt.Sprintf(`import "%s"; export default function() {}`, mod)),
-			}, afero.NewMemMapFs())
-			assert.NoError(t, err)
-		})
-	}
+	t.Run("Modules", func(t *testing.T) {
+		modules := []string{
+			"k6",
+			"k6/http",
+			"k6/metrics",
+			"k6/html",
+		}
+		for _, mod := range modules {
+			t.Run(mod, func(t *testing.T) {
+				_, err := New(&lib.SourceData{
+					Filename: "/script.js",
+					Data:     []byte(fmt.Sprintf(`import "%s"; export default function() {}`, mod)),
+				}, afero.NewMemMapFs())
+				assert.NoError(t, err)
+			})
+		}
+	})
+
+	t.Run("Files", func(t *testing.T) {
+		fs := afero.NewMemMapFs()
+		assert.NoError(t, fs.MkdirAll("/path/to", 0755))
+		assert.NoError(t, afero.WriteFile(fs, "/path/to/lib.js", []byte(`export default "hi!";`), 0644))
+
+		testdata := map[string]struct{ filename, path string }{
+			"Absolute":       {"/path/script.js", "/path/to/lib.js"},
+			"Relative":       {"/path/script.js", "./to/lib.js"},
+			"Adjacent":       {"/path/to/script.js", "./lib.js"},
+			"STDIN-Absolute": {"-", "/path/to/lib.js"},
+			"STDIN-Relative": {"-", "./path/to/lib.js"},
+		}
+		for name, data := range testdata {
+			t.Run(name, func(t *testing.T) {
+				r, err := New(&lib.SourceData{
+					Filename: data.filename,
+					Data: []byte(fmt.Sprintf(`
+					import hi from "%s";
+					export default function() {
+						if (hi != "hi!") { throw new Error("incorrect value"); }
+					}`, data.path)),
+				}, fs)
+				if !assert.NoError(t, err) {
+					return
+				}
+
+				vu, err := r.NewVU()
+				if !assert.NoError(t, err) {
+					return
+				}
+				_, err = vu.RunOnce(context.Background())
+				assert.NoError(t, err)
+			})
+		}
+	})
 }
 
 func TestVURunContext(t *testing.T) {
