@@ -23,6 +23,7 @@ package netext
 import (
 	"context"
 	"net"
+	"strings"
 	"sync/atomic"
 
 	"github.com/viki-org/dnscache"
@@ -42,15 +43,16 @@ func NewDialer(dialer net.Dialer) *Dialer {
 }
 
 func (d Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn, error) {
-	host, port, err := net.SplitHostPort(addr)
+	delimiter := strings.LastIndex(addr, ":")
+	ip, err := d.Resolver.FetchOne(addr[:delimiter])
 	if err != nil {
 		return nil, err
 	}
-	ip, err := d.Resolver.FetchOne(host)
-	if err != nil {
-		return nil, err
+	ipStr := ip.String()
+	if strings.ContainsRune(ipStr, ':') {
+		ipStr = "[" + ipStr + "]"
 	}
-	conn, err := d.Dialer.DialContext(ctx, proto, ip.String()+":"+port)
+	conn, err := d.Dialer.DialContext(ctx, proto, ipStr+":"+addr[delimiter+1:])
 	if err != nil {
 		return nil, err
 	}
