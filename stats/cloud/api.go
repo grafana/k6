@@ -42,7 +42,7 @@ func (c *Client) CreateTestRun(testRun *TestRun) (*CreateTestRunResponse, error)
 		return nil, err
 	}
 
-	var ctrr = CreateTestRunResponse{}
+	ctrr := CreateTestRunResponse{}
 	err = c.Do(req, &ctrr)
 	if err != nil {
 		return nil, err

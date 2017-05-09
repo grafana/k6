@@ -26,8 +26,7 @@ type Client struct {
 }
 
 func NewClient(token, host, version string) *Client {
-
-	var client = &http.Client{
+	client := &http.Client{
 		Timeout: TIMEOUT,
 	}
 
@@ -35,7 +34,6 @@ func NewClient(token, host, version string) *Client {
 	if hostEnv != "" {
 		host = hostEnv
 	}
-
 	if host == "" {
 		host = "https://ingest.loadimpact.com"
 	}
@@ -86,8 +84,7 @@ func (c *Client) Do(req *http.Request, v interface{}) error {
 	err = checkResponse(resp)
 
 	if v != nil {
-		err = json.NewDecoder(resp.Body).Decode(v)
-		if err == io.EOF {
+		if err = json.NewDecoder(resp.Body).Decode(v); err == io.EOF {
 			err = nil // Ignore EOF from empty body
 		}
 	}
@@ -101,9 +98,9 @@ func checkResponse(r *http.Response) error {
 	}
 
 	if r.StatusCode == 401 {
-		return AuthenticateError
+		return ErrNotAuthenticated
 	} else if r.StatusCode == 403 {
-		return AuthorizeError
+		return ErrNotAuthorized
 	}
 
 	// Struct of errors set back from API
@@ -114,8 +111,7 @@ func checkResponse(r *http.Response) error {
 		} `json:"error"`
 	}{}
 
-	err := json.NewDecoder(r.Body).Decode(errorStruct)
-	if err != nil {
+	if err := json.NewDecoder(r.Body).Decode(errorStruct); err != nil {
 		return errors.Wrap(err, "Non-standard API error response")
 	}
 
