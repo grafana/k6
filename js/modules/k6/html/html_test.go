@@ -35,9 +35,9 @@ const testHTML = `
 	<title>This is the title</title>
 </head>
 <body>
-	<h1 id="top" data-test="dataval" data-int-val="123">Lorem ipsum</h1>
+	<h1 id="top" data-test="dataval" data-numeric-val="123">Lorem ipsum</h1>
 
-	<p data-test-2="true" data-opts='{"id":101}'>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec ac dui erat. Pellentesque eu euismod odio, eget fringilla ante. In vitae nulla at est tincidunt gravida sit amet maximus arcu. Sed accumsan tristique massa, blandit sodales quam malesuada eu. Morbi vitae luctus augue. Nunc nec ligula quam. Cras fringilla nulla leo, at dignissim enim accumsan vitae. Sed eu cursus sapien, a rhoncus lorem. Etiam sed massa egestas, bibendum quam sit amet, eleifend ipsum. Maecenas mi ante, consectetur at tincidunt id, suscipit nec sem. Integer congue elit vel ligula commodo ultricies. Suspendisse condimentum laoreet ligula at aliquet.</p>
+	<p data-test-b="true" data-opts='{"id":101}'>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec ac dui erat. Pellentesque eu euismod odio, eget fringilla ante. In vitae nulla at est tincidunt gravida sit amet maximus arcu. Sed accumsan tristique massa, blandit sodales quam malesuada eu. Morbi vitae luctus augue. Nunc nec ligula quam. Cras fringilla nulla leo, at dignissim enim accumsan vitae. Sed eu cursus sapien, a rhoncus lorem. Etiam sed massa egestas, bibendum quam sit amet, eleifend ipsum. Maecenas mi ante, consectetur at tincidunt id, suscipit nec sem. Integer congue elit vel ligula commodo ultricies. Suspendisse condimentum laoreet ligula at aliquet.</p>
 	<p>Nullam id nisi eget ex pharetra imperdiet. Maecenas augue ligula, aliquet sit amet maximus ut, vestibulum et magna. Nam in arcu sed tortor volutpat porttitor sed eget dolor. Duis rhoncus est id dui porttitor, id molestie ex imperdiet. Proin purus ligula, pretium eleifend felis a, tempor feugiat mi. Cras rutrum pulvinar neque, eu dictum arcu. Cras purus metus, fermentum eget malesuada sit amet, dignissim non dui.</p>
 
 	<form id="form1">
@@ -722,53 +722,58 @@ func TestParseHTML(t *testing.T) {
 		})
 	})
 
-	t.Run("Data 1", func(t *testing.T) {
-		t.Run("Named string", func(t *testing.T) {
+	t.Run("Data <h1>", func(t *testing.T) {
+		t.Run("string attr", func(t *testing.T) {
 			v, err := common.RunString(rt, `doc.find("h1").data("test")`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, "dataval", v.Export())
 			}
 		})
 
-		t.Run("Named int", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("h1").data("int-val")`)
+		t.Run("numeric attr", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("h1").data("numeric-val")`)
 			if assert.NoError(t, err) {
-				assert.Equal(t, int64(123), v.Export())
+				assert.Equal(t, float64(123), v.Export())
 			}
 		})
 
 
-		t.Run("Unamed obj 1", func(t *testing.T) {
+		t.Run("dataset", func(t *testing.T) {
 			v, err := common.RunString(rt, `doc.find("h1").data()`)
 			if assert.NoError(t, err) {
 				data := v.Export().(map[string]interface{})
 				assert.Equal(t, "dataval", data["test"])
-				assert.Equal(t, int64(123), data["intVal"])
+				assert.Equal(t, float64(123), data["numericVal"])
 			}
 		})
 	})
 
-	t.Run("Data 2", func(t *testing.T) {
-		t.Run("Named bool", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("p").data("test-2")`)
+	t.Run("Data <p>", func(t *testing.T) {
+		t.Run("boolean attr", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("p").data("test-b")`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, true, v.Export())
 			}
 		})
 
-		t.Run("Named obj", func(t *testing.T) {
+		t.Run("json attr", func(t *testing.T) {
 			v, err := common.RunString(rt, `doc.find("p").data("opts").id`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, float64(101), v.Export())
 			}
 		})
 
-		t.Run("Unamed obj", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("p").data()`)
+		t.Run("dataset property", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("p").data().testB`)
 			if assert.NoError(t, err) {
-				data := v.Export().(map[string]interface{})
-				assert.Equal(t, true, data["test-2"])
-				assert.Equal(t, float64(101), data["opts"].(map[string]interface{})["id"])
+				assert.Equal(t, true, v.Export())
+			}
+		})
+
+		t.Run("dataset object", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("p").data().opts.id`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, float64(101), v.Export())
 			}
 		})
 	})

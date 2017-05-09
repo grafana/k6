@@ -478,8 +478,11 @@ func convert(val string) interface{} {
 				return goja.Undefined()
 
 			default:
+				// matches description of data - only return Numeric val for values when the representation is unchanged
+				// other numeric values (ie "101.00" "1E02") are left as strings
+				// could return int64 but instead return float64 to match how json.Unmarshal() treats numeric values
 				if intVal, err := strconv.ParseInt(val, 0, 64); err == nil {
-					return intVal
+					return float64(intVal)
 				} else {
 					return val
 				}
