@@ -25,7 +25,6 @@ type loadimpactConfig struct {
 type Collector struct {
 	referenceID string
 	initErr     error // Possible error from init call to cloud API
-	sampleFails int   // Failed calls to cloud API
 
 	name       string
 	project_id int
@@ -43,15 +42,13 @@ func New(fname string, src *lib.SourceData, opts lib.Options, version string) (*
 	if val, ok := opts.External["loadimpact"]; ok {
 		err := mapstructure.Decode(val, &extConfig)
 		if err != nil {
-			// For now we ignore if loadimpact section is malformed
+			log.Warn("Malformed loadimpact settings in script options")
 		}
 	}
 
 	thresholds := make(map[string][]*stats.Threshold)
 	for name, t := range opts.Thresholds {
-		for _, threshold := range t.Thresholds {
-			thresholds[name] = append(thresholds[name], threshold)
-		}
+		thresholds[name] = append(thresholds[name], t.Thresholds...)
 	}
 
 	// Sum test duration from options. -1 for unknown duration.

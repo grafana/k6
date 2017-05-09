@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"os"
 	"time"
@@ -127,20 +126,4 @@ func checkResponse(r *http.Response) error {
 	}
 
 	return errorResponse
-}
-
-func retry(r *http.Response, err error) bool {
-	if e, ok := err.(net.Error); ok {
-		if e.Temporary() == true {
-			return true
-		}
-	}
-
-	if r != nil {
-		if r.StatusCode >= 502 {
-			return true
-		}
-	}
-
-	return false
 }
