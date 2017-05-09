@@ -339,7 +339,6 @@ func (s Selection) Contents() Selection {
 func (s Selection) Each(v goja.Value) Selection {
 	gojaFn, isFn := goja.AssertFunction(v)
 	if isFn {
-		// TODO change goquery.Selection arg to html.Node
 		fn := func(idx int, sel *goquery.Selection) {
 			gojaFn(v, s.rt.ToValue(idx), s.rt.ToValue(sel))
 		}
@@ -362,24 +361,28 @@ func (s Selection) buildMatcher(v goja.Value, gojaFn goja.Callable) func (int, *
 }
 
 func (s Selection) Filter(v goja.Value) Selection {
-	gojaFn, isFn := goja.AssertFunction(v)
-	if isFn {
+	if gojaFn, isFn := goja.AssertFunction(v); isFn {
 		return Selection{s.rt, s.sel.FilterFunction(s.buildMatcher(v, gojaFn))}
-	} else if filSel, isSel := v.Export().(Selection); isSel {
-		return Selection{s.rt, s.sel.FilterSelection(filSel.sel)}
+	} else if cmp, isSel := v.Export().(Selection); isSel {
+		return Selection{s.rt, s.sel.FilterSelection(cmp.sel)}
+	} else if str, isStr:= v.Export().(string); isStr {
+		return Selection{s.rt, s.sel.Filter(str)}
 	} else {
-		return Selection{s.rt, s.sel.Filter(v.String())}
+		panic(s.rt.NewGoError(errors.New("Argument to filter() must be a function, a selector or a query object")))
+		return Selection{}
 	}
 }
 
 func (s Selection) Is(v goja.Value) bool {
-	gojaFn, isFn := goja.AssertFunction(v)
-	if isFn {
+	if gojaFn, isFn := goja.AssertFunction(v); isFn {
 		return s.sel.IsFunction(s.buildMatcher(v, gojaFn))
-	} else if cmpSel, isSel := v.Export().(Selection); isSel {
-		return s.sel.IsSelection(cmpSel.sel)
+	} else if cmp, isSel := v.Export().(Selection); isSel {
+		return s.sel.IsSelection(cmp.sel)
+	} else if str, isStr:= v.Export().(string); isStr {
+		return s.sel.Is(str)
 	} else {
-		return s.sel.Is(v.String())
+		panic(s.rt.NewGoError(errors.New("Argument to is() must be a function, a selector or a query object")))
+		return false
 	}
 }
 
@@ -435,7 +438,8 @@ func (s Selection) Not(v goja.Value) Selection {
 			return Selection{s.rt, s.sel.Not(val.(string))}
 
 		default:
-			return Selection{s.rt, s.sel.Not(v.String())}
+			panic(s.rt.NewGoError(errors.New("Argument to not() must be a function, a selector or a query object")))
+			return Selection{}
 	}
 }
 
@@ -477,20 +481,23 @@ func (s Selection) Parents(def ...string) Selection {
 	return s.adjacent(s.sel.Parents, s.sel.ParentsFiltered, def...)
 }
 
+func (s Selection) Siblings(def ...string) Selection {
+	return s.adjacent(s.sel.Siblings, s.sel.SiblingsFiltered, def...)
+}
+
 func (s Selection) adjacentUntil(until func (string) *goquery.Selection,
 								 untilSelection func(*goquery.Selection) *goquery.Selection,
 								 filteredUntil func(string, string) *goquery.Selection,
 								 filteredUntilSelection func(string, *goquery.Selection) *goquery.Selection,
 								 def ...goja.Value) Selection {
-	// empty selector to nextuntil and prevuntil matches jquery api and has same effect as prevAll and nextAll
-	// relies on goquery.compileMatcher retrning a matcher which fails all matches when invalid selector given to cascadia.compile
+	// empty selector to nextuntil and prevuntil acts like revAll and nextAll
+	// relies on goquery.compileMatcher returning a matcher which fails all matches when the selector being compiled is invalid
 	if(len(def) == 0) {
 		return Selection{s.rt, until("")}
 	}
 
 	selector := def[0].Export()
-
-	if(len(def) == 1) {
+	if len(def) == 1 {
 		switch selector.(type) {
 			case string:
 				return Selection{s.rt, until(selector.(string))}
@@ -498,29 +505,35 @@ func (s Selection) adjacentUntil(until func (string) *goquery.Selection,
 			case Selection:
 				return Selection{s.rt, untilSelection(selector.(Selection).sel)}
 
-			default:
+			case nil:
 				return Selection{s.rt, until("")}
+
+			default:
+				panic(s.rt.NewGoError(errors.New("Invalid argument. The selector must be a string or query object")))
+				return Selection{}
 		}
-	}
+	} else {
+		filter := def[1].String()
+		switch selector.(type) {
+			case string:
+				return Selection{s.rt, filteredUntil(filter, selector.(string))}
 
-	filter := def[1].String()
+			case Selection:
+				return Selection{s.rt, filteredUntilSelection(filter, selector.(Selection).sel)}
 
-	switch selector.(type) {
-		case string:
-			return Selection{s.rt, filteredUntil(filter, selector.(string))}
+			case nil:
+				return Selection{s.rt, filteredUntil(filter, "")}
 
-		case Selection:
-			return Selection{s.rt, filteredUntilSelection(filter, selector.(Selection).sel)}
-
-		default:
-			return Selection{s.rt, filteredUntil(filter, "")}
+			default:
+				panic(s.rt.NewGoError(errors.New("Invalid argument. The selector must be a string or query object")))
+				return Selection{}
+		}
 	}
 }
 
-// prevUntil, nextUntil and parentsUntil support two args based on jquery api
-// 1st arg is either a selector string or goquery.selection.
-// 2nd arg is filter selector
-// if 1st arg is nil or blank string then behaviour is similar to prevAll or nextAll
+// prevUntil, nextUntil and parentsUntil support two args
+// 1st arg is either a selector string, goquery selection object, or nil
+// 2nd arg is filter selector string or nil/undefined
 func (s Selection) PrevUntil(def ...goja.Value) Selection {
 	return s.adjacentUntil(
 		s.sel.PrevUntil,
@@ -551,9 +564,6 @@ func (s Selection) ParentsUntil(def ...goja.Value) Selection {
 	)
 }
 
-func (s Selection) Siblings(def ...string) Selection {
-	return s.adjacent(s.sel.Siblings, s.sel.SiblingsFiltered, def...)
-}
 
 func (s Selection) Slice(start int, def ...int) Selection {
 	if len(def) > 0 {
@@ -598,12 +608,14 @@ func (s Selection) Index(def ...goja.Value) int {
 			return s.sel.IndexSelector(v.(string))
 
 		default:
-			panic(s.rt.NewGoError(errors.New("The argument to index() be a string or a selection")))
+			panic(s.rt.NewGoError(errors.New("The argument to index() must be a string or a query object")))
 			return -1
 	}
 }
 
-
+// end result of the following is two strings.Replacer objects
+// Replacer("-a", "A", "-b", "B"..., "-z", "Z") and Replacer("A", "-a",...)
+//to translate to "data-attr-name" to "attrName" and back
 const (
 	lowAlpha = "abcdefghijklmnopqrstuvwxyz"
 	highAlpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -631,6 +643,7 @@ func toDataName(attrName string) string {
 	return attrToDataName.Replace(attrName)
 }
 
+//
 func convert(val string) interface{} {
 	if val[0] == '{' || val[0] == '[' {
 		var subdata interface{}
@@ -665,8 +678,10 @@ func convert(val string) interface{} {
 	}
 }
 
+//when 0 args, read all data from attributes beggining with "data-".
+//when 1 arg, read requested data attr
 func (s Selection) Data(def ...string) goja.Value {
-	if s.sel.Length() == 0 {
+	if s.sel.Length() == 0 || len(s.sel.Nodes[0].Attr) == 0 {
 		return goja.Undefined()
 	}
 
@@ -677,17 +692,13 @@ func (s Selection) Data(def ...string) goja.Value {
 		} else {
 			return goja.Undefined()
 		}
-	}
-
-	if len(s.sel.Nodes[0].Attr) == 0 {
-		return goja.Undefined()
-	}
-
-	data := make(map[string]interface{})
-	for _, attr := range s.sel.Nodes[0].Attr {
-		if strings.HasPrefix(attr.Key, "data-") && len(attr.Key) > 6 {
-			data[toDataName(attr.Key[5:])] = convert(attr.Val)
+	} else {
+		data := make(map[string]interface{})
+		for _, attr := range s.sel.Nodes[0].Attr {
+			if strings.HasPrefix(attr.Key, "data-") && len(attr.Key) > 6 {
+				data[toDataName(attr.Key[5:])] = convert(attr.Val)
+			}
 		}
+		return s.rt.ToValue(data)
 	}
-	return s.rt.ToValue(data)
 }
