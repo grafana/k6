@@ -194,7 +194,7 @@ func TestParseHTML(t *testing.T) {
 			if assert.NoError(t, err) {
 				sel := v.Export().(Selection).sel
 				assert.Equal(t, 1, sel.Length())
-				assert.Equal(t, true, sel.Is("title"))
+				assert.True(t, sel.Is("title"))
 			}
 		})
 		t.Run("With selector", func(t *testing.T) {
@@ -362,7 +362,7 @@ func TestParseHTML(t *testing.T) {
 			if assert.NoError(t, err) {
 				sel := v.Export().(Selection).sel
 				assert.Equal(t, 1, sel.Length())
-				assert.Equal(t, true, sel.Is("p"))
+				assert.True(t, sel.Is("p"))
 			}
 		})
 
@@ -399,7 +399,7 @@ func TestParseHTML(t *testing.T) {
 			v, err := common.RunString(rt, `doc.find("footer").prev()`)
 			if assert.NoError(t, err) {
 				sel := v.Export().(Selection).sel
-				assert.Equal(t, true, sel.Is("form"))
+				assert.True(t, sel.Is("form"))
 			}
 		})
 
@@ -640,7 +640,7 @@ func TestParseHTML(t *testing.T) {
 			if assert.NoError(t, err) {
 				sel := v.Export().(Selection).sel
 				assert.Equal(t, 1, sel.Length())
-				assert.Equal(t, true, sel.Is("p"))
+				assert.True(t, sel.Is("p"))
 				assert.Contains(t, sel.Text(), "Lorem ipsum dolor")
 			}
 		})
