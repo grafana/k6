@@ -107,7 +107,7 @@ func checkResponse(r *http.Response) error {
 	}
 
 	// Struct of errors set back from API
-	errorStruct := struct {
+	errorStruct := &struct {
 		ErrorData struct {
 			Message string `json:"message"`
 			Code    int    `json:"code"`
