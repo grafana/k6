@@ -140,7 +140,7 @@ func (c *Collector) Run(ctx context.Context) {
 		}
 	}
 
-	if c.referenceID == "" {
+	if c.referenceID != "" {
 		err := c.client.TestFinished(c.referenceID, thresholdResults, testTainted)
 		if err != nil {
 			log.WithFields(log.Fields{
