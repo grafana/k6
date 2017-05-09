@@ -40,6 +40,7 @@ import (
 	"github.com/loadimpact/k6/js/modules/k6/html"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
+	"github.com/pkg/errors"
 )
 
 type HTTPResponseTimings struct {
@@ -154,7 +155,16 @@ func (*HTTP) Request(ctx context.Context, method, url string, args ...goja.Value
 		}
 	}
 
-	client := http.Client{Transport: state.HTTPTransport}
+	client := http.Client{
+		Transport: state.HTTPTransport,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			max := int(state.Options.MaxRedirects.Int64)
+			if len(via) >= max {
+				return errors.Errorf("stopped after %d redirects", max)
+			}
+			return nil
+		},
+	}
 	tracer := netext.Tracer{}
 	res, err := client.Do(req.WithContext(netext.WithTracer(ctx, &tracer)))
 	if err != nil {

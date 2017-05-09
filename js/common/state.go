@@ -29,6 +29,9 @@ import (
 
 // Provides volatile state for a VU.
 type State struct {
+	// Global options.
+	Options lib.Options
+
 	// Current group; all emitted metrics are tagged with this.
 	Group *lib.Group
 

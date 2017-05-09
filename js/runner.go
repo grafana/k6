@@ -120,6 +120,7 @@ type VU struct {
 
 func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 	state := &common.State{
+		Options:       u.Runner.Bundle.Options,
 		Group:         u.Runner.defaultGroup,
 		HTTPTransport: u.HTTPTransport,
 	}
