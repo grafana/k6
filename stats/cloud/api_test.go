@@ -14,7 +14,7 @@ func TestCreateTestRun(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient("token", server.URL)
+	client := NewClient("token", server.URL, "1.0")
 
 	tr := &TestRun{
 		Name: "test",
@@ -35,7 +35,7 @@ func TestPublishMetric(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient("token", server.URL)
+	client := NewClient("token", server.URL, "1.0")
 
 	samples := []*sample{
 		{
@@ -61,7 +61,7 @@ func TestFinished(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient("token", server.URL)
+	client := NewClient("token", server.URL, "1.0")
 
 	thresholds := map[string]map[string]bool{
 		"threshold": {

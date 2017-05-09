@@ -36,7 +36,7 @@ type Collector struct {
 }
 
 // New creates a new cloud collector
-func New(fname string, src *lib.SourceData, opts lib.Options) (*Collector, error) {
+func New(fname string, src *lib.SourceData, opts lib.Options, version string) (*Collector, error) {
 	token := os.Getenv("K6CLOUD_TOKEN")
 
 	var extConfig loadimpactConfig
@@ -71,7 +71,7 @@ func New(fname string, src *lib.SourceData, opts lib.Options) (*Collector, error
 		name:       getName(src, extConfig),
 		project_id: getProjectId(extConfig),
 		thresholds: thresholds,
-		client:     NewClient(token, ""),
+		client:     NewClient(token, "", version),
 		duration:   duration,
 	}, nil
 }
