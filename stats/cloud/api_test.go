@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestCreateTestRun(t *testing.T) {
@@ -21,12 +23,8 @@ func TestCreateTestRun(t *testing.T) {
 	}
 	resp, err := client.CreateTestRun(tr)
 
-	if err != nil {
-		t.Fatal(err, nil)
-	}
-	if resp.ReferenceID != "1" {
-		t.Fatal(resp.ReferenceID, "1")
-	}
+	assert.Nil(t, err)
+	assert.Equal(t, resp.ReferenceID, "1")
 }
 
 func TestPublishMetric(t *testing.T) {
@@ -50,9 +48,7 @@ func TestPublishMetric(t *testing.T) {
 	}
 	err := client.PushMetric("1", samples)
 
-	if err != nil {
-		t.Fatal(err, nil)
-	}
+	assert.Nil(t, err)
 }
 
 func TestFinished(t *testing.T) {
@@ -70,7 +66,5 @@ func TestFinished(t *testing.T) {
 	}
 	err := client.TestFinished("1", thresholds, true)
 
-	if err != nil {
-		t.Fatal(err, nil)
-	}
+	assert.Nil(t, err)
 }
