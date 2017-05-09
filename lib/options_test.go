@@ -76,6 +76,11 @@ func TestOptionsApply(t *testing.T) {
 		assert.True(t, opts.InsecureSkipTLSVerify.Valid)
 		assert.True(t, opts.InsecureSkipTLSVerify.Bool)
 	})
+	t.Run("NoConnectionReuse", func(t *testing.T) {
+		opts := Options{}.Apply(Options{NoConnectionReuse: null.BoolFrom(true)})
+		assert.True(t, opts.NoConnectionReuse.Valid)
+		assert.True(t, opts.NoConnectionReuse.Bool)
+	})
 	t.Run("Thresholds", func(t *testing.T) {
 		opts := Options{}.Apply(Options{Thresholds: map[string]stats.Thresholds{
 			"metric": {

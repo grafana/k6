@@ -60,6 +60,7 @@ type Options struct {
 
 	MaxRedirects          null.Int  `json:"maxRedirects"`
 	InsecureSkipTLSVerify null.Bool `json:"insecureSkipTLSVerify"`
+	NoConnectionReuse     null.Bool `json:"noConnectionReuse"`
 
 	Thresholds map[string]stats.Thresholds `json:"thresholds"`
 
@@ -97,6 +98,9 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.InsecureSkipTLSVerify.Valid {
 		o.InsecureSkipTLSVerify = opts.InsecureSkipTLSVerify
+	}
+	if opts.NoConnectionReuse.Valid {
+		o.NoConnectionReuse = opts.NoConnectionReuse
 	}
 	if opts.Thresholds != nil {
 		o.Thresholds = opts.Thresholds
