@@ -116,7 +116,11 @@ func (o Options) SetAllValid(valid bool) Options {
 	o.VUs.Valid = valid
 	o.VUsMax.Valid = valid
 	o.Duration.Valid = valid
+	o.Iterations.Valid = valid
 	o.Linger.Valid = valid
 	o.NoUsageReport.Valid = valid
+	o.MaxRedirects.Valid = valid
+	o.InsecureSkipTLSVerify.Valid = valid
+	o.NoConnectionReuse.Valid = valid
 	return o
 }
