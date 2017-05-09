@@ -21,9 +21,11 @@ type loadimpactConfig struct {
 	Name      string `mapstructure:"name"`
 }
 
-// Collector sends results data to the Load Impact cloud service.
+// Collector sends result data to the Load Impact cloud service.
 type Collector struct {
 	referenceID string
+	initErr     error // Possible error from init call to cloud API
+	sampleFails int   // Failed calls to cloud API
 
 	name       string
 	project_id int
@@ -46,7 +48,6 @@ func New(fname string, src *lib.SourceData, opts lib.Options) (*Collector, error
 	}
 
 	thresholds := make(map[string][]*stats.Threshold)
-
 	for name, t := range opts.Thresholds {
 		for _, threshold := range t.Thresholds {
 			thresholds[name] = append(thresholds[name], threshold)
@@ -70,7 +71,7 @@ func New(fname string, src *lib.SourceData, opts lib.Options) (*Collector, error
 		name:       getName(src, extConfig),
 		project_id: getProjectId(extConfig),
 		thresholds: thresholds,
-		client:     NewClient(token),
+		client:     NewClient(token, ""),
 		duration:   duration,
 	}, nil
 }
@@ -92,24 +93,36 @@ func (c *Collector) Init() {
 		ProjectID:  c.project_id,
 	}
 
-	// TODO fix this and add proper error handling
-	response := c.client.CreateTestRun(testRun)
-	if response != nil {
-		c.referenceID = response.ReferenceID
-	} else {
-		log.Warn("Failed to create test in Load Impact cloud")
+	response, err := c.client.CreateTestRun(testRun)
+
+	if err != nil {
+		c.initErr = err
+		log.WithFields(log.Fields{
+			"error": err,
+		}).Error("Cloud collector failed to init")
+		return
 	}
+	c.referenceID = response.ReferenceID
 
 	log.WithFields(log.Fields{
 		"name":        c.name,
 		"projectId":   c.project_id,
 		"duration":    c.duration,
 		"referenceId": c.referenceID,
-	}).Debug("Cloud collector init")
+	}).Debug("Cloud collector init successful")
 }
 
 func (c *Collector) String() string {
-	return fmt.Sprintf("Load Impact (https://app.staging.loadimpact.com/k6/runs/%s)", c.referenceID)
+	if c.initErr == nil {
+		return fmt.Sprintf("Load Impact (https://app.loadimpact.com/k6/runs/%s)", c.referenceID)
+	}
+
+	switch c.initErr {
+	case AuthorizeError:
+	case AuthorizeError:
+		return c.initErr.Error()
+	}
+	return fmt.Sprintf("Failed to create test in Load Impact cloud")
 }
 
 func (c *Collector) Run(ctx context.Context) {
@@ -128,7 +141,12 @@ func (c *Collector) Run(ctx context.Context) {
 	}
 
 	if c.referenceID == "" {
-		c.client.TestFinished(c.referenceID, thresholdResults, testTainted)
+		err := c.client.TestFinished(c.referenceID, thresholdResults, testTainted)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"error": err,
+			}).Warn("Failed to send test finished to cloud")
+		}
 	}
 }
 
@@ -137,23 +155,29 @@ func (c *Collector) Collect(samples []stats.Sample) {
 		return
 	}
 
-	var cloudSamples []*Sample
-	for _, sample := range samples {
-		sampleJSON := &Sample{
+	var cloudSamples []*sample
+	for _, samp := range samples {
+		sampleJSON := &sample{
 			Type:   "Point",
-			Metric: sample.Metric.Name,
-			Data: SampleData{
-				Type:  sample.Metric.Type,
-				Time:  sample.Time,
-				Value: sample.Value,
-				Tags:  sample.Tags,
+			Metric: samp.Metric.Name,
+			Data: sampleData{
+				Type:  samp.Metric.Type,
+				Time:  samp.Time,
+				Value: samp.Value,
+				Tags:  samp.Tags,
 			},
 		}
 		cloudSamples = append(cloudSamples, sampleJSON)
 	}
 
 	if len(cloudSamples) > 0 {
-		c.client.PushMetric(c.referenceID, cloudSamples)
+		err := c.client.PushMetric(c.referenceID, cloudSamples)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"error":   err,
+				"samples": cloudSamples,
+			}).Warn("Failed to send metrics to cloud")
+		}
 	}
 }
 

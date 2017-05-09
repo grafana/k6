@@ -5,12 +5,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/loadimpact/k6/stats"
+	"github.com/pkg/errors"
+)
+
+const (
+	TIMEOUT = 10 * time.Second
 )
 
 // Client handles communication with Load Impact cloud API.
@@ -20,19 +25,19 @@ type Client struct {
 	baseURL string
 }
 
-type ErrorResponse struct {
-	Message string `json:"message"`
-}
-
-func NewClient(token string) *Client {
+func NewClient(token, host string) *Client {
 
 	var client = &http.Client{
-		Timeout: 30 * time.Second,
+		Timeout: TIMEOUT,
 	}
 
-	host := os.Getenv("K6CLOUD_HOST")
+	hostEnv := os.Getenv("K6CLOUD_HOST")
+	if hostEnv != "" {
+		host = hostEnv
+	}
+
 	if host == "" {
-		host = "http://localhost:5000"
+		host = "https://ingest.loadimpact.com"
 	}
 
 	baseURL := fmt.Sprintf("%s/v1", host)
@@ -61,20 +66,23 @@ func (c *Client) NewRequest(method, url string, data interface{}) (*http.Request
 }
 
 func (c *Client) Do(req *http.Request, v interface{}) error {
-
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", fmt.Sprintf("Token %s", c.token))
+	req.Header.Set("User-Agent", "k6cloud")
 
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return err
 	}
+
 	defer func() {
 		err := resp.Body.Close()
 		if err != nil {
 			log.Errorln(err)
 		}
 	}()
+
+	err = checkResponse(resp)
 
 	if v != nil {
 		err = json.NewDecoder(resp.Body).Decode(v)
@@ -86,87 +94,51 @@ func (c *Client) Do(req *http.Request, v interface{}) error {
 	return err
 }
 
-type ThresholdResult map[string]map[string]bool
-
-type TestRun struct {
-	Name       string              `json:"name"`
-	ProjectID  int                 `json:"project_id,omitempty"`
-	Thresholds map[string][]string `json:"thresholds"`
-	// Duration of test in seconds. -1 for unknown length, 0 for continuous running.
-	Duration int64 `json:"duration"`
-}
-
-type CreateTestRunResponse struct {
-	ReferenceID string `json:"reference_id"`
-}
-
-func (c *Client) CreateTestRun(testRun *TestRun) *CreateTestRunResponse {
-	url := fmt.Sprintf("%s/tests", c.baseURL)
-	req, err := c.NewRequest("POST", url, testRun)
-	if err != nil {
+func checkResponse(r *http.Response) error {
+	if c := r.StatusCode; c >= 200 && c <= 299 {
 		return nil
 	}
 
-	var ctrr = CreateTestRunResponse{}
-	err = c.Do(req, &ctrr)
-	if err != nil {
-		return nil
+	if r.StatusCode == 401 {
+		return AuthenticateError
+	} else if r.StatusCode == 403 {
+		return AuthorizeError
 	}
 
-	return &ctrr
+	// Struct of errors set back from API
+	errorStruct := struct {
+		ErrorData struct {
+			Message string `json:"message"`
+			Code    int    `json:"code"`
+		} `json:"error"`
+	}{}
+
+	err := json.NewDecoder(r.Body).Decode(errorStruct)
+	if err != nil {
+		return errors.Wrap(err, "Non-standard API error response")
+	}
+
+	errorResponse := &ErrorResponse{
+		Response: r,
+		Message:  errorStruct.ErrorData.Message,
+		Code:     errorStruct.ErrorData.Code,
+	}
+
+	return errorResponse
 }
 
-func (c *Client) PushMetric(referenceID string, samples []*Sample) {
-	url := fmt.Sprintf("%s/metrics/%s", c.baseURL, referenceID)
-
-	req, err := c.NewRequest("POST", url, samples)
-	if err != nil {
-		return
+func retry(r *http.Response, err error) bool {
+	if e, ok := err.(net.Error); ok {
+		if e.Temporary() == true {
+			return true
+		}
 	}
 
-	err = c.Do(req, nil)
-	if err != nil {
-		return
-	}
-}
-
-func (c *Client) TestFinished(referenceID string, thresholds ThresholdResult, tained bool) {
-	url := fmt.Sprintf("%s/tests/%s", c.baseURL, referenceID)
-
-	status := 1
-
-	if tained {
-		status = 2
+	if r != nil {
+		if r.StatusCode >= 502 {
+			return true
+		}
 	}
 
-	data := struct {
-		Status     int             `json:"status"`
-		Thresholds ThresholdResult `json:"thresholds"`
-	}{
-		status,
-		thresholds,
-	}
-
-	req, err := c.NewRequest("POST", url, data)
-	if err != nil {
-		return
-	}
-
-	err = c.Do(req, nil)
-	if err != nil {
-		return
-	}
-}
-
-type Sample struct {
-	Type   string     `json:"type"`
-	Metric string     `json:"metric"`
-	Data   SampleData `json:"data"`
-}
-
-type SampleData struct {
-	Type  stats.MetricType  `json:"type"`
-	Time  time.Time         `json:"time"`
-	Value float64           `json:"value"`
-	Tags  map[string]string `json:"tags,omitempty"`
+	return false
 }
