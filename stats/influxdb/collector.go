@@ -44,6 +44,10 @@ type Collector struct {
 }
 
 func New(s string, opts lib.Options) (*Collector, error) {
+	if s == "" {
+		s = "http://localhost:8086/k6"
+	}
+
 	u, err := url.Parse(s)
 	if err != nil {
 		return nil, err

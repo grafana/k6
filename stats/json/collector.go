@@ -24,6 +24,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"os"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/k6/lib"
@@ -47,16 +48,20 @@ func (c *Collector) HasSeenMetric(str string) bool {
 }
 
 func New(fname string, fs afero.Fs, opts lib.Options) (*Collector, error) {
+	if fname == "" || fname == "-" {
+		return &Collector{
+			outfile: os.Stdout,
+			fname:   "-",
+		}, nil
+	}
+
 	logfile, err := fs.Create(fname)
 	if err != nil {
 		return nil, err
 	}
-
-	t := make([]string, 16)
 	return &Collector{
-		outfile:     logfile,
-		fname:       fname,
-		seenMetrics: t,
+		outfile: logfile,
+		fname:   fname,
 	}, nil
 }
 
