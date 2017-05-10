@@ -230,7 +230,7 @@ func splitCollectorString(s string) (string, string) {
 }
 
 func makeCollector(s string, src *lib.SourceData, opts lib.Options, version string) (lib.Collector, error) {
-        t, p := splitCollectorString(s)
+	t, p := splitCollectorString(s)
 	switch t {
 	case "influxdb":
 		return influxdb.New(p, opts)
