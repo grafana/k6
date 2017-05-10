@@ -35,7 +35,7 @@ const testHTML = `
 	<title>This is the title</title>
 </head>
 <body>
-	<h1 id="top" data-test="dataval" data-numeric-val="123">Lorem ipsum</h1>
+	<h1 id="top" data-test="dataval" data-num-a="123" data-num-b="1.5" data-not-num-a="1.50" data-not-num-b="1.1e02">Lorem ipsum</h1>
 
 	<p data-test-b="true" data-opts='{"id":101}'>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec ac dui erat. Pellentesque eu euismod odio, eget fringilla ante. In vitae nulla at est tincidunt gravida sit amet maximus arcu. Sed accumsan tristique massa, blandit sodales quam malesuada eu. Morbi vitae luctus augue. Nunc nec ligula quam. Cras fringilla nulla leo, at dignissim enim accumsan vitae. Sed eu cursus sapien, a rhoncus lorem. Etiam sed massa egestas, bibendum quam sit amet, eleifend ipsum. Maecenas mi ante, consectetur at tincidunt id, suscipit nec sem. Integer congue elit vel ligula commodo ultricies. Suspendisse condimentum laoreet ligula at aliquet.</p>
 	<p>Nullam id nisi eget ex pharetra imperdiet. Maecenas augue ligula, aliquet sit amet maximus ut, vestibulum et magna. Nam in arcu sed tortor volutpat porttitor sed eget dolor. Duis rhoncus est id dui porttitor, id molestie ex imperdiet. Proin purus ligula, pretium eleifend felis a, tempor feugiat mi. Cras rutrum pulvinar neque, eu dictum arcu. Cras purus metus, fermentum eget malesuada sit amet, dignissim non dui.</p>
@@ -730,10 +730,31 @@ func TestParseHTML(t *testing.T) {
 			}
 		})
 
-		t.Run("numeric attr", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("h1").data("numeric-val")`)
+		t.Run("numeric attr 1", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("h1").data("num-a")`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, float64(123), v.Export())
+			}
+		})
+
+		t.Run("numeric attr 2", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("h1").data("num-b")`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, float64(1.5), v.Export())
+			}
+		})
+
+		t.Run("not numeric attr 1", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("h1").data("not-num-a")`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, "1.50", v.Export())
+			}
+		})
+
+		t.Run("not numeric attr 2", func(t *testing.T) {
+			v, err := common.RunString(rt, `doc.find("h1").data("not-num-b")`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, "1.1e02", v.Export())
 			}
 		})
 
@@ -743,7 +764,7 @@ func TestParseHTML(t *testing.T) {
 			if assert.NoError(t, err) {
 				data := v.Export().(map[string]interface{})
 				assert.Equal(t, "dataval", data["test"])
-				assert.Equal(t, float64(123), data["numericVal"])
+				assert.Equal(t, float64(123), data["numA"])
 			}
 		})
 	})
