@@ -24,25 +24,25 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/robertkrimen/otto"
+	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestNewThreshold(t *testing.T) {
 	src := `1+1==2`
-	vm := otto.New()
-	th, err := NewThreshold(src, vm)
+	rt := goja.New()
+	th, err := NewThreshold(src, rt)
 	assert.NoError(t, err)
 
 	assert.Equal(t, src, th.Source)
 	assert.False(t, th.Failed)
-	assert.NotNil(t, th.script)
-	assert.Equal(t, vm, th.vm)
+	assert.NotNil(t, th.pgm)
+	assert.Equal(t, rt, th.rt)
 }
 
 func TestThresholdRun(t *testing.T) {
 	t.Run("true", func(t *testing.T) {
-		th, err := NewThreshold(`1+1==2`, otto.New())
+		th, err := NewThreshold(`1+1==2`, goja.New())
 		assert.NoError(t, err)
 
 		t.Run("no taint", func(t *testing.T) {
@@ -61,7 +61,7 @@ func TestThresholdRun(t *testing.T) {
 	})
 
 	t.Run("false", func(t *testing.T) {
-		th, err := NewThreshold(`1+1==4`, otto.New())
+		th, err := NewThreshold(`1+1==4`, goja.New())
 		assert.NoError(t, err)
 
 		t.Run("no taint", func(t *testing.T) {
@@ -94,8 +94,8 @@ func TestNewThresholds(t *testing.T) {
 		for i, th := range ts.Thresholds {
 			assert.Equal(t, sources[i], th.Source)
 			assert.False(t, th.Failed)
-			assert.NotNil(t, th.script)
-			assert.Equal(t, ts.VM, th.vm)
+			assert.NotNil(t, th.pgm)
+			assert.Equal(t, ts.Runtime, th.rt)
 		}
 	})
 }
@@ -104,12 +104,7 @@ func TestThresholdsUpdateVM(t *testing.T) {
 	ts, err := NewThresholds(nil)
 	assert.NoError(t, err)
 	assert.NoError(t, ts.UpdateVM(DummySink{"a": 1234.5}))
-
-	v, err := ts.VM.Get("a")
-	assert.NoError(t, err)
-	f, err := v.ToFloat()
-	assert.NoError(t, err)
-	assert.Equal(t, 1234.5, f)
+	assert.Equal(t, 1234.5, ts.Runtime.Get("a").ToFloat())
 }
 
 func TestThresholdsRunAll(t *testing.T) {
