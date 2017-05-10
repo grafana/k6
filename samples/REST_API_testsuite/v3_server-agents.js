@@ -6,8 +6,8 @@
 
 import http from "k6/http";
 import { group, sleep, check } from "k6";
-import { myTrend, options, urlbase, thinktime1, thinktime2 } from "./common";
-import { v3_account_login } from "./v3_account_login";
+import { myTrend, options, urlbase, thinktime1, thinktime2 } from "./common.js";
+import { v3_account_login } from "./v3_account_login.js";
 
 // Export options object so k6 can access it
 export { options };
