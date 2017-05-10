@@ -47,6 +47,7 @@ import (
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/simple"
 	"github.com/loadimpact/k6/stats"
+	"github.com/loadimpact/k6/stats/cloud"
 	"github.com/loadimpact/k6/stats/influxdb"
 	"github.com/loadimpact/k6/stats/json"
 	"github.com/loadimpact/k6/ui"
@@ -228,13 +229,15 @@ func splitCollectorString(s string) (string, string) {
 	return parts[0], parts[1]
 }
 
-func makeCollector(s string, src *lib.SourceData, opts lib.Options) (lib.Collector, error) {
+func makeCollector(s string, src *lib.SourceData, opts lib.Options, version string) (lib.Collector, error) {
 	t, p := splitCollectorString(s)
 	switch t {
 	case "influxdb":
 		return influxdb.New(p, opts)
 	case "json":
 		return json.New(p, afero.NewOsFs(), opts)
+	case "cloud":
+		return cloud.New(p, src, opts, version)
 	default:
 		return nil, errors.New("Unknown output type: " + t)
 	}
@@ -345,7 +348,7 @@ func actionRun(cc *cli.Context) error {
 	// Make the metric collector, if requested.
 	var collector lib.Collector
 	if out != "" {
-		c, err := makeCollector(out, src, opts)
+		c, err := makeCollector(out, src, opts, cc.App.Version)
 		if err != nil {
 			log.WithError(err).Error("Couldn't create output")
 			return err
