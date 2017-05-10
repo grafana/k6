@@ -465,7 +465,9 @@ func toNumeric(val string) (float64, bool) {
 }
 
 func convert(val string) interface{} {
-	if val[0] == '{' || val[0] == '[' {
+	if len(val) == 0 {
+		return goja.Undefined()
+	} else if val[0] == '{' || val[0] == '[' {
 		var subdata interface{}
 
 		err := json.Unmarshal([]byte(val), &subdata)
@@ -506,7 +508,7 @@ func (s Selection) Data(def ...string) goja.Value {
 	}
 
 	if len(def) > 0 {
-		val, exists := s.sel.Attr("data-" + def[0])
+		val, exists := s.sel.Attr("data-" + toAttrName(def[0]))
 		if exists {
 			return s.rt.ToValue(convert(val))
 		} else {
@@ -515,7 +517,7 @@ func (s Selection) Data(def ...string) goja.Value {
 	} else {
 		data := make(map[string]interface{})
 		for _, attr := range s.sel.Nodes[0].Attr {
-			if strings.HasPrefix(attr.Key, "data-") && len(attr.Key) > 6 {
+			if strings.HasPrefix(attr.Key, "data-") && len(attr.Key) > 5 {
 				data[toDataName(attr.Key[5:])] = convert(attr.Val)
 			}
 		}
