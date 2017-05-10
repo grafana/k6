@@ -101,7 +101,9 @@ func (c *Client) Do(req *http.Request, v interface{}) error {
 		}
 	}()
 
-	err = checkResponse(resp)
+	if err = checkResponse(resp); err != nil {
+		return err
+	}
 
 	if v != nil {
 		if err = json.NewDecoder(resp.Body).Decode(v); err == io.EOF {

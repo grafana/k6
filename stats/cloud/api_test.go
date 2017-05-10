@@ -88,3 +88,18 @@ func TestFinished(t *testing.T) {
 
 	assert.Nil(t, err)
 }
+
+func TestAuthorizedError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		fmt.Fprintf(w, `{"error": {"code": 5, "message": "Not allowed"}}`)
+	}))
+	defer server.Close()
+
+	client := NewClient("token", server.URL, "1.0")
+
+	resp, err := client.CreateTestRun(&TestRun{Name: "test"})
+
+	assert.Nil(t, resp)
+	assert.EqualError(t, err, ErrNotAuthorized.Error())
+}
