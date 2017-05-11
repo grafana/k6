@@ -23,6 +23,7 @@ package http
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"strconv"
@@ -30,8 +31,8 @@ import (
 	"testing"
 	"time"
 
-	null "gopkg.in/guregu/null.v3"
-
+	log "github.com/Sirupsen/logrus"
+	logtest "github.com/Sirupsen/logrus/hooks/test"
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
@@ -39,6 +40,7 @@ import (
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
 	"github.com/stretchr/testify/assert"
+	null "gopkg.in/guregu/null.v3"
 )
 
 func assertRequestMetricsEmitted(t *testing.T, samples []stats.Sample, method, url string, status int, group string) {
@@ -82,14 +84,20 @@ func TestRequest(t *testing.T) {
 	root, err := lib.NewGroup("", nil)
 	assert.NoError(t, err)
 
+	logger := log.New()
+	logger.Level = log.DebugLevel
+	logger.Out = ioutil.Discard
+
 	rt := goja.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 	state := &common.State{
 		Options: lib.Options{
 			MaxRedirects: null.IntFrom(10),
 			UserAgent:    null.StringFrom("TestUserAgent"),
+			Throw:        null.BoolFrom(true),
 		},
-		Group: root,
+		Logger: logger,
+		Group:  root,
 		HTTPTransport: &http.Transport{
 			DialContext: (netext.NewDialer(net.Dialer{
 				Timeout:   10 * time.Second,
@@ -110,8 +118,18 @@ func TestRequest(t *testing.T) {
 			assert.NoError(t, err)
 		})
 		t.Run("10", func(t *testing.T) {
+			hook := logtest.NewLocal(state.Logger)
+			defer hook.Reset()
+
 			_, err := common.RunString(rt, `http.get("https://httpbin.org/redirect/10")`)
 			assert.EqualError(t, err, "GoError: Get /get: stopped after 10 redirects")
+
+			logEntry := hook.LastEntry()
+			if assert.NotNil(t, logEntry) {
+				assert.Equal(t, log.WarnLevel, logEntry.Level)
+				assert.EqualError(t, logEntry.Data["error"].(error), "Get /get: stopped after 10 redirects")
+				assert.Equal(t, "Request Failed", logEntry.Message)
+			}
 		})
 	})
 	t.Run("Timeout", func(t *testing.T) {
@@ -124,6 +142,9 @@ func TestRequest(t *testing.T) {
 			assert.NoError(t, err)
 		})
 		t.Run("10s", func(t *testing.T) {
+			hook := logtest.NewLocal(state.Logger)
+			defer hook.Reset()
+
 			startTime := time.Now()
 			_, err := common.RunString(rt, `
 				http.get("https://httpbin.org/delay/10", {
@@ -133,6 +154,13 @@ func TestRequest(t *testing.T) {
 			endTime := time.Now()
 			assert.EqualError(t, err, "GoError: Get https://httpbin.org/delay/10: net/http: request canceled (Client.Timeout exceeded while awaiting headers)")
 			assert.WithinDuration(t, startTime.Add(1*time.Second), endTime, 1*time.Second)
+
+			logEntry := hook.LastEntry()
+			if assert.NotNil(t, logEntry) {
+				assert.Equal(t, log.WarnLevel, logEntry.Level)
+				assert.EqualError(t, logEntry.Data["error"].(error), "Get https://httpbin.org/delay/10: net/http: request canceled (Client.Timeout exceeded while awaiting headers)")
+				assert.Equal(t, "Request Failed", logEntry.Message)
+			}
 		})
 	})
 	t.Run("UserAgent", func(t *testing.T) {
@@ -216,8 +244,36 @@ func TestRequest(t *testing.T) {
 		})
 	})
 	t.Run("Invalid", func(t *testing.T) {
+		hook := logtest.NewLocal(state.Logger)
+		defer hook.Reset()
+
 		_, err := common.RunString(rt, `http.request("", "");`)
 		assert.EqualError(t, err, "GoError: Get : unsupported protocol scheme \"\"")
+
+		logEntry := hook.LastEntry()
+		if assert.NotNil(t, logEntry) {
+			assert.Equal(t, log.WarnLevel, logEntry.Level)
+			assert.EqualError(t, logEntry.Data["error"].(error), "Get : unsupported protocol scheme \"\"")
+			assert.Equal(t, "Request Failed", logEntry.Message)
+		}
+
+		t.Run("throw=false", func(t *testing.T) {
+			hook := logtest.NewLocal(state.Logger)
+			defer hook.Reset()
+
+			_, err := common.RunString(rt, `
+				let res = http.request("", "", { throw: false });
+				throw new Error(res.error);
+			`)
+			assert.EqualError(t, err, "GoError: Get : unsupported protocol scheme \"\"")
+
+			logEntry := hook.LastEntry()
+			if assert.NotNil(t, logEntry) {
+				assert.Equal(t, log.WarnLevel, logEntry.Level)
+				assert.EqualError(t, logEntry.Data["error"].(error), "Get : unsupported protocol scheme \"\"")
+				assert.Equal(t, "Request Failed", logEntry.Message)
+			}
+		})
 	})
 	t.Run("Unroutable", func(t *testing.T) {
 		_, err := common.RunString(rt, `http.request("GET", "http://sdafsgdhfjg/");`)

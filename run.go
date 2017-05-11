@@ -120,6 +120,10 @@ var commandRun = cli.Command{
 			Name:  "no-connection-reuse",
 			Usage: "don't reuse connections between VU iterations",
 		},
+		cli.BoolFlag{
+			Name:  "throw, t",
+			Usage: "throw errors on failed requests",
+		},
 		cli.StringFlag{
 			Name:   "out, o",
 			Usage:  "output metrics to an external data store (format: type=uri)",
@@ -270,6 +274,7 @@ func actionRun(cc *cli.Context) error {
 		MaxRedirects:          cliInt64(cc, "max-redirects"),
 		InsecureSkipTLSVerify: cliBool(cc, "insecure-skip-tls-verify"),
 		NoConnectionReuse:     cliBool(cc, "no-connection-reuse"),
+		Throw:                 cliBool(cc, "throw"),
 		NoUsageReport:         cliBool(cc, "no-usage-report"),
 	}
 	for _, s := range cc.StringSlice("stage") {

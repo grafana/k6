@@ -176,6 +176,7 @@ func TestVURunContext(t *testing.T) {
 		state := common.GetState(*vu.Context)
 		if assert.NotNil(t, state) {
 			assert.Equal(t, null.IntFrom(10), state.Options.VUs)
+			assert.NotNil(t, state.Logger)
 			assert.Equal(t, r.GetDefaultGroup(), state.Group)
 			assert.Equal(t, vu.HTTPTransport, state.HTTPTransport)
 		}

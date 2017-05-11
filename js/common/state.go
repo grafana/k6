@@ -23,6 +23,7 @@ package common
 import (
 	"net/http"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
 )
@@ -31,6 +32,9 @@ import (
 type State struct {
 	// Global options.
 	Options lib.Options
+
+	// Logger. Avoid using the global logger.
+	Logger *log.Logger
 
 	// Current group; all emitted metrics are tagged with this.
 	Group *lib.Group
