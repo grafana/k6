@@ -113,6 +113,27 @@ func TestRequest(t *testing.T) {
 			assert.EqualError(t, err, "GoError: Get /get: stopped after 10 redirects")
 		})
 	})
+	t.Run("Timeout", func(t *testing.T) {
+		t.Run("10s", func(t *testing.T) {
+			_, err := common.RunString(rt, `
+				http.get("https://httpbin.org/delay/1", {
+					timeout: 5*1000,
+				})
+			`)
+			assert.NoError(t, err)
+		})
+		t.Run("10s", func(t *testing.T) {
+			startTime := time.Now()
+			_, err := common.RunString(rt, `
+				http.get("https://httpbin.org/delay/10", {
+					timeout: 1*1000,
+				})
+			`)
+			endTime := time.Now()
+			assert.EqualError(t, err, "GoError: Get https://httpbin.org/delay/10: net/http: request canceled (Client.Timeout exceeded while awaiting headers)")
+			assert.WithinDuration(t, startTime.Add(1*time.Second), endTime, 1*time.Second)
+		})
+	})
 
 	t.Run("HTML", func(t *testing.T) {
 		state.Samples = nil
