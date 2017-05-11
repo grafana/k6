@@ -61,6 +61,7 @@ type Options struct {
 	InsecureSkipTLSVerify null.Bool   `json:"insecureSkipTLSVerify"`
 	NoConnectionReuse     null.Bool   `json:"noConnectionReuse"`
 	UserAgent             null.String `json:"userAgent"`
+	Throw                 null.Bool   `json:"throw"`
 
 	Thresholds map[string]stats.Thresholds `json:"thresholds"`
 
@@ -122,5 +123,7 @@ func (o Options) SetAllValid(valid bool) Options {
 	o.MaxRedirects.Valid = valid
 	o.InsecureSkipTLSVerify.Valid = valid
 	o.NoConnectionReuse.Valid = valid
+	o.UserAgent.Valid = valid
+	o.Throw.Valid = valid
 	return o
 }

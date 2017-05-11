@@ -35,6 +35,7 @@ import (
 	"sync"
 	"time"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/js/modules/k6/html"
@@ -57,6 +58,7 @@ type HTTPResponse struct {
 	Headers    map[string]string
 	Body       string
 	Timings    HTTPResponseTimings
+	Error      string
 
 	cachedJSON goja.Value
 }
@@ -123,6 +125,7 @@ func (*HTTP) Request(ctx context.Context, method, url string, args ...goja.Value
 		"group":  state.Group.Path,
 	}
 	timeout := 60 * time.Second
+	throw := state.Options.Throw.Bool
 
 	if len(args) > 1 {
 		paramsV := args[1]
@@ -156,11 +159,17 @@ func (*HTTP) Request(ctx context.Context, method, url string, args ...goja.Value
 					}
 				case "timeout":
 					timeout = time.Duration(params.Get(k).ToFloat() * float64(time.Millisecond))
+				case "throw":
+					throw = params.Get(k).ToBoolean()
 				}
 			}
 		}
 	}
 
+	resp := &HTTPResponse{
+		ctx: ctx,
+		URL: url,
+	}
 	client := http.Client{
 		Transport: state.HTTPTransport,
 		Timeout:   timeout,
@@ -172,48 +181,53 @@ func (*HTTP) Request(ctx context.Context, method, url string, args ...goja.Value
 			return nil
 		},
 	}
+
 	tracer := netext.Tracer{}
-	res, err := client.Do(req.WithContext(netext.WithTracer(ctx, &tracer)))
-	if err != nil {
-		state.Samples = append(state.Samples, tracer.Done().Samples(tags)...)
-		return nil, err
+	res, resErr := client.Do(req.WithContext(netext.WithTracer(ctx, &tracer)))
+	if res != nil {
+		body, _ := ioutil.ReadAll(res.Body)
+		_ = res.Body.Close()
+		resp.Body = string(body)
 	}
-
-	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		state.Samples = append(state.Samples, tracer.Done().Samples(tags)...)
-		return nil, err
-	}
-	_ = res.Body.Close()
 	trail := tracer.Done()
-
-	tags["status"] = strconv.Itoa(res.StatusCode)
-	state.Samples = append(state.Samples, trail.Samples(tags)...)
-
-	headers := make(map[string]string, len(res.Header))
-	for k, vs := range res.Header {
-		headers[k] = strings.Join(vs, ", ")
+	if trail.ConnRemoteAddr != nil {
+		remoteHost, remotePortStr, _ := net.SplitHostPort(trail.ConnRemoteAddr.String())
+		remotePort, _ := strconv.Atoi(remotePortStr)
+		resp.RemoteIP = remoteHost
+		resp.RemotePort = remotePort
 	}
-	remoteHost, remotePortStr, _ := net.SplitHostPort(trail.ConnRemoteAddr.String())
-	remotePort, _ := strconv.Atoi(remotePortStr)
-	return &HTTPResponse{
-		ctx: ctx,
+	resp.Timings = HTTPResponseTimings{
+		Duration:   stats.D(trail.Duration),
+		Blocked:    stats.D(trail.Blocked),
+		Connecting: stats.D(trail.Connecting),
+		Sending:    stats.D(trail.Sending),
+		Waiting:    stats.D(trail.Waiting),
+		Receiving:  stats.D(trail.Receiving),
+	}
 
-		RemoteIP:   remoteHost,
-		RemotePort: remotePort,
-		URL:        res.Request.URL.String(),
-		Status:     res.StatusCode,
-		Headers:    headers,
-		Body:       string(body),
-		Timings: HTTPResponseTimings{
-			Duration:   stats.D(trail.Duration),
-			Blocked:    stats.D(trail.Blocked),
-			Connecting: stats.D(trail.Connecting),
-			Sending:    stats.D(trail.Sending),
-			Waiting:    stats.D(trail.Waiting),
-			Receiving:  stats.D(trail.Receiving),
-		},
-	}, nil
+	if resErr != nil {
+		resp.Error = resErr.Error()
+		tags["error"] = resp.Error
+	} else {
+		resp.URL = res.Request.URL.String()
+		resp.Status = res.StatusCode
+		tags["url"] = resp.URL
+		tags["status"] = strconv.Itoa(resp.Status)
+
+		resp.Headers = make(map[string]string, len(res.Header))
+		for k, vs := range res.Header {
+			resp.Headers[k] = strings.Join(vs, ", ")
+		}
+	}
+
+	state.Samples = append(state.Samples, trail.Samples(tags)...)
+	if resErr != nil {
+		log.WithField("error", resErr).Warn("Request Failed")
+		if throw {
+			return nil, resErr
+		}
+	}
+	return resp, nil
 }
 
 func (http *HTTP) Get(ctx context.Context, url string, args ...goja.Value) (*HTTPResponse, error) {
