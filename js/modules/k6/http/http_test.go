@@ -23,6 +23,7 @@ package http
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"strconv"
@@ -83,6 +84,10 @@ func TestRequest(t *testing.T) {
 	root, err := lib.NewGroup("", nil)
 	assert.NoError(t, err)
 
+	logger := log.New()
+	logger.Level = log.DebugLevel
+	logger.Out = ioutil.Discard
+
 	rt := goja.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 	state := &common.State{
@@ -91,7 +96,8 @@ func TestRequest(t *testing.T) {
 			UserAgent:    null.StringFrom("TestUserAgent"),
 			Throw:        null.BoolFrom(true),
 		},
-		Group: root,
+		Logger: logger,
+		Group:  root,
 		HTTPTransport: &http.Transport{
 			DialContext: (netext.NewDialer(net.Dialer{
 				Timeout:   10 * time.Second,
@@ -112,7 +118,7 @@ func TestRequest(t *testing.T) {
 			assert.NoError(t, err)
 		})
 		t.Run("10", func(t *testing.T) {
-			hook := logtest.NewGlobal()
+			hook := logtest.NewLocal(state.Logger)
 			defer hook.Reset()
 
 			_, err := common.RunString(rt, `http.get("https://httpbin.org/redirect/10")`)
@@ -136,7 +142,7 @@ func TestRequest(t *testing.T) {
 			assert.NoError(t, err)
 		})
 		t.Run("10s", func(t *testing.T) {
-			hook := logtest.NewGlobal()
+			hook := logtest.NewLocal(state.Logger)
 			defer hook.Reset()
 
 			startTime := time.Now()
@@ -238,7 +244,7 @@ func TestRequest(t *testing.T) {
 		})
 	})
 	t.Run("Invalid", func(t *testing.T) {
-		hook := logtest.NewGlobal()
+		hook := logtest.NewLocal(state.Logger)
 		defer hook.Reset()
 
 		_, err := common.RunString(rt, `http.request("", "");`)
@@ -252,7 +258,7 @@ func TestRequest(t *testing.T) {
 		}
 
 		t.Run("throw=false", func(t *testing.T) {
-			hook := logtest.NewGlobal()
+			hook := logtest.NewLocal(state.Logger)
 			defer hook.Reset()
 
 			_, err := common.RunString(rt, `

@@ -26,6 +26,7 @@ import (
 	"net/http"
 	"time"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
@@ -36,6 +37,7 @@ import (
 
 type Runner struct {
 	Bundle       *Bundle
+	Logger       *log.Logger
 	defaultGroup *lib.Group
 
 	Dialer *netext.Dialer
@@ -54,6 +56,7 @@ func New(src *lib.SourceData, fs afero.Fs) (*Runner, error) {
 
 	return &Runner{
 		Bundle:       bundle,
+		Logger:       log.StandardLogger(),
 		defaultGroup: defaultGroup,
 		Dialer: netext.NewDialer(net.Dialer{
 			Timeout:   30 * time.Second,
@@ -120,6 +123,7 @@ type VU struct {
 
 func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 	state := &common.State{
+		Logger:        u.Runner.Logger,
 		Options:       u.Runner.Bundle.Options,
 		Group:         u.Runner.defaultGroup,
 		HTTPTransport: u.HTTPTransport,

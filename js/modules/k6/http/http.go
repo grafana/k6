@@ -35,7 +35,6 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/js/modules/k6/html"
@@ -222,7 +221,7 @@ func (*HTTP) Request(ctx context.Context, method, url string, args ...goja.Value
 
 	state.Samples = append(state.Samples, trail.Samples(tags)...)
 	if resErr != nil {
-		log.WithField("error", resErr).Warn("Request Failed")
+		state.Logger.WithField("error", resErr).Warn("Request Failed")
 		if throw {
 			return nil, resErr
 		}
