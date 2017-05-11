@@ -112,6 +112,9 @@ func (*HTTP) Request(ctx context.Context, method, url string, args ...goja.Value
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
 	}
+	if userAgent := state.Options.UserAgent; userAgent.Valid {
+		req.Header.Set("User-Agent", userAgent.String)
+	}
 
 	tags := map[string]string{
 		"status": "0",

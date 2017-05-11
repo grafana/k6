@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/loadimpact/k6/stats"
-
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -58,9 +57,10 @@ type Options struct {
 	Linger        null.Bool `json:"linger"`
 	NoUsageReport null.Bool `json:"noUsageReport"`
 
-	MaxRedirects          null.Int  `json:"maxRedirects"`
-	InsecureSkipTLSVerify null.Bool `json:"insecureSkipTLSVerify"`
-	NoConnectionReuse     null.Bool `json:"noConnectionReuse"`
+	MaxRedirects          null.Int    `json:"maxRedirects"`
+	InsecureSkipTLSVerify null.Bool   `json:"insecureSkipTLSVerify"`
+	NoConnectionReuse     null.Bool   `json:"noConnectionReuse"`
+	UserAgent             null.String `json:"userAgent"`
 
 	Thresholds map[string]stats.Thresholds `json:"thresholds"`
 
