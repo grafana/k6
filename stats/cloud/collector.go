@@ -34,6 +34,8 @@ import (
 	"github.com/mitchellh/mapstructure"
 )
 
+const TestName = "k6 test"
+
 type loadimpactConfig struct {
 	ProjectId int    `mapstructure:"project_id"`
 	Name      string `mapstructure:"name"`
@@ -230,12 +232,12 @@ func getName(src *lib.SourceData, extConfig loadimpactConfig) string {
 		return extConfig.Name
 	}
 
-	if src.Filename != "" {
+	if src.Filename != "" && src.Filename != "-" {
 		name := filepath.Base(src.Filename)
 		if name != "" || name != "." {
 			return name
 		}
 	}
 
-	return "k6 test"
+	return TestName
 }
