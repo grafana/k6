@@ -121,7 +121,7 @@ var commandRun = cli.Command{
 			Usage: "don't reuse connections between VU iterations",
 		},
 		cli.BoolFlag{
-			Name:  "throw, t",
+			Name:  "throw, w",
 			Usage: "throw errors on failed requests",
 		},
 		cli.StringFlag{
