@@ -29,11 +29,10 @@ import (
 	"net"
 	"net/http"
 	neturl "net/url"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
-
-	"reflect"
 
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
