@@ -34,6 +34,11 @@ import (
 	"github.com/spf13/afero"
 )
 
+type programWithSource struct {
+	pgm *goja.Program
+	src string
+}
+
 // Provides APIs for use in the init context.
 type InitContext struct {
 	// Bound runtime; used to instantiate objects.
@@ -47,7 +52,7 @@ type InitContext struct {
 	pwd string
 
 	// Cache of loaded programs and files.
-	programs map[string]*goja.Program
+	programs map[string]programWithSource
 	files    map[string][]byte
 
 	// Console object.
@@ -61,7 +66,7 @@ func NewInitContext(rt *goja.Runtime, ctxPtr *context.Context, fs afero.Fs, pwd 
 		fs:      fs,
 		pwd:     pwd,
 
-		programs: make(map[string]*goja.Program),
+		programs: make(map[string]programWithSource),
 		files:    make(map[string][]byte),
 
 		Console: NewConsole(),
@@ -145,14 +150,14 @@ func (i *InitContext) requireFile(name string) (goja.Value, error) {
 		if err != nil {
 			return goja.Undefined(), err
 		}
-		i.programs[filename] = pgm_
-		pgm = pgm_
+		pgm = programWithSource{pgm_, src}
+		i.programs[filename] = pgm
 	}
 
 	// Execute the program to populate exports. You may notice that this theoretically allows an
 	// imported file to access or overwrite globals defined outside of it. Please don't do anything
 	// stupid with this, consider *any* use of it undefined behavior >_>;;
-	if _, err := i.runtime.RunProgram(pgm); err != nil {
+	if _, err := i.runtime.RunProgram(pgm.pgm); err != nil {
 		return goja.Undefined(), err
 	}
 

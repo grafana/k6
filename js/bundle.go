@@ -115,6 +115,33 @@ func NewBundle(src *lib.SourceData, fs afero.Fs) (*Bundle, error) {
 	return &bundle, nil
 }
 
+func NewBundleFromArchive(arc *lib.Archive) (*Bundle, error) {
+	pgm, err := goja.Compile(arc.Filename, string(arc.Data), true)
+	if err != nil {
+		return nil, err
+	}
+
+	initctx := NewInitContext(goja.New(), new(context.Context), nil, arc.Pwd)
+	initctx.files = arc.Files
+	for filename, data := range arc.Scripts {
+		src := string(data)
+		scr, err := goja.Compile(filename, src, true)
+		if err != nil {
+			return nil, err
+		}
+		initctx.programs[filename] = programWithSource{scr, src}
+	}
+
+	return &Bundle{
+		Filename:        arc.Filename,
+		Program:         pgm,
+		BaseInitContext: initctx,
+	}, nil
+}
+
+func (b *Bundle) Archive() *lib.Archive {
+}
+
 // Instantiates a new runtime from this bundle.
 func (b *Bundle) Instantiate() (*BundleInstance, error) {
 	// Placeholder for a real context.
