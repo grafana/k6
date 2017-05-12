@@ -34,7 +34,7 @@ import (
 )
 
 const (
-	TIMEOUT = 10 * time.Second
+	RequestTimeout = 10 * time.Second
 )
 
 // Client handles communication with Load Impact cloud API.
@@ -47,7 +47,7 @@ type Client struct {
 
 func NewClient(token, host, version string) *Client {
 	client := &http.Client{
-		Timeout: TIMEOUT,
+		Timeout: RequestTimeout,
 	}
 
 	hostEnv := os.Getenv("K6CLOUD_HOST")
