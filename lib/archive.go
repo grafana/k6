@@ -36,6 +36,6 @@ type Archive struct {
 	Pwd string
 
 	// Archived filesystem.
-	Files   map[string][]byte // non-script resources
 	Scripts map[string][]byte // included scripts
+	Files   map[string][]byte // non-script resources
 }
