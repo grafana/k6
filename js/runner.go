@@ -48,14 +48,25 @@ func New(src *lib.SourceData, fs afero.Fs) (*Runner, error) {
 	if err != nil {
 		return nil, err
 	}
+	return NewFromBundle(bundle)
+}
 
+func NewFromArchive(arc *lib.Archive) (*Runner, error) {
+	bundle, err := NewBundleFromArchive(arc)
+	if err != nil {
+		return nil, err
+	}
+	return NewFromBundle(bundle)
+}
+
+func NewFromBundle(b *Bundle) (*Runner, error) {
 	defaultGroup, err := lib.NewGroup("", nil)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Runner{
-		Bundle:       bundle,
+		Bundle:       b,
 		Logger:       log.StandardLogger(),
 		defaultGroup: defaultGroup,
 		Dialer: netext.NewDialer(net.Dialer{
@@ -64,6 +75,10 @@ func New(src *lib.SourceData, fs afero.Fs) (*Runner, error) {
 			DualStack: true,
 		}),
 	}, nil
+}
+
+func (r *Runner) MakeArchive() *lib.Archive {
+	return r.Bundle.MakeArchive()
 }
 
 func (r *Runner) NewVU() (lib.VU, error) {
