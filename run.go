@@ -64,81 +64,88 @@ const (
 
 var urlRegex = regexp.MustCompile(`(?i)^https?://`)
 
+var optionFlags = []cli.Flag{
+	cli.Int64Flag{
+		Name:  "vus, u",
+		Usage: "virtual users to simulate",
+		Value: 1,
+	},
+	cli.Int64Flag{
+		Name:  "max, m",
+		Usage: "max number of virtual users, if more than --vus",
+	},
+	cli.DurationFlag{
+		Name:  "duration, d",
+		Usage: "test duration, 0 to run until cancelled",
+	},
+	cli.Int64Flag{
+		Name:  "iterations, i",
+		Usage: "run a set number of iterations, multiplied by VU count",
+	},
+	cli.StringSliceFlag{
+		Name:  "stage, s",
+		Usage: "define a test stage, in the format time[:vus] (10s:100)",
+	},
+	cli.BoolFlag{
+		Name:  "paused, p",
+		Usage: "start test in a paused state",
+	},
+	cli.StringFlag{
+		Name:  "type, t",
+		Usage: "input type, one of: auto, url, js",
+		Value: "auto",
+	},
+	cli.BoolFlag{
+		Name:  "linger, l",
+		Usage: "linger after test completion",
+	},
+	cli.Int64Flag{
+		Name:  "max-redirects",
+		Usage: "follow at most n redirects",
+		Value: 10,
+	},
+	cli.BoolFlag{
+		Name:  "insecure-skip-tls-verify",
+		Usage: "INSECURE: skip verification of TLS certificates",
+	},
+	cli.BoolFlag{
+		Name:  "no-connection-reuse",
+		Usage: "don't reuse connections between VU iterations",
+	},
+	cli.BoolFlag{
+		Name:  "throw, w",
+		Usage: "throw errors on failed requests",
+	},
+	cli.StringSliceFlag{
+		Name:  "config, c",
+		Usage: "read additional config files",
+	},
+	cli.BoolFlag{
+		Name:   "no-usage-report",
+		Usage:  "don't send heartbeat to k6 project on test execution",
+		EnvVar: "K6_NO_USAGE_REPORT",
+	},
+}
+
 var commandRun = cli.Command{
 	Name:      "run",
 	Usage:     "Starts running a load test",
 	ArgsUsage: "url|filename",
-	Flags: []cli.Flag{
+	Flags: append(optionFlags,
 		cli.BoolFlag{
 			Name:  "quiet, q",
 			Usage: "hide the progress bar",
-		},
-		cli.Int64Flag{
-			Name:  "vus, u",
-			Usage: "virtual users to simulate",
-			Value: 1,
-		},
-		cli.Int64Flag{
-			Name:  "max, m",
-			Usage: "max number of virtual users, if more than --vus",
-		},
-		cli.DurationFlag{
-			Name:  "duration, d",
-			Usage: "test duration, 0 to run until cancelled",
-		},
-		cli.Int64Flag{
-			Name:  "iterations, i",
-			Usage: "run a set number of iterations, multiplied by VU count",
-		},
-		cli.StringSliceFlag{
-			Name:  "stage, s",
-			Usage: "define a test stage, in the format time[:vus] (10s:100)",
-		},
-		cli.BoolFlag{
-			Name:  "paused, p",
-			Usage: "start test in a paused state",
-		},
-		cli.StringFlag{
-			Name:  "type, t",
-			Usage: "input type, one of: auto, url, js",
-			Value: "auto",
-		},
-		cli.BoolFlag{
-			Name:  "linger, l",
-			Usage: "linger after test completion",
-		},
-		cli.Int64Flag{
-			Name:  "max-redirects",
-			Usage: "follow at most n redirects",
-			Value: 10,
-		},
-		cli.BoolFlag{
-			Name:  "insecure-skip-tls-verify",
-			Usage: "INSECURE: skip verification of TLS certificates",
-		},
-		cli.BoolFlag{
-			Name:  "no-connection-reuse",
-			Usage: "don't reuse connections between VU iterations",
-		},
-		cli.BoolFlag{
-			Name:  "throw, w",
-			Usage: "throw errors on failed requests",
 		},
 		cli.StringFlag{
 			Name:   "out, o",
 			Usage:  "output metrics to an external data store (format: type=uri)",
 			EnvVar: "K6_OUT",
 		},
-		cli.StringSliceFlag{
-			Name:  "config, c",
-			Usage: "read additional config files",
+		cli.StringFlag{
+			Name:  "archive, a",
+			Usage: "Run an archive",
 		},
-		cli.BoolFlag{
-			Name:   "no-usage-report",
-			Usage:  "don't send heartbeat to k6 project on test execution",
-			EnvVar: "K6_NO_USAGE_REPORT",
-		},
-	},
+	),
 	Action: actionRun,
 	Description: `Run starts a load test.
 
@@ -154,6 +161,23 @@ var commandRun = cli.Command{
    duration) to 'run', which will be applied through a normal API call.`,
 }
 
+var commandArchive = cli.Command{
+	Name:      "archive",
+	Usage:     "Archives a test configuration",
+	ArgsUsage: "url|filename",
+	Flags: append(optionFlags,
+		cli.StringFlag{
+			Name:  "archive, a",
+			Usage: "Filename for the archive",
+			Value: "archive.tar",
+		},
+	),
+	Action: actionArchive,
+	Description: `
+
+	`,
+}
+
 var commandInspect = cli.Command{
 	Name:      "inspect",
 	Aliases:   []string{"i"},
@@ -164,10 +188,6 @@ var commandInspect = cli.Command{
 			Name:  "type, t",
 			Usage: "input type, one of: auto, url, js",
 			Value: "auto",
-		},
-		cli.StringSliceFlag{
-			Name:  "config, c",
-			Usage: "read additional config files",
 		},
 	},
 	Action: actionInspect,
@@ -247,6 +267,48 @@ func makeCollector(s string, src *lib.SourceData, opts lib.Options, version stri
 	}
 }
 
+func getOptions(cc *cli.Context) (lib.Options, error) {
+	opts := lib.Options{
+		Paused:                cliBool(cc, "paused"),
+		VUs:                   cliInt64(cc, "vus"),
+		VUsMax:                cliInt64(cc, "max"),
+		Duration:              cliDuration(cc, "duration"),
+		Iterations:            cliInt64(cc, "iterations"),
+		Linger:                cliBool(cc, "linger"),
+		MaxRedirects:          cliInt64(cc, "max-redirects"),
+		InsecureSkipTLSVerify: cliBool(cc, "insecure-skip-tls-verify"),
+		NoConnectionReuse:     cliBool(cc, "no-connection-reuse"),
+		Throw:                 cliBool(cc, "throw"),
+		NoUsageReport:         cliBool(cc, "no-usage-report"),
+	}
+	for _, s := range cc.StringSlice("stage") {
+		stage, err := ParseStage(s)
+		if err != nil {
+			log.WithError(err).Error("Invalid stage specified")
+			return opts, err
+		}
+		opts.Stages = append(opts.Stages, stage)
+	}
+	return opts, nil
+}
+
+func readConfigFiles(cc *cli.Context, fs afero.Fs) (lib.Options, error) {
+	var opts lib.Options
+	for _, filename := range cc.StringSlice("config") {
+		data, err := afero.ReadFile(fs, filename)
+		if err != nil {
+			return opts, err
+		}
+
+		var configOpts lib.Options
+		if err := yaml.Unmarshal(data, &configOpts); err != nil {
+			return opts, err
+		}
+		opts = opts.Apply(configOpts)
+	}
+	return opts, nil
+}
+
 func actionRun(cc *cli.Context) error {
 	wg := sync.WaitGroup{}
 
@@ -264,26 +326,9 @@ func actionRun(cc *cli.Context) error {
 	addr := cc.GlobalString("address")
 	out := cc.String("out")
 	quiet := cc.Bool("quiet")
-	cliOpts := lib.Options{
-		Paused:                cliBool(cc, "paused"),
-		VUs:                   cliInt64(cc, "vus"),
-		VUsMax:                cliInt64(cc, "max"),
-		Duration:              cliDuration(cc, "duration"),
-		Iterations:            cliInt64(cc, "iterations"),
-		Linger:                cliBool(cc, "linger"),
-		MaxRedirects:          cliInt64(cc, "max-redirects"),
-		InsecureSkipTLSVerify: cliBool(cc, "insecure-skip-tls-verify"),
-		NoConnectionReuse:     cliBool(cc, "no-connection-reuse"),
-		Throw:                 cliBool(cc, "throw"),
-		NoUsageReport:         cliBool(cc, "no-usage-report"),
-	}
-	for _, s := range cc.StringSlice("stage") {
-		stage, err := ParseStage(s)
-		if err != nil {
-			log.WithError(err).Error("Invalid stage specified")
-			return err
-		}
-		cliOpts.Stages = append(cliOpts.Stages, stage)
+	cliOpts, err := getOptions(cc)
+	if err != nil {
+		return cli.NewExitError(err, 1)
 	}
 	opts := cliOpts
 
@@ -311,18 +356,11 @@ func actionRun(cc *cli.Context) error {
 	opts = opts.Apply(runner.GetOptions())
 
 	// Read config files.
-	for _, filename := range cc.StringSlice("config") {
-		data, err := afero.ReadFile(fs, filename)
-		if err != nil {
-			return cli.NewExitError(err.Error(), 1)
-		}
-
-		var configOpts lib.Options
-		if err := yaml.Unmarshal(data, &configOpts); err != nil {
-			return cli.NewExitError(err.Error(), 1)
-		}
-		opts = opts.Apply(configOpts)
+	fileOpts, err := readConfigFiles(cc, fs)
+	if err != nil {
+		return cli.NewExitError(err, 1)
 	}
+	opts = opts.Apply(fileOpts)
 
 	// CLI options override everything.
 	opts = opts.Apply(cliOpts)
@@ -625,6 +663,46 @@ loop:
 	return nil
 }
 
+func actionArchive(cc *cli.Context) error {
+	args := cc.Args()
+	if len(args) != 1 {
+		return cli.NewExitError("Wrong number of arguments!", 1)
+	}
+	arg := args[0]
+
+	pwd, err := os.Getwd()
+	if err != nil {
+		pwd = "/"
+	}
+
+	fs := afero.NewOsFs()
+	src, err := getSrcData(arg, pwd, os.Stdin, fs)
+	if err != nil {
+		return cli.NewExitError(err, 1)
+	}
+	runnerType := cc.String("type")
+	if runnerType == TypeAuto {
+		runnerType = guessType(src.Data)
+	}
+
+	r, err := makeRunner(runnerType, src, fs)
+	if err != nil {
+		return cli.NewExitError(err, 1)
+	}
+
+	f, err := os.Create(cc.String("archive"))
+	if err != nil {
+		return cli.NewExitError(err, 1)
+	}
+	defer func() { _ = f.Close() }()
+
+	arc := r.MakeArchive()
+	if err := arc.Write(f); err != nil {
+		return cli.NewExitError(err, 1)
+	}
+	return nil
+}
+
 func actionInspect(cc *cli.Context) error {
 	args := cc.Args()
 	if len(args) != 1 {
@@ -656,19 +734,6 @@ func actionInspect(cc *cli.Context) error {
 			return cli.NewExitError(err.Error(), 1)
 		}
 		opts = opts.Apply(r.Options)
-	}
-
-	for _, filename := range cc.StringSlice("config") {
-		data, err := afero.ReadFile(fs, filename)
-		if err != nil {
-			return cli.NewExitError(err.Error(), 1)
-		}
-
-		var configOpts lib.Options
-		if err := yaml.Unmarshal(data, &configOpts); err != nil {
-			return cli.NewExitError(err.Error(), 1)
-		}
-		opts = opts.Apply(configOpts)
 	}
 
 	return dumpYAML(opts)

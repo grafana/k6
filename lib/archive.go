@@ -20,22 +20,161 @@
 
 package lib
 
+import (
+	"archive/tar"
+	"encoding/json"
+	"io"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"time"
+)
+
 // An Archive is a rollup of all resources and options needed to reproduce a test identically elsewhere.
 type Archive struct {
 	// The runner to use, eg. "js".
-	Type string
+	Type string `json:"type"`
 
 	// Options to use.
-	Options Options
+	Options Options `json:"options"`
 
 	// Filename and contents of the main file being executed.
-	Filename string
-	Data     []byte
+	Filename string `json:"filename"`
+	Data     []byte `json:"-"`
 
 	// Working directory for resolving relative paths.
-	Pwd string
+	Pwd string `json:"pwd"`
 
 	// Archived filesystem.
-	Scripts map[string][]byte // included scripts
-	Files   map[string][]byte // non-script resources
+	Scripts map[string][]byte `json:"-"` // included scripts
+	Files   map[string][]byte `json:"-"` // non-script resources
+}
+
+func ReadArchive(in io.Reader) (*Archive, error) {
+	r := tar.NewReader(in)
+	arc := &Archive{}
+
+	for {
+		hdr, err := r.Next()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, err
+		}
+
+		switch {
+		case hdr.Name == "metadata.json":
+			if err := json.NewDecoder(r).Decode(&arc); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	return nil, nil
+}
+
+func (arc *Archive) Write(out io.Writer) error {
+	w := tar.NewWriter(out)
+	t := time.Now()
+
+	metadata, err := json.MarshalIndent(arc, "", "  ")
+	if err != nil {
+		return err
+	}
+	w.WriteHeader(&tar.Header{
+		Name:     "metadata.json",
+		Mode:     0644,
+		Size:     int64(len(metadata)),
+		ModTime:  t,
+		Typeflag: tar.TypeReg,
+	})
+	if _, err := w.Write(metadata); err != nil {
+		return err
+	}
+
+	w.WriteHeader(&tar.Header{
+		Name:     "data",
+		Mode:     0644,
+		Size:     int64(len(arc.Data)),
+		ModTime:  t,
+		Typeflag: tar.TypeReg,
+	})
+	if _, err := w.Write(arc.Data); err != nil {
+		return err
+	}
+
+	arcfs := []struct {
+		name  string
+		files map[string][]byte
+	}{
+		{"scripts", arc.Scripts},
+		{"files", arc.Files},
+	}
+	for _, entry := range arcfs {
+		w.WriteHeader(&tar.Header{
+			Name:     entry.name,
+			Mode:     0755,
+			ModTime:  t,
+			Typeflag: tar.TypeDir,
+		})
+
+		// A couple of things going on here:
+		// - You can't just create file entries, you need to create directory entries too.
+		//   Figure out which directories are in use here.
+		// - We want archives to be comparable by hash, which means the entries need to be written
+		//   in the same order every time. Go maps are shuffled, so we need to sort lists of keys.
+		foundDirs := make(map[string]bool)
+		paths := make([]string, 0, len(entry.files))
+		for path := range entry.files {
+			paths = append(paths, path)
+			dir := filepath.Dir(path)
+			for {
+				foundDirs[dir] = true
+				idx := strings.LastIndexByte(dir, os.PathSeparator)
+				if idx == -1 {
+					break
+				}
+				dir = dir[:idx]
+			}
+		}
+		dirs := make([]string, 0, len(foundDirs))
+		for dirpath := range foundDirs {
+			dirs = append(dirs, dirpath)
+		}
+		sort.Strings(paths)
+		sort.Strings(dirs)
+
+		for _, dirpath := range dirs {
+			if dirpath == "" || dirpath[0] == '/' {
+				dirpath = "_" + dirpath
+			}
+			w.WriteHeader(&tar.Header{
+				Name:     filepath.Clean(entry.name + "/" + dirpath),
+				Mode:     0755,
+				ModTime:  t,
+				Typeflag: tar.TypeDir,
+			})
+		}
+
+		for _, path := range paths {
+			data := entry.files[path]
+			if path[0] == '/' {
+				path = "_" + path
+			}
+			w.WriteHeader(&tar.Header{
+				Name:     filepath.Clean(entry.name + "/" + path),
+				Mode:     0644,
+				Size:     int64(len(data)),
+				ModTime:  t,
+				Typeflag: tar.TypeReg,
+			})
+			if _, err := w.Write(data); err != nil {
+				return err
+			}
+		}
+	}
+
+	return w.Close()
 }
