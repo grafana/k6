@@ -21,8 +21,8 @@
 package main
 
 import (
+	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -38,6 +38,8 @@ import (
 	"syscall"
 	"time"
 
+	"archive/tar"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/fatih/color"
 	"github.com/ghodss/yaml"
@@ -51,15 +53,17 @@ import (
 	"github.com/loadimpact/k6/stats/influxdb"
 	"github.com/loadimpact/k6/stats/json"
 	"github.com/loadimpact/k6/ui"
+	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"gopkg.in/guregu/null.v3"
 	"gopkg.in/urfave/cli.v1"
 )
 
 const (
-	TypeAuto = "auto"
-	TypeURL  = "url"
-	TypeJS   = "js"
+	TypeAuto    = "auto"
+	TypeURL     = "url"
+	TypeJS      = "js"
+	TypeArchive = "archive"
 )
 
 var urlRegex = regexp.MustCompile(`(?i)^https?://`)
@@ -92,7 +96,7 @@ var optionFlags = []cli.Flag{
 	},
 	cli.StringFlag{
 		Name:  "type, t",
-		Usage: "input type, one of: auto, url, js",
+		Usage: "input type, one of: auto, url, js, archive",
 		Value: "auto",
 	},
 	cli.BoolFlag{
@@ -141,10 +145,6 @@ var commandRun = cli.Command{
 			Usage:  "output metrics to an external data store (format: type=uri)",
 			EnvVar: "K6_OUT",
 		},
-		cli.StringFlag{
-			Name:  "archive, a",
-			Usage: "Run an archive",
-		},
 	),
 	Action: actionRun,
 	Description: `Run starts a load test.
@@ -186,7 +186,7 @@ var commandInspect = cli.Command{
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "type, t",
-			Usage: "input type, one of: auto, url, js",
+			Usage: "input type, one of: auto, url, js, archive",
 			Value: "auto",
 		},
 	},
@@ -194,8 +194,13 @@ var commandInspect = cli.Command{
 }
 
 func guessType(data []byte) string {
+	// See if it looks like a URL.
 	if urlRegex.Match(data) {
 		return TypeURL
+	}
+	// See if it has a valid tar header.
+	if _, err := tar.NewReader(bytes.NewReader(data)).Next(); err == nil {
+		return TypeArchive
 	}
 	return TypeJS
 }
@@ -240,6 +245,17 @@ func makeRunner(runnerType string, src *lib.SourceData, fs afero.Fs) (lib.Runner
 		return r, err
 	case TypeJS:
 		return js.New(src, fs)
+	case TypeArchive:
+		arc, err := lib.ReadArchive(bytes.NewReader(src.Data))
+		if err != nil {
+			return nil, err
+		}
+		switch arc.Type {
+		case TypeJS:
+			return js.NewFromArchive(arc)
+		default:
+			return nil, errors.Errorf("Invalid archive - unrecognized type: '%s'", arc.Type)
+		}
 	default:
 		return nil, errors.New("Invalid type specified, see --help")
 	}
