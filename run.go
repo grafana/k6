@@ -292,6 +292,27 @@ func getOptions(cc *cli.Context) (lib.Options, error) {
 	return opts, nil
 }
 
+func finalizeOptions(opts lib.Options) lib.Options {
+	// If VUsMax is unspecified, default to either VUs or the highest Stage Target.
+	if !opts.VUsMax.Valid {
+		opts.VUsMax.Int64 = opts.VUs.Int64
+		if len(opts.Stages) > 0 {
+			for _, stage := range opts.Stages {
+				if stage.Target.Valid && stage.Target.Int64 > opts.VUsMax.Int64 {
+					opts.VUsMax = stage.Target
+				}
+			}
+		}
+	}
+
+	// Default to 1 iteration if duration and stages are unspecified.
+	if !opts.Duration.Valid && !opts.Iterations.Valid && len(opts.Stages) == 0 {
+		opts.Iterations = null.IntFrom(1)
+	}
+
+	return opts
+}
+
 func readConfigFiles(cc *cli.Context, fs afero.Fs) (lib.Options, error) {
 	var opts lib.Options
 	for _, filename := range cc.StringSlice("config") {
@@ -353,39 +374,15 @@ func actionRun(cc *cli.Context) error {
 		}
 		return err
 	}
-	opts = opts.Apply(runner.GetOptions())
 
 	// Read config files.
 	fileOpts, err := readConfigFiles(cc, fs)
 	if err != nil {
 		return cli.NewExitError(err, 1)
 	}
-	opts = opts.Apply(fileOpts)
 
-	// CLI options override everything.
-	opts = opts.Apply(cliOpts)
-
-	// Default to 1 iteration if duration and stages are unspecified.
-	if !opts.Duration.Valid && !opts.Iterations.Valid && len(opts.Stages) == 0 {
-		opts.Iterations = null.IntFrom(1)
-	}
-
-	// Apply defaults.
-	opts = opts.SetAllValid(true)
-
-	// Make sure VUsMax defaults to VUs if not specified.
-	if opts.VUsMax.Int64 == 0 {
-		opts.VUsMax.Int64 = opts.VUs.Int64
-		if len(opts.Stages) > 0 {
-			for _, stage := range opts.Stages {
-				if stage.Target.Valid && stage.Target.Int64 > opts.VUsMax.Int64 {
-					opts.VUsMax = stage.Target
-				}
-			}
-		}
-	}
-
-	// Update the runner's options.
+	// Combine options in order, apply the final results.
+	opts = finalizeOptions(opts.Apply(runner.GetOptions()).Apply(fileOpts).Apply(cliOpts))
 	runner.ApplyOptions(opts)
 
 	// Make the metric collector, if requested.
@@ -675,6 +672,12 @@ func actionArchive(cc *cli.Context) error {
 		pwd = "/"
 	}
 
+	cliOpts, err := getOptions(cc)
+	if err != nil {
+		return cli.NewExitError(err, 1)
+	}
+	opts := cliOpts
+
 	fs := afero.NewOsFs()
 	src, err := getSrcData(arg, pwd, os.Stdin, fs)
 	if err != nil {
@@ -689,6 +692,14 @@ func actionArchive(cc *cli.Context) error {
 	if err != nil {
 		return cli.NewExitError(err, 1)
 	}
+
+	fileOpts, err := readConfigFiles(cc, fs)
+	if err != nil {
+		return cli.NewExitError(err, 1)
+	}
+
+	opts = finalizeOptions(opts.Apply(r.GetOptions()).Apply(fileOpts).Apply(cliOpts))
+	r.ApplyOptions(opts)
 
 	f, err := os.Create(cc.String("archive"))
 	if err != nil {
