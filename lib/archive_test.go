@@ -28,6 +28,24 @@ import (
 	null "gopkg.in/guregu/null.v3"
 )
 
+func TestAnonymizePath(t *testing.T) {
+	testdata := map[string]string{
+		"/tmp":                                      "/tmp",
+		"/tmp/":                                     "/tmp/",
+		"/tmp/myfile.txt":                           "/tmp/myfile.txt",
+		"/home/myname":                              "/home/nobody",
+		"/home/myname/":                             "/home/nobody/",
+		"/home/myname/myfile.txt":                   "/home/nobody/myfile.txt",
+		"/Users/myname/myfile.txt":                  "/Users/nobody/myfile.txt",
+		"/Documents and Settings/myname/myfile.txt": "/Documents and Settings/nobody/myfile.txt",
+	}
+	for from, to := range testdata {
+		t.Run("path="+from, func(t *testing.T) {
+			assert.Equal(t, to, AnonymizePath(from))
+		})
+	}
+}
+
 func TestArchiveReadWrite(t *testing.T) {
 	t.Run("Roundtrip", func(t *testing.T) {
 		arc1 := &Archive{
@@ -54,5 +72,49 @@ func TestArchiveReadWrite(t *testing.T) {
 		arc2, err := ReadArchive(buf)
 		assert.NoError(t, err)
 		assert.Equal(t, arc1, arc2)
+	})
+
+	t.Run("Anonymized", func(t *testing.T) {
+		arc1 := &Archive{
+			Type:     "js",
+			Options:  Options{VUs: null.IntFrom(12345)},
+			Filename: "/home/myname/script.js",
+			Data:     []byte(`// contents...`),
+			Pwd:      "/home/myname",
+			Scripts: map[string][]byte{
+				"/home/myname/a.js":         []byte(`// a contents`),
+				"/home/myname/b.js":         []byte(`// b contents`),
+				"cdnjs.com/libraries/Faker": []byte(`// faker contents`),
+			},
+			Files: map[string][]byte{
+				"/home/myname/file1.txt":             []byte(`hi!`),
+				"/home/myname/file2.txt":             []byte(`bye!`),
+				"github.com/loadimpact/k6/README.md": []byte(`README`),
+			},
+		}
+		arc1Anon := &Archive{
+			Type:     "js",
+			Options:  Options{VUs: null.IntFrom(12345)},
+			Filename: "/home/nobody/script.js",
+			Data:     []byte(`// contents...`),
+			Pwd:      "/home/nobody",
+			Scripts: map[string][]byte{
+				"/home/nobody/a.js":         []byte(`// a contents`),
+				"/home/nobody/b.js":         []byte(`// b contents`),
+				"cdnjs.com/libraries/Faker": []byte(`// faker contents`),
+			},
+			Files: map[string][]byte{
+				"/home/nobody/file1.txt":             []byte(`hi!`),
+				"/home/nobody/file2.txt":             []byte(`bye!`),
+				"github.com/loadimpact/k6/README.md": []byte(`README`),
+			},
+		}
+
+		buf := bytes.NewBuffer(nil)
+		assert.NoError(t, arc1.Write(buf))
+
+		arc2, err := ReadArchive(buf)
+		assert.NoError(t, err)
+		assert.Equal(t, arc1Anon, arc2)
 	})
 }
