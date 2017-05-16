@@ -44,6 +44,7 @@ func main() {
 	app.Commands = []cli.Command{
 		commandRun,
 		commandInspect,
+		commandArchive,
 		commandStatus,
 		commandStats,
 		commandScale,

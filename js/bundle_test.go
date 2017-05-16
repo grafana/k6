@@ -391,6 +391,64 @@ func TestNewBundle(t *testing.T) {
 	})
 }
 
+func TestNewBundleFromArchive(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	assert.NoError(t, fs.MkdirAll("/path/to", 0755))
+	assert.NoError(t, afero.WriteFile(fs, "/path/to/file.txt", []byte(`hi`), 0644))
+	assert.NoError(t, afero.WriteFile(fs, "/path/to/exclaim.js", []byte(`export default function(s) { return s + "!" };`), 0644))
+
+	b, err := NewBundle(&lib.SourceData{
+		Filename: "/path/to/script.js",
+		Data: []byte(`
+			import exclaim from "./exclaim.js";
+			export let options = { vus: 12345 };
+			export let file = open("./file.txt");
+			export default function() { return exclaim(file); };
+		`),
+	}, fs)
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.Equal(t, lib.Options{VUs: null.IntFrom(12345)}, b.Options)
+
+	bi, err := b.Instantiate()
+	if !assert.NoError(t, err) {
+		return
+	}
+	v, err := bi.Default(goja.Undefined())
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.Equal(t, "hi!", v.Export())
+
+	arc := b.MakeArchive()
+	assert.Equal(t, "js", arc.Type)
+	assert.Equal(t, lib.Options{VUs: null.IntFrom(12345)}, arc.Options)
+	assert.Equal(t, "/path/to/script.js", arc.Filename)
+	assert.Equal(t, "\"use strict\";Object.defineProperty(exports, \"__esModule\", { value: true });exports.file = exports.options = undefined;exports.default =\n\n\n\nfunction () {return (0, _exclaim2.default)(file);};var _exclaim = require(\"./exclaim.js\");var _exclaim2 = _interopRequireDefault(_exclaim);function _interopRequireDefault(obj) {return obj && obj.__esModule ? obj : { default: obj };}var options = exports.options = { vus: 12345 };var file = exports.file = open(\"./file.txt\");;", string(arc.Data))
+	assert.Equal(t, "/path/to", arc.Pwd)
+	assert.Len(t, arc.Scripts, 1)
+	assert.Equal(t, "\"use strict\";Object.defineProperty(exports, \"__esModule\", { value: true });exports.default = function (s) {return s + \"!\";};;", string(arc.Scripts["/path/to/exclaim.js"]))
+	assert.Len(t, arc.Files, 1)
+	assert.Equal(t, `hi`, string(arc.Files["/path/to/file.txt"]))
+
+	b2, err := NewBundleFromArchive(arc)
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.Equal(t, lib.Options{VUs: null.IntFrom(12345)}, b2.Options)
+
+	bi2, err := b.Instantiate()
+	if !assert.NoError(t, err) {
+		return
+	}
+	v2, err := bi2.Default(goja.Undefined())
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.Equal(t, "hi!", v2.Export())
+}
+
 func TestBundleInstantiate(t *testing.T) {
 	b, err := NewBundle(&lib.SourceData{
 		Filename: "/script.js",

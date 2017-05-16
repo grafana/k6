@@ -38,6 +38,7 @@ import (
 // You can use this to produce identical BundleInstance objects.
 type Bundle struct {
 	Filename string
+	Source   string
 	Program  *goja.Program
 	Options  lib.Options
 
@@ -74,6 +75,7 @@ func NewBundle(src *lib.SourceData, fs afero.Fs) (*Bundle, error) {
 	rt := goja.New()
 	bundle := Bundle{
 		Filename:        src.Filename,
+		Source:          code,
 		Program:         pgm,
 		BaseInitContext: NewInitContext(rt, new(context.Context), fs, loader.Dir(src.Filename)),
 	}
@@ -113,6 +115,54 @@ func NewBundle(src *lib.SourceData, fs afero.Fs) (*Bundle, error) {
 	// bundle.InitContext.fs = mirrorFS
 
 	return &bundle, nil
+}
+
+func NewBundleFromArchive(arc *lib.Archive) (*Bundle, error) {
+	if arc.Type != "js" {
+		return nil, errors.Errorf("expected bundle type 'js', got '%s'", arc.Type)
+	}
+
+	pgm, err := goja.Compile(arc.Filename, string(arc.Data), true)
+	if err != nil {
+		return nil, err
+	}
+
+	initctx := NewInitContext(goja.New(), new(context.Context), nil, arc.Pwd)
+	for filename, data := range arc.Scripts {
+		src := string(data)
+		scr, err := goja.Compile(filename, src, true)
+		if err != nil {
+			return nil, err
+		}
+		initctx.programs[filename] = programWithSource{scr, src}
+	}
+	initctx.files = arc.Files
+
+	return &Bundle{
+		Filename:        arc.Filename,
+		Source:          string(arc.Data),
+		Program:         pgm,
+		Options:         arc.Options,
+		BaseInitContext: initctx,
+	}, nil
+}
+
+func (b *Bundle) MakeArchive() *lib.Archive {
+	arc := &lib.Archive{
+		Type:     "js",
+		Options:  b.Options,
+		Filename: b.Filename,
+		Data:     []byte(b.Source),
+		Pwd:      b.BaseInitContext.pwd,
+	}
+
+	arc.Scripts = make(map[string][]byte, len(b.BaseInitContext.programs))
+	for name, pgm := range b.BaseInitContext.programs {
+		arc.Scripts[name] = []byte(pgm.src)
+	}
+	arc.Files = b.BaseInitContext.files
+
+	return arc
 }
 
 // Instantiates a new runtime from this bundle.

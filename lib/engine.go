@@ -110,6 +110,14 @@ func NewEngine(r Runner, o Options) (*Engine, error) {
 	}
 	e.clearSubcontext()
 
+	if err := e.SetVUsMax(o.VUsMax.Int64); err != nil {
+		return nil, err
+	}
+	if err := e.SetVUs(o.VUs.Int64); err != nil {
+		return nil, err
+	}
+	e.SetPaused(o.Paused.Bool)
+
 	if o.Stages != nil {
 		e.Stages = o.Stages
 	} else if o.Duration.Valid {
@@ -121,30 +129,16 @@ func NewEngine(r Runner, o Options) (*Engine, error) {
 	} else {
 		e.Stages = []Stage{{Duration: 0}}
 	}
-	if o.VUsMax.Valid {
-		if err := e.SetVUsMax(o.VUsMax.Int64); err != nil {
-			return nil, err
-		}
-	}
-	if o.VUs.Valid {
-		if err := e.SetVUs(o.VUs.Int64); err != nil {
-			return nil, err
-		}
-	}
-	if o.Paused.Valid {
-		e.SetPaused(o.Paused.Bool)
-	}
-	if o.Thresholds != nil {
-		e.thresholds = o.Thresholds
-		e.submetrics = make(map[string][]stats.Submetric)
-		for name := range e.thresholds {
-			if !strings.Contains(name, "{") {
-				continue
-			}
 
-			parent, sm := stats.NewSubmetric(name)
-			e.submetrics[parent] = append(e.submetrics[parent], sm)
+	e.thresholds = o.Thresholds
+	e.submetrics = make(map[string][]stats.Submetric)
+	for name := range e.thresholds {
+		if !strings.Contains(name, "{") {
+			continue
 		}
+
+		parent, sm := stats.NewSubmetric(name)
+		e.submetrics[parent] = append(e.submetrics[parent], sm)
 	}
 
 	return e, nil
