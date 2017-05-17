@@ -173,7 +173,7 @@ func TestParseHTML(t *testing.T) {
 		t.Run("Select Option Multiple", func(t *testing.T) {
 			v, err := common.RunString(rt, `doc.find("#select_multi").val()`)
 			if assert.NoError(t, err) {
-				var opts[] string
+				var opts []string
 				rt.ExportTo(v, &opts)
 				assert.Equal(t, 2, len(opts))
 				assert.Equal(t, "option 2", opts[0])
@@ -225,9 +225,9 @@ func TestParseHTML(t *testing.T) {
 
 	t.Run("Each", func(t *testing.T) {
 		t.Run("Func arg", func(t *testing.T) {
-			v, err := common.RunString(rt, `{ var elems = []; doc.find("#select_multi option").each(function(idx, gqval) { elems[idx] = gqval.text() }); elems }`)
+			v, err := common.RunString(rt, `{ var elems = []; doc.find("#select_multi option").each(function(idx, elem) { elems[idx] = elem.innerHTML; }); elems }`)
 			if assert.NoError(t, err) {
-				var elems[] string
+				var elems []string
 				rt.ExportTo(v, &elems)
 				assert.Equal(t, 3, len(elems))
 				assert.Equal(t, "option 1", elems[0])
@@ -280,7 +280,7 @@ func TestParseHTML(t *testing.T) {
 			if assert.NoError(t, err) {
 				sel := v.Export().(Selection).sel
 				assert.Equal(t, 2, sel.Length())
- 			}
+			}
 		})
 
 		t.Run("Selection", func(t *testing.T) {
@@ -288,7 +288,7 @@ func TestParseHTML(t *testing.T) {
 			if assert.NoError(t, err) {
 				sel := v.Export().(Selection).sel
 				assert.Equal(t, 2, sel.Length())
- 			}
+			}
 		})
 	})
 
@@ -343,7 +343,7 @@ func TestParseHTML(t *testing.T) {
 			if assert.NoError(t, err) {
 				mapped := v.Export().([]string)
 				assert.Equal(t, 3, len(mapped))
-				assert.Equal(t, [] string{"option 1", "option 2", "option 3"}, mapped)
+				assert.Equal(t, []string{"option 1", "option 2", "option 3"}, mapped)
 			}
 		})
 
@@ -392,7 +392,6 @@ func TestParseHTML(t *testing.T) {
 			}
 		})
 	})
-
 
 	t.Run("Prev", func(t *testing.T) {
 		t.Run("No arg", func(t *testing.T) {
@@ -594,7 +593,6 @@ func TestParseHTML(t *testing.T) {
 		})
 	})
 
-
 	t.Run("Not", func(t *testing.T) {
 		t.Run("String selector", func(t *testing.T) {
 			v, err := common.RunString(rt, `doc.find("body").children().not("p").size()`)
@@ -658,34 +656,32 @@ func TestParseHTML(t *testing.T) {
 	t.Run("Get", func(t *testing.T) {
 		t.Run("No args", func(t *testing.T) {
 			v, err := common.RunString(rt, `doc.find("body").children().get()`)
+			// 			fmt.Println(fmt.Sprintf("type is: %T\n", v.Export()))
 			if assert.NoError(t, err) {
-				arr := v.Export().([]Selection)
-				assert.Equal(t, 5, len(arr))
-				assert.True(t, arr[0].sel.Is("h1"))
-				assert.True(t, arr[1].sel.Is("p"))
-				assert.True(t, arr[4].sel.Is("footer"))
+				elems := valToElementList(v)
+
+				assert.Equal(t, "h1", elems[0].NodeName())
+				assert.Equal(t, "p", elems[1].NodeName())
+				assert.Equal(t, "footer", elems[4].NodeName())
 			}
 		})
 
 		t.Run("+ve index", func(t *testing.T) {
 			v, err := common.RunString(rt, `doc.find("body").children().get(1)`)
 			if assert.NoError(t, err) {
-				sel := v.Export().(Selection).sel
-				assert.True(t, sel.Is("p"))
-				assert.Contains(t, sel.Text(), "Lorem ipsum dolor sit amet")
+				elem, _ := valToElement(v)
+				assert.Contains(t, elem.InnerHTML(), "Lorem ipsum dolor sit amet")
 			}
 		})
 
 		t.Run("-ve index", func(t *testing.T) {
 			v, err := common.RunString(rt, `doc.find("body").children().get(-1)`)
 			if assert.NoError(t, err) {
-				sel := v.Export().(Selection).sel
-				assert.Equal(t, 1, sel.Length())
-				assert.True(t, sel.Is("footer"))
+				elem, _ := valToElement(v)
+				assert.Equal(t, "This is the footer.", elem.InnerHTML().String())
 			}
 		})
 	})
-
 
 	t.Run("ToArray", func(t *testing.T) {
 		v, err := common.RunString(rt, `doc.find("p").toArray()`)
@@ -757,7 +753,6 @@ func TestParseHTML(t *testing.T) {
 				assert.Equal(t, "1.1e02", v.Export())
 			}
 		})
-
 
 		t.Run("dataset", func(t *testing.T) {
 			v, err := common.RunString(rt, `doc.find("h1").data()`)
