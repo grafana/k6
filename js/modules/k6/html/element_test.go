@@ -122,6 +122,12 @@ func TestElement(t *testing.T) {
 			assert.Contains(t, v.Export(), "innerlast")
 		}
 	})
+	t.Run("ChildElementCount", func(t *testing.T) {
+		v, err := common.RunString(rt, `doc.find("body").get(0).childElementCount`)
+		if assert.NoError(t, err) {
+			assert.Equal(t, int64(6), v.Export())
+		}
+	})
 	t.Run("FirstElementChild", func(t *testing.T) {
 		v, err := common.RunString(rt, `doc.find("div").get(0).firstElementChild.textContent`)
 		if assert.NoError(t, err) {

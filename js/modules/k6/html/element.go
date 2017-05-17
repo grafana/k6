@@ -192,7 +192,7 @@ func (e Element) Children() []goja.Value {
 	return elemList(e.sel.Children())
 }
 
-func (e Element) childElementCount() int {
+func (e Element) ChildElementCount() int {
 	return e.sel.Children().Size()
 }
 
