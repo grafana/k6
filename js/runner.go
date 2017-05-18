@@ -107,7 +107,7 @@ func (r *Runner) newVU() (*VU, error) {
 			},
 			DialContext: r.Dialer.DialContext,
 		},
-		VUContext: NewVUContext(),
+		VUContext: NewVUContext(r.Bundle.Options),
 	}
 	common.BindToGlobal(vu.Runtime, common.Bind(vu.Runtime, vu.VUContext, vu.Context))
 

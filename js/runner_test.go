@@ -265,6 +265,40 @@ func TestVURunSamples(t *testing.T) {
 	}
 }
 
+func TestVUEnv(t *testing.T) {
+	r1, err := New(&lib.SourceData{
+		Filename: "/script.js",
+		Data: []byte(`
+		export let options = { env: { KEY: "value" } };
+		export default function() {
+			if (__ENV.KEY !== "value") { throw new Error("Invalid __ENV.KEY: " + __ENV.KEY) }
+		}
+		`),
+	}, afero.NewMemMapFs())
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	r2, err := NewFromArchive(r1.MakeArchive())
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
+	for name, r := range testdata {
+		t.Run(name, func(t *testing.T) {
+			vu, err := r.NewVU()
+			if !assert.NoError(t, err) {
+				return
+			}
+			_, err = vu.RunOnce(context.Background())
+			if !assert.NoError(t, err) {
+				return
+			}
+		})
+	}
+}
+
 func TestVUIntegrationGroups(t *testing.T) {
 	r1, err := New(&lib.SourceData{
 		Filename: "/script.js",
