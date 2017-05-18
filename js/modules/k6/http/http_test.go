@@ -184,6 +184,10 @@ func TestRequest(t *testing.T) {
 			assert.NoError(t, err)
 		})
 	})
+	t.Run("BadSSL", func(t *testing.T) {
+		_, err := common.RunString(rt, `http.get("https://expired.badssl.com/");`)
+		assert.EqualError(t, err, "GoError: Get https://expired.badssl.com/: x509: certificate has expired or is not yet valid")
+	})
 
 	t.Run("HTML", func(t *testing.T) {
 		state.Samples = nil

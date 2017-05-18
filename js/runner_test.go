@@ -26,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	logtest "github.com/Sirupsen/logrus/hooks/test"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
@@ -358,6 +359,65 @@ func TestVUIntegrationMetrics(t *testing.T) {
 				assert.Equal(t, 5.0, samples[0].Value)
 				assert.Equal(t, "my_metric", samples[0].Metric.Name)
 				assert.Equal(t, stats.Trend, samples[0].Metric.Type)
+			}
+		})
+	}
+}
+
+func TestVUIntegrationInsecureRequests(t *testing.T) {
+	testdata := map[string]struct {
+		opts   lib.Options
+		errMsg string
+	}{
+		"Null": {
+			lib.Options{},
+			"GoError: Get https://expired.badssl.com/: x509: certificate has expired or is not yet valid",
+		},
+		"False": {
+			lib.Options{InsecureSkipTLSVerify: null.BoolFrom(false)},
+			"GoError: Get https://expired.badssl.com/: x509: certificate has expired or is not yet valid",
+		},
+		"True": {
+			lib.Options{InsecureSkipTLSVerify: null.BoolFrom(true)},
+			"",
+		},
+	}
+	for name, data := range testdata {
+		t.Run(name, func(t *testing.T) {
+			r1, err := New(&lib.SourceData{
+				Filename: "/script.js",
+				Data: []byte(`
+					import http from "k6/http";
+					export default function() { http.get("https://expired.badssl.com/"); }
+				`),
+			}, afero.NewMemMapFs())
+			if !assert.NoError(t, err) {
+				return
+			}
+			r1.ApplyOptions(lib.Options{Throw: null.BoolFrom(true)})
+			r1.ApplyOptions(data.opts)
+
+			r2, err := NewFromArchive(r1.MakeArchive())
+			if !assert.NoError(t, err) {
+				return
+			}
+
+			runners := map[string]*Runner{"Source": r1, "Archive": r2}
+			for name, r := range runners {
+				t.Run(name, func(t *testing.T) {
+					r.Logger, _ = logtest.NewNullLogger()
+
+					vu, err := r.NewVU()
+					if !assert.NoError(t, err) {
+						return
+					}
+					_, err = vu.RunOnce(context.Background())
+					if data.errMsg != "" {
+						assert.EqualError(t, err, data.errMsg)
+					} else {
+						assert.NoError(t, err)
+					}
+				})
 			}
 		})
 	}
