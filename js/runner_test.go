@@ -191,6 +191,7 @@ func TestVURunContext(t *testing.T) {
 	if !assert.NoError(t, err) {
 		return
 	}
+	r1.ApplyOptions(lib.Options{Throw: null.BoolFrom(true)})
 
 	r2, err := NewFromArchive(r1.MakeArchive())
 	if !assert.NoError(t, err) {
@@ -214,6 +215,7 @@ func TestVURunContext(t *testing.T) {
 				state := common.GetState(*vu.Context)
 				if assert.NotNil(t, state) {
 					assert.Equal(t, null.IntFrom(10), state.Options.VUs)
+					assert.Equal(t, null.BoolFrom(true), state.Options.Throw)
 					assert.NotNil(t, state.Logger)
 					assert.Equal(t, r.GetDefaultGroup(), state.Group)
 					assert.Equal(t, vu.HTTPTransport, state.HTTPTransport)
