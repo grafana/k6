@@ -26,6 +26,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -34,7 +35,10 @@ import (
 	"github.com/mitchellh/mapstructure"
 )
 
-const TestName = "k6 test"
+const (
+	TestName          = "k6 test"
+	MetricPushinteral = 1 * time.Second
+)
 
 type loadimpactConfig struct {
 	ProjectId int    `mapstructure:"project_id"`
@@ -52,6 +56,9 @@ type Collector struct {
 	duration   int64
 	thresholds map[string][]*stats.Threshold
 	client     *Client
+
+	sampleBuffer []*sample
+	sampleMu     sync.Mutex
 }
 
 // New creates a new cloud collector
@@ -142,26 +149,16 @@ func (c *Collector) String() string {
 }
 
 func (c *Collector) Run(ctx context.Context) {
-	<-ctx.Done()
+	timer := time.NewTicker(MetricPushinteral)
 
-	testTainted := false
-	thresholdResults := make(ThresholdResult)
-	for name, thresholds := range c.thresholds {
-		thresholdResults[name] = make(map[string]bool)
-		for _, t := range thresholds {
-			thresholdResults[name][t.Source] = t.Failed
-			if t.Failed {
-				testTainted = true
-			}
-		}
-	}
-
-	if c.referenceID != "" {
-		err := c.client.TestFinished(c.referenceID, thresholdResults, testTainted)
-		if err != nil {
-			log.WithFields(log.Fields{
-				"error": err,
-			}).Warn("Failed to send test finished to cloud")
+	for {
+		select {
+		case <-timer.C:
+			c.pushMetrics()
+		case <-ctx.Done():
+			c.pushMetrics()
+			c.testFinished()
+			return
 		}
 	}
 }
@@ -187,13 +184,61 @@ func (c *Collector) Collect(samples []stats.Sample) {
 	}
 
 	if len(cloudSamples) > 0 {
-		err := c.client.PushMetric(c.referenceID, cloudSamples)
-		if err != nil {
-			log.WithFields(log.Fields{
-				"error":   err,
-				"samples": cloudSamples,
-			}).Warn("Failed to send metrics to cloud")
+		c.sampleMu.Lock()
+		c.sampleBuffer = append(c.sampleBuffer, cloudSamples...)
+		c.sampleMu.Unlock()
+	}
+}
+
+func (c *Collector) pushMetrics() {
+	c.sampleMu.Lock()
+	if len(c.sampleBuffer) == 0 {
+		c.sampleMu.Unlock()
+		return
+	}
+	buffer := c.sampleBuffer
+	c.sampleBuffer = nil
+	c.sampleMu.Unlock()
+
+	log.WithFields(log.Fields{
+		"samples": len(buffer),
+	}).Debug("Pushing metrics to cloud")
+
+	err := c.client.PushMetric(c.referenceID, buffer)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"error": err,
+		}).Warn("Failed to send metrics to cloud")
+	}
+}
+
+func (c *Collector) testFinished() {
+	if c.referenceID == "" {
+		return
+	}
+
+	testTainted := false
+	thresholdResults := make(ThresholdResult)
+	for name, thresholds := range c.thresholds {
+		thresholdResults[name] = make(map[string]bool)
+		for _, t := range thresholds {
+			thresholdResults[name][t.Source] = t.Failed
+			if t.Failed {
+				testTainted = true
+			}
 		}
+	}
+
+	log.WithFields(log.Fields{
+		"ref":     c.referenceID,
+		"tainted": testTainted,
+	}).Debug("Sending test finished")
+
+	err := c.client.TestFinished(c.referenceID, thresholdResults, testTainted)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"error": err,
+		}).Warn("Failed to send test finished to cloud")
 	}
 }
 
