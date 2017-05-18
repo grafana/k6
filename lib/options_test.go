@@ -61,6 +61,12 @@ func TestOptionsApply(t *testing.T) {
 		assert.Len(t, opts.Stages, 1)
 		assert.Equal(t, 1*time.Second, opts.Stages[0].Duration)
 	})
+	t.Run("Env", func(t *testing.T) {
+		opts := Options{}.Apply(Options{Env: map[string]string{"A": "1"}})
+		assert.Equal(t, opts.Env, map[string]string{"A": "1"})
+		opts = opts.Apply(Options{Env: map[string]string{"B": "2"}})
+		assert.Equal(t, opts.Env, map[string]string{"A": "1", "B": "2"})
+	})
 	t.Run("Linger", func(t *testing.T) {
 		opts := Options{}.Apply(Options{Linger: null.BoolFrom(true)})
 		assert.True(t, opts.Linger.Valid)

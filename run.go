@@ -21,6 +21,7 @@
 package main
 
 import (
+	"archive/tar"
 	"bytes"
 	"context"
 	"fmt"
@@ -37,8 +38,6 @@ import (
 	"sync"
 	"syscall"
 	"time"
-
-	"archive/tar"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/fatih/color"
@@ -89,6 +88,10 @@ var optionFlags = []cli.Flag{
 	cli.StringSliceFlag{
 		Name:  "stage, s",
 		Usage: "define a test stage, in the format time[:vus] (10s:100)",
+	},
+	cli.StringSliceFlag{
+		Name:  "env, e",
+		Usage: "set an env var (key=val), just key takes val from env",
 	},
 	cli.BoolFlag{
 		Name:  "paused, p",
@@ -304,6 +307,17 @@ func getOptions(cc *cli.Context) (lib.Options, error) {
 			return opts, err
 		}
 		opts.Stages = append(opts.Stages, stage)
+	}
+	if env := cc.StringSlice("env"); len(env) > 0 {
+		opts.Env = make(map[string]string, len(env))
+		for _, s := range env {
+			sep := strings.IndexRune(s, '=')
+			if sep != -1 {
+				opts.Env[s[:sep]] = s[sep+1:]
+			} else {
+				fmt.Printf("%s = [%s]", s, opts.Env[s])
+			}
+		}
 	}
 	return opts, nil
 }
