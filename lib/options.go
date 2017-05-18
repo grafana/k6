@@ -103,6 +103,12 @@ func (o Options) Apply(opts Options) Options {
 	if opts.NoConnectionReuse.Valid {
 		o.NoConnectionReuse = opts.NoConnectionReuse
 	}
+	if opts.UserAgent.Valid {
+		o.UserAgent = opts.UserAgent
+	}
+	if opts.Throw.Valid {
+		o.Throw = opts.Throw
+	}
 	if opts.Thresholds != nil {
 		o.Thresholds = opts.Thresholds
 	}
