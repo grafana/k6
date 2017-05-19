@@ -22,6 +22,7 @@ package js
 
 import (
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
@@ -480,4 +481,41 @@ func TestBundleInstantiate(t *testing.T) {
 			assert.Equal(t, false, v.Export())
 		}
 	})
+}
+
+func TestBundleEnv(t *testing.T) {
+	assert.NoError(t, os.Setenv("TEST_A", "1"))
+	assert.NoError(t, os.Setenv("TEST_B", ""))
+
+	b1, err := NewBundle(&lib.SourceData{
+		Filename: "/script.js",
+		Data: []byte(`
+			export default function() {
+				if (__ENV.TEST_A !== "1") { throw new Error("Invalid TEST_A: " + __ENV.TEST_A); }
+				if (__ENV.TEST_B !== "") { throw new Error("Invalid TEST_B: " + __ENV.TEST_B); }
+			}
+		`),
+	}, afero.NewMemMapFs())
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	b2, err := NewBundleFromArchive(b1.MakeArchive())
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	bundles := map[string]*Bundle{"Source": b1, "Archive": b2}
+	for name, b := range bundles {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, "1", b.Env["TEST_A"])
+			assert.Equal(t, "", b.Env["TEST_B"])
+
+			bi, err := b.Instantiate()
+			if assert.NoError(t, err) {
+				_, err := bi.Default(goja.Undefined())
+				assert.NoError(t, err)
+			}
+		})
+	}
 }
