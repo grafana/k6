@@ -23,7 +23,9 @@ package js
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"reflect"
+	"strings"
 
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
@@ -43,6 +45,8 @@ type Bundle struct {
 	Options  lib.Options
 
 	BaseInitContext *InitContext
+
+	Env map[string]string
 }
 
 // A BundleInstance is a self-contained instance of a Bundle.
@@ -50,6 +54,18 @@ type BundleInstance struct {
 	Runtime *goja.Runtime
 	Context *context.Context
 	Default goja.Callable
+}
+
+func collectEnv() map[string]string {
+	env := make(map[string]string)
+	for _, kv := range os.Environ() {
+		if idx := strings.IndexRune(kv, '='); idx != -1 {
+			env[kv[:idx]] = kv[idx+1:]
+		} else {
+			env[kv] = ""
+		}
+	}
+	return env
 }
 
 // Creates a new bundle from a source file and a filesystem.
@@ -78,6 +94,7 @@ func NewBundle(src *lib.SourceData, fs afero.Fs) (*Bundle, error) {
 		Source:          code,
 		Program:         pgm,
 		BaseInitContext: NewInitContext(rt, new(context.Context), fs, loader.Dir(src.Filename)),
+		Env:             collectEnv(),
 	}
 	if err := bundle.instantiate(rt, bundle.BaseInitContext); err != nil {
 		return nil, err
@@ -144,6 +161,7 @@ func NewBundleFromArchive(arc *lib.Archive) (*Bundle, error) {
 		Program:         pgm,
 		Options:         arc.Options,
 		BaseInitContext: initctx,
+		Env:             collectEnv(),
 	}, nil
 }
 
@@ -200,6 +218,8 @@ func (b *Bundle) instantiate(rt *goja.Runtime, init *InitContext) error {
 	module := rt.NewObject()
 	_ = module.Set("exports", exports)
 	rt.Set("module", module)
+
+	rt.Set("__ENV", b.Env)
 
 	*init.ctxPtr = common.WithRuntime(context.Background(), rt)
 	unbindInit := common.BindToGlobal(rt, common.Bind(rt, init, init.ctxPtr))

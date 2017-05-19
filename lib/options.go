@@ -47,13 +47,12 @@ func (d *Duration) UnmarshalJSON(data []byte) error {
 }
 
 type Options struct {
-	Paused     null.Bool         `json:"paused"`
-	VUs        null.Int          `json:"vus"`
-	VUsMax     null.Int          `json:"vusMax"`
-	Duration   null.String       `json:"duration"`
-	Iterations null.Int          `json:"iterations"`
-	Stages     []Stage           `json:"stages"`
-	Env        map[string]string `json:"env"`
+	Paused     null.Bool   `json:"paused"`
+	VUs        null.Int    `json:"vus"`
+	VUsMax     null.Int    `json:"vusMax"`
+	Duration   null.String `json:"duration"`
+	Iterations null.Int    `json:"iterations"`
+	Stages     []Stage     `json:"stages"`
 
 	Linger        null.Bool `json:"linger"`
 	NoUsageReport null.Bool `json:"noUsageReport"`
@@ -88,14 +87,6 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.Stages != nil {
 		o.Stages = opts.Stages
-	}
-	if l := len(opts.Env); l > 0 {
-		if o.Env == nil {
-			o.Env = make(map[string]string, l)
-		}
-		for k, v := range opts.Env {
-			o.Env[k] = v
-		}
 	}
 	if opts.Linger.Valid {
 		o.Linger = opts.Linger
