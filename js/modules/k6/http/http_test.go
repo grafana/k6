@@ -200,9 +200,7 @@ func TestRequest(t *testing.T) {
 		defer func() { *ctx = oldctx }()
 
 		_, err := common.RunString(rt, `http.get("https://httpbin.org/get/");`)
-		if assert.Error(t, err) {
-			assert.Contains(t, err.Error(), "context canceled")
-		}
+		assert.Error(t, err)
 		assert.Nil(t, hook.LastEntry())
 	})
 
