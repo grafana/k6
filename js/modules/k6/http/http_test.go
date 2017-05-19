@@ -107,10 +107,11 @@ func TestRequest(t *testing.T) {
 		},
 	}
 
-	ctx := context.Background()
-	ctx = common.WithState(ctx, state)
-	ctx = common.WithRuntime(ctx, rt)
-	rt.Set("http", common.Bind(rt, &HTTP{}, &ctx))
+	ctx := new(context.Context)
+	*ctx = context.Background()
+	*ctx = common.WithState(*ctx, state)
+	*ctx = common.WithRuntime(*ctx, rt)
+	rt.Set("http", common.Bind(rt, &HTTP{}, ctx))
 
 	t.Run("Redirects", func(t *testing.T) {
 		t.Run("9", func(t *testing.T) {
@@ -187,6 +188,20 @@ func TestRequest(t *testing.T) {
 	t.Run("BadSSL", func(t *testing.T) {
 		_, err := common.RunString(rt, `http.get("https://expired.badssl.com/");`)
 		assert.EqualError(t, err, "GoError: Get https://expired.badssl.com/: x509: certificate has expired or is not yet valid")
+	})
+	t.Run("Cancelled", func(t *testing.T) {
+		hook := logtest.NewLocal(state.Logger)
+		defer hook.Reset()
+
+		oldctx := *ctx
+		newctx, cancel := context.WithCancel(oldctx)
+		cancel()
+		*ctx = newctx
+		defer func() { *ctx = oldctx }()
+
+		_, err := common.RunString(rt, `http.get("https://httpbin.org/get/");`)
+		assert.EqualError(t, err, "GoError: Get https://httpbin.org/get/: context canceled")
+		assert.Nil(t, hook.LastEntry())
 	})
 
 	t.Run("HTML", func(t *testing.T) {
