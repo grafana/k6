@@ -421,7 +421,7 @@ func actionRun(cc *cli.Context) error {
 
 	collectorString := "-"
 	if collector != nil {
-		collector.Init()
+		collector.Init(collector.MakeConfig())
 		collectorString = fmt.Sprint(collector)
 	}
 

@@ -29,8 +29,13 @@ import (
 // A Collector abstracts away the details of a storage backend from the application.
 type Collector interface {
 	// Init is called between the collector's creation and the call to Run(), right after the k6
-	// banner has been printed to stdout.
-	Init()
+	// banner has been printed to stdout. The argument is the result of calling MakeConfig() and
+	// then deserializing from JSON the config value stored to disk (if any).
+	Init(conf interface{}) error
+
+	// MakeConfig is called before Init() and should instantiate a blank configuration struct.
+	// Do not apply defaults here, instead use null'able values and apply defaults in Init().
+	MakeConfig() interface{}
 
 	// Run is called in a goroutine and starts the collector. Should commit samples to the backend
 	// at regular intervals and when the context is terminated.
