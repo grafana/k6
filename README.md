@@ -6,7 +6,15 @@ This is how load testing should look in the 21st century.
 
 [![](demo.gif)](https://asciinema.org/a/cbohbo6pbkxjwo1k8x0gkl7py)
 
-Join our [Slack](https://slackin-defaimlmsd.now.sh/)!
+---
+
+- Project site: [http://k6.io](http://k6.io)
+
+- Documentation: [http://docs.k6.io](http://docs.k6.io)
+
+- Check out k6 on [Slack](https://slackin-defaimlmsd.now.sh/)!
+
+---
 
 Installation
 ------------
@@ -28,40 +36,28 @@ docker pull loadimpact/k6
 
 Grab a prebuilt binary from [the Releases page](https://github.com/loadimpact/k6/releases).
 
-Introduction
-------------
 
-k6 works with the concept of **virtual users** (VUs), which run scripts - they're essentially glorified, parallel `while(true)` loops. Scripts are written using JavaScript, as ES6 modules, which allows you to break larger tests into smaller pieces, or make reusable pieces as you like.
+Running k6
+----------
 
-Scripts must contain, at the very least, a `default` function - this defines the entry point for your VUs, similar to the `main()` function in many other languages:
+Create a k6 script, to describe what the virtual users should do in your load test:
 
-```bash
-export default function() {
-    // do things here...
-}
-```
-
-*"Why not just run my script normally, from top to bottom"*, you might ask - the answer is: we do, but code **inside** and **outside** your `default` function can do different things.
-
-Code inside `default` is called "VU code", and is run over and over for as long as the test is running. Code outside of it is called "init code", and is run only once per VU.
-
-VU code can make HTTP requests, emit metrics, and generally do everything you'd expect a load test to do - with a few important exceptions: you can't load anything from your local filesystem, or import any other modules. This all has to be done from init code.
-
-There are two reasons for this. The first is, of course: performance.
-
-If you read a file from disk on every single script iteration, it'd be needlessly slow; even if you cache the contents of the file and any imported modules, it'd mean the *first run* of the script would be much slower than all the others. Worse yet, if you have a script that imports or loads things based on things that can only be known at runtime, you'd get slow iterations thrown in every time you load something new.
-
-But there's another, more interesting reason. By forcing all imports and file reads into the init context, we design for distributed execution. We know which files will be needed, so we distribute only those files. We know which modules will be imported, so we can bundle them up from the get-go. And, tying into the performance point above, the other nodes don't even need writable filesystems - everything can be kept in-memory.
-
-As an added bonus, you can use this to reuse data between iterations (but only for the same VU):
-
-```js
-var counter = 0;
+```javascript
+import http from "k6/http";
 
 export default function() {
-    counter++;
-}
+  http.get("http://test.loadimpact.com");
+};
 ```
+
+Save it as `script.js`, then run k6:
+
+`k6 run script.js`
+
+(Note that if you use the Docker image, the command is slightly different: `docker run -i loadimpact/k6 run - <script.js`)
+
+For more information on how to get started running k6, please look at the [Running k6](https://docs.k6.io/docs/running-k6) documentation.
+
 
 Development Setup
 -----------------
