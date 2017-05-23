@@ -40,7 +40,7 @@ Grab a prebuilt binary from [the Releases page](https://github.com/loadimpact/k6
 Running k6
 ----------
 
-Create a k6 script, to describe what the virtual users should do in your load test:
+First, create a k6 script to describe what the virtual users should do in your load test:
 
 ```javascript
 import http from "k6/http";
@@ -50,14 +50,15 @@ export default function() {
 };
 ```
 
-Save it as `script.js`, then run k6:
+Save it as `script.js`, then run k6 like this:
 
 `k6 run script.js`
 
 (Note that if you use the Docker image, the command is slightly different: `docker run -i loadimpact/k6 run - <script.js`)
 
-For more information on how to get started running k6, please look at the [Running k6](https://docs.k6.io/docs/running-k6) documentation.
+For more information on how to get started running k6, please look at the [Running k6](https://docs.k6.io/docs/running-k6) documentation. If you want more info on the scripting API or results output, you'll find that also on [https://docs.k6.io](https://docs.k6.io).
 
+---
 
 Development Setup
 -----------------
