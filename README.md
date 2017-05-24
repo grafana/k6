@@ -6,27 +6,14 @@ This is how load testing should look in the 21st century.
 
 [![](demo.gif)](https://asciinema.org/a/cbohbo6pbkxjwo1k8x0gkl7py)
 
-Join our [Slack](https://slackin-defaimlmsd.now.sh/)!
+---
 
-Installation
-------------
+- Project site: [http://k6.io](http://k6.io)
 
-### Mac
+- Documentation: [http://docs.k6.io](http://docs.k6.io)
 
-```bash
-brew tap loadimpact/k6
-brew install k6
-```
+- Check out k6 on [Slack](https://slackin-defaimlmsd.now.sh/)!
 
-### Docker
-
-```bash
-docker pull loadimpact/k6
-```
-
-### Other Platforms
-
-Grab a prebuilt binary from [the Releases page](https://github.com/loadimpact/k6/releases).
 
 Introduction
 ------------
@@ -35,7 +22,7 @@ k6 works with the concept of **virtual users** (VUs), which run scripts - they'r
 
 Scripts must contain, at the very least, a `default` function - this defines the entry point for your VUs, similar to the `main()` function in many other languages:
 
-```bash
+```js
 export default function() {
     // do things here...
 }
@@ -63,10 +50,54 @@ export default function() {
 }
 ```
 
+Installation
+------------
+
+### Mac
+
+```bash
+brew tap loadimpact/k6
+brew install k6
+```
+
+### Docker
+
+```bash
+docker pull loadimpact/k6
+```
+
+### Other Platforms
+
+Grab a prebuilt binary from [the Releases page](https://github.com/loadimpact/k6/releases).
+
+
+Running k6
+----------
+
+First, create a k6 script to describe what the virtual users should do in your load test:
+
+```js
+import http from "k6/http";
+
+export default function() {
+  http.get("http://test.loadimpact.com");
+};
+```
+
+Save it as `script.js`, then run k6 like this:
+
+`k6 run script.js`
+
+(Note that if you use the Docker image, the command is slightly different: `docker run -i loadimpact/k6 run - <script.js`)
+
+For more information on how to get started running k6, please look at the [Running k6](https://docs.k6.io/docs/running-k6) documentation. If you want more info on the scripting API or results output, you'll find that also on [https://docs.k6.io](https://docs.k6.io).
+
+---
+
 Development Setup
 -----------------
 
-```
+```bash
 go get -u github.com/loadimpact/k6
 ```
 
@@ -74,13 +105,13 @@ The only catch is, if you want the web UI available, it has to be built separate
 
 First, install the `ember-cli` and `bower` tools if you don't have them already:
 
-```
+```bash
 npm install -g ember-cli bower
 ```
 
 Then build the UI:
 
-```
+```bash
 cd $GOPATH/src/github.com/loadimpact/k6/web
 npm install && bower install
 ember build
