@@ -1,7 +1,11 @@
-import websocket from "k6/websocket";
+import ws from "k6/ws";
+import { check } from "k6";
 
 export default function () {
-    var result = websocket.connect("wss://echo.websocket.org", function(socket) {
+    var url = "ws://echo.websocket.org";
+    var params = { "tags": { "my_tag": "hello" } };
+
+    var response = ws.connect(url, params, function (socket) {
         socket.on('open', function open() {
             console.log('connected');
             socket.send(Date.now());
@@ -12,8 +16,17 @@ export default function () {
             }, 1000);
         });
 
+        socket.on('ping', function () {
+            console.log("PING!");
+        });
+
         socket.on('pong', function () {
             console.log("PONG!");
+        });
+
+        socket.on('pong', function () {
+            // Multiple event handlers on the same event
+            console.log("OTHER PONG!");
         });
 
         socket.on('message', function incoming(data) {
@@ -28,12 +41,16 @@ export default function () {
         });
 
         socket.on('error', function (e) {
-            console.log('An error occured: ', e.error());
+            if (e.error() != "websocket: close sent") {
+                console.log('An unexpected error occured: ', e.error());
+            }
         });
 
-        socket.setTimeout(function() {
-            console.log('5 seconds passed, closing the socket');
+        socket.setTimeout(function () {
+            console.log('2 seconds passed, closing the socket');
             socket.close();
-        }, 5000);
+        }, 2000);
     });
+
+    check(response, { "status is 101": (r) => r && r.status_code === 101 });
 };

@@ -23,6 +23,11 @@ var (
 	HTTPReqWaiting    = stats.New("http_req_waiting", stats.Trend, stats.Time)
 	HTTPReqReceiving  = stats.New("http_req_receiving", stats.Trend, stats.Time)
 
+	// Websocket-related
+	WSSessions        = stats.New("ws_sessions", stats.Counter)
+	WSSessionDuration = stats.New("ws_session_duration", stats.Trend, stats.Time)
+	WSHandshaking     = stats.New("ws_handshaking", stats.Trend, stats.Time)
+
 	// Network-related; used for future protocols as well.
 	DataSent     = stats.New("data_sent", stats.Counter, stats.Data)
 	DataReceived = stats.New("data_received", stats.Counter, stats.Data)

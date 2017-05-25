@@ -1,7 +1,7 @@
 /*
  *
  * k6 - a next-generation load testing tool
- * Copyright (C) 2016 Load Impact
+ * Copyright (C) 2017 Load Impact
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,23 +18,27 @@
  *
  */
 
-package modules
+package ws
 
 import (
-	"github.com/loadimpact/k6/js/modules/k6"
-	"github.com/loadimpact/k6/js/modules/k6/crypto"
-	"github.com/loadimpact/k6/js/modules/k6/html"
-	"github.com/loadimpact/k6/js/modules/k6/http"
-	"github.com/loadimpact/k6/js/modules/k6/metrics"
-	"github.com/loadimpact/k6/js/modules/k6/ws"
+	"net"
+	"sync/atomic"
 )
 
-// Index of module implementations.
-var Index = map[string]interface{}{
-	"k6":         &k6.K6{},
-	"k6/crypto":  &crypto.Crypto{},
-	"k6/http":    &http.HTTP{},
-	"k6/metrics": &metrics.Metrics{},
-	"k6/html":    &html.HTML{},
-	"k6/ws":      &ws.WS{},
+type TraceConn struct {
+	net.Conn
+
+	BytesRead, BytesWritten int64
+}
+
+func (c *TraceConn) Read(b []byte) (int, error) {
+	n, err := c.Conn.Read(b)
+	atomic.AddInt64(&c.BytesRead, int64(n))
+	return n, err
+}
+
+func (c *TraceConn) Write(b []byte) (int, error) {
+	n, err := c.Conn.Write(b)
+	atomic.AddInt64(&c.BytesWritten, int64(n))
+	return n, err
 }
