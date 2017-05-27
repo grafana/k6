@@ -29,6 +29,8 @@ import (
 	"strconv"
 	"time"
 
+	"sync"
+
 	"github.com/dop251/goja"
 	"github.com/gorilla/websocket"
 	"github.com/loadimpact/k6/js/common"
@@ -45,6 +47,7 @@ type Socket struct {
 	eventHandlers map[string][]goja.Callable
 	scheduled     chan goja.Callable
 	done          chan struct{}
+	shutdownOnce  sync.Once
 }
 
 const writeWait = 10 * time.Second
@@ -239,13 +242,8 @@ func (s *Socket) Close(args ...goja.Value) {
 func (s *Socket) closeConnection(code int) error {
 	// Attempts to close the websocket gracefully
 
-	select {
-	case <-s.done:
-		// If the done channel is closed, this means someone has called this
-		// function already
-		return nil
-
-	case <-time.After(time.Second):
+	var err error
+	s.shutdownOnce.Do(func() {
 		rt := common.GetRuntime(s.ctx)
 
 		err := s.conn.WriteControl(websocket.CloseMessage,
@@ -258,9 +256,11 @@ func (s *Socket) closeConnection(code int) error {
 		}
 		s.conn.Close()
 
+		// Stops the main control loop
 		close(s.done)
-		return err
-	}
+	})
+
+	return err
 }
 
 // Wraps conn.ReadMessage in a channel
