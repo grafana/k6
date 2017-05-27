@@ -33,6 +33,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib/metrics"
+	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
 )
 
@@ -70,11 +71,12 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) *http.Re
 
 	// Pass a custom net.Dial function to websocket.Dialer that will substitute
 	// the underlying net.Conn with our own TraceConn
-	var traceConn *TraceConn
+	var traceConn *netext.Conn
+	var bytesRead, bytesWritten int64
 	netDial := func(network, address string) (net.Conn, error) {
 		var d net.Dialer
 		conn, err := d.Dial(network, address)
-		traceConn = &TraceConn{conn, 0, 0}
+		traceConn = &netext.Conn{conn, &bytesRead, &bytesWritten}
 
 		return traceConn, err
 	}
@@ -147,8 +149,8 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) *http.Re
 				{Metric: metrics.WSSessions, Time: end, Tags: tags, Value: 1},
 				{Metric: metrics.WSHandshaking, Time: end, Tags: tags, Value: connecting},
 				{Metric: metrics.WSSessionDuration, Time: end, Tags: tags, Value: duration},
-				{Metric: metrics.DataReceived, Time: end, Tags: tags, Value: float64(traceConn.BytesRead)},
-				{Metric: metrics.DataSent, Time: end, Tags: tags, Value: float64(traceConn.BytesWritten)},
+				{Metric: metrics.DataReceived, Time: end, Tags: tags, Value: float64(bytesRead)},
+				{Metric: metrics.DataSent, Time: end, Tags: tags, Value: float64(bytesWritten)},
 			}
 			state.Samples = append(state.Samples, samples...)
 
