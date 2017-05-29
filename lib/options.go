@@ -57,11 +57,13 @@ type Options struct {
 	Linger        null.Bool `json:"linger"`
 	NoUsageReport null.Bool `json:"noUsageReport"`
 
-	MaxRedirects          null.Int    `json:"maxRedirects"`
-	InsecureSkipTLSVerify null.Bool   `json:"insecureSkipTLSVerify"`
-	NoConnectionReuse     null.Bool   `json:"noConnectionReuse"`
-	UserAgent             null.String `json:"userAgent"`
-	Throw                 null.Bool   `json:"throw"`
+	MaxRedirects          null.Int         `json:"maxRedirects"`
+	InsecureSkipTLSVerify null.Bool        `json:"insecureSkipTLSVerify"`
+	TLSCipherSuites       *TLSCipherSuites `json:"tlsCipherSuites"`
+	TLSVersion            *TLSVersion      `json:"tlsVersion"`
+	NoConnectionReuse     null.Bool        `json:"noConnectionReuse"`
+	UserAgent             null.String      `json:"userAgent"`
+	Throw                 null.Bool        `json:"throw"`
 
 	Thresholds map[string]stats.Thresholds `json:"thresholds"`
 
@@ -99,6 +101,12 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.InsecureSkipTLSVerify.Valid {
 		o.InsecureSkipTLSVerify = opts.InsecureSkipTLSVerify
+	}
+	if opts.TLSCipherSuites != nil {
+		o.TLSCipherSuites = opts.TLSCipherSuites
+	}
+	if opts.TLSVersion != nil {
+		o.TLSVersion = opts.TLSVersion
 	}
 	if opts.NoConnectionReuse.Valid {
 		o.NoConnectionReuse = opts.NoConnectionReuse

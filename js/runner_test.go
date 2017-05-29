@@ -26,6 +26,8 @@ import (
 	"testing"
 	"time"
 
+	"crypto/tls"
+
 	logtest "github.com/Sirupsen/logrus/hooks/test"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
@@ -389,6 +391,76 @@ func TestVUIntegrationInsecureRequests(t *testing.T) {
 				Data: []byte(`
 					import http from "k6/http";
 					export default function() { http.get("https://expired.badssl.com/"); }
+				`),
+			}, afero.NewMemMapFs())
+			if !assert.NoError(t, err) {
+				return
+			}
+			r1.ApplyOptions(lib.Options{Throw: null.BoolFrom(true)})
+			r1.ApplyOptions(data.opts)
+
+			r2, err := NewFromArchive(r1.MakeArchive())
+			if !assert.NoError(t, err) {
+				return
+			}
+
+			runners := map[string]*Runner{"Source": r1, "Archive": r2}
+			for name, r := range runners {
+				t.Run(name, func(t *testing.T) {
+					r.Logger, _ = logtest.NewNullLogger()
+
+					vu, err := r.NewVU()
+					if !assert.NoError(t, err) {
+						return
+					}
+					_, err = vu.RunOnce(context.Background())
+					if data.errMsg != "" {
+						assert.EqualError(t, err, data.errMsg)
+					} else {
+						assert.NoError(t, err)
+					}
+				})
+			}
+		})
+	}
+}
+func TestVUIntegrationTLSConfig(t *testing.T) {
+	testdata := map[string]struct {
+		opts   lib.Options
+		errMsg string
+	}{
+		"NullCipherSuites": {
+			lib.Options{},
+			"",
+		},
+		"SupportedCipherSuite": {
+			lib.Options{TLSCipherSuites: &lib.TLSCipherSuites{Values: []uint16{tls.TLS_RSA_WITH_AES_128_GCM_SHA256}}},
+			"",
+		},
+		"UnsupportedCipherSuite": {
+			lib.Options{TLSCipherSuites: &lib.TLSCipherSuites{Values: []uint16{tls.TLS_RSA_WITH_RC4_128_SHA}}},
+			"GoError: Get https://sha256.badssl.com/: remote error: tls: handshake failure",
+		},
+		"NullVersion": {
+			lib.Options{},
+			"",
+		},
+		"SupportedVersion": {
+			lib.Options{TLSVersion: &lib.TLSVersion{Min: tls.VersionTLS12, Max: tls.VersionTLS12}},
+			"",
+		},
+		"UnsupportedVersion": {
+			lib.Options{TLSVersion: &lib.TLSVersion{Min: tls.VersionSSL30, Max: tls.VersionSSL30}},
+			"GoError: Get https://sha256.badssl.com/: remote error: tls: handshake failure",
+		},
+	}
+	for name, data := range testdata {
+		t.Run(name, func(t *testing.T) {
+			r1, err := New(&lib.SourceData{
+				Filename: "/script.js",
+				Data: []byte(`
+					import http from "k6/http";
+					export default function() { http.get("https://sha256.badssl.com/"); }
 				`),
 			}, afero.NewMemMapFs())
 			if !assert.NoError(t, err) {

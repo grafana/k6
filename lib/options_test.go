@@ -24,6 +24,8 @@ import (
 	"testing"
 	"time"
 
+	"crypto/tls"
+
 	"github.com/loadimpact/k6/stats"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v3"
@@ -75,6 +77,26 @@ func TestOptionsApply(t *testing.T) {
 		opts := Options{}.Apply(Options{InsecureSkipTLSVerify: null.BoolFrom(true)})
 		assert.True(t, opts.InsecureSkipTLSVerify.Valid)
 		assert.True(t, opts.InsecureSkipTLSVerify.Bool)
+	})
+	t.Run("TLSCipherSuites", func(t *testing.T) {
+		suiteIDs := []uint16{
+			tls.TLS_RSA_WITH_RC4_128_SHA,
+			tls.TLS_RSA_WITH_3DES_EDE_CBC_SHA,
+		}
+		opts := Options{}.Apply(Options{TLSCipherSuites: &TLSCipherSuites{suiteIDs}})
+
+		assert.NotNil(t, opts.TLSCipherSuites.Values)
+		assert.Len(t, opts.TLSCipherSuites.Values, 2)
+		assert.Equal(t, tls.TLS_RSA_WITH_RC4_128_SHA, opts.TLSCipherSuites.Values[0])
+		assert.Equal(t, tls.TLS_RSA_WITH_3DES_EDE_CBC_SHA, opts.TLSCipherSuites.Values[1])
+	})
+	t.Run("TLSVersion", func(t *testing.T) {
+		version := TLSVersion{Min: tls.VersionSSL30, Max: tls.VersionTLS12}
+		opts := Options{}.Apply(Options{TLSVersion: &version})
+
+		assert.NotNil(t, opts.TLSVersion)
+		assert.Equal(t, opts.TLSVersion.Min, tls.VersionSSL30)
+		assert.Equal(t, opts.TLSVersion.Max, tls.VersionTLS12)
 	})
 	t.Run("NoConnectionReuse", func(t *testing.T) {
 		opts := Options{}.Apply(Options{NoConnectionReuse: null.BoolFrom(true)})

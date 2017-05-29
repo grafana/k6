@@ -21,6 +21,7 @@
 package js
 
 import (
+	"crypto/tls"
 	"fmt"
 	"os"
 	"testing"
@@ -369,6 +370,58 @@ func TestNewBundle(t *testing.T) {
 			}, afero.NewMemMapFs())
 			if assert.NoError(t, err) {
 				assert.Equal(t, null.BoolFrom(true), b.Options.InsecureSkipTLSVerify)
+			}
+		})
+		t.Run("TLSCipherSuites", func(t *testing.T) {
+			b, err := NewBundle(&lib.SourceData{
+				Filename: "/script.js",
+				Data: []byte(`
+					export let options = {
+						tlsCipherSuites: [
+							"TLS_RSA_WITH_RC4_128_SHA",
+							"TLS_RSA_WITH_3DES_EDE_CBC_SHA"
+						]
+					};
+					export default function() {};
+				`),
+			}, afero.NewMemMapFs())
+			if assert.NoError(t, err) {
+				if assert.Len(t, b.Options.TLSCipherSuites.Values, 2) {
+					assert.Equal(t, b.Options.TLSCipherSuites.Values[0], tls.TLS_RSA_WITH_RC4_128_SHA)
+					assert.Equal(t, b.Options.TLSCipherSuites.Values[1], tls.TLS_RSA_WITH_3DES_EDE_CBC_SHA)
+				}
+			}
+		})
+		t.Run("TLSVersion", func(t *testing.T) {
+			b1, err := NewBundle(&lib.SourceData{
+				Filename: "/script.js",
+				Data: []byte(`
+					export let options = {
+						tlsVersion: {
+							min: "ssl3.0",
+							max: "tls1.2"
+						}
+					};
+					export default function() {};
+				`),
+			}, afero.NewMemMapFs())
+			if assert.NoError(t, err) {
+				assert.Equal(t, b1.Options.TLSVersion.Min, tls.VersionSSL30)
+				assert.Equal(t, b1.Options.TLSVersion.Max, tls.VersionTLS12)
+			}
+
+			b2, err := NewBundle(&lib.SourceData{
+				Filename: "/script.js",
+				Data: []byte(`
+					export let options = {
+						tlsVersion: "ssl3.0"
+					};
+					export default function() {};
+				`),
+			}, afero.NewMemMapFs())
+			if assert.NoError(t, err) {
+				assert.Equal(t, b2.Options.TLSVersion.Min, tls.VersionSSL30)
+				assert.Equal(t, b2.Options.TLSVersion.Max, tls.VersionSSL30)
 			}
 		})
 		t.Run("Thresholds", func(t *testing.T) {
