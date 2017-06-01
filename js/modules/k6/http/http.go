@@ -322,3 +322,16 @@ func (http *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, erro
 	}
 	return retval, err
 }
+
+func (http *HTTP) Url(parts []string, pieces ...string) URLTag {
+	var tag URLTag
+	for i, part := range parts {
+		tag.Name += part
+		tag.URL += part
+		if i < len(pieces) {
+			tag.Name += "${}"
+			tag.URL += pieces[i]
+		}
+	}
+	return tag
+}

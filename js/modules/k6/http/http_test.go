@@ -483,3 +483,25 @@ func TestRequest(t *testing.T) {
 		})
 	})
 }
+
+func TestTagURL(t *testing.T) {
+	rt := goja.New()
+	rt.SetFieldNameMapper(common.FieldNameMapper{})
+	rt.Set("http", common.Bind(rt, &HTTP{}, nil))
+
+	testdata := map[string]URLTag{
+		`http://example.com/`:               URLTag{URL: "http://example.com/", Name: "http://example.com/"},
+		`http://example.com/${1+1}`:         URLTag{URL: "http://example.com/2", Name: "http://example.com/${}"},
+		`http://example.com/${1+1}/`:        URLTag{URL: "http://example.com/2/", Name: "http://example.com/${}/"},
+		`http://example.com/${1+1}/${1+2}`:  URLTag{URL: "http://example.com/2/3", Name: "http://example.com/${}/${}"},
+		`http://example.com/${1+1}/${1+2}/`: URLTag{URL: "http://example.com/2/3/", Name: "http://example.com/${}/${}/"},
+	}
+	for expr, tag := range testdata {
+		t.Run("expr="+expr, func(t *testing.T) {
+			v, err := common.RunString(rt, "http.url`"+expr+"`")
+			if assert.NoError(t, err) {
+				assert.Equal(t, tag, v.Export())
+			}
+		})
+	}
+}
