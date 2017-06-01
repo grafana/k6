@@ -65,7 +65,7 @@ func New(fname string, fs afero.Fs, opts lib.Options) (*Collector, error) {
 	}, nil
 }
 
-func (c *Collector) Init(conf interface{}) error {
+func (c *Collector) Init() error {
 	return nil
 }
 

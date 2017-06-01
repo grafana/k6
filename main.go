@@ -45,6 +45,7 @@ func main() {
 		commandRun,
 		commandInspect,
 		commandArchive,
+		commandLogin,
 		commandStatus,
 		commandStats,
 		commandScale,

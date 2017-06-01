@@ -63,6 +63,10 @@ const (
 	TypeURL     = "url"
 	TypeJS      = "js"
 	TypeArchive = "archive"
+
+	CollectorJSON     = "json"
+	CollectorInfluxDB = "influxdb"
+	CollectorCloud    = "cloud"
 )
 
 var urlRegex = regexp.MustCompile(`(?i)^https?://`)
@@ -268,17 +272,30 @@ func splitCollectorString(s string) (string, string) {
 	return parts[0], parts[1]
 }
 
-func makeCollector(s string, src *lib.SourceData, opts lib.Options, version string) (lib.Collector, error) {
+func makeCollector(s string, conf Config, src *lib.SourceData, opts lib.Options, version string) (lib.Collector, error) {
 	t, p := splitCollectorString(s)
 	switch t {
-	case "influxdb":
-		return influxdb.New(p, opts)
-	case "json":
+	case CollectorInfluxDB:
+		return influxdb.New(p, conf.Collectors.Get(t), opts)
+	case CollectorJSON:
 		return json.New(p, afero.NewOsFs(), opts)
-	case "cloud":
+	case CollectorCloud:
 		return cloud.New(p, src, opts, version)
 	default:
 		return nil, errors.New("Unknown output type: " + t)
+	}
+}
+
+func collectorOfType(t string) lib.Collector {
+	switch t {
+	case CollectorInfluxDB:
+		return &influxdb.Collector{}
+	case CollectorJSON:
+		return &json.Collector{}
+	case CollectorCloud:
+		return &json.Collector{}
+	default:
+		return nil
 	}
 }
 
@@ -358,6 +375,12 @@ func actionRun(cc *cli.Context) error {
 		pwd = "/"
 	}
 
+	// Read the config file.
+	conf, err := LoadConfig()
+	if err != nil {
+		return cli.NewExitError(err, 1)
+	}
+
 	// Collect CLI arguments, most (not all) relating to options.
 	addr := cc.GlobalString("address")
 	out := cc.String("out")
@@ -403,7 +426,7 @@ func actionRun(cc *cli.Context) error {
 	// Make the metric collector, if requested.
 	var collector lib.Collector
 	if out != "" {
-		c, err := makeCollector(out, src, opts, cc.App.Version)
+		c, err := makeCollector(out, conf, src, opts, cc.App.Version)
 		if err != nil {
 			log.WithError(err).Error("Couldn't create output")
 			return err
@@ -421,7 +444,7 @@ func actionRun(cc *cli.Context) error {
 
 	collectorString := "-"
 	if collector != nil {
-		if err := collector.Init(collector.MakeConfig()); err != nil {
+		if err := collector.Init(); err != nil {
 			return cli.NewExitError(err, 1)
 		}
 		collectorString = fmt.Sprint(collector)

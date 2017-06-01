@@ -18,51 +18,42 @@
  *
  */
 
-package dummy
+package main
 
 import (
-	"context"
-	"sync"
+	"os"
 
-	"github.com/loadimpact/k6/stats"
+	"github.com/loadimpact/k6/lib"
+	"gopkg.in/urfave/cli.v1"
 )
 
-type Collector struct {
-	Samples []stats.Sample
-	running bool
-
-	lock sync.Mutex
+var commandLogin = cli.Command{
+	Name:  "login",
+	Usage: "Logs into a remote service.",
+	Subcommands: cli.Commands{
+		cli.Command{
+			Name:   "influxdb",
+			Usage:  "Logs into an influxdb server.",
+			Action: actionLogin(CollectorInfluxDB),
+		},
+	},
 }
 
-func (c *Collector) Init() error { return nil }
+func actionLogin(t string) func(cc *cli.Context) error {
+	return func(cc *cli.Context) error {
+		conf, err := LoadConfig()
+		if err != nil {
+			return err
+		}
 
-func (c *Collector) MakeConfig() interface{} { return nil }
+		c := collectorOfType(t).(lib.AuthenticatedCollector)
 
-func (c *Collector) Run(ctx context.Context) {
-	c.lock.Lock()
-	c.running = true
-	c.lock.Unlock()
+		cconf, err := c.Login(conf.Collectors.Get(t), os.Stdin, os.Stdout)
+		if err != nil {
+			return err
+		}
+		conf.Collectors[t] = cconf
 
-	<-ctx.Done()
-
-	c.lock.Lock()
-	c.running = false
-	c.lock.Unlock()
-}
-
-func (c *Collector) Collect(samples []stats.Sample) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	if !c.running {
-		panic("attempted to collect while not running")
+		return conf.Store()
 	}
-	c.Samples = append(c.Samples, samples...)
-}
-
-func (c *Collector) IsRunning() bool {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	return c.running
 }

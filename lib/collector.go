@@ -22,6 +22,7 @@ package lib
 
 import (
 	"context"
+	"io"
 
 	"github.com/loadimpact/k6/stats"
 )
@@ -31,7 +32,7 @@ type Collector interface {
 	// Init is called between the collector's creation and the call to Run(), right after the k6
 	// banner has been printed to stdout. The argument is the result of calling MakeConfig() and
 	// then deserializing from JSON the config value stored to disk (if any).
-	Init(conf interface{}) error
+	Init() error
 
 	// MakeConfig is called before Init() and should instantiate a blank configuration struct.
 	// Do not apply defaults here, instead use null'able values and apply defaults in Init().
@@ -44,4 +45,12 @@ type Collector interface {
 	// Collect receives a set of samples. This method is never called concurrently, and only while
 	// the context for Run() is valid, but should defer as much work as possible to Run().
 	Collect(samples []stats.Sample)
+}
+
+// An AuthenticatedCollector is a collector that can store persistent authentication.
+type AuthenticatedCollector interface {
+	Collector
+
+	// Present a login form to the user.
+	Login(conf interface{}, in io.Reader, out io.Writer) (interface{}, error)
 }

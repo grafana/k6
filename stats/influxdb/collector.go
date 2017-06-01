@@ -23,17 +23,31 @@ package influxdb
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/url"
 	"sync"
 	"time"
+
+	"bufio"
+
+	"strings"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/influxdata/influxdb/client/v2"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
+	null "gopkg.in/guregu/null.v3"
 )
 
-const pushInterval = 1 * time.Second
+const (
+	pushInterval = 1 * time.Second
+
+	defaultURL = "http://localhost:8086/k6"
+)
+
+type Config struct {
+	DefaultURL null.String `json:"default_url,omitempty"`
+}
 
 type Collector struct {
 	u          *url.URL
@@ -43,9 +57,14 @@ type Collector struct {
 	bufferLock sync.Mutex
 }
 
-func New(s string, opts lib.Options) (*Collector, error) {
+func New(s string, conf_ interface{}, opts lib.Options) (*Collector, error) {
+	conf := conf_.(*Config)
+
 	if s == "" {
-		s = "http://localhost:8086/k6"
+		s = conf.DefaultURL.String
+	}
+	if s == "" {
+		s = defaultURL
 	}
 
 	u, err := url.Parse(s)
@@ -65,12 +84,47 @@ func New(s string, opts lib.Options) (*Collector, error) {
 	}, nil
 }
 
-func (c *Collector) Init(conf interface{}) error {
+func (c *Collector) Init() error {
+	// Try to create the database if it doesn't exist. Failure to do so is USUALLY harmless; it
+	// usually means we're either a non-admin user to an existing DB or connecting over UDP.
+	_, err := c.client.Query(client.NewQuery("CREATE DATABASE "+c.batchConf.Database, "", ""))
+	if err != nil {
+		log.WithError(err).Debug("InfluxDB: Couldn't create database; most likely harmless")
+	}
+
 	return nil
 }
 
 func (c *Collector) MakeConfig() interface{} {
-	return nil
+	return &Config{}
+}
+
+func (c *Collector) Login(conf_ interface{}, in io.Reader, out io.Writer) (interface{}, error) {
+	conf := conf_.(*Config)
+
+	buf := bufio.NewReader(in)
+	fmt.Fprintf(out, "default connection url: ")
+	ustr, err := buf.ReadString('\n')
+	if err != nil {
+		return nil, err
+	}
+	ustr = strings.TrimSpace(ustr)
+
+	u, err := url.Parse(ustr)
+	if err != nil {
+		return nil, err
+	}
+	cl, _, err := parseURL(u)
+	if err != nil {
+		return nil, err
+	}
+	if _, _, err := cl.Ping(5 * time.Second); err != nil {
+		return nil, err
+	}
+
+	conf.DefaultURL = null.StringFrom(u.String())
+
+	return conf, nil
 }
 
 func (c *Collector) String() string {

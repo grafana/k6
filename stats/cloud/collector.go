@@ -100,7 +100,7 @@ func New(fname string, src *lib.SourceData, opts lib.Options, version string) (*
 	}, nil
 }
 
-func (c *Collector) Init(conf interface{}) error {
+func (c *Collector) Init() error {
 	thresholds := make(map[string][]string)
 
 	for name, t := range c.thresholds {
