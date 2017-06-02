@@ -1,4 +1,5 @@
 /k6
+/k6.exe
 /dist
 /web/bower_components
 /web/node_modules
