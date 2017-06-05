@@ -68,6 +68,20 @@ func TestForm(t *testing.T) {
 		assert.Equal(t, map[string]interface{}{"a": "1", "b": "2"}, data)
 		assert.Equal(t, "  label a:   label b: ", out.String())
 	})
+	t.Run("Defaults", func(t *testing.T) {
+		f := Form{
+			Fields: []Field{
+				StringField{Key: "a", Label: "label a", Default: "default a"},
+				StringField{Key: "b", Label: "label b", Default: "default b"},
+			},
+		}
+		in := "\n2\n"
+		out := bytes.NewBuffer(nil)
+		data, err := f.Run(strings.NewReader(in), out)
+		assert.NoError(t, err)
+		assert.Equal(t, map[string]interface{}{"a": "default a", "b": "2"}, data)
+		assert.Equal(t, "  label a [default a]:   label b [default b]: ", out.String())
+	})
 	t.Run("Errors", func(t *testing.T) {
 		f := Form{
 			Fields: []Field{

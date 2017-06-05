@@ -29,8 +29,9 @@ import (
 var _ Field = StringField{}
 
 type StringField struct {
-	Key   string
-	Label string
+	Key     string
+	Label   string
+	Default string
 
 	// Length constraints.
 	Min, Max int
@@ -44,6 +45,10 @@ func (f StringField) GetLabel() string {
 	return f.Label
 }
 
+func (f StringField) GetLabelExtra() string {
+	return f.Default
+}
+
 func (f StringField) Clean(s string) (interface{}, error) {
 	s = strings.TrimSpace(s)
 	if f.Min != 0 && len(s) < f.Min {
@@ -51,6 +56,9 @@ func (f StringField) Clean(s string) (interface{}, error) {
 	}
 	if f.Max != 0 && len(s) > f.Max {
 		return nil, errors.Errorf("invalid input, max length is %d", f.Max)
+	}
+	if s == "" {
+		s = f.Default
 	}
 	return s, nil
 }

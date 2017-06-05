@@ -53,4 +53,11 @@ func TestStringField(t *testing.T) {
 		_, err := f.Clean("too dang long")
 		assert.EqualError(t, err, "invalid input, max length is 10")
 	})
+	t.Run("Default", func(t *testing.T) {
+		f := f
+		f.Default = "default"
+		v, err := f.Clean("")
+		assert.NoError(t, err)
+		assert.Equal(t, "default", v)
+	})
 }
