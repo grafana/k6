@@ -18,51 +18,47 @@
  *
  */
 
-package dummy
+package ui
 
 import (
-	"context"
-	"sync"
+	"strings"
 
-	"github.com/loadimpact/k6/stats"
+	"github.com/pkg/errors"
 )
 
-type Collector struct {
-	Samples []stats.Sample
-	running bool
+var _ Field = StringField{}
 
-	lock sync.Mutex
+type StringField struct {
+	Key     string
+	Label   string
+	Default string
+
+	// Length constraints.
+	Min, Max int
 }
 
-func (c *Collector) Init() error { return nil }
-
-func (c *Collector) MakeConfig() interface{} { return nil }
-
-func (c *Collector) Run(ctx context.Context) {
-	c.lock.Lock()
-	c.running = true
-	c.lock.Unlock()
-
-	<-ctx.Done()
-
-	c.lock.Lock()
-	c.running = false
-	c.lock.Unlock()
+func (f StringField) GetKey() string {
+	return f.Key
 }
 
-func (c *Collector) Collect(samples []stats.Sample) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
+func (f StringField) GetLabel() string {
+	return f.Label
+}
 
-	if !c.running {
-		panic("attempted to collect while not running")
+func (f StringField) GetLabelExtra() string {
+	return f.Default
+}
+
+func (f StringField) Clean(s string) (interface{}, error) {
+	s = strings.TrimSpace(s)
+	if f.Min != 0 && len(s) < f.Min {
+		return nil, errors.Errorf("invalid input, min length is %d", f.Min)
 	}
-	c.Samples = append(c.Samples, samples...)
-}
-
-func (c *Collector) IsRunning() bool {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	return c.running
+	if f.Max != 0 && len(s) > f.Max {
+		return nil, errors.Errorf("invalid input, max length is %d", f.Max)
+	}
+	if s == "" {
+		s = f.Default
+	}
+	return s, nil
 }
