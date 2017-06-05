@@ -99,9 +99,5 @@ func (c Config) Store() error {
 
 	cdir := configdir.New("loadimpact", "k6")
 	folders := cdir.QueryFolders(configdir.Global)
-	if err := folders[0].WriteFile(configFilename, data); err != nil {
-		return err
-	}
-
-	return nil
+	return folders[0].WriteFile(configFilename, data)
 }
