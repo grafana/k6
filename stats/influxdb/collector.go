@@ -29,6 +29,7 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/fatih/color"
 	"github.com/influxdata/influxdb/client/v2"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
@@ -104,8 +105,22 @@ func (c *Collector) Login(conf_ interface{}, in io.Reader, out io.Writer) (inter
 	form := ui.Form{
 		Fields: []ui.Field{
 			ui.StringField{
-				Key:   "url",
-				Label: "default connection url",
+				Key:     "host",
+				Label:   "host",
+				Default: "http://localhost:8086",
+			},
+			ui.StringField{
+				Key:     "db",
+				Label:   "database",
+				Default: "k6",
+			},
+			ui.StringField{
+				Key:   "username",
+				Label: "username",
+			},
+			ui.StringField{
+				Key:   "password",
+				Label: "password",
 			},
 		},
 	}
@@ -113,12 +128,23 @@ func (c *Collector) Login(conf_ interface{}, in io.Reader, out io.Writer) (inter
 	if err != nil {
 		return nil, err
 	}
+	host := data["host"].(string)
+	db := data["db"].(string)
+	username := data["username"].(string)
+	password := data["password"].(string)
 
-	ustr := data["url"].(string)
-	u, err := url.Parse(ustr)
+	u, err := url.Parse(host + "/" + db)
 	if err != nil {
 		return nil, err
 	}
+	if username != "" {
+		if password != "" {
+			u.User = url.UserPassword(username, password)
+		} else {
+			u.User = url.User(username)
+		}
+	}
+
 	cl, _, err := parseURL(u)
 	if err != nil {
 		return nil, err
@@ -128,6 +154,7 @@ func (c *Collector) Login(conf_ interface{}, in io.Reader, out io.Writer) (inter
 	}
 
 	conf.DefaultURL = null.StringFrom(u.String())
+	fmt.Fprint(out, color.New(color.Faint).Sprint("\n  to use this database: ")+color.CyanString("k6 run ")+color.New(color.FgHiCyan).Sprint("-o influxdb")+color.CyanString(" ...\n"))
 
 	return conf, nil
 }
