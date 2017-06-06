@@ -23,11 +23,32 @@ type Element struct {
 
 type Attribute struct {
 	Name         string
-	NamespaceURI string
-	LocalName    string
-	Prefix       string
+	nsPrefix     string
 	OwnerElement goja.Value
 	Value        string
+}
+
+func namespaceURI(prefix string) string {
+	switch prefix {
+	case "svg":
+		return "http://www.w3.org/2000/svg"
+	case "math":
+		return "http://www.w3.org/1998/Math/MathML"
+	default:
+		return "http://www.w3.org/1999/xhtml"
+	}
+}
+
+func (a Attribute) Prefix() string {
+	return a.nsPrefix
+}
+
+func (a Attribute) NamespaceURI() string {
+	return namespaceURI(a.nsPrefix)
+}
+
+func (a Attribute) LocalName() string {
+	return a.Name
 }
 
 func (e Element) GetAttribute(name string) goja.Value {
@@ -36,7 +57,7 @@ func (e Element) GetAttribute(name string) goja.Value {
 
 func (e Element) GetAttributeNode(self goja.Value, name string) goja.Value {
 	if attr := getHtmlAttr(e.node, name); attr != nil {
-		return e.rt.ToValue(Attribute{attr.Key, attr.Namespace, attr.Namespace, attr.Namespace, self, attr.Val})
+		return e.rt.ToValue(Attribute{attr.Key, attr.Namespace, self, attr.Val})
 	} else {
 		return goja.Undefined()
 	}
@@ -54,7 +75,7 @@ func (e Element) Attributes(self goja.Value) map[string]Attribute {
 	attrs := make(map[string]Attribute)
 	for i := 0; i < len(e.node.Attr); i++ {
 		attr := e.node.Attr[i]
-		attrs[attr.Key] = Attribute{attr.Key, attr.Namespace, attr.Namespace, attr.Namespace, self, attr.Val}
+		attrs[attr.Key] = Attribute{attr.Key, attr.Namespace, self, attr.Val}
 	}
 	return attrs
 }
@@ -225,12 +246,11 @@ func (e Element) OwnerDocument() goja.Value {
 }
 
 func (e Element) NamespaceURI() string {
-	return e.node.Namespace
+	return namespaceURI(e.node.Namespace)
 }
 
 func (e Element) IsDefaultNamespace() bool {
-	// 	TODO namespace value of node always seems to be blank?
-	return false
+	return e.node.Namespace == ""
 }
 
 func getOwnerDocNode(node *gohtml.Node) *gohtml.Node {
@@ -422,7 +442,6 @@ func compileProtoElem() {
 	get ownerDocument() { return this.__elem__.ownerDocument(); },
 	get namespaceURI() { return this.__elem__.namespaceURI(); },
 
-
 	toString: function() { return this.__elem__.toString(); },
 	hasAttribute: function(name) { return this.__elem__.hasAttribute(name); },
 	getAttribute: function(name) { return this.__elem__.getAttribute(name); },
@@ -431,6 +450,7 @@ func compileProtoElem() {
 	hasChildNodes: function() { return this.__elem__.hasChildNodes(); },
 	isSameNode: function(val) { return this.__elem__.isSameNode(val); },
 	isEqualNode: function(val) { return this.__elem__.isEqualNode(val); },
+	isDefaultNamespace: function() { return this.__elem__.isDefaultNamespace(); }
 	getElementsByClassName: function(val) { return this.__elem__.getElementsByClassName(val); },
 	getElementsByTagName: function(val) { return this.__elem__.getElementsByTagName(val); },
 
