@@ -26,7 +26,7 @@ var (
 	// Websocket-related
 	WSSessions        = stats.New("ws_sessions", stats.Counter)
 	WSSessionDuration = stats.New("ws_session_duration", stats.Trend, stats.Time)
-	WSHandshaking     = stats.New("ws_handshaking", stats.Trend, stats.Time)
+	WSConnecting      = stats.New("ws_connecting", stats.Trend, stats.Time)
 
 	// Network-related; used for future protocols as well.
 	DataSent     = stats.New("data_sent", stats.Counter, stats.Data)

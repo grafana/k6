@@ -27,9 +27,8 @@ import (
 	"net"
 	"net/http"
 	"strconv"
-	"time"
-
 	"sync"
+	"time"
 
 	"github.com/dop251/goja"
 	"github.com/gorilla/websocket"
@@ -61,7 +60,12 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) *http.Re
 	rt := common.GetRuntime(ctx)
 	state := common.GetState(ctx)
 
-	setupFn, userTags, header := parseArgs(rt, args)
+	setupFn, userTags, header, err := parseArgs(rt, args)
+	if err != nil {
+		// Argument parsing errors should be passed to the user
+		common.Throw(rt, err)
+		return nil
+	}
 
 	tags := map[string]string{
 		"url":   url,
@@ -72,22 +76,33 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) *http.Re
 		tags[k] = v
 	}
 
+	var bytesRead, bytesWritten int64
 	// Pass a custom net.Dial function to websocket.Dialer that will substitute
 	// the underlying net.Conn with our own TraceConn
-	var traceConn *netext.Conn
-	var bytesRead, bytesWritten int64
 	netDial := func(network, address string) (net.Conn, error) {
-		var d net.Dialer
-		conn, err := d.Dial(network, address)
-		traceConn = &netext.Conn{conn, &bytesRead, &bytesWritten}
+		var err error
+		var conn, traceConn net.Conn
+
+		dialer := netext.NewDialer(net.Dialer{})
+		if conn, err = dialer.DialContext(ctx, network, address); err != nil {
+			return nil, err
+		}
+		if traceConn, err = dialer.TraceConnection(conn, &bytesRead, &bytesWritten); err != nil {
+			return nil, err
+		}
 
 		return traceConn, err
 	}
-	wsd := websocket.Dialer{NetDial: netDial, Proxy: http.ProxyFromEnvironment}
 
-	connectionStart := time.Now()
+	wsd := websocket.Dialer{
+		NetDial: netDial,
+		Proxy:   http.ProxyFromEnvironment,
+	}
+
+	start := time.Now()
 	conn, response, connErr := wsd.Dial(url, header)
-	connecting := float64(time.Since(connectionStart)) / float64(time.Millisecond)
+	connectionEnd := time.Now()
+	connectionDuration := stats.D(connectionEnd.Sub(start))
 
 	socket := Socket{
 		ctx:           ctx,
@@ -145,13 +160,13 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) *http.Re
 
 		case <-socket.done:
 			// This is the final exit point normally triggered by closeConnection
-			duration := float64(time.Since(connectionStart)) / float64(time.Millisecond)
 			end := time.Now()
+			sessionDuration := stats.D(end.Sub(start))
 
 			samples := []stats.Sample{
 				{Metric: metrics.WSSessions, Time: end, Tags: tags, Value: 1},
-				{Metric: metrics.WSHandshaking, Time: end, Tags: tags, Value: connecting},
-				{Metric: metrics.WSSessionDuration, Time: end, Tags: tags, Value: duration},
+				{Metric: metrics.WSConnecting, Time: end, Tags: tags, Value: connectionDuration},
+				{Metric: metrics.WSSessionDuration, Time: end, Tags: tags, Value: sessionDuration},
 				{Metric: metrics.DataReceived, Time: end, Tags: tags, Value: float64(bytesRead)},
 				{Metric: metrics.DataSent, Time: end, Tags: tags, Value: float64(bytesWritten)},
 			}
@@ -283,7 +298,7 @@ func readPump(conn *websocket.Conn, readChan chan []byte, errorChan chan error) 
 	}
 }
 
-func parseArgs(rt *goja.Runtime, args []goja.Value) (goja.Callable, map[string]string, http.Header) {
+func parseArgs(rt *goja.Runtime, args []goja.Value) (goja.Callable, map[string]string, http.Header, error) {
 	var callableV goja.Value
 	var paramsV goja.Value
 
@@ -295,16 +310,14 @@ func parseArgs(rt *goja.Runtime, args []goja.Value) (goja.Callable, map[string]s
 		paramsV = goja.Undefined()
 		callableV = args[0]
 	} else {
-		common.Throw(rt, errors.New("Invalid number of arguments to ws.connect"))
-		return nil, nil, nil
+		return nil, nil, nil, errors.New("Invalid number of arguments to ws.connect")
 	}
 
 	// Get the callable (required)
 	var callable goja.Callable
 	var isFunc bool
 	if callable, isFunc = goja.AssertFunction(callableV); !isFunc {
-		common.Throw(rt, errors.New("Last argument to ws.connect must be a function"))
-		return nil, nil, nil
+		return nil, nil, nil, errors.New("Last argument to ws.connect must be a function")
 	}
 
 	// Leave header to nil by default so we can pass it directly to the Dialer
@@ -345,5 +358,5 @@ func parseArgs(rt *goja.Runtime, args []goja.Value) (goja.Callable, map[string]s
 
 	}
 
-	return callable, tags, header
+	return callable, tags, header, nil
 }
