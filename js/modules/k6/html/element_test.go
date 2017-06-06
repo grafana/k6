@@ -61,7 +61,7 @@ func TestElement(t *testing.T) {
 	ctx := common.WithRuntime(context.Background(), rt)
 	rt.Set("src", testHTMLElem)
 	rt.Set("html", common.Bind(rt, &HTML{}, &ctx))
-	compileProtoElem()
+	// compileProtoElem()
 
 	_, err := common.RunString(rt, `let doc = html.parseHTML(src)`)
 
@@ -69,118 +69,118 @@ func TestElement(t *testing.T) {
 	assert.IsType(t, Selection{}, rt.Get("doc").Export())
 
 	t.Run("NodeName", func(t *testing.T) {
-		v, err := common.RunString(rt, `doc.find("#top").get(0).nodeName`)
+		v, err := common.RunString(rt, `doc.find("#top").get(0).nodeName()`)
 		if assert.NoError(t, err) {
 			assert.Equal(t, "h1", v.Export())
 		}
 	})
 	t.Run("NodeType", func(t *testing.T) {
-		v, err := common.RunString(rt, `doc.find("#top").get(0).nodeType`)
+		v, err := common.RunString(rt, `doc.find("#top").get(0).nodeType()`)
 		if assert.NoError(t, err) {
 			assert.Equal(t, "1", v.String())
 		}
 	})
 	t.Run("NodeValue", func(t *testing.T) {
-		v, err := common.RunString(rt, `doc.find("#top").get(0).firstChild.nodeValue`)
+		v, err := common.RunString(rt, `doc.find("#top").get(0).firstChild().nodeValue()`)
 		if assert.NoError(t, err) {
 			assert.Equal(t, "Lorem ipsum", v.String())
 		}
 	})
 	t.Run("InnerHtml", func(t *testing.T) {
-		v, err := common.RunString(rt, `doc.find("span").get(0).innerHTML`)
+		v, err := common.RunString(rt, `doc.find("span").get(0).innerHTML()`)
 		if assert.NoError(t, err) {
 			assert.Equal(t, "<b>test content</b>", v.String())
 		}
 	})
 	t.Run("TextContent", func(t *testing.T) {
-		v, err := common.RunString(rt, `doc.find("b").get(0).textContent`)
+		v, err := common.RunString(rt, `doc.find("b").get(0).textContent()`)
 		if assert.NoError(t, err) {
 			assert.Equal(t, "test content", v.String())
 		}
 	})
 	t.Run("OwnerDocument", func(t *testing.T) {
-		v, err := common.RunString(rt, `doc.find("body").get(0).ownerDocument.nodeName`)
+		v, err := common.RunString(rt, `doc.find("body").get(0).ownerDocument().nodeName()`)
 		if assert.NoError(t, err) {
 			assert.Equal(t, "#document", v.String())
 		}
 	})
 	t.Run("Attributes", func(t *testing.T) {
-		v, err := common.RunString(rt, `doc.find("div").get(0).attributes`)
+		v, err := common.RunString(rt, `doc.find("div").get(0).attributes()`)
 		if assert.NoError(t, err) {
 			attrs := v.Export().(map[string]Attribute)
 			assert.Equal(t, "div_elem", attrs["id"].Value)
 		}
 	})
 	t.Run("FirstChild", func(t *testing.T) {
-		v, err := common.RunString(rt, `doc.find("div").get(0).firstChild.nodeValue`)
+		v, err := common.RunString(rt, `doc.find("div").get(0).firstChild().nodeValue()`)
 		if assert.NoError(t, err) {
 			assert.Contains(t, v.Export(), "innerfirst")
 		}
 	})
 	t.Run("LastChild", func(t *testing.T) {
-		v, err := common.RunString(rt, `doc.find("div").get(0).lastChild.nodeValue`)
+		v, err := common.RunString(rt, `doc.find("div").get(0).lastChild().nodeValue()`)
 		if assert.NoError(t, err) {
 			assert.Contains(t, v.Export(), "innerlast")
 		}
 	})
 	t.Run("ChildElementCount", func(t *testing.T) {
-		v, err := common.RunString(rt, `doc.find("body").get(0).childElementCount`)
+		v, err := common.RunString(rt, `doc.find("body").get(0).childElementCount()`)
 		if assert.NoError(t, err) {
 			assert.Equal(t, int64(6), v.Export())
 		}
 	})
 	t.Run("FirstElementChild", func(t *testing.T) {
-		v, err := common.RunString(rt, `doc.find("div").get(0).firstElementChild.textContent`)
+		v, err := common.RunString(rt, `doc.find("div").get(0).firstElementChild().textContent()`)
 		if assert.NoError(t, err) {
 			assert.Contains(t, v.Export(), "Nullam id nisi ")
 		}
 	})
 	t.Run("LastElementChild", func(t *testing.T) {
-		v, err := common.RunString(rt, `doc.find("div").get(0).lastElementChild.textContent`)
+		v, err := common.RunString(rt, `doc.find("div").get(0).lastElementChild().textContent()`)
 		if assert.NoError(t, err) {
 			assert.Contains(t, v.Export(), "Maecenas augue ligula")
 		}
 	})
 	t.Run("PreviousSibling", func(t *testing.T) {
-		v, err := common.RunString(rt, `doc.find("div").get(0).previousSibling.textContent`)
+		v, err := common.RunString(rt, `doc.find("div").get(0).previousSibling().textContent()`)
 		if assert.NoError(t, err) {
 			assert.Contains(t, v.Export(), "pretext")
 		}
 	})
 	t.Run("NextSibling", func(t *testing.T) {
-		v, err := common.RunString(rt, `doc.find("div").get(0).nextSibling.textContent`)
+		v, err := common.RunString(rt, `doc.find("div").get(0).nextSibling().textContent()`)
 		if assert.NoError(t, err) {
 			assert.Contains(t, v.Export(), "aftertext")
 		}
 	})
 	t.Run("PreviousElementSibling", func(t *testing.T) {
-		v, err := common.RunString(rt, `doc.find("div").get(0).previousElementSibling.textContent`)
+		v, err := common.RunString(rt, `doc.find("div").get(0).previousElementSibling().textContent()`)
 		if assert.NoError(t, err) {
 			assert.Contains(t, v.Export(), "consectetur adipiscing elit")
 		}
 	})
 	t.Run("NextElementSibling", func(t *testing.T) {
-		v, err := common.RunString(rt, `doc.find("div").get(0).nextElementSibling.textContent`)
+		v, err := common.RunString(rt, `doc.find("div").get(0).nextElementSibling().textContent()`)
 		if assert.NoError(t, err) {
 			assert.Contains(t, v.Export(), "This is the footer.")
 		}
 	})
 	t.Run("ParentElement", func(t *testing.T) {
-		v, err := common.RunString(rt, `doc.find("div").get(0).parentElement.nodeName`)
+		v, err := common.RunString(rt, `doc.find("div").get(0).parentElement().nodeName()`)
 		if assert.NoError(t, err) {
 			assert.Equal(t, "body", v.String())
 		}
 	})
 	t.Run("ParentNode", func(t *testing.T) {
-		nodeVal, err1 := common.RunString(rt, `doc.find("html").get(0).parentNode.nodeName`)
-		nilVal, err2 := common.RunString(rt, `doc.find("html").get(0).parentElement`)
+		nodeVal, err1 := common.RunString(rt, `doc.find("html").get(0).parentNode().nodeName()`)
+		nilVal, err2 := common.RunString(rt, `doc.find("html").get(0).parentElement()`)
 		if assert.NoError(t, err1) && assert.NoError(t, err2) {
 			assert.Equal(t, "#document", nodeVal.String())
 			assert.Equal(t, nil, nilVal.Export())
 		}
 	})
 	t.Run("ChildNodes", func(t *testing.T) {
-		v, err := common.RunString(rt, `doc.find("div").get(0).childNodes`)
+		v, err := common.RunString(rt, `doc.find("div").get(0).childNodes()`)
 		if assert.NoError(t, err) {
 			nodes := valToElementList(v)
 			assert.Equal(t, 9, len(nodes))
@@ -189,7 +189,7 @@ func TestElement(t *testing.T) {
 		}
 	})
 	t.Run("Children", func(t *testing.T) {
-		v, err := common.RunString(rt, `doc.find("div").get(0).children`)
+		v, err := common.RunString(rt, `doc.find("div").get(0).children()`)
 		if assert.NoError(t, err) {
 			nodes := valToElementList(v)
 			assert.Equal(t, 4, len(nodes))
@@ -198,7 +198,7 @@ func TestElement(t *testing.T) {
 		}
 	})
 	t.Run("ClassList", func(t *testing.T) {
-		v, err := common.RunString(rt, `doc.find("div").get(0).classList`)
+		v, err := common.RunString(rt, `doc.find("div").get(0).classList()`)
 		if assert.NoError(t, err) {
 			clsNames := v.Export().([]string)
 			assert.Equal(t, 2, len(clsNames))
@@ -206,20 +206,20 @@ func TestElement(t *testing.T) {
 		}
 	})
 	t.Run("ClassName", func(t *testing.T) {
-		v, err := common.RunString(rt, `doc.find("div").get(0).className`)
+		v, err := common.RunString(rt, `doc.find("div").get(0).className()`)
 		if assert.NoError(t, err) {
 			assert.Equal(t, "class1 class2", v.String())
 		}
 	})
 	t.Run("Lang", func(t *testing.T) {
-		v, err := common.RunString(rt, `doc.find("div").get(0).lang`)
+		v, err := common.RunString(rt, `doc.find("div").get(0).lang()`)
 		if assert.NoError(t, err) {
 			assert.Equal(t, "en", v.String())
 		}
 	})
 	t.Run("ToString", func(t *testing.T) {
 		v1, err1 := common.RunString(rt, `doc.find("div").get(0).toString()`)
-		v2, err2 := common.RunString(rt, `doc.find("div").get(0).previousSibling.toString()`)
+		v2, err2 := common.RunString(rt, `doc.find("div").get(0).previousSibling().toString()`)
 		if assert.NoError(t, err1) && assert.NoError(t, err2) {
 			assert.Equal(t, "[object html.Node]", v1.String())
 			assert.Equal(t, "[object #text]", v2.String())
@@ -292,7 +292,7 @@ func TestElement(t *testing.T) {
 		}
 	})
 	t.Run("QuerySelector", func(t *testing.T) {
-		v, err := common.RunString(rt, `doc.find("body").get(0).querySelector("#div_elem").id`)
+		v, err := common.RunString(rt, `doc.find("body").get(0).querySelector("#div_elem").id()`)
 		if assert.NoError(t, err) {
 			assert.Equal(t, "div_elem", v.Export())
 		}
@@ -317,14 +317,14 @@ func TestElement(t *testing.T) {
 		}
 	})
 	t.Run("NamespaceURI", func(t *testing.T) {
-		v, err := common.RunString(rt, `doc.find("#svg_elem").namespaceURI`)
+		v, err := common.RunString(rt, `doc.find("#svg_elem").get(0).namespaceURI()`)
 		if assert.NoError(t, err) {
 			assert.Equal(t, "http://www.w3.org/2000/svg", v.Export())
 		}
 	})
 	t.Run("IsDefaultNamespace", func(t *testing.T) {
-		v1, err1 := common.RunString(rt, `doc.find("#svg_elem").isDefaultNamespace`)
-		v2, err2 := common.RunString(rt, `doc.find("#div_elem").isDefaultNamespace`)
+		v1, err1 := common.RunString(rt, `doc.find("#svg_elem").get(0).isDefaultNamespace()`)
+		v2, err2 := common.RunString(rt, `doc.find("#div_elem").get(0).isDefaultNamespace()`)
 		if assert.NoError(t, err1) && assert.NoError(t, err2) {
 			assert.Equal(t, false, v1.ToBoolean())
 			assert.Equal(t, true, v2.ToBoolean())

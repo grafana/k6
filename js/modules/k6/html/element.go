@@ -6,12 +6,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/dop251/goja"
-	"github.com/loadimpact/k6/js/common"
 	gohtml "golang.org/x/net/html"
-)
-
-var (
-	protoPrg *goja.Program
 )
 
 type Element struct {
@@ -24,7 +19,7 @@ type Element struct {
 type Attribute struct {
 	Name         string
 	nsPrefix     string
-	OwnerElement goja.Value
+	OwnerElement *Element
 	Value        string
 }
 
@@ -55,9 +50,9 @@ func (e Element) GetAttribute(name string) goja.Value {
 	return e.sel.Attr(name)
 }
 
-func (e Element) GetAttributeNode(self goja.Value, name string) goja.Value {
+func (e Element) GetAttributeNode(name string) goja.Value {
 	if attr := getHtmlAttr(e.node, name); attr != nil {
-		return e.rt.ToValue(Attribute{attr.Key, attr.Namespace, self, attr.Val})
+		return e.rt.ToValue(Attribute{attr.Key, attr.Namespace, &e, attr.Val})
 	} else {
 		return goja.Undefined()
 	}
@@ -71,11 +66,11 @@ func (e Element) HasAttributes() bool {
 	return e.qsel.Length() > 0 && len(e.node.Attr) > 0
 }
 
-func (e Element) Attributes(self goja.Value) map[string]Attribute {
+func (e Element) Attributes() map[string]Attribute {
 	attrs := make(map[string]Attribute)
 	for i := 0; i < len(e.node.Attr); i++ {
 		attr := e.node.Attr[i]
-		attrs[attr.Key] = Attribute{attr.Key, attr.Namespace, self, attr.Val}
+		attrs[attr.Key] = Attribute{attr.Key, attr.Namespace, &e, attr.Val}
 	}
 	return attrs
 }
@@ -103,7 +98,7 @@ func (e Element) Id() goja.Value {
 }
 
 func (e Element) IsEqualNode(v goja.Value) bool {
-	if other, ok := valToElement(v); ok {
+	if other, ok := v.Export().(Element); ok {
 		htmlA, errA := e.qsel.Html()
 		htmlB, errB := other.qsel.Html()
 
@@ -114,7 +109,7 @@ func (e Element) IsEqualNode(v goja.Value) bool {
 }
 
 func (e Element) IsSameNode(v goja.Value) bool {
-	if other, ok := valToElement(v); ok {
+	if other, ok := v.Export().(Element); ok {
 		return e.node == other.node
 	} else {
 		return false
@@ -302,7 +297,7 @@ func (e Element) NodeValue() goja.Value {
 }
 
 func (e Element) Contains(v goja.Value) bool {
-	if other, ok := valToElement(v); ok {
+	if other, ok := v.Export().(Element); ok {
 		// when testing if a node contains itself, jquery + goquery Contains() return true, JS return false
 		return other.node == e.node || e.qsel.Contains(other.node)
 	} else {
@@ -341,34 +336,12 @@ func nodeToElement(e Element, node *gohtml.Node) goja.Value {
 	return selToElement(sel)
 }
 
-func valToElementList(val goja.Value) (elems []*Element) {
+func valToElementList(val goja.Value) (elems []Element) {
 	vals := val.Export().([]goja.Value)
 	for i := 0; i < len(vals); i++ {
-		if elem, ok := valToElement(vals[i]); ok {
-			elems = append(elems, elem)
-		}
+		elems = append(elems, vals[i].Export().(Element))
 	}
 	return
-}
-
-func valToElement(v goja.Value) (*Element, bool) {
-	obj, ok := v.Export().(map[string]interface{})
-
-	if !ok {
-		return nil, false
-	}
-
-	other, ok := obj["__elem__"]
-
-	if !ok {
-		return nil, false
-	}
-
-	if elem, ok := other.(*Element); ok {
-		return elem, true
-	} else {
-		return nil, false
-	}
 }
 
 func selToElement(sel Selection) goja.Value {
@@ -378,88 +351,7 @@ func selToElement(sel Selection) goja.Value {
 		sel = sel.First()
 	}
 
-	elem := sel.rt.NewObject()
-
-	e := Element{&sel, sel.rt, sel.sel, sel.sel.Nodes[0]}
-
-	proto, ok := initJsElem(sel.rt)
-	if !ok {
-		return goja.Undefined()
-	}
-
-	elem.Set("__proto__", proto)
-	elem.Set("__elem__", sel.rt.ToValue(&e))
+	elem := Element{&sel, sel.rt, sel.sel, sel.sel.Nodes[0]}
 
 	return sel.rt.ToValue(elem)
-}
-
-func initJsElem(rt *goja.Runtime) (goja.Value, bool) {
-	if protoPrg == nil {
-		compileProtoElem()
-	}
-
-	obj, err := rt.RunProgram(protoPrg)
-	if err != nil {
-		panic(err)
-	}
-
-	return obj, true
-}
-
-func compileProtoElem() {
-	protoPrg = common.MustCompile("Element proto", `Object.freeze({
-	get id() { return this.__elem__.id(); },
-	get nodeName() { return this.__elem__.nodeName(); },
-	get nodeType() { return this.__elem__.nodeType(); },
-	get nodeValue() { return this.__elem__.nodeValue(); },
-	get innerHTML() { return this.__elem__.innerHTML(); },
-	get textContent() { return this.__elem__.textContent(); },
-
-	get attributes() { return this.__elem__.attributes(this); },
-
-	get firstChild() { return this.__elem__.firstChild(); },
-	get lastChild() { return this.__elem__.lastChild(); },
-	get firstElementChild() { return this.__elem__.firstElementChild(); },
-	get lastElementChild() { return this.__elem__.lastElementChild(); },
-
-	get previousSibling() { return this.__elem__.previousSibling(); },
-	get nextSibling() { return this.__elem__.nextSibling(); },
-
-	get previousElementSibling() { return this.__elem__.previousElementSibling(); },
-	get nextElementSibling() { return this.__elem__.nextElementSibling(); },
-
-	get parentNode() { return this.__elem__.parentNode(); },
-	get parentElement() { return this.__elem__.parentElement(); },
-
-	get childNodes() { return this.__elem__.childNodes(); },
-	get childElementCount() { return this.__elem__.childElementCount(); },
-	get children() { return this.__elem__.children(); },
-
-	get classList() { return this.__elem__.classList(); },
-	get className() { return this.__elem__.className(); },
-
-	get lang() { return this.__elem__.lang(); },
-	get ownerDocument() { return this.__elem__.ownerDocument(); },
-	get namespaceURI() { return this.__elem__.namespaceURI(); },
-
-	toString: function() { return this.__elem__.toString(); },
-	hasAttribute: function(name) { return this.__elem__.hasAttribute(name); },
-	getAttribute: function(name) { return this.__elem__.getAttribute(name); },
-	getAttributeNode: function(name) { return this.__elem__.getAttributeNode(this, name); },
-	hasAttributes: function() { return this.__elem__.hasAttributes(); },
-	hasChildNodes: function() { return this.__elem__.hasChildNodes(); },
-	isSameNode: function(val) { return this.__elem__.isSameNode(val); },
-	isEqualNode: function(val) { return this.__elem__.isEqualNode(val); },
-	isDefaultNamespace: function() { return this.__elem__.isDefaultNamespace(); }
-	getElementsByClassName: function(val) { return this.__elem__.getElementsByClassName(val); },
-	getElementsByTagName: function(val) { return this.__elem__.getElementsByTagName(val); },
-
-	querySelector: function(val) { return this.__elem__.querySelector(val); },
-	querySelectorAll: function(val) { return this.__elem__.querySelectorAll(val); },
-
-	contains: function(node) { return this.__elem__.contains(node); }
-	matches: function(str) { return this.__elem__.matches(str); }
-
-});
-`, true)
 }
