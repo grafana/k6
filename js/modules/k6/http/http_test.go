@@ -555,11 +555,11 @@ func TestTagURL(t *testing.T) {
 	rt.Set("http", common.Bind(rt, &HTTP{}, nil))
 
 	testdata := map[string]URLTag{
-		`http://example.com/`:               URLTag{URL: "http://example.com/", Name: "http://example.com/"},
-		`http://example.com/${1+1}`:         URLTag{URL: "http://example.com/2", Name: "http://example.com/${}"},
-		`http://example.com/${1+1}/`:        URLTag{URL: "http://example.com/2/", Name: "http://example.com/${}/"},
-		`http://example.com/${1+1}/${1+2}`:  URLTag{URL: "http://example.com/2/3", Name: "http://example.com/${}/${}"},
-		`http://example.com/${1+1}/${1+2}/`: URLTag{URL: "http://example.com/2/3/", Name: "http://example.com/${}/${}/"},
+		`http://example.com/`:               {URL: "http://example.com/", Name: "http://example.com/"},
+		`http://example.com/${1+1}`:         {URL: "http://example.com/2", Name: "http://example.com/${}"},
+		`http://example.com/${1+1}/`:        {URL: "http://example.com/2/", Name: "http://example.com/${}/"},
+		`http://example.com/${1+1}/${1+2}`:  {URL: "http://example.com/2/3", Name: "http://example.com/${}/${}"},
+		`http://example.com/${1+1}/${1+2}/`: {URL: "http://example.com/2/3/", Name: "http://example.com/${}/${}/"},
 	}
 	for expr, tag := range testdata {
 		t.Run("expr="+expr, func(t *testing.T) {
