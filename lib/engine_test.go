@@ -27,10 +27,10 @@ import (
 	"testing"
 	"time"
 
-	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/stats/dummy"
 	"github.com/pkg/errors"
+	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v3"
 )

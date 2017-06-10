@@ -39,7 +39,6 @@ import (
 	"syscall"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/fatih/color"
 	"github.com/ghodss/yaml"
 	"github.com/loadimpact/k6/api"
@@ -53,6 +52,7 @@ import (
 	"github.com/loadimpact/k6/stats/json"
 	"github.com/loadimpact/k6/ui"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"gopkg.in/guregu/null.v3"
 	"gopkg.in/urfave/cli.v1"
