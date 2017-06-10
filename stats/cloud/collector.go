@@ -83,12 +83,7 @@ func New(fname string, src *lib.SourceData, opts lib.Options, version string) (*
 	if len(opts.Stages) > 0 {
 		duration = sumStages(opts.Stages)
 	} else if opts.Duration.Valid {
-		// Parse duration if no stages found
-		dur, err := time.ParseDuration(opts.Duration.String)
-		// ignore error and keep default -1 value
-		if err == nil {
-			duration = int64(dur.Seconds())
-		}
+		duration = int64(time.Duration(opts.Duration.Duration).Seconds())
 	}
 
 	return &Collector{
@@ -250,7 +245,7 @@ func (c *Collector) testFinished() {
 func sumStages(stages []lib.Stage) int64 {
 	var total time.Duration
 	for _, stage := range stages {
-		total += stage.Duration
+		total += time.Duration(stage.Duration.Duration)
 	}
 
 	return int64(total.Seconds())

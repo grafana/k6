@@ -85,34 +85,34 @@ func TestNewEngine(t *testing.T) {
 func TestNewEngineOptions(t *testing.T) {
 	t.Run("Duration", func(t *testing.T) {
 		e, err, _ := newTestEngine(nil, Options{
-			Duration: null.StringFrom("10s"),
+			Duration: NullDurationFrom(10 * time.Second),
 		})
 		assert.NoError(t, err)
 		if assert.Len(t, e.Stages, 1) {
-			assert.Equal(t, e.Stages[0], Stage{Duration: 10 * time.Second})
+			assert.Equal(t, e.Stages[0], Stage{Duration: NullDurationFrom(10 * time.Second)})
 		}
 	})
 	t.Run("Stages", func(t *testing.T) {
 		e, err, _ := newTestEngine(nil, Options{
 			Stages: []Stage{
-				{Duration: 10 * time.Second, Target: null.IntFrom(10)},
+				{Duration: NullDurationFrom(10 * time.Second), Target: null.IntFrom(10)},
 			},
 		})
 		assert.NoError(t, err)
 		if assert.Len(t, e.Stages, 1) {
-			assert.Equal(t, e.Stages[0], Stage{Duration: 10 * time.Second, Target: null.IntFrom(10)})
+			assert.Equal(t, e.Stages[0], Stage{Duration: NullDurationFrom(10 * time.Second), Target: null.IntFrom(10)})
 		}
 	})
 	t.Run("Stages/Duration", func(t *testing.T) {
 		e, err, _ := newTestEngine(nil, Options{
-			Duration: null.StringFrom("60s"),
+			Duration: NullDurationFrom(60 * time.Second),
 			Stages: []Stage{
-				{Duration: 10 * time.Second, Target: null.IntFrom(10)},
+				{Duration: NullDurationFrom(10 * time.Second), Target: null.IntFrom(10)},
 			},
 		})
 		assert.NoError(t, err)
 		if assert.Len(t, e.Stages, 1) {
-			assert.Equal(t, e.Stages[0], Stage{Duration: 10 * time.Second, Target: null.IntFrom(10)})
+			assert.Equal(t, e.Stages[0], Stage{Duration: NullDurationFrom(10 * time.Second), Target: null.IntFrom(10)})
 		}
 	})
 	t.Run("VUsMax", func(t *testing.T) {
@@ -249,17 +249,20 @@ func TestEngineRun(t *testing.T) {
 			"none": {},
 			"one": {
 				1 * time.Second,
-				[]Stage{{Duration: 1 * time.Second}},
+				[]Stage{{Duration: NullDurationFrom(1 * time.Second)}},
 			},
 			"two": {
 				2 * time.Second,
-				[]Stage{{Duration: 1 * time.Second}, {Duration: 1 * time.Second}},
+				[]Stage{
+					{Duration: NullDurationFrom(1 * time.Second)},
+					{Duration: NullDurationFrom(1 * time.Second)},
+				},
 			},
 			"two/targeted": {
 				2 * time.Second,
 				[]Stage{
-					{Duration: 1 * time.Second, Target: null.IntFrom(5)},
-					{Duration: 1 * time.Second, Target: null.IntFrom(10)},
+					{Duration: NullDurationFrom(1 * time.Second), Target: null.IntFrom(5)},
+					{Duration: NullDurationFrom(1 * time.Second), Target: null.IntFrom(10)},
 				},
 			},
 		}
@@ -333,18 +336,15 @@ func TestEngineTotalTime(t *testing.T) {
 	t.Run("Duration", func(t *testing.T) {
 		for _, d := range []time.Duration{0, 1 * time.Second, 10 * time.Second} {
 			t.Run(d.String(), func(t *testing.T) {
-				e, err, _ := newTestEngine(nil, Options{Duration: null.StringFrom(d.String())})
+				e, err, _ := newTestEngine(nil, Options{Duration: NullDurationFrom(d)})
 				assert.NoError(t, err)
 
 				assert.Len(t, e.Stages, 1)
-				assert.Equal(t, Stage{Duration: d}, e.Stages[0])
+				assert.Equal(t, Stage{Duration: NullDurationFrom(d)}, e.Stages[0])
 			})
 		}
 	})
 	t.Run("Stages", func(t *testing.T) {
-		// The lines get way too damn long if I have to write time.Second everywhere
-		sec := time.Second
-
 		testdata := map[string]struct {
 			Duration time.Duration
 			Stages   []Stage
@@ -352,9 +352,12 @@ func TestEngineTotalTime(t *testing.T) {
 			"nil":        {0, nil},
 			"empty":      {0, []Stage{}},
 			"1,infinite": {0, []Stage{{}}},
-			"2,infinite": {0, []Stage{{Duration: 10 * sec}, {}}},
-			"1,finite":   {10 * sec, []Stage{{Duration: 10 * sec}}},
-			"2,finite":   {15 * sec, []Stage{{Duration: 10 * sec}, {Duration: 5 * sec}}},
+			"2,infinite": {0, []Stage{{Duration: NullDurationFrom(10 * time.Second)}, {}}},
+			"1,finite":   {10 * time.Second, []Stage{{Duration: NullDurationFrom(10 * time.Second)}}},
+			"2,finite": {15 * time.Second, []Stage{
+				{Duration: NullDurationFrom(10 * time.Second)},
+				{Duration: NullDurationFrom(5 * time.Second)}},
+			},
 		}
 		for name, data := range testdata {
 			t.Run(name, func(t *testing.T) {
@@ -680,7 +683,7 @@ func TestEngine_processStages(t *testing.T) {
 		},
 		"one": {
 			[]Stage{
-				{Duration: 10 * time.Second},
+				{Duration: NullDurationFrom(10 * time.Second)},
 			},
 			[]checkpoint{
 				{0 * time.Second, true, 0},
@@ -690,7 +693,7 @@ func TestEngine_processStages(t *testing.T) {
 		},
 		"one/targeted": {
 			[]Stage{
-				{Duration: 10 * time.Second, Target: null.IntFrom(100)},
+				{Duration: NullDurationFrom(10 * time.Second), Target: null.IntFrom(100)},
 			},
 			[]checkpoint{
 				{0 * time.Second, true, 0},
@@ -709,8 +712,8 @@ func TestEngine_processStages(t *testing.T) {
 		},
 		"two": {
 			[]Stage{
-				{Duration: 5 * time.Second},
-				{Duration: 5 * time.Second},
+				{Duration: NullDurationFrom(5 * time.Second)},
+				{Duration: NullDurationFrom(5 * time.Second)},
 			},
 			[]checkpoint{
 				{0 * time.Second, true, 0},
@@ -720,8 +723,8 @@ func TestEngine_processStages(t *testing.T) {
 		},
 		"two/targeted": {
 			[]Stage{
-				{Duration: 5 * time.Second, Target: null.IntFrom(100)},
-				{Duration: 5 * time.Second, Target: null.IntFrom(0)},
+				{Duration: NullDurationFrom(5 * time.Second), Target: null.IntFrom(100)},
+				{Duration: NullDurationFrom(5 * time.Second), Target: null.IntFrom(0)},
 			},
 			[]checkpoint{
 				{0 * time.Second, true, 0},
@@ -740,9 +743,9 @@ func TestEngine_processStages(t *testing.T) {
 		},
 		"three": {
 			[]Stage{
-				{Duration: 5 * time.Second},
-				{Duration: 5 * time.Second},
-				{Duration: 5 * time.Second},
+				{Duration: NullDurationFrom(5 * time.Second)},
+				{Duration: NullDurationFrom(5 * time.Second)},
+				{Duration: NullDurationFrom(5 * time.Second)},
 			},
 			[]checkpoint{
 				{0 * time.Second, true, 0},
@@ -752,9 +755,9 @@ func TestEngine_processStages(t *testing.T) {
 		},
 		"three/targeted": {
 			[]Stage{
-				{Duration: 5 * time.Second, Target: null.IntFrom(50)},
-				{Duration: 5 * time.Second, Target: null.IntFrom(100)},
-				{Duration: 5 * time.Second, Target: null.IntFrom(0)},
+				{Duration: NullDurationFrom(5 * time.Second), Target: null.IntFrom(50)},
+				{Duration: NullDurationFrom(5 * time.Second), Target: null.IntFrom(100)},
+				{Duration: NullDurationFrom(5 * time.Second), Target: null.IntFrom(0)},
 			},
 			[]checkpoint{
 				{0 * time.Second, true, 0},
@@ -778,12 +781,12 @@ func TestEngine_processStages(t *testing.T) {
 		},
 		"mix": {
 			[]Stage{
-				{Duration: 5 * time.Second, Target: null.IntFrom(20)},
-				{Duration: 5 * time.Second, Target: null.IntFrom(10)},
-				{Duration: 2 * time.Second},
-				{Duration: 5 * time.Second, Target: null.IntFrom(20)},
-				{Duration: 2 * time.Second},
-				{Duration: 5 * time.Second, Target: null.IntFrom(10)},
+				{Duration: NullDurationFrom(5 * time.Second), Target: null.IntFrom(20)},
+				{Duration: NullDurationFrom(5 * time.Second), Target: null.IntFrom(10)},
+				{Duration: NullDurationFrom(2 * time.Second)},
+				{Duration: NullDurationFrom(5 * time.Second), Target: null.IntFrom(20)},
+				{Duration: NullDurationFrom(2 * time.Second)},
+				{Duration: NullDurationFrom(5 * time.Second), Target: null.IntFrom(10)},
 			},
 			[]checkpoint{
 				{0 * time.Second, true, 0},

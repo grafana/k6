@@ -296,11 +296,12 @@ func collectorOfType(t string) lib.Collector {
 }
 
 func getOptions(cc *cli.Context) (lib.Options, error) {
+	var err error
 	opts := lib.Options{
 		Paused:                cliBool(cc, "paused"),
 		VUs:                   cliInt64(cc, "vus"),
 		VUsMax:                cliInt64(cc, "max"),
-		Duration:              cliDuration(cc, "duration"),
+		Duration:              cliDuration(cc, "duration", &err),
 		Iterations:            cliInt64(cc, "iterations"),
 		Linger:                cliBool(cc, "linger"),
 		MaxRedirects:          cliInt64(cc, "max-redirects"),
@@ -452,7 +453,7 @@ func actionRun(cc *cli.Context) error {
 	fmt.Fprintf(color.Output, "     output: %s\n", color.CyanString(collectorString))
 	fmt.Fprintf(color.Output, "     script: %s (%s)\n", color.CyanString(src.Filename), color.CyanString(runnerType))
 	fmt.Fprintf(color.Output, "\n")
-	fmt.Fprintf(color.Output, "   duration: %s, iterations: %s\n", color.CyanString(opts.Duration.String), color.CyanString("%d", opts.Iterations.Int64))
+	fmt.Fprintf(color.Output, "   duration: %s, iterations: %s\n", color.CyanString(opts.Duration.String()), color.CyanString("%d", opts.Iterations.Int64))
 	fmt.Fprintf(color.Output, "        vus: %s, max: %s\n", color.CyanString("%d", opts.VUs.Int64), color.CyanString("%d", opts.VUsMax.Int64))
 	fmt.Fprintf(color.Output, "\n")
 	fmt.Fprintf(color.Output, "    web ui: %s\n", color.CyanString("http://%s/", addr))
