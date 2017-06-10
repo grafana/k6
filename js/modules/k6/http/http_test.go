@@ -31,8 +31,8 @@ import (
 	"testing"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
-	logtest "github.com/Sirupsen/logrus/hooks/test"
+	log "github.com/sirupsen/logrus"
+	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"

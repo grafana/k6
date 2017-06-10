@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/GeertJohan/go.rice"
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/dop251/goja"
 	"github.com/mitchellh/mapstructure"
 )

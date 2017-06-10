@@ -24,7 +24,7 @@ import (
 	"encoding/json"
 	"os"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/ghodss/yaml"
 	"github.com/shibukawa/configdir"
 )

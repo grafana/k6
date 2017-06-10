@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	logtest "github.com/Sirupsen/logrus/hooks/test"
+	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"

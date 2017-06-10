@@ -25,8 +25,8 @@ import (
 	"fmt"
 	"testing"
 
-	log "github.com/Sirupsen/logrus"
-	logtest "github.com/Sirupsen/logrus/hooks/test"
+	log "github.com/sirupsen/logrus"
+	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/loadimpact/k6/lib"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"

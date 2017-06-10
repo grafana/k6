@@ -23,7 +23,7 @@ package main
 import (
 	"os"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/fatih/color"
 	"github.com/mattn/go-isatty"
 	"gopkg.in/urfave/cli.v1"

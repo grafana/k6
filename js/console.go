@@ -23,7 +23,7 @@ package js
 import (
 	"strconv"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/dop251/goja"
 )
 

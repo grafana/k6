@@ -25,7 +25,7 @@ import (
 	"net/http"
 
 	"github.com/GeertJohan/go.rice"
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/loadimpact/k6/api/common"
 	"github.com/loadimpact/k6/api/v1"
 	"github.com/loadimpact/k6/lib"

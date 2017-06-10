@@ -28,7 +28,7 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/loadimpact/k6/lib"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
