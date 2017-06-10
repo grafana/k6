@@ -23,10 +23,8 @@ package lib
 import (
 	"crypto/md5"
 	"encoding/hex"
-	"encoding/json"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/pkg/errors"
 	"gopkg.in/guregu/null.v3"
@@ -42,30 +40,8 @@ type SourceData struct {
 }
 
 type Stage struct {
-	Duration time.Duration `json:"duration"`
-	Target   null.Int      `json:"target"`
-}
-
-func (s *Stage) UnmarshalJSON(data []byte) error {
-	var fields struct {
-		Duration string   `json:"duration"`
-		Target   null.Int `json:"target"`
-	}
-	if err := json.Unmarshal(data, &fields); err != nil {
-		return err
-	}
-
-	s.Target = fields.Target
-
-	if fields.Duration != "" {
-		d, err := time.ParseDuration(fields.Duration)
-		if err != nil {
-			return err
-		}
-		s.Duration = d
-	}
-
-	return nil
+	Duration NullDuration `json:"duration"`
+	Target   null.Int     `json:"target"`
 }
 
 type Group struct {

@@ -33,9 +33,9 @@ func TestParseStage(t *testing.T) {
 	testdata := map[string]lib.Stage{
 		"":        {},
 		":":       {},
-		"10s":     {Duration: 10 * time.Second},
-		"10s:":    {Duration: 10 * time.Second},
-		"10s:100": {Duration: 10 * time.Second, Target: null.IntFrom(100)},
+		"10s":     {Duration: lib.NullDurationFrom(10 * time.Second)},
+		"10s:":    {Duration: lib.NullDurationFrom(10 * time.Second)},
+		"10s:100": {Duration: lib.NullDurationFrom(10 * time.Second), Target: null.IntFrom(100)},
 		":100":    {Target: null.IntFrom(100)},
 	}
 	for s, st := range testdata {

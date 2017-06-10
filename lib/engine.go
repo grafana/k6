@@ -121,13 +121,9 @@ func NewEngine(r Runner, o Options) (*Engine, error) {
 	if o.Stages != nil {
 		e.Stages = o.Stages
 	} else if o.Duration.Valid {
-		d, err := time.ParseDuration(o.Duration.String)
-		if err != nil {
-			return nil, errors.Wrap(err, "options.duration")
-		}
-		e.Stages = []Stage{{Duration: d}}
+		e.Stages = []Stage{{Duration: o.Duration}}
 	} else {
-		e.Stages = []Stage{{Duration: 0}}
+		e.Stages = []Stage{{}}
 	}
 
 	e.thresholds = o.Thresholds
@@ -426,10 +422,10 @@ func (e *Engine) TotalTime() time.Duration {
 
 	var total time.Duration
 	for _, stage := range e.Stages {
-		if stage.Duration <= 0 {
+		if !stage.Duration.Valid {
 			return 0
 		}
-		total += stage.Duration
+		total += time.Duration(stage.Duration.Duration)
 	}
 	return total
 }
@@ -458,19 +454,20 @@ func (e *Engine) processStages(dT time.Duration) (bool, error) {
 	}
 
 	stage := e.Stages[e.atStage]
-	if stage.Duration > 0 && e.atTime > e.atStageSince+stage.Duration {
+	if stage.Duration.Valid && e.atTime > e.atStageSince+time.Duration(stage.Duration.Duration) {
 		e.Logger.Debug("processStages: stage expired")
 		stageIdx := -1
 		stageStart := 0 * time.Second
 		stageStartVUs := e.vus
 		for i, s := range e.Stages {
-			if stageStart+s.Duration > e.atTime || s.Duration == 0 {
+			d := time.Duration(s.Duration.Duration)
+			if !s.Duration.Valid || stageStart+d > e.atTime {
 				e.Logger.WithField("idx", i).Debug("processStages: proceeding to next stage...")
 				stage = s
 				stageIdx = i
 				break
 			}
-			stageStart += s.Duration
+			stageStart += d
 			if s.Target.Valid {
 				stageStartVUs = s.Target.Int64
 			}
@@ -493,8 +490,8 @@ func (e *Engine) processStages(dT time.Duration) (bool, error) {
 		from := e.atStageStartVUs
 		to := stage.Target.Int64
 		t := 1.0
-		if stage.Duration > 0 {
-			t = Clampf(float64(e.atTime-e.atStageSince)/float64(stage.Duration), 0.0, 1.0)
+		if stage.Duration.Duration > 0 {
+			t = Clampf(float64(e.atTime-e.atStageSince)/float64(stage.Duration.Duration), 0.0, 1.0)
 		}
 		vus := Lerp(from, to, t)
 		if e.vus != vus {
