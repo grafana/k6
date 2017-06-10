@@ -31,6 +31,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -216,7 +217,7 @@ func getSrcData(filename, pwd string, stdin io.Reader, fs afero.Fs) (*lib.Source
 		return &lib.SourceData{Filename: "-", Data: data}, nil
 	}
 
-	abspath := loader.Resolve(pwd, filename)
+	abspath := filepath.Join(pwd, filename)
 	if ok, _ := afero.Exists(fs, abspath); ok {
 		data, err := afero.ReadFile(fs, abspath)
 		if err != nil {
