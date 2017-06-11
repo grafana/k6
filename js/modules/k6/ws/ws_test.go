@@ -41,7 +41,6 @@ func assertSessionMetricsEmitted(t *testing.T, samples []stats.Sample, subprotoc
 	seenConnecting := false
 	seenMessagesReceived := false
 	seenMessagesSent := false
-	seenPing := false
 	seenDataSent := false
 	seenDataReceived := false
 
@@ -54,8 +53,6 @@ func assertSessionMetricsEmitted(t *testing.T, samples []stats.Sample, subprotoc
 				seenMessagesReceived = true
 			case metrics.WSMessagesSent:
 				seenMessagesSent = true
-			case metrics.WSPing:
-				seenPing = true
 			case metrics.WSSessionDuration:
 				seenSessionDuration = true
 			case metrics.WSSessions:
@@ -74,11 +71,23 @@ func assertSessionMetricsEmitted(t *testing.T, samples []stats.Sample, subprotoc
 	assert.True(t, seenConnecting, "url %s didn't emit Connecting", url)
 	assert.True(t, seenMessagesReceived, "url %s didn't emit MessagesReceived", url)
 	assert.True(t, seenMessagesSent, "url %s didn't emit MessagesSent", url)
-	assert.True(t, seenPing, "url %s didn't emit Ping", url)
 	assert.True(t, seenSessions, "url %s didn't emit Sessions", url)
 	assert.True(t, seenSessionDuration, "url %s didn't emit SessionDuration", url)
 	assert.True(t, seenDataSent, "url %s didn't emit DataSent", url)
 	assert.True(t, seenDataReceived, "url %s didn't emit DataReceived", url)
+}
+
+func assertPingMetricEmitted(t *testing.T, samples []stats.Sample, url string) {
+	seenPing := false
+
+	for _, sample := range samples {
+		if sample.Tags["url"] == url {
+			if sample.Metric == metrics.WSPing {
+				seenPing = true
+			}
+		}
+	}
+	assert.True(t, seenPing, "url %s didn't emit Ping", url)
 }
 
 func TestSession(t *testing.T) {
@@ -213,6 +222,7 @@ func TestSession(t *testing.T) {
 		assert.NoError(t, err)
 	})
 	assertSessionMetricsEmitted(t, state.Samples, "", "ws://echo.websocket.org", 101, "")
+	assertPingMetricEmitted(t, state.Samples, "ws://echo.websocket.org")
 
 	t.Run("multiple_handlers", func(t *testing.T) {
 		state.Samples = nil
@@ -245,6 +255,7 @@ func TestSession(t *testing.T) {
 		assert.NoError(t, err)
 	})
 	assertSessionMetricsEmitted(t, state.Samples, "", "ws://echo.websocket.org", 101, "")
+	assertPingMetricEmitted(t, state.Samples, "ws://echo.websocket.org")
 }
 
 func TestErrors(t *testing.T) {
