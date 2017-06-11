@@ -49,10 +49,10 @@ type Socket struct {
 
 	msgsSent, msgsReceived float64
 
-	pingCounter       int
-	pingStart         time.Time
-	totalPingCount    float64
-	totalPingDuration time.Duration
+	pingSendTimestamps map[string]time.Time
+	pingSendCounter    int
+	totalPingCount     float64
+	totalPingDuration  time.Duration
 }
 
 const writeWait = 10 * time.Second
@@ -63,7 +63,6 @@ var (
 )
 
 func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) *http.Response {
-
 	rt := common.GetRuntime(ctx)
 	state := common.GetState(ctx)
 
@@ -111,11 +110,12 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) *http.Re
 	connectionDuration := stats.D(connectionEnd.Sub(start))
 
 	socket := Socket{
-		ctx:           ctx,
-		conn:          conn,
-		eventHandlers: make(map[string][]goja.Callable),
-		scheduled:     make(chan goja.Callable),
-		done:          make(chan struct{}),
+		ctx:                ctx,
+		conn:               conn,
+		eventHandlers:      make(map[string][]goja.Callable),
+		pingSendTimestamps: make(map[string]time.Time),
+		scheduled:          make(chan goja.Callable),
+		done:               make(chan struct{}),
 	}
 
 	// Run the user-provided set up function
@@ -135,10 +135,10 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) *http.Re
 	socket.handleEvent("open")
 
 	// Pass ping/pong events through the main control loop
-	pingChan := make(chan interface{})
-	pongChan := make(chan interface{})
-	conn.SetPingHandler(func(string) error { pingChan <- "ping"; return nil })
-	conn.SetPongHandler(func(string) error { pongChan <- "pong"; return nil })
+	pingChan := make(chan string)
+	pongChan := make(chan string)
+	conn.SetPingHandler(func(msg string) error { pingChan <- msg; return nil })
+	conn.SetPongHandler(func(pingID string) error { pongChan <- pingID; return nil })
 
 	readDataChan := make(chan []byte)
 	readErrChan := make(chan error)
@@ -154,9 +154,9 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) *http.Re
 			// Handle pings received from the server
 			socket.handleEvent("ping")
 
-		case <-pongChan:
+		case pingID := <-pongChan:
 			// Handle pong responses to our pings
-			socket.decPingCounter()
+			socket.trackPong(pingID)
 			socket.handleEvent("pong")
 
 		case readData := <-readDataChan:
@@ -229,32 +229,31 @@ func (s *Socket) Send(message string) {
 func (s *Socket) Ping() {
 	rt := common.GetRuntime(s.ctx)
 	deadline := time.Now().Add(writeWait)
+	pingID := strconv.Itoa(s.pingSendCounter)
+	data := []byte(pingID)
 
-	err := s.conn.WriteControl(websocket.PingMessage, []byte{}, deadline)
+	err := s.conn.WriteControl(websocket.PingMessage, data, deadline)
 	if err != nil {
 		s.handleEvent("error", rt.ToValue(err))
 		return
 	}
 
-	s.incPingCounter()
+	s.pingSendTimestamps[pingID] = time.Now()
+	s.pingSendCounter++
 }
 
-func (s *Socket) incPingCounter() {
-	s.pingCounter++
+func (s *Socket) trackPong(pingID string) {
+	pongTimestamp := time.Now()
+
+	if _, ok := s.pingSendTimestamps[pingID]; !ok {
+		// We received a pong for a ping we didn't send; ignore
+		// (this shouldn't happen with a compliant server)
+		return
+	}
+	pingTimestamp := s.pingSendTimestamps[pingID]
+
+	s.totalPingDuration += pongTimestamp.Sub(pingTimestamp)
 	s.totalPingCount++
-
-	if s.pingCounter == 1 {
-		s.pingStart = time.Now()
-	}
-}
-
-func (s *Socket) decPingCounter() {
-	s.pingCounter--
-
-	if s.pingCounter == 0 {
-		pingEnd := time.Now()
-		s.totalPingDuration += pingEnd.Sub(s.pingStart)
-	}
 }
 
 func (s *Socket) SetTimeout(fn goja.Callable, timeoutMs int) {
