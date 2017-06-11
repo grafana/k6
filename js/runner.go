@@ -122,6 +122,7 @@ func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 	state := &common.State{
 		Group:         u.Runner.defaultGroup,
 		HTTPTransport: u.HTTPTransport,
+		Dialer:        u.Runner.Dialer,
 	}
 
 	ctx = common.WithRuntime(ctx, u.Runtime)

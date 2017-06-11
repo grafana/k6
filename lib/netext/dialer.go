@@ -56,13 +56,9 @@ func (d Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn, 
 	}
 	if v := ctx.Value(ctxKeyTracer); v != nil {
 		tracer := v.(*Tracer)
-		return d.TraceConnection(conn, &tracer.bytesRead, &tracer.bytesWritten)
+		return TrackConn(conn, &tracer.bytesRead, &tracer.bytesWritten), nil
 	}
 	return conn, err
-}
-
-func (d Dialer) TraceConnection(conn net.Conn, bytesRead, bytesWritten *int64) (*Conn, error) {
-	return &Conn{conn, bytesRead, bytesWritten}, nil
 }
 
 type Conn struct {
@@ -81,4 +77,8 @@ func (c *Conn) Write(b []byte) (int, error) {
 	n, err := c.Conn.Write(b)
 	atomic.AddInt64(c.BytesWritten, int64(n))
 	return n, err
+}
+
+func TrackConn(conn net.Conn, bytesRead, bytesWritten *int64) *Conn {
+	return &Conn{conn, bytesRead, bytesWritten}
 }

@@ -21,13 +21,16 @@ package ws
 
 import (
 	"context"
+	"net"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
+	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
 	"github.com/stretchr/testify/assert"
 )
@@ -35,15 +38,24 @@ import (
 func assertSessionMetricsEmitted(t *testing.T, samples []stats.Sample, subprotocol, url string, status int, group string) {
 	seenSessions := false
 	seenSessionDuration := false
-	seenHandshaking := false
+	seenConnecting := false
+	seenMessagesReceived := false
+	seenMessagesSent := false
+	seenPing := false
 	seenDataSent := false
 	seenDataReceived := false
 
 	for _, sample := range samples {
 		if sample.Tags["url"] == url {
 			switch sample.Metric {
-			case metrics.WSHandshaking:
-				seenHandshaking = true
+			case metrics.WSConnecting:
+				seenConnecting = true
+			case metrics.WSMessagesReceived:
+				seenMessagesReceived = true
+			case metrics.WSMessagesSent:
+				seenMessagesSent = true
+			case metrics.WSPing:
+				seenPing = true
 			case metrics.WSSessionDuration:
 				seenSessionDuration = true
 			case metrics.WSSessions:
@@ -59,7 +71,10 @@ func assertSessionMetricsEmitted(t *testing.T, samples []stats.Sample, subprotoc
 			assert.Equal(t, group, sample.Tags["group"])
 		}
 	}
-	assert.True(t, seenHandshaking, "url %s didn't emit Handshaking", url)
+	assert.True(t, seenConnecting, "url %s didn't emit Connecting", url)
+	assert.True(t, seenMessagesReceived, "url %s didn't emit MessagesReceived", url)
+	assert.True(t, seenMessagesSent, "url %s didn't emit MessagesSent", url)
+	assert.True(t, seenPing, "url %s didn't emit Ping", url)
 	assert.True(t, seenSessions, "url %s didn't emit Sessions", url)
 	assert.True(t, seenSessionDuration, "url %s didn't emit SessionDuration", url)
 	assert.True(t, seenDataSent, "url %s didn't emit DataSent", url)
@@ -72,7 +87,12 @@ func TestSession(t *testing.T) {
 
 	rt := goja.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
-	state := &common.State{Group: root}
+	dialer := netext.NewDialer(net.Dialer{
+		Timeout:   10 * time.Second,
+		KeepAlive: 60 * time.Second,
+		DualStack: true,
+	})
+	state := &common.State{Group: root, Dialer: dialer}
 
 	ctx := context.Background()
 	ctx = common.WithState(ctx, state)
@@ -233,7 +253,12 @@ func TestErrors(t *testing.T) {
 
 	rt := goja.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
-	state := &common.State{Group: root}
+	dialer := netext.NewDialer(net.Dialer{
+		Timeout:   10 * time.Second,
+		KeepAlive: 60 * time.Second,
+		DualStack: true,
+	})
+	state := &common.State{Group: root, Dialer: dialer}
 
 	ctx := context.Background()
 	ctx = common.WithState(ctx, state)

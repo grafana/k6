@@ -21,7 +21,6 @@
 package ws
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"net"
@@ -47,6 +46,13 @@ type Socket struct {
 	scheduled     chan goja.Callable
 	done          chan struct{}
 	shutdownOnce  sync.Once
+
+	msgsSent, msgsReceived float64
+
+	pingCounter       int
+	pingStart         time.Time
+	totalPingCount    float64
+	totalPingDuration time.Duration
 }
 
 const writeWait = 10 * time.Second
@@ -57,6 +63,7 @@ var (
 )
 
 func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) *http.Response {
+
 	rt := common.GetRuntime(ctx)
 	state := common.GetState(ctx)
 
@@ -78,20 +85,19 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) *http.Re
 
 	var bytesRead, bytesWritten int64
 	// Pass a custom net.Dial function to websocket.Dialer that will substitute
-	// the underlying net.Conn with our own TraceConn
+	// the underlying net.Conn with our own tracked netext.Conn
 	netDial := func(network, address string) (net.Conn, error) {
 		var err error
-		var conn, traceConn net.Conn
+		var conn net.Conn
 
-		dialer := netext.NewDialer(net.Dialer{})
+		dialer := state.Dialer
 		if conn, err = dialer.DialContext(ctx, network, address); err != nil {
 			return nil, err
 		}
-		if traceConn, err = dialer.TraceConnection(conn, &bytesRead, &bytesWritten); err != nil {
-			return nil, err
-		}
 
-		return traceConn, err
+		trackedConn := netext.TrackConn(conn, &bytesRead, &bytesWritten)
+
+		return trackedConn, nil
 	}
 
 	wsd := websocket.Dialer{
@@ -129,9 +135,10 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) *http.Re
 	socket.handleEvent("open")
 
 	// Pass ping/pong events through the main control loop
-	pingPongChan := make(chan string)
-	conn.SetPingHandler(func(string) error { pingPongChan <- "ping"; return nil })
-	conn.SetPongHandler(func(string) error { pingPongChan <- "pong"; return nil })
+	pingChan := make(chan interface{})
+	pongChan := make(chan interface{})
+	conn.SetPingHandler(func(string) error { pingChan <- "ping"; return nil })
+	conn.SetPongHandler(func(string) error { pongChan <- "pong"; return nil })
 
 	readDataChan := make(chan []byte)
 	readErrChan := make(chan error)
@@ -143,10 +150,19 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) *http.Re
 	// should only be executed by this thread to avoid race conditions
 	for {
 		select {
-		case ev := <-pingPongChan:
-			socket.handleEvent(ev)
+		case <-pingChan:
+			// Handle pings received from the server
+			socket.handleEvent("ping")
+
+		case <-pongChan:
+			// Handle pong responses to our pings
+			socket.decPingCounter()
+			socket.handleEvent("pong")
+
 		case readData := <-readDataChan:
+			socket.msgsReceived++
 			socket.handleEvent("message", rt.ToValue(string(readData)))
+
 		case readErr := <-readErrChan:
 			socket.handleEvent("error", rt.ToValue(readErr))
 
@@ -163,10 +179,16 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) *http.Re
 			end := time.Now()
 			sessionDuration := stats.D(end.Sub(start))
 
+			avgPingRoundtrip := float64(socket.totalPingDuration) / socket.totalPingCount
+			pingMetric := stats.D(time.Duration(avgPingRoundtrip))
+
 			samples := []stats.Sample{
 				{Metric: metrics.WSSessions, Time: end, Tags: tags, Value: 1},
+				{Metric: metrics.WSMessagesSent, Time: end, Tags: tags, Value: socket.msgsReceived},
+				{Metric: metrics.WSMessagesReceived, Time: end, Tags: tags, Value: socket.msgsSent},
 				{Metric: metrics.WSConnecting, Time: end, Tags: tags, Value: connectionDuration},
 				{Metric: metrics.WSSessionDuration, Time: end, Tags: tags, Value: sessionDuration},
+				{Metric: metrics.WSPing, Time: end, Tags: tags, Value: pingMetric},
 				{Metric: metrics.DataReceived, Time: end, Tags: tags, Value: float64(bytesRead)},
 				{Metric: metrics.DataSent, Time: end, Tags: tags, Value: float64(bytesWritten)},
 			}
@@ -200,6 +222,8 @@ func (s *Socket) Send(message string) {
 	if err := s.conn.WriteMessage(websocket.TextMessage, writeData); err != nil {
 		s.handleEvent("error", rt.ToValue(err))
 	}
+
+	s.msgsSent++
 }
 
 func (s *Socket) Ping() {
@@ -209,6 +233,27 @@ func (s *Socket) Ping() {
 	err := s.conn.WriteControl(websocket.PingMessage, []byte{}, deadline)
 	if err != nil {
 		s.handleEvent("error", rt.ToValue(err))
+		return
+	}
+
+	s.incPingCounter()
+}
+
+func (s *Socket) incPingCounter() {
+	s.pingCounter++
+	s.totalPingCount++
+
+	if s.pingCounter == 1 {
+		s.pingStart = time.Now()
+	}
+}
+
+func (s *Socket) decPingCounter() {
+	s.pingCounter--
+
+	if s.pingCounter == 0 {
+		pingEnd := time.Now()
+		s.totalPingDuration += pingEnd.Sub(s.pingStart)
 	}
 }
 
@@ -247,15 +292,15 @@ func (s *Socket) SetInterval(fn goja.Callable, intervalMs int) {
 
 func (s *Socket) Close(args ...goja.Value) {
 	code := websocket.CloseGoingAway
-	if len(args) > 0 && !goja.IsUndefined(args[0]) && !goja.IsNull(args[0]) {
+	if len(args) > 0 {
 		code = int(args[0].ToInteger())
 	}
 
 	s.closeConnection(code)
 }
 
+// Attempts to close the websocket gracefully
 func (s *Socket) closeConnection(code int) error {
-	// Attempts to close the websocket gracefully
 
 	var err error
 	s.shutdownOnce.Do(func() {
@@ -293,7 +338,6 @@ func readPump(conn *websocket.Conn, readChan chan []byte, errorChan chan error) 
 			return
 		}
 
-		message = bytes.TrimSpace(bytes.Replace(message, newline, space, -1))
 		readChan <- message
 	}
 }
@@ -303,13 +347,14 @@ func parseArgs(rt *goja.Runtime, args []goja.Value) (goja.Callable, map[string]s
 	var paramsV goja.Value
 
 	// The params argument is optional
-	if len(args) == 2 {
+	switch len(args) {
+	case 2:
 		paramsV = args[0]
 		callableV = args[1]
-	} else if len(args) == 1 {
+	case 1:
 		paramsV = goja.Undefined()
 		callableV = args[0]
-	} else {
+	default:
 		return nil, nil, nil, errors.New("Invalid number of arguments to ws.connect")
 	}
 
@@ -322,7 +367,10 @@ func parseArgs(rt *goja.Runtime, args []goja.Value) (goja.Callable, map[string]s
 
 	// Leave header to nil by default so we can pass it directly to the Dialer
 	var header http.Header
-	tags := map[string]string{}
+	tags := map[string]string{
+		"status":      "0",
+		"subprotocol": "",
+	}
 
 	if !goja.IsUndefined(paramsV) && !goja.IsNull(paramsV) {
 		params := paramsV.ToObject(rt)
