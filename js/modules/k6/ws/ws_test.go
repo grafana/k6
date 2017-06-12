@@ -39,18 +39,12 @@ func assertSessionMetricsEmitted(t *testing.T, samples []stats.Sample, subprotoc
 	seenSessions := false
 	seenSessionDuration := false
 	seenConnecting := false
-	seenMessagesReceived := false
-	seenMessagesSent := false
 
 	for _, sample := range samples {
 		if sample.Tags["url"] == url {
 			switch sample.Metric {
 			case metrics.WSConnecting:
 				seenConnecting = true
-			case metrics.WSMessagesReceived:
-				seenMessagesReceived = true
-			case metrics.WSMessagesSent:
-				seenMessagesSent = true
 			case metrics.WSSessionDuration:
 				seenSessionDuration = true
 			case metrics.WSSessions:
@@ -63,25 +57,22 @@ func assertSessionMetricsEmitted(t *testing.T, samples []stats.Sample, subprotoc
 		}
 	}
 	assert.True(t, seenConnecting, "url %s didn't emit Connecting", url)
-	assert.True(t, seenMessagesReceived, "url %s didn't emit MessagesReceived", url)
-	assert.True(t, seenMessagesSent, "url %s didn't emit MessagesSent", url)
 	assert.True(t, seenSessions, "url %s didn't emit Sessions", url)
 	assert.True(t, seenSessionDuration, "url %s didn't emit SessionDuration", url)
 }
 
-func assertPingMetricEmitted(t *testing.T, samples []stats.Sample, url string) {
+func assertMetricEmitted(t *testing.T, metric *stats.Metric, samples []stats.Sample, url string) {
 	seenPing := false
 
 	for _, sample := range samples {
 		if sample.Tags["url"] == url {
-			if sample.Metric == metrics.WSPing {
+			if sample.Metric == metric {
 				seenPing = true
 			}
 		}
 	}
-	assert.True(t, seenPing, "url %s didn't emit Ping", url)
+	assert.True(t, seenPing, "url %s didn't emit %s", url, metric.Name)
 }
-
 func TestSession(t *testing.T) {
 	root, err := lib.NewGroup("", nil)
 	assert.NoError(t, err)
@@ -106,7 +97,7 @@ func TestSession(t *testing.T) {
 		let res = ws.connect("ws://echo.websocket.org", function(socket){
 			socket.close()
 		});
-		if (res.status_code != 101) { throw new Error("connection failed with status: " + res.status); }
+		if (res.status != 101) { throw new Error("connection failed with status: " + res.status); }
 		`)
 		assert.NoError(t, err)
 	})
@@ -117,7 +108,7 @@ func TestSession(t *testing.T) {
 		let res = ws.connect("wss://echo.websocket.org", function(socket){
 			socket.close()
 		});
-		if (res.status_code != 101) { throw new Error("TLS connection failed with status: " + res.status); }
+		if (res.status != 101) { throw new Error("TLS connection failed with status: " + res.status); }
 		`)
 		assert.NoError(t, err)
 	})
@@ -157,6 +148,8 @@ func TestSession(t *testing.T) {
 		assert.NoError(t, err)
 	})
 	assertSessionMetricsEmitted(t, state.Samples, "", "ws://echo.websocket.org", 101, "")
+	assertMetricEmitted(t, metrics.WSMessagesSent, state.Samples, "ws://echo.websocket.org")
+	assertMetricEmitted(t, metrics.WSMessagesReceived, state.Samples, "ws://echo.websocket.org")
 
 	t.Run("interval", func(t *testing.T) {
 		state.Samples = nil
@@ -214,7 +207,7 @@ func TestSession(t *testing.T) {
 		assert.NoError(t, err)
 	})
 	assertSessionMetricsEmitted(t, state.Samples, "", "ws://echo.websocket.org", 101, "")
-	assertPingMetricEmitted(t, state.Samples, "ws://echo.websocket.org")
+	assertMetricEmitted(t, metrics.WSPing, state.Samples, "ws://echo.websocket.org")
 
 	t.Run("multiple_handlers", func(t *testing.T) {
 		state.Samples = nil
@@ -247,7 +240,7 @@ func TestSession(t *testing.T) {
 		assert.NoError(t, err)
 	})
 	assertSessionMetricsEmitted(t, state.Samples, "", "ws://echo.websocket.org", 101, "")
-	assertPingMetricEmitted(t, state.Samples, "ws://echo.websocket.org")
+	assertMetricEmitted(t, metrics.WSPing, state.Samples, "ws://echo.websocket.org")
 }
 
 func TestErrors(t *testing.T) {
@@ -272,21 +265,13 @@ func TestErrors(t *testing.T) {
 	t.Run("invalid_url", func(t *testing.T) {
 		state.Samples = nil
 		_, err := common.RunString(rt, `
-		let hasError = false;
 		let res = ws.connect("INVALID", function(socket){
 			socket.on("open", function() {
 				socket.close();
 			});
-
-			socket.on("error", function(errorEvent) {
-				hasError = true;
-			});
 		});
-		if (!hasError) {
-			throw new Error ("no error emitted for invalid url");
-		}
 		`)
-		assert.NoError(t, err)
+		assert.Error(t, err)
 	})
 
 	t.Run("send_after_close", func(t *testing.T) {

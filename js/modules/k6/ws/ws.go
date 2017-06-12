@@ -160,13 +160,6 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 	connectionEnd := time.Now()
 	connectionDuration := stats.D(connectionEnd.Sub(start))
 
-	wsResponse, wsRespErr := wrapHTTPResponse(httpResponse)
-	if wsRespErr != nil {
-		return nil, wsRespErr
-	}
-
-	wsResponse.URL = url
-
 	socket := Socket{
 		ctx:                ctx,
 		conn:               conn,
@@ -183,10 +176,15 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 		// Pass the error to the user script before exiting immediately
 		socket.handleEvent("error", rt.ToValue(connErr))
 
-		wsResponse.Error = connErr.Error()
-		tags["error"] = wsResponse.Error
-		return wsResponse, connErr
+		return nil, connErr
 	}
+
+	wsResponse, wsRespErr := wrapHTTPResponse(httpResponse)
+	if wsRespErr != nil {
+		return nil, wsRespErr
+	}
+	wsResponse.URL = url
+
 	defer conn.Close()
 
 	tags["status"] = strconv.Itoa(httpResponse.StatusCode)
