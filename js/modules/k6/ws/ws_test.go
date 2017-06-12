@@ -41,8 +41,6 @@ func assertSessionMetricsEmitted(t *testing.T, samples []stats.Sample, subprotoc
 	seenConnecting := false
 	seenMessagesReceived := false
 	seenMessagesSent := false
-	seenDataSent := false
-	seenDataReceived := false
 
 	for _, sample := range samples {
 		if sample.Tags["url"] == url {
@@ -57,10 +55,6 @@ func assertSessionMetricsEmitted(t *testing.T, samples []stats.Sample, subprotoc
 				seenSessionDuration = true
 			case metrics.WSSessions:
 				seenSessions = true
-			case metrics.DataReceived:
-				seenDataReceived = true
-			case metrics.DataSent:
-				seenDataSent = true
 			}
 
 			assert.Equal(t, strconv.Itoa(status), sample.Tags["status"])
@@ -73,8 +67,6 @@ func assertSessionMetricsEmitted(t *testing.T, samples []stats.Sample, subprotoc
 	assert.True(t, seenMessagesSent, "url %s didn't emit MessagesSent", url)
 	assert.True(t, seenSessions, "url %s didn't emit Sessions", url)
 	assert.True(t, seenSessionDuration, "url %s didn't emit SessionDuration", url)
-	assert.True(t, seenDataSent, "url %s didn't emit DataSent", url)
-	assert.True(t, seenDataReceived, "url %s didn't emit DataReceived", url)
 }
 
 func assertPingMetricEmitted(t *testing.T, samples []stats.Sample, url string) {

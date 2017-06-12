@@ -81,7 +81,3 @@ func (c *Conn) Write(b []byte) (int, error) {
 	atomic.AddInt64(c.BytesWritten, int64(n))
 	return n, err
 }
-
-func TrackConn(conn net.Conn, bytesRead, bytesWritten *int64) *Conn {
-	return &Conn{conn, bytesRead, bytesWritten}
-}
