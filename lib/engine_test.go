@@ -822,6 +822,15 @@ func TestEngine_processStages(t *testing.T) {
 				{1 * time.Second, true, 10},
 			},
 		},
+		"infinite": {
+			[]Stage{{}},
+			[]checkpoint{
+				{0 * time.Second, true, 0},
+				{1 * time.Minute, true, 0},
+				{1 * time.Hour, true, 0},
+				{24 * time.Hour, true, 0},
+			},
+		},
 	}
 	for name, data := range testdata {
 		t.Run(name, func(t *testing.T) {
