@@ -9,6 +9,9 @@
 /js/node_modules
 /docs
 
+/debug
+test.debug
+
 .vscode
 *.sublime-workspace
 .idea
