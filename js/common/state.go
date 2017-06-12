@@ -24,6 +24,7 @@ import (
 	"net/http"
 
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
 	log "github.com/sirupsen/logrus"
 )
@@ -41,6 +42,9 @@ type State struct {
 
 	// Networking equipment.
 	HTTPTransport http.RoundTripper
+
+	// Also expose the underlying dialer
+	Dialer *netext.Dialer
 
 	// Sample buffer, emitted at the end of the iteration.
 	Samples []stats.Sample

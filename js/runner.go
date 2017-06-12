@@ -156,6 +156,7 @@ func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 		Options:       u.Runner.Bundle.Options,
 		Group:         u.Runner.defaultGroup,
 		HTTPTransport: u.HTTPTransport,
+		Dialer:        u.Dialer,
 	}
 	u.Dialer.BytesRead = &state.BytesRead
 	u.Dialer.BytesWritten = &state.BytesWritten

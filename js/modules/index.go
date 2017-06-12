@@ -26,6 +26,7 @@ import (
 	"github.com/loadimpact/k6/js/modules/k6/html"
 	"github.com/loadimpact/k6/js/modules/k6/http"
 	"github.com/loadimpact/k6/js/modules/k6/metrics"
+	"github.com/loadimpact/k6/js/modules/k6/ws"
 )
 
 // Index of module implementations.
@@ -35,4 +36,5 @@ var Index = map[string]interface{}{
 	"k6/http":    &http.HTTP{},
 	"k6/metrics": &metrics.Metrics{},
 	"k6/html":    &html.HTML{},
+	"k6/ws":      &ws.WS{},
 }
