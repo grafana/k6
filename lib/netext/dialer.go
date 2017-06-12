@@ -32,7 +32,9 @@ import (
 type Dialer struct {
 	net.Dialer
 
-	Resolver *dnscache.Resolver
+	Resolver     *dnscache.Resolver
+	BytesRead    *int64
+	BytesWritten *int64
 }
 
 func NewDialer(dialer net.Dialer) *Dialer {
@@ -56,9 +58,8 @@ func (d Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn, 
 	if err != nil {
 		return nil, err
 	}
-	if v := ctx.Value(ctxKeyTracer); v != nil {
-		tracer := v.(*Tracer)
-		conn = &Conn{conn, &tracer.bytesRead, &tracer.bytesWritten}
+	if d.BytesRead != nil && d.BytesWritten != nil {
+		conn = &Conn{conn, d.BytesRead, d.BytesWritten}
 	}
 	return conn, err
 }

@@ -47,9 +47,6 @@ type Trail struct {
 	// Detailed connection information.
 	ConnReused     bool
 	ConnRemoteAddr net.Addr
-
-	// Bandwidth usage.
-	BytesRead, BytesWritten int64
 }
 
 func (tr Trail) Samples(tags map[string]string) []stats.Sample {
@@ -61,8 +58,6 @@ func (tr Trail) Samples(tags map[string]string) []stats.Sample {
 		{Metric: metrics.HTTPReqSending, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Sending)},
 		{Metric: metrics.HTTPReqWaiting, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Waiting)},
 		{Metric: metrics.HTTPReqReceiving, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Receiving)},
-		{Metric: metrics.DataReceived, Time: tr.EndTime, Tags: tags, Value: float64(tr.BytesRead)},
-		{Metric: metrics.DataSent, Time: tr.EndTime, Tags: tags, Value: float64(tr.BytesWritten)},
 	}
 }
 
@@ -83,8 +78,6 @@ type Tracer struct {
 	connRemoteAddr net.Addr
 
 	protoError error
-
-	bytesRead, bytesWritten int64
 }
 
 // Trace() returns a premade ClientTrace that calls all of the Tracer's hooks.
@@ -106,8 +99,6 @@ func (t *Tracer) Done() Trail {
 	trail := Trail{
 		ConnReused:     t.connReused,
 		ConnRemoteAddr: t.connRemoteAddr,
-		BytesRead:      t.bytesRead,
-		BytesWritten:   t.bytesWritten,
 	}
 
 	if !t.gotConn.IsZero() && !t.gotConn.IsZero() {
@@ -149,12 +140,6 @@ func (t *Tracer) GotConn(info httptrace.GotConnInfo) {
 	if t.connReused {
 		t.connectStart = t.gotConn
 		t.connectDone = t.gotConn
-
-		// If the connection was reused, patch it to use this tracer's data counters.
-		if conn, ok := info.Conn.(*Conn); ok {
-			conn.BytesRead = &t.bytesRead
-			conn.BytesWritten = &t.bytesWritten
-		}
 	}
 }
 
