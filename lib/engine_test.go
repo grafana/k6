@@ -317,6 +317,49 @@ func TestEngineRun(t *testing.T) {
 			})
 		}
 	})
+	t.Run("respects cutoff", func(t *testing.T) {
+		testMetric := stats.New("test_metric", stats.Trend)
+
+		var e *Engine
+		signalChan := make(chan interface{})
+		r := RunnerFunc(func(ctx context.Context) (samples []stats.Sample, err error) {
+			samples = append(samples, stats.Sample{Metric: testMetric, Time: time.Now(), Value: 1})
+			close(signalChan)
+			<-ctx.Done()
+			for {
+				time.Sleep(1 * time.Millisecond)
+				if !e.cutoff.IsZero() {
+					break
+				}
+			}
+			samples = append(samples, stats.Sample{Metric: testMetric, Time: time.Now(), Value: 2})
+			return samples, err
+		})
+		e, err, _ := newTestEngine(r, Options{VUs: null.IntFrom(1), VUsMax: null.IntFrom(1)})
+		if !assert.NoError(t, err) {
+			return
+		}
+
+		c := &dummy.Collector{}
+		e.Collector = c
+
+		ctx, cancel := context.WithCancel(context.Background())
+		errC := make(chan error)
+		go func() { errC <- e.Run(ctx) }()
+		<-signalChan
+		cancel()
+		assert.NoError(t, <-errC)
+
+		found := 0
+		for _, s := range c.Samples {
+			if s.Metric != testMetric {
+				continue
+			}
+			found++
+			assert.Equal(t, 1.0, s.Value, "wrong value")
+		}
+		assert.Equal(t, 1, found, "wrong number of samples")
+	})
 }
 
 func TestEngineIsRunning(t *testing.T) {
