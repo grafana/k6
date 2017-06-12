@@ -118,9 +118,11 @@ func NewEngine(r Runner, o Options) (*Engine, error) {
 	}
 	e.SetPaused(o.Paused.Bool)
 
+	// Use Stages if available, if not, construct a stage to fill the specified duration.
+	// Special case: A valid duration of 0 = an infinite (invalid duration) stage.
 	if o.Stages != nil {
 		e.Stages = o.Stages
-	} else if o.Duration.Valid {
+	} else if o.Duration.Valid && o.Duration.Duration > 0 {
 		e.Stages = []Stage{{Duration: o.Duration}}
 	} else {
 		e.Stages = []Stage{{}}

@@ -91,6 +91,12 @@ func TestNewEngineOptions(t *testing.T) {
 		if assert.Len(t, e.Stages, 1) {
 			assert.Equal(t, e.Stages[0], Stage{Duration: NullDurationFrom(10 * time.Second)})
 		}
+
+		t.Run("Infinite", func(t *testing.T) {
+			e, err, _ := newTestEngine(nil, Options{Duration: NullDurationFrom(0)})
+			assert.NoError(t, err)
+			assert.Equal(t, []Stage{{}}, e.Stages)
+		})
 	})
 	t.Run("Stages", func(t *testing.T) {
 		e, err, _ := newTestEngine(nil, Options{
