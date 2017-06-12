@@ -22,9 +22,8 @@ package html
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"strconv"
+	"fmt"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -53,221 +52,90 @@ type Selection struct {
 }
 
 func (s Selection) emptySelection() Selection {
-	return s.Eq(s.Size()) //ask for out of bounds item to empty selection
+	// Ask for out of bounds item for an empty selection.
+	return s.Eq(s.Size())
 }
 
-func (s Selection) varargFnCall(arg goja.Value,
+func (s Selection) varargFnCall(arg interface{},
 	strFilter func(string) *goquery.Selection,
 	selFilter func(*goquery.Selection) *goquery.Selection,
 	nodeFilter func(...*gohtml.Node) *goquery.Selection) Selection {
 
-	val := arg.Export()
-	switch val.(type) {
-	case Selection:
-		return Selection{s.rt, selFilter(val.(Selection).sel)}
-
+	switch v := arg.(type) {
 	case string:
-		return Selection{s.rt, strFilter(val.(string))}
+		return Selection{s.rt, strFilter(v)}
 
-	case Element:
-		if elem, ok := arg.Export().(Element); ok {
-			return Selection{s.rt, nodeFilter(elem.node)}
-		} else {
-			return Selection{s.rt, s.emptySelection().sel}
+	case goja.Value:
+		switch gv := v.Export().(type) {
+		case Selection:
+			return Selection{s.rt, selFilter(gv.sel)}
+
+		case string:
+			return Selection{s.rt, strFilter(gv)}
+
+		case Element:
+			return Selection{s.rt, nodeFilter(gv.node)}
+
+		default:
+			return s.emptySelection()
 		}
-
 	default:
-		return Selection{s.rt, s.emptySelection().sel}
-	}
-}
-
-func (s Selection) Add(arg goja.Value) Selection {
-	return s.varargFnCall(arg, s.sel.Add, s.sel.AddSelection, s.sel.AddNodes)
-}
-
-func (s Selection) Find(arg goja.Value) Selection {
-	return s.varargFnCall(arg, s.sel.Find, s.sel.FindSelection, s.sel.FindNodes)
-}
-
-func (s Selection) Text() string {
-	return s.sel.Text()
-}
-
-func (s Selection) Attr(name string, def ...goja.Value) goja.Value {
-	val, exists := s.sel.Attr(name)
-	if !exists {
-		if len(def) > 0 {
-			return def[0]
-		}
-		return goja.Undefined()
-	}
-	return s.rt.ToValue(val)
-}
-
-func (s Selection) Html() goja.Value {
-	val, err := s.sel.Html()
-	if err != nil {
-		return goja.Undefined()
-	}
-	return s.rt.ToValue(val)
-}
-
-func optionVal(s *goquery.Selection) string {
-	if val, exists := s.Attr("value"); exists {
-		return val
-	}
-
-	if val, err := s.Html(); err == nil {
-		return val
-	}
-
-	return ""
-}
-
-func (s Selection) Val() goja.Value {
-	switch goquery.NodeName(s.sel) {
-	case "input":
-		return s.Attr("value")
-
-	case "textarea":
-		return s.Html()
-
-	case "button":
-		return s.Attr("value")
-
-	case "option":
-		return s.rt.ToValue(optionVal(s.sel))
-
-	case "select":
-		selected := s.sel.First().Find("option[selected]")
-
-		if _, exists := s.sel.Attr("multiple"); exists {
-			return s.rt.ToValue(selected.Map(func(idx int, opt *goquery.Selection) string { return optionVal(opt) }))
-		} else {
-			return s.rt.ToValue(optionVal(selected))
-		}
-
-	default:
-		return goja.Undefined()
-	}
-}
-
-func (s Selection) Closest(arg goja.Value) Selection {
-	return s.varargFnCall(arg, s.sel.Closest, s.sel.ClosestSelection, s.sel.ClosestNodes)
-}
-
-func (s Selection) Children(def ...string) Selection {
-	if len(def) == 0 {
-		return Selection{s.rt, s.sel.Children()}
-	} else {
-		return Selection{s.rt, s.sel.ChildrenFiltered(def[0])}
-	}
-}
-
-func (s Selection) Contents() Selection {
-	return Selection{s.rt, s.sel.Contents()}
-}
-
-func (s Selection) Each(v goja.Value) Selection {
-	gojaFn, isFn := goja.AssertFunction(v)
-	if isFn {
-		fn := func(idx int, sel *goquery.Selection) {
-			gojaFn(v, s.rt.ToValue(idx), selToElement(s))
-		}
-
-		return Selection{s.rt, s.sel.Each(fn)}
-	} else {
-		panic(s.rt.NewGoError(errors.New("Argument to each() must be a function")))
-		return s
-	}
-}
-
-func (s Selection) End() Selection {
-	return Selection{s.rt, s.sel.End()}
-}
-
-func (s Selection) buildMatcher(v goja.Value, gojaFn goja.Callable) func(int, *goquery.Selection) bool {
-	return func(idx int, sel *goquery.Selection) bool {
-		fnRes, fnErr := gojaFn(v, s.rt.ToValue(idx), s.rt.ToValue(sel))
-		return fnErr == nil && fnRes.ToBoolean()
-	}
-}
-
-func (s Selection) Filter(v goja.Value) Selection {
-	if gojaFn, isFn := goja.AssertFunction(v); isFn {
-		return Selection{s.rt, s.sel.FilterFunction(s.buildMatcher(v, gojaFn))}
-	} else if cmp, isSel := v.Export().(Selection); isSel {
-		return Selection{s.rt, s.sel.FilterSelection(cmp.sel)}
-	} else if str, isStr := v.Export().(string); isStr {
-		return Selection{s.rt, s.sel.Filter(str)}
-	} else {
-		panic(s.rt.NewGoError(errors.New("Argument to filter() must be a function, a selector or a query object")))
-		return Selection{}
-	}
-}
-
-func (s Selection) Is(v goja.Value) bool {
-	if gojaFn, isFn := goja.AssertFunction(v); isFn {
-		return s.sel.IsFunction(s.buildMatcher(v, gojaFn))
-	} else if cmp, isSel := v.Export().(Selection); isSel {
-		return s.sel.IsSelection(cmp.sel)
-	} else if str, isStr := v.Export().(string); isStr {
-		return s.sel.Is(str)
-	} else {
-		panic(s.rt.NewGoError(errors.New("Argument to is() must be a function, a selector or a query object")))
-		return false
-	}
-}
-
-func (s Selection) Eq(idx int) Selection {
-	return Selection{s.rt, s.sel.Eq(idx)}
-}
-
-func (s Selection) First() Selection {
-	return Selection{s.rt, s.sel.First()}
-}
-
-func (s Selection) Last() Selection {
-	return Selection{s.rt, s.sel.Last()}
-}
-
-func (s Selection) Has(arg goja.Value) Selection {
-	return s.varargFnCall(arg, s.sel.Has, s.sel.HasSelection, s.sel.HasNodes)
-}
-
-func (s Selection) Map(v goja.Value) (result []string) {
-	gojaFn, isFn := goja.AssertFunction(v)
-	if isFn {
-		fn := func(idx int, sel *goquery.Selection) string {
-			if fnRes, fnErr := gojaFn(v, s.rt.ToValue(idx), s.rt.ToValue(sel)); fnErr == nil {
-				return fnRes.String()
-			} else {
-				return ""
-			}
-		}
-		return s.sel.Map(fn)
-	} else {
-		panic(s.rt.NewGoError(errors.New("Argument to map() must be a function")))
-		return nil
-	}
-}
-
-func (s Selection) Not(v goja.Value) Selection {
-	if gojaFn, isFn := goja.AssertFunction(v); isFn {
-		return Selection{s.rt, s.sel.NotFunction(s.buildMatcher(v, gojaFn))}
-	} else {
-		return s.varargFnCall(v, s.sel.Not, s.sel.NotSelection, s.sel.NotNodes)
+		errmsg := fmt.Sprintf("Invalid argument: Cannot use a %T as a selector, requires a string or Selection object", arg)
+		panic(s.rt.NewGoError(errors.New(errmsg)))
 	}
 }
 
 func (s Selection) adjacent(unfiltered func() *goquery.Selection,
 	filtered func(string) *goquery.Selection,
 	def ...string) Selection {
-	if len(def) == 0 {
-		return Selection{s.rt, unfiltered()}
-	} else {
+	if len(def) > 0 {
 		return Selection{s.rt, filtered(def[0])}
 	}
+
+	return Selection{s.rt, unfiltered()}
+}
+
+func (s Selection) adjacentUntil(until func(string) *goquery.Selection,
+	untilSelection func(*goquery.Selection) *goquery.Selection,
+	filteredUntil func(string, string) *goquery.Selection,
+	filteredUntilSelection func(string, *goquery.Selection) *goquery.Selection,
+	def ...goja.Value) Selection {
+
+	switch len(def) {
+	case 0:
+		return Selection{s.rt, until("")}
+	case 1:
+		switch selector := def[0].Export().(type) {
+		case string:
+			return Selection{s.rt, until(selector)}
+
+		case Selection:
+			return Selection{s.rt, untilSelection(selector.sel)}
+
+		case nil:
+			return Selection{s.rt, until("")}
+
+		default:
+			panic(s.rt.NewGoError(errors.New("Invalid argument: Expected a selector string or Selection object")))
+		}
+	case 2:
+		filter := def[1].String()
+		switch selector := def[0].Export().(type) {
+		case string:
+			return Selection{s.rt, filteredUntil(filter, selector)}
+
+		case Selection:
+			return Selection{s.rt, filteredUntilSelection(filter, selector.sel)}
+
+		case nil:
+			return Selection{s.rt, filteredUntil(filter, "")}
+
+		default:
+			panic(s.rt.NewGoError(errors.New("Invalid argument: Expected a selector string or Selection object")))
+		}
+	}
+
+	return s.emptySelection()
 }
 
 func (s Selection) Next(def ...string) Selection {
@@ -298,55 +166,9 @@ func (s Selection) Siblings(def ...string) Selection {
 	return s.adjacent(s.sel.Siblings, s.sel.SiblingsFiltered, def...)
 }
 
-func (s Selection) adjacentUntil(until func(string) *goquery.Selection,
-	untilSelection func(*goquery.Selection) *goquery.Selection,
-	filteredUntil func(string, string) *goquery.Selection,
-	filteredUntilSelection func(string, *goquery.Selection) *goquery.Selection,
-	def ...goja.Value) Selection {
-	// empty selector to nextuntil and prevuntil acts like revAll and nextAll
-	// relies on goquery.compileMatcher returning a matcher which fails all matches when the selector being compiled is invalid
-	if len(def) == 0 {
-		return Selection{s.rt, until("")}
-	}
-
-	selector := def[0].Export()
-	if len(def) == 1 {
-		switch selector.(type) {
-		case string:
-			return Selection{s.rt, until(selector.(string))}
-
-		case Selection:
-			return Selection{s.rt, untilSelection(selector.(Selection).sel)}
-
-		case nil:
-			return Selection{s.rt, until("")}
-
-		default:
-			panic(s.rt.NewGoError(errors.New("Invalid argument. The selector must be a string or query object")))
-			return Selection{}
-		}
-	} else {
-		filter := def[1].String()
-		switch selector.(type) {
-		case string:
-			return Selection{s.rt, filteredUntil(filter, selector.(string))}
-
-		case Selection:
-			return Selection{s.rt, filteredUntilSelection(filter, selector.(Selection).sel)}
-
-		case nil:
-			return Selection{s.rt, filteredUntil(filter, "")}
-
-		default:
-			panic(s.rt.NewGoError(errors.New("Invalid argument. The selector must be a string or query object")))
-			return Selection{}
-		}
-	}
-}
-
-// prevUntil, nextUntil and parentsUntil support two args
-// 1st arg is either a selector string, goquery selection object, or nil
-// 2nd arg is filter selector string or nil/undefined
+// prevUntil, nextUntil and parentsUntil support two arguments with mutable type.
+// 1st argument is the selector. Either a selector string, a Selection object, or nil
+// 2nd argument is the filter. Either a selector string or nil/undefined
 func (s Selection) PrevUntil(def ...goja.Value) Selection {
 	return s.adjacentUntil(
 		s.sel.PrevUntil,
@@ -377,35 +199,217 @@ func (s Selection) ParentsUntil(def ...goja.Value) Selection {
 	)
 }
 
-func (s Selection) Slice(start int, def ...int) Selection {
-	if len(def) > 0 {
-		return Selection{s.rt, s.sel.Slice(start, def[0])}
-	} else {
-		return Selection{s.rt, s.sel.Slice(start, s.sel.Length())}
-	}
+func (s Selection) Add(arg interface{}) Selection {
+	return s.varargFnCall(arg, s.sel.Add, s.sel.AddSelection, s.sel.AddNodes)
 }
 
-func (s Selection) Get(def ...int) goja.Value {
-	if len(def) == 0 {
-		var items []goja.Value
+func (s Selection) Find(arg interface{}) Selection {
+	return s.varargFnCall(arg, s.sel.Find, s.sel.FindSelection, s.sel.FindNodes)
+}
 
-		for i := 0; i < len(s.sel.Nodes); i++ {
-			items = append(items, selToElement(s.Eq(i)))
+func (s Selection) Text() string {
+	return s.sel.Text()
+}
+
+func (s Selection) Attr(name string, def ...goja.Value) goja.Value {
+	val, exists := s.sel.Attr(name)
+	if !exists {
+		if len(def) > 0 {
+			return def[0]
+		}
+		return goja.Undefined()
+	}
+	return s.rt.ToValue(val)
+}
+
+func (s Selection) Html() goja.Value {
+	val, err := s.sel.Html()
+	if err != nil {
+		return goja.Undefined()
+	}
+	return s.rt.ToValue(val)
+}
+
+func (s Selection) Val() goja.Value {
+	switch goquery.NodeName(s.sel) {
+	case "input":
+		return s.Attr("value")
+
+	case "textarea":
+		return s.Html()
+
+	case "button":
+		return s.Attr("value")
+
+	case "option":
+		return s.rt.ToValue(valueOrHTML(s.sel))
+
+	case "select":
+		selected := s.sel.First().Find("option[selected]")
+
+		if _, exists := s.sel.Attr("multiple"); exists {
+			return s.rt.ToValue(selected.Map(func(idx int, opt *goquery.Selection) string { return valueOrHTML(opt) }))
+		} else {
+			return s.rt.ToValue(valueOrHTML(selected))
 		}
 
-		return s.rt.ToValue(items)
-	} else if def[0] < s.sel.Length() && def[0] > -s.sel.Length() {
-		return selToElement(s.Eq(def[0]))
-	} else {
+	default:
 		return goja.Undefined()
 	}
 }
 
-func (s Selection) ToArray() (items []Selection) {
-	for i := range s.sel.Nodes {
-		items = append(items, Selection{s.rt, s.sel.Eq(i)})
+func (s Selection) Closest(arg interface{}) Selection {
+	return s.varargFnCall(arg, s.sel.Closest, s.sel.ClosestSelection, s.sel.ClosestNodes)
+}
+
+func (s Selection) Children(def ...string) Selection {
+	if len(def) == 0 {
+		return Selection{s.rt, s.sel.Children()}
 	}
-	return
+
+	return Selection{s.rt, s.sel.ChildrenFiltered(def[0])}
+}
+
+func (s Selection) Contents() Selection {
+	return Selection{s.rt, s.sel.Contents()}
+}
+
+func (s Selection) Each(v goja.Value) Selection {
+	gojaFn, isFn := goja.AssertFunction(v)
+	if !isFn {
+		panic(s.rt.NewGoError(errors.New("Argument to each() must be a function")))
+	}
+
+	fn := func(idx int, sel *goquery.Selection) {
+		gojaFn(v, s.rt.ToValue(idx), selToElement(s))
+	}
+
+	return Selection{s.rt, s.sel.Each(fn)}
+}
+
+func (s Selection) End() Selection {
+	return Selection{s.rt, s.sel.End()}
+}
+
+func (s Selection) buildMatcher(v goja.Value, gojaFn goja.Callable) func(int, *goquery.Selection) bool {
+	return func(idx int, sel *goquery.Selection) bool {
+		fnRes, fnErr := gojaFn(v, s.rt.ToValue(idx), s.rt.ToValue(sel))
+
+		if fnErr != nil {
+			panic(fnErr)
+		}
+
+		return fnRes.ToBoolean()
+	}
+}
+
+func (s Selection) Filter(v goja.Value) Selection {
+	switch val := v.Export().(type) {
+	case string:
+		return Selection{s.rt, s.sel.Filter(val)}
+
+	case Selection:
+		return Selection{s.rt, s.sel.FilterSelection(val.sel)}
+	}
+
+	gojaFn, isFn := goja.AssertFunction(v)
+	if !isFn {
+		panic(s.rt.NewGoError(errors.New("Argument to filter() must be a function, a selector or a query object")))
+	}
+
+	return Selection{s.rt, s.sel.FilterFunction(s.buildMatcher(v, gojaFn))}
+}
+
+func (s Selection) Is(v goja.Value) bool {
+	switch val := v.Export().(type) {
+	case string:
+		return s.sel.Is(val)
+
+	case Selection:
+		return s.sel.IsSelection(val.sel)
+	}
+
+	gojaFn, isFn := goja.AssertFunction(v)
+	if !isFn {
+		panic(s.rt.NewGoError(errors.New("Argument to is() must be a function, a selector or a query object")))
+	}
+
+	return s.sel.IsFunction(s.buildMatcher(v, gojaFn))
+}
+
+func (s Selection) Eq(idx int) Selection {
+	return Selection{s.rt, s.sel.Eq(idx)}
+}
+
+func (s Selection) First() Selection {
+	return Selection{s.rt, s.sel.First()}
+}
+
+func (s Selection) Last() Selection {
+	return Selection{s.rt, s.sel.Last()}
+}
+
+func (s Selection) Has(arg interface{}) Selection {
+	return s.varargFnCall(arg, s.sel.Has, s.sel.HasSelection, s.sel.HasNodes)
+}
+
+func (s Selection) Map(v goja.Value) (result []string) {
+	gojaFn, isFn := goja.AssertFunction(v)
+	if !isFn {
+		panic(s.rt.NewGoError(errors.New("Argument to map() must be a function")))
+	}
+
+	fn := func(idx int, sel *goquery.Selection) string {
+		if fnRes, fnErr := gojaFn(v, s.rt.ToValue(idx), s.rt.ToValue(sel)); fnErr == nil {
+			return fnRes.String()
+		} else {
+			return ""
+		}
+	}
+
+	return s.sel.Map(fn)
+}
+
+func (s Selection) Not(v goja.Value) Selection {
+	gojaFn, isFn := goja.AssertFunction(v)
+	if !isFn {
+		return s.varargFnCall(v, s.sel.Not, s.sel.NotSelection, s.sel.NotNodes)
+	}
+
+	return Selection{s.rt, s.sel.NotFunction(s.buildMatcher(v, gojaFn))}
+}
+
+func (s Selection) Slice(start int, def ...int) Selection {
+	if len(def) > 0 {
+		return Selection{s.rt, s.sel.Slice(start, def[0])}
+	}
+
+	return Selection{s.rt, s.sel.Slice(start, s.sel.Length())}
+}
+
+func (s Selection) Get(def ...int) goja.Value {
+	switch {
+	case len(def) == 0:
+		var items []goja.Value
+		for i := 0; i < len(s.sel.Nodes); i++ {
+			items = append(items, selToElement(s.Eq(i)))
+		}
+		return s.rt.ToValue(items)
+
+	case def[0] < s.sel.Length() && def[0] > -s.sel.Length():
+		return selToElement(s.Eq(def[0]))
+
+	default:
+		return goja.Undefined()
+	}
+}
+
+func (s Selection) ToArray() []Selection {
+	items := make([]Selection, len(s.sel.Nodes))
+	for i := range s.sel.Nodes {
+		items[i] = Selection{s.rt, s.sel.Eq(i)}
+	}
+	return items
 }
 
 func (s Selection) Size() int {
@@ -417,20 +421,16 @@ func (s Selection) Index(def ...goja.Value) int {
 		return s.sel.Index()
 	}
 
-	v := def[0].Export()
-	switch v.(type) {
+	switch v := def[0].Export().(type) {
 	case Selection:
-		return s.sel.IndexOfSelection(v.(Selection).sel)
+		return s.sel.IndexOfSelection(v.sel)
 
 	case string:
-		return s.sel.IndexSelector(v.(string))
+		return s.sel.IndexSelector(v)
 
 	case Element:
-		if elem, ok := def[0].Export().(Element); ok {
-			return s.sel.IndexOfNode(elem.node)
-		} else {
-			return -1
-		}
+		return s.sel.IndexOfNode(v.node)
+
 	default:
 		return -1
 	}
@@ -466,56 +466,8 @@ func toDataName(attrName string) string {
 	return attrToDataName.Replace(attrName)
 }
 
-// return numeric value when the representation is unchanged by conversion to float and back
-// other numeric values (ie "101.00" "1E02") are left as strings
-func toNumeric(val string) (float64, bool) {
-	if fltVal, err := strconv.ParseFloat(val, 64); err != nil {
-		return 0, false
-	} else if repr := strconv.FormatFloat(fltVal, 'f', -1, 64); repr == val {
-		return fltVal, true
-	} else {
-		return 0, false
-	}
-}
-
-func convert(val string) interface{} {
-	if len(val) == 0 {
-		return goja.Undefined()
-	} else if val[0] == '{' || val[0] == '[' {
-		var subdata interface{}
-
-		err := json.Unmarshal([]byte(val), &subdata)
-		if err == nil {
-			return subdata
-		} else {
-			return val
-		}
-	} else {
-		switch val {
-		case "true":
-			return true
-
-		case "false":
-			return false
-
-		case "null":
-			return goja.Undefined()
-
-		case "undefined":
-			return goja.Undefined()
-
-		default:
-			if fltVal, isOk := toNumeric(val); isOk {
-				return fltVal
-			} else {
-				return val
-			}
-		}
-	}
-}
-
-//when 0 args, read all data from attributes beginning with "data-".
-//when 1 arg, read requested data attr
+// When 0 arguments: Read all data from attributes beginning with "data-", build a goja hashmap of attributeName -> valuee
+// When 1 argument: Treat arguemnt as suffix to "data-" and try to read the request attribute
 func (s Selection) Data(def ...string) goja.Value {
 	if s.sel.Length() == 0 || len(s.sel.Nodes[0].Attr) == 0 {
 		return goja.Undefined()
@@ -524,7 +476,7 @@ func (s Selection) Data(def ...string) goja.Value {
 	if len(def) > 0 {
 		val, exists := s.sel.Attr("data-" + toAttrName(def[0]))
 		if exists {
-			return s.rt.ToValue(convert(val))
+			return s.rt.ToValue(convertDataAttrVal(val))
 		} else {
 			return goja.Undefined()
 		}
@@ -532,7 +484,7 @@ func (s Selection) Data(def ...string) goja.Value {
 		data := make(map[string]interface{})
 		for _, attr := range s.sel.Nodes[0].Attr {
 			if strings.HasPrefix(attr.Key, "data-") && len(attr.Key) > 5 {
-				data[toDataName(attr.Key[5:])] = convert(attr.Val)
+				data[toDataName(attr.Key[5:])] = convertDataAttrVal(attr.Val)
 			}
 		}
 		return s.rt.ToValue(data)
