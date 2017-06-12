@@ -103,46 +103,27 @@ func (t *Tracer) Trace() *httptrace.ClientTrace {
 func (t *Tracer) Done() Trail {
 	done := time.Now()
 
-	// Cover for if the server closed the connection without a response.
-	if t.gotFirstResponseByte.IsZero() {
-		t.gotFirstResponseByte = done
-	}
-
-	// GotConn is not guaranteed to be called in all cases.
-	if t.gotConn.IsZero() {
-		t.gotConn = t.getConn
-	}
-
 	trail := Trail{
-		Blocked:    t.gotConn.Sub(t.getConn),
-		Connecting: t.connectDone.Sub(t.connectStart),
-		Sending:    t.wroteRequest.Sub(t.connectDone),
-		Waiting:    t.gotFirstResponseByte.Sub(t.wroteRequest),
-		Receiving:  done.Sub(t.gotFirstResponseByte),
-
 		ConnReused:     t.connReused,
 		ConnRemoteAddr: t.connRemoteAddr,
-
-		BytesRead:    t.bytesRead,
-		BytesWritten: t.bytesWritten,
+		BytesRead:      t.bytesRead,
+		BytesWritten:   t.bytesWritten,
 	}
 
-	// If the connection was reused, it never blocked.
-	if t.connReused {
-		trail.Blocked = 0
-		trail.Connecting = 0
+	if !t.gotConn.IsZero() && !t.gotConn.IsZero() {
+		trail.Blocked = t.gotConn.Sub(t.getConn)
 	}
-
-	// If the connection failed, we'll never get any (meaningful) data for these.
-	if t.protoError != nil {
-		trail.Sending = 0
-		trail.Waiting = 0
-		trail.Receiving = 0
-
-		// URL is invalid/unroutable.
-		if trail.Blocked < 0 {
-			trail.Blocked = 0
+	if !t.connectDone.IsZero() && !t.connectStart.IsZero() {
+		trail.Connecting = t.connectDone.Sub(t.connectStart)
+	}
+	if !t.wroteRequest.IsZero() {
+		trail.Sending = t.wroteRequest.Sub(t.connectDone)
+		if !t.gotFirstResponseByte.IsZero() {
+			trail.Waiting = t.gotFirstResponseByte.Sub(t.wroteRequest)
 		}
+	}
+	if !t.gotFirstResponseByte.IsZero() {
+		trail.Receiving = done.Sub(t.gotFirstResponseByte)
 	}
 
 	// Calculate total times using adjusted values.

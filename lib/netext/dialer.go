@@ -52,13 +52,15 @@ func (d Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn, 
 	if strings.ContainsRune(ipStr, ':') {
 		ipStr = "[" + ipStr + "]"
 	}
-	conn, err := d.Dialer.DialContext(ctx, proto, ipStr+":"+addr[delimiter+1:])
+	rawConn, err := d.Dialer.DialContext(ctx, proto, ipStr+":"+addr[delimiter+1:])
 	if err != nil {
 		return nil, err
 	}
+	conn := &Conn{Conn: rawConn}
 	if v := ctx.Value(ctxKeyTracer); v != nil {
 		tracer := v.(*Tracer)
-		return &Conn{conn, &tracer.bytesRead, &tracer.bytesWritten}, nil
+		conn.BytesRead = &tracer.bytesRead
+		conn.BytesWritten = &tracer.bytesWritten
 	}
 	return conn, err
 }
