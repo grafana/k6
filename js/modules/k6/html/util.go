@@ -4,28 +4,10 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"strings"
-
 	"github.com/PuerkitoBio/goquery"
 	"github.com/dop251/goja"
-	"github.com/serenize/snaker"
-
 	gohtml "golang.org/x/net/html"
 )
-
-func attrToProperty(s string) string {
-	idx := strings.Index(s, "-")
-
-	if idx == -1 {
-		return s
-	}
-
-	return s[0:idx] + snaker.SnakeToCamel(strings.Replace(s[idx+1:], "-", "_", -1))
-}
-
-func propertyToAttr(attrName string) string {
-	return strings.Replace(snaker.CamelToSnake(attrName), "_", "-", -1)
-}
 
 func namespaceURI(prefix string) string {
 	switch prefix {
@@ -61,20 +43,21 @@ func getHtmlAttr(node *gohtml.Node, name string) *gohtml.Attribute {
 }
 
 func elemList(s Selection) (items []goja.Value) {
-	items = make([]goja.Value, s.Size())
 	for i := 0; i < s.Size(); i++ {
-		items[i] = selToElement(s.Eq(i))
+		items = append(items, selToElement(s.Eq(i)))
 	}
 	return items
 }
 
 func nodeToElement(e Element, node *gohtml.Node) goja.Value {
-	// Goquery does not expose a way to build a goquery.Selection with an arbitrary html.Node.
-	// Workaround by adding a node to an empty Selection
+	// Goquery does not expose a way to build a goquery.Selection with an arbitraty html.Node
+	// so workaround by making an empty Selection and directly adding the node
 	emptySel := e.sel.emptySelection()
 	emptySel.sel.Nodes = append(emptySel.sel.Nodes, node)
 
-	return selToElement(emptySel)
+	elem := Element{node, &emptySel}
+
+	return emptySel.rt.ToValue(elem)
 }
 
 func selToElement(sel Selection) goja.Value {
@@ -83,22 +66,8 @@ func selToElement(sel Selection) goja.Value {
 	}
 
 	elem := Element{sel.sel.Nodes[0], &sel}
-	switch elem.node.Data {
-	case "a":
-		return sel.rt.ToValue(AnchorElement{HrefElement{elem}})
 
-	case "area":
-		return sel.rt.ToValue(AreaElement{HrefElement{elem}})
-
-	case "base":
-		return sel.rt.ToValue(BaseElement{elem})
-
-	case "button":
-		return sel.rt.ToValue(ButtonElement{elem})
-
-	default:
-		return sel.rt.ToValue(elem)
-	}
+	return sel.rt.ToValue(elem)
 }
 
 // Try to read numeric values in data- attributes.
@@ -148,23 +117,4 @@ func convertDataAttrVal(val string) interface{} {
 			}
 		}
 	}
-}
-
-func (e Element) ownerFormSel() (*goquery.Selection, bool) {
-	prtForm := e.sel.sel.Closest("form")
-	if prtForm.Length() > 0 {
-		return prtForm, true
-	}
-
-	formId := e.attrAsString("form")
-	if formId == "" {
-		return nil, false
-	}
-
-	findForm := e.sel.sel.Parents().Last().Find("#" + formId)
-	if findForm.Length() == 0 {
-		return nil, false
-	}
-
-	return findForm, true
 }
