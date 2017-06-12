@@ -27,6 +27,7 @@ import (
 	"testing"
 
 	"github.com/loadimpact/k6/api/common"
+	"github.com/loadimpact/k6/core"
 	"github.com/loadimpact/k6/lib"
 	log "github.com/sirupsen/logrus"
 	logtest "github.com/sirupsen/logrus/hooks/test"
@@ -70,7 +71,7 @@ func TestLogger(t *testing.T) {
 }
 
 func TestWithEngine(t *testing.T) {
-	engine, err := lib.NewEngine(nil, lib.Options{})
+	engine, err := core.NewEngine(nil, lib.Options{})
 	if !assert.NoError(t, err) {
 		return
 	}

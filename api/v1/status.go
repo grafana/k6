@@ -21,7 +21,7 @@
 package v1
 
 import (
-	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/core"
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -35,7 +35,7 @@ type Status struct {
 	Tainted bool `json:"tainted"`
 }
 
-func NewStatus(engine *lib.Engine) Status {
+func NewStatus(engine *core.Engine) Status {
 	return Status{
 		Paused:  null.BoolFrom(engine.IsPaused()),
 		VUs:     null.IntFrom(engine.GetVUs()),

@@ -26,6 +26,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/loadimpact/k6/core"
 	"github.com/loadimpact/k6/lib"
 	"github.com/manyminds/api2go/jsonapi"
 	"github.com/stretchr/testify/assert"
@@ -53,7 +54,7 @@ func TestGetGroups(t *testing.T) {
 	g2, err := g1.Group("group 2")
 	assert.NoError(t, err)
 
-	engine, err := lib.NewEngine(groupDummyRunner{g0}, lib.Options{})
+	engine, err := core.NewEngine(groupDummyRunner{g0}, lib.Options{})
 	assert.NoError(t, err)
 
 	t.Run("list", func(t *testing.T) {

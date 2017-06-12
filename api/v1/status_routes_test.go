@@ -27,6 +27,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/loadimpact/k6/core"
 	"github.com/loadimpact/k6/lib"
 	"github.com/manyminds/api2go/jsonapi"
 	"github.com/stretchr/testify/assert"
@@ -34,7 +35,7 @@ import (
 )
 
 func TestGetStatus(t *testing.T) {
-	engine, err := lib.NewEngine(nil, lib.Options{})
+	engine, err := core.NewEngine(nil, lib.Options{})
 	assert.NoError(t, err)
 
 	rw := httptest.NewRecorder()
@@ -75,7 +76,7 @@ func TestPatchStatus(t *testing.T) {
 
 	for name, indata := range testdata {
 		t.Run(name, func(t *testing.T) {
-			engine, err := lib.NewEngine(nil, lib.Options{})
+			engine, err := core.NewEngine(nil, lib.Options{})
 			assert.NoError(t, err)
 
 			body, err := jsonapi.Marshal(indata.Status)

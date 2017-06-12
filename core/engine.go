@@ -18,7 +18,7 @@
  *
  */
 
-package lib
+package core
 
 import (
 	"context"
@@ -28,6 +28,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/stats"
 	"github.com/pkg/errors"
@@ -47,7 +48,7 @@ const (
 )
 
 type vuEntry struct {
-	VU     VU
+	VU     lib.VU
 	Cancel context.CancelFunc
 
 	Samples    []stats.Sample
@@ -57,12 +58,12 @@ type vuEntry struct {
 
 // The Engine is the beating heart of K6.
 type Engine struct {
-	Runner    Runner
-	Options   Options
-	Collector Collector
+	Runner    lib.Runner
+	Options   lib.Options
+	Collector lib.Collector
 	Logger    *log.Logger
 
-	Stages      []Stage
+	Stages      []lib.Stage
 	Metrics     map[string]*stats.Metric
 	MetricsLock sync.RWMutex
 
@@ -101,7 +102,7 @@ type Engine struct {
 	cutoff time.Time
 }
 
-func NewEngine(r Runner, o Options) (*Engine, error) {
+func NewEngine(r lib.Runner, o lib.Options) (*Engine, error) {
 	e := &Engine{
 		Runner:  r,
 		Options: o,
@@ -126,9 +127,9 @@ func NewEngine(r Runner, o Options) (*Engine, error) {
 	if o.Stages != nil {
 		e.Stages = o.Stages
 	} else if o.Duration.Valid && o.Duration.Duration > 0 {
-		e.Stages = []Stage{{Duration: o.Duration}}
+		e.Stages = []lib.Stage{{Duration: o.Duration}}
 	} else {
-		e.Stages = []Stage{{}}
+		e.Stages = []lib.Stage{{}}
 	}
 
 	e.thresholds = o.Thresholds
@@ -497,9 +498,9 @@ func (e *Engine) processStages(dT time.Duration) (bool, error) {
 		to := stage.Target.Int64
 		t := 1.0
 		if stage.Duration.Duration > 0 {
-			t = Clampf(float64(e.atTime-e.atStageSince)/float64(stage.Duration.Duration), 0.0, 1.0)
+			t = lib.Clampf(float64(e.atTime-e.atStageSince)/float64(stage.Duration.Duration), 0.0, 1.0)
 		}
-		vus := Lerp(from, to, t)
+		vus := lib.Lerp(from, to, t)
 		if e.vus != vus {
 			e.Logger.WithFields(log.Fields{"from": e.vus, "to": vus}).Debug("processStages: interpolating...")
 			if err := e.setVUsNoLock(vus); err != nil {

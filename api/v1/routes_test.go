@@ -27,11 +27,11 @@ import (
 	"testing"
 
 	"github.com/loadimpact/k6/api/common"
-	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/core"
 	"github.com/stretchr/testify/assert"
 )
 
-func newRequestWithEngine(engine *lib.Engine, method, target string, body io.Reader) *http.Request {
+func newRequestWithEngine(engine *core.Engine, method, target string, body io.Reader) *http.Request {
 	r := httptest.NewRequest(method, target, body)
 	return r.WithContext(common.WithEngine(r.Context(), engine))
 }

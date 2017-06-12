@@ -42,6 +42,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/ghodss/yaml"
 	"github.com/loadimpact/k6/api"
+	"github.com/loadimpact/k6/core"
 	"github.com/loadimpact/k6/js"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/loader"
@@ -461,7 +462,7 @@ func actionRun(cc *cli.Context) error {
 	fmt.Fprintf(color.Output, "\n")
 
 	// Make the Engine
-	engine, err := lib.NewEngine(runner, opts)
+	engine, err := core.NewEngine(runner, opts)
 	if err != nil {
 		log.WithError(err).Error("Couldn't create the engine")
 		return err
