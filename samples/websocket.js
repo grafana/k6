@@ -52,5 +52,5 @@ export default function () {
         }, 2000);
     });
 
-    check(response, { "status is 101": (r) => r && r.status_code === 101 });
+    check(response, { "status is 101": (r) => r && r.status === 101 });
 };
