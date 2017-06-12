@@ -51,8 +51,7 @@ type Socket struct {
 
 	pingSendTimestamps map[string]time.Time
 	pingSendCounter    int
-	totalPingCount     float64
-	totalPingDuration  time.Duration
+	pingDeltas         []time.Duration
 }
 
 const writeWait = 10 * time.Second
@@ -66,37 +65,84 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) *http.Re
 	rt := common.GetRuntime(ctx)
 	state := common.GetState(ctx)
 
-	setupFn, userTags, header, err := parseArgs(rt, args)
-	if err != nil {
-		// Argument parsing errors should be passed to the user
-		common.Throw(rt, err)
+	var callableV goja.Value
+	var paramsV goja.Value
+
+	// The params argument is optional
+	switch len(args) {
+	case 2:
+		paramsV = args[0]
+		callableV = args[1]
+	case 1:
+		paramsV = goja.Undefined()
+		callableV = args[0]
+	default:
+		common.Throw(rt, errors.New("Invalid number of arguments to ws.connect"))
 		return nil
 	}
 
-	tags := map[string]string{
-		"url":   url,
-		"group": state.Group.Path,
+	// Get the callable (required)
+	setupFn, isFunc := goja.AssertFunction(callableV)
+	if !isFunc {
+		common.Throw(rt, errors.New("Last argument to ws.connect must be a function"))
+		return nil
 	}
-	// Merge with the user-provided tags
-	for k, v := range userTags {
-		tags[k] = v
+
+	// Leave header to nil by default so we can pass it directly to the Dialer
+	var header http.Header
+
+	tags := map[string]string{
+		"url":         url,
+		"group":       state.Group.Path,
+		"status":      "0",
+		"subprotocol": "",
+	}
+
+	// Parse the optional second argument (params)
+	if !goja.IsUndefined(paramsV) && !goja.IsNull(paramsV) {
+		params := paramsV.ToObject(rt)
+		for _, k := range params.Keys() {
+			switch k {
+			case "headers":
+				header = http.Header{}
+				headersV := params.Get(k)
+				if goja.IsUndefined(headersV) || goja.IsNull(headersV) {
+					continue
+				}
+				headersObj := headersV.ToObject(rt)
+				if headersObj == nil {
+					continue
+				}
+				for _, key := range headersObj.Keys() {
+					header.Set(key, headersObj.Get(key).String())
+				}
+			case "tags":
+				tagsV := params.Get(k)
+				if goja.IsUndefined(tagsV) || goja.IsNull(tagsV) {
+					continue
+				}
+				tagObj := tagsV.ToObject(rt)
+				if tagObj == nil {
+					continue
+				}
+				for _, key := range tagObj.Keys() {
+					tags[key] = tagObj.Get(key).String()
+				}
+			}
+		}
+
 	}
 
 	var bytesRead, bytesWritten int64
 	// Pass a custom net.Dial function to websocket.Dialer that will substitute
 	// the underlying net.Conn with our own tracked netext.Conn
 	netDial := func(network, address string) (net.Conn, error) {
-		var err error
-		var conn net.Conn
-
-		dialer := state.Dialer
-		if conn, err = dialer.DialContext(ctx, network, address); err != nil {
-			return nil, err
+		conn, err := state.Dialer.DialContext(ctx, network, address)
+		if err != nil {
+			return conn, err
 		}
 
-		trackedConn := netext.TrackConn(conn, &bytesRead, &bytesWritten)
-
-		return trackedConn, nil
+		return netext.TrackConn(conn, &bytesRead, &bytesWritten), nil
 	}
 
 	wsd := websocket.Dialer{
@@ -189,13 +235,12 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) *http.Re
 				{Metric: metrics.DataSent, Time: end, Tags: tags, Value: float64(bytesWritten)},
 			}
 
-			if socket.totalPingCount > 0 {
-				avgPingRoundtrip := float64(socket.totalPingDuration) / socket.totalPingCount
+			for _, pingDelta := range socket.pingDeltas {
 				samples = append(samples, stats.Sample{
 					Metric: metrics.WSPing,
 					Time:   end,
 					Tags:   tags,
-					Value:  stats.D(time.Duration(avgPingRoundtrip)),
+					Value:  stats.D(pingDelta),
 				})
 			}
 
@@ -259,8 +304,7 @@ func (s *Socket) trackPong(pingID string) {
 	}
 	pingTimestamp := s.pingSendTimestamps[pingID]
 
-	s.totalPingDuration += pongTimestamp.Sub(pingTimestamp)
-	s.totalPingCount++
+	s.pingDeltas = append(s.pingDeltas, pongTimestamp.Sub(pingTimestamp))
 }
 
 func (s *Socket) SetTimeout(fn goja.Callable, timeoutMs int) {
@@ -307,18 +351,19 @@ func (s *Socket) Close(args ...goja.Value) {
 
 // Attempts to close the websocket gracefully
 func (s *Socket) closeConnection(code int) error {
-
 	var err error
+
 	s.shutdownOnce.Do(func() {
 		rt := common.GetRuntime(s.ctx)
 
-		err := s.conn.WriteControl(websocket.CloseMessage,
+		writeErr := s.conn.WriteControl(websocket.CloseMessage,
 			websocket.FormatCloseMessage(code, ""),
 			time.Now().Add(writeWait),
 		)
-		if err != nil {
-			s.handleEvent("error", rt.ToValue(err))
+		if writeErr != nil {
 			// Just call the handler, we'll try to close the connection anyway
+			s.handleEvent("error", rt.ToValue(err))
+			err = writeErr
 		}
 		s.conn.Close()
 
@@ -346,71 +391,4 @@ func readPump(conn *websocket.Conn, readChan chan []byte, errorChan chan error) 
 
 		readChan <- message
 	}
-}
-
-func parseArgs(rt *goja.Runtime, args []goja.Value) (goja.Callable, map[string]string, http.Header, error) {
-	var callableV goja.Value
-	var paramsV goja.Value
-
-	// The params argument is optional
-	switch len(args) {
-	case 2:
-		paramsV = args[0]
-		callableV = args[1]
-	case 1:
-		paramsV = goja.Undefined()
-		callableV = args[0]
-	default:
-		return nil, nil, nil, errors.New("Invalid number of arguments to ws.connect")
-	}
-
-	// Get the callable (required)
-	var callable goja.Callable
-	var isFunc bool
-	if callable, isFunc = goja.AssertFunction(callableV); !isFunc {
-		return nil, nil, nil, errors.New("Last argument to ws.connect must be a function")
-	}
-
-	// Leave header to nil by default so we can pass it directly to the Dialer
-	var header http.Header
-	tags := map[string]string{
-		"status":      "0",
-		"subprotocol": "",
-	}
-
-	if !goja.IsUndefined(paramsV) && !goja.IsNull(paramsV) {
-		params := paramsV.ToObject(rt)
-		for _, k := range params.Keys() {
-			switch k {
-			case "headers":
-				header = http.Header{}
-				headersV := params.Get(k)
-				if goja.IsUndefined(headersV) || goja.IsNull(headersV) {
-					continue
-				}
-				headersObj := headersV.ToObject(rt)
-				if headersObj == nil {
-					continue
-				}
-				for _, key := range headersObj.Keys() {
-					header.Set(key, headersObj.Get(key).String())
-				}
-			case "tags":
-				tagsV := params.Get(k)
-				if goja.IsUndefined(tagsV) || goja.IsNull(tagsV) {
-					continue
-				}
-				tagObj := tagsV.ToObject(rt)
-				if tagObj == nil {
-					continue
-				}
-				for _, key := range tagObj.Keys() {
-					tags[key] = tagObj.Get(key).String()
-				}
-			}
-		}
-
-	}
-
-	return callable, tags, header, nil
 }
