@@ -60,13 +60,6 @@ func parseURL(u *url.URL) (client.Client, client.BatchPointsConfig, error) {
 		return nil, batchConf, err
 	}
 
-	// Create database if it does not exist
-	q := client.NewQuery("CREATE DATABASE "+batchConf.Database, "", "")
-	_, err = c.Query(q)
-	if err != nil {
-		return nil, batchConf, err
-	}
-
 	return c, batchConf, nil
 }
 

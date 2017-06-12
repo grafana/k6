@@ -54,8 +54,12 @@ func cliInt64(cc *cli.Context, name string) null.Int {
 }
 
 // cliDuration returns a CLI argument as a duration string, which is invalid if not given.
-func cliDuration(cc *cli.Context, name string) null.String {
-	return null.NewString(cc.Duration(name).String(), cc.IsSet(name))
+func cliDuration(cc *cli.Context, name string, errdst *error) lib.NullDuration {
+	d, err := time.ParseDuration(cc.Duration(name).String())
+	if err != nil {
+		*errdst = err
+	}
+	return lib.NullDuration{Duration: lib.Duration(d), Valid: cc.IsSet(name)}
 }
 
 func roundDuration(d, to time.Duration) time.Duration {
@@ -71,7 +75,7 @@ func ParseStage(s string) (lib.Stage, error) {
 		if err != nil {
 			return stage, err
 		}
-		stage.Duration = d
+		stage.Duration = lib.NullDurationFrom(d)
 	}
 	if len(parts) > 1 && parts[1] != "" {
 		vus, err := strconv.ParseInt(parts[1], 10, 64)

@@ -21,45 +21,26 @@
 package lib
 
 import (
-	"encoding/json"
-	"time"
-
 	"github.com/loadimpact/k6/stats"
-
 	"gopkg.in/guregu/null.v3"
 )
 
-type Duration time.Duration
-
-func (d *Duration) UnmarshalJSON(data []byte) error {
-	var str string
-	if err := json.Unmarshal(data, &str); err != nil {
-		return err
-	}
-
-	v, err := time.ParseDuration(str)
-	if err != nil {
-		return err
-	}
-
-	*d = Duration(v)
-
-	return nil
-}
-
 type Options struct {
-	Paused     null.Bool   `json:"paused"`
-	VUs        null.Int    `json:"vus"`
-	VUsMax     null.Int    `json:"vusMax"`
-	Duration   null.String `json:"duration"`
-	Iterations null.Int    `json:"iterations"`
-	Stages     []Stage     `json:"stages"`
+	Paused     null.Bool    `json:"paused"`
+	VUs        null.Int     `json:"vus"`
+	VUsMax     null.Int     `json:"vusMax"`
+	Duration   NullDuration `json:"duration"`
+	Iterations null.Int     `json:"iterations"`
+	Stages     []Stage      `json:"stages"`
 
 	Linger        null.Bool `json:"linger"`
 	NoUsageReport null.Bool `json:"noUsageReport"`
 
-	MaxRedirects          null.Int  `json:"maxRedirects"`
-	InsecureSkipTLSVerify null.Bool `json:"insecureSkipTLSVerify"`
+	MaxRedirects          null.Int    `json:"maxRedirects"`
+	InsecureSkipTLSVerify null.Bool   `json:"insecureSkipTLSVerify"`
+	NoConnectionReuse     null.Bool   `json:"noConnectionReuse"`
+	UserAgent             null.String `json:"userAgent"`
+	Throw                 null.Bool   `json:"throw"`
 
 	Thresholds map[string]stats.Thresholds `json:"thresholds"`
 
@@ -98,21 +79,20 @@ func (o Options) Apply(opts Options) Options {
 	if opts.InsecureSkipTLSVerify.Valid {
 		o.InsecureSkipTLSVerify = opts.InsecureSkipTLSVerify
 	}
+	if opts.NoConnectionReuse.Valid {
+		o.NoConnectionReuse = opts.NoConnectionReuse
+	}
+	if opts.UserAgent.Valid {
+		o.UserAgent = opts.UserAgent
+	}
+	if opts.Throw.Valid {
+		o.Throw = opts.Throw
+	}
 	if opts.Thresholds != nil {
 		o.Thresholds = opts.Thresholds
 	}
 	if opts.External != nil {
 		o.External = opts.External
 	}
-	return o
-}
-
-func (o Options) SetAllValid(valid bool) Options {
-	o.Paused.Valid = valid
-	o.VUs.Valid = valid
-	o.VUsMax.Valid = valid
-	o.Duration.Valid = valid
-	o.Linger.Valid = valid
-	o.NoUsageReport.Valid = valid
 	return o
 }

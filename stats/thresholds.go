@@ -23,43 +23,53 @@ package stats
 import (
 	"encoding/json"
 
+	"github.com/dop251/goja"
 	"github.com/pkg/errors"
-	"github.com/robertkrimen/otto"
 )
 
-const jsEnv = `
+const jsEnvSrc = `
 function p(pct) {
 	return __sink__.P(pct/100.0);
 };
 `
 
+var jsEnv *goja.Program
+
+func init() {
+	pgm, err := goja.Compile("__env__", jsEnvSrc, true)
+	if err != nil {
+		panic(err)
+	}
+	jsEnv = pgm
+}
+
 type Threshold struct {
 	Source string
 	Failed bool
 
-	script *otto.Script
-	vm     *otto.Otto
+	pgm *goja.Program
+	rt  *goja.Runtime
 }
 
-func NewThreshold(src string, vm *otto.Otto) (*Threshold, error) {
-	script, err := vm.Compile("__threshold__", src)
+func NewThreshold(src string, rt *goja.Runtime) (*Threshold, error) {
+	pgm, err := goja.Compile("__threshold__", src, true)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Threshold{
 		Source: src,
-		script: script,
-		vm:     vm,
+		pgm:    pgm,
+		rt:     rt,
 	}, nil
 }
 
 func (t Threshold) RunNoTaint() (bool, error) {
-	v, err := t.vm.Run(t.script)
+	v, err := t.rt.RunProgram(t.pgm)
 	if err != nil {
 		return false, err
 	}
-	return v.ToBoolean()
+	return v.ToBoolean(), nil
 }
 
 func (t *Threshold) Run() (bool, error) {
@@ -71,36 +81,31 @@ func (t *Threshold) Run() (bool, error) {
 }
 
 type Thresholds struct {
-	VM         *otto.Otto
+	Runtime    *goja.Runtime
 	Thresholds []*Threshold
 }
 
 func NewThresholds(sources []string) (Thresholds, error) {
-	vm := otto.New()
-
-	if _, err := vm.Eval(jsEnv); err != nil {
+	rt := goja.New()
+	if _, err := rt.RunProgram(jsEnv); err != nil {
 		return Thresholds{}, errors.Wrap(err, "builtin")
 	}
 
 	ts := make([]*Threshold, len(sources))
 	for i, src := range sources {
-		t, err := NewThreshold(src, vm)
+		t, err := NewThreshold(src, rt)
 		if err != nil {
 			return Thresholds{}, errors.Wrapf(err, "%d", i)
 		}
 		ts[i] = t
 	}
-	return Thresholds{vm, ts}, nil
+	return Thresholds{rt, ts}, nil
 }
 
 func (ts *Thresholds) UpdateVM(sink Sink) error {
-	if err := ts.VM.Set("__sink__", sink); err != nil {
-		return err
-	}
+	ts.Runtime.Set("__sink__", sink)
 	for k, v := range sink.Format() {
-		if err := ts.VM.Set(k, v); err != nil {
-			return errors.Wrapf(err, "%s", k)
-		}
+		ts.Runtime.Set(k, v)
 	}
 	return nil
 }

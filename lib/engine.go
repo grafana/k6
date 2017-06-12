@@ -28,10 +28,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/stats"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -96,6 +96,9 @@ type Engine struct {
 	subctx    context.Context
 	subcancel context.CancelFunc
 	subwg     sync.WaitGroup
+
+	// Cutoff point for samples.
+	cutoff time.Time
 }
 
 func NewEngine(r Runner, o Options) (*Engine, error) {
@@ -110,41 +113,33 @@ func NewEngine(r Runner, o Options) (*Engine, error) {
 	}
 	e.clearSubcontext()
 
+	if err := e.SetVUsMax(o.VUsMax.Int64); err != nil {
+		return nil, err
+	}
+	if err := e.SetVUs(o.VUs.Int64); err != nil {
+		return nil, err
+	}
+	e.SetPaused(o.Paused.Bool)
+
+	// Use Stages if available, if not, construct a stage to fill the specified duration.
+	// Special case: A valid duration of 0 = an infinite (invalid duration) stage.
 	if o.Stages != nil {
 		e.Stages = o.Stages
-	} else if o.Duration.Valid {
-		d, err := time.ParseDuration(o.Duration.String)
-		if err != nil {
-			return nil, errors.Wrap(err, "options.duration")
-		}
-		e.Stages = []Stage{{Duration: d}}
+	} else if o.Duration.Valid && o.Duration.Duration > 0 {
+		e.Stages = []Stage{{Duration: o.Duration}}
 	} else {
-		e.Stages = []Stage{{Duration: 0}}
+		e.Stages = []Stage{{}}
 	}
-	if o.VUsMax.Valid {
-		if err := e.SetVUsMax(o.VUsMax.Int64); err != nil {
-			return nil, err
-		}
-	}
-	if o.VUs.Valid {
-		if err := e.SetVUs(o.VUs.Int64); err != nil {
-			return nil, err
-		}
-	}
-	if o.Paused.Valid {
-		e.SetPaused(o.Paused.Bool)
-	}
-	if o.Thresholds != nil {
-		e.thresholds = o.Thresholds
-		e.submetrics = make(map[string][]stats.Submetric)
-		for name := range e.thresholds {
-			if !strings.Contains(name, "{") {
-				continue
-			}
 
-			parent, sm := stats.NewSubmetric(name)
-			e.submetrics[parent] = append(e.submetrics[parent], sm)
+	e.thresholds = o.Thresholds
+	e.submetrics = make(map[string][]stats.Submetric)
+	for name := range e.thresholds {
+		if !strings.Contains(name, "{") {
+			continue
 		}
+
+		parent, sm := stats.NewSubmetric(name)
+		e.submetrics[parent] = append(e.submetrics[parent], sm)
 	}
 
 	return e, nil
@@ -274,6 +269,7 @@ func (e *Engine) Run(ctx context.Context) error {
 		case <-ticker.C:
 		case <-ctx.Done():
 			e.Logger.Debug("run: context expired; exiting...")
+			e.cutoff = time.Now()
 			return nil
 		}
 	}
@@ -432,10 +428,10 @@ func (e *Engine) TotalTime() time.Duration {
 
 	var total time.Duration
 	for _, stage := range e.Stages {
-		if stage.Duration <= 0 {
+		if !stage.Duration.Valid {
 			return 0
 		}
-		total += stage.Duration
+		total += time.Duration(stage.Duration.Duration)
 	}
 	return total
 }
@@ -464,19 +460,20 @@ func (e *Engine) processStages(dT time.Duration) (bool, error) {
 	}
 
 	stage := e.Stages[e.atStage]
-	if stage.Duration > 0 && e.atTime > e.atStageSince+stage.Duration {
+	if stage.Duration.Valid && e.atTime > e.atStageSince+time.Duration(stage.Duration.Duration) {
 		e.Logger.Debug("processStages: stage expired")
 		stageIdx := -1
 		stageStart := 0 * time.Second
 		stageStartVUs := e.vus
 		for i, s := range e.Stages {
-			if stageStart+s.Duration > e.atTime || s.Duration == 0 {
+			d := time.Duration(s.Duration.Duration)
+			if !s.Duration.Valid || stageStart+d > e.atTime {
 				e.Logger.WithField("idx", i).Debug("processStages: proceeding to next stage...")
 				stage = s
 				stageIdx = i
 				break
 			}
-			stageStart += s.Duration
+			stageStart += d
 			if s.Target.Valid {
 				stageStartVUs = s.Target.Int64
 			}
@@ -499,8 +496,8 @@ func (e *Engine) processStages(dT time.Duration) (bool, error) {
 		from := e.atStageStartVUs
 		to := stage.Target.Int64
 		t := 1.0
-		if stage.Duration > 0 {
-			t = Clampf(float64(e.atTime-e.atStageSince)/float64(stage.Duration), 0.0, 1.0)
+		if stage.Duration.Duration > 0 {
+			t = Clampf(float64(e.atTime-e.atStageSince)/float64(stage.Duration.Duration), 0.0, 1.0)
 		}
 		vus := Lerp(from, to, t)
 		if e.vus != vus {
@@ -571,40 +568,40 @@ func (e *Engine) runVU(ctx context.Context, vu *vuEntry) {
 
 func (e *Engine) runVUOnce(ctx context.Context, vu *vuEntry) bool {
 	samples, err := vu.VU.RunOnce(ctx)
-
-	// Expired VUs usually have request cancellation errors, and thus skewed metrics and
-	// unhelpful "request cancelled" errors. Don't process those.
-	select {
-	case <-ctx.Done():
-		return true
-	default:
-	}
-
 	t := time.Now()
 
-	atomic.AddInt64(&vu.Iterations, 1)
-	atomic.AddInt64(&e.numIterations, 1)
-	samples = append(samples,
-		stats.Sample{
-			Time:   t,
-			Metric: metrics.Iterations,
-			Value:  1,
-		})
-	if err != nil {
-		if serr, ok := err.(fmt.Stringer); ok {
-			e.Logger.Error(serr.String())
-		} else {
-			e.Logger.WithError(err).Error("VU Error")
+	select {
+	case <-ctx.Done():
+		// Expired VUs usually have request cancellation errors, and thus skewed metrics and
+		// unhelpful "request cancelled" errors. Filter out samples past the cutoff point.
+		samples2 := make([]stats.Sample, 0, len(samples))
+		for _, s := range samples {
+			if s.Time.Before(e.cutoff) {
+				samples2 = append(samples2, s)
+			}
 		}
-		samples = append(samples,
-			stats.Sample{
-				Time:   t,
-				Metric: metrics.Errors,
-				Tags:   map[string]string{"error": err.Error()},
-				Value:  1,
-			},
-		)
-		atomic.AddInt64(&e.numErrors, 1)
+		samples = samples2
+	default:
+		// Only successful runs are counted and have their errors reported.
+		if err != nil {
+			if serr, ok := err.(fmt.Stringer); ok {
+				e.Logger.Error(serr.String())
+			} else {
+				e.Logger.WithError(err).Error("VU Error")
+			}
+			samples = append(samples,
+				stats.Sample{
+					Time:   t,
+					Metric: metrics.Errors,
+					Tags:   map[string]string{"error": err.Error()},
+					Value:  1,
+				},
+			)
+			atomic.AddInt64(&e.numErrors, 1)
+		}
+		atomic.AddInt64(&vu.Iterations, 1)
+		atomic.AddInt64(&e.numIterations, 1)
+		samples = append(samples, stats.Sample{Time: t, Metric: metrics.Iterations, Value: 1})
 	}
 
 	vu.lock.Lock()

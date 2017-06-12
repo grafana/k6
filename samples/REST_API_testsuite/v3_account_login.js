@@ -6,7 +6,7 @@
 
 import http from "k6/http";
 import { group, sleep, check } from "k6";
-import { myTrend, options, urlbase, thinktime1, thinktime2 } from "./common";
+import { myTrend, options, urlbase, thinktime1, thinktime2 } from "./common.js";
 
 export { options };
 

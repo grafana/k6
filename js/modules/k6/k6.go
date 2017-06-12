@@ -29,9 +29,14 @@ import (
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/stats"
+	"github.com/pkg/errors"
 )
 
 type K6 struct{}
+
+func (*K6) Fail(msg string) (goja.Value, error) {
+	return goja.Undefined(), errors.New(msg)
+}
 
 func (*K6) Sleep(ctx context.Context, secs float64) {
 	timer := time.NewTimer(time.Duration(secs * float64(time.Second)))

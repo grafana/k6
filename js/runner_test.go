@@ -24,11 +24,12 @@ import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/stats"
+	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v3"
@@ -69,102 +70,167 @@ func TestRunnerNew(t *testing.T) {
 }
 
 func TestRunnerGetDefaultGroup(t *testing.T) {
-	r, err := New(&lib.SourceData{
+	r1, err := New(&lib.SourceData{
 		Filename: "/script.js",
 		Data:     []byte(`export default function() {};`),
 	}, afero.NewMemMapFs())
-	assert.NoError(t, err)
-	assert.NotNil(t, r.GetDefaultGroup())
+	if assert.NoError(t, err) {
+		assert.NotNil(t, r1.GetDefaultGroup())
+	}
+
+	r2, err := NewFromArchive(r1.MakeArchive())
+	if assert.NoError(t, err) {
+		assert.NotNil(t, r2.GetDefaultGroup())
+	}
 }
 
 func TestRunnerOptions(t *testing.T) {
-	r, err := New(&lib.SourceData{
+	r1, err := New(&lib.SourceData{
 		Filename: "/script.js",
 		Data:     []byte(`export default function() {};`),
 	}, afero.NewMemMapFs())
-	assert.NoError(t, err)
-
-	assert.Equal(t, r.Bundle.Options, r.GetOptions())
-	assert.Equal(t, null.NewBool(false, false), r.Bundle.Options.Paused)
-	r.ApplyOptions(lib.Options{Paused: null.BoolFrom(true)})
-	assert.Equal(t, r.Bundle.Options, r.GetOptions())
-	assert.Equal(t, null.NewBool(true, true), r.Bundle.Options.Paused)
-	r.ApplyOptions(lib.Options{Paused: null.BoolFrom(false)})
-	assert.Equal(t, r.Bundle.Options, r.GetOptions())
-	assert.Equal(t, null.NewBool(false, true), r.Bundle.Options.Paused)
-}
-
-func TestRunnerIntegrationImports(t *testing.T) {
-	modules := []string{
-		"k6",
-		"k6/http",
-		"k6/metrics",
-		"k6/html",
+	if !assert.NoError(t, err) {
+		return
 	}
-	for _, mod := range modules {
-		t.Run(mod, func(t *testing.T) {
-			_, err := New(&lib.SourceData{
-				Filename: "/script.js",
-				Data:     []byte(fmt.Sprintf(`import "%s"; export default function() {}`, mod)),
-			}, afero.NewMemMapFs())
-			assert.NoError(t, err)
+
+	r2, err := NewFromArchive(r1.MakeArchive())
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
+	for name, r := range testdata {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, r.Bundle.Options, r.GetOptions())
+			assert.Equal(t, null.NewBool(false, false), r.Bundle.Options.Paused)
+			r.ApplyOptions(lib.Options{Paused: null.BoolFrom(true)})
+			assert.Equal(t, r.Bundle.Options, r.GetOptions())
+			assert.Equal(t, null.NewBool(true, true), r.Bundle.Options.Paused)
+			r.ApplyOptions(lib.Options{Paused: null.BoolFrom(false)})
+			assert.Equal(t, r.Bundle.Options, r.GetOptions())
+			assert.Equal(t, null.NewBool(false, true), r.Bundle.Options.Paused)
 		})
 	}
 }
 
-func TestVURunContext(t *testing.T) {
-	r, err := New(&lib.SourceData{
-		Filename: "/script.js",
-		Data:     []byte(`export default function() { fn(); }`),
-	}, afero.NewMemMapFs())
-	if !assert.NoError(t, err) {
-		return
-	}
-
-	vu, err := r.newVU()
-	if !assert.NoError(t, err) {
-		return
-	}
-
-	fnCalled := false
-	vu.Runtime.Set("fn", func() {
-		fnCalled = true
-		assert.Equal(t, vu.Runtime, common.GetRuntime(*vu.Context), "incorrect runtime in context")
-		assert.Equal(t, r.GetDefaultGroup(), common.GetState(*vu.Context).Group, "incorrect group in context")
+func TestRunnerIntegrationImports(t *testing.T) {
+	t.Run("Modules", func(t *testing.T) {
+		modules := []string{
+			"k6",
+			"k6/http",
+			"k6/metrics",
+			"k6/html",
+		}
+		for _, mod := range modules {
+			t.Run(mod, func(t *testing.T) {
+				t.Run("Source", func(t *testing.T) {
+					_, err := New(&lib.SourceData{
+						Filename: "/script.js",
+						Data:     []byte(fmt.Sprintf(`import "%s"; export default function() {}`, mod)),
+					}, afero.NewMemMapFs())
+					assert.NoError(t, err)
+				})
+			})
+		}
 	})
-	_, err = vu.RunOnce(context.Background())
-	assert.NoError(t, err)
-	assert.True(t, fnCalled, "fn() not called")
+
+	t.Run("Files", func(t *testing.T) {
+		fs := afero.NewMemMapFs()
+		assert.NoError(t, fs.MkdirAll("/path/to", 0755))
+		assert.NoError(t, afero.WriteFile(fs, "/path/to/lib.js", []byte(`export default "hi!";`), 0644))
+
+		testdata := map[string]struct{ filename, path string }{
+			"Absolute":       {"/path/script.js", "/path/to/lib.js"},
+			"Relative":       {"/path/script.js", "./to/lib.js"},
+			"Adjacent":       {"/path/to/script.js", "./lib.js"},
+			"STDIN-Absolute": {"-", "/path/to/lib.js"},
+			"STDIN-Relative": {"-", "./path/to/lib.js"},
+		}
+		for name, data := range testdata {
+			t.Run(name, func(t *testing.T) {
+				r1, err := New(&lib.SourceData{
+					Filename: data.filename,
+					Data: []byte(fmt.Sprintf(`
+					import hi from "%s";
+					export default function() {
+						if (hi != "hi!") { throw new Error("incorrect value"); }
+					}`, data.path)),
+				}, fs)
+				if !assert.NoError(t, err) {
+					return
+				}
+
+				r2, err := NewFromArchive(r1.MakeArchive())
+				if !assert.NoError(t, err) {
+					return
+				}
+
+				testdata := map[string]*Runner{"Source": r1, "Archive": r2}
+				for name, r := range testdata {
+					t.Run(name, func(t *testing.T) {
+						vu, err := r.NewVU()
+						if !assert.NoError(t, err) {
+							return
+						}
+						_, err = vu.RunOnce(context.Background())
+						assert.NoError(t, err)
+					})
+				}
+			})
+		}
+	})
 }
 
-func TestVURunSamples(t *testing.T) {
-	r, err := New(&lib.SourceData{
+func TestVURunContext(t *testing.T) {
+	r1, err := New(&lib.SourceData{
 		Filename: "/script.js",
-		Data:     []byte(`export default function() { fn(); }`),
+		Data: []byte(`
+		export let options = { vus: 10 };
+		export default function() { fn(); }
+		`),
 	}, afero.NewMemMapFs())
 	if !assert.NoError(t, err) {
 		return
 	}
+	r1.ApplyOptions(lib.Options{Throw: null.BoolFrom(true)})
 
-	vu, err := r.newVU()
+	r2, err := NewFromArchive(r1.MakeArchive())
 	if !assert.NoError(t, err) {
 		return
 	}
 
-	metric := stats.New("my_metric", stats.Counter)
-	sample := stats.Sample{Time: time.Now(), Metric: metric, Value: 1}
-	vu.Runtime.Set("fn", func() {
-		state := common.GetState(*vu.Context)
-		state.Samples = append(state.Samples, sample)
-	})
+	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
+	for name, r := range testdata {
+		t.Run(name, func(t *testing.T) {
+			vu, err := r.newVU()
+			if !assert.NoError(t, err) {
+				return
+			}
 
-	_, err = vu.RunOnce(context.Background())
-	assert.NoError(t, err)
-	assert.Equal(t, []stats.Sample{sample}, common.GetState(*vu.Context).Samples)
+			fnCalled := false
+			vu.Runtime.Set("fn", func() {
+				fnCalled = true
+
+				assert.Equal(t, vu.Runtime, common.GetRuntime(*vu.Context), "incorrect runtime in context")
+
+				state := common.GetState(*vu.Context)
+				if assert.NotNil(t, state) {
+					assert.Equal(t, null.IntFrom(10), state.Options.VUs)
+					assert.Equal(t, null.BoolFrom(true), state.Options.Throw)
+					assert.NotNil(t, state.Logger)
+					assert.Equal(t, r.GetDefaultGroup(), state.Group)
+					assert.Equal(t, vu.HTTPTransport, state.HTTPTransport)
+				}
+			})
+			_, err = vu.RunOnce(context.Background())
+			assert.NoError(t, err)
+			assert.True(t, fnCalled, "fn() not called")
+		})
+	}
 }
 
 func TestVUIntegrationGroups(t *testing.T) {
-	r, err := New(&lib.SourceData{
+	r1, err := New(&lib.SourceData{
 		Filename: "/script.js",
 		Data: []byte(`
 		import { group } from "k6";
@@ -183,40 +249,50 @@ func TestVUIntegrationGroups(t *testing.T) {
 		return
 	}
 
-	vu, err := r.newVU()
+	r2, err := NewFromArchive(r1.MakeArchive())
 	if !assert.NoError(t, err) {
 		return
 	}
 
-	fnOuterCalled := false
-	fnInnerCalled := false
-	fnNestedCalled := false
-	vu.Runtime.Set("fnOuter", func() {
-		fnOuterCalled = true
-		assert.Equal(t, r.GetDefaultGroup(), common.GetState(*vu.Context).Group)
-	})
-	vu.Runtime.Set("fnInner", func() {
-		fnInnerCalled = true
-		g := common.GetState(*vu.Context).Group
-		assert.Equal(t, "my group", g.Name)
-		assert.Equal(t, r.GetDefaultGroup(), g.Parent)
-	})
-	vu.Runtime.Set("fnNested", func() {
-		fnNestedCalled = true
-		g := common.GetState(*vu.Context).Group
-		assert.Equal(t, "nested group", g.Name)
-		assert.Equal(t, "my group", g.Parent.Name)
-		assert.Equal(t, r.GetDefaultGroup(), g.Parent.Parent)
-	})
-	_, err = vu.RunOnce(context.Background())
-	assert.NoError(t, err)
-	assert.True(t, fnOuterCalled, "fnOuter() not called")
-	assert.True(t, fnInnerCalled, "fnInner() not called")
-	assert.True(t, fnNestedCalled, "fnNested() not called")
+	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
+	for name, r := range testdata {
+		t.Run(name, func(t *testing.T) {
+			vu, err := r.newVU()
+			if !assert.NoError(t, err) {
+				return
+			}
+
+			fnOuterCalled := false
+			fnInnerCalled := false
+			fnNestedCalled := false
+			vu.Runtime.Set("fnOuter", func() {
+				fnOuterCalled = true
+				assert.Equal(t, r.GetDefaultGroup(), common.GetState(*vu.Context).Group)
+			})
+			vu.Runtime.Set("fnInner", func() {
+				fnInnerCalled = true
+				g := common.GetState(*vu.Context).Group
+				assert.Equal(t, "my group", g.Name)
+				assert.Equal(t, r.GetDefaultGroup(), g.Parent)
+			})
+			vu.Runtime.Set("fnNested", func() {
+				fnNestedCalled = true
+				g := common.GetState(*vu.Context).Group
+				assert.Equal(t, "nested group", g.Name)
+				assert.Equal(t, "my group", g.Parent.Name)
+				assert.Equal(t, r.GetDefaultGroup(), g.Parent.Parent)
+			})
+			_, err = vu.RunOnce(context.Background())
+			assert.NoError(t, err)
+			assert.True(t, fnOuterCalled, "fnOuter() not called")
+			assert.True(t, fnInnerCalled, "fnInner() not called")
+			assert.True(t, fnNestedCalled, "fnNested() not called")
+		})
+	}
 }
 
 func TestVUIntegrationMetrics(t *testing.T) {
-	r, err := New(&lib.SourceData{
+	r1, err := New(&lib.SourceData{
 		Filename: "/script.js",
 		Data: []byte(`
 		import { group } from "k6";
@@ -229,15 +305,95 @@ func TestVUIntegrationMetrics(t *testing.T) {
 		return
 	}
 
-	vu, err := r.newVU()
+	r2, err := NewFromArchive(r1.MakeArchive())
 	if !assert.NoError(t, err) {
 		return
 	}
 
-	samples, err := vu.RunOnce(context.Background())
-	if assert.NoError(t, err) && assert.Len(t, samples, 1) {
-		assert.Equal(t, 5.0, samples[0].Value)
-		assert.Equal(t, "my_metric", samples[0].Metric.Name)
-		assert.Equal(t, stats.Trend, samples[0].Metric.Type)
+	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
+	for name, r := range testdata {
+		t.Run(name, func(t *testing.T) {
+			vu, err := r.newVU()
+			if !assert.NoError(t, err) {
+				return
+			}
+
+			samples, err := vu.RunOnce(context.Background())
+			assert.NoError(t, err)
+			assert.Len(t, samples, 3)
+			for i, s := range samples {
+				switch i {
+				case 0:
+					assert.Equal(t, 5.0, s.Value)
+					assert.Equal(t, "my_metric", s.Metric.Name)
+					assert.Equal(t, stats.Trend, s.Metric.Type)
+				case 1:
+					assert.Equal(t, 0.0, s.Value)
+					assert.Equal(t, metrics.DataSent, s.Metric)
+				case 2:
+					assert.Equal(t, 0.0, s.Value)
+					assert.Equal(t, metrics.DataReceived, s.Metric)
+				}
+			}
+		})
+	}
+}
+
+func TestVUIntegrationInsecureRequests(t *testing.T) {
+	testdata := map[string]struct {
+		opts   lib.Options
+		errMsg string
+	}{
+		"Null": {
+			lib.Options{},
+			"GoError: Get https://expired.badssl.com/: x509: certificate has expired or is not yet valid",
+		},
+		"False": {
+			lib.Options{InsecureSkipTLSVerify: null.BoolFrom(false)},
+			"GoError: Get https://expired.badssl.com/: x509: certificate has expired or is not yet valid",
+		},
+		"True": {
+			lib.Options{InsecureSkipTLSVerify: null.BoolFrom(true)},
+			"",
+		},
+	}
+	for name, data := range testdata {
+		t.Run(name, func(t *testing.T) {
+			r1, err := New(&lib.SourceData{
+				Filename: "/script.js",
+				Data: []byte(`
+					import http from "k6/http";
+					export default function() { http.get("https://expired.badssl.com/"); }
+				`),
+			}, afero.NewMemMapFs())
+			if !assert.NoError(t, err) {
+				return
+			}
+			r1.ApplyOptions(lib.Options{Throw: null.BoolFrom(true)})
+			r1.ApplyOptions(data.opts)
+
+			r2, err := NewFromArchive(r1.MakeArchive())
+			if !assert.NoError(t, err) {
+				return
+			}
+
+			runners := map[string]*Runner{"Source": r1, "Archive": r2}
+			for name, r := range runners {
+				t.Run(name, func(t *testing.T) {
+					r.Logger, _ = logtest.NewNullLogger()
+
+					vu, err := r.NewVU()
+					if !assert.NoError(t, err) {
+						return
+					}
+					_, err = vu.RunOnce(context.Background())
+					if data.errMsg != "" {
+						assert.EqualError(t, err, data.errMsg)
+					} else {
+						assert.NoError(t, err)
+					}
+				})
+			}
+		})
 	}
 }

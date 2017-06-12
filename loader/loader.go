@@ -28,9 +28,9 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/k6/lib"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 )
 
@@ -55,10 +55,15 @@ func Resolve(pwd, name string) string {
 
 // Returns the directory for the path.
 func Dir(name string) string {
+	if name == "-" {
+		return "/"
+	}
 	return filepath.Dir(name)
 }
 
 func Load(fs afero.Fs, pwd, name string) (*lib.SourceData, error) {
+	log.WithFields(log.Fields{"pwd": pwd, "name": name}).Debug("Loading...")
+
 	// We just need to make sure `import ""` doesn't crash the loader.
 	if name == "" {
 		return nil, errors.New("local or remote path required")
@@ -70,15 +75,16 @@ func Load(fs afero.Fs, pwd, name string) (*lib.SourceData, error) {
 	}
 
 	// Do not allow remote-loaded scripts to lift arbitrary files off the user's machine.
-	if name[0] == '/' && pwd[0] != '/' {
+	if (name[0] == '/' && pwd[0] != '/') || (filepath.VolumeName(name) != "" && filepath.VolumeName(pwd) == "") {
 		return nil, errors.Errorf("origin (%s) not allowed to load local file: %s", pwd, name)
 	}
 
 	// If the file starts with ".", resolve it as a relative path.
 	name = Resolve(pwd, name)
+	log.WithField("name", name).Debug("Resolved...")
 
-	// If the resolved path starts with a "/", it's a local file.
-	if name[0] == '/' {
+	// If the resolved path starts with a "/" or has a volume, it's a local file.
+	if name[0] == '/' || filepath.VolumeName(name) != "" {
 		data, err := afero.ReadFile(fs, name)
 		if err != nil {
 			return nil, err

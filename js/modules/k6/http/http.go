@@ -29,17 +29,23 @@ import (
 	"net"
 	"net/http"
 	neturl "net/url"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
-
-	"reflect"
+	"time"
 
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/js/modules/k6/html"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
+	"github.com/pkg/errors"
+)
+
+var (
+	typeString = reflect.TypeOf("")
+	typeURLTag = reflect.TypeOf(URLTag{})
 )
 
 type HTTPResponseTimings struct {
@@ -56,6 +62,7 @@ type HTTPResponse struct {
 	Headers    map[string]string
 	Body       string
 	Timings    HTTPResponseTimings
+	Error      string
 
 	cachedJSON goja.Value
 }
@@ -84,7 +91,7 @@ func (res *HTTPResponse) Html(selector ...string) html.Selection {
 
 type HTTP struct{}
 
-func (*HTTP) Request(ctx context.Context, method, url string, args ...goja.Value) (*HTTPResponse, error) {
+func (*HTTP) Request(ctx context.Context, method string, url goja.Value, args ...goja.Value) (*HTTPResponse, error) {
 	rt := common.GetRuntime(ctx)
 	state := common.GetState(ctx)
 
@@ -104,20 +111,38 @@ func (*HTTP) Request(ctx context.Context, method, url string, args ...goja.Value
 		}
 	}
 
-	req, err := http.NewRequest(method, url, bodyReader)
+	// The provided URL can be either a string (or at least something stringable) or a URLTag.
+	var urlStr string
+	var nameTag string
+	switch v := url.Export().(type) {
+	case URLTag:
+		urlStr = v.URL
+		nameTag = v.Name
+	default:
+		urlStr = url.String()
+		nameTag = urlStr
+	}
+
+	req, err := http.NewRequest(method, urlStr, bodyReader)
 	if err != nil {
 		return nil, err
 	}
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
 	}
+	if userAgent := state.Options.UserAgent; userAgent.Valid {
+		req.Header.Set("User-Agent", userAgent.String)
+	}
 
 	tags := map[string]string{
 		"status": "0",
 		"method": method,
-		"url":    url,
+		"url":    urlStr,
+		"name":   nameTag,
 		"group":  state.Group.Path,
 	}
+	timeout := 60 * time.Second
+	throw := state.Options.Throw.Bool
 
 	if len(args) > 1 {
 		paramsV := args[1]
@@ -149,81 +174,110 @@ func (*HTTP) Request(ctx context.Context, method, url string, args ...goja.Value
 					for _, key := range tagObj.Keys() {
 						tags[key] = tagObj.Get(key).String()
 					}
+				case "timeout":
+					timeout = time.Duration(params.Get(k).ToFloat() * float64(time.Millisecond))
+				case "throw":
+					throw = params.Get(k).ToBoolean()
 				}
 			}
 		}
 	}
 
-	client := http.Client{Transport: state.HTTPTransport}
-	tracer := netext.Tracer{}
-	res, err := client.Do(req.WithContext(netext.WithTracer(ctx, &tracer)))
-	if err != nil {
-		state.Samples = append(state.Samples, tracer.Done().Samples(tags)...)
-		return nil, err
-	}
-
-	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		state.Samples = append(state.Samples, tracer.Done().Samples(tags)...)
-		return nil, err
-	}
-	_ = res.Body.Close()
-	trail := tracer.Done()
-
-	tags["status"] = strconv.Itoa(res.StatusCode)
-	state.Samples = append(state.Samples, trail.Samples(tags)...)
-
-	headers := make(map[string]string, len(res.Header))
-	for k, vs := range res.Header {
-		headers[k] = strings.Join(vs, ", ")
-	}
-	remoteHost, remotePortStr, _ := net.SplitHostPort(trail.ConnRemoteAddr.String())
-	remotePort, _ := strconv.Atoi(remotePortStr)
-	return &HTTPResponse{
+	resp := &HTTPResponse{
 		ctx: ctx,
-
-		RemoteIP:   remoteHost,
-		RemotePort: remotePort,
-		URL:        res.Request.URL.String(),
-		Status:     res.StatusCode,
-		Headers:    headers,
-		Body:       string(body),
-		Timings: HTTPResponseTimings{
-			Duration:   stats.D(trail.Duration),
-			Blocked:    stats.D(trail.Blocked),
-			Connecting: stats.D(trail.Connecting),
-			Sending:    stats.D(trail.Sending),
-			Waiting:    stats.D(trail.Waiting),
-			Receiving:  stats.D(trail.Receiving),
+		URL: urlStr,
+	}
+	client := http.Client{
+		Transport: state.HTTPTransport,
+		Timeout:   timeout,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			max := int(state.Options.MaxRedirects.Int64)
+			if len(via) >= max {
+				return errors.Errorf("stopped after %d redirects", max)
+			}
+			return nil
 		},
-	}, nil
+	}
+
+	tracer := netext.Tracer{}
+	res, resErr := client.Do(req.WithContext(netext.WithTracer(ctx, &tracer)))
+	if res != nil {
+		body, _ := ioutil.ReadAll(res.Body)
+		_ = res.Body.Close()
+		resp.Body = string(body)
+	}
+	trail := tracer.Done()
+	if trail.ConnRemoteAddr != nil {
+		remoteHost, remotePortStr, _ := net.SplitHostPort(trail.ConnRemoteAddr.String())
+		remotePort, _ := strconv.Atoi(remotePortStr)
+		resp.RemoteIP = remoteHost
+		resp.RemotePort = remotePort
+	}
+	resp.Timings = HTTPResponseTimings{
+		Duration:   stats.D(trail.Duration),
+		Blocked:    stats.D(trail.Blocked),
+		Connecting: stats.D(trail.Connecting),
+		Sending:    stats.D(trail.Sending),
+		Waiting:    stats.D(trail.Waiting),
+		Receiving:  stats.D(trail.Receiving),
+	}
+
+	if resErr != nil {
+		resp.Error = resErr.Error()
+		tags["error"] = resp.Error
+	} else {
+		resp.URL = res.Request.URL.String()
+		resp.Status = res.StatusCode
+		tags["url"] = resp.URL
+		tags["status"] = strconv.Itoa(resp.Status)
+
+		resp.Headers = make(map[string]string, len(res.Header))
+		for k, vs := range res.Header {
+			resp.Headers[k] = strings.Join(vs, ", ")
+		}
+	}
+
+	state.Samples = append(state.Samples, trail.Samples(tags)...)
+	if resErr != nil {
+		// Do *not* log errors about the contex being cancelled.
+		select {
+		case <-ctx.Done():
+		default:
+			state.Logger.WithField("error", resErr).Warn("Request Failed")
+		}
+
+		if throw {
+			return nil, resErr
+		}
+	}
+	return resp, nil
 }
 
-func (http *HTTP) Get(ctx context.Context, url string, args ...goja.Value) (*HTTPResponse, error) {
+func (http *HTTP) Get(ctx context.Context, url goja.Value, args ...goja.Value) (*HTTPResponse, error) {
 	// The body argument is always undefined for GETs and HEADs.
 	args = append([]goja.Value{goja.Undefined()}, args...)
 	return http.Request(ctx, "GET", url, args...)
 }
 
-func (http *HTTP) Head(ctx context.Context, url string, args ...goja.Value) (*HTTPResponse, error) {
+func (http *HTTP) Head(ctx context.Context, url goja.Value, args ...goja.Value) (*HTTPResponse, error) {
 	// The body argument is always undefined for GETs and HEADs.
 	args = append([]goja.Value{goja.Undefined()}, args...)
 	return http.Request(ctx, "HEAD", url, args...)
 }
 
-func (http *HTTP) Post(ctx context.Context, url string, args ...goja.Value) (*HTTPResponse, error) {
+func (http *HTTP) Post(ctx context.Context, url goja.Value, args ...goja.Value) (*HTTPResponse, error) {
 	return http.Request(ctx, "POST", url, args...)
 }
 
-func (http *HTTP) Put(ctx context.Context, url string, args ...goja.Value) (*HTTPResponse, error) {
+func (http *HTTP) Put(ctx context.Context, url goja.Value, args ...goja.Value) (*HTTPResponse, error) {
 	return http.Request(ctx, "PUT", url, args...)
 }
 
-func (http *HTTP) Patch(ctx context.Context, url string, args ...goja.Value) (*HTTPResponse, error) {
+func (http *HTTP) Patch(ctx context.Context, url goja.Value, args ...goja.Value) (*HTTPResponse, error) {
 	return http.Request(ctx, "PATCH", url, args...)
 }
 
-func (http *HTTP) Del(ctx context.Context, url string, args ...goja.Value) (*HTTPResponse, error) {
+func (http *HTTP) Del(ctx context.Context, url goja.Value, args ...goja.Value) (*HTTPResponse, error) {
 	return http.Request(ctx, "DELETE", url, args...)
 }
 
@@ -240,14 +294,16 @@ func (http *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, erro
 		k := k
 		v := reqs.Get(k)
 
-		var method, url string
+		var method string
+		var url goja.Value
 		var args []goja.Value
 
 		// Shorthand: "http://example.com/" -> ["GET", "http://example.com/"]
-		if v.ExportType().Kind() == reflect.String {
+		switch v.ExportType() {
+		case typeString, typeURLTag:
 			method = "GET"
-			url = v.String()
-		} else {
+			url = v
+		default:
 			obj := v.ToObject(rt)
 			objkeys := obj.Keys()
 			for i, objk := range objkeys {
@@ -259,7 +315,7 @@ func (http *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, erro
 						args = []goja.Value{goja.Undefined()}
 					}
 				case 1:
-					url = objv.String()
+					url = objv
 				default:
 					args = append(args, objv)
 				}
@@ -285,4 +341,17 @@ func (http *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, erro
 		}
 	}
 	return retval, err
+}
+
+func (http *HTTP) Url(parts []string, pieces ...string) URLTag {
+	var tag URLTag
+	for i, part := range parts {
+		tag.Name += part
+		tag.URL += part
+		if i < len(pieces) {
+			tag.Name += "${}"
+			tag.URL += pieces[i]
+		}
+	}
+	return tag
 }

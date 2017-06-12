@@ -26,10 +26,17 @@ import (
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
+	log "github.com/sirupsen/logrus"
 )
 
 // Provides volatile state for a VU.
 type State struct {
+	// Global options.
+	Options lib.Options
+
+	// Logger. Avoid using the global logger.
+	Logger *log.Logger
+
 	// Current group; all emitted metrics are tagged with this.
 	Group *lib.Group
 
@@ -41,4 +48,7 @@ type State struct {
 
 	// Sample buffer, emitted at the end of the iteration.
 	Samples []stats.Sample
+
+	// Bytes sent and received during this iteration. Use `sync/atomic`.
+	BytesRead, BytesWritten int64
 }

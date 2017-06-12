@@ -35,6 +35,8 @@ type groupDummyRunner struct {
 	Group *lib.Group
 }
 
+func (r groupDummyRunner) MakeArchive() *lib.Archive { return nil }
+
 func (r groupDummyRunner) NewVU() (lib.VU, error) { return nil, nil }
 
 func (r groupDummyRunner) GetDefaultGroup() *lib.Group { return r.Group }

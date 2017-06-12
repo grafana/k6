@@ -63,6 +63,13 @@ func New(u *url.URL) (*Runner, error) {
 	}, nil
 }
 
+func (r *Runner) MakeArchive() *lib.Archive {
+	return &lib.Archive{
+		Type:     "url",
+		Filename: r.URL.String(),
+	}
+}
+
 func (r *Runner) NewVU() (lib.VU, error) {
 	return &VU{
 		Runner:    r,
