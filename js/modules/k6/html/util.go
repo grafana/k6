@@ -2,36 +2,29 @@ package html
 
 import (
 	"encoding/json"
-	"regexp"
 	"strconv"
+
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/dop251/goja"
+	"github.com/serenize/snaker"
+
 	gohtml "golang.org/x/net/html"
 )
 
-var (
-	lowerRe = regexp.MustCompile("-[[:lower:]]")
-	upperRe = regexp.MustCompile("[[:upper:]]")
-)
+func attrToProperty(s string) string {
+	idx := strings.Index(s, "-")
 
-func toAttrName(dataName string) string {
-	return upperRe.ReplaceAllStringFunc(dataName, dataNameCb)
+	if idx == -1 {
+		return s
+	}
+
+	return s[0:idx] + snaker.SnakeToCamel(strings.Replace(s[idx+1:], "-", "_", -1))
 }
 
-func toDataName(attrName string) string {
-	return lowerRe.ReplaceAllStringFunc(attrName, attrNameCb)
-}
-
-// Receives a single upper case char
-func dataNameCb(s string) string {
-	return "-" + strings.ToLower(s)
-}
-
-// Receives a single lower case letter with a hyphen prefix
-func attrNameCb(s string) string {
-	return strings.ToUpper(s[1:])
+func propertyToAttr(attrName string) string {
+	return strings.Replace(snaker.CamelToSnake(attrName), "_", "-", -1)
 }
 
 func namespaceURI(prefix string) string {
@@ -93,16 +86,6 @@ func selToElement(sel Selection) goja.Value {
 	elem := Element{sel.sel.Nodes[0], &sel}
 
 	return sel.rt.ToValue(elem)
-}
-
-// Some Selection methods use an interface{} to handle an argument which may be a Element/Selection/string or a goja wrapper of those types
-// This function unwraps the goja value into it's native go type to be used in a type switch
-func exportIfGojaVal(arg interface{}) interface{} {
-	if gojaArg, ok := arg.(goja.Value); ok {
-		return gojaArg.Export()
-	}
-
-	return arg
 }
 
 // Try to read numeric values in data- attributes.
