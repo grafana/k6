@@ -94,6 +94,20 @@ For more information on how to get started running k6, please look at the [Runni
 
 ---
 
+Need help or want to contribute?
+----------------
+Types of questions and where to ask:
+
+- How do I? -- [Stack Overflow](https://stackoverflow.com/questions/tagged/k6) (use tags: k6, javascript, load-testing)
+- I got this error, why? -- [Stack Overflow](https://stackoverflow.com/questions/tagged/k6)
+- I got this error and I'm sure it's a bug -- [file an issue](https://github.com/loadimpact/k6/issues)
+- I have an idea/request -- [file an issue](https://github.com/loadimpact/k6/issues)
+- Why do you? -- [Slack](https://slackin-defaimlmsd.now.sh/)
+- When will you? -- [Slack](https://slackin-defaimlmsd.now.sh/)
+- I want to contribute/help with development -- [Start here](https://github.com/loadimpact/k6/blob/master/CONTRIBUTING.md), then [Slack](https://slackin-defaimlmsd.now.sh/) and [issues](https://github.com/loadimpact/k6/issues)
+
+---
+
 Development Setup
 -----------------
 
