@@ -71,11 +71,6 @@ type WSHTTPResponse struct {
 
 const writeWait = 10 * time.Second
 
-var (
-	newline = []byte{'\n'}
-	space   = []byte{' '}
-)
-
 func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTPResponse, error) {
 	rt := common.GetRuntime(ctx)
 	state := common.GetState(ctx)
