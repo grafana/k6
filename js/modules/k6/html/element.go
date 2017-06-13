@@ -10,10 +10,10 @@ import (
 )
 
 const (
-	TextNode     = 3
-	DocumentNode = 9
 	ElementNode  = 1
-	CommentNode  = 1
+	TextNode     = 3
+	CommentNode  = 8
+	DocumentNode = 9
 	DoctypeNode  = 10
 )
 
