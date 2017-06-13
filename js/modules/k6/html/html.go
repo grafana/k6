@@ -29,6 +29,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
+
 	gohtml "golang.org/x/net/html"
 )
 
@@ -73,7 +74,7 @@ func (s Selection) varargFnCall(arg interface{},
 	selFilter func(*goquery.Selection) *goquery.Selection,
 	nodeFilter func(...*gohtml.Node) *goquery.Selection) Selection {
 
-	switch v := exportIfGojaVal(arg).(type) {
+	switch v := arg.(type) {
 	case Selection:
 		return Selection{s.rt, selFilter(v.sel)}
 
@@ -82,6 +83,9 @@ func (s Selection) varargFnCall(arg interface{},
 
 	case Element:
 		return Selection{s.rt, nodeFilter(v.node)}
+
+	case goja.Value:
+		return s.varargFnCall(v.Export(), strFilter, selFilter, nodeFilter)
 
 	default:
 		errmsg := fmt.Sprintf("Invalid argument: Cannot use a %T as a selector", arg)
@@ -331,7 +335,7 @@ func (s Selection) Filter(v goja.Value) Selection {
 
 	gojaFn, isFn := goja.AssertFunction(v)
 	if !isFn {
-		panic(s.rt.NewGoError(errors.New("Argument to filter() must be a function, a selector or a query object")))
+		panic(s.rt.NewGoError(errors.New("Argument to filter() must be a function, a selector or a selection")))
 	}
 
 	return Selection{s.rt, s.sel.FilterFunction(s.buildMatcher(v, gojaFn))}
@@ -348,7 +352,7 @@ func (s Selection) Is(v goja.Value) bool {
 
 	gojaFn, isFn := goja.AssertFunction(v)
 	if !isFn {
-		panic(s.rt.NewGoError(errors.New("Argument to is() must be a function, a selector or a query object")))
+		panic(s.rt.NewGoError(errors.New("Argument to is() must be a function, a selector or a selection")))
 	}
 
 	return s.sel.IsFunction(s.buildMatcher(v, gojaFn))
@@ -432,7 +436,7 @@ func (s Selection) Data(def ...string) goja.Value {
 	}
 
 	if len(def) > 0 {
-		val, exists := s.sel.Attr("data-" + toAttrName(def[0]))
+		val, exists := s.sel.Attr("data-" + propertyToAttr(def[0]))
 		if exists {
 			return s.rt.ToValue(convertDataAttrVal(val))
 		} else {
@@ -442,7 +446,7 @@ func (s Selection) Data(def ...string) goja.Value {
 		data := make(map[string]interface{})
 		for _, attr := range s.sel.Nodes[0].Attr {
 			if strings.HasPrefix(attr.Key, "data-") && len(attr.Key) > 5 {
-				data[toDataName(attr.Key[5:])] = convertDataAttrVal(attr.Val)
+				data[attrToProperty(attr.Key[5:])] = convertDataAttrVal(attr.Val)
 			}
 		}
 		return s.rt.ToValue(data)
