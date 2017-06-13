@@ -170,7 +170,9 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 	}
 
 	// Run the user-provided set up function
-	setupFn(goja.Undefined(), rt.ToValue(&socket))
+	if _, err := setupFn(goja.Undefined(), rt.ToValue(&socket)); err != nil {
+		return nil, err
+	}
 
 	if connErr != nil {
 		// Pass the error to the user script before exiting immediately
@@ -185,7 +187,7 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 	}
 	wsResponse.URL = url
 
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	tags["status"] = strconv.Itoa(httpResponse.StatusCode)
 	tags["subprotocol"] = httpResponse.Header.Get("Sec-WebSocket-Protocol")
@@ -226,12 +228,14 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 			socket.handleEvent("error", rt.ToValue(readErr))
 
 		case scheduledFn := <-socket.scheduled:
-			scheduledFn(goja.Undefined())
+			if _, err := scheduledFn(goja.Undefined()); err != nil {
+				return nil, err
+			}
 
 		case <-ctx.Done():
 			// This means that the VU is shutting down (e.g., during an interrupt)
 			socket.handleEvent("close", rt.ToValue("Interrupt"))
-			socket.closeConnection(websocket.CloseGoingAway)
+			_ = socket.closeConnection(websocket.CloseGoingAway)
 
 		case <-socket.done:
 			// This is the final exit point normally triggered by closeConnection
@@ -287,7 +291,9 @@ func (s *Socket) On(event string, handler goja.Value) {
 func (s *Socket) handleEvent(event string, args ...goja.Value) {
 	if handlers, ok := s.eventHandlers[event]; ok {
 		for _, handler := range handlers {
-			handler(goja.Undefined(), args...)
+			if _, err := handler(goja.Undefined(), args...); err != nil {
+				common.Throw(common.GetRuntime(s.ctx), err)
+			}
 		}
 	}
 }
@@ -373,7 +379,7 @@ func (s *Socket) Close(args ...goja.Value) {
 		code = int(args[0].ToInteger())
 	}
 
-	s.closeConnection(code)
+	_ = s.closeConnection(code)
 }
 
 // Attempts to close the websocket gracefully
@@ -392,7 +398,7 @@ func (s *Socket) closeConnection(code int) error {
 			s.handleEvent("error", rt.ToValue(err))
 			err = writeErr
 		}
-		s.conn.Close()
+		_ = s.conn.Close()
 
 		// Stops the main control loop
 		close(s.done)
@@ -403,7 +409,7 @@ func (s *Socket) closeConnection(code int) error {
 
 // Wraps conn.ReadMessage in a channel
 func readPump(conn *websocket.Conn, readChan chan []byte, errorChan chan error) {
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	for {
 		_, message, err := conn.ReadMessage()
