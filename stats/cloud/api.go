@@ -90,10 +90,10 @@ func (c *Client) PushMetric(referenceID string, samples []*sample) error {
 func (c *Client) TestFinished(referenceID string, thresholds ThresholdResult, tained bool) error {
 	url := fmt.Sprintf("%s/tests/%s", c.baseURL, referenceID)
 
-	status := 1
+	status := 0
 
 	if tained {
-		status = 2
+		status = 1
 	}
 
 	data := struct {
