@@ -18,35 +18,21 @@
  *
  */
 
-package lib
+package local
 
 import (
 	"context"
-	"time"
-
-	"github.com/loadimpact/k6/stats"
-	null "gopkg.in/guregu/null.v3"
+	"testing"
 )
 
-// An Executor wraps a Runner, and abstracts away an execution environment.
-type Executor interface {
-	Run(ctx context.Context, out <-chan []stats.Sample) error
-	IsRunning() bool
+func TestExecutorIsRunning(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	e := New(nil)
 
-	GetIterations() int64
-	GetEndIterations() null.Int
-	SetEndIterations(i null.Int)
-
-	GetTime() time.Duration
-	GetEndTime() NullDuration
-	SetEndTime(t NullDuration)
-
-	IsPaused() bool
-	SetPaused(paused bool)
-
-	GetVUs() int64
-	SetVUs(vus int64) error
-
-	GetVUsMax() int64
-	SetVUsMax(max int64) error
+	go e.Run(ctx, nil)
+	for !e.IsRunning() {
+	}
+	cancel()
+	for e.IsRunning() {
+	}
 }
