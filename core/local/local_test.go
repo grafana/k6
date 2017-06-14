@@ -23,6 +23,8 @@ package local
 import (
 	"context"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestExecutorIsRunning(t *testing.T) {
@@ -35,4 +37,67 @@ func TestExecutorIsRunning(t *testing.T) {
 	cancel()
 	for e.IsRunning() {
 	}
+}
+
+func TestExecutorSetVUsMax(t *testing.T) {
+	t.Run("Negative", func(t *testing.T) {
+		assert.EqualError(t, New(nil).SetVUsMax(-1), "vu cap can't be negative")
+	})
+
+	t.Run("Raise", func(t *testing.T) {
+		e := New(nil)
+
+		assert.NoError(t, e.SetVUsMax(50))
+		assert.Equal(t, int64(50), e.GetVUsMax())
+
+		assert.NoError(t, e.SetVUsMax(100))
+		assert.Equal(t, int64(100), e.GetVUsMax())
+
+		t.Run("Lower", func(t *testing.T) {
+			assert.NoError(t, e.SetVUsMax(50))
+			assert.Equal(t, int64(50), e.GetVUsMax())
+		})
+	})
+
+	t.Run("TooLow", func(t *testing.T) {
+		e := New(nil)
+		e.ctx = context.Background()
+
+		assert.NoError(t, e.SetVUsMax(100))
+		assert.Equal(t, int64(100), e.GetVUsMax())
+
+		assert.NoError(t, e.SetVUs(100))
+		assert.Equal(t, int64(100), e.GetVUs())
+
+		assert.EqualError(t, e.SetVUsMax(50), "can't lower vu cap (to 50) below vu count (100)")
+	})
+}
+
+func TestExecutorSetVUs(t *testing.T) {
+	t.Run("Negative", func(t *testing.T) {
+		assert.EqualError(t, New(nil).SetVUs(-1), "vu count can't be negative")
+	})
+
+	t.Run("Too High", func(t *testing.T) {
+		assert.EqualError(t, New(nil).SetVUs(100), "can't raise vu count (to 100) above vu cap (0)")
+	})
+
+	t.Run("Raise", func(t *testing.T) {
+		e := New(nil)
+		e.ctx = context.Background()
+
+		assert.NoError(t, e.SetVUsMax(100))
+		assert.Equal(t, int64(100), e.GetVUsMax())
+
+		assert.NoError(t, e.SetVUs(50))
+		assert.Equal(t, int64(50), e.GetVUs())
+
+		assert.NoError(t, e.SetVUs(100))
+		assert.Equal(t, int64(100), e.GetVUs())
+
+		t.Run("Lower", func(t *testing.T) {
+			assert.NoError(t, e.SetVUs(50))
+			assert.Equal(t, int64(50), e.GetVUs())
+		})
+	})
 }

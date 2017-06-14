@@ -28,26 +28,41 @@ import (
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
+	"github.com/pkg/errors"
 	null "gopkg.in/guregu/null.v3"
 )
 
-type VUHandle struct {
-	VU      lib.VU
-	Cancel  context.CancelFunc
-	Samples []stats.Sample
+type vuHandle struct {
+	VU     lib.VU
+	Cancel context.CancelFunc
+	Lock   sync.RWMutex
+
+	runLock sync.Mutex
+}
+
+func (h *vuHandle) Run(ctx context.Context) error {
+	h.Lock.Lock()
+	_, cancel := context.WithCancel(ctx)
+	h.Cancel = cancel
+	h.Lock.Unlock()
+
+	return nil
 }
 
 type Executor struct {
 	Runner lib.Runner
-	VUs    []VUHandle
 
-	runLock   sync.Mutex
-	isRunning bool
+	vus       []*vuHandle
+	vusLock   sync.RWMutex
+	numVUs    int64
+	numVUsMax int64
 
 	iterations, endIterations int64
 	time, endTime             int64
 	paused                    lib.AtomicBool
-	vus, vusMax               int64
+
+	runLock sync.Mutex
+	ctx     context.Context
 }
 
 func New(r lib.Runner) *Executor {
@@ -56,18 +71,17 @@ func New(r lib.Runner) *Executor {
 
 func (e *Executor) Run(ctx context.Context, out <-chan []stats.Sample) error {
 	e.runLock.Lock()
-	e.isRunning = true
-	defer func() {
-		e.isRunning = false
-		e.runLock.Unlock()
-	}()
+	defer e.runLock.Unlock()
 
+	e.ctx = ctx
 	<-ctx.Done()
+	e.ctx = nil
+
 	return nil
 }
 
 func (e *Executor) IsRunning() bool {
-	return e.isRunning
+	return e.ctx != nil
 }
 
 func (e *Executor) GetIterations() int64 {
@@ -117,19 +131,75 @@ func (e *Executor) SetPaused(paused bool) {
 }
 
 func (e *Executor) GetVUs() int64 {
-	return atomic.LoadInt64(&e.vus)
+	return atomic.LoadInt64(&e.numVUs)
 }
 
-func (e *Executor) SetVUs(vus int64) error {
-	atomic.StoreInt64(&e.vus, vus)
+func (e *Executor) SetVUs(num int64) error {
+	if num < 0 {
+		return errors.New("vu count can't be negative")
+	}
+
+	if numVUsMax := atomic.LoadInt64(&e.numVUsMax); num > numVUsMax {
+		return errors.Errorf("can't raise vu count (to %d) above vu cap (%d)", num, numVUsMax)
+	}
+
+	e.vusLock.Lock()
+	defer e.vusLock.Unlock()
+
+	for i, handle := range e.vus {
+		if i <= int(num) {
+			_, cancel := context.WithCancel(e.ctx)
+			handle.Cancel = cancel
+		} else if handle.Cancel != nil {
+			handle.Cancel()
+			handle.Cancel = nil
+		}
+	}
+
+	atomic.StoreInt64(&e.numVUs, num)
+
 	return nil
 }
 
 func (e *Executor) GetVUsMax() int64 {
-	return atomic.LoadInt64(&e.vusMax)
+	return atomic.LoadInt64(&e.numVUsMax)
 }
 
 func (e *Executor) SetVUsMax(max int64) error {
-	atomic.StoreInt64(&e.vusMax, max)
+	if max < 0 {
+		return errors.New("vu cap can't be negative")
+	}
+
+	if numVUs := atomic.LoadInt64(&e.numVUs); max < numVUs {
+		return errors.Errorf("can't lower vu cap (to %d) below vu count (%d)", max, numVUs)
+	}
+
+	numVUsMax := atomic.LoadInt64(&e.numVUsMax)
+
+	if max < numVUsMax {
+		e.vus = e.vus[:max]
+		atomic.StoreInt64(&e.numVUsMax, max)
+		return nil
+	}
+
+	e.vusLock.Lock()
+	defer e.vusLock.Unlock()
+
+	vus := e.vus
+	for i := numVUsMax; i < max; i++ {
+		var handle vuHandle
+		if e.Runner != nil {
+			vu, err := e.Runner.NewVU()
+			if err != nil {
+				return err
+			}
+			handle.VU = vu
+		}
+		vus = append(vus, &handle)
+	}
+	e.vus = vus
+
+	atomic.StoreInt64(&e.numVUsMax, max)
+
 	return nil
 }
