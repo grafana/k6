@@ -24,8 +24,35 @@ import (
 	"context"
 	"testing"
 
+	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/stats"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestExecutorRun(t *testing.T) {
+	t.Run("Normal", func(t *testing.T) {
+		ch := make(chan struct{})
+		e := New(lib.RunnerFunc(func(ctx context.Context) ([]stats.Sample, error) {
+			select {
+			case ch <- struct{}{}:
+			case <-ctx.Done():
+			}
+			return nil, nil
+		}))
+		e.SetVUsMax(10)
+		e.SetVUs(10)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		err := make(chan error)
+		go func() { err <- e.Run(ctx, nil) }()
+		for i := 0; i < 10; i++ {
+			<-ch
+		}
+		cancel()
+		assert.NoError(t, <-err)
+		assert.Equal(t, int64(10), e.GetIterations())
+	})
+}
 
 func TestExecutorIsRunning(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())

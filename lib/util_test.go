@@ -123,3 +123,13 @@ func TestClampf(t *testing.T) {
 		})
 	}
 }
+
+func TestMin(t *testing.T) {
+	assert.Equal(t, int64(10), Min(10, 100))
+	assert.Equal(t, int64(10), Min(100, 10))
+}
+
+func TestMax(t *testing.T) {
+	assert.Equal(t, int64(100), Max(10, 100))
+	assert.Equal(t, int64(100), Max(100, 10))
+}

@@ -22,6 +22,7 @@ package local
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -29,6 +30,7 @@ import (
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	null "gopkg.in/guregu/null.v3"
 )
 
@@ -40,17 +42,12 @@ type vuHandle struct {
 	runLock sync.Mutex
 }
 
-func (h *vuHandle) Run(ctx context.Context) error {
-	h.Lock.Lock()
-	_, cancel := context.WithCancel(ctx)
-	h.Cancel = cancel
-	h.Lock.Unlock()
-
-	return nil
-}
-
 type Executor struct {
 	Runner lib.Runner
+	Logger *log.Logger
+
+	runLock sync.Mutex
+	wg      sync.WaitGroup
 
 	vus       []*vuHandle
 	vusLock   sync.RWMutex
@@ -59,28 +56,135 @@ type Executor struct {
 
 	iterations, endIterations int64
 	time, endTime             int64
-	paused                    lib.AtomicBool
 
-	runLock sync.Mutex
-	ctx     context.Context
+	pauseLock sync.RWMutex
+	pause     chan interface{}
+
+	// Lock for: ctx, flow, out
+	lock sync.RWMutex
+
+	// Current context, nil if a test isn't running right now.
+	ctx context.Context
+
+	// Engineward output channel for samples.
+	out chan<- []stats.Sample
+
+	// Flow control for VUs; iterations are run only after reading from this channel.
+	flow chan struct{}
 }
 
 func New(r lib.Runner) *Executor {
-	return &Executor{Runner: r}
+	return &Executor{
+		Runner:        r,
+		Logger:        log.StandardLogger(),
+		endIterations: -1,
+		endTime:       -1,
+	}
 }
 
-func (e *Executor) Run(ctx context.Context, out <-chan []stats.Sample) error {
+func (e *Executor) Run(ctx context.Context, out chan<- []stats.Sample) error {
 	e.runLock.Lock()
 	defer e.runLock.Unlock()
 
+	e.lock.Lock()
 	e.ctx = ctx
-	<-ctx.Done()
-	e.ctx = nil
+	e.out = out
+	e.flow = make(chan struct{})
+	e.lock.Unlock()
 
-	return nil
+	e.scale(ctx, lib.Max(0, atomic.LoadInt64(&e.numVUs)))
+
+	defer func() {
+		e.lock.Lock()
+		e.ctx = nil
+		e.out = nil
+		e.flow = nil
+		e.lock.Unlock()
+
+		e.wg.Wait()
+	}()
+
+	ticker := time.NewTicker(1 * time.Millisecond)
+	defer ticker.Stop()
+
+	lastTick := time.Now()
+	for {
+		// If the test is paused, sleep until either the pause or the test ends.
+		// Also shift the last tick to omit time spent paused, but not partial ticks.
+		e.pauseLock.RLock()
+		pause := e.pause
+		e.pauseLock.RUnlock()
+		if pause != nil {
+			leftovers := time.Since(lastTick)
+			select {
+			case <-pause:
+				lastTick = time.Now().Add(-leftovers)
+			case <-ctx.Done():
+				return nil
+			}
+		}
+
+		select {
+		case t := <-ticker.C:
+			d := t.Sub(lastTick)
+			lastTick = t
+
+			at := atomic.AddInt64(&e.time, int64(d))
+			end := atomic.LoadInt64(&e.endTime)
+			if end >= 0 && at >= end {
+				return nil
+			}
+		case e.flow <- struct{}{}:
+			at := atomic.AddInt64(&e.iterations, 1)
+			end := atomic.LoadInt64(&e.endIterations)
+			if end >= 0 && at >= end {
+				return nil
+			}
+		case <-ctx.Done():
+			return nil
+		}
+	}
+}
+
+func (e *Executor) runVU(ctx context.Context, handle *vuHandle) {
+	e.lock.RLock()
+	flow := e.flow
+	out := e.out
+	e.lock.RUnlock()
+
+	for range flow {
+		samples, err := handle.VU.RunOnce(ctx)
+		if err != nil {
+			if s, ok := err.(fmt.Stringer); ok {
+				e.Logger.Error(s.String())
+			} else {
+				e.Logger.Error(err.Error())
+			}
+			continue
+		}
+		out <- samples
+	}
+}
+
+func (e *Executor) scale(ctx context.Context, num int64) {
+	e.vusLock.Lock()
+	defer e.vusLock.Unlock()
+
+	for i, handle := range e.vus {
+		if i <= int(num) && handle.Cancel == nil {
+			ctx, cancel := context.WithCancel(ctx)
+			handle.Cancel = cancel
+			go e.runVU(ctx, handle)
+		} else if handle.Cancel != nil {
+			handle.Cancel()
+			handle.Cancel = nil
+		}
+	}
 }
 
 func (e *Executor) IsRunning() bool {
+	e.lock.RLock()
+	defer e.lock.RUnlock()
 	return e.ctx != nil
 }
 
@@ -123,11 +227,21 @@ func (e *Executor) SetEndTime(t lib.NullDuration) {
 }
 
 func (e *Executor) IsPaused() bool {
-	return e.paused.Get()
+	e.pauseLock.RLock()
+	defer e.pauseLock.RUnlock()
+	return e.pause != nil
 }
 
 func (e *Executor) SetPaused(paused bool) {
-	e.paused.Set(paused)
+	e.pauseLock.Lock()
+	defer e.pauseLock.Unlock()
+
+	if paused && e.pause == nil {
+		e.pause = make(chan interface{})
+	} else if !paused && e.pause != nil {
+		close(e.pause)
+		e.pause = nil
+	}
 }
 
 func (e *Executor) GetVUs() int64 {
@@ -143,17 +257,11 @@ func (e *Executor) SetVUs(num int64) error {
 		return errors.Errorf("can't raise vu count (to %d) above vu cap (%d)", num, numVUsMax)
 	}
 
-	e.vusLock.Lock()
-	defer e.vusLock.Unlock()
+	e.lock.Lock()
+	defer e.lock.Unlock()
 
-	for i, handle := range e.vus {
-		if i <= int(num) {
-			_, cancel := context.WithCancel(e.ctx)
-			handle.Cancel = cancel
-		} else if handle.Cancel != nil {
-			handle.Cancel()
-			handle.Cancel = nil
-		}
+	if ctx := e.ctx; ctx != nil {
+		e.scale(ctx, num)
 	}
 
 	atomic.StoreInt64(&e.numVUs, num)
