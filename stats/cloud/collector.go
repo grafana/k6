@@ -57,7 +57,7 @@ type Collector struct {
 	thresholds map[string][]*stats.Threshold
 	client     *Client
 
-	sampleBuffer []*sample
+	sampleBuffer []*Sample
 	sampleMu     sync.Mutex
 }
 
@@ -168,12 +168,12 @@ func (c *Collector) Collect(samples []stats.Sample) {
 		return
 	}
 
-	var cloudSamples []*sample
+	var cloudSamples []*Sample
 	for _, samp := range samples {
-		sampleJSON := &sample{
+		sampleJSON := &Sample{
 			Type:   "Point",
 			Metric: samp.Metric.Name,
-			Data: sampleData{
+			Data: SampleData{
 				Type:  samp.Metric.Type,
 				Time:  samp.Time,
 				Value: samp.Value,
