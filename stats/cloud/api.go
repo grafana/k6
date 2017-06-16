@@ -28,13 +28,13 @@ import (
 	"github.com/pkg/errors"
 )
 
-type sample struct {
+type Sample struct {
 	Type   string     `json:"type"`
 	Metric string     `json:"metric"`
-	Data   sampleData `json:"data"`
+	Data   SampleData `json:"data"`
 }
 
-type sampleData struct {
+type SampleData struct {
 	Type  stats.MetricType  `json:"type"`
 	Time  time.Time         `json:"time"`
 	Value float64           `json:"value"`
@@ -75,7 +75,7 @@ func (c *Client) CreateTestRun(testRun *TestRun) (*CreateTestRunResponse, error)
 	return &ctrr, nil
 }
 
-func (c *Client) PushMetric(referenceID string, samples []*sample) error {
+func (c *Client) PushMetric(referenceID string, samples []*Sample) error {
 	url := fmt.Sprintf("%s/metrics/%s", c.baseURL, referenceID)
 
 	req, err := c.NewRequest("POST", url, samples)
