@@ -108,12 +108,12 @@ func (t *TrendSink) Format() map[string]float64 {
 	}
 
 	return map[string]float64{
-		"min": t.min,
-		"max": t.max,
-		"avg": t.avg,
-		"med": t.med,
-		"p90": t.P(0.90),
-		"p95": t.P(0.95),
+		"min":   t.min,
+		"max":   t.max,
+		"avg":   t.avg,
+		"med":   t.med,
+		"p(90)": t.P(0.90),
+		"p(95)": t.P(0.95),
 	}
 }
 
