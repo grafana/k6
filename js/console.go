@@ -21,6 +21,7 @@
 package js
 
 import (
+	"context"
 	"strconv"
 
 	"github.com/dop251/goja"
@@ -35,7 +36,15 @@ func NewConsole() *Console {
 	return &Console{log.StandardLogger()}
 }
 
-func (c Console) log(level log.Level, msgobj goja.Value, args ...goja.Value) {
+func (c Console) log(ctx *context.Context, level log.Level, msgobj goja.Value, args ...goja.Value) {
+	if ctx != nil && *ctx != nil {
+		select {
+		case <-(*ctx).Done():
+			return
+		default:
+		}
+	}
+
 	fields := make(log.Fields)
 	for i, arg := range args {
 		fields[strconv.Itoa(i)] = arg.String()
@@ -54,22 +63,22 @@ func (c Console) log(level log.Level, msgobj goja.Value, args ...goja.Value) {
 	}
 }
 
-func (c Console) Log(msg goja.Value, args ...goja.Value) {
-	c.Info(msg, args...)
+func (c Console) Log(ctx *context.Context, msg goja.Value, args ...goja.Value) {
+	c.Info(ctx, msg, args...)
 }
 
-func (c Console) Debug(msg goja.Value, args ...goja.Value) {
-	c.log(log.DebugLevel, msg, args...)
+func (c Console) Debug(ctx *context.Context, msg goja.Value, args ...goja.Value) {
+	c.log(ctx, log.DebugLevel, msg, args...)
 }
 
-func (c Console) Info(msg goja.Value, args ...goja.Value) {
-	c.log(log.InfoLevel, msg, args...)
+func (c Console) Info(ctx *context.Context, msg goja.Value, args ...goja.Value) {
+	c.log(ctx, log.InfoLevel, msg, args...)
 }
 
-func (c Console) Warn(msg goja.Value, args ...goja.Value) {
-	c.log(log.WarnLevel, msg, args...)
+func (c Console) Warn(ctx *context.Context, msg goja.Value, args ...goja.Value) {
+	c.log(ctx, log.WarnLevel, msg, args...)
 }
 
-func (c Console) Error(msg goja.Value, args ...goja.Value) {
-	c.log(log.ErrorLevel, msg, args...)
+func (c Console) Error(ctx *context.Context, msg goja.Value, args ...goja.Value) {
+	c.log(ctx, log.ErrorLevel, msg, args...)
 }
