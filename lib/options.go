@@ -24,29 +24,10 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"errors"
-	"time"
 
 	"github.com/loadimpact/k6/stats"
 	"gopkg.in/guregu/null.v3"
 )
-
-type Duration time.Duration
-
-func (d *Duration) UnmarshalJSON(data []byte) error {
-	var str string
-	if err := json.Unmarshal(data, &str); err != nil {
-		return err
-	}
-
-	v, err := time.ParseDuration(str)
-	if err != nil {
-		return err
-	}
-
-	*d = Duration(v)
-
-	return nil
-}
 
 type TLSVersion struct {
 	Min int
@@ -132,12 +113,12 @@ func (s *TLSCipherSuites) UnmarshalJSON(data []byte) error {
 }
 
 type Options struct {
-	Paused     null.Bool   `json:"paused"`
-	VUs        null.Int    `json:"vus"`
-	VUsMax     null.Int    `json:"vusMax"`
-	Duration   null.String `json:"duration"`
-	Iterations null.Int    `json:"iterations"`
-	Stages     []Stage     `json:"stages"`
+	Paused     null.Bool    `json:"paused"`
+	VUs        null.Int     `json:"vus"`
+	VUsMax     null.Int     `json:"vusMax"`
+	Duration   NullDuration `json:"duration"`
+	Iterations null.Int     `json:"iterations"`
+	Stages     []Stage      `json:"stages"`
 
 	Linger        null.Bool `json:"linger"`
 	NoUsageReport null.Bool `json:"noUsageReport"`

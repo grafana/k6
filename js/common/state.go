@@ -23,9 +23,10 @@ package common
 import (
 	"net/http"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
+	log "github.com/sirupsen/logrus"
 )
 
 // Provides volatile state for a VU.
@@ -42,6 +43,12 @@ type State struct {
 	// Networking equipment.
 	HTTPTransport http.RoundTripper
 
+	// Also expose the underlying dialer
+	Dialer *netext.Dialer
+
 	// Sample buffer, emitted at the end of the iteration.
 	Samples []stats.Sample
+
+	// Bytes sent and received during this iteration. Use `sync/atomic`.
+	BytesRead, BytesWritten int64
 }

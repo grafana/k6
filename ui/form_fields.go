@@ -18,23 +18,47 @@
  *
  */
 
-package modules
+package ui
 
 import (
-	"github.com/loadimpact/k6/js/modules/k6"
-	"github.com/loadimpact/k6/js/modules/k6/crypto"
-	"github.com/loadimpact/k6/js/modules/k6/html"
-	"github.com/loadimpact/k6/js/modules/k6/http"
-	"github.com/loadimpact/k6/js/modules/k6/metrics"
-	"github.com/loadimpact/k6/js/modules/k6/ws"
+	"strings"
+
+	"github.com/pkg/errors"
 )
 
-// Index of module implementations.
-var Index = map[string]interface{}{
-	"k6":         &k6.K6{},
-	"k6/crypto":  &crypto.Crypto{},
-	"k6/http":    &http.HTTP{},
-	"k6/metrics": &metrics.Metrics{},
-	"k6/html":    &html.HTML{},
-	"k6/ws":      &ws.WS{},
+var _ Field = StringField{}
+
+type StringField struct {
+	Key     string
+	Label   string
+	Default string
+
+	// Length constraints.
+	Min, Max int
+}
+
+func (f StringField) GetKey() string {
+	return f.Key
+}
+
+func (f StringField) GetLabel() string {
+	return f.Label
+}
+
+func (f StringField) GetLabelExtra() string {
+	return f.Default
+}
+
+func (f StringField) Clean(s string) (interface{}, error) {
+	s = strings.TrimSpace(s)
+	if f.Min != 0 && len(s) < f.Min {
+		return nil, errors.Errorf("invalid input, min length is %d", f.Min)
+	}
+	if f.Max != 0 && len(s) > f.Max {
+		return nil, errors.Errorf("invalid input, max length is %d", f.Max)
+	}
+	if s == "" {
+		s = f.Default
+	}
+	return s, nil
 }

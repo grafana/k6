@@ -4,9 +4,9 @@ import (
 	"time"
 
 	"github.com/GeertJohan/go.rice"
-	log "github.com/Sirupsen/logrus"
 	"github.com/dop251/goja"
 	"github.com/mitchellh/mapstructure"
+	log "github.com/sirupsen/logrus"
 )
 
 var (

@@ -25,12 +25,12 @@ import (
 	"crypto/tls"
 	"fmt"
 	"testing"
-	"time"
 
-	logtest "github.com/Sirupsen/logrus/hooks/test"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/stats"
+	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v3"
@@ -230,42 +230,6 @@ func TestVURunContext(t *testing.T) {
 	}
 }
 
-func TestVURunSamples(t *testing.T) {
-	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
-		Data:     []byte(`export default function() { fn(); }`),
-	}, afero.NewMemMapFs())
-	if !assert.NoError(t, err) {
-		return
-	}
-
-	r2, err := NewFromArchive(r1.MakeArchive())
-	if !assert.NoError(t, err) {
-		return
-	}
-
-	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
-	for name, r := range testdata {
-		t.Run(name, func(t *testing.T) {
-			vu, err := r.newVU()
-			if !assert.NoError(t, err) {
-				return
-			}
-
-			metric := stats.New("my_metric", stats.Counter)
-			sample := stats.Sample{Time: time.Now(), Metric: metric, Value: 1}
-			vu.Runtime.Set("fn", func() {
-				state := common.GetState(*vu.Context)
-				state.Samples = append(state.Samples, sample)
-			})
-
-			_, err = vu.RunOnce(context.Background())
-			assert.NoError(t, err)
-			assert.Equal(t, []stats.Sample{sample}, common.GetState(*vu.Context).Samples)
-		})
-	}
-}
-
 func TestVUIntegrationGroups(t *testing.T) {
 	r1, err := New(&lib.SourceData{
 		Filename: "/script.js",
@@ -356,10 +320,21 @@ func TestVUIntegrationMetrics(t *testing.T) {
 			}
 
 			samples, err := vu.RunOnce(context.Background())
-			if assert.NoError(t, err) && assert.Len(t, samples, 1) {
-				assert.Equal(t, 5.0, samples[0].Value)
-				assert.Equal(t, "my_metric", samples[0].Metric.Name)
-				assert.Equal(t, stats.Trend, samples[0].Metric.Type)
+			assert.NoError(t, err)
+			assert.Len(t, samples, 3)
+			for i, s := range samples {
+				switch i {
+				case 0:
+					assert.Equal(t, 5.0, s.Value)
+					assert.Equal(t, "my_metric", s.Metric.Name)
+					assert.Equal(t, stats.Trend, s.Metric.Type)
+				case 1:
+					assert.Equal(t, 0.0, s.Value)
+					assert.Equal(t, metrics.DataSent, s.Metric)
+				case 2:
+					assert.Equal(t, 0.0, s.Value)
+					assert.Equal(t, metrics.DataReceived, s.Metric)
+				}
 			}
 		})
 	}

@@ -162,8 +162,12 @@ func TestCheck(t *testing.T) {
 		}
 	})
 	t.Run("Literal", func(t *testing.T) {
-		_, err := common.RunString(rt, `k6.check(null, null)`)
-		assert.EqualError(t, err, "TypeError: Cannot convert undefined or null to object")
+		state := &common.State{Group: root}
+		*ctx = common.WithState(baseCtx, state)
+
+		_, err := common.RunString(rt, `k6.check(null, 12345)`)
+		assert.NoError(t, err)
+		assert.Len(t, state.Samples, 0)
 	})
 
 	t.Run("Throws", func(t *testing.T) {
@@ -223,6 +227,34 @@ func TestCheck(t *testing.T) {
 				}
 			})
 		}
+
+		t.Run("ContextExpiry", func(t *testing.T) {
+			root, err := lib.NewGroup("", nil)
+			assert.NoError(t, err)
+
+			state := &common.State{Group: root}
+			ctx2, cancel := context.WithCancel(common.WithState(baseCtx, state))
+			*ctx = ctx2
+
+			v, err := common.RunString(rt, `k6.check(null, { "check": true })`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, true, v.Export())
+			}
+
+			check, _ := root.Check("check")
+			assert.Equal(t, int64(1), check.Passes)
+			assert.Equal(t, int64(0), check.Fails)
+
+			cancel()
+
+			v, err = common.RunString(rt, `k6.check(null, { "check": true })`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, true, v.Export())
+			}
+
+			assert.Equal(t, int64(1), check.Passes)
+			assert.Equal(t, int64(0), check.Fails)
+		})
 	})
 
 	t.Run("Tags", func(t *testing.T) {

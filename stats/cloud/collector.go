@@ -29,10 +29,10 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
 	"github.com/mitchellh/mapstructure"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -57,7 +57,7 @@ type Collector struct {
 	thresholds map[string][]*stats.Threshold
 	client     *Client
 
-	sampleBuffer []*sample
+	sampleBuffer []*Sample
 	sampleMu     sync.Mutex
 }
 
@@ -83,12 +83,7 @@ func New(fname string, src *lib.SourceData, opts lib.Options, version string) (*
 	if len(opts.Stages) > 0 {
 		duration = sumStages(opts.Stages)
 	} else if opts.Duration.Valid {
-		// Parse duration if no stages found
-		dur, err := time.ParseDuration(opts.Duration.String)
-		// ignore error and keep default -1 value
-		if err == nil {
-			duration = int64(dur.Seconds())
-		}
+		duration = int64(time.Duration(opts.Duration.Duration).Seconds())
 	}
 
 	return &Collector{
@@ -100,7 +95,7 @@ func New(fname string, src *lib.SourceData, opts lib.Options, version string) (*
 	}, nil
 }
 
-func (c *Collector) Init() {
+func (c *Collector) Init() error {
 	thresholds := make(map[string][]string)
 
 	for name, t := range c.thresholds {
@@ -123,7 +118,7 @@ func (c *Collector) Init() {
 		log.WithFields(log.Fields{
 			"error": err,
 		}).Error("Cloud collector failed to init")
-		return
+		return nil
 	}
 	c.referenceID = response.ReferenceID
 
@@ -133,6 +128,11 @@ func (c *Collector) Init() {
 		"duration":    c.duration,
 		"referenceId": c.referenceID,
 	}).Debug("Cloud collector init successful")
+	return nil
+}
+
+func (c *Collector) MakeConfig() interface{} {
+	return nil
 }
 
 func (c *Collector) String() string {
@@ -168,12 +168,12 @@ func (c *Collector) Collect(samples []stats.Sample) {
 		return
 	}
 
-	var cloudSamples []*sample
+	var cloudSamples []*Sample
 	for _, samp := range samples {
-		sampleJSON := &sample{
+		sampleJSON := &Sample{
 			Type:   "Point",
 			Metric: samp.Metric.Name,
-			Data: sampleData{
+			Data: SampleData{
 				Type:  samp.Metric.Type,
 				Time:  samp.Time,
 				Value: samp.Value,
@@ -245,7 +245,7 @@ func (c *Collector) testFinished() {
 func sumStages(stages []lib.Stage) int64 {
 	var total time.Duration
 	for _, stage := range stages {
-		total += stage.Duration
+		total += time.Duration(stage.Duration.Duration)
 	}
 
 	return int64(total.Seconds())

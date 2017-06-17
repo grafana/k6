@@ -27,13 +27,15 @@ import (
 	"net/http"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
+	"github.com/viki-org/dnscache"
 )
 
 type Runner struct {
@@ -41,7 +43,8 @@ type Runner struct {
 	Logger       *log.Logger
 	defaultGroup *lib.Group
 
-	Dialer *netext.Dialer
+	BaseDialer net.Dialer
+	Resolver   *dnscache.Resolver
 }
 
 func New(src *lib.SourceData, fs afero.Fs) (*Runner, error) {
@@ -70,11 +73,12 @@ func NewFromBundle(b *Bundle) (*Runner, error) {
 		Bundle:       b,
 		Logger:       log.StandardLogger(),
 		defaultGroup: defaultGroup,
-		Dialer: netext.NewDialer(net.Dialer{
+		BaseDialer: net.Dialer{
 			Timeout:   30 * time.Second,
 			KeepAlive: 30 * time.Second,
 			DualStack: true,
-		}),
+		},
+		Resolver: dnscache.New(0),
 	}, nil
 }
 
@@ -108,6 +112,7 @@ func (r *Runner) newVU() (*VU, error) {
 	}
 
 	// Make a VU, apply the VU context.
+	dialer := &netext.Dialer{Dialer: r.BaseDialer, Resolver: r.Resolver}
 	vu := &VU{
 		BundleInstance: *bi,
 		Runner:         r,
@@ -119,11 +124,12 @@ func (r *Runner) newVU() (*VU, error) {
 				MinVersion:         uint16(tlsVersion.Min),
 				MaxVersion:         uint16(tlsVersion.Max),
 			},
-			DialContext: r.Dialer.DialContext,
+			DialContext: dialer.DialContext,
 		},
-		VUContext: NewVUContext(r.Bundle.Options),
+		Dialer:  dialer,
+		Console: NewConsole(),
 	}
-	common.BindToGlobal(vu.Runtime, common.Bind(vu.Runtime, vu.VUContext, vu.Context))
+	vu.Runtime.Set("console", common.Bind(vu.Runtime, vu.Console, vu.Context))
 
 	// Give the VU an initial sense of identity.
 	if err := vu.Reconfigure(0); err != nil {
@@ -150,10 +156,11 @@ type VU struct {
 
 	Runner        *Runner
 	HTTPTransport *http.Transport
+	Dialer        *netext.Dialer
 	ID            int64
 	Iteration     int64
 
-	VUContext *VUContext
+	Console *Console
 }
 
 func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
@@ -162,7 +169,10 @@ func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 		Options:       u.Runner.Bundle.Options,
 		Group:         u.Runner.defaultGroup,
 		HTTPTransport: u.HTTPTransport,
+		Dialer:        u.Dialer,
 	}
+	u.Dialer.BytesRead = &state.BytesRead
+	u.Dialer.BytesWritten = &state.BytesWritten
 
 	ctx = common.WithRuntime(ctx, u.Runtime)
 	ctx = common.WithState(ctx, state)
@@ -173,10 +183,16 @@ func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 
 	_, err := u.Default(goja.Undefined())
 
+	t := time.Now()
+	samples := append(state.Samples,
+		stats.Sample{Time: t, Metric: metrics.DataSent, Value: float64(state.BytesWritten)},
+		stats.Sample{Time: t, Metric: metrics.DataReceived, Value: float64(state.BytesRead)},
+	)
+
 	if u.Runner.Bundle.Options.NoConnectionReuse.Bool {
 		u.HTTPTransport.CloseIdleConnections()
 	}
-	return state.Samples, err
+	return samples, err
 }
 
 func (u *VU) Reconfigure(id int64) error {

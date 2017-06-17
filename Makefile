@@ -8,13 +8,13 @@ build: web
 
 .PHONY: web
 web: web/node_modules web/bower_components
-	cd web && ember build -prod
+	cd web && node node_modules/.bin/ember build -prod
 
 web/node_modules:
 	cd web && npm install
 
-web/bower_components:
-	cd web && bower install --allow-root
+web/bower_components: web/node_modules
+	cd web && node node_modules/.bin/bower install --allow-root
 
 .PHONY: docs
 docs:

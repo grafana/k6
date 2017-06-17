@@ -26,9 +26,9 @@ import (
 	"io"
 	"os"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 )
 
@@ -65,7 +65,12 @@ func New(fname string, fs afero.Fs, opts lib.Options) (*Collector, error) {
 	}, nil
 }
 
-func (c *Collector) Init() {
+func (c *Collector) Init() error {
+	return nil
+}
+
+func (c *Collector) MakeConfig() interface{} {
+	return nil
 }
 
 func (c *Collector) String() string {

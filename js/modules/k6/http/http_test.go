@@ -31,19 +31,23 @@ import (
 	"testing"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
-	logtest "github.com/Sirupsen/logrus/hooks/test"
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
+	log "github.com/sirupsen/logrus"
+	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	null "gopkg.in/guregu/null.v3"
 )
 
-func assertRequestMetricsEmitted(t *testing.T, samples []stats.Sample, method, url string, status int, group string) {
+func assertRequestMetricsEmitted(t *testing.T, samples []stats.Sample, method, url, name string, status int, group string) {
+	if name == "" {
+		name = url
+	}
+
 	seenDuration := false
 	seenBlocked := false
 	seenConnecting := false
@@ -70,6 +74,7 @@ func assertRequestMetricsEmitted(t *testing.T, samples []stats.Sample, method, u
 			assert.Equal(t, strconv.Itoa(status), sample.Tags["status"])
 			assert.Equal(t, method, sample.Tags["method"])
 			assert.Equal(t, group, sample.Tags["group"])
+			assert.Equal(t, name, sample.Tags["name"])
 		}
 	}
 	assert.True(t, seenDuration, "url %s didn't emit Duration", url)
@@ -212,7 +217,7 @@ func TestRequest(t *testing.T) {
 		if (res.body.indexOf("Herman Melville - Moby-Dick") == -1) { throw new Error("wrong body: " + res.body); }
 		`)
 		assert.NoError(t, err)
-		assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/html", 200, "")
+		assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/html", "", 200, "")
 
 		t.Run("html", func(t *testing.T) {
 			_, err := common.RunString(rt, `
@@ -243,7 +248,7 @@ func TestRequest(t *testing.T) {
 			if (res.body.indexOf("Herman Melville - Moby-Dick") == -1) { throw new Error("wrong body: " + res.body); }
 			`)
 			assert.NoError(t, err)
-			assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/html", 200, "::my group")
+			assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/html", "", 200, "::my group")
 		})
 	})
 	t.Run("JSON", func(t *testing.T) {
@@ -255,7 +260,7 @@ func TestRequest(t *testing.T) {
 		if (res.json().args.b != "2") { throw new Error("wrong ?b: " + res.json().args.b); }
 		`)
 		assert.NoError(t, err)
-		assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/get?a=1&b=2", 200, "")
+		assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/get?a=1&b=2", "", 200, "")
 
 		t.Run("Invalid", func(t *testing.T) {
 			_, err := common.RunString(rt, `http.request("GET", "https://httpbin.org/html").json();`)
@@ -308,7 +313,7 @@ func TestRequest(t *testing.T) {
 				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 				`, literal))
 				assert.NoError(t, err)
-				assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/headers", 200, "")
+				assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/headers", "", 200, "")
 			})
 		}
 
@@ -321,7 +326,7 @@ func TestRequest(t *testing.T) {
 					if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 					`, literal))
 					assert.NoError(t, err)
-					assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/headers", 200, "")
+					assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/headers", "", 200, "")
 				})
 			}
 
@@ -335,7 +340,7 @@ func TestRequest(t *testing.T) {
 				if (res.json().headers["X-My-Header"] != "value") { throw new Error("wrong X-My-Header: " + res.json().headers["X-My-Header"]); }
 				`)
 				assert.NoError(t, err)
-				assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/headers", 200, "")
+				assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/headers", "", 200, "")
 			})
 		})
 
@@ -348,7 +353,7 @@ func TestRequest(t *testing.T) {
 					if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 					`, literal))
 					assert.NoError(t, err)
-					assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/headers", 200, "")
+					assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/headers", "", 200, "")
 				})
 			}
 
@@ -359,7 +364,7 @@ func TestRequest(t *testing.T) {
 				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 				`)
 				assert.NoError(t, err)
-				assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/headers", 200, "")
+				assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/headers", "", 200, "")
 				for _, sample := range state.Samples {
 					assert.Equal(t, "value", sample.Tags["tag"])
 				}
@@ -376,7 +381,21 @@ func TestRequest(t *testing.T) {
 		if (res.json().args.b != "2") { throw new Error("wrong ?b: " + res.json().args.b); }
 		`)
 		assert.NoError(t, err)
-		assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/get?a=1&b=2", 200, "")
+		assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/get?a=1&b=2", "", 200, "")
+
+		t.Run("Tagged", func(t *testing.T) {
+			state.Samples = nil
+			_, err := common.RunString(rt, `
+			let a = "1";
+			let b = "2";
+			let res = http.get(http.url`+"`"+`https://httpbin.org/get?a=${a}&b=${b}`+"`"+`);
+			if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+			if (res.json().args.a != a) { throw new Error("wrong ?a: " + res.json().args.a); }
+			if (res.json().args.b != b) { throw new Error("wrong ?b: " + res.json().args.b); }
+			`)
+			assert.NoError(t, err)
+			assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/get?a=1&b=2", "https://httpbin.org/get?a=${}&b=${}", 200, "")
+		})
 	})
 	t.Run("HEAD", func(t *testing.T) {
 		state.Samples = nil
@@ -386,7 +405,7 @@ func TestRequest(t *testing.T) {
 		if (res.body.length != 0) { throw new Error("HEAD responses shouldn't have a body"); }
 		`)
 		assert.NoError(t, err)
-		assertRequestMetricsEmitted(t, state.Samples, "HEAD", "https://httpbin.org/get?a=1&b=2", 200, "")
+		assertRequestMetricsEmitted(t, state.Samples, "HEAD", "https://httpbin.org/get?a=1&b=2", "", 200, "")
 	})
 
 	postMethods := map[string]string{
@@ -405,7 +424,7 @@ func TestRequest(t *testing.T) {
 			if (res.json().headers["Content-Type"]) { throw new Error("content type set: " + res.json().headers["Content-Type"]); }
 			`, fn, strings.ToLower(method)))
 			assert.NoError(t, err)
-			assertRequestMetricsEmitted(t, state.Samples, method, "https://httpbin.org/"+strings.ToLower(method), 200, "")
+			assertRequestMetricsEmitted(t, state.Samples, method, "https://httpbin.org/"+strings.ToLower(method), "", 200, "")
 
 			t.Run("object", func(t *testing.T) {
 				state.Samples = nil
@@ -417,7 +436,7 @@ func TestRequest(t *testing.T) {
 				if (res.json().headers["Content-Type"] != "application/x-www-form-urlencoded") { throw new Error("wrong content type: " + res.json().headers["Content-Type"]); }
 				`, fn, strings.ToLower(method)))
 				assert.NoError(t, err)
-				assertRequestMetricsEmitted(t, state.Samples, method, "https://httpbin.org/"+strings.ToLower(method), 200, "")
+				assertRequestMetricsEmitted(t, state.Samples, method, "https://httpbin.org/"+strings.ToLower(method), "", 200, "")
 
 				t.Run("Content-Type", func(t *testing.T) {
 					state.Samples = nil
@@ -429,7 +448,7 @@ func TestRequest(t *testing.T) {
 					if (res.json().headers["Content-Type"] != "application/x-www-form-urlencoded; charset=utf-8") { throw new Error("wrong content type: " + res.json().headers["Content-Type"]); }
 					`, fn, strings.ToLower(method)))
 					assert.NoError(t, err)
-					assertRequestMetricsEmitted(t, state.Samples, method, "https://httpbin.org/"+strings.ToLower(method), 200, "")
+					assertRequestMetricsEmitted(t, state.Samples, method, "https://httpbin.org/"+strings.ToLower(method), "", 200, "")
 				})
 			})
 		})
@@ -437,6 +456,7 @@ func TestRequest(t *testing.T) {
 
 	t.Run("Batch", func(t *testing.T) {
 		t.Run("GET", func(t *testing.T) {
+			state.Samples = nil
 			_, err := common.RunString(rt, `
 			let reqs = [
 				["GET", "https://httpbin.org/"],
@@ -448,8 +468,29 @@ func TestRequest(t *testing.T) {
 				if (res[key].url != reqs[key][1]) { throw new Error("wrong url: " + res[key].url); }
 			}`)
 			assert.NoError(t, err)
+			assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/", "", 200, "")
+			assertRequestMetricsEmitted(t, state.Samples, "GET", "https://example.com/", "", 200, "")
+
+			t.Run("Tagged", func(t *testing.T) {
+				state.Samples = nil
+				_, err := common.RunString(rt, `
+				let fragment = "get";
+				let reqs = [
+					["GET", http.url`+"`"+`https://httpbin.org/${fragment}`+"`"+`],
+					["GET", http.url`+"`"+`https://example.com/`+"`"+`],
+				];
+				let res = http.batch(reqs);
+				for (var key in res) {
+					if (res[key].status != 200) { throw new Error("wrong status: " + res[key].status); }
+					if (res[key].url != reqs[key][1].url) { throw new Error("wrong url: " + res[key].url); }
+				}`)
+				assert.NoError(t, err)
+				assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/get", "https://httpbin.org/${}", 200, "")
+				assertRequestMetricsEmitted(t, state.Samples, "GET", "https://example.com/", "", 200, "")
+			})
 
 			t.Run("Shorthand", func(t *testing.T) {
+				state.Samples = nil
 				_, err := common.RunString(rt, `
 				let reqs = [
 					"https://httpbin.org/",
@@ -461,9 +502,30 @@ func TestRequest(t *testing.T) {
 					if (res[key].url != reqs[key]) { throw new Error("wrong url: " + res[key].url); }
 				}`)
 				assert.NoError(t, err)
+				assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/", "", 200, "")
+				assertRequestMetricsEmitted(t, state.Samples, "GET", "https://example.com/", "", 200, "")
+
+				t.Run("Tagged", func(t *testing.T) {
+					state.Samples = nil
+					_, err := common.RunString(rt, `
+					let fragment = "get";
+					let reqs = [
+						http.url`+"`"+`https://httpbin.org/${fragment}`+"`"+`,
+						http.url`+"`"+`https://example.com/`+"`"+`,
+					];
+					let res = http.batch(reqs);
+					for (var key in res) {
+						if (res[key].status != 200) { throw new Error("wrong status: " + res[key].status); }
+						if (res[key].url != reqs[key].url) { throw new Error("wrong url: " + res[key].url); }
+					}`)
+					assert.NoError(t, err)
+					assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/get", "https://httpbin.org/${}", 200, "")
+					assertRequestMetricsEmitted(t, state.Samples, "GET", "https://example.com/", "", 200, "")
+				})
 			})
 		})
 		t.Run("POST", func(t *testing.T) {
+			state.Samples = nil
 			_, err := common.RunString(rt, `
 			let res = http.batch([ ["POST", "https://httpbin.org/post", { key: "value" }] ]);
 			for (var key in res) {
@@ -471,8 +533,10 @@ func TestRequest(t *testing.T) {
 				if (res[key].json().form.key != "value") { throw new Error("wrong form: " + JSON.stringify(res[key].json().form)); }
 			}`)
 			assert.NoError(t, err)
+			assertRequestMetricsEmitted(t, state.Samples, "POST", "https://httpbin.org/post", "", 200, "")
 		})
 		t.Run("PUT", func(t *testing.T) {
+			state.Samples = nil
 			_, err := common.RunString(rt, `
 			let res = http.batch([ ["PUT", "https://httpbin.org/put", { key: "value" }] ]);
 			for (var key in res) {
@@ -480,6 +544,29 @@ func TestRequest(t *testing.T) {
 				if (res[key].json().form.key != "value") { throw new Error("wrong form: " + JSON.stringify(res[key].json().form)); }
 			}`)
 			assert.NoError(t, err)
+			assertRequestMetricsEmitted(t, state.Samples, "PUT", "https://httpbin.org/put", "", 200, "")
 		})
 	})
+}
+
+func TestTagURL(t *testing.T) {
+	rt := goja.New()
+	rt.SetFieldNameMapper(common.FieldNameMapper{})
+	rt.Set("http", common.Bind(rt, &HTTP{}, nil))
+
+	testdata := map[string]URLTag{
+		`http://example.com/`:               {URL: "http://example.com/", Name: "http://example.com/"},
+		`http://example.com/${1+1}`:         {URL: "http://example.com/2", Name: "http://example.com/${}"},
+		`http://example.com/${1+1}/`:        {URL: "http://example.com/2/", Name: "http://example.com/${}/"},
+		`http://example.com/${1+1}/${1+2}`:  {URL: "http://example.com/2/3", Name: "http://example.com/${}/${}"},
+		`http://example.com/${1+1}/${1+2}/`: {URL: "http://example.com/2/3/", Name: "http://example.com/${}/${}/"},
+	}
+	for expr, tag := range testdata {
+		t.Run("expr="+expr, func(t *testing.T) {
+			v, err := common.RunString(rt, "http.url`"+expr+"`")
+			if assert.NoError(t, err) {
+				assert.Equal(t, tag, v.Export())
+			}
+		})
+	}
 }

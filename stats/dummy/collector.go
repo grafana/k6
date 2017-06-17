@@ -34,8 +34,9 @@ type Collector struct {
 	lock sync.Mutex
 }
 
-func (c *Collector) Init() {
-}
+func (c *Collector) Init() error { return nil }
+
+func (c *Collector) MakeConfig() interface{} { return nil }
 
 func (c *Collector) Run(ctx context.Context) {
 	c.lock.Lock()

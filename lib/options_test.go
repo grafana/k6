@@ -48,9 +48,9 @@ func TestOptionsApply(t *testing.T) {
 		assert.Equal(t, int64(12345), opts.VUsMax.Int64)
 	})
 	t.Run("Duration", func(t *testing.T) {
-		opts := Options{}.Apply(Options{Duration: null.StringFrom("2m")})
+		opts := Options{}.Apply(Options{Duration: NullDurationFrom(2 * time.Minute)})
 		assert.True(t, opts.Duration.Valid)
-		assert.Equal(t, "2m", opts.Duration.String)
+		assert.Equal(t, "2m0s", opts.Duration.String())
 	})
 	t.Run("Iterations", func(t *testing.T) {
 		opts := Options{}.Apply(Options{Iterations: null.IntFrom(1234)})
@@ -58,10 +58,10 @@ func TestOptionsApply(t *testing.T) {
 		assert.Equal(t, int64(1234), opts.Iterations.Int64)
 	})
 	t.Run("Stages", func(t *testing.T) {
-		opts := Options{}.Apply(Options{Stages: []Stage{{Duration: 1 * time.Second}}})
+		opts := Options{}.Apply(Options{Stages: []Stage{{Duration: NullDurationFrom(1 * time.Second)}}})
 		assert.NotNil(t, opts.Stages)
 		assert.Len(t, opts.Stages, 1)
-		assert.Equal(t, 1*time.Second, opts.Stages[0].Duration)
+		assert.Equal(t, 1*time.Second, time.Duration(opts.Stages[0].Duration.Duration))
 	})
 	t.Run("Linger", func(t *testing.T) {
 		opts := Options{}.Apply(Options{Linger: null.BoolFrom(true)})

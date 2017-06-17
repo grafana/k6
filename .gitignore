@@ -1,4 +1,5 @@
 /k6
+/k6.exe
 /dist
 /web/bower_components
 /web/node_modules
@@ -7,6 +8,9 @@
 /web/tmp
 /js/node_modules
 /docs
+
+/debug
+test.debug
 
 .vscode
 *.sublime-workspace

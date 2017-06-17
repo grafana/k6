@@ -31,7 +31,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
-	"path"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -39,7 +39,6 @@ import (
 	"syscall"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/fatih/color"
 	"github.com/ghodss/yaml"
 	"github.com/loadimpact/k6/api"
@@ -53,6 +52,7 @@ import (
 	"github.com/loadimpact/k6/stats/json"
 	"github.com/loadimpact/k6/ui"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"gopkg.in/guregu/null.v3"
 	"gopkg.in/urfave/cli.v1"
@@ -63,6 +63,10 @@ const (
 	TypeURL     = "url"
 	TypeJS      = "js"
 	TypeArchive = "archive"
+
+	CollectorJSON     = "json"
+	CollectorInfluxDB = "influxdb"
+	CollectorCloud    = "cloud"
 )
 
 var urlRegex = regexp.MustCompile(`(?i)^https?://`)
@@ -213,10 +217,7 @@ func getSrcData(filename, pwd string, stdin io.Reader, fs afero.Fs) (*lib.Source
 		return &lib.SourceData{Filename: "-", Data: data}, nil
 	}
 
-	abspath := filename
-	if !path.IsAbs(abspath) {
-		abspath = path.Join(pwd, abspath)
-	}
+	abspath := filepath.Join(pwd, filename)
 	if ok, _ := afero.Exists(fs, abspath); ok {
 		data, err := afero.ReadFile(fs, abspath)
 		if err != nil {
@@ -268,26 +269,40 @@ func splitCollectorString(s string) (string, string) {
 	return parts[0], parts[1]
 }
 
-func makeCollector(s string, src *lib.SourceData, opts lib.Options, version string) (lib.Collector, error) {
+func makeCollector(s string, conf Config, src *lib.SourceData, opts lib.Options, version string) (lib.Collector, error) {
 	t, p := splitCollectorString(s)
 	switch t {
-	case "influxdb":
-		return influxdb.New(p, opts)
-	case "json":
+	case CollectorInfluxDB:
+		return influxdb.New(p, conf.Collectors.Get(t), opts)
+	case CollectorJSON:
 		return json.New(p, afero.NewOsFs(), opts)
-	case "cloud":
+	case CollectorCloud:
 		return cloud.New(p, src, opts, version)
 	default:
 		return nil, errors.New("Unknown output type: " + t)
 	}
 }
 
+func collectorOfType(t string) lib.Collector {
+	switch t {
+	case CollectorInfluxDB:
+		return &influxdb.Collector{}
+	case CollectorJSON:
+		return &json.Collector{}
+	case CollectorCloud:
+		return &json.Collector{}
+	default:
+		return nil
+	}
+}
+
 func getOptions(cc *cli.Context) (lib.Options, error) {
+	var err error
 	opts := lib.Options{
 		Paused:                cliBool(cc, "paused"),
 		VUs:                   cliInt64(cc, "vus"),
 		VUsMax:                cliInt64(cc, "max"),
-		Duration:              cliDuration(cc, "duration"),
+		Duration:              cliDuration(cc, "duration", &err),
 		Iterations:            cliInt64(cc, "iterations"),
 		Linger:                cliBool(cc, "linger"),
 		MaxRedirects:          cliInt64(cc, "max-redirects"),
@@ -358,6 +373,12 @@ func actionRun(cc *cli.Context) error {
 		pwd = "/"
 	}
 
+	// Read the config file.
+	conf, err := LoadConfig()
+	if err != nil {
+		return cli.NewExitError(err, 1)
+	}
+
 	// Collect CLI arguments, most (not all) relating to options.
 	addr := cc.GlobalString("address")
 	out := cc.String("out")
@@ -403,7 +424,7 @@ func actionRun(cc *cli.Context) error {
 	// Make the metric collector, if requested.
 	var collector lib.Collector
 	if out != "" {
-		c, err := makeCollector(out, src, opts, cc.App.Version)
+		c, err := makeCollector(out, conf, src, opts, cc.App.Version)
 		if err != nil {
 			log.WithError(err).Error("Couldn't create output")
 			return err
@@ -421,7 +442,9 @@ func actionRun(cc *cli.Context) error {
 
 	collectorString := "-"
 	if collector != nil {
-		collector.Init()
+		if err := collector.Init(); err != nil {
+			return cli.NewExitError(err, 1)
+		}
 		collectorString = fmt.Sprint(collector)
 	}
 
@@ -431,7 +454,7 @@ func actionRun(cc *cli.Context) error {
 	fmt.Fprintf(color.Output, "     output: %s\n", color.CyanString(collectorString))
 	fmt.Fprintf(color.Output, "     script: %s (%s)\n", color.CyanString(src.Filename), color.CyanString(runnerType))
 	fmt.Fprintf(color.Output, "\n")
-	fmt.Fprintf(color.Output, "   duration: %s, iterations: %s\n", color.CyanString(opts.Duration.String), color.CyanString("%d", opts.Iterations.Int64))
+	fmt.Fprintf(color.Output, "   duration: %s, iterations: %s\n", color.CyanString(opts.Duration.String()), color.CyanString("%d", opts.Iterations.Int64))
 	fmt.Fprintf(color.Output, "        vus: %s, max: %s\n", color.CyanString("%d", opts.VUs.Int64), color.CyanString("%d", opts.VUsMax.Int64))
 	fmt.Fprintf(color.Output, "\n")
 	fmt.Fprintf(color.Output, "    web ui: %s\n", color.CyanString("http://%s/", addr))
@@ -579,16 +602,28 @@ loop:
 			for _, check := range g.Checks {
 				icon := "✓"
 				statusColor := color.GreenString
-				if check.Fails > 0 {
+				isCheckFailure := check.Fails > 0
+
+				if isCheckFailure {
 					icon = "✗"
 					statusColor = color.RedString
 				}
-				fmt.Fprint(color.Output, statusColor("%s  %s %2.2f%% - %s\n",
+
+				fmt.Fprint(color.Output, statusColor("%s  %s %s\n",
 					indent,
 					icon,
-					100*(float64(check.Passes)/float64(check.Passes+check.Fails)),
 					check.Name,
 				))
+
+				if isCheckFailure {
+					fmt.Fprint(color.Output, statusColor("%s        %2.2f%% (%v/%v) \n",
+						indent,
+						100*(float64(check.Fails)/float64(check.Passes+check.Fails)),
+						check.Fails,
+						check.Passes+check.Fails,
+					))
+				}
+
 			}
 			fmt.Fprintf(color.Output, "\n")
 		}

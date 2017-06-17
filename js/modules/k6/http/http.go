@@ -43,6 +43,11 @@ import (
 	"github.com/pkg/errors"
 )
 
+var (
+	typeString = reflect.TypeOf("")
+	typeURLTag = reflect.TypeOf(URLTag{})
+)
+
 type HTTPResponseTimings struct {
 	Duration, Blocked, LookingUp, Connecting, Sending, Waiting, Receiving float64
 }
@@ -86,10 +91,7 @@ func (res *HTTPResponse) Html(selector ...string) html.Selection {
 
 type HTTP struct{}
 
-func (*HTTP) Request(ctx context.Context, method, url string, args ...goja.Value) (*HTTPResponse, error) {
-	rt := common.GetRuntime(ctx)
-	state := common.GetState(ctx)
-
+func (*HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.State, method string, url goja.Value, args ...goja.Value) (*HTTPResponse, []stats.Sample, error) {
 	var bodyReader io.Reader
 	var contentType string
 	if len(args) > 0 && !goja.IsUndefined(args[0]) && !goja.IsNull(args[0]) {
@@ -106,9 +108,21 @@ func (*HTTP) Request(ctx context.Context, method, url string, args ...goja.Value
 		}
 	}
 
-	req, err := http.NewRequest(method, url, bodyReader)
+	// The provided URL can be either a string (or at least something stringable) or a URLTag.
+	var urlStr string
+	var nameTag string
+	switch v := url.Export().(type) {
+	case URLTag:
+		urlStr = v.URL
+		nameTag = v.Name
+	default:
+		urlStr = url.String()
+		nameTag = urlStr
+	}
+
+	req, err := http.NewRequest(method, urlStr, bodyReader)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
@@ -120,7 +134,8 @@ func (*HTTP) Request(ctx context.Context, method, url string, args ...goja.Value
 	tags := map[string]string{
 		"status": "0",
 		"method": method,
-		"url":    url,
+		"url":    urlStr,
+		"name":   nameTag,
 		"group":  state.Group.Path,
 	}
 	timeout := 60 * time.Second
@@ -167,7 +182,7 @@ func (*HTTP) Request(ctx context.Context, method, url string, args ...goja.Value
 
 	resp := &HTTPResponse{
 		ctx: ctx,
-		URL: url,
+		URL: urlStr,
 	}
 	client := http.Client{
 		Transport: state.HTTPTransport,
@@ -219,7 +234,6 @@ func (*HTTP) Request(ctx context.Context, method, url string, args ...goja.Value
 		}
 	}
 
-	state.Samples = append(state.Samples, trail.Samples(tags)...)
 	if resErr != nil {
 		// Do *not* log errors about the contex being cancelled.
 		select {
@@ -229,42 +243,52 @@ func (*HTTP) Request(ctx context.Context, method, url string, args ...goja.Value
 		}
 
 		if throw {
-			return nil, resErr
+			return nil, nil, resErr
 		}
 	}
-	return resp, nil
+	return resp, trail.Samples(tags), nil
 }
 
-func (http *HTTP) Get(ctx context.Context, url string, args ...goja.Value) (*HTTPResponse, error) {
+func (http *HTTP) Request(ctx context.Context, method string, url goja.Value, args ...goja.Value) (*HTTPResponse, error) {
+	rt := common.GetRuntime(ctx)
+	state := common.GetState(ctx)
+
+	res, samples, err := http.request(ctx, rt, state, method, url, args...)
+	state.Samples = append(state.Samples, samples...)
+	return res, err
+}
+
+func (http *HTTP) Get(ctx context.Context, url goja.Value, args ...goja.Value) (*HTTPResponse, error) {
 	// The body argument is always undefined for GETs and HEADs.
 	args = append([]goja.Value{goja.Undefined()}, args...)
 	return http.Request(ctx, "GET", url, args...)
 }
 
-func (http *HTTP) Head(ctx context.Context, url string, args ...goja.Value) (*HTTPResponse, error) {
+func (http *HTTP) Head(ctx context.Context, url goja.Value, args ...goja.Value) (*HTTPResponse, error) {
 	// The body argument is always undefined for GETs and HEADs.
 	args = append([]goja.Value{goja.Undefined()}, args...)
 	return http.Request(ctx, "HEAD", url, args...)
 }
 
-func (http *HTTP) Post(ctx context.Context, url string, args ...goja.Value) (*HTTPResponse, error) {
+func (http *HTTP) Post(ctx context.Context, url goja.Value, args ...goja.Value) (*HTTPResponse, error) {
 	return http.Request(ctx, "POST", url, args...)
 }
 
-func (http *HTTP) Put(ctx context.Context, url string, args ...goja.Value) (*HTTPResponse, error) {
+func (http *HTTP) Put(ctx context.Context, url goja.Value, args ...goja.Value) (*HTTPResponse, error) {
 	return http.Request(ctx, "PUT", url, args...)
 }
 
-func (http *HTTP) Patch(ctx context.Context, url string, args ...goja.Value) (*HTTPResponse, error) {
+func (http *HTTP) Patch(ctx context.Context, url goja.Value, args ...goja.Value) (*HTTPResponse, error) {
 	return http.Request(ctx, "PATCH", url, args...)
 }
 
-func (http *HTTP) Del(ctx context.Context, url string, args ...goja.Value) (*HTTPResponse, error) {
+func (http *HTTP) Del(ctx context.Context, url goja.Value, args ...goja.Value) (*HTTPResponse, error) {
 	return http.Request(ctx, "DELETE", url, args...)
 }
 
 func (http *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, error) {
 	rt := common.GetRuntime(ctx)
+	state := common.GetState(ctx)
 
 	errs := make(chan error)
 	retval := rt.NewObject()
@@ -276,14 +300,16 @@ func (http *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, erro
 		k := k
 		v := reqs.Get(k)
 
-		var method, url string
+		var method string
+		var url goja.Value
 		var args []goja.Value
 
 		// Shorthand: "http://example.com/" -> ["GET", "http://example.com/"]
-		if v.ExportType().Kind() == reflect.String {
+		switch v.ExportType() {
+		case typeString, typeURLTag:
 			method = "GET"
-			url = v.String()
-		} else {
+			url = v
+		default:
 			obj := v.ToObject(rt)
 			objkeys := obj.Keys()
 			for i, objk := range objkeys {
@@ -295,7 +321,7 @@ func (http *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, erro
 						args = []goja.Value{goja.Undefined()}
 					}
 				case 1:
-					url = objv.String()
+					url = objv
 				default:
 					args = append(args, objv)
 				}
@@ -303,12 +329,13 @@ func (http *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, erro
 		}
 
 		go func() {
-			res, err := http.Request(ctx, method, url, args...)
+			res, samples, err := http.request(ctx, rt, state, method, url, args...)
 			if err != nil {
 				errs <- err
 			}
 			mutex.Lock()
 			_ = retval.Set(k, res)
+			state.Samples = append(state.Samples, samples...)
 			mutex.Unlock()
 			errs <- nil
 		}()
@@ -321,4 +348,17 @@ func (http *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, erro
 		}
 	}
 	return retval, err
+}
+
+func (http *HTTP) Url(parts []string, pieces ...string) URLTag {
+	var tag URLTag
+	for i, part := range parts {
+		tag.Name += part
+		tag.URL += part
+		if i < len(pieces) {
+			tag.Name += "${}"
+			tag.URL += pieces[i]
+		}
+	}
+	return tag
 }

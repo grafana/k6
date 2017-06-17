@@ -47,9 +47,6 @@ type Trail struct {
 	// Detailed connection information.
 	ConnReused     bool
 	ConnRemoteAddr net.Addr
-
-	// Bandwidth usage.
-	BytesRead, BytesWritten int64
 }
 
 func (tr Trail) Samples(tags map[string]string) []stats.Sample {
@@ -61,8 +58,6 @@ func (tr Trail) Samples(tags map[string]string) []stats.Sample {
 		{Metric: metrics.HTTPReqSending, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Sending)},
 		{Metric: metrics.HTTPReqWaiting, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Waiting)},
 		{Metric: metrics.HTTPReqReceiving, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Receiving)},
-		{Metric: metrics.DataReceived, Time: tr.EndTime, Tags: tags, Value: float64(tr.BytesRead)},
-		{Metric: metrics.DataSent, Time: tr.EndTime, Tags: tags, Value: float64(tr.BytesWritten)},
 	}
 }
 
@@ -83,8 +78,6 @@ type Tracer struct {
 	connRemoteAddr net.Addr
 
 	protoError error
-
-	bytesRead, bytesWritten int64
 }
 
 // Trace() returns a premade ClientTrace that calls all of the Tracer's hooks.
@@ -103,46 +96,25 @@ func (t *Tracer) Trace() *httptrace.ClientTrace {
 func (t *Tracer) Done() Trail {
 	done := time.Now()
 
-	// Cover for if the server closed the connection without a response.
-	if t.gotFirstResponseByte.IsZero() {
-		t.gotFirstResponseByte = done
-	}
-
-	// GotConn is not guaranteed to be called in all cases.
-	if t.gotConn.IsZero() {
-		t.gotConn = t.getConn
-	}
-
 	trail := Trail{
-		Blocked:    t.gotConn.Sub(t.getConn),
-		Connecting: t.connectDone.Sub(t.connectStart),
-		Sending:    t.wroteRequest.Sub(t.connectDone),
-		Waiting:    t.gotFirstResponseByte.Sub(t.wroteRequest),
-		Receiving:  done.Sub(t.gotFirstResponseByte),
-
 		ConnReused:     t.connReused,
 		ConnRemoteAddr: t.connRemoteAddr,
-
-		BytesRead:    t.bytesRead,
-		BytesWritten: t.bytesWritten,
 	}
 
-	// If the connection was reused, it never blocked.
-	if t.connReused {
-		trail.Blocked = 0
-		trail.Connecting = 0
+	if !t.gotConn.IsZero() && !t.getConn.IsZero() {
+		trail.Blocked = t.gotConn.Sub(t.getConn)
 	}
-
-	// If the connection failed, we'll never get any (meaningful) data for these.
-	if t.protoError != nil {
-		trail.Sending = 0
-		trail.Waiting = 0
-		trail.Receiving = 0
-
-		// URL is invalid/unroutable.
-		if trail.Blocked < 0 {
-			trail.Blocked = 0
+	if !t.connectDone.IsZero() && !t.connectStart.IsZero() {
+		trail.Connecting = t.connectDone.Sub(t.connectStart)
+	}
+	if !t.wroteRequest.IsZero() {
+		trail.Sending = t.wroteRequest.Sub(t.connectDone)
+		if !t.gotFirstResponseByte.IsZero() {
+			trail.Waiting = t.gotFirstResponseByte.Sub(t.wroteRequest)
 		}
+	}
+	if !t.gotFirstResponseByte.IsZero() {
+		trail.Receiving = done.Sub(t.gotFirstResponseByte)
 	}
 
 	// Calculate total times using adjusted values.
@@ -168,12 +140,6 @@ func (t *Tracer) GotConn(info httptrace.GotConnInfo) {
 	if t.connReused {
 		t.connectStart = t.gotConn
 		t.connectDone = t.gotConn
-
-		// If the connection was reused, patch it to use this tracer's data counters.
-		if conn, ok := info.Conn.(*Conn); ok {
-			conn.BytesRead = &t.bytesRead
-			conn.BytesWritten = &t.bytesWritten
-		}
 	}
 }
 

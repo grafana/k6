@@ -192,7 +192,7 @@ func TestNewBundle(t *testing.T) {
 				`),
 			}, afero.NewMemMapFs())
 			if assert.NoError(t, err) {
-				assert.Equal(t, null.StringFrom("10s"), b.Options.Duration)
+				assert.Equal(t, lib.NullDurationFrom(10*time.Second), b.Options.Duration)
 			}
 		})
 		t.Run("Iterations", func(t *testing.T) {
@@ -273,7 +273,7 @@ func TestNewBundle(t *testing.T) {
 				}, afero.NewMemMapFs())
 				if assert.NoError(t, err) {
 					if assert.Len(t, b.Options.Stages, 1) {
-						assert.Equal(t, lib.Stage{Duration: 10 * time.Second}, b.Options.Stages[0])
+						assert.Equal(t, lib.Stage{Duration: lib.NullDurationFrom(10 * time.Second)}, b.Options.Stages[0])
 					}
 				}
 			})
@@ -291,7 +291,7 @@ func TestNewBundle(t *testing.T) {
 				}, afero.NewMemMapFs())
 				if assert.NoError(t, err) {
 					if assert.Len(t, b.Options.Stages, 1) {
-						assert.Equal(t, lib.Stage{Duration: 10 * time.Second, Target: null.IntFrom(10)}, b.Options.Stages[0])
+						assert.Equal(t, lib.Stage{Duration: lib.NullDurationFrom(10 * time.Second), Target: null.IntFrom(10)}, b.Options.Stages[0])
 					}
 				}
 			})
@@ -310,8 +310,8 @@ func TestNewBundle(t *testing.T) {
 				}, afero.NewMemMapFs())
 				if assert.NoError(t, err) {
 					if assert.Len(t, b.Options.Stages, 2) {
-						assert.Equal(t, lib.Stage{Duration: 10 * time.Second, Target: null.IntFrom(10)}, b.Options.Stages[0])
-						assert.Equal(t, lib.Stage{Duration: 5 * time.Second}, b.Options.Stages[1])
+						assert.Equal(t, lib.Stage{Duration: lib.NullDurationFrom(10 * time.Second), Target: null.IntFrom(10)}, b.Options.Stages[0])
+						assert.Equal(t, lib.Stage{Duration: lib.NullDurationFrom(5 * time.Second)}, b.Options.Stages[1])
 					}
 				}
 			})

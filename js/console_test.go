@@ -25,12 +25,44 @@ import (
 	"fmt"
 	"testing"
 
-	log "github.com/Sirupsen/logrus"
-	logtest "github.com/Sirupsen/logrus/hooks/test"
+	"github.com/dop251/goja"
+	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
+	log "github.com/sirupsen/logrus"
+	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestConsoleContext(t *testing.T) {
+	rt := goja.New()
+	rt.SetFieldNameMapper(common.FieldNameMapper{})
+
+	ctxPtr := new(context.Context)
+	logger, hook := logtest.NewNullLogger()
+	rt.Set("console", common.Bind(rt, &Console{logger}, ctxPtr))
+
+	_, err := common.RunString(rt, `console.log("a")`)
+	assert.NoError(t, err)
+	if entry := hook.LastEntry(); assert.NotNil(t, entry) {
+		assert.Equal(t, "a", entry.Message)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	*ctxPtr = ctx
+	_, err = common.RunString(rt, `console.log("b")`)
+	assert.NoError(t, err)
+	if entry := hook.LastEntry(); assert.NotNil(t, entry) {
+		assert.Equal(t, "b", entry.Message)
+	}
+
+	cancel()
+	_, err = common.RunString(rt, `console.log("c")`)
+	assert.NoError(t, err)
+	if entry := hook.LastEntry(); assert.NotNil(t, entry) {
+		assert.Equal(t, "b", entry.Message)
+	}
+}
 
 func TestConsole(t *testing.T) {
 	levels := map[string]log.Level{
@@ -67,7 +99,7 @@ func TestConsole(t *testing.T) {
 
 					logger, hook := logtest.NewNullLogger()
 					logger.Level = log.DebugLevel
-					vu.VUContext.Console.Logger = logger
+					vu.Console.Logger = logger
 
 					_, err = vu.RunOnce(context.Background())
 					assert.NoError(t, err)

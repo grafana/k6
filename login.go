@@ -18,23 +18,42 @@
  *
  */
 
-package modules
+package main
 
 import (
-	"github.com/loadimpact/k6/js/modules/k6"
-	"github.com/loadimpact/k6/js/modules/k6/crypto"
-	"github.com/loadimpact/k6/js/modules/k6/html"
-	"github.com/loadimpact/k6/js/modules/k6/http"
-	"github.com/loadimpact/k6/js/modules/k6/metrics"
-	"github.com/loadimpact/k6/js/modules/k6/ws"
+	"os"
+
+	"github.com/loadimpact/k6/lib"
+	"gopkg.in/urfave/cli.v1"
 )
 
-// Index of module implementations.
-var Index = map[string]interface{}{
-	"k6":         &k6.K6{},
-	"k6/crypto":  &crypto.Crypto{},
-	"k6/http":    &http.HTTP{},
-	"k6/metrics": &metrics.Metrics{},
-	"k6/html":    &html.HTML{},
-	"k6/ws":      &ws.WS{},
+var commandLogin = cli.Command{
+	Name:  "login",
+	Usage: "Logs into a remote service.",
+	Subcommands: cli.Commands{
+		cli.Command{
+			Name:   "influxdb",
+			Usage:  "Logs into an influxdb server.",
+			Action: actionLogin(CollectorInfluxDB),
+		},
+	},
+}
+
+func actionLogin(t string) func(cc *cli.Context) error {
+	return func(cc *cli.Context) error {
+		conf, err := LoadConfig()
+		if err != nil {
+			return err
+		}
+
+		c := collectorOfType(t).(lib.AuthenticatedCollector)
+
+		cconf, err := c.Login(conf.Collectors.Get(t), os.Stdin, os.Stdout)
+		if err != nil {
+			return err
+		}
+		conf.Collectors[t] = cconf
+
+		return conf.Store()
+	}
 }
