@@ -28,8 +28,6 @@ import (
 	"sync"
 	"time"
 
-	"crypto/tls"
-
 	"github.com/pkg/errors"
 	"gopkg.in/guregu/null.v3"
 )
@@ -66,109 +64,6 @@ func (s *Stage) UnmarshalJSON(data []byte) error {
 		}
 		s.Duration = d
 	}
-
-	return nil
-}
-
-type TLSVersion struct {
-	Min int
-	Max int
-}
-
-func (v *TLSVersion) UnmarshalJSON(data []byte) error {
-	// From https://golang.org/pkg/crypto/tls/#pkg-constants
-	versionMap := map[string]int{
-		"ssl3.0": tls.VersionSSL30,
-		"tls1.0": tls.VersionTLS10,
-		"tls1.1": tls.VersionTLS11,
-		"tls1.2": tls.VersionTLS12,
-	}
-
-	// Version might be a string or an object with separate min & max fields
-	var fields struct {
-		Min string `json:"min"`
-		Max string `json:"max"`
-	}
-	if err := json.Unmarshal(data, &fields); err != nil {
-		switch err.(type) {
-		case *json.UnmarshalTypeError:
-			// Check if it's a type error and the user has passed a string
-			var version string
-			if otherErr := json.Unmarshal(data, &version); otherErr != nil {
-				// Some other error occurred or none of the types match
-				return otherErr
-			}
-			// It was a string, assign it to both min & max
-			fields.Min = version
-			fields.Max = version
-		default:
-			return err
-		}
-	}
-
-	var minVersion int
-	var maxVersion int
-	var ok bool
-	if minVersion, ok = versionMap[fields.Min]; !ok {
-		return errors.New("Unknown TLS version : " + fields.Min)
-	}
-
-	if maxVersion, ok = versionMap[fields.Max]; !ok {
-		return errors.New("Unknown TLS version : " + fields.Max)
-	}
-
-	v.Min = minVersion
-	v.Max = maxVersion
-
-	return nil
-}
-
-type TLSCipherSuites struct {
-	Values []uint16
-}
-
-func (s *TLSCipherSuites) UnmarshalJSON(data []byte) error {
-	// From https://golang.org/pkg/crypto/tls#pkg-constants
-	suiteMap := map[string]uint16{
-		"TLS_RSA_WITH_RC4_128_SHA":                0x0005,
-		"TLS_RSA_WITH_3DES_EDE_CBC_SHA":           0x000a,
-		"TLS_RSA_WITH_AES_128_CBC_SHA":            0x002f,
-		"TLS_RSA_WITH_AES_256_CBC_SHA":            0x0035,
-		"TLS_RSA_WITH_AES_128_CBC_SHA256":         0x003c,
-		"TLS_RSA_WITH_AES_128_GCM_SHA256":         0x009c,
-		"TLS_RSA_WITH_AES_256_GCM_SHA384":         0x009d,
-		"TLS_ECDHE_ECDSA_WITH_RC4_128_SHA":        0xc007,
-		"TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA":    0xc009,
-		"TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA":    0xc00a,
-		"TLS_ECDHE_RSA_WITH_RC4_128_SHA":          0xc011,
-		"TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA":     0xc012,
-		"TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA":      0xc013,
-		"TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA":      0xc014,
-		"TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256": 0xc023,
-		"TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256":   0xc027,
-		"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256":   0xc02f,
-		"TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256": 0xc02b,
-		"TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384":   0xc030,
-		"TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384": 0xc02c,
-		"TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305":    0xcca8,
-		"TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305":  0xcca9,
-	}
-
-	var suiteNames []string
-	if err := json.Unmarshal(data, &suiteNames); err != nil {
-		return err
-	}
-
-	var suiteIDs []uint16
-	for _, name := range suiteNames {
-		if suiteID, ok := suiteMap[name]; ok {
-			suiteIDs = append(suiteIDs, suiteID)
-		} else {
-			return errors.New("Unknown cipher suite: " + name)
-		}
-	}
-
-	s.Values = suiteIDs
 
 	return nil
 }

@@ -21,7 +21,9 @@
 package lib
 
 import (
+	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/loadimpact/k6/stats"
@@ -42,6 +44,89 @@ func (d *Duration) UnmarshalJSON(data []byte) error {
 	}
 
 	*d = Duration(v)
+
+	return nil
+}
+
+type TLSVersion struct {
+	Min int
+	Max int
+}
+
+func (v *TLSVersion) UnmarshalJSON(data []byte) error {
+	// From https://golang.org/pkg/crypto/tls/#pkg-constants
+	versionMap := map[string]int{
+		"ssl3.0": tls.VersionSSL30,
+		"tls1.0": tls.VersionTLS10,
+		"tls1.1": tls.VersionTLS11,
+		"tls1.2": tls.VersionTLS12,
+	}
+
+	// Version might be a string or an object with separate min & max fields
+	var fields struct {
+		Min string `json:"min"`
+		Max string `json:"max"`
+	}
+	if err := json.Unmarshal(data, &fields); err != nil {
+		switch err.(type) {
+		case *json.UnmarshalTypeError:
+			// Check if it's a type error and the user has passed a string
+			var version string
+			if otherErr := json.Unmarshal(data, &version); otherErr != nil {
+				switch otherErr.(type) {
+				case *json.UnmarshalTypeError:
+					return errors.New("Type error: the value of tlsVersion " +
+						"should be an object with min/max fields or a string")
+				}
+
+				// Some other error occurred
+				return otherErr
+			}
+			// It was a string, assign it to both min & max
+			fields.Min = version
+			fields.Max = version
+		default:
+			return err
+		}
+	}
+
+	var minVersion int
+	var maxVersion int
+	var ok bool
+	if minVersion, ok = versionMap[fields.Min]; !ok {
+		return errors.New("Unknown TLS version : " + fields.Min)
+	}
+
+	if maxVersion, ok = versionMap[fields.Max]; !ok {
+		return errors.New("Unknown TLS version : " + fields.Max)
+	}
+
+	v.Min = minVersion
+	v.Max = maxVersion
+
+	return nil
+}
+
+type TLSCipherSuites struct {
+	Values []uint16
+}
+
+func (s *TLSCipherSuites) UnmarshalJSON(data []byte) error {
+	var suiteNames []string
+	if err := json.Unmarshal(data, &suiteNames); err != nil {
+		return err
+	}
+
+	var suiteIDs []uint16
+	for _, name := range suiteNames {
+		if suiteID, ok := SupportedTLSCipherSuites[name]; ok {
+			suiteIDs = append(suiteIDs, suiteID)
+		} else {
+			return errors.New("Unknown cipher suite: " + name)
+		}
+	}
+
+	s.Values = suiteIDs
 
 	return nil
 }

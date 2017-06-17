@@ -373,56 +373,63 @@ func TestNewBundle(t *testing.T) {
 			}
 		})
 		t.Run("TLSCipherSuites", func(t *testing.T) {
-			b, err := NewBundle(&lib.SourceData{
-				Filename: "/script.js",
-				Data: []byte(`
+			for suiteName, suiteID := range lib.SupportedTLSCipherSuites {
+				t.Run(suiteName, func(t *testing.T) {
+					script := `
 					export let options = {
-						tlsCipherSuites: [
-							"TLS_RSA_WITH_RC4_128_SHA",
-							"TLS_RSA_WITH_3DES_EDE_CBC_SHA"
-						]
+						tlsCipherSuites: ["%s"]
 					};
 					export default function() {};
-				`),
-			}, afero.NewMemMapFs())
-			if assert.NoError(t, err) {
-				if assert.Len(t, b.Options.TLSCipherSuites.Values, 2) {
-					assert.Equal(t, b.Options.TLSCipherSuites.Values[0], tls.TLS_RSA_WITH_RC4_128_SHA)
-					assert.Equal(t, b.Options.TLSCipherSuites.Values[1], tls.TLS_RSA_WITH_3DES_EDE_CBC_SHA)
-				}
+					`
+					script = fmt.Sprintf(script, suiteName)
+
+					b, err := NewBundle(&lib.SourceData{
+						Filename: "/script.js",
+						Data:     []byte(script),
+					}, afero.NewMemMapFs())
+					if assert.NoError(t, err) {
+						if assert.Len(t, b.Options.TLSCipherSuites.Values, 1) {
+							assert.Equal(t, b.Options.TLSCipherSuites.Values[0], suiteID)
+						}
+					}
+				})
 			}
 		})
 		t.Run("TLSVersion", func(t *testing.T) {
-			b1, err := NewBundle(&lib.SourceData{
-				Filename: "/script.js",
-				Data: []byte(`
-					export let options = {
-						tlsVersion: {
-							min: "ssl3.0",
-							max: "tls1.2"
-						}
-					};
-					export default function() {};
-				`),
-			}, afero.NewMemMapFs())
-			if assert.NoError(t, err) {
-				assert.Equal(t, b1.Options.TLSVersion.Min, tls.VersionSSL30)
-				assert.Equal(t, b1.Options.TLSVersion.Max, tls.VersionTLS12)
-			}
-
-			b2, err := NewBundle(&lib.SourceData{
-				Filename: "/script.js",
-				Data: []byte(`
+			t.Run("Object", func(t *testing.T) {
+				b, err := NewBundle(&lib.SourceData{
+					Filename: "/script.js",
+					Data: []byte(`
+						export let options = {
+							tlsVersion: {
+								min: "ssl3.0",
+								max: "tls1.2"
+							}
+						};
+						export default function() {};
+					`),
+				}, afero.NewMemMapFs())
+				if assert.NoError(t, err) {
+					assert.Equal(t, b.Options.TLSVersion.Min, tls.VersionSSL30)
+					assert.Equal(t, b.Options.TLSVersion.Max, tls.VersionTLS12)
+				}
+			})
+			t.Run("String", func(t *testing.T) {
+				b, err := NewBundle(&lib.SourceData{
+					Filename: "/script.js",
+					Data: []byte(`
 					export let options = {
 						tlsVersion: "ssl3.0"
 					};
 					export default function() {};
 				`),
-			}, afero.NewMemMapFs())
-			if assert.NoError(t, err) {
-				assert.Equal(t, b2.Options.TLSVersion.Min, tls.VersionSSL30)
-				assert.Equal(t, b2.Options.TLSVersion.Max, tls.VersionSSL30)
-			}
+				}, afero.NewMemMapFs())
+				if assert.NoError(t, err) {
+					assert.Equal(t, b.Options.TLSVersion.Min, tls.VersionSSL30)
+					assert.Equal(t, b.Options.TLSVersion.Max, tls.VersionSSL30)
+				}
+
+			})
 		})
 		t.Run("Thresholds", func(t *testing.T) {
 			b, err := NewBundle(&lib.SourceData{

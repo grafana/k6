@@ -22,11 +22,10 @@ package js
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"testing"
 	"time"
-
-	"crypto/tls"
 
 	logtest "github.com/Sirupsen/logrus/hooks/test"
 	"github.com/loadimpact/k6/js/common"
