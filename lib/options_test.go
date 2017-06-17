@@ -21,10 +21,9 @@
 package lib
 
 import (
+	"crypto/tls"
 	"testing"
 	"time"
-
-	"crypto/tls"
 
 	"github.com/loadimpact/k6/stats"
 	"github.com/stretchr/testify/assert"
