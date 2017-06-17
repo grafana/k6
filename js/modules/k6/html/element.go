@@ -41,6 +41,19 @@ func (a Attribute) LocalName() string {
 	return a.Name
 }
 
+func (e Element) attrAsString(name string) string {
+	val, exists := e.sel.sel.Attr(name)
+	if !exists {
+		return ""
+	}
+	return val
+}
+
+func (e Element) attrIsPresent(name string) bool {
+	_, exists := e.sel.sel.Attr(name)
+	return exists
+}
+
 func (e Element) GetAttribute(name string) goja.Value {
 	return e.sel.Attr(name)
 }
@@ -91,8 +104,8 @@ func (e Element) TextContent() string {
 	return e.sel.sel.Text()
 }
 
-func (e Element) Id() goja.Value {
-	return e.GetAttribute("id")
+func (e Element) Id() string {
+	return e.attrAsString("id")
 }
 
 func (e Element) IsEqualNode(v goja.Value) bool {
