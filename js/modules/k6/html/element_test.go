@@ -287,7 +287,7 @@ func TestElement(t *testing.T) {
 		v, err := common.RunString(rt, `doc.find("body").get(0).getElementsByClassName("class2")`)
 		if assert.NoError(t, err) {
 			elems := valToElementList(v)
-			assert.Equal(t, []string{"div_elem", "h2_elem"}, []string{elems[0].Id().String(), elems[1].Id().String()})
+			assert.Equal(t, []string{"div_elem", "h2_elem"}, []string{elems[0].Id(), elems[1].Id()})
 		}
 	})
 	t.Run("GetElementsByTagName", func(t *testing.T) {
@@ -307,7 +307,7 @@ func TestElement(t *testing.T) {
 		v, err := common.RunString(rt, `doc.find("body").get(0).querySelectorAll("span")`)
 		if assert.NoError(t, err) {
 			elems := valToElementList(v)
-			assert.Equal(t, []string{"span1", "span2"}, []string{elems[0].Id().String(), elems[1].Id().String()})
+			assert.Equal(t, []string{"span1", "span2"}, []string{elems[0].Id(), elems[1].Id()})
 		}
 	})
 	t.Run("Contains", func(t *testing.T) {
