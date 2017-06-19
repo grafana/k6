@@ -35,9 +35,40 @@ import (
 )
 
 type vuHandle struct {
-	VU     lib.VU
-	Cancel context.CancelFunc
-	Lock   sync.RWMutex
+	sync.RWMutex
+	vu     lib.VU
+	ctx    context.Context
+	cancel context.CancelFunc
+}
+
+func (h *vuHandle) run(logger *log.Logger, flow <-chan struct{}, out chan<- []stats.Sample) {
+	h.RLock()
+	ctx := h.ctx
+	h.RUnlock()
+
+	for {
+		select {
+		case <-flow:
+		case <-ctx.Done():
+			return
+		}
+
+		samples, err := h.vu.RunOnce(ctx)
+		if err != nil {
+			if s, ok := err.(fmt.Stringer); ok {
+				logger.Error(s.String())
+			} else {
+				logger.Error(err.Error())
+			}
+			continue
+		}
+
+		select {
+		case out <- samples:
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 type Executor struct {
@@ -80,9 +111,11 @@ func New(r lib.Runner) *Executor {
 	}
 }
 
-func (e *Executor) Run(ctx context.Context, out chan<- []stats.Sample) error {
+func (e *Executor) Run(parent context.Context, out chan<- []stats.Sample) error {
 	e.runLock.Lock()
 	defer e.runLock.Unlock()
+
+	ctx, cancel := context.WithCancel(parent)
 
 	e.lock.Lock()
 	e.ctx = ctx
@@ -90,9 +123,9 @@ func (e *Executor) Run(ctx context.Context, out chan<- []stats.Sample) error {
 	e.flow = make(chan struct{})
 	e.lock.Unlock()
 
-	e.scale(ctx, lib.Max(0, atomic.LoadInt64(&e.numVUs)))
-
 	defer func() {
+		cancel()
+
 		e.lock.Lock()
 		e.ctx = nil
 		e.out = nil
@@ -101,6 +134,8 @@ func (e *Executor) Run(ctx context.Context, out chan<- []stats.Sample) error {
 
 		e.wg.Wait()
 	}()
+
+	e.scale(ctx, lib.Max(0, atomic.LoadInt64(&e.numVUs)))
 
 	ticker := time.NewTicker(1 * time.Millisecond)
 	defer ticker.Stop()
@@ -144,38 +179,32 @@ func (e *Executor) Run(ctx context.Context, out chan<- []stats.Sample) error {
 	}
 }
 
-func (e *Executor) runVU(ctx context.Context, handle *vuHandle) {
+func (e *Executor) scale(ctx context.Context, num int64) {
 	e.lock.RLock()
 	flow := e.flow
 	out := e.out
 	e.lock.RUnlock()
 
-	for range flow {
-		samples, err := handle.VU.RunOnce(ctx)
-		if err != nil {
-			if s, ok := err.(fmt.Stringer); ok {
-				e.Logger.Error(s.String())
-			} else {
-				e.Logger.Error(err.Error())
-			}
-			continue
-		}
-		out <- samples
-	}
-}
-
-func (e *Executor) scale(ctx context.Context, num int64) {
 	e.vusLock.Lock()
 	defer e.vusLock.Unlock()
 
 	for i, handle := range e.vus {
-		if i <= int(num) && handle.Cancel == nil {
-			ctx, cancel := context.WithCancel(ctx)
-			handle.Cancel = cancel
-			go e.runVU(ctx, handle)
-		} else if handle.Cancel != nil {
-			handle.Cancel()
-			handle.Cancel = nil
+		handle := handle
+		if i <= int(num) && handle.cancel == nil {
+			vuctx, cancel := context.WithCancel(ctx)
+			handle.Lock()
+			handle.ctx = vuctx
+			handle.cancel = cancel
+			handle.Unlock()
+
+			e.wg.Add(1)
+			go func() {
+				handle.run(e.Logger, flow, out)
+				e.wg.Done()
+			}()
+		} else if handle.cancel != nil {
+			handle.cancel()
+			handle.cancel = nil
 		}
 	}
 }
@@ -255,9 +284,6 @@ func (e *Executor) SetVUs(num int64) error {
 		return errors.Errorf("can't raise vu count (to %d) above vu cap (%d)", num, numVUsMax)
 	}
 
-	e.lock.Lock()
-	defer e.lock.Unlock()
-
 	if ctx := e.ctx; ctx != nil {
 		e.scale(ctx, num)
 	}
@@ -299,7 +325,7 @@ func (e *Executor) SetVUsMax(max int64) error {
 			if err != nil {
 				return err
 			}
-			handle.VU = vu
+			handle.vu = vu
 		}
 		vus = append(vus, &handle)
 	}
