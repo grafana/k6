@@ -177,7 +177,6 @@ func (e *Executor) Run(parent context.Context, out chan<- []stats.Sample) error 
 			}
 		case e.flow <- struct{}{}:
 			at := atomic.AddInt64(&e.iterations, 1)
-			println(at)
 			end := atomic.LoadInt64(&e.endIterations)
 			if end >= 0 && at >= end {
 				return nil

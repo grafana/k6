@@ -33,26 +33,15 @@ import (
 )
 
 func TestExecutorRun(t *testing.T) {
-	ch := make(chan struct{})
-	e := New(lib.RunnerFunc(func(ctx context.Context) ([]stats.Sample, error) {
-		select {
-		case ch <- struct{}{}:
-		case <-ctx.Done():
-		}
-		return nil, nil
-	}))
+	e := New(nil)
 	assert.NoError(t, e.SetVUsMax(10))
 	assert.NoError(t, e.SetVUs(10))
 
 	ctx, cancel := context.WithCancel(context.Background())
-	err := make(chan error)
+	err := make(chan error, 1)
 	go func() { err <- e.Run(ctx, nil) }()
-	for i := 0; i < 10; i++ {
-		<-ch
-	}
 	cancel()
 	assert.NoError(t, <-err)
-	assert.Equal(t, int64(10), e.GetIterations())
 }
 
 func TestExecutorEndTime(t *testing.T) {
