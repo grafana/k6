@@ -270,30 +270,74 @@ func TestHMac(t *testing.T) {
 
 	rt.Set("crypto", common.Bind(rt, &Crypto{}, &ctx))
 
-	t.Run("Valid", func(t *testing.T) {
-		_, err := common.RunString(rt, `
-		const correctHex = "7fd04df92f636fd450bc841c9418e5825c17f33ad9c87c518115a45971f7f77e";
+	testData := map[string]string{
+		"md4":        "92d8f5c302cf04cca0144d7a9feb1596",
+		"md5":        "e04f2ec05c8b12e19e46936b171c9d03",
+		"sha1":       "c113b62711ff5d8e8100bbb17b998591af81dc24",
+		"sha256":     "7fd04df92f636fd450bc841c9418e5825c17f33ad9c87c518115a45971f7f77e",
+		"sha384":     "d331e169e2dcfc742e80a3bf4dcc76d0e6425ab3777a3ac217ac6b2552aad5529ed4d40135b06e53a495ac7425d1e462",
+		"sha512_224": "bac4e6256bdbf81d029aec48af4fdd4b14001db6721f07c429a80817",
+		"sha512_256": "e3d0763ba92a4f40676c3d5b234d9842b71951e6e0767082cfb3f5e14c124b22",
+		"sha512":     "cd3146f96a3005024108ff56b025517552435589a4c218411f165da0a368b6f47228b20a1a4bf081e4aae6f07e2790f27194fc77f0addc890e98ce1951cacc9f",
+		"ripemd160":  "00bb4ce0d6afd4c7424c9d01b8a6caa3e749b08b",
+	}
+	for algorithm, value := range testData {
+		rt.Set("correctHex", rt.ToValue(value))
+		rt.Set("algorithm", rt.ToValue(algorithm))
+		t.Run(algorithm+" hasher: valid", func(t *testing.T) {
+			_, err := common.RunString(rt, `
+			let hasher = crypto.createHmac(algorithm, "a secret");
+			hasher.update("some data to hash");
 
-		let hasher = crypto.createHmac("sha256", "a secret");
-		hasher.update("some data to hash");
+			const resultHex = hasher.digest("hex");
+			if (resultHex !== correctHex) {
+				throw new Error("Hex encoding mismatch: " + resultHex);
+			}`)
 
-		const resultHex = hasher.digest("hex");
-		if (resultHex !== correctHex) {
-			throw new Error("Hex encoding mismatch: " + resultHex);
-		}`)
+			assert.NoError(t, err)
+		})
 
-		assert.NoError(t, err)
-	})
+		t.Run(algorithm+" wrapper: valid", func(t *testing.T) {
+			_, err := common.RunString(rt, `
+			let resultHex = crypto.hmac(algorithm, "a secret", "some data to hash", "hex");
+			if (resultHex !== correctHex) {
+				throw new Error("Hex encoding mismatch: " + resultHex);
+			}`)
 
-	t.Run("Wrapper", func(t *testing.T) {
-		_, err := common.RunString(rt, `
-		const correctHex = "7fd04df92f636fd450bc841c9418e5825c17f33ad9c87c518115a45971f7f77e";
+			assert.NoError(t, err)
+		})
+	}
 
-		let resultHex = crypto.hmac("sha256", "a secret", "some data to hash", "hex");
-		if (resultHex !== correctHex) {
-			throw new Error("Hex encoding mismatch: " + resultHex);
-		}`)
+	// Algorithms not supported or typing error
+	invalidData := map[string]string{
+		"md6":    "e04f2ec05c8b12e19e46936b171c9d03",
+		"sha526": "7fd04df92f636fd450bc841c9418e5825c17f33ad9c87c518115a45971f7f77e",
+		"sha348": "d331e169e2dcfc742e80a3bf4dcc76d0e6425ab3777a3ac217ac6b2552aad5529ed4d40135b06e53a495ac7425d1e462",
+	}
+	for algorithm, value := range invalidData {
+		rt.Set("correctHex", rt.ToValue(value))
+		rt.Set("algorithm", rt.ToValue(algorithm))
+		t.Run(algorithm+" hasher: invalid", func(t *testing.T) {
+			_, err := common.RunString(rt, `
+			let hasher = crypto.createHmac(algorithm, "a secret");
+			hasher.update("some data to hash");
 
-		assert.NoError(t, err)
-	})
+			const resultHex = hasher.digest("hex");
+			if (resultHex !== correctHex) {
+				throw new Error("Hex encoding mismatch: " + resultHex);
+			}`)
+
+			assert.EqualError(t, err, "GoError: Invalid algorithm: "+algorithm)
+		})
+
+		t.Run(algorithm+" wrapper: invalid", func(t *testing.T) {
+			_, err := common.RunString(rt, `
+			let resultHex = crypto.hmac(algorithm, "a secret", "some data to hash", "hex");
+			if (resultHex !== correctHex) {
+				throw new Error("Hex encoding mismatch: " + resultHex);
+			}`)
+
+			assert.EqualError(t, err, "GoError: Invalid algorithm: "+algorithm)
+		})
+	}
 }

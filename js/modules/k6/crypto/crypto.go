@@ -177,6 +177,9 @@ func (c Crypto) CreateHmac(ctx context.Context, algorithm string, key string) *H
 		hasher.hash = hmac.New(sha512.New, keyBuffer)
 	case "ripemd160":
 		hasher.hash = hmac.New(ripemd160.New, keyBuffer)
+	default:
+		err := errors.New("Invalid algorithm: " + algorithm)
+		common.Throw(common.GetRuntime(hasher.ctx), err)
 	}
 
 	return &hasher
