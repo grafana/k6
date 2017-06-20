@@ -22,36 +22,64 @@ package local
 
 import (
 	"context"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
 	"github.com/stretchr/testify/assert"
+	null "gopkg.in/guregu/null.v3"
 )
 
 func TestExecutorRun(t *testing.T) {
-	t.Run("Normal", func(t *testing.T) {
-		ch := make(chan struct{})
-		e := New(lib.RunnerFunc(func(ctx context.Context) ([]stats.Sample, error) {
-			select {
-			case ch <- struct{}{}:
-			case <-ctx.Done():
-			}
-			return nil, nil
-		}))
-		assert.NoError(t, e.SetVUsMax(10))
-		assert.NoError(t, e.SetVUs(10))
-
-		ctx, cancel := context.WithCancel(context.Background())
-		err := make(chan error)
-		go func() { err <- e.Run(ctx, nil) }()
-		for i := 0; i < 10; i++ {
-			<-ch
+	ch := make(chan struct{})
+	e := New(lib.RunnerFunc(func(ctx context.Context) ([]stats.Sample, error) {
+		select {
+		case ch <- struct{}{}:
+		case <-ctx.Done():
 		}
-		cancel()
-		assert.NoError(t, <-err)
-		assert.Equal(t, int64(10), e.GetIterations())
-	})
+		return nil, nil
+	}))
+	assert.NoError(t, e.SetVUsMax(10))
+	assert.NoError(t, e.SetVUs(10))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	err := make(chan error)
+	go func() { err <- e.Run(ctx, nil) }()
+	for i := 0; i < 10; i++ {
+		<-ch
+	}
+	cancel()
+	assert.NoError(t, <-err)
+	assert.Equal(t, int64(10), e.GetIterations())
+}
+
+func TestExecutorEndTime(t *testing.T) {
+	e := New(nil)
+	assert.NoError(t, e.SetVUsMax(10))
+	assert.NoError(t, e.SetVUs(10))
+	e.SetEndTime(lib.NullDurationFrom(1 * time.Second))
+	assert.Equal(t, lib.NullDurationFrom(1*time.Second), e.GetEndTime())
+
+	startTime := time.Now()
+	assert.NoError(t, e.Run(context.Background(), nil))
+	assert.True(t, time.Now().After(startTime.Add(1*time.Second)), "test did not take 1s")
+}
+
+func TestExecutorEndIterations(t *testing.T) {
+	var i int64
+	e := New(lib.RunnerFunc(func(ctx context.Context) ([]stats.Sample, error) {
+		atomic.AddInt64(&i, 1)
+		return nil, nil
+	}))
+	assert.NoError(t, e.SetVUsMax(10))
+	assert.NoError(t, e.SetVUs(10))
+	e.SetEndIterations(null.IntFrom(100))
+	assert.Equal(t, null.IntFrom(100), e.GetEndIterations())
+	assert.NoError(t, e.Run(context.Background(), nil))
+	assert.Equal(t, int64(100), e.GetIterations())
+	assert.Equal(t, int64(100), i)
 }
 
 func TestExecutorIsRunning(t *testing.T) {
