@@ -286,7 +286,7 @@ func TestHMac(t *testing.T) {
 		rt.Set("algorithm", rt.ToValue(algorithm))
 		t.Run(algorithm+" hasher: valid", func(t *testing.T) {
 			_, err := common.RunString(rt, `
-			let hasher = crypto.createHmac(algorithm, "a secret");
+			let hasher = crypto.createHMAC(algorithm, "a secret");
 			hasher.update("some data to hash");
 
 			const resultHex = hasher.digest("hex");
@@ -319,7 +319,7 @@ func TestHMac(t *testing.T) {
 		rt.Set("algorithm", rt.ToValue(algorithm))
 		t.Run(algorithm+" hasher: invalid", func(t *testing.T) {
 			_, err := common.RunString(rt, `
-			let hasher = crypto.createHmac(algorithm, "a secret");
+			let hasher = crypto.createHMAC(algorithm, "a secret");
 			hasher.update("some data to hash");
 
 			const resultHex = hasher.digest("hex");

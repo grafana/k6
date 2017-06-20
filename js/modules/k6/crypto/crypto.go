@@ -153,7 +153,7 @@ func (hasher *Hasher) Digest(outputEncoding string) string {
 	return ""
 }
 
-func (c Crypto) CreateHmac(ctx context.Context, algorithm string, key string) *Hasher {
+func (c Crypto) CreateHMAC(ctx context.Context, algorithm string, key string) *Hasher {
 	hasher := Hasher{}
 	hasher.ctx = ctx
 	keyBuffer := []byte(key)
@@ -186,7 +186,7 @@ func (c Crypto) CreateHmac(ctx context.Context, algorithm string, key string) *H
 }
 
 func (c *Crypto) Hmac(ctx context.Context, algorithm string, key string, input string, outputEncoding string) string {
-	hasher := c.CreateHmac(ctx, algorithm, key)
+	hasher := c.CreateHMAC(ctx, algorithm, key)
 	hasher.Update(input)
 	return hasher.Digest(outputEncoding)
 }
