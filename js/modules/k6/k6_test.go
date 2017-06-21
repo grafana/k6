@@ -227,6 +227,34 @@ func TestCheck(t *testing.T) {
 				}
 			})
 		}
+
+		t.Run("ContextExpiry", func(t *testing.T) {
+			root, err := lib.NewGroup("", nil)
+			assert.NoError(t, err)
+
+			state := &common.State{Group: root}
+			ctx2, cancel := context.WithCancel(common.WithState(baseCtx, state))
+			*ctx = ctx2
+
+			v, err := common.RunString(rt, `k6.check(null, { "check": true })`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, true, v.Export())
+			}
+
+			check, _ := root.Check("check")
+			assert.Equal(t, int64(1), check.Passes)
+			assert.Equal(t, int64(0), check.Fails)
+
+			cancel()
+
+			v, err = common.RunString(rt, `k6.check(null, { "check": true })`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, true, v.Export())
+			}
+
+			assert.Equal(t, int64(1), check.Passes)
+			assert.Equal(t, int64(0), check.Fails)
+		})
 	})
 
 	t.Run("Tags", func(t *testing.T) {
