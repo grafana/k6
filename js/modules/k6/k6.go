@@ -59,7 +59,17 @@ func (*K6) Group(ctx context.Context, name string, fn goja.Callable) (goja.Value
 	state.Group = g
 	defer func() { state.Group = old }()
 
-	return fn(goja.Undefined())
+	tags := make(map[string]string)
+	tags["group"] = g.Path
+	// Call group function and generate group_duration sample
+	startTime := time.Now()
+	ret, err := fn(goja.Undefined())
+	t := time.Now()
+	duration := t.Sub(startTime).Seconds() * 1000
+	state.Samples = append(state.Samples,
+		stats.Sample{Time: t, Metric: metrics.GroupDuration, Tags: tags, Value: duration},
+	)
+	return ret, err
 }
 
 func (*K6) Check(ctx context.Context, arg0, checks goja.Value, extras ...goja.Value) (bool, error) {
