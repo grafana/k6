@@ -22,9 +22,10 @@ package html
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/pkg/errors"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/dop251/goja"
@@ -318,7 +319,9 @@ func (s Selection) Each(v goja.Value) Selection {
 	}
 
 	fn := func(idx int, sel *goquery.Selection) {
-		gojaFn(v, s.rt.ToValue(idx), selToElement(s))
+		if _, err := gojaFn(v, s.rt.ToValue(idx), selToElement(s)); err != nil {
+			panic(s.rt.NewGoError(errors.Wrap(err, "Function passed to each() failed:")))
+		}
 	}
 
 	return Selection{s.rt, s.sel.Each(fn)}
