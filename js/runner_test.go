@@ -408,11 +408,11 @@ func TestVUIntegrationTLSConfig(t *testing.T) {
 			"",
 		},
 		"SupportedCipherSuite": {
-			lib.Options{TLSCipherSuites: &lib.TLSCipherSuites{Values: []uint16{tls.TLS_RSA_WITH_AES_128_GCM_SHA256}}},
+			lib.Options{TLSCipherSuites: &lib.TLSCipherSuites{tls.TLS_RSA_WITH_AES_128_GCM_SHA256}},
 			"",
 		},
 		"UnsupportedCipherSuite": {
-			lib.Options{TLSCipherSuites: &lib.TLSCipherSuites{Values: []uint16{tls.TLS_RSA_WITH_RC4_128_SHA}}},
+			lib.Options{TLSCipherSuites: &lib.TLSCipherSuites{tls.TLS_RSA_WITH_RC4_128_SHA}},
 			"GoError: Get https://sha256.badssl.com/: remote error: tls: handshake failure",
 		},
 		"NullVersion": {

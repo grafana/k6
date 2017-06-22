@@ -80,11 +80,11 @@ func TestOptionsApply(t *testing.T) {
 	t.Run("TLSCipherSuites", func(t *testing.T) {
 		for suiteName, suiteID := range SupportedTLSCipherSuites {
 			t.Run(suiteName, func(t *testing.T) {
-				opts := Options{}.Apply(Options{TLSCipherSuites: &TLSCipherSuites{[]uint16{suiteID}}})
+				opts := Options{}.Apply(Options{TLSCipherSuites: &TLSCipherSuites{suiteID}})
 
-				assert.NotNil(t, opts.TLSCipherSuites.Values)
-				assert.Len(t, opts.TLSCipherSuites.Values, 1)
-				assert.Equal(t, suiteID, opts.TLSCipherSuites.Values[0])
+				assert.NotNil(t, opts.TLSCipherSuites)
+				assert.Len(t, *(opts.TLSCipherSuites), 1)
+				assert.Equal(t, suiteID, (*opts.TLSCipherSuites)[0])
 			})
 		}
 	})

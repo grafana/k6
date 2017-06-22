@@ -388,8 +388,8 @@ func TestNewBundle(t *testing.T) {
 						Data:     []byte(script),
 					}, afero.NewMemMapFs())
 					if assert.NoError(t, err) {
-						if assert.Len(t, b.Options.TLSCipherSuites.Values, 1) {
-							assert.Equal(t, b.Options.TLSCipherSuites.Values[0], suiteID)
+						if assert.Len(t, *b.Options.TLSCipherSuites, 1) {
+							assert.Equal(t, (*b.Options.TLSCipherSuites)[0], suiteID)
 						}
 					}
 				})

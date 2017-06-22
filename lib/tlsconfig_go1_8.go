@@ -24,6 +24,13 @@ package lib
 
 import "crypto/tls"
 
+var SupportedTLSVersions = map[string]int{
+	"ssl3.0": tls.VersionSSL30,
+	"tls1.0": tls.VersionTLS10,
+	"tls1.1": tls.VersionTLS11,
+	"tls1.2": tls.VersionTLS12,
+}
+
 var SupportedTLSCipherSuites = map[string]uint16{
 	"TLS_RSA_WITH_RC4_128_SHA":                tls.TLS_RSA_WITH_RC4_128_SHA,
 	"TLS_RSA_WITH_3DES_EDE_CBC_SHA":           tls.TLS_RSA_WITH_3DES_EDE_CBC_SHA,
