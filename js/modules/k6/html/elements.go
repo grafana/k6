@@ -8,11 +8,20 @@ import (
 	"github.com/dop251/goja"
 )
 
+//go:generate go run gen/main.go
+
 var defaultPorts = map[string]string{
 	"http":  "80",
 	"https": "443",
 	"ftp":   "21",
 }
+
+const (
+	Anchor = "a"
+	Area   = "area"
+	Base   = "base"
+	Button = "button"
+)
 
 type HrefElement struct{ Element }
 type AnchorElement struct{ HrefElement }
