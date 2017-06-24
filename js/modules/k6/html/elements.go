@@ -17,10 +17,10 @@ var defaultPorts = map[string]string{
 }
 
 const (
-	Anchor = "a"
-	Area   = "area"
-	Base   = "base"
-	Button = "button"
+	AnchorTagName = "a"
+	AreaTagName   = "area"
+	BaseTagName   = "base"
+	ButtonTagName = "button"
 )
 
 type HrefElement struct{ Element }
