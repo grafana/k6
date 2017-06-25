@@ -26,6 +26,10 @@ const (
 	DataListTagName = "datalist"
 	EmbedTagName    = "embed"
 	FieldSetTagName = "fieldset"
+	FormTagName     = "form"
+	IFrameTagName   = "iframe"
+	ImageTagName    = "img"
+	InputTagName    = "input"
 )
 
 type HrefElement struct{ Element }
@@ -41,6 +45,10 @@ type DataElement struct{ Element }
 type DataListElement struct{ Element }
 type EmbedElement struct{ Element }
 type FieldSetElement struct{ Element }
+type FormElement struct{ Element }
+type IFrameElement struct{ Element }
+type ImageElement struct{ Element }
+type InputElement struct{ FormFieldElement }
 
 func (h HrefElement) hrefURL() *url.URL {
 	url, err := url.Parse(h.attrAsString("href"))
@@ -160,26 +168,6 @@ func (f FormFieldElement) Form() goja.Value {
 
 // Used by the formAction, formMethod, formTarget and formEnctype methods of Button and Input elements
 // Attempts to read attribute "form" + attrName on the current element or attrName on the owning form element
-func (f FormFieldElement) formAttrOrElemOverride(attrName string) string {
-	if elemAttr, exists := f.sel.sel.Attr("form" + attrName); exists {
-		return elemAttr
-	}
-
-	formSel, exists := f.ownerFormSel()
-	if !exists {
-		return ""
-	}
-
-	formAttr, exists := formSel.Attr(attrName)
-	if !exists {
-		return ""
-	}
-
-	return formAttr
-}
-
-// Used by the formAction, formMethod, formTarget and formEnctype methods of Button and Input elements
-// Attempts to read attribute "form" + attrName on the current element or attrName on the owning form element
 func (f FormFieldElement) formOrElemAttrString(attrName string) string {
 	if elemAttr, exists := f.sel.sel.Attr("form" + attrName); exists {
 		return elemAttr
@@ -221,7 +209,11 @@ func (f FormFieldElement) FormEnctype() string {
 }
 
 func (f FormFieldElement) FormMethod() string {
-	return f.formOrElemAttrString("method")
+	if method := strings.ToLower(f.formOrElemAttrString("method")); method == "post" {
+		return "post"
+	}
+
+	return "get"
 }
 
 func (f FormFieldElement) FormNoValidate() bool {
@@ -258,19 +250,6 @@ func (f FormFieldElement) Name() string {
 	return f.attrAsString("name")
 }
 
-func (b ButtonElement) Type() string {
-	switch b.attrAsString("type") {
-	case "button":
-		return "button"
-	case "menu":
-		return "menu"
-	case "reset":
-		return "reset"
-	default:
-		return "submit"
-	}
-}
-
 func (b ButtonElement) Value() string {
 	return valueOrHTML(b.sel.sel)
 }
@@ -305,4 +284,48 @@ func (f FieldSetElement) Elements() []goja.Value {
 
 func (f FieldSetElement) Validity() goja.Value {
 	return goja.Undefined()
+}
+
+func (f FormElement) Elements() []goja.Value {
+	return elemList(f.sel.Find("input,select,button,textarea,fieldset"))
+}
+
+func (f FormElement) Length() int {
+	return f.sel.sel.Find("input,select,button,textarea,fieldset").Size()
+}
+
+func (f FormElement) Method() string {
+	if method := f.attrAsString("method"); method == "post" {
+		return "post"
+	}
+
+	return "get"
+}
+
+func (i InputElement) List() goja.Value {
+	listId := i.attrAsString("list")
+
+	if listId == "" {
+		return goja.Undefined()
+	}
+
+	switch i.attrAsString("type") {
+	case "hidden":
+		return goja.Undefined()
+	case "checkbox":
+		return goja.Undefined()
+	case "radio":
+		return goja.Undefined()
+	case "file":
+		return goja.Undefined()
+	case "button":
+		return goja.Undefined()
+	}
+
+	datalist := i.sel.sel.Parents().Last().Find("datalist[id=\"" + listId + "\"]")
+	if datalist.Length() == 0 {
+		return goja.Undefined()
+	}
+
+	return selToElement(Selection{i.sel.rt, datalist.Eq(0)})
 }

@@ -43,7 +43,7 @@ const testHTMLElems = `
 	<area href="web.address.com"></area>
 	<base href="/rel/path" target="_self"></base>
 	
-	<form id="form1" action="action_url" enctype="text/plain" method="get" target="_self">
+	<form id="form1" action="action_url" enctype="text/plain" target="_self">
 		<label for="form_btn" id="form_btn_label"></label>
 		<button id="form_btn" name="form_btn" accesskey="b" autofocus disabled></button>
 		<label for="form_btn_2" id="form_btn_2_label"></label>
@@ -55,8 +55,8 @@ const testHTMLElems = `
 	<button id="named_form_btn" form="form2"></button>
 	<button id="no_form_btn"></button>
 	<canvas width="200"></canvas>
-	<datalist><option id="dl_opt_1"/><option id="dl_opt_2"/></datalist>
-	<form id="fieldset_form"><fieldset><input type="text"><input type="text"><select></select><button></button><textarea></textarea></fieldset></form>
+	<datalist id="datalist1"><option id="dl_opt_1"/><option id="dl_opt_2"/></datalist>
+	<form method="post" id="fieldset_form"><fieldset><input id="test_dl_input" type="text" list="datalist1"><input type="text"><select></select><button></button><textarea></textarea></fieldset></form>
 </body>
 `
 
@@ -224,14 +224,6 @@ func TestElements(t *testing.T) {
 				assert.Equal(t, "form_btn", v.Export())
 			}
 		})
-		t.Run("type", func(t *testing.T) {
-			if v, err := common.RunString(rt, `doc.find("#form_btn").get(0).type()`); assert.NoError(t, err) {
-				assert.Equal(t, "submit", v.Export())
-			}
-			if v, err := common.RunString(rt, `doc.find("#form_btn_2").get(0).type()`); assert.NoError(t, err) {
-				assert.Equal(t, "button", v.Export())
-			}
-		})
 		t.Run("value", func(t *testing.T) {
 			if v, err := common.RunString(rt, `doc.find("#form_btn_2").get(0).value()`); assert.NoError(t, err) {
 				assert.Equal(t, "initval", v.Export())
@@ -272,6 +264,33 @@ func TestElements(t *testing.T) {
 			if v, err := common.RunString(rt, `doc.find("fieldset").get(0).form().id()`); assert.NoError(t, err) {
 				assert.Equal(t, "fieldset_form", v.Export())
 			}
+		})
+	})
+	t.Run("FormElement", func(t *testing.T) {
+		t.Run("elements", func(t *testing.T) {
+			if v, err := common.RunString(rt, `doc.find("#fieldset_form").get(0).elements()`); assert.NoError(t, err) {
+				assert.Equal(t, 6, len(v.Export().([]goja.Value)))
+			}
+		})
+		t.Run("length", func(t *testing.T) {
+			if v, err := common.RunString(rt, `doc.find("#fieldset_form").get(0).length()`); assert.NoError(t, err) {
+				assert.Equal(t, int64(6), v.Export())
+			}
+		})
+		t.Run("method", func(t *testing.T) {
+			v1, err1 := common.RunString(rt, `doc.find("#form1").get(0).method()`)
+			v2, err2 := common.RunString(rt, `doc.find("#fieldset_form").get(0).method()`)
+			if assert.NoError(t, err1) && assert.NoError(t, err2) {
+				assert.Equal(t, "get", v1.Export())
+				assert.Equal(t, "post", v2.Export())
+			}
+		})
+		t.Run("InputElement", func(t *testing.T) {
+			t.Run("form", func(t *testing.T) {
+				if v, err := common.RunString(rt, `doc.find("#test_dl_input").get(0).list().options()`); assert.NoError(t, err) {
+					assert.Equal(t, 2, len(v.Export().([]goja.Value)))
+				}
+			})
 		})
 	})
 }
