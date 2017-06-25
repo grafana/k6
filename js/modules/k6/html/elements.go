@@ -24,11 +24,13 @@ const (
 )
 
 type HrefElement struct{ Element }
+type FormFieldElement struct{ Element }
+
 type AnchorElement struct{ HrefElement }
 type AreaElement struct{ HrefElement }
 
 type BaseElement struct{ Element }
-type ButtonElement struct{ Element }
+type ButtonElement struct{ FormFieldElement }
 
 func (h HrefElement) hrefURL() *url.URL {
 	url, err := url.Parse(h.attrAsString("href"))
@@ -138,22 +140,22 @@ func (h HrefElement) Text() string {
 	return h.TextContent()
 }
 
-func (b ButtonElement) Form() goja.Value {
-	formSel, exists := b.ownerFormSel()
+func (f FormFieldElement) Form() goja.Value {
+	formSel, exists := f.ownerFormSel()
 	if !exists {
 		return goja.Undefined()
 	}
-	return selToElement(Selection{b.sel.rt, formSel})
+	return selToElement(Selection{f.sel.rt, formSel})
 }
 
 // Used by the formAction, formMethod, formTarget and formEnctype methods of Button and Input elements
 // Attempts to read attribute "form" + attrName on the current element or attrName on the owning form element
-func (e Element) formAttrOrElemOverride(attrName string) string {
-	if elemAttr, exists := e.sel.sel.Attr("form" + attrName); exists {
+func (f FormFieldElement) formAttrOrElemOverride(attrName string) string {
+	if elemAttr, exists := f.sel.sel.Attr("form" + attrName); exists {
 		return elemAttr
 	}
 
-	formSel, exists := e.ownerFormSel()
+	formSel, exists := f.ownerFormSel()
 	if !exists {
 		return ""
 	}
@@ -168,12 +170,12 @@ func (e Element) formAttrOrElemOverride(attrName string) string {
 
 // Used by the formAction, formMethod, formTarget and formEnctype methods of Button and Input elements
 // Attempts to read attribute "form" + attrName on the current element or attrName on the owning form element
-func (e Element) formOrElemAttrString(attrName string) string {
-	if elemAttr, exists := e.sel.sel.Attr("form" + attrName); exists {
+func (f FormFieldElement) formOrElemAttrString(attrName string) string {
+	if elemAttr, exists := f.sel.sel.Attr("form" + attrName); exists {
 		return elemAttr
 	}
 
-	formSel, exists := e.ownerFormSel()
+	formSel, exists := f.ownerFormSel()
 	if !exists {
 		return ""
 	}
@@ -186,12 +188,12 @@ func (e Element) formOrElemAttrString(attrName string) string {
 	return formAttr
 }
 
-func (e Element) formOrElemAttrPresent(attrName string) bool {
-	if _, exists := e.sel.sel.Attr("form" + attrName); exists {
+func (f FormFieldElement) formOrElemAttrPresent(attrName string) bool {
+	if _, exists := f.sel.sel.Attr("form" + attrName); exists {
 		return true
 	}
 
-	formSel, exists := e.ownerFormSel()
+	formSel, exists := f.ownerFormSel()
 	if !exists {
 		return false
 	}
@@ -200,51 +202,47 @@ func (e Element) formOrElemAttrPresent(attrName string) bool {
 	return exists
 }
 
-func (b ButtonElement) FormAction() string {
-	return b.formOrElemAttrString("action")
+func (f FormFieldElement) FormAction() string {
+	return f.formOrElemAttrString("action")
 }
 
-func (b ButtonElement) FormEnctype() string {
-	return b.formOrElemAttrString("enctype")
+func (f FormFieldElement) FormEnctype() string {
+	return f.formOrElemAttrString("enctype")
 }
 
-func (b ButtonElement) FormMethod() string {
-	return b.formOrElemAttrString("method")
+func (f FormFieldElement) FormMethod() string {
+	return f.formOrElemAttrString("method")
 }
 
-func (b ButtonElement) FormNoValidate() bool {
-	return b.formOrElemAttrPresent("novalidate")
+func (f FormFieldElement) FormNoValidate() bool {
+	return f.formOrElemAttrPresent("novalidate")
 }
 
-func (b ButtonElement) FormTarget() string {
-	return b.formOrElemAttrString("target")
+func (f FormFieldElement) FormTarget() string {
+	return f.formOrElemAttrString("target")
 }
 
-func (e Element) elemLabels() (items []goja.Value) {
-	wrapperLbl := e.sel.sel.Closest("label")
+func (f FormFieldElement) elemLabels() (items []goja.Value) {
+	wrapperLbl := f.sel.sel.Closest("label")
 
-	id := e.attrAsString("id")
+	id := f.attrAsString("id")
 	if id == "" {
-		return elemList(Selection{e.sel.rt, wrapperLbl})
+		return elemList(Selection{f.sel.rt, wrapperLbl})
 	}
 
-	idLbl := e.sel.sel.Parents().Last().Find("label[for=\"" + id + "\"]")
+	idLbl := f.sel.sel.Parents().Last().Find("label[for=\"" + id + "\"]")
 	if idLbl.Size() == 0 {
-		return elemList(Selection{e.sel.rt, wrapperLbl})
+		return elemList(Selection{f.sel.rt, wrapperLbl})
 	}
 
 	allLbls := wrapperLbl.AddSelection(idLbl)
 
-	return elemList(Selection{e.sel.rt, allLbls})
+	return elemList(Selection{f.sel.rt, allLbls})
 }
 
-func (b ButtonElement) Labels() (items []goja.Value) {
-	return b.elemLabels()
+func (f FormFieldElement) Labels() (items []goja.Value) {
+	return f.elemLabels()
 }
-
-// func (b ButtonElement) Name() string {
-// 	return b.attrAsString("name")
-// }
 
 func (b ButtonElement) Type() string {
 	switch b.attrAsString("type") {
@@ -258,7 +256,3 @@ func (b ButtonElement) Type() string {
 		return "submit"
 	}
 }
-
-// func (b ButtonElement) Value() string {
-// 	return b.attrAsString("value")
-// }
