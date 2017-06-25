@@ -116,10 +116,6 @@ func (h HrefElement) Protocol() string {
 	return h.hrefURL().Scheme
 }
 
-func (h HrefElement) Rel() string {
-	return h.attrAsString("rel")
-}
-
 func (h HrefElement) RelList() []string {
 	rel := h.attrAsString("rel")
 
@@ -138,56 +134,8 @@ func (h HrefElement) Search() string {
 	return "?" + q
 }
 
-func (h HrefElement) Target() string {
-	return h.attrAsString("target")
-}
-
 func (h HrefElement) Text() string {
 	return h.TextContent()
-}
-
-func (h HrefElement) Type() string {
-	return h.attrAsString("type")
-}
-
-func (h HrefElement) AccessKey() string {
-	return h.attrAsString("accesskey")
-}
-
-func (h HrefElement) HrefLang() string {
-	return h.attrAsString("hreflang")
-}
-
-func (h HrefElement) Media() string {
-	return h.attrAsString("media")
-}
-
-func (h HrefElement) ToString() string {
-	return h.attrAsString("href")
-}
-
-func (h HrefElement) Href() string {
-	return h.attrAsString("href")
-}
-
-func (h BaseElement) Href() string {
-	return h.attrAsString("href")
-}
-
-func (h BaseElement) Target() string {
-	return h.attrAsString("target")
-}
-
-func (b ButtonElement) AccessKey() string {
-	return b.attrAsString("accesskey")
-}
-
-func (b ButtonElement) Autofocus() bool {
-	return b.attrIsPresent("autofocus")
-}
-
-func (b ButtonElement) Disabled() bool {
-	return b.attrIsPresent("disabled")
 }
 
 func (b ButtonElement) Form() goja.Value {
@@ -294,9 +242,9 @@ func (b ButtonElement) Labels() (items []goja.Value) {
 	return b.elemLabels()
 }
 
-func (b ButtonElement) Name() string {
-	return b.attrAsString("name")
-}
+// func (b ButtonElement) Name() string {
+// 	return b.attrAsString("name")
+// }
 
 func (b ButtonElement) Type() string {
 	switch b.attrAsString("type") {
@@ -311,6 +259,6 @@ func (b ButtonElement) Type() string {
 	}
 }
 
-func (b ButtonElement) Value() string {
-	return b.attrAsString("value")
-}
+// func (b ButtonElement) Value() string {
+// 	return b.attrAsString("value")
+// }
