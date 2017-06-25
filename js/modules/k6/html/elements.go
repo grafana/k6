@@ -5,7 +5,6 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/PuerkitoBio/goquery"
 	"github.com/dop251/goja"
 )
 
@@ -25,6 +24,8 @@ const (
 	CanvasTagName   = "canvas"
 	DataTagName     = "data"
 	DataListTagName = "datalist"
+	EmbedTagName    = "embed"
+	FieldSetTagName = "fieldset"
 )
 
 type HrefElement struct{ Element }
@@ -38,6 +39,8 @@ type ButtonElement struct{ FormFieldElement }
 type CanvasElement struct{ Element }
 type DataElement struct{ Element }
 type DataListElement struct{ Element }
+type EmbedElement struct{ Element }
+type FieldSetElement struct{ Element }
 
 func (h HrefElement) hrefURL() *url.URL {
 	url, err := url.Parse(h.attrAsString("href"))
@@ -145,25 +148,6 @@ func (h HrefElement) Search() string {
 
 func (h HrefElement) Text() string {
 	return h.TextContent()
-}
-
-func (f FormFieldElement) ownerFormSel() (*goquery.Selection, bool) {
-	prtForm := f.sel.sel.Closest("form")
-	if prtForm.Length() > 0 {
-		return prtForm, true
-	}
-
-	formId := f.attrAsString("form")
-	if formId == "" {
-		return nil, false
-	}
-
-	findForm := f.sel.sel.Parents().Last().Find("#" + formId)
-	if findForm.Length() == 0 {
-		return nil, false
-	}
-
-	return findForm, true
 }
 
 func (f FormFieldElement) Form() goja.Value {
@@ -301,4 +285,24 @@ func (c CanvasElement) Height() int64 {
 
 func (d DataListElement) Options() (items []goja.Value) {
 	return elemList(d.sel.Find("option"))
+}
+
+func (f FieldSetElement) Form() goja.Value {
+	formSel, exists := f.ownerFormSel()
+	if !exists {
+		return goja.Undefined()
+	}
+	return selToElement(Selection{f.sel.rt, formSel})
+}
+
+func (f FieldSetElement) Type() string {
+	return "fieldset"
+}
+
+func (f FieldSetElement) Elements() []goja.Value {
+	return elemList(f.sel.Find("input,select,button,textarea"))
+}
+
+func (f FieldSetElement) Validity() goja.Value {
+	return goja.Undefined()
 }

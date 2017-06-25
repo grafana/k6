@@ -54,6 +54,25 @@ func (e Element) attrIsPresent(name string) bool {
 	return exists
 }
 
+func (e Element) ownerFormSel() (*goquery.Selection, bool) {
+	prtForm := e.sel.sel.Closest("form")
+	if prtForm.Length() > 0 {
+		return prtForm, true
+	}
+
+	formId := e.attrAsString("form")
+	if formId == "" {
+		return nil, false
+	}
+
+	findForm := e.sel.sel.Parents().Last().Find("#" + formId)
+	if findForm.Length() == 0 {
+		return nil, false
+	}
+
+	return findForm, true
+}
+
 func (e Element) GetAttribute(name string) goja.Value {
 	return e.sel.Attr(name)
 }
