@@ -22,15 +22,13 @@ package core
 
 import (
 	"context"
-	"runtime"
-	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/loadimpact/k6/core/local"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/stats/dummy"
-	"github.com/pkg/errors"
 	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v3"
@@ -44,13 +42,13 @@ func (e testErrorWithString) String() string { return string(e) }
 // Apply a null logger to the engine and return the hook.
 func applyNullLogger(e *Engine) *logtest.Hook {
 	logger, hook := logtest.NewNullLogger()
-	e.Logger = logger
+	e.SetLogger(logger)
 	return hook
 }
 
 // Wrapper around newEngine that applies a null logger.
-func newTestEngine(r lib.Runner, opts lib.Options) (*Engine, error, *logtest.Hook) {
-	e, err := NewEngine(r, opts)
+func newTestEngine(ex lib.Executor, opts lib.Options) (*Engine, error, *logtest.Hook) {
+	e, err := NewEngine(ex, opts)
 	if err != nil {
 		return e, err, nil
 	}
@@ -58,24 +56,12 @@ func newTestEngine(r lib.Runner, opts lib.Options) (*Engine, error, *logtest.Hoo
 	return e, nil, hook
 }
 
-// Helper for asserting the number of active/dead VUs.
-func assertActiveVUs(t *testing.T, e *Engine, active, dead int) {
-	e.lock.Lock()
-	defer e.lock.Unlock()
+func L(r lib.Runner) lib.Executor {
+	return local.New(r)
+}
 
-	var numActive, numDead int
-	var lastWasDead bool
-	for _, vu := range e.vuEntries {
-		if vu.Cancel != nil {
-			numActive++
-			assert.False(t, lastWasDead, "living vu in dead zone")
-		} else {
-			numDead++
-			lastWasDead = true
-		}
-	}
-	assert.Equal(t, active, numActive, "wrong number of active vus")
-	assert.Equal(t, dead, numDead, "wrong number of dead vus")
+func LF(fn func(ctx context.Context) ([]stats.Sample, error)) lib.Executor {
+	return L(lib.RunnerFunc(fn))
 }
 
 func TestNewEngine(t *testing.T) {
@@ -92,11 +78,13 @@ func TestNewEngineOptions(t *testing.T) {
 		if assert.Len(t, e.Stages, 1) {
 			assert.Equal(t, e.Stages[0], lib.Stage{Duration: lib.NullDurationFrom(10 * time.Second)})
 		}
+		assert.Equal(t, lib.NullDurationFrom(10*time.Second), e.Executor.GetEndTime())
 
 		t.Run("Infinite", func(t *testing.T) {
 			e, err, _ := newTestEngine(nil, lib.Options{Duration: lib.NullDurationFrom(0)})
 			assert.NoError(t, err)
 			assert.Equal(t, []lib.Stage{{}}, e.Stages)
+			assert.Equal(t, lib.NullDuration{}, e.Executor.GetEndTime())
 		})
 	})
 	t.Run("Stages", func(t *testing.T) {
@@ -109,6 +97,7 @@ func TestNewEngineOptions(t *testing.T) {
 		if assert.Len(t, e.Stages, 1) {
 			assert.Equal(t, e.Stages[0], lib.Stage{Duration: lib.NullDurationFrom(10 * time.Second), Target: null.IntFrom(10)})
 		}
+		assert.Equal(t, lib.NullDurationFrom(10*time.Second), e.Executor.GetEndTime())
 	})
 	t.Run("Stages/Duration", func(t *testing.T) {
 		e, err, _ := newTestEngine(nil, lib.Options{
@@ -121,21 +110,27 @@ func TestNewEngineOptions(t *testing.T) {
 		if assert.Len(t, e.Stages, 1) {
 			assert.Equal(t, e.Stages[0], lib.Stage{Duration: lib.NullDurationFrom(10 * time.Second), Target: null.IntFrom(10)})
 		}
+		assert.Equal(t, lib.NullDurationFrom(10*time.Second), e.Executor.GetEndTime())
+	})
+	t.Run("Iterations", func(t *testing.T) {
+		e, err, _ := newTestEngine(nil, lib.Options{Iterations: null.IntFrom(100)})
+		assert.NoError(t, err)
+		assert.Equal(t, null.IntFrom(100), e.Executor.GetEndIterations())
 	})
 	t.Run("VUsMax", func(t *testing.T) {
 		t.Run("not set", func(t *testing.T) {
 			e, err, _ := newTestEngine(nil, lib.Options{})
 			assert.NoError(t, err)
-			assert.Equal(t, int64(0), e.GetVUsMax())
-			assert.Equal(t, int64(0), e.GetVUs())
+			assert.Equal(t, int64(0), e.Executor.GetVUsMax())
+			assert.Equal(t, int64(0), e.Executor.GetVUs())
 		})
 		t.Run("set", func(t *testing.T) {
 			e, err, _ := newTestEngine(nil, lib.Options{
 				VUsMax: null.IntFrom(10),
 			})
 			assert.NoError(t, err)
-			assert.Equal(t, int64(10), e.GetVUsMax())
-			assert.Equal(t, int64(0), e.GetVUs())
+			assert.Equal(t, int64(10), e.Executor.GetVUsMax())
+			assert.Equal(t, int64(0), e.Executor.GetVUs())
 		})
 	})
 	t.Run("VUs", func(t *testing.T) {
@@ -143,14 +138,14 @@ func TestNewEngineOptions(t *testing.T) {
 			_, err, _ := newTestEngine(nil, lib.Options{
 				VUs: null.IntFrom(10),
 			})
-			assert.EqualError(t, err, "more vus than allocated requested")
+			assert.EqualError(t, err, "can't raise vu count (to 10) above vu cap (0)")
 		})
 		t.Run("max too low", func(t *testing.T) {
 			_, err, _ := newTestEngine(nil, lib.Options{
 				VUsMax: null.IntFrom(1),
 				VUs:    null.IntFrom(10),
 			})
-			assert.EqualError(t, err, "more vus than allocated requested")
+			assert.EqualError(t, err, "can't raise vu count (to 10) above vu cap (1)")
 		})
 		t.Run("max higher", func(t *testing.T) {
 			e, err, _ := newTestEngine(nil, lib.Options{
@@ -158,8 +153,8 @@ func TestNewEngineOptions(t *testing.T) {
 				VUs:    null.IntFrom(1),
 			})
 			assert.NoError(t, err)
-			assert.Equal(t, int64(10), e.GetVUsMax())
-			assert.Equal(t, int64(1), e.GetVUs())
+			assert.Equal(t, int64(10), e.Executor.GetVUsMax())
+			assert.Equal(t, int64(1), e.Executor.GetVUs())
 		})
 		t.Run("max just right", func(t *testing.T) {
 			e, err, _ := newTestEngine(nil, lib.Options{
@@ -167,29 +162,29 @@ func TestNewEngineOptions(t *testing.T) {
 				VUs:    null.IntFrom(10),
 			})
 			assert.NoError(t, err)
-			assert.Equal(t, int64(10), e.GetVUsMax())
-			assert.Equal(t, int64(10), e.GetVUs())
+			assert.Equal(t, int64(10), e.Executor.GetVUsMax())
+			assert.Equal(t, int64(10), e.Executor.GetVUs())
 		})
 	})
 	t.Run("Paused", func(t *testing.T) {
 		t.Run("not set", func(t *testing.T) {
 			e, err, _ := newTestEngine(nil, lib.Options{})
 			assert.NoError(t, err)
-			assert.False(t, e.IsPaused())
+			assert.False(t, e.Executor.IsPaused())
 		})
 		t.Run("false", func(t *testing.T) {
 			e, err, _ := newTestEngine(nil, lib.Options{
 				Paused: null.BoolFrom(false),
 			})
 			assert.NoError(t, err)
-			assert.False(t, e.IsPaused())
+			assert.False(t, e.Executor.IsPaused())
 		})
 		t.Run("true", func(t *testing.T) {
 			e, err, _ := newTestEngine(nil, lib.Options{
 				Paused: null.BoolFrom(true),
 			})
 			assert.NoError(t, err)
-			assert.True(t, e.IsPaused())
+			assert.True(t, e.Executor.IsPaused())
 		})
 	})
 	t.Run("thresholds", func(t *testing.T) {
@@ -216,37 +211,36 @@ func TestNewEngineOptions(t *testing.T) {
 
 func TestEngineRun(t *testing.T) {
 	t.Run("exits with context", func(t *testing.T) {
-		startTime := time.Now()
 		duration := 100 * time.Millisecond
 		e, err, _ := newTestEngine(nil, lib.Options{})
 		assert.NoError(t, err)
 
 		ctx, cancel := context.WithTimeout(context.Background(), duration)
 		defer cancel()
+		startTime := time.Now()
 		assert.NoError(t, e.Run(ctx))
 		assert.WithinDuration(t, startTime.Add(duration), time.Now(), 100*time.Millisecond)
 	})
-	t.Run("terminates subctx", func(t *testing.T) {
-		e, err, _ := newTestEngine(nil, lib.Options{})
+	t.Run("exits with iterations", func(t *testing.T) {
+		e, err, _ := newTestEngine(nil, lib.Options{
+			VUs:        null.IntFrom(10),
+			VUsMax:     null.IntFrom(10),
+			Iterations: null.IntFrom(100),
+		})
 		assert.NoError(t, err)
-
-		subctx := e.subctx
-		select {
-		case <-subctx.Done():
-			assert.Fail(t, "context is already terminated")
-		default:
-		}
-
-		ctx, cancel := context.WithCancel(context.Background())
-		cancel()
-		assert.NoError(t, e.Run(ctx))
-
-		assert.NotEqual(t, subctx, e.subctx, "subcontext not changed")
-		select {
-		case <-subctx.Done():
-		default:
-			assert.Fail(t, "context was not terminated")
-		}
+		assert.NoError(t, e.Run(context.Background()))
+		assert.Equal(t, int64(100), e.Executor.GetIterations())
+	})
+	t.Run("exits with duration", func(t *testing.T) {
+		e, err, _ := newTestEngine(nil, lib.Options{
+			VUs:      null.IntFrom(10),
+			VUsMax:   null.IntFrom(10),
+			Duration: lib.NullDurationFrom(1 * time.Second),
+		})
+		assert.NoError(t, err)
+		startTime := time.Now()
+		assert.NoError(t, e.Run(context.Background()))
+		assert.True(t, time.Now().After(startTime.Add(1*time.Second)))
 	})
 	t.Run("exits with stages", func(t *testing.T) {
 		testdata := map[string]struct {
@@ -275,7 +269,10 @@ func TestEngineRun(t *testing.T) {
 		}
 		for name, data := range testdata {
 			t.Run(name, func(t *testing.T) {
-				e, err, _ := newTestEngine(nil, lib.Options{VUsMax: null.IntFrom(10)})
+				e, err, _ := newTestEngine(nil, lib.Options{
+					VUs:    null.IntFrom(10),
+					VUsMax: null.IntFrom(10),
+				})
 				assert.NoError(t, err)
 
 				e.Stages = data.Stages
@@ -283,7 +280,7 @@ func TestEngineRun(t *testing.T) {
 				assert.NoError(t, e.Run(context.Background()))
 				assert.WithinDuration(t,
 					startTime.Add(data.Duration),
-					startTime.Add(e.AtTime()),
+					startTime.Add(e.Executor.GetTime()),
 					100*TickRate,
 				)
 			})
@@ -292,51 +289,18 @@ func TestEngineRun(t *testing.T) {
 	t.Run("collects samples", func(t *testing.T) {
 		testMetric := stats.New("test_metric", stats.Trend)
 
-		errors := map[string]error{
-			"nil":   nil,
-			"error": errors.New("error"),
-		}
-		for name, reterr := range errors {
-			t.Run(name, func(t *testing.T) {
-				e, err, _ := newTestEngine(lib.RunnerFunc(func(ctx context.Context) ([]stats.Sample, error) {
-					return []stats.Sample{{Metric: testMetric, Value: 1.0}}, reterr
-				}), lib.Options{VUsMax: null.IntFrom(1), VUs: null.IntFrom(1)})
-				assert.NoError(t, err)
-
-				ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-				assert.NoError(t, e.Run(ctx))
-				cancel()
-
-				e.lock.Lock()
-				defer e.lock.Unlock()
-
-				if !assert.True(t, e.numIterations > 0, "no iterations performed") {
-					return
-				}
-				sink := e.Metrics["test_metric"].Sink.(*stats.TrendSink)
-				assert.True(t, len(sink.Values) > int(float64(e.numIterations)*0.99), "more than 1%% of iterations missed")
-			})
-		}
-	})
-	t.Run("respects cutoff", func(t *testing.T) {
-		testMetric := stats.New("test_metric", stats.Trend)
-
-		var e *Engine
 		signalChan := make(chan interface{})
-		r := lib.RunnerFunc(func(ctx context.Context) (samples []stats.Sample, err error) {
+		var e *Engine
+		e, err, _ := newTestEngine(LF(func(ctx context.Context) (samples []stats.Sample, err error) {
 			samples = append(samples, stats.Sample{Metric: testMetric, Time: time.Now(), Value: 1})
 			close(signalChan)
 			<-ctx.Done()
-			for {
-				time.Sleep(1 * time.Millisecond)
-				if !e.cutoff.IsZero() {
-					break
-				}
-			}
 			samples = append(samples, stats.Sample{Metric: testMetric, Time: time.Now(), Value: 2})
 			return samples, err
+		}), lib.Options{
+			VUs:    null.IntFrom(1),
+			VUsMax: null.IntFrom(1),
 		})
-		e, err, _ := newTestEngine(r, lib.Options{VUs: null.IntFrom(1), VUsMax: null.IntFrom(1)})
 		if !assert.NoError(t, err) {
 			return
 		}
@@ -363,62 +327,6 @@ func TestEngineRun(t *testing.T) {
 	})
 }
 
-func TestEngineIsRunning(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	e, err, _ := newTestEngine(nil, lib.Options{})
-	assert.NoError(t, err)
-
-	ch := make(chan error)
-	go func() { ch <- e.Run(ctx) }()
-	runtime.Gosched()
-	time.Sleep(1 * time.Millisecond)
-	assert.True(t, e.IsRunning())
-
-	cancel()
-	runtime.Gosched()
-	time.Sleep(1 * time.Millisecond)
-	assert.False(t, e.IsRunning())
-
-	assert.NoError(t, <-ch)
-}
-
-func TestEngineTotalTime(t *testing.T) {
-	t.Run("Duration", func(t *testing.T) {
-		for _, d := range []time.Duration{1 * time.Second, 10 * time.Second} {
-			t.Run(d.String(), func(t *testing.T) {
-				e, err, _ := newTestEngine(nil, lib.Options{Duration: lib.NullDurationFrom(d)})
-				assert.NoError(t, err)
-
-				assert.Len(t, e.Stages, 1)
-				assert.Equal(t, lib.Stage{Duration: lib.NullDurationFrom(d)}, e.Stages[0])
-			})
-		}
-	})
-	t.Run("Stages", func(t *testing.T) {
-		testdata := map[string]struct {
-			Duration time.Duration
-			Stages   []lib.Stage
-		}{
-			"nil":        {0, nil},
-			"empty":      {0, []lib.Stage{}},
-			"1,infinite": {0, []lib.Stage{{}}},
-			"2,infinite": {0, []lib.Stage{{Duration: lib.NullDurationFrom(10 * time.Second)}, {}}},
-			"1,finite":   {10 * time.Second, []lib.Stage{{Duration: lib.NullDurationFrom(10 * time.Second)}}},
-			"2,finite": {15 * time.Second, []lib.Stage{
-				{Duration: lib.NullDurationFrom(10 * time.Second)},
-				{Duration: lib.NullDurationFrom(5 * time.Second)}},
-			},
-		}
-		for name, data := range testdata {
-			t.Run(name, func(t *testing.T) {
-				e, err, _ := newTestEngine(nil, lib.Options{Stages: data.Stages})
-				assert.NoError(t, err)
-				assert.Equal(t, data.Duration, e.TotalTime())
-			})
-		}
-	})
-}
-
 func TestEngineAtTime(t *testing.T) {
 	e, err, _ := newTestEngine(nil, lib.Options{})
 	assert.NoError(t, err)
@@ -426,291 +334,6 @@ func TestEngineAtTime(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 	assert.NoError(t, e.Run(ctx))
-}
-
-func TestEngineSetPaused(t *testing.T) {
-	t.Run("offline", func(t *testing.T) {
-		e, err, _ := newTestEngine(nil, lib.Options{})
-		assert.NoError(t, err)
-		assert.False(t, e.IsPaused())
-
-		e.SetPaused(true)
-		assert.True(t, e.IsPaused())
-
-		e.SetPaused(false)
-		assert.False(t, e.IsPaused())
-	})
-
-	t.Run("running", func(t *testing.T) {
-		e, err, _ := newTestEngine(lib.RunnerFunc(func(ctx context.Context) ([]stats.Sample, error) {
-			return nil, nil
-		}), lib.Options{VUsMax: null.IntFrom(1), VUs: null.IntFrom(1)})
-		assert.NoError(t, err)
-		assert.False(t, e.IsPaused())
-
-		ctx, cancel := context.WithCancel(context.Background())
-		ch := make(chan error)
-		go func() { ch <- e.Run(ctx) }()
-		time.Sleep(1 * time.Millisecond)
-		assert.True(t, e.IsRunning())
-
-		// The iteration counter and time should increase over time when not paused...
-		iterationSampleA1 := atomic.LoadInt64(&e.numIterations)
-		atTimeSampleA1 := e.AtTime()
-		time.Sleep(100 * time.Millisecond)
-		iterationSampleA2 := atomic.LoadInt64(&e.numIterations)
-		atTimeSampleA2 := e.AtTime()
-		assert.True(t, iterationSampleA2 > iterationSampleA1, "iteration counter did not increase")
-		assert.True(t, atTimeSampleA2 > atTimeSampleA1, "timer did not increase")
-
-		// ...stop increasing when you pause... (sleep to ensure outstanding VUs finish)
-		e.SetPaused(true)
-		assert.True(t, e.IsPaused(), "engine did not pause")
-		time.Sleep(1 * time.Millisecond)
-		iterationSampleB1 := atomic.LoadInt64(&e.numIterations)
-		atTimeSampleB1 := e.AtTime()
-		time.Sleep(100 * time.Millisecond)
-		iterationSampleB2 := atomic.LoadInt64(&e.numIterations)
-		atTimeSampleB2 := e.AtTime()
-		assert.Equal(t, iterationSampleB1, iterationSampleB2, "iteration counter changed while paused")
-		assert.Equal(t, atTimeSampleB1, atTimeSampleB2, "timer changed while paused")
-
-		// ...and resume when you unpause.
-		e.SetPaused(false)
-		assert.False(t, e.IsPaused(), "engine did not unpause")
-		iterationSampleC1 := atomic.LoadInt64(&e.numIterations)
-		atTimeSampleC1 := e.AtTime()
-		time.Sleep(100 * time.Millisecond)
-		iterationSampleC2 := atomic.LoadInt64(&e.numIterations)
-		atTimeSampleC2 := e.AtTime()
-		assert.True(t, iterationSampleC2 > iterationSampleC1, "iteration counter did not increase after unpause")
-		assert.True(t, atTimeSampleC2 > atTimeSampleC1, "timer did not increase after unpause")
-
-		cancel()
-		assert.NoError(t, <-ch)
-	})
-
-	t.Run("exit", func(t *testing.T) {
-		e, err, _ := newTestEngine(lib.RunnerFunc(func(ctx context.Context) ([]stats.Sample, error) {
-			return nil, nil
-		}), lib.Options{VUsMax: null.IntFrom(1), VUs: null.IntFrom(1)})
-		assert.NoError(t, err)
-
-		ctx, cancel := context.WithCancel(context.Background())
-		ch := make(chan error)
-		go func() { ch <- e.Run(ctx) }()
-		time.Sleep(1 * time.Millisecond)
-		assert.True(t, e.IsRunning())
-
-		e.SetPaused(true)
-		assert.True(t, e.IsPaused())
-		cancel()
-		time.Sleep(1 * time.Millisecond)
-		assert.False(t, e.IsPaused())
-		assert.False(t, e.IsRunning())
-
-		assert.NoError(t, <-ch)
-	})
-}
-
-func TestEngineSetVUsMax(t *testing.T) {
-	t.Run("not set", func(t *testing.T) {
-		e, err, _ := newTestEngine(nil, lib.Options{})
-		assert.NoError(t, err)
-		assert.Equal(t, int64(0), e.GetVUsMax())
-		assert.Len(t, e.vuEntries, 0)
-	})
-	t.Run("set", func(t *testing.T) {
-		e, err, _ := newTestEngine(nil, lib.Options{})
-		assert.NoError(t, err)
-		assert.NoError(t, e.SetVUsMax(10))
-		assert.Equal(t, int64(10), e.GetVUsMax())
-		assert.Len(t, e.vuEntries, 10)
-		for _, vu := range e.vuEntries {
-			assert.Nil(t, vu.Cancel)
-		}
-
-		t.Run("higher", func(t *testing.T) {
-			assert.NoError(t, e.SetVUsMax(15))
-			assert.Equal(t, int64(15), e.GetVUsMax())
-			assert.Len(t, e.vuEntries, 15)
-			for _, vu := range e.vuEntries {
-				assert.Nil(t, vu.Cancel)
-			}
-		})
-
-		t.Run("lower", func(t *testing.T) {
-			assert.NoError(t, e.SetVUsMax(5))
-			assert.Equal(t, int64(5), e.GetVUsMax())
-			assert.Len(t, e.vuEntries, 5)
-			for _, vu := range e.vuEntries {
-				assert.Nil(t, vu.Cancel)
-			}
-		})
-	})
-	t.Run("set negative", func(t *testing.T) {
-		e, err, _ := newTestEngine(nil, lib.Options{})
-		assert.NoError(t, err)
-		assert.EqualError(t, e.SetVUsMax(-1), "vus-max can't be negative")
-		assert.Len(t, e.vuEntries, 0)
-	})
-	t.Run("set too low", func(t *testing.T) {
-		e, err, _ := newTestEngine(nil, lib.Options{
-			VUsMax: null.IntFrom(10),
-			VUs:    null.IntFrom(10),
-		})
-		assert.NoError(t, err)
-		assert.EqualError(t, e.SetVUsMax(5), "can't reduce vus-max below vus")
-		assert.Len(t, e.vuEntries, 10)
-	})
-}
-
-func TestEngineSetVUs(t *testing.T) {
-	assertVUIDSequence := func(t *testing.T, e *Engine, ids []int64) {
-		actualIDs := make([]int64, len(ids))
-		for i := range ids {
-			actualIDs[i] = e.vuEntries[i].VU.(*lib.RunnerFuncVU).ID
-		}
-		assert.Equal(t, ids, actualIDs)
-	}
-
-	t.Run("not set", func(t *testing.T) {
-		e, err, _ := newTestEngine(nil, lib.Options{})
-		assert.NoError(t, err)
-		assert.Equal(t, int64(0), e.GetVUsMax())
-		assert.Equal(t, int64(0), e.GetVUs())
-	})
-	t.Run("set", func(t *testing.T) {
-		e, err, _ := newTestEngine(lib.RunnerFunc(nil), lib.Options{VUsMax: null.IntFrom(15)})
-		assert.NoError(t, err)
-		assert.NoError(t, e.SetVUs(10))
-		assert.Equal(t, int64(10), e.GetVUs())
-		assertActiveVUs(t, e, 10, 5)
-		assertVUIDSequence(t, e, []int64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
-
-		t.Run("negative", func(t *testing.T) {
-			assert.EqualError(t, e.SetVUs(-1), "vus can't be negative")
-			assert.Equal(t, int64(10), e.GetVUs())
-			assertActiveVUs(t, e, 10, 5)
-			assertVUIDSequence(t, e, []int64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
-		})
-
-		t.Run("too high", func(t *testing.T) {
-			assert.EqualError(t, e.SetVUs(20), "more vus than allocated requested")
-			assert.Equal(t, int64(10), e.GetVUs())
-			assertActiveVUs(t, e, 10, 5)
-			assertVUIDSequence(t, e, []int64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
-		})
-
-		t.Run("lower", func(t *testing.T) {
-			assert.NoError(t, e.SetVUs(5))
-			assert.Equal(t, int64(5), e.GetVUs())
-			assertActiveVUs(t, e, 5, 10)
-			assertVUIDSequence(t, e, []int64{1, 2, 3, 4, 5})
-		})
-
-		t.Run("higher", func(t *testing.T) {
-			assert.NoError(t, e.SetVUs(15))
-			assert.Equal(t, int64(15), e.GetVUs())
-			assertActiveVUs(t, e, 15, 0)
-			assertVUIDSequence(t, e, []int64{1, 2, 3, 4, 5, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20})
-		})
-	})
-}
-
-func TestEngine_runVUOnceKeepsCounters(t *testing.T) {
-	e, err, hook := newTestEngine(nil, lib.Options{})
-	assert.NoError(t, err)
-	assert.Equal(t, int64(0), e.numIterations)
-	assert.Equal(t, int64(0), e.numErrors)
-
-	t.Run("success", func(t *testing.T) {
-		hook.Reset()
-		e.numIterations = 0
-		e.numErrors = 0
-		e.runVUOnce(context.Background(), &vuEntry{
-			VU: lib.RunnerFunc(func(ctx context.Context) ([]stats.Sample, error) {
-				return nil, nil
-			}).VU(),
-		})
-		assert.Equal(t, int64(1), e.numIterations)
-		assert.Equal(t, int64(0), e.numErrors)
-		assert.False(t, e.IsTainted(), "test is tainted")
-	})
-	t.Run("error", func(t *testing.T) {
-		hook.Reset()
-		e.numIterations = 0
-		e.numErrors = 0
-		e.runVUOnce(context.Background(), &vuEntry{
-			VU: lib.RunnerFunc(func(ctx context.Context) ([]stats.Sample, error) {
-				return nil, errors.New("this is an error")
-			}).VU(),
-		})
-		assert.Equal(t, int64(1), e.numIterations)
-		assert.Equal(t, int64(1), e.numErrors)
-		assert.Equal(t, "this is an error", hook.LastEntry().Data["error"].(error).Error())
-
-		t.Run("string", func(t *testing.T) {
-			hook.Reset()
-			e.numIterations = 0
-			e.numErrors = 0
-			e.runVUOnce(context.Background(), &vuEntry{
-				VU: lib.RunnerFunc(func(ctx context.Context) ([]stats.Sample, error) {
-					return nil, testErrorWithString("this is an error")
-				}).VU(),
-			})
-			assert.Equal(t, int64(1), e.numIterations)
-			assert.Equal(t, int64(1), e.numErrors)
-
-			entry := hook.LastEntry()
-			assert.Equal(t, "this is an error", entry.Message)
-			assert.Empty(t, entry.Data)
-		})
-	})
-	t.Run("cancelled", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		cancel()
-
-		t.Run("success", func(t *testing.T) {
-			hook.Reset()
-			e.numIterations = 0
-			e.numErrors = 0
-			e.runVUOnce(ctx, &vuEntry{
-				VU: lib.RunnerFunc(func(ctx context.Context) ([]stats.Sample, error) {
-					return nil, nil
-				}).VU(),
-			})
-			assert.Equal(t, int64(0), e.numIterations)
-			assert.Equal(t, int64(0), e.numErrors)
-		})
-		t.Run("error", func(t *testing.T) {
-			hook.Reset()
-			e.numIterations = 0
-			e.numErrors = 0
-			e.runVUOnce(ctx, &vuEntry{
-				VU: lib.RunnerFunc(func(ctx context.Context) ([]stats.Sample, error) {
-					return nil, errors.New("this is an error")
-				}).VU(),
-			})
-			assert.Equal(t, int64(0), e.numIterations)
-			assert.Equal(t, int64(0), e.numErrors)
-			assert.Nil(t, hook.LastEntry())
-
-			t.Run("string", func(t *testing.T) {
-				hook.Reset()
-				e.numIterations = 0
-				e.numErrors = 0
-				e.runVUOnce(ctx, &vuEntry{
-					VU: lib.RunnerFunc(func(ctx context.Context) ([]stats.Sample, error) {
-						return nil, testErrorWithString("this is an error")
-					}).VU(),
-				})
-				assert.Equal(t, int64(0), e.numIterations)
-				assert.Equal(t, int64(0), e.numErrors)
-				assert.Nil(t, hook.LastEntry())
-			})
-		})
-	})
 }
 
 func TestEngine_processStages(t *testing.T) {
@@ -892,7 +515,7 @@ func TestEngine_processStages(t *testing.T) {
 
 			e.Stages = data.Stages
 			for _, ckp := range data.Checkpoints {
-				t.Run((e.AtTime() + ckp.D).String(), func(t *testing.T) {
+				t.Run((e.Executor.GetTime() + ckp.D).String(), func(t *testing.T) {
 					cont, err := e.processStages(ckp.D)
 					assert.NoError(t, err)
 					if ckp.Cont {
@@ -900,7 +523,7 @@ func TestEngine_processStages(t *testing.T) {
 					} else {
 						assert.False(t, cont, "test not stopped")
 					}
-					assert.Equal(t, ckp.VUs, e.GetVUs())
+					assert.Equal(t, ckp.VUs, e.Executor.GetVUs())
 				})
 			}
 		})
@@ -911,7 +534,7 @@ func TestEngineCollector(t *testing.T) {
 	testMetric := stats.New("test_metric", stats.Trend)
 	c := &dummy.Collector{}
 
-	e, err, _ := newTestEngine(lib.RunnerFunc(func(ctx context.Context) ([]stats.Sample, error) {
+	e, err, _ := newTestEngine(LF(func(ctx context.Context) ([]stats.Sample, error) {
 		return []stats.Sample{{Metric: testMetric}}, nil
 	}), lib.Options{VUs: null.IntFrom(1), VUsMax: null.IntFrom(1)})
 	assert.NoError(t, err)
@@ -922,13 +545,13 @@ func TestEngineCollector(t *testing.T) {
 	go func() { ch <- e.Run(ctx) }()
 
 	time.Sleep(100 * time.Millisecond)
-	assert.True(t, e.IsRunning(), "engine not running")
+	assert.True(t, e.Executor.IsRunning(), "engine not running")
 	assert.True(t, c.IsRunning(), "collector not running")
 
 	cancel()
 	assert.NoError(t, <-ch)
 
-	assert.False(t, e.IsRunning(), "engine still running")
+	assert.False(t, e.Executor.IsRunning(), "engine still running")
 	assert.False(t, c.IsRunning(), "collector still running")
 
 	cSamples := []stats.Sample{}

@@ -22,12 +22,11 @@ package core
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
+	"github.com/loadimpact/k6/core/local"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/stats"
@@ -47,21 +46,15 @@ const (
 	BackoffMax    = 10 * time.Second
 )
 
-type vuEntry struct {
-	VU     lib.VU
-	Cancel context.CancelFunc
-
-	Samples    []stats.Sample
-	Iterations int64
-	lock       sync.Mutex
-}
-
 // The Engine is the beating heart of K6.
 type Engine struct {
-	Runner    lib.Runner
+	runLock sync.Mutex
+
+	Executor  lib.Executor
 	Options   lib.Options
 	Collector lib.Collector
-	Logger    *log.Logger
+
+	logger *log.Logger
 
 	Stages      []lib.Stage
 	Metrics     map[string]*stats.Metric
@@ -77,50 +70,29 @@ type Engine struct {
 	atStageSince    time.Duration
 	atStageStartVUs int64
 
-	// VU tracking.
-	vus       int64
-	vusMax    int64
-	vuEntries []*vuEntry
-	vuStop    chan interface{}
-	vuPause   chan interface{}
-
-	nextVUID int64
-
-	// Atomic counters.
-	numIterations int64
-	numErrors     int64
-
+	// Are thresholds tainted?
 	thresholdsTainted bool
-
-	// Subsystem-related.
-	lock      sync.RWMutex
-	subctx    context.Context
-	subcancel context.CancelFunc
-	subwg     sync.WaitGroup
-
-	// Cutoff point for samples.
-	cutoff time.Time
 }
 
-func NewEngine(r lib.Runner, o lib.Options) (*Engine, error) {
+func NewEngine(ex lib.Executor, o lib.Options) (*Engine, error) {
+	if ex == nil {
+		ex = local.New(nil)
+	}
+
 	e := &Engine{
-		Runner:  r,
-		Options: o,
-		Logger:  log.StandardLogger(),
-
-		Metrics: make(map[string]*stats.Metric),
-
-		vuStop: make(chan interface{}),
+		Executor: ex,
+		Options:  o,
+		Metrics:  make(map[string]*stats.Metric),
 	}
-	e.clearSubcontext()
+	e.SetLogger(log.StandardLogger())
 
-	if err := e.SetVUsMax(o.VUsMax.Int64); err != nil {
+	if err := ex.SetVUsMax(o.VUsMax.Int64); err != nil {
 		return nil, err
 	}
-	if err := e.SetVUs(o.VUs.Int64); err != nil {
+	if err := ex.SetVUs(o.VUs.Int64); err != nil {
 		return nil, err
 	}
-	e.SetPaused(o.Paused.Bool)
+	ex.SetPaused(o.Paused.Bool)
 
 	// Use Stages if available, if not, construct a stage to fill the specified duration.
 	// Special case: A valid duration of 0 = an infinite (invalid duration) stage.
@@ -131,6 +103,9 @@ func NewEngine(r lib.Runner, o lib.Options) (*Engine, error) {
 	} else {
 		e.Stages = []lib.Stage{{}}
 	}
+
+	ex.SetEndTime(SumStages(e.Stages))
+	ex.SetEndIterations(o.Iterations)
 
 	e.thresholds = o.Thresholds
 	e.submetrics = make(map[string][]stats.Submetric)
@@ -146,330 +121,135 @@ func NewEngine(r lib.Runner, o lib.Options) (*Engine, error) {
 	return e, nil
 }
 
-func (e *Engine) Run(ctx context.Context) error {
+func (e *Engine) Run(engctx context.Context) error {
+	e.runLock.Lock()
+	defer e.runLock.Unlock()
+
+	engctx, engcancel := context.WithCancel(engctx)
+
+	collectorwg := sync.WaitGroup{}
 	collectorctx, collectorcancel := context.WithCancel(context.Background())
-	collectorch := make(chan interface{})
 	if e.Collector != nil {
+		collectorwg.Add(1)
 		go func() {
 			e.Collector.Run(collectorctx)
-			close(collectorch)
+			collectorwg.Done()
 		}()
-	} else {
-		close(collectorch)
 	}
 
-	e.lock.Lock()
-	{
-		// Run metrics emission.
-		e.subwg.Add(1)
-		go func(ctx context.Context) {
-			e.runMetricsEmission(ctx)
-			e.subwg.Done()
-		}(e.subctx)
+	subctx, subcancel := context.WithCancel(context.Background())
+	subwg := sync.WaitGroup{}
 
-		// Run metrics collection.
-		e.subwg.Add(1)
-		go func(ctx context.Context) {
-			e.runCollection(ctx)
-			e.subwg.Done()
-		}(e.subctx)
+	// Run metrics emission.
+	subwg.Add(1)
+	go func() {
+		e.runMetricsEmission(subctx)
+		subwg.Done()
+	}()
 
-		// Run thresholds.
-		e.subwg.Add(1)
-		go func(ctx context.Context) {
-			e.runThresholds(ctx)
-			e.subwg.Done()
-		}(e.subctx)
-	}
-	e.lock.Unlock()
+	// Run thresholds.
+	subwg.Add(1)
+	go func() {
+		e.runThresholds(subctx)
+		subwg.Done()
+	}()
 
-	close(e.vuStop)
+	// Run the executor.
+	out := make(chan []stats.Sample)
+	subwg.Add(1)
+	go func() {
+		e.Executor.Run(subctx, out)
+		engcancel()
+		subwg.Done()
+	}()
+
 	defer func() {
-		e.lock.Lock()
-		e.vuStop = make(chan interface{})
-		e.lock.Unlock()
-		e.SetPaused(false)
+		// Shut down subsystems.
+		cutoff := time.Now()
+		subcancel()
 
-		// Shut down subsystems, wait for graceful termination.
-		e.clearSubcontext()
-		e.subwg.Wait()
+		// Process samples until the subsystems have shut down.
+		// Filter out samples produced past the end of a test.
+		go func() {
+			subwg.Wait()
+			close(out)
+		}()
+		for samples := range out {
+			for _, sample := range samples {
+				if !sample.Time.After(cutoff) {
+					e.processSamples(sample)
+				} 
+			}
+		}
 
 		// Emit final metrics.
 		e.emitMetrics()
 
-		// Process any leftover samples.
-		e.processSamples(e.collect()...)
-
 		// Process final thresholds.
 		e.processThresholds()
 
-		// Shut down collector
+		// Finally, shut down collector.
 		collectorcancel()
-		<-collectorch
+		collectorwg.Wait()
 	}()
 
-	// Set tracking to defaults.
-	e.lock.Lock()
-	e.atTime = 0
-	e.atStage = 0
-	e.atStageSince = 0
-	e.atStageStartVUs = e.vus
-	e.nextVUID = 0
-	e.numErrors = 0
-	e.lock.Unlock()
-
-	atomic.StoreInt64(&e.numIterations, 0)
-
-	var lastTick time.Time
+	lastAt := time.Duration(0)
 	ticker := time.NewTicker(TickRate)
-
-	maxIterations := e.Options.Iterations.Int64
 	for {
-		// Don't do anything while the engine is paused.
-		e.lock.RLock()
-		vuPause := e.vuPause
-		e.lock.RUnlock()
-		if vuPause != nil {
-			select {
-			case <-vuPause:
-			case <-ctx.Done():
-				e.Logger.Debug("run: context expired (paused); exiting...")
-				return nil
-			}
-		}
-
-		// If we have an iteration cap, exit once we hit it.
-		numIterations := atomic.LoadInt64(&e.numIterations)
-		if maxIterations > 0 && numIterations >= atomic.LoadInt64(&e.vusMax)*maxIterations {
-			e.Logger.WithFields(log.Fields{
-				"total": e.numIterations,
-				"cap":   e.vusMax * maxIterations,
-			}).Debug("run: hit iteration cap; exiting...")
-			return nil
-		}
-
-		// Calculate the time delta between now and the last tick.
-		now := time.Now()
-		if lastTick.IsZero() {
-			lastTick = now
-		}
-		dT := now.Sub(lastTick)
-		lastTick = now
-
-		// Update state.
-		keepRunning, err := e.processStages(dT)
-		if err != nil {
-			return err
-		}
-		if !keepRunning {
-			e.Logger.Debug("run: processStages() returned false; exiting...")
-			return nil
-		}
-
 		select {
 		case <-ticker.C:
-		case <-ctx.Done():
-			e.Logger.Debug("run: context expired; exiting...")
-			e.cutoff = time.Now()
-			return nil
-		}
-	}
-}
+			at := e.Executor.GetTime()
+			dT := at - lastAt
+			lastAt = at
 
-func (e *Engine) IsRunning() bool {
-	e.lock.RLock()
-	vuStop := e.vuStop
-	e.lock.RUnlock()
-
-	select {
-	case <-vuStop:
-		return true
-	default:
-		return false
-	}
-}
-
-func (e *Engine) SetPaused(v bool) {
-	e.lock.Lock()
-	defer e.lock.Unlock()
-
-	if v && e.vuPause == nil {
-		e.vuPause = make(chan interface{})
-	} else if !v && e.vuPause != nil {
-		close(e.vuPause)
-		e.vuPause = nil
-	}
-}
-
-func (e *Engine) IsPaused() bool {
-	e.lock.RLock()
-	defer e.lock.RUnlock()
-
-	return e.vuPause != nil
-}
-
-func (e *Engine) SetVUs(v int64) error {
-	if v < 0 {
-		return errors.New("vus can't be negative")
-	}
-
-	e.lock.Lock()
-	defer e.lock.Unlock()
-
-	return e.setVUsNoLock(v)
-}
-
-func (e *Engine) setVUsNoLock(v int64) error {
-	if v > e.vusMax {
-		return errors.New("more vus than allocated requested")
-	}
-
-	// Scale up
-	for i := e.vus; i < v; i++ {
-		vu := e.vuEntries[i]
-		if vu.Cancel != nil {
-			panic(errors.New("fatal miscalculation: attempted to re-schedule active VU"))
-		}
-
-		id := atomic.AddInt64(&e.nextVUID, 1)
-
-		// nil runners are used for testing.
-		if vu.VU != nil {
-			if err := vu.VU.Reconfigure(id); err != nil {
-				return err
-			}
-		}
-
-		ctx, cancel := context.WithCancel(e.subctx)
-		vu.Cancel = cancel
-
-		e.subwg.Add(1)
-		go func() {
-			e.runVU(ctx, vu)
-			e.subwg.Done()
-		}()
-	}
-
-	// Scale down
-	for i := e.vus - 1; i >= v; i-- {
-		vu := e.vuEntries[i]
-		vu.Cancel()
-		vu.Cancel = nil
-	}
-
-	e.vus = v
-	return nil
-}
-
-func (e *Engine) GetVUs() int64 {
-	e.lock.RLock()
-	defer e.lock.RUnlock()
-
-	return e.vus
-}
-
-func (e *Engine) SetVUsMax(v int64) error {
-	if v < 0 {
-		return errors.New("vus-max can't be negative")
-	}
-
-	e.lock.Lock()
-	defer e.lock.Unlock()
-
-	if v < e.vus {
-		return errors.New("can't reduce vus-max below vus")
-	}
-
-	// Scale up
-	for len(e.vuEntries) < int(v) {
-		var entry vuEntry
-		if e.Runner != nil {
-			vu, err := e.Runner.NewVU()
+			keepRunning, err := e.processStages(dT)
 			if err != nil {
 				return err
 			}
-			entry.VU = vu
+			if !keepRunning {
+				e.logger.Debug("run: processStages() returned false; exiting...")
+				return nil
+			}
+		case samples := <-out:
+			e.processSamples(samples...)
+		case <-engctx.Done():
+			e.logger.Debug("run: context expired; exiting...")
+			return nil
 		}
-		e.vuEntries = append(e.vuEntries, &entry)
 	}
-
-	// Scale down
-	if len(e.vuEntries) > int(v) {
-		e.vuEntries = e.vuEntries[:int(v)]
-	}
-
-	e.vusMax = v
-	return nil
-}
-
-func (e *Engine) GetVUsMax() int64 {
-	e.lock.RLock()
-	defer e.lock.RUnlock()
-
-	return e.vusMax
 }
 
 func (e *Engine) IsTainted() bool {
-	e.MetricsLock.RLock()
-	defer e.MetricsLock.RUnlock()
-
 	return e.thresholdsTainted
 }
 
-func (e *Engine) AtTime() time.Duration {
-	e.lock.RLock()
-	defer e.lock.RUnlock()
-
-	return e.atTime
+func (e *Engine) SetLogger(l *log.Logger) {
+	e.logger = l
+	e.Executor.SetLogger(l)
 }
 
-func (e *Engine) TotalTime() time.Duration {
-	e.lock.RLock()
-	defer e.lock.RUnlock()
-
-	var total time.Duration
-	for _, stage := range e.Stages {
-		if !stage.Duration.Valid {
-			return 0
-		}
-		total += time.Duration(stage.Duration.Duration)
-	}
-	return total
-}
-
-func (e *Engine) clearSubcontext() {
-	e.lock.Lock()
-	defer e.lock.Unlock()
-
-	if e.subcancel != nil {
-		e.subcancel()
-	}
-	subctx, subcancel := context.WithCancel(context.Background())
-	e.subctx = subctx
-	e.subcancel = subcancel
+func (e *Engine) GetLogger() *log.Logger {
+	return e.logger
 }
 
 func (e *Engine) processStages(dT time.Duration) (bool, error) {
-	e.lock.Lock()
-	defer e.lock.Unlock()
-
 	e.atTime += dT
 
 	if len(e.Stages) == 0 {
-		e.Logger.Debug("processStages: no stages")
+		e.logger.Debug("processStages: no stages")
 		return false, nil
 	}
 
 	stage := e.Stages[e.atStage]
 	if stage.Duration.Valid && e.atTime > e.atStageSince+time.Duration(stage.Duration.Duration) {
-		e.Logger.Debug("processStages: stage expired")
+		e.logger.Debug("processStages: stage expired")
 		stageIdx := -1
 		stageStart := 0 * time.Second
-		stageStartVUs := e.vus
+		stageStartVUs := e.Executor.GetVUs()
 		for i, s := range e.Stages {
 			d := time.Duration(s.Duration.Duration)
 			if !s.Duration.Valid || stageStart+d > e.atTime {
-				e.Logger.WithField("idx", i).Debug("processStages: proceeding to next stage...")
+				e.logger.WithField("idx", i).Debug("processStages: proceeding to next stage...")
 				stage = s
 				stageIdx = i
 				break
@@ -480,15 +260,15 @@ func (e *Engine) processStages(dT time.Duration) (bool, error) {
 			}
 		}
 		if stageIdx == -1 {
-			e.Logger.Debug("processStages: end of test exceeded")
+			e.logger.Debug("processStages: end of test exceeded")
 			return false, nil
 		}
 
 		e.atStage = stageIdx
 		e.atStageSince = stageStart
 
-		e.Logger.WithField("vus", stageStartVUs).Debug("processStages: normalizing VU count...")
-		if err := e.setVUsNoLock(stageStartVUs); err != nil {
+		e.logger.WithField("vus", stageStartVUs).Debug("processStages: normalizing VU count...")
+		if err := e.Executor.SetVUs(stageStartVUs); err != nil {
 			return false, errors.Wrapf(err, "stage #%d (normalization)", e.atStage)
 		}
 		e.atStageStartVUs = stageStartVUs
@@ -500,116 +280,18 @@ func (e *Engine) processStages(dT time.Duration) (bool, error) {
 		if stage.Duration.Duration > 0 {
 			t = lib.Clampf(float64(e.atTime-e.atStageSince)/float64(stage.Duration.Duration), 0.0, 1.0)
 		}
-		vus := lib.Lerp(from, to, t)
-		if e.vus != vus {
-			e.Logger.WithFields(log.Fields{"from": e.vus, "to": vus}).Debug("processStages: interpolating...")
-			if err := e.setVUsNoLock(vus); err != nil {
+
+		vus := e.Executor.GetVUs()
+		newVUs := lib.Lerp(from, to, t)
+		if vus != newVUs {
+			e.logger.WithFields(log.Fields{"from": vus, "to": vus}).Debug("processStages: interpolating...")
+			if err := e.Executor.SetVUs(vus); err != nil {
 				return false, errors.Wrapf(err, "stage #%d", e.atStage+1)
 			}
 		}
 	}
 
 	return true, nil
-}
-
-func (e *Engine) runVU(ctx context.Context, vu *vuEntry) {
-	maxIterations := e.Options.Iterations.Int64
-
-	// nil runners that produce nil VUs are used for testing.
-	if vu.VU == nil {
-		<-ctx.Done()
-		return
-	}
-
-	// Sleep until the engine starts running.
-	select {
-	case <-e.vuStop:
-	case <-ctx.Done():
-		return
-	}
-
-	backoffCounter := 0
-	backoff := time.Duration(0)
-	for {
-		// Exit if the VU has run all its intended iterations.
-		if maxIterations > 0 && vu.Iterations >= maxIterations {
-			return
-		}
-
-		// If the engine is paused, sleep until it resumes.
-		e.lock.RLock()
-		vuPause := e.vuPause
-		e.lock.RUnlock()
-		if vuPause != nil {
-			<-vuPause
-		}
-
-		select {
-		case <-ctx.Done():
-			return
-		default:
-		}
-
-		succ := e.runVUOnce(ctx, vu)
-		if !succ {
-			backoff += BackoffAmount * time.Duration(backoffCounter)
-			if backoff > BackoffMax {
-				backoff = BackoffMax
-			}
-			backoffCounter++
-			select {
-			case <-time.After(backoff):
-			case <-ctx.Done():
-			}
-		} else {
-			backoff = 0
-		}
-	}
-}
-
-func (e *Engine) runVUOnce(ctx context.Context, vu *vuEntry) bool {
-	samples, err := vu.VU.RunOnce(ctx)
-	t := time.Now()
-
-	select {
-	case <-ctx.Done():
-		// Expired VUs usually have request cancellation errors, and thus skewed metrics and
-		// unhelpful "request cancelled" errors. Filter out samples past the cutoff point.
-		samples2 := make([]stats.Sample, 0, len(samples))
-		for _, s := range samples {
-			if s.Time.Before(e.cutoff) {
-				samples2 = append(samples2, s)
-			}
-		}
-		samples = samples2
-	default:
-		// Only successful runs are counted and have their errors reported.
-		if err != nil {
-			if serr, ok := err.(fmt.Stringer); ok {
-				e.Logger.Error(serr.String())
-			} else {
-				e.Logger.WithError(err).Error("VU Error")
-			}
-			samples = append(samples,
-				stats.Sample{
-					Time:   t,
-					Metric: metrics.Errors,
-					Tags:   map[string]string{"error": err.Error()},
-					Value:  1,
-				},
-			)
-			atomic.AddInt64(&e.numErrors, 1)
-		}
-		atomic.AddInt64(&vu.Iterations, 1)
-		atomic.AddInt64(&e.numIterations, 1)
-		samples = append(samples, stats.Sample{Time: t, Metric: metrics.Iterations, Value: 1})
-	}
-
-	vu.lock.Lock()
-	vu.Samples = append(vu.Samples, samples...)
-	vu.lock.Unlock()
-
-	return err == nil
 }
 
 func (e *Engine) runMetricsEmission(ctx context.Context) {
@@ -625,20 +307,17 @@ func (e *Engine) runMetricsEmission(ctx context.Context) {
 }
 
 func (e *Engine) emitMetrics() {
-	e.lock.RLock()
-	defer e.lock.RUnlock()
-
 	t := time.Now()
 	e.processSamples(
 		stats.Sample{
 			Time:   t,
 			Metric: metrics.VUs,
-			Value:  float64(e.vus),
+			Value:  float64(e.Executor.GetVUs()),
 		},
 		stats.Sample{
 			Time:   t,
 			Metric: metrics.VUsMax,
-			Value:  float64(e.vusMax),
+			Value:  float64(e.Executor.GetVUsMax()),
 		},
 	)
 }
@@ -666,46 +345,18 @@ func (e *Engine) processThresholds() {
 		}
 		m.Tainted = null.BoolFrom(false)
 
-		e.Logger.WithField("m", m.Name).Debug("running thresholds")
+		e.logger.WithField("m", m.Name).Debug("running thresholds")
 		succ, err := m.Thresholds.Run(m.Sink)
 		if err != nil {
-			e.Logger.WithField("m", m.Name).WithError(err).Error("Threshold error")
+			e.logger.WithField("m", m.Name).WithError(err).Error("Threshold error")
 			continue
 		}
 		if !succ {
-			e.Logger.WithField("m", m.Name).Debug("Thresholds failed")
+			e.logger.WithField("m", m.Name).Debug("Thresholds failed")
 			m.Tainted = null.BoolFrom(true)
 			e.thresholdsTainted = true
 		}
 	}
-}
-
-func (e *Engine) runCollection(ctx context.Context) {
-	ticker := time.NewTicker(CollectRate)
-	for {
-		select {
-		case <-ticker.C:
-			e.processSamples(e.collect()...)
-		case <-ctx.Done():
-			return
-		}
-	}
-}
-
-func (e *Engine) collect() []stats.Sample {
-	e.lock.RLock()
-	defer e.lock.RUnlock()
-
-	samples := []stats.Sample{}
-	for _, vu := range e.vuEntries {
-		vu.lock.Lock()
-		if len(vu.Samples) > 0 {
-			samples = append(samples, vu.Samples...)
-			vu.Samples = nil
-		}
-		vu.lock.Unlock()
-	}
-	return samples
 }
 
 func (e *Engine) processSamples(samples ...stats.Sample) {

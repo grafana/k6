@@ -18,39 +18,19 @@
  *
  */
 
-package lib
+package core
 
 import (
-	"context"
-	"time"
-
-	"github.com/loadimpact/k6/stats"
-	log "github.com/sirupsen/logrus"
-	null "gopkg.in/guregu/null.v3"
+	"github.com/loadimpact/k6/lib"
 )
 
-// An Executor wraps a Runner, and abstracts away an execution environment.
-type Executor interface {
-	Run(ctx context.Context, out chan<- []stats.Sample) error
-	IsRunning() bool
-
-	SetLogger(l *log.Logger)
-	GetLogger() *log.Logger
-
-	GetIterations() int64
-	GetEndIterations() null.Int
-	SetEndIterations(i null.Int)
-
-	GetTime() time.Duration
-	GetEndTime() NullDuration
-	SetEndTime(t NullDuration)
-
-	IsPaused() bool
-	SetPaused(paused bool)
-
-	GetVUs() int64
-	SetVUs(vus int64) error
-
-	GetVUsMax() int64
-	SetVUsMax(max int64) error
+// Returns the total sum of time taken by the given set of stages.
+func SumStages(stages []lib.Stage) (d lib.NullDuration) {
+	for _, stage := range stages {
+		d.Valid = stage.Duration.Valid
+		if stage.Duration.Valid {
+			d.Duration += stage.Duration.Duration
+		}
+	}
+	return d
 }
