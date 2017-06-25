@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/PuerkitoBio/goquery"
 	"github.com/dop251/goja"
 )
 
