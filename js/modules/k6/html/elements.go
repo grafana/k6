@@ -5,6 +5,8 @@ import (
 	"net/url"
 	"strings"
 
+	"strconv"
+
 	"github.com/dop251/goja"
 )
 
@@ -31,6 +33,11 @@ const (
 	ImageTagName    = "img"
 	InputTagName    = "input"
 	KeygenTagName   = "keygen"
+	LabelTagName    = "label"
+	LegendTagName   = "legend"
+	LiTagName       = "li"
+	LinkTagName     = "link"
+	MapTagName      = "map"
 )
 
 type HrefElement struct{ Element }
@@ -51,6 +58,11 @@ type IFrameElement struct{ Element }
 type ImageElement struct{ Element }
 type InputElement struct{ FormFieldElement }
 type KeygenElement struct{ Element }
+type LabelElement struct{ Element }
+type LegendElement struct{ Element }
+type LiElement struct{ Element }
+type LinkElement struct{ Element }
+type MapElement struct{ Element }
 
 func (h HrefElement) hrefURL() *url.URL {
 	url, err := url.Parse(h.attrAsString("href"))
@@ -139,13 +151,7 @@ func (h HrefElement) Protocol() string {
 }
 
 func (h HrefElement) RelList() []string {
-	rel := h.attrAsString("rel")
-
-	if rel == "" {
-		return make([]string, 0)
-	}
-
-	return strings.Split(rel, " ")
+	return h.splitAttr("rel")
 }
 
 func (h HrefElement) Search() string {
@@ -234,12 +240,12 @@ func (b ButtonElement) Value() string {
 	return valueOrHTML(b.sel.sel)
 }
 
-func (c CanvasElement) Width() int64 {
-	return c.intAttrOrDefault("width", 150)
+func (c CanvasElement) Width() int {
+	return c.attrAsInt("width", 150)
 }
 
-func (c CanvasElement) Height() int64 {
-	return c.intAttrOrDefault("height", 150)
+func (c CanvasElement) Height() int {
+	return c.attrAsInt("height", 150)
 }
 
 func (d DataListElement) Options() (items []goja.Value) {
@@ -316,4 +322,73 @@ func (k KeygenElement) Form() goja.Value {
 
 func (k KeygenElement) Labels() []goja.Value {
 	return k.elemLabels()
+}
+
+func (l LabelElement) Control() goja.Value {
+	forAttr, exists := l.sel.sel.Attr("for")
+	if !exists {
+		return goja.Undefined()
+	}
+
+	findControl := l.sel.sel.Parents().Last().Find("#" + forAttr)
+	if findControl.Length() == 0 {
+		return goja.Undefined()
+	}
+
+	return selToElement(Selection{l.sel.rt, findControl.Eq(0)})
+}
+
+func (l LabelElement) Form() goja.Value {
+	return l.ownerFormVal()
+}
+
+func (l LegendElement) Form() goja.Value {
+	return l.ownerFormVal()
+}
+
+func (l LiElement) Value() goja.Value {
+	if l.sel.sel.ParentFiltered("ol").Size() == 0 {
+		return goja.Undefined()
+	}
+
+	prev := l.sel.sel.PrevAllFiltered("li")
+	len := prev.Length()
+
+	if len == 0 {
+		return l.sel.rt.ToValue(1)
+	}
+
+	for idx := 0; idx < len; idx++ {
+		val, exists := prev.Eq(idx).Attr("value")
+		if !exists {
+			continue
+		}
+
+		intVal, err := strconv.Atoi(val)
+		if err != nil {
+			continue
+		}
+
+		return l.sel.rt.ToValue(intVal + idx + 1)
+	}
+
+	return l.sel.rt.ToValue(len + 1)
+}
+
+func (l LinkElement) RelList() []string {
+	return l.splitAttr("rel")
+}
+
+func (m MapElement) Areas() []goja.Value {
+	return elemList(m.sel.Find("area"))
+}
+
+func (m MapElement) Images() []goja.Value {
+	name, exists := m.idOrNameAttr()
+
+	if !exists {
+		return make([]goja.Value, 0)
+	}
+
+	return elemList(Selection{m.sel.rt, m.sel.sel.Parents().Last().Find("img[usemap=\"#" + name + "\"],object[usemap=\"#" + name + "\"]")})
 }

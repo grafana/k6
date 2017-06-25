@@ -2,9 +2,8 @@ package html
 
 import (
 	"fmt"
-	"strings"
-
 	"strconv"
+	"strings"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/dop251/goja"
@@ -29,18 +28,6 @@ type Attribute struct {
 	nsPrefix     string
 	OwnerElement *Element
 	Value        string
-}
-
-func (a Attribute) Prefix() string {
-	return a.nsPrefix
-}
-
-func (a Attribute) NamespaceURI() string {
-	return namespaceURI(a.nsPrefix)
-}
-
-func (a Attribute) LocalName() string {
-	return a.Name
 }
 
 func (e Element) attrAsString(name string) string {
@@ -113,6 +100,40 @@ func (e Element) elemLabels() []goja.Value {
 	allLbls := wrapperLbl.AddSelection(idLbl)
 
 	return elemList(Selection{e.sel.rt, allLbls})
+}
+
+func (e Element) splitAttr(attrName string) []string {
+	attr := e.attrAsString(attrName)
+
+	if attr == "" {
+		return make([]string, 0)
+	}
+
+	return strings.Split(attr, " ")
+}
+
+func (e Element) idOrNameAttr() (string, bool) {
+	if id, exists := e.sel.sel.Attr("id"); exists {
+		return id, true
+	}
+
+	if name, exists := e.sel.sel.Attr("id"); exists {
+		return name, true
+	}
+
+	return "", false
+}
+
+func (a Attribute) Prefix() string {
+	return a.nsPrefix
+}
+
+func (a Attribute) NamespaceURI() string {
+	return namespaceURI(a.nsPrefix)
+}
+
+func (a Attribute) LocalName() string {
+	return a.Name
 }
 
 func (e Element) GetAttribute(name string) goja.Value {

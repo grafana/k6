@@ -31,7 +31,7 @@ import (
 
 const testHTMLElems = `
 <html>
-<head></head>
+<head><link rel="alternate next"/></head>
 <body>
 	<a href="/testhref?querytxt#hashtext">0</a>
 	<a href="http://example.com:80">1</a>
@@ -48,7 +48,7 @@ const testHTMLElems = `
 		<button id="form_btn" name="form_btn" accesskey="b" autofocus disabled></button>
 		<label for="form_btn_2" id="form_btn_2_label"></label>
 		<label id="wrapper_label">
-			<button id="form_btn_2" type="button" formaction="override_action_url" formenctype="multipart/form-data" formmethod="post" formnovalidate formtarget="_top" value="initval"></button>
+			<button id="form_btn_2" type="button" formaction="override_action_url" formenctype="multipart/form-data" formmethod="post" formnovalidate formtarget="_top" value="form_btn_2_initval"></button>
 		</label>
 	</form>
 	<form id="form2"></form>
@@ -56,7 +56,13 @@ const testHTMLElems = `
 	<button id="no_form_btn"></button>
 	<canvas width="200"></canvas>
 	<datalist id="datalist1"><option id="dl_opt_1"/><option id="dl_opt_2"/></datalist>
-	<form method="post" id="fieldset_form"><fieldset><input id="test_dl_input" type="text" list="datalist1"><input type="text"><select></select><button></button><textarea></textarea></fieldset></form>
+	<form method="post" id="fieldset_form"><fieldset id="fieldset_1"><legend id="legend_1">Legend title</legend><input id="test_dl_input" type="text" list="datalist1"><input type="text"><select></select><button></button><textarea></textarea></fieldset></form>
+	<ul><li id="li_nil"/></ul>
+	<ol><li id="li_first"/><li value="10"/><li id="li_eleven"/></ol>
+	<map id="not_this_map"></map>
+	<map id="find_this_map"><area/><area/><area/></map>
+	<img usemap="#find_this_map"/><object usemap="#find_this_map"/><img usemap="#not_this_map"/>
+
 </body>
 `
 
@@ -211,12 +217,12 @@ func TestElements(t *testing.T) {
 		t.Run("labels", func(t *testing.T) {
 			if v, err := common.RunString(rt, `doc.find("#form_btn").get(0).labels()`); assert.NoError(t, err) {
 				assert.Equal(t, 1, len(v.Export().([]goja.Value)))
-				assert.Equal(t, "form_btn_label", v.Export().([]goja.Value)[0].Export().(Element).Id())
+				assert.Equal(t, "form_btn_label", v.Export().([]goja.Value)[0].Export().(LabelElement).Id())
 			}
 			if v, err := common.RunString(rt, `doc.find("#form_btn_2").get(0).labels()`); assert.NoError(t, err) {
 				assert.Equal(t, 2, len(v.Export().([]goja.Value)))
-				assert.Equal(t, "wrapper_label", v.Export().([]goja.Value)[0].Export().(Element).Id())
-				assert.Equal(t, "form_btn_2_label", v.Export().([]goja.Value)[1].Export().(Element).Id())
+				assert.Equal(t, "wrapper_label", v.Export().([]goja.Value)[0].Export().(LabelElement).Id())
+				assert.Equal(t, "form_btn_2_label", v.Export().([]goja.Value)[1].Export().(LabelElement).Id())
 			}
 		})
 		t.Run("name", func(t *testing.T) {
@@ -226,7 +232,7 @@ func TestElements(t *testing.T) {
 		})
 		t.Run("value", func(t *testing.T) {
 			if v, err := common.RunString(rt, `doc.find("#form_btn_2").get(0).value()`); assert.NoError(t, err) {
-				assert.Equal(t, "initval", v.Export())
+				assert.Equal(t, "form_btn_2_initval", v.Export())
 			}
 		})
 	})
@@ -292,5 +298,61 @@ func TestElements(t *testing.T) {
 				}
 			})
 		})
+		t.Run("LabelElement", func(t *testing.T) {
+			t.Run("control", func(t *testing.T) {
+				if v, err := common.RunString(rt, `doc.find("#form_btn_2_label").get(0).control().value()`); assert.NoError(t, err) {
+					assert.Equal(t, "form_btn_2_initval", v.Export())
+				}
+			})
+			t.Run("form", func(t *testing.T) {
+				if v, err := common.RunString(rt, `doc.find("#form_btn_2_label").get(0).form().id()`); assert.NoError(t, err) {
+					assert.Equal(t, "form1", v.Export())
+				}
+			})
+		})
+		t.Run("LegendElement", func(t *testing.T) {
+			t.Run("form", func(t *testing.T) {
+				if v, err := common.RunString(rt, `doc.find("#legend_1").get(0).form().id()`); assert.NoError(t, err) {
+					assert.Equal(t, "fieldset_form", v.Export())
+				}
+			})
+		})
+		t.Run("LiElement", func(t *testing.T) {
+			t.Run("value nil", func(t *testing.T) {
+				if v, err := common.RunString(rt, `doc.find("#li_nil").get(0).value()`); assert.NoError(t, err) {
+					assert.Equal(t, nil, v.Export())
+				}
+			})
+			t.Run("value 1", func(t *testing.T) {
+				if v, err := common.RunString(rt, `doc.find("#li_first").get(0).value()`); assert.NoError(t, err) {
+					assert.Equal(t, int64(1), v.Export())
+				}
+			})
+			t.Run("value 11", func(t *testing.T) {
+				if v, err := common.RunString(rt, `doc.find("#li_eleven").get(0).value()`); assert.NoError(t, err) {
+					assert.Equal(t, int64(11), v.Export())
+				}
+			})
+		})
+		t.Run("LinkElement", func(t *testing.T) {
+			t.Run("rel list", func(t *testing.T) {
+				if v, err := common.RunString(rt, `doc.find("link").get(0).relList()`); assert.NoError(t, err) {
+					assert.Equal(t, []string{"alternate", "next"}, v.Export())
+				}
+			})
+		})
+		t.Run("MapElement", func(t *testing.T) {
+			t.Run("areas", func(t *testing.T) {
+				if v, err := common.RunString(rt, `doc.find("#find_this_map").get(0).areas()`); assert.NoError(t, err) {
+					assert.Equal(t, 3, len(v.Export().([]goja.Value)))
+				}
+			})
+			t.Run("images", func(t *testing.T) {
+				if v, err := common.RunString(rt, `doc.find("#find_this_map").get(0).images()`); assert.NoError(t, err) {
+					assert.Equal(t, 2, len(v.Export().([]goja.Value)))
+				}
+			})
+		})
+
 	})
 }

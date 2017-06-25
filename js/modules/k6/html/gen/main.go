@@ -125,6 +125,21 @@ var funcDefs = []string{
 	"Keygen Keytype enum=RSA,DSA,EC",
 	"Keygen Name string",
 	"Keygen Type enum=keygen",
+
+	"Label HtmlFor=for string",
+
+	"Legend AccessKey string",
+	"Legend Value string",
+
+	"Link Href string",
+	"Link Hreflang string",
+	"Link Media string",
+	// The first value in enum lists gets used as the default. Putting "," at the start makes "" the default value for Rel instead of "alternate"
+	"Link Rel enum=,alternate,author,dns-prefetch,help,icon,license,next,pingback,preconnect,prefetch,preload,prerender,prev,search,stylesheet",
+	"Link Target string",
+	"Link Type string",
+
+	"Map Name string",
 }
 
 type TestDef struct {
