@@ -30,6 +30,7 @@ const (
 	IFrameTagName   = "iframe"
 	ImageTagName    = "img"
 	InputTagName    = "input"
+	KeygenTagName   = "keygen"
 )
 
 type HrefElement struct{ Element }
@@ -49,6 +50,7 @@ type FormElement struct{ Element }
 type IFrameElement struct{ Element }
 type ImageElement struct{ Element }
 type InputElement struct{ FormFieldElement }
+type KeygenElement struct{ Element }
 
 func (h HrefElement) hrefURL() *url.URL {
 	url, err := url.Parse(h.attrAsString("href"))
@@ -159,11 +161,7 @@ func (h HrefElement) Text() string {
 }
 
 func (f FormFieldElement) Form() goja.Value {
-	formSel, exists := f.ownerFormSel()
-	if !exists {
-		return goja.Undefined()
-	}
-	return selToElement(Selection{f.sel.rt, formSel})
+	return f.ownerFormVal()
 }
 
 // Used by the formAction, formMethod, formTarget and formEnctype methods of Button and Input elements
@@ -222,24 +220,6 @@ func (f FormFieldElement) FormNoValidate() bool {
 
 func (f FormFieldElement) FormTarget() string {
 	return f.formOrElemAttrString("target")
-}
-
-func (f FormFieldElement) elemLabels() []goja.Value {
-	wrapperLbl := f.sel.sel.Closest("label")
-
-	id := f.attrAsString("id")
-	if id == "" {
-		return elemList(Selection{f.sel.rt, wrapperLbl})
-	}
-
-	idLbl := f.sel.sel.Parents().Last().Find("label[for=\"" + id + "\"]")
-	if idLbl.Size() == 0 {
-		return elemList(Selection{f.sel.rt, wrapperLbl})
-	}
-
-	allLbls := wrapperLbl.AddSelection(idLbl)
-
-	return elemList(Selection{f.sel.rt, allLbls})
 }
 
 func (f FormFieldElement) Labels() []goja.Value {
@@ -328,4 +308,12 @@ func (i InputElement) List() goja.Value {
 	}
 
 	return selToElement(Selection{i.sel.rt, datalist.Eq(0)})
+}
+
+func (k KeygenElement) Form() goja.Value {
+	return k.ownerFormVal()
+}
+
+func (k KeygenElement) Labels() []goja.Value {
+	return k.elemLabels()
 }
