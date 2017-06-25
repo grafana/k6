@@ -53,8 +53,9 @@ const testHTMLElems = `
 	</form>
 	<form id="form2"></form>
 	<button id="named_form_btn" form="form2"></button>
-	
 	<button id="no_form_btn"></button>
+	<canvas width="200"></canvas>
+	<datalist><option id="dl_opt_1"/><option id="dl_opt_2"/></datalist>
 </body>
 `
 
@@ -235,5 +236,24 @@ func TestElements(t *testing.T) {
 				assert.Equal(t, "initval", v.Export())
 			}
 		})
+	})
+	t.Run("CanvasElement", func(t *testing.T) {
+		t.Run("width", func(t *testing.T) {
+			if v, err := common.RunString(rt, `doc.find("canvas").get(0).width()`); assert.NoError(t, err) {
+				assert.Equal(t, int64(200), v.Export())
+			}
+		})
+		t.Run("height", func(t *testing.T) {
+			if v, err := common.RunString(rt, `doc.find("canvas").get(0).height()`); assert.NoError(t, err) {
+				assert.Equal(t, int64(150), v.Export())
+			}
+		})
+	})
+	t.Run("DataListElement options", func(t *testing.T) {
+		if v, err := common.RunString(rt, `doc.find("datalist").get(0).options()`); assert.NoError(t, err) {
+			assert.Equal(t, 2, len(v.Export().([]goja.Value)))
+			assert.Equal(t, "dl_opt_1", v.Export().([]goja.Value)[0].Export().(Element).Id())
+			assert.Equal(t, "dl_opt_2", v.Export().([]goja.Value)[1].Export().(Element).Id())
+		}
 	})
 }

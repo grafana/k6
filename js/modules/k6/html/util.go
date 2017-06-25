@@ -125,3 +125,17 @@ func convertDataAttrVal(val string) interface{} {
 		}
 	}
 }
+
+func (e Element) intAttrOrDefault(attrName string, defaultVal int64) int64 {
+	attrValStr, exists := e.sel.sel.Attr(attrName)
+	if !exists {
+		return defaultVal
+	}
+
+	attrVal, err := strconv.ParseInt(attrValStr, 10, 64)
+	if err != nil {
+		return defaultVal
+	}
+
+	return attrVal
+}
