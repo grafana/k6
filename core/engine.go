@@ -30,7 +30,6 @@ import (
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/stats"
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/guregu/null.v3"
 )
@@ -63,12 +62,6 @@ type Engine struct {
 	// Assigned to metrics upon first received sample.
 	thresholds map[string]stats.Thresholds
 	submetrics map[string][]stats.Submetric
-
-	// Stage tracking.
-	atTime          time.Duration
-	atStage         int
-	atStageSince    time.Duration
-	atStageStartVUs int64
 
 	// Are thresholds tainted?
 	thresholdsTainted bool
@@ -178,7 +171,7 @@ func (e *Engine) Run(engctx context.Context) error {
 			for _, sample := range samples {
 				if !sample.Time.After(cutoff) {
 					e.processSamples(sample)
-				} 
+				}
 			}
 		}
 
@@ -193,23 +186,16 @@ func (e *Engine) Run(engctx context.Context) error {
 		collectorwg.Wait()
 	}()
 
-	lastAt := time.Duration(0)
 	ticker := time.NewTicker(TickRate)
 	for {
 		select {
 		case <-ticker.C:
-			at := e.Executor.GetTime()
-			dT := at - lastAt
-			lastAt = at
-
-			keepRunning, err := e.processStages(dT)
-			if err != nil {
-				return err
-			}
+			vus, keepRunning := ProcessStages(e.Stages, e.Executor.GetTime())
 			if !keepRunning {
-				e.logger.Debug("run: processStages() returned false; exiting...")
+				e.logger.Debug("run: ProcessStages() returned false; exiting...")
 				return nil
 			}
+			e.Executor.SetVUs(vus)
 		case samples := <-out:
 			e.processSamples(samples...)
 		case <-engctx.Done():
@@ -230,68 +216,6 @@ func (e *Engine) SetLogger(l *log.Logger) {
 
 func (e *Engine) GetLogger() *log.Logger {
 	return e.logger
-}
-
-func (e *Engine) processStages(dT time.Duration) (bool, error) {
-	e.atTime += dT
-
-	if len(e.Stages) == 0 {
-		e.logger.Debug("processStages: no stages")
-		return false, nil
-	}
-
-	stage := e.Stages[e.atStage]
-	if stage.Duration.Valid && e.atTime > e.atStageSince+time.Duration(stage.Duration.Duration) {
-		e.logger.Debug("processStages: stage expired")
-		stageIdx := -1
-		stageStart := 0 * time.Second
-		stageStartVUs := e.Executor.GetVUs()
-		for i, s := range e.Stages {
-			d := time.Duration(s.Duration.Duration)
-			if !s.Duration.Valid || stageStart+d > e.atTime {
-				e.logger.WithField("idx", i).Debug("processStages: proceeding to next stage...")
-				stage = s
-				stageIdx = i
-				break
-			}
-			stageStart += d
-			if s.Target.Valid {
-				stageStartVUs = s.Target.Int64
-			}
-		}
-		if stageIdx == -1 {
-			e.logger.Debug("processStages: end of test exceeded")
-			return false, nil
-		}
-
-		e.atStage = stageIdx
-		e.atStageSince = stageStart
-
-		e.logger.WithField("vus", stageStartVUs).Debug("processStages: normalizing VU count...")
-		if err := e.Executor.SetVUs(stageStartVUs); err != nil {
-			return false, errors.Wrapf(err, "stage #%d (normalization)", e.atStage)
-		}
-		e.atStageStartVUs = stageStartVUs
-	}
-	if stage.Target.Valid {
-		from := e.atStageStartVUs
-		to := stage.Target.Int64
-		t := 1.0
-		if stage.Duration.Duration > 0 {
-			t = lib.Clampf(float64(e.atTime-e.atStageSince)/float64(stage.Duration.Duration), 0.0, 1.0)
-		}
-
-		vus := e.Executor.GetVUs()
-		newVUs := lib.Lerp(from, to, t)
-		if vus != newVUs {
-			e.logger.WithFields(log.Fields{"from": vus, "to": vus}).Debug("processStages: interpolating...")
-			if err := e.Executor.SetVUs(vus); err != nil {
-				return false, errors.Wrapf(err, "stage #%d", e.atStage+1)
-			}
-		}
-	}
-
-	return true, nil
 }
 
 func (e *Engine) runMetricsEmission(ctx context.Context) {
