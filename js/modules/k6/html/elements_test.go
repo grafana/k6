@@ -69,6 +69,7 @@ const testHTMLElems = `
 	<label><output id="output1" form="form3">defaultVal</output></label>
 	<progress id="progress1" max="100" value="70"></progress>
 	<progress id="progress2"></progress>
+	<script id="script1">script text</script>
 </body>
 `
 
@@ -450,6 +451,13 @@ func TestElements(t *testing.T) {
 				if assert.NoError(t, err1) && assert.NoError(t, err2) {
 					assert.Equal(t, float64(0.7), v1.Export())
 					assert.Equal(t, float64(-1), v2.Export())
+				}
+			})
+		})
+		t.Run("ScriptElement", func(t *testing.T) {
+			t.Run("text", func(t *testing.T) {
+				if v, err := common.RunString(rt, `doc.find("#script1").get(0).text()`); assert.NoError(t, err) {
+					assert.Equal(t, "script text", v.Export())
 				}
 			})
 		})
