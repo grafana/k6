@@ -83,6 +83,10 @@ func (c *Collector) Run(ctx context.Context) {
 	_ = c.outfile.Close()
 }
 
+func (c *Collector) IsReady() bool {
+	return true
+}
+
 func (c *Collector) HandleMetric(m *stats.Metric) {
 	if c.HasSeenMetric(m.Name) {
 		return

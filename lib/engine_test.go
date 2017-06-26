@@ -922,13 +922,13 @@ func TestEngineCollector(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 	assert.True(t, e.IsRunning(), "engine not running")
-	assert.True(t, c.IsRunning(), "collector not running")
+	assert.True(t, c.IsReady(), "collector not running")
 
 	cancel()
 	assert.NoError(t, <-ch)
 
 	assert.False(t, e.IsRunning(), "engine still running")
-	assert.False(t, c.IsRunning(), "collector still running")
+	assert.False(t, c.IsReady(), "collector still running")
 
 	cSamples := []stats.Sample{}
 	for _, sample := range c.Samples {
