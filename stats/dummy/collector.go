@@ -60,7 +60,7 @@ func (c *Collector) Collect(samples []stats.Sample) {
 	c.Samples = append(c.Samples, samples...)
 }
 
-func (c *Collector) IsRunning() bool {
+func (c *Collector) IsReady() bool {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
