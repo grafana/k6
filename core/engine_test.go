@@ -22,7 +22,6 @@ package core
 
 import (
 	"context"
-	"runtime"
 	"testing"
 	"time"
 
@@ -340,37 +339,15 @@ func TestEngineAtTime(t *testing.T) {
 func TestEngineCollector(t *testing.T) {
 	testMetric := stats.New("test_metric", stats.Trend)
 
-	holdup := make(chan interface{})
 	e, err, _ := newTestEngine(LF(func(ctx context.Context) ([]stats.Sample, error) {
-		<-holdup
 		return []stats.Sample{{Metric: testMetric}}, nil
-	}), lib.Options{VUs: null.IntFrom(1), VUsMax: null.IntFrom(1)})
+	}), lib.Options{VUs: null.IntFrom(1), VUsMax: null.IntFrom(1), Iterations: null.IntFrom(1)})
 	assert.NoError(t, err)
 
 	c := &dummy.Collector{}
 	e.Collector = c
 
-	ctx, cancel := context.WithCancel(context.Background())
-	ch := make(chan error)
-	go func() { ch <- e.Run(ctx) }()
-
-	for !e.Executor.IsRunning() {
-		runtime.Gosched()
-	}
-	for !c.IsRunning() {
-		runtime.Gosched()
-	}
-
-	close(holdup)
-	cancel()
-	assert.NoError(t, <-ch)
-
-	for e.Executor.IsRunning() {
-		runtime.Gosched()
-	}
-	for c.IsRunning() {
-		runtime.Gosched()
-	}
+	assert.NoError(t, e.Run(context.Background()))
 
 	cSamples := []stats.Sample{}
 	for _, sample := range c.Samples {
@@ -378,9 +355,15 @@ func TestEngineCollector(t *testing.T) {
 			cSamples = append(cSamples, sample)
 		}
 	}
-	numCollectorSamples := len(cSamples)
-	numEngineSamples := len(e.Metrics["test_metric"].Sink.(*stats.TrendSink).Values)
-	assert.Equal(t, numEngineSamples, numCollectorSamples)
+	metric := e.Metrics["test_metric"]
+	if assert.NotNil(t, metric) {
+		sink := metric.Sink.(*stats.TrendSink)
+		if assert.NotNil(t, sink) {
+			numCollectorSamples := len(cSamples)
+			numEngineSamples := len(sink.Values)
+			assert.Equal(t, numEngineSamples, numCollectorSamples)
+		}
+	}
 }
 
 func TestEngine_processSamples(t *testing.T) {

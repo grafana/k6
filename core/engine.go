@@ -162,6 +162,10 @@ func (e *Engine) Run(ctx context.Context) error {
 		// Process samples until the subsystems have shut down.
 		// Filter out samples produced past the end of a test.
 		go func() {
+			if errC != nil {
+				<-errC
+				errC = nil
+			}
 			subwg.Wait()
 			close(out)
 		}()
@@ -199,6 +203,7 @@ func (e *Engine) Run(ctx context.Context) error {
 		case samples := <-out:
 			e.processSamples(samples...)
 		case err := <-errC:
+			errC = nil
 			if err != nil {
 				e.logger.WithError(err).Debug("run: executor returned an error")
 				return err
