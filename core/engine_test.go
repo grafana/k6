@@ -22,6 +22,7 @@ package core
 
 import (
 	"context"
+	"runtime"
 	"testing"
 	"time"
 
@@ -338,27 +339,36 @@ func TestEngineAtTime(t *testing.T) {
 
 func TestEngineCollector(t *testing.T) {
 	testMetric := stats.New("test_metric", stats.Trend)
-	c := &dummy.Collector{}
 
+	holdup := make(chan interface{})
 	e, err, _ := newTestEngine(LF(func(ctx context.Context) ([]stats.Sample, error) {
+		<-holdup
 		return []stats.Sample{{Metric: testMetric}}, nil
 	}), lib.Options{VUs: null.IntFrom(1), VUsMax: null.IntFrom(1)})
 	assert.NoError(t, err)
+
+	c := &dummy.Collector{}
 	e.Collector = c
 
 	ctx, cancel := context.WithCancel(context.Background())
 	ch := make(chan error)
 	go func() { ch <- e.Run(ctx) }()
 
-	time.Sleep(100 * time.Millisecond)
-	assert.True(t, e.Executor.IsRunning(), "engine not running")
-	assert.True(t, c.IsRunning(), "collector not running")
+	runtime.Gosched()
+	for !e.Executor.IsRunning() {
+	}
+	for !c.IsRunning() {
+	}
 
+	close(holdup)
 	cancel()
 	assert.NoError(t, <-ch)
 
-	assert.False(t, e.Executor.IsRunning(), "engine still running")
-	assert.False(t, c.IsRunning(), "collector still running")
+	runtime.Gosched()
+	for e.Executor.IsRunning() {
+	}
+	for c.IsRunning() {
+	}
 
 	cSamples := []stats.Sample{}
 	for _, sample := range c.Samples {
