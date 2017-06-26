@@ -6,6 +6,11 @@ all: build web
 build: web
 	go build
 
+.PHONY: check
+check:
+	gometalinter --deadline 10m --config gometalinter.json ./...
+	go test -timeout 30s ./...
+
 .PHONY: web
 web: web/node_modules web/bower_components
 	cd web && node node_modules/.bin/ember build -prod

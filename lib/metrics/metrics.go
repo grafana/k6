@@ -12,7 +12,8 @@ var (
 	Errors     = stats.New("errors", stats.Counter)
 
 	// Runner-emitted.
-	Checks = stats.New("checks", stats.Rate)
+	Checks        = stats.New("checks", stats.Rate)
+	GroupDuration = stats.New("group_duration", stats.Trend, stats.Time)
 
 	// HTTP-related.
 	HTTPReqs          = stats.New("http_reqs", stats.Counter)

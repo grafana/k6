@@ -12,7 +12,7 @@ This is how load testing should look in the 21st century.
 
 - Documentation: [http://docs.k6.io](http://docs.k6.io)
 
-- Check out k6 on [Slack](https://slackin-defaimlmsd.now.sh/)!
+- Check out k6 on [Slack](https://k6.io/slack)!
 
 
 Introduction
@@ -102,9 +102,9 @@ Types of questions and where to ask:
 - I got this error, why? -- [Stack Overflow](https://stackoverflow.com/questions/tagged/k6)
 - I got this error and I'm sure it's a bug -- [file an issue](https://github.com/loadimpact/k6/issues)
 - I have an idea/request -- [file an issue](https://github.com/loadimpact/k6/issues)
-- Why do you? -- [Slack](https://slackin-defaimlmsd.now.sh/)
-- When will you? -- [Slack](https://slackin-defaimlmsd.now.sh/)
-- I want to contribute/help with development -- [Start here](https://github.com/loadimpact/k6/blob/master/CONTRIBUTING.md), then [Slack](https://slackin-defaimlmsd.now.sh/) and [issues](https://github.com/loadimpact/k6/issues)
+- Why do you? -- [Slack](https://k6.io/slack)
+- When will you? -- [Slack](https://k6.io/slack)
+- I want to contribute/help with development -- [Start here](https://github.com/loadimpact/k6/blob/master/CONTRIBUTING.md), then [Slack](https://k6.io/slack) and [issues](https://github.com/loadimpact/k6/issues)
 
 ---
 
