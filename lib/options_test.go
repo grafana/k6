@@ -21,7 +21,6 @@
 package lib
 
 import (
-	"crypto/tls"
 	"testing"
 	"time"
 
@@ -76,25 +75,6 @@ func TestOptionsApply(t *testing.T) {
 		opts := Options{}.Apply(Options{InsecureSkipTLSVerify: null.BoolFrom(true)})
 		assert.True(t, opts.InsecureSkipTLSVerify.Valid)
 		assert.True(t, opts.InsecureSkipTLSVerify.Bool)
-	})
-	t.Run("TLSCipherSuites", func(t *testing.T) {
-		for suiteName, suiteID := range SupportedTLSCipherSuites {
-			t.Run(suiteName, func(t *testing.T) {
-				opts := Options{}.Apply(Options{TLSCipherSuites: &TLSCipherSuites{suiteID}})
-
-				assert.NotNil(t, opts.TLSCipherSuites)
-				assert.Len(t, *(opts.TLSCipherSuites), 1)
-				assert.Equal(t, suiteID, (*opts.TLSCipherSuites)[0])
-			})
-		}
-	})
-	t.Run("TLSVersion", func(t *testing.T) {
-		version := TLSVersion{Min: tls.VersionSSL30, Max: tls.VersionTLS12}
-		opts := Options{}.Apply(Options{TLSVersion: &version})
-
-		assert.NotNil(t, opts.TLSVersion)
-		assert.Equal(t, opts.TLSVersion.Min, tls.VersionSSL30)
-		assert.Equal(t, opts.TLSVersion.Max, tls.VersionTLS12)
 	})
 	t.Run("NoConnectionReuse", func(t *testing.T) {
 		opts := Options{}.Apply(Options{NoConnectionReuse: null.BoolFrom(true)})
