@@ -43,6 +43,7 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/loadimpact/k6/api"
 	"github.com/loadimpact/k6/core"
+	"github.com/loadimpact/k6/core/local"
 	"github.com/loadimpact/k6/js"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/loader"
@@ -462,7 +463,7 @@ func actionRun(cc *cli.Context) error {
 	fmt.Fprintf(color.Output, "\n")
 
 	// Make the Engine
-	engine, err := core.NewEngine(runner, opts)
+	engine, err := core.NewEngine(local.New(runner), opts)
 	if err != nil {
 		log.WithError(err).Error("Couldn't create the engine")
 		return err
@@ -525,20 +526,20 @@ loop:
 	for {
 		select {
 		case <-ticker.C:
-			if !engine.IsRunning() {
+			if !engine.Executor.IsRunning() {
 				break loop
 			}
 
 			statusString := "running"
-			if engine.IsPaused() {
+			if engine.Executor.IsPaused() {
 				statusString = "paused"
 			}
 
-			atTime := engine.AtTime()
-			totalTime := engine.TotalTime()
+			atTime := engine.Executor.GetTime()
+			endTime := engine.Executor.GetEndTime()
 			progress := 0.0
-			if totalTime > 0 {
-				progress = float64(atTime) / float64(totalTime)
+			if endTime.Valid {
+				progress = float64(atTime) / float64(endTime.Duration)
 			}
 
 			if isTTY && !quiet {
@@ -547,13 +548,13 @@ loop:
 					statusString,
 					progressBar.String(),
 					roundDuration(atTime, 100*time.Millisecond),
-					roundDuration(totalTime, 100*time.Millisecond),
+					roundDuration(time.Duration(endTime.Duration), 100*time.Millisecond),
 				)
 			} else {
 				fmt.Fprintf(color.Output, "[%-10s] %s / %s\n",
 					statusString,
 					roundDuration(atTime, 100*time.Millisecond),
-					roundDuration(totalTime, 100*time.Millisecond),
+					roundDuration(time.Duration(endTime.Duration), 100*time.Millisecond),
 				)
 			}
 		case <-ctx.Done():
@@ -570,7 +571,7 @@ loop:
 	wg.Wait()
 
 	// Test done, leave that status as the final progress bar!
-	atTime := engine.AtTime()
+	atTime := engine.Executor.GetTime()
 	if isTTY && !quiet {
 		progressBar.Progress = 1.0
 		fmt.Fprintf(color.Output, "      done %s %10s / %s\n",
@@ -638,7 +639,7 @@ loop:
 		}
 	}
 
-	printGroup(engine.Runner.GetDefaultGroup(), 1)
+	printGroup(engine.Executor.GetRunner().GetDefaultGroup(), 1)
 
 	// Sort and print metrics.
 	metricNames := make([]string, 0, len(engine.Metrics))

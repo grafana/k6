@@ -34,6 +34,8 @@ type Executor interface {
 	Run(ctx context.Context, out chan<- []stats.Sample) error
 	IsRunning() bool
 
+	GetRunner() Runner
+
 	SetLogger(l *log.Logger)
 	GetLogger() *log.Logger
 

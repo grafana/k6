@@ -221,6 +221,10 @@ func (e *Executor) IsRunning() bool {
 	return e.ctx != nil
 }
 
+func (e *Executor) GetRunner() lib.Runner {
+	return e.Runner
+}
+
 func (e *Executor) SetLogger(l *log.Logger) {
 	e.Logger = l
 }
@@ -305,7 +309,7 @@ func (e *Executor) SetVUs(num int64) error {
 	if ctx := e.ctx; ctx != nil {
 		e.scale(ctx, num)
 	} else {
-	atomic.StoreInt64(&e.numVUs, num)
+		atomic.StoreInt64(&e.numVUs, num)
 	}
 
 	return nil
