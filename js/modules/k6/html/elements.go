@@ -44,6 +44,13 @@ const (
 	MeterTagName    = "meter"
 	ObjectTagName   = "object"
 	OListTagName    = "olist"
+	OptGroupTagName = "optgroup"
+	OptionTagName   = "option"
+	OutputTagName   = "output"
+	ParamTagName    = "param"
+	PreTagName      = "pre"
+	ProgressTagName = "progress"
+	QuoteTagName    = "progress"
 )
 
 type HrefElement struct{ Element }
@@ -78,6 +85,13 @@ type MetaElement struct{ Element }
 type MeterElement struct{ Element }
 type ObjectElement struct{ Element }
 type OListElement struct{ Element }
+type OptGroupElement struct{ Element }
+type OptionElement struct{ Element }
+type OutputElement struct{ Element }
+type ParamElement struct{ Element }
+type PreElement struct{ Element }
+type ProgressElement struct{ Element }
+type QuoteElement struct{ Element }
 
 func (h HrefElement) hrefURL() *url.URL {
 	url, err := url.Parse(h.attrAsString("href"))
@@ -414,4 +428,119 @@ func (m MeterElement) Labels() []goja.Value {
 
 func (o ObjectElement) Form() goja.Value {
 	return o.ownerFormVal()
+}
+
+func (o OptionElement) Disabled() bool {
+	if o.attrIsPresent("disabled") {
+		return true
+	}
+
+	optGroup := o.sel.sel.ParentsFiltered("optgroup")
+	if optGroup.Length() == 0 {
+		return false
+	}
+
+	_, exists := optGroup.Attr("disabled")
+	return exists
+}
+
+func (o OptionElement) Form() goja.Value {
+	prtForm := o.sel.sel.ParentsFiltered("form")
+	if prtForm.Length() != 0 {
+		return selToElement(Selection{o.sel.rt, prtForm.First()})
+	}
+
+	prtSelect := o.sel.sel.ParentsFiltered("select")
+	formId, exists := prtSelect.Attr("form")
+	if !exists {
+		return goja.Undefined()
+	}
+
+	ownerForm := prtSelect.Parents().Last().Find("form[id=\"" + formId + "\"]")
+	if ownerForm.Length() == 0 {
+		return goja.Undefined()
+	}
+
+	return selToElement(Selection{o.sel.rt, ownerForm.First()})
+}
+
+func (o OptionElement) Index() int {
+	optsHolder := o.sel.sel.ParentsFiltered("select,datalist")
+	if optsHolder.Length() == 0 {
+		return 0
+	}
+
+	return optsHolder.Find("option").IndexOfSelection(o.sel.sel)
+}
+
+func (o OptionElement) Label() string {
+	if lbl, exists := o.sel.sel.Attr("label"); exists {
+		return lbl
+	}
+
+	return o.TextContent()
+}
+
+func (o OptionElement) Text() string {
+	return o.TextContent()
+}
+
+func (o OptionElement) Value() string {
+	return valueOrHTML(o.sel.sel)
+}
+
+func (o OutputElement) Form() goja.Value {
+	return o.ownerFormVal()
+}
+
+func (o OutputElement) Labels() []goja.Value {
+	return o.elemLabels()
+}
+
+func (o OutputElement) Value() string {
+	return o.TextContent()
+}
+
+func (o OutputElement) DefaultValue() string {
+	return o.TextContent()
+}
+
+func (p ProgressElement) Max() float64 {
+	maxStr, exists := p.sel.sel.Attr("max")
+	if !exists {
+		return 1.0
+	}
+
+	maxVal, err := strconv.ParseFloat(maxStr, 64)
+	if err != nil || maxVal < 0 {
+		return 1.0
+	}
+
+	return maxVal
+}
+
+func (p ProgressElement) calcProgress(defaultVal float64) float64 {
+	valStr, exists := p.sel.sel.Attr("value")
+	if !exists {
+		return defaultVal
+	}
+
+	val, err := strconv.ParseFloat(valStr, 64)
+	if err != nil || val < 0 {
+		return defaultVal
+	}
+
+	return val / p.Max()
+}
+
+func (p ProgressElement) Value() float64 {
+	return p.calcProgress(0.0)
+}
+
+func (p ProgressElement) Position() float64 {
+	return p.calcProgress(-1.0)
+}
+
+func (p ProgressElement) Labels() []goja.Value {
+	return p.elemLabels()
 }

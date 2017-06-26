@@ -98,7 +98,7 @@ var funcDefs = []string{
 	"Input Value string",
 
 	"Input Checked bool",
-	"Input DefaultChecked bool",
+	"Input DefaultChecked=checked bool",
 
 	"Input Alt string",
 	"Input Src string",
@@ -169,6 +169,24 @@ var funcDefs = []string{
 	"OList Reversed bool",
 	"OList Start int",
 	"OList Type enum=1,a,A,i,I",
+
+	"OptGroup Disabled bool",
+	"OptGroup Label string",
+
+	"Option DefaultSelected=selected bool",
+	"Option Selected bool",
+
+	"Output HtmlFor=for string",
+	"Output Name string",
+	"Output Type enum=output",
+
+	"Param Name string",
+	"Param Value string",
+
+	"Pre Name string",
+	"Pre Value string",
+
+	"Quote Cite string",
 }
 
 type TestDef struct {
