@@ -26,22 +26,30 @@ const (
 	CanvasTagName   = "canvas"
 	DataTagName     = "data"
 	DataListTagName = "datalist"
+	DelTagName      = "del"
 	EmbedTagName    = "embed"
 	FieldSetTagName = "fieldset"
 	FormTagName     = "form"
 	IFrameTagName   = "iframe"
 	ImageTagName    = "img"
 	InputTagName    = "input"
+	InsTagName      = "ins"
 	KeygenTagName   = "keygen"
 	LabelTagName    = "label"
 	LegendTagName   = "legend"
 	LiTagName       = "li"
 	LinkTagName     = "link"
 	MapTagName      = "map"
+	MetaTagName     = "meta"
+	MeterTagName    = "meter"
+	ObjectTagName   = "object"
+	OListTagName    = "olist"
 )
 
 type HrefElement struct{ Element }
+type MediaElement struct{ Element }
 type FormFieldElement struct{ Element }
+type ModElement struct{ Element }
 
 type AnchorElement struct{ HrefElement }
 type AreaElement struct{ HrefElement }
@@ -51,6 +59,9 @@ type ButtonElement struct{ FormFieldElement }
 type CanvasElement struct{ Element }
 type DataElement struct{ Element }
 type DataListElement struct{ Element }
+type DelElement struct{ ModElement }
+type InsElement struct{ ModElement }
+
 type EmbedElement struct{ Element }
 type FieldSetElement struct{ Element }
 type FormElement struct{ Element }
@@ -63,6 +74,10 @@ type LegendElement struct{ Element }
 type LiElement struct{ Element }
 type LinkElement struct{ Element }
 type MapElement struct{ Element }
+type MetaElement struct{ Element }
+type MeterElement struct{ Element }
+type ObjectElement struct{ Element }
+type OListElement struct{ Element }
 
 func (h HrefElement) hrefURL() *url.URL {
 	url, err := url.Parse(h.attrAsString("href"))
@@ -391,4 +406,12 @@ func (m MapElement) Images() []goja.Value {
 	}
 
 	return elemList(Selection{m.sel.rt, m.sel.sel.Parents().Last().Find("img[usemap=\"#" + name + "\"],object[usemap=\"#" + name + "\"]")})
+}
+
+func (m MeterElement) Labels() []goja.Value {
+	return m.elemLabels()
+}
+
+func (o ObjectElement) Form() goja.Value {
+	return o.ownerFormVal()
 }

@@ -35,6 +35,11 @@ type FuncDef struct {
 	ReturnOpts []string
 }
 
+var renameTestElems = map[string]string{
+	"href": "a",
+	"mod":  "del",
+}
+
 var funcDefs = []string{
 	"Href Rel string",
 	"Href Href string",
@@ -140,6 +145,30 @@ var funcDefs = []string{
 	"Link Type string",
 
 	"Map Name string",
+
+	"Meta Content string",
+	"Meta HttpEquiv=http-equiv enum=content-type,default-style,refresh",
+	"Meta Name enum=application-name,author,description,generator,keywords,viewport",
+
+	"Meter Min int",
+	"Meter Max int",
+	"Meter High int",
+	"Meter Low int",
+	"Meter Optimum int",
+
+	"Mod Cite string",
+	"Mod DateTime string",
+
+	"Object Data string",
+	"Object Height string",
+	"Object Name string",
+	"Object Type string",
+	"Object UseMap string",
+	"Object Width string",
+
+	"OList Reversed bool",
+	"OList Start int",
+	"OList Type enum=1,a,A,i,I",
 }
 
 type TestDef struct {
@@ -350,8 +379,8 @@ func (ce *CollectElements) buildTestDef(index int, testDef string) TestDef {
 
 	if elemInfo, ok := ce.elemInfos[parts[0]]; ok {
 		elemHtmlName = strings.Trim(elemInfo.TagName, "\"")
-	} else if elemHtmlName == "href" {
-		elemHtmlName = "a"
+	} else if useElemName, ok := renameTestElems[elemHtmlName]; ok {
+		elemHtmlName = useElemName
 	}
 
 	if eqPos := strings.Index(elemMethod, "="); eqPos != -1 {

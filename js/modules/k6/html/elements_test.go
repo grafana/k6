@@ -62,6 +62,7 @@ const testHTMLElems = `
 	<map id="not_this_map"></map>
 	<map id="find_this_map"><area/><area/><area/></map>
 	<img usemap="#find_this_map"/><object usemap="#find_this_map"/><img usemap="#not_this_map"/>
+	<object id="obj_1" form="form1"/>
 
 </body>
 `
@@ -350,6 +351,13 @@ func TestElements(t *testing.T) {
 			t.Run("images", func(t *testing.T) {
 				if v, err := common.RunString(rt, `doc.find("#find_this_map").get(0).images()`); assert.NoError(t, err) {
 					assert.Equal(t, 2, len(v.Export().([]goja.Value)))
+				}
+			})
+		})
+		t.Run("ObjectElement", func(t *testing.T) {
+			t.Run("form", func(t *testing.T) {
+				if v, err := common.RunString(rt, `doc.find("#obj_1").get(0).form().id()`); assert.NoError(t, err) {
+					assert.Equal(t, "form1", v.Export())
 				}
 			})
 		})
