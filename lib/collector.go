@@ -42,6 +42,10 @@ type Collector interface {
 	// at regular intervals and when the context is terminated.
 	Run(ctx context.Context)
 
+	// Returns whether the collector is ready to receive samples. The engine will wait for this to
+	// return true before doing anything else.
+	IsReady() bool
+
 	// Collect receives a set of samples. This method is never called concurrently, and only while
 	// the context for Run() is valid, but should defer as much work as possible to Run().
 	Collect(samples []stats.Sample)

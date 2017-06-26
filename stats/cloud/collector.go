@@ -163,6 +163,10 @@ func (c *Collector) Run(ctx context.Context) {
 	}
 }
 
+func (c *Collector) IsReady() bool {
+	return true
+}
+
 func (c *Collector) Collect(samples []stats.Sample) {
 	if c.referenceID == "" {
 		return
