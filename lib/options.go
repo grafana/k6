@@ -21,84 +21,9 @@
 package lib
 
 import (
-	"encoding/json"
-	"errors"
-
 	"github.com/loadimpact/k6/stats"
 	"gopkg.in/guregu/null.v3"
 )
-
-type TLSVersion struct {
-	Min int
-	Max int
-}
-
-func (v *TLSVersion) UnmarshalJSON(data []byte) error {
-	version := TLSVersion{}
-
-	// Version might be a string or an object with separate min & max fields
-	var fields struct {
-		Min string `json:"min"`
-		Max string `json:"max"`
-	}
-	if err := json.Unmarshal(data, &fields); err != nil {
-		switch err.(type) {
-		case *json.UnmarshalTypeError:
-			// Check if it's a type error and the user has passed a string
-			var version string
-			if otherErr := json.Unmarshal(data, &version); otherErr != nil {
-				switch otherErr.(type) {
-				case *json.UnmarshalTypeError:
-					return errors.New("Type error: the value of tlsVersion " +
-						"should be an object with min/max fields or a string")
-				}
-
-				// Some other error occurred
-				return otherErr
-			}
-			// It was a string, assign it to both min & max
-			fields.Min = version
-			fields.Max = version
-		default:
-			return err
-		}
-	}
-
-	var ok bool
-	if version.Min, ok = SupportedTLSVersions[fields.Min]; !ok {
-		return errors.New("Unknown TLS version : " + fields.Min)
-	}
-
-	if version.Max, ok = SupportedTLSVersions[fields.Max]; !ok {
-		return errors.New("Unknown TLS version : " + fields.Max)
-	}
-
-	*v = version
-
-	return nil
-}
-
-type TLSCipherSuites []uint16
-
-func (s *TLSCipherSuites) UnmarshalJSON(data []byte) error {
-	var suiteNames []string
-	if err := json.Unmarshal(data, &suiteNames); err != nil {
-		return err
-	}
-
-	var suiteIDs []uint16
-	for _, name := range suiteNames {
-		if suiteID, ok := SupportedTLSCipherSuites[name]; ok {
-			suiteIDs = append(suiteIDs, suiteID)
-		} else {
-			return errors.New("Unknown cipher suite: " + name)
-		}
-	}
-
-	*s = suiteIDs
-
-	return nil
-}
 
 type Options struct {
 	Paused     null.Bool    `json:"paused"`
@@ -111,13 +36,11 @@ type Options struct {
 	Linger        null.Bool `json:"linger"`
 	NoUsageReport null.Bool `json:"noUsageReport"`
 
-	MaxRedirects          null.Int         `json:"maxRedirects"`
-	InsecureSkipTLSVerify null.Bool        `json:"insecureSkipTLSVerify"`
-	TLSCipherSuites       *TLSCipherSuites `json:"tlsCipherSuites"`
-	TLSVersion            *TLSVersion      `json:"tlsVersion"`
-	NoConnectionReuse     null.Bool        `json:"noConnectionReuse"`
-	UserAgent             null.String      `json:"userAgent"`
-	Throw                 null.Bool        `json:"throw"`
+	MaxRedirects          null.Int    `json:"maxRedirects"`
+	InsecureSkipTLSVerify null.Bool   `json:"insecureSkipTLSVerify"`
+	NoConnectionReuse     null.Bool   `json:"noConnectionReuse"`
+	UserAgent             null.String `json:"userAgent"`
+	Throw                 null.Bool   `json:"throw"`
 
 	Thresholds map[string]stats.Thresholds `json:"thresholds"`
 
@@ -155,12 +78,6 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.InsecureSkipTLSVerify.Valid {
 		o.InsecureSkipTLSVerify = opts.InsecureSkipTLSVerify
-	}
-	if opts.TLSCipherSuites != nil {
-		o.TLSCipherSuites = opts.TLSCipherSuites
-	}
-	if opts.TLSVersion != nil {
-		o.TLSVersion = opts.TLSVersion
 	}
 	if opts.NoConnectionReuse.Valid {
 		o.NoConnectionReuse = opts.NoConnectionReuse
