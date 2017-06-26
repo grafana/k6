@@ -101,6 +101,16 @@ func (r *Runner) newVU() (*VU, error) {
 		return nil, err
 	}
 
+	var cipherSuites []uint16
+	if r.Bundle.Options.TLSCipherSuites != nil {
+		cipherSuites = *r.Bundle.Options.TLSCipherSuites
+	}
+
+	var tlsVersion lib.TLSVersion
+	if r.Bundle.Options.TLSVersion != nil {
+		tlsVersion = *r.Bundle.Options.TLSVersion
+	}
+
 	// Make a VU, apply the VU context.
 	dialer := &netext.Dialer{Dialer: r.BaseDialer, Resolver: r.Resolver}
 	vu := &VU{
@@ -110,6 +120,9 @@ func (r *Runner) newVU() (*VU, error) {
 			Proxy: http.ProxyFromEnvironment,
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: r.Bundle.Options.InsecureSkipTLSVerify.Bool,
+				CipherSuites:       cipherSuites,
+				MinVersion:         uint16(tlsVersion.Min),
+				MaxVersion:         uint16(tlsVersion.Max),
 			},
 			DialContext: dialer.DialContext,
 		},
