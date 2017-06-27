@@ -52,6 +52,9 @@ const (
 	ProgressTagName = "progress"
 	QuoteTagName    = "quote"
 	ScriptTagName   = "script"
+	SelectTagName   = "select"
+	SourceTagName   = "source"
+	StyleTagName    = "style"
 )
 
 type HrefElement struct{ Element }
@@ -94,6 +97,9 @@ type PreElement struct{ Element }
 type ProgressElement struct{ Element }
 type QuoteElement struct{ Element }
 type ScriptElement struct{ Element }
+type SelectElement struct{ Element }
+type SourceElement struct{ Element }
+type StyleElement struct{ Element }
 
 func (h HrefElement) hrefURL() *url.URL {
 	url, err := url.Parse(h.attrAsString("href"))
@@ -279,7 +285,7 @@ func (c CanvasElement) Height() int {
 	return c.attrAsInt("height", 150)
 }
 
-func (d DataListElement) Options() (items []goja.Value) {
+func (d DataListElement) Options() []goja.Value {
 	return elemList(d.sel.Find("option"))
 }
 
@@ -421,7 +427,8 @@ func (m MapElement) Images() []goja.Value {
 		return make([]goja.Value, 0)
 	}
 
-	return elemList(Selection{m.sel.rt, m.sel.sel.Parents().Last().Find("img[usemap=\"#" + name + "\"],object[usemap=\"#" + name + "\"]")})
+	imgs := m.sel.sel.Parents().Last().Find("img[usemap=\"#" + name + "\"],object[usemap=\"#" + name + "\"]")
+	return elemList(Selection{m.sel.rt, imgs})
 }
 
 func (m MeterElement) Labels() []goja.Value {
@@ -549,4 +556,56 @@ func (p ProgressElement) Labels() []goja.Value {
 
 func (s ScriptElement) Text() string {
 	return s.TextContent()
+}
+
+func (s SelectElement) Form() goja.Value {
+	return s.ownerFormVal()
+}
+
+func (s SelectElement) Labels() []goja.Value {
+	return s.elemLabels()
+}
+
+func (s SelectElement) Length() int {
+	return s.sel.Find("option").Size()
+}
+
+func (s SelectElement) Options() []goja.Value {
+	return elemList(Selection{s.sel.rt, s.sel.sel.Find("option")})
+}
+
+func (s SelectElement) SelectedIndex() int {
+	option := s.sel.sel.Find("option[selected]")
+	if option.Length() == 0 {
+		return -1
+	}
+	return s.sel.sel.Find("option").IndexOfSelection(option)
+}
+
+func (s SelectElement) SelectedOptions() []goja.Value {
+	return elemList(Selection{s.sel.rt, s.sel.sel.Find("option[selected]")})
+}
+
+func (s SelectElement) Size() int {
+	if s.attrIsPresent("multiple") {
+		return 4
+	} else {
+		return 1
+	}
+}
+
+func (s SelectElement) Type() string {
+	if s.attrIsPresent("multiple") {
+		return "select-multiple"
+	} else {
+		return "select"
+	}
+}
+
+func (s SelectElement) Value() string {
+	option := s.sel.sel.Find("option[selected]")
+	if option.Length() == 0 {
+		return ""
+	}
+	return valueOrHTML(option.First())
 }

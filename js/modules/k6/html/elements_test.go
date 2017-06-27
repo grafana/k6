@@ -63,8 +63,8 @@ const testHTMLElems = `
 	<map id="find_this_map"><area/><area/><area/></map>
 	<img usemap="#find_this_map"/><object usemap="#find_this_map"/><img usemap="#not_this_map"/>
 	<object id="obj_1" form="form1"/>
-	<form id="form3"><select><option id="opt_1">txt_label</option><option id="opt_2" disabled label="attr_label" value="attr_val"/><optgroup disabled><option id="opt_3"/></optgroup></select></form>
-	<select form="form3"><option id="opt_4"/></select>
+	<form id="form3"><select id="sel1"><option id="opt_1">txt_label</option><option id="opt_2" disabled label="attr_label" value="selected_attr_val" selected>option 2</option><optgroup disabled><option id="opt_3" selected/></optgroup></select></form>
+	<select form="form3" id="sel2"><option id="opt_4"/></select>
 	<label for="output1"></label>
 	<label><output id="output1" form="form3">defaultVal</output></label>
 	<progress id="progress1" max="100" value="70"></progress>
@@ -409,7 +409,7 @@ func TestElements(t *testing.T) {
 				v2, err2 := common.RunString(rt, `doc.find("#opt_2").get(0).value()`)
 				if assert.NoError(t, err1) && assert.NoError(t, err2) {
 					assert.Equal(t, "txt_label", v1.Export())
-					assert.Equal(t, "attr_val", v2.Export())
+					assert.Equal(t, "selected_attr_val", v2.Export())
 				}
 			})
 		})
@@ -458,6 +458,43 @@ func TestElements(t *testing.T) {
 			t.Run("text", func(t *testing.T) {
 				if v, err := common.RunString(rt, `doc.find("#script1").get(0).text()`); assert.NoError(t, err) {
 					assert.Equal(t, "script text", v.Export())
+				}
+			})
+		})
+		t.Run("SelectElement", func(t *testing.T) {
+			t.Run("form", func(t *testing.T) {
+				if v, err := common.RunString(rt, `doc.find("#sel2").get(0).form().id()`); assert.NoError(t, err) {
+					assert.Equal(t, "form3", v.Export())
+				}
+			})
+			t.Run("length", func(t *testing.T) {
+				if v, err := common.RunString(rt, `doc.find("#sel1").get(0).length()`); assert.NoError(t, err) {
+					assert.Equal(t, int64(3), v.Export())
+				}
+			})
+			t.Run("options", func(t *testing.T) {
+				if v, err := common.RunString(rt, `doc.find("#sel1").get(0).options()`); assert.NoError(t, err) {
+					assert.Equal(t, 3, len(v.Export().([]goja.Value)))
+					assert.Equal(t, "opt_1", v.Export().([]goja.Value)[0].Export().(OptionElement).Id())
+				}
+			})
+			t.Run("selectedOptions", func(t *testing.T) {
+				if v, err := common.RunString(rt, `doc.find("#sel1").get(0).selectedOptions()`); assert.NoError(t, err) {
+					assert.Equal(t, 2, len(v.Export().([]goja.Value)))
+					assert.Equal(t, "opt_2", v.Export().([]goja.Value)[0].Export().(OptionElement).Id())
+				}
+			})
+			t.Run("selectedIndex", func(t *testing.T) {
+				v1, err1 := common.RunString(rt, `doc.find("#sel1").get(0).selectedIndex()`)
+				v2, err2 := common.RunString(rt, `doc.find("#sel2").get(0).selectedIndex()`)
+				if assert.NoError(t, err1) && assert.NoError(t, err2) {
+					assert.Equal(t, int64(1), v1.Export())
+					assert.Equal(t, int64(-1), v2.Export())
+				}
+			})
+			t.Run("value", func(t *testing.T) {
+				if v, err := common.RunString(rt, `doc.find("#sel1").get(0).value()`); assert.NoError(t, err) {
+					assert.Equal(t, "selected_attr_val", v.Export())
 				}
 			})
 		})

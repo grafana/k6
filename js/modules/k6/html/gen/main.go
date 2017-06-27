@@ -195,6 +195,23 @@ var funcDefs = []string{
 	"Script Async bool",
 	"Script Defer bool",
 	"Script NoModule bool",
+
+	"Select Autofocus bool",
+	"Select Disabled bool",
+	"Select Multiple bool",
+	"Select Name string",
+	"Select Required bool",
+
+	"Source KeySystem string",
+	"Source Media string",
+	"Source Sizes string",
+	"Source Src string",
+	"Source SrcSet string",
+	"Source Type string",
+
+	"Style Media string",
+	"Style Type string",
+	"Style Disabled bool",
 }
 
 type TestDef struct {
