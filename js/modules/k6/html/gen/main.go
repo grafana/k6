@@ -334,21 +334,25 @@ func selToElement(sel Selection) goja.Value {
 	switch elem.node.Data { {{ range $elemInfo := .ElemInfos }}
 	case {{ $elemInfo.ConstName }}:
 		return sel.rt.ToValue({{ buildStruct $elemInfo }})
-	{{ end }}
+{{ end }}
 	default:
 		return sel.rt.ToValue(elem)
 	}
  }
 
-{{ range $funcDefStr := .FuncDefs }} {{ $funcDef := buildFuncDef $funcDefStr }}
-func (e {{$funcDef.ElemName}}) {{$funcDef.ElemMethod}}() {{ if ne $funcDef.ReturnType "enum" }} {{$funcDef.ReturnType}}{{else}} string {{end}} {
-{{ if ne $funcDef.ReturnType "enum" }} return e.{{ $funcDef.AttrMethod }}("{{ $funcDef.AttrName }}"{{ if $funcDef.ReturnOpts }}, {{ index $funcDef.ReturnOpts 0 }}{{end}}){{ else }} attrVal := e.attrAsString("{{ $funcDef.AttrName }}")
-	switch attrVal { {{ range $optVal := $funcDef.ReturnOpts }}
-		case "{{$optVal}}": 
-			return "{{$optVal}}"
-		{{ end }}
+{{ range $funcDefStr := .FuncDefs -}} 
+{{ $funcDef := buildFuncDef $funcDefStr -}}
+func (e {{$funcDef.ElemName}}) {{$funcDef.ElemMethod}}() 
+{{- if eq $funcDef.ReturnType "enum" }} string{{else}} {{$funcDef.ReturnType}} {{end}} {
+{{ if ne $funcDef.ReturnType "enum" }} return e.{{ $funcDef.AttrMethod }}("{{ $funcDef.AttrName }}"
+  {{- if $funcDef.ReturnOpts }}, {{ index $funcDef.ReturnOpts 0 }}{{end}}){{ else }} attrVal := e.attrAsString("{{ $funcDef.AttrName }}")
+	switch attrVal { {{- range $optVal := $funcDef.ReturnOpts }}
+	case "{{$optVal}}":
+		return "{{$optVal}}"
+{{ end }}
 	}
-	return "{{ index $funcDef.ReturnOpts 0}}" {{ end }}
+	return "{{ index $funcDef.ReturnOpts 0}}"
+{{ end }}
 }
 {{ end }}
 `))
