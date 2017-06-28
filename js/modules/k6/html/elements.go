@@ -19,52 +19,65 @@ var defaultPorts = map[string]string{
 }
 
 const (
-	AnchorTagName   = "a"
-	AreaTagName     = "area"
-	BaseTagName     = "base"
-	ButtonTagName   = "button"
-	CanvasTagName   = "canvas"
-	DataTagName     = "data"
-	DataListTagName = "datalist"
-	DelTagName      = "del"
-	EmbedTagName    = "embed"
-	FieldSetTagName = "fieldset"
-	FormTagName     = "form"
-	IFrameTagName   = "iframe"
-	ImageTagName    = "img"
-	InputTagName    = "input"
-	InsTagName      = "ins"
-	KeygenTagName   = "keygen"
-	LabelTagName    = "label"
-	LegendTagName   = "legend"
-	LiTagName       = "li"
-	LinkTagName     = "link"
-	MapTagName      = "map"
-	MetaTagName     = "meta"
-	MeterTagName    = "meter"
-	ObjectTagName   = "object"
-	OListTagName    = "olist"
-	OptGroupTagName = "optgroup"
-	OptionTagName   = "option"
-	OutputTagName   = "output"
-	ParamTagName    = "param"
-	PreTagName      = "pre"
-	ProgressTagName = "progress"
-	QuoteTagName    = "quote"
-	ScriptTagName   = "script"
-	SelectTagName   = "select"
-	SourceTagName   = "source"
-	StyleTagName    = "style"
+	AnchorTagName          = "a"
+	AreaTagName            = "area"
+	BaseTagName            = "base"
+	ButtonTagName          = "button"
+	CanvasTagName          = "canvas"
+	DataTagName            = "data"
+	DataListTagName        = "datalist"
+	DelTagName             = "del"
+	EmbedTagName           = "embed"
+	FieldSetTagName        = "fieldset"
+	FormTagName            = "form"
+	IFrameTagName          = "iframe"
+	ImageTagName           = "img"
+	InputTagName           = "input"
+	InsTagName             = "ins"
+	KeygenTagName          = "keygen"
+	LabelTagName           = "label"
+	LegendTagName          = "legend"
+	LiTagName              = "li"
+	LinkTagName            = "link"
+	MapTagName             = "map"
+	MetaTagName            = "meta"
+	MeterTagName           = "meter"
+	ObjectTagName          = "object"
+	OListTagName           = "olist"
+	OptGroupTagName        = "optgroup"
+	OptionTagName          = "option"
+	OutputTagName          = "output"
+	ParamTagName           = "param"
+	PreTagName             = "pre"
+	ProgressTagName        = "progress"
+	QuoteTagName           = "quote"
+	ScriptTagName          = "script"
+	SelectTagName          = "select"
+	SourceTagName          = "source"
+	StyleTagName           = "style"
+	TableTagName           = "table"
+	TableHeadTagName       = "thead"
+	TableFootTagName       = "tfoot"
+	TableBodyTagName       = "tbody"
+	TableRowTagName        = "tr"
+	TableColTagName        = "col"
+	TableDataCellTagName   = "td"
+	TableHeaderCellTagName = "th"
+	TextAreaTagName        = "tagname"
+	TimeTagName            = "time"
+	TitleTagName           = "title"
+	UListTagName           = "ul"
 )
 
 type HrefElement struct{ Element }
 type MediaElement struct{ Element }
 type FormFieldElement struct{ Element }
 type ModElement struct{ Element }
+type TableSectionElement struct{ Element }
+type TableCellElement struct{ Element }
 
 type AnchorElement struct{ HrefElement }
 type AreaElement struct{ HrefElement }
-
 type BaseElement struct{ Element }
 type ButtonElement struct{ FormFieldElement }
 type CanvasElement struct{ Element }
@@ -72,7 +85,6 @@ type DataElement struct{ Element }
 type DataListElement struct{ Element }
 type DelElement struct{ ModElement }
 type InsElement struct{ ModElement }
-
 type EmbedElement struct{ Element }
 type FieldSetElement struct{ Element }
 type FormElement struct{ Element }
@@ -100,6 +112,18 @@ type ScriptElement struct{ Element }
 type SelectElement struct{ Element }
 type SourceElement struct{ Element }
 type StyleElement struct{ Element }
+type TableElement struct{ Element }
+type TableHeadElement struct{ TableSectionElement }
+type TableFootElement struct{ TableSectionElement }
+type TableBodyElement struct{ TableSectionElement }
+type TableRowElement struct{ Element }
+type TableColElement struct{ Element }
+type TableDataCellElement struct{ TableCellElement }
+type TableHeaderCellElement struct{ TableCellElement }
+type TextAreaElement struct{ Element }
+type TimeElement struct{ Element }
+type TitleElement struct{ Element }
+type UListElement struct{ Element }
 
 func (h HrefElement) hrefURL() *url.URL {
 	url, err := url.Parse(h.attrAsString("href"))
@@ -383,35 +407,6 @@ func (l LegendElement) Form() goja.Value {
 	return l.ownerFormVal()
 }
 
-func (l LiElement) Value() goja.Value {
-	if l.sel.sel.ParentFiltered("ol").Size() == 0 {
-		return goja.Undefined()
-	}
-
-	prev := l.sel.sel.PrevAllFiltered("li")
-	len := prev.Length()
-
-	if len == 0 {
-		return l.sel.rt.ToValue(1)
-	}
-
-	for idx := 0; idx < len; idx++ {
-		val, exists := prev.Eq(idx).Attr("value")
-		if !exists {
-			continue
-		}
-
-		intVal, err := strconv.Atoi(val)
-		if err != nil {
-			continue
-		}
-
-		return l.sel.rt.ToValue(intVal + idx + 1)
-	}
-
-	return l.sel.rt.ToValue(len + 1)
-}
-
 func (l LinkElement) RelList() []string {
 	return l.splitAttr("rel")
 }
@@ -608,4 +603,84 @@ func (s SelectElement) Value() string {
 		return ""
 	}
 	return valueOrHTML(option.First())
+}
+
+func (t TableElement) firstChild(elemName string) goja.Value {
+	child := t.sel.sel.ChildrenFiltered(elemName)
+	if child.Size() == 0 {
+		return goja.Undefined()
+	}
+	return selToElement(Selection{t.sel.rt, child})
+}
+
+func (t TableElement) Caption() goja.Value {
+	return t.firstChild("caption")
+}
+
+func (t TableElement) THead() goja.Value {
+	return t.firstChild("thead")
+}
+
+func (t TableElement) TFoot() goja.Value {
+	return t.firstChild("tfoot")
+}
+
+func (t TableElement) Rows() []goja.Value {
+	return elemList(Selection{t.sel.rt, t.sel.sel.Find("tr")})
+}
+
+func (t TableElement) TBodies() []goja.Value {
+	return elemList(Selection{t.sel.rt, t.sel.sel.Find("tbody")})
+}
+
+func (t TableSectionElement) Rows() []goja.Value {
+	return elemList(Selection{t.sel.rt, t.sel.sel.Find("tr")})
+}
+
+func (t TableCellElement) CellIndex() int {
+	prtRow := t.sel.sel.ParentsFiltered("tr")
+	if prtRow.Length() == 0 {
+		return -1
+	}
+	return prtRow.Find("th,td").IndexOfSelection(t.sel.sel)
+}
+
+func (t TableRowElement) Cells() []goja.Value {
+	return elemList(Selection{t.sel.rt, t.sel.sel.Find("th,td")})
+}
+
+func (t TableRowElement) RowIndex() int {
+	table := t.sel.sel.ParentsFiltered("table")
+	if table.Length() == 0 {
+		return -1
+	}
+	return table.Find("tr").IndexOfSelection(t.sel.sel)
+}
+
+func (t TableRowElement) SectionRowIndex() int {
+	section := t.sel.sel.ParentsFiltered("thead,tbody,tfoot")
+	if section.Length() == 0 {
+		return -1
+	}
+	return section.Find("tr").IndexOfSelection(t.sel.sel)
+}
+
+func (t TextAreaElement) Form() goja.Value {
+	return t.ownerFormVal()
+}
+
+func (t TextAreaElement) Length() int {
+	return len(t.attrAsString("value"))
+}
+
+func (t TextAreaElement) Labels() []goja.Value {
+	return t.elemLabels()
+}
+
+func (t TableColElement) Span() int {
+	span := t.attrAsInt("span", 1)
+	if span < 1 {
+		return 1
+	}
+	return span
 }

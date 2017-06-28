@@ -36,8 +36,10 @@ type FuncDef struct {
 }
 
 var renameTestElems = map[string]string{
-	"href": "a",
-	"mod":  "del",
+	"href":            "a",
+	"mod":             "del",
+	"tablecell":       "",
+	"tableheadercell": "",
 }
 
 var funcDefs = []string{
@@ -114,9 +116,6 @@ var funcDefs = []string{
 	"Input Readonly bool",
 	"Input Min string",
 	"Input Max string",
-	"Input SelectionStart int",
-	"Input SelectionEnd int",
-	"Input SelectionDirection enum=forward,back,none",
 
 	"Input DefaultValue=value string",
 	"Input DirName string",
@@ -135,6 +134,9 @@ var funcDefs = []string{
 
 	"Legend AccessKey string",
 	"Legend Value string",
+
+	"Li Value string",
+	"Li Type enum=,1,a,A,i,I,disc,square,circle",
 
 	"Link Href string",
 	"Link Hreflang string",
@@ -212,6 +214,34 @@ var funcDefs = []string{
 	"Style Media string",
 	"Style Type string",
 	"Style Disabled bool",
+
+	"TableCell ColSpan int=1",
+	"TableCell RowSpan int=1",
+	"TableCell Headers string",
+
+	"TableHeaderCell Abbr string",
+	"TableHeaderCell Scope string",
+	"TableHeaderCell Sorted bool",
+
+	"TextArea Type enum=textarea",
+	"TextArea Value string",
+	"TextArea DefaultValue=value string",
+	"TextArea Placeholder string",
+	"TextArea Rows int",
+	"TextArea Cols int",
+	"TextArea MaxLength int",
+	"TextArea AccessKey string",
+	"TextArea ReadOnly bool",
+	"TextArea Required bool",
+	"TextArea Autocomplete bool",
+	"TextArea Autocapitalize enum=none,off,characters,words,sentences",
+	"TextArea Wrap string",
+
+	"Time DateTime string",
+
+	"Title Text string",
+
+	"UList Type string",
 }
 
 type TestDef struct {
@@ -324,10 +354,18 @@ import (
 )
 
 const testGenElems = ` + "`" + `<html><body>
-{{ range $index, $testDefStr := .FuncDefs }} {{ $def := buildTestDef $index $testDefStr }} {{ if eq $def.ReturnType "enum" }} {{ range $optIdx, $optVal := $def.ReturnOpts }}
- 	<{{$def.ElemHtmlName}} id="elem_{{$index}}_{{$optIdx}}" {{$def.AttrName}}="{{$optVal}}"> {{end}}
- {{else}} <{{$def.ElemHtmlName}} id="elem_{{$index}}"{{ if eq $def.ReturnType "bool" }} {{$def.AttrName}} {{else}} {{$def.AttrName}}="{{$def.AttrVal}}"{{end}}></{{ $def.ElemHtmlName }}> {{ end }}
-{{end}}
+{{- range $index, $testDefStr := .FuncDefs -}}
+	{{ $def := buildTestDef $index $testDefStr -}}
+	{{ if eq $def.ElemHtmlName "" -}}
+	{{ else if eq $def.ReturnType "enum" -}}
+	{{ range $optIdx, $optVal := $def.ReturnOpts -}}
+		<{{$def.ElemHtmlName}} id="elem_{{$index}}_{{$optIdx}}" {{$def.AttrName}}="{{$optVal}}"> {{end}}
+ 	{{- else if eq $def.ReturnType "bool" -}}
+	  <{{$def.ElemHtmlName}} id="elem_{{$index}}" {{$def.AttrName}}></{{ $def.ElemHtmlName }}>
+	{{else -}} 
+	  <{{$def.ElemHtmlName}} id="elem_{{$index}}" {{$def.AttrName}}="{{$def.AttrVal}}"></{{ $def.ElemHtmlName }}>
+	{{end -}}
+{{- end}}
 </body></html>` + "`" + `
 
 func TestGenElements(t *testing.T) {
@@ -343,16 +381,24 @@ func TestGenElements(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.IsType(t, Selection{}, rt.Get("doc").Export())
-{{ range $index, $testDefStr := .FuncDefs }} {{ $def := buildTestDef $index $testDefStr }} t.Run("{{$def.ElemHtmlName}}.{{$def.ElemMethod}}", func(t *testing.T) { {{ if eq $def.ReturnType "enum" }} 
-		{{ range $optIdx, $optVal := $def.ReturnOpts }}
+{{ range $index, $testDefStr := .FuncDefs }} 
+{{ $def := buildTestDef $index $testDefStr }} 
+	{{ if ne $def.ElemHtmlName "" -}}
+		t.Run("{{$def.ElemHtmlName}}.{{$def.ElemMethod}}", func(t *testing.T) { 
+	{{ if eq $def.ReturnType "enum" -}} 
+		{{ range $optIdx, $optVal := $def.ReturnOpts -}}
 			if v, err := common.RunString(rt, "doc.find(\"#elem_{{$index}}_{{$optIdx}}\").get(0).{{$def.ElemMethod}}()"); assert.NoError(t, err) {
 					assert.Equal(t, "{{$optVal}}", v.Export()) 
-			} {{end}}
-		{{else}} if v, err := common.RunString(rt, "doc.find(\"#elem_{{$index}}\").get(0).{{$def.ElemMethod}}()"); assert.NoError(t, err) {
+			} 
+		{{end -}}
+	{{else -}} 
+	  	if v, err := common.RunString(rt, "doc.find(\"#elem_{{$index}}\").get(0).{{$def.ElemMethod}}()"); assert.NoError(t, err) {
 				assert.Equal(t, {{ if eq $def.ReturnType "bool" }}{{$def.AttrVal}} {{else if eq $def.ReturnType "string" }} "{{$def.AttrVal}}" {{else if eq $def.ReturnType "int"}} int64({{$def.AttrVal}}) {{end}}, v.Export()) 
-		} {{end}}
-	})
+			} 
+	{{end -}}
+})
 {{ end }}
+{{- end -}}
 }
 `))
 
@@ -420,10 +466,10 @@ func (ce *CollectElements) buildTestDef(index int, testDef string) TestDef {
 	returnType := parts[2]
 	returnOpts := ""
 
-	if elemInfo, ok := ce.elemInfos[parts[0]]; ok {
-		elemHtmlName = strings.Trim(elemInfo.TagName, "\"")
-	} else if useElemName, ok := renameTestElems[elemHtmlName]; ok {
+	if useElemName, ok := renameTestElems[elemHtmlName]; ok {
 		elemHtmlName = useElemName
+	} else if elemInfo, ok := ce.elemInfos[parts[0]]; ok {
+		elemHtmlName = strings.Trim(elemInfo.TagName, "\"")
 	}
 
 	if eqPos := strings.Index(elemMethod, "="); eqPos != -1 {
