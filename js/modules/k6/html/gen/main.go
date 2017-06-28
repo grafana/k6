@@ -43,6 +43,8 @@ var renameTestElems = map[string]string{
 }
 
 var funcDefs = []string{
+	"Href Download string",
+	"Href ReferrerPolicy string",
 	"Href Rel string",
 	"Href Href string",
 	"Href Target string",
@@ -58,7 +60,7 @@ var funcDefs = []string{
 	"Button AccessKey string",
 	"Button Autofocus bool",
 	"Button Disabled bool",
-	"Button Type enum=submit,button,menu,reset",
+	"Button Type enum=submit,button,menu,reset,menu",
 
 	"Data Value string",
 
@@ -79,11 +81,16 @@ var funcDefs = []string{
 	"Form Autocomplete string",
 	"Form NoValidate bool",
 
+	"IFrame Allowfullscreen bool",
+	"IFrame ReferrerPolicy string",
 	"IFrame Height string",
 	"IFrame Width string",
 	"IFrame Name string",
 	"IFrame Src string",
 
+	"Image CurrentSrc=src string",
+	"Image Sizes string",
+	"Image Srcset string",
 	"Image Alt string",
 	"Image CrossOrigin enum=anonymous,use-credentials",
 	"Image Height int",
@@ -98,6 +105,7 @@ var funcDefs = []string{
 	"Input Autofocus bool",
 	"Input Required bool",
 	"Input Value string",
+	"Image ReferrerPolicy string",
 
 	"Input Checked bool",
 	"Input DefaultChecked=checked bool",
@@ -138,6 +146,8 @@ var funcDefs = []string{
 	"Li Value string",
 	"Li Type enum=,1,a,A,i,I,disc,square,circle",
 
+	"Link Crossorigin enum=anonymous,use-credentials",
+	"Link ReferrerPolicy string",
 	"Link Href string",
 	"Link Hreflang string",
 	"Link Media string",
@@ -165,6 +175,8 @@ var funcDefs = []string{
 	"Object Height string",
 	"Object Name string",
 	"Object Type string",
+	"Object TabIndex int",
+	"Object TypeMustMatch bool",
 	"Object UseMap string",
 	"Object Width string",
 
@@ -190,6 +202,7 @@ var funcDefs = []string{
 
 	"Quote Cite string",
 
+	"Script CrossOrigin string",
 	"Script Type string",
 	"Script Src string",
 	"Script HtmlFor=for string",
@@ -214,6 +227,8 @@ var funcDefs = []string{
 	"Style Media string",
 	"Style Type string",
 	"Style Disabled bool",
+
+	"Table Sortable bool",
 
 	"TableCell ColSpan int=1",
 	"TableCell RowSpan int=1",
