@@ -31,7 +31,7 @@ import (
 func HandleGetGroups(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	engine := common.GetEngine(r.Context())
 
-	root := NewGroup(engine.Runner.GetDefaultGroup(), nil)
+	root := NewGroup(engine.Executor.GetRunner().GetDefaultGroup(), nil)
 	groups := FlattenGroup(root)
 
 	data, err := jsonapi.Marshal(groups)
@@ -47,7 +47,7 @@ func HandleGetGroup(rw http.ResponseWriter, r *http.Request, p httprouter.Params
 
 	engine := common.GetEngine(r.Context())
 
-	root := NewGroup(engine.Runner.GetDefaultGroup(), nil)
+	root := NewGroup(engine.Executor.GetRunner().GetDefaultGroup(), nil)
 	groups := FlattenGroup(root)
 
 	var group *Group

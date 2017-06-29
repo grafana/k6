@@ -23,17 +23,17 @@ package common
 import (
 	"context"
 
-	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/core"
 )
 
 type ContextKey int
 
 const ctxKeyEngine = ContextKey(1)
 
-func WithEngine(ctx context.Context, engine *lib.Engine) context.Context {
+func WithEngine(ctx context.Context, engine *core.Engine) context.Context {
 	return context.WithValue(ctx, ctxKeyEngine, engine)
 }
 
-func GetEngine(ctx context.Context) *lib.Engine {
-	return ctx.Value(ctxKeyEngine).(*lib.Engine)
+func GetEngine(ctx context.Context) *core.Engine {
+	return ctx.Value(ctxKeyEngine).(*core.Engine)
 }

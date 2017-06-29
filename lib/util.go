@@ -50,3 +50,19 @@ func Clampf(val, min, max float64) float64 {
 		return val
 	}
 }
+
+// Returns the maximum value between a and b.
+func Max(a, b int64) int64 {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+// Returns the minimum value between a and b.
+func Min(a, b int64) int64 {
+	if a < b {
+		return a
+	}
+	return b
+}

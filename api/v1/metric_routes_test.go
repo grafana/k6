@@ -26,6 +26,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/loadimpact/k6/core"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
 	"github.com/manyminds/api2go/jsonapi"
@@ -34,7 +35,7 @@ import (
 )
 
 func TestGetMetrics(t *testing.T) {
-	engine, err := lib.NewEngine(nil, lib.Options{})
+	engine, err := core.NewEngine(nil, lib.Options{})
 	assert.NoError(t, err)
 
 	engine.Metrics = map[string]*stats.Metric{
@@ -73,7 +74,7 @@ func TestGetMetrics(t *testing.T) {
 }
 
 func TestGetMetric(t *testing.T) {
-	engine, err := lib.NewEngine(nil, lib.Options{})
+	engine, err := core.NewEngine(nil, lib.Options{})
 	assert.NoError(t, err)
 
 	engine.Metrics = map[string]*stats.Metric{

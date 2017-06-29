@@ -18,41 +18,41 @@
  *
  */
 
-package v1
+package lib
 
 import (
-	"github.com/loadimpact/k6/core"
-	"gopkg.in/guregu/null.v3"
+	"context"
+	"time"
+
+	"github.com/loadimpact/k6/stats"
+	log "github.com/sirupsen/logrus"
+	null "gopkg.in/guregu/null.v3"
 )
 
-type Status struct {
-	Paused null.Bool `json:"paused"`
-	VUs    null.Int  `json:"vus"`
-	VUsMax null.Int  `json:"vus-max"`
+// An Executor wraps a Runner, and abstracts away an execution environment.
+type Executor interface {
+	Run(ctx context.Context, out chan<- []stats.Sample) error
+	IsRunning() bool
 
-	// Readonly.
-	Running bool `json:"running"`
-	Tainted bool `json:"tainted"`
-}
+	GetRunner() Runner
 
-func NewStatus(engine *core.Engine) Status {
-	return Status{
-		Paused:  null.BoolFrom(engine.Executor.IsPaused()),
-		VUs:     null.IntFrom(engine.Executor.GetVUs()),
-		VUsMax:  null.IntFrom(engine.Executor.GetVUsMax()),
-		Running: engine.Executor.IsRunning(),
-		Tainted: engine.IsTainted(),
-	}
-}
+	SetLogger(l *log.Logger)
+	GetLogger() *log.Logger
 
-func (s Status) GetName() string {
-	return "status"
-}
+	GetIterations() int64
+	GetEndIterations() null.Int
+	SetEndIterations(i null.Int)
 
-func (s Status) GetID() string {
-	return "default"
-}
+	GetTime() time.Duration
+	GetEndTime() NullDuration
+	SetEndTime(t NullDuration)
 
-func (s Status) SetID(id string) error {
-	return nil
+	IsPaused() bool
+	SetPaused(paused bool)
+
+	GetVUs() int64
+	SetVUs(vus int64) error
+
+	GetVUsMax() int64
+	SetVUsMax(max int64) error
 }
