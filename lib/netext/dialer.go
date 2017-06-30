@@ -44,7 +44,7 @@ func NewDialer(dialer net.Dialer) *Dialer {
 	}
 }
 
-func (d Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn, error) {
+func (d *Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn, error) {
 	delimiter := strings.LastIndex(addr, ":")
 	ip, err := d.Resolver.FetchOne(addr[:delimiter])
 	if err != nil {
