@@ -79,19 +79,24 @@ func (*K6) Check(ctx context.Context, arg0, checks goja.Value, extras ...goja.Va
 	t := time.Now()
 
 	// Prepare tags, make sure the `group` tag can't be overwritten.
-	tags := make(map[string]string)
+	commonTags := make(map[string]string)
 	if len(extras) > 0 {
 		obj := extras[0].ToObject(rt)
 		for _, k := range obj.Keys() {
-			tags[k] = obj.Get(k).String()
+			commonTags[k] = obj.Get(k).String()
 		}
 	}
-	tags["group"] = state.Group.Path
+	commonTags["group"] = state.Group.Path
 
 	succ := true
 	obj := checks.ToObject(rt)
 	for _, name := range obj.Keys() {
 		val := obj.Get(name)
+
+		tags := make(map[string]string, len(commonTags))
+		for k, v := range commonTags {
+			tags[k] = v
+		}
 
 		// Resolve the check record.
 		check, err := state.Group.Check(name)
