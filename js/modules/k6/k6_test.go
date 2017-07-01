@@ -139,6 +139,32 @@ func TestCheck(t *testing.T) {
 			}, state.Samples[0].Tags)
 		}
 
+		t.Run("Multiple", func(t *testing.T) {
+			state := &common.State{Group: root}
+			*ctx = common.WithState(baseCtx, state)
+
+			_, err := common.RunString(rt, `k6.check(null, { "a": true, "b": false })`)
+			assert.NoError(t, err)
+
+			assert.Len(t, state.Samples, 2)
+			var foundA, foundB bool
+			for _, sample := range state.Samples {
+				name := sample.Tags["check"]
+				switch name {
+				case "a":
+					assert.False(t, foundA, "duplicate 'a'")
+					foundA = true
+				case "b":
+					assert.False(t, foundB, "duplicate 'b'")
+					foundB = true
+				default:
+					assert.Fail(t, name)
+				}
+			}
+			assert.True(t, foundA, "missing 'a'")
+			assert.True(t, foundB, "missing 'b'")
+		})
+
 		t.Run("Invalid", func(t *testing.T) {
 			_, err := common.RunString(rt, `k6.check(null, { "::": true })`)
 			assert.EqualError(t, err, "GoError: group and check names may not contain '::'")
