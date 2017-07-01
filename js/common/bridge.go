@@ -22,12 +22,11 @@ package common
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"reflect"
 	"strings"
 
 	"github.com/dop251/goja"
+	"github.com/pkg/errors"
 	"github.com/serenize/snaker"
 )
 
@@ -158,7 +157,7 @@ func Bind(rt *goja.Runtime, v interface{}, ctxPtr *context.Context) map[string]i
 				func(args []reflect.Value) []reflect.Value {
 					if wantsContext {
 						if ctxPtr == nil || *ctxPtr == nil {
-							Throw(rt, errors.New(fmt.Sprintf("%s needs a valid VU context", meth.Name)))
+							Throw(rt, errors.Errorf("%s needs a valid VU context", meth.Name))
 						}
 						args = append([]reflect.Value{reflect.ValueOf(*ctxPtr)}, args...)
 					} else if wantsContextPtr {

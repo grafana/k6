@@ -22,8 +22,6 @@ package js
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/dop251/goja"
@@ -31,6 +29,7 @@ import (
 	"github.com/loadimpact/k6/js/compiler"
 	"github.com/loadimpact/k6/js/modules"
 	"github.com/loadimpact/k6/loader"
+	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 )
 
@@ -104,7 +103,7 @@ func (i *InitContext) Require(arg string) goja.Value {
 func (i *InitContext) requireModule(name string) (goja.Value, error) {
 	mod, ok := modules.Index[name]
 	if !ok {
-		return nil, errors.New(fmt.Sprintf("unknown builtin module: %s", name))
+		return nil, errors.Errorf("unknown builtin module: %s", name)
 	}
 	return i.runtime.ToValue(common.Bind(i.runtime, mod, i.ctxPtr)), nil
 }
