@@ -594,60 +594,78 @@ loop:
 	}
 	fmt.Fprintf(color.Output, "\n")
 
-	// Print groups.
-	var printGroup func(g *lib.Group, level int)
-	printGroup = func(g *lib.Group, level int) {
-		indent := strings.Repeat("  ", level)
+	// Print results in a human readable format
+	printHumanizedSummary(engine, atTime)
 
-		if g.Name != "" && g.Parent != nil {
-			fmt.Fprintf(color.Output, "%s█ %s\n", indent, g.Name)
-		}
-
-		if len(g.Checks) > 0 {
-			if g.Name != "" && g.Parent != nil {
-				fmt.Fprintf(color.Output, "\n")
-			}
-			for _, check := range g.Checks {
-				icon := "✓"
-				statusColor := color.GreenString
-				isCheckFailure := check.Fails > 0
-
-				if isCheckFailure {
-					icon = "✗"
-					statusColor = color.RedString
-				}
-
-				fmt.Fprint(color.Output, statusColor("%s  %s %s\n",
-					indent,
-					icon,
-					check.Name,
-				))
-
-				if isCheckFailure {
-					fmt.Fprint(color.Output, statusColor("%s        %2.2f%% (%v/%v) \n",
-						indent,
-						100*(float64(check.Fails)/float64(check.Passes+check.Fails)),
-						check.Fails,
-						check.Passes+check.Fails,
-					))
-				}
-
-			}
-			fmt.Fprintf(color.Output, "\n")
-		}
-		if len(g.Groups) > 0 {
-			if g.Name != "" && g.Parent != nil && len(g.Checks) > 0 {
-				fmt.Fprintf(color.Output, "\n")
-			}
-			for _, g := range g.Groups {
-				printGroup(g, level+1)
-			}
-		}
+	if opts.Linger.Bool {
+		<-signals
 	}
 
-	printGroup(engine.Executor.GetRunner().GetDefaultGroup(), 1)
+	if engine.IsTainted() {
+		return cli.NewExitError("", 99)
+	}
+	return nil
+}
+
+func printHumanizedSummary(engine *core.Engine, atTime time.Duration) {
+	// Print groups.
+	printHumanizedGroups(engine.Executor.GetRunner().GetDefaultGroup(), 1)
 
 	// Sort and print metrics.
+	printHumanizedMetrics(engine, atTime)
+}
+
+func printHumanizedGroups(g *lib.Group, level int) {
+	indent := strings.Repeat("  ", level)
+
+	if g.Name != "" && g.Parent != nil {
+		fmt.Fprintf(color.Output, "%s█ %s\n", indent, g.Name)
+	}
+
+	if len(g.Checks) > 0 {
+		if g.Name != "" && g.Parent != nil {
+			fmt.Fprintf(color.Output, "\n")
+		}
+		for _, check := range g.Checks {
+			icon := "✓"
+			statusColor := color.GreenString
+			isCheckFailure := check.Fails > 0
+
+			if isCheckFailure {
+				icon = "✗"
+				statusColor = color.RedString
+			}
+
+			fmt.Fprint(color.Output, statusColor("%s  %s %s\n",
+				indent,
+				icon,
+				check.Name,
+			))
+
+			if isCheckFailure {
+				fmt.Fprint(color.Output, statusColor("%s        %2.2f%% (%v/%v) \n",
+					indent,
+					100*(float64(check.Fails)/float64(check.Passes+check.Fails)),
+					check.Fails,
+					check.Passes+check.Fails,
+				))
+			}
+
+		}
+		fmt.Fprintf(color.Output, "\n")
+	}
+	if len(g.Groups) > 0 {
+		if g.Name != "" && g.Parent != nil && len(g.Checks) > 0 {
+			fmt.Fprintf(color.Output, "\n")
+		}
+		for _, g := range g.Groups {
+			printHumanizedGroups(g, level+1)
+		}
+	}
+}
+
+func printHumanizedMetrics(engine *core.Engine, atTime time.Duration) {
+	// Sort metric names
 	metricNames := make([]string, 0, len(engine.Metrics))
 	metricNameWidth := 0
 	for _, m := range engine.Metrics {
@@ -658,6 +676,7 @@ loop:
 	}
 	sort.Strings(metricNames)
 
+	// Print the metrics in the sorted order
 	for _, name := range metricNames {
 		m := engine.Metrics[name]
 		sample := m.Sink.Format()
@@ -707,15 +726,6 @@ loop:
 			val,
 		)
 	}
-
-	if opts.Linger.Bool {
-		<-signals
-	}
-
-	if engine.IsTainted() {
-		return cli.NewExitError("", 99)
-	}
-	return nil
 }
 
 func actionArchive(cc *cli.Context) error {
