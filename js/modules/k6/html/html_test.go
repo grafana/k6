@@ -591,13 +591,12 @@ func TestParseHTML(t *testing.T) {
 	t.Run("Get", func(t *testing.T) {
 		t.Run("No args", func(t *testing.T) {
 			v, err := common.RunString(rt, `doc.find("body").children().get()`)
-			// 			fmt.Println(fmt.Sprintf("type is: %T\n", v.Export()))
 			if assert.NoError(t, err) {
-				elems := valToElementList(v)
+				elems := v.Export().([]goja.Value)
 
-				assert.Equal(t, "h1", elems[0].NodeName())
-				assert.Equal(t, "p", elems[1].NodeName())
-				assert.Equal(t, "footer", elems[4].NodeName())
+				assert.Equal(t, "h1", elems[0].Export().(Element).NodeName())
+				assert.Equal(t, "p", elems[1].Export().(Element).NodeName())
+				assert.Equal(t, "footer", elems[4].Export().(Element).NodeName())
 			}
 		})
 		t.Run("+ve index", func(t *testing.T) {

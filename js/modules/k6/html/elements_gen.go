@@ -18,6 +18,9 @@ func selToElement(sel Selection) goja.Value {
 	case AreaTagName:
 		return sel.rt.ToValue(AreaElement{HrefElement{elem}})
 
+	case AudioTagName:
+		return sel.rt.ToValue(AudioElement{MediaElement{elem}})
+
 	case BaseTagName:
 		return sel.rt.ToValue(BaseElement{elem})
 
@@ -153,837 +156,855 @@ func selToElement(sel Selection) goja.Value {
 	case TitleTagName:
 		return sel.rt.ToValue(TitleElement{elem})
 
+	case TrackTagName:
+		return sel.rt.ToValue(TrackElement{elem})
+
 	case UListTagName:
 		return sel.rt.ToValue(UListElement{elem})
+
+	case VideoTagName:
+		return sel.rt.ToValue(VideoElement{MediaElement{elem}})
 
 	default:
 		return sel.rt.ToValue(elem)
 	}
  }
 
-func (e HrefElement) Download() string  {
- return e.attrAsString("download")
+func (e HrefElement) Download() string {
+	return e.attrAsString("download")
 }
-func (e HrefElement) ReferrerPolicy() string  {
- return e.attrAsString("referrerpolicy")
-}
-func (e HrefElement) Rel() string  {
- return e.attrAsString("rel")
-}
-func (e HrefElement) Href() string  {
- return e.attrAsString("href")
-}
-func (e HrefElement) Target() string  {
- return e.attrAsString("target")
-}
-func (e HrefElement) Type() string  {
- return e.attrAsString("type")
-}
-func (e HrefElement) AccessKey() string  {
- return e.attrAsString("accesskey")
-}
-func (e HrefElement) HrefLang() string  {
- return e.attrAsString("hreflang")
-}
-func (e HrefElement) Media() string  {
- return e.attrAsString("media")
-}
-func (e HrefElement) ToString() string  {
- return e.attrAsString("href")
-}
-func (e BaseElement) Href() bool  {
- return e.attrIsPresent("href")
-}
-func (e BaseElement) Target() bool  {
- return e.attrIsPresent("target")
-}
-func (e ButtonElement) AccessKey() string  {
- return e.attrAsString("accesskey")
-}
-func (e ButtonElement) Autofocus() bool  {
- return e.attrIsPresent("autofocus")
-}
-func (e ButtonElement) Disabled() bool  {
- return e.attrIsPresent("disabled")
-}
-func (e ButtonElement) Type() string {
- attrVal := e.attrAsString("type")
+func (e HrefElement) ReferrerPolicy() string {
+	attrVal := e.attrAsString("referrerpolicy")
 	switch attrVal {
-	case "submit":
-		return "submit"
-
-	case "button":
-		return "button"
-
-	case "menu":
-		return "menu"
-
-	case "reset":
-		return "reset"
-
-	case "menu":
-		return "menu"
-
+	case "no-referrer":
+		return "no-referrer"
+	case "no-referrer-when-downgrade":
+		return "no-referrer-when-downgrade"
+	case "origin":
+		return "origin"
+	case "origin-when-cross-origin":
+		return "origin-when-cross-origin"
+	case "unsafe-url":
+		return "unsafe-url"
+	default:
+		return ""
 	}
-	return "submit"
-
 }
-func (e DataElement) Value() string  {
- return e.attrAsString("value")
+func (e HrefElement) Rel() string {
+	return e.attrAsString("rel")
 }
-func (e EmbedElement) Height() string  {
- return e.attrAsString("height")
+func (e HrefElement) Href() string {
+	return e.attrAsString("href")
 }
-func (e EmbedElement) Width() string  {
- return e.attrAsString("width")
+func (e HrefElement) Target() string {
+	return e.attrAsString("target")
 }
-func (e EmbedElement) Src() string  {
- return e.attrAsString("src")
+func (e HrefElement) Type() string {
+	return e.attrAsString("type")
 }
-func (e EmbedElement) Type() string  {
- return e.attrAsString("type")
+func (e HrefElement) AccessKey() string {
+	return e.attrAsString("accesskey")
 }
-func (e FieldSetElement) Disabled() bool  {
- return e.attrIsPresent("disabled")
+func (e HrefElement) HrefLang() string {
+	return e.attrAsString("hreflang")
 }
-func (e FieldSetElement) Name() string  {
- return e.attrAsString("name")
+func (e HrefElement) ToString() string {
+	return e.attrAsString("href")
 }
-func (e FormElement) Name() string  {
- return e.attrAsString("name")
+func (e MediaElement) Autoplay() bool {
+	return e.attrIsPresent("autoplay")
 }
-func (e FormElement) Target() string  {
- return e.attrAsString("target")
+func (e MediaElement) Controls() bool {
+	return e.attrIsPresent("controls")
 }
-func (e FormElement) Action() string  {
- return e.attrAsString("action")
+func (e MediaElement) Loop() bool {
+	return e.attrIsPresent("loop")
 }
-func (e FormElement) Enctype() string  {
- return e.attrAsString("enctype")
+func (e MediaElement) Muted() bool {
+	return e.attrIsPresent("muted")
 }
-func (e FormElement) Encoding() string  {
- return e.attrAsString("enctype")
+func (e MediaElement) Preload() string {
+	attrVal := e.attrAsString("preload")
+	switch attrVal {
+	case "metadata":
+		return "metadata"
+	case "none":
+		return "none"
+	default:
+		return "auto"
+	}
 }
-func (e FormElement) AcceptCharset() string  {
- return e.attrAsString("accept-charset")
+func (e MediaElement) Src() string {
+	return e.attrAsString("src")
 }
-func (e FormElement) Autocomplete() string  {
- return e.attrAsString("autocomplete")
-}
-func (e FormElement) NoValidate() bool  {
- return e.attrIsPresent("novalidate")
-}
-func (e IFrameElement) Allowfullscreen() bool  {
- return e.attrIsPresent("allowfullscreen")
-}
-func (e IFrameElement) ReferrerPolicy() string  {
- return e.attrAsString("referrerpolicy")
-}
-func (e IFrameElement) Height() string  {
- return e.attrAsString("height")
-}
-func (e IFrameElement) Width() string  {
- return e.attrAsString("width")
-}
-func (e IFrameElement) Name() string  {
- return e.attrAsString("name")
-}
-func (e IFrameElement) Src() string  {
- return e.attrAsString("src")
-}
-func (e ImageElement) CurrentSrc() string  {
- return e.attrAsString("src")
-}
-func (e ImageElement) Sizes() string  {
- return e.attrAsString("sizes")
-}
-func (e ImageElement) Srcset() string  {
- return e.attrAsString("srcset")
-}
-func (e ImageElement) Alt() string  {
- return e.attrAsString("alt")
-}
-func (e ImageElement) CrossOrigin() string {
- attrVal := e.attrAsString("crossorigin")
+func (e MediaElement) CrossOrigin() goja.Value {
+	attrVal, exists := e.sel.sel.Attr("crossorigin")
+	if !exists {
+		return goja.Undefined()
+	}
 	switch attrVal {
 	case "anonymous":
-		return "anonymous"
-
+		return e.sel.rt.ToValue("anonymous")
 	case "use-credentials":
-		return "use-credentials"
-
+		return e.sel.rt.ToValue("use-credentials")
+	default:
+		return goja.Undefined()
 	}
-	return "anonymous"
-
 }
-func (e ImageElement) Height() int  {
- return e.attrAsInt("height", 0)
+func (e MediaElement) CurrentSrc() string {
+	return e.attrAsString("src")
 }
-func (e ImageElement) Width() int  {
- return e.attrAsInt("width", 0)
+func (e MediaElement) DefaultMuted() bool {
+	return e.attrIsPresent("muted")
 }
-func (e ImageElement) IsMap() bool  {
- return e.attrIsPresent("ismap")
+func (e MediaElement) MediaGroup() string {
+	return e.attrAsString("mediagroup")
 }
-func (e ImageElement) Name() string  {
- return e.attrAsString("name")
+func (e BaseElement) Href() string {
+	return e.attrAsString("href")
 }
-func (e ImageElement) Src() string  {
- return e.attrAsString("src")
+func (e BaseElement) Target() string {
+	return e.attrAsString("target")
 }
-func (e ImageElement) UseMap() string  {
- return e.attrAsString("usemap")
+func (e ButtonElement) AccessKey() string {
+	return e.attrAsString("accesskey")
 }
-func (e InputElement) Type() string {
- attrVal := e.attrAsString("type")
+func (e ButtonElement) Autofocus() bool {
+	return e.attrIsPresent("autofocus")
+}
+func (e ButtonElement) Disabled() bool {
+	return e.attrIsPresent("disabled")
+}
+func (e ButtonElement) TabIndex() int {
+	return e.attrAsInt("tabindex", 0)
+}
+func (e ButtonElement) Type() string {
+	attrVal := e.attrAsString("type")
 	switch attrVal {
-	case "text":
-		return "text"
-
 	case "button":
 		return "button"
-
-	case "checkbox":
-		return "checkbox"
-
-	case "color":
-		return "color"
-
-	case "date":
-		return "date"
-
-	case "datetime-local":
-		return "datetime-local"
-
-	case "email":
-		return "email"
-
-	case "file":
-		return "file"
-
-	case "hidden":
-		return "hidden"
-
-	case "image":
-		return "image"
-
-	case "month":
-		return "month"
-
-	case "number":
-		return "number"
-
-	case "password":
-		return "password"
-
-	case "radio":
-		return "radio"
-
-	case "range":
-		return "range"
-
+	case "menu":
+		return "menu"
 	case "reset":
 		return "reset"
-
-	case "search":
-		return "search"
-
-	case "submit":
+	default:
 		return "submit"
-
-	case "tel":
-		return "tel"
-
-	case "time":
-		return "time"
-
-	case "url":
-		return "url"
-
-	case "week":
-		return "week"
-
 	}
-	return "text"
-
 }
-func (e InputElement) Disabled() bool  {
- return e.attrIsPresent("disabled")
+func (e DataElement) Value() string {
+	return e.attrAsString("value")
 }
-func (e InputElement) Autofocus() bool  {
- return e.attrIsPresent("autofocus")
+func (e EmbedElement) Height() string {
+	return e.attrAsString("height")
 }
-func (e InputElement) Required() bool  {
- return e.attrIsPresent("required")
+func (e EmbedElement) Width() string {
+	return e.attrAsString("width")
 }
-func (e InputElement) Value() string  {
- return e.attrAsString("value")
+func (e EmbedElement) Src() string {
+	return e.attrAsString("src")
 }
-func (e ImageElement) ReferrerPolicy() string  {
- return e.attrAsString("referrerpolicy")
+func (e EmbedElement) Type() string {
+	return e.attrAsString("type")
 }
-func (e InputElement) Checked() bool  {
- return e.attrIsPresent("checked")
+func (e FieldSetElement) Disabled() bool {
+	return e.attrIsPresent("disabled")
 }
-func (e InputElement) DefaultChecked() bool  {
- return e.attrIsPresent("checked")
+func (e FieldSetElement) Name() string {
+	return e.attrAsString("name")
 }
-func (e InputElement) Alt() string  {
- return e.attrAsString("alt")
+func (e FormElement) Name() string {
+	return e.attrAsString("name")
 }
-func (e InputElement) Src() string  {
- return e.attrAsString("src")
+func (e FormElement) Target() string {
+	return e.attrAsString("target")
 }
-func (e InputElement) Height() string  {
- return e.attrAsString("height")
+func (e FormElement) Action() string {
+	return e.attrAsString("action")
 }
-func (e InputElement) Width() string  {
- return e.attrAsString("width")
+func (e FormElement) Enctype() string {
+	attrVal := e.attrAsString("enctype")
+	switch attrVal {
+	case "multipart/form-data":
+		return "multipart/form-data"
+	case "text/plain":
+		return "text/plain"
+	default:
+		return "application/x-www-form-urlencoded"
+	}
 }
-func (e InputElement) Accept() string  {
- return e.attrAsString("accept")
+func (e FormElement) Encoding() string {
+	attrVal := e.attrAsString("enctype")
+	switch attrVal {
+	case "multipart/form-data":
+		return "multipart/form-data"
+	case "text/plain":
+		return "text/plain"
+	default:
+		return "application/x-www-form-urlencoded"
+	}
 }
-func (e InputElement) Autocomplete() string {
- attrVal := e.attrAsString("autocomplete")
+func (e FormElement) AcceptCharset() string {
+	return e.attrAsString("accept-charset")
+}
+func (e FormElement) Autocomplete() string {
+	attrVal := e.attrAsString("autocomplete")
 	switch attrVal {
 	case "off":
 		return "off"
-
-	case "on":
+	default:
 		return "on"
-
 	}
-	return "off"
-
 }
-func (e InputElement) MaxLength() int  {
- return e.attrAsInt("maxlength", -1)
+func (e FormElement) NoValidate() bool {
+	return e.attrIsPresent("novalidate")
 }
-func (e InputElement) Size() int  {
- return e.attrAsInt("size", 0)
+func (e IFrameElement) Allowfullscreen() bool {
+	return e.attrIsPresent("allowfullscreen")
 }
-func (e InputElement) Pattern() string  {
- return e.attrAsString("pattern")
-}
-func (e InputElement) Placeholder() string  {
- return e.attrAsString("placeholder")
-}
-func (e InputElement) Readonly() bool  {
- return e.attrIsPresent("readonly")
-}
-func (e InputElement) Min() string  {
- return e.attrAsString("min")
-}
-func (e InputElement) Max() string  {
- return e.attrAsString("max")
-}
-func (e InputElement) DefaultValue() string  {
- return e.attrAsString("value")
-}
-func (e InputElement) DirName() string  {
- return e.attrAsString("dirname")
-}
-func (e InputElement) AccessKey() string  {
- return e.attrAsString("accesskey")
-}
-func (e InputElement) Multiple() bool  {
- return e.attrIsPresent("multiple")
-}
-func (e InputElement) Step() string  {
- return e.attrAsString("step")
-}
-func (e KeygenElement) Autofocus() bool  {
- return e.attrIsPresent("autofocus")
-}
-func (e KeygenElement) Challenge() string  {
- return e.attrAsString("challenge")
-}
-func (e KeygenElement) Disabled() bool  {
- return e.attrIsPresent("disabled")
-}
-func (e KeygenElement) Keytype() string {
- attrVal := e.attrAsString("keytype")
+func (e IFrameElement) ReferrerPolicy() string {
+	attrVal := e.attrAsString("referrerpolicy")
 	switch attrVal {
-	case "RSA":
-		return "RSA"
-
-	case "DSA":
-		return "DSA"
-
-	case "EC":
-		return "EC"
-
-	}
-	return "RSA"
-
-}
-func (e KeygenElement) Name() string  {
- return e.attrAsString("name")
-}
-func (e KeygenElement) Type() string {
- attrVal := e.attrAsString("type")
-	switch attrVal {
-	case "keygen":
-		return "keygen"
-
-	}
-	return "keygen"
-
-}
-func (e LabelElement) HtmlFor() string  {
- return e.attrAsString("for")
-}
-func (e LegendElement) AccessKey() string  {
- return e.attrAsString("accesskey")
-}
-func (e LegendElement) Value() string  {
- return e.attrAsString("value")
-}
-func (e LiElement) Value() string  {
- return e.attrAsString("value")
-}
-func (e LiElement) Type() string {
- attrVal := e.attrAsString("type")
-	switch attrVal {
-	case "":
+	case "no-referrer":
+		return "no-referrer"
+	case "no-referrer-when-downgrade":
+		return "no-referrer-when-downgrade"
+	case "origin":
+		return "origin"
+	case "origin-when-cross-origin":
+		return "origin-when-cross-origin"
+	case "unsafe-url":
+		return "unsafe-url"
+	default:
 		return ""
-
-	case "1":
-		return "1"
-
-	case "a":
-		return "a"
-
-	case "A":
-		return "A"
-
-	case "i":
-		return "i"
-
-	case "I":
-		return "I"
-
-	case "disc":
-		return "disc"
-
-	case "square":
-		return "square"
-
-	case "circle":
-		return "circle"
-
 	}
-	return ""
-
 }
-func (e LinkElement) Crossorigin() string {
- attrVal := e.attrAsString("crossorigin")
+func (e IFrameElement) Height() string {
+	return e.attrAsString("height")
+}
+func (e IFrameElement) Width() string {
+	return e.attrAsString("width")
+}
+func (e IFrameElement) Name() string {
+	return e.attrAsString("name")
+}
+func (e IFrameElement) Src() string {
+	return e.attrAsString("src")
+}
+func (e ImageElement) CurrentSrc() string {
+	return e.attrAsString("src")
+}
+func (e ImageElement) Sizes() string {
+	return e.attrAsString("sizes")
+}
+func (e ImageElement) Srcset() string {
+	return e.attrAsString("srcset")
+}
+func (e ImageElement) Alt() string {
+	return e.attrAsString("alt")
+}
+func (e ImageElement) CrossOrigin() goja.Value {
+	attrVal, exists := e.sel.sel.Attr("crossorigin")
+	if !exists {
+		return goja.Undefined()
+	}
 	switch attrVal {
 	case "anonymous":
-		return "anonymous"
-
+		return e.sel.rt.ToValue("anonymous")
 	case "use-credentials":
-		return "use-credentials"
-
+		return e.sel.rt.ToValue("use-credentials")
+	default:
+		return goja.Undefined()
 	}
-	return "anonymous"
-
 }
-func (e LinkElement) ReferrerPolicy() string  {
- return e.attrAsString("referrerpolicy")
+func (e ImageElement) Height() int {
+	return e.attrAsInt("height", 0)
 }
-func (e LinkElement) Href() string  {
- return e.attrAsString("href")
+func (e ImageElement) Width() int {
+	return e.attrAsInt("width", 0)
 }
-func (e LinkElement) Hreflang() string  {
- return e.attrAsString("hreflang")
+func (e ImageElement) IsMap() bool {
+	return e.attrIsPresent("ismap")
 }
-func (e LinkElement) Media() string  {
- return e.attrAsString("media")
+func (e ImageElement) Name() string {
+	return e.attrAsString("name")
 }
-func (e LinkElement) Rel() string {
- attrVal := e.attrAsString("rel")
+func (e ImageElement) Src() string {
+	return e.attrAsString("src")
+}
+func (e ImageElement) UseMap() string {
+	return e.attrAsString("usemap")
+}
+func (e ImageElement) ReferrerPolicy() string {
+	attrVal := e.attrAsString("referrerpolicy")
 	switch attrVal {
-	case "":
+	case "no-referrer":
+		return "no-referrer"
+	case "no-referrer-when-downgrade":
+		return "no-referrer-when-downgrade"
+	case "origin":
+		return "origin"
+	case "origin-when-cross-origin":
+		return "origin-when-cross-origin"
+	case "unsafe-url":
+		return "unsafe-url"
+	default:
 		return ""
-
-	case "alternate":
-		return "alternate"
-
-	case "author":
-		return "author"
-
-	case "dns-prefetch":
-		return "dns-prefetch"
-
-	case "help":
-		return "help"
-
-	case "icon":
-		return "icon"
-
-	case "license":
-		return "license"
-
-	case "next":
-		return "next"
-
-	case "pingback":
-		return "pingback"
-
-	case "preconnect":
-		return "preconnect"
-
-	case "prefetch":
-		return "prefetch"
-
-	case "preload":
-		return "preload"
-
-	case "prerender":
-		return "prerender"
-
-	case "prev":
-		return "prev"
-
+	}
+}
+func (e InputElement) Name() string {
+	return e.attrAsString("name")
+}
+func (e InputElement) TabIndex() int {
+	return e.attrAsInt("tabindex", 0)
+}
+func (e InputElement) Type() string {
+	attrVal := e.attrAsString("type")
+	switch attrVal {
+	case "button":
+		return "button"
+	case "checkbox":
+		return "checkbox"
+	case "color":
+		return "color"
+	case "date":
+		return "date"
+	case "datetime-local":
+		return "datetime-local"
+	case "email":
+		return "email"
+	case "file":
+		return "file"
+	case "hidden":
+		return "hidden"
+	case "image":
+		return "image"
+	case "month":
+		return "month"
+	case "number":
+		return "number"
+	case "password":
+		return "password"
+	case "radio":
+		return "radio"
+	case "range":
+		return "range"
+	case "reset":
+		return "reset"
 	case "search":
 		return "search"
-
-	case "stylesheet":
-		return "stylesheet"
-
+	case "submit":
+		return "submit"
+	case "tel":
+		return "tel"
+	case "time":
+		return "time"
+	case "url":
+		return "url"
+	case "week":
+		return "week"
+	default:
+		return "text"
 	}
-	return ""
-
 }
-func (e LinkElement) Target() string  {
- return e.attrAsString("target")
+func (e InputElement) Disabled() bool {
+	return e.attrIsPresent("disabled")
 }
-func (e LinkElement) Type() string  {
- return e.attrAsString("type")
+func (e InputElement) Autofocus() bool {
+	return e.attrIsPresent("autofocus")
 }
-func (e MapElement) Name() string  {
- return e.attrAsString("name")
+func (e InputElement) Required() bool {
+	return e.attrIsPresent("required")
 }
-func (e MetaElement) Content() string  {
- return e.attrAsString("content")
+func (e InputElement) Value() string {
+	return e.attrAsString("value")
 }
-func (e MetaElement) HttpEquiv() string {
- attrVal := e.attrAsString("http-equiv")
+func (e InputElement) Checked() bool {
+	return e.attrIsPresent("checked")
+}
+func (e InputElement) DefaultChecked() bool {
+	return e.attrIsPresent("checked")
+}
+func (e InputElement) Alt() string {
+	return e.attrAsString("alt")
+}
+func (e InputElement) Src() string {
+	return e.attrAsString("src")
+}
+func (e InputElement) Height() string {
+	return e.attrAsString("height")
+}
+func (e InputElement) Width() string {
+	return e.attrAsString("width")
+}
+func (e InputElement) Accept() string {
+	return e.attrAsString("accept")
+}
+func (e InputElement) Autocomplete() string {
+	attrVal := e.attrAsString("autocomplete")
 	switch attrVal {
-	case "content-type":
-		return "content-type"
-
-	case "default-style":
-		return "default-style"
-
-	case "refresh":
-		return "refresh"
-
+	case "off":
+		return "off"
+	default:
+		return "on"
 	}
-	return "content-type"
-
 }
-func (e MetaElement) Name() string {
- attrVal := e.attrAsString("name")
+func (e InputElement) MaxLength() int {
+	return e.attrAsInt("maxlength", -1)
+}
+func (e InputElement) Size() int {
+	return e.attrAsInt("size", 0)
+}
+func (e InputElement) Pattern() string {
+	return e.attrAsString("pattern")
+}
+func (e InputElement) Placeholder() string {
+	return e.attrAsString("placeholder")
+}
+func (e InputElement) Readonly() bool {
+	return e.attrIsPresent("readonly")
+}
+func (e InputElement) Min() string {
+	return e.attrAsString("min")
+}
+func (e InputElement) Max() string {
+	return e.attrAsString("max")
+}
+func (e InputElement) DefaultValue() string {
+	return e.attrAsString("value")
+}
+func (e InputElement) DirName() string {
+	return e.attrAsString("dirname")
+}
+func (e InputElement) AccessKey() string {
+	return e.attrAsString("accesskey")
+}
+func (e InputElement) Multiple() bool {
+	return e.attrIsPresent("multiple")
+}
+func (e InputElement) Step() string {
+	return e.attrAsString("step")
+}
+func (e KeygenElement) Autofocus() bool {
+	return e.attrIsPresent("autofocus")
+}
+func (e KeygenElement) Challenge() string {
+	return e.attrAsString("challenge")
+}
+func (e KeygenElement) Disabled() bool {
+	return e.attrIsPresent("disabled")
+}
+func (e KeygenElement) Keytype() string {
+	attrVal := e.attrAsString("keytype")
 	switch attrVal {
-	case "application-name":
-		return "application-name"
-
-	case "author":
-		return "author"
-
-	case "description":
-		return "description"
-
-	case "generator":
-		return "generator"
-
-	case "keywords":
-		return "keywords"
-
-	case "viewport":
-		return "viewport"
-
+	case "DSA":
+		return "DSA"
+	case "EC":
+		return "EC"
+	default:
+		return "RSA"
 	}
-	return "application-name"
-
 }
-func (e MeterElement) Min() int  {
- return e.attrAsInt("min", 0)
+func (e KeygenElement) Name() string {
+	return e.attrAsString("name")
 }
-func (e MeterElement) Max() int  {
- return e.attrAsInt("max", 0)
+func (e KeygenElement) Type() string {
+	return "keygen"
 }
-func (e MeterElement) High() int  {
- return e.attrAsInt("high", 0)
+func (e LabelElement) HtmlFor() string {
+	return e.attrAsString("for")
 }
-func (e MeterElement) Low() int  {
- return e.attrAsInt("low", 0)
+func (e LegendElement) AccessKey() string {
+	return e.attrAsString("accesskey")
 }
-func (e MeterElement) Optimum() int  {
- return e.attrAsInt("optimum", 0)
+func (e LiElement) Value() int {
+	return e.attrAsInt("value", 0)
 }
-func (e ModElement) Cite() string  {
- return e.attrAsString("cite")
-}
-func (e ModElement) DateTime() string  {
- return e.attrAsString("datetime")
-}
-func (e ObjectElement) Data() string  {
- return e.attrAsString("data")
-}
-func (e ObjectElement) Height() string  {
- return e.attrAsString("height")
-}
-func (e ObjectElement) Name() string  {
- return e.attrAsString("name")
-}
-func (e ObjectElement) Type() string  {
- return e.attrAsString("type")
-}
-func (e ObjectElement) TabIndex() int  {
- return e.attrAsInt("tabindex", 0)
-}
-func (e ObjectElement) TypeMustMatch() bool  {
- return e.attrIsPresent("typemustmatch")
-}
-func (e ObjectElement) UseMap() string  {
- return e.attrAsString("usemap")
-}
-func (e ObjectElement) Width() string  {
- return e.attrAsString("width")
-}
-func (e OListElement) Reversed() bool  {
- return e.attrIsPresent("reversed")
-}
-func (e OListElement) Start() int  {
- return e.attrAsInt("start", 0)
-}
-func (e OListElement) Type() string {
- attrVal := e.attrAsString("type")
+func (e LiElement) Type() string {
+	attrVal := e.attrAsString("type")
 	switch attrVal {
 	case "1":
 		return "1"
-
 	case "a":
 		return "a"
-
 	case "A":
 		return "A"
-
 	case "i":
 		return "i"
-
 	case "I":
 		return "I"
-
+	case "disc":
+		return "disc"
+	case "square":
+		return "square"
+	case "circle":
+		return "circle"
+	default:
+		return ""
 	}
-	return "1"
-
 }
-func (e OptGroupElement) Disabled() bool  {
- return e.attrIsPresent("disabled")
+func (e LinkElement) CrossOrigin() goja.Value {
+	attrVal, exists := e.sel.sel.Attr("crossorigin")
+	if !exists {
+		return goja.Undefined()
+	}
+	switch attrVal {
+	case "anonymous":
+		return e.sel.rt.ToValue("anonymous")
+	case "use-credentials":
+		return e.sel.rt.ToValue("use-credentials")
+	default:
+		return goja.Undefined()
+	}
 }
-func (e OptGroupElement) Label() string  {
- return e.attrAsString("label")
+func (e LinkElement) ReferrerPolicy() string {
+	attrVal := e.attrAsString("referrerpolicy")
+	switch attrVal {
+	case "no-referrer":
+		return "no-referrer"
+	case "no-referrer-when-downgrade":
+		return "no-referrer-when-downgrade"
+	case "origin":
+		return "origin"
+	case "origin-when-cross-origin":
+		return "origin-when-cross-origin"
+	case "unsafe-url":
+		return "unsafe-url"
+	default:
+		return ""
+	}
 }
-func (e OptionElement) DefaultSelected() bool  {
- return e.attrIsPresent("selected")
+func (e LinkElement) Href() string {
+	return e.attrAsString("href")
 }
-func (e OptionElement) Selected() bool  {
- return e.attrIsPresent("selected")
+func (e LinkElement) Hreflang() string {
+	return e.attrAsString("hreflang")
 }
-func (e OutputElement) HtmlFor() string  {
- return e.attrAsString("for")
+func (e LinkElement) Media() string {
+	return e.attrAsString("media")
 }
-func (e OutputElement) Name() string  {
- return e.attrAsString("name")
+func (e LinkElement) Rel() string {
+	return e.attrAsString("rel")
+}
+func (e LinkElement) Target() string {
+	return e.attrAsString("target")
+}
+func (e LinkElement) Type() string {
+	return e.attrAsString("type")
+}
+func (e MapElement) Name() string {
+	return e.attrAsString("name")
+}
+func (e MetaElement) Content() string {
+	return e.attrAsString("content")
+}
+func (e MetaElement) Name() string {
+	return e.attrAsString("name")
+}
+func (e MetaElement) HttpEquiv() string {
+	attrVal := e.attrAsString("http-equiv")
+	switch attrVal {
+	case "default-style":
+		return "default-style"
+	case "refresh":
+		return "refresh"
+	default:
+		return "content-type"
+	}
+}
+func (e MeterElement) Min() int {
+	return e.attrAsInt("min", 0)
+}
+func (e MeterElement) Max() int {
+	return e.attrAsInt("max", 0)
+}
+func (e MeterElement) High() int {
+	return e.attrAsInt("high", 0)
+}
+func (e MeterElement) Low() int {
+	return e.attrAsInt("low", 0)
+}
+func (e MeterElement) Optimum() int {
+	return e.attrAsInt("optimum", 0)
+}
+func (e ModElement) Cite() string {
+	return e.attrAsString("cite")
+}
+func (e ModElement) Datetime() string {
+	return e.attrAsString("datetime")
+}
+func (e ObjectElement) Data() string {
+	return e.attrAsString("data")
+}
+func (e ObjectElement) Height() string {
+	return e.attrAsString("height")
+}
+func (e ObjectElement) Name() string {
+	return e.attrAsString("name")
+}
+func (e ObjectElement) Type() string {
+	return e.attrAsString("type")
+}
+func (e ObjectElement) TabIndex() int {
+	return e.attrAsInt("tabindex", 0)
+}
+func (e ObjectElement) TypeMustMatch() bool {
+	return e.attrIsPresent("typemustmatch")
+}
+func (e ObjectElement) UseMap() string {
+	return e.attrAsString("usemap")
+}
+func (e ObjectElement) Width() string {
+	return e.attrAsString("width")
+}
+func (e OListElement) Reversed() bool {
+	return e.attrIsPresent("reversed")
+}
+func (e OListElement) Start() int {
+	return e.attrAsInt("start", 0)
+}
+func (e OListElement) Type() string {
+	attrVal := e.attrAsString("type")
+	switch attrVal {
+	case "a":
+		return "a"
+	case "A":
+		return "A"
+	case "i":
+		return "i"
+	case "I":
+		return "I"
+	default:
+		return "1"
+	}
+}
+func (e OptGroupElement) Disabled() bool {
+	return e.attrIsPresent("disabled")
+}
+func (e OptGroupElement) Label() string {
+	return e.attrAsString("label")
+}
+func (e OptionElement) DefaultSelected() bool {
+	return e.attrIsPresent("selected")
+}
+func (e OptionElement) Selected() bool {
+	return e.attrIsPresent("selected")
+}
+func (e OutputElement) HtmlFor() string {
+	return e.attrAsString("for")
+}
+func (e OutputElement) Name() string {
+	return e.attrAsString("name")
 }
 func (e OutputElement) Type() string {
- attrVal := e.attrAsString("type")
-	switch attrVal {
-	case "output":
-		return "output"
-
-	}
 	return "output"
-
 }
-func (e ParamElement) Name() string  {
- return e.attrAsString("name")
+func (e ParamElement) Name() string {
+	return e.attrAsString("name")
 }
-func (e ParamElement) Value() string  {
- return e.attrAsString("value")
+func (e ParamElement) Value() string {
+	return e.attrAsString("value")
 }
-func (e PreElement) Name() string  {
- return e.attrAsString("name")
+func (e PreElement) Name() string {
+	return e.attrAsString("name")
 }
-func (e PreElement) Value() string  {
- return e.attrAsString("value")
+func (e PreElement) Value() string {
+	return e.attrAsString("value")
 }
-func (e QuoteElement) Cite() string  {
- return e.attrAsString("cite")
+func (e QuoteElement) Cite() string {
+	return e.attrAsString("cite")
 }
-func (e ScriptElement) CrossOrigin() string  {
- return e.attrAsString("crossorigin")
+func (e ScriptElement) CrossOrigin() string {
+	return e.attrAsString("crossorigin")
 }
-func (e ScriptElement) Type() string  {
- return e.attrAsString("type")
+func (e ScriptElement) Type() string {
+	return e.attrAsString("type")
 }
-func (e ScriptElement) Src() string  {
- return e.attrAsString("src")
+func (e ScriptElement) Src() string {
+	return e.attrAsString("src")
 }
-func (e ScriptElement) HtmlFor() string  {
- return e.attrAsString("for")
+func (e ScriptElement) Charset() string {
+	return e.attrAsString("charset")
 }
-func (e ScriptElement) Charset() string  {
- return e.attrAsString("charset")
+func (e ScriptElement) Async() bool {
+	return e.attrIsPresent("async")
 }
-func (e ScriptElement) Async() bool  {
- return e.attrIsPresent("async")
+func (e ScriptElement) Defer() bool {
+	return e.attrIsPresent("defer")
 }
-func (e ScriptElement) Defer() bool  {
- return e.attrIsPresent("defer")
+func (e ScriptElement) NoModule() bool {
+	return e.attrIsPresent("nomodule")
 }
-func (e ScriptElement) NoModule() bool  {
- return e.attrIsPresent("nomodule")
+func (e SelectElement) Autofocus() bool {
+	return e.attrIsPresent("autofocus")
 }
-func (e SelectElement) Autofocus() bool  {
- return e.attrIsPresent("autofocus")
+func (e SelectElement) Disabled() bool {
+	return e.attrIsPresent("disabled")
 }
-func (e SelectElement) Disabled() bool  {
- return e.attrIsPresent("disabled")
+func (e SelectElement) Multiple() bool {
+	return e.attrIsPresent("multiple")
 }
-func (e SelectElement) Multiple() bool  {
- return e.attrIsPresent("multiple")
+func (e SelectElement) Name() string {
+	return e.attrAsString("name")
 }
-func (e SelectElement) Name() string  {
- return e.attrAsString("name")
+func (e SelectElement) Required() bool {
+	return e.attrIsPresent("required")
 }
-func (e SelectElement) Required() bool  {
- return e.attrIsPresent("required")
+func (e SelectElement) TabIndex() int {
+	return e.attrAsInt("tabindex", 0)
 }
-func (e SourceElement) KeySystem() string  {
- return e.attrAsString("keysystem")
+func (e SourceElement) KeySystem() string {
+	return e.attrAsString("keysystem")
 }
-func (e SourceElement) Media() string  {
- return e.attrAsString("media")
+func (e SourceElement) Media() string {
+	return e.attrAsString("media")
 }
-func (e SourceElement) Sizes() string  {
- return e.attrAsString("sizes")
+func (e SourceElement) Sizes() string {
+	return e.attrAsString("sizes")
 }
-func (e SourceElement) Src() string  {
- return e.attrAsString("src")
+func (e SourceElement) Src() string {
+	return e.attrAsString("src")
 }
-func (e SourceElement) SrcSet() string  {
- return e.attrAsString("srcset")
+func (e SourceElement) Srcset() string {
+	return e.attrAsString("srcset")
 }
-func (e SourceElement) Type() string  {
- return e.attrAsString("type")
+func (e SourceElement) Type() string {
+	return e.attrAsString("type")
 }
-func (e StyleElement) Media() string  {
- return e.attrAsString("media")
+func (e StyleElement) Media() string {
+	return e.attrAsString("media")
 }
-func (e StyleElement) Type() string  {
- return e.attrAsString("type")
+func (e TableElement) Sortable() bool {
+	return e.attrIsPresent("sortable")
 }
-func (e StyleElement) Disabled() bool  {
- return e.attrIsPresent("disabled")
+func (e TableCellElement) ColSpan() int {
+	return e.attrAsInt("colspan", 1)
 }
-func (e TableElement) Sortable() bool  {
- return e.attrIsPresent("sortable")
+func (e TableCellElement) RowSpan() int {
+	return e.attrAsInt("rowspan", 1)
 }
-func (e TableCellElement) ColSpan() int  {
- return e.attrAsInt("colspan", 1)
+func (e TableCellElement) Headers() string {
+	return e.attrAsString("headers")
 }
-func (e TableCellElement) RowSpan() int  {
- return e.attrAsInt("rowspan", 1)
+func (e TableHeaderCellElement) Abbr() string {
+	return e.attrAsString("abbr")
 }
-func (e TableCellElement) Headers() string  {
- return e.attrAsString("headers")
+func (e TableHeaderCellElement) Scope() string {
+	attrVal := e.attrAsString("scope")
+	switch attrVal {
+	case "row":
+		return "row"
+	case "col":
+		return "col"
+	case "colgroup":
+		return "colgroup"
+	case "rowgroup":
+		return "rowgroup"
+	default:
+		return ""
+	}
 }
-func (e TableHeaderCellElement) Abbr() string  {
- return e.attrAsString("abbr")
-}
-func (e TableHeaderCellElement) Scope() string  {
- return e.attrAsString("scope")
-}
-func (e TableHeaderCellElement) Sorted() bool  {
- return e.attrIsPresent("sorted")
+func (e TableHeaderCellElement) Sorted() bool {
+	return e.attrIsPresent("sorted")
 }
 func (e TextAreaElement) Type() string {
- attrVal := e.attrAsString("type")
-	switch attrVal {
-	case "textarea":
-		return "textarea"
-
-	}
 	return "textarea"
-
 }
-func (e TextAreaElement) Value() string  {
- return e.attrAsString("value")
+func (e TextAreaElement) Value() string {
+	return e.attrAsString("value")
 }
-func (e TextAreaElement) DefaultValue() string  {
- return e.attrAsString("value")
+func (e TextAreaElement) DefaultValue() string {
+	return e.attrAsString("value")
 }
-func (e TextAreaElement) Placeholder() string  {
- return e.attrAsString("placeholder")
+func (e TextAreaElement) Placeholder() string {
+	return e.attrAsString("placeholder")
 }
-func (e TextAreaElement) Rows() int  {
- return e.attrAsInt("rows", 0)
+func (e TextAreaElement) Rows() int {
+	return e.attrAsInt("rows", 0)
 }
-func (e TextAreaElement) Cols() int  {
- return e.attrAsInt("cols", 0)
+func (e TextAreaElement) Cols() int {
+	return e.attrAsInt("cols", 0)
 }
-func (e TextAreaElement) MaxLength() int  {
- return e.attrAsInt("maxlength", 0)
+func (e TextAreaElement) MaxLength() int {
+	return e.attrAsInt("maxlength", 0)
 }
-func (e TextAreaElement) AccessKey() string  {
- return e.attrAsString("accesskey")
+func (e TextAreaElement) TabIndex() int {
+	return e.attrAsInt("tabindex", 0)
 }
-func (e TextAreaElement) ReadOnly() bool  {
- return e.attrIsPresent("readonly")
+func (e TextAreaElement) AccessKey() string {
+	return e.attrAsString("accesskey")
 }
-func (e TextAreaElement) Required() bool  {
- return e.attrIsPresent("required")
+func (e TextAreaElement) ReadOnly() bool {
+	return e.attrIsPresent("readonly")
 }
-func (e TextAreaElement) Autocomplete() bool  {
- return e.attrIsPresent("autocomplete")
+func (e TextAreaElement) Required() bool {
+	return e.attrIsPresent("required")
+}
+func (e TextAreaElement) Autocomplete() string {
+	attrVal := e.attrAsString("autocomplete")
+	switch attrVal {
+	case "off":
+		return "off"
+	default:
+		return "on"
+	}
 }
 func (e TextAreaElement) Autocapitalize() string {
- attrVal := e.attrAsString("autocapitalize")
+	attrVal := e.attrAsString("autocapitalize")
 	switch attrVal {
 	case "none":
 		return "none"
-
 	case "off":
 		return "off"
-
 	case "characters":
 		return "characters"
-
 	case "words":
 		return "words"
-
-	case "sentences":
+	default:
 		return "sentences"
-
 	}
-	return "none"
-
 }
-func (e TextAreaElement) Wrap() string  {
- return e.attrAsString("wrap")
+func (e TextAreaElement) Wrap() string {
+	attrVal := e.attrAsString("wrap")
+	switch attrVal {
+	case "hard":
+		return "hard"
+	case "off":
+		return "off"
+	default:
+		return "soft"
+	}
 }
-func (e TimeElement) DateTime() string  {
- return e.attrAsString("datetime")
+func (e TimeElement) Datetime() string {
+	return e.attrAsString("datetime")
 }
-func (e TitleElement) Text() string  {
- return e.attrAsString("text")
+func (e TrackElement) Kind() string {
+	attrVal := e.attrAsString("kind")
+	switch attrVal {
+	case "captions":
+		return "captions"
+	case "descriptions":
+		return "descriptions"
+	case "chapters":
+		return "chapters"
+	case "metadata":
+		return "metadata"
+	default:
+		return "subtitle"
+	}
 }
-func (e UListElement) Type() string  {
- return e.attrAsString("type")
+func (e TrackElement) Src() string {
+	return e.attrAsString("src")
+}
+func (e TrackElement) Srclang() string {
+	return e.attrAsString("srclang")
+}
+func (e TrackElement) Label() string {
+	return e.attrAsString("label")
+}
+func (e TrackElement) Default() bool {
+	return e.attrIsPresent("default")
+}
+func (e UListElement) Type() string {
+	return e.attrAsString("type")
 }
 

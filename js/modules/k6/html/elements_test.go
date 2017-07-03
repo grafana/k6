@@ -31,7 +31,7 @@ import (
 
 const testHTMLElems = `
 <html>
-<head><link rel="alternate next"/></head>
+<head><link rel="alternate next"/><title>titletest</title></head>
 <body>
 	<a href="/testhref?querytxt#hashtext">0</a>
 	<a href="http://example.com:80">1</a>
@@ -71,6 +71,7 @@ const testHTMLElems = `
 	<progress id="progress1" max="100" value="70"></progress>
 	<progress id="progress2"></progress>
 	<script id="script1">script text</script>
+	<style id="style1"></style>
 	<table><caption>caption text</caption>
 		<thead><tr id="thead_row"><td></td><th id="th_cell" colSpan="2"></th><td id="td_cell" rowSpan="2" headers="th_cell"></td></tr></thead>
 		<tfoot><tr></tr> <tr></tr> <tr id="tfoot_row"></tr></tfoot>
@@ -78,6 +79,7 @@ const testHTMLElems = `
 		<tr id="last_row"></tr>
 	</table>
 	<table><tr id="sectionfree_row"></tr></table>
+	<video id="video1"><track id="trk1"><track id="trk2"></video>
 </body>
 `
 
@@ -490,6 +492,13 @@ func TestElements(t *testing.T) {
 			}
 		})
 	})
+	t.Run("StyleElement", func(t *testing.T) {
+		t.Run("text", func(t *testing.T) {
+			if v, err := common.RunString(rt, `doc.find("#style1").get(0).type()`); assert.NoError(t, err) {
+				assert.Equal(t, "text/css", v.Export())
+			}
+		})
+	})
 	t.Run("TableElement", func(t *testing.T) {
 		t.Run("caption", func(t *testing.T) {
 			if v, err := common.RunString(rt, `doc.find("table").get(0).caption().textContent()`); assert.NoError(t, err) {
@@ -583,6 +592,21 @@ func TestElements(t *testing.T) {
 				}
 			})
 		})
-
+	})
+	t.Run("VideoElement", func(t *testing.T) {
+		t.Run("text tracks", func(t *testing.T) {
+			if v, err := common.RunString(rt, `doc.find("#video1").get(0).textTracks()`); assert.NoError(t, err) {
+				assert.Equal(t, 2, len(v.Export().([]goja.Value)))
+				assert.Equal(t, "trk1", v.Export().([]goja.Value)[0].Export().(TrackElement).Id())
+				assert.Equal(t, "trk2", v.Export().([]goja.Value)[1].Export().(TrackElement).Id())
+			}
+		})
+	})
+	t.Run("TitleElement", func(t *testing.T) {
+		t.Run("text tracks", func(t *testing.T) {
+			if v, err := common.RunString(rt, `doc.find("title").get(0).text()`); assert.NoError(t, err) {
+				assert.Equal(t, "titletest", v.Export())
+			}
+		})
 	})
 }

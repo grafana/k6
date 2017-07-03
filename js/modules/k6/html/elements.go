@@ -21,6 +21,7 @@ var defaultPorts = map[string]string{
 const (
 	AnchorTagName          = "a"
 	AreaTagName            = "area"
+	AudioTagName           = "audio"
 	BaseTagName            = "base"
 	ButtonTagName          = "button"
 	CanvasTagName          = "canvas"
@@ -43,7 +44,7 @@ const (
 	MetaTagName            = "meta"
 	MeterTagName           = "meter"
 	ObjectTagName          = "object"
-	OListTagName           = "olist"
+	OListTagName           = "ol"
 	OptGroupTagName        = "optgroup"
 	OptionTagName          = "option"
 	OutputTagName          = "output"
@@ -63,10 +64,12 @@ const (
 	TableColTagName        = "col"
 	TableDataCellTagName   = "td"
 	TableHeaderCellTagName = "th"
-	TextAreaTagName        = "tagname"
+	TextAreaTagName        = "textarea"
 	TimeTagName            = "time"
 	TitleTagName           = "title"
+	TrackTagName           = "track"
 	UListTagName           = "ul"
+	VideoTagName           = "video"
 )
 
 type HrefElement struct{ Element }
@@ -78,6 +81,7 @@ type TableCellElement struct{ Element }
 
 type AnchorElement struct{ HrefElement }
 type AreaElement struct{ HrefElement }
+type AudioElement struct{ MediaElement }
 type BaseElement struct{ Element }
 type ButtonElement struct{ FormFieldElement }
 type CanvasElement struct{ Element }
@@ -123,7 +127,9 @@ type TableHeaderCellElement struct{ TableCellElement }
 type TextAreaElement struct{ Element }
 type TimeElement struct{ Element }
 type TitleElement struct{ Element }
+type TrackElement struct{ Element }
 type UListElement struct{ Element }
+type VideoElement struct{ MediaElement }
 
 func (h HrefElement) hrefURL() *url.URL {
 	url, err := url.Parse(h.attrAsString("href"))
@@ -605,6 +611,14 @@ func (s SelectElement) Value() string {
 	return valueOrHTML(option.First())
 }
 
+func (s StyleElement) Type() string {
+	typeVal := s.attrAsString("type")
+	if typeVal == "" {
+		return "text/css"
+	}
+	return typeVal
+}
+
 func (t TableElement) firstChild(elemName string) goja.Value {
 	child := t.sel.sel.ChildrenFiltered(elemName)
 	if child.Size() == 0 {
@@ -683,4 +697,12 @@ func (t TableColElement) Span() int {
 		return 1
 	}
 	return span
+}
+
+func (m MediaElement) TextTracks() []goja.Value {
+	return elemList(Selection{m.sel.rt, m.sel.sel.Find("track")})
+}
+
+func (t TitleElement) Text() string {
+	return t.TextContent()
 }
