@@ -150,6 +150,11 @@ var commandRun = cli.Command{
 			Usage:  "output metrics to an external data store (format: type=uri)",
 			EnvVar: "K6_OUT",
 		},
+		cli.StringFlag{
+			Name: "summary-file",
+			Usage: "file where the summary is written (default: standard output)",
+			EnvVar: "K6_SUMMARY_FILE",
+		},
 	),
 	Action: actionRun,
 	Description: `Run starts a load test.
@@ -384,6 +389,7 @@ func actionRun(cc *cli.Context) error {
 	// Collect CLI arguments, most (not all) relating to options.
 	addr := cc.GlobalString("address")
 	out := cc.String("out")
+	summaryFile := cc.String("summary-file")
 	quiet := cc.Bool("quiet")
 	cliOpts, err := getOptions(cc)
 	if err != nil {
@@ -595,7 +601,10 @@ loop:
 	fmt.Fprintf(color.Output, "\n")
 
 	// Print results in a human readable format
-	printHumanizedSummary(engine, atTime)
+	summaryError := printHumanizedSummary(fs, summaryFile, engine, atTime)
+	if summaryError != nil {
+		log.Error(summaryError)
+	}
 
 	if opts.Linger.Bool {
 		<-signals
@@ -607,24 +616,53 @@ loop:
 	return nil
 }
 
-func printHumanizedSummary(engine *core.Engine, atTime time.Duration) {
+func printHumanizedSummary(fs afero.Fs, filename string, engine *core.Engine, atTime time.Duration) error {
+	var out io.Writer
+	var err error
+	
+	// File or stdout
+	if filename == "" || filename == "-" {
+		out = color.Output
+	} else {
+		file, err := fs.Create(filename)
+		if err != nil {
+			return err
+		}
+		out = file
+		defer file.Close()
+	}
+	
 	// Print groups.
-	printHumanizedGroups(engine.Executor.GetRunner().GetDefaultGroup(), 1)
+	err = printHumanizedGroups(out, engine.Executor.GetRunner().GetDefaultGroup(), 1)
+	if err != nil {
+		return err
+	}
 
 	// Sort and print metrics.
-	printHumanizedMetrics(engine, atTime)
+	err = printHumanizedMetrics(out, engine, atTime)
+	if err != nil {
+		return err
+	}
+	
+	return nil
 }
 
-func printHumanizedGroups(g *lib.Group, level int) {
+func printHumanizedGroups(out io.Writer, g *lib.Group, level int) error {
 	indent := strings.Repeat("  ", level)
 
 	if g.Name != "" && g.Parent != nil {
-		fmt.Fprintf(color.Output, "%s█ %s\n", indent, g.Name)
+		_, err := fmt.Fprintf(out, "%s█ %s\n", indent, g.Name)
+		if err != nil {
+			return err
+		}
 	}
 
 	if len(g.Checks) > 0 {
 		if g.Name != "" && g.Parent != nil {
-			fmt.Fprintf(color.Output, "\n")
+			_, err := fmt.Fprintf(out, "\n")
+			if err != nil {
+				return err
+			}
 		}
 		for _, check := range g.Checks {
 			icon := "✓"
@@ -636,14 +674,14 @@ func printHumanizedGroups(g *lib.Group, level int) {
 				statusColor = color.RedString
 			}
 
-			fmt.Fprint(color.Output, statusColor("%s  %s %s\n",
+			fmt.Fprint(out, statusColor("%s  %s %s\n",
 				indent,
 				icon,
 				check.Name,
 			))
 
 			if isCheckFailure {
-				fmt.Fprint(color.Output, statusColor("%s        %2.2f%% (%v/%v) \n",
+				fmt.Fprint(out, statusColor("%s        %2.2f%% (%v/%v) \n",
 					indent,
 					100*(float64(check.Fails)/float64(check.Passes+check.Fails)),
 					check.Fails,
@@ -652,19 +690,30 @@ func printHumanizedGroups(g *lib.Group, level int) {
 			}
 
 		}
-		fmt.Fprintf(color.Output, "\n")
+		_, err := fmt.Fprintf(out, "\n")
+		if err != nil {
+			return err
+		}
 	}
 	if len(g.Groups) > 0 {
 		if g.Name != "" && g.Parent != nil && len(g.Checks) > 0 {
-			fmt.Fprintf(color.Output, "\n")
+			_, err := fmt.Fprintf(out, "\n")
+			if err != nil {
+				return err
+			}
 		}
 		for _, g := range g.Groups {
-			printHumanizedGroups(g, level+1)
+			err := printHumanizedGroups(out, g, level+1)
+			if err != nil {
+				return err
+			}
 		}
 	}
+	
+	return nil
 }
 
-func printHumanizedMetrics(engine *core.Engine, atTime time.Duration) {
+func printHumanizedMetrics(out io.Writer, engine *core.Engine, atTime time.Duration) error {
 	// Sort metric names
 	metricNames := make([]string, 0, len(engine.Metrics))
 	metricNameWidth := 0
@@ -719,13 +768,18 @@ func printHumanizedMetrics(engine *core.Engine, atTime time.Duration) {
 		}
 
 		namePadding := strings.Repeat(".", metricNameWidth-len(name)+3)
-		fmt.Fprintf(color.Output, "  %s %s%s %s\n",
+		_, err := fmt.Fprintf(out, "  %s %s%s %s\n",
 			icon,
 			name,
 			color.New(color.Faint).Sprint(namePadding+":"),
 			val,
 		)
+		if err != nil {
+			return err
+		}
 	}
+	
+	return nil
 }
 
 func actionArchive(cc *cli.Context) error {
