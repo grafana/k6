@@ -137,21 +137,65 @@ func TestExecutorSetVUs(t *testing.T) {
 	})
 
 	t.Run("Raise", func(t *testing.T) {
-		e := New(nil)
+		e := New(lib.RunnerFunc(func(ctx context.Context) ([]stats.Sample, error) {
+			return nil, nil
+		}))
 		e.ctx = context.Background()
 
 		assert.NoError(t, e.SetVUsMax(100))
 		assert.Equal(t, int64(100), e.GetVUsMax())
+		if assert.Len(t, e.vus, 100) {
+			num := 0
+			for i, handle := range e.vus {
+				num++
+				assert.NotNil(t, handle.vu, "vu %d lacks impl", i)
+				assert.Nil(t, handle.ctx, "vu %d has ctx", i)
+				assert.Nil(t, handle.cancel, "vu %d has cancel", i)
+			}
+			assert.Equal(t, 100, num)
+		}
 
 		assert.NoError(t, e.SetVUs(50))
 		assert.Equal(t, int64(50), e.GetVUs())
+		if assert.Len(t, e.vus, 100) {
+			num := 0
+			for i, handle := range e.vus {
+				if i < 50 {
+					assert.NotNil(t, handle.cancel, "vu %d lacks cancel", i)
+					num++
+				} else {
+					assert.Nil(t, handle.cancel, "vu %d has cancel", i)
+				}
+			}
+			assert.Equal(t, 50, num)
+		}
 
 		assert.NoError(t, e.SetVUs(100))
 		assert.Equal(t, int64(100), e.GetVUs())
+		if assert.Len(t, e.vus, 100) {
+			num := 0
+			for i, handle := range e.vus {
+				assert.NotNil(t, handle.cancel, "vu %d lacks cancel", i)
+				num++
+			}
+			assert.Equal(t, 100, num)
+		}
 
 		t.Run("Lower", func(t *testing.T) {
 			assert.NoError(t, e.SetVUs(50))
 			assert.Equal(t, int64(50), e.GetVUs())
+			if assert.Len(t, e.vus, 100) {
+				num := 0
+				for i, handle := range e.vus {
+					if i < 50 {
+						assert.NotNil(t, handle.cancel, "vu %d lacks cancel", i)
+						num++
+					} else {
+						assert.Nil(t, handle.cancel, "vu %d has cancel", i)
+					}
+				}
+				assert.Equal(t, 50, num)
+			}
 		})
 	})
 }
