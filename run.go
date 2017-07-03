@@ -24,6 +24,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"context"
+	jsonenc "encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -69,7 +70,12 @@ const (
 	CollectorJSON     = "json"
 	CollectorInfluxDB = "influxdb"
 	CollectorCloud    = "cloud"
+
+	SummaryFormatText = SummaryFormat(iota)
+	SummaryFormatJSON
 )
+
+type SummaryFormat int
 
 var urlRegex = regexp.MustCompile(`(?i)^https?://`)
 
@@ -154,6 +160,12 @@ var commandRun = cli.Command{
 			Name: "summary-file",
 			Usage: "file where the summary is written (default: standard output)",
 			EnvVar: "K6_SUMMARY_FILE",
+		},
+		cli.StringFlag{
+			Name: "summary-format",
+			Usage: "file format for summary, one of: text, json",
+			EnvVar: "K6_SUMMARY_FILE",
+			Value: "text",
 		},
 	),
 	Action: actionRun,
@@ -303,6 +315,23 @@ func collectorOfType(t string) lib.Collector {
 	}
 }
 
+func getSummaryFormat(cc *cli.Context) (SummaryFormat, error) {
+	var err error
+	var value SummaryFormat
+	format := cc.String("summary-format")
+	
+	switch format {
+	case "json":
+		value = SummaryFormatJSON
+	case "text":
+		value = SummaryFormatText
+	default:
+		err = errors.Errorf("Invalid summary format: %s", format)
+	}
+
+	return value, err
+}
+
 func getOptions(cc *cli.Context) (lib.Options, error) {
 	var err error
 	opts := lib.Options{
@@ -390,6 +419,10 @@ func actionRun(cc *cli.Context) error {
 	addr := cc.GlobalString("address")
 	out := cc.String("out")
 	summaryFile := cc.String("summary-file")
+	summaryFormat, err := getSummaryFormat(cc)
+	if err != nil {
+		return err
+	}
 	quiet := cc.Bool("quiet")
 	cliOpts, err := getOptions(cc)
 	if err != nil {
@@ -600,10 +633,10 @@ loop:
 	}
 	fmt.Fprintf(color.Output, "\n")
 
-	// Print results in a human readable format
-	summaryError := printHumanizedSummary(fs, summaryFile, engine, atTime)
+	// Print summary
+	summaryError := printSummary(fs, summaryFile, summaryFormat, engine, atTime)
 	if summaryError != nil {
-		log.Error(summaryError)
+		log.WithError(summaryError).Errorf("Could not write summary to file %s", summaryFile)
 	}
 
 	if opts.Linger.Bool {
@@ -616,10 +649,9 @@ loop:
 	return nil
 }
 
-func printHumanizedSummary(fs afero.Fs, filename string, engine *core.Engine, atTime time.Duration) error {
+func printSummary(fs afero.Fs, filename string, summaryFormat SummaryFormat, engine *core.Engine, atTime time.Duration) error {
 	var out io.Writer
-	var err error
-	
+
 	// File or stdout
 	if filename == "" || filename == "-" {
 		out = color.Output
@@ -632,8 +664,19 @@ func printHumanizedSummary(fs afero.Fs, filename string, engine *core.Engine, at
 		defer file.Close()
 	}
 	
+	switch summaryFormat {
+	case SummaryFormatText:
+		return printHumanizedSummary(out, engine, atTime)
+	case SummaryFormatJSON:
+		return printJsonSummary(out, engine)
+	default:
+		return errors.Errorf("Unexpected summary format: %s", summaryFormat)
+	}
+}
+
+func printHumanizedSummary(out io.Writer, engine *core.Engine, atTime time.Duration) error {
 	// Print groups.
-	err = printHumanizedGroups(out, engine.Executor.GetRunner().GetDefaultGroup(), 1)
+	err := printHumanizedGroups(out, engine.Executor.GetRunner().GetDefaultGroup(), 1)
 	if err != nil {
 		return err
 	}
@@ -777,6 +820,36 @@ func printHumanizedMetrics(out io.Writer, engine *core.Engine, atTime time.Durat
 		if err != nil {
 			return err
 		}
+	}
+	
+	return nil
+}
+
+type EngineSummary struct {
+	Groups  *lib.Group 		 `json:"groups"`
+	Metrics []*stats.Summary `json:"metrics"`
+}
+
+func printJsonSummary(out io.Writer, engine *core.Engine) error {
+	metrics := make([]*stats.Summary, 0, len(engine.Metrics))
+	
+	for _, metric := range engine.Metrics {
+		metrics = append(metrics, metric.Summary())
+	}
+	
+	summary := &EngineSummary{
+		Groups: engine.Executor.GetRunner().GetDefaultGroup(),
+		Metrics: metrics,
+	}
+	
+	bs, err := jsonenc.Marshal(summary)
+	if err != nil {
+		return err
+	}
+	
+	_, err = out.Write(bs)
+	if err != nil {
+		return err
 	}
 	
 	return nil
