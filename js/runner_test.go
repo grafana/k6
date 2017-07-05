@@ -468,3 +468,47 @@ func TestVUIntegrationTLSConfig(t *testing.T) {
 		})
 	}
 }
+
+func TestVUIntegrationHTTP2(t *testing.T) {
+	r1, err := New(&lib.SourceData{
+		Filename: "/script.js",
+		Data: []byte(`
+			import http from "k6/http";
+			export default function() {
+				let res = http.request("GET", "https://http2.akamai.com/demo");
+				if (res.status != 200) { throw new Error("wrong status: " + res.status) }
+				if (res.proto != "HTTP/2.0") { throw new Error("wrong proto: " + res.proto) }
+			}
+		`),
+	}, afero.NewMemMapFs())
+	if !assert.NoError(t, err) {
+		return
+	}
+	r1.ApplyOptions(lib.Options{Throw: null.BoolFrom(true)})
+
+	r2, err := NewFromArchive(r1.MakeArchive())
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	runners := map[string]*Runner{"Source": r1, "Archive": r2}
+	for name, r := range runners {
+		t.Run(name, func(t *testing.T) {
+			vu, err := r.NewVU()
+			if !assert.NoError(t, err) {
+				return
+			}
+			samples, err := vu.RunOnce(context.Background())
+			assert.NoError(t, err)
+
+			protoFound := false
+			for _, sample := range samples {
+				if proto := sample.Tags["proto"]; proto != "" {
+					protoFound = true
+					assert.Equal(t, "HTTP/2.0", proto)
+				}
+			}
+			assert.True(t, protoFound)
+		})
+	}
+}
