@@ -4,6 +4,75 @@ package html
 
 import "github.com/dop251/goja"
 
+const (
+	constBlank = ""
+	const1 = "1"
+	constA = "A"
+	constDSA = "DSA"
+	constEC = "EC"
+	constI = "I"
+	constRSA = "RSA"
+	consta = "a"
+	constanonymous = "anonymous"
+	constapplication_x_www_form_urlencoded = "application/x-www-form-urlencoded"
+	constauto = "auto"
+	constbutton = "button"
+	constcaptions = "captions"
+	constchapters = "chapters"
+	constcharacters = "characters"
+	constcheckbox = "checkbox"
+	constcircle = "circle"
+	constcol = "col"
+	constcolgroup = "colgroup"
+	constcolor = "color"
+	constcontent_type = "content-type"
+	constdate = "date"
+	constdatetime_local = "datetime-local"
+	constdefault_style = "default-style"
+	constdescriptions = "descriptions"
+	constdisc = "disc"
+	constemail = "email"
+	constfile = "file"
+	consthard = "hard"
+	consthidden = "hidden"
+	consti = "i"
+	constimage = "image"
+	constmenu = "menu"
+	constmetadata = "metadata"
+	constmonth = "month"
+	constmultipart_form_data = "multipart/form-data"
+	constno_referrer = "no-referrer"
+	constno_referrer_when_downgrade = "no-referrer-when-downgrade"
+	constnone = "none"
+	constnumber = "number"
+	constoff = "off"
+	conston = "on"
+	constorigin = "origin"
+	constorigin_when_cross_origin = "origin-when-cross-origin"
+	constpassword = "password"
+	constradio = "radio"
+	constrange = "range"
+	constrefresh = "refresh"
+	constreset = "reset"
+	constrow = "row"
+	constrowgroup = "rowgroup"
+	constsearch = "search"
+	constsentences = "sentences"
+	constsoft = "soft"
+	constsquare = "square"
+	constsubmit = "submit"
+	constsubtitle = "subtitle"
+	consttel = "tel"
+	consttext = "text"
+	consttext_plain = "text/plain"
+	consttime = "time"
+	constunsafe_url = "unsafe-url"
+	consturl = "url"
+	constuse_credentials = "use-credentials"
+	constweek = "week"
+	constwords = "words"
+	)
+
 func selToElement(sel Selection) goja.Value {
 	if sel.sel.Length() == 0 {
 		return goja.Undefined()
@@ -176,18 +245,18 @@ func (e HrefElement) Download() string {
 func (e HrefElement) ReferrerPolicy() string {
 	attrVal := e.attrAsString("referrerpolicy")
 	switch attrVal {
-	case "no-referrer":
-		return "no-referrer"
-	case "no-referrer-when-downgrade":
-		return "no-referrer-when-downgrade"
-	case "origin":
-		return "origin"
-	case "origin-when-cross-origin":
-		return "origin-when-cross-origin"
-	case "unsafe-url":
-		return "unsafe-url"
-	default:
-		return ""
+	case constno_referrer:
+		return constno_referrer
+	case constno_referrer_when_downgrade:
+		return constno_referrer_when_downgrade
+	case constorigin:
+		return constorigin
+	case constorigin_when_cross_origin:
+		return constorigin_when_cross_origin
+	case constunsafe_url:
+		return constunsafe_url
+	default: 
+		return constBlank 
 	}
 }
 func (e HrefElement) Rel() string {
@@ -226,12 +295,12 @@ func (e MediaElement) Muted() bool {
 func (e MediaElement) Preload() string {
 	attrVal := e.attrAsString("preload")
 	switch attrVal {
-	case "metadata":
-		return "metadata"
-	case "none":
-		return "none"
-	default:
-		return "auto"
+	case constmetadata:
+		return constmetadata
+	case constnone:
+		return constnone
+	default: 
+		return constauto 
 	}
 }
 func (e MediaElement) Src() string {
@@ -243,10 +312,10 @@ func (e MediaElement) CrossOrigin() goja.Value {
 		return goja.Undefined()
 	}
 	switch attrVal {
-	case "anonymous":
-		return e.sel.rt.ToValue("anonymous")
-	case "use-credentials":
-		return e.sel.rt.ToValue("use-credentials")
+	case constanonymous:
+		return e.sel.rt.ToValue(constanonymous)
+	case constuse_credentials:
+		return e.sel.rt.ToValue(constuse_credentials)
 	default:
 		return goja.Undefined()
 	}
@@ -281,14 +350,14 @@ func (e ButtonElement) TabIndex() int {
 func (e ButtonElement) Type() string {
 	attrVal := e.attrAsString("type")
 	switch attrVal {
-	case "button":
-		return "button"
-	case "menu":
-		return "menu"
-	case "reset":
-		return "reset"
-	default:
-		return "submit"
+	case constbutton:
+		return constbutton
+	case constmenu:
+		return constmenu
+	case constreset:
+		return constreset
+	default: 
+		return constsubmit 
 	}
 }
 func (e DataElement) Value() string {
@@ -324,23 +393,23 @@ func (e FormElement) Action() string {
 func (e FormElement) Enctype() string {
 	attrVal := e.attrAsString("enctype")
 	switch attrVal {
-	case "multipart/form-data":
-		return "multipart/form-data"
-	case "text/plain":
-		return "text/plain"
-	default:
-		return "application/x-www-form-urlencoded"
+	case constmultipart_form_data:
+		return constmultipart_form_data
+	case consttext_plain:
+		return consttext_plain
+	default: 
+		return constapplication_x_www_form_urlencoded 
 	}
 }
 func (e FormElement) Encoding() string {
 	attrVal := e.attrAsString("enctype")
 	switch attrVal {
-	case "multipart/form-data":
-		return "multipart/form-data"
-	case "text/plain":
-		return "text/plain"
-	default:
-		return "application/x-www-form-urlencoded"
+	case constmultipart_form_data:
+		return constmultipart_form_data
+	case consttext_plain:
+		return consttext_plain
+	default: 
+		return constapplication_x_www_form_urlencoded 
 	}
 }
 func (e FormElement) AcceptCharset() string {
@@ -349,10 +418,10 @@ func (e FormElement) AcceptCharset() string {
 func (e FormElement) Autocomplete() string {
 	attrVal := e.attrAsString("autocomplete")
 	switch attrVal {
-	case "off":
-		return "off"
-	default:
-		return "on"
+	case constoff:
+		return constoff
+	default: 
+		return conston 
 	}
 }
 func (e FormElement) NoValidate() bool {
@@ -364,18 +433,18 @@ func (e IFrameElement) Allowfullscreen() bool {
 func (e IFrameElement) ReferrerPolicy() string {
 	attrVal := e.attrAsString("referrerpolicy")
 	switch attrVal {
-	case "no-referrer":
-		return "no-referrer"
-	case "no-referrer-when-downgrade":
-		return "no-referrer-when-downgrade"
-	case "origin":
-		return "origin"
-	case "origin-when-cross-origin":
-		return "origin-when-cross-origin"
-	case "unsafe-url":
-		return "unsafe-url"
-	default:
-		return ""
+	case constno_referrer:
+		return constno_referrer
+	case constno_referrer_when_downgrade:
+		return constno_referrer_when_downgrade
+	case constorigin:
+		return constorigin
+	case constorigin_when_cross_origin:
+		return constorigin_when_cross_origin
+	case constunsafe_url:
+		return constunsafe_url
+	default: 
+		return constBlank 
 	}
 }
 func (e IFrameElement) Height() string {
@@ -408,10 +477,10 @@ func (e ImageElement) CrossOrigin() goja.Value {
 		return goja.Undefined()
 	}
 	switch attrVal {
-	case "anonymous":
-		return e.sel.rt.ToValue("anonymous")
-	case "use-credentials":
-		return e.sel.rt.ToValue("use-credentials")
+	case constanonymous:
+		return e.sel.rt.ToValue(constanonymous)
+	case constuse_credentials:
+		return e.sel.rt.ToValue(constuse_credentials)
 	default:
 		return goja.Undefined()
 	}
@@ -437,18 +506,18 @@ func (e ImageElement) UseMap() string {
 func (e ImageElement) ReferrerPolicy() string {
 	attrVal := e.attrAsString("referrerpolicy")
 	switch attrVal {
-	case "no-referrer":
-		return "no-referrer"
-	case "no-referrer-when-downgrade":
-		return "no-referrer-when-downgrade"
-	case "origin":
-		return "origin"
-	case "origin-when-cross-origin":
-		return "origin-when-cross-origin"
-	case "unsafe-url":
-		return "unsafe-url"
-	default:
-		return ""
+	case constno_referrer:
+		return constno_referrer
+	case constno_referrer_when_downgrade:
+		return constno_referrer_when_downgrade
+	case constorigin:
+		return constorigin
+	case constorigin_when_cross_origin:
+		return constorigin_when_cross_origin
+	case constunsafe_url:
+		return constunsafe_url
+	default: 
+		return constBlank 
 	}
 }
 func (e InputElement) Name() string {
@@ -460,50 +529,50 @@ func (e InputElement) TabIndex() int {
 func (e InputElement) Type() string {
 	attrVal := e.attrAsString("type")
 	switch attrVal {
-	case "button":
-		return "button"
-	case "checkbox":
-		return "checkbox"
-	case "color":
-		return "color"
-	case "date":
-		return "date"
-	case "datetime-local":
-		return "datetime-local"
-	case "email":
-		return "email"
-	case "file":
-		return "file"
-	case "hidden":
-		return "hidden"
-	case "image":
-		return "image"
-	case "month":
-		return "month"
-	case "number":
-		return "number"
-	case "password":
-		return "password"
-	case "radio":
-		return "radio"
-	case "range":
-		return "range"
-	case "reset":
-		return "reset"
-	case "search":
-		return "search"
-	case "submit":
-		return "submit"
-	case "tel":
-		return "tel"
-	case "time":
-		return "time"
-	case "url":
-		return "url"
-	case "week":
-		return "week"
-	default:
-		return "text"
+	case constbutton:
+		return constbutton
+	case constcheckbox:
+		return constcheckbox
+	case constcolor:
+		return constcolor
+	case constdate:
+		return constdate
+	case constdatetime_local:
+		return constdatetime_local
+	case constemail:
+		return constemail
+	case constfile:
+		return constfile
+	case consthidden:
+		return consthidden
+	case constimage:
+		return constimage
+	case constmonth:
+		return constmonth
+	case constnumber:
+		return constnumber
+	case constpassword:
+		return constpassword
+	case constradio:
+		return constradio
+	case constrange:
+		return constrange
+	case constreset:
+		return constreset
+	case constsearch:
+		return constsearch
+	case constsubmit:
+		return constsubmit
+	case consttel:
+		return consttel
+	case consttime:
+		return consttime
+	case consturl:
+		return consturl
+	case constweek:
+		return constweek
+	default: 
+		return consttext 
 	}
 }
 func (e InputElement) Disabled() bool {
@@ -542,10 +611,10 @@ func (e InputElement) Accept() string {
 func (e InputElement) Autocomplete() string {
 	attrVal := e.attrAsString("autocomplete")
 	switch attrVal {
-	case "off":
-		return "off"
-	default:
-		return "on"
+	case constoff:
+		return constoff
+	default: 
+		return conston 
 	}
 }
 func (e InputElement) MaxLength() int {
@@ -596,12 +665,12 @@ func (e KeygenElement) Disabled() bool {
 func (e KeygenElement) Keytype() string {
 	attrVal := e.attrAsString("keytype")
 	switch attrVal {
-	case "DSA":
-		return "DSA"
-	case "EC":
-		return "EC"
-	default:
-		return "RSA"
+	case constDSA:
+		return constDSA
+	case constEC:
+		return constEC
+	default: 
+		return constRSA 
 	}
 }
 func (e KeygenElement) Name() string {
@@ -622,24 +691,24 @@ func (e LiElement) Value() int {
 func (e LiElement) Type() string {
 	attrVal := e.attrAsString("type")
 	switch attrVal {
-	case "1":
-		return "1"
-	case "a":
-		return "a"
-	case "A":
-		return "A"
-	case "i":
-		return "i"
-	case "I":
-		return "I"
-	case "disc":
-		return "disc"
-	case "square":
-		return "square"
-	case "circle":
-		return "circle"
-	default:
-		return ""
+	case const1:
+		return const1
+	case consta:
+		return consta
+	case constA:
+		return constA
+	case consti:
+		return consti
+	case constI:
+		return constI
+	case constdisc:
+		return constdisc
+	case constsquare:
+		return constsquare
+	case constcircle:
+		return constcircle
+	default: 
+		return constBlank 
 	}
 }
 func (e LinkElement) CrossOrigin() goja.Value {
@@ -648,10 +717,10 @@ func (e LinkElement) CrossOrigin() goja.Value {
 		return goja.Undefined()
 	}
 	switch attrVal {
-	case "anonymous":
-		return e.sel.rt.ToValue("anonymous")
-	case "use-credentials":
-		return e.sel.rt.ToValue("use-credentials")
+	case constanonymous:
+		return e.sel.rt.ToValue(constanonymous)
+	case constuse_credentials:
+		return e.sel.rt.ToValue(constuse_credentials)
 	default:
 		return goja.Undefined()
 	}
@@ -659,18 +728,18 @@ func (e LinkElement) CrossOrigin() goja.Value {
 func (e LinkElement) ReferrerPolicy() string {
 	attrVal := e.attrAsString("referrerpolicy")
 	switch attrVal {
-	case "no-referrer":
-		return "no-referrer"
-	case "no-referrer-when-downgrade":
-		return "no-referrer-when-downgrade"
-	case "origin":
-		return "origin"
-	case "origin-when-cross-origin":
-		return "origin-when-cross-origin"
-	case "unsafe-url":
-		return "unsafe-url"
-	default:
-		return ""
+	case constno_referrer:
+		return constno_referrer
+	case constno_referrer_when_downgrade:
+		return constno_referrer_when_downgrade
+	case constorigin:
+		return constorigin
+	case constorigin_when_cross_origin:
+		return constorigin_when_cross_origin
+	case constunsafe_url:
+		return constunsafe_url
+	default: 
+		return constBlank 
 	}
 }
 func (e LinkElement) Href() string {
@@ -703,12 +772,12 @@ func (e MetaElement) Name() string {
 func (e MetaElement) HttpEquiv() string {
 	attrVal := e.attrAsString("http-equiv")
 	switch attrVal {
-	case "default-style":
-		return "default-style"
-	case "refresh":
-		return "refresh"
-	default:
-		return "content-type"
+	case constdefault_style:
+		return constdefault_style
+	case constrefresh:
+		return constrefresh
+	default: 
+		return constcontent_type 
 	}
 }
 func (e MeterElement) Min() int {
@@ -765,16 +834,16 @@ func (e OListElement) Start() int {
 func (e OListElement) Type() string {
 	attrVal := e.attrAsString("type")
 	switch attrVal {
-	case "a":
-		return "a"
-	case "A":
-		return "A"
-	case "i":
-		return "i"
-	case "I":
-		return "I"
-	default:
-		return "1"
+	case consta:
+		return consta
+	case constA:
+		return constA
+	case consti:
+		return consti
+	case constI:
+		return constI
+	default: 
+		return const1 
 	}
 }
 func (e OptGroupElement) Disabled() bool {
@@ -891,16 +960,16 @@ func (e TableHeaderCellElement) Abbr() string {
 func (e TableHeaderCellElement) Scope() string {
 	attrVal := e.attrAsString("scope")
 	switch attrVal {
-	case "row":
-		return "row"
-	case "col":
-		return "col"
-	case "colgroup":
-		return "colgroup"
-	case "rowgroup":
-		return "rowgroup"
-	default:
-		return ""
+	case constrow:
+		return constrow
+	case constcol:
+		return constcol
+	case constcolgroup:
+		return constcolgroup
+	case constrowgroup:
+		return constrowgroup
+	default: 
+		return constBlank 
 	}
 }
 func (e TableHeaderCellElement) Sorted() bool {
@@ -942,36 +1011,36 @@ func (e TextAreaElement) Required() bool {
 func (e TextAreaElement) Autocomplete() string {
 	attrVal := e.attrAsString("autocomplete")
 	switch attrVal {
-	case "off":
-		return "off"
-	default:
-		return "on"
+	case constoff:
+		return constoff
+	default: 
+		return conston 
 	}
 }
 func (e TextAreaElement) Autocapitalize() string {
 	attrVal := e.attrAsString("autocapitalize")
 	switch attrVal {
-	case "none":
-		return "none"
-	case "off":
-		return "off"
-	case "characters":
-		return "characters"
-	case "words":
-		return "words"
-	default:
-		return "sentences"
+	case constnone:
+		return constnone
+	case constoff:
+		return constoff
+	case constcharacters:
+		return constcharacters
+	case constwords:
+		return constwords
+	default: 
+		return constsentences 
 	}
 }
 func (e TextAreaElement) Wrap() string {
 	attrVal := e.attrAsString("wrap")
 	switch attrVal {
-	case "hard":
-		return "hard"
-	case "off":
-		return "off"
-	default:
-		return "soft"
+	case consthard:
+		return consthard
+	case constoff:
+		return constoff
+	default: 
+		return constsoft 
 	}
 }
 func (e TimeElement) Datetime() string {
@@ -980,16 +1049,16 @@ func (e TimeElement) Datetime() string {
 func (e TrackElement) Kind() string {
 	attrVal := e.attrAsString("kind")
 	switch attrVal {
-	case "captions":
-		return "captions"
-	case "descriptions":
-		return "descriptions"
-	case "chapters":
-		return "chapters"
-	case "metadata":
-		return "metadata"
-	default:
-		return "subtitle"
+	case constcaptions:
+		return constcaptions
+	case constdescriptions:
+		return constdescriptions
+	case constchapters:
+		return constchapters
+	case constmetadata:
+		return constmetadata
+	default: 
+		return constsubtitle 
 	}
 }
 func (e TrackElement) Src() string {
