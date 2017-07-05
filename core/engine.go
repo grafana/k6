@@ -119,6 +119,27 @@ func (e *Engine) Run(ctx context.Context) error {
 	e.runLock.Lock()
 	defer e.runLock.Unlock()
 
+	e.logger.Debug("Engine: Starting with parameters...")
+	for i, st := range e.Stages {
+		fields := make(log.Fields)
+		if st.Target.Valid {
+			fields["tgt"] = st.Target.Int64
+		}
+		if st.Duration.Valid {
+			fields["d"] = st.Duration.Duration
+		}
+		e.logger.WithFields(fields).Debugf(" - stage #%d", i)
+	}
+
+	fields := make(log.Fields)
+	if endTime := e.Executor.GetEndTime(); endTime.Valid {
+		fields["time"] = endTime.Duration
+	}
+	if endIter := e.Executor.GetEndIterations(); endIter.Valid {
+		fields["iter"] = endIter.Int64
+	}
+	e.logger.WithFields(fields).Debug(" - end conditions (if any)")
+
 	collectorwg := sync.WaitGroup{}
 	collectorctx, collectorcancel := context.WithCancel(context.Background())
 	if e.Collector != nil {
@@ -139,6 +160,7 @@ func (e *Engine) Run(ctx context.Context) error {
 	subwg.Add(1)
 	go func() {
 		e.runMetricsEmission(subctx)
+		e.logger.Debug("Engine: Emission terminated")
 		subwg.Done()
 	}()
 
@@ -146,6 +168,7 @@ func (e *Engine) Run(ctx context.Context) error {
 	subwg.Add(1)
 	go func() {
 		e.runThresholds(subctx)
+		e.logger.Debug("Engine: Thresholds terminated")
 		subwg.Done()
 	}()
 
@@ -155,12 +178,12 @@ func (e *Engine) Run(ctx context.Context) error {
 	subwg.Add(1)
 	go func() {
 		errC <- e.Executor.Run(subctx, out)
+		e.logger.Debug("Engine: Executor terminated")
 		subwg.Done()
 	}()
 
 	defer func() {
 		// Shut down subsystems.
-		cutoff := time.Now()
 		subcancel()
 
 		// Process samples until the subsystems have shut down.
@@ -174,11 +197,7 @@ func (e *Engine) Run(ctx context.Context) error {
 			close(out)
 		}()
 		for samples := range out {
-			for _, sample := range samples {
-				if !sample.Time.After(cutoff) {
-					e.processSamples(sample)
-				}
-			}
+			e.processSamples(samples...)
 		}
 
 		// Emit final metrics.
@@ -201,8 +220,10 @@ func (e *Engine) Run(ctx context.Context) error {
 				e.logger.Debug("run: ProcessStages() returned false; exiting...")
 				return nil
 			}
-			if err := e.Executor.SetVUs(vus); err != nil {
-				return err
+			if vus.Valid {
+				if err := e.Executor.SetVUs(vus.Int64); err != nil {
+					return err
+				}
 			}
 		case samples := <-out:
 			e.processSamples(samples...)
