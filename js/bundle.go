@@ -24,7 +24,6 @@ import (
 	"context"
 	"encoding/json"
 	"os"
-	"reflect"
 	"strings"
 
 	"github.com/dop251/goja"
@@ -112,7 +111,7 @@ func NewBundle(src *lib.SourceData, fs afero.Fs) (*Bundle, error) {
 	if def == nil || goja.IsNull(def) || goja.IsUndefined(def) {
 		return nil, errors.New("script must export a default function")
 	}
-	if def.ExportType().Kind() != reflect.Func {
+	if _, ok := goja.AssertFunction(def); !ok {
 		return nil, errors.New("default export must be a function")
 	}
 
@@ -198,7 +197,10 @@ func (b *Bundle) Instantiate() (*BundleInstance, error) {
 
 	// Grab the default function; type is already checked in NewBundle().
 	exports := rt.Get("exports").ToObject(rt)
-	def, _ := goja.AssertFunction(exports.Get("default"))
+	def, ok := goja.AssertFunction(exports.Get("default"))
+	if !ok || def == nil {
+		panic("exported default is not a function")
+	}
 
 	return &BundleInstance{
 		Runtime: rt,
