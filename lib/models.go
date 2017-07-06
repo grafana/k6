@@ -52,8 +52,8 @@ type Group struct {
 	Groups map[string]*Group `json:"groups"`
 	Checks map[string]*Check `json:"checks"`
 
-	groupMutex sync.Mutex    `json:"-"`
-	checkMutex sync.Mutex    `json:"-"`
+	groupMutex sync.Mutex `json:"-"`
+	checkMutex sync.Mutex `json:"-"`
 }
 
 func NewGroup(name string, parent *Group) (*Group, error) {

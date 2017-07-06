@@ -636,7 +636,9 @@ func writeFile(fs afero.Fs, filename string, contents []byte) (err error) {
 		return
 	}
 
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 
 	_, err = file.Write(contents)
 
