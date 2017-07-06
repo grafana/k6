@@ -262,7 +262,7 @@ func main() {
 		}
 	}
 
-	elemFuncsTemplate.Execute(f, struct {
+	err = elemFuncsTemplate.Execute(f, struct {
 		ElemInfos  map[string]*ElemInfo
 		FuncDefs   []string
 		EnumConsts map[string]string
@@ -271,7 +271,14 @@ func main() {
 		funcDefs,
 		enumConsts,
 	})
-	f.Close()
+	if err != nil {
+		log.Println("error, unable to execute template:", err)
+	}
+
+	err = f.Close()
+	if err != nil {
+		log.Println("Unable to close generated code file: ", err)
+	}
 }
 
 var elemFuncsTemplate = template.Must(template.New("").Funcs(template.FuncMap{
@@ -318,7 +325,7 @@ func (e {{$funcDef.ElemName}}) {{$funcDef.ElemMethod}}() {{$funcDef.ReturnType}}
 	{{- $optConst := toConst $optVal }}
 		{{- if ne $optIdx 0 }}
 	case {{$optConst}}:
-		return {{$optConst}}
+		return attrVal
 		{{- end }}
 	{{- end}}
 	default: 
@@ -333,7 +340,7 @@ func (e {{$funcDef.ElemName}}) {{$funcDef.ElemMethod}}() {{$funcDef.ReturnType}}
 	{{- range $optVal := $funcDef.ReturnOpts }}
 	{{- $optConst := toConst $optVal }}
 	case {{$optConst}}:
-		return e.sel.rt.ToValue({{$optConst}})
+		return e.sel.rt.ToValue(attrVal)
 	{{- end}}
 	default:
 		return goja.Undefined()

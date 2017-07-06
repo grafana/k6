@@ -70,6 +70,8 @@ const (
 	TrackTagName           = "track"
 	UListTagName           = "ul"
 	VideoTagName           = "video"
+	methodPost             = "post"
+	methodGet              = "get"
 )
 
 type HrefElement struct{ Element }
@@ -280,11 +282,11 @@ func (f FormFieldElement) FormEnctype() string {
 }
 
 func (f FormFieldElement) FormMethod() string {
-	if method := strings.ToLower(f.formOrElemAttrString("method")); method == "post" {
-		return "post"
+	if method := strings.ToLower(f.formOrElemAttrString("method")); method == methodPost {
+		return methodPost
 	}
 
-	return "get"
+	return methodGet
 }
 
 func (f FormFieldElement) FormNoValidate() bool {
@@ -348,11 +350,11 @@ func (f FormElement) Length() int {
 }
 
 func (f FormElement) Method() string {
-	if method := f.attrAsString("method"); method == "post" {
-		return "post"
+	if method := f.attrAsString("method"); method == methodPost {
+		return methodPost
 	}
 
-	return "get"
+	return methodGet
 }
 
 func (i InputElement) List() goja.Value {
