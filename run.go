@@ -70,12 +70,7 @@ const (
 	CollectorJSON     = "json"
 	CollectorInfluxDB = "influxdb"
 	CollectorCloud    = "cloud"
-
-	SummaryFormatText = SummaryFormat(iota)
-	SummaryFormatJSON
 )
-
-type SummaryFormat int
 
 var urlRegex = regexp.MustCompile(`(?i)^https?://`)
 
@@ -157,28 +152,22 @@ var commandRun = cli.Command{
 			EnvVar: "K6_OUT",
 		},
 		cli.StringFlag{
-			Name: "summary-file",
-			Usage: "file where the summary is written (default: standard output)",
-			EnvVar: "K6_SUMMARY_FILE",
-		},
-		cli.StringFlag{
-			Name: "summary-format",
-			Usage: "file format for summary, one of: text, json",
-			EnvVar: "K6_SUMMARY_FILE",
-			Value: "text",
+			Name:   "report, r",
+			Usage:  "file where the JSON summary report is written",
+			EnvVar: "K6_REPORT",
 		},
 	),
 	Action: actionRun,
 	Description: `Run starts a load test.
 
    This is the main entry point to k6, and will do two things:
-   
+
    - Construct an Engine and provide it with a Runner, depending on the first
      argument and the --type flag, which is used to execute the test.
-   
+
    - Start an a web server on the address specified by the global --address
      flag, which serves a web interface and a REST API for remote control.
-   
+
    For ease of use, you may also pass initial status parameters (vus, max,
    duration) to 'run', which will be applied through a normal API call.`,
 }
@@ -315,23 +304,6 @@ func collectorOfType(t string) lib.Collector {
 	}
 }
 
-func getSummaryFormat(cc *cli.Context) (SummaryFormat, error) {
-	var err error
-	var value SummaryFormat
-	format := cc.String("summary-format")
-	
-	switch format {
-	case "json":
-		value = SummaryFormatJSON
-	case "text":
-		value = SummaryFormatText
-	default:
-		err = errors.Errorf("Invalid summary format: %s", format)
-	}
-
-	return value, err
-}
-
 func getOptions(cc *cli.Context) (lib.Options, error) {
 	var err error
 	opts := lib.Options{
@@ -418,11 +390,7 @@ func actionRun(cc *cli.Context) error {
 	// Collect CLI arguments, most (not all) relating to options.
 	addr := cc.GlobalString("address")
 	out := cc.String("out")
-	summaryFile := cc.String("summary-file")
-	summaryFormat, err := getSummaryFormat(cc)
-	if err != nil {
-		return err
-	}
+	reportFile := cc.String("report")
 	quiet := cc.Bool("quiet")
 	cliOpts, err := getOptions(cc)
 	if err != nil {
@@ -633,10 +601,13 @@ loop:
 	}
 	fmt.Fprintf(color.Output, "\n")
 
-	// Print summary
-	summaryError := printSummary(fs, summaryFile, summaryFormat, engine, atTime)
-	if summaryError != nil {
-		log.WithError(summaryError).Errorf("Could not write summary to file %s", summaryFile)
+	// Print summary to stdout
+	printHumanizedSummary(engine, atTime)
+
+	if reportFile != "" {
+		if err := writeJsonReport(fs, reportFile, engine); err != nil {
+			log.WithError(err).Errorf("Could not JSON summary report to file %s", reportFile)
+		}
 	}
 
 	if opts.Linger.Bool {
@@ -649,63 +620,47 @@ loop:
 	return nil
 }
 
-func printSummary(fs afero.Fs, filename string, summaryFormat SummaryFormat, engine *core.Engine, atTime time.Duration) error {
-	var out io.Writer
+func writeJsonReport(fs afero.Fs, reportFile string, engine *core.Engine) (err error) {
+	bs, err := createJsonReport(engine)
+	if err != nil {
+		return
+	}
 
-	// File or stdout
-	if filename == "" || filename == "-" {
-		out = color.Output
-	} else {
-		file, err := fs.Create(filename)
-		if err != nil {
-			return err
-		}
-		out = file
-		defer file.Close()
-	}
-	
-	switch summaryFormat {
-	case SummaryFormatText:
-		return printHumanizedSummary(out, engine, atTime)
-	case SummaryFormatJSON:
-		return printJsonSummary(out, engine)
-	default:
-		return errors.Errorf("Unexpected summary format: %s", summaryFormat)
-	}
+	err = writeFile(fs, reportFile, bs)
+	return
 }
 
-func printHumanizedSummary(out io.Writer, engine *core.Engine, atTime time.Duration) error {
-	// Print groups.
-	err := printHumanizedGroups(out, engine.Executor.GetRunner().GetDefaultGroup(), 1)
+func writeFile(fs afero.Fs, filename string, contents []byte) (err error) {
+	file, err := fs.Create(filename)
 	if err != nil {
-		return err
+		return
 	}
+
+	defer file.Close()
+
+	_, err = file.Write(contents)
+
+	return
+}
+
+func printHumanizedSummary(engine *core.Engine, atTime time.Duration) {
+	// Print groups.
+	printHumanizedGroups(engine.Executor.GetRunner().GetDefaultGroup(), 1)
 
 	// Sort and print metrics.
-	err = printHumanizedMetrics(out, engine, atTime)
-	if err != nil {
-		return err
-	}
-	
-	return nil
+	printHumanizedMetrics(engine, atTime)
 }
 
-func printHumanizedGroups(out io.Writer, g *lib.Group, level int) error {
+func printHumanizedGroups(g *lib.Group, level int) {
 	indent := strings.Repeat("  ", level)
 
 	if g.Name != "" && g.Parent != nil {
-		_, err := fmt.Fprintf(out, "%s█ %s\n", indent, g.Name)
-		if err != nil {
-			return err
-		}
+		fmt.Fprintf(color.Output, "%s█ %s\n", indent, g.Name)
 	}
 
 	if len(g.Checks) > 0 {
 		if g.Name != "" && g.Parent != nil {
-			_, err := fmt.Fprintf(out, "\n")
-			if err != nil {
-				return err
-			}
+			fmt.Fprintf(color.Output, "\n")
 		}
 		for _, check := range g.Checks {
 			icon := "✓"
@@ -717,14 +672,14 @@ func printHumanizedGroups(out io.Writer, g *lib.Group, level int) error {
 				statusColor = color.RedString
 			}
 
-			fmt.Fprint(out, statusColor("%s  %s %s\n",
+			fmt.Fprint(color.Output, statusColor("%s  %s %s\n",
 				indent,
 				icon,
 				check.Name,
 			))
 
 			if isCheckFailure {
-				fmt.Fprint(out, statusColor("%s        %2.2f%% (%v/%v) \n",
+				fmt.Fprint(color.Output, statusColor("%s        %2.2f%% (%v/%v) \n",
 					indent,
 					100*(float64(check.Fails)/float64(check.Passes+check.Fails)),
 					check.Fails,
@@ -733,30 +688,19 @@ func printHumanizedGroups(out io.Writer, g *lib.Group, level int) error {
 			}
 
 		}
-		_, err := fmt.Fprintf(out, "\n")
-		if err != nil {
-			return err
-		}
+		fmt.Fprintf(color.Output, "\n")
 	}
 	if len(g.Groups) > 0 {
 		if g.Name != "" && g.Parent != nil && len(g.Checks) > 0 {
-			_, err := fmt.Fprintf(out, "\n")
-			if err != nil {
-				return err
-			}
+			fmt.Fprintf(color.Output, "\n")
 		}
 		for _, g := range g.Groups {
-			err := printHumanizedGroups(out, g, level+1)
-			if err != nil {
-				return err
-			}
+			printHumanizedGroups(g, level+1)
 		}
 	}
-	
-	return nil
 }
 
-func printHumanizedMetrics(out io.Writer, engine *core.Engine, atTime time.Duration) error {
+func printHumanizedMetrics(engine *core.Engine, atTime time.Duration) {
 	// Sort metric names
 	metricNames := make([]string, 0, len(engine.Metrics))
 	metricNameWidth := 0
@@ -811,48 +755,37 @@ func printHumanizedMetrics(out io.Writer, engine *core.Engine, atTime time.Durat
 		}
 
 		namePadding := strings.Repeat(".", metricNameWidth-len(name)+3)
-		_, err := fmt.Fprintf(out, "  %s %s%s %s\n",
+		fmt.Fprintf(color.Output, "  %s %s%s %s\n",
 			icon,
 			name,
 			color.New(color.Faint).Sprint(namePadding+":"),
 			val,
 		)
-		if err != nil {
-			return err
-		}
 	}
-	
-	return nil
 }
 
-type EngineSummary struct {
-	Groups  *lib.Group 		 `json:"groups"`
+type EngineReport struct {
+	Groups  *lib.Group       `json:"groups"`
 	Metrics []*stats.Summary `json:"metrics"`
 }
 
-func printJsonSummary(out io.Writer, engine *core.Engine) error {
+func createJsonReport(engine *core.Engine) ([]byte, error) {
 	metrics := make([]*stats.Summary, 0, len(engine.Metrics))
-	
+
 	for _, metric := range engine.Metrics {
 		metrics = append(metrics, metric.Summary())
 	}
-	
-	summary := &EngineSummary{
-		Groups: engine.Executor.GetRunner().GetDefaultGroup(),
+
+	summary := &EngineReport{
+		Groups:  engine.Executor.GetRunner().GetDefaultGroup(),
 		Metrics: metrics,
 	}
-	
+
 	bs, err := jsonenc.Marshal(summary)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	
-	_, err = out.Write(bs)
-	if err != nil {
-		return err
-	}
-	
-	return nil
+	return bs, nil
 }
 
 func actionArchive(cc *cli.Context) error {
