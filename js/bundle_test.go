@@ -489,7 +489,7 @@ func TestNewBundleFromArchive(t *testing.T) {
 	assert.Equal(t, "\"use strict\";Object.defineProperty(exports, \"__esModule\", { value: true });exports.file = exports.options = undefined;exports.default =\n\n\n\nfunction () {return (0, _exclaim2.default)(file);};var _exclaim = require(\"./exclaim.js\");var _exclaim2 = _interopRequireDefault(_exclaim);function _interopRequireDefault(obj) {return obj && obj.__esModule ? obj : { default: obj };}var options = exports.options = { vus: 12345 };var file = exports.file = open(\"./file.txt\");;", string(arc.Data))
 	assert.Equal(t, "/path/to", arc.Pwd)
 	assert.Len(t, arc.Scripts, 1)
-	assert.Equal(t, "\"use strict\";Object.defineProperty(exports, \"__esModule\", { value: true });exports.default = function (s) {return s + \"!\";};;", string(arc.Scripts["/path/to/exclaim.js"]))
+	assert.Equal(t, "(function(){\"use strict\";Object.defineProperty(exports, \"__esModule\", { value: true });exports.default = function (s) {return s + \"!\";};;})()", string(arc.Scripts["/path/to/exclaim.js"]))
 	assert.Len(t, arc.Files, 1)
 	assert.Equal(t, `hi`, string(arc.Files["/path/to/file.txt"]))
 

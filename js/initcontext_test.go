@@ -129,7 +129,7 @@ func TestInitContextRequire(t *testing.T) {
 				Filename: "/script.js",
 				Data:     []byte(`import "/file.js"; export default function() {}`),
 			}, fs)
-			assert.EqualError(t, err, "Error: aaaa at /file.js:1:20(3)")
+			assert.EqualError(t, err, "Error: aaaa at /file.js:1:32(4)")
 		})
 
 		imports := map[string]struct {
@@ -211,6 +211,34 @@ func TestInitContextRequire(t *testing.T) {
 				}
 			})
 		}
+
+		t.Run("Isolation", func(t *testing.T) {
+			fs := afero.NewMemMapFs()
+			assert.NoError(t, afero.WriteFile(fs, "/a.js", []byte(`const myvar = "a";`), 0644))
+			assert.NoError(t, afero.WriteFile(fs, "/b.js", []byte(`const myvar = "b";`), 0644))
+			b, err := NewBundle(&lib.SourceData{
+				Filename: "/script.js",
+				Data: []byte(`
+				import "./a.js";
+				import "./b.js";
+				export default function() {
+					if (typeof myvar != "undefined") {
+						throw new Error("myvar is set in global scope");
+					}
+				};
+				`),
+			}, fs)
+			if !assert.NoError(t, err) {
+				return
+			}
+
+			bi, err := b.Instantiate()
+			if !assert.NoError(t, err) {
+				return
+			}
+			_, err = bi.Default(goja.Undefined())
+			assert.NoError(t, err)
+		})
 	})
 }
 
