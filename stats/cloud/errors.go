@@ -41,5 +41,5 @@ func (e *ErrorResponse) Error() string {
 var (
 	ErrNotAuthorized    = errors.New("Not allowed to upload result to Load Impact cloud")
 	ErrNotAuthenticated = errors.New("Failed to authenticate with Load Impact cloud")
-	ErrNotUnknown       = errors.New("An error occurred talking to Load Impact cloud")
+	ErrUnknown          = errors.New("An error occurred talking to Load Impact cloud")
 )
