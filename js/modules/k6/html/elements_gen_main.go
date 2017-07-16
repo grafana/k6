@@ -12,20 +12,23 @@ import (
 	"text/template"
 )
 
+// The ast parser populates this struct using the <ElemName>TagName const and <ElemName>Element struct
 type ElemInfo struct {
 	ConstName     string
 	StructName    string
 	PrtStructName string
 }
 
-type NodeHandler func(node ast.Node) NodeHandler
+// The signature for functions which inspect the ast nodes
+type ElemInfoCollector func(node ast.Node) ElemInfoCollector
 
-type CollectElements struct {
-	handler   NodeHandler
-	elemName  string
+type ElemInfoCollectorState struct {
+	handler   ElemInfoCollector // The current function to check ast nodes
+	elemName  string            // Only valid when a TagName const or Element struct encountered and used as an index into elemInfos
 	elemInfos map[string]*ElemInfo
 }
 
+// Built from an entry in funcDefs by buildFuncDef(funcDef)
 type FuncDef struct {
 	ElemName   string
 	ElemMethod string
@@ -40,23 +43,23 @@ var funcDefs = []string{
 	"Href Download string",
 	"Href ReferrerPolicy enum=,no-referrer,no-referrer-when-downgrade,origin,origin-when-cross-origin,unsafe-url",
 	"Href Rel string",
-	"Href Href string",
+	"Href Href url",
 	"Href Target string",
 	"Href Type string",
 	"Href AccessKey string",
 	"Href HrefLang string",
-	"Href ToString=href string",
+	"Href ToString=href url",
 	"Media Autoplay bool",
 	"Media Controls bool",
 	"Media Loop bool",
 	"Media Muted bool",
 	"Media Preload enum=auto,metadata,none",
-	"Media Src string",
+	"Media Src url",
 	"Media CrossOrigin enum-nullable=anonymous,use-credentials",
 	"Media CurrentSrc=src string",
 	"Media DefaultMuted=muted bool",
 	"Media MediaGroup string",
-	"Base Href string",
+	"Base Href url",
 	"Base Target string",
 	"Button AccessKey string",
 	"Button Autofocus bool",
@@ -72,7 +75,7 @@ var funcDefs = []string{
 	"FieldSet Name string",
 	"Form Name string",
 	"Form Target string",
-	"Form Action string",
+	"Form Action url",
 	"Form Enctype enum=application/x-www-form-urlencoded,multipart/form-data,text/plain",
 	"Form Encoding=enctype enum=application/x-www-form-urlencoded,multipart/form-data,text/plain",
 	"Form AcceptCharset=accept-charset string",
@@ -83,8 +86,8 @@ var funcDefs = []string{
 	"IFrame Height string",
 	"IFrame Width string",
 	"IFrame Name string",
-	"IFrame Src string",
-	"Image CurrentSrc=src string",
+	"IFrame Src url",
+	"Image CurrentSrc=src url",
 	"Image Sizes string",
 	"Image Srcset string",
 	"Image Alt string",
@@ -93,7 +96,7 @@ var funcDefs = []string{
 	"Image Width int",
 	"Image IsMap bool",
 	"Image Name string",
-	"Image Src string",
+	"Image Src url",
 	"Image UseMap string",
 	"Image ReferrerPolicy enum=,no-referrer,no-referrer-when-downgrade,origin,origin-when-cross-origin,unsafe-url",
 	"Input Name string",
@@ -106,7 +109,7 @@ var funcDefs = []string{
 	"Input Checked bool",
 	"Input DefaultChecked=checked bool",
 	"Input Alt string",
-	"Input Src string",
+	"Input Src url",
 	"Input Height string",
 	"Input Width string",
 	"Input Accept string",
@@ -135,10 +138,9 @@ var funcDefs = []string{
 	"Li Type enum=,1,a,A,i,I,disc,square,circle",
 	"Link CrossOrigin enum-nullable=anonymous,use-credentials",
 	"Link ReferrerPolicy enum=,no-referrer,no-referrer-when-downgrade,origin,origin-when-cross-origin,unsafe-url",
-	"Link Href string",
+	"Link Href url",
 	"Link Hreflang string",
 	"Link Media string",
-	// The first value in enum lists gets used as the default. Putting "," at the start makes "" the default value for Rel instead of "alternate"
 	"Link Rel string",
 	"Link Target string",
 	"Link Type string",
@@ -153,7 +155,7 @@ var funcDefs = []string{
 	"Meter Optimum int",
 	"Mod Cite string",
 	"Mod Datetime string",
-	"Object Data string",
+	"Object Data url",
 	"Object Height string",
 	"Object Name string",
 	"Object Type string",
@@ -178,7 +180,7 @@ var funcDefs = []string{
 	"Quote Cite string",
 	"Script CrossOrigin string",
 	"Script Type string",
-	"Script Src string",
+	"Script Src url",
 	"Script Charset string",
 	"Script Async bool",
 	"Script Defer bool",
@@ -192,7 +194,7 @@ var funcDefs = []string{
 	"Source KeySystem string",
 	"Source Media string",
 	"Source Sizes string",
-	"Source Src string",
+	"Source Src url",
 	"Source Srcset string",
 	"Source Type string",
 	"Style Media string",
@@ -219,14 +221,14 @@ var funcDefs = []string{
 	"TextArea Wrap enum=soft,hard,off",
 	"Time Datetime string",
 	"Track Kind enum=subtitle,captions,descriptions,chapters,metadata",
-	"Track Src string",
+	"Track Src url",
 	"Track Srclang string",
 	"Track Label string",
 	"Track Default bool",
 	"UList Type string",
 }
 
-var collector = &CollectElements{}
+var collector = &ElemInfoCollectorState{}
 
 func main() {
 	fs := token.NewFileSet()
@@ -239,6 +241,7 @@ func main() {
 	collector.handler = collector.defaultHandler
 	collector.elemInfos = make(map[string]*ElemInfo)
 
+	// Populate the elemInfos data
 	ast.Inspect(parsedFile, func(n ast.Node) bool {
 		if n != nil {
 			collector.handler = collector.handler(n)
@@ -248,9 +251,10 @@ func main() {
 
 	f, err := os.Create("elements_gen.go")
 	if err != nil {
-		log.Println("warning: internal error: invalid Go generated:", err)
+		log.Println("warning: Unable to create the file 'elements_gen.go'", err)
 	}
 
+	// Generate consts used in the enum items in funcDefs. Consts are needed to avoid warnings for the repeated use of strings
 	var enumConsts = map[string]string{}
 	for _, def := range funcDefs {
 		funcDef := buildFuncDef(def)
@@ -258,12 +262,12 @@ func main() {
 		if !strings.HasPrefix(funcDef.ReturnBody, "enum") {
 			continue
 		}
-
 		for _, opt := range funcDef.ReturnOpts {
 			enumConsts[opt] = toConst(opt)
 		}
 	}
 
+	//
 	err = elemFuncsTemplate.Execute(f, struct {
 		ElemInfos  map[string]*ElemInfo
 		FuncDefs   []string
@@ -279,7 +283,7 @@ func main() {
 
 	err = f.Close()
 	if err != nil {
-		log.Println("Unable to close generated code file: ", err)
+		log.Println("Unable to close the file 'elements_gen.go': ", err)
 	}
 }
 
@@ -428,6 +432,12 @@ func buildFuncDef(funcDef string) FuncDef {
 		// => `func (e ButtonElement) AccessKey() string{ return e.attrAsString("accessKey") }``
 		return FuncDef{elemName, elemMethod, "attrAsString", attrName, returnType, returnType, nil}
 
+	case "url":
+		// "Href Href url"
+		// => {"HrefElement" "Href", "attrIsString", "accesskey", "string", "url", nil}
+		// => `func (e HrefElement) Href() string{ return e.attrAsUrlString("href") }``
+		return FuncDef{elemName, elemMethod, "attrAsURLString", attrName, "string", returnType, nil}
+
 	case "const":
 		// "Output Type const=output"
 		// => {"OutputElement" "Type", "", "type", "string", "const", []{"output"}}
@@ -447,7 +457,7 @@ func buildFuncDef(funcDef string) FuncDef {
 
 // Node handler functions used in ast.Inspect to scrape TagName consts and the names of Element structs and their parent/nested struct
 
-func (ce *CollectElements) defaultHandler(node ast.Node) NodeHandler {
+func (ce *ElemInfoCollectorState) defaultHandler(node ast.Node) ElemInfoCollector {
 	ce.elemName = ""
 	switch node.(type) {
 	case *ast.TypeSpec:
@@ -461,7 +471,8 @@ func (ce *CollectElements) defaultHandler(node ast.Node) NodeHandler {
 	}
 }
 
-func (ce *CollectElements) tagNameValueSpecHandler(node ast.Node) NodeHandler {
+// Found a const, a Tagname suffix means it's for an Element.
+func (ce *ElemInfoCollectorState) tagNameValueSpecHandler(node ast.Node) ElemInfoCollector {
 	switch x := node.(type) {
 	case *ast.Ident:
 		if strings.HasSuffix(x.Name, "TagName") {
@@ -476,7 +487,7 @@ func (ce *CollectElements) tagNameValueSpecHandler(node ast.Node) NodeHandler {
 	}
 }
 
-func (ce *CollectElements) elemTypeSpecHandler(node ast.Node) NodeHandler {
+func (ce *ElemInfoCollectorState) elemTypeSpecHandler(node ast.Node) ElemInfoCollector {
 	switch x := node.(type) {
 	case *ast.Ident:
 		if !strings.HasSuffix(x.Name, "Element") {
@@ -485,7 +496,8 @@ func (ce *CollectElements) elemTypeSpecHandler(node ast.Node) NodeHandler {
 
 		if ce.elemName == "" {
 			ce.elemName = strings.TrimSuffix(x.Name, "Element")
-			// Ignore elements which have not had an entry added by the TagName handler.
+			// Ignore elements which haven't had an elemInfo created by the TagName handler.
+			// (Specifically intermediate structs like HrefElement, MediaElement & FormFieldElement)
 			if _, ok := ce.elemInfos[ce.elemName]; !ok {
 				return ce.defaultHandler
 			}

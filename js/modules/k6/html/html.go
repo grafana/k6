@@ -45,12 +45,13 @@ func (HTML) ParseHTML(ctx context.Context, src string) (Selection, error) {
 	if err != nil {
 		return Selection{}, err
 	}
-	return Selection{common.GetRuntime(ctx), doc.Selection}, nil
+	return Selection{rt: common.GetRuntime(ctx), sel: doc.Selection}, nil
 }
 
 type Selection struct {
 	rt  *goja.Runtime
 	sel *goquery.Selection
+	Url string
 }
 
 func (s Selection) emptySelection() Selection {
@@ -77,13 +78,13 @@ func (s Selection) varargFnCall(arg interface{},
 
 	switch v := arg.(type) {
 	case Selection:
-		return Selection{s.rt, selFilter(v.sel)}
+		return Selection{s.rt, selFilter(v.sel), s.Url}
 
 	case string:
-		return Selection{s.rt, strFilter(v)}
+		return Selection{s.rt, strFilter(v), s.Url}
 
 	case Element:
-		return Selection{s.rt, nodeFilter(v.node)}
+		return Selection{s.rt, nodeFilter(v.node), s.Url}
 
 	case goja.Value:
 		return s.varargFnCall(v.Export(), strFilter, selFilter, nodeFilter)
@@ -98,10 +99,10 @@ func (s Selection) adjacent(unfiltered func() *goquery.Selection,
 	filtered func(string) *goquery.Selection,
 	def ...string) Selection {
 	if len(def) > 0 {
-		return Selection{s.rt, filtered(def[0])}
+		return Selection{s.rt, filtered(def[0]), s.Url}
 	}
 
-	return Selection{s.rt, unfiltered()}
+	return Selection{s.rt, unfiltered(), s.Url}
 }
 
 func (s Selection) adjacentUntil(until func(string) *goquery.Selection,
@@ -112,30 +113,30 @@ func (s Selection) adjacentUntil(until func(string) *goquery.Selection,
 
 	switch len(def) {
 	case 0:
-		return Selection{s.rt, until("")}
+		return Selection{s.rt, until(""), s.Url}
 	case 1:
 		switch selector := def[0].Export().(type) {
 		case string:
-			return Selection{s.rt, until(selector)}
+			return Selection{s.rt, until(selector), s.Url}
 
 		case Selection:
-			return Selection{s.rt, untilSelection(selector.sel)}
+			return Selection{s.rt, untilSelection(selector.sel), s.Url}
 
 		case nil:
-			return Selection{s.rt, until("")}
+			return Selection{s.rt, until(""), s.Url}
 		}
 	case 2:
 		filter := def[1].String()
 
 		switch selector := def[0].Export().(type) {
 		case string:
-			return Selection{s.rt, filteredUntil(filter, selector)}
+			return Selection{s.rt, filteredUntil(filter, selector), s.Url}
 
 		case Selection:
-			return Selection{s.rt, filteredUntilSelection(filter, selector.sel)}
+			return Selection{s.rt, filteredUntilSelection(filter, selector.sel), s.Url}
 
 		case nil:
-			return Selection{s.rt, filteredUntil(filter, "")}
+			return Selection{s.rt, filteredUntil(filter, ""), s.Url}
 		}
 	}
 
@@ -165,7 +166,7 @@ func (s Selection) Not(v goja.Value) Selection {
 		return s.varargFnCall(v, s.sel.Not, s.sel.NotSelection, s.sel.NotNodes)
 	}
 
-	return Selection{s.rt, s.sel.NotFunction(s.buildMatcher(v, gojaFn))}
+	return Selection{s.rt, s.sel.NotFunction(s.buildMatcher(v, gojaFn)), s.Url}
 }
 
 func (s Selection) Next(def ...string) Selection {
@@ -234,23 +235,23 @@ func (s Selection) Size() int {
 }
 
 func (s Selection) End() Selection {
-	return Selection{s.rt, s.sel.End()}
+	return Selection{s.rt, s.sel.End(), s.Url}
 }
 
 func (s Selection) Eq(idx int) Selection {
-	return Selection{s.rt, s.sel.Eq(idx)}
+	return Selection{s.rt, s.sel.Eq(idx), s.Url}
 }
 
 func (s Selection) First() Selection {
-	return Selection{s.rt, s.sel.First()}
+	return Selection{s.rt, s.sel.First(), s.Url}
 }
 
 func (s Selection) Last() Selection {
-	return Selection{s.rt, s.sel.Last()}
+	return Selection{s.rt, s.sel.Last(), s.Url}
 }
 
 func (s Selection) Contents() Selection {
-	return Selection{s.rt, s.sel.Contents()}
+	return Selection{s.rt, s.sel.Contents(), s.Url}
 }
 
 func (s Selection) Text() string {
@@ -306,10 +307,10 @@ func (s Selection) Val() goja.Value {
 
 func (s Selection) Children(def ...string) Selection {
 	if len(def) == 0 {
-		return Selection{s.rt, s.sel.Children()}
+		return Selection{s.rt, s.sel.Children(), s.Url}
 	}
 
-	return Selection{s.rt, s.sel.ChildrenFiltered(def[0])}
+	return Selection{s.rt, s.sel.ChildrenFiltered(def[0]), s.Url}
 }
 
 func (s Selection) Each(v goja.Value) Selection {
@@ -324,16 +325,16 @@ func (s Selection) Each(v goja.Value) Selection {
 		}
 	}
 
-	return Selection{s.rt, s.sel.Each(fn)}
+	return Selection{s.rt, s.sel.Each(fn), s.Url}
 }
 
 func (s Selection) Filter(v goja.Value) Selection {
 	switch val := v.Export().(type) {
 	case string:
-		return Selection{s.rt, s.sel.Filter(val)}
+		return Selection{s.rt, s.sel.Filter(val), s.Url}
 
 	case Selection:
-		return Selection{s.rt, s.sel.FilterSelection(val.sel)}
+		return Selection{s.rt, s.sel.FilterSelection(val.sel), s.Url}
 	}
 
 	gojaFn, isFn := goja.AssertFunction(v)
@@ -341,7 +342,7 @@ func (s Selection) Filter(v goja.Value) Selection {
 		panic(s.rt.NewGoError(errors.New("Argument to filter() must be a function, a selector or a selection")))
 	}
 
-	return Selection{s.rt, s.sel.FilterFunction(s.buildMatcher(v, gojaFn))}
+	return Selection{s.rt, s.sel.FilterFunction(s.buildMatcher(v, gojaFn)), s.Url}
 }
 
 func (s Selection) Is(v goja.Value) bool {
@@ -380,10 +381,10 @@ func (s Selection) Map(v goja.Value) (result []string) {
 
 func (s Selection) Slice(start int, def ...int) Selection {
 	if len(def) > 0 {
-		return Selection{s.rt, s.sel.Slice(start, def[0])}
+		return Selection{s.rt, s.sel.Slice(start, def[0]), s.Url}
 	}
 
-	return Selection{s.rt, s.sel.Slice(start, s.sel.Length())}
+	return Selection{s.rt, s.sel.Slice(start, s.sel.Length()), s.Url}
 }
 
 func (s Selection) Get(def ...int) goja.Value {
@@ -406,7 +407,7 @@ func (s Selection) Get(def ...int) goja.Value {
 func (s Selection) ToArray() []Selection {
 	items := make([]Selection, len(s.sel.Nodes))
 	for i := range s.sel.Nodes {
-		items[i] = Selection{s.rt, s.sel.Eq(i)}
+		items[i] = Selection{s.rt, s.sel.Eq(i), s.Url}
 	}
 	return items
 }

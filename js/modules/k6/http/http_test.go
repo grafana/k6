@@ -266,6 +266,13 @@ func TestRequest(t *testing.T) {
 				`)
 				assert.NoError(t, err)
 			})
+
+			t.Run("url", func(t *testing.T) {
+				_, err := common.RunString(rt, `
+				if (res.html().url != "https://httpbin.org/html") { throw new Error("url incorrect: " + res.html().url); }
+				`)
+				assert.NoError(t, err)
+			})
 		})
 
 		t.Run("group", func(t *testing.T) {

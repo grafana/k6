@@ -263,7 +263,7 @@ func (e HrefElement) Rel() string {
 	return e.attrAsString("rel")
 }
 func (e HrefElement) Href() string {
-	return e.attrAsString("href")
+	return e.attrAsURLString("href")
 }
 func (e HrefElement) Target() string {
 	return e.attrAsString("target")
@@ -278,7 +278,7 @@ func (e HrefElement) HrefLang() string {
 	return e.attrAsString("hreflang")
 }
 func (e HrefElement) ToString() string {
-	return e.attrAsString("href")
+	return e.attrAsURLString("href")
 }
 func (e MediaElement) Autoplay() bool {
 	return e.attrIsPresent("autoplay")
@@ -304,7 +304,7 @@ func (e MediaElement) Preload() string {
 	}
 }
 func (e MediaElement) Src() string {
-	return e.attrAsString("src")
+	return e.attrAsURLString("src")
 }
 func (e MediaElement) CrossOrigin() goja.Value {
 	attrVal, exists := e.sel.sel.Attr("crossorigin")
@@ -330,7 +330,7 @@ func (e MediaElement) MediaGroup() string {
 	return e.attrAsString("mediagroup")
 }
 func (e BaseElement) Href() string {
-	return e.attrAsString("href")
+	return e.attrAsURLString("href")
 }
 func (e BaseElement) Target() string {
 	return e.attrAsString("target")
@@ -388,7 +388,7 @@ func (e FormElement) Target() string {
 	return e.attrAsString("target")
 }
 func (e FormElement) Action() string {
-	return e.attrAsString("action")
+	return e.attrAsURLString("action")
 }
 func (e FormElement) Enctype() string {
 	attrVal := e.attrAsString("enctype")
@@ -457,10 +457,10 @@ func (e IFrameElement) Name() string {
 	return e.attrAsString("name")
 }
 func (e IFrameElement) Src() string {
-	return e.attrAsString("src")
+	return e.attrAsURLString("src")
 }
 func (e ImageElement) CurrentSrc() string {
-	return e.attrAsString("src")
+	return e.attrAsURLString("src")
 }
 func (e ImageElement) Sizes() string {
 	return e.attrAsString("sizes")
@@ -498,7 +498,7 @@ func (e ImageElement) Name() string {
 	return e.attrAsString("name")
 }
 func (e ImageElement) Src() string {
-	return e.attrAsString("src")
+	return e.attrAsURLString("src")
 }
 func (e ImageElement) UseMap() string {
 	return e.attrAsString("usemap")
@@ -597,7 +597,7 @@ func (e InputElement) Alt() string {
 	return e.attrAsString("alt")
 }
 func (e InputElement) Src() string {
-	return e.attrAsString("src")
+	return e.attrAsURLString("src")
 }
 func (e InputElement) Height() string {
 	return e.attrAsString("height")
@@ -743,7 +743,7 @@ func (e LinkElement) ReferrerPolicy() string {
 	}
 }
 func (e LinkElement) Href() string {
-	return e.attrAsString("href")
+	return e.attrAsURLString("href")
 }
 func (e LinkElement) Hreflang() string {
 	return e.attrAsString("hreflang")
@@ -802,7 +802,7 @@ func (e ModElement) Datetime() string {
 	return e.attrAsString("datetime")
 }
 func (e ObjectElement) Data() string {
-	return e.attrAsString("data")
+	return e.attrAsURLString("data")
 }
 func (e ObjectElement) Height() string {
 	return e.attrAsString("height")
@@ -889,7 +889,7 @@ func (e ScriptElement) Type() string {
 	return e.attrAsString("type")
 }
 func (e ScriptElement) Src() string {
-	return e.attrAsString("src")
+	return e.attrAsURLString("src")
 }
 func (e ScriptElement) Charset() string {
 	return e.attrAsString("charset")
@@ -931,7 +931,7 @@ func (e SourceElement) Sizes() string {
 	return e.attrAsString("sizes")
 }
 func (e SourceElement) Src() string {
-	return e.attrAsString("src")
+	return e.attrAsURLString("src")
 }
 func (e SourceElement) Srcset() string {
 	return e.attrAsString("srcset")
@@ -1062,7 +1062,7 @@ func (e TrackElement) Kind() string {
 	}
 }
 func (e TrackElement) Src() string {
-	return e.attrAsString("src")
+	return e.attrAsURLString("src")
 }
 func (e TrackElement) Srclang() string {
 	return e.attrAsString("srclang")
