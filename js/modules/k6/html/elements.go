@@ -136,16 +136,19 @@ type UListElement struct{ Element }
 type VideoElement struct{ MediaElement }
 
 func (h HrefElement) hrefURL() *url.URL {
-	url, exists := h.attrAsURL("href")
+	URL, exists := h.attrAsURL("href")
 	if !exists {
-		url, err := url.Parse(h.sel.Url)
+		baseURL, err := url.Parse(h.sel.Url)
 
 		if err != nil {
-			url, _ = url.Parse("")
+			emptyURL, _ := url.Parse("")
+			return emptyURL
 		}
+
+		return baseURL
 	}
 
-	return url
+	return URL
 }
 
 func (h HrefElement) Hash() string {
