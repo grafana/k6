@@ -138,30 +138,29 @@ type VideoElement struct{ MediaElement }
 func (h HrefElement) hrefURL() *url.URL {
 	URL, exists := h.attrAsURL("href")
 	if !exists {
-		baseURL, err := url.Parse(h.sel.Url)
-
-		if err != nil {
-			emptyURL, _ := url.Parse("")
-			return emptyURL
-		}
-
-		return baseURL
+		URL = &url.URL{}
 	}
 
 	return URL
 }
 
 func (h HrefElement) Hash() string {
-	return "#" + h.hrefURL().Fragment
+	frag := h.hrefURL().Fragment
+	if frag == "" {
+		return ""
+	}
+	return "#" + frag
 }
 
 func (h HrefElement) Host() string {
 	href := h.hrefURL()
-	hostAndPort := href.Host
+	if href.Host == "" {
+		return ""
+	}
 
-	host, port, err := net.SplitHostPort(hostAndPort)
+	host, port, err := net.SplitHostPort(href.Host)
 	if err != nil {
-		return hostAndPort
+		return href.Host
 	}
 
 	defaultPort := defaultPorts[href.Scheme]
@@ -169,22 +168,34 @@ func (h HrefElement) Host() string {
 		return strings.TrimSuffix(host, ":"+defaultPort)
 	}
 
-	return hostAndPort
+	return href.Host
 }
 
 func (h HrefElement) Hostname() string {
-	host, _, err := net.SplitHostPort(h.hrefURL().Host)
-	if err != nil {
-		return h.hrefURL().Host
+	hostAndPort := h.hrefURL().Host
+	if hostAndPort == "" {
+		return ""
 	}
+
+	host, _, err := net.SplitHostPort(hostAndPort)
+	if err != nil {
+		return hostAndPort
+	}
+
 	return host
 }
 
 func (h HrefElement) Port() string {
-	_, port, err := net.SplitHostPort(h.hrefURL().Host)
+	hostAndPort := h.hrefURL().Host
+	if hostAndPort == "" {
+		return ""
+	}
+
+	_, port, err := net.SplitHostPort(hostAndPort)
 	if err != nil {
 		return ""
 	}
+
 	return port
 }
 
@@ -196,22 +207,26 @@ func (h HrefElement) Username() string {
 	return user.Username()
 }
 
-func (h HrefElement) Password() goja.Value {
+func (h HrefElement) Password() string {
 	user := h.hrefURL().User
 	if user == nil {
-		return goja.Undefined()
+		return ""
 	}
 
 	pwd, defined := user.Password()
 	if !defined {
-		return goja.Undefined()
+		return ""
 	}
 
-	return h.sel.rt.ToValue(pwd)
+	return pwd
 }
 
 func (h HrefElement) Origin() string {
 	href := h.hrefURL()
+
+	if href.Scheme == "" {
+		return ""
+	}
 
 	if href.Scheme == "file" {
 		return h.Href()
@@ -225,7 +240,11 @@ func (h HrefElement) Pathname() string {
 }
 
 func (h HrefElement) Protocol() string {
-	return h.hrefURL().Scheme
+	scheme := h.hrefURL().Scheme
+	if scheme == "" {
+		return ":"
+	}
+	return scheme
 }
 
 func (h HrefElement) RelList() []string {
@@ -248,44 +267,32 @@ func (f FormFieldElement) Form() goja.Value {
 	return f.ownerFormVal()
 }
 
-// Used by the formAction, formMethod, formTarget and formEnctype methods of Button and Input elements
-// Attempts to read attribute "form" + attrName on the current element or attrName on the owning form element
-func (f FormFieldElement) formOrElemAttrString(attrName string) string {
+func (f FormFieldElement) formOrElemAttr(attrName string) (string, bool) {
 	if elemAttr, exists := f.sel.sel.Attr("form" + attrName); exists {
-		return elemAttr
+		return elemAttr, true
 	}
 
 	formSel, exists := f.ownerFormSel()
 	if !exists {
-		return ""
+		return "", false
 	}
 
 	formAttr, exists := formSel.Attr(attrName)
 	if !exists {
-		return ""
+		return "", false
 	}
 
-	return formAttr
-}
-
-func (f FormFieldElement) formOrElemAttrPresent(attrName string) bool {
-	if _, exists := f.sel.sel.Attr("form" + attrName); exists {
-		return true
-	}
-
-	formSel, exists := f.ownerFormSel()
-	if !exists {
-		return false
-	}
-
-	_, exists = formSel.Attr(attrName)
-	return exists
+	return formAttr, true
 }
 
 func (f FormFieldElement) FormAction() string {
-	action := f.formOrElemAttrString("action")
-	if f.sel.Url == "" {
+	action, exists := f.formOrElemAttr("action")
+	if f.sel.URL == "" {
 		return action
+	}
+
+	if !exists || action == "" {
+		return f.sel.URL
 	}
 
 	actionURL, ok := f.resolveURL(action)
@@ -297,23 +304,37 @@ func (f FormFieldElement) FormAction() string {
 }
 
 func (f FormFieldElement) FormEnctype() string {
-	return f.formOrElemAttrString("enctype")
+	enctype, _ := f.formOrElemAttr("enctype")
+
+	switch enctype {
+	case const_multipart_form_data:
+		return enctype
+	case const_text_plain:
+		return enctype
+	default:
+		return const_application_x_www_form_urlencoded
+	}
 }
 
 func (f FormFieldElement) FormMethod() string {
-	if method := strings.ToLower(f.formOrElemAttrString("method")); method == methodPost {
-		return methodPost
-	}
+	method, _ := f.formOrElemAttr("method")
 
-	return methodGet
+	switch strings.ToLower(method) {
+	case methodPost:
+		return methodPost
+	default:
+		return methodGet
+	}
 }
 
 func (f FormFieldElement) FormNoValidate() bool {
-	return f.formOrElemAttrPresent("novalidate")
+	_, exists := f.formOrElemAttr("novalidate")
+	return exists
 }
 
 func (f FormFieldElement) FormTarget() string {
-	return f.formOrElemAttrString("target")
+	target, _ := f.formOrElemAttr("target")
+	return target
 }
 
 func (f FormFieldElement) Labels() []goja.Value {
@@ -345,7 +366,7 @@ func (f FieldSetElement) Form() goja.Value {
 	if !exists {
 		return goja.Undefined()
 	}
-	return selToElement(Selection{f.sel.rt, formSel, f.sel.Url})
+	return selToElement(Selection{f.sel.rt, formSel, f.sel.URL})
 }
 
 func (f FieldSetElement) Type() string {
@@ -401,7 +422,7 @@ func (i InputElement) List() goja.Value {
 		return goja.Undefined()
 	}
 
-	return selToElement(Selection{i.sel.rt, datalist.Eq(0), i.sel.Url})
+	return selToElement(Selection{i.sel.rt, datalist.Eq(0), i.sel.URL})
 }
 
 func (k KeygenElement) Form() goja.Value {
@@ -423,7 +444,7 @@ func (l LabelElement) Control() goja.Value {
 		return goja.Undefined()
 	}
 
-	return selToElement(Selection{l.sel.rt, findControl.Eq(0), l.sel.Url})
+	return selToElement(Selection{l.sel.rt, findControl.Eq(0), l.sel.URL})
 }
 
 func (l LabelElement) Form() goja.Value {
@@ -450,7 +471,7 @@ func (m MapElement) Images() []goja.Value {
 	}
 
 	imgs := m.sel.sel.Parents().Last().Find("img[usemap=\"#" + name + "\"],object[usemap=\"#" + name + "\"]")
-	return elemList(Selection{m.sel.rt, imgs, m.sel.Url})
+	return elemList(Selection{m.sel.rt, imgs, m.sel.URL})
 }
 
 func (m MeterElement) Labels() []goja.Value {
@@ -478,7 +499,7 @@ func (o OptionElement) Disabled() bool {
 func (o OptionElement) Form() goja.Value {
 	prtForm := o.sel.sel.ParentsFiltered("form")
 	if prtForm.Length() != 0 {
-		return selToElement(Selection{o.sel.rt, prtForm.First(), o.sel.Url})
+		return selToElement(Selection{o.sel.rt, prtForm.First(), o.sel.URL})
 	}
 
 	prtSelect := o.sel.sel.ParentsFiltered("select")
@@ -492,7 +513,7 @@ func (o OptionElement) Form() goja.Value {
 		return goja.Undefined()
 	}
 
-	return selToElement(Selection{o.sel.rt, ownerForm.First(), o.sel.Url})
+	return selToElement(Selection{o.sel.rt, ownerForm.First(), o.sel.URL})
 }
 
 func (o OptionElement) Index() int {
@@ -593,7 +614,7 @@ func (s SelectElement) Length() int {
 }
 
 func (s SelectElement) Options() []goja.Value {
-	return elemList(Selection{s.sel.rt, s.sel.sel.Find("option"), s.sel.Url})
+	return elemList(Selection{s.sel.rt, s.sel.sel.Find("option"), s.sel.URL})
 }
 
 func (s SelectElement) SelectedIndex() int {
@@ -605,7 +626,7 @@ func (s SelectElement) SelectedIndex() int {
 }
 
 func (s SelectElement) SelectedOptions() []goja.Value {
-	return elemList(Selection{s.sel.rt, s.sel.sel.Find("option[selected]"), s.sel.Url})
+	return elemList(Selection{s.sel.rt, s.sel.sel.Find("option[selected]"), s.sel.URL})
 }
 
 func (s SelectElement) Size() int {
@@ -645,7 +666,7 @@ func (t TableElement) firstChild(elemName string) goja.Value {
 	if child.Size() == 0 {
 		return goja.Undefined()
 	}
-	return selToElement(Selection{t.sel.rt, child, t.sel.Url})
+	return selToElement(Selection{t.sel.rt, child, t.sel.URL})
 }
 
 func (t TableElement) Caption() goja.Value {
@@ -661,15 +682,15 @@ func (t TableElement) TFoot() goja.Value {
 }
 
 func (t TableElement) Rows() []goja.Value {
-	return elemList(Selection{t.sel.rt, t.sel.sel.Find("tr"), t.sel.Url})
+	return elemList(Selection{t.sel.rt, t.sel.sel.Find("tr"), t.sel.URL})
 }
 
 func (t TableElement) TBodies() []goja.Value {
-	return elemList(Selection{t.sel.rt, t.sel.sel.Find("tbody"), t.sel.Url})
+	return elemList(Selection{t.sel.rt, t.sel.sel.Find("tbody"), t.sel.URL})
 }
 
 func (t TableSectionElement) Rows() []goja.Value {
-	return elemList(Selection{t.sel.rt, t.sel.sel.Find("tr"), t.sel.Url})
+	return elemList(Selection{t.sel.rt, t.sel.sel.Find("tr"), t.sel.URL})
 }
 
 func (t TableCellElement) CellIndex() int {
@@ -681,7 +702,7 @@ func (t TableCellElement) CellIndex() int {
 }
 
 func (t TableRowElement) Cells() []goja.Value {
-	return elemList(Selection{t.sel.rt, t.sel.sel.Find("th,td"), t.sel.Url})
+	return elemList(Selection{t.sel.rt, t.sel.sel.Find("th,td"), t.sel.URL})
 }
 
 func (t TableRowElement) RowIndex() int {
@@ -721,7 +742,7 @@ func (t TableColElement) Span() int {
 }
 
 func (m MediaElement) TextTracks() []goja.Value {
-	return elemList(Selection{m.sel.rt, m.sel.sel.Find("track"), m.sel.Url})
+	return elemList(Selection{m.sel.rt, m.sel.sel.Find("track"), m.sel.URL})
 }
 
 func (t TitleElement) Text() string {

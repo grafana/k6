@@ -289,6 +289,7 @@ var urlTests = []struct {
 	baseUrl  string
 	data     string
 }{
+	{"a2", "href", "http://example.com/testpath", ""},
 	{"a3", "href", "http://example.com", "http://example.com/relpath"},
 	{"a3", "href", "http://example.com/somepath", "http://example.com/relpath"},
 	{"a3", "href", "http://example.com/subdir/", "http://example.com/subdir/relpath"},
@@ -297,17 +298,40 @@ var urlTests = []struct {
 	{"a5", "href", "http://example.com/path?a=no-a&c=no-c", "http://example.com/path?a=yes-a&b=yes-b"},
 	{"a6", "href", "http://example.com/path#oldfrag", "http://example.com/path#testfrag"},
 	{"a7", "href", "http://example.com/prevdir/prevpath", "http://example.com/prtpath"},
+	{"a8", "href", "http://example.com/testpath", "http://example.com/testpath"},
 	{"base1", "href", "http://example.com", "http://example.com/foo.html"},
+	{"base2", "href", "http://example.com", "http://example.com"},
+	{"base3", "href", "http://example.com", "http://example.com"},
 	{"audio1", "src", "http://example.com", "http://example.com/foo.wav"},
+	{"audio2", "src", "http://example.com", ""},
+	{"audio3", "src", "http://example.com", "http://example.com"},
 	{"form1", "action", "http://example.com/", "http://example.com/submit_url"},
+	{"form2", "action", "http://example.com/", ""},
+	{"form3", "action", "http://example.com/", "http://example.com/"},
 	{"iframe1", "src", "http://example.com", "http://example.com/testframe.html"},
+	{"iframe2", "src", "http://example.com", ""},
+	{"iframe3", "src", "http://example.com", "http://example.com"},
 	{"img1", "src", "http://example.com", "http://example.com/test.png"},
+	{"img2", "src", "http://example.com", ""},
+	{"img3", "src", "http://example.com", "http://example.com"},
 	{"input5", "src", "http://example.com", "http://example.com/input.png"},
+	{"input5b", "src", "http://example.com", ""},
+	{"input5c", "src", "http://example.com", "http://example.com"},
 	{"link1", "href", "http://example.com", "http://example.com/test.css"},
+	{"link2", "href", "http://example.com", ""},
+	{"link3", "href", "http://example.com", "http://example.com"},
 	{"object1", "data", "http://example.com", "http://example.com/test.png"},
+	{"object2", "data", "http://example.com", ""},
+	{"object3", "data", "http://example.com", "http://example.com"},
 	{"script1", "src", "http://example.com", "http://example.com/script.js"},
+	{"script2", "src", "http://example.com", ""},
+	{"script3", "src", "http://example.com", "http://example.com"},
 	{"src1", "src", "http://example.com", "http://example.com/test.png"},
+	{"src2", "src", "http://example.com", ""},
+	{"src3", "src", "http://example.com", "http://example.com"},
 	{"track1", "src", "http://example.com", "http://example.com/foo.en.vtt"},
+	{"track3", "src", "http://example.com", ""},
+	{"track4", "src", "http://example.com", "http://example.com"},
 }
 
 const testGenElems = `<html><body>
@@ -318,48 +342,70 @@ const testGenElems = `<html><body>
 	<a id="a5" href="?a=yes-a&b=yes-b"></a>
 	<a id="a6" href="#testfrag"></a>
 	<a id="a7" href="../prtpath"></a>
-	<audio id="audio1" autoplay controls loop muted src="foo.wav" crossorigin="anonymous" mediagroup="testgroup"></audio> <audio id="audio2"></audio>
+	<a id="a8" href=""></a>
+	<audio id="audio1" autoplay controls loop muted src="foo.wav" crossorigin="anonymous" mediagroup="testgroup"></audio>
+	<audio id="audio2"></audio>
+	<audio id="audio3" src=""></audio>
 	<base id="base1" href="foo.html" target="__any"></base>
-	<button id="btn1" accesskey="e" target="__any" autofocus disabled type="button"></button> <button id="btn2"></button>
+	<base id="base2"></base>
+	<base id="base3" href="" target="__any"></base>
+	<button id="btn1" accesskey="e" target="__any" autofocus disabled type="button"></button>
+	<button id="btn2"></button>
 	<button id="btn3" type="invalid_uses_default"></button> <button id="btn3" type="invalid_uses_default"></button>
 	<ul><li><data id="data1" value="121"></data></li><li><data id="data2"></data></li></ul>
 	<embed id="embed1" type="video/avi" src="movie.avi" width="640" height="480">
-	<fieldset id="fset1" disabled name="fset1_name"></fieldset> <fieldset id="fset2"></fieldset>
-	<form id="form1" name="form1_name" target="__self" enctype="text/plain" action="submit_url" accept-charset="ISO-8859-1" autocomplete="off" novalidate></form> <form id="form2"></form>
+	<fieldset id="fset1" disabled name="fset1_name"></fieldset>
+	<fieldset id="fset2"></fieldset>
+	<form id="form1" name="form1_name" target="__self" enctype="text/plain" action="submit_url" accept-charset="ISO-8859-1" autocomplete="off" novalidate></form>
+	<form id="form2"></form>
+	<form id="form3" action=""></form>
 	<iframe id="iframe1" allowfullscreen referrerpolicy="no-referrer" name="frame_name" width="640" height="480" src="testframe.html"></iframe>
-	<iframe id="iframe2" referrerpolicy="use-default-when-invalid"></iframe> <iframe id="iframe3"></iframe>
+	<iframe id="iframe2" referrerpolicy="use-default-when-invalid"></iframe>
+	<iframe id="iframe3" src=""></iframe>
 	<img id="img1" src="test.png" sizes="100vw,50vw" srcset="large.jpg 1024w,medium.jpg 640w" alt="alt text" crossorigin="anonymous" height="50" width="100" ismap name="img_name" usemap="#map_name" referrerpolicy="origin"/>
-	<img id="img2" crossorigin="use-credentials" referrerpolicy="use-default-when-invalid"/> <img id="img3"/>
+	<img id="img2" crossorigin="use-credentials" referrerpolicy="use-default-when-invalid"/>
+	<img id="img3" src=""/>
 	<input id="input1" name="input1_name" disabled autofocus required value="input1-val" type="button"/>
 	<input id="input2"/>
 	<input id="input3" type="checkbox" checked multiple/>
 	<input id="input4" type="checkbox"/>
 	<input id="input5" type="image" alt="input_img" src="input.png" width="80" height="40"/>
+	<input id="input5b" type="image" />
+	<input id="input5c" type="image" src=""/>
 	<input id="input6" type="file" accept=".jpg,.png"/>
 	<input id="input7" type="text" autocomplete="off" maxlength="10" size="5" pattern="..." placeholder="help text" readonly min="2017-01-01" max="2017-12-12" dirname="input7.dir" accesskey="s" step="0.1"/>
-	<keygen id="kg1" autofocus challenge="cx1" disabled keytype="DSA" name="kg1_name"/> <keygen id="kg2"/>
+	<keygen id="kg1" autofocus challenge="cx1" disabled keytype="DSA" name="kg1_name"/>
+	<keygen id="kg2"/>
 	<label id="label1" for="input1_name"/>
 	<legend id="legend1" accesskey="l"/>
 	<li id="li1" type="disc"></li> <li id="li2" value="10" type=""></li>
-	<link id="link1" crossorigin="use-credentials" referrerpolicy="no-referrer" href="test.css" hreflang="pl" media="print" rel="alternate author" target="__self" type="stylesheet"/> <link id="link2"/>
+	<link id="link1" crossorigin="use-credentials" referrerpolicy="no-referrer" href="test.css" hreflang="pl" media="print" rel="alternate author" target="__self" type="stylesheet"/>
+	<link id="link2"/>
+	<link id="link3" href=""/>
 	<map id="map1" name="map1_name"></map>
 	<meta id="meta1" name="author" content="author name" />
 	<meta id="meta2" http-equiv="refresh" content="1;www.test.com" />
 	<meter id="meter1" min="90" max="110" low="95" high="105" optimum="100"/>
 	<ins id="ins1" cite="cite.html" datetime="2017-01-01"/>
-	<object id="object1" name="obj1_name" data="test.png" type="image/png" width="150" height="75" tabindex="6" typemustmatch usemap="#map1_name"/> <object id="object2"/>
+	<object id="object1" name="obj1_name" data="test.png" type="image/png" width="150" height="75" tabindex="6" typemustmatch usemap="#map1_name"/>
+	<object id="object2"/>
+	<object id="object3" data=""/>
 	<ol id="ol1" reversed start="1" type="a"></ol> <ol id="ol2"></ol>
-	<optgroup id="optgroup1" disabled label="optlabel"></optgroup> <optgroup id="optgroup2"></optgroup>
+	<optgroup id="optgroup1" disabled label="optlabel"></optgroup>
+	<optgroup id="optgroup2"></optgroup>
 	<option id="opt1" selected/><option id="opt2" />
 	<output id="out1" for="input1" name="out1_name"/>
 	<param id="par1" name="param1_name" value="param1_val"/>
 	<pre id="pre1" name="pre1_name" value="pre1_val"/>
 	<quote id="quote1" cite="http://cite.com/url"/>
 	<script id="script1" crossorigin="use-credentials" type="text/javascript" src="script.js" charset="ISO-8859-1" defer async nomodule></script>
-	<script id="script2" ></script>
+	<script id="script2"></script>
+	<script id="script3" src=""></script>
 	<select id="select1" name="sel1_name" autofocus disabled multiple required></select>
 	<select id="select2"></select>
 	<source id="src1" keysystem="keysys" media="(min-width: 600px)" sizes="100vw,50vw" srcset="large.jpg 1024w,medium.jpg 640w" src="test.png" type="image/png"></source>
+	<source id="src2"></source>
+	<source id="src3" src=""></source>
 	<style id="style1" media="print"></style>
 	<table id="table1" sortable><tr><td id="td1" colspan="2" rowspan="3" headers="th1"></th><th id="th1" abbr="hdr" scope="row" sorted>Header</th><th id="th2"></th></tr></table>
 	<table id="table2"></table>
@@ -368,6 +414,8 @@ const testGenElems = `<html><body>
 	<time id="time1" datetime="2017-01-01"/>
 	<track id="track1" kind="metadata" src="foo.en.vtt" srclang="en" label="English"></track>
 	<track id="track2" src="foo.sv.vtt" srclang="sv" label="Svenska"></track>
+	<track id="track3"></track>
+	<track id="track4" src=""></track>
 	<ul id="ul1" type="circle"/>
 	`
 
@@ -443,7 +491,7 @@ func TestGenElements(t *testing.T) {
 		}
 
 		for _, test := range urlTests {
-			sel.Url = test.baseUrl
+			sel.URL = test.baseUrl
 			rt.Set("urldoc", sel)
 
 			v, err := common.RunString(rt, `urldoc.find("#`+test.id+`").get(0).`+test.property+`()`)

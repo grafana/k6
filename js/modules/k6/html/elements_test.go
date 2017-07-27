@@ -40,6 +40,7 @@ const testHTMLElems = `
 	<a href="https://ssl.example.com:444/">4</a>
 	<a href="http://username:password@example.com:80">5</a>
 	<a href="http://example.com" rel="prev next" target="_self" type="rare" accesskey="q" hreflang="en-US" media="print">6</a>
+	<a id="blank_anchor">6</a>
 	<area href="web.address.com"></area>
 	<base href="/rel/path" target="_self"></base>
 	
@@ -90,7 +91,6 @@ func TestElements(t *testing.T) {
 	ctx := common.WithRuntime(context.Background(), rt)
 	rt.Set("src", testHTMLElems)
 	rt.Set("html", common.Bind(rt, &HTML{}, &ctx))
-	// compileProtoElem()
 
 	_, err := common.RunString(rt, `let doc = html.parseHTML(src)`)
 
@@ -101,6 +101,9 @@ func TestElements(t *testing.T) {
 		t.Run("Hash", func(t *testing.T) {
 			if v, err := common.RunString(rt, `doc.find("a").get(0).hash()`); assert.NoError(t, err) {
 				assert.Equal(t, "#hashtext", v.Export())
+			}
+			if v, err := common.RunString(rt, `doc.find("#blank_anchor").get(0).hash()`); assert.NoError(t, err) {
+				assert.Equal(t, "", v.Export())
 			}
 		})
 		t.Run("Host", func(t *testing.T) {
@@ -116,30 +119,48 @@ func TestElements(t *testing.T) {
 			if v, err := common.RunString(rt, `doc.find("a").get(4).host()`); assert.NoError(t, err) {
 				assert.Equal(t, "ssl.example.com:444", v.Export())
 			}
+			if v, err := common.RunString(rt, `doc.find("#blank_anchor").get(0).host()`); assert.NoError(t, err) {
+				assert.Equal(t, "", v.Export())
+			}
 		})
 		t.Run("Hostname", func(t *testing.T) {
 			if v, err := common.RunString(rt, `doc.find("a").get(1).hostname()`); assert.NoError(t, err) {
 				assert.Equal(t, "example.com", v.Export())
+			}
+			if v, err := common.RunString(rt, `doc.find("#blank_anchor").get(0).hostname()`); assert.NoError(t, err) {
+				assert.Equal(t, "", v.Export())
 			}
 		})
 		t.Run("Port", func(t *testing.T) {
 			if v, err := common.RunString(rt, `doc.find("a").get(5).port()`); assert.NoError(t, err) {
 				assert.Equal(t, "80", v.Export())
 			}
+			if v, err := common.RunString(rt, `doc.find("#blank_anchor").get(0).port()`); assert.NoError(t, err) {
+				assert.Equal(t, "", v.Export())
+			}
 		})
 		t.Run("Username", func(t *testing.T) {
 			if v, err := common.RunString(rt, `doc.find("a").get(5).username()`); assert.NoError(t, err) {
 				assert.Equal(t, "username", v.Export())
+			}
+			if v, err := common.RunString(rt, `doc.find("#blank_anchor").get(0).username()`); assert.NoError(t, err) {
+				assert.Equal(t, "", v.Export())
 			}
 		})
 		t.Run("Password", func(t *testing.T) {
 			if v, err := common.RunString(rt, `doc.find("a").get(5).password()`); assert.NoError(t, err) {
 				assert.Equal(t, "password", v.Export())
 			}
+			if v, err := common.RunString(rt, `doc.find("#blank_anchor").get(0).password()`); assert.NoError(t, err) {
+				assert.Equal(t, "", v.Export())
+			}
 		})
 		t.Run("Origin", func(t *testing.T) {
 			if v, err := common.RunString(rt, `doc.find("a").get(5).origin()`); assert.NoError(t, err) {
 				assert.Equal(t, "http://example.com:80", v.Export())
+			}
+			if v, err := common.RunString(rt, `doc.find("#blank_anchor").get(0).origin()`); assert.NoError(t, err) {
+				assert.Equal(t, "", v.Export())
 			}
 		})
 		t.Run("Pathname", func(t *testing.T) {
@@ -149,10 +170,16 @@ func TestElements(t *testing.T) {
 			if v, err := common.RunString(rt, `doc.find("a").get(2).pathname()`); assert.NoError(t, err) {
 				assert.Equal(t, "/path/file", v.Export())
 			}
+			if v, err := common.RunString(rt, `doc.find("#blank_anchor").get(0).pathname()`); assert.NoError(t, err) {
+				assert.Equal(t, "", v.Export())
+			}
 		})
 		t.Run("Protocol", func(t *testing.T) {
 			if v, err := common.RunString(rt, `doc.find("a").get(4).protocol()`); assert.NoError(t, err) {
 				assert.Equal(t, "https", v.Export())
+			}
+			if v, err := common.RunString(rt, `doc.find("#blank_anchor").get(0).protocol()`); assert.NoError(t, err) {
+				assert.Equal(t, ":", v.Export())
 			}
 		})
 		t.Run("RelList", func(t *testing.T) {

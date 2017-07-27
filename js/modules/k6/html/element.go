@@ -40,7 +40,7 @@ func (e Element) attrAsString(name string) string {
 }
 
 func (e Element) resolveURL(val string) (*url.URL, bool) {
-	baseURL, err := url.Parse(e.sel.Url)
+	baseURL, err := url.Parse(e.sel.URL)
 	if err != nil {
 		return nil, false
 	}
@@ -62,14 +62,14 @@ func (e Element) attrAsURL(name string) (*url.URL, bool) {
 	return e.resolveURL(val)
 }
 
-func (e Element) attrAsURLString(name string) string {
-	if e.sel.Url == "" {
+func (e Element) attrAsURLString(name string, defaultWhenNoAttr string) string {
+	if e.sel.URL == "" {
 		return e.attrAsString(name)
 	}
 
 	url, ok := e.attrAsURL(name)
 	if !ok {
-		return e.sel.Url
+		return defaultWhenNoAttr
 	}
 
 	return url.String()
@@ -118,7 +118,7 @@ func (e Element) ownerFormVal() goja.Value {
 	if !exists {
 		return goja.Undefined()
 	}
-	return selToElement(Selection{e.sel.rt, formSel.Eq(0), e.sel.Url})
+	return selToElement(Selection{e.sel.rt, formSel.Eq(0), e.sel.URL})
 }
 
 func (e Element) elemLabels() []goja.Value {
@@ -126,17 +126,17 @@ func (e Element) elemLabels() []goja.Value {
 
 	id := e.attrAsString("id")
 	if id == "" {
-		return elemList(Selection{e.sel.rt, wrapperLbl, e.sel.Url})
+		return elemList(Selection{e.sel.rt, wrapperLbl, e.sel.URL})
 	}
 
 	idLbl := e.sel.sel.Parents().Last().Find("label[for=\"" + id + "\"]")
 	if idLbl.Size() == 0 {
-		return elemList(Selection{e.sel.rt, wrapperLbl, e.sel.Url})
+		return elemList(Selection{e.sel.rt, wrapperLbl, e.sel.URL})
 	}
 
 	allLbls := wrapperLbl.AddSelection(idLbl)
 
-	return elemList(Selection{e.sel.rt, allLbls, e.sel.Url})
+	return elemList(Selection{e.sel.rt, allLbls, e.sel.URL})
 }
 
 func (e Element) splitAttr(attrName string) []string {
@@ -247,19 +247,19 @@ func (e Element) IsSameNode(v goja.Value) bool {
 }
 
 func (e Element) GetElementsByClassName(name string) []goja.Value {
-	return elemList(Selection{e.sel.rt, e.sel.sel.Find("." + name), e.sel.Url})
+	return elemList(Selection{e.sel.rt, e.sel.sel.Find("." + name), e.sel.URL})
 }
 
 func (e Element) GetElementsByTagName(name string) []goja.Value {
-	return elemList(Selection{e.sel.rt, e.sel.sel.Find(name), e.sel.Url})
+	return elemList(Selection{e.sel.rt, e.sel.sel.Find(name), e.sel.URL})
 }
 
 func (e Element) QuerySelector(selector string) goja.Value {
-	return selToElement(Selection{e.sel.rt, e.sel.sel.Find(selector), e.sel.Url})
+	return selToElement(Selection{e.sel.rt, e.sel.sel.Find(selector), e.sel.URL})
 }
 
 func (e Element) QuerySelectorAll(selector string) []goja.Value {
-	return elemList(Selection{e.sel.rt, e.sel.sel.Find(selector), e.sel.Url})
+	return elemList(Selection{e.sel.rt, e.sel.sel.Find(selector), e.sel.URL})
 }
 
 func (e Element) NodeName() string {
@@ -276,7 +276,7 @@ func (e Element) LastChild() goja.Value {
 
 func (e Element) FirstElementChild() goja.Value {
 	if child := e.sel.sel.Children().First(); child.Length() > 0 {
-		return selToElement(Selection{e.sel.rt, child.First(), e.sel.Url})
+		return selToElement(Selection{e.sel.rt, child.First(), e.sel.URL})
 	}
 
 	return goja.Undefined()
@@ -284,7 +284,7 @@ func (e Element) FirstElementChild() goja.Value {
 
 func (e Element) LastElementChild() goja.Value {
 	if child := e.sel.sel.Children(); child.Length() > 0 {
-		return selToElement(Selection{e.sel.rt, child.Last(), e.sel.Url})
+		return selToElement(Selection{e.sel.rt, child.Last(), e.sel.URL})
 	}
 
 	return goja.Undefined()
@@ -300,7 +300,7 @@ func (e Element) NextSibling() goja.Value {
 
 func (e Element) PreviousElementSibling() goja.Value {
 	if prev := e.sel.sel.Prev(); prev.Length() > 0 {
-		return selToElement(Selection{e.sel.rt, prev, e.sel.Url})
+		return selToElement(Selection{e.sel.rt, prev, e.sel.URL})
 	}
 
 	return goja.Undefined()
@@ -308,7 +308,7 @@ func (e Element) PreviousElementSibling() goja.Value {
 
 func (e Element) NextElementSibling() goja.Value {
 	if next := e.sel.sel.Next(); next.Length() > 0 {
-		return selToElement(Selection{e.sel.rt, next, e.sel.Url})
+		return selToElement(Selection{e.sel.rt, next, e.sel.URL})
 	}
 
 	return goja.Undefined()
@@ -324,7 +324,7 @@ func (e Element) ParentNode() goja.Value {
 
 func (e Element) ParentElement() goja.Value {
 	if prt := e.sel.sel.Parent(); prt.Length() > 0 {
-		return selToElement(Selection{e.sel.rt, prt, e.sel.Url})
+		return selToElement(Selection{e.sel.rt, prt, e.sel.URL})
 	}
 
 	return goja.Undefined()

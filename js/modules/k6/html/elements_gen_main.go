@@ -43,23 +43,23 @@ var funcDefs = []string{
 	"Href Download string",
 	"Href ReferrerPolicy enum=,no-referrer,no-referrer-when-downgrade,origin,origin-when-cross-origin,unsafe-url",
 	"Href Rel string",
-	"Href Href url",
+	"Href Href url-or-blank",
 	"Href Target string",
 	"Href Type string",
 	"Href AccessKey string",
 	"Href HrefLang string",
-	"Href ToString=href url",
+	"Href ToString=href url-or-blank",
 	"Media Autoplay bool",
 	"Media Controls bool",
 	"Media Loop bool",
 	"Media Muted bool",
 	"Media Preload enum=auto,metadata,none",
-	"Media Src url",
+	"Media Src url-or-blank",
 	"Media CrossOrigin enum-nullable=anonymous,use-credentials",
 	"Media CurrentSrc=src string",
 	"Media DefaultMuted=muted bool",
 	"Media MediaGroup string",
-	"Base Href url",
+	"Base Href url-or-currpage",
 	"Base Target string",
 	"Button AccessKey string",
 	"Button Autofocus bool",
@@ -73,9 +73,9 @@ var funcDefs = []string{
 	"Embed Type string",
 	"FieldSet Disabled bool",
 	"FieldSet Name string",
+	"Form Action url-or-blank",
 	"Form Name string",
 	"Form Target string",
-	"Form Action url",
 	"Form Enctype enum=application/x-www-form-urlencoded,multipart/form-data,text/plain",
 	"Form Encoding=enctype enum=application/x-www-form-urlencoded,multipart/form-data,text/plain",
 	"Form AcceptCharset=accept-charset string",
@@ -86,8 +86,8 @@ var funcDefs = []string{
 	"IFrame Height string",
 	"IFrame Width string",
 	"IFrame Name string",
-	"IFrame Src url",
-	"Image CurrentSrc=src url",
+	"IFrame Src url-or-blank",
+	"Image CurrentSrc=src url-or-blank",
 	"Image Sizes string",
 	"Image Srcset string",
 	"Image Alt string",
@@ -96,7 +96,7 @@ var funcDefs = []string{
 	"Image Width int",
 	"Image IsMap bool",
 	"Image Name string",
-	"Image Src url",
+	"Image Src url-or-blank",
 	"Image UseMap string",
 	"Image ReferrerPolicy enum=,no-referrer,no-referrer-when-downgrade,origin,origin-when-cross-origin,unsafe-url",
 	"Input Name string",
@@ -109,7 +109,7 @@ var funcDefs = []string{
 	"Input Checked bool",
 	"Input DefaultChecked=checked bool",
 	"Input Alt string",
-	"Input Src url",
+	"Input Src url-or-blank",
 	"Input Height string",
 	"Input Width string",
 	"Input Accept string",
@@ -138,7 +138,7 @@ var funcDefs = []string{
 	"Li Type enum=,1,a,A,i,I,disc,square,circle",
 	"Link CrossOrigin enum-nullable=anonymous,use-credentials",
 	"Link ReferrerPolicy enum=,no-referrer,no-referrer-when-downgrade,origin,origin-when-cross-origin,unsafe-url",
-	"Link Href url",
+	"Link Href url-or-blank",
 	"Link Hreflang string",
 	"Link Media string",
 	"Link Rel string",
@@ -155,7 +155,7 @@ var funcDefs = []string{
 	"Meter Optimum int",
 	"Mod Cite string",
 	"Mod Datetime string",
-	"Object Data url",
+	"Object Data url-or-blank",
 	"Object Height string",
 	"Object Name string",
 	"Object Type string",
@@ -180,7 +180,7 @@ var funcDefs = []string{
 	"Quote Cite string",
 	"Script CrossOrigin string",
 	"Script Type string",
-	"Script Src url",
+	"Script Src url-or-blank",
 	"Script Charset string",
 	"Script Async bool",
 	"Script Defer bool",
@@ -194,7 +194,7 @@ var funcDefs = []string{
 	"Source KeySystem string",
 	"Source Media string",
 	"Source Sizes string",
-	"Source Src url",
+	"Source Src url-or-blank",
 	"Source Srcset string",
 	"Source Type string",
 	"Style Media string",
@@ -221,7 +221,7 @@ var funcDefs = []string{
 	"TextArea Wrap enum=soft,hard,off",
 	"Time Datetime string",
 	"Track Kind enum=subtitle,captions,descriptions,chapters,metadata",
-	"Track Src url",
+	"Track Src url-or-blank",
 	"Track Srclang string",
 	"Track Label string",
 	"Track Default bool",
@@ -353,6 +353,8 @@ func (e {{$funcDef.ElemName}}) {{$funcDef.ElemMethod}}() {{$funcDef.ReturnType}}
 	}
 {{- else if eq $funcDef.ReturnBody "const" }}
 	return "{{ index $funcDef.ReturnOpts 0 }}"
+{{- else if eq $funcDef.ReturnBody "url" }}
+	return e.{{ $funcDef.AttrMethod }}("{{ $funcDef.AttrName }}", {{ index $funcDef.ReturnOpts 0 }})
 {{- else }}
 	return e.{{ $funcDef.AttrMethod }}("{{ $funcDef.AttrName }}")
 {{- end}}
@@ -369,9 +371,9 @@ func constNameMapper(r rune) rune {
 
 func toConst(optName string) string {
 	if optName == "" {
-		return "constBlank"
+		return "const_Blank"
 	}
-	return "const" + strings.Map(constNameMapper, optName)
+	return "const_" + strings.Map(constNameMapper, optName)
 }
 
 func buildStruct(elemInfo ElemInfo) string {
@@ -432,11 +434,19 @@ func buildFuncDef(funcDef string) FuncDef {
 		// => `func (e ButtonElement) AccessKey() string{ return e.attrAsString("accessKey") }``
 		return FuncDef{elemName, elemMethod, "attrAsString", attrName, returnType, returnType, nil}
 
-	case "url":
-		// "Href Href url"
-		// => {"HrefElement" "Href", "attrIsString", "accesskey", "string", "url", nil}
-		// => `func (e HrefElement) Href() string{ return e.attrAsUrlString("href") }``
-		return FuncDef{elemName, elemMethod, "attrAsURLString", attrName, "string", returnType, nil}
+	// This url function uses the current page URL as default when attribute is empty and empty string as default when the attribute is undefined
+	case "url-or-blank":
+		// "Href Href url-or-blank"
+		// => {"HrefElement" "Href", "attrIsString", "accesskey", "string", "url", []string{"\"\""}}
+		// => `func (e HrefElement) Href() string{ return e.attrAsUrlString("href", """) }``
+		return FuncDef{elemName, elemMethod, "attrAsURLString", attrName, "string", "url", []string{"\"\""}}
+
+	// This url function uses current page URL for empty and undefined attributes
+	case "url-or-currpage":
+		// "Base Href url-or-currpage"
+		// => {"BaseElement" "Href", "attrIsString", "accesskey", "string", "url", []string{"e.sel.URL"}}
+		// => `func (e HrefElement) Href() string{ return e.attrAsUrlString("href", e.sel.URL) }``
+		return FuncDef{elemName, elemMethod, "attrAsURLString", attrName, "string", "url", []string{"e.sel.URL"}}
 
 	case "const":
 		// "Output Type const=output"
