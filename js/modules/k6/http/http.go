@@ -140,7 +140,7 @@ func (res *HTTPResponse) Html(selector ...string) html.Selection {
 	if err != nil {
 		common.Throw(common.GetRuntime(res.ctx), err)
 	}
-	sel.Url = res.URL
+	sel.URL = res.URL
 	if len(selector) > 0 {
 		sel = sel.Find(selector[0])
 >>>>>>> Make accessors for attributes which contain urls behave similarly to DOM API.
