@@ -96,7 +96,9 @@ func TestFinished(t *testing.T) {
 }
 
 func TestAuthorizedError(t *testing.T) {
+	called := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called += 1
 		w.WriteHeader(http.StatusForbidden)
 		fmt.Fprintf(w, `{"error": {"code": 5, "message": "Not allowed"}}`)
 	}))
@@ -106,6 +108,45 @@ func TestAuthorizedError(t *testing.T) {
 
 	resp, err := client.CreateTestRun(&TestRun{Name: "test"})
 
+	assert.Equal(t, 1, called)
 	assert.Nil(t, resp)
 	assert.EqualError(t, err, ErrNotAuthorized.Error())
+}
+
+func TestRetry(t *testing.T) {
+	called := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called += 1
+		w.WriteHeader(500)
+	}))
+	defer server.Close()
+
+	client := NewClient("token", server.URL, "1.0")
+	client.retryInterval = 1 * time.Millisecond
+	resp, err := client.CreateTestRun(&TestRun{Name: "test"})
+
+	assert.Equal(t, 3, called)
+	assert.Nil(t, resp)
+	assert.NotNil(t, err)
+}
+
+func TestRetrySuccessOnSecond(t *testing.T) {
+	called := 1
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called += 1
+		if called == 2 {
+			fmt.Fprintf(w, `{"reference_id": "1"}`)
+			return
+		}
+		w.WriteHeader(500)
+	}))
+	defer server.Close()
+
+	client := NewClient("token", server.URL, "1.0")
+	client.retryInterval = 1 * time.Millisecond
+	resp, err := client.CreateTestRun(&TestRun{Name: "test"})
+
+	assert.Equal(t, 2, called)
+	assert.NotNil(t, resp)
+	assert.Nil(t, err)
 }

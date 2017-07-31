@@ -25,16 +25,21 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"time"
 
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 )
 
 const (
+	// Default request timeout
 	RequestTimeout = 10 * time.Second
+	// Retry interval
+	RetryInterval = 500 * time.Millisecond
+	// Retry attempts
+	MaxRetries = 3
 )
 
 // Client handles communication with Load Impact cloud API.
@@ -43,6 +48,9 @@ type Client struct {
 	token   string
 	baseURL string
 	version string
+
+	retries       int
+	retryInterval time.Duration
 }
 
 func NewClient(token, host, version string) *Client {
@@ -61,10 +69,12 @@ func NewClient(token, host, version string) *Client {
 	baseURL := fmt.Sprintf("%s/v1", host)
 
 	c := &Client{
-		client:  client,
-		token:   token,
-		baseURL: baseURL,
-		version: version,
+		client:        client,
+		token:         token,
+		baseURL:       baseURL,
+		version:       version,
+		retries:       MaxRetries,
+		retryInterval: RetryInterval,
 	}
 	return c
 }
@@ -85,24 +95,59 @@ func (c *Client) NewRequest(method, url string, data interface{}) (*http.Request
 }
 
 func (c *Client) Do(req *http.Request, v interface{}) error {
+	var originalBody []byte
+	var err error
+
+	if req.Body != nil {
+		originalBody, err = ioutil.ReadAll(req.Body)
+		if err != nil {
+			return err
+		}
+
+		if cerr := req.Body.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+	}
+
+	for i := 1; i <= c.retries; i++ {
+		if len(originalBody) > 0 {
+			req.Body = ioutil.NopCloser(bytes.NewBuffer(originalBody))
+		}
+
+		retry, err := c.do(req, v, i)
+
+		if retry {
+			time.Sleep(c.retryInterval)
+			continue
+		}
+
+		return err
+	}
+
+	return err
+}
+
+func (c *Client) do(req *http.Request, v interface{}, attempt int) (retry bool, err error) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", fmt.Sprintf("Token %s", c.token))
 	req.Header.Set("User-Agent", "k6cloud/"+c.version)
 
 	resp, err := c.client.Do(req)
-	if err != nil {
-		return err
-	}
 
 	defer func() {
-		err := resp.Body.Close()
-		if err != nil {
-			log.Errorln(err)
+		if resp != nil {
+			if cerr := resp.Body.Close(); cerr != nil && err == nil {
+				err = cerr
+			}
 		}
 	}()
 
+	if shouldRetry(resp, err, attempt, c.retries) {
+		return true, err
+	}
+
 	if err = checkResponse(resp); err != nil {
-		return err
+		return false, err
 	}
 
 	if v != nil {
@@ -111,10 +156,14 @@ func (c *Client) Do(req *http.Request, v interface{}) error {
 		}
 	}
 
-	return err
+	return false, err
 }
 
 func checkResponse(r *http.Response) error {
+	if r == nil {
+		return ErrUnknown
+	}
+
 	if c := r.StatusCode; c >= 200 && c <= 299 {
 		return nil
 	}
@@ -144,4 +193,20 @@ func checkResponse(r *http.Response) error {
 	}
 
 	return errorResponse
+}
+
+func shouldRetry(resp *http.Response, err error, attempt, maxAttempts int) bool {
+	if attempt >= maxAttempts {
+		return false
+	}
+
+	if resp == nil || err != nil {
+		return true
+	}
+
+	if resp.StatusCode >= 500 || resp.StatusCode == 429 {
+		return true
+	}
+
+	return false
 }
