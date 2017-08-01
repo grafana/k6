@@ -512,3 +512,51 @@ func TestVUIntegrationHTTP2(t *testing.T) {
 		})
 	}
 }
+
+func TestVUIntegrationCookies(t *testing.T) {
+	r1, err := New(&lib.SourceData{
+		Filename: "/script.js",
+		Data: []byte(`
+			import http from "k6/http";
+			export default function() {
+				let preRes = http.get("https://httpbin.org/cookies");
+				if (preRes.status != 200) { throw new Error("wrong status (pre): " + preRes.status); }
+				if (preRes.json().cookies.k1 || preRes.json().cookies.k2) {
+					throw new Error("cookies persisted: " + preRes.body);
+				}
+
+				let res = http.get("https://httpbin.org/cookies/set?k2=v2&k1=v1");
+				if (res.status != 200) { throw new Error("wrong status: " + res.status) }
+				if (res.json().cookies.k1 != "v1" || res.json().cookies.k2 != "v2") {
+					throw new Error("wrong cookies: " + res.body);
+				}
+			}
+		`),
+	}, afero.NewMemMapFs())
+	if !assert.NoError(t, err) {
+		return
+	}
+	r1.ApplyOptions(lib.Options{
+		Throw:        null.BoolFrom(true),
+		MaxRedirects: null.IntFrom(10),
+	})
+
+	r2, err := NewFromArchive(r1.MakeArchive())
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	runners := map[string]*Runner{"Source": r1, "Archive": r2}
+	for name, r := range runners {
+		t.Run(name, func(t *testing.T) {
+			vu, err := r.NewVU()
+			if !assert.NoError(t, err) {
+				return
+			}
+			for i := 0; i < 2; i++ {
+				_, err = vu.RunOnce(context.Background())
+				assert.NoError(t, err)
+			}
+		})
+	}
+}

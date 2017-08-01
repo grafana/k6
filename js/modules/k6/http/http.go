@@ -188,6 +188,7 @@ func (*HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.State,
 	}
 	client := http.Client{
 		Transport: state.HTTPTransport,
+		Jar:       state.CookieJar,
 		Timeout:   timeout,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			max := int(state.Options.MaxRedirects.Int64)

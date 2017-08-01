@@ -22,6 +22,7 @@ package common
 
 import (
 	"net/http"
+	"net/http/cookiejar"
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/netext"
@@ -42,9 +43,8 @@ type State struct {
 
 	// Networking equipment.
 	HTTPTransport http.RoundTripper
-
-	// Also expose the underlying dialer
-	Dialer *netext.Dialer
+	Dialer        *netext.Dialer
+	CookieJar     *cookiejar.Jar
 
 	// Sample buffer, emitted at the end of the iteration.
 	Samples []stats.Sample

@@ -25,6 +25,7 @@ import (
 	"crypto/tls"
 	"net"
 	"net/http"
+	"net/http/cookiejar"
 	"time"
 
 	"github.com/dop251/goja"
@@ -167,12 +168,18 @@ type VU struct {
 }
 
 func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
+	cookieJar, err := cookiejar.New(nil)
+	if err != nil {
+		return nil, err
+	}
+
 	state := &common.State{
 		Logger:        u.Runner.Logger,
 		Options:       u.Runner.Bundle.Options,
 		Group:         u.Runner.defaultGroup,
 		HTTPTransport: u.HTTPTransport,
 		Dialer:        u.Dialer,
+		CookieJar:     cookieJar,
 	}
 	u.Dialer.BytesRead = &state.BytesRead
 	u.Dialer.BytesWritten = &state.BytesWritten
@@ -184,7 +191,7 @@ func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 	u.Runtime.Set("__ITER", u.Iteration)
 	u.Iteration++
 
-	_, err := u.Default(goja.Undefined())
+	_, err = u.Default(goja.Undefined())
 
 	t := time.Now()
 	samples := append(state.Samples,
