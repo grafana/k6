@@ -161,7 +161,9 @@ func TestExecutorSetVUs(t *testing.T) {
 			num := 0
 			for i, handle := range e.vus {
 				num++
-				assert.NotNil(t, handle.vu, "vu %d lacks impl", i)
+				if assert.NotNil(t, handle.vu, "vu %d lacks impl", i) {
+					assert.Equal(t, int64(0), handle.vu.(*lib.RunnerFuncVU).ID)
+				}
 				assert.Nil(t, handle.ctx, "vu %d has ctx", i)
 				assert.Nil(t, handle.cancel, "vu %d has cancel", i)
 			}
@@ -175,9 +177,11 @@ func TestExecutorSetVUs(t *testing.T) {
 			for i, handle := range e.vus {
 				if i < 50 {
 					assert.NotNil(t, handle.cancel, "vu %d lacks cancel", i)
+					assert.Equal(t, int64(i+1), handle.vu.(*lib.RunnerFuncVU).ID)
 					num++
 				} else {
 					assert.Nil(t, handle.cancel, "vu %d has cancel", i)
+					assert.Equal(t, int64(0), handle.vu.(*lib.RunnerFuncVU).ID)
 				}
 			}
 			assert.Equal(t, 50, num)
@@ -189,6 +193,7 @@ func TestExecutorSetVUs(t *testing.T) {
 			num := 0
 			for i, handle := range e.vus {
 				assert.NotNil(t, handle.cancel, "vu %d lacks cancel", i)
+				assert.Equal(t, int64(i+1), handle.vu.(*lib.RunnerFuncVU).ID)
 				num++
 			}
 			assert.Equal(t, 100, num)
@@ -206,9 +211,25 @@ func TestExecutorSetVUs(t *testing.T) {
 					} else {
 						assert.Nil(t, handle.cancel, "vu %d has cancel", i)
 					}
+					assert.Equal(t, int64(i+1), handle.vu.(*lib.RunnerFuncVU).ID)
 				}
 				assert.Equal(t, 50, num)
 			}
+
+			t.Run("Raise", func(t *testing.T) {
+				assert.NoError(t, e.SetVUs(100))
+				assert.Equal(t, int64(100), e.GetVUs())
+				if assert.Len(t, e.vus, 100) {
+					for i, handle := range e.vus {
+						assert.NotNil(t, handle.cancel, "vu %d lacks cancel", i)
+						if i < 50 {
+							assert.Equal(t, int64(i+1), handle.vu.(*lib.RunnerFuncVU).ID)
+						} else {
+							assert.Equal(t, int64(50+i+1), handle.vu.(*lib.RunnerFuncVU).ID)
+						}
+					}
+				}
+			})
 		})
 	})
 }

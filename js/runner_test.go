@@ -560,3 +560,36 @@ func TestVUIntegrationCookies(t *testing.T) {
 		})
 	}
 }
+
+func TestVUIntegrationVUID(t *testing.T) {
+	r1, err := New(&lib.SourceData{
+		Filename: "/script.js",
+		Data: []byte(`
+			export default function() {
+				if (__VU != 1234) { throw new Error("wrong __VU: " + __VU); }
+			}`,
+		),
+	}, afero.NewMemMapFs())
+	if !assert.NoError(t, err) {
+		return
+	}
+	r1.ApplyOptions(lib.Options{Throw: null.BoolFrom(true)})
+
+	r2, err := NewFromArchive(r1.MakeArchive())
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	runners := map[string]*Runner{"Source": r1, "Archive": r2}
+	for name, r := range runners {
+		t.Run(name, func(t *testing.T) {
+			vu, err := r.NewVU()
+			if !assert.NoError(t, err) {
+				return
+			}
+			assert.NoError(t, vu.Reconfigure(1234))
+			_, err = vu.RunOnce(context.Background())
+			assert.NoError(t, err)
+		})
+	}
+}
