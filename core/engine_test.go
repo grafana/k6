@@ -298,8 +298,9 @@ func TestEngineRun(t *testing.T) {
 			samples = append(samples, stats.Sample{Metric: testMetric, Time: time.Now(), Value: 2})
 			return samples, err
 		}), lib.Options{
-			VUs:    null.IntFrom(1),
-			VUsMax: null.IntFrom(1),
+			VUs:        null.IntFrom(1),
+			VUsMax:     null.IntFrom(1),
+			Iterations: null.IntFrom(1),
 		})
 		if !assert.NoError(t, err) {
 			return

@@ -43,14 +43,17 @@ type vuHandle struct {
 	cancel context.CancelFunc
 }
 
-func (h *vuHandle) run(logger *log.Logger, flow <-chan struct{}, out chan<- []stats.Sample) {
+func (h *vuHandle) run(logger *log.Logger, flow <-chan int64, out chan<- []stats.Sample) {
 	h.RLock()
 	ctx := h.ctx
 	h.RUnlock()
 
 	for {
 		select {
-		case <-flow:
+		case _, ok := <-flow:
+			if !ok {
+				return
+			}
 		case <-ctx.Done():
 			return
 		}
@@ -104,7 +107,7 @@ type Executor struct {
 	out chan<- []stats.Sample
 
 	// Flow control for VUs; iterations are run only after reading from this channel.
-	flow chan struct{}
+	flow chan int64
 }
 
 func New(r lib.Runner) *Executor {
@@ -122,7 +125,7 @@ func (e *Executor) Run(parent context.Context, out chan<- []stats.Sample) error 
 
 	ctx, cancel := context.WithCancel(parent)
 	vuOut := make(chan []stats.Sample)
-	vuFlow := make(chan struct{})
+	vuFlow := make(chan int64)
 
 	e.lock.Lock()
 	e.ctx = ctx
@@ -157,11 +160,15 @@ func (e *Executor) Run(parent context.Context, out chan<- []stats.Sample) error 
 					}
 				}
 			case <-wait:
+			}
+			select {
+			case <-wait:
 				close(vuOut)
 				if out != nil && len(samples) > 0 {
 					out <- samples
 				}
 				return
+			default:
 			}
 		}
 	}()
@@ -197,14 +204,14 @@ func (e *Executor) Run(parent context.Context, out chan<- []stats.Sample) error 
 		// conditionally select on a channel either...so, we cheat: swap out the flow channel for a
 		// nil channel (writing to nil always blocks) if we don't wanna write an iteration.
 		flow := vuFlow
-		if end := atomic.LoadInt64(&e.endIters); end >= 0 {
-			if partials := atomic.LoadInt64(&e.partIters); partials >= end {
-				flow = nil
-			}
+		end := atomic.LoadInt64(&e.endIters)
+		partials := atomic.LoadInt64(&e.partIters)
+		if end >= 0 && partials >= end {
+			flow = nil
 		}
 
 		select {
-		case flow <- struct{}{}:
+		case flow <- partials:
 			// Start an iteration if there's a VU waiting. See also: the big comment block above.
 			atomic.AddInt64(&e.partIters, 1)
 		case t := <-ticker.C:
