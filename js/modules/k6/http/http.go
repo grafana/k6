@@ -188,7 +188,6 @@ func (*HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.State,
 	}
 	client := http.Client{
 		Transport: state.HTTPTransport,
-		Jar:       state.CookieJar,
 		Timeout:   timeout,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			max := int(state.Options.MaxRedirects.Int64)
@@ -197,6 +196,9 @@ func (*HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.State,
 			}
 			return nil
 		},
+	}
+	if state.CookieJar != nil {
+		client.Jar = state.CookieJar
 	}
 
 	tracer := netext.Tracer{}
