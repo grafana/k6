@@ -34,6 +34,7 @@ var (
 	ctxPtrT = reflect.TypeOf((*context.Context)(nil))
 	ctxT    = reflect.TypeOf((*context.Context)(nil)).Elem()
 	errorT  = reflect.TypeOf((*error)(nil)).Elem()
+	jsValT  = reflect.TypeOf((*goja.Value)(nil)).Elem()
 	fnCallT = reflect.TypeOf((*goja.FunctionCall)(nil)).Elem()
 
 	constructWrap = MustCompile(
@@ -157,6 +158,12 @@ func Bind(rt *goja.Runtime, v interface{}, ctxPtr *context.Context) map[string]i
 
 					T := fnT.In(i)
 
+					// A function that takes a goja.FunctionCall takes only that arg (+ injected).
+					if T == fnCallT {
+						args[i] = reflect.ValueOf(call)
+						break
+					}
+
 					// The last arg to a varadic function is a slice of the remainder.
 					if isVaradic && i == numIn-1 {
 						varArgsLen := len(call.Arguments) - (i - reservedArgs)
@@ -182,6 +189,10 @@ func Bind(rt *goja.Runtime, v interface{}, ctxPtr *context.Context) map[string]i
 
 					// Optimization: no need to allocate a pointer and export for a zero value.
 					if goja.IsUndefined(arg) {
+						if T == jsValT {
+							args[i] = reflect.ValueOf(goja.Undefined())
+							continue
+						}
 						args[i] = reflect.Zero(T)
 						continue
 					}

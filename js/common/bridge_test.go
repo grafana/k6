@@ -58,6 +58,66 @@ type bridgeTestErrorType struct{}
 
 func (bridgeTestErrorType) Error() error { return errors.New("error") }
 
+type bridgeTestJSValueType struct{}
+
+func (bridgeTestJSValueType) Func(arg goja.Value) goja.Value { return arg }
+
+type bridgeTestJSValueErrorType struct{}
+
+func (bridgeTestJSValueErrorType) Func(arg goja.Value) (goja.Value, error) {
+	if goja.IsUndefined(arg) {
+		return goja.Undefined(), errors.New("missing argument")
+	}
+	return arg, nil
+}
+
+type bridgeTestJSValueContextType struct{}
+
+func (bridgeTestJSValueContextType) Func(ctx context.Context, arg goja.Value) goja.Value {
+	return arg
+}
+
+type bridgeTestJSValueContextErrorType struct{}
+
+func (bridgeTestJSValueContextErrorType) Func(ctx context.Context, arg goja.Value) (goja.Value, error) {
+	if goja.IsUndefined(arg) {
+		return goja.Undefined(), errors.New("missing argument")
+	}
+	return arg, nil
+}
+
+type bridgeTestNativeFunctionType struct{}
+
+func (bridgeTestNativeFunctionType) Func(call goja.FunctionCall) goja.Value {
+	return call.Argument(0)
+}
+
+type bridgeTestNativeFunctionErrorType struct{}
+
+func (bridgeTestNativeFunctionErrorType) Func(call goja.FunctionCall) (goja.Value, error) {
+	arg := call.Argument(0)
+	if goja.IsUndefined(arg) {
+		return goja.Undefined(), errors.New("missing argument")
+	}
+	return arg, nil
+}
+
+type bridgeTestNativeFunctionContextType struct{}
+
+func (bridgeTestNativeFunctionContextType) Func(ctx context.Context, call goja.FunctionCall) goja.Value {
+	return call.Argument(0)
+}
+
+type bridgeTestNativeFunctionContextErrorType struct{}
+
+func (bridgeTestNativeFunctionContextErrorType) Func(ctx context.Context, call goja.FunctionCall) (goja.Value, error) {
+	arg := call.Argument(0)
+	if goja.IsUndefined(arg) {
+		return goja.Undefined(), errors.New("missing argument")
+	}
+	return arg, nil
+}
+
 type bridgeTestAddType struct{}
 
 func (bridgeTestAddType) Add(a, b int) int { return a + b }
@@ -285,6 +345,106 @@ func TestBind(t *testing.T) {
 		{"Error", bridgeTestErrorType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
 			_, err := RunString(rt, `obj.error()`)
 			assert.EqualError(t, err, "GoError: error")
+		}},
+		{"JSValue", bridgeTestJSValueType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
+			v, err := RunString(rt, `obj.func(1234)`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, int64(1234), v.Export())
+			}
+		}},
+		{"JSValueError", bridgeTestJSValueErrorType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
+			_, err := RunString(rt, `obj.func()`)
+			assert.EqualError(t, err, "GoError: missing argument")
+
+			t.Run("Valid", func(t *testing.T) {
+				v, err := RunString(rt, `obj.func(1234)`)
+				if assert.NoError(t, err) {
+					assert.Equal(t, int64(1234), v.Export())
+				}
+			})
+		}},
+		{"JSValueContext", bridgeTestJSValueContextType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
+			_, err := RunString(rt, `obj.func()`)
+			assert.EqualError(t, err, "GoError: func() can only be called from within default()")
+
+			t.Run("Context", func(t *testing.T) {
+				*ctxPtr = context.Background()
+				defer func() { *ctxPtr = nil }()
+
+				v, err := RunString(rt, `obj.func(1234)`)
+				if assert.NoError(t, err) {
+					assert.Equal(t, int64(1234), v.Export())
+				}
+			})
+		}},
+		{"JSValueContextError", bridgeTestJSValueContextErrorType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
+			_, err := RunString(rt, `obj.func()`)
+			assert.EqualError(t, err, "GoError: func() can only be called from within default()")
+
+			t.Run("Context", func(t *testing.T) {
+				*ctxPtr = context.Background()
+				defer func() { *ctxPtr = nil }()
+
+				_, err := RunString(rt, `obj.func()`)
+				assert.EqualError(t, err, "GoError: missing argument")
+
+				t.Run("Valid", func(t *testing.T) {
+					v, err := RunString(rt, `obj.func(1234)`)
+					if assert.NoError(t, err) {
+						assert.Equal(t, int64(1234), v.Export())
+					}
+				})
+			})
+		}},
+		{"NativeFunction", bridgeTestNativeFunctionType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
+			v, err := RunString(rt, `obj.func(1234)`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, int64(1234), v.Export())
+			}
+		}},
+		{"NativeFunctionError", bridgeTestNativeFunctionErrorType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
+			_, err := RunString(rt, `obj.func()`)
+			assert.EqualError(t, err, "GoError: missing argument")
+
+			t.Run("Valid", func(t *testing.T) {
+				v, err := RunString(rt, `obj.func(1234)`)
+				if assert.NoError(t, err) {
+					assert.Equal(t, int64(1234), v.Export())
+				}
+			})
+		}},
+		{"NativeFunctionContext", bridgeTestNativeFunctionContextType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
+			_, err := RunString(rt, `obj.func()`)
+			assert.EqualError(t, err, "GoError: func() can only be called from within default()")
+
+			t.Run("Context", func(t *testing.T) {
+				*ctxPtr = context.Background()
+				defer func() { *ctxPtr = nil }()
+
+				v, err := RunString(rt, `obj.func(1234)`)
+				if assert.NoError(t, err) {
+					assert.Equal(t, int64(1234), v.Export())
+				}
+			})
+		}},
+		{"NativeFunctionContextError", bridgeTestNativeFunctionContextErrorType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
+			_, err := RunString(rt, `obj.func()`)
+			assert.EqualError(t, err, "GoError: func() can only be called from within default()")
+
+			t.Run("Context", func(t *testing.T) {
+				*ctxPtr = context.Background()
+				defer func() { *ctxPtr = nil }()
+
+				_, err := RunString(rt, `obj.func()`)
+				assert.EqualError(t, err, "GoError: missing argument")
+
+				t.Run("Valid", func(t *testing.T) {
+					v, err := RunString(rt, `obj.func(1234)`)
+					if assert.NoError(t, err) {
+						assert.Equal(t, int64(1234), v.Export())
+					}
+				})
+			})
 		}},
 		{"Add", bridgeTestAddType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
 			v, err := RunString(rt, `obj.add(1, 2)`)
