@@ -34,6 +34,7 @@ var (
 	ctxPtrT = reflect.TypeOf((*context.Context)(nil))
 	ctxT    = reflect.TypeOf((*context.Context)(nil)).Elem()
 	errorT  = reflect.TypeOf((*error)(nil)).Elem()
+	fnCallT = reflect.TypeOf((*goja.FunctionCall)(nil)).Elem()
 
 	constructWrap = MustCompile(
 		"__constructor__",
@@ -128,59 +129,86 @@ func Bind(rt *goja.Runtime, v interface{}, ctxPtr *context.Context) map[string]i
 			}
 		}
 		if hasError || wantsContext || wantsContextPtr {
-			// Varadic functions are called a bit differently.
-			varadic := fnT.IsVariadic()
+			isVaradic := fnT.IsVariadic()
+			realFn := fn
+			fn = reflect.ValueOf(func(call goja.FunctionCall) goja.Value {
+				// Number of arguments: the higher number between the function's required arguments
+				// and the number of arguments actually given.
+				args := make([]reflect.Value, numIn)
 
-			// Collect input types, but skip the context (if any).
-			var in []reflect.Type
-			if numIn > 0 {
-				inOffset := 0
-				if wantsContext || wantsContextPtr {
-					inOffset = 1
+				// Inject any requested parameters, and reserve them to offset user args.
+				reservedArgs := 0
+				if wantsContext {
+					if ctxPtr == nil || *ctxPtr == nil {
+						Throw(rt, errors.Errorf("%s() can only be called from within default()", name))
+					}
+					args[0] = reflect.ValueOf(*ctxPtr)
+					reservedArgs++
+				} else if wantsContextPtr {
+					args[0] = reflect.ValueOf(ctxPtr)
+					reservedArgs++
 				}
-				in = make([]reflect.Type, numIn-inOffset)
-				for i := inOffset; i < numIn; i++ {
-					in[i-inOffset] = fnT.In(i)
+
+				// Copy over arguments.
+				for i := 0; i < numIn; i++ {
+					if i < reservedArgs {
+						continue
+					}
+
+					T := fnT.In(i)
+
+					// The last arg to a varadic function is a slice of the remainder.
+					if isVaradic && i == numIn-1 {
+						varArgsLen := len(call.Arguments) - (i - reservedArgs)
+						if varArgsLen <= 0 {
+							args[i] = reflect.Zero(T)
+							break
+						}
+						varArgs := reflect.MakeSlice(T, varArgsLen, varArgsLen)
+						emT := T.Elem()
+						for j := 0; j < varArgsLen; j++ {
+							arg := call.Arguments[i+j-reservedArgs]
+							v := reflect.New(emT)
+							if err := rt.ExportTo(arg, v.Interface()); err != nil {
+								Throw(rt, err)
+							}
+							varArgs.Index(j).Set(v.Elem())
+						}
+						args[i] = varArgs
+						break
+					}
+
+					arg := call.Argument(i - reservedArgs)
+
+					// Optimization: no need to allocate a pointer and export for a zero value.
+					if goja.IsUndefined(arg) {
+						args[i] = reflect.Zero(T)
+						continue
+					}
+
+					// Allocate a T* and export the JS value to it.
+					v := reflect.New(T)
+					if err := rt.ExportTo(arg, v.Interface()); err != nil {
+						Throw(rt, err)
+					}
+					args[i] = v.Elem()
 				}
-			}
 
-			// Collect the output type (if any). JS functions can only return a single value, but
-			// allow returning an error, which will be thrown as a JS exception.
-			var out []reflect.Type
-			if numOut != 0 {
-				out = []reflect.Type{fnT.Out(0)}
-			}
+				var ret []reflect.Value
+				if isVaradic {
+					ret = realFn.CallSlice(args)
+				} else {
+					ret = realFn.Call(args)
+				}
 
-			wrappedFn := fn
-			fn = reflect.MakeFunc(
-				reflect.FuncOf(in, out, varadic),
-				func(args []reflect.Value) []reflect.Value {
-					if wantsContext {
-						if ctxPtr == nil || *ctxPtr == nil {
-							Throw(rt, errors.Errorf("%s needs a valid VU context", meth.Name))
-						}
-						args = append([]reflect.Value{reflect.ValueOf(*ctxPtr)}, args...)
-					} else if wantsContextPtr {
-						args = append([]reflect.Value{reflect.ValueOf(ctxPtr)}, args...)
+				if len(ret) > 0 {
+					if hasError && !ret[1].IsNil() {
+						Throw(rt, ret[1].Interface().(error))
 					}
-
-					var res []reflect.Value
-					if varadic {
-						res = wrappedFn.CallSlice(args)
-					} else {
-						res = wrappedFn.Call(args)
-					}
-
-					if hasError {
-						if !res[1].IsNil() {
-							Throw(rt, res[1].Interface().(error))
-						}
-						res = res[:1]
-					}
-
-					return res
-				},
-			)
+					return rt.ToValue(ret[0].Interface())
+				}
+				return goja.Undefined()
+			})
 		}
 
 		// X-Prefixed methods are assumed to be constructors; use a closure to wrap them in a
