@@ -28,15 +28,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestMustCompile(t *testing.T) {
-	t.Run("Valid", func(t *testing.T) {
-		assert.NotNil(t, MustCompile("script.js", "1+1", true))
-	})
-	t.Run("Invalid", func(t *testing.T) {
-		assert.Panics(t, func() { MustCompile("script.js", "#", true) })
-	})
-}
-
 func TestRunString(t *testing.T) {
 	t.Run("Valid", func(t *testing.T) {
 		_, err := RunString(goja.New(), `let a = 1;`)
