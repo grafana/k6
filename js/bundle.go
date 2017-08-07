@@ -29,6 +29,7 @@ import (
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/js/compiler"
+	jslib "github.com/loadimpact/k6/js/lib"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/loader"
 	"github.com/pkg/errors"
@@ -214,6 +215,10 @@ func (b *Bundle) Instantiate() (*BundleInstance, error) {
 func (b *Bundle) instantiate(rt *goja.Runtime, init *InitContext) error {
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 	rt.SetRandSource(common.DefaultRandSource)
+
+	if _, err := rt.RunProgram(jslib.CoreJS); err != nil {
+		return err
+	}
 
 	exports := rt.NewObject()
 	rt.Set("exports", exports)
