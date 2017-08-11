@@ -62,7 +62,7 @@ type Engine struct {
 
 	// Assigned to metrics upon first received sample.
 	thresholds map[string]stats.Thresholds
-	submetrics map[string][]stats.Submetric
+	submetrics map[string][]*stats.Submetric
 
 	// Are thresholds tainted?
 	thresholdsTainted bool
@@ -102,7 +102,7 @@ func NewEngine(ex lib.Executor, o lib.Options) (*Engine, error) {
 	ex.SetEndIterations(o.Iterations)
 
 	e.thresholds = o.Thresholds
-	e.submetrics = make(map[string][]stats.Submetric)
+	e.submetrics = make(map[string][]*stats.Submetric)
 	for name := range e.thresholds {
 		if !strings.Contains(name, "{") {
 			continue

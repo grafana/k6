@@ -171,13 +171,13 @@ type Sample struct {
 
 // A Metric defines the shape of a set of data.
 type Metric struct {
-	Name       string      `json:"name"`
-	Type       MetricType  `json:"type"`
-	Contains   ValueType   `json:"contains"`
-	Tainted    null.Bool   `json:"tainted"`
-	Thresholds Thresholds  `json:"thresholds"`
-	Submetrics []Submetric `json:"submetrics"`
-	Sink       Sink        `json:"-"`
+	Name       string       `json:"name"`
+	Type       MetricType   `json:"type"`
+	Contains   ValueType    `json:"contains"`
+	Tainted    null.Bool    `json:"tainted"`
+	Thresholds Thresholds   `json:"thresholds"`
+	Submetrics []*Submetric `json:"submetrics"`
+	Sink       Sink         `json:"-"`
 }
 
 func New(name string, typ MetricType, t ...ValueType) *Metric {
@@ -236,10 +236,10 @@ type Submetric struct {
 }
 
 // Creates a submetric from a name.
-func NewSubmetric(name string) (parentName string, sm Submetric) {
+func NewSubmetric(name string) (parentName string, sm *Submetric) {
 	parts := strings.SplitN(strings.TrimSuffix(name, "}"), "{", 2)
 	if len(parts) == 1 {
-		return parts[0], Submetric{Name: name}
+		return parts[0], &Submetric{Name: name}
 	}
 
 	kvs := strings.Split(parts[1], ",")
@@ -259,5 +259,5 @@ func NewSubmetric(name string) (parentName string, sm Submetric) {
 		value := strings.TrimSpace(strings.Trim(parts[1], `"'`))
 		tags[key] = value
 	}
-	return parts[0], Submetric{Name: name, Tags: tags}
+	return parts[0], &Submetric{Name: name, Tags: tags}
 }
