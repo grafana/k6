@@ -21,6 +21,7 @@
 package lib
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 
@@ -100,6 +101,38 @@ func (s *TLSCipherSuites) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+type TLSAuthFields struct {
+	Cert    string   `json:"cert"`
+	Key     string   `json:"key"`
+	Domains []string `json:"domains"`
+}
+
+type TLSAuth struct {
+	TLSAuthFields
+	certificate *tls.Certificate
+}
+
+func (c *TLSAuth) UnmarshalJSON(data []byte) error {
+	if err := json.Unmarshal(data, &c.TLSAuthFields); err != nil {
+		return err
+	}
+	if _, err := c.Certificate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *TLSAuth) Certificate() (*tls.Certificate, error) {
+	if c.certificate == nil {
+		cert, err := tls.X509KeyPair([]byte(c.Cert), []byte(c.Key))
+		if err != nil {
+			return nil, err
+		}
+		c.certificate = &cert
+	}
+	return c.certificate, nil
+}
+
 type Options struct {
 	Paused     null.Bool    `json:"paused"`
 	VUs        null.Int     `json:"vus"`
@@ -115,6 +148,7 @@ type Options struct {
 	InsecureSkipTLSVerify null.Bool        `json:"insecureSkipTLSVerify"`
 	TLSCipherSuites       *TLSCipherSuites `json:"tlsCipherSuites"`
 	TLSVersion            *TLSVersion      `json:"tlsVersion"`
+	TLSAuth               []*TLSAuth       `json:"tlsAuth"`
 	NoConnectionReuse     null.Bool        `json:"noConnectionReuse"`
 	UserAgent             null.String      `json:"userAgent"`
 	Throw                 null.Bool        `json:"throw"`
@@ -161,6 +195,9 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.TLSVersion != nil {
 		o.TLSVersion = opts.TLSVersion
+	}
+	if opts.TLSAuth != nil {
+		o.TLSAuth = opts.TLSAuth
 	}
 	if opts.NoConnectionReuse.Valid {
 		o.NoConnectionReuse = opts.NoConnectionReuse

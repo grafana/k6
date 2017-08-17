@@ -22,6 +22,7 @@ package lib
 
 import (
 	"crypto/tls"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -95,6 +96,66 @@ func TestOptionsApply(t *testing.T) {
 		assert.NotNil(t, opts.TLSVersion)
 		assert.Equal(t, opts.TLSVersion.Min, tls.VersionSSL30)
 		assert.Equal(t, opts.TLSVersion.Max, tls.VersionTLS12)
+	})
+	t.Run("TLSAuth", func(t *testing.T) {
+		tlsAuth := []*TLSAuth{
+			{TLSAuthFields{
+				Domains: []string{"example.com", "*.example.com"},
+				Cert: "-----BEGIN CERTIFICATE-----\n" +
+					"MIIBoTCCAUegAwIBAgIUQl0J1Gkd6U2NIMwMDnpfH8c1myEwCgYIKoZIzj0EAwIw\n" +
+					"EDEOMAwGA1UEAxMFTXkgQ0EwHhcNMTcwODE1MTYxODAwWhcNMTgwODE1MTYxODAw\n" +
+					"WjAQMQ4wDAYDVQQDEwV1c2VyMTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABLaf\n" +
+					"xEOmBHkzbqd9/0VZX/39qO2yQq2Gz5faRdvy38kuLMCV+9HYrfMx6GYCZzTUIq6h\n" +
+					"8QXOrlgYTixuUVfhJNWjfzB9MA4GA1UdDwEB/wQEAwIFoDAdBgNVHSUEFjAUBggr\n" +
+					"BgEFBQcDAQYIKwYBBQUHAwIwDAYDVR0TAQH/BAIwADAdBgNVHQ4EFgQUxmQiq5K3\n" +
+					"KUnVME945Byt3Ysvkh8wHwYDVR0jBBgwFoAU3qEhcpRgpsqo9V+LFns9a+oZIYww\n" +
+					"CgYIKoZIzj0EAwIDSAAwRQIgSGxnJ+/cLUNTzt7fhr/mjJn7ShsTW33dAdfLM7H2\n" +
+					"z/gCIQDyVf8DePtxlkMBScTxZmIlMQdNc6+6VGZQ4QscruVLmg==\n" +
+					"-----END CERTIFICATE-----",
+				Key: "-----BEGIN EC PRIVATE KEY-----\n" +
+					"MHcCAQEEIAfJeoc+XgcqmYV0b4owmofx0LXwPRqOPXMO+PUKxZSgoAoGCCqGSM49\n" +
+					"AwEHoUQDQgAEtp/EQ6YEeTNup33/RVlf/f2o7bJCrYbPl9pF2/LfyS4swJX70dit\n" +
+					"8zHoZgJnNNQirqHxBc6uWBhOLG5RV+Ek1Q==\n" +
+					"-----END EC PRIVATE KEY-----",
+			}, nil},
+			{TLSAuthFields{
+				Domains: []string{"sub.example.com"},
+				Cert: "-----BEGIN CERTIFICATE-----\n" +
+					"MIIBojCCAUegAwIBAgIUWMpVQhmGoLUDd2x6XQYoOOV6C9AwCgYIKoZIzj0EAwIw\n" +
+					"EDEOMAwGA1UEAxMFTXkgQ0EwHhcNMTcwODE1MTYxODAwWhcNMTgwODE1MTYxODAw\n" +
+					"WjAQMQ4wDAYDVQQDEwV1c2VyMTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABBfF\n" +
+					"85gu8fDbNGNlsrtnO+4HvuiP4IXA041jjGczD5kUQ8aihS7hg81tSrLNd1jgxkkv\n" +
+					"Po+3TQjzniysiunG3iKjfzB9MA4GA1UdDwEB/wQEAwIFoDAdBgNVHSUEFjAUBggr\n" +
+					"BgEFBQcDAQYIKwYBBQUHAwIwDAYDVR0TAQH/BAIwADAdBgNVHQ4EFgQUU0JfPCQb\n" +
+					"2YpQZV4j1yiRXBa7J64wHwYDVR0jBBgwFoAU3qEhcpRgpsqo9V+LFns9a+oZIYww\n" +
+					"CgYIKoZIzj0EAwIDSQAwRgIhANYDaM18sXAdkjybHccH8xTbBWUNpOYvoHhrGW32\n" +
+					"Ov9JAiEA7QKGpm07tQl8p+t7UsOgZu132dHNZUtfgp1bjWfcapU=\n" +
+					"-----END CERTIFICATE-----",
+				Key: "-----BEGIN EC PRIVATE KEY-----\n" +
+					"MHcCAQEEINVilD5qOBkSy+AYfd41X0QPB5N3Z6OzgoBj8FZmSJOFoAoGCCqGSM49\n" +
+					"AwEHoUQDQgAEF8XzmC7x8Ns0Y2Wyu2c77ge+6I/ghcDTjWOMZzMPmRRDxqKFLuGD\n" +
+					"zW1Kss13WODGSS8+j7dNCPOeLKyK6cbeIg==\n" +
+					"-----END EC PRIVATE KEY-----",
+			}, nil},
+		}
+		opts := Options{}.Apply(Options{TLSAuth: tlsAuth})
+		assert.Equal(t, tlsAuth, opts.TLSAuth)
+
+		t.Run("Roundtrip", func(t *testing.T) {
+			optsData, err := json.Marshal(opts)
+			assert.NoError(t, err)
+
+			var opts2 Options
+			assert.NoError(t, json.Unmarshal(optsData, &opts2))
+			if assert.Len(t, opts2.TLSAuth, len(opts.TLSAuth)) {
+				for i := 0; i < len(opts2.TLSAuth); i++ {
+					assert.Equal(t, opts.TLSAuth[i].TLSAuthFields, opts2.TLSAuth[i].TLSAuthFields)
+					cert, err := opts2.TLSAuth[i].Certificate()
+					assert.NoError(t, err)
+					assert.NotNil(t, cert)
+				}
+			}
+		})
 	})
 	t.Run("NoConnectionReuse", func(t *testing.T) {
 		opts := Options{}.Apply(Options{NoConnectionReuse: null.BoolFrom(true)})

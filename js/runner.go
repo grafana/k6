@@ -113,6 +113,20 @@ func (r *Runner) newVU() (*VU, error) {
 		tlsVersion = *r.Bundle.Options.TLSVersion
 	}
 
+	tlsAuth := r.Bundle.Options.TLSAuth
+	certs := make([]tls.Certificate, len(tlsAuth))
+	nameToCert := make(map[string]*tls.Certificate)
+	for i, auth := range tlsAuth {
+		for _, name := range auth.Domains {
+			cert, err := auth.Certificate()
+			if err != nil {
+				return nil, err
+			}
+			certs[i] = *cert
+			nameToCert[name] = &certs[i]
+		}
+	}
+
 	dialer := &netext.Dialer{Dialer: r.BaseDialer, Resolver: r.Resolver}
 	transport := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
@@ -121,6 +135,8 @@ func (r *Runner) newVU() (*VU, error) {
 			CipherSuites:       cipherSuites,
 			MinVersion:         uint16(tlsVersion.Min),
 			MaxVersion:         uint16(tlsVersion.Max),
+			Certificates:       certs,
+			NameToCertificate:  nameToCert,
 		},
 		DialContext: dialer.DialContext,
 	}
