@@ -26,7 +26,7 @@ import (
 
 	"github.com/ghodss/yaml"
 	"github.com/shibukawa/configdir"
-	log "github.com/sirupsen/logrus"
+	log "github.com/Sirupsen/logrus"
 )
 
 const configFilename = "config.yml"

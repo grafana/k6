@@ -25,7 +25,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/mattn/go-isatty"
-	log "github.com/sirupsen/logrus"
+	log "github.com/Sirupsen/logrus"
 	"gopkg.in/urfave/cli.v1"
 )
 

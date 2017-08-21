@@ -6,7 +6,7 @@ import (
 	"github.com/GeertJohan/go.rice"
 	"github.com/dop251/goja"
 	"github.com/mitchellh/mapstructure"
-	log "github.com/sirupsen/logrus"
+	log "github.com/Sirupsen/logrus"
 )
 
 var (

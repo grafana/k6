@@ -28,7 +28,7 @@ import (
 	"github.com/loadimpact/k6/api/common"
 	"github.com/loadimpact/k6/api/v1"
 	"github.com/loadimpact/k6/core"
-	log "github.com/sirupsen/logrus"
+	log "github.com/Sirupsen/logrus"
 	"github.com/urfave/negroni"
 )
 

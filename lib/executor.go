@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/loadimpact/k6/stats"
-	log "github.com/sirupsen/logrus"
+	log "github.com/Sirupsen/logrus"
 	null "gopkg.in/guregu/null.v3"
 )
 

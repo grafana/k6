@@ -25,7 +25,7 @@ import (
 	"strconv"
 
 	"github.com/dop251/goja"
-	log "github.com/sirupsen/logrus"
+	log "github.com/Sirupsen/logrus"
 )
 
 type Console struct {

@@ -27,7 +27,7 @@ import (
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
-	log "github.com/sirupsen/logrus"
+	log "github.com/Sirupsen/logrus"
 )
 
 // Provides volatile state for a VU.

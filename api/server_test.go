@@ -29,8 +29,8 @@ import (
 	"github.com/loadimpact/k6/api/common"
 	"github.com/loadimpact/k6/core"
 	"github.com/loadimpact/k6/lib"
-	log "github.com/sirupsen/logrus"
-	logtest "github.com/sirupsen/logrus/hooks/test"
+	log "github.com/Sirupsen/logrus"
+	logtest "github.com/Sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/urfave/negroni"
 )

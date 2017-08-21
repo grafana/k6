@@ -30,7 +30,7 @@ import (
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
+	log "github.com/Sirupsen/logrus"
 	null "gopkg.in/guregu/null.v3"
 )
 

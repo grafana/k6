@@ -37,8 +37,8 @@ import (
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
-	log "github.com/sirupsen/logrus"
-	logtest "github.com/sirupsen/logrus/hooks/test"
+	log "github.com/Sirupsen/logrus"
+	logtest "github.com/Sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	null "gopkg.in/guregu/null.v3"
 )

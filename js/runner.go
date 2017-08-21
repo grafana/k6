@@ -34,7 +34,7 @@ import (
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
-	log "github.com/sirupsen/logrus"
+	log "github.com/Sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/viki-org/dnscache"
 	"golang.org/x/net/http2"
