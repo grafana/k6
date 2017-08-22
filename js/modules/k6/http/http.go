@@ -208,13 +208,10 @@ func (*HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.State,
 		defer state.BPool.Put(buf)
 		_, err := io.Copy(buf, res.Body)
 		if err != nil && err != io.EOF {
-			println("hi")
 			resErr = err
 		}
+		resp.Body = buf.String()
 		_ = res.Body.Close()
-		if resErr != nil {
-			resp.Body = buf.String()
-		}
 	}
 	trail := tracer.Done()
 	if trail.ConnRemoteAddr != nil {

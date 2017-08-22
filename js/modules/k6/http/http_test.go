@@ -31,14 +31,15 @@ import (
 	"testing"
 	"time"
 
-	log "github.com/sirupsen/logrus"
-	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
+	"github.com/oxtoacart/bpool"
+	log "github.com/sirupsen/logrus"
+	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	null "gopkg.in/guregu/null.v3"
 )
@@ -110,6 +111,7 @@ func TestRequest(t *testing.T) {
 				DualStack: true,
 			})).DialContext,
 		},
+		BPool: bpool.NewBufferPool(1),
 	}
 
 	ctx := new(context.Context)
@@ -474,7 +476,7 @@ func TestRequest(t *testing.T) {
 			_, err := common.RunString(rt, `
 			let reqs = [
 				["GET", "https://httpbin.org/"],
-				["GET", "https://example.com/"],
+				["GET", "https://now.httpbin.org/"],
 			];
 			let res = http.batch(reqs);
 			for (var key in res) {
@@ -483,7 +485,7 @@ func TestRequest(t *testing.T) {
 			}`)
 			assert.NoError(t, err)
 			assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/", "", 200, "")
-			assertRequestMetricsEmitted(t, state.Samples, "GET", "https://example.com/", "", 200, "")
+			assertRequestMetricsEmitted(t, state.Samples, "GET", "https://now.httpbin.org/", "", 200, "")
 
 			t.Run("Tagged", func(t *testing.T) {
 				state.Samples = nil
@@ -491,7 +493,7 @@ func TestRequest(t *testing.T) {
 				let fragment = "get";
 				let reqs = [
 					["GET", http.url`+"`"+`https://httpbin.org/${fragment}`+"`"+`],
-					["GET", http.url`+"`"+`https://example.com/`+"`"+`],
+					["GET", http.url`+"`"+`https://now.httpbin.org/`+"`"+`],
 				];
 				let res = http.batch(reqs);
 				for (var key in res) {
@@ -500,7 +502,7 @@ func TestRequest(t *testing.T) {
 				}`)
 				assert.NoError(t, err)
 				assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/get", "https://httpbin.org/${}", 200, "")
-				assertRequestMetricsEmitted(t, state.Samples, "GET", "https://example.com/", "", 200, "")
+				assertRequestMetricsEmitted(t, state.Samples, "GET", "https://now.httpbin.org/", "", 200, "")
 			})
 
 			t.Run("Shorthand", func(t *testing.T) {
@@ -508,7 +510,7 @@ func TestRequest(t *testing.T) {
 				_, err := common.RunString(rt, `
 				let reqs = [
 					"https://httpbin.org/",
-					"https://example.com/",
+					"https://now.httpbin.org/",
 				];
 				let res = http.batch(reqs);
 				for (var key in res) {
@@ -517,7 +519,7 @@ func TestRequest(t *testing.T) {
 				}`)
 				assert.NoError(t, err)
 				assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/", "", 200, "")
-				assertRequestMetricsEmitted(t, state.Samples, "GET", "https://example.com/", "", 200, "")
+				assertRequestMetricsEmitted(t, state.Samples, "GET", "https://now.httpbin.org/", "", 200, "")
 
 				t.Run("Tagged", func(t *testing.T) {
 					state.Samples = nil
@@ -525,7 +527,7 @@ func TestRequest(t *testing.T) {
 					let fragment = "get";
 					let reqs = [
 						http.url`+"`"+`https://httpbin.org/${fragment}`+"`"+`,
-						http.url`+"`"+`https://example.com/`+"`"+`,
+						http.url`+"`"+`https://now.httpbin.org/`+"`"+`,
 					];
 					let res = http.batch(reqs);
 					for (var key in res) {
@@ -534,7 +536,7 @@ func TestRequest(t *testing.T) {
 					}`)
 					assert.NoError(t, err)
 					assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/get", "https://httpbin.org/${}", 200, "")
-					assertRequestMetricsEmitted(t, state.Samples, "GET", "https://example.com/", "", 200, "")
+					assertRequestMetricsEmitted(t, state.Samples, "GET", "https://now.httpbin.org/", "", 200, "")
 				})
 			})
 		})
@@ -569,11 +571,11 @@ func TestTagURL(t *testing.T) {
 	rt.Set("http", common.Bind(rt, &HTTP{}, nil))
 
 	testdata := map[string]URLTag{
-		`http://example.com/`:               {URL: "http://example.com/", Name: "http://example.com/"},
-		`http://example.com/${1+1}`:         {URL: "http://example.com/2", Name: "http://example.com/${}"},
-		`http://example.com/${1+1}/`:        {URL: "http://example.com/2/", Name: "http://example.com/${}/"},
-		`http://example.com/${1+1}/${1+2}`:  {URL: "http://example.com/2/3", Name: "http://example.com/${}/${}"},
-		`http://example.com/${1+1}/${1+2}/`: {URL: "http://example.com/2/3/", Name: "http://example.com/${}/${}/"},
+		`http://httpbin.org/anything/`:               {URL: "http://httpbin.org/anything/", Name: "http://httpbin.org/anything/"},
+		`http://httpbin.org/anything/${1+1}`:         {URL: "http://httpbin.org/anything/2", Name: "http://httpbin.org/anything/${}"},
+		`http://httpbin.org/anything/${1+1}/`:        {URL: "http://httpbin.org/anything/2/", Name: "http://httpbin.org/anything/${}/"},
+		`http://httpbin.org/anything/${1+1}/${1+2}`:  {URL: "http://httpbin.org/anything/2/3", Name: "http://httpbin.org/anything/${}/${}"},
+		`http://httpbin.org/anything/${1+1}/${1+2}/`: {URL: "http://httpbin.org/anything/2/3/", Name: "http://httpbin.org/anything/${}/${}/"},
 	}
 	for expr, tag := range testdata {
 		t.Run("expr="+expr, func(t *testing.T) {
