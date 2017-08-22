@@ -542,7 +542,9 @@ loop:
 				progress = float64(atTime) / float64(endTime.Duration)
 			}
 
-			if isTTY && !quiet {
+			if quiet {
+				// do nothing
+			} else if isTTY {
 				progressBar.Progress = progress
 				fmt.Fprintf(color.Output, "%10s %s %10s / %s\r",
 					statusString,
@@ -572,7 +574,9 @@ loop:
 
 	// Test done, leave that status as the final progress bar!
 	atTime := engine.Executor.GetTime()
-	if isTTY && !quiet {
+	if quiet {
+		// do nothing
+	} else if isTTY {
 		progressBar.Progress = 1.0
 		fmt.Fprintf(color.Output, "      done %s %10s / %s\n",
 			progressBar.String(),
