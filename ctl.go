@@ -28,9 +28,9 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/loadimpact/k6/api/v1"
 	"github.com/manyminds/api2go/jsonapi"
-	log "github.com/Sirupsen/logrus"
 	"gopkg.in/guregu/null.v3"
 	"gopkg.in/urfave/cli.v1"
 )

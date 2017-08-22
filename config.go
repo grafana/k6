@@ -24,9 +24,9 @@ import (
 	"encoding/json"
 	"os"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/ghodss/yaml"
 	"github.com/shibukawa/configdir"
-	log "github.com/Sirupsen/logrus"
 )
 
 const configFilename = "config.yml"

@@ -24,8 +24,8 @@ import (
 	"context"
 	"strconv"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/dop251/goja"
-	log "github.com/Sirupsen/logrus"
 )
 
 type Console struct {

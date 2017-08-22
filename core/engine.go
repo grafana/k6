@@ -27,11 +27,11 @@ import (
 	"sync"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/loadimpact/k6/core/local"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/stats"
-	log "github.com/Sirupsen/logrus"
 	"gopkg.in/guregu/null.v3"
 )
 
