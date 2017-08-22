@@ -26,9 +26,9 @@ import (
 	"testing"
 	"time"
 
-	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
+	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	null "gopkg.in/guregu/null.v3"
 )

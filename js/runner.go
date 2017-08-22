@@ -28,7 +28,6 @@ import (
 	"net/http/cookiejar"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
@@ -36,6 +35,7 @@ import (
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
 	"github.com/oxtoacart/bpool"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/viki-org/dnscache"
 	"golang.org/x/net/http2"

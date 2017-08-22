@@ -25,11 +25,11 @@ import (
 	"fmt"
 	"testing"
 
-	log "github.com/sirupsen/logrus"
-	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
+	log "github.com/sirupsen/logrus"
+	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 )

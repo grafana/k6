@@ -24,11 +24,11 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
 	"github.com/oxtoacart/bpool"
+	log "github.com/sirupsen/logrus"
 )
 
 // Provides volatile state for a VU.
