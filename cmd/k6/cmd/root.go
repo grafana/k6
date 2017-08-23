@@ -69,25 +69,27 @@ func init() {
 	}
 
 	// It makes no sense to bind this to viper, so register it afterwards.
-	RootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file (default $HOME/.k6.yaml)")
+	RootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file (default ./k6.yaml ~/.config/k6.yaml)")
+	cobra.MarkFlagFilename(RootCmd.PersistentFlags(), "config")
 }
 
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
-	// Enable ability to specify config file via flag.
-	if cfgFile != "" {
-		viper.SetConfigFile(cfgFile)
-	}
+	viper.AddConfigPath(".")             // Look for config files in the current directory.
+	viper.AddConfigPath("$HOME/.config") // Look for config files in $HOME/.config.
+	viper.SetConfigName("k6")            // Look for config files named "k6.yaml".
+	viper.SetConfigType("yaml")          // Look for config files named "k6.yaml".
+	viper.SetConfigFile(cfgFile)         // Let -c/--config override config path.
+	viper.SetEnvPrefix("k6")             // Read environment variables starting with "K6_".
 
-	viper.SetConfigName(".k6")   // Name of config file (without extension).
-	viper.AddConfigPath("$HOME") // Adding home directory as first search path.
-	viper.SetEnvPrefix("k6")     // Accept environment variables starting with K6_.
-	viper.AutomaticEnv()         // Read in environment variables that match.
+	// Auto-load matching environment vars, eg. K6_VERBOSE -> verbose.
+	viper.AutomaticEnv()
 
-	// If a config file is found, read it in.
+	// Find a config file and load it.
 	if err := viper.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			log.WithError(err).Error("Couldn't read global config")
+		_, isNotFound := err.(viper.ConfigFileNotFoundError)
+		if cfgFile != "" || !isNotFound {
+			log.WithError(err).Error("Couldn't read config")
 		}
 	}
 }
