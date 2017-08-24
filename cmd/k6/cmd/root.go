@@ -26,7 +26,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var Version = "0.17.1"
@@ -37,7 +36,13 @@ var Banner = `
    /          \   |  |‾\  \ | (_) | 
   / __________ \  |__|  \__\ \___/ .io`
 
-var cfgFile string
+var (
+	cfgFile string
+
+	verbose bool
+	quiet   bool
+	address string
+)
 
 // RootCmd represents the base command when called without any subcommands.
 var RootCmd = &cobra.Command{
@@ -45,7 +50,7 @@ var RootCmd = &cobra.Command{
 	Short: "a next-generation load generator",
 	Long:  Banner,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		if viper.GetBool("verbose") {
+		if verbose {
 			log.SetLevel(log.DebugLevel)
 		}
 	},
@@ -61,35 +66,9 @@ func Execute() {
 }
 
 func init() {
-	cobra.OnInitialize(initConfig)
-
-	RootCmd.PersistentFlags().BoolP("verbose", "v", false, "enable debug logging")
-	if err := viper.BindPFlags(RootCmd.PersistentFlags()); err != nil {
-		panic(err)
-	}
-
-	// It makes no sense to bind this to viper, so register it afterwards.
-	RootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file (default ./k6.yaml ~/.config/k6.yaml)")
+	RootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "enable debug logging")
+	RootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "disable progress updates")
+	RootCmd.PersistentFlags().StringVarP(&address, "address", "a", "localhost:6565", "address for the api server")
+	RootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file (default ./k6.yaml or ~/.config/k6.yaml)")
 	cobra.MarkFlagFilename(RootCmd.PersistentFlags(), "config")
-}
-
-// initConfig reads in config file and ENV variables if set.
-func initConfig() {
-	viper.AddConfigPath(".")             // Look for config files in the current directory.
-	viper.AddConfigPath("$HOME/.config") // Look for config files in $HOME/.config.
-	viper.SetConfigName("k6")            // Look for config files named "k6.yaml".
-	viper.SetConfigType("yaml")          // Look for config files named "k6.yaml".
-	viper.SetConfigFile(cfgFile)         // Let -c/--config override config path.
-	viper.SetEnvPrefix("k6")             // Read environment variables starting with "K6_".
-
-	// Auto-load matching environment vars, eg. K6_VERBOSE -> verbose.
-	viper.AutomaticEnv()
-
-	// Find a config file and load it.
-	if err := viper.ReadInConfig(); err != nil {
-		_, isNotFound := err.(viper.ConfigFileNotFoundError)
-		if cfgFile != "" || !isNotFound {
-			log.WithError(err).Error("Couldn't read config")
-		}
-	}
 }
