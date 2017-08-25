@@ -167,7 +167,6 @@ a commandline interface for interacting with it.`,
 				return ((atT / precision) * precision).String()
 			},
 		}
-		ticker2 := time.NewTicker(500 * time.Millisecond)
 
 		// Ticker for progress bar updates. Less frequent updates for non-TTYs, none if quiet.
 		updateFreq := 50 * time.Millisecond
@@ -207,8 +206,6 @@ a commandline interface for interacting with it.`,
 				}
 				progress.Progress = prog
 				fmt.Fprintf(stdout, "%s\x1b[0K\r", progress.String())
-			case <-ticker2.C:
-				log.Info("hi")
 			case err := <-errC:
 				if err != nil {
 					log.WithError(err).Error("Engine error")
