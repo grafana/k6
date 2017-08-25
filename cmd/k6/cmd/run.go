@@ -24,12 +24,16 @@ import (
 	"archive/tar"
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"syscall"
+	"time"
+
+	"github.com/loadimpact/k6/ui"
 
 	"github.com/loadimpact/k6/core"
 	"github.com/loadimpact/k6/core/local"
@@ -137,9 +141,35 @@ a commandline interface for interacting with it.`,
 		errC := make(chan error)
 		go func() { errC <- engine.Run(ctx) }()
 
+		// Show progress to the user.
+		progress := ui.ProgressBar{
+			Width: 60,
+			Left: func() string {
+				if engine.Executor.IsPaused() {
+					return " paused"
+				} else if engine.Executor.IsRunning() {
+					return "running"
+				} else {
+					return "   done"
+				}
+			},
+		}
+		ticker2 := time.NewTicker(500 * time.Millisecond)
+		ticker := time.NewTicker(50 * time.Millisecond)
 	mainLoop:
 		for {
 			select {
+			case <-ticker.C:
+				var prog float64
+				if endIt := engine.Executor.GetEndIterations(); endIt.Valid {
+					prog = float64(engine.Executor.GetIterations()) / float64(endIt.Int64)
+				} else if endT := engine.Executor.GetEndTime(); endT.Valid {
+					prog = float64(engine.Executor.GetTime()) / float64(endT.Duration)
+				}
+				progress.Progress = prog
+				fmt.Fprintf(stdout, "%s\r", progress.String())
+			case <-ticker2.C:
+				log.Info("hi")
 			case err := <-errC:
 				if err != nil {
 					log.WithError(err).Error("Engine error")
@@ -153,6 +183,8 @@ a commandline interface for interacting with it.`,
 				cancel()
 			}
 		}
+		progress.Progress = 1
+		fmt.Fprintf(stdout, "%s\n", progress.String())
 
 		log.Infof("Test ended after: %s", engine.Executor.GetTime())
 		return nil
