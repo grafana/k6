@@ -130,18 +130,17 @@ a commandline interface for interacting with it.`,
 			return err
 		}
 
-		// Trap signals, run the engine until it exits on its own, or a signal is trapped.
+		// Run the engine with a cancellable context.
 		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		errC := make(chan error)
+		go func() { errC <- engine.Run(ctx) }()
 
+		// Trap Interrupts, SIGINTs and SIGTERMs.
 		sigC := make(chan os.Signal, 1)
 		signal.Notify(sigC, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer signal.Stop(sigC)
 
-		errC := make(chan error)
-		go func() { errC <- engine.Run(ctx) }()
-
-		// Show progress to the user.
+		// Prepare a progress bar.
 		progress := ui.ProgressBar{
 			Width: 60,
 			Left: func() string {
@@ -169,11 +168,37 @@ a commandline interface for interacting with it.`,
 			},
 		}
 		ticker2 := time.NewTicker(500 * time.Millisecond)
-		ticker := time.NewTicker(50 * time.Millisecond)
+
+		// Ticker for progress bar updates. Less frequent updates for non-TTYs, none if quiet.
+		updateFreq := 50 * time.Millisecond
+		if !stdoutTTY {
+			updateFreq = 1 * time.Second
+		}
+		ticker := time.NewTicker(updateFreq)
+		if quiet {
+			ticker.Stop()
+		}
 	mainLoop:
 		for {
 			select {
 			case <-ticker.C:
+				if quiet || !stdoutTTY {
+					l := log.WithFields(log.Fields{
+						"t": engine.Executor.GetTime(),
+						"i": engine.Executor.GetIterations(),
+					})
+					fn := l.Info
+					if quiet {
+						fn = l.Debug
+					}
+					if engine.Executor.IsPaused() {
+						fn("Paused")
+					} else {
+						fn("Running")
+					}
+					break
+				}
+
 				var prog float64
 				if endIt := engine.Executor.GetEndIterations(); endIt.Valid {
 					prog = float64(engine.Executor.GetIterations()) / float64(endIt.Int64)
@@ -197,10 +222,21 @@ a commandline interface for interacting with it.`,
 				cancel()
 			}
 		}
-		progress.Progress = 1
-		fmt.Fprintf(stdout, "%s\x1b[0K\n", progress.String())
+		if quiet || !stdoutTTY {
+			e := log.WithFields(log.Fields{
+				"t": engine.Executor.GetTime(),
+				"i": engine.Executor.GetIterations(),
+			})
+			fn := e.Info
+			if quiet {
+				fn = e.Debug
+			}
+			fn("Test finished")
+		} else {
+			progress.Progress = 1
+			fmt.Fprintf(stdout, "%s\x1b[0K\n", progress.String())
+		}
 
-		log.Infof("Test ended after: %s", engine.Executor.GetTime())
 		return nil
 	},
 }
