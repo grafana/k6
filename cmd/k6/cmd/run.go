@@ -153,6 +153,20 @@ a commandline interface for interacting with it.`,
 					return "   done"
 				}
 			},
+			Right: func() string {
+				if endIt := engine.Executor.GetEndIterations(); endIt.Valid {
+					return fmt.Sprintf("%d / %d", engine.Executor.GetIterations(), endIt.Int64)
+				}
+				precision := 100 * time.Millisecond
+				atT := engine.Executor.GetTime()
+				if endT := engine.Executor.GetEndTime(); endT.Valid {
+					return fmt.Sprintf("%s / %s",
+						(atT/precision)*precision,
+						(time.Duration(endT.Duration)/precision)*precision,
+					)
+				}
+				return ((atT / precision) * precision).String()
+			},
 		}
 		ticker2 := time.NewTicker(500 * time.Millisecond)
 		ticker := time.NewTicker(50 * time.Millisecond)
@@ -167,7 +181,7 @@ a commandline interface for interacting with it.`,
 					prog = float64(engine.Executor.GetTime()) / float64(endT.Duration)
 				}
 				progress.Progress = prog
-				fmt.Fprintf(stdout, "%s\r", progress.String())
+				fmt.Fprintf(stdout, "%s\x1b[0K\r", progress.String())
 			case <-ticker2.C:
 				log.Info("hi")
 			case err := <-errC:
@@ -184,7 +198,7 @@ a commandline interface for interacting with it.`,
 			}
 		}
 		progress.Progress = 1
-		fmt.Fprintf(stdout, "%s\n", progress.String())
+		fmt.Fprintf(stdout, "%s\x1b[0K\n", progress.String())
 
 		log.Infof("Test ended after: %s", engine.Executor.GetTime())
 		return nil
