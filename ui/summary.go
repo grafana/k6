@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -128,25 +129,25 @@ func SummarizeGroup(w io.Writer, indent string, group *lib.Group) {
 	}
 }
 
-func NonTrendMetricValueForSum(t time.Duration, m *stats.Metric) (data, extra string) {
+func NonTrendMetricValueForSum(t time.Duration, m *stats.Metric) (data string, extra []string) {
 	m.Sink.Calc()
 	switch sink := m.Sink.(type) {
 	case *stats.CounterSink:
 		value := m.HumanizeValue(sink.Value)
 		rate := m.HumanizeValue(sink.Value / float64(t/time.Second))
-		return value, rate + "/s"
+		return value, []string{rate + "/s"}
 	case *stats.GaugeSink:
 		value := m.HumanizeValue(sink.Value)
 		min := m.HumanizeValue(sink.Min)
 		max := m.HumanizeValue(sink.Max)
-		return value, "min=" + min + " max=" + max
+		return value, []string{"min=" + min, "max=" + max}
 	case *stats.RateSink:
 		value := m.HumanizeValue(float64(sink.Trues) / float64(sink.Total))
 		passes := sink.Trues
 		fails := sink.Total - sink.Trues
-		return value, fmt.Sprintf("✓ %d ✗ %d", passes, fails)
+		return value, []string{"✓ " + strconv.FormatInt(passes, 10), "✗ " + strconv.FormatInt(fails, 10)}
 	default:
-		return "[no data]", ""
+		return "[no data]", nil
 	}
 }
 
@@ -155,8 +156,9 @@ func SummarizeMetrics(w io.Writer, indent string, t time.Duration, metrics map[s
 	nameLenMax := 0
 
 	values := make(map[string]string)
-	extras := make(map[string]string)
 	valueMaxLen := 0
+	extras := make(map[string][]string)
+	extraMaxLens := make([]int, 2)
 
 	trendCols := make(map[string][]string)
 	trendColMaxLens := make([]int, len(TrendColumns))
@@ -182,9 +184,16 @@ func SummarizeMetrics(w io.Writer, indent string, t time.Duration, metrics map[s
 
 		value, extra := NonTrendMetricValueForSum(t, m)
 		values[name] = value
-		extras[name] = extra
 		if l := NumGlyph(value); l > valueMaxLen {
 			valueMaxLen = l
+		}
+		extras[name] = extra
+		if len(extra) > 1 {
+			for i, ex := range extra {
+				if l := NumGlyph(ex); l > extraMaxLens[i] {
+					extraMaxLens[i] = l
+				}
+			}
 		}
 	}
 
@@ -212,8 +221,18 @@ func SummarizeMetrics(w io.Writer, indent string, t time.Duration, metrics map[s
 		} else {
 			value := values[name]
 			fmtData = ValueColor.Sprint(value) + strings.Repeat(" ", valueMaxLen-NumGlyph(value))
-			if extra := extras[name]; extra != "" {
-				fmtData = fmtData + " " + ExtraColor.Sprint(extra)
+
+			extra := extras[name]
+			switch len(extra) {
+			case 0:
+			case 1:
+				fmtData = fmtData + " " + ExtraColor.Sprint(extra[0])
+			default:
+				parts := make([]string, len(extra))
+				for i, ex := range extra {
+					parts[i] = ExtraColor.Sprint(ex) + strings.Repeat(" ", extraMaxLens[i]-NumGlyph(ex))
+				}
+				fmtData = fmtData + " " + ExtraColor.Sprint(strings.Join(parts, " "))
 			}
 		}
 		fmt.Fprint(w, indent+mark+" "+fmtName+" "+fmtData+"\n")
