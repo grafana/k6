@@ -24,10 +24,13 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strings"
+	"time"
 
 	"github.com/fatih/color"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
+	"golang.org/x/text/unicode/norm"
 )
 
 const (
@@ -39,18 +42,48 @@ const (
 )
 
 var (
-	SuccColor = color.New(color.FgGreen)
-	FailColor = color.New(color.FgRed)
+	SuccColor     = color.New(color.FgGreen)             // Successful stuff.
+	FailColor     = color.New(color.FgRed)               // Failed stuff.
+	NamePadColor  = color.New(color.Faint)               // Padding for metric names.
+	ValueColor    = color.New(color.FgCyan)              // Values of all kinds.
+	ExtraColor    = color.New(color.FgCyan, color.Faint) // Extra annotations for values.
+	ExtraKeyColor = color.New(color.Faint)               // Keys inside extra annotations.
+
+	TrendColumns = []TrendColumn{
+		{"avg", func(s *stats.TrendSink) float64 { return s.Avg }},
+		{"min", func(s *stats.TrendSink) float64 { return s.Min }},
+		{"med", func(s *stats.TrendSink) float64 { return s.Med }},
+		{"max", func(s *stats.TrendSink) float64 { return s.Max }},
+		{"p(90)", func(s *stats.TrendSink) float64 { return s.P(0.90) }},
+		{"p(95)", func(s *stats.TrendSink) float64 { return s.P(0.95) }},
+	}
 )
+
+type TrendColumn struct {
+	Key string
+	Get func(s *stats.TrendSink) float64
+}
+
+// Returns the number of unicode glyphs in a string.
+func NumGlyph(s string) (n int) {
+	var it norm.Iter
+	it.InitString(norm.NFKD, s)
+	for !it.Done() {
+		n++
+		it.Next()
+	}
+	return
+}
 
 // SummaryData represents data passed to Summarize.
 type SummaryData struct {
 	Opts    lib.Options
 	Root    *lib.Group
 	Metrics map[string]*stats.Metric
+	Time    time.Duration
 }
 
-func SummarizeCheck(w io.Writer, tty bool, indent string, check *lib.Check) {
+func SummarizeCheck(w io.Writer, indent string, check *lib.Check) {
 	mark := SuccMark
 	color := SuccColor
 	if check.Fails > 0 {
@@ -67,9 +100,10 @@ func SummarizeCheck(w io.Writer, tty bool, indent string, check *lib.Check) {
 	}
 }
 
-func SummarizeGroup(w io.Writer, tty bool, indent string, group *lib.Group) {
+func SummarizeGroup(w io.Writer, indent string, group *lib.Group) {
 	if group.Name != "" {
 		_, _ = fmt.Fprintf(w, "%s%s %s\n\n", indent, GroupPrefix, group.Name)
+		indent = indent + "  "
 	}
 
 	var checkNames []string
@@ -78,7 +112,7 @@ func SummarizeGroup(w io.Writer, tty bool, indent string, group *lib.Group) {
 	}
 	sort.Strings(checkNames)
 	for _, name := range checkNames {
-		SummarizeCheck(w, tty, indent+"  ", group.Checks[name])
+		SummarizeCheck(w, indent, group.Checks[name])
 	}
 	if len(checkNames) > 0 {
 		fmt.Fprintf(w, "\n")
@@ -90,11 +124,104 @@ func SummarizeGroup(w io.Writer, tty bool, indent string, group *lib.Group) {
 	}
 	sort.Strings(groupNames)
 	for _, name := range groupNames {
-		SummarizeGroup(w, tty, indent+"  ", group.Groups[name])
+		SummarizeGroup(w, indent, group.Groups[name])
+	}
+}
+
+func NonTrendMetricValueForSum(t time.Duration, m *stats.Metric) (data, extra string) {
+	m.Sink.Calc()
+	switch sink := m.Sink.(type) {
+	case *stats.CounterSink:
+		value := m.HumanizeValue(sink.Value)
+		rate := m.HumanizeValue(sink.Value / float64(t/time.Second))
+		return value, rate + "/s"
+	case *stats.GaugeSink:
+		value := m.HumanizeValue(sink.Value)
+		min := m.HumanizeValue(sink.Min)
+		max := m.HumanizeValue(sink.Max)
+		return value, "min=" + min + " max=" + max
+	case *stats.RateSink:
+		value := m.HumanizeValue(float64(sink.Trues) / float64(sink.Total))
+		passes := sink.Trues
+		fails := sink.Total - sink.Trues
+		return value, fmt.Sprintf("✓ %d ✗ %d", passes, fails)
+	default:
+		return "[no data]", ""
+	}
+}
+
+func SummarizeMetrics(w io.Writer, indent string, t time.Duration, metrics map[string]*stats.Metric) {
+	names := []string{}
+	nameLenMax := 0
+
+	values := make(map[string]string)
+	extras := make(map[string]string)
+	valueMaxLen := 0
+
+	trendCols := make(map[string][]string)
+	trendColMaxLens := make([]int, len(TrendColumns))
+
+	for name, m := range metrics {
+		names = append(names, name)
+		if l := NumGlyph(name); l > nameLenMax {
+			nameLenMax = l
+		}
+
+		if sink, ok := m.Sink.(*stats.TrendSink); ok {
+			cols := make([]string, len(TrendColumns))
+			for i, col := range TrendColumns {
+				value := m.HumanizeValue(col.Get(sink))
+				if l := NumGlyph(value); l > trendColMaxLens[i] {
+					trendColMaxLens[i] = l
+				}
+				cols[i] = value
+			}
+			trendCols[name] = cols
+			continue
+		}
+
+		value, extra := NonTrendMetricValueForSum(t, m)
+		values[name] = value
+		extras[name] = extra
+		if l := NumGlyph(value); l > valueMaxLen {
+			valueMaxLen = l
+		}
+	}
+
+	sort.Strings(names)
+	tmpCols := make([]string, len(TrendColumns))
+	for _, name := range names {
+		m := metrics[name]
+
+		mark := " "
+		if m.Tainted.Valid {
+			if m.Tainted.Bool {
+				mark = FailColor.Sprint(FailMark)
+			} else {
+				mark = SuccColor.Sprint(SuccMark)
+			}
+		}
+
+		fmtName := name + NamePadColor.Sprint(strings.Repeat(".", nameLenMax-NumGlyph(name)+3)+":")
+		fmtData := ""
+		if cols := trendCols[name]; cols != nil {
+			for i, val := range cols {
+				tmpCols[i] = TrendColumns[i].Key + "=" + ValueColor.Sprint(val) + strings.Repeat(" ", trendColMaxLens[i]-NumGlyph(val))
+			}
+			fmtData = strings.Join(tmpCols, " ")
+		} else {
+			value := values[name]
+			fmtData = ValueColor.Sprint(value) + strings.Repeat(" ", valueMaxLen-NumGlyph(value))
+			if extra := extras[name]; extra != "" {
+				fmtData = fmtData + " " + ExtraColor.Sprint(extra)
+			}
+		}
+		fmt.Fprint(w, indent+mark+" "+fmtName+" "+fmtData+"\n")
 	}
 }
 
 // Summarizes a dataset and returns whether the test run was considered a success.
-func Summarize(w io.Writer, tty bool, indent string, data SummaryData) {
-	SummarizeGroup(w, tty, indent, data.Root)
+func Summarize(w io.Writer, indent string, data SummaryData) {
+	SummarizeGroup(w, indent+"    ", data.Root)
+	SummarizeMetrics(w, indent+"  ", data.Time, data.Metrics)
 }
