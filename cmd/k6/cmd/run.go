@@ -234,6 +234,16 @@ a commandline interface for interacting with it.`,
 			fmt.Fprintf(stdout, "%s\x1b[0K\n", progress.String())
 		}
 
+		// Print the end-of-test summary.
+		if !quiet {
+			fmt.Fprintf(stdout, "\n")
+			ui.Summarize(stdout, stdoutTTY, "", ui.SummaryData{
+				Opts:    opts,
+				Root:    engine.Executor.GetRunner().GetDefaultGroup(),
+				Metrics: engine.Metrics,
+			})
+		}
+
 		return nil
 	},
 }
