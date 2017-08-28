@@ -53,12 +53,8 @@ func (b ProgressBar) String() string {
 	}
 
 	padding := ""
-	filler := "="
-	if color.NoColor {
-		filler = " "
-	}
 	if space > filled {
-		padding = faint.Sprint(strings.Repeat(filler, space-filled))
+		padding = faint.Sprint(strings.Repeat("-", space-filled))
 	}
 
 	var left, right string

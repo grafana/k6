@@ -145,11 +145,11 @@ a commandline interface for interacting with it.`,
 			Width: 60,
 			Left: func() string {
 				if engine.Executor.IsPaused() {
-					return " paused"
+					return "  paused"
 				} else if engine.Executor.IsRunning() {
-					return "running"
+					return " running"
 				} else {
-					return "   done"
+					return "    done"
 				}
 			},
 			Right: func() string {
