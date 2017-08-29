@@ -177,6 +177,7 @@ type Metric struct {
 	Tainted    null.Bool    `json:"tainted"`
 	Thresholds Thresholds   `json:"thresholds"`
 	Submetrics []*Submetric `json:"submetrics"`
+	Sub        Submetric    `json:"sub,omitempty"`
 	Sink       Sink         `json:"-"`
 }
 
@@ -231,6 +232,8 @@ func (m Metric) HumanizeValue(v float64) string {
 // A Submetric represents a filtered dataset based on a parent metric.
 type Submetric struct {
 	Name   string            `json:"name"`
+	Parent string            `json:"parent"`
+	Suffix string            `json:"suffix"`
 	Tags   map[string]string `json:"tags"`
 	Metric *Metric           `json:"metric"`
 }
@@ -259,5 +262,5 @@ func NewSubmetric(name string) (parentName string, sm *Submetric) {
 		value := strings.TrimSpace(strings.Trim(parts[1], `"'`))
 		tags[key] = value
 	}
-	return parts[0], &Submetric{Name: name, Tags: tags}
+	return parts[0], &Submetric{Name: name, Parent: parts[0], Suffix: parts[1], Tags: tags}
 }
