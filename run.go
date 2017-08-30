@@ -27,7 +27,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net"
+	"net/http"
 	"net/url"
 	"os"
 	"os/signal"
@@ -471,15 +471,11 @@ func actionRun(cc *cli.Context) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	engine.Collector = collector
 
-	// Send usage report, if we're allowed to
-	if opts.NoUsageReport.Valid && !opts.NoUsageReport.Bool {
+	if !opts.NoUsageReport.Valid || !opts.NoUsageReport.Bool {
 		go func() {
-			conn, err := net.Dial("udp", "k6reports.loadimpact.com:6565")
+			resp, err := http.Get("http://k6reports.loadimpact.com")
 			if err == nil {
-				// This is a best-effort attempt to send a usage report. We don't want
-				// to inconvenience users if this doesn't work, for whatever reason
-				_, _ = conn.Write([]byte("nyoom"))
-				_ = conn.Close()
+				resp.Body.Close()
 			}
 		}()
 	}
