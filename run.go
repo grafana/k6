@@ -475,7 +475,7 @@ func actionRun(cc *cli.Context) error {
 		go func() {
 			resp, err := http.Get("http://k6reports.loadimpact.com")
 			if err == nil {
-				resp.Body.Close()
+				_ = resp.Body.Close()
 			}
 		}()
 	}
