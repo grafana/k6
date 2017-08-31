@@ -473,13 +473,15 @@ func actionRun(cc *cli.Context) error {
 
 	if !opts.NoUsageReport.Valid || !opts.NoUsageReport.Bool {
 		go func() {
-			var jsonStr = []byte(`{"k6_version":"` + cc.App.Version + `"}`)
+			jsonStr := []byte(`{"k6_version":"` + cc.App.Version + `"}`)
 			req, err := http.NewRequest("POST", "http://k6reports.loadimpact.com/", bytes.NewBuffer(jsonStr))
-			req.Header.Set("Content-Type", "application/json")
-			client := &http.Client{}
-			resp, err := client.Do(req)
 			if err == nil {
-				_ = resp.Body.Close()
+				req.Header.Set("Content-Type", "application/json")
+				client := &http.Client{}
+				resp, err := client.Do(req)
+				if err == nil {
+					_ = resp.Body.Close()
+				}
 			}
 		}()
 	}
