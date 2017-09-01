@@ -30,33 +30,25 @@ import (
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 	null "gopkg.in/guregu/null.v3"
 )
 
-type syncWriter struct {
+// A writer that syncs writes with a mutex and, if the output is a TTY, clears before newlines.
+type consoleWriter struct {
 	Writer io.Writer
+	IsTTY  bool
 	Mutex  *sync.Mutex
 }
 
-func (w syncWriter) Write(p []byte) (n int, err error) {
+func (w consoleWriter) Write(p []byte) (n int, err error) {
+	if w.IsTTY {
+		p = bytes.Replace(p, []byte{'\n'}, []byte{'\x1b', '[', '0', 'K', '\n'}, -1)
+	}
 	w.Mutex.Lock()
 	n, err = w.Writer.Write(p)
 	w.Mutex.Unlock()
 	return
-}
-
-// clearingFormatter is a logrus formatter that clears after each line.
-// This gets rid of garbage left over from a previous write of the progress bar.
-type clearingFormatter struct{ log.Formatter }
-
-func (f clearingFormatter) Format(entry *log.Entry) ([]byte, error) {
-	b, err := f.Formatter.Format(entry)
-	return append(
-		bytes.Replace(b, []byte{'\n'}, []byte{'\x1b', '[', '0', 'K', '\n'}, -1),
-		'\x1b', '[', '0', 'K',
-	), err
 }
 
 func must(err error) {
