@@ -46,7 +46,7 @@ var (
 	StdColor      = color.New()                          // Default color.
 	SuccColor     = color.New(color.FgGreen)             // Successful stuff.
 	FailColor     = color.New(color.FgRed)               // Failed stuff.
-	NamePadColor  = color.New(color.Faint)               // Padding for metric names.
+	GrayColor     = color.New(color.Faint)               // Padding and disabled stuff.
 	ValueColor    = color.New(color.FgCyan)              // Values of all kinds.
 	ExtraColor    = color.New(color.FgCyan, color.Faint) // Extra annotations for values.
 	ExtraKeyColor = color.New(color.Faint)               // Keys inside extra annotations.
@@ -257,7 +257,7 @@ func SummarizeMetrics(w io.Writer, indent string, t time.Duration, metrics map[s
 
 		fmtName := DisplayNameForMetric(m)
 		fmtIndent := IndentForMetric(m)
-		fmtName += NamePadColor.Sprint(strings.Repeat(".", nameLenMax-StrWidth(fmtName)-StrWidth(fmtIndent)+3) + ":")
+		fmtName += GrayColor.Sprint(strings.Repeat(".", nameLenMax-StrWidth(fmtName)-StrWidth(fmtIndent)+3) + ":")
 
 		fmtData := ""
 		if cols := trendCols[name]; cols != nil {
