@@ -34,6 +34,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/loadimpact/k6/api"
 	"github.com/loadimpact/k6/core"
 	"github.com/loadimpact/k6/core/local"
 	"github.com/loadimpact/k6/js"
@@ -90,9 +91,9 @@ a commandline interface for interacting with it.`,
 			Width: 60,
 			Left:  func() string { return "    init" },
 		}
-		fmt.Fprintf(stdout, "%s runner\r", initBar.String())
 
 		// Create the Runner.
+		fmt.Fprintf(stdout, "%s runner\r", initBar.String())
 		pwd, err := os.Getwd()
 		if err != nil {
 			return err
@@ -112,11 +113,10 @@ a commandline interface for interacting with it.`,
 		fmt.Fprintf(stdout, "     script: %s\n", ui.ValueColor.Sprint(filename))
 		fmt.Fprintf(stdout, "\n")
 
-		fmt.Fprintf(stdout, "%s options\r", initBar.String())
-
 		// Assemble options; start with the CLI-provided options to get shadowed (non-Valid)
 		// defaults in there, override with Runner-provided ones, then merge the CLI opts in
 		// on top to give them priority.
+		fmt.Fprintf(stdout, "%s options\r", initBar.String())
 		cliOpts, err := getOptions(cmd.Flags())
 		if err != nil {
 			return err
@@ -140,6 +140,7 @@ a commandline interface for interacting with it.`,
 		// Write options back to the runner too.
 		r.ApplyOptions(opts)
 
+		// Write the options banner.
 		{
 			duration := ui.GrayColor.Sprint("-")
 			iterations := ui.GrayColor.Sprint("-")
@@ -164,17 +165,23 @@ a commandline interface for interacting with it.`,
 			fmt.Fprintf(stdout, "\n")
 		}
 
-		fmt.Fprintf(stdout, "%s executor\r", initBar.String())
-
 		// Create an engine with a local executor, wrapping the Runner.
+		fmt.Fprintf(stdout, "%s   engine\r", initBar.String())
 		engine, err := core.NewEngine(local.New(r), opts)
 		if err != nil {
 			return err
 		}
 
-		fmt.Fprintf(stdout, "%s starting\r", initBar.String())
+		// Create an API server.
+		fmt.Fprintf(stdout, "%s   server\r", initBar.String())
+		go func() {
+			if err := api.ListenAndServe(address, engine); err != nil {
+				log.WithError(err).Warn("Error from API server")
+			}
+		}()
 
 		// Run the engine with a cancellable context.
+		fmt.Fprintf(stdout, "%s starting\r", initBar.String())
 		ctx, cancel := context.WithCancel(context.Background())
 		errC := make(chan error)
 		go func() { errC <- engine.Run(ctx) }()
