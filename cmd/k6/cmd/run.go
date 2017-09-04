@@ -85,7 +85,7 @@ a commandline interface for interacting with it.`,
   k6 run -u 0 -s 10s:100 -s 60s -s 10s:0`[1:],
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		BannerColor.Fprint(stdout, Banner+"\n\n")
+		_, _ = BannerColor.Fprint(stdout, Banner+"\n\n")
 
 		initBar := ui.ProgressBar{
 			Width: 60,

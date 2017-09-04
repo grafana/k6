@@ -86,5 +86,5 @@ func init() {
 	RootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "disable progress updates")
 	RootCmd.PersistentFlags().StringVarP(&address, "address", "a", "localhost:6565", "address for the api server")
 	RootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file (default ./k6.yaml or ~/.config/k6.yaml)")
-	cobra.MarkFlagFilename(RootCmd.PersistentFlags(), "config")
+	must(cobra.MarkFlagFilename(RootCmd.PersistentFlags(), "config"))
 }

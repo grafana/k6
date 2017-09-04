@@ -265,7 +265,7 @@ func SummarizeMetrics(w io.Writer, indent string, t time.Duration, metrics map[s
 		fmtIndent := IndentForMetric(m)
 		fmtName += GrayColor.Sprint(strings.Repeat(".", nameLenMax-StrWidth(fmtName)-StrWidth(fmtIndent)+3) + ":")
 
-		fmtData := ""
+		var fmtData string
 		if cols := trendCols[name]; cols != nil {
 			for i, val := range cols {
 				tmpCols[i] = TrendColumns[i].Key + "=" + ValueColor.Sprint(val) + strings.Repeat(" ", trendColMaxLens[i]-StrWidth(val))
