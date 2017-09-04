@@ -23,9 +23,8 @@ package stats
 import (
 	"errors"
 	"strconv"
-	"time"
-
 	"strings"
+	"time"
 
 	"github.com/dustin/go-humanize"
 	"gopkg.in/guregu/null.v3"
@@ -224,7 +223,7 @@ func (m *Metric) HumanizeValue(v float64) string {
 		case Data:
 			return humanize.Bytes(uint64(v))
 		default:
-			return strconv.FormatFloat(v, 'f', -1, 64)
+			return humanize.Ftoa(v)
 		}
 	}
 }

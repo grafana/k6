@@ -156,19 +156,25 @@ func SummarizeGroup(w io.Writer, indent string, group *lib.Group) {
 func NonTrendMetricValueForSum(t time.Duration, m *stats.Metric) (data string, extra []string) {
 	switch sink := m.Sink.(type) {
 	case *stats.CounterSink:
-		value := m.HumanizeValue(sink.Value)
-		rate := m.HumanizeValue(sink.Value / float64(t/time.Second))
-		return value, []string{rate + "/s"}
+		value := sink.Value
+		rate := value / (float64(t) / float64(time.Second))
+		return m.HumanizeValue(value), []string{m.HumanizeValue(rate) + "/s"}
 	case *stats.GaugeSink:
-		value := m.HumanizeValue(sink.Value)
-		min := m.HumanizeValue(sink.Min)
-		max := m.HumanizeValue(sink.Max)
-		return value, []string{"min=" + min, "max=" + max}
+		value := sink.Value
+		min := sink.Min
+		max := sink.Max
+		return m.HumanizeValue(value), []string{
+			"min=" + m.HumanizeValue(min),
+			"max=" + m.HumanizeValue(max),
+		}
 	case *stats.RateSink:
-		value := m.HumanizeValue(float64(sink.Trues) / float64(sink.Total))
+		value := float64(sink.Trues) / float64(sink.Total)
 		passes := sink.Trues
 		fails := sink.Total - sink.Trues
-		return value, []string{"✓ " + strconv.FormatInt(passes, 10), "✗ " + strconv.FormatInt(fails, 10)}
+		return m.HumanizeValue(value), []string{
+			"✓ " + strconv.FormatInt(passes, 10),
+			"✗ " + strconv.FormatInt(fails, 10),
+		}
 	default:
 		return "[no data]", nil
 	}
