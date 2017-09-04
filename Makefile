@@ -6,6 +6,10 @@ all: build
 build:
 	go build
 
+.PHONY: format
+format:
+	find . -name '*.go' -exec gofmt -s -w {} +
+
 .PHONY: check
 check:
 	gometalinter --deadline 10m --config gometalinter.json ./...
