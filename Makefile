@@ -1,10 +1,12 @@
-VERSION := 0.2.1
-
 all: build web
 
 .PHONY: build
 build: web
 	go build
+
+.PHONY: format
+format:
+	find . -name '*.go' -exec gofmt -s -w {} +
 
 .PHONY: check
 check:
