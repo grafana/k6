@@ -34,13 +34,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/loadimpact/k6/ui"
-
 	"github.com/loadimpact/k6/core"
 	"github.com/loadimpact/k6/core/local"
 	"github.com/loadimpact/k6/js"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/loader"
+	"github.com/loadimpact/k6/ui"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
