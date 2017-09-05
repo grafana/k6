@@ -296,6 +296,9 @@ a commandline interface for interacting with it.`,
 			})
 		}
 
+		if engine.IsTainted() {
+			return ExitCode{errors.New("some thresholds have failed"), 99}
+		}
 		return nil
 	},
 }
