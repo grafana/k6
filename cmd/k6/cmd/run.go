@@ -42,6 +42,7 @@ import (
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/ui"
 	"github.com/pkg/errors"
+	"github.com/shibukawa/configdir"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
@@ -55,9 +56,8 @@ const (
 )
 
 var (
-	runType       string
-	linger        bool
-	noUsageReport bool
+	runType string
+	linger  bool
 )
 
 // runCmd represents the run command.
@@ -313,7 +313,12 @@ func init() {
 	flags.SortFlags = false
 	flags.StringVarP(&runType, "type", "t", "", "override file `type`, \"js\" or \"archive\"")
 	flags.BoolVarP(&linger, "linger", "l", false, "keep the API server alive past test end")
-	flags.BoolVar(&noUsageReport, "no-usage-report", false, "don't send analytics to the maintainers")
+}
+
+// Reads a configuration file from disk.
+func readConfig() (lib.Options, error) {
+	cdir := configdir.New("loadimpact", "k6")
+
 }
 
 // Reads a source file from any supported destination.

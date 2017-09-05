@@ -141,8 +141,8 @@ type Options struct {
 	Iterations null.Int     `json:"iterations"`
 	Stages     []Stage      `json:"stages"`
 
-	Linger        null.Bool `json:"linger"`
-	NoUsageReport null.Bool `json:"noUsageReport"`
+	Linger        null.Bool `json:"linger"`        // DEPRECATED; will be removed.
+	NoUsageReport null.Bool `json:"noUsageReport"` // DEPRECATED; will be moved to cli config.
 
 	MaxRedirects          null.Int         `json:"maxRedirects"`
 	InsecureSkipTLSVerify null.Bool        `json:"insecureSkipTLSVerify"`
