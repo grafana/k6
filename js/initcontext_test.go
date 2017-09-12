@@ -239,6 +239,62 @@ func TestInitContextRequire(t *testing.T) {
 			_, err = bi.Default(goja.Undefined())
 			assert.NoError(t, err)
 		})
+
+		t.Run("requireModule", func(t *testing.T) {
+
+			t.Run("module.exports", func(t *testing.T) {
+				fs := afero.NewMemMapFs()
+				assert.NoError(t, afero.WriteFile(fs, "/a.js", []byte(`(function(){ module.exports = function() { return "hi!"; } })();`), 0644))
+				b, err := NewBundle(&lib.SourceData{
+					Filename: "/script.js",
+					Data: []byte(`
+					const a = requireModule("./a.js");
+					export default function() {
+						return a();
+					};
+					`),
+				}, fs)
+				if !assert.NoError(t, err) {
+					return
+				}
+
+				bi, err := b.Instantiate()
+				if !assert.NoError(t, err) {
+					return
+				}
+				v, err := bi.Default(goja.Undefined())
+				assert.NoError(t, err)
+
+				assert.Equal(t, "hi!", v.Export())
+			})
+
+			t.Run("iief", func(t *testing.T) {
+				fs := afero.NewMemMapFs()
+				assert.NoError(t, afero.WriteFile(fs, "/a.js", []byte(`(function(){ module.exports = function() { return "hi!"; } })();`), 0644))
+				b, err := NewBundle(&lib.SourceData{
+					Filename: "/script.js",
+					Data: []byte(`
+					const a = requireModule("./a.js");
+					export default function() {
+						return a();
+					};
+					`),
+				}, fs)
+				if !assert.NoError(t, err) {
+					return
+				}
+
+				bi, err := b.Instantiate()
+				if !assert.NoError(t, err) {
+					return
+				}
+				v, err := bi.Default(goja.Undefined())
+				assert.NoError(t, err)
+
+				assert.Equal(t, "hi!", v.Export())
+			})
+
+		})
 	})
 }
 

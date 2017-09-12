@@ -80,19 +80,29 @@ func newBoundInitContext(base *InitContext, ctxPtr *context.Context, rt *goja.Ru
 	}
 }
 
+func (i *InitContext) RequireModule(arg string) goja.Value {
+	// Import a ES5 library and skip the Babel transformation
+	//    const moment = requireModule('./vendor/moment.js')
+	v, err := i.requireFile(arg, false)
+	if err != nil {
+		common.Throw(i.runtime, err)
+	}
+	return v
+}
+
 func (i *InitContext) Require(arg string) goja.Value {
 	switch {
 	case arg == "k6", strings.HasPrefix(arg, "k6/"):
 		// Builtin modules ("k6" or "k6/...") are handled specially, as they don't exist on the
 		// filesystem. This intentionally shadows attempts to name your own modules this.
-		v, err := i.requireModule(arg)
+		v, err := i.requireBuiltInModule(arg)
 		if err != nil {
 			common.Throw(i.runtime, err)
 		}
 		return v
 	default:
 		// Fall back to loading from the filesystem.
-		v, err := i.requireFile(arg)
+		v, err := i.requireFile(arg, true)
 		if err != nil {
 			common.Throw(i.runtime, err)
 		}
@@ -100,7 +110,7 @@ func (i *InitContext) Require(arg string) goja.Value {
 	}
 }
 
-func (i *InitContext) requireModule(name string) (goja.Value, error) {
+func (i *InitContext) requireBuiltInModule(name string) (goja.Value, error) {
 	mod, ok := modules.Index[name]
 	if !ok {
 		return nil, errors.Errorf("unknown builtin module: %s", name)
@@ -108,7 +118,7 @@ func (i *InitContext) requireModule(name string) (goja.Value, error) {
 	return i.runtime.ToValue(common.Bind(i.runtime, mod, i.ctxPtr)), nil
 }
 
-func (i *InitContext) requireFile(name string) (goja.Value, error) {
+func (i *InitContext) requireFile(name string, useBabelCompiler bool) (goja.Value, error) {
 	// Resolve the file path, push the target directory as pwd to make relative imports work.
 	pwd := i.pwd
 	filename := loader.Resolve(pwd, name)
@@ -134,11 +144,18 @@ func (i *InitContext) requireFile(name string) (goja.Value, error) {
 		if err != nil {
 			return goja.Undefined(), err
 		}
-		src, _, err := compiler.Transform(string(data.Data), data.Filename)
-		src = "(function(){" + src + "})()"
-		if err != nil {
-			return goja.Undefined(), err
+
+		src := string(data.Data)
+
+		if useBabelCompiler {
+			compiledSrc, _, err := compiler.Transform(src, data.Filename)
+			if err != nil {
+				return goja.Undefined(), err
+			}
+			src = compiledSrc
 		}
+
+		src = "(function(){" + src + "})()"
 		pgm_, err := goja.Compile(data.Filename, src, true)
 		if err != nil {
 			return goja.Undefined(), err
