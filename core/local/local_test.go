@@ -53,6 +53,41 @@ func TestExecutorSetLogger(t *testing.T) {
 	assert.Equal(t, logger, e.GetLogger())
 }
 
+func TestExecutorStages(t *testing.T) {
+	testdata := map[string]struct {
+		Duration time.Duration
+		Stages   []lib.Stage
+	}{
+		"one": {
+			1 * time.Second,
+			[]lib.Stage{{Duration: lib.NullDurationFrom(1 * time.Second)}},
+		},
+		"two": {
+			2 * time.Second,
+			[]lib.Stage{
+				{Duration: lib.NullDurationFrom(1 * time.Second)},
+				{Duration: lib.NullDurationFrom(1 * time.Second)},
+			},
+		},
+		"two/targeted": {
+			2 * time.Second,
+			[]lib.Stage{
+				{Duration: lib.NullDurationFrom(1 * time.Second), Target: null.IntFrom(5)},
+				{Duration: lib.NullDurationFrom(1 * time.Second), Target: null.IntFrom(10)},
+			},
+		},
+	}
+	for name, data := range testdata {
+		t.Run(name, func(t *testing.T) {
+			e := New(nil)
+			assert.NoError(t, e.SetVUsMax(10))
+			e.SetStages(data.Stages)
+			assert.NoError(t, e.Run(context.Background(), nil))
+			assert.True(t, e.GetTime() >= data.Duration)
+		})
+	}
+}
+
 func TestExecutorEndTime(t *testing.T) {
 	e := New(nil)
 	assert.NoError(t, e.SetVUsMax(10))
