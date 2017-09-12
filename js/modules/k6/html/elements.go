@@ -10,7 +10,7 @@ import (
 	"github.com/dop251/goja"
 )
 
-//go:generate go run elements_gen_main.go
+//go:generate go run gen/gen_elements.go
 //go:generate gofmt -s -w elements_gen.go
 
 var defaultPorts = map[string]string{
