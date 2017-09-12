@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/stats"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -229,7 +230,13 @@ func (e *Executor) Run(parent context.Context, out chan<- []stats.Sample) error 
 			}
 		case samples := <-vuOut:
 			// Every iteration ends with a write to vuOut. Check if we've hit the end point.
+			// If not, make sure to include an Iterations bump in the list!
 			if out != nil {
+				samples = append(samples, stats.Sample{
+					Time:   time.Now(),
+					Metric: metrics.Iterations,
+					Value:  1,
+				})
 				out <- samples
 			}
 

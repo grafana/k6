@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/stats"
 	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
@@ -88,7 +89,11 @@ func TestExecutorEndIterations(t *testing.T) {
 
 	for i := 0; i < 100; i++ {
 		samples := <-samples
-		assert.Equal(t, []stats.Sample{{Metric: metric, Value: 1.0}}, samples)
+		if assert.Len(t, samples, 2) {
+			assert.Equal(t, stats.Sample{Metric: metric, Value: 1.0}, samples[0])
+			assert.Equal(t, metrics.Iterations, samples[1].Metric)
+			assert.Equal(t, float64(1), samples[1].Value)
+		}
 	}
 }
 
