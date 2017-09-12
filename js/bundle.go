@@ -70,14 +70,10 @@ func collectEnv() map[string]string {
 
 // Creates a new bundle from a source file and a filesystem.
 func NewBundle(src *lib.SourceData, fs afero.Fs) (*Bundle, error) {
-	// Compile the main program.
-	code, _, err := compiler.Transform(string(src.Data), src.Filename)
+	// Compile sources, both ES5 and ES6 are supported.
+	pgm, code, err := compiler.Compile(string(src.Data), src.Filename, "", "", true)
 	if err != nil {
-		return nil, errors.Wrap(err, "Transform")
-	}
-	pgm, err := goja.Compile(src.Filename, code, true)
-	if err != nil {
-		return nil, errors.Wrap(err, "Compile")
+		return nil, err
 	}
 
 	// We want to eliminate disk access at runtime, so we set up a memory mapped cache that's
