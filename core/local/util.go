@@ -18,7 +18,7 @@
  *
  */
 
-package core
+package local
 
 import (
 	"time"

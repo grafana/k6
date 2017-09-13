@@ -70,7 +70,7 @@ func TestRunnerNew(t *testing.T) {
 			Filename: "/script.js",
 			Data:     []byte(`blarg`),
 		}, afero.NewMemMapFs())
-		assert.EqualError(t, err, "ReferenceError: blarg is not defined at /script.js:1:14(0)")
+		assert.EqualError(t, err, "ReferenceError: blarg is not defined at /script.js:1:1(0)")
 	})
 }
 
