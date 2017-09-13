@@ -115,38 +115,38 @@ func (i *InitContext) requireFile(name string) (goja.Value, error) {
 	i.pwd = loader.Dir(filename)
 	defer func() { i.pwd = pwd }()
 
-	// Swap the importing scope's imports out, then put it back again.
+	// Swap the importing scope's exports out, then put it back again.
 	oldExports := i.runtime.Get("exports")
 	defer i.runtime.Set("exports", oldExports)
 	oldModule := i.runtime.Get("module")
 	defer i.runtime.Set("module", oldModule)
-
 	exports := i.runtime.NewObject()
 	i.runtime.Set("exports", exports)
 	module := i.runtime.NewObject()
 	_ = module.Set("exports", exports)
 	i.runtime.Set("module", module)
 
-	// Read sources, transform into ES6 and cache the compiled program.
+	// First, check if we have a cached program already.
 	pgm, ok := i.programs[filename]
 	if !ok {
+		// Load the sources; the loader takes care of remote loading, etc.
 		data, err := loader.Load(i.fs, pwd, name)
 		if err != nil {
 			return goja.Undefined(), err
 		}
-		src, _, err := compiler.Transform(string(data.Data), data.Filename)
-		src = "(function(){" + src + "})()"
+
+		// Compile the sources; this handles ES5 vs ES6 automatically.
+		pgm_, src, err := compiler.Compile(string(data.Data), data.Filename, "(function(){", "})()", true)
 		if err != nil {
 			return goja.Undefined(), err
 		}
-		pgm_, err := goja.Compile(data.Filename, src, true)
-		if err != nil {
-			return goja.Undefined(), err
-		}
+
+		// Cache the compiled program.
 		pgm = programWithSource{pgm_, src}
 		i.programs[filename] = pgm
 	}
 
+	// Run the program.
 	if _, err := i.runtime.RunProgram(pgm.pgm); err != nil {
 		return goja.Undefined(), err
 	}

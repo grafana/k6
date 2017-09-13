@@ -56,7 +56,6 @@ type Engine struct {
 
 	logger *log.Logger
 
-	Stages      []lib.Stage
 	Metrics     map[string]*stats.Metric
 	MetricsLock sync.RWMutex
 
@@ -87,18 +86,8 @@ func NewEngine(ex lib.Executor, o lib.Options) (*Engine, error) {
 		return nil, err
 	}
 	ex.SetPaused(o.Paused.Bool)
-
-	// Use Stages if available, if not, construct a stage to fill the specified duration.
-	// Special case: A valid duration of 0 = an infinite (invalid duration) stage.
-	if o.Stages != nil {
-		e.Stages = o.Stages
-	} else if o.Duration.Valid && o.Duration.Duration > 0 {
-		e.Stages = []lib.Stage{{Duration: o.Duration}}
-	} else {
-		e.Stages = []lib.Stage{{}}
-	}
-
-	ex.SetEndTime(SumStages(e.Stages))
+	ex.SetStages(o.Stages)
+	ex.SetEndTime(o.Duration)
 	ex.SetEndIterations(o.Iterations)
 
 	e.thresholds = o.Thresholds
@@ -120,7 +109,7 @@ func (e *Engine) Run(ctx context.Context) error {
 	defer e.runLock.Unlock()
 
 	e.logger.Debug("Engine: Starting with parameters...")
-	for i, st := range e.Stages {
+	for i, st := range e.Executor.GetStages() {
 		fields := make(log.Fields)
 		if st.Target.Valid {
 			fields["tgt"] = st.Target.Int64
@@ -211,20 +200,8 @@ func (e *Engine) Run(ctx context.Context) error {
 		collectorwg.Wait()
 	}()
 
-	ticker := time.NewTicker(TickRate)
 	for {
 		select {
-		case <-ticker.C:
-			vus, keepRunning := ProcessStages(e.Stages, e.Executor.GetTime())
-			if !keepRunning {
-				e.logger.Debug("run: ProcessStages() returned false; exiting...")
-				return nil
-			}
-			if vus.Valid {
-				if err := e.Executor.SetVUs(vus.Int64); err != nil {
-					return err
-				}
-			}
 		case samples := <-out:
 			e.processSamples(samples...)
 		case err := <-errC:

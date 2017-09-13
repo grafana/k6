@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/stats"
 	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
@@ -50,6 +51,41 @@ func TestExecutorSetLogger(t *testing.T) {
 	e := New(nil)
 	e.SetLogger(logger)
 	assert.Equal(t, logger, e.GetLogger())
+}
+
+func TestExecutorStages(t *testing.T) {
+	testdata := map[string]struct {
+		Duration time.Duration
+		Stages   []lib.Stage
+	}{
+		"one": {
+			1 * time.Second,
+			[]lib.Stage{{Duration: lib.NullDurationFrom(1 * time.Second)}},
+		},
+		"two": {
+			2 * time.Second,
+			[]lib.Stage{
+				{Duration: lib.NullDurationFrom(1 * time.Second)},
+				{Duration: lib.NullDurationFrom(1 * time.Second)},
+			},
+		},
+		"two/targeted": {
+			2 * time.Second,
+			[]lib.Stage{
+				{Duration: lib.NullDurationFrom(1 * time.Second), Target: null.IntFrom(5)},
+				{Duration: lib.NullDurationFrom(1 * time.Second), Target: null.IntFrom(10)},
+			},
+		},
+	}
+	for name, data := range testdata {
+		t.Run(name, func(t *testing.T) {
+			e := New(nil)
+			assert.NoError(t, e.SetVUsMax(10))
+			e.SetStages(data.Stages)
+			assert.NoError(t, e.Run(context.Background(), nil))
+			assert.True(t, e.GetTime() >= data.Duration)
+		})
+	}
 }
 
 func TestExecutorEndTime(t *testing.T) {
@@ -88,7 +124,11 @@ func TestExecutorEndIterations(t *testing.T) {
 
 	for i := 0; i < 100; i++ {
 		samples := <-samples
-		assert.Equal(t, []stats.Sample{{Metric: metric, Value: 1.0}}, samples)
+		if assert.Len(t, samples, 2) {
+			assert.Equal(t, stats.Sample{Metric: metric, Value: 1.0}, samples[0])
+			assert.Equal(t, metrics.Iterations, samples[1].Metric)
+			assert.Equal(t, float64(1), samples[1].Value)
+		}
 	}
 }
 

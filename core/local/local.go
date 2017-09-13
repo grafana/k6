@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/stats"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -96,6 +97,8 @@ type Executor struct {
 
 	pauseLock sync.RWMutex
 	pause     chan interface{}
+
+	stages []lib.Stage
 
 	// Lock for: ctx, flow, out
 	lock sync.RWMutex
@@ -215,8 +218,9 @@ func (e *Executor) Run(parent context.Context, out chan<- []stats.Sample) error 
 			// Start an iteration if there's a VU waiting. See also: the big comment block above.
 			atomic.AddInt64(&e.partIters, 1)
 		case t := <-ticker.C:
-			// Every tick, increment the clock and see if we passed the end point. If the test ends
-			// this way, set a cutoff point; any samples collected past the cutoff point are excluded.
+			// Every tick, increment the clock, see if we passed the end point, and process stages.
+			// If the test ends this way, set a cutoff point; any samples collected past the cutoff
+			// point are excluded.
 			d := t.Sub(lastTick)
 			lastTick = t
 
@@ -227,9 +231,30 @@ func (e *Executor) Run(parent context.Context, out chan<- []stats.Sample) error 
 				cutoff = time.Now()
 				return nil
 			}
+
+			stages := e.stages
+			if stages != nil {
+				vus, keepRunning := ProcessStages(stages, at)
+				if !keepRunning {
+					e.Logger.WithField("at", at).Debug("Local: Ran out of stages")
+					cutoff = time.Now()
+					return nil
+				}
+				if vus.Valid {
+					if err := e.SetVUs(vus.Int64); err != nil {
+						return err
+					}
+				}
+			}
 		case samples := <-vuOut:
 			// Every iteration ends with a write to vuOut. Check if we've hit the end point.
+			// If not, make sure to include an Iterations bump in the list!
 			if out != nil {
+				samples = append(samples, stats.Sample{
+					Time:   time.Now(),
+					Metric: metrics.Iterations,
+					Value:  1,
+				})
 				out <- samples
 			}
 
@@ -314,6 +339,14 @@ func (e *Executor) SetLogger(l *log.Logger) {
 
 func (e *Executor) GetLogger() *log.Logger {
 	return e.Logger
+}
+
+func (e *Executor) GetStages() []lib.Stage {
+	return e.stages
+}
+
+func (e *Executor) SetStages(s []lib.Stage) {
+	e.stages = s
 }
 
 func (e *Executor) GetIterations() int64 {
