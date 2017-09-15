@@ -22,17 +22,19 @@ package cmd
 
 import (
 	"github.com/loadimpact/k6/lib"
+	"github.com/shibukawa/configdir"
 	null "gopkg.in/guregu/null.v3"
 )
+
+const configFilename = "k6.yaml"
+
+var configDirs = configdir.New("loadimpact", "k6")
 
 type Config struct {
 	lib.Options
 
-	Linger        null.Bool `json:"linger"`        // DEPRECATED; will be removed.
-	NoUsageReport null.Bool `json:"noUsageReport"` // DEPRECATED; will be removed.
-}
-
-func ConfigFromEnv(env []string) {
+	Linger        null.Bool `json:"linger" envconfig:"linger"`
+	NoUsageReport null.Bool `json:"noUsageReport" envconfig:"no_usage_report"`
 }
 
 func (c Config) Apply(cfg Config) Config {
