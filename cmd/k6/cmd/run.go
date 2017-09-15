@@ -322,7 +322,7 @@ func init() {
 	RootCmd.AddCommand(runCmd)
 
 	runCmd.Flags().SortFlags = false
-	registerOptions(runCmd.Flags())
+	runCmd.Flags().AddFlagSet(optionFlagSet)
 
 	flags := pflag.NewFlagSet("", 0)
 	flags.SortFlags = false
