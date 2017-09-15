@@ -46,7 +46,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 	null "gopkg.in/guregu/null.v3"
 	yaml "gopkg.in/yaml.v2"
 )
@@ -56,10 +55,7 @@ const (
 	typeArchive = "archive"
 )
 
-var (
-	runType string
-	linger  bool
-)
+var runType = os.Getenv("K6_TYPE")
 
 // runCmd represents the run command.
 var runCmd = &cobra.Command{
@@ -118,7 +114,6 @@ a commandline interface for interacting with it.`,
 		// defaults in there, override with Runner-provided ones, then merge the CLI opts in
 		// on top to give them priority.
 		fmt.Fprintf(stdout, "%s options\r", initBar.String())
-
 		fileConf, err := readDiskConfig()
 		if err != nil {
 			return err
@@ -127,11 +122,12 @@ a commandline interface for interacting with it.`,
 		if err != nil {
 			return err
 		}
-		cliOpts, err := getOptions(cmd.Flags())
+		cliConf, err := getConfig(cmd.Flags())
 		if err != nil {
 			return err
 		}
-		opts := cliOpts.Apply(fileConf.Options).Apply(r.GetOptions()).Apply(envConf.Options).Apply(cliOpts)
+		conf := cliConf.Apply(fileConf).Apply(Config{Options: r.GetOptions()}).Apply(envConf).Apply(cliConf)
+		opts := conf.Options
 
 		// If -m/--max isn't specified, figure out the max that should be needed.
 		if !opts.VUsMax.Valid {
@@ -311,6 +307,11 @@ a commandline interface for interacting with it.`,
 			fmt.Fprintf(stdout, "\n")
 		}
 
+		if conf.Linger.Bool {
+			log.Info("Linger set; waiting for Ctrl+C...")
+			<-sigC
+		}
+
 		if engine.IsTainted() {
 			return ExitCode{errors.New("some thresholds have failed"), 99}
 		}
@@ -323,11 +324,8 @@ func init() {
 
 	runCmd.Flags().SortFlags = false
 	runCmd.Flags().AddFlagSet(optionFlagSet)
-
-	flags := pflag.NewFlagSet("", 0)
-	flags.SortFlags = false
-	flags.StringVarP(&runType, "type", "t", "", "override file `type`, \"js\" or \"archive\"")
-	flags.BoolVarP(&linger, "linger", "l", false, "keep the API server alive past test end")
+	runCmd.Flags().AddFlagSet(configFlagSet)
+	runCmd.Flags().StringVarP(&runType, "type", "t", runType, "override file `type`, \"js\" or \"archive\"")
 }
 
 // Reads a configuration file from disk.

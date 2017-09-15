@@ -41,6 +41,10 @@ func TestConfigEnv(t *testing.T) {
 			"true":  func(c Config) { assert.Equal(t, null.BoolFrom(true), c.NoUsageReport) },
 			"false": func(c Config) { assert.Equal(t, null.BoolFrom(false), c.NoUsageReport) },
 		},
+		{"Out", "K6_OUT"}: {
+			"":         func(c Config) { assert.Equal(t, null.String{}, c.Out) },
+			"influxdb": func(c Config) { assert.Equal(t, null.StringFrom("influxdb"), c.Out) },
+		},
 	}
 	for field, data := range testdata {
 		os.Clearenv()
@@ -65,5 +69,9 @@ func TestConfigApply(t *testing.T) {
 	t.Run("NoUsageReport", func(t *testing.T) {
 		conf := Config{}.Apply(Config{NoUsageReport: null.BoolFrom(true)})
 		assert.Equal(t, null.BoolFrom(true), conf.NoUsageReport)
+	})
+	t.Run("Out", func(t *testing.T) {
+		conf := Config{}.Apply(Config{Out: null.StringFrom("influxdb")})
+		assert.Equal(t, null.StringFrom("influxdb"), conf.Out)
 	})
 }
