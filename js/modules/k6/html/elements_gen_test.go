@@ -9,8 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// type struct
-
 var textTests = []struct {
 	id       string
 	property string
@@ -50,10 +48,8 @@ var textTests = []struct {
 	{"form1", "acceptCharset", "ISO-8859-1"},
 	{"form1", "target", "__self"},
 	{"form1", "autocomplete", "off"},
-
 	{"form2", "enctype", "application/x-www-form-urlencoded"},
 	{"form2", "autocomplete", "on"},
-
 	{"iframe1", "referrerPolicy", "no-referrer"},
 	{"iframe2", "referrerPolicy", ""},
 	{"iframe3", "referrerPolicy", ""},
@@ -61,7 +57,6 @@ var textTests = []struct {
 	{"iframe1", "height", "480"},
 	{"iframe1", "name", "frame_name"},
 	{"iframe1", "src", "testframe.html"},
-
 	{"img1", "src", "test.png"},
 	{"img1", "currentSrc", "test.png"},
 	{"img1", "sizes", "100vw,50vw"},
@@ -71,26 +66,20 @@ var textTests = []struct {
 	{"img1", "name", "img_name"},
 	{"img1", "useMap", "#map_name"},
 	{"img1", "referrerPolicy", "origin"},
-
 	{"img2", "crossOrigin", "use-credentials"},
 	{"img2", "referrerPolicy", ""},
 	{"img3", "referrerPolicy", ""},
-
 	{"input1", "name", "input1_name"},
 	{"input1", "type", "button"},
 	{"input1", "value", "input1-val"},
 	{"input1", "defaultValue", "input1-val"},
-
 	{"input2", "type", "text"},
 	{"input2", "value", ""},
-
 	{"input5", "alt", "input_img"},
 	{"input5", "src", "input.png"},
 	{"input5", "width", "80"},
 	{"input5", "height", "40"},
-
 	{"input6", "accept", ".jpg,.png"},
-
 	{"input7", "autocomplete", "off"},
 	{"input7", "pattern", "..."},
 	{"input7", "placeholder", "help text"},
@@ -99,21 +88,16 @@ var textTests = []struct {
 	{"input7", "dirName", "input7.dir"},
 	{"input7", "accessKey", "s"},
 	{"input7", "step", "0.1"},
-
 	{"kg1", "challenge", "cx1"},
 	{"kg1", "keytype", "DSA"},
 	{"kg1", "name", "kg1_name"},
 	{"kg2", "challenge", ""},
 	{"kg2", "keytype", "RSA"},
 	{"kg2", "type", "keygen"},
-
 	{"label1", "htmlFor", "input1_name"},
-
 	{"legend1", "accessKey", "l"},
-
 	{"li1", "type", "disc"},
 	{"li2", "type", ""},
-
 	{"link1", "crossOrigin", "use-credentials"},
 	{"link1", "referrerPolicy", "no-referrer"},
 	{"link1", "href", "test.css"},
@@ -122,72 +106,52 @@ var textTests = []struct {
 	{"link1", "rel", "alternate author"},
 	{"link1", "target", "__self"},
 	{"link1", "type", "stylesheet"},
-
 	{"link2", "referrerPolicy", ""},
-
 	{"map1", "name", "map1_name"},
-
 	{"meta1", "name", "author"},
 	{"meta1", "content", "author name"},
-
 	{"meta2", "httpEquiv", "refresh"},
 	{"meta2", "content", "1;www.test.com"},
-
 	{"meta2", "content", "1;www.test.com"},
-
 	{"ins1", "cite", "cite.html"},
 	{"ins1", "datetime", "2017-01-01"},
-
 	{"object1", "data", "test.png"},
 	{"object1", "type", "image/png"},
 	{"object1", "name", "obj1_name"},
 	{"object1", "width", "150"},
 	{"object1", "height", "75"},
 	{"object1", "useMap", "#map1_name"},
-
 	{"ol1", "type", "a"},
-
 	{"optgroup1", "label", "optlabel"},
-
 	{"out1", "htmlFor", "input1"},
 	{"out1", "name", "out1_name"},
 	{"out1", "type", "output"},
-
 	{"par1", "name", "param1_name"},
 	{"par1", "value", "param1_val"},
-
 	{"pre1", "name", "pre1_name"},
 	{"pre1", "value", "pre1_val"},
-
 	{"quote1", "cite", "http://cite.com/url"},
-
 	{"script1", "crossOrigin", "use-credentials"},
 	{"script1", "type", "text/javascript"},
 	{"script1", "src", "script.js"},
 	{"script1", "charset", "ISO-8859-1"},
-
 	{"select1", "name", "sel1_name"},
-
 	{"src1", "keySystem", "keysys"},
 	{"src1", "media", "(min-width: 600px)"},
 	{"src1", "sizes", "100vw,50vw"},
 	{"src1", "srcset", "large.jpg 1024w,medium.jpg 640w"},
 	{"src1", "src", "test.png"},
 	{"src1", "type", "image/png"},
-
 	{"td1", "headers", "th1"},
 	{"th1", "abbr", "hdr"},
 	{"th1", "scope", "row"},
-
 	{"txtarea1", "accessKey", "k"},
 	{"txtarea1", "autocomplete", "off"},
 	{"txtarea1", "autocapitalize", "words"},
 	{"txtarea1", "wrap", "hard"},
-
 	{"txtarea2", "autocomplete", "on"},
 	{"txtarea2", "autocapitalize", "sentences"},
 	{"txtarea2", "wrap", "soft"},
-
 	{"track1", "kind", "metadata"},
 	{"track1", "src", "foo.en.vtt"},
 	{"track1", "label", "English"},
@@ -196,7 +160,6 @@ var textTests = []struct {
 	{"track2", "src", "foo.sv.vtt"},
 	{"track2", "srclang", "sv"},
 	{"track2", "label", "Svenska"},
-
 	{"time1", "datetime", "2017-01-01"},
 	{"ul1", "type", "circle"},
 }
@@ -432,7 +395,7 @@ func TestGenElements(t *testing.T) {
 	assert.NoError(t, err)
 	assert.IsType(t, Selection{}, rt.Get("doc").Export())
 
-	t.Run("Generated text properties", func(t *testing.T) {
+	t.Run("Test text properties", func(t *testing.T) {
 		for _, test := range textTests {
 			v, err := common.RunString(rt, `doc.find("#`+test.id+`").get(0).`+test.property+`()`)
 			if err != nil {
@@ -443,7 +406,7 @@ func TestGenElements(t *testing.T) {
 		}
 	})
 
-	t.Run("Generated bool properties", func(t *testing.T) {
+	t.Run("Test bool properties", func(t *testing.T) {
 		for _, test := range boolTests {
 			vT, errT := common.RunString(rt, `doc.find("#`+test.idTrue+`").get(0).`+test.property+`()`)
 			if errT != nil {

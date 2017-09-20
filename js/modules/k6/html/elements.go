@@ -3,15 +3,13 @@ package html
 import (
 	"net"
 	"net/url"
-	"strings"
-
 	"strconv"
+	"strings"
 
 	"github.com/dop251/goja"
 )
 
 //go:generate go run gen/gen_elements.go
-//go:generate gofmt -s -w elements_gen.go
 
 var defaultPorts = map[string]string{
 	"http":  "80",
@@ -72,8 +70,9 @@ const (
 	TrackTagName           = "track"
 	UListTagName           = "ul"
 	VideoTagName           = "video"
-	methodPost             = "post"
-	methodGet              = "get"
+
+	methodPost = "post"
+	methodGet  = "get"
 )
 
 type HrefElement struct{ Element }
@@ -136,12 +135,11 @@ type UListElement struct{ Element }
 type VideoElement struct{ MediaElement }
 
 func (h HrefElement) hrefURL() *url.URL {
-	URL, exists := h.attrAsURL("href")
+	href, exists := h.attrAsURL("href")
 	if !exists {
-		URL = &url.URL{}
+		return &url.URL{}
 	}
-
-	return URL
+	return href
 }
 
 func (h HrefElement) Hash() string {
@@ -307,12 +305,12 @@ func (f FormFieldElement) FormEnctype() string {
 	enctype, _ := f.formOrElemAttr("enctype")
 
 	switch enctype {
-	case const_multipart_form_data:
+	case "multipart/form-data":
 		return enctype
-	case const_text_plain:
+	case "text/plain":
 		return enctype
 	default:
-		return const_application_x_www_form_urlencoded
+		return "application/x-www-form-urlencoded"
 	}
 }
 
@@ -508,7 +506,7 @@ func (o OptionElement) Form() goja.Value {
 		return goja.Undefined()
 	}
 
-	ownerForm := prtSelect.Parents().Last().Find("form[id=\"" + formId + "\"]")
+	ownerForm := prtSelect.Parents().Last().Find("form#" + formId)
 	if ownerForm.Length() == 0 {
 		return goja.Undefined()
 	}

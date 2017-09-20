@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"go/ast"
+	"go/format"
 	"go/parser"
 	"go/token"
 	"log"
@@ -12,7 +14,6 @@ import (
 
 // The ast parser populates this struct using the <ElemName>TagName const and <ElemName>Element struct
 type ElemInfo struct {
-	ConstName     string
 	StructName    string
 	PrtStructName string
 }
@@ -26,204 +27,203 @@ type ElemInfoCollectorState struct {
 	elemInfos map[string]*ElemInfo
 }
 
-// Built from an entry in funcDefs by buildFuncDef(funcDef)
-type FuncDef struct {
-	ElemName   string
-	ElemMethod string
-	AttrMethod string
-	AttrName   string
-	ReturnType string
-	ReturnBody string
-	ReturnOpts []string
-}
-
-var funcDefs = []string{
-	"Href Download string",
-	"Href ReferrerPolicy enum=,no-referrer,no-referrer-when-downgrade,origin,origin-when-cross-origin,unsafe-url",
-	"Href Rel string",
-	"Href Href url-or-blank",
-	"Href Target string",
-	"Href Type string",
-	"Href AccessKey string",
-	"Href HrefLang string",
-	"Href ToString=href url-or-blank",
-	"Media Autoplay bool",
-	"Media Controls bool",
-	"Media Loop bool",
-	"Media Muted bool",
-	"Media Preload enum=auto,metadata,none",
-	"Media Src url-or-blank",
-	"Media CrossOrigin enum-nullable=anonymous,use-credentials",
-	"Media CurrentSrc=src string",
-	"Media DefaultMuted=muted bool",
-	"Media MediaGroup string",
-	"Base Href url-or-currpage",
-	"Base Target string",
-	"Button AccessKey string",
-	"Button Autofocus bool",
-	"Button Disabled bool",
-	"Button TabIndex int",
-	"Button Type enum=submit,button,menu,reset",
-	"Data Value string",
-	"Embed Height string",
-	"Embed Width string",
-	"Embed Src string",
-	"Embed Type string",
-	"FieldSet Disabled bool",
-	"FieldSet Name string",
-	"Form Action url-or-blank",
-	"Form Name string",
-	"Form Target string",
-	"Form Enctype enum=application/x-www-form-urlencoded,multipart/form-data,text/plain",
-	"Form Encoding=enctype enum=application/x-www-form-urlencoded,multipart/form-data,text/plain",
-	"Form AcceptCharset=accept-charset string",
-	"Form Autocomplete enum=on,off",
-	"Form NoValidate bool",
-	"IFrame Allowfullscreen bool",
-	"IFrame ReferrerPolicy enum=,no-referrer,no-referrer-when-downgrade,origin,origin-when-cross-origin,unsafe-url",
-	"IFrame Height string",
-	"IFrame Width string",
-	"IFrame Name string",
-	"IFrame Src url-or-blank",
-	"Image CurrentSrc=src url-or-blank",
-	"Image Sizes string",
-	"Image Srcset string",
-	"Image Alt string",
-	"Image CrossOrigin enum-nullable=anonymous,use-credentials",
-	"Image Height int",
-	"Image Width int",
-	"Image IsMap bool",
-	"Image Name string",
-	"Image Src url-or-blank",
-	"Image UseMap string",
-	"Image ReferrerPolicy enum=,no-referrer,no-referrer-when-downgrade,origin,origin-when-cross-origin,unsafe-url",
-	"Input Name string",
-	"Input TabIndex int",
-	"Input Type enum=text,button,checkbox,color,date,datetime-local,email,file,hidden,image,month,number,password,radio,range,reset,search,submit,tel,time,url,week",
-	"Input Disabled bool",
-	"Input Autofocus bool",
-	"Input Required bool",
-	"Input Value string",
-	"Input Checked bool",
-	"Input DefaultChecked=checked bool",
-	"Input Alt string",
-	"Input Src url-or-blank",
-	"Input Height string",
-	"Input Width string",
-	"Input Accept string",
-	"Input Autocomplete enum=on,off",
-	"Input MaxLength int=-1",
-	"Input Size int",
-	"Input Pattern string",
-	"Input Placeholder string",
-	"Input Readonly bool",
-	"Input Min string",
-	"Input Max string",
-	"Input DefaultValue=value string",
-	"Input DirName string",
-	"Input AccessKey string",
-	"Input Multiple bool",
-	"Input Step string",
-	"Keygen Autofocus bool",
-	"Keygen Challenge string",
-	"Keygen Disabled bool",
-	"Keygen Keytype enum=RSA,DSA,EC",
-	"Keygen Name string",
-	"Keygen Type const=keygen",
-	"Label HtmlFor=for string",
-	"Legend AccessKey string",
-	"Li Value int=0",
-	"Li Type enum=,1,a,A,i,I,disc,square,circle",
-	"Link CrossOrigin enum-nullable=anonymous,use-credentials",
-	"Link ReferrerPolicy enum=,no-referrer,no-referrer-when-downgrade,origin,origin-when-cross-origin,unsafe-url",
-	"Link Href url-or-blank",
-	"Link Hreflang string",
-	"Link Media string",
-	"Link Rel string",
-	"Link Target string",
-	"Link Type string",
-	"Map Name string",
-	"Meta Content string",
-	"Meta Name string",
-	"Meta HttpEquiv=http-equiv enum=content-type,default-style,refresh",
-	"Meter Min int",
-	"Meter Max int",
-	"Meter High int",
-	"Meter Low int",
-	"Meter Optimum int",
-	"Mod Cite string",
-	"Mod Datetime string",
-	"Object Data url-or-blank",
-	"Object Height string",
-	"Object Name string",
-	"Object Type string",
-	"Object TabIndex int=0",
-	"Object TypeMustMatch bool",
-	"Object UseMap string",
-	"Object Width string",
-	"OList Reversed bool",
-	"OList Start int",
-	"OList Type enum=1,a,A,i,I",
-	"OptGroup Disabled bool",
-	"OptGroup Label string",
-	"Option DefaultSelected=selected bool",
-	"Option Selected bool",
-	"Output HtmlFor=for string",
-	"Output Name string",
-	"Output Type const=output",
-	"Param Name string",
-	"Param Value string",
-	"Pre Name string",
-	"Pre Value string",
-	"Quote Cite string",
-	"Script CrossOrigin string",
-	"Script Type string",
-	"Script Src url-or-blank",
-	"Script Charset string",
-	"Script Async bool",
-	"Script Defer bool",
-	"Script NoModule bool",
-	"Select Autofocus bool",
-	"Select Disabled bool",
-	"Select Multiple bool",
-	"Select Name string",
-	"Select Required bool",
-	"Select TabIndex int",
-	"Source KeySystem string",
-	"Source Media string",
-	"Source Sizes string",
-	"Source Src url-or-blank",
-	"Source Srcset string",
-	"Source Type string",
-	"Style Media string",
-	"Table Sortable bool",
-	"TableCell ColSpan int=1",
-	"TableCell RowSpan int=1",
-	"TableCell Headers string",
-	"TableHeaderCell Abbr string",
-	"TableHeaderCell Scope enum=,row,col,colgroup,rowgroup",
-	"TableHeaderCell Sorted bool",
-	"TextArea Type const=textarea",
-	"TextArea Value string",
-	"TextArea DefaultValue=value string",
-	"TextArea Placeholder string",
-	"TextArea Rows int",
-	"TextArea Cols int",
-	"TextArea MaxLength int",
-	"TextArea TabIndex int",
-	"TextArea AccessKey string",
-	"TextArea ReadOnly bool",
-	"TextArea Required bool",
-	"TextArea Autocomplete enum=on,off",
-	"TextArea Autocapitalize enum=sentences,none,off,characters,words",
-	"TextArea Wrap enum=soft,hard,off",
-	"Time Datetime string",
-	"Track Kind enum=subtitle,captions,descriptions,chapters,metadata",
-	"Track Src url-or-blank",
-	"Track Srclang string",
-	"Track Label string",
-	"Track Default bool",
-	"UList Type string",
+// "Elem" is the struct name for an Element. "Method" is the go method name. "Attr" is the name of the DOM attribute the method will access.
+// "TemplateType" is used the "elemFuncsTemplate" and the returnType function - either string
+// The Opts property:
+//     for "string" and "bool" template types it is nil.
+//     for "const", "int" and "url" templates it is the default return value when the attribute is unset. The "url" default should be an empty string or e.sel.URL
+//     for "enum" template it is the list of valid options used in a switch statement - the default case is the first in the Opts list
+//     for "enum-goja" template - same as the "enum" template except the function returns a goja.Value and the default value is always null
+var funcDefs = []struct {
+	Elem, Method, Attr, TemplateType string
+	Opts                             []string
+}{
+	{"HrefElement", "Download", "download", "string", nil},
+	{"HrefElement", "ReferrerPolicy", "referrerpolicy", "enum", []string{"", "no-referrer", "no-referrer-when-downgrade", "origin", "origin-when-cross-origin", "unsafe-url"}},
+	{"HrefElement", "Rel", "rel", "string", nil},
+	{"HrefElement", "Href", "href", "url", []string{"\"\""}},
+	{"HrefElement", "Target", "target", "string", nil},
+	{"HrefElement", "Type", "type", "string", nil},
+	{"HrefElement", "AccessKey", "accesskey", "string", nil},
+	{"HrefElement", "HrefLang", "hreflang", "string", nil},
+	{"HrefElement", "ToString", "href", "url", []string{"\"\""}},
+	{"MediaElement", "Autoplay", "autoplay", "bool", nil},
+	{"MediaElement", "Controls", "controls", "bool", nil},
+	{"MediaElement", "Loop", "loop", "bool", nil},
+	{"MediaElement", "Muted", "muted", "bool", nil},
+	{"MediaElement", "Preload", "preload", "enum", []string{"auto", "metadata", "none"}},
+	{"MediaElement", "Src", "src", "url", []string{"\"\""}},
+	{"MediaElement", "CrossOrigin", "crossorigin", "enum-goja", []string{"anonymous", "use-credentials"}},
+	{"MediaElement", "CurrentSrc", "src", "string", nil},
+	{"MediaElement", "DefaultMuted", "muted", "bool", nil},
+	{"MediaElement", "MediaGroup", "mediagroup", "string", nil},
+	{"BaseElement", "Href", "href", "url", []string{"e.sel.URL"}},
+	{"BaseElement", "Target", "target", "string", nil},
+	{"ButtonElement", "AccessKey", "accesskey", "string", nil},
+	{"ButtonElement", "Autofocus", "autofocus", "bool", nil},
+	{"ButtonElement", "Disabled", "disabled", "bool", nil},
+	{"ButtonElement", "TabIndex", "tabindex", "int", []string{"0"}},
+	{"ButtonElement", "Type", "type", "enum", []string{"submit", "button", "menu", "reset"}},
+	{"DataElement", "Value", "value", "string", nil},
+	{"EmbedElement", "Height", "height", "string", nil},
+	{"EmbedElement", "Width", "width", "string", nil},
+	{"EmbedElement", "Src", "src", "string", nil},
+	{"EmbedElement", "Type", "type", "string", nil},
+	{"FieldSetElement", "Disabled", "disabled", "bool", nil},
+	{"FieldSetElement", "Name", "name", "string", nil},
+	{"FormElement", "Action", "action", "url", []string{"\"\""}},
+	{"FormElement", "Name", "name", "string", nil},
+	{"FormElement", "Target", "target", "string", nil},
+	{"FormElement", "Enctype", "enctype", "enum", []string{"application/x-www-form-urlencoded", "multipart/form-data", "text/plain"}},
+	{"FormElement", "Encoding", "enctype", "enum", []string{"application/x-www-form-urlencoded", "multipart/form-data", "text/plain"}},
+	{"FormElement", "AcceptCharset", "accept-charset", "string", nil},
+	{"FormElement", "Autocomplete", "autocomplete", "enum", []string{"on", "off"}},
+	{"FormElement", "NoValidate", "novalidate", "bool", nil},
+	{"IFrameElement", "Allowfullscreen", "allowfullscreen", "bool", nil},
+	{"IFrameElement", "ReferrerPolicy", "referrerpolicy", "enum", []string{"", "no-referrer", "no-referrer-when-downgrade", "origin", "origin-when-cross-origin", "unsafe-url"}},
+	{"IFrameElement", "Height", "height", "string", nil},
+	{"IFrameElement", "Width", "width", "string", nil},
+	{"IFrameElement", "Name", "name", "string", nil},
+	{"IFrameElement", "Src", "src", "url", []string{"\"\""}},
+	{"ImageElement", "CurrentSrc", "src", "url", []string{"\"\""}},
+	{"ImageElement", "Sizes", "sizes", "string", nil},
+	{"ImageElement", "Srcset", "srcset", "string", nil},
+	{"ImageElement", "Alt", "alt", "string", nil},
+	{"ImageElement", "CrossOrigin", "crossorigin", "enum-goja", []string{"anonymous", "use-credentials"}},
+	{"ImageElement", "Height", "height", "int", []string{"0"}},
+	{"ImageElement", "Width", "width", "int", []string{"0"}},
+	{"ImageElement", "IsMap", "ismap", "bool", nil},
+	{"ImageElement", "Name", "name", "string", nil},
+	{"ImageElement", "Src", "src", "url", []string{"\"\""}},
+	{"ImageElement", "UseMap", "usemap", "string", nil},
+	{"ImageElement", "ReferrerPolicy", "referrerpolicy", "enum", []string{"", "no-referrer", "no-referrer-when-downgrade", "origin", "origin-when-cross-origin", "unsafe-url"}},
+	{"InputElement", "Name", "name", "string", nil},
+	{"InputElement", "TabIndex", "tabindex", "int", []string{"0"}},
+	{"InputElement", "Type", "type", "enum", []string{"text", "button", "checkbox", "color", "date", "datetime-local", "email", "file", "hidden", "image", "month", "number", "password", "radio", "range", "reset", "search", "submit", "tel", "time", "url", "week"}},
+	{"InputElement", "Disabled", "disabled", "bool", nil},
+	{"InputElement", "Autofocus", "autofocus", "bool", nil},
+	{"InputElement", "Required", "required", "bool", nil},
+	{"InputElement", "Value", "value", "string", nil},
+	{"InputElement", "Checked", "checked", "bool", nil},
+	{"InputElement", "DefaultChecked", "checked", "bool", nil},
+	{"InputElement", "Alt", "alt", "string", nil},
+	{"InputElement", "Src", "src", "url", []string{"\"\""}},
+	{"InputElement", "Height", "height", "string", nil},
+	{"InputElement", "Width", "width", "string", nil},
+	{"InputElement", "Accept", "accept", "string", nil},
+	{"InputElement", "Autocomplete", "autocomplete", "enum", []string{"on", "off"}},
+	{"InputElement", "MaxLength", "maxlength", "int", []string{"-1"}},
+	{"InputElement", "Size", "size", "int", []string{"0"}},
+	{"InputElement", "Pattern", "pattern", "string", nil},
+	{"InputElement", "Placeholder", "placeholder", "string", nil},
+	{"InputElement", "Readonly", "readonly", "bool", nil},
+	{"InputElement", "Min", "min", "string", nil},
+	{"InputElement", "Max", "max", "string", nil},
+	{"InputElement", "DefaultValue", "value", "string", nil},
+	{"InputElement", "DirName", "dirname", "string", nil},
+	{"InputElement", "AccessKey", "accesskey", "string", nil},
+	{"InputElement", "Multiple", "multiple", "bool", nil},
+	{"InputElement", "Step", "step", "string", nil},
+	{"KeygenElement", "Autofocus", "autofocus", "bool", nil},
+	{"KeygenElement", "Challenge", "challenge", "string", nil},
+	{"KeygenElement", "Disabled", "disabled", "bool", nil},
+	{"KeygenElement", "Keytype", "keytype", "enum", []string{"RSA", "DSA", "EC"}},
+	{"KeygenElement", "Name", "name", "string", nil},
+	{"KeygenElement", "Type", "type", "const", []string{"keygen"}},
+	{"LabelElement", "HtmlFor", "for", "string", nil},
+	{"LegendElement", "AccessKey", "accesskey", "string", nil},
+	{"LiElement", "Value", "value", "int", []string{"0"}},
+	{"LiElement", "Type", "type", "enum", []string{"", "1", "a", "A", "i", "I", "disc", "square", "circle"}},
+	{"LinkElement", "CrossOrigin", "crossorigin", "enum-goja", []string{"anonymous", "use-credentials"}},
+	{"LinkElement", "ReferrerPolicy", "referrerpolicy", "enum", []string{"", "no-referrer", "no-referrer-when-downgrade", "origin", "origin-when-cross-origin", "unsafe-url"}},
+	{"LinkElement", "Href", "href", "url", []string{"\"\""}},
+	{"LinkElement", "Hreflang", "hreflang", "string", nil},
+	{"LinkElement", "Media", "media", "string", nil},
+	{"LinkElement", "Rel", "rel", "string", nil},
+	{"LinkElement", "Target", "target", "string", nil},
+	{"LinkElement", "Type", "type", "string", nil},
+	{"MapElement", "Name", "name", "string", nil},
+	{"MetaElement", "Content", "content", "string", nil},
+	{"MetaElement", "Name", "name", "string", nil},
+	{"MetaElement", "HttpEquiv", "http-equiv", "enum", []string{"content-type", "default-style", "refresh"}},
+	{"MeterElement", "Min", "min", "int", []string{"0"}},
+	{"MeterElement", "Max", "max", "int", []string{"0"}},
+	{"MeterElement", "High", "high", "int", []string{"0"}},
+	{"MeterElement", "Low", "low", "int", []string{"0"}},
+	{"MeterElement", "Optimum", "optimum", "int", []string{"0"}},
+	{"ModElement", "Cite", "cite", "string", nil},
+	{"ModElement", "Datetime", "datetime", "string", nil},
+	{"ObjectElement", "Data", "data", "url", []string{"\"\""}},
+	{"ObjectElement", "Height", "height", "string", nil},
+	{"ObjectElement", "Name", "name", "string", nil},
+	{"ObjectElement", "Type", "type", "string", nil},
+	{"ObjectElement", "TabIndex", "tabindex", "int", []string{"0"}},
+	{"ObjectElement", "TypeMustMatch", "typemustmatch", "bool", nil},
+	{"ObjectElement", "UseMap", "usemap", "string", nil},
+	{"ObjectElement", "Width", "width", "string", nil},
+	{"OListElement", "Reversed", "reversed", "bool", nil},
+	{"OListElement", "Start", "start", "int", []string{"0"}},
+	{"OListElement", "Type", "type", "enum", []string{"1", "a", "A", "i", "I"}},
+	{"OptGroupElement", "Disabled", "disabled", "bool", nil},
+	{"OptGroupElement", "Label", "label", "string", nil},
+	{"OptionElement", "DefaultSelected", "selected", "bool", nil},
+	{"OptionElement", "Selected", "selected", "bool", nil},
+	{"OutputElement", "HtmlFor", "for", "string", nil},
+	{"OutputElement", "Name", "name", "string", nil},
+	{"OutputElement", "Type", "type", "const", []string{"output"}},
+	{"ParamElement", "Name", "name", "string", nil},
+	{"ParamElement", "Value", "value", "string", nil},
+	{"PreElement", "Name", "name", "string", nil},
+	{"PreElement", "Value", "value", "string", nil},
+	{"QuoteElement", "Cite", "cite", "string", nil},
+	{"ScriptElement", "CrossOrigin", "crossorigin", "string", nil},
+	{"ScriptElement", "Type", "type", "string", nil},
+	{"ScriptElement", "Src", "src", "url", []string{"\"\""}},
+	{"ScriptElement", "Charset", "charset", "string", nil},
+	{"ScriptElement", "Async", "async", "bool", nil},
+	{"ScriptElement", "Defer", "defer", "bool", nil},
+	{"ScriptElement", "NoModule", "nomodule", "bool", nil},
+	{"SelectElement", "Autofocus", "autofocus", "bool", nil},
+	{"SelectElement", "Disabled", "disabled", "bool", nil},
+	{"SelectElement", "Multiple", "multiple", "bool", nil},
+	{"SelectElement", "Name", "name", "string", nil},
+	{"SelectElement", "Required", "required", "bool", nil},
+	{"SelectElement", "TabIndex", "tabindex", "int", []string{"0"}},
+	{"SourceElement", "KeySystem", "keysystem", "string", nil},
+	{"SourceElement", "Media", "media", "string", nil},
+	{"SourceElement", "Sizes", "sizes", "string", nil},
+	{"SourceElement", "Src", "src", "url", []string{"\"\""}},
+	{"SourceElement", "Srcset", "srcset", "string", nil},
+	{"SourceElement", "Type", "type", "string", nil},
+	{"StyleElement", "Media", "media", "string", nil},
+	{"TableElement", "Sortable", "sortable", "bool", nil},
+	{"TableCellElement", "ColSpan", "colspan", "int", []string{"1"}},
+	{"TableCellElement", "RowSpan", "rowspan", "int", []string{"1"}},
+	{"TableCellElement", "Headers", "headers", "string", nil},
+	{"TableHeaderCellElement", "Abbr", "abbr", "string", nil},
+	{"TableHeaderCellElement", "Scope", "scope", "enum", []string{"", "row", "col", "colgroup", "rowgroup"}},
+	{"TableHeaderCellElement", "Sorted", "sorted", "bool", nil},
+	{"TextAreaElement", "Type", "type", "const", []string{"textarea"}},
+	{"TextAreaElement", "Value", "value", "string", nil},
+	{"TextAreaElement", "DefaultValue", "value", "string", nil},
+	{"TextAreaElement", "Placeholder", "placeholder", "string", nil},
+	{"TextAreaElement", "Rows", "rows", "int", []string{"0"}},
+	{"TextAreaElement", "Cols", "cols", "int", []string{"0"}},
+	{"TextAreaElement", "MaxLength", "maxlength", "int", []string{"0"}},
+	{"TextAreaElement", "TabIndex", "tabindex", "int", []string{"0"}},
+	{"TextAreaElement", "AccessKey", "accesskey", "string", nil},
+	{"TextAreaElement", "ReadOnly", "readonly", "bool", nil},
+	{"TextAreaElement", "Required", "required", "bool", nil},
+	{"TextAreaElement", "Autocomplete", "autocomplete", "enum", []string{"on", "off"}},
+	{"TextAreaElement", "Autocapitalize", "autocapitalize", "enum", []string{"sentences", "none", "off", "characters", "words"}},
+	{"TextAreaElement", "Wrap", "wrap", "enum", []string{"soft", "hard", "off"}},
+	{"TimeElement", "Datetime", "datetime", "string", nil},
+	{"TrackElement", "Kind", "kind", "enum", []string{"subtitle", "captions", "descriptions", "chapters", "metadata"}},
+	{"TrackElement", "Src", "src", "url", []string{"\"\""}},
+	{"TrackElement", "Srclang", "srclang", "string", nil},
+	{"TrackElement", "Label", "label", "string", nil},
+	{"TrackElement", "Default", "default", "bool", nil},
+	{"UListElement", "Type", "type", "string", nil},
 }
 
 var collector = &ElemInfoCollectorState{}
@@ -232,8 +232,7 @@ func main() {
 	fs := token.NewFileSet()
 	parsedFile, parseErr := parser.ParseFile(fs, "elements.go", nil, 0)
 	if parseErr != nil {
-		log.Fatalf("warning: internal error: could not parse elements.go: %s", parseErr)
-		return
+		log.Fatalf("error: could not parse elements.go\n", parseErr)
 	}
 
 	collector.handler = collector.defaultHandler
@@ -247,59 +246,49 @@ func main() {
 		return true
 	})
 
-	f, err := os.Create("elements_gen.go")
-	if err != nil {
-		log.Println("warning: Unable to create the file 'elements_gen.go'", err)
-	}
-
-	// Generate consts used in the enum items in funcDefs. Consts are needed to avoid warnings for the repeated use of strings
-	var enumConsts = map[string]string{}
-	for _, def := range funcDefs {
-		funcDef := buildFuncDef(def)
-
-		if !strings.HasPrefix(funcDef.ReturnBody, "enum") {
-			continue
+	buf := new(bytes.Buffer)
+	err := elemFuncsTemplate.Execute(buf, struct {
+		ElemInfos map[string]*ElemInfo
+		FuncDefs  []struct {
+			Elem, Method, Attr, TemplateType string
+			Opts                             []string
 		}
-		for _, opt := range funcDef.ReturnOpts {
-			enumConsts[opt] = toConst(opt)
-		}
-	}
-
-	//
-	err = elemFuncsTemplate.Execute(f, struct {
-		ElemInfos  map[string]*ElemInfo
-		FuncDefs   []string
-		EnumConsts map[string]string
 	}{
 		collector.elemInfos,
 		funcDefs,
-		enumConsts,
 	})
 	if err != nil {
-		log.Println("error, unable to execute template:", err)
+		log.Fatalf("error: unable to execute template\n", err)
+	}
+
+	src, err := format.Source(buf.Bytes())
+	if err != nil {
+		log.Fatalf("error: format.Source on generated code failed\n", err)
+	}
+
+	f, err := os.Create("elements_gen.go")
+	if err != nil {
+		log.Fatalf("error: Unable to create the file 'elements_gen.go'\n", err)
+	}
+
+	if _, err = f.Write(src); err != nil {
+		log.Fatalf("error: Unable to write to 'elements_gen.go'\n", err)
 	}
 
 	err = f.Close()
 	if err != nil {
-		log.Println("Unable to close the file 'elements_gen.go': ", err)
+		log.Fatalf("error: unable to close the file 'elements_gen.go'\n", err)
 	}
 }
 
 var elemFuncsTemplate = template.Must(template.New("").Funcs(template.FuncMap{
-	"buildStruct":  buildStruct,
-	"buildFuncDef": buildFuncDef,
-	"toConst":      toConst,
-}).Parse(`// go generate
-// generated by js/modules/k6/html/gen/main.go directed by js/modules/k6/html/elements.go;  DO NOT EDIT
+	"buildStruct": buildStruct,
+	"returnType":  returnType,
+}).Parse(`// generated by js/modules/k6/html/gen/gen_elements.go directed by js/modules/k6/html/elements.go;  DO NOT EDIT
+// nolint: goconst
 package html
 
 import "github.com/dop251/goja"
-
-const (
-	{{ range $constVal, $constName := .EnumConsts -}}
-		{{$constName}} = "{{$constVal}}"
-	{{ end -}}
-)
 
 func selToElement(sel Selection) goja.Value {
 	if sel.sel.Length() == 0 {
@@ -308,71 +297,58 @@ func selToElement(sel Selection) goja.Value {
 
 	elem := Element{sel.sel.Nodes[0], &sel}
 
-	switch elem.node.Data { {{ range $elemInfo := .ElemInfos }}
-	case {{ $elemInfo.ConstName }}:
+	switch elem.node.Data { 
+{{- range $elemName, $elemInfo := .ElemInfos }}
+	case {{ $elemName }}TagName:
 		return sel.rt.ToValue({{ buildStruct $elemInfo }})
-{{ end }}
+{{- end }}
 	default:
 		return sel.rt.ToValue(elem)
 	}
  }
 
-{{ range $funcDefStr := .FuncDefs -}} 
-{{ $funcDef := buildFuncDef $funcDefStr -}}
-func (e {{$funcDef.ElemName}}) {{$funcDef.ElemMethod}}() {{$funcDef.ReturnType}} {
-{{- if eq $funcDef.ReturnBody "int" }}
-	return e.{{ $funcDef.AttrMethod }}("{{ $funcDef.AttrName }}", {{ index $funcDef.ReturnOpts 0 }})
-{{- else if eq $funcDef.ReturnBody "enum" }}
-	attrVal := e.attrAsString("{{ $funcDef.AttrName }}")
+{{ range $funcDef := .FuncDefs -}} 
+
+func (e {{$funcDef.Elem}}) {{$funcDef.Method}}() {{ returnType $funcDef.TemplateType }} {
+{{- if eq $funcDef.TemplateType "int" }}
+	return e.attrAsInt("{{ $funcDef.Attr }}", {{ index $funcDef.Opts 0 }})
+{{- else if eq $funcDef.TemplateType "enum" }}
+	attrVal := e.attrAsString("{{ $funcDef.Attr }}")
 	switch attrVal { 
-	{{- range $optIdx, $optVal := $funcDef.ReturnOpts }}
-	{{- $optConst := toConst $optVal }}
-		{{- if ne $optIdx 0 }}
-	case {{$optConst}}:
+	{{- range $optIdx, $optVal := $funcDef.Opts }}
+	{{- if ne $optIdx 0 }}
+	case "{{$optVal}}":
 		return attrVal
-		{{- end }}
+	{{- end }}
 	{{- end}}
 	default: 
-		return {{ index $funcDef.ReturnOpts 0 | toConst }} 
+		return "{{ index $funcDef.Opts 0 }}" 
 	}
-{{- else if eq $funcDef.ReturnBody "enum-nullable" }}
-	attrVal, exists := e.sel.sel.Attr("{{ $funcDef.AttrName }}")
+{{- else if eq $funcDef.TemplateType "enum-goja" }}
+	attrVal, exists := e.sel.sel.Attr("{{ $funcDef.Attr }}")
 	if !exists {
 		return goja.Undefined()
 	}
 	switch attrVal { 
-	{{- range $optVal := $funcDef.ReturnOpts }}
-	{{- $optConst := toConst $optVal }}
-	case {{$optConst}}:
+	{{- range $optVal := $funcDef.Opts }}
+	case "{{$optVal}}":
 		return e.sel.rt.ToValue(attrVal)
 	{{- end}}
 	default:
 		return goja.Undefined()
 	}
-{{- else if eq $funcDef.ReturnBody "const" }}
-	return "{{ index $funcDef.ReturnOpts 0 }}"
-{{- else if eq $funcDef.ReturnBody "url" }}
-	return e.{{ $funcDef.AttrMethod }}("{{ $funcDef.AttrName }}", {{ index $funcDef.ReturnOpts 0 }})
-{{- else }}
-	return e.{{ $funcDef.AttrMethod }}("{{ $funcDef.AttrName }}")
+{{- else if eq $funcDef.TemplateType "const" }}
+	return "{{ index $funcDef.Opts 0 }}"
+{{- else if eq $funcDef.TemplateType "url" }}
+	return e.attrAsURLString("{{ $funcDef.Attr }}", {{ index $funcDef.Opts 0 }})
+{{- else if eq $funcDef.TemplateType "string" }}
+	return e.attrAsString("{{ $funcDef.Attr }}")
+{{- else if eq $funcDef.TemplateType "bool" }}
+	return e.attrIsPresent("{{ $funcDef.Attr }}")
 {{- end}}
 }
 {{ end }}
 `))
-
-func constNameMapper(r rune) rune {
-	if r == '-' || r == '/' {
-		return '_'
-	}
-	return r
-}
-
-func toConst(optName string) string {
-	if optName == "" {
-		return "const_Blank"
-	}
-	return "const_" + strings.Map(constNameMapper, optName)
-}
 
 func buildStruct(elemInfo ElemInfo) string {
 	if elemInfo.PrtStructName == "Element" {
@@ -382,89 +358,20 @@ func buildStruct(elemInfo ElemInfo) string {
 	}
 }
 
-func buildFuncDef(funcDef string) FuncDef {
-	parts := strings.Split(funcDef, " ")
-	// parts[0] is the element struct name (without the Element suffix)
-	// parts[1] is either:
-	//   MethodName               The name of method added onto that struct and converted to lowercase thenn used as the argument to elem.attrAsString(...) or elem.AttrIsPresent(...)
-	//   MethodName=attrname      The MethodName is added to the struct. The attrname is the argument for attrAsString or AttrIsPresent
-	// parts[2] is the return type, either string, const, bool, int, enum or enum-nullable.
-	elemName := parts[0] + "Element"
-	elemMethod := parts[1]
-	attrName := strings.ToLower(parts[1])
-	returnType := parts[2]
-	returnOpts := ""
-
-	if eqPos := strings.Index(parts[1], "="); eqPos != -1 {
-		attrName = elemMethod[eqPos+1:]
-		elemMethod = elemMethod[0:eqPos]
-	}
-
-	if eqPos := strings.Index(returnType, "="); eqPos != -1 {
-		returnOpts = returnType[eqPos+1:]
-		returnType = returnType[0:eqPos]
-	}
-
-	switch returnType {
-	case "int":
-		// The number following 'int=' is a default value used when the attribute is not defined.
-		// "TableCell ColSpan int=1"
-		// => {"TableCellElement" "ColSpan", "attrAsInt", "colspan", "int", "int", []string{"1"}}
-		// => `func (e TableCellElement) ColSpan() int{ return e.attrAsInt("colspan", 1) }``
-		if returnOpts == "" {
-			return FuncDef{elemName, elemMethod, "attrAsInt", attrName, "int", returnType, []string{"0"}}
-		} else {
-			return FuncDef{elemName, elemMethod, "attrAsInt", attrName, "int", returnType, []string{returnOpts}}
-		}
-
-	case "enum":
-		// "Button Type enum=submit,button,menu,reset"
-		// The items in the comma separated list are used in a switch statement. The first value in the list is used as the default.
-		return FuncDef{elemName, elemMethod, "", attrName, "string", returnType, strings.Split(returnOpts, ",")}
-
-	case "enum-nullable":
-		// Similar to the enum except the default is goja.Undefined()
-		return FuncDef{elemName, elemMethod, "", attrName, "goja.Value", returnType, strings.Split(returnOpts, ",")}
-
-	case "string":
-		// "Button AccessKey string"
-		// => {"ButtonElement" "AccessKey", "attrIsString", "accesskey", "string", "string", nil}
-		// => `func (e ButtonElement) AccessKey() string{ return e.attrAsString("accessKey") }``
-		return FuncDef{elemName, elemMethod, "attrAsString", attrName, returnType, returnType, nil}
-
-	// This url function uses the current page URL as default when attribute is empty and empty string as default when the attribute is undefined
-	case "url-or-blank":
-		// "Href Href url-or-blank"
-		// => {"HrefElement" "Href", "attrIsString", "accesskey", "string", "url", []string{"\"\""}}
-		// => `func (e HrefElement) Href() string{ return e.attrAsUrlString("href", """) }``
-		return FuncDef{elemName, elemMethod, "attrAsURLString", attrName, "string", "url", []string{"\"\""}}
-
-	// This url function uses current page URL for empty and undefined attributes
-	case "url-or-currpage":
-		// "Base Href url-or-currpage"
-		// => {"BaseElement" "Href", "attrIsString", "accesskey", "string", "url", []string{"e.sel.URL"}}
-		// => `func (e HrefElement) Href() string{ return e.attrAsUrlString("href", e.sel.URL) }``
-		return FuncDef{elemName, elemMethod, "attrAsURLString", attrName, "string", "url", []string{"e.sel.URL"}}
-
-	case "const":
-		// "Output Type const=output"
-		// => {"OutputElement" "Type", "", "type", "string", "const", []{"output"}}
-		// => `func (e OutputElement) Type() string{ return "output" }``
-		return FuncDef{elemName, elemMethod, "", attrName, "string", returnType, []string{returnOpts}}
-
+func returnType(templateType string) string {
+	switch templateType {
 	case "bool":
-		// "Button Autofocus bool"
-		// => {"Button" "Autofocus", "attrIsPresent", "autofocus", "bool", "bool", nil}
-		// => `func (e ButtonElement) ToString() bool { return e.attrIsPresent("autofocus") }``
-		return FuncDef{elemName, elemMethod, "attrIsPresent", attrName, returnType, returnType, nil}
-
+		return "bool"
+	case "int":
+		return "int"
+	case "enum-goja":
+		return "goja.Value"
 	default:
-		panic("Unknown return type in a funcDef: " + returnType)
+		return "string"
 	}
 }
 
-// Node handler functions used in ast.Inspect to scrape TagName consts and the names of Element structs and their parent/nested struct
-
+// Node handler functions for ast.Inspect.
 func (ce *ElemInfoCollectorState) defaultHandler(node ast.Node) ElemInfoCollector {
 	ce.elemName = ""
 	switch node.(type) {
@@ -479,13 +386,13 @@ func (ce *ElemInfoCollectorState) defaultHandler(node ast.Node) ElemInfoCollecto
 	}
 }
 
-// Found a const, a Tagname suffix means it's for an Element.
+// Found a tagname constant. eg AnchorTagName = "a" adds the entry ce.elemInfos["Anchor"] = {""", ""}
 func (ce *ElemInfoCollectorState) tagNameValueSpecHandler(node ast.Node) ElemInfoCollector {
 	switch x := node.(type) {
 	case *ast.Ident:
 		if strings.HasSuffix(x.Name, "TagName") {
 			ce.elemName = strings.TrimSuffix(x.Name, "TagName")
-			ce.elemInfos[ce.elemName] = &ElemInfo{x.Name, "", ""}
+			ce.elemInfos[ce.elemName] = &ElemInfo{"", ""}
 		}
 
 		return ce.defaultHandler
@@ -504,8 +411,8 @@ func (ce *ElemInfoCollectorState) elemTypeSpecHandler(node ast.Node) ElemInfoCol
 
 		if ce.elemName == "" {
 			ce.elemName = strings.TrimSuffix(x.Name, "Element")
-			// Ignore elements which haven't had an elemInfo created by the TagName handler.
-			// (Specifically intermediate structs like HrefElement, MediaElement & FormFieldElement)
+			// Ignore elements which don't have a tag name constant meaning no elemInfo structure was created by the TagName handle.
+			// It skips the Href, Media, FormField, Mod, TableSection or TableCell structs as these structs are inherited by other elements and not created indepedently.
 			if _, ok := ce.elemInfos[ce.elemName]; !ok {
 				return ce.defaultHandler
 			}

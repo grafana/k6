@@ -25,12 +25,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/pkg/errors"
-
 	"github.com/PuerkitoBio/goquery"
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
-
+	"github.com/pkg/errors"
 	gohtml "golang.org/x/net/html"
 )
 
@@ -62,9 +60,8 @@ func (s Selection) emptySelection() Selection {
 func (s Selection) buildMatcher(v goja.Value, gojaFn goja.Callable) func(int, *goquery.Selection) bool {
 	return func(idx int, sel *goquery.Selection) bool {
 		fnRes, fnErr := gojaFn(v, s.rt.ToValue(idx), s.rt.ToValue(sel))
-
 		if fnErr != nil {
-			panic(fnErr)
+			common.Throw(s.rt, fnErr)
 		}
 
 		return fnRes.ToBoolean()
@@ -293,12 +290,11 @@ func (s Selection) Val() goja.Value {
 
 	case "select":
 		selected := s.sel.First().Find("option[selected]")
-
 		if _, exists := s.sel.Attr("multiple"); exists {
 			return s.rt.ToValue(selected.Map(func(idx int, opt *goquery.Selection) string { return valueOrHTML(opt) }))
-		} else {
-			return s.rt.ToValue(valueOrHTML(selected))
 		}
+
+		return s.rt.ToValue(valueOrHTML(selected))
 
 	default:
 		return goja.Undefined()
@@ -316,12 +312,12 @@ func (s Selection) Children(def ...string) Selection {
 func (s Selection) Each(v goja.Value) Selection {
 	gojaFn, isFn := goja.AssertFunction(v)
 	if !isFn {
-		panic(s.rt.NewGoError(errors.New("Argument to each() must be a function")))
+		common.Throw(s.rt, errors.New("Argument to each() must be a function."))
 	}
 
 	fn := func(idx int, sel *goquery.Selection) {
 		if _, err := gojaFn(v, s.rt.ToValue(idx), selToElement(s)); err != nil {
-			panic(s.rt.NewGoError(errors.Wrap(err, "Function passed to each() failed:")))
+			common.Throw(s.rt, errors.Wrap(err, "Function passed to each() failed."))
 		}
 	}
 
@@ -339,7 +335,7 @@ func (s Selection) Filter(v goja.Value) Selection {
 
 	gojaFn, isFn := goja.AssertFunction(v)
 	if !isFn {
-		panic(s.rt.NewGoError(errors.New("Argument to filter() must be a function, a selector or a selection")))
+		common.Throw(s.rt, errors.New("Argument to filter() must be a function, a selector or a selection"))
 	}
 
 	return Selection{s.rt, s.sel.FilterFunction(s.buildMatcher(v, gojaFn)), s.URL}
@@ -352,28 +348,28 @@ func (s Selection) Is(v goja.Value) bool {
 
 	case Selection:
 		return s.sel.IsSelection(val.sel)
-	}
 
-	gojaFn, isFn := goja.AssertFunction(v)
-	if !isFn {
-		panic(s.rt.NewGoError(errors.New("Argument to is() must be a function, a selector or a selection")))
-	}
+	default:
+		gojaFn, isFn := goja.AssertFunction(v)
+		if !isFn {
+			common.Throw(s.rt, errors.New("Argument to is() must be a function, a selector or a selection"))
+		}
 
-	return s.sel.IsFunction(s.buildMatcher(v, gojaFn))
+		return s.sel.IsFunction(s.buildMatcher(v, gojaFn))
+	}
 }
 
 func (s Selection) Map(v goja.Value) (result []string) {
 	gojaFn, isFn := goja.AssertFunction(v)
 	if !isFn {
-		panic(s.rt.NewGoError(errors.New("Argument to map() must be a function")))
+		common.Throw(s.rt, errors.New("Argument to map() must be a function"))
 	}
 
 	fn := func(idx int, sel *goquery.Selection) string {
 		if fnRes, fnErr := gojaFn(v, s.rt.ToValue(idx), s.rt.ToValue(sel)); fnErr == nil {
 			return fnRes.String()
-		} else {
-			return ""
 		}
+		return ""
 	}
 
 	return s.sel.Map(fn)

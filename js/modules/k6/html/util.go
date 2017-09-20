@@ -3,24 +3,19 @@ package html
 import (
 	"encoding/json"
 	"strconv"
-
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/dop251/goja"
 	"github.com/serenize/snaker"
-
 	gohtml "golang.org/x/net/html"
 )
 
 func attrToProperty(s string) string {
-	idx := strings.Index(s, "-")
-
-	if idx == -1 {
-		return s
+	if idx := strings.Index(s, "-"); idx != -1 {
+		return s[0:idx] + snaker.SnakeToCamel(strings.Replace(s[idx+1:], "-", "_", -1))
 	}
-
-	return s[0:idx] + snaker.SnakeToCamel(strings.Replace(s[idx+1:], "-", "_", -1))
+	return s
 }
 
 func propertyToAttr(attrName string) string {

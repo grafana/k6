@@ -25,9 +25,9 @@ type Element struct {
 }
 
 type Attribute struct {
+	OwnerElement *Element
 	Name         string
 	nsPrefix     string
-	OwnerElement *Element
 	Value        string
 }
 
@@ -179,7 +179,7 @@ func (e Element) GetAttribute(name string) goja.Value {
 
 func (e Element) GetAttributeNode(name string) goja.Value {
 	if attr := getHtmlAttr(e.node, name); attr != nil {
-		return e.sel.rt.ToValue(Attribute{attr.Key, attr.Namespace, &e, attr.Val})
+		return e.sel.rt.ToValue(Attribute{&e, attr.Key, attr.Namespace, attr.Val})
 	}
 
 	return goja.Undefined()
@@ -198,7 +198,7 @@ func (e Element) Attributes() map[string]Attribute {
 	attrs := make(map[string]Attribute)
 	for i := 0; i < len(e.node.Attr); i++ {
 		attr := e.node.Attr[i]
-		attrs[attr.Key] = Attribute{attr.Key, attr.Namespace, &e, attr.Val}
+		attrs[attr.Key] = Attribute{&e, attr.Key, attr.Namespace, attr.Val}
 	}
 	return attrs
 }
