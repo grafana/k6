@@ -24,6 +24,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -39,6 +40,7 @@ import (
 	"github.com/loadimpact/k6/js/modules/k6/html"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
+	"github.com/loadimpact/k6/version"
 	"github.com/pkg/errors"
 )
 
@@ -129,6 +131,8 @@ func (*HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.State,
 	}
 	if userAgent := state.Options.UserAgent; userAgent.Valid {
 		req.Header.Set("User-Agent", userAgent.String)
+	} else {
+		req.Header.Set("User-Agent", fmt.Sprintf("k6/%s (https://k6.io/);", version.Version))
 	}
 
 	tags := map[string]string{

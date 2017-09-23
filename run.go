@@ -421,9 +421,6 @@ func actionRun(cc *cli.Context) error {
 
 	// Combine options in order, apply the final results.
 	opts = finalizeOptions(opts.Apply(runner.GetOptions()).Apply(fileOpts).Apply(cliOpts))
-	if !opts.UserAgent.Valid {
-		opts.UserAgent = null.StringFrom(fmt.Sprintf("k6/%s (https://k6.io/);", cc.App.Version))
-	}
 	runner.ApplyOptions(opts)
 
 	// Make the metric collector, if requested.
