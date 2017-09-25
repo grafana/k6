@@ -26,6 +26,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/http/cookiejar"
 	"strconv"
 	"strings"
 	"testing"
@@ -399,6 +400,136 @@ func TestRequest(t *testing.T) {
 				assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/headers", "", 200, "")
 			})
 		}
+
+		t.Run("cookies", func(t *testing.T) {
+			t.Run("access", func(t *testing.T) {
+				cookieJar, err := cookiejar.New(nil)
+				assert.NoError(t, err)
+				state.CookieJar = cookieJar
+				state.Samples = nil
+				_, err = common.RunString(rt, `
+				let res = http.request("GET", "https://httpbin.org/cookies/set?key=value", null);
+				if (res.cookies.key[0].value != "value") { throw new Error("wrong cookie value: " + res.cookies.key[0]); }
+				`)
+				assert.NoError(t, err)
+				assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/cookies", "https://httpbin.org/cookies/set?key=value", 200, "")
+			})
+
+			t.Run("setting", func(t *testing.T) {
+				cookieJar, err := cookiejar.New(nil)
+				assert.NoError(t, err)
+				state.CookieJar = cookieJar
+				state.Samples = nil
+				_, err = common.RunString(rt, `
+				let res = http.request("GET", "https://httpbin.org/cookies", null, { cookies: [{ name: "key", value: "value" }] });
+				if (res.cookies.key[0].value != "value") { throw new Error("wrong cookie value: " + res.cookies.key[0]); }
+				`)
+				assert.NoError(t, err)
+				assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/cookies", "", 200, "")
+			})
+
+			t.Run("settingSimple", func(t *testing.T) {
+				cookieJar, err := cookiejar.New(nil)
+				assert.NoError(t, err)
+				state.CookieJar = cookieJar
+				state.Samples = nil
+				_, err = common.RunString(rt, `
+				let res = http.request("GET", "https://httpbin.org/cookies", null, { cookies: { key: "value" } });
+				if (res.cookies.key[0].value != "value") { throw new Error("wrong cookie value: " + res.cookies.key[0]); }
+				`)
+				assert.NoError(t, err)
+				assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/cookies", "", 200, "")
+			})
+
+			t.Run("domain", func(t *testing.T) {
+				cookieJar, err := cookiejar.New(nil)
+				assert.NoError(t, err)
+				state.CookieJar = cookieJar
+				state.Samples = nil
+				_, err = common.RunString(rt, `
+				let cookie = { name: "key", value: "value", domain: "httpbin.org" };
+				let res = http.request("GET", "https://httpbin.org/cookies", null, { cookies: [cookie] });
+				if (res.cookies.key[0].value != "value") {
+					throw new Error("wrong cookie value: " + res.cookies.key[0]);
+				}
+				cookie = { name: "key2", value: "value2", domain: "example.com" };
+				res = http.request("GET", "http://httpbin.org/cookies", null, { cookies: [cookie] });
+				if (res.cookies.key[0].value != "value") {
+					throw new Error("wrong cookie value: " + res.cookies.key[0]);
+				}
+				if (res.cookies.key2 != undefined) {
+					throw new Error("cookie 'key2' unexpectedly found");
+				}
+				`)
+				assert.NoError(t, err)
+				assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/cookies", "", 200, "")
+			})
+
+			t.Run("path", func(t *testing.T) {
+				cookieJar, err := cookiejar.New(nil)
+				assert.NoError(t, err)
+				state.CookieJar = cookieJar
+				state.Samples = nil
+				_, err = common.RunString(rt, `
+				let cookie = { name: "key", value: "value", path: "/cookies" };
+				let res = http.request("GET", "https://httpbin.org/cookies", null, { cookies: [cookie] });
+				if (res.cookies.key[0].value != "value") {
+					throw new Error("wrong cookie value: " + res.cookies.key[0]);
+				}
+				cookie = { name: "key2", value: "value2", path: "/some-other-path" };
+				res = http.request("GET", "http://httpbin.org/cookies", null, { cookies: [cookie] });
+				if (res.cookies.key[0].value != "value") {
+					throw new Error("wrong cookie value: " + res.cookies.key[0]);
+				}
+				if (res.cookies.key2 != undefined) {
+					throw new Error("cookie 'key2' unexpectedly found");
+				}
+				`)
+				assert.NoError(t, err)
+				assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/cookies", "", 200, "")
+			})
+
+			t.Run("expires", func(t *testing.T) {
+				cookieJar, err := cookiejar.New(nil)
+				assert.NoError(t, err)
+				state.CookieJar = cookieJar
+				state.Samples = nil
+				_, err = common.RunString(rt, `
+				let cookie = { name: "key", value: "value", expires: "Sun, 24 Jul 1983 17:01:02 GMT" };
+				let res = http.request("GET", "https://httpbin.org/cookies", null, { cookies: [cookie] });
+				if (res.cookies.key != undefined) {
+					throw new Error("cookie 'key' unexpectedly found");
+				}
+				cookie.expires = "Sat, 24 Jul 2083 17:01:02 GMT";
+				res = http.request("GET", "https://httpbin.org/cookies", null, { cookies: [cookie] });
+				if (res.cookies.key[0].value != "value") {
+					throw new Error("cookie 'key' not found");
+				}
+				`)
+				assert.NoError(t, err)
+				assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/cookies", "", 200, "")
+			})
+
+			t.Run("secure", func(t *testing.T) {
+				cookieJar, err := cookiejar.New(nil)
+				assert.NoError(t, err)
+				state.CookieJar = cookieJar
+				state.Samples = nil
+				_, err = common.RunString(rt, `
+				let cookie = { name: "key", value: "value", secure: true };
+				let res = http.request("GET", "https://httpbin.org/cookies", null, { cookies: [cookie] });
+				if (res.cookies.key[0].value != "value") {
+					throw new Error("wrong cookie value: " + res.cookies.key[0]);
+				}
+				res = http.request("GET", "http://httpbin.org/cookies", null, { cookies: [cookie] });
+				if (Object.keys(res.cookies).length != 0) {
+					throw new Error("no cookies should've been sent");
+				}
+				`)
+				assert.NoError(t, err)
+				assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/cookies", "", 200, "")
+			})
+		})
 
 		t.Run("headers", func(t *testing.T) {
 			for _, literal := range []string{`null`, `undefined`} {
