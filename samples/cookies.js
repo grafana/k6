@@ -7,8 +7,8 @@ export default function() {
             name: "value1",
             name2: "value2"
         };
-        let r = http.get("http://httpbin.org/cookies", { cookies: cookies });
-        check(r, {
+        let res = http.get("http://httpbin.org/cookies", { cookies: cookies });
+        check(res, {
             "status is 200": (r) => r.status === 200,
             "has cookie 'name'": (r) => r.cookies.name.length > 0,
             "has cookie 'name2'": (r) => r.cookies.name2.length > 0
@@ -17,8 +17,8 @@ export default function() {
 
     group("Advanced cookies", function() {
         let cookie = { name: "name3", value: "value3", domain: "httpbin.org", path: "/cookies" };
-        let r = http.get("http://httpbin.org/cookies", { cookies: [cookie] });
-        check(r, {
+        let res = http.get("http://httpbin.org/cookies", { cookies: [cookie] });
+        check(res, {
             "status is 200": (r) => r.status === 200,
             "has cookie 'name3'": (r) => r.cookies.name3.length > 0
         });
