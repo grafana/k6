@@ -23,6 +23,7 @@ package http
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"io"
 	"net"
@@ -34,9 +35,12 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/crypto/ocsp"
+
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/js/modules/k6/html"
+	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
 	"github.com/pkg/errors"
@@ -47,6 +51,16 @@ var (
 	typeURLTag = reflect.TypeOf(URLTag{})
 )
 
+type OCSPStapledResponse struct {
+	ProducedAt, ThisUpdate, NextUpdate, RevokedAt string
+	RevocationReason                              string
+	Status                                        string
+}
+
+type OCSP struct {
+	StapledResponse OCSPStapledResponse
+}
+
 type HTTPResponseTimings struct {
 	Duration, Blocked, LookingUp, Connecting, Sending, Waiting, Receiving float64
 }
@@ -54,15 +68,18 @@ type HTTPResponseTimings struct {
 type HTTPResponse struct {
 	ctx context.Context
 
-	RemoteIP   string
-	RemotePort int
-	URL        string
-	Status     int
-	Proto      string
-	Headers    map[string]string
-	Body       string
-	Timings    HTTPResponseTimings
-	Error      string
+	RemoteIP       string
+	RemotePort     int
+	URL            string
+	Status         int
+	Proto          string
+	Headers        map[string]string
+	Body           string
+	Timings        HTTPResponseTimings
+	TLSVersion     string
+	TLSCipherSuite string
+	OCSP           OCSP `js:"ocsp"`
+	Error          string
 
 	cachedJSON goja.Value
 }
@@ -239,6 +256,60 @@ func (*HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.State,
 		tags["url"] = resp.URL
 		tags["status"] = strconv.Itoa(resp.Status)
 		tags["proto"] = resp.Proto
+
+		if res.TLS != nil {
+			tlsState := res.TLS
+			switch tlsState.Version {
+			case tls.VersionSSL30:
+				resp.TLSVersion = "ssl3.0"
+			case tls.VersionTLS10:
+				resp.TLSVersion = "tls1.0"
+			case tls.VersionTLS11:
+				resp.TLSVersion = "tls1.1"
+			case tls.VersionTLS12:
+				resp.TLSVersion = "tls1.2"
+			}
+			resp.TLSCipherSuite = lib.SupportedTLSCipherSuitesToString[tlsState.CipherSuite]
+			resp.OCSP.StapledResponse = OCSPStapledResponse{}
+			if ocspRes, err := ocsp.ParseResponse(tlsState.OCSPResponse, nil); err == nil {
+				switch ocspRes.Status {
+				case ocsp.Good:
+					resp.OCSP.StapledResponse.Status = "good"
+				case ocsp.Revoked:
+					resp.OCSP.StapledResponse.Status = "revoked"
+				case ocsp.Unknown:
+					resp.OCSP.StapledResponse.Status = "unknown"
+				case ocsp.ServerFailed:
+					resp.OCSP.StapledResponse.Status = "server_failed"
+				}
+				switch ocspRes.RevocationReason {
+				case ocsp.Unspecified:
+					resp.OCSP.StapledResponse.RevocationReason = "unspecified"
+				case ocsp.KeyCompromise:
+					resp.OCSP.StapledResponse.RevocationReason = "key_compromise"
+				case ocsp.CACompromise:
+					resp.OCSP.StapledResponse.RevocationReason = "ca_compromise"
+				case ocsp.AffiliationChanged:
+					resp.OCSP.StapledResponse.RevocationReason = "affiliation_changed"
+				case ocsp.Superseded:
+					resp.OCSP.StapledResponse.RevocationReason = "superseded"
+				case ocsp.CessationOfOperation:
+					resp.OCSP.StapledResponse.RevocationReason = "cessation_of_operation"
+				case ocsp.CertificateHold:
+					resp.OCSP.StapledResponse.RevocationReason = "certificate_hold"
+				case ocsp.RemoveFromCRL:
+					resp.OCSP.StapledResponse.RevocationReason = "remove_from_crl"
+				case ocsp.PrivilegeWithdrawn:
+					resp.OCSP.StapledResponse.RevocationReason = "privilege_withdrawn"
+				case ocsp.AACompromise:
+					resp.OCSP.StapledResponse.RevocationReason = "aa_compromise"
+				}
+				resp.OCSP.StapledResponse.ProducedAt = ocspRes.ProducedAt.String()
+				resp.OCSP.StapledResponse.ThisUpdate = ocspRes.ThisUpdate.String()
+				resp.OCSP.StapledResponse.NextUpdate = ocspRes.NextUpdate.String()
+				resp.OCSP.StapledResponse.RevokedAt = ocspRes.RevokedAt.String()
+			}
+		}
 
 		resp.Headers = make(map[string]string, len(res.Header))
 		for k, vs := range res.Header {
