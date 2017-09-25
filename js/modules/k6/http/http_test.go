@@ -410,6 +410,10 @@ func TestRequest(t *testing.T) {
 				_, err = common.RunString(rt, `
 				let res = http.request("GET", "https://httpbin.org/cookies/set?key=value", null);
 				if (res.cookies.key[0].value != "value") { throw new Error("wrong cookie value: " + res.cookies.key[0]); }
+				const props = ["name", "value", "domain", "path", "expires", "max_age", "secure", "http_only"];
+				for (let i = 0; i < props.length; i++) {
+					if (res.cookies.key[0][props[i]] === undefined) { throw new Error("cookie property not found: " + props[i]); }
+				}
 				`)
 				assert.NoError(t, err)
 				assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/cookies", "https://httpbin.org/cookies/set?key=value", 200, "")

@@ -10,7 +10,8 @@ export default function() {
         let r = http.get("http://httpbin.org/cookies", { cookies: cookies });
         check(r, {
             "status is 200": (r) => r.status === 200,
-            "has cookie": (r) => r.cookies["name"].length > 0
+            "has cookie 'name'": (r) => r.cookies.name.length > 0,
+            "has cookie 'name2'": (r) => r.cookies.name2.length > 0
         });
     });
 
@@ -19,7 +20,7 @@ export default function() {
         let r = http.get("http://httpbin.org/cookies", { cookies: [cookie] });
         check(r, {
             "status is 200": (r) => r.status === 200,
-            "has cookie": (r) => r.cookies["name3"].length > 0
+            "has cookie 'name3'": (r) => r.cookies.name3.length > 0
         });
     });
 }
