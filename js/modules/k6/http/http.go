@@ -131,6 +131,7 @@ func (*HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.State,
 		req.Header.Set("User-Agent", userAgent.String)
 	}
 
+	followRedirects := true
 	tags := map[string]string{
 		"proto":  "",
 		"status": "0",
@@ -148,6 +149,8 @@ func (*HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.State,
 			params := paramsV.ToObject(rt)
 			for _, k := range params.Keys() {
 				switch k {
+				case "follow":
+					followRedirects = params.Get(k).ToBoolean()
 				case "headers":
 					headersV := params.Get(k)
 					if goja.IsUndefined(headersV) || goja.IsNull(headersV) {
@@ -189,6 +192,9 @@ func (*HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.State,
 		Transport: state.HTTPTransport,
 		Timeout:   timeout,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if !followRedirects {
+				return http.ErrUseLastResponse
+			}
 			max := int(state.Options.MaxRedirects.Int64)
 			if len(via) >= max {
 				return errors.Errorf("stopped after %d redirects", max)

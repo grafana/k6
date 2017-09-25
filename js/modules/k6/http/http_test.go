@@ -139,6 +139,22 @@ func TestRequest(t *testing.T) {
 				assert.Equal(t, "Request Failed", logEntry.Message)
 			}
 		})
+		t.Run("follow", func(t *testing.T) {
+			_, err := common.RunString(rt, `
+			let res = http.get("https://httpbin.org/redirect/1", {follow: true});
+			if (res.status != 200) { throw new Error("wrong status: " + res.status) }
+			if (res.url != "https://httpbin.org/get") { throw new Error("incorrect URL: " + res.url) }
+			`)
+			assert.NoError(t, err)
+		})
+		t.Run("nofollow", func(t *testing.T) {
+			_, err := common.RunString(rt, `
+			let res = http.get("https://httpbin.org/redirect/1", {follow: false});
+			if (res.status != 302) { throw new Error("wrong status: " + res.status) }
+			if (res.url != "https://httpbin.org/redirect/1") { throw new Error("incorrect URL: " + res.url) }
+			`)
+			assert.NoError(t, err)
+		})
 	})
 	t.Run("Timeout", func(t *testing.T) {
 		t.Run("10s", func(t *testing.T) {
