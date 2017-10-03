@@ -539,6 +539,23 @@ func TestRequest(t *testing.T) {
 					assertRequestMetricsEmitted(t, state.Samples, "GET", "https://now.httpbin.org/", "", 200, "")
 				})
 			})
+
+			t.Run("ObjectForm", func(t *testing.T) {
+				state.Samples = nil
+				_, err := common.RunString(rt, `
+				let reqs = [
+					{ url: "https://httpbin.org/", method: "GET" },
+					{ method: "GET", url: "https://now.httpbin.org/" },
+				];
+				let res = http.batch(reqs);
+				for (var key in res) {
+					if (res[key].status != 200) { throw new Error("wrong status: " + res[key].status); }
+					if (res[key].url != reqs[key].url) { throw new Error("wrong url: " + res[key].url); }
+				}`)
+				assert.NoError(t, err)
+				assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/", "", 200, "")
+				assertRequestMetricsEmitted(t, state.Samples, "GET", "https://now.httpbin.org/", "", 200, "")
+			})
 		})
 		t.Run("POST", func(t *testing.T) {
 			state.Samples = nil
