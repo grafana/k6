@@ -36,7 +36,7 @@ var (
 
 func init() {
 	configFlagSet.SortFlags = false
-	configFlagSet.StringP("out", "o", "", "send metrics to an external database")
+	configFlagSet.StringP("out", "o", "", "`uri` for an external metrics database")
 	configFlagSet.BoolP("linger", "l", false, "keep the API server alive past test end")
 	configFlagSet.Bool("no-usage-report", false, "don't send anonymous stats to the developers")
 }
