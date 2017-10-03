@@ -197,10 +197,11 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 	conn.SetPongHandler(func(pingID string) error { pongChan <- pingID; return nil })
 
 	readDataChan := make(chan []byte)
+	readCloseChan := make(chan int)
 	readErrChan := make(chan error)
 
 	// Wraps a couple of channels around conn.ReadMessage
-	go readPump(conn, readDataChan, readErrChan)
+	go readPump(conn, readDataChan, readErrChan, readCloseChan)
 
 	// This is the main control loop. All JS code (including error handlers)
 	// should only be executed by this thread to avoid race conditions
@@ -222,14 +223,18 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 		case readErr := <-readErrChan:
 			socket.handleEvent("error", rt.ToValue(readErr))
 
+		case readClose := <-readCloseChan:
+			// handle server close
+			socket.handleEvent("close", rt.ToValue(readClose))
+
 		case scheduledFn := <-socket.scheduled:
 			if _, err := scheduledFn(goja.Undefined()); err != nil {
 				return nil, err
 			}
 
 		case <-ctx.Done():
-			// This means that the VU is shutting down (e.g., during an interrupt)
-			socket.handleEvent("close", rt.ToValue("Interrupt"))
+			// VU is shutting down during an interrupt
+			// socket events will not be forwarded to the VU
 			_ = socket.closeConnection(websocket.CloseGoingAway)
 
 		case <-socket.done:
@@ -393,6 +398,9 @@ func (s *Socket) closeConnection(code int) error {
 			s.handleEvent("error", rt.ToValue(err))
 			err = writeErr
 		}
+
+		// trigger `close` event when the client closes the connection
+		s.handleEvent("close", rt.ToValue(code))
 		_ = s.conn.Close()
 
 		// Stops the main control loop
@@ -403,17 +411,22 @@ func (s *Socket) closeConnection(code int) error {
 }
 
 // Wraps conn.ReadMessage in a channel
-func readPump(conn *websocket.Conn, readChan chan []byte, errorChan chan error) {
+func readPump(conn *websocket.Conn, readChan chan []byte, errorChan chan error, closeChan chan int) {
 	defer func() { _ = conn.Close() }()
 
 	for {
 		_, message, err := conn.ReadMessage()
 		if err != nil {
-			// Only emit the error if we didn't close the socket ourselves
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway) {
+
+			if websocket.IsCloseError(err, websocket.CloseNormalClosure) {
+				closeChan <- err.(*websocket.CloseError).Code
+			} else if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway) {
+				// Emit the error if it is not CloseNormalClosure
+				// and the error is not  originated from closing the socket ourselves with `CloseGoingAway`
 				errorChan <- err
 			}
 
+			//CloseGoingAway errors are ignored
 			return
 		}
 
