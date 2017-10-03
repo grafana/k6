@@ -23,13 +23,9 @@ package cmd
 import (
 	"bytes"
 	"io"
-	"strconv"
-	"strings"
 	"sync"
-	"time"
 
 	"github.com/loadimpact/k6/lib"
-	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 	null "gopkg.in/guregu/null.v3"
 )
@@ -64,20 +60,6 @@ func (w consoleWriter) Write(p []byte) (n int, err error) {
 	return
 }
 
-func registerOptions(flags *pflag.FlagSet) {
-	flags.Int64P("vus", "u", 1, "number of virtual users")
-	flags.Int64P("max", "m", 0, "max available virtual users")
-	flags.DurationP("duration", "d", 0, "test duration limit")
-	flags.Int64P("iterations", "i", 0, "script iteration limit")
-	flags.StringSliceP("stage", "s", nil, "add a `stage`, as `[duration]:[target]`")
-	flags.BoolP("paused", "p", false, "start the test in a paused state")
-	flags.Int64("max-redirects", 10, "follow at most n redirects")
-	flags.String("user-agent", "", "user agent for http requests")
-	flags.Bool("insecure-skip-tls-verify", false, "skip verification of TLS certificates")
-	flags.Bool("no-connection-reuse", false, "don't reuse connections between iterations")
-	flags.BoolP("throw", "w", false, "throw warnings (like failed http requests) as errors")
-}
-
 func getNullBool(flags *pflag.FlagSet, key string) null.Bool {
 	v, err := flags.GetBool(key)
 	if err != nil {
@@ -108,54 +90,4 @@ func getNullString(flags *pflag.FlagSet, key string) null.String {
 		panic(err)
 	}
 	return null.NewString(v, flags.Changed(key))
-}
-
-func parseStage(s string) (lib.Stage, error) {
-	var stage lib.Stage
-
-	parts := strings.SplitN(s, ":", 2)
-	if len(parts) > 0 && parts[0] != "" {
-		d, err := time.ParseDuration(parts[0])
-		if err != nil {
-			return stage, err
-		}
-		stage.Duration = lib.NullDurationFrom(d)
-	}
-	if len(parts) > 1 && parts[1] != "" {
-		t, err := strconv.ParseInt(s, 10, 64)
-		if err != nil {
-			return stage, err
-		}
-		stage.Target = null.IntFrom(t)
-	}
-
-	return stage, nil
-}
-
-func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
-	opts := lib.Options{
-		VUs:                   getNullInt64(flags, "vus"),
-		VUsMax:                getNullInt64(flags, "max"),
-		Duration:              getNullDuration(flags, "duration"),
-		Iterations:            getNullInt64(flags, "iterations"),
-		Paused:                getNullBool(flags, "paused"),
-		MaxRedirects:          getNullInt64(flags, "max-redirects"),
-		UserAgent:             getNullString(flags, "user-agent"),
-		InsecureSkipTLSVerify: getNullBool(flags, "insecure-skip-tls-verify"),
-		NoConnectionReuse:     getNullBool(flags, "no-connection-reuse"),
-		Throw:                 getNullBool(flags, "throw"),
-	}
-
-	stageStrings, err := flags.GetStringSlice("stage")
-	if err != nil {
-		return opts, err
-	}
-	for i, s := range stageStrings {
-		stage, err := parseStage(s)
-		if err != nil {
-			return opts, errors.Wrapf(err, "stage %d", i)
-		}
-		opts.Stages = append(opts.Stages, stage)
-	}
-	return opts, nil
 }

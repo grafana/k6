@@ -134,29 +134,30 @@ func (c *TLSAuth) Certificate() (*tls.Certificate, error) {
 }
 
 type Options struct {
-	Paused     null.Bool    `json:"paused"`
-	VUs        null.Int     `json:"vus"`
-	VUsMax     null.Int     `json:"vusMax"`
-	Duration   NullDuration `json:"duration"`
-	Iterations null.Int     `json:"iterations"`
-	Stages     []Stage      `json:"stages"`
+	Paused     null.Bool    `json:"paused" envconfig:"paused"`
+	VUs        null.Int     `json:"vus" envconfig:"vus"`
+	VUsMax     null.Int     `json:"vusMax" envconfig:"vus_max"`
+	Duration   NullDuration `json:"duration" envconfig:"duration"`
+	Iterations null.Int     `json:"iterations" envconfig:"iterations"`
+	Stages     []Stage      `json:"stages" envconfig:"stages"`
 
-	Linger        null.Bool `json:"linger"`        // DEPRECATED; will be removed.
-	NoUsageReport null.Bool `json:"noUsageReport"` // DEPRECATED; will be moved to cli config.
+	Linger        null.Bool `json:"linger" ignored:"true"`        // DEPRECATED; will be removed.
+	NoUsageReport null.Bool `json:"noUsageReport" ignored:"true"` // DEPRECATED; will be moved to cli config.
 
-	MaxRedirects          null.Int         `json:"maxRedirects"`
-	InsecureSkipTLSVerify null.Bool        `json:"insecureSkipTLSVerify"`
-	TLSCipherSuites       *TLSCipherSuites `json:"tlsCipherSuites"`
-	TLSVersion            *TLSVersion      `json:"tlsVersion"`
-	TLSAuth               []*TLSAuth       `json:"tlsAuth"`
-	NoConnectionReuse     null.Bool        `json:"noConnectionReuse"`
-	UserAgent             null.String      `json:"userAgent"`
-	Throw                 null.Bool        `json:"throw"`
+	MaxRedirects          null.Int         `json:"maxRedirects" envconfig:"max_redirects"`
+	InsecureSkipTLSVerify null.Bool        `json:"insecureSkipTLSVerify" envconfig:"insecure_skip_tls_verify"`
+	TLSCipherSuites       *TLSCipherSuites `json:"tlsCipherSuites" envconfig:"tls_cipher_suites"`
+	TLSVersion            *TLSVersion      `json:"tlsVersion" envconfig:"tls_version"`
+	TLSAuth               []*TLSAuth       `json:"tlsAuth" envconfig:"tlsauth"`
+	NoConnectionReuse     null.Bool        `json:"noConnectionReuse" envconfig:"no_connection_reuse"`
+	UserAgent             null.String      `json:"userAgent" envconfig:"user_agent"`
+	Throw                 null.Bool        `json:"throw" envconfig:"throw"`
 
-	Thresholds map[string]stats.Thresholds `json:"thresholds"`
+	Thresholds map[string]stats.Thresholds `json:"thresholds" envconfig:"thresholds"`
 
 	// These values are for third party collectors' benefit.
-	External map[string]interface{} `json:"ext"`
+	// Can't be set through env vars.
+	External map[string]interface{} `json:"ext" ignored:"true"`
 }
 
 func (o Options) Apply(opts Options) Options {

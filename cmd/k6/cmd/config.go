@@ -22,17 +22,44 @@ package cmd
 
 import (
 	"github.com/loadimpact/k6/lib"
+	"github.com/shibukawa/configdir"
+	"github.com/spf13/pflag"
 	null "gopkg.in/guregu/null.v3"
 )
+
+const configFilename = "k6.yaml"
+
+var (
+	configDirs    = configdir.New("loadimpact", "k6")
+	configFlagSet = pflag.NewFlagSet("", 0)
+)
+
+func init() {
+	configFlagSet.SortFlags = false
+	configFlagSet.StringP("out", "o", "", "send metrics to an external database")
+	configFlagSet.BoolP("linger", "l", false, "keep the API server alive past test end")
+	configFlagSet.Bool("no-usage-report", false, "don't send anonymous stats to the developers")
+}
 
 type Config struct {
 	lib.Options
 
-	Linger        null.Bool `json:"linger"`        // DEPRECATED; will be removed.
-	NoUsageReport null.Bool `json:"noUsageReport"` // DEPRECATED; will be removed.
+	Out           null.String `json:"out" envconfig:"out"`
+	Linger        null.Bool   `json:"linger" envconfig:"linger"`
+	NoUsageReport null.Bool   `json:"noUsageReport" envconfig:"no_usage_report"`
 }
 
-func ConfigFromEnv(env []string) {
+func getConfig(flags *pflag.FlagSet) (Config, error) {
+	opts, err := getOptions(flags)
+	if err != nil {
+		return Config{}, err
+	}
+	return Config{
+		Options:       opts,
+		Out:           getNullString(flags, "out"),
+		Linger:        getNullBool(flags, "linger"),
+		NoUsageReport: getNullBool(flags, "no-usage-report"),
+	}, nil
 }
 
 func (c Config) Apply(cfg Config) Config {
@@ -42,6 +69,9 @@ func (c Config) Apply(cfg Config) Config {
 	}
 	if cfg.NoUsageReport.Valid {
 		c.NoUsageReport = cfg.NoUsageReport
+	}
+	if cfg.Out.Valid {
+		c.Out = cfg.Out
 	}
 	return c
 }

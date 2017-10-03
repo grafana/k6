@@ -34,6 +34,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/kelseyhightower/envconfig"
 	"github.com/loadimpact/k6/api"
 	"github.com/loadimpact/k6/core"
 	"github.com/loadimpact/k6/core/local"
@@ -42,12 +43,11 @@ import (
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/ui"
 	"github.com/pkg/errors"
-	"github.com/shibukawa/configdir"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 	null "gopkg.in/guregu/null.v3"
+	yaml "gopkg.in/yaml.v2"
 )
 
 const (
@@ -55,10 +55,7 @@ const (
 	typeArchive = "archive"
 )
 
-var (
-	runType string
-	linger  bool
-)
+var runType = os.Getenv("K6_TYPE")
 
 // runCmd represents the run command.
 var runCmd = &cobra.Command{
@@ -117,11 +114,20 @@ a commandline interface for interacting with it.`,
 		// defaults in there, override with Runner-provided ones, then merge the CLI opts in
 		// on top to give them priority.
 		fmt.Fprintf(stdout, "%s options\r", initBar.String())
-		cliOpts, err := getOptions(cmd.Flags())
+		fileConf, err := readDiskConfig()
 		if err != nil {
 			return err
 		}
-		opts := cliOpts.Apply(r.GetOptions()).Apply(cliOpts)
+		envConf, err := readEnvConfig()
+		if err != nil {
+			return err
+		}
+		cliConf, err := getConfig(cmd.Flags())
+		if err != nil {
+			return err
+		}
+		conf := cliConf.Apply(fileConf).Apply(Config{Options: r.GetOptions()}).Apply(envConf).Apply(cliConf)
+		opts := conf.Options
 
 		// If -m/--max isn't specified, figure out the max that should be needed.
 		if !opts.VUsMax.Valid {
@@ -135,6 +141,10 @@ a commandline interface for interacting with it.`,
 		// If -d/--duration, -i/--iterations and -s/--stage are all unset, run to one iteration.
 		if !opts.Duration.Valid && !opts.Iterations.Valid && opts.Stages == nil {
 			opts.Iterations = null.IntFrom(1)
+		}
+		// If duration is explicitly set to 0, it means run forever.
+		if opts.Duration.Valid && opts.Duration.Duration == 0 {
+			opts.Duration = lib.NullDuration{}
 		}
 
 		// Write options back to the runner too.
@@ -294,6 +304,12 @@ a commandline interface for interacting with it.`,
 				Metrics: engine.Metrics,
 				Time:    engine.Executor.GetTime(),
 			})
+			fmt.Fprintf(stdout, "\n")
+		}
+
+		if conf.Linger.Bool {
+			log.Info("Linger set; waiting for Ctrl+C...")
+			<-sigC
 		}
 
 		if engine.IsTainted() {
@@ -307,18 +323,31 @@ func init() {
 	RootCmd.AddCommand(runCmd)
 
 	runCmd.Flags().SortFlags = false
-	registerOptions(runCmd.Flags())
-
-	flags := pflag.NewFlagSet("", 0)
-	flags.SortFlags = false
-	flags.StringVarP(&runType, "type", "t", "", "override file `type`, \"js\" or \"archive\"")
-	flags.BoolVarP(&linger, "linger", "l", false, "keep the API server alive past test end")
+	runCmd.Flags().AddFlagSet(optionFlagSet)
+	runCmd.Flags().AddFlagSet(configFlagSet)
+	runCmd.Flags().StringVarP(&runType, "type", "t", runType, "override file `type`, \"js\" or \"archive\"")
 }
 
 // Reads a configuration file from disk.
-func readConfig() (lib.Options, error) {
-	cdir := configdir.New("loadimpact", "k6")
+func readDiskConfig() (conf Config, err error) {
+	cdir := configDirs.QueryFolderContainsFile(configFilename)
+	if cdir == nil {
+		return conf, nil
+	}
+	data, err := cdir.ReadFile(configFilename)
+	if err != nil {
+		return conf, err
+	}
+	if err := yaml.Unmarshal(data, &conf); err != nil {
+		return conf, err
+	}
+	return conf, nil
+}
 
+// Reads configuration variables from the environment.
+func readEnvConfig() (conf Config, err error) {
+	err = envconfig.Process("k6", &conf)
+	return conf, err
 }
 
 // Reads a source file from any supported destination.
