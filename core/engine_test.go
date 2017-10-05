@@ -29,6 +29,7 @@ import (
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/stats/dummy"
+	log "github.com/sirupsen/logrus"
 	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v3"
@@ -75,15 +76,13 @@ func TestNewEngineOptions(t *testing.T) {
 			Duration: lib.NullDurationFrom(10 * time.Second),
 		})
 		assert.NoError(t, err)
-		if assert.Len(t, e.Stages, 1) {
-			assert.Equal(t, e.Stages[0], lib.Stage{Duration: lib.NullDurationFrom(10 * time.Second)})
-		}
+		assert.Nil(t, e.Executor.GetStages())
 		assert.Equal(t, lib.NullDurationFrom(10*time.Second), e.Executor.GetEndTime())
 
 		t.Run("Infinite", func(t *testing.T) {
-			e, err, _ := newTestEngine(nil, lib.Options{Duration: lib.NullDurationFrom(0)})
+			e, err, _ := newTestEngine(nil, lib.Options{Duration: lib.NullDuration{}})
 			assert.NoError(t, err)
-			assert.Equal(t, []lib.Stage{{}}, e.Stages)
+			assert.Nil(t, e.Executor.GetStages())
 			assert.Equal(t, lib.NullDuration{}, e.Executor.GetEndTime())
 		})
 	})
@@ -94,10 +93,9 @@ func TestNewEngineOptions(t *testing.T) {
 			},
 		})
 		assert.NoError(t, err)
-		if assert.Len(t, e.Stages, 1) {
-			assert.Equal(t, e.Stages[0], lib.Stage{Duration: lib.NullDurationFrom(10 * time.Second), Target: null.IntFrom(10)})
+		if assert.Len(t, e.Executor.GetStages(), 1) {
+			assert.Equal(t, e.Executor.GetStages()[0], lib.Stage{Duration: lib.NullDurationFrom(10 * time.Second), Target: null.IntFrom(10)})
 		}
-		assert.Equal(t, lib.NullDurationFrom(10*time.Second), e.Executor.GetEndTime())
 	})
 	t.Run("Stages/Duration", func(t *testing.T) {
 		e, err, _ := newTestEngine(nil, lib.Options{
@@ -107,10 +105,10 @@ func TestNewEngineOptions(t *testing.T) {
 			},
 		})
 		assert.NoError(t, err)
-		if assert.Len(t, e.Stages, 1) {
-			assert.Equal(t, e.Stages[0], lib.Stage{Duration: lib.NullDurationFrom(10 * time.Second), Target: null.IntFrom(10)})
+		if assert.Len(t, e.Executor.GetStages(), 1) {
+			assert.Equal(t, e.Executor.GetStages()[0], lib.Stage{Duration: lib.NullDurationFrom(10 * time.Second), Target: null.IntFrom(10)})
 		}
-		assert.Equal(t, lib.NullDurationFrom(10*time.Second), e.Executor.GetEndTime())
+		assert.Equal(t, lib.NullDurationFrom(60*time.Second), e.Executor.GetEndTime())
 	})
 	t.Run("Iterations", func(t *testing.T) {
 		e, err, _ := newTestEngine(nil, lib.Options{Iterations: null.IntFrom(100)})
@@ -210,6 +208,7 @@ func TestNewEngineOptions(t *testing.T) {
 }
 
 func TestEngineRun(t *testing.T) {
+	log.SetLevel(log.DebugLevel)
 	t.Run("exits with context", func(t *testing.T) {
 		duration := 100 * time.Millisecond
 		e, err, _ := newTestEngine(nil, lib.Options{})
@@ -221,7 +220,7 @@ func TestEngineRun(t *testing.T) {
 		assert.NoError(t, e.Run(ctx))
 		assert.WithinDuration(t, startTime.Add(duration), time.Now(), 100*time.Millisecond)
 	})
-	t.Run("exits with iterations", func(t *testing.T) {
+	t.Run("exits with executor", func(t *testing.T) {
 		e, err, _ := newTestEngine(nil, lib.Options{
 			VUs:        null.IntFrom(10),
 			VUsMax:     null.IntFrom(10),
@@ -230,61 +229,6 @@ func TestEngineRun(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NoError(t, e.Run(context.Background()))
 		assert.Equal(t, int64(100), e.Executor.GetIterations())
-	})
-	t.Run("exits with duration", func(t *testing.T) {
-		e, err, _ := newTestEngine(nil, lib.Options{
-			VUs:      null.IntFrom(10),
-			VUsMax:   null.IntFrom(10),
-			Duration: lib.NullDurationFrom(1 * time.Second),
-		})
-		assert.NoError(t, err)
-		startTime := time.Now()
-		assert.NoError(t, e.Run(context.Background()))
-		assert.True(t, time.Now().After(startTime.Add(1*time.Second)))
-	})
-	t.Run("exits with stages", func(t *testing.T) {
-		testdata := map[string]struct {
-			Duration time.Duration
-			Stages   []lib.Stage
-		}{
-			"none": {},
-			"one": {
-				1 * time.Second,
-				[]lib.Stage{{Duration: lib.NullDurationFrom(1 * time.Second)}},
-			},
-			"two": {
-				2 * time.Second,
-				[]lib.Stage{
-					{Duration: lib.NullDurationFrom(1 * time.Second)},
-					{Duration: lib.NullDurationFrom(1 * time.Second)},
-				},
-			},
-			"two/targeted": {
-				2 * time.Second,
-				[]lib.Stage{
-					{Duration: lib.NullDurationFrom(1 * time.Second), Target: null.IntFrom(5)},
-					{Duration: lib.NullDurationFrom(1 * time.Second), Target: null.IntFrom(10)},
-				},
-			},
-		}
-		for name, data := range testdata {
-			t.Run(name, func(t *testing.T) {
-				e, err, _ := newTestEngine(nil, lib.Options{
-					VUs:    null.IntFrom(10),
-					VUsMax: null.IntFrom(10),
-				})
-				assert.NoError(t, err)
-
-				e.Stages = data.Stages
-				startTime := time.Now()
-				assert.NoError(t, e.Run(context.Background()))
-				assert.WithinDuration(t,
-					startTime.Add(data.Duration),
-					startTime.Add(e.Executor.GetTime()),
-					100*TickRate,
-				)
-			})
-		}
 	})
 	t.Run("collects samples", func(t *testing.T) {
 		testMetric := stats.New("test_metric", stats.Trend)

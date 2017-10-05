@@ -34,6 +34,7 @@ import (
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
+	"github.com/oxtoacart/bpool"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/viki-org/dnscache"
@@ -148,6 +149,7 @@ func (r *Runner) newVU() (*VU, error) {
 		HTTPTransport:  transport,
 		Dialer:         dialer,
 		Console:        NewConsole(),
+		BPool:          bpool.NewBufferPool(100),
 	}
 	vu.Runtime.Set("console", common.Bind(vu.Runtime, vu.Console, vu.Context))
 
@@ -181,6 +183,7 @@ type VU struct {
 	Iteration     int64
 
 	Console *Console
+	BPool   *bpool.BufferPool
 }
 
 func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
@@ -196,6 +199,7 @@ func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 		HTTPTransport: u.HTTPTransport,
 		Dialer:        u.Dialer,
 		CookieJar:     cookieJar,
+		BPool:         u.BPool,
 	}
 	u.Dialer.BytesRead = &state.BytesRead
 	u.Dialer.BytesWritten = &state.BytesWritten

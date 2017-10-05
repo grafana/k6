@@ -27,6 +27,7 @@ import (
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
+	"github.com/oxtoacart/bpool"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -51,4 +52,7 @@ type State struct {
 
 	// Bytes sent and received during this iteration. Use `sync/atomic`.
 	BytesRead, BytesWritten int64
+
+	// Buffer pool; use instead of allocating fresh buffers when possible.
+	BPool *bpool.BufferPool
 }
