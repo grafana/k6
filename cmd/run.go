@@ -41,6 +41,9 @@ import (
 	"github.com/loadimpact/k6/js"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/loader"
+	"github.com/loadimpact/k6/stats/cloud"
+	"github.com/loadimpact/k6/stats/influxdb"
+	"github.com/loadimpact/k6/stats/json"
 	"github.com/loadimpact/k6/ui"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -53,6 +56,10 @@ import (
 const (
 	typeJS      = "js"
 	typeArchive = "archive"
+
+	collectorInfluxDB = "influxdb"
+	collectorJSON     = "json"
+	collectorCloud    = "cloud"
 )
 
 var runType = os.Getenv("K6_TYPE")
@@ -81,7 +88,7 @@ a commandline interface for interacting with it.`,
   # Ramp VUs from 0 to 100 over 10s, stay there for 60s, then 10s down to 0.
   k6 run -u 0 -s 10s:100 -s 60s -s 10s:0
 
-  # Send metrics to an external influxdb server
+  # Send metrics to an influxdb server
   k6 run -o influxdb=http://1.2.3.4:8086/k6`[1:],
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -107,11 +114,6 @@ a commandline interface for interacting with it.`,
 		if err != nil {
 			return err
 		}
-
-		fmt.Fprintf(stdout, "  execution: %s\n", ui.ValueColor.Sprint("local"))
-		fmt.Fprintf(stdout, "     output: %s\n", ui.ValueColor.Sprint("-"))
-		fmt.Fprintf(stdout, "     script: %s\n", ui.ValueColor.Sprint(filename))
-		fmt.Fprintf(stdout, "\n")
 
 		// Assemble options; start with the CLI-provided options to get shadowed (non-Valid)
 		// defaults in there, override with Runner-provided ones, then merge the CLI opts in
@@ -153,8 +155,47 @@ a commandline interface for interacting with it.`,
 		// Write options back to the runner too.
 		r.ApplyOptions(opts)
 
-		// Write the options banner.
+		// Create an engine with a local executor, wrapping the Runner.
+		fmt.Fprintf(stdout, "%s   engine\r", initBar.String())
+		engine, err := core.NewEngine(local.New(r), opts)
+		if err != nil {
+			return err
+		}
+
+		// Create a collector and assign it to the engine if requested.
+		fmt.Fprintf(stdout, "%s   collector\r", initBar.String())
+		if conf.Out.Valid {
+			t, arg := parseCollector(conf.Out.String)
+			collector, err := newCollector(t, arg, src, conf)
+			if err != nil {
+				return err
+			}
+			if err := collector.Init(); err != nil {
+				return err
+			}
+			engine.Collector = collector
+		}
+
+		// Create an API server.
+		fmt.Fprintf(stdout, "%s   server\r", initBar.String())
+		go func() {
+			if err := api.ListenAndServe(address, engine); err != nil {
+				log.WithError(err).Warn("Error from API server")
+			}
+		}()
+
+		// Write the big banner.
 		{
+			out := "-"
+			if engine.Collector != nil {
+				out = fmt.Sprint(engine.Collector)
+			}
+
+			fmt.Fprintf(stdout, "  execution: %s\n", ui.ValueColor.Sprint("local"))
+			fmt.Fprintf(stdout, "     output: %s\n", ui.ValueColor.Sprint(out))
+			fmt.Fprintf(stdout, "     script: %s\n", ui.ValueColor.Sprint(filename))
+			fmt.Fprintf(stdout, "\n")
+
 			duration := ui.GrayColor.Sprint("-")
 			iterations := ui.GrayColor.Sprint("-")
 			if opts.Duration.Valid {
@@ -177,21 +218,6 @@ a commandline interface for interacting with it.`,
 			fmt.Fprintf(stdout, "         vus: %s,%s max: %s\n", vus, vusPad, max)
 			fmt.Fprintf(stdout, "\n")
 		}
-
-		// Create an engine with a local executor, wrapping the Runner.
-		fmt.Fprintf(stdout, "%s   engine\r", initBar.String())
-		engine, err := core.NewEngine(local.New(r), opts)
-		if err != nil {
-			return err
-		}
-
-		// Create an API server.
-		fmt.Fprintf(stdout, "%s   server\r", initBar.String())
-		go func() {
-			if err := api.ListenAndServe(address, engine); err != nil {
-				log.WithError(err).Warn("Error from API server")
-			}
-		}()
 
 		// Run the engine with a cancellable context.
 		fmt.Fprintf(stdout, "%s starting\r", initBar.String())
@@ -392,5 +418,43 @@ func newRunner(src *lib.SourceData, typ string, fs afero.Fs) (lib.Runner, error)
 		}
 	default:
 		return nil, errors.Errorf("unknown -t/--type: %s", typ)
+	}
+}
+
+func parseCollector(s string) (t, arg string) {
+	parts := strings.SplitN(s, "=", 2)
+	switch len(parts) {
+	case 0:
+		return "", ""
+	case 1:
+		return parts[0], ""
+	default:
+		return parts[0], parts[1]
+	}
+}
+
+func dummyCollector(t string) lib.Collector {
+	switch t {
+	case collectorInfluxDB:
+		return &influxdb.Collector{}
+	case collectorJSON:
+		return &json.Collector{}
+	case collectorCloud:
+		return &cloud.Collector{}
+	default:
+		return nil
+	}
+}
+
+func newCollector(t, arg string, src *lib.SourceData, conf Config) (lib.Collector, error) {
+	switch t {
+	case collectorInfluxDB:
+		return influxdb.New(arg, dummyCollector(t).MakeConfig(), conf.Options)
+	case collectorJSON:
+		return json.New(arg, afero.NewOsFs(), conf.Options)
+	case collectorCloud:
+		return cloud.New(arg, src, conf.Options, Version)
+	default:
+		return nil, errors.Errorf("unknown output type: %s", t)
 	}
 }
