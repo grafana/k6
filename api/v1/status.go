@@ -26,13 +26,13 @@ import (
 )
 
 type Status struct {
-	Paused null.Bool `json:"paused"`
-	VUs    null.Int  `json:"vus"`
-	VUsMax null.Int  `json:"vus-max"`
+	Paused null.Bool `json:"paused" yaml:"paused"`
+	VUs    null.Int  `json:"vus" yaml:"vus"`
+	VUsMax null.Int  `json:"vus-max" yaml:"vus-max"`
 
 	// Readonly.
-	Running bool `json:"running"`
-	Tainted bool `json:"tainted"`
+	Running bool `json:"running" yaml:"running"`
+	Tainted bool `json:"tainted" yaml:"tainted"`
 }
 
 func NewStatus(engine *core.Engine) Status {

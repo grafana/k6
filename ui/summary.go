@@ -28,7 +28,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fatih/color"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
 	"golang.org/x/text/unicode/norm"
@@ -42,24 +41,14 @@ const (
 	FailMark = "✗"
 )
 
-var (
-	StdColor      = color.New()                          // Default color.
-	SuccColor     = color.New(color.FgGreen)             // Successful stuff.
-	FailColor     = color.New(color.FgRed)               // Failed stuff.
-	GrayColor     = color.New(color.Faint)               // Padding and disabled stuff.
-	ValueColor    = color.New(color.FgCyan)              // Values of all kinds.
-	ExtraColor    = color.New(color.FgCyan, color.Faint) // Extra annotations for values.
-	ExtraKeyColor = color.New(color.Faint)               // Keys inside extra annotations.
-
-	TrendColumns = []TrendColumn{
-		{"avg", func(s *stats.TrendSink) float64 { return s.Avg }},
-		{"min", func(s *stats.TrendSink) float64 { return s.Min }},
-		{"med", func(s *stats.TrendSink) float64 { return s.Med }},
-		{"max", func(s *stats.TrendSink) float64 { return s.Max }},
-		{"p(90)", func(s *stats.TrendSink) float64 { return s.P(0.90) }},
-		{"p(95)", func(s *stats.TrendSink) float64 { return s.P(0.95) }},
-	}
-)
+var TrendColumns = []TrendColumn{
+	{"avg", func(s *stats.TrendSink) float64 { return s.Avg }},
+	{"min", func(s *stats.TrendSink) float64 { return s.Min }},
+	{"med", func(s *stats.TrendSink) float64 { return s.Med }},
+	{"max", func(s *stats.TrendSink) float64 { return s.Max }},
+	{"p(90)", func(s *stats.TrendSink) float64 { return s.P(0.90) }},
+	{"p(95)", func(s *stats.TrendSink) float64 { return s.P(0.95) }},
+}
 
 type TrendColumn struct {
 	Key string

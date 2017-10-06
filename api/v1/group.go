@@ -27,11 +27,11 @@ import (
 )
 
 type Check struct {
-	ID     string `json:"id"`
-	Path   string `json:"path"`
-	Name   string `json:"name"`
-	Passes int64  `json:"passes"`
-	Fails  int64  `json:"fails"`
+	ID     string `json:"id" yaml:"id"`
+	Path   string `json:"path" yaml:"path"`
+	Name   string `json:"name" yaml:"name"`
+	Passes int64  `json:"passes" yaml:"passes"`
+	Fails  int64  `json:"fails" yaml:"fails"`
 }
 
 func NewCheck(c *lib.Check) Check {
@@ -45,15 +45,15 @@ func NewCheck(c *lib.Check) Check {
 }
 
 type Group struct {
-	ID     string  `json:"-"`
-	Path   string  `json:"path"`
-	Name   string  `json:"name"`
-	Checks []Check `json:"checks"`
+	ID     string  `json:"-" yaml:"id"`
+	Path   string  `json:"path" yaml:"path"`
+	Name   string  `json:"name" yaml:"name"`
+	Checks []Check `json:"checks" yaml:"checks"`
 
-	Parent   *Group   `json:"-"`
-	ParentID string   `json:"-"`
-	Groups   []*Group `json:"-"`
-	GroupIDs []string `json:"-"`
+	Parent   *Group   `json:"-" yaml:"-"`
+	ParentID string   `json:"-" yaml:"parent-id"`
+	Groups   []*Group `json:"-" yaml:"-"`
+	GroupIDs []string `json:"-" yaml:"group-ids"`
 }
 
 func NewGroup(g *lib.Group, parent *Group) *Group {
