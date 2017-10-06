@@ -6,10 +6,21 @@ import (
 	"go/format"
 	"go/parser"
 	"go/token"
-	"log"
 	"os"
 	"strings"
 	"text/template"
+
+	log "github.com/Sirupsen/logrus"
+)
+
+const (
+	stringTemplate   = "string"
+	urlTemplate      = "url"
+	enumTemplate     = "enum"
+	boolTemplate     = "bool"
+	gojaEnumTemplate = "enum-goja"
+	intTemplate      = "int"
+	constTemplate    = "const"
 )
 
 // The ast parser populates this struct using the <ElemName>TagName const and <ElemName>Element struct
@@ -38,192 +49,192 @@ var funcDefs = []struct {
 	Elem, Method, Attr, TemplateType string
 	Opts                             []string
 }{
-	{"HrefElement", "Download", "download", "string", nil},
-	{"HrefElement", "ReferrerPolicy", "referrerpolicy", "enum", []string{"", "no-referrer", "no-referrer-when-downgrade", "origin", "origin-when-cross-origin", "unsafe-url"}},
-	{"HrefElement", "Rel", "rel", "string", nil},
-	{"HrefElement", "Href", "href", "url", []string{"\"\""}},
-	{"HrefElement", "Target", "target", "string", nil},
-	{"HrefElement", "Type", "type", "string", nil},
-	{"HrefElement", "AccessKey", "accesskey", "string", nil},
-	{"HrefElement", "HrefLang", "hreflang", "string", nil},
-	{"HrefElement", "ToString", "href", "url", []string{"\"\""}},
-	{"MediaElement", "Autoplay", "autoplay", "bool", nil},
-	{"MediaElement", "Controls", "controls", "bool", nil},
-	{"MediaElement", "Loop", "loop", "bool", nil},
-	{"MediaElement", "Muted", "muted", "bool", nil},
-	{"MediaElement", "Preload", "preload", "enum", []string{"auto", "metadata", "none"}},
-	{"MediaElement", "Src", "src", "url", []string{"\"\""}},
-	{"MediaElement", "CrossOrigin", "crossorigin", "enum-goja", []string{"anonymous", "use-credentials"}},
-	{"MediaElement", "CurrentSrc", "src", "string", nil},
-	{"MediaElement", "DefaultMuted", "muted", "bool", nil},
-	{"MediaElement", "MediaGroup", "mediagroup", "string", nil},
-	{"BaseElement", "Href", "href", "url", []string{"e.sel.URL"}},
-	{"BaseElement", "Target", "target", "string", nil},
-	{"ButtonElement", "AccessKey", "accesskey", "string", nil},
-	{"ButtonElement", "Autofocus", "autofocus", "bool", nil},
-	{"ButtonElement", "Disabled", "disabled", "bool", nil},
-	{"ButtonElement", "TabIndex", "tabindex", "int", []string{"0"}},
-	{"ButtonElement", "Type", "type", "enum", []string{"submit", "button", "menu", "reset"}},
-	{"DataElement", "Value", "value", "string", nil},
-	{"EmbedElement", "Height", "height", "string", nil},
-	{"EmbedElement", "Width", "width", "string", nil},
-	{"EmbedElement", "Src", "src", "string", nil},
-	{"EmbedElement", "Type", "type", "string", nil},
-	{"FieldSetElement", "Disabled", "disabled", "bool", nil},
-	{"FieldSetElement", "Name", "name", "string", nil},
-	{"FormElement", "Action", "action", "url", []string{"\"\""}},
-	{"FormElement", "Name", "name", "string", nil},
-	{"FormElement", "Target", "target", "string", nil},
-	{"FormElement", "Enctype", "enctype", "enum", []string{"application/x-www-form-urlencoded", "multipart/form-data", "text/plain"}},
-	{"FormElement", "Encoding", "enctype", "enum", []string{"application/x-www-form-urlencoded", "multipart/form-data", "text/plain"}},
-	{"FormElement", "AcceptCharset", "accept-charset", "string", nil},
-	{"FormElement", "Autocomplete", "autocomplete", "enum", []string{"on", "off"}},
-	{"FormElement", "NoValidate", "novalidate", "bool", nil},
-	{"IFrameElement", "Allowfullscreen", "allowfullscreen", "bool", nil},
-	{"IFrameElement", "ReferrerPolicy", "referrerpolicy", "enum", []string{"", "no-referrer", "no-referrer-when-downgrade", "origin", "origin-when-cross-origin", "unsafe-url"}},
-	{"IFrameElement", "Height", "height", "string", nil},
-	{"IFrameElement", "Width", "width", "string", nil},
-	{"IFrameElement", "Name", "name", "string", nil},
-	{"IFrameElement", "Src", "src", "url", []string{"\"\""}},
-	{"ImageElement", "CurrentSrc", "src", "url", []string{"\"\""}},
-	{"ImageElement", "Sizes", "sizes", "string", nil},
-	{"ImageElement", "Srcset", "srcset", "string", nil},
-	{"ImageElement", "Alt", "alt", "string", nil},
-	{"ImageElement", "CrossOrigin", "crossorigin", "enum-goja", []string{"anonymous", "use-credentials"}},
-	{"ImageElement", "Height", "height", "int", []string{"0"}},
-	{"ImageElement", "Width", "width", "int", []string{"0"}},
-	{"ImageElement", "IsMap", "ismap", "bool", nil},
-	{"ImageElement", "Name", "name", "string", nil},
-	{"ImageElement", "Src", "src", "url", []string{"\"\""}},
-	{"ImageElement", "UseMap", "usemap", "string", nil},
-	{"ImageElement", "ReferrerPolicy", "referrerpolicy", "enum", []string{"", "no-referrer", "no-referrer-when-downgrade", "origin", "origin-when-cross-origin", "unsafe-url"}},
-	{"InputElement", "Name", "name", "string", nil},
-	{"InputElement", "TabIndex", "tabindex", "int", []string{"0"}},
-	{"InputElement", "Type", "type", "enum", []string{"text", "button", "checkbox", "color", "date", "datetime-local", "email", "file", "hidden", "image", "month", "number", "password", "radio", "range", "reset", "search", "submit", "tel", "time", "url", "week"}},
-	{"InputElement", "Disabled", "disabled", "bool", nil},
-	{"InputElement", "Autofocus", "autofocus", "bool", nil},
-	{"InputElement", "Required", "required", "bool", nil},
-	{"InputElement", "Value", "value", "string", nil},
-	{"InputElement", "Checked", "checked", "bool", nil},
-	{"InputElement", "DefaultChecked", "checked", "bool", nil},
-	{"InputElement", "Alt", "alt", "string", nil},
-	{"InputElement", "Src", "src", "url", []string{"\"\""}},
-	{"InputElement", "Height", "height", "string", nil},
-	{"InputElement", "Width", "width", "string", nil},
-	{"InputElement", "Accept", "accept", "string", nil},
-	{"InputElement", "Autocomplete", "autocomplete", "enum", []string{"on", "off"}},
-	{"InputElement", "MaxLength", "maxlength", "int", []string{"-1"}},
-	{"InputElement", "Size", "size", "int", []string{"0"}},
-	{"InputElement", "Pattern", "pattern", "string", nil},
-	{"InputElement", "Placeholder", "placeholder", "string", nil},
-	{"InputElement", "Readonly", "readonly", "bool", nil},
-	{"InputElement", "Min", "min", "string", nil},
-	{"InputElement", "Max", "max", "string", nil},
-	{"InputElement", "DefaultValue", "value", "string", nil},
-	{"InputElement", "DirName", "dirname", "string", nil},
-	{"InputElement", "AccessKey", "accesskey", "string", nil},
-	{"InputElement", "Multiple", "multiple", "bool", nil},
-	{"InputElement", "Step", "step", "string", nil},
-	{"KeygenElement", "Autofocus", "autofocus", "bool", nil},
-	{"KeygenElement", "Challenge", "challenge", "string", nil},
-	{"KeygenElement", "Disabled", "disabled", "bool", nil},
-	{"KeygenElement", "Keytype", "keytype", "enum", []string{"RSA", "DSA", "EC"}},
-	{"KeygenElement", "Name", "name", "string", nil},
-	{"KeygenElement", "Type", "type", "const", []string{"keygen"}},
-	{"LabelElement", "HtmlFor", "for", "string", nil},
-	{"LegendElement", "AccessKey", "accesskey", "string", nil},
-	{"LiElement", "Value", "value", "int", []string{"0"}},
-	{"LiElement", "Type", "type", "enum", []string{"", "1", "a", "A", "i", "I", "disc", "square", "circle"}},
-	{"LinkElement", "CrossOrigin", "crossorigin", "enum-goja", []string{"anonymous", "use-credentials"}},
-	{"LinkElement", "ReferrerPolicy", "referrerpolicy", "enum", []string{"", "no-referrer", "no-referrer-when-downgrade", "origin", "origin-when-cross-origin", "unsafe-url"}},
-	{"LinkElement", "Href", "href", "url", []string{"\"\""}},
-	{"LinkElement", "Hreflang", "hreflang", "string", nil},
-	{"LinkElement", "Media", "media", "string", nil},
-	{"LinkElement", "Rel", "rel", "string", nil},
-	{"LinkElement", "Target", "target", "string", nil},
-	{"LinkElement", "Type", "type", "string", nil},
-	{"MapElement", "Name", "name", "string", nil},
-	{"MetaElement", "Content", "content", "string", nil},
-	{"MetaElement", "Name", "name", "string", nil},
-	{"MetaElement", "HttpEquiv", "http-equiv", "enum", []string{"content-type", "default-style", "refresh"}},
-	{"MeterElement", "Min", "min", "int", []string{"0"}},
-	{"MeterElement", "Max", "max", "int", []string{"0"}},
-	{"MeterElement", "High", "high", "int", []string{"0"}},
-	{"MeterElement", "Low", "low", "int", []string{"0"}},
-	{"MeterElement", "Optimum", "optimum", "int", []string{"0"}},
-	{"ModElement", "Cite", "cite", "string", nil},
-	{"ModElement", "Datetime", "datetime", "string", nil},
-	{"ObjectElement", "Data", "data", "url", []string{"\"\""}},
-	{"ObjectElement", "Height", "height", "string", nil},
-	{"ObjectElement", "Name", "name", "string", nil},
-	{"ObjectElement", "Type", "type", "string", nil},
-	{"ObjectElement", "TabIndex", "tabindex", "int", []string{"0"}},
-	{"ObjectElement", "TypeMustMatch", "typemustmatch", "bool", nil},
-	{"ObjectElement", "UseMap", "usemap", "string", nil},
-	{"ObjectElement", "Width", "width", "string", nil},
-	{"OListElement", "Reversed", "reversed", "bool", nil},
-	{"OListElement", "Start", "start", "int", []string{"0"}},
-	{"OListElement", "Type", "type", "enum", []string{"1", "a", "A", "i", "I"}},
-	{"OptGroupElement", "Disabled", "disabled", "bool", nil},
-	{"OptGroupElement", "Label", "label", "string", nil},
-	{"OptionElement", "DefaultSelected", "selected", "bool", nil},
-	{"OptionElement", "Selected", "selected", "bool", nil},
-	{"OutputElement", "HtmlFor", "for", "string", nil},
-	{"OutputElement", "Name", "name", "string", nil},
-	{"OutputElement", "Type", "type", "const", []string{"output"}},
-	{"ParamElement", "Name", "name", "string", nil},
-	{"ParamElement", "Value", "value", "string", nil},
-	{"PreElement", "Name", "name", "string", nil},
-	{"PreElement", "Value", "value", "string", nil},
-	{"QuoteElement", "Cite", "cite", "string", nil},
-	{"ScriptElement", "CrossOrigin", "crossorigin", "string", nil},
-	{"ScriptElement", "Type", "type", "string", nil},
-	{"ScriptElement", "Src", "src", "url", []string{"\"\""}},
-	{"ScriptElement", "Charset", "charset", "string", nil},
-	{"ScriptElement", "Async", "async", "bool", nil},
-	{"ScriptElement", "Defer", "defer", "bool", nil},
-	{"ScriptElement", "NoModule", "nomodule", "bool", nil},
-	{"SelectElement", "Autofocus", "autofocus", "bool", nil},
-	{"SelectElement", "Disabled", "disabled", "bool", nil},
-	{"SelectElement", "Multiple", "multiple", "bool", nil},
-	{"SelectElement", "Name", "name", "string", nil},
-	{"SelectElement", "Required", "required", "bool", nil},
-	{"SelectElement", "TabIndex", "tabindex", "int", []string{"0"}},
-	{"SourceElement", "KeySystem", "keysystem", "string", nil},
-	{"SourceElement", "Media", "media", "string", nil},
-	{"SourceElement", "Sizes", "sizes", "string", nil},
-	{"SourceElement", "Src", "src", "url", []string{"\"\""}},
-	{"SourceElement", "Srcset", "srcset", "string", nil},
-	{"SourceElement", "Type", "type", "string", nil},
-	{"StyleElement", "Media", "media", "string", nil},
-	{"TableElement", "Sortable", "sortable", "bool", nil},
-	{"TableCellElement", "ColSpan", "colspan", "int", []string{"1"}},
-	{"TableCellElement", "RowSpan", "rowspan", "int", []string{"1"}},
-	{"TableCellElement", "Headers", "headers", "string", nil},
-	{"TableHeaderCellElement", "Abbr", "abbr", "string", nil},
-	{"TableHeaderCellElement", "Scope", "scope", "enum", []string{"", "row", "col", "colgroup", "rowgroup"}},
-	{"TableHeaderCellElement", "Sorted", "sorted", "bool", nil},
-	{"TextAreaElement", "Type", "type", "const", []string{"textarea"}},
-	{"TextAreaElement", "Value", "value", "string", nil},
-	{"TextAreaElement", "DefaultValue", "value", "string", nil},
-	{"TextAreaElement", "Placeholder", "placeholder", "string", nil},
-	{"TextAreaElement", "Rows", "rows", "int", []string{"0"}},
-	{"TextAreaElement", "Cols", "cols", "int", []string{"0"}},
-	{"TextAreaElement", "MaxLength", "maxlength", "int", []string{"0"}},
-	{"TextAreaElement", "TabIndex", "tabindex", "int", []string{"0"}},
-	{"TextAreaElement", "AccessKey", "accesskey", "string", nil},
-	{"TextAreaElement", "ReadOnly", "readonly", "bool", nil},
-	{"TextAreaElement", "Required", "required", "bool", nil},
-	{"TextAreaElement", "Autocomplete", "autocomplete", "enum", []string{"on", "off"}},
-	{"TextAreaElement", "Autocapitalize", "autocapitalize", "enum", []string{"sentences", "none", "off", "characters", "words"}},
-	{"TextAreaElement", "Wrap", "wrap", "enum", []string{"soft", "hard", "off"}},
-	{"TimeElement", "Datetime", "datetime", "string", nil},
-	{"TrackElement", "Kind", "kind", "enum", []string{"subtitle", "captions", "descriptions", "chapters", "metadata"}},
-	{"TrackElement", "Src", "src", "url", []string{"\"\""}},
-	{"TrackElement", "Srclang", "srclang", "string", nil},
-	{"TrackElement", "Label", "label", "string", nil},
-	{"TrackElement", "Default", "default", "bool", nil},
-	{"UListElement", "Type", "type", "string", nil},
+	{"HrefElement", "Download", "download", stringTemplate, nil},
+	{"HrefElement", "ReferrerPolicy", "referrerpolicy", enumTemplate, []string{"", "no-referrer", "no-referrer-when-downgrade", "origin", "origin-when-cross-origin", "unsafe-url"}},
+	{"HrefElement", "Rel", "rel", stringTemplate, nil},
+	{"HrefElement", "Href", "href", urlTemplate, []string{"\"\""}},
+	{"HrefElement", "Target", "target", stringTemplate, nil},
+	{"HrefElement", "Type", "type", stringTemplate, nil},
+	{"HrefElement", "AccessKey", "accesskey", stringTemplate, nil},
+	{"HrefElement", "HrefLang", "hreflang", stringTemplate, nil},
+	{"HrefElement", "ToString", "href", urlTemplate, []string{"\"\""}},
+	{"MediaElement", "Autoplay", "autoplay", boolTemplate, nil},
+	{"MediaElement", "Controls", "controls", boolTemplate, nil},
+	{"MediaElement", "Loop", "loop", boolTemplate, nil},
+	{"MediaElement", "Muted", "muted", boolTemplate, nil},
+	{"MediaElement", "Preload", "preload", enumTemplate, []string{"auto", "metadata", "none"}},
+	{"MediaElement", "Src", "src", urlTemplate, []string{"\"\""}},
+	{"MediaElement", "CrossOrigin", "crossorigin", gojaEnumTemplate, []string{"anonymous", "use-credentials"}},
+	{"MediaElement", "CurrentSrc", "src", stringTemplate, nil},
+	{"MediaElement", "DefaultMuted", "muted", boolTemplate, nil},
+	{"MediaElement", "MediaGroup", "mediagroup", stringTemplate, nil},
+	{"BaseElement", "Href", "href", urlTemplate, []string{"e.sel.URL"}},
+	{"BaseElement", "Target", "target", stringTemplate, nil},
+	{"ButtonElement", "AccessKey", "accesskey", stringTemplate, nil},
+	{"ButtonElement", "Autofocus", "autofocus", boolTemplate, nil},
+	{"ButtonElement", "Disabled", "disabled", boolTemplate, nil},
+	{"ButtonElement", "TabIndex", "tabindex", intTemplate, []string{"0"}},
+	{"ButtonElement", "Type", "type", enumTemplate, []string{"submit", "button", "menu", "reset"}},
+	{"DataElement", "Value", "value", stringTemplate, nil},
+	{"EmbedElement", "Height", "height", stringTemplate, nil},
+	{"EmbedElement", "Width", "width", stringTemplate, nil},
+	{"EmbedElement", "Src", "src", stringTemplate, nil},
+	{"EmbedElement", "Type", "type", stringTemplate, nil},
+	{"FieldSetElement", "Disabled", "disabled", boolTemplate, nil},
+	{"FieldSetElement", "Name", "name", stringTemplate, nil},
+	{"FormElement", "Action", "action", urlTemplate, []string{"\"\""}},
+	{"FormElement", "Name", "name", stringTemplate, nil},
+	{"FormElement", "Target", "target", stringTemplate, nil},
+	{"FormElement", "Enctype", "enctype", enumTemplate, []string{"application/x-www-form-urlencoded", "multipart/form-data", "text/plain"}},
+	{"FormElement", "Encoding", "enctype", enumTemplate, []string{"application/x-www-form-urlencoded", "multipart/form-data", "text/plain"}},
+	{"FormElement", "AcceptCharset", "accept-charset", stringTemplate, nil},
+	{"FormElement", "Autocomplete", "autocomplete", enumTemplate, []string{"on", "off"}},
+	{"FormElement", "NoValidate", "novalidate", boolTemplate, nil},
+	{"IFrameElement", "Allowfullscreen", "allowfullscreen", boolTemplate, nil},
+	{"IFrameElement", "ReferrerPolicy", "referrerpolicy", enumTemplate, []string{"", "no-referrer", "no-referrer-when-downgrade", "origin", "origin-when-cross-origin", "unsafe-url"}},
+	{"IFrameElement", "Height", "height", stringTemplate, nil},
+	{"IFrameElement", "Width", "width", stringTemplate, nil},
+	{"IFrameElement", "Name", "name", stringTemplate, nil},
+	{"IFrameElement", "Src", "src", urlTemplate, []string{"\"\""}},
+	{"ImageElement", "CurrentSrc", "src", urlTemplate, []string{"\"\""}},
+	{"ImageElement", "Sizes", "sizes", stringTemplate, nil},
+	{"ImageElement", "Srcset", "srcset", stringTemplate, nil},
+	{"ImageElement", "Alt", "alt", stringTemplate, nil},
+	{"ImageElement", "CrossOrigin", "crossorigin", gojaEnumTemplate, []string{"anonymous", "use-credentials"}},
+	{"ImageElement", "Height", "height", intTemplate, []string{"0"}},
+	{"ImageElement", "Width", "width", intTemplate, []string{"0"}},
+	{"ImageElement", "IsMap", "ismap", boolTemplate, nil},
+	{"ImageElement", "Name", "name", stringTemplate, nil},
+	{"ImageElement", "Src", "src", urlTemplate, []string{"\"\""}},
+	{"ImageElement", "UseMap", "usemap", stringTemplate, nil},
+	{"ImageElement", "ReferrerPolicy", "referrerpolicy", enumTemplate, []string{"", "no-referrer", "no-referrer-when-downgrade", "origin", "origin-when-cross-origin", "unsafe-url"}},
+	{"InputElement", "Name", "name", stringTemplate, nil},
+	{"InputElement", "TabIndex", "tabindex", intTemplate, []string{"0"}},
+	{"InputElement", "Type", "type", enumTemplate, []string{"text", "button", "checkbox", "color", "date", "datetime-local", "email", "file", "hidden", "image", "month", "number", "password", "radio", "range", "reset", "search", "submit", "tel", "time", "url", "week"}},
+	{"InputElement", "Disabled", "disabled", boolTemplate, nil},
+	{"InputElement", "Autofocus", "autofocus", boolTemplate, nil},
+	{"InputElement", "Required", "required", boolTemplate, nil},
+	{"InputElement", "Value", "value", stringTemplate, nil},
+	{"InputElement", "Checked", "checked", boolTemplate, nil},
+	{"InputElement", "DefaultChecked", "checked", boolTemplate, nil},
+	{"InputElement", "Alt", "alt", stringTemplate, nil},
+	{"InputElement", "Src", "src", urlTemplate, []string{"\"\""}},
+	{"InputElement", "Height", "height", stringTemplate, nil},
+	{"InputElement", "Width", "width", stringTemplate, nil},
+	{"InputElement", "Accept", "accept", stringTemplate, nil},
+	{"InputElement", "Autocomplete", "autocomplete", enumTemplate, []string{"on", "off"}},
+	{"InputElement", "MaxLength", "maxlength", intTemplate, []string{"-1"}},
+	{"InputElement", "Size", "size", intTemplate, []string{"0"}},
+	{"InputElement", "Pattern", "pattern", stringTemplate, nil},
+	{"InputElement", "Placeholder", "placeholder", stringTemplate, nil},
+	{"InputElement", "Readonly", "readonly", boolTemplate, nil},
+	{"InputElement", "Min", "min", stringTemplate, nil},
+	{"InputElement", "Max", "max", stringTemplate, nil},
+	{"InputElement", "DefaultValue", "value", stringTemplate, nil},
+	{"InputElement", "DirName", "dirname", stringTemplate, nil},
+	{"InputElement", "AccessKey", "accesskey", stringTemplate, nil},
+	{"InputElement", "Multiple", "multiple", boolTemplate, nil},
+	{"InputElement", "Step", "step", stringTemplate, nil},
+	{"KeygenElement", "Autofocus", "autofocus", boolTemplate, nil},
+	{"KeygenElement", "Challenge", "challenge", stringTemplate, nil},
+	{"KeygenElement", "Disabled", "disabled", boolTemplate, nil},
+	{"KeygenElement", "Keytype", "keytype", enumTemplate, []string{"RSA", "DSA", "EC"}},
+	{"KeygenElement", "Name", "name", stringTemplate, nil},
+	{"KeygenElement", "Type", "type", constTemplate, []string{"keygen"}},
+	{"LabelElement", "HtmlFor", "for", stringTemplate, nil},
+	{"LegendElement", "AccessKey", "accesskey", stringTemplate, nil},
+	{"LiElement", "Value", "value", intTemplate, []string{"0"}},
+	{"LiElement", "Type", "type", enumTemplate, []string{"", "1", "a", "A", "i", "I", "disc", "square", "circle"}},
+	{"LinkElement", "CrossOrigin", "crossorigin", gojaEnumTemplate, []string{"anonymous", "use-credentials"}},
+	{"LinkElement", "ReferrerPolicy", "referrerpolicy", enumTemplate, []string{"", "no-referrer", "no-referrer-when-downgrade", "origin", "origin-when-cross-origin", "unsafe-url"}},
+	{"LinkElement", "Href", "href", urlTemplate, []string{"\"\""}},
+	{"LinkElement", "Hreflang", "hreflang", stringTemplate, nil},
+	{"LinkElement", "Media", "media", stringTemplate, nil},
+	{"LinkElement", "Rel", "rel", stringTemplate, nil},
+	{"LinkElement", "Target", "target", stringTemplate, nil},
+	{"LinkElement", "Type", "type", stringTemplate, nil},
+	{"MapElement", "Name", "name", stringTemplate, nil},
+	{"MetaElement", "Content", "content", stringTemplate, nil},
+	{"MetaElement", "Name", "name", stringTemplate, nil},
+	{"MetaElement", "HttpEquiv", "http-equiv", enumTemplate, []string{"content-type", "default-style", "refresh"}},
+	{"MeterElement", "Min", "min", intTemplate, []string{"0"}},
+	{"MeterElement", "Max", "max", intTemplate, []string{"0"}},
+	{"MeterElement", "High", "high", intTemplate, []string{"0"}},
+	{"MeterElement", "Low", "low", intTemplate, []string{"0"}},
+	{"MeterElement", "Optimum", "optimum", intTemplate, []string{"0"}},
+	{"ModElement", "Cite", "cite", stringTemplate, nil},
+	{"ModElement", "Datetime", "datetime", stringTemplate, nil},
+	{"ObjectElement", "Data", "data", urlTemplate, []string{"\"\""}},
+	{"ObjectElement", "Height", "height", stringTemplate, nil},
+	{"ObjectElement", "Name", "name", stringTemplate, nil},
+	{"ObjectElement", "Type", "type", stringTemplate, nil},
+	{"ObjectElement", "TabIndex", "tabindex", intTemplate, []string{"0"}},
+	{"ObjectElement", "TypeMustMatch", "typemustmatch", boolTemplate, nil},
+	{"ObjectElement", "UseMap", "usemap", stringTemplate, nil},
+	{"ObjectElement", "Width", "width", stringTemplate, nil},
+	{"OListElement", "Reversed", "reversed", boolTemplate, nil},
+	{"OListElement", "Start", "start", intTemplate, []string{"0"}},
+	{"OListElement", "Type", "type", enumTemplate, []string{"1", "a", "A", "i", "I"}},
+	{"OptGroupElement", "Disabled", "disabled", boolTemplate, nil},
+	{"OptGroupElement", "Label", "label", stringTemplate, nil},
+	{"OptionElement", "DefaultSelected", "selected", boolTemplate, nil},
+	{"OptionElement", "Selected", "selected", boolTemplate, nil},
+	{"OutputElement", "HtmlFor", "for", stringTemplate, nil},
+	{"OutputElement", "Name", "name", stringTemplate, nil},
+	{"OutputElement", "Type", "type", constTemplate, []string{"output"}},
+	{"ParamElement", "Name", "name", stringTemplate, nil},
+	{"ParamElement", "Value", "value", stringTemplate, nil},
+	{"PreElement", "Name", "name", stringTemplate, nil},
+	{"PreElement", "Value", "value", stringTemplate, nil},
+	{"QuoteElement", "Cite", "cite", stringTemplate, nil},
+	{"ScriptElement", "CrossOrigin", "crossorigin", stringTemplate, nil},
+	{"ScriptElement", "Type", "type", stringTemplate, nil},
+	{"ScriptElement", "Src", "src", urlTemplate, []string{"\"\""}},
+	{"ScriptElement", "Charset", "charset", stringTemplate, nil},
+	{"ScriptElement", "Async", "async", boolTemplate, nil},
+	{"ScriptElement", "Defer", "defer", boolTemplate, nil},
+	{"ScriptElement", "NoModule", "nomodule", boolTemplate, nil},
+	{"SelectElement", "Autofocus", "autofocus", boolTemplate, nil},
+	{"SelectElement", "Disabled", "disabled", boolTemplate, nil},
+	{"SelectElement", "Multiple", "multiple", boolTemplate, nil},
+	{"SelectElement", "Name", "name", stringTemplate, nil},
+	{"SelectElement", "Required", "required", boolTemplate, nil},
+	{"SelectElement", "TabIndex", "tabindex", intTemplate, []string{"0"}},
+	{"SourceElement", "KeySystem", "keysystem", stringTemplate, nil},
+	{"SourceElement", "Media", "media", stringTemplate, nil},
+	{"SourceElement", "Sizes", "sizes", stringTemplate, nil},
+	{"SourceElement", "Src", "src", urlTemplate, []string{"\"\""}},
+	{"SourceElement", "Srcset", "srcset", stringTemplate, nil},
+	{"SourceElement", "Type", "type", stringTemplate, nil},
+	{"StyleElement", "Media", "media", stringTemplate, nil},
+	{"TableElement", "Sortable", "sortable", boolTemplate, nil},
+	{"TableCellElement", "ColSpan", "colspan", intTemplate, []string{"1"}},
+	{"TableCellElement", "RowSpan", "rowspan", intTemplate, []string{"1"}},
+	{"TableCellElement", "Headers", "headers", stringTemplate, nil},
+	{"TableHeaderCellElement", "Abbr", "abbr", stringTemplate, nil},
+	{"TableHeaderCellElement", "Scope", "scope", enumTemplate, []string{"", "row", "col", "colgroup", "rowgroup"}},
+	{"TableHeaderCellElement", "Sorted", "sorted", boolTemplate, nil},
+	{"TextAreaElement", "Type", "type", constTemplate, []string{"textarea"}},
+	{"TextAreaElement", "Value", "value", stringTemplate, nil},
+	{"TextAreaElement", "DefaultValue", "value", stringTemplate, nil},
+	{"TextAreaElement", "Placeholder", "placeholder", stringTemplate, nil},
+	{"TextAreaElement", "Rows", "rows", intTemplate, []string{"0"}},
+	{"TextAreaElement", "Cols", "cols", intTemplate, []string{"0"}},
+	{"TextAreaElement", "MaxLength", "maxlength", intTemplate, []string{"0"}},
+	{"TextAreaElement", "TabIndex", "tabindex", intTemplate, []string{"0"}},
+	{"TextAreaElement", "AccessKey", "accesskey", stringTemplate, nil},
+	{"TextAreaElement", "ReadOnly", "readonly", boolTemplate, nil},
+	{"TextAreaElement", "Required", "required", boolTemplate, nil},
+	{"TextAreaElement", "Autocomplete", "autocomplete", enumTemplate, []string{"on", "off"}},
+	{"TextAreaElement", "Autocapitalize", "autocapitalize", enumTemplate, []string{"sentences", "none", "off", "characters", "words"}},
+	{"TextAreaElement", "Wrap", "wrap", enumTemplate, []string{"soft", "hard", "off"}},
+	{"TimeElement", "Datetime", "datetime", stringTemplate, nil},
+	{"TrackElement", "Kind", "kind", enumTemplate, []string{"subtitle", "captions", "descriptions", "chapters", "metadata"}},
+	{"TrackElement", "Src", "src", urlTemplate, []string{"\"\""}},
+	{"TrackElement", "Srclang", "srclang", stringTemplate, nil},
+	{"TrackElement", "Label", "label", stringTemplate, nil},
+	{"TrackElement", "Default", "default", boolTemplate, nil},
+	{"UListElement", "Type", "type", stringTemplate, nil},
 }
 
 var collector = &ElemInfoCollectorState{}
@@ -232,7 +243,7 @@ func main() {
 	fs := token.NewFileSet()
 	parsedFile, parseErr := parser.ParseFile(fs, "elements.go", nil, 0)
 	if parseErr != nil {
-		log.Fatalf("error: could not parse elements.go\n", parseErr)
+		log.WithError(parseErr).Fatal("Could not parse elements.go")
 	}
 
 	collector.handler = collector.defaultHandler
@@ -246,38 +257,40 @@ func main() {
 		return true
 	})
 
-	buf := new(bytes.Buffer)
-	err := elemFuncsTemplate.Execute(buf, struct {
+	var buf bytes.Buffer
+	err := elemFuncsTemplate.Execute(&buf, struct {
 		ElemInfos map[string]*ElemInfo
 		FuncDefs  []struct {
 			Elem, Method, Attr, TemplateType string
 			Opts                             []string
 		}
+		TemplateType struct{ String, Url, Enum, Bool, GojaEnum, Int, Const string }
 	}{
 		collector.elemInfos,
 		funcDefs,
+		struct{ String, Url, Enum, Bool, GojaEnum, Int, Const string }{stringTemplate, urlTemplate, enumTemplate, boolTemplate, gojaEnumTemplate, intTemplate, constTemplate},
 	})
 	if err != nil {
-		log.Fatalf("error: unable to execute template\n", err)
+		log.WithError(err).Fatal("Unable to execute template")
 	}
 
 	src, err := format.Source(buf.Bytes())
 	if err != nil {
-		log.Fatalf("error: format.Source on generated code failed\n", err)
+		log.WithError(err).Fatal("format.Source on generated code failed")
 	}
 
 	f, err := os.Create("elements_gen.go")
 	if err != nil {
-		log.Fatalf("error: Unable to create the file 'elements_gen.go'\n", err)
+		log.WithError(err).Fatal("Unable to create the file 'elements_gen.go'")
 	}
 
 	if _, err = f.Write(src); err != nil {
-		log.Fatalf("error: Unable to write to 'elements_gen.go'\n", err)
+		log.WithError(err).Fatal("Unable to write to 'elements_gen.go'")
 	}
 
 	err = f.Close()
 	if err != nil {
-		log.Fatalf("error: unable to close the file 'elements_gen.go'\n", err)
+		log.WithError(err).Fatal("Unable to close 'elements_gen.go'")
 	}
 }
 
@@ -307,12 +320,13 @@ func selToElement(sel Selection) goja.Value {
 	}
  }
 
+{{ $templateType := .TemplateType }}
 {{ range $funcDef := .FuncDefs -}} 
 
 func (e {{$funcDef.Elem}}) {{$funcDef.Method}}() {{ returnType $funcDef.TemplateType }} {
-{{- if eq $funcDef.TemplateType "int" }}
+{{- if eq $funcDef.TemplateType $templateType.Int }}
 	return e.attrAsInt("{{ $funcDef.Attr }}", {{ index $funcDef.Opts 0 }})
-{{- else if eq $funcDef.TemplateType "enum" }}
+{{- else if eq $funcDef.TemplateType $templateType.Enum }}
 	attrVal := e.attrAsString("{{ $funcDef.Attr }}")
 	switch attrVal { 
 	{{- range $optIdx, $optVal := $funcDef.Opts }}
@@ -324,7 +338,7 @@ func (e {{$funcDef.Elem}}) {{$funcDef.Method}}() {{ returnType $funcDef.Template
 	default: 
 		return "{{ index $funcDef.Opts 0 }}" 
 	}
-{{- else if eq $funcDef.TemplateType "enum-goja" }}
+{{- else if eq $funcDef.TemplateType $templateType.GojaEnum }}
 	attrVal, exists := e.sel.sel.Attr("{{ $funcDef.Attr }}")
 	if !exists {
 		return goja.Undefined()
@@ -337,13 +351,13 @@ func (e {{$funcDef.Elem}}) {{$funcDef.Method}}() {{ returnType $funcDef.Template
 	default:
 		return goja.Undefined()
 	}
-{{- else if eq $funcDef.TemplateType "const" }}
+{{- else if eq $funcDef.TemplateType $templateType.Const }}
 	return "{{ index $funcDef.Opts 0 }}"
-{{- else if eq $funcDef.TemplateType "url" }}
+{{- else if eq $funcDef.TemplateType $templateType.Url }}
 	return e.attrAsURLString("{{ $funcDef.Attr }}", {{ index $funcDef.Opts 0 }})
-{{- else if eq $funcDef.TemplateType "string" }}
+{{- else if eq $funcDef.TemplateType $templateType.String }}
 	return e.attrAsString("{{ $funcDef.Attr }}")
-{{- else if eq $funcDef.TemplateType "bool" }}
+{{- else if eq $funcDef.TemplateType $templateType.Bool }}
 	return e.attrIsPresent("{{ $funcDef.Attr }}")
 {{- end}}
 }
@@ -360,11 +374,11 @@ func buildStruct(elemInfo ElemInfo) string {
 
 func returnType(templateType string) string {
 	switch templateType {
-	case "bool":
+	case boolTemplate:
 		return "bool"
-	case "int":
+	case intTemplate:
 		return "int"
-	case "enum-goja":
+	case gojaEnumTemplate:
 		return "goja.Value"
 	default:
 		return "string"
