@@ -41,7 +41,7 @@ Use the global --address flag to specify the URL to the API server.`,
 		if err != nil {
 			return err
 		}
-		status, err := c.GetStatus(context.Background())
+		status, err := c.Status(context.Background())
 		if err != nil {
 			return err
 		}

@@ -18,21 +18,41 @@
  *
  */
 
-package client
+package cmd
 
 import (
 	"context"
-	"net/url"
 
 	"github.com/loadimpact/k6/api/v1"
+	"github.com/loadimpact/k6/api/v1/client"
+	"github.com/loadimpact/k6/ui"
+	"github.com/spf13/cobra"
+	"gopkg.in/guregu/null.v3"
 )
 
-var StatusURL = &url.URL{Path: "/v1/status"}
+// pauseCmd represents the pause command
+var pauseCmd = &cobra.Command{
+	Use:   "pause",
+	Short: "Pause a running test",
+	Long: `Pause a running test.
 
-func (c *Client) Status(ctx context.Context) (ret v1.Status, err error) {
-	return ret, c.call(ctx, "GET", StatusURL, nil, &ret)
+Use the global --address flag to specify the URL to the API server.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		c, err := client.New(address)
+		if err != nil {
+			return err
+		}
+		status, err := c.SetStatus(context.Background(), v1.Status{
+			Paused: null.BoolFrom(true),
+		})
+		if err != nil {
+			return err
+		}
+		ui.Dump(stdout, status)
+		return nil
+	},
 }
 
-func (c *Client) SetStatus(ctx context.Context, patch v1.Status) (ret v1.Status, err error) {
-	return ret, c.call(ctx, "PATCH", StatusURL, patch, &ret)
+func init() {
+	RootCmd.AddCommand(pauseCmd)
 }
