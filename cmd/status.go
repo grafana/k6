@@ -23,9 +23,8 @@ package cmd
 import (
 	"context"
 
-	"github.com/loadimpact/k6/ui"
-
 	"github.com/loadimpact/k6/api/v1/client"
+	"github.com/loadimpact/k6/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -35,7 +34,7 @@ var statusCmd = &cobra.Command{
 	Short: "Show test status",
 	Long: `Show test status.
 
-Use the global --address flag to specify the URL to the API server.`,
+  Use the global --address flag to specify the URL to the API server.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		c, err := client.New(address)
 		if err != nil {

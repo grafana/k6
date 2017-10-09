@@ -35,8 +35,8 @@ var resumeCmd = &cobra.Command{
 	Use:   "resume",
 	Short: "Resume a paused test",
 	Long: `Resume a paused test.
- 
- Use the global --address flag to specify the URL to the API server.`,
+
+  Use the global --address flag to specify the URL to the API server.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		c, err := client.New(address)
 		if err != nil {
