@@ -36,7 +36,7 @@ var pauseCmd = &cobra.Command{
 	Short: "Pause a running test",
 	Long: `Pause a running test.
 
-Use the global --address flag to specify the URL to the API server.`,
+  Use the global --address flag to specify the URL to the API server.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		c, err := client.New(address)
 		if err != nil {
