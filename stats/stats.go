@@ -234,7 +234,7 @@ type Submetric struct {
 	Parent string            `json:"parent"`
 	Suffix string            `json:"suffix"`
 	Tags   map[string]string `json:"tags"`
-	Metric *Metric           `json:"metric"`
+	Metric *Metric           `json:"-"`
 }
 
 // Creates a submetric from a name.

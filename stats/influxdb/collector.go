@@ -22,63 +22,38 @@ package influxdb
 
 import (
 	"context"
-	"fmt"
-	"io"
-	"net/url"
 	"sync"
 	"time"
 
-	"github.com/fatih/color"
 	"github.com/influxdata/influxdb/client/v2"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
-	"github.com/loadimpact/k6/ui"
 	log "github.com/sirupsen/logrus"
-	null "gopkg.in/guregu/null.v3"
 )
 
 const (
 	pushInterval = 1 * time.Second
-
-	defaultURL = "http://localhost:8086/k6"
 )
 
-var _ lib.AuthenticatedCollector = &Collector{}
-
-type Config struct {
-	DefaultURL null.String `json:"default_url,omitempty"`
-}
+var _ lib.Collector = &Collector{}
 
 type Collector struct {
-	u          *url.URL
-	client     client.Client
-	batchConf  client.BatchPointsConfig
+	config    Config
+	client    client.Client
+	batchConf client.BatchPointsConfig
+
 	buffer     []stats.Sample
 	bufferLock sync.Mutex
 }
 
-func New(s string, conf_ interface{}, opts lib.Options) (*Collector, error) {
-	conf := conf_.(*Config)
-
-	if s == "" {
-		s = conf.DefaultURL.String
-	}
-	if s == "" {
-		s = defaultURL
-	}
-
-	u, err := url.Parse(s)
+func New(conf Config) (*Collector, error) {
+	cl, err := MakeClient(conf)
 	if err != nil {
 		return nil, err
 	}
-
-	cl, batchConf, err := parseURL(u)
-	if err != nil {
-		return nil, err
-	}
-
+	batchConf := MakeBatchConfig(conf)
 	return &Collector{
-		u:         u,
+		config:    conf,
 		client:    cl,
 		batchConf: batchConf,
 	}, nil
@@ -95,74 +70,6 @@ func (c *Collector) Init() error {
 	return nil
 }
 
-func (c *Collector) MakeConfig() interface{} {
-	return &Config{}
-}
-
-func (c *Collector) Login(conf_ interface{}, in io.Reader, out io.Writer) (interface{}, error) {
-	conf := conf_.(*Config)
-
-	form := ui.Form{
-		Fields: []ui.Field{
-			ui.StringField{
-				Key:     "host",
-				Label:   "host",
-				Default: "http://localhost:8086",
-			},
-			ui.StringField{
-				Key:     "db",
-				Label:   "database",
-				Default: "k6",
-			},
-			ui.StringField{
-				Key:   "username",
-				Label: "username",
-			},
-			ui.StringField{
-				Key:   "password",
-				Label: "password",
-			},
-		},
-	}
-	data, err := form.Run(in, out)
-	if err != nil {
-		return nil, err
-	}
-	host := data["host"].(string)
-	db := data["db"].(string)
-	username := data["username"].(string)
-	password := data["password"].(string)
-
-	u, err := url.Parse(host + "/" + db)
-	if err != nil {
-		return nil, err
-	}
-	if username != "" {
-		if password != "" {
-			u.User = url.UserPassword(username, password)
-		} else {
-			u.User = url.User(username)
-		}
-	}
-
-	cl, _, err := parseURL(u)
-	if err != nil {
-		return nil, err
-	}
-	if _, _, err := cl.Ping(5 * time.Second); err != nil {
-		return nil, err
-	}
-
-	conf.DefaultURL = null.StringFrom(u.String())
-	fmt.Fprint(out, color.New(color.Faint).Sprint("\n  to use this database: ")+color.CyanString("k6 run ")+color.New(color.FgHiCyan).Sprint("-o influxdb")+color.CyanString(" ...\n"))
-
-	return conf, nil
-}
-
-func (c *Collector) String() string {
-	return fmt.Sprintf("influxdb (%s)", c.u.Host)
-}
-
 func (c *Collector) Run(ctx context.Context) {
 	log.Debug("InfluxDB: Running!")
 	ticker := time.NewTicker(pushInterval)
@@ -175,10 +82,6 @@ func (c *Collector) Run(ctx context.Context) {
 			return
 		}
 	}
-}
-
-func (c *Collector) IsReady() bool {
-	return true
 }
 
 func (c *Collector) Collect(samples []stats.Sample) {
