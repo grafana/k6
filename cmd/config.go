@@ -21,6 +21,8 @@
 package cmd
 
 import (
+	"encoding/json"
+
 	"github.com/loadimpact/k6/lib"
 	"github.com/shibukawa/configdir"
 	"github.com/spf13/pflag"
@@ -47,6 +49,8 @@ type Config struct {
 	Out           null.String `json:"out" envconfig:"out"`
 	Linger        null.Bool   `json:"linger" envconfig:"linger"`
 	NoUsageReport null.Bool   `json:"noUsageReport" envconfig:"no_usage_report"`
+
+	Collectors map[string]json.RawMessage `json:"collectors"`
 }
 
 func getConfig(flags *pflag.FlagSet) (Config, error) {
@@ -74,4 +78,11 @@ func (c Config) Apply(cfg Config) Config {
 		c.Out = cfg.Out
 	}
 	return c
+}
+
+func (c Config) ConfigureCollector(t string, out interface{}) error {
+	if data, ok := c.Collectors[t]; ok {
+		return json.Unmarshal(data, out)
+	}
+	return nil
 }

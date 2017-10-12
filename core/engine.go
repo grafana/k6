@@ -22,7 +22,6 @@ package core
 
 import (
 	"context"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -137,9 +136,6 @@ func (e *Engine) Run(ctx context.Context) error {
 			e.Collector.Run(collectorctx)
 			collectorwg.Done()
 		}()
-		for !e.Collector.IsReady() {
-			runtime.Gosched()
-		}
 	}
 
 	subctx, subcancel := context.WithCancel(context.Background())
