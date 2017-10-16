@@ -23,13 +23,14 @@ package cmd
 import (
 	"encoding/json"
 
+	"github.com/kelseyhightower/envconfig"
 	"github.com/loadimpact/k6/lib"
 	"github.com/shibukawa/configdir"
 	"github.com/spf13/pflag"
 	null "gopkg.in/guregu/null.v3"
 )
 
-const configFilename = "k6.yaml"
+const configFilename = "k6.json"
 
 var (
 	configDirs    = configdir.New("loadimpact", "k6")
@@ -53,6 +54,7 @@ type Config struct {
 	Collectors map[string]json.RawMessage `json:"collectors"`
 }
 
+// Gets configuration from CLI flags.
 func getConfig(flags *pflag.FlagSet) (Config, error) {
 	opts, err := getOptions(flags)
 	if err != nil {
@@ -64,6 +66,38 @@ func getConfig(flags *pflag.FlagSet) (Config, error) {
 		Linger:        getNullBool(flags, "linger"),
 		NoUsageReport: getNullBool(flags, "no-usage-report"),
 	}, nil
+}
+
+// Reads a configuration file from disk.
+func readDiskConfig() (Config, *configdir.Config, error) {
+	cdir := configDirs.QueryFolderContainsFile(configFilename)
+	if cdir == nil {
+		return Config{}, configDirs.QueryFolders(configdir.Global)[0], nil
+	}
+	data, err := cdir.ReadFile(configFilename)
+	if err != nil {
+		return Config{}, cdir, err
+	}
+	var conf Config
+	if err := json.Unmarshal(data, &conf); err != nil {
+		return conf, cdir, err
+	}
+	return conf, cdir, nil
+}
+
+// Writes configuration back to disk.
+func writeDiskConfig(cdir *configdir.Config, conf Config) error {
+	data, err := json.MarshalIndent(conf, "", "  ")
+	if err != nil {
+		return err
+	}
+	return cdir.WriteFile(configFilename, data)
+}
+
+// Reads configuration variables from the environment.
+func readEnvConfig() (conf Config, err error) {
+	err = envconfig.Process("k6", &conf)
+	return conf, err
 }
 
 func (c Config) Apply(cfg Config) Config {
@@ -84,5 +118,17 @@ func (c Config) ConfigureCollector(t string, out interface{}) error {
 	if data, ok := c.Collectors[t]; ok {
 		return json.Unmarshal(data, out)
 	}
+	return nil
+}
+
+func (c *Config) SetCollectorConfig(t string, conf interface{}) error {
+	data, err := json.Marshal(conf)
+	if err != nil {
+		return err
+	}
+	if c.Collectors == nil {
+		c.Collectors = make(map[string]json.RawMessage)
+	}
+	c.Collectors[t] = data
 	return nil
 }
