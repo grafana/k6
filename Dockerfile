@@ -4,8 +4,7 @@ FROM golang:1.9-alpine
 COPY --from=0 / /
 WORKDIR $GOPATH/src/github.com/loadimpact/k6
 ADD . .
-RUN apk upgrade --no-cache && \
-	apk --no-cache add --virtual .build-deps make git && \
+RUN apk --no-cache add --virtual .build-deps make git build-base && \
 	yarn global add ember-cli bower && \
 	make web && pwd && rm -r web/tmp web/node_modules web/bower_components && \
 	go get . && go install . && rm -rf $GOPATH/lib $GOPATH/pkg && \

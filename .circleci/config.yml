@@ -20,7 +20,7 @@ jobs:
       - run:
           name: Run tests
           command: |
-            docker run --entrypoint /bin/sh loadimpact/k6 -c 'apk --no-cache add --virtual .deps git make && cd $GOPATH/src/github.com/loadimpact/k6 && go get -t ./... && go get github.com/alecthomas/gometalinter && gometalinter --install && make check && apk del .deps'
+            docker run --entrypoint /bin/sh loadimpact/k6 -c 'apk --no-cache add --virtual .deps git make build-base && cd $GOPATH/src/github.com/loadimpact/k6 && go get -t ./... && go get github.com/alecthomas/gometalinter && gometalinter --install && make check'
             docker run loadimpact/k6 --help
             docker run loadimpact/k6 help
             docker run loadimpact/k6 run --help
