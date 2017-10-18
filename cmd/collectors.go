@@ -24,6 +24,7 @@ import (
 	"encoding"
 	"strings"
 
+	"github.com/kelseyhightower/envconfig"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats/influxdb"
 	jsonc "github.com/loadimpact/k6/stats/json"
@@ -45,6 +46,9 @@ func parseCollector(s string) (t, arg string) {
 
 func newCollector(t, arg string, src *lib.SourceData, conf Config) (lib.Collector, error) {
 	loadConfig := func(out encoding.TextUnmarshaler) error {
+		if err := envconfig.Process("k6", out); err != nil {
+			return err
+		}
 		if err := out.UnmarshalText([]byte(arg)); err != nil {
 			return err
 		}
