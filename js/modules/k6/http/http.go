@@ -39,7 +39,6 @@ import (
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -67,6 +66,18 @@ const OCSP_REASON_CERTIFICATE_HOLD = "certificate_hold"
 const OCSP_REASON_REMOVE_FROM_CRL = "remove_from_crl"
 const OCSP_REASON_PRIVILEGE_WITHDRAWN = "privilege_withdrawn"
 const OCSP_REASON_AA_COMPROMISE = "aa_compromise"
+
+type HTTPCookie struct {
+	Name, Value, Domain, Path string
+	HttpOnly, Secure          bool
+	MaxAge                    int
+	Expires                   int64
+}
+
+type HTTPRequestCookie struct {
+	Name, Value string
+	Replace     bool
+}
 
 type HTTP struct {
 	SSL_3_0                            string `js:"SSL_3_0"`
@@ -109,6 +120,34 @@ func New() *HTTP {
 		OCSP_REASON_REMOVE_FROM_CRL:        OCSP_REASON_REMOVE_FROM_CRL,
 		OCSP_REASON_PRIVILEGE_WITHDRAWN:    OCSP_REASON_PRIVILEGE_WITHDRAWN,
 		OCSP_REASON_AA_COMPROMISE:          OCSP_REASON_AA_COMPROMISE,
+	}
+}
+
+func (*HTTP) XCookieJar(ctx *context.Context) *HTTPCookieJar {
+	return newCookieJar(ctx)
+}
+
+func (*HTTP) CookieJar(ctx context.Context) *HTTPCookieJar {
+	state := common.GetState(ctx)
+	return &HTTPCookieJar{state.CookieJar, &ctx}
+}
+
+func (*HTTP) setRequestCookies(req *http.Request, jar *cookiejar.Jar, reqCookies map[string]*HTTPRequestCookie) {
+	jarCookies := make(map[string][]*http.Cookie)
+	for _, c := range jar.Cookies(req.URL) {
+		jarCookies[c.Name] = append(jarCookies[c.Name], c)
+	}
+	for key, reqCookie := range reqCookies {
+		if jc := jarCookies[key]; jc != nil && reqCookie.Replace {
+			jarCookies[key] = []*http.Cookie{{Name: key, Value: reqCookie.Value}}
+		} else {
+			jarCookies[key] = append(jarCookies[key], &http.Cookie{Name: key, Value: reqCookie.Value})
+		}
+	}
+	for _, cookies := range jarCookies {
+		for _, c := range cookies {
+			req.AddCookie(c)
+		}
 	}
 }
 
@@ -164,6 +203,12 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 	timeout := 60 * time.Second
 	throw := state.Options.Throw.Bool
 
+	var activeJar *cookiejar.Jar
+	if state.CookieJar != nil {
+		activeJar = state.CookieJar
+	}
+	reqCookies := make(map[string]*HTTPRequestCookie)
+
 	if len(args) > 1 {
 		paramsV := args[1]
 		if !goja.IsUndefined(paramsV) && !goja.IsNull(paramsV) {
@@ -171,11 +216,6 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 			for _, k := range params.Keys() {
 				switch k {
 				case "cookies":
-					var cookieJar *cookiejar.Jar
-					if state.CookieJar == nil {
-						continue
-					}
-					cookieJar = state.CookieJar
 					cookiesV := params.Get(k)
 					if goja.IsUndefined(cookiesV) || goja.IsNull(cookiesV) {
 						continue
@@ -184,52 +224,27 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 					if cookies == nil {
 						continue
 					}
-					var cookiesList []*http.Cookie
-					switch cookies.ExportType() {
-					case typeMapKeyStringValueInterface:
-						for _, key := range cookies.Keys() {
-							c := http.Cookie{
-								Name:  key,
-								Value: cookies.Get(key).String(),
-							}
-							cookiesList = append(cookiesList, &c)
+					for _, key := range cookies.Keys() {
+						cookieV := cookies.Get(key)
+						if goja.IsUndefined(cookieV) || goja.IsNull(cookieV) {
+							continue
 						}
-					default:
-						for _, i := range cookies.Keys() {
-							c := http.Cookie{}
-							obj := cookies.Get(i).ToObject(rt)
-							for _, key := range obj.Keys() {
-								switch strings.ToLower(key) {
-								case "name":
-									c.Name = obj.Get(key).String()
+						switch cookieV.ExportType() {
+						case typeMapKeyStringValueInterface:
+							reqCookies[key] = &HTTPRequestCookie{Name: key, Value: "", Replace: false}
+							cookie := cookieV.ToObject(rt)
+							for _, attr := range cookie.Keys() {
+								switch strings.ToLower(attr) {
+								case "replace":
+									reqCookies[key].Replace = cookie.Get(attr).ToBoolean()
 								case "value":
-									c.Value = obj.Get(key).String()
-								case "path":
-									c.Path = obj.Get(key).String()
-								case "domain":
-									c.Domain = obj.Get(key).String()
-								case "expires":
-									var t time.Time
-									expires := obj.Get(key).String()
-									if expires != "" {
-										t, err = time.Parse(time.RFC1123, expires)
-										if err != nil {
-											return nil, nil, errors.Errorf("unable to parse \"expires\" date string \"%s\" with: %s", expires, err.Error())
-										}
-									}
-									c.Expires = t
-								case "max_age":
-									c.MaxAge = int(obj.Get(key).ToInteger())
-								case "secure":
-									c.Secure = obj.Get(key).ToBoolean()
-								case "http_only":
-									c.HttpOnly = obj.Get(key).ToBoolean()
+									reqCookies[key].Value = cookie.Get(attr).String()
 								}
 							}
-							cookiesList = append(cookiesList, &c)
+						default:
+							reqCookies[key] = &HTTPRequestCookie{Name: key, Value: cookieV.String(), Replace: false}
 						}
 					}
-					cookieJar.SetCookies(req.URL, cookiesList)
 				case "headers":
 					headersV := params.Get(k)
 					if goja.IsUndefined(headersV) || goja.IsNull(headersV) {
@@ -241,6 +256,15 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 					}
 					for _, key := range headers.Keys() {
 						req.Header.Set(key, headers.Get(key).String())
+					}
+				case "jar":
+					jarV := params.Get(k)
+					if goja.IsUndefined(jarV) || goja.IsNull(jarV) {
+						continue
+					}
+					switch v := jarV.Export().(type) {
+					case *HTTPCookieJar:
+						activeJar = v.jar
 					}
 				case "redirects":
 					redirects = int(params.Get(k).ToInteger())
@@ -268,6 +292,10 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 		}
 	}
 
+	if activeJar != nil {
+		h.setRequestCookies(req, activeJar, reqCookies)
+	}
+
 	resp := &HTTPResponse{
 		ctx: ctx,
 		URL: urlStr,
@@ -276,6 +304,14 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 		Transport: state.HTTPTransport,
 		Timeout:   timeout,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			// Update active jar with cookies found in "Set-Cookie" header(s) of redirect response
+			if activeJar != nil {
+				if respCookies := req.Response.Cookies(); len(respCookies) > 0 {
+					activeJar.SetCookies(req.URL, respCookies)
+					h.setRequestCookies(req, activeJar, reqCookies)
+				}
+			}
+
 			max := int(state.Options.MaxRedirects.Int64)
 			if redirects >= 0 {
 				max = redirects
@@ -292,9 +328,6 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 			}
 			return nil
 		},
-	}
-	if state.CookieJar != nil {
-		client.Jar = state.CookieJar
 	}
 
 	tracer := netext.Tracer{}
@@ -330,6 +363,12 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 		resp.Error = resErr.Error()
 		tags["error"] = resp.Error
 	} else {
+		if activeJar != nil {
+			if rc := res.Cookies(); len(rc) > 0 {
+				activeJar.SetCookies(req.URL, rc)
+			}
+		}
+
 		resp.URL = res.Request.URL.String()
 		resp.Status = res.StatusCode
 		resp.Proto = res.Proto
@@ -350,13 +389,20 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 
 		var resCookies []*http.Cookie
 		if client.Jar != nil {
-			resCookies = client.Jar.Cookies(res.Request.URL)
-		} else {
-			resCookies = []*http.Cookie{}
+			resCookies = res.Cookies()
 		}
-		resp.Cookies = make(map[string][]string, len(resCookies))
+		resp.Cookies = make(map[string][]*HTTPCookie, len(resCookies))
 		for _, c := range resCookies {
-			resp.Cookies[c.Name] = append(resp.Cookies[c.Name], c.Value)
+			resp.Cookies[c.Name] = append(resp.Cookies[c.Name], &HTTPCookie{
+				Name:     c.Name,
+				Value:    c.Value,
+				Domain:   c.Domain,
+				Path:     c.Path,
+				HttpOnly: c.HttpOnly,
+				Secure:   c.Secure,
+				MaxAge:   c.MaxAge,
+				Expires:  c.Expires.UnixNano() / 1000000,
+			})
 		}
 	}
 
