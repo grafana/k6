@@ -31,17 +31,17 @@ import (
 
 type ConfigFields struct {
 	// Connection.
-	Addr        string `json:"addr"`
-	Username    string `json:"username,omitempty"`
-	Password    string `json:"password,omitempty"`
-	Insecure    bool   `json:"insecure,omitempty"`
-	PayloadSize int    `json:"payload_size,omitempty"`
+	Addr        string `json:"addr" envconfig:"INFLUXDB_ADDR"`
+	Username    string `json:"username,omitempty" envconfig:"INFLUXDB_USERNAME"`
+	Password    string `json:"password,omitempty" envconfig:"INFLUXDB_PASSWORD"`
+	Insecure    bool   `json:"insecure,omitempty" envconfig:"INFLUXDB_INSECURE"`
+	PayloadSize int    `json:"payload_size,omitempty" envconfig:"INFLUXDB_PAYLOAD_SIZE"`
 
 	// Samples.
-	Database    string `json:"database"`
-	Precision   string `json:"precision,omitempty"`
-	Retention   string `json:"retention,omitempty"`
-	Consistency string `json:"consistency,omitempty"`
+	DB          string `json:"db" envconfig:"INFLUXDB_DB"`
+	Precision   string `json:"precision,omitempty" envconfig:"INFLUXDB_PRECISION"`
+	Retention   string `json:"retention,omitempty" envconfig:"INFLUXDB_RETENTION"`
+	Consistency string `json:"consistency,omitempty" envconfig:"INFLUXDB_CONSISTENCY"`
 }
 
 type Config ConfigFields
@@ -55,7 +55,7 @@ func (c *Config) UnmarshalText(text []byte) error {
 		c.Addr = u.Scheme + "://" + u.Host
 	}
 	if db := strings.TrimPrefix(u.Path, "/"); db != "" {
-		c.Database = db
+		c.DB = db
 	}
 	if u.User != nil {
 		c.Username = u.User.Username()

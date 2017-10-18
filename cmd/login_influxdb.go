@@ -10,7 +10,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// loginInfluxDBCommand represents the resume command
+// loginInfluxDBCommand represents the 'login influxdb' command
 var loginInfluxDBCommand = &cobra.Command{
 	Use:   "influxdb [uri]",
 	Short: "Authenticate with InfluxDB",
@@ -33,8 +33,8 @@ This will set the default server used when just "-o influxdb" is passed.`,
 		if conf.Addr == "" {
 			conf.Addr = "http://localhost:8086"
 		}
-		if conf.Database == "" {
-			conf.Database = "k6"
+		if conf.DB == "" {
+			conf.DB = "k6"
 		}
 
 		form := ui.Form{
@@ -45,9 +45,9 @@ This will set the default server used when just "-o influxdb" is passed.`,
 					Default: conf.Addr,
 				},
 				ui.StringField{
-					Key:     "Database",
+					Key:     "DB",
 					Label:   "Database",
-					Default: conf.Database,
+					Default: conf.DB,
 				},
 				ui.StringField{
 					Key:     "Username",
