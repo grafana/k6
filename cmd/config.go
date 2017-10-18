@@ -25,12 +25,13 @@ import (
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/stats/influxdb"
 	"github.com/shibukawa/configdir"
 	"github.com/spf13/pflag"
 	null "gopkg.in/guregu/null.v3"
 )
 
-const configFilename = "k6.json"
+const configFilename = "config.json"
 
 var (
 	configDirs    = configdir.New("loadimpact", "k6")
@@ -51,7 +52,9 @@ type Config struct {
 	Linger        null.Bool   `json:"linger" envconfig:"linger"`
 	NoUsageReport null.Bool   `json:"noUsageReport" envconfig:"no_usage_report"`
 
-	Collectors map[string]json.RawMessage `json:"collectors"`
+	Collectors struct {
+		InfluxDB influxdb.Config `json:"influxdb"`
+	} `json:"collectors"`
 }
 
 // Gets configuration from CLI flags.
@@ -112,23 +115,4 @@ func (c Config) Apply(cfg Config) Config {
 		c.Out = cfg.Out
 	}
 	return c
-}
-
-func (c Config) ConfigureCollector(t string, out interface{}) error {
-	if data, ok := c.Collectors[t]; ok {
-		return json.Unmarshal(data, out)
-	}
-	return nil
-}
-
-func (c *Config) SetCollectorConfig(t string, conf interface{}) error {
-	data, err := json.Marshal(conf)
-	if err != nil {
-		return err
-	}
-	if c.Collectors == nil {
-		c.Collectors = make(map[string]json.RawMessage)
-	}
-	c.Collectors[t] = data
-	return nil
 }

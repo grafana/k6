@@ -45,9 +45,6 @@ func parseCollector(s string) (t, arg string) {
 
 func newCollector(t, arg string, src *lib.SourceData, conf Config) (lib.Collector, error) {
 	loadConfig := func(out encoding.TextUnmarshaler) error {
-		if err := conf.ConfigureCollector(t, out); err != nil {
-			return err
-		}
 		if err := out.UnmarshalText([]byte(arg)); err != nil {
 			return err
 		}
@@ -58,7 +55,7 @@ func newCollector(t, arg string, src *lib.SourceData, conf Config) (lib.Collecto
 	case collectorJSON:
 		return jsonc.New(afero.NewOsFs(), arg)
 	case collectorInfluxDB:
-		var config influxdb.Config
+		config := conf.Collectors.InfluxDB
 		if err := loadConfig(&config); err != nil {
 			return nil, err
 		}
