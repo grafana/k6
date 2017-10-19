@@ -466,8 +466,6 @@ func actionRun(cc *cli.Context) error {
 	fmt.Fprintf(color.Output, "   duration: %s, iterations: %s\n", color.CyanString(opts.Duration.String()), color.CyanString("%d", opts.Iterations.Int64))
 	fmt.Fprintf(color.Output, "        vus: %s, max: %s\n", color.CyanString("%d", opts.VUs.Int64), color.CyanString("%d", opts.VUsMax.Int64))
 	fmt.Fprintf(color.Output, "\n")
-	fmt.Fprintf(color.Output, "    web server: %s\n", color.CyanString("http://%s/", addr))
-	fmt.Fprintf(color.Output, "\n")
 
 	// Make the Engine
 	engine, err := core.NewEngine(local.New(runner), opts)
