@@ -117,3 +117,7 @@ func (c *Collector) Collect(samples []stats.Sample) {
 		}
 	}
 }
+
+func (c *Collector) Link() string {
+	return ""
+}

@@ -27,7 +27,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/pkg/errors"
@@ -54,24 +53,13 @@ type Client struct {
 }
 
 func NewClient(token, host, version string) *Client {
-	client := &http.Client{
-		Timeout: RequestTimeout,
-	}
-
-	hostEnv := os.Getenv("K6CLOUD_HOST")
-	if hostEnv != "" {
-		host = hostEnv
-	}
 	if host == "" {
 		host = "https://ingest.loadimpact.com"
 	}
-
-	baseURL := fmt.Sprintf("%s/v1", host)
-
 	c := &Client{
-		client:        client,
+		client:        &http.Client{Timeout: RequestTimeout},
 		token:         token,
-		baseURL:       baseURL,
+		baseURL:       fmt.Sprintf("%s/v1", host),
 		version:       version,
 		retries:       MaxRetries,
 		retryInterval: RetryInterval,

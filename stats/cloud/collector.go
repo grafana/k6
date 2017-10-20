@@ -23,9 +23,7 @@ package cloud
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
-	"strconv"
 	"sync"
 	"time"
 
@@ -40,18 +38,10 @@ const (
 	MetricPushinteral = 1 * time.Second
 )
 
-type loadimpactConfig struct {
-	ProjectId int    `mapstructure:"project_id"`
-	Name      string `mapstructure:"name"`
-}
-
 // Collector sends result data to the Load Impact cloud service.
 type Collector struct {
+	config      Config
 	referenceID string
-	initErr     error // Possible error from init call to cloud API
-
-	name       string
-	project_id int
 
 	duration   int64
 	thresholds map[string][]*stats.Threshold
@@ -64,15 +54,15 @@ type Collector struct {
 }
 
 // New creates a new cloud collector
-func New(fname string, src *lib.SourceData, opts lib.Options, version string) (*Collector, error) {
-	token := os.Getenv("K6CLOUD_TOKEN")
-
-	var extConfig loadimpactConfig
+func New(conf Config, src *lib.SourceData, opts lib.Options, version string) (*Collector, error) {
 	if val, ok := opts.External["loadimpact"]; ok {
-		err := mapstructure.Decode(val, &extConfig)
-		if err != nil {
-			log.Warn("Malformed loadimpact settings in script options")
+		if err := mapstructure.Decode(val, &conf); err != nil {
+			return nil, err
 		}
+	}
+
+	if conf.Name == "" {
+		conf.Name = filepath.Base(src.Filename)
 	}
 
 	thresholds := make(map[string][]*stats.Threshold)
@@ -89,10 +79,9 @@ func New(fname string, src *lib.SourceData, opts lib.Options, version string) (*
 	}
 
 	return &Collector{
-		name:       getName(src, extConfig),
-		project_id: getProjectId(extConfig),
+		config:     conf,
 		thresholds: thresholds,
-		client:     NewClient(token, "", version),
+		client:     NewClient(conf.Token, conf.Host, version),
 		anonymous:  len(token) == 0,
 		duration:   duration,
 	}, nil
@@ -108,51 +97,30 @@ func (c *Collector) Init() error {
 	}
 
 	testRun := &TestRun{
-		Name:       c.name,
+		Name:       c.config.Name,
+		ProjectID:  c.config.ProjectID,
 		Thresholds: thresholds,
 		Duration:   c.duration,
-		ProjectID:  c.project_id,
 	}
 
 	response, err := c.client.CreateTestRun(testRun)
 
 	if err != nil {
-		c.initErr = err
-		log.WithFields(log.Fields{
-			"error": err,
-		}).Error("Cloud collector failed to init")
-		return nil
+		return err
 	}
 	c.referenceID = response.ReferenceID
 
 	log.WithFields(log.Fields{
-		"name":        c.name,
-		"projectId":   c.project_id,
+		"name":        c.config.Name,
+		"projectId":   c.config.ProjectID,
 		"duration":    c.duration,
 		"referenceId": c.referenceID,
-	}).Debug("Cloud collector init successful")
+	}).Debug("Cloud: Initialized")
 	return nil
 }
 
-func (c *Collector) MakeConfig() interface{} {
-	return nil
-}
-
-func (c *Collector) String() string {
-	if c.initErr == nil {
-		path := "runs"
-		if c.anonymous {
-			path = "anonymous"
-		}
-		return fmt.Sprintf("Load Impact (https://app.loadimpact.com/k6/%s/%s)", path, c.referenceID)
-	}
-
-	switch c.initErr {
-	case ErrNotAuthorized:
-	case ErrNotAuthorized:
-		return c.initErr.Error()
-	}
-	return fmt.Sprintf("Failed to create test in Load Impact cloud")
+func (c *Collector) Link() string {
+	return fmt.Sprintf("https://app.loadimpact.com/k6/runs/%s", c.referenceID)
 }
 
 func (c *Collector) Run(ctx context.Context) {
@@ -260,40 +228,4 @@ func sumStages(stages []lib.Stage) int64 {
 	}
 
 	return int64(total.Seconds())
-}
-
-func getProjectId(extConfig loadimpactConfig) int {
-	env := os.Getenv("K6CLOUD_PROJECTID")
-	if env != "" {
-		id, err := strconv.Atoi(env)
-		if err == nil && id > 0 {
-			return id
-		}
-	}
-
-	if extConfig.ProjectId > 0 {
-		return extConfig.ProjectId
-	}
-
-	return 0
-}
-
-func getName(src *lib.SourceData, extConfig loadimpactConfig) string {
-	envName := os.Getenv("K6CLOUD_NAME")
-	if envName != "" {
-		return envName
-	}
-
-	if extConfig.Name != "" {
-		return extConfig.Name
-	}
-
-	if src.Filename != "" && src.Filename != "-" {
-		name := filepath.Base(src.Filename)
-		if name != "" || name != "." {
-			return name
-		}
-	}
-
-	return TestName
 }

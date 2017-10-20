@@ -25,6 +25,7 @@ import (
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/stats/cloud"
 	"github.com/loadimpact/k6/stats/influxdb"
 	"github.com/shibukawa/configdir"
 	"github.com/spf13/pflag"
@@ -54,7 +55,24 @@ type Config struct {
 
 	Collectors struct {
 		InfluxDB influxdb.Config `json:"influxdb"`
+		Cloud    cloud.Config    `json:"cloud"`
 	} `json:"collectors"`
+}
+
+func (c Config) Apply(cfg Config) Config {
+	c.Options = c.Options.Apply(cfg.Options)
+	if cfg.Out.Valid {
+		c.Out = cfg.Out
+	}
+	if cfg.Linger.Valid {
+		c.Linger = cfg.Linger
+	}
+	if cfg.NoUsageReport.Valid {
+		c.NoUsageReport = cfg.NoUsageReport
+	}
+	c.Collectors.InfluxDB = c.Collectors.InfluxDB.Apply(cfg.Collectors.InfluxDB)
+	c.Collectors.Cloud = c.Collectors.Cloud.Apply(cfg.Collectors.Cloud)
+	return c
 }
 
 // Gets configuration from CLI flags.
@@ -101,18 +119,4 @@ func writeDiskConfig(cdir *configdir.Config, conf Config) error {
 func readEnvConfig() (conf Config, err error) {
 	err = envconfig.Process("k6", &conf)
 	return conf, err
-}
-
-func (c Config) Apply(cfg Config) Config {
-	c.Options = c.Options.Apply(cfg.Options)
-	if cfg.Linger.Valid {
-		c.Linger = cfg.Linger
-	}
-	if cfg.NoUsageReport.Valid {
-		c.NoUsageReport = cfg.NoUsageReport
-	}
-	if cfg.Out.Valid {
-		c.Out = cfg.Out
-	}
-	return c
 }

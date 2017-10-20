@@ -40,6 +40,9 @@ type Collector interface {
 	// Collect receives a set of samples. This method is never called concurrently, and only while
 	// the context for Run() is valid, but should defer as much work as possible to Run().
 	Collect(samples []stats.Sample)
+
+	// Optionally return a link that is shown to the user.
+	Link() string
 }
 
 // An AuthenticatedCollector is a collector that can store persistent authentication.
