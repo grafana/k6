@@ -57,7 +57,7 @@ func TestMetrics(t *testing.T) {
 
 					ctxPtr := new(context.Context)
 					*ctxPtr = common.WithRuntime(context.Background(), rt)
-					rt.Set("metrics", common.Bind(rt, &Metrics{}, ctxPtr))
+					rt.Set("metrics", common.Bind(rt, New(), ctxPtr))
 
 					root, _ := lib.NewGroup("", nil)
 					child, _ := root.Group("child")
