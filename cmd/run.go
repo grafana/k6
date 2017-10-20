@@ -182,12 +182,16 @@ a commandline interface for interacting with it.`,
 		// Write the big banner.
 		{
 			out := "-"
+			link := ""
 			if engine.Collector != nil {
-				out = fmt.Sprint(engine.Collector)
+				out = conf.Out.String
+				if l := engine.Collector.Link(); l != "" {
+					link = " (" + l + ")"
+				}
 			}
 
 			fmt.Fprintf(stdout, "  execution: %s\n", ui.ValueColor.Sprint("local"))
-			fmt.Fprintf(stdout, "     output: %s\n", ui.ValueColor.Sprint(out))
+			fmt.Fprintf(stdout, "     output: %s%s\n", ui.ValueColor.Sprint(out), ui.ExtraColor.Sprint(link))
 			fmt.Fprintf(stdout, "     script: %s\n", ui.ValueColor.Sprint(filename))
 			fmt.Fprintf(stdout, "\n")
 

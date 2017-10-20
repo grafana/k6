@@ -26,6 +26,7 @@ import (
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/stats/cloud"
 	"github.com/loadimpact/k6/stats/influxdb"
 	jsonc "github.com/loadimpact/k6/stats/json"
 	"github.com/pkg/errors"
@@ -64,8 +65,12 @@ func newCollector(t, arg string, src *lib.SourceData, conf Config) (lib.Collecto
 			return nil, err
 		}
 		return influxdb.New(config)
-	// case collectorCloud:
-	// 	return cloud.New(arg, src, conf.Options, Version)
+	case collectorCloud:
+		config := conf.Collectors.Cloud
+		if err := loadConfig(&config); err != nil {
+			return nil, err
+		}
+		return cloud.New(config, src, conf.Options, Version)
 	default:
 		return nil, errors.Errorf("unknown output type: %s", t)
 	}

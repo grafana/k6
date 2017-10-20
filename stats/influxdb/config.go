@@ -46,6 +46,37 @@ type ConfigFields struct {
 
 type Config ConfigFields
 
+func (c Config) Apply(cfg Config) Config {
+	if cfg.Addr != "" {
+		c.Addr = cfg.Addr
+	}
+	if cfg.Username != "" {
+		c.Username = cfg.Username
+	}
+	if cfg.Password != "" {
+		c.Password = cfg.Password
+	}
+	if cfg.Insecure {
+		c.Insecure = cfg.Insecure
+	}
+	if cfg.PayloadSize > 0 {
+		c.PayloadSize = cfg.PayloadSize
+	}
+	if cfg.DB != "" {
+		c.DB = cfg.DB
+	}
+	if cfg.Precision != "" {
+		c.Precision = cfg.Precision
+	}
+	if cfg.Retention != "" {
+		c.Retention = cfg.Retention
+	}
+	if cfg.Consistency != "" {
+		c.Consistency = cfg.Consistency
+	}
+	return c
+}
+
 func (c *Config) UnmarshalText(text []byte) error {
 	u, err := url.Parse(string(text))
 	if err != nil {
