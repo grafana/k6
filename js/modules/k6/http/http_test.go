@@ -121,37 +121,44 @@ func TestRequest(t *testing.T) {
 	rt.Set("http", common.Bind(rt, &HTTP{}, ctx))
 
 	t.Run("Redirects", func(t *testing.T) {
-		t.Run("9", func(t *testing.T) {
-			_, err := common.RunString(rt, `http.get("https://httpbin.org/redirect/9")`)
+		t.Run("10", func(t *testing.T) {
+			_, err := common.RunString(rt, `http.get("https://httpbin.org/redirect/10")`)
 			assert.NoError(t, err)
 		})
-		t.Run("10", func(t *testing.T) {
+		t.Run("11", func(t *testing.T) {
 			hook := logtest.NewLocal(state.Logger)
 			defer hook.Reset()
 
-			_, err := common.RunString(rt, `http.get("https://httpbin.org/redirect/10")`)
-			assert.EqualError(t, err, "GoError: Get /get: stopped after 10 redirects")
+			_, err := common.RunString(rt, `
+			let res = http.get("https://httpbin.org/redirect/11");
+			if (res.status != 302) { throw new Error("wrong status: " + res.status) }
+			if (res.url != "https://httpbin.org/relative-redirect/1") { throw new Error("incorrect URL: " + res.url) }
+			if (res.headers["Location"] != "/get") { throw new Error("incorrect Location header: " + res.headers["Location"]) }
+			`)
+			assert.NoError(t, err)
 
 			logEntry := hook.LastEntry()
 			if assert.NotNil(t, logEntry) {
 				assert.Equal(t, log.WarnLevel, logEntry.Level)
-				assert.EqualError(t, logEntry.Data["error"].(error), "Get /get: stopped after 10 redirects")
-				assert.Equal(t, "Request Failed", logEntry.Message)
+				assert.Equal(t, "Possible redirect loop, 302 response returned last, 10 redirects followed; pass { redirects: n } in request params to silence this", logEntry.Data["error"])
+				assert.Equal(t, "https://httpbin.org/redirect/11", logEntry.Data["url"])
+				assert.Equal(t, "Redirect Limit", logEntry.Message)
 			}
 		})
-		t.Run("follow", func(t *testing.T) {
+		t.Run("requestScopeRedirects", func(t *testing.T) {
 			_, err := common.RunString(rt, `
-			let res = http.get("https://httpbin.org/redirect/1", {follow: true});
+			let res = http.get("https://httpbin.org/redirect/1", {redirects: 3});
 			if (res.status != 200) { throw new Error("wrong status: " + res.status) }
 			if (res.url != "https://httpbin.org/get") { throw new Error("incorrect URL: " + res.url) }
 			`)
 			assert.NoError(t, err)
 		})
-		t.Run("nofollow", func(t *testing.T) {
+		t.Run("requestScopeNoRedirects", func(t *testing.T) {
 			_, err := common.RunString(rt, `
-			let res = http.get("https://httpbin.org/redirect/1", {follow: false});
+			let res = http.get("https://httpbin.org/redirect/1", {redirects: 0});
 			if (res.status != 302) { throw new Error("wrong status: " + res.status) }
 			if (res.url != "https://httpbin.org/redirect/1") { throw new Error("incorrect URL: " + res.url) }
+			if (res.headers["Location"] != "/get") { throw new Error("incorrect Location header: " + res.headers["Location"]) }
 			`)
 			assert.NoError(t, err)
 		})
