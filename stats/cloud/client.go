@@ -134,6 +134,10 @@ func (c *Client) do(req *http.Request, v interface{}, attempt int) (retry bool, 
 		return true, err
 	}
 
+	if err != nil {
+		return false, err
+	}
+
 	if err = checkResponse(resp); err != nil {
 		return false, err
 	}
