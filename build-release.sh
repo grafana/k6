@@ -40,7 +40,7 @@ build_dist() {
 
 	# Build a binary, embed what we can by means of static assets inside it.
 	GOARCH=$GOARCH GOOS=$GOOS go build -o dist/$DIR/$BIN
-	rice append --exec=dist/$DIR/$BIN -i ./api -i ./js/compiler -i ./js/lib
+	rice append --exec=dist/$DIR/$BIN -i ./js/compiler -i ./js/lib
 
 	# Archive it all, native format depends on the platform. Subshell to not mess with $PWD.
 	( cd dist && make_archive $FMT $DIR )
