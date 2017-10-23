@@ -7,7 +7,6 @@ eval $(go env)
 VERSION=${1:-$(git describe --tags --abbrev=0)}
 
 # Fail early if external dependencies aren't installed.
-node --version > /dev/null || (echo "ERROR: node is not installed, bailing out."; exit 1)
 rice --help > /dev/null || (echo "ERROR: rice is not installed, run: go get github.com/GeertJohan/go.rice"; exit 1)
 
 make_archive() {
@@ -41,7 +40,7 @@ build_dist() {
 
 	# Build a binary, embed what we can by means of static assets inside it.
 	GOARCH=$GOARCH GOOS=$GOOS go build -o dist/$DIR/$BIN
-	rice append --exec=dist/$DIR/$BIN -i ./api -i ./js/compiler -i ./js/lib
+	rice append --exec=dist/$DIR/$BIN -i ./js/compiler -i ./js/lib
 
 	# Archive it all, native format depends on the platform. Subshell to not mess with $PWD.
 	( cd dist && make_archive $FMT $DIR )
@@ -51,9 +50,6 @@ build_dist() {
 }
 
 echo "--- Building Release: ${VERSION}"
-
-echo "-> Building web assets..."
-make web
 
 echo "-> Building platform packages..."
 mkdir -p dist
