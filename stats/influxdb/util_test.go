@@ -37,7 +37,7 @@ func TestMakeBatchConfig(t *testing.T) {
 	t.Run("DB Set", func(t *testing.T) {
 		assert.Equal(t,
 			client.BatchPointsConfig{Database: "dbname"},
-			MakeBatchConfig(Config{Database: "dbname"}),
+			MakeBatchConfig(Config{DB: "dbname"}),
 		)
 	})
 }
