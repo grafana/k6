@@ -88,12 +88,12 @@ type Group struct {
 	ID     string            `json:"id"`
 	Path   string            `json:"path"`
 	Name   string            `json:"name"`
-	Parent *Group            `json:"parent"`
+	Parent *Group            `json:"-"`
 	Groups map[string]*Group `json:"groups"`
 	Checks map[string]*Check `json:"checks"`
 
-	groupMutex sync.Mutex
-	checkMutex sync.Mutex
+	groupMutex sync.Mutex `json:"-"`
+	checkMutex sync.Mutex `json:"-"`
 }
 
 func NewGroup(name string, parent *Group) (*Group, error) {
@@ -163,7 +163,7 @@ func (g *Group) Check(name string) (*Check, error) {
 type Check struct {
 	ID    string `json:"id"`
 	Path  string `json:"path"`
-	Group *Group `json:"group"`
+	Group *Group `json:"-"`
 	Name  string `json:"name"`
 
 	Passes int64 `json:"passes"`

@@ -47,6 +47,8 @@ type Collector struct {
 	thresholds map[string][]*stats.Threshold
 	client     *Client
 
+	anonymous bool
+
 	sampleBuffer []*Sample
 	sampleMu     sync.Mutex
 }
@@ -80,6 +82,7 @@ func New(conf Config, src *lib.SourceData, opts lib.Options, version string) (*C
 		config:     conf,
 		thresholds: thresholds,
 		client:     NewClient(conf.Token, conf.Host, version),
+		anonymous:  conf.Token == "",
 		duration:   duration,
 	}, nil
 }
@@ -117,7 +120,11 @@ func (c *Collector) Init() error {
 }
 
 func (c *Collector) Link() string {
-	return fmt.Sprintf("https://app.loadimpact.com/k6/runs/%s", c.referenceID)
+	path := "runs"
+	if c.config.Token == "" {
+		path = "anonymous"
+	}
+	return fmt.Sprintf("https://app.loadimpact.com/k6/%s/%s", path, c.referenceID)
 }
 
 func (c *Collector) Run(ctx context.Context) {

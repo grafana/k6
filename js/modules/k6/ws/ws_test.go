@@ -241,6 +241,24 @@ func TestSession(t *testing.T) {
 	})
 	assertSessionMetricsEmitted(t, state.Samples, "", "ws://echo.websocket.org", 101, "")
 	assertMetricEmitted(t, metrics.WSPing, state.Samples, "ws://echo.websocket.org")
+
+	t.Run("close", func(t *testing.T) {
+		state.Samples = nil
+		_, err := common.RunString(rt, `
+		let closed = false;
+		let res = ws.connect("ws://echo.websocket.org", function(socket){
+			socket.on("open", function() {
+							socket.close()
+			})
+			socket.on("close", function() {
+							closed = true;
+			})
+		});
+		if (!closed) { throw new Error ("close event not fired"); }
+		`)
+		assert.NoError(t, err)
+	})
+	assertSessionMetricsEmitted(t, state.Samples, "", "ws://echo.websocket.org", 101, "")
 }
 
 func TestErrors(t *testing.T) {
