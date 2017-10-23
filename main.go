@@ -24,6 +24,7 @@ import (
 	"os"
 
 	"github.com/fatih/color"
+	"github.com/loadimpact/k6/version"
 	"github.com/mattn/go-isatty"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/urfave/cli.v1"
@@ -39,7 +40,7 @@ func main() {
 	app := cli.NewApp()
 	app.Name = "k6"
 	app.Usage = "a next generation load generator"
-	app.Version = "0.17.1"
+	app.Version = version.Version
 	app.Commands = []cli.Command{
 		commandRun,
 		commandInspect,
