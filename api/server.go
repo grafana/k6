@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/GeertJohan/go.rice"
 	"github.com/loadimpact/k6/api/common"
 	"github.com/loadimpact/k6/api/v1"
 	"github.com/loadimpact/k6/core"
@@ -32,13 +31,11 @@ import (
 	"github.com/urfave/negroni"
 )
 
-var static = rice.MustFindBox("../web/dist")
-
 func NewHandler() http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("/v1/", v1.NewHandler())
 	mux.Handle("/ping", HandlePing())
-	mux.Handle("/", http.FileServer(static.HTTPBox()))
+	mux.Handle("/", HandlePing())
 	return mux
 }
 

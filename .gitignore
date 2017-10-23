@@ -1,11 +1,6 @@
 /k6
 /k6.exe
 /dist
-/web/bower_components
-/web/node_modules
-/web/dist/*
-!/web/dist/.gitkeep
-/web/tmp
 /js/node_modules
 /docs
 

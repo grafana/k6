@@ -166,7 +166,7 @@ var commandRun = cli.Command{
      argument and the --type flag, which is used to execute the test.
 
    - Start an a web server on the address specified by the global --address
-     flag, which serves a web interface and a REST API for remote control.
+     flag, which serves as a REST API for remote control.
 
    For ease of use, you may also pass initial status parameters (vus, max,
    duration) to 'run', which will be applied through a normal API call.`,
@@ -465,8 +465,6 @@ func actionRun(cc *cli.Context) error {
 	fmt.Fprintf(color.Output, "\n")
 	fmt.Fprintf(color.Output, "   duration: %s, iterations: %s\n", color.CyanString(opts.Duration.String()), color.CyanString("%d", opts.Iterations.Int64))
 	fmt.Fprintf(color.Output, "        vus: %s, max: %s\n", color.CyanString("%d", opts.VUs.Int64), color.CyanString("%d", opts.VUsMax.Int64))
-	fmt.Fprintf(color.Output, "\n")
-	fmt.Fprintf(color.Output, "    web ui: %s\n", color.CyanString("http://%s/", addr))
 	fmt.Fprintf(color.Output, "\n")
 
 	// Make the Engine
