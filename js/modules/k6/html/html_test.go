@@ -49,7 +49,7 @@ func TestParseHTML(t *testing.T) {
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 	ctx := common.WithRuntime(context.Background(), rt)
 	rt.Set("src", testHTML)
-	rt.Set("html", common.Bind(rt, &HTML{}, &ctx))
+	rt.Set("html", common.Bind(rt, New(), &ctx))
 
 	// TODO: I literally cannot think of a snippet that makes goquery error.
 	// I'm not sure if it's even possible without like, an invalid reader or something, which would

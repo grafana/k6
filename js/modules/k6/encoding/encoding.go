@@ -29,6 +29,10 @@ import (
 
 type Encoding struct{}
 
+func New() *Encoding {
+	return &Encoding{}
+}
+
 func (e *Encoding) B64encode(ctx context.Context, input []byte, encoding string) string {
 	switch encoding {
 	case "rawstd":

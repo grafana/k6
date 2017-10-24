@@ -72,6 +72,10 @@ func (m Metric) Add(ctx context.Context, v goja.Value, addTags ...map[string]str
 
 type Metrics struct{}
 
+func New() *Metrics {
+	return &Metrics{}
+}
+
 func (*Metrics) XCounter(ctx *context.Context, name string, isTime ...bool) (interface{}, error) {
 	return newMetric(ctx, name, stats.Counter, isTime)
 }

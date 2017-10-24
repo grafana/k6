@@ -31,6 +31,10 @@ import (
 
 type HTML struct{}
 
+func New() *HTML {
+	return &HTML{}
+}
+
 func (HTML) ParseHTML(ctx context.Context, src string) (Selection, error) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(src))
 	if err != nil {

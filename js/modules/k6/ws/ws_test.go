@@ -90,7 +90,7 @@ func TestSession(t *testing.T) {
 	ctx = common.WithState(ctx, state)
 	ctx = common.WithRuntime(ctx, rt)
 
-	rt.Set("ws", common.Bind(rt, &WS{}, &ctx))
+	rt.Set("ws", common.Bind(rt, New(), &ctx))
 
 	t.Run("connect_ws", func(t *testing.T) {
 		_, err := common.RunString(rt, `
@@ -278,7 +278,7 @@ func TestErrors(t *testing.T) {
 	ctx = common.WithState(ctx, state)
 	ctx = common.WithRuntime(ctx, rt)
 
-	rt.Set("ws", common.Bind(rt, &WS{}, &ctx))
+	rt.Set("ws", common.Bind(rt, New(), &ctx))
 
 	t.Run("invalid_url", func(t *testing.T) {
 		state.Samples = nil

@@ -46,6 +46,10 @@ type Hasher struct {
 	hash hash.Hash
 }
 
+func New() *Crypto {
+	return &Crypto{}
+}
+
 func (c *Crypto) Md4(ctx context.Context, input string, outputEncoding string) string {
 	hasher := c.CreateHash(ctx, "md4")
 	hasher.Update(input)
