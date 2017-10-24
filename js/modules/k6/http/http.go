@@ -23,6 +23,7 @@ package http
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -37,7 +38,7 @@ import (
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
-	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -156,6 +157,7 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 		"name":   nameTag,
 		"group":  state.Group.Path,
 	}
+	redirects := -1
 	timeout := 60 * time.Second
 	throw := state.Options.Throw.Bool
 
@@ -176,6 +178,11 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 					}
 					for _, key := range headers.Keys() {
 						req.Header.Set(key, headers.Get(key).String())
+					}
+				case "redirects":
+					redirects = int(params.Get(k).ToInteger())
+					if redirects < 0 {
+						redirects = 0
 					}
 				case "tags":
 					tagsV := params.Get(k)
@@ -207,8 +214,18 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 		Timeout:   timeout,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			max := int(state.Options.MaxRedirects.Int64)
-			if len(via) >= max {
-				return errors.Errorf("stopped after %d redirects", max)
+			if redirects >= 0 {
+				max = redirects
+			}
+			if len(via) > max {
+				if redirects < 0 {
+					log.Println(via[0].Response)
+					state.Logger.WithFields(log.Fields{
+						"error": fmt.Sprintf("Possible redirect loop, %d response returned last, %d redirects followed; pass { redirects: n } in request params to silence this", via[len(via)-1].Response.StatusCode, max),
+						"url":   via[0].URL.String(),
+					}).Warn("Redirect Limit")
+				}
+				return http.ErrUseLastResponse
 			}
 			return nil
 		},
