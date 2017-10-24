@@ -30,6 +30,12 @@ jobs:
             docker run loadimpact/k6 scale --help
             docker run loadimpact/k6 pause --help
             docker run loadimpact/k6 resume --help
+      - run:
+          name: code coverage
+          command: |
+            go get github.com/mattn/goveralls
+            go test -v -cover -race -coverprofile=/home/ubuntu/coverage.out
+            /home/ubuntu/.go_workspace/bin/goveralls -coverprofile=/home/ubuntu/coverage.out -service=circle-ci -repotoken=$COVERALLS_TOKEN
       - deploy:
           name: Push application Docker image
           command: |
