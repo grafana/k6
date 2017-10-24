@@ -46,6 +46,10 @@ type Hasher struct {
 	hash hash.Hash
 }
 
+func New() *Crypto {
+	return &Crypto{}
+}
+
 func (c *Crypto) Md4(ctx context.Context, input string, outputEncoding string) string {
 	hasher := c.CreateHash(ctx, "md4")
 	hasher.Update(input)
@@ -141,6 +145,12 @@ func (hasher *Hasher) Digest(outputEncoding string) string {
 	switch outputEncoding {
 	case "base64":
 		return base64.StdEncoding.EncodeToString(sum)
+
+	case "base64url":
+		return base64.URLEncoding.EncodeToString(sum)
+
+	case "base64rawurl":
+		return base64.URLEncoding.WithPadding(base64.NoPadding).EncodeToString(sum)
 
 	case "hex":
 		return hex.EncodeToString(sum)

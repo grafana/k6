@@ -22,7 +22,6 @@ package core
 
 import (
 	"context"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -137,9 +136,6 @@ func (e *Engine) Run(ctx context.Context) error {
 			e.Collector.Run(collectorctx)
 			collectorwg.Done()
 		}()
-		for !e.Collector.IsReady() {
-			runtime.Gosched()
-		}
 	}
 
 	subctx, subcancel := context.WithCancel(context.Background())
@@ -329,6 +325,7 @@ func (e *Engine) processSamples(samples ...stats.Sample) {
 
 			if sm.Metric == nil {
 				sm.Metric = stats.New(sm.Name, sample.Metric.Type, sample.Metric.Contains)
+				sm.Metric.Sub = *sm
 				sm.Metric.Thresholds = e.thresholds[sm.Name]
 				e.Metrics[sm.Name] = sm.Metric
 			}

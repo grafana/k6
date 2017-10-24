@@ -47,6 +47,15 @@ func (d Duration) String() string {
 	return time.Duration(d).String()
 }
 
+func (d *Duration) UnmarshalText(data []byte) error {
+	v, err := time.ParseDuration(string(data))
+	if err != nil {
+		return err
+	}
+	*d = Duration(v)
+	return nil
+}
+
 func (d *Duration) UnmarshalJSON(data []byte) error {
 	if len(data) > 0 && data[0] == '"' {
 		var str string
@@ -82,6 +91,18 @@ type NullDuration struct {
 
 func NullDurationFrom(d time.Duration) NullDuration {
 	return NullDuration{Duration(d), true}
+}
+
+func (d *NullDuration) UnmarshalText(data []byte) error {
+	if len(data) == 0 {
+		*d = NullDuration{}
+		return nil
+	}
+	if err := d.Duration.UnmarshalText(data); err != nil {
+		return err
+	}
+	d.Valid = true
+	return nil
 }
 
 func (d *NullDuration) UnmarshalJSON(data []byte) error {

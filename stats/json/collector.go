@@ -26,7 +26,6 @@ import (
 	"io"
 	"os"
 
-	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
@@ -47,7 +46,7 @@ func (c *Collector) HasSeenMetric(str string) bool {
 	return false
 }
 
-func New(fname string, fs afero.Fs, opts lib.Options) (*Collector, error) {
+func New(fs afero.Fs, fname string) (*Collector, error) {
 	if fname == "" || fname == "-" {
 		return &Collector{
 			outfile: os.Stdout,
@@ -69,22 +68,10 @@ func (c *Collector) Init() error {
 	return nil
 }
 
-func (c *Collector) MakeConfig() interface{} {
-	return nil
-}
-
-func (c *Collector) String() string {
-	return "JSON"
-}
-
 func (c *Collector) Run(ctx context.Context) {
 	log.WithField("filename", c.fname).Debug("JSON: Writing JSON metrics")
 	<-ctx.Done()
 	_ = c.outfile.Close()
-}
-
-func (c *Collector) IsReady() bool {
-	return true
 }
 
 func (c *Collector) HandleMetric(m *stats.Metric) {
@@ -129,4 +116,8 @@ func (c *Collector) Collect(samples []stats.Sample) {
 			continue
 		}
 	}
+}
+
+func (c *Collector) Link() string {
+	return ""
 }

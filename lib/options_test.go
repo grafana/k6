@@ -23,9 +23,12 @@ package lib
 import (
 	"crypto/tls"
 	"encoding/json"
+	"os"
+	"reflect"
 	"testing"
 	"time"
 
+	"github.com/kelseyhightower/envconfig"
 	"github.com/loadimpact/k6/stats"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v3"
@@ -180,4 +183,84 @@ func TestOptionsApply(t *testing.T) {
 		assert.True(t, opts.NoUsageReport.Valid)
 		assert.True(t, opts.NoUsageReport.Bool)
 	})
+}
+
+func TestOptionsEnv(t *testing.T) {
+	testdata := map[struct{ Name, Key string }]map[string]interface{}{
+		{"Paused", "K6_PAUSED"}: {
+			"":      null.Bool{},
+			"true":  null.BoolFrom(true),
+			"false": null.BoolFrom(false),
+		},
+		{"VUs", "K6_VUS"}: {
+			"":    null.Int{},
+			"123": null.IntFrom(123),
+		},
+		{"VUsMax", "K6_VUS_MAX"}: {
+			"":    null.Int{},
+			"123": null.IntFrom(123),
+		},
+		{"Duration", "K6_DURATION"}: {
+			"":    NullDuration{},
+			"10s": NullDurationFrom(10 * time.Second),
+		},
+		{"Iterations", "K6_ITERATIONS"}: {
+			"":    null.Int{},
+			"123": null.IntFrom(123),
+		},
+		{"Stages", "K6_STAGES"}: {
+			// "": []Stage{},
+			"1s": []Stage{{
+				Duration: NullDurationFrom(1 * time.Second)},
+			},
+			"1s:100": []Stage{
+				{Duration: NullDurationFrom(1 * time.Second), Target: null.IntFrom(100)},
+			},
+			"1s,2s:100": []Stage{
+				{Duration: NullDurationFrom(1 * time.Second)},
+				{Duration: NullDurationFrom(2 * time.Second), Target: null.IntFrom(100)},
+			},
+		},
+		{"MaxRedirects", "K6_MAX_REDIRECTS"}: {
+			"":    null.Int{},
+			"123": null.IntFrom(123),
+		},
+		{"InsecureSkipTLSVerify", "K6_INSECURE_SKIP_TLS_VERIFY"}: {
+			"":      null.Bool{},
+			"true":  null.BoolFrom(true),
+			"false": null.BoolFrom(false),
+		},
+		// TLSCipherSuites
+		// TLSVersion
+		// TLSAuth
+		{"NoConnectionReuse", "K6_NO_CONNECTION_REUSE"}: {
+			"":      null.Bool{},
+			"true":  null.BoolFrom(true),
+			"false": null.BoolFrom(false),
+		},
+		{"UserAgent", "K6_USER_AGENT"}: {
+			"":    null.String{},
+			"Hi!": null.StringFrom("Hi!"),
+		},
+		{"Throw", "K6_THROW"}: {
+			"":      null.Bool{},
+			"true":  null.BoolFrom(true),
+			"false": null.BoolFrom(false),
+		},
+		// Thresholds
+		// External
+	}
+	for field, data := range testdata {
+		os.Clearenv()
+		t.Run(field.Name, func(t *testing.T) {
+			for str, val := range data {
+				t.Run(`"`+str+`"`, func(t *testing.T) {
+					assert.NoError(t, os.Setenv(field.Key, str))
+					var opts Options
+					assert.NoError(t, envconfig.Process("k6", &opts))
+					assert.Equal(t, val, reflect.ValueOf(opts).FieldByName(field.Name).Interface())
+				})
+			}
+		})
+	}
 }

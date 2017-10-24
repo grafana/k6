@@ -23,8 +23,11 @@ package lib
 import (
 	"crypto/md5"
 	"encoding/hex"
+	"encoding/json"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/pkg/errors"
 	"gopkg.in/guregu/null.v3"
@@ -39,21 +42,58 @@ type SourceData struct {
 	Filename string
 }
 
-type Stage struct {
+type StageFields struct {
 	Duration NullDuration `json:"duration"`
 	Target   null.Int     `json:"target"`
+}
+
+type Stage StageFields
+
+// For some reason, implementing UnmarshalText makes encoding/json treat the type as a string.
+func (s *Stage) UnmarshalJSON(b []byte) error {
+	var fields StageFields
+	if err := json.Unmarshal(b, &fields); err != nil {
+		return err
+	}
+	*s = Stage(fields)
+	return nil
+}
+
+func (s Stage) MarshalJSON() ([]byte, error) {
+	return json.Marshal(StageFields(s))
+}
+
+func (s *Stage) UnmarshalText(b []byte) error {
+	var stage Stage
+	parts := strings.SplitN(string(b), ":", 2)
+	if len(parts) > 0 && parts[0] != "" {
+		d, err := time.ParseDuration(parts[0])
+		if err != nil {
+			return err
+		}
+		stage.Duration = NullDurationFrom(d)
+	}
+	if len(parts) > 1 && parts[1] != "" {
+		t, err := strconv.ParseInt(parts[1], 10, 64)
+		if err != nil {
+			return err
+		}
+		stage.Target = null.IntFrom(t)
+	}
+	*s = stage
+	return nil
 }
 
 type Group struct {
 	ID     string            `json:"id"`
 	Path   string            `json:"path"`
 	Name   string            `json:"name"`
-	Parent *Group            `json:"parent"`
+	Parent *Group            `json:"-"`
 	Groups map[string]*Group `json:"groups"`
 	Checks map[string]*Check `json:"checks"`
 
-	groupMutex sync.Mutex
-	checkMutex sync.Mutex
+	groupMutex sync.Mutex `json:"-"`
+	checkMutex sync.Mutex `json:"-"`
 }
 
 func NewGroup(name string, parent *Group) (*Group, error) {
@@ -123,7 +163,7 @@ func (g *Group) Check(name string) (*Check, error) {
 type Check struct {
 	ID    string `json:"id"`
 	Path  string `json:"path"`
-	Group *Group `json:"group"`
+	Group *Group `json:"-"`
 	Name  string `json:"name"`
 
 	Passes int64 `json:"passes"`

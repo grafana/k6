@@ -34,6 +34,10 @@ import (
 
 type K6 struct{}
 
+func New() *K6 {
+	return &K6{}
+}
+
 func (*K6) Fail(msg string) (goja.Value, error) {
 	return goja.Undefined(), errors.New(msg)
 }

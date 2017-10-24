@@ -118,7 +118,7 @@ func TestRequest(t *testing.T) {
 	*ctx = context.Background()
 	*ctx = common.WithState(*ctx, state)
 	*ctx = common.WithRuntime(*ctx, rt)
-	rt.Set("http", common.Bind(rt, &HTTP{}, ctx))
+	rt.Set("http", common.Bind(rt, New(), ctx))
 
 	t.Run("Redirects", func(t *testing.T) {
 		t.Run("10", func(t *testing.T) {
@@ -215,10 +215,6 @@ func TestRequest(t *testing.T) {
 			assert.NoError(t, err)
 		})
 	})
-	t.Run("BadSSL", func(t *testing.T) {
-		_, err := common.RunString(rt, `http.get("https://expired.badssl.com/");`)
-		assert.EqualError(t, err, "GoError: Get https://expired.badssl.com/: x509: certificate has expired or is not yet valid")
-	})
 	t.Run("Cancelled", func(t *testing.T) {
 		hook := logtest.NewLocal(state.Logger)
 		defer hook.Reset()
@@ -304,6 +300,54 @@ func TestRequest(t *testing.T) {
 		t.Run("Invalid", func(t *testing.T) {
 			_, err := common.RunString(rt, `http.request("GET", "https://httpbin.org/html").json();`)
 			assert.EqualError(t, err, "GoError: invalid character '<' looking for beginning of value")
+		})
+	})
+	t.Run("TLS", func(t *testing.T) {
+		t.Run("cert_expired", func(t *testing.T) {
+			_, err := common.RunString(rt, `http.get("https://expired.badssl.com/");`)
+			assert.EqualError(t, err, "GoError: Get https://expired.badssl.com/: x509: certificate has expired or is not yet valid")
+		})
+		tlsVersionTests := []struct {
+			Name, URL, Version string
+		}{
+			{Name: "tls10", URL: "https://tls-v1-0.badssl.com:1010/", Version: "http.TLS_1_0"},
+			{Name: "tls11", URL: "https://tls-v1-1.badssl.com:1011/", Version: "http.TLS_1_1"},
+			{Name: "tls12", URL: "https://badssl.com/", Version: "http.TLS_1_2"},
+		}
+		for _, versionTest := range tlsVersionTests {
+			t.Run(versionTest.Name, func(t *testing.T) {
+				_, err := common.RunString(rt, fmt.Sprintf(`
+					let res = http.get("%s");
+					if (res.tls_version != %s) { throw new Error("wrong TLS version: " + res.tls_version); }
+				`, versionTest.URL, versionTest.Version))
+				assert.NoError(t, err)
+				assertRequestMetricsEmitted(t, state.Samples, "GET", versionTest.URL, "", 200, "")
+			})
+		}
+		tlsCipherSuiteTests := []struct {
+			Name, URL, CipherSuite string
+		}{
+			{Name: "cipher_suite_cbc", URL: "https://cbc.badssl.com/", CipherSuite: "TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA"},
+			{Name: "cipher_suite_ecc384", URL: "https://ecc384.badssl.com/", CipherSuite: "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256"},
+		}
+		for _, cipherSuiteTest := range tlsCipherSuiteTests {
+			t.Run(cipherSuiteTest.Name, func(t *testing.T) {
+				_, err := common.RunString(rt, fmt.Sprintf(`
+					let res = http.get("%s");
+					if (res.tls_cipher_suite != "%s") { throw new Error("wrong TLS cipher suite: " + res.tls_cipher_suite); }
+				`, cipherSuiteTest.URL, cipherSuiteTest.CipherSuite))
+				assert.NoError(t, err)
+				assertRequestMetricsEmitted(t, state.Samples, "GET", cipherSuiteTest.URL, "", 200, "")
+			})
+		}
+		t.Run("ocsp_stapled_good", func(t *testing.T) {
+			state.Samples = nil
+			_, err := common.RunString(rt, `
+			let res = http.request("GET", "https://stackoverflow.com/");
+			if (res.ocsp.status != http.OCSP_STATUS_GOOD) { throw new Error("wrong ocsp stapled response status: " + res.ocsp.status); }
+			`)
+			assert.NoError(t, err)
+			assertRequestMetricsEmitted(t, state.Samples, "GET", "https://stackoverflow.com/", "", 200, "")
 		})
 	})
 	t.Run("Invalid", func(t *testing.T) {
@@ -562,6 +606,23 @@ func TestRequest(t *testing.T) {
 					assertRequestMetricsEmitted(t, state.Samples, "GET", "https://now.httpbin.org/", "", 200, "")
 				})
 			})
+
+			t.Run("ObjectForm", func(t *testing.T) {
+				state.Samples = nil
+				_, err := common.RunString(rt, `
+				let reqs = [
+					{ url: "https://httpbin.org/", method: "GET" },
+					{ method: "GET", url: "https://now.httpbin.org/" },
+				];
+				let res = http.batch(reqs);
+				for (var key in res) {
+					if (res[key].status != 200) { throw new Error("wrong status: " + res[key].status); }
+					if (res[key].url != reqs[key].url) { throw new Error("wrong url: " + res[key].url); }
+				}`)
+				assert.NoError(t, err)
+				assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/", "", 200, "")
+				assertRequestMetricsEmitted(t, state.Samples, "GET", "https://now.httpbin.org/", "", 200, "")
+			})
 		})
 		t.Run("POST", func(t *testing.T) {
 			state.Samples = nil
@@ -591,7 +652,7 @@ func TestRequest(t *testing.T) {
 func TestTagURL(t *testing.T) {
 	rt := goja.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
-	rt.Set("http", common.Bind(rt, &HTTP{}, nil))
+	rt.Set("http", common.Bind(rt, New(), nil))
 
 	testdata := map[string]URLTag{
 		`http://httpbin.org/anything/`:               {URL: "http://httpbin.org/anything/", Name: "http://httpbin.org/anything/"},

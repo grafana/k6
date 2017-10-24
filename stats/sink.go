@@ -25,9 +25,18 @@ import (
 	"sort"
 )
 
+var (
+	_ Sink = &CounterSink{}
+	_ Sink = &GaugeSink{}
+	_ Sink = &TrendSink{}
+	_ Sink = &RateSink{}
+	_ Sink = &DummySink{}
+)
+
 type Sink interface {
-	Add(s Sample)
-	Format() map[string]float64
+	Add(s Sample)               // Add a sample to the sink.
+	Calc()                      // Make final calculations.
+	Format() map[string]float64 // Data for thresholds. (also legacy display)
 }
 
 type CounterSink struct {
@@ -38,49 +47,62 @@ func (c *CounterSink) Add(s Sample) {
 	c.Value += s.Value
 }
 
+func (c *CounterSink) Calc() {}
+
 func (c *CounterSink) Format() map[string]float64 {
 	return map[string]float64{"count": c.Value}
 }
 
 type GaugeSink struct {
-	Value float64
+	Value    float64
+	Max, Min float64
+	minSet   bool
 }
 
 func (g *GaugeSink) Add(s Sample) {
 	g.Value = s.Value
+	if s.Value > g.Max {
+		g.Max = s.Value
+	}
+	if s.Value < g.Min || !g.minSet {
+		g.Min = s.Value
+		g.minSet = true
+	}
 }
+
+func (g *GaugeSink) Calc() {}
 
 func (g *GaugeSink) Format() map[string]float64 {
 	return map[string]float64{"value": g.Value}
 }
 
 type TrendSink struct {
-	Values []float64
+	Values  []float64
+	jumbled bool
 
-	jumbled  bool
-	count    uint64
-	min, max float64
-	sum, avg float64
-	med      float64
+	Count    uint64
+	Min, Max float64
+	Sum, Avg float64
+	Med      float64
 }
 
 func (t *TrendSink) Add(s Sample) {
 	t.Values = append(t.Values, s.Value)
 	t.jumbled = true
-	t.count += 1
-	t.sum += s.Value
-	t.avg = t.sum / float64(t.count)
+	t.Count += 1
+	t.Sum += s.Value
+	t.Avg = t.Sum / float64(t.Count)
 
-	if s.Value > t.max {
-		t.max = s.Value
+	if s.Value > t.Max {
+		t.Max = s.Value
 	}
-	if s.Value < t.min || t.min == 0 {
-		t.min = s.Value
+	if s.Value < t.Min || t.Count == 1 {
+		t.Min = s.Value
 	}
 }
 
 func (t *TrendSink) P(pct float64) float64 {
-	switch t.count {
+	switch t.Count {
 	case 0:
 		return 0
 	case 1:
@@ -92,26 +114,32 @@ func (t *TrendSink) P(pct float64) float64 {
 			return t.Values[1]
 		}
 	default:
-		return t.Values[int(float64(t.count)*pct)]
+		return t.Values[int(float64(t.Count)*pct)]
+	}
+}
+
+func (t *TrendSink) Calc() {
+	if !t.jumbled {
+		return
+	}
+
+	sort.Float64s(t.Values)
+	t.jumbled = false
+
+	// The median of an even number of values is the average of the middle two.
+	if (t.Count & 0x01) == 0 {
+		t.Med = (t.Med + t.Values[(t.Count/2)-1]) / 2
+	} else {
+		t.Med = t.Values[t.Count/2]
 	}
 }
 
 func (t *TrendSink) Format() map[string]float64 {
-	if t.jumbled {
-		sort.Float64s(t.Values)
-		t.jumbled = false
-
-		t.med = t.Values[t.count/2]
-		if (t.count & 0x01) == 0 {
-			t.med = (t.med + t.Values[(t.count/2)-1]) / 2
-		}
-	}
-
 	return map[string]float64{
-		"min":   t.min,
-		"max":   t.max,
-		"avg":   t.avg,
-		"med":   t.med,
+		"min":   t.Min,
+		"max":   t.Max,
+		"avg":   t.Avg,
+		"med":   t.Med,
 		"p(90)": t.P(0.90),
 		"p(95)": t.P(0.95),
 	}
@@ -129,6 +157,8 @@ func (r *RateSink) Add(s Sample) {
 	}
 }
 
+func (r RateSink) Calc() {}
+
 func (r RateSink) Format() map[string]float64 {
 	return map[string]float64{"rate": float64(r.Trues) / float64(r.Total)}
 }
@@ -138,6 +168,8 @@ type DummySink map[string]float64
 func (d DummySink) Add(s Sample) {
 	panic(errors.New("you can't add samples to a dummy sink"))
 }
+
+func (d DummySink) Calc() {}
 
 func (d DummySink) Format() map[string]float64 {
 	return map[string]float64(d)
