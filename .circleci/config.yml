@@ -33,7 +33,7 @@ jobs:
       - run:
           name: code coverage
           command: |
-            docker run --entrypoint /bin/sh loadimpact/k6 -c 'apk --no-cache add --virtual .deps git make build-base && cd $GOPATH/src/github.com/loadimpact/k6 && go get -t ./... && go get github.com/mattn/goveralls && go test -v -cover -coverprofile=/root/coverage.out && goveralls -coverprofile=/root/coverage.out -service=circle-ci -repotoken=${COVERALLS_TOKEN}'
+            docker run --entrypoint /bin/sh loadimpact/k6 -c 'apk --no-cache add --virtual .deps git make build-base && cd $GOPATH/src/github.com/loadimpact/k6 && go get -t ./... && go get github.com/mattn/goveralls && go test -v -cover -coverprofile=./coverage.out && goveralls -coverprofile=./coverage.out -service=circle-ci -repotoken=${COVERALLS_TOKEN}'
       - deploy:
           name: Push application Docker image
           command: |
