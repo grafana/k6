@@ -33,9 +33,7 @@ jobs:
       - run:
           name: code coverage
           command: |
-            go get github.com/mattn/goveralls
-            go test -v -cover -race -coverprofile=/home/ubuntu/coverage.out
-            /home/ubuntu/.go_workspace/bin/goveralls -coverprofile=/home/ubuntu/coverage.out -service=circle-ci -repotoken=$COVERALLS_TOKEN
+          docker run --entrypoint /bin/sh loadimpact/k6 -c 'apk --no-cache add --virtual .deps git make build-base && cd $GOPATH/src/github.com/loadimpact/k6 && go get -t ./... && go get github.com/mattn/goveralls && go test -v -cover -race -coverprofile=/root/coverage.out && goveralls -coverprofile=/root/coverage.out -service=circle-ci -repotoken=${COVERALLS_TOKEN}'
       - deploy:
           name: Push application Docker image
           command: |
