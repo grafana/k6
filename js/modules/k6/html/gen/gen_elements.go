@@ -10,7 +10,7 @@ import (
 	"strings"
 	"text/template"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 // Generate elements_gen.go. There are two sections of code which need to be generated. The selToElement function and the attribute accessor methods.
