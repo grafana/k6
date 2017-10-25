@@ -86,7 +86,6 @@ type HTTP struct {
 	OCSP_REASON_AA_COMPROMISE          string `js:"OCSP_REASON_AA_COMPROMISE"`
 }
 
-<<<<<<< 93373207f9385fe87d544cd849358263659e082d
 func New() *HTTP {
 	return &HTTP{
 		SSL_3_0:                            SSL_3_0,
@@ -107,43 +106,6 @@ func New() *HTTP {
 		OCSP_REASON_REMOVE_FROM_CRL:        OCSP_REASON_REMOVE_FROM_CRL,
 		OCSP_REASON_PRIVILEGE_WITHDRAWN:    OCSP_REASON_PRIVILEGE_WITHDRAWN,
 		OCSP_REASON_AA_COMPROMISE:          OCSP_REASON_AA_COMPROMISE,
-=======
-type HTTPResponse struct {
-	ctx context.Context
-
-	RemoteIP   string
-	RemotePort int
-	URL        string
-	Status     int
-	Proto      string
-	Headers    map[string]string
-	Body       string
-	Timings    HTTPResponseTimings
-	Error      string
-
-	cachedJSON goja.Value
-}
-
-func (res *HTTPResponse) Json() goja.Value {
-	if res.cachedJSON == nil {
-		var v interface{}
-		if err := json.Unmarshal([]byte(res.Body), &v); err != nil {
-			common.Throw(common.GetRuntime(res.ctx), err)
-		}
-		res.cachedJSON = common.GetRuntime(res.ctx).ToValue(v)
-	}
-	return res.cachedJSON
-}
-
-func (res *HTTPResponse) Html(selector ...string) html.Selection {
-	sel, err := html.HTML{}.ParseHTML(res.ctx, res.Body)
-	if err != nil {
-		common.Throw(common.GetRuntime(res.ctx), err)
-	}
-	sel.URL = res.URL
-	if len(selector) > 0 {
-		sel = sel.Find(selector[0])
->>>>>>> Make accessors for attributes which contain urls behave similarly to DOM API.
 	}
 }
 
