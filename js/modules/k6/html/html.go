@@ -53,7 +53,7 @@ type Selection struct {
 }
 
 func (s Selection) emptySelection() Selection {
-	// Ask for out of bounds item for an empty selection.
+	// Goquery has no direct way to return an empty selection apart from asking for an out of bounds item.
 	return s.Eq(s.Size())
 }
 
