@@ -318,7 +318,6 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 			}
 			if len(via) > max {
 				if redirects < 0 {
-					log.Println(via[0].Response)
 					state.Logger.WithFields(log.Fields{
 						"error": fmt.Sprintf("Possible redirect loop, %d response returned last, %d redirects followed; pass { redirects: n } in request params to silence this", via[len(via)-1].Response.StatusCode, max),
 						"url":   via[0].URL.String(),
@@ -388,7 +387,7 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 		}
 
 		var resCookies []*http.Cookie
-		if client.Jar != nil {
+		if activeJar != nil {
 			resCookies = res.Cookies()
 		}
 		resp.Cookies = make(map[string][]*HTTPCookie, len(resCookies))

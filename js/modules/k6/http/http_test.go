@@ -408,11 +408,12 @@ func TestRequest(t *testing.T) {
 				state.CookieJar = cookieJar
 				state.Samples = nil
 				_, err = common.RunString(rt, `
-				let res = http.request("GET", "https://httpbin.org/cookies/set?key=value", null, { follow: false });
-				if (res.cookies.key[0] != "value") { throw new Error("wrong cookie value: " + res.cookies.key[0]); }
+				let res = http.request("GET", "https://httpbin.org/cookies/set?key=value", null, { redirects: 0 });
+				if (res.cookies.key[0].value != "value") { throw new Error("wrong cookie value: " + res.cookies.key[0].value); }
+				if (res.cookies.key[0].path != "/") { throw new Error("wrong cookie value: " + res.cookies.key[0].path); }
 				`)
 				assert.NoError(t, err)
-				assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/cookies", "https://httpbin.org/cookies/set?key=value", 200, "")
+				assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/cookies/set?key=value", "", 302, "")
 			})
 
 			t.Run("vuJar", func(t *testing.T) {
