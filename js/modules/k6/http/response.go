@@ -134,6 +134,7 @@ func (res *HTTPResponse) Html(selector ...string) html.Selection {
 	if err != nil {
 		common.Throw(common.GetRuntime(res.ctx), err)
 	}
+	sel.URL = res.URL
 	if len(selector) > 0 {
 		sel = sel.Find(selector[0])
 	}
