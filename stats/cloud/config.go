@@ -25,10 +25,11 @@ import (
 )
 
 type ConfigFields struct {
-	Token     string `json:"token" mapstructure:"token" envconfig:"CLOUD_TOKEN"`
-	Name      string `json:"name" mapstructure:"name" envconfig:"CLOUD_NAME"`
-	Host      string `json:"host" mapstructure:"host" envconfig:"CLOUD_HOST"`
-	ProjectID int    `json:"project_id" mapstructure:"project_id" envconfig:"CLOUD_PROJECT_ID"`
+	Token           string `json:"token" mapstructure:"token" envconfig:"CLOUD_TOKEN"`
+	Name            string `json:"name" mapstructure:"name" envconfig:"CLOUD_NAME"`
+	Host            string `json:"host" mapstructure:"host" envconfig:"CLOUD_HOST"`
+	ProjectID       int    `json:"project_id" mapstructure:"project_id" envconfig:"CLOUD_PROJECT_ID"`
+	DeprecatedToken string `envconfig:"K6CLOUD_TOKEN"`
 }
 
 type Config ConfigFields
