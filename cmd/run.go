@@ -24,6 +24,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -235,7 +236,15 @@ a commandline interface for interacting with it.`,
 			go func() {
 				u := "http://k6reports.loadimpact.com/"
 				mime := "application/json"
-				body := []byte(`{"k6_version":"` + Version + `"}`)
+				body, err := json.Marshal(map[string]interface{}{
+					"k6_version": Version,
+					"vus_max":    engine.Executor.GetVUsMax(),
+					"duration":   engine.Executor.GetEndTime(),
+					"iterations": engine.Executor.GetEndIterations(),
+				})
+				if err != nil {
+					panic(err) // This should never happen!!
+				}
 				if _, err := http.Post(u, mime, bytes.NewBuffer(body)); err != nil {
 					log.WithError(err).Debug("Couldn't send usage blip")
 				}
