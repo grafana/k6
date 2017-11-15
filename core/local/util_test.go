@@ -66,10 +66,12 @@ func TestProcessStages(t *testing.T) {
 		VUs  null.Int
 	}
 	testdata := map[string]struct {
+		Start       int64
 		Stages      []lib.Stage
 		Checkpoints []checkpoint
 	}{
 		"none": {
+			0,
 			[]lib.Stage{},
 			[]checkpoint{
 				{0 * time.Second, false, null.NewInt(0, false)},
@@ -78,6 +80,7 @@ func TestProcessStages(t *testing.T) {
 			},
 		},
 		"one": {
+			0,
 			[]lib.Stage{
 				{Duration: lib.NullDurationFrom(10 * time.Second)},
 			},
@@ -88,7 +91,20 @@ func TestProcessStages(t *testing.T) {
 				{11 * time.Second, false, null.NewInt(0, false)},
 			},
 		},
+		"one/start": {
+			5,
+			[]lib.Stage{
+				{Duration: lib.NullDurationFrom(10 * time.Second)},
+			},
+			[]checkpoint{
+				{0 * time.Second, true, null.NewInt(5, false)},
+				{1 * time.Second, true, null.NewInt(5, false)},
+				{10 * time.Second, true, null.NewInt(5, false)},
+				{11 * time.Second, false, null.NewInt(5, false)},
+			},
+		},
 		"one/targeted": {
+			0,
 			[]lib.Stage{
 				{Duration: lib.NullDurationFrom(10 * time.Second), Target: null.IntFrom(100)},
 			},
@@ -107,7 +123,28 @@ func TestProcessStages(t *testing.T) {
 				{11 * time.Second, false, null.IntFrom(100)},
 			},
 		},
+		"one/targeted/start": {
+			50,
+			[]lib.Stage{
+				{Duration: lib.NullDurationFrom(10 * time.Second), Target: null.IntFrom(100)},
+			},
+			[]checkpoint{
+				{0 * time.Second, true, null.IntFrom(50)},
+				{1 * time.Second, true, null.IntFrom(55)},
+				{2 * time.Second, true, null.IntFrom(60)},
+				{3 * time.Second, true, null.IntFrom(65)},
+				{4 * time.Second, true, null.IntFrom(70)},
+				{5 * time.Second, true, null.IntFrom(75)},
+				{6 * time.Second, true, null.IntFrom(80)},
+				{7 * time.Second, true, null.IntFrom(85)},
+				{8 * time.Second, true, null.IntFrom(90)},
+				{9 * time.Second, true, null.IntFrom(95)},
+				{10 * time.Second, true, null.IntFrom(100)},
+				{11 * time.Second, false, null.IntFrom(100)},
+			},
+		},
 		"two": {
+			0,
 			[]lib.Stage{
 				{Duration: lib.NullDurationFrom(5 * time.Second)},
 				{Duration: lib.NullDurationFrom(5 * time.Second)},
@@ -118,7 +155,20 @@ func TestProcessStages(t *testing.T) {
 				{11 * time.Second, false, null.NewInt(0, false)},
 			},
 		},
+		"two/start": {
+			5,
+			[]lib.Stage{
+				{Duration: lib.NullDurationFrom(5 * time.Second)},
+				{Duration: lib.NullDurationFrom(5 * time.Second)},
+			},
+			[]checkpoint{
+				{0 * time.Second, true, null.NewInt(5, false)},
+				{1 * time.Second, true, null.NewInt(5, false)},
+				{11 * time.Second, false, null.NewInt(5, false)},
+			},
+		},
 		"two/targeted": {
+			0,
 			[]lib.Stage{
 				{Duration: lib.NullDurationFrom(5 * time.Second), Target: null.IntFrom(100)},
 				{Duration: lib.NullDurationFrom(5 * time.Second), Target: null.IntFrom(0)},
@@ -139,6 +189,7 @@ func TestProcessStages(t *testing.T) {
 			},
 		},
 		"three": {
+			0,
 			[]lib.Stage{
 				{Duration: lib.NullDurationFrom(5 * time.Second)},
 				{Duration: lib.NullDurationFrom(10 * time.Second)},
@@ -153,6 +204,7 @@ func TestProcessStages(t *testing.T) {
 			},
 		},
 		"three/targeted": {
+			0,
 			[]lib.Stage{
 				{Duration: lib.NullDurationFrom(5 * time.Second), Target: null.IntFrom(50)},
 				{Duration: lib.NullDurationFrom(5 * time.Second), Target: null.IntFrom(100)},
@@ -179,6 +231,7 @@ func TestProcessStages(t *testing.T) {
 			},
 		},
 		"mix": {
+			0,
 			[]lib.Stage{
 				{Duration: lib.NullDurationFrom(5 * time.Second), Target: null.IntFrom(20)},
 				{Duration: lib.NullDurationFrom(5 * time.Second), Target: null.IntFrom(10)},
@@ -221,7 +274,30 @@ func TestProcessStages(t *testing.T) {
 				{24 * time.Second, true, null.IntFrom(10)},
 			},
 		},
+		"mix/start": {
+			5,
+			[]lib.Stage{
+				{Duration: lib.NullDurationFrom(5 * time.Second)},
+				{Duration: lib.NullDurationFrom(5 * time.Second), Target: null.IntFrom(10)},
+			},
+			[]checkpoint{
+				{0 * time.Second, true, null.NewInt(5, false)},
+
+				{1 * time.Second, true, null.NewInt(5, false)},
+				{2 * time.Second, true, null.NewInt(5, false)},
+				{3 * time.Second, true, null.NewInt(5, false)},
+				{4 * time.Second, true, null.NewInt(5, false)},
+				{5 * time.Second, true, null.NewInt(5, false)},
+
+				{6 * time.Second, true, null.NewInt(6, true)},
+				{7 * time.Second, true, null.NewInt(7, true)},
+				{8 * time.Second, true, null.NewInt(8, true)},
+				{9 * time.Second, true, null.NewInt(9, true)},
+				{10 * time.Second, true, null.NewInt(10, true)},
+			},
+		},
 		"infinite": {
+			0,
 			[]lib.Stage{{}},
 			[]checkpoint{
 				{0 * time.Second, true, null.NewInt(0, false)},
@@ -236,7 +312,7 @@ func TestProcessStages(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			for _, ckp := range data.Checkpoints {
 				t.Run(ckp.D.String(), func(t *testing.T) {
-					vus, keepRunning := ProcessStages(data.Stages, ckp.D)
+					vus, keepRunning := ProcessStages(data.Start, data.Stages, ckp.D)
 					assert.Equal(t, ckp.VUs, vus)
 					assert.Equal(t, ckp.Keep, keepRunning)
 				})

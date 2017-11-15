@@ -39,8 +39,8 @@ func SumStages(stages []lib.Stage) (d lib.NullDuration) {
 }
 
 // Returns the VU count and whether to keep going at the specified time.
-func ProcessStages(stages []lib.Stage, t time.Duration) (null.Int, bool) {
-	var vus null.Int
+func ProcessStages(startVUs int64, stages []lib.Stage, t time.Duration) (null.Int, bool) {
+	vus := null.NewInt(startVUs, false)
 
 	var start time.Duration
 	for _, stage := range stages {
