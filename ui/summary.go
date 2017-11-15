@@ -283,6 +283,8 @@ func SummarizeMetrics(w io.Writer, indent string, t time.Duration, metrics map[s
 
 // Summarizes a dataset and returns whether the test run was considered a success.
 func Summarize(w io.Writer, indent string, data SummaryData) {
-	SummarizeGroup(w, indent+"    ", data.Root)
+	if data.Root != nil {
+		SummarizeGroup(w, indent+"    ", data.Root)
+	}
 	SummarizeMetrics(w, indent+"  ", data.Time, data.Metrics)
 }
