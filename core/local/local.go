@@ -63,10 +63,14 @@ func (h *vuHandle) run(logger *log.Logger, flow <-chan int64, out chan<- []stats
 		if h.vu != nil {
 			s, err := h.vu.RunOnce(ctx)
 			if err != nil {
-				if s, ok := err.(fmt.Stringer); ok {
-					logger.Error(s.String())
-				} else {
-					logger.Error(err.Error())
+				select {
+				case <-ctx.Done():
+				default:
+					if s, ok := err.(fmt.Stringer); ok {
+						logger.Error(s.String())
+					} else {
+						logger.Error(err.Error())
+					}
 				}
 			}
 			samples = s
