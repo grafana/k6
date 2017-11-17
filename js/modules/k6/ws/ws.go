@@ -253,9 +253,9 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 			sessionDuration := stats.D(end.Sub(start))
 
 			samples := []stats.Sample{
-				{Metric: metrics.WSSessions, Time: end, Tags: tags, Value: 1},
-				{Metric: metrics.WSConnecting, Time: end, Tags: tags, Value: connectionDuration},
-				{Metric: metrics.WSSessionDuration, Time: end, Tags: tags, Value: sessionDuration},
+				{Metric: metrics.WSSessions, Time: start, Tags: tags, Value: 1},
+				{Metric: metrics.WSConnecting, Time: start, Tags: tags, Value: connectionDuration},
+				{Metric: metrics.WSSessionDuration, Time: start, Tags: tags, Value: sessionDuration},
 			}
 
 			for _, msgSentTimestamp := range socket.msgSentTimestamps {
