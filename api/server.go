@@ -29,6 +29,7 @@ import (
 	"github.com/loadimpact/k6/core"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/negroni"
+	"github.com/loadimpact/k6/api/prometheus"
 )
 
 func NewHandler() http.Handler {
@@ -36,6 +37,7 @@ func NewHandler() http.Handler {
 	mux.Handle("/v1/", v1.NewHandler())
 	mux.Handle("/ping", HandlePing())
 	mux.Handle("/", HandlePing())
+	mux.Handle("/metrics", prometheus.HandlePrometheusMetrics())
 	return mux
 }
 
