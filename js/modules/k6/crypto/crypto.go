@@ -32,6 +32,7 @@ import (
 	"errors"
 	"hash"
 
+	"github.com/dop251/goja"
 	"golang.org/x/crypto/md4"
 	"golang.org/x/crypto/ripemd160"
 
@@ -50,55 +51,55 @@ func New() *Crypto {
 	return &Crypto{}
 }
 
-func (c *Crypto) Md4(ctx context.Context, input string, outputEncoding string) string {
+func (c *Crypto) Md4(ctx context.Context, input goja.Value, outputEncoding string) string {
 	hasher := c.CreateHash(ctx, "md4")
 	hasher.Update(input)
 	return hasher.Digest(outputEncoding)
 }
 
-func (c *Crypto) Md5(ctx context.Context, input string, outputEncoding string) string {
+func (c *Crypto) Md5(ctx context.Context, input goja.Value, outputEncoding string) string {
 	hasher := c.CreateHash(ctx, "md5")
 	hasher.Update(input)
 	return hasher.Digest(outputEncoding)
 }
 
-func (c *Crypto) Sha1(ctx context.Context, input string, outputEncoding string) string {
+func (c *Crypto) Sha1(ctx context.Context, input goja.Value, outputEncoding string) string {
 	hasher := c.CreateHash(ctx, "sha1")
 	hasher.Update(input)
 	return hasher.Digest(outputEncoding)
 }
 
-func (c *Crypto) Sha256(ctx context.Context, input string, outputEncoding string) string {
+func (c *Crypto) Sha256(ctx context.Context, input goja.Value, outputEncoding string) string {
 	hasher := c.CreateHash(ctx, "sha256")
 	hasher.Update(input)
 	return hasher.Digest(outputEncoding)
 }
 
-func (c *Crypto) Sha384(ctx context.Context, input string, outputEncoding string) string {
+func (c *Crypto) Sha384(ctx context.Context, input goja.Value, outputEncoding string) string {
 	hasher := c.CreateHash(ctx, "sha384")
 	hasher.Update(input)
 	return hasher.Digest(outputEncoding)
 }
 
-func (c *Crypto) Sha512(ctx context.Context, input string, outputEncoding string) string {
+func (c *Crypto) Sha512(ctx context.Context, input goja.Value, outputEncoding string) string {
 	hasher := c.CreateHash(ctx, "sha512")
 	hasher.Update(input)
 	return hasher.Digest(outputEncoding)
 }
 
-func (c *Crypto) Sha512_224(ctx context.Context, input string, outputEncoding string) string {
+func (c *Crypto) Sha512_224(ctx context.Context, input goja.Value, outputEncoding string) string {
 	hasher := c.CreateHash(ctx, "sha512_224")
 	hasher.Update(input)
 	return hasher.Digest(outputEncoding)
 }
 
-func (c *Crypto) Sha512_256(ctx context.Context, input string, outputEncoding string) string {
+func (c *Crypto) Sha512_256(ctx context.Context, input goja.Value, outputEncoding string) string {
 	hasher := c.CreateHash(ctx, "sha512_256")
 	hasher.Update(input)
 	return hasher.Digest(outputEncoding)
 }
 
-func (c *Crypto) Ripemd160(ctx context.Context, input string, outputEncoding string) string {
+func (c *Crypto) Ripemd160(ctx context.Context, input goja.Value, outputEncoding string) string {
 	hasher := c.CreateHash(ctx, "ripemd160")
 	hasher.Update(input)
 	return hasher.Digest(outputEncoding)
@@ -132,8 +133,15 @@ func (*Crypto) CreateHash(ctx context.Context, algorithm string) *Hasher {
 	return &hasher
 }
 
-func (hasher *Hasher) Update(input string) {
-	_, err := hasher.hash.Write([]byte(input))
+func (hasher *Hasher) Update(input goja.Value) {
+	var data []byte
+	if input.ExportType().String() == "string" {
+		data = []byte(input.String())
+	} else {
+		ob := input.ToObject(common.GetRuntime(hasher.ctx))
+		data = ob.Get("data").Export().([]byte)
+	}
+	_, err := hasher.hash.Write(data)
 	if err != nil {
 		common.Throw(common.GetRuntime(hasher.ctx), err)
 	}
@@ -163,10 +171,21 @@ func (hasher *Hasher) Digest(outputEncoding string) string {
 	return ""
 }
 
-func (c Crypto) CreateHMAC(ctx context.Context, algorithm string, key string) *Hasher {
+func (c Crypto) CreateHMAC(ctx context.Context, algorithm string, key goja.Value) *Hasher {
 	hasher := Hasher{}
 	hasher.ctx = ctx
-	keyBuffer := []byte(key)
+	var keyBuffer []byte
+
+	if key.ExportType().String() == "string" {
+		keyBuffer = []byte(key.String())
+	} else {
+		v := common.FileData{}
+		err := common.GetRuntime(hasher.ctx).ExportTo(key, v)
+		if err != nil {
+			common.Throw(common.GetRuntime(hasher.ctx), err)
+		}
+		keyBuffer = v.Bytes()
+	}
 
 	switch algorithm {
 	case "md4":
@@ -195,7 +214,7 @@ func (c Crypto) CreateHMAC(ctx context.Context, algorithm string, key string) *H
 	return &hasher
 }
 
-func (c *Crypto) Hmac(ctx context.Context, algorithm string, key string, input string, outputEncoding string) string {
+func (c *Crypto) Hmac(ctx context.Context, algorithm string, key goja.Value, input goja.Value, outputEncoding string) string {
 	hasher := c.CreateHMAC(ctx, algorithm, key)
 	hasher.Update(input)
 	return hasher.Digest(outputEncoding)
