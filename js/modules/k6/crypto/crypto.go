@@ -179,12 +179,8 @@ func (c Crypto) CreateHMAC(ctx context.Context, algorithm string, key goja.Value
 	if key.ExportType().String() == "string" {
 		keyBuffer = []byte(key.String())
 	} else {
-		v := common.FileData{}
-		err := common.GetRuntime(hasher.ctx).ExportTo(key, v)
-		if err != nil {
-			common.Throw(common.GetRuntime(hasher.ctx), err)
-		}
-		keyBuffer = v.Bytes()
+		ob := key.ToObject(common.GetRuntime(hasher.ctx))
+		keyBuffer = ob.Get("data").Export().([]byte)
 	}
 
 	switch algorithm {
