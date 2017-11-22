@@ -44,8 +44,8 @@ type Runner interface {
 	// Returns the option set.
 	GetOptions() Options
 
-	// Applies a set of options.
-	ApplyOptions(opts Options)
+	// Sets the option set.
+	SetOptions(opts Options)
 }
 
 // A VU is a Virtual User.
@@ -82,7 +82,7 @@ func (fn RunnerFunc) GetOptions() Options {
 	return Options{}
 }
 
-func (fn RunnerFunc) ApplyOptions(opts Options) {
+func (fn RunnerFunc) SetOptions(opts Options) {
 }
 
 type RunnerFuncVU struct {
