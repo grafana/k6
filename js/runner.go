@@ -169,8 +169,8 @@ func (r *Runner) GetOptions() lib.Options {
 	return r.Bundle.Options
 }
 
-func (r *Runner) ApplyOptions(opts lib.Options) {
-	r.Bundle.Options = r.Bundle.Options.Apply(opts)
+func (r *Runner) SetOptions(opts lib.Options) {
+	r.Bundle.Options = opts
 }
 
 type VU struct {

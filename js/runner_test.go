@@ -108,10 +108,10 @@ func TestRunnerOptions(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			assert.Equal(t, r.Bundle.Options, r.GetOptions())
 			assert.Equal(t, null.NewBool(false, false), r.Bundle.Options.Paused)
-			r.ApplyOptions(lib.Options{Paused: null.BoolFrom(true)})
+			r.SetOptions(lib.Options{Paused: null.BoolFrom(true)})
 			assert.Equal(t, r.Bundle.Options, r.GetOptions())
 			assert.Equal(t, null.NewBool(true, true), r.Bundle.Options.Paused)
-			r.ApplyOptions(lib.Options{Paused: null.BoolFrom(false)})
+			r.SetOptions(lib.Options{Paused: null.BoolFrom(false)})
 			assert.Equal(t, r.Bundle.Options, r.GetOptions())
 			assert.Equal(t, null.NewBool(false, true), r.Bundle.Options.Paused)
 		})
@@ -197,7 +197,7 @@ func TestVURunContext(t *testing.T) {
 	if !assert.NoError(t, err) {
 		return
 	}
-	r1.ApplyOptions(lib.Options{Throw: null.BoolFrom(true)})
+	r1.SetOptions(r1.GetOptions().Apply(lib.Options{Throw: null.BoolFrom(true)}))
 
 	r2, err := NewFromArchive(r1.MakeArchive())
 	if !assert.NoError(t, err) {
@@ -374,8 +374,7 @@ func TestVUIntegrationInsecureRequests(t *testing.T) {
 			if !assert.NoError(t, err) {
 				return
 			}
-			r1.ApplyOptions(lib.Options{Throw: null.BoolFrom(true)})
-			r1.ApplyOptions(data.opts)
+			r1.SetOptions(lib.Options{Throw: null.BoolFrom(true)}.Apply(data.opts))
 
 			r2, err := NewFromArchive(r1.MakeArchive())
 			if !assert.NoError(t, err) {
@@ -444,8 +443,7 @@ func TestVUIntegrationTLSConfig(t *testing.T) {
 			if !assert.NoError(t, err) {
 				return
 			}
-			r1.ApplyOptions(lib.Options{Throw: null.BoolFrom(true)})
-			r1.ApplyOptions(data.opts)
+			r1.SetOptions(lib.Options{Throw: null.BoolFrom(true)}.Apply(data.opts))
 
 			r2, err := NewFromArchive(r1.MakeArchive())
 			if !assert.NoError(t, err) {
@@ -488,7 +486,7 @@ func TestVUIntegrationHTTP2(t *testing.T) {
 	if !assert.NoError(t, err) {
 		return
 	}
-	r1.ApplyOptions(lib.Options{Throw: null.BoolFrom(true)})
+	r1.SetOptions(lib.Options{Throw: null.BoolFrom(true)})
 
 	r2, err := NewFromArchive(r1.MakeArchive())
 	if !assert.NoError(t, err) {
@@ -540,7 +538,7 @@ func TestVUIntegrationCookies(t *testing.T) {
 	if !assert.NoError(t, err) {
 		return
 	}
-	r1.ApplyOptions(lib.Options{
+	r1.SetOptions(lib.Options{
 		Throw:        null.BoolFrom(true),
 		MaxRedirects: null.IntFrom(10),
 	})
@@ -577,7 +575,7 @@ func TestVUIntegrationVUID(t *testing.T) {
 	if !assert.NoError(t, err) {
 		return
 	}
-	r1.ApplyOptions(lib.Options{Throw: null.BoolFrom(true)})
+	r1.SetOptions(lib.Options{Throw: null.BoolFrom(true)})
 
 	r2, err := NewFromArchive(r1.MakeArchive())
 	if !assert.NoError(t, err) {
@@ -672,7 +670,7 @@ func TestVUIntegrationClientCerts(t *testing.T) {
 	if !assert.NoError(t, err) {
 		return
 	}
-	r1.ApplyOptions(lib.Options{
+	r1.SetOptions(lib.Options{
 		Throw: null.BoolFrom(true),
 		InsecureSkipTLSVerify: null.BoolFrom(true),
 	})
@@ -696,7 +694,7 @@ func TestVUIntegrationClientCerts(t *testing.T) {
 		}
 	})
 
-	r1.ApplyOptions(lib.Options{
+	r1.SetOptions(lib.Options{
 		TLSAuth: []*lib.TLSAuth{
 			{
 				TLSAuthFields: lib.TLSAuthFields{

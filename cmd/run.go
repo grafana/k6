@@ -116,15 +116,15 @@ a commandline interface for interacting with it.`,
 		// defaults in there, override with Runner-provided ones, then merge the CLI opts in
 		// on top to give them priority.
 		fmt.Fprintf(stdout, "%s options\r", initBar.String())
+		cliConf, err := getConfig(cmd.Flags())
+		if err != nil {
+			return err
+		}
 		fileConf, _, err := readDiskConfig()
 		if err != nil {
 			return err
 		}
 		envConf, err := readEnvConfig()
-		if err != nil {
-			return err
-		}
-		cliConf, err := getConfig(cmd.Flags())
 		if err != nil {
 			return err
 		}
@@ -149,7 +149,7 @@ a commandline interface for interacting with it.`,
 		}
 
 		// Write options back to the runner too.
-		r.ApplyOptions(conf.Options)
+		r.SetOptions(conf.Options)
 
 		// Create an engine with a local executor, wrapping the Runner.
 		fmt.Fprintf(stdout, "%s   engine\r", initBar.String())
