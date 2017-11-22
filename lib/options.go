@@ -188,6 +188,9 @@ func (o Options) Apply(opts Options) Options {
 	if opts.MaxRedirects.Valid {
 		o.MaxRedirects = opts.MaxRedirects
 	}
+	if !o.MaxRedirects.Valid {
+		o.MaxRedirects = null.IntFrom(10)
+	}
 	if opts.InsecureSkipTLSVerify.Valid {
 		o.InsecureSkipTLSVerify = opts.InsecureSkipTLSVerify
 	}
