@@ -129,32 +129,31 @@ a commandline interface for interacting with it.`,
 			return err
 		}
 		conf := cliConf.Apply(fileConf).Apply(Config{Options: r.GetOptions()}).Apply(envConf).Apply(cliConf)
-		opts := conf.Options
 
 		// If -m/--max isn't specified, figure out the max that should be needed.
-		if !opts.VUsMax.Valid {
-			opts.VUsMax = null.IntFrom(opts.VUs.Int64)
-			for _, stage := range opts.Stages {
-				if stage.Target.Valid && stage.Target.Int64 > opts.VUsMax.Int64 {
-					opts.VUsMax = stage.Target
+		if !conf.VUsMax.Valid {
+			conf.VUsMax = null.IntFrom(conf.VUs.Int64)
+			for _, stage := range conf.Stages {
+				if stage.Target.Valid && stage.Target.Int64 > conf.VUsMax.Int64 {
+					conf.VUsMax = stage.Target
 				}
 			}
 		}
 		// If -d/--duration, -i/--iterations and -s/--stage are all unset, run to one iteration.
-		if !opts.Duration.Valid && !opts.Iterations.Valid && opts.Stages == nil {
-			opts.Iterations = null.IntFrom(1)
+		if !conf.Duration.Valid && !conf.Iterations.Valid && conf.Stages == nil {
+			conf.Iterations = null.IntFrom(1)
 		}
 		// If duration is explicitly set to 0, it means run forever.
-		if opts.Duration.Valid && opts.Duration.Duration == 0 {
-			opts.Duration = lib.NullDuration{}
+		if conf.Duration.Valid && conf.Duration.Duration == 0 {
+			conf.Duration = lib.NullDuration{}
 		}
 
 		// Write options back to the runner too.
-		r.ApplyOptions(opts)
+		r.ApplyOptions(conf.Options)
 
 		// Create an engine with a local executor, wrapping the Runner.
 		fmt.Fprintf(stdout, "%s   engine\r", initBar.String())
-		engine, err := core.NewEngine(local.New(r), opts)
+		engine, err := core.NewEngine(local.New(r), conf.Options)
 		if err != nil {
 			return err
 		}
@@ -199,14 +198,14 @@ a commandline interface for interacting with it.`,
 
 			duration := ui.GrayColor.Sprint("-")
 			iterations := ui.GrayColor.Sprint("-")
-			if opts.Duration.Valid {
-				duration = ui.ValueColor.Sprint(opts.Duration.Duration)
+			if conf.Duration.Valid {
+				duration = ui.ValueColor.Sprint(conf.Duration.Duration)
 			}
-			if opts.Iterations.Valid {
-				iterations = ui.ValueColor.Sprint(opts.Iterations.Int64)
+			if conf.Iterations.Valid {
+				iterations = ui.ValueColor.Sprint(conf.Iterations.Int64)
 			}
-			vus := ui.ValueColor.Sprint(opts.VUs.Int64)
-			max := ui.ValueColor.Sprint(opts.VUsMax.Int64)
+			vus := ui.ValueColor.Sprint(conf.VUs.Int64)
+			max := ui.ValueColor.Sprint(conf.VUsMax.Int64)
 
 			leftWidth := ui.StrWidth(duration)
 			if l := ui.StrWidth(vus); l > leftWidth {
@@ -349,7 +348,7 @@ a commandline interface for interacting with it.`,
 		if !quiet {
 			fmt.Fprintf(stdout, "\n")
 			ui.Summarize(stdout, "", ui.SummaryData{
-				Opts:    opts,
+				Opts:    conf.Options,
 				Root:    engine.Executor.GetRunner().GetDefaultGroup(),
 				Metrics: engine.Metrics,
 				Time:    engine.Executor.GetTime(),
