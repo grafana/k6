@@ -309,9 +309,13 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 				}
 			}
 
-			if l := len(via); int64(l) >= redirects.Int64 {
+			if l := len(via); int64(l) > redirects.Int64 {
 				if !redirects.Valid {
-					state.Logger.WithFields(log.Fields{"url": req.URL}).Warnf("Stopped after %d redirects and returned the redirection; pass { redirects: n } in request params or set global maxRedirects to silence this", l)
+					url := req.URL
+					if l > 0 {
+						url = via[0].URL
+					}
+					state.Logger.WithFields(log.Fields{"url": url.String()}).Warnf("Stopped after %d redirects and returned the redirection; pass { redirects: n } in request params or set global maxRedirects to silence this", l)
 				}
 				return http.ErrUseLastResponse
 			}
