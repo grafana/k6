@@ -1,0 +1,8 @@
+language: go
+
+go:
+  - 1.2
+  - 1.3
+  - tip
+
+install: go get -t -d -v ./... && go build -v ./...
