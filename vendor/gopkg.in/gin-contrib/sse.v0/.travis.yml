@@ -1,0 +1,15 @@
+language: go
+sudo: false
+go:
+  - 1.6.4
+  - 1.7.4
+  - tip
+
+git:
+  depth: 3
+
+script:
+  - go test -v -covermode=count -coverprofile=coverage.out
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
