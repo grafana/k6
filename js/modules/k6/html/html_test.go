@@ -655,7 +655,7 @@ func TestParseHTML(t *testing.T) {
 		t.Run("numeric attr 1", func(t *testing.T) {
 			v, err := common.RunString(rt, `doc.find("h1").data("num-a")`)
 			if assert.NoError(t, err) {
-				assert.Equal(t, float64(123), v.Export())
+				assert.Equal(t, int64(123), v.Export())
 			}
 		})
 		t.Run("numeric attr 2", func(t *testing.T) {
@@ -707,7 +707,7 @@ func TestParseHTML(t *testing.T) {
 		t.Run("json attr", func(t *testing.T) {
 			v, err := common.RunString(rt, `doc.find("p").data("opts").id`)
 			if assert.NoError(t, err) {
-				assert.Equal(t, float64(101), v.Export())
+				assert.Equal(t, int64(101), v.Export())
 			}
 		})
 		t.Run("dataset property", func(t *testing.T) {
@@ -719,7 +719,7 @@ func TestParseHTML(t *testing.T) {
 		t.Run("dataset object", func(t *testing.T) {
 			v, err := common.RunString(rt, `doc.find("p").data().opts.id`)
 			if assert.NoError(t, err) {
-				assert.Equal(t, float64(101), v.Export())
+				assert.Equal(t, int64(101), v.Export())
 			}
 		})
 	})
