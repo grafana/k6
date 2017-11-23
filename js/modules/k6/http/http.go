@@ -304,6 +304,11 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 		Transport: state.HTTPTransport,
 		Timeout:   timeout,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			// Avoid checkRedirect if there is no response
+			if via[len(via)-1].Response == nil {
+				return nil
+			}
+
 			// Update active jar with cookies found in "Set-Cookie" header(s) of redirect response
 			if activeJar != nil {
 				if respCookies := req.Response.Cookies(); len(respCookies) > 0 {
