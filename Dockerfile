@@ -1,9 +1,15 @@
-FROM golang:1.9-alpine
-
+FROM golang:1.9-alpine as builder
 WORKDIR $GOPATH/src/github.com/loadimpact/k6
 ADD . .
-RUN apk --no-cache add --virtual .build-deps make git build-base && \
-	go get . && go install . && rm -rf $GOPATH/pkg && \
-	apk del .build-deps
+RUN apk --no-cache add --virtual .build-deps git make build-base && \
+  go get . && CGO_ENABLED=0 go install -a -ldflags '-s -w' && \
+  go get github.com/GeertJohan/go.rice && \
+  cd $GOPATH/src/github.com/GeertJohan/go.rice/rice && \
+  go get . && go install && \
+  cd $GOPATH/src/github.com/loadimpact/k6 && \
+  rice append --exec=$GOPATH/bin/k6 -i ./js/compiler -i ./js/lib
 
-ENTRYPOINT ["k6"]
+FROM scratch
+WORKDIR /root/
+COPY --from=builder /go/bin/k6 /root
+ENTRYPOINT ["./k6"]
