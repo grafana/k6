@@ -29,8 +29,8 @@ jobs:
           command: |
             export PATH=$GOPATH/bin:$PATH
             go get github.com/mattn/goveralls
-            go test -timeout 30s -cover -coverprofile=~/cover.out
-            goveralls -service=circle-ci -coverprofile=~/cover.out -repotoken=$COVERALLS_TOKEN || true
+            go test -timeout 30s -cover -coverprofile=$HOME/cover.out
+            goveralls -service=circle-ci -coverprofile=$HOME/cover.out -repotoken=$COVERALLS_TOKEN || true
       - run:
           name: Build application Docker image
           command: |
