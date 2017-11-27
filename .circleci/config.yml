@@ -51,12 +51,12 @@ jobs:
       - deploy:
           name: Push application Docker image
           command: |
-            if [ "${CIRCLE_BRANCH}" == "master" ]; then 
+            if [ "${CIRCLE_BRANCH}" == "master" ]; then
               docker push loadimpact/k6
-            elif [ "${CIRCLE_BRANCH}" == "develop" ]; then 
+            elif [ "${CIRCLE_BRANCH}" == "develop" ]; then
               docker tag loadimpact/k6 loadimpact/k6:develop
               docker push loadimpact/k6:develop
-            elif [[ "${CIRCLE_TAG}" =~ ^v[0-9]+(\.[0-9]+)*$ ]]; then 
+            elif [[ "${CIRCLE_TAG}" =~ ^v[0-9]+(\.[0-9]+)*$ ]]; then
               docker tag loadimpact/k6 loadimpact/k6:${CIRCLE_TAG:1}
               docker push loadimpact/k6:${CIRCLE_TAG:1}
             fi
