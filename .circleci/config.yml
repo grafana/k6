@@ -31,7 +31,7 @@ jobs:
             go get github.com/axw/gocov/gocov
             go get github.com/mattn/goveralls
             gocov test -timeout 30s ./... > ~/coverage.json
-            goveralls -service=circle-ci -gocovdata=~/coverage.json -repotoken=$COVERALLS_REPO_TOKEN || true
+            goveralls -service=circle-ci -gocovdata=~/coverage.json -repotoken=$COVERALLS_TOKEN || true
       - run:
           name: Build application Docker image
           command: |
