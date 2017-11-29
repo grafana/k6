@@ -12,4 +12,5 @@ RUN apk --no-cache add --virtual .build-deps git make build-base && \
 FROM scratch
 WORKDIR /root/
 COPY --from=builder /go/bin/k6 /root
+COPY --from=builder /etc/ssl /etc/ssl
 ENTRYPOINT ["./k6"]
