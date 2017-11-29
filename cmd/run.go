@@ -273,7 +273,13 @@ a commandline interface for interacting with it.`,
 				}
 				precision := 100 * time.Millisecond
 				atT := engine.Executor.GetTime()
-				if endT := engine.Executor.GetEndTime(); endT.Valid {
+
+                                endT := engine.Executor.GetEndTime()
+                                if stages := engine.Executor.GetStages(); len(stages) > 0 {
+                                        endT = local.SumStages(stages)
+                                }
+
+                                if endT.Valid {
 					return fmt.Sprintf("%s / %s",
 						(atT/precision)*precision,
 						(time.Duration(endT.Duration)/precision)*precision,
