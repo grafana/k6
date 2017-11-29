@@ -117,7 +117,9 @@ func (c *Client) Do(req *http.Request, v interface{}) error {
 
 func (c *Client) do(req *http.Request, v interface{}, attempt int) (retry bool, err error) {
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Token %s", c.token))
+	if c.token != "" {
+		req.Header.Set("Authorization", fmt.Sprintf("Token %s", c.token))
+	}
 	req.Header.Set("User-Agent", "k6cloud/"+c.version)
 
 	resp, err := c.client.Do(req)
