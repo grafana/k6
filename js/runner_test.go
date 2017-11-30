@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	stdlog "log"
+	"net"
 	"net/http"
 	"testing"
 
@@ -401,6 +402,46 @@ func TestVUIntegrationInsecureRequests(t *testing.T) {
 		})
 	}
 }
+
+func TestVUIntegrationBlacklist(t *testing.T) {
+	r1, err := New(&lib.SourceData{
+		Filename: "/script.js",
+		Data: []byte(`
+					import http from "k6/http";
+					export default function() { http.get("http://10.1.2.3/"); }
+				`),
+	}, afero.NewMemMapFs())
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	_, cidr, err := net.ParseCIDR("10.0.0.0/8")
+	if !assert.NoError(t, err) {
+		return
+	}
+	r1.SetOptions(lib.Options{
+		Throw:        null.BoolFrom(true),
+		BlacklistIPs: []*net.IPNet{cidr},
+	})
+
+	r2, err := NewFromArchive(r1.MakeArchive())
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	runners := map[string]*Runner{"Source": r1, "Archive": r2}
+	for name, r := range runners {
+		t.Run(name, func(t *testing.T) {
+			vu, err := r.NewVU()
+			if !assert.NoError(t, err) {
+				return
+			}
+			_, err = vu.RunOnce(context.Background())
+			assert.EqualError(t, err, "GoError: Get http://10.1.2.3/: IP (10.1.2.3) is in a blacklisted range (10.0.0.0/8)")
+		})
+	}
+}
+
 func TestVUIntegrationTLSConfig(t *testing.T) {
 	testdata := map[string]struct {
 		opts   lib.Options
