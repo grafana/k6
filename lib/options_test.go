@@ -66,11 +66,6 @@ func TestOptionsApply(t *testing.T) {
 		assert.Len(t, opts.Stages, 1)
 		assert.Equal(t, 1*time.Second, time.Duration(opts.Stages[0].Duration.Duration))
 	})
-	t.Run("Linger", func(t *testing.T) {
-		opts := Options{}.Apply(Options{Linger: null.BoolFrom(true)})
-		assert.True(t, opts.Linger.Valid)
-		assert.True(t, opts.Linger.Bool)
-	})
 	t.Run("MaxRedirects", func(t *testing.T) {
 		opts := Options{}.Apply(Options{MaxRedirects: null.IntFrom(12345)})
 		assert.True(t, opts.MaxRedirects.Valid)
@@ -177,11 +172,6 @@ func TestOptionsApply(t *testing.T) {
 	t.Run("External", func(t *testing.T) {
 		opts := Options{}.Apply(Options{External: map[string]interface{}{"a": 1}})
 		assert.Equal(t, map[string]interface{}{"a": 1}, opts.External)
-	})
-	t.Run("NoUsageReport", func(t *testing.T) {
-		opts := Options{}.Apply(Options{NoUsageReport: null.BoolFrom(true)})
-		assert.True(t, opts.NoUsageReport.Valid)
-		assert.True(t, opts.NoUsageReport.Bool)
 	})
 }
 
