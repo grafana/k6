@@ -141,9 +141,6 @@ type Options struct {
 	Iterations null.Int     `json:"iterations" envconfig:"iterations"`
 	Stages     []Stage      `json:"stages" envconfig:"stages"`
 
-	Linger        null.Bool `json:"linger" ignored:"true"`        // DEPRECATED; will be removed.
-	NoUsageReport null.Bool `json:"noUsageReport" ignored:"true"` // DEPRECATED; will be moved to cli config.
-
 	MaxRedirects          null.Int         `json:"maxRedirects" envconfig:"max_redirects"`
 	InsecureSkipTLSVerify null.Bool        `json:"insecureSkipTLSVerify" envconfig:"insecure_skip_tls_verify"`
 	TLSCipherSuites       *TLSCipherSuites `json:"tlsCipherSuites" envconfig:"tls_cipher_suites"`
@@ -178,12 +175,6 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.Stages != nil {
 		o.Stages = opts.Stages
-	}
-	if opts.Linger.Valid {
-		o.Linger = opts.Linger
-	}
-	if opts.NoUsageReport.Valid {
-		o.NoUsageReport = opts.NoUsageReport
 	}
 	if opts.MaxRedirects.Valid {
 		o.MaxRedirects = opts.MaxRedirects

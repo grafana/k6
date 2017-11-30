@@ -316,34 +316,6 @@ func TestNewBundle(t *testing.T) {
 				}
 			})
 		})
-		t.Run("Linger", func(t *testing.T) {
-			b, err := NewBundle(&lib.SourceData{
-				Filename: "/script.js",
-				Data: []byte(`
-					export let options = {
-						linger: true,
-					};
-					export default function() {};
-				`),
-			}, afero.NewMemMapFs())
-			if assert.NoError(t, err) {
-				assert.Equal(t, null.BoolFrom(true), b.Options.Linger)
-			}
-		})
-		t.Run("NoUsageReport", func(t *testing.T) {
-			b, err := NewBundle(&lib.SourceData{
-				Filename: "/script.js",
-				Data: []byte(`
-					export let options = {
-						noUsageReport: true,
-					};
-					export default function() {};
-				`),
-			}, afero.NewMemMapFs())
-			if assert.NoError(t, err) {
-				assert.Equal(t, null.BoolFrom(true), b.Options.NoUsageReport)
-			}
-		})
 		t.Run("MaxRedirects", func(t *testing.T) {
 			b, err := NewBundle(&lib.SourceData{
 				Filename: "/script.js",
