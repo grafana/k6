@@ -277,10 +277,9 @@ a commandline interface for interacting with it.`,
                                 if !endT.Valid {
                                         endT = engine.Executor.GetEndTime()
                                 }
-
                                 if endT.Valid {
-					return fmt.Sprintf("%s / %s",
-						(atT/precision)*precision,
+                                        return fmt.Sprintf("%s / %s",
+                                                (atT/precision)*precision,
 						(time.Duration(endT.Duration)/precision)*precision,
 					)
 				}
