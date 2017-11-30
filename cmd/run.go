@@ -270,13 +270,12 @@ a commandline interface for interacting with it.`,
 			Right: func() string {
 				if endIt := engine.Executor.GetEndIterations(); endIt.Valid {
 					return fmt.Sprintf("%d / %d", engine.Executor.GetIterations(), endIt.Int64)
-				}
-				precision := 100 * time.Millisecond
-				atT := engine.Executor.GetTime()
-
-                                endT := engine.Executor.GetEndTime()
-                                if stages := engine.Executor.GetStages(); len(stages) > 0 {
-                                        endT = local.SumStages(stages)
+                                }
+                                precision := 100 * time.Millisecond
+                                atT := engine.Executor.GetTime()
+                                endT := local.SumStages(engine.Executor.GetStages())
+                                if !endT.Valid {
+                                        endT = engine.Executor.GetEndTime()
                                 }
 
                                 if endT.Valid {
