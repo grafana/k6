@@ -321,8 +321,14 @@ a commandline interface for interacting with it.`,
 				var prog float64
 				if endIt := engine.Executor.GetEndIterations(); endIt.Valid {
 					prog = float64(engine.Executor.GetIterations()) / float64(endIt.Int64)
-				} else if endT := engine.Executor.GetEndTime(); endT.Valid {
-					prog = float64(engine.Executor.GetTime()) / float64(endT.Duration)
+                                } else {
+                                        endT := lib.SumStages(engine.Executor.GetStages())
+                                        if !endT.Valid {
+                                                endT = engine.Executor.GetEndTime()
+                                        }
+                                        if endT.Valid {
+                                                prog = float64(engine.Executor.GetTime()) / float64(endT.Duration)
+                                        }
 				}
 				progress.Progress = prog
 				fmt.Fprintf(stdout, "%s\x1b[0K\r", progress.String())
