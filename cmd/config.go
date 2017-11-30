@@ -44,6 +44,7 @@ func init() {
 	configFlagSet.StringP("out", "o", "", "`uri` for an external metrics database")
 	configFlagSet.BoolP("linger", "l", false, "keep the API server alive past test end")
 	configFlagSet.Bool("no-usage-report", false, "don't send anonymous stats to the developers")
+	configFlagSet.Bool("no-thresholds", false, "don't run thresholds")
 }
 
 type Config struct {
@@ -52,6 +53,7 @@ type Config struct {
 	Out           null.String `json:"out" envconfig:"out"`
 	Linger        null.Bool   `json:"linger" envconfig:"linger"`
 	NoUsageReport null.Bool   `json:"noUsageReport" envconfig:"no_usage_report"`
+	NoThresholds  null.Bool   `json:"noThresholds" envconfig:"no_thresholds"`
 
 	Collectors struct {
 		InfluxDB influxdb.Config `json:"influxdb"`
@@ -70,6 +72,9 @@ func (c Config) Apply(cfg Config) Config {
 	if cfg.NoUsageReport.Valid {
 		c.NoUsageReport = cfg.NoUsageReport
 	}
+	if cfg.NoThresholds.Valid {
+		c.NoThresholds = cfg.NoThresholds
+	}
 	c.Collectors.InfluxDB = c.Collectors.InfluxDB.Apply(cfg.Collectors.InfluxDB)
 	c.Collectors.Cloud = c.Collectors.Cloud.Apply(cfg.Collectors.Cloud)
 	return c
@@ -86,6 +91,7 @@ func getConfig(flags *pflag.FlagSet) (Config, error) {
 		Out:           getNullString(flags, "out"),
 		Linger:        getNullBool(flags, "linger"),
 		NoUsageReport: getNullBool(flags, "no-usage-report"),
+		NoThresholds:  getNullBool(flags, "no-thresholds"),
 	}, nil
 }
 

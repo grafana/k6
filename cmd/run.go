@@ -158,6 +158,11 @@ a commandline interface for interacting with it.`,
 			return err
 		}
 
+		// Configure the engine.
+		if conf.NoThresholds.Valid {
+			engine.NoThresholds = conf.NoThresholds.Bool
+		}
+
 		// Create a collector and assign it to the engine if requested.
 		fmt.Fprintf(stdout, "%s   collector\r", initBar.String())
 		if conf.Out.Valid {
