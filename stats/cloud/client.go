@@ -168,25 +168,18 @@ func checkResponse(r *http.Response) error {
 		return ErrNotAuthorized
 	}
 
-	// Struct of errors set back from API
-	errorStruct := &struct {
-		ErrorData struct {
-			Message string `json:"message"`
-			Code    int    `json:"code"`
-		} `json:"error"`
-	}{}
-
-	if err := json.NewDecoder(r.Body).Decode(errorStruct); err != nil {
-		return errors.Wrap(err, "Non-standard API error response")
+	data, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		return err
 	}
 
-	errorResponse := &ErrorResponse{
-		Response: r,
-		Message:  errorStruct.ErrorData.Message,
-		Code:     errorStruct.ErrorData.Code,
+	var payload struct {
+		Error ErrorResponse `json:"error"`
 	}
-
-	return errorResponse
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return errors.Errorf("Unknown Error: %s", string(data))
+	}
+	return payload.Error
 }
 
 func shouldRetry(resp *http.Response, err error, attempt, maxAttempts int) bool {

@@ -21,25 +21,41 @@
 package cloud
 
 import (
-	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/pkg/errors"
 )
-
-// ErrorResponse represents an error cause by talking to the API
-type ErrorResponse struct {
-	Response *http.Response
-	Message  string
-	Code     int
-}
-
-func (e *ErrorResponse) Error() string {
-	return fmt.Sprintf("%d %v", e.Code, e.Message)
-}
 
 var (
 	ErrNotAuthorized    = errors.New("Not allowed to upload result to Load Impact cloud")
 	ErrNotAuthenticated = errors.New("Failed to authenticate with Load Impact cloud")
 	ErrUnknown          = errors.New("An error occurred talking to Load Impact cloud")
 )
+
+// ErrorResponse represents an error cause by talking to the API
+type ErrorResponse struct {
+	Response *http.Response `json:"-"`
+
+	Code    int               `json:"code"`
+	Message string            `json:"message"`
+	Details map[string]string `json:"details"`
+}
+
+func (e ErrorResponse) Error() string {
+	msg := e.Message
+	if e.Code != 0 {
+		msg = strconv.Itoa(e.Code) + " " + msg
+	}
+
+	var details []string
+	for k, v := range e.Details {
+		details = append(details, k+" ("+v+")")
+	}
+	if len(details) > 0 {
+		msg += ": " + strings.Join(details, ", ")
+	}
+
+	return msg
+}
