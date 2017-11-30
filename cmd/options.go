@@ -21,6 +21,8 @@
 package cmd
 
 import (
+	"net"
+
 	"github.com/loadimpact/k6/lib"
 	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
@@ -41,6 +43,7 @@ func init() {
 	optionFlagSet.Bool("insecure-skip-tls-verify", false, "skip verification of TLS certificates")
 	optionFlagSet.Bool("no-connection-reuse", false, "don't reuse connections between iterations")
 	optionFlagSet.BoolP("throw", "w", false, "throw warnings (like failed http requests) as errors")
+	optionFlagSet.StringSlice("blacklist-ip", nil, "blacklist an `ip range` from being called")
 }
 
 func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
@@ -71,5 +74,18 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 			opts.Stages[i] = stage
 		}
 	}
+
+	blacklistIPStrings, err := flags.GetStringSlice("blacklist-ip")
+	if err != nil {
+		return opts, err
+	}
+	for _, s := range blacklistIPStrings {
+		_, net, err := net.ParseCIDR(s)
+		if err != nil {
+			return opts, errors.Wrap(err, "blacklist-ip")
+		}
+		opts.BlacklistIPs = append(opts.BlacklistIPs, net)
+	}
+
 	return opts, nil
 }

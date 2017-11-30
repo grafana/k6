@@ -26,13 +26,16 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"github.com/pkg/errors"
 	"github.com/viki-org/dnscache"
 )
 
 type Dialer struct {
 	net.Dialer
 
-	Resolver     *dnscache.Resolver
+	Resolver  *dnscache.Resolver
+	Blacklist []*net.IPNet
+
 	BytesRead    *int64
 	BytesWritten *int64
 }
@@ -49,6 +52,11 @@ func (d *Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn,
 	ip, err := d.Resolver.FetchOne(addr[:delimiter])
 	if err != nil {
 		return nil, err
+	}
+	for _, net := range d.Blacklist {
+		if net.Contains(ip) {
+			return nil, errors.Errorf("IP (%s) is in a blacklisted range (%s)", ip, net)
+		}
 	}
 	ipStr := ip.String()
 	if strings.ContainsRune(ipStr, ':') {

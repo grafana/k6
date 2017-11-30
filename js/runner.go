@@ -128,7 +128,11 @@ func (r *Runner) newVU() (*VU, error) {
 		}
 	}
 
-	dialer := &netext.Dialer{Dialer: r.BaseDialer, Resolver: r.Resolver}
+	dialer := &netext.Dialer{
+		Dialer:    r.BaseDialer,
+		Resolver:  r.Resolver,
+		Blacklist: r.Bundle.Options.BlacklistIPs,
+	}
 	transport := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 		TLSClientConfig: &tls.Config{
