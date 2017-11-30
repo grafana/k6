@@ -24,9 +24,40 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
+        "time"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func TestSumStages(t *testing.T) {
+        testdata := map[string]struct {
+                Time   NullDuration
+                Stages []Stage
+        }{
+                "Blank":    {NullDuration{}, []Stage{}},
+                "Infinite": {NullDuration{}, []Stage{{}}},
+                "Limit": {
+                        NullDurationFrom(10 * time.Second),
+                        []Stage{
+                                {Duration: NullDurationFrom(5 * time.Second)},
+                                {Duration: NullDurationFrom(5 * time.Second)},
+                        },
+                },
+                "InfiniteTail": {
+                        NullDuration{Duration: Duration(10 * time.Second), Valid: false},
+                        []Stage{
+                                {Duration: NullDurationFrom(5 * time.Second)},
+                                {Duration: NullDurationFrom(5 * time.Second)},
+                                {},
+                        },
+                },
+        }
+        for name, data := range testdata {
+                t.Run(name, func(t *testing.T) {
+                        assert.Equal(t, data.Time, SumStages(data.Stages))
+                })
+        }
+}
 
 func TestSplitKV(t *testing.T) {
 	testdata := map[string]struct {

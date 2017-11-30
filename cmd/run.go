@@ -273,7 +273,7 @@ a commandline interface for interacting with it.`,
                                 }
                                 precision := 100 * time.Millisecond
                                 atT := engine.Executor.GetTime()
-                                endT := local.SumStages(engine.Executor.GetStages())
+                                endT := lib.SumStages(engine.Executor.GetStages())
                                 if !endT.Valid {
                                         endT = engine.Executor.GetEndTime()
                                 }
