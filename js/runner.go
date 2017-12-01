@@ -26,6 +26,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/cookiejar"
+	"strconv"
 	"time"
 
 	"github.com/dop251/goja"
@@ -246,6 +247,8 @@ func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 		CookieJar:     cookieJar,
 		RPSLimit:      u.Runner.RPSLimit,
 		BPool:         u.BPool,
+		Vu:            u.ID,
+		Iteration:     u.Iteration,
 	}
 	u.Dialer.BytesRead = &state.BytesRead
 	u.Dialer.BytesWritten = &state.BytesWritten
@@ -255,14 +258,21 @@ func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 	*u.Context = ctx
 
 	u.Runtime.Set("__ITER", u.Iteration)
+	iter := u.Iteration
 	u.Iteration++
 
+	startTime := time.Now()
 	_, err = u.Default(goja.Undefined())
 
 	t := time.Now()
+	tags := map[string]string{
+		"vu":   strconv.FormatInt(u.ID, 10),
+		"iter": strconv.FormatInt(iter, 10)}
+
 	samples := append(state.Samples,
-		stats.Sample{Time: t, Metric: metrics.DataSent, Value: float64(state.BytesWritten)},
-		stats.Sample{Time: t, Metric: metrics.DataReceived, Value: float64(state.BytesRead)},
+		stats.Sample{Time: t, Metric: metrics.DataSent, Value: float64(state.BytesWritten), Tags: tags},
+		stats.Sample{Time: t, Metric: metrics.DataReceived, Value: float64(state.BytesRead), Tags: tags},
+		stats.Sample{Time: t, Metric: metrics.IterationDuration, Value: stats.D(t.Sub(startTime)), Tags: tags},
 	)
 
 	if u.Runner.Bundle.Options.NoConnectionReuse.Bool {
