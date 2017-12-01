@@ -275,7 +275,6 @@ a commandline interface for interacting with it.`,
 				atT := engine.Executor.GetTime()
 				stagesEndT := lib.SumStages(engine.Executor.GetStages())
 				endT := engine.Executor.GetEndTime()
-				//get both times and use whichever is valid and lower
 				if !endT.Valid || endT.Duration > stagesEndT.Duration {
 					endT = stagesEndT
 				}
