@@ -27,17 +27,6 @@ import (
 	"gopkg.in/guregu/null.v3"
 )
 
-// Returns the total sum of time taken by the given set of stages.
-func SumStages(stages []lib.Stage) (d lib.NullDuration) {
-	for _, stage := range stages {
-		d.Valid = stage.Duration.Valid
-		if stage.Duration.Valid {
-			d.Duration += stage.Duration.Duration
-		}
-	}
-	return d
-}
-
 // Returns the VU count and whether to keep going at the specified time.
 func ProcessStages(startVUs int64, stages []lib.Stage, t time.Duration) (null.Int, bool) {
 	vus := null.NewInt(startVUs, false)

@@ -29,36 +29,6 @@ import (
 	null "gopkg.in/guregu/null.v3"
 )
 
-func TestSumStages(t *testing.T) {
-	testdata := map[string]struct {
-		Time   lib.NullDuration
-		Stages []lib.Stage
-	}{
-		"Blank":    {lib.NullDuration{}, []lib.Stage{}},
-		"Infinite": {lib.NullDuration{}, []lib.Stage{{}}},
-		"Limit": {
-			lib.NullDurationFrom(10 * time.Second),
-			[]lib.Stage{
-				{Duration: lib.NullDurationFrom(5 * time.Second)},
-				{Duration: lib.NullDurationFrom(5 * time.Second)},
-			},
-		},
-		"InfiniteTail": {
-			lib.NullDuration{Duration: lib.Duration(10 * time.Second), Valid: false},
-			[]lib.Stage{
-				{Duration: lib.NullDurationFrom(5 * time.Second)},
-				{Duration: lib.NullDurationFrom(5 * time.Second)},
-				{},
-			},
-		},
-	}
-	for name, data := range testdata {
-		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, data.Time, SumStages(data.Stages))
-		})
-	}
-}
-
 func TestProcessStages(t *testing.T) {
 	type checkpoint struct {
 		D    time.Duration
