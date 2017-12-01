@@ -64,6 +64,9 @@ func New(conf Config, src *lib.SourceData, opts lib.Options, version string) (*C
 	if conf.Name == "" {
 		conf.Name = filepath.Base(src.Filename)
 	}
+	if conf.Name == "" {
+		conf.Name = "k6 test"
+	}
 
 	thresholds := make(map[string][]*stats.Threshold)
 	for name, t := range opts.Thresholds {
