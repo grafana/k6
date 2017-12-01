@@ -359,7 +359,7 @@ func TestVUIntegrationMetrics(t *testing.T) {
 
 			samples, err := vu.RunOnce(context.Background())
 			assert.NoError(t, err)
-			assert.Len(t, samples, 3)
+			assert.Len(t, samples, 4)
 			for i, s := range samples {
 				switch i {
 				case 0:
@@ -372,6 +372,8 @@ func TestVUIntegrationMetrics(t *testing.T) {
 				case 2:
 					assert.Equal(t, 0.0, s.Value)
 					assert.Equal(t, metrics.DataReceived, s.Metric)
+				case 3:
+					assert.Equal(t, metrics.IterationDuration, s.Metric)
 				}
 			}
 		})
