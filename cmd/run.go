@@ -270,16 +270,18 @@ a commandline interface for interacting with it.`,
 			Right: func() string {
 				if endIt := engine.Executor.GetEndIterations(); endIt.Valid {
 					return fmt.Sprintf("%d / %d", engine.Executor.GetIterations(), endIt.Int64)
-                                }
-                                precision := 100 * time.Millisecond
-                                atT := engine.Executor.GetTime()
-                                endT := lib.SumStages(engine.Executor.GetStages())
-                                if !endT.Valid {
-                                        endT = engine.Executor.GetEndTime()
-                                }
-                                if endT.Valid {
-                                        return fmt.Sprintf("%s / %s",
-                                                (atT/precision)*precision,
+				}
+				precision := 100 * time.Millisecond
+				atT := engine.Executor.GetTime()
+				stagesEndT := lib.SumStages(engine.Executor.GetStages())
+				endT := engine.Executor.GetEndTime()
+				//get both times and use whichever is valid and lower
+				if !endT.Valid || endT.Duration > stagesEndT.Duration {
+					endT = stagesEndT
+				}
+				if endT.Valid {
+					return fmt.Sprintf("%s / %s",
+						(atT/precision)*precision,
 						(time.Duration(endT.Duration)/precision)*precision,
 					)
 				}
@@ -320,14 +322,15 @@ a commandline interface for interacting with it.`,
 				var prog float64
 				if endIt := engine.Executor.GetEndIterations(); endIt.Valid {
 					prog = float64(engine.Executor.GetIterations()) / float64(endIt.Int64)
-                                } else {
-                                        endT := lib.SumStages(engine.Executor.GetStages())
-                                        if !endT.Valid {
-                                                endT = engine.Executor.GetEndTime()
-                                        }
-                                        if endT.Valid {
-                                                prog = float64(engine.Executor.GetTime()) / float64(endT.Duration)
-                                        }
+				} else {
+					stagesEndT := lib.SumStages(engine.Executor.GetStages())
+					endT := engine.Executor.GetEndTime()
+					if !endT.Valid || endT.Duration > stagesEndT.Duration {
+						endT = stagesEndT
+					}
+					if endT.Valid {
+						prog = float64(engine.Executor.GetTime()) / float64(endT.Duration)
+					}
 				}
 				progress.Progress = prog
 				fmt.Fprintf(stdout, "%s\x1b[0K\r", progress.String())
