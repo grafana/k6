@@ -1,18 +1,15 @@
 package prometheus
 
 import (
-	"net/http"
-
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/prometheus/common/version"
-
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"sync"
-
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/prometheus/common/version"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -27,7 +24,6 @@ var (
 func HandlePrometheusMetrics() http.Handler {
 
 	exporter := NewExporter(scrapeURI)
-
 	prometheus.MustRegister(exporter)
 	prometheus.MustRegister(version.NewCollector("k6_exporter"))
 
@@ -54,28 +50,6 @@ type Exporter struct {
 	httpReqWaiting    *prometheus.Desc
 	httpReqReceiving  *prometheus.Desc
 	httpReqDuration   *prometheus.Desc
-}
-
-// newLabels converts to a set of prometheus.Labels.
-func newLabels(labels []string) prometheus.Labels {
-	promLabels := prometheus.Labels{}
-	labelName := "http"
-	for _, each := range labels {
-		if each == "max" {
-			promLabels[labelName] = "max"
-		} else if each == "min" {
-			promLabels[labelName] = "min"
-		} else if each == "avg" {
-			promLabels[labelName] = "avg"
-		} else if each == "ninety" {
-			promLabels[labelName] = "ninety"
-		} else if each == "ninetyfive" {
-			promLabels[labelName] = "ninetyfive"
-		} else {
-			log.Errorf("%s is not a valid label type", each)
-		}
-	}
-	return promLabels
 }
 
 // NewExporter returns an initialized Exporter.
