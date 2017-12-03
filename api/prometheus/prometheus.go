@@ -40,30 +40,20 @@ type Exporter struct {
 	mutex  sync.Mutex
 	client *http.Client
 
-	up         *prometheus.Desc
-	vus        *prometheus.Desc
-	vusMax     *prometheus.Desc
-	iterations *prometheus.Desc
-
-	checks *prometheus.Desc
-
-	httpReqs *prometheus.Desc
-
-	httpReqBlocked *prometheus.Desc
-
-	dataSent *prometheus.Desc
-
-	dataReceived *prometheus.Desc
-
+	up                *prometheus.Desc
+	vus               *prometheus.Desc
+	vusMax            *prometheus.Desc
+	iterations        *prometheus.Desc
+	checks            *prometheus.Desc
+	httpReqs          *prometheus.Desc
+	httpReqBlocked    *prometheus.Desc
+	dataSent          *prometheus.Desc
+	dataReceived      *prometheus.Desc
 	httpReqConnecting *prometheus.Desc
-
-	httpReqSending *prometheus.Desc
-
-	httpReqWaiting *prometheus.Desc
-
-	httpReqReceiving *prometheus.Desc
-
-	httpReqDuration *prometheus.Desc
+	httpReqSending    *prometheus.Desc
+	httpReqWaiting    *prometheus.Desc
+	httpReqReceiving  *prometheus.Desc
+	httpReqDuration   *prometheus.Desc
 }
 
 // newLabels converts to a set of prometheus.Labels.
@@ -126,7 +116,7 @@ func NewExporter(uri string) *Exporter {
 			prometheus.BuildFQName(namespace, "", "http_req_blocked"),
 			"Time (ms) spent blocked (waiting for a free TCP connection slot) before initiating request.",
 			[]string{"type"},
-			nil), //newLabels([]string{"min", "max", "avg", "ninety", "ninteyfive"})),
+			nil),
 		dataSent: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "", "data_sent_total"),
 			"Data sent in bytes",
