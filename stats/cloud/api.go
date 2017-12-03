@@ -56,7 +56,7 @@ type CreateTestRunResponse struct {
 }
 
 type LoginResponse struct {
-        APIToken string `json:"token"`
+	APIToken string `json:"token"`
 }
 
 func (c *Client) CreateTestRun(testRun *TestRun) (*CreateTestRunResponse, error) {
@@ -118,28 +118,26 @@ func (c *Client) TestFinished(referenceID string, thresholds ThresholdResult, ta
 }
 
 func (c *Client) Login(email string, password string) (*LoginResponse, error) {
-        url := fmt.Sprintf("%s/login", c.baseURL)
+	url := fmt.Sprintf("%s/login", c.baseURL)
 
-        data := struct {
-                Email    string `json:"email"`
-                Password string `json:"password"`
-        }{
-                email,
-                password,
-        }
+	data := struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}{
+		email,
+		password,
+	}
 
-        req, err := c.NewRequest("POST", url, data)
-        if err != nil {
-                return nil, err
-        }
+	req, err := c.NewRequest("POST", url, data)
+	if err != nil {
+		return nil, err
+	}
 
-        lr := LoginResponse{}
-        err = c.Do(req, &lr)
-        if err != nil {
-                // if wrong email or password, it will throw an Error
-                // `client.Do` should handle this in a better way
-                return nil, err
-        }
+	lr := LoginResponse{}
+	err = c.Do(req, &lr)
+	if err != nil {
+		return nil, errors.New("Failed to login.")
+	}
 
-        return &lr, nil
+	return &lr, nil
 }
