@@ -2,16 +2,18 @@ package prometheus
 
 import (
 	"net/http"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/version"
 
-	log "github.com/sirupsen/logrus"
-	"sync"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"crypto/tls"
 	"io/ioutil"
+	"sync"
+
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -43,45 +45,47 @@ type Exporter struct {
 	vusMax     *prometheus.Desc
 	iterations *prometheus.Desc
 
+	checks *prometheus.Desc
+
 	httpReqs *prometheus.Desc
-	
-	httpReqBlocked_min *prometheus.Desc
-	httpReqBlocked_max *prometheus.Desc
-	httpReqBlocked_avg *prometheus.Desc
-	httpReqBlocked_90p *prometheus.Desc
-	httpReqBlocked_95p *prometheus.Desc
 
-	httpReqLookingUp *prometheus.Desc
+	httpReqBlocked *prometheus.Desc
 
-	httpReqConnecting_min *prometheus.Desc
-	httpReqConnecting_max *prometheus.Desc
-	httpReqConnecting_avg *prometheus.Desc
-	httpReqConnecting_90p *prometheus.Desc
-	httpReqConnecting_95p *prometheus.Desc
+	dataSent *prometheus.Desc
 
-	httpReqSending_min *prometheus.Desc
-	httpReqSending_max *prometheus.Desc
-	httpReqSending_avg *prometheus.Desc
-	httpReqSending_90p *prometheus.Desc
-	httpReqSending_95p *prometheus.Desc
+	dataReceived *prometheus.Desc
 
-	httpReqWaiting_min *prometheus.Desc
-	httpReqWaiting_max *prometheus.Desc
-	httpReqWaiting_avg *prometheus.Desc
-	httpReqWaiting_90p *prometheus.Desc
-	httpReqWaiting_95p *prometheus.Desc
+	httpReqConnecting *prometheus.Desc
 
-	httpReqReceiving_min *prometheus.Desc
-	httpReqReceiving_max *prometheus.Desc
-	httpReqReceiving_avg *prometheus.Desc
-	httpReqReceiving_90p *prometheus.Desc
-	httpReqReceiving_95p *prometheus.Desc
+	httpReqSending *prometheus.Desc
 
-	httpReqDuration_min *prometheus.Desc
-	httpReqDuration_max *prometheus.Desc
-	httpReqDuration_avg *prometheus.Desc
-	httpReqDuration_90p *prometheus.Desc
-	httpReqDuration_95p *prometheus.Desc
+	httpReqWaiting *prometheus.Desc
+
+	httpReqReceiving *prometheus.Desc
+
+	httpReqDuration *prometheus.Desc
+}
+
+// newLabels converts to a set of prometheus.Labels.
+func newLabels(labels []string) prometheus.Labels {
+	promLabels := prometheus.Labels{}
+	labelName := "http"
+	for _, each := range labels {
+		if each == "max" {
+			promLabels[labelName] = "max"
+		} else if each == "min" {
+			promLabels[labelName] = "min"
+		} else if each == "avg" {
+			promLabels[labelName] = "avg"
+		} else if each == "ninety" {
+			promLabels[labelName] = "ninety"
+		} else if each == "ninetyfive" {
+			promLabels[labelName] = "ninetyfive"
+		} else {
+			log.Errorf("%s is not a valid label type", each)
+		}
+	}
+	return promLabels
 }
 
 // NewExporter returns an initialized Exporter.
@@ -108,165 +112,55 @@ func NewExporter(uri string) *Exporter {
 			"The aggregate number of times the VUs in the test have executed the JS script",
 			nil,
 			nil),
+		checks: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "", "http_req_checks_total"),
+			"Number of different checks",
+			nil,
+			nil),
 		httpReqs: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "", "http_reqs_total"),
 			"How many HTTP requests has k6 generated, in total",
 			nil,
 			nil),
-		httpReqBlocked_min: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "http_blocked_min_total"),
+		httpReqBlocked: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "", "http_req_blocked"),
 			"Time (ms) spent blocked (waiting for a free TCP connection slot) before initiating request.",
+			[]string{"type"},
+			nil), //newLabels([]string{"min", "max", "avg", "ninety", "ninteyfive"})),
+		dataSent: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "", "data_sent_total"),
+			"Data sent in bytes",
 			nil,
 			nil),
-		httpReqBlocked_max: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "http_blocked_max_total"),
-			"Time (ms) spent blocked (waiting for a free TCP connection slot) before initiating request.",
+		dataReceived: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "", "data_received_total"),
+			"Data received in bytes",
 			nil,
 			nil),
-		httpReqBlocked_avg: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "http_blocked_avg_total"),
-			"Time (ms) spent blocked (waiting for a free TCP connection slot) before initiating request.",
-			nil,
-			nil),
-		httpReqBlocked_90p: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "http_blocked_90p_total"),
-			"Time (ms) spent blocked (waiting for a free TCP connection slot) before initiating request.",
-			nil,
-			nil),
-		httpReqBlocked_95p: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "http_blocked_95p_total"),
-			"Time (ms) spent blocked (waiting for a free TCP connection slot) before initiating request.",
-			nil,
-			nil),
-		httpReqLookingUp: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "http_req_looking_up_total"),
-			"Time (ms) spent looking up remote host name in DNS",
-			[]string{"min", "max", "avg", "percentiles"},
-			nil),
-		httpReqConnecting_min: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "http_reqs_connecting_min_total"),
+		httpReqConnecting: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "", "http_req_connecting_total"),
 			"Time (ms) spent establishing TCP connection to remote host",
-			nil,
+			[]string{"type"},
 			nil),
-		httpReqConnecting_max: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "http_reqs_connecting_max_total"),
-			"Time (ms) spent establishing TCP connection to remote host",
-			nil,
-			nil),
-		httpReqConnecting_avg: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "http_reqs_connecting_avg_total"),
-			"Time (ms) spent establishing TCP connection to remote host",
-			nil,
-			nil),
-		httpReqConnecting_90p: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "http_reqs_connecting_90p_total"),
-			"Time (ms) spent establishing TCP connection to remote host",
-			nil,
-			nil),
-		httpReqConnecting_95p: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "http_reqs_connecting_95p_total"),
-			"Time (ms) spent establishing TCP connection to remote host",
-			nil,
-			nil),
-		httpReqSending_min: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "http_req_sending_min_total"),
+		httpReqSending: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "", "http_req_sending_total"),
 			"Time (ms) spent sending data to remote host",
-			nil,
+			[]string{"type"},
 			nil),
-		httpReqSending_max: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "http_req_sending_max_total"),
-			"Time (ms) spent sending data to remote host",
-			nil,
-			nil),
-		httpReqSending_avg: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "http_req_sending_avg_total"),
-			"Time (ms) spent sending data to remote host",
-			nil,
-			nil),
-		httpReqSending_90p: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "http_req_sending_90p_total"),
-			"Time (ms) spent sending data to remote host",
-			nil,
-			nil),
-		httpReqSending_95p: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "http_req_sending_95p_total"),
-			"Time (ms) spent sending data to remote host",
-			nil,
-			nil),
-		httpReqWaiting_min: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "http_req_waiting_min_total"),
+		httpReqWaiting: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "", "http_req_waiting_total"),
 			"Time (ms) spent waiting for response from remote host (a.k.a. 'time to first byte', or 'TTFB')",
-			nil,
+			[]string{"type"},
 			nil),
-		httpReqWaiting_max: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "http_req_waiting_max_total"),
-			"Time (ms) spent waiting for response from remote host (a.k.a. 'time to first byte', or 'TTFB')",
-			nil,
-			nil),
-		httpReqWaiting_avg: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "http_req_waiting_avg_total"),
-			"Time (ms) spent waiting for response from remote host (a.k.a. 'time to first byte', or 'TTFB')",
-			nil,
-			nil),
-		httpReqWaiting_90p: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "http_req_waiting_90p_total"),
-			"Time (ms) spent waiting for response from remote host (a.k.a. 'time to first byte', or 'TTFB')",
-			nil,
-			nil),
-		httpReqWaiting_95p: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "http_req_waiting_95p_total"),
-			"Time (ms) spent waiting for response from remote host (a.k.a. 'time to first byte', or 'TTFB')",
-			nil,
-			nil),
-		httpReqReceiving_min: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "http_req_receiving_min_total"),
+		httpReqReceiving: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "", "http_req_receiving_total"),
 			"Time (ms) spent establishing TCP connection to remote host",
-			nil,
+			[]string{"type"},
 			nil),
-		httpReqReceiving_max: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "http_req_receiving_max_total"),
-			"Time (ms) spent establishing TCP connection to remote host",
-			nil,
-			nil),
-		httpReqReceiving_avg: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "http_req_receiving_avg_total"),
-			"Time (ms) spent establishing TCP connection to remote host",
-			nil,
-			nil),
-		httpReqReceiving_90p: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "http_req_receiving_90p_total"),
-			"Time (ms) spent establishing TCP connection to remote host",
-			nil,
-			nil),
-		httpReqReceiving_95p: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "http_req_receiving_95p_total"),
-			"Time (ms) spent establishing TCP connection to remote host",
-			nil,
-			nil),
-		httpReqDuration_min: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "http_req_duration_min_total"),
-			"Total time (ms) for request, excluding time spent blocked (http_req_blocked), DNS lookup (http_req_looking_up) and TCP connect (http_req_connecting) time",
-			nil,
-			nil),
-		httpReqDuration_max: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "http_req_duration_max_total"),
-			"Total time (ms) for request, excluding time spent blocked (http_req_blocked), DNS lookup (http_req_looking_up) and TCP connect (http_req_connecting) time",
-			nil,
-			nil),
-		httpReqDuration_avg: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "http_req_duration_avg_total"),
-			"Total time (ms) for request, excluding time spent blocked (http_req_blocked), DNS lookup (http_req_looking_up) and TCP connect (http_req_connecting) time",
-			nil,
-			nil),
-		httpReqDuration_90p: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "http_req_duration_90p_total"),
-			"Total time (ms) for request, excluding time spent blocked (http_req_blocked), DNS lookup (http_req_looking_up) and TCP connect (http_req_connecting) time",
-			nil,
-			nil),
-		httpReqDuration_95p: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "http_req_duration_95p_total"),
-			"Total time (ms) for request, excluding time spent blocked (http_req_blocked), DNS lookup (http_req_looking_up) and TCP connect (http_req_connecting) time",
-			nil,
+		httpReqDuration: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "", "http_req_duration_total"),
+			"Total time (ms) for request, excluding time spent blocked, DNS lookup and TCP connect time",
+			[]string{"type"},
 			nil),
 		client: &http.Client{
 			Transport: &http.Transport{
@@ -282,44 +176,16 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	ch <- e.vus
 	ch <- e.vusMax
 	ch <- e.iterations
+	ch <- e.checks
 	ch <- e.httpReqs
-	ch <- e.httpReqBlocked_min
-	ch <- e.httpReqBlocked_max
-	ch <- e.httpReqBlocked_avg
-	ch <- e.httpReqBlocked_90p
-	ch <- e.httpReqBlocked_95p
-
-	ch <- e.httpReqLookingUp
-
-	ch <- e.httpReqConnecting_min
-	ch <- e.httpReqConnecting_max
-	ch <- e.httpReqConnecting_avg
-	ch <- e.httpReqConnecting_90p
-	ch <- e.httpReqConnecting_95p
-
-	ch <- e.httpReqSending_min
-	ch <- e.httpReqSending_max
-	ch <- e.httpReqSending_avg
-	ch <- e.httpReqSending_90p
-	ch <- e.httpReqSending_95p
-
-	ch <- e.httpReqWaiting_min
-	ch <- e.httpReqWaiting_max
-	ch <- e.httpReqWaiting_avg
-	ch <- e.httpReqWaiting_90p
-	ch <- e.httpReqWaiting_95p
-
-	ch <- e.httpReqReceiving_min
-	ch <- e.httpReqReceiving_max
-	ch <- e.httpReqReceiving_avg
-	ch <- e.httpReqReceiving_90p
-	ch <- e.httpReqReceiving_95p
-
-	ch <- e.httpReqDuration_min
-	ch <- e.httpReqDuration_max
-	ch <- e.httpReqDuration_avg
-	ch <- e.httpReqDuration_90p
-	ch <- e.httpReqDuration_95p
+	ch <- e.httpReqBlocked
+	ch <- e.dataSent
+	ch <- e.dataReceived
+	ch <- e.httpReqConnecting
+	ch <- e.httpReqSending
+	ch <- e.httpReqWaiting
+	ch <- e.httpReqReceiving
+	ch <- e.httpReqDuration
 }
 
 // Collect fetches the stats from configured k6 location and delivers them
@@ -394,44 +260,50 @@ func (e *Exporter) collect(ch chan<- prometheus.Metric) error {
 			ch <- prometheus.MustNewConstMetric(e.vus, prometheus.GaugeValue, float64(d.Attributes.Sample.Value))
 		} else if d.ID == "iterations" {
 			ch <- prometheus.MustNewConstMetric(e.iterations, prometheus.GaugeValue, float64(d.Attributes.Sample.Value))
+		} else if d.ID == "checks" {
+			ch <- prometheus.MustNewConstMetric(e.checks, prometheus.GaugeValue, float64(d.Attributes.Sample.Value))
 		} else if d.ID == "http_reqs" {
 			ch <- prometheus.MustNewConstMetric(e.httpReqs, prometheus.GaugeValue, float64(d.Attributes.Sample.Value))
 		} else if d.ID == "http_req_blocked" {
-			ch <- prometheus.MustNewConstMetric(e.httpReqBlocked_min, prometheus.GaugeValue, d.Attributes.Sample.Min)
-			ch <- prometheus.MustNewConstMetric(e.httpReqBlocked_max, prometheus.GaugeValue, d.Attributes.Sample.Max)
-			ch <- prometheus.MustNewConstMetric(e.httpReqBlocked_avg, prometheus.GaugeValue, d.Attributes.Sample.Avg)
-			ch <- prometheus.MustNewConstMetric(e.httpReqBlocked_90p, prometheus.GaugeValue, d.Attributes.Sample.P90)
-			ch <- prometheus.MustNewConstMetric(e.httpReqBlocked_95p, prometheus.GaugeValue, d.Attributes.Sample.P95)
+			ch <- prometheus.MustNewConstMetric(e.httpReqBlocked, prometheus.GaugeValue, d.Attributes.Sample.Min, "min")
+			ch <- prometheus.MustNewConstMetric(e.httpReqBlocked, prometheus.GaugeValue, d.Attributes.Sample.Max, "max")
+			ch <- prometheus.MustNewConstMetric(e.httpReqBlocked, prometheus.GaugeValue, d.Attributes.Sample.Avg, "avg")
+			ch <- prometheus.MustNewConstMetric(e.httpReqBlocked, prometheus.GaugeValue, d.Attributes.Sample.P90, "p(90)")
+			ch <- prometheus.MustNewConstMetric(e.httpReqBlocked, prometheus.GaugeValue, d.Attributes.Sample.P95, "p(95)")
+		} else if d.ID == "data_sent" {
+			ch <- prometheus.MustNewConstMetric(e.dataSent, prometheus.GaugeValue, float64(d.Attributes.Sample.Value))
+		} else if d.ID == "data_received" {
+			ch <- prometheus.MustNewConstMetric(e.dataReceived, prometheus.GaugeValue, float64(d.Attributes.Sample.Value))
 		} else if d.ID == "http_req_connecting" {
-			ch <- prometheus.MustNewConstMetric(e.httpReqConnecting_min, prometheus.GaugeValue, d.Attributes.Sample.Min)
-			ch <- prometheus.MustNewConstMetric(e.httpReqConnecting_max, prometheus.GaugeValue, d.Attributes.Sample.Max)
-			ch <- prometheus.MustNewConstMetric(e.httpReqConnecting_avg, prometheus.GaugeValue, d.Attributes.Sample.Avg)
-			ch <- prometheus.MustNewConstMetric(e.httpReqConnecting_90p, prometheus.GaugeValue, d.Attributes.Sample.P90)
-			ch <- prometheus.MustNewConstMetric(e.httpReqConnecting_95p, prometheus.GaugeValue, d.Attributes.Sample.P95)
+			ch <- prometheus.MustNewConstMetric(e.httpReqConnecting, prometheus.GaugeValue, d.Attributes.Sample.Min, "min")
+			ch <- prometheus.MustNewConstMetric(e.httpReqConnecting, prometheus.GaugeValue, d.Attributes.Sample.Max, "max")
+			ch <- prometheus.MustNewConstMetric(e.httpReqConnecting, prometheus.GaugeValue, d.Attributes.Sample.Avg, "avg")
+			ch <- prometheus.MustNewConstMetric(e.httpReqConnecting, prometheus.GaugeValue, d.Attributes.Sample.P90, "p(90)")
+			ch <- prometheus.MustNewConstMetric(e.httpReqConnecting, prometheus.GaugeValue, d.Attributes.Sample.P95, "p(95)")
 		} else if d.ID == "http_req_sending" {
-			ch <- prometheus.MustNewConstMetric(e.httpReqSending_min, prometheus.GaugeValue, d.Attributes.Sample.Min)
-			ch <- prometheus.MustNewConstMetric(e.httpReqSending_max, prometheus.GaugeValue, d.Attributes.Sample.Max)
-			ch <- prometheus.MustNewConstMetric(e.httpReqSending_avg, prometheus.GaugeValue, d.Attributes.Sample.Avg)
-			ch <- prometheus.MustNewConstMetric(e.httpReqSending_90p, prometheus.GaugeValue, d.Attributes.Sample.P90)
-			ch <- prometheus.MustNewConstMetric(e.httpReqSending_95p, prometheus.GaugeValue, d.Attributes.Sample.P95)
+			ch <- prometheus.MustNewConstMetric(e.httpReqSending, prometheus.GaugeValue, d.Attributes.Sample.Min, "min")
+			ch <- prometheus.MustNewConstMetric(e.httpReqSending, prometheus.GaugeValue, d.Attributes.Sample.Max, "max")
+			ch <- prometheus.MustNewConstMetric(e.httpReqSending, prometheus.GaugeValue, d.Attributes.Sample.Avg, "avg")
+			ch <- prometheus.MustNewConstMetric(e.httpReqSending, prometheus.GaugeValue, d.Attributes.Sample.P90, "p(90)")
+			ch <- prometheus.MustNewConstMetric(e.httpReqSending, prometheus.GaugeValue, d.Attributes.Sample.P95, "p(95)")
 		} else if d.ID == "http_req_waiting" {
-			ch <- prometheus.MustNewConstMetric(e.httpReqWaiting_min, prometheus.GaugeValue, d.Attributes.Sample.Min)
-			ch <- prometheus.MustNewConstMetric(e.httpReqWaiting_max, prometheus.GaugeValue, d.Attributes.Sample.Min)
-			ch <- prometheus.MustNewConstMetric(e.httpReqWaiting_avg, prometheus.GaugeValue, d.Attributes.Sample.Avg)
-			ch <- prometheus.MustNewConstMetric(e.httpReqWaiting_90p, prometheus.GaugeValue, d.Attributes.Sample.P90)
-			ch <- prometheus.MustNewConstMetric(e.httpReqWaiting_95p, prometheus.GaugeValue, d.Attributes.Sample.P95)
+			ch <- prometheus.MustNewConstMetric(e.httpReqWaiting, prometheus.GaugeValue, d.Attributes.Sample.Min, "min")
+			ch <- prometheus.MustNewConstMetric(e.httpReqWaiting, prometheus.GaugeValue, d.Attributes.Sample.Min, "max")
+			ch <- prometheus.MustNewConstMetric(e.httpReqWaiting, prometheus.GaugeValue, d.Attributes.Sample.Avg, "avg")
+			ch <- prometheus.MustNewConstMetric(e.httpReqWaiting, prometheus.GaugeValue, d.Attributes.Sample.P90, "p(90)")
+			ch <- prometheus.MustNewConstMetric(e.httpReqWaiting, prometheus.GaugeValue, d.Attributes.Sample.P95, "p(95)")
 		} else if d.ID == "http_req_receiving" {
-			ch <- prometheus.MustNewConstMetric(e.httpReqReceiving_min, prometheus.GaugeValue, d.Attributes.Sample.Min)
-			ch <- prometheus.MustNewConstMetric(e.httpReqReceiving_max, prometheus.GaugeValue, d.Attributes.Sample.Max)
-			ch <- prometheus.MustNewConstMetric(e.httpReqReceiving_avg, prometheus.GaugeValue, d.Attributes.Sample.Avg)
-			ch <- prometheus.MustNewConstMetric(e.httpReqReceiving_90p, prometheus.GaugeValue, d.Attributes.Sample.P90)
-			ch <- prometheus.MustNewConstMetric(e.httpReqReceiving_95p, prometheus.GaugeValue, d.Attributes.Sample.P95)
+			ch <- prometheus.MustNewConstMetric(e.httpReqReceiving, prometheus.GaugeValue, d.Attributes.Sample.Min, "min")
+			ch <- prometheus.MustNewConstMetric(e.httpReqReceiving, prometheus.GaugeValue, d.Attributes.Sample.Max, "max")
+			ch <- prometheus.MustNewConstMetric(e.httpReqReceiving, prometheus.GaugeValue, d.Attributes.Sample.Avg, "avg")
+			ch <- prometheus.MustNewConstMetric(e.httpReqReceiving, prometheus.GaugeValue, d.Attributes.Sample.P90, "p(90)")
+			ch <- prometheus.MustNewConstMetric(e.httpReqReceiving, prometheus.GaugeValue, d.Attributes.Sample.P95, "p(95)")
 		} else if d.ID == "http_req_duration" {
-			ch <- prometheus.MustNewConstMetric(e.httpReqDuration_min, prometheus.GaugeValue, d.Attributes.Sample.Min)
-			ch <- prometheus.MustNewConstMetric(e.httpReqDuration_max, prometheus.GaugeValue, d.Attributes.Sample.Max)
-			ch <- prometheus.MustNewConstMetric(e.httpReqDuration_avg, prometheus.GaugeValue, d.Attributes.Sample.Avg)
-			ch <- prometheus.MustNewConstMetric(e.httpReqDuration_90p, prometheus.GaugeValue, d.Attributes.Sample.P90)
-			ch <- prometheus.MustNewConstMetric(e.httpReqDuration_95p, prometheus.GaugeValue, d.Attributes.Sample.P95)
+			ch <- prometheus.MustNewConstMetric(e.httpReqDuration, prometheus.GaugeValue, d.Attributes.Sample.Min, "min")
+			ch <- prometheus.MustNewConstMetric(e.httpReqDuration, prometheus.GaugeValue, d.Attributes.Sample.Max, "max")
+			ch <- prometheus.MustNewConstMetric(e.httpReqDuration, prometheus.GaugeValue, d.Attributes.Sample.Avg, "avg")
+			ch <- prometheus.MustNewConstMetric(e.httpReqDuration, prometheus.GaugeValue, d.Attributes.Sample.P90, "p(90)")
+			ch <- prometheus.MustNewConstMetric(e.httpReqDuration, prometheus.GaugeValue, d.Attributes.Sample.P95, "p(95)")
 		}
 
 	}
