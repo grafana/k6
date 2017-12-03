@@ -136,7 +136,8 @@ func (i *InitContext) requireFile(name string) (goja.Value, error) {
 		}
 
 		// Compile the sources; this handles ES5 vs ES6 automatically.
-		pgm_, src, err := compiler.Compile(string(data.Data), data.Filename, "(function(){", "})()", true)
+		src := string(data.Data)
+		pgm_, err := i.compileImport(src, data.Filename)
 		if err != nil {
 			return goja.Undefined(), err
 		}
@@ -152,6 +153,11 @@ func (i *InitContext) requireFile(name string) (goja.Value, error) {
 	}
 
 	return module.Get("exports"), nil
+}
+
+func (i *InitContext) compileImport(src, filename string) (*goja.Program, error) {
+	pgm, _, err := compiler.Compile(src, filename, "(function(){", "})()", true)
+	return pgm, err
 }
 
 func (i *InitContext) Open(name string) (string, error) {
