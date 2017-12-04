@@ -39,6 +39,7 @@ func init() {
 	optionFlagSet.StringSliceP("stage", "s", nil, "add a `stage`, as `[duration]:[target]`")
 	optionFlagSet.BoolP("paused", "p", false, "start the test in a paused state")
 	optionFlagSet.Int64("max-redirects", 10, "follow at most n redirects")
+	optionFlagSet.Int64("batch", 10, "max parallel http.batch() requests; 0 = unlimited")
 	optionFlagSet.String("user-agent", "", "user agent for http requests")
 	optionFlagSet.Bool("insecure-skip-tls-verify", false, "skip verification of TLS certificates")
 	optionFlagSet.Bool("no-connection-reuse", false, "don't reuse connections between iterations")
@@ -54,6 +55,7 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		Iterations:            getNullInt64(flags, "iterations"),
 		Paused:                getNullBool(flags, "paused"),
 		MaxRedirects:          getNullInt64(flags, "max-redirects"),
+		Batch:                 getNullInt64(flags, "batch"),
 		UserAgent:             getNullString(flags, "user-agent"),
 		InsecureSkipTLSVerify: getNullBool(flags, "insecure-skip-tls-verify"),
 		NoConnectionReuse:     getNullBool(flags, "no-connection-reuse"),
