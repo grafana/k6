@@ -452,9 +452,13 @@ func (http *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, erro
 	rt := common.GetRuntime(ctx)
 	state := common.GetState(ctx)
 
-	errs := make(chan error)
+	// Return values; retval must be guarded by the mutex.
+	var mutex sync.Mutex
 	retval := rt.NewObject()
-	mutex := sync.Mutex{}
+	errs := make(chan error)
+
+	// Concurrency limits.
+	globalLimiter := NewSlotLimiter(int(state.Options.Batch.Int64))
 
 	reqs := reqsV.ToObject(rt)
 	keys := reqs.Keys()
@@ -491,6 +495,9 @@ func (http *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, erro
 		}
 
 		go func() {
+			globalLimiter.Begin()
+			defer globalLimiter.End()
+
 			res, samples, err := http.request(ctx, rt, state, method, url, args...)
 			if err != nil {
 				errs <- err
