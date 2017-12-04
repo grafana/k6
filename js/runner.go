@@ -142,6 +142,7 @@ func (r *Runner) newVU() (*VU, error) {
 			MaxVersion:         uint16(tlsVersion.Max),
 			Certificates:       certs,
 			NameToCertificate:  nameToCert,
+			Renegotiation:      tls.RenegotiateFreelyAsClient,
 		},
 		DialContext: dialer.DialContext,
 	}
