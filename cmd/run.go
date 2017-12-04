@@ -32,6 +32,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -240,11 +241,22 @@ a commandline interface for interacting with it.`,
 			go func() {
 				u := "http://k6reports.loadimpact.com/"
 				mime := "application/json"
+				var endTSeconds float64
+				if endT := engine.Executor.GetEndTime(); endT.Valid {
+					endTSeconds = time.Duration(endT.Duration).Seconds()
+				}
+				var stagesEndTSeconds float64
+				if stagesEndT := lib.SumStages(engine.Executor.GetStages()); stagesEndT.Valid {
+					stagesEndTSeconds = time.Duration(stagesEndT.Duration).Seconds()
+				}
 				body, err := json.Marshal(map[string]interface{}{
-					"k6_version": Version,
-					"vus_max":    engine.Executor.GetVUsMax(),
-					"duration":   engine.Executor.GetEndTime(),
-					"iterations": engine.Executor.GetEndIterations(),
+					"k6_version":  Version,
+					"vus_max":     engine.Executor.GetVUsMax(),
+					"iterations":  engine.Executor.GetEndIterations(),
+					"duration":    endTSeconds,
+					"st_duration": stagesEndTSeconds,
+					"goos":        runtime.GOOS,
+					"goarch":      runtime.GOARCH,
 				})
 				if err != nil {
 					panic(err) // This should never happen!!
