@@ -10,6 +10,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+        actionSetToken = iota
+        actionShowToken
+        actionLogin
+)
+
 // loginCloudCommand represents the 'login cloud' command
 var loginCloudCommand = &cobra.Command{
 	Use:   "cloud",
@@ -43,47 +49,55 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 		token := getNullString(cmd.Flags(), "token")
 		show := getNullBool(cmd.Flags(), "show")
 
+                cmdName := actionLogin
+                if show.Valid {
+                        cmdName = actionShowToken
+                } else if token.Valid {
+                        cmdName = actionSetToken
+                }
+
 		conf := config.Collectors.Cloud
 
-		if !show.Valid {
-			if token.Valid {
-				conf.Token = token.String
-			} else {
-				printToken(conf)
+                switch cmdName {
+                case actionSetToken:
+                        conf.Token = token.String
+                case actionLogin:
+                        printToken(conf)
 
-				form := ui.Form{
-					Fields: []ui.Field{
-						ui.StringField{
-							Key:   "Email",
-							Label: "Email",
-						},
-						ui.StringField{
-							Key:   "Password",
-							Label: "Password",
-						},
+                        form := ui.Form{
+                                Fields: []ui.Field{
+                                        ui.StringField{
+                                                Key:   "Email",
+                                                Label: "Email",
 					},
-				}
+                                        ui.StringField{
+                                                Key:   "Password",
+                                                Label: "Password",
+                                        },
+                                },
+                        }
 
-				vals, err := form.Run(os.Stdin, stdout)
-				if err != nil {
-					return err
-				}
-
-				email := vals["Email"].(string)
-				password := vals["Password"].(string)
-				client := cloud.NewClient("", conf.Host, Version)
-				response, err := client.Login(email, password)
-				if err != nil {
-					return err
-				}
-
-				if response.APIToken == "" {
-					return errors.New("Your account has no API token, please generate one: `https://app.loadimpact.com/account/token`.")
-				}
-
-				conf.Token = response.APIToken
+                        vals, err := form.Run(os.Stdin, stdout)
+                        if err != nil {
+                                return err
 			}
 
+                        email := vals["Email"].(string)
+                        password := vals["Password"].(string)
+                        client := cloud.NewClient("", conf.Host, Version)
+                        response, err := client.Login(email, password)
+                        if err != nil {
+                                return err
+                        }
+
+                        if response.APIToken == "" {
+                                return errors.New("Your account has no API token, please generate one: `https://app.loadimpact.com/account/token`.")
+                        }
+
+                        conf.Token = response.APIToken
+                }
+
+                if cmdName != actionShowToken {
 			config.Collectors.Cloud = conf
 			if err := writeDiskConfig(cdir, config); err != nil {
 				return err
@@ -92,7 +106,6 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 
 		printToken(conf)
 		return nil
-
 	},
 }
 
