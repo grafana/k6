@@ -776,8 +776,8 @@ func TestRequestBatch(t *testing.T) {
 				];
 				let res = http.batch(reqs);
 				for (var key in res) {
-					if (res[key].status != 200) { throw new Error("wrong status: " + res[key].status); }
-					if (res[key].url != reqs[key][1].url) { throw new Error("wrong url: " + res[key].url); }
+					if (res[key].status != 200) { throw new Error("wrong status: " + key + ": " + res[key].status); }
+					if (res[key].url != reqs[key][1].url) { throw new Error("wrong url: " + key + ": " + res[key].url + " != " + reqs[key][1].url); }
 				}`)
 				assert.NoError(t, err)
 				assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/get", "https://httpbin.org/${}", 200, "")
@@ -793,8 +793,8 @@ func TestRequestBatch(t *testing.T) {
 				];
 				let res = http.batch(reqs);
 				for (var key in res) {
-					if (res[key].status != 200) { throw new Error("wrong status: " + res[key].status); }
-					if (res[key].url != reqs[key]) { throw new Error("wrong url: " + res[key].url); }
+					if (res[key].status != 200) { throw new Error("wrong status: " + key + ": " + res[key].status); }
+					if (res[key].url != reqs[key]) { throw new Error("wrong url: " + key + ": " + res[key].url); }
 				}`)
 				assert.NoError(t, err)
 				assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/", "", 200, "")
@@ -810,8 +810,8 @@ func TestRequestBatch(t *testing.T) {
 					];
 					let res = http.batch(reqs);
 					for (var key in res) {
-						if (res[key].status != 200) { throw new Error("wrong status: " + res[key].status); }
-						if (res[key].url != reqs[key].url) { throw new Error("wrong url: " + res[key].url); }
+						if (res[key].status != 200) { throw new Error("wrong status: " + key + ": " + res[key].status); }
+						if (res[key].url != reqs[key].url) { throw new Error("wrong url: " + key + ": " + res[key].url + " != " + reqs[key].url); }
 					}`)
 					assert.NoError(t, err)
 					assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/get", "https://httpbin.org/${}", 200, "")
@@ -828,8 +828,8 @@ func TestRequestBatch(t *testing.T) {
 				];
 				let res = http.batch(reqs);
 				for (var key in res) {
-					if (res[key].status != 200) { throw new Error("wrong status: " + res[key].status); }
-					if (res[key].url != reqs[key].url) { throw new Error("wrong url: " + res[key].url); }
+					if (res[key].status != 200) { throw new Error("wrong status: " + key + ": " + res[key].status); }
+					if (res[key].url != reqs[key].url) { throw new Error("wrong url: " + key + ": " + res[key].url + " != " + reqs[key].url); }
 				}`)
 				assert.NoError(t, err)
 				assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/", "", 200, "")
@@ -841,8 +841,8 @@ func TestRequestBatch(t *testing.T) {
 			_, err := common.RunString(rt, `
 			let res = http.batch([ ["POST", "https://httpbin.org/post", { key: "value" }] ]);
 			for (var key in res) {
-				if (res[key].status != 200) { throw new Error("wrong status: " + res[key].status); }
-				if (res[key].json().form.key != "value") { throw new Error("wrong form: " + JSON.stringify(res[key].json().form)); }
+				if (res[key].status != 200) { throw new Error("wrong status: " + key + ": " + res[key].status); }
+				if (res[key].json().form.key != "value") { throw new Error("wrong form: " + key + ": " + JSON.stringify(res[key].json().form)); }
 			}`)
 			assert.NoError(t, err)
 			assertRequestMetricsEmitted(t, state.Samples, "POST", "https://httpbin.org/post", "", 200, "")
@@ -852,8 +852,8 @@ func TestRequestBatch(t *testing.T) {
 			_, err := common.RunString(rt, `
 			let res = http.batch([ ["PUT", "https://httpbin.org/put", { key: "value" }] ]);
 			for (var key in res) {
-				if (res[key].status != 200) { throw new Error("wrong status: " + res[key].status); }
-				if (res[key].json().form.key != "value") { throw new Error("wrong form: " + JSON.stringify(res[key].json().form)); }
+				if (res[key].status != 200) { throw new Error("wrong status: " + key + ": " + res[key].status); }
+				if (res[key].json().form.key != "value") { throw new Error("wrong form: " + key + ": " + JSON.stringify(res[key].json().form)); }
 			}`)
 			assert.NoError(t, err)
 			assertRequestMetricsEmitted(t, state.Samples, "PUT", "https://httpbin.org/put", "", 200, "")
