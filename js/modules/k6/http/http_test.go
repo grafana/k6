@@ -21,6 +21,7 @@
 package http
 
 import (
+	"net/url"
 	"testing"
 
 	"github.com/dop251/goja"
@@ -33,15 +34,18 @@ func TestTagURL(t *testing.T) {
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 	rt.Set("http", common.Bind(rt, New(), nil))
 
-	testdata := map[string]URLTag{
-		`http://httpbin.org/anything/`:               {URL: "http://httpbin.org/anything/", Name: "http://httpbin.org/anything/"},
-		`http://httpbin.org/anything/${1+1}`:         {URL: "http://httpbin.org/anything/2", Name: "http://httpbin.org/anything/${}"},
-		`http://httpbin.org/anything/${1+1}/`:        {URL: "http://httpbin.org/anything/2/", Name: "http://httpbin.org/anything/${}/"},
-		`http://httpbin.org/anything/${1+1}/${1+2}`:  {URL: "http://httpbin.org/anything/2/3", Name: "http://httpbin.org/anything/${}/${}"},
-		`http://httpbin.org/anything/${1+1}/${1+2}/`: {URL: "http://httpbin.org/anything/2/3/", Name: "http://httpbin.org/anything/${}/${}/"},
+	testdata := map[string]struct{ u, n string }{
+		`http://httpbin.org/anything/`:               {"http://httpbin.org/anything/", "http://httpbin.org/anything/"},
+		`http://httpbin.org/anything/${1+1}`:         {"http://httpbin.org/anything/2", "http://httpbin.org/anything/${}"},
+		`http://httpbin.org/anything/${1+1}/`:        {"http://httpbin.org/anything/2/", "http://httpbin.org/anything/${}/"},
+		`http://httpbin.org/anything/${1+1}/${1+2}`:  {"http://httpbin.org/anything/2/3", "http://httpbin.org/anything/${}/${}"},
+		`http://httpbin.org/anything/${1+1}/${1+2}/`: {"http://httpbin.org/anything/2/3/", "http://httpbin.org/anything/${}/${}/"},
 	}
-	for expr, tag := range testdata {
+	for expr, data := range testdata {
 		t.Run("expr="+expr, func(t *testing.T) {
+			u, err := url.Parse(data.u)
+			assert.NoError(t, err)
+			tag := URL{u, data.n, data.u}
 			v, err := common.RunString(rt, "http.url`"+expr+"`")
 			if assert.NoError(t, err) {
 				assert.Equal(t, tag, v.Export())
