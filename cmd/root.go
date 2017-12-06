@@ -25,6 +25,7 @@ import (
 	"sync"
 
 	"github.com/fatih/color"
+	"github.com/mattn/go-colorable"
 	"github.com/mattn/go-isatty"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -44,8 +45,8 @@ var (
 	outMutex  = &sync.Mutex{}
 	stdoutTTY = isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsCygwinTerminal(os.Stdout.Fd())
 	stderrTTY = isatty.IsTerminal(os.Stderr.Fd()) || isatty.IsCygwinTerminal(os.Stderr.Fd())
-	stdout    = consoleWriter{os.Stdout, stdoutTTY, outMutex}
-	stderr    = consoleWriter{os.Stderr, stderrTTY, outMutex}
+	stdout    = consoleWriter{colorable.NewColorableStdout(), stdoutTTY, outMutex}
+	stderr    = consoleWriter{colorable.NewColorableStderr(), stderrTTY, outMutex}
 )
 
 var (
