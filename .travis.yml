@@ -1,0 +1,54 @@
+language: go
+
+go:
+  - 1.9
+  - 1.8
+
+git:
+  depth: 1
+
+stages:
+  - "linter"
+  - "test"
+  - "dockerimage"
+
+# default test stage
+script:
+  - go test -timeout 30s ./...;
+
+jobs:
+  include:
+    - stage: linter
+      script:
+        - go get -u github.com/alecthomas/gometalinter
+        - gometalinter --install
+        - gometalinter --deadline 10m --config gometalinter.json --vendor ./...
+
+    - stage: dockerimage
+      before_script:
+        - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+        - sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+        - sudo apt-get update
+        - sudo apt-get -y install docker-ce
+        - echo "{\"https://index.docker.io/v1/\":{\"auth\":\"$DOCKER_AUTH\",\"email\":\"$DOCKER_EMAIL\"}}" >~/.dockercfg
+      script:
+        - docker build -t loadimpact/k6 .;
+          docker run loadimpact/k6 --help;
+          docker run loadimpact/k6 help;
+          docker run loadimpact/k6 run --help;
+          docker run loadimpact/k6 inspect --help;
+          docker run loadimpact/k6 status --help;
+          docker run loadimpact/k6 stats --help;
+          docker run loadimpact/k6 scale --help;
+          docker run loadimpact/k6 pause --help;
+          docker run loadimpact/k6 resume --help;
+      after_success:
+        - if [ "${TRAVIS_BRANCH}" == "master" ]; then
+            docker push loadimpact/k6
+          elif [ "${TRAVIS_BRANCH}" == "develop" ]; then
+            docker tag loadimpact/k6 loadimpact/k6:develop
+            docker push loadimpact/k6:develop
+          elif [[ "${TRAVIS_TAG}" =~ ^v[0-9]+(\.[0-9]+)*$ ]]; then
+            docker tag loadimpact/k6 loadimpact/k6:${TRAVIS_TAG:1}
+            docker push loadimpact/k6:${TRAVIS_TAG:1}
+          fi

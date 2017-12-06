@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/loadimpact/k6.svg?branch=master)](https://travis-ci.org/loadimpact/k6)
+
 ![](logo.png)
 
 **k6** is a modern load testing tool, building on [Load Impact](https://loadimpact.com/)'s years of experience. It provides a clean, approachable scripting API, distributed and cloud execution, and orchestration via a REST API.
