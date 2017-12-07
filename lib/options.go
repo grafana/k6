@@ -144,6 +144,7 @@ type Options struct {
 
 	MaxRedirects          null.Int         `json:"maxRedirects" envconfig:"max_redirects"`
 	Batch                 null.Int         `json:"batch" envconfig:"batch"`
+	BatchPerHost          null.Int         `json:"batchPerHost" envconfig:"batch_per_host"`
 	InsecureSkipTLSVerify null.Bool        `json:"insecureSkipTLSVerify" envconfig:"insecure_skip_tls_verify"`
 	TLSCipherSuites       *TLSCipherSuites `json:"tlsCipherSuites" envconfig:"tls_cipher_suites"`
 	TLSVersion            *TLSVersion      `json:"tlsVersion" envconfig:"tls_version"`
@@ -184,6 +185,9 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.Batch.Valid {
 		o.Batch = opts.Batch
+	}
+	if opts.BatchPerHost.Valid {
+		o.BatchPerHost = opts.BatchPerHost
 	}
 	if opts.InsecureSkipTLSVerify.Valid {
 		o.InsecureSkipTLSVerify = opts.InsecureSkipTLSVerify

@@ -344,6 +344,7 @@ func (http *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, erro
 
 	// Concurrency limits.
 	globalLimiter := NewSlotLimiter(int(state.Options.Batch.Int64))
+	perHostLimiter := NewMultiSlotLimiter(int(state.Options.BatchPerHost.Int64))
 
 	reqs := reqsV.ToObject(rt)
 	keys := reqs.Keys()
@@ -391,6 +392,11 @@ func (http *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, erro
 		go func() {
 			globalLimiter.Begin()
 			defer globalLimiter.End()
+
+			if hl := perHostLimiter.Slot(url.URL.Host); hl != nil {
+				hl.Begin()
+				defer hl.End()
+			}
 
 			res, samples, err := http.request(ctx, rt, state, method, url, args...)
 			if err != nil {
