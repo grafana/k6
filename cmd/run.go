@@ -287,7 +287,7 @@ a commandline interface for interacting with it.`,
 				atT := engine.Executor.GetTime()
 				stagesEndT := lib.SumStages(engine.Executor.GetStages())
 				endT := engine.Executor.GetEndTime()
-				if !endT.Valid || endT.Duration > stagesEndT.Duration {
+				if !endT.Valid || (stagesEndT.Valid && endT.Duration > stagesEndT.Duration) {
 					endT = stagesEndT
 				}
 				if endT.Valid {
@@ -336,7 +336,7 @@ a commandline interface for interacting with it.`,
 				} else {
 					stagesEndT := lib.SumStages(engine.Executor.GetStages())
 					endT := engine.Executor.GetEndTime()
-					if !endT.Valid || endT.Duration > stagesEndT.Duration {
+					if !endT.Valid || (stagesEndT.Valid && endT.Duration > stagesEndT.Duration) {
 						endT = stagesEndT
 					}
 					if endT.Valid {
