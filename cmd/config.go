@@ -34,17 +34,16 @@ import (
 
 const configFilename = "config.json"
 
-var (
-	configDirs    = configdir.New("loadimpact", "k6")
-	configFlagSet = pflag.NewFlagSet("", 0)
-)
+var configDirs = configdir.New("loadimpact", "k6")
 
-func init() {
-	configFlagSet.SortFlags = false
-	configFlagSet.StringP("out", "o", "", "`uri` for an external metrics database")
-	configFlagSet.BoolP("linger", "l", false, "keep the API server alive past test end")
-	configFlagSet.Bool("no-usage-report", false, "don't send anonymous stats to the developers")
-	configFlagSet.Bool("no-thresholds", false, "don't run thresholds")
+func configFlagSet() *pflag.FlagSet {
+	flags := pflag.NewFlagSet("", 0)
+	flags.SortFlags = false
+	flags.StringP("out", "o", "", "`uri` for an external metrics database")
+	flags.BoolP("linger", "l", false, "keep the API server alive past test end")
+	flags.Bool("no-usage-report", false, "don't send anonymous stats to the developers")
+	flags.Bool("no-thresholds", false, "don't run thresholds")
+	return flags
 }
 
 type Config struct {

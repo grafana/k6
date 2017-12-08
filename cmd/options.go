@@ -28,24 +28,24 @@ import (
 	"github.com/spf13/pflag"
 )
 
-var optionFlagSet = pflag.NewFlagSet("", 0)
-
-func init() {
-	optionFlagSet.SortFlags = false
-	optionFlagSet.Int64P("vus", "u", 1, "number of virtual users")
-	optionFlagSet.Int64P("max", "m", 0, "max available virtual users")
-	optionFlagSet.DurationP("duration", "d", 0, "test duration limit")
-	optionFlagSet.Int64P("iterations", "i", 0, "script iteration limit")
-	optionFlagSet.StringSliceP("stage", "s", nil, "add a `stage`, as `[duration]:[target]`")
-	optionFlagSet.BoolP("paused", "p", false, "start the test in a paused state")
-	optionFlagSet.Int64("max-redirects", 10, "follow at most n redirects")
-	optionFlagSet.Int64("batch", 10, "max parallel batch reqs")
-	optionFlagSet.Int64("batch-per-host", 0, "max parallel batch reqs per host")
-	optionFlagSet.String("user-agent", "", "user agent for http requests")
-	optionFlagSet.Bool("insecure-skip-tls-verify", false, "skip verification of TLS certificates")
-	optionFlagSet.Bool("no-connection-reuse", false, "don't reuse connections between iterations")
-	optionFlagSet.BoolP("throw", "w", false, "throw warnings (like failed http requests) as errors")
-	optionFlagSet.StringSlice("blacklist-ip", nil, "blacklist an `ip range` from being called")
+func optionFlagSet() *pflag.FlagSet {
+	flags := pflag.NewFlagSet("", 0)
+	flags.SortFlags = false
+	flags.Int64P("vus", "u", 1, "number of virtual users")
+	flags.Int64P("max", "m", 0, "max available virtual users")
+	flags.DurationP("duration", "d", 0, "test duration limit")
+	flags.Int64P("iterations", "i", 0, "script iteration limit")
+	flags.StringSliceP("stage", "s", nil, "add a `stage`, as `[duration]:[target]`")
+	flags.BoolP("paused", "p", false, "start the test in a paused state")
+	flags.Int64("max-redirects", 10, "follow at most n redirects")
+	flags.Int64("batch", 10, "max parallel batch reqs")
+	flags.Int64("batch-per-host", 0, "max parallel batch reqs per host")
+	flags.String("user-agent", "", "user agent for http requests")
+	flags.Bool("insecure-skip-tls-verify", false, "skip verification of TLS certificates")
+	flags.Bool("no-connection-reuse", false, "don't reuse connections between iterations")
+	flags.BoolP("throw", "w", false, "throw warnings (like failed http requests) as errors")
+	flags.StringSlice("blacklist-ip", nil, "blacklist an `ip range` from being called")
+	return flags
 }
 
 func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
