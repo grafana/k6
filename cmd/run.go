@@ -401,8 +401,8 @@ func init() {
 	RootCmd.AddCommand(runCmd)
 
 	runCmd.Flags().SortFlags = false
-	runCmd.Flags().AddFlagSet(optionFlagSet)
-	runCmd.Flags().AddFlagSet(configFlagSet)
+	runCmd.Flags().AddFlagSet(optionFlagSet())
+	runCmd.Flags().AddFlagSet(configFlagSet())
 	runCmd.Flags().StringVarP(&runType, "type", "t", runType, "override file `type`, \"js\" or \"archive\"")
 }
 
