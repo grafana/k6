@@ -21,9 +21,11 @@
 package cmd
 
 import (
+	"fmt"
 	"net"
 
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/version"
 	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 )
@@ -40,7 +42,7 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.Int64("max-redirects", 10, "follow at most n redirects")
 	flags.Int64("batch", 10, "max parallel batch reqs")
 	flags.Int64("batch-per-host", 0, "max parallel batch reqs per host")
-	flags.String("user-agent", "", "user agent for http requests")
+	flags.String("user-agent", fmt.Sprintf("k6/%s (https://k6.io/);", version.Full()), "user agent for http requests")
 	flags.Bool("insecure-skip-tls-verify", false, "skip verification of TLS certificates")
 	flags.Bool("no-connection-reuse", false, "don't reuse connections between iterations")
 	flags.BoolP("throw", "w", false, "throw warnings (like failed http requests) as errors")
