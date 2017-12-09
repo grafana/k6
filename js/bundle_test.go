@@ -382,8 +382,8 @@ func TestNewBundle(t *testing.T) {
 					`),
 				}, afero.NewMemMapFs())
 				if assert.NoError(t, err) {
-					assert.Equal(t, b.Options.TLSVersion.Min, tls.VersionSSL30)
-					assert.Equal(t, b.Options.TLSVersion.Max, tls.VersionTLS12)
+					assert.Equal(t, b.Options.TLSVersion.Min, lib.TLSVersion(tls.VersionSSL30))
+					assert.Equal(t, b.Options.TLSVersion.Max, lib.TLSVersion(tls.VersionTLS12))
 				}
 			})
 			t.Run("String", func(t *testing.T) {
@@ -397,8 +397,8 @@ func TestNewBundle(t *testing.T) {
 				`),
 				}, afero.NewMemMapFs())
 				if assert.NoError(t, err) {
-					assert.Equal(t, b.Options.TLSVersion.Min, tls.VersionSSL30)
-					assert.Equal(t, b.Options.TLSVersion.Max, tls.VersionSSL30)
+					assert.Equal(t, b.Options.TLSVersion.Min, lib.TLSVersion(tls.VersionSSL30))
+					assert.Equal(t, b.Options.TLSVersion.Max, lib.TLSVersion(tls.VersionSSL30))
 				}
 
 			})

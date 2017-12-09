@@ -464,11 +464,11 @@ func TestVUIntegrationTLSConfig(t *testing.T) {
 			"",
 		},
 		"SupportedVersion": {
-			lib.Options{TLSVersion: &lib.TLSVersion{Min: tls.VersionTLS12, Max: tls.VersionTLS12}},
+			lib.Options{TLSVersion: &lib.TLSVersions{Min: tls.VersionTLS12, Max: tls.VersionTLS12}},
 			"",
 		},
 		"UnsupportedVersion": {
-			lib.Options{TLSVersion: &lib.TLSVersion{Min: tls.VersionSSL30, Max: tls.VersionSSL30}},
+			lib.Options{TLSVersion: &lib.TLSVersions{Min: tls.VersionSSL30, Max: tls.VersionSSL30}},
 			"GoError: Get https://sha256.badssl.com/: remote error: tls: handshake failure",
 		},
 	}
