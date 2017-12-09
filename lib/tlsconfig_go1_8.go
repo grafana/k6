@@ -24,11 +24,18 @@ package lib
 
 import "crypto/tls"
 
-var SupportedTLSVersions = map[string]int{
+var SupportedTLSVersions = map[string]TLSVersion{
 	"ssl3.0": tls.VersionSSL30,
 	"tls1.0": tls.VersionTLS10,
 	"tls1.1": tls.VersionTLS11,
 	"tls1.2": tls.VersionTLS12,
+}
+
+var SupportedTLSVersionsToString = map[TLSVersion]string{
+	tls.VersionSSL30: "ssl3.0",
+	tls.VersionTLS10: "tls1.0",
+	tls.VersionTLS11: "tls1.1",
+	tls.VersionTLS12: "tls1.2",
 }
 
 var SupportedTLSCipherSuites = map[string]uint16{
