@@ -18,25 +18,25 @@
  *
  */
 
-package cmd
+package version
 
-import (
-	"fmt"
+import "fmt"
 
-	"github.com/loadimpact/k6/version"
-	"github.com/spf13/cobra"
-)
-
-// versionCmd represents the version command.
-var versionCmd = &cobra.Command{
-	Use:   "version",
-	Short: "Show application version",
-	Long:  `Show the application version and exit.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("k6 v" + version.Full())
-	},
+// Version represents a sember - k6 uses semantic versioning (http://semver.org/)
+type Version struct {
+	Major uint
+	Minor uint
+	Patch uint
 }
 
+// Current represents the current version and can be shared across packages
+var Current Version
+
 func init() {
-	RootCmd.AddCommand(versionCmd)
+	Current = Version{Major: 0, Minor: 18, Patch: 2}
+}
+
+// Full returns the full semantic version as a string major.minor.patch
+func Full() string {
+	return fmt.Sprintf("%d.%d.%d", Current.Major, Current.Minor, Current.Patch)
 }

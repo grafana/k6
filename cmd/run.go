@@ -44,6 +44,7 @@ import (
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/ui"
+	"github.com/loadimpact/k6/version"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
@@ -250,7 +251,7 @@ a commandline interface for interacting with it.`,
 					stagesEndTSeconds = time.Duration(stagesEndT.Duration).Seconds()
 				}
 				body, err := json.Marshal(map[string]interface{}{
-					"k6_version":  Version,
+					"k6_version":  version.Full(),
 					"vus_max":     engine.Executor.GetVUsMax(),
 					"iterations":  engine.Executor.GetEndIterations(),
 					"duration":    endTSeconds,
