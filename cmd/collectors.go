@@ -29,6 +29,7 @@ import (
 	"github.com/loadimpact/k6/stats/cloud"
 	"github.com/loadimpact/k6/stats/influxdb"
 	jsonc "github.com/loadimpact/k6/stats/json"
+	"github.com/loadimpact/k6/version"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 )
@@ -70,7 +71,7 @@ func newCollector(t, arg string, src *lib.SourceData, conf Config) (lib.Collecto
 		if err := loadConfig(&config); err != nil {
 			return nil, err
 		}
-		return cloud.New(config, src, conf.Options, Version)
+		return cloud.New(config, src, conf.Options, version.Full())
 	default:
 		return nil, errors.Errorf("unknown output type: %s", t)
 	}
