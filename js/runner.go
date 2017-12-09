@@ -128,7 +128,11 @@ func (r *Runner) newVU() (*VU, error) {
 		}
 	}
 
-	dialer := &netext.Dialer{Dialer: r.BaseDialer, Resolver: r.Resolver}
+	dialer := &netext.Dialer{
+		Dialer:    r.BaseDialer,
+		Resolver:  r.Resolver,
+		Blacklist: r.Bundle.Options.BlacklistIPs,
+	}
 	transport := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 		TLSClientConfig: &tls.Config{
@@ -138,6 +142,7 @@ func (r *Runner) newVU() (*VU, error) {
 			MaxVersion:         uint16(tlsVersion.Max),
 			Certificates:       certs,
 			NameToCertificate:  nameToCert,
+			Renegotiation:      tls.RenegotiateFreelyAsClient,
 		},
 		DialContext: dialer.DialContext,
 	}
@@ -169,8 +174,8 @@ func (r *Runner) GetOptions() lib.Options {
 	return r.Bundle.Options
 }
 
-func (r *Runner) ApplyOptions(opts lib.Options) {
-	r.Bundle.Options = r.Bundle.Options.Apply(opts)
+func (r *Runner) SetOptions(opts lib.Options) {
+	r.Bundle.Options = opts
 }
 
 type VU struct {

@@ -27,7 +27,9 @@ import (
 	"time"
 
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/stats"
+	"github.com/pkg/errors"
 	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	null "gopkg.in/guregu/null.v3"
@@ -52,6 +54,41 @@ func TestExecutorSetLogger(t *testing.T) {
 	assert.Equal(t, logger, e.GetLogger())
 }
 
+func TestExecutorStages(t *testing.T) {
+	testdata := map[string]struct {
+		Duration time.Duration
+		Stages   []lib.Stage
+	}{
+		"one": {
+			1 * time.Second,
+			[]lib.Stage{{Duration: lib.NullDurationFrom(1 * time.Second)}},
+		},
+		"two": {
+			2 * time.Second,
+			[]lib.Stage{
+				{Duration: lib.NullDurationFrom(1 * time.Second)},
+				{Duration: lib.NullDurationFrom(1 * time.Second)},
+			},
+		},
+		"two/targeted": {
+			2 * time.Second,
+			[]lib.Stage{
+				{Duration: lib.NullDurationFrom(1 * time.Second), Target: null.IntFrom(5)},
+				{Duration: lib.NullDurationFrom(1 * time.Second), Target: null.IntFrom(10)},
+			},
+		},
+	}
+	for name, data := range testdata {
+		t.Run(name, func(t *testing.T) {
+			e := New(nil)
+			assert.NoError(t, e.SetVUsMax(10))
+			e.SetStages(data.Stages)
+			assert.NoError(t, e.Run(context.Background(), nil))
+			assert.True(t, e.GetTime() >= data.Duration)
+		})
+	}
+}
+
 func TestExecutorEndTime(t *testing.T) {
 	e := New(nil)
 	assert.NoError(t, e.SetVUsMax(10))
@@ -62,6 +99,48 @@ func TestExecutorEndTime(t *testing.T) {
 	startTime := time.Now()
 	assert.NoError(t, e.Run(context.Background(), nil))
 	assert.True(t, time.Now().After(startTime.Add(1*time.Second)), "test did not take 1s")
+
+	t.Run("Runtime Errors", func(t *testing.T) {
+		e := New(lib.RunnerFunc(func(ctx context.Context) ([]stats.Sample, error) {
+			return nil, errors.New("hi")
+		}))
+		assert.NoError(t, e.SetVUsMax(10))
+		assert.NoError(t, e.SetVUs(10))
+		e.SetEndTime(lib.NullDurationFrom(100 * time.Millisecond))
+		assert.Equal(t, lib.NullDurationFrom(100*time.Millisecond), e.GetEndTime())
+
+		l, hook := logtest.NewNullLogger()
+		e.SetLogger(l)
+
+		startTime := time.Now()
+		assert.NoError(t, e.Run(context.Background(), nil))
+		assert.True(t, time.Now().After(startTime.Add(100*time.Millisecond)), "test did not take 100ms")
+
+		assert.NotEmpty(t, hook.Entries)
+		for _, e := range hook.Entries {
+			assert.Equal(t, "hi", e.Message)
+		}
+	})
+
+	t.Run("End Errors", func(t *testing.T) {
+		e := New(lib.RunnerFunc(func(ctx context.Context) ([]stats.Sample, error) {
+			<-ctx.Done()
+			return nil, errors.New("hi")
+		}))
+		assert.NoError(t, e.SetVUsMax(10))
+		assert.NoError(t, e.SetVUs(10))
+		e.SetEndTime(lib.NullDurationFrom(100 * time.Millisecond))
+		assert.Equal(t, lib.NullDurationFrom(100*time.Millisecond), e.GetEndTime())
+
+		l, hook := logtest.NewNullLogger()
+		e.SetLogger(l)
+
+		startTime := time.Now()
+		assert.NoError(t, e.Run(context.Background(), nil))
+		assert.True(t, time.Now().After(startTime.Add(100*time.Millisecond)), "test did not take 100ms")
+
+		assert.Empty(t, hook.Entries)
+	})
 }
 
 func TestExecutorEndIterations(t *testing.T) {
@@ -88,7 +167,11 @@ func TestExecutorEndIterations(t *testing.T) {
 
 	for i := 0; i < 100; i++ {
 		samples := <-samples
-		assert.Equal(t, []stats.Sample{{Metric: metric, Value: 1.0}}, samples)
+		if assert.Len(t, samples, 2) {
+			assert.Equal(t, stats.Sample{Metric: metric, Value: 1.0}, samples[0])
+			assert.Equal(t, metrics.Iterations, samples[1].Metric)
+			assert.Equal(t, float64(1), samples[1].Value)
+		}
 	}
 }
 

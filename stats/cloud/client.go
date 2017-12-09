@@ -27,7 +27,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/pkg/errors"
@@ -54,24 +53,13 @@ type Client struct {
 }
 
 func NewClient(token, host, version string) *Client {
-	client := &http.Client{
-		Timeout: RequestTimeout,
-	}
-
-	hostEnv := os.Getenv("K6CLOUD_HOST")
-	if hostEnv != "" {
-		host = hostEnv
-	}
 	if host == "" {
 		host = "https://ingest.loadimpact.com"
 	}
-
-	baseURL := fmt.Sprintf("%s/v1", host)
-
 	c := &Client{
-		client:        client,
+		client:        &http.Client{Timeout: RequestTimeout},
 		token:         token,
-		baseURL:       baseURL,
+		baseURL:       fmt.Sprintf("%s/v1", host),
 		version:       version,
 		retries:       MaxRetries,
 		retryInterval: RetryInterval,
@@ -129,7 +117,9 @@ func (c *Client) Do(req *http.Request, v interface{}) error {
 
 func (c *Client) do(req *http.Request, v interface{}, attempt int) (retry bool, err error) {
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Token %s", c.token))
+	if c.token != "" {
+		req.Header.Set("Authorization", fmt.Sprintf("Token %s", c.token))
+	}
 	req.Header.Set("User-Agent", "k6cloud/"+c.version)
 
 	resp, err := c.client.Do(req)
@@ -144,6 +134,10 @@ func (c *Client) do(req *http.Request, v interface{}, attempt int) (retry bool, 
 
 	if shouldRetry(resp, err, attempt, c.retries) {
 		return true, err
+	}
+
+	if err != nil {
+		return false, err
 	}
 
 	if err = checkResponse(resp); err != nil {
@@ -174,25 +168,18 @@ func checkResponse(r *http.Response) error {
 		return ErrNotAuthorized
 	}
 
-	// Struct of errors set back from API
-	errorStruct := &struct {
-		ErrorData struct {
-			Message string `json:"message"`
-			Code    int    `json:"code"`
-		} `json:"error"`
-	}{}
-
-	if err := json.NewDecoder(r.Body).Decode(errorStruct); err != nil {
-		return errors.Wrap(err, "Non-standard API error response")
+	data, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		return err
 	}
 
-	errorResponse := &ErrorResponse{
-		Response: r,
-		Message:  errorStruct.ErrorData.Message,
-		Code:     errorStruct.ErrorData.Code,
+	var payload struct {
+		Error ErrorResponse `json:"error"`
 	}
-
-	return errorResponse
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return errors.Errorf("Unknown Error: %s", string(data))
+	}
+	return payload.Error
 }
 
 func shouldRetry(resp *http.Response, err error, attempt, maxAttempts int) bool {

@@ -1,16 +1,16 @@
-FROM golang:1.7
-
-RUN curl -sL https://deb.nodesource.com/setup_6.x | bash && \
-	apt-get install -y nodejs && \
-	apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
+FROM golang:1.9-alpine as builder
 WORKDIR $GOPATH/src/github.com/loadimpact/k6
 ADD . .
-RUN npm -g install ember-cli bower && \
-	make web && pwd && rm -r web/tmp web/node_modules web/bower_components && \
-	go get . && go install . && rm -rf $GOPATH/lib $GOPATH/pkg && \
-	(cd $GOPATH/src && ls | grep -v github | xargs rm -r) && \
-	(cd $GOPATH/src/github.com && ls | grep -v loadimpact | xargs rm -r)
+RUN apk --no-cache add --virtual .build-deps git make build-base && \
+  go get . && CGO_ENABLED=0 go install -a -ldflags '-s -w' && \
+  go get github.com/GeertJohan/go.rice && \
+  cd $GOPATH/src/github.com/GeertJohan/go.rice/rice && \
+  go get . && go install && \
+  cd $GOPATH/src/github.com/loadimpact/k6 && \
+  rice append --exec=$GOPATH/bin/k6 -i ./js/compiler -i ./js/lib
 
-ENV K6_ADDRESS 0.0.0.0:6565
-ENTRYPOINT ["k6"]
+FROM scratch
+WORKDIR /root/
+COPY --from=builder /go/bin/k6 /root
+COPY --from=builder /etc/ssl /etc/ssl
+ENTRYPOINT ["./k6"]

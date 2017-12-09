@@ -21,360 +21,119 @@
 package http
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"fmt"
-	"io"
-	"net"
 	"net/http"
-	neturl "net/url"
+	"net/http/cookiejar"
 	"reflect"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
 
-	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
-	"github.com/loadimpact/k6/js/modules/k6/html"
-	"github.com/loadimpact/k6/lib/netext"
-	"github.com/loadimpact/k6/stats"
-	"github.com/loadimpact/k6/version"
-	"github.com/pkg/errors"
 )
 
 var (
-	typeString = reflect.TypeOf("")
-	typeURLTag = reflect.TypeOf(URLTag{})
+	typeString                     = reflect.TypeOf("")
+	typeURL                        = reflect.TypeOf(URL{})
+	typeMapKeyStringValueInterface = reflect.TypeOf(map[string]interface{}{})
 )
 
-type HTTPResponseTimings struct {
-	Duration, Blocked, LookingUp, Connecting, Sending, Waiting, Receiving float64
+const SSL_3_0 = "ssl3.0"
+const TLS_1_0 = "tls1.0"
+const TLS_1_1 = "tls1.1"
+const TLS_1_2 = "tls1.2"
+const OCSP_STATUS_GOOD = "good"
+const OCSP_STATUS_REVOKED = "revoked"
+const OCSP_STATUS_SERVER_FAILED = "server_failed"
+const OCSP_STATUS_UNKNOWN = "unknown"
+const OCSP_REASON_UNSPECIFIED = "unspecified"
+const OCSP_REASON_KEY_COMPROMISE = "key_compromise"
+const OCSP_REASON_CA_COMPROMISE = "ca_compromise"
+const OCSP_REASON_AFFILIATION_CHANGED = "affiliation_changed"
+const OCSP_REASON_SUPERSEDED = "superseded"
+const OCSP_REASON_CESSATION_OF_OPERATION = "cessation_of_operation"
+const OCSP_REASON_CERTIFICATE_HOLD = "certificate_hold"
+const OCSP_REASON_REMOVE_FROM_CRL = "remove_from_crl"
+const OCSP_REASON_PRIVILEGE_WITHDRAWN = "privilege_withdrawn"
+const OCSP_REASON_AA_COMPROMISE = "aa_compromise"
+
+type HTTPCookie struct {
+	Name, Value, Domain, Path string
+	HttpOnly, Secure          bool
+	MaxAge                    int
+	Expires                   int64
 }
 
-type HTTPResponse struct {
-	ctx context.Context
-
-	RemoteIP   string
-	RemotePort int
-	URL        string
-	Status     int
-	Proto      string
-	Headers    map[string]string
-	Body       string
-	Timings    HTTPResponseTimings
-	Error      string
-
-	cachedJSON goja.Value
+type HTTPRequestCookie struct {
+	Name, Value string
+	Replace     bool
 }
 
-func (res *HTTPResponse) Json() goja.Value {
-	if res.cachedJSON == nil {
-		var v interface{}
-		if err := json.Unmarshal([]byte(res.Body), &v); err != nil {
-			common.Throw(common.GetRuntime(res.ctx), err)
-		}
-		res.cachedJSON = common.GetRuntime(res.ctx).ToValue(v)
+type HTTP struct {
+	SSL_3_0                            string `js:"SSL_3_0"`
+	TLS_1_0                            string `js:"TLS_1_0"`
+	TLS_1_1                            string `js:"TLS_1_1"`
+	TLS_1_2                            string `js:"TLS_1_2"`
+	OCSP_STATUS_GOOD                   string `js:"OCSP_STATUS_GOOD"`
+	OCSP_STATUS_REVOKED                string `js:"OCSP_STATUS_REVOKED"`
+	OCSP_STATUS_SERVER_FAILED          string `js:"OCSP_STATUS_SERVER_FAILED"`
+	OCSP_STATUS_UNKNOWN                string `js:"OCSP_STATUS_UNKNOWN"`
+	OCSP_REASON_UNSPECIFIED            string `js:"OCSP_REASON_UNSPECIFIED"`
+	OCSP_REASON_KEY_COMPROMISE         string `js:"OCSP_REASON_KEY_COMPROMISE"`
+	OCSP_REASON_CA_COMPROMISE          string `js:"OCSP_REASON_CA_COMPROMISE"`
+	OCSP_REASON_AFFILIATION_CHANGED    string `js:"OCSP_REASON_AFFILIATION_CHANGED"`
+	OCSP_REASON_SUPERSEDED             string `js:"OCSP_REASON_SUPERSEDED"`
+	OCSP_REASON_CESSATION_OF_OPERATION string `js:"OCSP_REASON_CESSATION_OF_OPERATION"`
+	OCSP_REASON_CERTIFICATE_HOLD       string `js:"OCSP_REASON_CERTIFICATE_HOLD"`
+	OCSP_REASON_REMOVE_FROM_CRL        string `js:"OCSP_REASON_REMOVE_FROM_CRL"`
+	OCSP_REASON_PRIVILEGE_WITHDRAWN    string `js:"OCSP_REASON_PRIVILEGE_WITHDRAWN"`
+	OCSP_REASON_AA_COMPROMISE          string `js:"OCSP_REASON_AA_COMPROMISE"`
+}
+
+func New() *HTTP {
+	return &HTTP{
+		SSL_3_0:                            SSL_3_0,
+		TLS_1_0:                            TLS_1_0,
+		TLS_1_1:                            TLS_1_1,
+		TLS_1_2:                            TLS_1_2,
+		OCSP_STATUS_GOOD:                   OCSP_STATUS_GOOD,
+		OCSP_STATUS_REVOKED:                OCSP_STATUS_REVOKED,
+		OCSP_STATUS_SERVER_FAILED:          OCSP_STATUS_SERVER_FAILED,
+		OCSP_STATUS_UNKNOWN:                OCSP_STATUS_UNKNOWN,
+		OCSP_REASON_UNSPECIFIED:            OCSP_REASON_UNSPECIFIED,
+		OCSP_REASON_KEY_COMPROMISE:         OCSP_REASON_KEY_COMPROMISE,
+		OCSP_REASON_CA_COMPROMISE:          OCSP_REASON_CA_COMPROMISE,
+		OCSP_REASON_AFFILIATION_CHANGED:    OCSP_REASON_AFFILIATION_CHANGED,
+		OCSP_REASON_SUPERSEDED:             OCSP_REASON_SUPERSEDED,
+		OCSP_REASON_CESSATION_OF_OPERATION: OCSP_REASON_CESSATION_OF_OPERATION,
+		OCSP_REASON_CERTIFICATE_HOLD:       OCSP_REASON_CERTIFICATE_HOLD,
+		OCSP_REASON_REMOVE_FROM_CRL:        OCSP_REASON_REMOVE_FROM_CRL,
+		OCSP_REASON_PRIVILEGE_WITHDRAWN:    OCSP_REASON_PRIVILEGE_WITHDRAWN,
+		OCSP_REASON_AA_COMPROMISE:          OCSP_REASON_AA_COMPROMISE,
 	}
-	return res.cachedJSON
 }
 
-func (res *HTTPResponse) Html(selector ...string) html.Selection {
-	sel, err := html.HTML{}.ParseHTML(res.ctx, res.Body)
-	if err != nil {
-		common.Throw(common.GetRuntime(res.ctx), err)
-	}
-	if len(selector) > 0 {
-		sel = sel.Find(selector[0])
-	}
-	return sel
+func (*HTTP) XCookieJar(ctx *context.Context) *HTTPCookieJar {
+	return newCookieJar(ctx)
 }
 
-type HTTP struct{}
+func (*HTTP) CookieJar(ctx context.Context) *HTTPCookieJar {
+	state := common.GetState(ctx)
+	return &HTTPCookieJar{state.CookieJar, &ctx}
+}
 
-func (*HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.State, method string, url goja.Value, args ...goja.Value) (*HTTPResponse, []stats.Sample, error) {
-	var bodyReader io.Reader
-	var contentType string
-	if len(args) > 0 && !goja.IsUndefined(args[0]) && !goja.IsNull(args[0]) {
-		var data map[string]goja.Value
-		if rt.ExportTo(args[0], &data) == nil {
-			bodyQuery := make(neturl.Values, len(data))
-			for k, v := range data {
-				bodyQuery.Set(k, v.String())
-			}
-			bodyReader = bytes.NewBufferString(bodyQuery.Encode())
-			contentType = "application/x-www-form-urlencoded"
+func (*HTTP) setRequestCookies(req *http.Request, jar *cookiejar.Jar, reqCookies map[string]*HTTPRequestCookie) {
+	jarCookies := make(map[string][]*http.Cookie)
+	for _, c := range jar.Cookies(req.URL) {
+		jarCookies[c.Name] = append(jarCookies[c.Name], c)
+	}
+	for key, reqCookie := range reqCookies {
+		if jc := jarCookies[key]; jc != nil && reqCookie.Replace {
+			jarCookies[key] = []*http.Cookie{{Name: key, Value: reqCookie.Value}}
 		} else {
-			bodyReader = bytes.NewBufferString(args[0].String())
+			jarCookies[key] = append(jarCookies[key], &http.Cookie{Name: key, Value: reqCookie.Value})
 		}
 	}
-
-	// The provided URL can be either a string (or at least something stringable) or a URLTag.
-	var urlStr string
-	var nameTag string
-	switch v := url.Export().(type) {
-	case URLTag:
-		urlStr = v.URL
-		nameTag = v.Name
-	default:
-		urlStr = url.String()
-		nameTag = urlStr
-	}
-
-	req, err := http.NewRequest(method, urlStr, bodyReader)
-	if err != nil {
-		return nil, nil, err
-	}
-	if contentType != "" {
-		req.Header.Set("Content-Type", contentType)
-	}
-	if userAgent := state.Options.UserAgent; userAgent.Valid {
-		req.Header.Set("User-Agent", userAgent.String)
-	} else {
-		req.Header.Set("User-Agent", fmt.Sprintf("k6/%s (https://k6.io/);", version.Version))
-	}
-
-	tags := map[string]string{
-		"proto":  "",
-		"status": "0",
-		"method": method,
-		"url":    urlStr,
-		"name":   nameTag,
-		"group":  state.Group.Path,
-	}
-	timeout := 60 * time.Second
-	throw := state.Options.Throw.Bool
-
-	if len(args) > 1 {
-		paramsV := args[1]
-		if !goja.IsUndefined(paramsV) && !goja.IsNull(paramsV) {
-			params := paramsV.ToObject(rt)
-			for _, k := range params.Keys() {
-				switch k {
-				case "headers":
-					headersV := params.Get(k)
-					if goja.IsUndefined(headersV) || goja.IsNull(headersV) {
-						continue
-					}
-					headers := headersV.ToObject(rt)
-					if headers == nil {
-						continue
-					}
-					for _, key := range headers.Keys() {
-						req.Header.Set(key, headers.Get(key).String())
-					}
-				case "tags":
-					tagsV := params.Get(k)
-					if goja.IsUndefined(tagsV) || goja.IsNull(tagsV) {
-						continue
-					}
-					tagObj := tagsV.ToObject(rt)
-					if tagObj == nil {
-						continue
-					}
-					for _, key := range tagObj.Keys() {
-						tags[key] = tagObj.Get(key).String()
-					}
-				case "timeout":
-					timeout = time.Duration(params.Get(k).ToFloat() * float64(time.Millisecond))
-				case "throw":
-					throw = params.Get(k).ToBoolean()
-				}
-			}
+	for _, cookies := range jarCookies {
+		for _, c := range cookies {
+			req.AddCookie(c)
 		}
 	}
-
-	resp := &HTTPResponse{
-		ctx: ctx,
-		URL: urlStr,
-	}
-	client := http.Client{
-		Transport: state.HTTPTransport,
-		Timeout:   timeout,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			max := int(state.Options.MaxRedirects.Int64)
-			if len(via) >= max {
-				return errors.Errorf("stopped after %d redirects", max)
-			}
-			return nil
-		},
-	}
-	if state.CookieJar != nil {
-		client.Jar = state.CookieJar
-	}
-
-	tracer := netext.Tracer{}
-	res, resErr := client.Do(req.WithContext(netext.WithTracer(ctx, &tracer)))
-	if resErr == nil && res != nil {
-		buf := state.BPool.Get()
-		buf.Reset()
-		defer state.BPool.Put(buf)
-		_, err := io.Copy(buf, res.Body)
-		if err != nil && err != io.EOF {
-			resErr = err
-		}
-		resp.Body = buf.String()
-		_ = res.Body.Close()
-	}
-	trail := tracer.Done()
-	if trail.ConnRemoteAddr != nil {
-		remoteHost, remotePortStr, _ := net.SplitHostPort(trail.ConnRemoteAddr.String())
-		remotePort, _ := strconv.Atoi(remotePortStr)
-		resp.RemoteIP = remoteHost
-		resp.RemotePort = remotePort
-	}
-	resp.Timings = HTTPResponseTimings{
-		Duration:   stats.D(trail.Duration),
-		Blocked:    stats.D(trail.Blocked),
-		Connecting: stats.D(trail.Connecting),
-		Sending:    stats.D(trail.Sending),
-		Waiting:    stats.D(trail.Waiting),
-		Receiving:  stats.D(trail.Receiving),
-	}
-
-	if resErr != nil {
-		resp.Error = resErr.Error()
-		tags["error"] = resp.Error
-	} else {
-		resp.URL = res.Request.URL.String()
-		resp.Status = res.StatusCode
-		resp.Proto = res.Proto
-		tags["url"] = resp.URL
-		tags["status"] = strconv.Itoa(resp.Status)
-		tags["proto"] = resp.Proto
-
-		resp.Headers = make(map[string]string, len(res.Header))
-		for k, vs := range res.Header {
-			resp.Headers[k] = strings.Join(vs, ", ")
-		}
-	}
-
-	if resErr != nil {
-		// Do *not* log errors about the contex being cancelled.
-		select {
-		case <-ctx.Done():
-		default:
-			state.Logger.WithField("error", resErr).Warn("Request Failed")
-		}
-
-		if throw {
-			return nil, nil, resErr
-		}
-	}
-	return resp, trail.Samples(tags), nil
-}
-
-func (http *HTTP) Request(ctx context.Context, method string, url goja.Value, args ...goja.Value) (*HTTPResponse, error) {
-	rt := common.GetRuntime(ctx)
-	state := common.GetState(ctx)
-
-	res, samples, err := http.request(ctx, rt, state, method, url, args...)
-	state.Samples = append(state.Samples, samples...)
-	return res, err
-}
-
-func (http *HTTP) Get(ctx context.Context, url goja.Value, args ...goja.Value) (*HTTPResponse, error) {
-	// The body argument is always undefined for GETs and HEADs.
-	args = append([]goja.Value{goja.Undefined()}, args...)
-	return http.Request(ctx, "GET", url, args...)
-}
-
-func (http *HTTP) Head(ctx context.Context, url goja.Value, args ...goja.Value) (*HTTPResponse, error) {
-	// The body argument is always undefined for GETs and HEADs.
-	args = append([]goja.Value{goja.Undefined()}, args...)
-	return http.Request(ctx, "HEAD", url, args...)
-}
-
-func (http *HTTP) Post(ctx context.Context, url goja.Value, args ...goja.Value) (*HTTPResponse, error) {
-	return http.Request(ctx, "POST", url, args...)
-}
-
-func (http *HTTP) Put(ctx context.Context, url goja.Value, args ...goja.Value) (*HTTPResponse, error) {
-	return http.Request(ctx, "PUT", url, args...)
-}
-
-func (http *HTTP) Patch(ctx context.Context, url goja.Value, args ...goja.Value) (*HTTPResponse, error) {
-	return http.Request(ctx, "PATCH", url, args...)
-}
-
-func (http *HTTP) Del(ctx context.Context, url goja.Value, args ...goja.Value) (*HTTPResponse, error) {
-	return http.Request(ctx, "DELETE", url, args...)
-}
-
-func (http *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, error) {
-	rt := common.GetRuntime(ctx)
-	state := common.GetState(ctx)
-
-	errs := make(chan error)
-	retval := rt.NewObject()
-	mutex := sync.Mutex{}
-
-	reqs := reqsV.ToObject(rt)
-	keys := reqs.Keys()
-	for _, k := range keys {
-		k := k
-		v := reqs.Get(k)
-
-		var method string
-		var url goja.Value
-		var args []goja.Value
-
-		// Shorthand: "http://example.com/" -> ["GET", "http://example.com/"]
-		switch v.ExportType() {
-		case typeString, typeURLTag:
-			method = "GET"
-			url = v
-		default:
-			obj := v.ToObject(rt)
-			objkeys := obj.Keys()
-			for i, objk := range objkeys {
-				objv := obj.Get(objk)
-				switch i {
-				case 0:
-					method = strings.ToUpper(objv.String())
-					if method == "GET" || method == "HEAD" {
-						args = []goja.Value{goja.Undefined()}
-					}
-				case 1:
-					url = objv
-				default:
-					args = append(args, objv)
-				}
-			}
-		}
-
-		go func() {
-			res, samples, err := http.request(ctx, rt, state, method, url, args...)
-			if err != nil {
-				errs <- err
-			}
-			mutex.Lock()
-			_ = retval.Set(k, res)
-			state.Samples = append(state.Samples, samples...)
-			mutex.Unlock()
-			errs <- nil
-		}()
-	}
-
-	var err error
-	for range keys {
-		if e := <-errs; e != nil {
-			err = e
-		}
-	}
-	return retval, err
-}
-
-func (http *HTTP) Url(parts []string, pieces ...string) URLTag {
-	var tag URLTag
-	for i, part := range parts {
-		tag.Name += part
-		tag.URL += part
-		if i < len(pieces) {
-			tag.Name += "${}"
-			tag.URL += pieces[i]
-		}
-	}
-	return tag
 }

@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/stats"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -62,10 +63,14 @@ func (h *vuHandle) run(logger *log.Logger, flow <-chan int64, out chan<- []stats
 		if h.vu != nil {
 			s, err := h.vu.RunOnce(ctx)
 			if err != nil {
-				if s, ok := err.(fmt.Stringer); ok {
-					logger.Error(s.String())
-				} else {
-					logger.Error(err.Error())
+				select {
+				case <-ctx.Done():
+				default:
+					if s, ok := err.(fmt.Stringer); ok {
+						logger.Error(s.String())
+					} else {
+						logger.Error(err.Error())
+					}
 				}
 			}
 			samples = s
@@ -96,6 +101,8 @@ type Executor struct {
 
 	pauseLock sync.RWMutex
 	pause     chan interface{}
+
+	stages []lib.Stage
 
 	// Lock for: ctx, flow, out
 	lock sync.RWMutex
@@ -173,7 +180,8 @@ func (e *Executor) Run(parent context.Context, out chan<- []stats.Sample) error 
 		}
 	}()
 
-	if err := e.scale(ctx, lib.Max(0, atomic.LoadInt64(&e.numVUs))); err != nil {
+	startVUs := atomic.LoadInt64(&e.numVUs)
+	if err := e.scale(ctx, lib.Max(0, startVUs)); err != nil {
 		return err
 	}
 
@@ -215,8 +223,9 @@ func (e *Executor) Run(parent context.Context, out chan<- []stats.Sample) error 
 			// Start an iteration if there's a VU waiting. See also: the big comment block above.
 			atomic.AddInt64(&e.partIters, 1)
 		case t := <-ticker.C:
-			// Every tick, increment the clock and see if we passed the end point. If the test ends
-			// this way, set a cutoff point; any samples collected past the cutoff point are excluded.
+			// Every tick, increment the clock, see if we passed the end point, and process stages.
+			// If the test ends this way, set a cutoff point; any samples collected past the cutoff
+			// point are excluded.
 			d := t.Sub(lastTick)
 			lastTick = t
 
@@ -227,9 +236,30 @@ func (e *Executor) Run(parent context.Context, out chan<- []stats.Sample) error 
 				cutoff = time.Now()
 				return nil
 			}
+
+			stages := e.stages
+			if stages != nil {
+				vus, keepRunning := ProcessStages(startVUs, stages, at)
+				if !keepRunning {
+					e.Logger.WithField("at", at).Debug("Local: Ran out of stages")
+					cutoff = time.Now()
+					return nil
+				}
+				if vus.Valid {
+					if err := e.SetVUs(vus.Int64); err != nil {
+						return err
+					}
+				}
+			}
 		case samples := <-vuOut:
 			// Every iteration ends with a write to vuOut. Check if we've hit the end point.
+			// If not, make sure to include an Iterations bump in the list!
 			if out != nil {
+				samples = append(samples, stats.Sample{
+					Time:   time.Now(),
+					Metric: metrics.Iterations,
+					Value:  1,
+				})
 				out <- samples
 			}
 
@@ -250,6 +280,8 @@ func (e *Executor) Run(parent context.Context, out chan<- []stats.Sample) error 
 }
 
 func (e *Executor) scale(ctx context.Context, num int64) error {
+	e.Logger.WithField("num", num).Debug("Local: Scaling...")
+
 	e.vusLock.Lock()
 	defer e.vusLock.Unlock()
 
@@ -314,6 +346,14 @@ func (e *Executor) GetLogger() *log.Logger {
 	return e.Logger
 }
 
+func (e *Executor) GetStages() []lib.Stage {
+	return e.stages
+}
+
+func (e *Executor) SetStages(s []lib.Stage) {
+	e.stages = s
+}
+
 func (e *Executor) GetIterations() int64 {
 	return atomic.LoadInt64(&e.iters)
 }
@@ -330,6 +370,7 @@ func (e *Executor) SetEndIterations(i null.Int) {
 	if !i.Valid {
 		i.Int64 = -1
 	}
+	e.Logger.WithField("i", i.Int64).Debug("Local: Setting end iterations")
 	atomic.StoreInt64(&e.endIters, i.Int64)
 }
 
@@ -349,6 +390,7 @@ func (e *Executor) SetEndTime(t lib.NullDuration) {
 	if !t.Valid {
 		t.Duration = -1
 	}
+	e.Logger.WithField("d", t.Duration).Debug("Local: Setting end time")
 	atomic.StoreInt64(&e.endTime, int64(t.Duration))
 }
 
@@ -359,6 +401,7 @@ func (e *Executor) IsPaused() bool {
 }
 
 func (e *Executor) SetPaused(paused bool) {
+	e.Logger.WithField("paused", paused).Debug("Local: Setting paused")
 	e.pauseLock.Lock()
 	defer e.pauseLock.Unlock()
 
@@ -375,6 +418,7 @@ func (e *Executor) GetVUs() int64 {
 }
 
 func (e *Executor) SetVUs(num int64) error {
+	e.Logger.WithField("vus", num).Debug("Local: Setting VUs")
 	if num < 0 {
 		return errors.New("vu count can't be negative")
 	}
@@ -403,6 +447,7 @@ func (e *Executor) GetVUsMax() int64 {
 }
 
 func (e *Executor) SetVUsMax(max int64) error {
+	e.Logger.WithField("max", max).Debug("Local: Setting max VUs")
 	if max < 0 {
 		return errors.New("vu cap can't be negative")
 	}

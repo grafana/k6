@@ -1,25 +1,19 @@
-VERSION := 0.2.1
+VERSION := 0.2.2
 
-all: build web
+all: build
 
 .PHONY: build
-build: web
+build:
 	go build
+
+.PHONY: format
+format:
+	find . -name '*.go' -exec gofmt -s -w {} +
 
 .PHONY: check
 check:
-	gometalinter --deadline 10m --config gometalinter.json ./...
+	gometalinter --deadline 10m --config gometalinter.json --vendor ./...
 	go test -timeout 30s ./...
-
-.PHONY: web
-web: web/node_modules web/bower_components
-	cd web && node node_modules/.bin/ember build -prod
-
-web/node_modules:
-	cd web && npm install
-
-web/bower_components: web/node_modules
-	cd web && node node_modules/.bin/bower install --allow-root
 
 .PHONY: docs
 docs:

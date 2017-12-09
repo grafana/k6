@@ -47,14 +47,14 @@ func TestNewBundle(t *testing.T) {
 			Filename: "/script.js",
 			Data:     []byte{0x00},
 		}, afero.NewMemMapFs())
-		assert.EqualError(t, err, "Transform: SyntaxError: /script.js: Unexpected character '\x00' (1:0)\n> 1 | \x00\n    | ^ at <eval>:2:26853(114)")
+		assert.EqualError(t, err, "SyntaxError: /script.js: Unexpected character '\x00' (1:0)\n> 1 | \x00\n    | ^ at <eval>:2:26853(114)")
 	})
 	t.Run("Error", func(t *testing.T) {
 		_, err := NewBundle(&lib.SourceData{
 			Filename: "/script.js",
 			Data:     []byte(`throw new Error("aaaa");`),
 		}, afero.NewMemMapFs())
-		assert.EqualError(t, err, "Error: aaaa at /script.js:1:20(3)")
+		assert.EqualError(t, err, "Error: aaaa at /script.js:1:7(3)")
 	})
 	t.Run("InvalidExports", func(t *testing.T) {
 		_, err := NewBundle(&lib.SourceData{
@@ -316,34 +316,6 @@ func TestNewBundle(t *testing.T) {
 				}
 			})
 		})
-		t.Run("Linger", func(t *testing.T) {
-			b, err := NewBundle(&lib.SourceData{
-				Filename: "/script.js",
-				Data: []byte(`
-					export let options = {
-						linger: true,
-					};
-					export default function() {};
-				`),
-			}, afero.NewMemMapFs())
-			if assert.NoError(t, err) {
-				assert.Equal(t, null.BoolFrom(true), b.Options.Linger)
-			}
-		})
-		t.Run("NoUsageReport", func(t *testing.T) {
-			b, err := NewBundle(&lib.SourceData{
-				Filename: "/script.js",
-				Data: []byte(`
-					export let options = {
-						noUsageReport: true,
-					};
-					export default function() {};
-				`),
-			}, afero.NewMemMapFs())
-			if assert.NoError(t, err) {
-				assert.Equal(t, null.BoolFrom(true), b.Options.NoUsageReport)
-			}
-		})
 		t.Run("MaxRedirects", func(t *testing.T) {
 			b, err := NewBundle(&lib.SourceData{
 				Filename: "/script.js",
@@ -458,7 +430,7 @@ func TestNewBundleFromArchive(t *testing.T) {
 	assert.NoError(t, afero.WriteFile(fs, "/path/to/file.txt", []byte(`hi`), 0644))
 	assert.NoError(t, afero.WriteFile(fs, "/path/to/exclaim.js", []byte(`export default function(s) { return s + "!" };`), 0644))
 
-	b, err := NewBundle(&lib.SourceData{
+	src := &lib.SourceData{
 		Filename: "/path/to/script.js",
 		Data: []byte(`
 			import exclaim from "./exclaim.js";
@@ -466,7 +438,8 @@ func TestNewBundleFromArchive(t *testing.T) {
 			export let file = open("./file.txt");
 			export default function() { return exclaim(file); };
 		`),
-	}, fs)
+	}
+	b, err := NewBundle(src, fs)
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -486,10 +459,10 @@ func TestNewBundleFromArchive(t *testing.T) {
 	assert.Equal(t, "js", arc.Type)
 	assert.Equal(t, lib.Options{VUs: null.IntFrom(12345)}, arc.Options)
 	assert.Equal(t, "/path/to/script.js", arc.Filename)
-	assert.Equal(t, "\"use strict\";Object.defineProperty(exports, \"__esModule\", { value: true });exports.file = exports.options = undefined;exports.default =\n\n\n\nfunction () {return (0, _exclaim2.default)(file);};var _exclaim = require(\"./exclaim.js\");var _exclaim2 = _interopRequireDefault(_exclaim);function _interopRequireDefault(obj) {return obj && obj.__esModule ? obj : { default: obj };}var options = exports.options = { vus: 12345 };var file = exports.file = open(\"./file.txt\");;", string(arc.Data))
+	assert.Equal(t, string(src.Data), string(arc.Data))
 	assert.Equal(t, "/path/to", arc.Pwd)
 	assert.Len(t, arc.Scripts, 1)
-	assert.Equal(t, "(function(){\"use strict\";Object.defineProperty(exports, \"__esModule\", { value: true });exports.default = function (s) {return s + \"!\";};;})()", string(arc.Scripts["/path/to/exclaim.js"]))
+	assert.Equal(t, `export default function(s) { return s + "!" };`, string(arc.Scripts["/path/to/exclaim.js"]))
 	assert.Len(t, arc.Files, 1)
 	assert.Equal(t, `hi`, string(arc.Files["/path/to/file.txt"]))
 

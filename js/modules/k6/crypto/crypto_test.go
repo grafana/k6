@@ -39,7 +39,7 @@ func TestCryptoAlgorithms(t *testing.T) {
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 	ctx := context.Background()
 	ctx = common.WithRuntime(ctx, rt)
-	rt.Set("crypto", common.Bind(rt, &Crypto{}, &ctx))
+	rt.Set("crypto", common.Bind(rt, New(), &ctx))
 
 	t.Run("MD4", func(t *testing.T) {
 		_, err := common.RunString(rt, `
@@ -155,7 +155,7 @@ func TestStreamingApi(t *testing.T) {
 	ctx = common.WithState(ctx, state)
 	ctx = common.WithRuntime(ctx, rt)
 
-	rt.Set("crypto", common.Bind(rt, &Crypto{}, &ctx))
+	rt.Set("crypto", common.Bind(rt, New(), &ctx))
 
 	// Empty strings are still hashable
 	t.Run("Empty", func(t *testing.T) {
@@ -220,12 +220,14 @@ func TestOutputEncoding(t *testing.T) {
 	ctx = common.WithState(ctx, state)
 	ctx = common.WithRuntime(ctx, rt)
 
-	rt.Set("crypto", common.Bind(rt, &Crypto{}, &ctx))
+	rt.Set("crypto", common.Bind(rt, New(), &ctx))
 
 	t.Run("Valid", func(t *testing.T) {
 		_, err := common.RunString(rt, `
 		const correctHex = "5eb63bbbe01eeed093cb22bb8f5acdc3";
 		const correctBase64 = "XrY7u+Ae7tCTyyK7j1rNww==";
+		const correctBase64URL = "XrY7u-Ae7tCTyyK7j1rNww=="
+		const correctBase64RawURL = "XrY7u-Ae7tCTyyK7j1rNww";
 
 		let hasher = crypto.createHash("md5");
 		hasher.update("hello world");
@@ -238,7 +240,18 @@ func TestOutputEncoding(t *testing.T) {
 		const resultBase64 = hasher.digest("base64");
 		if (resultBase64 !== correctBase64) {
 			throw new Error("Base64 encoding mismatch: " + resultBase64);
-		}`)
+		}
+
+		const resultBase64URL = hasher.digest("base64url");
+		if (resultBase64URL !== correctBase64URL) {
+			throw new Error("Base64 URL encoding mismatch: " + resultBase64URL);
+		}
+
+		const resultBase64RawURL = hasher.digest("base64rawurl");
+		if (resultBase64RawURL !== correctBase64RawURL) {
+			throw new Error("Base64 raw URL encoding mismatch: " + resultBase64RawURL);
+		}
+		`)
 
 		assert.NoError(t, err)
 	})
@@ -268,7 +281,7 @@ func TestHMac(t *testing.T) {
 	ctx = common.WithState(ctx, state)
 	ctx = common.WithRuntime(ctx, rt)
 
-	rt.Set("crypto", common.Bind(rt, &Crypto{}, &ctx))
+	rt.Set("crypto", common.Bind(rt, New(), &ctx))
 
 	testData := map[string]string{
 		"md4":        "92d8f5c302cf04cca0144d7a9feb1596",

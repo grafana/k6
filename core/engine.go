@@ -22,7 +22,6 @@ package core
 
 import (
 	"context"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -50,13 +49,13 @@ const (
 type Engine struct {
 	runLock sync.Mutex
 
-	Executor  lib.Executor
-	Options   lib.Options
-	Collector lib.Collector
+	Executor     lib.Executor
+	Options      lib.Options
+	Collector    lib.Collector
+	NoThresholds bool
 
 	logger *log.Logger
 
-	Stages      []lib.Stage
 	Metrics     map[string]*stats.Metric
 	MetricsLock sync.RWMutex
 
@@ -87,18 +86,8 @@ func NewEngine(ex lib.Executor, o lib.Options) (*Engine, error) {
 		return nil, err
 	}
 	ex.SetPaused(o.Paused.Bool)
-
-	// Use Stages if available, if not, construct a stage to fill the specified duration.
-	// Special case: A valid duration of 0 = an infinite (invalid duration) stage.
-	if o.Stages != nil {
-		e.Stages = o.Stages
-	} else if o.Duration.Valid && o.Duration.Duration > 0 {
-		e.Stages = []lib.Stage{{Duration: o.Duration}}
-	} else {
-		e.Stages = []lib.Stage{{}}
-	}
-
-	ex.SetEndTime(SumStages(e.Stages))
+	ex.SetStages(o.Stages)
+	ex.SetEndTime(o.Duration)
 	ex.SetEndIterations(o.Iterations)
 
 	e.thresholds = o.Thresholds
@@ -120,7 +109,7 @@ func (e *Engine) Run(ctx context.Context) error {
 	defer e.runLock.Unlock()
 
 	e.logger.Debug("Engine: Starting with parameters...")
-	for i, st := range e.Stages {
+	for i, st := range e.Executor.GetStages() {
 		fields := make(log.Fields)
 		if st.Target.Valid {
 			fields["tgt"] = st.Target.Int64
@@ -148,9 +137,6 @@ func (e *Engine) Run(ctx context.Context) error {
 			e.Collector.Run(collectorctx)
 			collectorwg.Done()
 		}()
-		for !e.Collector.IsReady() {
-			runtime.Gosched()
-		}
 	}
 
 	subctx, subcancel := context.WithCancel(context.Background())
@@ -165,12 +151,14 @@ func (e *Engine) Run(ctx context.Context) error {
 	}()
 
 	// Run thresholds.
-	subwg.Add(1)
-	go func() {
-		e.runThresholds(subctx)
-		e.logger.Debug("Engine: Thresholds terminated")
-		subwg.Done()
-	}()
+	if !e.NoThresholds {
+		subwg.Add(1)
+		go func() {
+			e.runThresholds(subctx)
+			e.logger.Debug("Engine: Thresholds terminated")
+			subwg.Done()
+		}()
+	}
 
 	// Run the executor.
 	out := make(chan []stats.Sample)
@@ -204,27 +192,17 @@ func (e *Engine) Run(ctx context.Context) error {
 		e.emitMetrics()
 
 		// Process final thresholds.
-		e.processThresholds()
+		if !e.NoThresholds {
+			e.processThresholds()
+		}
 
 		// Finally, shut down collector.
 		collectorcancel()
 		collectorwg.Wait()
 	}()
 
-	ticker := time.NewTicker(TickRate)
 	for {
 		select {
-		case <-ticker.C:
-			vus, keepRunning := ProcessStages(e.Stages, e.Executor.GetTime())
-			if !keepRunning {
-				e.logger.Debug("run: ProcessStages() returned false; exiting...")
-				return nil
-			}
-			if vus.Valid {
-				if err := e.Executor.SetVUs(vus.Int64); err != nil {
-					return err
-				}
-			}
 		case samples := <-out:
 			e.processSamples(samples...)
 		case err := <-errC:
@@ -352,6 +330,7 @@ func (e *Engine) processSamples(samples ...stats.Sample) {
 
 			if sm.Metric == nil {
 				sm.Metric = stats.New(sm.Name, sample.Metric.Type, sample.Metric.Contains)
+				sm.Metric.Sub = *sm
 				sm.Metric.Thresholds = e.thresholds[sm.Name]
 				e.Metrics[sm.Name] = sm.Metric
 			}

@@ -24,6 +24,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"errors"
+	"net"
 
 	"github.com/loadimpact/k6/stats"
 	"gopkg.in/guregu/null.v3"
@@ -134,29 +135,30 @@ func (c *TLSAuth) Certificate() (*tls.Certificate, error) {
 }
 
 type Options struct {
-	Paused     null.Bool    `json:"paused"`
-	VUs        null.Int     `json:"vus"`
-	VUsMax     null.Int     `json:"vusMax"`
-	Duration   NullDuration `json:"duration"`
-	Iterations null.Int     `json:"iterations"`
-	Stages     []Stage      `json:"stages"`
+	Paused     null.Bool    `json:"paused" envconfig:"paused"`
+	VUs        null.Int     `json:"vus" envconfig:"vus"`
+	VUsMax     null.Int     `json:"vusMax" envconfig:"vus_max"`
+	Duration   NullDuration `json:"duration" envconfig:"duration"`
+	Iterations null.Int     `json:"iterations" envconfig:"iterations"`
+	Stages     []Stage      `json:"stages" envconfig:"stages"`
 
-	Linger        null.Bool `json:"linger"`
-	NoUsageReport null.Bool `json:"noUsageReport"`
+	MaxRedirects          null.Int         `json:"maxRedirects" envconfig:"max_redirects"`
+	Batch                 null.Int         `json:"batch" envconfig:"batch"`
+	BatchPerHost          null.Int         `json:"batchPerHost" envconfig:"batch_per_host"`
+	InsecureSkipTLSVerify null.Bool        `json:"insecureSkipTLSVerify" envconfig:"insecure_skip_tls_verify"`
+	TLSCipherSuites       *TLSCipherSuites `json:"tlsCipherSuites" envconfig:"tls_cipher_suites"`
+	TLSVersion            *TLSVersion      `json:"tlsVersion" envconfig:"tls_version"`
+	TLSAuth               []*TLSAuth       `json:"tlsAuth" envconfig:"tlsauth"`
+	NoConnectionReuse     null.Bool        `json:"noConnectionReuse" envconfig:"no_connection_reuse"`
+	UserAgent             null.String      `json:"userAgent" envconfig:"user_agent"`
+	Throw                 null.Bool        `json:"throw" envconfig:"throw"`
 
-	MaxRedirects          null.Int         `json:"maxRedirects"`
-	InsecureSkipTLSVerify null.Bool        `json:"insecureSkipTLSVerify"`
-	TLSCipherSuites       *TLSCipherSuites `json:"tlsCipherSuites"`
-	TLSVersion            *TLSVersion      `json:"tlsVersion"`
-	TLSAuth               []*TLSAuth       `json:"tlsAuth"`
-	NoConnectionReuse     null.Bool        `json:"noConnectionReuse"`
-	UserAgent             null.String      `json:"userAgent"`
-	Throw                 null.Bool        `json:"throw"`
-
-	Thresholds map[string]stats.Thresholds `json:"thresholds"`
+	Thresholds   map[string]stats.Thresholds `json:"thresholds" envconfig:"thresholds"`
+	BlacklistIPs []*net.IPNet                `json:"blacklistIPs" envconfig:"blacklist_ips"`
 
 	// These values are for third party collectors' benefit.
-	External map[string]interface{} `json:"ext"`
+	// Can't be set through env vars.
+	External map[string]interface{} `json:"ext" ignored:"true"`
 }
 
 func (o Options) Apply(opts Options) Options {
@@ -178,14 +180,14 @@ func (o Options) Apply(opts Options) Options {
 	if opts.Stages != nil {
 		o.Stages = opts.Stages
 	}
-	if opts.Linger.Valid {
-		o.Linger = opts.Linger
-	}
-	if opts.NoUsageReport.Valid {
-		o.NoUsageReport = opts.NoUsageReport
-	}
 	if opts.MaxRedirects.Valid {
 		o.MaxRedirects = opts.MaxRedirects
+	}
+	if opts.Batch.Valid {
+		o.Batch = opts.Batch
+	}
+	if opts.BatchPerHost.Valid {
+		o.BatchPerHost = opts.BatchPerHost
 	}
 	if opts.InsecureSkipTLSVerify.Valid {
 		o.InsecureSkipTLSVerify = opts.InsecureSkipTLSVerify
@@ -210,6 +212,9 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.Thresholds != nil {
 		o.Thresholds = opts.Thresholds
+	}
+	if opts.BlacklistIPs != nil {
+		o.BlacklistIPs = opts.BlacklistIPs
 	}
 	if opts.External != nil {
 		o.External = opts.External

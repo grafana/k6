@@ -32,8 +32,9 @@ var (
 )
 
 type ProgressBar struct {
-	Width    int
-	Progress float64
+	Width       int
+	Progress    float64
+	Left, Right func() string
 }
 
 func (b ProgressBar) String() string {
@@ -52,13 +53,16 @@ func (b ProgressBar) String() string {
 	}
 
 	padding := ""
-	filler := "="
-	if color.NoColor {
-		filler = " "
-	}
 	if space > filled {
-		padding = faint.Sprint(strings.Repeat(filler, space-filled))
+		padding = faint.Sprint(strings.Repeat("-", space-filled))
 	}
 
-	return fmt.Sprintf("[%s%s%s]", filling, caret, padding)
+	var left, right string
+	if b.Left != nil {
+		left = b.Left() + " "
+	}
+	if b.Right != nil {
+		right = " " + b.Right()
+	}
+	return fmt.Sprintf("%s[%s%s%s]%s", left, filling, caret, padding, right)
 }

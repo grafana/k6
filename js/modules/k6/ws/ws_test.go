@@ -90,35 +90,35 @@ func TestSession(t *testing.T) {
 	ctx = common.WithState(ctx, state)
 	ctx = common.WithRuntime(ctx, rt)
 
-	rt.Set("ws", common.Bind(rt, &WS{}, &ctx))
+	rt.Set("ws", common.Bind(rt, New(), &ctx))
 
 	t.Run("connect_ws", func(t *testing.T) {
 		_, err := common.RunString(rt, `
-		let res = ws.connect("ws://echo.websocket.org", function(socket){
+		let res = ws.connect("ws://demos.kaazing.com/echo", function(socket){
 			socket.close()
 		});
 		if (res.status != 101) { throw new Error("connection failed with status: " + res.status); }
 		`)
 		assert.NoError(t, err)
 	})
-	assertSessionMetricsEmitted(t, state.Samples, "", "ws://echo.websocket.org", 101, "")
+	assertSessionMetricsEmitted(t, state.Samples, "", "ws://demos.kaazing.com/echo", 101, "")
 
 	t.Run("connect_wss", func(t *testing.T) {
 		_, err := common.RunString(rt, `
-		let res = ws.connect("wss://echo.websocket.org", function(socket){
+		let res = ws.connect("wss://demos.kaazing.com/echo", function(socket){
 			socket.close()
 		});
 		if (res.status != 101) { throw new Error("TLS connection failed with status: " + res.status); }
 		`)
 		assert.NoError(t, err)
 	})
-	assertSessionMetricsEmitted(t, state.Samples, "", "wss://echo.websocket.org", 101, "")
+	assertSessionMetricsEmitted(t, state.Samples, "", "wss://demos.kaazing.com/echo", 101, "")
 
 	t.Run("open", func(t *testing.T) {
 		state.Samples = nil
 		_, err := common.RunString(rt, `
 		let opened = false;
-		let res = ws.connect("ws://echo.websocket.org", function(socket){
+		let res = ws.connect("ws://demos.kaazing.com/echo", function(socket){
 			socket.on("open", function() {
 				opened = true;
 				socket.close()
@@ -128,12 +128,12 @@ func TestSession(t *testing.T) {
 		`)
 		assert.NoError(t, err)
 	})
-	assertSessionMetricsEmitted(t, state.Samples, "", "ws://echo.websocket.org", 101, "")
+	assertSessionMetricsEmitted(t, state.Samples, "", "ws://demos.kaazing.com/echo", 101, "")
 
 	t.Run("send_receive", func(t *testing.T) {
 		state.Samples = nil
 		_, err := common.RunString(rt, `
-		let res = ws.connect("ws://echo.websocket.org", function(socket){
+		let res = ws.connect("ws://demos.kaazing.com/echo", function(socket){
 			socket.on("open", function() {
 				socket.send("test")
 			})
@@ -147,15 +147,15 @@ func TestSession(t *testing.T) {
 		`)
 		assert.NoError(t, err)
 	})
-	assertSessionMetricsEmitted(t, state.Samples, "", "ws://echo.websocket.org", 101, "")
-	assertMetricEmitted(t, metrics.WSMessagesSent, state.Samples, "ws://echo.websocket.org")
-	assertMetricEmitted(t, metrics.WSMessagesReceived, state.Samples, "ws://echo.websocket.org")
+	assertSessionMetricsEmitted(t, state.Samples, "", "ws://demos.kaazing.com/echo", 101, "")
+	assertMetricEmitted(t, metrics.WSMessagesSent, state.Samples, "ws://demos.kaazing.com/echo")
+	assertMetricEmitted(t, metrics.WSMessagesReceived, state.Samples, "ws://demos.kaazing.com/echo")
 
 	t.Run("interval", func(t *testing.T) {
 		state.Samples = nil
 		_, err := common.RunString(rt, `
 		let counter = 0;
-		let res = ws.connect("ws://echo.websocket.org", function(socket){
+		let res = ws.connect("ws://demos.kaazing.com/echo", function(socket){
 			socket.setInterval(function () {
 				counter += 1;
 				if (counter > 2) { socket.close(); }
@@ -165,14 +165,14 @@ func TestSession(t *testing.T) {
 		`)
 		assert.NoError(t, err)
 	})
-	assertSessionMetricsEmitted(t, state.Samples, "", "ws://echo.websocket.org", 101, "")
+	assertSessionMetricsEmitted(t, state.Samples, "", "ws://demos.kaazing.com/echo", 101, "")
 
 	t.Run("timeout", func(t *testing.T) {
 		state.Samples = nil
 		_, err := common.RunString(rt, `
 		let start = new Date().getTime();
 		let ellapsed = new Date().getTime() - start;
-		let res = ws.connect("ws://echo.websocket.org", function(socket){
+		let res = ws.connect("ws://demos.kaazing.com/echo", function(socket){
 			socket.setTimeout(function () {
 				ellapsed = new Date().getTime() - start;
 				socket.close();
@@ -184,13 +184,13 @@ func TestSession(t *testing.T) {
 		`)
 		assert.NoError(t, err)
 	})
-	assertSessionMetricsEmitted(t, state.Samples, "", "ws://echo.websocket.org", 101, "")
+	assertSessionMetricsEmitted(t, state.Samples, "", "ws://demos.kaazing.com/echo", 101, "")
 
 	t.Run("ping", func(t *testing.T) {
 		state.Samples = nil
 		_, err := common.RunString(rt, `
 		let pongReceived = false;
-		let res = ws.connect("ws://echo.websocket.org", function(socket){
+		let res = ws.connect("ws://demos.kaazing.com/echo", function(socket){
 			socket.on("open", function(data) {
 				socket.ping();
 			});
@@ -206,8 +206,8 @@ func TestSession(t *testing.T) {
 		`)
 		assert.NoError(t, err)
 	})
-	assertSessionMetricsEmitted(t, state.Samples, "", "ws://echo.websocket.org", 101, "")
-	assertMetricEmitted(t, metrics.WSPing, state.Samples, "ws://echo.websocket.org")
+	assertSessionMetricsEmitted(t, state.Samples, "", "ws://demos.kaazing.com/echo", 101, "")
+	assertMetricEmitted(t, metrics.WSPing, state.Samples, "ws://demos.kaazing.com/echo")
 
 	t.Run("multiple_handlers", func(t *testing.T) {
 		state.Samples = nil
@@ -215,7 +215,7 @@ func TestSession(t *testing.T) {
 		let pongReceived = false;
 		let otherPongReceived = false;
 
-		let res = ws.connect("ws://echo.websocket.org", function(socket){
+		let res = ws.connect("ws://demos.kaazing.com/echo", function(socket){
 			socket.on("open", function(data) {
 				socket.ping();
 			});
@@ -239,8 +239,26 @@ func TestSession(t *testing.T) {
 		`)
 		assert.NoError(t, err)
 	})
-	assertSessionMetricsEmitted(t, state.Samples, "", "ws://echo.websocket.org", 101, "")
-	assertMetricEmitted(t, metrics.WSPing, state.Samples, "ws://echo.websocket.org")
+	assertSessionMetricsEmitted(t, state.Samples, "", "ws://demos.kaazing.com/echo", 101, "")
+	assertMetricEmitted(t, metrics.WSPing, state.Samples, "ws://demos.kaazing.com/echo")
+
+	t.Run("close", func(t *testing.T) {
+		state.Samples = nil
+		_, err := common.RunString(rt, `
+		let closed = false;
+		let res = ws.connect("ws://demos.kaazing.com/echo", function(socket){
+			socket.on("open", function() {
+							socket.close()
+			})
+			socket.on("close", function() {
+							closed = true;
+			})
+		});
+		if (!closed) { throw new Error ("close event not fired"); }
+		`)
+		assert.NoError(t, err)
+	})
+	assertSessionMetricsEmitted(t, state.Samples, "", "ws://demos.kaazing.com/echo", 101, "")
 }
 
 func TestErrors(t *testing.T) {
@@ -260,7 +278,7 @@ func TestErrors(t *testing.T) {
 	ctx = common.WithState(ctx, state)
 	ctx = common.WithRuntime(ctx, rt)
 
-	rt.Set("ws", common.Bind(rt, &WS{}, &ctx))
+	rt.Set("ws", common.Bind(rt, New(), &ctx))
 
 	t.Run("invalid_url", func(t *testing.T) {
 		state.Samples = nil
@@ -278,7 +296,7 @@ func TestErrors(t *testing.T) {
 		state.Samples = nil
 		_, err := common.RunString(rt, `
 		let hasError = false;
-		let res = ws.connect("ws://echo.websocket.org", function(socket){
+		let res = ws.connect("ws://demos.kaazing.com/echo", function(socket){
 			socket.on("open", function() {
 				socket.close();
 				socket.send("test");
@@ -293,6 +311,6 @@ func TestErrors(t *testing.T) {
 		}
 		`)
 		assert.NoError(t, err)
-		assertSessionMetricsEmitted(t, state.Samples, "", "ws://echo.websocket.org", 101, "")
+		assertSessionMetricsEmitted(t, state.Samples, "", "ws://demos.kaazing.com/echo", 101, "")
 	})
 }
