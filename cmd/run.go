@@ -54,10 +54,6 @@ import (
 const (
 	typeJS      = "js"
 	typeArchive = "archive"
-
-	collectorInfluxDB = "influxdb"
-	collectorJSON     = "json"
-	collectorCloud    = "cloud"
 )
 
 var runType = os.Getenv("K6_TYPE")
