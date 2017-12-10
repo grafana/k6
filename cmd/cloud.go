@@ -39,10 +39,10 @@ var cloudCmd = &cobra.Command{
         Short: "Execute a test on the cloud",
         Long: `Execute a test on the cloud.
 
-        This will execute the test on the Load Impact cloud service. Use "k6 login cloud" to authenticate.`,
+                This will execute the test on the Load Impact cloud service. Use "k6 login cloud" to authenticate.`,
 
         Example: `
-        k6 cloud script.js`[1:],
+                k6 cloud script.js`[1:],
 
         Args: cobra.ExactArgs(1),
         RunE: func(cmd *cobra.Command, args []string) error {
@@ -111,8 +111,12 @@ var cloudCmd = &cobra.Command{
                 // Start cloud test run
                 client := cloud.NewClient(token, host, Version)
 
-                name := filepath.Base(filename)
+                err = client.ValidateConfig(arc)
+                if err != nil {
+                        return err
+                }
 
+                name := filepath.Base(filename)
                 testUrl, err := client.StartCloudTestRun(name, arc)
                 if err != nil {
                         return err

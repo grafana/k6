@@ -79,6 +79,18 @@ func (c *Client) CreateTestRun(testRun *TestRun) (*CreateTestRunResponse, error)
 	return &ctrr, nil
 }
 
+func (c *Client) PushMetric(referenceID string, samples []*Sample) error {
+        url := fmt.Sprintf("%s/metrics/%s", c.baseURL, referenceID)
+
+        req, err := c.NewRequest("POST", url, samples)
+        if err != nil {
+                return err
+        }
+
+        err = c.Do(req, nil)
+        return err
+}
+
 func (c *Client) StartCloudTestRun(name string, arc *lib.Archive) (string, error) {
         requestUrl := fmt.Sprintf("%s/archive-upload", c.baseURL)
 
@@ -111,23 +123,11 @@ func (c *Client) StartCloudTestRun(name string, arc *lib.Archive) (string, error
 
         ctrr := CreateTestRunResponse{}
         err = c.Do(req, &ctrr)
-        if err != nil {
-                return "", err
-        }
-
-        return ctrr.ReferenceID, nil
-}
-
-func (c *Client) PushMetric(referenceID string, samples []*Sample) error {
-	url := fmt.Sprintf("%s/metrics/%s", c.baseURL, referenceID)
-
-	req, err := c.NewRequest("POST", url, samples)
 	if err != nil {
-		return err
+                return "", err
 	}
 
-	err = c.Do(req, nil)
-	return err
+        return ctrr.ReferenceID, nil
 }
 
 func (c *Client) TestFinished(referenceID string, thresholds ThresholdResult, tained bool) error {
@@ -154,4 +154,23 @@ func (c *Client) TestFinished(referenceID string, thresholds ThresholdResult, ta
 
 	err = c.Do(req, nil)
 	return err
+}
+
+func (c *Client) ValidateConfig(arc *lib.Archive) error {
+        url := fmt.Sprintf("%s/validate-config", c.baseURL)
+
+        data := struct {
+                Config *lib.Archive `json:"config"`
+        }{
+                arc,
+        }
+
+        req, err := c.NewRequest("POST", url, data)
+        if err != nil {
+                return err
+        }
+
+        err = c.Do(req, nil)
+        return err
+
 }
