@@ -87,7 +87,7 @@ func assertRequestMetricsEmitted(t *testing.T, samples []stats.Sample, method, u
 	assert.True(t, seenReceiving, "url %s didn't emit Receiving", url)
 }
 
-func TestRequestBatch(t *testing.T) {
+func TestRequestAndBatch(t *testing.T) {
 	root, err := lib.NewGroup("", nil)
 	assert.NoError(t, err)
 
@@ -636,6 +636,19 @@ func TestRequestBatch(t *testing.T) {
 				`)
 				assert.NoError(t, err)
 				assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/headers", "", 200, "")
+			})
+
+			t.Run("Host", func(t *testing.T) {
+				state.Samples = nil
+				_, err := common.RunString(rt, `
+				let res = http.request("GET", "http://httpbin.org/headers", null, {
+					headers: { "Host": "www.httpbin.org" },
+				});
+				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+				if (res.json().headers["Host"] != "www.httpbin.org") { throw new Error("wrong Host: " + res.json().headers["Host"]); }
+				`)
+				assert.NoError(t, err)
+				assertRequestMetricsEmitted(t, state.Samples, "GET", "http://httpbin.org/headers", "", 200, "")
 			})
 		})
 
