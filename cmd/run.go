@@ -369,6 +369,11 @@ a commandline interface for interacting with it.`,
 			fmt.Fprintf(stdout, "%s\x1b[0K\n", progress.String())
 		}
 
+		// Warn if no iterations could be completed.
+		if engine.Executor.GetIterations() == 0 {
+			log.Warn("No data generated, because no script iterations finished, consider making the test duration longer")
+		}
+
 		// Print the end-of-test summary.
 		if !quiet {
 			fmt.Fprintf(stdout, "\n")
