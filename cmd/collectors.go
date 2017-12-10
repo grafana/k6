@@ -33,6 +33,12 @@ import (
 	"github.com/spf13/afero"
 )
 
+const (
+	collectorInfluxDB = "influxdb"
+	collectorJSON     = "json"
+	collectorCloud    = "cloud"
+)
+
 func parseCollector(s string) (t, arg string) {
 	parts := strings.SplitN(s, "=", 2)
 	switch len(parts) {
