@@ -216,12 +216,14 @@ func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 	u.Runtime.Set("__ITER", u.Iteration)
 	u.Iteration++
 
+	startTime := time.Now()
 	_, err = u.Default(goja.Undefined())
 
 	t := time.Now()
 	samples := append(state.Samples,
 		stats.Sample{Time: t, Metric: metrics.DataSent, Value: float64(state.BytesWritten)},
 		stats.Sample{Time: t, Metric: metrics.DataReceived, Value: float64(state.BytesRead)},
+		stats.Sample{Time: t, Metric: metrics.IterationDuration, Value: stats.D(t.Sub(startTime))},
 	)
 
 	if u.Runner.Bundle.Options.NoConnectionReuse.Bool {
