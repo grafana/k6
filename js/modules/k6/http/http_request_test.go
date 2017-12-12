@@ -229,6 +229,26 @@ func TestRequestAndBatch(t *testing.T) {
 			assert.NoError(t, err)
 		})
 	})
+	t.Run("Compression", func(t *testing.T) {
+		t.Run("gzip", func(t *testing.T) {
+			_, err := common.RunString(rt, `
+				let res = http.get("http://httpbin.org/gzip");
+				if (res.json()['gzipped'] != true) {
+					throw new Error("unexpected body data: " + res.json()['gzipped'])
+				}
+			`)
+			assert.NoError(t, err)
+		})
+		t.Run("deflate", func(t *testing.T) {
+			_, err := common.RunString(rt, `
+				let res = http.get("http://httpbin.org/deflate");
+				if (res.json()['deflated'] != true) {
+					throw new Error("unexpected body data: " + res.json()['deflated'])
+				}
+			`)
+			assert.NoError(t, err)
+		})
+	})
 	t.Run("Cancelled", func(t *testing.T) {
 		hook := logtest.NewLocal(state.Logger)
 		defer hook.Reset()

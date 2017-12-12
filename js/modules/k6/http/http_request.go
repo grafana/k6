@@ -22,6 +22,7 @@ package http
 
 import (
 	"bytes"
+	"compress/zlib"
 	"context"
 	"io"
 	"io/ioutil"
@@ -264,6 +265,15 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 		buf := state.BPool.Get()
 		buf.Reset()
 		defer state.BPool.Put(buf)
+
+		if res.Header.Get("Content-Encoding") == "deflate" {
+			var err error
+			res.Body, err = zlib.NewReader(res.Body)
+			if err != nil {
+				resErr = err
+			}
+		}
+
 		_, err := io.Copy(buf, res.Body)
 		if err != nil && err != io.EOF {
 			resErr = err
