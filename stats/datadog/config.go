@@ -22,7 +22,6 @@ package datadog
 
 import (
 	"encoding/json"
-	"net/url"
 )
 
 // ConfigFields contains statsd configuration
@@ -57,13 +56,7 @@ func (c Config) Apply(cfg Config) Config {
 
 // UnmarshalText used to convert string into a struct
 func (c *Config) UnmarshalText(text []byte) error {
-	u, err := url.Parse(string(text))
-	if err != nil {
-		return err
-	}
-	c.Addr = u.Hostname()
-	c.Port = u.Port()
-	return err
+	return nil
 }
 
 // UnmarshalJSON sets Config from json
