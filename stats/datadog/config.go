@@ -28,7 +28,7 @@ import (
 type ConfigFields struct {
 	// Connection.
 	Addr       string `json:"addr" envconfig:"STATSD_ADDR"`
-	Port       string `json:"port,omitempty" envconfig:"STATSD_PORT"`
+	Port       string `json:"port,omitempty" envconfig:"STATSD_PORT" default:"8126"`
 	Namespace  string `json:"namespace,omitempty" envconfig:"STATSD_NAMESPACE"`
 	BufferSize int    `json:"buffer_size" envconfig:"STATSD_BUFFER_SIZE" default:"10"`
 }
