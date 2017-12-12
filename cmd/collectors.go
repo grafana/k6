@@ -27,18 +27,19 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats/cloud"
-	"github.com/loadimpact/k6/stats/datadog"
 	"github.com/loadimpact/k6/stats/influxdb"
 	jsonc "github.com/loadimpact/k6/stats/json"
+	"github.com/loadimpact/k6/stats/statsd"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 )
 
 const (
-	collectorInfluxDB = "influxdb"
-	collectorJSON     = "json"
-	collectorCloud    = "cloud"
-	collectorDatadog  = "datadog"
+	collectorInfluxDB  = "influxdb"
+	collectorJSON      = "json"
+	collectorCloud     = "cloud"
+	collectorStatsD    = "statsd"
+	collectorDogStatsD = "dogstatsd"
 )
 
 func parseCollector(s string) (t, arg string) {
@@ -79,12 +80,18 @@ func newCollector(t, arg string, src *lib.SourceData, conf Config) (lib.Collecto
 			return nil, err
 		}
 		return cloud.New(config, src, conf.Options, Version)
-	case collectorDatadog:
-		config := conf.Collectors.Datadog
+	case collectorStatsD:
+		config := conf.Collectors.StatsD
 		if err := loadConfig(&config); err != nil {
 			return nil, err
 		}
-		return datadog.New(config)
+		return statsd.NewStatsD(config)
+	case collectorDogStatsD:
+		config := conf.Collectors.StatsD
+		if err := loadConfig(&config); err != nil {
+			return nil, err
+		}
+		return statsd.NewDogStatsD(config)
 	default:
 		return nil, errors.Errorf("unknown output type: %s", t)
 	}

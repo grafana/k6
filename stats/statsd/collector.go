@@ -18,7 +18,7 @@
  *
  */
 
-package datadog
+package statsd
 
 import (
 	"context"
@@ -42,22 +42,10 @@ type Collector struct {
 	Client *statsd.Client
 	Config Config
 	Logger *log.Entry
+	Type   ClientType
 
 	buffer     []*Sample
 	bufferLock sync.Mutex
-}
-
-// New initialises a collector
-func New(conf Config) (*Collector, error) {
-	cl, err := MakeClient(conf)
-	if err != nil {
-		return nil, err
-	}
-	return &Collector{
-		Client: cl,
-		Config: conf,
-		Logger: log.WithField("type", "statsd"),
-	}, nil
 }
 
 // Init sets up the collector
@@ -72,13 +60,14 @@ func (c *Collector) Link() string {
 
 // Run the collector
 func (c *Collector) Run(ctx context.Context) {
-	c.Logger.Debug("StatsD: Running!")
+	c.Logger.Debugf("%s: Running!", c.Type.String())
 	ticker := time.NewTicker(pushInterval)
 	for {
 		select {
 		case <-ticker.C:
 			c.pushMetrics()
 		case <-ctx.Done():
+			c.Logger.Debugf("%s: Cleaning up!", c.Type.String())
 			c.pushMetrics()
 			c.finish()
 			return
@@ -113,38 +102,47 @@ func (c *Collector) pushMetrics() {
 
 	c.Logger.
 		WithField("samples", len(buffer)).
-		Debug("Pushing metrics to cloud")
+		Debugf("%s: Pushing metrics to server", c.Type.String())
 
 	if err := c.commit(buffer); err != nil {
 		c.Logger.
 			WithError(err).
-			Error("StastD: Couldn't commit a batch")
+			Errorf("%s: Couldn't commit a batch", c.Type.String())
 	}
 }
 
 func (c *Collector) finish() {
 	// Close when context is done
 	if err := c.Client.Close(); err != nil {
-		c.Logger.Debugf("StastD: Error closing the client, %+v", err)
+		c.Logger.Debugf("%s: Error closing the client, %+v", c.Type.String(), err)
 	}
 }
 
 func (c *Collector) commit(data []*Sample) error {
 	for _, entry := range data {
-		switch entry.Type {
-		case stats.Counter:
-			c.Client.Count(entry.Metric, int64(entry.Data.Value), []string{}, 1)
-			// log.Infof("counter -> %+v", fmt.Sprintf("%s|%v|%+v", entry.Metric, entry.Data.Value, entry.Data.Tags))
-		case stats.Trend:
-			c.Client.TimeInMilliseconds(entry.Metric, entry.Data.Value, []string{}, 1)
-			// log.Infof("trend -> %+v", fmt.Sprintf("%s|%v|%+v", entry.Metric, entry.Data.Value, entry.Data.Tags))
-		case stats.Gauge:
-			c.Client.Gauge(entry.Metric, entry.Data.Value, []string{}, 1)
-			// log.Infof("gauge -> %+v", fmt.Sprintf("%s|%v|%+v", entry.Metric, entry.Data.Value, entry.Data.Tags))
-		case stats.Rate:
-			// log.Infof("rate -> %+v", fmt.Sprintf("%s|%v|%+v", entry.Metric, entry.Data.Value, entry.Data.Tags))
-		}
-
+		c.dispatch(entry)
 	}
 	return c.Client.Flush()
+}
+
+func (c *Collector) dispatch(entry *Sample) {
+	tag := []string{}
+	// DogStatsD allows extra TAG data to be sent
+	if c.Type == DogStatsD {
+		tag = mapToSlice(
+			takeOnly(entry.Data.Tags, c.Config.TagWhitelist),
+		)
+	}
+
+	switch entry.Type {
+	case stats.Counter:
+		c.Client.Count(entry.Metric, int64(entry.Data.Value), tag, 1)
+	case stats.Trend:
+		c.Client.TimeInMilliseconds(entry.Metric, entry.Data.Value, tag, 1)
+	case stats.Gauge:
+		c.Client.Gauge(entry.Metric, entry.Data.Value, tag, 1)
+	case stats.Rate:
+		// A rate, displays % of values that aren't 0
+		// Not sure what the use case here / what to send
+	}
 }

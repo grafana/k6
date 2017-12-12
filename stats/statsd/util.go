@@ -18,10 +18,11 @@
  *
  */
 
-package datadog
+package statsd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/DataDog/datadog-go/statsd"
 	"github.com/loadimpact/k6/stats"
@@ -29,12 +30,12 @@ import (
 )
 
 // MakeClient creates a new statsd buffered client
-func MakeClient(conf Config) (*statsd.Client, error) {
-	log.
-		WithField("type", "statsd").
-		Debug("Connecting to StatsD metrics server")
-
+func MakeClient(conf Config, clientType string) (*statsd.Client, error) {
 	connStr := fmt.Sprintf("%s:%s", conf.Addr, conf.Port)
+
+	log.
+		WithField("type", clientType).
+		Debugf("Connecting to %s metrics server: %s", clientType, connStr)
 
 	c, err := statsd.NewBuffered(connStr, conf.BufferSize)
 	if err != nil {
@@ -54,4 +55,24 @@ func generateDataPoint(sample stats.Sample) *Sample {
 			Tags:  sample.Tags,
 		},
 	}
+}
+
+func mapToSlice(tags map[string]string) []string {
+	res := []string{}
+	for key, value := range tags {
+		if value != "" {
+			res = append(res, fmt.Sprintf("%s:%v", key, value))
+		}
+	}
+	return res
+}
+
+func takeOnly(tags map[string]string, whitelist string) map[string]string {
+	res := map[string]string{}
+	for key, value := range tags {
+		if strings.Contains(whitelist, key) && value != "" {
+			res[key] = value
+		}
+	}
+	return res
 }
