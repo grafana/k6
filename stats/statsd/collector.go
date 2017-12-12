@@ -55,7 +55,14 @@ func (c *Collector) Init() error {
 
 // Link returns the address of the client
 func (c *Collector) Link() string {
-	return c.Config.Addr
+	switch c.Type {
+	case StatsD:
+		return c.Config.StatsDAddr
+	case DogStatsD:
+		return c.Config.DogStatsDAddr
+	default:
+		return "[NO LINK PROVIDED]"
+	}
 }
 
 // Run the collector
@@ -130,7 +137,7 @@ func (c *Collector) dispatch(entry *Sample) {
 	// DogStatsD allows extra TAG data to be sent
 	if c.Type == DogStatsD {
 		tag = mapToSlice(
-			takeOnly(entry.Data.Tags, c.Config.TagWhitelist),
+			takeOnly(entry.Data.Tags, c.Config.DogStatsTagWhitelist),
 		)
 	}
 

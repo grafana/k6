@@ -29,19 +29,44 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+const (
+	connStrSplitter   = ":"
+	defaultBufferSize = 10
+)
+
 // MakeClient creates a new statsd buffered client
-func MakeClient(conf Config, clientType string) (*statsd.Client, error) {
-	connStr := fmt.Sprintf("%s:%s", conf.Addr, conf.Port)
+func MakeClient(conf Config, clientType ClientType) (*statsd.Client, error) {
+	connStr := ""
+	bufferSize := defaultBufferSize
+	namespace := ""
 
+	switch clientType {
+	case StatsD:
+		connStr = fmt.Sprintf("%s%s%s", conf.StatsDAddr, connStrSplitter, conf.StatsDPort)
+		bufferSize = conf.StatsDBufferSize
+	case DogStatsD:
+		connStr = fmt.Sprintf("%s%s%s", conf.DogStatsDAddr, connStrSplitter, conf.DogStatsDPort)
+		bufferSize = conf.DogStatsDBufferSize
+		namespace = conf.DogStatsNamespace
+	}
 	log.
-		WithField("type", clientType).
-		Debugf("Connecting to %s metrics server: %s", clientType, connStr)
+		WithField("type", clientType.String()).
+		Debugf("Connecting to %s metrics server: %s", clientType.String(), connStr)
 
-	c, err := statsd.NewBuffered(connStr, conf.BufferSize)
+	if !validConnStr(connStr) {
+		return nil, fmt.Errorf("%s: connection string is invalid. Received: \"%+v\"", clientType.String(), connStr)
+	}
+
+	c, err := statsd.NewBuffered(connStr, bufferSize)
 	if err != nil {
 		log.Info(err)
 		return nil, err
 	}
+
+	if clientType == DogStatsD {
+		c.Namespace = namespace
+	}
+
 	return c, nil
 }
 
@@ -55,6 +80,14 @@ func generateDataPoint(sample stats.Sample) *Sample {
 			Tags:  sample.Tags,
 		},
 	}
+}
+
+func validConnStr(connStr string) bool {
+	sVal := strings.Split(connStr, connStrSplitter)
+	if sVal[0] == "" || sVal[1] == "" {
+		return false
+	}
+	return true
 }
 
 func mapToSlice(tags map[string]string) []string {

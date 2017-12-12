@@ -24,7 +24,7 @@ const (
 
 // NewStatsD initialises a new StatsD collector
 func NewStatsD(conf Config) (*Collector, error) {
-	cl, err := MakeClient(conf, StatsD.String())
+	cl, err := MakeClient(conf, StatsD)
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +38,7 @@ func NewStatsD(conf Config) (*Collector, error) {
 
 // NewDogStatsD initialises a new DogStatsD collector
 func NewDogStatsD(conf Config) (*Collector, error) {
-	cl, err := MakeClient(conf, DogStatsD.String())
+	cl, err := MakeClient(conf, DogStatsD)
 	if err != nil {
 		return nil, err
 	}
