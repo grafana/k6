@@ -114,7 +114,9 @@ func (c *Collector) pushMetrics() {
 		"type":    "statsd",
 	}).Debug("Pushing metrics to cloud")
 
-	c.commit(buffer)
+	if err := c.commit(buffer); err != nil {
+		log.WithError(err).Error("StastD: Couldn't commit a batch")
+	}
 }
 
 func (c *Collector) finish() {
@@ -124,7 +126,7 @@ func (c *Collector) finish() {
 	}
 }
 
-func (c *Collector) commit(data []*Sample) {
+func (c *Collector) commit(data []*Sample) error {
 	for _, entry := range data {
 		switch entry.Type {
 		case stats.Counter:
@@ -141,4 +143,5 @@ func (c *Collector) commit(data []*Sample) {
 		}
 
 	}
+	return c.Client.Flush()
 }
