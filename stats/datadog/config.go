@@ -30,7 +30,7 @@ type ConfigFields struct {
 	Addr       string `json:"addr" envconfig:"STATSD_ADDR"`
 	Port       string `json:"port,omitempty" envconfig:"STATSD_PORT"`
 	Namespace  string `json:"namespace,omitempty" envconfig:"STATSD_NAMESPACE"`
-	BufferSize int    `json:"buffer_size" envconfig:"STATSD_BUFFER_SIZE"`
+	BufferSize int    `json:"buffer_size" envconfig:"STATSD_BUFFER_SIZE" default:"10"`
 }
 
 // Config defines a config type
