@@ -30,9 +30,9 @@ import (
 
 // MakeClient creates a new statsd buffered client
 func MakeClient(conf Config) (*statsd.Client, error) {
-	log.WithFields(log.Fields{
-		"type": "statsd",
-	}).Debug("Connecting to StatsD metrics server")
+	log.
+		WithField("type", "statsd").
+		Debug("Connecting to StatsD metrics server")
 
 	connStr := fmt.Sprintf("%s:%s", conf.Addr, conf.Port)
 

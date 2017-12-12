@@ -41,6 +41,7 @@ var _ lib.Collector = &Collector{}
 type Collector struct {
 	Client *statsd.Client
 	Config Config
+	Logger *log.Entry
 
 	buffer     []*Sample
 	bufferLock sync.Mutex
@@ -55,6 +56,7 @@ func New(conf Config) (*Collector, error) {
 	return &Collector{
 		Client: cl,
 		Config: conf,
+		Logger: log.WithField("type", "statsd"),
 	}, nil
 }
 
@@ -70,7 +72,7 @@ func (c *Collector) Link() string {
 
 // Run the collector
 func (c *Collector) Run(ctx context.Context) {
-	log.Debug("StatsD: Running!")
+	c.Logger.Debug("StatsD: Running!")
 	ticker := time.NewTicker(pushInterval)
 	for {
 		select {
@@ -109,20 +111,21 @@ func (c *Collector) pushMetrics() {
 	c.buffer = nil
 	c.bufferLock.Unlock()
 
-	log.WithFields(log.Fields{
-		"samples": len(buffer),
-		"type":    "statsd",
-	}).Debug("Pushing metrics to cloud")
+	c.Logger.
+		WithField("samples", len(buffer)).
+		Debug("Pushing metrics to cloud")
 
 	if err := c.commit(buffer); err != nil {
-		log.WithError(err).Error("StastD: Couldn't commit a batch")
+		c.Logger.
+			WithError(err).
+			Error("StastD: Couldn't commit a batch")
 	}
 }
 
 func (c *Collector) finish() {
 	// Close when context is done
 	if err := c.Client.Close(); err != nil {
-		log.Infof("StastD: Error closing the client, %+v", err)
+		c.Logger.Debugf("StastD: Error closing the client, %+v", err)
 	}
 }
 
