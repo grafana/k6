@@ -143,11 +143,11 @@ func (c *Collector) dispatch(entry *Sample) {
 
 	switch entry.Type {
 	case stats.Counter:
-		c.Client.Count(entry.Metric, int64(entry.Data.Value), tag, 1)
+		_ = c.Client.Count(entry.Metric, int64(entry.Data.Value), tag, 1)
 	case stats.Trend:
-		c.Client.TimeInMilliseconds(entry.Metric, entry.Data.Value, tag, 1)
+		_ = c.Client.TimeInMilliseconds(entry.Metric, entry.Data.Value, tag, 1)
 	case stats.Gauge:
-		c.Client.Gauge(entry.Metric, entry.Data.Value, tag, 1)
+		_ = c.Client.Gauge(entry.Metric, entry.Data.Value, tag, 1)
 	case stats.Rate:
 		// A rate, displays % of values that aren't 0
 		// Not sure what the use case here / what to send
