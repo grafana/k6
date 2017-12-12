@@ -4,6 +4,11 @@
 	"GodepVersion": "v79",
 	"Deps": [
 		{
+			"ImportPath": "github.com/DataDog/datadog-go/statsd",
+			"Comment": "1.1.0-16-g4d2e569",
+			"Rev": "4d2e5696ebe914940bd7459d2266fb7d555ea1b7"
+		},
+		{
 			"ImportPath": "github.com/GeertJohan/go.rice",
 			"Rev": "c02ca9a983da5807ddf7d796784928f5be4afd09"
 		},
