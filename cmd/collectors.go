@@ -27,6 +27,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats/cloud"
+	"github.com/loadimpact/k6/stats/datadog"
 	"github.com/loadimpact/k6/stats/influxdb"
 	jsonc "github.com/loadimpact/k6/stats/json"
 	"github.com/pkg/errors"
@@ -37,6 +38,7 @@ const (
 	collectorInfluxDB = "influxdb"
 	collectorJSON     = "json"
 	collectorCloud    = "cloud"
+	collectorDatadog  = "datadog"
 )
 
 func parseCollector(s string) (t, arg string) {
@@ -77,6 +79,12 @@ func newCollector(t, arg string, src *lib.SourceData, conf Config) (lib.Collecto
 			return nil, err
 		}
 		return cloud.New(config, src, conf.Options, Version)
+	case collectorDatadog:
+		config := conf.Collectors.Datadog
+		if err := loadConfig(&config); err != nil {
+			return nil, err
+		}
+		return datadog.New(config)
 	default:
 		return nil, errors.Errorf("unknown output type: %s", t)
 	}

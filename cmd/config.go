@@ -28,6 +28,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats/cloud"
+	"github.com/loadimpact/k6/stats/datadog"
 	"github.com/loadimpact/k6/stats/influxdb"
 	"github.com/shibukawa/configdir"
 	"github.com/spf13/afero"
@@ -62,6 +63,7 @@ type Config struct {
 	Collectors struct {
 		InfluxDB influxdb.Config `json:"influxdb"`
 		Cloud    cloud.Config    `json:"cloud"`
+		Datadog  datadog.Config  `json:"datadog"`
 	} `json:"collectors"`
 }
 
@@ -81,6 +83,7 @@ func (c Config) Apply(cfg Config) Config {
 	}
 	c.Collectors.InfluxDB = c.Collectors.InfluxDB.Apply(cfg.Collectors.InfluxDB)
 	c.Collectors.Cloud = c.Collectors.Cloud.Apply(cfg.Collectors.Cloud)
+	c.Collectors.Datadog = c.Collectors.Datadog.Apply(cfg.Collectors.Datadog)
 	return c
 }
 
