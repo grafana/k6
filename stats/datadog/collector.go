@@ -111,7 +111,7 @@ func (c *Collector) pushMetrics() {
 
 	log.WithFields(log.Fields{
 		"samples": len(buffer),
-		"type":    "datadog",
+		"type":    "statsd",
 	}).Debug("Pushing metrics to cloud")
 
 	c.commit(buffer)
