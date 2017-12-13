@@ -45,7 +45,7 @@ func TestTracer(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			tracer := &Tracer{}
-			req, err := http.NewRequest("GET", "http://httpbin.org/get", nil)
+			req, err := http.NewRequest("GET", "https://httpbin.org/get", nil)
 			if !assert.NoError(t, err) {
 				return
 			}
@@ -58,7 +58,7 @@ func TestTracer(t *testing.T) {
 			assert.NoError(t, res.Body.Close())
 			samples := tracer.Done().Samples(map[string]string{"tag": "value"})
 
-			assert.Len(t, samples, 7)
+			assert.Len(t, samples, 8)
 			seenMetrics := map[*stats.Metric]bool{}
 			for _, s := range samples {
 				assert.NotContains(t, seenMetrics, s.Metric)
@@ -78,6 +78,12 @@ func TestTracer(t *testing.T) {
 					fallthrough
 				case metrics.HTTPReqDuration, metrics.HTTPReqBlocked, metrics.HTTPReqSending, metrics.HTTPReqWaiting, metrics.HTTPReqReceiving:
 					assert.True(t, s.Value > 0.0, "%s is <= 0", s.Metric.Name)
+				case metrics.HTTPReqHandshaking:
+					if !isReuse {
+						assert.True(t, s.Value > 0.0, "%s is <= 0", s.Metric.Name)
+						continue
+					}
+					assert.True(t, s.Value == 0.0, "%s is <> 0", s.Metric.Name)
 				default:
 					t.Errorf("unexpected metric: %s", s.Metric.Name)
 				}
