@@ -11,3 +11,5 @@ test.debug
 *.sublime-workspace
 .idea
 .vagrant
+
+*.DS_Store
