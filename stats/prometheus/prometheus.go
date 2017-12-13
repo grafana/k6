@@ -4,13 +4,13 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"net/http"
-	"sync"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/version"
 	log "github.com/sirupsen/logrus"
+	"io/ioutil"
+	"net/http"
+	"sync"
 )
 
 const (
