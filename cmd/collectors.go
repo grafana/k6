@@ -27,6 +27,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats/cloud"
+	"github.com/loadimpact/k6/stats/dogstatsd"
 	"github.com/loadimpact/k6/stats/influxdb"
 	jsonc "github.com/loadimpact/k6/stats/json"
 	"github.com/loadimpact/k6/stats/statsd"
@@ -85,13 +86,13 @@ func newCollector(t, arg string, src *lib.SourceData, conf Config) (lib.Collecto
 		if err := loadConfig(&config); err != nil {
 			return nil, err
 		}
-		return statsd.NewStatsD(config)
+		return statsd.New(config)
 	case collectorDogStatsD:
-		config := conf.Collectors.StatsD
+		config := conf.Collectors.DogStatsD
 		if err := loadConfig(&config); err != nil {
 			return nil, err
 		}
-		return statsd.NewDogStatsD(config)
+		return dogstatsd.New(config)
 	default:
 		return nil, errors.Errorf("unknown output type: %s", t)
 	}

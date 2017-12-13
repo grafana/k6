@@ -28,6 +28,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats/cloud"
+	"github.com/loadimpact/k6/stats/dogstatsd"
 	"github.com/loadimpact/k6/stats/influxdb"
 	"github.com/loadimpact/k6/stats/statsd"
 	"github.com/shibukawa/configdir"
@@ -61,9 +62,10 @@ type Config struct {
 	NoThresholds  null.Bool   `json:"noThresholds" envconfig:"no_thresholds"`
 
 	Collectors struct {
-		InfluxDB influxdb.Config `json:"influxdb"`
-		Cloud    cloud.Config    `json:"cloud"`
-		StatsD   statsd.Config   `json:"statsd"`
+		InfluxDB  influxdb.Config  `json:"influxdb"`
+		Cloud     cloud.Config     `json:"cloud"`
+		StatsD    statsd.Config    `json:"statsd"`
+		DogStatsD dogstatsd.Config `json:"dogstatsd"`
 	} `json:"collectors"`
 }
 
@@ -84,6 +86,7 @@ func (c Config) Apply(cfg Config) Config {
 	c.Collectors.InfluxDB = c.Collectors.InfluxDB.Apply(cfg.Collectors.InfluxDB)
 	c.Collectors.Cloud = c.Collectors.Cloud.Apply(cfg.Collectors.Cloud)
 	c.Collectors.StatsD = c.Collectors.StatsD.Apply(cfg.Collectors.StatsD)
+	c.Collectors.DogStatsD = c.Collectors.DogStatsD.Apply(cfg.Collectors.DogStatsD)
 	return c
 }
 

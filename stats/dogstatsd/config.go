@@ -18,7 +18,7 @@
  *
  */
 
-package statsd
+package dogstatsd
 
 import (
 	"encoding/json"
@@ -28,9 +28,11 @@ import (
 
 // ConfigFields contains statsd configuration
 type ConfigFields struct {
-	Addr     string `json:"addr,omitempty" envconfig:"STATSD_ADDR"`
-	P        string `json:"port,omitempty" envconfig:"STATSD_PORT" default:"8126"`
-	BuffSize int    `json:"buffer_size,omitempty" envconfig:"STATSD_BUFFER_SIZE" default:"10"`
+	Addr         string `json:"addr,omitempty" envconfig:"DOGSTATSD_ADDR"`
+	P            string `json:"port,omitempty" envconfig:"DOGSTATSD_PORT" default:"8126"`
+	BuffSize     int    `json:"buffer_size,omitempty" envconfig:"DOGSTATSD_BUFFER_SIZE" default:"10"`
+	Namespace    string `json:"namespace,omitempty" envconfig:"DOGSTATSD_NAMESPACE"`
+	TagWhitelist string `json:"tag_whitelist,omitempty" envconfig:"DOGSTATSD_TAG_WHITELIST" default:"status, method"`
 }
 
 // Config defines a config type
@@ -53,7 +55,10 @@ func (c Config) BufferSize() int {
 
 // Extra returns client extra config
 func (c Config) Extra() *statsd.ExtraConfig {
-	return &statsd.ExtraConfig{}
+	return &statsd.ExtraConfig{
+		Namespace:    c.Namespace,
+		TagWhitelist: c.TagWhitelist,
+	}
 }
 
 // Apply returns config with defaults applied
