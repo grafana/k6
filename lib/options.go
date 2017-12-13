@@ -150,6 +150,8 @@ type Options struct {
 	Thresholds   map[string]stats.Thresholds `json:"thresholds" envconfig:"thresholds"`
 	BlacklistIPs []*net.IPNet                `json:"blacklistIPs" envconfig:"blacklist_ips"`
 
+	FixTimeUnit null.Bool `json:"fixTimeUnit" envconfig:"fix_time_unit"`
+
 	// These values are for third party collectors' benefit.
 	// Can't be set through env vars.
 	External map[string]interface{} `json:"ext" ignored:"true"`

@@ -22,6 +22,7 @@ package stats
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -201,7 +202,7 @@ func New(name string, typ MetricType, t ...ValueType) *Metric {
 	return &Metric{Name: name, Type: typ, Contains: vt, Sink: sink}
 }
 
-func (m *Metric) HumanizeValue(v float64) string {
+func (m *Metric) HumanizeValue(v float64, fixTimeUnit bool) string {
 	switch m.Type {
 	case Rate:
 		return strconv.FormatFloat(100*v, 'f', 2, 64) + "%"
@@ -209,6 +210,12 @@ func (m *Metric) HumanizeValue(v float64) string {
 		switch m.Contains {
 		case Time:
 			d := ToD(v)
+			// format all duration in fixed millisecond
+			if fixTimeUnit {
+				ms := float64(d) / float64(time.Millisecond)
+				return fmt.Sprintf("%.3fms", ms)
+			}
+
 			switch {
 			case d > time.Minute:
 				d -= d % (1 * time.Second)
