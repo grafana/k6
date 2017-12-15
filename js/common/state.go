@@ -32,8 +32,6 @@ import (
 	"golang.org/x/time/rate"
 )
 
-var DefaultRPSLimit = rate.NewLimiter(rate.Inf, 0)
-
 // Provides volatile state for a VU.
 type State struct {
 	// Global options.
