@@ -27,6 +27,7 @@ import (
 	"context"
 	"io"
 	"io/ioutil"
+	"mime/multipart"
 	"net"
 	"net/http"
 	"net/http/cookiejar"
@@ -84,6 +85,13 @@ func (http *HTTP) Options(ctx context.Context, url goja.Value, args ...goja.Valu
 	return http.Request(ctx, HTTP_METHOD_OPTIONS, url, args...)
 }
 
+func (http *HTTP) Upload(ctx context.Context, url goja.Value, args ...goja.Value) (*HTTPResponse, error) {
+	// flag as multipart request
+	http.isMultipart = true
+
+	return http.Request(ctx, "POST", url, args...)
+}
+
 func (http *HTTP) Request(ctx context.Context, method string, url goja.Value, args ...goja.Value) (*HTTPResponse, error) {
 	rt := common.GetRuntime(ctx)
 	state := common.GetState(ctx)
@@ -103,14 +111,48 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 	if len(args) > 0 && !goja.IsUndefined(args[0]) && !goja.IsNull(args[0]) {
 		var data map[string]goja.Value
 		if rt.ExportTo(args[0], &data) == nil {
-			bodyQuery := make(neturl.Values, len(data))
-			for k, v := range data {
-				if v != goja.Undefined() {
+			if h.isMultipart {
+				mpw := multipart.NewWriter(bodyBuf)
+
+				// For parameters of type common.FileData, created with open(file, "b"),
+				// we write the file boundary to the body buffer.
+				// Otherwise parameters are treated as standard form field.
+				for k, v := range data {
+					switch ve := v.Export().(type) {
+					case common.FileData:
+						fw, err := mpw.CreateFormFile(k, ve.FileName)
+						if err != nil {
+							return nil, nil, err
+						}
+
+						if _, err := fw.Write(ve.Data); err != nil {
+							return nil, nil, err
+						}
+					default:
+						fw, err := mpw.CreateFormField(k)
+						if err != nil {
+							return nil, nil, err
+						}
+
+						if _, err := fw.Write([]byte(v.String())); err != nil {
+							return nil, nil, err
+						}
+					}
+				}
+
+				if err := mpw.Close(); err != nil {
+					return nil, nil, err
+				}
+
+				contentType = "multipart/form-data"
+			} else {
+				bodyQuery := make(neturl.Values, len(data))
+				for k, v := range data {
 					bodyQuery.Set(k, v.String())
 				}
+				bodyBuf = bytes.NewBufferString(bodyQuery.Encode())
+				contentType = "application/x-www-form-urlencoded"
 			}
-			bodyBuf = bytes.NewBufferString(bodyQuery.Encode())
-			contentType = "application/x-www-form-urlencoded"
 		} else {
 			bodyBuf = bytes.NewBufferString(args[0].String())
 		}
