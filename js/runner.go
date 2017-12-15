@@ -181,7 +181,7 @@ func (r *Runner) GetOptions() lib.Options {
 func (r *Runner) SetOptions(opts lib.Options) {
 	r.Bundle.Options = opts
 
-	r.RPSLimit = common.DefaultRPSLimit
+	r.RPSLimit = nil
 	if rps := opts.RPS; rps.Valid {
 		r.RPSLimit = rate.NewLimiter(rate.Limit(rps.Int64), 1)
 	}
