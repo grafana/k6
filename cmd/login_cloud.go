@@ -69,7 +69,7 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
                         }
 
                         if res.Token == "" {
-                                return errors.New("Your account has no API token, please generate one: \"https://app.loadimpact.com/account/token\".")
+                                return errors.New(`Your account has no API token, please generate one: "https://app.loadimpact.com/account/token".`)
                         }
 
                         conf.Token = res.Token
