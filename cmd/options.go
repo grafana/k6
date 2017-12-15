@@ -40,6 +40,7 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.Int64("max-redirects", 10, "follow at most n redirects")
 	flags.Int64("batch", 10, "max parallel batch reqs")
 	flags.Int64("batch-per-host", 0, "max parallel batch reqs per host")
+	flags.Int64("rps", 0, "limit requests per second")
 	flags.String("user-agent", "", "user agent for http requests")
 	flags.Bool("insecure-skip-tls-verify", false, "skip verification of TLS certificates")
 	flags.Bool("no-connection-reuse", false, "don't reuse connections between iterations")
@@ -57,6 +58,7 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		Paused:                getNullBool(flags, "paused"),
 		MaxRedirects:          getNullInt64(flags, "max-redirects"),
 		Batch:                 getNullInt64(flags, "batch"),
+		RPS:                   getNullInt64(flags, "rps"),
 		UserAgent:             getNullString(flags, "user-agent"),
 		InsecureSkipTLSVerify: getNullBool(flags, "insecure-skip-tls-verify"),
 		NoConnectionReuse:     getNullBool(flags, "no-connection-reuse"),

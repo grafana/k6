@@ -29,7 +29,10 @@ import (
 	"github.com/loadimpact/k6/stats"
 	"github.com/oxtoacart/bpool"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/time/rate"
 )
+
+var DefaultRPSLimit = rate.NewLimiter(rate.Inf, 0)
 
 // Provides volatile state for a VU.
 type State struct {
@@ -46,6 +49,9 @@ type State struct {
 	HTTPTransport http.RoundTripper
 	Dialer        *netext.Dialer
 	CookieJar     *cookiejar.Jar
+
+	// Rate limits.
+	RPSLimit *rate.Limiter
 
 	// Sample buffer, emitted at the end of the iteration.
 	Samples []stats.Sample
