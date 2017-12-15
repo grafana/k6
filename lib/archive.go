@@ -22,6 +22,7 @@ package lib
 
 import (
 	"archive/tar"
+	"bytes"
 	"encoding/json"
 	"io"
 	"io/ioutil"
@@ -127,7 +128,7 @@ func (arc *Archive) Write(out io.Writer) error {
 	metaArc := *arc
 	metaArc.Filename = AnonymizePath(metaArc.Filename)
 	metaArc.Pwd = AnonymizePath(metaArc.Pwd)
-	metadata, err := json.MarshalIndent(metaArc, "", "  ")
+	metadata, err := metaArc.json()
 	if err != nil {
 		return err
 	}
@@ -230,4 +231,17 @@ func (arc *Archive) Write(out io.Writer) error {
 	}
 
 	return w.Close()
+}
+
+func (arc *Archive) json() ([]byte, error) {
+	buffer := &bytes.Buffer{}
+	encoder := json.NewEncoder(buffer)
+	// this prevents <, >, and & from being escaped in JSON strings
+	encoder.SetEscapeHTML(false)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(arc); err != nil {
+		return nil, err
+	}
+
+	return buffer.Bytes(), nil
 }
