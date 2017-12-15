@@ -47,8 +47,6 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 
                 switch {
                 case show.Bool:
-                        printToken(conf)
-                        return nil
                 case token != "":
                         conf.Token = token
                 default:
