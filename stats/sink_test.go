@@ -33,5 +33,5 @@ func TestDummySinkAddPanics(t *testing.T) {
 }
 
 func TestDummySinkFormatReturnsItself(t *testing.T) {
-	assert.Equal(t, map[string]float64{"a": 1}, DummySink{"a": 1}.Format())
+	assert.Equal(t, map[string]float64{"a": 1}, DummySink{"a": 1}.Format(0))
 }
