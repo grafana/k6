@@ -87,15 +87,14 @@ func (c *Client) PushMetric(referenceID string, samples []*Sample) error {
                 return err
         }
 
-        err = c.Do(req, nil)
-        return err
+        return c.Do(req, nil)
 }
 
 func (c *Client) StartCloudTestRun(name string, arc *lib.Archive) (string, error) {
         requestUrl := fmt.Sprintf("%s/archive-upload", c.baseURL)
 
-        buf := bytes.NewBuffer(nil)
-        mp := multipart.NewWriter(buf)
+        var buf bytes.Buffer
+        mp := multipart.NewWriter(&buf)
 
         if err := mp.WriteField("name", name); err != nil {
                 return "", err
@@ -114,7 +113,7 @@ func (c *Client) StartCloudTestRun(name string, arc *lib.Archive) (string, error
                 return "", err
         }
 
-        req, err := http.NewRequest("POST", requestUrl, buf)
+        req, err := http.NewRequest("POST", requestUrl, &buf)
         if err != nil {
                 return "", err
         }
@@ -130,10 +129,8 @@ func (c *Client) StartCloudTestRun(name string, arc *lib.Archive) (string, error
         path := "runs"
         if c.token == "" {
                 path = "anonymous"
-	}
-        testUrl := fmt.Sprintf("https://app.loadimpact.com/k6/%s/%s", path, ctrr.ReferenceID)
-
-        return testUrl, nil
+        }
+        return fmt.Sprintf("https://app.loadimpact.com/k6/%s/%s", path, ctrr.ReferenceID), nil
 }
 
 func (c *Client) TestFinished(referenceID string, thresholds ThresholdResult, tained bool) error {
@@ -155,11 +152,10 @@ func (c *Client) TestFinished(referenceID string, thresholds ThresholdResult, ta
 
 	req, err := c.NewRequest("POST", url, data)
 	if err != nil {
-		return err
-	}
+                return err
+        }
 
-	err = c.Do(req, nil)
-        return err
+        return c.Do(req, nil)
 }
 
 func (c *Client) ValidateOptions(options lib.Options) error {
@@ -176,7 +172,5 @@ func (c *Client) ValidateOptions(options lib.Options) error {
                 return err
         }
 
-        err = c.Do(req, nil)
-        return err
-
+        return c.Do(req, nil)
 }
