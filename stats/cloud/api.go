@@ -136,7 +136,7 @@ func (c *Client) Login(email string, password string) (*LoginResponse, error) {
 	lr := LoginResponse{}
 	err = c.Do(req, &lr)
 	if err != nil {
-		return nil, errors.New("Failed to login.")
+                return nil, err
 	}
 
 	return &lr, nil
