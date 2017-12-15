@@ -33,25 +33,16 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
                         return err
                 }
 
-                flags := cmd.Flags()
-                show := getNullBool(flags, "show")
-                token, err := flags.GetString("token")
-                if err != nil {
-                        return err
-                }
+                show := getNullBool(cmd.Flags(), "show")
+                token := getNullString(cmd.Flags(), "token")
 
-                printToken := func(conf cloud.Config) {
-                        fmt.Fprintf(stdout, "  token: %s\n", ui.ValueColor.Sprint(conf.Token))
-                }
                 conf := config.Collectors.Cloud
 
                 switch {
                 case show.Bool:
-                case token != "":
-                        conf.Token = token
+                case token.Valid:
+                        conf.Token = token.String
                 default:
-                        printToken(conf)
-
                         form := ui.Form{
                                 Fields: []ui.Field{
                                         ui.StringField{
@@ -77,11 +68,11 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
                                 return err
                         }
 
-                        if res.APIToken == "" {
+                        if res.Token == "" {
                                 return errors.New("Your account has no API token, please generate one: \"https://app.loadimpact.com/account/token\".")
                         }
 
-                        conf.Token = res.APIToken
+                        conf.Token = res.Token
                 }
 
                 config.Collectors.Cloud = conf
@@ -89,9 +80,9 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
                         return err
                 }
 
-                printToken(conf)
-		return nil
-	},
+                fmt.Fprintf(stdout, "  token: %s\n", ui.ValueColor.Sprint(conf.Token))
+                return nil
+        },
 }
 
 func init() {
