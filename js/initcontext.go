@@ -160,16 +160,24 @@ func (i *InitContext) compileImport(src, filename string) (*goja.Program, error)
 	return pgm, err
 }
 
-func (i *InitContext) Open(name string) (string, error) {
+func (i *InitContext) Open(name string, args ...string) (goja.Value, error) {
 	filename := loader.Resolve(i.pwd, name)
 	data, ok := i.files[filename]
 	if !ok {
 		data_, err := loader.Load(i.fs, i.pwd, name)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 		i.files[filename] = data_.Data
 		data = data_.Data
 	}
-	return string(data), nil
+
+	if len(args) > 0 && args[0] == "b" {
+		fd := common.FileData{
+			FileName: name,
+			Data:     data,
+		}
+		return i.runtime.ToValue(fd), nil
+	}
+	return i.runtime.ToValue(string(data)), nil
 }

@@ -22,10 +22,13 @@ package js
 
 import (
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"testing"
 
 	"github.com/dop251/goja"
+	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
@@ -280,4 +283,84 @@ func TestInitContextOpen(t *testing.T) {
 		}, fs)
 		assert.EqualError(t, err, "GoError: open /nonexistent.txt: file does not exist")
 	})
+}
+
+func TestInitContextOpenBinary(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	assert.NoError(t, fs.MkdirAll("/path/to", 0755))
+	assert.NoError(t, afero.WriteFile(fs, "/path/to/file.bin", []byte("hi!"), 0644))
+
+	b, err := NewBundle(&lib.SourceData{
+		Filename: "/path/to/script.js",
+		Data: []byte(`
+		export let data = open("/path/to/file.bin", "b");
+		export default function() { console.log(data); }
+		`),
+	}, fs)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	bi, err := b.Instantiate()
+	if !assert.NoError(t, err) {
+		t.Log(err)
+		return
+	}
+
+	fd := common.FileData{Data: []byte{104, 105, 33}}
+	assert.Equal(t, fd, bi.Runtime.Get("data").Export())
+}
+
+func TestRequestWithBinaryFile(t *testing.T) {
+	t.Parallel()
+
+	ch := make(chan bool)
+
+	h := func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			ch <- true
+		}()
+
+		r.ParseMultipartForm(32 << 20)
+		file, _, err := r.FormFile("file")
+		assert.NoError(t, err)
+		defer file.Close()
+		var bytes []byte
+		_, err = file.Read(bytes)
+		assert.NoError(t, err)
+		assert.Equal(t, []byte("hi!"), bytes)
+	}
+
+	svr := httptest.NewServer(http.HandlerFunc(h))
+	defer svr.Close()
+
+	fs := afero.NewMemMapFs()
+	assert.NoError(t, fs.MkdirAll("/path/to", 0755))
+	assert.NoError(t, afero.WriteFile(fs, "/path/to/file.bin", []byte("hi!"), 0644))
+
+	b, err := NewBundle(&lib.SourceData{
+		Filename: "/path/to/script.js",
+		Data: []byte(fmt.Sprintf(`
+			import http from "k6/http";
+			let binFile = open("/path/to/file.bin", "b");
+			export default function() {
+				var data = {
+					field: "this is a standard form field",
+					file: binFile
+				};
+				var res = http.upload("%s", data);
+				return true;
+			}
+			`, svr.URL)),
+	}, fs)
+	assert.NoError(t, err)
+
+	bi, err := b.Instantiate()
+	assert.NoError(t, err)
+
+	v, err := bi.Default(goja.Undefined())
+	assert.NoError(t, err)
+	assert.Equal(t, true, v.Export())
+
+	<-ch
 }
