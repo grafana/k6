@@ -6,6 +6,7 @@ export let options = {
 		'http_req_duration{kind:html}': ["avg<=10"],
 		'http_req_duration{kind:css}': ["avg<=10"],
 		'http_req_duration{kind:img}': ["avg<=100"],
+		'http_reqs': ["rate>100"],
 	}
 };
 

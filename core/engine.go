@@ -277,6 +277,8 @@ func (e *Engine) processThresholds() {
 	e.MetricsLock.Lock()
 	defer e.MetricsLock.Unlock()
 
+	t := e.Executor.GetTime()
+
 	e.thresholdsTainted = false
 	for _, m := range e.Metrics {
 		if len(m.Thresholds.Thresholds) == 0 {
@@ -285,7 +287,7 @@ func (e *Engine) processThresholds() {
 		m.Tainted = null.BoolFrom(false)
 
 		e.logger.WithField("m", m.Name).Debug("running thresholds")
-		succ, err := m.Thresholds.Run(m.Sink)
+		succ, err := m.Thresholds.Run(m.Sink, t)
 		if err != nil {
 			e.logger.WithField("m", m.Name).WithError(err).Error("Threshold error")
 			continue
