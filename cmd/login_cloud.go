@@ -14,46 +14,39 @@ import (
 var loginCloudCommand = &cobra.Command{
         Use:   "cloud",
 	Short: "Authenticate with Load Impact",
-	Long: `Authenticate with Load Impact.
+        Long: `Authenticate with Load Impact.
 
 This will set the default token used when just "k6 run -o cloud" is passed.`,
-
-	Example: `
+        Example: `
   # Show the stored token.
   k6 login cloud -s
 
-  # Set up the token.
+  # Store a token.
   k6 login cloud -t YOUR_TOKEN
 
-  # Ask for your Load Impact user email and password to automatically set up the token.
+  # Log in with an email/password.
   k6 login cloud`[1:],
-
-	Args: cobra.NoArgs,
-	RunE: func(cmd *cobra.Command, args []string) error {
-
-		printToken := func(conf cloud.Config) {
-			fmt.Fprintf(stdout, "  token: %s\n", ui.ValueColor.Sprint(conf.Token))
-		}
-
-		config, cdir, err := readDiskConfig()
-		if err != nil {
+        Args: cobra.NoArgs,
+        RunE: func(cmd *cobra.Command, args []string) error {
+                config, cdir, err := readDiskConfig()
+                if err != nil {
                         return err
                 }
 
                 flags := cmd.Flags()
-                show, err := flags.GetBool("show")
-                if err != nil {
-                        return err
-                }
+                show := getNullBool(flags, "show")
                 token, err := flags.GetString("token")
                 if err != nil {
                         return err
                 }
 
+                printToken := func(conf cloud.Config) {
+                        fmt.Fprintf(stdout, "  token: %s\n", ui.ValueColor.Sprint(conf.Token))
+                }
                 conf := config.Collectors.Cloud
 
                 switch {
-                case show:
+                case show.Bool:
                         printToken(conf)
                         return nil
                 case token != "":
@@ -73,25 +66,24 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
                                         },
                                 },
                         }
-
                         vals, err := form.Run(os.Stdin, stdout)
                         if err != nil {
                                 return err
-			}
-
+                        }
                         email := vals["Email"].(string)
                         password := vals["Password"].(string)
+
                         client := cloud.NewClient("", conf.Host, Version)
-                        response, err := client.Login(email, password)
+                        res, err := client.Login(email, password)
                         if err != nil {
                                 return err
                         }
 
-                        if response.APIToken == "" {
-                                return errors.New("Your account has no API token, please generate one: `https://app.loadimpact.com/account/token`.")
+                        if res.APIToken == "" {
+                                return errors.New("Your account has no API token, please generate one: \"https://app.loadimpact.com/account/token\".")
                         }
 
-                        conf.Token = response.APIToken
+                        conf.Token = res.APIToken
                 }
 
                 config.Collectors.Cloud = conf
