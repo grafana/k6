@@ -29,33 +29,54 @@ import (
 	null "gopkg.in/guregu/null.v3"
 )
 
-// An Executor wraps a Runner, and abstracts away an execution environment.
+// An Executor is in charge of scheduling VUs created by a wrapped Runner, but decouples how you
+// control a swarm of VUs from the details of how or even where they're scheduled.
+//
+// The core/local executor schedules VUs on the local machine, but the same interface may be
+// implemented to control a test running on a cluster or in the cloud.
 type Executor interface {
+	// Run the Executor, funneling generated samples through the out channel.
 	Run(ctx context.Context, out chan<- []stats.Sample) error
+	// Is the executor currently running?
 	IsRunning() bool
 
+	// Returns the wrapped runner. May return nil if not applicable, eg. if we're remote
+	// controlling a test running on another machine.
 	GetRunner() Runner
 
-	SetLogger(l *log.Logger)
+	// Get and set the logger. This is propagated to the Runner.
 	GetLogger() *log.Logger
+	SetLogger(l *log.Logger)
 
+	// Get and set the list of stages.
 	GetStages() []Stage
 	SetStages(s []Stage)
 
+	// Get iterations executed so far, get and set how many to end the test after.
 	GetIterations() int64
 	GetEndIterations() null.Int
 	SetEndIterations(i null.Int)
 
+	// Get time elapsed so far, accounting for pauses, get and set at what point to end the test.
 	GetTime() time.Duration
 	GetEndTime() NullDuration
 	SetEndTime(t NullDuration)
 
+	// Check whether the test is paused, or pause it. A paused won't start any new iterations (but
+	// will allow currently in progress ones to finish), and will not increment the value returned
+	// by GetTime().
 	IsPaused() bool
 	SetPaused(paused bool)
 
+	// Get and set the number of currently active VUs.
+	// It is an error to try to set this higher than MaxVUs.
 	GetVUs() int64
 	SetVUs(vus int64) error
 
+	// Get and set the number of allocated, available VUs.
+	// Please note that initialising new VUs is a very expensive operation, and doing it during a
+	// running test may skew metrics; if you're not sure how many you will need, it's generally
+	// speaking better to preallocate too many than too few.
 	GetVUsMax() int64
 	SetVUsMax(max int64) error
 }

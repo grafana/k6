@@ -29,41 +29,48 @@ import (
 // Ensure RunnerFunc conforms to Runner.
 var _ Runner = RunnerFunc(nil)
 
-// A Runner is a factory for VUs.
+// A Runner is a factory for VUs. It should precompute as much as possible upon creation (parse
+// ASTs, load files into memory, etc.), so that spawning VUs becomes as fast as possible.
+// The Runner doesn't actually *do* anything in itself, the Executor is responsible for wrapping
+// and scheduling these VUs for execution.
+//
+// TODO: Rename this to something more obvious? This name made sense a very long time ago.
 type Runner interface {
-	// Archives the runner; an archive can be restored anywhere else to create a perfect clone.
+	// Creates an Archive of the runner. There should be a corresponding NewFromArchive() function
+	// that will restore the runner from the archive.
 	MakeArchive() *Archive
 
-	// Creates a new VU. As much as possible should be precomputed here, to allow a pool
-	// of prepared VUs to be used to quickly scale up and down.
+	// Spawns a new VU. It's fine to make this function rather heavy, if it means a performance
+	// improvement at runtime. Remember, this is called once per VU and normally only at the start
+	// of a test - RunOnce() may be called hundreds of thousands of times, and must be fast.
 	NewVU() (VU, error)
 
-	// Returns the default (root) group.
+	// Returns the default (root) Group.
 	GetDefaultGroup() *Group
 
-	// Returns the option set.
+	// Get and set options. The initial value will be whatever the script specifies (for JS,
+	// `export let options = {}`); cmd/run.go will mix this in with CLI-, config- and env-provided
+	// values and write it back to the runner.
 	GetOptions() Options
-
-	// Sets the option set.
 	SetOptions(opts Options)
 }
 
-// A VU is a Virtual User.
+// A VU is a Virtual User, that can be scheduled by an Executor.
 type VU interface {
-	// Runs the VU once. An iteration should be completely self-contained, and no state
-	// or open connections should carry over from one iteration to the next.
+	// Runs the VU once. The VU is responsible for handling the Halting Problem, eg. making sure
+	// that execution actually stops when the context is cancelled.
 	RunOnce(ctx context.Context) ([]stats.Sample, error)
 
-	// Called when the VU's identity changes.
+	// Assign the VU a new ID. Called by the Executor upon creation, but may be called multiple
+	// times if the VU is recycled because the test was scaled down and then back up.
 	Reconfigure(id int64) error
 }
 
-// RunnerFunc adapts a function to be used as both a runner and a VU.
-// Mainly useful for testing.
+// RunnerFunc wraps a function in a runner whose VUs will simply call that function.
 type RunnerFunc func(ctx context.Context) ([]stats.Sample, error)
 
-func (fn RunnerFunc) VU() *RunnerFuncVU {
-	return &RunnerFuncVU{Fn: fn}
+func (fn RunnerFunc) VU() *runnerFuncVU {
+	return &runnerFuncVU{Fn: fn}
 }
 
 func (fn RunnerFunc) MakeArchive() *Archive {
@@ -85,19 +92,19 @@ func (fn RunnerFunc) GetOptions() Options {
 func (fn RunnerFunc) SetOptions(opts Options) {
 }
 
-type RunnerFuncVU struct {
+type runnerFuncVU struct {
 	Fn RunnerFunc
 	ID int64
 }
 
-func (fn RunnerFuncVU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
+func (fn runnerFuncVU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 	if fn.Fn == nil {
 		return []stats.Sample{}, nil
 	}
 	return fn.Fn(ctx)
 }
 
-func (fn *RunnerFuncVU) Reconfigure(id int64) error {
+func (fn *runnerFuncVU) Reconfigure(id int64) error {
 	fn.ID = id
 	return nil
 }
