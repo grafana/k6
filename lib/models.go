@@ -33,20 +33,29 @@ import (
 	"gopkg.in/guregu/null.v3"
 )
 
-const groupSeparator = "::"
+// Separator for group IDs.
+const GroupSeparator = "::"
 
-var ErrNameContainsGroupSeparator = errors.Errorf("group and check names may not contain '%s'", groupSeparator)
+// Error emitted if you attempt to instantiate a Group or Check that contains the separator.
+var ErrNameContainsGroupSeparator = errors.New("group and check names may not contain '::'")
 
+// Wraps a source file; data and filename.
 type SourceData struct {
 	Data     []byte
 	Filename string
 }
 
+// StageFields defines the fields used for a Stage; this is a dumb hack to make the JSON code
+// cleaner. pls fix.
 type StageFields struct {
+	// Duration of the stage.
 	Duration NullDuration `json:"duration"`
-	Target   null.Int     `json:"target"`
+
+	// If Valid, the VU count will be linearly interpolated towards this value.
+	Target null.Int `json:"target"`
 }
 
+// A Stage defines a step in a test's timeline.
 type Stage StageFields
 
 // For some reason, implementing UnmarshalText makes encoding/json treat the type as a string.
@@ -84,11 +93,26 @@ func (s *Stage) UnmarshalText(b []byte) error {
 	return nil
 }
 
+// A Group is an organisational block, that samples and checks may be tagged with.
+//
+// For more information, refer to the js/modules/k6.K6.Group() function.
 type Group struct {
-	ID     string            `json:"id"`
-	Path   string            `json:"path"`
-	Name   string            `json:"name"`
-	Parent *Group            `json:"-"`
+	// Arbitrary name of the group.
+	Name string `json:"name"`
+
+	// A group may belong to another group, which may belong to another group, etc. The Path
+	// describes the hierarchy leading down to this group, with the segments delimited by '::'.
+	// As an example: a group "Inner" inside a group named "Outer" would have a path of
+	// "::Outer::Inner". The empty first item is the root group, which is always named "".
+	Parent *Group `json:"-"`
+	Path   string `json:"path"`
+
+	// A group's ID is a hash of the Path. It is deterministic between different k6
+	// instances of the same version, but should be treated as opaque - the hash function
+	// or length may change.
+	ID string `json:"id"`
+
+	// Groups and checks that are children of this group.
 	Groups map[string]*Group `json:"groups"`
 	Checks map[string]*Check `json:"checks"`
 
@@ -96,14 +120,18 @@ type Group struct {
 	checkMutex sync.Mutex
 }
 
+// Creates a new group with the given name and parent group.
+//
+// The root group must be created with the name "" and parent set to nil; this is the only case
+// where a nil parent or empty name is allowed.
 func NewGroup(name string, parent *Group) (*Group, error) {
-	if strings.Contains(name, groupSeparator) {
+	if strings.Contains(name, GroupSeparator) {
 		return nil, ErrNameContainsGroupSeparator
 	}
 
 	path := name
 	if parent != nil {
-		path = parent.Path + groupSeparator + path
+		path = parent.Path + GroupSeparator + path
 	}
 
 	hash := md5.Sum([]byte(path))
@@ -119,6 +147,8 @@ func NewGroup(name string, parent *Group) (*Group, error) {
 	}, nil
 }
 
+// Create a child group belonging to this group.
+// This is safe to call from multiple goroutines simultaneously.
 func (g *Group) Group(name string) (*Group, error) {
 	snapshot := g.Groups
 	group, ok := snapshot[name]
@@ -140,6 +170,8 @@ func (g *Group) Group(name string) (*Group, error) {
 	return group, nil
 }
 
+// Create a check belonging to this group.
+// This is safe to call from multiple goroutines simultaneously.
 func (g *Group) Check(name string) (*Check, error) {
 	snapshot := g.Checks
 	check, ok := snapshot[name]
@@ -160,22 +192,38 @@ func (g *Group) Check(name string) (*Check, error) {
 	return check, nil
 }
 
+// A Check stores a series of successful or failing tests against a value.
+//
+// For more information, refer to the js/modules/k6.K6.Check() function.
 type Check struct {
-	ID    string `json:"id"`
-	Path  string `json:"path"`
-	Group *Group `json:"-"`
-	Name  string `json:"name"`
+	// Arbitary name of the check.
+	Name string `json:"name"`
 
+	// A Check belongs to a Group, which may belong to other groups. The Path describes
+	// the hierarchy of these groups, with the segments delimited by '::'.
+	// As an example: a check "My Check" within a group "Inner" within a group "Outer"
+	// would have a Path of "::Outer::Inner::My Check". The empty first item is the root group,
+	// which is always named "".
+	Group *Group `json:"-"`
+	Path  string `json:"path"`
+
+	// A check's ID is a hash of the Path. It is deterministic between different k6
+	// instances of the same version, but should be treated as opaque - the hash function
+	// or length may change.
+	ID string `json:"id"`
+
+	// Counters for how many times this check has passed and failed respectively.
 	Passes int64 `json:"passes"`
 	Fails  int64 `json:"fails"`
 }
 
+// Creates a new check with the given name and parent group. The group may not be nil.
 func NewCheck(name string, group *Group) (*Check, error) {
-	if strings.Contains(name, groupSeparator) {
+	if strings.Contains(name, GroupSeparator) {
 		return nil, ErrNameContainsGroupSeparator
 	}
 
-	path := group.Path + groupSeparator + name
+	path := group.Path + GroupSeparator + name
 	hash := md5.Sum([]byte(path))
 	id := hex.EncodeToString(hash[:])
 

@@ -26,7 +26,8 @@ import (
 	"github.com/loadimpact/k6/stats"
 )
 
-// A Collector abstracts away the details of a storage backend from the application.
+// A Collector abstracts the process of funneling samples to an external storage backend,
+// such as an InfluxDB instance.
 type Collector interface {
 	// Init is called between the collector's creation and the call to Run().
 	// You should do any lenghty setup here rather than in New.
