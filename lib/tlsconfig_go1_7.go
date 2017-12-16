@@ -26,6 +26,7 @@ import "crypto/tls"
 
 // From https://golang.org/pkg/crypto/tls/#pkg-constants
 
+// String-to-constant map of available TLS versions.
 var SupportedTLSVersions = map[string]TLSVersion{
 	"ssl3.0": tls.VersionSSL30,
 	"tls1.0": tls.VersionTLS10,
@@ -33,6 +34,7 @@ var SupportedTLSVersions = map[string]TLSVersion{
 	"tls1.2": tls.VersionTLS12,
 }
 
+// Constant-to-string map of available TLS versions.
 var SupportedTLSVersionsToString = map[TLSVersion]string{
 	tls.VersionSSL30: "ssl3.0",
 	tls.VersionTLS10: "tls1.0",
@@ -40,6 +42,7 @@ var SupportedTLSVersionsToString = map[TLSVersion]string{
 	tls.VersionTLS12: "tls1.2",
 }
 
+// String-to-constant map of available TLS cipher suites.
 var SupportedTLSCipherSuites = map[string]uint16{
 	"TLS_RSA_WITH_RC4_128_SHA":                tls.TLS_RSA_WITH_RC4_128_SHA,
 	"TLS_RSA_WITH_3DES_EDE_CBC_SHA":           tls.TLS_RSA_WITH_3DES_EDE_CBC_SHA,
@@ -60,6 +63,7 @@ var SupportedTLSCipherSuites = map[string]uint16{
 	"TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384": tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
 }
 
+// Constant-to-string map of available TLS cipher suites.
 var SupportedTLSCipherSuitesToString = map[uint16]string{
 	tls.TLS_RSA_WITH_RC4_128_SHA:                "TLS_RSA_WITH_RC4_128_SHA",
 	tls.TLS_RSA_WITH_3DES_EDE_CBC_SHA:           "TLS_RSA_WITH_3DES_EDE_CBC_SHA",

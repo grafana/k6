@@ -36,7 +36,7 @@ import (
 
 var homeDirRE = regexp.MustCompile(`^/(Users|home|Documents and Settings)/(?:[^/]+)`)
 
-// Archives should be share-able; to that end, paths including home directories should be anonymized.
+// Anonymizes a file path, by scrubbing usernames from home directories.
 func AnonymizePath(path string) string {
 	return homeDirRE.ReplaceAllString(path, `/$1/nobody`)
 }
@@ -61,6 +61,7 @@ type Archive struct {
 	Files   map[string][]byte `json:"-"` // non-script resources
 }
 
+// Reads an archive created by Archive.Write from a reader.
 func ReadArchive(in io.Reader) (*Archive, error) {
 	r := tar.NewReader(in)
 	arc := &Archive{
@@ -121,6 +122,11 @@ func ReadArchive(in io.Reader) (*Archive, error) {
 	return arc, nil
 }
 
+// Write serialises the archive to a writer.
+//
+// The format should be treated as opaque; currently it is simply a TAR rollup, but this may
+// change. If it does change, ReadArchive must be able to handle all previous formats as well as
+// the current one.
 func (arc *Archive) Write(out io.Writer) error {
 	w := tar.NewWriter(out)
 	t := time.Now()
