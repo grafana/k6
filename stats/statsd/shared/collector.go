@@ -21,13 +21,16 @@
 package statsd
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/DataDog/datadog-go/statsd"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
+	"github.com/loadimpact/k6/ui"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -39,16 +42,17 @@ var _ lib.Collector = &Collector{}
 
 // Tagger defines a type that can process tags
 type Tagger interface {
-	Process(string) func(map[string]string) []string
+	Process(string) func(map[string]string, string) []string
 }
 
 // Collector defines a collector struct
 type Collector struct {
-	Client *statsd.Client
-	Config Config
-	Logger *log.Entry
-	Type   ClientType
-	Tagger Tagger
+	Client  *statsd.Client
+	Config  Config
+	Logger  *log.Entry
+	Type    ClientType
+	Tagger  Tagger
+	Summary map[string]*stats.Metric
 
 	buffer     []*Sample
 	bufferLock sync.Mutex
@@ -56,6 +60,7 @@ type Collector struct {
 
 // Init sets up the collector
 func (c *Collector) Init() error {
+	c.Summary = make(map[string]*stats.Metric)
 	return nil
 }
 
@@ -73,7 +78,6 @@ func (c *Collector) Run(ctx context.Context) {
 		case <-ticker.C:
 			c.pushMetrics()
 		case <-ctx.Done():
-			c.Logger.Debugf("%s: Cleaning up!", c.Type.String())
 			c.pushMetrics()
 			c.finish()
 			return
@@ -118,6 +122,26 @@ func (c *Collector) pushMetrics() {
 }
 
 func (c *Collector) finish() {
+	if c.Type == DogStatsD {
+		c.Logger.Debugf("%s: Generating summary event", c.Type.String())
+		x := &bytes.Buffer{}
+		ui.SummarizeMetrics(x, "", 1*time.Second, c.Summary)
+		err := c.Client.SimpleEvent("[K6] Summary", x.String())
+		if err != nil {
+			c.Logger.
+				WithError(err).
+				Errorf("%s: Couldn't create event", c.Type.String())
+		} else {
+			err = c.Client.Flush()
+			if err != nil {
+				c.Logger.
+					WithError(err).
+					Errorf("%s: Couldn't send event", c.Type.String())
+			} else {
+				c.Logger.Debugf("%s: Summary event sent", c.Type.String())
+			}
+		}
+	}
 	// Close when context is done
 	if err := c.Client.Close(); err != nil {
 		c.Logger.Debugf("%s: Error closing the client, %+v", c.Type.String(), err)
@@ -134,7 +158,10 @@ func (c *Collector) commit(data []*Sample) error {
 func (c *Collector) dispatch(entry *Sample) {
 	tagList := c.Tagger.Process(c.Config.Extra().TagWhitelist)(
 		entry.Data.Tags,
+		entry.Extra.Group,
 	)
+
+	c.Summary[entry.Metric] = entry.Extra.Raw
 
 	switch entry.Type {
 	case stats.Counter:
@@ -144,7 +171,14 @@ func (c *Collector) dispatch(entry *Sample) {
 	case stats.Gauge:
 		_ = c.Client.Gauge(entry.Metric, entry.Data.Value, tagList, 1)
 	case stats.Rate:
-		// A rate, displays % of values that aren't 0
-		// Not sure what the use case here / what to send
+		if entry.Extra.Check != "" {
+			label := "pass"
+			if entry.Data.Value == 0 {
+				label = "fail"
+			}
+			_ = c.Client.Count(fmt.Sprintf("check.%s.%s", entry.Extra.Check, label), 1, tagList, 1)
+		} else {
+			_ = c.Client.Count(entry.Metric, int64(entry.Data.Value), tagList, 1)
+		}
 	}
 }

@@ -23,14 +23,14 @@ package dogstatsd
 import (
 	"encoding/json"
 
-	"github.com/loadimpact/k6/core/statsd"
+	statsd "github.com/loadimpact/k6/stats/statsd/shared"
 )
 
 // ConfigFields contains statsd configuration
 type ConfigFields struct {
 	Addr         string `json:"addr,omitempty" envconfig:"DOGSTATSD_ADDR"`
 	P            string `json:"port,omitempty" envconfig:"DOGSTATSD_PORT" default:"8126"`
-	BuffSize     int    `json:"buffer_size,omitempty" envconfig:"DOGSTATSD_BUFFER_SIZE" default:"10"`
+	BuffSize     int    `json:"buffer_size,omitempty" envconfig:"DOGSTATSD_BUFFER_SIZE" default:"20"`
 	Namespace    string `json:"namespace,omitempty" envconfig:"DOGSTATSD_NAMESPACE"`
 	TagWhitelist string `json:"tag_whitelist,omitempty" envconfig:"DOGSTATSD_TAG_WHITELIST" default:"status, method"`
 }

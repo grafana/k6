@@ -1,7 +1,9 @@
 package dogstatsd
 
 import (
-	"github.com/loadimpact/k6/core/statsd"
+	"fmt"
+
+	statsd "github.com/loadimpact/k6/stats/statsd/shared"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -9,11 +11,12 @@ import (
 type TagHandler struct{}
 
 // Process implements the interface method of Tagger
-func (t *TagHandler) Process(whitelist string) func(map[string]string) []string {
-	return func(tags map[string]string) []string {
-		return statsd.MapToSlice(
+func (t *TagHandler) Process(whitelist string) func(map[string]string, string) []string {
+	return func(tags map[string]string, group string) []string {
+		slice := statsd.MapToSlice(
 			statsd.TakeOnly(tags, whitelist),
 		)
+		return append(slice, fmt.Sprintf("group:%s", group))
 	}
 }
 

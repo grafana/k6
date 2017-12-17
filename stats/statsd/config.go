@@ -23,7 +23,7 @@ package statsd
 import (
 	"encoding/json"
 
-	"github.com/loadimpact/k6/core/statsd"
+	statsd "github.com/loadimpact/k6/stats/statsd/shared"
 )
 
 // ConfigFields contains statsd configuration

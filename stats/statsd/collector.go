@@ -1,7 +1,7 @@
 package statsd
 
 import (
-	"github.com/loadimpact/k6/core/statsd"
+	statsd "github.com/loadimpact/k6/stats/statsd/shared"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -9,8 +9,8 @@ import (
 type TagHandler struct{}
 
 // Process implements the interface method of Tagger
-func (t *TagHandler) Process(whitelist string) func(map[string]string) []string {
-	return func(tags map[string]string) []string {
+func (t *TagHandler) Process(whitelist string) func(map[string]string, string) []string {
+	return func(tags map[string]string, group string) []string {
 		return []string{}
 	}
 }

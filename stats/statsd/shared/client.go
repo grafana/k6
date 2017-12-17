@@ -38,7 +38,6 @@ func MakeClient(conf Config, cliType ClientType) (*statsd.Client, error) {
 	}
 
 	connStr := fmt.Sprintf("%s%s%s", conf.Address(), connStrSplitter, conf.Port())
-
 	c, err := statsd.NewBuffered(connStr, conf.BufferSize())
 	if err != nil {
 		log.Info(err)
