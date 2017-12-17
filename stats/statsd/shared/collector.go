@@ -158,15 +158,24 @@ func (c *Collector) dispatch(entry *Sample) {
 		_ = c.Client.Gauge(entry.Metric, entry.Data.Value, tagList, 1)
 	case stats.Rate:
 		if entry.Extra.Check != "" {
-			label := "pass"
-			if entry.Data.Value == 0 {
-				label = "fail"
-			}
-			_ = c.Client.Count(fmt.Sprintf("check.%s.%s", entry.Extra.Check, label), 1, tagList, 1)
+			_ = c.Client.Count(
+				checkToString(entry.Extra.Check, entry.Data.Value),
+				1,
+				tagList,
+				1,
+			)
 		} else {
 			_ = c.Client.Count(entry.Metric, int64(entry.Data.Value), tagList, 1)
 		}
 	}
+}
+
+func checkToString(check string, value float64) string {
+	label := "pass"
+	if value == 0 {
+		label = "fail"
+	}
+	return fmt.Sprintf("check.%s.%s", check, label)
 }
 
 func (c *Collector) sendSummaryData() {
