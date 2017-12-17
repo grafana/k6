@@ -65,7 +65,6 @@ func generateDataPoint(sample stats.Sample) *Sample {
 		Extra: ExtraData{
 			Raw:       sample.Metric,
 			Threshold: generateThreshold(threshold),
-			Summary:   sample.Metric.Summary(),
 			Group:     sample.Tags["group"],
 			Check:     sample.Tags["check"],
 		},
