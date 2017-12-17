@@ -18,41 +18,43 @@
  *
  */
 
-package common
+package http
 
 import (
-	"context"
-
-	"github.com/dop251/goja"
+	"fmt"
+	"strings"
+	"time"
 )
 
-type ctxKey int
-
-const (
-	ctxKeyState ctxKey = iota
-	ctxKeyRuntime
-)
-
-func WithState(ctx context.Context, state *State) context.Context {
-	return context.WithValue(ctx, ctxKeyState, state)
+// FileData represents a binary file requiring multipart request encoding
+type FileData struct {
+	Data        []byte
+	Filename    string
+	ContentType string
 }
 
-func GetState(ctx context.Context) *State {
-	v := ctx.Value(ctxKeyState)
-	if v == nil {
-		return nil
+var quoteEscaper = strings.NewReplacer("\\", "\\\\", `"`, "\\\"")
+
+func escapeQuotes(s string) string {
+	return quoteEscaper.Replace(s)
+}
+
+// File returns a FileData parameter
+func (h *HTTP) File(data []byte, args ...string) FileData {
+	// supply valid default if filename and content-type are not specified
+	fname, ct := fmt.Sprintf("%d", time.Now().UnixNano()), "application/octet-stream"
+
+	if len(args) > 0 {
+		fname = escapeQuotes(args[0])
+
+		if len(args) > 1 {
+			ct = escapeQuotes(args[1])
+		}
 	}
-	return v.(*State)
-}
 
-func WithRuntime(ctx context.Context, rt *goja.Runtime) context.Context {
-	return context.WithValue(ctx, ctxKeyRuntime, rt)
-}
-
-func GetRuntime(ctx context.Context) *goja.Runtime {
-	v := ctx.Value(ctxKeyRuntime)
-	if v == nil {
-		return nil
+	return FileData{
+		Data:        data,
+		Filename:    fname,
+		ContentType: ct,
 	}
-	return v.(*goja.Runtime)
 }

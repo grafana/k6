@@ -23,12 +23,14 @@ package http
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"mime/multipart"
 	"net"
 	"net/http"
 	"net/http/cookiejar"
+	"net/textproto"
 	neturl "net/url"
 	"strconv"
 	"strings"
@@ -71,13 +73,6 @@ func (http *HTTP) Del(ctx context.Context, url goja.Value, args ...goja.Value) (
 	return http.Request(ctx, "DELETE", url, args...)
 }
 
-func (http *HTTP) Upload(ctx context.Context, url goja.Value, args ...goja.Value) (*HTTPResponse, error) {
-	// flag as multipart request
-	http.isMultipart = true
-
-	return http.Request(ctx, "POST", url, args...)
-}
-
 func (http *HTTP) Request(ctx context.Context, method string, url goja.Value, args ...goja.Value) (*HTTPResponse, error) {
 	rt := common.GetRuntime(ctx)
 	state := common.GetState(ctx)
@@ -98,7 +93,8 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 		var data map[string]goja.Value
 		if rt.ExportTo(args[0], &data) == nil {
 			// handling multipart request
-			if h.isMultipart {
+			if requestContainsFile(data) {
+				bodyBuf = &bytes.Buffer{}
 				mpw := multipart.NewWriter(bodyBuf)
 
 				// For parameters of type common.FileData:
@@ -107,8 +103,18 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 				// Otherwise parameters are treated as standard form field.
 				for k, v := range data {
 					switch ve := v.Export().(type) {
-					case common.FileData:
-						fw, err := mpw.CreateFormFile(k, ve.FileName)
+					case FileData:
+						// writing our own part to handle receiving
+						// different content-type than the default application/octet-stream
+						h := make(textproto.MIMEHeader)
+						h.Set("Content-Disposition",
+							fmt.Sprintf(`form-data; name="%s"; filename="%s"`,
+								ve.Filename, ve.Filename))
+						h.Set("Content-Type", ve.ContentType)
+
+						// this writer will be closed either be the next part or
+						// the call to mpw.Close()
+						fw, err := mpw.CreatePart(h)
 						if err != nil {
 							return nil, nil, err
 						}
@@ -132,7 +138,7 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 					return nil, nil, err
 				}
 
-				contentType = "multipart/form-data"
+				contentType = mpw.FormDataContentType()
 			} else {
 				bodyQuery := make(neturl.Values, len(data))
 				for k, v := range data {
@@ -472,4 +478,14 @@ func (http *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, erro
 		}
 	}
 	return retval, err
+}
+
+func requestContainsFile(data map[string]goja.Value) bool {
+	for _, v := range data {
+		switch v.Export().(type) {
+		case FileData:
+			return true
+		}
+	}
+	return false
 }

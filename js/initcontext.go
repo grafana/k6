@@ -173,11 +173,7 @@ func (i *InitContext) Open(name string, args ...string) (goja.Value, error) {
 	}
 
 	if len(args) > 0 && args[0] == "b" {
-		fd := common.FileData{
-			FileName: name,
-			Data:     data,
-		}
-		return i.runtime.ToValue(fd), nil
+		return i.runtime.ToValue(data), nil
 	}
 	return i.runtime.ToValue(string(data)), nil
 }
