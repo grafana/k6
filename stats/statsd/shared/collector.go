@@ -54,6 +54,7 @@ type Collector struct {
 	Tagger  Tagger
 	Summary map[string]*stats.Metric
 
+	startTime  time.Time
 	buffer     []*Sample
 	bufferLock sync.Mutex
 }
@@ -73,6 +74,8 @@ func (c *Collector) Link() string {
 func (c *Collector) Run(ctx context.Context) {
 	c.Logger.Debugf("%s: Running!", c.Type.String())
 	ticker := time.NewTicker(pushInterval)
+	c.startTime = time.Now()
+
 	for {
 		select {
 		case <-ticker.C:
@@ -123,24 +126,7 @@ func (c *Collector) pushMetrics() {
 
 func (c *Collector) finish() {
 	if c.Type == DogStatsD {
-		c.Logger.Debugf("%s: Generating summary event", c.Type.String())
-		x := &bytes.Buffer{}
-		ui.SummarizeMetrics(x, "", 1*time.Second, c.Summary)
-		err := c.Client.SimpleEvent("[K6] Summary", x.String())
-		if err != nil {
-			c.Logger.
-				WithError(err).
-				Errorf("%s: Couldn't create event", c.Type.String())
-		} else {
-			err = c.Client.Flush()
-			if err != nil {
-				c.Logger.
-					WithError(err).
-					Errorf("%s: Couldn't send event", c.Type.String())
-			} else {
-				c.Logger.Debugf("%s: Summary event sent", c.Type.String())
-			}
-		}
+		c.sendSummaryData()
 	}
 	// Close when context is done
 	if err := c.Client.Close(); err != nil {
@@ -179,6 +165,27 @@ func (c *Collector) dispatch(entry *Sample) {
 			_ = c.Client.Count(fmt.Sprintf("check.%s.%s", entry.Extra.Check, label), 1, tagList, 1)
 		} else {
 			_ = c.Client.Count(entry.Metric, int64(entry.Data.Value), tagList, 1)
+		}
+	}
+}
+
+func (c *Collector) sendSummaryData() {
+	c.Logger.Debugf("%s: Generating summary event", c.Type.String())
+	x := &bytes.Buffer{}
+	ui.SummarizeMetrics(x, "", time.Since(c.startTime), c.Summary)
+	err := c.Client.SimpleEvent("[K6] Summary", x.String())
+	if err != nil {
+		c.Logger.
+			WithError(err).
+			Errorf("%s: Couldn't create event", c.Type.String())
+	} else {
+		err = c.Client.Flush()
+		if err != nil {
+			c.Logger.
+				WithError(err).
+				Errorf("%s: Couldn't send event", c.Type.String())
+		} else {
+			c.Logger.Debugf("%s: Summary event sent", c.Type.String())
 		}
 	}
 }
