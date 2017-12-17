@@ -36,8 +36,8 @@ import (
 
 var cloudCmd = &cobra.Command{
         Use:   "cloud",
-        Short: "Execute a test on the cloud",
-        Long: `Execute a test on the cloud.
+        Short: "Run a test on the cloud",
+        Long: `Run a test on the cloud.
 
 This will execute the test on the Load Impact cloud service. Use "k6 login cloud" to authenticate.`,
         Example: `
@@ -45,7 +45,7 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
         Args: cobra.ExactArgs(1),
         RunE: func(cmd *cobra.Command, args []string) error {
                 _, _ = BannerColor.Fprint(stdout, Banner+"\n\n")
-                fmt.Fprint(stdout, "  Deploying script to the cloud..")
+                fmt.Fprint(stdout, "  Uploading script to the cloud..")
 
                 // Runner
                 pwd, err := os.Getwd()
@@ -80,7 +80,7 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
                 conf := cliConf.Apply(fileConf).Apply(Config{Options: r.GetOptions()}).Apply(envConf).Apply(cliConf)
                 r.SetOptions(conf.Options)
 
-                // Overwrite Cloud config
+                // Cloud config
                 cloudConfig := conf.Collectors.Cloud
                 if err := envconfig.Process("k6", &cloudConfig); err != nil {
                         return err
@@ -88,9 +88,6 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
                 if cloudConfig.Token == "" {
                         return errors.New("Not logged in, please use `k6 login cloud`.")
                 }
-
-                // Start cloud test run
-                client := cloud.NewClient(cloudConfig.Token, cloudConfig.Host, Version)
 
                 // Create a ticker to add a dot to the console every 0.5s
                 ticker := time.NewTicker(time.Millisecond * 500)
@@ -100,21 +97,26 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
                         }
                 }()
 
+                // Start cloud test run
+                client := cloud.NewClient(cloudConfig.Token, cloudConfig.Host, Version)
+
                 arc := r.MakeArchive()
                 if err := client.ValidateOptions(arc.Options); err != nil {
                         return err
                 }
 
                 name := filepath.Base(filename)
-                testUrl, err := client.StartCloudTestRun(name, arc)
+                refID, err := client.StartCloudTestRun(name, arc)
                 if err != nil {
                         return err
                 }
                 ticker.Stop()
 
-                fmt.Fprintf(stdout, "\n\n  execution: %s\n", ui.ValueColor.Sprint("cloud"))
+                testURL := cloud.URLForResults(refID, cloudConfig)
+                fmt.Fprint(stdout, "\n\n")
+                fmt.Fprintf(stdout, "     execution: %s\n", ui.ValueColor.Sprint("cloud"))
                 fmt.Fprintf(stdout, "     script: %s\n", ui.ValueColor.Sprint(filename))
-                fmt.Fprintf(stdout, "     output: %s\n", ui.ValueColor.Sprint(testUrl))
+                fmt.Fprintf(stdout, "     output: %s\n", ui.ValueColor.Sprint(testURL))
                 return nil
         },
 }
