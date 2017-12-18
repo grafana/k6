@@ -196,7 +196,7 @@ func (g *Group) Check(name string) (*Check, error) {
 //
 // For more information, refer to the js/modules/k6.K6.Check() function.
 type Check struct {
-	// Arbitary name of the check.
+	// Arbitrary name of the check.
 	Name string `json:"name"`
 
 	// A Check belongs to a Group, which may belong to other groups. The Path describes
