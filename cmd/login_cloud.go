@@ -5,6 +5,7 @@ import (
 
 	"github.com/loadimpact/k6/ui"
 	"github.com/mitchellh/mapstructure"
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 )
 
@@ -17,7 +18,8 @@ var loginCloudCommand = &cobra.Command{
 This will set the default server used when just "-o cloud" is passed.`,
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		config, cdir, err := readDiskConfig()
+		fs := afero.NewOsFs()
+		config, cdir, err := readDiskConfig(fs)
 		if err != nil {
 			return err
 		}
@@ -41,7 +43,7 @@ This will set the default server used when just "-o cloud" is passed.`,
 		}
 
 		config.Collectors.Cloud = conf
-		return writeDiskConfig(cdir, config)
+		return writeDiskConfig(fs, cdir, config)
 	},
 }
 

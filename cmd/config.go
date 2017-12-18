@@ -22,12 +22,15 @@ package cmd
 
 import (
 	"encoding/json"
+	"io/ioutil"
+	"os"
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats/cloud"
 	"github.com/loadimpact/k6/stats/influxdb"
 	"github.com/shibukawa/configdir"
+	"github.com/spf13/afero"
 	"github.com/spf13/pflag"
 	null "gopkg.in/guregu/null.v3"
 )
@@ -35,6 +38,7 @@ import (
 const configFilename = "config.json"
 
 var configDirs = configdir.New("loadimpact", "k6")
+var configFile = os.Getenv("K6_CONFIG") // overridden by `-c` flag!
 
 func configFlagSet() *pflag.FlagSet {
 	flags := pflag.NewFlagSet("", 0)
@@ -43,6 +47,7 @@ func configFlagSet() *pflag.FlagSet {
 	flags.BoolP("linger", "l", false, "keep the API server alive past test end")
 	flags.Bool("no-usage-report", false, "don't send anonymous stats to the developers")
 	flags.Bool("no-thresholds", false, "don't run thresholds")
+	flags.StringVarP(&configFile, "config", "c", configFile, "specify config file to read")
 	return flags
 }
 
@@ -95,7 +100,17 @@ func getConfig(flags *pflag.FlagSet) (Config, error) {
 }
 
 // Reads a configuration file from disk.
-func readDiskConfig() (Config, *configdir.Config, error) {
+func readDiskConfig(fs afero.Fs) (Config, *configdir.Config, error) {
+	if configFile != "" {
+		data, err := ioutil.ReadFile(configFile)
+		if err != nil {
+			return Config{}, nil, err
+		}
+		var conf Config
+		err = json.Unmarshal(data, &conf)
+		return conf, nil, err
+	}
+
 	cdir := configDirs.QueryFolderContainsFile(configFilename)
 	if cdir == nil {
 		return Config{}, configDirs.QueryFolders(configdir.Global)[0], nil
@@ -110,10 +125,13 @@ func readDiskConfig() (Config, *configdir.Config, error) {
 }
 
 // Writes configuration back to disk.
-func writeDiskConfig(cdir *configdir.Config, conf Config) error {
+func writeDiskConfig(fs afero.Fs, cdir *configdir.Config, conf Config) error {
 	data, err := json.MarshalIndent(conf, "", "  ")
 	if err != nil {
 		return err
+	}
+	if configFile != "" {
+		return afero.WriteFile(fs, configFilename, data, 0644)
 	}
 	return cdir.WriteFile(configFilename, data)
 }
