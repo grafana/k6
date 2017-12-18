@@ -359,6 +359,7 @@ func TestRequestWithBinaryFile(t *testing.T) {
 
 	v, err := bi.Default(goja.Undefined())
 	assert.NoError(t, err)
+	assert.NotNil(t, v)
 	assert.Equal(t, true, v.Export())
 
 	<-ch
