@@ -86,7 +86,7 @@ func TestNullValueTypeJSON(t *testing.T) {
 func TestNewMetric(t *testing.T) {
 	old := stats.New("name", stats.Trend, stats.Time)
 	old.Tainted = null.BoolFrom(true)
-	m := NewMetric(old)
+	m := NewMetric(old, 0)
 	assert.Equal(t, "name", m.Name)
 	assert.True(t, m.Type.Valid)
 	assert.Equal(t, stats.Trend, m.Type.Type)

@@ -23,6 +23,7 @@ package v1
 import (
 	"bytes"
 	"encoding/json"
+	"time"
 
 	"github.com/loadimpact/k6/stats"
 	"gopkg.in/guregu/null.v3"
@@ -80,13 +81,13 @@ type Metric struct {
 	Sample map[string]float64 `json:"sample" yaml:"sample"`
 }
 
-func NewMetric(m *stats.Metric) Metric {
+func NewMetric(m *stats.Metric, t time.Duration) Metric {
 	return Metric{
 		Name:     m.Name,
 		Type:     NullMetricType{m.Type, true},
 		Contains: NullValueType{m.Contains, true},
 		Tainted:  m.Tainted,
-		Sample:   m.Sink.Format(),
+		Sample:   m.Sink.Format(t),
 	}
 }
 

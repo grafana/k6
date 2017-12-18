@@ -22,6 +22,8 @@ package stats
 
 import (
 	"encoding/json"
+	"fmt"
+	"time"
 
 	"github.com/dop251/goja"
 	"github.com/pkg/errors"
@@ -102,9 +104,11 @@ func NewThresholds(sources []string) (Thresholds, error) {
 	return Thresholds{rt, ts}, nil
 }
 
-func (ts *Thresholds) UpdateVM(sink Sink) error {
+func (ts *Thresholds) UpdateVM(sink Sink, t time.Duration) error {
 	ts.Runtime.Set("__sink__", sink)
-	for k, v := range sink.Format() {
+	f := sink.Format(t)
+	fmt.Println(f)
+	for k, v := range f {
 		ts.Runtime.Set(k, v)
 	}
 	return nil
@@ -124,8 +128,8 @@ func (ts *Thresholds) RunAll() (bool, error) {
 	return succ, nil
 }
 
-func (ts *Thresholds) Run(sink Sink) (bool, error) {
-	if err := ts.UpdateVM(sink); err != nil {
+func (ts *Thresholds) Run(sink Sink, t time.Duration) (bool, error) {
+	if err := ts.UpdateVM(sink, t); err != nil {
 		return false, err
 	}
 	return ts.RunAll()

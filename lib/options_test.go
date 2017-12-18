@@ -34,7 +34,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 )
 
-func TestOptionsApply(t *testing.T) {
+func TestOptions(t *testing.T) {
 	t.Run("Paused", func(t *testing.T) {
 		opts := Options{}.Apply(Options{Paused: null.BoolFrom(true)})
 		assert.True(t, opts.Paused.Valid)
@@ -88,12 +88,48 @@ func TestOptionsApply(t *testing.T) {
 		}
 	})
 	t.Run("TLSVersion", func(t *testing.T) {
-		version := TLSVersion{Min: tls.VersionSSL30, Max: tls.VersionTLS12}
-		opts := Options{}.Apply(Options{TLSVersion: &version})
+		versions := TLSVersions{Min: tls.VersionSSL30, Max: tls.VersionTLS12}
+		opts := Options{}.Apply(Options{TLSVersion: &versions})
 
 		assert.NotNil(t, opts.TLSVersion)
-		assert.Equal(t, opts.TLSVersion.Min, tls.VersionSSL30)
-		assert.Equal(t, opts.TLSVersion.Max, tls.VersionTLS12)
+		assert.Equal(t, opts.TLSVersion.Min, TLSVersion(tls.VersionSSL30))
+		assert.Equal(t, opts.TLSVersion.Max, TLSVersion(tls.VersionTLS12))
+
+		t.Run("JSON", func(t *testing.T) {
+			t.Run("Object", func(t *testing.T) {
+				var opts Options
+				jsonStr := `{"tlsVersion":{"min":"ssl3.0","max":"tls1.2"}}`
+				assert.NoError(t, json.Unmarshal([]byte(jsonStr), &opts))
+				assert.Equal(t, &TLSVersions{
+					Min: TLSVersion(tls.VersionSSL30),
+					Max: TLSVersion(tls.VersionTLS12),
+				}, opts.TLSVersion)
+
+				t.Run("Roundtrip", func(t *testing.T) {
+					data, err := json.Marshal(opts.TLSVersion)
+					assert.NoError(t, err)
+					assert.Equal(t, `{"min":"ssl3.0","max":"tls1.2"}`, string(data))
+					var vers2 TLSVersions
+					assert.NoError(t, json.Unmarshal(data, &vers2))
+					assert.Equal(t, &vers2, opts.TLSVersion)
+				})
+			})
+			t.Run("String", func(t *testing.T) {
+				var opts Options
+				jsonStr := `{"tlsVersion":"tls1.2"}`
+				assert.NoError(t, json.Unmarshal([]byte(jsonStr), &opts))
+				assert.Equal(t, &TLSVersions{
+					Min: TLSVersion(tls.VersionTLS12),
+					Max: TLSVersion(tls.VersionTLS12),
+				}, opts.TLSVersion)
+			})
+			t.Run("Blank", func(t *testing.T) {
+				var opts Options
+				jsonStr := `{"tlsVersion":""}`
+				assert.NoError(t, json.Unmarshal([]byte(jsonStr), &opts))
+				assert.Equal(t, &TLSVersions{}, opts.TLSVersion)
+			})
+		})
 	})
 	t.Run("TLSAuth", func(t *testing.T) {
 		tlsAuth := []*TLSAuth{
@@ -172,6 +208,14 @@ func TestOptionsApply(t *testing.T) {
 	t.Run("External", func(t *testing.T) {
 		opts := Options{}.Apply(Options{External: map[string]interface{}{"a": 1}})
 		assert.Equal(t, map[string]interface{}{"a": 1}, opts.External)
+	})
+
+	t.Run("JSON", func(t *testing.T) {
+		data, err := json.Marshal(Options{})
+		assert.NoError(t, err)
+		var opts Options
+		assert.NoError(t, json.Unmarshal(data, &opts))
+		assert.Equal(t, Options{}, opts)
 	})
 }
 

@@ -32,6 +32,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -53,10 +54,6 @@ import (
 const (
 	typeJS      = "js"
 	typeArchive = "archive"
-
-	collectorInfluxDB = "influxdb"
-	collectorJSON     = "json"
-	collectorCloud    = "cloud"
 )
 
 var runType = os.Getenv("K6_TYPE")
@@ -240,11 +237,22 @@ a commandline interface for interacting with it.`,
 			go func() {
 				u := "http://k6reports.loadimpact.com/"
 				mime := "application/json"
+				var endTSeconds float64
+				if endT := engine.Executor.GetEndTime(); endT.Valid {
+					endTSeconds = time.Duration(endT.Duration).Seconds()
+				}
+				var stagesEndTSeconds float64
+				if stagesEndT := lib.SumStages(engine.Executor.GetStages()); stagesEndT.Valid {
+					stagesEndTSeconds = time.Duration(stagesEndT.Duration).Seconds()
+				}
 				body, err := json.Marshal(map[string]interface{}{
-					"k6_version": Version,
-					"vus_max":    engine.Executor.GetVUsMax(),
-					"duration":   engine.Executor.GetEndTime(),
-					"iterations": engine.Executor.GetEndIterations(),
+					"k6_version":  Version,
+					"vus_max":     engine.Executor.GetVUsMax(),
+					"iterations":  engine.Executor.GetEndIterations(),
+					"duration":    endTSeconds,
+					"st_duration": stagesEndTSeconds,
+					"goos":        runtime.GOOS,
+					"goarch":      runtime.GOARCH,
 				})
 				if err != nil {
 					panic(err) // This should never happen!!
@@ -275,7 +283,7 @@ a commandline interface for interacting with it.`,
 				atT := engine.Executor.GetTime()
 				stagesEndT := lib.SumStages(engine.Executor.GetStages())
 				endT := engine.Executor.GetEndTime()
-				if !endT.Valid || endT.Duration > stagesEndT.Duration {
+				if !endT.Valid || (stagesEndT.Valid && endT.Duration > stagesEndT.Duration) {
 					endT = stagesEndT
 				}
 				if endT.Valid {
@@ -324,7 +332,7 @@ a commandline interface for interacting with it.`,
 				} else {
 					stagesEndT := lib.SumStages(engine.Executor.GetStages())
 					endT := engine.Executor.GetEndTime()
-					if !endT.Valid || endT.Duration > stagesEndT.Duration {
+					if !endT.Valid || (stagesEndT.Valid && endT.Duration > stagesEndT.Duration) {
 						endT = stagesEndT
 					}
 					if endT.Valid {
@@ -361,6 +369,11 @@ a commandline interface for interacting with it.`,
 			fmt.Fprintf(stdout, "%s\x1b[0K\n", progress.String())
 		}
 
+		// Warn if no iterations could be completed.
+		if engine.Executor.GetIterations() == 0 {
+			log.Warn("No data generated, because no script iterations finished, consider making the test duration longer")
+		}
+
 		// Print the end-of-test summary.
 		if !quiet {
 			fmt.Fprintf(stdout, "\n")
@@ -389,8 +402,8 @@ func init() {
 	RootCmd.AddCommand(runCmd)
 
 	runCmd.Flags().SortFlags = false
-	runCmd.Flags().AddFlagSet(optionFlagSet)
-	runCmd.Flags().AddFlagSet(configFlagSet)
+	runCmd.Flags().AddFlagSet(optionFlagSet())
+	runCmd.Flags().AddFlagSet(configFlagSet())
 	runCmd.Flags().StringVarP(&runType, "type", "t", runType, "override file `type`, \"js\" or \"archive\"")
 }
 

@@ -22,12 +22,12 @@ package lib
 
 import (
 	"context"
-	"io"
 
 	"github.com/loadimpact/k6/stats"
 )
 
-// A Collector abstracts away the details of a storage backend from the application.
+// A Collector abstracts the process of funneling samples to an external storage backend,
+// such as an InfluxDB instance.
 type Collector interface {
 	// Init is called between the collector's creation and the call to Run().
 	// You should do any lenghty setup here rather than in New.
@@ -43,12 +43,4 @@ type Collector interface {
 
 	// Optionally return a link that is shown to the user.
 	Link() string
-}
-
-// An AuthenticatedCollector is a collector that can store persistent authentication.
-type AuthenticatedCollector interface {
-	Collector
-
-	// Present a login form to the user.
-	Login(conf interface{}, in io.Reader, out io.Writer) (interface{}, error)
 }

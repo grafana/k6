@@ -23,6 +23,7 @@ package stats
 import (
 	"errors"
 	"sort"
+	"time"
 )
 
 var (
@@ -34,23 +35,30 @@ var (
 )
 
 type Sink interface {
-	Add(s Sample)               // Add a sample to the sink.
-	Calc()                      // Make final calculations.
-	Format() map[string]float64 // Data for thresholds. (also legacy display)
+	Add(s Sample)                              // Add a sample to the sink.
+	Calc()                                     // Make final calculations.
+	Format(t time.Duration) map[string]float64 // Data for thresholds.
 }
 
 type CounterSink struct {
 	Value float64
+	First time.Time
 }
 
 func (c *CounterSink) Add(s Sample) {
 	c.Value += s.Value
+	if c.First.IsZero() {
+		c.First = s.Time
+	}
 }
 
 func (c *CounterSink) Calc() {}
 
-func (c *CounterSink) Format() map[string]float64 {
-	return map[string]float64{"count": c.Value}
+func (c *CounterSink) Format(t time.Duration) map[string]float64 {
+	return map[string]float64{
+		"count": c.Value,
+		"rate":  c.Value / (float64(t) / float64(time.Second)),
+	}
 }
 
 type GaugeSink struct {
@@ -72,7 +80,7 @@ func (g *GaugeSink) Add(s Sample) {
 
 func (g *GaugeSink) Calc() {}
 
-func (g *GaugeSink) Format() map[string]float64 {
+func (g *GaugeSink) Format(t time.Duration) map[string]float64 {
 	return map[string]float64{"value": g.Value}
 }
 
@@ -134,7 +142,7 @@ func (t *TrendSink) Calc() {
 	}
 }
 
-func (t *TrendSink) Format() map[string]float64 {
+func (t *TrendSink) Format(tt time.Duration) map[string]float64 {
 	return map[string]float64{
 		"min":   t.Min,
 		"max":   t.Max,
@@ -159,7 +167,7 @@ func (r *RateSink) Add(s Sample) {
 
 func (r RateSink) Calc() {}
 
-func (r RateSink) Format() map[string]float64 {
+func (r RateSink) Format(t time.Duration) map[string]float64 {
 	return map[string]float64{"rate": float64(r.Trues) / float64(r.Total)}
 }
 
@@ -171,6 +179,6 @@ func (d DummySink) Add(s Sample) {
 
 func (d DummySink) Calc() {}
 
-func (d DummySink) Format() map[string]float64 {
+func (d DummySink) Format(t time.Duration) map[string]float64 {
 	return map[string]float64(d)
 }
