@@ -23,7 +23,7 @@ package dogstatsd
 import (
 	"encoding/json"
 
-	statsd "github.com/loadimpact/k6/stats/statsd/shared"
+	statsd "github.com/loadimpact/k6/stats/statsd/common"
 )
 
 // ConfigFields contains statsd configuration
