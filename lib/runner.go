@@ -69,8 +69,8 @@ type VU interface {
 // RunnerFunc wraps a function in a runner whose VUs will simply call that function.
 type RunnerFunc func(ctx context.Context) ([]stats.Sample, error)
 
-func (fn RunnerFunc) VU() *runnerFuncVU {
-	return &runnerFuncVU{Fn: fn}
+func (fn RunnerFunc) VU() *RunnerFuncVU {
+	return &RunnerFuncVU{Fn: fn}
 }
 
 func (fn RunnerFunc) MakeArchive() *Archive {
@@ -92,19 +92,20 @@ func (fn RunnerFunc) GetOptions() Options {
 func (fn RunnerFunc) SetOptions(opts Options) {
 }
 
-type runnerFuncVU struct {
+// A VU spawned by a RunnerFunc.
+type RunnerFuncVU struct {
 	Fn RunnerFunc
 	ID int64
 }
 
-func (fn runnerFuncVU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
+func (fn RunnerFuncVU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 	if fn.Fn == nil {
 		return []stats.Sample{}, nil
 	}
 	return fn.Fn(ctx)
 }
 
-func (fn *runnerFuncVU) Reconfigure(id int64) error {
+func (fn *RunnerFuncVU) Reconfigure(id int64) error {
 	fn.ID = id
 	return nil
 }
