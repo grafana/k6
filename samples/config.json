@@ -1,4 +1,3 @@
 {
-	"quit": true,
-	"quit-on-taint": true,
+	"vus": 100
 }

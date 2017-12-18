@@ -100,7 +100,8 @@ a commandline interface for interacting with it.`,
 			return err
 		}
 		filename := args[0]
-		src, err := readSource(filename, pwd, afero.NewOsFs(), os.Stdin)
+		fs := afero.NewOsFs()
+		src, err := readSource(filename, pwd, fs, os.Stdin)
 		if err != nil {
 			return err
 		}
@@ -117,7 +118,7 @@ a commandline interface for interacting with it.`,
 		if err != nil {
 			return err
 		}
-		fileConf, _, err := readDiskConfig()
+		fileConf, _, err := readDiskConfig(fs)
 		if err != nil {
 			return err
 		}

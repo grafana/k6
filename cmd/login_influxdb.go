@@ -7,6 +7,7 @@ import (
 	"github.com/loadimpact/k6/stats/influxdb"
 	"github.com/loadimpact/k6/ui"
 	"github.com/mitchellh/mapstructure"
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 )
 
@@ -19,7 +20,8 @@ var loginInfluxDBCommand = &cobra.Command{
 This will set the default server used when just "-o influxdb" is passed.`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		config, cdir, err := readDiskConfig()
+		fs := afero.NewOsFs()
+		config, cdir, err := readDiskConfig(fs)
 		if err != nil {
 			return err
 		}
@@ -78,7 +80,7 @@ This will set the default server used when just "-o influxdb" is passed.`,
 		}
 
 		config.Collectors.InfluxDB = conf
-		return writeDiskConfig(cdir, config)
+		return writeDiskConfig(fs, cdir, config)
 	},
 }
 
