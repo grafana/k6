@@ -36,23 +36,23 @@
 		},
 		{
 			"ImportPath": "github.com/dop251/goja",
-			"Rev": "4e76d8820401fbc3a2d128e5fcc4674519fe9850"
+			"Rev": "f24d0f0d86a47fa387c535769dad27745ac8c36c"
 		},
 		{
 			"ImportPath": "github.com/dop251/goja/ast",
-			"Rev": "4e76d8820401fbc3a2d128e5fcc4674519fe9850"
+			"Rev": "f24d0f0d86a47fa387c535769dad27745ac8c36c"
 		},
 		{
 			"ImportPath": "github.com/dop251/goja/file",
-			"Rev": "4e76d8820401fbc3a2d128e5fcc4674519fe9850"
+			"Rev": "f24d0f0d86a47fa387c535769dad27745ac8c36c"
 		},
 		{
 			"ImportPath": "github.com/dop251/goja/parser",
-			"Rev": "4e76d8820401fbc3a2d128e5fcc4674519fe9850"
+			"Rev": "f24d0f0d86a47fa387c535769dad27745ac8c36c"
 		},
 		{
 			"ImportPath": "github.com/dop251/goja/token",
-			"Rev": "4e76d8820401fbc3a2d128e5fcc4674519fe9850"
+			"Rev": "f24d0f0d86a47fa387c535769dad27745ac8c36c"
 		},
 		{
 			"ImportPath": "github.com/dustin/go-humanize",
