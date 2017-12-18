@@ -22,6 +22,7 @@ package v1
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/loadimpact/k6/api/common"
@@ -31,9 +32,14 @@ import (
 func HandleGetMetrics(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	engine := common.GetEngine(r.Context())
 
+	var t time.Duration
+	if engine.Executor != nil {
+		t = engine.Executor.GetTime()
+	}
+
 	metrics := make([]Metric, 0)
 	for _, m := range engine.Metrics {
-		metrics = append(metrics, NewMetric(m))
+		metrics = append(metrics, NewMetric(m, t))
 	}
 
 	data, err := jsonapi.Marshal(metrics)
@@ -48,11 +54,16 @@ func HandleGetMetric(rw http.ResponseWriter, r *http.Request, p httprouter.Param
 	id := p.ByName("id")
 	engine := common.GetEngine(r.Context())
 
+	var t time.Duration
+	if engine.Executor != nil {
+		t = engine.Executor.GetTime()
+	}
+
 	var metric Metric
 	var found bool
 	for _, m := range engine.Metrics {
 		if m.Name == id {
-			metric = NewMetric(m)
+			metric = NewMetric(m, t)
 			found = true
 			break
 		}

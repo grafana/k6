@@ -40,6 +40,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/viki-org/dnscache"
 	"golang.org/x/net/http2"
+	"golang.org/x/time/rate"
 )
 
 var errInterrupt = errors.New("context cancelled")
@@ -51,6 +52,7 @@ type Runner struct {
 
 	BaseDialer net.Dialer
 	Resolver   *dnscache.Resolver
+	RPSLimit   *rate.Limiter
 }
 
 func New(src *lib.SourceData, fs afero.Fs) (*Runner, error) {
@@ -75,7 +77,7 @@ func NewFromBundle(b *Bundle) (*Runner, error) {
 		return nil, err
 	}
 
-	return &Runner{
+	r := &Runner{
 		Bundle:       b,
 		Logger:       log.StandardLogger(),
 		defaultGroup: defaultGroup,
@@ -85,7 +87,9 @@ func NewFromBundle(b *Bundle) (*Runner, error) {
 			DualStack: true,
 		},
 		Resolver: dnscache.New(0),
-	}, nil
+	}
+	r.SetOptions(r.Bundle.Options)
+	return r, nil
 }
 
 func (r *Runner) MakeArchive() *lib.Archive {
@@ -112,9 +116,9 @@ func (r *Runner) newVU() (*VU, error) {
 		cipherSuites = *r.Bundle.Options.TLSCipherSuites
 	}
 
-	var tlsVersion lib.TLSVersion
+	var tlsVersions lib.TLSVersions
 	if r.Bundle.Options.TLSVersion != nil {
-		tlsVersion = *r.Bundle.Options.TLSVersion
+		tlsVersions = *r.Bundle.Options.TLSVersion
 	}
 
 	tlsAuth := r.Bundle.Options.TLSAuth
@@ -141,10 +145,11 @@ func (r *Runner) newVU() (*VU, error) {
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: r.Bundle.Options.InsecureSkipTLSVerify.Bool,
 			CipherSuites:       cipherSuites,
-			MinVersion:         uint16(tlsVersion.Min),
-			MaxVersion:         uint16(tlsVersion.Max),
+			MinVersion:         uint16(tlsVersions.Min),
+			MaxVersion:         uint16(tlsVersions.Max),
 			Certificates:       certs,
 			NameToCertificate:  nameToCert,
+			Renegotiation:      tls.RenegotiateFreelyAsClient,
 		},
 		DialContext: dialer.DialContext,
 	}
@@ -178,6 +183,11 @@ func (r *Runner) GetOptions() lib.Options {
 
 func (r *Runner) SetOptions(opts lib.Options) {
 	r.Bundle.Options = opts
+
+	r.RPSLimit = nil
+	if rps := opts.RPS; rps.Valid {
+		r.RPSLimit = rate.NewLimiter(rate.Limit(rps.Int64), 1)
+	}
 }
 
 type VU struct {
@@ -233,6 +243,7 @@ func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 		HTTPTransport: u.HTTPTransport,
 		Dialer:        u.Dialer,
 		CookieJar:     cookieJar,
+		RPSLimit:      u.Runner.RPSLimit,
 		BPool:         u.BPool,
 	}
 	u.Dialer.BytesRead = &state.BytesRead

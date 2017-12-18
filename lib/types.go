@@ -23,24 +23,10 @@ package lib
 import (
 	"bytes"
 	"encoding/json"
-	"sync/atomic"
 	"time"
 )
 
-type AtomicBool struct{ v uint32 }
-
-func (a *AtomicBool) Set(v bool) {
-	var i uint32
-	if v {
-		i = 1
-	}
-	atomic.StoreUint32(&a.v, i)
-}
-
-func (a *AtomicBool) Get() bool {
-	return atomic.LoadUint32(&a.v) != 0
-}
-
+// Duration is an alias for time.Duration that de/serialises to JSON as human-readable strings.
 type Duration time.Duration
 
 func (d Duration) String() string {
@@ -84,11 +70,14 @@ func (d Duration) MarshalJSON() ([]byte, error) {
 	return json.Marshal(d.String())
 }
 
+// NullDuration is a nullable Duration, in the same vein as the nullable types provided by
+// package gopkg.in/guregu/null.v3.
 type NullDuration struct {
 	Duration
 	Valid bool
 }
 
+// Creates a valid NullDuration from a time.Duration.
 func NullDurationFrom(d time.Duration) NullDuration {
 	return NullDuration{Duration(d), true}
 }
