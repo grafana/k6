@@ -338,6 +338,10 @@
 			"Rev": "88f656faf3f37f690df1a32515b479415e1a6769"
 		},
 		{
+			"ImportPath": "golang.org/x/time/rate",
+			"Rev": "6dc17368e09b0e8634d71cac8168d853e869a0c7"
+		},
+		{
 			"ImportPath": "gopkg.in/gin-contrib/sse.v0",
 			"Rev": "22d885f9ecc78bf4ee5d72b937e4bbcdc58e8cae"
 		},
