@@ -160,6 +160,44 @@ func (e *InterruptedError) Value() interface{} {
 	return e.iface
 }
 
+func (e *InterruptedError) String() string {
+	if e == nil {
+		return "<nil>"
+	}
+	var b bytes.Buffer
+	if e.iface != nil {
+		b.WriteString(fmt.Sprint(e.iface))
+		b.WriteByte('\n')
+	}
+	e.writeFullStack(&b)
+	return b.String()
+}
+
+func (e *InterruptedError) Error() string {
+	if e == nil || e.iface == nil {
+		return "<nil>"
+	}
+	var b bytes.Buffer
+	b.WriteString(fmt.Sprint(e.iface))
+	e.writeShortStack(&b)
+	return b.String()
+}
+
+func (e *Exception) writeFullStack(b *bytes.Buffer) {
+	for _, frame := range e.stack {
+		b.WriteString("\tat ")
+		frame.write(b)
+		b.WriteByte('\n')
+	}
+}
+
+func (e *Exception) writeShortStack(b *bytes.Buffer) {
+	if len(e.stack) > 0 && (e.stack[0].prg != nil || e.stack[0].funcName != "") {
+		b.WriteString(" at ")
+		e.stack[0].write(b)
+	}
+}
+
 func (e *Exception) String() string {
 	if e == nil {
 		return "<nil>"
@@ -167,13 +205,9 @@ func (e *Exception) String() string {
 	var b bytes.Buffer
 	if e.val != nil {
 		b.WriteString(e.val.String())
-	}
-	b.WriteByte('\n')
-	for _, frame := range e.stack {
-		b.WriteString("\tat ")
-		frame.write(&b)
 		b.WriteByte('\n')
 	}
+	e.writeFullStack(&b)
 	return b.String()
 }
 
@@ -181,15 +215,10 @@ func (e *Exception) Error() string {
 	if e == nil || e.val == nil {
 		return "<nil>"
 	}
-	if len(e.stack) > 0 && (e.stack[0].prg != nil || e.stack[0].funcName != "") {
-		var b bytes.Buffer
-		b.WriteString(e.val.String())
-		b.WriteString(" at ")
-		e.stack[0].write(&b)
-		return b.String()
-	}
-
-	return e.val.String()
+	var b bytes.Buffer
+	b.WriteString(e.val.String())
+	e.writeShortStack(&b)
+	return b.String()
 }
 
 func (e *Exception) Value() Value {
@@ -1370,6 +1399,15 @@ func AssertFunction(v Value) (Callable, bool) {
 	if obj, ok := v.(*Object); ok {
 		if f, ok := obj.self.assertCallable(); ok {
 			return func(this Value, args ...Value) (ret Value, err error) {
+				defer func() {
+					if x := recover(); x != nil {
+						if ex, ok := x.(*InterruptedError); ok {
+							err = ex
+						} else {
+							panic(x)
+						}
+					}
+				}()
 				ex := obj.runtime.vm.try(func() {
 					ret = f(FunctionCall{
 						This:      this,
@@ -1413,6 +1451,8 @@ func tryFunc(f func()) (err error) {
 		if x := recover(); x != nil {
 			switch x := x.(type) {
 			case *Exception:
+				err = x
+			case *InterruptedError:
 				err = x
 			case Value:
 				err = &Exception{

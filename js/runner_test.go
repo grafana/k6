@@ -30,6 +30,7 @@ import (
 	"net"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
@@ -231,6 +232,38 @@ func TestVURunContext(t *testing.T) {
 			_, err = vu.RunOnce(context.Background())
 			assert.NoError(t, err)
 			assert.True(t, fnCalled, "fn() not called")
+		})
+	}
+}
+
+func TestVURunInterrupt(t *testing.T) {
+	r1, err := New(&lib.SourceData{
+		Filename: "/script.js",
+		Data: []byte(`
+		export default function() { while(true) {} }
+		`),
+	}, afero.NewMemMapFs())
+	if !assert.NoError(t, err) {
+		return
+	}
+	r1.SetOptions(lib.Options{Throw: null.BoolFrom(true)})
+
+	r2, err := NewFromArchive(r1.MakeArchive())
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
+	for name, r := range testdata {
+		t.Run(name, func(t *testing.T) {
+			vu, err := r.newVU()
+			if !assert.NoError(t, err) {
+				return
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+			defer cancel()
+			_, err = vu.RunOnce(ctx)
+			assert.EqualError(t, err, "context cancelled at /script.js:1:1(1)")
 		})
 	}
 }

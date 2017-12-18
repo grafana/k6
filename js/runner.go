@@ -35,12 +35,15 @@ import (
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
 	"github.com/oxtoacart/bpool"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/viki-org/dnscache"
 	"golang.org/x/net/http2"
 	"golang.org/x/time/rate"
 )
+
+var errInterrupt = errors.New("context cancelled")
 
 type Runner struct {
 	Bundle       *Bundle
@@ -198,9 +201,36 @@ type VU struct {
 
 	Console *Console
 	BPool   *bpool.BufferPool
+
+	// A VU will track the last context it was called with for cancellation.
+	// Note that interruptTrackedCtx is the context that is currently being tracked, while
+	// interruptCancel cancels an unrelated context that terminates the tracking goroutine
+	// without triggering an interrupt (for if the context changes).
+	// There are cleaner ways of handling the interruption problem, but this is a hot path that
+	// needs to be called thousands of times per second, which rules out anything that spawns a
+	// goroutine per call.
+	interruptTrackedCtx context.Context
+	interruptCancel     context.CancelFunc
 }
 
 func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
+	// Track the context and interrupt JS execution if it's cancelled.
+	if u.interruptTrackedCtx != ctx {
+		interCtx, interCancel := context.WithCancel(context.Background())
+		if u.interruptCancel != nil {
+			u.interruptCancel()
+		}
+		u.interruptCancel = interCancel
+		u.interruptTrackedCtx = ctx
+		go func() {
+			select {
+			case <-interCtx.Done():
+			case <-ctx.Done():
+				u.Runtime.Interrupt(errInterrupt)
+			}
+		}()
+	}
+
 	cookieJar, err := cookiejar.New(nil)
 	if err != nil {
 		return nil, err
