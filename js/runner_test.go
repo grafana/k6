@@ -263,7 +263,7 @@ func TestVURunInterrupt(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 			defer cancel()
 			_, err = vu.RunOnce(ctx)
-			assert.EqualError(t, err, "blah")
+			assert.EqualError(t, err, "context cancelled at /script.js:1:1(1)")
 		})
 	}
 }
