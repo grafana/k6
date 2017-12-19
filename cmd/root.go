@@ -52,10 +52,11 @@ var (
 var (
 	cfgFile string
 
-	verbose bool
-	quiet   bool
-	noColor bool
-	address string
+	verbose  bool
+	quiet    bool
+	noColor  bool
+	logstash bool
+	address  string
 )
 
 // RootCmd represents the base command when called without any subcommands.
@@ -71,6 +72,9 @@ var RootCmd = &cobra.Command{
 		l.Formatter = &log.TextFormatter{ForceColors: stderrTTY}
 		if verbose {
 			l.SetLevel(log.DebugLevel)
+		}
+		if logstash {
+			setupLogstash()
 		}
 		if noColor {
 			stdout.Writer = colorable.NewNonColorable(os.Stdout)
@@ -95,6 +99,7 @@ func init() {
 	RootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "enable debug logging")
 	RootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "disable progress updates")
 	RootCmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "disable colored output")
+	RootCmd.PersistentFlags().BoolVar(&logstash, "logstash", false, "output logstash logs")
 	RootCmd.PersistentFlags().StringVarP(&address, "address", "a", "localhost:6565", "address for the api server")
 	RootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file (default ./k6.yaml or ~/.config/k6.yaml)")
 	must(cobra.MarkFlagFilename(RootCmd.PersistentFlags(), "config"))
