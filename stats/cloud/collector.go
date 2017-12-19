@@ -22,7 +22,6 @@ package cloud
 
 import (
 	"context"
-	"fmt"
 	"path/filepath"
 	"sync"
 	"time"
@@ -128,11 +127,7 @@ func (c *Collector) Init() error {
 }
 
 func (c *Collector) Link() string {
-	path := "runs"
-	if c.config.Token == "" {
-		path = "anonymous"
-	}
-	return fmt.Sprintf("https://app.loadimpact.com/k6/%s/%s", path, c.referenceID)
+	return URLForResults(c.referenceID, c.config)
 }
 
 func (c *Collector) Run(ctx context.Context) {
