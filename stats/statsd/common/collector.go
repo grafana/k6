@@ -67,7 +67,7 @@ func (c *Collector) Init() error {
 
 // Link returns the address of the client
 func (c *Collector) Link() string {
-	return c.Config.Address()
+	return c.Config.Addr
 }
 
 // Run the collector
@@ -142,7 +142,7 @@ func (c *Collector) commit(data []*Sample) error {
 }
 
 func (c *Collector) dispatch(entry *Sample) {
-	tagList := c.Tagger.Process(c.Config.Extra().TagWhitelist)(
+	tagList := c.Tagger.Process(c.Config.TagWhitelist)(
 		entry.Data.Tags,
 		entry.Extra.Group,
 	)

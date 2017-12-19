@@ -30,15 +30,15 @@ const (
 
 // MakeClient creates a new statsd buffered generic client
 func MakeClient(conf Config, cliType ClientType) (*statsd.Client, error) {
-	if conf.Address() == "" || conf.Port() == "" {
+	if conf.Addr == "" || conf.Port == "" {
 		return nil, fmt.Errorf(
 			"%s: connection string is invalid. Received: \"%+s%s%s\"",
-			cliType, conf.Address(), connStrSplitter, conf.Port(),
+			cliType, conf.Addr, connStrSplitter, conf.Port,
 		)
 	}
 
-	connStr := fmt.Sprintf("%s%s%s", conf.Address(), connStrSplitter, conf.Port())
-	c, err := statsd.NewBuffered(connStr, conf.BufferSize())
+	connStr := fmt.Sprintf("%s%s%s", conf.Addr, connStrSplitter, conf.Port)
+	c, err := statsd.NewBuffered(connStr, conf.BufferSize)
 	if err != nil {
 		log.Info(err)
 		return nil, err

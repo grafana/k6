@@ -27,7 +27,7 @@ func New(conf statsd.Config) (*statsd.Collector, error) {
 		return nil, err
 	}
 
-	if namespace := conf.Extra().Namespace; namespace != "" {
+	if namespace := conf.Namespace; namespace != "" {
 		cl.Namespace = namespace
 	}
 

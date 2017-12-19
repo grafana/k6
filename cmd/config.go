@@ -28,9 +28,8 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats/cloud"
-	"github.com/loadimpact/k6/stats/datadog"
 	"github.com/loadimpact/k6/stats/influxdb"
-	"github.com/loadimpact/k6/stats/statsd"
+	"github.com/loadimpact/k6/stats/statsd/common"
 	"github.com/shibukawa/configdir"
 	"github.com/spf13/afero"
 	"github.com/spf13/pflag"
@@ -65,7 +64,7 @@ type Config struct {
 		InfluxDB influxdb.Config `json:"influxdb"`
 		Cloud    cloud.Config    `json:"cloud"`
 		StatsD   statsd.Config   `json:"statsd"`
-		Datadog  datadog.Config  `json:"datadog"`
+		Datadog  statsd.Config   `json:"datadog"`
 	} `json:"collectors"`
 }
 
