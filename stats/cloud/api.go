@@ -59,6 +59,10 @@ type CreateTestRunResponse struct {
 	ReferenceID string `json:"reference_id"`
 }
 
+type LoginResponse struct {
+	Token string `json:"token"`
+}
+
 func (c *Client) CreateTestRun(testRun *TestRun) (*CreateTestRunResponse, error) {
 	url := fmt.Sprintf("%s/tests", c.baseURL)
 	req, err := c.NewRequest("POST", url, testRun)
@@ -167,4 +171,29 @@ func (c *Client) ValidateOptions(options lib.Options) error {
 	}
 
 	return c.Do(req, nil)
+}
+
+func (c *Client) Login(email string, password string) (*LoginResponse, error) {
+	url := fmt.Sprintf("%s/login", c.baseURL)
+
+	data := struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}{
+		email,
+		password,
+	}
+
+	req, err := c.NewRequest("POST", url, data)
+	if err != nil {
+		return nil, err
+	}
+
+	lr := LoginResponse{}
+	err = c.Do(req, &lr)
+	if err != nil {
+		return nil, err
+	}
+
+	return &lr, nil
 }
