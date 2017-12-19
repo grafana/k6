@@ -116,9 +116,9 @@ func (c *Client) Do(req *http.Request, v interface{}) error {
 }
 
 func (c *Client) do(req *http.Request, v interface{}, attempt int) (retry bool, err error) {
-        if req.Header.Get("Content-Type") == "" {
-                req.Header.Set("Content-Type", "application/json")
-        }
+	if req.Header.Get("Content-Type") == "" {
+		req.Header.Set("Content-Type", "application/json")
+	}
 	if c.token != "" {
 		req.Header.Set("Authorization", fmt.Sprintf("Token %s", c.token))
 	}
