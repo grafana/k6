@@ -39,12 +39,12 @@ type Trail struct {
 	// Total request duration, excluding DNS lookup and connect time.
 	Duration time.Duration
 
-	Blocked     time.Duration // Waiting to acquire a connection.
-	Connecting  time.Duration // Connecting to remote host.
-	Sending     time.Duration // Writing request.
-	Waiting     time.Duration // Waiting for first byte.
-	Receiving   time.Duration // Receiving response.
-	Handshaking time.Duration // Executing TLS handshake.
+	Blocked        time.Duration // Waiting to acquire a connection.
+	Connecting     time.Duration // Connecting to remote host.
+	Sending        time.Duration // Writing request.
+	Waiting        time.Duration // Waiting for first byte.
+	Receiving      time.Duration // Receiving response.
+	TLSHandshaking time.Duration // Executing TLS handshake.
 
 	// Detailed connection information.
 	ConnReused     bool
@@ -60,7 +60,7 @@ func (tr Trail) Samples(tags map[string]string) []stats.Sample {
 		{Metric: metrics.HTTPReqSending, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Sending)},
 		{Metric: metrics.HTTPReqWaiting, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Waiting)},
 		{Metric: metrics.HTTPReqReceiving, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Receiving)},
-		{Metric: metrics.HTTPReqHandshaking, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Handshaking)},
+		{Metric: metrics.HTTPReqTLSShaking, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.TLSHandshaking)},
 	}
 }
 
@@ -115,7 +115,7 @@ func (t *Tracer) Done() Trail {
 		trail.Connecting = t.connectDone.Sub(t.connectStart)
 	}
 	if !t.tlsHandshakeDone.IsZero() && !t.tlsHandshakeStart.IsZero() {
-		trail.Handshaking = t.tlsHandshakeDone.Sub(t.tlsHandshakeStart)
+		trail.TLSHandshaking = t.tlsHandshakeDone.Sub(t.tlsHandshakeStart)
 	}
 	if !t.wroteRequest.IsZero() {
 		trail.Sending = t.wroteRequest.Sub(t.connectDone)
