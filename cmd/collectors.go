@@ -26,6 +26,7 @@ import (
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/stats/binary"
 	"github.com/loadimpact/k6/stats/cloud"
 	"github.com/loadimpact/k6/stats/influxdb"
 	jsonc "github.com/loadimpact/k6/stats/json"
@@ -37,6 +38,7 @@ const (
 	collectorInfluxDB = "influxdb"
 	collectorJSON     = "json"
 	collectorCloud    = "cloud"
+	collectorBinary   = "bin"
 )
 
 func parseCollector(s string) (t, arg string) {
@@ -77,6 +79,8 @@ func newCollector(t, arg string, src *lib.SourceData, conf Config) (lib.Collecto
 			return nil, err
 		}
 		return cloud.New(config, src, conf.Options, Version)
+	case collectorBinary:
+		return binary.New(afero.NewOsFs(), arg)
 	default:
 		return nil, errors.Errorf("unknown output type: %s", t)
 	}

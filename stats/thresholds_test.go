@@ -95,7 +95,7 @@ func TestNewThresholds(t *testing.T) {
 			assert.Equal(t, sources[i], th.Source)
 			assert.False(t, th.Failed)
 			assert.NotNil(t, th.pgm)
-			assert.Equal(t, ts.Runtime, th.rt)
+			assert.Equal(t, ts.runtime, th.rt)
 		}
 	})
 }
@@ -104,7 +104,7 @@ func TestThresholdsUpdateVM(t *testing.T) {
 	ts, err := NewThresholds(nil)
 	assert.NoError(t, err)
 	assert.NoError(t, ts.UpdateVM(DummySink{"a": 1234.5}, 0))
-	assert.Equal(t, 1234.5, ts.Runtime.Get("a").ToFloat())
+	assert.Equal(t, 1234.5, ts.runtime.Get("a").ToFloat())
 }
 
 func TestThresholdsRunAll(t *testing.T) {
