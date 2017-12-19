@@ -127,7 +127,7 @@ func (c *Collector) Init() error {
 }
 
 func (c *Collector) Link() string {
-        return URLForResults(c.referenceID, c.config)
+	return URLForResults(c.referenceID, c.config)
 }
 
 func (c *Collector) Run(ctx context.Context) {
