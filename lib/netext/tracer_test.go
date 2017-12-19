@@ -78,7 +78,7 @@ func TestTracer(t *testing.T) {
 					fallthrough
 				case metrics.HTTPReqDuration, metrics.HTTPReqBlocked, metrics.HTTPReqSending, metrics.HTTPReqWaiting, metrics.HTTPReqReceiving:
 					assert.True(t, s.Value > 0.0, "%s is <= 0", s.Metric.Name)
-				case metrics.HTTPReqHandshaking:
+				case metrics.HTTPReqTLSShaking:
 					if !isReuse {
 						assert.True(t, s.Value > 0.0, "%s is <= 0", s.Metric.Name)
 						continue
