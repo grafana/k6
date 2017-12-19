@@ -1,4 +1,4 @@
-package dogstatsd
+package datadog
 
 import (
 	"fmt"
@@ -22,7 +22,7 @@ func (t *TagHandler) Process(whitelist string) func(map[string]string, string) [
 
 // New creates a new statsd connector client
 func New(conf statsd.Config) (*statsd.Collector, error) {
-	cl, err := statsd.MakeClient(conf, statsd.DogStatsD)
+	cl, err := statsd.MakeClient(conf, statsd.Datadog)
 	if err != nil {
 		return nil, err
 	}
@@ -34,8 +34,8 @@ func New(conf statsd.Config) (*statsd.Collector, error) {
 	return &statsd.Collector{
 		Client: cl,
 		Config: conf,
-		Logger: log.WithField("type", statsd.DogStatsD.String()),
-		Type:   statsd.DogStatsD,
+		Logger: log.WithField("type", statsd.Datadog.String()),
+		Type:   statsd.Datadog,
 		Tagger: &TagHandler{},
 	}, nil
 }

@@ -14,8 +14,8 @@ func (t ClientType) String() string {
 	switch t {
 	case StatsD:
 		return "StatsD"
-	case DogStatsD:
-		return "DogStatsD"
+	case Datadog:
+		return "Datadog"
 	default:
 		return "[INVALID]"
 	}
@@ -24,7 +24,7 @@ func (t ClientType) String() string {
 // Possible values for ClientType
 const (
 	StatsD = ClientType(iota)
-	DogStatsD
+	Datadog
 	connStrSplitter = ":"
 )
 

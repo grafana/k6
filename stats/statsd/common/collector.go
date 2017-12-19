@@ -125,7 +125,7 @@ func (c *Collector) pushMetrics() {
 }
 
 func (c *Collector) finish() {
-	if c.Type == DogStatsD {
+	if c.Type == Datadog {
 		c.sendSummaryData()
 	}
 	// Close when context is done

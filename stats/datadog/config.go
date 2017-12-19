@@ -18,7 +18,7 @@
  *
  */
 
-package dogstatsd
+package datadog
 
 import (
 	"encoding/json"
@@ -28,11 +28,11 @@ import (
 
 // ConfigFields contains statsd configuration
 type ConfigFields struct {
-	Addr         string `json:"addr,omitempty" envconfig:"DOGSTATSD_ADDR"`
-	P            string `json:"port,omitempty" envconfig:"DOGSTATSD_PORT" default:"8126"`
-	BuffSize     int    `json:"buffer_size,omitempty" envconfig:"DOGSTATSD_BUFFER_SIZE" default:"20"`
-	Namespace    string `json:"namespace,omitempty" envconfig:"DOGSTATSD_NAMESPACE"`
-	TagWhitelist string `json:"tag_whitelist,omitempty" envconfig:"DOGSTATSD_TAG_WHITELIST" default:"status, method"`
+	Addr         string `json:"addr,omitempty" envconfig:"DATADOG_ADDR"`
+	P            string `json:"port,omitempty" envconfig:"DATADOG_PORT" default:"8126"`
+	BuffSize     int    `json:"buffer_size,omitempty" envconfig:"DATADOG_BUFFER_SIZE" default:"20"`
+	Namespace    string `json:"namespace,omitempty" envconfig:"DATADOG_NAMESPACE"`
+	TagWhitelist string `json:"tag_whitelist,omitempty" envconfig:"DATADOG_TAG_WHITELIST" default:"status, method"`
 }
 
 // Config defines a config type
