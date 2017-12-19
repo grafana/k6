@@ -56,7 +56,7 @@ type CreateTestRunResponse struct {
 }
 
 type LoginResponse struct {
-        Token string `json:"token"`
+	Token string `json:"token"`
 }
 
 func (c *Client) CreateTestRun(testRun *TestRun) (*CreateTestRunResponse, error) {
@@ -136,7 +136,7 @@ func (c *Client) Login(email string, password string) (*LoginResponse, error) {
 	lr := LoginResponse{}
 	err = c.Do(req, &lr)
 	if err != nil {
-                return nil, err
+		return nil, err
 	}
 
 	return &lr, nil
