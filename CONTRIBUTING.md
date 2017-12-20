@@ -43,7 +43,7 @@ In order to keep the project manageable, consistency is very important. Most of 
 
 As you'd expect, please adhere to good ol' `gofmt` (there are plugins for most editors that can autocorrect this), but also `gofmt -s` (code simplification), and don't leave unused functions laying around.
 
-Continous integration will catch all of this if you don't, and it's fine to just fix linter complaints with another commit, but you can also run the linter yourself:
+Continuous integration will catch all of this if you don't, and it's fine to just fix linter complaints with another commit, but you can also run the linter yourself:
 
 ```
 gometalinter --config gometalinter.json --deadline 10m ./...
