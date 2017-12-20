@@ -25,6 +25,7 @@ import (
 	"sync"
 
 	"github.com/fatih/color"
+	"github.com/loadimpact/k6/lib/loggers"
 	"github.com/mattn/go-colorable"
 	"github.com/mattn/go-isatty"
 	log "github.com/sirupsen/logrus"
@@ -73,13 +74,11 @@ var RootCmd = &cobra.Command{
 		if verbose {
 			l.SetLevel(log.DebugLevel)
 		}
-		if logFmt == "logstash" {
-			setupLogstash()
-		}
 		if noColor {
 			stdout.Writer = colorable.NewNonColorable(os.Stdout)
 			stdout.Writer = colorable.NewNonColorable(os.Stderr)
 		}
+		setupLoggers(logFmt)
 	},
 }
 
@@ -99,8 +98,17 @@ func init() {
 	RootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "enable debug logging")
 	RootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "disable progress updates")
 	RootCmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "disable colored output")
-	RootCmd.PersistentFlags().StringVarP(&logFmt, "format", "f", "", "log output format")
+	RootCmd.PersistentFlags().StringVarP(&logFmt, "logformat", "f", "", "log output format")
 	RootCmd.PersistentFlags().StringVarP(&address, "address", "a", "localhost:6565", "address for the api server")
 	RootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file (default ./k6.yaml or ~/.config/k6.yaml)")
 	must(cobra.MarkFlagFilename(RootCmd.PersistentFlags(), "config"))
+}
+
+func setupLoggers(logFmt string) {
+	switch logFmt {
+	case "json":
+		loggers.SetupJSON()
+	default:
+		log.Debugf("Logger type unknown: %s. Using default instead", logFmt)
+	}
 }
