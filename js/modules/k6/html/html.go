@@ -24,7 +24,6 @@ import (
 	"context"
 	"fmt"
 	neturl "net/url"
-	"regexp"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -56,7 +55,7 @@ type Selection struct {
 
 type FormValue struct {
 	name  string
-	value string
+	value goja.Value
 }
 
 func (s Selection) emptySelection() Selection {
@@ -482,30 +481,26 @@ func (s Selection) SerializeArray() []FormValue {
 			inputType != "reset" &&
 			inputType != "image" && // Must not be an image or file
 			inputType != "file" &&
-			(checked == "checked" || (inputType != "checkbox" && inputType != "radio" )) // Must be checked if it is an checkbox or radio
+			(checked == "checked" || (inputType != "checkbox" && inputType != "radio")) // Must be checked if it is an checkbox or radio
 	})
 
-	reCRLF := regexp.MustCompile("\r?\n")
 	result := make([]FormValue, len(formElements.Nodes))
 	formElements.Each(func(i int, sel *goquery.Selection) {
+		element := Selection{s.rt, sel, s.URL}
 		name, _ := sel.Attr("name")
-		// ToDo: find a way to use something like 'sel.Val()' or implement it here
-		value := reCRLF.ReplaceAllString(sel.AttrOr("value", ""), "\r\n")
-		result[i] = FormValue{name: name, value: value}
-
-		// ToDo: If we have an array of values (e.g. `<select multiple>`), return an array of key/value pairs
-		// This would make FormValue.value either an string or an array of { name, value }. 
+		result[i] = FormValue{name: name, value: element.Val()}
 	})
 	return result
 }
 
-func (s Selection) SerializeObject() map[string]string {
+func (s Selection) SerializeObject() map[string]goja.Value {
 	formValues := s.SerializeArray()
-	result := make(map[string]string)
+	result := make(map[string]goja.Value)
 	for i := range formValues {
 		formValue := formValues[i]
 		result[formValue.name] = formValue.value
 	}
+
 	return result
 }
 
@@ -514,7 +509,14 @@ func (s Selection) Serialize() string {
 	urlValues := make(neturl.Values, len(formValues))
 	for i := range formValues {
 		formValue := formValues[i]
-		urlValues.Set(formValue.name, formValue.value)
+		value := formValue.value.Export()
+		switch value.(type) {
+		case string:
+			urlValues.Set(formValue.name, value.(string))
+		case []string:
+			urlValues[formValue.name] = value.([]string)
+		}
+
 	}
 	return urlValues.Encode()
 }
