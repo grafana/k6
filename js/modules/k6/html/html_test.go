@@ -41,21 +41,21 @@ const testHTML = `
 	<p>Nullam id nisi eget ex pharetra imperdiet. Maecenas augue ligula, aliquet sit amet maximus ut, vestibulum et magna. Nam in arcu sed tortor volutpat porttitor sed eget dolor. Duis rhoncus est id dui porttitor, id molestie ex imperdiet. Proin purus ligula, pretium eleifend felis a, tempor feugiat mi. Cras rutrum pulvinar neque, eu dictum arcu. Cras purus metus, fermentum eget malesuada sit amet, dignissim non dui.</p>
 
 	<form id="form1">
-		<input id="text_input" type="text" value="input-text-value"/>
-		<select id="select_one">
+		<input id="text_input" name="text_input" type="text" value="input-text-value"/>
+		<select id="select_one" name="select_one">
 			<option value="not this option">no</option>
 			<option value="yes this option" selected>yes</option>
 		</select>
-		<select id="select_text">
+		<select id="select_text" name="select_text">
 			<option>no text</option>
 			<option selected>yes text</option>
 		</select>
-		<select id="select_multi" multiple>
+		<select id="select_multi" name="select_multi" multiple>
 			<option>option 1</option>
 			<option selected>option 2</option>
 			<option selected>option 3</option>
 		</select>
-		<textarea id="textarea" multiple>Lorem ipsum dolor sit amet</textarea>
+		<textarea id="textarea" name="textarea" multiple>Lorem ipsum dolor sit amet</textarea>
 	</form>
 
 	<footer>This is the footer.</footer>
@@ -722,5 +722,50 @@ func TestParseHTML(t *testing.T) {
 				assert.Equal(t, int64(101), v.Export())
 			}
 		})
+	})
+
+	t.Run("SerializeArray", func(t *testing.T) {
+		v, err := common.RunString(rt, `doc.find("form").serializeArray()`)
+		if assert.NoError(t, err) {
+			arr := v.Export().([]FormValue)
+			assert.Equal(t, 5, len(arr))
+
+			assert.Equal(t, "text_input", arr[0].name)
+			assert.Equal(t, "input-text-value", arr[0].value)
+
+			assert.Equal(t, "select_one", arr[1].name)
+			assert.Equal(t, "yes this option", arr[1].value)
+
+			assert.Equal(t, "select_text", arr[2].name)
+			assert.Equal(t, "yes text", arr[2].value)
+
+			assert.Equal(t, "select_multi", arr[3].name)
+			assert.Equal(t, "", arr[3].value)
+
+			assert.Equal(t, "textarea", arr[4].name)
+			assert.Equal(t, "Lorem ipsum dolor sit amet", arr[4].value)
+		}
+	})
+
+	t.Run("SerializeObject", func(t *testing.T) {
+		v, err := common.RunString(rt, `doc.find("form").serializeObject()`)
+		if assert.NoError(t, err) {
+			obj := v.Export().(map[string]string)
+			assert.Equal(t, 5, len(obj))
+
+			assert.Equal(t, "input-text-value", obj["text_input"])
+			assert.Equal(t, "yes this option", obj["select_one"])
+			assert.Equal(t, "yes text", obj["select_text"])
+			assert.Equal(t, "", obj["select_multi"])
+			assert.Equal(t, "Lorem ipsum dolor sit amet", obj["textarea"])
+		}
+	})
+
+	t.Run("Serialize", func(t *testing.T) {
+		v, err := common.RunString(rt, `doc.find("form").serialize()`)
+		if assert.NoError(t, err) {
+			url := v.Export().(string)
+			assert.Equal(t, "select_multi=&select_one=&select_text=&text_input=input-text-value&textarea=", url)
+		}
 	})
 }
