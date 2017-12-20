@@ -1,6 +1,9 @@
 package statsd
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"strings"
+)
 
 // ExtraConfig contains extra statsd config
 type ExtraConfig struct {
@@ -24,6 +27,13 @@ func (c Config) Apply(cfg Config) Config {
 
 // UnmarshalText used to convert string into a struct
 func (c *Config) UnmarshalText(text []byte) error {
+	vals := strings.Split(string(text), ":")
+	// A connection, if provided, needs to be in the shape of ADDRESS:PORT
+	if len(vals) != 2 {
+		return nil
+	}
+	c.Addr = vals[0]
+	c.Port = vals[1]
 	return nil
 }
 
