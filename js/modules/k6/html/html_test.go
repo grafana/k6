@@ -731,33 +731,39 @@ func TestParseHTML(t *testing.T) {
 			assert.Equal(t, 5, len(arr))
 
 			assert.Equal(t, "text_input", arr[0].name)
-			assert.Equal(t, "input-text-value", arr[0].value)
+			assert.Equal(t, "input-text-value", arr[0].value.Export().(string))
 
 			assert.Equal(t, "select_one", arr[1].name)
-			assert.Equal(t, "yes this option", arr[1].value)
+			assert.Equal(t, "yes this option", arr[1].value.Export().(string))
 
 			assert.Equal(t, "select_text", arr[2].name)
-			assert.Equal(t, "yes text", arr[2].value)
+			assert.Equal(t, "yes text", arr[2].value.Export().(string))
 
+			multiValues := arr[3].value.Export().([]string)
 			assert.Equal(t, "select_multi", arr[3].name)
-			assert.Equal(t, "", arr[3].value)
+			assert.Equal(t, 2, len(multiValues))
+			assert.Equal(t, "option 2", multiValues[0])
+			assert.Equal(t, "option 3", multiValues[1])
 
 			assert.Equal(t, "textarea", arr[4].name)
-			assert.Equal(t, "Lorem ipsum dolor sit amet", arr[4].value)
+			assert.Equal(t, "Lorem ipsum dolor sit amet", arr[4].value.Export().(string))
 		}
 	})
 
 	t.Run("SerializeObject", func(t *testing.T) {
 		v, err := common.RunString(rt, `doc.find("form").serializeObject()`)
 		if assert.NoError(t, err) {
-			obj := v.Export().(map[string]string)
+			obj := v.Export().(map[string]goja.Value)
 			assert.Equal(t, 5, len(obj))
 
-			assert.Equal(t, "input-text-value", obj["text_input"])
-			assert.Equal(t, "yes this option", obj["select_one"])
-			assert.Equal(t, "yes text", obj["select_text"])
-			assert.Equal(t, "", obj["select_multi"])
-			assert.Equal(t, "Lorem ipsum dolor sit amet", obj["textarea"])
+			assert.Equal(t, "input-text-value", obj["text_input"].Export().(string))
+			assert.Equal(t, "yes this option", obj["select_one"].Export().(string))
+			assert.Equal(t, "yes text", obj["select_text"].Export().(string))
+			assert.Equal(t, "Lorem ipsum dolor sit amet", obj["textarea"].Export().(string))
+
+			multiValues := obj["select_multi"].Export().([]string)
+			assert.Equal(t, "option 2", multiValues[0])
+			assert.Equal(t, "option 3", multiValues[1])
 		}
 	})
 
@@ -765,7 +771,12 @@ func TestParseHTML(t *testing.T) {
 		v, err := common.RunString(rt, `doc.find("form").serialize()`)
 		if assert.NoError(t, err) {
 			url := v.Export().(string)
-			assert.Equal(t, "select_multi=&select_one=&select_text=&text_input=input-text-value&textarea=", url)
+			assert.Equal(t, "select_multi=option+2"+
+				"&select_multi=option+3"+
+				"&select_one=yes+this+option"+
+				"&select_text=yes+text"+
+				"&text_input=input-text-value"+
+				"&textarea=Lorem+ipsum+dolor+sit+amet", url)
 		}
 	})
 }
