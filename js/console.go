@@ -22,6 +22,7 @@ package js
 
 import (
 	"context"
+	"reflect"
 	"strconv"
 
 	"github.com/dop251/goja"
@@ -47,9 +48,16 @@ func (c Console) log(ctx *context.Context, level log.Level, msgobj goja.Value, a
 
 	fields := make(log.Fields)
 	for i, arg := range args {
-		fields[strconv.Itoa(i)] = arg.String()
+		if arg.ExportType() == reflect.TypeOf((*[]byte)(nil)).Elem() {
+			fields[strconv.Itoa(i)] = string(arg.Export().([]byte))
+		} else {
+			fields[strconv.Itoa(i)] = arg.String()
+		}
 	}
-	msg := msgobj.ToString()
+	msg := msgobj.String()
+	if msgobj.ExportType() == reflect.TypeOf((*[]byte)(nil)).Elem() {
+		msg = string(msgobj.Export().([]byte))
+	}
 	e := c.Logger.WithFields(fields)
 	switch level {
 	case log.DebugLevel:

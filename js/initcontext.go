@@ -154,18 +154,7 @@ func (i *InitContext) requireFile(name string) (goja.Value, error) {
 	return module.Get("exports"), nil
 }
 
-func (i *InitContext) Open(name string, args ...string) (goja.Value, error) {
-	data, err := open(i, name)
-	if err != nil {
-		return nil, err
-	}
-	if len(args) > 0 && args[0] == "b" {
-		return i.runtime.ToValue(data), nil
-	}
-	return i.runtime.ToValue(data.String()), nil
-}
-
-func open(i *InitContext, name string) (common.TextOrBinaryData, error) {
+func (i *InitContext) Open(name string) ([]byte, error) {
 	filename := loader.Resolve(i.pwd, name)
 	data, ok := i.files[filename]
 	if !ok {
@@ -176,5 +165,5 @@ func open(i *InitContext, name string) (common.TextOrBinaryData, error) {
 		i.files[filename] = data_.Data
 		data = data_.Data
 	}
-	return &common.FileData{Data: data}, nil
+	return data, nil
 }
