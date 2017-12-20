@@ -56,7 +56,11 @@ func init() {
 
 // New returns a collector ready to start writing samples
 func New(fs afero.Fs, fname string) (*Collector, error) {
-	if fname == "" || fname == "-" {
+	if len(fname) == 0 {
+		return nil, fmt.Errorf("you must specify a filename => -o bin=filename.k6")
+	}
+
+	if fname == "-" {
 		return &Collector{
 			file:  os.Stdout,
 			recvr: make(chan []stats.Sample),
@@ -89,9 +93,11 @@ func (c *Collector) Run(ctx context.Context) {
 			if err := c.encoder.Encode(samples); err != nil {
 				fmt.Println(err)
 			}
+
 		case <-ctx.Done():
-			// HACK: For some reasons the Done is called twice causing
-			// a panic closing the c.recvr channel twice /cc Emily
+			// HACK: even with the break there's still the ctx.Done() being
+			// called twice
+
 			if c.closed {
 				return
 			}
@@ -102,6 +108,7 @@ func (c *Collector) Run(ctx context.Context) {
 
 			close(c.recvr)
 			c.writer.Flush()
+			break
 		}
 	}
 }
@@ -109,7 +116,9 @@ func (c *Collector) Run(ctx context.Context) {
 // Collect receives chunk of new sample that are sent to the
 // receiver channel for processing
 func (c *Collector) Collect(samples []stats.Sample) {
-	c.recvr <- samples
+	go func() {
+		c.recvr <- samples
+	}()
 }
 
 // Link returns nothing as this does not creates a linkable resource
