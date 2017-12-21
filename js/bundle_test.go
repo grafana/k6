@@ -343,6 +343,36 @@ func TestNewBundle(t *testing.T) {
 			}
 		})
 	})
+	t.Run("UnrecognizedExorts", func(t *testing.T) {
+		_, err := NewBundle(&lib.SourceData{
+			Filename: "/script.js",
+			Data: []byte(`
+				export function boop() {};
+				export default function() {};
+			`),
+		}, afero.NewMemMapFs())
+		assert.EqualError(t, err, "unrecognised root-level export: boop")
+	})
+	t.Run("SetupTeardown", func(t *testing.T) {
+		b, err := NewBundle(&lib.SourceData{
+			Filename: "/script.js",
+			Data: []byte(`
+				export function setup() { return 1; }
+				export function teardown(data) { return data + 1; }
+				export default function() {}
+			`),
+		}, afero.NewMemMapFs())
+		if assert.NoError(t, err) {
+			v1, err := b.Setup(goja.Undefined())
+			if assert.NoError(t, err) {
+				assert.Equal(t, int64(1), v1.Export())
+			}
+			v2, err := b.Teardown(goja.Undefined(), v1)
+			if assert.NoError(t, err) {
+				assert.Equal(t, int64(2), v2.Export())
+			}
+		}
+	})
 }
 
 func TestNewBundleFromArchive(t *testing.T) {
