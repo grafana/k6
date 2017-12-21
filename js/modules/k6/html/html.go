@@ -23,6 +23,7 @@ package html
 import (
 	"context"
 	"fmt"
+	neturl "net/url"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -50,6 +51,11 @@ type Selection struct {
 	rt  *goja.Runtime
 	sel *goquery.Selection
 	URL string
+}
+
+type FormValue struct {
+	name  string
+	value goja.Value
 }
 
 func (s Selection) emptySelection() Selection {
@@ -451,4 +457,67 @@ func (s Selection) Data(def ...string) goja.Value {
 		}
 		return s.rt.ToValue(data)
 	}
+}
+
+// nolint: goconst
+func (s Selection) SerializeArray() []FormValue {
+	submittableSelector := "input,select,textarea,keygen"
+	var formElements *goquery.Selection
+	if s.sel.Is("form") {
+		formElements = s.sel.Find(submittableSelector)
+	} else {
+		formElements = s.sel.Filter(submittableSelector)
+	}
+
+	formElements = formElements.FilterFunction(func(i int, sel *goquery.Selection) bool {
+		name := sel.AttrOr("name", "")
+		inputType := sel.AttrOr("type", "")
+		disabled := sel.AttrOr("disabled", "")
+		checked := sel.AttrOr("checked", "")
+
+		return name != "" && // Must have a non-empty name
+			disabled != "disabled" && // Must not be disabled
+			inputType != "submit" && // Must not be a button
+			inputType != "button" &&
+			inputType != "reset" &&
+			inputType != "image" && // Must not be an image or file
+			inputType != "file" &&
+			(checked == "checked" || (inputType != "checkbox" && inputType != "radio")) // Must be checked if it is an checkbox or radio
+	})
+
+	result := make([]FormValue, len(formElements.Nodes))
+	formElements.Each(func(i int, sel *goquery.Selection) {
+		element := Selection{s.rt, sel, s.URL}
+		name, _ := sel.Attr("name")
+		result[i] = FormValue{name: name, value: element.Val()}
+	})
+	return result
+}
+
+func (s Selection) SerializeObject() map[string]goja.Value {
+	formValues := s.SerializeArray()
+	result := make(map[string]goja.Value)
+	for i := range formValues {
+		formValue := formValues[i]
+		result[formValue.name] = formValue.value
+	}
+
+	return result
+}
+
+func (s Selection) Serialize() string {
+	formValues := s.SerializeArray()
+	urlValues := make(neturl.Values, len(formValues))
+	for i := range formValues {
+		formValue := formValues[i]
+		value := formValue.value.Export()
+		switch value.(type) {
+		case string:
+			urlValues.Set(formValue.name, value.(string))
+		case []string:
+			urlValues[formValue.name] = value.([]string)
+		}
+
+	}
+	return urlValues.Encode()
 }
