@@ -730,23 +730,23 @@ func TestParseHTML(t *testing.T) {
 			arr := v.Export().([]FormValue)
 			assert.Equal(t, 5, len(arr))
 
-			assert.Equal(t, "text_input", arr[0].name)
-			assert.Equal(t, "input-text-value", arr[0].value.Export().(string))
+			assert.Equal(t, "text_input", arr[0].Name)
+			assert.Equal(t, "input-text-value", arr[0].Value.Export().(string))
 
-			assert.Equal(t, "select_one", arr[1].name)
-			assert.Equal(t, "yes this option", arr[1].value.Export().(string))
+			assert.Equal(t, "select_one", arr[1].Name)
+			assert.Equal(t, "yes this option", arr[1].Value.Export().(string))
 
-			assert.Equal(t, "select_text", arr[2].name)
-			assert.Equal(t, "yes text", arr[2].value.Export().(string))
+			assert.Equal(t, "select_text", arr[2].Name)
+			assert.Equal(t, "yes text", arr[2].Value.Export().(string))
 
-			multiValues := arr[3].value.Export().([]string)
-			assert.Equal(t, "select_multi", arr[3].name)
+			multiValues := arr[3].Value.Export().([]string)
+			assert.Equal(t, "select_multi", arr[3].Name)
 			assert.Equal(t, 2, len(multiValues))
 			assert.Equal(t, "option 2", multiValues[0])
 			assert.Equal(t, "option 3", multiValues[1])
 
-			assert.Equal(t, "textarea", arr[4].name)
-			assert.Equal(t, "Lorem ipsum dolor sit amet", arr[4].value.Export().(string))
+			assert.Equal(t, "textarea", arr[4].Name)
+			assert.Equal(t, "Lorem ipsum dolor sit amet", arr[4].Value.Export().(string))
 		}
 	})
 

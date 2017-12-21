@@ -54,8 +54,8 @@ type Selection struct {
 }
 
 type FormValue struct {
-	name  string
-	value goja.Value
+	Name  string
+	Value goja.Value
 }
 
 func (s Selection) emptySelection() Selection {
@@ -489,7 +489,7 @@ func (s Selection) SerializeArray() []FormValue {
 	formElements.Each(func(i int, sel *goquery.Selection) {
 		element := Selection{s.rt, sel, s.URL}
 		name, _ := sel.Attr("name")
-		result[i] = FormValue{name: name, value: element.Val()}
+		result[i] = FormValue{Name: name, Value: element.Val()}
 	})
 	return result
 }
@@ -499,7 +499,7 @@ func (s Selection) SerializeObject() map[string]goja.Value {
 	result := make(map[string]goja.Value)
 	for i := range formValues {
 		formValue := formValues[i]
-		result[formValue.name] = formValue.value
+		result[formValue.Name] = formValue.Value
 	}
 
 	return result
@@ -510,12 +510,12 @@ func (s Selection) Serialize() string {
 	urlValues := make(neturl.Values, len(formValues))
 	for i := range formValues {
 		formValue := formValues[i]
-		value := formValue.value.Export()
+		value := formValue.Value.Export()
 		switch value.(type) {
 		case string:
-			urlValues.Set(formValue.name, value.(string))
+			urlValues.Set(formValue.Name, value.(string))
 		case []string:
-			urlValues[formValue.name] = value.([]string)
+			urlValues[formValue.Name] = value.([]string)
 		}
 
 	}
