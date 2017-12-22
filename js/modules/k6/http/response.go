@@ -157,9 +157,9 @@ func (res *HTTPResponse) SubmitForm(args ...goja.Value) (*HTTPResponse, error) {
 		for _, k := range params.Keys() {
 			switch k {
 			case "formSelector":
-				formSelector = params.Get(k).Export().(string)
+				formSelector = params.Get(k).String()
 			case "submitSelector":
-				formSelector = params.Get(k).Export().(string)
+				formSelector = params.Get(k).String()
 			case "fields":
 				rt.ExportTo(params.Get(k), &fields)
 			case "options":
@@ -179,7 +179,7 @@ func (res *HTTPResponse) SubmitForm(args ...goja.Value) (*HTTPResponse, error) {
 		// Use GET by default
 		requestMethod = "GET"
 	} else {
-		requestMethod = strings.ToUpper(methodAttr.Export().(string))
+		requestMethod = strings.ToUpper(methodAttr.String())
 	}
 
 	actionAttr := form.Attr("action")
@@ -190,7 +190,7 @@ func (res *HTTPResponse) SubmitForm(args ...goja.Value) (*HTTPResponse, error) {
 	} else {
 		// Resolve the action url from the response url
 		responseUrl, _ := url.Parse(res.URL)
-		actionUrl, _ := url.Parse(actionAttr.Export().(string))
+		actionUrl, _ := url.Parse(actionAttr.String())
 		requestUrl = rt.ToValue(responseUrl.ResolveReference(actionUrl).String())
 	}
 
