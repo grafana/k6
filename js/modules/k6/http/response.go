@@ -30,6 +30,8 @@ import (
 	"github.com/loadimpact/k6/js/modules/k6/html"
 	"github.com/loadimpact/k6/lib"
 	"golang.org/x/crypto/ocsp"
+	"strings"
+	"net/url"
 )
 
 type OCSP struct {
@@ -140,4 +142,58 @@ func (res *HTTPResponse) Html(selector ...string) html.Selection {
 		sel = sel.Find(selector[0])
 	}
 	return sel
+}
+
+func (res *HTTPResponse) SubmitForm(args... goja.Value) (*HTTPResponse, error) {
+	rt := common.GetRuntime(res.ctx)
+	
+	selector := "form"
+	var fields map[string]goja.Value
+	var requestOptions goja.Value
+	if len(args) > 0{
+		params := args[0].ToObject(rt)
+		for _, k := range params.Keys() {
+			switch k {
+			case "selector":
+				selector = params.Get(k).Export().(string)
+			case "fields":
+				rt.ExportTo(params.Get(k), &fields)
+			case "options":
+				requestOptions = params.Get(k)
+			}
+		}
+	}	
+	
+	form := res.Html(selector)
+	
+	methodAttr := form.Attr("method")
+	var requestMethod string
+	if methodAttr == goja.Undefined(){
+		requestMethod = "GET"
+	} else{
+		requestMethod = strings.ToUpper(methodAttr.Export().(string))
+	}
+
+	actionAttr := form.Attr("action")
+	var requestUrl goja.Value
+	if actionAttr == goja.Undefined(){
+		requestUrl = rt.ToValue(res.URL)
+	} else{
+		responseUrl, _ := url.Parse(res.URL)
+		actionUrl, _ := url.Parse(actionAttr.Export().(string))
+		requestUrl = rt.ToValue(responseUrl.ResolveReference(actionUrl).String())
+	}
+	
+	body := form.SerializeObject()
+	if fields != nil{
+		for k, v := range fields {
+			body[k] = rt.ToValue(v)
+		}
+	}
+	
+	if requestOptions == nil {
+		return New().Request(res.ctx, requestMethod, requestUrl, rt.ToValue(body))
+	} else {
+		return New().Request(res.ctx, requestMethod, requestUrl, rt.ToValue(body), requestOptions)
+	}
 }
