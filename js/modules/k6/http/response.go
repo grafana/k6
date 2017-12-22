@@ -147,15 +147,18 @@ func (res *HTTPResponse) Html(selector ...string) html.Selection {
 func (res *HTTPResponse) SubmitForm(args... goja.Value) (*HTTPResponse, error) {
 	rt := common.GetRuntime(res.ctx)
 	
-	selector := "form"
+	formSelector := "form"
+	submitSelector := "[type=\"submit\"]"
 	var fields map[string]goja.Value
 	var requestOptions goja.Value
 	if len(args) > 0{
 		params := args[0].ToObject(rt)
 		for _, k := range params.Keys() {
 			switch k {
-			case "selector":
-				selector = params.Get(k).Export().(string)
+			case "formSelector":
+				formSelector = params.Get(k).Export().(string)
+			case "submitSelector":
+				formSelector = params.Get(k).Export().(string)
 			case "fields":
 				rt.ExportTo(params.Get(k), &fields)
 			case "options":
@@ -164,11 +167,12 @@ func (res *HTTPResponse) SubmitForm(args... goja.Value) (*HTTPResponse, error) {
 		}
 	}	
 	
-	form := res.Html(selector)
+	form := res.Html(formSelector)
 	
 	methodAttr := form.Attr("method")
 	var requestMethod string
 	if methodAttr == goja.Undefined(){
+		// Use GET by default
 		requestMethod = "GET"
 	} else{
 		requestMethod = strings.ToUpper(methodAttr.Export().(string))
@@ -177,8 +181,10 @@ func (res *HTTPResponse) SubmitForm(args... goja.Value) (*HTTPResponse, error) {
 	actionAttr := form.Attr("action")
 	var requestUrl goja.Value
 	if actionAttr == goja.Undefined(){
+		// Use the url of the response if no action is set
 		requestUrl = rt.ToValue(res.URL)
 	} else{
+		// Resolve the action url from the response url
 		responseUrl, _ := url.Parse(res.URL)
 		actionUrl, _ := url.Parse(actionAttr.Export().(string))
 		requestUrl = rt.ToValue(responseUrl.ResolveReference(actionUrl).String())
@@ -189,6 +195,14 @@ func (res *HTTPResponse) SubmitForm(args... goja.Value) (*HTTPResponse, error) {
 		for k, v := range fields {
 			body[k] = rt.ToValue(v)
 		}
+	}
+	
+	// Add the name + value of the submit button to the fields
+	submit := form.Find(submitSelector)
+	submitName := submit.Attr("name")
+	submitValue := submit.Val()
+	if submitName != goja.Undefined() && submitValue != goja.Undefined(){
+		body[submitName.String()] = submitValue
 	}
 	
 	if requestOptions == nil {
