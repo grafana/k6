@@ -80,13 +80,13 @@ func TestSerialize(t *testing.T) {
 			assert.Equal(t, 5, len(arr))
 
 			assert.Equal(t, "text_input", arr[0].Name)
-			assert.Equal(t, "input-text-value", arr[0].Value.Export().(string))
+			assert.Equal(t, "input-text-value", arr[0].Value.String())
 
 			assert.Equal(t, "select_one", arr[1].Name)
-			assert.Equal(t, "yes this option", arr[1].Value.Export().(string))
+			assert.Equal(t, "yes this option", arr[1].Value.String())
 
 			assert.Equal(t, "select_text", arr[2].Name)
-			assert.Equal(t, "yes text", arr[2].Value.Export().(string))
+			assert.Equal(t, "yes text", arr[2].Value.String())
 
 			multiValues := arr[3].Value.Export().([]string)
 			assert.Equal(t, "select_multi", arr[3].Name)
@@ -95,7 +95,7 @@ func TestSerialize(t *testing.T) {
 			assert.Equal(t, "option 3", multiValues[1])
 
 			assert.Equal(t, "textarea", arr[4].Name)
-			assert.Equal(t, "Lorem ipsum dolor sit amet", arr[4].Value.Export().(string))
+			assert.Equal(t, "Lorem ipsum dolor sit amet", arr[4].Value.String())
 		}
 	})
 
@@ -105,10 +105,10 @@ func TestSerialize(t *testing.T) {
 			obj := v.Export().(map[string]goja.Value)
 			assert.Equal(t, 5, len(obj))
 
-			assert.Equal(t, "input-text-value", obj["text_input"].Export().(string))
-			assert.Equal(t, "yes this option", obj["select_one"].Export().(string))
-			assert.Equal(t, "yes text", obj["select_text"].Export().(string))
-			assert.Equal(t, "Lorem ipsum dolor sit amet", obj["textarea"].Export().(string))
+			assert.Equal(t, "input-text-value", obj["text_input"].String())
+			assert.Equal(t, "yes this option", obj["select_one"].String())
+			assert.Equal(t, "yes text", obj["select_text"].String())
+			assert.Equal(t, "Lorem ipsum dolor sit amet", obj["textarea"].String())
 
 			multiValues := obj["select_multi"].Export().([]string)
 			assert.Equal(t, "option 2", multiValues[0])
@@ -119,7 +119,7 @@ func TestSerialize(t *testing.T) {
 	t.Run("Serialize", func(t *testing.T) {
 		v, err := common.RunString(rt, `doc.find("form").serialize()`)
 		if assert.NoError(t, err) {
-			url := v.Export().(string)
+			url := v.String()
 			assert.Equal(t, "select_multi=option+2"+
 				"&select_multi=option+3"+
 				"&select_one=yes+this+option"+
