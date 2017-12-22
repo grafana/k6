@@ -67,6 +67,43 @@ func TestRunnerNew(t *testing.T) {
 		})
 	})
 
+	t.Run("SetupTeardown", func(t *testing.T) {
+		r, err := New(&lib.SourceData{
+			Filename: "/script.js",
+			Data: []byte(`
+				export function setup() {
+					return { v: 1 };
+				}
+				export function teardown(data) {
+					if (data.v != 1) {
+						throw new Error("teardown: wrong data: " + JSON.stringify(data))
+					}
+				}
+				export default function(data) {
+					if (data.v != 1) {
+						throw new Error("default: wrong data: " + JSON.stringify(data))
+					}
+				}
+			`),
+		}, afero.NewMemMapFs())
+		if !assert.NoError(t, err) {
+			return
+		}
+		if !assert.NoError(t, r.Setup()) {
+			return
+		}
+
+		t.Run("VU", func(t *testing.T) {
+			vu, err := r.NewVU()
+			if assert.NoError(t, err) {
+				_, err := vu.RunOnce(context.Background())
+				assert.NoError(t, err)
+			}
+		})
+
+		assert.NoError(t, r.Teardown())
+	})
+
 	t.Run("Invalid", func(t *testing.T) {
 		_, err := New(&lib.SourceData{
 			Filename: "/script.js",

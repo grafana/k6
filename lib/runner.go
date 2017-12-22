@@ -45,6 +45,12 @@ type Runner interface {
 	// of a test - RunOnce() may be called hundreds of thousands of times, and must be fast.
 	NewVU() (VU, error)
 
+	// Runs pre-test setup, if applicable.
+	Setup() error
+
+	// Runs post-test teardown, if applicable.
+	Teardown() error
+
 	// Returns the default (root) Group.
 	GetDefaultGroup() *Group
 
@@ -79,6 +85,14 @@ func (fn RunnerFunc) MakeArchive() *Archive {
 
 func (fn RunnerFunc) NewVU() (VU, error) {
 	return fn.VU(), nil
+}
+
+func (fn RunnerFunc) Setup() error {
+	return nil
+}
+
+func (fn RunnerFunc) Teardown() error {
+	return nil
 }
 
 func (fn RunnerFunc) GetDefaultGroup() *Group {
