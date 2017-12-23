@@ -46,10 +46,10 @@ type Runner interface {
 	NewVU() (VU, error)
 
 	// Runs pre-test setup, if applicable.
-	Setup() error
+	Setup(ctx context.Context) error
 
 	// Runs post-test teardown, if applicable.
-	Teardown() error
+	Teardown(ctx context.Context) error
 
 	// Returns the default (root) Group.
 	GetDefaultGroup() *Group
