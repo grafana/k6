@@ -23,6 +23,7 @@ package js
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"net"
 	"net/http"
 	"net/http/cookiejar"
@@ -55,8 +56,7 @@ type Runner struct {
 	Resolver   *dnscache.Resolver
 	RPSLimit   *rate.Limiter
 
-	// Value returned from setup(), if anything.
-	setupData goja.Value
+	setupData interface{}
 }
 
 func New(src *lib.SourceData, fs afero.Fs, rtOpts lib.RuntimeOptions) (*Runner, error) {
@@ -169,6 +169,7 @@ func (r *Runner) newVU() (*VU, error) {
 		Console:        NewConsole(),
 		BPool:          bpool.NewBufferPool(100),
 	}
+	vu.setupData = vu.Runtime.ToValue(r.setupData)
 	vu.Runtime.Set("console", common.Bind(vu.Runtime, vu.Console, vu.Context))
 
 	// Give the VU an initial sense of identity.
@@ -179,18 +180,21 @@ func (r *Runner) newVU() (*VU, error) {
 	return vu, nil
 }
 
-func (r *Runner) Setup() (err error) {
-	if setup := r.Bundle.Setup; setup != nil {
-		r.setupData, err = setup(goja.Undefined())
+func (r *Runner) Setup(ctx context.Context) error {
+	v, err := r.runPart(ctx, "setup", nil)
+	if err != nil {
+		return errors.Wrap(err, "setup")
 	}
-	return
+	data, err := json.Marshal(v.Export())
+	if err != nil {
+		return errors.Wrap(err, "setup")
+	}
+	return json.Unmarshal(data, &r.setupData)
 }
 
-func (r *Runner) Teardown() (err error) {
-	if teardown := r.Bundle.Teardown; teardown != nil {
-		_, err = teardown(goja.Undefined(), r.setupData)
-	}
-	return
+func (r *Runner) Teardown(ctx context.Context) error {
+	_, err := r.runPart(ctx, "teardown", r.setupData)
+	return err
 }
 
 func (r *Runner) GetDefaultGroup() *lib.Group {
@@ -210,6 +214,32 @@ func (r *Runner) SetOptions(opts lib.Options) {
 	}
 }
 
+// Runs an exported function in its own temporary VU, optionally with an argument. Execution is
+// interrupted if the context expires. No error is returned if the part does not exist.
+func (r *Runner) runPart(ctx context.Context, name string, arg interface{}) (goja.Value, error) {
+	vu, err := r.newVU()
+	if err != nil {
+		return goja.Undefined(), err
+	}
+	exp := vu.Runtime.Get("exports").ToObject(vu.Runtime)
+	if exp == nil {
+		return goja.Undefined(), nil
+	}
+	fn, ok := goja.AssertFunction(exp.Get(name))
+	if !ok {
+		return goja.Undefined(), nil
+	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	go func() {
+		<-ctx.Done()
+		vu.Runtime.Interrupt(errInterrupt)
+	}()
+	v, _, err := vu.runFn(ctx, fn, vu.Runtime.ToValue(arg))
+	cancel()
+	return v, err
+}
+
 type VU struct {
 	BundleInstance
 
@@ -222,6 +252,8 @@ type VU struct {
 	Console *Console
 	BPool   *bpool.BufferPool
 
+	setupData goja.Value
+
 	// A VU will track the last context it was called with for cancellation.
 	// Note that interruptTrackedCtx is the context that is currently being tracked, while
 	// interruptCancel cancels an unrelated context that terminates the tracking goroutine
@@ -231,6 +263,13 @@ type VU struct {
 	// goroutine per call.
 	interruptTrackedCtx context.Context
 	interruptCancel     context.CancelFunc
+}
+
+func (u *VU) Reconfigure(id int64) error {
+	u.ID = id
+	u.Iteration = 0
+	u.Runtime.Set("__VU", u.ID)
+	return nil
 }
 
 func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
@@ -251,9 +290,18 @@ func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 		}()
 	}
 
-	cookieJar, err := cookiejar.New(nil)
+	// Call the default function.
+	_, state, err := u.runFn(ctx, u.Default, u.setupData)
 	if err != nil {
 		return nil, err
+	}
+	return state.Samples, nil
+}
+
+func (u *VU) runFn(ctx context.Context, fn goja.Callable, args ...goja.Value) (goja.Value, *common.State, error) {
+	cookieJar, err := cookiejar.New(nil)
+	if err != nil {
+		return goja.Undefined(), nil, err
 	}
 
 	state := &common.State{
@@ -281,7 +329,7 @@ func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 	u.Iteration++
 
 	startTime := time.Now()
-	_, err = u.Default(goja.Undefined(), u.Runner.setupData) // Actually run the JS script
+	v, err := fn(goja.Undefined(), args...) // Actually run the JS script
 	t := time.Now()
 
 	tags := map[string]string{}
@@ -292,7 +340,7 @@ func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 		tags["iter"] = strconv.FormatInt(iter, 10)
 	}
 
-	samples := append(state.Samples,
+    state.Samples := append(state.Samples,
 		stats.Sample{Time: t, Metric: metrics.DataSent, Value: float64(u.Dialer.BytesWritten), Tags: tags},
 		stats.Sample{Time: t, Metric: metrics.DataReceived, Value: float64(u.Dialer.BytesRead), Tags: tags},
 		stats.Sample{Time: t, Metric: metrics.IterationDuration, Value: stats.D(t.Sub(startTime)), Tags: tags},
@@ -301,12 +349,5 @@ func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 	if u.Runner.Bundle.Options.NoConnectionReuse.Bool {
 		u.HTTPTransport.CloseIdleConnections()
 	}
-	return samples, err
-}
-
-func (u *VU) Reconfigure(id int64) error {
-	u.ID = id
-	u.Iteration = 0
-	u.Runtime.Set("__VU", u.ID)
-	return nil
+	return v, state, err
 }
