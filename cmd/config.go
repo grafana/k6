@@ -63,8 +63,8 @@ type Config struct {
 	Collectors struct {
 		InfluxDB influxdb.Config `json:"influxdb"`
 		Cloud    cloud.Config    `json:"cloud"`
-		StatsD   statsd.Config   `json:"statsd"`
-		Datadog  statsd.Config   `json:"datadog"`
+		StatsD   common.Config   `json:"statsd"`
+		Datadog  common.Config   `json:"datadog"`
 	} `json:"collectors"`
 }
 

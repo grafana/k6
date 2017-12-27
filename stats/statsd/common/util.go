@@ -18,7 +18,7 @@
  *
  */
 
-package statsd
+package common
 
 import (
 	"fmt"
