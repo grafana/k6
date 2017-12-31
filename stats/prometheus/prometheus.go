@@ -204,7 +204,14 @@ func (e *Exporter) collect(ch chan<- prometheus.Metric) error {
 	}
 
 	// close connection
-	resp.Body.Close()
+	defer func() {
+		err := resp.Body.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	// check http code
 	if resp.StatusCode != 200 {
 		fmt.Println("There was an error")
 		return fmt.Errorf("Status %s (%d)", resp.Status, resp.StatusCode)
