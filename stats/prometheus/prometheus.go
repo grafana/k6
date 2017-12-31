@@ -22,11 +22,9 @@ var (
 )
 
 func HandlePrometheusMetrics() http.Handler {
-
 	exporter := NewExporter(scrapeURI)
 	prometheus.MustRegister(exporter)
 	prometheus.MustRegister(version.NewCollector("k6_exporter"))
-
 	return promhttp.Handler()
 }
 

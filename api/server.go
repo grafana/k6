@@ -36,8 +36,8 @@ func NewHandler() http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("/v1/", v1.NewHandler())
 	mux.Handle("/ping", HandlePing())
-	mux.Handle("/", HandlePing())
 	mux.Handle("/metrics", prometheus.HandlePrometheusMetrics())
+	mux.Handle("/", HandlePing())
 	return mux
 }
 
