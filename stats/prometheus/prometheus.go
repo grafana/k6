@@ -159,7 +159,6 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	if err := e.collect(ch); err != nil {
 		log.Errorf("Error scraping k6: %s", err)
 	}
-	return
 }
 
 // json data structure for k6 metrics api
