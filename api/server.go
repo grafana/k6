@@ -27,9 +27,9 @@ import (
 	"github.com/loadimpact/k6/api/common"
 	"github.com/loadimpact/k6/api/v1"
 	"github.com/loadimpact/k6/core"
+	"github.com/loadimpact/k6/stats/prometheus"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/negroni"
-	"github.com/loadimpact/k6/stats/prometheus"
 )
 
 func NewHandler() http.Handler {

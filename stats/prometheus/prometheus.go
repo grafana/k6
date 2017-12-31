@@ -4,13 +4,13 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"net/http"
-	"sync"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/version"
 	log "github.com/sirupsen/logrus"
+	"io/ioutil"
+	"net/http"
+	"sync"
 )
 
 const (
@@ -159,7 +159,6 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	if err := e.collect(ch); err != nil {
 		log.Errorf("Error scraping k6: %s", err)
 	}
-	return
 }
 
 // json data structure for k6 metrics api
