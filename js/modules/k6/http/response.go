@@ -151,7 +151,7 @@ func (res *HTTPResponse) SubmitForm(args ...goja.Value) (*HTTPResponse, error) {
 	formSelector := "form"
 	submitSelector := "[type=\"submit\"]"
 	var fields map[string]goja.Value
-	var requestOptions goja.Value
+	var requestParams goja.Value
 	if len(args) > 0 {
 		params := args[0].ToObject(rt)
 		for _, k := range params.Keys() {
@@ -159,11 +159,11 @@ func (res *HTTPResponse) SubmitForm(args ...goja.Value) (*HTTPResponse, error) {
 			case "formSelector":
 				formSelector = params.Get(k).String()
 			case "submitSelector":
-				formSelector = params.Get(k).String()
+				submitSelector = params.Get(k).String()
 			case "fields":
 				rt.ExportTo(params.Get(k), &fields)
-			case "options":
-				requestOptions = params.Get(k)
+			case "params":
+				requestParams = params.Get(k)
 			}
 		}
 	}
@@ -212,9 +212,9 @@ func (res *HTTPResponse) SubmitForm(args ...goja.Value) (*HTTPResponse, error) {
 		}
 	}
 
-	if requestOptions == nil {
+	if requestParams == nil {
 		return New().Request(res.ctx, requestMethod, requestUrl, rt.ToValue(body))
 	} else {
-		return New().Request(res.ctx, requestMethod, requestUrl, rt.ToValue(body), requestOptions)
+		return New().Request(res.ctx, requestMethod, requestUrl, rt.ToValue(body), requestParams)
 	}
 }
