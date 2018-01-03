@@ -263,7 +263,6 @@ func TestRequestAndBatch(t *testing.T) {
 		assert.Error(t, err)
 		assert.Nil(t, hook.LastEntry())
 	})
-
 	t.Run("HTTP/2", func(t *testing.T) {
 		state.Samples = nil
 		_, err := common.RunString(rt, `
@@ -276,72 +275,6 @@ func TestRequestAndBatch(t *testing.T) {
 		for _, sample := range state.Samples {
 			assert.Equal(t, "HTTP/2.0", sample.Tags["proto"])
 		}
-	})
-
-	t.Run("HTML", func(t *testing.T) {
-		state.Samples = nil
-		_, err := common.RunString(rt, `
-		let res = http.request("GET", "https://httpbin.org/html");
-		if (res.status != 200) { throw new Error("wrong status: " + res.status); }
-		if (res.body.indexOf("Herman Melville - Moby-Dick") == -1) { throw new Error("wrong body: " + res.body); }
-		`)
-		assert.NoError(t, err)
-		assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/html", "", 200, "")
-
-		t.Run("html", func(t *testing.T) {
-			_, err := common.RunString(rt, `
-			if (res.html().find("h1").text() != "Herman Melville - Moby-Dick") { throw new Error("wrong title: " + res.body); }
-			`)
-			assert.NoError(t, err)
-
-			t.Run("shorthand", func(t *testing.T) {
-				_, err := common.RunString(rt, `
-				if (res.html("h1").text() != "Herman Melville - Moby-Dick") { throw new Error("wrong title: " + res.body); }
-				`)
-				assert.NoError(t, err)
-			})
-
-			t.Run("url", func(t *testing.T) {
-				_, err := common.RunString(rt, `
-				if (res.html().url != "https://httpbin.org/html") { throw new Error("url incorrect: " + res.html().url); }
-				`)
-				assert.NoError(t, err)
-			})
-		})
-
-		t.Run("group", func(t *testing.T) {
-			g, err := root.Group("my group")
-			if assert.NoError(t, err) {
-				old := state.Group
-				state.Group = g
-				defer func() { state.Group = old }()
-			}
-
-			state.Samples = nil
-			_, err = common.RunString(rt, `
-			let res = http.request("GET", "https://httpbin.org/html");
-			if (res.status != 200) { throw new Error("wrong status: " + res.status); }
-			if (res.body.indexOf("Herman Melville - Moby-Dick") == -1) { throw new Error("wrong body: " + res.body); }
-			`)
-			assert.NoError(t, err)
-			assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/html", "", 200, "::my group")
-		})
-	})
-	t.Run("JSON", func(t *testing.T) {
-		state.Samples = nil
-		_, err := common.RunString(rt, `
-		let res = http.request("GET", "https://httpbin.org/get?a=1&b=2");
-		if (res.status != 200) { throw new Error("wrong status: " + res.status); }
-		if (res.json().args.a != "1") { throw new Error("wrong ?a: " + res.json().args.a); }
-		if (res.json().args.b != "2") { throw new Error("wrong ?b: " + res.json().args.b); }
-		`)
-		assert.NoError(t, err)
-		assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/get?a=1&b=2", "", 200, "")
-
-		t.Run("Invalid", func(t *testing.T) {
-			_, err := common.RunString(rt, `http.request("GET", "https://httpbin.org/html").json();`)
-			assert.EqualError(t, err, "GoError: invalid character '<' looking for beginning of value")
-		})
 	})
 	t.Run("TLS", func(t *testing.T) {
 		t.Run("cert_expired", func(t *testing.T) {
