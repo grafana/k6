@@ -161,7 +161,9 @@ func (res *HTTPResponse) SubmitForm(args ...goja.Value) (*HTTPResponse, error) {
 			case "submitSelector":
 				submitSelector = params.Get(k).String()
 			case "fields":
-				rt.ExportTo(params.Get(k), &fields)
+				if rt.ExportTo(params.Get(k), &fields) != nil {
+					fields = nil
+				}
 			case "params":
 				requestParams = params.Get(k)
 			}
