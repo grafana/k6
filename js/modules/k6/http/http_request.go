@@ -92,7 +92,9 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 		if rt.ExportTo(args[0], &data) == nil {
 			bodyQuery := make(neturl.Values, len(data))
 			for k, v := range data {
-				bodyQuery.Set(k, v.String())
+				if v != goja.Undefined(){
+					bodyQuery.Set(k, v.String())
+				}
 			}
 			bodyBuf = bytes.NewBufferString(bodyQuery.Encode())
 			contentType = "application/x-www-form-urlencoded"
