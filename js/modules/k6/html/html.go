@@ -278,7 +278,7 @@ func (s Selection) Val() goja.Value {
 	switch goquery.NodeName(s.sel) {
 	case "input", ButtonTagName:
 		return s.rt.ToValue(value(s.sel))
-		
+
 	case "textarea":
 		return s.Html()
 

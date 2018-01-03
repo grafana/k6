@@ -177,7 +177,7 @@ func (res *HTTPResponse) SubmitForm(args ...goja.Value) (*HTTPResponse, error) {
 	var requestMethod string
 	if methodAttr == goja.Undefined() {
 		// Use GET by default
-		requestMethod = "GET" // nolint: goconst
+		requestMethod = HTTP_METHOD_GET
 	} else {
 		requestMethod = strings.ToUpper(methodAttr.String())
 	}
@@ -206,10 +206,8 @@ func (res *HTTPResponse) SubmitForm(args ...goja.Value) (*HTTPResponse, error) {
 	}
 
 	// Set the values supplied in the arguments, overriding automatically set values
-	if fields != nil {
-		for k, v := range fields {
-			body[k] = v
-		}
+	for k, v := range fields {
+		body[k] = v
 	}
 
 	if requestParams == nil {
