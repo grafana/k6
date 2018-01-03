@@ -42,6 +42,8 @@ const testSerializeHTML = `
 
 	<form id="form1">
 		<input id="text_input" name="text_input" type="text" value="input-text-value"/>
+		<input id="text_input" name="empty_text_input1" type="text" value="" />
+		<input id="text_input" name="empty_text_input2" type="text" />
 		<select id="select_one" name="select_one">
 			<option value="not this option">no</option>
 			<option value="yes this option" selected>yes</option>
@@ -77,25 +79,31 @@ func TestSerialize(t *testing.T) {
 		v, err := common.RunString(rt, `doc.find("form").serializeArray()`)
 		if assert.NoError(t, err) {
 			arr := v.Export().([]FormValue)
-			assert.Equal(t, 5, len(arr))
+			assert.Equal(t, 7, len(arr))
 
 			assert.Equal(t, "text_input", arr[0].Name)
 			assert.Equal(t, "input-text-value", arr[0].Value.String())
 
-			assert.Equal(t, "select_one", arr[1].Name)
-			assert.Equal(t, "yes this option", arr[1].Value.String())
+			assert.Equal(t, "empty_text_input1", arr[1].Name)
+			assert.Equal(t, "", arr[1].Value.String())
 
-			assert.Equal(t, "select_text", arr[2].Name)
-			assert.Equal(t, "yes text", arr[2].Value.String())
+			assert.Equal(t, "empty_text_input2", arr[2].Name)
+			assert.Equal(t, "", arr[2].Value.String())
 
-			multiValues := arr[3].Value.Export().([]string)
-			assert.Equal(t, "select_multi", arr[3].Name)
+			assert.Equal(t, "select_one", arr[3].Name)
+			assert.Equal(t, "yes this option", arr[3].Value.String())
+
+			assert.Equal(t, "select_text", arr[4].Name)
+			assert.Equal(t, "yes text", arr[4].Value.String())
+
+			multiValues := arr[5].Value.Export().([]string)
+			assert.Equal(t, "select_multi", arr[5].Name)
 			assert.Equal(t, 2, len(multiValues))
 			assert.Equal(t, "option 2", multiValues[0])
 			assert.Equal(t, "option 3", multiValues[1])
 
-			assert.Equal(t, "textarea", arr[4].Name)
-			assert.Equal(t, "Lorem ipsum dolor sit amet", arr[4].Value.String())
+			assert.Equal(t, "textarea", arr[6].Name)
+			assert.Equal(t, "Lorem ipsum dolor sit amet", arr[6].Value.String())
 		}
 	})
 
@@ -103,9 +111,11 @@ func TestSerialize(t *testing.T) {
 		v, err := common.RunString(rt, `doc.find("form").serializeObject()`)
 		if assert.NoError(t, err) {
 			obj := v.Export().(map[string]goja.Value)
-			assert.Equal(t, 5, len(obj))
+			assert.Equal(t, 7, len(obj))
 
 			assert.Equal(t, "input-text-value", obj["text_input"].String())
+			assert.Equal(t, "", obj["empty_text_input1"].String())
+			assert.Equal(t, "", obj["empty_text_input2"].String())
 			assert.Equal(t, "yes this option", obj["select_one"].String())
 			assert.Equal(t, "yes text", obj["select_text"].String())
 			assert.Equal(t, "Lorem ipsum dolor sit amet", obj["textarea"].String())
@@ -120,7 +130,9 @@ func TestSerialize(t *testing.T) {
 		v, err := common.RunString(rt, `doc.find("form").serialize()`)
 		if assert.NoError(t, err) {
 			url := v.String()
-			assert.Equal(t, "select_multi=option+2"+
+			assert.Equal(t, "empty_text_input1=" + 
+				"&empty_text_input2=" + 
+				"&select_multi=option+2"+
 				"&select_multi=option+3"+
 				"&select_one=yes+this+option"+
 				"&select_text=yes+text"+
