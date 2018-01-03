@@ -130,8 +130,8 @@ func TestSerialize(t *testing.T) {
 		v, err := common.RunString(rt, `doc.find("form").serialize()`)
 		if assert.NoError(t, err) {
 			url := v.String()
-			assert.Equal(t, "empty_text_input1=" + 
-				"&empty_text_input2=" + 
+			assert.Equal(t, "empty_text_input1="+
+				"&empty_text_input2="+
 				"&select_multi=option+2"+
 				"&select_multi=option+3"+
 				"&select_one=yes+this+option"+

@@ -35,6 +35,15 @@ var (
 	typeMapKeyStringValueInterface = reflect.TypeOf(map[string]interface{}{})
 )
 
+const (
+	HTTP_METHOD_GET    = "GET"
+	HTTP_METHOD_POST   = "POST"
+	HTTP_METHOD_PUT    = "PUT"
+	HTTP_METHOD_DELETE = "DELETE"
+	HTTP_METHOD_HEAD   = "HEAD"
+	HTTP_METHOD_PATCH  = "PATCH"
+)
+
 const SSL_3_0 = "ssl3.0"
 const TLS_1_0 = "tls1.0"
 const TLS_1_1 = "tls1.1"
