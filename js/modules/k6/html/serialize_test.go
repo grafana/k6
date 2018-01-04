@@ -58,6 +58,12 @@ const testSerializeHTML = `
 			<option selected>option 3</option>
 		</select>
 		<textarea id="textarea" name="textarea" multiple>Lorem ipsum dolor sit amet</textarea>
+		<input type="checkbox" id="checkbox1" name="checkbox1" value="some checkbox" checked="checked" />
+		<input type="checkbox" id="checkbox2" name="checkbox2" checked="checked" />
+		<input type="checkbox" id="checkbox3" name="checkbox3" />
+		<input type="radio" id="radio1" name="radio1" value="some radio" checked="checked" />
+		<input type="radio" id="radio2" name="radio2" checked="checked" />
+		<input type="radio" id="radio3" name="radio3" />
 	</form>
 
 	<footer>This is the footer.</footer>
@@ -79,7 +85,7 @@ func TestSerialize(t *testing.T) {
 		v, err := common.RunString(rt, `doc.find("form").serializeArray()`)
 		if assert.NoError(t, err) {
 			arr := v.Export().([]FormValue)
-			assert.Equal(t, 7, len(arr))
+			assert.Equal(t, 11, len(arr))
 
 			assert.Equal(t, "text_input", arr[0].Name)
 			assert.Equal(t, "input-text-value", arr[0].Value.String())
@@ -104,6 +110,18 @@ func TestSerialize(t *testing.T) {
 
 			assert.Equal(t, "textarea", arr[6].Name)
 			assert.Equal(t, "Lorem ipsum dolor sit amet", arr[6].Value.String())
+
+			assert.Equal(t, "checkbox1", arr[7].Name)
+			assert.Equal(t, "some checkbox", arr[7].Value.String())
+
+			assert.Equal(t, "checkbox2", arr[8].Name)
+			assert.Equal(t, "on", arr[8].Value.String())
+
+			assert.Equal(t, "radio1", arr[9].Name)
+			assert.Equal(t, "some radio", arr[9].Value.String())
+
+			assert.Equal(t, "radio2", arr[10].Name)
+			assert.Equal(t, "on", arr[10].Value.String())
 		}
 	})
 
@@ -111,7 +129,7 @@ func TestSerialize(t *testing.T) {
 		v, err := common.RunString(rt, `doc.find("form").serializeObject()`)
 		if assert.NoError(t, err) {
 			obj := v.Export().(map[string]goja.Value)
-			assert.Equal(t, 7, len(obj))
+			assert.Equal(t, 11, len(obj))
 
 			assert.Equal(t, "input-text-value", obj["text_input"].String())
 			assert.Equal(t, "", obj["empty_text_input1"].String())
@@ -119,6 +137,10 @@ func TestSerialize(t *testing.T) {
 			assert.Equal(t, "yes this option", obj["select_one"].String())
 			assert.Equal(t, "yes text", obj["select_text"].String())
 			assert.Equal(t, "Lorem ipsum dolor sit amet", obj["textarea"].String())
+			assert.Equal(t, "some checkbox", obj["checkbox1"].String())
+			assert.Equal(t, "on", obj["checkbox2"].String())
+			assert.Equal(t, "some radio", obj["radio1"].String())
+			assert.Equal(t, "on", obj["radio2"].String())
 
 			multiValues := obj["select_multi"].Export().([]string)
 			assert.Equal(t, "option 2", multiValues[0])
@@ -130,8 +152,12 @@ func TestSerialize(t *testing.T) {
 		v, err := common.RunString(rt, `doc.find("form").serialize()`)
 		if assert.NoError(t, err) {
 			url := v.String()
-			assert.Equal(t, "empty_text_input1="+
+			assert.Equal(t, "checkbox1=some+checkbox"+
+				"&checkbox2=on"+
+				"&empty_text_input1="+
 				"&empty_text_input2="+
+				"&radio1=some+radio"+
+				"&radio2=on"+
 				"&select_multi=option+2"+
 				"&select_multi=option+3"+
 				"&select_one=yes+this+option"+
