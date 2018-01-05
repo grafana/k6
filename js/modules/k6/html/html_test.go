@@ -41,21 +41,21 @@ const testHTML = `
 	<p>Nullam id nisi eget ex pharetra imperdiet. Maecenas augue ligula, aliquet sit amet maximus ut, vestibulum et magna. Nam in arcu sed tortor volutpat porttitor sed eget dolor. Duis rhoncus est id dui porttitor, id molestie ex imperdiet. Proin purus ligula, pretium eleifend felis a, tempor feugiat mi. Cras rutrum pulvinar neque, eu dictum arcu. Cras purus metus, fermentum eget malesuada sit amet, dignissim non dui.</p>
 
 	<form id="form1">
-		<input id="text_input" type="text" value="input-text-value"/>
-		<select id="select_one">
+		<input id="text_input" name="text_input" type="text" value="input-text-value"/>
+		<select id="select_one" name="select_one">
 			<option value="not this option">no</option>
 			<option value="yes this option" selected>yes</option>
 		</select>
-		<select id="select_text">
+		<select id="select_text" name="select_text">
 			<option>no text</option>
 			<option selected>yes text</option>
 		</select>
-		<select id="select_multi" multiple>
+		<select id="select_multi" name="select_multi" multiple>
 			<option>option 1</option>
 			<option selected>option 2</option>
 			<option selected>option 3</option>
 		</select>
-		<textarea id="textarea" multiple>Lorem ipsum dolor sit amet</textarea>
+		<textarea id="textarea" name="textarea" multiple>Lorem ipsum dolor sit amet</textarea>
 	</form>
 
 	<footer>This is the footer.</footer>
