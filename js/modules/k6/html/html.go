@@ -274,21 +274,35 @@ func (s Selection) Html() goja.Value {
 	return s.rt.ToValue(val)
 }
 
+// nolint: goconst
 func (s Selection) Val() goja.Value {
 	switch goquery.NodeName(s.sel) {
-	case "input":
-		return s.Attr("value")
-
-	case "textarea":
-		return s.Html()
+	case InputTagName:
+		val, exists := s.sel.Attr("value")
+		if !exists {
+			inputType, _ := s.sel.Attr("type")
+			if inputType == "radio" || inputType == "checkbox" {
+				val = "on"
+			} else {
+				val = ""
+			}
+		}
+		return s.rt.ToValue(val)
 
 	case ButtonTagName:
-		return s.Attr("value")
+		val, exists := s.sel.Attr("value")
+		if !exists {
+			val = ""
+		}
+		return s.rt.ToValue(val)
 
-	case "option":
+	case TextAreaTagName:
+		return s.Html()
+
+	case OptionTagName:
 		return s.rt.ToValue(valueOrHTML(s.sel))
 
-	case "select":
+	case SelectTagName:
 		selected := s.sel.First().Find("option[selected]")
 		if _, exists := s.sel.Attr("multiple"); exists {
 			return s.rt.ToValue(selected.Map(func(idx int, opt *goquery.Selection) string { return valueOrHTML(opt) }))
