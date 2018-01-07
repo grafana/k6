@@ -17,104 +17,89 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
+
 package cmd
 
 import (
-        "path/filepath"
+	"path/filepath"
 
-        "github.com/pkg/errors"
-        "github.com/spf13/cobra"
+	"github.com/spf13/cobra"
 
-        "bufio"
-        "bytes"
-        "fmt"
-        "os"
+	"os"
 
-        "github.com/loadimpact/k6/converter/har"
+	"github.com/loadimpact/k6/converter/har"
 )
 
+var output = "har-script.js"
+
 var (
-        output           string
-        enableChecks     bool
-        threshold        uint
-        only             []string
-        skip             []string
-        maxRequestsBatch uint
+	enableChecks bool
+	threshold    uint
+	only         []string
+	skip         []string
 )
 
 var convertCmd = &cobra.Command{
-        Use:   "convert",
-        Short: "Converts a HAR file to a k6 js script",
-        Long: `Converts a HAR (HTTP Archive) file to a k6 script.
+	Use:   "convert",
+	Short: "Convert a HAR file to a k6 script",
+	Long:  "Convert a HAR (HTTP Archive) file to a k6 script",
+	Example: `
+  # Convert a HAR file to a k6 script.
+  k6 convert -O har-session.js session.har
 
-  By default the HTTP requests are grouped by their start time in intervals
-  of 500ms. You can modify this value with the flag --batch-inclusion-threshold.
+  # Convert a HAR file to a k6 script creating requests only for the given domain/s.
+  k6 convert -O har-session.js --only yourdomain.com,additionaldomain.com session.har
 
-  --only and --skip flags allow you to filter HAR HTTP requests and generate a
-  k6 script with the desired requests: --only domain.com`,
-        RunE: func(cmd *cobra.Command, args []string) error {
-                if len(args) < 1 {
-                        return errors.New("Must specify a HAR file as parameter!")
-                }
+  # Run the k6 script.
+  k6 run har-session.js`[1:],
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		// Parse the HAR file
+		filePath, err := filepath.Abs(args[0])
+		if err != nil {
+			return err
+		}
+		r, err := os.Open(filePath)
+		if err != nil {
+			return err
+		}
+		h, err := har.Decode(r)
+		if err != nil {
+			return err
+		}
+		if err := r.Close(); err != nil {
+			return err
+		}
 
-                // handles absolute/relative paths
-                abs, err := filepath.Abs(args[0])
-                if err != nil {
-                        return errors.New(err.Error())
-                }
+		script, err := har.Convert(h, enableChecks, threshold, only, skip)
+		if err != nil {
+			return err
+		}
 
-                // parse HAR file
-                h, err := har.Read(abs)
-                if err != nil {
-                        return errors.New(err.Error())
-                }
-
-                var b bytes.Buffer
-                w := bufio.NewWriter(&b)
-
-                err = har.WriteK6Script(
-                        w,
-                        h,
-                        enableChecks,
-                        threshold,
-                        only,
-                        skip,
-                        maxRequestsBatch,
-                )
-                if err != nil {
-                        return errors.New(err.Error())
-                }
-
-                // output filename
-                if output == "" {
-                        basename := filepath.Base(abs)
-                        output = fmt.Sprintf("%v.js", basename[0:len(basename)-len(filepath.Ext(basename))])
-                }
-
-                f, err := os.Create(output)
-                if err != nil {
-                        return errors.New("Can't create output filename")
-                }
-                if _, err = f.Write(b.Bytes()); err != nil {
-                        return errors.New(err.Error())
-                }
-                if err = f.Sync(); err != nil {
-                        return errors.New(err.Error())
-                }
-                if err = f.Close(); err != nil {
-                        return errors.New(err.Error())
-                }
-
-                return nil
-        },
+		// Write script content to output
+		f, err := os.Create(output)
+		if err != nil {
+			return err
+		}
+		if _, err := f.WriteString(script); err != nil {
+			return err
+		}
+		if err := f.Sync(); err != nil {
+			return err
+		}
+		if err := f.Close(); err != nil {
+			return err
+		}
+		return nil
+	},
 }
 
 func init() {
-        RootCmd.AddCommand(convertCmd)
-        convertCmd.Flags().StringVarP(&output, "output", "o", "", "filename for the output k6 script file")
-        convertCmd.Flags().BoolVarP(&enableChecks, "enable-status-code-checks", "", false, "add a status code check in every request")
-        convertCmd.Flags().UintVarP(&threshold, "batch-inclusion-threshold", "", 500, "batch inclusion threshold")
-        convertCmd.Flags().StringSliceVarP(&only, "only", "", []string{}, "include only requests from the given domains")
-        convertCmd.Flags().StringSliceVarP(&skip, "skip", "", []string{}, "skip requests from the given domains")
-        convertCmd.Flags().UintVarP(&maxRequestsBatch, "max-requests-batch", "", 5, "max number of requests in a batch statement")
+	RootCmd.AddCommand(convertCmd)
+	convertCmd.Flags().SortFlags = false
+	convertCmd.Flags().StringVarP(&output, "output", "O", output, "k6 script output filename")
+	convertCmd.Flags().StringSliceVarP(&only, "only", "", []string{}, "include only requests from the given domains")
+	convertCmd.Flags().StringSliceVarP(&skip, "skip", "", []string{}, "skip requests from the given domains")
+	convertCmd.Flags().UintVarP(&threshold, "batch-threshold", "", 500, "split requests in different batch statements when the start time difference between subsequent requests is smaller than the given value in ms. A sleep will be added between the batch statements.")
+	convertCmd.Flags().BoolVarP(&enableChecks, "enable-status-code-checks", "", false, "add a check for each http status response")
 }
