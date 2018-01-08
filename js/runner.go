@@ -151,7 +151,8 @@ func (r *Runner) newVU() (*VU, error) {
 			NameToCertificate:  nameToCert,
 			Renegotiation:      tls.RenegotiateFreelyAsClient,
 		},
-		DialContext: dialer.DialContext,
+		DialContext:        dialer.DialContext,
+		DisableCompression: true,
 	}
 	_ = http2.ConfigureTransport(transport)
 
