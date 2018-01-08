@@ -263,10 +263,10 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 	tracer := netext.Tracer{}
 	res, resErr := client.Do(req.WithContext(netext.WithTracer(ctx, &tracer)))
 	if resErr == nil && res != nil {
-		if res.Header.Get("Content-Encoding") == "deflate" {
+		switch res.Header.Get("Content-Encoding") {
+		case "deflate":
 			res.Body, resErr = zlib.NewReader(res.Body)
-		}
-		if res.Header.Get("Content-Encoding") == "gzip" {
+		case "gzip":
 			res.Body, resErr = gzip.NewReader(res.Body)
 		}
 	}
