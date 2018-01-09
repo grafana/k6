@@ -21,6 +21,7 @@
 package netext
 
 import (
+	"crypto/tls"
 	"net"
 	"net/http/httptrace"
 	"time"
@@ -38,11 +39,12 @@ type Trail struct {
 	// Total request duration, excluding DNS lookup and connect time.
 	Duration time.Duration
 
-	Blocked    time.Duration // Waiting to acquire a connection.
-	Connecting time.Duration // Connecting to remote host.
-	Sending    time.Duration // Writing request.
-	Waiting    time.Duration // Waiting for first byte.
-	Receiving  time.Duration // Receiving response.
+	Blocked        time.Duration // Waiting to acquire a connection.
+	Connecting     time.Duration // Connecting to remote host.
+	Sending        time.Duration // Writing request.
+	Waiting        time.Duration // Waiting for first byte.
+	Receiving      time.Duration // Receiving response.
+	TLSHandshaking time.Duration // Executing TLS handshake.
 
 	// Detailed connection information.
 	ConnReused     bool
@@ -58,6 +60,7 @@ func (tr Trail) Samples(tags map[string]string) []stats.Sample {
 		{Metric: metrics.HTTPReqSending, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Sending)},
 		{Metric: metrics.HTTPReqWaiting, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Waiting)},
 		{Metric: metrics.HTTPReqReceiving, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Receiving)},
+		{Metric: metrics.HTTPReqTLSShaking, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.TLSHandshaking)},
 	}
 }
 
@@ -73,6 +76,8 @@ type Tracer struct {
 	connectStart         time.Time
 	connectDone          time.Time
 	wroteRequest         time.Time
+	tlsHandshakeStart    time.Time
+	tlsHandshakeDone     time.Time
 
 	connReused     bool
 	connRemoteAddr net.Addr
@@ -89,6 +94,8 @@ func (t *Tracer) Trace() *httptrace.ClientTrace {
 		ConnectStart:         t.ConnectStart,
 		ConnectDone:          t.ConnectDone,
 		WroteRequest:         t.WroteRequest,
+		TLSHandshakeStart:    t.TLSHandshakeStart,
+		TLSHandshakeDone:     t.TLSHandshakeDone,
 	}
 }
 
@@ -106,6 +113,9 @@ func (t *Tracer) Done() Trail {
 	}
 	if !t.connectDone.IsZero() && !t.connectStart.IsZero() {
 		trail.Connecting = t.connectDone.Sub(t.connectStart)
+	}
+	if !t.tlsHandshakeDone.IsZero() && !t.tlsHandshakeStart.IsZero() {
+		trail.TLSHandshaking = t.tlsHandshakeDone.Sub(t.tlsHandshakeStart)
 	}
 	if !t.wroteRequest.IsZero() {
 		trail.Sending = t.wroteRequest.Sub(t.connectDone)
@@ -168,6 +178,20 @@ func (t *Tracer) ConnectDone(network, addr string, err error) {
 	if t.gotConn.IsZero() {
 		t.gotConn = t.connectDone
 	}
+
+	if err != nil {
+		t.protoError = err
+	}
+}
+
+// TLSHandshakeStart hook.
+func (t *Tracer) TLSHandshakeStart() {
+	t.tlsHandshakeStart = time.Now()
+}
+
+// TLSHandshakeDone hook.
+func (t *Tracer) TLSHandshakeDone(state tls.ConnectionState, err error) {
+	t.tlsHandshakeDone = time.Now()
 
 	if err != nil {
 		t.protoError = err
