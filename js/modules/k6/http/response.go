@@ -217,6 +217,6 @@ func (res *HTTPResponse) SubmitForm(args ...goja.Value) (*HTTPResponse, error) {
 	for k, v := range fields {
 		body[k] = v
 	}
-	
+
 	return New().Request(res.ctx, requestMethod, requestUrl, rt.ToValue(body), requestParams)
 }
