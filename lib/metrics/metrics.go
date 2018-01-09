@@ -23,6 +23,7 @@ var (
 	HTTPReqSending    = stats.New("http_req_sending", stats.Trend, stats.Time)
 	HTTPReqWaiting    = stats.New("http_req_waiting", stats.Trend, stats.Time)
 	HTTPReqReceiving  = stats.New("http_req_receiving", stats.Trend, stats.Time)
+	HTTPReqTLSShaking = stats.New("http_req_tls_shaking", stats.Trend, stats.Time)
 
 	// Websocket-related
 	WSSessions         = stats.New("ws_sessions", stats.Counter)
