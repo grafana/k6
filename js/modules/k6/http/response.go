@@ -25,11 +25,14 @@ import (
 	"crypto/tls"
 	"encoding/json"
 
+	"fmt"
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/js/modules/k6/html"
 	"github.com/loadimpact/k6/lib"
 	"golang.org/x/crypto/ocsp"
+	"net/url"
+	"strings"
 )
 
 type OCSP struct {
@@ -140,4 +143,80 @@ func (res *HTTPResponse) Html(selector ...string) html.Selection {
 		sel = sel.Find(selector[0])
 	}
 	return sel
+}
+
+func (res *HTTPResponse) SubmitForm(args ...goja.Value) (*HTTPResponse, error) {
+	rt := common.GetRuntime(res.ctx)
+
+	formSelector := "form"
+	submitSelector := "[type=\"submit\"]"
+	var fields map[string]goja.Value
+	requestParams := goja.Null()
+	if len(args) > 0 {
+		params := args[0].ToObject(rt)
+		for _, k := range params.Keys() {
+			switch k {
+			case "formSelector":
+				formSelector = params.Get(k).String()
+			case "submitSelector":
+				submitSelector = params.Get(k).String()
+			case "fields":
+				if rt.ExportTo(params.Get(k), &fields) != nil {
+					fields = nil
+				}
+			case "params":
+				requestParams = params.Get(k)
+			}
+		}
+	}
+
+	form := res.Html(formSelector)
+	if form.Size() == 0 {
+		common.Throw(rt, fmt.Errorf("no form found for selector '%s' in response '%s'", formSelector, res.URL))
+	}
+
+	methodAttr := form.Attr("method")
+	var requestMethod string
+	if methodAttr == goja.Undefined() {
+		// Use GET by default
+		requestMethod = HTTP_METHOD_GET
+	} else {
+		requestMethod = strings.ToUpper(methodAttr.String())
+	}
+
+	actionAttr := form.Attr("action")
+	var requestUrl goja.Value
+	if actionAttr == goja.Undefined() {
+		// Use the url of the response if no action is set
+		requestUrl = rt.ToValue(res.URL)
+	} else {
+		// Resolve the action url from the response url
+		responseUrl, responseUrlError := url.Parse(res.URL)
+		if responseUrlError != nil {
+			common.Throw(rt, responseUrlError)
+		}
+		actionUrl, actionUrlError := url.Parse(actionAttr.String())
+		if actionUrlError != nil {
+			common.Throw(rt, actionUrlError)
+		}
+		requestUrl = rt.ToValue(responseUrl.ResolveReference(actionUrl).String())
+	}
+
+	// Set the body based on the form values
+	body := form.SerializeObject()
+
+	// Set the name + value of the submit button
+	submit := form.Find(submitSelector)
+	submitName := submit.Attr("name")
+	submitValue := submit.Val()
+	if submitName != goja.Undefined() && submitValue != goja.Undefined() {
+		body[submitName.String()] = submitValue
+	}
+
+	// Set the values supplied in the arguments, overriding automatically set values
+	for k, v := range fields {
+		body[k] = v
+	}
+
+	return New().Request(res.ctx, requestMethod, requestUrl, rt.ToValue(body), requestParams)
 }
