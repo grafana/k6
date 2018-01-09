@@ -91,7 +91,7 @@ func init() {
 	RootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "enable debug logging")
 	RootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "disable progress updates")
 	RootCmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "disable colored output")
-	RootCmd.PersistentFlags().StringVarP(&logFmt, "logformat", "f", "", "log output format")
+	RootCmd.PersistentFlags().StringVar(&logFmt, "logformat", "", "log output format")
 	RootCmd.PersistentFlags().StringVarP(&address, "address", "a", "localhost:6565", "address for the api server")
 	RootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file (default ./k6.yaml or ~/.config/k6.yaml)")
 	must(cobra.MarkFlagFilename(RootCmd.PersistentFlags(), "config"))
