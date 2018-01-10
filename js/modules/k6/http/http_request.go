@@ -44,6 +44,14 @@ import (
 	null "gopkg.in/guregu/null.v3"
 )
 
+type HTTPRequest struct {
+	Method  string
+	URL     *neturl.URL
+	Headers http.Header
+	Body    io.Closer
+	Cookies map[string]*HTTPRequestCookie
+}
+
 func (http *HTTP) Get(ctx context.Context, url goja.Value, args ...goja.Value) (*HTTPResponse, error) {
 	// The body argument is always undefined for GETs and HEADs.
 	args = append([]goja.Value{goja.Undefined()}, args...)
@@ -113,9 +121,14 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 		URL:    url.URL,
 		Header: make(http.Header),
 	}
+	HTTPReq := &HTTPRequest{
+		Method: req.Method,
+		URL:    req.URL,
+	}
 	if bodyBuf != nil {
 		req.Body = ioutil.NopCloser(bodyBuf)
 		req.ContentLength = int64(bodyBuf.Len())
+		HTTPReq.Body = req.Body
 	}
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
@@ -241,7 +254,10 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 		}
 	}
 
-	resp := &HTTPResponse{ctx: ctx, URL: url.URLString}
+	HTTPReq.Headers = req.Header
+	HTTPReq.Cookies = reqCookies
+
+	resp := &HTTPResponse{ctx: ctx, URL: url.URLString, Request: *HTTPReq}
 	client := http.Client{
 		Transport: state.HTTPTransport,
 		Timeout:   timeout,
