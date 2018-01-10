@@ -2,6 +2,9 @@
 	"ImportPath": "github.com/loadimpact/k6",
 	"GoVersion": "go1.9",
 	"GodepVersion": "v79",
+	"Packages": [
+		"./..."
+	],
 	"Deps": [
 		{
 			"ImportPath": "github.com/GeertJohan/go.rice",
@@ -23,6 +26,11 @@
 		{
 			"ImportPath": "github.com/daaku/go.zipexe",
 			"Rev": "a5fe2436ffcb3236e175e5149162b41cd28bd27d"
+		},
+		{
+			"ImportPath": "github.com/davecgh/go-spew/spew",
+			"Comment": "v1.1.0-9-gecdeabc",
+			"Rev": "ecdeabc65495df2dec95d7c4a4c3e021903035e5"
 		},
 		{
 			"ImportPath": "github.com/dlclark/regexp2",
@@ -184,6 +192,11 @@
 			"Rev": "f15c970de5b76fac0b59abb32d62c17cc7bed265"
 		},
 		{
+			"ImportPath": "github.com/pmezard/go-difflib/difflib",
+			"Comment": "v1.0.0",
+			"Rev": "792786c7400a136282c1664665ae0a8db921c6c2"
+		},
+		{
 			"ImportPath": "github.com/serenize/snaker",
 			"Rev": "c7a77c38c398a5468cac9579c3b2b1de22fb4da6"
 		},
@@ -193,8 +206,13 @@
 		},
 		{
 			"ImportPath": "github.com/sirupsen/logrus",
-			"Comment": "v1.0.3-19-g95cd2b9",
-			"Rev": "95cd2b9c79aa5e72ab0bc69b7ccc2be15bf850f6"
+			"Comment": "v1.0.4",
+			"Rev": "d682213848ed68c0a260ca37d6dd5ace8423f5ba"
+		},
+		{
+			"ImportPath": "github.com/sirupsen/logrus/hooks/test",
+			"Comment": "v1.0.4",
+			"Rev": "d682213848ed68c0a260ca37d6dd5ace8423f5ba"
 		},
 		{
 			"ImportPath": "github.com/spf13/afero",
@@ -215,6 +233,11 @@
 			"ImportPath": "github.com/spf13/pflag",
 			"Comment": "v1.0.0-10-g4c012f6",
 			"Rev": "4c012f6dcd9546820e378d0bdda4d8fc772cdfea"
+		},
+		{
+			"ImportPath": "github.com/stretchr/testify/assert",
+			"Comment": "v1.2.0-4-g87b1dfb",
+			"Rev": "87b1dfb5b2fa649f52695dd9eae19abe404a4308"
 		},
 		{
 			"ImportPath": "github.com/ugorji/go/codec",
