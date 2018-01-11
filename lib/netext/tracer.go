@@ -119,6 +119,12 @@ func (t *Tracer) Done() Trail {
 	}
 	if !t.wroteRequest.IsZero() {
 		trail.Sending = t.wroteRequest.Sub(t.connectDone)
+		// If the request was sent over TLS, we need to use
+		// TLS Handshake Done time to calculate sending duration
+		if !t.tlsHandshakeDone.IsZero() {
+			trail.Sending = t.wroteRequest.Sub(t.tlsHandshakeDone)
+		}
+
 		if !t.gotFirstResponseByte.IsZero() {
 			trail.Waiting = t.gotFirstResponseByte.Sub(t.wroteRequest)
 		}
