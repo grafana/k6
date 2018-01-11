@@ -26,13 +26,14 @@ import (
 	"encoding/json"
 
 	"fmt"
+	"net/url"
+	"strings"
+
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/js/modules/k6/html"
 	"github.com/loadimpact/k6/lib"
 	"golang.org/x/crypto/ocsp"
-	"net/url"
-	"strings"
 )
 
 type OCSP struct {
@@ -184,39 +185,47 @@ func (res *HTTPResponse) SubmitForm(args ...goja.Value) (*HTTPResponse, error) {
 		requestMethod = strings.ToUpper(methodAttr.String())
 	}
 
+	responseUrl, err := url.Parse(res.URL)
+	if err != nil {
+		common.Throw(rt, err)
+	}
+
 	actionAttr := form.Attr("action")
-	var requestUrl goja.Value
+	var requestUrl *url.URL
 	if actionAttr == goja.Undefined() {
 		// Use the url of the response if no action is set
-		requestUrl = rt.ToValue(res.URL)
+		requestUrl = responseUrl
 	} else {
-		// Resolve the action url from the response url
-		responseUrl, responseUrlError := url.Parse(res.URL)
-		if responseUrlError != nil {
-			common.Throw(rt, responseUrlError)
+		actionUrl, err := url.Parse(actionAttr.String())
+		if err != nil {
+			common.Throw(rt, err)
 		}
-		actionUrl, actionUrlError := url.Parse(actionAttr.String())
-		if actionUrlError != nil {
-			common.Throw(rt, actionUrlError)
-		}
-		requestUrl = rt.ToValue(responseUrl.ResolveReference(actionUrl).String())
+		requestUrl = responseUrl.ResolveReference(actionUrl)
 	}
 
 	// Set the body based on the form values
-	body := form.SerializeObject()
+	values := form.SerializeObject()
 
 	// Set the name + value of the submit button
 	submit := form.Find(submitSelector)
 	submitName := submit.Attr("name")
 	submitValue := submit.Val()
 	if submitName != goja.Undefined() && submitValue != goja.Undefined() {
-		body[submitName.String()] = submitValue
+		values[submitName.String()] = submitValue
 	}
 
 	// Set the values supplied in the arguments, overriding automatically set values
 	for k, v := range fields {
-		body[k] = v
+		values[k] = v
 	}
 
-	return New().Request(res.ctx, requestMethod, requestUrl, rt.ToValue(body), requestParams)
+	if requestMethod == HTTP_METHOD_GET {
+		q := url.Values{}
+		for k, v := range values {
+			q.Add(k, v.String())
+		}
+		requestUrl.RawQuery = q.Encode()
+		return New().Request(res.ctx, requestMethod, rt.ToValue(requestUrl.String()), goja.Null(), requestParams)
+	}
+	return New().Request(res.ctx, requestMethod, rt.ToValue(requestUrl.String()), rt.ToValue(values), requestParams)
 }
