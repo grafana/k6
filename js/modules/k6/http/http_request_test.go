@@ -862,4 +862,23 @@ func TestRequestAndBatch(t *testing.T) {
 			assertRequestMetricsEmitted(t, state.Samples, "PUT", "https://httpbin.org/put", "", 200, "")
 		})
 	})
+
+	t.Run("HTTPRequest", func(t *testing.T) {
+		_, err := common.RunString(rt, `
+			let res = http.get("https://httpbin.org/get?a=1&b=2");
+
+			if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+			if (res.json().args.a != "1") { throw new Error("wrong ?a: " + res.json().args.a); }
+			if (res.json().args.b != "2") { throw new Error("wrong ?b: " + res.json().args.b); }
+
+			if (res.request["method"] !== "GET") { throw new Error("http request method was not \"GET\": " + JSON.stringify(res.request)) }
+			if (res.request["body"] != null) { throw new Error("http request body was not null: " + JSON.stringify(res.request)) }
+			if (res.request["url"]["host"] != "httpbin.org" || res.request["url"]["path"] != "/get" || res.request["url"]["raw_query"] != "a=1&b=2") {
+				throw new Error("http request url was not null: " + JSON.stringify(res.request))
+			}
+			if (Object.keys(res.request["cookies"]).length != 0) { throw new Error("http request cookies was not empty: " + JSON.stringify(res.request)) }
+			if (res.request["headers"]["User-Agent"][0] != "TestUserAgent") { throw new Error("http request headers was not set properly: " + JSON.stringify(res.request)) }
+			`)
+		assert.NoError(t, err)
+	})
 }
