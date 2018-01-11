@@ -16,13 +16,14 @@ var (
 	GroupDuration = stats.New("group_duration", stats.Trend, stats.Time)
 
 	// HTTP-related.
-	HTTPReqs          = stats.New("http_reqs", stats.Counter)
-	HTTPReqDuration   = stats.New("http_req_duration", stats.Trend, stats.Time)
-	HTTPReqBlocked    = stats.New("http_req_blocked", stats.Trend, stats.Time)
-	HTTPReqConnecting = stats.New("http_req_connecting", stats.Trend, stats.Time)
-	HTTPReqSending    = stats.New("http_req_sending", stats.Trend, stats.Time)
-	HTTPReqWaiting    = stats.New("http_req_waiting", stats.Trend, stats.Time)
-	HTTPReqReceiving  = stats.New("http_req_receiving", stats.Trend, stats.Time)
+	HTTPReqs              = stats.New("http_reqs", stats.Counter)
+	HTTPReqDuration       = stats.New("http_req_duration", stats.Trend, stats.Time)
+	HTTPReqBlocked        = stats.New("http_req_blocked", stats.Trend, stats.Time)
+	HTTPReqConnecting     = stats.New("http_req_connecting", stats.Trend, stats.Time)
+	HTTPReqSending        = stats.New("http_req_sending", stats.Trend, stats.Time)
+	HTTPReqWaiting        = stats.New("http_req_waiting", stats.Trend, stats.Time)
+	HTTPReqReceiving      = stats.New("http_req_receiving", stats.Trend, stats.Time)
+	HTTPReqTLSHandshaking = stats.New("http_req_tls_handshaking", stats.Trend, stats.Time)
 
 	// Websocket-related
 	WSSessions         = stats.New("ws_sessions", stats.Counter)
