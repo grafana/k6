@@ -47,7 +47,7 @@ import (
 type HTTPRequest struct {
 	Method  string
 	URL     *neturl.URL
-	Headers http.Header
+	Headers map[string][]string
 	Body    io.Closer
 	Cookies map[string]*HTTPRequestCookie
 }
