@@ -43,7 +43,7 @@ type OCSP struct {
 }
 
 type HTTPResponseTimings struct {
-	Duration, Blocked, LookingUp, Connecting, Sending, Waiting, Receiving float64
+	Duration, Blocked, LookingUp, Connecting, TLSHandshaking, Sending, Waiting, Receiving float64
 }
 
 type HTTPResponse struct {
