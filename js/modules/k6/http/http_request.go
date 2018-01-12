@@ -121,14 +121,14 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 		URL:    url.URL,
 		Header: make(http.Header),
 	}
-	HTTPReq := &HTTPRequest{
+	respReq := &HTTPRequest{
 		Method: req.Method,
 		URL:    req.URL.String(),
 	}
 	if bodyBuf != nil {
 		req.Body = ioutil.NopCloser(bodyBuf)
 		req.ContentLength = int64(bodyBuf.Len())
-		HTTPReq.Body = req.Body
+		respReq.Body = req.Body
 	}
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
@@ -254,10 +254,10 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 		}
 	}
 
-	HTTPReq.Headers = req.Header
-	HTTPReq.Cookies = reqCookies
+	respReq.Headers = req.Header
+	respReq.Cookies = reqCookies
 
-	resp := &HTTPResponse{ctx: ctx, URL: url.URLString, Request: *HTTPReq}
+	resp := &HTTPResponse{ctx: ctx, URL: url.URLString, Request: *respReq}
 	client := http.Client{
 		Transport: state.HTTPTransport,
 		Timeout:   timeout,
