@@ -72,7 +72,7 @@ func TestPublishMetric(t *testing.T) {
 			},
 		},
 	}
-	err := client.PushMetric("1", samples)
+	err := client.PushMetric("1", false, samples)
 
 	assert.Nil(t, err)
 }
