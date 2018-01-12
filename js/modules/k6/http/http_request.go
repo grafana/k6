@@ -46,7 +46,7 @@ import (
 
 type HTTPRequest struct {
 	Method  string
-	URL     *neturl.URL
+	URL     string
 	Headers map[string][]string
 	Body    io.Closer
 	Cookies map[string]*HTTPRequestCookie
@@ -123,7 +123,7 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 	}
 	HTTPReq := &HTTPRequest{
 		Method: req.Method,
-		URL:    req.URL,
+		URL:    req.URL.String(),
 	}
 	if bodyBuf != nil {
 		req.Body = ioutil.NopCloser(bodyBuf)
