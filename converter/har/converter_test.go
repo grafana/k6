@@ -29,39 +29,19 @@ import (
 	"github.com/spf13/afero"
 )
 
-func TestBuildK6Cookies(t *testing.T) {
-	var cookies = []struct {
-		values   []Cookie
-		expected string
-	}{
-		{[]Cookie{{Name: "a", Value: "b"}}, "a=b"},
-		{[]Cookie{{Name: "a", Value: "b"}, {Name: "c", Value: "d"}}, "a=b; c=d"},
-	}
-
-	for _, pair := range cookies {
-		v := buildK6CookiesValues(pair.values)
-		if v != pair.expected {
-			t.Errorf("buildK6Cookies(%v): expected %v, actual %v", pair.values, pair.expected, v)
-		}
-	}
-}
-
 func TestBuildK6Headers(t *testing.T) {
 	var headers = []struct {
 		values   []Header
-		expected string
+		expected []string
 	}{
-		{[]Header{{"name", "1"}, {"name", "2"}}, "\"headers\" : { \"name\" : \"1\" }"},
-		{[]Header{{"name", "1"}, {"Name", "2"}}, "\"headers\" : { \"name\" : \"1\" }"},
-		{[]Header{{"Name", "1"}, {"name", "2"}}, "\"headers\" : { \"Name\" : \"1\" }"},
-		{[]Header{{"name", "value"}, {"name2", "value2"}}, "\"headers\" : { \"name\" : \"value\", \"name2\" : \"value2\" }"},
-		{[]Header{{"accept-language", "es-ES,es;q=0.8"}}, "\"headers\" : { \"accept-language\" : \"es-ES,es;q=0.8\" }"},
-		{[]Header{{":host", "localhost"}}, "\"headers\" : {  }"}, // avoid SPDY’s colon headers
+		{[]Header{{"name", "1"}, {"name", "2"}}, []string{`"name": "1"`}},
+		{[]Header{{"name", "1"}, {"name2", "2"}}, []string{`"name": "1"`, `"name2": "2"`}},
+		{[]Header{{":host", "localhost"}}, []string{}},
 	}
 
 	for _, pair := range headers {
 		v := buildK6Headers(pair.values)
-		if v != pair.expected {
+		if len(v) != len(pair.expected) {
 			t.Errorf("buildK6Headers(%v): expected %v, actual %v", pair.values, pair.expected, v)
 		}
 	}
