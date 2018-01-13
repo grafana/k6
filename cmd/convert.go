@@ -21,13 +21,11 @@
 package cmd
 
 import (
+	"os"
 	"path/filepath"
 
-	"github.com/spf13/cobra"
-
-	"os"
-
 	"github.com/loadimpact/k6/converter/har"
+	"github.com/spf13/cobra"
 )
 
 var output = "har-script.js"

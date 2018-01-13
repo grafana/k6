@@ -52,7 +52,6 @@ func TestIsAllowedURL(t *testing.T) {
 }
 
 func TestSplitEntriesInBatches(t *testing.T) {
-
 	t1 := time.Date(2017, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	entries := []*Entry{}
