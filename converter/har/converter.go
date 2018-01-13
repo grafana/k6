@@ -158,19 +158,27 @@ func buildK6RequestObject(req *Request) (string, error) {
 	if method == "delete" {
 		method = "del"
 	}
-	fmt.Fprintf(w, "\"method\": %q,\n\"url\": %q", method, req.URL)
+	fmt.Fprintf(w, `"method": %q, "url": %q`, method, req.URL)
 
 	if req.PostData != nil && req.PostData.Text != "" && method != "get" {
-		fmt.Fprintf(w, ", \"body\": \n%q\n", req.PostData.Text)
+		fmt.Fprintf(w, `, "body": %q`, req.PostData.Text)
 	}
 
-	headers := req.Headers
-	if c := buildK6CookiesValues(req.Cookies); c != "" {
-		headers = append(headers, Header{Name: "Cookie", Value: c})
+	var params []string
+	var cookies []string
+	for _, c := range req.Cookies {
+		cookies = append(cookies, fmt.Sprintf(`%q: %q`, c.Name, c.Value))
+	}
+	if len(cookies) > 0 {
+		params = append(params, fmt.Sprintf(`"cookies": { %s }`, strings.Join(cookies, ", ")))
 	}
 
-	if header := buildK6Headers(headers); len(header) > 0 {
-		fmt.Fprintf(w, ", \"params\": {\n%s\n}\n", header)
+	if headers := buildK6Headers(req.Headers); len(headers) > 0 {
+		params = append(params, fmt.Sprintf(`"headers": { %s }`, strings.Join(headers, ", ")))
+	}
+
+	if len(params) > 0 {
+		fmt.Fprintf(w, `, "params": { %s }`, strings.Join(params, ", "))
 	}
 
 	fmt.Fprint(w, "}")
@@ -186,35 +194,19 @@ func buildK6RequestObject(req *Request) (string, error) {
 	return buffer.String(), nil
 }
 
-func buildK6Headers(headers []Header) string {
-	if len(headers) == 0 {
-		return ""
-	}
-	m := make(map[string]Header)
-
+func buildK6Headers(headers []Header) []string {
 	var h []string
-	for _, header := range headers {
-		// Avoid SPDY's colon headers
-		if header.Name[0] != ':' {
-			// Avoid header duplicity
-			_, exists := m[strings.ToLower(header.Name)]
-			if !exists {
+	if len(headers) > 0 {
+		m := make(map[string]Header)
+		for _, header := range headers {
+			name := strings.ToLower(header.Name)
+			_, exists := m[name]
+			// Avoid SPDY's, duplicated or cookie headers
+			if !exists && name[0] != ':' && name != "cookie" {
 				m[strings.ToLower(header.Name)] = header
-				h = append(h, fmt.Sprintf("%q : %q", header.Name, header.Value))
+				h = append(h, fmt.Sprintf("%q: %q", header.Name, header.Value))
 			}
 		}
 	}
-	return fmt.Sprintf("\"headers\" : { %v }", strings.Join(h, ", "))
-}
-
-func buildK6CookiesValues(cookies []Cookie) string {
-	if len(cookies) == 0 {
-		return ""
-	}
-
-	var c []string
-	for _, cookie := range cookies {
-		c = append(c, fmt.Sprintf("%v=%v", cookie.Name, cookie.Value))
-	}
-	return strings.Join(c, "; ")
+	return h
 }
