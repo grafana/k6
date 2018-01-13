@@ -30,14 +30,6 @@ import (
 	"strings"
 )
 
-const (
-	Get   = "get"
-	Post  = "post"
-	Del   = "del"
-	Put   = "put"
-	Patch = "patch"
-)
-
 func Convert(h HAR, includeCodeCheck bool, batchTime uint, only, skip []string) (string, error) {
 	var b bytes.Buffer
 	w := bufio.NewWriter(&b)
@@ -164,11 +156,11 @@ func buildK6RequestObject(req *Request) (string, error) {
 
 	method := strings.ToLower(req.Method)
 	if method == "delete" {
-		method = Del
+		method = "del"
 	}
 	fmt.Fprintf(w, "\"method\": %q,\n\"url\": %q", method, req.URL)
 
-	if req.PostData != nil && req.PostData.Text != "" && method != Get {
+	if req.PostData != nil && req.PostData.Text != "" && method != "get" {
 		fmt.Fprintf(w, ", \"body\": \n%q\n", req.PostData.Text)
 	}
 
