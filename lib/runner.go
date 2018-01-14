@@ -27,7 +27,7 @@ import (
 )
 
 // Ensure MiniRunner conforms to Runner.
-var _ Runner = MiniRunner{}
+var _ Runner = &MiniRunner{}
 
 // A Runner is a factory for VUs. It should precompute as much as possible upon creation (parse
 // ASTs, load files into memory, etc.), so that spawning VUs becomes as fast as possible.

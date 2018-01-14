@@ -69,7 +69,7 @@ func L(r lib.Runner) lib.Executor {
 }
 
 func LF(fn func(ctx context.Context) ([]stats.Sample, error)) lib.Executor {
-	return L(lib.MiniRunner{Fn: fn})
+	return L(&lib.MiniRunner{Fn: fn})
 }
 
 func TestNewEngine(t *testing.T) {
