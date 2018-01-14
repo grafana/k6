@@ -80,4 +80,8 @@ type Executor interface {
 	// speaking better to preallocate too many than too few.
 	GetVUsMax() int64
 	SetVUsMax(max int64) error
+
+	// Set whether or not to run setup/teardown phases. Default is to run all of them.
+	SetRunSetup(r bool)
+	SetRunTeardown(r bool)
 }

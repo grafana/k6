@@ -81,6 +81,22 @@ func TestExecutorSetupTeardownRun(t *testing.T) {
 			},
 		})
 		assert.EqualError(t, e.Run(context.Background(), nil), "setup error")
+
+		t.Run("Don't Run Setup", func(t *testing.T) {
+			e := New(lib.MiniRunner{
+				SetupFn: func(ctx context.Context) error {
+					return errors.New("setup error")
+				},
+				TeardownFn: func(ctx context.Context) error {
+					return errors.New("teardown error")
+				},
+			})
+			e.SetRunSetup(false)
+			e.SetEndIterations(null.IntFrom(1))
+			assert.NoError(t, e.SetVUsMax(1))
+			assert.NoError(t, e.SetVUs(1))
+			assert.EqualError(t, e.Run(context.Background(), nil), "teardown error")
+		})
 	})
 	t.Run("Teardown Error", func(t *testing.T) {
 		e := New(lib.MiniRunner{
@@ -95,6 +111,22 @@ func TestExecutorSetupTeardownRun(t *testing.T) {
 		assert.NoError(t, e.SetVUsMax(1))
 		assert.NoError(t, e.SetVUs(1))
 		assert.EqualError(t, e.Run(context.Background(), nil), "teardown error")
+
+		t.Run("Don't Run Teardown", func(t *testing.T) {
+			e := New(lib.MiniRunner{
+				SetupFn: func(ctx context.Context) error {
+					return nil
+				},
+				TeardownFn: func(ctx context.Context) error {
+					return errors.New("teardown error")
+				},
+			})
+			e.SetRunTeardown(false)
+			e.SetEndIterations(null.IntFrom(1))
+			assert.NoError(t, e.SetVUsMax(1))
+			assert.NoError(t, e.SetVUs(1))
+			assert.NoError(t, e.Run(context.Background(), nil))
+		})
 	})
 }
 
