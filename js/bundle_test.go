@@ -343,16 +343,6 @@ func TestNewBundle(t *testing.T) {
 			}
 		})
 	})
-	t.Run("UnrecognizedExorts", func(t *testing.T) {
-		_, err := NewBundle(&lib.SourceData{
-			Filename: "/script.js",
-			Data: []byte(`
-				export function boop() {};
-				export default function() {};
-			`),
-		}, afero.NewMemMapFs())
-		assert.EqualError(t, err, "unrecognised root-level export: boop")
-	})
 }
 
 func TestNewBundleFromArchive(t *testing.T) {
