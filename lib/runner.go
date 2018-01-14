@@ -26,8 +26,8 @@ import (
 	"github.com/loadimpact/k6/stats"
 )
 
-// Ensure RunnerFunc conforms to Runner.
-var _ Runner = RunnerFunc(nil)
+// Ensure MiniRunner conforms to Runner.
+var _ Runner = MiniRunner{}
 
 // A Runner is a factory for VUs. It should precompute as much as possible upon creation (parse
 // ASTs, load files into memory, etc.), so that spawning VUs becomes as fast as possible.
@@ -72,54 +72,64 @@ type VU interface {
 	Reconfigure(id int64) error
 }
 
-// RunnerFunc wraps a function in a runner whose VUs will simply call that function.
-type RunnerFunc func(ctx context.Context) ([]stats.Sample, error)
-
-func (fn RunnerFunc) VU() *RunnerFuncVU {
-	return &RunnerFuncVU{Fn: fn}
+// MiniRunner wraps a function in a runner whose VUs will simply call that function.
+type MiniRunner struct {
+	Fn         func(ctx context.Context) ([]stats.Sample, error)
+	SetupFn    func(ctx context.Context) error
+	TeardownFn func(ctx context.Context) error
 }
 
-func (fn RunnerFunc) MakeArchive() *Archive {
+func (r MiniRunner) VU() *MiniRunnerVU {
+	return &MiniRunnerVU{R: r}
+}
+
+func (r MiniRunner) MakeArchive() *Archive {
 	return nil
 }
 
-func (fn RunnerFunc) NewVU() (VU, error) {
-	return fn.VU(), nil
+func (r MiniRunner) NewVU() (VU, error) {
+	return r.VU(), nil
 }
 
-func (fn RunnerFunc) Setup() error {
+func (r MiniRunner) Setup(ctx context.Context) error {
+	if fn := r.SetupFn; fn != nil {
+		return fn(ctx)
+	}
 	return nil
 }
 
-func (fn RunnerFunc) Teardown() error {
+func (r MiniRunner) Teardown(ctx context.Context) error {
+	if fn := r.TeardownFn; fn != nil {
+		return fn(ctx)
+	}
 	return nil
 }
 
-func (fn RunnerFunc) GetDefaultGroup() *Group {
+func (r MiniRunner) GetDefaultGroup() *Group {
 	return &Group{}
 }
 
-func (fn RunnerFunc) GetOptions() Options {
+func (r MiniRunner) GetOptions() Options {
 	return Options{}
 }
 
-func (fn RunnerFunc) SetOptions(opts Options) {
+func (r MiniRunner) SetOptions(opts Options) {
 }
 
-// A VU spawned by a RunnerFunc.
-type RunnerFuncVU struct {
-	Fn RunnerFunc
+// A VU spawned by a MiniRunner.
+type MiniRunnerVU struct {
+	R  MiniRunner
 	ID int64
 }
 
-func (fn RunnerFuncVU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
-	if fn.Fn == nil {
+func (vu MiniRunnerVU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
+	if vu.R.Fn == nil {
 		return []stats.Sample{}, nil
 	}
-	return fn.Fn(ctx)
+	return vu.R.Fn(ctx)
 }
 
-func (fn *RunnerFuncVU) Reconfigure(id int64) error {
-	fn.ID = id
+func (vu *MiniRunnerVU) Reconfigure(id int64) error {
+	vu.ID = id
 	return nil
 }
