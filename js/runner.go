@@ -169,7 +169,6 @@ func (r *Runner) newVU() (*VU, error) {
 		Console:        NewConsole(),
 		BPool:          bpool.NewBufferPool(100),
 	}
-	vu.setupData = vu.Runtime.ToValue(r.setupData)
 	vu.Runtime.Set("console", common.Bind(vu.Runtime, vu.Console, vu.Context))
 
 	// Give the VU an initial sense of identity.
@@ -288,6 +287,14 @@ func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 				u.Runtime.Interrupt(errInterrupt)
 			}
 		}()
+	}
+
+	// Lazily JS-ify setupData on first run. This is lightweight enough that we can get away with
+	// it, and alleviates a problem where setupData wouldn't get populated properly if NewVU() was
+	// called before Setup(), which is hard to avoid with how the Executor works w/o complicating
+	// the local executor further by deferring SetVUsMax() calls to within the Run() function.
+	if u.setupData == nil && u.Runner.setupData != nil {
+		u.setupData = u.Runtime.ToValue(u.Runner.setupData)
 	}
 
 	// Call the default function.
