@@ -119,7 +119,7 @@ func (r MiniRunner) GetOptions() Options {
 	return r.Options
 }
 
-func (r MiniRunner) SetOptions(opts Options) {
+func (r *MiniRunner) SetOptions(opts Options) {
 	r.Options = opts
 }
 
