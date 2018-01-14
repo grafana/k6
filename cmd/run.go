@@ -57,7 +57,11 @@ const (
 	typeArchive = "archive"
 )
 
-var runType = os.Getenv("K6_TYPE")
+var (
+	runType       = os.Getenv("K6_TYPE")
+	runNoSetup    = os.Getenv("K6_NO_SETUP") != ""
+	runNoTeardown = os.Getenv("K6_NO_TEARDOWN") != ""
+)
 
 // runCmd represents the run command.
 var runCmd = &cobra.Command{
@@ -160,9 +164,19 @@ a commandline interface for interacting with it.`,
 		// Write options back to the runner too.
 		r.SetOptions(conf.Options)
 
-		// Create an engine with a local executor, wrapping the Runner.
+		// Create a local executor wrapping the runner.
+		fmt.Fprintf(stdout, "%s executor\r", initBar.String())
+		ex := local.New(r)
+		if runNoSetup {
+			ex.SetRunSetup(false)
+		}
+		if runNoTeardown {
+			ex.SetRunTeardown(false)
+		}
+
+		// Create an engine.
 		fmt.Fprintf(stdout, "%s   engine\r", initBar.String())
-		engine, err := core.NewEngine(local.New(r), conf.Options)
+		engine, err := core.NewEngine(ex, conf.Options)
 		if err != nil {
 			return err
 		}
@@ -418,6 +432,8 @@ func init() {
 	runCmd.Flags().AddFlagSet(runtimeOptionFlagSet(true))
 	runCmd.Flags().AddFlagSet(configFlagSet())
 	runCmd.Flags().StringVarP(&runType, "type", "t", runType, "override file `type`, \"js\" or \"archive\"")
+	runCmd.Flags().BoolVar(&runNoSetup, "no-setup", runNoSetup, "don't run setup()")
+	runCmd.Flags().BoolVar(&runNoTeardown, "no-teardown", runNoTeardown, "don't run teardown()")
 }
 
 // Reads a source file from any supported destination.
