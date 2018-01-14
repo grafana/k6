@@ -33,20 +33,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-type groupDummyRunner struct {
-	Group *lib.Group
-}
-
-func (r groupDummyRunner) MakeArchive() *lib.Archive { return nil }
-
-func (r groupDummyRunner) NewVU() (lib.VU, error) { return nil, nil }
-
-func (r groupDummyRunner) GetDefaultGroup() *lib.Group { return r.Group }
-
-func (r groupDummyRunner) GetOptions() lib.Options { return lib.Options{} }
-
-func (r groupDummyRunner) SetOptions(opts lib.Options) {}
-
 func TestGetGroups(t *testing.T) {
 	g0, err := lib.NewGroup("", nil)
 	assert.NoError(t, err)
@@ -55,7 +41,7 @@ func TestGetGroups(t *testing.T) {
 	g2, err := g1.Group("group 2")
 	assert.NoError(t, err)
 
-	engine, err := core.NewEngine(local.New(groupDummyRunner{g0}), lib.Options{})
+	engine, err := core.NewEngine(local.New(lib.MiniRunner{Group: g0}), lib.Options{})
 	assert.NoError(t, err)
 
 	t.Run("list", func(t *testing.T) {

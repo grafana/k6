@@ -77,6 +77,9 @@ type MiniRunner struct {
 	Fn         func(ctx context.Context) ([]stats.Sample, error)
 	SetupFn    func(ctx context.Context) error
 	TeardownFn func(ctx context.Context) error
+
+	Group   *Group
+	Options Options
 }
 
 func (r MiniRunner) VU() *MiniRunnerVU {
@@ -106,14 +109,18 @@ func (r MiniRunner) Teardown(ctx context.Context) error {
 }
 
 func (r MiniRunner) GetDefaultGroup() *Group {
-	return &Group{}
+	if r.Group == nil {
+		r.Group = &Group{}
+	}
+	return r.Group
 }
 
 func (r MiniRunner) GetOptions() Options {
-	return Options{}
+	return r.Options
 }
 
 func (r MiniRunner) SetOptions(opts Options) {
+	r.Options = opts
 }
 
 // A VU spawned by a MiniRunner.
