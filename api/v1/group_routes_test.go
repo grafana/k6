@@ -41,7 +41,7 @@ func TestGetGroups(t *testing.T) {
 	g2, err := g1.Group("group 2")
 	assert.NoError(t, err)
 
-	engine, err := core.NewEngine(local.New(lib.MiniRunner{Group: g0}), lib.Options{})
+	engine, err := core.NewEngine(local.New(&lib.MiniRunner{Group: g0}), lib.Options{})
 	assert.NoError(t, err)
 
 	t.Run("list", func(t *testing.T) {

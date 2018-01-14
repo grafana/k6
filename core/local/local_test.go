@@ -52,7 +52,7 @@ func TestExecutorSetupTeardownRun(t *testing.T) {
 	t.Run("Normal", func(t *testing.T) {
 		setupC := make(chan struct{})
 		teardownC := make(chan struct{})
-		e := New(lib.MiniRunner{
+		e := New(&lib.MiniRunner{
 			SetupFn: func(ctx context.Context) error {
 				close(setupC)
 				return nil
@@ -72,7 +72,7 @@ func TestExecutorSetupTeardownRun(t *testing.T) {
 		assert.NoError(t, <-err)
 	})
 	t.Run("Setup Error", func(t *testing.T) {
-		e := New(lib.MiniRunner{
+		e := New(&lib.MiniRunner{
 			SetupFn: func(ctx context.Context) error {
 				return errors.New("setup error")
 			},
@@ -83,7 +83,7 @@ func TestExecutorSetupTeardownRun(t *testing.T) {
 		assert.EqualError(t, e.Run(context.Background(), nil), "setup error")
 
 		t.Run("Don't Run Setup", func(t *testing.T) {
-			e := New(lib.MiniRunner{
+			e := New(&lib.MiniRunner{
 				SetupFn: func(ctx context.Context) error {
 					return errors.New("setup error")
 				},
@@ -99,7 +99,7 @@ func TestExecutorSetupTeardownRun(t *testing.T) {
 		})
 	})
 	t.Run("Teardown Error", func(t *testing.T) {
-		e := New(lib.MiniRunner{
+		e := New(&lib.MiniRunner{
 			SetupFn: func(ctx context.Context) error {
 				return nil
 			},
@@ -113,7 +113,7 @@ func TestExecutorSetupTeardownRun(t *testing.T) {
 		assert.EqualError(t, e.Run(context.Background(), nil), "teardown error")
 
 		t.Run("Don't Run Teardown", func(t *testing.T) {
-			e := New(lib.MiniRunner{
+			e := New(&lib.MiniRunner{
 				SetupFn: func(ctx context.Context) error {
 					return nil
 				},
@@ -184,7 +184,7 @@ func TestExecutorEndTime(t *testing.T) {
 	assert.True(t, time.Now().After(startTime.Add(1*time.Second)), "test did not take 1s")
 
 	t.Run("Runtime Errors", func(t *testing.T) {
-		e := New(lib.MiniRunner{Fn: func(ctx context.Context) ([]stats.Sample, error) {
+		e := New(&lib.MiniRunner{Fn: func(ctx context.Context) ([]stats.Sample, error) {
 			return nil, errors.New("hi")
 		}})
 		assert.NoError(t, e.SetVUsMax(10))
@@ -206,7 +206,7 @@ func TestExecutorEndTime(t *testing.T) {
 	})
 
 	t.Run("End Errors", func(t *testing.T) {
-		e := New(lib.MiniRunner{Fn: func(ctx context.Context) ([]stats.Sample, error) {
+		e := New(&lib.MiniRunner{Fn: func(ctx context.Context) ([]stats.Sample, error) {
 			<-ctx.Done()
 			return nil, errors.New("hi")
 		}})
@@ -230,7 +230,7 @@ func TestExecutorEndIterations(t *testing.T) {
 	metric := &stats.Metric{Name: "test_metric"}
 
 	var i int64
-	e := New(lib.MiniRunner{Fn: func(ctx context.Context) ([]stats.Sample, error) {
+	e := New(&lib.MiniRunner{Fn: func(ctx context.Context) ([]stats.Sample, error) {
 		select {
 		case <-ctx.Done():
 		default:
@@ -316,7 +316,7 @@ func TestExecutorSetVUs(t *testing.T) {
 	})
 
 	t.Run("Raise", func(t *testing.T) {
-		e := New(lib.MiniRunner{Fn: func(ctx context.Context) ([]stats.Sample, error) {
+		e := New(&lib.MiniRunner{Fn: func(ctx context.Context) ([]stats.Sample, error) {
 			return nil, nil
 		}})
 		e.ctx = context.Background()
