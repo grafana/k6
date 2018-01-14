@@ -48,6 +48,56 @@ func TestExecutorRun(t *testing.T) {
 	assert.NoError(t, <-err)
 }
 
+func TestExecutorSetupTeardownRun(t *testing.T) {
+	t.Run("Normal", func(t *testing.T) {
+		setupC := make(chan struct{})
+		teardownC := make(chan struct{})
+		e := New(lib.MiniRunner{
+			SetupFn: func(ctx context.Context) error {
+				close(setupC)
+				return nil
+			},
+			TeardownFn: func(ctx context.Context) error {
+				close(teardownC)
+				return nil
+			},
+		})
+
+		ctx, cancel := context.WithCancel(context.Background())
+		err := make(chan error, 1)
+		go func() { err <- e.Run(ctx, nil) }()
+		cancel()
+		<-setupC
+		<-teardownC
+		assert.NoError(t, <-err)
+	})
+	t.Run("Setup Error", func(t *testing.T) {
+		e := New(lib.MiniRunner{
+			SetupFn: func(ctx context.Context) error {
+				return errors.New("setup error")
+			},
+			TeardownFn: func(ctx context.Context) error {
+				return errors.New("teardown error")
+			},
+		})
+		assert.EqualError(t, e.Run(context.Background(), nil), "setup error")
+	})
+	t.Run("Teardown Error", func(t *testing.T) {
+		e := New(lib.MiniRunner{
+			SetupFn: func(ctx context.Context) error {
+				return nil
+			},
+			TeardownFn: func(ctx context.Context) error {
+				return errors.New("teardown error")
+			},
+		})
+		e.SetEndIterations(null.IntFrom(1))
+		assert.NoError(t, e.SetVUsMax(1))
+		assert.NoError(t, e.SetVUs(1))
+		assert.EqualError(t, e.Run(context.Background(), nil), "teardown error")
+	})
+}
+
 func TestExecutorSetLogger(t *testing.T) {
 	logger, _ := logtest.NewNullLogger()
 	e := New(nil)
