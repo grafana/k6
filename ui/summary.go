@@ -55,6 +55,66 @@ type TrendColumn struct {
 	Get func(s *stats.TrendSink) float64
 }
 
+// VerifyTrendColumnStat checks if stat is a valid trend column
+func VerifyTrendColumnStat(stat string) bool {
+	if stat == "" {
+		return false
+	}
+
+	for _, col := range TrendColumns {
+		if col.Key == stat {
+			return true
+		}
+	}
+
+	if generatePercentileTrendColumn(stat) != nil {
+		return true
+	}
+
+	return false
+}
+
+// UpdateTrendColumns updates the default trend columns with user defined ones
+func UpdateTrendColumns(stats []string) {
+	newTrendColumns := make([]TrendColumn, 0, len(stats))
+
+	for _, stat := range stats {
+		percentileTrendColumn := generatePercentileTrendColumn(stat)
+
+		if percentileTrendColumn != nil {
+			newTrendColumns = append(newTrendColumns, TrendColumn{stat, percentileTrendColumn})
+			continue
+		}
+
+		for _, col := range TrendColumns {
+			if col.Key == stat {
+				newTrendColumns = append(newTrendColumns, col)
+				break
+			}
+		}
+	}
+
+	if len(newTrendColumns) > 0 {
+		TrendColumns = newTrendColumns
+	}
+}
+
+func generatePercentileTrendColumn(stat string) func(s *stats.TrendSink) float64 {
+	if stat == "" || !strings.HasPrefix(stat, "p(") || !strings.HasSuffix(stat, ")") {
+		return nil
+	}
+
+	percentile, err := strconv.ParseFloat(stat[2:len(stat)-1], 64)
+
+	if err != nil {
+		return nil
+	}
+
+	percentile = percentile / 100
+
+	return func(s *stats.TrendSink) float64 { return s.P(percentile) }
+}
+
 // Returns the actual width of the string.
 func StrWidth(s string) (n int) {
 	var it norm.Iter
