@@ -25,7 +25,7 @@
 This is how load testing should look in the 21st century.
 
 <p align="center">
-<img src="https://asciinema.org/a/cbohbo6pbkxjwo1k8x0gkl7py" alt="demo.gif">
+[![](demo.gif)](https://asciinema.org/a/cbohbo6pbkxjwo1k8x0gkl7py)
 </p>
 
 ## Menu
