@@ -1,4 +1,4 @@
-<p align="center"><img src="logo.svg" alt="k6" width="300"></p>
+<p align="center"><img src="logo.png" alt="k6" width="300" height="282"></p>
 
 <h3 align="center">Like unit testing, for performance</h3>
 <p align="center">A modern load testing tool for developers and testers in the DevOps era.</p>
