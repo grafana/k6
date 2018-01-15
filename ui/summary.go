@@ -67,11 +67,7 @@ func VerifyTrendColumnStat(stat string) bool {
 		}
 	}
 
-	if generatePercentileTrendColumn(stat) != nil {
-		return true
-	}
-
-	return false
+	return generatePercentileTrendColumn(stat) != nil
 }
 
 // UpdateTrendColumns updates the default trend columns with user defined ones
