@@ -88,9 +88,6 @@ func (c *Client) CreateTestRun(testRun *TestRun) (*CreateTestRunResponse, error)
 func (c *Client) PushMetric(referenceID string, compress bool, samples []*Sample) error {
 	url := fmt.Sprintf("%s/metrics/%s", c.baseURL, referenceID)
 
-	var req *http.Request
-	var reqError error
-
 	if compress {
 		var buf bytes.Buffer
 		if samples != nil {
@@ -106,14 +103,19 @@ func (c *Client) PushMetric(referenceID string, compress bool, samples []*Sample
 				return err
 			}
 		}
-		req, reqError = http.NewRequest("POST", url, &buf)
+		req, err := http.NewRequest("POST", url, &buf)
+		if err != nil {
+			return err
+		}
+		req.Header.Set("Content-Encoding", "gzip")
+		return c.Do(req, nil)
 	} else {
-		req, reqError = c.NewRequest("POST", url, samples)
+		req, err := c.NewRequest("POST", url, samples)
+		if err != nil {
+			return err
+		}
+		return c.Do(req, nil)
 	}
-	if reqError != nil {
-		return reqError
-	}
-	return c.Do(req, nil)
 }
 
 func (c *Client) StartCloudTestRun(name string, arc *lib.Archive) (string, error) {
