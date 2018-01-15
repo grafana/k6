@@ -229,3 +229,42 @@ func (res *HTTPResponse) SubmitForm(args ...goja.Value) (*HTTPResponse, error) {
 	}
 	return New().Request(res.ctx, requestMethod, rt.ToValue(requestUrl.String()), rt.ToValue(values), requestParams)
 }
+
+func (res *HTTPResponse) ClickLink(args ...goja.Value) (*HTTPResponse, error) {
+	rt := common.GetRuntime(res.ctx)
+
+	selector := "a[href]"
+	requestParams := goja.Null()
+	if len(args) > 0 {
+		params := args[0].ToObject(rt)
+		for _, k := range params.Keys() {
+			switch k {
+			case "selector":
+				selector = params.Get(k).String()
+			case "params":
+				requestParams = params.Get(k)
+			}
+		}
+	}
+
+	responseUrl, err := url.Parse(res.URL)
+	if err != nil {
+		common.Throw(rt, err)
+	}
+
+	link := res.Html(selector)
+	if link.Size() == 0 {
+		common.Throw(rt, fmt.Errorf("no element found for selector '%s' in response '%s'", selector, res.URL))
+	}
+	hrefAttr := link.Attr("href")
+	if hrefAttr == goja.Undefined() {
+		common.Throw(rt, fmt.Errorf("no valid href atribute value found on element '%s' in response '%s'", selector, res.URL))
+	}
+	hrefUrl, err := url.Parse(hrefAttr.String())
+	if err != nil {
+		common.Throw(rt, err)
+	}
+	requestUrl := responseUrl.ResolveReference(hrefUrl)
+
+	return New().Get(res.ctx, rt.ToValue(requestUrl.String()), requestParams)
+}
