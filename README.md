@@ -38,7 +38,7 @@ This is how load testing should look in the 21st century.
 
 - **Scripting in ES6 JS**: support for [modules](https://docs.k6.io/docs/modules) to aid code reusability across an organization
 - **Everything as code**: test logic and [configuration options](https://docs.k6.io/docs/options) are both in JS for version control friendliness
-- **Automation-friendly**: checks (like asserts) and thresholds
+- **Automation-friendly**: [checks](https://docs.k6.io/docs/checks) (like asserts) and [thresholds](https://docs.k6.io/docs/thresholds)
 - **HTTP/1.1**, [**HTTP/2**](https://docs.k6.io/docs/http2) and [**WebSocket**](https://docs.k6.io/docs/websockets) protocol support
 - **TLS features**: [client certificates](https://docs.k6.io/docs/ssl-tls-client-certificates), [configurable SSL/TLS versions and ciphers](https://docs.k6.io/docs/ssl-tls-version-and-cipher-suites)
 - **Batteries included**: [Cookies](https://docs.k6.io/docs/cookies), [Crypto](https://docs.k6.io/docs/k6crypto), [Custom metrics](https://docs.k6.io/docs/result-metrics#section-custom-metrics), [Encodings](https://docs.k6.io/docs/k6encoding), [Environment variables](https://docs.k6.io/docs/environment-variables), JSON, HTML forms and more.
