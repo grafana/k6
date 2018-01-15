@@ -99,7 +99,7 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		return opts, err
 	}
 	for _, s := range trendStatStrings {
-		if ui.VerifyTrendColumn(s) {
+		if ui.VerifyTrendColumnStat(s) {
 			opts.SummaryTrendStats = append(opts.SummaryTrendStats, s)
 		}
 	}
