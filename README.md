@@ -24,9 +24,7 @@
 
 This is how load testing should look in the 21st century.
 
-<p align="center">
-<a href="https://asciinema.org/a/cbohbo6pbkxjwo1k8x0gkl7py" target="_blank"><img src="https://asciinema.org/a/cbohbo6pbkxjwo1k8x0gkl7py.png" /></a>
-</p>
+[![](demo.gif)](https://asciinema.org/a/cbohbo6pbkxjwo1k8x0gkl7py)
 
 ## Menu
 
