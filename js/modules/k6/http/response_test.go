@@ -300,4 +300,54 @@ func TestResponse(t *testing.T) {
 			assertRequestMetricsEmitted(t, state.Samples, "GET", srv.URL+"/forms/get", "", 200, "")
 		})
 	})
+
+	t.Run("ClickLink", func(t *testing.T) {
+		t.Run("withoutArgs", func(t *testing.T) {
+			state.Samples = nil
+			_, err := common.RunString(rt, `
+			let res = http.request("GET", "https://httpbin.org/links/10/0");
+			if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+			res = res.clickLink()
+			if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+		`)
+			assert.NoError(t, err)
+			assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/links/10/1", "", 200, "")
+		})
+
+		t.Run("withSelector", func(t *testing.T) {
+			state.Samples = nil
+			_, err := common.RunString(rt, `
+			let res = http.request("GET", "https://httpbin.org/links/10/0");
+			if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+			res = res.clickLink({ selector: 'a:nth-child(4)' })
+			if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+		`)
+			assert.NoError(t, err)
+			assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/links/10/4", "", 200, "")
+		})
+
+		t.Run("withNonExistentLink", func(t *testing.T) {
+			state.Samples = nil
+			_, err := common.RunString(rt, `
+			let res = http.request("GET", "https://httpbin.org/links/10/0");
+			if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+			res = res.clickLink({ selector: 'a#doesNotExist' })
+		`)
+			assert.EqualError(t, err, "GoError: no element found for selector 'a#doesNotExist' in response 'https://httpbin.org/links/10/0'")
+		})
+
+		t.Run("withRequestParams", func(t *testing.T) {
+			state.Samples = nil
+			_, err := common.RunString(rt, `
+			let res = http.request("GET", "https://httpbin.org");
+			if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+			res = res.clickLink({ selector: 'a[href="/get"]', params: { headers: { "My-Fancy-Header": "SomeValue" } } })
+			if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+			let headers = res.json().headers
+			if (headers["My-Fancy-Header"] !== "SomeValue" ) { throw new Error("incorrect header: " + headers["My-Fancy-Header"]); }
+		`)
+			assert.NoError(t, err)
+			assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/get", "", 200, "")
+		})
+	})
 }
