@@ -865,20 +865,24 @@ func TestRequestAndBatch(t *testing.T) {
 
 	t.Run("HTTPRequest", func(t *testing.T) {
 		_, err := common.RunString(rt, `
-			let reqUrl = "https://httpbin.org/get?a=1&b=2"
+			let reqUrl = "https://httpbin.org/cookies"
 			let res = http.get(reqUrl);
+			let jar = new http.CookieJar();
+
+			jar.set("https://httpbin.org/cookies", "key", "value");
+			res = http.request("GET", "https://httpbin.org/cookies", null, { cookies: { key2: "value2" }, jar: jar });
+
+			if (res.json().cookies.key != "value") { throw new Error("wrong cookie value: " + res.json().cookies.key); }
 
 			if (res.status != 200) { throw new Error("wrong status: " + res.status); }
-			if (res.json().args.a != "1") { throw new Error("wrong ?a: " + res.json().args.a); }
-			if (res.json().args.b != "2") { throw new Error("wrong ?b: " + res.json().args.b); }
-
 			if (res.request["method"] !== "GET") { throw new Error("http request method was not \"GET\": " + JSON.stringify(res.request)) }
 			if (res.request["body"] != null) { throw new Error("http request body was not null: " + JSON.stringify(res.request)) }
 			if (res.request["url"] != reqUrl) {
-				throw new Error("http request url was not null: " + JSON.stringify(res.request))
+				throw new Error("wront http request url: " + JSON.stringify(res.request))
 			}
-			if (Object.keys(res.request["cookies"]).length != 0) { throw new Error("http request cookies was not empty: " + JSON.stringify(res.request)) }
-			if (res.request["headers"]["User-Agent"][0] != "TestUserAgent") { throw new Error("http request headers was not set properly: " + JSON.stringify(res.request)) }
+			// TODO: this is kind of ugly, is there a way to simplify the cookies structure?
+			if (res.request["cookies"][1]["name"] != "key2") { throw new Error("wrong http request cookies: " + JSON.stringify(res.request["cookies"][1]["name"]) + " full request:  " + JSON.stringify(res.request)) }
+			if (res.request["headers"]["User-Agent"][0] != "TestUserAgent") { throw new Error("wrong http request headers: " + JSON.stringify(res.request)) }
 			`)
 		assert.NoError(t, err)
 	})
