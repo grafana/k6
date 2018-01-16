@@ -127,6 +127,8 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 		"url":    url.URLString,
 		"name":   url.Name,
 		"group":  state.Group.Path,
+		"vu":     strconv.FormatInt(state.Vu, 10),
+		"iter":   strconv.FormatInt(state.Iteration, 10),
 	}
 	redirects := state.Options.MaxRedirects
 	timeout := 60 * time.Second

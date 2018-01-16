@@ -22,6 +22,7 @@ package k6
 
 import (
 	"context"
+	"strconv"
 	"sync/atomic"
 	"time"
 
@@ -70,8 +71,11 @@ func (*K6) Group(ctx context.Context, name string, fn goja.Callable) (goja.Value
 		stats.Sample{
 			Time:   t,
 			Metric: metrics.GroupDuration,
-			Tags:   map[string]string{"group": g.Path},
-			Value:  stats.D(t.Sub(startTime)),
+			Tags: map[string]string{
+				"group": g.Path,
+				"vu":    strconv.FormatInt(state.Vu, 10),
+				"iter":  strconv.FormatInt(state.Iteration, 10)},
+			Value: stats.D(t.Sub(startTime)),
 		},
 	)
 	return ret, err
@@ -108,6 +112,8 @@ func (*K6) Check(ctx context.Context, arg0, checks goja.Value, extras ...goja.Va
 			return false, err
 		}
 		tags["check"] = check.Name
+		tags["vu"] = strconv.FormatInt(state.Vu, 10)
+		tags["iter"] = strconv.FormatInt(state.Iteration, 10)
 
 		// Resolve callables into values.
 		fn, ok := goja.AssertFunction(val)
