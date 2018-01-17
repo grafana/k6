@@ -47,7 +47,7 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.Bool("no-connection-reuse", false, "don't reuse connections between iterations")
 	flags.BoolP("throw", "w", false, "throw warnings (like failed http requests) as errors")
 	flags.StringSlice("blacklist-ip", nil, "blacklist an `ip range` from being called")
-	flags.StringSlice("summary-trend-stats", nil, "define `stats` for trend metrics (response times)")
+	flags.StringSlice("summary-trend-stats", nil, "define `stats` for trend metrics (response times), one or more as 'avg,p(95),...'")
 	return flags
 }
 
