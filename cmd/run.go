@@ -145,6 +145,10 @@ a commandline interface for interacting with it.`,
 		if conf.Duration.Valid && conf.Duration.Duration == 0 {
 			conf.Duration = lib.NullDuration{}
 		}
+		// If summary trend stats are defined, update the UI to reflect them
+		if len(conf.SummaryTrendStats) > 0 {
+			ui.UpdateTrendColumns(conf.SummaryTrendStats)
+		}
 
 		// Write options back to the runner too.
 		r.SetOptions(conf.Options)
