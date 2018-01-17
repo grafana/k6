@@ -50,7 +50,7 @@ type HTTPRequest struct {
 	URL     string
 	Headers map[string][]string
 	Body    io.Closer
-	Cookies []*http.Cookie
+	Cookies map[string][]*HTTPRequestCookie
 }
 
 func (http *HTTP) Get(ctx context.Context, url goja.Value, args ...goja.Value) (*HTTPResponse, error) {
@@ -245,7 +245,9 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 	}
 
 	if activeJar != nil {
-		h.setRequestCookies(req, activeJar, reqCookies)
+		mergedCookies := h.mergeCookies(req, activeJar, reqCookies)
+		respReq.Cookies = mergedCookies
+		h.setRequestCookies(req, mergedCookies)
 	}
 
 	// Check rate limit *after* we've prepared a request; no need to wait with that part.
@@ -256,7 +258,6 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 	}
 
 	respReq.Headers = req.Header
-	respReq.Cookies = req.Cookies()
 
 	resp := &HTTPResponse{ctx: ctx, URL: url.URLString, Request: *respReq}
 	client := http.Client{
@@ -269,7 +270,9 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 					activeJar.SetCookies(req.URL, respCookies)
 				}
 				req.Header.Del("Cookie")
-				h.setRequestCookies(req, activeJar, reqCookies)
+				mergedCookies := h.mergeCookies(req, activeJar, reqCookies)
+
+				h.setRequestCookies(req, mergedCookies)
 			}
 
 			if l := len(via); int64(l) > redirects.Int64 {
