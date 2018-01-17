@@ -116,7 +116,7 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
 	}
-	if userAgent := state.Options.UserAgent; userAgent.Valid {
+	if userAgent := state.Options.UserAgent; userAgent.String != "" {
 		req.Header.Set("User-Agent", userAgent.String)
 	}
 
