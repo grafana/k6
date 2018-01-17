@@ -74,11 +74,8 @@ func VerifyTrendColumnStat(stat string) error {
 		}
 	}
 
-	if _, err := generatePercentileTrendColumn(stat); err != nil {
-		return err
-	}
-
-	return nil
+	_, err := generatePercentileTrendColumn(stat)
+	return err
 }
 
 // UpdateTrendColumns updates the default trend columns with user defined ones
