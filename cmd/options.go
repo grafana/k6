@@ -99,9 +99,11 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		return opts, err
 	}
 	for _, s := range trendStatStrings {
-		if ui.VerifyTrendColumnStat(s) {
-			opts.SummaryTrendStats = append(opts.SummaryTrendStats, s)
+		if err := ui.VerifyTrendColumnStat(s); err != nil {
+			return opts, errors.Wrapf(err, "stat '%s'", s)
 		}
+
+		opts.SummaryTrendStats = append(opts.SummaryTrendStats, s)
 	}
 
 	return opts, nil
