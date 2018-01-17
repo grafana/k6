@@ -24,7 +24,9 @@
 
 This is how load testing should look in the 21st century.
 
-[![](demo.gif)](https://asciinema.org/a/cbohbo6pbkxjwo1k8x0gkl7py)
+<p align="center">
+  <img width="600" src="https://cdn.rawgit.com/loadimpact/k6/master/demo.svg">
+</p>
 
 ## Menu
 
