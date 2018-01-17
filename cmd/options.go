@@ -21,6 +21,7 @@
 package cmd
 
 import (
+	"fmt"
 	"net"
 
 	"github.com/loadimpact/k6/lib"
@@ -42,7 +43,7 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.Int64("batch", 10, "max parallel batch reqs")
 	flags.Int64("batch-per-host", 0, "max parallel batch reqs per host")
 	flags.Int64("rps", 0, "limit requests per second")
-	flags.String("user-agent", "", "user agent for http requests")
+	flags.String("user-agent", fmt.Sprintf("k6/%s (https://k6.io/);", Version), "user agent for http requests")
 	flags.Bool("insecure-skip-tls-verify", false, "skip verification of TLS certificates")
 	flags.Bool("no-connection-reuse", false, "don't reuse connections between iterations")
 	flags.BoolP("throw", "w", false, "throw warnings (like failed http requests) as errors")
