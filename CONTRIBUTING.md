@@ -33,6 +33,60 @@ If you'd like to contribute code to k6, this is the basic procedure. Make sure t
 
 4. We will discuss implementation details until everyone is happy, then a maintainer will merge it.
 
+Development setup
+-----------------
+
+To get a basic development environment for Go and k6 up and running, first make sure you have **[Git](https://git-scm.com/downloads)** and **[Go](https://golang.org/doc/install)** (1.8 or newer) installed and working properly.
+
+Once that's done, you can get the k6 source into your Go workspace (`$GOPATH/src`) by running:
+```bash
+go get github.com/loadimpact/k6
+```
+
+**Building from source**:
+
+Now, standing in the repo root (`$GOPATH/src/github.com/loadimpact/k6`) you can build a k6 binary from source by running:
+```bash
+cd $GOPATH/src/github.com/loadimpact/k6
+go build
+```
+
+**Running the linter**:
+
+We make use of the [`gometalinter`]() tool to lint the code in CI. To run it locally:
+```bash
+go get -u github.com/alecthomas/gometalinter
+gometalinter --install
+gometalinter --deadline 10m --config gometalinter.json --vendor ./...
+```
+
+If you've added new dependencies you might also want to check and make sure all dependencies exists in `vendor/` folder by running:
+```bash
+go get -u github.com/FiloSottile/vendorcheck
+vendorcheck ./...
+```
+
+**Running the test suite**:
+
+To exercise the entire test suite:
+```bash
+go test ./...
+```
+
+To run the tests of a specific package:
+```bash
+go test github.com/loadimpact/k6/core
+```
+
+To run just a specific test case use `-run` and pass in a regex that matches the name of the test:
+```bash
+go test ./... -run ^TestEngineRun$
+```
+
+Combining the two above we can run a specific test case in a specific package:
+```bash
+go test github.com/loadimpact/k6/core -run ^TestEngineRun$
+```
 
 Style guide
 -----------
