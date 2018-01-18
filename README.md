@@ -20,7 +20,7 @@
 
 ---
 
-**k6** is a modern load testing tool, building on [Load Impact](https://loadimpact.com/)'s years of experience in the load and performance testing industry. It provides a clean, approachable scripting API, distributed and cloud execution, with command & control through CLI or a REST API.
+**k6** is a modern load testing tool, building on [Load Impact](https://loadimpact.com/)'s years of experience in the load and performance testing industry. It provides a clean, approachable scripting API, local and cloud execution, with command & control through CLI or a REST API.
 
 This is how load testing should look in the 21st century.
 
