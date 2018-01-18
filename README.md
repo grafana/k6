@@ -34,7 +34,6 @@ This is how load testing should look in the 21st century.
 - [Install](#install)
 - [Quick Start](#quick-start)
 - [Need help or want to contribute?](#need-help-or-want-to-contribute)
-- [Development setup](#development-setup)
 
 ## Features
 
@@ -43,8 +42,8 @@ This is how load testing should look in the 21st century.
 - **Automation-friendly**: [checks](https://docs.k6.io/docs/checks) (like asserts) and [thresholds](https://docs.k6.io/docs/thresholds)
 - **HTTP/1.1**, [**HTTP/2**](https://docs.k6.io/docs/http2) and [**WebSocket**](https://docs.k6.io/docs/websockets) protocol support
 - **TLS features**: [client certificates](https://docs.k6.io/docs/ssl-tls-client-certificates), [configurable SSL/TLS versions and ciphers](https://docs.k6.io/docs/ssl-tls-version-and-cipher-suites)
-- **Batteries included**: [Cookies](https://docs.k6.io/docs/cookies), [Crypto](https://docs.k6.io/docs/k6crypto), [Custom metrics](https://docs.k6.io/docs/result-metrics#section-custom-metrics), [Encodings](https://docs.k6.io/docs/k6encoding), [Environment variables](https://docs.k6.io/docs/environment-variables), JSON, HTML forms and more.
-- **Flexible metrics storage**: [InfluxDB](https://docs.k6.io/docs/influxdb-grafana), JSON or [Load Impact Insights](https://docs.k6.io/docs/load-impact-insights)
+- **Batteries included**: [Cookies](https://docs.k6.io/docs/cookies), [Crypto](https://docs.k6.io/docs/k6crypto), [Custom metrics](https://docs.k6.io/docs/result-metrics#section-custom-metrics), [Encodings](https://docs.k6.io/docs/k6encoding), [Environment variables](https://docs.k6.io/docs/environment-variables), JSON, [HTML forms](https://docs.k6.io/docs/working-with-html-forms) and more.
+- **Flexible metrics storage/visualization**: [InfluxDB](https://docs.k6.io/docs/influxdb-grafana) (+Grafana), JSON or [Load Impact Insights](https://docs.k6.io/docs/load-impact-insights)
 
 There's even more! [See all features available in k6.](https://docs.k6.io/welcome)
 
@@ -142,81 +141,4 @@ Types of questions and where to ask:
 - I have an idea/request -- [file an issue](https://github.com/loadimpact/k6/issues)
 - Why do you? -- [Slack](https://k6.io/slack)
 - When will you? -- [Slack](https://k6.io/slack)
-- I want to contribute/help with development -- [Start here](https://github.com/loadimpact/k6/blob/master/CONTRIBUTING.md), then [Slack](https://k6.io/slack) and [issues](https://github.com/loadimpact/k6/issues)
-
-## Development setup
-
-To get a basic development environment for k6 setup, first make sure you have **[Git](https://git-scm.com/downloads)** and **[Go](https://golang.org/doc/install)** (1.8 or newer) installed and working properly.
-
-Then you can get the k6 source into your Go workspace (`$GOPATH/src`) by running:
-```bash
-go get github.com/loadimpact/k6
-```
-
-**Building from source**:
-
-Now, standing in the repo root (`$GOPATH/src/github.com/loadimpact/k6`) you can build a k6 binary from source by running:
-```bash
-cd $GOPATH/src/github.com/loadimpact/k6
-go build
-```
-
-**Running the linter**:
-
-We make use of the [`gometalinter`]() tool to lint the code in CI. To run it locally:
-```bash
-go get -u github.com/alecthomas/gometalinter
-gometalinter --install
-gometalinter --deadline 10m --config gometalinter.json --vendor ./...
-```
-
-**Running the test suite**:
-
-To exercise the entire test suite:
-```bash
-go test ./...
-```
-
-To run the tests of a specific package:
-```bash
-go test github.com/loadimpact/k6/core
-```
-
-To run just a specific test case use `-run` and pass in a regex that matches the name of the test:
-```bash
-go test ./.. -run ^TestEngineRun$
-```
-
-Combining the two above we can run a specific test case in a specific package:
-```bash
-go test github.com/loadimpact/k6/core -run ^TestEngineRun$
-```
-
-**Contributing code**:
-
-1. First, find an issue that you'd like to work on
-2. Fork repo to your Github account
-3. Get a development environment setup (get the source into `$GOPATH/src/github.com/YOUR_ACCOUNT/k6` using `go get github.com/YOUR_ACCOUNT/k6`)
-4. Write some code
-5. Before creating Pull Request please do the following (the CI will check these things when you create the PR so you can save yourself a roundtrip):
-
-    a. Run the Go formatter on the code:
-    ```bash
-    find . -name '*.go' -exec gofmt -s -w {} +
-    ```
-    b. Lint the code:
-    ```bash
-    go get -u github.com/alecthomas/gometalinter
-    gometalinter --install
-    gometalinter --deadline 10m --config gometalinter.json --vendor ./...
-    ```
-    c. Vendor check the code (make sure all dependencies exists in `vendor/` folder):
-    ```bash
-    go get github.com/FiloSottile/vendorcheck
-    vendorcheck ./...
-    ```
-    d. Make sure all tests pass:
-    ```bash
-    go test ./...
-    ```
-6. Now you're ready to create the Pull Request!
+- I want to contribute/help with development -- Start by reading [CONTRIBUTING.md](https://github.com/loadimpact/k6/blob/master/CONTRIBUTING.md), then [Slack](https://k6.io/slack) and [issues](https://github.com/loadimpact/k6/issues)
