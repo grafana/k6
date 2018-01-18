@@ -28,14 +28,16 @@ This is how load testing should look in the 21st century.
   <img width="600" src="https://cdn.rawgit.com/loadimpact/k6/feature/readme-update/demo.svg">
 </p>
 
-## Menu
+Menu
+----
 
 - [Features](#features)
 - [Install](#install)
 - [Quick Start](#quick-start)
 - [Need help or want to contribute?](#need-help-or-want-to-contribute)
 
-## Features
+Features
+--------
 
 - **Scripting in ES6 JS**: support for [modules](https://docs.k6.io/docs/modules) to aid code reusability across an organization
 - **Everything as code**: test logic and [configuration options](https://docs.k6.io/docs/options) are both in JS for version control friendliness
@@ -47,7 +49,8 @@ This is how load testing should look in the 21st century.
 
 There's even more! [See all features available in k6.](https://docs.k6.io/welcome)
 
-## Install
+Install
+------
 
 ### Mac
 
@@ -75,7 +78,8 @@ To build from source you need **[Git](https://git-scm.com/downloads)** and **[Go
 
 Then make sure to put the `k6` binary somewhere in your PATH.
 
-## Quick start
+Quick start
+-----------
 
 k6 works with the concept of **virtual users** (VUs), which run scripts - they're essentially glorified, parallel `while(true)` loops. Scripts are written using JavaScript, as ES6 modules, which allows you to break larger tests into smaller and more reusable pieces, which makes it easy to scale across an organization.
 
@@ -131,7 +135,8 @@ For more information on how to get started running k6, please look at the [Runni
 
 ---
 
-## Need help or want to contribute?
+Need help or want to contribute?
+--------------------------------
 
 Types of questions and where to ask:
 
