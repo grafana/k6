@@ -695,6 +695,17 @@ func TestRequestAndBatch(t *testing.T) {
 		assertRequestMetricsEmitted(t, state.Samples, "HEAD", "https://httpbin.org/get?a=1&b=2", "", 200, "")
 	})
 
+	t.Run("OPTIONS", func(t *testing.T) {
+		state.Samples = nil
+		_, err := common.RunString(rt, `
+		let res = http.options("https://httpbin.org/get?a=1&b=2");
+		if (res.body.length != 0) { throw new Error("OPTIONS responses shouldn't have a body " + res.body); }
+		if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+		`)
+		assert.NoError(t, err)
+		assertRequestMetricsEmitted(t, state.Samples, "OPTIONS", "https://httpbin.org/get?a=1&b=2", "", 200, "")
+	})
+
 	postMethods := map[string]string{
 		"POST":   "post",
 		"PUT":    "put",

@@ -42,6 +42,7 @@ const (
 	HTTP_METHOD_DELETE                 = "DELETE"
 	HTTP_METHOD_HEAD                   = "HEAD"
 	HTTP_METHOD_PATCH                  = "PATCH"
+	HTTP_METHOD_OPTIONS                = "OPTIONS"
 	OCSP_STATUS_GOOD                   = "good"
 	OCSP_STATUS_REVOKED                = "revoked"
 	OCSP_STATUS_SERVER_FAILED          = "server_failed"
