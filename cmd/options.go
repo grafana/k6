@@ -47,6 +47,7 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.Bool("insecure-skip-tls-verify", false, "skip verification of TLS certificates")
 	flags.Bool("no-connection-reuse", false, "don't reuse connections between iterations")
 	flags.BoolP("throw", "w", false, "throw warnings (like failed http requests) as errors")
+	flags.Bool("fix-time-unit", false, "display all time units in milliseconds")
 	flags.StringSlice("blacklist-ip", nil, "blacklist an `ip range` from being called")
 	flags.StringSlice("summary-trend-stats", nil, "define `stats` for trend metrics (response times), one or more as 'avg,p(95),...'")
 	return flags
@@ -66,6 +67,7 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		InsecureSkipTLSVerify: getNullBool(flags, "insecure-skip-tls-verify"),
 		NoConnectionReuse:     getNullBool(flags, "no-connection-reuse"),
 		Throw:                 getNullBool(flags, "throw"),
+		FixTimeUnit:           getNullBool(flags, "fix-time-unit"),
 	}
 
 	stageStrings, err := flags.GetStringSlice("stage")

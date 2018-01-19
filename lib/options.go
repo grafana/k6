@@ -188,6 +188,8 @@ type Options struct {
 	// errors about running out of file handles or sockets, or being unable to bind addresses.
 	NoConnectionReuse null.Bool `json:"noConnectionReuse" envconfig:"no_connection_reuse"`
 
+	FixTimeUnit null.Bool `json:"fixTimeUnit" envconfig:"fix_time_unit"`
+
 	// These values are for third party collectors' benefit.
 	// Can't be set through env vars.
 	External map[string]interface{} `json:"ext" ignored:"true"`
