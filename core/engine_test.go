@@ -230,6 +230,8 @@ func TestEngineRun(t *testing.T) {
 		assert.NoError(t, e.Run(context.Background()))
 		assert.Equal(t, int64(100), e.Executor.GetIterations())
 	})
+
+	// Make sure samples are discarded after context close (using "cutoff" timestamp in local.go)
 	t.Run("collects samples", func(t *testing.T) {
 		testMetric := stats.New("test_metric", stats.Trend)
 
@@ -239,6 +241,15 @@ func TestEngineRun(t *testing.T) {
 			samples = append(samples, stats.Sample{Metric: testMetric, Time: time.Now(), Value: 1})
 			close(signalChan)
 			<-ctx.Done()
+
+			// HACK(robin): Add a sleep here to temporarily workaround two problems with this test:
+			// 1. The sample times are compared against the `cutoff` in core/local/local.go and sometimes the
+			//    second sample (below) gets a `Time` smaller than `cutoff` because the lines below get executed
+			//    before the `<-ctx.Done()` select in local.go:Run() on multi-core systems where
+			//    goroutines can run in parallel.
+			// 2. Sometimes the `case samples := <-vuOut` gets selected before the `<-ctx.Done()` in
+			//    core/local/local.go:Run() causing all samples from this mocked "RunOnce()" function to be accepted.
+			time.Sleep(time.Millisecond * 10)
 			samples = append(samples, stats.Sample{Metric: testMetric, Time: time.Now(), Value: 2})
 			return samples, err
 		}), lib.Options{
