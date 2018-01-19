@@ -864,25 +864,35 @@ func TestRequestAndBatch(t *testing.T) {
 	})
 
 	t.Run("HTTPRequest", func(t *testing.T) {
-		_, err := common.RunString(rt, `
-			let reqUrl = "https://httpbin.org/cookies"
-			let res = http.get(reqUrl);
-			let jar = new http.CookieJar();
+		t.Run("EmptyBody", func(t *testing.T) {
+			_, err := common.RunString(rt, `
+				let reqUrl = "https://httpbin.org/cookies"
+				let res = http.get(reqUrl);
+				let jar = new http.CookieJar();
 
-			jar.set("https://httpbin.org/cookies", "key", "value");
-			res = http.request("GET", "https://httpbin.org/cookies", null, { cookies: { key2: "value2" }, jar: jar });
+				jar.set("https://httpbin.org/cookies", "key", "value");
+				res = http.request("GET", "https://httpbin.org/cookies", null, { cookies: { key2: "value2" }, jar: jar });
 
-			if (res.json().cookies.key != "value") { throw new Error("wrong cookie value: " + res.json().cookies.key); }
+				if (res.json().cookies.key != "value") { throw new Error("wrong cookie value: " + res.json().cookies.key); }
 
-			if (res.status != 200) { throw new Error("wrong status: " + res.status); }
-			if (res.request["method"] !== "GET") { throw new Error("http request method was not \"GET\": " + JSON.stringify(res.request)) }
-			if (res.request["body"] != null) { throw new Error("http request body was not null: " + JSON.stringify(res.request)) }
-			if (res.request["url"] != reqUrl) {
-				throw new Error("wront http request url: " + JSON.stringify(res.request))
-			}
-			if (res.request["cookies"]["key2"][0].name != "key2") { throw new Error("wrong http request cookies: " + JSON.stringify(JSON.stringify(res.request["cookies"]["key2"]))) }
-			if (res.request["headers"]["User-Agent"][0] != "TestUserAgent") { throw new Error("wrong http request headers: " + JSON.stringify(res.request)) }
-			`)
-		assert.NoError(t, err)
+				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+				if (res.request["method"] !== "GET") { throw new Error("http request method was not \"GET\": " + JSON.stringify(res.request)) }
+				if (res.request["body"].length != 0) { throw new Error("http request body was not null: " + JSON.stringify(res.request["body"])) }
+				if (res.request["url"] != reqUrl) {
+					throw new Error("wrong http request url: " + JSON.stringify(res.request))
+				}
+				if (res.request["cookies"]["key2"][0].name != "key2") { throw new Error("wrong http request cookies: " + JSON.stringify(JSON.stringify(res.request["cookies"]["key2"]))) }
+				if (res.request["headers"]["User-Agent"][0] != "TestUserAgent") { throw new Error("wrong http request headers: " + JSON.stringify(res.request)) }
+				`)
+			assert.NoError(t, err)
+		})
+		t.Run("NonEmptyBody", func(t *testing.T) {
+			_, err := common.RunString(rt, `
+				let res = http.post("https://httpbin.org/post", {a: "a", b: 2}, {headers: {"Content-Type": "application/x-www-form-urlencoded; charset=utf-8"}});
+				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+				if (res.request["body"] != "a=a&b=2") { throw new Error("http request body was not set properly: " + JSON.stringify(res.request))}
+				`)
+			assert.NoError(t, err)
+		})
 	})
 }

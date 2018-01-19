@@ -25,7 +25,6 @@ import (
 	"compress/gzip"
 	"compress/zlib"
 	"context"
-	// "fmt"
 	"io"
 	"io/ioutil"
 	"net"
@@ -49,7 +48,7 @@ type HTTPRequest struct {
 	Method  string
 	URL     string
 	Headers map[string][]string
-	Body    io.Closer
+	Body    string
 	Cookies map[string][]*HTTPRequestCookie
 }
 
@@ -129,7 +128,7 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 	if bodyBuf != nil {
 		req.Body = ioutil.NopCloser(bodyBuf)
 		req.ContentLength = int64(bodyBuf.Len())
-		respReq.Body = req.Body
+		respReq.Body = bodyBuf.String()
 	}
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
