@@ -48,6 +48,9 @@ var convertCmd = &cobra.Command{
   # Convert a HAR file to a k6 script creating requests only for the given domain/s.
   k6 convert -O har-session.js --only yourdomain.com,additionaldomain.com session.har
 
+  # Convert a HAR file. Batching requests together as long as idle time between requests <800ms
+  k6 convert --batch-threshold 800 session.har
+
   # Run the k6 script.
   k6 run har-session.js`[1:],
 	Args: cobra.ExactArgs(1),
@@ -98,6 +101,6 @@ func init() {
 	convertCmd.Flags().StringVarP(&output, "output", "O", output, "k6 script output filename")
 	convertCmd.Flags().StringSliceVarP(&only, "only", "", []string{}, "include only requests from the given domains")
 	convertCmd.Flags().StringSliceVarP(&skip, "skip", "", []string{}, "skip requests from the given domains")
-	convertCmd.Flags().UintVarP(&threshold, "batch-threshold", "", 500, "split requests in different batch statements when the start time difference between subsequent requests is smaller than the given value in ms. A sleep will be added between the batch statements.")
+	convertCmd.Flags().UintVarP(&threshold, "batch-threshold", "", 500, "batch request idle time threshold (see example)")
 	convertCmd.Flags().BoolVarP(&enableChecks, "enable-status-code-checks", "", false, "add a check for each http status response")
 }
