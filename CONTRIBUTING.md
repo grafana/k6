@@ -42,10 +42,11 @@ Once that's done, you can get the k6 source into your Go workspace (`$GOPATH/src
 ```bash
 go get github.com/loadimpact/k6
 ```
+This will also build a `k6` binary and put it in `$GOPATH/bin`.
 
 **Building from source**:
 
-Now, standing in the repo root (`$GOPATH/src/github.com/loadimpact/k6`) you can build a k6 binary from source by running:
+Standing in the repo root (`$GOPATH/src/github.com/loadimpact/k6`) you can build a k6 binary from source by running:
 ```bash
 cd $GOPATH/src/github.com/loadimpact/k6
 go build
@@ -53,10 +54,13 @@ go build
 
 **Running the linter**:
 
-We make use of the [`gometalinter`]() tool to lint the code in CI. To run it locally:
+We make use of the [gometalinter](https://github.com/alecthomas/gometalinter) tool to lint the code in CI. To run it locally, first install it:
 ```bash
 go get -u github.com/alecthomas/gometalinter
 gometalinter --install
+```
+then run:
+```
 gometalinter --deadline 10m --config gometalinter.json --vendor ./...
 ```
 
