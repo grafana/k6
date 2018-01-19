@@ -20,8 +20,6 @@ const (
 )
 
 var (
-	//engine  = *common.core.Engine
-	//metrics = 0
 	metrics = make([]v1.Metric, 0)
 )
 
@@ -47,11 +45,9 @@ func HandlePrometheusMetrics() http.Handler {
 
 //prometheus exporter
 type Exporter struct {
-	URI    string
 	mutex  sync.Mutex
 	client *http.Client
 
-	//up                *prometheus.Desc
 	vus               *prometheus.Desc
 	vusMax            *prometheus.Desc
 	iterations        *prometheus.Desc
@@ -70,12 +66,6 @@ type Exporter struct {
 // NewExporter returns an initialized Exporter.
 func NewExporter() *Exporter {
 	return &Exporter{
-		//URI: uri,
-		/*up: prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, "", "up"),
-		"Could k6 be reached",
-		nil,
-		nil),*/
 		vus: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "", "vus_length"),
 			"Current number of active virtual users",
