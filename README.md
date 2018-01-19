@@ -70,13 +70,13 @@ docker pull loadimpact/k6
 Grab a prebuilt binary from [the Releases page](https://github.com/loadimpact/k6/releases).
 
 ### Build from source
-To build from source you need **[Git](https://git-scm.com/downloads)** and **[Go](https://golang.org/doc/install)** (1.8 or newer). Follow these instruction for fast building:
+To build from source you need **[Git](https://git-scm.com/downloads)** and **[Go](https://golang.org/doc/install)** (1.8 or newer). Follow these instructions:
 
-- Get source `go get github.com/loadimpact/k6`
-- Now `cd` to `$GOPATH/src/github.com/loadimpact/k6` and run `go build`
-- Tada, you can now run k6 using `./k6 run script.js`
-
-Then make sure to put the `k6` binary somewhere in your PATH.
+- Run `go get github.com/loadimpact/k6` which will:
+  - git clone the repo and put the source in `$GOPATH/src/github.com/loadimpact/k6`
+  - build a `k6` binary and put it in `$GOPATH/bin`
+- Make sure you have `$GOPATH/bin` in your PATH
+- Tada, you can now run k6 using `k6 run script.js`
 
 Quick start
 -----------
