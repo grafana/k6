@@ -84,7 +84,7 @@ a commandline interface for interacting with it.`,
 
   # Send metrics to an influxdb server
   k6 run -o influxdb=http://1.2.3.4:8086/k6`[1:],
-	Args: cobra.ExactArgs(1),
+	Args: exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		_, _ = BannerColor.Fprint(stdout, Banner+"\n\n")
 

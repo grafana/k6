@@ -43,7 +43,7 @@ var cloudCmd = &cobra.Command{
 This will execute the test on the Load Impact cloud service. Use "k6 login cloud" to authenticate.`,
 	Example: `
         k6 cloud script.js`[1:],
-	Args: cobra.ExactArgs(1),
+	Args: exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		_, _ = BannerColor.Fprint(stdout, Banner+"\n\n")
 		fmt.Fprint(stdout, "  Uploading script to the cloud..")
