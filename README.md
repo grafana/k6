@@ -47,7 +47,7 @@ Features
 - **Batteries included**: [Cookies](https://docs.k6.io/docs/cookies), [Crypto](https://docs.k6.io/docs/k6crypto), [Custom metrics](https://docs.k6.io/docs/result-metrics#section-custom-metrics), [Encodings](https://docs.k6.io/docs/k6encoding), [Environment variables](https://docs.k6.io/docs/environment-variables), JSON, [HTML forms](https://docs.k6.io/docs/working-with-html-forms) and more.
 - **Flexible metrics storage/visualization**: [InfluxDB](https://docs.k6.io/docs/influxdb-grafana) (+Grafana), JSON or [Load Impact Insights](https://docs.k6.io/docs/load-impact-insights)
 
-There's even more! [See all features available in k6.](https://docs.k6.io/welcome)
+There's even more! [See all features available in k6.](https://docs.k6.io/docs/welcome)
 
 Install
 ------
