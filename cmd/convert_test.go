@@ -133,6 +133,7 @@ func TestIntegrationConvertCmd(t *testing.T) {
 		assert.NoError(t, err)
 
 		output, err := afero.ReadFile(defaultFs, "/output.js")
+		assert.NoError(t, err)
 		assert.Equal(t, testHARConvertResult, string(output))
 	})
 }
