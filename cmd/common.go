@@ -24,13 +24,19 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"os"
 	"sync"
 
 	"github.com/loadimpact/k6/lib"
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	null "gopkg.in/guregu/null.v3"
 )
+
+// Use these when interacting with fs and writing to terminal, makes a command testable
+var defaultFs = afero.NewOsFs()
+var defaultWriter io.Writer = os.Stdout
 
 // Panic if the given error is not nil.
 func must(err error) {
