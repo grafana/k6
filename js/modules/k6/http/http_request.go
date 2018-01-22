@@ -312,7 +312,7 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 	} else {
 		if activeJar != nil {
 			if rc := res.Cookies(); len(rc) > 0 {
-				activeJar.SetCookies(req.URL, rc)
+				activeJar.SetCookies(res.Request.URL, rc)
 			}
 		}
 
