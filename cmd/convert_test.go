@@ -115,21 +115,24 @@ export default function() {
 func TestIntegrationConvertCmd(t *testing.T) {
 	t.Run("Stdout", func(t *testing.T) {
 		defaultFs = afero.NewMemMapFs()
-		afero.WriteFile(defaultFs, "/input.har", []byte(testHAR), 0644)
+		err := afero.WriteFile(defaultFs, "/input.har", []byte(testHAR), 0644)
+		assert.NoError(t, err)
 
 		buf := &bytes.Buffer{}
 		defaultWriter = buf
 
-		err := convertCmd.RunE(convertCmd, []string{"/input.har"})
+		err = convertCmd.RunE(convertCmd, []string{"/input.har"})
 		assert.NoError(t, err)
 		assert.Equal(t, testHARConvertResult, buf.String())
 	})
 	t.Run("Output file", func(t *testing.T) {
 		defaultFs = afero.NewMemMapFs()
-		afero.WriteFile(defaultFs, "/input.har", []byte(testHAR), 0644)
+		err := afero.WriteFile(defaultFs, "/input.har", []byte(testHAR), 0644)
+		assert.NoError(t, err)
 
-		convertCmd.Flags().Set("output", "/output.js")
-		err := convertCmd.RunE(convertCmd, []string{"/input.har"})
+		err = convertCmd.Flags().Set("output", "/output.js")
+		assert.NoError(t, err)
+		err = convertCmd.RunE(convertCmd, []string{"/input.har"})
 		assert.NoError(t, err)
 
 		output, err := afero.ReadFile(defaultFs, "/output.js")
