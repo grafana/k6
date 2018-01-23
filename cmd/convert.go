@@ -21,14 +21,14 @@
 package cmd
 
 import (
-	"os"
+	"io"
 	"path/filepath"
 
 	"github.com/loadimpact/k6/converter/har"
 	"github.com/spf13/cobra"
 )
 
-var output = "har-script.js"
+var output = ""
 
 var (
 	enableChecks bool
@@ -60,7 +60,7 @@ var convertCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		r, err := os.Open(filePath)
+		r, err := defaultFs.Open(filePath)
 		if err != nil {
 			return err
 		}
@@ -77,19 +77,25 @@ var convertCmd = &cobra.Command{
 			return err
 		}
 
-		// Write script content to output
-		f, err := os.Create(output)
-		if err != nil {
-			return err
-		}
-		if _, err := f.WriteString(script); err != nil {
-			return err
-		}
-		if err := f.Sync(); err != nil {
-			return err
-		}
-		if err := f.Close(); err != nil {
-			return err
+		// Write script content to stdout or file
+		if output == "" || output == "-" {
+			if _, err := io.WriteString(defaultWriter, script); err != nil {
+				return err
+			}
+		} else {
+			f, err := defaultFs.Create(output)
+			if err != nil {
+				return err
+			}
+			if _, err := f.WriteString(script); err != nil {
+				return err
+			}
+			if err := f.Sync(); err != nil {
+				return err
+			}
+			if err := f.Close(); err != nil {
+				return err
+			}
 		}
 		return nil
 	},
@@ -98,7 +104,7 @@ var convertCmd = &cobra.Command{
 func init() {
 	RootCmd.AddCommand(convertCmd)
 	convertCmd.Flags().SortFlags = false
-	convertCmd.Flags().StringVarP(&output, "output", "O", output, "k6 script output filename")
+	convertCmd.Flags().StringVarP(&output, "output", "O", output, "k6 script output filename (stdout by default)")
 	convertCmd.Flags().StringSliceVarP(&only, "only", "", []string{}, "include only requests from the given domains")
 	convertCmd.Flags().StringSliceVarP(&skip, "skip", "", []string{}, "skip requests from the given domains")
 	convertCmd.Flags().UintVarP(&threshold, "batch-threshold", "", 500, "batch request idle time threshold (see example)")
