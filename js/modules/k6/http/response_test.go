@@ -86,7 +86,7 @@ func (h *TestGetFormHttpHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	}
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(body)))
 	w.WriteHeader(200)
-	w.Write(body)
+	_, _ = w.Write(body)
 }
 
 func TestResponse(t *testing.T) {
