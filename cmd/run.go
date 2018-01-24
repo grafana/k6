@@ -307,7 +307,7 @@ a commandline interface for interacting with it.`,
 			updateFreq = 1 * time.Second
 		}
 		ticker := time.NewTicker(updateFreq)
-		if quiet {
+		if quiet || conf.HttpDebug.Bool || conf.HttpDebugFull.Bool {
 			ticker.Stop()
 		}
 	mainLoop:
