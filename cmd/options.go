@@ -44,7 +44,8 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.Int64("batch-per-host", 0, "max parallel batch reqs per host")
 	flags.Int64("rps", 0, "limit requests per second")
 	flags.String("user-agent", fmt.Sprintf("k6/%s (https://k6.io/);", Version), "user agent for http requests")
-	flags.Bool("http-debug", false, "log all HTTP requests and responses")
+	flags.Bool("http-debug", false, "log all HTTP requests and responses, excluding body")
+	flags.Bool("http-debug-full", false, "log all HTTP requests and responses, including body")
 	flags.Bool("insecure-skip-tls-verify", false, "skip verification of TLS certificates")
 	flags.Bool("no-connection-reuse", false, "don't reuse connections between iterations")
 	flags.BoolP("throw", "w", false, "throw warnings (like failed http requests) as errors")
@@ -65,6 +66,7 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		RPS:                   getNullInt64(flags, "rps"),
 		UserAgent:             getNullString(flags, "user-agent"),
 		HttpDebug:             getNullBool(flags, "http-debug"),
+		HttpDebugFull:         getNullBool(flags, "http-debug-full"),
 		InsecureSkipTLSVerify: getNullBool(flags, "insecure-skip-tls-verify"),
 		NoConnectionReuse:     getNullBool(flags, "no-connection-reuse"),
 		Throw:                 getNullBool(flags, "throw"),
