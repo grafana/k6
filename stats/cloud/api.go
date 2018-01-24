@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"mime/multipart"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/loadimpact/k6/lib"
@@ -118,7 +119,7 @@ func (c *Client) PushMetric(referenceID string, noCompress bool, samples []*Samp
 	}
 }
 
-func (c *Client) StartCloudTestRun(name string, arc *lib.Archive) (string, error) {
+func (c *Client) StartCloudTestRun(name string, projectID int, arc *lib.Archive) (string, error) {
 	requestUrl := fmt.Sprintf("%s/archive-upload", c.baseURL)
 
 	var buf bytes.Buffer
@@ -126,6 +127,12 @@ func (c *Client) StartCloudTestRun(name string, arc *lib.Archive) (string, error
 
 	if err := mp.WriteField("name", name); err != nil {
 		return "", err
+	}
+
+	if projectID != 0 {
+		if err := mp.WriteField("project_id", strconv.Itoa(projectID)); err != nil {
+			return "", err
+		}
 	}
 
 	fw, err := mp.CreateFormFile("file", "archive.tar")
