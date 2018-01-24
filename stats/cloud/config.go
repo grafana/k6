@@ -29,7 +29,7 @@ type ConfigFields struct {
 	Name            string `json:"name" mapstructure:"name" envconfig:"CLOUD_NAME"`
 	Host            string `json:"host" mapstructure:"host" envconfig:"CLOUD_HOST"`
 	NoCompress      bool   `json:"no_compress" mapstructure:"no_compress" envconfig:"CLOUD_NO_COMPRESS"`
-	ProjectID       int    `json:"project_id" mapstructure:"project_id" envconfig:"CLOUD_PROJECT_ID"`
+	ProjectID       int    `json:"project_id" mapstructure:"projectID" envconfig:"CLOUD_PROJECT_ID"`
 	DeprecatedToken string `envconfig:"K6CLOUD_TOKEN"`
 }
 
