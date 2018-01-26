@@ -61,6 +61,13 @@ type CreateTestRunResponse struct {
 	ReferenceID string `json:"reference_id"`
 }
 
+type TestProgressResponse struct {
+	RunStatusText string  `json:"run_status_text"`
+	RunStatus     int     `json:"run_status"`
+	ResultStatus  int     `json:"result_status"`
+	Progress      float64 `json:"progress"`
+}
+
 type LoginResponse struct {
 	Token string `json:"token"`
 }
@@ -173,6 +180,33 @@ func (c *Client) TestFinished(referenceID string, thresholds ThresholdResult, ta
 	}
 
 	req, err := c.NewRequest("POST", url, data)
+	if err != nil {
+		return err
+	}
+
+	return c.Do(req, nil)
+}
+
+func (c *Client) GetTestProgress(referenceID string) (*TestProgressResponse, error) {
+	url := fmt.Sprintf("%s/test-progress/%s", c.baseURL, referenceID)
+	req, err := c.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	ctrr := TestProgressResponse{}
+	err = c.Do(req, &ctrr)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ctrr, nil
+}
+
+func (c *Client) StopCloudTestRun(referenceID string) error {
+	url := fmt.Sprintf("%s/tests/%s/stop", c.baseURL, referenceID)
+
+	req, err := c.NewRequest("POST", url, nil)
 	if err != nil {
 		return err
 	}
