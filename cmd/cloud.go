@@ -119,7 +119,7 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 			name = filepath.Base(filename)
 		}
 
-		refID, err := client.StartCloudTestRun(name, arc)
+		refID, err := client.StartCloudTestRun(name, cloudConfig.ProjectID, arc)
 		if err != nil {
 			return err
 		}
