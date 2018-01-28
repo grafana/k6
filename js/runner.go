@@ -21,6 +21,7 @@
 package js
 
 import (
+	"container/ring"
 	"context"
 	"crypto/tls"
 	"net"
@@ -136,10 +137,21 @@ func (r *Runner) newVU() (*VU, error) {
 		}
 	}
 
+	hosts := map[string]*ring.Ring{}
+	for host, ips := range r.Bundle.Options.Hosts {
+		hosts[host] = ring.New(len(ips))
+
+		for i := 0; i < len(ips); i++ {
+			hosts[host].Value = ips[i]
+			hosts[host] = hosts[host].Next()
+		}
+	}
+
 	dialer := &netext.Dialer{
 		Dialer:    r.BaseDialer,
 		Resolver:  r.Resolver,
 		Blacklist: r.Bundle.Options.BlacklistIPs,
+		Hosts:     hosts,
 	}
 	transport := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
