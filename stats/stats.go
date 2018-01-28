@@ -204,7 +204,8 @@ func New(name string, typ MetricType, t ...ValueType) *Metric {
 func (m *Metric) HumanizeValue(v float64) string {
 	switch m.Type {
 	case Rate:
-		return strconv.FormatFloat(100*v, 'f', 2, 64) + "%"
+		// Truncate instead of round when decreasing precision to 2 decimal places
+		return strconv.FormatFloat(float64(int(v*100*100))/100, 'f', 2, 64) + "%"
 	default:
 		switch m.Contains {
 		case Time:
