@@ -62,6 +62,7 @@ type HTTPResponse struct {
 	TLSCipherSuite string
 	OCSP           OCSP `js:"ocsp"`
 	Error          string
+	Request        HTTPRequest
 
 	cachedJSON goja.Value
 }

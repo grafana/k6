@@ -44,6 +44,14 @@ import (
 	null "gopkg.in/guregu/null.v3"
 )
 
+type HTTPRequest struct {
+	Method  string
+	URL     string
+	Headers map[string][]string
+	Body    string
+	Cookies map[string][]*HTTPRequestCookie
+}
+
 func (http *HTTP) Get(ctx context.Context, url goja.Value, args ...goja.Value) (*HTTPResponse, error) {
 	// The body argument is always undefined for GETs and HEADs.
 	args = append([]goja.Value{goja.Undefined()}, args...)
@@ -113,9 +121,14 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 		URL:    url.URL,
 		Header: make(http.Header),
 	}
+	respReq := &HTTPRequest{
+		Method: req.Method,
+		URL:    req.URL.String(),
+	}
 	if bodyBuf != nil {
 		req.Body = ioutil.NopCloser(bodyBuf)
 		req.ContentLength = int64(bodyBuf.Len())
+		respReq.Body = bodyBuf.String()
 	}
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
@@ -231,7 +244,9 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 	}
 
 	if activeJar != nil {
-		h.setRequestCookies(req, activeJar, reqCookies)
+		mergedCookies := h.mergeCookies(req, activeJar, reqCookies)
+		respReq.Cookies = mergedCookies
+		h.setRequestCookies(req, mergedCookies)
 	}
 
 	// Check rate limit *after* we've prepared a request; no need to wait with that part.
@@ -241,7 +256,9 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 		}
 	}
 
-	resp := &HTTPResponse{ctx: ctx, URL: url.URLString}
+	respReq.Headers = req.Header
+
+	resp := &HTTPResponse{ctx: ctx, URL: url.URLString, Request: *respReq}
 	client := http.Client{
 		Transport: state.HTTPTransport,
 		Timeout:   timeout,
@@ -252,7 +269,9 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 					activeJar.SetCookies(req.URL, respCookies)
 				}
 				req.Header.Del("Cookie")
-				h.setRequestCookies(req, activeJar, reqCookies)
+				mergedCookies := h.mergeCookies(req, activeJar, reqCookies)
+
+				h.setRequestCookies(req, mergedCookies)
 			}
 
 			if l := len(via); int64(l) > redirects.Int64 {
