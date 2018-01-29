@@ -128,21 +128,25 @@ func (*HTTP) CookieJar(ctx context.Context) *HTTPCookieJar {
 	return &HTTPCookieJar{state.CookieJar, &ctx}
 }
 
-func (*HTTP) setRequestCookies(req *http.Request, jar *cookiejar.Jar, reqCookies map[string]*HTTPRequestCookie) {
-	jarCookies := make(map[string][]*http.Cookie)
+func (*HTTP) mergeCookies(req *http.Request, jar *cookiejar.Jar, reqCookies map[string]*HTTPRequestCookie) map[string][]*HTTPRequestCookie {
+	allCookies := make(map[string][]*HTTPRequestCookie)
 	for _, c := range jar.Cookies(req.URL) {
-		jarCookies[c.Name] = append(jarCookies[c.Name], c)
+		allCookies[c.Name] = append(allCookies[c.Name], &HTTPRequestCookie{Name: c.Name, Value: c.Value})
 	}
 	for key, reqCookie := range reqCookies {
-		if jc := jarCookies[key]; jc != nil && reqCookie.Replace {
-			jarCookies[key] = []*http.Cookie{{Name: key, Value: reqCookie.Value}}
+		if jc := allCookies[key]; jc != nil && reqCookie.Replace {
+			allCookies[key] = []*HTTPRequestCookie{{Name: key, Value: reqCookie.Value}}
 		} else {
-			jarCookies[key] = append(jarCookies[key], &http.Cookie{Name: key, Value: reqCookie.Value})
+			allCookies[key] = append(allCookies[key], &HTTPRequestCookie{Name: key, Value: reqCookie.Value})
 		}
 	}
-	for _, cookies := range jarCookies {
+	return allCookies
+}
+
+func (*HTTP) setRequestCookies(req *http.Request, reqCookies map[string][]*HTTPRequestCookie) {
+	for _, cookies := range reqCookies {
 		for _, c := range cookies {
-			req.AddCookie(c)
+			req.AddCookie(&http.Cookie{Name: c.Name, Value: c.Value})
 		}
 	}
 }
