@@ -159,14 +159,13 @@ func (c *Client) TestFinished(referenceID string, thresholds ThresholdResult, ta
 	url := fmt.Sprintf("%s/tests/%s", c.baseURL, referenceID)
 
 	status := 0
-
 	if tained {
 		status = 1
 	}
 
 	data := struct {
-		Status     int             `json:"status"`
-		Thresholds ThresholdResult `json:"thresholds"`
+		ResultStatus int             `json:"result_status"`
+		Thresholds   ThresholdResult `json:"thresholds"`
 	}{
 		status,
 		thresholds,
