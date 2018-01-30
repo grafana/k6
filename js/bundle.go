@@ -32,6 +32,7 @@ import (
 	jslib "github.com/loadimpact/k6/js/lib"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/loader"
+	"github.com/loadimpact/k6/stats"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 )
@@ -120,8 +121,34 @@ func NewBundle(src *lib.SourceData, fs afero.Fs) (*Bundle, error) {
 		if err != nil {
 			return nil, err
 		}
-		if err := json.Unmarshal(optdata, &bundle.Options); err != nil {
+		var f interface{}
+		if err := json.Unmarshal(optdata, &f); err != nil {
 			return nil, err
+		}
+		switch f.(type) {
+		case []interface{}:
+			var tempOptions []lib.Options
+			if err := json.Unmarshal(optdata, &tempOptions); err != nil {
+				return nil, err
+			}
+
+			// merge things, there's probably an easier way to do this but it works at the moment
+			mergedThresholds := make(map[string]stats.Thresholds)
+			for _, options := range tempOptions {
+				for k := range options.Thresholds {
+					runtime := options.Thresholds[k].Runtime
+					var tempThresholds []*stats.Threshold
+					tempThresholds = append(mergedThresholds[k].Thresholds, options.Thresholds[k].Thresholds...)
+					mergedThresholds[k] = stats.Thresholds{Runtime: runtime, Thresholds: tempThresholds}
+				}
+			}
+			// take the last options from the array and replace the thresholds with merged thresholds
+			bundle.Options = tempOptions[len(tempOptions)-1]
+			bundle.Options.Thresholds = mergedThresholds
+		case map[string]interface{}:
+			if err := json.Unmarshal(optdata, &bundle.Options); err != nil {
+				return nil, err
+			}
 		}
 	}
 
