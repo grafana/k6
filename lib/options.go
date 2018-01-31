@@ -165,10 +165,7 @@ type Options struct {
 	BatchPerHost null.Int `json:"batchPerHost" envconfig:"batch_per_host"`
 
 	// Should all HTTP requests and responses be logged (excluding body)?
-	HttpDebug null.Bool `json:"httpDebug" envconfig:"http_debug"`
-
-	// Should all HTTP requests and responses be logged (including body)?
-	HttpDebugFull null.Bool `json:"httpDebugFull" envconfig:"http_debug_full"`
+	HttpDebug null.String `json:"httpDebug" envconfig:"http_debug"`
 
 	// Accept invalid or untrusted TLS certificates.
 	InsecureSkipTLSVerify null.Bool `json:"insecureSkipTLSVerify" envconfig:"insecure_skip_tls_verify"`
@@ -244,9 +241,6 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.HttpDebug.Valid {
 		o.HttpDebug = opts.HttpDebug
-	}
-	if opts.HttpDebugFull.Valid {
-		o.HttpDebugFull = opts.HttpDebugFull
 	}
 	if opts.InsecureSkipTLSVerify.Valid {
 		o.InsecureSkipTLSVerify = opts.InsecureSkipTLSVerify
