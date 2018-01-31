@@ -59,15 +59,17 @@ brew tap loadimpact/k6
 brew install k6
 ```
 
+### Other Platforms
+
+Grab a prebuilt binary from [the Releases page](https://github.com/loadimpact/k6/releases).
+
+Install the binary in your _PATH_ to run k6 from any location.
+
 ### Docker
 
 ```bash
 docker pull loadimpact/k6
 ```
-
-### Other Platforms
-
-Grab a prebuilt binary from [the Releases page](https://github.com/loadimpact/k6/releases).
 
 ### Build from source
 To build from source you need **[Git](https://git-scm.com/downloads)** and **[Go](https://golang.org/doc/install)** (1.8 or newer). Follow these instructions:
