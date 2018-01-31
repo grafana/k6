@@ -21,9 +21,12 @@
 package har
 
 import (
+	"fmt"
 	"sort"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestIsAllowedURL(t *testing.T) {
@@ -45,9 +48,7 @@ func TestIsAllowedURL(t *testing.T) {
 
 	for _, s := range allowed {
 		v := IsAllowedURL(s.url, s.only, s.skip)
-		if v != s.expected {
-			t.Errorf("IsAllowedURL(%v, %v, %v): expected %v, actual %v", s.url, s.only, s.skip, s.expected, v)
-		}
+		assert.Equal(t, v, s.expected, fmt.Sprintf("params: %v, %v, %v", s.url, s.only, s.skip))
 	}
 }
 
@@ -82,8 +83,6 @@ func TestSplitEntriesInBatches(t *testing.T) {
 
 	for _, v := range splitValues {
 		result := SplitEntriesInBatches(entries, v.diff)
-		if len(result) != int(v.groups) {
-			t.Errorf("SplitEntriesInBatches(entries, %v) Expected %v, actual %v", v.diff, v.groups, len(result))
-		}
+		assert.Equal(t, len(result), int(v.groups), fmt.Sprintf("params: entries, %v", v.diff))
 	}
 }
