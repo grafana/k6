@@ -161,7 +161,7 @@ func (*HTTP) debugRequest(state *common.State, req *http.Request, description st
 }
 
 func (*HTTP) debugResponse(state *common.State, res *http.Response, description string) {
-	if state.Options.HttpDebug.String != "" {
+	if state.Options.HttpDebug.String != "" && res != nil {
 		dump, err := httputil.DumpResponse(res, state.Options.HttpDebug.String == "full")
 		if err != nil {
 			log.Fatal(err)
