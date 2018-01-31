@@ -22,6 +22,7 @@ package har
 
 import (
 	"fmt"
+	"net/url"
 	"testing"
 
 	"github.com/loadimpact/k6/js"
@@ -66,4 +67,52 @@ func TestBuildK6RequestObject(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+}
+
+func TestBuildK6Body(t *testing.T) {
+
+	bodyText := "ccustemail=ppcano%40gmail.com&size=medium&topping=cheese&delivery=12%3A00&comments="
+
+	req := &Request{
+		Method: "post",
+		URL:    "http://www.google.es",
+		PostData: &PostData{
+			MimeType: "application/x-www-form-urlencoded",
+			Text:     bodyText,
+		},
+	}
+	postParams, plainText, err := buildK6Body(req)
+	if err != nil {
+		t.Error(err)
+	} else if len(postParams) > 0 {
+		t.Error("buildK6Body postParams should be empty")
+	} else if plainText != bodyText {
+		t.Errorf("buildK6Body: expected %v, actual %v", bodyText, plainText)
+	}
+
+	email := "user@mail.es"
+	expectedEmailParam := fmt.Sprintf(`"email": %q`, email)
+
+	req = &Request{
+		Method: "post",
+		URL:    "http://www.google.es",
+		PostData: &PostData{
+			MimeType: "application/x-www-form-urlencoded",
+			Params: []Param{
+				{Name: "email", Value: url.QueryEscape(email)},
+				{Name: "pw", Value: "hola"},
+			},
+		},
+	}
+	postParams, plainText, err = buildK6Body(req)
+	if err != nil {
+		t.Error(err)
+	} else if plainText != "" {
+		t.Errorf("buildK6Body: expected empty plainText, actual %v", plainText)
+	} else if len(postParams) != 2 {
+		t.Errorf("buildK6Body: expected params length %v, actual %v", 2, len(postParams))
+	} else if postParams[0] != expectedEmailParam {
+		t.Errorf("buildK6Body: expected unescaped value %v, actual %v", expectedEmailParam, postParams[0])
+	}
+
 }
