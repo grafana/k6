@@ -263,6 +263,8 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 		Transport: state.HTTPTransport,
 		Timeout:   timeout,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			h.debugResponse(state, req.Response, "RedirectResponse")
+
 			// Update active jar with cookies found in "Set-Cookie" header(s) of redirect response
 			if activeJar != nil {
 				if respCookies := req.Response.Cookies(); len(respCookies) > 0 {
@@ -283,13 +285,17 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 					state.Logger.WithFields(log.Fields{"url": url.String()}).Warnf("Stopped after %d redirects and returned the redirection; pass { redirects: n } in request params or set global maxRedirects to silence this", l)
 				}
 				return http.ErrUseLastResponse
+			} else {
+				h.debugRequest(state, req, "RedirectRequest")
 			}
 			return nil
 		},
 	}
 
 	tracer := netext.Tracer{}
+	h.debugRequest(state, req, "Request")
 	res, resErr := client.Do(req.WithContext(netext.WithTracer(ctx, &tracer)))
+	h.debugResponse(state, res, "Response")
 	if resErr == nil && res != nil {
 		switch res.Header.Get("Content-Encoding") {
 		case "deflate":
