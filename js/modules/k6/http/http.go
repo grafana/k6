@@ -26,7 +26,10 @@ import (
 	"net/http/cookiejar"
 	"reflect"
 
+	"fmt"
 	"github.com/loadimpact/k6/js/common"
+	log "github.com/sirupsen/logrus"
+	"net/http/httputil"
 )
 
 var (
@@ -149,4 +152,28 @@ func (*HTTP) setRequestCookies(req *http.Request, reqCookies map[string][]*HTTPR
 			req.AddCookie(&http.Cookie{Name: c.Name, Value: c.Value})
 		}
 	}
+}
+
+func (*HTTP) debugRequest(state *common.State, req *http.Request, description string) {
+	if state.Options.HttpDebug.String != "" {
+		dump, err := httputil.DumpRequestOut(req, state.Options.HttpDebug.String == "full")
+		if err != nil {
+			log.Fatal(err)
+		}
+		logDump(description, dump)
+	}
+}
+
+func (*HTTP) debugResponse(state *common.State, res *http.Response, description string) {
+	if state.Options.HttpDebug.String != "" && res != nil {
+		dump, err := httputil.DumpResponse(res, state.Options.HttpDebug.String == "full")
+		if err != nil {
+			log.Fatal(err)
+		}
+		logDump(description, dump)
+	}
+}
+
+func logDump(description string, dump []byte) {
+	fmt.Printf("%s:\n%s\n", description, dump)
 }
