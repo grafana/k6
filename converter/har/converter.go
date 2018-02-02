@@ -123,7 +123,7 @@ func Convert(h HAR, includeCodeCheck bool, batchTime uint, nobatch bool, only, s
 
 				if includeCodeCheck {
 					if e.Response.Status > 0 {
-						fmt.Fprintf(w, "\t\tcheck(res, {\n\t\t\t\"status is %v\": (r) => r.status === %v\n\t\t});\n", e.Response.Status, e.Response.Status)
+						fmt.Fprintf(w, "\t\tif (!check(res, {\"status is %v\": (r) => r.status === %v })) { return };\n", e.Response.Status, e.Response.Status)
 					}
 				}
 			}
