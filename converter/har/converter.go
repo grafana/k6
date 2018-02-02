@@ -30,7 +30,7 @@ import (
 	"strings"
 )
 
-func Convert(h HAR, includeCodeCheck bool, batchTime uint, only, skip []string) (string, error) {
+func Convert(h HAR, includeCodeCheck bool, batchTime uint, nobatch bool, only, skip []string) (string, error) {
 	var b bytes.Buffer
 	w := bufio.NewWriter(&b)
 	if includeCodeCheck {
@@ -87,55 +87,95 @@ func Convert(h HAR, includeCodeCheck bool, batchTime uint, only, skip []string) 
 		fmt.Fprintf(w, "\tgroup(\"%s - %s\", function() {\n", page.ID, page.Title)
 
 		sort.Sort(EntryByStarted(entries))
-		batches := SplitEntriesInBatches(entries, batchTime)
 
-		fmt.Fprint(w, "\t\tlet req, res;\n")
+		if nobatch {
+			for _, e := range entries {
 
-		for j, batchEntries := range batches {
+				var params []string
+				var cookies []string
+				var body string
 
-			fmt.Fprint(w, "\t\treq = [")
-			for k, e := range batchEntries {
-				r, err := buildK6RequestObject(e.Request)
-				if err != nil {
-					return "", err
+				if e.Request.PostData != nil {
+					body = e.Request.PostData.Text
 				}
-				fmt.Fprintf(w, "%v", r)
-				if k != len(batchEntries)-1 {
-					fmt.Fprint(w, ",")
-				}
-			}
-			fmt.Fprint(w, "];\n")
-			fmt.Fprint(w, "\t\tres = http.batch(req);\n")
 
-			if includeCodeCheck {
-				for k, e := range batchEntries {
+				for _, c := range e.Request.Cookies {
+					cookies = append(cookies, fmt.Sprintf(`%q: %q`, c.Name, c.Value))
+				}
+				if len(cookies) > 0 {
+					params = append(params, fmt.Sprintf("\"cookies\": {\n\t\t\t\t%s\n\t\t\t}", strings.Join(cookies, ",\n\t\t\t\t\t")))
+				}
+
+				if headers := buildK6Headers(e.Request.Headers); len(headers) > 0 {
+					params = append(params, fmt.Sprintf("\"headers\": {\n\t\t\t\t\t%s\n\t\t\t\t}", strings.Join(headers, ",\n\t\t\t\t\t")))
+				}
+
+				fmt.Fprintf(w, "\t\tres = http.%s(%q,\n\t\t\t%q",
+					strings.ToLower(e.Request.Method), e.Request.URL, body)
+
+				if len(params) > 0 {
+					fmt.Fprintf(w, ",\n\t\t\t{\n\t\t\t\t%s\n\t\t\t}", strings.Join(params, ",\n\t\t\t"))
+				}
+
+				fmt.Fprintf(w, "\n\t\t)\n")
+
+				if includeCodeCheck {
 					if e.Response.Status > 0 {
-						fmt.Fprintf(w, "\t\tcheck(res[%v], {\n\t\t\"status is %v\": (r) => r.status === %v,\n\t});\n", k, e.Response.Status, e.Response.Status)
+						fmt.Fprintf(w, "\t\tcheck(res, {\n\t\t\t\"status is %v\": (r) => r.status === %v\n\t\t});\n", e.Response.Status, e.Response.Status)
 					}
 				}
 			}
+		} else {
+			batches := SplitEntriesInBatches(entries, batchTime)
 
-			if j != len(batches)-1 {
-				lastBatchEntry := batchEntries[len(batchEntries)-1]
-				firstBatchEntry := batches[j+1][0]
-				t := firstBatchEntry.StartedDateTime.Sub(lastBatchEntry.StartedDateTime).Seconds()
+			fmt.Fprint(w, "\t\tlet req, res;\n")
+
+			for j, batchEntries := range batches {
+
+				fmt.Fprint(w, "\t\treq = [")
+				for k, e := range batchEntries {
+					r, err := buildK6RequestObject(e.Request)
+					if err != nil {
+						return "", err
+					}
+					fmt.Fprintf(w, "%v", r)
+					if k != len(batchEntries)-1 {
+						fmt.Fprint(w, ",")
+					}
+				}
+				fmt.Fprint(w, "];\n")
+				fmt.Fprint(w, "\t\tres = http.batch(req);\n")
+
+				if includeCodeCheck {
+					for k, e := range batchEntries {
+						if e.Response.Status > 0 {
+							fmt.Fprintf(w, "\t\tcheck(res[%v], {\n\t\t\"status is %v\": (r) => r.status === %v,\n\t});\n", k, e.Response.Status, e.Response.Status)
+						}
+					}
+				}
+
+				if j != len(batches)-1 {
+					lastBatchEntry := batchEntries[len(batchEntries)-1]
+					firstBatchEntry := batches[j+1][0]
+					t := firstBatchEntry.StartedDateTime.Sub(lastBatchEntry.StartedDateTime).Seconds()
+					fmt.Fprintf(w, "\t\tsleep(%.2f);\n", t)
+				}
+			}
+
+			if i == len(pages)-1 {
+				// Last page; add random sleep time at the group completion
+				fmt.Fprint(w, "\t\t// Random sleep between 2s and 4s\n")
+				fmt.Fprint(w, "\t\tsleep(Math.floor(Math.random()*3+2));\n")
+			} else {
+				// Add sleep time at the end of the group
+				nextPage := pages[i+1]
+				lastEntry := entries[len(entries)-1]
+				t := nextPage.StartedDateTime.Sub(lastEntry.StartedDateTime).Seconds()
+				if t < 0.01 {
+					t = 0.5
+				}
 				fmt.Fprintf(w, "\t\tsleep(%.2f);\n", t)
 			}
-		}
-
-		if i == len(pages)-1 {
-			// Last page; add random sleep time at the group completion
-			fmt.Fprint(w, "\t\t// Random sleep between 2s and 4s\n")
-			fmt.Fprint(w, "\t\tsleep(Math.floor(Math.random()*3+2));\n")
-		} else {
-			// Add sleep time at the end of the group
-			nextPage := pages[i+1]
-			lastEntry := entries[len(entries)-1]
-			t := nextPage.StartedDateTime.Sub(lastEntry.StartedDateTime).Seconds()
-			if t < 0.01 {
-				t = 0.5
-			}
-			fmt.Fprintf(w, "\t\tsleep(%.2f);\n", t)
 		}
 
 		fmt.Fprint(w, "\t});\n")
