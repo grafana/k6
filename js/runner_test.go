@@ -528,7 +528,7 @@ func TestVUIntegrationHosts(t *testing.T) {
 		NoConnectionReuse: null.BoolFrom(true),
 		Throw:             null.BoolFrom(true),
 		Hosts: map[string][]net.IP{
-			"test.loadimpact.com": []net.IP{ips[0], ips[1]},
+			"test.loadimpact.com": {ips[0], ips[1]},
 		},
 	})
 
