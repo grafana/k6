@@ -27,9 +27,10 @@ import (
 	"reflect"
 
 	"fmt"
+	"net/http/httputil"
+
 	"github.com/loadimpact/k6/js/common"
 	log "github.com/sirupsen/logrus"
-	"net/http/httputil"
 )
 
 var (
