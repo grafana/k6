@@ -34,23 +34,17 @@ import (
 func TestInitContextRequire(t *testing.T) {
 	t.Run("Modules", func(t *testing.T) {
 		t.Run("Nonexistent", func(t *testing.T) {
-			_, err := NewBundle(&lib.SourceData{
-				Filename: "/script.js",
-				Data:     []byte(`import "k6/NONEXISTENT";`),
-			}, afero.NewMemMapFs())
+			_, err := getSimpleBundle("/script.js", `import "k6/NONEXISTENT";`)
 			assert.EqualError(t, err, "GoError: unknown builtin module: k6/NONEXISTENT")
 		})
 
 		t.Run("k6", func(t *testing.T) {
-			b, err := NewBundle(&lib.SourceData{
-				Filename: "/script.js",
-				Data: []byte(`
+			b, err := getSimpleBundle("/script.js", `
 					import k6 from "k6";
 					export let _k6 = k6;
 					export let dummy = "abc123";
 					export default function() {}
-				`),
-			}, afero.NewMemMapFs())
+			`)
 			if !assert.NoError(t, err, "bundle error") {
 				return
 			}
@@ -74,15 +68,12 @@ func TestInitContextRequire(t *testing.T) {
 			}
 
 			t.Run("group", func(t *testing.T) {
-				b, err := NewBundle(&lib.SourceData{
-					Filename: "/script.js",
-					Data: []byte(`
+				b, err := getSimpleBundle("/script.js", `
 						import { group } from "k6";
 						export let _group = group;
 						export let dummy = "abc123";
 						export default function() {}
-					`),
-				}, afero.NewMemMapFs())
+				`)
 				if !assert.NoError(t, err) {
 					return
 				}
@@ -107,10 +98,7 @@ func TestInitContextRequire(t *testing.T) {
 
 	t.Run("Files", func(t *testing.T) {
 		t.Run("Nonexistent", func(t *testing.T) {
-			_, err := NewBundle(&lib.SourceData{
-				Filename: "/script.js",
-				Data:     []byte(`import "/nonexistent.js"; export default function() {}`),
-			}, afero.NewMemMapFs())
+			_, err := getSimpleBundle("/script.js", `import "/nonexistent.js"; export default function() {}`)
 			assert.EqualError(t, err, "GoError: open /nonexistent.js: file does not exist")
 		})
 		t.Run("Invalid", func(t *testing.T) {
@@ -119,7 +107,7 @@ func TestInitContextRequire(t *testing.T) {
 			_, err := NewBundle(&lib.SourceData{
 				Filename: "/script.js",
 				Data:     []byte(`import "/file.js"; export default function() {}`),
-			}, fs)
+			}, fs, lib.RuntimeOptions{})
 			assert.EqualError(t, err, "SyntaxError: /file.js: Unexpected character '\x00' (1:0)\n> 1 | \x00\n    | ^ at <eval>:2:26853(114)")
 		})
 		t.Run("Error", func(t *testing.T) {
@@ -128,7 +116,7 @@ func TestInitContextRequire(t *testing.T) {
 			_, err := NewBundle(&lib.SourceData{
 				Filename: "/script.js",
 				Data:     []byte(`import "/file.js"; export default function() {}`),
-			}, fs)
+			}, fs, lib.RuntimeOptions{})
 			assert.EqualError(t, err, "Error: aaaa at /file.js:1:19(4)")
 		})
 
@@ -180,9 +168,9 @@ func TestInitContextRequire(t *testing.T) {
 							`, libName)),
 						}
 
-						lib := `export default function() { return 12345; }`
+						jsLib := `export default function() { return 12345; }`
 						if constName != "" {
-							lib = fmt.Sprintf(
+							jsLib = fmt.Sprintf(
 								`import { c } from "%s"; export default function() { return c; }`,
 								constName,
 							)
@@ -193,9 +181,9 @@ func TestInitContextRequire(t *testing.T) {
 						}
 
 						assert.NoError(t, fs.MkdirAll(filepath.Dir(data.LibPath), 0755))
-						assert.NoError(t, afero.WriteFile(fs, data.LibPath, []byte(lib), 0644))
+						assert.NoError(t, afero.WriteFile(fs, data.LibPath, []byte(jsLib), 0644))
 
-						b, err := NewBundle(src, fs)
+						b, err := NewBundle(src, fs, lib.RuntimeOptions{})
 						if !assert.NoError(t, err) {
 							return
 						}
@@ -227,7 +215,7 @@ func TestInitContextRequire(t *testing.T) {
 					}
 				};
 				`),
-			}, fs)
+			}, fs, lib.RuntimeOptions{})
 			if !assert.NoError(t, err) {
 				return
 			}
@@ -259,7 +247,7 @@ func TestInitContextOpen(t *testing.T) {
 				export let data = open("%s");
 				export default function() {}
 				`, loadPath)),
-			}, fs)
+			}, fs, lib.RuntimeOptions{})
 			if !assert.NoError(t, err) {
 				return
 			}
@@ -277,7 +265,7 @@ func TestInitContextOpen(t *testing.T) {
 		_, err := NewBundle(&lib.SourceData{
 			Filename: "/script.js",
 			Data:     []byte(`open("/nonexistent.txt"); export default function() {}`),
-		}, fs)
+		}, fs, lib.RuntimeOptions{})
 		assert.EqualError(t, err, "GoError: open /nonexistent.txt: file does not exist")
 	})
 }
