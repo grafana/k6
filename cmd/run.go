@@ -105,7 +105,13 @@ a commandline interface for interacting with it.`,
 		if err != nil {
 			return err
 		}
-		r, err := newRunner(src, runType, afero.NewOsFs())
+
+		runtimeOptions, err := getRuntimeOptions(cmd.Flags())
+		if err != nil {
+			return err
+		}
+
+		r, err := newRunner(src, runType, afero.NewOsFs(), runtimeOptions)
 		if err != nil {
 			return err
 		}
@@ -408,6 +414,7 @@ func init() {
 
 	runCmd.Flags().SortFlags = false
 	runCmd.Flags().AddFlagSet(optionFlagSet())
+	runCmd.Flags().AddFlagSet(runtimeOptionFlagSet())
 	runCmd.Flags().AddFlagSet(configFlagSet())
 	runCmd.Flags().StringVarP(&runType, "type", "t", runType, "override file `type`, \"js\" or \"archive\"")
 }
@@ -429,12 +436,12 @@ func readSource(src, pwd string, fs afero.Fs, stdin io.Reader) (*lib.SourceData,
 }
 
 // Creates a new runner.
-func newRunner(src *lib.SourceData, typ string, fs afero.Fs) (lib.Runner, error) {
+func newRunner(src *lib.SourceData, typ string, fs afero.Fs, rtOpts lib.RuntimeOptions) (lib.Runner, error) {
 	switch typ {
 	case "":
-		return newRunner(src, detectType(src.Data), fs)
+		return newRunner(src, detectType(src.Data), fs, rtOpts)
 	case typeJS:
-		return js.New(src, fs)
+		return js.New(src, fs, rtOpts)
 	case typeArchive:
 		arc, err := lib.ReadArchive(bytes.NewReader(src.Data))
 		if err != nil {
@@ -442,7 +449,7 @@ func newRunner(src *lib.SourceData, typ string, fs afero.Fs) (lib.Runner, error)
 		}
 		switch arc.Type {
 		case typeJS:
-			return js.NewFromArchive(arc)
+			return js.NewFromArchive(arc, rtOpts)
 		default:
 			return nil, errors.Errorf("archive requests unsupported runner: %s", arc.Type)
 		}
