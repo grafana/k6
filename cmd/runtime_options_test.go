@@ -130,7 +130,7 @@ func TestEnvVars(t *testing.T) {
 			require.NoError(t, err)
 			require.EqualValues(t, tc.expEnv, rtOpts.Env)
 
-			// Clear the env again so real system values don't accidentally polute the end-to-end test
+			// Clear the env again so real system values don't accidentally pollute the end-to-end test
 			os.Clearenv()
 
 			jsCode := "export default function() {\n"
