@@ -60,7 +60,12 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 			return err
 		}
 
-		r, err := newRunner(src, runType, afero.NewOsFs())
+		runtimeOptions, err := getRuntimeOptions(cmd.Flags())
+		if err != nil {
+			return err
+		}
+
+		r, err := newRunner(src, runType, afero.NewOsFs(), runtimeOptions)
 		if err != nil {
 			return err
 		}
@@ -137,4 +142,5 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 func init() {
 	RootCmd.AddCommand(cloudCmd)
 	cloudCmd.Flags().AddFlagSet(optionFlagSet())
+	cloudCmd.Flags().AddFlagSet(runtimeOptionFlagSet())
 }

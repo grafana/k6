@@ -34,12 +34,12 @@ var archiveCmd = &cobra.Command{
 	Use:   "archive",
 	Short: "Create an archive",
 	Long: `Create an archive.
-	 
+
 An archive is a fully self-contained test run, and can be executed identically elsewhere.`,
 	Example: `
   # Archive a test run.
   k6 archive -u 10 -d 10s -O myarchive.tar script.js
-  
+
   # Run the resulting archive.
   k6 run myarchive.tar`[1:],
 	Args: cobra.ExactArgs(1),
@@ -55,7 +55,13 @@ An archive is a fully self-contained test run, and can be executed identically e
 		if err != nil {
 			return err
 		}
-		r, err := newRunner(src, runType, afero.NewOsFs())
+
+		runtimeOptions, err := getRuntimeOptions(cmd.Flags())
+		if err != nil {
+			return err
+		}
+
+		r, err := newRunner(src, runType, afero.NewOsFs(), runtimeOptions)
 		if err != nil {
 			return err
 		}
@@ -89,5 +95,6 @@ An archive is a fully self-contained test run, and can be executed identically e
 func init() {
 	RootCmd.AddCommand(archiveCmd)
 	archiveCmd.Flags().AddFlagSet(optionFlagSet())
+	archiveCmd.Flags().AddFlagSet(runtimeOptionFlagSet())
 	archiveCmd.Flags().StringVarP(&archiveOut, "archive-out", "O", archiveOut, "archive output filename")
 }

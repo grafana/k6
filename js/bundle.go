@@ -23,8 +23,6 @@ package js
 import (
 	"context"
 	"encoding/json"
-	"os"
-	"strings"
 
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
@@ -56,20 +54,8 @@ type BundleInstance struct {
 	Default goja.Callable
 }
 
-func collectEnv() map[string]string {
-	env := make(map[string]string)
-	for _, kv := range os.Environ() {
-		if idx := strings.IndexRune(kv, '='); idx != -1 {
-			env[kv[:idx]] = kv[idx+1:]
-		} else {
-			env[kv] = ""
-		}
-	}
-	return env
-}
-
 // Creates a new bundle from a source file and a filesystem.
-func NewBundle(src *lib.SourceData, fs afero.Fs) (*Bundle, error) {
+func NewBundle(src *lib.SourceData, fs afero.Fs, rtOpts lib.RuntimeOptions) (*Bundle, error) {
 	// Compile sources, both ES5 and ES6 are supported.
 	code := string(src.Data)
 	pgm, _, err := compiler.Compile(code, src.Filename, "", "", true)
@@ -91,7 +77,7 @@ func NewBundle(src *lib.SourceData, fs afero.Fs) (*Bundle, error) {
 		Source:          code,
 		Program:         pgm,
 		BaseInitContext: NewInitContext(rt, new(context.Context), fs, loader.Dir(src.Filename)),
-		Env:             collectEnv(),
+		Env:             rtOpts.Env,
 	}
 	if err := bundle.instantiate(rt, bundle.BaseInitContext); err != nil {
 		return nil, err
@@ -131,7 +117,7 @@ func NewBundle(src *lib.SourceData, fs afero.Fs) (*Bundle, error) {
 	return &bundle, nil
 }
 
-func NewBundleFromArchive(arc *lib.Archive) (*Bundle, error) {
+func NewBundleFromArchive(arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle, error) {
 	if arc.Type != "js" {
 		return nil, errors.Errorf("expected bundle type 'js', got '%s'", arc.Type)
 	}
@@ -158,7 +144,7 @@ func NewBundleFromArchive(arc *lib.Archive) (*Bundle, error) {
 		Program:         pgm,
 		Options:         arc.Options,
 		BaseInitContext: initctx,
-		Env:             collectEnv(),
+		Env:             rtOpts.Env, //TODO: use Env from archive (and apply the rtOpts.Env?)
 	}, nil
 }
 
