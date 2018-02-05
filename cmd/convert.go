@@ -32,6 +32,7 @@ var output = ""
 
 var (
 	enableChecks bool
+	returnOnFailedCheck bool
 	threshold    uint
 	nobatch      bool
 	only         []string
@@ -73,7 +74,7 @@ var convertCmd = &cobra.Command{
 			return err
 		}
 
-		script, err := har.Convert(h, enableChecks, threshold, nobatch, only, skip)
+		script, err := har.Convert(h, enableChecks, returnOnFailedCheck, threshold, nobatch, only, skip)
 		if err != nil {
 			return err
 		}
@@ -111,4 +112,6 @@ func init() {
 	convertCmd.Flags().UintVarP(&threshold, "batch-threshold", "", 500, "batch request idle time threshold (see example)")
 	convertCmd.Flags().BoolVarP(&nobatch, "no-batch", "", false, "don't generate batch calls")
 	convertCmd.Flags().BoolVarP(&enableChecks, "enable-status-code-checks", "", false, "add a check for each http status response")
+	convertCmd.Flags().BoolVarP(&returnOnFailedCheck, "return-on-failure", "", false, "return from iteration if we get an unexpected response code")
+
 }
