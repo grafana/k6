@@ -70,6 +70,10 @@ func (c *Collector) Init() error {
 	return nil
 }
 
+func (c *Collector) GetOptions() lib.CollectorOptions {
+	return lib.CollectorOptions{}
+}
+
 func (c *Collector) Run(ctx context.Context) {
 	log.Debug("InfluxDB: Running!")
 	ticker := time.NewTicker(pushInterval)

@@ -31,6 +31,32 @@ import (
 	"gopkg.in/guregu/null.v3"
 )
 
+type Tags map[string]bool
+
+func (t Tags) MarshalJSON() ([]byte, error) {
+	var tags []string
+	for tag, _ := range t {
+		tags = append(tags, tag)
+	}
+	return json.Marshal(tags)
+}
+
+func (t *Tags) UnmarshalJSON(data []byte) error {
+	var tags []string
+	if err := json.Unmarshal(data, &tags); err != nil {
+		return err
+	}
+	if len(tags) == 0 {
+		return nil
+	}
+	_tags := Tags{}
+	for _, tag := range tags {
+		_tags[tag] = true
+	}
+	*t = _tags
+	return nil
+}
+
 // Describes a TLS version. Serialised to/from JSON as a string, eg. "tls1.2".
 type TLSVersion int
 
@@ -201,6 +227,9 @@ type Options struct {
 
 	// Summary trend stats for trend metrics (response times) in CLI output
 	SummaryTrendStats []string `json:"SummaryTrendStats" envconfig:"summary_trend_stats"`
+
+	// Which default tags to include with metrics, namespaced ("http:method", "vu:id" etc.)
+	DefaultTags Tags `json:"defaultTags" envconfig:"default_tags"`
 }
 
 // Returns the result of overwriting any fields with any that are set on the argument.
@@ -278,6 +307,9 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.SummaryTrendStats != nil {
 		o.SummaryTrendStats = opts.SummaryTrendStats
+	}
+	if opts.DefaultTags != nil {
+		o.DefaultTags = opts.DefaultTags
 	}
 	return o
 }
