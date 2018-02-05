@@ -28,11 +28,17 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"github.com/pkg/errors"
 )
 
-func Convert(h HAR, includeCodeCheck bool, batchTime uint, nobatch bool, only, skip []string) (string, error) {
+func Convert(h HAR, includeCodeCheck bool, returnOnFailedCheck bool, batchTime uint, nobatch bool, only, skip []string) (string, error) {
 	var b bytes.Buffer
 	w := bufio.NewWriter(&b)
+
+	if returnOnFailedCheck && !includeCodeCheck {
+		return "", errors.Errorf("return on failed check requires --enable-status-code-checks")
+	}
+
 	if includeCodeCheck {
 		fmt.Fprint(w, "import { group, check, sleep } from 'k6';\n")
 	} else {
@@ -123,7 +129,11 @@ func Convert(h HAR, includeCodeCheck bool, batchTime uint, nobatch bool, only, s
 
 				if includeCodeCheck {
 					if e.Response.Status > 0 {
-						fmt.Fprintf(w, "\t\tif (!check(res, {\"status is %v\": (r) => r.status === %v })) { return };\n", e.Response.Status, e.Response.Status)
+						if returnOnFailedCheck {
+							fmt.Fprintf(w, "\t\tif (!check(res, {\"status is %v\": (r) => r.status === %v })) { return };\n", e.Response.Status, e.Response.Status)
+						} else {
+							fmt.Fprintf(w, "\t\tcheck(res, {\"status is %v\": (r) => r.status === %v });\n", e.Response.Status, e.Response.Status)
+						}
 					}
 				}
 			}
@@ -151,7 +161,11 @@ func Convert(h HAR, includeCodeCheck bool, batchTime uint, nobatch bool, only, s
 				if includeCodeCheck {
 					for k, e := range batchEntries {
 						if e.Response.Status > 0 {
-							fmt.Fprintf(w, "\t\tcheck(res[%v], {\n\t\t\"status is %v\": (r) => r.status === %v,\n\t});\n", k, e.Response.Status, e.Response.Status)
+							if returnOnFailedCheck {
+								fmt.Fprintf(w, "\t\tif (!check(res, {\"status is %v\": (r) => r.status === %v })) { return };\n", e.Response.Status, e.Response.Status)
+							} else {
+								fmt.Fprintf(w, "\t\tcheck(res[%v], {\"status is %v\": (r) => r.status === %v });\n", k, e.Response.Status, e.Response.Status)
+							}
 						}
 					}
 				}
