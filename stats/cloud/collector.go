@@ -127,6 +127,15 @@ func (c *Collector) Init() error {
 	return nil
 }
 
+func (c *Collector) GetOptions() lib.CollectorOptions {
+	return lib.CollectorOptions{
+		DefaultTags: lib.Tags{
+			"vu:id":   true,
+			"vu:iter": true,
+		},
+	}
+}
+
 func (c *Collector) Link() string {
 	return URLForResults(c.referenceID, c.config)
 }

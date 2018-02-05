@@ -137,16 +137,48 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 		req.Header.Set("User-Agent", userAgent.String)
 	}
 
-	tags := map[string]string{
-		"proto":  "",
-		"status": "0",
-		"method": method,
-		"url":    url.URLString,
-		"name":   url.Name,
-		"group":  state.Group.Path,
-		"vu":     strconv.FormatInt(state.Vu, 10),
-		"iter":   strconv.FormatInt(state.Iteration, 10),
+	var tags map[string]string
+	if state.Options.DefaultTags == nil {
+		tags = map[string]string{
+			"proto":  "",
+			"status": "0",
+			"method": method,
+			"url":    url.URLString,
+			"name":   url.Name,
+			"group":  state.Group.Path,
+		}
+	} else {
+		tags = map[string]string{}
+		if state.Options.DefaultTags["http:proto"] {
+			tags["proto"] = ""
+		}
+		if state.Options.DefaultTags["http:status"] {
+			tags["status"] = "0"
+		}
+		if state.Options.DefaultTags["http:method"] {
+			tags["method"] = method
+		}
+		if state.Options.DefaultTags["http:url"] {
+			tags["url"] = url.URLString
+		}
+		if state.Options.DefaultTags["http:name"] {
+			tags["name"] = url.Name
+		}
+		if state.Options.DefaultTags["vu:group"] {
+			tags["group"] = state.Group.Path
+		}
 	}
+
+	// Check collector options, update tags accordingly.
+	if (state.CollectorOptions.DefaultTags != nil && state.CollectorOptions.DefaultTags["vu:id"]) ||
+		(state.Options.DefaultTags != nil && state.Options.DefaultTags["vu:id"]) {
+		tags["vu"] = strconv.FormatInt(state.Vu, 10)
+	}
+	if (state.CollectorOptions.DefaultTags != nil && state.CollectorOptions.DefaultTags["vu:iter"]) ||
+		(state.Options.DefaultTags != nil && state.Options.DefaultTags["vu:iter"]) {
+		tags["iter"] = strconv.FormatInt(state.Iteration, 10)
+	}
+
 	redirects := state.Options.MaxRedirects
 	timeout := 60 * time.Second
 	throw := state.Options.Throw.Bool
@@ -334,7 +366,9 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 
 	if resErr != nil {
 		resp.Error = resErr.Error()
-		tags["error"] = resp.Error
+		if state.Options.DefaultTags == nil || state.Options.DefaultTags["http:error"] {
+			tags["error"] = resp.Error
+		}
 	} else {
 		if activeJar != nil {
 			if rc := res.Cookies(); len(rc) > 0 {
@@ -345,14 +379,25 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 		resp.URL = res.Request.URL.String()
 		resp.Status = res.StatusCode
 		resp.Proto = res.Proto
-		tags["url"] = resp.URL
-		tags["status"] = strconv.Itoa(resp.Status)
-		tags["proto"] = resp.Proto
+
+		if state.Options.DefaultTags == nil || state.Options.DefaultTags["http:url"] {
+			tags["url"] = resp.URL
+		}
+		if state.Options.DefaultTags == nil || state.Options.DefaultTags["http:status"] {
+			tags["status"] = strconv.Itoa(resp.Status)
+		}
+		if state.Options.DefaultTags == nil || state.Options.DefaultTags["http:proto"] {
+			tags["proto"] = resp.Proto
+		}
 
 		if res.TLS != nil {
 			resp.setTLSInfo(res.TLS)
-			tags["tls_version"] = resp.TLSVersion
-			tags["ocsp_status"] = resp.OCSP.Status
+			if state.Options.DefaultTags == nil || state.Options.DefaultTags["http:tls_version"] {
+				tags["tls_version"] = resp.TLSVersion
+			}
+			if state.Options.DefaultTags == nil || state.Options.DefaultTags["http:ocsp_status"] {
+				tags["ocsp_status"] = resp.OCSP.Status
+			}
 		}
 
 		resp.Headers = make(map[string]string, len(res.Header))

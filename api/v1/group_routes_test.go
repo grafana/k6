@@ -47,6 +47,8 @@ func (r groupDummyRunner) GetOptions() lib.Options { return lib.Options{} }
 
 func (r groupDummyRunner) SetOptions(opts lib.Options) {}
 
+func (r groupDummyRunner) SetCollectorOptions(opts lib.CollectorOptions) {}
+
 func TestGetGroups(t *testing.T) {
 	g0, err := lib.NewGroup("", nil)
 	assert.NoError(t, err)
