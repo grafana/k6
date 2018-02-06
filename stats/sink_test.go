@@ -22,9 +22,45 @@ package stats
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func TestCounterSink(t *testing.T) {
+	samples10 := []float64{1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 100.0}
+	now := time.Now()
+
+	t.Run("add", func(t *testing.T) {
+		t.Run("one value", func(t *testing.T) {
+			sink := CounterSink{}
+			sink.Add(Sample{Metric: &Metric{}, Value: 1.0, Time: now})
+			assert.Equal(t, 1.0, sink.Value)
+			assert.Equal(t, now, sink.First)
+		})
+		t.Run("values", func(t *testing.T) {
+			sink := CounterSink{}
+			for _, s := range samples10 {
+				sink.Add(Sample{Metric: &Metric{}, Value: s, Time: now})
+			}
+			assert.Equal(t, 145.0, sink.Value)
+			assert.Equal(t, now, sink.First)
+		})
+	})
+	t.Run("calc", func(t *testing.T) {
+		sink := CounterSink{}
+		sink.Calc()
+		assert.Equal(t, 0.0, sink.Value)
+		assert.Equal(t, time.Time{}, sink.First)
+	})
+	t.Run("format", func(t *testing.T) {
+		sink := CounterSink{}
+		for _, s := range samples10 {
+			sink.Add(Sample{Metric: &Metric{}, Value: s, Time: now})
+		}
+		assert.Equal(t, map[string]float64{"count": 145, "rate": 145.0}, sink.Format(1*time.Second))
+	})
+}
 
 func TestGaugeSink(t *testing.T) {
 	samples6 := []float64{1.0, 2.0, 3.0, 4.0, 10.0, 5.0}
