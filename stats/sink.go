@@ -121,6 +121,7 @@ func (t *TrendSink) P(pct float64) float64 {
 		// If percentile falls on a value in Values slice, we return that value.
 		// If percentile does not fall on a value in Values slice, we calculate (linear interpolation)
 		// the value that would fall at percentile, given the values above and below that percentile.
+		t.Calc()
 		i := pct * (float64(t.Count) - 1.0)
 		j := t.Values[int(math.Floor(i))]
 		k := t.Values[int(math.Ceil(i))]
@@ -146,6 +147,7 @@ func (t *TrendSink) Calc() {
 }
 
 func (t *TrendSink) Format(tt time.Duration) map[string]float64 {
+	t.Calc()
 	return map[string]float64{
 		"min":   t.Min,
 		"max":   t.Max,
