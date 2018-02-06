@@ -31,12 +31,12 @@ import (
 var output = ""
 
 var (
-	enableChecks bool
+	enableChecks        bool
 	returnOnFailedCheck bool
-	threshold    uint
-	nobatch      bool
-	only         []string
-	skip         []string
+	threshold           uint
+	nobatch             bool
+	only                []string
+	skip                []string
 )
 
 var convertCmd = &cobra.Command{
