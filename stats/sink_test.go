@@ -26,6 +26,46 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestGaugeSink(t *testing.T) {
+	samples6 := []float64{1.0, 2.0, 3.0, 4.0, 10.0, 5.0}
+
+	t.Run("add", func(t *testing.T) {
+		t.Run("one value", func(t *testing.T) {
+			sink := GaugeSink{}
+			sink.Add(Sample{Metric: &Metric{}, Value: 1.0})
+			assert.Equal(t, 1.0, sink.Value)
+			assert.Equal(t, 1.0, sink.Min)
+			assert.Equal(t, true, sink.minSet)
+			assert.Equal(t, 1.0, sink.Max)
+		})
+		t.Run("values", func(t *testing.T) {
+			sink := GaugeSink{}
+			for _, s := range samples6 {
+				sink.Add(Sample{Metric: &Metric{}, Value: s})
+			}
+			assert.Equal(t, 5.0, sink.Value)
+			assert.Equal(t, 1.0, sink.Min)
+			assert.Equal(t, true, sink.minSet)
+			assert.Equal(t, 10.0, sink.Max)
+		})
+	})
+	t.Run("calc", func(t *testing.T) {
+		sink := GaugeSink{}
+		sink.Calc()
+		assert.Equal(t, 0.0, sink.Value)
+		assert.Equal(t, 0.0, sink.Min)
+		assert.Equal(t, false, sink.minSet)
+		assert.Equal(t, 0.0, sink.Max)
+	})
+	t.Run("format", func(t *testing.T) {
+		sink := GaugeSink{}
+		for _, s := range samples6 {
+			sink.Add(Sample{Metric: &Metric{}, Value: s})
+		}
+		assert.Equal(t, map[string]float64{"value": 5.0}, sink.Format(0))
+	})
+}
+
 func TestTrendSink(t *testing.T) {
 	unsortedSamples10 := []float64{0.0, 100.0, 30.0, 80.0, 70.0, 60.0, 50.0, 40.0, 90.0, 20.0}
 
