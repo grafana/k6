@@ -159,6 +159,7 @@ func Convert(h HAR, includeCodeCheck bool, returnOnFailedCheck bool, batchTime u
 						if header.Name == "Location" {
 							fmt.Fprintf(w, "\t\tredirectUrl = res.headers.Location;\n")
 							recordedRedirectUrl = header.Value
+							break
 						}
 					}
 				}
