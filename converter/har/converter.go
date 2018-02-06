@@ -25,10 +25,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/pkg/errors"
 	"net/url"
 	"sort"
 	"strings"
-	"github.com/pkg/errors"
 )
 
 func Convert(h HAR, includeCodeCheck bool, returnOnFailedCheck bool, batchTime uint, nobatch bool, only, skip []string) (string, error) {
