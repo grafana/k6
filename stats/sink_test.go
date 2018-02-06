@@ -26,6 +26,107 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestTrendSink(t *testing.T) {
+	unsortedSamples10 := []float64{0.0, 100.0, 30.0, 80.0, 70.0, 60.0, 50.0, 40.0, 90.0, 20.0}
+
+	t.Run("add", func(t *testing.T) {
+		t.Run("one value", func(t *testing.T) {
+			sink := TrendSink{}
+			sink.Add(Sample{Metric: &Metric{}, Value: 7.0})
+			assert.Equal(t, uint64(1), sink.Count)
+			assert.Equal(t, true, sink.jumbled)
+			assert.Equal(t, 7.0, sink.Min)
+			assert.Equal(t, 7.0, sink.Max)
+			assert.Equal(t, 7.0, sink.Avg)
+			assert.Equal(t, 0.0, sink.Med) // calculated in Calc()
+		})
+		t.Run("values", func(t *testing.T) {
+			sink := TrendSink{}
+			for _, s := range unsortedSamples10 {
+				sink.Add(Sample{Metric: &Metric{}, Value: s})
+			}
+			assert.Equal(t, uint64(len(unsortedSamples10)), sink.Count)
+			assert.Equal(t, true, sink.jumbled)
+			assert.Equal(t, 0.0, sink.Min)
+			assert.Equal(t, 100.0, sink.Max)
+			assert.Equal(t, 54.0, sink.Avg)
+			assert.Equal(t, 0.0, sink.Med) // calculated in Calc()
+		})
+	})
+	t.Run("calc", func(t *testing.T) {
+		t.Run("no values", func(t *testing.T) {
+			sink := TrendSink{}
+			sink.Calc()
+			assert.Equal(t, uint64(0), sink.Count)
+			assert.Equal(t, false, sink.jumbled)
+			assert.Equal(t, 0.0, sink.Med)
+		})
+		t.Run("sorted", func(t *testing.T) {
+			sink := TrendSink{}
+			for _, s := range unsortedSamples10 {
+				sink.Add(Sample{Metric: &Metric{}, Value: s})
+			}
+			sink.Calc()
+			assert.Equal(t, uint64(len(unsortedSamples10)), sink.Count)
+			assert.Equal(t, false, sink.jumbled)
+			assert.Equal(t, 55.0, sink.Med)
+			assert.Equal(t, 0.0, sink.Min)
+			assert.Equal(t, 100.0, sink.Max)
+			assert.Equal(t, 54.0, sink.Avg)
+		})
+	})
+	t.Run("percentile", func(t *testing.T) {
+		t.Run("no values", func(t *testing.T) {
+			sink := TrendSink{}
+			for i := 1; i <= 100; i++ {
+				assert.Equal(t, 0.0, sink.P(float64(i)/100.0))
+			}
+		})
+		t.Run("one value", func(t *testing.T) {
+			sink := TrendSink{}
+			sink.Add(Sample{Metric: &Metric{}, Value: 10.0})
+			for i := 1; i <= 100; i++ {
+				assert.Equal(t, 10.0, sink.P(float64(i)/100.0))
+			}
+		})
+		t.Run("two values", func(t *testing.T) {
+			sink := TrendSink{}
+			sink.Add(Sample{Metric: &Metric{}, Value: 5.0})
+			sink.Add(Sample{Metric: &Metric{}, Value: 10.0})
+			assert.Equal(t, 5.0, sink.P(0.0))
+			assert.Equal(t, 7.5, sink.P(0.5))
+			assert.Equal(t, 5+(10-5)*0.95, sink.P(0.95))
+			assert.Equal(t, 5+(10-5)*0.99, sink.P(0.99))
+			assert.Equal(t, 10.0, sink.P(1.0))
+		})
+		t.Run("more than 2", func(t *testing.T) {
+			sink := TrendSink{}
+			for _, s := range unsortedSamples10 {
+				sink.Add(Sample{Metric: &Metric{}, Value: s})
+			}
+			assert.Equal(t, 0.0, sink.P(0.0))
+			assert.Equal(t, 55.0, sink.P(0.5))
+			assert.Equal(t, 95.49999999999999, sink.P(0.95))
+			assert.Equal(t, 99.1, sink.P(0.99))
+			assert.Equal(t, 100.0, sink.P(1.0))
+		})
+	})
+	t.Run("format", func(t *testing.T) {
+		sink := TrendSink{}
+		for _, s := range unsortedSamples10 {
+			sink.Add(Sample{Metric: &Metric{}, Value: s})
+		}
+		assert.Equal(t, map[string]float64{
+			"min":   0.0,
+			"max":   100.0,
+			"avg":   54.0,
+			"med":   55.0,
+			"p(90)": 91.0,
+			"p(95)": 95.49999999999999,
+		}, sink.Format(0))
+	})
+}
+
 func TestDummySinkAddPanics(t *testing.T) {
 	assert.Panics(t, func() {
 		DummySink{}.Add(Sample{})
