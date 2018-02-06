@@ -184,7 +184,7 @@ type Options struct {
 	BlacklistIPs []*net.IPNet `json:"blacklistIPs" envconfig:"blacklist_ips"`
 
 	// Hosts overrides dns entries for given hosts
-	Hosts map[string][]net.IP `json:"hosts" envconfig:"hosts"`
+	Hosts map[string]net.IP `json:"hosts" envconfig:"hosts"`
 
 	// Do not reuse connections between VU iterations. This gives more realistic results (depending
 	// on what you're looking for), but you need to raise various kernel limits or you'll get

@@ -488,47 +488,27 @@ func TestVUIntegrationHosts(t *testing.T) {
 	go srv.ListenAndServe()
 	defer srv.Shutdown(context.TODO())
 
-	// Getting local ip addresses to assert
-	addrs, err := net.InterfaceAddrs()
-	if !assert.NoError(t, err) {
-		return
-	}
-	ips := []net.IP{}
-	for _, address := range addrs {
-		if ipnet, ok := address.(*net.IPNet); ok {
-			if ipnet.IP.To4() != nil {
-				ips = append(ips, ipnet.IP)
-			}
-		}
-	}
-
 	r1, err := New(&lib.SourceData{
 		Filename: "/script.js",
-		Data: []byte(fmt.Sprintf(`
+		Data: []byte(`
 					import { check, fail } from "k6";
 					import http from "k6/http";
-					let ips = [];
 					export default function() {
 						let res = http.get("http://test.loadimpact.com:8080/");
-						ips.push(res.remote_ip)
-
-						if (ips.length === 2) {
-							check(ips, {
-								"is correct IP": (ips) => ips.toString() == ["%s", "%s"].toString()
-							}) || fail("failed to override dns");
-						}
+						check(res, {
+							"is correct IP": (r) => r.remote_ip === "127.0.0.1"
+						}) || fail("failed to override dns");
 					}
-				`, ips[1].String(), ips[0].String())),
+				`),
 	}, afero.NewMemMapFs())
 	if !assert.NoError(t, err) {
 		return
 	}
 
 	r1.SetOptions(lib.Options{
-		NoConnectionReuse: null.BoolFrom(true),
-		Throw:             null.BoolFrom(true),
-		Hosts: map[string][]net.IP{
-			"test.loadimpact.com": {ips[0], ips[1]},
+		Throw: null.BoolFrom(true),
+		Hosts: map[string]net.IP{
+			"test.loadimpact.com": net.ParseIP("127.0.0.1"),
 		},
 	})
 
@@ -545,11 +525,6 @@ func TestVUIntegrationHosts(t *testing.T) {
 				return
 			}
 
-			//Running VU twice to assert each ip
-			_, err = vu.RunOnce(context.Background())
-			if !assert.NoError(t, err) {
-				return
-			}
 			_, err = vu.RunOnce(context.Background())
 			if !assert.NoError(t, err) {
 				return
