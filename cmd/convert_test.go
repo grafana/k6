@@ -91,6 +91,8 @@ import http from 'k6/http';
 // Version: 1.2
 // Creator: WebInspector
 
+export let options = { maxRedirects: 0 };
+
 export default function() {
 
 	group("page_2 - https://golang.org/", function() {
