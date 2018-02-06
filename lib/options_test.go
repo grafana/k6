@@ -23,6 +23,7 @@ package lib
 import (
 	"crypto/tls"
 	"encoding/json"
+	"net"
 	"os"
 	"reflect"
 	"testing"
@@ -196,6 +197,16 @@ func TestOptions(t *testing.T) {
 		assert.True(t, opts.NoConnectionReuse.Valid)
 		assert.True(t, opts.NoConnectionReuse.Bool)
 	})
+
+	t.Run("Hosts", func(t *testing.T) {
+		opts := Options{}.Apply(Options{Hosts: map[string]net.IP{
+			"test.loadimpact.com": net.ParseIP("192.0.2.1"),
+		}})
+		assert.NotNil(t, opts.Hosts)
+		assert.NotEmpty(t, opts.Hosts)
+		assert.Equal(t, "192.0.2.1", opts.Hosts["test.loadimpact.com"].String())
+	})
+
 	t.Run("Thresholds", func(t *testing.T) {
 		opts := Options{}.Apply(Options{Thresholds: map[string]stats.Thresholds{
 			"metric": {
