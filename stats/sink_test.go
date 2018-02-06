@@ -127,6 +127,46 @@ func TestTrendSink(t *testing.T) {
 	})
 }
 
+func TestRateSink(t *testing.T) {
+	samples6 := []float64{1.0, 0.0, 1.0, 0.0, 0.0, 1.0}
+
+	t.Run("add", func(t *testing.T) {
+		t.Run("one true", func(t *testing.T) {
+			sink := RateSink{}
+			sink.Add(Sample{Metric: &Metric{}, Value: 1.0})
+			assert.Equal(t, int64(1), sink.Total)
+			assert.Equal(t, int64(1), sink.Trues)
+		})
+		t.Run("one false", func(t *testing.T) {
+			sink := RateSink{}
+			sink.Add(Sample{Metric: &Metric{}, Value: 0.0})
+			assert.Equal(t, int64(1), sink.Total)
+			assert.Equal(t, int64(0), sink.Trues)
+		})
+		t.Run("values", func(t *testing.T) {
+			sink := RateSink{}
+			for _, s := range samples6 {
+				sink.Add(Sample{Metric: &Metric{}, Value: s})
+			}
+			assert.Equal(t, int64(6), sink.Total)
+			assert.Equal(t, int64(3), sink.Trues)
+		})
+	})
+	t.Run("calc", func(t *testing.T) {
+		sink := RateSink{}
+		sink.Calc()
+		assert.Equal(t, int64(0), sink.Total)
+		assert.Equal(t, int64(0), sink.Trues)
+	})
+	t.Run("format", func(t *testing.T) {
+		sink := RateSink{}
+		for _, s := range samples6 {
+			sink.Add(Sample{Metric: &Metric{}, Value: s})
+		}
+		assert.Equal(t, map[string]float64{"rate": 0.5}, sink.Format(0))
+	})
+}
+
 func TestDummySinkAddPanics(t *testing.T) {
 	assert.Panics(t, func() {
 		DummySink{}.Add(Sample{})
