@@ -89,6 +89,8 @@ func Convert(h HAR, includeCodeCheck bool, batchTime uint, nobatch bool, only, s
 		sort.Sort(EntryByStarted(entries))
 
 		if nobatch {
+			fmt.Fprint(w, "\t\tlet res;\n")
+
 			for _, e := range entries {
 
 				var params []string
