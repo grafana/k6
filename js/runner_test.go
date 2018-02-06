@@ -477,6 +477,62 @@ func TestVUIntegrationBlacklist(t *testing.T) {
 	}
 }
 
+func TestVUIntegrationHosts(t *testing.T) {
+	srv := &http.Server{
+		Addr: ":8080",
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			_, _ = fmt.Fprintf(w, "ok")
+		}),
+		ErrorLog: stdlog.New(ioutil.Discard, "", 0),
+	}
+	go srv.ListenAndServe()
+	defer srv.Shutdown(context.TODO())
+
+	r1, err := New(&lib.SourceData{
+		Filename: "/script.js",
+		Data: []byte(`
+					import { check, fail } from "k6";
+					import http from "k6/http";
+					export default function() {
+						let res = http.get("http://test.loadimpact.com:8080/");
+						check(res, {
+							"is correct IP": (r) => r.remote_ip === "127.0.0.1"
+						}) || fail("failed to override dns");
+					}
+				`),
+	}, afero.NewMemMapFs())
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	r1.SetOptions(lib.Options{
+		Throw: null.BoolFrom(true),
+		Hosts: map[string]net.IP{
+			"test.loadimpact.com": net.ParseIP("127.0.0.1"),
+		},
+	})
+
+	r2, err := NewFromArchive(r1.MakeArchive())
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	runners := map[string]*Runner{"Source": r1, "Archive": r2}
+	for name, r := range runners {
+		t.Run(name, func(t *testing.T) {
+			vu, err := r.NewVU()
+			if !assert.NoError(t, err) {
+				return
+			}
+
+			_, err = vu.RunOnce(context.Background())
+			if !assert.NoError(t, err) {
+				return
+			}
+		})
+	}
+}
+
 func TestVUIntegrationTLSConfig(t *testing.T) {
 	testdata := map[string]struct {
 		opts   lib.Options
