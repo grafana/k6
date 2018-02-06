@@ -33,6 +33,7 @@ var output = ""
 var (
 	enableChecks        bool
 	returnOnFailedCheck bool
+	correlate           bool
 	threshold           uint
 	nobatch             bool
 	only                []string
@@ -74,7 +75,7 @@ var convertCmd = &cobra.Command{
 			return err
 		}
 
-		script, err := har.Convert(h, enableChecks, returnOnFailedCheck, threshold, nobatch, only, skip)
+		script, err := har.Convert(h, enableChecks, returnOnFailedCheck, threshold, nobatch, correlate, only, skip)
 		if err != nil {
 			return err
 		}
@@ -113,5 +114,5 @@ func init() {
 	convertCmd.Flags().BoolVarP(&nobatch, "no-batch", "", false, "don't generate batch calls")
 	convertCmd.Flags().BoolVarP(&enableChecks, "enable-status-code-checks", "", false, "add a status code check for each HTTP response")
 	convertCmd.Flags().BoolVarP(&returnOnFailedCheck, "return-on-failed-check", "", false, "return from iteration if we get an unexpected response status code")
-
+	convertCmd.Flags().BoolVarP(&correlate, "correlate", "", false, "detect values in responses being used in subsequent requests and try adapt the script accordingly (only redirects for now, but in the future we will try to track things like generated IDs etc)")
 }
