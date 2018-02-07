@@ -138,13 +138,18 @@ func NewBundleFromArchive(arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle,
 	}
 	initctx.files = arc.Files
 
+	env := arc.Env
+	for k, v := range rtOpts.Env {
+		env[k] = v
+	}
+
 	return &Bundle{
 		Filename:        arc.Filename,
 		Source:          string(arc.Data),
 		Program:         pgm,
 		Options:         arc.Options,
 		BaseInitContext: initctx,
-		Env:             arc.Env, //TODO: if set, overwrite some options via rtOpts.Env?
+		Env:             env,
 	}, nil
 }
 
