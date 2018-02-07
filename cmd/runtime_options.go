@@ -48,26 +48,26 @@ func collectEnv() map[string]string {
 	return env
 }
 
-func runtimeOptionFlagSet() *pflag.FlagSet {
+func runtimeOptionFlagSet(includeSysEnv bool) *pflag.FlagSet {
 	flags := pflag.NewFlagSet("", 0)
 	flags.SortFlags = false
-	flags.Bool("no-system-env-vars", false, "don't pass actual system environment variables to the runtime")
+	flags.Bool("include-system-env-vars", includeSysEnv, "pass the real system environment variables to the runtime")
 	flags.StringSliceP("env", "e", nil, "add/override environment variable with `VAR=value`")
 	return flags
 }
 
 func getRuntimeOptions(flags *pflag.FlagSet) (lib.RuntimeOptions, error) {
 	opts := lib.RuntimeOptions{
-		NoSystemEnvVars: getNullBool(flags, "no-system-env-vars"),
-		Env:             make(map[string]string),
+		IncludeSystemEnvVars: getNullBool(flags, "include-system-env-vars"),
+		Env:                  make(map[string]string),
 	}
 
-	// If not disabled, gather the actual system environment variables
-	if !opts.NoSystemEnvVars.Bool {
+	// If enabled, gather the actual system environment variables
+	if opts.IncludeSystemEnvVars.Bool {
 		opts.Env = collectEnv()
 	}
 
-	// Set/overwrite environment varialbes with custom user-supplied values
+	// Set/overwrite environment variables with custom user-supplied values
 	envVars, err := flags.GetStringSlice("env")
 	if err != nil {
 		return opts, err

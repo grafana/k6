@@ -33,6 +33,7 @@ import (
 
 type EnvVarTest struct {
 	name      string
+	useSysEnv bool // Whether to include the system env vars by default (run) or not (cloud/archive/inspect)
 	systemEnv map[string]string
 	cliOpts   []string
 	expErr    bool
@@ -42,20 +43,63 @@ type EnvVarTest struct {
 var envVarTestCases = []EnvVarTest{
 	{
 		"empty env",
+		true,
 		map[string]string{},
 		[]string{},
 		false,
 		map[string]string{},
 	},
 	{
-		"disabled sys env",
+		"disabled sys env by default",
+		false,
 		map[string]string{"test1": "val1"},
-		[]string{"--no-system-env-vars"},
+		[]string{},
 		false,
 		map[string]string{},
 	},
 	{
-		"only system env",
+		"disabled sys env by cli 1",
+		true,
+		map[string]string{"test1": "val1"},
+		[]string{"--include-system-env-vars=false"},
+		false,
+		map[string]string{},
+	},
+	{
+		"disabled sys env by cli 2",
+		true,
+		map[string]string{"test1": "val1"},
+		[]string{"--include-system-env-vars=0"},
+		false,
+		map[string]string{},
+	},
+	{
+		"enabled sys env by default",
+		true,
+		map[string]string{"test1": "val1"},
+		[]string{},
+		false,
+		map[string]string{"test1": "val1"},
+	},
+	{
+		"enabled sys env by cli 1",
+		false,
+		map[string]string{"test1": "val1"},
+		[]string{"--include-system-env-vars"},
+		false,
+		map[string]string{"test1": "val1"},
+	},
+	{
+		"enabled sys env by cli 2",
+		false,
+		map[string]string{"test1": "val1"},
+		[]string{"--include-system-env-vars=true"},
+		false,
+		map[string]string{"test1": "val1"},
+	},
+	{
+		"run only system env",
+		true,
 		map[string]string{"test1": "val1"},
 		[]string{},
 		false,
@@ -63,20 +107,31 @@ var envVarTestCases = []EnvVarTest{
 	},
 	{
 		"mixed system and cli env",
+		true,
 		map[string]string{"test1": "val1", "test2": ""},
 		[]string{"--env", "test3=val3", "-e", "test4", "-e", "test5="},
 		false,
 		map[string]string{"test1": "val1", "test2": "", "test3": "val3", "test4": "", "test5": ""},
 	},
 	{
+		"mixed system and cli env 2",
+		false,
+		map[string]string{"test1": "val1", "test2": ""},
+		[]string{"--env", "test3=val3", "-e", "test4", "-e", "test5=", "--include-system-env-vars=1"},
+		false,
+		map[string]string{"test1": "val1", "test2": "", "test3": "val3", "test4": "", "test5": ""},
+	},
+	{
 		"disabled system env with cli params",
+		false,
 		map[string]string{"test1": "val1"},
-		[]string{"-e", "test2=overwriten", "-e", "test2=val2", "--no-system-env-vars"},
+		[]string{"-e", "test2=overwriten", "-e", "test2=val2"},
 		false,
 		map[string]string{"test2": "val2"},
 	},
 	{
 		"overwriting system env with cli param",
+		true,
 		map[string]string{"test1": "val1sys"},
 		[]string{"--env", "test1=val1cli"},
 		false,
@@ -84,6 +139,7 @@ var envVarTestCases = []EnvVarTest{
 	},
 	{
 		"error invalid cli var name 1",
+		true,
 		map[string]string{},
 		[]string{"--env", "test a=error"},
 		true,
@@ -91,6 +147,7 @@ var envVarTestCases = []EnvVarTest{
 	},
 	{
 		"error invalid cli var name 2",
+		true,
 		map[string]string{},
 		[]string{"--env", "1var=error"},
 		true,
@@ -98,6 +155,7 @@ var envVarTestCases = []EnvVarTest{
 	},
 	{
 		"error invalid cli var name 3",
+		true,
 		map[string]string{},
 		[]string{"--env", "уникод=unicode-disabled"},
 		true,
@@ -105,6 +163,7 @@ var envVarTestCases = []EnvVarTest{
 	},
 	{
 		"valid env vars with spaces",
+		true,
 		map[string]string{"test1": "value 1"},
 		[]string{"--env", "test2=value 2"},
 		false,
@@ -119,7 +178,7 @@ func TestEnvVars(t *testing.T) {
 			for key, val := range tc.systemEnv {
 				require.NoError(t, os.Setenv(key, val))
 			}
-			flags := runtimeOptionFlagSet()
+			flags := runtimeOptionFlagSet(tc.useSysEnv)
 			require.NoError(t, flags.Parse(tc.cliOpts))
 
 			rtOpts, err := getRuntimeOptions(flags)
