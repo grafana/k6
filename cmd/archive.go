@@ -94,7 +94,8 @@ An archive is a fully self-contained test run, and can be executed identically e
 
 func init() {
 	RootCmd.AddCommand(archiveCmd)
+	archiveCmd.Flags().SortFlags = false
 	archiveCmd.Flags().AddFlagSet(optionFlagSet())
-	archiveCmd.Flags().AddFlagSet(runtimeOptionFlagSet())
+	archiveCmd.Flags().AddFlagSet(runtimeOptionFlagSet(false))
 	archiveCmd.Flags().StringVarP(&archiveOut, "archive-out", "O", archiveOut, "archive output filename")
 }

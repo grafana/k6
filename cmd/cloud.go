@@ -141,6 +141,7 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 
 func init() {
 	RootCmd.AddCommand(cloudCmd)
+	cloudCmd.Flags().SortFlags = false
 	cloudCmd.Flags().AddFlagSet(optionFlagSet())
-	cloudCmd.Flags().AddFlagSet(runtimeOptionFlagSet())
+	cloudCmd.Flags().AddFlagSet(runtimeOptionFlagSet(false))
 }
