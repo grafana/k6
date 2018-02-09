@@ -67,8 +67,8 @@ func TestNewBundle(t *testing.T) {
 		_, err := NewBundle(&lib.SourceData{
 			Filename: "/script.js",
 			Data: []byte(`
-				export default undefined;
-			`),
+					export default undefined;
+				`),
 		}, afero.NewMemMapFs())
 		assert.EqualError(t, err, "script must export a default function")
 	})
@@ -76,8 +76,8 @@ func TestNewBundle(t *testing.T) {
 		_, err := NewBundle(&lib.SourceData{
 			Filename: "/script.js",
 			Data: []byte(`
-				export default null;
-			`),
+					export default null;
+				`),
 		}, afero.NewMemMapFs())
 		assert.EqualError(t, err, "script must export a default function")
 	})
@@ -85,8 +85,8 @@ func TestNewBundle(t *testing.T) {
 		_, err := NewBundle(&lib.SourceData{
 			Filename: "/script.js",
 			Data: []byte(`
-				export default 12345;
-			`),
+					export default 12345;
+				`),
 		}, afero.NewMemMapFs())
 		assert.EqualError(t, err, "default export must be a function")
 	})
@@ -122,7 +122,6 @@ func TestNewBundle(t *testing.T) {
 			invalidOptions := map[string]struct {
 				Expr, Error string
 			}{
-				"Array":    {`[]`, "json: cannot unmarshal array into Go value of type lib.Options"},
 				"Function": {`function(){}`, "json: unsupported type: func(goja.FunctionCall) goja.Value"},
 			}
 			for name, data := range invalidOptions {
@@ -404,20 +403,39 @@ func TestNewBundle(t *testing.T) {
 			})
 		})
 		t.Run("Thresholds", func(t *testing.T) {
+			fmt.Println("asdf")
+
 			b, err := NewBundle(&lib.SourceData{
 				Filename: "/script.js",
 				Data: []byte(`
-					export let options = {
-						thresholds: {
-							http_req_duration: ["avg<100"],
-						},
-					};
+					export let options = [
+						{ thresholds: {	http_req_duration: ["avg<100"], } },					
+					]
 					export default function() {};
 				`),
 			}, afero.NewMemMapFs())
 			if assert.NoError(t, err) {
 				if assert.Len(t, b.Options.Thresholds["http_req_duration"].Thresholds, 1) {
 					assert.Equal(t, "avg<100", b.Options.Thresholds["http_req_duration"].Thresholds[0].Source)
+				}
+			}
+		})
+		t.Run("MergeThresholds", func(t *testing.T) {
+			fmt.Println("asdf")
+			b, err := NewBundle(&lib.SourceData{
+				Filename: "/script.js",
+				Data: []byte(`
+					export let options = [
+						{ thresholds: {	http_req_duration: ["avg<100"], } },
+						{ thresholds: {	http_req_duration: ["avg<50"], } },	
+					]
+					export default function() {};
+				`),
+			}, afero.NewMemMapFs())
+			if assert.NoError(t, err) {
+				if assert.Len(t, b.Options.Thresholds["http_req_duration"].Thresholds, 2) {
+					assert.Equal(t, "avg<100", b.Options.Thresholds["http_req_duration"].Thresholds[0].Source)
+					assert.Equal(t, "avg<50", b.Options.Thresholds["http_req_duration"].Thresholds[1].Source)
 				}
 			}
 		})
