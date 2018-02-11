@@ -21,16 +21,25 @@
 package js
 
 import (
+	"context"
 	"fmt"
+	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/dop251/goja"
+	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/netext"
+	"github.com/oxtoacart/bpool"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
+	null "gopkg.in/guregu/null.v3"
 )
 
 func TestInitContextRequire(t *testing.T) {
@@ -313,7 +322,7 @@ func TestInitContextOpenBinary(t *testing.T) {
 func TestRequestWithBinaryFile(t *testing.T) {
 	t.Parallel()
 
-	ch := make(chan bool)
+	ch := make(chan bool, 1)
 
 	h := func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
@@ -324,14 +333,14 @@ func TestRequestWithBinaryFile(t *testing.T) {
 		file, _, err := r.FormFile("test.bin")
 		assert.NoError(t, err)
 		defer file.Close()
-		var bytes []byte
+		bytes := make([]byte, 3)
 		_, err = file.Read(bytes)
 		assert.NoError(t, err)
 		assert.Equal(t, []byte("hi!"), bytes)
 	}
 
-	svr := httptest.NewServer(http.HandlerFunc(h))
-	defer svr.Close()
+	srv := httptest.NewServer(http.HandlerFunc(h))
+	defer srv.Close()
 
 	fs := afero.NewMemMapFs()
 	assert.NoError(t, fs.MkdirAll("/path/to", 0755))
@@ -350,12 +359,40 @@ func TestRequestWithBinaryFile(t *testing.T) {
 				var res = http.post("%s", data);
 				return true;
 			}
-			`, svr.URL)),
+			`, srv.URL)),
 	}, fs)
 	assert.NoError(t, err)
 
 	bi, err := b.Instantiate()
 	assert.NoError(t, err)
+
+	root, err := lib.NewGroup("", nil)
+	assert.NoError(t, err)
+
+	logger := log.New()
+	logger.Level = log.DebugLevel
+	logger.Out = ioutil.Discard
+
+	state := &common.State{
+		Options: lib.Options{
+			HttpDebug: null.StringFrom("full"),
+		},
+		Logger: logger,
+		Group:  root,
+		HTTPTransport: &http.Transport{
+			DialContext: (netext.NewDialer(net.Dialer{
+				Timeout:   10 * time.Second,
+				KeepAlive: 60 * time.Second,
+				DualStack: true,
+			})).DialContext,
+		},
+		BPool: bpool.NewBufferPool(1),
+	}
+
+	ctx := context.Background()
+	ctx = common.WithState(ctx, state)
+	ctx = common.WithRuntime(ctx, bi.Runtime)
+	*bi.Context = ctx
 
 	v, err := bi.Default(goja.Undefined())
 	assert.NoError(t, err)
