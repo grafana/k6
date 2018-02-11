@@ -337,6 +337,7 @@ func TestRequestWithBinaryFile(t *testing.T) {
 		_, err = file.Read(bytes)
 		assert.NoError(t, err)
 		assert.Equal(t, []byte("hi!"), bytes)
+		assert.Equal(t, "this is a standard form field", r.FormValue("field"))
 	}
 
 	srv := httptest.NewServer(http.HandlerFunc(h))
