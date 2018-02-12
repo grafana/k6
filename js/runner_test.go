@@ -500,7 +500,7 @@ func TestVUIntegrationHosts(t *testing.T) {
 						}) || fail("failed to override dns");
 					}
 				`),
-	}, afero.NewMemMapFs())
+	}, afero.NewMemMapFs(), lib.RuntimeOptions{})
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -512,7 +512,7 @@ func TestVUIntegrationHosts(t *testing.T) {
 		},
 	})
 
-	r2, err := NewFromArchive(r1.MakeArchive())
+	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{})
 	if !assert.NoError(t, err) {
 		return
 	}
