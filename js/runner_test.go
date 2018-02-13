@@ -368,12 +368,12 @@ func TestVUIntegrationMetrics(t *testing.T) {
 					assert.Equal(t, stats.Trend, s.Metric.Type)
 				case 1:
 					assert.Equal(t, 0.0, s.Value)
-					assert.Equal(t, metrics.DataSent, s.Metric)
+					assert.Equal(t, metrics.DataSent, s.Metric, "`data_sent` sample is before `data_received` and `iteration_duration`")
 				case 2:
 					assert.Equal(t, 0.0, s.Value)
-					assert.Equal(t, metrics.DataReceived, s.Metric)
+					assert.Equal(t, metrics.DataReceived, s.Metric, "`data_received` sample is after `data_received`")
 				case 3:
-					assert.Equal(t, metrics.IterationDuration, s.Metric)
+					assert.Equal(t, metrics.IterationDuration, s.Metric, "`iteration-duration` sample is after `data_received`")
 				}
 			}
 		})
