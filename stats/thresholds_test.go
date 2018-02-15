@@ -31,18 +31,20 @@ import (
 func TestNewThreshold(t *testing.T) {
 	src := `1+1==2`
 	rt := goja.New()
-	th, err := NewThreshold(src, rt)
+	abortOnFail := false
+	th, err := NewThreshold(src, rt, abortOnFail)
 	assert.NoError(t, err)
 
 	assert.Equal(t, src, th.Source)
 	assert.False(t, th.Failed)
 	assert.NotNil(t, th.pgm)
 	assert.Equal(t, rt, th.rt)
+	assert.Equal(t, abortOnFail, th.AbortOnFail)
 }
 
 func TestThresholdRun(t *testing.T) {
 	t.Run("true", func(t *testing.T) {
-		th, err := NewThreshold(`1+1==2`, goja.New())
+		th, err := NewThreshold(`1+1==2`, goja.New(), false)
 		assert.NoError(t, err)
 
 		t.Run("no taint", func(t *testing.T) {
@@ -61,7 +63,7 @@ func TestThresholdRun(t *testing.T) {
 	})
 
 	t.Run("false", func(t *testing.T) {
-		th, err := NewThreshold(`1+1==4`, goja.New())
+		th, err := NewThreshold(`1+1==4`, goja.New(), false)
 		assert.NoError(t, err)
 
 		t.Run("no taint", func(t *testing.T) {
@@ -94,6 +96,31 @@ func TestNewThresholds(t *testing.T) {
 		for i, th := range ts.Thresholds {
 			assert.Equal(t, sources[i], th.Source)
 			assert.False(t, th.Failed)
+			assert.False(t, th.AbortOnFail)
+			assert.NotNil(t, th.pgm)
+			assert.Equal(t, ts.Runtime, th.rt)
+		}
+	})
+}
+
+func TestNewThresholdsWithConfig(t *testing.T) {
+	t.Run("empty", func(t *testing.T) {
+		ts, err := NewThresholds([]string{})
+		assert.NoError(t, err)
+		assert.Len(t, ts.Thresholds, 0)
+	})
+	t.Run("two", func(t *testing.T) {
+		configs := []ThresholdConfig{
+			{`1+1==2`, false},
+			{`1+1==4`, true},
+		}
+		ts, err := NewThresholdsWithConfig(configs)
+		assert.NoError(t, err)
+		assert.Len(t, ts.Thresholds, 2)
+		for i, th := range ts.Thresholds {
+			assert.Equal(t, configs[i].Threshold, th.Source)
+			assert.False(t, th.Failed)
+			assert.Equal(t, configs[i].AbortOnTaint, th.AbortOnFail)
 			assert.NotNil(t, th.pgm)
 			assert.Equal(t, ts.Runtime, th.rt)
 		}
@@ -109,22 +136,29 @@ func TestThresholdsUpdateVM(t *testing.T) {
 
 func TestThresholdsRunAll(t *testing.T) {
 	testdata := map[string]struct {
-		succ bool
-		err  bool
-		srcs []string
+		succ  bool
+		err   bool
+		abort bool
+		srcs  []string
 	}{
-		"one passing":  {true, false, []string{`1+1==2`}},
-		"one failing":  {false, false, []string{`1+1==4`}},
-		"two passing":  {true, false, []string{`1+1==2`, `2+2==4`}},
-		"two failing":  {false, false, []string{`1+1==4`, `2+2==2`}},
-		"two mixed":    {false, false, []string{`1+1==2`, `1+1==4`}},
-		"one erroring": {false, true, []string{`throw new Error('?!');`}},
+		"one passing":  {true, false, false, []string{`1+1==2`}},
+		"one failing":  {false, false, false, []string{`1+1==4`}},
+		"two passing":  {true, false, false, []string{`1+1==2`, `2+2==4`}},
+		"two failing":  {false, false, false, []string{`1+1==4`, `2+2==2`}},
+		"two mixed":    {false, false, false, []string{`1+1==2`, `1+1==4`}},
+		"one erroring": {false, true, false, []string{`throw new Error('?!');`}},
+		"one aborting": {false, false, true, []string{`1+1==4`}},
 	}
 
 	for name, data := range testdata {
 		t.Run(name, func(t *testing.T) {
 			ts, err := NewThresholds(data.srcs)
 			assert.NoError(t, err)
+
+			if data.abort {
+				ts.Thresholds[0].AbortOnFail = true
+			}
+
 			b, err := ts.RunAll()
 
 			if data.err {
@@ -137,6 +171,12 @@ func TestThresholdsRunAll(t *testing.T) {
 				assert.True(t, b)
 			} else {
 				assert.False(t, b)
+			}
+
+			if data.abort {
+				assert.True(t, ts.Abort)
+			} else {
+				assert.False(t, ts.Abort)
 			}
 		})
 	}
@@ -166,26 +206,57 @@ func TestThresholdsRun(t *testing.T) {
 }
 
 func TestThresholdsJSON(t *testing.T) {
-	testdata := map[string][]string{
-		`[]`:                  {},
-		`["1+1==2"]`:          {"1+1==2"},
-		`["1+1==2","1+1==3"]`: {"1+1==2", "1+1==3"},
+	var testdata = []struct {
+		JSON        string
+		srcs        []string
+		abortOnFail bool
+		outputJSON  string
+	}{
+		{`[]`, []string{}, false, ""},
+		{`["1+1==2"]`, []string{"1+1==2"}, false, ""},
+		{`["1+1==2","1+1==3"]`, []string{"1+1==2", "1+1==3"}, false, ""},
+
+		{`[{"threshold":"1+1==2"}]`, []string{"1+1==2"}, false, `["1+1==2"]`},
+		{`[{"threshold":"1+1==2","abortOnTaint":true}]`, []string{"1+1==2"}, true, ""},
+		{`[{"threshold":"1+1==2","abortOnTaint":false}]`, []string{"1+1==2"}, false, `["1+1==2"]`},
+		{`[{"threshold":"1+1==2"}, "1+1==3"]`, []string{"1+1==2", "1+1==3"}, false, `["1+1==2","1+1==3"]`},
 	}
 
-	for data, srcs := range testdata {
-		t.Run(data, func(t *testing.T) {
+	for _, data := range testdata {
+		t.Run(data.JSON, func(t *testing.T) {
 			var ts Thresholds
-			assert.NoError(t, json.Unmarshal([]byte(data), &ts))
-			assert.Equal(t, len(srcs), len(ts.Thresholds))
-			for i, src := range srcs {
+			assert.NoError(t, json.Unmarshal([]byte(data.JSON), &ts))
+			assert.Equal(t, len(data.srcs), len(ts.Thresholds))
+			for i, src := range data.srcs {
 				assert.Equal(t, src, ts.Thresholds[i].Source)
+				assert.Equal(t, data.abortOnFail, ts.Thresholds[i].AbortOnFail)
 			}
 
 			t.Run("marshal", func(t *testing.T) {
 				data2, err := json.Marshal(ts)
 				assert.NoError(t, err)
-				assert.Equal(t, data, string(data2))
+				output := data.JSON
+				if data.outputJSON != "" {
+					output = data.outputJSON
+				}
+				assert.Equal(t, output, string(data2))
 			})
 		})
 	}
+
+	t.Run("bad JSON", func(t *testing.T) {
+		var ts Thresholds
+		assert.Error(t, json.Unmarshal([]byte("42"), &ts))
+		assert.Nil(t, ts.Thresholds)
+		assert.Nil(t, ts.Runtime)
+		assert.False(t, ts.Abort)
+	})
+
+	t.Run("bad source", func(t *testing.T) {
+		var ts Thresholds
+		assert.Error(t, json.Unmarshal([]byte(`["="]`), &ts))
+		assert.Nil(t, ts.Thresholds)
+		assert.Nil(t, ts.Runtime)
+		assert.False(t, ts.Abort)
+	})
 }
