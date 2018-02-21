@@ -120,7 +120,7 @@ func TestNewThresholdsWithConfig(t *testing.T) {
 		for i, th := range ts.Thresholds {
 			assert.Equal(t, configs[i].Threshold, th.Source)
 			assert.False(t, th.Failed)
-			assert.Equal(t, configs[i].AbortOnTaint, th.AbortOnFail)
+			assert.Equal(t, configs[i].AbortOnFail, th.AbortOnFail)
 			assert.NotNil(t, th.pgm)
 			assert.Equal(t, ts.Runtime, th.rt)
 		}
@@ -217,8 +217,8 @@ func TestThresholdsJSON(t *testing.T) {
 		{`["1+1==2","1+1==3"]`, []string{"1+1==2", "1+1==3"}, false, ""},
 
 		{`[{"threshold":"1+1==2"}]`, []string{"1+1==2"}, false, `["1+1==2"]`},
-		{`[{"threshold":"1+1==2","abortOnTaint":true}]`, []string{"1+1==2"}, true, ""},
-		{`[{"threshold":"1+1==2","abortOnTaint":false}]`, []string{"1+1==2"}, false, `["1+1==2"]`},
+		{`[{"threshold":"1+1==2","abortOnFail":true}]`, []string{"1+1==2"}, true, ""},
+		{`[{"threshold":"1+1==2","abortOnFail":false}]`, []string{"1+1==2"}, false, `["1+1==2"]`},
 		{`[{"threshold":"1+1==2"}, "1+1==3"]`, []string{"1+1==2", "1+1==3"}, false, `["1+1==2","1+1==3"]`},
 	}
 
