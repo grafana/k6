@@ -9,8 +9,9 @@ RUN apk --no-cache add --virtual .build-deps git make build-base && \
   cd $GOPATH/src/github.com/loadimpact/k6 && \
   rice append --exec=$GOPATH/bin/k6 -i ./js/compiler -i ./js/lib
 
-FROM scratch
+FROM alpine
 WORKDIR /root/
 COPY --from=builder /go/bin/k6 /root
 COPY --from=builder /etc/ssl /etc/ssl
+ENV PATH "$PATH:/root"
 ENTRYPOINT ["./k6"]
