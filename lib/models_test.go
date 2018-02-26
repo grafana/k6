@@ -25,12 +25,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/loadimpact/k6/lib/types"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v3"
 )
 
 func TestStageJSON(t *testing.T) {
-	s := Stage{Duration: NullDurationFrom(10 * time.Second), Target: null.IntFrom(10)}
+	s := Stage{Duration: types.NullDurationFrom(10 * time.Second), Target: null.IntFrom(10)}
 
 	data, err := json.Marshal(s)
 	assert.NoError(t, err)

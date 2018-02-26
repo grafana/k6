@@ -26,28 +26,29 @@ import (
 	"testing"
 	"time"
 
+	"github.com/loadimpact/k6/lib/types"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestSumStages(t *testing.T) {
 	testdata := map[string]struct {
-		Time   NullDuration
+		Time   types.NullDuration
 		Stages []Stage
 	}{
-		"Blank":    {NullDuration{}, []Stage{}},
-		"Infinite": {NullDuration{}, []Stage{{}}},
+		"Blank":    {types.NullDuration{}, []Stage{}},
+		"Infinite": {types.NullDuration{}, []Stage{{}}},
 		"Limit": {
-			NullDurationFrom(10 * time.Second),
+			types.NullDurationFrom(10 * time.Second),
 			[]Stage{
-				{Duration: NullDurationFrom(5 * time.Second)},
-				{Duration: NullDurationFrom(5 * time.Second)},
+				{Duration: types.NullDurationFrom(5 * time.Second)},
+				{Duration: types.NullDurationFrom(5 * time.Second)},
 			},
 		},
 		"InfiniteTail": {
-			NullDuration{Duration: Duration(10 * time.Second), Valid: false},
+			types.NullDuration{Duration: types.Duration(10 * time.Second), Valid: false},
 			[]Stage{
-				{Duration: NullDurationFrom(5 * time.Second)},
-				{Duration: NullDurationFrom(5 * time.Second)},
+				{Duration: types.NullDurationFrom(5 * time.Second)},
+				{Duration: types.NullDurationFrom(5 * time.Second)},
 				{},
 			},
 		},
