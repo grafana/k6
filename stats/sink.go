@@ -22,6 +22,7 @@ package stats
 
 import (
 	"errors"
+	"math"
 	"sort"
 	"time"
 )
@@ -109,20 +110,23 @@ func (t *TrendSink) Add(s Sample) {
 	}
 }
 
+// P calculates the given percentile from sink values.
 func (t *TrendSink) P(pct float64) float64 {
 	switch t.Count {
 	case 0:
 		return 0
 	case 1:
 		return t.Values[0]
-	case 2:
-		if pct < 0.5 {
-			return t.Values[0]
-		} else {
-			return t.Values[1]
-		}
 	default:
-		return t.Values[int(float64(t.Count)*pct)]
+		// If percentile falls on a value in Values slice, we return that value.
+		// If percentile does not fall on a value in Values slice, we calculate (linear interpolation)
+		// the value that would fall at percentile, given the values above and below that percentile.
+		t.Calc()
+		i := pct * (float64(t.Count) - 1.0)
+		j := t.Values[int(math.Floor(i))]
+		k := t.Values[int(math.Ceil(i))]
+		f := i - math.Floor(i)
+		return j + (k-j)*f
 	}
 }
 
@@ -143,6 +147,7 @@ func (t *TrendSink) Calc() {
 }
 
 func (t *TrendSink) Format(tt time.Duration) map[string]float64 {
+	t.Calc()
 	return map[string]float64{
 		"min":   t.Min,
 		"max":   t.Max,

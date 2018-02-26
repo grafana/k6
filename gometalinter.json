@@ -6,5 +6,6 @@
 		"ineffassign", "interfacer", "unconvert",
 		"goconst", "gosimple", "staticcheck",
 		"misspell"
-	]
+	],
+	"Exclude": ["/usr/local/go/src", "/go/src"]
 }
