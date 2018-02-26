@@ -18,7 +18,7 @@
  *
  */
 
-package lib
+package types
 
 import (
 	"bytes"

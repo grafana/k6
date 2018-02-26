@@ -42,6 +42,7 @@ import (
 	"github.com/loadimpact/k6/core/local"
 	"github.com/loadimpact/k6/js"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/ui"
 	"github.com/pkg/errors"
@@ -149,7 +150,7 @@ a commandline interface for interacting with it.`,
 		}
 		// If duration is explicitly set to 0, it means run forever.
 		if conf.Duration.Valid && conf.Duration.Duration == 0 {
-			conf.Duration = lib.NullDuration{}
+			conf.Duration = types.NullDuration{}
 		}
 		// If summary trend stats are defined, update the UI to reflect them
 		if len(conf.SummaryTrendStats) > 0 {

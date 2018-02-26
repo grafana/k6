@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
+	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v3"
@@ -52,7 +53,7 @@ func TestOptions(t *testing.T) {
 		assert.Equal(t, int64(12345), opts.VUsMax.Int64)
 	})
 	t.Run("Duration", func(t *testing.T) {
-		opts := Options{}.Apply(Options{Duration: NullDurationFrom(2 * time.Minute)})
+		opts := Options{}.Apply(Options{Duration: types.NullDurationFrom(2 * time.Minute)})
 		assert.True(t, opts.Duration.Valid)
 		assert.Equal(t, "2m0s", opts.Duration.String())
 	})
@@ -62,7 +63,7 @@ func TestOptions(t *testing.T) {
 		assert.Equal(t, int64(1234), opts.Iterations.Int64)
 	})
 	t.Run("Stages", func(t *testing.T) {
-		opts := Options{}.Apply(Options{Stages: []Stage{{Duration: NullDurationFrom(1 * time.Second)}}})
+		opts := Options{}.Apply(Options{Stages: []Stage{{Duration: types.NullDurationFrom(1 * time.Second)}}})
 		assert.NotNil(t, opts.Stages)
 		assert.Len(t, opts.Stages, 1)
 		assert.Equal(t, 1*time.Second, time.Duration(opts.Stages[0].Duration.Duration))
@@ -246,8 +247,8 @@ func TestOptionsEnv(t *testing.T) {
 			"123": null.IntFrom(123),
 		},
 		{"Duration", "K6_DURATION"}: {
-			"":    NullDuration{},
-			"10s": NullDurationFrom(10 * time.Second),
+			"":    types.NullDuration{},
+			"10s": types.NullDurationFrom(10 * time.Second),
 		},
 		{"Iterations", "K6_ITERATIONS"}: {
 			"":    null.Int{},
@@ -256,14 +257,14 @@ func TestOptionsEnv(t *testing.T) {
 		{"Stages", "K6_STAGES"}: {
 			// "": []Stage{},
 			"1s": []Stage{{
-				Duration: NullDurationFrom(1 * time.Second)},
+				Duration: types.NullDurationFrom(1 * time.Second)},
 			},
 			"1s:100": []Stage{
-				{Duration: NullDurationFrom(1 * time.Second), Target: null.IntFrom(100)},
+				{Duration: types.NullDurationFrom(1 * time.Second), Target: null.IntFrom(100)},
 			},
 			"1s,2s:100": []Stage{
-				{Duration: NullDurationFrom(1 * time.Second)},
-				{Duration: NullDurationFrom(2 * time.Second), Target: null.IntFrom(100)},
+				{Duration: types.NullDurationFrom(1 * time.Second)},
+				{Duration: types.NullDurationFrom(2 * time.Second), Target: null.IntFrom(100)},
 			},
 		},
 		{"MaxRedirects", "K6_MAX_REDIRECTS"}: {

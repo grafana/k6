@@ -28,6 +28,7 @@ import (
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
+	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 	"github.com/pkg/errors"
 	logtest "github.com/sirupsen/logrus/hooks/test"
@@ -61,20 +62,20 @@ func TestExecutorStages(t *testing.T) {
 	}{
 		"one": {
 			1 * time.Second,
-			[]lib.Stage{{Duration: lib.NullDurationFrom(1 * time.Second)}},
+			[]lib.Stage{{Duration: types.NullDurationFrom(1 * time.Second)}},
 		},
 		"two": {
 			2 * time.Second,
 			[]lib.Stage{
-				{Duration: lib.NullDurationFrom(1 * time.Second)},
-				{Duration: lib.NullDurationFrom(1 * time.Second)},
+				{Duration: types.NullDurationFrom(1 * time.Second)},
+				{Duration: types.NullDurationFrom(1 * time.Second)},
 			},
 		},
 		"two/targeted": {
 			2 * time.Second,
 			[]lib.Stage{
-				{Duration: lib.NullDurationFrom(1 * time.Second), Target: null.IntFrom(5)},
-				{Duration: lib.NullDurationFrom(1 * time.Second), Target: null.IntFrom(10)},
+				{Duration: types.NullDurationFrom(1 * time.Second), Target: null.IntFrom(5)},
+				{Duration: types.NullDurationFrom(1 * time.Second), Target: null.IntFrom(10)},
 			},
 		},
 	}
@@ -93,8 +94,8 @@ func TestExecutorEndTime(t *testing.T) {
 	e := New(nil)
 	assert.NoError(t, e.SetVUsMax(10))
 	assert.NoError(t, e.SetVUs(10))
-	e.SetEndTime(lib.NullDurationFrom(1 * time.Second))
-	assert.Equal(t, lib.NullDurationFrom(1*time.Second), e.GetEndTime())
+	e.SetEndTime(types.NullDurationFrom(1 * time.Second))
+	assert.Equal(t, types.NullDurationFrom(1*time.Second), e.GetEndTime())
 
 	startTime := time.Now()
 	assert.NoError(t, e.Run(context.Background(), nil))
@@ -106,8 +107,8 @@ func TestExecutorEndTime(t *testing.T) {
 		}))
 		assert.NoError(t, e.SetVUsMax(10))
 		assert.NoError(t, e.SetVUs(10))
-		e.SetEndTime(lib.NullDurationFrom(100 * time.Millisecond))
-		assert.Equal(t, lib.NullDurationFrom(100*time.Millisecond), e.GetEndTime())
+		e.SetEndTime(types.NullDurationFrom(100 * time.Millisecond))
+		assert.Equal(t, types.NullDurationFrom(100*time.Millisecond), e.GetEndTime())
 
 		l, hook := logtest.NewNullLogger()
 		e.SetLogger(l)
@@ -129,8 +130,8 @@ func TestExecutorEndTime(t *testing.T) {
 		}))
 		assert.NoError(t, e.SetVUsMax(10))
 		assert.NoError(t, e.SetVUs(10))
-		e.SetEndTime(lib.NullDurationFrom(100 * time.Millisecond))
-		assert.Equal(t, lib.NullDurationFrom(100*time.Millisecond), e.GetEndTime())
+		e.SetEndTime(types.NullDurationFrom(100 * time.Millisecond))
+		assert.Equal(t, types.NullDurationFrom(100*time.Millisecond), e.GetEndTime())
 
 		l, hook := logtest.NewNullLogger()
 		e.SetLogger(l)
