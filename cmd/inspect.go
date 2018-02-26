@@ -54,6 +54,11 @@ var inspectCmd = &cobra.Command{
 			typ = detectType(src.Data)
 		}
 
+		runtimeOptions, err := getRuntimeOptions(cmd.Flags())
+		if err != nil {
+			return err
+		}
+
 		var opts lib.Options
 		switch typ {
 		case typeArchive:
@@ -61,9 +66,13 @@ var inspectCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			opts = arc.Options
+			b, err := js.NewBundleFromArchive(arc, runtimeOptions)
+			if err != nil {
+				return err
+			}
+			opts = b.Options
 		case typeJS:
-			b, err := js.NewBundle(src, fs)
+			b, err := js.NewBundle(src, fs, runtimeOptions)
 			if err != nil {
 				return err
 			}
@@ -81,5 +90,7 @@ var inspectCmd = &cobra.Command{
 
 func init() {
 	RootCmd.AddCommand(inspectCmd)
+	inspectCmd.Flags().SortFlags = false
+	inspectCmd.Flags().AddFlagSet(runtimeOptionFlagSet(false))
 	inspectCmd.Flags().StringVarP(&runType, "type", "t", runType, "override file `type`, \"js\" or \"archive\"")
 }

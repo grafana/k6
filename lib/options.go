@@ -186,6 +186,9 @@ type Options struct {
 	// Blacklist IP ranges that tests may not contact. Mainly useful in hosted setups.
 	BlacklistIPs []*net.IPNet `json:"blacklistIPs" envconfig:"blacklist_ips"`
 
+	// Hosts overrides dns entries for given hosts
+	Hosts map[string]net.IP `json:"hosts" envconfig:"hosts"`
+
 	// Do not reuse connections between VU iterations. This gives more realistic results (depending
 	// on what you're looking for), but you need to raise various kernel limits or you'll get
 	// errors about running out of file handles or sockets, or being unable to bind addresses.
@@ -262,6 +265,9 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.BlacklistIPs != nil {
 		o.BlacklistIPs = opts.BlacklistIPs
+	}
+	if opts.Hosts != nil {
+		o.Hosts = opts.Hosts
 	}
 	if opts.NoConnectionReuse.Valid {
 		o.NoConnectionReuse = opts.NoConnectionReuse
