@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
+	"github.com/loadimpact/k6/lib/types"
 	"github.com/pkg/errors"
 )
 
@@ -45,25 +46,27 @@ func init() {
 }
 
 type Threshold struct {
-	Source      string
-	Failed      bool
-	AbortOnFail bool
+	Source           string
+	Failed           bool
+	AbortOnFail      bool
+	AbortGracePeriod types.NullDuration
 
 	pgm *goja.Program
 	rt  *goja.Runtime
 }
 
-func NewThreshold(src string, rt *goja.Runtime, abortOnFail bool) (*Threshold, error) {
+func NewThreshold(src string, rt *goja.Runtime, abortOnFail bool, gracePeriod types.NullDuration) (*Threshold, error) {
 	pgm, err := goja.Compile("__threshold__", src, true)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Threshold{
-		Source:      src,
-		AbortOnFail: abortOnFail,
-		pgm:         pgm,
-		rt:          rt,
+		Source:           src,
+		AbortOnFail:      abortOnFail,
+		AbortGracePeriod: gracePeriod,
+		pgm:              pgm,
+		rt:               rt,
 	}, nil
 }
 
@@ -84,8 +87,9 @@ func (t *Threshold) Run() (bool, error) {
 }
 
 type ThresholdConfig struct {
-	Threshold   string `json:"threshold"`
-	AbortOnFail bool   `json:"abortOnFail"`
+	Threshold        string             `json:"threshold"`
+	AbortOnFail      bool               `json:"abortOnFail"`
+	AbortGracePeriod types.NullDuration `json:"delayAbortEval"`
 }
 
 //used internally for JSON marshalling
@@ -131,7 +135,7 @@ func NewThresholdsWithConfig(configs []ThresholdConfig) (Thresholds, error) {
 
 	ts := make([]*Threshold, len(configs))
 	for i, config := range configs {
-		t, err := NewThreshold(config.Threshold, rt, config.AbortOnFail)
+		t, err := NewThreshold(config.Threshold, rt, config.AbortOnFail, config.AbortGracePeriod)
 		if err != nil {
 			return Thresholds{}, errors.Wrapf(err, "%d", i)
 		}
@@ -150,7 +154,7 @@ func (ts *Thresholds) UpdateVM(sink Sink, t time.Duration) error {
 	return nil
 }
 
-func (ts *Thresholds) RunAll() (bool, error) {
+func (ts *Thresholds) RunAll(t time.Duration) (bool, error) {
 	succ := true
 	for i, th := range ts.Thresholds {
 		b, err := th.Run()
@@ -159,9 +163,13 @@ func (ts *Thresholds) RunAll() (bool, error) {
 		}
 		if !b {
 			succ = false
-			if !ts.Abort && th.AbortOnFail {
-				ts.Abort = true
+
+			if ts.Abort || !th.AbortOnFail {
+				continue
 			}
+
+			ts.Abort = !th.AbortGracePeriod.Valid ||
+				th.AbortGracePeriod.Duration < types.Duration(t)
 		}
 	}
 	return succ, nil
@@ -171,7 +179,7 @@ func (ts *Thresholds) Run(sink Sink, t time.Duration) (bool, error) {
 	if err := ts.UpdateVM(sink, t); err != nil {
 		return false, err
 	}
-	return ts.RunAll()
+	return ts.RunAll(t)
 }
 
 func (ts *Thresholds) UnmarshalJSON(data []byte) error {
@@ -192,6 +200,7 @@ func (ts Thresholds) MarshalJSON() ([]byte, error) {
 	for i, t := range ts.Thresholds {
 		configs[i].Threshold = t.Source
 		configs[i].AbortOnFail = t.AbortOnFail
+		configs[i].AbortGracePeriod = t.AbortGracePeriod
 	}
 	return json.Marshal(configs)
 }

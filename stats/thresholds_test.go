@@ -23,8 +23,10 @@ package stats
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/dop251/goja"
+	"github.com/loadimpact/k6/lib/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -32,7 +34,8 @@ func TestNewThreshold(t *testing.T) {
 	src := `1+1==2`
 	rt := goja.New()
 	abortOnFail := false
-	th, err := NewThreshold(src, rt, abortOnFail)
+	gracePeriod := types.NullDurationFrom(2 * time.Second)
+	th, err := NewThreshold(src, rt, abortOnFail, gracePeriod)
 	assert.NoError(t, err)
 
 	assert.Equal(t, src, th.Source)
@@ -40,11 +43,12 @@ func TestNewThreshold(t *testing.T) {
 	assert.NotNil(t, th.pgm)
 	assert.Equal(t, rt, th.rt)
 	assert.Equal(t, abortOnFail, th.AbortOnFail)
+	assert.Equal(t, gracePeriod, th.AbortGracePeriod)
 }
 
 func TestThresholdRun(t *testing.T) {
 	t.Run("true", func(t *testing.T) {
-		th, err := NewThreshold(`1+1==2`, goja.New(), false)
+		th, err := NewThreshold(`1+1==2`, goja.New(), false, types.NullDuration{})
 		assert.NoError(t, err)
 
 		t.Run("no taint", func(t *testing.T) {
@@ -63,7 +67,7 @@ func TestThresholdRun(t *testing.T) {
 	})
 
 	t.Run("false", func(t *testing.T) {
-		th, err := NewThreshold(`1+1==4`, goja.New(), false)
+		th, err := NewThreshold(`1+1==4`, goja.New(), false, types.NullDuration{})
 		assert.NoError(t, err)
 
 		t.Run("no taint", func(t *testing.T) {
@@ -111,8 +115,8 @@ func TestNewThresholdsWithConfig(t *testing.T) {
 	})
 	t.Run("two", func(t *testing.T) {
 		configs := []ThresholdConfig{
-			{`1+1==2`, false},
-			{`1+1==4`, true},
+			{`1+1==2`, false, types.NullDuration{}},
+			{`1+1==4`, true, types.NullDuration{}},
 		}
 		ts, err := NewThresholdsWithConfig(configs)
 		assert.NoError(t, err)
@@ -135,31 +139,38 @@ func TestThresholdsUpdateVM(t *testing.T) {
 }
 
 func TestThresholdsRunAll(t *testing.T) {
+	zero := types.NullDuration{}
+	oneSec := types.NullDurationFrom(time.Second)
+	twoSec := types.NullDurationFrom(2 * time.Second)
 	testdata := map[string]struct {
 		succ  bool
 		err   bool
 		abort bool
+		grace types.NullDuration
 		srcs  []string
 	}{
-		"one passing":  {true, false, false, []string{`1+1==2`}},
-		"one failing":  {false, false, false, []string{`1+1==4`}},
-		"two passing":  {true, false, false, []string{`1+1==2`, `2+2==4`}},
-		"two failing":  {false, false, false, []string{`1+1==4`, `2+2==2`}},
-		"two mixed":    {false, false, false, []string{`1+1==2`, `1+1==4`}},
-		"one erroring": {false, true, false, []string{`throw new Error('?!');`}},
-		"one aborting": {false, false, true, []string{`1+1==4`}},
+		"one passing":                {true, false, false, zero, []string{`1+1==2`}},
+		"one failing":                {false, false, false, zero, []string{`1+1==4`}},
+		"two passing":                {true, false, false, zero, []string{`1+1==2`, `2+2==4`}},
+		"two failing":                {false, false, false, zero, []string{`1+1==4`, `2+2==2`}},
+		"two mixed":                  {false, false, false, zero, []string{`1+1==2`, `1+1==4`}},
+		"one erroring":               {false, true, false, zero, []string{`throw new Error('?!');`}},
+		"one aborting":               {false, false, true, zero, []string{`1+1==4`}},
+		"abort with grace period":    {false, false, true, oneSec, []string{`1+1==4`}},
+		"no abort with grace period": {false, false, true, twoSec, []string{`1+1==4`}},
 	}
 
 	for name, data := range testdata {
 		t.Run(name, func(t *testing.T) {
 			ts, err := NewThresholds(data.srcs)
+			ts.Thresholds[0].AbortOnFail = data.abort
+			ts.Thresholds[0].AbortGracePeriod = data.grace
+
+			runDuration := 1500 * time.Millisecond
+
 			assert.NoError(t, err)
 
-			if data.abort {
-				ts.Thresholds[0].AbortOnFail = true
-			}
-
-			b, err := ts.RunAll()
+			b, err := ts.RunAll(runDuration)
 
 			if data.err {
 				assert.Error(t, err)
@@ -173,7 +184,7 @@ func TestThresholdsRunAll(t *testing.T) {
 				assert.False(t, b)
 			}
 
-			if data.abort {
+			if data.abort && data.grace.Duration < types.Duration(runDuration) {
 				assert.True(t, ts.Abort)
 			} else {
 				assert.False(t, ts.Abort)
@@ -210,16 +221,65 @@ func TestThresholdsJSON(t *testing.T) {
 		JSON        string
 		srcs        []string
 		abortOnFail bool
+		gracePeriod types.NullDuration
 		outputJSON  string
 	}{
-		{`[]`, []string{}, false, ""},
-		{`["1+1==2"]`, []string{"1+1==2"}, false, ""},
-		{`["1+1==2","1+1==3"]`, []string{"1+1==2", "1+1==3"}, false, ""},
-
-		{`[{"threshold":"1+1==2"}]`, []string{"1+1==2"}, false, `["1+1==2"]`},
-		{`[{"threshold":"1+1==2","abortOnFail":true}]`, []string{"1+1==2"}, true, ""},
-		{`[{"threshold":"1+1==2","abortOnFail":false}]`, []string{"1+1==2"}, false, `["1+1==2"]`},
-		{`[{"threshold":"1+1==2"}, "1+1==3"]`, []string{"1+1==2", "1+1==3"}, false, `["1+1==2","1+1==3"]`},
+		{
+			`[]`,
+			[]string{},
+			false,
+			types.NullDuration{},
+			"",
+		},
+		{
+			`["1+1==2"]`,
+			[]string{"1+1==2"},
+			false,
+			types.NullDuration{},
+			"",
+		},
+		{
+			`["1+1==2","1+1==3"]`,
+			[]string{"1+1==2", "1+1==3"},
+			false,
+			types.NullDuration{},
+			"",
+		},
+		{
+			`[{"threshold":"1+1==2"}]`,
+			[]string{"1+1==2"},
+			false,
+			types.NullDuration{},
+			`["1+1==2"]`,
+		},
+		{
+			`[{"threshold":"1+1==2","abortOnFail":true,"delayAbortEval":null}]`,
+			[]string{"1+1==2"},
+			true,
+			types.NullDuration{},
+			"",
+		},
+		{
+			`[{"threshold":"1+1==2","abortOnFail":true,"delayAbortEval":"2s"}]`,
+			[]string{"1+1==2"},
+			true,
+			types.NullDurationFrom(2 * time.Second),
+			"",
+		},
+		{
+			`[{"threshold":"1+1==2","abortOnFail":false}]`,
+			[]string{"1+1==2"},
+			false,
+			types.NullDuration{},
+			`["1+1==2"]`,
+		},
+		{
+			`[{"threshold":"1+1==2"}, "1+1==3"]`,
+			[]string{"1+1==2", "1+1==3"},
+			false,
+			types.NullDuration{},
+			`["1+1==2","1+1==3"]`,
+		},
 	}
 
 	for _, data := range testdata {
@@ -230,6 +290,7 @@ func TestThresholdsJSON(t *testing.T) {
 			for i, src := range data.srcs {
 				assert.Equal(t, src, ts.Thresholds[i].Source)
 				assert.Equal(t, data.abortOnFail, ts.Thresholds[i].AbortOnFail)
+				assert.Equal(t, data.gracePeriod, ts.Thresholds[i].AbortGracePeriod)
 			}
 
 			t.Run("marshal", func(t *testing.T) {
