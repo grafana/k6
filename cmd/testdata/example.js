@@ -57,7 +57,7 @@ export default function() {
 		)
 		if (!check(res, {"status is 201": (r) => r.status === 201 })) { return };
 		redirectUrl = res.headers.Location;
-		restID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.exec(redirectUrl)[0];
+		let restID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.exec(redirectUrl)[0];
 		json = JSON.parse(res.body);
 		// Request #1
 		res = http.get(redirectUrl,
