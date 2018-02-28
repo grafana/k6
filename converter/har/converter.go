@@ -201,7 +201,7 @@ func Convert(h HAR, enableChecks bool, returnOnFailedCheck bool, batchTime uint,
 								re := regexp.MustCompile(guidRegexString)
 								if match := re.FindString(recordedRedirectURL); match != "" {
 									recordedRestID = match
-									fmt.Fprintf(w, "\t\trestID = /%s/.exec(redirectUrl)[0];\n", guidRegexString)
+									fmt.Fprintf(w, "\t\tlet restID = /%s/.exec(redirectUrl)[0];\n", guidRegexString)
 								}
 								break
 							}
