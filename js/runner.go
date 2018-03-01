@@ -251,8 +251,9 @@ func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 		Vu:            u.ID,
 		Iteration:     u.Iteration,
 	}
-	u.Dialer.BytesRead = &state.BytesRead
-	u.Dialer.BytesWritten = &state.BytesWritten
+	// Zero out the values, since we may be reusing a connection
+	u.Dialer.BytesRead = 0
+	u.Dialer.BytesWritten = 0
 
 	ctx = common.WithRuntime(ctx, u.Runtime)
 	ctx = common.WithState(ctx, state)
@@ -271,8 +272,8 @@ func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 		"iter": strconv.FormatInt(iter, 10)}
 
 	samples := append(state.Samples,
-		stats.Sample{Time: t, Metric: metrics.DataSent, Value: float64(state.BytesWritten), Tags: tags},
-		stats.Sample{Time: t, Metric: metrics.DataReceived, Value: float64(state.BytesRead), Tags: tags},
+		stats.Sample{Time: t, Metric: metrics.DataSent, Value: float64(u.Dialer.BytesWritten), Tags: tags},
+		stats.Sample{Time: t, Metric: metrics.DataReceived, Value: float64(u.Dialer.BytesRead), Tags: tags},
 		stats.Sample{Time: t, Metric: metrics.IterationDuration, Value: stats.D(t.Sub(startTime)), Tags: tags},
 	)
 
