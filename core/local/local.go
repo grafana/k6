@@ -29,6 +29,7 @@ import (
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
+	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -378,15 +379,15 @@ func (e *Executor) GetTime() time.Duration {
 	return time.Duration(atomic.LoadInt64(&e.time))
 }
 
-func (e *Executor) GetEndTime() lib.NullDuration {
+func (e *Executor) GetEndTime() types.NullDuration {
 	v := atomic.LoadInt64(&e.endTime)
 	if v < 0 {
-		return lib.NullDuration{}
+		return types.NullDuration{}
 	}
-	return lib.NullDurationFrom(time.Duration(v))
+	return types.NullDurationFrom(time.Duration(v))
 }
 
-func (e *Executor) SetEndTime(t lib.NullDuration) {
+func (e *Executor) SetEndTime(t types.NullDuration) {
 	if !t.Valid {
 		t.Duration = -1
 	}

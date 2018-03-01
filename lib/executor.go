@@ -24,6 +24,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 	log "github.com/sirupsen/logrus"
 	null "gopkg.in/guregu/null.v3"
@@ -59,8 +60,8 @@ type Executor interface {
 
 	// Get time elapsed so far, accounting for pauses, get and set at what point to end the test.
 	GetTime() time.Duration
-	GetEndTime() NullDuration
-	SetEndTime(t NullDuration)
+	GetEndTime() types.NullDuration
+	SetEndTime(t types.NullDuration)
 
 	// Check whether the test is paused, or pause it. A paused won't start any new iterations (but
 	// will allow currently in progress ones to finish), and will not increment the value returned

@@ -28,6 +28,7 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/types"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v3"
@@ -151,7 +152,7 @@ func TestNewBundle(t *testing.T) {
 				export default function() {};
 			`)
 			if assert.NoError(t, err) {
-				assert.Equal(t, lib.NullDurationFrom(10*time.Second), b.Options.Duration)
+				assert.Equal(t, types.NullDurationFrom(10*time.Second), b.Options.Duration)
 			}
 		})
 		t.Run("Iterations", func(t *testing.T) {
@@ -217,7 +218,7 @@ func TestNewBundle(t *testing.T) {
 				`)
 				if assert.NoError(t, err) {
 					if assert.Len(t, b.Options.Stages, 1) {
-						assert.Equal(t, lib.Stage{Duration: lib.NullDurationFrom(10 * time.Second)}, b.Options.Stages[0])
+						assert.Equal(t, lib.Stage{Duration: types.NullDurationFrom(10 * time.Second)}, b.Options.Stages[0])
 					}
 				}
 			})
@@ -232,7 +233,7 @@ func TestNewBundle(t *testing.T) {
 				`)
 				if assert.NoError(t, err) {
 					if assert.Len(t, b.Options.Stages, 1) {
-						assert.Equal(t, lib.Stage{Duration: lib.NullDurationFrom(10 * time.Second), Target: null.IntFrom(10)}, b.Options.Stages[0])
+						assert.Equal(t, lib.Stage{Duration: types.NullDurationFrom(10 * time.Second), Target: null.IntFrom(10)}, b.Options.Stages[0])
 					}
 				}
 			})
@@ -248,8 +249,8 @@ func TestNewBundle(t *testing.T) {
 				`)
 				if assert.NoError(t, err) {
 					if assert.Len(t, b.Options.Stages, 2) {
-						assert.Equal(t, lib.Stage{Duration: lib.NullDurationFrom(10 * time.Second), Target: null.IntFrom(10)}, b.Options.Stages[0])
-						assert.Equal(t, lib.Stage{Duration: lib.NullDurationFrom(5 * time.Second)}, b.Options.Stages[1])
+						assert.Equal(t, lib.Stage{Duration: types.NullDurationFrom(10 * time.Second), Target: null.IntFrom(10)}, b.Options.Stages[0])
+						assert.Equal(t, lib.Stage{Duration: types.NullDurationFrom(5 * time.Second)}, b.Options.Stages[1])
 					}
 				}
 			})

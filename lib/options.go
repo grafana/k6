@@ -25,6 +25,7 @@ import (
 	"encoding/json"
 	"net"
 
+	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 	"github.com/pkg/errors"
 	"gopkg.in/guregu/null.v3"
@@ -145,11 +146,11 @@ type Options struct {
 
 	// Initial values for VUs, max VUs, duration cap, iteration cap, and stages.
 	// See the Runner or Executor interfaces for more information.
-	VUs        null.Int     `json:"vus" envconfig:"vus"`
-	VUsMax     null.Int     `json:"vusMax" envconfig:"vus_max"`
-	Duration   NullDuration `json:"duration" envconfig:"duration"`
-	Iterations null.Int     `json:"iterations" envconfig:"iterations"`
-	Stages     []Stage      `json:"stages" envconfig:"stages"`
+	VUs        null.Int           `json:"vus" envconfig:"vus"`
+	VUsMax     null.Int           `json:"vusMax" envconfig:"vus_max"`
+	Duration   types.NullDuration `json:"duration" envconfig:"duration"`
+	Iterations null.Int           `json:"iterations" envconfig:"iterations"`
+	Stages     []Stage            `json:"stages" envconfig:"stages"`
 
 	// Limit HTTP requests per second.
 	RPS null.Int `json:"rps" envconfig:"rps"`
