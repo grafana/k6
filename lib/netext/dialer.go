@@ -37,8 +37,8 @@ type Dialer struct {
 	Blacklist []*net.IPNet
 	Hosts     map[string]net.IP
 
-	BytesRead    *int64
-	BytesWritten *int64
+	BytesRead    int64
+	BytesWritten int64
 }
 
 func NewDialer(dialer net.Dialer) *Dialer {
@@ -75,9 +75,7 @@ func (d *Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn,
 	if err != nil {
 		return nil, err
 	}
-	if d.BytesRead != nil && d.BytesWritten != nil {
-		conn = &Conn{conn, d.BytesRead, d.BytesWritten}
-	}
+	conn = &Conn{conn, &d.BytesRead, &d.BytesWritten}
 	return conn, err
 }
 
