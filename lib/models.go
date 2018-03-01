@@ -29,6 +29,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/loadimpact/k6/lib/types"
 	"github.com/pkg/errors"
 	"gopkg.in/guregu/null.v3"
 )
@@ -49,7 +50,7 @@ type SourceData struct {
 // cleaner. pls fix.
 type StageFields struct {
 	// Duration of the stage.
-	Duration NullDuration `json:"duration"`
+	Duration types.NullDuration `json:"duration"`
 
 	// If Valid, the VU count will be linearly interpolated towards this value.
 	Target null.Int `json:"target"`
@@ -80,7 +81,7 @@ func (s *Stage) UnmarshalText(b []byte) error {
 		if err != nil {
 			return err
 		}
-		stage.Duration = NullDurationFrom(d)
+		stage.Duration = types.NullDurationFrom(d)
 	}
 	if len(parts) > 1 && parts[1] != "" {
 		t, err := strconv.ParseInt(parts[1], 10, 64)

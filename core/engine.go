@@ -154,7 +154,7 @@ func (e *Engine) Run(ctx context.Context) error {
 	if !e.NoThresholds {
 		subwg.Add(1)
 		go func() {
-			e.runThresholds(subctx)
+			e.runThresholds(subctx, subcancel)
 			e.logger.Debug("Engine: Thresholds terminated")
 			subwg.Done()
 		}()
@@ -193,7 +193,7 @@ func (e *Engine) Run(ctx context.Context) error {
 
 		// Process final thresholds.
 		if !e.NoThresholds {
-			e.processThresholds()
+			e.processThresholds(nil)
 		}
 
 		// Finally, shut down collector.
@@ -261,23 +261,24 @@ func (e *Engine) emitMetrics() {
 	)
 }
 
-func (e *Engine) runThresholds(ctx context.Context) {
+func (e *Engine) runThresholds(ctx context.Context, abort func()) {
 	ticker := time.NewTicker(ThresholdsRate)
 	for {
 		select {
 		case <-ticker.C:
-			e.processThresholds()
+			e.processThresholds(abort)
 		case <-ctx.Done():
 			return
 		}
 	}
 }
 
-func (e *Engine) processThresholds() {
+func (e *Engine) processThresholds(abort func()) {
 	e.MetricsLock.Lock()
 	defer e.MetricsLock.Unlock()
 
 	t := e.Executor.GetTime()
+	abortOnFail := false
 
 	e.thresholdsTainted = false
 	for _, m := range e.Metrics {
@@ -296,7 +297,14 @@ func (e *Engine) processThresholds() {
 			e.logger.WithField("m", m.Name).Debug("Thresholds failed")
 			m.Tainted = null.BoolFrom(true)
 			e.thresholdsTainted = true
+			if !abortOnFail && m.Thresholds.Abort {
+				abortOnFail = true
+			}
 		}
+	}
+
+	if abortOnFail && abort != nil {
+		abort()
 	}
 }
 

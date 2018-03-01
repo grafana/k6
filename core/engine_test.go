@@ -27,6 +27,7 @@ import (
 
 	"github.com/loadimpact/k6/core/local"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/stats/dummy"
 	log "github.com/sirupsen/logrus"
@@ -73,42 +74,42 @@ func TestNewEngine(t *testing.T) {
 func TestNewEngineOptions(t *testing.T) {
 	t.Run("Duration", func(t *testing.T) {
 		e, err, _ := newTestEngine(nil, lib.Options{
-			Duration: lib.NullDurationFrom(10 * time.Second),
+			Duration: types.NullDurationFrom(10 * time.Second),
 		})
 		assert.NoError(t, err)
 		assert.Nil(t, e.Executor.GetStages())
-		assert.Equal(t, lib.NullDurationFrom(10*time.Second), e.Executor.GetEndTime())
+		assert.Equal(t, types.NullDurationFrom(10*time.Second), e.Executor.GetEndTime())
 
 		t.Run("Infinite", func(t *testing.T) {
-			e, err, _ := newTestEngine(nil, lib.Options{Duration: lib.NullDuration{}})
+			e, err, _ := newTestEngine(nil, lib.Options{Duration: types.NullDuration{}})
 			assert.NoError(t, err)
 			assert.Nil(t, e.Executor.GetStages())
-			assert.Equal(t, lib.NullDuration{}, e.Executor.GetEndTime())
+			assert.Equal(t, types.NullDuration{}, e.Executor.GetEndTime())
 		})
 	})
 	t.Run("Stages", func(t *testing.T) {
 		e, err, _ := newTestEngine(nil, lib.Options{
 			Stages: []lib.Stage{
-				{Duration: lib.NullDurationFrom(10 * time.Second), Target: null.IntFrom(10)},
+				{Duration: types.NullDurationFrom(10 * time.Second), Target: null.IntFrom(10)},
 			},
 		})
 		assert.NoError(t, err)
 		if assert.Len(t, e.Executor.GetStages(), 1) {
-			assert.Equal(t, e.Executor.GetStages()[0], lib.Stage{Duration: lib.NullDurationFrom(10 * time.Second), Target: null.IntFrom(10)})
+			assert.Equal(t, e.Executor.GetStages()[0], lib.Stage{Duration: types.NullDurationFrom(10 * time.Second), Target: null.IntFrom(10)})
 		}
 	})
 	t.Run("Stages/Duration", func(t *testing.T) {
 		e, err, _ := newTestEngine(nil, lib.Options{
-			Duration: lib.NullDurationFrom(60 * time.Second),
+			Duration: types.NullDurationFrom(60 * time.Second),
 			Stages: []lib.Stage{
-				{Duration: lib.NullDurationFrom(10 * time.Second), Target: null.IntFrom(10)},
+				{Duration: types.NullDurationFrom(10 * time.Second), Target: null.IntFrom(10)},
 			},
 		})
 		assert.NoError(t, err)
 		if assert.Len(t, e.Executor.GetStages(), 1) {
-			assert.Equal(t, e.Executor.GetStages()[0], lib.Stage{Duration: lib.NullDurationFrom(10 * time.Second), Target: null.IntFrom(10)})
+			assert.Equal(t, e.Executor.GetStages()[0], lib.Stage{Duration: types.NullDurationFrom(10 * time.Second), Target: null.IntFrom(10)})
 		}
-		assert.Equal(t, lib.NullDurationFrom(60*time.Second), e.Executor.GetEndTime())
+		assert.Equal(t, types.NullDurationFrom(60*time.Second), e.Executor.GetEndTime())
 	})
 	t.Run("Iterations", func(t *testing.T) {
 		e, err, _ := newTestEngine(nil, lib.Options{Iterations: null.IntFrom(100)})
@@ -137,6 +138,12 @@ func TestNewEngineOptions(t *testing.T) {
 				VUs: null.IntFrom(10),
 			})
 			assert.EqualError(t, err, "can't raise vu count (to 10) above vu cap (0)")
+		})
+		t.Run("negative max", func(t *testing.T) {
+			_, err, _ := newTestEngine(nil, lib.Options{
+				VUsMax: null.IntFrom(-1),
+			})
+			assert.EqualError(t, err, "vu cap can't be negative")
 		})
 		t.Run("max too low", func(t *testing.T) {
 			_, err, _ := newTestEngine(nil, lib.Options{
@@ -360,20 +367,80 @@ func TestEngine_processSamples(t *testing.T) {
 	})
 }
 
+func TestEngine_runThresholds(t *testing.T) {
+	metric := stats.New("my_metric", stats.Gauge)
+	thresholds := make(map[string]stats.Thresholds, 1)
+
+	ths, err := stats.NewThresholds([]string{"1+1==3"})
+	assert.NoError(t, err)
+
+	t.Run("aborted", func(t *testing.T) {
+		ths.Thresholds[0].AbortOnFail = true
+		thresholds[metric.Name] = ths
+		e, err, _ := newTestEngine(nil, lib.Options{Thresholds: thresholds})
+		assert.NoError(t, err)
+
+		e.processSamples(
+			stats.Sample{Metric: metric, Value: 1.25, Tags: map[string]string{"a": "1"}},
+		)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		aborted := false
+
+		cancelFunc := func() {
+			cancel()
+			aborted = true
+		}
+
+		e.runThresholds(ctx, cancelFunc)
+
+		assert.True(t, aborted)
+	})
+
+	t.Run("canceled", func(t *testing.T) {
+		ths.Abort = false
+		thresholds[metric.Name] = ths
+		e, err, _ := newTestEngine(nil, lib.Options{Thresholds: thresholds})
+		assert.NoError(t, err)
+
+		e.processSamples(
+			stats.Sample{Metric: metric, Value: 1.25, Tags: map[string]string{"a": "1"}},
+		)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			e.runThresholds(ctx, cancel)
+		}()
+
+		select {
+		case <-done:
+			return
+		case <-time.After(1 * time.Second):
+			assert.Fail(t, "Test should have completed within a second")
+		}
+	})
+}
+
 func TestEngine_processThresholds(t *testing.T) {
 	metric := stats.New("my_metric", stats.Gauge)
 
 	testdata := map[string]struct {
-		pass bool
-		ths  map[string][]string
+		pass  bool
+		ths   map[string][]string
+		abort bool
 	}{
-		"passing": {true, map[string][]string{"my_metric": {"1+1==2"}}},
-		"failing": {false, map[string][]string{"my_metric": {"1+1==3"}}},
+		"passing":  {true, map[string][]string{"my_metric": {"1+1==2"}}, false},
+		"failing":  {false, map[string][]string{"my_metric": {"1+1==3"}}, false},
+		"aborting": {false, map[string][]string{"my_metric": {"1+1==3"}}, true},
 
-		"submetric,match,passing":   {true, map[string][]string{"my_metric{a:1}": {"1+1==2"}}},
-		"submetric,match,failing":   {false, map[string][]string{"my_metric{a:1}": {"1+1==3"}}},
-		"submetric,nomatch,passing": {true, map[string][]string{"my_metric{a:2}": {"1+1==2"}}},
-		"submetric,nomatch,failing": {true, map[string][]string{"my_metric{a:2}": {"1+1==3"}}},
+		"submetric,match,passing":   {true, map[string][]string{"my_metric{a:1}": {"1+1==2"}}, false},
+		"submetric,match,failing":   {false, map[string][]string{"my_metric{a:1}": {"1+1==3"}}, false},
+		"submetric,nomatch,passing": {true, map[string][]string{"my_metric{a:2}": {"1+1==2"}}, false},
+		"submetric,nomatch,failing": {true, map[string][]string{"my_metric{a:2}": {"1+1==3"}}, false},
 	}
 
 	for name, data := range testdata {
@@ -382,6 +449,7 @@ func TestEngine_processThresholds(t *testing.T) {
 			for m, srcs := range data.ths {
 				ths, err := stats.NewThresholds(srcs)
 				assert.NoError(t, err)
+				ths.Thresholds[0].AbortOnFail = data.abort
 				thresholds[m] = ths
 			}
 
@@ -391,9 +459,19 @@ func TestEngine_processThresholds(t *testing.T) {
 			e.processSamples(
 				stats.Sample{Metric: metric, Value: 1.25, Tags: map[string]string{"a": "1"}},
 			)
-			e.processThresholds()
+
+			abortCalled := false
+
+			abortFunc := func() {
+				abortCalled = true
+			}
+
+			e.processThresholds(abortFunc)
 
 			assert.Equal(t, data.pass, !e.IsTainted())
+			if data.abort {
+				assert.True(t, abortCalled)
+			}
 		})
 	}
 }

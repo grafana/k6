@@ -27,7 +27,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/types"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -84,12 +84,12 @@ func getNullInt64(flags *pflag.FlagSet, key string) null.Int {
 	return null.NewInt(v, flags.Changed(key))
 }
 
-func getNullDuration(flags *pflag.FlagSet, key string) lib.NullDuration {
+func getNullDuration(flags *pflag.FlagSet, key string) types.NullDuration {
 	v, err := flags.GetDuration(key)
 	if err != nil {
 		panic(err)
 	}
-	return lib.NullDuration{Duration: lib.Duration(v), Valid: flags.Changed(key)}
+	return types.NullDuration{Duration: types.Duration(v), Valid: flags.Changed(key)}
 }
 
 func getNullString(flags *pflag.FlagSet, key string) null.String {
