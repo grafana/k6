@@ -255,9 +255,9 @@ func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 	u.Dialer.BytesRead = 0
 	u.Dialer.BytesWritten = 0
 
-	ctx = common.WithRuntime(ctx, u.Runtime)
-	ctx = common.WithState(ctx, state)
-	*u.Context = ctx
+	newctx := common.WithRuntime(ctx, u.Runtime)
+	newctx = common.WithState(newctx, state)
+	*u.Context = newctx
 
 	u.Runtime.Set("__ITER", u.Iteration)
 	iter := u.Iteration
