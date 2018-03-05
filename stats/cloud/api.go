@@ -52,9 +52,9 @@ type SampleData struct {
 type ThresholdResult map[string]map[string]bool
 
 type TestRun struct {
-	Name       string              `json:"name"`
-	ProjectID  int                 `json:"project_id,omitempty"`
-	Thresholds map[string][]string `json:"thresholds"`
+	Name       string                        `json:"name"`
+	ProjectID  int                           `json:"project_id,omitempty"`
+	Thresholds map[string][]*stats.Threshold `json:"thresholds"`
 	// Duration of test in seconds. -1 for unknown length, 0 for continuous running.
 	Duration int64 `json:"duration"`
 }
