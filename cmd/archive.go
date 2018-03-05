@@ -67,7 +67,7 @@ An archive is a fully self-contained test run, and can be executed identically e
 		}
 
 		// Options.
-		cliOpts, err := getOptions(cmd.Flags())
+		cliConf, err := getConfig(cmd.Flags())
 		if err != nil {
 			return err
 		}
@@ -79,8 +79,9 @@ An archive is a fully self-contained test run, and can be executed identically e
 		if err != nil {
 			return err
 		}
-		opts := cliOpts.Apply(fileConf.Options).Apply(r.GetOptions()).Apply(envConf.Options).Apply(cliOpts)
-		r.SetOptions(opts)
+
+		conf := cliConf.Apply(fileConf).Apply(Config{Options: r.GetOptions()}).Apply(envConf).Apply(cliConf)
+		r.SetOptions(conf.Options)
 
 		// Archive.
 		arc := r.MakeArchive()
@@ -97,5 +98,6 @@ func init() {
 	archiveCmd.Flags().SortFlags = false
 	archiveCmd.Flags().AddFlagSet(optionFlagSet())
 	archiveCmd.Flags().AddFlagSet(runtimeOptionFlagSet(false))
+	archiveCmd.Flags().AddFlagSet(configFlagSet())
 	archiveCmd.Flags().StringVarP(&archiveOut, "archive-out", "O", archiveOut, "archive output filename")
 }
