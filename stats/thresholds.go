@@ -48,7 +48,7 @@ func init() {
 type Threshold struct {
 	Source           string             `json:"threshold"`
 	Failed           bool               `json:"-"`
-	AbortOnFail      bool               `json:"abort_on_failed"`
+	AbortOnFail      bool               `json:"abort_on_fail"`
 	AbortGracePeriod types.NullDuration `json:"delay_abort_eval"`
 
 	pgm *goja.Program `json:"-"`
