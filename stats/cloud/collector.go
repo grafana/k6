@@ -187,7 +187,7 @@ func (c *Collector) Collect(samples []stats.Sample) {
 			}
 			iterationJSON.Data.Values[name] = samp.Value
 			cloudSamples = append(cloudSamples, iterationJSON)
-		} else if name == "data_received" || name == "iter_duration" {
+		} else if name == "data_received" || name == "iteration_duration" {
 			iterationJSON.Data.Values[name] = samp.Value
 		} else if strings.HasPrefix(name, "http_req_") {
 			httpJSON.Data.Values[name] = samp.Value
