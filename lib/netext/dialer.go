@@ -37,8 +37,8 @@ type Dialer struct {
 	Blacklist []*net.IPNet
 	Hosts     map[string]net.IP
 
-	BytesRead    *int64
-	BytesWritten *int64
+	BytesRead    int64
+	BytesWritten int64
 }
 
 func NewDialer(dialer net.Dialer) *Dialer {
@@ -75,9 +75,7 @@ func (d *Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn,
 	if err != nil {
 		return nil, err
 	}
-	if d.BytesRead != nil && d.BytesWritten != nil {
-		conn = &Conn{conn, d.BytesRead, d.BytesWritten}
-	}
+	conn = &Conn{conn, &d.BytesRead, &d.BytesWritten}
 	return conn, err
 }
 
@@ -89,12 +87,16 @@ type Conn struct {
 
 func (c *Conn) Read(b []byte) (int, error) {
 	n, err := c.Conn.Read(b)
-	atomic.AddInt64(c.BytesRead, int64(n))
+	if n > 0 {
+		atomic.AddInt64(c.BytesRead, int64(n))
+	}
 	return n, err
 }
 
 func (c *Conn) Write(b []byte) (int, error) {
 	n, err := c.Conn.Write(b)
-	atomic.AddInt64(c.BytesWritten, int64(n))
+	if n > 0 {
+		atomic.AddInt64(c.BytesWritten, int64(n))
+	}
 	return n, err
 }
