@@ -54,9 +54,6 @@ type State struct {
 	// Sample buffer, emitted at the end of the iteration.
 	Samples []stats.Sample
 
-	// Bytes sent and received during this iteration. Use `sync/atomic`.
-	BytesRead, BytesWritten int64
-
 	// Buffer pool; use instead of allocating fresh buffers when possible.
 	BPool *bpool.BufferPool
 

@@ -22,17 +22,23 @@ package core
 
 import (
 	"context"
+	"fmt"
+	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/loadimpact/k6/core/local"
+	"github.com/loadimpact/k6/js"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/stats/dummy"
+	"github.com/mccutchen/go-httpbin/httpbin"
 	log "github.com/sirupsen/logrus"
 	logtest "github.com/sirupsen/logrus/hooks/test"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -471,6 +477,84 @@ func TestEngine_processThresholds(t *testing.T) {
 			assert.Equal(t, data.pass, !e.IsTainted())
 			if data.abort {
 				assert.True(t, abortCalled)
+			}
+		})
+	}
+}
+
+func getMetricSum(samples []stats.Sample, name string) (result float64) {
+	for _, s := range samples {
+		if s.Metric.Name == name {
+			result += s.Value
+		}
+	}
+	return
+}
+func TestSentReceivedMetrics(t *testing.T) {
+	//t.Parallel()
+	srv := httptest.NewServer(httpbin.NewHTTPBin().Handler())
+	defer srv.Close()
+
+	burl := func(bytecount uint32) string {
+		return fmt.Sprintf(`"%s/bytes/%d"`, srv.URL, bytecount)
+	}
+
+	expectedSingleData := 50000.0
+	r, err := js.New(&lib.SourceData{
+		Filename: "/script.js",
+		Data: []byte(`
+			import http from "k6/http";
+			export default function() {
+				http.get(` + burl(10000) + `);
+				http.batch([` + burl(10000) + `,` + burl(20000) + `,` + burl(10000) + `]);
+			}
+		`),
+	}, afero.NewMemMapFs(), lib.RuntimeOptions{})
+	require.NoError(t, err)
+
+	testCases := []struct{ Iterations, VUs int64 }{
+		{1, 1}, {1, 2}, {2, 1}, {2, 2}, {3, 1}, {5, 2}, {10, 3}, {25, 2},
+	}
+
+	for testn, tc := range testCases {
+		t.Run(fmt.Sprintf("SentReceivedMetrics_%d", testn), func(t *testing.T) {
+			//t.Parallel()
+			options := lib.Options{
+				Iterations: null.IntFrom(tc.Iterations),
+				VUs:        null.IntFrom(tc.VUs),
+				VUsMax:     null.IntFrom(tc.VUs),
+			}
+			//TODO: test for differences with NoConnectionReuse enabled and disabled
+
+			engine, err := NewEngine(local.New(r), options)
+			require.NoError(t, err)
+
+			collector := &dummy.Collector{}
+			engine.Collector = collector
+
+			ctx, cancel := context.WithCancel(context.Background())
+			errC := make(chan error)
+			go func() { errC <- engine.Run(ctx) }()
+
+			select {
+			case <-time.After(5 * time.Second):
+				cancel()
+				t.Fatal("Test timed out")
+			case err := <-errC:
+				cancel()
+				require.NoError(t, err)
+			}
+
+			receivedData := getMetricSum(collector.Samples, "data_received")
+			expectedDataMin := expectedSingleData * float64(tc.Iterations)
+			expectedDataMax := 1.05 * expectedDataMin // To account for headers
+			if receivedData < expectedDataMin || receivedData > expectedDataMax {
+				t.Errorf(
+					"The received data should be in the interval [%f, %f] but was %f",
+					expectedDataMin,
+					expectedDataMax,
+					receivedData,
+				)
 			}
 		})
 	}
