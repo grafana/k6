@@ -87,12 +87,16 @@ type Conn struct {
 
 func (c *Conn) Read(b []byte) (int, error) {
 	n, err := c.Conn.Read(b)
-	atomic.AddInt64(c.BytesRead, int64(n))
+	if n > 0 {
+		atomic.AddInt64(c.BytesRead, int64(n))
+	}
 	return n, err
 }
 
 func (c *Conn) Write(b []byte) (int, error) {
 	n, err := c.Conn.Write(b)
-	atomic.AddInt64(c.BytesWritten, int64(n))
+	if n > 0 {
+		atomic.AddInt64(c.BytesWritten, int64(n))
+	}
 	return n, err
 }
