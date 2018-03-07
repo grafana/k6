@@ -264,9 +264,9 @@ func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 	u.Iteration++
 
 	startTime := time.Now()
-	_, err = u.Default(goja.Undefined())
-
+	_, err = u.Default(goja.Undefined()) // Actually run the JS script
 	t := time.Now()
+
 	tags := map[string]string{
 		"vu":   strconv.FormatInt(u.ID, 10),
 		"iter": strconv.FormatInt(iter, 10)}
