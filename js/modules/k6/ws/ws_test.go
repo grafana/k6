@@ -314,3 +314,56 @@ func TestErrors(t *testing.T) {
 		assertSessionMetricsEmitted(t, state.Samples, "", "ws://demos.kaazing.com/echo", 101, "")
 	})
 }
+
+func TestDefaultTags(t *testing.T) {
+	root, err := lib.NewGroup("", nil)
+	assert.NoError(t, err)
+
+	rt := goja.New()
+	rt.SetFieldNameMapper(common.FieldNameMapper{})
+	dialer := netext.NewDialer(net.Dialer{
+		Timeout:   10 * time.Second,
+		KeepAlive: 60 * time.Second,
+		DualStack: true,
+	})
+	state := &common.State{
+		Group:   root,
+		Dialer:  dialer,
+		Options: lib.Options{},
+	}
+
+	ctx := context.Background()
+	ctx = common.WithState(ctx, state)
+	ctx = common.WithRuntime(ctx, rt)
+
+	rt.Set("ws", common.Bind(rt, New(), &ctx))
+
+	defaultTagsTest := []string{"group", "status", "subprotocol", "url"}
+	for _, expectedTag := range defaultTagsTest {
+		t.Run("only "+expectedTag, func(t *testing.T) {
+			state.Options.DefaultTags = map[string]bool{
+				expectedTag: true,
+			}
+			state.Samples = nil
+			_, err := common.RunString(rt, `
+			let res = ws.connect("ws://demos.kaazing.com/echo", function(socket){
+				socket.on("open", function() {
+					socket.send("test")
+				})
+				socket.on("message", function (data){
+					if (!data=="test") {
+						throw new Error ("echo'd data doesn't match our message!");
+					}
+					socket.close()
+				});
+			});
+			`)
+			assert.NoError(t, err)
+			for _, sample := range state.Samples {
+				for emittedTag := range sample.Tags {
+					assert.Equal(t, expectedTag, emittedTag)
+				}
+			}
+		})
+	}
+}
