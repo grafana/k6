@@ -933,7 +933,6 @@ func TestDefaultTags(t *testing.T) {
 	defaultTagsTest := map[string]string{
 		"error":       "http://nonexistenturl.loadimpact.com",
 		"group":       "https://httpbin.org/",
-		"iter":        "https://httpbin.org/",
 		"method":      "https://httpbin.org/",
 		"name":        "https://httpbin.org/",
 		"ocsp_status": "https://stackoverflow.com/",
@@ -941,7 +940,6 @@ func TestDefaultTags(t *testing.T) {
 		"status":      "https://httpbin.org/",
 		"tls_version": "https://httpbin.org/",
 		"url":         "https://httpbin.org/",
-		"vu":          "https://httpbin.org/",
 	}
 	for _, expectedTag := range defaultTagsTest {
 		t.Run("only "+expectedTag, func(t *testing.T) {
