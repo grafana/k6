@@ -130,8 +130,8 @@ func (c *Collector) Init() error {
 func (c *Collector) GetOptions() lib.CollectorOptions {
 	return lib.CollectorOptions{
 		DefaultTags: lib.Tags{
-			"vu:id":   true,
-			"vu:iter": true,
+			"vu":   true,
+			"iter": true,
 		},
 	}
 }
