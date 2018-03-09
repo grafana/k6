@@ -240,17 +240,16 @@ func TestOptions(t *testing.T) {
 		t.Run("JSON", func(t *testing.T) {
 			t.Run("Array", func(t *testing.T) {
 				var opts Options
-				jsonStr := `{"defaultTags":["vu","url"]}`
+				jsonStr := `{"defaultTags":["url"]}`
 				assert.NoError(t, json.Unmarshal([]byte(jsonStr), &opts))
 				assert.Equal(t, Tags{
-					"vu":  true,
 					"url": true,
 				}, opts.DefaultTags)
 
 				t.Run("Roundtrip", func(t *testing.T) {
 					data, err := json.Marshal(opts.DefaultTags)
 					assert.NoError(t, err)
-					assert.Equal(t, `["vu","url"]`, string(data))
+					assert.Equal(t, `["url"]`, string(data))
 					var vers2 Tags
 					assert.NoError(t, json.Unmarshal(data, &vers2))
 					assert.Equal(t, vers2, opts.DefaultTags)

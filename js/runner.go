@@ -26,7 +26,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/cookiejar"
-	"strconv"
 	"time"
 
 	"github.com/dop251/goja"
@@ -266,28 +265,16 @@ func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 	*u.Context = newctx
 
 	u.Runtime.Set("__ITER", u.Iteration)
-	iter := u.Iteration
 	u.Iteration++
 
 	startTime := time.Now()
 	_, err = u.Default(goja.Undefined()) // Actually run the JS script
 	t := time.Now()
 
-	// Check collector options, update tags accordingly.
-	tags := map[string]string{}
-	if (state.CollectorOptions.DefaultTags != nil && state.CollectorOptions.DefaultTags["vu"]) ||
-		(state.Options.DefaultTags != nil && state.Options.DefaultTags["vu"]) {
-		tags["vu"] = strconv.FormatInt(u.ID, 10)
-	}
-	if (state.CollectorOptions.DefaultTags != nil && state.CollectorOptions.DefaultTags["iter"]) ||
-		(state.Options.DefaultTags != nil && state.Options.DefaultTags["iter"]) {
-		tags["iter"] = strconv.FormatInt(iter, 10)
-	}
-
 	samples := append(state.Samples,
-		stats.Sample{Time: t, Metric: metrics.DataSent, Value: float64(u.Dialer.BytesWritten), Tags: tags},
-		stats.Sample{Time: t, Metric: metrics.DataReceived, Value: float64(u.Dialer.BytesRead), Tags: tags},
-		stats.Sample{Time: t, Metric: metrics.IterationDuration, Value: stats.D(t.Sub(startTime)), Tags: tags},
+		stats.Sample{Time: t, Metric: metrics.DataSent, Value: float64(u.Dialer.BytesWritten)},
+		stats.Sample{Time: t, Metric: metrics.DataReceived, Value: float64(u.Dialer.BytesRead)},
+		stats.Sample{Time: t, Metric: metrics.IterationDuration, Value: stats.D(t.Sub(startTime))},
 	)
 
 	if u.Runner.Bundle.Options.NoConnectionReuse.Bool {
