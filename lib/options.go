@@ -229,7 +229,7 @@ type Options struct {
 	// Summary trend stats for trend metrics (response times) in CLI output
 	SummaryTrendStats []string `json:"SummaryTrendStats" envconfig:"summary_trend_stats"`
 
-	// Which default tags to include with metrics, namespaced ("http:method", "vu:id" etc.)
+	// Which default tags to include with metrics ("method", "vu" etc.)
 	DefaultTags Tags `json:"defaultTags" envconfig:"default_tags"`
 }
 
