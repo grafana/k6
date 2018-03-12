@@ -1,7 +1,7 @@
 /*
  *
  * k6 - a next-generation load testing tool
- * Copyright (C) 2016 Load Impact
+ * Copyright (C) 2018 Load Impact
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -45,10 +45,10 @@ func (h *HTTP) File(data []byte, args ...string) FileData {
 	fname, ct := fmt.Sprintf("%d", time.Now().UnixNano()), "application/octet-stream"
 
 	if len(args) > 0 {
-		fname = escapeQuotes(args[0])
+		fname = args[0]
 
 		if len(args) > 1 {
-			ct = escapeQuotes(args[1])
+			ct = args[1]
 		}
 	}
 

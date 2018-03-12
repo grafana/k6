@@ -120,9 +120,10 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 						// writing our own part to handle receiving
 						// different content-type than the default application/octet-stream
 						h := make(textproto.MIMEHeader)
+						escapedFilename := escapeQuotes(ve.Filename)
 						h.Set("Content-Disposition",
 							fmt.Sprintf(`form-data; name="%s"; filename="%s"`,
-								ve.Filename, ve.Filename))
+								escapedFilename, escapedFilename))
 						h.Set("Content-Type", ve.ContentType)
 
 						// this writer will be closed either be the next part or
