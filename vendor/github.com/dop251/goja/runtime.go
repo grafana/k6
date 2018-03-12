@@ -1443,7 +1443,7 @@ func Undefined() Value {
 
 // Null returns JS null value.
 func Null() Value {
-	return _undefined
+	return _null
 }
 
 func tryFunc(f func()) (err error) {

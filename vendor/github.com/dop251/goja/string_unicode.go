@@ -236,7 +236,7 @@ func (s unicodeString) index(substr valueString, start int64) int64 {
 
 	// TODO: optimise
 	end := int64(len(s) - len(ss))
-	for start < end {
+	for start <= end {
 		for i := int64(0); i < int64(len(ss)); i++ {
 			if s[start+i] != ss[i] {
 				goto nomatch

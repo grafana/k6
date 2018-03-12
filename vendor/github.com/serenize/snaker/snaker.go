@@ -51,6 +51,11 @@ func snakeToCamel(s string, upperCase bool) string {
 	words := strings.Split(s, "_")
 
 	for i, word := range words {
+		if exception := snakeToCamelExceptions[word]; len(exception) > 0 {
+			result += exception
+			continue
+		}
+
 		if upperCase || i > 0 {
 			if upper := strings.ToUpper(word); commonInitialisms[upper] {
 				result += upper
@@ -136,4 +141,10 @@ var commonInitialisms = map[string]bool{
 	"XMPP":  true,
 	"XSRF":  true,
 	"XSS":   true,
+	"OAuth": true,
+}
+
+// add exceptions here for things that are not automatically convertable
+var snakeToCamelExceptions = map[string]string{
+	"oauth": "OAuth",
 }

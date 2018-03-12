@@ -10,11 +10,11 @@ import (
 	"net/http"
 	"path"
 	"regexp"
-	"strings"
 )
 
 var (
 	ErrMethodMismatch = errors.New("method is not allowed")
+	ErrNotFound       = errors.New("no matching route was found")
 )
 
 // NewRouter returns a new router instance.
@@ -63,26 +63,51 @@ type Router struct {
 	KeepContext bool
 	// see Router.UseEncodedPath(). This defines a flag for all routes.
 	useEncodedPath bool
+	// Slice of middlewares to be called after a match is found
+	middlewares []middleware
 }
 
-// Match matches registered routes against the request.
+// Match attempts to match the given request against the router's registered routes.
+//
+// If the request matches a route of this router or one of its subrouters the Route,
+// Handler, and Vars fields of the the match argument are filled and this function
+// returns true.
+//
+// If the request does not match any of this router's or its subrouters' routes
+// then this function returns false. If available, a reason for the match failure
+// will be filled in the match argument's MatchErr field. If the match failure type
+// (eg: not found) has a registered handler, the handler is assigned to the Handler
+// field of the match argument.
 func (r *Router) Match(req *http.Request, match *RouteMatch) bool {
 	for _, route := range r.routes {
 		if route.Match(req, match) {
+			// Build middleware chain if no error was found
+			if match.MatchErr == nil {
+				for i := len(r.middlewares) - 1; i >= 0; i-- {
+					match.Handler = r.middlewares[i].Middleware(match.Handler)
+				}
+			}
 			return true
 		}
 	}
 
-	if match.MatchErr == ErrMethodMismatch && r.MethodNotAllowedHandler != nil {
-		match.Handler = r.MethodNotAllowedHandler
-		return true
+	if match.MatchErr == ErrMethodMismatch {
+		if r.MethodNotAllowedHandler != nil {
+			match.Handler = r.MethodNotAllowedHandler
+			return true
+		} else {
+			return false
+		}
 	}
 
 	// Closest match for a router (includes sub-routers)
 	if r.NotFoundHandler != nil {
 		match.Handler = r.NotFoundHandler
+		match.MatchErr = ErrNotFound
 		return true
 	}
+
+	match.MatchErr = ErrNotFound
 	return false
 }
 
@@ -94,7 +119,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if !r.skipClean {
 		path := req.URL.Path
 		if r.useEncodedPath {
-			path = getPath(req)
+			path = req.URL.EscapedPath()
 		}
 		// Clean path to canonical form and redirect.
 		if p := cleanPath(path); p != path {
@@ -130,6 +155,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if !r.KeepContext {
 		defer contextClear(req)
 	}
+
 	handler.ServeHTTP(w, req)
 }
 
@@ -147,12 +173,17 @@ func (r *Router) GetRoute(name string) *Route {
 // StrictSlash defines the trailing slash behavior for new routes. The initial
 // value is false.
 //
-// When true, if the route path is "/path/", accessing "/path" will redirect
+// When true, if the route path is "/path/", accessing "/path" will perform a redirect
 // to the former and vice versa. In other words, your application will always
 // see the path as specified in the route.
 //
 // When false, if the route path is "/path", accessing "/path/" will not match
 // this route and vice versa.
+//
+// The re-direct is a HTTP 301 (Moved Permanently). Note that when this is set for
+// routes with a non-idempotent method (e.g. POST, PUT), the subsequent re-directed
+// request will be made as a GET by most clients. Use middleware or client settings
+// to modify this behaviour as needed.
 //
 // Special case: when a route sets a path prefix using the PathPrefix() method,
 // strict slash is ignored for that route because the redirect behavior can't
@@ -179,10 +210,6 @@ func (r *Router) SkipClean(value bool) *Router {
 // UseEncodedPath tells the router to match the encoded original path
 // to the routes.
 // For eg. "/path/foo%2Fbar/to" will match the path "/path/{var}/to".
-// This behavior has the drawback of needing to match routes against
-// r.RequestURI instead of r.URL.Path. Any modifications (such as http.StripPrefix)
-// to r.URL.Path will not affect routing when this flag is on and thus may
-// induce unintended behavior.
 //
 // If not called, the router will match the unencoded path to the routes.
 // For eg. "/path/foo%2Fbar/to" will match the path "/path/foo/bar/to"
@@ -408,28 +435,6 @@ func setCurrentRoute(r *http.Request, val interface{}) *http.Request {
 // ----------------------------------------------------------------------------
 // Helpers
 // ----------------------------------------------------------------------------
-
-// getPath returns the escaped path if possible; doing what URL.EscapedPath()
-// which was added in go1.5 does
-func getPath(req *http.Request) string {
-	if req.RequestURI != "" {
-		// Extract the path from RequestURI (which is escaped unlike URL.Path)
-		// as detailed here as detailed in https://golang.org/pkg/net/url/#URL
-		// for < 1.5 server side workaround
-		// http://localhost/path/here?v=1 -> /path/here
-		path := req.RequestURI
-		path = strings.TrimPrefix(path, req.URL.Scheme+`://`)
-		path = strings.TrimPrefix(path, req.URL.Host)
-		if i := strings.LastIndex(path, "?"); i > -1 {
-			path = path[:i]
-		}
-		if i := strings.LastIndex(path, "#"); i > -1 {
-			path = path[:i]
-		}
-		return path
-	}
-	return req.URL.Path
-}
 
 // cleanPath returns the canonical path for p, eliminating . and .. elements.
 // Borrowed from the net/http package.

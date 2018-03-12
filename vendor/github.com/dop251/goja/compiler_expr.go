@@ -782,6 +782,7 @@ func (e *compiledFunctionLiteral) emitGetter(putOnStack bool) {
 	}
 
 	e.c.compileFunctions(e.expr.DeclarationList)
+	e.c.markBlockStart()
 	e.c.compileStatement(e.expr.Body, false)
 
 	if e.c.blockStart >= len(e.c.p.code)-1 || e.c.p.code[len(e.c.p.code)-1] != ret {

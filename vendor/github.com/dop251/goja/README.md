@@ -47,7 +47,7 @@ are converted to the corresponding JavaScript primitives.
 
 *func(FunctionCall) Value* is treated as a native JavaScript function.
 
-*func(ConstructorCall) Value* is treated as a JavaScript constructor (see Native Constructors).
+*func(ConstructorCall) \*Object* is treated as a JavaScript constructor (see Native Constructors).
 
 *map[string]interface{}* is converted into a host object that largely behaves like a JavaScript Object.
 
@@ -85,7 +85,7 @@ Native Constructors
 
 In order to implement a constructor function in Go:
 ```go
-func MyObject(call goja.ConstructorCall) Value {
+func MyObject(call goja.ConstructorCall) *Object {
     // call.This contains the newly created object as per http://www.ecma-international.org/ecma-262/5.1/index.html#sec-13.2.2
     // call.Arguments contain arguments passed to the function
 
