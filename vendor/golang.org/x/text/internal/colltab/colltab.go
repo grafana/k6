@@ -4,7 +4,7 @@
 
 // Package colltab contains functionality related to collation tables.
 // It is only to be used by the collate and search packages.
-package colltab
+package colltab // import "golang.org/x/text/internal/colltab"
 
 import (
 	"sort"
