@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package colltab
+package colltab // import "golang.org/x/text/internal/colltab"
 
 // A Weighter can be used as a source for Collator and Searcher.
 type Weighter interface {

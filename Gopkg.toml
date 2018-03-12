@@ -1,0 +1,90 @@
+# Gopkg.toml example
+#
+# Refer to https://github.com/golang/dep/blob/master/docs/Gopkg.toml.md
+# for detailed Gopkg.toml documentation.
+#
+# required = ["github.com/user/thing/cmd/thing"]
+# ignored = ["github.com/user/project/pkgX", "bitbucket.org/user/project/pkgA/pkgY"]
+#
+# [[constraint]]
+#   name = "github.com/user/project"
+#   version = "1.0.0"
+#
+# [[constraint]]
+#   name = "github.com/user/project2"
+#   branch = "dev"
+#   source = "github.com/myfork/project2"
+#
+# [[override]]
+#   name = "github.com/x/y"
+#   version = "2.4.0"
+#
+# [prune]
+#   non-go = false
+#   go-tests = true
+#   unused-packages = true
+
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/GeertJohan/go.rice"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/dustin/go-humanize"
+
+[[constraint]]
+  name = "github.com/manyminds/api2go"
+  version = "1.0.0-RC4"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/mattn/go-isatty"
+
+[[constraint]]
+  name = "github.com/mccutchen/go-httpbin"
+  version = "1.1.1"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/oxtoacart/bpool"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/shibukawa/configdir"
+
+[[constraint]]
+  name = "github.com/sirupsen/logrus"
+  version = "1.0.4"
+
+[[constraint]]
+  name = "github.com/spf13/afero"
+  version = "1.0.0"
+
+[[constraint]]
+  name = "github.com/urfave/negroni"
+  version = "0.3.0"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/viki-org/dnscache"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/zyedidia/highlight"
+
+[[constraint]]
+  branch = "master"
+  name = "golang.org/x/crypto"
+
+[[constraint]]
+  branch = "master"
+  name = "golang.org/x/time"
+
+[[constraint]]
+  name = "gopkg.in/guregu/null.v3"
+  version = "3.2.0"
+
+[prune]
+  go-tests = true
+  unused-packages = true
