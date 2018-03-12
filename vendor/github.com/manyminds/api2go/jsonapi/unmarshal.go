@@ -188,7 +188,7 @@ func setRelationshipIDs(relationships map[string]Relationship, target UnmarshalI
 			}
 
 			castedToOne.SetToOneReferenceID(name, "")
-			break
+			continue
 		}
 
 		// valid toOne case

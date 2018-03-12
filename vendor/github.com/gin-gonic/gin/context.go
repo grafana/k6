@@ -16,9 +16,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gin-contrib/sse"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/gin-gonic/gin/render"
-	"gopkg.in/gin-contrib/sse.v0"
 )
 
 // Content-Type MIME of the most common data formats
@@ -85,13 +85,18 @@ func (c *Context) HandlerName() string {
 	return nameOfFunction(c.handlers.Last())
 }
 
+// Handler returns the main handler.
+func (c *Context) Handler() HandlerFunc {
+	return c.handlers.Last()
+}
+
 /************************************/
 /*********** FLOW CONTROL ***********/
 /************************************/
 
 // Next should be used only inside middleware.
 // It executes the pending handlers in the chain inside the calling handler.
-// See example in github.
+// See example in GitHub.
 func (c *Context) Next() {
 	c.index++
 	s := int8(len(c.handlers))
@@ -114,7 +119,7 @@ func (c *Context) Abort() {
 }
 
 // AbortWithStatus calls `Abort()` and writes the headers with the specified status code.
-// For example, a failed attempt to authentificate a request could use: context.AbortWithStatus(401).
+// For example, a failed attempt to authenticate a request could use: context.AbortWithStatus(401).
 func (c *Context) AbortWithStatus(code int) {
 	c.Status(code)
 	c.Writer.WriteHeaderNow()
@@ -163,7 +168,7 @@ func (c *Context) Error(err error) *Error {
 /******** METADATA MANAGEMENT********/
 /************************************/
 
-// Set is used to store a new key/value pair exclusivelly for this context.
+// Set is used to store a new key/value pair exclusively for this context.
 // It also lazy initializes  c.Keys if it was not used previously.
 func (c *Context) Set(key string, value interface{}) {
 	if c.Keys == nil {
@@ -187,6 +192,94 @@ func (c *Context) MustGet(key string) interface{} {
 	panic("Key \"" + key + "\" does not exist")
 }
 
+// GetString returns the value associated with the key as a string.
+func (c *Context) GetString(key string) (s string) {
+	if val, ok := c.Get(key); ok && val != nil {
+		s, _ = val.(string)
+	}
+	return
+}
+
+// GetBool returns the value associated with the key as a boolean.
+func (c *Context) GetBool(key string) (b bool) {
+	if val, ok := c.Get(key); ok && val != nil {
+		b, _ = val.(bool)
+	}
+	return
+}
+
+// GetInt returns the value associated with the key as an integer.
+func (c *Context) GetInt(key string) (i int) {
+	if val, ok := c.Get(key); ok && val != nil {
+		i, _ = val.(int)
+	}
+	return
+}
+
+// GetInt64 returns the value associated with the key as an integer.
+func (c *Context) GetInt64(key string) (i64 int64) {
+	if val, ok := c.Get(key); ok && val != nil {
+		i64, _ = val.(int64)
+	}
+	return
+}
+
+// GetFloat64 returns the value associated with the key as a float64.
+func (c *Context) GetFloat64(key string) (f64 float64) {
+	if val, ok := c.Get(key); ok && val != nil {
+		f64, _ = val.(float64)
+	}
+	return
+}
+
+// GetTime returns the value associated with the key as time.
+func (c *Context) GetTime(key string) (t time.Time) {
+	if val, ok := c.Get(key); ok && val != nil {
+		t, _ = val.(time.Time)
+	}
+	return
+}
+
+// GetDuration returns the value associated with the key as a duration.
+func (c *Context) GetDuration(key string) (d time.Duration) {
+	if val, ok := c.Get(key); ok && val != nil {
+		d, _ = val.(time.Duration)
+	}
+	return
+}
+
+// GetStringSlice returns the value associated with the key as a slice of strings.
+func (c *Context) GetStringSlice(key string) (ss []string) {
+	if val, ok := c.Get(key); ok && val != nil {
+		ss, _ = val.([]string)
+	}
+	return
+}
+
+// GetStringMap returns the value associated with the key as a map of interfaces.
+func (c *Context) GetStringMap(key string) (sm map[string]interface{}) {
+	if val, ok := c.Get(key); ok && val != nil {
+		sm, _ = val.(map[string]interface{})
+	}
+	return
+}
+
+// GetStringMapString returns the value associated with the key as a map of strings.
+func (c *Context) GetStringMapString(key string) (sms map[string]string) {
+	if val, ok := c.Get(key); ok && val != nil {
+		sms, _ = val.(map[string]string)
+	}
+	return
+}
+
+// GetStringMapStringSlice returns the value associated with the key as a map to a slice of strings.
+func (c *Context) GetStringMapStringSlice(key string) (smss map[string][]string) {
+	if val, ok := c.Get(key); ok && val != nil {
+		smss, _ = val.(map[string][]string)
+	}
+	return
+}
+
 /************************************/
 /************ INPUT DATA ************/
 /************************************/
@@ -202,7 +295,7 @@ func (c *Context) Param(key string) string {
 }
 
 // Query returns the keyed url query value if it exists,
-// othewise it returns an empty string `("")`.
+// otherwise it returns an empty string `("")`.
 // It is shortcut for `c.Request.URL.Query().Get(key)`
 // 		GET /path?id=1234&name=Manu&value=
 // 		c.Query("id") == "1234"
@@ -215,7 +308,7 @@ func (c *Context) Query(key string) string {
 }
 
 // DefaultQuery returns the keyed url query value if it exists,
-// othewise it returns the specified defaultValue string.
+// otherwise it returns the specified defaultValue string.
 // See: Query() and GetQuery() for further information.
 // 		GET /?name=Manu&lastname=
 // 		c.DefaultQuery("name", "unknown") == "Manu"
@@ -230,7 +323,7 @@ func (c *Context) DefaultQuery(key, defaultValue string) string {
 
 // GetQuery is like Query(), it returns the keyed url query value
 // if it exists `(value, true)` (even when the value is an empty string),
-// othewise it returns `("", false)`.
+// otherwise it returns `("", false)`.
 // It is shortcut for `c.Request.URL.Query().Get(key)`
 // 		GET /?name=Manu&lastname=
 // 		("Manu", true) == c.GetQuery("name")
@@ -337,22 +430,30 @@ func (c *Context) MultipartForm() (*multipart.Form, error) {
 // Like ParseBody() but this method also writes a 400 error if the json is not valid.
 func (c *Context) Bind(obj interface{}) error {
 	b := binding.Default(c.Request.Method, c.ContentType())
-	return c.BindWith(obj, b)
+	return c.MustBindWith(obj, b)
 }
 
-// BindJSON is a shortcut for c.BindWith(obj, binding.JSON)
+// BindJSON is a shortcut for c.MustBindWith(obj, binding.JSON)
 func (c *Context) BindJSON(obj interface{}) error {
-	return c.BindWith(obj, binding.JSON)
+	return c.MustBindWith(obj, binding.JSON)
 }
 
-// BindWith binds the passed struct pointer using the specified binding engine.
+// MustBindWith binds the passed struct pointer using the specified binding
+// engine. It will abort the request with HTTP 400 if any error ocurrs.
 // See the binding package.
-func (c *Context) BindWith(obj interface{}, b binding.Binding) error {
-	if err := b.Bind(c.Request, obj); err != nil {
+func (c *Context) MustBindWith(obj interface{}, b binding.Binding) (err error) {
+	if err = c.ShouldBindWith(obj, b); err != nil {
 		c.AbortWithError(400, err).SetType(ErrorTypeBind)
-		return err
 	}
-	return nil
+
+	return
+}
+
+// ShouldBindWith binds the passed struct pointer using the specified binding
+// engine.
+// See the binding package.
+func (c *Context) ShouldBindWith(obj interface{}, b binding.Binding) error {
+	return b.Bind(c.Request, obj)
 }
 
 // ClientIP implements a best effort algorithm to return the real client IP, it parses
@@ -507,7 +608,7 @@ func (c *Context) HTML(code int, name string, obj interface{}) {
 
 // IndentedJSON serializes the given struct as pretty JSON (indented + endlines) into the response body.
 // It also sets the Content-Type as "application/json".
-// WARNING: we recommend to use this only for development propuses since printing pretty JSON is
+// WARNING: we recommend to use this only for development purposes since printing pretty JSON is
 // more CPU and bandwidth consuming. Use Context.JSON() instead.
 func (c *Context) IndentedJSON(code int, obj interface{}) {
 	c.Render(code, render.IndentedJSON{Data: obj})

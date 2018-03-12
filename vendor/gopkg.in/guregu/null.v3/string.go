@@ -30,6 +30,14 @@ func StringFromPtr(s *string) String {
 	return NewString(*s, true)
 }
 
+// ValueOrZero returns the inner value if valid, otherwise zero.
+func (s String) ValueOrZero() string {
+	if !s.Valid {
+		return ""
+	}
+	return s.String
+}
+
 // NewString creates a new String
 func NewString(s string, valid bool) String {
 	return String{

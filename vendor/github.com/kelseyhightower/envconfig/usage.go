@@ -27,7 +27,7 @@ variables can be used:
   [default]     {{usage_default .}}
   [required]    {{usage_required .}}{{end}}
 `
-	// DefaultTableFormat constant to use to display usage in a tabular format
+	// DefaultTableFormat constant to use to display usage in a tabluar format
 	DefaultTableFormat = `This application is configured via the environment. The following environment
 variables can be used:
 

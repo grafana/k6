@@ -596,13 +596,13 @@ func (i *objectPropIter) next() (propIterItem, iterNextFunc) {
 	return propIterItem{}, nil
 }
 
-func (o *baseObject) _enumerate(recusrive bool) iterNextFunc {
+func (o *baseObject) _enumerate(recursive bool) iterNextFunc {
 	propNames := make([]string, len(o.propNames))
 	copy(propNames, o.propNames)
 	return (&objectPropIter{
 		o:         o,
 		propNames: propNames,
-		recursive: recusrive,
+		recursive: recursive,
 	}).next
 }
 

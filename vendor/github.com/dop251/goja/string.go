@@ -176,12 +176,12 @@ func (i *stringPropIter) next() (propIterItem, iterNextFunc) {
 	return i.obj.baseObject._enumerate(i.recursive)()
 }
 
-func (s *stringObject) _enumerate(recusrive bool) iterNextFunc {
+func (s *stringObject) _enumerate(recursive bool) iterNextFunc {
 	return (&stringPropIter{
 		str:       s.value,
 		obj:       s,
 		length:    s.length,
-		recursive: recusrive,
+		recursive: recursive,
 	}).next
 }
 

@@ -292,10 +292,10 @@ func (i *arrayPropIter) next() (propIterItem, iterNextFunc) {
 	return i.a.baseObject._enumerate(i.recursive)()
 }
 
-func (a *arrayObject) _enumerate(recusrive bool) iterNextFunc {
+func (a *arrayObject) _enumerate(recursive bool) iterNextFunc {
 	return (&arrayPropIter{
 		a:         a,
-		recursive: recusrive,
+		recursive: recursive,
 	}).next
 }
 
