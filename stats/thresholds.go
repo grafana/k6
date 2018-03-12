@@ -86,6 +86,17 @@ func (t *Threshold) Run() (bool, error) {
 	return b, err
 }
 
+func (t *Threshold) MarshalJSON() ([]byte, error) {
+	type Alias Threshold
+	return json.Marshal(&struct {
+		AbortGracePeriod int64 `json:"delay_abort_eval"`
+		*Alias
+	}{
+		AbortGracePeriod: int64(time.Duration(t.AbortGracePeriod.Duration).Seconds()),
+		Alias:            (*Alias)(t),
+	})
+}
+
 type ThresholdConfig struct {
 	Threshold        string             `json:"threshold"`
 	AbortOnFail      bool               `json:"abortOnFail"`
@@ -105,9 +116,17 @@ func (tc *ThresholdConfig) UnmarshalJSON(data []byte) error {
 	return json.Unmarshal(data, rawConfig)
 }
 
-func (tc ThresholdConfig) MarshalJSON() ([]byte, error) {
+func (tc *ThresholdConfig) MarshalJSON() ([]byte, error) {
+	type Aliass ThresholdConfig
 	if tc.AbortOnFail {
-		return json.Marshal(rawThresholdConfig(tc))
+		// return json.Marshal(rawThresholdConfig(tc))
+		return json.Marshal(&struct {
+			AbortGracePeriod int64 `json:"delayAbortEval"`
+			*Aliass
+		}{
+			AbortGracePeriod: int64(time.Duration(tc.AbortGracePeriod.Duration).Seconds()),
+			Aliass:           (*Aliass)(tc),
+		})
 	}
 	return json.Marshal(tc.Threshold)
 }

@@ -96,7 +96,6 @@ func New(conf Config, src *lib.SourceData, opts lib.Options, version string) (*C
 }
 
 func (c *Collector) Init() error {
-
 	testRun := &TestRun{
 		Name:       c.config.Name,
 		ProjectID:  c.config.ProjectID,
