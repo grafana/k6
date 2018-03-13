@@ -101,28 +101,12 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 	// Leave header to nil by default so we can pass it directly to the Dialer
 	var header http.Header
 
-	var tags map[string]string
-	if state.Options.DefaultTags == nil {
-		tags = map[string]string{
-			"url":         url,
-			"group":       state.Group.Path,
-			"status":      "0",
-			"subprotocol": "",
-		}
-	} else {
-		tags = map[string]string{}
-		if state.Options.DefaultTags["subprotocol"] {
-			tags["subprotocol"] = ""
-		}
-		if state.Options.DefaultTags["status"] {
-			tags["status"] = "0"
-		}
-		if state.Options.DefaultTags["url"] {
-			tags["url"] = url
-		}
-		if state.Options.DefaultTags["group"] {
-			tags["group"] = state.Group.Path
-		}
+	tags := map[string]string{}
+	if state.Options.SystemTags["url"] {
+		tags["url"] = url
+	}
+	if state.Options.SystemTags["group"] {
+		tags["group"] = state.Group.Path
 	}
 
 	// Parse the optional second argument (params)
@@ -205,11 +189,11 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 
 	defer func() { _ = conn.Close() }()
 
-	if state.Options.DefaultTags == nil || state.Options.DefaultTags["status"] {
+	if state.Options.SystemTags["status"] {
 		tags["status"] = strconv.Itoa(httpResponse.StatusCode)
 	}
-	if state.Options.DefaultTags == nil || state.Options.DefaultTags["subprotocol"] {
-		tags["subprotocol"] = httpResponse.Header.Get("Sec-WebSocket-Protocol")
+	if state.Options.SystemTags["subproto"] {
+		tags["subproto"] = httpResponse.Header.Get("Sec-WebSocket-Protocol")
 	}
 
 	// The connection is now open, emit the event

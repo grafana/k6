@@ -52,7 +52,7 @@ func assertSessionMetricsEmitted(t *testing.T, samples []stats.Sample, subprotoc
 			}
 
 			assert.Equal(t, strconv.Itoa(status), sample.Tags["status"])
-			assert.Equal(t, subprotocol, sample.Tags["subprotocol"])
+			assert.Equal(t, subprotocol, sample.Tags["subproto"])
 			assert.Equal(t, group, sample.Tags["group"])
 		}
 	}
@@ -84,7 +84,13 @@ func TestSession(t *testing.T) {
 		KeepAlive: 60 * time.Second,
 		DualStack: true,
 	})
-	state := &common.State{Group: root, Dialer: dialer}
+	state := &common.State{
+		Group:  root,
+		Dialer: dialer,
+		Options: lib.Options{
+			SystemTags: lib.GetTagSet("url", "proto", "status", "subproto"),
+		},
+	}
 
 	ctx := context.Background()
 	ctx = common.WithState(ctx, state)
@@ -272,7 +278,13 @@ func TestErrors(t *testing.T) {
 		KeepAlive: 60 * time.Second,
 		DualStack: true,
 	})
-	state := &common.State{Group: root, Dialer: dialer}
+	state := &common.State{
+		Group:  root,
+		Dialer: dialer,
+		Options: lib.Options{
+			SystemTags: lib.GetTagSet(lib.DefaultSystemTagList...),
+		},
+	}
 
 	ctx := context.Background()
 	ctx = common.WithState(ctx, state)
@@ -315,7 +327,7 @@ func TestErrors(t *testing.T) {
 	})
 }
 
-func TestDefaultTags(t *testing.T) {
+func TestSystemTags(t *testing.T) {
 	root, err := lib.NewGroup("", nil)
 	assert.NoError(t, err)
 
@@ -326,10 +338,12 @@ func TestDefaultTags(t *testing.T) {
 		KeepAlive: 60 * time.Second,
 		DualStack: true,
 	})
+
+	testedSystemTags := []string{"group", "status", "subproto", "url"}
 	state := &common.State{
 		Group:   root,
 		Dialer:  dialer,
-		Options: lib.Options{},
+		Options: lib.Options{SystemTags: lib.GetTagSet(testedSystemTags...)},
 	}
 
 	ctx := context.Background()
@@ -338,10 +352,9 @@ func TestDefaultTags(t *testing.T) {
 
 	rt.Set("ws", common.Bind(rt, New(), &ctx))
 
-	defaultTagsTest := []string{"group", "status", "subprotocol", "url"}
-	for _, expectedTag := range defaultTagsTest {
+	for _, expectedTag := range testedSystemTags {
 		t.Run("only "+expectedTag, func(t *testing.T) {
-			state.Options.DefaultTags = map[string]bool{
+			state.Options.SystemTags = map[string]bool{
 				expectedTag: true,
 			}
 			state.Samples = nil

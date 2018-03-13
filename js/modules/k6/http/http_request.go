@@ -137,36 +137,18 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 		req.Header.Set("User-Agent", userAgent.String)
 	}
 
-	var tags map[string]string
-	if state.Options.DefaultTags == nil {
-		tags = map[string]string{
-			"proto":  "",
-			"status": "0",
-			"method": method,
-			"url":    url.URLString,
-			"name":   url.Name,
-			"group":  state.Group.Path,
-		}
-	} else {
-		tags = map[string]string{}
-		if state.Options.DefaultTags["proto"] {
-			tags["proto"] = ""
-		}
-		if state.Options.DefaultTags["status"] {
-			tags["status"] = "0"
-		}
-		if state.Options.DefaultTags["method"] {
-			tags["method"] = method
-		}
-		if state.Options.DefaultTags["url"] {
-			tags["url"] = url.URLString
-		}
-		if state.Options.DefaultTags["name"] {
-			tags["name"] = url.Name
-		}
-		if state.Options.DefaultTags["group"] {
-			tags["group"] = state.Group.Path
-		}
+	tags := map[string]string{}
+	if state.Options.SystemTags["method"] {
+		tags["method"] = method
+	}
+	if state.Options.SystemTags["url"] {
+		tags["url"] = url.URLString
+	}
+	if state.Options.SystemTags["name"] {
+		tags["name"] = url.Name
+	}
+	if state.Options.SystemTags["group"] {
+		tags["group"] = state.Group.Path
 	}
 
 	redirects := state.Options.MaxRedirects
@@ -356,7 +338,7 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 
 	if resErr != nil {
 		resp.Error = resErr.Error()
-		if state.Options.DefaultTags == nil || state.Options.DefaultTags["error"] {
+		if state.Options.SystemTags["error"] {
 			tags["error"] = resp.Error
 		}
 	} else {
@@ -370,22 +352,22 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 		resp.Status = res.StatusCode
 		resp.Proto = res.Proto
 
-		if state.Options.DefaultTags == nil || state.Options.DefaultTags["url"] {
+		if state.Options.SystemTags["url"] {
 			tags["url"] = resp.URL
 		}
-		if state.Options.DefaultTags == nil || state.Options.DefaultTags["status"] {
+		if state.Options.SystemTags["status"] {
 			tags["status"] = strconv.Itoa(resp.Status)
 		}
-		if state.Options.DefaultTags == nil || state.Options.DefaultTags["proto"] {
+		if state.Options.SystemTags["proto"] {
 			tags["proto"] = resp.Proto
 		}
 
 		if res.TLS != nil {
 			resp.setTLSInfo(res.TLS)
-			if state.Options.DefaultTags == nil || state.Options.DefaultTags["tls_version"] {
+			if state.Options.SystemTags["tls_version"] {
 				tags["tls_version"] = resp.TLSVersion
 			}
-			if state.Options.DefaultTags == nil || state.Options.DefaultTags["ocsp_status"] {
+			if state.Options.SystemTags["ocsp_status"] {
 				tags["ocsp_status"] = resp.OCSP.Status
 			}
 		}
