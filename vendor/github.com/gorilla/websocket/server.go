@@ -230,11 +230,10 @@ func (u *Upgrader) Upgrade(w http.ResponseWriter, r *http.Request, responseHeade
 
 // Upgrade upgrades the HTTP server connection to the WebSocket protocol.
 //
-// Deprecated: Use websocket.Upgrader instead.
+// This function is deprecated, use websocket.Upgrader instead.
 //
-// Upgrade does not perform origin checking. The application is responsible for
-// checking the Origin header before calling Upgrade. An example implementation
-// of the same origin policy check is:
+// The application is responsible for checking the request origin before
+// calling Upgrade. An example implementation of the same origin policy is:
 //
 //	if req.Header.Get("Origin") != "http://"+req.Host {
 //		http.Error(w, "Origin not allowed", 403)

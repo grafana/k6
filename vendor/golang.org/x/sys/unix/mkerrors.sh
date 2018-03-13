@@ -187,6 +187,7 @@ struct ltchars {
 #include <linux/vm_sockets.h>
 #include <linux/taskstats.h>
 #include <linux/genetlink.h>
+#include <linux/stat.h>
 #include <linux/watchdog.h>
 #include <net/route.h>
 #include <asm/termbits.h>
@@ -363,6 +364,7 @@ ccflags="$@"
 		$2 ~ /^IGN/ ||
 		$2 ~ /^IX(ON|ANY|OFF)$/ ||
 		$2 ~ /^IN(LCR|PCK)$/ ||
+		$2 !~ "X86_CR3_PCID_NOFLUSH" &&
 		$2 ~ /(^FLU?SH)|(FLU?SH$)/ ||
 		$2 ~ /^C(LOCAL|READ|MSPAR|RTSCTS)$/ ||
 		$2 == "BRKINT" ||
@@ -426,7 +428,9 @@ ccflags="$@"
 		$2 ~ /^(VM|VMADDR)_/ ||
 		$2 ~ /^IOCTL_VM_SOCKETS_/ ||
 		$2 ~ /^(TASKSTATS|TS)_/ ||
+		$2 ~ /^CGROUPSTATS_/ ||
 		$2 ~ /^GENL_/ ||
+		$2 ~ /^STATX_/ ||
 		$2 ~ /^UTIME_/ ||
 		$2 ~ /^XATTR_(CREATE|REPLACE)/ ||
 		$2 ~ /^ATTR_(BIT_MAP_COUNT|(CMN|VOL|FILE)_)/ ||

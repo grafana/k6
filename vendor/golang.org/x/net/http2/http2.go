@@ -14,7 +14,7 @@
 //
 // See https://http2.golang.org/ for a test server running this code.
 //
-package http2
+package http2 // import "golang.org/x/net/http2"
 
 import (
 	"bufio"
@@ -312,7 +312,7 @@ func mustUint31(v int32) uint32 {
 }
 
 // bodyAllowedForStatus reports whether a given response status code
-// permits a body. See RFC 2616, section 4.4.
+// permits a body. See RFC 7230, section 3.3.
 func bodyAllowedForStatus(status int) bool {
 	switch {
 	case status >= 100 && status <= 199:
