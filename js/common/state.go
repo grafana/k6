@@ -37,9 +37,6 @@ type State struct {
 	// Global options.
 	Options lib.Options
 
-	// Collector options.
-	CollectorOptions lib.CollectorOptions
-
 	// Logger. Avoid using the global logger.
 	Logger *log.Logger
 

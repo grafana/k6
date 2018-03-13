@@ -127,10 +127,6 @@ func (c *Collector) Init() error {
 	return nil
 }
 
-func (c *Collector) GetOptions() lib.CollectorOptions {
-	return lib.CollectorOptions{}
-}
-
 func (c *Collector) Link() string {
 	return URLForResults(c.referenceID, c.config)
 }
