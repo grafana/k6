@@ -31,9 +31,25 @@ import (
 	"gopkg.in/guregu/null.v3"
 )
 
-// A set of tags, used to keep track of which default tags to emit with metrics.
+// DefaultSystemTagList includes all of the system tags emitted with metrics by default.
+var DefaultSystemTagList = []string{
+	"proto", "subproto", "status", "method", "url", "name", "group", "error", "tls_version",
+}
+
+// Tags is a set (represented as a string to bool map for lookup efficiency)
+// used to keep track of which system tags to emit with metrics.
 type Tags map[string]bool
 
+// GetTagSet converts a the passed string tag names into the expected string to bool map.
+func GetTagSet(tags ...string) Tags {
+	result := Tags{}
+	for _, tag := range tags {
+		result[tag] = true
+	}
+	return result
+}
+
+// MarshalJSON converts the tags map to a list (JS array).
 func (t Tags) MarshalJSON() ([]byte, error) {
 	var tags []string
 	for tag := range t {
@@ -42,19 +58,15 @@ func (t Tags) MarshalJSON() ([]byte, error) {
 	return json.Marshal(tags)
 }
 
+// UnmarshalJSON converts the tag list back to a the expected set (string to bool map).
 func (t *Tags) UnmarshalJSON(data []byte) error {
 	var tags []string
 	if err := json.Unmarshal(data, &tags); err != nil {
 		return err
 	}
-	if len(tags) == 0 {
-		return nil
+	if len(tags) != 0 {
+		*t = GetTagSet(tags...)
 	}
-	_tags := Tags{}
-	for _, tag := range tags {
-		_tags[tag] = true
-	}
-	*t = _tags
 	return nil
 }
 
@@ -229,8 +241,8 @@ type Options struct {
 	// Summary trend stats for trend metrics (response times) in CLI output
 	SummaryTrendStats []string `json:"SummaryTrendStats" envconfig:"summary_trend_stats"`
 
-	// Which default tags to include with metrics ("method", "vu" etc.)
-	DefaultTags Tags `json:"defaultTags" envconfig:"default_tags"`
+	// Which system tags to include with metrics ("method", "vu" etc.)
+	SystemTags Tags `json:"systemTags" envconfig:"system_tags"`
 }
 
 // Returns the result of overwriting any fields with any that are set on the argument.
@@ -309,8 +321,8 @@ func (o Options) Apply(opts Options) Options {
 	if opts.SummaryTrendStats != nil {
 		o.SummaryTrendStats = opts.SummaryTrendStats
 	}
-	if opts.DefaultTags != nil {
-		o.DefaultTags = opts.DefaultTags
+	if opts.SystemTags != nil {
+		o.SystemTags = opts.SystemTags
 	}
 	return o
 }

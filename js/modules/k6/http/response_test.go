@@ -104,6 +104,7 @@ func TestResponse(t *testing.T) {
 			MaxRedirects: null.IntFrom(10),
 			UserAgent:    null.StringFrom("TestUserAgent"),
 			Throw:        null.BoolFrom(true),
+			SystemTags:   lib.GetTagSet(lib.DefaultSystemTagList...),
 		},
 		Logger: logger,
 		Group:  root,
@@ -206,11 +207,11 @@ func TestResponse(t *testing.T) {
 			if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 			let data = res.json().form
 			if (data.custname !== "" ||
-				data.extradata !== undefined || 
-				data.comments !== "" || 
-				data.custemail !== "" || 
-				data.custtel !== "" || 
-				data.delivery !== "" 
+				data.extradata !== undefined ||
+				data.comments !== "" ||
+				data.custemail !== "" ||
+				data.custtel !== "" ||
+				data.delivery !== ""
 			) { throw new Error("incorrect body: " + JSON.stringify(data, null, 4) ); }
 		`)
 			assert.NoError(t, err)
@@ -226,11 +227,11 @@ func TestResponse(t *testing.T) {
 			if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 			let data = res.json().form
 			if (data.custname !== "test" ||
-				data.extradata !== "test2" || 
-				data.comments !== "" || 
-				data.custemail !== "" || 
-				data.custtel !== "" || 
-				data.delivery !== "" 
+				data.extradata !== "test2" ||
+				data.comments !== "" ||
+				data.custemail !== "" ||
+				data.custtel !== "" ||
+				data.delivery !== ""
 			) { throw new Error("incorrect body: " + JSON.stringify(data, null, 4) ); }
 		`)
 			assert.NoError(t, err)
@@ -260,11 +261,11 @@ func TestResponse(t *testing.T) {
 			if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 			let data = res.json().form
 			if (data.custname !== "" ||
-				data.extradata !== undefined || 
-				data.comments !== "" || 
-				data.custemail !== "" || 
-				data.custtel !== "" || 
-				data.delivery !== "" 
+				data.extradata !== undefined ||
+				data.comments !== "" ||
+				data.custemail !== "" ||
+				data.custtel !== "" ||
+				data.delivery !== ""
 			) { throw new Error("incorrect body: " + JSON.stringify(data, null, 4) ); }
 		`)
 			assert.NoError(t, err)
