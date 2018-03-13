@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"math"
 	"reflect"
 	"strconv"
 )
@@ -36,6 +37,14 @@ func FloatFromPtr(f *float64) Float {
 		return NewFloat(0, false)
 	}
 	return NewFloat(*f, true)
+}
+
+// ValueOrZero returns the inner value if valid, otherwise zero.
+func (f Float) ValueOrZero() float64 {
+	if !f.Valid {
+		return 0
+	}
+	return f.Float64
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -90,6 +99,12 @@ func (f *Float) UnmarshalText(text []byte) error {
 func (f Float) MarshalJSON() ([]byte, error) {
 	if !f.Valid {
 		return []byte("null"), nil
+	}
+	if math.IsInf(f.Float64, 0) || math.IsNaN(f.Float64) {
+		return nil, &json.UnsupportedValueError{
+			Value: reflect.ValueOf(f.Float64),
+			Str:   strconv.FormatFloat(f.Float64, 'g', -1, 64),
+		}
 	}
 	return []byte(strconv.FormatFloat(f.Float64, 'f', -1, 64)), nil
 }

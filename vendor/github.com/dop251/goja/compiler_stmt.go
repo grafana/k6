@@ -44,9 +44,7 @@ func (c *compiler) compileStatement(v ast.Statement, needResult bool) {
 	case *ast.LabelledStatement:
 		c.compileLabeledStatement(v, needResult)
 	case *ast.EmptyStatement:
-		if needResult {
-			c.emit(loadUndef)
-		}
+		c.compileEmptyStatement(needResult)
 	case *ast.WithStatement:
 		c.compileWithStatement(v, needResult)
 	case *ast.DebuggerStatement:
@@ -63,8 +61,6 @@ func (c *compiler) compileLabeledStatement(v *ast.LabelledStatement, needResult 
 		}
 	}
 	switch s := v.Statement.(type) {
-	case *ast.BlockStatement:
-		c.compileLabeledBlockStatement(s, needResult, label)
 	case *ast.ForInStatement:
 		c.compileLabeledForInStatement(s, needResult, label)
 	case *ast.ForStatement:
@@ -74,7 +70,7 @@ func (c *compiler) compileLabeledStatement(v *ast.LabelledStatement, needResult 
 	case *ast.DoWhileStatement:
 		c.compileLabeledDoWhileStatement(s, needResult, label)
 	default:
-		c.compileStatement(v.Statement, needResult)
+		c.compileGenericLabeledStatement(v.Statement, needResult, label)
 	}
 }
 
@@ -209,20 +205,21 @@ func (c *compiler) compileDoWhileStatement(v *ast.DoWhileStatement, needResult b
 
 func (c *compiler) compileLabeledDoWhileStatement(v *ast.DoWhileStatement, needResult bool, label string) {
 	c.block = &block{
-		typ:   blockLoop,
-		outer: c.block,
-		label: label,
+		typ:        blockLoop,
+		outer:      c.block,
+		label:      label,
+		needResult: needResult,
 	}
 
 	if needResult {
-		c.emit(loadUndef)
+		c.emit(jump(2))
 	}
 	start := len(c.p.code)
+	if needResult {
+		c.emit(pop)
+	}
 	c.markBlockStart()
 	c.compileStatement(v.Body, needResult)
-	if needResult {
-		c.emit(rdupN(1), pop)
-	}
 	c.block.cont = len(c.p.code)
 	c.emitExpr(c.compileExpression(v.Test), true)
 	c.emit(jeq(start - len(c.p.code)))
@@ -245,7 +242,7 @@ func (c *compiler) compileLabeledForStatement(v *ast.ForStatement, needResult bo
 		c.compileExpression(v.Initializer).emitGetter(false)
 	}
 	if needResult {
-		c.emit(loadUndef)
+		c.emit(loadUndef) // initial result
 	}
 	start := len(c.p.code)
 	c.markBlockStart()
@@ -281,10 +278,11 @@ func (c *compiler) compileLabeledForStatement(v *ast.ForStatement, needResult bo
 			c.emit(nil)
 		}
 	}
-	c.compileStatement(v.Body, needResult)
 	if needResult {
-		c.emit(rdupN(1), pop)
+		c.emit(pop) // remove last result
 	}
+	c.markBlockStart()
+	c.compileStatement(v.Body, needResult)
 	c.block.cont = len(c.p.code)
 	if v.Update != nil {
 		c.compileExpression(v.Update).emitGetter(false)
@@ -323,10 +321,11 @@ func (c *compiler) compileLabeledForInStatement(v *ast.ForInStatement, needResul
 	c.emit(nil)
 	c.compileExpression(v.Into).emitSetter(&c.enumGetExpr)
 	c.emit(pop)
-	c.compileStatement(v.Body, needResult)
 	if needResult {
-		c.emit(rdupN(1), pop)
+		c.emit(pop) // remove last result
 	}
+	c.markBlockStart()
+	c.compileStatement(v.Body, needResult)
 	c.emit(jump(start - len(c.p.code)))
 	c.p.code[start] = enumNext(len(c.p.code) - start)
 	c.leaveBlock()
@@ -340,9 +339,10 @@ func (c *compiler) compileWhileStatement(v *ast.WhileStatement, needResult bool)
 
 func (c *compiler) compileLabeledWhileStatement(v *ast.WhileStatement, needResult bool, label string) {
 	c.block = &block{
-		typ:   blockLoop,
-		outer: c.block,
-		label: label,
+		typ:        blockLoop,
+		outer:      c.block,
+		label:      label,
+		needResult: needResult,
 	}
 
 	if needResult {
@@ -374,10 +374,11 @@ func (c *compiler) compileLabeledWhileStatement(v *ast.WhileStatement, needResul
 		j = len(c.p.code)
 		c.emit(nil)
 	}
-	c.compileStatement(v.Body, needResult)
 	if needResult {
-		c.emit(rdupN(1), pop)
+		c.emit(pop)
 	}
+	c.markBlockStart()
+	c.compileStatement(v.Body, needResult)
 	c.emit(jump(start - len(c.p.code)))
 	if !testTrue {
 		c.p.code[j] = jne(len(c.p.code) - j)
@@ -387,14 +388,16 @@ end:
 	c.markBlockStart()
 }
 
-func (c *compiler) compileBranchStatement(v *ast.BranchStatement, needResult bool) {
+func (c *compiler) compileEmptyStatement(needResult bool) {
 	if needResult {
-		if c.p.code[len(c.p.code)-1] != pop {
-			// panic("Not pop")
-		} else {
-			c.p.code = c.p.code[:len(c.p.code)-1]
+		if len(c.p.code) == c.blockStart {
+			// first statement in block, use undefined as result
+			c.emit(loadUndef)
 		}
 	}
+}
+
+func (c *compiler) compileBranchStatement(v *ast.BranchStatement, needResult bool) {
 	switch v.Token {
 	case token.BREAK:
 		c.compileBreak(v.Label, v.Idx)
@@ -403,6 +406,60 @@ func (c *compiler) compileBranchStatement(v *ast.BranchStatement, needResult boo
 	default:
 		panic(fmt.Errorf("Unknown branch statement token: %s", v.Token.String()))
 	}
+}
+
+func (c *compiler) findBranchBlock(st *ast.BranchStatement) *block {
+	switch st.Token {
+	case token.BREAK:
+		return c.findBreakBlock(st.Label)
+	case token.CONTINUE:
+		return c.findContinueBlock(st.Label)
+	}
+	return nil
+}
+
+func (c *compiler) findContinueBlock(label *ast.Identifier) (block *block) {
+	if label != nil {
+		for b := c.block; b != nil; b = b.outer {
+			if b.typ == blockLoop && b.label == label.Name {
+				block = b
+				break
+			}
+		}
+	} else {
+		// find the nearest loop
+		for b := c.block; b != nil; b = b.outer {
+			if b.typ == blockLoop {
+				block = b
+				break
+			}
+		}
+	}
+
+	return
+}
+
+func (c *compiler) findBreakBlock(label *ast.Identifier) (block *block) {
+	if label != nil {
+		for b := c.block; b != nil; b = b.outer {
+			if b.label == label.Name {
+				block = b
+				break
+			}
+		}
+	} else {
+		// find the nearest loop or switch
+	L:
+		for b := c.block; b != nil; b = b.outer {
+			switch b.typ {
+			case blockLoop, blockSwitch:
+				block = b
+				break L
+			}
+		}
+	}
+
+	return
 }
 
 func (c *compiler) compileBreak(label *ast.Identifier, idx file.Idx) {
@@ -437,8 +494,8 @@ func (c *compiler) compileBreak(label *ast.Identifier, idx file.Idx) {
 	}
 
 	if block != nil {
-		if block.needResult {
-			c.emit(pop, loadUndef)
+		if len(c.p.code) == c.blockStart && block.needResult {
+			c.emit(loadUndef)
 		}
 		block.breaks = append(block.breaks, len(c.p.code))
 		c.emit(nil)
@@ -450,7 +507,6 @@ func (c *compiler) compileBreak(label *ast.Identifier, idx file.Idx) {
 func (c *compiler) compileContinue(label *ast.Identifier, idx file.Idx) {
 	var block *block
 	if label != nil {
-
 		for b := c.block; b != nil; b = b.outer {
 			if b.typ == blockTry {
 				c.emit(halt)
@@ -472,6 +528,9 @@ func (c *compiler) compileContinue(label *ast.Identifier, idx file.Idx) {
 	}
 
 	if block != nil {
+		if len(c.p.code) == c.blockStart && block.needResult {
+			c.emit(loadUndef)
+		}
 		block.conts = append(block.conts, len(c.p.code))
 		c.emit(nil)
 	} else {
@@ -489,10 +548,12 @@ func (c *compiler) compileIfStatement(v *ast.IfStatement, needResult bool) {
 			return
 		}
 		if r.ToBoolean() {
+			c.markBlockStart()
 			c.compileStatement(v.Consequent, needResult)
 			if v.Alternate != nil {
 				p := c.p
 				c.p = &Program{}
+				c.markBlockStart()
 				c.compileStatement(v.Alternate, false)
 				c.p = p
 			}
@@ -515,6 +576,7 @@ func (c *compiler) compileIfStatement(v *ast.IfStatement, needResult bool) {
 	test.emitGetter(true)
 	jmp := len(c.p.code)
 	c.emit(nil)
+	c.markBlockStart()
 	c.compileStatement(v.Consequent, needResult)
 	if v.Alternate != nil {
 		jmp1 := len(c.p.code)
@@ -557,15 +619,60 @@ func (c *compiler) compileVariableStatement(v *ast.VariableStatement, needResult
 	}
 }
 
+func (c *compiler) getFirstNonEmptyStatement(st ast.Statement) ast.Statement {
+	switch st := st.(type) {
+	case *ast.BlockStatement:
+		return c.getFirstNonEmptyStatementList(st.List)
+	case *ast.LabelledStatement:
+		return c.getFirstNonEmptyStatement(st.Statement)
+	}
+	return st
+}
+
+func (c *compiler) getFirstNonEmptyStatementList(list []ast.Statement) ast.Statement {
+	for _, st := range list {
+		switch st := st.(type) {
+		case *ast.EmptyStatement:
+			continue
+		case *ast.BlockStatement:
+			return c.getFirstNonEmptyStatementList(st.List)
+		case *ast.LabelledStatement:
+			return c.getFirstNonEmptyStatement(st.Statement)
+		}
+		return st
+	}
+	return nil
+}
+
 func (c *compiler) compileStatements(list []ast.Statement, needResult bool) {
 	if len(list) > 0 {
-		for _, s := range list[:len(list)-1] {
-			c.compileStatement(s, needResult)
-			if needResult {
-				c.emit(pop)
+		cur := list[0]
+		for idx := 0; idx < len(list); {
+			var next ast.Statement
+			// find next non-empty statement
+			for idx++; idx < len(list); idx++ {
+				if _, empty := list[idx].(*ast.EmptyStatement); !empty {
+					next = list[idx]
+					break
+				}
+			}
+
+			if next != nil {
+				bs := c.getFirstNonEmptyStatement(next)
+				if bs, ok := bs.(*ast.BranchStatement); ok {
+					block := c.findBranchBlock(bs)
+					if block != nil {
+						c.compileStatement(cur, block.needResult)
+						cur = next
+						continue
+					}
+				}
+				c.compileStatement(cur, false)
+				cur = next
+			} else {
+				c.compileStatement(cur, needResult)
 			}
 		}
-		c.compileStatement(list[len(list)-1], needResult)
 	} else {
 		if needResult {
 			c.emit(loadUndef)
@@ -573,13 +680,14 @@ func (c *compiler) compileStatements(list []ast.Statement, needResult bool) {
 	}
 }
 
-func (c *compiler) compileLabeledBlockStatement(v *ast.BlockStatement, needResult bool, label string) {
+func (c *compiler) compileGenericLabeledStatement(v ast.Statement, needResult bool, label string) {
 	c.block = &block{
-		typ:   blockBranch,
-		outer: c.block,
-		label: label,
+		typ:        blockBranch,
+		outer:      c.block,
+		label:      label,
+		needResult: needResult,
 	}
-	c.compileBlockStatement(v, needResult)
+	c.compileStatement(v, needResult)
 	c.leaveBlock()
 }
 
@@ -604,8 +712,9 @@ func (c *compiler) compileWithStatement(v *ast.WithStatement, needResult bool) {
 	c.compileExpression(v.Object).emitGetter(true)
 	c.emit(enterWith)
 	c.block = &block{
-		outer: c.block,
-		typ:   blockWith,
+		outer:      c.block,
+		typ:        blockWith,
+		needResult: needResult,
 	}
 	c.newScope()
 	c.scope.dynamic = true
@@ -618,12 +727,9 @@ func (c *compiler) compileWithStatement(v *ast.WithStatement, needResult bool) {
 
 func (c *compiler) compileSwitchStatement(v *ast.SwitchStatement, needResult bool) {
 	c.block = &block{
-		typ:   blockSwitch,
-		outer: c.block,
-	}
-
-	if needResult {
-		c.emit(loadUndef)
+		typ:        blockSwitch,
+		outer:      c.block,
+		needResult: needResult,
 	}
 
 	c.compileExpression(v.Discriminant).emitGetter(true)
@@ -658,13 +764,29 @@ func (c *compiler) compileSwitchStatement(v *ast.SwitchStatement, needResult boo
 			c.p.code[jumps[i]] = jump(len(c.p.code) - jumps[i])
 			c.markBlockStart()
 		}
+		nr := false
+		c.markBlockStart()
 		if needResult {
-			c.emit(pop)
+			if i < len(v.Body)-1 {
+				st := c.getFirstNonEmptyStatementList(v.Body[i+1].Consequent)
+				if st, ok := st.(*ast.BranchStatement); ok && st.Token == token.BREAK {
+					if c.findBreakBlock(st.Label) != nil {
+						stmts := append(s.Consequent, st)
+						c.compileStatements(stmts, false)
+						continue
+					}
+				}
+			} else {
+				nr = true
+			}
 		}
-		c.compileStatements(s.Consequent, needResult)
+		c.compileStatements(s.Consequent, nr)
 	}
 	if jumpNoMatch != -1 {
 		c.p.code[jumpNoMatch] = jump(len(c.p.code) - jumpNoMatch)
+		if len(v.Body) == 0 && needResult {
+			c.emit(loadUndef)
+		}
 	}
 	c.leaveBlock()
 	c.markBlockStart()

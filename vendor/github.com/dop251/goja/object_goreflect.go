@@ -377,10 +377,10 @@ func (i *goreflectPropIter) nextMethod() (propIterItem, iterNextFunc) {
 	return propIterItem{}, nil
 }
 
-func (o *objectGoReflect) _enumerate(recusrive bool) iterNextFunc {
+func (o *objectGoReflect) _enumerate(recursive bool) iterNextFunc {
 	r := &goreflectPropIter{
 		o:         o,
-		recursive: recusrive,
+		recursive: recursive,
 	}
 	if o.value.Kind() == reflect.Struct {
 		return r.nextField

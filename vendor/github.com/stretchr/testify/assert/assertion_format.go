@@ -35,7 +35,7 @@ func DirExistsf(t TestingT, path string, msg string, args ...interface{}) bool {
 // listB(array, slice...) ignoring the order of the elements. If there are duplicate elements,
 // the number of appearances of each of them in both lists should match.
 //
-// assert.ElementsMatchf(t, [1, 3, 2, 3], [1, 3, 3, 2], "error message %s", "formatted"))
+// assert.ElementsMatchf(t, [1, 3, 2, 3], [1, 3, 3, 2], "error message %s", "formatted")
 func ElementsMatchf(t TestingT, listA interface{}, listB interface{}, msg string, args ...interface{}) bool {
 	return ElementsMatch(t, listA, listB, append([]interface{}{msg}, args...)...)
 }

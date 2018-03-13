@@ -1,6 +1,12 @@
-# Gin Web Framework <img align="right" src="https://raw.githubusercontent.com/gin-gonic/gin/master/logo.jpg">
+# Gin Web Framework
 
-[![Build Status](https://travis-ci.org/gin-gonic/gin.svg)](https://travis-ci.org/gin-gonic/gin) [![codecov](https://codecov.io/gh/gin-gonic/gin/branch/master/graph/badge.svg)](https://codecov.io/gh/gin-gonic/gin) [![Go Report Card](https://goreportcard.com/badge/github.com/gin-gonic/gin)](https://goreportcard.com/report/github.com/gin-gonic/gin) [![GoDoc](https://godoc.org/github.com/gin-gonic/gin?status.svg)](https://godoc.org/github.com/gin-gonic/gin) [![Join the chat at https://gitter.im/gin-gonic/gin](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/gin-gonic/gin?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge) [![Sourcegraph Badge](https://sourcegraph.com/github.com/gin-gonic/gin/-/badge.svg)](https://sourcegraph.com/github.com/gin-gonic/gin?badge)
+<img align="right" src="https://raw.githubusercontent.com/gin-gonic/gin/master/logo.jpg">
+
+[![Build Status](https://travis-ci.org/gin-gonic/gin.svg)](https://travis-ci.org/gin-gonic/gin)
+ [![codecov](https://codecov.io/gh/gin-gonic/gin/branch/master/graph/badge.svg)](https://codecov.io/gh/gin-gonic/gin)
+ [![Go Report Card](https://goreportcard.com/badge/github.com/gin-gonic/gin)](https://goreportcard.com/report/github.com/gin-gonic/gin)
+ [![GoDoc](https://godoc.org/github.com/gin-gonic/gin?status.svg)](https://godoc.org/github.com/gin-gonic/gin)
+ [![Join the chat at https://gitter.im/gin-gonic/gin](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/gin-gonic/gin?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 Gin is a web framework written in Go (Golang). It features a martini-like API with much better performance, up to 40 times faster thanks to [httprouter](https://github.com/julienschmidt/httprouter). If you need performance and good productivity, you will love Gin.
 
@@ -13,7 +19,7 @@ $ cat test.go
 ```go
 package main
 
-import "gopkg.in/gin-gonic/gin.v1"
+import "github.com/gin-gonic/gin"
 
 func main() {
 	r := gin.Default()
@@ -82,27 +88,19 @@ BenchmarkZeus_GithubAll 		| 2000 		| 944234 	| 300688 	| 2648
 1. Download and install it:
 
 ```sh
-$ go get gopkg.in/gin-gonic/gin.v1
+$ go get github.com/gin-gonic/gin
 ```
 
 2. Import it in your code:
 
 ```go
-import "gopkg.in/gin-gonic/gin.v1"
+import "github.com/gin-gonic/gin"
 ```
 
 3. (Optional) Import `net/http`. This is required for example if using constants such as `http.StatusOK`.
 
 ```go
 import "net/http"
-```
-
-4. (Optional) Use latest changes (note: they may be broken and/or unstable):
-
-```sh  
-$ GIN_PATH=$GOPATH/src/gopkg.in/gin-gonic/gin.v1
-$ git -C $GIN_PATH checkout develop
-$ git -C $GIN_PATH pull origin develop 
 ```
 
 ## API Examples
@@ -451,7 +449,7 @@ func startPage(c *gin.Context) {
 package main
 
 import (
-	"gopkg.in/gin-gonic/gin.v1"
+	"github.com/gin-gonic/gin"
 )
 
 type LoginForm struct {
@@ -463,7 +461,7 @@ func main() {
 	router := gin.Default()
 	router.POST("/login", func(c *gin.Context) {
 		// you can bind multipart form with explicit binding declaration:
-		// c.BindWith(&form, binding.Form)
+		// c.MustBindWith(&form, binding.Form)
 		// or you can simply use autobinding with Bind method:
 		var form LoginForm
 		// in this case proper binding will be automatically selected
@@ -622,6 +620,54 @@ func main() {
 }
 ```
 
+You may use custom delims
+
+```go
+	r := gin.Default()
+	r.Delims("{[{", "}]}")
+	r.LoadHTMLGlob("/path/to/templates"))
+```  
+
+#### Add custom template funcs
+
+main.go
+
+```go
+	...
+	
+	func formatAsDate(t time.Time) string {
+		year, month, day := t.Date()
+		return fmt.Sprintf("%d/%02d/%02d", year, month, day)
+	}
+	
+	...
+	
+	router.SetFuncMap(template.FuncMap{
+		"formatAsDate": formatAsDate,
+	})
+	
+	...
+	
+	router.GET("/raw", func(c *Context) {
+		c.HTML(http.StatusOK, "raw.tmpl", map[string]interface{}{
+			"now": time.Date(2017, 07, 01, 0, 0, 0, 0, time.UTC),
+		})
+	})
+	
+	...
+```
+
+raw.tmpl
+
+```html
+Date: {[{.now | formatAsDate}]}
+```
+
+Result:
+```
+Date: 2017/07/01
+```
+
 ### Multitemplate
 
 Gin allow by default use only one html.Template. Check [a multitemplate render](https://github.com/gin-contrib/multitemplate) for using features like go 1.6 `block template`.
@@ -774,6 +820,65 @@ func main() {
 		MaxHeaderBytes: 1 << 20,
 	}
 	s.ListenAndServe()
+}
+```
+
+### Support Let's Encrypt
+
+example for 1-line LetsEncrypt HTTPS servers.
+
+[embedmd]:# (examples/auto-tls/example1.go go)
+```go
+package main
+
+import (
+	"log"
+
+	"github.com/gin-gonic/autotls"
+	"github.com/gin-gonic/gin"
+)
+
+func main() {
+	r := gin.Default()
+
+	// Ping handler
+	r.GET("/ping", func(c *gin.Context) {
+		c.String(200, "pong")
+	})
+
+	log.Fatal(autotls.Run(r, "example1.com", "example2.com"))
+}
+```
+
+example for custom autocert manager.
+
+[embedmd]:# (examples/auto-tls/example2.go go)
+```go
+package main
+
+import (
+	"log"
+
+	"github.com/gin-gonic/autotls"
+	"github.com/gin-gonic/gin"
+	"golang.org/x/crypto/acme/autocert"
+)
+
+func main() {
+	r := gin.Default()
+
+	// Ping handler
+	r.GET("/ping", func(c *gin.Context) {
+		c.String(200, "pong")
+	})
+
+	m := autocert.Manager{
+		Prompt:     autocert.AcceptTOS,
+		HostPolicy: autocert.HostWhitelist("example1.com", "example2.com"),
+		Cache:      autocert.DirCache("/var/www/.cache"),
+	}
+
+	log.Fatal(autotls.RunWithManager(r, m))
 }
 ```
 

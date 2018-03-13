@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // Package ripemd160 implements the RIPEMD-160 hash algorithm.
-package ripemd160
+package ripemd160 // import "golang.org/x/crypto/ripemd160"
 
 // RIPEMD-160 is designed by by Hans Dobbertin, Antoon Bosselaers, and Bart
 // Preneel with specifications available at:

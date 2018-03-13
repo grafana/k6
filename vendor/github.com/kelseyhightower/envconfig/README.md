@@ -1,6 +1,6 @@
 # envconfig
 
-[![Build Status](https://travis-ci.org/kelseyhightower/envconfig.svg)](https://travis-ci.org/kelseyhightower/envconfig)
+[![Build Status](https://travis-ci.org/kelseyhightower/envconfig.png)](https://travis-ci.org/kelseyhightower/envconfig)
 
 ```Go
 import "github.com/kelseyhightower/envconfig"
@@ -54,7 +54,7 @@ func main() {
         log.Fatal(err.Error())
     }
     format := "Debug: %v\nPort: %d\nUser: %s\nRate: %f\nTimeout: %s\n"
-    _, err = fmt.Printf(format, s.Debug, s.Port, s.User, s.Rate, s.Timeout)
+    _, err = fmt.Printf(format, s.Debug, s.Port, s.User, s.Rate)
     if err != nil {
         log.Fatal(err.Error())
     }
