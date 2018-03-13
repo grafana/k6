@@ -184,10 +184,6 @@ a commandline interface for interacting with it.`,
 				return err
 			}
 			engine.Collector = collector
-
-			// Get collector options and pass them to runner.
-			collectorOpts := collector.GetOptions()
-			r.SetCollectorOptions(collectorOpts)
 		}
 
 		// Create an API server.

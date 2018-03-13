@@ -150,6 +150,12 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 	if state.Options.SystemTags["group"] {
 		tags["group"] = state.Group.Path
 	}
+	if state.Options.SystemTags["vu"] {
+		tags["vu"] = strconv.FormatInt(state.Vu, 10)
+	}
+	if state.Options.SystemTags["iter"] {
+		tags["iter"] = strconv.FormatInt(state.Iteration, 10)
+	}
 
 	redirects := state.Options.MaxRedirects
 	timeout := 60 * time.Second

@@ -26,6 +26,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/cookiejar"
+	"strconv"
 	"time"
 
 	"github.com/dop251/goja"
@@ -50,10 +51,9 @@ type Runner struct {
 	Logger       *log.Logger
 	defaultGroup *lib.Group
 
-	BaseDialer       net.Dialer
-	Resolver         *dnscache.Resolver
-	RPSLimit         *rate.Limiter
-	CollectorOptions lib.CollectorOptions
+	BaseDialer net.Dialer
+	Resolver   *dnscache.Resolver
+	RPSLimit   *rate.Limiter
 }
 
 func New(src *lib.SourceData, fs afero.Fs, rtOpts lib.RuntimeOptions) (*Runner, error) {
@@ -193,10 +193,6 @@ func (r *Runner) SetOptions(opts lib.Options) {
 	}
 }
 
-func (r *Runner) SetCollectorOptions(opts lib.CollectorOptions) {
-	r.CollectorOptions = opts
-}
-
 type VU struct {
 	BundleInstance
 
@@ -244,17 +240,16 @@ func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 	}
 
 	state := &common.State{
-		Logger:           u.Runner.Logger,
-		Options:          u.Runner.Bundle.Options,
-		CollectorOptions: u.Runner.CollectorOptions,
-		Group:            u.Runner.defaultGroup,
-		HTTPTransport:    u.HTTPTransport,
-		Dialer:           u.Dialer,
-		CookieJar:        cookieJar,
-		RPSLimit:         u.Runner.RPSLimit,
-		BPool:            u.BPool,
-		Vu:               u.ID,
-		Iteration:        u.Iteration,
+		Logger:        u.Runner.Logger,
+		Options:       u.Runner.Bundle.Options,
+		Group:         u.Runner.defaultGroup,
+		HTTPTransport: u.HTTPTransport,
+		Dialer:        u.Dialer,
+		CookieJar:     cookieJar,
+		RPSLimit:      u.Runner.RPSLimit,
+		BPool:         u.BPool,
+		Vu:            u.ID,
+		Iteration:     u.Iteration,
 	}
 	// Zero out the values, since we may be reusing a connection
 	u.Dialer.BytesRead = 0
@@ -265,16 +260,25 @@ func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
 	*u.Context = newctx
 
 	u.Runtime.Set("__ITER", u.Iteration)
+	iter := u.Iteration
 	u.Iteration++
 
 	startTime := time.Now()
 	_, err = u.Default(goja.Undefined()) // Actually run the JS script
 	t := time.Now()
 
+	tags := map[string]string{}
+	if state.Options.SystemTags["vu"] {
+		tags["vu"] = strconv.FormatInt(u.ID, 10)
+	}
+	if state.Options.SystemTags["iter"] {
+		tags["iter"] = strconv.FormatInt(iter, 10)
+	}
+
 	samples := append(state.Samples,
-		stats.Sample{Time: t, Metric: metrics.DataSent, Value: float64(u.Dialer.BytesWritten)},
-		stats.Sample{Time: t, Metric: metrics.DataReceived, Value: float64(u.Dialer.BytesRead)},
-		stats.Sample{Time: t, Metric: metrics.IterationDuration, Value: stats.D(t.Sub(startTime))},
+		stats.Sample{Time: t, Metric: metrics.DataSent, Value: float64(u.Dialer.BytesWritten), Tags: tags},
+		stats.Sample{Time: t, Metric: metrics.DataReceived, Value: float64(u.Dialer.BytesRead), Tags: tags},
+		stats.Sample{Time: t, Metric: metrics.IterationDuration, Value: stats.D(t.Sub(startTime)), Tags: tags},
 	)
 
 	if u.Runner.Bundle.Options.NoConnectionReuse.Bool {
