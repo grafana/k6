@@ -347,6 +347,12 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 		if state.Options.SystemTags["error"] {
 			tags["error"] = resp.Error
 		}
+
+		//TODO: expand/replace this so we can recognize the different non-HTTP
+		// errors, probably by using a type switch for resErr
+		if state.Options.SystemTags["status"] {
+			tags["status"] = "0"
+		}
 	} else {
 		if activeJar != nil {
 			if rc := res.Cookies(); len(rc) > 0 {
