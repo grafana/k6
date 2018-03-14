@@ -17,6 +17,12 @@
   version = "v1.3.0"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/Soontao/goHttpDigestClient"
+  packages = ["."]
+  revision = "6d28bb1415c5d06b76a4dcc4bb6e0dd39ce61af9"
+
+[[projects]]
   name = "github.com/andybalholm/cascadia"
   packages = ["."]
   revision = "901648c87902174f774fac311d7f176f8647bdaa"
@@ -211,6 +217,12 @@
 
 [[projects]]
   branch = "master"
+  name = "github.com/nu7hatch/gouuid"
+  packages = ["."]
+  revision = "179d4d0c4d8d407a32af483c2354df1d2c91e6c3"
+
+[[projects]]
+  branch = "master"
   name = "github.com/oxtoacart/bpool"
   packages = ["."]
   revision = "4e1c5567d7c2dd59fa4c7c83d34c2f3528b025d6"
@@ -400,6 +412,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "2a88a032b77c39fdd51d9e403fbc031b1fd8205ce62d89af1d205b5525bfe6e2"
+  inputs-digest = "286861647386e05906be851a8e3432fc51d0b51ace8da682222802cb32fbfef8"
   solver-name = "gps-cdcl"
   solver-version = 1

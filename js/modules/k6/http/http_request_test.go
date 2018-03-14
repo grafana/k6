@@ -592,6 +592,27 @@ func TestRequestAndBatch(t *testing.T) {
 			})
 		})
 
+		t.Run("auth", func(t *testing.T) {
+			t.Run("basic", func(t *testing.T) {
+				state.Samples = nil
+				_, err := common.RunString(rt, `
+				let res = http.request("GET", "https://bob:pass@httpbin.org/basic-auth/bob/pass", null, {});
+				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+				`)
+				assert.NoError(t, err)
+				assertRequestMetricsEmitted(t, state.Samples, "GET", "https://bob:pass@httpbin.org/basic-auth/bob/pass", "", 200, "")
+			})
+			t.Run("digest", func(t *testing.T) {
+				state.Samples = nil
+				_, err := common.RunString(rt, `
+				let res = http.request("GET", "https://bob:pass@httpbin.org/digest-auth/auth/bob/pass", null, { auth: "digest" });
+				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+				`)
+				assert.NoError(t, err)
+				assertRequestMetricsEmitted(t, state.Samples, "GET", "https://bob:pass@httpbin.org/digest-auth/auth/bob/pass", "", 200, "")
+			})
+		})
+
 		t.Run("headers", func(t *testing.T) {
 			for _, literal := range []string{`null`, `undefined`} {
 				state.Samples = nil
