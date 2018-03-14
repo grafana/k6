@@ -39,6 +39,7 @@ import (
 	"sync"
 	"time"
 
+	digest "github.com/Soontao/goHttpDigestClient"
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib/netext"
@@ -210,6 +211,7 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 	redirects := state.Options.MaxRedirects
 	timeout := 60 * time.Second
 	throw := state.Options.Throw.Bool
+	auth := ""
 
 	var activeJar *cookiejar.Jar
 	if state.CookieJar != nil {
@@ -294,6 +296,8 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 					for _, key := range tagObj.Keys() {
 						tags[key] = tagObj.Get(key).String()
 					}
+				case "auth":
+					auth = params.Get(k).String()
 				case "timeout":
 					timeout = time.Duration(params.Get(k).ToFloat() * float64(time.Millisecond))
 				case "throw":
@@ -352,10 +356,29 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 		},
 	}
 
+	// if digest authentication option is passed, make an initial request to get the authentication params to compute the authorization header
+	if auth == "digest" {
+		res, _ := client.Do(req.WithContext(ctx))
+		if res.StatusCode == http.StatusUnauthorized {
+			username := url.URL.User.Username()
+			password, _ := url.URL.User.Password()
+			body := ""
+			if b, err := ioutil.ReadAll(res.Body); err == nil {
+				body = string(b)
+			}
+
+			challenge := digest.GetChallengeFromHeader(&res.Header)
+			challenge.ComputeResponse(req.Method, req.URL.RequestURI(), body, username, password)
+			authorization := challenge.ToAuthorizationStr()
+			req.Header.Set(digest.KEY_AUTHORIZATION, authorization)
+		}
+	}
+
 	tracer := netext.Tracer{}
 	h.debugRequest(state, req, "Request")
 	res, resErr := client.Do(req.WithContext(netext.WithTracer(ctx, &tracer)))
 	h.debugResponse(state, res, "Response")
+
 	if resErr == nil && res != nil {
 		switch res.Header.Get("Content-Encoding") {
 		case "deflate":
