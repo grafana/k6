@@ -68,7 +68,10 @@ func (*K6) Group(ctx context.Context, name string, fn goja.Callable) (goja.Value
 	ret, err := fn(goja.Undefined())
 	t := time.Now()
 
-	tags := map[string]string{"group": g.Path}
+	tags := map[string]string{}
+	if state.Options.SystemTags["group"] {
+		tags["group"] = g.Path
+	}
 	if state.Options.SystemTags["vu"] {
 		tags["vu"] = strconv.FormatInt(state.Vu, 10)
 	}
@@ -93,7 +96,10 @@ func (*K6) Check(ctx context.Context, arg0, checks goja.Value, extras ...goja.Va
 	t := time.Now()
 
 	// Prepare tags, make sure the `group` tag can't be overwritten.
-	commonTags := map[string]string{"group": state.Group.Path}
+	commonTags := map[string]string{}
+	if state.Options.SystemTags["group"] {
+		commonTags["group"] = state.Group.Path
+	}
 	if len(extras) > 0 {
 		obj := extras[0].ToObject(rt)
 		for _, k := range obj.Keys() {
@@ -122,7 +128,9 @@ func (*K6) Check(ctx context.Context, arg0, checks goja.Value, extras ...goja.Va
 		if err != nil {
 			return false, err
 		}
-		tags["check"] = check.Name
+		if state.Options.SystemTags["check"] {
+			tags["check"] = check.Name
+		}
 
 		// Resolve callables into values.
 		fn, ok := goja.AssertFunction(val)

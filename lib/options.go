@@ -32,17 +32,18 @@ import (
 )
 
 // DefaultSystemTagList includes all of the system tags emitted with metrics by default.
+// Other tags that are not enabled by default include: iter, vu, ocsp_status
 var DefaultSystemTagList = []string{
-	"proto", "subproto", "status", "method", "url", "name", "group", "error", "tls_version",
+	"proto", "subproto", "status", "method", "url", "name", "group", "check", "error", "tls_version",
 }
 
-// Tags is a set (represented as a string to bool map for lookup efficiency)
-// used to keep track of which system tags to emit with metrics.
-type Tags map[string]bool
+// TagSet is a string to bool map (for lookup efficiency) that is used to keep track
+// which system tags should be included with with metrics.
+type TagSet map[string]bool
 
 // GetTagSet converts a the passed string tag names into the expected string to bool map.
-func GetTagSet(tags ...string) Tags {
-	result := Tags{}
+func GetTagSet(tags ...string) TagSet {
+	result := TagSet{}
 	for _, tag := range tags {
 		result[tag] = true
 	}
@@ -50,7 +51,7 @@ func GetTagSet(tags ...string) Tags {
 }
 
 // MarshalJSON converts the tags map to a list (JS array).
-func (t Tags) MarshalJSON() ([]byte, error) {
+func (t TagSet) MarshalJSON() ([]byte, error) {
 	var tags []string
 	for tag := range t {
 		tags = append(tags, tag)
@@ -59,7 +60,7 @@ func (t Tags) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON converts the tag list back to a the expected set (string to bool map).
-func (t *Tags) UnmarshalJSON(data []byte) error {
+func (t *TagSet) UnmarshalJSON(data []byte) error {
 	var tags []string
 	if err := json.Unmarshal(data, &tags); err != nil {
 		return err
@@ -242,7 +243,7 @@ type Options struct {
 	SummaryTrendStats []string `json:"SummaryTrendStats" envconfig:"summary_trend_stats"`
 
 	// Which system tags to include with metrics ("method", "vu" etc.)
-	SystemTags Tags `json:"systemTags" envconfig:"system_tags"`
+	SystemTags TagSet `json:"systemTags" envconfig:"system_tags"`
 }
 
 // Returns the result of overwriting any fields with any that are set on the argument.

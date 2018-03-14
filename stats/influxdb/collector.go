@@ -129,3 +129,8 @@ func (c *Collector) commit() {
 	t := time.Since(startTime)
 	log.WithField("t", t).Debug("InfluxDB: Batch written!")
 }
+
+// GetRequiredSystemTags returns which sample tags are needed by this collector
+func (c *Collector) GetRequiredSystemTags() lib.TagSet {
+	return lib.TagSet{} // There are no required tags for this collector
+}

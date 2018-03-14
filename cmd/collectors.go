@@ -22,6 +22,7 @@ package cmd
 
 import (
 	"encoding"
+	"fmt"
 	"strings"
 
 	"github.com/kelseyhightower/envconfig"
@@ -51,7 +52,7 @@ func parseCollector(s string) (t, arg string) {
 	}
 }
 
-func newCollector(t, arg string, src *lib.SourceData, conf Config) (lib.Collector, error) {
+func newCollector(collectorName, arg string, src *lib.SourceData, conf Config) (lib.Collector, error) {
 	loadConfig := func(out encoding.TextUnmarshaler) error {
 		if err := envconfig.Process("k6", out); err != nil {
 			return err
@@ -62,22 +63,46 @@ func newCollector(t, arg string, src *lib.SourceData, conf Config) (lib.Collecto
 		return nil
 	}
 
-	switch t {
-	case collectorJSON:
-		return jsonc.New(afero.NewOsFs(), arg)
-	case collectorInfluxDB:
-		config := conf.Collectors.InfluxDB
-		if err := loadConfig(&config); err != nil {
-			return nil, err
+	getCollector := func() (lib.Collector, error) {
+		switch collectorName {
+		case collectorJSON:
+			return jsonc.New(afero.NewOsFs(), arg)
+		case collectorInfluxDB:
+			config := conf.Collectors.InfluxDB
+			if err := loadConfig(&config); err != nil {
+				return nil, err
+			}
+			return influxdb.New(config)
+		case collectorCloud:
+			config := conf.Collectors.Cloud
+			if err := loadConfig(&config); err != nil {
+				return nil, err
+			}
+			return cloud.New(config, src, conf.Options, Version)
+		default:
+			return nil, errors.Errorf("unknown output type: %s", collectorName)
 		}
-		return influxdb.New(config)
-	case collectorCloud:
-		config := conf.Collectors.Cloud
-		if err := loadConfig(&config); err != nil {
-			return nil, err
-		}
-		return cloud.New(config, src, conf.Options, Version)
-	default:
-		return nil, errors.Errorf("unknown output type: %s", t)
 	}
+
+	collector, err := getCollector()
+	if err != nil {
+		return collector, err
+	}
+
+	// Check if all required tags are present
+	missingRequiredTags := []string{}
+	for reqTag := range collector.GetRequiredSystemTags() {
+		if !conf.SystemTags[reqTag] {
+			missingRequiredTags = append(missingRequiredTags, reqTag)
+		}
+	}
+	if len(missingRequiredTags) > 0 {
+		return collector, fmt.Errorf(
+			"The specified collector '%s' needs the following system tags enabled: %s",
+			collectorName,
+			strings.Join(missingRequiredTags, ", "),
+		)
+	}
+
+	return collector, nil
 }
