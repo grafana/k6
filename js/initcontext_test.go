@@ -291,7 +291,7 @@ func TestInitContextOpenBinary(t *testing.T) {
 		export let data = open("/path/to/file.bin", "b");
 		export default function() { console.log(data); }
 		`),
-	}, fs)
+	}, fs, lib.RuntimeOptions{})
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -348,7 +348,7 @@ func TestRequestWithBinaryFile(t *testing.T) {
 				return true;
 			}
 			`, srv.URL)),
-	}, fs)
+	}, fs, lib.RuntimeOptions{})
 	assert.NoError(t, err)
 
 	bi, err := b.Instantiate()
