@@ -26,6 +26,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
@@ -120,4 +121,9 @@ func (c *Collector) Collect(samples []stats.Sample) {
 
 func (c *Collector) Link() string {
 	return ""
+}
+
+// GetRequiredSystemTags returns which sample tags are needed by this collector
+func (c *Collector) GetRequiredSystemTags() lib.TagSet {
+	return lib.TagSet{} // There are no required tags for this collector
 }

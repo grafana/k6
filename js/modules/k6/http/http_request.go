@@ -187,16 +187,26 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 		req.Header.Set("User-Agent", userAgent.String)
 	}
 
-	tags := map[string]string{
-		"proto":  "",
-		"status": "0",
-		"method": method,
-		"url":    url.URLString,
-		"name":   url.Name,
-		"group":  state.Group.Path,
-		"vu":     strconv.FormatInt(state.Vu, 10),
-		"iter":   strconv.FormatInt(state.Iteration, 10),
+	tags := map[string]string{}
+	if state.Options.SystemTags["method"] {
+		tags["method"] = method
 	}
+	if state.Options.SystemTags["url"] {
+		tags["url"] = url.URLString
+	}
+	if state.Options.SystemTags["name"] {
+		tags["name"] = url.Name
+	}
+	if state.Options.SystemTags["group"] {
+		tags["group"] = state.Group.Path
+	}
+	if state.Options.SystemTags["vu"] {
+		tags["vu"] = strconv.FormatInt(state.Vu, 10)
+	}
+	if state.Options.SystemTags["iter"] {
+		tags["iter"] = strconv.FormatInt(state.Iteration, 10)
+	}
+
 	redirects := state.Options.MaxRedirects
 	timeout := 60 * time.Second
 	throw := state.Options.Throw.Bool
@@ -384,7 +394,15 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 
 	if resErr != nil {
 		resp.Error = resErr.Error()
-		tags["error"] = resp.Error
+		if state.Options.SystemTags["error"] {
+			tags["error"] = resp.Error
+		}
+
+		//TODO: expand/replace this so we can recognize the different non-HTTP
+		// errors, probably by using a type switch for resErr
+		if state.Options.SystemTags["status"] {
+			tags["status"] = "0"
+		}
 	} else {
 		if activeJar != nil {
 			if rc := res.Cookies(); len(rc) > 0 {
@@ -395,14 +413,25 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 		resp.URL = res.Request.URL.String()
 		resp.Status = res.StatusCode
 		resp.Proto = res.Proto
-		tags["url"] = resp.URL
-		tags["status"] = strconv.Itoa(resp.Status)
-		tags["proto"] = resp.Proto
+
+		if state.Options.SystemTags["url"] {
+			tags["url"] = resp.URL
+		}
+		if state.Options.SystemTags["status"] {
+			tags["status"] = strconv.Itoa(resp.Status)
+		}
+		if state.Options.SystemTags["proto"] {
+			tags["proto"] = resp.Proto
+		}
 
 		if res.TLS != nil {
 			resp.setTLSInfo(res.TLS)
-			tags["tls_version"] = resp.TLSVersion
-			tags["ocsp_status"] = resp.OCSP.Status
+			if state.Options.SystemTags["tls_version"] {
+				tags["tls_version"] = resp.TLSVersion
+			}
+			if state.Options.SystemTags["ocsp_status"] {
+				tags["ocsp_status"] = resp.OCSP.Status
+			}
 		}
 
 		resp.Headers = make(map[string]string, len(res.Header))

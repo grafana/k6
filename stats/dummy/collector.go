@@ -24,6 +24,7 @@ import (
 	"context"
 	"sync"
 
+	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
 )
 
@@ -62,4 +63,9 @@ func (c *Collector) Collect(samples []stats.Sample) {
 
 func (c *Collector) Link() string {
 	return "http://example.com/"
+}
+
+// GetRequiredSystemTags returns which sample tags are needed by this collector
+func (c *Collector) GetRequiredSystemTags() lib.TagSet {
+	return lib.TagSet{} // There are no required tags for this collector
 }

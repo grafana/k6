@@ -106,6 +106,7 @@ func TestRequestAndBatch(t *testing.T) {
 			MaxRedirects: null.IntFrom(10),
 			UserAgent:    null.StringFrom("TestUserAgent"),
 			Throw:        null.BoolFrom(true),
+			SystemTags:   lib.GetTagSet(lib.DefaultSystemTagList...),
 		},
 		Logger: logger,
 		Group:  root,
@@ -895,4 +896,65 @@ func TestRequestAndBatch(t *testing.T) {
 			assert.NoError(t, err)
 		})
 	})
+}
+func TestSystemTags(t *testing.T) {
+	root, err := lib.NewGroup("", nil)
+	assert.NoError(t, err)
+
+	logger := log.New()
+	logger.Level = log.DebugLevel
+	logger.Out = ioutil.Discard
+
+	rt := goja.New()
+	rt.SetFieldNameMapper(common.FieldNameMapper{})
+	state := &common.State{
+		Options: lib.Options{
+			MaxRedirects: null.IntFrom(10),
+			UserAgent:    null.StringFrom("TestUserAgent"),
+			Throw:        null.BoolFrom(false),
+		},
+		Logger: logger,
+		Group:  root,
+		HTTPTransport: &http.Transport{
+			DialContext: (netext.NewDialer(net.Dialer{
+				Timeout:   10 * time.Second,
+				KeepAlive: 60 * time.Second,
+				DualStack: true,
+			})).DialContext,
+		},
+		BPool: bpool.NewBufferPool(1),
+	}
+
+	ctx := new(context.Context)
+	*ctx = context.Background()
+	*ctx = common.WithState(*ctx, state)
+	*ctx = common.WithRuntime(*ctx, rt)
+	rt.Set("http", common.Bind(rt, New(), ctx))
+
+	testedSystemTags := map[string]string{
+		"error":       "http://nonexistenturl.loadimpact.com",
+		"group":       "https://httpbin.org/",
+		"method":      "https://httpbin.org/",
+		"name":        "https://httpbin.org/",
+		"ocsp_status": "https://stackoverflow.com/",
+		"proto":       "https://httpbin.org/",
+		"status":      "https://httpbin.org/",
+		"tls_version": "https://httpbin.org/",
+		"url":         "https://httpbin.org/",
+	}
+	for _, expectedTag := range testedSystemTags {
+		t.Run("only "+expectedTag, func(t *testing.T) {
+			state.Options.SystemTags = map[string]bool{
+				expectedTag: true,
+			}
+			state.Samples = nil
+			_, err := common.RunString(rt, `http.get("https://httpbin.org/");`)
+			assert.NoError(t, err)
+			for _, sample := range state.Samples {
+				for emittedTag := range sample.Tags {
+					assert.Equal(t, expectedTag, emittedTag)
+				}
+			}
+		})
+	}
 }

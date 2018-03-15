@@ -101,11 +101,12 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 	// Leave header to nil by default so we can pass it directly to the Dialer
 	var header http.Header
 
-	tags := map[string]string{
-		"url":         url,
-		"group":       state.Group.Path,
-		"status":      "0",
-		"subprotocol": "",
+	tags := map[string]string{}
+	if state.Options.SystemTags["url"] {
+		tags["url"] = url
+	}
+	if state.Options.SystemTags["group"] {
+		tags["group"] = state.Group.Path
 	}
 
 	// Parse the optional second argument (params)
@@ -188,8 +189,12 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 
 	defer func() { _ = conn.Close() }()
 
-	tags["status"] = strconv.Itoa(httpResponse.StatusCode)
-	tags["subprotocol"] = httpResponse.Header.Get("Sec-WebSocket-Protocol")
+	if state.Options.SystemTags["status"] {
+		tags["status"] = strconv.Itoa(httpResponse.StatusCode)
+	}
+	if state.Options.SystemTags["subproto"] {
+		tags["subproto"] = httpResponse.Header.Get("Sec-WebSocket-Protocol")
+	}
 
 	// The connection is now open, emit the event
 	socket.handleEvent("open")
