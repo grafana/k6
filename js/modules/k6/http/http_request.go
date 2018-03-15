@@ -356,9 +356,26 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 		},
 	}
 
+	statsSamples := []stats.Sample{}
 	// if digest authentication option is passed, make an initial request to get the authentication params to compute the authorization header
 	if auth == "digest" {
-		res, _ := client.Do(req.WithContext(ctx))
+		tracer := netext.Tracer{}
+		h.debugRequest(state, req, "DigestRequest")
+		res, err := client.Do(req.WithContext(netext.WithTracer(ctx, &tracer)))
+		h.debugRequest(state, req, "DigestResponse")
+		if err != nil {
+			// Do *not* log errors about the contex being cancelled.
+			select {
+			case <-ctx.Done():
+			default:
+				state.Logger.WithField("error", res).Warn("Digest request failed")
+			}
+
+			if throw {
+				return nil, nil, err
+			}
+		}
+
 		if res.StatusCode == http.StatusUnauthorized {
 			username := url.URL.User.Username()
 			password, _ := url.URL.User.Password()
@@ -372,6 +389,8 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 			authorization := challenge.ToAuthorizationStr()
 			req.Header.Set(digest.KEY_AUTHORIZATION, authorization)
 		}
+
+		statsSamples = append(statsSamples, tracer.Done().Samples(tags)...)
 	}
 
 	tracer := netext.Tracer{}
@@ -490,7 +509,9 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 			return nil, nil, resErr
 		}
 	}
-	return resp, trail.Samples(tags), nil
+
+	statsSamples = append(statsSamples, trail.Samples(tags)...)
+	return resp, statsSamples, nil
 }
 
 func (http *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, error) {
