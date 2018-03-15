@@ -397,7 +397,6 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 	h.debugRequest(state, req, "Request")
 	res, resErr := client.Do(req.WithContext(netext.WithTracer(ctx, &tracer)))
 	h.debugResponse(state, res, "Response")
-
 	if resErr == nil && res != nil {
 		switch res.Header.Get("Content-Encoding") {
 		case "deflate":
