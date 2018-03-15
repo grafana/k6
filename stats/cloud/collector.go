@@ -273,3 +273,8 @@ func sumStages(stages []lib.Stage) int64 {
 
 	return int64(total.Seconds())
 }
+
+// GetRequiredSystemTags returns which sample tags are needed by this collector
+func (c *Collector) GetRequiredSystemTags() lib.TagSet {
+	return lib.GetTagSet("name", "method", "status", "error", "check", "group")
+}

@@ -49,8 +49,11 @@ func TestAnonymizePath(t *testing.T) {
 func TestArchiveReadWrite(t *testing.T) {
 	t.Run("Roundtrip", func(t *testing.T) {
 		arc1 := &Archive{
-			Type:     "js",
-			Options:  Options{VUs: null.IntFrom(12345)},
+			Type: "js",
+			Options: Options{
+				VUs:        null.IntFrom(12345),
+				SystemTags: GetTagSet(DefaultSystemTagList...),
+			},
 			Filename: "/path/to/script.js",
 			Data:     []byte(`// contents...`),
 			Pwd:      "/path/to",
@@ -76,8 +79,11 @@ func TestArchiveReadWrite(t *testing.T) {
 
 	t.Run("Anonymized", func(t *testing.T) {
 		arc1 := &Archive{
-			Type:     "js",
-			Options:  Options{VUs: null.IntFrom(12345)},
+			Type: "js",
+			Options: Options{
+				VUs:        null.IntFrom(12345),
+				SystemTags: GetTagSet(DefaultSystemTagList...),
+			},
 			Filename: "/home/myname/script.js",
 			Data:     []byte(`// contents...`),
 			Pwd:      "/home/myname",
@@ -93,8 +99,11 @@ func TestArchiveReadWrite(t *testing.T) {
 			},
 		}
 		arc1Anon := &Archive{
-			Type:     "js",
-			Options:  Options{VUs: null.IntFrom(12345)},
+			Type: "js",
+			Options: Options{
+				VUs:        null.IntFrom(12345),
+				SystemTags: GetTagSet(DefaultSystemTagList...),
+			},
 			Filename: "/home/nobody/script.js",
 			Data:     []byte(`// contents...`),
 			Pwd:      "/home/nobody",

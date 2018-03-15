@@ -31,6 +31,46 @@ import (
 	"gopkg.in/guregu/null.v3"
 )
 
+// DefaultSystemTagList includes all of the system tags emitted with metrics by default.
+// Other tags that are not enabled by default include: iter, vu, ocsp_status
+var DefaultSystemTagList = []string{
+	"proto", "subproto", "status", "method", "url", "name", "group", "check", "error", "tls_version",
+}
+
+// TagSet is a string to bool map (for lookup efficiency) that is used to keep track
+// which system tags should be included with with metrics.
+type TagSet map[string]bool
+
+// GetTagSet converts a the passed string tag names into the expected string to bool map.
+func GetTagSet(tags ...string) TagSet {
+	result := TagSet{}
+	for _, tag := range tags {
+		result[tag] = true
+	}
+	return result
+}
+
+// MarshalJSON converts the tags map to a list (JS array).
+func (t TagSet) MarshalJSON() ([]byte, error) {
+	var tags []string
+	for tag := range t {
+		tags = append(tags, tag)
+	}
+	return json.Marshal(tags)
+}
+
+// UnmarshalJSON converts the tag list back to a the expected set (string to bool map).
+func (t *TagSet) UnmarshalJSON(data []byte) error {
+	var tags []string
+	if err := json.Unmarshal(data, &tags); err != nil {
+		return err
+	}
+	if len(tags) != 0 {
+		*t = GetTagSet(tags...)
+	}
+	return nil
+}
+
 // Describes a TLS version. Serialised to/from JSON as a string, eg. "tls1.2".
 type TLSVersion int
 
@@ -201,6 +241,9 @@ type Options struct {
 
 	// Summary trend stats for trend metrics (response times) in CLI output
 	SummaryTrendStats []string `json:"SummaryTrendStats" envconfig:"summary_trend_stats"`
+
+	// Which system tags to include with metrics ("method", "vu" etc.)
+	SystemTags TagSet `json:"systemTags" envconfig:"system_tags"`
 }
 
 // Returns the result of overwriting any fields with any that are set on the argument.
@@ -278,6 +321,9 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.SummaryTrendStats != nil {
 		o.SummaryTrendStats = opts.SummaryTrendStats
+	}
+	if opts.SystemTags != nil {
+		o.SystemTags = opts.SystemTags
 	}
 	return o
 }

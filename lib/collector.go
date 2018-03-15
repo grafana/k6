@@ -43,4 +43,7 @@ type Collector interface {
 
 	// Optionally return a link that is shown to the user.
 	Link() string
+
+	// Return the required system sample tags for the specific collector
+	GetRequiredSystemTags() TagSet
 }

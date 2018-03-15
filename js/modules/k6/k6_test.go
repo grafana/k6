@@ -122,8 +122,16 @@ func TestCheck(t *testing.T) {
 	*ctx = baseCtx
 	rt.Set("k6", common.Bind(rt, New(), ctx))
 
+	getState := func() *common.State {
+		return &common.State{
+			Group: root,
+			Options: lib.Options{
+				SystemTags: lib.GetTagSet(lib.DefaultSystemTagList...),
+			},
+		}
+	}
 	t.Run("Object", func(t *testing.T) {
-		state := &common.State{Group: root}
+		state := getState()
 		*ctx = common.WithState(baseCtx, state)
 
 		_, err := common.RunString(rt, `k6.check(null, { "check": true })`)
@@ -136,13 +144,11 @@ func TestCheck(t *testing.T) {
 			assert.Equal(t, map[string]string{
 				"group": "",
 				"check": "check",
-				"vu":    "0",
-				"iter":  "0",
 			}, state.Samples[0].Tags)
 		}
 
 		t.Run("Multiple", func(t *testing.T) {
-			state := &common.State{Group: root}
+			state := getState()
 			*ctx = common.WithState(baseCtx, state)
 
 			_, err := common.RunString(rt, `k6.check(null, { "a": true, "b": false })`)
@@ -172,8 +178,9 @@ func TestCheck(t *testing.T) {
 			assert.EqualError(t, err, "GoError: group and check names may not contain '::'")
 		})
 	})
+
 	t.Run("Array", func(t *testing.T) {
-		state := &common.State{Group: root}
+		state := getState()
 		*ctx = common.WithState(baseCtx, state)
 
 		_, err := common.RunString(rt, `k6.check(null, [ true ])`)
@@ -186,13 +193,12 @@ func TestCheck(t *testing.T) {
 			assert.Equal(t, map[string]string{
 				"group": "",
 				"check": "0",
-				"vu":    "0",
-				"iter":  "0",
 			}, state.Samples[0].Tags)
 		}
 	})
+
 	t.Run("Literal", func(t *testing.T) {
-		state := &common.State{Group: root}
+		state := getState()
 		*ctx = common.WithState(baseCtx, state)
 
 		_, err := common.RunString(rt, `k6.check(null, 12345)`)
@@ -232,7 +238,7 @@ func TestCheck(t *testing.T) {
 			t.Run(name, func(t *testing.T) {
 				for value, succ := range testdata {
 					t.Run(value, func(t *testing.T) {
-						state := &common.State{Group: root}
+						state := getState()
 						*ctx = common.WithState(baseCtx, state)
 
 						v, err := common.RunString(rt, fmt.Sprintf(tpl, value))
@@ -251,8 +257,6 @@ func TestCheck(t *testing.T) {
 							assert.Equal(t, map[string]string{
 								"group": "",
 								"check": "check",
-								"vu":    "0",
-								"iter":  "0",
 							}, state.Samples[0].Tags)
 						}
 					})
@@ -290,7 +294,7 @@ func TestCheck(t *testing.T) {
 	})
 
 	t.Run("Tags", func(t *testing.T) {
-		state := &common.State{Group: root}
+		state := getState()
 		*ctx = common.WithState(baseCtx, state)
 
 		v, err := common.RunString(rt, `k6.check(null, {"check": true}, {a: 1, b: "2"})`)
@@ -307,8 +311,6 @@ func TestCheck(t *testing.T) {
 				"check": "check",
 				"a":     "1",
 				"b":     "2",
-				"vu":    "0",
-				"iter":  "0",
 			}, state.Samples[0].Tags)
 		}
 	})
