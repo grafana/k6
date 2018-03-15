@@ -96,18 +96,10 @@ func New(conf Config, src *lib.SourceData, opts lib.Options, version string) (*C
 }
 
 func (c *Collector) Init() error {
-	thresholds := make(map[string][]string)
-
-	for name, t := range c.thresholds {
-		for _, threshold := range t {
-			thresholds[name] = append(thresholds[name], threshold.Source)
-		}
-	}
-
 	testRun := &TestRun{
 		Name:       c.config.Name,
 		ProjectID:  c.config.ProjectID,
-		Thresholds: thresholds,
+		Thresholds: c.thresholds,
 		Duration:   c.duration,
 	}
 

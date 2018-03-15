@@ -253,14 +253,14 @@ func TestThresholdsJSON(t *testing.T) {
 			`["1+1==2"]`,
 		},
 		{
-			`[{"threshold":"1+1==2","abortOnFail":true,"delayAbortEval":null}]`,
+			`[{"threshold":"1+1==2","abortOnFail":true,"delayAbortEval":0}]`,
 			[]string{"1+1==2"},
 			true,
 			types.NullDuration{},
 			"",
 		},
 		{
-			`[{"threshold":"1+1==2","abortOnFail":true,"delayAbortEval":"2s"}]`,
+			`[{"threshold":"1+1==2","abortOnFail":true,"delayAbortEval":2}]`,
 			[]string{"1+1==2"},
 			true,
 			types.NullDurationFrom(2 * time.Second),
