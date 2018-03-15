@@ -240,7 +240,7 @@ type Options struct {
 	External map[string]interface{} `json:"ext" ignored:"true"`
 
 	// Summary trend stats for trend metrics (response times) in CLI output
-	SummaryTrendStats []string `json:"SummaryTrendStats" envconfig:"summary_trend_stats"`
+	SummaryTrendStats []string `json:"summaryTrendStats" envconfig:"summary_trend_stats"`
 
 	// Which system tags to include with metrics ("method", "vu" etc.)
 	SystemTags TagSet `json:"systemTags" envconfig:"system_tags"`
