@@ -25,6 +25,12 @@ jobs:
             gometalinter --install
             gometalinter --deadline 10m --config gometalinter.json --vendor ./...
       - run:
+          name: Check dependencies
+          command: |
+            export PATH=$GOPATH/bin:$PATH
+            go get -u github.com/golang/dep/cmd/dep
+            dep status
+      - run:
           name: Run tests and code coverage
           command: |
             export PATH=$GOPATH/bin:$PATH
