@@ -137,6 +137,7 @@ func (e *Executor) Run(parent context.Context, out chan<- []stats.Sample) (reter
 	defer e.runLock.Unlock()
 
 	if e.Runner != nil && e.runSetup {
+		// TODO: make this timeout configurable
 		setupCtx, setupCancel := context.WithTimeout(parent, 10*time.Second)
 		if err := e.Runner.Setup(setupCtx); err != nil {
 			setupCancel()
@@ -158,6 +159,7 @@ func (e *Executor) Run(parent context.Context, out chan<- []stats.Sample) (reter
 	var cutoff time.Time
 	defer func() {
 		if e.Runner != nil && e.runTeardown {
+			// TODO: make this timeout configurable
 			teardownCtx, teardownCancel := context.WithTimeout(parent, 10*time.Second)
 			reterr = e.Runner.Teardown(teardownCtx)
 			teardownCancel()
