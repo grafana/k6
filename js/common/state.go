@@ -21,6 +21,7 @@
 package common
 
 import (
+	"crypto/tls"
 	"net/http"
 	"net/http/cookiejar"
 
@@ -47,6 +48,7 @@ type State struct {
 	HTTPTransport http.RoundTripper
 	Dialer        *netext.Dialer
 	CookieJar     *cookiejar.Jar
+	TLSConfig     *tls.Config
 
 	// Rate limits.
 	RPSLimit *rate.Limiter
