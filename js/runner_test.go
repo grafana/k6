@@ -120,6 +120,52 @@ func TestRunnerOptions(t *testing.T) {
 	}
 }
 
+func TestSetupTeardown(t *testing.T) {
+	r1, err := New(&lib.SourceData{
+		Filename: "/script.js",
+		Data: []byte(`
+			export function setup() {
+				return { v: 1 };
+			}
+			export function teardown(data) {
+				if (data.v != 1) {
+					throw new Error("teardown: wrong data: " + JSON.stringify(data))
+				}
+			}
+			export default function(data) {
+				if (data.v != 1) {
+					throw new Error("default: wrong data: " + JSON.stringify(data))
+				}
+			}
+		`),
+	}, afero.NewMemMapFs(), lib.RuntimeOptions{})
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{})
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
+	for name, r := range testdata {
+		t.Run(name, func(t *testing.T) {
+			if !assert.NoError(t, r.Setup(context.Background())) {
+				return
+			}
+
+			vu, err := r.NewVU()
+			if assert.NoError(t, err) {
+				_, err := vu.RunOnce(context.Background())
+				assert.NoError(t, err)
+			}
+
+			assert.NoError(t, r.Teardown(context.Background()))
+		})
+	}
+}
+
 func TestRunnerIntegrationImports(t *testing.T) {
 	t.Run("Modules", func(t *testing.T) {
 		modules := []string{

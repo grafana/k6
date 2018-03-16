@@ -87,6 +87,9 @@ type Executor struct {
 	runLock sync.Mutex
 	wg      sync.WaitGroup
 
+	runSetup    bool
+	runTeardown bool
+
 	vus       []*vuHandle
 	vusLock   sync.RWMutex
 	numVUs    int64
@@ -120,16 +123,28 @@ type Executor struct {
 
 func New(r lib.Runner) *Executor {
 	return &Executor{
-		Runner:   r,
-		Logger:   log.StandardLogger(),
-		endIters: -1,
-		endTime:  -1,
+		Runner:      r,
+		Logger:      log.StandardLogger(),
+		runSetup:    true,
+		runTeardown: true,
+		endIters:    -1,
+		endTime:     -1,
 	}
 }
 
-func (e *Executor) Run(parent context.Context, out chan<- []stats.Sample) error {
+func (e *Executor) Run(parent context.Context, out chan<- []stats.Sample) (reterr error) {
 	e.runLock.Lock()
 	defer e.runLock.Unlock()
+
+	if e.Runner != nil && e.runSetup {
+		// TODO: make this timeout configurable
+		setupCtx, setupCancel := context.WithTimeout(parent, 10*time.Second)
+		if err := e.Runner.Setup(setupCtx); err != nil {
+			setupCancel()
+			return err
+		}
+		setupCancel()
+	}
 
 	ctx, cancel := context.WithCancel(parent)
 	vuOut := make(chan []stats.Sample)
@@ -143,6 +158,13 @@ func (e *Executor) Run(parent context.Context, out chan<- []stats.Sample) error 
 
 	var cutoff time.Time
 	defer func() {
+		if e.Runner != nil && e.runTeardown {
+			// TODO: make this timeout configurable
+			teardownCtx, teardownCancel := context.WithTimeout(parent, 10*time.Second)
+			reterr = e.Runner.Teardown(teardownCtx)
+			teardownCancel()
+		}
+
 		close(vuFlow)
 		cancel()
 
@@ -490,4 +512,12 @@ func (e *Executor) SetVUsMax(max int64) error {
 	atomic.StoreInt64(&e.numVUsMax, max)
 
 	return nil
+}
+
+func (e *Executor) SetRunSetup(r bool) {
+	e.runSetup = r
+}
+
+func (e *Executor) SetRunTeardown(r bool) {
+	e.runTeardown = r
 }

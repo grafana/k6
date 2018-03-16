@@ -26,8 +26,8 @@ import (
 	"github.com/loadimpact/k6/stats"
 )
 
-// Ensure RunnerFunc conforms to Runner.
-var _ Runner = RunnerFunc(nil)
+// Ensure MiniRunner conforms to Runner.
+var _ Runner = &MiniRunner{}
 
 // A Runner is a factory for VUs. It should precompute as much as possible upon creation (parse
 // ASTs, load files into memory, etc.), so that spawning VUs becomes as fast as possible.
@@ -44,6 +44,12 @@ type Runner interface {
 	// improvement at runtime. Remember, this is called once per VU and normally only at the start
 	// of a test - RunOnce() may be called hundreds of thousands of times, and must be fast.
 	NewVU() (VU, error)
+
+	// Runs pre-test setup, if applicable.
+	Setup(ctx context.Context) error
+
+	// Runs post-test teardown, if applicable.
+	Teardown(ctx context.Context) error
 
 	// Returns the default (root) Group.
 	GetDefaultGroup() *Group
@@ -66,46 +72,71 @@ type VU interface {
 	Reconfigure(id int64) error
 }
 
-// RunnerFunc wraps a function in a runner whose VUs will simply call that function.
-type RunnerFunc func(ctx context.Context) ([]stats.Sample, error)
+// MiniRunner wraps a function in a runner whose VUs will simply call that function.
+type MiniRunner struct {
+	Fn         func(ctx context.Context) ([]stats.Sample, error)
+	SetupFn    func(ctx context.Context) error
+	TeardownFn func(ctx context.Context) error
 
-func (fn RunnerFunc) VU() *RunnerFuncVU {
-	return &RunnerFuncVU{Fn: fn}
+	Group   *Group
+	Options Options
 }
 
-func (fn RunnerFunc) MakeArchive() *Archive {
+func (r MiniRunner) VU() *MiniRunnerVU {
+	return &MiniRunnerVU{R: r}
+}
+
+func (r MiniRunner) MakeArchive() *Archive {
 	return nil
 }
 
-func (fn RunnerFunc) NewVU() (VU, error) {
-	return fn.VU(), nil
+func (r MiniRunner) NewVU() (VU, error) {
+	return r.VU(), nil
 }
 
-func (fn RunnerFunc) GetDefaultGroup() *Group {
-	return &Group{}
+func (r MiniRunner) Setup(ctx context.Context) error {
+	if fn := r.SetupFn; fn != nil {
+		return fn(ctx)
+	}
+	return nil
 }
 
-func (fn RunnerFunc) GetOptions() Options {
-	return Options{}
+func (r MiniRunner) Teardown(ctx context.Context) error {
+	if fn := r.TeardownFn; fn != nil {
+		return fn(ctx)
+	}
+	return nil
 }
 
-func (fn RunnerFunc) SetOptions(opts Options) {
+func (r MiniRunner) GetDefaultGroup() *Group {
+	if r.Group == nil {
+		r.Group = &Group{}
+	}
+	return r.Group
 }
 
-// A VU spawned by a RunnerFunc.
-type RunnerFuncVU struct {
-	Fn RunnerFunc
+func (r MiniRunner) GetOptions() Options {
+	return r.Options
+}
+
+func (r *MiniRunner) SetOptions(opts Options) {
+	r.Options = opts
+}
+
+// A VU spawned by a MiniRunner.
+type MiniRunnerVU struct {
+	R  MiniRunner
 	ID int64
 }
 
-func (fn RunnerFuncVU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
-	if fn.Fn == nil {
+func (vu MiniRunnerVU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
+	if vu.R.Fn == nil {
 		return []stats.Sample{}, nil
 	}
-	return fn.Fn(ctx)
+	return vu.R.Fn(ctx)
 }
 
-func (fn *RunnerFuncVU) Reconfigure(id int64) error {
-	fn.ID = id
+func (vu *MiniRunnerVU) Reconfigure(id int64) error {
+	vu.ID = id
 	return nil
 }
