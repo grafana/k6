@@ -359,6 +359,12 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 	statsSamples := []stats.Sample{}
 	// if digest authentication option is passed, make an initial request to get the authentication params to compute the authorization header
 	if auth == "digest" {
+		username := url.URL.User.Username()
+		password, _ := url.URL.User.Password()
+
+		// removing user from URL to avoid sending the authorization header fo basic auth
+		req.URL.User = nil
+
 		tracer := netext.Tracer{}
 		h.debugRequest(state, req, "DigestRequest")
 		res, err := client.Do(req.WithContext(netext.WithTracer(ctx, &tracer)))
@@ -377,8 +383,6 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 		}
 
 		if res.StatusCode == http.StatusUnauthorized {
-			username := url.URL.User.Username()
-			password, _ := url.URL.User.Password()
 			body := ""
 			if b, err := ioutil.ReadAll(res.Body); err == nil {
 				body = string(b)
