@@ -54,7 +54,7 @@ Thanks to @cstyan for their work on this!
 
 **Docs**: [Request information](https://docs.k6.io/docs/TODO)
 
-### k6/http: Support for HTTP Digest Authentication (#527)
+### k6/http: Support for HTTP Digest Authentication (#533)
 
 ```js
 import http from "k6/http";
