@@ -54,6 +54,27 @@ Thanks to @cstyan for their work on this!
 
 **Docs**: [Request information](https://docs.k6.io/docs/TODO)
 
+### k6/http: Support for HTTP Digest Authentication (#533)
+
+```js
+import http from "k6/http";
+import { check } from "k6";
+
+export default function() {
+    // Passing username and password as part of URL plus the auth option will authenticate using HTTP Digest authentication
+    let res = http.get("http://user:passwd@httpbin.org/digest-auth/auth/user/passwd", {auth: "digest"});
+
+    // Verify response
+    check(res, {
+        "status is 200": (r) => r.status === 200,
+        "is authenticated": (r) => r.json().authenticated === true,
+        "is correct user": (r) => r.json().user === "user"
+    });
+}
+```
+
+**Docs**: [HTTP Params](http://k6.readme.io/docs/params-k6http)
+
 ### Lifecycle: setup/teardown functions (#457)
 Finally k6 has the same basic test lifecycle hooks as many "normal" testing tools, setup and teardown, and you have the full JS API of k6 available within these functions which means you can make HTTP calls etc. that you can’t do in the global/init scope.
 

@@ -39,6 +39,7 @@ import (
 	"sync"
 	"time"
 
+	digest "github.com/Soontao/goHttpDigestClient"
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib/netext"
@@ -210,6 +211,7 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 	redirects := state.Options.MaxRedirects
 	timeout := 60 * time.Second
 	throw := state.Options.Throw.Bool
+	auth := ""
 
 	var activeJar *cookiejar.Jar
 	if state.CookieJar != nil {
@@ -294,6 +296,8 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 					for _, key := range tagObj.Keys() {
 						tags[key] = tagObj.Get(key).String()
 					}
+				case "auth":
+					auth = params.Get(k).String()
 				case "timeout":
 					timeout = time.Duration(params.Get(k).ToFloat() * float64(time.Millisecond))
 				case "throw":
@@ -350,6 +354,47 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 			}
 			return nil
 		},
+	}
+
+	statsSamples := []stats.Sample{}
+	// if digest authentication option is passed, make an initial request to get the authentication params to compute the authorization header
+	if auth == "digest" {
+		username := url.URL.User.Username()
+		password, _ := url.URL.User.Password()
+
+		// removing user from URL to avoid sending the authorization header fo basic auth
+		req.URL.User = nil
+
+		tracer := netext.Tracer{}
+		h.debugRequest(state, req, "DigestRequest")
+		res, err := client.Do(req.WithContext(netext.WithTracer(ctx, &tracer)))
+		h.debugRequest(state, req, "DigestResponse")
+		if err != nil {
+			// Do *not* log errors about the contex being cancelled.
+			select {
+			case <-ctx.Done():
+			default:
+				state.Logger.WithField("error", res).Warn("Digest request failed")
+			}
+
+			if throw {
+				return nil, nil, err
+			}
+		}
+
+		if res.StatusCode == http.StatusUnauthorized {
+			body := ""
+			if b, err := ioutil.ReadAll(res.Body); err == nil {
+				body = string(b)
+			}
+
+			challenge := digest.GetChallengeFromHeader(&res.Header)
+			challenge.ComputeResponse(req.Method, req.URL.RequestURI(), body, username, password)
+			authorization := challenge.ToAuthorizationStr()
+			req.Header.Set(digest.KEY_AUTHORIZATION, authorization)
+		}
+
+		statsSamples = append(statsSamples, tracer.Done().Samples(tags)...)
 	}
 
 	tracer := netext.Tracer{}
@@ -467,7 +512,9 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 			return nil, nil, resErr
 		}
 	}
-	return resp, trail.Samples(tags), nil
+
+	statsSamples = append(statsSamples, trail.Samples(tags)...)
+	return resp, statsSamples, nil
 }
 
 func (http *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, error) {
