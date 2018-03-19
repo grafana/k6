@@ -145,17 +145,18 @@ func (r *Runner) newVU() (*VU, error) {
 		Blacklist: r.Bundle.Options.BlacklistIPs,
 		Hosts:     r.Bundle.Options.Hosts,
 	}
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: r.Bundle.Options.InsecureSkipTLSVerify.Bool,
+		CipherSuites:       cipherSuites,
+		MinVersion:         uint16(tlsVersions.Min),
+		MaxVersion:         uint16(tlsVersions.Max),
+		Certificates:       certs,
+		NameToCertificate:  nameToCert,
+		Renegotiation:      tls.RenegotiateFreelyAsClient,
+	}
 	transport := &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: r.Bundle.Options.InsecureSkipTLSVerify.Bool,
-			CipherSuites:       cipherSuites,
-			MinVersion:         uint16(tlsVersions.Min),
-			MaxVersion:         uint16(tlsVersions.Max),
-			Certificates:       certs,
-			NameToCertificate:  nameToCert,
-			Renegotiation:      tls.RenegotiateFreelyAsClient,
-		},
+		Proxy:              http.ProxyFromEnvironment,
+		TLSClientConfig:    tlsConfig,
 		DialContext:        dialer.DialContext,
 		DisableCompression: true,
 	}
@@ -166,6 +167,7 @@ func (r *Runner) newVU() (*VU, error) {
 		Runner:         r,
 		HTTPTransport:  transport,
 		Dialer:         dialer,
+		TLSConfig:      tlsConfig,
 		Console:        NewConsole(),
 		BPool:          bpool.NewBufferPool(100),
 	}
@@ -245,6 +247,7 @@ type VU struct {
 	Runner        *Runner
 	HTTPTransport *http.Transport
 	Dialer        *netext.Dialer
+	TLSConfig     *tls.Config
 	ID            int64
 	Iteration     int64
 
@@ -317,6 +320,7 @@ func (u *VU) runFn(ctx context.Context, fn goja.Callable, args ...goja.Value) (g
 		Group:         u.Runner.defaultGroup,
 		HTTPTransport: u.HTTPTransport,
 		Dialer:        u.Dialer,
+		TLSConfig:     u.TLSConfig,
 		CookieJar:     cookieJar,
 		RPSLimit:      u.Runner.RPSLimit,
 		BPool:         u.BPool,
