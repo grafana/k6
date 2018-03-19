@@ -27,6 +27,8 @@ import (
 	"net"
 	"net/http"
 	"net/http/cookiejar"
+	"net/http/httptest"
+	"net/url"
 	"strconv"
 	"strings"
 	"testing"
@@ -38,6 +40,7 @@ import (
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
+	"github.com/mccutchen/go-httpbin/httpbin"
 	"github.com/oxtoacart/bpool"
 	log "github.com/sirupsen/logrus"
 	logtest "github.com/sirupsen/logrus/hooks/test"
@@ -92,6 +95,9 @@ func assertRequestMetricsEmitted(t *testing.T, samples []stats.Sample, method, u
 }
 
 func TestRequestAndBatch(t *testing.T) {
+	httpbinSrv := httptest.NewServer(httpbin.NewHTTPBin().Handler())
+	defer httpbinSrv.Close()
+
 	root, err := lib.NewGroup("", nil)
 	assert.NoError(t, err)
 
@@ -589,6 +595,34 @@ func TestRequestAndBatch(t *testing.T) {
 				`)
 				assert.NoError(t, err)
 				assertRequestMetricsEmitted(t, state.Samples, "GET", "https://httpbin.org/cookies", "", 200, "")
+			})
+		})
+
+		t.Run("auth", func(t *testing.T) {
+			srvUrl, err := url.Parse(httpbinSrv.URL)
+			assert.NoError(t, err)
+
+			t.Run("basic", func(t *testing.T) {
+				state.Samples = nil
+				url := fmt.Sprintf("http://bob:pass@127.0.0.1:%s/basic-auth/bob/pass", srvUrl.Port())
+
+				_, err = common.RunString(rt, fmt.Sprintf(`
+				let res = http.request("GET", "%s", null, {});
+				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+				`, url))
+				assert.NoError(t, err)
+				assertRequestMetricsEmitted(t, state.Samples, "GET", url, "", 200, "")
+			})
+			t.Run("digest", func(t *testing.T) {
+				state.Samples = nil
+				url := fmt.Sprintf("http://bob:pass@127.0.0.1:%s/digest-auth/auth/bob/pass", srvUrl.Port())
+
+				_, err := common.RunString(rt, fmt.Sprintf(`
+				let res = http.request("GET", "%s", null, { auth: "digest" });
+				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+				`, url))
+				assert.NoError(t, err)
+				assertRequestMetricsEmitted(t, state.Samples, "GET", fmt.Sprintf("http://127.0.0.1:%s/digest-auth/auth/bob/pass", srvUrl.Port()), url, 200, "")
 			})
 		})
 

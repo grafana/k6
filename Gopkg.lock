@@ -17,6 +17,12 @@
   version = "v1.3.0"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/Soontao/goHttpDigestClient"
+  packages = ["."]
+  revision = "6d28bb1415c5d06b76a4dcc4bb6e0dd39ce61af9"
+
+[[projects]]
   name = "github.com/andybalholm/cascadia"
   packages = ["."]
   revision = "901648c87902174f774fac311d7f176f8647bdaa"
@@ -211,6 +217,12 @@
 
 [[projects]]
   branch = "master"
+  name = "github.com/nu7hatch/gouuid"
+  packages = ["."]
+  revision = "179d4d0c4d8d407a32af483c2354df1d2c91e6c3"
+
+[[projects]]
+  branch = "master"
   name = "github.com/oxtoacart/bpool"
   packages = ["."]
   revision = "4e1c5567d7c2dd59fa4c7c83d34c2f3528b025d6"
@@ -240,13 +252,13 @@
   revision = "e180dbdc8da04c4fa04272e875ce64949f38bd3e"
 
 [[projects]]
+  branch = "master"
   name = "github.com/sirupsen/logrus"
   packages = [
     ".",
     "hooks/test"
   ]
-  revision = "c155da19408a8799da419ed3eeb0cb5db0ad5dbc"
-  version = "v1.0.5"
+  revision = "90150a8ed11b6ce285e77e8af2b0109559ce4777"
 
 [[projects]]
   branch = "master"
@@ -400,6 +412,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "2a88a032b77c39fdd51d9e403fbc031b1fd8205ce62d89af1d205b5525bfe6e2"
+  inputs-digest = "eef720183bd8c8d827fc4be518548c33ac0d913e1f998239696dbba85bd2d79e"
   solver-name = "gps-cdcl"
   solver-version = 1
