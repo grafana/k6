@@ -250,6 +250,7 @@ Note: Syslog hook also support connecting to local syslog (Ex. "/dev/log" or "/v
 | [Application Insights](https://github.com/jjcollinge/logrus-appinsights) | Hook for logging to [Application Insights](https://azure.microsoft.com/en-us/services/application-insights/)
 | [AzureTableHook](https://github.com/kpfaulkner/azuretablehook/) | Hook for logging to Azure Table Storage|
 | [Bugsnag](https://github.com/Shopify/logrus-bugsnag/blob/master/bugsnag.go) | Send errors to the Bugsnag exception tracking service. |
+| [ClickHouse](https://github.com/oxgrouby/logrus-clickhouse-hook) | Send logs to [ClickHouse](https://clickhouse.yandex/) |
 | [DeferPanic](https://github.com/deferpanic/dp-logrus) | Hook for logging to DeferPanic |
 | [Discordrus](https://github.com/kz/discordrus) | Hook for logging to [Discord](https://discordapp.com/) |
 | [ElasticSearch](https://github.com/sohlich/elogrus) | Hook for logging to ElasticSearch|
