@@ -200,3 +200,5 @@ The following tags can be specified:
 * Cloud/Insights: Fixed handling of unexpected responses from server. (#522)
 
 * Stats: Fixed issue with calculation of `data_received` and `data_sent` metrics. (#523)
+
+* WebSockets: Fixed issue that different TLS settings like `InsecureSkipTLSVerify` were ignored for websockets (#531)
