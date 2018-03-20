@@ -35,11 +35,11 @@ func TestTagURL(t *testing.T) {
 	rt.Set("http", common.Bind(rt, New(), nil))
 
 	testdata := map[string]struct{ u, n string }{
-		`http://httpbin.org/anything/`:               {"http://httpbin.org/anything/", "http://httpbin.org/anything/"},
-		`http://httpbin.org/anything/${1+1}`:         {"http://httpbin.org/anything/2", "http://httpbin.org/anything/${}"},
-		`http://httpbin.org/anything/${1+1}/`:        {"http://httpbin.org/anything/2/", "http://httpbin.org/anything/${}/"},
-		`http://httpbin.org/anything/${1+1}/${1+2}`:  {"http://httpbin.org/anything/2/3", "http://httpbin.org/anything/${}/${}"},
-		`http://httpbin.org/anything/${1+1}/${1+2}/`: {"http://httpbin.org/anything/2/3/", "http://httpbin.org/anything/${}/${}/"},
+		`http://localhost/anything/`:               {"http://localhost/anything/", "http://localhost/anything/"},
+		`http://localhost/anything/${1+1}`:         {"http://localhost/anything/2", "http://localhost/anything/${}"},
+		`http://localhost/anything/${1+1}/`:        {"http://localhost/anything/2/", "http://localhost/anything/${}/"},
+		`http://localhost/anything/${1+1}/${1+2}`:  {"http://localhost/anything/2/3", "http://localhost/anything/${}/${}"},
+		`http://localhost/anything/${1+1}/${1+2}/`: {"http://localhost/anything/2/3/", "http://localhost/anything/${}/${}/"},
 	}
 	for expr, data := range testdata {
 		t.Run("expr="+expr, func(t *testing.T) {

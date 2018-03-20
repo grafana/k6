@@ -26,17 +26,21 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/stats"
+	"github.com/mccutchen/go-httpbin/httpbin"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestTracer(t *testing.T) {
-	client := &http.Client{
-		Transport: &http.Transport{DialContext: NewDialer(net.Dialer{}).DialContext},
-	}
+	srv := httptest.NewTLSServer(httpbin.NewHTTPBin().Handler())
+	defer srv.Close()
+
+	client := srv.Client()
+	client.Transport.(*http.Transport).DialContext = NewDialer(net.Dialer{}).DialContext
 
 	for _, isReuse := range []bool{false, true} {
 		name := "First"
@@ -45,7 +49,7 @@ func TestTracer(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			tracer := &Tracer{}
-			req, err := http.NewRequest("GET", "https://httpbin.org/get", nil)
+			req, err := http.NewRequest("GET", srv.URL+"/get", nil)
 			if !assert.NoError(t, err) {
 				return
 			}

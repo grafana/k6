@@ -107,7 +107,7 @@ func parseBody(w http.ResponseWriter, r *http.Request, resp *bodyResponse) error
 
 	ct := r.Header.Get("Content-Type")
 	switch {
-	case ct == "application/x-www-form-urlencoded":
+	case strings.HasPrefix(ct, "application/x-www-form-urlencoded"):
 		if err := r.ParseForm(); err != nil {
 			return err
 		}
