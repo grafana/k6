@@ -21,8 +21,10 @@
 package loader
 
 import (
+	"net/http"
 	"testing"
 
+	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 )
@@ -40,13 +42,24 @@ func TestDir(t *testing.T) {
 }
 
 func TestLoad(t *testing.T) {
+	tb := testutils.NewHTTPMultiBin(t)
+	sr := tb.Replacer.Replace
+
+	oldHTTPTransport := http.DefaultTransport
+	http.DefaultTransport = tb.HTTPTransport
+
+	defer func() {
+		tb.Cleanup()
+		http.DefaultTransport = oldHTTPTransport
+	}()
+
 	t.Run("Blank", func(t *testing.T) {
 		_, err := Load(nil, "/", "")
 		assert.EqualError(t, err, "local or remote path required")
 	})
 
 	t.Run("Protocol", func(t *testing.T) {
-		_, err := Load(nil, "/", "https://httpbin.org/html")
+		_, err := Load(nil, "/", sr("HTTPSBIN_URL/html"))
 		assert.EqualError(t, err, "imports should not contain a protocol")
 	})
 
@@ -82,29 +95,30 @@ func TestLoad(t *testing.T) {
 	})
 
 	t.Run("Remote", func(t *testing.T) {
-		src, err := Load(nil, "/", "httpbin.org/html")
+		src, err := Load(nil, "/", sr("HTTPSBIN_DOMAIN:HTTPSBIN_PORT/html"))
 		if assert.NoError(t, err) {
-			assert.Equal(t, src.Filename, "httpbin.org/html")
+			assert.Equal(t, src.Filename, sr("HTTPSBIN_DOMAIN:HTTPSBIN_PORT/html"))
 			assert.Contains(t, string(src.Data), "Herman Melville - Moby-Dick")
 		}
 
 		t.Run("Absolute", func(t *testing.T) {
-			src, err := Load(nil, "httpbin.org", "httpbin.org/robots.txt")
+			src, err := Load(nil, sr("HTTPSBIN_DOMAIN:HTTPSBIN_PORT"), sr("HTTPSBIN_DOMAIN:HTTPSBIN_PORT/robots.txt"))
 			if assert.NoError(t, err) {
-				assert.Equal(t, src.Filename, "httpbin.org/robots.txt")
+				assert.Equal(t, src.Filename, sr("HTTPSBIN_DOMAIN:HTTPSBIN_PORT/robots.txt"))
 				assert.Equal(t, string(src.Data), "User-agent: *\nDisallow: /deny\n")
 			}
 		})
 
 		t.Run("Relative", func(t *testing.T) {
-			src, err := Load(nil, "httpbin.org", "./robots.txt")
+			src, err := Load(nil, sr("HTTPSBIN_DOMAIN:HTTPSBIN_PORT"), "./robots.txt")
 			if assert.NoError(t, err) {
-				assert.Equal(t, src.Filename, "httpbin.org/robots.txt")
+				assert.Equal(t, src.Filename, sr("HTTPSBIN_DOMAIN:HTTPSBIN_PORT/robots.txt"))
 				assert.Equal(t, string(src.Data), "User-agent: *\nDisallow: /deny\n")
 			}
 		})
 	})
 
+	//TODO: remove pastebin.com dependency
 	t.Run("No _k6=1 Fallback", func(t *testing.T) {
 		src, err := Load(nil, "/", "pastebin.com/raw/zngdRRDT")
 		if assert.NoError(t, err) {
