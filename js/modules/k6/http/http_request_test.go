@@ -725,25 +725,25 @@ func TestRequestAndBatch(t *testing.T) {
 	t.Run("HEAD", func(t *testing.T) {
 		state.Samples = nil
 		//TODO: convert use to local httpbin library
-		_, err := common.RunString(rt, `
-		let res = http.head("https://httpbin.org/get?a=1&b=2");
+		_, err := common.RunString(rt, sr(`
+		let res = http.head("HTTPBIN_URL/get?a=1&b=2");
 		if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 		if (res.body.length != 0) { throw new Error("HEAD responses shouldn't have a body"); }
-		`)
+		if (!res.headers["Content-Length"]) { throw new Error("Missing or invalid Content-Length header!"); }
+		`))
 		assert.NoError(t, err)
-		assertRequestMetricsEmitted(t, state.Samples, "HEAD", "https://httpbin.org/get?a=1&b=2", "", 200, "")
+		assertRequestMetricsEmitted(t, state.Samples, "HEAD", sr("HTTPBIN_URL/get?a=1&b=2"), "", 200, "")
 	})
 
 	t.Run("OPTIONS", func(t *testing.T) {
 		state.Samples = nil
-		//TODO: convert use to local httpbin library
-		_, err := common.RunString(rt, `
-		let res = http.options("https://httpbin.org/get?a=1&b=2");
-		if (res.body.length != 0) { throw new Error("OPTIONS responses shouldn't have a body " + res.body); }
+		_, err := common.RunString(rt, sr(`
+		let res = http.options("HTTPBIN_URL/?a=1&b=2");
 		if (res.status != 200) { throw new Error("wrong status: " + res.status); }
-		`)
+		if (!res.headers["Access-Control-Allow-Methods"]) { throw new Error("Missing Access-Control-Allow-Methods header!"); }
+		`))
 		assert.NoError(t, err)
-		assertRequestMetricsEmitted(t, state.Samples, "OPTIONS", "https://httpbin.org/get?a=1&b=2", "", 200, "")
+		assertRequestMetricsEmitted(t, state.Samples, "OPTIONS", sr("HTTPBIN_URL/?a=1&b=2"), "", 200, "")
 	})
 
 	postMethods := map[string]string{

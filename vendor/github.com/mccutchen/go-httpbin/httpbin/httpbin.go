@@ -175,6 +175,7 @@ func (h *HTTPBin) Handler() http.Handler {
 	handler = mux
 	handler = limitRequestSize(h.options.MaxMemory, handler)
 	handler = logger(handler)
+	handler = optionsAndHead(handler)
 	handler = cors(handler)
 	return handler
 }
