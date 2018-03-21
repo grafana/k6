@@ -125,7 +125,7 @@ export default function() {
 }
 ```
 
-Tip: you can use [environment variables](#cli-add--e-flag-environment-variable-flag-495) to switch the IP based on environment.
+Tip: you can use [environment variables](https://docs.k6.io/docs/environment-variables) to switch the IP based on environment.
 
 Thanks @luizbafilho for their work on this!
 
@@ -189,7 +189,7 @@ Thanks @pkruhlei for their contribution!
 
 ### CLI: Option to whitelist what tags should be added to metric samples (#525)
 
-Adds a CLI option `--system-tags "url,method,status"` to specify a whitelist of which system tags will be included in the metrics output. Some collectors could require that certain tags be included.
+Adds a CLI option `--system-tags "url,method,status"` to specify a whitelist of system tags that will be included in the metrics output.
 
 The following tags can be specified:
 
@@ -206,6 +206,8 @@ The following tags can be specified:
 - `ocsp_status` (http)
 - `iter` (vu)
 - `vu` (vu)
+
+All but the last 3 (`ocsp_status`, `iter`, `vu`) are included by default. Some collectors (e.g. `cloud`) could require that certain tags are included.
 
 **Docs**: [System tags](https://docs.k6.io/v1.0/docs/tags-and-groups#section-system-tags)
 
