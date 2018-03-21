@@ -250,7 +250,7 @@ func TestRequestAndBatch(t *testing.T) {
 		})
 		t.Run("deflate", func(t *testing.T) {
 			_, err := common.RunString(rt, sr(`
-				let res = http.get("https://httpbin.org/deflate");
+				let res = http.get("HTTPBIN_URL/deflate");
 				if (res.json()['deflated'] != true) {
 					throw new Error("unexpected body data: " + res.json()['deflated'])
 				}
@@ -272,7 +272,7 @@ func TestRequestAndBatch(t *testing.T) {
 		t.Run("deflate", func(t *testing.T) {
 			_, err := common.RunString(rt, sr(`
 				let params = { headers: { "Accept-Encoding": "deflate" } };
-				let res = http.get("https://httpbin.org/deflate", params);
+				let res = http.get("HTTPBIN_URL/deflate", params);
 				if (res.json()['deflated'] != true) {
 					throw new Error("unexpected body data: " + res.json()['deflated'])
 				}
