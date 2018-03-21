@@ -371,6 +371,68 @@ func TestEngine_processSamples(t *testing.T) {
 		assert.IsType(t, &stats.GaugeSink{}, e.Metrics["my_metric"].Sink)
 		assert.IsType(t, &stats.GaugeSink{}, e.Metrics["my_metric{a:1}"].Sink)
 	})
+	t.Run("apply run tags", func(t *testing.T) {
+		tags := map[string]string{"foo": "bar"}
+		e, err, _ := newTestEngine(nil, lib.Options{RunTags: tags})
+		assert.NoError(t, err)
+
+		c := &dummy.Collector{}
+		e.Collector = c
+
+		t.Run("sample untagged", func(t *testing.T) {
+			c.Samples = nil
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			go func() {
+				c.Run(ctx)
+			}()
+
+			for !c.IsRunning() {
+				time.Sleep(time.Millisecond)
+			}
+
+			e.processSamples(
+				stats.Sample{
+					Metric: metric,
+					Value:  1.25,
+				},
+			)
+
+			assert.Equal(t, tags, c.Samples[0].Tags)
+		})
+		t.Run("sample tagged", func(t *testing.T) {
+			c.Samples = nil
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			go func() {
+				c.Run(ctx)
+			}()
+
+			//wait for the collector to start running
+			for !c.IsRunning() {
+				time.Sleep(time.Millisecond)
+			}
+
+			e.processSamples(
+				stats.Sample{
+					Metric: metric,
+					Value:  1.25,
+					Tags:   map[string]string{"myTag": "foobar"},
+				},
+			)
+
+			assert.Equal(t, tags["foo"], c.Samples[0].Tags["foo"])
+		})
+
+		e.processSamples(
+			stats.Sample{Metric: metric, Value: 1.25, Tags: nil},
+		)
+
+	})
 }
 
 func TestEngine_runThresholds(t *testing.T) {

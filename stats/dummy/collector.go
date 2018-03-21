@@ -69,3 +69,8 @@ func (c *Collector) Link() string {
 func (c *Collector) GetRequiredSystemTags() lib.TagSet {
 	return lib.TagSet{} // There are no required tags for this collector
 }
+
+// IsRunning returns the current status of the collector
+func (c *Collector) IsRunning() bool {
+	return c.running
+}

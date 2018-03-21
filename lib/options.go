@@ -244,6 +244,9 @@ type Options struct {
 
 	// Which system tags to include with metrics ("method", "vu" etc.)
 	SystemTags TagSet `json:"systemTags" envconfig:"system_tags"`
+
+	// Tags to be applied to all samples for this running
+	RunTags map[string]string `json:"runTags" envconfig:"run_tags"`
 }
 
 // Returns the result of overwriting any fields with any that are set on the argument.
@@ -324,6 +327,10 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.SystemTags != nil {
 		o.SystemTags = opts.SystemTags
+
+	}
+	if opts.RunTags != nil {
+		o.RunTags = opts.RunTags
 	}
 	return o
 }
