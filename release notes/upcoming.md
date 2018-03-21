@@ -107,7 +107,7 @@ Thanks to @marklagendijk for their work on this!
 
 
 ### Options: DNS override (#494)
-Overriding DNS resoution of hostnames can come in handy when testing a system that is run in multiple environments (dev, staging, prod etc.) with different IP addresses but responds to the same `Host` header.
+Overriding DNS resolution of hostnames can come in handy when testing a system that is run in multiple environments (dev, staging, prod etc.) with different IP addresses but responds to the same `Host` header.
 
 ```js
 import http from "k6/http";
@@ -125,7 +125,7 @@ export default function() {
 }
 ```
 
-Tip: you can use [environment variables]() to switch the IP based on environment.
+Tip: you can use [environment variables](#cli-add--e-flag-environment-variable-flag-495) to switch the IP based on environment.
 
 Thanks @luizbafilho for their work on this!
 
@@ -189,28 +189,29 @@ Thanks @pkruhlei for their contribution!
 
 ### CLI: Option to whitelist what tags should be added to metric samples (#525)
 
-Adds a CLI option `--default-tags "url,method,status"` to specify which tags to include in metrics output, a whitelist. Collectors have the possibility to override and force certain tags to be included.
+Adds a CLI option `--system-tags "url,method,status"` to specify a whitelist of which system tags will be included in the metrics output. Some collectors could require that certain tags be included.
 
 The following tags can be specified:
 
-- `error` (http)
-- `group` (http)
-- `iter` (vu)
-- `method` (http)
-- `name` (http)
-- `ocsp_status` (http)
-- `proto` (http)
-- `status` (http, websocket)
-- `subprotocol` (websocket)
-- `tls_version` (http)
 - `url` (http, websocket)
+- `method` (http)
+- `status` (http, websocket)
+- `proto` (http)
+- `subproto` (websocket)
+- `error` (http)
+- `name` (http)
+- `group` (http)
+- `check` (http)
+- `tls_version` (http)
+- `ocsp_status` (http)
+- `iter` (vu)
 - `vu` (vu)
 
 **Docs**: [System tags](https://docs.k6.io/v1.0/docs/tags-and-groups#section-system-tags)
 
 ## Bugs fixed!
 
-* HAR converter: Fixed issue wuth construction of `body` parameter when `PostData.Params` values are present. (#489)
+* HAR converter: Fixed issue with construction of `body` parameter when `PostData.Params` values are present. (#489)
 
 * Stats: Fixed output of rate metrics to truncate rather than round when converting to string representation from float for summary output.
 
@@ -223,3 +224,7 @@ The following tags can be specified:
 * Stats: Fixed issue with calculation of `data_received` and `data_sent` metrics. (#523)
 
 * WebSockets: Fixed issue that different TLS settings like `InsecureSkipTLSVerify` were ignored for websockets (#531)
+
+## Breaking changes
+
+* The `SummaryTrendStats` configuration option has been renamed to `summaryTrendStats`, to match all of the other JS option names.
