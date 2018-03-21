@@ -67,6 +67,7 @@ const httpsDomain = "example.com"
 
 // HTTPMultiBin can be used as a local alternative of httpbin.org. It offers both http and https servers, as well as real domains
 type HTTPMultiBin struct {
+	Mux             *http.ServeMux
 	ServerHTTP      *httptest.Server
 	ServerHTTPS     *httptest.Server
 	Replacer        *strings.Replacer
@@ -78,18 +79,19 @@ type HTTPMultiBin struct {
 
 // NewHTTPMultiBin returns a fully configured and running HTTPMultiBin
 func NewHTTPMultiBin(t *testing.T) *HTTPMultiBin {
-	handler := httpbin.NewHTTPBin().Handler()
-	//TODO: add websockets
+	// Create a http.ServeMux and set the httpbin handler as the default
+	mux := http.NewServeMux()
+	mux.Handle("/", httpbin.NewHTTPBin().Handler())
 
-	// Get the HTTP server details
-	httpSrv := httptest.NewServer(handler)
+	// Initialize the HTTP server and get its details
+	httpSrv := httptest.NewServer(mux)
 	httpURL, err := url.Parse(httpSrv.URL)
 	require.NoError(t, err)
 	httpIP := net.ParseIP(httpURL.Hostname())
 	require.NotNil(t, httpIP)
 
-	// Get the HTTPS server details and TLS client config
-	httpsSrv := httptest.NewTLSServer(handler)
+	// Initialize the HTTPS server and get its details and tls config
+	httpsSrv := httptest.NewTLSServer(mux)
 	httpsURL, err := url.Parse(httpsSrv.URL)
 	require.NoError(t, err)
 	httpsIP := net.ParseIP(httpsURL.Hostname())
@@ -115,6 +117,7 @@ func NewHTTPMultiBin(t *testing.T) *HTTPMultiBin {
 	require.NoError(t, http2.ConfigureTransport(transport))
 
 	return &HTTPMultiBin{
+		Mux:         mux,
 		ServerHTTP:  httpSrv,
 		ServerHTTPS: httpsSrv,
 		Replacer: strings.NewReplacer(

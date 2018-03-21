@@ -24,7 +24,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/http/httptest"
 	"net/url"
 	"testing"
 
@@ -55,9 +54,7 @@ const testGetFormHTML = `
 </body>
 `
 
-type TestGetFormHttpHandler struct{}
-
-func (h *TestGetFormHttpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func myFormHandler(w http.ResponseWriter, r *http.Request) {
 	var body []byte
 	var err error
 	if r.URL.RawQuery != "" {
@@ -85,13 +82,7 @@ func TestResponse(t *testing.T) {
 	root := state.Group
 	sr := tb.Replacer.Replace
 
-	//TODO: remove
-	mux := http.NewServeMux()
-	mux.Handle("/forms/get", &TestGetFormHttpHandler{})
-	srv := httptest.NewServer(mux)
-	defer srv.Close()
-
-	rt.Set("httpTestServerURL", srv.URL)
+	tb.Mux.HandleFunc("/myforms/get", myFormHandler)
 
 	t.Run("Html", func(t *testing.T) {
 		state.Samples = nil
@@ -247,7 +238,7 @@ func TestResponse(t *testing.T) {
 		t.Run("withGetMethod", func(t *testing.T) {
 			state.Samples = nil
 			_, err := common.RunString(rt, sr(`
-				let res = http.request("GET", httpTestServerURL + "/forms/get");
+				let res = http.request("GET", "HTTPBIN_URL/myforms/get");
 				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 				res = res.submitForm()
 				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
@@ -260,7 +251,7 @@ func TestResponse(t *testing.T) {
 				) { throw new Error("incorrect body: " + JSON.stringify(data, null, 4) ); }
 			`))
 			assert.NoError(t, err)
-			assertRequestMetricsEmitted(t, state.Samples, "GET", srv.URL+"/forms/get", "", 200, "")
+			assertRequestMetricsEmitted(t, state.Samples, "GET", sr("HTTPBIN_URL/myforms/get"), "", 200, "")
 		})
 	})
 
