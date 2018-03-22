@@ -357,7 +357,10 @@ func (e *Engine) processSamples(samples ...stats.Sample) {
 		}
 
 		for k, v := range e.Options.RunTags {
-			samples[i].Tags[k] = v
+			//only set tags that haven't been already set on the sample
+			if _, ok := samples[i].Tags[k]; !ok {
+				samples[i].Tags[k] = v
+			}
 		}
 	}
 
