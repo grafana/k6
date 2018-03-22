@@ -160,7 +160,7 @@ export let options = {
 
 Thanks @antekresic for their work on this!
 
-**Docs**: [Thresholds](https://docs.k6.io/docs/thresholds)
+**Docs**: [Thresholds with abort](https://docs.k6.io/v1.0/docs/thresholds#section-aborting-a-test-when-a-threshold-is-crossed)
 
 ### Docker: Use full Alpine as base image for k6 (#514)
 
