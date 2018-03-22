@@ -322,9 +322,17 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 
 	respReq.Headers = req.Header
 
+	httpTransport := state.HTTPTransport
+
+	if auth == "ntlm" {
+		httpTransport = NTLMNegotiator{
+			RoundTripper: state.HTTPTransport,
+		}
+	}
+
 	resp := &HTTPResponse{ctx: ctx, URL: url.URLString, Request: *respReq}
 	client := http.Client{
-		Transport: state.HTTPTransport,
+		Transport: httpTransport,
 		Timeout:   timeout,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			h.debugResponse(state, req.Response, "RedirectResponse")
