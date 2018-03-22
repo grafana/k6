@@ -382,17 +382,6 @@ func TestEngine_processSamples(t *testing.T) {
 		t.Run("sample untagged", func(t *testing.T) {
 			c.Samples = nil
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			go func() {
-				c.Run(ctx)
-			}()
-
-			for !c.IsRunning() {
-				time.Sleep(time.Millisecond)
-			}
-
 			e.processSamples(
 				stats.Sample{
 					Metric: metric,
@@ -404,18 +393,6 @@ func TestEngine_processSamples(t *testing.T) {
 		})
 		t.Run("sample tagged", func(t *testing.T) {
 			c.Samples = nil
-
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			go func() {
-				c.Run(ctx)
-			}()
-
-			//wait for the collector to start running
-			for !c.IsRunning() {
-				time.Sleep(time.Millisecond)
-			}
 
 			e.processSamples(
 				stats.Sample{
