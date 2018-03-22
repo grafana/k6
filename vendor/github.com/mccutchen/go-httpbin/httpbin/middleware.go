@@ -8,8 +8,16 @@ import (
 	"time"
 )
 
-func optionsAndHead(h http.Handler) http.Handler {
+func metaRequests(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			origin = "*"
+		}
+		respHeader := w.Header()
+		respHeader.Set("Access-Control-Allow-Origin", origin)
+		respHeader.Set("Access-Control-Allow-Credentials", "true")
+
 		switch r.Method {
 		case "OPTIONS":
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, HEAD, PUT, DELETE, PATCH, OPTIONS")
@@ -28,20 +36,6 @@ func optionsAndHead(h http.Handler) http.Handler {
 		default:
 			h.ServeHTTP(w, r)
 		}
-	})
-}
-
-func cors(h http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		origin := r.Header.Get("Origin")
-		if origin == "" {
-			origin = "*"
-		}
-		respHeader := w.Header()
-		respHeader.Set("Access-Control-Allow-Origin", origin)
-		respHeader.Set("Access-Control-Allow-Credentials", "true")
-
-		h.ServeHTTP(w, r)
 	})
 }
 
@@ -68,8 +62,8 @@ func limitRequestSize(maxSize int64, h http.Handler) http.Handler {
 	})
 }
 
-// metaResponseWriter implements is an http.ResponseWriter and http.Flusher
-// that records its status code and body size for logging purposes.
+// metaResponseWriter implements http.ResponseWriter and http.Flusher in order
+// to record a response's status code and body size for logging purposes.
 type metaResponseWriter struct {
 	w      http.ResponseWriter
 	status int
@@ -109,10 +103,11 @@ func (mw *metaResponseWriter) Size() int {
 
 func logger(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reqMethod, reqURI := r.Method, r.URL.RequestURI()
 		mw := &metaResponseWriter{w: w}
 		t := time.Now()
 		h.ServeHTTP(mw, r)
 		duration := time.Now().Sub(t)
-		log.Printf("status=%d method=%s uri=%q size=%d duration=%s", mw.Status(), r.Method, r.URL.RequestURI(), mw.Size(), duration)
+		log.Printf("status=%d method=%s uri=%q size=%d duration=%s", mw.Status(), reqMethod, reqURI, mw.Size(), duration)
 	})
 }
