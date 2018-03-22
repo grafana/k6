@@ -234,6 +234,6 @@ func ntlmHandler(username, password string) func(w http.ResponseWriter, r *http.
 
 		data := "authenticated"
 		w.Header().Set("Content-Length", fmt.Sprint(len(data)))
-		fmt.Fprint(w, string(data))
+		fmt.Fprint(w, data)
 	}
 }
