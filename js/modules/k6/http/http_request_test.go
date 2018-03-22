@@ -92,7 +92,7 @@ func assertRequestMetricsEmitted(t *testing.T, samples []stats.Sample, method, u
 func newRuntime(t *testing.T) (*testutils.HTTPMultiBin, *common.State, *goja.Runtime, *context.Context) {
 	tb := testutils.NewHTTPMultiBin(t)
 
-	ntlmServer := newNTLMServer("bob", "pass")
+	ntlmServer := httptest.NewServer(http.HandlerFunc(ntlmHandler("bob", "pass")))
 	defer ntlmServer.Close()
 
 	root, err := lib.NewGroup("", nil)
