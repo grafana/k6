@@ -34,7 +34,7 @@ export default function() {
 
 Thanks @dstpierre for their work on this!
 
-**Docs**: [Multipart requests](https://docs.k6.io/docs/TODO)
+**Docs**: [Multipart requests](https://docs.k6.io/v1.0/docs/multipart-requests-file-uploads)
 
 ### k6/http: Request information through response object (#447)
 Request information is now exposed through the [Response object](https://docs.k6.io/docs/response-k6http):
@@ -52,28 +52,7 @@ export default function() {
 
 Thanks to @cstyan for their work on this!
 
-**Docs**: [Request information](https://docs.k6.io/docs/TODO)
-
-### k6/http: Support for HTTP Digest Authentication (#533)
-
-```js
-import http from "k6/http";
-import { check } from "k6";
-
-export default function() {
-    // Passing username and password as part of URL plus the auth option will authenticate using HTTP Digest authentication
-    let res = http.get("http://user:passwd@httpbin.org/digest-auth/auth/user/passwd", {auth: "digest"});
-
-    // Verify response
-    check(res, {
-        "status is 200": (r) => r.status === 200,
-        "is authenticated": (r) => r.json().authenticated === true,
-        "is correct user": (r) => r.json().user === "user"
-    });
-}
-```
-
-**Docs**: [HTTP Params](http://k6.readme.io/docs/params-k6http)
+**Docs**: [Request information](https://docs.k6.io/v1.0/docs/response-k6http)
 
 ### Lifecycle: setup/teardown functions (#457)
 Finally k6 has the same basic test lifecycle hooks as many "normal" testing tools, setup and teardown, and you have the full JS API of k6 available within these functions which means you can make HTTP calls etc. that you can’t do in the global/init scope.
@@ -103,7 +82,7 @@ If you specify `--http-debug` when running a test k6 will now continuously print
 
 Thanks to @marklagendijk for their work on this!
 
-**Docs**: [HTTP debugging](https://docs.k6.io/docs/TODO)
+**Docs**: [HTTP debugging](https://docs.k6.io/v1.0/docs/http-debugging)
 
 
 ### Options: DNS override (#494)
@@ -129,7 +108,7 @@ Tip: you can use [environment variables]() to switch the IP based on environment
 
 Thanks @luizbafilho for their work on this!
 
-**Docs**: [DNS Override](https://docs.k6.io/docs/TODO)
+**Docs**: [DNS Override option](https://docs.k6.io/docs/options)
 
 ### CLI: Add `-e` flag environment variable flag (#495)
 
@@ -207,6 +186,27 @@ The following tags can be specified:
 - `vu` (vu)
 
 **Docs**: [System tags](https://docs.k6.io/v1.0/docs/tags-and-groups#section-system-tags)
+
+### k6/http: Support for HTTP Digest Authentication (#533)
+
+```js
+import http from "k6/http";
+import { check } from "k6";
+
+export default function() {
+    // Passing username and password as part of URL plus the auth option will authenticate using HTTP Digest authentication
+    let res = http.get("http://user:passwd@httpbin.org/digest-auth/auth/user/passwd", {auth: "digest"});
+
+    // Verify response
+    check(res, {
+        "status is 200": (r) => r.status === 200,
+        "is authenticated": (r) => r.json().authenticated === true,
+        "is correct user": (r) => r.json().user === "user"
+    });
+}
+```
+
+**Docs**: [HTTP Params](http://k6.readme.io/docs/params-k6http)
 
 ## Bugs fixed!
 
