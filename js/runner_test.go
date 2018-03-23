@@ -35,6 +35,7 @@ import (
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
+	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/stats"
 	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/spf13/afero"
@@ -697,24 +698,28 @@ func TestVUIntegrationHTTP2(t *testing.T) {
 }
 
 func TestVUIntegrationCookies(t *testing.T) {
+	tb := testutils.NewHTTPMultiBin(t)
+	defer tb.Cleanup()
+
 	r1, err := New(&lib.SourceData{
 		Filename: "/script.js",
-		Data: []byte(`
+		Data: []byte(tb.Replacer.Replace(`
 			import http from "k6/http";
 			export default function() {
-				let preRes = http.get("https://httpbin.org/cookies");
+				let url = "HTTPBIN_URL";
+				let preRes = http.get(url + "/cookies");
 				if (preRes.status != 200) { throw new Error("wrong status (pre): " + preRes.status); }
-				if (preRes.json().cookies.k1 || preRes.json().cookies.k2) {
+				if (preRes.json().k1 || preRes.json().k2) {
 					throw new Error("cookies persisted: " + preRes.body);
 				}
 
-				let res = http.get("https://httpbin.org/cookies/set?k2=v2&k1=v1");
+				let res = http.get(url + "/cookies/set?k2=v2&k1=v1");
 				if (res.status != 200) { throw new Error("wrong status: " + res.status) }
-				if (res.json().cookies.k1 != "v1" || res.json().cookies.k2 != "v2") {
+				if (res.json().k1 != "v1" || res.json().k2 != "v2") {
 					throw new Error("wrong cookies: " + res.body);
 				}
 			}
-		`),
+		`)),
 	}, afero.NewMemMapFs(), lib.RuntimeOptions{})
 	if !assert.NoError(t, err) {
 		return
@@ -722,6 +727,7 @@ func TestVUIntegrationCookies(t *testing.T) {
 	r1.SetOptions(lib.Options{
 		Throw:        null.BoolFrom(true),
 		MaxRedirects: null.IntFrom(10),
+		Hosts:        tb.Dialer.Hosts,
 	})
 
 	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{})

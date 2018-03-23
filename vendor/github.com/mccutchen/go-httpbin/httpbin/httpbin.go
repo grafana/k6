@@ -174,8 +174,8 @@ func (h *HTTPBin) Handler() http.Handler {
 	var handler http.Handler
 	handler = mux
 	handler = limitRequestSize(h.options.MaxMemory, handler)
+	handler = metaRequests(handler)
 	handler = logger(handler)
-	handler = cors(handler)
 	return handler
 }
 
