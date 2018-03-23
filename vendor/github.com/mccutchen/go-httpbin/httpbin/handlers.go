@@ -2,8 +2,8 @@ package httpbin
 
 import (
 	"bytes"
-	"compress/flate"
 	"compress/gzip"
+	"compress/zlib"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -109,7 +109,7 @@ func (h *HTTPBin) Deflate(w http.ResponseWriter, r *http.Request) {
 	body, _ := json.Marshal(resp)
 
 	buf := &bytes.Buffer{}
-	w2, _ := flate.NewWriter(buf, flate.DefaultCompression)
+	w2 := zlib.NewWriter(buf)
 	w2.Write(body)
 	w2.Close()
 

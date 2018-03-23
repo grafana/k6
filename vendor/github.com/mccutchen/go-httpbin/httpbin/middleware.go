@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/http/httptest"
 	"time"
 )
 
-func cors(h http.Handler) http.Handler {
+func metaRequests(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
 		if origin == "" {
@@ -17,14 +18,24 @@ func cors(h http.Handler) http.Handler {
 		respHeader.Set("Access-Control-Allow-Origin", origin)
 		respHeader.Set("Access-Control-Allow-Credentials", "true")
 
-		if r.Method == "OPTIONS" {
-			respHeader.Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS")
-			respHeader.Set("Access-Control-Max-Age", "3600")
+		switch r.Method {
+		case "OPTIONS":
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, HEAD, PUT, DELETE, PATCH, OPTIONS")
+			w.Header().Set("Access-Control-Max-Age", "3600")
 			if r.Header.Get("Access-Control-Request-Headers") != "" {
-				respHeader.Set("Access-Control-Allow-Headers", r.Header.Get("Access-Control-Request-Headers"))
+				w.Header().Set("Access-Control-Allow-Headers", r.Header.Get("Access-Control-Request-Headers"))
 			}
+			w.WriteHeader(200)
+		case "HEAD":
+			rwRec := httptest.NewRecorder()
+			r.Method = "GET"
+			h.ServeHTTP(rwRec, r)
+
+			copyHeader(w.Header(), rwRec.Header())
+			w.WriteHeader(rwRec.Code)
+		default:
+			h.ServeHTTP(w, r)
 		}
-		h.ServeHTTP(w, r)
 	})
 }
 
@@ -51,8 +62,8 @@ func limitRequestSize(maxSize int64, h http.Handler) http.Handler {
 	})
 }
 
-// metaResponseWriter implements is an http.ResponseWriter and http.Flusher
-// that records its status code and body size for logging purposes.
+// metaResponseWriter implements http.ResponseWriter and http.Flusher in order
+// to record a response's status code and body size for logging purposes.
 type metaResponseWriter struct {
 	w      http.ResponseWriter
 	status int
@@ -92,10 +103,11 @@ func (mw *metaResponseWriter) Size() int {
 
 func logger(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reqMethod, reqURI := r.Method, r.URL.RequestURI()
 		mw := &metaResponseWriter{w: w}
 		t := time.Now()
 		h.ServeHTTP(mw, r)
 		duration := time.Now().Sub(t)
-		log.Printf("status=%d method=%s uri=%q size=%d duration=%s", mw.Status(), r.Method, r.URL.RequestURI(), mw.Size(), duration)
+		log.Printf("status=%d method=%s uri=%q size=%d duration=%s", mw.Status(), reqMethod, reqURI, mw.Size(), duration)
 	})
 }

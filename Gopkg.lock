@@ -207,7 +207,7 @@
     "httpbin/assets",
     "httpbin/digest"
   ]
-  revision = "273b70dcc766d92228fa61bab08c828710ccff5f"
+  revision = "793a504652281c75a1f3dbaba99bdd2c3246fc3e"
 
 [[projects]]
   branch = "master"
