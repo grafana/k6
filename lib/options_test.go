@@ -68,10 +68,35 @@ func TestOptions(t *testing.T) {
 		assert.Len(t, opts.Stages, 1)
 		assert.Equal(t, 1*time.Second, time.Duration(opts.Stages[0].Duration.Duration))
 	})
+	t.Run("RPS", func(t *testing.T) {
+		opts := Options{}.Apply(Options{RPS: null.IntFrom(12345)})
+		assert.True(t, opts.RPS.Valid)
+		assert.Equal(t, int64(12345), opts.RPS.Int64)
+	})
 	t.Run("MaxRedirects", func(t *testing.T) {
 		opts := Options{}.Apply(Options{MaxRedirects: null.IntFrom(12345)})
 		assert.True(t, opts.MaxRedirects.Valid)
 		assert.Equal(t, int64(12345), opts.MaxRedirects.Int64)
+	})
+	t.Run("UserAgent", func(t *testing.T) {
+		opts := Options{}.Apply(Options{UserAgent: null.StringFrom("foo")})
+		assert.True(t, opts.UserAgent.Valid)
+		assert.Equal(t, "foo", opts.UserAgent.String)
+	})
+	t.Run("Batch", func(t *testing.T) {
+		opts := Options{}.Apply(Options{Batch: null.IntFrom(12345)})
+		assert.True(t, opts.Batch.Valid)
+		assert.Equal(t, int64(12345), opts.Batch.Int64)
+	})
+	t.Run("BatchPerHost", func(t *testing.T) {
+		opts := Options{}.Apply(Options{BatchPerHost: null.IntFrom(12345)})
+		assert.True(t, opts.BatchPerHost.Valid)
+		assert.Equal(t, int64(12345), opts.BatchPerHost.Int64)
+	})
+	t.Run("HttpDebug", func(t *testing.T) {
+		opts := Options{}.Apply(Options{HttpDebug: null.StringFrom("foo")})
+		assert.True(t, opts.HttpDebug.Valid)
+		assert.Equal(t, "foo", opts.HttpDebug.String)
 	})
 	t.Run("InsecureSkipTLSVerify", func(t *testing.T) {
 		opts := Options{}.Apply(Options{InsecureSkipTLSVerify: null.BoolFrom(true)})
@@ -88,6 +113,26 @@ func TestOptions(t *testing.T) {
 				assert.Equal(t, suiteID, (*opts.TLSCipherSuites)[0])
 			})
 		}
+
+		t.Run("JSON", func(t *testing.T) {
+
+			t.Run("String", func(t *testing.T) {
+				var opts Options
+				jsonStr := `{"tlsCipherSuites":["TLS_ECDHE_RSA_WITH_RC4_128_SHA"]}`
+				assert.NoError(t, json.Unmarshal([]byte(jsonStr), &opts))
+				assert.Equal(t, &TLSCipherSuites{tls.TLS_ECDHE_RSA_WITH_RC4_128_SHA}, opts.TLSCipherSuites)
+			})
+			t.Run("Not a string", func(t *testing.T) {
+				var opts Options
+				jsonStr := `{"tlsCipherSuites":[1.2]}`
+				assert.Error(t, json.Unmarshal([]byte(jsonStr), &opts))
+			})
+			t.Run("Unknown cipher", func(t *testing.T) {
+				var opts Options
+				jsonStr := `{"tlsCipherSuites":["foo"]}`
+				assert.Error(t, json.Unmarshal([]byte(jsonStr), &opts))
+			})
+		})
 	})
 	t.Run("TLSVersion", func(t *testing.T) {
 		versions := TLSVersions{Min: tls.VersionSSL30, Max: tls.VersionTLS12}
@@ -130,6 +175,16 @@ func TestOptions(t *testing.T) {
 				jsonStr := `{"tlsVersion":""}`
 				assert.NoError(t, json.Unmarshal([]byte(jsonStr), &opts))
 				assert.Equal(t, &TLSVersions{}, opts.TLSVersion)
+			})
+			t.Run("Not a string", func(t *testing.T) {
+				var opts Options
+				jsonStr := `{"tlsVersion":1.2}`
+				assert.Error(t, json.Unmarshal([]byte(jsonStr), &opts))
+			})
+			t.Run("Unsupported version", func(t *testing.T) {
+				var opts Options
+				jsonStr := `{"tlsVersion":"-1"}`
+				assert.Error(t, json.Unmarshal([]byte(jsonStr), &opts))
 			})
 		})
 	})
@@ -192,11 +247,36 @@ func TestOptions(t *testing.T) {
 				}
 			}
 		})
+
+		t.Run("Invalid JSON", func(t *testing.T) {
+			var opts Options
+			jsonStr := `{"tlsAuth":["invalid"]}`
+			assert.Error(t, json.Unmarshal([]byte(jsonStr), &opts))
+		})
+
+		t.Run("Certificate error", func(t *testing.T) {
+			var opts Options
+			jsonStr := `{"tlsAuth":[{"Cert":""}]}`
+			assert.Error(t, json.Unmarshal([]byte(jsonStr), &opts))
+		})
 	})
 	t.Run("NoConnectionReuse", func(t *testing.T) {
 		opts := Options{}.Apply(Options{NoConnectionReuse: null.BoolFrom(true)})
 		assert.True(t, opts.NoConnectionReuse.Valid)
 		assert.True(t, opts.NoConnectionReuse.Bool)
+	})
+
+	t.Run("BlacklistIPs", func(t *testing.T) {
+		opts := Options{}.Apply(Options{
+			BlacklistIPs: []*net.IPNet{{
+				IP:   net.IPv4zero,
+				Mask: net.CIDRMask(1, 1),
+			}},
+		})
+		assert.NotNil(t, opts.BlacklistIPs)
+		assert.NotEmpty(t, opts.BlacklistIPs)
+		assert.Equal(t, net.IPv4zero, opts.BlacklistIPs[0].IP)
+		assert.Equal(t, net.CIDRMask(1, 1), opts.BlacklistIPs[0].Mask)
 	})
 
 	t.Run("Hosts", func(t *testing.T) {
@@ -206,6 +286,12 @@ func TestOptions(t *testing.T) {
 		assert.NotNil(t, opts.Hosts)
 		assert.NotEmpty(t, opts.Hosts)
 		assert.Equal(t, "192.0.2.1", opts.Hosts["test.loadimpact.com"].String())
+	})
+
+	t.Run("Throws", func(t *testing.T) {
+		opts := Options{}.Apply(Options{Throw: null.BoolFrom(true)})
+		assert.True(t, opts.Throw.Valid)
+		assert.Equal(t, true, opts.Throw.Bool)
 	})
 
 	t.Run("Thresholds", func(t *testing.T) {
@@ -258,6 +344,16 @@ func TestOptions(t *testing.T) {
 				assert.Nil(t, opts.SystemTags)
 			})
 		})
+	})
+	t.Run("SummaryTrendStats", func(t *testing.T) {
+		stats := []string{"myStat1", "myStat2"}
+		opts := Options{}.Apply(Options{SummaryTrendStats: stats})
+		assert.Equal(t, stats, opts.SummaryTrendStats)
+	})
+	t.Run("RunTags", func(t *testing.T) {
+		tags := map[string]string{"myTag": "hello"}
+		opts := Options{}.Apply(Options{RunTags: tags})
+		assert.Equal(t, tags, opts.RunTags)
 	})
 }
 

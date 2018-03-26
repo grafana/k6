@@ -23,11 +23,18 @@ package cmd
 import (
 	"fmt"
 	"net"
+	"strings"
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/ui"
 	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
+)
+
+var (
+	ErrTagEmptyName   = errors.New("Invalid tag, empty name")
+	ErrTagEmptyValue  = errors.New("Invalid tag, empty value")
+	ErrTagEmptyString = errors.New("Invalid tag, empty string")
 )
 
 func optionFlagSet() *pflag.FlagSet {
@@ -52,6 +59,7 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.StringSlice("blacklist-ip", nil, "blacklist an `ip range` from being called")
 	flags.StringSlice("summary-trend-stats", nil, "define `stats` for trend metrics (response times), one or more as 'avg,p(95),...'")
 	flags.StringSlice("system-tags", lib.DefaultSystemTagList, "only include these system tags in metrics")
+	flags.StringSlice("tag", nil, "add a `tag` to be applied to all samples, as `[name]=[value]`")
 	return flags
 }
 
@@ -117,5 +125,37 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 	}
 	opts.SystemTags = lib.GetTagSet(systemTagList...)
 
+	runTags, err := flags.GetStringSlice("tag")
+	if err != nil {
+		return opts, err
+	}
+	if len(runTags) > 0 {
+		opts.RunTags = make(map[string]string)
+		var name, value string
+		for i, s := range runTags {
+			if name, value, err = parseTagNameValue(s); err != nil {
+				return opts, errors.Wrapf(err, "tag %d", i)
+			}
+			opts.RunTags[name] = value
+		}
+	}
+
 	return opts, nil
+}
+
+func parseTagNameValue(nv string) (string, string, error) {
+	if nv == "" {
+		return "", "", ErrTagEmptyString
+	}
+
+	idx := strings.IndexRune(nv, '=')
+
+	switch idx {
+	case 0:
+		return "", "", ErrTagEmptyName
+	case -1, len(nv) - 1:
+		return "", "", ErrTagEmptyValue
+	default:
+		return nv[:idx], nv[idx+1:], nil
+	}
 }
