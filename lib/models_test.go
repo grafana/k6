@@ -22,6 +22,7 @@ package lib
 
 import (
 	"encoding/json"
+	"sync"
 	"testing"
 	"time"
 
@@ -40,4 +41,50 @@ func TestStageJSON(t *testing.T) {
 	var s2 Stage
 	assert.NoError(t, json.Unmarshal(data, &s2))
 	assert.Equal(t, s, s2)
+}
+
+// Suggested by @nkovacs in https://github.com/loadimpact/k6/issues/207#issuecomment-330545467
+func TestDataRaces(t *testing.T) {
+	t.Run("Check race", func(t *testing.T) {
+		group, err := NewGroup("test", nil)
+		assert.Nil(t, err, "NewGroup")
+		wg := sync.WaitGroup{}
+		wg.Add(2)
+		var check1, check2 *Check
+		go func() {
+			var err error // using the outer err would result in a data race
+			check1, err = group.Check("race")
+			assert.Nil(t, err, "Check 1")
+			wg.Done()
+		}()
+		go func() {
+			var err error
+			check2, err = group.Check("race")
+			assert.Nil(t, err, "Check 2")
+			wg.Done()
+		}()
+		wg.Wait()
+		assert.Equal(t, check1, check2, "Checks are the same")
+	})
+	t.Run("Group race", func(t *testing.T) {
+		group, err := NewGroup("test", nil)
+		assert.Nil(t, err, "NewGroup")
+		wg := sync.WaitGroup{}
+		wg.Add(2)
+		var group1, group2 *Group
+		go func() {
+			var err error
+			group1, err = group.Group("race")
+			assert.Nil(t, err, "Group 1")
+			wg.Done()
+		}()
+		go func() {
+			var err error
+			group2, err = group.Group("race")
+			assert.Nil(t, err, "Group 2")
+			wg.Done()
+		}()
+		wg.Wait()
+		assert.Equal(t, group1, group2, "Groups are the same")
+	})
 }

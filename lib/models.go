@@ -148,46 +148,35 @@ func NewGroup(name string, parent *Group) (*Group, error) {
 	}, nil
 }
 
-// Create a child group belonging to this group.
+// Group creates a child group belonging to this group.
 // This is safe to call from multiple goroutines simultaneously.
 func (g *Group) Group(name string) (*Group, error) {
-	snapshot := g.Groups
-	group, ok := snapshot[name]
+	g.groupMutex.Lock()
+	defer g.groupMutex.Unlock()
+	group, ok := g.Groups[name]
 	if !ok {
-		g.groupMutex.Lock()
-		defer g.groupMutex.Unlock()
-
-		group, ok := g.Groups[name]
-		if !ok {
-			group, err := NewGroup(name, g)
-			if err != nil {
-				return nil, err
-			}
-			g.Groups[name] = group
-			return group, nil
+		group, err := NewGroup(name, g)
+		if err != nil {
+			return nil, err
 		}
+		g.Groups[name] = group
 		return group, nil
 	}
 	return group, nil
 }
 
-// Create a check belonging to this group.
+// Check creates a chold check belonging to this group.
 // This is safe to call from multiple goroutines simultaneously.
 func (g *Group) Check(name string) (*Check, error) {
-	snapshot := g.Checks
-	check, ok := snapshot[name]
+	g.checkMutex.Lock()
+	defer g.checkMutex.Unlock()
+	check, ok := g.Checks[name]
 	if !ok {
-		g.checkMutex.Lock()
-		defer g.checkMutex.Unlock()
-		check, ok := g.Checks[name]
-		if !ok {
-			check, err := NewCheck(name, g)
-			if err != nil {
-				return nil, err
-			}
-			g.Checks[name] = check
-			return check, nil
+		check, err := NewCheck(name, g)
+		if err != nil {
+			return nil, err
 		}
+		g.Checks[name] = check
 		return check, nil
 	}
 	return check, nil
