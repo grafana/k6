@@ -246,7 +246,7 @@ type Options struct {
 	SystemTags TagSet `json:"systemTags" envconfig:"system_tags"`
 
 	// Tags to be applied to all samples for this running
-	RunTags map[string]string `json:"runTags" envconfig:"run_tags"`
+	RunTags map[string]string `json:"tags" envconfig:"tags"`
 }
 
 // Returns the result of overwriting any fields with any that are set on the argument.

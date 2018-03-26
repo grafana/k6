@@ -59,7 +59,7 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.StringSlice("blacklist-ip", nil, "blacklist an `ip range` from being called")
 	flags.StringSlice("summary-trend-stats", nil, "define `stats` for trend metrics (response times), one or more as 'avg,p(95),...'")
 	flags.StringSlice("system-tags", lib.DefaultSystemTagList, "only include these system tags in metrics")
-	flags.StringSlice("run-tags", nil, "set `tags` to be applied to all samples, one or more as 'myTag=hello,myTag2=world,...'")
+	flags.StringSlice("tag", nil, "add a `tag` to be applied to all samples, as `[name]=[value]`")
 	return flags
 }
 
@@ -125,7 +125,7 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 	}
 	opts.SystemTags = lib.GetTagSet(systemTagList...)
 
-	runTags, err := flags.GetStringSlice("run-tags")
+	runTags, err := flags.GetStringSlice("tag")
 	if err != nil {
 		return opts, err
 	}
