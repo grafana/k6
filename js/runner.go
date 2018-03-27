@@ -165,7 +165,7 @@ func (r *Runner) newVU() (*VU, error) {
 	vu := &VU{
 		BundleInstance: *bi,
 		Runner:         r,
-		HTTPTransport:  transport,
+		HTTPTransport:  netext.NewHTTPTransport(transport),
 		Dialer:         dialer,
 		TLSConfig:      tlsConfig,
 		Console:        NewConsole(),
@@ -245,7 +245,7 @@ type VU struct {
 	BundleInstance
 
 	Runner        *Runner
-	HTTPTransport *http.Transport
+	HTTPTransport *netext.HTTPTransport
 	Dialer        *netext.Dialer
 	TLSConfig     *tls.Config
 	ID            int64
