@@ -96,3 +96,6 @@ func TestTracer(t *testing.T) {
 		})
 	}
 }
+
+//TODO: test what happens with redirects
+//TODO: test what happens with HTTP/HTTPS proxies
