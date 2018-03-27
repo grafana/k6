@@ -1,7 +1,7 @@
 /*
  *
  * k6 - a next-generation load testing tool
- * Copyright (C) 2016 Load Impact
+ * Copyright (C) 2018 Load Impact
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -24,6 +24,8 @@ import (
 	"crypto/tls"
 	"net"
 	"net/http/httptrace"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/loadimpact/k6/lib/metrics"
@@ -41,16 +43,17 @@ type Trail struct {
 
 	Blocked        time.Duration // Waiting to acquire a connection.
 	Connecting     time.Duration // Connecting to remote host.
+	TLSHandshaking time.Duration // Executing TLS handshake.
 	Sending        time.Duration // Writing request.
 	Waiting        time.Duration // Waiting for first byte.
 	Receiving      time.Duration // Receiving response.
-	TLSHandshaking time.Duration // Executing TLS handshake.
 
 	// Detailed connection information.
 	ConnReused     bool
 	ConnRemoteAddr net.Addr
 }
 
+// Samples returns a slice with all of the pre-calculated sample values for the request
 func (tr Trail) Samples(tags map[string]string) []stats.Sample {
 	return []stats.Sample{
 		{Metric: metrics.HTTPReqs, Time: tr.EndTime, Tags: tags, Value: 1},
@@ -67,39 +70,167 @@ func (tr Trail) Samples(tags map[string]string) []stats.Sample {
 // A Tracer wraps "net/http/httptrace" to collect granular timings for HTTP requests.
 // Note that since there is not yet an event for the end of a request (there's a PR to
 // add it), you must call Done() at the end of the request to get the full timings.
-// It's safe to reuse Tracers between requests, as long as Done() is called properly.
+// It's NOT safe to reuse Tracers between requests.
 // Cheers, love, the cavalry's here.
 type Tracer struct {
-	getConn              time.Time
-	gotConn              time.Time
-	gotFirstResponseByte time.Time
-	connectStart         time.Time
-	connectDone          time.Time
-	wroteRequest         time.Time
-	tlsHandshakeStart    time.Time
-	tlsHandshakeDone     time.Time
+	getConn              int64
+	connectStart         int64
+	connectDone          int64
+	tlsHandshakeStart    int64
+	tlsHandshakeDone     int64
+	gotConn              int64
+	wroteRequest         int64
+	gotFirstResponseByte int64
 
 	connReused     bool
 	connRemoteAddr net.Addr
 
-	protoError error
+	protoErrorsMutex sync.Mutex
+	protoErrors      []error
 }
 
-// Trace() returns a premade ClientTrace that calls all of the Tracer's hooks.
+// Trace returns a premade ClientTrace that calls all of the Tracer's hooks.
 func (t *Tracer) Trace() *httptrace.ClientTrace {
 	return &httptrace.ClientTrace{
 		GetConn:              t.GetConn,
-		GotConn:              t.GotConn,
-		GotFirstResponseByte: t.GotFirstResponseByte,
 		ConnectStart:         t.ConnectStart,
 		ConnectDone:          t.ConnectDone,
-		WroteRequest:         t.WroteRequest,
 		TLSHandshakeStart:    t.TLSHandshakeStart,
 		TLSHandshakeDone:     t.TLSHandshakeDone,
+		GotConn:              t.GotConn,
+		WroteRequest:         t.WroteRequest,
+		GotFirstResponseByte: t.GotFirstResponseByte,
 	}
 }
 
-// Call when the request is finished. Calculates metrics and resets the tracer.
+// Add an error in a thread-safe way
+func (t *Tracer) addError(err error) {
+	t.protoErrorsMutex.Lock()
+	defer t.protoErrorsMutex.Unlock()
+	t.protoErrors = append(t.protoErrors, err)
+}
+
+func now() int64 {
+	return time.Now().UnixNano()
+}
+
+// GetConn is called before a connection is created or
+// retrieved from an idle pool. The hostPort is the
+// "host:port" of the target or proxy. GetConn is called even
+// if there's already an idle cached connection available.
+//
+// Keep in mind that GetConn won't be called if a connection
+// is reused though, for example when there's a redirect.
+// If it's called, it will be called before all other hooks.
+func (t *Tracer) GetConn(hostPort string) {
+	t.getConn = now()
+}
+
+// ConnectStart is called when a new connection's Dial begins.
+// If net.Dialer.DualStack (IPv6 "Happy Eyeballs") support is
+// enabled, this may be called multiple times.
+//
+// If the connection is reused, this won't be called. Otherwise,
+// it will be called after GetConn() and before ConnectDone().
+func (t *Tracer) ConnectStart(network, addr string) {
+	// If using dual-stack dialing, it's possible to get this
+	// multiple times, so the atomic compareAndSwap ensures
+	// that only the first call's time is recorded
+	atomic.CompareAndSwapInt64(&t.connectStart, 0, now())
+}
+
+// ConnectDone is called when a new connection's Dial
+// completes. The provided err indicates whether the
+// connection completedly successfully.
+// If net.Dialer.DualStack ("Happy Eyeballs") support is
+// enabled, this may be called multiple times.
+//
+// If the connection is reused, this won't be called. Otherwise,
+// it will be called after ConnectStart() and before either
+// TLSHandshakeStart() (for TLS connections) or GotConn().
+func (t *Tracer) ConnectDone(network, addr string, err error) {
+	// If using dual-stack dialing, it's possible to get this
+	// multiple times, so the atomic compareAndSwap ensures
+	// that only the first call's time is recorded
+	atomic.CompareAndSwapInt64(&t.connectDone, 0, now())
+
+	if err != nil {
+		t.addError(err)
+	}
+}
+
+// TLSHandshakeStart is called when the TLS handshake is started. When
+// connecting to a HTTPS site via a HTTP proxy, the handshake happens after
+// the CONNECT request is processed by the proxy.
+//
+// If the connection is reused, this won't be called. Otherwise,
+// it will be called after ConnectDone() and before TLSHandshakeDone().
+func (t *Tracer) TLSHandshakeStart() {
+	// This shouldn't be called multiple times so no synchronization here,
+	// it's better for the race detector to panic if we're wrong.
+	t.tlsHandshakeStart = now()
+}
+
+// TLSHandshakeDone is called after the TLS handshake with either the
+// successful handshake's connection state, or a non-nil error on handshake
+// failure.
+//
+// If the connection is reused, this won't be called. Otherwise,
+// it will be called after TLSHandshakeStart() and before GotConn().
+func (t *Tracer) TLSHandshakeDone(state tls.ConnectionState, err error) {
+	// This shouldn't be called multiple times so no synchronization here,
+	// it's better for the race detector to panic if we're wrong.
+	t.tlsHandshakeDone = now()
+
+	if err != nil {
+		t.addError(err)
+	}
+}
+
+// GotConn is called after a successful connection is
+// obtained. There is no hook for failure to obtain a
+// connection; instead, use the error from Transport.RoundTrip.
+//
+// This is the fist hook called for reused connections. For new
+// connections, it's called either after TLSHandshakeDone()
+// (for TLS connections) or after ConnectDone()
+func (t *Tracer) GotConn(info httptrace.GotConnInfo) {
+	now := now()
+
+	// This shouldn't be called multiple times so no synchronization here,
+	// it's better for the race detector to panic if we're wrong.
+	t.gotConn = now
+	t.connReused = info.Reused
+	t.connRemoteAddr = info.Conn.RemoteAddr()
+
+	if t.connReused {
+		atomic.CompareAndSwapInt64(&t.connectStart, 0, now)
+		atomic.CompareAndSwapInt64(&t.connectDone, 0, now)
+	}
+}
+
+// WroteRequest is called with the result of writing the
+// request and any body. It may be called multiple times
+// in the case of retried requests.
+//
+//
+func (t *Tracer) WroteRequest(info httptrace.WroteRequestInfo) {
+	atomic.CompareAndSwapInt64(&t.wroteRequest, 0, now())
+
+	if info.Err != nil {
+		t.addError(info.Err)
+	}
+}
+
+// GotFirstResponseByte is called when the first byte of the response
+// headers is available.
+func (t *Tracer) GotFirstResponseByte() {
+	// This shouldn't be called multiple times so no synchronization here,
+	// it's better for the race detector to panic if we're wrong.
+	t.gotFirstResponseByte = now()
+}
+
+// Done calculates all metrics and should be called when the request is finished.
 func (t *Tracer) Done() Trail {
 	done := time.Now()
 
@@ -108,29 +239,29 @@ func (t *Tracer) Done() Trail {
 		ConnRemoteAddr: t.connRemoteAddr,
 	}
 
-	if !t.gotConn.IsZero() && !t.getConn.IsZero() {
-		trail.Blocked = t.gotConn.Sub(t.getConn)
+	if t.gotConn != 0 && t.getConn != 0 {
+		trail.Blocked = time.Duration(t.gotConn - t.getConn)
 	}
-	if !t.connectDone.IsZero() && !t.connectStart.IsZero() {
-		trail.Connecting = t.connectDone.Sub(t.connectStart)
+	if t.connectDone != 0 && t.connectStart != 0 {
+		trail.Connecting = time.Duration(t.connectDone - t.connectStart)
 	}
-	if !t.tlsHandshakeDone.IsZero() && !t.tlsHandshakeStart.IsZero() {
-		trail.TLSHandshaking = t.tlsHandshakeDone.Sub(t.tlsHandshakeStart)
+	if t.tlsHandshakeDone != 0 && t.tlsHandshakeStart != 0 {
+		trail.TLSHandshaking = time.Duration(t.tlsHandshakeDone - t.tlsHandshakeStart)
 	}
-	if !t.wroteRequest.IsZero() {
-		trail.Sending = t.wroteRequest.Sub(t.connectDone)
+	if t.wroteRequest != 0 {
+		trail.Sending = time.Duration(t.wroteRequest - t.connectDone)
 		// If the request was sent over TLS, we need to use
 		// TLS Handshake Done time to calculate sending duration
-		if !t.tlsHandshakeDone.IsZero() {
-			trail.Sending = t.wroteRequest.Sub(t.tlsHandshakeDone)
+		if t.tlsHandshakeDone != 0 {
+			trail.Sending = time.Duration(t.wroteRequest - t.tlsHandshakeDone)
 		}
 
-		if !t.gotFirstResponseByte.IsZero() {
-			trail.Waiting = t.gotFirstResponseByte.Sub(t.wroteRequest)
+		if t.gotFirstResponseByte != 0 {
+			trail.Waiting = time.Duration(t.gotFirstResponseByte - t.wroteRequest)
 		}
 	}
-	if !t.gotFirstResponseByte.IsZero() {
-		trail.Receiving = done.Sub(t.gotFirstResponseByte)
+	if t.gotFirstResponseByte != 0 {
+		trail.Receiving = done.Sub(time.Unix(0, t.gotFirstResponseByte))
 	}
 
 	// Calculate total times using adjusted values.
@@ -138,76 +269,5 @@ func (t *Tracer) Done() Trail {
 	trail.Duration = trail.Sending + trail.Waiting + trail.Receiving
 	trail.StartTime = trail.EndTime.Add(-trail.Duration)
 
-	*t = Tracer{}
 	return trail
-}
-
-// GetConn event hook.
-func (t *Tracer) GetConn(hostPort string) {
-	t.getConn = time.Now()
-}
-
-// GotConn event hook.
-func (t *Tracer) GotConn(info httptrace.GotConnInfo) {
-	t.gotConn = time.Now()
-	t.connReused = info.Reused
-	t.connRemoteAddr = info.Conn.RemoteAddr()
-
-	if t.connReused {
-		t.connectStart = t.gotConn
-		t.connectDone = t.gotConn
-	}
-}
-
-// GotFirstResponseByte hook.
-func (t *Tracer) GotFirstResponseByte() {
-	t.gotFirstResponseByte = time.Now()
-}
-
-// ConnectStart hook.
-func (t *Tracer) ConnectStart(network, addr string) {
-	// If using dual-stack dialing, it's possible to get this multiple times.
-	if !t.connectStart.IsZero() {
-		return
-	}
-	t.connectStart = time.Now()
-}
-
-// ConnectDone hook.
-func (t *Tracer) ConnectDone(network, addr string, err error) {
-	// If using dual-stack dialing, it's possible to get this multiple times.
-	if !t.connectDone.IsZero() {
-		return
-	}
-
-	t.connectDone = time.Now()
-	if t.gotConn.IsZero() {
-		t.gotConn = t.connectDone
-	}
-
-	if err != nil {
-		t.protoError = err
-	}
-}
-
-// TLSHandshakeStart hook.
-func (t *Tracer) TLSHandshakeStart() {
-	t.tlsHandshakeStart = time.Now()
-}
-
-// TLSHandshakeDone hook.
-func (t *Tracer) TLSHandshakeDone(state tls.ConnectionState, err error) {
-	t.tlsHandshakeDone = time.Now()
-
-	if err != nil {
-		t.protoError = err
-	}
-}
-
-// WroteRequest hook.
-func (t *Tracer) WroteRequest(info httptrace.WroteRequestInfo) {
-	t.wroteRequest = time.Now()
-	if info.Err != nil {
-		t.protoError = info.Err
-	}
 }
