@@ -22,45 +22,69 @@ package netext
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"runtime"
 	"testing"
 
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/stats"
 	"github.com/mccutchen/go-httpbin/httpbin"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestTracer(t *testing.T) {
+	t.Parallel()
 	srv := httptest.NewTLSServer(httpbin.NewHTTPBin().Handler())
 	defer srv.Close()
 
-	client := srv.Client()
-	client.Transport.(*http.Transport).DialContext = NewDialer(net.Dialer{}).DialContext
+	transport, ok := srv.Client().Transport.(*http.Transport)
+	assert.True(t, ok)
+	transport.DialContext = NewDialer(net.Dialer{}).DialContext
 
-	for _, isReuse := range []bool{false, true} {
-		name := "First"
-		if isReuse {
-			name = "Reuse"
+	var prev int64
+	assertLaterOrZero := func(t *testing.T, val int64, canBeZero bool) {
+		if canBeZero && val == 0 {
+			return
 		}
-		t.Run(name, func(t *testing.T) {
+		if prev > val {
+			_, file, line, _ := runtime.Caller(1)
+			t.Errorf("Expected %d to be greater or equal to %d (from %s:%d)", val, prev, file, line)
+			return
+		}
+		prev = val
+	}
+
+	for tnum, isReuse := range []bool{false, true, true} {
+		t.Run(fmt.Sprintf("Test #%d", tnum), func(t *testing.T) {
+			// Do not enable parallel testing, test relies on sequential execution
 			tracer := &Tracer{}
 			req, err := http.NewRequest("GET", srv.URL+"/get", nil)
-			if !assert.NoError(t, err) {
-				return
-			}
-			res, err := client.Do(req.WithContext(WithTracer(context.Background(), tracer)))
-			if !assert.NoError(t, err) {
-				return
-			}
+			require.NoError(t, err)
+
+			res, err := transport.RoundTrip(req.WithContext(WithTracer(context.Background(), tracer)))
+			require.NoError(t, err)
+
 			_, err = io.Copy(ioutil.Discard, res.Body)
 			assert.NoError(t, err)
 			assert.NoError(t, res.Body.Close())
 			samples := tracer.Done().Samples(map[string]string{"tag": "value"})
+
+			assert.Empty(t, tracer.protoErrors)
+			assertLaterOrZero(t, tracer.getConn, isReuse)
+			assertLaterOrZero(t, tracer.connectStart, isReuse)
+			assertLaterOrZero(t, tracer.connectDone, isReuse)
+			assertLaterOrZero(t, tracer.tlsHandshakeStart, isReuse)
+			assertLaterOrZero(t, tracer.tlsHandshakeDone, isReuse)
+			assertLaterOrZero(t, tracer.gotConn, false)
+			assertLaterOrZero(t, tracer.wroteRequest, false)
+			assertLaterOrZero(t, tracer.gotFirstResponseByte, false)
+			assertLaterOrZero(t, now(), false)
 
 			assert.Len(t, samples, 8)
 			seenMetrics := map[*stats.Metric]bool{}
@@ -75,7 +99,7 @@ func TestTracer(t *testing.T) {
 				case metrics.HTTPReqs:
 					assert.Equal(t, 1.0, s.Value)
 					assert.Equal(t, 0, i, "`HTTPReqs` is reported before the other HTTP metrics")
-				case metrics.HTTPReqConnecting:
+				case metrics.HTTPReqConnecting, metrics.HTTPReqTLSHandshaking:
 					if isReuse {
 						assert.Equal(t, 0.0, s.Value)
 						break
@@ -83,12 +107,6 @@ func TestTracer(t *testing.T) {
 					fallthrough
 				case metrics.HTTPReqDuration, metrics.HTTPReqBlocked, metrics.HTTPReqSending, metrics.HTTPReqWaiting, metrics.HTTPReqReceiving:
 					assert.True(t, s.Value > 0.0, "%s is <= 0", s.Metric.Name)
-				case metrics.HTTPReqTLSHandshaking:
-					if !isReuse {
-						assert.True(t, s.Value > 0.0, "%s is <= 0", s.Metric.Name)
-						continue
-					}
-					assert.True(t, s.Value == 0.0, "%s is <> 0", s.Metric.Name)
 				default:
 					t.Errorf("unexpected metric: %s", s.Metric.Name)
 				}
@@ -97,5 +115,19 @@ func TestTracer(t *testing.T) {
 	}
 }
 
-//TODO: test what happens with redirects
-//TODO: test what happens with HTTP/HTTPS proxies
+func TestTracerError(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewTLSServer(httpbin.NewHTTPBin().Handler())
+	defer srv.Close()
+
+	tracer := &Tracer{}
+	req, err := http.NewRequest("GET", srv.URL+"/get", nil)
+	require.NoError(t, err)
+
+	_, err = http.DefaultTransport.RoundTrip(req.WithContext(WithTracer(context.Background(), tracer)))
+	assert.Error(t, err)
+
+	assert.Len(t, tracer.protoErrors, 1)
+	assert.Error(t, tracer.protoErrors[0])
+	assert.Equal(t, tracer.protoErrors, tracer.Done().Errors)
+}
