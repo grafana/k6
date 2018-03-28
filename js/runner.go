@@ -172,6 +172,11 @@ func (r *Runner) newVU() (*VU, error) {
 		BPool:          bpool.NewBufferPool(100),
 	}
 	vu.Runtime.Set("console", common.Bind(vu.Runtime, vu.Console, vu.Context))
+	common.BindToGlobal(vu.Runtime, map[string]interface{}{
+		"open": func() {
+			common.Throw(vu.Runtime, errors.New("open function it is only available at init code"))
+		},
+	})
 
 	// Give the VU an initial sense of identity.
 	if err := vu.Reconfigure(0); err != nil {
