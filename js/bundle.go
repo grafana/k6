@@ -215,7 +215,7 @@ func (b *Bundle) Instantiate() (*BundleInstance, error) {
 // of other things, will potentially thrash data and makes a mess in it if the operation fails.
 func (b *Bundle) instantiate(rt *goja.Runtime, init *InitContext) error {
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
-	rt.SetRandSource(common.DefaultRandSource)
+	rt.SetRandSource(common.NewRandSource())
 
 	if _, err := rt.RunProgram(jslib.CoreJS); err != nil {
 		return err
