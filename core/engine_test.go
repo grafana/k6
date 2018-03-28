@@ -530,7 +530,7 @@ func getMetricSum(samples []stats.Sample, name string) (result float64) {
 	return
 }
 func TestSentReceivedMetrics(t *testing.T) {
-	//t.Parallel()
+	t.Parallel()
 	srv := httptest.NewServer(httpbin.NewHTTPBin().Handler())
 	defer srv.Close()
 
@@ -539,25 +539,28 @@ func TestSentReceivedMetrics(t *testing.T) {
 	}
 
 	expectedSingleData := 50000.0
-	r, err := js.New(&lib.SourceData{
-		Filename: "/script.js",
-		Data: []byte(`
-			import http from "k6/http";
-			export default function() {
-				http.get(` + burl(10000) + `);
-				http.batch([` + burl(10000) + `,` + burl(20000) + `,` + burl(10000) + `]);
-			}
-		`),
-	}, afero.NewMemMapFs(), lib.RuntimeOptions{})
-	require.NoError(t, err)
 
-	testCases := []struct{ Iterations, VUs int64 }{
-		{1, 1}, {1, 2}, {2, 1}, {2, 2}, {3, 1}, {5, 2}, {10, 3}, {25, 2},
+	type testCase struct{ Iterations, VUs int64 }
+	testCases := []testCase{
+		{1, 1}, {1, 2}, {2, 1}, {2, 2}, {3, 1}, {5, 2}, {10, 3}, {25, 2}, {50, 5},
 	}
 
-	for testn, tc := range testCases {
-		t.Run(fmt.Sprintf("SentReceivedMetrics_%d", testn), func(t *testing.T) {
+	getTestCase := func(t *testing.T, tc testCase) func(t *testing.T) {
+		return func(t *testing.T) {
+			//TODO: figure out why it fails if we uncomment this:
 			//t.Parallel()
+			r, err := js.New(&lib.SourceData{
+				Filename: "/script.js",
+				Data: []byte(`
+					import http from "k6/http";
+					export default function() {
+						http.get(` + burl(10000) + `);
+						http.batch([` + burl(10000) + `,` + burl(20000) + `,` + burl(10000) + `]);
+					}
+				`),
+			}, afero.NewMemMapFs(), lib.RuntimeOptions{})
+			require.NoError(t, err)
+
 			options := lib.Options{
 				Iterations: null.IntFrom(tc.Iterations),
 				VUs:        null.IntFrom(tc.VUs),
@@ -595,6 +598,16 @@ func TestSentReceivedMetrics(t *testing.T) {
 					receivedData,
 				)
 			}
-		})
+		}
 	}
+
+	// This Run will not return until the parallel subtests complete.
+	t.Run("group", func(t *testing.T) {
+		for testn, tc := range testCases {
+			t.Run(
+				fmt.Sprintf("SentReceivedMetrics_%d(%d, %d)", testn, tc.Iterations, tc.VUs),
+				getTestCase(t, tc),
+			)
+		}
+	})
 }
