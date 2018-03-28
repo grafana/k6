@@ -51,6 +51,7 @@ type Trail struct {
 	// Detailed connection information.
 	ConnReused     bool
 	ConnRemoteAddr net.Addr
+	Errors         []error
 }
 
 // Samples returns a slice with all of the pre-calculated sample values for the request
@@ -237,6 +238,7 @@ func (t *Tracer) Done() Trail {
 	trail := Trail{
 		ConnReused:     t.connReused,
 		ConnRemoteAddr: t.connRemoteAddr,
+		Errors:         t.protoErrors,
 	}
 
 	if t.gotConn != 0 && t.getConn != 0 {
