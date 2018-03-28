@@ -174,7 +174,7 @@ func (r *Runner) newVU() (*VU, error) {
 	vu.Runtime.Set("console", common.Bind(vu.Runtime, vu.Console, vu.Context))
 	common.BindToGlobal(vu.Runtime, map[string]interface{}{
 		"open": func() {
-			common.Throw(vu.Runtime, errors.New("open function it is only available at init code"))
+			common.Throw(vu.Runtime, errors.New("\"open\" function is only available to the init code (aka global scope), see https://docs.k6.io/docs/test-life-cycle for more information"))
 		},
 	})
 
