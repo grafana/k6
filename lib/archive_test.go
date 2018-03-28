@@ -22,26 +22,29 @@ package lib
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	null "gopkg.in/guregu/null.v3"
 )
 
-func TestAnonymizePath(t *testing.T) {
+func TestNormalizeAndAnonymizePath(t *testing.T) {
 	testdata := map[string]string{
-		"/tmp":                                      "/tmp",
-		"/tmp/":                                     "/tmp/",
-		"/tmp/myfile.txt":                           "/tmp/myfile.txt",
-		"/home/myname":                              "/home/nobody",
-		"/home/myname/":                             "/home/nobody/",
-		"/home/myname/myfile.txt":                   "/home/nobody/myfile.txt",
-		"/Users/myname/myfile.txt":                  "/Users/nobody/myfile.txt",
-		"/Documents and Settings/myname/myfile.txt": "/Documents and Settings/nobody/myfile.txt",
+		"/tmp":                                           "/tmp",
+		"/tmp/":                                          "/tmp/",
+		"/tmp/myfile.txt":                                "/tmp/myfile.txt",
+		"/home/myname":                                   "/home/nobody",
+		"/home/myname/":                                  "/home/nobody/",
+		"/home/myname/myfile.txt":                        "/home/nobody/myfile.txt",
+		"/Users/myname/myfile.txt":                       "/Users/nobody/myfile.txt",
+		"/Documents and Settings/myname/myfile.txt":      "/Documents and Settings/nobody/myfile.txt",
+		"C:\\Users\\myname\\myfile.txt":                  "/C/Users/nobody/myfile.txt",
+		"D:\\Documents and Settings\\myname\\myfile.txt": "/D/Documents and Settings/nobody/myfile.txt",
 	}
 	for from, to := range testdata {
 		t.Run("path="+from, func(t *testing.T) {
-			assert.Equal(t, to, AnonymizePath(from))
+			assert.Equal(t, to, NormalizeAndAnonymizePath(from))
 		})
 	}
 }
@@ -78,53 +81,61 @@ func TestArchiveReadWrite(t *testing.T) {
 	})
 
 	t.Run("Anonymized", func(t *testing.T) {
-		arc1 := &Archive{
-			Type: "js",
-			Options: Options{
-				VUs:        null.IntFrom(12345),
-				SystemTags: GetTagSet(DefaultSystemTagList...),
-			},
-			Filename: "/home/myname/script.js",
-			Data:     []byte(`// contents...`),
-			Pwd:      "/home/myname",
-			Scripts: map[string][]byte{
-				"/home/myname/a.js":         []byte(`// a contents`),
-				"/home/myname/b.js":         []byte(`// b contents`),
-				"cdnjs.com/libraries/Faker": []byte(`// faker contents`),
-			},
-			Files: map[string][]byte{
-				"/home/myname/file1.txt":             []byte(`hi!`),
-				"/home/myname/file2.txt":             []byte(`bye!`),
-				"github.com/loadimpact/k6/README.md": []byte(`README`),
-			},
+		testdata := []struct {
+			Pwd, PwdNormAnon string
+		}{
+			{"/home/myname", "/home/nobody"},
+			{"C:\\Users\\Administrator", "/C/Users/nobody"},
 		}
-		arc1Anon := &Archive{
-			Type: "js",
-			Options: Options{
-				VUs:        null.IntFrom(12345),
-				SystemTags: GetTagSet(DefaultSystemTagList...),
-			},
-			Filename: "/home/nobody/script.js",
-			Data:     []byte(`// contents...`),
-			Pwd:      "/home/nobody",
-			Scripts: map[string][]byte{
-				"/home/nobody/a.js":         []byte(`// a contents`),
-				"/home/nobody/b.js":         []byte(`// b contents`),
-				"cdnjs.com/libraries/Faker": []byte(`// faker contents`),
-			},
-			Files: map[string][]byte{
-				"/home/nobody/file1.txt":             []byte(`hi!`),
-				"/home/nobody/file2.txt":             []byte(`bye!`),
-				"github.com/loadimpact/k6/README.md": []byte(`README`),
-			},
+		for _, entry := range testdata {
+			arc1 := &Archive{
+				Type: "js",
+				Options: Options{
+					VUs:        null.IntFrom(12345),
+					SystemTags: GetTagSet(DefaultSystemTagList...),
+				},
+				Filename: fmt.Sprintf("%s/script.js", entry.Pwd),
+				Data:     []byte(`// contents...`),
+				Pwd:      entry.Pwd,
+				Scripts: map[string][]byte{
+					fmt.Sprintf("%s/a.js", entry.Pwd): []byte(`// a contents`),
+					fmt.Sprintf("%s/b.js", entry.Pwd): []byte(`// b contents`),
+					"cdnjs.com/libraries/Faker":       []byte(`// faker contents`),
+				},
+				Files: map[string][]byte{
+					fmt.Sprintf("%s/file1.txt", entry.Pwd): []byte(`hi!`),
+					fmt.Sprintf("%s/file2.txt", entry.Pwd): []byte(`bye!`),
+					"github.com/loadimpact/k6/README.md":   []byte(`README`),
+				},
+			}
+			arc1Anon := &Archive{
+				Type: "js",
+				Options: Options{
+					VUs:        null.IntFrom(12345),
+					SystemTags: GetTagSet(DefaultSystemTagList...),
+				},
+				Filename: fmt.Sprintf("%s/script.js", entry.PwdNormAnon),
+				Data:     []byte(`// contents...`),
+				Pwd:      entry.PwdNormAnon,
+				Scripts: map[string][]byte{
+					fmt.Sprintf("%s/a.js", entry.PwdNormAnon): []byte(`// a contents`),
+					fmt.Sprintf("%s/b.js", entry.PwdNormAnon): []byte(`// b contents`),
+					"cdnjs.com/libraries/Faker":               []byte(`// faker contents`),
+				},
+				Files: map[string][]byte{
+					fmt.Sprintf("%s/file1.txt", entry.PwdNormAnon): []byte(`hi!`),
+					fmt.Sprintf("%s/file2.txt", entry.PwdNormAnon): []byte(`bye!`),
+					"github.com/loadimpact/k6/README.md":           []byte(`README`),
+				},
+			}
+
+			buf := bytes.NewBuffer(nil)
+			assert.NoError(t, arc1.Write(buf))
+
+			arc2, err := ReadArchive(buf)
+			assert.NoError(t, err)
+			assert.Equal(t, arc1Anon, arc2)
 		}
-
-		buf := bytes.NewBuffer(nil)
-		assert.NoError(t, arc1.Write(buf))
-
-		arc2, err := ReadArchive(buf)
-		assert.NoError(t, err)
-		assert.Equal(t, arc1Anon, arc2)
 	})
 }
 
