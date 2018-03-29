@@ -12,6 +12,6 @@ Thanks @antekresic for their work on this!
 
 **Docs**: [Test wide tags](https://docs.k6.io/v1.0/docs/tags-and-groups#section-test-wide-tags) and [Options](https://docs.k6.io/v1.0/docs/options#section-available-options)
 
-## Bugs fixed!
+## UX
 
-* Category: description of bug. (#PR)
+* Clearer error message when using `open` function outside init context (#563)

@@ -697,6 +697,21 @@ func TestVUIntegrationHTTP2(t *testing.T) {
 	}
 }
 
+func TestVUIntegrationOpenFunctionError(t *testing.T) {
+	r, err := New(&lib.SourceData{
+		Filename: "/script.js",
+		Data: []byte(`
+			export default function() { open("/tmp/foo") }
+		`),
+	}, afero.NewMemMapFs(), lib.RuntimeOptions{})
+	assert.NoError(t, err)
+
+	vu, err := r.NewVU()
+	assert.NoError(t, err)
+	_, err = vu.RunOnce(context.Background())
+	assert.EqualError(t, err, "GoError: \"open\" function is only available to the init code (aka global scope), see https://docs.k6.io/docs/test-life-cycle for more information")
+}
+
 func TestVUIntegrationCookies(t *testing.T) {
 	tb := testutils.NewHTTPMultiBin(t)
 	defer tb.Cleanup()
