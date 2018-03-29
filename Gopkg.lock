@@ -23,6 +23,15 @@
   revision = "6d28bb1415c5d06b76a4dcc4bb6e0dd39ce61af9"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/ThomsonReutersEikon/go-ntlm"
+  packages = [
+    "ntlm",
+    "ntlm/md4"
+  ]
+  revision = "2a7c173f9e18233a4ae29891da6a0a63637e2d8d"
+
+[[projects]]
   name = "github.com/andybalholm/cascadia"
   packages = ["."]
   revision = "901648c87902174f774fac311d7f176f8647bdaa"
@@ -412,6 +421,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "eef720183bd8c8d827fc4be518548c33ac0d913e1f998239696dbba85bd2d79e"
+  inputs-digest = "55869854f69af92ea79d360a9c1f396a29ba82c9b7fd18a8fddf56abc73a02e1"
   solver-name = "gps-cdcl"
   solver-version = 1

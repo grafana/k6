@@ -76,3 +76,7 @@
 [[constraint]]
   branch = "master"
   name = "github.com/Soontao/goHttpDigestClient"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/ThomsonReutersEikon/go-ntlm"
