@@ -12,6 +12,26 @@ Thanks @antekresic for their work on this!
 
 **Docs**: [Test wide tags](https://docs.k6.io/v1.0/docs/tags-and-groups#section-test-wide-tags) and [Options](https://docs.k6.io/v1.0/docs/options#section-available-options)
 
+### k6/http: Support for HTTP NTLM Authentication (#556)
+
+```js
+import http from "k6/http";
+import { check } from "k6";
+
+export default function() {
+    // Passing username and password as part of URL plus the auth option will authenticate using HTTP Digest authentication
+    let res = http.get("http://user:passwd@example.com/path", {auth: "ntlm"});
+
+    // Verify response
+    check(res, {
+        "status is 200": (r) => r.status === 200
+    });
+}
+```
+
+**Docs**: [HTTP Params](http://k6.readme.io/docs/params-k6http)
+
+
 ## UX
 
 * Clearer error message when using `open` function outside init context (#563)
