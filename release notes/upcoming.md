@@ -15,3 +15,7 @@ Thanks @antekresic for their work on this!
 ## Bugs fixed!
 
 * Category: description of bug. (#PR)
+
+## UX
+
+* Clearer error message when using `open` function outside init context (#563)
