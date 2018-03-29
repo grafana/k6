@@ -25,11 +25,13 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/stats"
@@ -130,4 +132,37 @@ func TestTracerError(t *testing.T) {
 	assert.Len(t, tracer.protoErrors, 1)
 	assert.Error(t, tracer.protoErrors[0])
 	assert.Equal(t, tracer.protoErrors, tracer.Done().Errors)
+}
+
+func TestCancelledRequest(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewTLSServer(httpbin.NewHTTPBin().Handler())
+	defer srv.Close()
+
+	cancelTest := func(t *testing.T) {
+		t.Parallel()
+		tracer := &Tracer{}
+		req, err := http.NewRequest("GET", srv.URL+"/delay/1", nil)
+		require.NoError(t, err)
+
+		ctx, cancel := context.WithCancel(WithTracer(req.Context(), tracer))
+		req = req.WithContext(ctx)
+		go func() {
+			time.Sleep(time.Duration(rand.Int31n(50)) * time.Millisecond)
+			cancel()
+		}()
+
+		resp, err := srv.Client().Transport.RoundTrip(req)
+		trail := tracer.Done()
+		if resp == nil && err == nil && len(trail.Errors) == 0 {
+			t.Errorf("Expected either a RoundTrip response, error or trail errors but got %#v, %#v and %#v", resp, err, trail.Errors)
+		}
+	}
+
+	// This Run will not return until the parallel subtests complete.
+	t.Run("group", func(t *testing.T) {
+		for i := 0; i < 200; i++ {
+			t.Run(fmt.Sprintf("TestCancelledRequest_%d", i), cancelTest)
+		}
+	})
 }
