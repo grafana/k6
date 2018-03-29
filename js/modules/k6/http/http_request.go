@@ -397,6 +397,10 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 		statsSamples = append(statsSamples, tracer.Done().Samples(tags)...)
 	}
 
+	if auth == "ntlm" {
+		ctx = netext.WithAuth(ctx, "ntlm")
+	}
+
 	tracer := netext.Tracer{}
 	h.debugRequest(state, req, "Request")
 	res, resErr := client.Do(req.WithContext(netext.WithTracer(ctx, &tracer)))
