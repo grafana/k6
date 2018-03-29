@@ -27,7 +27,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/cookiejar"
-	"net/http/httptest"
 	"strconv"
 	"strings"
 	"testing"
@@ -97,9 +96,6 @@ func assertRequestMetricsEmitted(t *testing.T, samples []stats.Sample, method, u
 
 func newRuntime(t *testing.T) (*testutils.HTTPMultiBin, *common.State, *goja.Runtime, *context.Context) {
 	tb := testutils.NewHTTPMultiBin(t)
-
-	ntlmServer := httptest.NewServer(http.HandlerFunc(ntlmHandler("bob", "pass")))
-	defer ntlmServer.Close()
 
 	root, err := lib.NewGroup("", nil)
 	require.NoError(t, err)
@@ -636,18 +632,28 @@ func TestRequestAndBatch(t *testing.T) {
 				assertRequestMetricsEmitted(t, state.Samples, "GET", sr("HTTPBIN_IP_URL/digest-auth/auth/bob/pass"), url, 200, "")
 			})
 			t.Run("ntlm", func(t *testing.T) {
-				ntlmServer := httptest.NewServer(http.HandlerFunc(ntlmHandler("bob", "pass")))
-				defer ntlmServer.Close()
+				tb.Mux.HandleFunc("/ntlm", http.HandlerFunc(ntlmHandler("bob", "pass")))
 
-				state.Samples = nil
-				url := strings.Replace(ntlmServer.URL, "http://", "http://bob:pass@", -1)
-
-				_, err := common.RunString(rt, fmt.Sprintf(`
-				let res = http.request("GET", "%s", null, { auth: "ntlm" });
-				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
-				`, url))
-				assert.NoError(t, err)
-				assertRequestMetricsEmitted(t, state.Samples, "GET", url, url, 200, "")
+				t.Run("success auth", func(t *testing.T) {
+					state.Samples = nil
+					url := strings.Replace(tb.ServerHTTP.URL+"/ntlm", "http://", "http://bob:pass@", -1)
+					_, err := common.RunString(rt, fmt.Sprintf(`
+						let res = http.request("GET", "%s", null, { auth: "ntlm" });
+						if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+						`, url))
+					assert.NoError(t, err)
+					assertRequestMetricsEmitted(t, state.Samples, "GET", url, url, 200, "")
+				})
+				t.Run("failed auth", func(t *testing.T) {
+					state.Samples = nil
+					url := strings.Replace(tb.ServerHTTP.URL+"/ntlm", "http://", "http://other:otherpass@", -1)
+					_, err := common.RunString(rt, fmt.Sprintf(`
+						let res = http.request("GET", "%s", null, { auth: "ntlm" });
+						if (res.status != 401) { throw new Error("wrong status: " + res.status); }
+						`, url))
+					assert.NoError(t, err)
+					assertRequestMetricsEmitted(t, state.Samples, "GET", url, url, 401, "")
+				})
 			})
 		})
 
@@ -1009,13 +1015,7 @@ func TestSystemTags(t *testing.T) {
 // Simple NTLM mock handler
 func ntlmHandler(username, password string) func(w http.ResponseWriter, r *http.Request) {
 	challenges := make(map[string]*ntlm.ChallengeMessage)
-	auths := make(map[string]bool)
 	return func(w http.ResponseWriter, r *http.Request) {
-		if auths[r.RemoteAddr] {
-			data := "authenticated"
-			w.Header().Set("Content-Length", fmt.Sprint(len(data)))
-			fmt.Fprint(w, data)
-		}
 		// Make sure there is some kind of authentication
 		if r.Header.Get("Authorization") == "" {
 			w.Header().Set("WWW-Authenticate", "NTLM")
@@ -1112,7 +1112,6 @@ func ntlmHandler(username, password string) func(w http.ResponseWriter, r *http.
 			}
 		}
 
-		auths[r.RemoteAddr] = true
 		data := "authenticated"
 		w.Header().Set("Content-Length", fmt.Sprint(len(data)))
 		fmt.Fprint(w, data)
