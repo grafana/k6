@@ -36,14 +36,24 @@ import (
 
 type loaderFunc func(path string, parts []string) (string, error)
 
-var loaders = []struct {
-	name string
-	fn   loaderFunc
-	expr *regexp.Regexp
-}{
-	{"cdnjs", cdnjs, regexp.MustCompile(`^cdnjs.com/libraries/([^/]+)(?:/([(\d\.)]+-?[^/]*))?(?:/(.*))?$`)},
-	{"github", github, regexp.MustCompile(`^github.com/([^/]+)/([^/]+)/(.*)$`)},
-}
+var (
+	loaders = []struct {
+		name string
+		fn   loaderFunc
+		expr *regexp.Regexp
+	}{
+		{"cdnjs", cdnjs, regexp.MustCompile(`^cdnjs.com/libraries/([^/]+)(?:/([(\d\.)]+-?[^/]*))?(?:/(.*))?$`)},
+		{"github", github, regexp.MustCompile(`^github.com/([^/]+)/([^/]+)/(.*)$`)},
+	}
+	invalidScriptErrMsg = `The file "%[1]s" couldn't be found on local disk, ` +
+		`and trying to retrieve it from https://%[1]s failed as well. Make ` +
+		`sure that you've specified the right path to the file. If you're ` +
+		`running k6 using the Docker image make sure you have mounted the ` +
+		`local directory (-v /local/path/:/inside/docker/path) containing ` +
+		`your script and modules so that they're accessible by k6 from ` +
+		`inside of the container, see ` +
+		`https://docs.k6.io/v1.0/docs/modules#section-using-local-modules-with-docker.`
+)
 
 // Resolves a relative path to an absolute one.
 func Resolve(pwd, name string) string {
@@ -106,9 +116,20 @@ func Load(fs afero.Fs, pwd, name string) (*lib.SourceData, error) {
 		return &lib.SourceData{Filename: name, Data: data}, nil
 	}
 
-	// If not, load it and have a look. HTTPS is enforced, because it's 2017, HTTPS is easy,
+	// If its not a file, check is it a remote location. HTTPS is enforced, because it's 2017, HTTPS is easy,
 	// running arbitrary, trivially MitM'd code (even sandboxed) is very, very bad.
 	origURL := "https://" + name
+	//parsedURL, err := url.Parse(origURL)
+
+	//if err != nil {
+	//	return nil, errors.Errorf(invalidScriptErrMsg, name)
+	//}
+
+	//if _, err = net.LookupHost(parsedURL.Hostname()); err != nil {
+	//	return nil, errors.Errorf(invalidScriptErrMsg, name)
+	//}
+
+	// Load it and have a look.
 	url := origURL
 	if !strings.ContainsRune(url, '?') {
 		url += "?"
@@ -122,7 +143,7 @@ func Load(fs afero.Fs, pwd, name string) (*lib.SourceData, error) {
 	if err != nil {
 		data2, err2 := fetch(origURL)
 		if err2 != nil {
-			return nil, err
+			return nil, errors.Errorf(invalidScriptErrMsg, name)
 		}
 		data = data2
 	}
