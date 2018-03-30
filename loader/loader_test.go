@@ -121,6 +121,10 @@ func TestLoad(t *testing.T) {
 
 	const responseStr = "export function fn() {\r\n    return 1234;\r\n}"
 	tb.Mux.HandleFunc("/raw/something", func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := r.URL.Query()["_k6"]; ok {
+			http.Error(w, "Internal server error", 500)
+			return
+		}
 		fmt.Fprint(w, responseStr)
 	})
 
@@ -132,7 +136,15 @@ func TestLoad(t *testing.T) {
 		}
 	})
 
+	tb.Mux.HandleFunc("/invalid", func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "Internal server error", 500)
+	})
+
 	t.Run("Invalid", func(t *testing.T) {
+		src, err := Load(nil, "/", sr("HTTPSBIN_DOMAIN:HTTPSBIN_PORT/invalid"))
+		assert.Nil(t, src)
+		assert.Error(t, err)
+
 		t.Run("Host", func(t *testing.T) {
 			src, err := Load(nil, "/", "some-path-that-doesnt-exist.js")
 			assert.Nil(t, src)
