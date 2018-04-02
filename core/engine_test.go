@@ -548,7 +548,7 @@ func TestSentReceivedMetrics(t *testing.T) {
 	getTestCase := func(t *testing.T, tc testCase) func(t *testing.T) {
 		return func(t *testing.T) {
 			//TODO: figure out why it fails if we uncomment this:
-			//t.Parallel()
+			t.Parallel()
 			r, err := js.New(&lib.SourceData{
 				Filename: "/script.js",
 				Data: []byte(`
