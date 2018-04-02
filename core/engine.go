@@ -57,7 +57,7 @@ type Engine struct {
 	logger *log.Logger
 
 	Metrics     map[string]*stats.Metric
-	MetricsLock sync.RWMutex
+	MetricsLock sync.Mutex
 
 	// Assigned to metrics upon first received sample.
 	thresholds map[string]stats.Thresholds
@@ -319,7 +319,7 @@ func (e *Engine) processSamples(samples ...stats.Sample) {
 	for i, sample := range samples {
 		m, ok := e.Metrics[sample.Metric.Name]
 		if !ok {
-			m = sample.Metric
+			m = stats.New(sample.Metric.Name, sample.Metric.Type, sample.Metric.Contains)
 			m.Thresholds = e.thresholds[m.Name]
 			m.Submetrics = e.submetrics[m.Name]
 			e.Metrics[m.Name] = m
