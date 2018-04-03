@@ -24,7 +24,6 @@ import (
 	"archive/tar"
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -36,12 +35,14 @@ import (
 )
 
 var volumeRE = regexp.MustCompile(`^([a-zA-Z]):(.*)`)
+var sharedRE = regexp.MustCompile(`^//([^/]+)`) // matches a shared folder in Windows after backslack replacement. i.e //VMBOXSVR/k6/script.js
 var homeDirRE = regexp.MustCompile(`^(/[a-zA-Z])?/(Users|home|Documents and Settings)/(?:[^/]+)`)
 
 // Normalizes (to use a / path separator) and anonymizes a file path, by scrubbing usernames from home directories.
 func NormalizeAndAnonymizePath(path string) string {
 	p := volumeRE.ReplaceAllString(path, `/$1$2`)
 	p = strings.Replace(p, "\\", "/", -1)
+	p = sharedRE.ReplaceAllString(p, `/nobody`)
 	return homeDirRE.ReplaceAllString(p, `$1/$2/nobody`)
 }
 
@@ -101,7 +102,6 @@ func ReadArchive(in io.Reader) (*Archive, error) {
 			// Path separator normalization for older archives (<=0.20.0)
 			arc.Filename = NormalizeAndAnonymizePath(arc.Filename)
 			arc.Pwd = NormalizeAndAnonymizePath(arc.Pwd)
-			fmt.Printf("Pwd: %s, Filename: %s\n", arc.Filename, arc.Pwd)
 			continue
 		case "data":
 			arc.Data = data
@@ -109,7 +109,6 @@ func ReadArchive(in io.Reader) (*Archive, error) {
 
 		// Path separator normalization for older archives (<=0.20.0)
 		normPath := NormalizeAndAnonymizePath(hdr.Name)
-		fmt.Printf("Hdr.Name: %s, normPath: %s\n", hdr.Name, normPath)
 		idx := strings.IndexRune(normPath, '/')
 		if idx == -1 {
 			continue
