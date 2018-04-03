@@ -31,16 +31,17 @@ import (
 
 func TestNormalizeAndAnonymizePath(t *testing.T) {
 	testdata := map[string]string{
-		"/tmp":                                           "/tmp",
-		"/tmp/":                                          "/tmp/",
-		"/tmp/myfile.txt":                                "/tmp/myfile.txt",
-		"/home/myname":                                   "/home/nobody",
-		"/home/myname/":                                  "/home/nobody/",
-		"/home/myname/myfile.txt":                        "/home/nobody/myfile.txt",
-		"/Users/myname/myfile.txt":                       "/Users/nobody/myfile.txt",
-		"/Documents and Settings/myname/myfile.txt":      "/Documents and Settings/nobody/myfile.txt",
-		"C:\\Users\\myname\\myfile.txt":                  "/C/Users/nobody/myfile.txt",
-		"D:\\Documents and Settings\\myname\\myfile.txt": "/D/Documents and Settings/nobody/myfile.txt",
+		"/tmp":                                                "/tmp",
+		"/tmp/":                                               "/tmp/",
+		"/tmp/myfile.txt":                                     "/tmp/myfile.txt",
+		"/home/myname":                                        "/home/nobody",
+		"/home/myname/":                                       "/home/nobody/",
+		"/home/myname/foo/bar/myfile.txt":                     "/home/nobody/foo/bar/myfile.txt",
+		"/Users/myname/myfile.txt":                            "/Users/nobody/myfile.txt",
+		"/Documents and Settings/myname/myfile.txt":           "/Documents and Settings/nobody/myfile.txt",
+		"\\\\MYSHARED\\dir\\dir\\myfile.txt":                  "/nobody/dir/dir/myfile.txt",
+		"C:\\Users\\myname\\dir\\myfile.txt":                  "/C/Users/nobody/dir/myfile.txt",
+		"D:\\Documents and Settings\\myname\\dir\\myfile.txt": "/D/Documents and Settings/nobody/dir/myfile.txt",
 	}
 	for from, to := range testdata {
 		t.Run("path="+from, func(t *testing.T) {
