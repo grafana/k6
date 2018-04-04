@@ -14,4 +14,4 @@ Thanks @antekresic for their work on this!
 
 ## Bugs fixed!
 
-* Category: description of bug. (#PR)
+* Archive: archives generated on Windows can now run on *nix and vice versa. (#566)
