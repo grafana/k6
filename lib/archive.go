@@ -28,6 +28,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -40,6 +41,8 @@ var homeDirRE = regexp.MustCompile(`^(/[a-zA-Z])?/(Users|home|Documents and Sett
 
 // Normalizes (to use a / path separator) and anonymizes a file path, by scrubbing usernames from home directories.
 func NormalizeAndAnonymizePath(path string) string {
+	path = filepath.Clean(path)
+
 	p := volumeRE.ReplaceAllString(path, `/$1$2`)
 	p = strings.Replace(p, "\\", "/", -1)
 	p = sharedRE.ReplaceAllString(p, `/nobody`)
