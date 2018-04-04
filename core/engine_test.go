@@ -23,17 +23,16 @@ package core
 import (
 	"context"
 	"fmt"
-	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/loadimpact/k6/core/local"
 	"github.com/loadimpact/k6/js"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/stats/dummy"
-	"github.com/mccutchen/go-httpbin/httpbin"
 	log "github.com/sirupsen/logrus"
 	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/spf13/afero"
@@ -530,41 +529,45 @@ func getMetricSum(samples []stats.Sample, name string) (result float64) {
 	return
 }
 func TestSentReceivedMetrics(t *testing.T) {
-	//t.Parallel()
-	srv := httptest.NewServer(httpbin.NewHTTPBin().Handler())
-	defer srv.Close()
+	t.Parallel()
+	tb := testutils.NewHTTPMultiBin(t)
+	defer tb.Cleanup()
 
-	burl := func(bytecount uint32) string {
-		return fmt.Sprintf(`"%s/bytes/%d"`, srv.URL, bytecount)
-	}
-
+	script := []byte(tb.Replacer.Replace(`
+		import http from "k6/http";
+		export default function() {
+			http.get("HTTPBIN_URL/bytes/5000");
+			http.get("HTTPSBIN_URL/bytes/5000");
+			http.batch(["HTTPBIN_URL/bytes/10000", "HTTPBIN_URL/bytes/20000", "HTTPSBIN_URL/bytes/10000"]);
+		}
+	`))
 	expectedSingleData := 50000.0
-	r, err := js.New(&lib.SourceData{
-		Filename: "/script.js",
-		Data: []byte(`
-			import http from "k6/http";
-			export default function() {
-				http.get(` + burl(10000) + `);
-				http.batch([` + burl(10000) + `,` + burl(20000) + `,` + burl(10000) + `]);
-			}
-		`),
-	}, afero.NewMemMapFs(), lib.RuntimeOptions{})
-	require.NoError(t, err)
 
-	testCases := []struct{ Iterations, VUs int64 }{
-		{1, 1}, {1, 2}, {2, 1}, {2, 2}, {3, 1}, {5, 2}, {10, 3}, {25, 2},
+	type testCase struct{ Iterations, VUs int64 }
+	testCases := []testCase{
+		{1, 1}, {1, 2}, {2, 1}, {2, 2}, {3, 1}, {5, 2}, {10, 3}, {25, 2}, {50, 5},
 	}
 
-	for testn, tc := range testCases {
-		t.Run(fmt.Sprintf("SentReceivedMetrics_%d", testn), func(t *testing.T) {
-			//t.Parallel()
+	getTestCase := func(t *testing.T, tc testCase) func(t *testing.T) {
+		return func(t *testing.T) {
+			t.Parallel()
+			r, err := js.New(
+				&lib.SourceData{Filename: "/script.js", Data: script},
+				afero.NewMemMapFs(),
+				lib.RuntimeOptions{},
+			)
+			require.NoError(t, err)
+
 			options := lib.Options{
 				Iterations: null.IntFrom(tc.Iterations),
 				VUs:        null.IntFrom(tc.VUs),
 				VUsMax:     null.IntFrom(tc.VUs),
+				Hosts:      tb.Dialer.Hosts,
+				InsecureSkipTLSVerify: null.BoolFrom(true),
 			}
 			//TODO: test for differences with NoConnectionReuse enabled and disabled
 
+			r.SetOptions(options)
 			engine, err := NewEngine(local.New(r), options)
 			require.NoError(t, err)
 
@@ -576,7 +579,7 @@ func TestSentReceivedMetrics(t *testing.T) {
 			go func() { errC <- engine.Run(ctx) }()
 
 			select {
-			case <-time.After(5 * time.Second):
+			case <-time.After(10 * time.Second):
 				cancel()
 				t.Fatal("Test timed out")
 			case err := <-errC:
@@ -595,6 +598,16 @@ func TestSentReceivedMetrics(t *testing.T) {
 					receivedData,
 				)
 			}
-		})
+		}
 	}
+
+	// This Run will not return until the parallel subtests complete.
+	t.Run("group", func(t *testing.T) {
+		for testn, tc := range testCases {
+			t.Run(
+				fmt.Sprintf("SentReceivedMetrics_%d(%d, %d)", testn, tc.Iterations, tc.VUs),
+				getTestCase(t, tc),
+			)
+		}
+	})
 }
