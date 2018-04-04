@@ -60,7 +60,7 @@ var (
 // Resolves a relative path to an absolute one.
 func Resolve(pwd, name string) string {
 	if name[0] == '.' {
-		return filepath.Join(pwd, name)
+		return filepath.ToSlash(filepath.Join(pwd, name))
 	}
 	return name
 }
