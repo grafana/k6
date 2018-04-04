@@ -21,6 +21,7 @@
 package compiler
 
 import (
+	"sync"
 	"time"
 
 	"github.com/GeertJohan/go.rice"
@@ -52,6 +53,7 @@ type Compiler struct {
 	// JS pointers.
 	this      goja.Value
 	transform goja.Callable
+	mutex     sync.Mutex //TODO: cache goja.CompileAST() in an init() function?
 }
 
 // Constructs a new compiler.
@@ -77,6 +79,9 @@ func (c *Compiler) Transform(src, filename string) (code string, srcmap SourceMa
 		opts[k] = v
 	}
 	opts["filename"] = filename
+
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
 
 	startTime := time.Now()
 	v, err := c.transform(c.this, c.vm.ToValue(src), c.vm.ToValue(opts))
