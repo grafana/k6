@@ -35,3 +35,7 @@ export default function() {
 ## UX
 
 * Clearer error message when using `open` function outside init context (#563)
+
+## Internals
+
+* Fixed various data races and enabled automated testing with `-race` (#564)

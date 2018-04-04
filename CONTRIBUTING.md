@@ -24,7 +24,7 @@ Contributing code
 If you'd like to contribute code to k6, this is the basic procedure. Make sure to follow the [style guide](#style-guide) described below!
 
 1. Find an issue you'd like to fix. If there is none already, or you'd like to add a feature, please open one and we can talk about how to do it.
-   
+
    Remember, there's more to software development than code; if it's not properly planned, stuff gets messy real fast.
 
 2. Create a fork and open a feature branch - `feature/my-cool-feature` is the classic way to name these, but it really doesn't matter.
@@ -74,22 +74,22 @@ vendorcheck ./...
 
 To exercise the entire test suite:
 ```bash
-go test ./...
+go test -race ./...
 ```
 
 To run the tests of a specific package:
 ```bash
-go test github.com/loadimpact/k6/core
+go test -race github.com/loadimpact/k6/core
 ```
 
 To run just a specific test case use `-run` and pass in a regex that matches the name of the test:
 ```bash
-go test ./... -run ^TestEngineRun$
+go test -race ./... -run ^TestEngineRun$
 ```
 
 Combining the two above we can run a specific test case in a specific package:
 ```bash
-go test github.com/loadimpact/k6/core -run ^TestEngineRun$
+go test -race github.com/loadimpact/k6/core -run ^TestEngineRun$
 ```
 
 Style guide
