@@ -97,5 +97,6 @@ func init() {
 	archiveCmd.Flags().SortFlags = false
 	archiveCmd.Flags().AddFlagSet(optionFlagSet())
 	archiveCmd.Flags().AddFlagSet(runtimeOptionFlagSet(false))
+	archiveCmd.Flags().AddFlagSet(configFileFlagSet())
 	archiveCmd.Flags().StringVarP(&archiveOut, "archive-out", "O", archiveOut, "archive output filename")
 }

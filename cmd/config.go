@@ -40,6 +40,14 @@ const configFilename = "config.json"
 var configDirs = configdir.New("loadimpact", "k6")
 var configFile = os.Getenv("K6_CONFIG") // overridden by `-c` flag!
 
+// configFileFlagSet returns a FlagSet that contains flags needed for specifying a config file.
+func configFileFlagSet() *pflag.FlagSet {
+	flags := pflag.NewFlagSet("", 0)
+	flags.StringVarP(&configFile, "config", "c", configFile, "specify config file to read")
+	return flags
+}
+
+// configFlagSet returns a FlagSet with the default run configuration flags.
 func configFlagSet() *pflag.FlagSet {
 	flags := pflag.NewFlagSet("", 0)
 	flags.SortFlags = false
@@ -47,7 +55,7 @@ func configFlagSet() *pflag.FlagSet {
 	flags.BoolP("linger", "l", false, "keep the API server alive past test end")
 	flags.Bool("no-usage-report", false, "don't send anonymous stats to the developers")
 	flags.Bool("no-thresholds", false, "don't run thresholds")
-	flags.StringVarP(&configFile, "config", "c", configFile, "specify config file to read")
+	flags.AddFlagSet(configFileFlagSet())
 	return flags
 }
 
