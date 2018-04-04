@@ -165,7 +165,7 @@ func (g *Group) Group(name string) (*Group, error) {
 	return group, nil
 }
 
-// Check creates a chold check belonging to this group.
+// Check creates a child check belonging to this group.
 // This is safe to call from multiple goroutines simultaneously.
 func (g *Group) Check(name string) (*Check, error) {
 	g.checkMutex.Lock()
