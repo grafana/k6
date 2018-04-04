@@ -31,7 +31,6 @@ export default function() {
 
 **Docs**: [HTTP Params](http://k6.readme.io/docs/params-k6http)
 
-
 ## UX
 
 * Clearer error message when using `open` function outside init context (#563)
@@ -41,3 +40,6 @@ export default function() {
 
 * Removed all httpbin.org usage in tests, now a local transient HTTP server is used instead (#555). Thanks to @mccutchen for the great [go-httpbin](https://github.com/mccutchen/go-httpbin) library!
 * Fixed various data races and enabled automated testing with `-race` (#564)
+
+## Bugs
+* Archive: archives generated on Windows can now run on *nix and vice versa. (#566)
