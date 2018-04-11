@@ -25,6 +25,8 @@ import (
 	"net"
 	"strings"
 
+	"github.com/loadimpact/k6/stats"
+
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/ui"
 	"github.com/pkg/errors"
@@ -129,15 +131,17 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 	if err != nil {
 		return opts, err
 	}
+
 	if len(runTags) > 0 {
-		opts.RunTags = make(map[string]string)
-		var name, value string
+		parsedRunTags := make(map[string]string, len(runTags))
 		for i, s := range runTags {
-			if name, value, err = parseTagNameValue(s); err != nil {
+			name, value, err := parseTagNameValue(s)
+			if err != nil {
 				return opts, errors.Wrapf(err, "tag %d", i)
 			}
-			opts.RunTags[name] = value
+			parsedRunTags[name] = value
 		}
+		opts.RunTags = stats.IntoSampleTags(&parsedRunTags)
 	}
 
 	return opts, nil

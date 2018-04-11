@@ -34,8 +34,8 @@ import (
 )
 
 const (
-	TestName          = "k6 test"
-	MetricPushinteral = 1 * time.Second
+	TestName           = "k6 test"
+	MetricPushInterval = 1 * time.Second
 )
 
 // Collector sends result data to the Load Impact cloud service.
@@ -132,7 +132,7 @@ func (c *Collector) Link() string {
 }
 
 func (c *Collector) Run(ctx context.Context) {
-	timer := time.NewTicker(MetricPushinteral)
+	timer := time.NewTicker(MetricPushInterval)
 
 	for {
 		select {
@@ -188,8 +188,10 @@ func (c *Collector) Collect(samples []stats.Sample) {
 			iterationJSON.Data.Values[name] = samp.Value
 			cloudSamples = append(cloudSamples, iterationJSON)
 		} else if name == "data_received" || name == "iteration_duration" {
+			//TODO: make sure that tags match
 			iterationJSON.Data.Values[name] = samp.Value
 		} else if strings.HasPrefix(name, "http_req_") {
+			//TODO: make sure that tags match
 			httpJSON.Data.Values[name] = samp.Value
 		} else {
 			sampleJSON := &Sample{
