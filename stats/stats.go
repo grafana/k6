@@ -181,7 +181,7 @@ func (st *SampleTags) Get(key string) (string, bool) {
 	return val, ok
 }
 
-// IsEqual trues to compare two tag sets with maximum efficiency.
+// IsEqual tries to compare two tag sets with maximum efficiency.
 func (st *SampleTags) IsEqual(other *SampleTags) bool {
 	if st == other {
 		return true
@@ -224,8 +224,8 @@ func (st *SampleTags) UnmarshalJSON(data []byte) error {
 	return json.Unmarshal(data, &st.tags)
 }
 
-// CloneTags copies and sample tags and underlying tag set returns
-// the result. If the receiver is nil, it returns an empty non-nil map.
+// CloneTags copies the underlying set of a sample tags and
+// returns it. If the receiver is nil, it returns an empty non-nil map.
 func (st *SampleTags) CloneTags() map[string]string {
 	res := map[string]string{}
 	if st != nil {
