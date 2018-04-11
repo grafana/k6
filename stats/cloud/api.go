@@ -46,7 +46,7 @@ type SampleData struct {
 	Time   time.Time          `json:"time"`
 	Value  float64            `json:"value"`
 	Values map[string]float64 `json:"values,omitempty"`
-	Tags   map[string]string  `json:"tags,omitempty"`
+	Tags   *stats.SampleTags  `json:"tags,omitempty"`
 }
 
 type ThresholdResult map[string]map[string]bool

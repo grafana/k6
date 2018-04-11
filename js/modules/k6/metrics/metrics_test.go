@@ -33,6 +33,7 @@ import (
 )
 
 func TestMetrics(t *testing.T) {
+	t.Parallel()
 	types := map[string]stats.MetricType{
 		"Counter": stats.Counter,
 		"Gauge":   stats.Gauge,
@@ -50,8 +51,10 @@ func TestMetrics(t *testing.T) {
 	}
 	for fn, mtyp := range types {
 		t.Run(fn, func(t *testing.T) {
+			t.Parallel()
 			for isTime, valueType := range map[bool]stats.ValueType{false: stats.Default, true: stats.Time} {
 				t.Run(fmt.Sprintf("isTime=%v", isTime), func(t *testing.T) {
+					t.Parallel()
 					rt := goja.New()
 					rt.SetFieldNameMapper(common.FieldNameMapper{})
 
@@ -61,7 +64,10 @@ func TestMetrics(t *testing.T) {
 
 					root, _ := lib.NewGroup("", nil)
 					child, _ := root.Group("child")
-					state := &common.State{Group: root}
+					state := &common.State{
+						Options: lib.Options{SystemTags: lib.GetTagSet("group")},
+						Group:   root,
+					}
 
 					isTimeString := ""
 					if isTime {
@@ -98,7 +104,7 @@ func TestMetrics(t *testing.T) {
 											assert.Equal(t, state.Samples[0].Value, val.Float)
 											assert.Equal(t, map[string]string{
 												"group": g.Path,
-											}, state.Samples[0].Tags)
+											}, state.Samples[0].Tags.CloneTags())
 											assert.Equal(t, "my_metric", state.Samples[0].Metric.Name)
 											assert.Equal(t, mtyp, state.Samples[0].Metric.Type)
 											assert.Equal(t, valueType, state.Samples[0].Metric.Contains)
@@ -114,7 +120,7 @@ func TestMetrics(t *testing.T) {
 											assert.Equal(t, map[string]string{
 												"group": g.Path,
 												"a":     "1",
-											}, state.Samples[0].Tags)
+											}, state.Samples[0].Tags.CloneTags())
 											assert.Equal(t, "my_metric", state.Samples[0].Metric.Name)
 											assert.Equal(t, mtyp, state.Samples[0].Metric.Type)
 											assert.Equal(t, valueType, state.Samples[0].Metric.Contains)

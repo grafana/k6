@@ -351,7 +351,7 @@ func TestOptions(t *testing.T) {
 		assert.Equal(t, stats, opts.SummaryTrendStats)
 	})
 	t.Run("RunTags", func(t *testing.T) {
-		tags := map[string]string{"myTag": "hello"}
+		tags := stats.IntoSampleTags(&map[string]string{"myTag": "hello"})
 		opts := Options{}.Apply(Options{RunTags: tags})
 		assert.Equal(t, tags, opts.RunTags)
 	})
