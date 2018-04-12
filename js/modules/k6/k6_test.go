@@ -144,7 +144,7 @@ func TestCheck(t *testing.T) {
 			assert.Equal(t, map[string]string{
 				"group": "",
 				"check": "check",
-			}, state.Samples[0].Tags)
+			}, state.Samples[0].Tags.CloneTags())
 		}
 
 		t.Run("Multiple", func(t *testing.T) {
@@ -157,7 +157,8 @@ func TestCheck(t *testing.T) {
 			assert.Len(t, state.Samples, 2)
 			var foundA, foundB bool
 			for _, sample := range state.Samples {
-				name := sample.Tags["check"]
+				name, ok := sample.Tags.Get("check")
+				assert.True(t, ok)
 				switch name {
 				case "a":
 					assert.False(t, foundA, "duplicate 'a'")
@@ -193,7 +194,7 @@ func TestCheck(t *testing.T) {
 			assert.Equal(t, map[string]string{
 				"group": "",
 				"check": "0",
-			}, state.Samples[0].Tags)
+			}, state.Samples[0].Tags.CloneTags())
 		}
 	})
 
@@ -257,7 +258,7 @@ func TestCheck(t *testing.T) {
 							assert.Equal(t, map[string]string{
 								"group": "",
 								"check": "check",
-							}, state.Samples[0].Tags)
+							}, state.Samples[0].Tags.CloneTags())
 						}
 					})
 				}
@@ -311,7 +312,7 @@ func TestCheck(t *testing.T) {
 				"check": "check",
 				"a":     "1",
 				"b":     "2",
-			}, state.Samples[0].Tags)
+			}, state.Samples[0].Tags.CloneTags())
 		}
 	})
 }

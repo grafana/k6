@@ -21,6 +21,7 @@
 package stats
 
 import (
+	"encoding/json"
 	"errors"
 	"strconv"
 	"strings"
@@ -160,11 +161,106 @@ func (t ValueType) String() string {
 	}
 }
 
+// SampleTags is an immutable string[string] map for tags. Once a tag
+// set is created, direct modification is prohibited. It has
+// copy-on-write semantics and uses pointers for faster comparison
+// between maps, since the same tag set is often used for multiple samples.
+// All methods should not panic, even if they are called on a nil pointer.
+type SampleTags struct {
+	tags map[string]string
+	json []byte
+}
+
+// Get returns an empty string and false if the the requested key is not
+// present or its value and true if it is.
+func (st *SampleTags) Get(key string) (string, bool) {
+	if st == nil {
+		return "", false
+	}
+	val, ok := st.tags[key]
+	return val, ok
+}
+
+// IsEqual tries to compare two tag sets with maximum efficiency.
+func (st *SampleTags) IsEqual(other *SampleTags) bool {
+	if st == other {
+		return true
+	}
+	if st == nil || other == nil || len(st.tags) != len(other.tags) {
+		return false
+	}
+	for k, v := range st.tags {
+		if otherv, ok := other.tags[k]; !ok || v != otherv {
+			return false
+		}
+	}
+	return true
+}
+
+// MarshalJSON serializes SampleTags to a JSON string and caches
+// the result. It is not thread safe in the sense that the Go race
+// detector will complain if it's used concurrently, but no data
+// should be corrupted.
+func (st *SampleTags) MarshalJSON() ([]byte, error) {
+	if st == nil {
+		return []byte("null"), nil
+	}
+	if st.json != nil {
+		return st.json, nil
+	}
+	res, err := json.Marshal(st.tags)
+	if err != nil {
+		return res, err
+	}
+	st.json = res
+	return res, nil
+}
+
+// UnmarshalJSON deserializes SampleTags from a JSON string.
+func (st *SampleTags) UnmarshalJSON(data []byte) error {
+	if st == nil {
+		*st = SampleTags{}
+	}
+	return json.Unmarshal(data, &st.tags)
+}
+
+// CloneTags copies the underlying set of a sample tags and
+// returns it. If the receiver is nil, it returns an empty non-nil map.
+func (st *SampleTags) CloneTags() map[string]string {
+	res := map[string]string{}
+	if st != nil {
+		for k, v := range st.tags {
+			res[k] = v
+		}
+	}
+	return res
+}
+
+// NewSampleTags *copies* the supplied tag set and returns a new SampleTags
+// instance with the key-value pairs from it.
+func NewSampleTags(data map[string]string) *SampleTags {
+	tags := map[string]string{}
+	for k, v := range data {
+		tags[k] = v
+	}
+	return &SampleTags{tags: tags}
+}
+
+// IntoSampleTags "consumes" the passed map and creates a new SampleTags
+// struct with the data. The map is set to nil as a hint that it shouldn't
+// be changed after it has been transformed into an "immutable" tag set.
+// Oh, how I miss Rust and move semantics... :)
+func IntoSampleTags(data *map[string]string) *SampleTags {
+	res := SampleTags{tags: *data}
+	*data = nil
+	return &res
+}
+
 // A Sample is a single measurement.
 type Sample struct {
 	Metric *Metric
 	Time   time.Time
-	Tags   map[string]string
+	Tags   *SampleTags
 	Value  float64
 }
 
@@ -231,11 +327,11 @@ func (m *Metric) HumanizeValue(v float64) string {
 
 // A Submetric represents a filtered dataset based on a parent metric.
 type Submetric struct {
-	Name   string            `json:"name"`
-	Parent string            `json:"parent"`
-	Suffix string            `json:"suffix"`
-	Tags   map[string]string `json:"tags"`
-	Metric *Metric           `json:"-"`
+	Name   string      `json:"name"`
+	Parent string      `json:"parent"`
+	Suffix string      `json:"suffix"`
+	Tags   *SampleTags `json:"tags"`
+	Metric *Metric     `json:"-"`
 }
 
 // Creates a submetric from a name.
@@ -262,7 +358,7 @@ func NewSubmetric(name string) (parentName string, sm *Submetric) {
 		value := strings.TrimSpace(strings.Trim(parts[1], `"'`))
 		tags[key] = value
 	}
-	return parts[0], &Submetric{Name: name, Parent: parts[0], Suffix: parts[1], Tags: tags}
+	return parts[0], &Submetric{Name: name, Parent: parts[0], Suffix: parts[1], Tags: IntoSampleTags(&tags)}
 }
 
 func (m *Metric) Summary(t time.Duration) *Summary {

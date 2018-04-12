@@ -246,7 +246,7 @@ type Options struct {
 	SystemTags TagSet `json:"systemTags" envconfig:"system_tags"`
 
 	// Tags to be applied to all samples for this running
-	RunTags map[string]string `json:"tags" envconfig:"tags"`
+	RunTags *stats.SampleTags `json:"tags" envconfig:"tags"`
 }
 
 // Returns the result of overwriting any fields with any that are set on the argument.
@@ -327,7 +327,6 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.SystemTags != nil {
 		o.SystemTags = opts.SystemTags
-
 	}
 	if opts.RunTags != nil {
 		o.RunTags = opts.RunTags

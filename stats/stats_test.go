@@ -21,6 +21,7 @@
 package stats
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -28,6 +29,7 @@ import (
 )
 
 func TestMetricHumanizeValue(t *testing.T) {
+	t.Parallel()
 	data := map[*Metric]map[float64]string{
 		{Type: Counter, Contains: Default}: {
 			1.0:     "1",
@@ -118,6 +120,7 @@ func TestMetricHumanizeValue(t *testing.T) {
 
 	for m, values := range data {
 		t.Run(fmt.Sprintf("type=%s,contains=%s", m.Type.String(), m.Contains.String()), func(t *testing.T) {
+			t.Parallel()
 			for v, s := range values {
 				t.Run(fmt.Sprintf("v=%f", v), func(t *testing.T) {
 					assert.Equal(t, s, m.HumanizeValue(v))
@@ -128,6 +131,7 @@ func TestMetricHumanizeValue(t *testing.T) {
 }
 
 func TestNew(t *testing.T) {
+	t.Parallel()
 	testdata := map[string]struct {
 		Type     MetricType
 		SinkType Sink
@@ -140,6 +144,7 @@ func TestNew(t *testing.T) {
 
 	for name, data := range testdata {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			m := New("my_metric", data.Type)
 			assert.Equal(t, "my_metric", m.Name)
 			assert.IsType(t, data.SinkType, m.Sink)
@@ -148,6 +153,7 @@ func TestNew(t *testing.T) {
 }
 
 func TestNewSubmetric(t *testing.T) {
+	t.Parallel()
 	testdata := map[string]struct {
 		parent string
 		tags   map[string]string
@@ -164,13 +170,72 @@ func TestNewSubmetric(t *testing.T) {
 
 	for name, data := range testdata {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			parent, sm := NewSubmetric(name)
 			assert.Equal(t, data.parent, parent)
 			if data.tags != nil {
-				assert.EqualValues(t, data.tags, sm.Tags)
+				assert.EqualValues(t, data.tags, sm.Tags.tags)
 			} else {
 				assert.Nil(t, sm.Tags)
 			}
 		})
 	}
+}
+
+func TestSampleTags(t *testing.T) {
+	t.Parallel()
+
+	// Nil pointer to SampleTags
+	var nilTags *SampleTags
+	assert.True(t, nilTags.IsEqual(nilTags))
+	assert.Equal(t, map[string]string{}, nilTags.CloneTags())
+
+	nilJSON, err := json.Marshal(nilTags)
+	assert.NoError(t, err)
+	assert.Equal(t, "null", string(nilJSON))
+
+	// Empty SampleTags
+	emptyTagMap := map[string]string{}
+	emptyTags := NewSampleTags(emptyTagMap)
+	assert.NotNil(t, emptyTags)
+	assert.True(t, emptyTags.IsEqual(emptyTags))
+	assert.False(t, emptyTags.IsEqual(nilTags))
+	assert.Equal(t, emptyTagMap, emptyTags.CloneTags())
+
+	emptyJSON, err := json.Marshal(emptyTags)
+	assert.NoError(t, err)
+	assert.Equal(t, "{}", string(emptyJSON))
+
+	var emptyTagsUnmarshaled *SampleTags
+	err = json.Unmarshal(emptyJSON, &emptyTagsUnmarshaled)
+	assert.NoError(t, err)
+	assert.NotNil(t, emptyTagsUnmarshaled)
+	assert.True(t, emptyTagsUnmarshaled.IsEqual(emptyTags))
+	assert.False(t, emptyTagsUnmarshaled.IsEqual(nilTags))
+	assert.Equal(t, emptyTagMap, emptyTagsUnmarshaled.CloneTags())
+
+	// SampleTags with keys and values
+	tagMap := map[string]string{"key1": "val1", "key2": "val2"}
+	tags := NewSampleTags(tagMap)
+	assert.NotNil(t, tags)
+	assert.True(t, tags.IsEqual(tags))
+	assert.False(t, tags.IsEqual(nilTags))
+	assert.False(t, tags.IsEqual(emptyTags))
+	assert.False(t, tags.IsEqual(IntoSampleTags(&map[string]string{"key1": "val1", "key2": "val3"})))
+	assert.Equal(t, tagMap, tags.CloneTags())
+
+	assert.Nil(t, tags.json) // No cache
+	tagsJSON, err := json.Marshal(tags)
+	expJSON := `{"key1":"val1","key2":"val2"}`
+	assert.NoError(t, err)
+	assert.JSONEq(t, expJSON, string(tagsJSON))
+	assert.JSONEq(t, expJSON, string(tags.json)) // Populated cache
+
+	var tagsUnmarshaled *SampleTags
+	err = json.Unmarshal(tagsJSON, &tagsUnmarshaled)
+	assert.NoError(t, err)
+	assert.NotNil(t, tagsUnmarshaled)
+	assert.True(t, tagsUnmarshaled.IsEqual(tags))
+	assert.False(t, tagsUnmarshaled.IsEqual(nilTags))
+	assert.Equal(t, tagMap, tagsUnmarshaled.CloneTags())
 }
