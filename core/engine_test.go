@@ -494,6 +494,7 @@ func TestSentReceivedMetrics(t *testing.T) {
 	t.Parallel()
 	tb := testutils.NewHTTPMultiBin(t)
 	defer tb.Cleanup()
+	tr := tb.Replacer.Replace
 
 	const expectedHeaderMaxLength = 500
 
@@ -504,21 +505,40 @@ func TestSentReceivedMetrics(t *testing.T) {
 		ExpectedDataReceived int64
 	}
 	testScripts := []testScript{
-		{
-			tb.Replacer.Replace(`
-			import http from "k6/http";
+		{tr(`import http from "k6/http";
+			export default function() {
+				http.get("HTTPBIN_URL/bytes/15000");
+			}`), 1, 0, 15000},
+		{tr(`import http from "k6/http";
 			export default function() {
 				http.get("HTTPBIN_URL/bytes/5000");
 				http.get("HTTPSBIN_URL/bytes/5000");
 				http.batch(["HTTPBIN_URL/bytes/10000", "HTTPBIN_URL/bytes/20000", "HTTPSBIN_URL/bytes/10000"]);
-			}`), 5, 0, 50000,
-		},
-		//TODO: test websockets
+			}`), 5, 0, 50000},
+		{tr(`import http from "k6/http";
+			let data = "0123456789".repeat(100);
+			export default function() {
+				http.post("HTTPBIN_URL/ip", {
+					file: http.file(data, "test.txt")
+				});
+			}`), 1, 1000, 100},
+		{tr(`import ws from "k6/ws";
+			let data = "0123456789".repeat(100);
+			export default function() {
+				ws.connect("ws://HTTPBIN_IP:HTTPBIN_PORT/ws-echo", null, function (socket) {
+					socket.on('open', function open() {
+						socket.send(data);
+					});
+					socket.on('message', function (message) {
+						socket.close();
+					});
+				});
+			}`), 2, 1000, 1000},
 	}
 
 	type testCase struct{ Iterations, VUs int64 }
 	testCases := []testCase{
-		{1, 1}, {1, 2}, {2, 1}, {2, 2}, {3, 1}, {5, 2}, {10, 3}, {25, 2}, {50, 5},
+		{1, 1}, {1, 2}, {2, 1}, {5, 2}, {25, 2}, {50, 5},
 	}
 
 	runTest := func(t *testing.T, ts testScript, tc testCase, noConnReuse bool) (float64, float64) {
@@ -579,9 +599,15 @@ func TestSentReceivedMetrics(t *testing.T) {
 	getTestCase := func(t *testing.T, ts testScript, tc testCase) func(t *testing.T) {
 		return func(t *testing.T) {
 			t.Parallel()
-			runTest(t, ts, tc, false)
-			runTest(t, ts, tc, true)
-			//TODO: test for differences with NoConnectionReuse enabled and disabled
+			noReuseSent, noReuseReceived := runTest(t, ts, tc, true)
+			reuseSent, reuseReceived := runTest(t, ts, tc, false)
+
+			if noReuseSent < reuseSent {
+				t.Errorf("noReuseSent=%f is greater than reuseSent=%f", noReuseSent, reuseSent)
+			}
+			if noReuseReceived < reuseReceived {
+				t.Errorf("noReuseReceived=%f is greater than reuseReceived=%f", noReuseReceived, reuseReceived)
+			}
 		}
 	}
 
@@ -590,7 +616,7 @@ func TestSentReceivedMetrics(t *testing.T) {
 		for tsNum, ts := range testScripts {
 			for tcNum, tc := range testCases {
 				t.Run(
-					fmt.Sprintf("SentReceivedMetrics_script[%d]_case[%d](%d, %d)", tsNum, tcNum, tc.Iterations, tc.VUs),
+					fmt.Sprintf("SentReceivedMetrics_script[%d]_case[%d](%d,%d)", tsNum, tcNum, tc.Iterations, tc.VUs),
 					getTestCase(t, ts, tc),
 				)
 			}
