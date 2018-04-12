@@ -81,15 +81,19 @@ type HTTPMultiBin struct {
 
 func getWebsocketEchoHandler(t *testing.T) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		t.Logf("[%p %s] Upgrading to websocket connection...", req, req.URL)
 		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, w.Header())
 		if !assert.NoError(t, err) {
 			return
 		}
+		t.Logf("[%p %s] Upgraded...", req, req.URL)
 
 		mt, message, err := conn.ReadMessage()
+		t.Logf("[%p %s] Read message '%s' of type %d (error '%v')", req, req.URL, message, mt, err)
 		assert.NoError(t, err)
 		assert.NoError(t, conn.WriteMessage(mt, message))
 		assert.NoError(t, conn.Close())
+		t.Logf("[%p %s] Wrote back message '%s' of type %d and closed the connection", req, req.URL, message, mt)
 	})
 }
 func getWebsocketCloserHandler(t *testing.T) http.Handler {
