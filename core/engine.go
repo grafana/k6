@@ -247,16 +247,19 @@ func (e *Engine) runMetricsEmission(ctx context.Context) {
 
 func (e *Engine) emitMetrics() {
 	t := time.Now()
+
 	e.processSamples(
 		stats.Sample{
 			Time:   t,
 			Metric: metrics.VUs,
 			Value:  float64(e.Executor.GetVUs()),
+			Tags:   e.Options.RunTags,
 		},
 		stats.Sample{
 			Time:   t,
 			Metric: metrics.VUsMax,
 			Value:  float64(e.Executor.GetVUsMax()),
+			Tags:   e.Options.RunTags,
 		},
 	)
 }
@@ -316,7 +319,7 @@ func (e *Engine) processSamples(samples ...stats.Sample) {
 	e.MetricsLock.Lock()
 	defer e.MetricsLock.Unlock()
 
-	for i, sample := range samples {
+	for _, sample := range samples {
 		m, ok := e.Metrics[sample.Metric.Name]
 		if !ok {
 			m = stats.New(sample.Metric.Name, sample.Metric.Type, sample.Metric.Contains)
@@ -327,14 +330,7 @@ func (e *Engine) processSamples(samples ...stats.Sample) {
 		m.Sink.Add(sample)
 
 		for _, sm := range m.Submetrics {
-			passing := true
-			for k, v := range sm.Tags {
-				if sample.Tags[k] != v {
-					passing = false
-					break
-				}
-			}
-			if !passing {
+			if !sm.Tags.IsEqual(sample.Tags) {
 				continue
 			}
 
@@ -346,24 +342,7 @@ func (e *Engine) processSamples(samples ...stats.Sample) {
 			}
 			sm.Metric.Sink.Add(sample)
 		}
-
-		if e.Options.RunTags == nil {
-			continue
-		}
-
-		if samples[i].Tags == nil {
-			samples[i].Tags = e.Options.RunTags
-			continue
-		}
-
-		for k, v := range e.Options.RunTags {
-			//only set tags that haven't been already set on the sample
-			if _, ok := samples[i].Tags[k]; !ok {
-				samples[i].Tags[k] = v
-			}
-		}
 	}
-
 	if e.Collector != nil {
 		e.Collector.Collect(samples)
 	}

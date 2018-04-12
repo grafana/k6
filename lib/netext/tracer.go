@@ -55,7 +55,7 @@ type Trail struct {
 }
 
 // Samples returns a slice with all of the pre-calculated sample values for the request
-func (tr Trail) Samples(tags map[string]string) []stats.Sample {
+func (tr Trail) Samples(tags *stats.SampleTags) []stats.Sample {
 	return []stats.Sample{
 		{Metric: metrics.HTTPReqs, Time: tr.EndTime, Tags: tags, Value: 1},
 		{Metric: metrics.HTTPReqDuration, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Duration)},

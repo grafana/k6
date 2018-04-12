@@ -110,7 +110,7 @@ func (c *Collector) commit() {
 	for _, sample := range samples {
 		p, err := client.NewPoint(
 			sample.Metric.Name,
-			sample.Tags,
+			sample.Tags.CloneTags(), //TODO: optimize when implementing https://github.com/loadimpact/k6/issues/569
 			map[string]interface{}{"value": sample.Value},
 			sample.Time,
 		)

@@ -102,7 +102,7 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 	// Leave header to nil by default so we can pass it directly to the Dialer
 	var header http.Header
 
-	tags := map[string]string{}
+	tags := state.Options.RunTags.CloneTags()
 	if state.Options.SystemTags["url"] {
 		tags["url"] = url
 	}
@@ -266,17 +266,19 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 			end := time.Now()
 			sessionDuration := stats.D(end.Sub(start))
 
+			sampleTags := stats.IntoSampleTags(&tags)
+
 			samples := []stats.Sample{
-				{Metric: metrics.WSSessions, Time: start, Tags: tags, Value: 1},
-				{Metric: metrics.WSConnecting, Time: start, Tags: tags, Value: connectionDuration},
-				{Metric: metrics.WSSessionDuration, Time: start, Tags: tags, Value: sessionDuration},
+				{Metric: metrics.WSSessions, Time: start, Tags: sampleTags, Value: 1},
+				{Metric: metrics.WSConnecting, Time: start, Tags: sampleTags, Value: connectionDuration},
+				{Metric: metrics.WSSessionDuration, Time: start, Tags: sampleTags, Value: sessionDuration},
 			}
 
 			for _, msgSentTimestamp := range socket.msgSentTimestamps {
 				samples = append(samples, stats.Sample{
 					Metric: metrics.WSMessagesSent,
 					Time:   msgSentTimestamp,
-					Tags:   tags,
+					Tags:   sampleTags,
 					Value:  1,
 				})
 			}
@@ -285,7 +287,7 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 				samples = append(samples, stats.Sample{
 					Metric: metrics.WSMessagesReceived,
 					Time:   msgReceivedTimestamp,
-					Tags:   tags,
+					Tags:   sampleTags,
 					Value:  1,
 				})
 			}
@@ -294,7 +296,7 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 				samples = append(samples, stats.Sample{
 					Metric: metrics.WSPing,
 					Time:   pingDelta.pong,
-					Tags:   tags,
+					Tags:   sampleTags,
 					Value:  stats.D(pingDelta.pong.Sub(pingDelta.ping)),
 				})
 			}

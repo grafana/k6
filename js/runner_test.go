@@ -687,7 +687,7 @@ func TestVUIntegrationHTTP2(t *testing.T) {
 
 			protoFound := false
 			for _, sample := range samples {
-				if proto := sample.Tags["proto"]; proto != "" {
+				if proto, ok := sample.Tags.Get("proto"); ok {
 					protoFound = true
 					assert.Equal(t, "HTTP/2.0", proto)
 				}

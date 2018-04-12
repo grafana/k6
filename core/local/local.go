@@ -278,10 +278,15 @@ func (e *Executor) Run(parent context.Context, out chan<- []stats.Sample) (reter
 			// Every iteration ends with a write to vuOut. Check if we've hit the end point.
 			// If not, make sure to include an Iterations bump in the list!
 			if out != nil {
+				var tags *stats.SampleTags
+				if e.Runner != nil {
+					tags = e.Runner.GetOptions().RunTags
+				}
 				samples = append(samples, stats.Sample{
 					Time:   time.Now(),
 					Metric: metrics.Iterations,
 					Value:  1,
+					Tags:   tags,
 				})
 				out <- samples
 			}
