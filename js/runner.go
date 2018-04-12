@@ -28,6 +28,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/dop251/goja"
@@ -332,9 +333,6 @@ func (u *VU) runFn(ctx context.Context, fn goja.Callable, args ...goja.Value) (g
 		Vu:            u.ID,
 		Iteration:     u.Iteration,
 	}
-	// Zero out the values, since we may be reusing a connection
-	u.Dialer.BytesRead = 0
-	u.Dialer.BytesWritten = 0
 
 	newctx := common.WithRuntime(ctx, u.Runtime)
 	newctx = common.WithState(newctx, state)
@@ -346,7 +344,7 @@ func (u *VU) runFn(ctx context.Context, fn goja.Callable, args ...goja.Value) (g
 
 	startTime := time.Now()
 	v, err := fn(goja.Undefined(), args...) // Actually run the JS script
-	t := time.Now()
+	endTime := time.Now()
 
 	tags := state.Options.RunTags.CloneTags()
 	if state.Options.SystemTags["vu"] {
@@ -355,17 +353,32 @@ func (u *VU) runFn(ctx context.Context, fn goja.Callable, args ...goja.Value) (g
 	if state.Options.SystemTags["iter"] {
 		tags["iter"] = strconv.FormatInt(iter, 10)
 	}
-
 	sampleTags := stats.IntoSampleTags(&tags)
-
-	state.Samples = append(state.Samples,
-		stats.Sample{Time: t, Metric: metrics.DataSent, Value: float64(u.Dialer.BytesWritten), Tags: sampleTags},
-		stats.Sample{Time: t, Metric: metrics.DataReceived, Value: float64(u.Dialer.BytesRead), Tags: sampleTags},
-		stats.Sample{Time: t, Metric: metrics.IterationDuration, Value: stats.D(t.Sub(startTime)), Tags: sampleTags},
-	)
 
 	if u.Runner.Bundle.Options.NoConnectionReuse.Bool {
 		u.HTTPTransport.CloseIdleConnections()
 	}
+
+	bytesWritten := atomic.SwapInt64(&u.Dialer.BytesWritten, 0)
+	bytesRead := atomic.SwapInt64(&u.Dialer.BytesRead, 0)
+
+	state.Samples = append(state.Samples,
+		stats.Sample{
+			Time:   endTime,
+			Metric: metrics.DataSent,
+			Value:  float64(bytesWritten),
+			Tags:   sampleTags},
+		stats.Sample{
+			Time:   endTime,
+			Metric: metrics.DataReceived,
+			Value:  float64(bytesRead),
+			Tags:   sampleTags},
+		stats.Sample{
+			Time:   endTime,
+			Metric: metrics.IterationDuration,
+			Value:  stats.D(endTime.Sub(startTime)),
+			Tags:   sampleTags},
+	)
+
 	return v, state, err
 }
