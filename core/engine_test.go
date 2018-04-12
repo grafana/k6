@@ -626,26 +626,30 @@ func TestRunTags(t *testing.T) {
 			})
 
 			group("websockets", function() {
-				var response = ws.connect("wss://HTTPSBIN_IP:HTTPSBIN_PORT/ws-close", params, function (socket) {
-					socket.close()
-					/*
-					//TODO: enable these and use /ws-echo endpoint when data race is fixed
+				var response = ws.connect("wss://HTTPSBIN_IP:HTTPSBIN_PORT/ws-echo", params, function (socket) {
 					socket.on('open', function open() {
-						console.log('connected');
+						console.log('ws open and say hello');
 						socket.send("hello");
 					});
 
 					socket.on('message', function (message) {
+						console.log('ws got message ' + message);
 						if (message != "hello") {
 							fail("Expected to receive 'hello' but got '" + message + "' instead !");
 						}
+						console.log('ws closing socket...');
+						socket.close();
 					});
 
 					socket.on('close', function () {
-						console.log('disconnected');
+						console.log('ws close');
 					});
-					*/
+
+					socket.on('error', function (e) {
+						console.log('ws error: ' + e.error());
+					});
 				});
+				console.log('connect returned');
 				check(response, { "status is 101": (r) => r && r.status === 101 }, customTags);
 			})
 
