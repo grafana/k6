@@ -494,82 +494,132 @@ func TestSentReceivedMetrics(t *testing.T) {
 	t.Parallel()
 	tb := testutils.NewHTTPMultiBin(t)
 	defer tb.Cleanup()
+	tr := tb.Replacer.Replace
 
-	script := []byte(tb.Replacer.Replace(`
-		import http from "k6/http";
-		export default function() {
-			http.get("HTTPBIN_URL/bytes/5000");
-			http.get("HTTPSBIN_URL/bytes/5000");
-			http.batch(["HTTPBIN_URL/bytes/10000", "HTTPBIN_URL/bytes/20000", "HTTPSBIN_URL/bytes/10000"]);
-		}
-	`))
-	expectedSingleData := 50000.0
+	const expectedHeaderMaxLength = 500
+
+	type testScript struct {
+		Code                 string
+		NumRequests          int64
+		ExpectedDataSent     int64
+		ExpectedDataReceived int64
+	}
+	testScripts := []testScript{
+		{tr(`import http from "k6/http";
+			export default function() {
+				http.get("HTTPBIN_URL/bytes/15000");
+			}`), 1, 0, 15000},
+		{tr(`import http from "k6/http";
+			export default function() {
+				http.get("HTTPBIN_URL/bytes/5000");
+				http.get("HTTPSBIN_URL/bytes/5000");
+				http.batch(["HTTPBIN_URL/bytes/10000", "HTTPBIN_URL/bytes/20000", "HTTPSBIN_URL/bytes/10000"]);
+			}`), 5, 0, 50000},
+		{tr(`import http from "k6/http";
+			let data = "0123456789".repeat(100);
+			export default function() {
+				http.post("HTTPBIN_URL/ip", {
+					file: http.file(data, "test.txt")
+				});
+			}`), 1, 1000, 100},
+		{tr(`import ws from "k6/ws";
+			let data = "0123456789".repeat(100);
+			export default function() {
+				ws.connect("ws://HTTPBIN_IP:HTTPBIN_PORT/ws-echo", null, function (socket) {
+					socket.on('open', function open() {
+						socket.send(data);
+					});
+					socket.on('message', function (message) {
+						socket.close();
+					});
+				});
+			}`), 2, 1000, 1000},
+	}
 
 	type testCase struct{ Iterations, VUs int64 }
 	testCases := []testCase{
-		{1, 1}, {1, 2}, {2, 1}, {2, 2}, {3, 1}, {5, 2}, {10, 3}, {25, 2}, {50, 5},
+		{1, 1}, {1, 2}, {2, 1}, {5, 2}, {25, 2}, {50, 5},
 	}
 
-	getTestCase := func(t *testing.T, tc testCase) func(t *testing.T) {
+	runTest := func(t *testing.T, ts testScript, tc testCase, noConnReuse bool) (float64, float64) {
+		r, err := js.New(
+			&lib.SourceData{Filename: "/script.js", Data: []byte(ts.Code)},
+			afero.NewMemMapFs(),
+			lib.RuntimeOptions{},
+		)
+		require.NoError(t, err)
+
+		options := lib.Options{
+			Iterations: null.IntFrom(tc.Iterations),
+			VUs:        null.IntFrom(tc.VUs),
+			VUsMax:     null.IntFrom(tc.VUs),
+			Hosts:      tb.Dialer.Hosts,
+			InsecureSkipTLSVerify: null.BoolFrom(true),
+			NoConnectionReuse:     null.BoolFrom(noConnReuse),
+		}
+
+		r.SetOptions(options)
+		engine, err := NewEngine(local.New(r), options)
+		require.NoError(t, err)
+
+		collector := &dummy.Collector{}
+		engine.Collector = collector
+
+		ctx, cancel := context.WithCancel(context.Background())
+		errC := make(chan error)
+		go func() { errC <- engine.Run(ctx) }()
+
+		select {
+		case <-time.After(10 * time.Second):
+			cancel()
+			t.Fatal("Test timed out")
+		case err := <-errC:
+			cancel()
+			require.NoError(t, err)
+		}
+
+		checkData := func(name string, expected int64) float64 {
+			data := getMetricSum(collector.Samples, name)
+			expectedDataMin := float64(expected * tc.Iterations)
+			expectedDataMax := float64((expected + ts.NumRequests*expectedHeaderMaxLength) * tc.Iterations)
+
+			if data < expectedDataMin || data > expectedDataMax {
+				t.Errorf(
+					"The %s sum should be in the interval [%f, %f] but was %f",
+					name, expectedDataMin, expectedDataMax, data,
+				)
+			}
+			return data
+		}
+
+		return checkData("data_sent", ts.ExpectedDataSent),
+			checkData("data_received", ts.ExpectedDataReceived)
+	}
+
+	getTestCase := func(t *testing.T, ts testScript, tc testCase) func(t *testing.T) {
 		return func(t *testing.T) {
 			t.Parallel()
-			r, err := js.New(
-				&lib.SourceData{Filename: "/script.js", Data: script},
-				afero.NewMemMapFs(),
-				lib.RuntimeOptions{},
-			)
-			require.NoError(t, err)
+			noReuseSent, noReuseReceived := runTest(t, ts, tc, true)
+			reuseSent, reuseReceived := runTest(t, ts, tc, false)
 
-			options := lib.Options{
-				Iterations: null.IntFrom(tc.Iterations),
-				VUs:        null.IntFrom(tc.VUs),
-				VUsMax:     null.IntFrom(tc.VUs),
-				Hosts:      tb.Dialer.Hosts,
-				InsecureSkipTLSVerify: null.BoolFrom(true),
+			if noReuseSent < reuseSent {
+				t.Errorf("noReuseSent=%f is greater than reuseSent=%f", noReuseSent, reuseSent)
 			}
-			//TODO: test for differences with NoConnectionReuse enabled and disabled
-
-			r.SetOptions(options)
-			engine, err := NewEngine(local.New(r), options)
-			require.NoError(t, err)
-
-			collector := &dummy.Collector{}
-			engine.Collector = collector
-
-			ctx, cancel := context.WithCancel(context.Background())
-			errC := make(chan error)
-			go func() { errC <- engine.Run(ctx) }()
-
-			select {
-			case <-time.After(10 * time.Second):
-				cancel()
-				t.Fatal("Test timed out")
-			case err := <-errC:
-				cancel()
-				require.NoError(t, err)
-			}
-
-			receivedData := getMetricSum(collector.Samples, "data_received")
-			expectedDataMin := expectedSingleData * float64(tc.Iterations)
-			expectedDataMax := 1.05 * expectedDataMin // To account for headers
-			if receivedData < expectedDataMin || receivedData > expectedDataMax {
-				t.Errorf(
-					"The received data should be in the interval [%f, %f] but was %f",
-					expectedDataMin,
-					expectedDataMax,
-					receivedData,
-				)
+			if noReuseReceived < reuseReceived {
+				t.Errorf("noReuseReceived=%f is greater than reuseReceived=%f", noReuseReceived, reuseReceived)
 			}
 		}
 	}
 
 	// This Run will not return until the parallel subtests complete.
 	t.Run("group", func(t *testing.T) {
-		for testn, tc := range testCases {
-			t.Run(
-				fmt.Sprintf("SentReceivedMetrics_%d(%d, %d)", testn, tc.Iterations, tc.VUs),
-				getTestCase(t, tc),
-			)
+		for tsNum, ts := range testScripts {
+			for tcNum, tc := range testCases {
+				t.Run(
+					fmt.Sprintf("SentReceivedMetrics_script[%d]_case[%d](%d,%d)", tsNum, tcNum, tc.Iterations, tc.VUs),
+					getTestCase(t, ts, tc),
+				)
+			}
 		}
 	})
 }
@@ -602,26 +652,30 @@ func TestRunTags(t *testing.T) {
 			})
 
 			group("websockets", function() {
-				var response = ws.connect("wss://HTTPSBIN_IP:HTTPSBIN_PORT/ws-close", params, function (socket) {
-					socket.close()
-					/*
-					//TODO: enable these and use /ws-echo endpoint when data race is fixed
+				var response = ws.connect("wss://HTTPSBIN_IP:HTTPSBIN_PORT/ws-echo", params, function (socket) {
 					socket.on('open', function open() {
-						console.log('connected');
+						console.log('ws open and say hello');
 						socket.send("hello");
 					});
 
 					socket.on('message', function (message) {
+						console.log('ws got message ' + message);
 						if (message != "hello") {
 							fail("Expected to receive 'hello' but got '" + message + "' instead !");
 						}
+						console.log('ws closing socket...');
+						socket.close();
 					});
 
 					socket.on('close', function () {
-						console.log('disconnected');
+						console.log('ws close');
 					});
-					*/
+
+					socket.on('error', function (e) {
+						console.log('ws error: ' + e.error());
+					});
 				});
+				console.log('connect returned');
 				check(response, { "status is 101": (r) => r && r.status === 101 }, customTags);
 			})
 
