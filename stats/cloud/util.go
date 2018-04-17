@@ -24,7 +24,7 @@ import "fmt"
 
 func URLForResults(refID string, config Config) string {
 	path := "runs"
-	if config.Token == "" {
+	if !config.Token.Valid {
 		path = "anonymous"
 	}
 	return fmt.Sprintf("https://app.loadimpact.com/k6/%s/%s", path, refID)

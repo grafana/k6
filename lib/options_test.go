@@ -304,8 +304,9 @@ func TestOptions(t *testing.T) {
 		assert.NotEmpty(t, opts.Thresholds)
 	})
 	t.Run("External", func(t *testing.T) {
-		opts := Options{}.Apply(Options{External: map[string]interface{}{"a": 1}})
-		assert.Equal(t, map[string]interface{}{"a": 1}, opts.External)
+		ext := map[string]json.RawMessage{"a": json.RawMessage("1")}
+		opts := Options{}.Apply(Options{External: ext})
+		assert.Equal(t, ext, opts.External)
 	})
 
 	t.Run("JSON", func(t *testing.T) {
