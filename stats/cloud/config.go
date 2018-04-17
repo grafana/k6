@@ -21,52 +21,73 @@
 package cloud
 
 import (
-	"encoding/json"
+	"time"
+
+	"github.com/loadimpact/k6/lib/types"
+	"gopkg.in/guregu/null.v3"
 )
 
-type ConfigFields struct {
-	Token           string `json:"token" mapstructure:"token" envconfig:"CLOUD_TOKEN"`
-	Name            string `json:"name" mapstructure:"name" envconfig:"CLOUD_NAME"`
-	Host            string `json:"host" mapstructure:"host" envconfig:"CLOUD_HOST"`
-	NoCompress      bool   `json:"no_compress" mapstructure:"no_compress" envconfig:"CLOUD_NO_COMPRESS"`
-	ProjectID       int    `json:"project_id" mapstructure:"projectID" envconfig:"CLOUD_PROJECT_ID"`
-	DeprecatedToken string `envconfig:"K6CLOUD_TOKEN"`
+// Config holds all the neccessary data and options for sending metrics to the Load Impact cloud.
+type Config struct {
+	Token              null.String        `json:"token" envconfig:"CLOUD_TOKEN"`
+	DeprecatedToken    null.String        `envconfig:"K6CLOUD_TOKEN"`
+	Name               null.String        `json:"name" envconfig:"CLOUD_NAME"`
+	Host               null.String        `json:"host" envconfig:"CLOUD_HOST"`
+	NoCompress         null.Bool          `json:"noCompress" envconfig:"CLOUD_NO_COMPRESS"`
+	ProjectID          null.Int           `json:"projectID" envconfig:"CLOUD_PROJECT_ID"`
+	MetricPushInterval types.NullDuration `json:"metricPushInterval" envconfig:"CLOUD_METRIC_PUSH_INTERVAL"`
+
+	// If specified and greater than 0, sample aggregation with that period is enabled.
+	AggregationPeriod types.NullDuration `json:"aggregationPeriod" envconfig:"CLOUD_AGGREGATION_PERIOD"`
+
+	// If aggregation is enabled, this specifies how long we'll wait for period samples to accomulate before pushing them to the cloud.
+	AggregationPushDelay types.NullDuration `json:"aggregationPushDelay" envconfig:"CLOUD_AGGREGATION_PUSH_DELAY"`
+
+	// If AggregationPeriod is positive, but the collected samples for a certain period are less than this number, they won't be aggregated.
+	AggregationMinSamples null.Int `json:"aggregationMinSamples" envconfig:"CLOUD_AGGREGATION_MIN_SAMPLES"`
 }
 
-type Config ConfigFields
+// NewConfig creates a new Config instance with default values for some fields.
+func NewConfig() Config {
+	return Config{
+		Host:                  null.StringFrom("https://ingest.loadimpact.com"),
+		MetricPushInterval:    types.NullDurationFrom(1 * time.Second),
+		AggregationPushDelay:  types.NullDurationFrom(3 * time.Second),
+		AggregationMinSamples: null.IntFrom(100),
+	}
+}
 
+// Apply saves config non-zero config values from the passed config in the receiver.
 func (c Config) Apply(cfg Config) Config {
-	if cfg.Token != "" {
+	if cfg.Token.Valid {
 		c.Token = cfg.Token
 	}
-	if cfg.Name != "" {
+	if cfg.DeprecatedToken.Valid {
+		c.DeprecatedToken = cfg.DeprecatedToken
+	}
+	if cfg.Name.Valid {
 		c.Name = cfg.Name
 	}
-	if cfg.Host != "" {
+	if cfg.Host.Valid {
 		c.Host = cfg.Host
 	}
-	if cfg.ProjectID != 0 {
+	if cfg.NoCompress.Valid {
+		c.NoCompress = cfg.NoCompress
+	}
+	if cfg.ProjectID.Valid {
 		c.ProjectID = cfg.ProjectID
 	}
+	if cfg.MetricPushInterval.Valid {
+		c.MetricPushInterval = cfg.MetricPushInterval
+	}
+	if cfg.AggregationPeriod.Valid {
+		c.AggregationPeriod = cfg.AggregationPeriod
+	}
+	if cfg.AggregationPushDelay.Valid {
+		c.AggregationPushDelay = cfg.AggregationPushDelay
+	}
+	if cfg.AggregationMinSamples.Valid {
+		c.AggregationMinSamples = cfg.AggregationMinSamples
+	}
 	return c
-}
-
-func (c *Config) UnmarshalText(data []byte) error {
-	if s := string(data); s != "" {
-		c.Name = s
-	}
-	return nil
-}
-
-func (c *Config) UnmarshalJSON(data []byte) error {
-	fields := ConfigFields(*c)
-	if err := json.Unmarshal(data, &fields); err != nil {
-		return err
-	}
-	*c = Config(fields)
-	return nil
-}
-
-func (c Config) MarshalJSON() ([]byte, error) {
-	return json.Marshal(ConfigFields(c))
 }

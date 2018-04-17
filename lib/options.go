@@ -237,7 +237,7 @@ type Options struct {
 
 	// These values are for third party collectors' benefit.
 	// Can't be set through env vars.
-	External map[string]interface{} `json:"ext" ignored:"true"`
+	External map[string]json.RawMessage `json:"ext" ignored:"true"`
 
 	// Summary trend stats for trend metrics (response times) in CLI output
 	SummaryTrendStats []string `json:"summaryTrendStats" envconfig:"summary_trend_stats"`
