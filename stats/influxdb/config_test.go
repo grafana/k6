@@ -27,23 +27,24 @@ import (
 )
 
 func TestConfigText(t *testing.T) {
+	defaultTagsAsFields := []string{"vu", "iter", "url"}
 	testdata := map[string]Config{
-		"":                             {},
-		"dbname":                       {DB: "dbname"},
-		"/dbname":                      {DB: "dbname"},
-		"http://localhost:8086":        {Addr: "http://localhost:8086"},
-		"http://localhost:8086/dbname": {Addr: "http://localhost:8086", DB: "dbname"},
+		"":                             {TagsAsFields: defaultTagsAsFields},
+		"dbname":                       {DB: "dbname", TagsAsFields: defaultTagsAsFields},
+		"/dbname":                      {DB: "dbname", TagsAsFields: defaultTagsAsFields},
+		"http://localhost:8086":        {Addr: "http://localhost:8086", TagsAsFields: defaultTagsAsFields},
+		"http://localhost:8086/dbname": {Addr: "http://localhost:8086", DB: "dbname", TagsAsFields: defaultTagsAsFields},
 	}
 	queries := map[string]struct {
 		Config Config
 		Err    string
 	}{
-		"?":                {Config{}, ""},
-		"?insecure=false":  {Config{Insecure: false}, ""},
-		"?insecure=true":   {Config{Insecure: true}, ""},
-		"?insecure=ture":   {Config{}, "insecure must be true or false, not ture"},
-		"?payload_size=69": {Config{PayloadSize: 69}, ""},
-		"?payload_size=a":  {Config{}, "strconv.Atoi: parsing \"a\": invalid syntax"},
+		"?":                {Config{TagsAsFields: defaultTagsAsFields}, ""},
+		"?insecure=false":  {Config{Insecure: false, TagsAsFields: defaultTagsAsFields}, ""},
+		"?insecure=true":   {Config{Insecure: true, TagsAsFields: defaultTagsAsFields}, ""},
+		"?insecure=ture":   {Config{TagsAsFields: defaultTagsAsFields}, "insecure must be true or false, not ture"},
+		"?payload_size=69": {Config{PayloadSize: 69, TagsAsFields: defaultTagsAsFields}, ""},
+		"?payload_size=a":  {Config{TagsAsFields: defaultTagsAsFields}, "strconv.Atoi: parsing \"a\": invalid syntax"},
 	}
 	for str, data := range testdata {
 		t.Run(str, func(t *testing.T) {
