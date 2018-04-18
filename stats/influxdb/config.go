@@ -82,6 +82,7 @@ func (c Config) Apply(cfg Config) Config {
 }
 
 func (c *Config) UnmarshalText(text []byte) error {
+	c.defaultValues()
 	u, err := url.Parse(string(text))
 	if err != nil {
 		return err
@@ -116,7 +117,7 @@ func (c *Config) UnmarshalText(text []byte) error {
 			c.Retention = vs[0]
 		case "consistency":
 			c.Consistency = vs[0]
-		case "tagsasfields":
+		case "tagsAsFields":
 			c.TagsAsFields = vs
 		default:
 			return errors.Errorf("unknown query parameter: %s", k)
@@ -126,6 +127,7 @@ func (c *Config) UnmarshalText(text []byte) error {
 }
 
 func (c *Config) UnmarshalJSON(data []byte) error {
+	c.defaultValues()
 	fields := ConfigFields(*c)
 	if err := json.Unmarshal(data, &fields); err != nil {
 		return err
@@ -136,4 +138,10 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 
 func (c Config) MarshalJSON() ([]byte, error) {
 	return json.Marshal(ConfigFields(c))
+}
+
+func (c *Config) defaultValues() {
+	if len(c.TagsAsFields) == 0 {
+		c.TagsAsFields = []string{"vu", "iter", "url"}
+	}
 }
