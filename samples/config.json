@@ -2,7 +2,7 @@
   "vus": 100,
   "collectors": {
     "influxdb": {
-      "tagsAsFields": ["vu","iter"]
+      "tagsAsFields": ["vu","iter", "url", "name"]
     }
   }
 }
