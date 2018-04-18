@@ -38,10 +38,11 @@ type ConfigFields struct {
 	PayloadSize int    `json:"payload_size,omitempty" envconfig:"INFLUXDB_PAYLOAD_SIZE"`
 
 	// Samples.
-	DB          string `json:"db" envconfig:"INFLUXDB_DB"`
-	Precision   string `json:"precision,omitempty" envconfig:"INFLUXDB_PRECISION"`
-	Retention   string `json:"retention,omitempty" envconfig:"INFLUXDB_RETENTION"`
-	Consistency string `json:"consistency,omitempty" envconfig:"INFLUXDB_CONSISTENCY"`
+	DB           string   `json:"db" envconfig:"INFLUXDB_DB"`
+	Precision    string   `json:"precision,omitempty" envconfig:"INFLUXDB_PRECISION"`
+	Retention    string   `json:"retention,omitempty" envconfig:"INFLUXDB_RETENTION"`
+	Consistency  string   `json:"consistency,omitempty" envconfig:"INFLUXDB_CONSISTENCY"`
+	TagsAsFields []string `json:"tagsAsFields,omitempty" envconfig:"INFLUXDB_TAGS_AS_FIELDS"`
 }
 
 type Config ConfigFields
@@ -73,6 +74,9 @@ func (c Config) Apply(cfg Config) Config {
 	}
 	if cfg.Consistency != "" {
 		c.Consistency = cfg.Consistency
+	}
+	if len(cfg.TagsAsFields) > 0 {
+		c.TagsAsFields = cfg.TagsAsFields
 	}
 	return c
 }
@@ -112,6 +116,8 @@ func (c *Config) UnmarshalText(text []byte) error {
 			c.Retention = vs[0]
 		case "consistency":
 			c.Consistency = vs[0]
+		case "tagsasfields":
+			c.TagsAsFields = vs
 		default:
 			return errors.Errorf("unknown query parameter: %s", k)
 		}
