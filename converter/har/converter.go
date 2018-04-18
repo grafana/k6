@@ -28,7 +28,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/tidwall/pretty"
 	"net/url"
-	"regexp"
 	"sort"
 	"strings"
 )
@@ -188,22 +187,6 @@ func Convert(h HAR, enableChecks bool, returnOnFailedCheck bool, batchTime uint,
 								fmt.Fprintf(w, "\t\tif (!check(res, {\"status is %v\": (r) => r.status === %v })) { return };\n", e.Response.Status, e.Response.Status)
 							} else {
 								fmt.Fprintf(w, "\t\tcheck(res, {\"status is %v\": (r) => r.status === %v });\n", e.Response.Status, e.Response.Status)
-							}
-						}
-					}
-
-					if e.Response.Headers != nil {
-						for _, header := range e.Response.Headers {
-							if header.Name == "Location" {
-								fmt.Fprintf(w, "\t\tredirectUrl = res.headers.Location;\n")
-								recordedRedirectURL = header.Value
-								guidRegexString := "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
-								re := regexp.MustCompile(guidRegexString)
-								if match := re.FindString(recordedRedirectURL); match != "" {
-									recordedRestID = match
-									fmt.Fprintf(w, "\t\tlet restID = /%s/.exec(redirectUrl)[0];\n", guidRegexString)
-								}
-								break
 							}
 						}
 					}
