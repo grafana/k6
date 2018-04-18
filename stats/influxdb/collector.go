@@ -108,10 +108,12 @@ func (c *Collector) commit() {
 	}
 
 	for _, sample := range samples {
+		tags := sample.Tags.CloneTags() //TODO: optimize when implementing https://github.com/loadimpact/k6/issues/569
+		values := c.extractFields(tags, sample.Value)
 		p, err := client.NewPoint(
 			sample.Metric.Name,
-			sample.Tags.CloneTags(), //TODO: optimize when implementing https://github.com/loadimpact/k6/issues/569
-			map[string]interface{}{"value": sample.Value},
+			tags,
+			values,
 			sample.Time,
 		)
 		if err != nil {
@@ -128,6 +130,18 @@ func (c *Collector) commit() {
 	}
 	t := time.Since(startTime)
 	log.WithField("t", t).Debug("InfluxDB: Batch written!")
+}
+
+func (c *Collector) extractFields(tags map[string]string, value interface{}) map[string]interface{} {
+	fields := make(map[string]interface{})
+	fields["value"] = value
+	for _, tag := range c.Config.TagsAsFields {
+		if val, ok := tags[tag]; ok {
+			fields[tag] = val
+			delete(tags, tag)
+		}
+	}
+	return fields
 }
 
 // GetRequiredSystemTags returns which sample tags are needed by this collector
