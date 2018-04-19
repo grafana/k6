@@ -31,7 +31,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var Version = "0.20.0"
+var Version = "0.21.0-dev"
 var Banner = `
           /\      |‾‾|  /‾‾/  /‾/   
      /\  /  \     |  |_/  /  / /   
