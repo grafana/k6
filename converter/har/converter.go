@@ -103,7 +103,6 @@ func Convert(h HAR, enableChecks bool, returnOnFailedCheck bool, batchTime uint,
 
 		if nobatch {
 			var recordedRedirectURL string
-			var recordedRestID string
 			previousResponse := map[string]interface{}{}
 
 			fmt.Fprint(w, "\t\tlet res, redirectUrl, json;\n")
@@ -140,11 +139,7 @@ func Convert(h HAR, enableChecks bool, returnOnFailedCheck bool, batchTime uint,
 					fmt.Fprintf(w, "redirectUrl")
 					recordedRedirectURL = ""
 				} else {
-					if recordedRestID != "" && strings.Contains(e.Request.URL, recordedRestID) {
-						fmt.Fprintf(w, "`%s`", strings.Replace(e.Request.URL, recordedRestID, "${restID}", -1))
-					} else {
-						fmt.Fprintf(w, "%q", e.Request.URL)
-					}
+					fmt.Fprintf(w, "%q", e.Request.URL)
 				}
 
 				if e.Request.Method != "GET" {
@@ -187,6 +182,16 @@ func Convert(h HAR, enableChecks bool, returnOnFailedCheck bool, batchTime uint,
 								fmt.Fprintf(w, "\t\tif (!check(res, {\"status is %v\": (r) => r.status === %v })) { return };\n", e.Response.Status, e.Response.Status)
 							} else {
 								fmt.Fprintf(w, "\t\tcheck(res, {\"status is %v\": (r) => r.status === %v });\n", e.Response.Status, e.Response.Status)
+							}
+						}
+					}
+
+					if e.Response.Headers != nil {
+						for _, header := range e.Response.Headers {
+							if header.Name == "Location" {
+								fmt.Fprintf(w, "\t\tredirectUrl = res.headers.Location;\n")
+								recordedRedirectURL = header.Value
+								break
 							}
 						}
 					}
