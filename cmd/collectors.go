@@ -68,7 +68,7 @@ func newCollector(collectorName, arg string, src *lib.SourceData, conf Config) (
 		case collectorJSON:
 			return jsonc.New(afero.NewOsFs(), arg)
 		case collectorInfluxDB:
-			config := conf.Collectors.InfluxDB
+			config := influxdb.NewConfig().Apply(conf.Collectors.InfluxDB)
 			if err := loadConfig(&config); err != nil {
 				return nil, err
 			}
