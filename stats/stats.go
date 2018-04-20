@@ -264,6 +264,80 @@ type Sample struct {
 	Value  float64
 }
 
+// SampleContainer is a simple abstraction that allows sample
+// producers to attach extra information to samples they return
+type SampleContainer interface {
+	GetSamples() []Sample
+}
+
+// Samples is just the simplest SampleContainer implementation
+// that will be used when there's no need for extra information
+type Samples []Sample
+
+// GetSamples just implements the SampleContainer interface
+func (s Samples) GetSamples() []Sample {
+	return s
+}
+
+// ConnectedSampleContainer is an extension of the SampleContainer
+// interface that should be implemented when emitted samples
+// are connected and share the same time and tags.
+type ConnectedSampleContainer interface {
+	SampleContainer
+	GetTags() *SampleTags
+	GetTime() time.Time
+}
+
+// ConnectedSamples is the simplest ConnectedSampleContainer
+// implementation that will be used when there's no need for
+// extra information
+type ConnectedSamples struct {
+	Samples []Sample
+	Tags    *SampleTags
+	Time    time.Time
+}
+
+// GetSamples implements the SampleContainer and ConnectedSampleContainer
+// interfaces and returns the stored slice with samples.
+func (cs ConnectedSamples) GetSamples() []Sample {
+	return cs.Samples
+}
+
+// GetTags implements ConnectedSampleContainer interface and returns stored tags.
+func (cs ConnectedSamples) GetTags() *SampleTags {
+	return cs.Tags
+}
+
+// GetTime implements ConnectedSampleContainer interface and returns stored time.
+func (cs ConnectedSamples) GetTime() time.Time {
+	return cs.Time
+}
+
+// GetSamples implement the ConnectedSampleContainer interface
+// for a single Sample, since it's obviously connected with itself :)
+func (s Sample) GetSamples() []Sample {
+	return []Sample{s}
+}
+
+// GetTags implements ConnectedSampleContainer interface
+// and returns the sample's tags.
+func (s Sample) GetTags() *SampleTags {
+	return s.Tags
+}
+
+// GetTime just implements ConnectedSampleContainer interface
+// and returns the sample's time.
+func (s Sample) GetTime() time.Time {
+	return s.Time
+}
+
+// Ensure that interfaces are implemented correctly
+var _ SampleContainer = Sample{}
+var _ SampleContainer = Samples{}
+
+var _ ConnectedSampleContainer = Sample{}
+var _ ConnectedSampleContainer = ConnectedSamples{}
+
 // A Metric defines the shape of a set of data.
 type Metric struct {
 	Name       string       `json:"name"`

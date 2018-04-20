@@ -33,6 +33,7 @@ import (
 	"github.com/pkg/errors"
 	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	null "gopkg.in/guregu/null.v3"
 )
 
@@ -184,7 +185,7 @@ func TestExecutorEndTime(t *testing.T) {
 	assert.True(t, time.Now().After(startTime.Add(1*time.Second)), "test did not take 1s")
 
 	t.Run("Runtime Errors", func(t *testing.T) {
-		e := New(&lib.MiniRunner{Fn: func(ctx context.Context) ([]stats.Sample, error) {
+		e := New(&lib.MiniRunner{Fn: func(ctx context.Context) ([]stats.SampleContainer, error) {
 			return nil, errors.New("hi")
 		}})
 		assert.NoError(t, e.SetVUsMax(10))
@@ -206,7 +207,7 @@ func TestExecutorEndTime(t *testing.T) {
 	})
 
 	t.Run("End Errors", func(t *testing.T) {
-		e := New(&lib.MiniRunner{Fn: func(ctx context.Context) ([]stats.Sample, error) {
+		e := New(&lib.MiniRunner{Fn: func(ctx context.Context) ([]stats.SampleContainer, error) {
 			<-ctx.Done()
 			return nil, errors.New("hi")
 		}})
@@ -230,30 +231,31 @@ func TestExecutorEndIterations(t *testing.T) {
 	metric := &stats.Metric{Name: "test_metric"}
 
 	var i int64
-	e := New(&lib.MiniRunner{Fn: func(ctx context.Context) ([]stats.Sample, error) {
+	e := New(&lib.MiniRunner{Fn: func(ctx context.Context) ([]stats.SampleContainer, error) {
 		select {
 		case <-ctx.Done():
 		default:
 			atomic.AddInt64(&i, 1)
 		}
-		return []stats.Sample{{Metric: metric, Value: 1.0}}, nil
+		return []stats.SampleContainer{stats.Sample{Metric: metric, Value: 1.0}}, nil
 	}})
 	assert.NoError(t, e.SetVUsMax(1))
 	assert.NoError(t, e.SetVUs(1))
 	e.SetEndIterations(null.IntFrom(100))
 	assert.Equal(t, null.IntFrom(100), e.GetEndIterations())
 
-	samples := make(chan []stats.Sample, 101)
+	samples := make(chan []stats.SampleContainer, 101)
 	assert.NoError(t, e.Run(context.Background(), samples))
 	assert.Equal(t, int64(100), e.GetIterations())
 	assert.Equal(t, int64(100), i)
-
 	for i := 0; i < 100; i++ {
 		samples := <-samples
 		if assert.Len(t, samples, 2) {
 			assert.Equal(t, stats.Sample{Metric: metric, Value: 1.0}, samples[0])
-			assert.Equal(t, metrics.Iterations, samples[1].Metric)
-			assert.Equal(t, float64(1), samples[1].Value)
+			sample, ok := (samples[1]).(stats.Sample)
+			require.True(t, ok)
+			assert.Equal(t, metrics.Iterations, sample.Metric)
+			assert.Equal(t, float64(1), sample.Value)
 		}
 	}
 }
@@ -316,7 +318,7 @@ func TestExecutorSetVUs(t *testing.T) {
 	})
 
 	t.Run("Raise", func(t *testing.T) {
-		e := New(&lib.MiniRunner{Fn: func(ctx context.Context) ([]stats.Sample, error) {
+		e := New(&lib.MiniRunner{Fn: func(ctx context.Context) ([]stats.SampleContainer, error) {
 			return nil, nil
 		}})
 		e.ctx = context.Background()

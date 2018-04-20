@@ -52,20 +52,31 @@ type Trail struct {
 	ConnReused     bool
 	ConnRemoteAddr net.Addr
 	Errors         []error
+
+	// Populated by SaveSamples()
+	Tags    *stats.SampleTags
+	Samples []stats.Sample
 }
 
-// Samples returns a slice with all of the pre-calculated sample values for the request
-func (tr Trail) Samples(tags *stats.SampleTags) []stats.Sample {
-	return []stats.Sample{
+// SaveSamples populates the Trail's sample slice so they're accesible via GetSamples()
+func (tr *Trail) SaveSamples(tags *stats.SampleTags) {
+	tr.Tags = tags
+	tr.Samples = []stats.Sample{
 		{Metric: metrics.HTTPReqs, Time: tr.EndTime, Tags: tags, Value: 1},
 		{Metric: metrics.HTTPReqDuration, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Duration)},
+
 		{Metric: metrics.HTTPReqBlocked, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Blocked)},
 		{Metric: metrics.HTTPReqConnecting, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Connecting)},
+		{Metric: metrics.HTTPReqTLSHandshaking, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.TLSHandshaking)},
 		{Metric: metrics.HTTPReqSending, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Sending)},
 		{Metric: metrics.HTTPReqWaiting, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Waiting)},
 		{Metric: metrics.HTTPReqReceiving, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Receiving)},
-		{Metric: metrics.HTTPReqTLSHandshaking, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.TLSHandshaking)},
 	}
+}
+
+// GetSamples implements the stats.SampleContainer interface.
+func (tr *Trail) GetSamples() []stats.Sample {
+	return tr.Samples
 }
 
 // A Tracer wraps "net/http/httptrace" to collect granular timings for HTTP requests.
@@ -228,7 +239,7 @@ func (t *Tracer) GotFirstResponseByte() {
 }
 
 // Done calculates all metrics and should be called when the request is finished.
-func (t *Tracer) Done() Trail {
+func (t *Tracer) Done() *Trail {
 	done := time.Now()
 
 	trail := Trail{
@@ -285,5 +296,5 @@ func (t *Tracer) Done() Trail {
 		trail.Errors = append([]error{}, t.protoErrors...)
 	}
 
-	return trail
+	return &trail
 }

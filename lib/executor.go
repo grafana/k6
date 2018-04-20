@@ -37,7 +37,7 @@ import (
 // implemented to control a test running on a cluster or in the cloud.
 type Executor interface {
 	// Run the Executor, funneling generated samples through the out channel.
-	Run(ctx context.Context, out chan<- []stats.Sample) error
+	Run(ctx context.Context, out chan<- []stats.SampleContainer) error
 	// Is the executor currently running?
 	IsRunning() bool
 

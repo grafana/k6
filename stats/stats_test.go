@@ -182,6 +182,8 @@ func TestNewSubmetric(t *testing.T) {
 	}
 }
 
+//TODO: test the new sample interfaces and implementations
+
 func TestSampleTags(t *testing.T) {
 	t.Parallel()
 
