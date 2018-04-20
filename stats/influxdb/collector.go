@@ -107,27 +107,25 @@ func (c *Collector) commit() {
 		return
 	}
 
-	cache := map[*stats.SampleTags]struct {
+	type cacheItem struct {
 		tags   map[string]string
 		values map[string]interface{}
-	}{}
-
-	var tags map[string]string
-	var values map[string]interface{}
+	}
+	cache := map[*stats.SampleTags]cacheItem{}
 	for _, sample := range samples {
+		var tags map[string]string
+		var values = make(map[string]interface{})
 		if cached, ok := cache[sample.Tags]; ok {
 			tags = cached.tags
-			values = cached.values
-			values["value"] = sample.Value // Overwrite the "value" field
+			for k, v := range cached.values {
+				values[k] = v
+			}
 		} else {
 			tags = sample.Tags.CloneTags()
-			values = c.extractFields(tags)
-			values["value"] = sample.Value // Ok since the "value" field will always be overwritten
-			cache[sample.Tags] = struct {
-				tags   map[string]string
-				values map[string]interface{}
-			}{sample.Tags.CloneTags(), values}
+			c.extractTagsToValues(tags, values)
+			cache[sample.Tags] = cacheItem{tags, values}
 		}
+		values["value"] = sample.Value
 		p, err := client.NewPoint(
 			sample.Metric.Name,
 			tags,
@@ -150,15 +148,14 @@ func (c *Collector) commit() {
 	log.WithField("t", t).Debug("InfluxDB: Batch written!")
 }
 
-func (c *Collector) extractFields(tags map[string]string) map[string]interface{} {
-	fields := make(map[string]interface{})
+func (c *Collector) extractTagsToValues(tags map[string]string, values map[string]interface{}) map[string]interface{} {
 	for _, tag := range c.Config.TagsAsFields {
 		if val, ok := tags[tag]; ok {
-			fields[tag] = val
+			values[tag] = val
 			delete(tags, tag)
 		}
 	}
-	return fields
+	return values
 }
 
 // GetRequiredSystemTags returns which sample tags are needed by this collector
