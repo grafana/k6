@@ -107,9 +107,27 @@ func (c *Collector) commit() {
 		return
 	}
 
+	cache := map[*stats.SampleTags]struct {
+		tags   map[string]string
+		values map[string]interface{}
+	}{}
+
+	var tags map[string]string
+	var values map[string]interface{}
 	for _, sample := range samples {
-		tags := sample.Tags.CloneTags() //TODO: optimize when implementing https://github.com/loadimpact/k6/issues/569
-		values := c.extractFields(tags, sample.Value)
+		if cached, ok := cache[sample.Tags]; ok {
+			tags = cached.tags
+			values = cached.values
+			values["value"] = sample.Value // Overwrite the "value" field
+		} else {
+			tags = sample.Tags.CloneTags()
+			values = c.extractFields(tags)
+			values["value"] = sample.Value // Ok since the "value" field will always be overwritten
+			cache[sample.Tags] = struct {
+				tags   map[string]string
+				values map[string]interface{}
+			}{sample.Tags.CloneTags(), values}
+		}
 		p, err := client.NewPoint(
 			sample.Metric.Name,
 			tags,
@@ -132,9 +150,8 @@ func (c *Collector) commit() {
 	log.WithField("t", t).Debug("InfluxDB: Batch written!")
 }
 
-func (c *Collector) extractFields(tags map[string]string, value interface{}) map[string]interface{} {
+func (c *Collector) extractFields(tags map[string]string) map[string]interface{} {
 	fields := make(map[string]interface{})
-	fields["value"] = value
 	for _, tag := range c.Config.TagsAsFields {
 		if val, ok := tags[tag]; ok {
 			fields[tag] = val
