@@ -107,11 +107,29 @@ func (c *Collector) commit() {
 		return
 	}
 
+	type cacheItem struct {
+		tags   map[string]string
+		values map[string]interface{}
+	}
+	cache := map[*stats.SampleTags]cacheItem{}
 	for _, sample := range samples {
+		var tags map[string]string
+		var values = make(map[string]interface{})
+		if cached, ok := cache[sample.Tags]; ok {
+			tags = cached.tags
+			for k, v := range cached.values {
+				values[k] = v
+			}
+		} else {
+			tags = sample.Tags.CloneTags()
+			c.extractTagsToValues(tags, values)
+			cache[sample.Tags] = cacheItem{tags, values}
+		}
+		values["value"] = sample.Value
 		p, err := client.NewPoint(
 			sample.Metric.Name,
-			sample.Tags.CloneTags(), //TODO: optimize when implementing https://github.com/loadimpact/k6/issues/569
-			map[string]interface{}{"value": sample.Value},
+			tags,
+			values,
 			sample.Time,
 		)
 		if err != nil {
@@ -128,6 +146,16 @@ func (c *Collector) commit() {
 	}
 	t := time.Since(startTime)
 	log.WithField("t", t).Debug("InfluxDB: Batch written!")
+}
+
+func (c *Collector) extractTagsToValues(tags map[string]string, values map[string]interface{}) map[string]interface{} {
+	for _, tag := range c.Config.TagsAsFields {
+		if val, ok := tags[tag]; ok {
+			values[tag] = val
+			delete(tags, tag)
+		}
+	}
+	return values
 }
 
 // GetRequiredSystemTags returns which sample tags are needed by this collector
