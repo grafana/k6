@@ -24,8 +24,10 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/pmezard/go-difflib/difflib"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
+	"io/ioutil"
 )
 
 const testHAR = `
@@ -115,6 +117,47 @@ export default function() {
 `
 
 func TestIntegrationConvertCmd(t *testing.T) {
+	t.Run("Correlate", func(t *testing.T) {
+		har, err := ioutil.ReadFile("testdata/example.har")
+		assert.NoError(t, err)
+
+		expectedTestPlan, err := ioutil.ReadFile("testdata/example.js")
+		assert.NoError(t, err)
+
+		defaultFs = afero.NewMemMapFs()
+		err = afero.WriteFile(defaultFs, "/input.har", []byte(har), 0644)
+		assert.NoError(t, err)
+
+		buf := &bytes.Buffer{}
+		defaultWriter = buf
+
+		convertCmd.Flags().Set("correlate", "true")
+		convertCmd.Flags().Set("no-batch", "true")
+		convertCmd.Flags().Set("enable-status-code-checks", "true")
+		convertCmd.Flags().Set("return-on-failed-check", "true")
+
+		err = convertCmd.RunE(convertCmd, []string{"/input.har"})
+
+		// reset the convertCmd to default flags. There must be a nicer and less error prone way to do this...
+		convertCmd.Flags().Set("correlate", "false")
+		convertCmd.Flags().Set("no-batch", "false")
+		convertCmd.Flags().Set("enable-status-code-checks", "false")
+		convertCmd.Flags().Set("return-on-failed-check", "false")
+
+		if assert.NoError(t, err) {
+			// assert.Equal suppresses the diff it is too big, so we add it as the test error message manually as well.
+			diff, _ := difflib.GetUnifiedDiffString(difflib.UnifiedDiff{
+				A:        difflib.SplitLines(string(expectedTestPlan)),
+				B:        difflib.SplitLines(buf.String()),
+				FromFile: "Expected",
+				FromDate: "",
+				ToFile:   "Actual",
+				ToDate:   "",
+				Context:  1,
+			})
+			assert.Equal(t, string(expectedTestPlan), buf.String(), diff)
+		}
+	})
 	t.Run("Stdout", func(t *testing.T) {
 		defaultFs = afero.NewMemMapFs()
 		err := afero.WriteFile(defaultFs, "/input.har", []byte(testHAR), 0644)
