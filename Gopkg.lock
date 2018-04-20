@@ -300,6 +300,12 @@
   version = "v1.2.1"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/tidwall/pretty"
+  packages = ["."]
+  revision = "65a9db5fad5105a89e17f38adcc9878685be6d78"
+
+[[projects]]
   name = "github.com/ugorji/go"
   packages = ["codec"]
   revision = "9831f2c3ac1068a78f50999a30db84270f647af6"
@@ -421,6 +427,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "55869854f69af92ea79d360a9c1f396a29ba82c9b7fd18a8fddf56abc73a02e1"
+  inputs-digest = "1c247eda7343f528e62a9903188d4362a9641e9f960eadb4d01741e1b2bb5df8"
   solver-name = "gps-cdcl"
   solver-version = 1
