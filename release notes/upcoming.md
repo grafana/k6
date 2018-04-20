@@ -31,6 +31,19 @@ export default function() {
 
 **Docs**: [HTTP Params](http://k6.readme.io/docs/params-k6http)
 
+### HAR converter: Add support for correlating JSON values (#516)
+
+There is now support for correlating JSON values in recordings, replacing recorded request values with references to the previous response.
+
+Thanks to @cyberw for their work on this!
+
+### InfluxDB collector: Add support for sending certain sample tags as fields (#585)
+
+Since InfluxDB indexes tags, highly variable information like `vu`, `iter` or even `url` may lead to high memory usage. The InfluxDB documentation [recommends](https://docs.influxdata.com/influxdb/v1.5/concepts/schema_and_data_layout/#encouraged-schema-design) to use fields in that case, which is what k6 does now. There is a new `INFLUXDB_TAGS_AS_FIELDS` option (`collectors.influxdb.tagsAsFields` in the global k6 JSON config) that specifies which of the tags k6 emits will be sent as fields to InfluxDB. By default that's only `url` (but not `name`), `vu` and `iter` (if enabled).
+
+Thanks to @danron for their work on this!
+
+
 ## UX
 
 * Clearer error message when using `open` function outside init context (#563)
