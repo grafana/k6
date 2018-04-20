@@ -161,7 +161,7 @@ func (e *Engine) Run(ctx context.Context) error {
 	}
 
 	// Run the executor.
-	out := make(chan []stats.Sample)
+	out := make(chan []stats.SampleContainer)
 	errC := make(chan error)
 	subwg.Add(1)
 	go func() {
@@ -184,8 +184,10 @@ func (e *Engine) Run(ctx context.Context) error {
 			subwg.Wait()
 			close(out)
 		}()
-		for samples := range out {
-			e.processSamples(samples...)
+		for sampleContainers := range out {
+			for _, sampleContainer := range sampleContainers {
+				e.processSamples(sampleContainer)
+			}
 		}
 
 		// Emit final metrics.
@@ -203,8 +205,10 @@ func (e *Engine) Run(ctx context.Context) error {
 
 	for {
 		select {
-		case samples := <-out:
-			e.processSamples(samples...)
+		case sampleContainers := <-out:
+			for _, sampleContainer := range sampleContainers {
+				e.processSamples(sampleContainer)
+			}
 		case err := <-errC:
 			errC = nil
 			if err != nil {
@@ -248,20 +252,23 @@ func (e *Engine) runMetricsEmission(ctx context.Context) {
 func (e *Engine) emitMetrics() {
 	t := time.Now()
 
-	e.processSamples(
-		stats.Sample{
-			Time:   t,
-			Metric: metrics.VUs,
-			Value:  float64(e.Executor.GetVUs()),
-			Tags:   e.Options.RunTags,
+	e.processSamples(stats.ConnectedSamples{
+		Samples: []stats.Sample{
+			{
+				Time:   t,
+				Metric: metrics.VUs,
+				Value:  float64(e.Executor.GetVUs()),
+				Tags:   e.Options.RunTags,
+			}, {
+				Time:   t,
+				Metric: metrics.VUsMax,
+				Value:  float64(e.Executor.GetVUsMax()),
+				Tags:   e.Options.RunTags,
+			},
 		},
-		stats.Sample{
-			Time:   t,
-			Metric: metrics.VUsMax,
-			Value:  float64(e.Executor.GetVUsMax()),
-			Tags:   e.Options.RunTags,
-		},
-	)
+		Tags: e.Options.RunTags,
+		Time: t,
+	})
 }
 
 func (e *Engine) runThresholds(ctx context.Context, abort func()) {
@@ -311,7 +318,13 @@ func (e *Engine) processThresholds(abort func()) {
 	}
 }
 
-func (e *Engine) processSamples(samples ...stats.Sample) {
+func (e *Engine) processSamples(sampleCointainer stats.SampleContainer) {
+	if sampleCointainer == nil {
+		return
+	}
+
+	samples := sampleCointainer.GetSamples()
+
 	if len(samples) == 0 {
 		return
 	}
@@ -344,6 +357,6 @@ func (e *Engine) processSamples(samples ...stats.Sample) {
 		}
 	}
 	if e.Collector != nil {
-		e.Collector.Collect(samples)
+		e.Collector.Collect(sampleCointainer)
 	}
 }

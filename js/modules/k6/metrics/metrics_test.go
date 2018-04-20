@@ -30,6 +30,7 @@ import (
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMetrics(t *testing.T) {
@@ -100,14 +101,17 @@ func TestMetrics(t *testing.T) {
 										_, err := common.RunString(rt, fmt.Sprintf(`m.add(%v)`, val.JS))
 										assert.NoError(t, err)
 										if assert.Len(t, state.Samples, 1) {
-											assert.NotZero(t, state.Samples[0].Time)
-											assert.Equal(t, state.Samples[0].Value, val.Float)
+											sample, ok := state.Samples[0].(stats.Sample)
+											require.True(t, ok)
+
+											assert.NotZero(t, sample.Time)
+											assert.Equal(t, sample.Value, val.Float)
 											assert.Equal(t, map[string]string{
 												"group": g.Path,
-											}, state.Samples[0].Tags.CloneTags())
-											assert.Equal(t, "my_metric", state.Samples[0].Metric.Name)
-											assert.Equal(t, mtyp, state.Samples[0].Metric.Type)
-											assert.Equal(t, valueType, state.Samples[0].Metric.Contains)
+											}, sample.Tags.CloneTags())
+											assert.Equal(t, "my_metric", sample.Metric.Name)
+											assert.Equal(t, mtyp, sample.Metric.Type)
+											assert.Equal(t, valueType, sample.Metric.Contains)
 										}
 									})
 									t.Run("Tags", func(t *testing.T) {
@@ -115,15 +119,18 @@ func TestMetrics(t *testing.T) {
 										_, err := common.RunString(rt, fmt.Sprintf(`m.add(%v, {a:1})`, val.JS))
 										assert.NoError(t, err)
 										if assert.Len(t, state.Samples, 1) {
-											assert.NotZero(t, state.Samples[0].Time)
-											assert.Equal(t, state.Samples[0].Value, val.Float)
+											sample, ok := state.Samples[0].(stats.Sample)
+											require.True(t, ok)
+
+											assert.NotZero(t, sample.Time)
+											assert.Equal(t, sample.Value, val.Float)
 											assert.Equal(t, map[string]string{
 												"group": g.Path,
 												"a":     "1",
-											}, state.Samples[0].Tags.CloneTags())
-											assert.Equal(t, "my_metric", state.Samples[0].Metric.Name)
-											assert.Equal(t, mtyp, state.Samples[0].Metric.Type)
-											assert.Equal(t, valueType, state.Samples[0].Metric.Contains)
+											}, sample.Tags.CloneTags())
+											assert.Equal(t, "my_metric", sample.Metric.Name)
+											assert.Equal(t, mtyp, sample.Metric.Type)
+											assert.Equal(t, valueType, sample.Metric.Contains)
 										}
 									})
 								})

@@ -48,7 +48,7 @@ import (
 	null "gopkg.in/guregu/null.v3"
 )
 
-func assertRequestMetricsEmitted(t *testing.T, samples []stats.Sample, method, url, name string, status int, group string) {
+func assertRequestMetricsEmitted(t *testing.T, sampleContainers []stats.SampleContainer, method, url, name string, status int, group string) {
 	if name == "" {
 		name = url
 	}
@@ -60,30 +60,32 @@ func assertRequestMetricsEmitted(t *testing.T, samples []stats.Sample, method, u
 	seenSending := false
 	seenWaiting := false
 	seenReceiving := false
-	for _, sample := range samples {
-		tags := sample.Tags.CloneTags()
-		if tags["url"] == url {
-			switch sample.Metric {
-			case metrics.HTTPReqDuration:
-				seenDuration = true
-			case metrics.HTTPReqBlocked:
-				seenBlocked = true
-			case metrics.HTTPReqConnecting:
-				seenConnecting = true
-			case metrics.HTTPReqTLSHandshaking:
-				seenTLSHandshaking = true
-			case metrics.HTTPReqSending:
-				seenSending = true
-			case metrics.HTTPReqWaiting:
-				seenWaiting = true
-			case metrics.HTTPReqReceiving:
-				seenReceiving = true
-			}
+	for _, sampleContainer := range sampleContainers {
+		for _, sample := range sampleContainer.GetSamples() {
+			tags := sample.Tags.CloneTags()
+			if tags["url"] == url {
+				switch sample.Metric {
+				case metrics.HTTPReqDuration:
+					seenDuration = true
+				case metrics.HTTPReqBlocked:
+					seenBlocked = true
+				case metrics.HTTPReqConnecting:
+					seenConnecting = true
+				case metrics.HTTPReqTLSHandshaking:
+					seenTLSHandshaking = true
+				case metrics.HTTPReqSending:
+					seenSending = true
+				case metrics.HTTPReqWaiting:
+					seenWaiting = true
+				case metrics.HTTPReqReceiving:
+					seenReceiving = true
+				}
 
-			assert.Equal(t, strconv.Itoa(status), tags["status"])
-			assert.Equal(t, method, tags["method"])
-			assert.Equal(t, group, tags["group"])
-			assert.Equal(t, name, tags["name"])
+				assert.Equal(t, strconv.Itoa(status), tags["status"])
+				assert.Equal(t, method, tags["method"])
+				assert.Equal(t, group, tags["group"])
+				assert.Equal(t, name, tags["name"])
+			}
 		}
 	}
 	assert.True(t, seenDuration, "url %s didn't emit Duration", url)
@@ -309,10 +311,12 @@ func TestRequestAndBatch(t *testing.T) {
 		`)
 		assert.NoError(t, err)
 		assertRequestMetricsEmitted(t, state.Samples, "GET", "https://http2.akamai.com/demo", "", 200, "")
-		for _, sample := range state.Samples {
-			proto, ok := sample.Tags.Get("proto")
-			assert.True(t, ok)
-			assert.Equal(t, "HTTP/2.0", proto)
+		for _, sampleC := range state.Samples {
+			for _, sample := range sampleC.GetSamples() {
+				proto, ok := sample.Tags.Get("proto")
+				assert.True(t, ok)
+				assert.Equal(t, "HTTP/2.0", proto)
+			}
 		}
 	})
 	t.Run("TLS", func(t *testing.T) {
@@ -721,10 +725,12 @@ func TestRequestAndBatch(t *testing.T) {
 				`))
 				assert.NoError(t, err)
 				assertRequestMetricsEmitted(t, state.Samples, "GET", sr("HTTPBIN_URL/headers"), "", 200, "")
-				for _, sample := range state.Samples {
-					tagValue, ok := sample.Tags.Get("tag")
-					assert.True(t, ok)
-					assert.Equal(t, "value", tagValue)
+				for _, sampleC := range state.Samples {
+					for _, sample := range sampleC.GetSamples() {
+						tagValue, ok := sample.Tags.Get("tag")
+						assert.True(t, ok)
+						assert.Equal(t, "value", tagValue)
+					}
 				}
 			})
 		})
@@ -1007,10 +1013,12 @@ func TestSystemTags(t *testing.T) {
 			_, err := common.RunString(rt, fmt.Sprintf(`http.get("%s");`, url))
 			assert.NoError(t, err)
 			assert.NotEmpty(t, state.Samples)
-			for _, sample := range state.Samples {
-				assert.NotEmpty(t, sample.Tags)
-				for emittedTag := range sample.Tags.CloneTags() {
-					assert.Equal(t, expectedTag, emittedTag)
+			for _, sampleC := range state.Samples {
+				for _, sample := range sampleC.GetSamples() {
+					assert.NotEmpty(t, sample.Tags)
+					for emittedTag := range sample.Tags.CloneTags() {
+						assert.Equal(t, expectedTag, emittedTag)
+					}
 				}
 			}
 		})

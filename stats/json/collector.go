@@ -38,6 +38,9 @@ type Collector struct {
 	seenMetrics []string
 }
 
+// Verify that Collector implements lib.Collector
+var _ lib.Collector = &Collector{}
+
 func (c *Collector) HasSeenMetric(str string) bool {
 	for _, n := range c.seenMetrics {
 		if n == str {
@@ -97,8 +100,8 @@ func (c *Collector) HandleMetric(m *stats.Metric) {
 	}
 }
 
-func (c *Collector) Collect(samples []stats.Sample) {
-	for _, sample := range samples {
+func (c *Collector) Collect(samples stats.SampleContainer) {
+	for _, sample := range samples.GetSamples() {
 		c.HandleMetric(sample.Metric)
 
 		env := WrapSample(&sample)
