@@ -28,13 +28,11 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"strconv"
-	"sync/atomic"
 	"time"
 
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
 	"github.com/oxtoacart/bpool"
@@ -362,36 +360,7 @@ func (u *VU) runFn(ctx context.Context, fn goja.Callable, args ...goja.Value) (g
 		u.HTTPTransport.CloseIdleConnections()
 	}
 
-	bytesWritten := atomic.SwapInt64(&u.Dialer.BytesWritten, 0)
-	bytesRead := atomic.SwapInt64(&u.Dialer.BytesRead, 0)
-
-	state.Samples = append(
-		state.Samples,
-		stats.ConnectedSamples{
-			Samples: []stats.Sample{
-				stats.Sample{
-					Time:   endTime,
-					Metric: metrics.DataSent,
-					Value:  float64(bytesWritten),
-					Tags:   sampleTags,
-				},
-				stats.Sample{
-					Time:   endTime,
-					Metric: metrics.DataReceived,
-					Value:  float64(bytesRead),
-					Tags:   sampleTags,
-				},
-				stats.Sample{
-					Time:   endTime,
-					Metric: metrics.IterationDuration,
-					Value:  stats.D(endTime.Sub(startTime)),
-					Tags:   sampleTags,
-				},
-			},
-			Tags: sampleTags,
-			Time: endTime,
-		},
-	)
+	state.Samples = append(state.Samples, u.Dialer.GetTrail(startTime, endTime, sampleTags))
 
 	return v, state, err
 }
