@@ -28,32 +28,16 @@ import (
 	"mime/multipart"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/stats"
 	"github.com/pkg/errors"
 )
-
-type Sample struct {
-	Type   string     `json:"type"`
-	Metric string     `json:"metric"`
-	Data   SampleData `json:"data"`
-}
-
-type SampleData struct {
-	Type   stats.MetricType   `json:"type"`
-	Time   time.Time          `json:"time"`
-	Value  float64            `json:"value"`
-	Values map[string]float64 `json:"values,omitempty"`
-	Tags   *stats.SampleTags  `json:"tags,omitempty"`
-}
 
 type ThresholdResult map[string]map[string]bool
 
 type TestRun struct {
 	Name       string              `json:"name"`
-	ProjectID  int                 `json:"project_id,omitempty"`
+	ProjectID  int64               `json:"project_id,omitempty"`
 	Thresholds map[string][]string `json:"thresholds"`
 	// Duration of test in seconds. -1 for unknown length, 0 for continuous running.
 	Duration int64 `json:"duration"`
@@ -81,6 +65,9 @@ func (c *Client) CreateTestRun(testRun *TestRun) (*CreateTestRunResponse, error)
 		return nil, err
 	}
 
+	// TODO: add option to either overwrite certain aggregation options
+	// or to require that they are set
+
 	ctrr := CreateTestRunResponse{}
 	err = c.Do(req, &ctrr)
 	if err != nil {
@@ -103,31 +90,31 @@ func (c *Client) PushMetric(referenceID string, noCompress bool, samples []*Samp
 			return err
 		}
 		return c.Do(req, nil)
-	} else {
-		var buf bytes.Buffer
-		if samples != nil {
-			b, err := json.Marshal(&samples)
-			if err != nil {
-				return err
-			}
-			g := gzip.NewWriter(&buf)
-			if _, err = g.Write(b); err != nil {
-				return err
-			}
-			if err = g.Close(); err != nil {
-				return err
-			}
-		}
-		req, err := http.NewRequest("POST", url, &buf)
+	}
+
+	var buf bytes.Buffer
+	if samples != nil {
+		b, err := json.Marshal(&samples)
 		if err != nil {
 			return err
 		}
-		req.Header.Set("Content-Encoding", "gzip")
-		return c.Do(req, nil)
+		g := gzip.NewWriter(&buf)
+		if _, err = g.Write(b); err != nil {
+			return err
+		}
+		if err = g.Close(); err != nil {
+			return err
+		}
 	}
+	req, err := http.NewRequest("POST", url, &buf)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Encoding", "gzip")
+	return c.Do(req, nil)
 }
 
-func (c *Client) StartCloudTestRun(name string, projectID int, arc *lib.Archive) (string, error) {
+func (c *Client) StartCloudTestRun(name string, projectID int64, arc *lib.Archive) (string, error) {
 	requestUrl := fmt.Sprintf("%s/archive-upload", c.baseURL)
 
 	var buf bytes.Buffer
@@ -138,7 +125,7 @@ func (c *Client) StartCloudTestRun(name string, projectID int, arc *lib.Archive)
 	}
 
 	if projectID != 0 {
-		if err := mp.WriteField("project_id", strconv.Itoa(projectID)); err != nil {
+		if err := mp.WriteField("project_id", strconv.FormatInt(projectID, 10)); err != nil {
 			return "", err
 		}
 	}
