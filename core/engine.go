@@ -185,9 +185,7 @@ func (e *Engine) Run(ctx context.Context) error {
 			close(out)
 		}()
 		for sampleContainers := range out {
-			for _, sampleContainer := range sampleContainers {
-				e.processSamples(sampleContainer)
-			}
+			e.processSamples(sampleContainers...)
 		}
 
 		// Emit final metrics.
@@ -206,9 +204,7 @@ func (e *Engine) Run(ctx context.Context) error {
 	for {
 		select {
 		case sampleContainers := <-out:
-			for _, sampleContainer := range sampleContainers {
-				e.processSamples(sampleContainer)
-			}
+			e.processSamples(sampleContainers...)
 		case err := <-errC:
 			errC = nil
 			if err != nil {
@@ -318,45 +314,47 @@ func (e *Engine) processThresholds(abort func()) {
 	}
 }
 
-func (e *Engine) processSamples(sampleCointainer stats.SampleContainer) {
-	if sampleCointainer == nil {
-		return
-	}
-
-	samples := sampleCointainer.GetSamples()
-
-	if len(samples) == 0 {
+func (e *Engine) processSamples(sampleCointainers ...stats.SampleContainer) {
+	if len(sampleCointainers) == 0 {
 		return
 	}
 
 	e.MetricsLock.Lock()
 	defer e.MetricsLock.Unlock()
 
-	for _, sample := range samples {
-		m, ok := e.Metrics[sample.Metric.Name]
-		if !ok {
-			m = stats.New(sample.Metric.Name, sample.Metric.Type, sample.Metric.Contains)
-			m.Thresholds = e.thresholds[m.Name]
-			m.Submetrics = e.submetrics[m.Name]
-			e.Metrics[m.Name] = m
+	for _, sampleCointainer := range sampleCointainers {
+		samples := sampleCointainer.GetSamples()
+
+		if len(samples) == 0 {
+			continue
 		}
-		m.Sink.Add(sample)
 
-		for _, sm := range m.Submetrics {
-			if !sm.Tags.IsEqual(sample.Tags) {
-				continue
+		for _, sample := range samples {
+			m, ok := e.Metrics[sample.Metric.Name]
+			if !ok {
+				m = stats.New(sample.Metric.Name, sample.Metric.Type, sample.Metric.Contains)
+				m.Thresholds = e.thresholds[m.Name]
+				m.Submetrics = e.submetrics[m.Name]
+				e.Metrics[m.Name] = m
 			}
+			m.Sink.Add(sample)
 
-			if sm.Metric == nil {
-				sm.Metric = stats.New(sm.Name, sample.Metric.Type, sample.Metric.Contains)
-				sm.Metric.Sub = *sm
-				sm.Metric.Thresholds = e.thresholds[sm.Name]
-				e.Metrics[sm.Name] = sm.Metric
+			for _, sm := range m.Submetrics {
+				if !sm.Tags.IsEqual(sample.Tags) {
+					continue
+				}
+
+				if sm.Metric == nil {
+					sm.Metric = stats.New(sm.Name, sample.Metric.Type, sample.Metric.Contains)
+					sm.Metric.Sub = *sm
+					sm.Metric.Thresholds = e.thresholds[sm.Name]
+					e.Metrics[sm.Name] = sm.Metric
+				}
+				sm.Metric.Sink.Add(sample)
 			}
-			sm.Metric.Sink.Add(sample)
 		}
 	}
 	if e.Collector != nil {
-		e.Collector.Collect(sampleCointainer)
+		e.Collector.Collect(sampleCointainers)
 	}
 }
