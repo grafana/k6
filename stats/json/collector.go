@@ -100,24 +100,26 @@ func (c *Collector) HandleMetric(m *stats.Metric) {
 	}
 }
 
-func (c *Collector) Collect(samples stats.SampleContainer) {
-	for _, sample := range samples.GetSamples() {
-		c.HandleMetric(sample.Metric)
+func (c *Collector) Collect(scs []stats.SampleContainer) {
+	for _, sc := range scs {
+		for _, sample := range sc.GetSamples() {
+			c.HandleMetric(sample.Metric)
 
-		env := WrapSample(&sample)
-		row, err := json.Marshal(env)
+			env := WrapSample(&sample)
+			row, err := json.Marshal(env)
 
-		if err != nil || env == nil {
-			// Skip metric if it can't be made into JSON or envelope is null.
-			log.WithField("filename", c.fname).Warning(
-				"JSON: Envelope is nil or Sample couldn't be marshalled to JSON")
-			continue
-		}
-		row = append(row, '\n')
-		_, err = c.outfile.Write(row)
-		if err != nil {
-			log.WithField("filename", c.fname).Error("JSON: Error writing to file")
-			continue
+			if err != nil || env == nil {
+				// Skip metric if it can't be made into JSON or envelope is null.
+				log.WithField("filename", c.fname).Warning(
+					"JSON: Envelope is nil or Sample couldn't be marshalled to JSON")
+				continue
+			}
+			row = append(row, '\n')
+			_, err = c.outfile.Write(row)
+			if err != nil {
+				log.WithField("filename", c.fname).Error("JSON: Error writing to file")
+				continue
+			}
 		}
 	}
 }
