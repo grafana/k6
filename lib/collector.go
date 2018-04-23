@@ -30,7 +30,7 @@ import (
 // such as an InfluxDB instance.
 type Collector interface {
 	// Init is called between the collector's creation and the call to Run().
-	// You should do any lenghty setup here rather than in New.
+	// You should do any lengthy setup here rather than in New.
 	Init() error
 
 	// Run is called in a goroutine and starts the collector. Should commit samples to the backend

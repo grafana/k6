@@ -27,7 +27,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 )
 
-// Config holds all the neccessary data and options for sending metrics to the Load Impact cloud.
+// Config holds all the necessary data and options for sending metrics to the Load Impact cloud.
 type Config struct {
 	Token           null.String `json:"token" envconfig:"CLOUD_TOKEN"`
 	DeprecatedToken null.String `json:"-" envconfig:"K6CLOUD_TOKEN"`
@@ -47,7 +47,7 @@ type Config struct {
 	//   split into AggregationPeriod-sized time buckets (time slots) and
 	//   then into sub-buckets according to their tags (each sub-bucket
 	//   will contain only HTTP trails with the same sample tags).
-	// - If AggregationWaitPeriod is not passed for a particualr time
+	// - If AggregationWaitPeriod is not passed for a particular time
 	//   bucket, it's left undisturbed until the next AggregationCalcInterval
 	//   tick comes along.
 	// - If AggregationWaitPeriod is passed for a time bucket, all of its
