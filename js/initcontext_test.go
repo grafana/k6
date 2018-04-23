@@ -317,7 +317,7 @@ func TestRequestWithBinaryFile(t *testing.T) {
 		}()
 
 		r.ParseMultipartForm(32 << 20)
-		file, _, err := r.FormFile("test.bin")
+		file, _, err := r.FormFile("file")
 		assert.NoError(t, err)
 		defer file.Close()
 		bytes := make([]byte, 3)
