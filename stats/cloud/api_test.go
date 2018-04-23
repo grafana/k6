@@ -65,7 +65,7 @@ func TestPublishMetric(t *testing.T) {
 		{
 			Type:   "Point",
 			Metric: "metric",
-			Data: SampleData{
+			Data: SampleDataSingle{
 				Type:  1,
 				Time:  time.Now(),
 				Value: 1.2,
@@ -98,7 +98,7 @@ func TestFinished(t *testing.T) {
 func TestAuthorizedError(t *testing.T) {
 	called := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		called += 1
+		called++
 		w.WriteHeader(http.StatusForbidden)
 		fmt.Fprintf(w, `{"error": {"code": 5, "message": "Not allowed"}}`)
 	}))
@@ -116,7 +116,7 @@ func TestAuthorizedError(t *testing.T) {
 func TestRetry(t *testing.T) {
 	called := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		called += 1
+		called++
 		w.WriteHeader(500)
 	}))
 	defer server.Close()
@@ -133,7 +133,7 @@ func TestRetry(t *testing.T) {
 func TestRetrySuccessOnSecond(t *testing.T) {
 	called := 1
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		called += 1
+		called++
 		if called == 2 {
 			fmt.Fprintf(w, `{"reference_id": "1"}`)
 			return

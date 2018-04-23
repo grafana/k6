@@ -22,21 +22,23 @@ package cloud
 
 import (
 	"context"
+	"encoding/json"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
+	"github.com/loadimpact/k6/lib/metrics"
+	"github.com/loadimpact/k6/lib/netext"
+
+	"gopkg.in/guregu/null.v3"
+
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
-	"github.com/mitchellh/mapstructure"
 	log "github.com/sirupsen/logrus"
 )
 
-const (
-	TestName           = "k6 test"
-	MetricPushInterval = 1 * time.Second
-)
+// TestName is the default Load Impact Cloud test name
+const TestName = "k6 test"
 
 // Collector sends result data to the Load Impact cloud service.
 type Collector struct {
@@ -49,23 +51,29 @@ type Collector struct {
 
 	anonymous bool
 
-	sampleBuffer []*Sample
-	sampleMu     sync.Mutex
+	bufferMutex      sync.Mutex
+	bufferHTTPTrails []*netext.Trail
+	bufferSamples    []*Sample
+
+	aggBuckets map[int64]aggregationBucket
 }
+
+// Verify that Collector implements lib.Collector
+var _ lib.Collector = &Collector{}
 
 // New creates a new cloud collector
 func New(conf Config, src *lib.SourceData, opts lib.Options, version string) (*Collector, error) {
 	if val, ok := opts.External["loadimpact"]; ok {
-		if err := mapstructure.Decode(val, &conf); err != nil {
+		if err := json.Unmarshal(val, &conf); err != nil {
 			return nil, err
 		}
 	}
 
-	if conf.Name == "" {
-		conf.Name = filepath.Base(src.Filename)
+	if !conf.Name.Valid {
+		conf.Name = null.StringFrom(filepath.Base(src.Filename))
 	}
-	if conf.Name == "-" {
-		conf.Name = TestName
+	if conf.Name.String == "-" {
+		conf.Name = null.StringFrom(TestName)
 	}
 
 	thresholds := make(map[string][]*stats.Threshold)
@@ -81,7 +89,7 @@ func New(conf Config, src *lib.SourceData, opts lib.Options, version string) (*C
 		duration = int64(time.Duration(opts.Duration.Duration).Seconds())
 	}
 
-	if conf.Token == "" && conf.DeprecatedToken != "" {
+	if !conf.Token.Valid && conf.DeprecatedToken.Valid {
 		log.Warn("K6CLOUD_TOKEN is deprecated and will be removed. Use K6_CLOUD_TOKEN instead.")
 		conf.Token = conf.DeprecatedToken
 	}
@@ -89,9 +97,10 @@ func New(conf Config, src *lib.SourceData, opts lib.Options, version string) (*C
 	return &Collector{
 		config:     conf,
 		thresholds: thresholds,
-		client:     NewClient(conf.Token, conf.Host, version),
-		anonymous:  conf.Token == "",
+		client:     NewClient(conf.Token.String, conf.Host.String, version),
+		anonymous:  !conf.Token.Valid,
 		duration:   duration,
+		aggBuckets: map[int64]aggregationBucket{},
 	}, nil
 }
 
@@ -105,8 +114,8 @@ func (c *Collector) Init() error {
 	}
 
 	testRun := &TestRun{
-		Name:       c.config.Name,
-		ProjectID:  c.config.ProjectID,
+		Name:       c.config.Name.String,
+		ProjectID:  c.config.ProjectID.Int64,
 		Thresholds: thresholds,
 		Duration:   c.duration,
 	}
@@ -132,15 +141,41 @@ func (c *Collector) Link() string {
 }
 
 func (c *Collector) Run(ctx context.Context) {
-	timer := time.NewTicker(MetricPushInterval)
+	wg := sync.WaitGroup{}
 
+	// If enabled, start periodically aggregating the collected HTTP trails
+	if c.config.AggregationPeriod.Duration > 0 {
+		wg.Add(1)
+		aggregationTicker := time.NewTicker(time.Duration(c.config.AggregationCalcInterval.Duration))
+
+		go func() {
+			for {
+				select {
+				case <-aggregationTicker.C:
+					c.aggregateHTTPTrails()
+				case <-ctx.Done():
+					c.aggregateHTTPTrails()
+					c.flushHTTPTrails()
+					c.pushMetrics()
+					wg.Done()
+					return
+				}
+			}
+		}()
+	}
+
+	defer func() {
+		wg.Wait()
+		c.testFinished()
+	}()
+
+	pushTicker := time.NewTicker(time.Duration(c.config.MetricPushInterval.Duration))
 	for {
 		select {
-		case <-timer.C:
+		case <-pushTicker.C:
 			c.pushMetrics()
 		case <-ctx.Done():
 			c.pushMetrics()
-			c.testFinished()
 			return
 		}
 	}
@@ -150,86 +185,101 @@ func (c *Collector) IsReady() bool {
 	return true
 }
 
-func (c *Collector) Collect(samples []stats.Sample) {
+func (c *Collector) Collect(sampleContainers []stats.SampleContainer) {
 	if c.referenceID == "" {
 		return
 	}
 
-	var cloudSamples []*Sample
-	var httpJSON *Sample
-	var iterationJSON *Sample
-	for _, samp := range samples {
+	newSamples := []*Sample{}
+	newHTTPTrails := []*netext.Trail{}
 
-		name := samp.Metric.Name
-		if name == "http_reqs" {
-			httpJSON = &Sample{
-				Type:   "Points",
-				Metric: "http_req_li_all",
-				Data: SampleData{
-					Type:   samp.Metric.Type,
-					Time:   samp.Time,
-					Tags:   samp.Tags,
-					Values: make(map[string]float64),
-				},
+	for _, sampleContainer := range sampleContainers {
+		switch sc := sampleContainer.(type) {
+		case *netext.Trail:
+			// Check if aggregation is enabled,
+			if c.config.AggregationPeriod.Duration > 0 {
+				newHTTPTrails = append(newHTTPTrails, sc)
+			} else {
+				newSamples = append(newSamples, NewSampleFromTrail(sc))
 			}
-			httpJSON.Data.Values[name] = samp.Value
-			cloudSamples = append(cloudSamples, httpJSON)
-		} else if name == "data_sent" {
-			iterationJSON = &Sample{
+		case *netext.NetTrail:
+			//TODO: aggregate?
+			newSamples = append(newSamples, &Sample{
 				Type:   "Points",
 				Metric: "iter_li_all",
-				Data: SampleData{
-					Type:   samp.Metric.Type,
-					Time:   samp.Time,
-					Tags:   samp.Tags,
-					Values: make(map[string]float64),
-				},
+				Data: SampleDataMap{
+					Time: sc.GetTime(),
+					Tags: sc.GetTags(),
+					Values: map[string]float64{
+						metrics.DataSent.Name:          float64(sc.BytesWritten),
+						metrics.DataReceived.Name:      float64(sc.BytesRead),
+						metrics.IterationDuration.Name: stats.D(sc.EndTime.Sub(sc.StartTime)),
+					},
+				}})
+		default:
+			for _, sample := range sampleContainer.GetSamples() {
+				newSamples = append(newSamples, &Sample{
+					Type:   "Point",
+					Metric: sample.Metric.Name,
+					Data: SampleDataSingle{
+						Type:  sample.Metric.Type,
+						Time:  sample.Time,
+						Tags:  sample.Tags,
+						Value: sample.Value,
+					},
+				})
 			}
-			iterationJSON.Data.Values[name] = samp.Value
-			cloudSamples = append(cloudSamples, iterationJSON)
-		} else if name == "data_received" || name == "iteration_duration" {
-			//TODO: make sure that tags match
-			iterationJSON.Data.Values[name] = samp.Value
-		} else if strings.HasPrefix(name, "http_req_") {
-			//TODO: make sure that tags match
-			httpJSON.Data.Values[name] = samp.Value
-		} else {
-			sampleJSON := &Sample{
-				Type:   "Point",
-				Metric: name,
-				Data: SampleData{
-					Type:  samp.Metric.Type,
-					Time:  samp.Time,
-					Value: samp.Value,
-					Tags:  samp.Tags,
-				},
-			}
-			cloudSamples = append(cloudSamples, sampleJSON)
 		}
 	}
 
-	if len(cloudSamples) > 0 {
-		c.sampleMu.Lock()
-		c.sampleBuffer = append(c.sampleBuffer, cloudSamples...)
-		c.sampleMu.Unlock()
+	if len(newSamples) > 0 || len(newHTTPTrails) > 0 {
+		c.bufferMutex.Lock()
+		c.bufferSamples = append(c.bufferSamples, newSamples...)
+		c.bufferHTTPTrails = append(c.bufferHTTPTrails, newHTTPTrails...)
+		c.bufferMutex.Unlock()
 	}
 }
 
+func (c *Collector) aggregateHTTPTrails() {
+	//TODO, this is just a placeholder so I can commit without a broken build
+	c.flushHTTPTrails()
+}
+
+func (c *Collector) flushHTTPTrails() {
+	c.bufferMutex.Lock()
+	defer c.bufferMutex.Unlock()
+
+	newSamples := []*Sample{}
+	for _, trail := range c.bufferHTTPTrails {
+		newSamples = append(newSamples, NewSampleFromTrail(trail))
+	}
+	for _, bucket := range c.aggBuckets {
+		for _, trails := range bucket {
+			for _, trail := range trails {
+				newSamples = append(newSamples, NewSampleFromTrail(trail))
+			}
+		}
+	}
+
+	c.bufferHTTPTrails = nil
+	c.aggBuckets = map[int64]aggregationBucket{}
+	c.bufferSamples = append(c.bufferSamples, newSamples...)
+}
 func (c *Collector) pushMetrics() {
-	c.sampleMu.Lock()
-	if len(c.sampleBuffer) == 0 {
-		c.sampleMu.Unlock()
+	c.bufferMutex.Lock()
+	if len(c.bufferSamples) == 0 {
+		c.bufferMutex.Unlock()
 		return
 	}
-	buffer := c.sampleBuffer
-	c.sampleBuffer = nil
-	c.sampleMu.Unlock()
+	buffer := c.bufferSamples
+	c.bufferSamples = nil
+	c.bufferMutex.Unlock()
 
 	log.WithFields(log.Fields{
 		"samples": len(buffer),
 	}).Debug("Pushing metrics to cloud")
 
-	err := c.client.PushMetric(c.referenceID, c.config.NoCompress, buffer)
+	err := c.client.PushMetric(c.referenceID, c.config.NoCompress.Bool, buffer)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"error": err,

@@ -62,6 +62,15 @@ func (h *vuHandle) run(logger *log.Logger, flow <-chan int64, out chan<- []stats
 
 		var samples []stats.SampleContainer
 		if h.vu != nil {
+			// TODO: Refactor this if we want better aggregation...
+			// As seen below, at the moment test scripts will emit their
+			// metric samples only after they've finished executing. This
+			// means that long-running scripts will emit samples with
+			// times long in the past, long after their respective time buckets
+			// have been sent to the cloud. If we instead pass on the out
+			// SampleContainer channel directly to the VU, we could Collect()
+			// those samples as soon as they are emitted.
+
 			runSamples, err := h.vu.RunOnce(ctx)
 			if err != nil {
 				select {
