@@ -72,7 +72,7 @@ type Config struct {
 	// If aggregation is enabled, but the collected samples for a certain AggregationPeriod after AggregationPushDelay has passed are less than this number, they won't be aggregated.
 	AggregationMinSamples null.Int `json:"aggregationMinSamples" envconfig:"CLOUD_AGGREGATION_MIN_SAMPLES"`
 
-	// Which HTTP trails to consier non-aggregatable outliers.
+	// Which HTTP trails (how many IQRs below Q1 or above Q3) to consier non-aggregatable outliers.
 	AggregationOutliers null.Float `json:"aggregationOutliers" envconfig:"CLOUD_AGGREGATION_OUTLIERS"`
 }
 
@@ -85,7 +85,7 @@ func NewConfig() Config {
 		AggregationCalcInterval: types.NullDurationFrom(3 * time.Second),
 		AggregationWaitPeriod:   types.NullDurationFrom(5 * time.Second),
 		AggregationMinSamples:   null.IntFrom(100),
-		//TODO: set default AggregationOutliers
+		AggregationOutliers:     null.FloatFrom(1.5),
 	}
 }
 

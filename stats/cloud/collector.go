@@ -24,11 +24,13 @@ import (
 	"context"
 	"encoding/json"
 	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/netext"
+	"github.com/pkg/errors"
 
 	"gopkg.in/guregu/null.v3"
 
@@ -55,7 +57,7 @@ type Collector struct {
 	bufferHTTPTrails []*netext.Trail
 	bufferSamples    []*Sample
 
-	aggBuckets map[int64]aggregationBucket
+	aggrBuckets map[int64]aggregationBucket
 }
 
 // Verify that Collector implements lib.Collector
@@ -67,6 +69,10 @@ func New(conf Config, src *lib.SourceData, opts lib.Options, version string) (*C
 		if err := json.Unmarshal(val, &conf); err != nil {
 			return nil, err
 		}
+	}
+
+	if conf.AggregationPeriod.Duration > 0 && (opts.SystemTags["vu"] || opts.SystemTags["iter"]) {
+		return nil, errors.New("aggregatoion cannot be enabled if the 'vu' or 'iter' system tag is also enabled")
 	}
 
 	if !conf.Name.Valid {
@@ -95,12 +101,12 @@ func New(conf Config, src *lib.SourceData, opts lib.Options, version string) (*C
 	}
 
 	return &Collector{
-		config:     conf,
-		thresholds: thresholds,
-		client:     NewClient(conf.Token.String, conf.Host.String, version),
-		anonymous:  !conf.Token.Valid,
-		duration:   duration,
-		aggBuckets: map[int64]aggregationBucket{},
+		config:      conf,
+		thresholds:  thresholds,
+		client:      NewClient(conf.Token.String, conf.Host.String, version),
+		anonymous:   !conf.Token.Valid,
+		duration:    duration,
+		aggrBuckets: map[int64]aggregationBucket{},
 	}, nil
 }
 
@@ -152,9 +158,9 @@ func (c *Collector) Run(ctx context.Context) {
 			for {
 				select {
 				case <-aggregationTicker.C:
-					c.aggregateHTTPTrails()
+					c.aggregateHTTPTrails(time.Duration(c.config.AggregationWaitPeriod.Duration))
 				case <-ctx.Done():
-					c.aggregateHTTPTrails()
+					c.aggregateHTTPTrails(0)
 					c.flushHTTPTrails()
 					c.pushMetrics()
 					wg.Done()
@@ -240,9 +246,114 @@ func (c *Collector) Collect(sampleContainers []stats.SampleContainer) {
 	}
 }
 
-func (c *Collector) aggregateHTTPTrails() {
-	//TODO, this is just a placeholder so I can commit without a broken build
-	c.flushHTTPTrails()
+func (c *Collector) aggregateHTTPTrails(waitPeriod time.Duration) {
+	c.bufferMutex.Lock()
+	newHTTPTrails := c.bufferHTTPTrails
+	c.bufferHTTPTrails = nil
+	c.bufferMutex.Unlock()
+
+	aggrPeriod := int64(c.config.AggregationPeriod.Duration)
+
+	// Distribute all newly buffered HTTP trails into buckets and sub-buckets
+	for _, trail := range newHTTPTrails {
+		trailTags := trail.GetTags()
+		bucketID := trail.GetTime().UnixNano() / aggrPeriod
+
+		// Get or create a time bucket for that trail period
+		bucket, ok := c.aggrBuckets[bucketID]
+		if !ok {
+			bucket = aggregationBucket{}
+			c.aggrBuckets[bucketID] = bucket
+		}
+
+		// Either use an existing subbucket key or use the trail tags as a new one
+		subBucketKey := trailTags
+		subBucket, ok := bucket[subBucketKey]
+		if !ok {
+			for sbTags, sb := range bucket {
+				if trailTags.IsEqual(sbTags) {
+					subBucketKey = sbTags
+					subBucket = sb
+				}
+			}
+		}
+		bucket[subBucketKey] = append(subBucket, trail)
+	}
+
+	// Which buckets are still new and we'll wait for trails to accumulate before aggregating
+	bucketCutoffTime := time.Now().Add(-waitPeriod)
+	bucketCutoffID := int64(bucketCutoffTime.UnixNano()) / aggrPeriod
+	outliersCoef := c.config.AggregationOutliers.Float64
+	newSamples := []*Sample{}
+
+	// Handle all aggregation buckets older than bucketCutoffID
+	for bucketID, subBuckets := range c.aggrBuckets {
+		if bucketID > bucketCutoffID {
+			continue
+		}
+
+		for tags, httpTrails := range subBuckets {
+			trailCount := int64(len(httpTrails))
+			if trailCount < c.config.AggregationMinSamples.Int64 {
+				for _, trail := range httpTrails {
+					newSamples = append(newSamples, NewSampleFromTrail(trail))
+				}
+				continue
+			}
+
+			connDurations := make(durations, trailCount)
+			reqDurations := make(durations, trailCount)
+			for i, trail := range httpTrails {
+				connDurations[i] = trail.ConnDuration
+				reqDurations[i] = trail.Duration
+			}
+			sort.Sort(connDurations)
+			sort.Sort(reqDurations)
+
+			minConnDur, maxConnDur := connDurations.GetNormalBounds(outliersCoef)
+			minReqDur, maxReqDur := reqDurations.GetNormalBounds(outliersCoef)
+
+			aggData := SampleDataAggregatedHTTPReqs{
+				Time: time.Unix(0, bucketID*aggrPeriod+aggrPeriod/2),
+				Type: "aggregated_trend",
+				Tags: tags,
+			}
+
+			for _, trail := range httpTrails {
+				if trail.ConnDuration < minConnDur ||
+					trail.ConnDuration > maxConnDur ||
+					trail.Duration < minReqDur ||
+					trail.Duration > maxReqDur {
+
+					newSamples = append(newSamples, NewSampleFromTrail(trail))
+				} else {
+					aggData.Count++
+					aggData.Values.Duration.Add(trail.Duration)
+					aggData.Values.Blocked.Add(trail.Blocked)
+					aggData.Values.Connecting.Add(trail.Connecting)
+					aggData.Values.TLSHandshaking.Add(trail.TLSHandshaking)
+					aggData.Values.Sending.Add(trail.Sending)
+					aggData.Values.Waiting.Add(trail.Waiting)
+					aggData.Values.Receiving.Add(trail.Receiving)
+				}
+			}
+			aggData.CalcAverages()
+			if aggData.Count > 0 {
+				newSamples = append(newSamples, &Sample{
+					Type:   "AggregatedPoints",
+					Metric: "http_req_li_all",
+					Data:   aggData,
+				})
+			}
+		}
+		delete(c.aggrBuckets, bucketID)
+	}
+
+	if len(newSamples) > 0 {
+		c.bufferMutex.Lock()
+		c.bufferSamples = append(c.bufferSamples, newSamples...)
+		c.bufferMutex.Unlock()
+	}
 }
 
 func (c *Collector) flushHTTPTrails() {
@@ -253,7 +364,7 @@ func (c *Collector) flushHTTPTrails() {
 	for _, trail := range c.bufferHTTPTrails {
 		newSamples = append(newSamples, NewSampleFromTrail(trail))
 	}
-	for _, bucket := range c.aggBuckets {
+	for _, bucket := range c.aggrBuckets {
 		for _, trails := range bucket {
 			for _, trail := range trails {
 				newSamples = append(newSamples, NewSampleFromTrail(trail))
@@ -262,7 +373,7 @@ func (c *Collector) flushHTTPTrails() {
 	}
 
 	c.bufferHTTPTrails = nil
-	c.aggBuckets = map[int64]aggregationBucket{}
+	c.aggrBuckets = map[int64]aggregationBucket{}
 	c.bufferSamples = append(c.bufferSamples, newSamples...)
 }
 func (c *Collector) pushMetrics() {
