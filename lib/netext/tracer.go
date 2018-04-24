@@ -38,6 +38,9 @@ type Trail struct {
 	StartTime time.Time
 	EndTime   time.Time
 
+	// Total connect time (Connecting + TLSHandshaking)
+	ConnDuration time.Duration
+
 	// Total request duration, excluding DNS lookup and connect time.
 	Duration time.Duration
 
@@ -300,6 +303,7 @@ func (t *Tracer) Done() *Trail {
 
 	// Calculate total times using adjusted values.
 	trail.EndTime = done
+	trail.ConnDuration = trail.Connecting + trail.TLSHandshaking
 	trail.Duration = trail.Sending + trail.Waiting + trail.Receiving
 	trail.StartTime = trail.EndTime.Add(-trail.Duration)
 
