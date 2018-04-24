@@ -282,7 +282,7 @@ func (c *Collector) aggregateHTTPTrails(waitPeriod time.Duration) {
 
 	// Which buckets are still new and we'll wait for trails to accumulate before aggregating
 	bucketCutoffTime := time.Now().Add(-waitPeriod)
-	bucketCutoffID := int64(bucketCutoffTime.UnixNano()) / aggrPeriod
+	bucketCutoffID := bucketCutoffTime.UnixNano() / aggrPeriod
 	outliersCoef := c.config.AggregationOutliers.Float64
 	newSamples := []*Sample{}
 
