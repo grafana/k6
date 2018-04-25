@@ -536,13 +536,12 @@ func (http *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, erro
 
 	reqs := reqsV.ToObject(rt)
 	keys := reqs.Keys()
-	var args []goja.Value
 	for _, k := range keys {
 		k := k
 		v := reqs.Get(k)
 
 		method := HTTP_METHOD_GET
-		args = []goja.Value{goja.Undefined()}
+		args := []goja.Value{goja.Undefined()}
 		var url URL
 
 		// Shorthand: "http://example.com/" -> ["GET", "http://example.com/"]
