@@ -60,7 +60,7 @@ func newCollector(collectorName, arg string, src *lib.SourceData, conf Config) (
 			return jsonc.New(afero.NewOsFs(), arg)
 		case collectorInfluxDB:
 			config := influxdb.NewConfig().Apply(conf.Collectors.InfluxDB)
-			if err := envconfig.Process("k6", config); err != nil {
+			if err := envconfig.Process("k6", &config); err != nil {
 				return nil, err
 			}
 			urlConfig, err := influxdb.ParseURL(arg)
@@ -71,6 +71,9 @@ func newCollector(collectorName, arg string, src *lib.SourceData, conf Config) (
 			return influxdb.New(config)
 		case collectorCloud:
 			config := cloud.NewConfig().Apply(conf.Collectors.Cloud)
+			if err := envconfig.Process("k6", &config); err != nil {
+				return nil, err
+			}
 			if arg != "" {
 				config.Name = null.StringFrom(arg)
 			}
