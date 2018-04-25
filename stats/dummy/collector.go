@@ -62,3 +62,5 @@ func (c *Collector) Link() string {
 func (c *Collector) GetRequiredSystemTags() lib.TagSet {
 	return lib.TagSet{} // There are no required tags for this collector
 }
+
+func (c *Collector) SetRunStatus(status int) {}
