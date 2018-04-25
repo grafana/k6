@@ -69,6 +69,8 @@ func (c *Collector) Init() error {
 	return nil
 }
 
+func (c *Collector) SetRunStatus(status int) {}
+
 func (c *Collector) Run(ctx context.Context) {
 	log.WithField("filename", c.fname).Debug("JSON: Writing JSON metrics")
 	<-ctx.Done()
