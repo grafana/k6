@@ -24,7 +24,6 @@ import (
 	"context"
 	"encoding/json"
 	"path/filepath"
-	"sort"
 	"sync"
 	"time"
 
@@ -75,7 +74,7 @@ func New(conf Config, src *lib.SourceData, opts lib.Options, version string) (*C
 		return nil, errors.New("aggregatoion cannot be enabled if the 'vu' or 'iter' system tag is also enabled")
 	}
 
-	if !conf.Name.Valid {
+	if !conf.Name.Valid || conf.Name.String == "" {
 		conf.Name = null.StringFrom(filepath.Base(src.Filename))
 	}
 	if conf.Name.String == "-" {
@@ -235,6 +234,7 @@ func (c *Collector) Collect(sampleContainers []stats.SampleContainer) {
 					},
 				})
 			}
+
 		}
 	}
 
@@ -281,8 +281,7 @@ func (c *Collector) aggregateHTTPTrails(waitPeriod time.Duration) {
 	}
 
 	// Which buckets are still new and we'll wait for trails to accumulate before aggregating
-	bucketCutoffTime := time.Now().Add(-waitPeriod)
-	bucketCutoffID := bucketCutoffTime.UnixNano() / aggrPeriod
+	bucketCutoffID := time.Now().Add(-waitPeriod).UnixNano() / aggrPeriod
 	outliersCoef := c.config.AggregationOutliers.Float64
 	newSamples := []*Sample{}
 
@@ -307,13 +306,10 @@ func (c *Collector) aggregateHTTPTrails(waitPeriod time.Duration) {
 				connDurations[i] = trail.ConnDuration
 				reqDurations[i] = trail.Duration
 			}
-			sort.Sort(connDurations)
-			sort.Sort(reqDurations)
-
 			minConnDur, maxConnDur := connDurations.GetNormalBounds(outliersCoef)
 			minReqDur, maxReqDur := reqDurations.GetNormalBounds(outliersCoef)
 
-			aggData := SampleDataAggregatedHTTPReqs{
+			aggrData := SampleDataAggregatedHTTPReqs{
 				Time: Timestamp(time.Unix(0, bucketID*aggrPeriod+aggrPeriod/2)),
 				Type: "aggregated_trend",
 				Tags: tags,
@@ -327,22 +323,16 @@ func (c *Collector) aggregateHTTPTrails(waitPeriod time.Duration) {
 
 					newSamples = append(newSamples, NewSampleFromTrail(trail))
 				} else {
-					aggData.Count++
-					aggData.Values.Duration.Add(trail.Duration)
-					aggData.Values.Blocked.Add(trail.Blocked)
-					aggData.Values.Connecting.Add(trail.Connecting)
-					aggData.Values.TLSHandshaking.Add(trail.TLSHandshaking)
-					aggData.Values.Sending.Add(trail.Sending)
-					aggData.Values.Waiting.Add(trail.Waiting)
-					aggData.Values.Receiving.Add(trail.Receiving)
+					aggrData.Add(trail)
 				}
 			}
-			aggData.CalcAverages()
-			if aggData.Count > 0 {
+			aggrData.CalcAverages()
+
+			if aggrData.Count > 0 {
 				newSamples = append(newSamples, &Sample{
 					Type:   "AggregatedPoints",
 					Metric: "http_req_li_all",
-					Data:   aggData,
+					Data:   aggrData,
 				})
 			}
 		}

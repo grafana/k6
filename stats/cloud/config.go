@@ -33,6 +33,7 @@ type Config struct {
 	DeprecatedToken null.String `json:"-" envconfig:"K6CLOUD_TOKEN"`
 	Name            null.String `json:"name" envconfig:"CLOUD_NAME"`
 	Host            null.String `json:"host" envconfig:"CLOUD_HOST"`
+	WebAppURL       null.String `json:"webAppURL" envconfig:"CLOUD_WEB_APP_URL"`
 	NoCompress      null.Bool   `json:"noCompress" envconfig:"CLOUD_NO_COMPRESS"`
 	ProjectID       null.Int    `json:"projectID" envconfig:"CLOUD_PROJECT_ID"`
 
@@ -80,6 +81,7 @@ type Config struct {
 func NewConfig() Config {
 	return Config{
 		Host:                    null.StringFrom("https://ingest.loadimpact.com"),
+		WebAppURL:               null.StringFrom("https://app.loadimpact.com"),
 		MetricPushInterval:      types.NullDurationFrom(1 * time.Second),
 		AggregationPeriod:       types.NullDurationFrom(1 * time.Second),
 		AggregationCalcInterval: types.NullDurationFrom(3 * time.Second),

@@ -199,21 +199,21 @@ func TestSampleTags(t *testing.T) {
 	// Empty SampleTags
 	emptyTagMap := map[string]string{}
 	emptyTags := NewSampleTags(emptyTagMap)
-	assert.NotNil(t, emptyTags)
+	assert.Nil(t, emptyTags)
 	assert.True(t, emptyTags.IsEqual(emptyTags))
-	assert.False(t, emptyTags.IsEqual(nilTags))
+	assert.True(t, emptyTags.IsEqual(nilTags))
 	assert.Equal(t, emptyTagMap, emptyTags.CloneTags())
 
 	emptyJSON, err := json.Marshal(emptyTags)
 	assert.NoError(t, err)
-	assert.Equal(t, "{}", string(emptyJSON))
+	assert.Equal(t, "null", string(emptyJSON))
 
 	var emptyTagsUnmarshaled *SampleTags
 	err = json.Unmarshal(emptyJSON, &emptyTagsUnmarshaled)
 	assert.NoError(t, err)
-	assert.NotNil(t, emptyTagsUnmarshaled)
+	assert.Nil(t, emptyTagsUnmarshaled)
 	assert.True(t, emptyTagsUnmarshaled.IsEqual(emptyTags))
-	assert.False(t, emptyTagsUnmarshaled.IsEqual(nilTags))
+	assert.True(t, emptyTagsUnmarshaled.IsEqual(nilTags))
 	assert.Equal(t, emptyTagMap, emptyTagsUnmarshaled.CloneTags())
 
 	// SampleTags with keys and values

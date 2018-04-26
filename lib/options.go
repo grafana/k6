@@ -332,7 +332,7 @@ func (o Options) Apply(opts Options) Options {
 	if opts.SystemTags != nil {
 		o.SystemTags = opts.SystemTags
 	}
-	if opts.RunTags != nil {
+	if !opts.RunTags.IsEmpty() {
 		o.RunTags = opts.RunTags
 	}
 	return o
