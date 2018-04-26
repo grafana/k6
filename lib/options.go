@@ -192,6 +192,10 @@ type Options struct {
 	Iterations null.Int           `json:"iterations" envconfig:"iterations"`
 	Stages     []Stage            `json:"stages" envconfig:"stages"`
 
+	// Timeouts for the setup() and teardown() functions
+	SetupTimeout    types.NullDuration `json:"setupTimeout" envconfig:"setup_timeout"`
+	TeardownTimeout types.NullDuration `json:"teardownTimeout" envconfig:"teardown_timeout"`
+
 	// Limit HTTP requests per second.
 	RPS null.Int `json:"rps" envconfig:"rps"`
 
