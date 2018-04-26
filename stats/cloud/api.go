@@ -30,7 +30,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/k0kubun/pp"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
 	"github.com/pkg/errors"
@@ -211,7 +210,6 @@ func (c *Client) TestFinished(referenceID string, thresholds ThresholdResult, ta
 		thresholds,
 	}
 
-	pp.Println("sending", data)
 	req, err := c.NewRequest("POST", url, data)
 	if err != nil {
 		return err
