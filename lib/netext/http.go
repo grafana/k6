@@ -16,15 +16,22 @@ import (
 type HTTPTransport struct {
 	*http.Transport
 
-	mu        sync.Mutex
-	authCache map[string]bool
+	mu          sync.Mutex
+	authCache   map[string]bool
+	enableCache bool
 }
 
 func NewHTTPTransport(transport *http.Transport) *HTTPTransport {
 	return &HTTPTransport{
-		Transport: transport,
-		authCache: make(map[string]bool),
+		Transport:   transport,
+		authCache:   make(map[string]bool),
+		enableCache: true,
 	}
+}
+
+func (t *HTTPTransport) CloseIdleConnections() {
+	t.enableCache = false
+	t.Transport.CloseIdleConnections()
 }
 
 func (t *HTTPTransport) RoundTrip(req *http.Request) (res *http.Response, err error) {
@@ -61,7 +68,7 @@ func (t *HTTPTransport) roundtripWithNTLM(req *http.Request) (res *http.Response
 	}
 
 	// before making the request check if there is a cached authorization.
-	if _, ok := t.getAuthCache(req.URL.String()); ok {
+	if _, ok := t.getAuthCache(req.URL.String()); t.enableCache && ok {
 		req.Header.Del("Authorization")
 	} else {
 		req.Header.Set("Authorization", "NTLM TlRMTVNTUAABAAAAB4IAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAAAAAAAMAA=")
