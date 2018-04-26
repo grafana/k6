@@ -24,7 +24,9 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"time"
 
+	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 
 	"github.com/loadimpact/k6/lib"
@@ -80,6 +82,10 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		InsecureSkipTLSVerify: getNullBool(flags, "insecure-skip-tls-verify"),
 		NoConnectionReuse:     getNullBool(flags, "no-connection-reuse"),
 		Throw:                 getNullBool(flags, "throw"),
+
+		// Default values for options without CLI flags:
+		SetupTimeout:    types.NullDurationFrom(10 * time.Second),
+		TeardownTimeout: types.NullDurationFrom(10 * time.Second),
 	}
 
 	stageStrings, err := flags.GetStringSlice("stage")

@@ -43,6 +43,10 @@ Since InfluxDB indexes tags, highly variable information like `vu`, `iter` or ev
 
 Thanks to @danron for their work on this!
 
+### Configurable setup and teardown timeouts (#602)
+
+Previously the `setup()` and `teardown()` functions timed out after 10 seconds. Now that period is configurable via the `setupTimeout` and `teardownTimeout` script options or the `K6_SETUP_TIMEOUT` and `K6_TEARDOWN_TIMEOUT` environment variables. The default timeouts are still 10 seconds and at this time there are no CLI options for changing them to avoid clutter.
+
 
 ## UX
 

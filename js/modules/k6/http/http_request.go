@@ -124,10 +124,10 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 						escapedFilename := escapeQuotes(ve.Filename)
 						h.Set("Content-Disposition",
 							fmt.Sprintf(`form-data; name="%s"; filename="%s"`,
-								escapedFilename, escapedFilename))
+								k, escapedFilename))
 						h.Set("Content-Type", ve.ContentType)
 
-						// this writer will be closed either be the next part or
+						// this writer will be closed either by the next part or
 						// the call to mpw.Close()
 						fw, err := mpw.CreatePart(h)
 						if err != nil {
