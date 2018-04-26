@@ -35,6 +35,28 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Timestamp is used for sending times encoded as microsecond UNIX timestamps to the cloud servers
+type Timestamp time.Time
+
+// MarshalJSON encodes the microsecond UNIX timestamps as strings because JavaScripts doesn't have actual integers and tends to round big numbers
+func (ct Timestamp) MarshalJSON() ([]byte, error) {
+	return []byte(`"` + strconv.FormatInt(time.Time(ct).UnixNano()/1000, 10) + `"`), nil
+}
+
+// UnmarshalJSON decodes the string-enclosed microsecond timestamp back into the proper time.Time alias
+func (ct *Timestamp) UnmarshalJSON(p []byte) error {
+	var s string
+	if err := json.Unmarshal(p, &s); err != nil {
+		return err
+	}
+	microSecs, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return err
+	}
+	*ct = Timestamp(time.Unix(microSecs/1000000, (microSecs%1000000)*1000))
+	return nil
+}
+
 type Sample struct {
 	Type   string     `json:"type"`
 	Metric string     `json:"metric"`
@@ -43,7 +65,7 @@ type Sample struct {
 
 type SampleData struct {
 	Type   stats.MetricType   `json:"type"`
-	Time   time.Time          `json:"time"`
+	Time   Timestamp          `json:"time"`
 	Value  float64            `json:"value"`
 	Values map[string]float64 `json:"values,omitempty"`
 	Tags   *stats.SampleTags  `json:"tags,omitempty"`
