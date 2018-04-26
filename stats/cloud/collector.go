@@ -167,7 +167,7 @@ func (c *Collector) Collect(samples []stats.Sample) {
 				Metric: "http_req_li_all",
 				Data: SampleData{
 					Type:   samp.Metric.Type,
-					Time:   samp.Time,
+					Time:   Timestamp(samp.Time),
 					Tags:   samp.Tags,
 					Values: make(map[string]float64),
 				},
@@ -180,7 +180,7 @@ func (c *Collector) Collect(samples []stats.Sample) {
 				Metric: "iter_li_all",
 				Data: SampleData{
 					Type:   samp.Metric.Type,
-					Time:   samp.Time,
+					Time:   Timestamp(samp.Time),
 					Tags:   samp.Tags,
 					Values: make(map[string]float64),
 				},
@@ -199,7 +199,7 @@ func (c *Collector) Collect(samples []stats.Sample) {
 				Metric: name,
 				Data: SampleData{
 					Type:  samp.Metric.Type,
-					Time:  samp.Time,
+					Time:  Timestamp(samp.Time),
 					Value: samp.Value,
 					Tags:  samp.Tags,
 				},
