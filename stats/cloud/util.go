@@ -27,5 +27,5 @@ func URLForResults(refID string, config Config) string {
 	if !config.Token.Valid {
 		path = "anonymous"
 	}
-	return fmt.Sprintf("https://app.loadimpact.com/k6/%s/%s", path, refID)
+	return fmt.Sprintf("%s/k6/%s/%s", config.WebAppURL.String, path, refID)
 }
