@@ -329,6 +329,9 @@ func (c *Collector) aggregateHTTPTrails(waitPeriod time.Duration) {
 			aggrData.CalcAverages()
 
 			if aggrData.Count > 0 {
+				log.WithFields(log.Fields{
+					"http_samples": aggrData.Count,
+				}).Debug("Aggregated HTTP metrics")
 				newSamples = append(newSamples, &Sample{
 					Type:   "AggregatedPoints",
 					Metric: "http_req_li_all",
