@@ -52,8 +52,7 @@ type Collector struct {
 	sampleBuffer []*Sample
 	sampleMu     sync.Mutex
 
-	runStatus   int
-	runStatusMu sync.Mutex
+	runStatus chan int
 }
 
 // New creates a new cloud collector
@@ -95,6 +94,7 @@ func New(conf Config, src *lib.SourceData, opts lib.Options, version string) (*C
 		client:     NewClient(conf.Token, conf.Host, version),
 		anonymous:  conf.Token == "",
 		duration:   duration,
+		runStatus:  make(chan int, 1),
 	}, nil
 }
 
@@ -263,11 +263,11 @@ func (c *Collector) testFinished() {
 	}).Debug("Sending test finished")
 
 	runStatus := lib.RunStatusFinished
-	c.runStatusMu.Lock()
-	if c.runStatus != 0 {
-		runStatus = c.runStatus
+	select {
+	case status := <-c.runStatus:
+		runStatus = status
+	case <-time.After(100 * time.Millisecond):
 	}
-	c.runStatusMu.Unlock()
 
 	err := c.client.TestFinished(c.referenceID, thresholdResults, testTainted, runStatus)
 	if err != nil {
@@ -292,8 +292,5 @@ func (c *Collector) GetRequiredSystemTags() lib.TagSet {
 }
 
 func (c *Collector) SetRunStatus(status int) {
-	c.runStatusMu.Lock()
-	defer c.runStatusMu.Unlock()
-
-	c.runStatus = status
+	c.runStatus <- status
 }
