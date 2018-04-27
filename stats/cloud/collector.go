@@ -267,6 +267,9 @@ func (c *Collector) testFinished() {
 	case status := <-c.runStatus:
 		runStatus = status
 	case <-time.After(100 * time.Millisecond):
+		log.WithFields(log.Fields{
+			"ref": c.referenceID,
+		}).Debug("Receiving run test status timed out")
 	}
 
 	err := c.client.TestFinished(c.referenceID, thresholdResults, testTainted, runStatus)
