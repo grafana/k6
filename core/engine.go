@@ -221,6 +221,7 @@ func (e *Engine) Run(ctx context.Context) error {
 				return err
 			}
 			e.logger.Debug("run: executor terminated")
+			e.setRunStatus(lib.RunStatusFinished)
 			return nil
 		case <-ctx.Done():
 			e.logger.Debug("run: context expired; exiting...")
