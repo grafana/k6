@@ -120,7 +120,7 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 			}
 		}
 		name := cloudConfig.Name.String
-		if !cloudConfig.Name.Valid {
+		if !cloudConfig.Name.Valid || cloudConfig.Name.String == "" {
 			name = filepath.Base(filename)
 		}
 
