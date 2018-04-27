@@ -84,8 +84,9 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		Throw:                 getNullBool(flags, "throw"),
 
 		// Default values for options without CLI flags:
-		SetupTimeout:    types.NullDurationFrom(10 * time.Second),
-		TeardownTimeout: types.NullDurationFrom(10 * time.Second),
+		// TODO: find a saner and more dev-friendly and error-proof way to handle options
+		SetupTimeout:    types.NullDuration{Duration: types.Duration(10 * time.Second), Valid: false},
+		TeardownTimeout: types.NullDuration{Duration: types.Duration(10 * time.Second), Valid: false},
 	}
 
 	stageStrings, err := flags.GetStringSlice("stage")
