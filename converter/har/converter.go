@@ -25,11 +25,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/tidwall/pretty"
 	"net/url"
 	"sort"
 	"strings"
+
+	"github.com/pkg/errors"
+	"github.com/tidwall/pretty"
 )
 
 func Convert(h HAR, enableChecks bool, returnOnFailedCheck bool, batchTime uint, nobatch bool, correlate bool, only, skip []string) (string, error) {
@@ -250,8 +251,8 @@ func Convert(h HAR, enableChecks bool, returnOnFailedCheck bool, batchTime uint,
 
 			if i == len(pages)-1 {
 				// Last page; add random sleep time at the group completion
-				fmt.Fprint(w, "\t\t// Random sleep between 2s and 4s\n")
-				fmt.Fprint(w, "\t\tsleep(Math.floor(Math.random()*3+2));\n")
+				fmt.Fprint(w, "\t\t// Random sleep between 20s and 40s\n")
+				fmt.Fprint(w, "\t\tsleep(Math.floor(Math.random()*20+20));\n")
 			} else {
 				// Add sleep time at the end of the group
 				nextPage := pages[i+1]
