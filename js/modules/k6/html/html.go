@@ -330,7 +330,7 @@ func (s Selection) Each(v goja.Value) Selection {
 	}
 
 	fn := func(idx int, sel *goquery.Selection) {
-		if _, err := gojaFn(v, s.rt.ToValue(idx), selToElement(s)); err != nil {
+		if _, err := gojaFn(v, s.rt.ToValue(idx), selToElement(Selection{s.rt, s.sel.Eq(idx), s.URL})); err != nil {
 			common.Throw(s.rt, errors.Wrap(err, "Function passed to each() failed."))
 		}
 	}
