@@ -24,7 +24,7 @@ import "fmt"
 
 func URLForResults(refID string, config Config) string {
 	path := "runs"
-	if !config.Token.Valid {
+	if config.Token.String == "" {
 		path = "anonymous"
 	}
 	return fmt.Sprintf("%s/k6/%s/%s", config.WebAppURL.String, path, refID)
