@@ -38,6 +38,9 @@ func TestCollectorRun(t *testing.T) {
 		defer wg.Done()
 		c.Run(ctx)
 	}()
+
+	c.SetRunStatus(1)
+
 	cancel()
 	wg.Wait()
 }
