@@ -52,7 +52,7 @@ type Collector struct {
 	sampleBuffer []*Sample
 	sampleMu     sync.Mutex
 
-	runStatus chan int
+	runStatus int
 }
 
 // New creates a new cloud collector
@@ -94,7 +94,6 @@ func New(conf Config, src *lib.SourceData, opts lib.Options, version string) (*C
 		client:     NewClient(conf.Token, conf.Host, version),
 		anonymous:  conf.Token == "",
 		duration:   duration,
-		runStatus:  make(chan int, 1),
 	}, nil
 }
 
@@ -263,13 +262,8 @@ func (c *Collector) testFinished() {
 	}).Debug("Sending test finished")
 
 	runStatus := lib.RunStatusFinished
-	select {
-	case status := <-c.runStatus:
-		runStatus = status
-	case <-time.After(100 * time.Millisecond):
-		log.WithFields(log.Fields{
-			"ref": c.referenceID,
-		}).Debug("Receiving run test status timed out")
+	if c.runStatus != 0 {
+		runStatus = c.runStatus
 	}
 
 	err := c.client.TestFinished(c.referenceID, thresholdResults, testTainted, runStatus)
@@ -295,5 +289,5 @@ func (c *Collector) GetRequiredSystemTags() lib.TagSet {
 }
 
 func (c *Collector) SetRunStatus(status int) {
-	c.runStatus <- status
+	c.runStatus = status
 }
