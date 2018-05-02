@@ -210,9 +210,9 @@ func (c *Collector) Collect(sampleContainers []stats.SampleContainer) {
 		case *netext.NetTrail:
 			//TODO: aggregate?
 			newSamples = append(newSamples, &Sample{
-				Type:   "Points",
+				Type:   DataTypeMap,
 				Metric: "iter_li_all",
-				Data: SampleDataMap{
+				Data: &SampleDataMap{
 					Time: Timestamp(sc.GetTime()),
 					Tags: sc.GetTags(),
 					Values: map[string]float64{
@@ -224,9 +224,9 @@ func (c *Collector) Collect(sampleContainers []stats.SampleContainer) {
 		default:
 			for _, sample := range sampleContainer.GetSamples() {
 				newSamples = append(newSamples, &Sample{
-					Type:   "Point",
+					Type:   DataTypeSingle,
 					Metric: sample.Metric.Name,
-					Data: SampleDataSingle{
+					Data: &SampleDataSingle{
 						Type:  sample.Metric.Type,
 						Time:  Timestamp(sample.Time),
 						Tags:  sample.Tags,
@@ -309,7 +309,7 @@ func (c *Collector) aggregateHTTPTrails(waitPeriod time.Duration) {
 			minConnDur, maxConnDur := connDurations.GetNormalBounds(outliersCoef)
 			minReqDur, maxReqDur := reqDurations.GetNormalBounds(outliersCoef)
 
-			aggrData := SampleDataAggregatedHTTPReqs{
+			aggrData := &SampleDataAggregatedHTTPReqs{
 				Time: Timestamp(time.Unix(0, bucketID*aggrPeriod+aggrPeriod/2)),
 				Type: "aggregated_trend",
 				Tags: tags,
@@ -333,7 +333,7 @@ func (c *Collector) aggregateHTTPTrails(waitPeriod time.Duration) {
 					"http_samples": aggrData.Count,
 				}).Debug("Aggregated HTTP metrics")
 				newSamples = append(newSamples, &Sample{
-					Type:   "AggregatedPoints",
+					Type:   DataTypeAggregatedHTTPReqs,
 					Metric: "http_req_li_all",
 					Data:   aggrData,
 				})
