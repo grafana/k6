@@ -278,6 +278,12 @@ func (o Options) Apply(opts Options) Options {
 	if opts.Stages != nil {
 		o.Stages = opts.Stages
 	}
+	if opts.SetupTimeout.Valid {
+		o.SetupTimeout = opts.SetupTimeout
+	}
+	if opts.TeardownTimeout.Valid {
+		o.TeardownTimeout = opts.TeardownTimeout
+	}
 	if opts.RPS.Valid {
 		o.RPS = opts.RPS
 	}
