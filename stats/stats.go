@@ -198,10 +198,10 @@ func (st *SampleTags) IsEqual(other *SampleTags) bool {
 }
 
 func (st *SampleTags) Contains(other *SampleTags) bool {
-	if st == other {
+	if st == other || other == nil {
 		return true
 	}
-	if st == nil || other == nil || len(st.tags) < len(other.tags) {
+	if st == nil || len(st.tags) < len(other.tags) {
 		return false
 	}
 
