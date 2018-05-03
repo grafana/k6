@@ -197,6 +197,23 @@ func (st *SampleTags) IsEqual(other *SampleTags) bool {
 	return true
 }
 
+func (st *SampleTags) Contains(other *SampleTags) bool {
+	if st == other || other == nil {
+		return true
+	}
+	if st == nil || len(st.tags) < len(other.tags) {
+		return false
+	}
+
+	for k, v := range other.tags {
+		if st.tags[k] != v {
+			return false
+		}
+	}
+
+	return true
+}
+
 // MarshalJSON serializes SampleTags to a JSON string and caches
 // the result. It is not thread safe in the sense that the Go race
 // detector will complain if it's used concurrently, but no data

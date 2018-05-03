@@ -365,7 +365,7 @@ func TestEngine_processSamples(t *testing.T) {
 		assert.EqualValues(t, map[string]string{"a": "1"}, sms[0].Tags.CloneTags())
 
 		e.processSamples(
-			stats.Sample{Metric: metric, Value: 1.25, Tags: stats.IntoSampleTags(&map[string]string{"a": "1"})},
+			stats.Sample{Metric: metric, Value: 1.25, Tags: stats.IntoSampleTags(&map[string]string{"a": "1", "b": "2"})},
 		)
 
 		assert.IsType(t, &stats.GaugeSink{}, e.Metrics["my_metric"].Sink)
