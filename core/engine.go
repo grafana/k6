@@ -330,7 +330,7 @@ func (e *Engine) processSamples(samples ...stats.Sample) {
 		m.Sink.Add(sample)
 
 		for _, sm := range m.Submetrics {
-			if !sm.Tags.IsEqual(sample.Tags) {
+			if !sample.Tags.Contains(sm.Tags) {
 				continue
 			}
 
