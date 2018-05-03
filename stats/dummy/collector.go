@@ -23,9 +23,9 @@ package dummy
 import (
 	"context"
 
-	"github.com/labstack/gommon/log"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
+	log "github.com/sirupsen/logrus"
 )
 
 // Collector implements the lib.Collector interface and should be used only for testing
