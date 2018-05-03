@@ -60,3 +60,4 @@ Previously the `setup()` and `teardown()` functions timed out after 10 seconds. 
 
 ## Bugs
 * Archive: archives generated on Windows can now run on *nix and vice versa. (#566)
+* Htlm: fixed `Selection.each(fn)` function, which was return only the first element. (#610)
