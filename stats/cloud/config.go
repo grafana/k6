@@ -73,21 +73,32 @@ type Config struct {
 	// If aggregation is enabled, but the collected samples for a certain AggregationPeriod after AggregationPushDelay has passed are less than this number, they won't be aggregated.
 	AggregationMinSamples null.Int `json:"aggregationMinSamples" envconfig:"CLOUD_AGGREGATION_MIN_SAMPLES"`
 
-	// Which HTTP trails (how many IQRs below Q1 or above Q3) to consier non-aggregatable outliers.
-	AggregationOutliers null.Float `json:"aggregationOutliers" envconfig:"CLOUD_AGGREGATION_OUTLIERS"`
+	// The radius (as a fraction) from the median at which to sample Q1 and Q3.
+	// By default it's one quarter (0.25) and if set to something different, the Q in IQR
+	// won't make much sense... But this would allow us to select tighter sample groups for
+	// aggregation if we want.
+	AggregationOutlierIqrRadius null.Float `json:"aggregationOutlierIqrRadius" envconfig:"CLOUD_AGGREGATION_OUTLIER_IQR_RADIUS"`
+
+	// Connection or request times with how many IQRs below Q1 to consier as non-aggregatable outliers.
+	AggregationOutlierIqrCoefLower null.Float `json:"aggregationOutlierIqrCoefLower" envconfig:"CLOUD_AGGREGATION_OUTLIER_IQR_COEF_LOWER"`
+
+	// Connection or request times with how many IQRs above Q3 to consier as non-aggregatable outliers.
+	AggregationOutlierIqrCoefUpper null.Float `json:"aggregationOutlierIqrCoefUpper" envconfig:"CLOUD_AGGREGATION_OUTLIER_IQR_COEF_UPPER"`
 }
 
 // NewConfig creates a new Config instance with default values for some fields.
 func NewConfig() Config {
 	return Config{
-		Host:                    null.StringFrom("https://ingest.loadimpact.com"),
-		WebAppURL:               null.StringFrom("https://app.loadimpact.com"),
-		MetricPushInterval:      types.NullDurationFrom(1 * time.Second),
-		AggregationPeriod:       types.NullDurationFrom(1 * time.Second),
-		AggregationCalcInterval: types.NullDurationFrom(3 * time.Second),
-		AggregationWaitPeriod:   types.NullDurationFrom(5 * time.Second),
-		AggregationMinSamples:   null.IntFrom(100),
-		AggregationOutliers:     null.FloatFrom(1.5),
+		Host:                           null.StringFrom("https://ingest.loadimpact.com"),
+		WebAppURL:                      null.StringFrom("https://app.loadimpact.com"),
+		MetricPushInterval:             types.NullDurationFrom(1 * time.Second),
+		AggregationPeriod:              types.NullDurationFrom(1 * time.Second),
+		AggregationCalcInterval:        types.NullDurationFrom(3 * time.Second),
+		AggregationWaitPeriod:          types.NullDurationFrom(5 * time.Second),
+		AggregationMinSamples:          null.IntFrom(100),
+		AggregationOutlierIqrRadius:    null.FloatFrom(0.25),
+		AggregationOutlierIqrCoefLower: null.FloatFrom(1.5),
+		AggregationOutlierIqrCoefUpper: null.FloatFrom(1.3),
 	}
 }
 
@@ -126,8 +137,14 @@ func (c Config) Apply(cfg Config) Config {
 	if cfg.AggregationMinSamples.Valid {
 		c.AggregationMinSamples = cfg.AggregationMinSamples
 	}
-	if cfg.AggregationOutliers.Valid {
-		c.AggregationOutliers = cfg.AggregationOutliers
+	if cfg.AggregationOutlierIqrRadius.Valid {
+		c.AggregationOutlierIqrRadius = cfg.AggregationOutlierIqrRadius
+	}
+	if cfg.AggregationOutlierIqrCoefLower.Valid {
+		c.AggregationOutlierIqrCoefLower = cfg.AggregationOutlierIqrCoefLower
+	}
+	if cfg.AggregationOutlierIqrCoefUpper.Valid {
+		c.AggregationOutlierIqrCoefUpper = cfg.AggregationOutlierIqrCoefUpper
 	}
 	return c
 }
