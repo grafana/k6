@@ -282,7 +282,9 @@ func (c *Collector) aggregateHTTPTrails(waitPeriod time.Duration) {
 
 	// Which buckets are still new and we'll wait for trails to accumulate before aggregating
 	bucketCutoffID := time.Now().Add(-waitPeriod).UnixNano() / aggrPeriod
-	outliersCoef := c.config.AggregationOutliers.Float64
+	iqrRadius := c.config.AggregationOutlierIqrRadius.Float64
+	iqrLowerCoef := c.config.AggregationOutlierIqrCoefLower.Float64
+	iqrUpperCoef := c.config.AggregationOutlierIqrCoefUpper.Float64
 	newSamples := []*Sample{}
 
 	// Handle all aggregation buckets older than bucketCutoffID
@@ -306,8 +308,8 @@ func (c *Collector) aggregateHTTPTrails(waitPeriod time.Duration) {
 				connDurations[i] = trail.ConnDuration
 				reqDurations[i] = trail.Duration
 			}
-			minConnDur, maxConnDur := connDurations.GetNormalBounds(outliersCoef)
-			minReqDur, maxReqDur := reqDurations.GetNormalBounds(outliersCoef)
+			minConnDur, maxConnDur := connDurations.SelectGetNormalBounds(iqrRadius, iqrLowerCoef, iqrUpperCoef)
+			minReqDur, maxReqDur := reqDurations.SelectGetNormalBounds(iqrRadius, iqrLowerCoef, iqrUpperCoef)
 
 			aggrData := &SampleDataAggregatedHTTPReqs{
 				Time: Timestamp(time.Unix(0, bucketID*aggrPeriod+aggrPeriod/2)),

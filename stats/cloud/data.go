@@ -23,6 +23,7 @@ package cloud
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"time"
@@ -220,24 +221,91 @@ type durations []time.Duration
 func (d durations) Len() int           { return len(d) }
 func (d durations) Swap(i, j int)      { d[i], d[j] = d[j], d[i] }
 func (d durations) Less(i, j int) bool { return d[i] < d[j] }
-func (d durations) GetNormalBounds(iqrCoef float64) (min, max time.Duration) {
-	l := len(d)
-	if l == 0 {
+
+// This is currently used only for benchmark comparisons and tests.
+func (d durations) SortGetNormalBounds(radius, iqrLowerCoef, iqrUpperCoef float64) (min, max time.Duration) {
+	if len(d) == 0 {
 		return
 	}
-
 	sort.Sort(d)
-	var q1, q3 time.Duration
-	if l%4 == 0 {
-		q1 = d[l/4]
-		q3 = d[(l/4)*3]
-	} else {
-		q1 = (d[l/4] + d[(l/4)+1]) / 2
-		q3 = (d[(l/4)*3] + d[(l/4)*3+1]) / 2
+	last := float64(len(d) - 1)
+	radius = math.Min(0.5, radius)
+	q1 := d[int(last*(0.5-radius))]
+	q3 := d[int(last*(0.5+radius))]
+	iqr := float64(q3 - q1)
+	min = q1 - time.Duration(iqrLowerCoef*iqr)
+	max = q3 + time.Duration(iqrUpperCoef*iqr)
+	return
+}
+
+// Reworked and translated in Go from:
+// https://github.com/haifengl/smile/blob/master/math/src/main/java/smile/sort/QuickSelect.java
+// Originally Copyright (c) 2010 Haifeng Li
+// Licensed under the Apache License, Version 2.0
+func (d durations) quickSelect(k int) time.Duration {
+	n := len(d)
+	l := 0
+	ir := n - 1
+
+	var a time.Duration
+	var i, j, mid int
+	for {
+		if ir <= l+1 {
+			if ir == l+1 && d[ir] < d[l] {
+				d.Swap(l, ir)
+			}
+			return d[k]
+		}
+		mid = (l + ir) >> 1
+		d.Swap(mid, l+1)
+		if d[l] > d[ir] {
+			d.Swap(l, ir)
+		}
+		if d[l+1] > d[ir] {
+			d.Swap(l+1, ir)
+		}
+		if d[l] > d[l+1] {
+			d.Swap(l, l+1)
+		}
+		i = l + 1
+		j = ir
+		a = d[l+1]
+		for {
+			for i++; d[i] < a; i++ {
+			}
+			for j--; d[j] > a; j-- {
+			}
+
+			if j < i {
+				break
+			}
+			d.Swap(i, j)
+		}
+		d[l+1] = d[j]
+		d[j] = a
+		if j >= k {
+			ir = j - 1
+		}
+		if j <= k {
+			l = i
+		}
 	}
+}
+
+// Uses Quickselect to avoid sorting the whole slice
+// https://en.wikipedia.org/wiki/Quickselect
+func (d durations) SelectGetNormalBounds(radius, iqrLowerCoef, iqrUpperCoef float64) (min, max time.Duration) {
+	if len(d) == 0 {
+		return
+	}
+	radius = math.Min(0.5, radius)
+	last := float64(len(d) - 1)
+
+	q1 := d.quickSelect(int(last * (0.5 - radius)))
+	q3 := d.quickSelect(int(last * (0.5 + radius)))
 
 	iqr := float64(q3 - q1)
-	min = q1 - time.Duration(iqrCoef*iqr)
-	max = q3 + time.Duration(iqrCoef*iqr)
+	min = q1 - time.Duration(iqrLowerCoef*iqr)
+	max = q3 + time.Duration(iqrUpperCoef*iqr)
 	return
 }

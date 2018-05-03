@@ -23,6 +23,7 @@ package cloud
 import (
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"testing"
 	"time"
 
@@ -149,5 +150,105 @@ func TestSampleMarshaling(t *testing.T) {
 		newJSON, err := json.Marshal(newS)
 		assert.NoError(t, err)
 		assert.JSONEq(t, string(sJSON), string(newJSON))
+	}
+}
+
+// For more realistic request time distributions, import
+// "gonum.org/v1/gonum/stat/distuv" and use something like this:
+//
+// randSrc := rand.NewSource(uint64(time.Now().UnixNano()))
+// dist := distuv.LogNormal{Mu: 0, Sigma: 0.5, Src: randSrc}
+//
+// then set the data elements to time.Duration(dist.Rand() * multiplier)
+//
+// I've not used that after the initial tests because it's a big
+// external dependency that's not really needed for the tests at
+// this point.
+func getDurations(count int, min, multiplier float64) durations {
+	data := make(durations, count)
+	for j := 0; j < count; j++ {
+		data[j] = time.Duration(min + rand.Float64()*multiplier)
+	}
+	return data
+}
+func BenchmarkDurationBounds(b *testing.B) {
+	iqrRadius := 0.25 // If it's something different, the Q in IQR won't make much sense...
+	iqrLowerCoef := 1.5
+	iqrUpperCoef := 1.5
+
+	getData := func(b *testing.B, count int) durations {
+		b.StopTimer()
+		defer b.StartTimer()
+		return getDurations(count, 0.1*float64(time.Second), float64(time.Second))
+	}
+
+	for count := 100; count <= 5000; count += 500 {
+		b.Run(fmt.Sprintf("Sort-%d-elements", count), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				data := getData(b, count)
+				data.SortGetNormalBounds(iqrRadius, iqrLowerCoef, iqrUpperCoef)
+			}
+		})
+		b.Run(fmt.Sprintf("Select-%d-elements", count), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				data := getData(b, count)
+				data.SelectGetNormalBounds(iqrRadius, iqrLowerCoef, iqrUpperCoef)
+			}
+		})
+	}
+}
+
+func TestQuickSelectAndBounds(t *testing.T) {
+	t.Parallel()
+	mult := time.Millisecond
+	for _, count := range []int{1, 2, 3, 4, 5, 10, 15, 20, 25, 50, 100, 250 + rand.Intn(100)} {
+		count := count
+		t.Run(fmt.Sprintf("simple-%d", count), func(t *testing.T) {
+			t.Parallel()
+			data := make(durations, count)
+			for i := 0; i < count; i++ {
+				data[i] = time.Duration(i) * mult
+			}
+			rand.Shuffle(len(data), data.Swap)
+			for i := 0; i < 10; i++ {
+				dataCopy := make(durations, count)
+				assert.Equal(t, count, copy(dataCopy, data))
+				k := rand.Intn(count)
+				assert.Equal(t, dataCopy.quickSelect(k), time.Duration(k)*mult)
+			}
+		})
+		t.Run(fmt.Sprintf("random-%d", count), func(t *testing.T) {
+			t.Parallel()
+
+			testCases := []struct{ r, l, u float64 }{
+				{0.25, 1.5, 1.5}, // Textbook
+				{0.25, 1.5, 1.3}, // Defaults
+				{0.1, 0.5, 0.3},  // Extreme narrow
+				{0.3, 2, 1.8},    // Extreme wide
+			}
+
+			for tcNum, tc := range testCases {
+				tc := tc
+				data := getDurations(count, 0.3*float64(time.Second), 2*float64(time.Second))
+				dataForSort := make(durations, count)
+				dataForSelect := make(durations, count)
+				assert.Equal(t, count, copy(dataForSort, data))
+				assert.Equal(t, count, copy(dataForSelect, data))
+				assert.Equal(t, dataForSort, dataForSelect)
+
+				t.Run(fmt.Sprintf("bounds-tc%d", tcNum), func(t *testing.T) {
+					t.Parallel()
+					sortMin, sortMax := dataForSort.SortGetNormalBounds(tc.r, tc.l, tc.u)
+					selectMin, selectMax := dataForSelect.SelectGetNormalBounds(tc.r, tc.l, tc.u)
+					assert.Equal(t, sortMin, selectMin)
+					assert.Equal(t, sortMax, selectMax)
+
+					k := rand.Intn(count)
+					assert.Equal(t, dataForSort[k], dataForSelect.quickSelect(k))
+					assert.Equal(t, dataForSort[k], data.quickSelect(k))
+				})
+			}
+
+		})
 	}
 }
