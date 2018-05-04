@@ -8,20 +8,23 @@ import (
 	"sync"
 )
 
-type STREAM struct {
-	file    *os.File
-	reader  *bufio.Reader
-	scanner *bufio.Scanner
-	csv     *csv.Reader
-	loop    bool
-	mutex   sync.Mutex
+type Stream FileStream
+
+type FileStream struct {
+	file      *os.File
+	reader    *bufio.Reader
+	scanner   *bufio.Scanner
+	csv       *csv.Reader
+	loop      bool
+	mutex     sync.Mutex
+	csvHeader []string
 }
 
-func New() *STREAM {
-	return &STREAM{}
+func New() *FileStream {
+	return &FileStream{}
 }
 
-func (stream *STREAM) OpenFile(filename string, loop bool) {
+func (stream *FileStream) OpenFile(filename string, loop bool) {
 	stream.mutex.Lock()
 	defer stream.mutex.Unlock()
 
@@ -34,7 +37,7 @@ func (stream *STREAM) OpenFile(filename string, loop bool) {
 	stream.loop = loop
 }
 
-func (stream *STREAM) CloseFile() {
+func (stream *FileStream) CloseFile() {
 	stream.mutex.Lock()
 	defer stream.mutex.Unlock()
 
@@ -42,7 +45,7 @@ func (stream *STREAM) CloseFile() {
 	check(err)
 }
 
-func (stream *STREAM) ReadLine() string {
+func (stream *FileStream) ReadLine() string {
 	stream.mutex.Lock()
 	defer stream.mutex.Unlock()
 
@@ -65,10 +68,23 @@ func (stream *STREAM) ReadLine() string {
 	return line
 }
 
-func (stream *STREAM) ReadCsvLine() []string {
+func (stream *FileStream) ReadCSVHeader() []string {
 	stream.mutex.Lock()
 	defer stream.mutex.Unlock()
 
+	line := stream.readCSVLine()
+	stream.csvHeader = line
+	return line
+}
+
+func (stream *FileStream) ReadCSVLine() []string {
+	stream.mutex.Lock()
+	defer stream.mutex.Unlock()
+
+	return stream.readCSVLine()
+}
+
+func (stream *FileStream) readCSVLine() []string {
 	out, err := stream.csv.Read()
 	if err == io.EOF {
 		if stream.loop {
@@ -80,7 +96,7 @@ func (stream *STREAM) ReadCsvLine() []string {
 	return out
 }
 
-func (stream *STREAM) reset() {
+func (stream *FileStream) reset() {
 	stream.file.Seek(0, 0)
 	stream.scanner = bufio.NewScanner(stream.reader)
 }
