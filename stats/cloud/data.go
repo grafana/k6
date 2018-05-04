@@ -242,12 +242,16 @@ func (d durations) SortGetNormalBounds(radius, iqrLowerCoef, iqrUpperCoef float6
 // https://github.com/haifengl/smile/blob/master/math/src/main/java/smile/sort/QuickSelect.java
 // Originally Copyright (c) 2010 Haifeng Li
 // Licensed under the Apache License, Version 2.0
+//
+// This could potentially be implemented as a standalone function
+// that only depends on the sort.Interface methods, but that would
+// probably introduce some performance overhead because of the
+// dynamic dispatch.
 func (d durations) quickSelect(k int) time.Duration {
 	n := len(d)
 	l := 0
 	ir := n - 1
 
-	var a time.Duration
 	var i, j, mid int
 	for {
 		if ir <= l+1 {
@@ -269,20 +273,17 @@ func (d durations) quickSelect(k int) time.Duration {
 		}
 		i = l + 1
 		j = ir
-		a = d[l+1]
 		for {
-			for i++; d[i] < a; i++ {
+			for i++; d[i] < d[l+1]; i++ {
 			}
-			for j--; d[j] > a; j-- {
+			for j--; d[j] > d[l+1]; j-- {
 			}
-
 			if j < i {
 				break
 			}
 			d.Swap(i, j)
 		}
-		d[l+1] = d[j]
-		d[j] = a
+		d.Swap(l+1, j)
 		if j >= k {
 			ir = j - 1
 		}
