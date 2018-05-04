@@ -628,15 +628,30 @@ func TestRequestAndBatch(t *testing.T) {
 				assertRequestMetricsEmitted(t, state.Samples, "GET", url, "", 200, "")
 			})
 			t.Run("digest", func(t *testing.T) {
-				state.Samples = nil
-				url := sr("http://bob:pass@HTTPBIN_IP:HTTPBIN_PORT/digest-auth/auth/bob/pass")
+				t.Run("success", func(t *testing.T) {
+					state.Samples = nil
+					url := sr("http://bob:pass@HTTPBIN_IP:HTTPBIN_PORT/digest-auth/auth/bob/pass")
 
-				_, err := common.RunString(rt, fmt.Sprintf(`
-				let res = http.request("GET", "%s", null, { auth: "digest" });
-				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
-				`, url))
-				assert.NoError(t, err)
-				assertRequestMetricsEmitted(t, state.Samples, "GET", sr("HTTPBIN_IP_URL/digest-auth/auth/bob/pass"), url, 200, "")
+					_, err := common.RunString(rt, fmt.Sprintf(`
+					let res = http.request("GET", "%s", null, { auth: "digest" });
+					if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+					`, url))
+					assert.NoError(t, err)
+					assertRequestMetricsEmitted(t, state.Samples, "GET", sr("HTTPBIN_IP_URL/digest-auth/auth/bob/pass"), url, 200, "")
+				})
+				t.Run("failure", func(t *testing.T) {
+					tb.Mux.HandleFunc("/digest-auth/failure", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						time.Sleep(2 * time.Second)
+					}))
+
+					state.Samples = nil
+					url := sr("http://bob:pass@HTTPBIN_IP:HTTPBIN_PORT/digest-auth/failure")
+
+					_, err := common.RunString(rt, fmt.Sprintf(`
+					let res = http.request("GET", "%s", null, { auth: "digest", timeout: 1, throw: false });
+					`, url))
+					assert.NoError(t, err)
+				})
 			})
 			t.Run("ntlm", func(t *testing.T) {
 				tb.Mux.HandleFunc("/ntlm", http.HandlerFunc(ntlmHandler("bob", "pass")))

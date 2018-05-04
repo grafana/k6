@@ -380,6 +380,9 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 			if throw {
 				return nil, nil, err
 			}
+
+			resp.Error = err.Error()
+			return resp, statsSamples, nil
 		}
 
 		if res.StatusCode == http.StatusUnauthorized {
