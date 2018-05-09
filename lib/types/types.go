@@ -77,6 +77,11 @@ type NullDuration struct {
 	Valid bool
 }
 
+// NewNullDuration is a simple helper constructor function
+func NewNullDuration(d time.Duration, valid bool) NullDuration {
+	return NullDuration{Duration(d), valid}
+}
+
 // Creates a valid NullDuration from a time.Duration.
 func NullDurationFrom(d time.Duration) NullDuration {
 	return NullDuration{Duration(d), true}

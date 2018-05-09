@@ -44,7 +44,8 @@ type TestRun struct {
 }
 
 type CreateTestRunResponse struct {
-	ReferenceID string `json:"reference_id"`
+	ReferenceID    string  `json:"reference_id"`
+	ConfigOverride *Config `json:"config"`
 }
 
 type TestProgressResponse struct {

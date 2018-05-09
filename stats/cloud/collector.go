@@ -126,11 +126,17 @@ func (c *Collector) Init() error {
 	}
 
 	response, err := c.client.CreateTestRun(testRun)
-
 	if err != nil {
 		return err
 	}
 	c.referenceID = response.ReferenceID
+
+	if response.ConfigOverride != nil {
+		log.WithFields(log.Fields{
+			"override": response.ConfigOverride,
+		}).Debug("Cloud: overriding config options")
+		c.config.Apply(*response.ConfigOverride)
+	}
 
 	log.WithFields(log.Fields{
 		"name":        c.config.Name,
