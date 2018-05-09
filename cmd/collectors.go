@@ -30,6 +30,7 @@ import (
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats/cloud"
 	"github.com/loadimpact/k6/stats/influxdb"
+	"github.com/loadimpact/k6/stats/kafka"
 	jsonc "github.com/loadimpact/k6/stats/json"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
@@ -38,6 +39,7 @@ import (
 const (
 	collectorInfluxDB = "influxdb"
 	collectorJSON     = "json"
+	collectorKafka    = "kafka"
 	collectorCloud    = "cloud"
 )
 
@@ -78,6 +80,12 @@ func newCollector(collectorName, arg string, src *lib.SourceData, conf Config) (
 				config.Name = null.StringFrom(arg)
 			}
 			return cloud.New(config, src, conf.Options, Version)
+		case collectorKafka:
+			config := conf.Collectors.Kafka
+			if err := loadConfig(&config); err != nil {
+				return nil, err
+			}
+			return kafka.New(config)
 		default:
 			return nil, errors.Errorf("unknown output type: %s", collectorName)
 		}

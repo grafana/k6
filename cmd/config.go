@@ -29,6 +29,7 @@ import (
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats/cloud"
 	"github.com/loadimpact/k6/stats/influxdb"
+	"github.com/loadimpact/k6/stats/kafka"
 	"github.com/shibukawa/configdir"
 	"github.com/spf13/afero"
 	"github.com/spf13/pflag"
@@ -69,6 +70,7 @@ type Config struct {
 
 	Collectors struct {
 		InfluxDB influxdb.Config `json:"influxdb"`
+		Kafka    kafka.Config    `json:"kafka"`
 		Cloud    cloud.Config    `json:"cloud"`
 	} `json:"collectors"`
 }
