@@ -233,7 +233,7 @@ func TestCloudCollector(t *testing.T) {
 	collector.Collect(trails)
 	expSamples <- []Sample{
 		*NewSampleFromTrail(&outlierTrail),
-		Sample{
+		{
 			Type:   DataTypeAggregatedHTTPReqs,
 			Metric: "http_req_li_all",
 			Data: func(data interface{}) {
