@@ -135,7 +135,7 @@ func (c *Collector) Init() error {
 		log.WithFields(log.Fields{
 			"override": response.ConfigOverride,
 		}).Debug("Cloud: overriding config options")
-		c.config.Apply(*response.ConfigOverride)
+		c.config = c.config.Apply(*response.ConfigOverride)
 	}
 
 	log.WithFields(log.Fields{
