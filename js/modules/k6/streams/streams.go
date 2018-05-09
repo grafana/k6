@@ -78,7 +78,7 @@ func (fs *FileStream) ReadLine() string {
 	} else {
 		err := fs.scanner.Err()
 		if err != nil {
-			// An error other than io.EOF occured
+			// An error other than io.EOF occurred
 			line = err.Error()
 		} else {
 			// At end of file
@@ -121,7 +121,8 @@ func (fs *FileStream) readCSVHeader() []string {
 }
 
 func (fs *FileStream) reset(offset int64) {
-	fs.file.Seek(offset, 0)
+	_, err := fs.file.Seek(offset, 0)
+	check(err)
 	fs.scanner = bufio.NewScanner(fs.file)
 }
 
