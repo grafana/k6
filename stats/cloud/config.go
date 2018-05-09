@@ -89,16 +89,16 @@ type Config struct {
 // NewConfig creates a new Config instance with default values for some fields.
 func NewConfig() Config {
 	return Config{
-		Host:                           null.StringFrom("https://ingest.loadimpact.com"),
-		WebAppURL:                      null.StringFrom("https://app.loadimpact.com"),
-		MetricPushInterval:             types.NullDurationFrom(1 * time.Second),
-		AggregationPeriod:              types.NullDurationFrom(1 * time.Second),
-		AggregationCalcInterval:        types.NullDurationFrom(3 * time.Second),
-		AggregationWaitPeriod:          types.NullDurationFrom(5 * time.Second),
-		AggregationMinSamples:          null.IntFrom(100),
-		AggregationOutlierIqrRadius:    null.FloatFrom(0.25),
-		AggregationOutlierIqrCoefLower: null.FloatFrom(1.5),
-		AggregationOutlierIqrCoefUpper: null.FloatFrom(1.3),
+		Host:                           null.NewString("https://ingest.loadimpact.com", false),
+		WebAppURL:                      null.NewString("https://app.loadimpact.com", false),
+		MetricPushInterval:             types.NewNullDuration(1*time.Second, false),
+		AggregationPeriod:              types.NewNullDuration(1*time.Second, false),
+		AggregationCalcInterval:        types.NewNullDuration(3*time.Second, false),
+		AggregationWaitPeriod:          types.NewNullDuration(5*time.Second, false),
+		AggregationMinSamples:          null.NewInt(100, false),
+		AggregationOutlierIqrRadius:    null.NewFloat(0.25, false),
+		AggregationOutlierIqrCoefLower: null.NewFloat(1.5, false),
+		AggregationOutlierIqrCoefUpper: null.NewFloat(1.3, false),
 	}
 }
 
