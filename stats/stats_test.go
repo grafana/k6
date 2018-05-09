@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -182,8 +183,6 @@ func TestNewSubmetric(t *testing.T) {
 	}
 }
 
-//TODO: test the new sample interfaces and implementations
-
 func TestSampleTags(t *testing.T) {
 	t.Parallel()
 
@@ -242,4 +241,29 @@ func TestSampleTags(t *testing.T) {
 	assert.True(t, tagsUnmarshaled.IsEqual(tags))
 	assert.False(t, tagsUnmarshaled.IsEqual(nilTags))
 	assert.Equal(t, tagMap, tagsUnmarshaled.CloneTags())
+}
+
+func TestSampleImplementations(t *testing.T) {
+	tagMap := map[string]string{"key1": "val1", "key2": "val2"}
+	now := time.Now()
+
+	sample := Sample{
+		Metric: New("test_metric", Counter),
+		Time:   now,
+		Tags:   NewSampleTags(tagMap),
+		Value:  1.0,
+	}
+	samples := Samples(sample.GetSamples())
+	cSamples := ConnectedSamples{
+		Samples: []Sample{sample},
+		Time:    now,
+		Tags:    NewSampleTags(tagMap),
+	}
+	exp := []Sample{sample}
+	assert.Equal(t, exp, sample.GetSamples())
+	assert.Equal(t, exp, samples.GetSamples())
+	assert.Equal(t, exp, cSamples.GetSamples())
+	assert.Equal(t, now, sample.GetTime())
+	assert.Equal(t, now, cSamples.GetTime())
+	assert.Equal(t, sample.GetTags(), sample.GetTags())
 }

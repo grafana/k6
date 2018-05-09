@@ -66,17 +66,23 @@ func TestTimestampMarshaling(t *testing.T) {
 
 			var rev Timestamp
 			require.NoError(t, json.Unmarshal(res, &rev))
-			diff := tc.t.Sub(time.Time(rev))
-			if diff < -time.Microsecond || diff > time.Microsecond {
-				t.Errorf(
-					"Expected the difference to be under a microsecond, but is %s (%d and %d)",
-					diff,
-					tc.t.UnixNano(),
-					time.Time(rev).UnixNano(),
-				)
-			}
+
+			assert.Truef(
+				t,
+				rev.Equal(Timestamp(tc.t)),
+				"Expected the difference to be under a microsecond, but is %s (%d and %d)",
+				tc.t.Sub(time.Time(rev)),
+				tc.t.UnixNano(),
+				time.Time(rev).UnixNano(),
+			)
+
+			assert.False(t, Timestamp(time.Now()).Equal(Timestamp(tc.t)))
 		})
 	}
+
+	var expErr Timestamp
+	assert.Error(t, json.Unmarshal([]byte(`1234`), &expErr))
+	assert.Error(t, json.Unmarshal([]byte(`"1234a"`), &expErr))
 }
 
 func TestSampleMarshaling(t *testing.T) {
@@ -151,6 +157,19 @@ func TestSampleMarshaling(t *testing.T) {
 		assert.NoError(t, err)
 		assert.JSONEq(t, string(sJSON), string(newJSON))
 	}
+}
+
+func TestMetricAggregation(t *testing.T) {
+	m := AggregatedMetric{}
+	m.Add(1 * time.Second)
+	m.Add(1 * time.Second)
+	m.Add(3 * time.Second)
+	m.Add(5 * time.Second)
+	m.Add(10 * time.Second)
+	m.Calc(5)
+	assert.Equal(t, m.Min, stats.D(1*time.Second))
+	assert.Equal(t, m.Max, stats.D(10*time.Second))
+	assert.Equal(t, m.Avg, stats.D(4*time.Second))
 }
 
 // For more realistic request time distributions, import
