@@ -2,12 +2,12 @@ package streams
 
 import (
 	"bufio"
-	"context"
 	"encoding/csv"
 	"fmt"
 	"io"
-	"os"
 	"sync"
+
+	"github.com/spf13/afero"
 )
 
 type Streams struct {
@@ -16,9 +16,7 @@ type Streams struct {
 }
 
 type FileStream struct {
-	ctx       context.Context
-	file      *os.File
-	reader    *bufio.Reader
+	file      afero.File
 	scanner   *bufio.Scanner
 	csv       *csv.Reader
 	loop      bool
@@ -38,13 +36,13 @@ func (streams *Streams) OpenFile(filename string, loop bool, headerLine bool, st
 	streams.mutex.Lock()
 	defer streams.mutex.Unlock()
 
-	f, err := os.Open(filename)
+	fsys := afero.NewOsFs()
+	f, err := fsys.Open(filename)
 	check(err)
 	fileStream := &FileStream{}
 	fileStream.file = f
-	fileStream.reader = bufio.NewReader(fileStream.file)
-	fileStream.scanner = bufio.NewScanner(fileStream.reader)
-	fileStream.csv = csv.NewReader(fileStream.reader)
+	fileStream.scanner = bufio.NewScanner(f)
+	fileStream.csv = csv.NewReader(f)
 	fileStream.loop = loop
 
 	if headerLine {
@@ -124,7 +122,7 @@ func (fs *FileStream) readCSVHeader() []string {
 
 func (fs *FileStream) reset(offset int64) {
 	fs.file.Seek(offset, 0)
-	fs.scanner = bufio.NewScanner(fs.reader)
+	fs.scanner = bufio.NewScanner(fs.file)
 }
 
 func check(e error) {
