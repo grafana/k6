@@ -51,7 +51,7 @@ Previously the `setup()` and `teardown()` functions timed out after 10 seconds. 
 
 Metrics streamed to the LoadImpact cloud can be partially aggregated to reduce bandwidth usage and processing times. Outlier metrics are automatically detected and excluded from that aggregation.
 
-**Docs**: TODO
+**Docs**: [LoadImpact Insights Aggregation](https://docs.k6.io/docs/load-impact-insights#section-aggregation)
 
 ## UX
 
