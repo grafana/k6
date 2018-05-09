@@ -35,7 +35,7 @@ import (
 )
 
 // Dialer wraps net.Dialer and provides k6 specific functionality -
-// tracing, blocklists and DNS cache and aliases.
+// tracing, blacklists and DNS cache and aliases.
 type Dialer struct {
 	net.Dialer
 
@@ -47,7 +47,7 @@ type Dialer struct {
 	BytesWritten int64
 }
 
-// NewDialer constructs a new Dailer and initializes its cache.
+// NewDialer constructs a new Dialer and initializes its cache.
 func NewDialer(dialer net.Dialer) *Dialer {
 	return &Dialer{
 		Dialer:   dialer,
