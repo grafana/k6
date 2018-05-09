@@ -1,0 +1,8 @@
+{
+    "Brokers": "mybroker or $BROKERS env",
+    "Topic": "test",
+    "GroupID": "testgroup",
+    "PerfMsgCount": 1000000,
+    "PerfMsgSize": 100,
+    "Config": ["api.version.request=true"]
+}
