@@ -148,7 +148,10 @@ func (c *Collector) pushMetrics() {
 	}
 
 	// Wait for message deliveries
-	c.Producer.Flush(15 * 1000)
+	leftoverMessages := c.Producer.Flush(15 * 1000)
+	if leftoverMessages > 0 {
+		log.WithField("leftover messages", leftoverMessages).Warn("Kafka: Flush timed out.")
+	}
 
 	t := time.Since(startTime)
 	log.WithField("t", t).Debug("Kafka: Delivered!")
