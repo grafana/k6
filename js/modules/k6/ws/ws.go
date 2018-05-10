@@ -178,6 +178,12 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 		done:               make(chan struct{}),
 	}
 
+	if state.Options.SystemTags["ip"] && conn.RemoteAddr() != nil {
+		if ip, _, err := net.SplitHostPort(conn.RemoteAddr().String()); err == nil {
+			tags["ip"] = ip
+		}
+	}
+
 	// Run the user-provided set up function
 	if _, err := setupFn(goja.Undefined(), rt.ToValue(&socket)); err != nil {
 		return nil, err
