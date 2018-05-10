@@ -21,26 +21,11 @@
 package kafka
 
 import (
-	// "context"
-	// "sync"
 	"testing"
 
 	"github.com/loadimpact/k6/stats"
 	"github.com/stretchr/testify/assert"
 )
-
-// func TestCollectorRun(t *testing.T) {
-// 	var wg sync.WaitGroup
-// 	c := &Collector{}
-// 	ctx, cancel := context.WithCancel(context.Background())
-// 	wg.Add(1)
-// 	go func() {
-// 		defer wg.Done()
-// 		c.Run(ctx)
-// 	}()
-// 	cancel()
-// 	wg.Wait()
-// }
 
 func TestCollectorCollect(t *testing.T) {
 	c := &Collector{}
