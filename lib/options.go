@@ -277,7 +277,7 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if len(opts.Stages) > 0 {
 		for _, s := range opts.Stages {
-			if s.Duration.Valid && s.Target.Valid {
+			if s.Duration.Valid {
 				o.Stages = append(o.Stages, s)
 			}
 		}
