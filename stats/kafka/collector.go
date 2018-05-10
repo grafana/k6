@@ -22,6 +22,7 @@ package kafka
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 	"strings"
 	"time"
@@ -30,6 +31,7 @@ import (
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/stats/influxdb"
+	jsonCollector "github.com/loadimpact/k6/stats/json"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -109,7 +111,8 @@ func (c *Collector) pushMetrics() {
 
 	// Format the metrics
 	var metrics []string
-	if c.Config.Format == "influx" {
+	switch c.Config.Format {
+	case "influx":
 		i, err := influxdb.New(influxdb.Config{})
 		if err != nil {
 			log.WithError(err).Error("Kafka: Couldn't create influx collector")
@@ -119,6 +122,16 @@ func (c *Collector) pushMetrics() {
 		if err != nil {
 			log.WithError(err).Error("Kafka: Couldn't format samples into influx")
 			return
+		}
+	default:
+		for _, sample := range samples {
+			env := jsonCollector.WrapSample(&sample)
+			metric, err := json.Marshal(env)
+			if err != nil {
+				log.WithError(err).Error("Kafka: Couldn't format samples into json")
+				return
+			}
+			metrics = append(metrics, string(metric))
 		}
 	}
 
