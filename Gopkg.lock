@@ -95,6 +95,12 @@
   revision = "16278e9db8130ac7ec405dc174cfb94344f16325"
 
 [[projects]]
+  name = "github.com/ghodss/yaml"
+  packages = ["."]
+  revision = "0ca9ea5df5451ffdf184b4428c902747c2c11cd7"
+  version = "v1.0.0"
+
+[[projects]]
   branch = "master"
   name = "github.com/gin-contrib/sse"
   packages = ["."]
@@ -176,6 +182,12 @@
   packages = ["."]
   revision = "f611eb38b3875cc3bd991ca91c51d06446afa14c"
   version = "v1.3.0"
+
+[[projects]]
+  name = "github.com/kubernetes/helm"
+  packages = ["pkg/strvals"]
+  revision = "f6025bb9ee7daf9fee0026541c90a6f557a3e0bc"
+  version = "v2.9.0"
 
 [[projects]]
   name = "github.com/labstack/echo"
@@ -433,6 +445,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "1b77f3f5d62b97c92c4d335950ffd20d7e17dd0bf2150a869cd3453fa6dad898"
+  inputs-digest = "9a7590c7138763087f14125ca4925d25f8e764f95e79600d1dc55f0c7f9395fa"
   solver-name = "gps-cdcl"
   solver-version = 1

@@ -23,6 +23,7 @@ package kafka
 import (
 	"context"
 	"sync"
+	"strings"
 	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
@@ -47,7 +48,7 @@ type Collector struct {
 
 // New creates an instance of the collector
 func New(conf Config) (*Collector, error) {
-	p, err := kafka.NewProducer(&kafka.ConfigMap{"bootstrap.servers": conf.Broker})
+	p, err := kafka.NewProducer(&kafka.ConfigMap{"bootstrap.servers": strings.Join(conf.Brokers, ",")})
 	if err != nil {
 		return nil, err
 	}

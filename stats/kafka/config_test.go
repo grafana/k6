@@ -28,9 +28,9 @@ import (
 
 func TestConfigUnmarshalText(t *testing.T) {
 	c := &Config{}
-	err := c.UnmarshalText([]byte("broker=broker1,topic=someTopic,format=influx"))
+	err := c.UnmarshalText([]byte("brokers={broker1,broker2:9092},topic=someTopic,format=influx"))
 	assert.Nil(t, err)
-	assert.Equal(t, c.Broker, "broker1")
-	assert.Equal(t, c.Topic, "someTopic")
-	assert.Equal(t, c.Format, "influx")
+	assert.Equal(t, []string{"broker1","broker2:9092"}, c.Brokers)
+	assert.Equal(t, "someTopic", c.Topic)
+	assert.Equal(t, "influx", c.Format)
 }

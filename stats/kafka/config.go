@@ -22,14 +22,14 @@ package kafka
 
 import (
 	"encoding/json"
-	"strings"
 
+	"github.com/kubernetes/helm/pkg/strvals"
 	"github.com/pkg/errors"
 )
 
 type ConfigFields struct {
 	// Connection.
-	Broker  string `json:"broker" envconfig:"KAFKA_BROKER"`
+	Brokers []string `json:"brokers" envconfig:"KAFKA_BROKERS"`
 
 	// Samples.
 	Topic   string `json:"topic" envconfig:"KAFKA_TOPIC"`
@@ -39,8 +39,8 @@ type ConfigFields struct {
 type Config ConfigFields
 
 func (c Config) Apply(cfg Config) Config {
-	if cfg.Broker != "" {
-		c.Broker = cfg.Broker
+	if len(cfg.Brokers) > 0 {
+		c.Brokers = cfg.Brokers
 	}
 	if cfg.Format != "" {
 		c.Format = cfg.Format
@@ -52,20 +52,41 @@ func (c Config) Apply(cfg Config) Config {
 }
 
 func (c *Config) UnmarshalText(data []byte) error {
-	params := strings.Split(string(data), ",")
+	params, err := strvals.Parse(string(data))
 
-	for _, param := range params {
-		s := strings.SplitN(param, "=", 2)
-		key := s[0]
-		val := s[1]
+	if err != nil {
+		return err
+	}
 
+	for key, value := range params {
 		switch key {
-		case "broker":
-			c.Broker = val
+		case "brokers":
+			values, ok := value.([]interface{})
+
+			if !ok {
+				return errors.Errorf("Could not parse array from brokers")
+			}
+
+			var val []string
+			for _, i := range values {
+				v, ok := i.(string)
+
+				if !ok {
+					return errors.Errorf("Could not parse string from brokers")
+				}
+
+				val = append(val, v)
+			}
+
+			c.Brokers = val
 		case "topic":
-			c.Topic = val
+			if val, ok := value.(string); ok {
+				c.Topic = val
+			}
 		case "format":
-			c.Format = val
+			if val, ok := value.(string); ok {
+				c.Format = val
+			}
 		default:
 			return errors.Errorf("unknown query parameter: %s", key)
 		}
