@@ -22,7 +22,6 @@ package kafka
 
 import (
 	"context"
-	"encoding/json"
 	"sync"
 	"strings"
 	"time"
@@ -30,8 +29,6 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
-	"github.com/loadimpact/k6/stats/influxdb"
-	jsonCollector "github.com/loadimpact/k6/stats/json"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -109,33 +106,14 @@ func (c *Collector) pushMetrics() {
 	c.Samples = nil
 	c.lock.Unlock()
 
-	// Format the metrics
-	var metrics []string
-	switch c.Config.Format {
-	case "influx":
-		i, err := influxdb.New(influxdb.Config{})
-		if err != nil {
-			log.WithError(err).Error("Kafka: Couldn't create influx collector")
-			return
-		}
-		metrics, err = i.Format(samples)
-		if err != nil {
-			log.WithError(err).Error("Kafka: Couldn't format samples into influx")
-			return
-		}
-	default:
-		for _, sample := range samples {
-			env := jsonCollector.WrapSample(&sample)
-			metric, err := json.Marshal(env)
-			if err != nil {
-				log.WithError(err).Error("Kafka: Couldn't format samples into json")
-				return
-			}
-			metrics = append(metrics, string(metric))
-		}
+	// Format the samples
+	formattedSamples, err := formatSamples(c.Config.Format, samples)
+	if err != nil {
+		log.WithError(err).Error("Kafka: Couldn't format the samples")
+		return
 	}
 
-	// Send the metrics
+	// Send the samples
 	log.Debug("Kafka: Delivering...")
 
 	// Delivery report handler for produced messages
@@ -153,10 +131,10 @@ func (c *Collector) pushMetrics() {
 	}()
 
 	// Produce messages to topic (asynchronously)
-	for _, metric := range metrics {
+	for _, sample := range formattedSamples {
 		c.Producer.Produce(&kafka.Message{
 			TopicPartition: kafka.TopicPartition{Topic: &c.Config.Topic, Partition: kafka.PartitionAny},
-			Value:          []byte(metric),
+			Value:          []byte(sample),
 		}, nil)
 	}
 
