@@ -32,8 +32,8 @@ type ConfigFields struct {
 	Brokers []string `json:"brokers" envconfig:"KAFKA_BROKERS"`
 
 	// Samples.
-	Topic   string `json:"topic" envconfig:"KAFKA_TOPIC"`
-	Format  string `json:"format" envconfig:"KAFKA_FORMAT"`
+	Topic  string `json:"topic" envconfig:"KAFKA_TOPIC"`
+	Format string `json:"format" envconfig:"KAFKA_FORMAT"`
 }
 
 type Config ConfigFields

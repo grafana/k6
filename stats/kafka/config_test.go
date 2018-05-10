@@ -39,7 +39,7 @@ func TestConfigUnmarshalText(t *testing.T) {
 
 	err = c2.UnmarshalText([]byte("brokers={broker2,broker3:9092},topic=someTopic2,format=json"))
 	assert.Nil(t, err)
-	assert.Equal(t, []string{"broker2","broker3:9092"}, c2.Brokers)
+	assert.Equal(t, []string{"broker2", "broker3:9092"}, c2.Brokers)
 	assert.Equal(t, "someTopic2", c2.Topic)
 	assert.Equal(t, "json", c2.Format)
 }

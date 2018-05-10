@@ -40,8 +40,8 @@ type Collector struct {
 	Producer sarama.SyncProducer
 	Config   Config
 
-	Samples  []stats.Sample
-	lock     sync.Mutex
+	Samples []stats.Sample
+	lock    sync.Mutex
 }
 
 // New creates an instance of the collector
@@ -52,8 +52,8 @@ func New(conf Config) (*Collector, error) {
 	}
 
 	return &Collector{
-		Producer:  producer,
-		Config:    conf,
+		Producer: producer,
+		Config:   conf,
 	}, nil
 }
 
@@ -128,7 +128,7 @@ func (c *Collector) pushMetrics() {
 		} else {
 			log.WithFields(log.Fields{
 				"partition": partition,
-				"offset": offset,
+				"offset":    offset,
 			}).Debug("Kafka: message sent.")
 		}
 	}

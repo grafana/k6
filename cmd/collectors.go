@@ -30,8 +30,8 @@ import (
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats/cloud"
 	"github.com/loadimpact/k6/stats/influxdb"
-	"github.com/loadimpact/k6/stats/kafka"
 	jsonc "github.com/loadimpact/k6/stats/json"
+	"github.com/loadimpact/k6/stats/kafka"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 )

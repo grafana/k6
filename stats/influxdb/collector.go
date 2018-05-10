@@ -129,7 +129,7 @@ func (c *Collector) extractTagsToValues(tags map[string]string, values map[strin
 	return values
 }
 
-func (c *Collector) batchFromSamples(samples []stats.Sample) (client.BatchPoints ,error) {
+func (c *Collector) batchFromSamples(samples []stats.Sample) (client.BatchPoints, error) {
 	batch, err := client.NewBatchPoints(c.BatchConf)
 	if err != nil {
 		log.WithError(err).Error("InfluxDB: Couldn't make a batch")
