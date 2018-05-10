@@ -61,10 +61,20 @@ func (c *Config) UnmarshalText(data []byte) error {
 	for key, value := range params {
 		switch key {
 		case "brokers":
+			// Check if an array
 			values, ok := value.([]interface{})
 
 			if !ok {
-				return errors.Errorf("Could not parse array from brokers")
+				// Check if a string
+				v, ok := value.(string)
+
+				if !ok {
+					return errors.Errorf("Could not parse array/string from brokers")
+				}
+
+				c.Brokers = []string{v}
+
+				return nil
 			}
 
 			var val []string
