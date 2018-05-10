@@ -23,10 +23,9 @@ package kafka
 import (
 	"context"
 	"sync"
-	"strings"
 	"time"
 
-	"github.com/confluentinc/confluent-kafka-go/kafka"
+	"github.com/Shopify/sarama"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
 	log "github.com/sirupsen/logrus"
@@ -38,7 +37,7 @@ const (
 
 // Collector implements the lib.Collector interface and should be used only for testing
 type Collector struct {
-	Producer *kafka.Producer
+	Producer sarama.SyncProducer
 	Config   Config
 
 	Samples  []stats.Sample
@@ -47,13 +46,13 @@ type Collector struct {
 
 // New creates an instance of the collector
 func New(conf Config) (*Collector, error) {
-	p, err := kafka.NewProducer(&kafka.ConfigMap{"bootstrap.servers": strings.Join(conf.Brokers, ",")})
+	producer, err := sarama.NewSyncProducer(conf.Brokers, nil)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Collector{
-		Producer:  p,
+		Producer:  producer,
 		Config:    conf,
 	}, nil
 }
@@ -71,6 +70,11 @@ func (c *Collector) Run(ctx context.Context) {
 			c.pushMetrics()
 		case <-ctx.Done():
 			c.pushMetrics()
+
+			err := c.Producer.Close()
+			if err != nil {
+				log.WithError(err).Error("Kafka: Failed to close producer.")
+			}
 			return
 		}
 	}
@@ -116,32 +120,17 @@ func (c *Collector) pushMetrics() {
 	// Send the samples
 	log.Debug("Kafka: Delivering...")
 
-	// Delivery report handler for produced messages
-	go func() {
-		for e := range c.Producer.Events() {
-			switch ev := e.(type) {
-			case *kafka.Message:
-				if ev.TopicPartition.Error != nil {
-					log.Debugf("Kafka: Delivery failed: %v\n", ev.TopicPartition)
-				} else {
-					log.Debugf("Kafka: Delivered message to %v\n", ev.TopicPartition)
-				}
-			}
-		}
-	}()
-
-	// Produce messages to topic (asynchronously)
 	for _, sample := range formattedSamples {
-		c.Producer.Produce(&kafka.Message{
-			TopicPartition: kafka.TopicPartition{Topic: &c.Config.Topic, Partition: kafka.PartitionAny},
-			Value:          []byte(sample),
-		}, nil)
-	}
-
-	// Wait for message deliveries
-	leftoverMessages := c.Producer.Flush(15 * 1000)
-	if leftoverMessages > 0 {
-		log.WithField("leftover messages", leftoverMessages).Warn("Kafka: Flush timed out.")
+		msg := &sarama.ProducerMessage{Topic: c.Config.Topic, Value: sarama.StringEncoder(sample)}
+		partition, offset, err := c.Producer.SendMessage(msg)
+		if err != nil {
+			log.WithError(err).Error("Kafka: failed to send message.")
+		} else {
+			log.WithFields(log.Fields{
+				"partition": partition,
+				"offset": offset,
+			}).Debug("Kafka: message sent.")
+		}
 	}
 
 	t := time.Since(startTime)
