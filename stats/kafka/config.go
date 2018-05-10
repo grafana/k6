@@ -74,7 +74,7 @@ func (c *Config) UnmarshalText(data []byte) error {
 
 				c.Brokers = []string{v}
 
-				return nil
+				continue
 			}
 
 			var val []string
@@ -90,13 +90,21 @@ func (c *Config) UnmarshalText(data []byte) error {
 
 			c.Brokers = val
 		case "topic":
-			if val, ok := value.(string); ok {
-				c.Topic = val
+			val, ok := value.(string)
+
+			if !ok {
+				return errors.Errorf("Could not parse string from topic")
 			}
+
+			c.Topic = val
 		case "format":
-			if val, ok := value.(string); ok {
-				c.Format = val
+			val, ok := value.(string)
+
+			if !ok {
+				return errors.Errorf("Could not parse string from format")
 			}
+
+			c.Format = val
 		default:
 			return errors.Errorf("unknown query parameter: %s", key)
 		}

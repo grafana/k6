@@ -27,17 +27,19 @@ import (
 )
 
 func TestConfigUnmarshalText(t *testing.T) {
-	c := &Config{}
+	c1 := &Config{}
 
-	err := c.UnmarshalText([]byte("brokers=broker1,topic=someTopic,format=influx"))
+	err := c1.UnmarshalText([]byte("brokers=broker1,topic=someTopic,format=influx"))
 	assert.Nil(t, err)
-	assert.Equal(t, []string{"broker1"}, c.Brokers)
-	assert.Equal(t, "someTopic", c.Topic)
-	assert.Equal(t, "influx", c.Format)
+	assert.Equal(t, []string{"broker1"}, c1.Brokers)
+	assert.Equal(t, "someTopic", c1.Topic)
+	assert.Equal(t, "influx", c1.Format)
 
-	err = c.UnmarshalText([]byte("brokers={broker1,broker2:9092},topic=someTopic,format=influx"))
+	c2 := &Config{}
+
+	err = c2.UnmarshalText([]byte("brokers={broker2,broker3:9092},topic=someTopic2,format=json"))
 	assert.Nil(t, err)
-	assert.Equal(t, []string{"broker1","broker2:9092"}, c.Brokers)
-	assert.Equal(t, "someTopic", c.Topic)
-	assert.Equal(t, "influx", c.Format)
+	assert.Equal(t, []string{"broker2","broker3:9092"}, c2.Brokers)
+	assert.Equal(t, "someTopic2", c2.Topic)
+	assert.Equal(t, "json", c2.Format)
 }
