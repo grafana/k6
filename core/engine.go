@@ -161,7 +161,7 @@ func (e *Engine) Run(ctx context.Context) error {
 	}
 
 	// Run the executor.
-	out := make(chan []stats.Sample)
+	out := make(chan []stats.SampleContainer)
 	errC := make(chan error)
 	subwg.Add(1)
 	go func() {
@@ -184,8 +184,8 @@ func (e *Engine) Run(ctx context.Context) error {
 			subwg.Wait()
 			close(out)
 		}()
-		for samples := range out {
-			e.processSamples(samples...)
+		for sampleContainers := range out {
+			e.processSamples(sampleContainers...)
 		}
 
 		// Emit final metrics.
@@ -203,8 +203,8 @@ func (e *Engine) Run(ctx context.Context) error {
 
 	for {
 		select {
-		case samples := <-out:
-			e.processSamples(samples...)
+		case sampleContainers := <-out:
+			e.processSamples(sampleContainers...)
 		case err := <-errC:
 			errC = nil
 			if err != nil {
@@ -248,20 +248,23 @@ func (e *Engine) runMetricsEmission(ctx context.Context) {
 func (e *Engine) emitMetrics() {
 	t := time.Now()
 
-	e.processSamples(
-		stats.Sample{
-			Time:   t,
-			Metric: metrics.VUs,
-			Value:  float64(e.Executor.GetVUs()),
-			Tags:   e.Options.RunTags,
+	e.processSamples(stats.ConnectedSamples{
+		Samples: []stats.Sample{
+			{
+				Time:   t,
+				Metric: metrics.VUs,
+				Value:  float64(e.Executor.GetVUs()),
+				Tags:   e.Options.RunTags,
+			}, {
+				Time:   t,
+				Metric: metrics.VUsMax,
+				Value:  float64(e.Executor.GetVUsMax()),
+				Tags:   e.Options.RunTags,
+			},
 		},
-		stats.Sample{
-			Time:   t,
-			Metric: metrics.VUsMax,
-			Value:  float64(e.Executor.GetVUsMax()),
-			Tags:   e.Options.RunTags,
-		},
-	)
+		Tags: e.Options.RunTags,
+		Time: t,
+	})
 }
 
 func (e *Engine) runThresholds(ctx context.Context, abort func()) {
@@ -311,39 +314,47 @@ func (e *Engine) processThresholds(abort func()) {
 	}
 }
 
-func (e *Engine) processSamples(samples ...stats.Sample) {
-	if len(samples) == 0 {
+func (e *Engine) processSamples(sampleCointainers ...stats.SampleContainer) {
+	if len(sampleCointainers) == 0 {
 		return
 	}
 
 	e.MetricsLock.Lock()
 	defer e.MetricsLock.Unlock()
 
-	for _, sample := range samples {
-		m, ok := e.Metrics[sample.Metric.Name]
-		if !ok {
-			m = stats.New(sample.Metric.Name, sample.Metric.Type, sample.Metric.Contains)
-			m.Thresholds = e.thresholds[m.Name]
-			m.Submetrics = e.submetrics[m.Name]
-			e.Metrics[m.Name] = m
+	for _, sampleCointainer := range sampleCointainers {
+		samples := sampleCointainer.GetSamples()
+
+		if len(samples) == 0 {
+			continue
 		}
-		m.Sink.Add(sample)
 
-		for _, sm := range m.Submetrics {
-			if !sample.Tags.Contains(sm.Tags) {
-				continue
+		for _, sample := range samples {
+			m, ok := e.Metrics[sample.Metric.Name]
+			if !ok {
+				m = stats.New(sample.Metric.Name, sample.Metric.Type, sample.Metric.Contains)
+				m.Thresholds = e.thresholds[m.Name]
+				m.Submetrics = e.submetrics[m.Name]
+				e.Metrics[m.Name] = m
 			}
+			m.Sink.Add(sample)
 
-			if sm.Metric == nil {
-				sm.Metric = stats.New(sm.Name, sample.Metric.Type, sample.Metric.Contains)
-				sm.Metric.Sub = *sm
-				sm.Metric.Thresholds = e.thresholds[sm.Name]
-				e.Metrics[sm.Name] = sm.Metric
+			for _, sm := range m.Submetrics {
+				if !sample.Tags.Contains(sm.Tags) {
+					continue
+				}
+
+				if sm.Metric == nil {
+					sm.Metric = stats.New(sm.Name, sample.Metric.Type, sample.Metric.Contains)
+					sm.Metric.Sub = *sm
+					sm.Metric.Thresholds = e.thresholds[sm.Name]
+					e.Metrics[sm.Name] = sm.Metric
+				}
+				sm.Metric.Sink.Add(sample)
 			}
-			sm.Metric.Sink.Add(sample)
 		}
 	}
 	if e.Collector != nil {
-		e.Collector.Collect(samples)
+		e.Collector.Collect(sampleCointainers)
 	}
 }

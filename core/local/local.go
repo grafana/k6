@@ -45,7 +45,7 @@ type vuHandle struct {
 	cancel context.CancelFunc
 }
 
-func (h *vuHandle) run(logger *log.Logger, flow <-chan int64, out chan<- []stats.Sample) {
+func (h *vuHandle) run(logger *log.Logger, flow <-chan int64, out chan<- []stats.SampleContainer) {
 	h.RLock()
 	ctx := h.ctx
 	h.RUnlock()
@@ -60,9 +60,18 @@ func (h *vuHandle) run(logger *log.Logger, flow <-chan int64, out chan<- []stats
 			return
 		}
 
-		var samples []stats.Sample
+		var samples []stats.SampleContainer
 		if h.vu != nil {
-			s, err := h.vu.RunOnce(ctx)
+			// TODO: Refactor this if we want better aggregation...
+			// As seen below, at the moment test scripts will emit their
+			// metric samples only after they've finished executing. This
+			// means that long-running scripts will emit samples with
+			// times long in the past, long after their respective time buckets
+			// have been sent to the cloud. If we instead pass on the out
+			// SampleContainer channel directly to the VU, we could Collect()
+			// those samples as soon as they are emitted.
+
+			runSamples, err := h.vu.RunOnce(ctx)
 			if err != nil {
 				select {
 				case <-ctx.Done():
@@ -74,7 +83,7 @@ func (h *vuHandle) run(logger *log.Logger, flow <-chan int64, out chan<- []stats
 					}
 				}
 			}
-			samples = s
+			samples = runSamples
 		}
 		out <- samples
 	}
@@ -115,7 +124,7 @@ type Executor struct {
 	ctx context.Context
 
 	// Engineward output channel for samples.
-	out chan<- []stats.Sample
+	out chan<- []stats.SampleContainer
 
 	// Flow control for VUs; iterations are run only after reading from this channel.
 	flow chan int64
@@ -132,7 +141,7 @@ func New(r lib.Runner) *Executor {
 	}
 }
 
-func (e *Executor) Run(parent context.Context, out chan<- []stats.Sample) (reterr error) {
+func (e *Executor) Run(parent context.Context, out chan<- []stats.SampleContainer) (reterr error) {
 	e.runLock.Lock()
 	defer e.runLock.Unlock()
 
@@ -149,7 +158,7 @@ func (e *Executor) Run(parent context.Context, out chan<- []stats.Sample) (reter
 	}
 
 	ctx, cancel := context.WithCancel(parent)
-	vuOut := make(chan []stats.Sample)
+	vuOut := make(chan []stats.SampleContainer)
 	vuFlow := make(chan int64)
 
 	e.lock.Lock()
@@ -184,13 +193,23 @@ func (e *Executor) Run(parent context.Context, out chan<- []stats.Sample) (reter
 			close(wait)
 		}()
 
-		var samples []stats.Sample
+		var samples []stats.SampleContainer
 		for {
 			select {
-			case ss := <-vuOut:
-				for _, s := range ss {
-					if cutoff.IsZero() || s.Time.Before(cutoff) {
-						samples = append(samples, s)
+			case newSampleContainers := <-vuOut:
+				if cutoff.IsZero() {
+					samples = append(samples, newSampleContainers...)
+				} else {
+					for _, nsc := range newSampleContainers {
+						if csc, ok := nsc.(stats.ConnectedSampleContainer); ok && csc.GetTime().Before(cutoff) {
+							samples = append(samples, nsc)
+						} else if nsc != nil {
+							for _, s := range nsc.GetSamples() {
+								if s.Time.Before(cutoff) {
+									samples = append(samples, s)
+								}
+							}
+						}
 					}
 				}
 			case <-wait:
