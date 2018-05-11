@@ -51,9 +51,11 @@ func TestMetrics(t *testing.T) {
 		"False": {`false`, 0.0},
 	}
 	for fn, mtyp := range types {
+		fn, mtyp := fn, mtyp
 		t.Run(fn, func(t *testing.T) {
 			t.Parallel()
 			for isTime, valueType := range map[bool]stats.ValueType{false: stats.Default, true: stats.Time} {
+				isTime, valueType := isTime, valueType
 				t.Run(fmt.Sprintf("isTime=%v", isTime), func(t *testing.T) {
 					t.Parallel()
 					rt := goja.New()

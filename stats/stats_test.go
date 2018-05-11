@@ -120,6 +120,7 @@ func TestMetricHumanizeValue(t *testing.T) {
 	}
 
 	for m, values := range data {
+		m, values := m, values
 		t.Run(fmt.Sprintf("type=%s,contains=%s", m.Type.String(), m.Contains.String()), func(t *testing.T) {
 			t.Parallel()
 			for v, s := range values {
@@ -144,6 +145,7 @@ func TestNew(t *testing.T) {
 	}
 
 	for name, data := range testdata {
+		name, data := name, data
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			m := New("my_metric", data.Type)
@@ -160,7 +162,7 @@ func TestNewSubmetric(t *testing.T) {
 		tags   map[string]string
 	}{
 		"my_metric":                 {"my_metric", nil},
-		"my_metric{}":               {"my_metric", map[string]string{}},
+		"my_metric{}":               {"my_metric", nil},
 		"my_metric{a}":              {"my_metric", map[string]string{"a": ""}},
 		"my_metric{a:1}":            {"my_metric", map[string]string{"a": "1"}},
 		"my_metric{ a : 1 }":        {"my_metric", map[string]string{"a": "1"}},
@@ -170,6 +172,7 @@ func TestNewSubmetric(t *testing.T) {
 	}
 
 	for name, data := range testdata {
+		name, data := name, data
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			parent, sm := NewSubmetric(name)
