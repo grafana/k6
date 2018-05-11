@@ -66,7 +66,7 @@ Metrics streamed to the Load Impact cloud can be partially aggregated to reduce 
 ## Bugs
 * Archive: archives generated on Windows can now run on *nix and vice versa. (#566)
 * Submetrics are being tagged properly now. (#609)
-* NTLM: fixed `Selection.each(fn)` function, which was return only the first element. (#610)
+* HTML: fixed the `Selection.each(fn)` function, which was returning only the first element. (#610)
 * Invalid Stages option won't keep k6 running indefinitely. (#615)
 
 ## Breaking changes
