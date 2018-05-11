@@ -125,10 +125,8 @@ a commandline interface for interacting with it.`,
 		// defaults in there, override with Runner-provided ones, then merge the CLI opts in
 		// on top to give them priority.
 		fmt.Fprintf(stdout, "%s options\r", initBar.String())
-		cliConf, err := getConfig(cmd.Flags())
-		if err != nil {
-			return err
-		}
+
+		defaultConf := Config{Options: r.GetOptions()}
 		fileConf, _, err := readDiskConfig(fs)
 		if err != nil {
 			return err
@@ -137,7 +135,11 @@ a commandline interface for interacting with it.`,
 		if err != nil {
 			return err
 		}
-		conf := cliConf.Apply(fileConf).Apply(Config{Options: r.GetOptions()}).Apply(envConf).Apply(cliConf)
+		cliConf, err := getConfig(cmd.Flags())
+		if err != nil {
+			return err
+		}
+		conf := defaultConf.Apply(fileConf).Apply(envConf).Apply(cliConf)
 
 		// If -m/--max isn't specified, figure out the max that should be needed.
 		if !conf.VUsMax.Valid {
@@ -188,16 +190,18 @@ a commandline interface for interacting with it.`,
 
 		// Create a collector and assign it to the engine if requested.
 		fmt.Fprintf(stdout, "%s   collector\r", initBar.String())
-		if conf.Out.Valid {
-			t, arg := parseCollector(conf.Out.String)
-			collector, err := newCollector(t, arg, src, conf)
-			if err != nil {
-				return err
+		for _, out := range conf.Out {
+			if out.Valid {
+				t, arg := parseCollector(out.String)
+				collector, err := newCollector(t, arg, src, conf)
+				if err != nil {
+					return err
+				}
+				if err := collector.Init(); err != nil {
+					return err
+				}
+				engine.Collectors = append(engine.Collectors, collector)
 			}
-			if err := collector.Init(); err != nil {
-				return err
-			}
-			engine.Collector = collector
 		}
 
 		// Create an API server.
@@ -212,10 +216,17 @@ a commandline interface for interacting with it.`,
 		{
 			out := "-"
 			link := ""
-			if engine.Collector != nil {
-				out = conf.Out.String
-				if l := engine.Collector.Link(); l != "" {
-					link = " (" + l + ")"
+			if engine.Collectors != nil {
+				for idx, collector := range engine.Collectors {
+					if out != "-" {
+						out = out + "; " + conf.Out[idx].String
+					} else {
+						out = conf.Out[idx].String
+					}
+
+					if l := collector.Link(); l != "" {
+						link = link + " (" + l + ")"
+					}
 				}
 			}
 
