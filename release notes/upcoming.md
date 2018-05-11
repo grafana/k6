@@ -49,9 +49,9 @@ Previously the `setup()` and `teardown()` functions timed out after 10 seconds. 
 
 ### In-client aggregation for metrics streamed to the cloud (#600)
 
-Metrics streamed to the LoadImpact cloud can be partially aggregated to reduce bandwidth usage and processing times. Outlier metrics are automatically detected and excluded from that aggregation.
+Metrics streamed to the Load Impact cloud can be partially aggregated to reduce bandwidth usage and processing times. Outlier metrics are automatically detected and excluded from that aggregation.
 
-**Docs**: [LoadImpact Insights Aggregation](https://docs.k6.io/docs/load-impact-insights#section-aggregation)
+**Docs**: [Load Impact Insights Aggregation](https://docs.k6.io/docs/load-impact-insights#section-aggregation)
 
 ## UX
 
@@ -70,4 +70,4 @@ Metrics streamed to the LoadImpact cloud can be partially aggregated to reduce b
 * Invalid Stages option won't keep k6 running indefinitely. (#615)
 
 ## Breaking changes
-* The LoadImpact cloud configuration options `no_compress` and `project_id` and the `payload_size` InfluxDB option  have been renamed to `noCompress`, `projectID` and `payloadSize` respectively, to match the other JS option names.
+* The Load Impact cloud configuration options `no_compress` and `project_id` and the `payload_size` InfluxDB option have been renamed to `noCompress`, `projectID` and `payloadSize` respectively, to match the other JS option names.
