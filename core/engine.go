@@ -51,7 +51,7 @@ type Engine struct {
 
 	Executor     lib.Executor
 	Options      lib.Options
-	Collector    lib.Collector
+	Collectors   []lib.Collector
 	NoThresholds bool
 
 	logger *log.Logger
@@ -131,12 +131,14 @@ func (e *Engine) Run(ctx context.Context) error {
 
 	collectorwg := sync.WaitGroup{}
 	collectorctx, collectorcancel := context.WithCancel(context.Background())
-	if e.Collector != nil {
-		collectorwg.Add(1)
-		go func() {
-			e.Collector.Run(collectorctx)
-			collectorwg.Done()
-		}()
+	if len(e.Collectors) > 0 {
+		for _, collector := range e.Collectors {
+			collectorwg.Add(1)
+			go func(collector lib.Collector) {
+				collector.Run(collectorctx)
+				collectorwg.Done()
+			}(collector)
+		}
 	}
 
 	subctx, subcancel := context.WithCancel(context.Background())
@@ -354,7 +356,9 @@ func (e *Engine) processSamples(sampleCointainers ...stats.SampleContainer) {
 			}
 		}
 	}
-	if e.Collector != nil {
-		e.Collector.Collect(sampleCointainers)
+	if len(e.Collectors) > 0 {
+		for _, collector := range e.Collectors {
+			collector.Collect(sampleCointainers)
+		}
 	}
 }
