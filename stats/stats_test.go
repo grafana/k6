@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -119,6 +120,7 @@ func TestMetricHumanizeValue(t *testing.T) {
 	}
 
 	for m, values := range data {
+		m, values := m, values
 		t.Run(fmt.Sprintf("type=%s,contains=%s", m.Type.String(), m.Contains.String()), func(t *testing.T) {
 			t.Parallel()
 			for v, s := range values {
@@ -143,6 +145,7 @@ func TestNew(t *testing.T) {
 	}
 
 	for name, data := range testdata {
+		name, data := name, data
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			m := New("my_metric", data.Type)
@@ -159,7 +162,7 @@ func TestNewSubmetric(t *testing.T) {
 		tags   map[string]string
 	}{
 		"my_metric":                 {"my_metric", nil},
-		"my_metric{}":               {"my_metric", map[string]string{}},
+		"my_metric{}":               {"my_metric", nil},
 		"my_metric{a}":              {"my_metric", map[string]string{"a": ""}},
 		"my_metric{a:1}":            {"my_metric", map[string]string{"a": "1"}},
 		"my_metric{ a : 1 }":        {"my_metric", map[string]string{"a": "1"}},
@@ -169,6 +172,7 @@ func TestNewSubmetric(t *testing.T) {
 	}
 
 	for name, data := range testdata {
+		name, data := name, data
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			parent, sm := NewSubmetric(name)
@@ -197,21 +201,21 @@ func TestSampleTags(t *testing.T) {
 	// Empty SampleTags
 	emptyTagMap := map[string]string{}
 	emptyTags := NewSampleTags(emptyTagMap)
-	assert.NotNil(t, emptyTags)
+	assert.Nil(t, emptyTags)
 	assert.True(t, emptyTags.IsEqual(emptyTags))
-	assert.False(t, emptyTags.IsEqual(nilTags))
+	assert.True(t, emptyTags.IsEqual(nilTags))
 	assert.Equal(t, emptyTagMap, emptyTags.CloneTags())
 
 	emptyJSON, err := json.Marshal(emptyTags)
 	assert.NoError(t, err)
-	assert.Equal(t, "{}", string(emptyJSON))
+	assert.Equal(t, "null", string(emptyJSON))
 
 	var emptyTagsUnmarshaled *SampleTags
 	err = json.Unmarshal(emptyJSON, &emptyTagsUnmarshaled)
 	assert.NoError(t, err)
-	assert.NotNil(t, emptyTagsUnmarshaled)
+	assert.Nil(t, emptyTagsUnmarshaled)
 	assert.True(t, emptyTagsUnmarshaled.IsEqual(emptyTags))
-	assert.False(t, emptyTagsUnmarshaled.IsEqual(nilTags))
+	assert.True(t, emptyTagsUnmarshaled.IsEqual(nilTags))
 	assert.Equal(t, emptyTagMap, emptyTagsUnmarshaled.CloneTags())
 
 	// SampleTags with keys and values
@@ -240,4 +244,29 @@ func TestSampleTags(t *testing.T) {
 	assert.True(t, tagsUnmarshaled.IsEqual(tags))
 	assert.False(t, tagsUnmarshaled.IsEqual(nilTags))
 	assert.Equal(t, tagMap, tagsUnmarshaled.CloneTags())
+}
+
+func TestSampleImplementations(t *testing.T) {
+	tagMap := map[string]string{"key1": "val1", "key2": "val2"}
+	now := time.Now()
+
+	sample := Sample{
+		Metric: New("test_metric", Counter),
+		Time:   now,
+		Tags:   NewSampleTags(tagMap),
+		Value:  1.0,
+	}
+	samples := Samples(sample.GetSamples())
+	cSamples := ConnectedSamples{
+		Samples: []Sample{sample},
+		Time:    now,
+		Tags:    NewSampleTags(tagMap),
+	}
+	exp := []Sample{sample}
+	assert.Equal(t, exp, sample.GetSamples())
+	assert.Equal(t, exp, samples.GetSamples())
+	assert.Equal(t, exp, cSamples.GetSamples())
+	assert.Equal(t, now, sample.GetTime())
+	assert.Equal(t, now, cSamples.GetTime())
+	assert.Equal(t, sample.GetTags(), sample.GetTags())
 }

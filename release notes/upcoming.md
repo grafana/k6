@@ -47,6 +47,11 @@ Thanks to @danron for their work on this!
 
 Previously the `setup()` and `teardown()` functions timed out after 10 seconds. Now that period is configurable via the `setupTimeout` and `teardownTimeout` script options or the `K6_SETUP_TIMEOUT` and `K6_TEARDOWN_TIMEOUT` environment variables. The default timeouts are still 10 seconds and at this time there are no CLI options for changing them to avoid clutter.
 
+### In-client aggregation for metrics streamed to the cloud (#600)
+
+Metrics streamed to the Load Impact cloud can be partially aggregated to reduce bandwidth usage and processing times. Outlier metrics are automatically detected and excluded from that aggregation.
+
+**Docs**: [Load Impact Insights Aggregation](https://docs.k6.io/docs/load-impact-insights#section-aggregation)
 
 ## UX
 
@@ -60,6 +65,9 @@ Previously the `setup()` and `teardown()` functions timed out after 10 seconds. 
 
 ## Bugs
 * Archive: archives generated on Windows can now run on *nix and vice versa. (#566)
-* Submetrics are being tagged properly know. (#609)
-* Htlm: fixed `Selection.each(fn)` function, which was return only the first element. (#610)
+* Submetrics are being tagged properly now. (#609)
+* HTML: fixed the `Selection.each(fn)` function, which was returning only the first element. (#610)
 * Invalid Stages option won't keep k6 running indefinitely. (#615)
+
+## Breaking changes
+* The Load Impact cloud configuration options `no_compress` and `project_id` and the `payload_size` InfluxDB option have been renamed to `noCompress`, `projectID` and `payloadSize` respectively, to match the other JS option names.

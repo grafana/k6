@@ -38,6 +38,9 @@ type Trail struct {
 	StartTime time.Time
 	EndTime   time.Time
 
+	// Total connect time (Connecting + TLSHandshaking)
+	ConnDuration time.Duration
+
 	// Total request duration, excluding DNS lookup and connect time.
 	Duration time.Duration
 
@@ -52,21 +55,45 @@ type Trail struct {
 	ConnReused     bool
 	ConnRemoteAddr net.Addr
 	Errors         []error
+
+	// Populated by SaveSamples()
+	Tags    *stats.SampleTags
+	Samples []stats.Sample
 }
 
-// Samples returns a slice with all of the pre-calculated sample values for the request
-func (tr Trail) Samples(tags *stats.SampleTags) []stats.Sample {
-	return []stats.Sample{
+// SaveSamples populates the Trail's sample slice so they're accesible via GetSamples()
+func (tr *Trail) SaveSamples(tags *stats.SampleTags) {
+	tr.Tags = tags
+	tr.Samples = []stats.Sample{
 		{Metric: metrics.HTTPReqs, Time: tr.EndTime, Tags: tags, Value: 1},
 		{Metric: metrics.HTTPReqDuration, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Duration)},
+
 		{Metric: metrics.HTTPReqBlocked, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Blocked)},
 		{Metric: metrics.HTTPReqConnecting, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Connecting)},
+		{Metric: metrics.HTTPReqTLSHandshaking, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.TLSHandshaking)},
 		{Metric: metrics.HTTPReqSending, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Sending)},
 		{Metric: metrics.HTTPReqWaiting, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Waiting)},
 		{Metric: metrics.HTTPReqReceiving, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Receiving)},
-		{Metric: metrics.HTTPReqTLSHandshaking, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.TLSHandshaking)},
 	}
 }
+
+// GetSamples implements the stats.SampleContainer interface.
+func (tr *Trail) GetSamples() []stats.Sample {
+	return tr.Samples
+}
+
+// GetTags implements the stats.ConnectedSampleContainer interface.
+func (tr *Trail) GetTags() *stats.SampleTags {
+	return tr.Tags
+}
+
+// GetTime implements the stats.ConnectedSampleContainer interface.
+func (tr *Trail) GetTime() time.Time {
+	return tr.EndTime
+}
+
+// Ensure that interfaces are implemented correctly
+var _ stats.ConnectedSampleContainer = &Trail{}
 
 // A Tracer wraps "net/http/httptrace" to collect granular timings for HTTP requests.
 // Note that since there is not yet an event for the end of a request (there's a PR to
@@ -228,7 +255,7 @@ func (t *Tracer) GotFirstResponseByte() {
 }
 
 // Done calculates all metrics and should be called when the request is finished.
-func (t *Tracer) Done() Trail {
+func (t *Tracer) Done() *Trail {
 	done := time.Now()
 
 	trail := Trail{
@@ -276,6 +303,7 @@ func (t *Tracer) Done() Trail {
 
 	// Calculate total times using adjusted values.
 	trail.EndTime = done
+	trail.ConnDuration = trail.Connecting + trail.TLSHandshaking
 	trail.Duration = trail.Sending + trail.Waiting + trail.Receiving
 	trail.StartTime = trail.EndTime.Add(-trail.Duration)
 
@@ -285,5 +313,5 @@ func (t *Tracer) Done() Trail {
 		trail.Errors = append([]error{}, t.protoErrors...)
 	}
 
-	return trail
+	return &trail
 }

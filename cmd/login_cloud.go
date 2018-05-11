@@ -24,6 +24,8 @@ import (
 	"fmt"
 	"os"
 
+	"gopkg.in/guregu/null.v3"
+
 	"github.com/loadimpact/k6/stats/cloud"
 	"github.com/loadimpact/k6/ui"
 	"github.com/pkg/errors"
@@ -58,12 +60,12 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 		show := getNullBool(cmd.Flags(), "show")
 		token := getNullString(cmd.Flags(), "token")
 
-		conf := config.Collectors.Cloud
+		conf := cloud.NewConfig().Apply(config.Collectors.Cloud)
 
 		switch {
 		case show.Bool:
 		case token.Valid:
-			conf.Token = token.String
+			conf.Token = token
 		default:
 			form := ui.Form{
 				Fields: []ui.Field{
@@ -84,7 +86,7 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 			email := vals["Email"].(string)
 			password := vals["Password"].(string)
 
-			client := cloud.NewClient("", conf.Host, Version)
+			client := cloud.NewClient("", conf.Host.String, Version)
 			res, err := client.Login(email, password)
 			if err != nil {
 				return err
@@ -94,7 +96,7 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 				return errors.New(`Your account has no API token, please generate one: "https://app.loadimpact.com/account/token".`)
 			}
 
-			conf.Token = res.Token
+			conf.Token = null.StringFrom(res.Token)
 		}
 
 		config.Collectors.Cloud = conf

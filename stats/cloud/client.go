@@ -53,9 +53,6 @@ type Client struct {
 }
 
 func NewClient(token, host, version string) *Client {
-	if host == "" {
-		host = "https://ingest.loadimpact.com"
-	}
 	c := &Client{
 		client:        &http.Client{Timeout: RequestTimeout},
 		token:         token,
@@ -123,7 +120,6 @@ func (c *Client) do(req *http.Request, v interface{}, attempt int) (retry bool, 
 		req.Header.Set("Authorization", fmt.Sprintf("Token %s", c.token))
 	}
 	req.Header.Set("User-Agent", "k6cloud/"+c.version)
-
 	resp, err := c.client.Do(req)
 
 	defer func() {

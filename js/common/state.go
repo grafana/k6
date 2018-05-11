@@ -54,7 +54,7 @@ type State struct {
 	RPSLimit *rate.Limiter
 
 	// Sample buffer, emitted at the end of the iteration.
-	Samples []stats.Sample
+	Samples []stats.SampleContainer
 
 	// Buffer pool; use instead of allocating fresh buffers when possible.
 	BPool *bpool.BufferPool
