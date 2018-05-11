@@ -53,6 +53,10 @@ Metrics streamed to the Load Impact cloud can be partially aggregated to reduce 
 
 **Docs**: [Load Impact Insights Aggregation](https://docs.k6.io/docs/load-impact-insights#section-aggregation)
 
+### Remote IP address as an optional system metric tag (#616)
+
+It's now possible to add the remote server's IP address to the tags for HTTP and WebSocket metrics. The `ip` [system tag](https://docs.k6.io/docs/tags-and-groups#section-system-tags) is not included by default, but it could easily be enabled by modifying the `systemTags` [option](https://docs.k6.io/docs/options).
+
 ## UX
 
 * Clearer error message when using `open` function outside init context (#563)

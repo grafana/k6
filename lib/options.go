@@ -32,7 +32,7 @@ import (
 )
 
 // DefaultSystemTagList includes all of the system tags emitted with metrics by default.
-// Other tags that are not enabled by default include: iter, vu, ocsp_status
+// Other tags that are not enabled by default include: iter, vu, ocsp_status, ip
 var DefaultSystemTagList = []string{
 	"proto", "subproto", "status", "method", "url", "name", "group", "check", "error", "tls_version",
 }
