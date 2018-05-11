@@ -30,6 +30,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -89,6 +90,8 @@ func TestTracer(t *testing.T) {
 			assertLaterOrZero(t, tracer.wroteRequest, false)
 			assertLaterOrZero(t, tracer.gotFirstResponseByte, false)
 			assertLaterOrZero(t, now(), false)
+
+			assert.Equal(t, strings.TrimPrefix(srv.URL, "https://"), trail.ConnRemoteAddr.String())
 
 			assert.Len(t, samples, 8)
 			seenMetrics := map[*stats.Metric]bool{}

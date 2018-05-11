@@ -397,7 +397,14 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 			req.Header.Set(digest.KEY_AUTHORIZATION, authorization)
 		}
 		trail := tracer.Done()
+
+		if state.Options.SystemTags["ip"] && trail.ConnRemoteAddr != nil {
+			if ip, _, err := net.SplitHostPort(trail.ConnRemoteAddr.String()); err == nil {
+				tags["ip"] = ip
+			}
+		}
 		trail.SaveSamples(stats.NewSampleTags(tags))
+		delete(tags, "ip")
 		statsSamples = append(statsSamples, trail)
 	}
 
@@ -521,6 +528,11 @@ func (h *HTTP) request(ctx context.Context, rt *goja.Runtime, state *common.Stat
 		}
 	}
 
+	if state.Options.SystemTags["ip"] && trail.ConnRemoteAddr != nil {
+		if ip, _, err := net.SplitHostPort(trail.ConnRemoteAddr.String()); err == nil {
+			tags["ip"] = ip
+		}
+	}
 	trail.SaveSamples(stats.IntoSampleTags(&tags))
 	statsSamples = append(statsSamples, trail)
 	return resp, statsSamples, nil
