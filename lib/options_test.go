@@ -67,6 +67,8 @@ func TestOptions(t *testing.T) {
 		assert.NotNil(t, opts.Stages)
 		assert.Len(t, opts.Stages, 1)
 		assert.Equal(t, 1*time.Second, time.Duration(opts.Stages[0].Duration.Duration))
+
+		assert.Nil(t, Options{}.Apply(Options{Stages: []Stage{{}}}).Stages)
 	})
 	t.Run("RPS", func(t *testing.T) {
 		opts := Options{}.Apply(Options{RPS: null.IntFrom(12345)})
