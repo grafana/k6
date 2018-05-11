@@ -49,9 +49,9 @@ Previously the `setup()` and `teardown()` functions timed out after 10 seconds. 
 
 ### In-client aggregation for metrics streamed to the cloud (#600)
 
-Metrics streamed to the LoadImpact cloud can be partially aggregated to reduce bandwidth usage and processing times. Outlier metrics are automatically detected and excluded from that aggregation.
+Metrics streamed to the Load Impact cloud can be partially aggregated to reduce bandwidth usage and processing times. Outlier metrics are automatically detected and excluded from that aggregation.
 
-**Docs**: [LoadImpact Insights Aggregation](https://docs.k6.io/docs/load-impact-insights#section-aggregation)
+**Docs**: [Load Impact Insights Aggregation](https://docs.k6.io/docs/load-impact-insights#section-aggregation)
 
 ### Remote IP address as an optional system metric tag (#616)
 
@@ -70,8 +70,8 @@ It's now possible to add the remote server's IP address to the tags for HTTP and
 ## Bugs
 * Archive: archives generated on Windows can now run on *nix and vice versa. (#566)
 * Submetrics are being tagged properly now. (#609)
-* NTLM: fixed `Selection.each(fn)` function, which was return only the first element. (#610)
+* HTML: fixed the `Selection.each(fn)` function, which was returning only the first element. (#610)
 * Invalid Stages option won't keep k6 running indefinitely. (#615)
 
 ## Breaking changes
-* The LoadImpact cloud configuration options `no_compress` and `project_id` and the `payload_size` InfluxDB option  have been renamed to `noCompress`, `projectID` and `payloadSize` respectively, to match the other JS option names.
+* The Load Impact cloud configuration options `no_compress` and `project_id` and the `payload_size` InfluxDB option have been renamed to `noCompress`, `projectID` and `payloadSize` respectively, to match the other JS option names.
