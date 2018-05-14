@@ -21,8 +21,6 @@
 package kafka
 
 import (
-	"encoding/json"
-
 	"github.com/kubernetes/helm/pkg/strvals"
 	"github.com/mitchellh/mapstructure"
 	"gopkg.in/guregu/null.v3"
@@ -106,17 +104,4 @@ func ParseArg(arg string) (Config, error) {
 	c.Format = null.StringFrom(cfg.Format)
 
 	return c, nil
-}
-
-func (c *Config) UnmarshalJSON(data []byte) error {
-	fields := ConfigFields(*c)
-	if err := json.Unmarshal(data, &fields); err != nil {
-		return err
-	}
-	*c = Config(fields)
-	return nil
-}
-
-func (c Config) MarshalJSON() ([]byte, error) {
-	return json.Marshal(ConfigFields(c))
 }
