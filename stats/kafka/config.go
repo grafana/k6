@@ -47,6 +47,13 @@ type config struct {
 
 type Config ConfigFields
 
+// NewConfig creates a new Config instance with default values for some fields.
+func NewConfig() Config {
+	return Config{
+		Format: null.StringFrom("json"),
+	}
+}
+
 func (c Config) Apply(cfg Config) Config {
 	if len(cfg.Brokers) > 0 {
 		for _, b := range cfg.Brokers {
@@ -64,12 +71,13 @@ func (c Config) Apply(cfg Config) Config {
 	return c
 }
 
-// UnmarshalText takes an arg string and converts it to a config
-func (c *Config) UnmarshalText(data []byte) error {
-	params, err := strvals.Parse(string(data))
+// ParseArg takes an arg string and converts it to a config
+func ParseArg(arg string) (Config, error) {
+	c := Config{}
+	params, err := strvals.Parse(arg)
 
 	if err != nil {
-		return err
+		return c, err
 	}
 
 	if v, ok := params["brokers"].(string); ok {
@@ -85,7 +93,7 @@ func (c *Config) UnmarshalText(data []byte) error {
 	var cfg config
 	err = mapstructure.Decode(input, &cfg)
 	if err != nil {
-		return err
+		return c, err
 	}
 
 	var brokers []null.String
@@ -97,7 +105,7 @@ func (c *Config) UnmarshalText(data []byte) error {
 	c.Topic = null.StringFrom(cfg.Topic)
 	c.Format = null.StringFrom(cfg.Format)
 
-	return nil
+	return c, nil
 }
 
 func (c *Config) UnmarshalJSON(data []byte) error {

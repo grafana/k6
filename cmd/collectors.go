@@ -81,9 +81,16 @@ func newCollector(collectorName, arg string, src *lib.SourceData, conf Config) (
 			}
 			return cloud.New(config, src, conf.Options, Version)
 		case collectorKafka:
-			config := conf.Collectors.Kafka
-			if err := loadConfig(&config); err != nil {
+			config := kafka.NewConfig().Apply(conf.Collectors.Kafka)
+			if err := envconfig.Process("k6", &config); err != nil {
 				return nil, err
+			}
+			if arg != "" {
+				cmdConfig, err := kafka.ParseArg(arg)
+				if err != nil {
+					return nil, err
+				}
+				config = config.Apply(cmdConfig)
 			}
 			return kafka.New(config)
 		default:

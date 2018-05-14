@@ -9,7 +9,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 )
 
-func formatSamples(format string, samples []stats.Sample) ([]string, error) {
+func formatSamples(format string, samples stats.Samples) ([]string, error) {
 	var metrics []string
 
 	switch format {

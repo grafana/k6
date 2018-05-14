@@ -24,17 +24,14 @@ import (
 	"testing"
 
 	"github.com/loadimpact/k6/stats"
-	// "github.com/loadimpact/k6/stats/influxdb"
-	// jsonc "github.com/loadimpact/k6/stats/json"
 	"github.com/stretchr/testify/assert"
-	// "gopkg.in/guregu/null.v3"
 )
 
 func TestFormatSamples(t *testing.T) {
 	metric := stats.New("my_metric", stats.Gauge)
-	samples := []stats.Sample{
-		stats.Sample{Metric: metric, Value: 1.25, Tags: stats.IntoSampleTags(&map[string]string{"a": "1"})},
-		stats.Sample{Metric: metric, Value: 2, Tags: stats.IntoSampleTags(&map[string]string{"b": "2"})},
+	samples := stats.Samples{
+		{Metric: metric, Value: 1.25, Tags: stats.IntoSampleTags(&map[string]string{"a": "1"})},
+		{Metric: metric, Value: 2, Tags: stats.IntoSampleTags(&map[string]string{"b": "2"})},
 	}
 
 	fmtdSamples, err := formatSamples("influx", samples)

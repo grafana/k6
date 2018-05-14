@@ -86,9 +86,11 @@ func (c *Collector) Run(ctx context.Context) {
 // detect incorrect usage.
 // Also, theoretically the collector doesn't have to actually Run() before samples start
 // being collected, it only has to be initialized.
-func (c *Collector) Collect(samples []stats.Sample) {
+func (c *Collector) Collect(scs []stats.SampleContainer) {
 	c.lock.Lock()
-	c.Samples = append(c.Samples, samples...)
+	for _, sc := range scs {
+		c.Samples = append(c.Samples, sc.GetSamples()...)
+	}
 	c.lock.Unlock()
 }
 
