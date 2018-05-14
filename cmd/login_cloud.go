@@ -104,7 +104,7 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 			return err
 		}
 
-		fmt.Fprintf(stdout, "  token: %s\n", ui.ValueColor.Sprint(conf.Token))
+		fmt.Fprintf(stdout, "  token: %s\n", ui.ValueColor.Sprint(conf.Token.String))
 		return nil
 	},
 }
