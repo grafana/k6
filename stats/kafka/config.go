@@ -24,7 +24,7 @@ import (
 	"encoding/json"
 
 	"github.com/kubernetes/helm/pkg/strvals"
-	"github.com/pkg/errors"
+	"github.com/mitchellh/mapstructure"
 )
 
 type ConfigFields struct {
@@ -51,6 +51,7 @@ func (c Config) Apply(cfg Config) Config {
 	return c
 }
 
+// UnmarshalText takes an arg string and converts it to a config
 func (c *Config) UnmarshalText(data []byte) error {
 	params, err := strvals.Parse(string(data))
 
@@ -58,57 +59,21 @@ func (c *Config) UnmarshalText(data []byte) error {
 		return err
 	}
 
-	for key, value := range params {
-		switch key {
-		case "brokers":
-			// Check if an array
-			values, ok := value.([]interface{})
-
-			if !ok {
-				// Check if a string
-				v, ok := value.(string)
-
-				if !ok {
-					return errors.Errorf("Could not parse array/string from brokers")
-				}
-
-				c.Brokers = []string{v}
-
-				continue
-			}
-
-			var val []string
-			for _, i := range values {
-				v, ok := i.(string)
-
-				if !ok {
-					return errors.Errorf("Could not parse string from brokers")
-				}
-
-				val = append(val, v)
-			}
-
-			c.Brokers = val
-		case "topic":
-			val, ok := value.(string)
-
-			if !ok {
-				return errors.Errorf("Could not parse string from topic")
-			}
-
-			c.Topic = val
-		case "format":
-			val, ok := value.(string)
-
-			if !ok {
-				return errors.Errorf("Could not parse string from format")
-			}
-
-			c.Format = val
-		default:
-			return errors.Errorf("unknown query parameter: %s", key)
-		}
+	input := map[string]interface{}{
+		"brokers": params["brokers"],
+		"topic":   params["topic"],
+		"format":  params["format"],
 	}
+
+	var config Config
+	err = mapstructure.Decode(input, &config)
+	if err != nil {
+		return err
+	}
+
+	c.Brokers = config.Brokers
+	c.Topic = config.Topic
+	c.Format = config.Format
 
 	return nil
 }
