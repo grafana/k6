@@ -25,27 +25,40 @@ import (
 
 	"github.com/kubernetes/helm/pkg/strvals"
 	"github.com/mitchellh/mapstructure"
+	"gopkg.in/guregu/null.v3"
 )
 
 type ConfigFields struct {
 	// Connection.
-	Brokers []string `json:"brokers" envconfig:"KAFKA_BROKERS"`
+	Brokers []null.String `json:"brokers" envconfig:"KAFKA_BROKERS"`
 
 	// Samples.
-	Topic  string `json:"topic" envconfig:"KAFKA_TOPIC"`
-	Format string `json:"format" envconfig:"KAFKA_FORMAT"`
+	Topic  null.String `json:"topic" envconfig:"KAFKA_TOPIC"`
+	Format null.String `json:"format" envconfig:"KAFKA_FORMAT"`
+}
+
+// config is a duplicate of ConfigFields as we can not mapstructure.Decode into
+// null types so we duplicate the struct with primitive types to Decode into
+type config struct {
+	Brokers []string `json:"brokers" mapstructure:"brokers" envconfig:"KAFKA_BROKERS"`
+	Topic   string   `json:"topic" mapstructure:"topic" envconfig:"KAFKA_TOPIC"`
+	Format  string   `json:"format" mapstructure:"format" envconfig:"KAFKA_FORMAT"`
 }
 
 type Config ConfigFields
 
 func (c Config) Apply(cfg Config) Config {
 	if len(cfg.Brokers) > 0 {
-		c.Brokers = cfg.Brokers
+		for _, b := range cfg.Brokers {
+			if b.Valid {
+				c.Brokers = append(c.Brokers, b)
+			}
+		}
 	}
-	if cfg.Format != "" {
+	if cfg.Format.Valid {
 		c.Format = cfg.Format
 	}
-	if cfg.Topic != "" {
+	if cfg.Topic.Valid {
 		c.Topic = cfg.Topic
 	}
 	return c
@@ -69,15 +82,20 @@ func (c *Config) UnmarshalText(data []byte) error {
 		"format":  params["format"],
 	}
 
-	var config Config
-	err = mapstructure.Decode(input, &config)
+	var cfg config
+	err = mapstructure.Decode(input, &cfg)
 	if err != nil {
 		return err
 	}
 
-	c.Brokers = config.Brokers
-	c.Topic = config.Topic
-	c.Format = config.Format
+	var brokers []null.String
+	for _, b := range cfg.Brokers {
+		brokers = append(brokers, null.StringFrom(b))
+	}
+
+	c.Brokers = brokers
+	c.Topic = null.StringFrom(cfg.Topic)
+	c.Format = null.StringFrom(cfg.Format)
 
 	return nil
 }

@@ -46,7 +46,7 @@ type Collector struct {
 
 // New creates an instance of the collector
 func New(conf Config) (*Collector, error) {
-	producer, err := sarama.NewSyncProducer(conf.Brokers, nil)
+	producer, err := sarama.NewSyncProducer(StringsFromNulls(conf.Brokers), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +111,7 @@ func (c *Collector) pushMetrics() {
 	c.lock.Unlock()
 
 	// Format the samples
-	formattedSamples, err := formatSamples(c.Config.Format, samples)
+	formattedSamples, err := formatSamples(c.Config.Format.String, samples)
 	if err != nil {
 		log.WithError(err).Error("Kafka: Couldn't format the samples")
 		return
@@ -121,7 +121,7 @@ func (c *Collector) pushMetrics() {
 	log.Debug("Kafka: Delivering...")
 
 	for _, sample := range formattedSamples {
-		msg := &sarama.ProducerMessage{Topic: c.Config.Topic, Value: sarama.StringEncoder(sample)}
+		msg := &sarama.ProducerMessage{Topic: c.Config.Topic.String, Value: sarama.StringEncoder(sample)}
 		partition, offset, err := c.Producer.SendMessage(msg)
 		if err != nil {
 			log.WithError(err).Error("Kafka: failed to send message.")

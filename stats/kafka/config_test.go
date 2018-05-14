@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"gopkg.in/guregu/null.v3"
 )
 
 func TestConfigUnmarshalText(t *testing.T) {
@@ -31,15 +32,15 @@ func TestConfigUnmarshalText(t *testing.T) {
 
 	err := c1.UnmarshalText([]byte("brokers=broker1,topic=someTopic,format=influx"))
 	assert.Nil(t, err)
-	assert.Equal(t, []string{"broker1"}, c1.Brokers)
-	assert.Equal(t, "someTopic", c1.Topic)
-	assert.Equal(t, "influx", c1.Format)
+	assert.Equal(t, []null.String{null.StringFrom("broker1")}, c1.Brokers)
+	assert.Equal(t, null.StringFrom("someTopic"), c1.Topic)
+	assert.Equal(t, null.StringFrom("influx"), c1.Format)
 
 	c2 := &Config{}
 
 	err = c2.UnmarshalText([]byte("brokers={broker2,broker3:9092},topic=someTopic2,format=json"))
 	assert.Nil(t, err)
-	assert.Equal(t, []string{"broker2", "broker3:9092"}, c2.Brokers)
-	assert.Equal(t, "someTopic2", c2.Topic)
-	assert.Equal(t, "json", c2.Format)
+	assert.Equal(t, []null.String{null.StringFrom("broker2"), null.StringFrom("broker3:9092")}, c2.Brokers)
+	assert.Equal(t, null.StringFrom("someTopic2"), c2.Topic)
+	assert.Equal(t, null.StringFrom("json"), c2.Format)
 }
