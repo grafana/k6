@@ -27,7 +27,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 )
 
-func TestConfigUnmarshalText(t *testing.T) {
+func TestConfigParseArg(t *testing.T) {
 	c, err := ParseArg("brokers=broker1,topic=someTopic,format=influx")
 	assert.Nil(t, err)
 	assert.Equal(t, []null.String{null.StringFrom("broker1")}, c.Brokers)
