@@ -59,6 +59,10 @@ func (c *Config) UnmarshalText(data []byte) error {
 		return err
 	}
 
+	if v, ok := params["brokers"].(string); ok {
+		params["brokers"] = []string{v}
+	}
+
 	input := map[string]interface{}{
 		"brokers": params["brokers"],
 		"topic":   params["topic"],
