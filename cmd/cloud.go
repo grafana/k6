@@ -187,7 +187,7 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 		fmt.Fprintf(stdout, "     test status: %s\n", ui.ValueColor.Sprint(testProgress.RunStatusText))
 
 		if testProgress.ResultStatus == 1 {
-			return ExitCode{errors.New("The test have failed"), 99}
+			return ExitCode{errors.New("The test has failed"), 99}
 		}
 
 		return nil
