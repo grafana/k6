@@ -27,13 +27,15 @@ import (
 	"gopkg.in/guregu/null.v3"
 )
 
-type ConfigFields struct {
+// Config is the config for the kafka collector
+type Config struct {
 	// Connection.
 	Brokers []string `json:"brokers" envconfig:"KAFKA_BROKERS"`
 
 	// Samples.
-	Topic  null.String `json:"topic" envconfig:"KAFKA_TOPIC"`
-	Format null.String `json:"format" envconfig:"KAFKA_FORMAT"`
+	Topic        null.String `json:"topic" envconfig:"KAFKA_TOPIC"`
+	Format       null.String `json:"format" envconfig:"KAFKA_FORMAT"`
+	PushInterval null.String `json:"push_interval" envconfig:"KAFKA_PUSH_INTERVAL"`
 
 	InfluxDBConfig influxdb.Config `json:"influxdb"`
 }
@@ -41,19 +43,19 @@ type ConfigFields struct {
 // config is a duplicate of ConfigFields as we can not mapstructure.Decode into
 // null types so we duplicate the struct with primitive types to Decode into
 type config struct {
-	Brokers []string `json:"brokers" mapstructure:"brokers" envconfig:"KAFKA_BROKERS"`
-	Topic   string   `json:"topic" mapstructure:"topic" envconfig:"KAFKA_TOPIC"`
-	Format  string   `json:"format" mapstructure:"format" envconfig:"KAFKA_FORMAT"`
+	Brokers      []string `json:"brokers" mapstructure:"brokers" envconfig:"KAFKA_BROKERS"`
+	Topic        string   `json:"topic" mapstructure:"topic" envconfig:"KAFKA_TOPIC"`
+	Format       string   `json:"format" mapstructure:"format" envconfig:"KAFKA_FORMAT"`
+	PushInterval string   `json:"push_interval" mapstructure:"push_interval" envconfig:"KAFKA_PUSH_INTERVAL"`
 
 	InfluxDBConfig influxdb.Config `json:"influxdb" mapstructure:"influxdb"`
 }
 
-type Config ConfigFields
-
 // NewConfig creates a new Config instance with default values for some fields.
 func NewConfig() Config {
 	return Config{
-		Format: null.StringFrom("json"),
+		Format:       null.StringFrom("json"),
+		PushInterval: null.StringFrom("1s"),
 	}
 }
 
@@ -66,6 +68,9 @@ func (c Config) Apply(cfg Config) Config {
 	}
 	if cfg.Topic.Valid {
 		c.Topic = cfg.Topic
+	}
+	if cfg.PushInterval.Valid {
+		c.PushInterval = cfg.PushInterval
 	}
 	return c
 }
@@ -101,6 +106,7 @@ func ParseArg(arg string) (Config, error) {
 	c.Brokers = cfg.Brokers
 	c.Topic = null.StringFrom(cfg.Topic)
 	c.Format = null.StringFrom(cfg.Format)
+	c.PushInterval = null.StringFrom(cfg.PushInterval)
 
 	return c, nil
 }

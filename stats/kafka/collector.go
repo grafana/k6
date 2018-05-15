@@ -34,10 +34,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const (
-	pushInterval = 1 * time.Second
-)
-
 // Collector implements the lib.Collector interface and should be used only for testing
 type Collector struct {
 	Producer sarama.SyncProducer
@@ -66,7 +62,12 @@ func (c *Collector) Init() error { return nil }
 // Run just blocks until the context is done
 func (c *Collector) Run(ctx context.Context) {
 	log.Debug("Kafka: Running!")
-	ticker := time.NewTicker(pushInterval)
+	d, err := time.ParseDuration(c.Config.PushInterval.String)
+	if err != nil {
+		log.WithError(err).Error("Kafka: Failed to parse PushInterval.")
+		return
+	}
+	ticker := time.NewTicker(d)
 	for {
 		select {
 		case <-ticker.C:
