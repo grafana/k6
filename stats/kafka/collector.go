@@ -22,12 +22,15 @@ package kafka
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 	"time"
 
 	"github.com/Shopify/sarama"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
+	"github.com/loadimpact/k6/stats/influxdb"
+	jsonc "github.com/loadimpact/k6/stats/json"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -104,6 +107,35 @@ func (c *Collector) GetRequiredSystemTags() lib.TagSet {
 	return lib.TagSet{} // There are no required tags for this collector
 }
 
+func (c *Collector) formatSamples(samples stats.Samples) ([]string, error) {
+	var metrics []string
+
+	switch c.Config.Format.String {
+	case "influxdb":
+		i, err := influxdb.New(c.Config.InfluxDBConfig)
+		if err != nil {
+			return nil, err
+		}
+
+		metrics, err = i.Format(samples)
+		if err != nil {
+			return nil, err
+		}
+	default:
+		for _, sample := range samples {
+			env := jsonc.WrapSample(&sample)
+			metric, err := json.Marshal(env)
+			if err != nil {
+				return nil, err
+			}
+
+			metrics = append(metrics, string(metric))
+		}
+	}
+
+	return metrics, nil
+}
+
 func (c *Collector) pushMetrics() {
 	startTime := time.Now()
 
@@ -113,7 +145,7 @@ func (c *Collector) pushMetrics() {
 	c.lock.Unlock()
 
 	// Format the samples
-	formattedSamples, err := formatSamples(c.Config.Format.String, samples)
+	formattedSamples, err := c.formatSamples(samples)
 	if err != nil {
 		log.WithError(err).Error("Kafka: Couldn't format the samples")
 		return

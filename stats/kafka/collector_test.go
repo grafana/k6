@@ -25,21 +25,25 @@ import (
 
 	"github.com/loadimpact/k6/stats"
 	"github.com/stretchr/testify/assert"
+	"gopkg.in/guregu/null.v3"
 )
 
 func TestFormatSamples(t *testing.T) {
+	c := Collector{}
 	metric := stats.New("my_metric", stats.Gauge)
 	samples := stats.Samples{
 		{Metric: metric, Value: 1.25, Tags: stats.IntoSampleTags(&map[string]string{"a": "1"})},
 		{Metric: metric, Value: 2, Tags: stats.IntoSampleTags(&map[string]string{"b": "2"})},
 	}
 
-	fmtdSamples, err := formatSamples("influx", samples)
+	c.Config.Format = null.NewString("influxdb", false)
+	fmtdSamples, err := c.formatSamples(samples)
 
 	assert.Nil(t, err)
 	assert.Equal(t, []string{"my_metric,a=1 value=1.25", "my_metric,b=2 value=2"}, fmtdSamples)
 
-	fmtdSamples, err = formatSamples("json", samples)
+	c.Config.Format = null.NewString("json", false)
+	fmtdSamples, err = c.formatSamples(samples)
 
 	expJSON1 := "{\"type\":\"Point\",\"data\":{\"time\":\"0001-01-01T00:00:00Z\",\"value\":1.25,\"tags\":{\"a\":\"1\"}},\"metric\":\"my_metric\"}"
 	expJSON2 := "{\"type\":\"Point\",\"data\":{\"time\":\"0001-01-01T00:00:00Z\",\"value\":2,\"tags\":{\"b\":\"2\"}},\"metric\":\"my_metric\"}"

@@ -22,6 +22,7 @@ package kafka
 
 import (
 	"github.com/kubernetes/helm/pkg/strvals"
+	"github.com/loadimpact/k6/stats/influxdb"
 	"github.com/mitchellh/mapstructure"
 	"gopkg.in/guregu/null.v3"
 )
@@ -33,6 +34,8 @@ type ConfigFields struct {
 	// Samples.
 	Topic  null.String `json:"topic" envconfig:"KAFKA_TOPIC"`
 	Format null.String `json:"format" envconfig:"KAFKA_FORMAT"`
+
+	InfluxDBConfig influxdb.Config `json:"influxdb"`
 }
 
 // config is a duplicate of ConfigFields as we can not mapstructure.Decode into
@@ -41,6 +44,8 @@ type config struct {
 	Brokers []string `json:"brokers" mapstructure:"brokers" envconfig:"KAFKA_BROKERS"`
 	Topic   string   `json:"topic" mapstructure:"topic" envconfig:"KAFKA_TOPIC"`
 	Format  string   `json:"format" mapstructure:"format" envconfig:"KAFKA_FORMAT"`
+
+	InfluxDBConfig influxdb.Config `json:"influxdb" mapstructure:"influxdb"`
 }
 
 type Config ConfigFields
@@ -78,14 +83,17 @@ func ParseArg(arg string) (Config, error) {
 		params["brokers"] = []string{v}
 	}
 
-	input := map[string]interface{}{
-		"brokers": params["brokers"],
-		"topic":   params["topic"],
-		"format":  params["format"],
+	if v, ok := params["influxdb"].(map[string]interface{}); ok {
+		influxConfig, err := influxdb.ParseMap(v)
+		if err != nil {
+			return c, err
+		}
+		c.InfluxDBConfig = influxConfig
 	}
+	delete(params, "influxdb")
 
 	var cfg config
-	err = mapstructure.Decode(input, &cfg)
+	err = mapstructure.Decode(params, &cfg)
 	if err != nil {
 		return c, err
 	}

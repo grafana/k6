@@ -23,20 +23,43 @@ package kafka
 import (
 	"testing"
 
+	"github.com/loadimpact/k6/stats/influxdb"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v3"
 )
 
 func TestConfigParseArg(t *testing.T) {
-	c, err := ParseArg("brokers=broker1,topic=someTopic,format=influx")
+	c, err := ParseArg("brokers=broker1,topic=someTopic,format=influxdb")
+	expInfluxConfig := influxdb.Config{}
 	assert.Nil(t, err)
 	assert.Equal(t, []string{"broker1"}, c.Brokers)
 	assert.Equal(t, null.StringFrom("someTopic"), c.Topic)
-	assert.Equal(t, null.StringFrom("influx"), c.Format)
+	assert.Equal(t, null.StringFrom("influxdb"), c.Format)
+	assert.Equal(t, expInfluxConfig, c.InfluxDBConfig)
 
 	c, err = ParseArg("brokers={broker2,broker3:9092},topic=someTopic2,format=json")
 	assert.Nil(t, err)
 	assert.Equal(t, []string{"broker2", "broker3:9092"}, c.Brokers)
 	assert.Equal(t, null.StringFrom("someTopic2"), c.Topic)
 	assert.Equal(t, null.StringFrom("json"), c.Format)
+
+	c, err = ParseArg("brokers={broker2,broker3:9092},topic=someTopic,format=influxdb,influxdb.tagsAsFields=fake")
+	expInfluxConfig = influxdb.Config{
+		TagsAsFields: []string{"fake"},
+	}
+	assert.Nil(t, err)
+	assert.Equal(t, []string{"broker2", "broker3:9092"}, c.Brokers)
+	assert.Equal(t, null.StringFrom("someTopic"), c.Topic)
+	assert.Equal(t, null.StringFrom("influxdb"), c.Format)
+	assert.Equal(t, expInfluxConfig, c.InfluxDBConfig)
+
+	c, err = ParseArg("brokers={broker2,broker3:9092},topic=someTopic,format=influxdb,influxdb.tagsAsFields={fake,anotherFake}")
+	expInfluxConfig = influxdb.Config{
+		TagsAsFields: []string{"fake", "anotherFake"},
+	}
+	assert.Nil(t, err)
+	assert.Equal(t, []string{"broker2", "broker3:9092"}, c.Brokers)
+	assert.Equal(t, null.StringFrom("someTopic"), c.Topic)
+	assert.Equal(t, null.StringFrom("influxdb"), c.Format)
+	assert.Equal(t, expInfluxConfig, c.InfluxDBConfig)
 }
