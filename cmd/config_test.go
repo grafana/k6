@@ -36,7 +36,7 @@ type testCmdData struct {
 
 type testCmdTest struct {
 	Args     []string
-	Expected []null.String
+	Expected []string
 	Name     string
 }
 
@@ -50,17 +50,17 @@ func TestConfigCmd(t *testing.T) {
 				{
 					Name:     "NoArgs",
 					Args:     []string{""},
-					Expected: []null.String{{}},
+					Expected: []string{},
 				},
 				{
 					Name:     "SingleArg",
 					Args:     []string{"--out", "influxdb=http://localhost:8086/k6"},
-					Expected: []null.String{null.StringFrom("influxdb=http://localhost:8086/k6")},
+					Expected: []string{"influxdb=http://localhost:8086/k6"},
 				},
 				{
 					Name:     "MultiArg",
 					Args:     []string{"--out", "influxdb=http://localhost:8086/k6", "--out", "json=test.json"},
-					Expected: []null.String{null.StringFrom("influxdb=http://localhost:8086/k6"), null.StringFrom("json=test.json")},
+					Expected: []string{"influxdb=http://localhost:8086/k6", "json=test.json"},
 				},
 			},
 		},
@@ -96,8 +96,8 @@ func TestConfigEnv(t *testing.T) {
 			"false": func(c Config) { assert.Equal(t, null.BoolFrom(false), c.NoUsageReport) },
 		},
 		{"Out", "K6_OUT"}: {
-			"":         func(c Config) { assert.Equal(t, []null.String{{}}, c.Out) },
-			"influxdb": func(c Config) { assert.Equal(t, []null.String{null.StringFrom("influxdb")}, c.Out) },
+			"":         func(c Config) { assert.Equal(t, []string{""}, c.Out) },
+			"influxdb": func(c Config) { assert.Equal(t, []string{"influxdb"}, c.Out) },
 		},
 	}
 	for field, data := range testdata {
@@ -125,10 +125,10 @@ func TestConfigApply(t *testing.T) {
 		assert.Equal(t, null.BoolFrom(true), conf.NoUsageReport)
 	})
 	t.Run("Out", func(t *testing.T) {
-		conf := Config{}.Apply(Config{Out: []null.String{null.StringFrom("influxdb")}})
-		assert.Equal(t, []null.String{null.StringFrom("influxdb")}, conf.Out)
+		conf := Config{}.Apply(Config{Out: []string{"influxdb"}})
+		assert.Equal(t, []string{"influxdb"}, conf.Out)
 
-		conf = Config{}.Apply(Config{Out: []null.String{null.StringFrom("influxdb"), null.StringFrom("json")}})
-		assert.Equal(t, []null.String{null.StringFrom("influxdb"), null.StringFrom("json")}, conf.Out)
+		conf = Config{}.Apply(Config{Out: []string{"influxdb", "json"}})
+		assert.Equal(t, []string{"influxdb", "json"}, conf.Out)
 	})
 }

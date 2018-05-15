@@ -62,10 +62,10 @@ func configFlagSet() *pflag.FlagSet {
 type Config struct {
 	lib.Options
 
-	Out           []null.String `json:"out" envconfig:"out"`
-	Linger        null.Bool     `json:"linger" envconfig:"linger"`
-	NoUsageReport null.Bool     `json:"noUsageReport" envconfig:"no_usage_report"`
-	NoThresholds  null.Bool     `json:"noThresholds" envconfig:"no_thresholds"`
+	Out           []string  `json:"out" envconfig:"out"`
+	Linger        null.Bool `json:"linger" envconfig:"linger"`
+	NoUsageReport null.Bool `json:"noUsageReport" envconfig:"no_usage_report"`
+	NoThresholds  null.Bool `json:"noThresholds" envconfig:"no_thresholds"`
 
 	Collectors struct {
 		InfluxDB influxdb.Config `json:"influxdb"`
@@ -75,12 +75,9 @@ type Config struct {
 
 func (c Config) Apply(cfg Config) Config {
 	c.Options = c.Options.Apply(cfg.Options)
-	for _, o := range cfg.Out {
-		if o.Valid {
-			c.Out = append(c.Out, o)
-		}
+	if len(cfg.Out) > 0 {
+		c.Out = cfg.Out
 	}
-
 	if cfg.Linger.Valid {
 		c.Linger = cfg.Linger
 	}
@@ -101,9 +98,13 @@ func getConfig(flags *pflag.FlagSet) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	out, err := flags.GetStringArray("out")
+	if err != nil {
+		return Config{}, err
+	}
 	return Config{
 		Options:       opts,
-		Out:           getNullStrings(flags, "out"),
+		Out:           out,
 		Linger:        getNullBool(flags, "linger"),
 		NoUsageReport: getNullBool(flags, "no-usage-report"),
 		NoThresholds:  getNullBool(flags, "no-thresholds"),
