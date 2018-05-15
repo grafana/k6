@@ -22,12 +22,14 @@ package js
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/js/compiler"
 	"github.com/loadimpact/k6/js/modules"
+	"github.com/loadimpact/k6/js/streams"
 	"github.com/loadimpact/k6/loader"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
@@ -53,6 +55,7 @@ type InitContext struct {
 	// Cache of loaded programs and files.
 	programs map[string]programWithSource
 	files    map[string][]byte
+	streams  *streams.Streams
 }
 
 func NewInitContext(rt *goja.Runtime, ctxPtr *context.Context, fs afero.Fs, pwd string) *InitContext {
@@ -64,6 +67,7 @@ func NewInitContext(rt *goja.Runtime, ctxPtr *context.Context, fs afero.Fs, pwd 
 
 		programs: make(map[string]programWithSource),
 		files:    make(map[string][]byte),
+		streams:  streams.New(fs),
 	}
 }
 
@@ -77,6 +81,7 @@ func newBoundInitContext(base *InitContext, ctxPtr *context.Context, rt *goja.Ru
 
 		programs: base.programs,
 		files:    base.files,
+		streams:  base.streams,
 	}
 }
 
@@ -176,4 +181,13 @@ func (i *InitContext) Open(name string, args ...string) (goja.Value, error) {
 		return i.runtime.ToValue(data), nil
 	}
 	return i.runtime.ToValue(string(data)), nil
+}
+
+func (i *InitContext) OpenStream(filename string, loop bool, header bool, startPos int64, id string) (*streams.FileStream, error) {
+	if id == "" {
+		id = filename
+	}
+	fullID := fmt.Sprintf("%s/%t/%t/%d/%s", filename, loop, header, startPos, id)
+	fileStream, err := i.streams.OpenFile(filename, loop, header, startPos, fullID)
+	return fileStream, err
 }

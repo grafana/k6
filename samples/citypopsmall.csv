@@ -1,10 +1,10 @@
-Country,City,AccentCity,Region,Population,Latitude,Longitude
-ad,aixas,Aixàs,06,666,42.4833333,1.4666667
-ad,aixirivali,Aixirivali,06,777,42.4666667,1.5
-ad,aixirivall,Aixirivall,06,888,42.4666667,1.5
-ad,aixirvall,Aixirvall,06,999,42.4666667,1.5
-ad,aixovall,Aixovall,06,111,42.4666667,1.4833333
-ad,andorra,Andorra,07,222,42.5,1.5166667
-ad,andorra la vella,Andorra la Vella,07,20430,42.5,1.5166667
-ad,andorra-vieille,Andorra-Vieille,07,,42.5,1.5166667
-ad,andorre,Andorre,07,444,42.5,1.5166667
+0,Country,City,AccentCity,Region,Population,Latitude,Longitude
+1,ad,aixas,Aixàs,06,666,42.4833333,1.4666667
+2,ad,aixirivali,Aixirivali,06,777,42.4666667,1.5
+3,ad,aixirivall,Aixirivall,06,888,42.4666667,1.5
+4,ad,aixirvall,Aixirvall,06,999,42.4666667,1.5
+5,ad,aixovall,Aixovall,06,111,42.4666667,1.4833333
+6,ad,andorra,Andorra,07,222,42.5,1.5166667
+7,ad,andorra la vella,Andorra la Vella,07,20430,42.5,1.5166667
+8,ad,andorra-vieille,Andorra-Vieille,07,,42.5,1.5166667
+9,ad,andorre,Andorre,07,444,42.5,1.5166667

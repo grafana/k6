@@ -3,7 +3,6 @@ package streams
 import (
 	"bufio"
 	"encoding/csv"
-	"fmt"
 	"io"
 	"sync"
 
@@ -11,6 +10,7 @@ import (
 )
 
 type Streams struct {
+	fs    afero.Fs
 	files map[string]*FileStream
 	mutex sync.Mutex
 }
@@ -24,28 +24,33 @@ type FileStream struct {
 	csvHeader []string
 }
 
-func New() *Streams {
-	return &Streams{files: make(map[string]*FileStream)}
+func New(fs afero.Fs) *Streams {
+	return &Streams{
+		files: make(map[string]*FileStream),
+		fs:    fs,
+	}
 }
 
-func (streams *Streams) File(id string) *FileStream {
-	return streams.files[id]
-}
-
-func (streams *Streams) OpenFile(filename string, loop bool, headerLine bool, startPos int64) string {
+func (streams *Streams) OpenFile(filename string, loop bool, header bool, startPos int64, id string) (*FileStream, error) {
 	streams.mutex.Lock()
 	defer streams.mutex.Unlock()
 
-	fsys := afero.NewOsFs()
-	f, err := fsys.Open(filename)
-	check(err)
+	// If file is opened with the same args and id return the stored FileStream
+	if f, ok := streams.files[id]; ok {
+		return f, nil
+	}
+
+	f, err := streams.fs.Open(filename)
+	if err != nil {
+		return nil, err
+	}
 	fileStream := &FileStream{}
 	fileStream.file = f
 	fileStream.scanner = bufio.NewScanner(f)
 	fileStream.csv = csv.NewReader(f)
 	fileStream.loop = loop
 
-	if headerLine {
+	if header {
 		fileStream.readCSVHeader()
 	}
 
@@ -53,19 +58,17 @@ func (streams *Streams) OpenFile(filename string, loop bool, headerLine bool, st
 		fileStream.reset(startPos)
 	}
 
-	var key = fmt.Sprintf(`%s/%t/%t/%d`, filename, loop, headerLine, startPos)
+	streams.files[id] = fileStream
 
-	streams.files[key] = fileStream
-
-	return key
+	return fileStream, nil
 }
 
-func (fs *FileStream) Close() {
+func (fs *FileStream) Close() error {
 	fs.mutex.Lock()
 	defer fs.mutex.Unlock()
 
 	err := fs.file.Close()
-	check(err)
+	return err
 }
 
 func (fs *FileStream) ReadLine() string {
