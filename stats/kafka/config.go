@@ -21,7 +21,10 @@
 package kafka
 
 import (
+	"time"
+
 	"github.com/kubernetes/helm/pkg/strvals"
+	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats/influxdb"
 	"github.com/mitchellh/mapstructure"
 	"gopkg.in/guregu/null.v3"
@@ -33,9 +36,9 @@ type Config struct {
 	Brokers []string `json:"brokers" envconfig:"KAFKA_BROKERS"`
 
 	// Samples.
-	Topic        null.String `json:"topic" envconfig:"KAFKA_TOPIC"`
-	Format       null.String `json:"format" envconfig:"KAFKA_FORMAT"`
-	PushInterval null.String `json:"push_interval" envconfig:"KAFKA_PUSH_INTERVAL"`
+	Topic        null.String        `json:"topic" envconfig:"KAFKA_TOPIC"`
+	Format       null.String        `json:"format" envconfig:"KAFKA_FORMAT"`
+	PushInterval types.NullDuration `json:"push_interval" envconfig:"KAFKA_PUSH_INTERVAL"`
 
 	InfluxDBConfig influxdb.Config `json:"influxdb"`
 }
@@ -55,7 +58,7 @@ type config struct {
 func NewConfig() Config {
 	return Config{
 		Format:       null.StringFrom("json"),
-		PushInterval: null.StringFrom("1s"),
+		PushInterval: types.NullDurationFrom(1 * time.Second),
 	}
 }
 
@@ -97,6 +100,13 @@ func ParseArg(arg string) (Config, error) {
 	}
 	delete(params, "influxdb")
 
+	if v, ok := params["push_interval"].(string); ok {
+		err := c.PushInterval.UnmarshalText([]byte(v))
+		if err != nil {
+			return c, err
+		}
+	}
+
 	var cfg config
 	err = mapstructure.Decode(params, &cfg)
 	if err != nil {
@@ -106,7 +116,6 @@ func ParseArg(arg string) (Config, error) {
 	c.Brokers = cfg.Brokers
 	c.Topic = null.StringFrom(cfg.Topic)
 	c.Format = null.StringFrom(cfg.Format)
-	c.PushInterval = null.StringFrom(cfg.PushInterval)
 
 	return c, nil
 }

@@ -62,7 +62,7 @@ func (c *Collector) Init() error { return nil }
 // Run just blocks until the context is done
 func (c *Collector) Run(ctx context.Context) {
 	log.Debug("Kafka: Running!")
-	d, err := time.ParseDuration(c.Config.PushInterval.String)
+	d, err := time.ParseDuration(c.Config.PushInterval.String())
 	if err != nil {
 		log.WithError(err).Error("Kafka: Failed to parse PushInterval.")
 		return

@@ -21,12 +21,43 @@
 package kafka
 
 import (
+	"context"
+	"sync"
 	"testing"
 
+	"github.com/Shopify/sarama"
 	"github.com/loadimpact/k6/stats"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v3"
 )
+
+func TestRun(t *testing.T) {
+	broker := sarama.NewMockBroker(t, 1)
+	coordinator := sarama.NewMockBroker(t, 2)
+	seedMeta := new(sarama.MetadataResponse)
+	seedMeta.AddBroker(coordinator.Addr(), coordinator.BrokerID())
+	seedMeta.AddTopicPartition("my_topic", 0, 1, []int32{}, []int32{}, sarama.ErrNoError)
+	broker.Returns(seedMeta)
+
+	cfg := Config{
+		Brokers: []string{broker.Addr()},
+		Topic:   null.NewString("my_topic", false),
+	}
+	config := NewConfig().Apply(cfg)
+	c, err := New(config)
+
+	assert.Nil(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		c.Run(ctx)
+	}()
+	cancel()
+	wg.Wait()
+}
 
 func TestFormatSamples(t *testing.T) {
 	c := Collector{}
