@@ -46,7 +46,7 @@ type Collector struct {
 
 // New creates an instance of the collector
 func New(conf Config) (*Collector, error) {
-	producer, err := sarama.NewSyncProducer(StringsFromNulls(conf.Brokers), nil)
+	producer, err := sarama.NewSyncProducer(conf.Brokers, nil)
 	if err != nil {
 		return nil, err
 	}

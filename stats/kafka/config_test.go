@@ -30,13 +30,13 @@ import (
 func TestConfigParseArg(t *testing.T) {
 	c, err := ParseArg("brokers=broker1,topic=someTopic,format=influx")
 	assert.Nil(t, err)
-	assert.Equal(t, []null.String{null.StringFrom("broker1")}, c.Brokers)
+	assert.Equal(t, []string{"broker1"}, c.Brokers)
 	assert.Equal(t, null.StringFrom("someTopic"), c.Topic)
 	assert.Equal(t, null.StringFrom("influx"), c.Format)
 
 	c, err = ParseArg("brokers={broker2,broker3:9092},topic=someTopic2,format=json")
 	assert.Nil(t, err)
-	assert.Equal(t, []null.String{null.StringFrom("broker2"), null.StringFrom("broker3:9092")}, c.Brokers)
+	assert.Equal(t, []string{"broker2", "broker3:9092"}, c.Brokers)
 	assert.Equal(t, null.StringFrom("someTopic2"), c.Topic)
 	assert.Equal(t, null.StringFrom("json"), c.Format)
 }

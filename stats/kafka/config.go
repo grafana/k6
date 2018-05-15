@@ -28,7 +28,7 @@ import (
 
 type ConfigFields struct {
 	// Connection.
-	Brokers []null.String `json:"brokers" envconfig:"KAFKA_BROKERS"`
+	Brokers []string `json:"brokers" envconfig:"KAFKA_BROKERS"`
 
 	// Samples.
 	Topic  null.String `json:"topic" envconfig:"KAFKA_TOPIC"`
@@ -54,11 +54,7 @@ func NewConfig() Config {
 
 func (c Config) Apply(cfg Config) Config {
 	if len(cfg.Brokers) > 0 {
-		for _, b := range cfg.Brokers {
-			if b.Valid {
-				c.Brokers = append(c.Brokers, b)
-			}
-		}
+		c.Brokers = cfg.Brokers
 	}
 	if cfg.Format.Valid {
 		c.Format = cfg.Format
@@ -94,12 +90,7 @@ func ParseArg(arg string) (Config, error) {
 		return c, err
 	}
 
-	var brokers []null.String
-	for _, b := range cfg.Brokers {
-		brokers = append(brokers, null.StringFrom(b))
-	}
-
-	c.Brokers = brokers
+	c.Brokers = cfg.Brokers
 	c.Topic = null.StringFrom(cfg.Topic)
 	c.Format = null.StringFrom(cfg.Format)
 
