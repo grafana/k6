@@ -62,12 +62,7 @@ func (c *Collector) Init() error { return nil }
 // Run just blocks until the context is done
 func (c *Collector) Run(ctx context.Context) {
 	log.Debug("Kafka: Running!")
-	d, err := time.ParseDuration(c.Config.PushInterval.String())
-	if err != nil {
-		log.WithError(err).Error("Kafka: Failed to parse PushInterval.")
-		return
-	}
-	ticker := time.NewTicker(d)
+	ticker := time.NewTicker(time.Duration(c.Config.PushInterval.Duration))
 	for {
 		select {
 		case <-ticker.C:
