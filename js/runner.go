@@ -46,6 +46,9 @@ import (
 
 var errInterrupt = errors.New("context cancelled")
 
+// Ensure Runner implements the lib.Runner interface
+var _ lib.Runner = &Runner{}
+
 type Runner struct {
 	Bundle       *Bundle
 	Logger       *log.Logger
@@ -195,6 +198,16 @@ func (r *Runner) Setup(ctx context.Context) error {
 		return errors.Wrap(err, "setup")
 	}
 	return json.Unmarshal(data, &r.setupData)
+}
+
+// GetSetupData returns the setup data if Setup() was specified and executed, nil otherwise
+func (r *Runner) GetSetupData() interface{} {
+	return r.setupData
+}
+
+// SetSetupData saves the externally supplied setup data in the runner, so it can be used in VUs
+func (r *Runner) SetSetupData(data interface{}) {
+	r.setupData = data
 }
 
 func (r *Runner) Teardown(ctx context.Context) error {
