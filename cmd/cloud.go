@@ -39,6 +39,10 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+var (
+	exitOnRunning = os.Getenv("K6_EXIT_ON_RUNNING") != ""
+)
+
 var cloudCmd = &cobra.Command{
 	Use:   "cloud",
 	Short: "Run a test on the cloud",
@@ -164,7 +168,7 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 			case <-ticker.C:
 				testProgress, progressErr = client.GetTestProgress(refID)
 				if progressErr == nil {
-					if testProgress.RunStatus > 2 {
+					if (testProgress.RunStatus > 2) || (exitOnRunning && testProgress.RunStatus == 2) {
 						shouldExitLoop = true
 					}
 					progress.Progress = testProgress.Progress
@@ -199,4 +203,5 @@ func init() {
 	cloudCmd.Flags().SortFlags = false
 	cloudCmd.Flags().AddFlagSet(optionFlagSet())
 	cloudCmd.Flags().AddFlagSet(runtimeOptionFlagSet(false))
+	cloudCmd.Flags().BoolVar(&exitOnRunning, "exit-on-running", exitOnRunning, "exists when test reaches the running status")
 }
