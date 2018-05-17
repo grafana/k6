@@ -54,9 +54,9 @@ func TestExecutorSetupTeardownRun(t *testing.T) {
 		setupC := make(chan struct{})
 		teardownC := make(chan struct{})
 		e := New(&lib.MiniRunner{
-			SetupFn: func(ctx context.Context) error {
+			SetupFn: func(ctx context.Context) (interface{}, error) {
 				close(setupC)
-				return nil
+				return nil, nil
 			},
 			TeardownFn: func(ctx context.Context) error {
 				close(teardownC)
@@ -74,8 +74,8 @@ func TestExecutorSetupTeardownRun(t *testing.T) {
 	})
 	t.Run("Setup Error", func(t *testing.T) {
 		e := New(&lib.MiniRunner{
-			SetupFn: func(ctx context.Context) error {
-				return errors.New("setup error")
+			SetupFn: func(ctx context.Context) (interface{}, error) {
+				return nil, errors.New("setup error")
 			},
 			TeardownFn: func(ctx context.Context) error {
 				return errors.New("teardown error")
@@ -85,8 +85,8 @@ func TestExecutorSetupTeardownRun(t *testing.T) {
 
 		t.Run("Don't Run Setup", func(t *testing.T) {
 			e := New(&lib.MiniRunner{
-				SetupFn: func(ctx context.Context) error {
-					return errors.New("setup error")
+				SetupFn: func(ctx context.Context) (interface{}, error) {
+					return nil, errors.New("setup error")
 				},
 				TeardownFn: func(ctx context.Context) error {
 					return errors.New("teardown error")
@@ -101,8 +101,8 @@ func TestExecutorSetupTeardownRun(t *testing.T) {
 	})
 	t.Run("Teardown Error", func(t *testing.T) {
 		e := New(&lib.MiniRunner{
-			SetupFn: func(ctx context.Context) error {
-				return nil
+			SetupFn: func(ctx context.Context) (interface{}, error) {
+				return nil, nil
 			},
 			TeardownFn: func(ctx context.Context) error {
 				return errors.New("teardown error")
@@ -115,8 +115,8 @@ func TestExecutorSetupTeardownRun(t *testing.T) {
 
 		t.Run("Don't Run Teardown", func(t *testing.T) {
 			e := New(&lib.MiniRunner{
-				SetupFn: func(ctx context.Context) error {
-					return nil
+				SetupFn: func(ctx context.Context) (interface{}, error) {
+					return nil, nil
 				},
 				TeardownFn: func(ctx context.Context) error {
 					return errors.New("teardown error")
