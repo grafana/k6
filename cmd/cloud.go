@@ -203,5 +203,5 @@ func init() {
 	cloudCmd.Flags().SortFlags = false
 	cloudCmd.Flags().AddFlagSet(optionFlagSet())
 	cloudCmd.Flags().AddFlagSet(runtimeOptionFlagSet(false))
-	cloudCmd.Flags().BoolVar(&exitOnRunning, "exit-on-running", exitOnRunning, "exists when test reaches the running status")
+	cloudCmd.Flags().BoolVar(&exitOnRunning, "exit-on-running", exitOnRunning, "exits when test reaches the running status")
 }
