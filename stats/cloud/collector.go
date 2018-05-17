@@ -73,7 +73,7 @@ func New(conf Config, src *lib.SourceData, opts lib.Options, version string) (*C
 	}
 
 	if conf.AggregationPeriod.Duration > 0 && (opts.SystemTags["vu"] || opts.SystemTags["iter"]) {
-		return nil, errors.New("Aggregatoion cannot be enabled if the 'vu' or 'iter' system tag is also enabled")
+		return nil, errors.New("Aggregation cannot be enabled if the 'vu' or 'iter' system tag is also enabled")
 	}
 
 	if !conf.Name.Valid || conf.Name.String == "" {
