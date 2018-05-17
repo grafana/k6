@@ -97,7 +97,7 @@ func init() {
 	must(cobra.MarkFlagFilename(RootCmd.PersistentFlags(), "config"))
 }
 
-// RawFormatter it does nothgin with the message just prints it
+// RawFormatter it does nothing with the message just prints it
 type RawFormater struct{}
 
 // Format renders a single log entry
