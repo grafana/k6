@@ -25,6 +25,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/kubernetes/helm/pkg/strvals"
+	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 )
 
@@ -82,6 +84,30 @@ func (c Config) Apply(cfg Config) Config {
 		c.TagsAsFields = cfg.TagsAsFields
 	}
 	return c
+}
+
+// ParseArg parses an argument string into a Config
+func ParseArg(arg string) (Config, error) {
+	c := Config{}
+	params, err := strvals.Parse(arg)
+
+	if err != nil {
+		return c, err
+	}
+
+	c, err = ParseMap(params)
+	return c, err
+}
+
+// ParseMap parses a map[string]interface{} into a Config
+func ParseMap(m map[string]interface{}) (Config, error) {
+	c := Config{}
+	if v, ok := m["tagsAsFields"].(string); ok {
+		m["tagsAsFields"] = []string{v}
+	}
+
+	err := mapstructure.Decode(m, &c)
+	return c, err
 }
 
 func ParseURL(text string) (Config, error) {
