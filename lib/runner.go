@@ -102,13 +102,11 @@ func (r MiniRunner) NewVU() (VU, error) {
 	return r.VU(), nil
 }
 
-func (r MiniRunner) Setup(ctx context.Context) error {
+func (r *MiniRunner) Setup(ctx context.Context) (err error) {
 	if fn := r.SetupFn; fn != nil {
-		data, err := fn(ctx)
-		r.setupData = data
-		return err
+		r.setupData, err = fn(ctx)
 	}
-	return nil
+	return
 }
 
 // GetSetupData returns the setup data if Setup() was executed, nil otherwise
@@ -117,7 +115,7 @@ func (r MiniRunner) GetSetupData() interface{} {
 }
 
 // SetSetupData saves the externally supplied setup data in the runner
-func (r MiniRunner) SetSetupData(data interface{}) {
+func (r *MiniRunner) SetSetupData(data interface{}) {
 	r.setupData = data
 }
 
