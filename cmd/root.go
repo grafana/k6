@@ -21,12 +21,15 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/fatih/color"
 	"github.com/mattn/go-colorable"
 	"github.com/mattn/go-isatty"
+	"github.com/shibukawa/configdir"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -88,12 +91,18 @@ func Execute() {
 }
 
 func init() {
+	defaultConfigPathMsg := ""
+	configFolders := configDirs.QueryFolders(configdir.Global)
+	if len(configFolders) > 0 {
+		defaultConfigPathMsg = fmt.Sprintf(" (default %s)", filepath.Join(configFolders[0].Path, configFilename))
+	}
+
 	RootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "enable debug logging")
 	RootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "disable progress updates")
 	RootCmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "disable colored output")
 	RootCmd.PersistentFlags().StringVar(&logFmt, "logformat", "", "log output format")
 	RootCmd.PersistentFlags().StringVarP(&address, "address", "a", "localhost:6565", "address for the api server")
-	RootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file (default ./k6.yaml or ~/.config/k6.yaml)")
+	RootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file"+defaultConfigPathMsg)
 	must(cobra.MarkFlagFilename(RootCmd.PersistentFlags(), "config"))
 }
 
