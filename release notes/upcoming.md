@@ -37,7 +37,7 @@ There is now support for correlating JSON values in recordings, replacing record
 
 Thanks to @cyberw for their work on this!
 
-### InfluxDB collector: Add support for sending certain sample tags as fields (#585)
+### InfluxDB output: Add support for sending certain sample tags as fields (#585)
 
 Since InfluxDB indexes tags, highly variable information like `vu`, `iter` or even `url` may lead to high memory usage. The InfluxDB documentation [recommends](https://docs.influxdata.com/influxdb/v1.5/concepts/schema_and_data_layout/#encouraged-schema-design) to use fields in that case, which is what k6 does now. There is a new `INFLUXDB_TAGS_AS_FIELDS` option (`collectors.influxdb.tagsAsFields` in the global k6 JSON config) that specifies which of the tags k6 emits will be sent as fields to InfluxDB. By default that's only `url` (but not `name`), `vu` and `iter` (if enabled).
 
@@ -56,6 +56,34 @@ Metrics streamed to the Load Impact cloud can be partially aggregated to reduce 
 ### Remote IP address as an optional system metric tag (#616)
 
 It's now possible to add the remote server's IP address to the tags for HTTP and WebSocket metrics. The `ip` [system tag](https://docs.k6.io/docs/tags-and-groups#section-system-tags) is not included by default, but it could easily be enabled by modifying the `systemTags` [option](https://docs.k6.io/docs/options).
+
+
+### Option to output metrics to Apache Kafka (#617)
+
+There is now support for outputing metrics to Apache Kafka! You can configure a Kafka broker (or multiple ones), topic and message format directly from the command line like this:
+
+`k6 --out kafka=brokers={broker1,broker2},topic=k6,format=json`
+
+The default `format` is `json`, but you can also use the [InfluxDB line protocol](https://docs.influxdata.com/influxdb/v1.5/write_protocols/line_protocol_tutorial/) for direct ingestion by InfluxDB:
+
+`k6 --out kafka=brokers=my_broker_host,topic=k6metrics,format=influxdb`
+
+You can even specify format options such as the [`tagsAsFields` option](#influxdb-collector-add-support-for-sending-certain-sample-tags-as-fields-585) for InfluxDB:
+
+`k6 --out kafka=brokers=someBroker,topic=someTopic,format=influxdb,influxdb.tagsAsFields={url,name,myCustomTag}`
+
+**Docs**: [Apache Kafka output](https://docs.k6.io/docs/results-output#section-apache-kafka-output)
+
+Thanks to @jmccann for their work on this!
+
+
+### Multiple outputs
+
+It's now possible to simultaneously send the emitted metrics to several outputs by using the CLI `--out` flag multiple times, for example:
+`k6 run --out json=test.json --out influxdb=http://localhost:8086/k6`
+
+Thanks to @jmccann for their work on this!
+
 
 ## UX
 
