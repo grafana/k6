@@ -68,7 +68,7 @@ The default `format` is `json`, but you can also use the [InfluxDB line protocol
 
 `k6 --out kafka=brokers=my_broker_host,topic=k6metrics,format=influxdb`
 
-You can even specify format options such as the [`tagsAsFields` option](#influxdb-collector-add-support-for-sending-certain-sample-tags-as-fields-585) for InfluxDB:
+You can even specify format options such as the [`tagsAsFields` option](#influxdb-output-add-support-for-sending-certain-sample-tags-as-fields-585) for InfluxDB:
 
 `k6 --out kafka=brokers=someBroker,topic=someTopic,format=influxdb,influxdb.tagsAsFields={url,name,myCustomTag}`
 
