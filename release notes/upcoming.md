@@ -77,7 +77,7 @@ You can even specify format options such as the [`tagsAsFields` option](#influxd
 Thanks to @jmccann for their work on this!
 
 
-### Multiple outputs
+### Multiple outputs (#624)
 
 It's now possible to simultaneously send the emitted metrics to several outputs by using the CLI `--out` flag multiple times, for example:
 `k6 run --out json=test.json --out influxdb=http://localhost:8086/k6`
