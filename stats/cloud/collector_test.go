@@ -143,6 +143,7 @@ func TestCloudCollector(t *testing.T) {
 				"noCompress": true
 			}`)),
 		},
+		Duration: types.NullDurationFrom(1 * time.Second),
 	}
 
 	collector, err := New(NewConfig(), script, options, "1.0")
