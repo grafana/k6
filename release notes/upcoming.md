@@ -14,7 +14,7 @@ Thanks to @antekresic for their work on this!
 
 ### CLI/Options: Add `--summary-time-unit` flag (#638)
 
-You can now specify the time unit used to show the summary tred stats. It can be: 's' for seconds, 'ms' for milliseconds or 'us' microseconds.
+You can now specify the time unit used to show the summary trend stats. It can be: 's' for seconds, 'ms' for milliseconds or 'us' microseconds.
 
 ```bash
 $ k6 run --summary-time-unit ms ~/script.js
