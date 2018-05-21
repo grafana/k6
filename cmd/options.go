@@ -28,6 +28,7 @@ import (
 
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
+	null "gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/ui"
@@ -62,6 +63,7 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.BoolP("throw", "w", false, "throw warnings (like failed http requests) as errors")
 	flags.StringSlice("blacklist-ip", nil, "blacklist an `ip range` from being called")
 	flags.StringSlice("summary-trend-stats", nil, "define `stats` for trend metrics (response times), one or more as 'avg,p(95),...'")
+	flags.String("summary-time-unit", "", "define the time unit used to display the trend stats. Possible units are: 's', 'ms' and 'us'")
 	flags.StringSlice("system-tags", lib.DefaultSystemTagList, "only include these system tags in metrics")
 	flags.StringSlice("tag", nil, "add a `tag` to be applied to all samples, as `[name]=[value]`")
 	return flags
@@ -127,6 +129,16 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 
 		opts.SummaryTrendStats = append(opts.SummaryTrendStats, s)
 	}
+
+	summaryTimeUnit, err := flags.GetString("summary-time-unit")
+	if err != nil {
+		return opts, err
+	}
+	if summaryTimeUnit != "" && summaryTimeUnit != "s" && summaryTimeUnit != "ms" && summaryTimeUnit != "us" {
+		return opts, errors.New("invalid summary time unit. Use: 's', 'ms' or 'us'")
+	}
+
+	opts.SummaryTimeUnit = null.StringFrom(summaryTimeUnit)
 
 	systemTagList, err := flags.GetStringSlice("system-tags")
 	if err != nil {
