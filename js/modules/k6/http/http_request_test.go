@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/cookiejar"
+	"net/url"
 	"strconv"
 	"strings"
 	"testing"
@@ -48,7 +49,7 @@ import (
 	null "gopkg.in/guregu/null.v3"
 )
 
-func assertRequestMetricsEmitted(t *testing.T, samples []stats.Sample, method, url, name string, status int, group string) {
+func assertRequestMetricsEmitted(t *testing.T, sampleContainers []stats.SampleContainer, method, url, name string, status int, group string) {
 	if name == "" {
 		name = url
 	}
@@ -60,30 +61,32 @@ func assertRequestMetricsEmitted(t *testing.T, samples []stats.Sample, method, u
 	seenSending := false
 	seenWaiting := false
 	seenReceiving := false
-	for _, sample := range samples {
-		tags := sample.Tags.CloneTags()
-		if tags["url"] == url {
-			switch sample.Metric {
-			case metrics.HTTPReqDuration:
-				seenDuration = true
-			case metrics.HTTPReqBlocked:
-				seenBlocked = true
-			case metrics.HTTPReqConnecting:
-				seenConnecting = true
-			case metrics.HTTPReqTLSHandshaking:
-				seenTLSHandshaking = true
-			case metrics.HTTPReqSending:
-				seenSending = true
-			case metrics.HTTPReqWaiting:
-				seenWaiting = true
-			case metrics.HTTPReqReceiving:
-				seenReceiving = true
-			}
+	for _, sampleContainer := range sampleContainers {
+		for _, sample := range sampleContainer.GetSamples() {
+			tags := sample.Tags.CloneTags()
+			if tags["url"] == url {
+				switch sample.Metric {
+				case metrics.HTTPReqDuration:
+					seenDuration = true
+				case metrics.HTTPReqBlocked:
+					seenBlocked = true
+				case metrics.HTTPReqConnecting:
+					seenConnecting = true
+				case metrics.HTTPReqTLSHandshaking:
+					seenTLSHandshaking = true
+				case metrics.HTTPReqSending:
+					seenSending = true
+				case metrics.HTTPReqWaiting:
+					seenWaiting = true
+				case metrics.HTTPReqReceiving:
+					seenReceiving = true
+				}
 
-			assert.Equal(t, strconv.Itoa(status), tags["status"])
-			assert.Equal(t, method, tags["method"])
-			assert.Equal(t, group, tags["group"])
-			assert.Equal(t, name, tags["name"])
+				assert.Equal(t, strconv.Itoa(status), tags["status"])
+				assert.Equal(t, method, tags["method"])
+				assert.Equal(t, group, tags["group"])
+				assert.Equal(t, name, tags["name"])
+			}
 		}
 	}
 	assert.True(t, seenDuration, "url %s didn't emit Duration", url)
@@ -309,10 +312,12 @@ func TestRequestAndBatch(t *testing.T) {
 		`)
 		assert.NoError(t, err)
 		assertRequestMetricsEmitted(t, state.Samples, "GET", "https://http2.akamai.com/demo", "", 200, "")
-		for _, sample := range state.Samples {
-			proto, ok := sample.Tags.Get("proto")
-			assert.True(t, ok)
-			assert.Equal(t, "HTTP/2.0", proto)
+		for _, sampleC := range state.Samples {
+			for _, sample := range sampleC.GetSamples() {
+				proto, ok := sample.Tags.Get("proto")
+				assert.True(t, ok)
+				assert.Equal(t, "HTTP/2.0", proto)
+			}
 		}
 	})
 	t.Run("TLS", func(t *testing.T) {
@@ -736,10 +741,12 @@ func TestRequestAndBatch(t *testing.T) {
 				`))
 				assert.NoError(t, err)
 				assertRequestMetricsEmitted(t, state.Samples, "GET", sr("HTTPBIN_URL/headers"), "", 200, "")
-				for _, sample := range state.Samples {
-					tagValue, ok := sample.Tags.Get("tag")
-					assert.True(t, ok)
-					assert.Equal(t, "value", tagValue)
+				for _, sampleC := range state.Samples {
+					for _, sample := range sampleC.GetSamples() {
+						tagValue, ok := sample.Tags.Get("tag")
+						assert.True(t, ok)
+						assert.Equal(t, "value", tagValue)
+					}
 				}
 			})
 		})
@@ -998,34 +1005,54 @@ func TestRequestAndBatch(t *testing.T) {
 }
 func TestSystemTags(t *testing.T) {
 	tb, state, rt, _ := newRuntime(t)
+	tb.Mux.HandleFunc("/wrong-redirect", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Location", "%")
+		w.WriteHeader(http.StatusTemporaryRedirect)
+	})
 	defer tb.Cleanup()
 
-	testedSystemTags := map[string]string{
-		"proto":       tb.ServerHTTP.URL,
-		"status":      tb.ServerHTTP.URL,
-		"method":      tb.ServerHTTP.URL,
-		"url":         tb.ServerHTTP.URL,
-		"name":        tb.ServerHTTP.URL,
-		"group":       tb.ServerHTTP.URL,
-		"vu":          tb.ServerHTTP.URL,
-		"iter":        tb.ServerHTTP.URL,
-		"tls_version": tb.ServerHTTPS.URL,
-		"ocsp_status": tb.ServerHTTPS.URL,
+	httpGet := fmt.Sprintf(`http.get("%s");`, tb.ServerHTTP.URL)
+	httpsGet := fmt.Sprintf(`http.get("%s");`, tb.ServerHTTPS.URL)
+
+	httpURL, err := url.Parse(tb.ServerHTTP.URL)
+	require.NoError(t, err)
+
+	testedSystemTags := []struct{ tag, code, expVal string }{
+		{"proto", httpGet, "HTTP/1.1"},
+		{"status", httpGet, "200"},
+		{"method", httpGet, "GET"},
+		{"url", httpGet, tb.ServerHTTP.URL},
+		{"url", httpsGet, tb.ServerHTTPS.URL},
+		{"ip", httpGet, httpURL.Hostname()},
+		{"name", httpGet, tb.ServerHTTP.URL},
+		{"group", httpGet, ""},
+		{"vu", httpGet, "0"},
+		{"iter", httpGet, "0"},
+		{"tls_version", httpsGet, "tls1.2"},
+		{"ocsp_status", httpsGet, "unknown"},
+		{
+			"error",
+			tb.Replacer.Replace(`http.get("HTTPBIN_IP_URL/wrong-redirect");`),
+			tb.Replacer.Replace(`Get HTTPBIN_IP_URL/wrong-redirect: failed to parse Location header "%": parse %: invalid URL escape "%"`),
+		},
 	}
 
-	//TODO: test error
+	state.Options.Throw = null.BoolFrom(false)
 
-	for expectedTag, url := range testedSystemTags {
-		t.Run("only "+expectedTag, func(t *testing.T) {
-			state.Options.SystemTags = lib.GetTagSet(expectedTag)
+	for num, tc := range testedSystemTags {
+		t.Run(fmt.Sprintf("TC %d with only %s", num, tc.tag), func(t *testing.T) {
+			state.Options.SystemTags = lib.GetTagSet(tc.tag)
 			state.Samples = nil
-			_, err := common.RunString(rt, fmt.Sprintf(`http.get("%s");`, url))
+			_, err := common.RunString(rt, tc.code)
 			assert.NoError(t, err)
 			assert.NotEmpty(t, state.Samples)
-			for _, sample := range state.Samples {
-				assert.NotEmpty(t, sample.Tags)
-				for emittedTag := range sample.Tags.CloneTags() {
-					assert.Equal(t, expectedTag, emittedTag)
+			for _, sampleC := range state.Samples {
+				for _, sample := range sampleC.GetSamples() {
+					assert.NotEmpty(t, sample.Tags)
+					for emittedTag, emittedVal := range sample.Tags.CloneTags() {
+						assert.Equal(t, tc.tag, emittedTag)
+						assert.Equal(t, tc.expVal, emittedVal)
+					}
 				}
 			}
 		})

@@ -30,10 +30,14 @@ import (
 
 // Collector implements the lib.Collector interface and should be used only for testing
 type Collector struct {
-	Samples []stats.Sample
-
 	runStatus int
+
+	SampleContainers []stats.SampleContainer
+	Samples          []stats.Sample
 }
+
+// Verify that Collector implements lib.Collector
+var _ lib.Collector = &Collector{}
 
 // Init does nothing, it's only included to satisfy the lib.Collector interface
 func (c *Collector) Init() error { return nil }
@@ -53,8 +57,11 @@ func (c *Collector) Run(ctx context.Context) {
 // detect incorrect usage.
 // Also, theoretically the collector doesn't have to actually Run() before samples start
 // being collected, it only has to be initialized.
-func (c *Collector) Collect(samples []stats.Sample) {
-	c.Samples = append(c.Samples, samples...)
+func (c *Collector) Collect(scs []stats.SampleContainer) {
+	for _, sc := range scs {
+		c.SampleContainers = append(c.SampleContainers, sc)
+		c.Samples = append(c.Samples, sc.GetSamples()...)
+	}
 }
 
 // Link returns a dummy string, it's only included to satisfy the lib.Collector interface

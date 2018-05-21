@@ -47,6 +47,6 @@ func TestCollectorRun(t *testing.T) {
 
 func TestCollectorCollect(t *testing.T) {
 	c := &Collector{}
-	c.Collect([]stats.Sample{{}})
+	c.Collect([]stats.SampleContainer{stats.Sample{}})
 	assert.Len(t, c.Samples, 1)
 }

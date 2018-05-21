@@ -30,6 +30,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -75,7 +76,9 @@ func TestTracer(t *testing.T) {
 			_, err = io.Copy(ioutil.Discard, res.Body)
 			assert.NoError(t, err)
 			assert.NoError(t, res.Body.Close())
-			samples := tracer.Done().Samples(stats.IntoSampleTags(&map[string]string{"tag": "value"}))
+			trail := tracer.Done()
+			trail.SaveSamples(stats.IntoSampleTags(&map[string]string{"tag": "value"}))
+			samples := trail.GetSamples()
 
 			assert.Empty(t, tracer.protoErrors)
 			assertLaterOrZero(t, tracer.getConn, isReuse)
@@ -87,6 +90,8 @@ func TestTracer(t *testing.T) {
 			assertLaterOrZero(t, tracer.wroteRequest, false)
 			assertLaterOrZero(t, tracer.gotFirstResponseByte, false)
 			assertLaterOrZero(t, now(), false)
+
+			assert.Equal(t, strings.TrimPrefix(srv.URL, "https://"), trail.ConnRemoteAddr.String())
 
 			assert.Len(t, samples, 8)
 			seenMetrics := map[*stats.Metric]bool{}

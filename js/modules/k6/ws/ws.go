@@ -178,6 +178,12 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 		done:               make(chan struct{}),
 	}
 
+	if state.Options.SystemTags["ip"] && conn.RemoteAddr() != nil {
+		if ip, _, err := net.SplitHostPort(conn.RemoteAddr().String()); err == nil {
+			tags["ip"] = ip
+		}
+	}
+
 	// Run the user-provided set up function
 	if _, err := setupFn(goja.Undefined(), rt.ToValue(&socket)); err != nil {
 		return nil, err
@@ -268,10 +274,14 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 
 			sampleTags := stats.IntoSampleTags(&tags)
 
-			samples := []stats.Sample{
-				{Metric: metrics.WSSessions, Time: start, Tags: sampleTags, Value: 1},
-				{Metric: metrics.WSConnecting, Time: start, Tags: sampleTags, Value: connectionDuration},
-				{Metric: metrics.WSSessionDuration, Time: start, Tags: sampleTags, Value: sessionDuration},
+			samples := []stats.SampleContainer{
+				stats.ConnectedSamples{
+					[]stats.Sample{
+						{Metric: metrics.WSSessions, Time: start, Tags: sampleTags, Value: 1},
+						{Metric: metrics.WSConnecting, Time: start, Tags: sampleTags, Value: connectionDuration},
+						{Metric: metrics.WSSessionDuration, Time: start, Tags: sampleTags, Value: sessionDuration},
+					}, sampleTags, start,
+				},
 			}
 
 			for _, msgSentTimestamp := range socket.msgSentTimestamps {

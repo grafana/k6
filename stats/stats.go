@@ -181,6 +181,12 @@ func (st *SampleTags) Get(key string) (string, bool) {
 	return val, ok
 }
 
+// IsEmpty checks for a nil pointer or zero tags.
+// It's necessary because of this envconfig issue: https://github.com/kelseyhightower/envconfig/issues/113
+func (st *SampleTags) IsEmpty() bool {
+	return st == nil || len(st.tags) == 0
+}
+
 // IsEqual tries to compare two tag sets with maximum efficiency.
 func (st *SampleTags) IsEqual(other *SampleTags) bool {
 	if st == other {
@@ -197,12 +203,29 @@ func (st *SampleTags) IsEqual(other *SampleTags) bool {
 	return true
 }
 
+func (st *SampleTags) Contains(other *SampleTags) bool {
+	if st == other || other == nil {
+		return true
+	}
+	if st == nil || len(st.tags) < len(other.tags) {
+		return false
+	}
+
+	for k, v := range other.tags {
+		if st.tags[k] != v {
+			return false
+		}
+	}
+
+	return true
+}
+
 // MarshalJSON serializes SampleTags to a JSON string and caches
 // the result. It is not thread safe in the sense that the Go race
 // detector will complain if it's used concurrently, but no data
 // should be corrupted.
 func (st *SampleTags) MarshalJSON() ([]byte, error) {
-	if st == nil {
+	if st.IsEmpty() {
 		return []byte("null"), nil
 	}
 	if st.json != nil {
@@ -239,6 +262,10 @@ func (st *SampleTags) CloneTags() map[string]string {
 // NewSampleTags *copies* the supplied tag set and returns a new SampleTags
 // instance with the key-value pairs from it.
 func NewSampleTags(data map[string]string) *SampleTags {
+	if len(data) == 0 {
+		return nil
+	}
+
 	tags := map[string]string{}
 	for k, v := range data {
 		tags[k] = v
@@ -251,6 +278,10 @@ func NewSampleTags(data map[string]string) *SampleTags {
 // be changed after it has been transformed into an "immutable" tag set.
 // Oh, how I miss Rust and move semantics... :)
 func IntoSampleTags(data *map[string]string) *SampleTags {
+	if len(*data) == 0 {
+		return nil
+	}
+
 	res := SampleTags{tags: *data}
 	*data = nil
 	return &res
@@ -263,6 +294,80 @@ type Sample struct {
 	Tags   *SampleTags
 	Value  float64
 }
+
+// SampleContainer is a simple abstraction that allows sample
+// producers to attach extra information to samples they return
+type SampleContainer interface {
+	GetSamples() []Sample
+}
+
+// Samples is just the simplest SampleContainer implementation
+// that will be used when there's no need for extra information
+type Samples []Sample
+
+// GetSamples just implements the SampleContainer interface
+func (s Samples) GetSamples() []Sample {
+	return s
+}
+
+// ConnectedSampleContainer is an extension of the SampleContainer
+// interface that should be implemented when emitted samples
+// are connected and share the same time and tags.
+type ConnectedSampleContainer interface {
+	SampleContainer
+	GetTags() *SampleTags
+	GetTime() time.Time
+}
+
+// ConnectedSamples is the simplest ConnectedSampleContainer
+// implementation that will be used when there's no need for
+// extra information
+type ConnectedSamples struct {
+	Samples []Sample
+	Tags    *SampleTags
+	Time    time.Time
+}
+
+// GetSamples implements the SampleContainer and ConnectedSampleContainer
+// interfaces and returns the stored slice with samples.
+func (cs ConnectedSamples) GetSamples() []Sample {
+	return cs.Samples
+}
+
+// GetTags implements ConnectedSampleContainer interface and returns stored tags.
+func (cs ConnectedSamples) GetTags() *SampleTags {
+	return cs.Tags
+}
+
+// GetTime implements ConnectedSampleContainer interface and returns stored time.
+func (cs ConnectedSamples) GetTime() time.Time {
+	return cs.Time
+}
+
+// GetSamples implement the ConnectedSampleContainer interface
+// for a single Sample, since it's obviously connected with itself :)
+func (s Sample) GetSamples() []Sample {
+	return []Sample{s}
+}
+
+// GetTags implements ConnectedSampleContainer interface
+// and returns the sample's tags.
+func (s Sample) GetTags() *SampleTags {
+	return s.Tags
+}
+
+// GetTime just implements ConnectedSampleContainer interface
+// and returns the sample's time.
+func (s Sample) GetTime() time.Time {
+	return s.Time
+}
+
+// Ensure that interfaces are implemented correctly
+var _ SampleContainer = Sample{}
+var _ SampleContainer = Samples{}
+
+var _ ConnectedSampleContainer = Sample{}
+var _ ConnectedSampleContainer = ConnectedSamples{}
 
 // A Metric defines the shape of a set of data.
 type Metric struct {
