@@ -28,61 +28,24 @@ import (
 	"mime/multipart"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/stats"
 	"github.com/pkg/errors"
 )
-
-// Timestamp is used for sending times encoded as microsecond UNIX timestamps to the cloud servers
-type Timestamp time.Time
-
-// MarshalJSON encodes the microsecond UNIX timestamps as strings because JavaScripts doesn't have actual integers and tends to round big numbers
-func (ct Timestamp) MarshalJSON() ([]byte, error) {
-	return []byte(`"` + strconv.FormatInt(time.Time(ct).UnixNano()/1000, 10) + `"`), nil
-}
-
-// UnmarshalJSON decodes the string-enclosed microsecond timestamp back into the proper time.Time alias
-func (ct *Timestamp) UnmarshalJSON(p []byte) error {
-	var s string
-	if err := json.Unmarshal(p, &s); err != nil {
-		return err
-	}
-	microSecs, err := strconv.ParseInt(s, 10, 64)
-	if err != nil {
-		return err
-	}
-	*ct = Timestamp(time.Unix(microSecs/1000000, (microSecs%1000000)*1000))
-	return nil
-}
-
-type Sample struct {
-	Type   string     `json:"type"`
-	Metric string     `json:"metric"`
-	Data   SampleData `json:"data"`
-}
-
-type SampleData struct {
-	Type   stats.MetricType   `json:"type"`
-	Time   Timestamp          `json:"time"`
-	Value  float64            `json:"value"`
-	Values map[string]float64 `json:"values,omitempty"`
-	Tags   *stats.SampleTags  `json:"tags,omitempty"`
-}
 
 type ThresholdResult map[string]map[string]bool
 
 type TestRun struct {
 	Name       string              `json:"name"`
-	ProjectID  int                 `json:"project_id,omitempty"`
+	ProjectID  int64               `json:"project_id,omitempty"`
 	Thresholds map[string][]string `json:"thresholds"`
 	// Duration of test in seconds. -1 for unknown length, 0 for continuous running.
 	Duration int64 `json:"duration"`
 }
 
 type CreateTestRunResponse struct {
-	ReferenceID string `json:"reference_id"`
+	ReferenceID    string  `json:"reference_id"`
+	ConfigOverride *Config `json:"config"`
 }
 
 type TestProgressResponse struct {
@@ -125,31 +88,31 @@ func (c *Client) PushMetric(referenceID string, noCompress bool, samples []*Samp
 			return err
 		}
 		return c.Do(req, nil)
-	} else {
-		var buf bytes.Buffer
-		if samples != nil {
-			b, err := json.Marshal(&samples)
-			if err != nil {
-				return err
-			}
-			g := gzip.NewWriter(&buf)
-			if _, err = g.Write(b); err != nil {
-				return err
-			}
-			if err = g.Close(); err != nil {
-				return err
-			}
-		}
-		req, err := http.NewRequest("POST", url, &buf)
+	}
+
+	var buf bytes.Buffer
+	if samples != nil {
+		b, err := json.Marshal(&samples)
 		if err != nil {
 			return err
 		}
-		req.Header.Set("Content-Encoding", "gzip")
-		return c.Do(req, nil)
+		g := gzip.NewWriter(&buf)
+		if _, err = g.Write(b); err != nil {
+			return err
+		}
+		if err = g.Close(); err != nil {
+			return err
+		}
 	}
+	req, err := http.NewRequest("POST", url, &buf)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Encoding", "gzip")
+	return c.Do(req, nil)
 }
 
-func (c *Client) StartCloudTestRun(name string, projectID int, arc *lib.Archive) (string, error) {
+func (c *Client) StartCloudTestRun(name string, projectID int64, arc *lib.Archive) (string, error) {
 	requestUrl := fmt.Sprintf("%s/archive-upload", c.baseURL)
 
 	var buf bytes.Buffer
@@ -160,7 +123,7 @@ func (c *Client) StartCloudTestRun(name string, projectID int, arc *lib.Archive)
 	}
 
 	if projectID != 0 {
-		if err := mp.WriteField("project_id", strconv.Itoa(projectID)); err != nil {
+		if err := mp.WriteField("project_id", strconv.FormatInt(projectID, 10)); err != nil {
 			return "", err
 		}
 	}

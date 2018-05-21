@@ -25,11 +25,17 @@ import (
 	"net"
 	"strings"
 	"sync/atomic"
+	"time"
+
+	"github.com/loadimpact/k6/lib/metrics"
+	"github.com/loadimpact/k6/stats"
 
 	"github.com/pkg/errors"
 	"github.com/viki-org/dnscache"
 )
 
+// Dialer wraps net.Dialer and provides k6 specific functionality -
+// tracing, blacklists and DNS cache and aliases.
 type Dialer struct {
 	net.Dialer
 
@@ -41,6 +47,7 @@ type Dialer struct {
 	BytesWritten int64
 }
 
+// NewDialer constructs a new Dialer and initializes its cache.
 func NewDialer(dialer net.Dialer) *Dialer {
 	return &Dialer{
 		Dialer:   dialer,
@@ -48,6 +55,7 @@ func NewDialer(dialer net.Dialer) *Dialer {
 	}
 }
 
+// DialContext wraps the net.Dialer.DialContext and handles the k6 specifics
 func (d *Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn, error) {
 	delimiter := strings.LastIndex(addr, ":")
 	host := addr[:delimiter]
@@ -79,6 +87,70 @@ func (d *Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn,
 	return conn, err
 }
 
+// GetTrail creates a new NetTrail instance with the Dialer
+// sent and received data metrics and the supplied times and tags.
+func (d *Dialer) GetTrail(startTime, endTime time.Time, tags *stats.SampleTags) *NetTrail {
+	bytesWritten := atomic.SwapInt64(&d.BytesWritten, 0)
+	bytesRead := atomic.SwapInt64(&d.BytesRead, 0)
+	return &NetTrail{
+		BytesRead:    bytesRead,
+		BytesWritten: bytesWritten,
+		StartTime:    startTime,
+		EndTime:      endTime,
+		Tags:         tags,
+		Samples: []stats.Sample{
+			{
+				Time:   endTime,
+				Metric: metrics.DataSent,
+				Value:  float64(bytesWritten),
+				Tags:   tags,
+			},
+			{
+				Time:   endTime,
+				Metric: metrics.DataReceived,
+				Value:  float64(bytesRead),
+				Tags:   tags,
+			},
+			{
+				Time:   endTime,
+				Metric: metrics.IterationDuration,
+				Value:  stats.D(endTime.Sub(startTime)),
+				Tags:   tags,
+			},
+		},
+	}
+}
+
+// NetTrail contains information about the exchanged data size and length of a
+// series of connections from a particular netext.Dialer
+type NetTrail struct {
+	BytesRead    int64
+	BytesWritten int64
+	StartTime    time.Time
+	EndTime      time.Time
+	Tags         *stats.SampleTags
+	Samples      []stats.Sample
+}
+
+// Ensure that interfaces are implemented correctly
+var _ stats.ConnectedSampleContainer = &NetTrail{}
+
+// GetSamples implements the stats.SampleContainer interface.
+func (ntr *NetTrail) GetSamples() []stats.Sample {
+	return ntr.Samples
+}
+
+// GetTags implements the stats.ConnectedSampleContainer interface.
+func (ntr *NetTrail) GetTags() *stats.SampleTags {
+	return ntr.Tags
+}
+
+// GetTime implements the stats.ConnectedSampleContainer interface.
+func (ntr *NetTrail) GetTime() time.Time {
+	return ntr.EndTime
+}
+
+// Conn wraps net.Conn and keeps track of sent and received data size
 type Conn struct {
 	net.Conn
 

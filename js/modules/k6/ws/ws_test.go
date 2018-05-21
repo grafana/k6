@@ -39,26 +39,28 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func assertSessionMetricsEmitted(t *testing.T, samples []stats.Sample, subprotocol, url string, status int, group string) {
+func assertSessionMetricsEmitted(t *testing.T, sampleContainers []stats.SampleContainer, subprotocol, url string, status int, group string) {
 	seenSessions := false
 	seenSessionDuration := false
 	seenConnecting := false
 
-	for _, sample := range samples {
-		tags := sample.Tags.CloneTags()
-		if tags["url"] == url {
-			switch sample.Metric {
-			case metrics.WSConnecting:
-				seenConnecting = true
-			case metrics.WSSessionDuration:
-				seenSessionDuration = true
-			case metrics.WSSessions:
-				seenSessions = true
-			}
+	for _, sampleContainer := range sampleContainers {
+		for _, sample := range sampleContainer.GetSamples() {
+			tags := sample.Tags.CloneTags()
+			if tags["url"] == url {
+				switch sample.Metric {
+				case metrics.WSConnecting:
+					seenConnecting = true
+				case metrics.WSSessionDuration:
+					seenSessionDuration = true
+				case metrics.WSSessions:
+					seenSessions = true
+				}
 
-			assert.Equal(t, strconv.Itoa(status), tags["status"])
-			assert.Equal(t, subprotocol, tags["subproto"])
-			assert.Equal(t, group, tags["group"])
+				assert.Equal(t, strconv.Itoa(status), tags["status"])
+				assert.Equal(t, subprotocol, tags["subproto"])
+				assert.Equal(t, group, tags["group"])
+			}
 		}
 	}
 	assert.True(t, seenConnecting, "url %s didn't emit Connecting", url)
@@ -66,15 +68,17 @@ func assertSessionMetricsEmitted(t *testing.T, samples []stats.Sample, subprotoc
 	assert.True(t, seenSessionDuration, "url %s didn't emit SessionDuration", url)
 }
 
-func assertMetricEmitted(t *testing.T, metric *stats.Metric, samples []stats.Sample, url string) {
+func assertMetricEmitted(t *testing.T, metric *stats.Metric, sampleContainers []stats.SampleContainer, url string) {
 	seenMetric := false
 
-	for _, sample := range samples {
-		surl, ok := sample.Tags.Get("url")
-		assert.True(t, ok)
-		if surl == url {
-			if sample.Metric == metric {
-				seenMetric = true
+	for _, sampleContainer := range sampleContainers {
+		for _, sample := range sampleContainer.GetSamples() {
+			surl, ok := sample.Tags.Get("url")
+			assert.True(t, ok)
+			if surl == url {
+				if sample.Metric == metric {
+					seenMetric = true
+				}
 			}
 		}
 	}
@@ -351,7 +355,9 @@ func TestSystemTags(t *testing.T) {
 		DualStack: true,
 	})
 
-	testedSystemTags := []string{"group", "status", "subproto", "url"}
+	//TODO: test for actual tag values after removing the dependency on the
+	// external service demos.kaazing.com (https://github.com/loadimpact/k6/issues/537)
+	testedSystemTags := []string{"group", "status", "subproto", "url", "ip"}
 	state := &common.State{
 		Group:   root,
 		Dialer:  dialer,
@@ -384,9 +390,12 @@ func TestSystemTags(t *testing.T) {
 			});
 			`)
 			assert.NoError(t, err)
-			for _, sample := range state.Samples {
-				for emittedTag := range sample.Tags.CloneTags() {
-					assert.Equal(t, expectedTag, emittedTag)
+
+			for _, sampleContainer := range state.Samples {
+				for _, sample := range sampleContainer.GetSamples() {
+					for emittedTag := range sample.Tags.CloneTags() {
+						assert.Equal(t, expectedTag, emittedTag)
+					}
 				}
 			}
 		})
@@ -408,7 +417,7 @@ func TestTLSConfig(t *testing.T) {
 		Group:  root,
 		Dialer: dialer,
 		Options: lib.Options{
-			SystemTags: lib.GetTagSet("url", "proto", "status", "subproto"),
+			SystemTags: lib.GetTagSet("url", "proto", "status", "subproto", "ip"),
 		},
 	}
 

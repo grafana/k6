@@ -39,7 +39,7 @@ const (
 // such as an InfluxDB instance.
 type Collector interface {
 	// Init is called between the collector's creation and the call to Run().
-	// You should do any lenghty setup here rather than in New.
+	// You should do any lengthy setup here rather than in New.
 	Init() error
 
 	// Run is called in a goroutine and starts the collector. Should commit samples to the backend
@@ -48,7 +48,7 @@ type Collector interface {
 
 	// Collect receives a set of samples. This method is never called concurrently, and only while
 	// the context for Run() is valid, but should defer as much work as possible to Run().
-	Collect(samples []stats.Sample)
+	Collect(samples []stats.SampleContainer)
 
 	// Optionally return a link that is shown to the user.
 	Link() string

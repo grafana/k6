@@ -68,7 +68,7 @@ func L(r lib.Runner) lib.Executor {
 	return local.New(r)
 }
 
-func LF(fn func(ctx context.Context) ([]stats.Sample, error)) lib.Executor {
+func LF(fn func(ctx context.Context) ([]stats.SampleContainer, error)) lib.Executor {
 	return L(&lib.MiniRunner{Fn: fn})
 }
 
@@ -250,7 +250,7 @@ func TestEngineRun(t *testing.T) {
 
 		signalChan := make(chan interface{})
 		var e *Engine
-		e, err, _ := newTestEngine(LF(func(ctx context.Context) (samples []stats.Sample, err error) {
+		e, err, _ := newTestEngine(LF(func(ctx context.Context) (samples []stats.SampleContainer, err error) {
 			samples = append(samples, stats.Sample{Metric: testMetric, Time: time.Now(), Value: 1})
 			close(signalChan)
 			<-ctx.Done()
@@ -275,7 +275,7 @@ func TestEngineRun(t *testing.T) {
 		}
 
 		c := &dummy.Collector{}
-		e.Collector = c
+		e.Collectors = []lib.Collector{c}
 
 		ctx, cancel := context.WithCancel(context.Background())
 		errC := make(chan error)
@@ -308,13 +308,13 @@ func TestEngineAtTime(t *testing.T) {
 func TestEngineCollector(t *testing.T) {
 	testMetric := stats.New("test_metric", stats.Trend)
 
-	e, err, _ := newTestEngine(LF(func(ctx context.Context) ([]stats.Sample, error) {
-		return []stats.Sample{{Metric: testMetric}}, nil
+	e, err, _ := newTestEngine(LF(func(ctx context.Context) ([]stats.SampleContainer, error) {
+		return []stats.SampleContainer{stats.Sample{Metric: testMetric}}, nil
 	}), lib.Options{VUs: null.IntFrom(1), VUsMax: null.IntFrom(1), Iterations: null.IntFrom(1)})
 	assert.NoError(t, err)
 
 	c := &dummy.Collector{}
-	e.Collector = c
+	e.Collectors = []lib.Collector{c}
 
 	assert.NoError(t, e.Run(context.Background()))
 
@@ -365,7 +365,7 @@ func TestEngine_processSamples(t *testing.T) {
 		assert.EqualValues(t, map[string]string{"a": "1"}, sms[0].Tags.CloneTags())
 
 		e.processSamples(
-			stats.Sample{Metric: metric, Value: 1.25, Tags: stats.IntoSampleTags(&map[string]string{"a": "1"})},
+			stats.Sample{Metric: metric, Value: 1.25, Tags: stats.IntoSampleTags(&map[string]string{"a": "1", "b": "2"})},
 		)
 
 		assert.IsType(t, &stats.GaugeSink{}, e.Metrics["my_metric"].Sink)
@@ -482,10 +482,12 @@ func TestEngine_processThresholds(t *testing.T) {
 	}
 }
 
-func getMetricSum(samples []stats.Sample, name string) (result float64) {
-	for _, s := range samples {
-		if s.Metric.Name == name {
-			result += s.Value
+func getMetricSum(collector *dummy.Collector, name string) (result float64) {
+	for _, sc := range collector.SampleContainers {
+		for _, s := range sc.GetSamples() {
+			if s.Metric.Name == name {
+				result += s.Value
+			}
 		}
 	}
 	return
@@ -563,7 +565,7 @@ func TestSentReceivedMetrics(t *testing.T) {
 		require.NoError(t, err)
 
 		collector := &dummy.Collector{}
-		engine.Collector = collector
+		engine.Collectors = []lib.Collector{collector}
 
 		ctx, cancel := context.WithCancel(context.Background())
 		errC := make(chan error)
@@ -579,7 +581,7 @@ func TestSentReceivedMetrics(t *testing.T) {
 		}
 
 		checkData := func(name string, expected int64) float64 {
-			data := getMetricSum(collector.Samples, name)
+			data := getMetricSum(collector, name)
 			expectedDataMin := float64(expected * tc.Iterations)
 			expectedDataMax := float64((expected + ts.NumRequests*expectedHeaderMaxLength) * tc.Iterations)
 
@@ -592,8 +594,8 @@ func TestSentReceivedMetrics(t *testing.T) {
 			return data
 		}
 
-		return checkData("data_sent", ts.ExpectedDataSent),
-			checkData("data_received", ts.ExpectedDataReceived)
+		return checkData(metrics.DataSent.Name, ts.ExpectedDataSent),
+			checkData(metrics.DataReceived.Name, ts.ExpectedDataReceived)
 	}
 
 	getTestCase := func(t *testing.T, ts testScript, tc testCase) func(t *testing.T) {
@@ -705,7 +707,7 @@ func TestRunTags(t *testing.T) {
 	require.NoError(t, err)
 
 	collector := &dummy.Collector{}
-	engine.Collector = collector
+	engine.Collectors = []lib.Collector{collector}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	errC := make(chan error)

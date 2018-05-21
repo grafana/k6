@@ -65,7 +65,7 @@ type Runner interface {
 type VU interface {
 	// Runs the VU once. The VU is responsible for handling the Halting Problem, eg. making sure
 	// that execution actually stops when the context is cancelled.
-	RunOnce(ctx context.Context) ([]stats.Sample, error)
+	RunOnce(ctx context.Context) ([]stats.SampleContainer, error)
 
 	// Assign the VU a new ID. Called by the Executor upon creation, but may be called multiple
 	// times if the VU is recycled because the test was scaled down and then back up.
@@ -74,7 +74,7 @@ type VU interface {
 
 // MiniRunner wraps a function in a runner whose VUs will simply call that function.
 type MiniRunner struct {
-	Fn         func(ctx context.Context) ([]stats.Sample, error)
+	Fn         func(ctx context.Context) ([]stats.SampleContainer, error)
 	SetupFn    func(ctx context.Context) error
 	TeardownFn func(ctx context.Context) error
 
@@ -129,9 +129,9 @@ type MiniRunnerVU struct {
 	ID int64
 }
 
-func (vu MiniRunnerVU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
+func (vu MiniRunnerVU) RunOnce(ctx context.Context) ([]stats.SampleContainer, error) {
 	if vu.R.Fn == nil {
-		return []stats.Sample{}, nil
+		return []stats.SampleContainer{}, nil
 	}
 	return vu.R.Fn(ctx)
 }

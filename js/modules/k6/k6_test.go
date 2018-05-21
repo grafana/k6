@@ -27,11 +27,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/loadimpact/k6/stats"
+
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFail(t *testing.T) {
@@ -138,13 +141,16 @@ func TestCheck(t *testing.T) {
 		assert.NoError(t, err)
 
 		if assert.Len(t, state.Samples, 1) {
-			assert.NotZero(t, state.Samples[0].Time)
-			assert.Equal(t, metrics.Checks, state.Samples[0].Metric)
-			assert.Equal(t, float64(1), state.Samples[0].Value)
+			sample, ok := state.Samples[0].(stats.Sample)
+			require.True(t, ok)
+
+			assert.NotZero(t, sample.Time)
+			assert.Equal(t, metrics.Checks, sample.Metric)
+			assert.Equal(t, float64(1), sample.Value)
 			assert.Equal(t, map[string]string{
 				"group": "",
 				"check": "check",
-			}, state.Samples[0].Tags.CloneTags())
+			}, sample.Tags.CloneTags())
 		}
 
 		t.Run("Multiple", func(t *testing.T) {
@@ -156,18 +162,20 @@ func TestCheck(t *testing.T) {
 
 			assert.Len(t, state.Samples, 2)
 			var foundA, foundB bool
-			for _, sample := range state.Samples {
-				name, ok := sample.Tags.Get("check")
-				assert.True(t, ok)
-				switch name {
-				case "a":
-					assert.False(t, foundA, "duplicate 'a'")
-					foundA = true
-				case "b":
-					assert.False(t, foundB, "duplicate 'b'")
-					foundB = true
-				default:
-					assert.Fail(t, name)
+			for _, sampleC := range state.Samples {
+				for _, sample := range sampleC.GetSamples() {
+					name, ok := sample.Tags.Get("check")
+					assert.True(t, ok)
+					switch name {
+					case "a":
+						assert.False(t, foundA, "duplicate 'a'")
+						foundA = true
+					case "b":
+						assert.False(t, foundB, "duplicate 'b'")
+						foundB = true
+					default:
+						assert.Fail(t, name)
+					}
 				}
 			}
 			assert.True(t, foundA, "missing 'a'")
@@ -188,13 +196,16 @@ func TestCheck(t *testing.T) {
 		assert.NoError(t, err)
 
 		if assert.Len(t, state.Samples, 1) {
-			assert.NotZero(t, state.Samples[0].Time)
-			assert.Equal(t, metrics.Checks, state.Samples[0].Metric)
-			assert.Equal(t, float64(1), state.Samples[0].Value)
+			sample, ok := state.Samples[0].(stats.Sample)
+			require.True(t, ok)
+
+			assert.NotZero(t, sample.Time)
+			assert.Equal(t, metrics.Checks, sample.Metric)
+			assert.Equal(t, float64(1), sample.Value)
 			assert.Equal(t, map[string]string{
 				"group": "",
 				"check": "0",
-			}, state.Samples[0].Tags.CloneTags())
+			}, sample.Tags.CloneTags())
 		}
 	})
 
@@ -248,17 +259,20 @@ func TestCheck(t *testing.T) {
 						}
 
 						if assert.Len(t, state.Samples, 1) {
-							assert.NotZero(t, state.Samples[0].Time)
-							assert.Equal(t, metrics.Checks, state.Samples[0].Metric)
+							sample, ok := state.Samples[0].(stats.Sample)
+							require.True(t, ok)
+
+							assert.NotZero(t, sample.Time)
+							assert.Equal(t, metrics.Checks, sample.Metric)
 							if succ {
-								assert.Equal(t, float64(1), state.Samples[0].Value)
+								assert.Equal(t, float64(1), sample.Value)
 							} else {
-								assert.Equal(t, float64(0), state.Samples[0].Value)
+								assert.Equal(t, float64(0), sample.Value)
 							}
 							assert.Equal(t, map[string]string{
 								"group": "",
 								"check": "check",
-							}, state.Samples[0].Tags.CloneTags())
+							}, sample.Tags.CloneTags())
 						}
 					})
 				}
@@ -304,15 +318,18 @@ func TestCheck(t *testing.T) {
 		}
 
 		if assert.Len(t, state.Samples, 1) {
-			assert.NotZero(t, state.Samples[0].Time)
-			assert.Equal(t, metrics.Checks, state.Samples[0].Metric)
-			assert.Equal(t, float64(1), state.Samples[0].Value)
+			sample, ok := state.Samples[0].(stats.Sample)
+			require.True(t, ok)
+
+			assert.NotZero(t, sample.Time)
+			assert.Equal(t, metrics.Checks, sample.Metric)
+			assert.Equal(t, float64(1), sample.Value)
 			assert.Equal(t, map[string]string{
 				"group": "",
 				"check": "check",
 				"a":     "1",
 				"b":     "2",
-			}, state.Samples[0].Tags.CloneTags())
+			}, sample.Tags.CloneTags())
 		}
 	})
 }

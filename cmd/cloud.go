@@ -21,6 +21,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
@@ -31,12 +32,15 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/loadimpact/k6/stats/cloud"
 	"github.com/loadimpact/k6/ui"
-	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
 	log "github.com/sirupsen/logrus"
+)
+
+var (
+	exitOnRunning = os.Getenv("K6_EXIT_ON_RUNNING") != ""
 )
 
 var cloudCmd = &cobra.Command{
@@ -98,16 +102,16 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 		r.SetOptions(conf.Options)
 
 		// Cloud config
-		cloudConfig := conf.Collectors.Cloud
+		cloudConfig := cloud.NewConfig().Apply(conf.Collectors.Cloud)
 		if err := envconfig.Process("k6", &cloudConfig); err != nil {
 			return err
 		}
-		if cloudConfig.Token == "" {
+		if !cloudConfig.Token.Valid {
 			return errors.New("Not logged in, please use `k6 login cloud`.")
 		}
 
 		// Start cloud test run
-		client := cloud.NewClient(cloudConfig.Token, cloudConfig.Host, Version)
+		client := cloud.NewClient(cloudConfig.Token.String, cloudConfig.Host.String, Version)
 
 		arc := r.MakeArchive()
 		if err := client.ValidateOptions(arc.Options); err != nil {
@@ -115,16 +119,16 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 		}
 
 		if val, ok := arc.Options.External["loadimpact"]; ok {
-			if err := mapstructure.Decode(val, &cloudConfig); err != nil {
+			if err := json.Unmarshal(val, &cloudConfig); err != nil {
 				return err
 			}
 		}
-		name := cloudConfig.Name
-		if name == "" {
+		name := cloudConfig.Name.String
+		if !cloudConfig.Name.Valid || cloudConfig.Name.String == "" {
 			name = filepath.Base(filename)
 		}
 
-		refID, err := client.StartCloudTestRun(name, cloudConfig.ProjectID, arc)
+		refID, err := client.StartCloudTestRun(name, cloudConfig.ProjectID.Int64, arc)
 		if err != nil {
 			return err
 		}
@@ -164,7 +168,7 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 			case <-ticker.C:
 				testProgress, progressErr = client.GetTestProgress(refID)
 				if progressErr == nil {
-					if testProgress.RunStatus > 2 {
+					if (testProgress.RunStatus > 2) || (exitOnRunning && testProgress.RunStatus == 2) {
 						shouldExitLoop = true
 					}
 					progress.Progress = testProgress.Progress
@@ -187,7 +191,7 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 		fmt.Fprintf(stdout, "     test status: %s\n", ui.ValueColor.Sprint(testProgress.RunStatusText))
 
 		if testProgress.ResultStatus == 1 {
-			return ExitCode{errors.New("The test have failed"), 99}
+			return ExitCode{errors.New("The test has failed"), 99}
 		}
 
 		return nil
@@ -199,4 +203,5 @@ func init() {
 	cloudCmd.Flags().SortFlags = false
 	cloudCmd.Flags().AddFlagSet(optionFlagSet())
 	cloudCmd.Flags().AddFlagSet(runtimeOptionFlagSet(false))
+	cloudCmd.Flags().BoolVar(&exitOnRunning, "exit-on-running", exitOnRunning, "exits when test reaches the running status")
 }

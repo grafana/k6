@@ -28,13 +28,11 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"strconv"
-	"sync/atomic"
 	"time"
 
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
 	"github.com/oxtoacart/bpool"
@@ -273,6 +271,9 @@ type VU struct {
 	interruptCancel     context.CancelFunc
 }
 
+// Verify that VU implements lib.VU
+var _ lib.VU = &VU{}
+
 func (u *VU) Reconfigure(id int64) error {
 	u.ID = id
 	u.Iteration = 0
@@ -280,7 +281,7 @@ func (u *VU) Reconfigure(id int64) error {
 	return nil
 }
 
-func (u *VU) RunOnce(ctx context.Context) ([]stats.Sample, error) {
+func (u *VU) RunOnce(ctx context.Context) ([]stats.SampleContainer, error) {
 	// Track the context and interrupt JS execution if it's cancelled.
 	if u.interruptTrackedCtx != ctx {
 		interCtx, interCancel := context.WithCancel(context.Background())
@@ -359,26 +360,7 @@ func (u *VU) runFn(ctx context.Context, fn goja.Callable, args ...goja.Value) (g
 		u.HTTPTransport.CloseIdleConnections()
 	}
 
-	bytesWritten := atomic.SwapInt64(&u.Dialer.BytesWritten, 0)
-	bytesRead := atomic.SwapInt64(&u.Dialer.BytesRead, 0)
-
-	state.Samples = append(state.Samples,
-		stats.Sample{
-			Time:   endTime,
-			Metric: metrics.DataSent,
-			Value:  float64(bytesWritten),
-			Tags:   sampleTags},
-		stats.Sample{
-			Time:   endTime,
-			Metric: metrics.DataReceived,
-			Value:  float64(bytesRead),
-			Tags:   sampleTags},
-		stats.Sample{
-			Time:   endTime,
-			Metric: metrics.IterationDuration,
-			Value:  stats.D(endTime.Sub(startTime)),
-			Tags:   sampleTags},
-	)
+	state.Samples = append(state.Samples, u.Dialer.GetTrail(startTime, endTime, sampleTags))
 
 	return v, state, err
 }

@@ -67,6 +67,8 @@ func TestOptions(t *testing.T) {
 		assert.NotNil(t, opts.Stages)
 		assert.Len(t, opts.Stages, 1)
 		assert.Equal(t, 1*time.Second, time.Duration(opts.Stages[0].Duration.Duration))
+
+		assert.Nil(t, Options{}.Apply(Options{Stages: []Stage{{}}}).Stages)
 	})
 	t.Run("RPS", func(t *testing.T) {
 		opts := Options{}.Apply(Options{RPS: null.IntFrom(12345)})
@@ -304,8 +306,9 @@ func TestOptions(t *testing.T) {
 		assert.NotEmpty(t, opts.Thresholds)
 	})
 	t.Run("External", func(t *testing.T) {
-		opts := Options{}.Apply(Options{External: map[string]interface{}{"a": 1}})
-		assert.Equal(t, map[string]interface{}{"a": 1}, opts.External)
+		ext := map[string]json.RawMessage{"a": json.RawMessage("1")}
+		opts := Options{}.Apply(Options{External: ext})
+		assert.Equal(t, ext, opts.External)
 	})
 
 	t.Run("JSON", func(t *testing.T) {

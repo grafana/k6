@@ -29,6 +29,60 @@ import (
 	"gopkg.in/guregu/null.v3"
 )
 
+type testCmdData struct {
+	Name  string
+	Tests []testCmdTest
+}
+
+type testCmdTest struct {
+	Args     []string
+	Expected []string
+	Name     string
+}
+
+func TestConfigCmd(t *testing.T) {
+
+	testdata := []testCmdData{
+		{
+			Name: "Out",
+
+			Tests: []testCmdTest{
+				{
+					Name:     "NoArgs",
+					Args:     []string{""},
+					Expected: []string{},
+				},
+				{
+					Name:     "SingleArg",
+					Args:     []string{"--out", "influxdb=http://localhost:8086/k6"},
+					Expected: []string{"influxdb=http://localhost:8086/k6"},
+				},
+				{
+					Name:     "MultiArg",
+					Args:     []string{"--out", "influxdb=http://localhost:8086/k6", "--out", "json=test.json"},
+					Expected: []string{"influxdb=http://localhost:8086/k6", "json=test.json"},
+				},
+			},
+		},
+	}
+
+	for _, data := range testdata {
+		t.Run(data.Name, func(t *testing.T) {
+			for _, test := range data.Tests {
+				t.Run(`"`+test.Name+`"`, func(t *testing.T) {
+					fs := configFlagSet()
+					fs.AddFlagSet(optionFlagSet())
+					fs.Parse(test.Args)
+
+					config, err := getConfig(fs)
+					assert.NoError(t, err)
+					assert.Equal(t, test.Expected, config.Out)
+				})
+			}
+		})
+	}
+}
+
 func TestConfigEnv(t *testing.T) {
 	testdata := map[struct{ Name, Key string }]map[string]func(Config){
 		{"Linger", "K6_LINGER"}: {
@@ -42,8 +96,8 @@ func TestConfigEnv(t *testing.T) {
 			"false": func(c Config) { assert.Equal(t, null.BoolFrom(false), c.NoUsageReport) },
 		},
 		{"Out", "K6_OUT"}: {
-			"":         func(c Config) { assert.Equal(t, null.String{}, c.Out) },
-			"influxdb": func(c Config) { assert.Equal(t, null.StringFrom("influxdb"), c.Out) },
+			"":         func(c Config) { assert.Equal(t, []string{""}, c.Out) },
+			"influxdb": func(c Config) { assert.Equal(t, []string{"influxdb"}, c.Out) },
 		},
 	}
 	for field, data := range testdata {
@@ -71,7 +125,10 @@ func TestConfigApply(t *testing.T) {
 		assert.Equal(t, null.BoolFrom(true), conf.NoUsageReport)
 	})
 	t.Run("Out", func(t *testing.T) {
-		conf := Config{}.Apply(Config{Out: null.StringFrom("influxdb")})
-		assert.Equal(t, null.StringFrom("influxdb"), conf.Out)
+		conf := Config{}.Apply(Config{Out: []string{"influxdb"}})
+		assert.Equal(t, []string{"influxdb"}, conf.Out)
+
+		conf = Config{}.Apply(Config{Out: []string{"influxdb", "json"}})
+		assert.Equal(t, []string{"influxdb", "json"}, conf.Out)
 	})
 }

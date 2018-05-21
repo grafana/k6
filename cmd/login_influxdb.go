@@ -48,9 +48,11 @@ This will set the default server used when just "-o influxdb" is passed.`,
 
 		conf := influxdb.NewConfig().Apply(config.Collectors.InfluxDB)
 		if len(args) > 0 {
-			if err := conf.UnmarshalText([]byte(args[0])); err != nil {
+			urlConf, err := influxdb.ParseURL(args[0])
+			if err != nil {
 				return err
 			}
+			conf = conf.Apply(urlConf)
 		}
 		if conf.Addr == "" {
 			conf.Addr = "http://localhost:8086"
