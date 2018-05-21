@@ -106,6 +106,14 @@ func init() {
 	must(cobra.MarkFlagFilename(RootCmd.PersistentFlags(), "config"))
 }
 
+// RawFormatter it does nothing with the message just prints it
+type RawFormater struct{}
+
+// Format renders a single log entry
+func (f RawFormater) Format(entry *log.Entry) ([]byte, error) {
+	return append([]byte(entry.Message), '\n'), nil
+}
+
 func setupLoggers(logFmt string) {
 	if verbose {
 		log.SetLevel(log.DebugLevel)
@@ -113,11 +121,14 @@ func setupLoggers(logFmt string) {
 	log.SetOutput(stderr)
 
 	switch logFmt {
+	case "raw":
+		log.SetFormatter(&RawFormater{})
+		log.Debug("Logger format: RAW")
 	case "json":
 		log.SetFormatter(&log.JSONFormatter{})
 		log.Debug("Logger format: JSON")
 	default:
-		log.SetFormatter(&log.TextFormatter{ForceColors: stderrTTY})
+		log.SetFormatter(&log.TextFormatter{ForceColors: stderrTTY, DisableColors: noColor})
 		log.Debug("Logger format: TEXT")
 	}
 
