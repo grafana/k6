@@ -38,5 +38,11 @@ func NewHandler() http.Handler {
 	router.GET("/v1/groups", HandleGetGroups)
 	router.GET("/v1/groups/:id", HandleGetGroup)
 
+	router.POST("/v1/setup", HandleRunSetup)
+	router.PUT("/v1/setup", HandleSetSetupData)
+	router.GET("/v1/setup", HandleGetSetupData)
+
+	router.POST("/v1/teardown", HandleRunTeardown)
+
 	return router
 }

@@ -139,6 +139,12 @@ func TestRequestAndBatch(t *testing.T) {
 	defer tb.Cleanup()
 	sr := tb.Replacer.Replace
 
+	// Handple paths with custom logic
+	tb.Mux.HandleFunc("/ntlm", http.HandlerFunc(ntlmHandler("bob", "pass")))
+	tb.Mux.HandleFunc("/digest-auth/failure", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(2 * time.Second)
+	}))
+
 	t.Run("Redirects", func(t *testing.T) {
 		t.Run("10", func(t *testing.T) {
 			_, err := common.RunString(rt, sr(`http.get("HTTPBIN_URL/redirect/10")`))
@@ -641,10 +647,6 @@ func TestRequestAndBatch(t *testing.T) {
 					assertRequestMetricsEmitted(t, state.Samples, "GET", sr("HTTPBIN_IP_URL/digest-auth/auth/bob/pass"), url, 200, "")
 				})
 				t.Run("failure", func(t *testing.T) {
-					tb.Mux.HandleFunc("/digest-auth/failure", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-						time.Sleep(2 * time.Second)
-					}))
-
 					state.Samples = nil
 					url := sr("http://bob:pass@HTTPBIN_IP:HTTPBIN_PORT/digest-auth/failure")
 
@@ -655,8 +657,6 @@ func TestRequestAndBatch(t *testing.T) {
 				})
 			})
 			t.Run("ntlm", func(t *testing.T) {
-				tb.Mux.HandleFunc("/ntlm", http.HandlerFunc(ntlmHandler("bob", "pass")))
-
 				t.Run("success auth", func(t *testing.T) {
 					state.Samples = nil
 					url := strings.Replace(tb.ServerHTTP.URL+"/ntlm", "http://", "http://bob:pass@", -1)
@@ -1005,11 +1005,13 @@ func TestRequestAndBatch(t *testing.T) {
 }
 func TestSystemTags(t *testing.T) {
 	tb, state, rt, _ := newRuntime(t)
+	defer tb.Cleanup()
+
+	// Handple paths with custom logic
 	tb.Mux.HandleFunc("/wrong-redirect", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Location", "%")
 		w.WriteHeader(http.StatusTemporaryRedirect)
 	})
-	defer tb.Cleanup()
 
 	httpGet := fmt.Sprintf(`http.get("%s");`, tb.ServerHTTP.URL)
 	httpsGet := fmt.Sprintf(`http.get("%s");`, tb.ServerHTTPS.URL)
