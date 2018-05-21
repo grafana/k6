@@ -12,6 +12,16 @@ Thanks to @antekresic for their work on this!
 
 **Docs**: [Test wide tags](https://docs.k6.io/v1.0/docs/tags-and-groups#section-test-wide-tags) and [Options](https://docs.k6.io/v1.0/docs/options#section-available-options)
 
+### CLI/Options: Add `--summary-time-unit` flag (#638)
+
+You can now specify the time unit used to show the summary tred stats. It can be: 's' for seconds, 'ms' for milliseconds or 'us' microseconds.
+
+```bash
+$ k6 run --summary-time-unit ms ~/script.js
+```
+
+**Docs**: [Options](https://docs.k6.io/v1.0/docs/options#section-available-options)
+
 ### k6/http: Support for HTTP NTLM Authentication (#556)
 
 ```js
