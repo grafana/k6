@@ -58,7 +58,7 @@ Metrics streamed to the Load Impact cloud can be partially aggregated to reduce 
 It's now possible to add the remote server's IP address to the tags for HTTP and WebSocket metrics. The `ip` [system tag](https://docs.k6.io/docs/tags-and-groups#section-system-tags) is not included by default, but it could easily be enabled by modifying the `systemTags` [option](https://docs.k6.io/docs/options).
 
 ### Raw log format (#634)
-There is a new log format called `raw`. When used, it will print only the log message without adding any debug information like, date or the log level. It should be useful for debuging scripts when printing a HTLM response for example.
+There is a new log format called `raw`. When used, it will print only the log message without adding any debug information like, date or the log level. It should be useful for debuging scripts when printing a HTML response for example.
 
 ```
 $ k6 run --log-format raw ~/script.js
