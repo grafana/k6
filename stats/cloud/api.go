@@ -38,6 +38,7 @@ type ThresholdResult map[string]map[string]bool
 type TestRun struct {
 	Name       string              `json:"name"`
 	ProjectID  int64               `json:"project_id,omitempty"`
+	VUsMax     int64               `json:"vus"`
 	Thresholds map[string][]string `json:"thresholds"`
 	// Duration of test in seconds. -1 for unknown length, 0 for continuous running.
 	Duration int64 `json:"duration"`

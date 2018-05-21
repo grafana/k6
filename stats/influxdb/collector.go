@@ -104,10 +104,36 @@ func (c *Collector) commit() {
 	c.bufferLock.Unlock()
 
 	log.Debug("InfluxDB: Committing...")
+
+	batch, err := c.batchFromSamples(samples)
+	if err != nil {
+		return
+	}
+
+	log.WithField("points", len(batch.Points())).Debug("InfluxDB: Writing...")
+	startTime := time.Now()
+	if err := c.Client.Write(batch); err != nil {
+		log.WithError(err).Error("InfluxDB: Couldn't write stats")
+	}
+	t := time.Since(startTime)
+	log.WithField("t", t).Debug("InfluxDB: Batch written!")
+}
+
+func (c *Collector) extractTagsToValues(tags map[string]string, values map[string]interface{}) map[string]interface{} {
+	for _, tag := range c.Config.TagsAsFields {
+		if val, ok := tags[tag]; ok {
+			values[tag] = val
+			delete(tags, tag)
+		}
+	}
+	return values
+}
+
+func (c *Collector) batchFromSamples(samples []stats.Sample) (client.BatchPoints, error) {
 	batch, err := client.NewBatchPoints(c.BatchConf)
 	if err != nil {
 		log.WithError(err).Error("InfluxDB: Couldn't make a batch")
-		return
+		return nil, err
 	}
 
 	type cacheItem struct {
@@ -137,28 +163,28 @@ func (c *Collector) commit() {
 		)
 		if err != nil {
 			log.WithError(err).Error("InfluxDB: Couldn't make point from sample!")
-			return
+			return nil, err
 		}
 		batch.AddPoint(p)
 	}
 
-	log.WithField("points", len(batch.Points())).Debug("InfluxDB: Writing...")
-	startTime := time.Now()
-	if err := c.Client.Write(batch); err != nil {
-		log.WithError(err).Error("InfluxDB: Couldn't write stats")
-	}
-	t := time.Since(startTime)
-	log.WithField("t", t).Debug("InfluxDB: Batch written!")
+	return batch, err
 }
 
-func (c *Collector) extractTagsToValues(tags map[string]string, values map[string]interface{}) map[string]interface{} {
-	for _, tag := range c.Config.TagsAsFields {
-		if val, ok := tags[tag]; ok {
-			values[tag] = val
-			delete(tags, tag)
-		}
+// Format returns a string array of metrics in influx line-protocol
+func (c *Collector) Format(samples []stats.Sample) ([]string, error) {
+	var metrics []string
+	batch, err := c.batchFromSamples(samples)
+
+	if err != nil {
+		return metrics, err
 	}
-	return values
+
+	for _, point := range batch.Points() {
+		metrics = append(metrics, point.String())
+	}
+
+	return metrics, nil
 }
 
 // GetRequiredSystemTags returns which sample tags are needed by this collector
