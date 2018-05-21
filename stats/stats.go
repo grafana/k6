@@ -23,6 +23,7 @@ package stats
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -402,7 +403,13 @@ func New(name string, typ MetricType, t ...ValueType) *Metric {
 	return &Metric{Name: name, Type: typ, Contains: vt, Sink: sink}
 }
 
-func (m *Metric) HumanizeValue(v float64) string {
+var unitMap = map[string][]interface{}{
+	"s":  {"s", time.Second},
+	"ms": {"ms", time.Millisecond},
+	"us": {"µs", time.Microsecond},
+}
+
+func (m *Metric) HumanizeValue(v float64, timeUnit string) string {
 	switch m.Type {
 	case Rate:
 		// Truncate instead of round when decreasing precision to 2 decimal places
@@ -411,6 +418,11 @@ func (m *Metric) HumanizeValue(v float64) string {
 		switch m.Contains {
 		case Time:
 			d := ToD(v)
+
+			if v, ok := unitMap[timeUnit]; ok {
+				return fmt.Sprintf("%.2f%s", float64(d.Nanoseconds())/float64(v[1].(time.Duration)), v[0])
+			}
+
 			switch {
 			case d > time.Minute:
 				d -= d % (1 * time.Second)
