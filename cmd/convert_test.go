@@ -24,10 +24,11 @@ import (
 	"bytes"
 	"testing"
 
+	"io/ioutil"
+
 	"github.com/pmezard/go-difflib/difflib"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
-	"io/ioutil"
 )
 
 const testHAR = `
@@ -109,8 +110,8 @@ export default function() {
 			}
 		}];
 		res = http.batch(req);
-		// Random sleep between 2s and 4s
-		sleep(Math.floor(Math.random()*3+2));
+		// Random sleep between 20s and 40s
+		sleep(Math.floor(Math.random()*20+20));
 	});
 
 }
