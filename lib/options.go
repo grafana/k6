@@ -246,6 +246,9 @@ type Options struct {
 	// Summary trend stats for trend metrics (response times) in CLI output
 	SummaryTrendStats []string `json:"summaryTrendStats" envconfig:"summary_trend_stats"`
 
+	// Summary time unit for summary metrics (response times) in CLI output
+	SummaryTimeUnit null.String `json:"summaryTimeUnit" envconfig:"summary_time_unit"`
+
 	// Which system tags to include with metrics ("method", "vu" etc.)
 	SystemTags TagSet `json:"systemTags" envconfig:"system_tags"`
 
@@ -338,6 +341,9 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.SummaryTrendStats != nil {
 		o.SummaryTrendStats = opts.SummaryTrendStats
+	}
+	if opts.SummaryTimeUnit.Valid {
+		o.SummaryTimeUnit = opts.SummaryTimeUnit
 	}
 	if opts.SystemTags != nil {
 		o.SystemTags = opts.SystemTags
