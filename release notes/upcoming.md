@@ -63,6 +63,13 @@ Metrics streamed to the Load Impact cloud can be partially aggregated to reduce 
 
 **Docs**: [Load Impact Insights Aggregation](https://docs.k6.io/docs/load-impact-insights#section-aggregation)
 
+### HAR converter: Set more realistic sleep time (#608)
+
+The default sleep time added at the end of the generated test has been changed from 2-4s to 20-40s to be more realistic (although still probably on the low end for some types of sites [1][2]).
+
+[1] - https://moz.com/blog/ecommerce-benchmark-kpi-study-2017
+[2] - https://www.brafton.com/blog/strategy/brafton-2017-content-marketing-benchmark-report/
+
 ### Remote IP address as an optional system metric tag (#616)
 
 It's now possible to add the remote server's IP address to the tags for HTTP and WebSocket metrics. The `ip` [system tag](https://docs.k6.io/docs/tags-and-groups#section-system-tags) is not included by default, but it could easily be enabled by modifying the `systemTags` [option](https://docs.k6.io/docs/options).
