@@ -41,13 +41,13 @@ func TestParseTagKeyValue(t *testing.T) {
 			ErrTagEmptyString,
 		},
 		{
-			"=",
+			":",
 			"",
 			"",
 			ErrTagEmptyName,
 		},
 		{
-			"=test",
+			":test",
 			"",
 			"",
 			ErrTagEmptyName,
@@ -59,13 +59,13 @@ func TestParseTagKeyValue(t *testing.T) {
 			ErrTagEmptyValue,
 		},
 		{
-			"test=",
+			"test:",
 			"",
 			"",
 			ErrTagEmptyValue,
 		},
 		{
-			"myTag=foo",
+			"myTag:foo",
 			"myTag",
 			"foo",
 			nil,

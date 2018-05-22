@@ -171,7 +171,7 @@ func parseTagNameValue(nv string) (string, string, error) {
 		return "", "", ErrTagEmptyString
 	}
 
-	idx := strings.IndexRune(nv, '=')
+	idx := strings.IndexRune(nv, ':')
 
 	switch idx {
 	case 0:
