@@ -10,4 +10,4 @@ Description of feature.
 
 ## Bugs fixed!
 
-* Category: description of bug. (#PR)
+* Multiple bugs in the HTTP request and batch handling (#642)
