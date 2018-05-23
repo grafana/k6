@@ -749,6 +749,39 @@ func TestRequestAndBatch(t *testing.T) {
 					}
 				}
 			})
+
+			t.Run("tags-precedence", func(t *testing.T) {
+				oldOpts := state.Options
+				defer func() { state.Options = oldOpts }()
+				state.Options.RunTags = stats.IntoSampleTags(&map[string]string{"runtag1": "val1", "runtag2": "val2"})
+
+				state.Samples = nil
+				_, err := common.RunString(rt, sr(`
+				let res = http.request("GET", "HTTPBIN_URL/headers", null, { tags: { method: "test", name: "myName", runtag1: "fromreq" } });
+				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+				`))
+				assert.NoError(t, err)
+				assertRequestMetricsEmitted(t, state.Samples, "GET", sr("HTTPBIN_URL/headers"), "myName", 200, "")
+				for _, sampleC := range state.Samples {
+					for _, sample := range sampleC.GetSamples() {
+						tagValue, ok := sample.Tags.Get("method")
+						assert.True(t, ok)
+						assert.Equal(t, "GET", tagValue)
+
+						tagValue, ok = sample.Tags.Get("name")
+						assert.True(t, ok)
+						assert.Equal(t, "myName", tagValue)
+
+						tagValue, ok = sample.Tags.Get("runtag1")
+						assert.True(t, ok)
+						assert.Equal(t, "fromreq", tagValue)
+
+						tagValue, ok = sample.Tags.Get("runtag2")
+						assert.True(t, ok)
+						assert.Equal(t, "val2", tagValue)
+					}
+				}
+			})
 		})
 	})
 
@@ -934,7 +967,7 @@ func TestRequestAndBatch(t *testing.T) {
 				_, err := common.RunString(rt, sr(`
 				let reqs = [
 					{ method: "GET", url: "HTTPBIN_URL/" },
-					{ method: "GET", url: "HTTPBIN_IP_URL/" },
+					{ url: "HTTPBIN_IP_URL/", method: "GET"},
 				];
 				let res = http.batch(reqs);
 				for (var key in res) {
@@ -944,6 +977,71 @@ func TestRequestAndBatch(t *testing.T) {
 				assert.NoError(t, err)
 				assertRequestMetricsEmitted(t, state.Samples, "GET", sr("HTTPBIN_URL/"), "", 200, "")
 				assertRequestMetricsEmitted(t, state.Samples, "GET", sr("HTTPBIN_IP_URL/"), "", 200, "")
+			})
+
+			t.Run("ObjectKeys", func(t *testing.T) {
+				state.Samples = nil
+				_, err := common.RunString(rt, sr(`
+				let reqs = {
+					shorthand: "HTTPBIN_URL/get?r=shorthand",
+					arr: ["GET", "HTTPBIN_URL/get?r=arr", null, {tags: {name: 'arr'}}],
+					obj1: { method: "GET", url: "HTTPBIN_URL/get?r=obj1" },
+					obj2: { url: "HTTPBIN_URL/get?r=obj2", params: {tags: {name: 'obj2'}}, method: "GET"},
+				};
+				let res = http.batch(reqs);
+				for (var key in res) {
+					if (res[key].status != 200) { throw new Error("wrong status: " + key + ": " + res[key].status); }
+					if (res[key].json().args.r != key) { throw new Error("wrong request id: " + key); }
+				}`))
+				assert.NoError(t, err)
+				assertRequestMetricsEmitted(t, state.Samples, "GET", sr("HTTPBIN_URL/get?r=shorthand"), "", 200, "")
+				assertRequestMetricsEmitted(t, state.Samples, "GET", sr("HTTPBIN_URL/get?r=arr"), "arr", 200, "")
+				assertRequestMetricsEmitted(t, state.Samples, "GET", sr("HTTPBIN_URL/get?r=obj1"), "", 200, "")
+				assertRequestMetricsEmitted(t, state.Samples, "GET", sr("HTTPBIN_URL/get?r=obj2"), "obj2", 200, "")
+			})
+
+			t.Run("BodyAndParams", func(t *testing.T) {
+				state.Samples = nil
+
+				testStr := "testbody"
+				rt.Set("someStrFile", testStr)
+				rt.Set("someBinFile", []byte(testStr))
+
+				_, err := common.RunString(rt, sr(`
+					let reqs = [
+						["POST", "HTTPBIN_URL/post", "testbody"],
+						["POST", "HTTPBIN_URL/post", someStrFile],
+						["POST", "HTTPBIN_URL/post", someBinFile],
+						{
+							method: "POST",
+							url: "HTTPBIN_URL/post",
+							test: "test1",
+							body: "testbody",
+						}, {
+							body: someBinFile,
+							url: "HTTPBIN_IP_URL/post",
+							params: { tags: { name: "myname" } },
+							method: "POST",
+						}, {
+							method: "POST",
+							url: "HTTPBIN_IP_URL/post",
+							body: {
+								hello: "world!",
+							},
+							params: {
+								tags: { name: "myname" },
+								headers: { "Content-Type": "application/x-www-form-urlencoded" },
+							},
+						},
+					];
+					let res = http.batch(reqs);
+					for (var key in res) {
+						if (res[key].status != 200) { throw new Error("wrong status: " + key + ": " + res[key].status); }
+						if (res[key].json().data != "testbody" && res[key].json().form.hello != "world!") { throw new Error("wrong response for " + key + ": " + res[key].body); }
+					}`))
+				assert.NoError(t, err)
+				assertRequestMetricsEmitted(t, state.Samples, "POST", sr("HTTPBIN_URL/post"), "", 200, "")
+				assertRequestMetricsEmitted(t, state.Samples, "POST", sr("HTTPBIN_IP_URL/post"), "myname", 200, "")
 			})
 		})
 		t.Run("POST", func(t *testing.T) {
