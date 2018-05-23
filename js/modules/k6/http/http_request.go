@@ -34,6 +34,7 @@ import (
 	"net/http/cookiejar"
 	"net/textproto"
 	"net/url"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -249,7 +250,7 @@ func (h *HTTP) parseRequest(ctx context.Context, method string, reqURL URL, body
 		result.activeJar = state.CookieJar
 	}
 
-	// TODO: ditch goja.Value and use type assertions?
+	// TODO: ditch goja.Value, reflections and Object and use a simple go map and type assertions?
 	if params != nil && !goja.IsUndefined(params) && !goja.IsNull(params) {
 		params := params.ToObject(rt)
 		for _, k := range params.Keys() {
@@ -269,7 +270,7 @@ func (h *HTTP) parseRequest(ctx context.Context, method string, reqURL URL, body
 						continue
 					}
 					switch cookieV.ExportType() {
-					case typeMapKeyStringValueInterface:
+					case reflect.TypeOf(map[string]interface{}{}):
 						result.cookies[key] = &HTTPRequestCookie{Name: key, Value: "", Replace: false}
 						cookie := cookieV.ToObject(rt)
 						for _, attr := range cookie.Keys() {
@@ -620,7 +621,7 @@ func (h *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, error) 
 
 	parseBatchRequest := func(key string, val goja.Value) (result *parsedHTTPRequest, err error) {
 		method := HTTP_METHOD_GET
-		ok := false
+		var ok bool
 		var reqURL URL
 		var body interface{}
 		var params goja.Value
