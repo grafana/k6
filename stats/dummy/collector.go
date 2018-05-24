@@ -25,10 +25,13 @@ import (
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
+	log "github.com/sirupsen/logrus"
 )
 
 // Collector implements the lib.Collector interface and should be used only for testing
 type Collector struct {
+	runStatus int
+
 	SampleContainers []stats.SampleContainer
 	Samples          []stats.Sample
 }
@@ -45,6 +48,7 @@ func (c *Collector) MakeConfig() interface{} { return nil }
 // Run just blocks until the context is done
 func (c *Collector) Run(ctx context.Context) {
 	<-ctx.Done()
+	log.Debugf("finished status: %s", c.runStatus)
 }
 
 // Collect just appends all of the samples passed to it to the internal sample slice.
@@ -68,4 +72,8 @@ func (c *Collector) Link() string {
 // GetRequiredSystemTags returns which sample tags are needed by this collector
 func (c *Collector) GetRequiredSystemTags() lib.TagSet {
 	return lib.TagSet{} // There are no required tags for this collector
+}
+
+func (c *Collector) SetRunStatus(status int) {
+	c.runStatus = status
 }

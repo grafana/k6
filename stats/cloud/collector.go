@@ -51,6 +51,7 @@ type Collector struct {
 	client     *Client
 
 	anonymous bool
+	runStatus int
 
 	bufferMutex      sync.Mutex
 	bufferHTTPTrails []*netext.Trail
@@ -429,7 +430,12 @@ func (c *Collector) testFinished() {
 		"tainted": testTainted,
 	}).Debug("Sending test finished")
 
-	err := c.client.TestFinished(c.referenceID, thresholdResults, testTainted)
+	runStatus := lib.RunStatusFinished
+	if c.runStatus != 0 {
+		runStatus = c.runStatus
+	}
+
+	err := c.client.TestFinished(c.referenceID, thresholdResults, testTainted, runStatus)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"error": err,
@@ -449,4 +455,8 @@ func sumStages(stages []lib.Stage) int64 {
 // GetRequiredSystemTags returns which sample tags are needed by this collector
 func (c *Collector) GetRequiredSystemTags() lib.TagSet {
 	return lib.GetTagSet("name", "method", "status", "error", "check", "group")
+}
+
+func (c *Collector) SetRunStatus(status int) {
+	c.runStatus = status
 }
