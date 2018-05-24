@@ -103,6 +103,8 @@ func (c *Collector) GetRequiredSystemTags() lib.TagSet {
 	return lib.TagSet{} // There are no required tags for this collector
 }
 
+func (c *Collector) SetRunStatus(status int) {}
+
 func (c *Collector) formatSamples(samples stats.Samples) ([]string, error) {
 	var metrics []string
 
