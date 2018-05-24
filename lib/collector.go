@@ -26,6 +26,15 @@ import (
 	"github.com/loadimpact/k6/stats"
 )
 
+// Run Status used by cloud collector
+const (
+	RunStatusFinished           = 3
+	RunStatusAbortedUser        = 5
+	RunStatusAbortedSystem      = 6
+	RunStatusAbortedScriptError = 7
+	RunStatusAbortedThreshold   = 8
+)
+
 // A Collector abstracts the process of funneling samples to an external storage backend,
 // such as an InfluxDB instance.
 type Collector interface {
@@ -46,4 +55,7 @@ type Collector interface {
 
 	// Return the required system sample tags for the specific collector
 	GetRequiredSystemTags() TagSet
+
+	// Set run status
+	SetRunStatus(status int)
 }

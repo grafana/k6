@@ -156,19 +156,21 @@ func (c *Client) StartCloudTestRun(name string, projectID int64, arc *lib.Archiv
 	return ctrr.ReferenceID, nil
 }
 
-func (c *Client) TestFinished(referenceID string, thresholds ThresholdResult, tained bool) error {
+func (c *Client) TestFinished(referenceID string, thresholds ThresholdResult, tained bool, runStatus int) error {
 	url := fmt.Sprintf("%s/tests/%s", c.baseURL, referenceID)
 
-	status := 0
+	resultStatus := 0
 	if tained {
-		status = 1
+		resultStatus = 1
 	}
 
 	data := struct {
 		ResultStatus int             `json:"result_status"`
+		RunStatus    int             `json:"run_status"`
 		Thresholds   ThresholdResult `json:"thresholds"`
 	}{
-		status,
+		resultStatus,
+		runStatus,
 		thresholds,
 	}
 
