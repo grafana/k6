@@ -11,3 +11,4 @@ Description of feature.
 ## Bugs fixed!
 
 * Multiple bugs in the HTTP request and batch handling (#642)
+* Fix negative `http_req_sending` values in the summary (#651)
