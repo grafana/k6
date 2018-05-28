@@ -24,6 +24,7 @@ import (
 	"github.com/loadimpact/k6/js/modules/k6"
 	"github.com/loadimpact/k6/js/modules/k6/crypto"
 	"github.com/loadimpact/k6/js/modules/k6/encoding"
+	"github.com/loadimpact/k6/js/modules/k6/encoding/csv"
 	"github.com/loadimpact/k6/js/modules/k6/html"
 	"github.com/loadimpact/k6/js/modules/k6/http"
 	"github.com/loadimpact/k6/js/modules/k6/metrics"
@@ -32,11 +33,12 @@ import (
 
 // Index of module implementations.
 var Index = map[string]interface{}{
-	"k6":          k6.New(),
-	"k6/crypto":   crypto.New(),
-	"k6/encoding": encoding.New(),
-	"k6/http":     http.New(),
-	"k6/metrics":  metrics.New(),
-	"k6/html":     html.New(),
-	"k6/ws":       ws.New(),
+	"k6":              k6.New(),
+	"k6/crypto":       crypto.New(),
+	"k6/encoding":     encoding.New(),
+	"k6/encoding/csv": csv.New(),
+	"k6/http":         http.New(),
+	"k6/metrics":      metrics.New(),
+	"k6/html":         html.New(),
+	"k6/ws":           ws.New(),
 }

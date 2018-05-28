@@ -1,32 +1,47 @@
-package encoding
+package csv
 
 import (
 	"encoding/csv"
 	"io"
+	"sync"
 
 	"github.com/loadimpact/k6/js/streams"
 )
 
 type CSV struct {
+	streams map[string]*CSVStream
+	mutes   sync.Mutex
 }
 
 type CSVStream struct {
-	streams.StreamIO
+	streams.Stream
 	csvReader *csv.Reader
 	csvHeader []string
 	loop      bool
 }
 
-func (_ *CSV) New(streamio streams.StreamIO, header bool, loop bool) *CSVStream {
+func New() *CSV {
+	return &CSV{streams: make(map[string]*CSVStream)}
+}
+
+func (c *CSV) NewStream(stream streams.Stream /*interface{}*/, header bool, loop bool) *CSVStream {
+	if s, ok := c.streams[stream.GetId()]; ok {
+		return s
+	}
+
 	s := &CSVStream{
-		streamio,
-		csv.NewReader(streamio.GetReader()),
+		stream,
+		csv.NewReader(stream.GetReader()),
 		nil,
 		loop,
 	}
+
 	if header {
 		s.csvHeader = s.readCSVLine()
 	}
+
+	c.streams[stream.GetId()] = s
+
 	return s
 }
 
@@ -35,17 +50,17 @@ func (s *CSVStream) GetHeaders() []string {
 }
 
 func (s *CSVStream) ReadCSVLine() []string {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
+	s.Lock()
+	defer s.Unlock()
 
-	return fs.readCSVLine()
+	return s.readCSVLine()
 }
 
-func (csv *CSVStream) readCSVLine() []string {
-	out, err := fs.csv.Read()
+func (s *CSVStream) readCSVLine() []string {
+	out, err := s.csvReader.Read()
 	if err == io.EOF {
-		if fs.loop {
-			fs.reset(0)
+		if s.loop {
+			s.Seek(0)
 		}
 	} else if err != nil {
 		panic(err)

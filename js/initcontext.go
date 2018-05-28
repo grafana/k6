@@ -67,7 +67,7 @@ func NewInitContext(rt *goja.Runtime, ctxPtr *context.Context, fs afero.Fs, pwd 
 
 		programs: make(map[string]programWithSource),
 		files:    make(map[string][]byte),
-		streams:  streams.New(fs),
+		streams:  streams.New(),
 	}
 }
 
@@ -183,11 +183,11 @@ func (i *InitContext) Open(name string, args ...string) (goja.Value, error) {
 	return i.runtime.ToValue(string(data)), nil
 }
 
-func (i *InitContext) OpenStream(filename string, loop bool, header bool, startPos int64, id string) (*streams.FileStream, error) {
+func (i *InitContext) OpenStream(filename string, startPos int64, id string) (streams.Stream, error) {
 	if id == "" {
 		id = filename
 	}
-	fullID := fmt.Sprintf("%s/%t/%t/%d/%s", filename, loop, header, startPos, id)
-	fileStream, err := i.streams.OpenFile(filename, loop, header, startPos, fullID)
-	return fileStream, err
+	fullID := fmt.Sprintf("%s/%t/%t/%d/%s", filename, startPos, id)
+	stream, err := i.streams.OpenFile(filename, startPos, fullID)
+	return stream, err //i.runtime.ToValue(stream), err
 }

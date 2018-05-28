@@ -45,7 +45,7 @@ const (
 var (
 	ErrStatEmptyString            = errors.New("Invalid stat, empty string")
 	ErrStatUnknownFormat          = errors.New("Invalid stat, unknown format")
-	ErrPercentileStatInvalidValue = errorfs.New("Invalid percentile stat value, accepts a number")
+	ErrPercentileStatInvalidValue = errors.New("Invalid percentile stat value, accepts a number")
 )
 
 var TrendColumns = []TrendColumn{
