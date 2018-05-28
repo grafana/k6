@@ -165,7 +165,7 @@ func TestTracerNegativeHttpSendingValues(t *testing.T) {
 		assert.NoError(t, res.Body.Close())
 		tracer.Done()
 	}
-	// wait before making the request, so it fails on wrinting the request
+	// wait before making the request, so it fails on writing the request
 	time.Sleep(300 * time.Millisecond)
 
 	{
