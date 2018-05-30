@@ -73,7 +73,7 @@ func new() (*Compiler, error) {
 		LocateOrder: []rice.LocateMethod{rice.LocateEmbedded},
 	}
 
-	babelSrc := conf.MustFindBox("lib").MustString("babel-standalone-bower/babel.min.js")
+	babelSrc := conf.MustFindBox("lib").MustString("babel.min.js")
 
 	c := &Compiler{vm: goja.New()}
 	if _, err := c.vm.RunString(babelSrc); err != nil {
