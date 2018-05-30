@@ -35,7 +35,7 @@ func TestRunString(t *testing.T) {
 	})
 	t.Run("Invalid", func(t *testing.T) {
 		_, err := RunString(goja.New(), `let a = #;`)
-		assert.EqualError(t, err, "SyntaxError: __string__: Unexpected character '#' (1:8)\n> 1 | let a = #;\n    |         ^ at <eval>:2:26853(114)")
+		assert.EqualError(t, err, "SyntaxError: __string__: Unexpected character '#' (1:8)\n> 1 | let a = #;\n    |         ^ at <eval>:2:28542(114)")
 	})
 }
 

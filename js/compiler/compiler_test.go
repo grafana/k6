@@ -118,7 +118,7 @@ func TestCompile(t *testing.T) {
 			assert.IsType(t, &goja.Exception{}, err)
 			assert.EqualError(t, err, `SyntaxError: script.js: Unexpected token (1:26)
 > 1 | 1+(function() { return 2; )()
-    |                           ^ at <eval>:2:26853(114)`)
+    |                           ^ at <eval>:2:28542(114)`)
 		})
 	})
 	t.Run("ES6", func(t *testing.T) {
@@ -158,7 +158,7 @@ func TestCompile(t *testing.T) {
 			assert.IsType(t, &goja.Exception{}, err)
 			assert.EqualError(t, err, `SyntaxError: script.js: Unexpected token (1:3)
 > 1 | 1+(=>2)()
-    |    ^ at <eval>:2:26853(114)`)
+    |    ^ at <eval>:2:28542(114)`)
 		})
 	})
 }

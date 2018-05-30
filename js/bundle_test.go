@@ -52,7 +52,7 @@ func TestNewBundle(t *testing.T) {
 	})
 	t.Run("Invalid", func(t *testing.T) {
 		_, err := getSimpleBundle("/script.js", "\x00")
-		assert.EqualError(t, err, "SyntaxError: /script.js: Unexpected character '\x00' (1:0)\n> 1 | \x00\n    | ^ at <eval>:2:26853(114)")
+		assert.EqualError(t, err, "SyntaxError: /script.js: Unexpected character '\x00' (1:0)\n> 1 | \x00\n    | ^ at <eval>:2:28542(114)")
 	})
 	t.Run("Error", func(t *testing.T) {
 		_, err := getSimpleBundle("/script.js", `throw new Error("aaaa");`)
