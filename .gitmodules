@@ -1,3 +1,0 @@
-[submodule "js/lib/core-js"]
-	path = js/lib/core-js
-	url = https://github.com/zloirock/core-js

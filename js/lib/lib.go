@@ -29,8 +29,8 @@ import (
 
 func GetCoreJS() *goja.Program {
 	return goja.MustCompile(
-		"core-js/shim.js",
-		rice.MustFindBox("core-js").MustString("client/shim.js"),
+		"core-js/shim.min.js",
+		rice.MustFindBox("core-js").MustString("shim.min.js"),
 		true,
 	)
 }
