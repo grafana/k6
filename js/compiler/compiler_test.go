@@ -116,9 +116,8 @@ func TestCompile(t *testing.T) {
 			src := `1+(function() { return 2; )()`
 			_, _, err := c.Compile(src, "script.js", "", "", true)
 			assert.IsType(t, &goja.Exception{}, err)
-			assert.EqualError(t, err, `SyntaxError: script.js: Unexpected token (1:26)
-> 1 | 1+(function() { return 2; )()
-    |                           ^ at <eval>:2:28542(114)`)
+			assert.Contains(t, err.Error(), `SyntaxError: script.js: Unexpected token (1:26)
+> 1 | 1+(function() { return 2; )()`)
 		})
 	})
 	t.Run("ES6", func(t *testing.T) {
@@ -156,9 +155,8 @@ func TestCompile(t *testing.T) {
 		t.Run("Invalid", func(t *testing.T) {
 			_, _, err := c.Compile(`1+(=>2)()`, "script.js", "", "", true)
 			assert.IsType(t, &goja.Exception{}, err)
-			assert.EqualError(t, err, `SyntaxError: script.js: Unexpected token (1:3)
-> 1 | 1+(=>2)()
-    |    ^ at <eval>:2:28542(114)`)
+			assert.Contains(t, err.Error(), `SyntaxError: script.js: Unexpected token (1:3)
+> 1 | 1+(=>2)()`)
 		})
 	})
 }
