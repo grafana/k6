@@ -6,9 +6,6 @@ eval $(go env)
 # To override the latest git tag as the version, pass something else as the first arg.
 VERSION=${1:-$(git describe --tags --abbrev=0)}
 
-# Fail early if external dependencies aren't installed.
-rice --help > /dev/null || (echo "ERROR: rice is not installed, run: go get github.com/GeertJohan/go.rice/rice"; exit 1)
-
 make_archive() {
 	FMT=$1
 	DIR=$2
@@ -40,7 +37,6 @@ build_dist() {
 
 	# Build a binary, embed what we can by means of static assets inside it.
 	GOARCH=$GOARCH GOOS=$GOOS go build -o dist/$DIR/$BIN
-	rice append --exec=dist/$DIR/$BIN -i ./js/compiler -i ./js/lib
 
 	# Archive it all, native format depends on the platform. Subshell to not mess with $PWD.
 	( cd dist && make_archive $FMT $DIR )
@@ -60,7 +56,7 @@ checksum() {
 		echo "ERROR: unable to find a command to compute sha-256 hash"
 		return 1
 	fi
-	
+
 	rm -f dist/$CHECKSUM_FILE
 	( cd dist && for x in $(ls -1); do $CHECKSUM_CMD $x >> $CHECKSUM_FILE; done )
 }
