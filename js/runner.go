@@ -189,7 +189,13 @@ func (r *Runner) newVU() (*VU, error) {
 }
 
 func (r *Runner) Setup(ctx context.Context) error {
-	v, err := r.runPart(ctx, "setup", nil)
+	setupCtx, setupCancel := context.WithTimeout(
+		ctx,
+		time.Duration(r.Bundle.Options.SetupTimeout.Duration),
+	)
+	defer setupCancel()
+
+	v, err := r.runPart(setupCtx, "setup", nil)
 	if err != nil {
 		return errors.Wrap(err, "setup")
 	}
@@ -211,7 +217,13 @@ func (r *Runner) SetSetupData(data interface{}) {
 }
 
 func (r *Runner) Teardown(ctx context.Context) error {
-	_, err := r.runPart(ctx, "teardown", r.setupData)
+	teardownCtx, teardownCancel := context.WithTimeout(
+		ctx,
+		time.Duration(r.Bundle.Options.TeardownTimeout.Duration),
+	)
+	defer teardownCancel()
+
+	_, err := r.runPart(teardownCtx, "teardown", r.setupData)
 	return err
 }
 
