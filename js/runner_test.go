@@ -125,6 +125,11 @@ func TestSetupTeardown(t *testing.T) {
 	r1, err := New(&lib.SourceData{
 		Filename: "/script.js",
 		Data: []byte(`
+			export let options = {
+				setupTimeout: "1s",
+				teardownTimeout: "1s"
+			};
+
 			export function setup() {
 				return { v: 1 };
 			}
