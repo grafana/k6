@@ -12,3 +12,4 @@ Description of feature.
 
 * Multiple bugs in the HTTP request and batch handling (#642)
 * Fix negative `http_req_sending` values in the summary (#651)
+* Respect the `setup()` and `teardown()` timeouts even when triggered by the API (#661)
