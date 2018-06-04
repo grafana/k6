@@ -18,6 +18,8 @@
  *
  */
 
+//go:generate rice embed-go
+
 package compiler
 
 import (
@@ -32,9 +34,6 @@ import (
 )
 
 var (
-	lib      = rice.MustFindBox("lib")
-	babelSrc = lib.MustString("babel-standalone-bower/babel.min.js")
-
 	DefaultOpts = map[string]interface{}{
 		"presets":       []string{"latest"},
 		"ast":           false,
@@ -44,6 +43,9 @@ var (
 		"retainLines":   true,
 		"highlightCode": false,
 	}
+
+	compilerInstance *Compiler
+	once             sync.Once
 )
 
 // A Compiler uses Babel to compile ES6 code into something ES5-compatible.
@@ -58,6 +60,21 @@ type Compiler struct {
 
 // Constructs a new compiler.
 func New() (*Compiler, error) {
+	var err error
+	once.Do(func() {
+		compilerInstance, err = new()
+	})
+
+	return compilerInstance, err
+}
+
+func new() (*Compiler, error) {
+	conf := rice.Config{
+		LocateOrder: []rice.LocateMethod{rice.LocateEmbedded},
+	}
+
+	babelSrc := conf.MustFindBox("lib").MustString("babel.min.js")
+
 	c := &Compiler{vm: goja.New()}
 	if _, err := c.vm.RunString(babelSrc); err != nil {
 		return nil, err

@@ -7,5 +7,5 @@
 		"goconst", "gosimple", "staticcheck",
 		"misspell"
 	],
-	"Exclude": ["/usr/local/go/src", "/go/src"]
+	"Exclude": ["/usr/local/go/src", "/go/src", "rice-box.go"]
 }
