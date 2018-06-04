@@ -18,6 +18,8 @@
  *
  */
 
+//go:generate rice embed-go
+
 package lib
 
 import (
@@ -25,8 +27,10 @@ import (
 	"github.com/dop251/goja"
 )
 
-var CoreJS *goja.Program = goja.MustCompile(
-	"core-js/shim.js",
-	rice.MustFindBox("core-js").MustString("client/shim.js"),
-	true,
-)
+func GetCoreJS() *goja.Program {
+	return goja.MustCompile(
+		"core-js/shim.min.js",
+		rice.MustFindBox("core-js").MustString("shim.min.js"),
+		true,
+	)
+}

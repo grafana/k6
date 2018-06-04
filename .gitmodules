@@ -1,6 +1,0 @@
-[submodule "js2/compiler/lib/babel-standalone-bower"]
-	path = js/compiler/lib/babel-standalone-bower
-	url = https://github.com/Daniel15/babel-standalone-bower
-[submodule "js/lib/core-js"]
-	path = js/lib/core-js
-	url = https://github.com/zloirock/core-js
