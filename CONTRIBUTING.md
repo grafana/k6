@@ -31,7 +31,9 @@ If you'd like to contribute code to k6, this is the basic procedure. Make sure t
 
 3. Create a pull request!
 
-4. We will discuss implementation details until everyone is happy, then a maintainer will merge it.
+4. Sign the [Contributor License Agreement](https://cla-assistant.io/loadimpact/k6) (the process is integrated with the pull request flow through cla-assistant.io)
+
+5. We will discuss implementation details until everyone is happy, then a maintainer will merge it.
 
 Development setup
 -----------------
@@ -140,6 +142,6 @@ If you're writing a longer block of text to a terminal, wrap it at 80 characters
 
 **License**
 
-If you make a new source file, you must copy the license preamble from an existing file to the top of it. We can't merge a PR with unlicensed source files.
+If you make a new source file, you must copy the license preamble from an existing file to the top of it. We can't merge a PR with unlicensed source files. We also can't merge PRs unless all authors have signed the [Contributor License Agreement](https://cla-assistant.io/loadimpact/k6).
 
 This doesn't apply to documentation or sample code; only files that make up the application itself.
