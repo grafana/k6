@@ -25,3 +25,21 @@ services:
     environment:
       - K6_OUT=influxdb=http://influxdb:8086/k6
     command: 'version'
+
+  deb:
+    build:
+      context: .
+      dockerfile: packaging/Dockerfile.linux
+    command:
+      /gen-packages.sh deb
+    volumes:
+      - .:/go/src/github.com/loadimpact/k6
+
+  rpm:
+    build:
+      context: .
+      dockerfile: packaging/Dockerfile.linux
+    command: >
+      /gen-packages.sh rpm
+    volumes:
+      - .:/go/src/github.com/loadimpact/k6
