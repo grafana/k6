@@ -58,11 +58,14 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 		}
 
 		show := getNullBool(cmd.Flags(), "show")
+		reset := getNullBool(cmd.Flags(), "reset")
 		token := getNullString(cmd.Flags(), "token")
 
 		conf := cloud.NewConfig().Apply(config.Collectors.Cloud)
 
 		switch {
+		case reset.Valid:
+			conf.Token = null.StringFromPtr(nil)
 		case show.Bool:
 		case token.Valid:
 			conf.Token = token
@@ -104,7 +107,9 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 			return err
 		}
 
-		fmt.Fprintf(stdout, "  token: %s\n", ui.ValueColor.Sprint(conf.Token.String))
+		if conf.Token.Valid {
+			fmt.Fprintf(stdout, "  token: %s\n", ui.ValueColor.Sprint(conf.Token.String))
+		}
 		return nil
 	},
 }
@@ -113,4 +118,5 @@ func init() {
 	loginCmd.AddCommand(loginCloudCommand)
 	loginCloudCommand.Flags().StringP("token", "t", "", "specify `token` to use")
 	loginCloudCommand.Flags().BoolP("show", "s", false, "display saved token and exit")
+	loginCloudCommand.Flags().BoolP("reset", "r", false, "reset token")
 }
