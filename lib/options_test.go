@@ -267,7 +267,11 @@ func TestOptions(t *testing.T) {
 		assert.True(t, opts.NoConnectionReuse.Valid)
 		assert.True(t, opts.NoConnectionReuse.Bool)
 	})
-
+	t.Run("NoVUConnectionReuse", func(t *testing.T) {
+		opts := Options{}.Apply(Options{NoVUConnectionReuse: null.BoolFrom(true)})
+		assert.True(t, opts.NoVUConnectionReuse.Valid)
+		assert.True(t, opts.NoVUConnectionReuse.Bool)
+	})
 	t.Run("BlacklistIPs", func(t *testing.T) {
 		opts := Options{}.Apply(Options{
 			BlacklistIPs: []*net.IPNet{{
@@ -409,6 +413,11 @@ func TestOptionsEnv(t *testing.T) {
 		// TLSVersion
 		// TLSAuth
 		{"NoConnectionReuse", "K6_NO_CONNECTION_REUSE"}: {
+			"":      null.Bool{},
+			"true":  null.BoolFrom(true),
+			"false": null.BoolFrom(false),
+		},
+		{"NoVUConnectionReuse", "K6_NO_VU_CONNECTION_REUSE"}: {
 			"":      null.Bool{},
 			"true":  null.BoolFrom(true),
 			"false": null.BoolFrom(false),
