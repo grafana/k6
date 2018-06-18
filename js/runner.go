@@ -161,6 +161,7 @@ func (r *Runner) newVU() (*VU, error) {
 		TLSClientConfig:    tlsConfig,
 		DialContext:        dialer.DialContext,
 		DisableCompression: true,
+		DisableKeepAlives:  r.Bundle.Options.NoConnectionReuse.Bool,
 	}
 	_ = http2.ConfigureTransport(transport)
 
@@ -381,7 +382,7 @@ func (u *VU) runFn(ctx context.Context, fn goja.Callable, args ...goja.Value) (g
 	}
 	sampleTags := stats.IntoSampleTags(&tags)
 
-	if u.Runner.Bundle.Options.NoConnectionReuse.Bool {
+	if u.Runner.Bundle.Options.NoVUConnectionReuse.Bool {
 		u.HTTPTransport.CloseIdleConnections()
 	}
 
