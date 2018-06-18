@@ -79,14 +79,12 @@ func (*K6) Group(ctx context.Context, name string, fn goja.Callable) (goja.Value
 		tags["iter"] = strconv.FormatInt(state.Iteration, 10)
 	}
 
-	state.Samples = append(state.Samples,
-		stats.Sample{
-			Time:   t,
-			Metric: metrics.GroupDuration,
-			Tags:   stats.IntoSampleTags(&tags),
-			Value:  stats.D(t.Sub(startTime)),
-		},
-	)
+	state.Samples <- stats.Sample{
+		Time:   t,
+		Metric: metrics.GroupDuration,
+		Tags:   stats.IntoSampleTags(&tags),
+		Value:  stats.D(t.Sub(startTime)),
+	}
 	return ret, err
 }
 
@@ -150,15 +148,10 @@ func (*K6) Check(ctx context.Context, arg0, checks goja.Value, extras ...goja.Va
 		default:
 			if val.ToBoolean() {
 				atomic.AddInt64(&check.Passes, 1)
-				state.Samples = append(state.Samples,
-					stats.Sample{Time: t, Metric: metrics.Checks, Tags: sampleTags, Value: 1},
-				)
+				state.Samples <- stats.Sample{Time: t, Metric: metrics.Checks, Tags: sampleTags, Value: 1}
 			} else {
 				atomic.AddInt64(&check.Fails, 1)
-				state.Samples = append(state.Samples,
-					stats.Sample{Time: t, Metric: metrics.Checks, Tags: sampleTags, Value: 0},
-				)
-
+				state.Samples <- stats.Sample{Time: t, Metric: metrics.Checks, Tags: sampleTags, Value: 0}
 				// A single failure makes the return value false.
 				succ = false
 			}

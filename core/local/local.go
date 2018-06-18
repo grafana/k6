@@ -36,6 +36,12 @@ import (
 	null "gopkg.in/guregu/null.v3"
 )
 
+// TODO: totally rewrite this!
+// This is an overcomplicated and probably buggy piece of code that is a major PITA to refactor...
+// It does a ton of stuff in a very convoluted way, has a and uses a very incomprihensible mix
+// of all possible Go synchronization mechanisms (channels, mutexes, rwmutexes, atomics,
+// and waitgroups) and has a bunch of contexts and tickers on top...
+
 var _ lib.Executor = &Executor{}
 
 type vuHandle struct {
@@ -45,7 +51,7 @@ type vuHandle struct {
 	cancel context.CancelFunc
 }
 
-func (h *vuHandle) run(logger *log.Logger, flow <-chan int64, out chan<- []stats.SampleContainer) {
+func (h *vuHandle) run(logger *log.Logger, flow <-chan int64, iterDone chan<- struct{}) {
 	h.RLock()
 	ctx := h.ctx
 	h.RUnlock()
@@ -60,21 +66,12 @@ func (h *vuHandle) run(logger *log.Logger, flow <-chan int64, out chan<- []stats
 			return
 		}
 
-		var samples []stats.SampleContainer
 		if h.vu != nil {
-			// TODO: Refactor this if we want better aggregation...
-			// As seen below, at the moment test scripts will emit their
-			// metric samples only after they've finished executing. This
-			// means that long-running scripts will emit samples with
-			// times long in the past, long after their respective time buckets
-			// have been sent to the cloud. If we instead pass on the out
-			// SampleContainer channel directly to the VU, we could Collect()
-			// those samples as soon as they are emitted.
-
-			runSamples, err := h.vu.RunOnce(ctx)
+			err := h.vu.RunOnce(ctx)
 			if err != nil {
 				select {
 				case <-ctx.Done():
+				// Don't log errors from cancelled iterations
 				default:
 					if s, ok := err.(fmt.Stringer); ok {
 						logger.Error(s.String())
@@ -83,9 +80,8 @@ func (h *vuHandle) run(logger *log.Logger, flow <-chan int64, out chan<- []stats
 					}
 				}
 			}
-			samples = runSamples
 		}
-		out <- samples
+		iterDone <- struct{}{}
 	}
 }
 
@@ -123,8 +119,11 @@ type Executor struct {
 	// Current context, nil if a test isn't running right now.
 	ctx context.Context
 
-	// Engineward output channel for samples.
-	out chan<- []stats.SampleContainer
+	// Output channel to which VUs send samples.
+	vuOut chan stats.SampleContainer
+
+	// Channel on which VUs sigal that iterations are completed
+	iterDone chan struct{}
 
 	// Flow control for VUs; iterations are run only after reading from this channel.
 	flow chan int64
@@ -138,33 +137,34 @@ func New(r lib.Runner) *Executor {
 		runTeardown: true,
 		endIters:    -1,
 		endTime:     -1,
+		vuOut:       make(chan stats.SampleContainer, r.GetOptions().MetricSamplesBufferSize.Int64),
+		iterDone:    make(chan struct{}),
 	}
 }
 
-func (e *Executor) Run(parent context.Context, out chan<- []stats.SampleContainer) (reterr error) {
+func (e *Executor) Run(parent context.Context, engineOut chan<- stats.SampleContainer) (reterr error) {
 	e.runLock.Lock()
 	defer e.runLock.Unlock()
 
 	if e.Runner != nil && e.runSetup {
-		if err := e.Runner.Setup(parent); err != nil {
+		if err := e.Runner.Setup(parent, engineOut); err != nil {
 			return err
 		}
 	}
 
 	ctx, cancel := context.WithCancel(parent)
-	vuOut := make(chan []stats.SampleContainer)
 	vuFlow := make(chan int64)
-
 	e.lock.Lock()
+	vuOut := e.vuOut
+	iterDone := e.iterDone
 	e.ctx = ctx
-	e.out = vuOut
 	e.flow = vuFlow
 	e.lock.Unlock()
 
 	var cutoff time.Time
 	defer func() {
 		if e.Runner != nil && e.runTeardown {
-			err := e.Runner.Teardown(parent)
+			err := e.Runner.Teardown(parent, engineOut)
 			if reterr == nil {
 				reterr = err
 			} else if err != nil {
@@ -177,7 +177,7 @@ func (e *Executor) Run(parent context.Context, out chan<- []stats.SampleContaine
 
 		e.lock.Lock()
 		e.ctx = nil
-		e.out = nil
+		e.vuOut = nil
 		e.flow = nil
 		e.lock.Unlock()
 
@@ -187,22 +187,17 @@ func (e *Executor) Run(parent context.Context, out chan<- []stats.SampleContaine
 			close(wait)
 		}()
 
-		var samples []stats.SampleContainer
 		for {
 			select {
-			case newSampleContainers := <-vuOut:
+			case newSampleContainer := <-vuOut:
 				if cutoff.IsZero() {
-					samples = append(samples, newSampleContainers...)
+					engineOut <- newSampleContainer
+				} else if csc, ok := newSampleContainer.(stats.ConnectedSampleContainer); ok && csc.GetTime().Before(cutoff) {
+					engineOut <- newSampleContainer
 				} else {
-					for _, nsc := range newSampleContainers {
-						if csc, ok := nsc.(stats.ConnectedSampleContainer); ok && csc.GetTime().Before(cutoff) {
-							samples = append(samples, nsc)
-						} else if nsc != nil {
-							for _, s := range nsc.GetSamples() {
-								if s.Time.Before(cutoff) {
-									samples = append(samples, s)
-								}
-							}
+					for _, s := range newSampleContainer.GetSamples() {
+						if s.Time.Before(cutoff) {
+							engineOut <- s
 						}
 					}
 				}
@@ -211,9 +206,6 @@ func (e *Executor) Run(parent context.Context, out chan<- []stats.SampleContaine
 			select {
 			case <-wait:
 				close(vuOut)
-				if out != nil && len(samples) > 0 {
-					out <- samples
-				}
 				return
 			default:
 			}
@@ -291,21 +283,20 @@ func (e *Executor) Run(parent context.Context, out chan<- []stats.SampleContaine
 					}
 				}
 			}
-		case samples := <-vuOut:
-			// Every iteration ends with a write to vuOut. Check if we've hit the end point.
+		case sampleContainer := <-vuOut:
+			engineOut <- sampleContainer
+		case <-iterDone:
+			// Every iteration ends with a write to iterDone. Check if we've hit the end point.
 			// If not, make sure to include an Iterations bump in the list!
-			if out != nil {
-				var tags *stats.SampleTags
-				if e.Runner != nil {
-					tags = e.Runner.GetOptions().RunTags
-				}
-				samples = append(samples, stats.Sample{
-					Time:   time.Now(),
-					Metric: metrics.Iterations,
-					Value:  1,
-					Tags:   tags,
-				})
-				out <- samples
+			var tags *stats.SampleTags
+			if e.Runner != nil {
+				tags = e.Runner.GetOptions().RunTags
+			}
+			engineOut <- stats.Sample{
+				Time:   time.Now(),
+				Metric: metrics.Iterations,
+				Value:  1,
+				Tags:   tags,
 			}
 
 			end := atomic.LoadInt64(&e.endIters)
@@ -332,7 +323,7 @@ func (e *Executor) scale(ctx context.Context, num int64) error {
 
 	e.lock.RLock()
 	flow := e.flow
-	out := e.out
+	iterDone := e.iterDone
 	e.lock.RUnlock()
 
 	for i, handle := range e.vus {
@@ -357,7 +348,7 @@ func (e *Executor) scale(ctx context.Context, num int64) error {
 
 				e.wg.Add(1)
 				go func() {
-					handle.run(e.Logger, flow, out)
+					handle.run(e.Logger, flow, iterDone)
 					e.wg.Done()
 				}()
 			}
@@ -514,6 +505,10 @@ func (e *Executor) SetVUsMax(max int64) error {
 		return nil
 	}
 
+	e.lock.RLock()
+	vuOut := e.vuOut
+	e.lock.RUnlock()
+
 	e.vusLock.Lock()
 	defer e.vusLock.Unlock()
 
@@ -521,7 +516,7 @@ func (e *Executor) SetVUsMax(max int64) error {
 	for i := numVUsMax; i < max; i++ {
 		var handle vuHandle
 		if e.Runner != nil {
-			vu, err := e.Runner.NewVU()
+			vu, err := e.Runner.NewVU(vuOut)
 			if err != nil {
 				return err
 			}

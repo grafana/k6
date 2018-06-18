@@ -37,7 +37,7 @@ import (
 const (
 	TickRate        = 1 * time.Millisecond
 	MetricsRate     = 1 * time.Second
-	CollectRate     = 10 * time.Millisecond
+	CollectRate     = 50 * time.Millisecond
 	ThresholdsRate  = 2 * time.Second
 	ShutdownTimeout = 10 * time.Second
 
@@ -59,6 +59,8 @@ type Engine struct {
 	Metrics     map[string]*stats.Metric
 	MetricsLock sync.Mutex
 
+	Samples chan stats.SampleContainer
+
 	// Assigned to metrics upon first received sample.
 	thresholds map[string]stats.Thresholds
 	submetrics map[string][]*stats.Submetric
@@ -76,6 +78,7 @@ func NewEngine(ex lib.Executor, o lib.Options) (*Engine, error) {
 		Executor: ex,
 		Options:  o,
 		Metrics:  make(map[string]*stats.Metric),
+		Samples:  make(chan stats.SampleContainer, o.MetricSamplesBufferSize.Int64),
 	}
 	e.SetLogger(log.StandardLogger())
 
@@ -173,11 +176,10 @@ func (e *Engine) Run(ctx context.Context) error {
 	}
 
 	// Run the executor.
-	out := make(chan []stats.SampleContainer)
 	errC := make(chan error)
 	subwg.Add(1)
 	go func() {
-		errC <- e.Executor.Run(subctx, out)
+		errC <- e.Executor.Run(subctx, e.Samples)
 		e.logger.Debug("Engine: Executor terminated")
 		subwg.Done()
 	}()
@@ -194,11 +196,14 @@ func (e *Engine) Run(ctx context.Context) error {
 				errC = nil
 			}
 			subwg.Wait()
-			close(out)
+			close(e.Samples)
 		}()
-		for sampleContainers := range out {
-			e.processSamples(sampleContainers...)
+
+		sampleContainers := []stats.SampleContainer{}
+		for sc := range e.Samples {
+			sampleContainers = append(sampleContainers, sc)
 		}
+		e.processSamples(sampleContainers)
 
 		// Emit final metrics.
 		e.emitMetrics()
@@ -213,10 +218,17 @@ func (e *Engine) Run(ctx context.Context) error {
 		collectorwg.Wait()
 	}()
 
+	ticker := time.NewTicker(CollectRate)
+	sampleContainers := []stats.SampleContainer{}
 	for {
 		select {
-		case sampleContainers := <-out:
-			e.processSamples(sampleContainers...)
+		case <-ticker.C:
+			if len(sampleContainers) > 0 {
+				e.processSamples(sampleContainers)
+				sampleContainers = []stats.SampleContainer{}
+			}
+		case sc := <-e.Samples:
+			sampleContainers = append(sampleContainers, sc)
 		case err := <-errC:
 			errC = nil
 			if err != nil {
@@ -262,7 +274,7 @@ func (e *Engine) runMetricsEmission(ctx context.Context) {
 func (e *Engine) emitMetrics() {
 	t := time.Now()
 
-	e.processSamples(stats.ConnectedSamples{
+	e.processSamples([]stats.SampleContainer{stats.ConnectedSamples{
 		Samples: []stats.Sample{
 			{
 				Time:   t,
@@ -278,7 +290,7 @@ func (e *Engine) emitMetrics() {
 		},
 		Tags: e.Options.RunTags,
 		Time: t,
-	})
+	}})
 }
 
 func (e *Engine) runThresholds(ctx context.Context, abort func()) {
@@ -330,7 +342,7 @@ func (e *Engine) processThresholds(abort func()) {
 	}
 }
 
-func (e *Engine) processSamples(sampleCointainers ...stats.SampleContainer) {
+func (e *Engine) processSamples(sampleCointainers []stats.SampleContainer) {
 	if len(sampleCointainers) == 0 {
 		return
 	}
