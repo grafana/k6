@@ -6,13 +6,8 @@ if [[ -z "${VERSION}" ]]; then
     exit 2
 fi
 
-if [[ -z "${ARCH}" ]]; then
-    echo "\$ARCH enviroment variable undefined"
-    exit 2
-fi
-
 rm -rf pkg-build
 
 mkdir -p dist
-go-bin-deb generate --file packaging/deb.json -a $ARCH --version $VERSION -o dist/k6-v$VERSION-$ARCH.deb
-go-bin-rpm generate --file packaging/rpm.json -a $ARCH --version $VERSION -o dist/k6-v$VERSION-$ARCH.rpm
+go-bin-deb generate --file packaging/deb.json -a amd64 --version $VERSION -o dist/k6-v$VERSION-amd64.deb
+go-bin-rpm generate --file packaging/rpm.json -a amd64 --version $VERSION -o dist/k6-v$VERSION-amd64.rpm

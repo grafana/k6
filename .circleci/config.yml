@@ -122,8 +122,7 @@ jobs:
             CGO_ENABLED=0 GOARCH=$ARCH go build -a -ldflags '-s -w' -o /tmp/k6
             echo "Done!"
 
-            VERSION=${CIRCLE_TAG:1} ARCH=amd64 ./packaging/gen-packages.sh deb
-            VERSION=${CIRCLE_TAG:1} ARCH=amd64 ./packaging/gen-packages.sh rpm
+            VERSION=${CIRCLE_TAG:1} ./packaging/gen-packages.sh
 
       - deploy:
           name: Publish packages in Bintray

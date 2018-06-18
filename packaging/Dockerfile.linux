@@ -15,5 +15,3 @@ RUN go get github.com/mh-cbon/go-bin-rpm \
   && go install
 
  RUN apt-get update -y && apt-get install -y fakeroot rpm
-
- COPY ./packaging/gen-packages.sh /gen-packages.sh
