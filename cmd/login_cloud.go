@@ -66,6 +66,7 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 		switch {
 		case reset.Valid:
 			conf.Token = null.StringFromPtr(nil)
+			fmt.Fprintf(stdout, "  token reset\n")
 		case show.Bool:
 		case token.Valid:
 			conf.Token = token
