@@ -2,6 +2,8 @@ TODO: Intro
 
 ## New Features!
 
+* New option `--no-vu-connection-reuse` that let's users close the connections between iterations of a VU. (#676)
+
 ### Category: Title (#533)
 
 Description of feature.
@@ -10,6 +12,7 @@ Description of feature.
 
 ## UX
 * New option to reset cloud token (#672)
+* The option `--no-connection-reuse` now means that keep-alive connections will be disabled. (#676)
 
 ## Bugs fixed!
 
