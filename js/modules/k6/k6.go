@@ -22,6 +22,7 @@ package k6
 
 import (
 	"context"
+	"math/rand"
 	"strconv"
 	"sync/atomic"
 	"time"
@@ -50,6 +51,13 @@ func (*K6) Sleep(ctx context.Context, secs float64) {
 	case <-ctx.Done():
 		timer.Stop()
 	}
+}
+
+func (*K6) RandomSeed(ctx context.Context, seed int64) {
+	randSource := rand.New(rand.NewSource(seed)).Float64
+
+	rt := common.GetRuntime(ctx)
+	rt.SetRandSource(randSource)
 }
 
 func (*K6) Group(ctx context.Context, name string, fn goja.Callable) (goja.Value, error) {
