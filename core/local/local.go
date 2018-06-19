@@ -189,6 +189,8 @@ func (e *Executor) Run(parent context.Context, engineOut chan<- stats.SampleCont
 
 		for {
 			select {
+			case <-iterDone:
+				// Spool through all remaining iterations, do not emit stats since the Run() is over
 			case newSampleContainer := <-vuOut:
 				if cutoff.IsZero() {
 					engineOut <- newSampleContainer
