@@ -12,8 +12,10 @@ Description of feature.
 
 ## UX
 * New option to reset cloud token (#672)
-* The option `--no-connection-reuse` now means that keep-alive connections will be disabled. (#676)
 
 ## Bugs fixed!
 
 * Category: description of bug. (#PR)
+
+## Breaking Changes
+* The `--no-connection-reuse` option has been re-purposed and now disables keep-alive connections globally. The newly added `--no-vu-connection-reuse` option does what was previously done by `--no-connection-reuse` - it closes any open connections between iterations of a VU, but allows for reusing them inside of a single iteration. (#676)
