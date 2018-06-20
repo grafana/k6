@@ -192,7 +192,6 @@ func SummarizeGroup(w io.Writer, indent string, group *lib.Group) {
 	for _, check := range group.Checks {
 		checkNames = append(checkNames, check.Name)
 	}
-	sort.Strings(checkNames)
 	for _, name := range checkNames {
 		SummarizeCheck(w, indent, group.Checks[name])
 	}
@@ -204,7 +203,6 @@ func SummarizeGroup(w io.Writer, indent string, group *lib.Group) {
 	for _, grp := range group.Groups {
 		groupNames = append(groupNames, grp.Name)
 	}
-	sort.Strings(groupNames)
 	for _, name := range groupNames {
 		SummarizeGroup(w, indent, group.Groups[name])
 	}

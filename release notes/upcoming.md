@@ -8,11 +8,18 @@ Description of feature.
 
 **Docs**: [Title](http://k6.readme.io/docs/TODO)
 
+
+## UX
+
+* New option to reset cloud token (#672)
+
+
 ## Internals
 
 ### Real-time metrics (#678)
 
 Previously most metrics were emitted only when a script iteration ended. With these changes, metrics would be continuously pushed in real-time, even in the middle of a script iteration. This should slightly decrease memory usage and help a lot with the aggregation efficiency of the cloud collector.
+
 
 ## Bugs fixed!
 
