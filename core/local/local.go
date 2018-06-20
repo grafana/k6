@@ -38,7 +38,7 @@ import (
 
 // TODO: totally rewrite this!
 // This is an overcomplicated and probably buggy piece of code that is a major PITA to refactor...
-// It does a ton of stuff in a very convoluted way, has a and uses a very incomprihensible mix
+// It does a ton of stuff in a very convoluted way, has a and uses a very incomprehensible mix
 // of all possible Go synchronization mechanisms (channels, mutexes, rwmutexes, atomics,
 // and waitgroups) and has a bunch of contexts and tickers on top...
 
