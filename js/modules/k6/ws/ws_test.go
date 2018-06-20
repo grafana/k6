@@ -90,6 +90,8 @@ func makeWsProto(s string) string {
 }
 
 func TestSession(t *testing.T) {
+	//TODO: split and paralelize tests
+
 	root, err := lib.NewGroup("", nil)
 	assert.NoError(t, err)
 
@@ -100,12 +102,14 @@ func TestSession(t *testing.T) {
 		KeepAlive: 60 * time.Second,
 		DualStack: true,
 	})
+	samples := make(chan stats.SampleContainer, 1000)
 	state := &common.State{
 		Group:  root,
 		Dialer: dialer,
 		Options: lib.Options{
 			SystemTags: lib.GetTagSet("url", "proto", "status", "subproto"),
 		},
+		Samples: samples,
 	}
 
 	ctx := context.Background()
@@ -123,7 +127,7 @@ func TestSession(t *testing.T) {
 		`)
 		assert.NoError(t, err)
 	})
-	assertSessionMetricsEmitted(t, state.Samples, "", "ws://demos.kaazing.com/echo", 101, "")
+	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", "ws://demos.kaazing.com/echo", 101, "")
 
 	t.Run("connect_wss", func(t *testing.T) {
 		_, err := common.RunString(rt, `
@@ -134,10 +138,9 @@ func TestSession(t *testing.T) {
 		`)
 		assert.NoError(t, err)
 	})
-	assertSessionMetricsEmitted(t, state.Samples, "", "wss://demos.kaazing.com/echo", 101, "")
+	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", "wss://demos.kaazing.com/echo", 101, "")
 
 	t.Run("open", func(t *testing.T) {
-		state.Samples = nil
 		_, err := common.RunString(rt, `
 		let opened = false;
 		let res = ws.connect("ws://demos.kaazing.com/echo", function(socket){
@@ -150,10 +153,9 @@ func TestSession(t *testing.T) {
 		`)
 		assert.NoError(t, err)
 	})
-	assertSessionMetricsEmitted(t, state.Samples, "", "ws://demos.kaazing.com/echo", 101, "")
+	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", "ws://demos.kaazing.com/echo", 101, "")
 
 	t.Run("send_receive", func(t *testing.T) {
-		state.Samples = nil
 		_, err := common.RunString(rt, `
 		let res = ws.connect("ws://demos.kaazing.com/echo", function(socket){
 			socket.on("open", function() {
@@ -169,12 +171,13 @@ func TestSession(t *testing.T) {
 		`)
 		assert.NoError(t, err)
 	})
-	assertSessionMetricsEmitted(t, state.Samples, "", "ws://demos.kaazing.com/echo", 101, "")
-	assertMetricEmitted(t, metrics.WSMessagesSent, state.Samples, "ws://demos.kaazing.com/echo")
-	assertMetricEmitted(t, metrics.WSMessagesReceived, state.Samples, "ws://demos.kaazing.com/echo")
+
+	samplesBuf := stats.GetBufferedSamples(samples)
+	assertSessionMetricsEmitted(t, samplesBuf, "", "ws://demos.kaazing.com/echo", 101, "")
+	assertMetricEmitted(t, metrics.WSMessagesSent, samplesBuf, "ws://demos.kaazing.com/echo")
+	assertMetricEmitted(t, metrics.WSMessagesReceived, samplesBuf, "ws://demos.kaazing.com/echo")
 
 	t.Run("interval", func(t *testing.T) {
-		state.Samples = nil
 		_, err := common.RunString(rt, `
 		let counter = 0;
 		let res = ws.connect("ws://demos.kaazing.com/echo", function(socket){
@@ -187,10 +190,9 @@ func TestSession(t *testing.T) {
 		`)
 		assert.NoError(t, err)
 	})
-	assertSessionMetricsEmitted(t, state.Samples, "", "ws://demos.kaazing.com/echo", 101, "")
+	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", "ws://demos.kaazing.com/echo", 101, "")
 
 	t.Run("timeout", func(t *testing.T) {
-		state.Samples = nil
 		_, err := common.RunString(rt, `
 		let start = new Date().getTime();
 		let ellapsed = new Date().getTime() - start;
@@ -206,10 +208,9 @@ func TestSession(t *testing.T) {
 		`)
 		assert.NoError(t, err)
 	})
-	assertSessionMetricsEmitted(t, state.Samples, "", "ws://demos.kaazing.com/echo", 101, "")
+	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", "ws://demos.kaazing.com/echo", 101, "")
 
 	t.Run("ping", func(t *testing.T) {
-		state.Samples = nil
 		_, err := common.RunString(rt, `
 		let pongReceived = false;
 		let res = ws.connect("ws://demos.kaazing.com/echo", function(socket){
@@ -228,11 +229,12 @@ func TestSession(t *testing.T) {
 		`)
 		assert.NoError(t, err)
 	})
-	assertSessionMetricsEmitted(t, state.Samples, "", "ws://demos.kaazing.com/echo", 101, "")
-	assertMetricEmitted(t, metrics.WSPing, state.Samples, "ws://demos.kaazing.com/echo")
+
+	samplesBuf = stats.GetBufferedSamples(samples)
+	assertSessionMetricsEmitted(t, samplesBuf, "", "ws://demos.kaazing.com/echo", 101, "")
+	assertMetricEmitted(t, metrics.WSPing, samplesBuf, "ws://demos.kaazing.com/echo")
 
 	t.Run("multiple_handlers", func(t *testing.T) {
-		state.Samples = nil
 		_, err := common.RunString(rt, `
 		let pongReceived = false;
 		let otherPongReceived = false;
@@ -261,11 +263,12 @@ func TestSession(t *testing.T) {
 		`)
 		assert.NoError(t, err)
 	})
-	assertSessionMetricsEmitted(t, state.Samples, "", "ws://demos.kaazing.com/echo", 101, "")
-	assertMetricEmitted(t, metrics.WSPing, state.Samples, "ws://demos.kaazing.com/echo")
+
+	samplesBuf = stats.GetBufferedSamples(samples)
+	assertSessionMetricsEmitted(t, samplesBuf, "", "ws://demos.kaazing.com/echo", 101, "")
+	assertMetricEmitted(t, metrics.WSPing, samplesBuf, "ws://demos.kaazing.com/echo")
 
 	t.Run("close", func(t *testing.T) {
-		state.Samples = nil
 		_, err := common.RunString(rt, `
 		let closed = false;
 		let res = ws.connect("ws://demos.kaazing.com/echo", function(socket){
@@ -280,7 +283,7 @@ func TestSession(t *testing.T) {
 		`)
 		assert.NoError(t, err)
 	})
-	assertSessionMetricsEmitted(t, state.Samples, "", "ws://demos.kaazing.com/echo", 101, "")
+	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", "ws://demos.kaazing.com/echo", 101, "")
 }
 
 func TestErrors(t *testing.T) {
@@ -294,12 +297,14 @@ func TestErrors(t *testing.T) {
 		KeepAlive: 60 * time.Second,
 		DualStack: true,
 	})
+	samples := make(chan stats.SampleContainer, 1000)
 	state := &common.State{
 		Group:  root,
 		Dialer: dialer,
 		Options: lib.Options{
 			SystemTags: lib.GetTagSet(lib.DefaultSystemTagList...),
 		},
+		Samples: samples,
 	}
 
 	ctx := context.Background()
@@ -309,7 +314,6 @@ func TestErrors(t *testing.T) {
 	rt.Set("ws", common.Bind(rt, New(), &ctx))
 
 	t.Run("invalid_url", func(t *testing.T) {
-		state.Samples = nil
 		_, err := common.RunString(rt, `
 		let res = ws.connect("INVALID", function(socket){
 			socket.on("open", function() {
@@ -321,7 +325,6 @@ func TestErrors(t *testing.T) {
 	})
 
 	t.Run("send_after_close", func(t *testing.T) {
-		state.Samples = nil
 		_, err := common.RunString(rt, `
 		let hasError = false;
 		let res = ws.connect("ws://demos.kaazing.com/echo", function(socket){
@@ -339,7 +342,7 @@ func TestErrors(t *testing.T) {
 		}
 		`)
 		assert.NoError(t, err)
-		assertSessionMetricsEmitted(t, state.Samples, "", "ws://demos.kaazing.com/echo", 101, "")
+		assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", "ws://demos.kaazing.com/echo", 101, "")
 	})
 }
 
@@ -358,10 +361,13 @@ func TestSystemTags(t *testing.T) {
 	//TODO: test for actual tag values after removing the dependency on the
 	// external service demos.kaazing.com (https://github.com/loadimpact/k6/issues/537)
 	testedSystemTags := []string{"group", "status", "subproto", "url", "ip"}
+
+	samples := make(chan stats.SampleContainer, 1000)
 	state := &common.State{
 		Group:   root,
 		Dialer:  dialer,
 		Options: lib.Options{SystemTags: lib.GetTagSet(testedSystemTags...)},
+		Samples: samples,
 	}
 
 	ctx := context.Background()
@@ -375,7 +381,6 @@ func TestSystemTags(t *testing.T) {
 			state.Options.SystemTags = map[string]bool{
 				expectedTag: true,
 			}
-			state.Samples = nil
 			_, err := common.RunString(rt, `
 			let res = ws.connect("ws://demos.kaazing.com/echo", function(socket){
 				socket.on("open", function() {
@@ -391,7 +396,7 @@ func TestSystemTags(t *testing.T) {
 			`)
 			assert.NoError(t, err)
 
-			for _, sampleContainer := range state.Samples {
+			for _, sampleContainer := range stats.GetBufferedSamples(samples) {
 				for _, sample := range sampleContainer.GetSamples() {
 					for emittedTag := range sample.Tags.CloneTags() {
 						assert.Equal(t, expectedTag, emittedTag)
@@ -413,12 +418,14 @@ func TestTLSConfig(t *testing.T) {
 		KeepAlive: 60 * time.Second,
 		DualStack: true,
 	})
+	samples := make(chan stats.SampleContainer, 1000)
 	state := &common.State{
 		Group:  root,
 		Dialer: dialer,
 		Options: lib.Options{
 			SystemTags: lib.GetTagSet("url", "proto", "status", "subproto", "ip"),
 		},
+		Samples: samples,
 	}
 
 	ctx := context.Background()
@@ -445,7 +452,7 @@ func TestTLSConfig(t *testing.T) {
 		`, url))
 		assert.NoError(t, err)
 	})
-	assertSessionMetricsEmitted(t, state.Samples, "", url, 101, "")
+	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", url, 101, "")
 
 	t.Run("custom certificates", func(t *testing.T) {
 		state.TLSConfig = tb.TLSClientConfig
@@ -458,5 +465,5 @@ func TestTLSConfig(t *testing.T) {
 		`, url))
 		assert.NoError(t, err)
 	})
-	assertSessionMetricsEmitted(t, state.Samples, "", url, 101, "")
+	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", url, 101, "")
 }
