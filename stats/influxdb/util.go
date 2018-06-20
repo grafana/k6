@@ -24,35 +24,36 @@ import (
 	"strings"
 
 	client "github.com/influxdata/influxdb/client/v2"
+	null "gopkg.in/guregu/null.v3"
 )
 
 func MakeClient(conf Config) (client.Client, error) {
-	if strings.HasPrefix(conf.Addr, "udp://") {
+	if strings.HasPrefix(conf.Addr.String, "udp://") {
 		return client.NewUDPClient(client.UDPConfig{
-			Addr:        strings.TrimPrefix(conf.Addr, "udp://"),
-			PayloadSize: conf.PayloadSize,
+			Addr:        strings.TrimPrefix(conf.Addr.String, "udp://"),
+			PayloadSize: int(conf.PayloadSize.Int64),
 		})
 	}
-	if conf.Addr == "" {
-		conf.Addr = "http://localhost:8086"
+	if conf.Addr.String == "" {
+		conf.Addr = null.StringFrom("http://localhost:8086")
 	}
 	return client.NewHTTPClient(client.HTTPConfig{
-		Addr:               conf.Addr,
-		Username:           conf.Username,
-		Password:           conf.Password,
+		Addr:               conf.Addr.String,
+		Username:           conf.Username.String,
+		Password:           conf.Password.String,
 		UserAgent:          "k6",
-		InsecureSkipVerify: conf.Insecure,
+		InsecureSkipVerify: conf.Insecure.Bool,
 	})
 }
 
 func MakeBatchConfig(conf Config) client.BatchPointsConfig {
-	if conf.DB == "" {
-		conf.DB = "k6"
+	if !conf.DB.Valid || conf.DB.String == "" {
+		conf.DB = null.StringFrom("k6")
 	}
 	return client.BatchPointsConfig{
-		Precision:        conf.Precision,
-		Database:         conf.DB,
-		RetentionPolicy:  conf.Retention,
-		WriteConsistency: conf.Consistency,
+		Precision:        conf.Precision.String,
+		Database:         conf.DB.String,
+		RetentionPolicy:  conf.Retention.String,
+		WriteConsistency: conf.Consistency.String,
 	}
 }
