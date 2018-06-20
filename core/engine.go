@@ -184,6 +184,7 @@ func (e *Engine) Run(ctx context.Context) error {
 		subwg.Done()
 	}()
 
+	sampleContainers := []stats.SampleContainer{}
 	defer func() {
 		// Shut down subsystems.
 		subcancel()
@@ -199,11 +200,12 @@ func (e *Engine) Run(ctx context.Context) error {
 			close(e.Samples)
 		}()
 
-		sampleContainers := []stats.SampleContainer{}
 		for sc := range e.Samples {
 			sampleContainers = append(sampleContainers, sc)
 		}
-		e.processSamples(sampleContainers)
+		if len(sampleContainers) > 0 {
+			e.processSamples(sampleContainers)
+		}
 
 		// Emit final metrics.
 		e.emitMetrics()
@@ -219,7 +221,6 @@ func (e *Engine) Run(ctx context.Context) error {
 	}()
 
 	ticker := time.NewTicker(CollectRate)
-	sampleContainers := []stats.SampleContainer{}
 	for {
 		select {
 		case <-ticker.C:
