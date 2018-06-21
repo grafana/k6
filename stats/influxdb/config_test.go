@@ -29,11 +29,11 @@ import (
 
 func TestParseArg(t *testing.T) {
 	testdata := map[string]Config{
-		// "":          {},
-		"db=dbname": {DB: null.StringFrom("dbname")},
-		// "addr=http://localhost:8086":                                         {Addr: null.StringFrom("http://localhost:8086")},
-		// "addr=http://localhost:8086,db=dbname":                               {Addr: null.StringFrom("http://localhost:8086"), DB: null.StringFrom("dbname")},
-		// "addr=http://localhost:8086,db=dbname,insecure=false,payloadSize=69": {Addr: null.StringFrom("http://localhost:8086"), DB: null.StringFrom("dbname"), Insecure: null.BoolFrom(false), PayloadSize: null.IntFrom(69)},
+		"":                                                                   {},
+		"db=dbname":                                                          {DB: null.StringFrom("dbname")},
+		"addr=http://localhost:8086":                                         {Addr: null.StringFrom("http://localhost:8086")},
+		"addr=http://localhost:8086,db=dbname":                               {Addr: null.StringFrom("http://localhost:8086"), DB: null.StringFrom("dbname")},
+		"addr=http://localhost:8086,db=dbname,insecure=false,payloadSize=69": {Addr: null.StringFrom("http://localhost:8086"), DB: null.StringFrom("dbname"), Insecure: null.BoolFrom(false), PayloadSize: null.IntFrom(69)},
 	}
 
 	for str, expConfig := range testdata {

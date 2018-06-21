@@ -25,8 +25,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/k0kubun/pp"
 	"github.com/kubernetes/helm/pkg/strvals"
+	"github.com/loadimpact/k6/lib"
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	null "gopkg.in/guregu/null.v3"
@@ -57,10 +57,10 @@ func (c Config) Apply(cfg Config) Config {
 	if cfg.Addr.Valid {
 		c.Addr = cfg.Addr
 	}
-	if cfg.Username.Valid && cfg.Username.String != "" {
+	if cfg.Username.Valid {
 		c.Username = cfg.Username
 	}
-	if cfg.Password.Valid && cfg.Password.String != "" {
+	if cfg.Password.Valid {
 		c.Password = cfg.Password
 	}
 	if cfg.Insecure.Valid {
@@ -104,11 +104,17 @@ func ParseArg(arg string) (Config, error) {
 func ParseMap(m map[string]interface{}) (Config, error) {
 	c := Config{}
 	if v, ok := m["tagsAsFields"].(string); ok {
-		m["tagsAsFields"] = []null.String{null.StringFrom(v)}
+		m["tagsAsFields"] = []string{v}
 	}
-	pp.Println("===========>", m)
-	err := mapstructure.Decode(m, &c)
-	pp.Println(c)
+	dec, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		DecodeHook: lib.NullDecoder,
+		Result:     &c,
+	})
+	if err != nil {
+		return c, err
+	}
+
+	err = dec.Decode(m)
 	return c, err
 }
 

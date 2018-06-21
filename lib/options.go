@@ -24,6 +24,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"net"
+	"reflect"
 
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
@@ -352,4 +353,23 @@ func (o Options) Apply(opts Options) Options {
 		o.RunTags = opts.RunTags
 	}
 	return o
+}
+
+func NullDecoder(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
+	switch f.String() {
+	case "string":
+		return null.StringFrom(data.(string)), nil
+	case "bool":
+		return null.BoolFrom(data.(bool)), nil
+	case "int32":
+		return null.IntFrom(data.(int64)), nil
+	case "int64":
+		return null.IntFrom(data.(int64)), nil
+	case "float32":
+		return null.FloatFrom(data.(float64)), nil
+	case "float64":
+		return null.FloatFrom(data.(float64)), nil
+	}
+
+	return data, nil
 }
