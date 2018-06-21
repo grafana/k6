@@ -22,16 +22,21 @@ package local
 
 import (
 	"context"
+	"net"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/loadimpact/k6/lib/netext"
+
+	"github.com/loadimpact/k6/js"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 	"github.com/pkg/errors"
 	logtest "github.com/sirupsen/logrus/hooks/test"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	null "gopkg.in/guregu/null.v3"
@@ -423,4 +428,157 @@ func TestExecutorSetVUs(t *testing.T) {
 			})
 		})
 	})
+}
+
+func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
+	t.Parallel()
+	script := []byte(`
+	import { Counter } from "k6/metrics";
+	import { sleep } from "k6";
+
+	var counter = new Counter("test_counter");
+
+	export function setup() {
+		console.log("setup(), sleeping for 1 second");
+		counter.add(1, { place: "setupBeforeSleep" });
+		sleep(1);
+		console.log("setup sleep is done");
+		counter.add(2, { place: "setupAfterSleep" });
+		return { "some": ["data"], "v": 1 };
+	}
+
+	export function teardown(data) {
+		console.log("teardown(" + JSON.stringify(data) + "), sleeping for 1 second");
+		counter.add(3, { place: "teardownBeforeSleep" });
+		sleep(1);
+		if (!data || data.v != 1) {
+			throw new Error("incorrect data: " + JSON.stringify(data));
+		}
+		console.log("teardown sleep is done");
+		counter.add(4, { place: "teardownAfterSleep" });
+	}
+
+	export default function (data) {
+		console.log("default(" + JSON.stringify(data) + ") with ENV=" + JSON.stringify(__ENV) + " for in ITER " + __ITER + " and VU " + __VU);
+		counter.add(5, { place: "defaultBeforeSleep" });
+		if (!data || data.v != 1) {
+			throw new Error("incorrect data: " + JSON.stringify(data));
+		}
+		sleep(1);
+		console.log("default() for in ITER " + __ITER + " and VU " + __VU + " done!");
+		counter.add(6, { place: "defaultAfterSleep" });
+	}`)
+
+	runner, err := js.New(
+		&lib.SourceData{Filename: "/script.js", Data: script},
+		afero.NewMemMapFs(),
+		lib.RuntimeOptions{},
+	)
+	require.NoError(t, err)
+
+	options := lib.Options{
+		SystemTags:      lib.GetTagSet(lib.DefaultSystemTagList...),
+		SetupTimeout:    types.NullDurationFrom(4 * time.Second),
+		TeardownTimeout: types.NullDurationFrom(4 * time.Second),
+	}
+	runner.SetOptions(options)
+
+	executor := New(runner)
+	executor.SetEndIterations(null.IntFrom(2))
+	executor.SetVUsMax(1)
+	executor.SetVUs(1)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan struct{})
+	sampleContainers := make(chan stats.SampleContainer)
+	go func() {
+		assert.NoError(t, executor.Run(ctx, sampleContainers))
+		close(done)
+	}()
+
+	expectIn := func(from, to time.Duration, expected stats.SampleContainer) {
+		start := time.Now()
+		from = from * time.Millisecond
+		to = to * time.Millisecond
+		for {
+			select {
+			case sampleContainer := <-sampleContainers:
+				now := time.Now()
+				elapsed := now.Sub(start)
+				if elapsed < from {
+					t.Errorf("Received sample earlier (%s) than expected (%s)", elapsed, from)
+					return
+				}
+				assert.IsType(t, expected, sampleContainer)
+				expSamples := expected.GetSamples()
+				gotSamples := sampleContainer.GetSamples()
+				if assert.Len(t, gotSamples, len(expSamples)) {
+					for i, s := range gotSamples {
+						expS := expSamples[i]
+						if s.Metric != metrics.IterationDuration {
+							assert.Equal(t, expS.Value, s.Value)
+						}
+						assert.Equal(t, expS.Metric.Name, s.Metric.Name)
+						assert.Equal(t, expS.Tags.CloneTags(), s.Tags.CloneTags())
+						assert.InDelta(t, 0, now.Sub(s.Time), float64(50*time.Millisecond))
+					}
+				}
+				return
+			case <-time.After(to):
+				t.Errorf("Did not receive sample in the maximum alotted time (%s)", to)
+				return
+			}
+		}
+	}
+
+	getTags := func(args ...string) *stats.SampleTags {
+		tags := map[string]string{}
+		for i := 0; i < len(args)-1; i += 2 {
+			tags[args[i]] = args[i+1]
+		}
+		return stats.IntoSampleTags(&tags)
+	}
+	testCounter := stats.New("test_counter", stats.Counter)
+	getSample := func(expValue float64, expMetric *stats.Metric, expTags ...string) stats.SampleContainer {
+		return stats.Sample{
+			Metric: expMetric,
+			Time:   time.Now(),
+			Tags:   getTags(expTags...),
+			Value:  expValue,
+		}
+	}
+	getDummyTrail := func(group string) stats.SampleContainer {
+		return netext.NewDialer(net.Dialer{}).GetTrail(time.Now(), time.Now(), getTags("group", group))
+	}
+
+	// Initially give a long time (5s) for the executor to start
+	expectIn(0, 5000, getSample(1, testCounter, "group", "::setup", "place", "setupBeforeSleep"))
+	expectIn(900, 1100, getSample(2, testCounter, "group", "::setup", "place", "setupAfterSleep"))
+	expectIn(0, 100, getDummyTrail("::setup"))
+
+	expectIn(0, 100, getSample(5, testCounter, "group", "", "place", "defaultBeforeSleep"))
+	expectIn(900, 1100, getSample(6, testCounter, "group", "", "place", "defaultAfterSleep"))
+	expectIn(0, 100, getDummyTrail(""))
+	expectIn(0, 100, getSample(1, metrics.Iterations))
+
+	expectIn(0, 100, getSample(5, testCounter, "group", "", "place", "defaultBeforeSleep"))
+	expectIn(900, 1100, getSample(6, testCounter, "group", "", "place", "defaultAfterSleep"))
+	expectIn(0, 100, getDummyTrail(""))
+	expectIn(0, 100, getSample(1, metrics.Iterations))
+
+	expectIn(0, 1000, getSample(3, testCounter, "group", "::teardown", "place", "teardownBeforeSleep"))
+	expectIn(900, 1100, getSample(4, testCounter, "group", "::teardown", "place", "teardownAfterSleep"))
+	expectIn(0, 100, getDummyTrail("::teardown"))
+
+	for {
+		select {
+		case s := <-sampleContainers:
+			t.Fatalf("Did not expect anything in the sample channel bug got %#v", s)
+		case <-time.After(3 * time.Second):
+			t.Fatalf("Local executor took way to long to finish")
+		case <-done:
+			return // Exit normally
+		}
+	}
 }
