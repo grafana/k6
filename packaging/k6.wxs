@@ -42,5 +42,6 @@
         <UIRef Id="WixUI_ErrorProgressText" />
         <WixVariable Id="WixUIBannerBmp" Value="thin-white-stripe.jpg"/>
         <WixVariable Id="WixUIDialogBmp" Value="full-white-stripe.jpg"/>
+        <WixVariable Id="WixUILicenseRtf" Value="LICENSE.rtf"/>
     </Product>
 </Wix>

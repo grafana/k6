@@ -1,15 +1,16 @@
 image: Visual Studio 2017
 clone_folder: 'c:\gopath\src\github.com\%APPVEYOR_REPO_NAME%'
 
-branches:
-  only:
-    - /^v\d+\.\d+\.\d+$/
+# branches:
+#   only:
+#     - /^v\d+\.\d+\.\d+$/
 
 environment:
   # improve readability
   VCS_URL: 'https://github.com/%APPVEYOR_REPO_NAME%'
   # specific to go
-  VERSION: "%APPVEYOR_REPO_TAG_NAME:v=%"
+  # VERSION: "%APPVEYOR_REPO_TAG_NAME:v=%"
+  VERSION: 0.99.9
   GOPATH: c:\gopath
   BINTRAY_KEY:
     secure: /0S6SdBwfiuWEdY4SKJcZpxEV+QpsfJfqx3QqYbnK8vwmB2KMGqerGzQRnIrkbGD
@@ -18,7 +19,7 @@ environment:
 
 # prepare system and project
 install:
-  - choco install wixtoolset -y
+  - choco install wixtoolset pandoc -y
   - refreshenv
   # ensure wix is available in PATH
   - set PATH=%WIX%\bin;%PATH%
@@ -27,6 +28,7 @@ install:
 
 # build msi artifacts
 build_script:
+  - pandoc -s -f markdown -t rtf -o packaging\LICENSE.rtf LICENSE.md
   - CGO_ENABLED=0 GOARCH=amd64 go build -a -ldflags '-s -w' -o packaging\k6.exe
   - cd packaging
   - candle.exe -arch x64 -dVERSION=%VERSION% k6.wxs
