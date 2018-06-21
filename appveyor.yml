@@ -37,6 +37,8 @@ build_script:
   - light.exe -ext WixUIExtension k6.wixobj
 
 deploy_script:
+  # Publishing the msi
+  - 'curl -H "X-GPG-PASSPHRASE: %GPG_PASSPHRASE%" -T k6.msi "https://%BINTRAY_USER%:%BINTRAY_KEY%@api.bintray.com/content/loadimpact/windows/k6/%VERSION%/k6-v%VERSION%-amd64.msi?publish=1&override=1"'
   - ps: |
       # Create Chocolately Package
       mkdir .\k6.portable
@@ -47,8 +49,5 @@ deploy_script:
       Set-Location -Path .\k6.portable\
       (Get-Content '.\k6.portable.nuspec' -Raw).Replace("<version>__REPLACE__</version>", "<version>$($env:VERSION)</version>") | Out-File '.\k6.portable.nuspec'
       choco pack
-
-  # Publishing the msi
-  - 'curl -H "X-GPG-PASSPHRASE: %GPG_PASSPHRASE%" -T k6.msi "https://%BINTRAY_USER%:%BINTRAY_KEY%@api.bintray.com/content/loadimpact/windows/k6/%VERSION%/k6-v%VERSION%-amd64.msi?publish=1&override=1"'
   # Publising the chocolatey package
   - 'curl -H "X-GPG-PASSPHRASE: %GPG_PASSPHRASE%" -T .\k6.portable.%VERSION%.nupkg "https://%BINTRAY_USER%:%BINTRAY_KEY%@api.bintray.com/content/loadimpact/choco/k6.portable/%VERSION%/k6.portable.%VERSION%.nupkg?publish=1&override=1"'
