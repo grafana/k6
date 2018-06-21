@@ -45,7 +45,7 @@ func TestConfigParseArg(t *testing.T) {
 
 	c, err = ParseArg("brokers={broker2,broker3:9092},topic=someTopic,format=influxdb,influxdb.tagsAsFields=fake")
 	expInfluxConfig = influxdb.Config{
-		TagsAsFields: []null.String{null.StringFrom("fake")},
+		TagsAsFields: []string{"fake"},
 	}
 	assert.Nil(t, err)
 	assert.Equal(t, []string{"broker2", "broker3:9092"}, c.Brokers)
@@ -55,7 +55,7 @@ func TestConfigParseArg(t *testing.T) {
 
 	c, err = ParseArg("brokers={broker2,broker3:9092},topic=someTopic,format=influxdb,influxdb.tagsAsFields={fake,anotherFake}")
 	expInfluxConfig = influxdb.Config{
-		TagsAsFields: []null.String{null.StringFrom("fake"), null.StringFrom("anotherFake")},
+		TagsAsFields: []string{"fake", "anotherFake"},
 	}
 	assert.Nil(t, err)
 	assert.Equal(t, []string{"broker2", "broker3:9092"}, c.Brokers)

@@ -41,15 +41,15 @@ type Config struct {
 	PayloadSize null.Int    `json:"payloadSize,omitempty" envconfig:"INFLUXDB_PAYLOAD_SIZE"`
 
 	// Samples.
-	DB           null.String   `json:"db" envconfig:"INFLUXDB_DB"`
-	Precision    null.String   `json:"precision,omitempty" envconfig:"INFLUXDB_PRECISION"`
-	Retention    null.String   `json:"retention,omitempty" envconfig:"INFLUXDB_RETENTION"`
-	Consistency  null.String   `json:"consistency,omitempty" envconfig:"INFLUXDB_CONSISTENCY"`
-	TagsAsFields []null.String `json:"tagsAsFields,omitempty" envconfig:"INFLUXDB_TAGS_AS_FIELDS"`
+	DB           null.String `json:"db" envconfig:"INFLUXDB_DB"`
+	Precision    null.String `json:"precision,omitempty" envconfig:"INFLUXDB_PRECISION"`
+	Retention    null.String `json:"retention,omitempty" envconfig:"INFLUXDB_RETENTION"`
+	Consistency  null.String `json:"consistency,omitempty" envconfig:"INFLUXDB_CONSISTENCY"`
+	TagsAsFields []string    `json:"tagsAsFields,omitempty" envconfig:"INFLUXDB_TAGS_AS_FIELDS"`
 }
 
 func NewConfig() *Config {
-	c := &Config{TagsAsFields: []null.String{null.StringFrom("vu"), null.StringFrom("iter"), null.StringFrom("url")}}
+	c := &Config{TagsAsFields: []string{"vu", "iter", "url"}}
 	return c
 }
 
@@ -158,9 +158,7 @@ func ParseURL(text string) (Config, error) {
 		case "consistency":
 			c.Consistency = null.StringFrom(vs[0])
 		case "tagsAsFields":
-			for _, t := range vs {
-				c.TagsAsFields = append(c.TagsAsFields, null.StringFrom(t))
-			}
+			c.TagsAsFields = vs
 		default:
 			return c, errors.Errorf("unknown query parameter: %s", k)
 		}

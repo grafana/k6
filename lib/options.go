@@ -356,18 +356,14 @@ func (o Options) Apply(opts Options) Options {
 }
 
 func NullDecoder(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
-	switch f.String() {
-	case "string":
+	switch t.String() {
+	case "null.String":
 		return null.StringFrom(data.(string)), nil
-	case "bool":
+	case "null.Bool":
 		return null.BoolFrom(data.(bool)), nil
-	case "int32":
+	case "null.Int":
 		return null.IntFrom(data.(int64)), nil
-	case "int64":
-		return null.IntFrom(data.(int64)), nil
-	case "float32":
-		return null.FloatFrom(data.(float64)), nil
-	case "float64":
+	case "null.Float":
 		return null.FloatFrom(data.(float64)), nil
 	}
 

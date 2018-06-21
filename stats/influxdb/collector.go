@@ -121,9 +121,9 @@ func (c *Collector) commit() {
 
 func (c *Collector) extractTagsToValues(tags map[string]string, values map[string]interface{}) map[string]interface{} {
 	for _, tag := range c.Config.TagsAsFields {
-		if val, ok := tags[tag.String]; ok {
-			values[tag.String] = val
-			delete(tags, tag.String)
+		if val, ok := tags[tag]; ok {
+			values[tag] = val
+			delete(tags, tag)
 		}
 	}
 	return values
