@@ -3,6 +3,7 @@
 /dist
 /js/node_modules
 /docs
+/pkg-build
 
 /debug
 test.debug

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>k6.portable</id>
+    <title>k6 (Portable)</title>
+    <version>__REPLACE__</version>
+    <authors>Load Impact</authors>
+    <owners>Load Impact</owners>
+    <summary>Load testing for the 21st century</summary>
+    <description>
+        k6 is a developer centric open source load testing tool for testing the performance of your backend infrastructure. It’s built with Go and JavaScript to integrate well into your development workflow, so you can stay on top of performance without fuzz.
+    </description>
+    <projectUrl>https://k6.io</projectUrl>
+    <packageSourceUrl>https://github.com/loadimpact/k6</packageSourceUrl>
+    <projectSourceUrl>https://github.com/loadimpact/k6</projectSourceUrl>
+    <tags></tags>
+    <copyright></copyright>
+    <licenseUrl>https://github.com/loadimpact/k6/blob/master/LICENSE.md</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+  </metadata>
+</package>
