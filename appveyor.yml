@@ -31,7 +31,7 @@ install:
 # build msi artifacts
 build_script:
   - pandoc -s -f markdown -t rtf -o packaging\LICENSE.rtf LICENSE.md
-  - go build -a -ldflags '-s -w' -o packaging\k6.exe
+  - go build -a -ldflags "-s -w" -o packaging\k6.exe
   - cd packaging
   - candle.exe -arch x64 -dVERSION=%VERSION% k6.wxs
   - light.exe -ext WixUIExtension k6.wixobj
