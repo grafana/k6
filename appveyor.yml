@@ -12,6 +12,8 @@ environment:
   # VERSION: "%APPVEYOR_REPO_TAG_NAME:v=%"
   VERSION: 0.99.9
   GOPATH: c:\gopath
+  CGO_ENABLED: '0'
+  GOARCH: amd64
   BINTRAY_KEY:
     secure: /0S6SdBwfiuWEdY4SKJcZpxEV+QpsfJfqx3QqYbnK8vwmB2KMGqerGzQRnIrkbGD
   GPG_PASSPHRASE:
@@ -29,7 +31,7 @@ install:
 # build msi artifacts
 build_script:
   - pandoc -s -f markdown -t rtf -o packaging\LICENSE.rtf LICENSE.md
-  - CGO_ENABLED=0 GOARCH=amd64 go build -a -ldflags '-s -w' -o packaging\k6.exe
+  - go build -a -ldflags '-s -w' -o packaging\k6.exe
   - cd packaging
   - candle.exe -arch x64 -dVERSION=%VERSION% k6.wxs
   - light.exe -ext WixUIExtension k6.wixobj
