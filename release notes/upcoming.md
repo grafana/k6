@@ -1,6 +1,17 @@
 TODO: Intro
 
 ## New Features!
+* New JS API to set seed for PRNG. Now, you are able to set a seed to get reproducible (pseudo-)random numbers. (#677)
+
+```js
+import {randomSeed} from "k6";
+
+randomSeed(123456789);
+let rnd = Math.random();
+console.log(rnd)
+```
+
+* New option `--no-vu-connection-reuse` that let's users close the connections between iterations of a VU. (#676)
 
 ### Category: Title (#533)
 
@@ -24,3 +35,7 @@ Previously most metrics were emitted only when a script iteration ended. With th
 ## Bugs fixed!
 
 * Metrics emitted by `setup()` and `teardown()` are not discarded anymore. They are emitted and have the implicit root `group` tag values of `setup` and `teardown` respectively (#678)
+
+
+## Breaking Changes
+* The `--no-connection-reuse` option has been re-purposed and now disables keep-alive connections globally. The newly added `--no-vu-connection-reuse` option does what was previously done by `--no-connection-reuse` - it closes any open connections between iterations of a VU, but allows for reusing them inside of a single iteration. (#676)

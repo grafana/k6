@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+    <Product Id="*" UpgradeCode="8C5F9495-F697-4780-ABFD-90DCC2F681B6" Version="$(var.VERSION)" Language="1033" Name="k6" Manufacturer="Load Impact AB">
+        <Package InstallerVersion="300" Compressed="yes"/>
+        <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="A later version of [ProductName] is already installed. Setup will now exit."/>
+
+        <Icon Id="k6Icon" SourceFile="k6.ico"/>
+        <Property Id="ARPPRODUCTICON" Value="k6Icon"/>
+
+        <Media Id="1" Cabinet="k6.cab" EmbedCab="yes" />
+
+        <!-- Step 1: Define the directory structure -->
+        <Directory Id="TARGETDIR" Name="SourceDir">
+            <Directory Id="ProgramFiles64Folder">
+                <Directory Id="INSTALLDIR" Name="k6"/>
+            </Directory>
+        </Directory>
+
+        <!-- Step 2: Add files to your installer package -->
+        <DirectoryRef Id="INSTALLDIR">
+            <Component Id="k6.exe" Guid="*">
+                <File Id="k6.exe" Source="k6.exe" KeyPath="yes" />
+            </Component>
+            <Component Id="PathEnv" Guid="2DFDBB7D-292E-462c-A3E3-2FA14FFCD05D" >
+              <Environment Id="Path" Name="PATH" Value="[INSTALLDIR]" Permanent="no" Part="last" Action="set" System="yes" Separator=";" />
+              <CreateFolder />
+            </Component>
+        </DirectoryRef>
+
+        <!-- Step 3: Tell WiX to install the files -->
+        <Feature Id="MainApplication" Title="Main Application" Level="1">
+            <ComponentRef Id="k6.exe" />
+            <ComponentRef Id="PathEnv" />
+        </Feature>
+
+         <UI Id="k6InstallUI">
+            <Property Id="WIXUI_INSTALLDIR" Value="INSTALLDIR" />
+            <Property Id="WIXUI_EXITDIALOGOPTIONALTEXT" Value="k6 has been successfully installed." />
+         </UI>
+
+        <UIRef Id="WixUI_InstallDir" />
+        <UIRef Id="WixUI_ErrorProgressText" />
+        <WixVariable Id="WixUIBannerBmp" Value="thin-white-stripe.jpg"/>
+        <WixVariable Id="WixUIDialogBmp" Value="full-white-stripe.jpg"/>
+        <WixVariable Id="WixUILicenseRtf" Value="LICENSE.rtf"/>
+    </Product>
+</Wix>

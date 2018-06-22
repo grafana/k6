@@ -557,7 +557,7 @@ func TestSentReceivedMetrics(t *testing.T) {
 			VUsMax:     null.IntFrom(tc.VUs),
 			Hosts:      tb.Dialer.Hosts,
 			InsecureSkipTLSVerify: null.BoolFrom(true),
-			NoConnectionReuse:     null.BoolFrom(noConnReuse),
+			NoVUConnectionReuse:   null.BoolFrom(noConnReuse),
 		}
 
 		r.SetOptions(options)
