@@ -526,7 +526,7 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 				}
 				return
 			case <-time.After(to):
-				t.Errorf("Did not receive sample in the maximum alotted time (%s)", to)
+				t.Errorf("Did not receive sample in the maximum allotted time (%s)", to)
 				return
 			}
 		}
