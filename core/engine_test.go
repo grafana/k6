@@ -749,3 +749,70 @@ func TestRunTags(t *testing.T) {
 		}
 	}
 }
+
+func TestSetupTeardownThresholds(t *testing.T) {
+	t.Parallel()
+	tb := testutils.NewHTTPMultiBin(t)
+	defer tb.Cleanup()
+
+	script := []byte(tb.Replacer.Replace(`
+		import http from "k6/http";
+		import { check } from "k6";
+		import { Counter } from "k6/metrics";
+
+		let statusCheck = { "status is 200": (r) => r.status === 200 }
+		let myCounter = new Counter("setup_teardown");
+
+		export let options = {
+			iterations: 5,
+			thresholds: {
+				"setup_teardown": ["count == 2"],
+				"iterations": ["count == 5"],
+				"http_reqs": ["count == 7"],
+			},
+		};
+
+		export function setup() {
+			check(http.get("HTTPBIN_IP_URL"), statusCheck) && myCounter.add(1);
+		};
+
+		export default function () {
+			check(http.get("HTTPBIN_IP_URL"), statusCheck);
+		};
+
+		export function teardown() {
+			check(http.get("HTTPBIN_IP_URL"), statusCheck) && myCounter.add(1);
+		};
+	`))
+
+	runner, err := js.New(
+		&lib.SourceData{Filename: "/script.js", Data: script},
+		afero.NewMemMapFs(),
+		lib.RuntimeOptions{},
+	)
+	require.NoError(t, err)
+	runner.SetOptions(runner.GetOptions().Apply(lib.Options{
+		SystemTags:      lib.GetTagSet(lib.DefaultSystemTagList...),
+		SetupTimeout:    types.NullDurationFrom(3 * time.Second),
+		TeardownTimeout: types.NullDurationFrom(3 * time.Second),
+		VUs:             null.IntFrom(3),
+		VUsMax:          null.IntFrom(3),
+	}))
+
+	engine, err := NewEngine(local.New(runner), runner.GetOptions())
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	errC := make(chan error)
+	go func() { errC <- engine.Run(ctx) }()
+
+	select {
+	case <-time.After(10 * time.Second):
+		cancel()
+		t.Fatal("Test timed out")
+	case err := <-errC:
+		cancel()
+		require.NoError(t, err)
+		require.False(t, engine.IsTainted())
+	}
+}
