@@ -26,7 +26,7 @@ import (
 	"strings"
 
 	"github.com/kubernetes/helm/pkg/strvals"
-	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/types"
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	null "gopkg.in/guregu/null.v3"
@@ -107,7 +107,7 @@ func ParseMap(m map[string]interface{}) (Config, error) {
 		m["tagsAsFields"] = []string{v}
 	}
 	dec, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-		DecodeHook: lib.NullDecoder,
+		DecodeHook: types.NullDecoder,
 		Result:     &c,
 	})
 	if err != nil {
