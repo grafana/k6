@@ -59,7 +59,8 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.String("http-debug", "", "log all HTTP requests and responses. Excludes body by default. To include body use '---http-debug=full'")
 	flags.Lookup("http-debug").NoOptDefVal = "headers"
 	flags.Bool("insecure-skip-tls-verify", false, "skip verification of TLS certificates")
-	flags.Bool("no-connection-reuse", false, "don't reuse connections between iterations")
+	flags.Bool("no-connection-reuse", false, "disable keep-alive connections")
+	flags.Bool("no-vu-connection-reuse", false, "don't reuse connections between iterations")
 	flags.BoolP("throw", "w", false, "throw warnings (like failed http requests) as errors")
 	flags.StringSlice("blacklist-ip", nil, "blacklist an `ip range` from being called")
 	flags.StringSlice("summary-trend-stats", nil, "define `stats` for trend metrics (response times), one or more as 'avg,p(95),...'")
@@ -83,6 +84,7 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		HttpDebug:             getNullString(flags, "http-debug"),
 		InsecureSkipTLSVerify: getNullBool(flags, "insecure-skip-tls-verify"),
 		NoConnectionReuse:     getNullBool(flags, "no-connection-reuse"),
+		NoVUConnectionReuse:   getNullBool(flags, "no-vu-connection-reuse"),
 		Throw:                 getNullBool(flags, "throw"),
 
 		// Default values for options without CLI flags:

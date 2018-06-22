@@ -1,0 +1,52 @@
+image: Visual Studio 2017
+clone_folder: 'c:\gopath\src\github.com\%APPVEYOR_REPO_NAME%'
+
+branches:
+  only:
+    - /^v\d+\.\d+\.\d+$/
+
+environment:
+  # improve readability
+  VCS_URL: 'https://github.com/%APPVEYOR_REPO_NAME%'
+  # specific to go
+  VERSION: "%APPVEYOR_REPO_TAG_NAME:v=%"
+  GOPATH: c:\gopath
+  CGO_ENABLED: '0'
+  GOARCH: amd64
+  BINTRAY_KEY:
+    secure: /0S6SdBwfiuWEdY4SKJcZpxEV+QpsfJfqx3QqYbnK8vwmB2KMGqerGzQRnIrkbGD
+  GPG_PASSPHRASE:
+    secure: CMQ+U+qVVdhIr1Eip5nGPbaGFggVvSjg/BpSY0EpLbQ=
+
+# prepare system and project
+install:
+  - choco install wixtoolset pandoc -y
+  - refreshenv
+  # ensure wix is available in PATH
+  - set PATH=%WIX%\bin;%PATH%
+  # specific to go
+  - set PATH=%GOPATH%\bin;%PATH%
+
+# build msi artifacts
+build_script:
+  - pandoc -s -f markdown -t rtf -o packaging\LICENSE.rtf LICENSE.md
+  - go build -a -ldflags "-s -w" -o packaging\k6.exe
+  - cd packaging
+  - candle.exe -arch x64 -dVERSION=%VERSION% k6.wxs
+  - light.exe -ext WixUIExtension k6.wixobj
+
+deploy_script:
+  # Publishing the msi
+  - 'curl -H "X-GPG-PASSPHRASE: %GPG_PASSPHRASE%" -T k6.msi "https://%BINTRAY_USER%:%BINTRAY_KEY%@api.bintray.com/content/loadimpact/windows/k6/%VERSION%/k6-v%VERSION%-amd64.msi?publish=1&override=1"'
+  - ps: |
+      # Create Chocolately Package
+      mkdir .\k6.portable
+
+      Copy-Item -Path .\k6.portable.nuspec -Destination .\k6.portable\k6.portable.nuspec
+      Copy-Item -Path .\k6.exe -Destination .\k6.portable\k6.exe
+
+      Set-Location -Path .\k6.portable\
+      (Get-Content '.\k6.portable.nuspec' -Raw).Replace("<version>__REPLACE__</version>", "<version>$($env:VERSION)</version>") | Out-File '.\k6.portable.nuspec'
+      choco pack
+  # Publising the chocolatey package
+  - 'curl -H "X-GPG-PASSPHRASE: %GPG_PASSPHRASE%" -T .\k6.portable.%VERSION%.nupkg "https://%BINTRAY_USER%:%BINTRAY_KEY%@api.bintray.com/content/loadimpact/choco/k6.portable/%VERSION%/k6.portable.%VERSION%.nupkg?publish=1&override=1"'

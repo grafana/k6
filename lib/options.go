@@ -234,10 +234,13 @@ type Options struct {
 	// Hosts overrides dns entries for given hosts
 	Hosts map[string]net.IP `json:"hosts" envconfig:"hosts"`
 
+	// Disable keep-alive connections
+	NoConnectionReuse null.Bool `json:"noConnectionReuse" envconfig:"no_connection_reuse"`
+
 	// Do not reuse connections between VU iterations. This gives more realistic results (depending
 	// on what you're looking for), but you need to raise various kernel limits or you'll get
 	// errors about running out of file handles or sockets, or being unable to bind addresses.
-	NoConnectionReuse null.Bool `json:"noConnectionReuse" envconfig:"no_connection_reuse"`
+	NoVUConnectionReuse null.Bool `json:"noVUConnectionReuse" envconfig:"no_vu_connection_reuse"`
 
 	// These values are for third party collectors' benefit.
 	// Can't be set through env vars.
@@ -338,6 +341,9 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.NoConnectionReuse.Valid {
 		o.NoConnectionReuse = opts.NoConnectionReuse
+	}
+	if opts.NoVUConnectionReuse.Valid {
+		o.NoVUConnectionReuse = opts.NoVUConnectionReuse
 	}
 	if opts.External != nil {
 		o.External = opts.External
