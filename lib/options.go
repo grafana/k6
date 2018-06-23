@@ -187,80 +187,80 @@ type Options struct {
 
 	// Initial values for VUs, max VUs, duration cap, iteration cap, and stages.
 	// See the Runner or Executor interfaces for more information.
-	VUs        null.Int           `json:"vus" envconfig:"vus"`
-	VUsMax     null.Int           `json:"vusMax" envconfig:"vus_max"`
-	Duration   types.NullDuration `json:"duration" envconfig:"duration"`
-	Iterations null.Int           `json:"iterations" envconfig:"iterations"`
-	Stages     []Stage            `json:"stages" envconfig:"stages"`
+	VUs        null.Int           `json:"vus" envconfig:"vus" js:"vus"`
+	VUsMax     null.Int           `json:"vusMax" envconfig:"vus_max" js:"vusMax"`
+	Duration   types.NullDuration `json:"duration" envconfig:"duration" js:"duration"`
+	Iterations null.Int           `json:"iterations" envconfig:"iterations" js:"iterations"`
+	Stages     []Stage            `json:"stages" envconfig:"stages" js:"stages"`
 
 	// Timeouts for the setup() and teardown() functions
-	SetupTimeout    types.NullDuration `json:"setupTimeout" envconfig:"setup_timeout"`
-	TeardownTimeout types.NullDuration `json:"teardownTimeout" envconfig:"teardown_timeout"`
+	SetupTimeout    types.NullDuration `json:"setupTimeout" envconfig:"setup_timeout" js:"setupTimeout"`
+	TeardownTimeout types.NullDuration `json:"teardownTimeout" envconfig:"teardown_timeout" js:"teardownTimeout"`
 
 	// Limit HTTP requests per second.
-	RPS null.Int `json:"rps" envconfig:"rps"`
+	RPS null.Int `json:"rps" envconfig:"rps" js:"rps"`
 
 	// How many HTTP redirects do we follow?
-	MaxRedirects null.Int `json:"maxRedirects" envconfig:"max_redirects"`
+	MaxRedirects null.Int `json:"maxRedirects" envconfig:"max_redirects" js:"maxRedirects"`
 
 	// Default User Agent string for HTTP requests.
-	UserAgent null.String `json:"userAgent" envconfig:"user_agent"`
+	UserAgent null.String `json:"userAgent" envconfig:"user_agent" js:"userAgent"`
 
 	// How many batch requests are allowed in parallel, in total and per host?
-	Batch        null.Int `json:"batch" envconfig:"batch"`
-	BatchPerHost null.Int `json:"batchPerHost" envconfig:"batch_per_host"`
+	Batch        null.Int `json:"batch" envconfig:"batch" js:"batch"`
+	BatchPerHost null.Int `json:"batchPerHost" envconfig:"batch_per_host" js:"batchPerHost"`
 
 	// Should all HTTP requests and responses be logged (excluding body)?
-	HttpDebug null.String `json:"httpDebug" envconfig:"http_debug"`
+	HttpDebug null.String `json:"httpDebug" envconfig:"http_debug" js:"httpDebug"`
 
 	// Accept invalid or untrusted TLS certificates.
-	InsecureSkipTLSVerify null.Bool `json:"insecureSkipTLSVerify" envconfig:"insecure_skip_tls_verify"`
+	InsecureSkipTLSVerify null.Bool `json:"insecureSkipTLSVerify" envconfig:"insecure_skip_tls_verify" js:"insecureSkipTLSVerify"`
 
 	// Specify TLS versions and cipher suites, and present client certificates.
-	TLSCipherSuites *TLSCipherSuites `json:"tlsCipherSuites" envconfig:"tls_cipher_suites"`
-	TLSVersion      *TLSVersions     `json:"tlsVersion" envconfig:"tls_version"`
-	TLSAuth         []*TLSAuth       `json:"tlsAuth" envconfig:"tlsauth"`
+	TLSCipherSuites *TLSCipherSuites `json:"tlsCipherSuites" envconfig:"tls_cipher_suites" js:"tlsCipherSuites"`
+	TLSVersion      *TLSVersions     `json:"tlsVersion" envconfig:"tls_version" js:"tlsVersion"`
+	TLSAuth         []*TLSAuth       `json:"tlsAuth" envconfig:"tlsauth" js:"tlsAuth"`
 
 	// Throw warnings (eg. failed HTTP requests) as errors instead of simply logging them.
-	Throw null.Bool `json:"throw" envconfig:"throw"`
+	Throw null.Bool `json:"throw" envconfig:"throw" js:"throw"`
 
 	// Define thresholds; these take the form of 'metric=["snippet1", "snippet2"]'.
 	// To create a threshold on a derived metric based on tag queries ("submetrics"), create a
 	// metric on a nonexistent metric named 'real_metric{tagA:valueA,tagB:valueB}'.
-	Thresholds map[string]stats.Thresholds `json:"thresholds" envconfig:"thresholds"`
+	Thresholds map[string]stats.Thresholds `json:"thresholds" envconfig:"thresholds" js:"thresholds"`
 
 	// Blacklist IP ranges that tests may not contact. Mainly useful in hosted setups.
-	BlacklistIPs []*net.IPNet `json:"blacklistIPs" envconfig:"blacklist_ips"`
+	BlacklistIPs []*net.IPNet `json:"blacklistIPs" envconfig:"blacklist_ips" js:"blacklistIPs"`
 
 	// Hosts overrides dns entries for given hosts
-	Hosts map[string]net.IP `json:"hosts" envconfig:"hosts"`
+	Hosts map[string]net.IP `json:"hosts" envconfig:"hosts" js:"hosts"`
 
 	// Disable keep-alive connections
-	NoConnectionReuse null.Bool `json:"noConnectionReuse" envconfig:"no_connection_reuse"`
+	NoConnectionReuse null.Bool `json:"noConnectionReuse" envconfig:"no_connection_reuse" js:"noConnectionReuse"`
 
 	// Do not reuse connections between VU iterations. This gives more realistic results (depending
 	// on what you're looking for), but you need to raise various kernel limits or you'll get
 	// errors about running out of file handles or sockets, or being unable to bind addresses.
-	NoVUConnectionReuse null.Bool `json:"noVUConnectionReuse" envconfig:"no_vu_connection_reuse"`
+	NoVUConnectionReuse null.Bool `json:"noVUConnectionReuse" envconfig:"no_vu_connection_reuse" js:"noVUConnectionReuse"`
 
 	// These values are for third party collectors' benefit.
 	// Can't be set through env vars.
-	External map[string]json.RawMessage `json:"ext" ignored:"true"`
+	External map[string]json.RawMessage `json:"ext" ignored:"true" js:"ext"`
 
 	// Summary trend stats for trend metrics (response times) in CLI output
-	SummaryTrendStats []string `json:"summaryTrendStats" envconfig:"summary_trend_stats"`
+	SummaryTrendStats []string `json:"summaryTrendStats" envconfig:"summary_trend_stats" js:"summaryTrendStats"`
 
 	// Summary time unit for summary metrics (response times) in CLI output
-	SummaryTimeUnit null.String `json:"summaryTimeUnit" envconfig:"summary_time_unit"`
+	SummaryTimeUnit null.String `json:"summaryTimeUnit" envconfig:"summary_time_unit" js:"summaryTimeUnit"`
 
 	// Which system tags to include with metrics ("method", "vu" etc.)
-	SystemTags TagSet `json:"systemTags" envconfig:"system_tags"`
+	SystemTags TagSet `json:"systemTags" envconfig:"system_tags" js:"systemTags"`
 
 	// Tags to be applied to all samples for this running
-	RunTags *stats.SampleTags `json:"tags" envconfig:"tags"`
+	RunTags *stats.SampleTags `json:"tags" envconfig:"tags" js:"tags"`
 
 	// Buffer size of the channel for metric samples; 0 means unbuffered
-	MetricSamplesBufferSize null.Int `json:"metricSamplesBufferSize" envconfig:"metric_samples_buffer_size"`
+	MetricSamplesBufferSize null.Int `json:"metricSamplesBufferSize" envconfig:"metric_samples_buffer_size" js:"metricSamplesBufferSize"`
 }
 
 // Returns the result of overwriting any fields with any that are set on the argument.
