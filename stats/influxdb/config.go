@@ -26,58 +26,63 @@ import (
 	"strings"
 
 	"github.com/kubernetes/helm/pkg/strvals"
+	"github.com/loadimpact/k6/lib/types"
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
+	null "gopkg.in/guregu/null.v3"
 )
 
 type Config struct {
 	// Connection.
-	Addr        string `json:"addr" envconfig:"INFLUXDB_ADDR"`
-	Username    string `json:"username,omitempty" envconfig:"INFLUXDB_USERNAME"`
-	Password    string `json:"password,omitempty" envconfig:"INFLUXDB_PASSWORD"`
-	Insecure    bool   `json:"insecure,omitempty" envconfig:"INFLUXDB_INSECURE"`
-	PayloadSize int    `json:"payloadSize,omitempty" envconfig:"INFLUXDB_PAYLOAD_SIZE"`
+	Addr        null.String `json:"addr" envconfig:"INFLUXDB_ADDR"`
+	Username    null.String `json:"username,omitempty" envconfig:"INFLUXDB_USERNAME"`
+	Password    null.String `json:"password,omitempty" envconfig:"INFLUXDB_PASSWORD"`
+	Insecure    null.Bool   `json:"insecure,omitempty" envconfig:"INFLUXDB_INSECURE"`
+	PayloadSize null.Int    `json:"payloadSize,omitempty" envconfig:"INFLUXDB_PAYLOAD_SIZE"`
 
 	// Samples.
-	DB           string   `json:"db" envconfig:"INFLUXDB_DB"`
-	Precision    string   `json:"precision,omitempty" envconfig:"INFLUXDB_PRECISION"`
-	Retention    string   `json:"retention,omitempty" envconfig:"INFLUXDB_RETENTION"`
-	Consistency  string   `json:"consistency,omitempty" envconfig:"INFLUXDB_CONSISTENCY"`
-	TagsAsFields []string `json:"tagsAsFields,omitempty" envconfig:"INFLUXDB_TAGS_AS_FIELDS"`
+	DB           null.String `json:"db" envconfig:"INFLUXDB_DB"`
+	Precision    null.String `json:"precision,omitempty" envconfig:"INFLUXDB_PRECISION"`
+	Retention    null.String `json:"retention,omitempty" envconfig:"INFLUXDB_RETENTION"`
+	Consistency  null.String `json:"consistency,omitempty" envconfig:"INFLUXDB_CONSISTENCY"`
+	TagsAsFields []string    `json:"tagsAsFields,omitempty" envconfig:"INFLUXDB_TAGS_AS_FIELDS"`
 }
 
 func NewConfig() *Config {
-	c := &Config{TagsAsFields: []string{"vu", "iter", "url"}}
+	c := &Config{
+		Addr:         null.NewString("http://localhost:8086", false),
+		DB:           null.NewString("k6", false),
+		TagsAsFields: []string{"vu", "iter", "url"},
+	}
 	return c
 }
 
 func (c Config) Apply(cfg Config) Config {
-	//TODO: fix this, use nullable values like all other configs...
-	if cfg.Addr != "" {
+	if cfg.Addr.Valid {
 		c.Addr = cfg.Addr
 	}
-	if cfg.Username != "" {
+	if cfg.Username.Valid {
 		c.Username = cfg.Username
 	}
-	if cfg.Password != "" {
+	if cfg.Password.Valid {
 		c.Password = cfg.Password
 	}
-	if cfg.Insecure {
+	if cfg.Insecure.Valid {
 		c.Insecure = cfg.Insecure
 	}
-	if cfg.PayloadSize > 0 {
+	if cfg.PayloadSize.Valid && cfg.PayloadSize.Int64 > 0 {
 		c.PayloadSize = cfg.PayloadSize
 	}
-	if cfg.DB != "" {
+	if cfg.DB.Valid {
 		c.DB = cfg.DB
 	}
-	if cfg.Precision != "" {
+	if cfg.Precision.Valid {
 		c.Precision = cfg.Precision
 	}
-	if cfg.Retention != "" {
+	if cfg.Retention.Valid {
 		c.Retention = cfg.Retention
 	}
-	if cfg.Consistency != "" {
+	if cfg.Consistency.Valid {
 		c.Consistency = cfg.Consistency
 	}
 	if len(cfg.TagsAsFields) > 0 {
@@ -105,8 +110,15 @@ func ParseMap(m map[string]interface{}) (Config, error) {
 	if v, ok := m["tagsAsFields"].(string); ok {
 		m["tagsAsFields"] = []string{v}
 	}
+	dec, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		DecodeHook: types.NullDecoder,
+		Result:     &c,
+	})
+	if err != nil {
+		return c, err
+	}
 
-	err := mapstructure.Decode(m, &c)
+	err = dec.Decode(m)
 	return c, err
 }
 
@@ -117,14 +129,15 @@ func ParseURL(text string) (Config, error) {
 		return c, err
 	}
 	if u.Host != "" {
-		c.Addr = u.Scheme + "://" + u.Host
+		c.Addr = null.StringFrom(u.Scheme + "://" + u.Host)
 	}
 	if db := strings.TrimPrefix(u.Path, "/"); db != "" {
-		c.DB = db
+		c.DB = null.StringFrom(db)
 	}
 	if u.User != nil {
-		c.Username = u.User.Username()
-		c.Password, _ = u.User.Password()
+		c.Username = null.StringFrom(u.User.Username())
+		pass, _ := u.User.Password()
+		c.Password = null.StringFrom(pass)
 	}
 	for k, vs := range u.Query() {
 		switch k {
@@ -132,20 +145,22 @@ func ParseURL(text string) (Config, error) {
 			switch vs[0] {
 			case "":
 			case "false":
-				c.Insecure = false
+				c.Insecure = null.BoolFrom(false)
 			case "true":
-				c.Insecure = true
+				c.Insecure = null.BoolFrom(true)
 			default:
 				return c, errors.Errorf("insecure must be true or false, not %s", vs[0])
 			}
 		case "payload_size":
-			c.PayloadSize, err = strconv.Atoi(vs[0])
+			var size int
+			size, err = strconv.Atoi(vs[0])
+			c.PayloadSize = null.IntFrom(int64(size))
 		case "precision":
-			c.Precision = vs[0]
+			c.Precision = null.StringFrom(vs[0])
 		case "retention":
-			c.Retention = vs[0]
+			c.Retention = null.StringFrom(vs[0])
 		case "consistency":
-			c.Consistency = vs[0]
+			c.Consistency = null.StringFrom(vs[0])
 		case "tagsAsFields":
 			c.TagsAsFields = vs
 		default:
