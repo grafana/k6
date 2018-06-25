@@ -45,7 +45,6 @@ func NullDecoder(f reflect.Type, t reflect.Type, data interface{}) (interface{},
 		if typeFrom == reflect.Bool.String() {
 			return null.BoolFrom(data.(bool)), nil
 		}
-
 		expectedType = reflect.Bool.String()
 	case "null.Int":
 		if typeFrom == reflect.Int.String() {
@@ -57,7 +56,6 @@ func NullDecoder(f reflect.Type, t reflect.Type, data interface{}) (interface{},
 		if typeFrom == reflect.Int64.String() {
 			return null.IntFrom(data.(int64)), nil
 		}
-
 		expectedType = reflect.Int.String()
 	case "null.Float":
 		if typeFrom == reflect.Float32.String() {
@@ -73,7 +71,6 @@ func NullDecoder(f reflect.Type, t reflect.Type, data interface{}) (interface{},
 			err := d.UnmarshalText([]byte(data.(string)))
 			return d, err
 		}
-
 	}
 
 	if expectedType != "" {
