@@ -71,6 +71,7 @@ func NullDecoder(f reflect.Type, t reflect.Type, data interface{}) (interface{},
 			err := d.UnmarshalText([]byte(data.(string)))
 			return d, err
 		}
+		expectedType = reflect.String.String()
 	}
 
 	if expectedType != "" {

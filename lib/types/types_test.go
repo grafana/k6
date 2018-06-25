@@ -86,6 +86,7 @@ func TestNullDecoder(t *testing.T) {
 		"Integer64": {"invalid", "int", "string"},
 		"Float32":   {true, "float32 or float64", "bool"},
 		"Float64":   {"invalid", "float32 or float64", "string"},
+		"Dur":       {10, "string", "int"},
 	}
 
 	for k, v := range input {
