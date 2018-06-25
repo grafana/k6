@@ -79,13 +79,13 @@ func TestNullDecoder(t *testing.T) {
 	}, f)
 
 	input := map[string][]interface{}{
-		"Str":       []interface{}{true, "string", "bool"},
-		"Boolean":   []interface{}{"invalid", "bool", "string"},
-		"Integer":   []interface{}{"invalid", "int", "string"},
-		"Integer32": []interface{}{true, "int", "bool"},
-		"Integer64": []interface{}{"invalid", "int", "string"},
-		"Float32":   []interface{}{true, "float32 or float64", "bool"},
-		"Float64":   []interface{}{"invalid", "float32 or float64", "string"},
+		"Str":       {true, "string", "bool"},
+		"Boolean":   {"invalid", "bool", "string"},
+		"Integer":   {"invalid", "int", "string"},
+		"Integer32": {true, "int", "bool"},
+		"Integer64": {"invalid", "int", "string"},
+		"Float32":   {true, "float32 or float64", "bool"},
+		"Float64":   {"invalid", "float32 or float64", "string"},
 	}
 
 	for k, v := range input {
