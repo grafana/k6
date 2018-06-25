@@ -29,7 +29,6 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
-	null "gopkg.in/guregu/null.v3"
 )
 
 // loginInfluxDBCommand represents the 'login influxdb' command
@@ -54,12 +53,6 @@ This will set the default server used when just "-o influxdb" is passed.`,
 				return err
 			}
 			conf = conf.Apply(urlConf)
-		}
-		if conf.Addr.String == "" {
-			conf.Addr = null.StringFrom("http://localhost:8086")
-		}
-		if conf.DB.String == "" {
-			conf.DB = null.StringFrom("k6")
 		}
 
 		form := ui.Form{

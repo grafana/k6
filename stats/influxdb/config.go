@@ -49,7 +49,11 @@ type Config struct {
 }
 
 func NewConfig() *Config {
-	c := &Config{TagsAsFields: []string{"vu", "iter", "url"}}
+	c := &Config{
+		Addr:         null.NewString("http://localhost:8086", false),
+		DB:           null.NewString("k6", false),
+		TagsAsFields: []string{"vu", "iter", "url"},
+	}
 	return c
 }
 
