@@ -375,7 +375,10 @@ var _ ConnectedSampleContainer = ConnectedSamples{}
 func GetBufferedSamples(input <-chan SampleContainer) (result []SampleContainer) {
 	for {
 		select {
-		case val := <-input:
+		case val, ok := <-input:
+			if !ok {
+				return
+			}
 			result = append(result, val)
 		default:
 			return
