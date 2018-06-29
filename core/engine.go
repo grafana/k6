@@ -104,7 +104,7 @@ func NewEngine(ex lib.Executor, o lib.Options) (*Engine, error) {
 	return e, nil
 }
 
-func (e *Engine) setRunStatus(status int) {
+func (e *Engine) setRunStatus(status lib.RunStatus) {
 	if len(e.Collectors) == 0 {
 		return
 	}

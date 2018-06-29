@@ -103,7 +103,8 @@ func (c *Collector) GetRequiredSystemTags() lib.TagSet {
 	return lib.TagSet{} // There are no required tags for this collector
 }
 
-func (c *Collector) SetRunStatus(status int) {}
+// SetRunStatus does nothing in the Kafka collector
+func (c *Collector) SetRunStatus(status lib.RunStatus) {}
 
 func (c *Collector) formatSamples(samples stats.Samples) ([]string, error) {
 	var metrics []string
