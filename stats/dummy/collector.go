@@ -30,7 +30,7 @@ import (
 
 // Collector implements the lib.Collector interface and should be used only for testing
 type Collector struct {
-	runStatus int
+	RunStatus lib.RunStatus
 
 	SampleContainers []stats.SampleContainer
 	Samples          []stats.Sample
@@ -48,7 +48,7 @@ func (c *Collector) MakeConfig() interface{} { return nil }
 // Run just blocks until the context is done
 func (c *Collector) Run(ctx context.Context) {
 	<-ctx.Done()
-	log.Debugf("finished status: %s", c.runStatus)
+	log.Debugf("finished status: %s", c.RunStatus)
 }
 
 // Collect just appends all of the samples passed to it to the internal sample slice.
@@ -74,6 +74,7 @@ func (c *Collector) GetRequiredSystemTags() lib.TagSet {
 	return lib.TagSet{} // There are no required tags for this collector
 }
 
-func (c *Collector) SetRunStatus(status int) {
-	c.runStatus = status
+// SetRunStatus just saves the passed status for later inspection
+func (c *Collector) SetRunStatus(status lib.RunStatus) {
+	c.RunStatus = status
 }

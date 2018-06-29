@@ -26,13 +26,24 @@ import (
 	"github.com/loadimpact/k6/stats"
 )
 
-// Run Status used by cloud collector
+// RunStatus values can be used by k6 to denote how a script run ends
+// and by the cloud executor and collector so that k6 knows the current
+// status of a particular script run.
+type RunStatus int
+
+// Possible run status values; iota isn't used intentionally
 const (
-	RunStatusFinished           = 3
-	RunStatusAbortedUser        = 5
-	RunStatusAbortedSystem      = 6
-	RunStatusAbortedScriptError = 7
-	RunStatusAbortedThreshold   = 8
+	RunStatusCreated            RunStatus = -2
+	RunStatusValidated          RunStatus = -1
+	RunStatusQueued             RunStatus = 0
+	RunStatusInitializing       RunStatus = 1
+	RunStatusRunning            RunStatus = 2
+	RunStatusFinished           RunStatus = 3
+	RunStatusTimedOut           RunStatus = 4
+	RunStatusAbortedUser        RunStatus = 5
+	RunStatusAbortedSystem      RunStatus = 6
+	RunStatusAbortedScriptError RunStatus = 7
+	RunStatusAbortedThreshold   RunStatus = 8
 )
 
 // A Collector abstracts the process of funneling samples to an external storage backend,
@@ -57,5 +68,5 @@ type Collector interface {
 	GetRequiredSystemTags() TagSet
 
 	// Set run status
-	SetRunStatus(status int)
+	SetRunStatus(status RunStatus)
 }

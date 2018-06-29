@@ -25,6 +25,7 @@ import (
 
 	client "github.com/influxdata/influxdb/client/v2"
 	"github.com/stretchr/testify/assert"
+	null "gopkg.in/guregu/null.v3"
 )
 
 func TestMakeBatchConfig(t *testing.T) {
@@ -37,7 +38,7 @@ func TestMakeBatchConfig(t *testing.T) {
 	t.Run("DB Set", func(t *testing.T) {
 		assert.Equal(t,
 			client.BatchPointsConfig{Database: "dbname"},
-			MakeBatchConfig(Config{DB: "dbname"}),
+			MakeBatchConfig(Config{DB: null.StringFrom("dbname")}),
 		)
 	})
 }
