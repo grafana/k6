@@ -35,6 +35,7 @@ Previously most metrics were emitted only when a script iteration ended. With th
 ## Bugs fixed!
 
 * Metrics emitted by `setup()` and `teardown()` are not discarded anymore. They are emitted and have the implicit root `group` tag values of `setup` and `teardown` respectively (#678)
+* Fixed a potential `nil` pointer error when the `k6 cloud` command is interrupted. (#682)
 
 
 ## Breaking Changes
