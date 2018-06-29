@@ -55,8 +55,7 @@ Install
 ### Mac
 
 ```bash
-brew tap loadimpact/k6
-brew install k6
+brew install loadimpact/k6/k6
 ```
 
 ### Other Platforms
