@@ -110,10 +110,7 @@ func (h *HTTP) Request(ctx context.Context, method string, url goja.Value, args 
 		return nil, err
 	}
 
-	state := common.GetState(ctx)
-	res, samples, err := h.request(ctx, state, req)
-	state.Samples = append(state.Samples, samples...)
-	return res, err
+	return h.request(ctx, req)
 }
 
 type parsedHTTPRequest struct {
@@ -346,7 +343,8 @@ func (h *HTTP) parseRequest(ctx context.Context, method string, reqURL URL, body
 
 // request() shouldn't mess with the goja runtime or other thread-unsafe
 // things because it's called concurrently by Batch()
-func (h *HTTP) request(ctx context.Context, state *common.State, preq *parsedHTTPRequest) (*HTTPResponse, []stats.SampleContainer, error) {
+func (h *HTTP) request(ctx context.Context, preq *parsedHTTPRequest) (*HTTPResponse, error) {
+	state := common.GetState(ctx)
 
 	respReq := &HTTPRequest{
 		Method:  preq.req.Method,
@@ -387,7 +385,7 @@ func (h *HTTP) request(ctx context.Context, state *common.State, preq *parsedHTT
 	// Check rate limit *after* we've prepared a request; no need to wait with that part.
 	if rpsLimit := state.RPSLimit; rpsLimit != nil {
 		if err := rpsLimit.Wait(ctx); err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 	}
 
@@ -424,7 +422,6 @@ func (h *HTTP) request(ctx context.Context, state *common.State, preq *parsedHTT
 		},
 	}
 
-	statsSamples := []stats.SampleContainer{}
 	// if digest authentication option is passed, make an initial request to get the authentication params to compute the authorization header
 	if preq.auth == "digest" {
 		username := preq.url.URL.User.Username()
@@ -446,11 +443,11 @@ func (h *HTTP) request(ctx context.Context, state *common.State, preq *parsedHTT
 			}
 
 			if preq.throw {
-				return nil, nil, err
+				return nil, err
 			}
 
 			resp.Error = err.Error()
-			return resp, statsSamples, nil
+			return resp, nil
 		}
 
 		if res.StatusCode == http.StatusUnauthorized {
@@ -473,7 +470,7 @@ func (h *HTTP) request(ctx context.Context, state *common.State, preq *parsedHTT
 		}
 		trail.SaveSamples(stats.NewSampleTags(tags))
 		delete(tags, "ip")
-		statsSamples = append(statsSamples, trail)
+		state.Samples <- trail
 	}
 
 	if preq.auth == "ntlm" {
@@ -592,7 +589,7 @@ func (h *HTTP) request(ctx context.Context, state *common.State, preq *parsedHTT
 		}
 
 		if preq.throw {
-			return nil, nil, resErr
+			return nil, resErr
 		}
 	}
 
@@ -602,8 +599,8 @@ func (h *HTTP) request(ctx context.Context, state *common.State, preq *parsedHTT
 		}
 	}
 	trail.SaveSamples(stats.IntoSampleTags(&tags))
-	statsSamples = append(statsSamples, trail)
-	return resp, statsSamples, nil
+	state.Samples <- trail
+	return resp, nil
 }
 
 func (h *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, error) {
@@ -704,7 +701,7 @@ func (h *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, error) 
 				defer hl.End()
 			}
 
-			res, samples, err := h.request(ctx, state, parsedReq)
+			res, err := h.request(ctx, parsedReq)
 			if err != nil {
 				errs <- err
 				return
@@ -712,7 +709,6 @@ func (h *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, error) 
 
 			mutex.Lock()
 			_ = retval.Set(key, res)
-			state.Samples = append(state.Samples, samples...)
 			mutex.Unlock()
 
 			errs <- nil

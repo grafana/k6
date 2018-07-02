@@ -275,44 +275,40 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 
 			sampleTags := stats.IntoSampleTags(&tags)
 
-			samples := []stats.SampleContainer{
-				stats.ConnectedSamples{
-					[]stats.Sample{
-						{Metric: metrics.WSSessions, Time: start, Tags: sampleTags, Value: 1},
-						{Metric: metrics.WSConnecting, Time: start, Tags: sampleTags, Value: connectionDuration},
-						{Metric: metrics.WSSessionDuration, Time: start, Tags: sampleTags, Value: sessionDuration},
-					}, sampleTags, start,
-				},
+			state.Samples <- stats.ConnectedSamples{
+				[]stats.Sample{
+					{Metric: metrics.WSSessions, Time: start, Tags: sampleTags, Value: 1},
+					{Metric: metrics.WSConnecting, Time: start, Tags: sampleTags, Value: connectionDuration},
+					{Metric: metrics.WSSessionDuration, Time: start, Tags: sampleTags, Value: sessionDuration},
+				}, sampleTags, start,
 			}
 
 			for _, msgSentTimestamp := range socket.msgSentTimestamps {
-				samples = append(samples, stats.Sample{
+				state.Samples <- stats.Sample{
 					Metric: metrics.WSMessagesSent,
 					Time:   msgSentTimestamp,
 					Tags:   sampleTags,
 					Value:  1,
-				})
+				}
 			}
 
 			for _, msgReceivedTimestamp := range socket.msgReceivedTimestamps {
-				samples = append(samples, stats.Sample{
+				state.Samples <- stats.Sample{
 					Metric: metrics.WSMessagesReceived,
 					Time:   msgReceivedTimestamp,
 					Tags:   sampleTags,
 					Value:  1,
-				})
+				}
 			}
 
 			for _, pingDelta := range socket.pingTimestamps {
-				samples = append(samples, stats.Sample{
+				state.Samples <- stats.Sample{
 					Metric: metrics.WSPing,
 					Time:   pingDelta.pong,
 					Tags:   sampleTags,
 					Value:  stats.D(pingDelta.pong.Sub(pingDelta.ping)),
-				})
+				}
 			}
-
-			state.Samples = append(state.Samples, samples...)
 
 			return wsResponse, nil
 		}
