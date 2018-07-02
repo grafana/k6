@@ -55,15 +55,16 @@ func TestRunnerNew(t *testing.T) {
 		assert.NoError(t, err)
 
 		t.Run("NewVU", func(t *testing.T) {
-			vu_, err := r.NewVU()
+			vu, err := r.NewVU(make(chan stats.SampleContainer, 100))
 			assert.NoError(t, err)
-			vu := vu_.(*VU)
-			assert.Equal(t, int64(0), vu.Runtime.Get("counter").Export())
+			vuc, ok := vu.(*VU)
+			assert.True(t, ok)
+			assert.Equal(t, int64(0), vuc.Runtime.Get("counter").Export())
 
 			t.Run("RunOnce", func(t *testing.T) {
-				_, err = vu.RunOnce(context.Background())
+				err = vu.RunOnce(context.Background())
 				assert.NoError(t, err)
-				assert.Equal(t, int64(1), vu.Runtime.Get("counter").Export())
+				assert.Equal(t, int64(1), vuc.Runtime.Get("counter").Export())
 			})
 		})
 	})
@@ -156,18 +157,19 @@ func TestSetupTeardown(t *testing.T) {
 
 	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range testdata {
+		samples := make(chan stats.SampleContainer, 100)
 		t.Run(name, func(t *testing.T) {
-			if !assert.NoError(t, r.Setup(context.Background())) {
+			if !assert.NoError(t, r.Setup(context.Background(), samples)) {
 				return
 			}
 
-			vu, err := r.NewVU()
+			vu, err := r.NewVU(samples)
 			if assert.NoError(t, err) {
-				_, err := vu.RunOnce(context.Background())
+				err := vu.RunOnce(context.Background())
 				assert.NoError(t, err)
 			}
 
-			assert.NoError(t, r.Teardown(context.Background()))
+			assert.NoError(t, r.Teardown(context.Background(), samples))
 		})
 	}
 }
@@ -227,11 +229,11 @@ func TestRunnerIntegrationImports(t *testing.T) {
 				testdata := map[string]*Runner{"Source": r1, "Archive": r2}
 				for name, r := range testdata {
 					t.Run(name, func(t *testing.T) {
-						vu, err := r.NewVU()
+						vu, err := r.NewVU(make(chan stats.SampleContainer, 100))
 						if !assert.NoError(t, err) {
 							return
 						}
-						_, err = vu.RunOnce(context.Background())
+						err = vu.RunOnce(context.Background())
 						assert.NoError(t, err)
 					})
 				}
@@ -261,7 +263,7 @@ func TestVURunContext(t *testing.T) {
 	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range testdata {
 		t.Run(name, func(t *testing.T) {
-			vu, err := r.newVU()
+			vu, err := r.newVU(make(chan stats.SampleContainer, 100))
 			if !assert.NoError(t, err) {
 				return
 			}
@@ -281,7 +283,7 @@ func TestVURunContext(t *testing.T) {
 					assert.Equal(t, vu.HTTPTransport, state.HTTPTransport)
 				}
 			})
-			_, err = vu.RunOnce(context.Background())
+			err = vu.RunOnce(context.Background())
 			assert.NoError(t, err)
 			assert.True(t, fnCalled, "fn() not called")
 		})
@@ -308,13 +310,13 @@ func TestVURunInterrupt(t *testing.T) {
 	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range testdata {
 		t.Run(name, func(t *testing.T) {
-			vu, err := r.newVU()
+			vu, err := r.newVU(make(chan stats.SampleContainer, 100))
 			if !assert.NoError(t, err) {
 				return
 			}
 			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 			defer cancel()
-			_, err = vu.RunOnce(ctx)
+			err = vu.RunOnce(ctx)
 			assert.EqualError(t, err, "context cancelled at /script.js:1:1(1)")
 		})
 	}
@@ -348,7 +350,7 @@ func TestVUIntegrationGroups(t *testing.T) {
 	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range testdata {
 		t.Run(name, func(t *testing.T) {
-			vu, err := r.newVU()
+			vu, err := r.newVU(make(chan stats.SampleContainer, 100))
 			if !assert.NoError(t, err) {
 				return
 			}
@@ -373,7 +375,7 @@ func TestVUIntegrationGroups(t *testing.T) {
 				assert.Equal(t, "my group", g.Parent.Name)
 				assert.Equal(t, r.GetDefaultGroup(), g.Parent.Parent)
 			})
-			_, err = vu.RunOnce(context.Background())
+			err = vu.RunOnce(context.Background())
 			assert.NoError(t, err)
 			assert.True(t, fnOuterCalled, "fnOuter() not called")
 			assert.True(t, fnInnerCalled, "fnInner() not called")
@@ -404,15 +406,16 @@ func TestVUIntegrationMetrics(t *testing.T) {
 	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range testdata {
 		t.Run(name, func(t *testing.T) {
-			vu, err := r.newVU()
+			samples := make(chan stats.SampleContainer, 100)
+			vu, err := r.newVU(samples)
 			if !assert.NoError(t, err) {
 				return
 			}
 
-			samples, err := vu.RunOnce(context.Background())
+			err = vu.RunOnce(context.Background())
 			assert.NoError(t, err)
 			sampleCount := 0
-			for i, sampleC := range samples {
+			for i, sampleC := range stats.GetBufferedSamples(samples) {
 				for j, s := range sampleC.GetSamples() {
 					sampleCount++
 					switch i + j {
@@ -478,11 +481,11 @@ func TestVUIntegrationInsecureRequests(t *testing.T) {
 				t.Run(name, func(t *testing.T) {
 					r.Logger, _ = logtest.NewNullLogger()
 
-					vu, err := r.NewVU()
+					vu, err := r.NewVU(make(chan stats.SampleContainer, 100))
 					if !assert.NoError(t, err) {
 						return
 					}
-					_, err = vu.RunOnce(context.Background())
+					err = vu.RunOnce(context.Background())
 					if data.errMsg != "" {
 						assert.EqualError(t, err, data.errMsg)
 					} else {
@@ -523,11 +526,11 @@ func TestVUIntegrationBlacklist(t *testing.T) {
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range runners {
 		t.Run(name, func(t *testing.T) {
-			vu, err := r.NewVU()
+			vu, err := r.NewVU(make(chan stats.SampleContainer, 100))
 			if !assert.NoError(t, err) {
 				return
 			}
-			_, err = vu.RunOnce(context.Background())
+			err = vu.RunOnce(context.Background())
 			assert.EqualError(t, err, "GoError: Get http://10.1.2.3/: IP (10.1.2.3) is in a blacklisted range (10.0.0.0/8)")
 		})
 	}
@@ -576,12 +579,12 @@ func TestVUIntegrationHosts(t *testing.T) {
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range runners {
 		t.Run(name, func(t *testing.T) {
-			vu, err := r.NewVU()
+			vu, err := r.NewVU(make(chan stats.SampleContainer, 100))
 			if !assert.NoError(t, err) {
 				return
 			}
 
-			_, err = vu.RunOnce(context.Background())
+			err = vu.RunOnce(context.Background())
 			if !assert.NoError(t, err) {
 				return
 			}
@@ -643,11 +646,11 @@ func TestVUIntegrationTLSConfig(t *testing.T) {
 				t.Run(name, func(t *testing.T) {
 					r.Logger, _ = logtest.NewNullLogger()
 
-					vu, err := r.NewVU()
+					vu, err := r.NewVU(make(chan stats.SampleContainer, 100))
 					if !assert.NoError(t, err) {
 						return
 					}
-					_, err = vu.RunOnce(context.Background())
+					err = vu.RunOnce(context.Background())
 					if data.errMsg != "" {
 						assert.EqualError(t, err, data.errMsg)
 					} else {
@@ -687,15 +690,16 @@ func TestVUIntegrationHTTP2(t *testing.T) {
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range runners {
 		t.Run(name, func(t *testing.T) {
-			vu, err := r.NewVU()
+			samples := make(chan stats.SampleContainer, 100)
+			vu, err := r.NewVU(samples)
 			if !assert.NoError(t, err) {
 				return
 			}
-			samples, err := vu.RunOnce(context.Background())
+			err = vu.RunOnce(context.Background())
 			assert.NoError(t, err)
 
 			protoFound := false
-			for _, sampleC := range samples {
+			for _, sampleC := range stats.GetBufferedSamples(samples) {
 				for _, sample := range sampleC.GetSamples() {
 					if proto, ok := sample.Tags.Get("proto"); ok {
 						protoFound = true
@@ -717,9 +721,9 @@ func TestVUIntegrationOpenFunctionError(t *testing.T) {
 	}, afero.NewMemMapFs(), lib.RuntimeOptions{})
 	assert.NoError(t, err)
 
-	vu, err := r.NewVU()
+	vu, err := r.NewVU(make(chan stats.SampleContainer, 100))
 	assert.NoError(t, err)
-	_, err = vu.RunOnce(context.Background())
+	err = vu.RunOnce(context.Background())
 	assert.EqualError(t, err, "GoError: \"open\" function is only available to the init code (aka global scope), see https://docs.k6.io/docs/test-life-cycle for more information")
 }
 
@@ -764,12 +768,12 @@ func TestVUIntegrationCookies(t *testing.T) {
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range runners {
 		t.Run(name, func(t *testing.T) {
-			vu, err := r.NewVU()
+			vu, err := r.NewVU(make(chan stats.SampleContainer, 100))
 			if !assert.NoError(t, err) {
 				return
 			}
 			for i := 0; i < 2; i++ {
-				_, err = vu.RunOnce(context.Background())
+				err = vu.RunOnce(context.Background())
 				assert.NoError(t, err)
 			}
 		})
@@ -798,12 +802,12 @@ func TestVUIntegrationVUID(t *testing.T) {
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range runners {
 		t.Run(name, func(t *testing.T) {
-			vu, err := r.NewVU()
+			vu, err := r.NewVU(make(chan stats.SampleContainer, 100))
 			if !assert.NoError(t, err) {
 				return
 			}
 			assert.NoError(t, vu.Reconfigure(1234))
-			_, err = vu.RunOnce(context.Background())
+			err = vu.RunOnce(context.Background())
 			assert.NoError(t, err)
 		})
 	}
@@ -898,9 +902,9 @@ func TestVUIntegrationClientCerts(t *testing.T) {
 		for name, r := range runners {
 			t.Run(name, func(t *testing.T) {
 				r.Logger, _ = logtest.NewNullLogger()
-				vu, err := r.NewVU()
+				vu, err := r.NewVU(make(chan stats.SampleContainer, 100))
 				if assert.NoError(t, err) {
-					_, err := vu.RunOnce(context.Background())
+					err := vu.RunOnce(context.Background())
 					assert.EqualError(t, err, fmt.Sprintf("GoError: Get https://%s: remote error: tls: bad certificate", listener.Addr().String()))
 				}
 			})
@@ -942,9 +946,9 @@ func TestVUIntegrationClientCerts(t *testing.T) {
 		runners := map[string]*Runner{"Source": r1, "Archive": r2}
 		for name, r := range runners {
 			t.Run(name, func(t *testing.T) {
-				vu, err := r.NewVU()
+				vu, err := r.NewVU(make(chan stats.SampleContainer, 100))
 				if assert.NoError(t, err) {
-					_, err := vu.RunOnce(context.Background())
+					err := vu.RunOnce(context.Background())
 					assert.NoError(t, err)
 				}
 			})

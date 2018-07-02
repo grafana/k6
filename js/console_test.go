@@ -28,6 +28,7 @@ import (
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/stats"
 	log "github.com/sirupsen/logrus"
 	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/spf13/afero"
@@ -94,14 +95,15 @@ func TestConsole(t *testing.T) {
 					}, afero.NewMemMapFs(), lib.RuntimeOptions{})
 					assert.NoError(t, err)
 
-					vu, err := r.newVU()
+					samples := make(chan stats.SampleContainer, 100)
+					vu, err := r.newVU(samples)
 					assert.NoError(t, err)
 
 					logger, hook := logtest.NewNullLogger()
 					logger.Level = log.DebugLevel
 					vu.Console.Logger = logger
 
-					_, err = vu.RunOnce(context.Background())
+					err = vu.RunOnce(context.Background())
 					assert.NoError(t, err)
 
 					entry := hook.LastEntry()
