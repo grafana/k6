@@ -196,7 +196,7 @@ func SummarizeGroup(w io.Writer, indent string, group *lib.Group) {
 		SummarizeCheck(w, indent, group.Checks[name])
 	}
 	if len(checkNames) > 0 {
-		fmt.Fprintf(w, "\n")
+		_, _ = fmt.Fprintf(w, "\n")
 	}
 
 	var groupNames []string
@@ -343,7 +343,7 @@ func SummarizeMetrics(w io.Writer, indent string, t time.Duration, timeUnit stri
 				fmtData = fmtData + " " + ExtraColor.Sprint(strings.Join(parts, " "))
 			}
 		}
-		fmt.Fprint(w, indent+fmtIndent+markColor.Sprint(mark)+" "+fmtName+" "+fmtData+"\n")
+		_, _ = fmt.Fprint(w, indent+fmtIndent+markColor.Sprint(mark)+" "+fmtName+" "+fmtData+"\n")
 	}
 }
 
