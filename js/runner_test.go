@@ -40,7 +40,6 @@ import (
 	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -538,32 +537,21 @@ func TestVUIntegrationBlacklist(t *testing.T) {
 }
 
 func TestVUIntegrationHosts(t *testing.T) {
-	srv := &http.Server{
-		Addr: ":8080",
-		Handler: http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			_, _ = fmt.Fprintf(w, "ok")
-		}),
-		ErrorLog: stdlog.New(ioutil.Discard, "", 0),
-	}
-	go func() {
-		require.NoError(t, srv.ListenAndServe())
-	}()
-	defer func() {
-		require.NoError(t, srv.Shutdown(context.TODO()))
-	}()
+	tb := testutils.NewHTTPMultiBin(t)
+	defer tb.Cleanup()
 
 	r1, err := New(&lib.SourceData{
 		Filename: "/script.js",
-		Data: []byte(`
+		Data: []byte(tb.Replacer.Replace(`
 					import { check, fail } from "k6";
 					import http from "k6/http";
 					export default function() {
-						let res = http.get("http://test.loadimpact.com:8080/");
+						let res = http.get("http://test.loadimpact.com:HTTPBIN_PORT/");
 						check(res, {
 							"is correct IP": (r) => r.remote_ip === "127.0.0.1"
 						}) || fail("failed to override dns");
 					}
-				`),
+				`)),
 	}, afero.NewMemMapFs(), lib.RuntimeOptions{})
 	if !assert.NoError(t, err) {
 		return
