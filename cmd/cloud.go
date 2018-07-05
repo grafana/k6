@@ -22,7 +22,6 @@ package cmd
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -59,7 +58,7 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 			Width: 60,
 			Left:  func() string { return "    uploading script" },
 		}
-		fmt.Fprintf(stdout, "%s \r", initBar.String())
+		fprintf(stdout, "%s \r", initBar.String())
 
 		// Runner
 		pwd, err := os.Getwd()
@@ -135,11 +134,11 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 		}
 
 		testURL := cloud.URLForResults(refID, cloudConfig)
-		fmt.Fprint(stdout, "\n\n")
-		fmt.Fprintf(stdout, "     execution: %s\n", ui.ValueColor.Sprint("cloud"))
-		fmt.Fprintf(stdout, "     script: %s\n", ui.ValueColor.Sprint(filename))
-		fmt.Fprintf(stdout, "     output: %s\n", ui.ValueColor.Sprint(testURL))
-		fmt.Fprint(stdout, "\n")
+		fprintf(stdout, "\n\n")
+		fprintf(stdout, "     execution: %s\n", ui.ValueColor.Sprint("cloud"))
+		fprintf(stdout, "     script: %s\n", ui.ValueColor.Sprint(filename))
+		fprintf(stdout, "     output: %s\n", ui.ValueColor.Sprint(testURL))
+		fprintf(stdout, "\n")
 
 		// The quiet option hides the progress bar and disallow aborting the test
 		if quiet {
@@ -173,7 +172,7 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 						shouldExitLoop = true
 					}
 					progress.Progress = testProgress.Progress
-					fmt.Fprintf(stdout, "%s\x1b[0K\r", progress.String())
+					fprintf(stdout, "%s\x1b[0K\r", progress.String())
 				} else {
 					log.WithError(progressErr).Error("Test progress error")
 				}
@@ -194,7 +193,7 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 			return ExitCode{errors.New("Test progress error"), 98}
 		}
 
-		fmt.Fprintf(stdout, "     test status: %s\n", ui.ValueColor.Sprint(testProgress.RunStatusText))
+		fprintf(stdout, "     test status: %s\n", ui.ValueColor.Sprint(testProgress.RunStatusText))
 
 		if testProgress.ResultStatus == cloud.ResultStatusFailed {
 			return ExitCode{errors.New("The test has failed"), 99}

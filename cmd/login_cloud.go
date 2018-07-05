@@ -21,7 +21,6 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 
 	"gopkg.in/guregu/null.v3"
@@ -66,7 +65,7 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 		switch {
 		case reset.Valid:
 			conf.Token = null.StringFromPtr(nil)
-			fmt.Fprintf(stdout, "  token reset\n")
+			fprintf(stdout, "  token reset\n")
 		case show.Bool:
 		case token.Valid:
 			conf.Token = token
@@ -109,7 +108,7 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 		}
 
 		if conf.Token.Valid {
-			fmt.Fprintf(stdout, "  token: %s\n", ui.ValueColor.Sprint(conf.Token.String))
+			fprintf(stdout, "  token: %s\n", ui.ValueColor.Sprint(conf.Token.String))
 		}
 		return nil
 	},

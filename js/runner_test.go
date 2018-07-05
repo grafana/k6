@@ -40,6 +40,7 @@ import (
 	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -544,8 +545,12 @@ func TestVUIntegrationHosts(t *testing.T) {
 		}),
 		ErrorLog: stdlog.New(ioutil.Discard, "", 0),
 	}
-	go srv.ListenAndServe()
-	defer srv.Shutdown(context.TODO())
+	go func() {
+		require.NoError(t, srv.ListenAndServe())
+	}()
+	defer func() {
+		require.NoError(t, srv.Shutdown(context.TODO()))
+	}()
 
 	r1, err := New(&lib.SourceData{
 		Filename: "/script.js",

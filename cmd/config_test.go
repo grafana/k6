@@ -72,7 +72,7 @@ func TestConfigCmd(t *testing.T) {
 				t.Run(`"`+test.Name+`"`, func(t *testing.T) {
 					fs := configFlagSet()
 					fs.AddFlagSet(optionFlagSet())
-					fs.Parse(test.Args)
+					assert.NoError(t, fs.Parse(test.Args))
 
 					config, err := getConfig(fs)
 					assert.NoError(t, err)
