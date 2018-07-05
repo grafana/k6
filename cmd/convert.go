@@ -28,9 +28,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var output = ""
-
 var (
+	output              string
+	options             string
 	enableChecks        bool
 	returnOnFailedCheck bool
 	correlate           bool
@@ -75,7 +75,7 @@ var convertCmd = &cobra.Command{
 			return err
 		}
 
-		script, err := har.Convert(h, enableChecks, returnOnFailedCheck, threshold, nobatch, correlate, only, skip)
+		script, err := har.Convert(h, options, enableChecks, returnOnFailedCheck, threshold, nobatch, correlate, only, skip)
 		if err != nil {
 			return err
 		}
@@ -108,6 +108,7 @@ func init() {
 	RootCmd.AddCommand(convertCmd)
 	convertCmd.Flags().SortFlags = false
 	convertCmd.Flags().StringVarP(&output, "output", "O", output, "k6 script output filename (stdout by default)")
+	convertCmd.Flags().StringVarP(&options, "options", "", output, "path to a JSON file with options that would be injected in the output script")
 	convertCmd.Flags().StringSliceVarP(&only, "only", "", []string{}, "include only requests from the given domains")
 	convertCmd.Flags().StringSliceVarP(&skip, "skip", "", []string{}, "skip requests from the given domains")
 	convertCmd.Flags().UintVarP(&threshold, "batch-threshold", "", 500, "batch request idle time threshold (see example)")
