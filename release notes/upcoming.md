@@ -16,6 +16,33 @@ console.log(rnd)
 
 ## UX
 
+
+### Automated deb, rpm, msi and nuget package builds (#675)
+
+Previously we only had [Homebrew releases](https://github.com/loadimpact/k6#mac) for Mac and simple archives with [plain binary releases](https://github.com/loadimpact/k6/releases) for all other platforms. From now on, we'll also automatically build installation packages for Windows and rpm or deb based Linux distributions and upload them to bintray on every new release: [https://bintray.com/loadimpact](https://bintray.com/loadimpact/)
+
+For Debian-based Linux distributions, you have to do something like this to install k6:
+
+```sh
+apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 379CE192D401AB61
+echo "deb https://dl.bintray.com/loadimpact/deb stable main" | sudo tee -a /etc/apt/sources.list
+sudo apt-get update
+sudo apt-get install k6
+```
+
+And for rpm-based ones like Fedora and CentOS:
+
+```sh
+wget https://bintray.com/loadimpact/rpm/rpm -O bintray-loadimpact-rpm.repo
+sudo mv bintray-loadimpact-rpm.repo /etc/yum.repos.d/
+sudo yum install k6
+```
+
+For Windows you can download and install the [latest `.msi` package](https://dl.bintray.com/loadimpact/windows/k6-latest-amd64.msi) or, if you use the [chocolatey package manager](https://chocolatey.org/), follow [these instructions](https://bintray.com/repo/buildSettings?repoPath=%2Floadimpact%2Fchoco) to set up the k6 repository.
+
+
+### Other UX improvements
+
 * There's a new option to reset the saved cloud token: `k6 login cloud --reset` (#672)
 * The check and group names in the summary at the end of a test now appear in the order they were defined. Thanks to @mohanprasaths for fixing this! (#674)
 
@@ -25,12 +52,9 @@ console.log(rnd)
 
 Previously most metrics were emitted only when a script iteration ended. With these changes, metrics would be continuously pushed in real-time, even in the middle of a script iteration. This should slightly decrease memory usage and help a lot with the aggregation efficiency of the cloud collector.
 
-### Automated deb, rpm, msi and nuget package builds (#675)
+### Portable builds (#658)
 
-We now automatically build packages for different operating systems and upload them to bintray on every new release: [https://bintray.com/loadimpact](https://bintray.com/loadimpact/)
-
-TODO: information about how to add the bintray repos and install k6
-
+Before this, k6 builds that were done with just the standard Go language tools (i.e. `go get`, `go build`, etc.) [were not portable](https://github.com/loadimpact/k6/issues/545) because static resources like JS libraries had to be embedded in the binary after the build. Building fully portable binaries was done with the `build-release.sh` script (which used go.rice to bundle the static resources in the binary), but now that embedding is done beforehand and is commited in the git repo, so commands like `go get/build/install` produce fully-portable binary files without extra steps.
 
 ## Bugs fixed!
 
