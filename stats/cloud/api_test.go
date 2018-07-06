@@ -22,6 +22,7 @@ package cloud
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -30,6 +31,7 @@ import (
 
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func init() {
@@ -37,9 +39,15 @@ func init() {
 	_ = os.Setenv("K6CLOUD_TOKEN", "")
 }
 
+func fprintf(t *testing.T, w io.Writer, format string, a ...interface{}) int {
+	n, err := fmt.Fprintf(w, format, a...)
+	require.NoError(t, err)
+	return n
+}
+
 func TestCreateTestRun(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, `{"reference_id": "1", "config": {"aggregationPeriod": "2s"}}`)
+		fprintf(t, w, `{"reference_id": "1", "config": {"aggregationPeriod": "2s"}}`)
 	}))
 	defer server.Close()
 
@@ -60,7 +68,7 @@ func TestCreateTestRun(t *testing.T) {
 
 func TestPublishMetric(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "")
+		fprintf(t, w, "")
 	}))
 	defer server.Close()
 
@@ -84,7 +92,7 @@ func TestPublishMetric(t *testing.T) {
 
 func TestFinished(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "")
+		fprintf(t, w, "")
 	}))
 	defer server.Close()
 
@@ -105,7 +113,7 @@ func TestAuthorizedError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called++
 		w.WriteHeader(http.StatusForbidden)
-		fmt.Fprintf(w, `{"error": {"code": 5, "message": "Not allowed"}}`)
+		fprintf(t, w, `{"error": {"code": 5, "message": "Not allowed"}}`)
 	}))
 	defer server.Close()
 
@@ -140,7 +148,7 @@ func TestRetrySuccessOnSecond(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called++
 		if called == 2 {
-			fmt.Fprintf(w, `{"reference_id": "1"}`)
+			fprintf(t, w, `{"reference_id": "1"}`)
 			return
 		}
 		w.WriteHeader(500)

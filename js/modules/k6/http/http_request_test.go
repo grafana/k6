@@ -1284,6 +1284,8 @@ func ntlmHandler(username, password string) func(w http.ResponseWriter, r *http.
 
 		data := "authenticated"
 		w.Header().Set("Content-Length", fmt.Sprint(len(data)))
-		fmt.Fprint(w, data)
+		if _, err := fmt.Fprint(w, data); err != nil {
+			panic(err.Error())
+		}
 	}
 }

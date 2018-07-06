@@ -21,6 +21,7 @@
 package lib
 
 import (
+	"bytes"
 	"crypto/tls"
 	"encoding/json"
 	"net"
@@ -364,4 +365,31 @@ func (o Options) Apply(opts Options) Options {
 		o.MetricSamplesBufferSize = opts.MetricSamplesBufferSize
 	}
 	return o
+}
+
+// GetPrettyJSON is a massive hack that works around the fact that some
+// of the null-able types used in Options are marshalled to `null` when
+// their `valid` flag is false.
+// TODO: figure out something better or at least use reflect to do it, that
+// way field order could be preserved, we could optionally emit JS objects
+// (without mandatory quoted keys)` and we won't needlessly marshal and
+// unmarshal things...
+func (o Options) GetPrettyJSON(prefix, indent string) ([]byte, error) {
+	nullyResult, err := json.MarshalIndent(o, prefix, indent)
+	if err != nil {
+		return nil, err
+	}
+
+	var tmpMap map[string]json.RawMessage
+	if err := json.Unmarshal(nullyResult, &tmpMap); err != nil {
+		return nil, err
+	}
+
+	null := []byte("null")
+	for k, v := range tmpMap {
+		if bytes.Equal(v, null) {
+			delete(tmpMap, k)
+		}
+	}
+	return json.MarshalIndent(tmpMap, prefix, indent)
 }

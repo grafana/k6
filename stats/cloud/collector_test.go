@@ -119,7 +119,7 @@ func TestCloudCollector(t *testing.T) {
 	t.Parallel()
 	tb := testutils.NewHTTPMultiBin(t)
 	tb.Mux.HandleFunc("/v1/tests", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, `{
+		_, err := fmt.Fprintf(w, `{
 			"reference_id": "123",
 			"config": {
 				"metricPushInterval": "10ms",
@@ -128,6 +128,7 @@ func TestCloudCollector(t *testing.T) {
 				"aggregationWaitPeriod": "5ms"
 			}
 		}`)
+		require.NoError(t, err)
 	}))
 	defer tb.Cleanup()
 
