@@ -4,7 +4,7 @@ ADD . .
 RUN apk --no-cache add --virtual .build-deps git make build-base && \
   go get . && CGO_ENABLED=0 go install -a -ldflags '-s -w'
 
-FROM alpine:latest
+FROM alpine:3.7
 WORKDIR /root/
 COPY --from=builder /go/bin/k6 /root
 COPY --from=builder /etc/ssl /etc/ssl
