@@ -12,6 +12,7 @@ console.log(rnd)
 ```
 
 * A new option `--no-vu-connection-reuse` lets users close HTTP `keep-alive` connections between iterations of a VU. (#676)
+* Script options can now be injected when converting HAR files with the new `--options` CLI flag. (#694)
 
 
 ## UX
