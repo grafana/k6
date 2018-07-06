@@ -21,16 +21,22 @@
 package cmd
 
 import (
+	"encoding/json"
 	"io"
+	"io/ioutil"
 	"path/filepath"
 
 	"github.com/loadimpact/k6/converter/har"
+	"github.com/loadimpact/k6/lib"
 	"github.com/spf13/cobra"
+	null "gopkg.in/guregu/null.v3"
 )
 
-var output = ""
-
 var (
+	output              string
+	optionsFilePath     string
+	minSleep            uint
+	maxSleep            uint
 	enableChecks        bool
 	returnOnFailedCheck bool
 	correlate           bool
@@ -75,7 +81,23 @@ var convertCmd = &cobra.Command{
 			return err
 		}
 
-		script, err := har.Convert(h, enableChecks, returnOnFailedCheck, threshold, nobatch, correlate, only, skip)
+		// recordings include redirections as separate requests, and we dont want to trigger them twice
+		options := lib.Options{MaxRedirects: null.IntFrom(0)}
+
+		if optionsFilePath != "" {
+			optionsFileContents, err := ioutil.ReadFile(optionsFilePath)
+			if err != nil {
+				return err
+			}
+			var injectedOptions lib.Options
+			if err := json.Unmarshal(optionsFileContents, &injectedOptions); err != nil {
+				return err
+			}
+			options = options.Apply(injectedOptions)
+		}
+
+		//TODO: refactor...
+		script, err := har.Convert(h, options, minSleep, maxSleep, enableChecks, returnOnFailedCheck, threshold, nobatch, correlate, only, skip)
 		if err != nil {
 			return err
 		}
@@ -108,6 +130,7 @@ func init() {
 	RootCmd.AddCommand(convertCmd)
 	convertCmd.Flags().SortFlags = false
 	convertCmd.Flags().StringVarP(&output, "output", "O", output, "k6 script output filename (stdout by default)")
+	convertCmd.Flags().StringVarP(&optionsFilePath, "options", "", output, "path to a JSON file with options that would be injected in the output script")
 	convertCmd.Flags().StringSliceVarP(&only, "only", "", []string{}, "include only requests from the given domains")
 	convertCmd.Flags().StringSliceVarP(&skip, "skip", "", []string{}, "skip requests from the given domains")
 	convertCmd.Flags().UintVarP(&threshold, "batch-threshold", "", 500, "batch request idle time threshold (see example)")
@@ -115,4 +138,6 @@ func init() {
 	convertCmd.Flags().BoolVarP(&enableChecks, "enable-status-code-checks", "", false, "add a status code check for each HTTP response")
 	convertCmd.Flags().BoolVarP(&returnOnFailedCheck, "return-on-failed-check", "", false, "return from iteration if we get an unexpected response status code")
 	convertCmd.Flags().BoolVarP(&correlate, "correlate", "", false, "detect values in responses being used in subsequent requests and try adapt the script accordingly (only redirects and JSON values for now)")
+	convertCmd.Flags().UintVarP(&minSleep, "min-sleep", "", 20, "the minimum amount of seconds to sleep after each iteration")
+	convertCmd.Flags().UintVarP(&maxSleep, "max-sleep", "", 40, "the maximum amount of seconds to sleep after each iteration")
 }

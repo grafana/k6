@@ -12,6 +12,8 @@ console.log(rnd)
 ```
 
 * A new option `--no-vu-connection-reuse` lets users close HTTP `keep-alive` connections between iterations of a VU. (#676)
+* You can now set the minimum and maximum sleep time at the end of an iteration with the new `--min-sleep` and `--max-sleep` HAR coverter CLI flags. (#694)
+* Another new feature in the HAR converter enabled users to specify a JSON file with [script options](https://docs.k6.io/docs/options) that would be added to the options of the generated scripts with the new `--options` flag. (#694)
 
 
 ## UX
