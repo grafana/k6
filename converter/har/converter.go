@@ -26,7 +26,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/url"
 	"sort"
 	"strings"
@@ -34,7 +33,6 @@ import (
 	"github.com/loadimpact/k6/lib"
 	"github.com/pkg/errors"
 	"github.com/tidwall/pretty"
-	null "gopkg.in/guregu/null.v3"
 )
 
 // fprint panics when where's an error writing to the supplied io.Writer
@@ -60,26 +58,11 @@ func fprintf(w io.Writer, format string, a ...interface{}) int {
 }
 
 // TODO: refactor this to have fewer parameters... or just refactor in general...
-func Convert(h HAR, optionsFilePath string, enableChecks bool, returnOnFailedCheck bool, batchTime uint, nobatch bool, correlate bool, only, skip []string) (string, error) {
+func Convert(h HAR, options lib.Options, enableChecks bool, returnOnFailedCheck bool, batchTime uint, nobatch bool, correlate bool, only, skip []string) (string, error) {
 	var b bytes.Buffer
 	w := bufio.NewWriter(&b)
 
-	// recordings include redirections as separate requests, and we dont want to trigger them twice
-	scriptOptions := lib.Options{MaxRedirects: null.IntFrom(0)}
-
-	if optionsFilePath != "" {
-		optionsFileContents, err := ioutil.ReadFile(optionsFilePath)
-		if err != nil {
-			return "", err
-		}
-		var injectedOptions lib.Options
-		if err := json.Unmarshal(optionsFileContents, &injectedOptions); err != nil {
-			return "", err
-		}
-		scriptOptions = scriptOptions.Apply(injectedOptions)
-	}
-
-	scriptOptionsSrc, err := scriptOptions.GetCleanJSON()
+	scriptOptionsSrc, err := options.GetPrettyJSON("", "    ")
 	if err != nil {
 		return "", err
 	}
