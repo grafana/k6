@@ -5,8 +5,6 @@ RUN apk --no-cache add --virtual .build-deps git make build-base && \
   go get . && CGO_ENABLED=0 go install -a -ldflags '-s -w'
 
 FROM alpine:3.7
-WORKDIR /root/
-COPY --from=builder /go/bin/k6 /root
-COPY --from=builder /etc/ssl /etc/ssl
-ENV PATH "$PATH:/root"
-ENTRYPOINT ["./k6"]
+RUN apk add --no-cache ca-certificates
+COPY --from=builder /go/bin/k6 /usr/bin/k6
+ENTRYPOINT ["k6"]
