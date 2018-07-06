@@ -12,7 +12,7 @@ console.log(rnd)
 ```
 
 * A new option `--no-vu-connection-reuse` lets users close HTTP `keep-alive` connections between iterations of a VU. (#676)
-* Script options can now be injected when converting HAR files with the new `--options` CLI flag. (#694)
+* New options were added to the HAR converter. You can set the minimum and maximum sleep time at the end of an iteration with the new `--min-sleep` and `--max-sleep` CLI flags of `k6 convert`. You can also specify a JSON file with [script options](https://docs.k6.io/docs/options) that would be added to the options of the generated scripts with the new `--options` flag. (#694)
 
 
 ## UX
