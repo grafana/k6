@@ -37,7 +37,9 @@ import (
 
 func testHTTPHandler(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Add("Content-Type", "text/plain; charset=utf-8")
-	fmt.Fprint(rw, "ok")
+	if _, err := fmt.Fprint(rw, "ok"); err != nil {
+		panic(err.Error())
+	}
 }
 
 func TestLogger(t *testing.T) {

@@ -94,7 +94,9 @@ import http from 'k6/http';
 // Version: 1.2
 // Creator: WebInspector
 
-export let options = { maxRedirects: 0 };
+export let options = {
+    "maxRedirects": 0
+};
 
 export default function() {
 
@@ -132,18 +134,18 @@ func TestIntegrationConvertCmd(t *testing.T) {
 		buf := &bytes.Buffer{}
 		defaultWriter = buf
 
-		convertCmd.Flags().Set("correlate", "true")
-		convertCmd.Flags().Set("no-batch", "true")
-		convertCmd.Flags().Set("enable-status-code-checks", "true")
-		convertCmd.Flags().Set("return-on-failed-check", "true")
+		assert.NoError(t, convertCmd.Flags().Set("correlate", "true"))
+		assert.NoError(t, convertCmd.Flags().Set("no-batch", "true"))
+		assert.NoError(t, convertCmd.Flags().Set("enable-status-code-checks", "true"))
+		assert.NoError(t, convertCmd.Flags().Set("return-on-failed-check", "true"))
 
 		err = convertCmd.RunE(convertCmd, []string{"/input.har"})
 
 		// reset the convertCmd to default flags. There must be a nicer and less error prone way to do this...
-		convertCmd.Flags().Set("correlate", "false")
-		convertCmd.Flags().Set("no-batch", "false")
-		convertCmd.Flags().Set("enable-status-code-checks", "false")
-		convertCmd.Flags().Set("return-on-failed-check", "false")
+		assert.NoError(t, convertCmd.Flags().Set("correlate", "false"))
+		assert.NoError(t, convertCmd.Flags().Set("no-batch", "false"))
+		assert.NoError(t, convertCmd.Flags().Set("enable-status-code-checks", "false"))
+		assert.NoError(t, convertCmd.Flags().Set("return-on-failed-check", "false"))
 
 		if assert.NoError(t, err) {
 			// assert.Equal suppresses the diff it is too big, so we add it as the test error message manually as well.
@@ -185,4 +187,6 @@ func TestIntegrationConvertCmd(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, testHARConvertResult, string(output))
 	})
+	// TODO: test options injection; right now that's difficult because when there are multiple
+	// options, they can be emitted in different order in the JSON
 }
