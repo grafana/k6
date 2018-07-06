@@ -485,8 +485,8 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 
 	executor := New(runner)
 	executor.SetEndIterations(null.IntFrom(2))
-	executor.SetVUsMax(1)
-	executor.SetVUs(1)
+	require.NoError(t, executor.SetVUsMax(1))
+	require.NoError(t, executor.SetVUs(1))
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

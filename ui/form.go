@@ -47,7 +47,9 @@ type Form struct {
 // Runs the form against the specified input and output.
 func (f Form) Run(r io.Reader, w io.Writer) (map[string]interface{}, error) {
 	if f.Banner != "" {
-		fmt.Fprintln(w, color.BlueString(f.Banner)+"\n")
+		if _, err := fmt.Fprintln(w, color.BlueString(f.Banner)+"\n"); err != nil {
+			return nil, err
+		}
 	}
 
 	buf := bufio.NewReader(r)
@@ -58,7 +60,9 @@ func (f Form) Run(r io.Reader, w io.Writer) (map[string]interface{}, error) {
 			if extra := field.GetLabelExtra(); extra != "" {
 				displayLabel += " " + color.New(color.Faint, color.FgCyan).Sprint("["+extra+"]")
 			}
-			fmt.Fprintf(w, "  "+displayLabel+": ")
+			if _, err := fmt.Fprintf(w, "  "+displayLabel+": "); err != nil {
+				return nil, err
+			}
 
 			color.Set(color.FgCyan)
 			s, err := buf.ReadString('\n')
@@ -69,7 +73,9 @@ func (f Form) Run(r io.Reader, w io.Writer) (map[string]interface{}, error) {
 
 			v, err := field.Clean(s)
 			if err != nil {
-				fmt.Fprintln(w, color.RedString("- "+err.Error()))
+				if _, printErr := fmt.Fprintln(w, color.RedString("- "+err.Error())); printErr != nil {
+					return nil, printErr
+				}
 				continue
 			}
 
