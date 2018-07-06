@@ -79,7 +79,7 @@ func Convert(h HAR, optionsFilePath string, enableChecks bool, returnOnFailedChe
 		scriptOptions = scriptOptions.Apply(injectedOptions)
 	}
 
-	scriptOptionsSrc, err := json.Marshal(scriptOptions)
+	scriptOptionsSrc, err := scriptOptions.GetCleanJSON()
 	if err != nil {
 		return "", err
 	}
