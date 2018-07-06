@@ -58,7 +58,7 @@ func fprintf(w io.Writer, format string, a ...interface{}) int {
 }
 
 // TODO: refactor this to have fewer parameters... or just refactor in general...
-func Convert(h HAR, options lib.Options, enableChecks bool, returnOnFailedCheck bool, batchTime uint, nobatch bool, correlate bool, only, skip []string) (string, error) {
+func Convert(h HAR, options lib.Options, minSleep, maxSleep uint, enableChecks bool, returnOnFailedCheck bool, batchTime uint, nobatch bool, correlate bool, only, skip []string) (string, error) {
 	var b bytes.Buffer
 	w := bufio.NewWriter(&b)
 
@@ -280,8 +280,8 @@ func Convert(h HAR, options lib.Options, enableChecks bool, returnOnFailedCheck 
 
 			if i == len(pages)-1 {
 				// Last page; add random sleep time at the group completion
-				fprint(w, "\t\t// Random sleep between 20s and 40s\n")
-				fprint(w, "\t\tsleep(Math.floor(Math.random()*20+20));\n")
+				fprintf(w, "\t\t// Random sleep between %ds and %ds\n", minSleep, maxSleep)
+				fprintf(w, "\t\tsleep(Math.floor(Math.random()*%d+%d));\n", maxSleep-minSleep, minSleep)
 			} else {
 				// Add sleep time at the end of the group
 				nextPage := pages[i+1]

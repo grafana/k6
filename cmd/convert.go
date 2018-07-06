@@ -35,6 +35,8 @@ import (
 var (
 	output              string
 	optionsFilePath     string
+	minSleep            uint
+	maxSleep            uint
 	enableChecks        bool
 	returnOnFailedCheck bool
 	correlate           bool
@@ -94,7 +96,8 @@ var convertCmd = &cobra.Command{
 			options = options.Apply(injectedOptions)
 		}
 
-		script, err := har.Convert(h, options, enableChecks, returnOnFailedCheck, threshold, nobatch, correlate, only, skip)
+		//TODO: refactor...
+		script, err := har.Convert(h, options, minSleep, maxSleep, enableChecks, returnOnFailedCheck, threshold, nobatch, correlate, only, skip)
 		if err != nil {
 			return err
 		}
@@ -135,4 +138,6 @@ func init() {
 	convertCmd.Flags().BoolVarP(&enableChecks, "enable-status-code-checks", "", false, "add a status code check for each HTTP response")
 	convertCmd.Flags().BoolVarP(&returnOnFailedCheck, "return-on-failed-check", "", false, "return from iteration if we get an unexpected response status code")
 	convertCmd.Flags().BoolVarP(&correlate, "correlate", "", false, "detect values in responses being used in subsequent requests and try adapt the script accordingly (only redirects and JSON values for now)")
+	convertCmd.Flags().UintVarP(&minSleep, "min-sleep", "", 20, "the minimum amount of seconds to sleep after each iteration")
+	convertCmd.Flags().UintVarP(&maxSleep, "max-sleep", "", 40, "the maximum amount of seconds to sleep after each iteration")
 }
