@@ -94,7 +94,9 @@ import http from 'k6/http';
 // Version: 1.2
 // Creator: WebInspector
 
-export let options = { maxRedirects: 0 };
+export let options = {
+    "maxRedirects": 0
+};
 
 export default function() {
 
@@ -185,4 +187,6 @@ func TestIntegrationConvertCmd(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, testHARConvertResult, string(output))
 	})
+	// TODO: test options injection; right now that's difficult because when there are multiple
+	// options, they can be emitted in different order in the JSON
 }

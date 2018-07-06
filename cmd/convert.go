@@ -21,16 +21,20 @@
 package cmd
 
 import (
+	"encoding/json"
 	"io"
+	"io/ioutil"
 	"path/filepath"
 
 	"github.com/loadimpact/k6/converter/har"
+	"github.com/loadimpact/k6/lib"
 	"github.com/spf13/cobra"
+	null "gopkg.in/guregu/null.v3"
 )
 
 var (
 	output              string
-	options             string
+	optionsFilePath     string
 	enableChecks        bool
 	returnOnFailedCheck bool
 	correlate           bool
@@ -75,6 +79,21 @@ var convertCmd = &cobra.Command{
 			return err
 		}
 
+		// recordings include redirections as separate requests, and we dont want to trigger them twice
+		options := lib.Options{MaxRedirects: null.IntFrom(0)}
+
+		if optionsFilePath != "" {
+			optionsFileContents, err := ioutil.ReadFile(optionsFilePath)
+			if err != nil {
+				return err
+			}
+			var injectedOptions lib.Options
+			if err := json.Unmarshal(optionsFileContents, &injectedOptions); err != nil {
+				return err
+			}
+			options = options.Apply(injectedOptions)
+		}
+
 		script, err := har.Convert(h, options, enableChecks, returnOnFailedCheck, threshold, nobatch, correlate, only, skip)
 		if err != nil {
 			return err
@@ -108,7 +127,7 @@ func init() {
 	RootCmd.AddCommand(convertCmd)
 	convertCmd.Flags().SortFlags = false
 	convertCmd.Flags().StringVarP(&output, "output", "O", output, "k6 script output filename (stdout by default)")
-	convertCmd.Flags().StringVarP(&options, "options", "", output, "path to a JSON file with options that would be injected in the output script")
+	convertCmd.Flags().StringVarP(&optionsFilePath, "options", "", output, "path to a JSON file with options that would be injected in the output script")
 	convertCmd.Flags().StringSliceVarP(&only, "only", "", []string{}, "include only requests from the given domains")
 	convertCmd.Flags().StringSliceVarP(&skip, "skip", "", []string{}, "skip requests from the given domains")
 	convertCmd.Flags().UintVarP(&threshold, "batch-threshold", "", 500, "batch request idle time threshold (see example)")

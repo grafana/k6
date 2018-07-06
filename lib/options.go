@@ -367,11 +367,15 @@ func (o Options) Apply(opts Options) Options {
 	return o
 }
 
-// GetCleanJSON is a massive hack that works arround the fact that some
+// GetPrettyJSON is a massive hack that works around the fact that some
 // of the null-able types used in Options are marshalled to `null` when
 // their `valid` flag is false.
-func (o Options) GetCleanJSON() ([]byte, error) {
-	nullyResult, err := json.Marshal(o)
+// TODO: figure out something better or at least use reflect to do it, that
+// way field order could be preserved, we could optionally emit JS objects
+// (without mandatory quoted keys)` and we won't needlessly marshal and
+// unmarshal things...
+func (o Options) GetPrettyJSON(prefix, indent string) ([]byte, error) {
+	nullyResult, err := json.MarshalIndent(o, prefix, indent)
 	if err != nil {
 		return nil, err
 	}
@@ -387,5 +391,5 @@ func (o Options) GetCleanJSON() ([]byte, error) {
 			delete(tmpMap, k)
 		}
 	}
-	return json.Marshal(tmpMap)
+	return json.MarshalIndent(tmpMap, prefix, indent)
 }
