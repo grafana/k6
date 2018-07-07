@@ -42,7 +42,7 @@ deploy_script:
       Copy-Item -Path .\k6.exe -Destination .\k6.portable\k6.exe
 
       Set-Location -Path .\k6.portable\
-      (Get-Content '.\k6.portable.nuspec' -Raw).Replace("<version>__REPLACE__</version>", "<version>$($env:VERSION)</version>") | Out-File '.\k6.portable.nuspec'
+      (Get-Content '.\k6.portable.nuspec' -Raw).Replace("<version>__REPLACE__</version>", "<version>$($env:APPVEYOR_REPO_TAG_NAME.substring(1))</version>") | Out-File '.\k6.portable.nuspec'
       choco pack
   # Publising the chocolatey package
   - 'curl -H "X-GPG-PASSPHRASE: %GPG_PASSPHRASE%" -T .\k6.portable.%VERSION%.nupkg "https://%BINTRAY_USER%:%BINTRAY_KEY%@api.bintray.com/content/loadimpact/choco/k6.portable/%VERSION%/k6.portable.%VERSION%.nupkg?publish=1&override=1"'
