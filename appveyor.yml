@@ -1,6 +1,11 @@
 image: Visual Studio 2017
 clone_folder: 'c:\gopath\src\github.com\%APPVEYOR_REPO_NAME%'
 
+# Start builds on tags only (GitHub and BitBucket)
+skip_non_tags: true
+# Do not build feature branch with open Pull Requests
+skip_branch_with_pr: true
+
 environment:
   # improve readability
   VCS_URL: 'https://github.com/%APPVEYOR_REPO_NAME%'
