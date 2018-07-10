@@ -1,8 +1,6 @@
 image: Visual Studio 2017
 clone_folder: 'c:\gopath\src\github.com\%APPVEYOR_REPO_NAME%'
 
-# Start builds on tags only (GitHub and BitBucket)
-skip_non_tags: true
 # Do not build feature branch with open Pull Requests
 skip_branch_with_pr: true
 
@@ -28,8 +26,17 @@ install:
   # specific to go
   - set PATH=%GOPATH%\bin;%PATH%
 
+# scripts to run before tests
+before_test:
+  - go get -u github.com/golang/dep/cmd/dep
+
+test_script:
+  - dep.exe status
+
 # build msi artifacts
 build_script:
+  # In case of non tag build, mock a version
+  - if "%APPVEYOR_REPO_TAG%" == "false" (set VERSION="0.0.1")
   - pandoc -s -f markdown -t rtf -o packaging\LICENSE.rtf LICENSE.md
   - go build -a -ldflags "-s -w" -o packaging\k6.exe
   - cd packaging
@@ -37,6 +44,9 @@ build_script:
   - light.exe -ext WixUIExtension k6.wixobj
 
 deploy_script:
+  # Checking if the build has started by pushed tag
+  - ps: |
+      if ( $env:APPVEYOR_REPO_TAG -eq "false" ) { Exit-AppveyorBuild }
   # Publishing the msi
   - 'curl -H "X-GPG-PASSPHRASE: %GPG_PASSPHRASE%" -T k6.msi "https://%BINTRAY_USER%:%BINTRAY_KEY%@api.bintray.com/content/loadimpact/windows/k6/%VERSION%/k6-v%VERSION%-amd64.msi?publish=1&override=1"'
   - 'curl -H "X-GPG-PASSPHRASE: %GPG_PASSPHRASE%" -T k6.msi "https://%BINTRAY_USER%:%BINTRAY_KEY%@api.bintray.com/content/loadimpact/windows/k6/latest/k6-latest-amd64.msi?publish=1&override=1"'
