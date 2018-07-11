@@ -11,8 +11,9 @@ jobs:
       - run:
           name: Check dependencies
           command: |
-            export PATH=$GOPATH/bin:$PATH
-            go get -u github.com/golang/dep/cmd/dep
+            export PATH="$GOPATH/bin:$PATH"
+            mkdir -p "$GOPATH/bin"
+            curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
             dep status
             dep ensure -update -dry-run
       - run:
