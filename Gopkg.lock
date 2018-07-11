@@ -7,7 +7,7 @@
   name = "github.com/GeertJohan/go.rice"
   packages = [
     ".",
-    "embedded"
+    "embedded",
   ]
   pruneopts = "NUT"
   revision = "c02ca9a983da5807ddf7d796784928f5be4afd09"
@@ -42,7 +42,7 @@
   name = "github.com/ThomsonReutersEikon/go-ntlm"
   packages = [
     "ntlm",
-    "ntlm/md4"
+    "ntlm/md4",
   ]
   pruneopts = "NUT"
   revision = "2a7c173f9e18233a4ae29891da6a0a63637e2d8d"
@@ -76,7 +76,7 @@
   name = "github.com/dlclark/regexp2"
   packages = [
     ".",
-    "syntax"
+    "syntax",
   ]
   pruneopts = "NUT"
   revision = "487489b64fb796de2e55f4e8a4ad1e145f80e957"
@@ -91,7 +91,7 @@
     "ast",
     "file",
     "parser",
-    "token"
+    "token",
   ]
   pruneopts = "NUT"
   revision = "9183045acc25574e0dd2ad37d5e7f978b1a4de12"
@@ -166,7 +166,7 @@
   packages = [
     ".",
     "binding",
-    "render"
+    "render",
   ]
   pruneopts = "NUT"
   revision = "d459835d2b077e44f7c9b453505ee29881d5d12d"
@@ -177,7 +177,7 @@
   name = "github.com/go-sourcemap/sourcemap"
   packages = [
     ".",
-    "internal/base64vlq"
+    "internal/base64vlq",
   ]
   pruneopts = "NUT"
   revision = "b019cc30c1eaa584753491b0d8f8c1534bf1eb44"
@@ -237,7 +237,7 @@
   packages = [
     "client/v2",
     "models",
-    "pkg/escape"
+    "pkg/escape",
   ]
   pruneopts = "NUT"
   revision = "6ac835404e7e64ea7299a6eebcce1ab1ef15fe3c"
@@ -288,7 +288,7 @@
   name = "github.com/labstack/gommon"
   packages = [
     "color",
-    "log"
+    "log",
   ]
   pruneopts = "NUT"
   revision = "57409ada9da0f2afad6664c49502f8c50fbd8476"
@@ -301,7 +301,7 @@
   packages = [
     ".",
     "jsonapi",
-    "routing"
+    "routing",
   ]
   pruneopts = "NUT"
   revision = "95be7bd0455eb57da87c8b74723d2846f4c8a408"
@@ -329,7 +329,7 @@
   packages = [
     "httpbin",
     "httpbin/assets",
-    "httpbin/digest"
+    "httpbin/digest",
   ]
   pruneopts = "NUT"
   revision = "793a504652281c75a1f3dbaba99bdd2c3246fc3e"
@@ -420,7 +420,7 @@
   name = "github.com/sirupsen/logrus"
   packages = [
     ".",
-    "hooks/test"
+    "hooks/test",
   ]
   pruneopts = "NUT"
   revision = "90150a8ed11b6ce285e77e8af2b0109559ce4777"
@@ -431,7 +431,7 @@
   name = "github.com/spf13/afero"
   packages = [
     ".",
-    "mem"
+    "mem",
   ]
   pruneopts = "NUT"
   revision = "787d034dfe70e44075ccc060d346146ef53270ad"
@@ -445,19 +445,19 @@
   revision = "a114f312e075f65bf30d6d9a1430113f857e543b"
 
 [[projects]]
-  digest = "1:3ab855aa584d08db6541ce99dad60c12bd6a328ecb8a7358363887f85c976347"
+  digest = "1:15e5c398fbd9d2c439b635a08ac161b13d04f0c2aa587fe256b65dc0c3efe8b7"
   name = "github.com/spf13/pflag"
   packages = ["."]
   pruneopts = "NUT"
-  revision = "e57e3eeb33f795204c1ca35f56c44f83227c6e66"
-  version = "v1.0.0"
+  revision = "583c0c0531f06d5278b7d917446061adc344b5cd"
+  version = "v1.0.1"
 
 [[projects]]
   digest = "1:1b70b055ad90a0471dff7f92a31a0b85a970f513f7ff5c9e0536aec9e5ee30be"
   name = "github.com/stretchr/testify"
   packages = [
     "assert",
-    "require"
+    "require",
   ]
   pruneopts = "NUT"
   revision = "12b6f73e6084dad08a7c6e575284b177ecafbc71"
@@ -529,7 +529,7 @@
     "md4",
     "ocsp",
     "ripemd160",
-    "ssh/terminal"
+    "ssh/terminal",
   ]
   pruneopts = "NUT"
   revision = "c7dcf104e3a7a1417abc0230cb0d5240d764159d"
@@ -545,7 +545,7 @@
     "http2",
     "http2/hpack",
     "idna",
-    "lex/httplex"
+    "lex/httplex",
   ]
   pruneopts = "NUT"
   revision = "ae89d30ce0c63142b652837da33d782e2b0a9b25"
@@ -556,7 +556,7 @@
   name = "golang.org/x/sys"
   packages = [
     "unix",
-    "windows"
+    "windows",
   ]
   pruneopts = "NUT"
   revision = "c28acc882ebcbfbe8ce9f0f14b9ac26ee138dd51"
@@ -580,7 +580,7 @@
     "unicode/bidi",
     "unicode/cldr",
     "unicode/norm",
-    "unicode/rangetable"
+    "unicode/rangetable",
   ]
   pruneopts = "NUT"
   revision = "f21a4dfb5e38f5895301dc265a8def02365cc3d0"
@@ -667,7 +667,7 @@
     "golang.org/x/text/unicode/norm",
     "golang.org/x/time/rate",
     "gopkg.in/guregu/null.v3",
-    "gopkg.in/yaml.v2"
+    "gopkg.in/yaml.v2",
   ]
   solver-name = "gps-cdcl"
   solver-version = 1
