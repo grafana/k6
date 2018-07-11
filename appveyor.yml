@@ -26,13 +26,6 @@ install:
   # specific to go
   - set PATH=%GOPATH%\bin;%PATH%
 
-# scripts to run before tests
-before_test:
-  - go get -u github.com/golang/dep/cmd/dep
-
-test_script:
-  - dep.exe status
-
 # build msi artifacts
 build_script:
   # In case of non tag build, mock a version
