@@ -395,7 +395,7 @@ func (u *VU) runFn(ctx context.Context, group *lib.Group, fn goja.Callable, args
 		u.HTTPTransport.CloseIdleConnections()
 	}
 
-	state.Samples <- u.Dialer.GetTrail(startTime, endTime, stats.IntoSampleTags(&tags))
+	stats.PushIfNotCancelled(ctx, state.Samples, u.Dialer.GetTrail(startTime, endTime, stats.IntoSampleTags(&tags)))
 
 	return v, state, err
 }

@@ -816,3 +816,5 @@ func TestSetupTeardownThresholds(t *testing.T) {
 		require.False(t, engine.IsTainted())
 	}
 }
+
+// TODO: write a test that checks if samples are emitted when the context is cancelled
