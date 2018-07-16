@@ -21,10 +21,11 @@
 package lib
 
 import (
-	"bytes"
 	"crypto/tls"
 	"encoding/json"
+	"fmt"
 	"net"
+	"reflect"
 
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
@@ -187,80 +188,80 @@ type Options struct {
 
 	// Initial values for VUs, max VUs, duration cap, iteration cap, and stages.
 	// See the Runner or Executor interfaces for more information.
-	VUs        null.Int           `json:"vus" envconfig:"vus" js:"vus"`
-	VUsMax     null.Int           `json:"vusMax" envconfig:"vus_max" js:"vusMax"`
-	Duration   types.NullDuration `json:"duration" envconfig:"duration" js:"duration"`
-	Iterations null.Int           `json:"iterations" envconfig:"iterations" js:"iterations"`
-	Stages     []Stage            `json:"stages" envconfig:"stages" js:"stages"`
+	VUs        null.Int           `json:"vus" envconfig:"vus"`
+	VUsMax     null.Int           `json:"vusMax" envconfig:"vus_max"`
+	Duration   types.NullDuration `json:"duration" envconfig:"duration"`
+	Iterations null.Int           `json:"iterations" envconfig:"iterations"`
+	Stages     []Stage            `json:"stages" envconfig:"stages"`
 
 	// Timeouts for the setup() and teardown() functions
-	SetupTimeout    types.NullDuration `json:"setupTimeout" envconfig:"setup_timeout" js:"setupTimeout"`
-	TeardownTimeout types.NullDuration `json:"teardownTimeout" envconfig:"teardown_timeout" js:"teardownTimeout"`
+	SetupTimeout    types.NullDuration `json:"setupTimeout" envconfig:"setup_timeout"`
+	TeardownTimeout types.NullDuration `json:"teardownTimeout" envconfig:"teardown_timeout"`
 
 	// Limit HTTP requests per second.
-	RPS null.Int `json:"rps" envconfig:"rps" js:"rps"`
+	RPS null.Int `json:"rps" envconfig:"rps"`
 
 	// How many HTTP redirects do we follow?
-	MaxRedirects null.Int `json:"maxRedirects" envconfig:"max_redirects" js:"maxRedirects"`
+	MaxRedirects null.Int `json:"maxRedirects" envconfig:"max_redirects"`
 
 	// Default User Agent string for HTTP requests.
-	UserAgent null.String `json:"userAgent" envconfig:"user_agent" js:"userAgent"`
+	UserAgent null.String `json:"userAgent" envconfig:"user_agent"`
 
 	// How many batch requests are allowed in parallel, in total and per host?
-	Batch        null.Int `json:"batch" envconfig:"batch" js:"batch"`
-	BatchPerHost null.Int `json:"batchPerHost" envconfig:"batch_per_host" js:"batchPerHost"`
+	Batch        null.Int `json:"batch" envconfig:"batch"`
+	BatchPerHost null.Int `json:"batchPerHost" envconfig:"batch_per_host"`
 
 	// Should all HTTP requests and responses be logged (excluding body)?
-	HttpDebug null.String `json:"httpDebug" envconfig:"http_debug" js:"httpDebug"`
+	HttpDebug null.String `json:"httpDebug" envconfig:"http_debug"`
 
 	// Accept invalid or untrusted TLS certificates.
-	InsecureSkipTLSVerify null.Bool `json:"insecureSkipTLSVerify" envconfig:"insecure_skip_tls_verify" js:"insecureSkipTLSVerify"`
+	InsecureSkipTLSVerify null.Bool `json:"insecureSkipTLSVerify" envconfig:"insecure_skip_tls_verify"`
 
 	// Specify TLS versions and cipher suites, and present client certificates.
-	TLSCipherSuites *TLSCipherSuites `json:"tlsCipherSuites" envconfig:"tls_cipher_suites" js:"tlsCipherSuites"`
-	TLSVersion      *TLSVersions     `json:"tlsVersion" envconfig:"tls_version" js:"tlsVersion"`
-	TLSAuth         []*TLSAuth       `json:"tlsAuth" envconfig:"tlsauth" js:"tlsAuth"`
+	TLSCipherSuites *TLSCipherSuites `json:"tlsCipherSuites" envconfig:"tls_cipher_suites"`
+	TLSVersion      *TLSVersions     `json:"tlsVersion" envconfig:"tls_version"`
+	TLSAuth         []*TLSAuth       `json:"tlsAuth" envconfig:"tlsauth"`
 
 	// Throw warnings (eg. failed HTTP requests) as errors instead of simply logging them.
-	Throw null.Bool `json:"throw" envconfig:"throw" js:"throw"`
+	Throw null.Bool `json:"throw" envconfig:"throw"`
 
 	// Define thresholds; these take the form of 'metric=["snippet1", "snippet2"]'.
 	// To create a threshold on a derived metric based on tag queries ("submetrics"), create a
 	// metric on a nonexistent metric named 'real_metric{tagA:valueA,tagB:valueB}'.
-	Thresholds map[string]stats.Thresholds `json:"thresholds" envconfig:"thresholds" js:"thresholds"`
+	Thresholds map[string]stats.Thresholds `json:"thresholds" envconfig:"thresholds"`
 
 	// Blacklist IP ranges that tests may not contact. Mainly useful in hosted setups.
-	BlacklistIPs []*net.IPNet `json:"blacklistIPs" envconfig:"blacklist_ips" js:"blacklistIPs"`
+	BlacklistIPs []*net.IPNet `json:"blacklistIPs" envconfig:"blacklist_ips"`
 
 	// Hosts overrides dns entries for given hosts
-	Hosts map[string]net.IP `json:"hosts" envconfig:"hosts" js:"hosts"`
+	Hosts map[string]net.IP `json:"hosts" envconfig:"hosts"`
 
 	// Disable keep-alive connections
-	NoConnectionReuse null.Bool `json:"noConnectionReuse" envconfig:"no_connection_reuse" js:"noConnectionReuse"`
+	NoConnectionReuse null.Bool `json:"noConnectionReuse" envconfig:"no_connection_reuse"`
 
 	// Do not reuse connections between VU iterations. This gives more realistic results (depending
 	// on what you're looking for), but you need to raise various kernel limits or you'll get
 	// errors about running out of file handles or sockets, or being unable to bind addresses.
-	NoVUConnectionReuse null.Bool `json:"noVUConnectionReuse" envconfig:"no_vu_connection_reuse" js:"noVUConnectionReuse"`
+	NoVUConnectionReuse null.Bool `json:"noVUConnectionReuse" envconfig:"no_vu_connection_reuse"`
 
 	// These values are for third party collectors' benefit.
 	// Can't be set through env vars.
-	External map[string]json.RawMessage `json:"ext" ignored:"true" js:"ext"`
+	External map[string]json.RawMessage `json:"ext" ignored:"true"`
 
 	// Summary trend stats for trend metrics (response times) in CLI output
-	SummaryTrendStats []string `json:"summaryTrendStats" envconfig:"summary_trend_stats" js:"summaryTrendStats"`
+	SummaryTrendStats []string `json:"summaryTrendStats" envconfig:"summary_trend_stats"`
 
 	// Summary time unit for summary metrics (response times) in CLI output
-	SummaryTimeUnit null.String `json:"summaryTimeUnit" envconfig:"summary_time_unit" js:"summaryTimeUnit"`
+	SummaryTimeUnit null.String `json:"summaryTimeUnit" envconfig:"summary_time_unit"`
 
 	// Which system tags to include with metrics ("method", "vu" etc.)
-	SystemTags TagSet `json:"systemTags" envconfig:"system_tags" js:"systemTags"`
+	SystemTags TagSet `json:"systemTags" envconfig:"system_tags"`
 
 	// Tags to be applied to all samples for this running
-	RunTags *stats.SampleTags `json:"tags" envconfig:"tags" js:"tags"`
+	RunTags *stats.SampleTags `json:"tags" envconfig:"tags"`
 
 	// Buffer size of the channel for metric samples; 0 means unbuffered
-	MetricSamplesBufferSize null.Int `json:"metricSamplesBufferSize" envconfig:"metric_samples_buffer_size" js:"metricSamplesBufferSize"`
+	MetricSamplesBufferSize null.Int `json:"metricSamplesBufferSize" envconfig:"metric_samples_buffer_size"`
 }
 
 // Returns the result of overwriting any fields with any that are set on the argument.
@@ -367,29 +368,37 @@ func (o Options) Apply(opts Options) Options {
 	return o
 }
 
-// GetPrettyJSON is a massive hack that works around the fact that some
-// of the null-able types used in Options are marshalled to `null` when
-// their `valid` flag is false.
-// TODO: figure out something better or at least use reflect to do it, that
-// way field order could be preserved, we could optionally emit JS objects
-// (without mandatory quoted keys)` and we won't needlessly marshal and
-// unmarshal things...
-func (o Options) GetPrettyJSON(prefix, indent string) ([]byte, error) {
-	nullyResult, err := json.MarshalIndent(o, prefix, indent)
-	if err != nil {
-		return nil, err
-	}
+// ForEachValid enumerates all struct fields and calls the supplied function with each
+// element that is valid. It panics for any unfamiliar or unexpected fields, so make sure
+// new fields in Options are accounted for.
+func (o Options) ForEachValid(structTag string, callback func(key string, value interface{})) {
+	structType := reflect.TypeOf(o)
+	structVal := reflect.ValueOf(o)
+	for i := 0; i < structType.NumField(); i++ {
+		fieldType := structType.Field(i)
+		fieldVal := structVal.Field(i)
 
-	var tmpMap map[string]json.RawMessage
-	if err := json.Unmarshal(nullyResult, &tmpMap); err != nil {
-		return nil, err
-	}
+		shouldCall := false
+		switch fieldType.Type.Kind() {
+		case reflect.Struct:
+			shouldCall = fieldVal.FieldByName("Valid").Bool()
+		case reflect.Slice:
+			shouldCall = fieldVal.Len() > 0
+		case reflect.Map:
+			shouldCall = fieldVal.Len() > 0
+		case reflect.Ptr:
+			shouldCall = !fieldVal.IsNil()
+		default:
+			panic(fmt.Sprintf("Unknown Options field %#v", fieldType))
+		}
 
-	null := []byte("null")
-	for k, v := range tmpMap {
-		if bytes.Equal(v, null) {
-			delete(tmpMap, k)
+		if shouldCall {
+			key, ok := fieldType.Tag.Lookup(structTag)
+			if !ok {
+				key = fieldType.Name
+			}
+
+			callback(key, fieldVal.Interface())
 		}
 	}
-	return json.MarshalIndent(tmpMap, prefix, indent)
 }
