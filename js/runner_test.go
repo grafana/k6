@@ -41,6 +41,7 @@ import (
 	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -123,32 +124,50 @@ func TestRunnerOptions(t *testing.T) {
 	}
 }
 
-func TestOptions(t *testing.T) {
+func TestOptionsPropagationToScript(t *testing.T) {
 	fs := afero.NewMemMapFs()
 
 	src := &lib.SourceData{
 		Filename: "/script.js",
 		Data: []byte(`
-			export let options = { setupTimeout: "1s" };
-			export default function() {  };
+			export let options = { setupTimeout: "1s", myOption: "test" };
+			export default function() {
+				if (options.external) {
+					throw new Error("Unexpected property external!");
+				}
+				if (options.myOption != "test") {
+					throw new Error("expected myOption to remain unchanged but it was '" + options.myOption + "'");
+				}
+				if (options.setupTimeout != __ENV.expectedSetupTimeout) {
+					throw new Error("expected setupTimeout to be " + __ENV.expectedSetupTimeout + " but it was " + options.setupTimeout);
+				}
+			};
 		`),
 	}
 
-	r1, err := New(src, fs, lib.RuntimeOptions{IncludeSystemEnvVars: null.BoolFrom(true), Env: map[string]string{"K6_SETUPTIMEOUT": "5s"}})
-	if !assert.NoError(t, err) {
-		return
-	}
-	r1.SetOptions(lib.Options{SetupTimeout: types.NullDurationFrom(time.Duration(3) * time.Second)})
+	expScriptOptions := lib.Options{SetupTimeout: types.NullDurationFrom(1 * time.Second)}
+	r1, err := New(src, fs, lib.RuntimeOptions{Env: map[string]string{"expectedSetupTimeout": "1s"}})
+	require.NoError(t, err)
+	require.Equal(t, expScriptOptions, r1.GetOptions())
 
-	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{})
-	if !assert.NoError(t, err) {
-		return
-	}
+	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{Env: map[string]string{"expectedSetupTimeout": "3s"}})
+	require.NoError(t, err)
+	require.Equal(t, expScriptOptions, r2.GetOptions())
+
+	newOptions := lib.Options{SetupTimeout: types.NullDurationFrom(3 * time.Second)}
+	r2.SetOptions(newOptions)
+	require.Equal(t, newOptions, r2.GetOptions())
 
 	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range testdata {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, lib.Options{SetupTimeout: types.NullDurationFrom(time.Duration(3) * time.Second)}, r.GetOptions())
+			samples := make(chan stats.SampleContainer, 100)
+
+			vu, err := r.NewVU(samples)
+			if assert.NoError(t, err) {
+				err := vu.RunOnce(context.Background())
+				assert.NoError(t, err)
+			}
 		})
 	}
 }
