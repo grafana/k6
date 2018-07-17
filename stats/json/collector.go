@@ -41,6 +41,13 @@ type Collector struct {
 // Verify that Collector implements lib.Collector
 var _ lib.Collector = &Collector{}
 
+// Similar to ioutil.NopCloser, but for writers
+type nopCloser struct {
+	io.Writer
+}
+
+func (nopCloser) Close() error { return nil }
+
 func (c *Collector) HasSeenMetric(str string) bool {
 	for _, n := range c.seenMetrics {
 		if n == str {
@@ -53,7 +60,7 @@ func (c *Collector) HasSeenMetric(str string) bool {
 func New(fs afero.Fs, fname string) (*Collector, error) {
 	if fname == "" || fname == "-" {
 		return &Collector{
-			outfile: os.Stdout,
+			outfile: nopCloser{os.Stdout},
 			fname:   "-",
 		}, nil
 	}
