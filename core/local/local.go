@@ -68,20 +68,22 @@ func (h *vuHandle) run(logger *log.Logger, flow <-chan int64, iterDone chan<- st
 
 		if h.vu != nil {
 			err := h.vu.RunOnce(ctx)
-			if err != nil {
-				select {
-				case <-ctx.Done():
-				// Don't log errors from cancelled iterations
-				default:
+			select {
+			case <-ctx.Done():
+			// Don't log errors or emit iterations metrics from cancelled iterations
+			default:
+				if err != nil {
 					if s, ok := err.(fmt.Stringer); ok {
 						logger.Error(s.String())
 					} else {
 						logger.Error(err.Error())
 					}
 				}
+				iterDone <- struct{}{}
 			}
+		} else {
+			iterDone <- struct{}{}
 		}
-		iterDone <- struct{}{}
 	}
 }
 
