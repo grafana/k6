@@ -36,6 +36,7 @@ import (
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/testutils"
+	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/spf13/afero"
@@ -118,6 +119,36 @@ func TestRunnerOptions(t *testing.T) {
 			r.SetOptions(lib.Options{Paused: null.BoolFrom(false)})
 			assert.Equal(t, r.Bundle.Options, r.GetOptions())
 			assert.Equal(t, null.NewBool(false, true), r.Bundle.Options.Paused)
+		})
+	}
+}
+
+func TestOptions(t *testing.T) {
+	fs := afero.NewMemMapFs()
+
+	src := &lib.SourceData{
+		Filename: "/script.js",
+		Data: []byte(`
+			export let options = { setupTimeout: "1s" };
+			export default function() {  };
+		`),
+	}
+
+	r1, err := New(src, fs, lib.RuntimeOptions{IncludeSystemEnvVars: null.BoolFrom(true), Env: map[string]string{"K6_SETUPTIMEOUT": "5s"}})
+	if !assert.NoError(t, err) {
+		return
+	}
+	r1.SetOptions(lib.Options{SetupTimeout: types.NullDurationFrom(time.Duration(3) * time.Second)})
+
+	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{})
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
+	for name, r := range testdata {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, lib.Options{SetupTimeout: types.NullDurationFrom(time.Duration(3) * time.Second)}, r.GetOptions())
 		})
 	}
 }
