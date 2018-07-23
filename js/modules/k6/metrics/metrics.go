@@ -67,7 +67,7 @@ func (m Metric) Add(ctx context.Context, v goja.Value, addTags ...map[string]str
 		vfloat = 1.0
 	}
 
-	state.Samples <- stats.Sample{Time: time.Now(), Metric: m.metric, Value: vfloat, Tags: stats.IntoSampleTags(&tags)}
+	stats.PushIfNotCancelled(ctx, state.Samples, stats.Sample{Time: time.Now(), Metric: m.metric, Value: vfloat, Tags: stats.IntoSampleTags(&tags)})
 }
 
 type Metrics struct{}
