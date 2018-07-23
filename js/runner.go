@@ -395,7 +395,15 @@ func (u *VU) runFn(ctx context.Context, group *lib.Group, fn goja.Callable, args
 		u.HTTPTransport.CloseIdleConnections()
 	}
 
-	state.Samples <- u.Dialer.GetTrail(startTime, endTime, stats.IntoSampleTags(&tags))
+	var isFullIteration bool
+	select {
+	case <-ctx.Done():
+		isFullIteration = false
+	default:
+		isFullIteration = true
+	}
+
+	state.Samples <- u.Dialer.GetTrail(startTime, endTime, isFullIteration, stats.IntoSampleTags(&tags))
 
 	return v, state, err
 }

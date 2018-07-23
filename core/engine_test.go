@@ -492,13 +492,24 @@ func getMetricSum(collector *dummy.Collector, name string) (result float64) {
 	}
 	return
 }
+func getMetricCount(collector *dummy.Collector, name string) (result uint) {
+	for _, sc := range collector.SampleContainers {
+		for _, s := range sc.GetSamples() {
+			if s.Metric.Name == name {
+				result++
+			}
+		}
+	}
+	return
+}
+
+const expectedHeaderMaxLength = 500
+
 func TestSentReceivedMetrics(t *testing.T) {
 	t.Parallel()
 	tb := testutils.NewHTTPMultiBin(t)
 	defer tb.Cleanup()
 	tr := tb.Replacer.Replace
-
-	const expectedHeaderMaxLength = 500
 
 	type testScript struct {
 		Code                 string
@@ -815,4 +826,92 @@ func TestSetupTeardownThresholds(t *testing.T) {
 		require.NoError(t, err)
 		require.False(t, engine.IsTainted())
 	}
+}
+
+func TestEmittedMetricsWhenScalingDown(t *testing.T) {
+	t.Parallel()
+	tb := testutils.NewHTTPMultiBin(t)
+	defer tb.Cleanup()
+
+	script := []byte(tb.Replacer.Replace(`
+		import http from "k6/http";
+		import { sleep } from "k6";
+
+		export let options = {
+			systemTags: ["iter", "vu", "url"],
+
+			// Start with 2 VUs for 2 second and then quickly scale down to 1 for the next 2s and then quit
+			vus: 2,
+			vusMax: 2,
+			stages: [
+				{ duration: "2s", target: 2 },
+				{ duration: "1s", target: 1 },
+				{ duration: "1s", target: 1 },
+			],
+		};
+
+		export default function () {
+			console.log("VU " + __VU + " starting iteration #" + __ITER);
+			http.get("HTTPBIN_IP_URL/bytes/15000");
+			sleep(1.7);
+			http.get("HTTPBIN_IP_URL/bytes/15000");
+			console.log("VU " + __VU + " ending iteration #" + __ITER);
+		};
+	`))
+
+	runner, err := js.New(
+		&lib.SourceData{Filename: "/script.js", Data: script},
+		afero.NewMemMapFs(),
+		lib.RuntimeOptions{},
+	)
+	require.NoError(t, err)
+
+	engine, err := NewEngine(local.New(runner), runner.GetOptions())
+	require.NoError(t, err)
+
+	collector := &dummy.Collector{}
+	engine.Collectors = []lib.Collector{collector}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	errC := make(chan error)
+	go func() { errC <- engine.Run(ctx) }()
+
+	select {
+	case <-time.After(10 * time.Second):
+		cancel()
+		t.Fatal("Test timed out")
+	case err := <-errC:
+		cancel()
+		require.NoError(t, err)
+		require.False(t, engine.IsTainted())
+	}
+
+	// The 1.7 sleep in the default function would cause the first VU to comlete 2 full iterations
+	// and stat executing its third one, while the second VU will only fully complete 1 iteration
+	// and will be canceled in the middle of its second one.
+	assert.Equal(t, 3.0, getMetricSum(collector, metrics.Iterations.Name))
+
+	// That means that we expect to see 8 HTTP requests in total, 3*2=6 from the complete iterations
+	// and one each from the two iterations that would be canceled in the middle of their execution
+	assert.Equal(t, 8.0, getMetricSum(collector, metrics.HTTPReqs.Name))
+
+	// But we expect to only see the data_received for only 7 of those requests. The data for the 8th
+	// request (the 3rd one in the first VU before the test ends) gets cut off by the engine because
+	// it's emitted after the test officially ends
+	dataReceivedExpectedMin := 15000.0 * 7
+	dataReceivedExpectedMax := (15000.0 + expectedHeaderMaxLength) * 7
+	dataReceivedActual := getMetricSum(collector, metrics.DataReceived.Name)
+	if dataReceivedActual < dataReceivedExpectedMin || dataReceivedActual > dataReceivedExpectedMax {
+		t.Errorf(
+			"The data_received sum should be in the interval [%f, %f] but was %f",
+			dataReceivedExpectedMin, dataReceivedExpectedMax, dataReceivedActual,
+		)
+	}
+
+	// Also, the interrupted iterations shouldn't affect the average iteration_duration in any way, only
+	// complete iterations should be taken into account
+	durationCount := float64(getMetricCount(collector, metrics.IterationDuration.Name))
+	assert.Equal(t, 3.0, durationCount)
+	durationSum := getMetricSum(collector, metrics.IterationDuration.Name)
+	assert.InDelta(t, 1.7, durationSum/(1000*durationCount), 0.1)
 }
