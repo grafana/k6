@@ -21,8 +21,8 @@
 package cloud
 
 import (
+	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -45,8 +45,11 @@ type ErrorResponse struct {
 
 func (e ErrorResponse) Error() string {
 	msg := e.Message
+	if e.Response != nil {
+		msg = fmt.Sprintf("%d %s", e.Response.StatusCode, msg)
+	}
 	if e.Code != 0 {
-		msg = strconv.Itoa(e.Code) + " " + msg
+		msg = fmt.Sprintf("%s [err code %d]", msg, e.Code)
 	}
 
 	var details []string

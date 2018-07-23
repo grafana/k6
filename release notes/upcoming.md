@@ -11,6 +11,7 @@ Description of feature.
 ## UX
 
 * The consolidated user-supplied options (the final combination of config file options, exported script `options`, environment variables and command-line flags) are now exported back into the `options` script variable and can be accessed from the script. Thanks to @mohanprasaths for working on this! (#681 and #713)
+* Improved error messages when outputting results to or executing tests in the Load Impact cloud (#716)
 
 ## Bugs fixed!
 

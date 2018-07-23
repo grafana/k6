@@ -160,12 +160,6 @@ func checkResponse(r *http.Response) error {
 		return nil
 	}
 
-	if r.StatusCode == 401 {
-		return ErrNotAuthenticated
-	} else if r.StatusCode == 403 {
-		return ErrNotAuthorized
-	}
-
 	data, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		return err
@@ -175,6 +169,12 @@ func checkResponse(r *http.Response) error {
 		Error ErrorResponse `json:"error"`
 	}
 	if err := json.Unmarshal(data, &payload); err != nil {
+		if r.StatusCode == http.StatusUnauthorized {
+			return ErrNotAuthenticated
+		}
+		if r.StatusCode == http.StatusForbidden {
+			return ErrNotAuthorized
+		}
 		return errors.Errorf(
 			"Unexpected HTTP error from %s: %d %s",
 			r.Request.URL,
@@ -182,6 +182,7 @@ func checkResponse(r *http.Response) error {
 			http.StatusText(r.StatusCode),
 		)
 	}
+	payload.Error.Response = r
 	return payload.Error
 }
 
