@@ -123,7 +123,7 @@ func TestAuthorizedError(t *testing.T) {
 
 	assert.Equal(t, 1, called)
 	assert.Nil(t, resp)
-	assert.EqualError(t, err, ErrNotAuthorized.Error())
+	assert.EqualError(t, err, "403 Not allowed [err code 5]")
 }
 
 func TestRetry(t *testing.T) {
