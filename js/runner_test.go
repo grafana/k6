@@ -124,9 +124,53 @@ func TestRunnerOptions(t *testing.T) {
 	}
 }
 
-func TestOptionsPropagationToScript(t *testing.T) {
-	fs := afero.NewMemMapFs()
+func TestOptionsSettingToScript(t *testing.T) {
+	t.Parallel()
 
+	optionVariants := []string{
+		"",
+		"let options = null;",
+		"let options = undefined;",
+		"let options = {};",
+		"let options = {teardownTimeout: '1s'};",
+	}
+
+	for i, variant := range optionVariants {
+		variant := variant
+		t.Run(fmt.Sprintf("Variant#%d", i), func(t *testing.T) {
+			t.Parallel()
+			src := &lib.SourceData{
+				Filename: "/script.js",
+				Data: []byte(variant + `
+					export default function() {
+						if (!options) {
+							throw new Error("Expected options to be defined!");
+						}
+						if (options.teardownTimeout != __ENV.expectedTeardownTimeout) {
+							throw new Error("expected teardownTimeout to be " + __ENV.expectedTeardownTimeout + " but it was " + options.teardownTimeout);
+						}
+					};
+				`),
+			}
+			r, err := New(src, afero.NewMemMapFs(), lib.RuntimeOptions{Env: map[string]string{"expectedTeardownTimeout": "4s"}})
+			require.NoError(t, err)
+
+			newOptions := lib.Options{TeardownTimeout: types.NullDurationFrom(4 * time.Second)}
+			r.SetOptions(newOptions)
+			require.Equal(t, newOptions, r.GetOptions())
+
+			samples := make(chan stats.SampleContainer, 100)
+			vu, err := r.NewVU(samples)
+			if assert.NoError(t, err) {
+				err := vu.RunOnce(context.Background())
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestOptionsPropagationToScript(t *testing.T) {
+	t.Parallel()
 	src := &lib.SourceData{
 		Filename: "/script.js",
 		Data: []byte(`
@@ -146,7 +190,7 @@ func TestOptionsPropagationToScript(t *testing.T) {
 	}
 
 	expScriptOptions := lib.Options{SetupTimeout: types.NullDurationFrom(1 * time.Second)}
-	r1, err := New(src, fs, lib.RuntimeOptions{Env: map[string]string{"expectedSetupTimeout": "1s"}})
+	r1, err := New(src, afero.NewMemMapFs(), lib.RuntimeOptions{Env: map[string]string{"expectedSetupTimeout": "1s"}})
 	require.NoError(t, err)
 	require.Equal(t, expScriptOptions, r1.GetOptions())
 
