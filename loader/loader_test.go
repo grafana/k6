@@ -23,6 +23,7 @@ package loader
 import (
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"testing"
 
 	"github.com/loadimpact/k6/lib/testutils"
@@ -32,7 +33,7 @@ import (
 
 func TestDir(t *testing.T) {
 	testdata := map[string]string{
-		"/path/to/file.txt": "/path/to",
+		"/path/to/file.txt": filepath.FromSlash("/path/to"),
 		"-":                 "/",
 	}
 	for name, dir := range testdata {
@@ -85,8 +86,9 @@ func TestLoad(t *testing.T) {
 		}
 
 		t.Run("Nonexistent", func(t *testing.T) {
+			path := filepath.FromSlash("/nonexistent")
 			_, err := Load(fs, "/", "/nonexistent")
-			assert.EqualError(t, err, "open /nonexistent: file does not exist")
+			assert.EqualError(t, err, fmt.Sprintf("open %s: file does not exist", path))
 		})
 
 		t.Run("Remote Lifting Denied", func(t *testing.T) {
