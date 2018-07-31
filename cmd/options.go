@@ -55,7 +55,7 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.Int64("batch", 10, "max parallel batch reqs")
 	flags.Int64("batch-per-host", 0, "max parallel batch reqs per host")
 	flags.Int64("rps", 0, "limit requests per second")
-	flags.String("user-agent", fmt.Sprintf("k6/%s (https://k6.io/);", Version), "user agent for http requests")
+	flags.String("user-agent", fmt.Sprintf("k6/%s (https://k6.io/)", Version), "user agent for http requests")
 	flags.String("http-debug", "", "log all HTTP requests and responses. Excludes body by default. To include body use '---http-debug=full'")
 	flags.Lookup("http-debug").NoOptDefVal = "headers"
 	flags.Bool("insecure-skip-tls-verify", false, "skip verification of TLS certificates")
