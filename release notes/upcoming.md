@@ -2,7 +2,8 @@ TODO: Intro
 
 ## New Features!
 
-### Category: Title (#PR)
+### Option: No Cookies Reset (#729)
+A No Cookies Reset option has been added; it disables the cookies resetting after a VU iteration so that the cookies will be persisted across VUs iterations.
 
 Description of feature.
 
