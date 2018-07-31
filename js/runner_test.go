@@ -814,7 +814,8 @@ func TestVUIntegrationOpenFunctionError(t *testing.T) {
 	assert.EqualError(t, err, "GoError: \"open\" function is only available to the init code (aka global scope), see https://docs.k6.io/docs/test-life-cycle for more information")
 }
 
-func TestVUIntegrationCookies(t *testing.T) {
+func TestVUIntegrationCookiesReset(t *testing.T) {
+
 	tb := testutils.NewHTTPMultiBin(t)
 	defer tb.Cleanup()
 
@@ -863,6 +864,66 @@ func TestVUIntegrationCookies(t *testing.T) {
 				err = vu.RunOnce(context.Background())
 				assert.NoError(t, err)
 			}
+		})
+	}
+}
+
+func TestVUIntegrationCookiesNoReset(t *testing.T) {
+	tb := testutils.NewHTTPMultiBin(t)
+	defer tb.Cleanup()
+
+	r1, err := New(&lib.SourceData{
+		Filename: "/script.js",
+		Data: []byte(tb.Replacer.Replace(`
+			import http from "k6/http";
+			export default function() {
+				let url = "HTTPBIN_URL";
+				if (__ITER == 0) {
+					let res = http.get(url + "/cookies/set?k2=v2&k1=v1");
+					if (res.status != 200) { throw new Error("wrong status: " + res.status) }
+					if (res.json().k1 != "v1" || res.json().k2 != "v2") {
+						throw new Error("wrong cookies: " + res.body);
+					}
+				}
+
+				if (__ITER == 1) {
+					let res = http.get(url + "/cookies");
+					if (res.status != 200) { throw new Error("wrong status (pre): " + res.status); }
+					if (res.json().k1 != "v1" || res.json().k2 != "v2") {
+						throw new Error("wrong cookies: " + res.body);
+					}
+				}
+			}
+		`)),
+	}, afero.NewMemMapFs(), lib.RuntimeOptions{})
+	if !assert.NoError(t, err) {
+		return
+	}
+	r1.SetOptions(lib.Options{
+		Throw:          null.BoolFrom(true),
+		MaxRedirects:   null.IntFrom(10),
+		Hosts:          tb.Dialer.Hosts,
+		NoCookiesReset: null.BoolFrom(true),
+	})
+
+	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{})
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	runners := map[string]*Runner{"Source": r1, "Archive": r2}
+	for name, r := range runners {
+		t.Run(name, func(t *testing.T) {
+			vu, err := r.NewVU(make(chan stats.SampleContainer, 100))
+			if !assert.NoError(t, err) {
+				return
+			}
+
+			err = vu.RunOnce(context.Background())
+			assert.NoError(t, err)
+
+			err = vu.RunOnce(context.Background())
+			assert.NoError(t, err)
 		})
 	}
 }
