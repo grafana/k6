@@ -67,7 +67,6 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.String("summary-time-unit", "", "define the time unit used to display the trend stats. Possible units are: 's', 'ms' and 'us'")
 	flags.StringSlice("system-tags", lib.DefaultSystemTagList, "only include these system tags in metrics")
 	flags.StringSlice("tag", nil, "add a `tag` to be applied to all samples, as `[name]=[value]`")
-	flags.Bool("no-cookies-reset", false, "don't reset cookies after a VU iteration")
 	return flags
 }
 
@@ -87,7 +86,6 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		NoConnectionReuse:     getNullBool(flags, "no-connection-reuse"),
 		NoVUConnectionReuse:   getNullBool(flags, "no-vu-connection-reuse"),
 		Throw:                 getNullBool(flags, "throw"),
-		NoCookiesReset:        getNullBool(flags, "no-cookies-reset"),
 		// Default values for options without CLI flags:
 		// TODO: find a saner and more dev-friendly and error-proof way to handle options
 		SetupTimeout:    types.NullDuration{Duration: types.Duration(10 * time.Second), Valid: false},
