@@ -86,7 +86,6 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		NoConnectionReuse:     getNullBool(flags, "no-connection-reuse"),
 		NoVUConnectionReuse:   getNullBool(flags, "no-vu-connection-reuse"),
 		Throw:                 getNullBool(flags, "throw"),
-
 		// Default values for options without CLI flags:
 		// TODO: find a saner and more dev-friendly and error-proof way to handle options
 		SetupTimeout:    types.NullDuration{Duration: types.Duration(10 * time.Second), Valid: false},

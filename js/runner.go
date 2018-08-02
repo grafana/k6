@@ -165,11 +165,17 @@ func (r *Runner) newVU(samplesOut chan<- stats.SampleContainer) (*VU, error) {
 	}
 	_ = http2.ConfigureTransport(transport)
 
+	cookieJar, err := cookiejar.New(nil)
+	if err != nil {
+		return nil, err
+	}
+
 	vu := &VU{
 		BundleInstance: *bi,
 		Runner:         r,
 		HTTPTransport:  netext.NewHTTPTransport(transport),
 		Dialer:         dialer,
+		CookieJar:      cookieJar,
 		TLSConfig:      tlsConfig,
 		Console:        NewConsole(),
 		BPool:          bpool.NewBufferPool(100),
@@ -284,6 +290,7 @@ type VU struct {
 	Runner        *Runner
 	HTTPTransport *netext.HTTPTransport
 	Dialer        *netext.Dialer
+	CookieJar     *cookiejar.Jar
 	TLSConfig     *tls.Config
 	ID            int64
 	Iteration     int64
@@ -351,6 +358,10 @@ func (u *VU) runFn(ctx context.Context, group *lib.Group, fn goja.Callable, args
 	cookieJar, err := cookiejar.New(nil)
 	if err != nil {
 		return goja.Undefined(), nil, err
+	}
+
+	if u.Runner.Bundle.Options.NoCookiesReset.Valid && u.Runner.Bundle.Options.NoCookiesReset.Bool {
+		cookieJar = u.CookieJar
 	}
 
 	state := &common.State{
