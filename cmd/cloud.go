@@ -67,7 +67,8 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 		}
 
 		filename := args[0]
-		src, err := readSource(filename, pwd, afero.NewOsFs(), os.Stdin)
+		fs := afero.NewOsFs()
+		src, err := readSource(filename, pwd, fs, os.Stdin)
 		if err != nil {
 			return err
 		}
@@ -77,28 +78,16 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 			return err
 		}
 
-		r, err := newRunner(src, runType, afero.NewOsFs(), runtimeOptions)
+		r, err := newRunner(src, runType, fs, runtimeOptions)
 		if err != nil {
 			return err
 		}
 
-		// Options
-		fs := afero.NewOsFs()
-		fileConf, _, err := readDiskConfig(fs)
+		conf, err := getConsolidatedConfig(fs, cmd.Flags(), r)
 		if err != nil {
 			return err
 		}
-		options, err := getOptions(cmd.Flags())
-		if err != nil {
-			return err
-		}
-		cliConf := Config{Options: options}
 
-		envConf, err := readEnvConfig()
-		if err != nil {
-			return err
-		}
-		conf := cliConf.Apply(fileConf).Apply(Config{Options: r.GetOptions()}).Apply(envConf).Apply(cliConf)
 		r.SetOptions(conf.Options)
 
 		// Cloud config
