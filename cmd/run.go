@@ -116,28 +116,17 @@ a commandline interface for interacting with it.`,
 			return err
 		}
 
-		r, err := newRunner(src, runType, afero.NewOsFs(), runtimeOptions)
+		r, err := newRunner(src, runType, fs, runtimeOptions)
 		if err != nil {
 			return err
 		}
 
-		// Assemble options; start with the CLI-provided options to get shadowed (non-Valid)
-		// defaults in there, override with Runner-provided ones, then merge the CLI opts in
-		// on top to give them priority.
 		fprintf(stdout, "%s options\r", initBar.String())
-		cliConf, err := getConfig(cmd.Flags())
+
+		conf, err := getConsolidatedConfig(fs, cmd.Flags(), r)
 		if err != nil {
 			return err
 		}
-		fileConf, _, err := readDiskConfig(fs)
-		if err != nil {
-			return err
-		}
-		envConf, err := readEnvConfig()
-		if err != nil {
-			return err
-		}
-		conf := cliConf.Apply(fileConf).Apply(Config{Options: r.GetOptions()}).Apply(envConf).Apply(cliConf)
 
 		// If -m/--max isn't specified, figure out the max that should be needed.
 		if !conf.VUsMax.Valid {
@@ -148,14 +137,17 @@ a commandline interface for interacting with it.`,
 				}
 			}
 		}
+
 		// If -d/--duration, -i/--iterations and -s/--stage are all unset, run to one iteration.
 		if !conf.Duration.Valid && !conf.Iterations.Valid && conf.Stages == nil {
 			conf.Iterations = null.IntFrom(1)
 		}
+
 		// If duration is explicitly set to 0, it means run forever.
 		if conf.Duration.Valid && conf.Duration.Duration == 0 {
 			conf.Duration = types.NullDuration{}
 		}
+
 		// If summary trend stats are defined, update the UI to reflect them
 		if len(conf.SummaryTrendStats) > 0 {
 			ui.UpdateTrendColumns(conf.SummaryTrendStats)

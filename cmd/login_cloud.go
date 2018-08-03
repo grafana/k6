@@ -51,7 +51,13 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fs := afero.NewOsFs()
-		config, cdir, err := readDiskConfig(fs)
+
+		k6Conf, err := getConsolidatedConfig(fs, nil, nil)
+		if err != nil {
+			return err
+		}
+
+		currentDiskConf, cdir, err := readDiskConfig(fs)
 		if err != nil {
 			return err
 		}
@@ -60,15 +66,15 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 		reset := getNullBool(cmd.Flags(), "reset")
 		token := getNullString(cmd.Flags(), "token")
 
-		conf := cloud.NewConfig().Apply(config.Collectors.Cloud)
+		newCloudConf := cloud.NewConfig().Apply(currentDiskConf.Collectors.Cloud)
 
 		switch {
 		case reset.Valid:
-			conf.Token = null.StringFromPtr(nil)
+			newCloudConf.Token = null.StringFromPtr(nil)
 			fprintf(stdout, "  token reset\n")
 		case show.Bool:
 		case token.Valid:
-			conf.Token = token
+			newCloudConf.Token = token
 		default:
 			form := ui.Form{
 				Fields: []ui.Field{
@@ -76,7 +82,7 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 						Key:   "Email",
 						Label: "Email",
 					},
-					ui.StringField{
+					ui.PasswordField{
 						Key:   "Password",
 						Label: "Password",
 					},
@@ -89,7 +95,7 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 			email := vals["Email"].(string)
 			password := vals["Password"].(string)
 
-			client := cloud.NewClient("", conf.Host.String, Version)
+			client := cloud.NewClient("", k6Conf.Collectors.Cloud.Host.String, Version)
 			res, err := client.Login(email, password)
 			if err != nil {
 				return err
@@ -99,16 +105,16 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 				return errors.New(`Your account has no API token, please generate one: "https://app.loadimpact.com/account/token".`)
 			}
 
-			conf.Token = null.StringFrom(res.Token)
+			newCloudConf.Token = null.StringFrom(res.Token)
 		}
 
-		config.Collectors.Cloud = conf
-		if err := writeDiskConfig(fs, cdir, config); err != nil {
+		currentDiskConf.Collectors.Cloud = newCloudConf
+		if err := writeDiskConfig(fs, cdir, currentDiskConf); err != nil {
 			return err
 		}
 
-		if conf.Token.Valid {
-			fprintf(stdout, "  token: %s\n", ui.ValueColor.Sprint(conf.Token.String))
+		if newCloudConf.Token.Valid {
+			fprintf(stdout, "  token: %s\n", ui.ValueColor.Sprint(newCloudConf.Token.String))
 		}
 		return nil
 	},
