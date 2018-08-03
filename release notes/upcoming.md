@@ -11,4 +11,6 @@ Description of feature.
 
 ## Bugs fixed!
 
-* Category: description of bug. (#PR)
+* UI: The interactive `k6 login influxdb` command failed to write the supplied options to the config file. (#734)
+* UI: Password input is now masked in `k6 login influxdb` and `k6 login cloud`. (#734)
+* Config: Environment variables can now be used to modify k6's behavior in the `k6 login` subcommands. (#734)
