@@ -63,7 +63,7 @@ func (f StringField) GetLabelExtra() string {
 // of the newline and consume more of the stdin, because we'll mess up the next form field
 func (f StringField) GetContents(r io.Reader) (string, error) {
 	result := make([]byte, 0, 20)
-	buf := make([]byte, 1, 1)
+	buf := make([]byte, 1)
 	for {
 		n, err := io.ReadAtLeast(r, buf, 1)
 		if err != nil {
