@@ -27,7 +27,6 @@ import (
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats/cloud"
 	"github.com/loadimpact/k6/stats/influxdb"
 	"github.com/loadimpact/k6/stats/kafka"
@@ -92,6 +91,7 @@ func (c Config) Apply(cfg Config) Config {
 	}
 	c.Collectors.InfluxDB = c.Collectors.InfluxDB.Apply(cfg.Collectors.InfluxDB)
 	c.Collectors.Cloud = c.Collectors.Cloud.Apply(cfg.Collectors.Cloud)
+	c.Collectors.Kafka = c.Collectors.Kafka.Apply(cfg.Collectors.Kafka)
 	return c
 }
 
@@ -153,8 +153,16 @@ func writeDiskConfig(fs afero.Fs, cdir *configdir.Config, conf Config) error {
 
 // Reads configuration variables from the environment.
 func readEnvConfig() (conf Config, err error) {
-	err = envconfig.Process("k6", &conf)
-	return conf, err
+	// TODO: replace envconfig and refactor the whole configuration from the groun up :/
+	for _, err := range []error{
+		envconfig.Process("k6", &conf),
+		envconfig.Process("k6", &conf.Collectors.Cloud),
+		envconfig.Process("k6", &conf.Collectors.InfluxDB),
+		envconfig.Process("k6", &conf.Collectors.Kafka),
+	} {
+		return conf, err
+	}
+	return conf, nil
 }
 
 // Assemble the final consolidated configuration from all of the different sources:
@@ -164,12 +172,20 @@ func readEnvConfig() (conf Config, err error) {
 // - add the environment variables
 // - merge the user-supplied CLI flags back in on top, to give them the greatest priority
 // - set some defaults if they weren't previously specified
-// TODO: add better validation, improve consistency between formats
+// TODO: add better validation, more explicit default values and improve consistency between formats
 func getConsolidatedConfig(fs afero.Fs, flags *pflag.FlagSet, runner lib.Runner) (conf Config, err error) {
-	cliConf, err := getConfig(flags)
-	if err != nil {
-		return conf, err
+	cliConf := Config{}
+	if flags != nil {
+		cliConf, err = getConfig(flags)
+		if err != nil {
+			return conf, err
+		}
 	}
+
+	cliConf.Collectors.InfluxDB = influxdb.NewConfig().Apply(cliConf.Collectors.InfluxDB)
+	cliConf.Collectors.Cloud = cloud.NewConfig().Apply(cliConf.Collectors.Cloud)
+	cliConf.Collectors.Kafka = kafka.NewConfig().Apply(cliConf.Collectors.Kafka)
+
 	fileConf, _, err := readDiskConfig(fs)
 	if err != nil {
 		return conf, err
@@ -184,26 +200,6 @@ func getConsolidatedConfig(fs afero.Fs, flags *pflag.FlagSet, runner lib.Runner)
 		conf = conf.Apply(Config{Options: runner.GetOptions()})
 	}
 	conf = conf.Apply(envConf).Apply(cliConf)
-
-	// If -m/--max isn't specified, figure out the max that should be needed.
-	if !conf.VUsMax.Valid {
-		conf.VUsMax = null.NewInt(conf.VUs.Int64, conf.VUs.Valid)
-		for _, stage := range conf.Stages {
-			if stage.Target.Valid && stage.Target.Int64 > conf.VUsMax.Int64 {
-				conf.VUsMax = stage.Target
-			}
-		}
-	}
-
-	// If -d/--duration, -i/--iterations and -s/--stage are all unset, run to one iteration.
-	if !conf.Duration.Valid && !conf.Iterations.Valid && conf.Stages == nil {
-		conf.Iterations = null.IntFrom(1)
-	}
-
-	// If duration is explicitly set to 0, it means run forever.
-	if conf.Duration.Valid && conf.Duration.Duration == 0 {
-		conf.Duration = types.NullDuration{}
-	}
 
 	return conf, nil
 }
