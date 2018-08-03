@@ -3,7 +3,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:4311a599af4d1d002593505731fd92b46bec2809aa5be0b486f2d0beb3f5da86"
+  digest = "1:7d8fe22a434ddfb29d95e10a0231eb2d96100b9eaaf7bff7312eee7df7a34bfa"
   name = "github.com/GeertJohan/go.rice"
   packages = [
     ".",
@@ -38,7 +38,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:959fa1e95b8a8b28e22071a7af5e3eade3e4fcf5c682ef257b443cf14168b8b2"
+  digest = "1:69dabd9ff5154eba205b9c049a1716b4ce0e6d7da55e3d1a96fa1da2a3540158"
   name = "github.com/ThomsonReutersEikon/go-ntlm"
   packages = [
     "ntlm",
@@ -84,7 +84,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:ae5067125af1b735941a3abf4d055dc072ff4825a0606d85383dc7ddb97767d0"
+  digest = "1:9af09d68bd80a20b3fae068ab7c6476c9b53a145963b57df6d508180aabae7b9"
   name = "github.com/dop251/goja"
   packages = [
     ".",
@@ -161,7 +161,7 @@
   revision = "22d885f9ecc78bf4ee5d72b937e4bbcdc58e8cae"
 
 [[projects]]
-  digest = "1:9ab37684216559c96004c817c212154f514feef7755093414ee7fbc6881dca8f"
+  digest = "1:10095a140b7829bcf199c8447725c0b1b9874a527b3d73cb2fc9ffc4a5fe8178"
   name = "github.com/gin-gonic/gin"
   packages = [
     ".",
@@ -173,7 +173,7 @@
   version = "v1.2"
 
 [[projects]]
-  digest = "1:e7ea8ffe5d3fffce277bdd05b9956aa567ceb8f6b28bd7516b54a78a8b4ee13f"
+  digest = "1:7d5c6757be75cd60d5936e26b2894c16bbb555bd8dad4724b0fa19efb3a6f78b"
   name = "github.com/go-sourcemap/sourcemap"
   packages = [
     ".",
@@ -232,7 +232,7 @@
   version = "v1.0"
 
 [[projects]]
-  digest = "1:613e96a9d28627ab67a7dc1edeffb63a53df8512882d347ad104dad2afe50461"
+  digest = "1:32b1db7dd0c6cee1e65ab3841b7f8d8a9f0a6d97f85229137efee95a0dfcfddd"
   name = "github.com/influxdata/influxdb"
   packages = [
     "client/v2",
@@ -268,7 +268,7 @@
   version = "v1.3.0"
 
 [[projects]]
-  digest = "1:8e06d4e0c6f1327dff8efc263812aff62a95f4b72dce24a1b3f688a94fbe7c76"
+  digest = "1:2578ea84d8555a62f49e5f750848ec5d3bad2e5ba9e3977186e407c7501d3b95"
   name = "github.com/kubernetes/helm"
   packages = ["pkg/strvals"]
   pruneopts = "NUT"
@@ -284,7 +284,7 @@
   version = "3.2.6"
 
 [[projects]]
-  digest = "1:442eda44a7dd2637db80d34b6132e6901487dd2f72c77d6cb9c9d2e711a94518"
+  digest = "1:3e5716c10e24021c0c44dd1e3043b6d23a83cd143f8225281fba1b4d0143e4b7"
   name = "github.com/labstack/gommon"
   packages = [
     "color",
@@ -296,7 +296,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:d0f36a7fa3aa5d4932c7ddd9535334b95c35770626c131da5ee6611fe91fea12"
+  digest = "1:afbe9705722abb0d54d4ee48404ef173ba0cfd04fb0c4a76f927e8a68bfaea8a"
   name = "github.com/manyminds/api2go"
   packages = [
     ".",
@@ -324,7 +324,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:518f43f2e2a44dcc572c834208a408e12e3c31c8d56c7fdb0b27ca127de1dfd8"
+  digest = "1:a74203e799dbd148a873dc57fc2ef086b3a2c79d1390ab8a693992b1b25dadd7"
   name = "github.com/mccutchen/go-httpbin"
   packages = [
     "httpbin",
@@ -416,7 +416,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:c33813a8c5cfa48c41c7b446cc1fadd1291f1a5dede939aea0983479b1a48f54"
+  digest = "1:f9e30881a5a427fe87c58273f511fb6a10ee2c8ea55d409d7256ede192f7f4b7"
   name = "github.com/sirupsen/logrus"
   packages = [
     ".",
@@ -427,7 +427,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:a36d61943d51cd4a1d7ecaf6993190527535a57382114ebf6549956b3e4cb612"
+  digest = "1:330e9062b308ac597e28485699c02223bd052437a6eed32a173c9227dcb9d95a"
   name = "github.com/spf13/afero"
   packages = [
     ".",
@@ -438,7 +438,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:47a4d5abe130024f15fc43f8395aaeeebc4eb1e1310c79b59770ed59d856d50e"
+  digest = "1:234b95cdbb31612ff4f97e0ac69abdede0c60f5f84e5d3f40123859f77d8bc2c"
   name = "github.com/spf13/cobra"
   packages = ["."]
   pruneopts = "NT"
@@ -453,7 +453,7 @@
   version = "v1.0.1"
 
 [[projects]]
-  digest = "1:1b70b055ad90a0471dff7f92a31a0b85a970f513f7ff5c9e0536aec9e5ee30be"
+  digest = "1:0d3d375df794ab11a192668f4eacdb116ccd99aa574fe357185a2d463e07f2fb"
   name = "github.com/stretchr/testify"
   packages = [
     "assert",
@@ -521,7 +521,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:7634e83afe58d30c5a8468405daf3904619e740dc0a2a3f4ea9a7b7bfbb8913d"
+  digest = "1:5710f443edd59a8b20c6786b23b3fc873ff9267ec050dd520ec2416db884b3fe"
   name = "golang.org/x/crypto"
   packages = [
     "acme",
@@ -536,7 +536,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:44794dfe91ede43417d2355565cd67cdf81ea0820d4c510c9ea4e1d938597d75"
+  digest = "1:3d87ae21dd01efa1a49fdc98479b49eb59dc6d57f480e3968cf2c36de07d745e"
   name = "golang.org/x/net"
   packages = [
     "context",
@@ -552,7 +552,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:7bd8da6d1b5bb6d9a0ad7be56ac677f50ca469171dc74c65609a61b7b067858f"
+  digest = "1:b1a955501003b967a2c814e41ded50c7b29dfdeb7f266b7987b8ed38f65205d6"
   name = "golang.org/x/sys"
   packages = [
     "unix",
@@ -562,7 +562,7 @@
   revision = "c28acc882ebcbfbe8ce9f0f14b9ac26ee138dd51"
 
 [[projects]]
-  digest = "1:ea70ecfb936e4ca93523ebf61f74c2d5a777b954fb11e28554ef2cb5b1ebf53d"
+  digest = "1:0a6ace3c8a521f2c8861e89b8a22fc869c831e9bf6ad21fc62eb59afa16a8bff"
   name = "golang.org/x/text"
   packages = [
     "cases",
@@ -662,6 +662,7 @@
     "golang.org/x/crypto/md4",
     "golang.org/x/crypto/ocsp",
     "golang.org/x/crypto/ripemd160",
+    "golang.org/x/crypto/ssh/terminal",
     "golang.org/x/net/html",
     "golang.org/x/net/http2",
     "golang.org/x/text/unicode/norm",
