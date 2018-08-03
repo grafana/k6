@@ -24,6 +24,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats/influxdb"
 	"github.com/loadimpact/k6/ui"
 	"github.com/mitchellh/mapstructure"
@@ -72,10 +73,9 @@ This will set the default server used when just "-o influxdb" is passed.`,
 					Label:   "Username",
 					Default: conf.Username.String,
 				},
-				ui.StringField{
-					Key:     "Password",
-					Label:   "Password",
-					Default: conf.Password.String,
+				ui.PasswordField{
+					Key:   "Password",
+					Label: "Password",
 				},
 			},
 		}
@@ -83,7 +83,16 @@ This will set the default server used when just "-o influxdb" is passed.`,
 		if err != nil {
 			return err
 		}
-		if err := mapstructure.Decode(vals, &conf); err != nil {
+
+		dec, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+			DecodeHook: types.NullDecoder,
+			Result:     &conf,
+		})
+		if err != nil {
+			return err
+		}
+
+		if err := dec.Decode(vals); err != nil {
 			return err
 		}
 

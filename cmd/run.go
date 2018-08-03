@@ -42,12 +42,14 @@ import (
 	"github.com/loadimpact/k6/core/local"
 	"github.com/loadimpact/k6/js"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/ui"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
+	null "gopkg.in/guregu/null.v3"
 )
 
 const (
@@ -124,6 +126,26 @@ a commandline interface for interacting with it.`,
 		conf, err := getConsolidatedConfig(fs, cmd.Flags(), r)
 		if err != nil {
 			return err
+		}
+
+		// If -m/--max isn't specified, figure out the max that should be needed.
+		if !conf.VUsMax.Valid {
+			conf.VUsMax = null.NewInt(conf.VUs.Int64, conf.VUs.Valid)
+			for _, stage := range conf.Stages {
+				if stage.Target.Valid && stage.Target.Int64 > conf.VUsMax.Int64 {
+					conf.VUsMax = stage.Target
+				}
+			}
+		}
+
+		// If -d/--duration, -i/--iterations and -s/--stage are all unset, run to one iteration.
+		if !conf.Duration.Valid && !conf.Iterations.Valid && conf.Stages == nil {
+			conf.Iterations = null.IntFrom(1)
+		}
+
+		// If duration is explicitly set to 0, it means run forever.
+		if conf.Duration.Valid && conf.Duration.Duration == 0 {
+			conf.Duration = types.NullDuration{}
 		}
 
 		// If summary trend stats are defined, update the UI to reflect them

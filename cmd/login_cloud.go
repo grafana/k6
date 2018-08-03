@@ -52,7 +52,7 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fs := afero.NewOsFs()
 
-		k6Conf, err := getConsolidatedConfig(fs, cmd.Flags(), nil)
+		k6Conf, err := getConsolidatedConfig(fs, nil, nil)
 		if err != nil {
 			return err
 		}
@@ -82,7 +82,7 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 						Key:   "Email",
 						Label: "Email",
 					},
-					ui.StringField{
+					ui.PasswordField{
 						Key:   "Password",
 						Label: "Password",
 					},
