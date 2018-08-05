@@ -268,6 +268,9 @@ type Options struct {
 
 	// Discard Http Responses Body
 	DiscardResponseBodies null.Bool `json:"discardResponseBodies" envconfig:"discard_response_bodies"`
+
+	// Nic to be used for injection
+	Nic null.String `json:"nic" envconfig:"nic"`
 }
 
 // Returns the result of overwriting any fields with any that are set on the argument.
@@ -364,6 +367,9 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.SummaryTimeUnit.Valid {
 		o.SummaryTimeUnit = opts.SummaryTimeUnit
+	}
+	if opts.Nic.Valid {
+		o.Nic = opts.Nic
 	}
 	if opts.SystemTags != nil {
 		o.SystemTags = opts.SystemTags

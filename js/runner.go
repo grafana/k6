@@ -24,6 +24,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/http/cookiejar"
@@ -110,6 +111,38 @@ func (r *Runner) NewVU(samplesOut chan<- stats.SampleContainer) (lib.VU, error) 
 	return lib.VU(vu), nil
 }
 
+func rr_getAddr(ifaceName string) *net.IPAddr {
+	//rand.Seed(time.Now().Unix())
+
+	// Select given interface
+	targetIf, err := net.InterfaceByName(ifaceName)
+	if err != nil {
+		return nil
+	}
+	// Get available addresses for interface
+	addrs, err := targetIf.Addrs()
+	if err != nil {
+		return nil
+	}
+	rand.Shuffle(len(addrs), func(i, j int) { addrs[i], addrs[j] = addrs[j], addrs[i] })
+	ip := ""
+	for _, a := range addrs {
+		tip, _, err := net.ParseCIDR(a.String())
+		if err == nil && tip.String() != "::1" {
+			ip = tip.String()
+			break
+		}
+	}
+	if ip == "" {
+		return nil
+	}
+	localAddr, err := net.ResolveIPAddr("ip", ip)
+	if err != nil {
+		return nil
+	}
+	return localAddr
+}
+
 func (r *Runner) newVU(samplesOut chan<- stats.SampleContainer) (*VU, error) {
 	// Instantiate a new bundle, make a VU out of it.
 	bi, err := r.Bundle.Instantiate()
@@ -140,7 +173,15 @@ func (r *Runner) newVU(samplesOut chan<- stats.SampleContainer) (*VU, error) {
 			nameToCert[name] = &certs[i]
 		}
 	}
-
+	if r.Bundle.Options.Nic.ValueOrZero() != "" {
+		a := rr_getAddr(r.Bundle.Options.Nic.ValueOrZero())
+		if a != nil {
+			localTCPAddr := net.TCPAddr{
+				IP: a.IP,
+			}
+			r.BaseDialer.LocalAddr = &localTCPAddr
+		}
+	}
 	dialer := &netext.Dialer{
 		Dialer:    r.BaseDialer,
 		Resolver:  r.Resolver,
