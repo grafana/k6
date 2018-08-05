@@ -265,6 +265,9 @@ type Options struct {
 
 	// Do not reset cookies after a VU iteration
 	NoCookiesReset null.Bool `json:"noCookiesReset" envconfig:"no_cookies_reset"`
+
+	// Nic to be used for injection
+	Nic null.String `json:"nic" envconfig:"nic"`
 }
 
 // Returns the result of overwriting any fields with any that are set on the argument.
@@ -361,6 +364,9 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.SummaryTimeUnit.Valid {
 		o.SummaryTimeUnit = opts.SummaryTimeUnit
+	}
+	if opts.Nic.Valid {
+		o.Nic = opts.Nic
 	}
 	if opts.SystemTags != nil {
 		o.SystemTags = opts.SystemTags

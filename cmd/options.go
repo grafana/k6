@@ -65,6 +65,7 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.StringSlice("blacklist-ip", nil, "blacklist an `ip range` from being called")
 	flags.StringSlice("summary-trend-stats", nil, "define `stats` for trend metrics (response times), one or more as 'avg,p(95),...'")
 	flags.String("summary-time-unit", "", "define the time unit used to display the trend stats. Possible units are: 's', 'ms' and 'us'")
+	flags.StringP("nic", "n", "", "Use 'nic' for injection. All VU will be affected a random IP from this 'nic")
 	flags.StringSlice("system-tags", lib.DefaultSystemTagList, "only include these system tags in metrics")
 	flags.StringSlice("tag", nil, "add a `tag` to be applied to all samples, as `[name]=[value]`")
 	return flags
@@ -86,6 +87,8 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		NoConnectionReuse:     getNullBool(flags, "no-connection-reuse"),
 		NoVUConnectionReuse:   getNullBool(flags, "no-vu-connection-reuse"),
 		Throw:                 getNullBool(flags, "throw"),
+		Nic:                   getNullString(flags, "nic"),
+
 		// Default values for options without CLI flags:
 		// TODO: find a saner and more dev-friendly and error-proof way to handle options
 		SetupTimeout:    types.NullDuration{Duration: types.Duration(10 * time.Second), Valid: false},
