@@ -29,13 +29,11 @@ import (
 	"io"
 	"io/ioutil"
 	"mime/multipart"
-	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"net/textproto"
 	"net/url"
 	"reflect"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -44,7 +42,6 @@ import (
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib/netext"
-	"github.com/loadimpact/k6/stats"
 	log "github.com/sirupsen/logrus"
 	null "gopkg.in/guregu/null.v3"
 )
@@ -356,32 +353,6 @@ func (h *HTTP) request(ctx context.Context, preq *parsedHTTPRequest) (*HTTPRespo
 		respReq.Body = preq.body.String()
 	}
 
-	tags := state.Options.RunTags.CloneTags()
-	for k, v := range preq.tags {
-		tags[k] = v
-	}
-
-	if state.Options.SystemTags["method"] {
-		tags["method"] = preq.req.Method
-	}
-	if state.Options.SystemTags["url"] {
-		tags["url"] = preq.url.URLString
-	}
-
-	// Only set the name system tag if the user didn't explicitly set it beforehand
-	if _, ok := tags["name"]; !ok && state.Options.SystemTags["name"] {
-		tags["name"] = preq.url.Name
-	}
-	if state.Options.SystemTags["group"] {
-		tags["group"] = state.Group.Path
-	}
-	if state.Options.SystemTags["vu"] {
-		tags["vu"] = strconv.FormatInt(state.Vu, 10)
-	}
-	if state.Options.SystemTags["iter"] {
-		tags["iter"] = strconv.FormatInt(state.Iteration, 10)
-	}
-
 	// Check rate limit *after* we've prepared a request; no need to wait with that part.
 	if rpsLimit := state.RPSLimit; rpsLimit != nil {
 		if err := rpsLimit.Wait(ctx); err != nil {
@@ -430,9 +401,10 @@ func (h *HTTP) request(ctx context.Context, preq *parsedHTTPRequest) (*HTTPRespo
 		// removing user from URL to avoid sending the authorization header fo basic auth
 		preq.req.URL.User = nil
 
-		tracer := netext.Tracer{}
-		h.debugRequest(state, preq.req, "DigestRequest")
-		res, err := client.Do(preq.req.WithContext(netext.WithTracer(ctx, &tracer)))
+		// tracer := netext.Tracer{}
+		// h.debugRequest(state, preq.req, "DigestRequest")
+		// res, err := client.Do(preq.req.WithContext(netext.WithTracer(ctx, &tracer)))
+		res, err := client.Do(preq.req)
 		h.debugRequest(state, preq.req, "DigestResponse")
 		if err != nil {
 			// Do *not* log errors about the contex being cancelled.
@@ -461,25 +433,24 @@ func (h *HTTP) request(ctx context.Context, preq *parsedHTTPRequest) (*HTTPRespo
 			authorization := challenge.ToAuthorizationStr()
 			preq.req.Header.Set(digest.KEY_AUTHORIZATION, authorization)
 		}
-		trail := tracer.Done()
+		// trail := tracer.Done()
 
-		if state.Options.SystemTags["ip"] && trail.ConnRemoteAddr != nil {
-			if ip, _, err := net.SplitHostPort(trail.ConnRemoteAddr.String()); err == nil {
-				tags["ip"] = ip
-			}
-		}
-		trail.SaveSamples(stats.NewSampleTags(tags))
-		delete(tags, "ip")
-		stats.PushIfNotCancelled(ctx, state.Samples, trail)
+		// if state.Options.SystemTags["ip"] && trail.ConnRemoteAddr != nil {
+		// 	if ip, _, err := net.SplitHostPort(trail.ConnRemoteAddr.String()); err == nil {
+		// 		tags["ip"] = ip
+		// 	}
+		// }
+		// trail.SaveSamples(stats.NewSampleTags(tags))
+		// delete(tags, "ip")
+		// stats.PushIfNotCancelled(ctx, state.Samples, trail)
 	}
 
 	if preq.auth == "ntlm" {
 		ctx = netext.WithAuth(ctx, "ntlm")
 	}
 
-	tracer := netext.Tracer{}
 	h.debugRequest(state, preq.req, "Request")
-	res, resErr := client.Do(preq.req.WithContext(netext.WithTracer(ctx, &tracer)))
+	res, resErr := client.Do(preq.req)
 	h.debugResponse(state, res, "Response")
 	if resErr == nil && res != nil {
 		switch res.Header.Get("Content-Encoding") {
@@ -500,34 +471,34 @@ func (h *HTTP) request(ctx context.Context, preq *parsedHTTPRequest) (*HTTPRespo
 		resp.Body = buf.String()
 		_ = res.Body.Close()
 	}
-	trail := tracer.Done()
-	if trail.ConnRemoteAddr != nil {
-		remoteHost, remotePortStr, _ := net.SplitHostPort(trail.ConnRemoteAddr.String())
-		remotePort, _ := strconv.Atoi(remotePortStr)
-		resp.RemoteIP = remoteHost
-		resp.RemotePort = remotePort
-	}
-	resp.Timings = HTTPResponseTimings{
-		Duration:       stats.D(trail.Duration),
-		Blocked:        stats.D(trail.Blocked),
-		Connecting:     stats.D(trail.Connecting),
-		TLSHandshaking: stats.D(trail.TLSHandshaking),
-		Sending:        stats.D(trail.Sending),
-		Waiting:        stats.D(trail.Waiting),
-		Receiving:      stats.D(trail.Receiving),
-	}
+	// if trail.ConnRemoteAddr != nil {
+	// 	remoteHost, remotePortStr, _ := net.SplitHostPort(trail.ConnRemoteAddr.String())
+	// 	remotePort, _ := strconv.Atoi(remotePortStr)
+	// 	resp.RemoteIP = remoteHost
+	// 	resp.RemotePort = remotePort
+	// }
+	// resp.Timings = HTTPResponseTimings{
+	// 	Duration:       stats.D(trail.Duration),
+	// 	Blocked:        stats.D(trail.Blocked),
+	// 	Connecting:     stats.D(trail.Connecting),
+	// 	TLSHandshaking: stats.D(trail.TLSHandshaking),
+	// 	Sending:        stats.D(trail.Sending),
+	// 	Waiting:        stats.D(trail.Waiting),
+	// 	Receiving:      stats.D(trail.Receiving),
+	// }
 
 	if resErr != nil {
-		resp.Error = resErr.Error()
-		if state.Options.SystemTags["error"] {
-			tags["error"] = resp.Error
-		}
 
-		//TODO: expand/replace this so we can recognize the different non-HTTP
-		// errors, probably by using a type switch for resErr
-		if state.Options.SystemTags["status"] {
-			tags["status"] = "0"
-		}
+		resp.Error = resErr.Error()
+		// if state.Options.SystemTags["error"] {
+		// 	tags["error"] = resp.Error
+		// }
+
+		// //TODO: expand/replace this so we can recognize the different non-HTTP
+		// // errors, probably by using a type switch for resErr
+		// if state.Options.SystemTags["status"] {
+		// 	tags["status"] = "0"
+		// }
 	} else {
 		if preq.activeJar != nil {
 			if rc := res.Cookies(); len(rc) > 0 {
@@ -539,25 +510,25 @@ func (h *HTTP) request(ctx context.Context, preq *parsedHTTPRequest) (*HTTPRespo
 		resp.Status = res.StatusCode
 		resp.Proto = res.Proto
 
-		if state.Options.SystemTags["url"] {
-			tags["url"] = resp.URL
-		}
-		if state.Options.SystemTags["status"] {
-			tags["status"] = strconv.Itoa(resp.Status)
-		}
-		if state.Options.SystemTags["proto"] {
-			tags["proto"] = resp.Proto
-		}
+		// if state.Options.SystemTags["url"] {
+		// 	tags["url"] = resp.URL
+		// }
+		// if state.Options.SystemTags["status"] {
+		// 	tags["status"] = strconv.Itoa(resp.Status)
+		// }
+		// if state.Options.SystemTags["proto"] {
+		// 	tags["proto"] = resp.Proto
+		// }
 
-		if res.TLS != nil {
-			resp.setTLSInfo(res.TLS)
-			if state.Options.SystemTags["tls_version"] {
-				tags["tls_version"] = resp.TLSVersion
-			}
-			if state.Options.SystemTags["ocsp_status"] {
-				tags["ocsp_status"] = resp.OCSP.Status
-			}
-		}
+		// if res.TLS != nil {
+		// 	resp.setTLSInfo(res.TLS)
+		// 	if state.Options.SystemTags["tls_version"] {
+		// 		tags["tls_version"] = resp.TLSVersion
+		// 	}
+		// 	if state.Options.SystemTags["ocsp_status"] {
+		// 		tags["ocsp_status"] = resp.OCSP.Status
+		// 	}
+		// }
 
 		resp.Headers = make(map[string]string, len(res.Header))
 		for k, vs := range res.Header {
@@ -593,13 +564,13 @@ func (h *HTTP) request(ctx context.Context, preq *parsedHTTPRequest) (*HTTPRespo
 		}
 	}
 
-	if state.Options.SystemTags["ip"] && trail.ConnRemoteAddr != nil {
-		if ip, _, err := net.SplitHostPort(trail.ConnRemoteAddr.String()); err == nil {
-			tags["ip"] = ip
-		}
-	}
-	trail.SaveSamples(stats.IntoSampleTags(&tags))
-	stats.PushIfNotCancelled(ctx, state.Samples, trail)
+	// if state.Options.SystemTags["ip"] && trail.ConnRemoteAddr != nil {
+	// 	if ip, _, err := net.SplitHostPort(trail.ConnRemoteAddr.String()); err == nil {
+	// 		tags["ip"] = ip
+	// 	}
+	// }
+	// trail.SaveSamples(stats.IntoSampleTags(&tags))
+	// stats.PushIfNotCancelled(ctx, state.Samples, trail)
 	return resp, nil
 }
 

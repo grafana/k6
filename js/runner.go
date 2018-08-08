@@ -170,16 +170,18 @@ func (r *Runner) newVU(samplesOut chan<- stats.SampleContainer) (*VU, error) {
 		return nil, err
 	}
 
+	newTransport := netext.NewTransport(transport, samplesOut, r.Bundle.Options)
 	vu := &VU{
 		BundleInstance: *bi,
 		Runner:         r,
-		HTTPTransport:  netext.NewHTTPTransport(transport),
-		Dialer:         dialer,
-		CookieJar:      cookieJar,
-		TLSConfig:      tlsConfig,
-		Console:        NewConsole(),
-		BPool:          bpool.NewBufferPool(100),
-		Samples:        samplesOut,
+		// HTTPTransport:  netext.NewHTTPTransport(transport),
+		HTTPTransport: newTransport,
+		Dialer:        dialer,
+		CookieJar:     cookieJar,
+		TLSConfig:     tlsConfig,
+		Console:       NewConsole(),
+		BPool:         bpool.NewBufferPool(100),
+		Samples:       samplesOut,
 	}
 	vu.Runtime.Set("console", common.Bind(vu.Runtime, vu.Console, vu.Context))
 	common.BindToGlobal(vu.Runtime, map[string]interface{}{
@@ -287,8 +289,9 @@ func (r *Runner) runPart(ctx context.Context, out chan<- stats.SampleContainer, 
 type VU struct {
 	BundleInstance
 
-	Runner        *Runner
-	HTTPTransport *netext.HTTPTransport
+	Runner *Runner
+	// HTTPTransport *netext.HTTPTransport
+	HTTPTransport *netext.Transport
 	Dialer        *netext.Dialer
 	CookieJar     *cookiejar.Jar
 	TLSConfig     *tls.Config
