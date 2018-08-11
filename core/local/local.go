@@ -51,7 +51,7 @@ type vuHandle struct {
 	cancel context.CancelFunc
 }
 
-func (h *vuHandle) run(logger *log.Logger, flow <-chan int64, iterDone chan<- struct{}) {
+func (h *vuHandle) run(logger *log.Logger, flow <-chan int64, iterDone chan<- struct{}, errCh chan<- error) {
 	h.RLock()
 	ctx := h.ctx
 	h.RUnlock()
@@ -73,11 +73,7 @@ func (h *vuHandle) run(logger *log.Logger, flow <-chan int64, iterDone chan<- st
 			// Don't log errors or emit iterations metrics from cancelled iterations
 			default:
 				if err != nil {
-					if s, ok := err.(fmt.Stringer); ok {
-						logger.Error(s.String())
-					} else {
-						logger.Error(err.Error())
-					}
+					errCh <- err
 				}
 				iterDone <- struct{}{}
 			}
@@ -124,8 +120,11 @@ type Executor struct {
 	// Output channel to which VUs send samples.
 	vuOut chan stats.SampleContainer
 
-	// Channel on which VUs sigal that iterations are completed
+	// Channel on which VUs signal that iterations are completed
 	iterDone chan struct{}
+
+	// Channel on which VUs signal that a error occurred
+	errCh chan error
 
 	// Flow control for VUs; iterations are run only after reading from this channel.
 	flow chan int64
@@ -146,6 +145,7 @@ func New(r lib.Runner) *Executor {
 		endTime:     -1,
 		vuOut:       make(chan stats.SampleContainer, bufferSize),
 		iterDone:    make(chan struct{}),
+		errCh:       make(chan error),
 	}
 }
 
@@ -164,6 +164,7 @@ func (e *Executor) Run(parent context.Context, engineOut chan<- stats.SampleCont
 	e.lock.Lock()
 	vuOut := e.vuOut
 	iterDone := e.iterDone
+	errCh := e.errCh
 	e.ctx = ctx
 	e.flow = vuFlow
 	e.lock.Unlock()
@@ -294,6 +295,8 @@ func (e *Executor) Run(parent context.Context, engineOut chan<- stats.SampleCont
 			}
 		case sampleContainer := <-vuOut:
 			engineOut <- sampleContainer
+		case err := <-errCh:
+			return err
 		case <-iterDone:
 			// Every iteration ends with a write to iterDone. Check if we've hit the end point.
 			// If not, make sure to include an Iterations bump in the list!
@@ -333,6 +336,7 @@ func (e *Executor) scale(ctx context.Context, num int64) error {
 	e.lock.RLock()
 	flow := e.flow
 	iterDone := e.iterDone
+	errCh := e.errCh
 	e.lock.RUnlock()
 
 	for i, handle := range e.vus {
@@ -357,7 +361,7 @@ func (e *Executor) scale(ctx context.Context, num int64) error {
 
 				e.wg.Add(1)
 				go func() {
-					handle.run(e.Logger, flow, iterDone)
+					handle.run(e.Logger, flow, iterDone, errCh)
 					e.wg.Done()
 				}()
 			}
