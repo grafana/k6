@@ -22,6 +22,7 @@ package js
 
 import (
 	"context"
+	"path/filepath"
 	"strings"
 
 	"github.com/dop251/goja"
@@ -62,7 +63,7 @@ func NewInitContext(rt *goja.Runtime, compiler *compiler.Compiler, ctxPtr *conte
 		compiler: compiler,
 		ctxPtr:   ctxPtr,
 		fs:       fs,
-		pwd:      pwd,
+		pwd:      filepath.ToSlash(pwd),
 
 		programs: make(map[string]programWithSource),
 		files:    make(map[string][]byte),
