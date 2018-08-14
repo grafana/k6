@@ -73,6 +73,12 @@ func (h *vuHandle) run(logger *log.Logger, flow <-chan int64, iterDone chan<- st
 			// Don't log errors or emit iterations metrics from cancelled iterations
 			default:
 				if err != nil {
+					if s, ok := err.(fmt.Stringer); ok {
+						logger.Error(s.String())
+					} else {
+						logger.Error(err.Error())
+					}
+
 					errCh <- err
 				}
 				iterDone <- struct{}{}
@@ -197,6 +203,8 @@ func (e *Executor) Run(parent context.Context, engineOut chan<- stats.SampleCont
 
 		for {
 			select {
+			case reterr = <-errCh:
+				return
 			case <-iterDone:
 				// Spool through all remaining iterations, do not emit stats since the Run() is over
 			case newSampleContainer := <-vuOut:
