@@ -331,7 +331,7 @@ func (h *HTTP) parseRequest(ctx context.Context, method string, reqURL URL, body
 				result.timeout = time.Duration(params.Get(k).ToFloat() * float64(time.Millisecond))
 			case "throw":
 				result.throw = params.Get(k).ToBoolean()
-			case "discardresponsebody":
+			case "discardResponseBody":
 				result.discardResponseBody = params.Get(k).ToBoolean()
 			}
 		}
