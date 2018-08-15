@@ -22,6 +22,8 @@ package cmd
 
 import (
 	"bytes"
+	"regexp"
+	"runtime"
 	"testing"
 
 	"io/ioutil"
@@ -128,7 +130,13 @@ func TestIntegrationConvertCmd(t *testing.T) {
 		assert.NoError(t, err)
 
 		defaultFs = afero.NewMemMapFs()
-		err = afero.WriteFile(defaultFs, "/input.har", []byte(har), 0644)
+
+		filename := "/input.har"
+		if runtime.GOOS == "windows" {
+			filename = "C:\\input.har"
+		}
+
+		err = afero.WriteFile(defaultFs, filename, []byte(har), 0644)
 		assert.NoError(t, err)
 
 		buf := &bytes.Buffer{}
@@ -147,18 +155,24 @@ func TestIntegrationConvertCmd(t *testing.T) {
 		assert.NoError(t, convertCmd.Flags().Set("enable-status-code-checks", "false"))
 		assert.NoError(t, convertCmd.Flags().Set("return-on-failed-check", "false"))
 
+		//Sanitizing to avoid windows problems with carriage returns
+		re := regexp.MustCompile(`\r`)
+		expected := re.ReplaceAllString(string(expectedTestPlan), ``)
+		result := re.ReplaceAllString(buf.String(), ``)
+
 		if assert.NoError(t, err) {
 			// assert.Equal suppresses the diff it is too big, so we add it as the test error message manually as well.
 			diff, _ := difflib.GetUnifiedDiffString(difflib.UnifiedDiff{
-				A:        difflib.SplitLines(string(expectedTestPlan)),
-				B:        difflib.SplitLines(buf.String()),
+				A:        difflib.SplitLines(expected),
+				B:        difflib.SplitLines(result),
 				FromFile: "Expected",
 				FromDate: "",
 				ToFile:   "Actual",
 				ToDate:   "",
 				Context:  1,
 			})
-			assert.Equal(t, string(expectedTestPlan), buf.String(), diff)
+
+			assert.Equal(t, expected, result, diff)
 		}
 	})
 	t.Run("Stdout", func(t *testing.T) {
