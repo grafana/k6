@@ -27,8 +27,6 @@ install:
   - set PATH=%GOPATH%\bin;%PATH%
   - set CGO_ENABLED=1
 
-test_script:
-  - go test -race .\...
 
 # build msi artifacts
 build_script:
@@ -39,6 +37,10 @@ build_script:
   - cd packaging
   - candle.exe -arch x64 -dVERSION=%VERSION% k6.wxs
   - light.exe -ext WixUIExtension k6.wixobj
+
+test_script:
+  - cd %APPVEYOR_BUILD_FOLDER%
+  - go test -race ./...
 
 deploy_script:
   # Checking if the build has started by pushed tag
