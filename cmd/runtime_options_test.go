@@ -210,7 +210,7 @@ func TestEnvVars(t *testing.T) {
 			}
 			jsCode += "}"
 
-			// windows requires the enviroment variables to be loaded to gerenate the rand source
+			// windows requires the environment variables to be loaded to gerenate the rand source
 			if runtime.GOOS == "windows" {
 				for _, e := range envVars {
 					parts := strings.Split(e, "=")

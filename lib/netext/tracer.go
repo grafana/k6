@@ -22,7 +22,6 @@ package netext
 
 import (
 	"crypto/tls"
-	"fmt"
 	"net"
 	"net/http/httptrace"
 	"sync"
@@ -309,7 +308,6 @@ func (t *Tracer) Done() *Trail {
 	if connectDone != 0 && connectStart != 0 {
 		trail.Connecting = time.Duration(connectDone - connectStart)
 	}
-	fmt.Println("connectDone", connectDone, "connectStart", connectStart, "connecting", trail.Connecting)
 	if tlsHandshakeDone != 0 && tlsHandshakeStart != 0 {
 		trail.TLSHandshaking = time.Duration(tlsHandshakeDone - tlsHandshakeStart)
 	}
