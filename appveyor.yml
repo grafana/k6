@@ -26,6 +26,9 @@ install:
   # specific to go
   - set PATH=%GOPATH%\bin;%PATH%
 
+test_script:
+  - go test -race .\...
+
 # build msi artifacts
 build_script:
   # In case of non tag build, mock a version
