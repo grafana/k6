@@ -124,7 +124,7 @@ export default function() {
 func TestIntegrationConvertCmd(t *testing.T) {
 	harFile := "/input.har"
 	if runtime.GOOS == "windows" {
-		harFile = "C:\\input.har"
+		harFile = `C:\input.har`
 	}
 
 	t.Run("Correlate", func(t *testing.T) {
@@ -147,7 +147,7 @@ func TestIntegrationConvertCmd(t *testing.T) {
 		assert.NoError(t, convertCmd.Flags().Set("enable-status-code-checks", "true"))
 		assert.NoError(t, convertCmd.Flags().Set("return-on-failed-check", "true"))
 
-		err = convertCmd.RunE(convertCmd, []string{"/input.har"})
+		err = convertCmd.RunE(convertCmd, []string{harFile})
 
 		// reset the convertCmd to default flags. There must be a nicer and less error prone way to do this...
 		assert.NoError(t, convertCmd.Flags().Set("correlate", "false"))
