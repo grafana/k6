@@ -202,10 +202,16 @@ func BenchmarkDurationBounds(b *testing.B) {
 	}
 
 	for count := 100; count <= 5000; count += 500 {
-		b.Run(fmt.Sprintf("Sort-%d-elements", count), func(b *testing.B) {
+		b.Run(fmt.Sprintf("Sort-no-interp-%d-elements", count), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				data := getData(b, count)
-				data.SortGetNormalBounds(iqrRadius, iqrLowerCoef, iqrUpperCoef)
+				data.SortGetNormalBounds(iqrRadius, iqrLowerCoef, iqrUpperCoef, false)
+			}
+		})
+		b.Run(fmt.Sprintf("Sort-with-interp-%d-elements", count), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				data := getData(b, count)
+				data.SortGetNormalBounds(iqrRadius, iqrLowerCoef, iqrUpperCoef, true)
 			}
 		})
 		b.Run(fmt.Sprintf("Select-%d-elements", count), func(b *testing.B) {
@@ -257,7 +263,7 @@ func TestQuickSelectAndBounds(t *testing.T) {
 
 				t.Run(fmt.Sprintf("bounds-tc%d", tcNum), func(t *testing.T) {
 					t.Parallel()
-					sortMin, sortMax := dataForSort.SortGetNormalBounds(tc.r, tc.l, tc.u)
+					sortMin, sortMax := dataForSort.SortGetNormalBounds(tc.r, tc.l, tc.u, false)
 					selectMin, selectMax := dataForSelect.SelectGetNormalBounds(tc.r, tc.l, tc.u)
 					assert.Equal(t, sortMin, selectMin)
 					assert.Equal(t, sortMax, selectMax)
@@ -270,4 +276,20 @@ func TestQuickSelectAndBounds(t *testing.T) {
 
 		})
 	}
+}
+
+func TestSortInterpolation(t *testing.T) {
+	t.Parallel()
+
+	// Super contrived example to make the checks easy - 11 values from 0 to 10 seconds inclusive
+	count := 11
+	data := make(durations, count)
+	for i := 0; i < count; i++ {
+		data[i] = time.Duration(i) * time.Second
+	}
+
+	min, max := data.SortGetNormalBounds(0.25, 1, 1, true)
+	// Expected values: Q1=2.5, Q3=7.5, IQR=5, so with 1 for coefficients we can expect min=-2,5, max=12.5 seconds
+	assert.Equal(t, min, -2500*time.Millisecond)
+	assert.Equal(t, max, 12500*time.Millisecond)
 }
