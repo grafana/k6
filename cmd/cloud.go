@@ -83,7 +83,11 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 			return err
 		}
 
-		conf, err := getConsolidatedConfig(fs, cmd.Flags(), r)
+		cliOpts, err := getOptions(cmd.Flags())
+		if err != nil {
+			return err
+		}
+		conf, err := getConsolidatedConfig(fs, Config{Options: cliOpts}, r)
 		if err != nil {
 			return err
 		}

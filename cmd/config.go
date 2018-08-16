@@ -173,15 +173,7 @@ func readEnvConfig() (conf Config, err error) {
 // - merge the user-supplied CLI flags back in on top, to give them the greatest priority
 // - set some defaults if they weren't previously specified
 // TODO: add better validation, more explicit default values and improve consistency between formats
-func getConsolidatedConfig(fs afero.Fs, flags *pflag.FlagSet, runner lib.Runner) (conf Config, err error) {
-	cliConf := Config{}
-	if flags != nil {
-		cliConf, err = getConfig(flags)
-		if err != nil {
-			return conf, err
-		}
-	}
-
+func getConsolidatedConfig(fs afero.Fs, cliConf Config, runner lib.Runner) (conf Config, err error) {
 	cliConf.Collectors.InfluxDB = influxdb.NewConfig().Apply(cliConf.Collectors.InfluxDB)
 	cliConf.Collectors.Cloud = cloud.NewConfig().Apply(cliConf.Collectors.Cloud)
 	cliConf.Collectors.Kafka = kafka.NewConfig().Apply(cliConf.Collectors.Kafka)
