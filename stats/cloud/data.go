@@ -228,16 +228,35 @@ func (d durations) Len() int           { return len(d) }
 func (d durations) Swap(i, j int)      { d[i], d[j] = d[j], d[i] }
 func (d durations) Less(i, j int) bool { return d[i] < d[j] }
 
-// This is currently used only for benchmark comparisons and tests.
-func (d durations) SortGetNormalBounds(radius, iqrLowerCoef, iqrUpperCoef float64) (min, max time.Duration) {
+// Used when there are fewer samples in the bucket (so we can interpolate)
+// and for benchmark comparisons and verification of the quickselect
+// algorithm (it should return exactly the same results if interpolation isn't used).
+func (d durations) SortGetNormalBounds(radius, iqrLowerCoef, iqrUpperCoef float64, interpolate bool) (min, max time.Duration) {
 	if len(d) == 0 {
 		return
 	}
 	sort.Sort(d)
 	last := float64(len(d) - 1)
+
+	getValue := func(percentile float64) time.Duration {
+		i := percentile * last
+		// If interpolation is not enabled, we round the resulting slice position
+		// and return the value there.
+		if !interpolate {
+			return d[int(math.Round(i))]
+		}
+
+		// Otherwise, we calculate (with linear interpolation) the value that
+		// should fall at that percentile, given the values above and below it.
+		floor := d[int(math.Floor(i))]
+		ceil := d[int(math.Ceil(i))]
+		posDiff := i - math.Floor(i)
+		return floor + time.Duration(float64(ceil-floor)*posDiff)
+	}
+
 	radius = math.Min(0.5, radius)
-	q1 := d[int(last*(0.5-radius))]
-	q3 := d[int(last*(0.5+radius))]
+	q1 := getValue(0.5 - radius)
+	q3 := getValue(0.5 + radius)
 	iqr := float64(q3 - q1)
 	min = q1 - time.Duration(iqrLowerCoef*iqr)
 	max = q3 + time.Duration(iqrUpperCoef*iqr)
@@ -308,8 +327,8 @@ func (d durations) SelectGetNormalBounds(radius, iqrLowerCoef, iqrUpperCoef floa
 	radius = math.Min(0.5, radius)
 	last := float64(len(d) - 1)
 
-	q1 := d.quickSelect(int(last * (0.5 - radius)))
-	q3 := d.quickSelect(int(last * (0.5 + radius)))
+	q1 := d.quickSelect(int(math.Round(last * (0.5 - radius))))
+	q3 := d.quickSelect(int(math.Round(last * (0.5 + radius))))
 
 	iqr := float64(q3 - q1)
 	min = q1 - time.Duration(iqrLowerCoef*iqr)
