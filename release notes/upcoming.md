@@ -50,6 +50,11 @@ export default function () {
 
 Thanks to @ofauchon for their work on this!
 
+
+## Internals
+
+ * Cloud output: improved outlier metric detection for small batches (#744)
+
 ## Bugs fixed!
 
 * UI: The interactive `k6 login influxdb` command failed to write the supplied options to the config file. (#734)
