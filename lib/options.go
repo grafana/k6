@@ -267,7 +267,7 @@ type Options struct {
 	NoCookiesReset null.Bool `json:"noCookiesReset" envconfig:"no_cookies_reset"`
 
 	// Discard Http Responses Body
-	DiscardResponseBody null.Bool `json:"discardResponseBody" envconfig:"discard_response_body"`
+	DiscardResponseBodies null.Bool `json:"discardResponseBodies" envconfig:"discard_response_bodies"`
 }
 
 // Returns the result of overwriting any fields with any that are set on the argument.
@@ -374,8 +374,8 @@ func (o Options) Apply(opts Options) Options {
 	if opts.MetricSamplesBufferSize.Valid {
 		o.MetricSamplesBufferSize = opts.MetricSamplesBufferSize
 	}
-	if opts.DiscardResponseBody.Valid {
-		o.DiscardResponseBody = opts.DiscardResponseBody
+	if opts.DiscardResponseBodies.Valid {
+		o.DiscardResponseBodies = opts.DiscardResponseBodies
 	}
 	return o
 }
