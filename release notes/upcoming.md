@@ -4,11 +4,11 @@ TODO: Intro
 
 ### New option: No Cookies Reset (#729)
 
-A new option has been added that disables the default behavior of resetting the [cookie jar](https://docs.k6.io/docs/cookies) after each VU iteration. If it's enabled, saved cookies will be persisted across VUs iterations. For the moment there's no CLI flag for this option, instead it can only be set via the `noCookiesReset` key from the exported script `options` or via the `K6_NO_COOKIES_RESET` environment variable.
+A new option has been added that disables the default behavior of resetting the [cookie jar](https://docs.k6.io/docs/cookies) after each VU iteration. If it's enabled, saved cookies will be persisted across VU iterations. For the moment there's no CLI flag for this option, instead it can only be set via the `noCookiesReset` key from the exported script `options` or via the `K6_NO_COOKIES_RESET` environment variable.
 
 ### k6/http: New options to discard the response body or to specify its type (#742 and #749)
 
-You can now specify what the type of an HTTP response's body would be with the new `responseType` request option. The possible values for it are `text` (the default), `binary` and `none`. The default `text` response type is backward-compatible, it doesn't change the current k6 behavior of returning the `body` attribute of the `http/Response` object as a string. It's well suited for working with web pages, text-based APIs and similar HTTP responses, but it can be unsuitable when dealing with binary files.
+You can now specify what the type of an HTTP response's body should be with the new `responseType` request option. The possible values for it are `text` (the default), `binary` and `none`. The default `text` response type is backward-compatible, it doesn't change the current k6 behavior of returning the `body` attribute of the `http/Response` object as a string. It's well suited for working with web pages, text-based APIs and similar HTTP responses, but it can be unsuitable when dealing with binary files.
 
 That's mostly because JavaScript strings are encoded with UTF-16 and converting binary data to it will frequently mangle some of the data. The new `binary` response type allows us to avoid that, it causes k6 to return the HTTP response's `body` as a byte array. This allows us to deal with the binary data without mangling it:
 ```js
@@ -64,7 +64,7 @@ export default function () {
 };
 ```
 
-Thanks to @sherrman for reporting the binary handling issues that prompted the addition of the `responseType` option! And thanks to @ofauchon for implementing both of the discard response body options, of which the local per-request one was later transformed in the `responseType=none` value!
+Thanks to @sherrman for reporting the binary handling issues that prompted the addition of the `responseType` option! And thanks to @ofauchon for implementing both of the discard response body options, of which the local per-request one was later transformed into the `responseType=none` value!
 
 ## Internals
 
