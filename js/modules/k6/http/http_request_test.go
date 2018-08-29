@@ -38,7 +38,6 @@ import (
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
-	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/stats"
 	"github.com/oxtoacart/bpool"
@@ -119,17 +118,14 @@ func newRuntime(t *testing.T) (*testutils.HTTPMultiBin, *common.State, chan stat
 	}
 	samples := make(chan stats.SampleContainer, 1000)
 
-	newTransport := netext.NewTransport(tb.HTTPTransport, samples, options)
-
 	state := &common.State{
 		Options:   options,
 		Logger:    logger,
 		Group:     root,
 		TLSConfig: tb.TLSClientConfig,
-		// HTTPTransport: netext.NewHTTPTransport(tb.HTTPTransport),
-		HTTPTransport: newTransport,
-		BPool:         bpool.NewBufferPool(1),
-		Samples:       samples,
+		Transport: tb.HTTPTransport,
+		BPool:     bpool.NewBufferPool(1),
+		Samples:   samples,
 	}
 
 	ctx := new(context.Context)
@@ -166,16 +162,23 @@ func TestRequestAndBatch(t *testing.T) {
 
 	t.Run("Redirects", func(t *testing.T) {
 		t.Run("tracing", func(t *testing.T) {
-
 			_, err := common.RunString(rt, sr(`
-			let res = http.get("HTTPBIN_URL/redirect-to?url=HTTPBIN_URL/get");
-			// if (res.status != 302) { throw new Error("wrong status: " + res.status) }
-			// if (res.url != "HTTPBIN_URL/relative-redirect/1") { throw new Error("incorrect URL: " + res.url) }
-			// if (res.headers["Location"] != "/get") { throw new Error("incorrect Location header: " + res.headers["Location"]) }
+			let res = http.get("HTTPBIN_URL/redirect/9");
 			`))
 			assert.NoError(t, err)
 			bufSamples := stats.GetBufferedSamples(samples)
-			assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_URL/get"), sr("HTTPBIN_URL/redirect-to?url=HTTPBIN_URL/get"), 200, "")
+
+			reqsCount := 0
+			for _, container := range bufSamples {
+				for _, sample := range container.GetSamples() {
+					if sample.Metric.Name == "http_reqs" {
+						reqsCount++
+					}
+				}
+			}
+
+			assert.Equal(t, 10, reqsCount)
+			assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_URL/get"), sr("HTTPBIN_URL/redirect/9"), 200, "")
 		})
 
 		t.Run("10", func(t *testing.T) {
@@ -1167,12 +1170,12 @@ func TestSystemTags(t *testing.T) {
 		{"group", httpGet, ""},
 		{"vu", httpGet, "0"},
 		{"iter", httpGet, "0"},
-		// {"tls_version", httpsGet, "tls1.2"},
-		// {"ocsp_status", httpsGet, "unknown"},
+		{"tls_version", httpsGet, "tls1.2"},
+		{"ocsp_status", httpsGet, "unknown"},
 		{
 			"error",
-			tb.Replacer.Replace(`http.get("HTTPBIN_IP_URL/wrong-redirect");`),
-			tb.Replacer.Replace(`Get HTTPBIN_IP_URL/wrong-redirect: failed to parse Location header "%": parse %: invalid URL escape "%"`),
+			tb.Replacer.Replace(`http.get("http://foo");`),
+			tb.Replacer.Replace(`lookup foo: no such host`),
 		},
 	}
 
@@ -1181,9 +1184,6 @@ func TestSystemTags(t *testing.T) {
 	for num, tc := range testedSystemTags {
 		t.Run(fmt.Sprintf("TC %d with only %s", num, tc.tag), func(t *testing.T) {
 			state.Options.SystemTags = lib.GetTagSet(tc.tag)
-
-			newTransport := netext.NewTransport(tb.HTTPTransport, samples, state.Options)
-			state.HTTPTransport = newTransport
 
 			_, err := common.RunString(rt, tc.code)
 			assert.NoError(t, err)

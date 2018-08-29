@@ -170,18 +170,16 @@ func (r *Runner) newVU(samplesOut chan<- stats.SampleContainer) (*VU, error) {
 		return nil, err
 	}
 
-	newTransport := netext.NewTransport(transport, samplesOut, r.Bundle.Options)
 	vu := &VU{
 		BundleInstance: *bi,
 		Runner:         r,
-		// HTTPTransport:  netext.NewHTTPTransport(transport),
-		HTTPTransport: newTransport,
-		Dialer:        dialer,
-		CookieJar:     cookieJar,
-		TLSConfig:     tlsConfig,
-		Console:       NewConsole(),
-		BPool:         bpool.NewBufferPool(100),
-		Samples:       samplesOut,
+		Transport:      transport,
+		Dialer:         dialer,
+		CookieJar:      cookieJar,
+		TLSConfig:      tlsConfig,
+		Console:        NewConsole(),
+		BPool:          bpool.NewBufferPool(100),
+		Samples:        samplesOut,
 	}
 	vu.Runtime.Set("console", common.Bind(vu.Runtime, vu.Console, vu.Context))
 	common.BindToGlobal(vu.Runtime, map[string]interface{}{
@@ -289,14 +287,13 @@ func (r *Runner) runPart(ctx context.Context, out chan<- stats.SampleContainer, 
 type VU struct {
 	BundleInstance
 
-	Runner *Runner
-	// HTTPTransport *netext.HTTPTransport
-	HTTPTransport *netext.Transport
-	Dialer        *netext.Dialer
-	CookieJar     *cookiejar.Jar
-	TLSConfig     *tls.Config
-	ID            int64
-	Iteration     int64
+	Runner    *Runner
+	Transport *http.Transport
+	Dialer    *netext.Dialer
+	CookieJar *cookiejar.Jar
+	TLSConfig *tls.Config
+	ID        int64
+	Iteration int64
 
 	Console *Console
 	BPool   *bpool.BufferPool
@@ -368,18 +365,18 @@ func (u *VU) runFn(ctx context.Context, group *lib.Group, fn goja.Callable, args
 	}
 
 	state := &common.State{
-		Logger:        u.Runner.Logger,
-		Options:       u.Runner.Bundle.Options,
-		Group:         group,
-		HTTPTransport: u.HTTPTransport,
-		Dialer:        u.Dialer,
-		TLSConfig:     u.TLSConfig,
-		CookieJar:     cookieJar,
-		RPSLimit:      u.Runner.RPSLimit,
-		BPool:         u.BPool,
-		Vu:            u.ID,
-		Samples:       u.Samples,
-		Iteration:     u.Iteration,
+		Logger:    u.Runner.Logger,
+		Options:   u.Runner.Bundle.Options,
+		Group:     group,
+		Transport: u.Transport,
+		Dialer:    u.Dialer,
+		TLSConfig: u.TLSConfig,
+		CookieJar: cookieJar,
+		RPSLimit:  u.Runner.RPSLimit,
+		BPool:     u.BPool,
+		Vu:        u.ID,
+		Samples:   u.Samples,
+		Iteration: u.Iteration,
 	}
 
 	newctx := common.WithRuntime(ctx, u.Runtime)
@@ -406,7 +403,7 @@ func (u *VU) runFn(ctx context.Context, group *lib.Group, fn goja.Callable, args
 	}
 
 	if u.Runner.Bundle.Options.NoVUConnectionReuse.Bool {
-		u.HTTPTransport.CloseIdleConnections()
+		u.Transport.CloseIdleConnections()
 	}
 
 	var isFullIteration bool
