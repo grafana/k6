@@ -432,6 +432,7 @@ func (h *HTTP) request(ctx context.Context, preq *parsedHTTPRequest) (*HTTPRespo
 		// removing user from URL to avoid sending the authorization header fo basic auth
 		preq.req.URL.User = nil
 
+		h.debugRequest(state, preq.req, "DigestRequest")
 		res, err := client.Do(preq.req.WithContext(ctx))
 		h.debugRequest(state, preq.req, "DigestResponse")
 		if err != nil {
