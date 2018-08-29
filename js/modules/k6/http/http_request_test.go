@@ -1174,8 +1174,8 @@ func TestSystemTags(t *testing.T) {
 		{"ocsp_status", httpsGet, "unknown"},
 		{
 			"error",
-			tb.Replacer.Replace(`http.get("http://foo");`),
-			tb.Replacer.Replace(`lookup foo: no such host`),
+			tb.Replacer.Replace(`http.get("http://127.0.0.1");`),
+			tb.Replacer.Replace(`dial tcp 127.0.0.1:80: connect: connection refused`),
 		},
 	}
 
