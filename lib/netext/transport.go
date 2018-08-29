@@ -69,9 +69,8 @@ func (t *Transport) RoundTrip(req *http.Request) (res *http.Response, err error)
 	tracer := Tracer{}
 	reqWithTracer := req.WithContext(WithTracer(ctx, &tracer))
 
-	var roundTripFunc func(req *http.Request) (res *http.Response, err error)
+	roundTripFunc := t.Transport.RoundTrip
 
-	roundTripFunc = t.Transport.RoundTrip
 	if GetAuth(req.Context()) == "ntlm" && req.URL.User != nil {
 		roundTripFunc = t.roundtripWithNTLM
 	}
