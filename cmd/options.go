@@ -56,7 +56,7 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.Int64("batch-per-host", 0, "max parallel batch reqs per host")
 	flags.Int64("rps", 0, "limit requests per second")
 	flags.String("user-agent", fmt.Sprintf("k6/%s (https://k6.io/)", Version), "user agent for http requests")
-	flags.String("http-debug", "", "log all HTTP requests and responses. Excludes body by default. To include body use '---http-debug=full'")
+	flags.String("http-debug", "", "log all HTTP requests and responses. Excludes body by default. To include body use '--http-debug=full'")
 	flags.Lookup("http-debug").NoOptDefVal = "headers"
 	flags.Bool("insecure-skip-tls-verify", false, "skip verification of TLS certificates")
 	flags.Bool("no-connection-reuse", false, "disable keep-alive connections")
@@ -67,6 +67,7 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.String("summary-time-unit", "", "define the time unit used to display the trend stats. Possible units are: 's', 'ms' and 'us'")
 	flags.StringSlice("system-tags", lib.DefaultSystemTagList, "only include these system tags in metrics")
 	flags.StringSlice("tag", nil, "add a `tag` to be applied to all samples, as `[name]=[value]`")
+	flags.Bool("discard-response-bodies", false, "Read but don't process or save HTTP response bodies")
 	return flags
 }
 
@@ -86,6 +87,7 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		NoConnectionReuse:     getNullBool(flags, "no-connection-reuse"),
 		NoVUConnectionReuse:   getNullBool(flags, "no-vu-connection-reuse"),
 		Throw:                 getNullBool(flags, "throw"),
+		DiscardResponseBodies: getNullBool(flags, "discard-response-bodies"),
 		// Default values for options without CLI flags:
 		// TODO: find a saner and more dev-friendly and error-proof way to handle options
 		SetupTimeout:    types.NullDuration{Duration: types.Duration(10 * time.Second), Valid: false},

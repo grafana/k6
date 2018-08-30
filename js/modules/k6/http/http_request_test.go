@@ -21,8 +21,10 @@
 package http
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -135,6 +137,7 @@ func newRuntime(t *testing.T) (*testutils.HTTPMultiBin, *common.State, chan stat
 }
 
 func TestRequestAndBatch(t *testing.T) {
+	t.Parallel()
 	tb, state, samples, rt, ctx := newRuntime(t)
 	defer tb.Cleanup()
 	sr := tb.Replacer.Replace
@@ -1120,6 +1123,7 @@ func TestRequestAndBatch(t *testing.T) {
 	})
 }
 func TestSystemTags(t *testing.T) {
+	t.Parallel()
 	tb, state, samples, rt, _ := newRuntime(t)
 	defer tb.Cleanup()
 
@@ -1178,4 +1182,116 @@ func TestSystemTags(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestResponseTypes(t *testing.T) {
+	t.Parallel()
+	tb, state, _, rt, _ := newRuntime(t)
+	defer tb.Cleanup()
+
+	// We don't expect any failed requests
+	state.Options.Throw = null.BoolFrom(true)
+
+	text := `•?((¯°·._.• ţ€$ţɨɲǥ µɲɨȼ๏ď€ ɨɲ Ќ6 •._.·°¯))؟•`
+	textLen := len(text)
+	tb.Mux.HandleFunc("/get-text", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n, err := w.Write([]byte(text))
+		assert.NoError(t, err)
+		assert.Equal(t, textLen, n)
+	}))
+	tb.Mux.HandleFunc("/compare-text", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := ioutil.ReadAll(r.Body)
+		require.NoError(t, err)
+		assert.Equal(t, text, string(body))
+	}))
+
+	binaryLen := 300
+	binary := make([]byte, binaryLen)
+	for i := 0; i < binaryLen; i++ {
+		binary[i] = byte(i)
+	}
+	tb.Mux.HandleFunc("/get-bin", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n, err := w.Write(binary)
+		assert.NoError(t, err)
+		assert.Equal(t, binaryLen, n)
+	}))
+	tb.Mux.HandleFunc("/compare-bin", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := ioutil.ReadAll(r.Body)
+		require.NoError(t, err)
+		assert.True(t, bytes.Equal(binary, body))
+	}))
+
+	replace := func(s string) string {
+		return strings.NewReplacer(
+			"EXP_TEXT", text,
+			"EXP_BIN_LEN", strconv.Itoa(binaryLen),
+		).Replace(tb.Replacer.Replace(s))
+	}
+
+	_, err := common.RunString(rt, replace(`
+		let expText = "EXP_TEXT";
+		let expBinLength = EXP_BIN_LEN;
+
+		// Check default behaviour with a unicode text
+		let respTextImplicit = http.get("HTTPBIN_URL/get-text").body;
+		if (respTextImplicit !== expText) {
+			throw new Error("default response body should be '" + expText + "' but was '" + respTextImplicit + "'");
+		}
+		http.post("HTTPBIN_URL/compare-text", respTextImplicit);
+
+		// Check discarding of responses
+		let respNone = http.get("HTTPBIN_URL/get-text", { responseType: "none" }).body;
+		if (respNone != null) {
+			throw new Error("none response body should be null but was " + respNone);
+		}
+
+		// Check binary transmission of the text response as well
+		let respTextInBin = http.get("HTTPBIN_URL/get-text", { responseType: "binary" }).body;
+
+		// Hack to convert a utf-8 array to a JS string
+		let strConv = "";
+		function pad(n) { return n.length < 2 ? "0" + n : n; }
+		for( let i = 0; i < respTextInBin.length; i++ ) {
+			strConv += ( "%" + pad(respTextInBin[i].toString(16)));
+		}
+		strConv = decodeURIComponent(strConv);
+		if (strConv !== expText) {
+			throw new Error("converted response body should be '" + expText + "' but was '" + strConv + "'");
+		}
+		http.post("HTTPBIN_URL/compare-text", respTextInBin);
+
+		// Check binary response
+		let respBin = http.get("HTTPBIN_URL/get-bin", { responseType: "binary" }).body;
+		if (respBin.length !== expBinLength) {
+			throw new Error("response body length should be '" + expBinLength + "' but was '" + respBin.length + "'");
+		}
+		for( let i = 0; i < respBin.length; i++ ) {
+			if ( respBin[i] !== i%256 ) {
+				throw new Error("expected value " + (i%256) + " to be at position " + i + " but it was " + respBin[i]);
+			}
+		}
+		http.post("HTTPBIN_URL/compare-bin", respBin);
+	`))
+	assert.NoError(t, err)
+
+	// Verify that if we enable discardResponseBodies globally, the default value is none
+	state.Options.DiscardResponseBodies = null.BoolFrom(true)
+
+	_, err = common.RunString(rt, replace(`
+		let expText = "EXP_TEXT";
+
+		// Check default behaviour
+		let respDefault = http.get("HTTPBIN_URL/get-text").body;
+		if (respDefault !== null) {
+			throw new Error("default response body should be discarded and null but was " + respDefault);
+		}
+
+		// Check explicit text response
+		let respTextExplicit = http.get("HTTPBIN_URL/get-text", { responseType: "text" }).body;
+		if (respTextExplicit !== expText) {
+			throw new Error("text response body should be '" + expText + "' but was '" + respTextExplicit + "'");
+		}
+		http.post("HTTPBIN_URL/compare-text", respTextExplicit);
+	`))
+	assert.NoError(t, err)
 }

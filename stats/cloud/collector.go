@@ -59,6 +59,14 @@ type Collector struct {
 
 	opts lib.Options
 
+	// TODO: optimize this
+	//
+	// Since the real-time metrics refactoring (https://github.com/loadimpact/k6/pull/678),
+	// we should no longer have to handle metrics that have times long in the past. So instead of a
+	// map, we can probably use a simple slice (or even an array!) as a ring buffer to store the
+	// aggregation buckets. This should save us a some time, since it would make the lookups and WaitPeriod
+	// checks basically O(1). And even if for some reason there are occasional metrics with past times that
+	// don't fit in the chosen ring buffer size, we could just send them along to the buffer unaggregated
 	aggrBuckets map[int64]aggregationBucket
 }
 
@@ -317,32 +325,50 @@ func (c *Collector) aggregateHTTPTrails(waitPeriod time.Duration) {
 				continue
 			}
 
-			connDurations := make(durations, trailCount)
-			reqDurations := make(durations, trailCount)
-			for i, trail := range httpTrails {
-				connDurations[i] = trail.ConnDuration
-				reqDurations[i] = trail.Duration
-			}
-			minConnDur, maxConnDur := connDurations.SelectGetNormalBounds(iqrRadius, iqrLowerCoef, iqrUpperCoef)
-			minReqDur, maxReqDur := reqDurations.SelectGetNormalBounds(iqrRadius, iqrLowerCoef, iqrUpperCoef)
-
 			aggrData := &SampleDataAggregatedHTTPReqs{
 				Time: Timestamp(time.Unix(0, bucketID*aggrPeriod+aggrPeriod/2)),
 				Type: "aggregated_trend",
 				Tags: tags,
 			}
 
-			for _, trail := range httpTrails {
-				if trail.ConnDuration < minConnDur ||
-					trail.ConnDuration > maxConnDur ||
-					trail.Duration < minReqDur ||
-					trail.Duration > maxReqDur {
-
-					newSamples = append(newSamples, NewSampleFromTrail(trail))
-				} else {
+			if c.config.AggregationSkipOutlierDetection.Bool {
+				// Simply add up all HTTP trails, no outlier detection
+				for _, trail := range httpTrails {
 					aggrData.Add(trail)
 				}
+			} else {
+				connDurations := make(durations, trailCount)
+				reqDurations := make(durations, trailCount)
+				for i, trail := range httpTrails {
+					connDurations[i] = trail.ConnDuration
+					reqDurations[i] = trail.Duration
+				}
+
+				var minConnDur, maxConnDur, minReqDur, maxReqDur time.Duration
+				if trailCount < c.config.AggregationOutlierAlgoThreshold.Int64 {
+					// Since there are fewer samples, we'll use the interpolation-enabled and
+					// more precise sorting-based algorithm
+					minConnDur, maxConnDur = connDurations.SortGetNormalBounds(iqrRadius, iqrLowerCoef, iqrUpperCoef, true)
+					minReqDur, maxReqDur = reqDurations.SortGetNormalBounds(iqrRadius, iqrLowerCoef, iqrUpperCoef, true)
+				} else {
+					minConnDur, maxConnDur = connDurations.SelectGetNormalBounds(iqrRadius, iqrLowerCoef, iqrUpperCoef)
+					minReqDur, maxReqDur = reqDurations.SelectGetNormalBounds(iqrRadius, iqrLowerCoef, iqrUpperCoef)
+				}
+
+				for _, trail := range httpTrails {
+					if trail.ConnDuration < minConnDur ||
+						trail.ConnDuration > maxConnDur ||
+						trail.Duration < minReqDur ||
+						trail.Duration > maxReqDur {
+						// Seems like an outlier, add it as a standalone metric
+						newSamples = append(newSamples, NewSampleFromTrail(trail))
+					} else {
+						// Aggregate the trail
+						aggrData.Add(trail)
+					}
+				}
 			}
+
 			aggrData.CalcAverages()
 
 			if aggrData.Count > 0 {
