@@ -40,6 +40,7 @@ import (
 	"sync"
 	"time"
 
+	ntlmssp "github.com/Azure/go-ntlmssp"
 	digest "github.com/Soontao/goHttpDigestClient"
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
@@ -389,6 +390,12 @@ func (h *HTTP) request(ctx context.Context, preq *parsedHTTPRequest) (*HTTPRespo
 		}
 	}
 
+	if preq.auth == "ntlm" {
+		state.Transport = ntlmssp.Negotiator{
+			RoundTripper: state.Transport,
+		}
+	}
+
 	transport := netext.NewTransport(state.Transport, state.Samples, state.Options, tags)
 
 	resp := &HTTPResponse{ctx: ctx, URL: preq.url.URLString, Request: *respReq}
@@ -462,10 +469,6 @@ func (h *HTTP) request(ctx context.Context, preq *parsedHTTPRequest) (*HTTPRespo
 			authorization := challenge.ToAuthorizationStr()
 			preq.req.Header.Set(digest.KEY_AUTHORIZATION, authorization)
 		}
-	}
-
-	if preq.auth == "ntlm" {
-		ctx = netext.WithAuth(ctx, "ntlm")
 	}
 
 	h.debugRequest(state, preq.req, "Request")

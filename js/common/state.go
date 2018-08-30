@@ -45,7 +45,7 @@ type State struct {
 	Group *lib.Group
 
 	// Networking equipment.
-	Transport *http.Transport
+	Transport http.RoundTripper
 	Dialer    *netext.Dialer
 	CookieJar *cookiejar.Jar
 	TLSConfig *tls.Config

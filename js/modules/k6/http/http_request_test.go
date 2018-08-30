@@ -22,8 +22,6 @@ package http
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/binary"
 	"fmt"
 	"net/http"
 	"net/http/cookiejar"
@@ -33,7 +31,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ThomsonReutersEikon/go-ntlm/ntlm"
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
@@ -143,7 +140,6 @@ func TestRequestAndBatch(t *testing.T) {
 	sr := tb.Replacer.Replace
 
 	// Handple paths with custom logic
-	tb.Mux.HandleFunc("/ntlm", http.HandlerFunc(ntlmHandler("bob", "pass")))
 	tb.Mux.HandleFunc("/digest-auth/failure", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(2 * time.Second)
 	}))
@@ -714,26 +710,6 @@ func TestRequestAndBatch(t *testing.T) {
 					assert.NoError(t, err)
 				})
 			})
-			t.Run("ntlm", func(t *testing.T) {
-				t.Run("success auth", func(t *testing.T) {
-					url := strings.Replace(tb.ServerHTTP.URL+"/ntlm", "http://", "http://bob:pass@", -1)
-					_, err := common.RunString(rt, fmt.Sprintf(`
-						let res = http.request("GET", "%s", null, { auth: "ntlm" });
-						if (res.status != 200) { throw new Error("wrong status: " + res.status); }
-						`, url))
-					assert.NoError(t, err)
-					assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), "GET", url, url, 200, "")
-				})
-				t.Run("failed auth", func(t *testing.T) {
-					url := strings.Replace(tb.ServerHTTP.URL+"/ntlm", "http://", "http://other:otherpass@", -1)
-					_, err := common.RunString(rt, fmt.Sprintf(`
-						let res = http.request("GET", "%s", null, { auth: "ntlm" });
-						if (res.status != 401) { throw new Error("wrong status: " + res.status); }
-						`, url))
-					assert.NoError(t, err)
-					assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), "GET", url, url, 401, "")
-				})
-			})
 		})
 
 		t.Run("headers", func(t *testing.T) {
@@ -1201,113 +1177,5 @@ func TestSystemTags(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-// Simple NTLM mock handler
-func ntlmHandler(username, password string) func(w http.ResponseWriter, r *http.Request) {
-	challenges := make(map[string]*ntlm.ChallengeMessage)
-	return func(w http.ResponseWriter, r *http.Request) {
-		// Make sure there is some kind of authentication
-		if r.Header.Get("Authorization") == "" {
-			w.Header().Set("WWW-Authenticate", "NTLM")
-			w.WriteHeader(401)
-			return
-		}
-
-		// Parse the proxy authorization header
-		auth := r.Header.Get("Authorization")
-		parts := strings.SplitN(auth, " ", 2)
-		authType := parts[0]
-		authPayload := parts[1]
-
-		// Filter out unsupported authentication methods
-		if authType != "NTLM" {
-			w.Header().Set("WWW-Authenticate", "NTLM")
-			w.WriteHeader(401)
-			return
-		}
-
-		// Decode base64 auth data and get NTLM message type
-		rawAuthPayload, _ := base64.StdEncoding.DecodeString(authPayload)
-		ntlmMessageType := binary.LittleEndian.Uint32(rawAuthPayload[8:12])
-
-		// Handle NTLM negotiate message
-		if ntlmMessageType == 1 {
-			session, err := ntlm.CreateServerSession(ntlm.Version2, ntlm.ConnectionOrientedMode)
-			if err != nil {
-				return
-			}
-
-			session.SetUserInfo(username, password, "")
-
-			challenge, err := session.GenerateChallengeMessage()
-			if err != nil {
-				return
-			}
-
-			challenges[r.RemoteAddr] = challenge
-
-			authPayload := base64.StdEncoding.EncodeToString(challenge.Bytes())
-
-			w.Header().Set("WWW-Authenticate", "NTLM "+authPayload)
-			w.WriteHeader(401)
-
-			return
-		}
-
-		if ntlmMessageType == 3 {
-			challenge := challenges[r.RemoteAddr]
-			if challenge == nil {
-				w.Header().Set("WWW-Authenticate", "NTLM")
-				w.WriteHeader(401)
-				return
-			}
-
-			msg, err := ntlm.ParseAuthenticateMessage(rawAuthPayload, 2)
-			if err != nil {
-				msg2, err := ntlm.ParseAuthenticateMessage(rawAuthPayload, 1)
-
-				if err != nil {
-					return
-				}
-
-				session, err := ntlm.CreateServerSession(ntlm.Version1, ntlm.ConnectionOrientedMode)
-				if err != nil {
-					return
-				}
-
-				session.SetServerChallenge(challenge.ServerChallenge)
-				session.SetUserInfo(username, password, "")
-
-				err = session.ProcessAuthenticateMessage(msg2)
-				if err != nil {
-					w.Header().Set("WWW-Authenticate", "NTLM")
-					w.WriteHeader(401)
-					return
-				}
-			} else {
-				session, err := ntlm.CreateServerSession(ntlm.Version2, ntlm.ConnectionOrientedMode)
-				if err != nil {
-					return
-				}
-
-				session.SetServerChallenge(challenge.ServerChallenge)
-				session.SetUserInfo(username, password, "")
-
-				err = session.ProcessAuthenticateMessage(msg)
-				if err != nil {
-					w.Header().Set("WWW-Authenticate", "NTLM")
-					w.WriteHeader(401)
-					return
-				}
-			}
-		}
-
-		data := "authenticated"
-		w.Header().Set("Content-Length", fmt.Sprint(len(data)))
-		if _, err := fmt.Fprint(w, data); err != nil {
-			panic(err.Error())
-		}
 	}
 }
