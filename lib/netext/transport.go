@@ -44,13 +44,18 @@ func (t *Transport) RoundTrip(req *http.Request) (res *http.Response, err error)
 	if t.RoundTripper == nil {
 		return nil, errors.New("no roundtrip defined")
 	}
-	tags := t.tags
+
+	tags := map[string]string{}
+	for k, v := range t.tags {
+		tags[k] = v
+	}
 
 	ctx := req.Context()
 	tracer := Tracer{}
 	reqWithTracer := req.WithContext(WithTracer(ctx, &tracer))
 
 	resp, err := t.RoundTripper.RoundTrip(reqWithTracer)
+	trail := tracer.Done()
 	if err != nil {
 		if t.options.SystemTags["error"] {
 			tags["error"] = err.Error()
@@ -83,10 +88,7 @@ func (t *Transport) RoundTrip(req *http.Request) (res *http.Response, err error)
 
 			t.tlsInfo = tlsInfo
 		}
-
 	}
-	trail := tracer.Done()
-
 	if t.options.SystemTags["ip"] && trail.ConnRemoteAddr != nil {
 		if ip, _, err := net.SplitHostPort(trail.ConnRemoteAddr.String()); err == nil {
 			tags["ip"] = ip
@@ -94,7 +96,6 @@ func (t *Transport) RoundTrip(req *http.Request) (res *http.Response, err error)
 	}
 
 	t.trail = trail
-
 	trail.SaveSamples(stats.IntoSampleTags(&tags))
 	stats.PushIfNotCancelled(ctx, t.samplesCh, trail)
 
