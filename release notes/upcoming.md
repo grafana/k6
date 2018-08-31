@@ -52,7 +52,7 @@ For convenience, there's also a new global config option that causes k6 to disca
 ```js
 import http from 'k6/http';
 export let options = {
-  discardResponseBody: true,
+  discardResponseBodies: true,
 };
 export default function () {
   let response = http.get("http://test.loadimpact.com", { responseType: "text" });
