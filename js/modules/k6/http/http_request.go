@@ -426,13 +426,12 @@ func (h *HTTP) request(ctx context.Context, preq *parsedHTTPRequest) (*HTTPRespo
 		}
 	}
 
+	var transport http.RoundTripper = netext.NewTransport(state.Transport, state.Samples, &state.Options, tags)
 	if preq.auth == "ntlm" {
-		state.Transport = ntlmssp.Negotiator{
-			RoundTripper: state.Transport,
+		transport = ntlmssp.Negotiator{
+			RoundTripper: transport,
 		}
 	}
-
-	transport := netext.NewTransport(state.Transport, state.Samples, state.Options, tags)
 
 	resp := &HTTPResponse{ctx: ctx, URL: preq.url.URLString, Request: *respReq}
 	client := http.Client{
@@ -546,7 +545,7 @@ func (h *HTTP) request(ctx context.Context, preq *parsedHTTPRequest) (*HTTPRespo
 		}
 		_ = res.Body.Close()
 	}
-	trail := transport.GetTrail()
+	trail := transport.(*netext.Transport).GetTrail()
 
 	if trail.ConnRemoteAddr != nil {
 		remoteHost, remotePortStr, _ := net.SplitHostPort(trail.ConnRemoteAddr.String())

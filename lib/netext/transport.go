@@ -12,14 +12,14 @@ import (
 
 type Transport struct {
 	http.RoundTripper
-	options   lib.Options
+	options   *lib.Options
 	tags      map[string]string
 	trail     *Trail
 	tlsInfo   TLSInfo
 	samplesCh chan<- stats.SampleContainer
 }
 
-func NewTransport(transport http.RoundTripper, samplesCh chan<- stats.SampleContainer, options lib.Options, tags map[string]string) *Transport {
+func NewTransport(transport http.RoundTripper, samplesCh chan<- stats.SampleContainer, options *lib.Options, tags map[string]string) *Transport {
 	return &Transport{
 		RoundTripper: transport,
 		tags:         tags,
@@ -28,7 +28,7 @@ func NewTransport(transport http.RoundTripper, samplesCh chan<- stats.SampleCont
 	}
 }
 
-func (t *Transport) SetOptions(options lib.Options) {
+func (t *Transport) SetOptions(options *lib.Options) {
 	t.options = options
 }
 
