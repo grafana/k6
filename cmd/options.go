@@ -65,7 +65,7 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.StringSlice("blacklist-ip", nil, "blacklist an `ip range` from being called")
 	flags.StringSlice("summary-trend-stats", nil, "define `stats` for trend metrics (response times), one or more as 'avg,p(95),...'")
 	flags.String("summary-time-unit", "", "define the time unit used to display the trend stats. Possible units are: 's', 'ms' and 'us'")
-	flags.StringP("nic", "n", "", "Use 'nic' for injection. All VU will be affected a random IP from this 'nic")
+	flags.StringP("nic", "n", "", "define network interface to be used. All IPs from the interface will be used during the test")
 	flags.StringSlice("system-tags", lib.DefaultSystemTagList, "only include these system tags in metrics")
 	flags.StringSlice("tag", nil, "add a `tag` to be applied to all samples, as `[name]=[value]`")
 	flags.Bool("discard-response-bodies", false, "Read but don't process or save HTTP response bodies")
