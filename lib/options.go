@@ -271,7 +271,6 @@ type Options struct {
 
 	// Nic to be used for injection
 	Nic null.String `json:"nic" envconfig:"nic"`
-
 }
 
 // Returns the result of overwriting any fields with any that are set on the argument.
