@@ -63,12 +63,28 @@ func TestOptions(t *testing.T) {
 		assert.Equal(t, int64(1234), opts.Iterations.Int64)
 	})
 	t.Run("Stages", func(t *testing.T) {
-		opts := Options{}.Apply(Options{Stages: []Stage{{Duration: types.NullDurationFrom(1 * time.Second)}}})
+		opts := Options{}.Apply(Options{Stages: []Stage{
+			{Duration: types.NullDurationFrom(1 * time.Second), Target: null.IntFrom(10)},
+			{Duration: types.NullDurationFrom(2 * time.Second), Target: null.IntFrom(20)},
+		}})
 		assert.NotNil(t, opts.Stages)
-		assert.Len(t, opts.Stages, 1)
+		assert.Len(t, opts.Stages, 2)
 		assert.Equal(t, 1*time.Second, time.Duration(opts.Stages[0].Duration.Duration))
+		assert.Equal(t, int64(10), opts.Stages[0].Target.Int64)
+		assert.Equal(t, 2*time.Second, time.Duration(opts.Stages[1].Duration.Duration))
+		assert.Equal(t, int64(20), opts.Stages[1].Target.Int64)
 
-		assert.Nil(t, Options{}.Apply(Options{Stages: []Stage{{}}}).Stages)
+		emptyStages := []Stage{}
+		assert.Equal(t, emptyStages, Options{}.Apply(Options{Stages: []Stage{{}}}).Stages)
+		assert.Equal(t, emptyStages, Options{}.Apply(Options{Stages: []Stage{}}).Stages)
+		assert.Equal(t, emptyStages, opts.Apply(Options{Stages: []Stage{}}).Stages)
+		assert.Equal(t, emptyStages, opts.Apply(Options{Stages: []Stage{{}}}).Stages)
+
+		assert.Equal(t, opts.Stages, opts.Apply(opts).Stages)
+
+		oneStage := []Stage{{Duration: types.NullDurationFrom(5 * time.Second), Target: null.IntFrom(50)}}
+		assert.Equal(t, oneStage, opts.Apply(Options{Stages: oneStage}).Stages)
+		assert.Equal(t, oneStage, Options{}.Apply(opts).Apply(Options{Stages: oneStage}).Apply(Options{Stages: oneStage}).Stages)
 	})
 	t.Run("RPS", func(t *testing.T) {
 		opts := Options{}.Apply(Options{RPS: null.IntFrom(12345)})
