@@ -14,13 +14,14 @@
 </p>
 <p align="center">
 	<a href="https://github.com/loadimpact/k6/releases">Download</a> ·
+  <a href="#install">Install</a> ·
 	<a href="https://docs.k6.io">Documentation</a> ·
 	<a href="https://k6.io/slack">Community</a>
 </p>
 
 ---
 
-**k6** is a modern load testing tool, building on [Load Impact](https://loadimpact.com/)'s years of experience in the load and performance testing industry. It provides a clean, approachable scripting API, local and cloud execution, with command & control through CLI or a REST API.
+**k6** is a modern load testing tool, building on [Load Impact](https://loadimpact.com/)'s years of experience in the load and performance testing industry. It provides a clean, approachable scripting API, [local](https://docs.k6.io/docs/running-k6) and [cloud execution](https://docs.k6.io/docs/cloud-execution), with command & control through CLI or a [REST API](https://docs.k6.io/docs/rest-api).
 
 This is how load testing should look in the 21st century.
 
@@ -33,7 +34,8 @@ Menu
 
 - [Features](#features)
 - [Install](#install)
-- [Quick Start](#quick-start)
+- [Running k6](#running-k6)
+- [Overview](#overview)
 - [Need help or want to contribute?](#need-help-or-want-to-contribute)
 
 Features
@@ -41,28 +43,49 @@ Features
 
 - **Scripting in ES6 JS**: support for [modules](https://docs.k6.io/docs/modules) to aid code reusability across an organization
 - **Everything as code**: test logic and [configuration options](https://docs.k6.io/docs/options) are both in JS for version control friendliness
-- **Automation-friendly**: [checks](https://docs.k6.io/docs/checks) (like asserts) and [thresholds](https://docs.k6.io/docs/thresholds)
-- **HTTP/1.1**, [**HTTP/2**](https://docs.k6.io/docs/http2) and [**WebSocket**](https://docs.k6.io/docs/websockets) protocol support
+- **Automation-friendly**: [checks](https://docs.k6.io/docs/checks) (like asserts) and [thresholds](https://docs.k6.io/docs/thresholds) for easy and flexible CI configuration!
+- [**HTTP/1.1**](https://docs.k6.io/docs/http-requests), [**HTTP/2**](https://docs.k6.io/docs/http2) and [**WebSocket**](https://docs.k6.io/docs/websockets) protocol support
 - **TLS features**: [client certificates](https://docs.k6.io/docs/ssl-tls-client-certificates), [configurable SSL/TLS versions and ciphers](https://docs.k6.io/docs/ssl-tls-version-and-cipher-suites)
-- **Batteries included**: [Cookies](https://docs.k6.io/docs/cookies), [Crypto](https://docs.k6.io/docs/k6crypto), [Custom metrics](https://docs.k6.io/docs/result-metrics#section-custom-metrics), [Encodings](https://docs.k6.io/docs/k6encoding), [Environment variables](https://docs.k6.io/docs/environment-variables), JSON, [HTML forms](https://docs.k6.io/docs/working-with-html-forms) and more.
-- **Flexible metrics storage/visualization**: [InfluxDB](https://docs.k6.io/docs/influxdb-grafana) (+Grafana), JSON or [Load Impact Insights](https://docs.k6.io/docs/load-impact-insights)
+- **Batteries included**: [Cookies](https://docs.k6.io/docs/cookies), [Crypto](https://docs.k6.io/docs/k6crypto), [Custom metrics](https://docs.k6.io/docs/result-metrics#section-custom-metrics), [Encodings](https://docs.k6.io/docs/k6encoding), [Environment variables](https://docs.k6.io/docs/environment-variables), JSON, [HTML forms](https://docs.k6.io/docs/working-with-html-forms), [files](https://docs.k6.io/docs/open-filepath-mode), [flexible execution control](https://docs.k6.io/docs/running-k6#section-stages-ramping-updown-vus), and more.
+- **Built-in HAR converter**: record browser sessions as [`.har` files](https://en.wikipedia.org/wiki/.har) and [directly convert them to k6 scripts](https://docs.k6.io/docs/session-recording-har-support)
+- **Flexible metrics storage and visualization**: [InfluxDB](https://docs.k6.io/docs/influxdb-grafana) (+Grafana), [JSON](https://docs.k6.io/docs/results-output#section-json-output) or [Load Impact Insights](https://docs.k6.io/docs/load-impact-insights)
+- [**Cloud execution**](https://docs.k6.io/docs/cloud-execution) and distributed tests _(currently only on infrastructure managed by [Load Impact](https://loadimpact.com/), with native distributed execution in k6 [planned](https://github.com/loadimpact/k6/wiki/Roadmap) for the near future!)_
 
 There's even more! [See all features available in k6.](https://docs.k6.io/docs/welcome)
 
 Install
-------
+-------
 
 ### Mac
+
+Install with [Homebrew](https://brew.sh/) by running:
 
 ```bash
 brew install loadimpact/k6/k6
 ```
 
-### Other Platforms
+### Windows
 
-Grab a prebuilt binary from [the Releases page](https://github.com/loadimpact/k6/releases).
+You can manually download and install the [latest `.msi` installation package](https://dl.bintray.com/loadimpact/windows/k6-latest-amd64.msi) or, if you use the [chocolatey package manager](https://chocolatey.org/), follow [these instructions](https://bintray.com/repo/buildSettings?repoPath=%2Floadimpact%2Fchoco) to set up the k6 repository.
 
-Install the binary in your _PATH_ to run k6 from any location.
+### Linux
+
+For Debian-based Linux distributions, you can install k6 from the private deb repo like this:
+
+```bash
+sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 379CE192D401AB61
+echo "deb https://dl.bintray.com/loadimpact/deb stable main" | sudo tee -a /etc/apt/sources.list
+sudo apt-get update
+sudo apt-get install k6
+```
+
+And for rpm-based ones like Fedora and CentOS:
+
+```bash
+wget https://bintray.com/loadimpact/rpm/rpm -O bintray-loadimpact-rpm.repo
+sudo mv bintray-loadimpact-rpm.repo /etc/yum.repos.d/
+sudo dnf install k6   # use yum instead of dnf for older distros
+```
 
 ### Docker
 
@@ -70,71 +93,174 @@ Install the binary in your _PATH_ to run k6 from any location.
 docker pull loadimpact/k6
 ```
 
+### Pre-built binaries & other platforms
+
+If there isn't an official package for your operating system or architecture, or if you don't want to install a custom repository, you can easily grab a pre-built binary from [the GitHub Releases page](https://github.com/loadimpact/k6/releases). Once you download and unpack the release, you can optionally copy the `k6` binary it contains somewhere in your `PATH`, so you are able to run k6 from any location on your system.
+
 ### Build from source
-To build from source you need **[Git](https://git-scm.com/downloads)** and **[Go](https://golang.org/doc/install)** (1.10 or newer). Follow these instructions:
+
+k6 is written in Go, so it's just a single statically-linked executable and very easy to build and distribute. To build from source you need **[Git](https://git-scm.com/downloads)** and **[Go](https://golang.org/doc/install)** (1.10 or newer). Follow these instructions:
 
 - Run `go get github.com/loadimpact/k6` which will:
   - git clone the repo and put the source in `$GOPATH/src/github.com/loadimpact/k6`
   - build a `k6` binary and put it in `$GOPATH/bin`
-- Make sure you have `$GOPATH/bin` in your PATH
+- Make sure you have `$GOPATH/bin` in your `PATH` (or copy the `k6` binary somewhere in your `PATH`), so you are able to run k6 from any location.
 - Tada, you can now run k6 using `k6 run script.js`
 
-Quick start
------------
+Running k6
+----------
 
-k6 works with the concept of **virtual users** (VUs), which run scripts - they're essentially glorified, parallel `while(true)` loops. Scripts are written using JavaScript, as ES6 modules, which allows you to break larger tests into smaller and more reusable pieces, which makes it easy to scale across an organization.
+k6 works with the concept of **virtual users** (VUs) that execute scripts - they're essentially glorified, parallel `while(true)` loops. Scripts are written using JavaScript, as ES6 modules, which allows you to break larger tests into smaller and more reusable pieces, making it easy to scale tests across an organization.
 
-Scripts must contain, at the very least, a `default` function - this defines the entry point for your VUs, similar to the `main()` function in many other languages:
-
-```js
-export default function() {
-    // do things here...
-}
-```
-
-*"Why not just run my script normally, from top to bottom"*, you might ask - the answer is: we do, but code **inside** and **outside** your `default` function can do different things.
-
-Code inside `default` is called "VU code", and is run over and over for as long as the test is running. Code outside of it is called "init code", and is run only once per VU.
-
-VU code can make HTTP requests, emit metrics, and generally do everything you'd expect a load test to do - with a few important exceptions: you can't load anything from your local filesystem, or import any other modules. This all has to be done from init code.
-
-There are two reasons for this. The first is, of course: performance.
-
-If you read a file from disk on every single script iteration, it'd be needlessly slow; even if you cache the contents of the file and any imported modules, it'd mean the *first run* of the script would be much slower than all the others. Worse yet, if you have a script that imports or loads things based on things that can only be known at runtime, you'd get slow iterations thrown in every time you load something new.
-
-But there's another, more interesting reason. By forcing all imports and file reads into the init context, we design for distributed execution. We know which files will be needed, so we distribute only those files. We know which modules will be imported, so we can bundle them up from the get-go. And, tying into the performance point above, the other nodes don't even need writable filesystems - everything can be kept in-memory.
-
-As an added bonus, you can use this to reuse data between iterations (but only for the same VU):
-
-```js
-var counter = 0;
-
-export default function() {
-    counter++;
-}
-```
-
-### Running k6
-
-First, create a k6 script to describe what the virtual users should do in your load test:
+Scripts must contain, at the very least, an exported `default` function - this defines the entry point for your VUs, similar to the `main()` function in many languages. Let's create a very simple script that makes an HTTP GET request to a test website:
 
 ```js
 import http from "k6/http";
 
 export default function() {
-  http.get("http://test.loadimpact.com");
+  let response = http.get("https://test.loadimpact.com");
 };
 ```
 
-Save it as `script.js`, then run k6 like this:
+The script details and how we can extend and configure it will be explained below, but for now simply save the above snippet as a `script.js` file somewhere on your system. Assuming that you've [installed k6](#install) correctly, on Linux and Mac you can run the saved script by executing `k6 run script.js` from the same folder. For Windows the command is almost the same - `k6.exe run script.js`.
 
-`k6 run script.js`
+If you instead decide to use the k6 docker image, the used command would be slightly different. Instead of passing the script filename to k6, we can use a dash to tell it to read the script contents directly via the standard input. This allows us to to avoid messing with docker volumes for such a simple single-file script, greatly simplifying the docker command: `docker run -i loadimpact/k6 run - <script.js`.
 
-(Note that if you use the Docker image, the command is slightly different: `docker run -i loadimpact/k6 run - <script.js`)
+In some situations it may also be useful to execute remote scripts. You can do that with HTTP**S** URLs in k6 by [importing them](https://docs.k6.io/docs/modules#section-remote-modules) in the script via their URL or simply specifying their URL in the CLI command: `k6 run github.com/loadimpact/k6/samples/http_2.js` (k6 actually "knows" a bit about github and cdnjs URLs, so this command is actuall shorthand for `k6 run raw.githubusercontent.com/loadimpact/k6/master/samples/http_2.js`)
 
-For more information on how to get started running k6, please look at the [Running k6](https://docs.k6.io/docs/running-k6) documentation. If you want more info on the scripting API or results output, you'll find that also on [https://docs.k6.io](https://docs.k6.io).
+For more information on how to get started running k6, please look at the [Running k6](https://docs.k6.io/docs/running-k6) documentation page. If you want to know more about making and measuring HTTP requests with k6, take a look [here](https://docs.k6.io/docs/http-requests) and [here](https://docs.k6.io/docs/k6http). And for information about the commercial Load Impact services like distributed cloud execution (the `k6 cloud` command) or Insights, you can visit [loadimpact.com](https://loadimpact.com/) or view the [Load Impact documentation](https://support.loadimpact.com/4.0/).
 
----
+Overview
+--------
+
+In this section we'll briefly explore some of the basic concepts and principles of how k6 works. If you want to learn more in-depth about the k6 scripting API, results output, and features, you can visit the full k6 documentation website at [https://docs.k6.io](https://docs.k6.io).
+
+### Init and VU stages
+
+Earlier, in the [Running k6](#running-k6) section, we mentioned that scripts must contain a `default` function. *"Why not just run my script normally, from top to bottom"*, you might ask - the answer is: we do, but code **inside** and **outside** your `default` function can do different things.
+
+Each virtual user (VU) executes your script in a completely separate JavaScript runtime, parallel to all of the other running VUs. Code inside the `default` function is called "VU code", and is run over and over for as long as the test is running. Code outside of the `default` function is called "init code", and is run only once in each VU, when that VU is initialized.
+
+VU code can make HTTP and websocket requests, emit metrics, and generally do everything you'd expect a load test to do - with a few important exceptions: you can't load anything from your local filesystem, or import any other modules. This all has to be done from the [init code](https://docs.k6.io/docs/init-context).
+
+There are two reasons for this. The first is, of course: performance.
+
+If you read a file from disk on every single script iteration, it'd be needlessly slow. Even if you cache the contents of the file and any imported modules, it'd mean the *first run* of the script would be much slower than all the others. Worse yet, if you have a script that imports or loads things based on things that can only be known at runtime, you'd get slow iterations thrown in every time you load something new. That's also the reason why we initialize *all* needed VUs before any of them starts the actual load test by executing the `default` function.
+
+But there's another, more interesting reason. By forcing all imports and file reads into the init context, we design for distributed execution. We know which files will be needed, so we distribute only those files to each node in the cluster. We know which modules will be imported, so we can bundle them up from the get-go. And, tying into the performance point above, the other nodes don't even need writable file systems - everything can be kept in-memory.
+
+This means that if your script works when it's executed with `k6 run` locally, it should also work without any modifications in a distributed execution environment like `k6 cloud` (that executes it in the Load Impact cloud infrastructure) or, in the future, with the [planned](https://github.com/loadimpact/k6/wiki/Roadmap) k6 native cluster execution mode.
+
+### Script execution
+
+For simplicity, unlike many other JavaScript runtimes, a lot of the operations in k6 are synchronous. That means that, for example, the `let response = http.get("https://test.loadimpact.com")` call from the [Running k6](#running-k6) example script will block the VU execution until the HTTP request is completed, save the [response information](https://docs.k6.io/docs/response-k6http) in the `response` variable and only then continue executing the rest of the script - no callbacks and promises needed.
+
+This simplification works because k6 isn't just a single JavaScript runtime. Instead each VU independently executes the supplied script in its own separate JavaScript runtime, in parallel to all of the other running VUs. This allows us to fully utilize modern multi-core hardware, while at the same time lowering the script complexity by having mostly synchronous functions. Where it makes sense, we also have in-VU parallelization as well, for example the [`http.batch()`](https://docs.k6.io/docs/batch-requests) function (which allows a single VU to make multiple simultaneous HTTP requests) or the [websocket](https://docs.k6.io/docs/k6-websocket-api) support.
+
+As an added bonus, there's an actual [`sleep()` function](https://docs.k6.io/docs/sleep-t-1)! And you can also use the VU separation to reuse data between iterations (i.e. executions of the `default` function) in the same VU:
+```js
+var counter = 0;
+export default function() {
+    counter++;
+}
+```
+
+### Script options and execution control
+
+So we've talked about VUs and iterations, but how are those things controlled?
+
+By default, if nothing is specified, k6 runs a script with only 1 VU and for 1 iteration only. Useful for debugging while writing the script, but usually not very useful when doing load testing. So actual script execution in a load test, k6 offers a lot of flexibility - there are a few different configuration mechanisms you can use to specify script options, and several different options to control the number of VUs and how long your script will be executed, among [other things](https://docs.k6.io/docs/options).
+
+Let's say that you want to specify number of VUs in your script. In order of precedence, you can use any of the following configuration mechanisms to do it:
+1. Command-line flags: `k6 run --vus 10 script.js`, or via the short `-u` flag syntax if we want to save 3 keystrokes (`k6 run -u 10 script.js`).
+2. Environment variables: setting `K6_VUS=20` before you run the script with k6. Especially useful when using the docker k6 image and when running in containerized environments like Kubernetes.
+3. Your script can `export` an `options` object that k6 reads and uses to set any options you want; for example, setting VUs would look like this:
+  ```js
+  export let options = {
+    vus: 30,
+  };
+  export default function() { /* ... do whatever ... */ }
+  ```
+
+  This functionality is very useful, because here you have access to key-value [environment variables](https://docs.k6.io/docs/environment-variables) that k6 exposes to the script via the global `__ENV` object, so you can use the full power of JavaScript to do things like:
+
+  ```js
+  if (__ENV.script_scenario == "staging") {
+    export let options = { /* first set of options */ };
+  } else {
+    export let options = { /* second set of options */ };
+  }
+  ```
+  Or any variation of the above, like importing different config files, etc. Also, having most of the script configuration right next to the script code makes k6 scripts very easily version-controllable.
+
+4. A global JSON config. By default k6 looks for it in the config home folder of the current user (for Linux/BSDs, it will look for `config.json` inside of `${HOME}/.config/loadimpact/k6`), though that can be modified with the `--config`/`-c` CLI flag. It uses the same option keys as the exported `options` from the script file, so we can set the VUs by having `config.json` contain `{ "vus": 1 }`.
+
+Configuration mechanisms at the top of the list have more precedence and can override options that are specified via mechanisms lower on the list. If all of the examples in the above list for setting the number of VUs were used, we'd end up with 10 VUs, since the CLI flags have the highest priority. Also keep in mind that not all of the available options may be configurable via all different mechanisms - some options may be impractical to specify via simple strings (so no CLI/environment variables), while other rarely-used ones may be intentionally excluded from the CLI flags to avoid clutter.
+
+As shown above, there are several ways to configure the number of simultaneous virtual users k6 will launch. There are also different ways to specify how long those virtual users will be running. For simple tests you can:
+- Set the test duration by the `--duration`/`-d` CLI flag (or the `K6_DURATION` environment variable and the `duration` script/JSON option). For ease of use, `duration` is specified with human readable values like `1h30m10s`: `k6 run --duration 30s script.js`, `k6 cloud -d 15m10s script.js`, `export K6_DURATION=1h`, etc. If set to `0`, k6 wouldn't stop executing the script unless the user manually stops it.
+- Set the total number of script iterations with the `--iterations`/`-i` CLI flag (or the `K6_ITERATIONS` environment variable and the `iterations` script/JSON option). k6 will stop executing the script whenever the **total** number of iterations (i.e. the number of iterations across all VUs) reaches the specified number. So if you have `k6 run --iterations 10 --vus 10 script.js`, then each VU would make only a single iteration.
+- Set both the test duration and the total number of script iterations. In that case, k6 would stop the script execution whenever either one of the above conditions is reached first.
+
+For more complex cases, you can specify execution stages. They are a combination of `duration,target-VUs` pairs that tell k6 the number of VUs you want the script execution to ramp up or ramp down to over which period. You can set them via the `stages` script/JSON option as an array of `{ duration: ..., target: ... }` pairs, or with the `--stage`/`-s` CLI flags and the `K6_STAGE` environment variable via the `duration:target,duration:target...` syntax.
+
+For example, the following options would have k6 linearly ramping up from 5 to 10 VUs over the period of 3 minutes (k6 starts with `vus` number of VUs, or 1 by default), then staying flat at 10 VUs for 5 minutes, then ramping up from 10 to 35 VUs over the next 10 minutes before finally ramping down to 0 VUs for another 90 seconds.
+
+```js
+export let options = {
+    vus: 5,
+    stages: [
+        { duration: "3m", target: 10 },
+        { duration: "5m", target: 10 },
+        { duration: "10m", target: 35 },
+        { duration: "1m30s", target: 0 },
+    ]
+};
+```
+Alternatively, you can use the CLI flags `--vus 5 --stage 3m:10,5m:10,10m:35,1m30s:0` or set the environment variables `K6_VUS=5 K6_STAGE="3m:10,5m:10,10m:35,1m30s:0"` to achieve the same results.
+
+For a complete list of supported k6 options, take a look at the documentation at [https://docs.k6.io/docs/options](https://docs.k6.io/docs/options).
+
+_Hint: besides accessing the supplied [environment variables](https://docs.k6.io/docs/environment-variables) through the `__ENV` global object briefly mentioned above, you can also use the [execution context variables](https://docs.k6.io/docs/execution-context-variables) `__VU` and `__ITER` to access the current VU number and the number  oof the current iteration **in that VU**. These variables can be very useful if you want to have different scenarios for different VUs or you want to generate different data from different VUs: ```http.post("https://some.example.website/signup", {username: `testuser${__VU}@testsite.com`, /* ... */})```_
+
+For even more complex scenarios, you can use the k6 [REST API](https://docs.k6.io/docs/rest-api) and the `k6 status`, `k6 scale`, `k6 pause`, `k6 resume` CLI commands to manually control a running k6 test. For [cloud-based tests](https://docs.k6.io/docs/cloud-execution), executed on Load Impact's managed infrastructure via the `k6 cloud` command, you can also specify the VU distribution percentages for different load zones when executing load tests, giving you scalable and geographically-distributed test execution.
+
+
+### Setup and teardown
+
+Beyond the init code and the required VU stage (i.e. the `default` function), which is code run for each VU, k6 also supports test wide setup and teardown stages, like many other testing frameworks and tools. The `setup` and `teardown` functions, like the `default` function, needs to be exported functions. But unlike the `default` function, `setup` and `teardown` are only called once for a test - `setup()` is called at the beginning of the test, after the init stage but before the VU stage (`default` function), and `teardown()` is called at the end of a test, after the last VU iteration (`default` function) has finished executing. This works even when executing the tests in the distributed [cloud execution](https://docs.k6.io/docs/cloud-execution) mode via `k6 cloud`.
+
+See the [full example below](#example-code) for an illustration of how `setup()` and `teardown()` work, how they can be useful in a realistic situation, and how you can pass information from `setup()` to the `default` function and `teardown()`. You can also find more information and examples in the k6 docs [here](https://docs.k6.io/docs/test-life-cycle#section-setup-and-teardown-stages).
+
+
+### Metrics, checks, thresholds, output
+
+By default k6 measures and collects a lot of metrics about the things your scripts do - the duration of different script iterations, how much data was sent and received, how many HTTP request were made, what was their duration, and even how long did the TLS handshake of a particual HTTPS request take. You see a summary of those built-in metrics in the output when you run the simplest possible k6 test, e.g. `k6 run github.com/loadimpact/k6/samples/http_get.js`. More information about the different built-in metrics collected by k6 (and how some of them can be accessed from inside of the scripts) can be seen in the docs [here](https://docs.k6.io/docs/result-metrics).
+
+k6 also allows the creation of user-defined `Counter`, `Gauge`, `Rate` and `Trend` metrics. They can be used to more precisely track and measure a custom subset of the things k6 does, or measure non-timing information that is returned from the remote system.
+
+TODO: tags, groups
+TODO: checks and thresholds
+TODO: outputs: json, influxdb, kafka, LI insights
+
+### Example code
+
+```js
+TODO
+```
+
+You can find (and contribute!) more k6 script examples here: [https://github.com/loadimpact/k6/tree/master/samples](https://github.com/loadimpact/k6/tree/master/samples)
+
+### Modules and JavaScript compatibility
+
+k6 comes with several built-in modules for things like making (and measuring) [HTTP requests](https://docs.k6.io/docs/k6http) and [websocket connections](https://docs.k6.io/docs/k6-websocket-api), [parsing HTML](https://docs.k6.io/docs/k6html), [reading files](https://docs.k6.io/docs/open-filepath-mode), [calculating hashes](https://docs.k6.io/docs/k6crypto), setting up checks and thresholds, tracking [custom metrics](https://docs.k6.io/docs/k6metrics), and others.
+
+TODO: internal modules, babel, js compatibility
+
+### Debugging
+
+TODO: console.log, --http-debug, --logformat
+TODO
 
 Need help or want to contribute?
 --------------------------------
@@ -147,4 +273,7 @@ Types of questions and where to ask:
 - I have an idea/request -- [file an issue](https://github.com/loadimpact/k6/issues)
 - Why do you? -- [Slack](https://k6.io/slack)
 - When will you? -- [Slack](https://k6.io/slack)
-- I want to contribute/help with development -- Start by reading [CONTRIBUTING.md](https://github.com/loadimpact/k6/blob/master/CONTRIBUTING.md), then [Slack](https://k6.io/slack) and [issues](https://github.com/loadimpact/k6/issues)
+
+If your questions are about any of the commercial Load Impact services like managed cloud execution and Load Impact Insights, you can contact <support@loadimpact.com> or write in the `#loadimpact` channel in [Slack](https://k6.io/slack).
+
+If you want to want to contribute or help with the development of k6, start by reading [CONTRIBUTING.md](https://github.com/loadimpact/k6/blob/master/CONTRIBUTING.md). Before you start coding, especially when it comes to big changes and features, it might be a good idea to first discuss your plans and implementation details with the k6 maintainers. You can do this either in the [github issue](https://github.com/loadimpact/k6/issues) for the problem you're solving (create one if it doesn't exist) or in the `#developers` channel on [Slack](https://k6.io/slack).
