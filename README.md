@@ -167,9 +167,9 @@ export default function() {
 
 ### Script options and execution control
 
-So we've talked about VUs and iterations, but how are those things controlled?
+So we've mentioned VUs and iterations, but how are those things controlled?
 
-By default, if nothing is specified, k6 runs a script with only 1 VU and for 1 iteration only. Useful for debugging while writing the script, but usually not very useful when doing load testing. So actual script execution in a load test, k6 offers a lot of flexibility - there are a few different configuration mechanisms you can use to specify script options, and several different options to control the number of VUs and how long your script will be executed, among [other things](https://docs.k6.io/docs/options).
+By default, if nothing is specified, k6 runs a script with only 1 VU and for 1 iteration only. Useful for debugging, but usually not very useful when doing load testing. For actual script execution in a load test, k6 offers a lot of flexibility - there are a few different configuration mechanisms you can use to specify script options, and several different options to control the number of VUs and how long your script will be executed, among [other things](https://docs.k6.io/docs/options).
 
 Let's say that you want to specify number of VUs in your script. In order of precedence, you can use any of the following configuration mechanisms to do it:
 1. Command-line flags: `k6 run --vus 10 script.js`, or via the short `-u` flag syntax if we want to save 3 keystrokes (`k6 run -u 10 script.js`).
