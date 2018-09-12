@@ -21,8 +21,10 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/dop251/goja"
 	"net/http"
 	"net/url"
 	"testing"
@@ -77,6 +79,26 @@ func myFormHandler(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(body)
 }
 
+func jsonHandler(w http.ResponseWriter, r *http.Request) {
+	jsonData := `{"glossary": { 
+		"int": 1123456,
+		"null": null,
+		"intArray": [1,2,3],
+		"mixedArray": ["123",123,true,null],
+		"boolean": true,
+		"title": "example glossary",
+		"friends": [
+		{"first": "Dale", "last": "Murphy", "age": 44},
+		{"first": "Roger", "last": "Craig", "age": 68},
+		{"first": "Jane", "last": "Murphy", "age": 47}
+		]}}`
+	body := []byte(jsonData)
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(body)))
+	w.WriteHeader(200)
+	_, _ = w.Write(body)
+}
+
 func TestResponse(t *testing.T) {
 	tb, state, samples, rt, _ := newRuntime(t)
 	defer tb.Cleanup()
@@ -84,6 +106,7 @@ func TestResponse(t *testing.T) {
 	sr := tb.Replacer.Replace
 
 	tb.Mux.HandleFunc("/myforms/get", myFormHandler)
+	tb.Mux.HandleFunc("/json", jsonHandler)
 
 	t.Run("Html", func(t *testing.T) {
 		_, err := common.RunString(rt, sr(`
@@ -146,6 +169,46 @@ func TestResponse(t *testing.T) {
 			_, err := common.RunString(rt, sr(`http.request("GET", "HTTPBIN_URL/html").json();`))
 			assert.EqualError(t, err, "GoError: invalid character '<' looking for beginning of value")
 		})
+	})
+	t.Run("JsonSelector", func(t *testing.T) {
+		_, err := common.RunString(rt, sr(`
+			let res = http.request("GET", "HTTPBIN_URL/json");
+			if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+
+			var value = res.json("glossary.friends.1")
+	        if (typeof value != "object")
+				{ throw new Error("wrong type of result value: " + value); }
+
+			value = res.json("glossary.int1")
+	        if (value != undefined)
+				{ throw new Error("Expected undefined, but got: " + value); }
+
+			value = res.json("glossary.null") 
+	        if (value != null)
+				{ throw new Error("Expected null, but got: " + value); }
+
+			value = res.json("glossary.intArray.#")
+	        if (value != 3)
+				{ throw new Error("Expected num 3, but got: " + value); }
+
+			value = res.json("glossary.intArray")[2]
+	        if (value != 3)
+ 				{ throw new Error("Expected,  num 3, but got: " + value); }
+
+			value = res.json("glossary.boolean")
+	        if (value != true)
+				{ throw new Error("Expected boolean true, but got: " + value); }
+
+			value = res.json("glossary.title") 
+	        if (value != "example glossary") 
+				{ throw new Error("Expected 'example glossary'', but got: " + value); }
+
+			value =	res.json("glossary.friends.#.first")[0]
+	        if (value != "Dale")
+				{ throw new Error("Expected 'Dale', but got: " + value); }
+		`))
+		assert.NoError(t, err)
+		assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/json"), "", 200, "")
 	})
 
 	t.Run("SubmitForm", func(t *testing.T) {
@@ -292,4 +355,74 @@ func TestResponse(t *testing.T) {
 			assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/get"), "", 200, "")
 		})
 	})
+}
+
+func benchmarkResponseJson(b *testing.B, selector ...string) {
+	json := `{"glossary": {
+    "friends": [
+      {"first": "Dale", "last": "Murphy", "age": 44},
+      {"first": "Roger", "last": "Craig", "age": 68},
+      {"first": "Jane", "last": "Murphy", "age": 47}],
+	"GlossDiv": {
+	  "title": "S",
+	  "GlossList": {
+	    "GlossEntry": {
+	      "ID": "SGML",
+	      "SortAs": "SGML",
+	      "GlossTerm": "Standard Generalized Markup Language",
+	      "Acronym": "SGML",
+	      "Abbrev": "ISO 8879:1986",
+	      "GlossDef": {
+            "int": 1123456,
+            "null": null,
+            "intArray": [1,2,3],
+            "mixedArray": ["123",123,true,null],
+            "boolean": true,
+            "title": "example glossary",
+            "para": "A meta-markup language, used to create markup languages such as DocBook.",
+	  "GlossSeeAlso": ["GML","XML"]},
+	"GlossSee": "markup"}}}}}`
+	ctx := context.Background()
+	rt := goja.New()
+	ctx = common.WithRuntime(ctx, rt)
+	for n := 0; n < b.N; n++ {
+		resp := &HTTPResponse{ctx: ctx, Body: json}
+		resp.Json(selector...)
+	}
+}
+
+func BenchmarkJsonWithSelector_string(b *testing.B) {
+	benchmarkResponseJson(b, "glossary.GlossDiv.GlossList.GlossEntry.title")
+}
+
+func BenchmarkJsonWithSelector_int(b *testing.B) {
+	benchmarkResponseJson(b, "glossary.GlossDiv.GlossList.GlossEntry.int")
+}
+
+func BenchmarkJsonWithSelector_intArray(b *testing.B) {
+	benchmarkResponseJson(b, "glossary.GlossDiv.GlossList.GlossEntry.intArray")
+}
+
+func BenchmarkJsonWithSelector_mixedArray(b *testing.B) {
+	benchmarkResponseJson(b, "glossary.GlossDiv.GlossList.GlossEntry.mixedArray")
+}
+
+func BenchmarkJson_array(b *testing.B) {
+	benchmarkResponseJson(b, "glossary.friends")
+}
+
+func BenchmarkJson_arrayMultiSelect(b *testing.B) {
+	benchmarkResponseJson(b, "glossary.friends.#.first")
+}
+
+func BenchmarkJsonWithSelector_smallObject(b *testing.B) {
+	benchmarkResponseJson(b, "glossary.GlossDiv.GlossList.GlossEntry.GlossDef")
+}
+
+func BenchmarkJsonWithSelector_bigObject(b *testing.B) {
+	benchmarkResponseJson(b, "glossary")
+}
+
+func BenchmarkJsonWithoutSelector(b *testing.B) {
+	benchmarkResponseJson(b)
 }

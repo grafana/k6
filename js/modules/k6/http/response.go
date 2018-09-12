@@ -25,8 +25,8 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"errors"
-
 	"fmt"
+	"github.com/tidwall/gjson"
 	"net/url"
 	"strings"
 
@@ -125,8 +125,9 @@ func (res *HTTPResponse) setTLSInfo(tlsState *tls.ConnectionState) {
 	res.OCSP = ocspStapledRes
 }
 
-func (res *HTTPResponse) Json() goja.Value {
-	if res.cachedJSON == nil {
+func (res *HTTPResponse) Json(selector ...string) goja.Value {
+	hasSelector := len(selector) > 0
+	if res.cachedJSON == nil || hasSelector {
 		var v interface{}
 		var body []byte
 		switch b := res.Body.(type) {
@@ -137,6 +138,36 @@ func (res *HTTPResponse) Json() goja.Value {
 		default:
 			common.Throw(common.GetRuntime(res.ctx), errors.New("Invalid response type"))
 		}
+
+		if hasSelector {
+			result := gjson.GetBytes(body, selector[0])
+
+			if !result.Exists() {
+				return goja.Undefined()
+			}
+
+			switch result.Type {
+			case gjson.Null:
+				return goja.Null()
+			case gjson.Number:
+				return common.GetRuntime(res.ctx).ToValue(result.Num)
+			case gjson.String:
+				return common.GetRuntime(res.ctx).ToValue(result.Str)
+			}
+
+			var raw []byte
+			if result.Index > 0 {
+				raw = body[result.Index : result.Index+len(result.Raw)]
+			} else {
+				raw = []byte(result.Raw)
+			}
+
+			if err := json.Unmarshal(raw, &v); err != nil {
+				common.Throw(common.GetRuntime(res.ctx), err)
+			}
+			return common.GetRuntime(res.ctx).ToValue(v)
+		}
+
 		if err := json.Unmarshal(body, &v); err != nil {
 			common.Throw(common.GetRuntime(res.ctx), err)
 		}
