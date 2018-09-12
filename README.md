@@ -159,9 +159,9 @@ This simplification works because k6 isn't just a single JavaScript runtime. Ins
 
 As an added bonus, there's an actual [`sleep()` function](https://docs.k6.io/docs/sleep-t-1)! And you can also use the VU separation to reuse data between iterations (i.e. executions of the `default` function) in the same VU:
 ```js
-var counter = 0;
+var vuLocalCounter = 0;
 export default function() {
-    counter++;
+    vuLocalCounter++;
 }
 ```
 
@@ -233,34 +233,44 @@ Beyond the init code and the required VU stage (i.e. the `default` function), wh
 See the [full example below](#example-code) for an illustration of how `setup()` and `teardown()` work, how they can be useful in a realistic situation, and how you can pass information from `setup()` to the `default` function and `teardown()`. You can also find more information and examples in the k6 docs [here](https://docs.k6.io/docs/test-life-cycle#section-setup-and-teardown-stages).
 
 
-### Metrics, checks, thresholds, output
+### Metrics, tags and groups
 
-By default k6 measures and collects a lot of metrics about the things your scripts do - the duration of different script iterations, how much data was sent and received, how many HTTP request were made, what was their duration, and even how long did the TLS handshake of a particual HTTPS request take. You see a summary of those built-in metrics in the output when you run the simplest possible k6 test, e.g. `k6 run github.com/loadimpact/k6/samples/http_get.js`. More information about the different built-in metrics collected by k6 (and how some of them can be accessed from inside of the scripts) can be seen in the docs [here](https://docs.k6.io/docs/result-metrics).
+By default k6 measures and collects a lot of metrics about the things your scripts do - the duration of different script iterations, how much data was sent and received, how many HTTP requests were made, what was their duration, and even how long did the TLS handshake of a particual HTTPS request take. You see a summary of those built-in metrics in the output when you run the simplest possible k6 test, e.g. `k6 run github.com/loadimpact/k6/samples/http_get.js`. More information about the different built-in metrics collected by k6 (and how some of them can be accessed from inside of the scripts) can be seen in the docs [here](https://docs.k6.io/docs/result-metrics).
 
-k6 also allows the creation of user-defined `Counter`, `Gauge`, `Rate` and `Trend` metrics. They can be used to more precisely track and measure a custom subset of the things k6 does, or measure non-timing information that is returned from the remote system.
+k6 also allows the creation of user-defined `Counter`, `Gauge`, `Rate` and `Trend` metrics. They can be used to more precisely track and measure a custom subset of the things that k6 measures by default, or anything else the user wants, for example tracking non-timing information that is returned from the remote system. You can find more information about them [here](https://docs.k6.io/docs/result-metrics#section-custom-metrics) and a description of their APIs [here](https://docs.k6.io/docs/k6metrics).
 
-TODO: tags, groups
-TODO: checks and thresholds
-TODO: outputs: json, influxdb, kafka, LI insights
+Every measurement metric in k6 comes with a set of key-value tags attached. Some of them are automatically added by k6 - for example a particular `http_req_duration` metric may have the `method=GET`, `status=200`, `url=https://loadimpact.com`, etc. system tags attached to it. Others can be added by users - globally for a test run via the `tags` [option](https://docs.k6.io/docs/options), or individually as a [parameter](https://docs.k6.io/docs/params-k6http) in a specific HTTP request, websocket connection, `userMetric.Add()` call, etc.
+
+These tags don't show in the simple summary at the end of a k6 test (unless you reference them in a [threshold](#checks-and-thresholds)), but they are invaluable for filtering and investigating k6 test results if you use any of the [outputs](#outputs) mentioned below. k6 also supports simple hierarchical groups for easier code and result organization. You can find more information about groups and system and user-defined tags [here](https://docs.k6.io/docs/tags-and-groups).
+
+### Checks and thresholds
+
+Checks and thresholds are some of the k6 features that make it very easy to use load tests like unit and functional tests and integrate them in a CI (continuous integration) workflow.
+
+[Checks](https://docs.k6.io/docs/checks) are like asserts, but differ in that they don't halt execution, instead they just store the result of the check, pass or fail, and let the script execution continue. Checks are great for codifying assertions relating to HTTP requests/responses, making sure the response code is 2xx for example.
+
+[Thresholds](https://docs.k6.io/docs/thresholds) are global pass/fail criteria that can be used to verify any result metrics and make sure they stay in the desired bounds. They can even reference a subset of values in a given metric, based on the used metric tags. Thresholds are specified in the options section of a k6 script and if they are triggered during a test run, k6 would exit with a nonzero code, and optionally abort the test early. This makes thresholds ideally suited as checks in a CI workflow!
 
 ### Example code
 
 ```js
-TODO
+console.log("TODO");
 ```
 
 You can find (and contribute!) more k6 script examples here: [https://github.com/loadimpact/k6/tree/master/samples](https://github.com/loadimpact/k6/tree/master/samples)
+
+### Outputs
+
+To make full use of your test results and to be able to fully explore and understand them, k6 can output the raw metrics to a an external repository of your choice.
+
+The simplest output option, meant primarily for debugging, is to send the JSON-encoded metrics to a file or to `stdout`. Other ouput options are sending the metrics to an InfluxDB instance or to an Apache Kafka queue, or even to the Load Impact cloud. That way you can run your load tests locally or behind a company firewall, early in the development process or as a part of a CI suite, while at the same time being able store the results in the Load Impact cloud where you can use Insights for comparison and analysis. You can find more information about the available outputs [here](https://docs.k6.io/docs/results-output) and about Load Impact Insights [here](https://docs.k6.io/docs/load-impact-insights) and [here](https://loadimpact.com/insights/).
 
 ### Modules and JavaScript compatibility
 
 k6 comes with several built-in modules for things like making (and measuring) [HTTP requests](https://docs.k6.io/docs/k6http) and [websocket connections](https://docs.k6.io/docs/k6-websocket-api), [parsing HTML](https://docs.k6.io/docs/k6html), [reading files](https://docs.k6.io/docs/open-filepath-mode), [calculating hashes](https://docs.k6.io/docs/k6crypto), setting up checks and thresholds, tracking [custom metrics](https://docs.k6.io/docs/k6metrics), and others.
 
-TODO: internal modules, babel, js compatibility
+You can, of course, also write your own ES6 modules and `import` them in your scripts, potentially reusing code across across an organization. The situation with importing JavaScript libraries is a bit more complicated. You can potentially use **some** JS libraries in k6, even ones intended for Node.js if you use browserify, though if they depend on network/OS-related APIs, they likely won't work. You can find more details and instructions about writing or importing JS modules [here](https://docs.k6.io/docs/modules).
 
-### Debugging
-
-TODO: console.log, --http-debug, --logformat
-TODO
 
 Need help or want to contribute?
 --------------------------------
