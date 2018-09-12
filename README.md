@@ -1,4 +1,4 @@
-<p align="center"><img src="logo.png" alt="k6" width="300" height="282"></p>
+<p align="center"><a href="https://k6.io/"><img src="logo.png" alt="k6" width="300" height="282"></a></p>
 
 <h3 align="center">Like unit testing, for performance</h3>
 <p align="center">A modern load testing tool for developers and testers in the DevOps era.</p>
@@ -21,7 +21,7 @@
 
 ---
 
-**k6** is a modern load testing tool, building on [Load Impact](https://loadimpact.com/)'s years of experience in the load and performance testing industry. It provides a clean, approachable scripting API, [local](https://docs.k6.io/docs/running-k6) and [cloud execution](https://docs.k6.io/docs/cloud-execution), with command & control through CLI or a [REST API](https://docs.k6.io/docs/rest-api).
+**k6** is a modern load testing tool, building on [Load Impact](https://loadimpact.com/)'s years of experience in the load and performance testing industry. It provides a clean, approachable scripting API, [local](https://docs.k6.io/docs/running-k6) and [cloud execution](https://docs.k6.io/docs/cloud-execution), flexible configuration, with command & control through CLI or a [REST API](https://docs.k6.io/docs/rest-api).
 
 This is how load testing should look in the 21st century.
 
