@@ -118,7 +118,7 @@ Scripts must contain, at the very least, an exported `default` function - this d
 import http from "k6/http";
 
 export default function() {
-  let response = http.get("https://test.loadimpact.com");
+    let response = http.get("https://test.loadimpact.com");
 };
 ```
 
@@ -173,23 +173,21 @@ Let's say that you want to specify number of VUs in your script. In order of pre
 1. Command-line flags: `k6 run --vus 10 script.js`, or via the short `-u` flag syntax if we want to save 3 keystrokes (`k6 run -u 10 script.js`).
 2. Environment variables: setting `K6_VUS=20` before you run the script with k6. Especially useful when using the [docker k6 image](https://hub.docker.com/r/loadimpact/k6/) and when running in containerized environments like Kubernetes.
 3. Your script can `export` an `options` object that k6 reads and uses to set any options you want; for example, setting VUs would look like this:
-  ```js
-  export let options = {
-    vus: 30,
-  };
-  export default function() { /* ... do whatever ... */ }
-  ```
-
-  This functionality is very useful, because here you have access to key-value [environment variables](https://docs.k6.io/docs/environment-variables) that k6 exposes to the script via the global `__ENV` object, so you can use the full power of JavaScript to do things like:
-
-  ```js
-  if (__ENV.script_scenario == "staging") {
-    export let options = { /* first set of options */ };
-  } else {
-    export let options = { /* second set of options */ };
-  }
-  ```
-  Or any variation of the above, like importing different config files, etc. Also, having most of the script configuration right next to the script code makes k6 scripts very easily version-controllable.
+    ```js
+    export let options = {
+        vus: 30,
+    };
+    export default function() { /* ... do whatever ... */ }
+    ```
+    This functionality is very useful, because here you have access to key-value [environment variables](https://docs.k6.io/docs/environment-variables) that k6 exposes to the script via the global `__ENV` object, so you can use the full power of JavaScript to do things like:
+    ```js
+    if (__ENV.script_scenario == "staging") {
+        export let options = { /* first set of options */ };
+    } else {
+        export let options = { /* second set of options */ };
+    }
+    ```
+    Or any variation of the above, like importing different config files, etc. Also, having most of the script configuration right next to the script code makes k6 scripts very easily version-controllable.
 
 4. A global JSON config. By default k6 looks for it in the config home folder of the current user (OS-dependent, for Linux/BSDs k6 will look for `config.json` inside of `${HOME}/.config/loadimpact/k6`), though that can be modified with the `--config`/`-c` CLI flag.
 It uses the same option keys as the exported `options` from the script file, so we can set the VUs by having `config.json` contain `{ "vus": 1 }`. Although it rarely makes sense to set the number of VUs there, the global config file is much more useful for storing things like login credentials for the different [outputs](#outputs), as used by the `k6 login` subcommand...
