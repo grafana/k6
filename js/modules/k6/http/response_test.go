@@ -56,6 +56,30 @@ const testGetFormHTML = `
 	</form>
 </body>
 `
+const jsonData = `{"glossary": {
+    "friends": [
+      {"first": "Dale", "last": "Murphy", "age": 44},
+      {"first": "Roger", "last": "Craig", "age": 68},
+      {"first": "Jane", "last": "Murphy", "age": 47}],
+	"GlossDiv": {
+	  "title": "S",
+	  "GlossList": {
+	    "GlossEntry": {
+	      "ID": "SGML",
+	      "SortAs": "SGML",
+	      "GlossTerm": "Standard Generalized Markup Language",
+	      "Acronym": "SGML",
+	      "Abbrev": "ISO 8879:1986",
+	      "GlossDef": {
+            "int": 1123456,
+            "null": null,
+            "intArray": [1,2,3],
+            "mixedArray": ["123",123,true,null],
+            "boolean": true,
+            "title": "example glossary",
+            "para": "A meta-markup language, used to create markup languages such as DocBook.",
+	  "GlossSeeAlso": ["GML","XML"]},
+	"GlossSee": "markup"}}}}}`
 
 func myFormHandler(w http.ResponseWriter, r *http.Request) {
 	var body []byte
@@ -80,18 +104,6 @@ func myFormHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func jsonHandler(w http.ResponseWriter, r *http.Request) {
-	jsonData := `{"glossary": { 
-		"int": 1123456,
-		"null": null,
-		"intArray": [1,2,3],
-		"mixedArray": ["123",123,true,null],
-		"boolean": true,
-		"title": "example glossary",
-		"friends": [
-		{"first": "Dale", "last": "Murphy", "age": 44},
-		{"first": "Roger", "last": "Craig", "age": 68},
-		{"first": "Jane", "last": "Murphy", "age": 47}
-		]}}`
 	body := []byte(jsonData)
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(body)))
@@ -187,19 +199,19 @@ func TestResponse(t *testing.T) {
 	        if (value != null)
 				{ throw new Error("Expected null, but got: " + value); }
 
-			value = res.json("glossary.intArray.#")
+			value = res.json("glossary.GlossDiv.GlossList.GlossEntry.GlossDef.intArray.#")
 	        if (value != 3)
 				{ throw new Error("Expected num 3, but got: " + value); }
 
-			value = res.json("glossary.intArray")[2]
+			value = res.json("glossary.GlossDiv.GlossList.GlossEntry.GlossDef.intArray")[2]
 	        if (value != 3)
- 				{ throw new Error("Expected,  num 3, but got: " + value); }
+ 				{ throw new Error("Expected, num 3, but got: " + value); }
 
-			value = res.json("glossary.boolean")
+			value = res.json("glossary.GlossDiv.GlossList.GlossEntry.GlossDef.boolean")
 	        if (value != true)
 				{ throw new Error("Expected boolean true, but got: " + value); }
 
-			value = res.json("glossary.title") 
+			value = res.json("glossary.GlossDiv.GlossList.GlossEntry.GlossDef.title") 
 	        if (value != "example glossary") 
 				{ throw new Error("Expected 'example glossary'', but got: " + value); }
 
@@ -357,72 +369,36 @@ func TestResponse(t *testing.T) {
 	})
 }
 
-func benchmarkResponseJson(b *testing.B, selector ...string) {
-	json := `{"glossary": {
-    "friends": [
-      {"first": "Dale", "last": "Murphy", "age": 44},
-      {"first": "Roger", "last": "Craig", "age": 68},
-      {"first": "Jane", "last": "Murphy", "age": 47}],
-	"GlossDiv": {
-	  "title": "S",
-	  "GlossList": {
-	    "GlossEntry": {
-	      "ID": "SGML",
-	      "SortAs": "SGML",
-	      "GlossTerm": "Standard Generalized Markup Language",
-	      "Acronym": "SGML",
-	      "Abbrev": "ISO 8879:1986",
-	      "GlossDef": {
-            "int": 1123456,
-            "null": null,
-            "intArray": [1,2,3],
-            "mixedArray": ["123",123,true,null],
-            "boolean": true,
-            "title": "example glossary",
-            "para": "A meta-markup language, used to create markup languages such as DocBook.",
-	  "GlossSeeAlso": ["GML","XML"]},
-	"GlossSee": "markup"}}}}}`
+func BenchmarkResponseJson(b *testing.B) {
 	ctx := context.Background()
 	rt := goja.New()
 	ctx = common.WithRuntime(ctx, rt)
-	for n := 0; n < b.N; n++ {
-		resp := &HTTPResponse{ctx: ctx, Body: json}
-		resp.Json(selector...)
+	testCases := []struct {
+		selector string
+	}{
+		{"glossary.GlossDiv.GlossList.GlossEntry.title"},
+		{"glossary.GlossDiv.GlossList.GlossEntry.int"},
+		{"glossary.GlossDiv.GlossList.GlossEntry.intArray"},
+		{"glossary.GlossDiv.GlossList.GlossEntry.mixedArray"},
+		{"glossary.friends"},
+		{"glossary.friends.#.first"},
+		{"glossary.GlossDiv.GlossList.GlossEntry.GlossDef"},
+		{"glossary"},
 	}
-}
+	for _, tc := range testCases {
+		b.Run(fmt.Sprintf("Selector %s ", tc.selector), func(b *testing.B) {
+			for n := 0; n < b.N; n++ {
+				resp := &HTTPResponse{ctx: ctx, Body: jsonData}
+				resp.Json(tc.selector)
+			}
+		})
+	}
 
-func BenchmarkJsonWithSelector_string(b *testing.B) {
-	benchmarkResponseJson(b, "glossary.GlossDiv.GlossList.GlossEntry.title")
-}
+	b.Run("Without selector", func(b *testing.B) {
+		for n := 0; n < b.N; n++ {
+			resp := &HTTPResponse{ctx: ctx, Body: jsonData}
+			resp.Json()
+		}
+	})
 
-func BenchmarkJsonWithSelector_int(b *testing.B) {
-	benchmarkResponseJson(b, "glossary.GlossDiv.GlossList.GlossEntry.int")
-}
-
-func BenchmarkJsonWithSelector_intArray(b *testing.B) {
-	benchmarkResponseJson(b, "glossary.GlossDiv.GlossList.GlossEntry.intArray")
-}
-
-func BenchmarkJsonWithSelector_mixedArray(b *testing.B) {
-	benchmarkResponseJson(b, "glossary.GlossDiv.GlossList.GlossEntry.mixedArray")
-}
-
-func BenchmarkJson_array(b *testing.B) {
-	benchmarkResponseJson(b, "glossary.friends")
-}
-
-func BenchmarkJson_arrayMultiSelect(b *testing.B) {
-	benchmarkResponseJson(b, "glossary.friends.#.first")
-}
-
-func BenchmarkJsonWithSelector_smallObject(b *testing.B) {
-	benchmarkResponseJson(b, "glossary.GlossDiv.GlossList.GlossEntry.GlossDef")
-}
-
-func BenchmarkJsonWithSelector_bigObject(b *testing.B) {
-	benchmarkResponseJson(b, "glossary")
-}
-
-func BenchmarkJsonWithoutSelector(b *testing.B) {
-	benchmarkResponseJson(b)
 }
