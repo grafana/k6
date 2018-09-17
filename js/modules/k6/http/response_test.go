@@ -190,6 +190,8 @@ func TestResponse(t *testing.T) {
 			var value = res.json("glossary.friends.1")
 	        if (typeof value != "object")
 				{ throw new Error("wrong type of result value: " + value); }
+	        if (value["first"] != "Roger")
+				{ throw new Error("Expected Roger for key first but got: " + value["first"]); }
 
 			value = res.json("glossary.int1")
 	        if (value != undefined)
@@ -400,5 +402,4 @@ func BenchmarkResponseJson(b *testing.B) {
 			resp.Json()
 		}
 	})
-
 }
