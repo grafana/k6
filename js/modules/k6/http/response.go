@@ -65,7 +65,8 @@ type HTTPResponse struct {
 	Error          string
 	Request        HTTPRequest
 
-	cachedJSON goja.Value
+	cachedJSON    goja.Value
+	validatedJSON bool
 }
 
 func (res *HTTPResponse) setTLSInfo(tlsState *tls.ConnectionState) {
@@ -139,11 +140,15 @@ func (res *HTTPResponse) Json(selector ...string) goja.Value {
 			common.Throw(common.GetRuntime(res.ctx), errors.New("Invalid response type"))
 		}
 
-		if !gjson.ValidBytes(body) {
-			common.Throw(common.GetRuntime(res.ctx), errors.New("invalid json"))
-		}
-
 		if hasSelector {
+
+			if !res.validatedJSON {
+				if !gjson.ValidBytes(body) {
+					return goja.Undefined()
+				}
+				res.validatedJSON = true
+			}
+
 			result := gjson.GetBytes(body, selector[0])
 
 			if !result.Exists() {
@@ -155,6 +160,7 @@ func (res *HTTPResponse) Json(selector ...string) goja.Value {
 		if err := json.Unmarshal(body, &v); err != nil {
 			common.Throw(common.GetRuntime(res.ctx), err)
 		}
+		res.validatedJSON = true
 		res.cachedJSON = common.GetRuntime(res.ctx).ToValue(v)
 	}
 	return res.cachedJSON
