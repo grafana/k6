@@ -77,3 +77,4 @@ Thanks to @sherrman for reporting the binary handling issues that prompted the a
 * Config: Environment variables can now be used to modify k6's behavior in the `k6 login` subcommands. (#734)
 * HTTP: Binary response bodies were mangled because there was no way to avoid converting them to UTF-16 JavaScript strings. (#749)
 * Config: Stages were appended instead of overwritten from upper config "tiers", and were doubled when supplied via the CLI flag (#759)
+* HAR converter: Fixed a panic due to a missing array length check (#760)
