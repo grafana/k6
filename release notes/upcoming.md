@@ -69,6 +69,7 @@ Thanks to @sherrman for reporting the binary handling issues that prompted the a
 ## Internals
 
 * Cloud output: improved outlier metric detection for small batches (#744)
+* Use 20 as the the default values of the `batch` and `batchPerHost` options. They determine the maximum number of parallel requests (in total and per-host respectively) an `http.batch()` call will make per VU. The previous value for `batch` was 10 and for `batchPerHost` it was 0 (unlimited). We now also use their values to determine the maximum number of open idle connections in a VU (#685)
 
 ## Bugs fixed!
 
