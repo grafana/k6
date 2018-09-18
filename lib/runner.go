@@ -26,8 +26,9 @@ import (
 	"github.com/loadimpact/k6/stats"
 )
 
-// Ensure MiniRunner conforms to Runner.
+// Ensure mock implementations conform to the interfaces.
 var _ Runner = &MiniRunner{}
+var _ VU = &MiniRunnerVU{}
 
 // A Runner is a factory for VUs. It should precompute as much as possible upon creation (parse
 // ASTs, load files into memory, etc.), so that spawning VUs becomes as fast as possible.
@@ -43,10 +44,10 @@ type Runner interface {
 	// Spawns a new VU. It's fine to make this function rather heavy, if it means a performance
 	// improvement at runtime. Remember, this is called once per VU and normally only at the start
 	// of a test - RunOnce() may be called hundreds of thousands of times, and must be fast.
-	NewVU() (VU, error)
+	NewVU(out chan<- stats.SampleContainer) (VU, error)
 
 	// Runs pre-test setup, if applicable.
-	Setup(ctx context.Context) error
+	Setup(ctx context.Context, out chan<- stats.SampleContainer) error
 
 	// Returns the setup data if setup() is specified and run, nil otherwise
 	GetSetupData() interface{}
@@ -55,7 +56,7 @@ type Runner interface {
 	SetSetupData(interface{})
 
 	// Runs post-test teardown, if applicable.
-	Teardown(ctx context.Context) error
+	Teardown(ctx context.Context, out chan<- stats.SampleContainer) error
 
 	// Returns the default (root) Group.
 	GetDefaultGroup() *Group
@@ -71,7 +72,7 @@ type Runner interface {
 type VU interface {
 	// Runs the VU once. The VU is responsible for handling the Halting Problem, eg. making sure
 	// that execution actually stops when the context is cancelled.
-	RunOnce(ctx context.Context) ([]stats.SampleContainer, error)
+	RunOnce(ctx context.Context) error
 
 	// Assign the VU a new ID. Called by the Executor upon creation, but may be called multiple
 	// times if the VU is recycled because the test was scaled down and then back up.
@@ -80,9 +81,9 @@ type VU interface {
 
 // MiniRunner wraps a function in a runner whose VUs will simply call that function.
 type MiniRunner struct {
-	Fn         func(ctx context.Context) ([]stats.SampleContainer, error)
-	SetupFn    func(ctx context.Context) (interface{}, error)
-	TeardownFn func(ctx context.Context) error
+	Fn         func(ctx context.Context, out chan<- stats.SampleContainer) error
+	SetupFn    func(ctx context.Context, out chan<- stats.SampleContainer) (interface{}, error)
+	TeardownFn func(ctx context.Context, out chan<- stats.SampleContainer) error
 
 	setupData interface{}
 
@@ -90,21 +91,21 @@ type MiniRunner struct {
 	Options Options
 }
 
-func (r MiniRunner) VU() *MiniRunnerVU {
-	return &MiniRunnerVU{R: r}
+func (r MiniRunner) VU(out chan<- stats.SampleContainer) *MiniRunnerVU {
+	return &MiniRunnerVU{R: r, Out: out}
 }
 
 func (r MiniRunner) MakeArchive() *Archive {
 	return nil
 }
 
-func (r MiniRunner) NewVU() (VU, error) {
-	return r.VU(), nil
+func (r MiniRunner) NewVU(out chan<- stats.SampleContainer) (VU, error) {
+	return r.VU(out), nil
 }
 
-func (r *MiniRunner) Setup(ctx context.Context) (err error) {
+func (r *MiniRunner) Setup(ctx context.Context, out chan<- stats.SampleContainer) (err error) {
 	if fn := r.SetupFn; fn != nil {
-		r.setupData, err = fn(ctx)
+		r.setupData, err = fn(ctx, out)
 	}
 	return
 }
@@ -119,9 +120,9 @@ func (r *MiniRunner) SetSetupData(data interface{}) {
 	r.setupData = data
 }
 
-func (r MiniRunner) Teardown(ctx context.Context) error {
+func (r MiniRunner) Teardown(ctx context.Context, out chan<- stats.SampleContainer) error {
 	if fn := r.TeardownFn; fn != nil {
-		return fn(ctx)
+		return fn(ctx, out)
 	}
 	return nil
 }
@@ -143,15 +144,16 @@ func (r *MiniRunner) SetOptions(opts Options) {
 
 // A VU spawned by a MiniRunner.
 type MiniRunnerVU struct {
-	R  MiniRunner
-	ID int64
+	R   MiniRunner
+	Out chan<- stats.SampleContainer
+	ID  int64
 }
 
-func (vu MiniRunnerVU) RunOnce(ctx context.Context) ([]stats.SampleContainer, error) {
+func (vu MiniRunnerVU) RunOnce(ctx context.Context) error {
 	if vu.R.Fn == nil {
-		return []stats.SampleContainer{}, nil
+		return nil
 	}
-	return vu.R.Fn(ctx)
+	return vu.R.Fn(ctx, vu.Out)
 }
 
 func (vu *MiniRunnerVU) Reconfigure(id int64) error {

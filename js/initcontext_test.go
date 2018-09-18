@@ -35,6 +35,7 @@ import (
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/netext"
+	"github.com/loadimpact/k6/stats"
 	"github.com/oxtoacart/bpool"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
@@ -316,10 +317,12 @@ func TestRequestWithBinaryFile(t *testing.T) {
 			ch <- true
 		}()
 
-		r.ParseMultipartForm(32 << 20)
+		assert.NoError(t, r.ParseMultipartForm(32<<20))
 		file, _, err := r.FormFile("file")
 		assert.NoError(t, err)
-		defer file.Close()
+		defer func() {
+			assert.NoError(t, file.Close())
+		}()
 		bytes := make([]byte, 3)
 		_, err = file.Read(bytes)
 		assert.NoError(t, err)
@@ -372,7 +375,8 @@ func TestRequestWithBinaryFile(t *testing.T) {
 				DualStack: true,
 			})).DialContext,
 		},
-		BPool: bpool.NewBufferPool(1),
+		BPool:   bpool.NewBufferPool(1),
+		Samples: make(chan stats.SampleContainer, 500),
 	}
 
 	ctx := context.Background()

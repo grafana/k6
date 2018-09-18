@@ -63,12 +63,28 @@ func TestOptions(t *testing.T) {
 		assert.Equal(t, int64(1234), opts.Iterations.Int64)
 	})
 	t.Run("Stages", func(t *testing.T) {
-		opts := Options{}.Apply(Options{Stages: []Stage{{Duration: types.NullDurationFrom(1 * time.Second)}}})
+		opts := Options{}.Apply(Options{Stages: []Stage{
+			{Duration: types.NullDurationFrom(1 * time.Second), Target: null.IntFrom(10)},
+			{Duration: types.NullDurationFrom(2 * time.Second), Target: null.IntFrom(20)},
+		}})
 		assert.NotNil(t, opts.Stages)
-		assert.Len(t, opts.Stages, 1)
+		assert.Len(t, opts.Stages, 2)
 		assert.Equal(t, 1*time.Second, time.Duration(opts.Stages[0].Duration.Duration))
+		assert.Equal(t, int64(10), opts.Stages[0].Target.Int64)
+		assert.Equal(t, 2*time.Second, time.Duration(opts.Stages[1].Duration.Duration))
+		assert.Equal(t, int64(20), opts.Stages[1].Target.Int64)
 
-		assert.Nil(t, Options{}.Apply(Options{Stages: []Stage{{}}}).Stages)
+		emptyStages := []Stage{}
+		assert.Equal(t, emptyStages, Options{}.Apply(Options{Stages: []Stage{{}}}).Stages)
+		assert.Equal(t, emptyStages, Options{}.Apply(Options{Stages: []Stage{}}).Stages)
+		assert.Equal(t, emptyStages, opts.Apply(Options{Stages: []Stage{}}).Stages)
+		assert.Equal(t, emptyStages, opts.Apply(Options{Stages: []Stage{{}}}).Stages)
+
+		assert.Equal(t, opts.Stages, opts.Apply(opts).Stages)
+
+		oneStage := []Stage{{Duration: types.NullDurationFrom(5 * time.Second), Target: null.IntFrom(50)}}
+		assert.Equal(t, oneStage, opts.Apply(Options{Stages: oneStage}).Stages)
+		assert.Equal(t, oneStage, Options{}.Apply(opts).Apply(Options{Stages: oneStage}).Apply(Options{Stages: oneStage}).Stages)
 	})
 	t.Run("RPS", func(t *testing.T) {
 		opts := Options{}.Apply(Options{RPS: null.IntFrom(12345)})
@@ -272,6 +288,11 @@ func TestOptions(t *testing.T) {
 		assert.True(t, opts.NoVUConnectionReuse.Valid)
 		assert.True(t, opts.NoVUConnectionReuse.Bool)
 	})
+	t.Run("NoCookiesReset", func(t *testing.T) {
+		opts := Options{}.Apply(Options{NoCookiesReset: null.BoolFrom(true)})
+		assert.True(t, opts.NoCookiesReset.Valid)
+		assert.True(t, opts.NoCookiesReset.Bool)
+	})
 	t.Run("BlacklistIPs", func(t *testing.T) {
 		opts := Options{}.Apply(Options{
 			BlacklistIPs: []*net.IPNet{{
@@ -362,6 +383,12 @@ func TestOptions(t *testing.T) {
 		opts := Options{}.Apply(Options{RunTags: tags})
 		assert.Equal(t, tags, opts.RunTags)
 	})
+	t.Run("DiscardResponseBodies", func(t *testing.T) {
+		opts := Options{}.Apply(Options{DiscardResponseBodies: null.BoolFrom(true)})
+		assert.True(t, opts.DiscardResponseBodies.Valid)
+		assert.True(t, opts.DiscardResponseBodies.Bool)
+	})
+
 }
 
 func TestOptionsEnv(t *testing.T) {
@@ -427,6 +454,11 @@ func TestOptionsEnv(t *testing.T) {
 			"Hi!": null.StringFrom("Hi!"),
 		},
 		{"Throw", "K6_THROW"}: {
+			"":      null.Bool{},
+			"true":  null.BoolFrom(true),
+			"false": null.BoolFrom(false),
+		},
+		{"NoCookiesReset", "K6_NO_COOKIES_RESET"}: {
 			"":      null.Bool{},
 			"true":  null.BoolFrom(true),
 			"false": null.BoolFrom(false),

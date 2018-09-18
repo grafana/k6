@@ -22,6 +22,8 @@ package cmd
 
 import (
 	"fmt"
+	"io"
+	golog "log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -34,7 +36,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var Version = "0.21.1"
+var Version = "0.22.1"
 var Banner = `
           /\      |‾‾|  /‾‾/  /‾/   
      /\  /  \     |  |_/  /  / /   
@@ -73,8 +75,9 @@ var RootCmd = &cobra.Command{
 		setupLoggers(logFmt)
 		if noColor {
 			stdout.Writer = colorable.NewNonColorable(os.Stdout)
-			stdout.Writer = colorable.NewNonColorable(os.Stderr)
+			stderr.Writer = colorable.NewNonColorable(os.Stderr)
 		}
+		golog.SetOutput(log.StandardLogger().Writer())
 	},
 }
 
@@ -104,6 +107,15 @@ func init() {
 	RootCmd.PersistentFlags().StringVarP(&address, "address", "a", "localhost:6565", "address for the api server")
 	RootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file"+defaultConfigPathMsg)
 	must(cobra.MarkFlagFilename(RootCmd.PersistentFlags(), "config"))
+}
+
+// fprintf panics when where's an error writing to the supplied io.Writer
+func fprintf(w io.Writer, format string, a ...interface{}) (n int) {
+	n, err := fmt.Fprintf(w, format, a...)
+	if err != nil {
+		panic(err.Error())
+	}
+	return n
 }
 
 // RawFormatter it does nothing with the message just prints it

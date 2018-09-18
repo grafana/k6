@@ -21,7 +21,6 @@
 package ui
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 
@@ -30,9 +29,10 @@ import (
 
 // A Field in a form.
 type Field interface {
-	GetKey() string        // Key for the data map.
-	GetLabel() string      // Label to print as the prompt.
-	GetLabelExtra() string // Extra info for the label, eg. defaults.
+	GetKey() string                        // Key for the data map.
+	GetLabel() string                      // Label to print as the prompt.
+	GetLabelExtra() string                 // Extra info for the label, eg. defaults.
+	GetContents(io.Reader) (string, error) // Read the field contents from the supplied reader
 
 	// Sanitize user input and return the field's native type.
 	Clean(s string) (interface{}, error)
@@ -44,13 +44,14 @@ type Form struct {
 	Fields []Field
 }
 
-// Runs the form against the specified input and output.
+// Run executes the form against the specified input and output.
 func (f Form) Run(r io.Reader, w io.Writer) (map[string]interface{}, error) {
 	if f.Banner != "" {
-		fmt.Fprintln(w, color.BlueString(f.Banner)+"\n")
+		if _, err := fmt.Fprintln(w, color.BlueString(f.Banner)+"\n"); err != nil {
+			return nil, err
+		}
 	}
 
-	buf := bufio.NewReader(r)
 	data := make(map[string]interface{}, len(f.Fields))
 	for _, field := range f.Fields {
 		for {
@@ -58,10 +59,12 @@ func (f Form) Run(r io.Reader, w io.Writer) (map[string]interface{}, error) {
 			if extra := field.GetLabelExtra(); extra != "" {
 				displayLabel += " " + color.New(color.Faint, color.FgCyan).Sprint("["+extra+"]")
 			}
-			fmt.Fprintf(w, "  "+displayLabel+": ")
+			if _, err := fmt.Fprintf(w, "  "+displayLabel+": "); err != nil {
+				return nil, err
+			}
 
 			color.Set(color.FgCyan)
-			s, err := buf.ReadString('\n')
+			s, err := field.GetContents(r)
 			color.Unset()
 			if err != nil {
 				return nil, err
@@ -69,7 +72,9 @@ func (f Form) Run(r io.Reader, w io.Writer) (map[string]interface{}, error) {
 
 			v, err := field.Clean(s)
 			if err != nil {
-				fmt.Fprintln(w, color.RedString("- "+err.Error()))
+				if _, printErr := fmt.Fprintln(w, color.RedString("- "+err.Error())); printErr != nil {
+					return nil, printErr
+				}
 				continue
 			}
 

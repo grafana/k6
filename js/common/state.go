@@ -33,7 +33,7 @@ import (
 	"golang.org/x/time/rate"
 )
 
-// Provides volatile state for a VU.
+// State provides the volatile state for a VU.
 type State struct {
 	// Global options.
 	Options lib.Options
@@ -53,10 +53,11 @@ type State struct {
 	// Rate limits.
 	RPSLimit *rate.Limiter
 
-	// Sample buffer, emitted at the end of the iteration.
-	Samples []stats.SampleContainer
+	// Sample channel, possibly buffered
+	Samples chan<- stats.SampleContainer
 
 	// Buffer pool; use instead of allocating fresh buffers when possible.
+	// TODO: maybe use https://golang.org/pkg/sync/#Pool ?
 	BPool *bpool.BufferPool
 
 	Vu, Iteration int64

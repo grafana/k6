@@ -21,6 +21,7 @@
 package stats
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -369,6 +370,34 @@ var _ SampleContainer = Samples{}
 
 var _ ConnectedSampleContainer = Sample{}
 var _ ConnectedSampleContainer = ConnectedSamples{}
+
+// GetBufferedSamples will read all present (i.e. buffered or currently being pushed)
+// values in the input channel and return them as a slice.
+func GetBufferedSamples(input <-chan SampleContainer) (result []SampleContainer) {
+	for {
+		select {
+		case val, ok := <-input:
+			if !ok {
+				return
+			}
+			result = append(result, val)
+		default:
+			return
+		}
+	}
+}
+
+// PushIfNotCancelled first checks if the supplied context is cancelled and doesn't push
+// the sample container if it is.
+func PushIfNotCancelled(ctx context.Context, output chan<- SampleContainer, sample SampleContainer) bool {
+	select {
+	case <-ctx.Done():
+		return false
+	default: // Do nothing
+	}
+	output <- sample
+	return true
+}
 
 // A Metric defines the shape of a set of data.
 type Metric struct {

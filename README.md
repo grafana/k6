@@ -55,8 +55,7 @@ Install
 ### Mac
 
 ```bash
-brew tap loadimpact/k6
-brew install k6
+brew install loadimpact/k6/k6
 ```
 
 ### Other Platforms
@@ -72,7 +71,7 @@ docker pull loadimpact/k6
 ```
 
 ### Build from source
-To build from source you need **[Git](https://git-scm.com/downloads)** and **[Go](https://golang.org/doc/install)** (1.8 or newer). Follow these instructions:
+To build from source you need **[Git](https://git-scm.com/downloads)** and **[Go](https://golang.org/doc/install)** (1.10 or newer). Follow these instructions:
 
 - Run `go get github.com/loadimpact/k6` which will:
   - git clone the repo and put the source in `$GOPATH/src/github.com/loadimpact/k6`

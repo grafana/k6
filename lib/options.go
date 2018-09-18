@@ -23,7 +23,9 @@ package lib
 import (
 	"crypto/tls"
 	"encoding/json"
+	"fmt"
 	"net"
+	"reflect"
 
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
@@ -257,6 +259,15 @@ type Options struct {
 
 	// Tags to be applied to all samples for this running
 	RunTags *stats.SampleTags `json:"tags" envconfig:"tags"`
+
+	// Buffer size of the channel for metric samples; 0 means unbuffered
+	MetricSamplesBufferSize null.Int `json:"metricSamplesBufferSize" envconfig:"metric_samples_buffer_size"`
+
+	// Do not reset cookies after a VU iteration
+	NoCookiesReset null.Bool `json:"noCookiesReset" envconfig:"no_cookies_reset"`
+
+	// Discard Http Responses Body
+	DiscardResponseBodies null.Bool `json:"discardResponseBodies" envconfig:"discard_response_bodies"`
 }
 
 // Returns the result of overwriting any fields with any that are set on the argument.
@@ -281,7 +292,8 @@ func (o Options) Apply(opts Options) Options {
 	if opts.Iterations.Valid {
 		o.Iterations = opts.Iterations
 	}
-	if len(opts.Stages) > 0 {
+	if opts.Stages != nil {
+		o.Stages = []Stage{}
 		for _, s := range opts.Stages {
 			if s.Duration.Valid {
 				o.Stages = append(o.Stages, s)
@@ -342,6 +354,9 @@ func (o Options) Apply(opts Options) Options {
 	if opts.NoVUConnectionReuse.Valid {
 		o.NoVUConnectionReuse = opts.NoVUConnectionReuse
 	}
+	if opts.NoCookiesReset.Valid {
+		o.NoCookiesReset = opts.NoCookiesReset
+	}
 	if opts.External != nil {
 		o.External = opts.External
 	}
@@ -357,5 +372,46 @@ func (o Options) Apply(opts Options) Options {
 	if !opts.RunTags.IsEmpty() {
 		o.RunTags = opts.RunTags
 	}
+	if opts.MetricSamplesBufferSize.Valid {
+		o.MetricSamplesBufferSize = opts.MetricSamplesBufferSize
+	}
+	if opts.DiscardResponseBodies.Valid {
+		o.DiscardResponseBodies = opts.DiscardResponseBodies
+	}
 	return o
+}
+
+// ForEachValid enumerates all struct fields and calls the supplied function with each
+// element that is valid. It panics for any unfamiliar or unexpected fields, so make sure
+// new fields in Options are accounted for.
+func (o Options) ForEachValid(structTag string, callback func(key string, value interface{})) {
+	structType := reflect.TypeOf(o)
+	structVal := reflect.ValueOf(o)
+	for i := 0; i < structType.NumField(); i++ {
+		fieldType := structType.Field(i)
+		fieldVal := structVal.Field(i)
+
+		shouldCall := false
+		switch fieldType.Type.Kind() {
+		case reflect.Struct:
+			shouldCall = fieldVal.FieldByName("Valid").Bool()
+		case reflect.Slice:
+			shouldCall = fieldVal.Len() > 0
+		case reflect.Map:
+			shouldCall = fieldVal.Len() > 0
+		case reflect.Ptr:
+			shouldCall = !fieldVal.IsNil()
+		default:
+			panic(fmt.Sprintf("Unknown Options field %#v", fieldType))
+		}
+
+		if shouldCall {
+			key, ok := fieldType.Tag.Lookup(structTag)
+			if !ok {
+				key = fieldType.Name
+			}
+
+			callback(key, fieldVal.Interface())
+		}
+	}
 }

@@ -56,6 +56,9 @@ func applyNullLogger(e *Engine) *logtest.Hook {
 
 // Wrapper around newEngine that applies a null logger.
 func newTestEngine(ex lib.Executor, opts lib.Options) (*Engine, error, *logtest.Hook) {
+	if !opts.MetricSamplesBufferSize.Valid {
+		opts.MetricSamplesBufferSize = null.IntFrom(200)
+	}
 	e, err := NewEngine(ex, opts)
 	if err != nil {
 		return e, err, nil
@@ -64,12 +67,8 @@ func newTestEngine(ex lib.Executor, opts lib.Options) (*Engine, error, *logtest.
 	return e, nil, hook
 }
 
-func L(r lib.Runner) lib.Executor {
-	return local.New(r)
-}
-
-func LF(fn func(ctx context.Context) ([]stats.SampleContainer, error)) lib.Executor {
-	return L(&lib.MiniRunner{Fn: fn})
+func LF(fn func(ctx context.Context, out chan<- stats.SampleContainer) error) lib.Executor {
+	return local.New(&lib.MiniRunner{Fn: fn})
 }
 
 func TestNewEngine(t *testing.T) {
@@ -250,8 +249,8 @@ func TestEngineRun(t *testing.T) {
 
 		signalChan := make(chan interface{})
 		var e *Engine
-		e, err, _ := newTestEngine(LF(func(ctx context.Context) (samples []stats.SampleContainer, err error) {
-			samples = append(samples, stats.Sample{Metric: testMetric, Time: time.Now(), Value: 1})
+		e, err, _ := newTestEngine(LF(func(ctx context.Context, samples chan<- stats.SampleContainer) error {
+			samples <- stats.Sample{Metric: testMetric, Time: time.Now(), Value: 1}
 			close(signalChan)
 			<-ctx.Done()
 
@@ -263,8 +262,8 @@ func TestEngineRun(t *testing.T) {
 			// 2. Sometimes the `case samples := <-vuOut` gets selected before the `<-ctx.Done()` in
 			//    core/local/local.go:Run() causing all samples from this mocked "RunOnce()" function to be accepted.
 			time.Sleep(time.Millisecond * 10)
-			samples = append(samples, stats.Sample{Metric: testMetric, Time: time.Now(), Value: 2})
-			return samples, err
+			samples <- stats.Sample{Metric: testMetric, Time: time.Now(), Value: 2}
+			return nil
 		}), lib.Options{
 			VUs:        null.IntFrom(1),
 			VUsMax:     null.IntFrom(1),
@@ -308,8 +307,9 @@ func TestEngineAtTime(t *testing.T) {
 func TestEngineCollector(t *testing.T) {
 	testMetric := stats.New("test_metric", stats.Trend)
 
-	e, err, _ := newTestEngine(LF(func(ctx context.Context) ([]stats.SampleContainer, error) {
-		return []stats.SampleContainer{stats.Sample{Metric: testMetric}}, nil
+	e, err, _ := newTestEngine(LF(func(ctx context.Context, out chan<- stats.SampleContainer) error {
+		out <- stats.Sample{Metric: testMetric}
+		return nil
 	}), lib.Options{VUs: null.IntFrom(1), VUsMax: null.IntFrom(1), Iterations: null.IntFrom(1)})
 	assert.NoError(t, err)
 
@@ -343,7 +343,7 @@ func TestEngine_processSamples(t *testing.T) {
 		assert.NoError(t, err)
 
 		e.processSamples(
-			stats.Sample{Metric: metric, Value: 1.25, Tags: stats.IntoSampleTags(&map[string]string{"a": "1"})},
+			[]stats.SampleContainer{stats.Sample{Metric: metric, Value: 1.25, Tags: stats.IntoSampleTags(&map[string]string{"a": "1"})}},
 		)
 
 		assert.IsType(t, &stats.GaugeSink{}, e.Metrics["my_metric"].Sink)
@@ -365,7 +365,7 @@ func TestEngine_processSamples(t *testing.T) {
 		assert.EqualValues(t, map[string]string{"a": "1"}, sms[0].Tags.CloneTags())
 
 		e.processSamples(
-			stats.Sample{Metric: metric, Value: 1.25, Tags: stats.IntoSampleTags(&map[string]string{"a": "1", "b": "2"})},
+			[]stats.SampleContainer{stats.Sample{Metric: metric, Value: 1.25, Tags: stats.IntoSampleTags(&map[string]string{"a": "1", "b": "2"})}},
 		)
 
 		assert.IsType(t, &stats.GaugeSink{}, e.Metrics["my_metric"].Sink)
@@ -387,7 +387,7 @@ func TestEngine_runThresholds(t *testing.T) {
 		assert.NoError(t, err)
 
 		e.processSamples(
-			stats.Sample{Metric: metric, Value: 1.25, Tags: stats.IntoSampleTags(&map[string]string{"a": "1"})},
+			[]stats.SampleContainer{stats.Sample{Metric: metric, Value: 1.25, Tags: stats.IntoSampleTags(&map[string]string{"a": "1"})}},
 		)
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -410,7 +410,7 @@ func TestEngine_runThresholds(t *testing.T) {
 		assert.NoError(t, err)
 
 		e.processSamples(
-			stats.Sample{Metric: metric, Value: 1.25, Tags: stats.IntoSampleTags(&map[string]string{"a": "1"})},
+			[]stats.SampleContainer{stats.Sample{Metric: metric, Value: 1.25, Tags: stats.IntoSampleTags(&map[string]string{"a": "1"})}},
 		)
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -463,7 +463,7 @@ func TestEngine_processThresholds(t *testing.T) {
 			assert.NoError(t, err)
 
 			e.processSamples(
-				stats.Sample{Metric: metric, Value: 1.25, Tags: stats.IntoSampleTags(&map[string]string{"a": "1"})},
+				[]stats.SampleContainer{stats.Sample{Metric: metric, Value: 1.25, Tags: stats.IntoSampleTags(&map[string]string{"a": "1"})}},
 			)
 
 			abortCalled := false
@@ -492,13 +492,24 @@ func getMetricSum(collector *dummy.Collector, name string) (result float64) {
 	}
 	return
 }
+func getMetricCount(collector *dummy.Collector, name string) (result uint) {
+	for _, sc := range collector.SampleContainers {
+		for _, s := range sc.GetSamples() {
+			if s.Metric.Name == name {
+				result++
+			}
+		}
+	}
+	return
+}
+
+const expectedHeaderMaxLength = 500
+
 func TestSentReceivedMetrics(t *testing.T) {
 	t.Parallel()
 	tb := testutils.NewHTTPMultiBin(t)
 	defer tb.Cleanup()
 	tr := tb.Replacer.Replace
-
-	const expectedHeaderMaxLength = 500
 
 	type testScript struct {
 		Code                 string
@@ -748,4 +759,159 @@ func TestRunTags(t *testing.T) {
 			assert.Equalf(t, expVal, val, "Wrong tag value in sample for metric %#v", s.Metric)
 		}
 	}
+}
+
+func TestSetupTeardownThresholds(t *testing.T) {
+	t.Parallel()
+	tb := testutils.NewHTTPMultiBin(t)
+	defer tb.Cleanup()
+
+	script := []byte(tb.Replacer.Replace(`
+		import http from "k6/http";
+		import { check } from "k6";
+		import { Counter } from "k6/metrics";
+
+		let statusCheck = { "status is 200": (r) => r.status === 200 }
+		let myCounter = new Counter("setup_teardown");
+
+		export let options = {
+			iterations: 5,
+			thresholds: {
+				"setup_teardown": ["count == 2"],
+				"iterations": ["count == 5"],
+				"http_reqs": ["count == 7"],
+			},
+		};
+
+		export function setup() {
+			check(http.get("HTTPBIN_IP_URL"), statusCheck) && myCounter.add(1);
+		};
+
+		export default function () {
+			check(http.get("HTTPBIN_IP_URL"), statusCheck);
+		};
+
+		export function teardown() {
+			check(http.get("HTTPBIN_IP_URL"), statusCheck) && myCounter.add(1);
+		};
+	`))
+
+	runner, err := js.New(
+		&lib.SourceData{Filename: "/script.js", Data: script},
+		afero.NewMemMapFs(),
+		lib.RuntimeOptions{},
+	)
+	require.NoError(t, err)
+	runner.SetOptions(runner.GetOptions().Apply(lib.Options{
+		SystemTags:      lib.GetTagSet(lib.DefaultSystemTagList...),
+		SetupTimeout:    types.NullDurationFrom(3 * time.Second),
+		TeardownTimeout: types.NullDurationFrom(3 * time.Second),
+		VUs:             null.IntFrom(3),
+		VUsMax:          null.IntFrom(3),
+	}))
+
+	engine, err := NewEngine(local.New(runner), runner.GetOptions())
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	errC := make(chan error)
+	go func() { errC <- engine.Run(ctx) }()
+
+	select {
+	case <-time.After(10 * time.Second):
+		cancel()
+		t.Fatal("Test timed out")
+	case err := <-errC:
+		cancel()
+		require.NoError(t, err)
+		require.False(t, engine.IsTainted())
+	}
+}
+
+func TestEmittedMetricsWhenScalingDown(t *testing.T) {
+	t.Parallel()
+	tb := testutils.NewHTTPMultiBin(t)
+	defer tb.Cleanup()
+
+	script := []byte(tb.Replacer.Replace(`
+		import http from "k6/http";
+		import { sleep } from "k6";
+
+		export let options = {
+			systemTags: ["iter", "vu", "url"],
+
+			// Start with 2 VUs for 2 second and then quickly scale down to 1 for the next 2s and then quit
+			vus: 2,
+			vusMax: 2,
+			stages: [
+				{ duration: "2s", target: 2 },
+				{ duration: "1s", target: 1 },
+				{ duration: "1s", target: 1 },
+			],
+		};
+
+		export default function () {
+			console.log("VU " + __VU + " starting iteration #" + __ITER);
+			http.get("HTTPBIN_IP_URL/bytes/15000");
+			sleep(1.7);
+			http.get("HTTPBIN_IP_URL/bytes/15000");
+			console.log("VU " + __VU + " ending iteration #" + __ITER);
+		};
+	`))
+
+	runner, err := js.New(
+		&lib.SourceData{Filename: "/script.js", Data: script},
+		afero.NewMemMapFs(),
+		lib.RuntimeOptions{},
+	)
+	require.NoError(t, err)
+
+	engine, err := NewEngine(local.New(runner), runner.GetOptions())
+	require.NoError(t, err)
+
+	collector := &dummy.Collector{}
+	engine.Collectors = []lib.Collector{collector}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	errC := make(chan error)
+	go func() { errC <- engine.Run(ctx) }()
+
+	select {
+	case <-time.After(10 * time.Second):
+		cancel()
+		t.Fatal("Test timed out")
+	case err := <-errC:
+		cancel()
+		require.NoError(t, err)
+		require.False(t, engine.IsTainted())
+	}
+
+	// The 1.7 sleep in the default function would cause the first VU to comlete 2 full iterations
+	// and stat executing its third one, while the second VU will only fully complete 1 iteration
+	// and will be canceled in the middle of its second one.
+	assert.Equal(t, 3.0, getMetricSum(collector, metrics.Iterations.Name))
+
+	// That means that we expect to see 8 HTTP requests in total, 3*2=6 from the complete iterations
+	// and one each from the two iterations that would be canceled in the middle of their execution
+	assert.Equal(t, 8.0, getMetricSum(collector, metrics.HTTPReqs.Name))
+
+	// But we expect to only see the data_received for only 7 of those requests. The data for the 8th
+	// request (the 3rd one in the first VU before the test ends) gets cut off by the engine because
+	// it's emitted after the test officially ends
+	dataReceivedExpectedMin := 15000.0 * 7
+	dataReceivedExpectedMax := (15000.0 + expectedHeaderMaxLength) * 7
+	dataReceivedActual := getMetricSum(collector, metrics.DataReceived.Name)
+	if dataReceivedActual < dataReceivedExpectedMin || dataReceivedActual > dataReceivedExpectedMax {
+		t.Errorf(
+			"The data_received sum should be in the interval [%f, %f] but was %f",
+			dataReceivedExpectedMin, dataReceivedExpectedMax, dataReceivedActual,
+		)
+	}
+
+	// Also, the interrupted iterations shouldn't affect the average iteration_duration in any way, only
+	// complete iterations should be taken into account
+	durationCount := float64(getMetricCount(collector, metrics.IterationDuration.Name))
+	assert.Equal(t, 3.0, durationCount)
+	durationSum := getMetricSum(collector, metrics.IterationDuration.Name)
+	assert.InDelta(t, 1.7, durationSum/(1000*durationCount), 0.1)
 }

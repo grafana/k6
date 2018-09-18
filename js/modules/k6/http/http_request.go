@@ -110,11 +110,32 @@ func (h *HTTP) Request(ctx context.Context, method string, url goja.Value, args 
 		return nil, err
 	}
 
-	state := common.GetState(ctx)
-	res, samples, err := h.request(ctx, state, req)
-	state.Samples = append(state.Samples, samples...)
-	return res, err
+	return h.request(ctx, req)
 }
+
+// ResponseType is used in the request to specify how the response body should be treated
+// The conversion and validation methods are auto-generated with https://github.com/alvaroloes/enumer:
+//go:generate enumer -type=ResponseType -transform=snake -json -text -trimprefix ResponseType -output response_type_gen.go
+type ResponseType uint
+
+const (
+	// ResponseTypeText causes k6 to return the response body as a string. It works
+	// well for web pages and JSON documents, but it can cause issues with
+	// binary files since their data could be lost when they're converted in the
+	// UTF-16 strings JavaScript uses.
+	// This is the default value for backwards-compatibility, unless the global
+	// discardResponseBodies option is enabled.
+	ResponseTypeText ResponseType = iota
+	// ResponseTypeBinary causes k6 to return the response body as a []byte, suitable
+	// for working with binary files without lost data and needless string conversions.
+	ResponseTypeBinary
+	// ResponseTypeNone causes k6 to fully read the response body while immediately
+	// discarding the actual data - k6 would set the body of the returned HTTPResponse
+	// to null. This saves CPU and memory and is suitable for HTTP requests that we just
+	// want to  measure, but we don't care about their responses' contents. This is the
+	// default value for all requests if the global discardResponseBodies is enablled.
+	ResponseTypeNone
+)
 
 type parsedHTTPRequest struct {
 	url           *URL
@@ -123,6 +144,7 @@ type parsedHTTPRequest struct {
 	timeout       time.Duration
 	auth          string
 	throw         bool
+	responseType  ResponseType
 	redirects     null.Int
 	activeJar     *cookiejar.Jar
 	cookies       map[string]*HTTPRequestCookie
@@ -146,6 +168,11 @@ func (h *HTTP) parseRequest(ctx context.Context, method string, reqURL URL, body
 		redirects: state.Options.MaxRedirects,
 		cookies:   make(map[string]*HTTPRequestCookie),
 		tags:      make(map[string]string),
+	}
+	if state.Options.DiscardResponseBodies.Bool {
+		result.responseType = ResponseTypeNone
+	} else {
+		result.responseType = ResponseTypeText
 	}
 
 	formatFormVal := func(v interface{}) string {
@@ -332,6 +359,12 @@ func (h *HTTP) parseRequest(ctx context.Context, method string, reqURL URL, body
 				result.timeout = time.Duration(params.Get(k).ToFloat() * float64(time.Millisecond))
 			case "throw":
 				result.throw = params.Get(k).ToBoolean()
+			case "responseType":
+				responseType, err := ResponseTypeString(params.Get(k).String())
+				if err != nil {
+					return nil, err
+				}
+				result.responseType = responseType
 			}
 		}
 	}
@@ -346,7 +379,8 @@ func (h *HTTP) parseRequest(ctx context.Context, method string, reqURL URL, body
 
 // request() shouldn't mess with the goja runtime or other thread-unsafe
 // things because it's called concurrently by Batch()
-func (h *HTTP) request(ctx context.Context, state *common.State, preq *parsedHTTPRequest) (*HTTPResponse, []stats.SampleContainer, error) {
+func (h *HTTP) request(ctx context.Context, preq *parsedHTTPRequest) (*HTTPResponse, error) {
+	state := common.GetState(ctx)
 
 	respReq := &HTTPRequest{
 		Method:  preq.req.Method,
@@ -387,7 +421,7 @@ func (h *HTTP) request(ctx context.Context, state *common.State, preq *parsedHTT
 	// Check rate limit *after* we've prepared a request; no need to wait with that part.
 	if rpsLimit := state.RPSLimit; rpsLimit != nil {
 		if err := rpsLimit.Wait(ctx); err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 	}
 
@@ -424,7 +458,6 @@ func (h *HTTP) request(ctx context.Context, state *common.State, preq *parsedHTT
 		},
 	}
 
-	statsSamples := []stats.SampleContainer{}
 	// if digest authentication option is passed, make an initial request to get the authentication params to compute the authorization header
 	if preq.auth == "digest" {
 		username := preq.url.URL.User.Username()
@@ -446,11 +479,11 @@ func (h *HTTP) request(ctx context.Context, state *common.State, preq *parsedHTT
 			}
 
 			if preq.throw {
-				return nil, nil, err
+				return nil, err
 			}
 
 			resp.Error = err.Error()
-			return resp, statsSamples, nil
+			return resp, nil
 		}
 
 		if res.StatusCode == http.StatusUnauthorized {
@@ -473,7 +506,7 @@ func (h *HTTP) request(ctx context.Context, state *common.State, preq *parsedHTT
 		}
 		trail.SaveSamples(stats.NewSampleTags(tags))
 		delete(tags, "ip")
-		statsSamples = append(statsSamples, trail)
+		stats.PushIfNotCancelled(ctx, state.Samples, trail)
 	}
 
 	if preq.auth == "ntlm" {
@@ -493,14 +526,31 @@ func (h *HTTP) request(ctx context.Context, state *common.State, preq *parsedHTT
 		}
 	}
 	if resErr == nil && res != nil {
-		buf := state.BPool.Get()
-		buf.Reset()
-		defer state.BPool.Put(buf)
-		_, err := io.Copy(buf, res.Body)
-		if err != nil && err != io.EOF {
-			resErr = err
+		if preq.responseType == ResponseTypeNone {
+			_, err := io.Copy(ioutil.Discard, res.Body)
+			if err != nil && err != io.EOF {
+				resErr = err
+			}
+			resp.Body = nil
+		} else {
+			// Binary or string
+			buf := state.BPool.Get()
+			buf.Reset()
+			defer state.BPool.Put(buf)
+			_, err := io.Copy(buf, res.Body)
+			if err != nil && err != io.EOF {
+				resErr = err
+			}
+
+			switch preq.responseType {
+			case ResponseTypeText:
+				resp.Body = buf.String()
+			case ResponseTypeBinary:
+				resp.Body = buf.Bytes()
+			default:
+				resErr = fmt.Errorf("Unknown responseType %s", preq.responseType)
+			}
 		}
-		resp.Body = buf.String()
 		_ = res.Body.Close()
 	}
 	trail := tracer.Done()
@@ -592,7 +642,7 @@ func (h *HTTP) request(ctx context.Context, state *common.State, preq *parsedHTT
 		}
 
 		if preq.throw {
-			return nil, nil, resErr
+			return nil, resErr
 		}
 	}
 
@@ -602,8 +652,8 @@ func (h *HTTP) request(ctx context.Context, state *common.State, preq *parsedHTT
 		}
 	}
 	trail.SaveSamples(stats.IntoSampleTags(&tags))
-	statsSamples = append(statsSamples, trail)
-	return resp, statsSamples, nil
+	stats.PushIfNotCancelled(ctx, state.Samples, trail)
+	return resp, nil
 }
 
 func (h *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, error) {
@@ -704,7 +754,7 @@ func (h *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, error) 
 				defer hl.End()
 			}
 
-			res, samples, err := h.request(ctx, state, parsedReq)
+			res, err := h.request(ctx, parsedReq)
 			if err != nil {
 				errs <- err
 				return
@@ -712,7 +762,6 @@ func (h *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, error) 
 
 			mutex.Lock()
 			_ = retval.Set(key, res)
-			state.Samples = append(state.Samples, samples...)
 			mutex.Unlock()
 
 			errs <- nil

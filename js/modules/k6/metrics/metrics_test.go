@@ -67,9 +67,11 @@ func TestMetrics(t *testing.T) {
 
 					root, _ := lib.NewGroup("", nil)
 					child, _ := root.Group("child")
+					samples := make(chan stats.SampleContainer, 1000)
 					state := &common.State{
 						Options: lib.Options{SystemTags: lib.GetTagSet("group")},
 						Group:   root,
+						Samples: samples,
 					}
 
 					isTimeString := ""
@@ -99,11 +101,11 @@ func TestMetrics(t *testing.T) {
 							for name, val := range values {
 								t.Run(name, func(t *testing.T) {
 									t.Run("Simple", func(t *testing.T) {
-										state.Samples = nil
 										_, err := common.RunString(rt, fmt.Sprintf(`m.add(%v)`, val.JS))
 										assert.NoError(t, err)
-										if assert.Len(t, state.Samples, 1) {
-											sample, ok := state.Samples[0].(stats.Sample)
+										bufSamples := stats.GetBufferedSamples(samples)
+										if assert.Len(t, bufSamples, 1) {
+											sample, ok := bufSamples[0].(stats.Sample)
 											require.True(t, ok)
 
 											assert.NotZero(t, sample.Time)
@@ -117,11 +119,11 @@ func TestMetrics(t *testing.T) {
 										}
 									})
 									t.Run("Tags", func(t *testing.T) {
-										state.Samples = nil
 										_, err := common.RunString(rt, fmt.Sprintf(`m.add(%v, {a:1})`, val.JS))
 										assert.NoError(t, err)
-										if assert.Len(t, state.Samples, 1) {
-											sample, ok := state.Samples[0].(stats.Sample)
+										bufSamples := stats.GetBufferedSamples(samples)
+										if assert.Len(t, bufSamples, 1) {
+											sample, ok := bufSamples[0].(stats.Sample)
 											require.True(t, ok)
 
 											assert.NotZero(t, sample.Time)

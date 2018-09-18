@@ -61,26 +61,21 @@ An archive is a fully self-contained test run, and can be executed identically e
 			return err
 		}
 
-		r, err := newRunner(src, runType, afero.NewOsFs(), runtimeOptions)
+		r, err := newRunner(src, runType, fs, runtimeOptions)
 		if err != nil {
 			return err
 		}
 
-		// Options.
 		cliOpts, err := getOptions(cmd.Flags())
 		if err != nil {
 			return err
 		}
-		fileConf, _, err := readDiskConfig(fs)
+		conf, err := getConsolidatedConfig(fs, Config{Options: cliOpts}, r)
 		if err != nil {
 			return err
 		}
-		envConf, err := readEnvConfig()
-		if err != nil {
-			return err
-		}
-		opts := cliOpts.Apply(fileConf.Options).Apply(r.GetOptions()).Apply(envConf.Options).Apply(cliOpts)
-		r.SetOptions(opts)
+
+		r.SetOptions(conf.Options)
 
 		// Archive.
 		arc := r.MakeArchive()

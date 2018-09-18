@@ -25,15 +25,40 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/url"
 	"sort"
 	"strings"
 
+	"github.com/loadimpact/k6/lib"
 	"github.com/pkg/errors"
 	"github.com/tidwall/pretty"
 )
 
-func Convert(h HAR, enableChecks bool, returnOnFailedCheck bool, batchTime uint, nobatch bool, correlate bool, only, skip []string) (string, error) {
+// fprint panics when where's an error writing to the supplied io.Writer
+// since this will be used on in-memory expandable buffers, that should
+// happen only when we run out of memory...
+func fprint(w io.Writer, a ...interface{}) int {
+	n, err := fmt.Fprint(w, a...)
+	if err != nil {
+		panic(err.Error())
+	}
+	return n
+}
+
+// fprintf panics when where's an error writing to the supplied io.Writer
+// since this will be used on in-memory expandable buffers, that should
+// happen only when we run out of memory...
+func fprintf(w io.Writer, format string, a ...interface{}) int {
+	n, err := fmt.Fprintf(w, format, a...)
+	if err != nil {
+		panic(err.Error())
+	}
+	return n
+}
+
+// TODO: refactor this to have fewer parameters... or just refactor in general...
+func Convert(h HAR, options lib.Options, minSleep, maxSleep uint, enableChecks bool, returnOnFailedCheck bool, batchTime uint, nobatch bool, correlate bool, only, skip []string) (result string, convertErr error) {
 	var b bytes.Buffer
 	w := bufio.NewWriter(&b)
 
@@ -46,25 +71,35 @@ func Convert(h HAR, enableChecks bool, returnOnFailedCheck bool, batchTime uint,
 	}
 
 	if enableChecks {
-		fmt.Fprint(w, "import { group, check, sleep } from 'k6';\n")
+		fprint(w, "import { group, check, sleep } from 'k6';\n")
 	} else {
-		fmt.Fprint(w, "import { group, sleep } from 'k6';\n")
+		fprint(w, "import { group, sleep } from 'k6';\n")
 	}
-	fmt.Fprint(w, "import http from 'k6/http';\n\n")
+	fprint(w, "import http from 'k6/http';\n\n")
 
-	fmt.Fprintf(w, "// Version: %v\n", h.Log.Version)
-	fmt.Fprintf(w, "// Creator: %v\n", h.Log.Creator.Name)
+	fprintf(w, "// Version: %v\n", h.Log.Version)
+	fprintf(w, "// Creator: %v\n", h.Log.Creator.Name)
 	if h.Log.Browser != nil {
-		fmt.Fprintf(w, "// Browser: %v\n", h.Log.Browser.Name)
+		fprintf(w, "// Browser: %v\n", h.Log.Browser.Name)
 	}
 	if h.Log.Comment != "" {
-		fmt.Fprintf(w, "// %v\n", h.Log.Comment)
+		fprintf(w, "// %v\n", h.Log.Comment)
 	}
 
-	// recordings include redirections as separate requests, and we dont want to trigger them twice
-	fmt.Fprint(w, "\nexport let options = { maxRedirects: 0 };\n\n")
+	fprint(w, "\nexport let options = {\n")
+	options.ForEachValid("json", func(key string, val interface{}) {
+		if valJSON, err := json.MarshalIndent(val, "    ", "    "); err != nil {
+			convertErr = err
+		} else {
+			fprintf(w, "    %s: %s,\n", key, valJSON)
+		}
+	})
+	if convertErr != nil {
+		return "", convertErr
+	}
+	fprint(w, "};\n\n")
 
-	fmt.Fprint(w, "export default function() {\n\n")
+	fprint(w, "export default function() {\n\n")
 
 	pages := h.Log.Pages
 	sort.Sort(PageByStarted(pages))
@@ -98,7 +133,7 @@ func Convert(h HAR, enableChecks bool, returnOnFailedCheck bool, batchTime uint,
 	for i, page := range pages {
 
 		entries := pageEntries[page.ID]
-		fmt.Fprintf(w, "\tgroup(\"%s - %s\", function() {\n", page.ID, page.Title)
+		fprintf(w, "\tgroup(\"%s - %s\", function() {\n", page.ID, page.Title)
 
 		sort.Sort(EntryByStarted(entries))
 
@@ -106,7 +141,7 @@ func Convert(h HAR, enableChecks bool, returnOnFailedCheck bool, batchTime uint,
 			var recordedRedirectURL string
 			previousResponse := map[string]interface{}{}
 
-			fmt.Fprint(w, "\t\tlet res, redirectUrl, json;\n")
+			fprint(w, "\t\tlet res, redirectUrl, json;\n")
 
 			for entryIndex, e := range entries {
 
@@ -114,7 +149,7 @@ func Convert(h HAR, enableChecks bool, returnOnFailedCheck bool, batchTime uint,
 				var cookies []string
 				var body string
 
-				fmt.Fprintf(w, "\t\t// Request #%d\n", entryIndex)
+				fprintf(w, "\t\t// Request #%d\n", entryIndex)
 
 				if e.Request.PostData != nil {
 					body = e.Request.PostData.Text
@@ -131,16 +166,16 @@ func Convert(h HAR, enableChecks bool, returnOnFailedCheck bool, batchTime uint,
 					params = append(params, fmt.Sprintf("\"headers\": {\n\t\t\t\t\t%s\n\t\t\t\t}", strings.Join(headers, ",\n\t\t\t\t\t")))
 				}
 
-				fmt.Fprintf(w, "\t\tres = http.%s(", strings.ToLower(e.Request.Method))
+				fprintf(w, "\t\tres = http.%s(", strings.ToLower(e.Request.Method))
 
 				if correlate && recordedRedirectURL != "" {
 					if recordedRedirectURL != e.Request.URL {
 						return "", errors.Errorf("The har file contained a redirect but the next request did not match that redirect. Possibly a misbehaving client or concurrent requests?")
 					}
-					fmt.Fprintf(w, "redirectUrl")
+					fprintf(w, "redirectUrl")
 					recordedRedirectURL = ""
 				} else {
-					fmt.Fprintf(w, "%q", e.Request.URL)
+					fprintf(w, "%q", e.Request.URL)
 				}
 
 				if e.Request.Method != "GET" {
@@ -159,30 +194,30 @@ func Convert(h HAR, enableChecks bool, returnOnFailedCheck bool, batchTime uint,
 						requestText, err := json.Marshal(requestMap)
 						if err == nil {
 							prettyJSONString := string(pretty.PrettyOptions(requestText, &pretty.Options{Width: 999999, Prefix: "\t\t\t", Indent: "\t", SortKeys: true})[:])
-							fmt.Fprintf(w, ",\n\t\t\t`%s`", strings.TrimSpace(prettyJSONString))
+							fprintf(w, ",\n\t\t\t`%s`", strings.TrimSpace(prettyJSONString))
 						} else {
 							return "", err
 						}
 
 					} else {
-						fmt.Fprintf(w, ",\n\t\t%q", body)
+						fprintf(w, ",\n\t\t%q", body)
 					}
 				}
 
 				if len(params) > 0 {
-					fmt.Fprintf(w, ",\n\t\t\t{\n\t\t\t\t%s\n\t\t\t}", strings.Join(params, ",\n\t\t\t"))
+					fprintf(w, ",\n\t\t\t{\n\t\t\t\t%s\n\t\t\t}", strings.Join(params, ",\n\t\t\t"))
 				}
 
-				fmt.Fprintf(w, "\n\t\t)\n")
+				fprintf(w, "\n\t\t)\n")
 
 				if e.Response != nil {
 					// the response is nil if there is a failed request in the recording, or if responses were not recorded
 					if enableChecks {
 						if e.Response.Status > 0 {
 							if returnOnFailedCheck {
-								fmt.Fprintf(w, "\t\tif (!check(res, {\"status is %v\": (r) => r.status === %v })) { return };\n", e.Response.Status, e.Response.Status)
+								fprintf(w, "\t\tif (!check(res, {\"status is %v\": (r) => r.status === %v })) { return };\n", e.Response.Status, e.Response.Status)
 							} else {
-								fmt.Fprintf(w, "\t\tcheck(res, {\"status is %v\": (r) => r.status === %v });\n", e.Response.Status, e.Response.Status)
+								fprintf(w, "\t\tcheck(res, {\"status is %v\": (r) => r.status === %v });\n", e.Response.Status, e.Response.Status)
 							}
 						}
 					}
@@ -190,7 +225,7 @@ func Convert(h HAR, enableChecks bool, returnOnFailedCheck bool, batchTime uint,
 					if e.Response.Headers != nil {
 						for _, header := range e.Response.Headers {
 							if header.Name == "Location" {
-								fmt.Fprintf(w, "\t\tredirectUrl = res.headers.Location;\n")
+								fprintf(w, "\t\tredirectUrl = res.headers.Location;\n")
 								recordedRedirectURL = header.Value
 								break
 							}
@@ -204,38 +239,38 @@ func Convert(h HAR, enableChecks bool, returnOnFailedCheck bool, batchTime uint,
 						if err := json.Unmarshal([]byte(e.Response.Content.Text), &previousResponse); err != nil {
 							return "", err
 						}
-						fmt.Fprint(w, "\t\tjson = JSON.parse(res.body);\n")
+						fprint(w, "\t\tjson = JSON.parse(res.body);\n")
 					}
 				}
 			}
 		} else {
 			batches := SplitEntriesInBatches(entries, batchTime)
 
-			fmt.Fprint(w, "\t\tlet req, res;\n")
+			fprint(w, "\t\tlet req, res;\n")
 
 			for j, batchEntries := range batches {
 
-				fmt.Fprint(w, "\t\treq = [")
+				fprint(w, "\t\treq = [")
 				for k, e := range batchEntries {
 					r, err := buildK6RequestObject(e.Request)
 					if err != nil {
 						return "", err
 					}
-					fmt.Fprintf(w, "%v", r)
+					fprintf(w, "%v", r)
 					if k != len(batchEntries)-1 {
-						fmt.Fprint(w, ",")
+						fprint(w, ",")
 					}
 				}
-				fmt.Fprint(w, "];\n")
-				fmt.Fprint(w, "\t\tres = http.batch(req);\n")
+				fprint(w, "];\n")
+				fprint(w, "\t\tres = http.batch(req);\n")
 
 				if enableChecks {
 					for k, e := range batchEntries {
 						if e.Response.Status > 0 {
 							if returnOnFailedCheck {
-								fmt.Fprintf(w, "\t\tif (!check(res, {\"status is %v\": (r) => r.status === %v })) { return };\n", e.Response.Status, e.Response.Status)
+								fprintf(w, "\t\tif (!check(res, {\"status is %v\": (r) => r.status === %v })) { return };\n", e.Response.Status, e.Response.Status)
 							} else {
-								fmt.Fprintf(w, "\t\tcheck(res[%v], {\"status is %v\": (r) => r.status === %v });\n", k, e.Response.Status, e.Response.Status)
+								fprintf(w, "\t\tcheck(res[%v], {\"status is %v\": (r) => r.status === %v });\n", k, e.Response.Status, e.Response.Status)
 							}
 						}
 					}
@@ -245,14 +280,14 @@ func Convert(h HAR, enableChecks bool, returnOnFailedCheck bool, batchTime uint,
 					lastBatchEntry := batchEntries[len(batchEntries)-1]
 					firstBatchEntry := batches[j+1][0]
 					t := firstBatchEntry.StartedDateTime.Sub(lastBatchEntry.StartedDateTime).Seconds()
-					fmt.Fprintf(w, "\t\tsleep(%.2f);\n", t)
+					fprintf(w, "\t\tsleep(%.2f);\n", t)
 				}
 			}
 
 			if i == len(pages)-1 {
 				// Last page; add random sleep time at the group completion
-				fmt.Fprint(w, "\t\t// Random sleep between 20s and 40s\n")
-				fmt.Fprint(w, "\t\tsleep(Math.floor(Math.random()*20+20));\n")
+				fprintf(w, "\t\t// Random sleep between %ds and %ds\n", minSleep, maxSleep)
+				fprintf(w, "\t\tsleep(Math.floor(Math.random()*%d+%d));\n", maxSleep-minSleep, minSleep)
 			} else {
 				// Add sleep time at the end of the group
 				nextPage := pages[i+1]
@@ -261,14 +296,14 @@ func Convert(h HAR, enableChecks bool, returnOnFailedCheck bool, batchTime uint,
 				if t < 0.01 {
 					t = 0.5
 				}
-				fmt.Fprintf(w, "\t\tsleep(%.2f);\n", t)
+				fprintf(w, "\t\tsleep(%.2f);\n", t)
 			}
 		}
 
-		fmt.Fprint(w, "\t});\n")
+		fprint(w, "\t});\n")
 	}
 
-	fmt.Fprint(w, "\n}\n")
+	fprint(w, "\n}\n")
 	if err := w.Flush(); err != nil {
 		return "", err
 	}
@@ -279,22 +314,22 @@ func buildK6RequestObject(req *Request) (string, error) {
 	var b bytes.Buffer
 	w := bufio.NewWriter(&b)
 
-	fmt.Fprint(w, "{\n")
+	fprint(w, "{\n")
 
 	method := strings.ToLower(req.Method)
 	if method == "delete" {
 		method = "del"
 	}
-	fmt.Fprintf(w, `"method": %q, "url": %q`, method, req.URL)
+	fprintf(w, `"method": %q, "url": %q`, method, req.URL)
 
 	if req.PostData != nil && method != "get" {
 		postParams, plainText, err := buildK6Body(req)
 		if err != nil {
 			return "", err
 		} else if len(postParams) > 0 {
-			fmt.Fprintf(w, `, "body": { %s }`, strings.Join(postParams, ", "))
+			fprintf(w, `, "body": { %s }`, strings.Join(postParams, ", "))
 		} else if plainText != "" {
-			fmt.Fprintf(w, `, "body": %q`, plainText)
+			fprintf(w, `, "body": %q`, plainText)
 		}
 	}
 
@@ -312,10 +347,10 @@ func buildK6RequestObject(req *Request) (string, error) {
 	}
 
 	if len(params) > 0 {
-		fmt.Fprintf(w, `, "params": { %s }`, strings.Join(params, ", "))
+		fprintf(w, `, "params": { %s }`, strings.Join(params, ", "))
 	}
 
-	fmt.Fprint(w, "}")
+	fprint(w, "}")
 	if err := w.Flush(); err != nil {
 		return "", err
 	}

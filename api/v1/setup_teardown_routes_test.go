@@ -79,6 +79,10 @@ func TestSetupData(t *testing.T) {
 	engine, err := core.NewEngine(executor, runner.GetOptions())
 	require.NoError(t, err)
 
+	ctx, cancel := context.WithCancel(context.Background())
+	errC := make(chan error)
+	go func() { errC <- engine.Run(ctx) }()
+
 	handler := NewHandler()
 
 	checkSetup := func(method, body, expResult string) {
@@ -101,10 +105,6 @@ func TestSetupData(t *testing.T) {
 	checkSetup("GET", "", `{"data": {"v":1}}`)
 	checkSetup("PUT", `{"v":2, "test":"mest"}`, `{"data": {"v":2, "test":"mest"}}`)
 	checkSetup("GET", "", `{"data": {"v":2, "test":"mest"}}`)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	errC := make(chan error)
-	go func() { errC <- engine.Run(ctx) }()
 
 	engine.Executor.SetPaused(false)
 
