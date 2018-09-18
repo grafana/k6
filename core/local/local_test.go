@@ -213,15 +213,11 @@ func TestExecutorEndTime(t *testing.T) {
 		})
 		assert.NoError(t, e.SetVUsMax(10))
 		assert.NoError(t, e.SetVUs(10))
-		e.SetEndTime(types.NullDurationFrom(100 * time.Millisecond))
-		assert.Equal(t, types.NullDurationFrom(100*time.Millisecond), e.GetEndTime())
 
 		l, hook := logtest.NewNullLogger()
 		e.SetLogger(l)
 
-		startTime := time.Now()
-		assert.NoError(t, e.Run(context.Background(), make(chan stats.SampleContainer, 200)))
-		assert.True(t, time.Now().After(startTime.Add(100*time.Millisecond)), "test did not take 100ms")
+		assert.Error(t, e.Run(context.Background(), make(chan stats.SampleContainer, 200)))
 
 		assert.NotEmpty(t, hook.Entries)
 		for _, e := range hook.Entries {

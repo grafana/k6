@@ -332,6 +332,8 @@ a commandline interface for interacting with it.`,
 		if quiet || conf.HttpDebug.Valid && conf.HttpDebug.String != "" {
 			ticker.Stop()
 		}
+
+		var engineErr error
 	mainLoop:
 		for {
 			select {
@@ -371,6 +373,7 @@ a commandline interface for interacting with it.`,
 			case err := <-errC:
 				if err != nil {
 					log.WithError(err).Error("Engine error")
+					engineErr = err
 				} else {
 					log.Debug("Engine terminated cleanly")
 				}
@@ -421,6 +424,11 @@ a commandline interface for interacting with it.`,
 		if engine.IsTainted() {
 			return ExitCode{errors.New("some thresholds have failed"), 99}
 		}
+
+		if engineErr != nil {
+			return ExitCode{errors.New("execution failed"), 99}
+		}
+
 		return nil
 	},
 }
