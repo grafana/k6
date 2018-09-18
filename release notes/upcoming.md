@@ -78,3 +78,4 @@ Thanks to @sherrman for reporting the binary handling issues that prompted the a
 * HTTP: Binary response bodies were mangled because there was no way to avoid converting them to UTF-16 JavaScript strings. (#749)
 * Config: Stages were appended instead of overwritten from upper config "tiers", and were doubled when supplied via the CLI flag (#759)
 * HAR converter: Fixed a panic due to a missing array length check (#760)
+* HTTP: `http.batch()` calls could panic because of a data race when the `batchPerHost` global option was used (#770)
