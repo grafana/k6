@@ -75,6 +75,10 @@
   branch = "master"
   name = "github.com/ThomsonReutersEikon/go-ntlm"
 
+[[constraint]]
+  branch = "master"
+  name = "github.com/tidwall/gjson"
+
 # TODO: remove this once it's no longer necessary
 # https://github.com/manyminds/api2go/issues/304
 [[override]]

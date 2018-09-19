@@ -465,6 +465,22 @@
 
 [[projects]]
   branch = "master"
+  digest = "1:2f83658d78200672f74b3dacb01e17788449319282f5034c734bd1a52e7573db"
+  name = "github.com/tidwall/gjson"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "1e3f6aeaa5bad08d777ea7807b279a07885dd8b2"
+
+[[projects]]
+  branch = "master"
+  digest = "1:420af1239081e32845242dbfbf364362ee8e10fe1e315e5a6d6cae4bd7c1dd67"
+  name = "github.com/tidwall/match"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "1731857f09b1f38450e2c12409748407822dc6be"
+
+[[projects]]
+  branch = "master"
   digest = "1:76c0c4091c146bfb33186b84febc68537cf5321993abd0d404d9c0eba83fc0cf"
   name = "github.com/tidwall/pretty"
   packages = ["."]
@@ -655,6 +671,7 @@
     "github.com/spf13/pflag",
     "github.com/stretchr/testify/assert",
     "github.com/stretchr/testify/require",
+    "github.com/tidwall/gjson",
     "github.com/tidwall/pretty",
     "github.com/urfave/negroni",
     "github.com/viki-org/dnscache",
