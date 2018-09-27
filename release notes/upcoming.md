@@ -66,6 +66,29 @@ export default function () {
 
 Thanks to @sherrman for reporting the binary handling issues that prompted the addition of the `responseType` option! And thanks to @ofauchon for implementing both of the discard response body options, of which the local per-request one was later transformed into the `responseType=none` value!
 
+### k6/http: The `Response.json()` method now supports selectors
+
+The selectors are implemented with the [gjson](https://github.com/tidwall/gjson#path-syntax) library and allow optimized lookups and basic filtering of JSON elements in HTTP responses, which could be especially useful in combination with k6 checks:
+
+```js
+import http from "k6/http";
+import { check } from "k6";
+
+export default function () {
+	let resp = http.get("https://api.spacexdata.com/v2/launches/");
+
+	let currentYear = (new Date()).getFullYear();
+	check(resp, {
+		"falcon heavy": (r) => r.json("#[flight_number==55].rocket.second_stage.payloads.0.payload_id") === "Tesla Roadster",
+		"no failure this year": (r) => r.json("#[launch_success==false]#.launch_year").every((y) => y < currentYear),
+		"success ratio": (r) => r.json("#[launch_success==true]#").length > 10 * r.json("#[launch_success==false]#").length,
+	});
+}
+
+```
+
+Thanks to @AndriiChuzhynov for implementing this! (#766)
+
 ## Internals
 
 * Cloud output: improved outlier metric detection for small batches (#744)
