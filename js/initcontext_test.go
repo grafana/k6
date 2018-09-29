@@ -241,70 +241,88 @@ func TestInitContextRequire(t *testing.T) {
 	})
 }
 
-func TestInitContextOpen(t *testing.T) {
+func createFile(t *testing.T, file string, content string, binary bool) (*BundleInstance, error) {
 	fs := afero.NewMemMapFs()
 	assert.NoError(t, fs.MkdirAll("/path/to", 0755))
-	assert.NoError(t, afero.WriteFile(fs, "/path/to/file.txt", []byte("hi!"), 0644))
+	assert.NoError(t, afero.WriteFile(fs, "/path/to/"+file, []byte(content), 0644))
+
+	afero.WriteFile(fs, "/path/to/"+file, []byte(content), 0644)
+	binaryArg := ""
+	if binary {
+		binaryArg = ",\"b\""
+	}
+
+	b, err := NewBundle(&lib.SourceData{
+		Filename: "/path/to/script.js",
+		Data: []byte(fmt.Sprintf(`
+				export let data = open("/path/to/%s"%s);
+				export default function() {}
+				`, file, binaryArg)),
+	}, fs, lib.RuntimeOptions{})
+
+	if !assert.NoError(t, err) {
+		return nil, err
+	}
+
+	bi, err := b.Instantiate()
+	if !assert.NoError(t, err) {
+		return nil, err
+	}
+	return bi, nil
+}
+
+func TestInitContextOpen(t *testing.T) {
+
+	testCases := []struct {
+		content string
+		file    string
+	}{
+		{"hello world!", "ascii"},
+		{"?((¯°·._.• ţ€$ţɨɲǥ µɲɨȼ๏ď€ΣSЫ ɨɲ Ќ6 •._.·°¯))؟•", "utf"},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.file, func(t *testing.T) {
+			bi, err := createFile(t, tc.file, tc.content, false)
+			if !assert.NoError(t, err) {
+				return
+			}
+			assert.Equal(t, tc.content, bi.Runtime.Get("data").Export())
+		})
+	}
+
+	t.Run("Binary", func(t *testing.T) {
+		bi, err := createFile(t, "/path/to/file.bin", "hi!\x0f\xff\x01", true)
+		if !assert.NoError(t, err) {
+			return
+		}
+		bytes := []byte{104, 105, 33, 15, 255, 1}
+		assert.Equal(t, bytes, bi.Runtime.Get("data").Export())
+	})
 
 	testdata := map[string]string{
-		"Absolute": "/path/to/file.txt",
-		"Relative": "./file.txt",
+		"Absolute": "/path/to/file",
+		"Relative": "./file",
 	}
+
 	for name, loadPath := range testdata {
 		t.Run(name, func(t *testing.T) {
-			b, err := NewBundle(&lib.SourceData{
-				Filename: "/path/to/script.js",
-				Data: []byte(fmt.Sprintf(`
-				export let data = open("%s");
-				export default function() {}
-				`, loadPath)),
-			}, fs, lib.RuntimeOptions{})
+			_, err := createFile(t, loadPath, "content", false)
 			if !assert.NoError(t, err) {
 				return
 			}
-
-			bi, err := b.Instantiate()
-			if !assert.NoError(t, err) {
-				return
-			}
-
-			assert.Equal(t, "hi!", bi.Runtime.Get("data").Export())
 		})
 	}
 
 	t.Run("Nonexistent", func(t *testing.T) {
+		fs := afero.NewMemMapFs()
+
 		_, err := NewBundle(&lib.SourceData{
 			Filename: "/script.js",
 			Data:     []byte(`open("/nonexistent.txt"); export default function() {}`),
 		}, fs, lib.RuntimeOptions{})
 		assert.EqualError(t, err, "GoError: open /nonexistent.txt: file does not exist")
 	})
-}
 
-func TestInitContextOpenBinary(t *testing.T) {
-	fs := afero.NewMemMapFs()
-	assert.NoError(t, fs.MkdirAll("/path/to", 0755))
-	assert.NoError(t, afero.WriteFile(fs, "/path/to/file.bin", []byte("hi!"), 0644))
-
-	b, err := NewBundle(&lib.SourceData{
-		Filename: "/path/to/script.js",
-		Data: []byte(`
-		export let data = open("/path/to/file.bin", "b");
-		export default function() { console.log(data); }
-		`),
-	}, fs, lib.RuntimeOptions{})
-	if !assert.NoError(t, err) {
-		return
-	}
-
-	bi, err := b.Instantiate()
-	if !assert.NoError(t, err) {
-		t.Log(err)
-		return
-	}
-
-	bytes := []byte{104, 105, 33}
-	assert.Equal(t, bytes, bi.Runtime.Get("data").Export())
 }
 
 func TestRequestWithBinaryFile(t *testing.T) {
