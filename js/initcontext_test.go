@@ -241,7 +241,7 @@ func TestInitContextRequire(t *testing.T) {
 	})
 }
 
-func createFile(t *testing.T, file string, content string, binary bool) (*BundleInstance, error) {
+func createAndReadFile(t *testing.T, file string, content []byte, expectedLength int, binary bool) (*BundleInstance, error) {
 	fs := afero.NewMemMapFs()
 	assert.NoError(t, fs.MkdirAll("/path/to", 0755))
 	assert.NoError(t, afero.WriteFile(fs, "/path/to/"+file, []byte(content), 0644))
@@ -256,8 +256,12 @@ func createFile(t *testing.T, file string, content string, binary bool) (*Bundle
 		Filename: "/path/to/script.js",
 		Data: []byte(fmt.Sprintf(`
 				export let data = open("/path/to/%s"%s);
+				var expectedLength = %d;
+				if (data.length != expectedLength) {
+					throw new Error("Length not equal, expected: " + expectedLength + ", actual: " + data.length);
+				}
 				export default function() {}
-				`, file, binaryArg)),
+				`, file, binaryArg, expectedLength)),
 	}, fs, lib.RuntimeOptions{})
 
 	if !assert.NoError(t, err) {
@@ -274,24 +278,27 @@ func createFile(t *testing.T, file string, content string, binary bool) (*Bundle
 func TestInitContextOpen(t *testing.T) {
 
 	testCases := []struct {
-		content string
+		content []byte
 		file    string
+		length  int
 	}{
-		{"hello world!", "ascii"},
-		{"?((¯°·._.• ţ€$ţɨɲǥ µɲɨȼ๏ď€ΣSЫ ɨɲ Ќ6 •._.·°¯))؟•", "utf"},
+		{[]byte("hello world!"), "ascii", 12},
+		{[]byte("?((¯°·._.• ţ€$ţɨɲǥ µɲɨȼ๏ď€ΣSЫ ɨɲ Ќ6 •._.·°¯))؟•"), "utf", 47},
+		{[]byte{044, 226, 130, 172}, "utf-8", 2}, // $€
+		//{[]byte{00, 36, 32, 127}, "utf-16", 2},   // $€
 	}
 	for _, tc := range testCases {
 		t.Run(tc.file, func(t *testing.T) {
-			bi, err := createFile(t, tc.file, tc.content, false)
+			bi, err := createAndReadFile(t, tc.file, tc.content, tc.length, false)
 			if !assert.NoError(t, err) {
 				return
 			}
-			assert.Equal(t, tc.content, bi.Runtime.Get("data").Export())
+			assert.Equal(t, string(tc.content), bi.Runtime.Get("data").Export())
 		})
 	}
 
 	t.Run("Binary", func(t *testing.T) {
-		bi, err := createFile(t, "/path/to/file.bin", "hi!\x0f\xff\x01", true)
+		bi, err := createAndReadFile(t, "/path/to/file.bin", []byte("hi!\x0f\xff\x01"), 6, true)
 		if !assert.NoError(t, err) {
 			return
 		}
@@ -306,7 +313,7 @@ func TestInitContextOpen(t *testing.T) {
 
 	for name, loadPath := range testdata {
 		t.Run(name, func(t *testing.T) {
-			_, err := createFile(t, loadPath, "content", false)
+			_, err := createAndReadFile(t, loadPath, []byte("content"), 7, false)
 			if !assert.NoError(t, err) {
 				return
 			}
