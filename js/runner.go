@@ -58,7 +58,7 @@ type Runner struct {
 	Resolver   *dnscache.Resolver
 	RPSLimit   *rate.Limiter
 
-	setupData interface{}
+	setupData []byte
 }
 
 func New(src *lib.SourceData, fs afero.Fs, rtOpts lib.RuntimeOptions) (*Runner, error) {
@@ -209,20 +209,21 @@ func (r *Runner) Setup(ctx context.Context, out chan<- stats.SampleContainer) er
 	if err != nil {
 		return errors.Wrap(err, "setup")
 	}
-	data, err := json.Marshal(v.Export())
+	r.setupData, err = json.Marshal(v.Export())
 	if err != nil {
 		return errors.Wrap(err, "setup")
 	}
-	return json.Unmarshal(data, &r.setupData)
+	var tmp interface{}
+	return json.Unmarshal(r.setupData, &tmp)
 }
 
-// GetSetupData returns the setup data if Setup() was specified and executed, nil otherwise
-func (r *Runner) GetSetupData() interface{} {
+// GetSetupData returns the setup data as json if Setup() was specified and executed, nil otherwise
+func (r *Runner) GetSetupData() []byte {
 	return r.setupData
 }
 
-// SetSetupData saves the externally supplied setup data in the runner, so it can be used in VUs
-func (r *Runner) SetSetupData(data interface{}) {
+// SetSetupData saves the externally supplied setup data as json in the runner, so it can be used in VUs
+func (r *Runner) SetSetupData(data []byte) {
 	r.setupData = data
 }
 
@@ -233,7 +234,13 @@ func (r *Runner) Teardown(ctx context.Context, out chan<- stats.SampleContainer)
 	)
 	defer teardownCancel()
 
-	_, err := r.runPart(teardownCtx, out, "teardown", r.setupData)
+	var data interface{}
+	if len(r.setupData) != 0 {
+		if err := json.Unmarshal(r.setupData, &data); err != nil {
+			return errors.Wrap(err, "Teardown")
+		}
+	}
+	_, err := r.runPart(teardownCtx, out, "teardown", data)
 	return err
 }
 
@@ -343,13 +350,14 @@ func (u *VU) RunOnce(ctx context.Context) error {
 		}()
 	}
 
-	// Lazily JS-ify setupData on first run. This is lightweight enough that we can get away with
-	// it, and alleviates a problem where setupData wouldn't get populated properly if NewVU() was
-	// called before Setup(), which is hard to avoid with how the Executor works w/o complicating
-	// the local executor further by deferring SetVUsMax() calls to within the Run() function.
-	if u.setupData == nil && u.Runner.setupData != nil {
-		u.setupData = u.Runtime.ToValue(u.Runner.setupData)
+	// Always unmarshall the setupData so that it doesn't change between calls
+	var data interface{}
+	if len(u.Runner.setupData) != 0 {
+		if err := json.Unmarshal(u.Runner.setupData, &data); err != nil {
+			return errors.Wrap(err, "RunOnce")
+		}
 	}
+	u.setupData = u.Runtime.ToValue(data)
 
 	// Call the default function.
 	_, _, err := u.runFn(ctx, u.Runner.defaultGroup, u.Default, u.setupData)
