@@ -1191,7 +1191,7 @@ func TestVUIntegrationClientCerts(t *testing.T) {
 		return
 	}
 	r1.SetOptions(lib.Options{
-		Throw:                 null.BoolFrom(true),
+		Throw: null.BoolFrom(true),
 		InsecureSkipTLSVerify: null.BoolFrom(true),
 	})
 
