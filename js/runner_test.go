@@ -215,6 +215,7 @@ func TestOptionsPropagationToScript(t *testing.T) {
 		})
 	}
 }
+
 func TestSetupTeardown(t *testing.T) {
 	r1, err := New(&lib.SourceData{
 		Filename: "/script.js",
@@ -323,6 +324,105 @@ func TestSetupDataIsolation(t *testing.T) {
 	}
 }
 
+func testSetupDataHelper(t *testing.T, src *lib.SourceData) {
+	expScriptOptions := lib.Options{SetupTimeout: types.NullDurationFrom(1 * time.Second)}
+	r1, err := New(src, afero.NewMemMapFs(), lib.RuntimeOptions{Env: map[string]string{"expectedSetupTimeout": "1s"}})
+	require.NoError(t, err)
+	require.Equal(t, expScriptOptions, r1.GetOptions())
+
+	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{Env: map[string]string{"expectedSetupTimeout": "3s"}})
+	require.NoError(t, err)
+	require.Equal(t, expScriptOptions, r2.GetOptions())
+
+	newOptions := lib.Options{SetupTimeout: types.NullDurationFrom(3 * time.Second)}
+	r2.SetOptions(newOptions)
+	require.Equal(t, newOptions, r2.GetOptions())
+
+	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
+	for name, r := range testdata {
+		t.Run(name, func(t *testing.T) {
+			samples := make(chan stats.SampleContainer, 100)
+
+			if !assert.NoError(t, r.Setup(context.Background(), samples)) {
+				return
+			}
+			vu, err := r.NewVU(samples)
+			if assert.NoError(t, err) {
+				err := vu.RunOnce(context.Background())
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+func TestSetupDataReturnValue(t *testing.T) {
+	t.Parallel()
+	src := &lib.SourceData{
+		Filename: "/script.js",
+		Data: []byte(`
+			export let options = { setupTimeout: "1s", myOption: "test" };
+			export function setup() {
+				return 42;
+			}
+			export default function(data) {
+				if (data != 42) {
+					throw new Error("default: wrong data: " + JSON.stringify(data))
+				}
+			};
+
+			export function teardown(data) {
+				if (data != 42) {
+					throw new Error("teardown: wrong data: " + JSON.stringify(data))
+				}
+			};
+		`),
+	}
+	testSetupDataHelper(t, src)
+}
+
+func TestSetupDataNoSetup(t *testing.T) {
+	t.Parallel()
+	src := &lib.SourceData{
+		Filename: "/script.js",
+		Data: []byte(`
+			export let options = { setupTimeout: "1s", myOption: "test" };
+			export default function(data) {
+				if (data != null) {
+					throw new Error("default: wrong data: " + JSON.stringify(data))
+				}
+			};
+
+			export function teardown(data) {
+				if (data != null) {
+					throw new Error("teardown: wrong data: " + JSON.stringify(data))
+				}
+			};
+		`),
+	}
+	testSetupDataHelper(t, src)
+}
+
+func TestSetupDataNoReturn(t *testing.T) {
+	t.Parallel()
+	src := &lib.SourceData{
+		Filename: "/script.js",
+		Data: []byte(`
+			export let options = { setupTimeout: "1s", myOption: "test" };
+			export function setup() { }
+			export default function(data) {
+				if (data != null) {
+					throw new Error("default: wrong data: " + JSON.stringify(data))
+				}
+			};
+
+			export function teardown(data) {
+				if (data != null) {
+					throw new Error("teardown: wrong data: " + JSON.stringify(data))
+				}
+			};
+		`),
+	}
+	testSetupDataHelper(t, src)
+}
 func TestRunnerIntegrationImports(t *testing.T) {
 	t.Run("Modules", func(t *testing.T) {
 		modules := []string{
