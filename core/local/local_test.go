@@ -59,7 +59,7 @@ func TestExecutorSetupTeardownRun(t *testing.T) {
 		setupC := make(chan struct{})
 		teardownC := make(chan struct{})
 		e := New(&lib.MiniRunner{
-			SetupFn: func(ctx context.Context, out chan<- stats.SampleContainer) (interface{}, error) {
+			SetupFn: func(ctx context.Context, out chan<- stats.SampleContainer) ([]byte, error) {
 				close(setupC)
 				return nil, nil
 			},
@@ -79,7 +79,7 @@ func TestExecutorSetupTeardownRun(t *testing.T) {
 	})
 	t.Run("Setup Error", func(t *testing.T) {
 		e := New(&lib.MiniRunner{
-			SetupFn: func(ctx context.Context, out chan<- stats.SampleContainer) (interface{}, error) {
+			SetupFn: func(ctx context.Context, out chan<- stats.SampleContainer) ([]byte, error) {
 				return nil, errors.New("setup error")
 			},
 			TeardownFn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
@@ -90,7 +90,7 @@ func TestExecutorSetupTeardownRun(t *testing.T) {
 
 		t.Run("Don't Run Setup", func(t *testing.T) {
 			e := New(&lib.MiniRunner{
-				SetupFn: func(ctx context.Context, out chan<- stats.SampleContainer) (interface{}, error) {
+				SetupFn: func(ctx context.Context, out chan<- stats.SampleContainer) ([]byte, error) {
 					return nil, errors.New("setup error")
 				},
 				TeardownFn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
@@ -106,7 +106,7 @@ func TestExecutorSetupTeardownRun(t *testing.T) {
 	})
 	t.Run("Teardown Error", func(t *testing.T) {
 		e := New(&lib.MiniRunner{
-			SetupFn: func(ctx context.Context, out chan<- stats.SampleContainer) (interface{}, error) {
+			SetupFn: func(ctx context.Context, out chan<- stats.SampleContainer) ([]byte, error) {
 				return nil, nil
 			},
 			TeardownFn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
@@ -120,7 +120,7 @@ func TestExecutorSetupTeardownRun(t *testing.T) {
 
 		t.Run("Don't Run Teardown", func(t *testing.T) {
 			e := New(&lib.MiniRunner{
-				SetupFn: func(ctx context.Context, out chan<- stats.SampleContainer) (interface{}, error) {
+				SetupFn: func(ctx context.Context, out chan<- stats.SampleContainer) ([]byte, error) {
 					return nil, nil
 				},
 				TeardownFn: func(ctx context.Context, out chan<- stats.SampleContainer) error {

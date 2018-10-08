@@ -215,7 +215,6 @@ func TestOptionsPropagationToScript(t *testing.T) {
 		})
 	}
 }
-
 func TestSetupTeardown(t *testing.T) {
 	r1, err := New(&lib.SourceData{
 		Filename: "/script.js",
@@ -261,6 +260,62 @@ func TestSetupTeardown(t *testing.T) {
 			if assert.NoError(t, err) {
 				err := vu.RunOnce(context.Background())
 				assert.NoError(t, err)
+			}
+
+			assert.NoError(t, r.Teardown(context.Background(), samples))
+		})
+	}
+}
+
+func TestSetupDataIsolation(t *testing.T) {
+	r1, err := New(&lib.SourceData{
+		Filename: "/script.js",
+		Data: []byte(`
+			export let options = {
+				setupTimeout: "10s",
+				teardownTimeout: "10s",
+			};
+
+			export function setup() {
+				return { v: 1 };
+			}
+			export function teardown(data) {
+				if (data.v != 1) {
+					throw new Error("teardown: wrong data: " + data.v)
+				}
+				data.v = 2
+			}
+			export default function(data) {
+				if (data.v != 1) {
+					throw new Error("default: wrong data: " + JSON.stringify(data))
+				}
+				data.v = 2
+			}
+		`),
+	}, afero.NewMemMapFs(), lib.RuntimeOptions{})
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{})
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
+	for name, r := range testdata {
+		samples := make(chan stats.SampleContainer, 100)
+		t.Run(name, func(t *testing.T) {
+			if !assert.NoError(t, r.Setup(context.Background(), samples)) {
+				return
+			}
+
+			vu, err := r.NewVU(samples)
+			if assert.NoError(t, err) {
+				for i := 0; i < 10; i++ {
+					err := vu.RunOnce(context.Background())
+					assert.NoError(t, err)
+				}
 			}
 
 			assert.NoError(t, r.Teardown(context.Background(), samples))
@@ -1036,7 +1091,7 @@ func TestVUIntegrationClientCerts(t *testing.T) {
 		return
 	}
 	r1.SetOptions(lib.Options{
-		Throw: null.BoolFrom(true),
+		Throw:                 null.BoolFrom(true),
 		InsecureSkipTLSVerify: null.BoolFrom(true),
 	})
 
