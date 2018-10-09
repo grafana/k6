@@ -133,7 +133,7 @@ func Convert(h HAR, options lib.Options, minSleep, maxSleep uint, enableChecks b
 	for i, page := range pages {
 
 		entries := pageEntries[page.ID]
-		fprintf(w, "\tgroup(\"%s - %s\", function() {\n", page.ID, page.Title)
+		fprintf(w, "\tgroup(%q, function() {\n", page.ID+" - "+page.Title)
 
 		sort.Sort(EntryByStarted(entries))
 
