@@ -45,7 +45,7 @@ func (c Console) log(ctx *context.Context, level log.Level, msgobj goja.Value, a
 		}
 	}
 
-	fields := log.Fields{"source": "script-console"}
+	fields := make(log.Fields)
 	for i, arg := range args {
 		fields[strconv.Itoa(i)] = arg.String()
 	}
