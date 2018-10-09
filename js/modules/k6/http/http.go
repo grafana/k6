@@ -29,35 +29,18 @@ import (
 	"net/http/httputil"
 
 	"github.com/loadimpact/k6/js/common"
+	"github.com/loadimpact/k6/lib/netext"
 	log "github.com/sirupsen/logrus"
 )
 
 const (
-	HTTP_METHOD_GET                    = "GET"
-	HTTP_METHOD_POST                   = "POST"
-	HTTP_METHOD_PUT                    = "PUT"
-	HTTP_METHOD_DELETE                 = "DELETE"
-	HTTP_METHOD_HEAD                   = "HEAD"
-	HTTP_METHOD_PATCH                  = "PATCH"
-	HTTP_METHOD_OPTIONS                = "OPTIONS"
-	OCSP_STATUS_GOOD                   = "good"
-	OCSP_STATUS_REVOKED                = "revoked"
-	OCSP_STATUS_SERVER_FAILED          = "server_failed"
-	OCSP_STATUS_UNKNOWN                = "unknown"
-	OCSP_REASON_UNSPECIFIED            = "unspecified"
-	OCSP_REASON_KEY_COMPROMISE         = "key_compromise"
-	OCSP_REASON_CA_COMPROMISE          = "ca_compromise"
-	OCSP_REASON_AFFILIATION_CHANGED    = "affiliation_changed"
-	OCSP_REASON_SUPERSEDED             = "superseded"
-	OCSP_REASON_CESSATION_OF_OPERATION = "cessation_of_operation"
-	OCSP_REASON_CERTIFICATE_HOLD       = "certificate_hold"
-	OCSP_REASON_REMOVE_FROM_CRL        = "remove_from_crl"
-	OCSP_REASON_PRIVILEGE_WITHDRAWN    = "privilege_withdrawn"
-	OCSP_REASON_AA_COMPROMISE          = "aa_compromise"
-	SSL_3_0                            = "ssl3.0"
-	TLS_1_0                            = "tls1.0"
-	TLS_1_1                            = "tls1.1"
-	TLS_1_2                            = "tls1.2"
+	HTTP_METHOD_GET     = "GET"
+	HTTP_METHOD_POST    = "POST"
+	HTTP_METHOD_PUT     = "PUT"
+	HTTP_METHOD_DELETE  = "DELETE"
+	HTTP_METHOD_HEAD    = "HEAD"
+	HTTP_METHOD_PATCH   = "PATCH"
+	HTTP_METHOD_OPTIONS = "OPTIONS"
 )
 
 type HTTPCookie struct {
@@ -94,25 +77,26 @@ type HTTP struct {
 }
 
 func New() *HTTP {
+	//TODO: move this as an anonymous struct somewhere...
 	return &HTTP{
-		SSL_3_0:                            SSL_3_0,
-		TLS_1_0:                            TLS_1_0,
-		TLS_1_1:                            TLS_1_1,
-		TLS_1_2:                            TLS_1_2,
-		OCSP_STATUS_GOOD:                   OCSP_STATUS_GOOD,
-		OCSP_STATUS_REVOKED:                OCSP_STATUS_REVOKED,
-		OCSP_STATUS_SERVER_FAILED:          OCSP_STATUS_SERVER_FAILED,
-		OCSP_STATUS_UNKNOWN:                OCSP_STATUS_UNKNOWN,
-		OCSP_REASON_UNSPECIFIED:            OCSP_REASON_UNSPECIFIED,
-		OCSP_REASON_KEY_COMPROMISE:         OCSP_REASON_KEY_COMPROMISE,
-		OCSP_REASON_CA_COMPROMISE:          OCSP_REASON_CA_COMPROMISE,
-		OCSP_REASON_AFFILIATION_CHANGED:    OCSP_REASON_AFFILIATION_CHANGED,
-		OCSP_REASON_SUPERSEDED:             OCSP_REASON_SUPERSEDED,
-		OCSP_REASON_CESSATION_OF_OPERATION: OCSP_REASON_CESSATION_OF_OPERATION,
-		OCSP_REASON_CERTIFICATE_HOLD:       OCSP_REASON_CERTIFICATE_HOLD,
-		OCSP_REASON_REMOVE_FROM_CRL:        OCSP_REASON_REMOVE_FROM_CRL,
-		OCSP_REASON_PRIVILEGE_WITHDRAWN:    OCSP_REASON_PRIVILEGE_WITHDRAWN,
-		OCSP_REASON_AA_COMPROMISE:          OCSP_REASON_AA_COMPROMISE,
+		SSL_3_0:                            netext.SSL_3_0,
+		TLS_1_0:                            netext.TLS_1_0,
+		TLS_1_1:                            netext.TLS_1_1,
+		TLS_1_2:                            netext.TLS_1_2,
+		OCSP_STATUS_GOOD:                   netext.OCSP_STATUS_GOOD,
+		OCSP_STATUS_REVOKED:                netext.OCSP_STATUS_REVOKED,
+		OCSP_STATUS_SERVER_FAILED:          netext.OCSP_STATUS_SERVER_FAILED,
+		OCSP_STATUS_UNKNOWN:                netext.OCSP_STATUS_UNKNOWN,
+		OCSP_REASON_UNSPECIFIED:            netext.OCSP_REASON_UNSPECIFIED,
+		OCSP_REASON_KEY_COMPROMISE:         netext.OCSP_REASON_KEY_COMPROMISE,
+		OCSP_REASON_CA_COMPROMISE:          netext.OCSP_REASON_CA_COMPROMISE,
+		OCSP_REASON_AFFILIATION_CHANGED:    netext.OCSP_REASON_AFFILIATION_CHANGED,
+		OCSP_REASON_SUPERSEDED:             netext.OCSP_REASON_SUPERSEDED,
+		OCSP_REASON_CESSATION_OF_OPERATION: netext.OCSP_REASON_CESSATION_OF_OPERATION,
+		OCSP_REASON_CERTIFICATE_HOLD:       netext.OCSP_REASON_CERTIFICATE_HOLD,
+		OCSP_REASON_REMOVE_FROM_CRL:        netext.OCSP_REASON_REMOVE_FROM_CRL,
+		OCSP_REASON_PRIVILEGE_WITHDRAWN:    netext.OCSP_REASON_PRIVILEGE_WITHDRAWN,
+		OCSP_REASON_AA_COMPROMISE:          netext.OCSP_REASON_AA_COMPROMISE,
 	}
 }
 
