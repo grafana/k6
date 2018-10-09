@@ -32,17 +32,20 @@ import (
 	"testing"
 	"time"
 
+	"github.com/loadimpact/k6/core"
+	"github.com/loadimpact/k6/core/local"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
+	"github.com/loadimpact/k6/stats/dummy"
 	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/guregu/null.v3"
+	null "gopkg.in/guregu/null.v3"
 )
 
 func TestRunnerNew(t *testing.T) {
@@ -269,59 +272,75 @@ func TestSetupTeardown(t *testing.T) {
 }
 
 func TestSetupDataIsolation(t *testing.T) {
-	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
-		Data: []byte(`
-			export let options = {
-				setupTimeout: "10s",
-				teardownTimeout: "10s",
-			};
+	t.Parallel()
+	tb := testutils.NewHTTPMultiBin(t)
+	defer tb.Cleanup()
 
-			export function setup() {
-				return { v: 1 };
+	script := []byte(tb.Replacer.Replace(`
+		import { Counter } from "k6/metrics";
+
+		export let options = {
+			vus: 2,
+			vusMax: 10,
+			iterations: 10000,
+			teardownTimeout: "1s",
+			setupTimeout: "1s",
+		};
+		let myCounter = new Counter("mycounter");
+
+		export function setup() {
+			return { v: 0 };
+		}
+
+		export default function(data) {
+			if (data.v !== __ITER) {
+				throw new Error("default: wrong data for iter " + __ITER + ": " + JSON.stringify(data));
 			}
-			export function teardown(data) {
-				if (data.v != 1) {
-					throw new Error("teardown: wrong data: " + data.v)
-				}
-				data.v = 2
+			data.v += 1;
+			myCounter.add(1);
+		}
+
+		export function teardown(data) {
+			if (data.v !== 0) {
+				throw new Error("teardown: wrong data: " + data.v);
 			}
-			export default function(data) {
-				if (data.v != 1) {
-					throw new Error("default: wrong data: " + JSON.stringify(data))
-				}
-				data.v = 2
-			}
-		`),
-	}, afero.NewMemMapFs(), lib.RuntimeOptions{})
-	if !assert.NoError(t, err) {
-		return
+			myCounter.add(1);
+		}
+	`))
+
+	runner, err := New(
+		&lib.SourceData{Filename: "/script.js", Data: script},
+		afero.NewMemMapFs(),
+		lib.RuntimeOptions{},
+	)
+	require.NoError(t, err)
+
+	engine, err := core.NewEngine(local.New(runner), runner.GetOptions())
+	require.NoError(t, err)
+
+	collector := &dummy.Collector{}
+	engine.Collectors = []lib.Collector{collector}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	errC := make(chan error)
+	go func() { errC <- engine.Run(ctx) }()
+
+	select {
+	case <-time.After(10 * time.Second):
+		cancel()
+		t.Fatal("Test timed out")
+	case err := <-errC:
+		cancel()
+		require.NoError(t, err)
+		require.False(t, engine.IsTainted())
 	}
-
-	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{})
-	if !assert.NoError(t, err) {
-		return
+	var count int
+	for _, s := range collector.Samples {
+		if s.Metric.Name == "mycounter" {
+			count += int(s.Value)
+		}
 	}
-
-	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
-	for name, r := range testdata {
-		samples := make(chan stats.SampleContainer, 100)
-		t.Run(name, func(t *testing.T) {
-			if !assert.NoError(t, r.Setup(context.Background(), samples)) {
-				return
-			}
-
-			vu, err := r.NewVU(samples)
-			if assert.NoError(t, err) {
-				for i := 0; i < 10; i++ {
-					err := vu.RunOnce(context.Background())
-					assert.NoError(t, err)
-				}
-			}
-
-			assert.NoError(t, r.Teardown(context.Background(), samples))
-		})
-	}
+	require.Equal(t, 10001, count, "mycounter should be the number of iterations + 1 for the teardown")
 }
 
 func testSetupDataHelper(t *testing.T, src *lib.SourceData) {
