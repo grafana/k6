@@ -209,6 +209,12 @@ func (r *Runner) Setup(ctx context.Context, out chan<- stats.SampleContainer) er
 	if err != nil {
 		return errors.Wrap(err, "setup")
 	}
+	// r.setupData = nil is special it means undefined from this moment forward
+	if goja.IsUndefined(v) {
+		r.setupData = nil
+		return nil
+	}
+
 	r.setupData, err = json.Marshal(v.Export())
 	if err != nil {
 		return errors.Wrap(err, "setup")
@@ -235,10 +241,12 @@ func (r *Runner) Teardown(ctx context.Context, out chan<- stats.SampleContainer)
 	defer teardownCancel()
 
 	var data interface{}
-	if len(r.setupData) != 0 {
+	if r.setupData != nil {
 		if err := json.Unmarshal(r.setupData, &data); err != nil {
 			return errors.Wrap(err, "Teardown")
 		}
+	} else {
+		data = goja.Undefined()
 	}
 	_, err := r.runPart(teardownCtx, out, "teardown", data)
 	return err
@@ -352,12 +360,16 @@ func (u *VU) RunOnce(ctx context.Context) error {
 
 	// Unmarshall the setupData only the first time for each VU so that VUs are isolated but we
 	// still don't use too much CPU in the middle test
-	if u.setupData == nil && len(u.Runner.setupData) != 0 {
-		var data interface{}
-		if err := json.Unmarshal(u.Runner.setupData, &data); err != nil {
-			return errors.Wrap(err, "RunOnce")
+	if u.setupData == nil {
+		if u.Runner.setupData != nil {
+			var data interface{}
+			if err := json.Unmarshal(u.Runner.setupData, &data); err != nil {
+				return errors.Wrap(err, "RunOnce")
+			}
+			u.setupData = u.Runtime.ToValue(data)
+		} else {
+			u.setupData = goja.Undefined()
 		}
-		u.setupData = u.Runtime.ToValue(data)
 	}
 
 	// Call the default function.

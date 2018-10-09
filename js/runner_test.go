@@ -219,58 +219,6 @@ func TestOptionsPropagationToScript(t *testing.T) {
 	}
 }
 
-func TestSetupTeardown(t *testing.T) {
-	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
-		Data: []byte(`
-			export let options = {
-				setupTimeout: "1s",
-				teardownTimeout: "1s"
-			};
-
-			export function setup() {
-				return { v: 1 };
-			}
-			export function teardown(data) {
-				if (data.v != 1) {
-					throw new Error("teardown: wrong data: " + JSON.stringify(data))
-				}
-			}
-			export default function(data) {
-				if (data.v != 1) {
-					throw new Error("default: wrong data: " + JSON.stringify(data))
-				}
-			}
-		`),
-	}, afero.NewMemMapFs(), lib.RuntimeOptions{})
-	if !assert.NoError(t, err) {
-		return
-	}
-
-	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{})
-	if !assert.NoError(t, err) {
-		return
-	}
-
-	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
-	for name, r := range testdata {
-		samples := make(chan stats.SampleContainer, 100)
-		t.Run(name, func(t *testing.T) {
-			if !assert.NoError(t, r.Setup(context.Background(), samples)) {
-				return
-			}
-
-			vu, err := r.NewVU(samples)
-			if assert.NoError(t, err) {
-				err := vu.RunOnce(context.Background())
-				assert.NoError(t, err)
-			}
-
-			assert.NoError(t, r.Teardown(context.Background(), samples))
-		})
-	}
-}
-
 func TestSetupDataIsolation(t *testing.T) {
 	t.Parallel()
 	tb := testutils.NewHTTPMultiBin(t)
@@ -344,20 +292,16 @@ func TestSetupDataIsolation(t *testing.T) {
 }
 
 func testSetupDataHelper(t *testing.T, src *lib.SourceData) {
-	expScriptOptions := lib.Options{SetupTimeout: types.NullDurationFrom(1 * time.Second)}
-	r1, err := New(src, afero.NewMemMapFs(), lib.RuntimeOptions{Env: map[string]string{"expectedSetupTimeout": "1s"}})
+	t.Helper()
+	expScriptOptions := lib.Options{
+		SetupTimeout:    types.NullDurationFrom(1 * time.Second),
+		TeardownTimeout: types.NullDurationFrom(1 * time.Second),
+	}
+	r1, err := New(src, afero.NewMemMapFs(), lib.RuntimeOptions{})
 	require.NoError(t, err)
 	require.Equal(t, expScriptOptions, r1.GetOptions())
 
-	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{Env: map[string]string{"expectedSetupTimeout": "3s"}})
-	require.NoError(t, err)
-	require.Equal(t, expScriptOptions, r2.GetOptions())
-
-	newOptions := lib.Options{SetupTimeout: types.NullDurationFrom(3 * time.Second)}
-	r2.SetOptions(newOptions)
-	require.Equal(t, newOptions, r2.GetOptions())
-
-	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
+	testdata := map[string]*Runner{"Source": r1}
 	for name, r := range testdata {
 		t.Run(name, func(t *testing.T) {
 			samples := make(chan stats.SampleContainer, 100)
@@ -378,7 +322,7 @@ func TestSetupDataReturnValue(t *testing.T) {
 	src := &lib.SourceData{
 		Filename: "/script.js",
 		Data: []byte(`
-			export let options = { setupTimeout: "1s", myOption: "test" };
+			export let options = { setupTimeout: "1s", teardownTimeout: "1s" };
 			export function setup() {
 				return 42;
 			}
@@ -403,15 +347,16 @@ func TestSetupDataNoSetup(t *testing.T) {
 	src := &lib.SourceData{
 		Filename: "/script.js",
 		Data: []byte(`
-			export let options = { setupTimeout: "1s", myOption: "test" };
+			export let options = { setupTimeout: "1s", teardownTimeout: "1s" };
 			export default function(data) {
-				if (data != null) {
+				if (data !== undefined) {
 					throw new Error("default: wrong data: " + JSON.stringify(data))
 				}
 			};
 
 			export function teardown(data) {
-				if (data != null) {
+				if (data !== undefined) {
+					console.log(data);
 					throw new Error("teardown: wrong data: " + JSON.stringify(data))
 				}
 			};
@@ -425,16 +370,16 @@ func TestSetupDataNoReturn(t *testing.T) {
 	src := &lib.SourceData{
 		Filename: "/script.js",
 		Data: []byte(`
-			export let options = { setupTimeout: "1s", myOption: "test" };
+			export let options = { setupTimeout: "1s", teardownTimeout: "1s" };
 			export function setup() { }
 			export default function(data) {
-				if (data != null) {
+				if (data !== undefined) {
 					throw new Error("default: wrong data: " + JSON.stringify(data))
 				}
 			};
 
 			export function teardown(data) {
-				if (data != null) {
+				if (data !== undefined) {
 					throw new Error("teardown: wrong data: " + JSON.stringify(data))
 				}
 			};
