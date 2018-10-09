@@ -11,17 +11,17 @@ import (
 )
 
 type Transport struct {
-	http.RoundTripper
-	options   *lib.Options
-	tags      map[string]string
-	trail     *Trail
-	tlsInfo   TLSInfo
-	samplesCh chan<- stats.SampleContainer
+	roundTripper http.RoundTripper
+	options      *lib.Options
+	tags         map[string]string
+	trail        *Trail
+	tlsInfo      TLSInfo
+	samplesCh    chan<- stats.SampleContainer
 }
 
 func NewTransport(transport http.RoundTripper, samplesCh chan<- stats.SampleContainer, options *lib.Options, tags map[string]string) *Transport {
 	return &Transport{
-		RoundTripper: transport,
+		roundTripper: transport,
 		tags:         tags,
 		options:      options,
 		samplesCh:    samplesCh,
@@ -41,8 +41,8 @@ func (t *Transport) TLSInfo() TLSInfo {
 }
 
 func (t *Transport) RoundTrip(req *http.Request) (res *http.Response, err error) {
-	if t.RoundTripper == nil {
-		return nil, errors.New("no roundtrip defined")
+	if t.roundTripper == nil {
+		return nil, errors.New("No roundtrip defined")
 	}
 
 	tags := map[string]string{}
@@ -54,7 +54,7 @@ func (t *Transport) RoundTrip(req *http.Request) (res *http.Response, err error)
 	tracer := Tracer{}
 	reqWithTracer := req.WithContext(WithTracer(ctx, &tracer))
 
-	resp, err := t.RoundTripper.RoundTrip(reqWithTracer)
+	resp, err := t.roundTripper.RoundTrip(reqWithTracer)
 	trail := tracer.Done()
 	if err != nil {
 		if t.options.SystemTags["error"] {
