@@ -350,14 +350,15 @@ func (u *VU) RunOnce(ctx context.Context) error {
 		}()
 	}
 
-	// Always unmarshall the setupData so that it doesn't change between calls
-	var data interface{}
-	if len(u.Runner.setupData) != 0 {
+	// Unmarshall the setupData only the first time for each VU so that VUs are isolated but we
+	// still don't use too much CPU in the middle test
+	if u.setupData == nil && len(u.Runner.setupData) != 0 {
+		var data interface{}
 		if err := json.Unmarshal(u.Runner.setupData, &data); err != nil {
 			return errors.Wrap(err, "RunOnce")
 		}
+		u.setupData = u.Runtime.ToValue(data)
 	}
-	u.setupData = u.Runtime.ToValue(data)
 
 	// Call the default function.
 	_, _, err := u.runFn(ctx, u.Runner.defaultGroup, u.Default, u.setupData)
