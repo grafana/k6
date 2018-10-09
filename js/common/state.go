@@ -45,10 +45,10 @@ type State struct {
 	Group *lib.Group
 
 	// Networking equipment.
-	HTTPTransport http.RoundTripper
-	Dialer        *netext.Dialer
-	CookieJar     *cookiejar.Jar
-	TLSConfig     *tls.Config
+	Transport http.RoundTripper
+	Dialer    *netext.Dialer
+	CookieJar *cookiejar.Jar
+	TLSConfig *tls.Config
 
 	// Rate limits.
 	RPSLimit *rate.Limiter
