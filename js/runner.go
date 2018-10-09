@@ -157,11 +157,13 @@ func (r *Runner) newVU(samplesOut chan<- stats.SampleContainer) (*VU, error) {
 		Renegotiation:      tls.RenegotiateFreelyAsClient,
 	}
 	transport := &http.Transport{
-		Proxy:              http.ProxyFromEnvironment,
-		TLSClientConfig:    tlsConfig,
-		DialContext:        dialer.DialContext,
-		DisableCompression: true,
-		DisableKeepAlives:  r.Bundle.Options.NoConnectionReuse.Bool,
+		Proxy:               http.ProxyFromEnvironment,
+		TLSClientConfig:     tlsConfig,
+		DialContext:         dialer.DialContext,
+		DisableCompression:  true,
+		DisableKeepAlives:   r.Bundle.Options.NoConnectionReuse.Bool,
+		MaxIdleConns:        int(r.Bundle.Options.Batch.Int64),
+		MaxIdleConnsPerHost: int(r.Bundle.Options.BatchPerHost.Int64),
 	}
 	_ = http2.ConfigureTransport(transport)
 
@@ -391,6 +393,14 @@ func (u *VU) runFn(ctx context.Context, group *lib.Group, fn goja.Callable, args
 	v, err := fn(goja.Undefined(), args...) // Actually run the JS script
 	endTime := time.Now()
 
+	var isFullIteration bool
+	select {
+	case <-ctx.Done():
+		isFullIteration = false
+	default:
+		isFullIteration = true
+	}
+
 	tags := state.Options.RunTags.CloneTags()
 	if state.Options.SystemTags["vu"] {
 		tags["vu"] = strconv.FormatInt(u.ID, 10)
@@ -404,14 +414,6 @@ func (u *VU) runFn(ctx context.Context, group *lib.Group, fn goja.Callable, args
 
 	if u.Runner.Bundle.Options.NoVUConnectionReuse.Bool {
 		u.Transport.CloseIdleConnections()
-	}
-
-	var isFullIteration bool
-	select {
-	case <-ctx.Done():
-		isFullIteration = false
-	default:
-		isFullIteration = true
 	}
 
 	state.Samples <- u.Dialer.GetTrail(startTime, endTime, isFullIteration, stats.IntoSampleTags(&tags))

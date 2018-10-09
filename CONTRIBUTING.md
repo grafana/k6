@@ -5,7 +5,7 @@ Thank you for your interest in contributing to k6!
 
 (ﾉ◕ヮ◕)ﾉ*:・ﾟ✧
 
-Before you begin, make sure to familiarize yourself with the [Code of Conduct](CODE_OF_CONDUCT.md). If you've previously contributed to other open source project, you may recognize it as the classic [Contributor Covenant](http://contributor-covenant.org/).
+Before you begin, make sure to familiarize yourself with the [Code of Conduct](CODE_OF_CONDUCT.md). If you've previously contributed to other open source project, you may recognize it as the classic [Contributor Covenant](https://contributor-covenant.org/).
 
 If you want to chat with the team or the community, you can [join our Slack team](https://k6.io/slack/).
 
@@ -38,7 +38,7 @@ If you'd like to contribute code to k6, this is the basic procedure. Make sure t
 Development setup
 -----------------
 
-To get a basic development environment for Go and k6 up and running, first make sure you have **[Git](https://git-scm.com/downloads)** and **[Go](https://golang.org/doc/install)** (1.8 or newer) installed and working properly.
+To get a basic development environment for Go and k6 up and running, first make sure you have **[Git](https://git-scm.com/downloads)** and **[Go](https://golang.org/doc/install)** (1.10 or newer) installed and working properly.
 
 Once that's done, you can get the k6 source into your Go workspace (`$GOPATH/src`) by running:
 ```bash
