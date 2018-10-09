@@ -374,7 +374,7 @@ func TestVURunContext(t *testing.T) {
 					assert.Equal(t, null.BoolFrom(true), state.Options.Throw)
 					assert.NotNil(t, state.Logger)
 					assert.Equal(t, r.GetDefaultGroup(), state.Group)
-					assert.Equal(t, vu.HTTPTransport, state.HTTPTransport)
+					assert.Equal(t, vu.Transport, state.Transport)
 				}
 			})
 			err = vu.RunOnce(context.Background())
