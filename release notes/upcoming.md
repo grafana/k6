@@ -89,6 +89,10 @@ export default function () {
 
 Thanks to @AndriiChuzhynov for implementing this! (#766)
 
+## UX
+
+* Added a warning when the maximum number of VUs is more than the total number of iterations (#802)
+
 ## Internals
 
 * Cloud output: improved outlier metric detection for small batches (#744)
