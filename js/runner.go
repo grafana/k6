@@ -58,7 +58,7 @@ type Runner struct {
 	Resolver   *dnscache.Resolver
 	RPSLimit   *rate.Limiter
 
-	setupData interface{}
+	setupData []byte
 }
 
 func New(src *lib.SourceData, fs afero.Fs, rtOpts lib.RuntimeOptions) (*Runner, error) {
@@ -209,20 +209,27 @@ func (r *Runner) Setup(ctx context.Context, out chan<- stats.SampleContainer) er
 	if err != nil {
 		return errors.Wrap(err, "setup")
 	}
-	data, err := json.Marshal(v.Export())
+	// r.setupData = nil is special it means undefined from this moment forward
+	if goja.IsUndefined(v) {
+		r.setupData = nil
+		return nil
+	}
+
+	r.setupData, err = json.Marshal(v.Export())
 	if err != nil {
 		return errors.Wrap(err, "setup")
 	}
-	return json.Unmarshal(data, &r.setupData)
+	var tmp interface{}
+	return json.Unmarshal(r.setupData, &tmp)
 }
 
-// GetSetupData returns the setup data if Setup() was specified and executed, nil otherwise
-func (r *Runner) GetSetupData() interface{} {
+// GetSetupData returns the setup data as json if Setup() was specified and executed, nil otherwise
+func (r *Runner) GetSetupData() []byte {
 	return r.setupData
 }
 
-// SetSetupData saves the externally supplied setup data in the runner, so it can be used in VUs
-func (r *Runner) SetSetupData(data interface{}) {
+// SetSetupData saves the externally supplied setup data as json in the runner, so it can be used in VUs
+func (r *Runner) SetSetupData(data []byte) {
 	r.setupData = data
 }
 
@@ -233,7 +240,15 @@ func (r *Runner) Teardown(ctx context.Context, out chan<- stats.SampleContainer)
 	)
 	defer teardownCancel()
 
-	_, err := r.runPart(teardownCtx, out, "teardown", r.setupData)
+	var data interface{}
+	if r.setupData != nil {
+		if err := json.Unmarshal(r.setupData, &data); err != nil {
+			return errors.Wrap(err, "Teardown")
+		}
+	} else {
+		data = goja.Undefined()
+	}
+	_, err := r.runPart(teardownCtx, out, "teardown", data)
 	return err
 }
 
@@ -343,12 +358,18 @@ func (u *VU) RunOnce(ctx context.Context) error {
 		}()
 	}
 
-	// Lazily JS-ify setupData on first run. This is lightweight enough that we can get away with
-	// it, and alleviates a problem where setupData wouldn't get populated properly if NewVU() was
-	// called before Setup(), which is hard to avoid with how the Executor works w/o complicating
-	// the local executor further by deferring SetVUsMax() calls to within the Run() function.
-	if u.setupData == nil && u.Runner.setupData != nil {
-		u.setupData = u.Runtime.ToValue(u.Runner.setupData)
+	// Unmarshall the setupData only the first time for each VU so that VUs are isolated but we
+	// still don't use too much CPU in the middle test
+	if u.setupData == nil {
+		if u.Runner.setupData != nil {
+			var data interface{}
+			if err := json.Unmarshal(u.Runner.setupData, &data); err != nil {
+				return errors.Wrap(err, "RunOnce")
+			}
+			u.setupData = u.Runtime.ToValue(data)
+		} else {
+			u.setupData = goja.Undefined()
+		}
 	}
 
 	// Call the default function.

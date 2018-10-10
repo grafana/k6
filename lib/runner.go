@@ -49,11 +49,11 @@ type Runner interface {
 	// Runs pre-test setup, if applicable.
 	Setup(ctx context.Context, out chan<- stats.SampleContainer) error
 
-	// Returns the setup data if setup() is specified and run, nil otherwise
-	GetSetupData() interface{}
+	// Returns json representation of the setup data if setup() is specified and run, nil otherwise
+	GetSetupData() []byte
 
-	// Saves the externally supplied setup data in the runner
-	SetSetupData(interface{})
+	// Saves the externally supplied setup data as json in the runner
+	SetSetupData([]byte)
 
 	// Runs post-test teardown, if applicable.
 	Teardown(ctx context.Context, out chan<- stats.SampleContainer) error
@@ -82,10 +82,10 @@ type VU interface {
 // MiniRunner wraps a function in a runner whose VUs will simply call that function.
 type MiniRunner struct {
 	Fn         func(ctx context.Context, out chan<- stats.SampleContainer) error
-	SetupFn    func(ctx context.Context, out chan<- stats.SampleContainer) (interface{}, error)
+	SetupFn    func(ctx context.Context, out chan<- stats.SampleContainer) ([]byte, error)
 	TeardownFn func(ctx context.Context, out chan<- stats.SampleContainer) error
 
-	setupData interface{}
+	setupData []byte
 
 	Group   *Group
 	Options Options
@@ -110,13 +110,13 @@ func (r *MiniRunner) Setup(ctx context.Context, out chan<- stats.SampleContainer
 	return
 }
 
-// GetSetupData returns the setup data if Setup() was executed, nil otherwise
-func (r MiniRunner) GetSetupData() interface{} {
+// GetSetupData returns json representation of the setup data if setup() is specified and run, nil otherwise
+func (r MiniRunner) GetSetupData() []byte {
 	return r.setupData
 }
 
-// SetSetupData saves the externally supplied setup data in the runner
-func (r *MiniRunner) SetSetupData(data interface{}) {
+// SetSetupData saves the externally supplied setup data as json in the runner
+func (r *MiniRunner) SetSetupData(data []byte) {
 	r.setupData = data
 }
 
