@@ -48,7 +48,7 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.Int64P("vus", "u", 1, "number of virtual users")
 	flags.Int64P("max", "m", 0, "max available virtual users")
 	flags.DurationP("duration", "d", 0, "test duration limit")
-	flags.Int64P("iterations", "i", 0, "script iteration limit")
+	flags.Int64P("iterations", "i", 0, "script total iteration limit (among all VUs)")
 	flags.StringSliceP("stage", "s", nil, "add a `stage`, as `[duration]:[target]`")
 	flags.BoolP("paused", "p", false, "start the test in a paused state")
 	flags.Int64("max-redirects", 10, "follow at most n redirects")
