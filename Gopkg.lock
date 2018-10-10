@@ -3,6 +3,14 @@
 
 [[projects]]
   branch = "master"
+  digest = "1:b2644fc631c849dc4122f7a33b4462eb9aa5aad165fa6de5fd2a167a46ed6f14"
+  name = "github.com/Azure/go-ntlmssp"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "4a21cbd618b459155f8b8ee7f4491cd54f5efa77"
+
+[[projects]]
+  branch = "master"
   digest = "1:7d8fe22a434ddfb29d95e10a0231eb2d96100b9eaaf7bff7312eee7df7a34bfa"
   name = "github.com/GeertJohan/go.rice"
   packages = [
@@ -35,17 +43,6 @@
   packages = ["."]
   pruneopts = "NUT"
   revision = "6d28bb1415c5d06b76a4dcc4bb6e0dd39ce61af9"
-
-[[projects]]
-  branch = "master"
-  digest = "1:69dabd9ff5154eba205b9c049a1716b4ce0e6d7da55e3d1a96fa1da2a3540158"
-  name = "github.com/ThomsonReutersEikon/go-ntlm"
-  packages = [
-    "ntlm",
-    "ntlm/md4",
-  ]
-  pruneopts = "NUT"
-  revision = "2a7c173f9e18233a4ae29891da6a0a63637e2d8d"
 
 [[projects]]
   digest = "1:fc86904a62ac4bfff8cfbe94f42231ce3d8cea8fe2506d5293eaef468f8eaecf"
@@ -638,12 +635,12 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
+    "github.com/Azure/go-ntlmssp",
     "github.com/GeertJohan/go.rice",
     "github.com/GeertJohan/go.rice/embedded",
     "github.com/PuerkitoBio/goquery",
     "github.com/Shopify/sarama",
     "github.com/Soontao/goHttpDigestClient",
-    "github.com/ThomsonReutersEikon/go-ntlm/ntlm",
     "github.com/dop251/goja",
     "github.com/dop251/goja/parser",
     "github.com/dustin/go-humanize",

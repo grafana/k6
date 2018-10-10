@@ -89,10 +89,15 @@ export default function () {
 
 Thanks to @AndriiChuzhynov for implementing this! (#766)
 
+## UX
+
+* Added a warning when the maximum number of VUs is more than the total number of iterations (#802)
+
 ## Internals
 
 * Cloud output: improved outlier metric detection for small batches (#744)
 * Use 20 as the the default values of the `batch` and `batchPerHost` options. They determine the maximum number of parallel requests (in total and per-host respectively) an `http.batch()` call will make per VU. The previous value for `batch` was 10 and for `batchPerHost` it was 0 (unlimited). We now also use their values to determine the maximum number of open idle connections in a VU (#685)
+* Due to refactoring needed for the redirect fixes, the NTLM authentication library k6 uses is changed from [this](https://github.com/ThomsonReutersEikon/go-ntlm/) to [this](https://github.com/Azure/go-ntlmssp) (#753)
 
 ## Bugs fixed!
 
@@ -106,3 +111,5 @@ Thanks to @AndriiChuzhynov for implementing this! (#766)
 * Docker: Fixed the grafana image in the docker-compose setup. Thanks @entone and @mariolopjr! (#783)
 * Config: Stages configured via the script `options` or environment variables couldn't be disabled via the CLI flags (#786)
 * UI: Don't report infinities and extreme speeds when tests take 0 time. Thanks @tkbky! (#790)
+* HTTP: Correct metric tracking when HTTP requests are redirected (#753)
+* HAR converter: Added escaping for page IDs and names in the generated scripts (#801)
