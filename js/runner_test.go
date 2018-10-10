@@ -220,7 +220,6 @@ func TestOptionsPropagationToScript(t *testing.T) {
 }
 
 func TestSetupDataIsolation(t *testing.T) {
-	t.Parallel()
 	tb := testutils.NewHTTPMultiBin(t)
 	defer tb.Cleanup()
 
@@ -230,7 +229,7 @@ func TestSetupDataIsolation(t *testing.T) {
 		export let options = {
 			vus: 2,
 			vusMax: 10,
-			iterations: 10000,
+			iterations: 500,
 			teardownTimeout: "1s",
 			setupTimeout: "1s",
 		};
@@ -288,7 +287,7 @@ func TestSetupDataIsolation(t *testing.T) {
 			count += int(s.Value)
 		}
 	}
-	require.Equal(t, 10001, count, "mycounter should be the number of iterations + 1 for the teardown")
+	require.Equal(t, 501, count, "mycounter should be the number of iterations + 1 for the teardown")
 }
 
 func testSetupDataHelper(t *testing.T, src *lib.SourceData) {
