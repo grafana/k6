@@ -30,6 +30,12 @@ import (
 	"github.com/manyminds/api2go/jsonapi"
 )
 
+// NullSetupData is wrapper around null to satisfy jsonapi
+type NullSetupData struct {
+	SetupData
+	Data interface{} `json:"data,omitempty" yaml:"data"`
+}
+
 // SetupData is just a simple wrapper to satisfy jsonapi
 type SetupData struct {
 	Data interface{} `json:"data" yaml:"data"`
@@ -45,14 +51,21 @@ func (sd SetupData) GetID() string {
 	return "default"
 }
 
-func handleSetupDataOutput(rw http.ResponseWriter, setupData interface{}) {
+func handleSetupDataOutput(rw http.ResponseWriter, setupData json.RawMessage) {
 	rw.Header().Set("Content-Type", "application/json")
+	var err error
+	var data []byte
 
-	data, err := jsonapi.Marshal(SetupData{setupData})
+	if setupData == nil {
+		data, err = jsonapi.Marshal(NullSetupData{Data: nil})
+	} else {
+		data, err = jsonapi.Marshal(SetupData{setupData})
+	}
 	if err != nil {
 		apiError(rw, "Encoding error", err.Error(), http.StatusInternalServerError)
 		return
 	}
+
 	_, _ = rw.Write(data)
 }
 
@@ -70,14 +83,21 @@ func HandleSetSetupData(rw http.ResponseWriter, r *http.Request, p httprouter.Pa
 		return
 	}
 
-	var setupData interface{}
-	if err := json.Unmarshal(body, &setupData); err != nil {
-		apiError(rw, "Error parsing request body", err.Error(), http.StatusBadRequest)
-		return
+	var data interface{}
+	if len(body) > 0 {
+		if err := json.Unmarshal(body, &data); err != nil {
+			apiError(rw, "Error parsing request body", err.Error(), http.StatusBadRequest)
+			return
+		}
 	}
 
 	runner := common.GetEngine(r.Context()).Executor.GetRunner()
-	runner.SetSetupData(setupData)
+
+	if len(body) == 0 {
+		runner.SetSetupData(nil)
+	} else {
+		runner.SetSetupData(body)
+	}
 
 	handleSetupDataOutput(rw, runner.GetSetupData())
 }
