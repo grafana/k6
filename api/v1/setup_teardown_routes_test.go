@@ -114,7 +114,7 @@ func TestSetupData(t *testing.T) {
 			};
 
 			export function teardown(data) {
-				if (data === udefined || data !== "") {
+				if (data === undefined || data !== "") {
 					throw new Error("incorrect teardown data: " + JSON.stringify(data));
 				}
 			} `),
