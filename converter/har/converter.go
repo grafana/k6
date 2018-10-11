@@ -104,6 +104,16 @@ func Convert(h HAR, options lib.Options, minSleep, maxSleep uint, enableChecks b
 	pages := h.Log.Pages
 	sort.Sort(PageByStarted(pages))
 
+	// Hack to handle HAR files without a pages array
+	// Temporary fix for https://github.com/loadimpact/k6/issues/793
+	if len(pages) == 0 {
+		pages = []Page{Page{
+			ID:      "", // The Pageref property of all Entries will be an empty string
+			Title:   "Global",
+			Comment: "Placeholder page since there were no pages specified in the HAR file",
+		}}
+	}
+
 	// Grouping by page and URL filtering
 	pageEntries := make(map[string][]*Entry)
 	for _, e := range h.Log.Entries {
@@ -133,7 +143,14 @@ func Convert(h HAR, options lib.Options, minSleep, maxSleep uint, enableChecks b
 	for i, page := range pages {
 
 		entries := pageEntries[page.ID]
-		fprintf(w, "\tgroup(%q, function() {\n", page.ID+" - "+page.Title)
+
+		scriptGroupName := page.ID + " - " + page.Title
+		if page.ID == "" {
+			// Temporary fix for https://github.com/loadimpact/k6/issues/793
+			// I can't just remove the group() call since all of the subsequent code indentation is hardcoded...
+			scriptGroupName = page.Title
+		}
+		fprintf(w, "\tgroup(%q, function() {\n", scriptGroupName)
 
 		sort.Sort(EntryByStarted(entries))
 
