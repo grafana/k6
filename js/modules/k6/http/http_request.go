@@ -51,11 +51,11 @@ import (
 )
 
 type HTTPRequest struct {
-	Method  string
-	URL     string
-	Headers map[string][]string
-	Body    string
-	Cookies map[string][]*HTTPRequestCookie
+	Method  string                          `json:"method"`
+	URL     string                          `json:"url"`
+	Headers map[string][]string             `json:"headers"`
+	Body    string                          `json:"body"`
+	Cookies map[string][]*HTTPRequestCookie `json:"cookies"`
 }
 
 func (h *HTTP) Get(ctx context.Context, url goja.Value, args ...goja.Value) (*HTTPResponse, error) {
