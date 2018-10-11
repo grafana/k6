@@ -107,7 +107,7 @@ func Convert(h HAR, options lib.Options, minSleep, maxSleep uint, enableChecks b
 	// Hack to handle HAR files without a pages array
 	// Temporary fix for https://github.com/loadimpact/k6/issues/793
 	if len(pages) == 0 {
-		pages = []Page{Page{
+		pages = []Page{{
 			ID:      "", // The Pageref property of all Entries will be an empty string
 			Title:   "Global",
 			Comment: "Placeholder page since there were no pages specified in the HAR file",
