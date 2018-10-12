@@ -29,6 +29,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/dop251/goja"
@@ -111,36 +112,43 @@ func (r *Runner) NewVU(samplesOut chan<- stats.SampleContainer) (lib.VU, error) 
 	return lib.VU(vu), nil
 }
 
-func rr_getAddr(ifaceName string) *net.IPAddr {
-	//rand.Seed(time.Now().Unix())
+func getRandomIP(ifacesList string) (*net.IPAddr, error) {
 
-	// Select given interface
-	targetIf, err := net.InterfaceByName(ifaceName)
-	if err != nil {
-		return nil
+	var addresses []net.Addr
+	for _, ifaceName := range strings.Split(ifacesList, ",") {
+		targetIf, err := net.InterfaceByName(ifaceName)
+
+		if err != nil {
+			return nil, errors.New("Can't find interface '" + ifaceName + "'")
+		}
+
+		addrs, err := targetIf.Addrs()
+		if err != nil {
+			return nil, errors.New("Can't get addresses for interface '" + ifaceName + "'")
+		}
+
+		addresses = append(addresses, addrs...)
 	}
-	// Get available addresses for interface
-	addrs, err := targetIf.Addrs()
-	if err != nil {
-		return nil
-	}
-	rand.Shuffle(len(addrs), func(i, j int) { addrs[i], addrs[j] = addrs[j], addrs[i] })
-	ip := ""
-	for _, a := range addrs {
+
+	rand.Shuffle(len(addresses), func(i, j int) { addresses[i], addresses[j] = addresses[j], addresses[i] })
+
+	selectedIP := ""
+	for _, a := range addresses {
 		tip, _, err := net.ParseCIDR(a.String())
 		if err == nil && tip.String() != "::1" {
-			ip = tip.String()
+			selectedIP = tip.String()
 			break
 		}
 	}
-	if ip == "" {
-		return nil
+	if selectedIP == "" {
+		return nil, errors.New("Could not find available addresses ...")
 	}
-	localAddr, err := net.ResolveIPAddr("ip", ip)
+	localAddr, err := net.ResolveIPAddr("ip", selectedIP)
 	if err != nil {
-		return nil
+		return nil, errors.New("Can't resolve ip: '" + selectedIP + "'")
 	}
-	return localAddr
+
+	return localAddr, nil
 }
 
 func (r *Runner) newVU(samplesOut chan<- stats.SampleContainer) (*VU, error) {
@@ -173,20 +181,22 @@ func (r *Runner) newVU(samplesOut chan<- stats.SampleContainer) (*VU, error) {
 			nameToCert[name] = &certs[i]
 		}
 	}
-	if r.Bundle.Options.Nic.ValueOrZero() != "" {
-		a := rr_getAddr(r.Bundle.Options.Nic.ValueOrZero())
-		if a != nil {
-			localTCPAddr := net.TCPAddr{
-				IP: a.IP,
-			}
-			r.BaseDialer.LocalAddr = &localTCPAddr
-		}
-	}
 	dialer := &netext.Dialer{
 		Dialer:    r.BaseDialer,
 		Resolver:  r.Resolver,
 		Blacklist: r.Bundle.Options.BlacklistIPs,
 		Hosts:     r.Bundle.Options.Hosts,
+	}
+	if r.Bundle.Options.Nic.Valid {
+		randAddr, err := getRandomIP(r.Bundle.Options.Nic.ValueOrZero())
+		if err != nil {
+			return nil, err
+		}
+
+		localTCPAddr := net.TCPAddr{
+			IP: randAddr.IP,
+		}
+		dialer.Dialer.LocalAddr = &localTCPAddr
 	}
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: r.Bundle.Options.InsecureSkipTLSVerify.Bool,
