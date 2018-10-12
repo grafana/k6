@@ -23,8 +23,6 @@ package http
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
-	"encoding/binary"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -35,12 +33,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ThomsonReutersEikon/go-ntlm/ntlm"
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
-	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/stats"
 	"github.com/oxtoacart/bpool"
@@ -112,22 +108,23 @@ func newRuntime(t *testing.T) (*testutils.HTTPMultiBin, *common.State, chan stat
 	rt := goja.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 
+	options := lib.Options{
+		MaxRedirects: null.IntFrom(10),
+		UserAgent:    null.StringFrom("TestUserAgent"),
+		Throw:        null.BoolFrom(true),
+		SystemTags:   lib.GetTagSet(lib.DefaultSystemTagList...),
+		//HttpDebug:    null.StringFrom("full"),
+	}
 	samples := make(chan stats.SampleContainer, 1000)
 
 	state := &common.State{
-		Options: lib.Options{
-			MaxRedirects: null.IntFrom(10),
-			UserAgent:    null.StringFrom("TestUserAgent"),
-			Throw:        null.BoolFrom(true),
-			SystemTags:   lib.GetTagSet(lib.DefaultSystemTagList...),
-			//HttpDebug:    null.StringFrom("full"),
-		},
-		Logger:        logger,
-		Group:         root,
-		TLSConfig:     tb.TLSClientConfig,
-		HTTPTransport: netext.NewHTTPTransport(tb.HTTPTransport),
-		BPool:         bpool.NewBufferPool(1),
-		Samples:       samples,
+		Options:   options,
+		Logger:    logger,
+		Group:     root,
+		TLSConfig: tb.TLSClientConfig,
+		Transport: tb.HTTPTransport,
+		BPool:     bpool.NewBufferPool(1),
+		Samples:   samples,
 	}
 
 	ctx := new(context.Context)
@@ -146,7 +143,6 @@ func TestRequestAndBatch(t *testing.T) {
 	sr := tb.Replacer.Replace
 
 	// Handple paths with custom logic
-	tb.Mux.HandleFunc("/ntlm", http.HandlerFunc(ntlmHandler("bob", "pass")))
 	tb.Mux.HandleFunc("/digest-auth/failure", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(2 * time.Second)
 	}))
@@ -164,6 +160,26 @@ func TestRequestAndBatch(t *testing.T) {
 	}))
 
 	t.Run("Redirects", func(t *testing.T) {
+		t.Run("tracing", func(t *testing.T) {
+			_, err := common.RunString(rt, sr(`
+			let res = http.get("HTTPBIN_URL/redirect/9");
+			`))
+			assert.NoError(t, err)
+			bufSamples := stats.GetBufferedSamples(samples)
+
+			reqsCount := 0
+			for _, container := range bufSamples {
+				for _, sample := range container.GetSamples() {
+					if sample.Metric.Name == "http_reqs" {
+						reqsCount++
+					}
+				}
+			}
+
+			assert.Equal(t, 10, reqsCount)
+			assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_URL/get"), sr("HTTPBIN_URL/redirect/9"), 200, "")
+		})
+
 		t.Run("10", func(t *testing.T) {
 			_, err := common.RunString(rt, sr(`http.get("HTTPBIN_URL/redirect/10")`))
 			assert.NoError(t, err)
@@ -686,7 +702,10 @@ func TestRequestAndBatch(t *testing.T) {
 					if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 					`, url))
 					assert.NoError(t, err)
-					assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), "GET", sr("HTTPBIN_IP_URL/digest-auth/auth/bob/pass"), url, 200, "")
+
+					sampleContainers := stats.GetBufferedSamples(samples)
+					assertRequestMetricsEmitted(t, sampleContainers[0:1], "GET", sr("HTTPBIN_IP_URL/digest-auth/auth/bob/pass"), url, 401, "")
+					assertRequestMetricsEmitted(t, sampleContainers[1:2], "GET", sr("HTTPBIN_IP_URL/digest-auth/auth/bob/pass"), url, 200, "")
 				})
 				t.Run("failure", func(t *testing.T) {
 					url := sr("http://bob:pass@HTTPBIN_IP:HTTPBIN_PORT/digest-auth/failure")
@@ -695,26 +714,6 @@ func TestRequestAndBatch(t *testing.T) {
 					let res = http.request("GET", "%s", null, { auth: "digest", timeout: 1, throw: false });
 					`, url))
 					assert.NoError(t, err)
-				})
-			})
-			t.Run("ntlm", func(t *testing.T) {
-				t.Run("success auth", func(t *testing.T) {
-					url := strings.Replace(tb.ServerHTTP.URL+"/ntlm", "http://", "http://bob:pass@", -1)
-					_, err := common.RunString(rt, fmt.Sprintf(`
-						let res = http.request("GET", "%s", null, { auth: "ntlm" });
-						if (res.status != 200) { throw new Error("wrong status: " + res.status); }
-						`, url))
-					assert.NoError(t, err)
-					assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), "GET", url, url, 200, "")
-				})
-				t.Run("failed auth", func(t *testing.T) {
-					url := strings.Replace(tb.ServerHTTP.URL+"/ntlm", "http://", "http://other:otherpass@", -1)
-					_, err := common.RunString(rt, fmt.Sprintf(`
-						let res = http.request("GET", "%s", null, { auth: "ntlm" });
-						if (res.status != 401) { throw new Error("wrong status: " + res.status); }
-						`, url))
-					assert.NoError(t, err)
-					assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), "GET", url, url, 401, "")
 				})
 			})
 		})
@@ -1158,8 +1157,8 @@ func TestSystemTags(t *testing.T) {
 		{"ocsp_status", httpsGet, "unknown"},
 		{
 			"error",
-			tb.Replacer.Replace(`http.get("HTTPBIN_IP_URL/wrong-redirect");`),
-			tb.Replacer.Replace(`Get HTTPBIN_IP_URL/wrong-redirect: failed to parse Location header "%": parse %: invalid URL escape "%"`),
+			tb.Replacer.Replace(`http.get("http://127.0.0.1:56789");`),
+			tb.Replacer.Replace(`dial tcp 127.0.0.1:56789: connect: connection refused`),
 		},
 	}
 
@@ -1168,12 +1167,14 @@ func TestSystemTags(t *testing.T) {
 	for num, tc := range testedSystemTags {
 		t.Run(fmt.Sprintf("TC %d with only %s", num, tc.tag), func(t *testing.T) {
 			state.Options.SystemTags = lib.GetTagSet(tc.tag)
+
 			_, err := common.RunString(rt, tc.code)
 			assert.NoError(t, err)
 
 			bufSamples := stats.GetBufferedSamples(samples)
 			assert.NotEmpty(t, bufSamples)
 			for _, sampleC := range bufSamples {
+
 				for _, sample := range sampleC.GetSamples() {
 					assert.NotEmpty(t, sample.Tags)
 					for emittedTag, emittedVal := range sample.Tags.CloneTags() {
@@ -1296,112 +1297,4 @@ func TestResponseTypes(t *testing.T) {
 		http.post("HTTPBIN_URL/compare-text", respTextExplicit);
 	`))
 	assert.NoError(t, err)
-}
-
-// Simple NTLM mock handler
-func ntlmHandler(username, password string) func(w http.ResponseWriter, r *http.Request) {
-	challenges := make(map[string]*ntlm.ChallengeMessage)
-	return func(w http.ResponseWriter, r *http.Request) {
-		// Make sure there is some kind of authentication
-		if r.Header.Get("Authorization") == "" {
-			w.Header().Set("WWW-Authenticate", "NTLM")
-			w.WriteHeader(401)
-			return
-		}
-
-		// Parse the proxy authorization header
-		auth := r.Header.Get("Authorization")
-		parts := strings.SplitN(auth, " ", 2)
-		authType := parts[0]
-		authPayload := parts[1]
-
-		// Filter out unsupported authentication methods
-		if authType != "NTLM" {
-			w.Header().Set("WWW-Authenticate", "NTLM")
-			w.WriteHeader(401)
-			return
-		}
-
-		// Decode base64 auth data and get NTLM message type
-		rawAuthPayload, _ := base64.StdEncoding.DecodeString(authPayload)
-		ntlmMessageType := binary.LittleEndian.Uint32(rawAuthPayload[8:12])
-
-		// Handle NTLM negotiate message
-		if ntlmMessageType == 1 {
-			session, err := ntlm.CreateServerSession(ntlm.Version2, ntlm.ConnectionOrientedMode)
-			if err != nil {
-				return
-			}
-
-			session.SetUserInfo(username, password, "")
-
-			challenge, err := session.GenerateChallengeMessage()
-			if err != nil {
-				return
-			}
-
-			challenges[r.RemoteAddr] = challenge
-
-			authPayload := base64.StdEncoding.EncodeToString(challenge.Bytes())
-
-			w.Header().Set("WWW-Authenticate", "NTLM "+authPayload)
-			w.WriteHeader(401)
-
-			return
-		}
-
-		if ntlmMessageType == 3 {
-			challenge := challenges[r.RemoteAddr]
-			if challenge == nil {
-				w.Header().Set("WWW-Authenticate", "NTLM")
-				w.WriteHeader(401)
-				return
-			}
-
-			msg, err := ntlm.ParseAuthenticateMessage(rawAuthPayload, 2)
-			if err != nil {
-				msg2, err := ntlm.ParseAuthenticateMessage(rawAuthPayload, 1)
-
-				if err != nil {
-					return
-				}
-
-				session, err := ntlm.CreateServerSession(ntlm.Version1, ntlm.ConnectionOrientedMode)
-				if err != nil {
-					return
-				}
-
-				session.SetServerChallenge(challenge.ServerChallenge)
-				session.SetUserInfo(username, password, "")
-
-				err = session.ProcessAuthenticateMessage(msg2)
-				if err != nil {
-					w.Header().Set("WWW-Authenticate", "NTLM")
-					w.WriteHeader(401)
-					return
-				}
-			} else {
-				session, err := ntlm.CreateServerSession(ntlm.Version2, ntlm.ConnectionOrientedMode)
-				if err != nil {
-					return
-				}
-
-				session.SetServerChallenge(challenge.ServerChallenge)
-				session.SetUserInfo(username, password, "")
-
-				err = session.ProcessAuthenticateMessage(msg)
-				if err != nil {
-					w.Header().Set("WWW-Authenticate", "NTLM")
-					w.WriteHeader(401)
-					return
-				}
-			}
-		}
-
-		data := "authenticated"
-		w.Header().Set("Content-Length", fmt.Sprint(len(data)))
-		if _, err := fmt.Fprint(w, data); err != nil {
-			panic(err.Error())
-		}
-	}
 }

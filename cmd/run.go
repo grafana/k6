@@ -143,8 +143,15 @@ a commandline interface for interacting with it.`,
 		}
 
 		// If -d/--duration, -i/--iterations and -s/--stage are all unset, run to one iteration.
-		if !conf.Duration.Valid && !conf.Iterations.Valid && conf.Stages == nil {
+		if !conf.Duration.Valid && !conf.Iterations.Valid && len(conf.Stages) == 0 {
 			conf.Iterations = null.IntFrom(1)
+		}
+
+		if conf.Iterations.Valid && conf.Iterations.Int64 < conf.VUsMax.Int64 {
+			log.Warnf(
+				"All iterations (%d in this test run) are shared between all VUs, so some of the %d VUs will not execute even a single iteration!",
+				conf.Iterations.Int64, conf.VUsMax.Int64,
+			)
 		}
 
 		// If duration is explicitly set to 0, it means run forever.

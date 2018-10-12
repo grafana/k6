@@ -1,6 +1,9 @@
-FROM grafana/grafana
+FROM grafana/grafana:5.2.4
+
+USER root
 
 RUN apt-get update && apt-get -y install curl
+
 
 # Change the default data directory (otherwise grafana.db won't persist)
 RUN mkdir /var/lib/grafanadb

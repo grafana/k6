@@ -48,12 +48,12 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.Int64P("vus", "u", 1, "number of virtual users")
 	flags.Int64P("max", "m", 0, "max available virtual users")
 	flags.DurationP("duration", "d", 0, "test duration limit")
-	flags.Int64P("iterations", "i", 0, "script iteration limit")
+	flags.Int64P("iterations", "i", 0, "script total iteration limit (among all VUs)")
 	flags.StringSliceP("stage", "s", nil, "add a `stage`, as `[duration]:[target]`")
 	flags.BoolP("paused", "p", false, "start the test in a paused state")
 	flags.Int64("max-redirects", 10, "follow at most n redirects")
-	flags.Int64("batch", 10, "max parallel batch reqs")
-	flags.Int64("batch-per-host", 0, "max parallel batch reqs per host")
+	flags.Int64("batch", 20, "max parallel batch reqs")
+	flags.Int64("batch-per-host", 20, "max parallel batch reqs per host")
 	flags.Int64("rps", 0, "limit requests per second")
 	flags.String("user-agent", fmt.Sprintf("k6/%s (https://k6.io/)", Version), "user agent for http requests")
 	flags.String("http-debug", "", "log all HTTP requests and responses. Excludes body by default. To include body use '--http-debug=full'")
@@ -99,18 +99,22 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		MetricSamplesBufferSize: null.NewInt(1000, false),
 	}
 
-	stageStrings, err := flags.GetStringSlice("stage")
-	if err != nil {
-		return opts, err
-	}
-	if len(stageStrings) > 0 {
-		opts.Stages = make([]lib.Stage, len(stageStrings))
+	// Using Lookup() because GetStringSlice() doesn't differentiate between --stage="" and no value
+	if flags.Lookup("stage").Changed {
+		stageStrings, err := flags.GetStringSlice("stage")
+		if err != nil {
+			return opts, err
+		}
+		opts.Stages = []lib.Stage{}
 		for i, s := range stageStrings {
 			var stage lib.Stage
 			if err := stage.UnmarshalText([]byte(s)); err != nil {
 				return opts, errors.Wrapf(err, "stage %d", i)
 			}
-			opts.Stages[i] = stage
+			if !stage.Duration.Valid {
+				return opts, fmt.Errorf("stage %d doesn't have a specified duration", i)
+			}
+			opts.Stages = append(opts.Stages, stage)
 		}
 	}
 

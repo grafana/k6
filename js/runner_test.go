@@ -32,17 +32,20 @@ import (
 	"testing"
 	"time"
 
+	"github.com/loadimpact/k6/core"
+	"github.com/loadimpact/k6/core/local"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
+	"github.com/loadimpact/k6/stats/dummy"
 	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/guregu/null.v3"
+	null "gopkg.in/guregu/null.v3"
 )
 
 func TestRunnerNew(t *testing.T) {
@@ -216,58 +219,170 @@ func TestOptionsPropagationToScript(t *testing.T) {
 	}
 }
 
-func TestSetupTeardown(t *testing.T) {
-	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
-		Data: []byte(`
-			export let options = {
-				setupTimeout: "1s",
-				teardownTimeout: "1s"
-			};
+func TestSetupDataIsolation(t *testing.T) {
+	tb := testutils.NewHTTPMultiBin(t)
+	defer tb.Cleanup()
 
-			export function setup() {
-				return { v: 1 };
+	script := []byte(tb.Replacer.Replace(`
+		import { Counter } from "k6/metrics";
+
+		export let options = {
+			vus: 2,
+			vusMax: 10,
+			iterations: 500,
+			teardownTimeout: "1s",
+			setupTimeout: "1s",
+		};
+		let myCounter = new Counter("mycounter");
+
+		export function setup() {
+			return { v: 0 };
+		}
+
+		export default function(data) {
+			if (data.v !== __ITER) {
+				throw new Error("default: wrong data for iter " + __ITER + ": " + JSON.stringify(data));
 			}
-			export function teardown(data) {
-				if (data.v != 1) {
-					throw new Error("teardown: wrong data: " + JSON.stringify(data))
-				}
+			data.v += 1;
+			myCounter.add(1);
+		}
+
+		export function teardown(data) {
+			if (data.v !== 0) {
+				throw new Error("teardown: wrong data: " + data.v);
 			}
-			export default function(data) {
-				if (data.v != 1) {
-					throw new Error("default: wrong data: " + JSON.stringify(data))
-				}
-			}
-		`),
-	}, afero.NewMemMapFs(), lib.RuntimeOptions{})
-	if !assert.NoError(t, err) {
-		return
+			myCounter.add(1);
+		}
+	`))
+
+	runner, err := New(
+		&lib.SourceData{Filename: "/script.js", Data: script},
+		afero.NewMemMapFs(),
+		lib.RuntimeOptions{},
+	)
+	require.NoError(t, err)
+
+	engine, err := core.NewEngine(local.New(runner), runner.GetOptions())
+	require.NoError(t, err)
+
+	collector := &dummy.Collector{}
+	engine.Collectors = []lib.Collector{collector}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	errC := make(chan error)
+	go func() { errC <- engine.Run(ctx) }()
+
+	select {
+	case <-time.After(10 * time.Second):
+		cancel()
+		t.Fatal("Test timed out")
+	case err := <-errC:
+		cancel()
+		require.NoError(t, err)
+		require.False(t, engine.IsTainted())
 	}
-
-	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{})
-	if !assert.NoError(t, err) {
-		return
+	var count int
+	for _, s := range collector.Samples {
+		if s.Metric.Name == "mycounter" {
+			count += int(s.Value)
+		}
 	}
+	require.Equal(t, 501, count, "mycounter should be the number of iterations + 1 for the teardown")
+}
 
-	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
+func testSetupDataHelper(t *testing.T, src *lib.SourceData) {
+	t.Helper()
+	expScriptOptions := lib.Options{
+		SetupTimeout:    types.NullDurationFrom(1 * time.Second),
+		TeardownTimeout: types.NullDurationFrom(1 * time.Second),
+	}
+	r1, err := New(src, afero.NewMemMapFs(), lib.RuntimeOptions{})
+	require.NoError(t, err)
+	require.Equal(t, expScriptOptions, r1.GetOptions())
+
+	testdata := map[string]*Runner{"Source": r1}
 	for name, r := range testdata {
-		samples := make(chan stats.SampleContainer, 100)
 		t.Run(name, func(t *testing.T) {
+			samples := make(chan stats.SampleContainer, 100)
+
 			if !assert.NoError(t, r.Setup(context.Background(), samples)) {
 				return
 			}
-
 			vu, err := r.NewVU(samples)
 			if assert.NoError(t, err) {
 				err := vu.RunOnce(context.Background())
 				assert.NoError(t, err)
 			}
-
-			assert.NoError(t, r.Teardown(context.Background(), samples))
 		})
 	}
 }
+func TestSetupDataReturnValue(t *testing.T) {
+	src := &lib.SourceData{
+		Filename: "/script.js",
+		Data: []byte(`
+			export let options = { setupTimeout: "1s", teardownTimeout: "1s" };
+			export function setup() {
+				return 42;
+			}
+			export default function(data) {
+				if (data != 42) {
+					throw new Error("default: wrong data: " + JSON.stringify(data))
+				}
+			};
 
+			export function teardown(data) {
+				if (data != 42) {
+					throw new Error("teardown: wrong data: " + JSON.stringify(data))
+				}
+			};
+		`),
+	}
+	testSetupDataHelper(t, src)
+}
+
+func TestSetupDataNoSetup(t *testing.T) {
+	src := &lib.SourceData{
+		Filename: "/script.js",
+		Data: []byte(`
+			export let options = { setupTimeout: "1s", teardownTimeout: "1s" };
+			export default function(data) {
+				if (data !== undefined) {
+					throw new Error("default: wrong data: " + JSON.stringify(data))
+				}
+			};
+
+			export function teardown(data) {
+				if (data !== undefined) {
+					console.log(data);
+					throw new Error("teardown: wrong data: " + JSON.stringify(data))
+				}
+			};
+		`),
+	}
+	testSetupDataHelper(t, src)
+}
+
+func TestSetupDataNoReturn(t *testing.T) {
+	src := &lib.SourceData{
+		Filename: "/script.js",
+		Data: []byte(`
+			export let options = { setupTimeout: "1s", teardownTimeout: "1s" };
+			export function setup() { }
+			export default function(data) {
+				if (data !== undefined) {
+					throw new Error("default: wrong data: " + JSON.stringify(data))
+				}
+			};
+
+			export function teardown(data) {
+				if (data !== undefined) {
+					throw new Error("teardown: wrong data: " + JSON.stringify(data))
+				}
+			};
+		`),
+	}
+	testSetupDataHelper(t, src)
+}
 func TestRunnerIntegrationImports(t *testing.T) {
 	t.Run("Modules", func(t *testing.T) {
 		modules := []string{
@@ -374,7 +489,7 @@ func TestVURunContext(t *testing.T) {
 					assert.Equal(t, null.BoolFrom(true), state.Options.Throw)
 					assert.NotNil(t, state.Logger)
 					assert.Equal(t, r.GetDefaultGroup(), state.Group)
-					assert.Equal(t, vu.HTTPTransport, state.HTTPTransport)
+					assert.Equal(t, vu.Transport, state.Transport)
 				}
 			})
 			err = vu.RunOnce(context.Background())

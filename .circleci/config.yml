@@ -39,7 +39,7 @@ jobs:
             export PATH=$GOPATH/bin:$PATH
             echo "mode: set" > coverage.txt
             for pkg in $(go list ./... | grep -v vendor); do
-                go test -race -timeout 210s -coverprofile=$(echo $pkg | tr / -).coverage $pkg
+                go test -race -timeout 600s -coverprofile=$(echo $pkg | tr / -).coverage $pkg
             done
             grep -h -v "^mode:" *.coverage >> coverage.txt
             rm -f *.coverage

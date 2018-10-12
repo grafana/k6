@@ -66,9 +66,38 @@ export default function () {
 
 Thanks to @sherrman for reporting the binary handling issues that prompted the addition of the `responseType` option! And thanks to @ofauchon for implementing both of the discard response body options, of which the local per-request one was later transformed into the `responseType=none` value!
 
+### k6/http: The `Response.json()` method now supports selectors
+
+The selectors are implemented with the [gjson](https://github.com/tidwall/gjson#path-syntax) library and allow optimized lookups and basic filtering of JSON elements in HTTP responses, which could be especially useful in combination with k6 checks:
+
+```js
+import http from "k6/http";
+import { check } from "k6";
+
+export default function () {
+	let resp = http.get("https://api.spacexdata.com/v2/launches/");
+
+	let currentYear = (new Date()).getFullYear();
+	check(resp, {
+		"falcon heavy": (r) => r.json("#[flight_number==55].rocket.second_stage.payloads.0.payload_id") === "Tesla Roadster",
+		"no failure this year": (r) => r.json("#[launch_success==false]#.launch_year").every((y) => y < currentYear),
+		"success ratio": (r) => r.json("#[launch_success==true]#").length > 10 * r.json("#[launch_success==false]#").length,
+	});
+}
+
+```
+
+Thanks to @AndriiChuzhynov for implementing this! (#766)
+
+## UX
+
+* Added a warning when the maximum number of VUs is more than the total number of iterations (#802)
+
 ## Internals
 
 * Cloud output: improved outlier metric detection for small batches (#744)
+* Use 20 as the the default values of the `batch` and `batchPerHost` options. They determine the maximum number of parallel requests (in total and per-host respectively) an `http.batch()` call will make per VU. The previous value for `batch` was 10 and for `batchPerHost` it was 0 (unlimited). We now also use their values to determine the maximum number of open idle connections in a VU (#685)
+* Due to refactoring needed for the redirect fixes, the NTLM authentication library k6 uses is changed from [this](https://github.com/ThomsonReutersEikon/go-ntlm/) to [this](https://github.com/Azure/go-ntlmssp) (#753)
 
 ## Bugs fixed!
 
@@ -76,3 +105,14 @@ Thanks to @sherrman for reporting the binary handling issues that prompted the a
 * UI: Password input is now masked in `k6 login influxdb` and `k6 login cloud`. (#734)
 * Config: Environment variables can now be used to modify k6's behavior in the `k6 login` subcommands. (#734)
 * HTTP: Binary response bodies were mangled because there was no way to avoid converting them to UTF-16 JavaScript strings. (#749)
+* Config: Stages were appended instead of overwritten from upper config "tiers", and were doubled when supplied via the CLI flag (#759)
+* HAR converter: Fixed a panic due to a missing array length check (#760)
+* HTTP: `http.batch()` calls could panic because of a data race when the `batchPerHost` global option was used (#770)
+* Docker: Fixed the grafana image in the docker-compose setup. Thanks @entone and @mariolopjr! (#783)
+* Config: Stages configured via the script `options` or environment variables couldn't be disabled via the CLI flags (#786)
+* UI: Don't report infinities and extreme speeds when tests take 0 time. Thanks @tkbky! (#790)
+* HTTP: Correct metric tracking when HTTP requests are redirected (#753)
+* HAR converter: Added escaping for page IDs and names in the generated scripts (#801)
+* Setup data: Distinguish between `undefined` (when there is no `setup()` function or when it doesn't return anything) and `null` (when `setup()` explicitly returns `null`) values for the setup `data` that's passed to the default function and `teardown()` (#799)
+* Setup data: Prevent data races by having each VU have its own independent copy of the setup data (#799)
+* HAR converter: Support HAR files that don't have a `pages` array (#806)

@@ -25,16 +25,15 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"errors"
-
 	"fmt"
+	"github.com/tidwall/gjson"
 	"net/url"
 	"strings"
 
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/js/modules/k6/html"
-	"github.com/loadimpact/k6/lib"
-	"golang.org/x/crypto/ocsp"
+	"github.com/loadimpact/k6/lib/netext"
 )
 
 type OCSP struct {
@@ -61,72 +60,24 @@ type HTTPResponse struct {
 	Timings        HTTPResponseTimings
 	TLSVersion     string
 	TLSCipherSuite string
-	OCSP           OCSP `js:"ocsp"`
+	OCSP           netext.OCSP `js:"ocsp"`
 	Error          string
 	Request        HTTPRequest
 
-	cachedJSON goja.Value
+	cachedJSON    goja.Value
+	validatedJSON bool
 }
 
 func (res *HTTPResponse) setTLSInfo(tlsState *tls.ConnectionState) {
-	switch tlsState.Version {
-	case tls.VersionSSL30:
-		res.TLSVersion = SSL_3_0
-	case tls.VersionTLS10:
-		res.TLSVersion = TLS_1_0
-	case tls.VersionTLS11:
-		res.TLSVersion = TLS_1_1
-	case tls.VersionTLS12:
-		res.TLSVersion = TLS_1_2
-	}
-
-	res.TLSCipherSuite = lib.SupportedTLSCipherSuitesToString[tlsState.CipherSuite]
-	ocspStapledRes := OCSP{Status: OCSP_STATUS_UNKNOWN}
-
-	if ocspRes, err := ocsp.ParseResponse(tlsState.OCSPResponse, nil); err == nil {
-		switch ocspRes.Status {
-		case ocsp.Good:
-			ocspStapledRes.Status = OCSP_STATUS_GOOD
-		case ocsp.Revoked:
-			ocspStapledRes.Status = OCSP_STATUS_REVOKED
-		case ocsp.ServerFailed:
-			ocspStapledRes.Status = OCSP_STATUS_SERVER_FAILED
-		case ocsp.Unknown:
-			ocspStapledRes.Status = OCSP_STATUS_UNKNOWN
-		}
-		switch ocspRes.RevocationReason {
-		case ocsp.Unspecified:
-			ocspStapledRes.RevocationReason = OCSP_REASON_UNSPECIFIED
-		case ocsp.KeyCompromise:
-			ocspStapledRes.RevocationReason = OCSP_REASON_KEY_COMPROMISE
-		case ocsp.CACompromise:
-			ocspStapledRes.RevocationReason = OCSP_REASON_CA_COMPROMISE
-		case ocsp.AffiliationChanged:
-			ocspStapledRes.RevocationReason = OCSP_REASON_AFFILIATION_CHANGED
-		case ocsp.Superseded:
-			ocspStapledRes.RevocationReason = OCSP_REASON_SUPERSEDED
-		case ocsp.CessationOfOperation:
-			ocspStapledRes.RevocationReason = OCSP_REASON_CESSATION_OF_OPERATION
-		case ocsp.CertificateHold:
-			ocspStapledRes.RevocationReason = OCSP_REASON_CERTIFICATE_HOLD
-		case ocsp.RemoveFromCRL:
-			ocspStapledRes.RevocationReason = OCSP_REASON_REMOVE_FROM_CRL
-		case ocsp.PrivilegeWithdrawn:
-			ocspStapledRes.RevocationReason = OCSP_REASON_PRIVILEGE_WITHDRAWN
-		case ocsp.AACompromise:
-			ocspStapledRes.RevocationReason = OCSP_REASON_AA_COMPROMISE
-		}
-		ocspStapledRes.ProducedAt = ocspRes.ProducedAt.Unix()
-		ocspStapledRes.ThisUpdate = ocspRes.ThisUpdate.Unix()
-		ocspStapledRes.NextUpdate = ocspRes.NextUpdate.Unix()
-		ocspStapledRes.RevokedAt = ocspRes.RevokedAt.Unix()
-	}
-
-	res.OCSP = ocspStapledRes
+	tlsInfo, oscp := netext.ParseTLSConnState(tlsState)
+	res.TLSVersion = tlsInfo.Version
+	res.TLSCipherSuite = tlsInfo.CipherSuite
+	res.OCSP = oscp
 }
 
-func (res *HTTPResponse) Json() goja.Value {
-	if res.cachedJSON == nil {
+func (res *HTTPResponse) Json(selector ...string) goja.Value {
+	hasSelector := len(selector) > 0
+	if res.cachedJSON == nil || hasSelector {
 		var v interface{}
 		var body []byte
 		switch b := res.Body.(type) {
@@ -137,9 +88,28 @@ func (res *HTTPResponse) Json() goja.Value {
 		default:
 			common.Throw(common.GetRuntime(res.ctx), errors.New("Invalid response type"))
 		}
+
+		if hasSelector {
+
+			if !res.validatedJSON {
+				if !gjson.ValidBytes(body) {
+					return goja.Undefined()
+				}
+				res.validatedJSON = true
+			}
+
+			result := gjson.GetBytes(body, selector[0])
+
+			if !result.Exists() {
+				return goja.Undefined()
+			}
+			return common.GetRuntime(res.ctx).ToValue(result.Value())
+		}
+
 		if err := json.Unmarshal(body, &v); err != nil {
 			common.Throw(common.GetRuntime(res.ctx), err)
 		}
+		res.validatedJSON = true
 		res.cachedJSON = common.GetRuntime(res.ctx).ToValue(v)
 	}
 	return res.cachedJSON

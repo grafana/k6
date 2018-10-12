@@ -10,7 +10,7 @@ export let options = {
 
 export default function() {
 
-	group("Page 0 - Page 0", function() {
+	group("Page 0 - Page 0 ţ€$ţɨɲǥ µɲɨȼ๏ď€ ɨɲ Ќ6 \" \x00\n\t♥\u2028", function() {
 		let res, redirectUrl, json;
 		// Request #0
 		res = http.post("https://some-host.example.com/checkout/v3/orders",
