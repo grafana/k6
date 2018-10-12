@@ -330,7 +330,7 @@ export default function () {
 }
 ```
 
-You can save the above example as a local file and run it, or you can also run it directly from the [github copy of the file](https://github.com/loadimpact/k6/blob/master/samples/thresholds_readme_example.js) with the `k6 run https://github.com/loadimpact/k6/samples/thresholds_readme_example.js` command. You can find (and contribute!) more k6 script examples here: [https://github.com/loadimpact/k6/tree/master/samples](https://github.com/loadimpact/k6/tree/master/samples)
+You can save the above example as a local file and run it, or you can also run it directly from the [github copy of the file](https://github.com/loadimpact/k6/blob/master/samples/thresholds_readme_example.js) with the `k6 run github.com/loadimpact/k6/samples/thresholds_readme_example.js` command. You can find (and contribute!) more k6 script examples here: [https://github.com/loadimpact/k6/tree/master/samples](https://github.com/loadimpact/k6/tree/master/samples)
 
 ### Outputs
 
