@@ -1,7 +1,7 @@
 /*
  *
  * k6 - a next-generation load testing tool
- * Copyright (C) 2016 Load Impact
+ * Copyright (C) 2018 Load Impact
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,7 +22,6 @@ package k6_test
 
 import (
 	"context"
-	"net"
 	"testing"
 	"time"
 
@@ -34,7 +33,6 @@ import (
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	null "gopkg.in/guregu/null.v3"
 )
 
 func TestSetupDataMarshalling(t *testing.T) {
@@ -45,8 +43,6 @@ func TestSetupDataMarshalling(t *testing.T) {
 		import http from "k6/http";
 		import html from "k6/html";
 		import ws from "k6/ws";
-		export let options = { setupTimeout: "10s" };
-
 
 		function make_jar() {
 			let jar = http.cookieJar();
@@ -55,9 +51,9 @@ func TestSetupDataMarshalling(t *testing.T) {
 		}
 
 		export function setup() {
-			let res = http.get("http://test.loadimpact.com:HTTPBIN_PORT");
+			let res = http.get("HTTPBIN_URL/html");
 			let html_selection = html.parseHTML(res.body); 
-			let ws_res = ws.connect("ws://test.loadimpact.com:HTTPBIN_PORT/ws-echo", function(socket){
+			let ws_res = ws.connect("ws://HTTPBIN_DOMAIN:HTTPBIN_PORT/ws-echo", function(socket){
 				socket.on("open", function() {
 					socket.send("test")
 				})
@@ -88,7 +84,9 @@ func TestSetupDataMarshalling(t *testing.T) {
 			if (first.length != second.length) {
 				return false
 			}
-			return first.every(element => second.includes(element))
+			return first.every(function(element, idx) {
+				return element === second[idx]
+			});
 		}
 
 		function diff_object_properties(name, first, second) {
@@ -111,7 +109,6 @@ func TestSetupDataMarshalling(t *testing.T) {
 		}
 
 		export default function (data) {
-			let first_properties = get_non_function_properties(data).sort();
 			diff_object_properties("setupdata", data, setup());
 		}
 	`))
@@ -119,16 +116,12 @@ func TestSetupDataMarshalling(t *testing.T) {
 	runner, err := js.New(
 		&lib.SourceData{Filename: "/script.js", Data: script},
 		afero.NewMemMapFs(),
-		lib.RuntimeOptions{Env: map[string]string{"setupTimeout": "10s"}},
+		lib.RuntimeOptions{},
 	)
 
 	runner.SetOptions(lib.Options{
 		SetupTimeout: types.NullDurationFrom(1 * time.Second),
-		MaxRedirects: null.IntFrom(10),
-		Throw:        null.BoolFrom(true),
-		Hosts: map[string]net.IP{
-			"test.loadimpact.com": net.ParseIP("127.0.0.1"),
-		},
+		Hosts:        tb.Dialer.Hosts,
 	})
 
 	require.NoError(t, err)
