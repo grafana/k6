@@ -35,6 +35,7 @@ import (
 	"github.com/loadimpact/k6/core"
 	"github.com/loadimpact/k6/core/local"
 	"github.com/loadimpact/k6/js/common"
+	k6http "github.com/loadimpact/k6/js/modules/k6/http"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/testutils"
@@ -1217,4 +1218,27 @@ func TestVUIntegrationClientCerts(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestHTTPRequestInInitContext(t *testing.T) {
+	tb := testutils.NewHTTPMultiBin(t)
+	defer tb.Cleanup()
+
+	_, err := New(&lib.SourceData{
+		Filename: "/script.js",
+		Data: []byte(tb.Replacer.Replace(`
+					import { check, fail } from "k6";
+					import http from "k6/http";
+					let res = http.get("HTTPBIN_URL/");
+					export default function() {
+						console.log(test);ci
+					}
+				`)),
+	}, afero.NewMemMapFs(), lib.RuntimeOptions{})
+	if assert.Error(t, err) {
+		assert.Equal(
+			t,
+			"GoError: "+k6http.ErrHTTPForbiddenInInitContext.Error(),
+			err.Error())
+	}
 }

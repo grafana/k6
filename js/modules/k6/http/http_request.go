@@ -25,6 +25,7 @@ import (
 	"compress/gzip"
 	"compress/zlib"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -49,6 +50,9 @@ import (
 	log "github.com/sirupsen/logrus"
 	null "gopkg.in/guregu/null.v3"
 )
+
+// ErrHTTPForbiddenInInitContext is used when a http requests was made in the init context
+var ErrHTTPForbiddenInInitContext = errors.New("Making http requests in the init context is not supported")
 
 type HTTPRequest struct {
 	Method  string                          `json:"method"`
@@ -156,6 +160,9 @@ type parsedHTTPRequest struct {
 func (h *HTTP) parseRequest(ctx context.Context, method string, reqURL URL, body interface{}, params goja.Value) (*parsedHTTPRequest, error) {
 	rt := common.GetRuntime(ctx)
 	state := common.GetState(ctx)
+	if state == nil {
+		return nil, ErrHTTPForbiddenInInitContext
+	}
 
 	result := &parsedHTTPRequest{
 		url: &reqURL,
