@@ -25,10 +25,10 @@ type Element struct {
 }
 
 type Attribute struct {
-	OwnerElement *Element
-	Name         string
+	OwnerElement *Element `json:"owner_element"`
+	Name         string   `json:"name"`
 	nsPrefix     string
-	Value        string
+	Value        string `json:"value"`
 }
 
 func (e Element) attrAsString(name string) string {

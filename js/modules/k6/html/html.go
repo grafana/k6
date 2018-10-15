@@ -49,7 +49,7 @@ func (HTML) ParseHTML(ctx context.Context, src string) (Selection, error) {
 type Selection struct {
 	rt  *goja.Runtime
 	sel *goquery.Selection
-	URL string
+	URL string `json:"url"`
 }
 
 func (s Selection) emptySelection() Selection {
