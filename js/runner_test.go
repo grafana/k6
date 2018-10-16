@@ -35,6 +35,10 @@ import (
 	"github.com/loadimpact/k6/core"
 	"github.com/loadimpact/k6/core/local"
 	"github.com/loadimpact/k6/js/common"
+	"github.com/loadimpact/k6/js/modules/k6"
+	k6http "github.com/loadimpact/k6/js/modules/k6/http"
+	k6metrics "github.com/loadimpact/k6/js/modules/k6/metrics"
+	"github.com/loadimpact/k6/js/modules/k6/ws"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/testutils"
@@ -1217,4 +1221,106 @@ func TestVUIntegrationClientCerts(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestHTTPRequestInInitContext(t *testing.T) {
+	tb := testutils.NewHTTPMultiBin(t)
+	defer tb.Cleanup()
+
+	_, err := New(&lib.SourceData{
+		Filename: "/script.js",
+		Data: []byte(tb.Replacer.Replace(`
+					import { check, fail } from "k6";
+					import http from "k6/http";
+					let res = http.get("HTTPBIN_URL/");
+					export default function() {
+						console.log(test);ci
+					}
+				`)),
+	}, afero.NewMemMapFs(), lib.RuntimeOptions{})
+	if assert.Error(t, err) {
+		assert.Equal(
+			t,
+			"GoError: "+k6http.ErrHTTPForbiddenInInitContext.Error(),
+			err.Error())
+	}
+}
+
+func TestInitContextForbidden(t *testing.T) {
+	var table = [...][3]string{
+		{
+			"http.request",
+			`import http from "k6/http";
+			 let res = http.get("HTTPBIN_URL");
+			 export default function() { console.log("p"); }`,
+			k6http.ErrHTTPForbiddenInInitContext.Error(),
+		},
+		{
+			"http.batch",
+			`import http from "k6/http";
+			 let res = http.batch("HTTPBIN_URL/something", "HTTPBIN_URL/else");
+			 export default function() { console.log("p"); }`,
+			k6http.ErrBatchForbiddenInInitContext.Error(),
+		},
+		{
+			"http.cookieJar",
+			`import http from "k6/http";
+			 let jar = http.cookieJar();
+			 export default function() { console.log("p"); }`,
+			k6http.ErrJarForbiddenInInitContext.Error(),
+		},
+		{
+			"check",
+			`import { check } from "k6";
+			 check("test", {'is test': (test) => test == "test"})
+			 export default function() { console.log("p"); }`,
+			k6.ErrCheckInInitContext.Error(),
+		},
+		{
+			"group",
+			`import { group } from "k6";
+			 group("group1", function () { console.log("group1");})
+			 export default function() { console.log("p"); }`,
+			k6.ErrGroupInInitContext.Error(),
+		},
+		{
+			"ws",
+			`import ws from "k6/ws";
+			 var url = "ws://echo.websocket.org";
+			 var params = { "tags": { "my_tag": "hello" } };
+			 var response = ws.connect(url, params, function (socket) {
+			   socket.on('open', function open() {
+					console.log('connected');
+			   })
+		   });
+
+			 export default function() { console.log("p"); }`,
+			ws.ErrWSInInitContext.Error(),
+		},
+		{
+			"metric",
+			`import { Counter } from "k6/metrics";
+			 let counter = Counter("myCounter");
+			 counter.add(1);
+			 export default function() { console.log("p"); }`,
+			k6metrics.ErrMetricsAddInInitContext.Error(),
+		},
+	}
+	tb := testutils.NewHTTPMultiBin(t)
+	defer tb.Cleanup()
+
+	for _, test := range table {
+		t.Run(test[0], func(t *testing.T) {
+			_, err := New(&lib.SourceData{
+				Filename: "/script.js",
+				Data:     []byte(tb.Replacer.Replace(test[1])),
+			}, afero.NewMemMapFs(), lib.RuntimeOptions{})
+			if assert.Error(t, err) {
+				assert.Equal(
+					t,
+					"GoError: "+test[2],
+					err.Error())
+			}
+		})
+	}
 }

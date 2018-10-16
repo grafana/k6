@@ -50,6 +50,12 @@ import (
 	null "gopkg.in/guregu/null.v3"
 )
 
+// ErrHTTPForbiddenInInitContext is used when a http requests was made in the init context
+var ErrHTTPForbiddenInInitContext = common.NewInitContextError("Making http requests in the init context is not supported")
+
+// ErrBatchForbiddenInInitContext is used when batch was made in the init context
+var ErrBatchForbiddenInInitContext = common.NewInitContextError("Using batch in the init context is not supported")
+
 type HTTPRequest struct {
 	Method  string                          `json:"method"`
 	URL     string                          `json:"url"`
@@ -156,6 +162,9 @@ type parsedHTTPRequest struct {
 func (h *HTTP) parseRequest(ctx context.Context, method string, reqURL URL, body interface{}, params goja.Value) (*parsedHTTPRequest, error) {
 	rt := common.GetRuntime(ctx)
 	state := common.GetState(ctx)
+	if state == nil {
+		return nil, ErrHTTPForbiddenInInitContext
+	}
 
 	result := &parsedHTTPRequest{
 		url: &reqURL,
@@ -622,6 +631,9 @@ func (h *HTTP) request(ctx context.Context, preq *parsedHTTPRequest) (*HTTPRespo
 func (h *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, error) {
 	rt := common.GetRuntime(ctx)
 	state := common.GetState(ctx)
+	if state == nil {
+		return nil, ErrBatchForbiddenInInitContext
+	}
 
 	// Return values; retval must be guarded by the mutex.
 	var mutex sync.Mutex
