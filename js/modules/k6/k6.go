@@ -36,6 +36,12 @@ import (
 
 type K6 struct{}
 
+// ErrGroupInInitContext is returned when group() are using in the init context
+var ErrGroupInInitContext = common.NewInitContextError("Using group() in the init context is not supported")
+
+// ErrCheckInInitContext is returned when check() are using in the init context
+var ErrCheckInInitContext = common.NewInitContextError("Using check() in the init context is not supported")
+
 func New() *K6 {
 	return &K6{}
 }
@@ -62,6 +68,9 @@ func (*K6) RandomSeed(ctx context.Context, seed int64) {
 
 func (*K6) Group(ctx context.Context, name string, fn goja.Callable) (goja.Value, error) {
 	state := common.GetState(ctx)
+	if state == nil {
+		return nil, ErrGroupInInitContext
+	}
 
 	g, err := state.Group.Group(name)
 	if err != nil {
@@ -99,6 +108,9 @@ func (*K6) Group(ctx context.Context, name string, fn goja.Callable) (goja.Value
 
 func (*K6) Check(ctx context.Context, arg0, checks goja.Value, extras ...goja.Value) (bool, error) {
 	state := common.GetState(ctx)
+	if state == nil {
+		return false, ErrCheckInInitContext
+	}
 	rt := common.GetRuntime(ctx)
 	t := time.Now()
 

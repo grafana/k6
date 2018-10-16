@@ -34,6 +34,9 @@ type Metric struct {
 	metric *stats.Metric
 }
 
+// ErrMetricsAddInInitContext is error returned when adding to metric is done in the init context
+var ErrMetricsAddInInitContext = common.NewInitContextError("Adding to metrics in the init context is not supported")
+
 func newMetric(ctxPtr *context.Context, name string, t stats.MetricType, isTime []bool) (interface{}, error) {
 	if common.GetState(*ctxPtr) != nil {
 		return nil, errors.New("Metrics must be declared in the init context")
@@ -48,8 +51,11 @@ func newMetric(ctxPtr *context.Context, name string, t stats.MetricType, isTime 
 	return common.Bind(rt, Metric{stats.New(name, t, valueType)}, ctxPtr), nil
 }
 
-func (m Metric) Add(ctx context.Context, v goja.Value, addTags ...map[string]string) {
+func (m Metric) Add(ctx context.Context, v goja.Value, addTags ...map[string]string) (bool, error) {
 	state := common.GetState(ctx)
+	if state == nil {
+		return false, ErrMetricsAddInInitContext
+	}
 
 	tags := state.Options.RunTags.CloneTags()
 	if state.Options.SystemTags["group"] {
@@ -68,6 +74,7 @@ func (m Metric) Add(ctx context.Context, v goja.Value, addTags ...map[string]str
 	}
 
 	stats.PushIfNotCancelled(ctx, state.Samples, stats.Sample{Time: time.Now(), Metric: m.metric, Value: vfloat, Tags: stats.IntoSampleTags(&tags)})
+	return true, nil
 }
 
 type Metrics struct{}

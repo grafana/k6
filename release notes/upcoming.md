@@ -116,3 +116,6 @@ Thanks to @AndriiChuzhynov for implementing this! (#766)
 * Setup data: Distinguish between `undefined` (when there is no `setup()` function or when it doesn't return anything) and `null` (when `setup()` explicitly returns `null`) values for the setup `data` that's passed to the default function and `teardown()` (#799)
 * Setup data: Prevent data races by having each VU have its own independent copy of the setup data (#799)
 * HAR converter: Support HAR files that don't have a `pages` array (#806)
+* UX: Instead of panicing on some operations in the init context we not return an error that the given
+  action is not supported(#811). This includes: making http requests(batched or not), websockets,
+  adding to metrics, making checks and groups or initializing cookie jars.
