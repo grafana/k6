@@ -345,9 +345,6 @@ func (e *Engine) processThresholds(abort func()) {
 }
 
 func (e *Engine) processSamplesForMetrics(sampleCointainers []stats.SampleContainer) {
-	e.MetricsLock.Lock()
-	defer e.MetricsLock.Unlock()
-
 	for _, sampleCointainer := range sampleCointainers {
 		samples := sampleCointainer.GetSamples()
 
@@ -386,6 +383,10 @@ func (e *Engine) processSamples(sampleCointainers []stats.SampleContainer) {
 	if len(sampleCointainers) == 0 {
 		return
 	}
+
+	// TODO: optimize this...
+	e.MetricsLock.Lock()
+	defer e.MetricsLock.Unlock()
 
 	// TODO: run this and the below code in goroutines?
 	if !(e.NoSummary && e.NoThresholds) {
