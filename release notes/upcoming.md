@@ -120,6 +120,7 @@ A new option that disables the end-of-test summary has been added. That summary 
 * Setup data: Distinguish between `undefined` (when there is no `setup()` function or when it doesn't return anything) and `null` (when `setup()` explicitly returns `null`) values for the setup `data` that's passed to the default function and `teardown()` (#799)
 * Setup data: Prevent data races by having each VU have its own independent copy of the setup data (#799)
 * HAR converter: Support HAR files that don't have a `pages` array (#806)
-* UX: Instead of panicing on some operations in the init context we not return an error that the given
-  action is not supported(#811). This includes: making http requests(batched or not), websockets,
-  adding to metrics, making checks and groups or initializing cookie jars.
+* Setup data: The property names of some of the internal k6 objects like `http.Response` weren't properly encoded when they were returned from the `setup()` function (#804)
+* UX: Instead of panicking on some operations in the init context, we now return an error that the given
+  action is not supported; this includes making HTTP requests (batched or not), websockets,
+  adding to custom metrics, making checks and groups, or initializing cookie jars (#811)
