@@ -39,6 +39,9 @@ import (
 	"github.com/loadimpact/k6/stats"
 )
 
+// ErrWSInInitContext is returned when websockets are using in init context
+var ErrWSInInitContext = errors.New("Using websockets in init context is not supported")
+
 type WS struct{}
 
 type pingDelta struct {
@@ -79,6 +82,9 @@ func New() *WS {
 func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTPResponse, error) {
 	rt := common.GetRuntime(ctx)
 	state := common.GetState(ctx)
+	if state == nil {
+		return nil, ErrWSInInitContext
+	}
 
 	// The params argument is optional
 	var callableV, paramsV goja.Value
