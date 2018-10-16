@@ -22,7 +22,6 @@ package http
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"net/http/cookiejar"
 
@@ -45,7 +44,7 @@ const (
 )
 
 // ErrJarForbiddenInInitContext is used when a cookie jar was made in the init context
-var ErrJarForbiddenInInitContext = errors.New("Making cookie jars in the init context is not supported")
+var ErrJarForbiddenInInitContext = common.NewInitContextError("Making cookie jars in the init context is not supported")
 
 type HTTPCookie struct {
 	Name, Value, Domain, Path string
