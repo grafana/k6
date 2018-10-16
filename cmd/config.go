@@ -56,6 +56,7 @@ func configFlagSet() *pflag.FlagSet {
 	flags.BoolP("linger", "l", false, "keep the API server alive past test end")
 	flags.Bool("no-usage-report", false, "don't send anonymous stats to the developers")
 	flags.Bool("no-thresholds", false, "don't run thresholds")
+	flags.Bool("no-summary", false, "don't show the summary at the end of the test")
 	flags.AddFlagSet(configFileFlagSet())
 	return flags
 }
@@ -67,6 +68,7 @@ type Config struct {
 	Linger        null.Bool `json:"linger" envconfig:"linger"`
 	NoUsageReport null.Bool `json:"noUsageReport" envconfig:"no_usage_report"`
 	NoThresholds  null.Bool `json:"noThresholds" envconfig:"no_thresholds"`
+	NoSummary     null.Bool `json:"noSummary" envconfig:"no_summary"`
 
 	Collectors struct {
 		InfluxDB influxdb.Config `json:"influxdb"`
@@ -88,6 +90,9 @@ func (c Config) Apply(cfg Config) Config {
 	}
 	if cfg.NoThresholds.Valid {
 		c.NoThresholds = cfg.NoThresholds
+	}
+	if cfg.NoSummary.Valid {
+		c.NoSummary = cfg.NoSummary
 	}
 	c.Collectors.InfluxDB = c.Collectors.InfluxDB.Apply(cfg.Collectors.InfluxDB)
 	c.Collectors.Cloud = c.Collectors.Cloud.Apply(cfg.Collectors.Cloud)
@@ -111,6 +116,7 @@ func getConfig(flags *pflag.FlagSet) (Config, error) {
 		Linger:        getNullBool(flags, "linger"),
 		NoUsageReport: getNullBool(flags, "no-usage-report"),
 		NoThresholds:  getNullBool(flags, "no-thresholds"),
+		NoSummary:     getNullBool(flags, "no-summary"),
 	}, nil
 }
 

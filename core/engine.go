@@ -53,6 +53,7 @@ type Engine struct {
 	Options      lib.Options
 	Collectors   []lib.Collector
 	NoThresholds bool
+	NoSummary    bool
 
 	logger *log.Logger
 
@@ -343,14 +344,7 @@ func (e *Engine) processThresholds(abort func()) {
 	}
 }
 
-func (e *Engine) processSamples(sampleCointainers []stats.SampleContainer) {
-	if len(sampleCointainers) == 0 {
-		return
-	}
-
-	e.MetricsLock.Lock()
-	defer e.MetricsLock.Unlock()
-
+func (e *Engine) processSamplesForMetrics(sampleCointainers []stats.SampleContainer) {
 	for _, sampleCointainer := range sampleCointainers {
 		samples := sampleCointainer.GetSamples()
 
@@ -383,6 +377,22 @@ func (e *Engine) processSamples(sampleCointainers []stats.SampleContainer) {
 			}
 		}
 	}
+}
+
+func (e *Engine) processSamples(sampleCointainers []stats.SampleContainer) {
+	if len(sampleCointainers) == 0 {
+		return
+	}
+
+	// TODO: optimize this...
+	e.MetricsLock.Lock()
+	defer e.MetricsLock.Unlock()
+
+	// TODO: run this and the below code in goroutines?
+	if !(e.NoSummary && e.NoThresholds) {
+		e.processSamplesForMetrics(sampleCointainers)
+	}
+
 	if len(e.Collectors) > 0 {
 		for _, collector := range e.Collectors {
 			collector.Collect(sampleCointainers)
