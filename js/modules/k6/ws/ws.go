@@ -39,8 +39,8 @@ import (
 	"github.com/loadimpact/k6/stats"
 )
 
-// ErrWSInInitContext is returned when websockets are using in init context
-var ErrWSInInitContext = errors.New("Using websockets in init context is not supported")
+// ErrWSInInitContext is returned when websockets are using in the init context
+var ErrWSInInitContext = common.NewInitError("Using websockets in the init context is not supported")
 
 type WS struct{}
 

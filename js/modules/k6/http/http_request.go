@@ -25,7 +25,6 @@ import (
 	"compress/gzip"
 	"compress/zlib"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -52,10 +51,10 @@ import (
 )
 
 // ErrHTTPForbiddenInInitContext is used when a http requests was made in the init context
-var ErrHTTPForbiddenInInitContext = errors.New("Making http requests in the init context is not supported")
+var ErrHTTPForbiddenInInitContext = common.NewInitError("Making http requests in the init context is not supported")
 
 // ErrBatchForbiddenInInitContext is used when batch was made in the init context
-var ErrBatchForbiddenInInitContext = errors.New("Using batch in the init context is not supported")
+var ErrBatchForbiddenInInitContext = common.NewInitError("Using batch in the init context is not supported")
 
 type HTTPRequest struct {
 	Method  string                          `json:"method"`

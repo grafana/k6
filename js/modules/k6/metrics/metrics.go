@@ -35,7 +35,7 @@ type Metric struct {
 }
 
 // ErrMetricsAddInInitContext is error returned when adding to metric is done in the init context
-var ErrMetricsAddInInitContext = errors.New("Adding to metrics in init context is not supported")
+var ErrMetricsAddInInitContext = common.NewInitError("Adding to metrics in the init context is not supported")
 
 func newMetric(ctxPtr *context.Context, name string, t stats.MetricType, isTime []bool) (interface{}, error) {
 	if common.GetState(*ctxPtr) != nil {
