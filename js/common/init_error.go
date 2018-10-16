@@ -1,17 +1,17 @@
 package common
 
-// InitError is an error that happened during the a test initiation
-type InitError string
+// InitContextError is an error that happened during the a test init context
+type InitContextError string
 
-// NewInitError returns a new InitError with the provided message
-func NewInitError(msg string) InitError {
-	return (InitError)(msg)
+// NewInitContextError returns a new InitContextError with the provided message
+func NewInitContextError(msg string) InitContextError {
+	return (InitContextError)(msg)
 }
 
-func (i InitError) Error() string {
+func (i InitContextError) Error() string {
 	return (string)(i)
 }
 
-func (i InitError) String() string {
+func (i InitContextError) String() string {
 	return (string)(i)
 }

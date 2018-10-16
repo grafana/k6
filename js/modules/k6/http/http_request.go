@@ -51,10 +51,10 @@ import (
 )
 
 // ErrHTTPForbiddenInInitContext is used when a http requests was made in the init context
-var ErrHTTPForbiddenInInitContext = common.NewInitError("Making http requests in the init context is not supported")
+var ErrHTTPForbiddenInInitContext = common.NewInitContextError("Making http requests in the init context is not supported")
 
 // ErrBatchForbiddenInInitContext is used when batch was made in the init context
-var ErrBatchForbiddenInInitContext = common.NewInitError("Using batch in the init context is not supported")
+var ErrBatchForbiddenInInitContext = common.NewInitContextError("Using batch in the init context is not supported")
 
 type HTTPRequest struct {
 	Method  string                          `json:"method"`

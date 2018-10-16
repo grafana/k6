@@ -40,7 +40,7 @@ import (
 )
 
 // ErrWSInInitContext is returned when websockets are using in the init context
-var ErrWSInInitContext = common.NewInitError("Using websockets in the init context is not supported")
+var ErrWSInInitContext = common.NewInitContextError("Using websockets in the init context is not supported")
 
 type WS struct{}
 

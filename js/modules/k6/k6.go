@@ -37,10 +37,10 @@ import (
 type K6 struct{}
 
 // ErrGroupInInitContext is returned when group() are using in the init context
-var ErrGroupInInitContext = common.NewInitError("Using group() in the init context is not supported")
+var ErrGroupInInitContext = common.NewInitContextError("Using group() in the init context is not supported")
 
 // ErrCheckInInitContext is returned when check() are using in the init context
-var ErrCheckInInitContext = common.NewInitError("Using check() in the init context is not supported")
+var ErrCheckInInitContext = common.NewInitContextError("Using check() in the init context is not supported")
 
 func New() *K6 {
 	return &K6{}
