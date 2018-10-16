@@ -89,6 +89,10 @@ export default function () {
 
 Thanks to @AndriiChuzhynov for implementing this! (#766)
 
+### New option to disable the summary at the end of a test (#729)
+
+A new option that disables the end-of-test summary has been added. That summary is often superfluous when k6 tests are run in a distributed execution mode, or when the generated metrics are piped to an external output like InfluxDB or Load Impact Insights. The option can be enabled with the `--no-summary` CLI flag or the `K6_NO_SUMMARY` environment variable. When both it and the and the `--no-thresholds` option are enabled, k6 won't store any generated metrics in-memory, making the test execution a bit more efficient.
+
 ## UX
 
 * Added a warning when the maximum number of VUs is more than the total number of iterations (#802)
