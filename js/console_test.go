@@ -103,7 +103,10 @@ func TestConsole(t *testing.T) {
 					logger.Level = log.DebugLevel
 					vu.Console.Logger = logger
 
-					err = vu.RunOnce(context.Background())
+					ctx, cancel := context.WithCancel(context.Background())
+					defer cancel()
+
+					err = vu.RunOnce(ctx)
 					assert.NoError(t, err)
 
 					entry := hook.LastEntry()
