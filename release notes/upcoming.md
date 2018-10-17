@@ -124,3 +124,4 @@ A new option that disables the end-of-test summary has been added. That summary 
 * UX: Instead of panicking on some operations in the init context, we now return an error that the given
   action is not supported; this includes making HTTP requests (batched or not), websockets,
   adding to custom metrics, making checks and groups, or initializing cookie jars (#811)
+* Don't leak VUs in tests (#815)
