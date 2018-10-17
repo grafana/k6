@@ -223,6 +223,28 @@ func TestOptionsPropagationToScript(t *testing.T) {
 	}
 }
 
+func TestMetricName(t *testing.T) {
+	tb := testutils.NewHTTPMultiBin(t)
+	defer tb.Cleanup()
+
+	script := []byte(tb.Replacer.Replace(`
+		import { Counter } from "k6/metrics";
+
+		let myCounter = new Counter("not ok name @");
+
+		export default function(data) {
+			myCounter.add(1);
+		}
+	`))
+
+	_, err := New(
+		&lib.SourceData{Filename: "/script.js", Data: script},
+		afero.NewMemMapFs(),
+		lib.RuntimeOptions{},
+	)
+	require.Error(t, err)
+}
+
 func TestSetupDataIsolation(t *testing.T) {
 	tb := testutils.NewHTTPMultiBin(t)
 	defer tb.Cleanup()
