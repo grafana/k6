@@ -35,7 +35,7 @@ import (
 // letters, numbers, hyphens, dots, underscores, dots and both normal and square brackets
 var ErrInvalidMetricName = errors.New("Invalid metric name")
 
-var nameRegexString = "^[\\p{L}\\p{N}\\._ -]{1,50}$"
+var nameRegexString = "^[\\p{L}\\p{N}\\._ -]{1,128}$"
 
 var compileNameRegex = regexp.MustCompile(nameRegexString)
 
