@@ -58,7 +58,7 @@ jobs:
           name: Run tests and code coverage
           command: |
             export PATH=$GOPATH/bin:$PATH
-            for pkg in $(go list ./... | grep -v vendor); do
+            go test -race -timeout 600s ./...
                 go test -race -timeout 600s  $pkg
             done
 
