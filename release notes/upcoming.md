@@ -89,6 +89,10 @@ export default function () {
 
 Thanks to @AndriiChuzhynov for implementing this! (#766)
 
+### New option to disable the summary at the end of a test (#729)
+
+A new option that disables the end-of-test summary has been added. That summary is often superfluous when k6 tests are run in a distributed execution mode, or when the generated metrics are piped to an external output like InfluxDB or Load Impact Insights. The option can be enabled with the `--no-summary` CLI flag or the `K6_NO_SUMMARY` environment variable. When both it and the and the `--no-thresholds` option are enabled, k6 won't store any generated metrics in-memory, making the test execution a bit more efficient.
+
 ## UX
 
 * Added a warning when the maximum number of VUs is more than the total number of iterations (#802)
@@ -116,3 +120,7 @@ Thanks to @AndriiChuzhynov for implementing this! (#766)
 * Setup data: Distinguish between `undefined` (when there is no `setup()` function or when it doesn't return anything) and `null` (when `setup()` explicitly returns `null`) values for the setup `data` that's passed to the default function and `teardown()` (#799)
 * Setup data: Prevent data races by having each VU have its own independent copy of the setup data (#799)
 * HAR converter: Support HAR files that don't have a `pages` array (#806)
+* Setup data: The property names of some of the internal k6 objects like `http.Response` weren't properly encoded when they were returned from the `setup()` function (#804)
+* UX: Instead of panicking on some operations in the init context, we now return an error that the given
+  action is not supported; this includes making HTTP requests (batched or not), websockets,
+  adding to custom metrics, making checks and groups, or initializing cookie jars (#811)
