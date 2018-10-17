@@ -2,7 +2,7 @@ version: 2
 jobs:
   lint:
     docker:
-      - image: circleci/golang:1.10
+      - image: circleci/golang:1.11.1
     environment:
       GOPATH: /home/circleci/.go_workspace
     working_directory: /home/circleci/.go_workspace/src/github.com/loadimpact/k6
@@ -27,7 +27,7 @@ jobs:
 
   test:
     docker:
-      - image: circleci/golang:1.10
+      - image: circleci/golang:1.11.1
     environment:
       GOPATH: /home/circleci/.go_workspace
     working_directory: /home/circleci/.go_workspace/src/github.com/loadimpact/k6
@@ -36,18 +36,35 @@ jobs:
       - run:
           name: Run tests and code coverage
           command: |
+            export GOMAXPROCS=4
             export PATH=$GOPATH/bin:$PATH
             echo "mode: set" > coverage.txt
             for pkg in $(go list ./... | grep -v vendor); do
-                go test -race -timeout 600s -coverprofile=$(echo $pkg | tr / -).coverage $pkg
+                go test -race -timeout 600s  --coverpkg="$(go list ./... | tr '\n' ',')" -coverprofile=$(echo $pkg | tr / -).coverage $pkg
             done
             grep -h -v "^mode:" *.coverage >> coverage.txt
             rm -f *.coverage
             bash <(curl -s https://codecov.io/bash)
 
+
+  test-go110:
+    docker:
+      - image: circleci/golang:1.10.3
+    environment:
+      GOPATH: /home/circleci/.go_workspace
+    working_directory: /home/circleci/.go_workspace/src/github.com/loadimpact/k6
+    steps:
+      - checkout
+      - run:
+          name: Run tests and code coverage
+          command: |
+            export GOMAXPROCS=4
+            export PATH=$GOPATH/bin:$PATH
+            go test -race -timeout 600s ./...
+
   build-docker-images:
     docker:
-      - image: circleci/golang:1.10
+      - image: circleci/golang:1.11.1
     environment:
       GOPATH: /home/circleci/.go_workspace
     working_directory: /home/circleci/.go_workspace/src/github.com/loadimpact/k6
@@ -92,7 +109,7 @@ jobs:
 
   build-linux-packages:
     docker:
-      - image: circleci/golang:1.10
+      - image: circleci/golang:1.11.1
     environment:
       GOPATH: /home/circleci/.go_workspace
     working_directory: /home/circleci/.go_workspace/src/github.com/loadimpact/k6
@@ -142,6 +159,10 @@ workflows:
             tags:
               only: /.*/
       - test:
+          filters:
+            tags:
+              only: /.*/
+      - test-go110:
           filters:
             tags:
               only: /.*/
