@@ -36,6 +36,7 @@ jobs:
       - run:
           name: Run tests and code coverage
           command: |
+            export GOMAXPROCS=4
             export PATH=$GOPATH/bin:$PATH
             echo "mode: set" > coverage.txt
             for pkg in $(go list ./... | grep -v vendor); do
@@ -57,6 +58,7 @@ jobs:
       - run:
           name: Run tests and code coverage
           command: |
+            export GOMAXPROCS=4
             export PATH=$GOPATH/bin:$PATH
             go test -race -timeout 600s ./...
 
