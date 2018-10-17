@@ -129,4 +129,4 @@ A new option that disables the end-of-test summary has been added. That summary 
 ## Breaking changes
 * Metric names are now restricted to only allow Unicode letters or numbers, spaces, dots, underscores, and
   hyphens. They also need to be between 1 and 128 characters. Previously practically anything was a
-  valid metric name.
+  valid metric name. (#810)
