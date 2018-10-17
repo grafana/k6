@@ -349,6 +349,7 @@ func (u *VU) RunOnce(ctx context.Context) error {
 		}
 		u.interruptCancel = interCancel
 		u.interruptTrackedCtx = ctx
+		defer interCancel()
 		go func() {
 			select {
 			case <-interCtx.Done():
