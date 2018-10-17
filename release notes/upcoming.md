@@ -124,3 +124,9 @@ A new option that disables the end-of-test summary has been added. That summary 
 * UX: Instead of panicking on some operations in the init context, we now return an error that the given
   action is not supported; this includes making HTTP requests (batched or not), websockets,
   adding to custom metrics, making checks and groups, or initializing cookie jars (#811)
+
+
+## Breaking changes
+* Metric names are now restricted to only allow Unicode letters or numbers, spaces, dots, underscores, and
+  hyphens. They also need to be between 1 and 128 characters. Previously practically anything was a
+  valid metric name. (#810)

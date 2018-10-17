@@ -146,3 +146,25 @@ func TestMetrics(t *testing.T) {
 		})
 	}
 }
+
+func TestMetricNames(t *testing.T) {
+	t.Parallel()
+	var testMap = map[string]bool{
+		"simple":       true,
+		"still_simple": true,
+		"":             false,
+		"@":            false,
+		"a":            true,
+		"special\n\t":  false,
+		// this has both hangul and japanese numerals .
+		"hello.World_in_한글一안녕一세상": true,
+		// too long
+		"tooolooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooog": false,
+	}
+
+	for key, value := range testMap {
+		t.Run(key, func(t *testing.T) {
+			assert.Equal(t, value, checkName(key), key)
+		})
+	}
+}
