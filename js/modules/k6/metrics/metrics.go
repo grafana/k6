@@ -55,6 +55,7 @@ func newMetric(ctxPtr *context.Context, name string, t stats.MetricType, isTime 
 		return nil, errors.New("Metrics must be declared in the init context")
 	}
 
+	//TODO: move verification outside the JS
 	if !checkName(name) {
 		return nil, ErrInvalidMetricName
 	}
