@@ -130,22 +130,20 @@ func getRandomIP(ifacesList string) (*net.IPAddr, error) {
 		addresses = append(addresses, addrs...)
 	}
 
+	if len(addresses) == 0 {
+		return nil, errors.New("Can't find usable addresses on designed interfaces '" + ifacesList + "'")
+	}
+
 	rand.Shuffle(len(addresses), func(i, j int) { addresses[i], addresses[j] = addresses[j], addresses[i] })
 
-	selectedIP := ""
-	for _, a := range addresses {
-		tip, _, err := net.ParseCIDR(a.String())
-		if err == nil && tip.String() != "::1" {
-			selectedIP = tip.String()
-			break
-		}
-	}
-	if selectedIP == "" {
-		return nil, errors.New("Could not find available addresses ...")
-	}
-	localAddr, err := net.ResolveIPAddr("ip", selectedIP)
+	tip, _, err := net.ParseCIDR(addresses[0].String())
 	if err != nil {
-		return nil, errors.New("Can't resolve ip: '" + selectedIP + "'")
+		return nil, errors.New("Can't get ip address from : '" + addresses[0].String() + "'")
+	}
+
+	localAddr, err := net.ResolveIPAddr("ip", tip.String())
+	if err != nil {
+		return nil, errors.New("Can't resolve ip: '" + addresses[0].String() + "'")
 	}
 
 	return localAddr, nil
