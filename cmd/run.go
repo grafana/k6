@@ -99,16 +99,18 @@ a commandline interface for interacting with it.`,
   k6 run -o influxdb=http://1.2.3.4:8086/k6`[1:],
 	Args: exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		//TODO: disable in quiet mode?
-		_, _ = BannerColor.Fprintf(stdout, "\n%s\n\n", consts.Banner)
-
+		if !quiet {
+			_, _ = BannerColor.Fprintf(stdout, "\n%s\n\n", consts.Banner)
+		}
 		initBar := ui.ProgressBar{
 			Width: 60,
 			Left:  func() string { return "    init" },
 		}
 
 		// Create the Runner.
-		fprintf(stdout, "%s runner\r", initBar.String())
+		if !quiet {
+			fprintf(stdout, "%s runner\r", initBar.String())
+		}
 		pwd, err := os.Getwd()
 		if err != nil {
 			return err
@@ -130,7 +132,9 @@ a commandline interface for interacting with it.`,
 			return err
 		}
 
-		fprintf(stdout, "%s options\r", initBar.String())
+		if !quiet {
+			fprintf(stdout, "%s options\r", initBar.String())
+		}
 
 		cliConf, err := getConfig(cmd.Flags())
 		if err != nil {
@@ -182,7 +186,9 @@ a commandline interface for interacting with it.`,
 		}
 
 		// Create a local executor wrapping the runner.
-		fprintf(stdout, "%s executor\r", initBar.String())
+		if !quiet {
+			fprintf(stdout, "%s executor\r", initBar.String())
+		}
 		ex := local.New(r)
 		if runNoSetup {
 			ex.SetRunSetup(false)
@@ -192,7 +198,9 @@ a commandline interface for interacting with it.`,
 		}
 
 		// Create an engine.
-		fprintf(stdout, "%s   engine\r", initBar.String())
+		if !quiet {
+			fprintf(stdout, "%s   engine\r", initBar.String())
+		}
 		engine, err := core.NewEngine(ex, conf.Options)
 		if err != nil {
 			return err
@@ -210,7 +218,9 @@ a commandline interface for interacting with it.`,
 		}
 
 		// Create a collector and assign it to the engine if requested.
-		fprintf(stdout, "%s   collector\r", initBar.String())
+		if !quiet {
+			fprintf(stdout, "%s   collector\r", initBar.String())
+		}
 		for _, out := range conf.Out {
 			t, arg := parseCollector(out)
 			collector, err := newCollector(t, arg, src, conf)
@@ -224,7 +234,9 @@ a commandline interface for interacting with it.`,
 		}
 
 		// Create an API server.
-		fprintf(stdout, "%s   server\r", initBar.String())
+		if !quiet {
+			fprintf(stdout, "%s   server\r", initBar.String())
+		}
 		go func() {
 			if err := api.ListenAndServe(address, engine); err != nil {
 				logrus.WithError(err).Warn("Error from API server")
@@ -232,7 +244,7 @@ a commandline interface for interacting with it.`,
 		}()
 
 		// Write the big banner.
-		{
+		if !quiet {
 			out := "-"
 			link := ""
 
@@ -277,7 +289,9 @@ a commandline interface for interacting with it.`,
 		}
 
 		// Run the engine with a cancellable context.
-		fprintf(stdout, "%s starting\r", initBar.String())
+		if !quiet {
+			fprintf(stdout, "%s starting\r", initBar.String())
+		}
 		ctx, cancel := context.WithCancel(context.Background())
 		errC := make(chan error)
 		go func() { errC <- engine.Run(ctx) }()

@@ -63,8 +63,9 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
         k6 cloud script.js`[1:],
 	Args: exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		//TODO: disable in quiet mode?
-		_, _ = BannerColor.Fprintf(stdout, "\n%s\n\n", consts.Banner)
+		if !quiet {
+			_, _ = BannerColor.Fprintf(stdout, "\n%s\n\n", consts.Banner)
+		}
 		initBar := ui.ProgressBar{
 			Width: 60,
 			Left:  func() string { return "    uploading script" },
