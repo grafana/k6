@@ -78,6 +78,7 @@ func TestArchiveReadWrite(t *testing.T) {
 		assert.NoError(t, arc1.Write(buf))
 
 		arc2, err := ReadArchive(buf)
+		arc2.FS = nil
 		assert.NoError(t, err)
 		assert.Equal(t, arc1, arc2)
 	})
@@ -135,6 +136,7 @@ func TestArchiveReadWrite(t *testing.T) {
 			assert.NoError(t, arc1.Write(buf))
 
 			arc2, err := ReadArchive(buf)
+			arc2.FS = nil
 			assert.NoError(t, err)
 			assert.Equal(t, arc1Anon, arc2)
 		}

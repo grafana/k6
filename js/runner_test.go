@@ -21,6 +21,7 @@
 package js
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -29,6 +30,7 @@ import (
 	stdlog "log"
 	"net"
 	"net/http"
+	"os"
 	"testing"
 	"time"
 
@@ -201,7 +203,8 @@ func TestOptionsPropagationToScript(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, expScriptOptions, r1.GetOptions())
 
-	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{Env: map[string]string{"expectedSetupTimeout": "3s"}})
+	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{Env: map[string]string{"expectedSetupTimeout": "1s"}})
+
 	require.NoError(t, err)
 	require.Equal(t, expScriptOptions, r2.GetOptions())
 
@@ -1342,6 +1345,86 @@ func TestInitContextForbidden(t *testing.T) {
 					t,
 					"GoError: "+test[2],
 					err.Error())
+			}
+		})
+	}
+}
+
+func TestArchiveRunningIntegraty(t *testing.T) {
+	tb := testutils.NewHTTPMultiBin(t)
+	defer tb.Cleanup()
+
+	fs := afero.NewMemMapFs()
+	require.NoError(t, afero.WriteFile(fs, "/home/somebody/test.json", []byte(`42`), os.ModePerm))
+	r1, err := New(&lib.SourceData{
+		Filename: "/script.js",
+		Data: []byte(tb.Replacer.Replace(`
+			let fput = open("/home/somebody/test.json");
+			export let options = { setupTimeout: "10s", teardownTimeout: "10s" };
+			export function setup() {
+				return JSON.parse(fput);
+			}
+			export default function(data) {
+				if (data != 42) {
+					throw new Error("incorrect answer " + data);
+				}
+			}
+		`)),
+	}, fs, lib.RuntimeOptions{})
+	require.NoError(t, err)
+
+	buf := bytes.NewBuffer(nil)
+	require.NoError(t, r1.MakeArchive().Write(buf))
+
+	arc, err := lib.ReadArchive(buf)
+	require.NoError(t, err)
+	r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
+	require.NoError(t, err)
+
+	runners := map[string]*Runner{"Source": r1, "Archive": r2}
+	for name, r := range runners {
+		t.Run(name, func(t *testing.T) {
+			ch := make(chan stats.SampleContainer, 100)
+			err = r.Setup(context.Background(), ch)
+			require.NoError(t, err)
+			vu, err := r.NewVU(ch)
+			require.NoError(t, err)
+			err = vu.RunOnce(context.Background())
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestArchiveNotPanicing(t *testing.T) {
+	tb := testutils.NewHTTPMultiBin(t)
+	defer tb.Cleanup()
+
+	fs := afero.NewMemMapFs()
+	require.NoError(t, afero.WriteFile(fs, "/non/existant", []byte(`42`), os.ModePerm))
+	r1, err := New(&lib.SourceData{
+		Filename: "/script.js",
+		Data: []byte(tb.Replacer.Replace(`
+			let fput = open("/non/existant");
+			export default function(data) {
+			}
+		`)),
+	}, fs, lib.RuntimeOptions{})
+	require.NoError(t, err)
+
+	arc := r1.MakeArchive()
+	arc.Files = make(map[string][]byte)
+	r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
+	require.NoError(t, err)
+
+	runners := map[string]*Runner{"Source": r1, "Archive": r2}
+	for name, r := range runners {
+		t.Run(name, func(t *testing.T) {
+			ch := make(chan stats.SampleContainer, 100)
+			_, err := r.NewVU(ch)
+			if name == "Source" {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
 			}
 		})
 	}

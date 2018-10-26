@@ -99,7 +99,7 @@ func NewFromBundle(b *Bundle) (*Runner, error) {
 }
 
 func (r *Runner) MakeArchive() *lib.Archive {
-	return r.Bundle.MakeArchive()
+	return r.Bundle.makeArchive()
 }
 
 func (r *Runner) NewVU(samplesOut chan<- stats.SampleContainer) (lib.VU, error) {
