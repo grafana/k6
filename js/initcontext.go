@@ -74,8 +74,9 @@ func newBoundInitContext(base *InitContext, ctxPtr *context.Context, rt *goja.Ru
 		runtime: rt,
 		ctxPtr:  ctxPtr,
 
-		fs:  nil,
-		pwd: base.pwd,
+		fs:       base.fs,
+		pwd:      base.pwd,
+		compiler: base.compiler,
 
 		programs: base.programs,
 		files:    base.files,
