@@ -1400,11 +1400,11 @@ func TestArchiveNotPanicing(t *testing.T) {
 	defer tb.Cleanup()
 
 	fs := afero.NewMemMapFs()
-	require.NoError(t, afero.WriteFile(fs, "/non/existant", []byte(`42`), os.ModePerm))
+	require.NoError(t, afero.WriteFile(fs, "/non/existent", []byte(`42`), os.ModePerm))
 	r1, err := New(&lib.SourceData{
 		Filename: "/script.js",
 		Data: []byte(tb.Replacer.Replace(`
-			let fput = open("/non/existant");
+			let fput = open("/non/existent");
 			export default function(data) {
 			}
 		`)),

@@ -55,7 +55,7 @@ type BundleInstance struct {
 	Default goja.Callable
 }
 
-// Creates a new bundle from a source file and a filesystem.
+// NewBundle creates a new bundle from a source file and a filesystem.
 func NewBundle(src *lib.SourceData, fs afero.Fs, rtOpts lib.RuntimeOptions) (*Bundle, error) {
 	compiler, err := compiler.New()
 	if err != nil {
@@ -131,6 +131,7 @@ func NewBundle(src *lib.SourceData, fs afero.Fs, rtOpts lib.RuntimeOptions) (*Bu
 	return &bundle, nil
 }
 
+// NewBundleFromArchive creates a new bundle from an lib.Archive.
 func NewBundleFromArchive(arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle, error) {
 	compiler, err := compiler.New()
 	if err != nil {
@@ -143,6 +144,9 @@ func NewBundleFromArchive(arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle,
 
 	initctx := NewInitContext(goja.New(), compiler, new(context.Context), arc.FS, arc.Pwd)
 	pgm, err := initctx.compileImport(string(arc.Data), arc.Filename)
+	if err != nil {
+		return nil, err
+	}
 	initctx.files = arc.Files
 
 	env := arc.Env
