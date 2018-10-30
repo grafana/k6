@@ -107,18 +107,26 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 		client := cloud.NewClient(cloudConfig.Token.String, cloudConfig.Host.String, Version)
 
 		arc := r.MakeArchive()
-		if err := client.ValidateOptions(arc.Options); err != nil {
-			return err
-		}
-
 		if val, ok := arc.Options.External["loadimpact"]; ok {
 			if err := json.Unmarshal(val, &cloudConfig); err != nil {
 				return err
 			}
 		}
+		if arc.Options.External == nil {
+			arc.Options.External = make(map[string]json.RawMessage)
+		}
+		arc.Options.External["loadimpact"], err = json.Marshal(cloudConfig)
+		if err != nil {
+			return err
+		}
+
 		name := cloudConfig.Name.String
 		if !cloudConfig.Name.Valid || cloudConfig.Name.String == "" {
 			name = filepath.Base(filename)
+		}
+
+		if err := client.ValidateOptions(arc.Options); err != nil {
+			return err
 		}
 
 		refID, err := client.StartCloudTestRun(name, cloudConfig.ProjectID.Int64, arc)
