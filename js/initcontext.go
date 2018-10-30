@@ -34,11 +34,12 @@ import (
 )
 
 type programWithSource struct {
-	pgm *goja.Program
-	src string
+	pgm     *goja.Program
+	src     string
+	exports goja.Value
 }
 
-// Provides APIs for use in the init context.
+// InitContext provides APIs for use in the init context.
 type InitContext struct {
 	// Bound runtime; used to instantiate objects.
 	runtime  *goja.Runtime
@@ -56,6 +57,7 @@ type InitContext struct {
 	files    map[string][]byte
 }
 
+// NewInitContext creates a new initcontext with the provided arguments
 func NewInitContext(rt *goja.Runtime, compiler *compiler.Compiler, ctxPtr *context.Context, fs afero.Fs, pwd string) *InitContext {
 	return &InitContext{
 		runtime:  rt,
@@ -83,6 +85,7 @@ func newBoundInitContext(base *InitContext, ctxPtr *context.Context, rt *goja.Ru
 	}
 }
 
+// Require is called when a module/file needs to be loaded by a script
 func (i *InitContext) Require(arg string) goja.Value {
 	switch {
 	case arg == "k6", strings.HasPrefix(arg, "k6/"):
@@ -115,23 +118,23 @@ func (i *InitContext) requireFile(name string) (goja.Value, error) {
 	// Resolve the file path, push the target directory as pwd to make relative imports work.
 	pwd := i.pwd
 	filename := loader.Resolve(pwd, name)
-	i.pwd = loader.Dir(filename)
-	defer func() { i.pwd = pwd }()
-
-	// Swap the importing scope's exports out, then put it back again.
-	oldExports := i.runtime.Get("exports")
-	defer i.runtime.Set("exports", oldExports)
-	oldModule := i.runtime.Get("module")
-	defer i.runtime.Set("module", oldModule)
-	exports := i.runtime.NewObject()
-	i.runtime.Set("exports", exports)
-	module := i.runtime.NewObject()
-	_ = module.Set("exports", exports)
-	i.runtime.Set("module", module)
 
 	// First, check if we have a cached program already.
 	pgm, ok := i.programs[filename]
 	if !ok {
+		i.pwd = loader.Dir(filename)
+		defer func() { i.pwd = pwd }()
+
+		// Swap the importing scope's exports out, then put it back again.
+		oldExports := i.runtime.Get("exports")
+		defer i.runtime.Set("exports", oldExports)
+		oldModule := i.runtime.Get("module")
+		defer i.runtime.Set("module", oldModule)
+		exports := i.runtime.NewObject()
+		i.runtime.Set("exports", exports)
+		module := i.runtime.NewObject()
+		_ = module.Set("exports", exports)
+		i.runtime.Set("module", module)
 		// Load the sources; the loader takes care of remote loading, etc.
 		data, err := loader.Load(i.fs, pwd, name)
 		if err != nil {
@@ -140,22 +143,26 @@ func (i *InitContext) requireFile(name string) (goja.Value, error) {
 
 		// Compile the sources; this handles ES5 vs ES6 automatically.
 		src := string(data.Data)
-		pgm_, err := i.compileImport(src, data.Filename)
+		newPgm, err := i.compileImport(src, data.Filename)
 		if err != nil {
 			return goja.Undefined(), err
 		}
 
+		// Run the program.
+		if _, err := i.runtime.RunProgram(newPgm); err != nil {
+			return goja.Undefined(), err
+		}
+
 		// Cache the compiled program.
-		pgm = programWithSource{pgm_, src}
+		pgm = programWithSource{
+			pgm:     newPgm,
+			src:     src,
+			exports: module.Get("exports"),
+		}
 		i.programs[filename] = pgm
 	}
 
-	// Run the program.
-	if _, err := i.runtime.RunProgram(pgm.pgm); err != nil {
-		return goja.Undefined(), err
-	}
-
-	return module.Get("exports"), nil
+	return pgm.exports, nil
 }
 
 func (i *InitContext) compileImport(src, filename string) (*goja.Program, error) {
@@ -163,16 +170,17 @@ func (i *InitContext) compileImport(src, filename string) (*goja.Program, error)
 	return pgm, err
 }
 
+// Open is the imlementation of open() and is used to open files from inside k6 scripts
 func (i *InitContext) Open(name string, args ...string) (goja.Value, error) {
 	filename := loader.Resolve(i.pwd, name)
 	data, ok := i.files[filename]
 	if !ok {
-		data_, err := loader.Load(i.fs, i.pwd, name)
+		sourceData, err := loader.Load(i.fs, i.pwd, name)
 		if err != nil {
 			return nil, err
 		}
-		i.files[filename] = data_.Data
-		data = data_.Data
+		i.files[filename] = sourceData.Data
+		data = sourceData.Data
 	}
 
 	if len(args) > 0 && args[0] == "b" {
