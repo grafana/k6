@@ -29,6 +29,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/fatih/color"
 	"github.com/tidwall/gjson"
 
 	"github.com/dop251/goja"
@@ -109,8 +110,25 @@ func (res *HTTPResponse) Json(selector ...string) goja.Value {
 		}
 
 		if err := json.Unmarshal(body, &v); err != nil {
+			var msg string
+			switch t := err.(type) {
+			case *json.SyntaxError:
+				jsn := string(body[0:t.Offset])
+				jsn += color.RedString("<--(Invalid Character)")
+				jsn += string(body[t.Offset:])
+				msg = fmt.Sprintf("\n Invalid character at offset %v\n %s", t.Offset, jsn)
+			case *json.UnmarshalTypeError:
+				jsn := string(body[0:t.Offset])
+				jsn += "<--(Invalid Type)"
+				jsn += string(body[t.Offset+1:])
+				msg = fmt.Sprintf("\n Invalid value at offset %v\n %s", t.Offset, jsn)
+			default:
+				msg = err.Error()
+			}
+			err = errors.New(err.Error() + msg)
 			common.Throw(common.GetRuntime(res.ctx), err)
 		}
+
 		res.validatedJSON = true
 		res.cachedJSON = common.GetRuntime(res.ctx).ToValue(v)
 	}
