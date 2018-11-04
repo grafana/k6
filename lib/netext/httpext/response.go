@@ -24,6 +24,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"fmt"
 
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/pkg/errors"
@@ -54,6 +55,17 @@ const (
 	// default value for all requests if the global discardResponseBodies is enablled.
 	ResponseTypeNone
 )
+
+type jsonError struct {
+	line      int
+	character int
+	err       error
+}
+
+func (j jsonError) Error() string {
+	errMessage := "cannot parse json due to an error at line"
+	return fmt.Sprintf("%s %d, character %d , error: %v", errMessage, j.line, j.character, j.err)
+}
 
 // ResponseTimings is a struct to put all timings for a given HTTP response/request
 type ResponseTimings struct {
@@ -127,7 +139,6 @@ func (res *Response) JSON(selector ...string) (interface{}, error) {
 		}
 
 		if hasSelector {
-
 			if !res.validatedJSON {
 				if !gjson.ValidBytes(body) {
 					return nil, nil
@@ -144,11 +155,35 @@ func (res *Response) JSON(selector ...string) (interface{}, error) {
 		}
 
 		if err := json.Unmarshal(body, &v); err != nil {
+			if syntaxError, ok := err.(*json.SyntaxError); ok {
+				err = checkErrorInJSON(body, int(syntaxError.Offset), err)
+			}
 			return nil, err
 		}
 		res.validatedJSON = true
 		res.cachedJSON = v
 	}
 	return res.cachedJSON, nil
+}
 
+func checkErrorInJSON(input []byte, offset int, err error) error {
+	lf := '\n'
+	str := string(input)
+
+	// Humans tend to count from 1.
+	line := 1
+	character := 0
+
+	for i, b := range str {
+		if b == lf {
+			line++
+			character = 0
+		}
+		character++
+		if i == offset {
+			break
+		}
+	}
+
+	return jsonError{line: line, character: character, err: err}
 }
