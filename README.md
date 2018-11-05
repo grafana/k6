@@ -133,7 +133,7 @@ For more information on how to get started running k6, please look at the [Runni
 Overview
 --------
 
-In this section we'll briefly explore some of the basic concepts and principles of how k6 works. If you want to learn more in-depth about the k6 scripting API, results output, and features, you can visit the full k6 documentation website at [https://docs.k6.io](docs.k6.io).
+In this section we'll briefly explore some of the basic concepts and principles of how k6 works. If you want to learn more in-depth about the k6 scripting API, results output, and features, you can visit the full k6 documentation website at [docs.k6.io](https://docs.k6.io).
 
 ### Init and VU stages
 
@@ -216,7 +216,7 @@ export let options = {
 ```
 Alternatively, you can use the CLI flags `--vus 5 --stage 3m:10,5m:10,10m:35,1m30s:0` or set the environment variables `K6_VUS=5 K6_STAGE="3m:10,5m:10,10m:35,1m30s:0"` to achieve the same results.
 
-For a complete list of supported k6 options, refer to the documentation at [https://docs.k6.io/docs/options](https://docs.k6.io/docs/options).
+For a complete list of supported k6 options, refer to the documentation at [docs.k6.io/docs/options](https://docs.k6.io/docs/options).
 
 _Hint: besides accessing the supplied [environment variables](https://docs.k6.io/docs/environment-variables) through the `__ENV` global object briefly mentioned above, you can also use the [execution context variables](https://docs.k6.io/docs/execution-context-variables) `__VU` and `__ITER` to access the current VU number and the number of the current iteration **for that VU**. These variables can be very useful if you want VUs to execute different scripts/scenarios or to aid in generating different data per VU. ```http.post("https://some.example.website/signup", {username: `testuser${__VU}@testsite.com`, /* ... */})```_
 
