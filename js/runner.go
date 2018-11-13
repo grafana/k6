@@ -440,5 +440,14 @@ func (u *VU) runFn(ctx context.Context, group *lib.Group, fn goja.Callable, args
 
 	state.Samples <- u.Dialer.GetTrail(startTime, endTime, isFullIteration, stats.IntoSampleTags(&tags))
 
+	// If MinIterationDuration is specified and the iteration wasn't cancelled
+	// and was less than it, sleep for the remainder
+	if isFullIteration && state.Options.MinIterationDuration.Valid {
+		durationDiff := time.Duration(state.Options.MinIterationDuration.Duration) - endTime.Sub(startTime)
+		if durationDiff > 0 {
+			time.Sleep(durationDiff)
+		}
+	}
+
 	return v, state, err
 }
