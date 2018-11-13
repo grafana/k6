@@ -1395,7 +1395,7 @@ func TestArchiveRunningIntegraty(t *testing.T) {
 	}
 }
 
-func TestArchiveNotPanicing(t *testing.T) {
+func TestArchiveNotPanicking(t *testing.T) {
 	tb := testutils.NewHTTPMultiBin(t)
 	defer tb.Cleanup()
 
@@ -1427,5 +1427,71 @@ func TestArchiveNotPanicing(t *testing.T) {
 				require.Error(t, err)
 			}
 		})
+	}
+}
+
+func TestStuffNotPanicking(t *testing.T) {
+	tb := testutils.NewHTTPMultiBin(t)
+	defer tb.Cleanup()
+
+	r, err := New(&lib.SourceData{
+		Filename: "/script.js",
+		Data: []byte(tb.Replacer.Replace(`
+			import http from "k6/http";
+			import ws from "k6/ws";
+			import { group } from "k6";
+			import { parseHTML } from "k6/html";
+
+			export let options = { iterations: 1, vus: 1, vusMax: 1 };
+
+			export default function() {
+				const doc = parseHTML(http.get("HTTPBIN_URL/html").body);
+
+				let testCases = [
+					() => group(),
+					() => group("test"),
+					() => group("test", "wat"),
+					() => doc.find('p').each(),
+					() => doc.find('p').each("wat"),
+					() => doc.find('p').map(),
+					() => doc.find('p').map("wat"),
+					() => ws.connect("ws://HTTPBIN_IP:HTTPBIN_PORT/ws-echo"),
+				];
+
+				testCases.forEach(function(fn, idx) {
+					var hasException;
+					try {
+						fn();
+						hasException = false;
+					} catch (e) {
+						hasException = true;
+					}
+
+					if (hasException === false) {
+						throw new Error("Expected test case #" + idx + " to return an error");
+					} else if (hasException === undefined) {
+						throw new Error("Something strange happened with test case #" + idx);
+					}
+				});
+			}
+		`)),
+	}, afero.NewMemMapFs(), lib.RuntimeOptions{})
+	require.NoError(t, err)
+
+	ch := make(chan stats.SampleContainer, 1000)
+	vu, err := r.NewVU(ch)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	errC := make(chan error)
+	go func() { errC <- vu.RunOnce(ctx) }()
+
+	select {
+	case <-time.After(15 * time.Second):
+		cancel()
+		t.Fatal("Test timed out")
+	case err := <-errC:
+		cancel()
+		require.NoError(t, err)
 	}
 }
