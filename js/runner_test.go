@@ -1259,7 +1259,7 @@ func TestHTTPRequestInInitContext(t *testing.T) {
 					import http from "k6/http";
 					let res = http.get("HTTPBIN_URL/");
 					export default function() {
-						console.log(test);ci
+						console.log(test);
 					}
 				`)),
 	}, afero.NewMemMapFs(), lib.RuntimeOptions{})

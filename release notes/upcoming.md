@@ -89,9 +89,13 @@ export default function () {
 
 Thanks to @AndriiChuzhynov for implementing this! (#766)
 
-### New option to disable the summary at the end of a test (#729)
+### New option: disable the summary at the end of a test (#729)
 
 A new option that disables the end-of-test summary has been added. That summary is often superfluous when k6 tests are run in a distributed execution mode, or when the generated metrics are piped to an external output like InfluxDB or Load Impact Insights. The option can be enabled with the `--no-summary` CLI flag or the `K6_NO_SUMMARY` environment variable. When both it and the and the `--no-thresholds` option are enabled, k6 won't store any generated metrics in-memory, making the test execution a bit more efficient.
+
+### New option: set a minimum iteration duration (#821)
+
+You can now specify the minimum amount of time a single iteration should take via the new `minIterationDuration` option. It's also configurable via the `--min-iteration-duration` CLI flag and `K6_MIN_ITERATION_DURATION` environment variable. This setting only applies for full iterations, so any interrupted iterations due to ramping down of VUs from a stage or at the end of the tests can still be shorter.
 
 ## UX
 
