@@ -442,7 +442,7 @@ func (u *VU) runFn(ctx context.Context, group *lib.Group, fn goja.Callable, args
 
 	// If MinIterationDuration is specified and the iteration wasn't cancelled
 	// and was less than it, sleep for the remainder
-	if state.Options.MinIterationDuration.Valid {
+	if isFullIteration && state.Options.MinIterationDuration.Valid {
 		durationDiff := time.Duration(state.Options.MinIterationDuration.Duration) - endTime.Sub(startTime)
 		if durationDiff > 0 {
 			time.Sleep(durationDiff)

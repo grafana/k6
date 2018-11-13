@@ -60,7 +60,7 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.Bool("insecure-skip-tls-verify", false, "skip verification of TLS certificates")
 	flags.Bool("no-connection-reuse", false, "disable keep-alive connections")
 	flags.Bool("no-vu-connection-reuse", false, "don't reuse connections between iterations")
-	flags.Duration("min-iteration-duration", 0, "minimum amount of time a single iteration should take")
+	flags.Duration("min-iteration-duration", 0, "minimum amount of time k6 will take executing a single iteration")
 	flags.BoolP("throw", "w", false, "throw warnings (like failed http requests) as errors")
 	flags.StringSlice("blacklist-ip", nil, "blacklist an `ip range` from being called")
 	flags.StringSlice("summary-trend-stats", nil, "define `stats` for trend metrics (response times), one or more as 'avg,p(95),...'")

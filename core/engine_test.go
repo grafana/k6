@@ -921,17 +921,19 @@ func TestMinIterationDuration(t *testing.T) {
 
 	runner, err := js.New(
 		&lib.SourceData{Filename: "/script.js", Data: []byte(`
-		import { sleep } from "k6";
+		import { Counter } from "k6/metrics";
+
+		let testCounter = new Counter("testcounter");
 
 		export let options = {
 			minIterationDuration: "1s",
 			vus: 2,
 			vusMax: 2,
-			duration: "1.5s",
+			duration: "1.9s",
 		};
 
 		export default function () {
-			sleep(0.1);
+			testCounter.add(1);
 		};`)},
 		afero.NewMemMapFs(),
 		lib.RuntimeOptions{},
@@ -960,4 +962,7 @@ func TestMinIterationDuration(t *testing.T) {
 
 	// Only 2 full iterations are expected to be completed due to the 1 second minIterationDuration
 	assert.Equal(t, 2.0, getMetricSum(collector, metrics.Iterations.Name))
+
+	// But we expect the custom counter to be added to 4 times
+	assert.Equal(t, 4.0, getMetricSum(collector, "testcounter"))
 }
