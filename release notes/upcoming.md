@@ -133,6 +133,7 @@ You can now specify the minimum amount of time a single iteration should take vi
   adding to custom metrics, making checks and groups, or initializing cookie jars (#811)
 * Fix not sending some cloud specific environment variables to the cloud options-validations when
   running `k6 cloud`. Most notably this include K6_CLOUD_PROJECT_ID. (#829)
+* Fix a panic when `group()` is called without a callback function. (#841)
 
 ## Breaking changes
 * Metric names are now restricted to only allow Unicode letters or numbers, spaces, dots, underscores, and
