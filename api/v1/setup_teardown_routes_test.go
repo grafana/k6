@@ -164,9 +164,8 @@ func TestSetupData(t *testing.T) {
 
 				var doc jsonapi.Document
 				assert.NoError(t, json.Unmarshal(rw.Body.Bytes(), &doc))
-				if !assert.NotNil(t, doc.Data.DataObject) {
-					return
-				}
+				require.NotNil(t, doc.Data)
+				require.NotNil(t, doc.Data.DataObject)
 				assert.Equal(t, "setupData", doc.Data.DataObject.Type)
 				assert.JSONEq(t, expResult, string(doc.Data.DataObject.Attributes))
 			}
