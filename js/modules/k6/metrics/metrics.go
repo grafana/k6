@@ -23,6 +23,7 @@ package metrics
 import (
 	"context"
 	"errors"
+	"fmt"
 	"regexp"
 	"time"
 
@@ -30,10 +31,6 @@ import (
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/stats"
 )
-
-// ErrInvalidMetricName is the error returned when the name of the metric is not containeing only
-// letters, numbers, hyphens, dots, underscores, dots and both normal and square brackets
-var ErrInvalidMetricName = errors.New("Invalid metric name")
 
 var nameRegexString = "^[\\p{L}\\p{N}\\._ -]{1,128}$"
 
@@ -57,7 +54,7 @@ func newMetric(ctxPtr *context.Context, name string, t stats.MetricType, isTime 
 
 	//TODO: move verification outside the JS
 	if !checkName(name) {
-		return nil, ErrInvalidMetricName
+		return nil, common.NewInitContextError(fmt.Sprintf("Invalid metric name: '%s'", name))
 	}
 
 	valueType := stats.Default
