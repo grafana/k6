@@ -1,4 +1,10 @@
-TODO: Intro
+v0.23.0 is here! :tada:
+
+Hopefully this is the last intermediary release before v1.0.0. It is a bit light on new features, but it includes a lot of bug fixes and minor improvements! Thanks to @sherrman, @ofauchon, @AndriiChuzhynov, @entone, @mariolopjr, and @tkbky for contributing to this release!
+
+To see what's left for the v1.0.0 release, check out [this milestone](https://github.com/loadimpact/k6/milestone/4)!
+
+Also, have a look at [our roadmap](https://github.com/loadimpact/k6/wiki/Roadmap) for what's up ahead, beyond the v1.0 release.
 
 ## New Features!
 
@@ -103,12 +109,10 @@ You can now specify the minimum amount of time a single iteration should take vi
 
 ## Internals
 
-* Cloud output: improved outlier metric detection for small batches (#744)
-* Use 20 as the the default values of the `batch` and `batchPerHost` options. They determine the maximum number of parallel requests (in total and per-host respectively) an `http.batch()` call will make per VU. The previous value for `batch` was 10 and for `batchPerHost` it was 0 (unlimited). We now also use their values to determine the maximum number of open idle connections in a VU (#685)
-* Due to refactoring needed for the redirect fixes, the NTLM authentication library k6 uses is changed from [this](https://github.com/ThomsonReutersEikon/go-ntlm/) to [this](https://github.com/Azure/go-ntlmssp) (#753)
-* Switched the default CircleCI tests and linting to use Go 1.11.1, but we still maintain 1.10
-  compatibility by running all of the tests with Go 1.10.3 too. Official k6 standalone builds will
-  also be done with Go 1.11+ from now on (#813)
+* Cloud output: improved outlier metric detection for small batches. (#744)
+* Use 20 as the the default values of the `batch` and `batchPerHost` options. They determine the maximum number of parallel requests (in total and per-host respectively) an `http.batch()` call will make per VU. The previous value for `batch` was 10 and for `batchPerHost` it was 0 (unlimited). We now also use their values to determine the maximum number of open idle connections in a VU. (#685)
+* Due to refactoring needed for the redirect fixes, the NTLM authentication library k6 uses is changed from [this](https://github.com/ThomsonReutersEikon/go-ntlm/) to [this](https://github.com/Azure/go-ntlmssp). (#753)
+* Switched the default CircleCI tests and linting to use Go 1.11.1, but we still maintain 1.10 compatibility by running all of the tests with Go 1.10.3 too. Official k6 standalone builds will also be done with Go 1.11+ from now on. (#813)
 
 ## Bugs fixed!
 
@@ -116,26 +120,22 @@ You can now specify the minimum amount of time a single iteration should take vi
 * UI: Password input is now masked in `k6 login influxdb` and `k6 login cloud`. (#734)
 * Config: Environment variables can now be used to modify k6's behavior in the `k6 login` subcommands. (#734)
 * HTTP: Binary response bodies were mangled because there was no way to avoid converting them to UTF-16 JavaScript strings. (#749)
-* Config: Stages were appended instead of overwritten from upper config "tiers", and were doubled when supplied via the CLI flag (#759)
-* HAR converter: Fixed a panic due to a missing array length check (#760)
-* HTTP: `http.batch()` calls could panic because of a data race when the `batchPerHost` global option was used (#770)
+* Config: Stages were appended instead of overwritten from upper config "tiers", and were doubled when supplied via the CLI flag. (#759)
+* HAR converter: Fixed a panic due to a missing array length check. (#760)
+* HTTP: `http.batch()` calls could panic because of a data race when the `batchPerHost` global option was used. (#770)
 * Docker: Fixed the grafana image in the docker-compose setup. Thanks @entone and @mariolopjr! (#783)
-* Config: Stages configured via the script `options` or environment variables couldn't be disabled via the CLI flags (#786)
+* Config: Stages configured via the script `options` or environment variables couldn't be disabled via the CLI flags. (#786)
 * UI: Don't report infinities and extreme speeds when tests take 0 time. Thanks @tkbky! (#790)
-* HTTP: Correct metric tracking when HTTP requests are redirected (#753)
-* HAR converter: Added escaping for page IDs and names in the generated scripts (#801)
-* Setup data: Distinguish between `undefined` (when there is no `setup()` function or when it doesn't return anything) and `null` (when `setup()` explicitly returns `null`) values for the setup `data` that's passed to the default function and `teardown()` (#799)
-* Setup data: Prevent data races by having each VU have its own independent copy of the setup data (#799)
-* HAR converter: Support HAR files that don't have a `pages` array (#806)
-* Setup data: The property names of some of the internal k6 objects like `http.Response` weren't properly encoded when they were returned from the `setup()` function (#804)
-* UX: Instead of panicking on some operations in the init context, we now return an error that the given
-  action is not supported; this includes making HTTP requests (batched or not), websockets,
-  adding to custom metrics, making checks and groups, or initializing cookie jars (#811)
-* Fix not sending some cloud specific environment variables to the cloud options-validations when
-  running `k6 cloud`. Most notably this include K6_CLOUD_PROJECT_ID. (#829)
-* Fix a panic when `group()` is called without a callback function. (#841)
+* HTTP: Correct metric tracking when HTTP requests are redirected. (#753)
+* HAR converter: Added escaping for page IDs and names in the generated scripts. (#801)
+* Setup data: Distinguish between `undefined` (when there is no `setup()` function or when it doesn't return anything) and `null` (when `setup()` explicitly returns `null`) values for the setup `data` that's passed to the default function and `teardown()`. (#799)
+* Setup data: Prevent data races by having each VU have its own independent copy of the setup data. (#799)
+* HAR converter: Support HAR files that don't have a `pages` array. (#806)
+* Setup data: The property names of some of the internal k6 objects like `http.Response` weren't properly encoded when they were returned from the `setup()` function. (#804)
+* UX: Instead of panicking on some operations in the init context, we now return an error that the given action is not supported; this includes making HTTP requests (batched or not), websockets, adding to custom metrics, making checks and groups, or initializing cookie jars. (#811)
+* Cloud execution: properly send specific environment variables to the cloud option validation endpoint when running `k6 cloud`. Most notably this includes K6_CLOUD_PROJECT_ID. (#829)
+* Cloud execution and archive running: Fixed an issue when files were imported or opened with their full paths and they were in the users' home folders. (#823)
+* Script: Fixed a panic when `group()` is called without a callback function. (#841)
 
 ## Breaking changes
-* Metric names are now restricted to only allow Unicode letters or numbers, spaces, dots, underscores, and
-  hyphens. They also need to be between 1 and 128 characters. Previously practically anything was a
-  valid metric name. (#810)
+* Metric names are now restricted to only allow Unicode letters or numbers, spaces, and the following special characters: `._!?/&#()<>%-`. They also need to be between 1 and 128 characters. Previously practically anything was a valid metric name. (#810)
