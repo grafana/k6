@@ -32,7 +32,7 @@ import (
 	"github.com/loadimpact/k6/stats"
 )
 
-var nameRegexString = "^[\\p{L}\\p{N}\\._ -]{1,128}$"
+var nameRegexString = "^[\\p{L}\\p{N}\\._ !\\?/&#\\(\\)<>%-]{1,128}$"
 
 var compileNameRegex = regexp.MustCompile(nameRegexString)
 
