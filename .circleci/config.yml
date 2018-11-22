@@ -169,6 +169,9 @@ workflows:
           requires:
             - lint
             - test
+          filters:
+            tags:
+              only: /.*/
       - build-linux-packages:
           requires:
             - lint
