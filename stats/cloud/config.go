@@ -29,13 +29,15 @@ import (
 
 // Config holds all the necessary data and options for sending metrics to the Load Impact cloud.
 type Config struct {
+	// TODO: refactor common stuff between cloud execution and output
 	Token           null.String `json:"token" envconfig:"CLOUD_TOKEN"`
 	DeprecatedToken null.String `json:"-" envconfig:"K6CLOUD_TOKEN"`
-	Name            null.String `json:"name" envconfig:"CLOUD_NAME"`
-	Host            null.String `json:"host" envconfig:"CLOUD_HOST"`
-	WebAppURL       null.String `json:"webAppURL" envconfig:"CLOUD_WEB_APP_URL"`
-	NoCompress      null.Bool   `json:"noCompress" envconfig:"CLOUD_NO_COMPRESS"`
 	ProjectID       null.Int    `json:"projectID" envconfig:"CLOUD_PROJECT_ID"`
+	Name            null.String `json:"name" envconfig:"CLOUD_NAME"`
+
+	Host       null.String `json:"host" envconfig:"CLOUD_HOST"`
+	WebAppURL  null.String `json:"webAppURL" envconfig:"CLOUD_WEB_APP_URL"`
+	NoCompress null.Bool   `json:"noCompress" envconfig:"CLOUD_NO_COMPRESS"`
 
 	// The time interval between periodic API calls for sending samples to the cloud ingest service.
 	MetricPushInterval types.NullDuration `json:"metricPushInterval" envconfig:"CLOUD_METRIC_PUSH_INTERVAL"`

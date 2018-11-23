@@ -31,6 +31,8 @@ import (
 	"testing"
 	"time"
 
+	"gopkg.in/guregu/null.v3"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/stretchr/testify/require"
@@ -138,16 +140,14 @@ func TestCloudCollector(t *testing.T) {
 	}
 
 	options := lib.Options{
-		External: map[string]json.RawMessage{
-			"loadimpact": json.RawMessage(tb.Replacer.Replace(`{
-				"host": "HTTPBIN_IP_URL",
-				"noCompress": true
-			}`)),
-		},
 		Duration: types.NullDurationFrom(1 * time.Second),
 	}
 
-	collector, err := New(NewConfig(), script, options, "1.0")
+	config := NewConfig().Apply(Config{
+		Host:       null.StringFrom(tb.ServerHTTP.URL),
+		NoCompress: null.BoolFrom(true),
+	})
+	collector, err := New(config, script, options, "1.0")
 	require.NoError(t, err)
 
 	assert.True(t, collector.config.Host.Valid)
