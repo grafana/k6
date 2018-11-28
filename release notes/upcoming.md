@@ -10,4 +10,4 @@ Description of feature.
 
 ## Bugs fixed!
 
-* Category: description of bug. (#PR)
+* JS: Fix a babel transformation issue that caused closing brackets to sometimes be commented out. (#853)

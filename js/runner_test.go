@@ -203,7 +203,7 @@ func TestOptionsPropagationToScript(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, expScriptOptions, r1.GetOptions())
 
-	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{Env: map[string]string{"expectedSetupTimeout": "1s"}})
+	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{Env: map[string]string{"expectedSetupTimeout": "3s"}})
 
 	require.NoError(t, err)
 	require.Equal(t, expScriptOptions, r2.GetOptions())
