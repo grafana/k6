@@ -142,11 +142,11 @@ func NewBundleFromArchive(arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle,
 		return nil, errors.Errorf("expected bundle type 'js', got '%s'", arc.Type)
 	}
 
-	initctx := NewInitContext(goja.New(), compiler, new(context.Context), arc.FS, arc.Pwd)
-	pgm, err := initctx.compileImport(string(arc.Data), arc.Filename)
+	pgm, _, err := compiler.Compile(string(arc.Data), arc.Filename, "", "", true)
 	if err != nil {
 		return nil, err
 	}
+	initctx := NewInitContext(goja.New(), compiler, new(context.Context), arc.FS, arc.Pwd)
 	initctx.files = arc.Files
 
 	env := arc.Env
