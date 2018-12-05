@@ -260,3 +260,95 @@ func TestCloudCollector(t *testing.T) {
 	cancel()
 	wg.Wait()
 }
+
+func TestCloudCollectorMaxPerPacket(t *testing.T) {
+	t.Parallel()
+	tb := testutils.NewHTTPMultiBin(t)
+	var maxMetricSamplesPerPackage = 20
+	tb.Mux.HandleFunc("/v1/tests", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := fmt.Fprintf(w, `{
+			"reference_id": "12",
+			"config": {
+				"metricPushInterval": "200ms",
+				"aggregationPeriod": "100ms",
+				"maxMetricSamplesPerPackage": %d,
+				"aggregationCalcInterval": "100ms",
+				"aggregationWaitPeriod": "100ms"
+			}
+		}`, maxMetricSamplesPerPackage)
+		require.NoError(t, err)
+	}))
+	defer tb.Cleanup()
+
+	script := &lib.SourceData{
+		Data:     []byte(""),
+		Filename: "/script.js",
+	}
+
+	options := lib.Options{
+		External: map[string]json.RawMessage{
+			"loadimpact": json.RawMessage(tb.Replacer.Replace(`{
+				"host": "HTTPBIN_IP_URL",
+				"noCompress": true
+			}`)),
+		},
+		Duration: types.NullDurationFrom(1 * time.Second),
+	}
+
+	collector, err := New(NewConfig(), script, options, "1.0")
+	require.NoError(t, err)
+	now := time.Now()
+	tags := stats.IntoSampleTags(&map[string]string{"test": "mest", "a": "b"})
+	var gotTheLimit = false
+
+	tb.Mux.HandleFunc(fmt.Sprintf("/v1/metrics/%s", collector.referenceID),
+		func(w http.ResponseWriter, r *http.Request) {
+			body, err := ioutil.ReadAll(r.Body)
+			assert.NoError(t, err)
+			receivedSamples := []Sample{}
+			assert.NoError(t, json.Unmarshal(body, &receivedSamples))
+			assert.True(t, len(receivedSamples) <= maxMetricSamplesPerPackage)
+			if len(receivedSamples) == maxMetricSamplesPerPackage {
+				gotTheLimit = true
+			}
+		})
+
+	require.NoError(t, collector.Init())
+	ctx, cancel := context.WithCancel(context.Background())
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		collector.Run(ctx)
+		wg.Done()
+	}()
+
+	collector.Collect([]stats.SampleContainer{stats.Sample{
+		Time:   now,
+		Metric: metrics.VUs,
+		Tags:   stats.NewSampleTags(tags.CloneTags()),
+		Value:  1.0,
+	}})
+	for j := time.Duration(1); j <= 200; j++ {
+		var container = make([]stats.SampleContainer, 0, 500)
+		for i := time.Duration(1); i <= 50; i++ {
+			container = append(container, &netext.Trail{
+				Blocked:        i % 200 * 100 * time.Millisecond,
+				Connecting:     i % 200 * 200 * time.Millisecond,
+				TLSHandshaking: i % 200 * 300 * time.Millisecond,
+				Sending:        i * i * 400 * time.Millisecond,
+				Waiting:        500 * time.Millisecond,
+				Receiving:      600 * time.Millisecond,
+
+				EndTime:      now.Add(i * 100),
+				ConnDuration: 500 * time.Millisecond,
+				Duration:     j * i * 1500 * time.Millisecond,
+				Tags:         stats.NewSampleTags(tags.CloneTags()),
+			})
+		}
+		collector.Collect(container)
+	}
+
+	cancel()
+	wg.Wait()
+	require.True(t, gotTheLimit)
+}
