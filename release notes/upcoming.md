@@ -14,3 +14,4 @@ Description of feature.
 * JS: Fixed a Babel transformation issue that caused closing brackets to sometimes be commented out. (#853)
 * JS: Fixed environment variable propagation when executing script bundles. (#853)
 * HAR converter: Fixed a panic due to a missing nil check (#861)
+* Cloud: Limit the amount of samples that k6 sends in a single package to the ingest by splitting them up. (#860)
