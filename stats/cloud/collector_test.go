@@ -286,12 +286,6 @@ func TestCloudCollectorMaxPerPacket(t *testing.T) {
 	}
 
 	options := lib.Options{
-		External: map[string]json.RawMessage{
-			"loadimpact": json.RawMessage(tb.Replacer.Replace(`{
-				"host": "HTTPBIN_IP_URL",
-				"noCompress": true
-			}`)),
-		},
 		Duration: types.NullDurationFrom(1 * time.Second),
 	}
 
