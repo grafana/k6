@@ -137,6 +137,8 @@ func New(conf Config, src *lib.SourceData, opts lib.Options, version string) (*C
 	}, nil
 }
 
+// Init is called between the collector's creation and the call to Run().
+// You should do any lengthy setup here rather than in New.
 func (c *Collector) Init() error {
 	thresholds := make(map[string][]string)
 
@@ -176,10 +178,13 @@ func (c *Collector) Init() error {
 	return nil
 }
 
+// Link return a link that is shown to the user.
 func (c *Collector) Link() string {
 	return URLForResults(c.referenceID, c.config)
 }
 
+// Run is called in a goroutine and starts the collector. Should commit samples to the backend
+// at regular intervals and when the context is terminated.
 func (c *Collector) Run(ctx context.Context) {
 	wg := sync.WaitGroup{}
 
@@ -221,10 +226,8 @@ func (c *Collector) Run(ctx context.Context) {
 	}
 }
 
-func (c *Collector) IsReady() bool {
-	return true
-}
-
+// Collect receives a set of samples. This method is never called concurrently, and only while
+// the context for Run() is valid, but should defer as much work as possible to Run().
 func (c *Collector) Collect(sampleContainers []stats.SampleContainer) {
 	if c.referenceID == "" {
 		return
@@ -443,11 +446,18 @@ func (c *Collector) pushMetrics() {
 		"samples": len(buffer),
 	}).Debug("Pushing metrics to cloud")
 
-	err := c.client.PushMetric(c.referenceID, c.config.NoCompress.Bool, buffer)
-	if err != nil {
-		log.WithFields(log.Fields{
-			"error": err,
-		}).Warn("Failed to send metrics to cloud")
+	for len(buffer) > 0 {
+		var size = len(buffer)
+		if size > int(c.config.MaxMetricSamplesPerPackage.Int64) {
+			size = int(c.config.MaxMetricSamplesPerPackage.Int64)
+		}
+		err := c.client.PushMetric(c.referenceID, c.config.NoCompress.Bool, buffer[:size])
+		if err != nil {
+			log.WithFields(log.Fields{
+				"error": err,
+			}).Warn("Failed to send metrics to cloud")
+		}
+		buffer = buffer[size:]
 	}
 }
 
@@ -500,6 +510,7 @@ func (c *Collector) GetRequiredSystemTags() lib.TagSet {
 	return lib.GetTagSet("name", "method", "status", "error", "check", "group")
 }
 
+// SetRunStatus Set run status
 func (c *Collector) SetRunStatus(status lib.RunStatus) {
 	c.runStatus = status
 }
