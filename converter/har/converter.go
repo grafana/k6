@@ -70,6 +70,10 @@ func Convert(h HAR, options lib.Options, minSleep, maxSleep uint, enableChecks b
 		return "", errors.Errorf("correlation requires --no-batch")
 	}
 
+	if h.Log == nil {
+		return "", errors.Errorf("invalid HAR file supplied, the 'log' property is missing")
+	}
+
 	if enableChecks {
 		fprint(w, "import { group, check, sleep } from 'k6';\n")
 	} else {
