@@ -295,7 +295,11 @@ func TestCloudCollectorMaxPerPacket(t *testing.T) {
 		Duration: types.NullDurationFrom(1 * time.Second),
 	}
 
-	collector, err := New(NewConfig(), script, options, "1.0")
+	config := NewConfig().Apply(Config{
+		Host:       null.StringFrom(tb.ServerHTTP.URL),
+		NoCompress: null.BoolFrom(true),
+	})
+	collector, err := New(config, script, options, "1.0")
 	require.NoError(t, err)
 	now := time.Now()
 	tags := stats.IntoSampleTags(&map[string]string{"test": "mest", "a": "b"})
