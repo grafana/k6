@@ -22,7 +22,6 @@ package netext
 
 import (
 	"crypto/tls"
-	"fmt"
 	"net"
 	"net/http/httptrace"
 	"sync"
@@ -231,8 +230,8 @@ func (t *Tracer) GotConn(info httptrace.GotConnInfo) {
 	t.connRemoteAddr = info.Conn.RemoteAddr()
 
 	// The Go stdlib's http module can start connecting to a remote server, only
-	// to abondan that connection even before it was fully established and reuse
-	// a recently freeded already existing connection.
+	// to abandon that connection even before it was fully established and reuse
+	// a recently freed already existing connection.
 	// We overwrite the different timestamps here, so the other callbacks don't
 	// put incorrect values in them (they use CompareAndSwap)
 	_, isConnTLS := info.Conn.(*tls.Conn)
@@ -346,13 +345,6 @@ func (t *Tracer) Done() *Trail {
 	defer t.protoErrorsMutex.Unlock()
 	if len(t.protoErrors) > 0 {
 		trail.Errors = append([]error{}, t.protoErrors...)
-	}
-
-	//TODO: remove this debug code
-	for i, v := range []time.Duration{trail.Blocked, trail.Connecting, trail.TLSHandshaking, trail.Sending, trail.Waiting, trail.Receiving} {
-		if v < 0 || v > 65*time.Second {
-			fmt.Printf("WRONG TRACER VALUE %d: %s\n\n%#v\n\n\n%#v\n\n", i, v, t, trail)
-		}
 	}
 
 	return &trail
