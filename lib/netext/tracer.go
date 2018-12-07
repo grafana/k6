@@ -180,9 +180,9 @@ func (t *Tracer) ConnectDone(network, addr string, err error) {
 	// If using dual-stack dialing, it's possible to get this
 	// multiple times, so the atomic compareAndSwap ensures
 	// that only the first call's time is recorded
-	atomic.CompareAndSwapInt64(&t.connectDone, 0, now())
-
-	if err != nil {
+	if err == nil {
+		atomic.CompareAndSwapInt64(&t.connectDone, 0, now())
+	} else {
 		t.addError(err)
 	}
 }
@@ -206,9 +206,9 @@ func (t *Tracer) TLSHandshakeStart() {
 // If the request was cancelled, this could be called after the
 // RoundTrip() method has returned.
 func (t *Tracer) TLSHandshakeDone(state tls.ConnectionState, err error) {
-	atomic.CompareAndSwapInt64(&t.tlsHandshakeDone, 0, now())
-
-	if err != nil {
+	if err == nil {
+		atomic.CompareAndSwapInt64(&t.tlsHandshakeDone, 0, now())
+	} else {
 		t.addError(err)
 	}
 }
@@ -229,9 +229,34 @@ func (t *Tracer) GotConn(info httptrace.GotConnInfo) {
 	t.connReused = info.Reused
 	t.connRemoteAddr = info.Conn.RemoteAddr()
 
-	if t.connReused {
+	// The Go stdlib's http module can start connecting to a remote server, only
+	// to abandon that connection even before it was fully established and reuse
+	// a recently freed already existing connection.
+	// We overwrite the different timestamps here, so the other callbacks don't
+	// put incorrect values in them (they use CompareAndSwap)
+	_, isConnTLS := info.Conn.(*tls.Conn)
+	if info.Reused {
+		atomic.SwapInt64(&t.connectStart, now)
+		atomic.SwapInt64(&t.connectDone, now)
+		if isConnTLS {
+			atomic.SwapInt64(&t.tlsHandshakeStart, now)
+			atomic.SwapInt64(&t.tlsHandshakeDone, now)
+		}
+	} else {
+		// There's a bug in the Go stdlib where an HTTP/2 connection can be reused
+		// but the httptrace.GotConnInfo struct will contain a false Reused property...
+		// That's probably from a previously made connection that was abandoned and
+		// directly put in the connection pool in favor of a just-freed already
+		// established connection...
+		//
+		// Using CompareAndSwap here because the HTTP/2 roundtripper has retries and
+		// it's possible this isn't actually the first request attempt...
 		atomic.CompareAndSwapInt64(&t.connectStart, 0, now)
 		atomic.CompareAndSwapInt64(&t.connectDone, 0, now)
+		if isConnTLS {
+			atomic.CompareAndSwapInt64(&t.tlsHandshakeStart, 0, now)
+			atomic.CompareAndSwapInt64(&t.tlsHandshakeDone, 0, now)
+		}
 	}
 }
 
@@ -263,7 +288,7 @@ func (t *Tracer) Done() *Trail {
 		ConnRemoteAddr: t.connRemoteAddr,
 	}
 
-	if t.gotConn != 0 && t.getConn != 0 {
+	if t.gotConn != 0 && t.getConn != 0 && t.gotConn > t.getConn {
 		trail.Blocked = time.Duration(t.gotConn - t.getConn)
 	}
 
@@ -276,6 +301,7 @@ func (t *Tracer) Done() *Trail {
 	connectDone := atomic.LoadInt64(&t.connectDone)
 	tlsHandshakeStart := atomic.LoadInt64(&t.tlsHandshakeStart)
 	tlsHandshakeDone := atomic.LoadInt64(&t.tlsHandshakeDone)
+	gotConn := atomic.LoadInt64(&t.gotConn)
 	wroteRequest := atomic.LoadInt64(&t.wroteRequest)
 	gotFirstResponseByte := atomic.LoadInt64(&t.gotFirstResponseByte)
 
@@ -286,14 +312,22 @@ func (t *Tracer) Done() *Trail {
 		trail.TLSHandshaking = time.Duration(tlsHandshakeDone - tlsHandshakeStart)
 	}
 	if wroteRequest != 0 {
-		trail.Sending = time.Duration(wroteRequest - connectDone)
-		// If the request was sent over TLS, we need to use
-		// TLS Handshake Done time to calculate sending duration
 		if tlsHandshakeDone != 0 {
+			// If the request was sent over TLS, we need to use
+			// TLS Handshake Done time to calculate sending duration
 			trail.Sending = time.Duration(wroteRequest - tlsHandshakeDone)
+		} else if connectDone != 0 {
+			// Otherwise, use the end of the normal connection
+			trail.Sending = time.Duration(wroteRequest - connectDone)
+		} else {
+			// Finally, this handles the strange HTTP/2 case where the GotConn() hook
+			// gets called first, but with Reused=false
+			trail.Sending = time.Duration(wroteRequest - gotConn)
 		}
 
-		if gotFirstResponseByte != 0 {
+		if gotFirstResponseByte != 0 && gotFirstResponseByte > wroteRequest {
+			// For some requests, especially HTTP/2, the server starts responding before the
+			// client has finished sending the full request
 			trail.Waiting = time.Duration(gotFirstResponseByte - wroteRequest)
 		}
 	}
