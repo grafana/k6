@@ -15,3 +15,4 @@ Description of feature.
 * JS: Fixed environment variable propagation when executing script bundles. (#853)
 * HAR converter: Fixed a panic due to a missing nil check (#861)
 * Cloud: Limit the amount of samples that k6 sends in a single package to the ingest by splitting them up. (#860)
+* Metrics: Fix the incorrect tracing of some corner case HTTP requests (#862)
