@@ -549,19 +549,19 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:3d87ae21dd01efa1a49fdc98479b49eb59dc6d57f480e3968cf2c36de07d745e"
+  digest = "1:e1ac31e25fd520610e39e9bb01dc7812b44085930118d76a0c7835a785ece07e"
   name = "golang.org/x/net"
   packages = [
     "context",
     "html",
     "html/atom",
+    "http/httpguts",
     "http2",
     "http2/hpack",
     "idna",
-    "lex/httplex",
   ]
   pruneopts = "NUT"
-  revision = "ae89d30ce0c63142b652837da33d782e2b0a9b25"
+  revision = "351d144fa1fc0bd934e2408202be0c29f25e35a0"
 
 [[projects]]
   branch = "master"
