@@ -264,9 +264,9 @@ func (t *Tracer) GotConn(info httptrace.GotConnInfo) {
 // request and any body. It may be called multiple times
 // in the case of retried requests.
 func (t *Tracer) WroteRequest(info httptrace.WroteRequestInfo) {
-	atomic.StoreInt64(&t.wroteRequest, now())
-
-	if info.Err != nil {
+	if info.Err == nil {
+		atomic.StoreInt64(&t.wroteRequest, now())
+	} else {
 		t.addError(info.Err)
 	}
 }
