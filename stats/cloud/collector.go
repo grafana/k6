@@ -73,13 +73,13 @@ type Collector struct {
 // Verify that Collector implements lib.Collector
 var _ lib.Collector = &Collector{}
 
-// New creates a new cloud collector
-func New(conf Config, src *lib.SourceData, opts lib.Options, version string) (*Collector, error) {
-	if val, ok := opts.External["loadimpact"]; ok {
+// MergeFromExternal merges three fields from json in a loadimact key of the provided external map
+func MergeFromExternal(external map[string]json.RawMessage, conf Config) error {
+	if val, ok := external["loadimpact"]; ok {
 		// TODO: Important! Separate configs and fix the whole 2 configs mess!
 		tmpConfig := Config{}
 		if err := json.Unmarshal(val, &tmpConfig); err != nil {
-			return nil, err
+			return err
 		}
 		// Only take out the ProjectID, Name and Token from the options.ext.loadimpact map:
 		if tmpConfig.ProjectID.Valid {
@@ -92,6 +92,12 @@ func New(conf Config, src *lib.SourceData, opts lib.Options, version string) (*C
 			conf.Token = tmpConfig.Token
 		}
 	}
+	return nil
+}
+
+// New creates a new cloud collector
+func New(conf Config, src *lib.SourceData, opts lib.Options, version string) (*Collector, error) {
+	MergeFromExternal(opts.External, conf)
 
 	if conf.AggregationPeriod.Duration > 0 && (opts.SystemTags["vu"] || opts.SystemTags["iter"]) {
 		return nil, errors.New("Aggregation cannot be enabled if the 'vu' or 'iter' system tag is also enabled")
