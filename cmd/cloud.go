@@ -121,7 +121,9 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 			}
 		}
 
-		cloud.MergeFromExternal(arc.Options.External, &cloudConfig)
+		if err := cloud.MergeFromExternal(arc.Options.External, &cloudConfig); err != nil {
+			return err
+		}
 		if tmpCloudConfig == nil {
 			tmpCloudConfig = make(map[string]interface{}, 3)
 		}
