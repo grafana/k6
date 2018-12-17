@@ -121,7 +121,7 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 			}
 		}
 
-		cloud.MergeFromExternal(arc.Options.External, cloudConfig)
+		cloud.MergeFromExternal(arc.Options.External, &cloudConfig)
 		if tmpCloudConfig == nil {
 			tmpCloudConfig = make(map[string]interface{}, 3)
 		}
@@ -142,12 +142,6 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 		arc.Options.External["loadimpact"], err = json.Marshal(tmpCloudConfig)
 		if err != nil {
 			return err
-		}
-
-		if val, ok := arc.Options.External["loadimpact"]; ok {
-			if err := json.Unmarshal(val, &cloudConfig); err != nil {
-				return err
-			}
 		}
 
 		name := cloudConfig.Name.String

@@ -74,7 +74,7 @@ type Collector struct {
 var _ lib.Collector = &Collector{}
 
 // MergeFromExternal merges three fields from json in a loadimact key of the provided external map
-func MergeFromExternal(external map[string]json.RawMessage, conf Config) error {
+func MergeFromExternal(external map[string]json.RawMessage, conf *Config) error {
 	if val, ok := external["loadimpact"]; ok {
 		// TODO: Important! Separate configs and fix the whole 2 configs mess!
 		tmpConfig := Config{}
@@ -97,7 +97,7 @@ func MergeFromExternal(external map[string]json.RawMessage, conf Config) error {
 
 // New creates a new cloud collector
 func New(conf Config, src *lib.SourceData, opts lib.Options, version string) (*Collector, error) {
-	MergeFromExternal(opts.External, conf)
+	MergeFromExternal(opts.External, &conf)
 
 	if conf.AggregationPeriod.Duration > 0 && (opts.SystemTags["vu"] || opts.SystemTags["iter"]) {
 		return nil, errors.New("Aggregation cannot be enabled if the 'vu' or 'iter' system tag is also enabled")
