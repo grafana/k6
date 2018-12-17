@@ -21,6 +21,7 @@
 package cmd
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"os/signal"
@@ -103,19 +104,41 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 			return errors.New("Not logged in, please use `k6 login cloud`.")
 		}
 
-		// Start cloud test run
-		client := cloud.NewClient(cloudConfig.Token.String, cloudConfig.Host.String, Version)
-
 		arc := r.MakeArchive()
+		// TODO: Fix this
+		// We reuse cloud.Config for parsing options.ext.loadimpact, but this probably shouldn't be
+		// done as the idea of options.ext is that they are extensible without touching k6. But in
+		// order for this to happen we shouldn't actually marshall cloud.Config on top of it because
+		// it will be missing some fields that aren't actually mentioned in the struct.
+		// So in order for use to copy the fields that we need for loadimpact's api we unmarshal in
+		// map[string]interface{} and copy what we need if it isn't set already
+		var tmpCloudConfig map[string]interface{}
 		if val, ok := arc.Options.External["loadimpact"]; ok {
-			if err := json.Unmarshal(val, &cloudConfig); err != nil {
+			var dec = json.NewDecoder(bytes.NewReader(val))
+			dec.UseNumber() // otherwise float64 are used
+			if err := dec.Decode(&tmpCloudConfig); err != nil {
 				return err
 			}
 		}
+
+		if tmpCloudConfig == nil {
+			tmpCloudConfig = make(map[string]interface{}, 3)
+		}
+
+		if _, ok := tmpCloudConfig["token"]; !ok && cloudConfig.Token.Valid {
+			tmpCloudConfig["token"] = cloudConfig.Token
+		}
+		if _, ok := tmpCloudConfig["name"]; !ok && cloudConfig.Name.Valid {
+			tmpCloudConfig["name"] = cloudConfig.Name
+		}
+		if _, ok := tmpCloudConfig["projectID"]; !ok && cloudConfig.ProjectID.Valid {
+			tmpCloudConfig["projectID"] = cloudConfig.ProjectID
+		}
+
 		if arc.Options.External == nil {
 			arc.Options.External = make(map[string]json.RawMessage)
 		}
-		arc.Options.External["loadimpact"], err = json.Marshal(cloudConfig)
+		arc.Options.External["loadimpact"], err = json.Marshal(tmpCloudConfig)
 		if err != nil {
 			return err
 		}
@@ -125,6 +148,8 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 			name = filepath.Base(filename)
 		}
 
+		// Start cloud test run
+		client := cloud.NewClient(cloudConfig.Token.String, cloudConfig.Host.String, Version)
 		if err := client.ValidateOptions(arc.Options); err != nil {
 			return err
 		}
