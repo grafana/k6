@@ -285,7 +285,6 @@ func (r *Runner) runPart(ctx context.Context, out chan<- stats.SampleContainer, 
 		return goja.Undefined(), nil
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
 	go func() {
 		<-ctx.Done()
 		vu.Runtime.Interrupt(errInterrupt)
@@ -297,7 +296,16 @@ func (r *Runner) runPart(ctx context.Context, out chan<- stats.SampleContainer, 
 	}
 
 	v, _, err := vu.runFn(ctx, group, fn, vu.Runtime.ToValue(arg))
-	cancel()
+
+	// deadline is reached so we have timeouted but this might've not been registered correctly
+	if deadline, ok := ctx.Deadline(); ok && time.Now().After(deadline) {
+		// we could have an error that is not errInterrupt in which case we should return it instead
+		if err, ok := err.(*goja.InterruptedError); ok && v != nil && err.Value() != errInterrupt {
+			return v, err
+		}
+		// otherwise we have timeouted
+		return v, lib.NewTimeoutError(name)
+	}
 	return v, err
 }
 
