@@ -56,10 +56,11 @@ const (
 	typeJS      = "js"
 	typeArchive = "archive"
 
-	setupTimeoutErrorCode    = 100
-	teardownTimeoutErrorCode = 101
-	genericTimeoutErrorCode  = 102
-	genericEngineErrorCode   = 103
+	thresholdHaveFailedErroCode = 99
+	setupTimeoutErrorCode       = 100
+	teardownTimeoutErrorCode    = 101
+	genericTimeoutErrorCode     = 102
+	genericEngineErrorCode      = 103
 )
 
 var (
@@ -450,7 +451,7 @@ a commandline interface for interacting with it.`,
 		}
 
 		if engine.IsTainted() {
-			return ExitCode{errors.New("some thresholds have failed"), 99}
+			return ExitCode{errors.New("some thresholds have failed"), thresholdHaveFailedErroCode}
 		}
 		return nil
 	},
