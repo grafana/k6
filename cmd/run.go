@@ -55,6 +55,12 @@ import (
 const (
 	typeJS      = "js"
 	typeArchive = "archive"
+
+	thresholdHaveFailedErroCode = 99
+	setupTimeoutErrorCode       = 100
+	teardownTimeoutErrorCode    = 101
+	genericTimeoutErrorCode     = 102
+	genericEngineErrorCode      = 103
 )
 
 var (
@@ -379,13 +385,29 @@ a commandline interface for interacting with it.`,
 				progress.Progress = prog
 				fprintf(stdout, "%s\x1b[0K\r", progress.String())
 			case err := <-errC:
-				if err != nil {
-					log.WithError(err).Error("Engine error")
-				} else {
-					log.Debug("Engine terminated cleanly")
-				}
 				cancel()
-				break mainLoop
+				if err == nil {
+					log.Debug("Engine terminated cleanly")
+					break mainLoop
+				}
+
+				switch e := errors.Cause(err).(type) {
+				case lib.TimeoutError:
+					switch string(e) {
+					case "setup":
+						log.WithError(err).Error("Setup timeout")
+						return ExitCode{errors.New("Setup timeout"), setupTimeoutErrorCode}
+					case "teardown":
+						log.WithError(err).Error("Teardown timeout")
+						return ExitCode{errors.New("Teardown timeout"), teardownTimeoutErrorCode}
+					default:
+						log.WithError(err).Error("Engine timeout")
+						return ExitCode{errors.New("Engine timeout"), genericTimeoutErrorCode}
+					}
+				default:
+					log.WithError(err).Error("Engine error")
+					return ExitCode{errors.New("Engine Error"), genericEngineErrorCode}
+				}
 			case sig := <-sigC:
 				log.WithField("sig", sig).Debug("Exiting in response to signal")
 				cancel()
@@ -429,7 +451,7 @@ a commandline interface for interacting with it.`,
 		}
 
 		if engine.IsTainted() {
-			return ExitCode{errors.New("some thresholds have failed"), 99}
+			return ExitCode{errors.New("some thresholds have failed"), thresholdHaveFailedErroCode}
 		}
 		return nil
 	},
