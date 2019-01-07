@@ -10,4 +10,5 @@ Description of feature.
 
 ## Bugs fixed!
 
-* Category: description of bug. (#PR)
+* JS: Consistently report setup/teardown timeouts as such and switch the error message to be more
+  expressive (#890)
