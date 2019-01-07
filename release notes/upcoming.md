@@ -12,3 +12,4 @@ Description of feature.
 
 * JS: Consistently report setup/teardown timeouts as such and switch the error message to be more
   expressive (#890)
+* JS: Correctly exit with non zero exit code when setup or teardown timeouts (#892)
