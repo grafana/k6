@@ -30,6 +30,7 @@ import (
 	"github.com/loadimpact/k6/stats/cloud"
 	"github.com/loadimpact/k6/stats/influxdb"
 	"github.com/loadimpact/k6/stats/kafka"
+	"github.com/loadimpact/k6/stats/statsd/common"
 	"github.com/shibukawa/configdir"
 	"github.com/spf13/afero"
 	"github.com/spf13/pflag"
@@ -74,6 +75,8 @@ type Config struct {
 		InfluxDB influxdb.Config `json:"influxdb"`
 		Kafka    kafka.Config    `json:"kafka"`
 		Cloud    cloud.Config    `json:"cloud"`
+		StatsD   common.Config   `json:"statsd"`
+		Datadog  common.Config   `json:"datadog"`
 	} `json:"collectors"`
 }
 
@@ -97,6 +100,8 @@ func (c Config) Apply(cfg Config) Config {
 	c.Collectors.InfluxDB = c.Collectors.InfluxDB.Apply(cfg.Collectors.InfluxDB)
 	c.Collectors.Cloud = c.Collectors.Cloud.Apply(cfg.Collectors.Cloud)
 	c.Collectors.Kafka = c.Collectors.Kafka.Apply(cfg.Collectors.Kafka)
+	c.Collectors.StatsD = c.Collectors.StatsD.Apply(cfg.Collectors.StatsD)
+	c.Collectors.Datadog = c.Collectors.Datadog.Apply(cfg.Collectors.Datadog)
 	return c
 }
 

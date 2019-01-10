@@ -29,9 +29,11 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats/cloud"
+	"github.com/loadimpact/k6/stats/datadog"
 	"github.com/loadimpact/k6/stats/influxdb"
 	jsonc "github.com/loadimpact/k6/stats/json"
 	"github.com/loadimpact/k6/stats/kafka"
+	"github.com/loadimpact/k6/stats/statsd"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 )
@@ -41,6 +43,8 @@ const (
 	collectorJSON     = "json"
 	collectorKafka    = "kafka"
 	collectorCloud    = "cloud"
+	collectorStatsD   = "statsd"
+	collectorDatadog  = "datadog"
 )
 
 func parseCollector(s string) (t, arg string) {
@@ -93,6 +97,18 @@ func newCollector(collectorName, arg string, src *lib.SourceData, conf Config) (
 				config = config.Apply(cmdConfig)
 			}
 			return kafka.New(config)
+		case collectorStatsD:
+			config := conf.Collectors.StatsD
+			if err := loadConfig(&config, "statsd"); err != nil {
+				return nil, err
+			}
+			return statsd.New(config)
+		case collectorDatadog:
+			config := conf.Collectors.Datadog
+			if err := loadConfig(&config, "datadog"); err != nil {
+				return nil, err
+			}
+			return datadog.New(config)
 		default:
 			return nil, errors.Errorf("unknown output type: %s", collectorName)
 		}
