@@ -35,11 +35,11 @@ func TestNewThreshold(t *testing.T) {
 	rt := goja.New()
 	abortOnFail := false
 	gracePeriod := types.NullDurationFrom(2 * time.Second)
-	th, err := NewThreshold(src, rt, abortOnFail, gracePeriod)
+	th, err := newThreshold(src, rt, abortOnFail, gracePeriod)
 	assert.NoError(t, err)
 
 	assert.Equal(t, src, th.Source)
-	assert.False(t, th.Failed)
+	assert.False(t, th.LastFailed)
 	assert.NotNil(t, th.pgm)
 	assert.Equal(t, rt, th.rt)
 	assert.Equal(t, abortOnFail, th.AbortOnFail)
@@ -48,40 +48,40 @@ func TestNewThreshold(t *testing.T) {
 
 func TestThresholdRun(t *testing.T) {
 	t.Run("true", func(t *testing.T) {
-		th, err := NewThreshold(`1+1==2`, goja.New(), false, types.NullDuration{})
+		th, err := newThreshold(`1+1==2`, goja.New(), false, types.NullDuration{})
 		assert.NoError(t, err)
 
 		t.Run("no taint", func(t *testing.T) {
-			b, err := th.RunNoTaint()
+			b, err := th.runNoTaint()
 			assert.NoError(t, err)
 			assert.True(t, b)
-			assert.False(t, th.Failed)
+			assert.False(t, th.LastFailed)
 		})
 
 		t.Run("taint", func(t *testing.T) {
-			b, err := th.Run()
+			b, err := th.run()
 			assert.NoError(t, err)
 			assert.True(t, b)
-			assert.False(t, th.Failed)
+			assert.False(t, th.LastFailed)
 		})
 	})
 
 	t.Run("false", func(t *testing.T) {
-		th, err := NewThreshold(`1+1==4`, goja.New(), false, types.NullDuration{})
+		th, err := newThreshold(`1+1==4`, goja.New(), false, types.NullDuration{})
 		assert.NoError(t, err)
 
 		t.Run("no taint", func(t *testing.T) {
-			b, err := th.RunNoTaint()
+			b, err := th.runNoTaint()
 			assert.NoError(t, err)
 			assert.False(t, b)
-			assert.False(t, th.Failed)
+			assert.False(t, th.LastFailed)
 		})
 
 		t.Run("taint", func(t *testing.T) {
-			b, err := th.Run()
+			b, err := th.run()
 			assert.NoError(t, err)
 			assert.False(t, b)
-			assert.True(t, th.Failed)
+			assert.True(t, th.LastFailed)
 		})
 	})
 }
@@ -99,7 +99,7 @@ func TestNewThresholds(t *testing.T) {
 		assert.Len(t, ts.Thresholds, 2)
 		for i, th := range ts.Thresholds {
 			assert.Equal(t, sources[i], th.Source)
-			assert.False(t, th.Failed)
+			assert.False(t, th.LastFailed)
 			assert.False(t, th.AbortOnFail)
 			assert.NotNil(t, th.pgm)
 			assert.Equal(t, ts.Runtime, th.rt)
@@ -114,16 +114,16 @@ func TestNewThresholdsWithConfig(t *testing.T) {
 		assert.Len(t, ts.Thresholds, 0)
 	})
 	t.Run("two", func(t *testing.T) {
-		configs := []ThresholdConfig{
+		configs := []thresholdConfig{
 			{`1+1==2`, false, types.NullDuration{}},
 			{`1+1==4`, true, types.NullDuration{}},
 		}
-		ts, err := NewThresholdsWithConfig(configs)
+		ts, err := newThresholdsWithConfig(configs)
 		assert.NoError(t, err)
 		assert.Len(t, ts.Thresholds, 2)
 		for i, th := range ts.Thresholds {
 			assert.Equal(t, configs[i].Threshold, th.Source)
-			assert.False(t, th.Failed)
+			assert.False(t, th.LastFailed)
 			assert.Equal(t, configs[i].AbortOnFail, th.AbortOnFail)
 			assert.NotNil(t, th.pgm)
 			assert.Equal(t, ts.Runtime, th.rt)
@@ -134,7 +134,7 @@ func TestNewThresholdsWithConfig(t *testing.T) {
 func TestThresholdsUpdateVM(t *testing.T) {
 	ts, err := NewThresholds(nil)
 	assert.NoError(t, err)
-	assert.NoError(t, ts.UpdateVM(DummySink{"a": 1234.5}, 0))
+	assert.NoError(t, ts.updateVM(DummySink{"a": 1234.5}, 0))
 	assert.Equal(t, 1234.5, ts.Runtime.Get("a").ToFloat())
 }
 
@@ -170,7 +170,7 @@ func TestThresholdsRunAll(t *testing.T) {
 
 			assert.NoError(t, err)
 
-			b, err := ts.RunAll(runDuration)
+			b, err := ts.runAll(runDuration)
 
 			if data.err {
 				assert.Error(t, err)
