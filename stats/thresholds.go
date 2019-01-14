@@ -80,9 +80,7 @@ func (t Threshold) RunNoTaint() (bool, error) {
 
 func (t *Threshold) Run() (bool, error) {
 	b, err := t.RunNoTaint()
-	if !b {
-		t.Failed = true
-	}
+	t.Failed = !b
 	return b, err
 }
 
