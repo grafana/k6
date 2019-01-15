@@ -479,8 +479,8 @@ func (c *Collector) testFinished() {
 	for name, thresholds := range c.thresholds {
 		thresholdResults[name] = make(map[string]bool)
 		for _, t := range thresholds {
-			thresholdResults[name][t.Source] = t.Failed
-			if t.Failed {
+			thresholdResults[name][t.Source] = t.LastFailed
+			if t.LastFailed {
 				testTainted = true
 			}
 		}
