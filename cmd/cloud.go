@@ -93,7 +93,10 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 			return err
 		}
 
-		r.SetOptions(conf.Options)
+		err = r.SetOptions(conf.Options)
+		if err != nil {
+			return err
+		}
 
 		// Cloud config
 		cloudConfig := cloud.NewConfig().Apply(conf.Collectors.Cloud)
