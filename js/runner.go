@@ -58,6 +58,7 @@ type Runner struct {
 	Resolver   *dnscache.Resolver
 	RPSLimit   *rate.Limiter
 
+	console   *console
 	setupData []byte
 }
 
@@ -92,10 +93,12 @@ func NewFromBundle(b *Bundle) (*Runner, error) {
 			KeepAlive: 30 * time.Second,
 			DualStack: true,
 		},
+		console:  newConsole(),
 		Resolver: dnscache.New(0),
 	}
-	r.SetOptions(r.Bundle.Options)
-	return r, nil
+
+	err = r.SetOptions(r.Bundle.Options)
+	return r, err
 }
 
 func (r *Runner) MakeArchive() *lib.Archive {
@@ -179,7 +182,7 @@ func (r *Runner) newVU(samplesOut chan<- stats.SampleContainer) (*VU, error) {
 		Dialer:         dialer,
 		CookieJar:      cookieJar,
 		TLSConfig:      tlsConfig,
-		Console:        NewConsole(),
+		Console:        r.console,
 		BPool:          bpool.NewBufferPool(100),
 		Samples:        samplesOut,
 	}
@@ -260,13 +263,24 @@ func (r *Runner) GetOptions() lib.Options {
 	return r.Bundle.Options
 }
 
-func (r *Runner) SetOptions(opts lib.Options) {
+func (r *Runner) SetOptions(opts lib.Options) error {
 	r.Bundle.Options = opts
 
 	r.RPSLimit = nil
 	if rps := opts.RPS; rps.Valid {
 		r.RPSLimit = rate.NewLimiter(rate.Limit(rps.Int64), 1)
 	}
+
+	if consoleOutputFile := opts.ConsoleOutput; consoleOutputFile.Valid {
+		c, err := newFileConsole(consoleOutputFile.String)
+		if err != nil {
+			return err
+		}
+
+		r.console = c
+	}
+
+	return nil
 }
 
 // Runs an exported function in its own temporary VU, optionally with an argument. Execution is
@@ -322,7 +336,7 @@ type VU struct {
 	ID        int64
 	Iteration int64
 
-	Console *Console
+	Console *console
 	BPool   *bpool.BufferPool
 
 	Samples chan<- stats.SampleContainer
