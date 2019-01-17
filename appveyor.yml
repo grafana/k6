@@ -40,6 +40,7 @@ build_script:
 
 test_script:
   - cd %APPVEYOR_BUILD_FOLDER%
+  - go test -race ./...
 
 deploy_script:
   # Checking if the build has started by pushed tag
