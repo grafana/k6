@@ -25,7 +25,6 @@ install:
   - set PATH=%WIX%\bin;%PATH%
   # specific to go
   - set PATH=%GOPATH%\bin;%PATH%
-  - set CGO_ENABLED=1
 
 
 # build msi artifacts
