@@ -75,7 +75,10 @@ An archive is a fully self-contained test run, and can be executed identically e
 			return err
 		}
 
-		r.SetOptions(conf.Options)
+		err = r.SetOptions(conf.Options)
+		if err != nil {
+			return err
+		}
 
 		// Archive.
 		arc := r.MakeArchive()

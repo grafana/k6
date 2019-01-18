@@ -65,7 +65,7 @@ type Runner interface {
 	// `export let options = {}`); cmd/run.go will mix this in with CLI-, config- and env-provided
 	// values and write it back to the runner.
 	GetOptions() Options
-	SetOptions(opts Options)
+	SetOptions(opts Options) error
 }
 
 // A VU is a Virtual User, that can be scheduled by an Executor.
@@ -138,8 +138,9 @@ func (r MiniRunner) GetOptions() Options {
 	return r.Options
 }
 
-func (r *MiniRunner) SetOptions(opts Options) {
+func (r *MiniRunner) SetOptions(opts Options) error {
 	r.Options = opts
+	return nil
 }
 
 // A VU spawned by a MiniRunner.

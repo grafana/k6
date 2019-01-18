@@ -265,6 +265,14 @@
   version = "v1.3.0"
 
 [[projects]]
+  digest = "1:4059c14e87a2de3a434430340521b5feece186c1469eff0834c29a63870de3ed"
+  name = "github.com/konsorten/go-windows-terminal-sequences"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "5c8c8bd35d3832f5d134ae1e1e375b69a4d25242"
+  version = "v1.0.1"
+
+[[projects]]
   digest = "1:2578ea84d8555a62f49e5f750848ec5d3bad2e5ba9e3977186e407c7501d3b95"
   name = "github.com/kubernetes/helm"
   packages = ["pkg/strvals"]
@@ -413,14 +421,14 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:f9e30881a5a427fe87c58273f511fb6a10ee2c8ea55d409d7256ede192f7f4b7"
+  digest = "1:88925026dc080b29f50bc9c917224dac3d4fa1df614df38429c3b373130c9a56"
   name = "github.com/sirupsen/logrus"
   packages = [
     ".",
     "hooks/test",
   ]
   pruneopts = "NUT"
-  revision = "90150a8ed11b6ce285e77e8af2b0109559ce4777"
+  revision = "7eeb7b7cbdeb0a582a5b7a1512d91f956f1674aa"
 
 [[projects]]
   branch = "master"
