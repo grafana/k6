@@ -28,6 +28,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -1149,6 +1150,10 @@ func TestSystemTags(t *testing.T) {
 
 	httpURL, err := url.Parse(tb.ServerHTTP.URL)
 	require.NoError(t, err)
+	var connectionRefusedErrorText = "connect: connection refused"
+	if runtime.GOOS == "windows" {
+		connectionRefusedErrorText = "connectex: No connection could be made because the target machine actively refused it."
+	}
 
 	testedSystemTags := []struct{ tag, code, expVal string }{
 		{"proto", httpGet, "HTTP/1.1"},
@@ -1166,7 +1171,7 @@ func TestSystemTags(t *testing.T) {
 		{
 			"error",
 			tb.Replacer.Replace(`http.get("http://127.0.0.1:56789");`),
-			tb.Replacer.Replace(`dial tcp 127.0.0.1:56789: connect: connection refused`),
+			tb.Replacer.Replace(`dial tcp 127.0.0.1:56789: ` + connectionRefusedErrorText),
 		},
 	}
 
