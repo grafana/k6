@@ -2,11 +2,11 @@ TODO: Intro
 
 ## New Features!
 
-### Category: Title (#533)
+### New option: Setting a file for the console.log` to be redirected to (#833)
 
-Description of feature.
+You can now specify a file for all things logged by `console.log` to get written to. The CLI flag is `--console-output` and the env variable is `K6_CONSOLE_OUTPUT` with no way to be configured from inside the script for security reasons.
 
-**Docs**: [Title](http://k6.readme.io/docs/TODO)
+Thanks to @cheesedosa for both proposing and implementing this!
 
 ## Bugs fixed!
 
