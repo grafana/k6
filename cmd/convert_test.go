@@ -22,8 +22,8 @@ package cmd
 
 import (
 	"bytes"
+	"os"
 	"regexp"
-	"runtime"
 	"testing"
 
 	"io/ioutil"
@@ -122,11 +122,13 @@ export default function() {
 `
 
 func TestIntegrationConvertCmd(t *testing.T) {
-	harFile := "/input.har"
-	if runtime.GOOS == "windows" {
-		harFile = `C:\input.har`
+	var tmpFile, err = ioutil.TempFile("", "")
+	if err != nil {
+		t.Fatalf("Couldn't create temporary file: %s", err)
 	}
-
+	harFile := tmpFile.Name()
+	defer os.Remove(harFile)
+	tmpFile.Close()
 	t.Run("Correlate", func(t *testing.T) {
 		har, err := ioutil.ReadFile("testdata/example.har")
 		assert.NoError(t, err)
@@ -183,7 +185,7 @@ func TestIntegrationConvertCmd(t *testing.T) {
 		buf := &bytes.Buffer{}
 		defaultWriter = buf
 
-		err = convertCmd.RunE(convertCmd, []string{"/input.har"})
+		err = convertCmd.RunE(convertCmd, []string{harFile})
 		assert.NoError(t, err)
 		assert.Equal(t, testHARConvertResult, buf.String())
 	})
@@ -194,7 +196,7 @@ func TestIntegrationConvertCmd(t *testing.T) {
 
 		err = convertCmd.Flags().Set("output", "/output.js")
 		assert.NoError(t, err)
-		err = convertCmd.RunE(convertCmd, []string{"/input.har"})
+		err = convertCmd.RunE(convertCmd, []string{harFile})
 		assert.NoError(t, err)
 
 		output, err := afero.ReadFile(defaultFs, "/output.js")
