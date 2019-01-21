@@ -38,16 +38,16 @@ import (
 )
 
 var volumeRE = regexp.MustCompile(`^([a-zA-Z]):(.*)`)
-var sharedRE = regexp.MustCompile(`^//([^/]+)`) // matches a shared folder in Windows after backslack replacement. i.e //VMBOXSVR/k6/script.js
+var sharedRE = regexp.MustCompile(`^\\\\([^\\]+)`) // matches a shared folder in Windows before backslack replacement. i.e \\VMBOXSVR\k6\script.js
 var homeDirRE = regexp.MustCompile(`^(/[a-zA-Z])?/(Users|home|Documents and Settings)/(?:[^/]+)`)
 
-// Normalizes (to use a / path separator) and anonymizes a file path, by scrubbing usernames from home directories.
+// NormalizeAndAnonymizePath Normalizes (to use a / path separator) and anonymizes a file path, by scrubbing usernames from home directories.
 func NormalizeAndAnonymizePath(path string) string {
 	path = filepath.Clean(path)
 
 	p := volumeRE.ReplaceAllString(path, `/$1$2`)
-	p = strings.Replace(p, "\\", "/", -1)
 	p = sharedRE.ReplaceAllString(p, `/nobody`)
+	p = strings.Replace(p, "\\", "/", -1)
 	return homeDirRE.ReplaceAllString(p, `$1/$2/nobody`)
 }
 

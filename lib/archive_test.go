@@ -39,6 +39,7 @@ func TestNormalizeAndAnonymizePath(t *testing.T) {
 		"/Documents and Settings/myname/myfile.txt": "/Documents and Settings/nobody/myfile.txt",
 		"//etc/hosts":                                         "/etc/hosts",
 		"\\\\MYSHARED\\dir\\dir\\myfile.txt":                  "/nobody/dir/dir/myfile.txt",
+		"\\NOTSHARED\\dir\\dir\\myfile.txt":                   "/NOTSHARED/dir/dir/myfile.txt",
 		"C:\\Users\\myname\\dir\\myfile.txt":                  "/C/Users/nobody/dir/myfile.txt",
 		"D:\\Documents and Settings\\myname\\dir\\myfile.txt": "/D/Documents and Settings/nobody/dir/myfile.txt",
 	}
