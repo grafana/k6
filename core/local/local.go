@@ -175,7 +175,7 @@ func (e *Executor) Run(parent context.Context, engineOut chan<- stats.SampleCont
 			if reterr == nil {
 				reterr = err
 			} else if err != nil {
-				reterr = fmt.Errorf("Teardown error %#v\nPrevious error: %#v", err, reterr)
+				reterr = fmt.Errorf("teardown error %#v\nPrevious error: %#v", err, reterr)
 			}
 		}
 

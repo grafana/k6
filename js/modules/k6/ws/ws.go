@@ -40,7 +40,7 @@ import (
 )
 
 // ErrWSInInitContext is returned when websockets are using in the init context
-var ErrWSInInitContext = common.NewInitContextError("Using websockets in the init context is not supported")
+var ErrWSInInitContext = common.NewInitContextError("using websockets in the init context is not supported")
 
 type WS struct{}
 
@@ -96,13 +96,13 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 		paramsV = goja.Undefined()
 		callableV = args[0]
 	default:
-		return nil, errors.New("Invalid number of arguments to ws.connect")
+		return nil, errors.New("invalid number of arguments to ws.connect")
 	}
 
 	// Get the callable (required)
 	setupFn, isFunc := goja.AssertFunction(callableV)
 	if !isFunc {
-		return nil, errors.New("Last argument to ws.connect must be a function")
+		return nil, errors.New("last argument to ws.connect must be a function")
 	}
 
 	// Leave header to nil by default so we can pass it directly to the Dialer
