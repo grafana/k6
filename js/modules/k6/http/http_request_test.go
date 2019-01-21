@@ -346,10 +346,6 @@ func TestRequestAndBatch(t *testing.T) {
 	})
 	t.Run("HTTP/2", func(t *testing.T) {
 		stats.GetBufferedSamples(samples) // Clean up buffered samples from previous tests
-		state.Transport = &http.Transport{}
-		defer func() {
-			state.Transport = tb.HTTPTransport
-		}()
 		_, err := common.RunString(rt, `
 		let res = http.request("GET", "https://http2.akamai.com/demo");
 		if (res.status != 200) { throw new Error("wrong status: " + res.status) }
@@ -368,11 +364,6 @@ func TestRequestAndBatch(t *testing.T) {
 		}
 	})
 	t.Run("TLS", func(t *testing.T) {
-		state.Transport = &http.Transport{}
-		defer func() {
-			state.Transport = tb.HTTPTransport
-		}()
-
 		t.Run("cert_expired", func(t *testing.T) {
 			_, err := common.RunString(rt, `http.get("https://expired.badssl.com/");`)
 			assert.EqualError(t, err, "GoError: Get https://expired.badssl.com/: x509: certificate has expired or is not yet valid")
