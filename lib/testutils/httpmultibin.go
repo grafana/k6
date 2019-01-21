@@ -29,6 +29,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -44,8 +45,15 @@ import (
 // GetTLSClientConfig returns a TLS config that trusts the supplied
 // httptest.Server certificate as well as all the system root certificates
 func GetTLSClientConfig(t *testing.T, srv *httptest.Server) *tls.Config {
-	certs, err := x509.SystemCertPool()
-	require.NoError(t, err)
+	var err error
+
+	certs := x509.NewCertPool()
+
+	if runtime.GOOS != "windows" {
+		certs, err = x509.SystemCertPool()
+		require.NoError(t, err)
+	}
+
 	for _, c := range srv.TLS.Certificates {
 		roots, err := x509.ParseCertificates(c.Certificate[len(c.Certificate)-1])
 		require.NoError(t, err)

@@ -26,6 +26,7 @@ install:
   # specific to go
   - set PATH=%GOPATH%\bin;%PATH%
 
+
 # build msi artifacts
 build_script:
   # In case of non tag build, mock a version
@@ -35,6 +36,10 @@ build_script:
   - cd packaging
   - candle.exe -arch x64 -dVERSION=%VERSION% k6.wxs
   - light.exe -ext WixUIExtension k6.wixobj
+
+test_script:
+  - cd %APPVEYOR_BUILD_FOLDER%
+  - go test ./...
 
 deploy_script:
   # Checking if the build has started by pushed tag
