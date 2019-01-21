@@ -23,6 +23,7 @@ package lib
 import (
 	"bytes"
 	"fmt"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -36,12 +37,17 @@ func TestNormalizeAndAnonymizePath(t *testing.T) {
 		"/home/myname":                    "/home/nobody",
 		"/home/myname/foo/bar/myfile.txt": "/home/nobody/foo/bar/myfile.txt",
 		"/Users/myname/myfile.txt":        "/Users/nobody/myfile.txt",
-		"/Documents and Settings/myname/myfile.txt": "/Documents and Settings/nobody/myfile.txt",
-		"//etc/hosts":                                         "/etc/hosts",
+		"/Documents and Settings/myname/myfile.txt":           "/Documents and Settings/nobody/myfile.txt",
 		"\\\\MYSHARED\\dir\\dir\\myfile.txt":                  "/nobody/dir/dir/myfile.txt",
 		"\\NOTSHARED\\dir\\dir\\myfile.txt":                   "/NOTSHARED/dir/dir/myfile.txt",
 		"C:\\Users\\myname\\dir\\myfile.txt":                  "/C/Users/nobody/dir/myfile.txt",
 		"D:\\Documents and Settings\\myname\\dir\\myfile.txt": "/D/Documents and Settings/nobody/dir/myfile.txt",
+	}
+	// TODO: fix this - the issue is that filepath.Clean replaces `/` with whatever the path
+	// separator is on the current OS and as such this gets confused for shared folder on
+	// windows :( https://github.com/golang/go/issues/16111
+	if runtime.GOOS != "windows" {
+		testdata["//etc/hosts"] = "/etc/hosts"
 	}
 	for from, to := range testdata {
 		t.Run("path="+from, func(t *testing.T) {
