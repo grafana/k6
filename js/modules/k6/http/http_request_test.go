@@ -28,6 +28,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -137,6 +138,9 @@ func newRuntime(t *testing.T) (*testutils.HTTPMultiBin, *common.State, chan stat
 }
 
 func TestRequestAndBatch(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip()
+	}
 	t.Parallel()
 	tb, state, samples, rt, ctx := newRuntime(t)
 	defer tb.Cleanup()
@@ -345,7 +349,6 @@ func TestRequestAndBatch(t *testing.T) {
 	})
 	t.Run("HTTP/2", func(t *testing.T) {
 		stats.GetBufferedSamples(samples) // Clean up buffered samples from previous tests
-
 		_, err := common.RunString(rt, `
 		let res = http.request("GET", "https://http2.akamai.com/demo");
 		if (res.status != 200) { throw new Error("wrong status: " + res.status) }
@@ -1141,6 +1144,10 @@ func TestSystemTags(t *testing.T) {
 
 	httpURL, err := url.Parse(tb.ServerHTTP.URL)
 	require.NoError(t, err)
+	var connectionRefusedErrorText = "connect: connection refused"
+	if runtime.GOOS == "windows" {
+		connectionRefusedErrorText = "connectex: No connection could be made because the target machine actively refused it."
+	}
 
 	testedSystemTags := []struct{ tag, code, expVal string }{
 		{"proto", httpGet, "HTTP/1.1"},
@@ -1158,7 +1165,7 @@ func TestSystemTags(t *testing.T) {
 		{
 			"error",
 			tb.Replacer.Replace(`http.get("http://127.0.0.1:56789");`),
-			tb.Replacer.Replace(`dial tcp 127.0.0.1:56789: connect: connection refused`),
+			tb.Replacer.Replace(`dial tcp 127.0.0.1:56789: ` + connectionRefusedErrorText),
 		},
 	}
 

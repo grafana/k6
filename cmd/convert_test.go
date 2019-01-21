@@ -22,6 +22,8 @@ package cmd
 
 import (
 	"bytes"
+	"os"
+	"regexp"
 	"testing"
 
 	"io/ioutil"
@@ -120,6 +122,13 @@ export default function() {
 `
 
 func TestIntegrationConvertCmd(t *testing.T) {
+	var tmpFile, err = ioutil.TempFile("", "")
+	if err != nil {
+		t.Fatalf("Couldn't create temporary file: %s", err)
+	}
+	harFile := tmpFile.Name()
+	defer os.Remove(harFile)
+	tmpFile.Close()
 	t.Run("Correlate", func(t *testing.T) {
 		har, err := ioutil.ReadFile("testdata/example.har")
 		assert.NoError(t, err)
@@ -128,7 +137,8 @@ func TestIntegrationConvertCmd(t *testing.T) {
 		assert.NoError(t, err)
 
 		defaultFs = afero.NewMemMapFs()
-		err = afero.WriteFile(defaultFs, "/input.har", []byte(har), 0644)
+
+		err = afero.WriteFile(defaultFs, harFile, []byte(har), 0644)
 		assert.NoError(t, err)
 
 		buf := &bytes.Buffer{}
@@ -139,7 +149,7 @@ func TestIntegrationConvertCmd(t *testing.T) {
 		assert.NoError(t, convertCmd.Flags().Set("enable-status-code-checks", "true"))
 		assert.NoError(t, convertCmd.Flags().Set("return-on-failed-check", "true"))
 
-		err = convertCmd.RunE(convertCmd, []string{"/input.har"})
+		err = convertCmd.RunE(convertCmd, []string{harFile})
 
 		// reset the convertCmd to default flags. There must be a nicer and less error prone way to do this...
 		assert.NoError(t, convertCmd.Flags().Set("correlate", "false"))
@@ -147,40 +157,46 @@ func TestIntegrationConvertCmd(t *testing.T) {
 		assert.NoError(t, convertCmd.Flags().Set("enable-status-code-checks", "false"))
 		assert.NoError(t, convertCmd.Flags().Set("return-on-failed-check", "false"))
 
+		//Sanitizing to avoid windows problems with carriage returns
+		re := regexp.MustCompile(`\r`)
+		expected := re.ReplaceAllString(string(expectedTestPlan), ``)
+		result := re.ReplaceAllString(buf.String(), ``)
+
 		if assert.NoError(t, err) {
 			// assert.Equal suppresses the diff it is too big, so we add it as the test error message manually as well.
 			diff, _ := difflib.GetUnifiedDiffString(difflib.UnifiedDiff{
-				A:        difflib.SplitLines(string(expectedTestPlan)),
-				B:        difflib.SplitLines(buf.String()),
+				A:        difflib.SplitLines(expected),
+				B:        difflib.SplitLines(result),
 				FromFile: "Expected",
 				FromDate: "",
 				ToFile:   "Actual",
 				ToDate:   "",
 				Context:  1,
 			})
-			assert.Equal(t, string(expectedTestPlan), buf.String(), diff)
+
+			assert.Equal(t, expected, result, diff)
 		}
 	})
 	t.Run("Stdout", func(t *testing.T) {
 		defaultFs = afero.NewMemMapFs()
-		err := afero.WriteFile(defaultFs, "/input.har", []byte(testHAR), 0644)
+		err := afero.WriteFile(defaultFs, harFile, []byte(testHAR), 0644)
 		assert.NoError(t, err)
 
 		buf := &bytes.Buffer{}
 		defaultWriter = buf
 
-		err = convertCmd.RunE(convertCmd, []string{"/input.har"})
+		err = convertCmd.RunE(convertCmd, []string{harFile})
 		assert.NoError(t, err)
 		assert.Equal(t, testHARConvertResult, buf.String())
 	})
 	t.Run("Output file", func(t *testing.T) {
 		defaultFs = afero.NewMemMapFs()
-		err := afero.WriteFile(defaultFs, "/input.har", []byte(testHAR), 0644)
+		err := afero.WriteFile(defaultFs, harFile, []byte(testHAR), 0644)
 		assert.NoError(t, err)
 
 		err = convertCmd.Flags().Set("output", "/output.js")
 		assert.NoError(t, err)
-		err = convertCmd.RunE(convertCmd, []string{"/input.har"})
+		err = convertCmd.RunE(convertCmd, []string{harFile})
 		assert.NoError(t, err)
 
 		output, err := afero.ReadFile(defaultFs, "/output.js")
