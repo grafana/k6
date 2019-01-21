@@ -138,6 +138,9 @@ func newRuntime(t *testing.T) (*testutils.HTTPMultiBin, *common.State, chan stat
 }
 
 func TestRequestAndBatch(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip()
+	}
 	t.Parallel()
 	tb, state, samples, rt, ctx := newRuntime(t)
 	defer tb.Cleanup()
