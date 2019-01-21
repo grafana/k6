@@ -60,10 +60,10 @@ const (
 )
 
 // The serialized metric type is invalid.
-var ErrInvalidMetricType = errors.New("Invalid metric type")
+var ErrInvalidMetricType = errors.New("invalid metric type")
 
 // The serialized value type is invalid.
-var ErrInvalidValueType = errors.New("Invalid value type")
+var ErrInvalidValueType = errors.New("invalid value type")
 
 // A MetricType specifies the type of a metric.
 type MetricType int

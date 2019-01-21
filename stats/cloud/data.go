@@ -95,7 +95,7 @@ func (ct *Sample) UnmarshalJSON(p []byte) error {
 	case DataTypeAggregatedHTTPReqs:
 		s.Data = new(SampleDataAggregatedHTTPReqs)
 	default:
-		return fmt.Errorf("Unknown sample type '%s'", tmpSample.Type)
+		return fmt.Errorf("unknown sample type '%s'", tmpSample.Type)
 	}
 
 	if err := json.Unmarshal(tmpSample.Data, &s.Data); err != nil {

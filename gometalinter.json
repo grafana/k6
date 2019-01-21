@@ -4,8 +4,7 @@
 		"gofmt", "deadcode",
 		"varcheck", "structcheck", "errcheck",
 		"ineffassign", "interfacer", "unconvert",
-		"goconst", "gosimple", "staticcheck",
-		"misspell"
+		"goconst", "staticcheck", "misspell"
 	],
 	"Exclude": ["/usr/local/go/src", "/go/src", "rice-box.go"]
 }
