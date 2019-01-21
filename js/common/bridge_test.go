@@ -43,10 +43,14 @@ type bridgeTestFieldsType struct {
 
 type bridgeTestMethodsType struct{}
 
-func (bridgeTestMethodsType) ExportedFn()   {}
+func (bridgeTestMethodsType) ExportedFn() {}
+
+//lint:ignore U1000 needed for the actual test to check that it won't be seen
 func (bridgeTestMethodsType) unexportedFn() {}
 
-func (*bridgeTestMethodsType) ExportedPtrFn()   {}
+func (*bridgeTestMethodsType) ExportedPtrFn() {}
+
+//lint:ignore U1000 needed for the actual test to check that it won't be seen
 func (*bridgeTestMethodsType) unexportedPtrFn() {}
 
 type bridgeTestOddFieldsType struct {
