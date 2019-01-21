@@ -49,7 +49,7 @@ var ErrMetricsAddInInitContext = common.NewInitContextError("Adding to metrics i
 
 func newMetric(ctxPtr *context.Context, name string, t stats.MetricType, isTime []bool) (interface{}, error) {
 	if common.GetState(*ctxPtr) != nil {
-		return nil, errors.New("Metrics must be declared in the init context")
+		return nil, errors.New("metrics must be declared in the init context")
 	}
 
 	//TODO: move verification outside the JS
