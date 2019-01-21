@@ -23,7 +23,6 @@ package lib
 import (
 	"bytes"
 	"fmt"
-	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -31,9 +30,6 @@ import (
 )
 
 func TestNormalizeAndAnonymizePath(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip()
-	}
 	testdata := map[string]string{
 		"/tmp":                            "/tmp",
 		"/tmp/myfile.txt":                 "/tmp/myfile.txt",
