@@ -656,12 +656,15 @@ func (h *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, error) 
 	globalLimiter := NewSlotLimiter(int(state.Options.Batch.Int64))
 	perHostLimiter := NewMultiSlotLimiter(int(state.Options.BatchPerHost.Int64))
 
-	parseBatchRequest := func(key string, val goja.Value) (result *parsedHTTPRequest, err error) {
-		method := HTTP_METHOD_GET
-		var ok bool
-		var reqURL URL
-		var body interface{}
-		var params goja.Value
+	parseBatchRequest := func(key string, val goja.Value) (*parsedHTTPRequest, error) {
+		var (
+			method = HTTP_METHOD_GET
+			ok     bool
+			err    error
+			reqURL URL
+			body   interface{}
+			params goja.Value
+		)
 
 		switch data := val.Export().(type) {
 		case []interface{}:
@@ -713,7 +716,7 @@ func (h *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, error) 
 			// Handling of "http://example.com/" or http.url`http://example.com/{$id}`
 			reqURL, err = ToURL(data)
 			if err != nil {
-				return
+				return nil, err
 			}
 		}
 
