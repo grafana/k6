@@ -106,7 +106,7 @@ func (h *HTTP) Options(ctx context.Context, url goja.Value, args ...goja.Value) 
 
 // Request makes an http request of the provided `method` and returns a corresponding response by
 // taking goja.Values as arguments
-func (h *HTTP) Request(ctx context.Context, method string, url goja.Value, args ...goja.Value) (*HTTPResponse, error) {
+func (h *HTTP) Request(ctx context.Context, method string, url goja.Value, args ...goja.Value) (*Response, error) {
 	u, err := ToURL(url)
 	if err != nil {
 		return nil, err
@@ -399,7 +399,7 @@ func (h *HTTP) parseRequest(ctx context.Context, method string, reqURL URL, body
 
 // request() shouldn't mess with the goja runtime or other thread-unsafe
 // things because it's called concurrently by Batch()
-func (h *HTTP) request(ctx context.Context, preq *parsedHTTPRequest) (*HTTPResponse, error) {
+func (h *HTTP) request(ctx context.Context, preq *parsedHTTPRequest) (*Response, error) {
 	state := common.GetState(ctx)
 
 	respReq := &Request{
@@ -453,7 +453,7 @@ func (h *HTTP) request(ctx context.Context, preq *parsedHTTPRequest) (*HTTPRespo
 		}
 	}
 
-	resp := &HTTPResponse{ctx: ctx, URL: preq.url.URLString, Request: *respReq}
+	resp := &Response{ctx: ctx, URL: preq.url.URLString, Request: *respReq}
 	client := http.Client{
 		Transport: transport,
 		Timeout:   preq.timeout,
@@ -574,7 +574,7 @@ func (h *HTTP) request(ctx context.Context, preq *parsedHTTPRequest) (*HTTPRespo
 		resp.RemoteIP = remoteHost
 		resp.RemotePort = remotePort
 	}
-	resp.Timings = HTTPResponseTimings{
+	resp.Timings = ResponseTimings{
 		Duration:       stats.D(trail.Duration),
 		Blocked:        stats.D(trail.Blocked),
 		Connecting:     stats.D(trail.Connecting),
