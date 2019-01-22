@@ -56,7 +56,8 @@ var ErrHTTPForbiddenInInitContext = common.NewInitContextError("Making http requ
 // ErrBatchForbiddenInInitContext is used when batch was made in the init context
 var ErrBatchForbiddenInInitContext = common.NewInitContextError("Using batch in the init context is not supported")
 
-type HTTPRequest struct {
+// Request represent an http request
+type Request struct {
 	Method  string                          `json:"method"`
 	URL     string                          `json:"url"`
 	Headers map[string][]string             `json:"headers"`
@@ -64,38 +65,47 @@ type HTTPRequest struct {
 	Cookies map[string][]*HTTPRequestCookie `json:"cookies"`
 }
 
-func (h *HTTP) Get(ctx context.Context, url goja.Value, args ...goja.Value) (*HTTPResponse, error) {
+// Get makes an HTTP GET request and returns a corresponding response by taking goja.Values as arguments
+func (h *HTTP) Get(ctx context.Context, url goja.Value, args ...goja.Value) (*Response, error) {
 	// The body argument is always undefined for GETs and HEADs.
 	args = append([]goja.Value{goja.Undefined()}, args...)
 	return h.Request(ctx, HTTP_METHOD_GET, url, args...)
 }
 
-func (h *HTTP) Head(ctx context.Context, url goja.Value, args ...goja.Value) (*HTTPResponse, error) {
+// Head makes an HTTP HEAD request and returns a corresponding response by taking goja.Values as arguments
+func (h *HTTP) Head(ctx context.Context, url goja.Value, args ...goja.Value) (*Response, error) {
 	// The body argument is always undefined for GETs and HEADs.
 	args = append([]goja.Value{goja.Undefined()}, args...)
 	return h.Request(ctx, HTTP_METHOD_HEAD, url, args...)
 }
 
-func (h *HTTP) Post(ctx context.Context, url goja.Value, args ...goja.Value) (*HTTPResponse, error) {
+// Post makes an HTTP POST request and returns a corresponding response by taking goja.Values as arguments
+func (h *HTTP) Post(ctx context.Context, url goja.Value, args ...goja.Value) (*Response, error) {
 	return h.Request(ctx, HTTP_METHOD_POST, url, args...)
 }
 
-func (h *HTTP) Put(ctx context.Context, url goja.Value, args ...goja.Value) (*HTTPResponse, error) {
+// Put makes an HTTP PUT request and returns a corresponding response by taking goja.Values as arguments
+func (h *HTTP) Put(ctx context.Context, url goja.Value, args ...goja.Value) (*Response, error) {
 	return h.Request(ctx, HTTP_METHOD_PUT, url, args...)
 }
 
-func (h *HTTP) Patch(ctx context.Context, url goja.Value, args ...goja.Value) (*HTTPResponse, error) {
+// Patch makes a patch request and returns a corresponding response by taking goja.Values as arguments
+func (h *HTTP) Patch(ctx context.Context, url goja.Value, args ...goja.Value) (*Response, error) {
 	return h.Request(ctx, HTTP_METHOD_PATCH, url, args...)
 }
 
-func (h *HTTP) Del(ctx context.Context, url goja.Value, args ...goja.Value) (*HTTPResponse, error) {
+// Del makes an HTTP DELETE and returns a corresponding response by taking goja.Values as arguments
+func (h *HTTP) Del(ctx context.Context, url goja.Value, args ...goja.Value) (*Response, error) {
 	return h.Request(ctx, HTTP_METHOD_DELETE, url, args...)
 }
 
-func (h *HTTP) Options(ctx context.Context, url goja.Value, args ...goja.Value) (*HTTPResponse, error) {
+// Options makes an HTTP OPTIONS request and returns a corresponding response by taking goja.Values as arguments
+func (h *HTTP) Options(ctx context.Context, url goja.Value, args ...goja.Value) (*Response, error) {
 	return h.Request(ctx, HTTP_METHOD_OPTIONS, url, args...)
 }
 
+// Request makes an http request of the provided `method` and returns a corresponding response by
+// taking goja.Values as arguments
 func (h *HTTP) Request(ctx context.Context, method string, url goja.Value, args ...goja.Value) (*HTTPResponse, error) {
 	u, err := ToURL(url)
 	if err != nil {
@@ -392,7 +402,7 @@ func (h *HTTP) parseRequest(ctx context.Context, method string, reqURL URL, body
 func (h *HTTP) request(ctx context.Context, preq *parsedHTTPRequest) (*HTTPResponse, error) {
 	state := common.GetState(ctx)
 
-	respReq := &HTTPRequest{
+	respReq := &Request{
 		Method:  preq.req.Method,
 		URL:     preq.req.URL.String(),
 		Cookies: preq.mergedCookies,
@@ -628,6 +638,8 @@ func (h *HTTP) request(ctx context.Context, preq *parsedHTTPRequest) (*HTTPRespo
 	return resp, nil
 }
 
+// Batch makes multiple simultaneous HTTP requests. The provideds reqsV should be an array of request
+// objects. Batch returns an array of responses and/or error
 func (h *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, error) {
 	rt := common.GetRuntime(ctx)
 	state := common.GetState(ctx)

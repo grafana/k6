@@ -64,7 +64,7 @@ type HTTPResponse struct {
 	TLSCipherSuite string                   `json:"tls_cipher_suite"`
 	OCSP           netext.OCSP              `js:"ocsp" json:"ocsp"`
 	Error          string                   `json:"error"`
-	Request        HTTPRequest              `json:"request"`
+	Request        Request                  `json:"request"`
 
 	cachedJSON    goja.Value
 	validatedJSON bool
