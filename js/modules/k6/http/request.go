@@ -641,20 +641,11 @@ func (h *HTTP) request(ctx context.Context, preq *parsedHTTPRequest) (*HTTPRespo
 // Batch makes multiple simultaneous HTTP requests. The provideds reqsV should be an array of request
 // objects. Batch returns an array of responses and/or error
 func (h *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, error) {
-	rt := common.GetRuntime(ctx)
 	state := common.GetState(ctx)
 	if state == nil {
 		return nil, ErrBatchForbiddenInInitContext
 	}
-
-	// Return values; retval must be guarded by the mutex.
-	var mutex sync.Mutex
-	retval := rt.NewObject()
-	errs := make(chan error)
-
-	// Concurrency limits.
-	globalLimiter := NewSlotLimiter(int(state.Options.Batch.Int64))
-	perHostLimiter := NewMultiSlotLimiter(int(state.Options.BatchPerHost.Int64))
+	rt := common.GetRuntime(ctx)
 
 	reqs := reqsV.ToObject(rt)
 	keys := reqs.Keys()
@@ -662,11 +653,21 @@ func (h *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, error) 
 	for _, key := range keys {
 		parsedReq, err := h.parseBatchRequest(ctx, key, reqs.Get(key))
 		if err != nil {
-			return retval, err
+			return nil, err
 		}
 		parsedReqs[key] = parsedReq
 	}
 
+	var (
+		// Return values; retval must be guarded by the mutex.
+		mutex  sync.Mutex
+		retval = rt.NewObject()
+		errs   = make(chan error)
+
+		// Concurrency limits.
+		globalLimiter  = NewSlotLimiter(int(state.Options.Batch.Int64))
+		perHostLimiter = NewMultiSlotLimiter(int(state.Options.BatchPerHost.Int64))
+	)
 	for k, pr := range parsedReqs {
 		go func(key string, parsedReq *parsedHTTPRequest) {
 			globalLimiter.Begin()
