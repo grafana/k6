@@ -656,78 +656,11 @@ func (h *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, error) 
 	globalLimiter := NewSlotLimiter(int(state.Options.Batch.Int64))
 	perHostLimiter := NewMultiSlotLimiter(int(state.Options.BatchPerHost.Int64))
 
-	parseBatchRequest := func(key string, val goja.Value) (*parsedHTTPRequest, error) {
-		var (
-			method = HTTP_METHOD_GET
-			ok     bool
-			err    error
-			reqURL URL
-			body   interface{}
-			params goja.Value
-		)
-
-		switch data := val.Export().(type) {
-		case []interface{}:
-			// Handling of ["GET", "http://example.com/"]
-			dataLen := len(data)
-			if dataLen < 2 {
-				return nil, fmt.Errorf("invalid batch request '%#v'", data)
-			}
-			method, ok = data[0].(string)
-			if !ok {
-				return nil, fmt.Errorf("invalid method type '%#v'", data[0])
-			}
-			reqURL, err = ToURL(data[1])
-			if err != nil {
-				return nil, err
-			}
-			if dataLen > 2 {
-				body = data[2]
-			}
-			if dataLen > 3 {
-				params = rt.ToValue(data[3])
-			}
-
-		case map[string]interface{}:
-			// Handling of {method: "GET", url: "http://test.loadimpact.com"}
-			if murl, ok := data["url"]; !ok {
-				return nil, fmt.Errorf("batch request %s doesn't have an url key", key)
-			} else if reqURL, err = ToURL(murl); err != nil {
-				return nil, err
-			}
-
-			body = data["body"] // It's fine if it's missing, the map lookup will return
-
-			if newMethod, ok := data["method"]; ok {
-				if method, ok = newMethod.(string); !ok {
-					return nil, fmt.Errorf("invalid method type '%#v'", newMethod)
-				}
-				method = strings.ToUpper(method)
-				if method == HTTP_METHOD_GET || method == HTTP_METHOD_HEAD {
-					body = nil
-				}
-			}
-
-			if p, ok := data["params"]; ok {
-				params = rt.ToValue(p)
-			}
-
-		default:
-			// Handling of "http://example.com/" or http.url`http://example.com/{$id}`
-			reqURL, err = ToURL(data)
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		return h.parseRequest(ctx, method, reqURL, body, params)
-	}
-
 	reqs := reqsV.ToObject(rt)
 	keys := reqs.Keys()
 	parsedReqs := map[string]*parsedHTTPRequest{}
 	for _, key := range keys {
-		parsedReq, err := parseBatchRequest(key, reqs.Get(key))
+		parsedReq, err := h.parseBatchRequest(ctx, key, reqs.Get(key))
 		if err != nil {
 			return retval, err
 		}
@@ -765,6 +698,74 @@ func (h *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, error) 
 		}
 	}
 	return retval, err
+}
+
+func (h *HTTP) parseBatchRequest(ctx context.Context, key string, val goja.Value) (*parsedHTTPRequest, error) {
+	var (
+		method = HTTP_METHOD_GET
+		ok     bool
+		err    error
+		reqURL URL
+		body   interface{}
+		params goja.Value
+		rt     = common.GetRuntime(ctx)
+	)
+
+	switch data := val.Export().(type) {
+	case []interface{}:
+		// Handling of ["GET", "http://example.com/"]
+		dataLen := len(data)
+		if dataLen < 2 {
+			return nil, fmt.Errorf("invalid batch request '%#v'", data)
+		}
+		method, ok = data[0].(string)
+		if !ok {
+			return nil, fmt.Errorf("invalid method type '%#v'", data[0])
+		}
+		reqURL, err = ToURL(data[1])
+		if err != nil {
+			return nil, err
+		}
+		if dataLen > 2 {
+			body = data[2]
+		}
+		if dataLen > 3 {
+			params = rt.ToValue(data[3])
+		}
+
+	case map[string]interface{}:
+		// Handling of {method: "GET", url: "http://test.loadimpact.com"}
+		if murl, ok := data["url"]; !ok {
+			return nil, fmt.Errorf("batch request %s doesn't have an url key", key)
+		} else if reqURL, err = ToURL(murl); err != nil {
+			return nil, err
+		}
+
+		body = data["body"] // It's fine if it's missing, the map lookup will return
+
+		if newMethod, ok := data["method"]; ok {
+			if method, ok = newMethod.(string); !ok {
+				return nil, fmt.Errorf("invalid method type '%#v'", newMethod)
+			}
+			method = strings.ToUpper(method)
+			if method == HTTP_METHOD_GET || method == HTTP_METHOD_HEAD {
+				body = nil
+			}
+		}
+
+		if p, ok := data["params"]; ok {
+			params = rt.ToValue(p)
+		}
+
+	default:
+		// Handling of "http://example.com/" or http.url`http://example.com/{$id}`
+		reqURL, err = ToURL(data)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return h.parseRequest(ctx, method, reqURL, body, params)
 }
 
 func requestContainsFile(data map[string]interface{}) bool {
