@@ -79,8 +79,8 @@ func (res *Response) setTLSInfo(tlsState *tls.ConnectionState) {
 	res.OCSP = oscp
 }
 
-// Json parses the body of a response as json and returns it to the goja VM
-func (res *Response) Json(selector ...string) goja.Value {
+// JSON parses the body of a response as json and returns it to the goja VM
+func (res *Response) JSON(selector ...string) goja.Value {
 	hasSelector := len(selector) > 0
 	if res.cachedJSON == nil || hasSelector {
 		var v interface{}
@@ -120,8 +120,8 @@ func (res *Response) Json(selector ...string) goja.Value {
 	return res.cachedJSON
 }
 
-// Html returns the body as an html.Selection
-func (res *Response) Html(selector ...string) html.Selection {
+// HTML returns the body as an html.Selection
+func (res *Response) HTML(selector ...string) html.Selection {
 	var body string
 	switch b := res.Body.(type) {
 	case []byte:
@@ -170,7 +170,7 @@ func (res *Response) SubmitForm(args ...goja.Value) (*Response, error) {
 		}
 	}
 
-	form := res.Html(formSelector)
+	form := res.HTML(formSelector)
 	if form.Size() == 0 {
 		common.Throw(rt, fmt.Errorf("no form found for selector '%s' in response '%s'", formSelector, res.URL))
 	}
@@ -229,8 +229,8 @@ func (res *Response) SubmitForm(args ...goja.Value) (*Response, error) {
 	return New().Request(res.ctx, requestMethod, rt.ToValue(requestURL.String()), rt.ToValue(values), requestParams)
 }
 
-// ClickLink parses the body as an html, looks for a link and than make a request as if the link was
-// cliecked
+// ClickLink parses the body as an html, looks for a link and than makes a request as if the link was
+// clicked
 func (res *Response) ClickLink(args ...goja.Value) (*Response, error) {
 	rt := common.GetRuntime(res.ctx)
 
@@ -253,7 +253,7 @@ func (res *Response) ClickLink(args ...goja.Value) (*Response, error) {
 		common.Throw(rt, err)
 	}
 
-	link := res.Html(selector)
+	link := res.HTML(selector)
 	if link.Size() == 0 {
 		common.Throw(rt, fmt.Errorf("no element found for selector '%s' in response '%s'", selector, res.URL))
 	}
@@ -265,7 +265,7 @@ func (res *Response) ClickLink(args ...goja.Value) (*Response, error) {
 	if err != nil {
 		common.Throw(rt, err)
 	}
-	requestURL := responseUrl.ResolveReference(hrefUrl)
+	requestURL := responseURL.ResolveReference(hrefURL)
 
 	return New().Get(res.ctx, rt.ToValue(requestURL.String()), requestParams)
 }
