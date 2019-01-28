@@ -66,10 +66,30 @@ type Response struct {
 	TLSCipherSuite string                   `json:"tls_cipher_suite"`
 	OCSP           netext.OCSP              `js:"ocsp" json:"ocsp"`
 	Error          string                   `json:"error"`
+	ErrorCode      int                      `json:"error_code"`
 	Request        Request                  `json:"request"`
 
 	cachedJSON    goja.Value
 	validatedJSON bool
+}
+
+// This should be used instead of setting Error as it will correctly set ErrorCode as well
+func (res *Response) setError(err error) {
+	var errorCode, errorMsg = errorCodeForError(err)
+	res.ErrorCode = int(errorCode)
+	if errorMsg == "" {
+		errorMsg = err.Error()
+	}
+	res.Error = errorMsg
+}
+
+// This should be used instead of setting Error as it will correctly set ErrorCode as well
+func (res *Response) setStatusCode(statusCode int) {
+	res.Status = statusCode
+	if statusCode >= 400 && statusCode < 600 {
+		res.ErrorCode = 1000 + statusCode
+		// TODO: maybe set the res.Error to some custom message
+	}
 }
 
 func (res *Response) setTLSInfo(tlsState *tls.ConnectionState) {
