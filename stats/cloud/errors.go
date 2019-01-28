@@ -38,26 +38,65 @@ var (
 type ErrorResponse struct {
 	Response *http.Response `json:"-"`
 
-	Code    int               `json:"code"`
-	Message string            `json:"message"`
-	Details map[string]string `json:"details"`
+	Code        int                 `json:"code"`
+	Message     string              `json:"message"`
+	Details     map[string][]string `json:"details"`
+	FieldErrors map[string][]string `json:"field_errors"`
+	Errors      []string            `json:"errors"`
+}
+
+func contains(s []string, e string) bool {
+	for _, a := range s {
+		if a == e {
+			return true
+		}
+	}
+	return false
 }
 
 func (e ErrorResponse) Error() string {
 	msg := e.Message
-	if e.Response != nil {
-		msg = fmt.Sprintf("%d %s", e.Response.StatusCode, msg)
-	}
-	if e.Code != 0 {
-		msg = fmt.Sprintf("%s [err code %d]", msg, e.Code)
+
+	for _, v := range e.Errors {
+		// atm: `errors` and `message` could be duplicated
+		// TODO: remove condition when the API changes
+		if v != msg {
+			msg += "\n " + v
+		}
 	}
 
+	// `e.Details` is the old API version
+	// TODO: do not handle `details` when the old API becomes obsolete
 	var details []string
+	var detail string
 	for k, v := range e.Details {
-		details = append(details, k+" ("+v+")")
+		detail = k + ": " + strings.Join(v, ", ")
+		details = append(details, detail)
 	}
+
+	for k, v := range e.FieldErrors {
+		detail = k + ": " + strings.Join(v, ", ")
+		// atm: `details` and `field_errors` could be duplicated
+		if !contains(details, detail) {
+			details = append(details, detail)
+		}
+	}
+
 	if len(details) > 0 {
-		msg += ": " + strings.Join(details, ", ")
+		msg += "\n " + strings.Join(details, "\n")
+	}
+
+	var code string
+	if e.Code > 0 && e.Response != nil {
+		code = fmt.Sprintf("%d/E%d", e.Response.StatusCode, e.Code)
+	} else if e.Response != nil {
+		code = fmt.Sprintf("%d", e.Response.StatusCode)
+	} else if e.Code > 0 {
+		code = fmt.Sprintf("E%d", e.Code)
+	}
+
+	if len(code) > 0 {
+		msg = fmt.Sprintf("(%s) %s", code, msg)
 	}
 
 	return msg
