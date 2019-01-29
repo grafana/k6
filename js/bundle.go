@@ -224,7 +224,7 @@ func (b *Bundle) Instantiate() (bi *BundleInstance, instErr error) {
 	} else {
 		jsOptionsObj = jsOptions.ToObject(rt)
 	}
-	b.Options.ForEachValid("json", func(key string, val interface{}) {
+	b.Options.ForEachSpecified("json", func(key string, val interface{}) {
 		if err := jsOptionsObj.Set(key, val); err != nil {
 			instErr = err
 		}
