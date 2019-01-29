@@ -37,6 +37,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
+
 	"github.com/loadimpact/k6/api"
 	"github.com/loadimpact/k6/core"
 	"github.com/loadimpact/k6/core/local"
@@ -61,6 +63,7 @@ const (
 	teardownTimeoutErrorCode    = 101
 	genericTimeoutErrorCode     = 102
 	genericEngineErrorCode      = 103
+	invalidOptionsErrorCode     = 104
 )
 
 var (
@@ -163,6 +166,18 @@ a commandline interface for interacting with it.`,
 		// If duration is explicitly set to 0, it means run forever.
 		if conf.Duration.Valid && conf.Duration.Duration == 0 {
 			conf.Duration = types.NullDuration{}
+		}
+
+		//TODO: move a bunch of the logic above to a config "constructor" and to the Validate() method
+		spew.Dump(conf.Options.Execution)
+		if errList := conf.Validate(); len(errList) != 0 {
+			errMsg := []string{
+				fmt.Sprintf("There were %d errors with the script options:", len(errList)),
+			}
+			for _, err := range errList {
+				errMsg = append(errMsg, fmt.Sprintf("\t- %s", err.Error()))
+			}
+			return ExitCode{errors.New(strings.Join(errMsg, "\n")), invalidOptionsErrorCode}
 		}
 
 		// If summary trend stats are defined, update the UI to reflect them

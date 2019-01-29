@@ -27,6 +27,7 @@ import (
 	"net"
 	"reflect"
 
+	"github.com/loadimpact/k6/lib/scheduler"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 	"github.com/pkg/errors"
@@ -194,6 +195,8 @@ type Options struct {
 	Iterations null.Int           `json:"iterations" envconfig:"iterations"`
 	Stages     []Stage            `json:"stages" envconfig:"stages"`
 
+	Execution scheduler.ConfigMap `json:"execution" envconfig:"execution"`
+
 	// Timeouts for the setup() and teardown() functions
 	SetupTimeout    types.NullDuration `json:"setupTimeout" envconfig:"setup_timeout"`
 	TeardownTimeout types.NullDuration `json:"teardownTimeout" envconfig:"teardown_timeout"`
@@ -307,6 +310,12 @@ func (o Options) Apply(opts Options) Options {
 			}
 		}
 	}
+
+	//TODO: handle o.Execution overwriting by plain vus/iterations/duration/stages options
+	if len(opts.Execution) > 0 {
+		o.Execution = opts.Execution
+	}
+
 	if opts.SetupTimeout.Valid {
 		o.SetupTimeout = opts.SetupTimeout
 	}
@@ -395,10 +404,17 @@ func (o Options) Apply(opts Options) Options {
 	return o
 }
 
-// ForEachValid enumerates all struct fields and calls the supplied function with each
+// Validate checks if all of the specified options make sense
+func (o Options) Validate() []error {
+	//TODO: validate all of the other options... that we should have already been validating...
+	//TODO: maybe integrate an external validation lib: https://github.com/avelino/awesome-go#validation
+	return o.Execution.Validate()
+}
+
+// ForEachSpecified enumerates all struct fields and calls the supplied function with each
 // element that is valid. It panics for any unfamiliar or unexpected fields, so make sure
 // new fields in Options are accounted for.
-func (o Options) ForEachValid(structTag string, callback func(key string, value interface{})) {
+func (o Options) ForEachSpecified(structTag string, callback func(key string, value interface{})) {
 	structType := reflect.TypeOf(o)
 	structVal := reflect.ValueOf(o)
 	for i := 0; i < structType.NumField(); i++ {
