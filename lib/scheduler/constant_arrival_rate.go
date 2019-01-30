@@ -17,7 +17,7 @@ type ConstantArrivalRateConfig struct {
 	TimeUnit types.NullDuration `json:"timeUnit"` //TODO: rename to something else?
 	Duration types.NullDuration `json:"duration"`
 
-	// Initialize `PreAllocatedVUs` numeber of VUs, and if more than that are needed,
+	// Initialize `PreAllocatedVUs` number of VUs, and if more than that are needed,
 	// they will be dynamically allocated, until `MaxVUs` is reached, which is an
 	// absolutely hard limit on the number of VUs the scheduler will use
 	PreAllocatedVUs null.Int `json:"preAllocatedVUs"`
