@@ -195,7 +195,7 @@ type Options struct {
 	Iterations null.Int           `json:"iterations" envconfig:"iterations"`
 	Stages     []Stage            `json:"stages" envconfig:"stages"`
 
-	Execution scheduler.ConfigMap `json:"execution" envconfig:"execution"`
+	Execution scheduler.ConfigMap `json:"execution,omitempty" envconfig:"execution"`
 
 	// Timeouts for the setup() and teardown() functions
 	SetupTimeout    types.NullDuration `json:"setupTimeout" envconfig:"setup_timeout"`

@@ -19,7 +19,7 @@ type VariableArrivalRateConfig struct {
 	Stages    json.RawMessage    `json:"stages"`   //TODO: figure out some equivalent to stages?
 	//TODO: maybe move common parts between this and the ConstantArrivalRateConfig in another struct?
 
-	// Initialize `PreAllocatedVUs` numeber of VUs, and if more than that are needed,
+	// Initialize `PreAllocatedVUs` number of VUs, and if more than that are needed,
 	// they will be dynamically allocated, until `MaxVUs` is reached, which is an
 	// absolutely hard limit on the number of VUs the scheduler will use
 	PreAllocatedVUs null.Int `json:"preAllocatedVUs"`
