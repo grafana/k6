@@ -42,7 +42,7 @@ func generateThreshold(t stats.Threshold) Threshold {
 
 	return Threshold{
 		Name:   tSource,
-		Failed: t.Failed,
+		Failed: t.LastFailed,
 	}
 }
 
