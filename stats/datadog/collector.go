@@ -21,28 +21,57 @@
 package datadog
 
 import (
-	"fmt"
+	"sort"
+	"strings"
 
 	"github.com/loadimpact/k6/stats/statsd/common"
 	log "github.com/sirupsen/logrus"
+	null "gopkg.in/guregu/null.v3"
 )
 
-// TagHandler defines a tag handler type
-type TagHandler struct{}
+type tagHandler sort.StringSlice
 
-// Process implements the interface method of Tagger
-func (t *TagHandler) Process(whitelist string) func(map[string]string, string) []string {
-	return func(tags map[string]string, group string) []string {
-		slice := common.MapToSlice(
-			common.TakeOnly(tags, whitelist),
-		)
-		return append(slice, fmt.Sprintf("group:%s", group))
+func (t tagHandler) filterTags(tags map[string]string, group string) []string {
+	var res []string
+
+	for key, value := range tags {
+		if value != "" && t.contains(key) {
+			res = append(res, key+":"+value)
+		}
 	}
+	return append(res, "group:"+group)
+}
+
+func (t tagHandler) contains(key string) bool {
+	var n = ((sort.StringSlice)(t)).Search(key)
+	return n != len(t) && t[n] == key
+}
+
+// Config defines the datadog configuration
+type Config struct {
+	common.Config
+
+	Namespace    null.String `json:"namespace,omitempty"`
+	TagWhitelist null.String `json:"tag_whitelist,omitempty" envconfig:"tag_whitelist" default:"status, method"`
+}
+
+// Apply returns config with defaults applied
+func (c Config) Apply(cfg Config) Config {
+	c.Config.Apply(cfg.Config)
+
+	if cfg.Namespace.Valid {
+		c.Namespace = cfg.Namespace
+	}
+	if cfg.TagWhitelist.Valid {
+		c.TagWhitelist = cfg.TagWhitelist
+	}
+
+	return c
 }
 
 // New creates a new statsd connector client
-func New(conf common.Config) (*common.Collector, error) {
-	cl, err := common.MakeClient(conf, common.Datadog)
+func New(conf Config) (*common.Collector, error) {
+	cl, err := common.MakeClient(conf.Config, common.Datadog)
 	if err != nil {
 		return nil, err
 	}
@@ -51,11 +80,16 @@ func New(conf common.Config) (*common.Collector, error) {
 		cl.Namespace = namespace
 	}
 
+	var tagsWhitelist = sort.StringSlice(strings.Split(conf.TagWhitelist.String, ","))
+	for index := range tagsWhitelist {
+		tagsWhitelist[index] = strings.TrimSpace(tagsWhitelist[index])
+	}
+	tagsWhitelist.Sort()
 	return &common.Collector{
-		Client: cl,
-		Config: conf,
-		Logger: log.WithField("type", common.Datadog.String()),
-		Type:   common.Datadog,
-		Tagger: &TagHandler{},
+		Client:     cl,
+		Config:     conf.Config,
+		Logger:     log.WithField("type", common.Datadog.String()),
+		Type:       common.Datadog,
+		FilterTags: tagHandler(tagsWhitelist).filterTags,
 	}, nil
 }

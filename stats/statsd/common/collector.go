@@ -40,19 +40,16 @@ const (
 
 var _ lib.Collector = &Collector{}
 
-// Tagger defines a type that can process tags
-type Tagger interface {
-	Process(string) func(map[string]string, string) []string
-}
-
 // Collector defines a collector struct
 type Collector struct {
-	Client  *statsd.Client
-	Config  Config
-	Logger  *log.Entry
-	Type    ClientType
-	Tagger  Tagger
-	Summary map[string]*stats.Metric
+	Client *statsd.Client
+	Config Config
+	Logger *log.Entry
+	Type   ClientType
+	// FilterTags will filter tags and will return a list representation of them if it's not set
+	// tags are not being sent
+	FilterTags func(map[string]string, string) []string
+	Summary    map[string]*stats.Metric
 
 	startTime  time.Time
 	buffer     []*Sample
@@ -152,11 +149,10 @@ func (c *Collector) commit(data []*Sample) error {
 }
 
 func (c *Collector) dispatch(entry *Sample) {
-	tagList := c.Tagger.Process(c.Config.TagWhitelist.String)(
-		entry.Data.Tags,
-		entry.Extra.Group,
-	)
-
+	var tagList []string
+	if c.FilterTags != nil {
+		tagList = c.FilterTags(entry.Data.Tags, entry.Extra.Group)
+	}
 	c.Summary[entry.Metric] = entry.Extra.Raw
 
 	switch entry.Type {

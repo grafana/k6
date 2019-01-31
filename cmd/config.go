@@ -28,6 +28,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats/cloud"
+	"github.com/loadimpact/k6/stats/datadog"
 	"github.com/loadimpact/k6/stats/influxdb"
 	"github.com/loadimpact/k6/stats/kafka"
 	"github.com/loadimpact/k6/stats/statsd/common"
@@ -76,7 +77,7 @@ type Config struct {
 		Kafka    kafka.Config    `json:"kafka"`
 		Cloud    cloud.Config    `json:"cloud"`
 		StatsD   common.Config   `json:"statsd"`
-		Datadog  common.Config   `json:"datadog"`
+		Datadog  datadog.Config  `json:"datadog"`
 	} `json:"collectors"`
 }
 

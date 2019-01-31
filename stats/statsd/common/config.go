@@ -24,18 +24,10 @@ import (
 	null "gopkg.in/guregu/null.v3"
 )
 
-// ExtraConfig contains extra statsd config
-type ExtraConfig struct {
-	Namespace    string
-	TagWhitelist string
-}
-
 // Config defines the statsd configuration
 type Config struct {
-	Addr         null.String `json:"addr,omitempty" default:"localhost:8125"`
-	BufferSize   null.Int    `json:"buffer_size,omitempty" default:"20"`
-	Namespace    null.String `json:"namespace,omitempty"`
-	TagWhitelist null.String `json:"tag_whitelist,omitempty" default:"status, method"`
+	Addr       null.String `json:"addr,omitempty" default:"localhost:8125"`
+	BufferSize null.Int    `json:"buffer_size,omitempty" default:"20"`
 }
 
 // Apply returns config with defaults applied
@@ -45,12 +37,6 @@ func (c Config) Apply(cfg Config) Config {
 	}
 	if cfg.BufferSize.Valid {
 		c.BufferSize = cfg.BufferSize
-	}
-	if cfg.Namespace.Valid {
-		c.Namespace = cfg.Namespace
-	}
-	if cfg.TagWhitelist.Valid {
-		c.TagWhitelist = cfg.TagWhitelist
 	}
 
 	return c

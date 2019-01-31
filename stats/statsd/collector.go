@@ -25,16 +25,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// TagHandler defines a tag handler type
-type TagHandler struct{}
-
-// Process implements the interface method of Tagger
-func (t *TagHandler) Process(whitelist string) func(map[string]string, string) []string {
-	return func(tags map[string]string, group string) []string {
-		return []string{}
-	}
-}
-
 // New creates a new statsd connector client
 func New(conf common.Config) (*common.Collector, error) {
 	cl, err := common.MakeClient(conf, common.StatsD)
@@ -47,6 +37,5 @@ func New(conf common.Config) (*common.Collector, error) {
 		Config: conf,
 		Logger: log.WithField("type", common.StatsD.String()),
 		Type:   common.StatsD,
-		Tagger: &TagHandler{},
 	}, nil
 }

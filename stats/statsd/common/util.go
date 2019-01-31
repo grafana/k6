@@ -21,9 +21,6 @@
 package common
 
 import (
-	"fmt"
-	"strings"
-
 	"github.com/loadimpact/k6/stats"
 )
 
@@ -70,27 +67,4 @@ func generateDataPoint(sample stats.Sample) *Sample {
 			Check:     tags["check"],
 		},
 	}
-}
-
-// MapToSlice converts a map of tags into a slice of tags
-func MapToSlice(tags map[string]string) []string {
-	res := []string{}
-	for key, value := range tags {
-		if value != "" {
-			res = append(res, fmt.Sprintf("%s:%v", key, value))
-		}
-	}
-	return res
-}
-
-// TakeOnly receives a tag map and a whitelist string and outputs keys that match the whitelist
-// This also ignores empty values
-func TakeOnly(tags map[string]string, whitelist string) map[string]string {
-	res := map[string]string{}
-	for key, value := range tags {
-		if strings.Contains(whitelist, key) && value != "" {
-			res[key] = value
-		}
-	}
-	return res
 }
