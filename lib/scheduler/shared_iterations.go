@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -9,6 +10,14 @@ import (
 )
 
 const sharedIterationsType = "shared-iterations"
+
+func init() {
+	RegisterConfigType(sharedIterationsType, func(name string, rawJSON []byte) (Config, error) {
+		config := NewSharedIterationsConfig(name)
+		err := json.Unmarshal(rawJSON, &config)
+		return config, err
+	})
+}
 
 // SharedIteationsConfig stores the number of VUs iterations, as well as maxDuration settings
 type SharedIteationsConfig struct {
