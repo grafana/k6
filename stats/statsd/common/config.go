@@ -28,7 +28,7 @@ import (
 type Config struct {
 	Addr       null.String `json:"addr,omitempty" default:"localhost:8125"`
 	BufferSize null.Int    `json:"buffer_size,omitempty" default:"20"`
-	Namespace  null.String `json:"namespace,omitempty"`
+	Namespace  null.String `json:"namespace,omitempty" default:"k6."`
 }
 
 // Apply returns config with defaults applied
