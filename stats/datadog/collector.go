@@ -47,7 +47,7 @@ func New(conf common.Config) (*common.Collector, error) {
 		return nil, err
 	}
 
-	if namespace := conf.Namespace; namespace != "" {
+	if namespace := conf.Namespace.String; namespace != "" {
 		cl.Namespace = namespace
 	}
 

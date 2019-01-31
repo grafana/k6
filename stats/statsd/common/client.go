@@ -45,20 +45,18 @@ func (t ClientType) String() string {
 const (
 	StatsD = ClientType(iota)
 	Datadog
-	connStrSplitter = ":"
 )
 
 // MakeClient creates a new statsd buffered generic client
 func MakeClient(conf Config, cliType ClientType) (*statsd.Client, error) {
-	if conf.Addr == "" || conf.Port == "" {
+	if conf.Addr.String == "" {
 		return nil, fmt.Errorf(
-			"%s: connection string is invalid. Received: \"%+s%s%s\"",
-			cliType, conf.Addr, connStrSplitter, conf.Port,
+			"%s: connection string is invalid. Received: \"%+s\"",
+			cliType, conf.Addr.String,
 		)
 	}
 
-	connStr := fmt.Sprintf("%s%s%s", conf.Addr, connStrSplitter, conf.Port)
-	c, err := statsd.NewBuffered(connStr, conf.BufferSize)
+	c, err := statsd.NewBuffered(conf.Addr.String, int(conf.BufferSize.Int64))
 	if err != nil {
 		log.Info(err)
 		return nil, err
