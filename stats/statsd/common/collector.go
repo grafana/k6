@@ -23,7 +23,6 @@ package common
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -181,7 +180,7 @@ func checkToString(check string, value float64) string {
 	if value == 0 {
 		label = "fail"
 	}
-	return fmt.Sprintf("check.%s.%s", check, label)
+	return "check." + check + "." + label
 }
 
 func (c *Collector) sendSummaryData() {
