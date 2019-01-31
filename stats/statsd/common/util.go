@@ -24,33 +24,7 @@ import (
 	"github.com/loadimpact/k6/stats"
 )
 
-const (
-	defaultThresholdName = "default"
-)
-
-// Threshold defines a test threshold
-type Threshold struct {
-	Name   string
-	Failed bool
-}
-
-func generateThreshold(t stats.Threshold) Threshold {
-	tSource := t.Source
-	if tSource == "" {
-		tSource = defaultThresholdName
-	}
-
-	return Threshold{
-		Name:   tSource,
-		Failed: t.LastFailed,
-	}
-}
-
 func generateDataPoint(sample stats.Sample) *Sample {
-	threshold := stats.Threshold{}
-	if len(sample.Metric.Thresholds.Thresholds) > 0 {
-		threshold = *sample.Metric.Thresholds.Thresholds[0]
-	}
 	var tags = sample.Tags.CloneTags()
 	return &Sample{
 		Type:   sample.Metric.Type,
@@ -61,10 +35,9 @@ func generateDataPoint(sample stats.Sample) *Sample {
 			Tags:  sample.Tags.CloneTags(),
 		},
 		Extra: ExtraData{
-			Raw:       sample.Metric,
-			Threshold: generateThreshold(threshold),
-			Group:     tags["group"],
-			Check:     tags["check"],
+			Raw:   sample.Metric,
+			Group: tags["group"],
+			Check: tags["check"],
 		},
 	}
 }

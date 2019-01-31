@@ -43,8 +43,7 @@ type SampleData struct {
 
 // ExtraData defines extra sample data
 type ExtraData struct {
-	Raw       *stats.Metric `json:"raw_metric,omitempty"`
-	Threshold Threshold     `json:"threshold,omitempty"`
-	Group     string        `json:"group,omitempty"`
-	Check     string        `json:"check,omitempty"`
+	Raw   *stats.Metric `json:"raw_metric,omitempty"`
+	Group string        `json:"group,omitempty"`
+	Check string        `json:"check,omitempty"`
 }
