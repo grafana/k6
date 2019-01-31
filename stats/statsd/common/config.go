@@ -28,6 +28,7 @@ import (
 type Config struct {
 	Addr       null.String `json:"addr,omitempty" default:"localhost:8125"`
 	BufferSize null.Int    `json:"buffer_size,omitempty" default:"20"`
+	Namespace  null.String `json:"namespace,omitempty"`
 }
 
 // Apply returns config with defaults applied
@@ -37,6 +38,9 @@ func (c Config) Apply(cfg Config) Config {
 	}
 	if cfg.BufferSize.Valid {
 		c.BufferSize = cfg.BufferSize
+	}
+	if cfg.Namespace.Valid {
+		c.Namespace = cfg.Namespace
 	}
 
 	return c

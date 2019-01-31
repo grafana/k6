@@ -51,7 +51,6 @@ func (t tagHandler) contains(key string) bool {
 type Config struct {
 	common.Config
 
-	Namespace    null.String `json:"namespace,omitempty"`
 	TagWhitelist null.String `json:"tag_whitelist,omitempty" envconfig:"tag_whitelist" default:"status, method"`
 }
 
@@ -59,9 +58,6 @@ type Config struct {
 func (c Config) Apply(cfg Config) Config {
 	c.Config.Apply(cfg.Config)
 
-	if cfg.Namespace.Valid {
-		c.Namespace = cfg.Namespace
-	}
 	if cfg.TagWhitelist.Valid {
 		c.TagWhitelist = cfg.TagWhitelist
 	}
@@ -74,10 +70,6 @@ func New(conf Config) (*common.Collector, error) {
 	cl, err := common.MakeClient(conf.Config, common.Datadog)
 	if err != nil {
 		return nil, err
-	}
-
-	if namespace := conf.Namespace.String; namespace != "" {
-		cl.Namespace = namespace
 	}
 
 	var tagsWhitelist = sort.StringSlice(strings.Split(conf.TagWhitelist.String, ","))

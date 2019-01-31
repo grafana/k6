@@ -61,6 +61,9 @@ func MakeClient(conf Config, cliType ClientType) (*statsd.Client, error) {
 		log.Info(err)
 		return nil, err
 	}
+	if namespace := conf.Namespace.String; namespace != "" {
+		c.Namespace = namespace
+	}
 
 	return c, nil
 }
