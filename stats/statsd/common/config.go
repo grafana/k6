@@ -33,8 +33,8 @@ type ExtraConfig struct {
 
 // Config defines the statsd configuration
 type Config struct {
-	Addr         string `json:"addr,omitempty"`
-	Port         string `json:"port,omitempty" default:"8126"`
+	Addr         string `json:"addr,omitempty" default:"localhost"`
+	Port         string `json:"port,omitempty" default:"8125"`
 	BufferSize   int    `json:"buffer_size,omitempty" default:"20"`
 	Namespace    string `json:"namespace,omitempty"`
 	TagWhitelist string `json:"tag_whitelist,omitempty" default:"status, method"`

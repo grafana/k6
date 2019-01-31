@@ -99,13 +99,13 @@ func newCollector(collectorName, arg string, src *lib.SourceData, conf Config) (
 			return kafka.New(config)
 		case collectorStatsD:
 			config := conf.Collectors.StatsD
-			if err := loadConfig(&config, "statsd"); err != nil {
+			if err := envconfig.Process("k6_statsd", &config); err != nil {
 				return nil, err
 			}
 			return statsd.New(config)
 		case collectorDatadog:
 			config := conf.Collectors.Datadog
-			if err := loadConfig(&config, "datadog"); err != nil {
+			if err := envconfig.Process("k6_datadog", &config); err != nil {
 				return nil, err
 			}
 			return datadog.New(config)

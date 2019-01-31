@@ -54,19 +54,20 @@ func generateDataPoint(sample stats.Sample) *Sample {
 	if len(sample.Metric.Thresholds.Thresholds) > 0 {
 		threshold = *sample.Metric.Thresholds.Thresholds[0]
 	}
+	var tags = sample.Tags.CloneTags()
 	return &Sample{
 		Type:   sample.Metric.Type,
 		Metric: sample.Metric.Name,
 		Data: SampleData{
 			Time:  sample.Time,
 			Value: sample.Value,
-			Tags:  sample.Tags,
+			Tags:  sample.Tags.CloneTags(),
 		},
 		Extra: ExtraData{
 			Raw:       sample.Metric,
 			Threshold: generateThreshold(threshold),
-			Group:     sample.Tags["group"],
-			Check:     sample.Tags["check"],
+			Group:     tags["group"],
+			Check:     tags["check"],
 		},
 	}
 }

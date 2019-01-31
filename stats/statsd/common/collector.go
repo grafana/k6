@@ -88,12 +88,22 @@ func (c *Collector) Run(ctx context.Context) {
 	}
 }
 
+// GetRequiredSystemTags Return the required system sample tags for the specific collector
+func (c *Collector) GetRequiredSystemTags() lib.TagSet {
+	return lib.TagSet{} // no tags are required
+}
+
+// SetRunStatus does nothing in statsd collector
+func (c *Collector) SetRunStatus(status lib.RunStatus) {}
+
 // Collect metrics
-func (c *Collector) Collect(samples []stats.Sample) {
+func (c *Collector) Collect(containers []stats.SampleContainer) {
 	var pointSamples []*Sample
 
-	for _, sample := range samples {
-		pointSamples = append(pointSamples, generateDataPoint(sample))
+	for _, container := range containers {
+		for _, sample := range container.GetSamples() {
+			pointSamples = append(pointSamples, generateDataPoint(sample))
+		}
 	}
 
 	if len(pointSamples) > 0 {
@@ -181,7 +191,7 @@ func checkToString(check string, value float64) string {
 func (c *Collector) sendSummaryData() {
 	c.Logger.Debugf("%s: Generating summary event", c.Type.String())
 	x := &bytes.Buffer{}
-	ui.SummarizeMetrics(x, "", time.Since(c.startTime), c.Summary)
+	ui.SummarizeMetrics(x, "", time.Since(c.startTime), pushInterval.String(), c.Summary)
 	err := c.Client.SimpleEvent("[K6] Summary", x.String())
 	if err != nil {
 		c.Logger.
