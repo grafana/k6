@@ -34,10 +34,7 @@ func generateDataPoint(sample stats.Sample) *Sample {
 			Value: sample.Value,
 			Tags:  sample.Tags.CloneTags(),
 		},
-		Extra: ExtraData{
-			Raw:   sample.Metric,
-			Group: tags["group"],
-			Check: tags["check"],
-		},
+		Group: tags["group"],
+		Check: tags["check"],
 	}
 }

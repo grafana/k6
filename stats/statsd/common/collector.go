@@ -98,6 +98,7 @@ func (c *Collector) Collect(containers []stats.SampleContainer) {
 
 	for _, container := range containers {
 		for _, sample := range container.GetSamples() {
+			c.Summary[sample.Metric.Name] = sample.Metric
 			pointSamples = append(pointSamples, generateDataPoint(sample))
 		}
 	}
@@ -150,9 +151,8 @@ func (c *Collector) commit(data []*Sample) error {
 func (c *Collector) dispatch(entry *Sample) {
 	var tagList []string
 	if c.FilterTags != nil {
-		tagList = c.FilterTags(entry.Data.Tags, entry.Extra.Group)
+		tagList = c.FilterTags(entry.Data.Tags, entry.Group)
 	}
-	c.Summary[entry.Metric] = entry.Extra.Raw
 
 	switch entry.Type {
 	case stats.Counter:
@@ -162,9 +162,9 @@ func (c *Collector) dispatch(entry *Sample) {
 	case stats.Gauge:
 		_ = c.Client.Gauge(entry.Metric, entry.Data.Value, tagList, 1)
 	case stats.Rate:
-		if entry.Extra.Check != "" {
+		if entry.Check != "" {
 			_ = c.Client.Count(
-				checkToString(entry.Extra.Check, entry.Data.Value),
+				checkToString(entry.Check, entry.Data.Value),
 				1,
 				tagList,
 				1,
