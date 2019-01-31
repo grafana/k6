@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -9,6 +10,14 @@ import (
 )
 
 const constantArrivalRateType = "constant-arrival-rate"
+
+func init() {
+	RegisterConfigType(constantArrivalRateType, func(name string, rawJSON []byte) (Config, error) {
+		config := NewConstantArrivalRateConfig(name)
+		err := json.Unmarshal(rawJSON, &config)
+		return config, err
+	})
+}
 
 // ConstantArrivalRateConfig stores config for the constant arrival-rate scheduler
 type ConstantArrivalRateConfig struct {

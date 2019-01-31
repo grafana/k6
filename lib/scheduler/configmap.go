@@ -3,45 +3,75 @@ package scheduler
 import (
 	"encoding/json"
 	"fmt"
+	"sync"
 )
+
+// ConfigMap can contain mixed scheduler config types
+type ConfigMap map[string]Config
+
+// ConfigConstructor is a simple function that returns a concrete Config instance
+// with the specified name and all default values correctly initialized
+type ConfigConstructor func(name string, rawJSON []byte) (Config, error)
+
+var (
+	configTypesMutex   sync.RWMutex
+	configConstructors = make(map[string]ConfigConstructor)
+)
+
+// RegisterConfigType adds the supplied ConfigConstructor as the constructor for its
+// type in the configConstructors map, in a thread-safe manner
+func RegisterConfigType(configType string, constructor ConfigConstructor) {
+	configTypesMutex.Lock()
+	defer configTypesMutex.Unlock()
+
+	if constructor == nil {
+		panic("scheduler configs: constructor is nil")
+	}
+	if _, configTypeExists := configConstructors[configType]; configTypeExists {
+		panic("scheduler configs: RegisterConfigType called twice for  " + configType)
+	}
+
+	configConstructors[configType] = constructor
+}
 
 // GetParsedConfig returns a struct instance corresponding to the supplied
 // config type. It will be fully initialized - with both the default values of
 // the type, as well as with whatever the user had specified in the JSON
 func GetParsedConfig(name, configType string, rawJSON []byte) (result Config, err error) {
-	switch configType {
-	case constantLoopingVUsType:
-		config := NewConstantLoopingVUsConfig(name)
-		err = json.Unmarshal(rawJSON, &config)
-		result = config
-	case variableLoopingVUsType:
-		config := NewVariableLoopingVUsConfig(name)
-		err = json.Unmarshal(rawJSON, &config)
-		result = config
-	case sharedIterationsType:
-		config := NewSharedIterationsConfig(name)
-		err = json.Unmarshal(rawJSON, &config)
-		result = config
-	case perVUIterationsType:
-		config := NewPerVUIterationsConfig(name)
-		err = json.Unmarshal(rawJSON, &config)
-		result = config
-	case constantArrivalRateType:
-		config := NewConstantArrivalRateConfig(name)
-		err = json.Unmarshal(rawJSON, &config)
-		result = config
-	case variableArrivalRateType:
-		config := NewVariableArrivalRateConfig(name)
-		err = json.Unmarshal(rawJSON, &config)
-		result = config
-	default:
+	configTypesMutex.Lock()
+	defer configTypesMutex.Unlock()
+
+	constructor, exists := configConstructors[configType]
+	if !exists {
 		return nil, fmt.Errorf("unknown execution scheduler type '%s'", configType)
 	}
-	return
-}
+	return constructor(name, rawJSON)
+	/*
+		switch configType {
+		case constantLoopingVUsType:
+			config := NewConstantLoopingVUsConfig(name)
+			err = json.Unmarshal(rawJSON, &config)
+			result = config
+		case variableLoopingVUsType:
+			config := NewVariableLoopingVUsConfig(name)
+			err = json.Unmarshal(rawJSON, &config)
+			result = config
+		case sharedIterationsType:
+			config := NewSharedIterationsConfig(name)
+			err = json.Unmarshal(rawJSON, &config)
+			result = config
+		case perVUIterationsType:
+			config := NewPerVUIterationsConfig(name)
+			err = json.Unmarshal(rawJSON, &config)
+			result = config
+		case constantArrivalRateType:
 
-// ConfigMap can contain mixed scheduler config types
-type ConfigMap map[string]Config
+		case variableArrivalRateType:
+			config := NewVariableArrivalRateConfig(name)
+			err = json.Unmarshal(rawJSON, &config)
+			result = config
+	*/
+}
 
 // UnmarshalJSON implements the json.Unmarshaler interface in a two-step manner,
 // creating the correct type of configs based on the `type` property.

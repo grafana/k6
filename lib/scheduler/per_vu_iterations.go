@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -9,6 +10,14 @@ import (
 )
 
 const perVUIterationsType = "per-vu-iterations"
+
+func init() {
+	RegisterConfigType(perVUIterationsType, func(name string, rawJSON []byte) (Config, error) {
+		config := NewPerVUIterationsConfig(name)
+		err := json.Unmarshal(rawJSON, &config)
+		return config, err
+	})
+}
 
 // PerVUIteationsConfig stores the number of VUs iterations, as well as maxDuration settings
 type PerVUIteationsConfig struct {

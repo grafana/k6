@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/loadimpact/k6/lib/types"
@@ -8,6 +9,14 @@ import (
 )
 
 const variableLoopingVUsType = "variable-looping-vus"
+
+func init() {
+	RegisterConfigType(variableLoopingVUsType, func(name string, rawJSON []byte) (Config, error) {
+		config := NewVariableLoopingVUsConfig(name)
+		err := json.Unmarshal(rawJSON, &config)
+		return config, err
+	})
+}
 
 // Stage contains
 type Stage struct {
