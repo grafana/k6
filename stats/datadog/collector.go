@@ -60,7 +60,7 @@ func (c Config) Apply(cfg Config) Config {
 func NewConfig() Config {
 	return Config{
 		Config:       common.NewConfig(),
-		TagWhitelist: lib.GetTagSet("status, method", "group"),
+		TagWhitelist: lib.GetTagSet("status", "method", "group"),
 	}
 }
 
