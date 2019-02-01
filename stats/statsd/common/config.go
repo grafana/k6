@@ -38,10 +38,10 @@ type Config struct {
 // NewConfig creates a new Config instance with default values for some fields.
 func NewConfig() Config {
 	return Config{
-		Addr:         null.StringFrom("localhost:8125"),
-		BufferSize:   null.IntFrom(20),
-		Namespace:    null.StringFrom("k6."),
-		PushInterval: types.NullDurationFrom(1 * time.Second),
+		Addr:         null.NewString("localhost:8125", false),
+		BufferSize:   null.NewInt(20, false),
+		Namespace:    null.NewString("k6.", false),
+		PushInterval: types.NewNullDuration(1*time.Second, false),
 	}
 }
 
