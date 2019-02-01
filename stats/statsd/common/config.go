@@ -33,7 +33,7 @@ type Config struct {
 	PushInterval types.NullDuration `json:"push_interval,omitempty" default:"1s" envconfig:"PUSH_INTERVAL"`
 }
 
-// Apply returns config with defaults applied
+// Apply saves config non-zero config values from the passed config in the receiver.
 func (c Config) Apply(cfg Config) Config {
 	if cfg.Addr.Valid {
 		c.Addr = cfg.Addr

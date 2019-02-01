@@ -34,13 +34,13 @@ import (
 
 var _ lib.Collector = &Collector{}
 
-// Collector defines a collector struct
+// Collector sends result data to statsd daemons with the ability to send to datadog as well
 type Collector struct {
 	Config Config
 	Type   string
-	// FilterTags will filter tags and will return a list representation of them if it's not set
-	// tags are not being sent
-	FilterTags func(map[string]string) []string
+	// ProcessTags is called on a map of all tags for each metric and returns a slice representation
+	// of those tags that should be sent. No tags are send in case of ProcessTags being null
+	ProcessTags func(map[string]string) []string
 
 	logger     *log.Entry
 	client     *statsd.Client
@@ -164,8 +164,8 @@ func (c *Collector) commit(data []*Sample) error {
 
 func (c *Collector) dispatch(entry *Sample) error {
 	var tagList []string
-	if c.FilterTags != nil {
-		tagList = c.FilterTags(entry.Tags)
+	if c.ProcessTags != nil {
+		tagList = c.ProcessTags(entry.Tags)
 	}
 
 	switch entry.Type {

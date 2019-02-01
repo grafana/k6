@@ -30,7 +30,7 @@ import (
 
 type tagHandler sort.StringSlice
 
-func (t tagHandler) filterTags(tags map[string]string) []string {
+func (t tagHandler) processTags(tags map[string]string) []string {
 	var res []string
 
 	for key, value := range tags {
@@ -53,7 +53,7 @@ type Config struct {
 	TagWhitelist null.String `json:"tag_whitelist,omitempty" envconfig:"tag_whitelist" default:"status, method"`
 }
 
-// Apply returns config with defaults applied
+// Apply saves config non-zero config values from the passed config in the receiver.
 func (c Config) Apply(cfg Config) Config {
 	c.Config.Apply(cfg.Config)
 
@@ -72,8 +72,8 @@ func New(conf Config) (*common.Collector, error) {
 	}
 	tagsWhitelist.Sort()
 	return &common.Collector{
-		Config:     conf.Config,
-		Type:       "datadog",
-		FilterTags: tagHandler(tagsWhitelist).filterTags,
+		Config:      conf.Config,
+		Type:        "datadog",
+		ProcessTags: tagHandler(tagsWhitelist).processTags,
 	}, nil
 }
