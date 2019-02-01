@@ -64,7 +64,7 @@ func (c *Collector) Init() (err error) {
 	c.Client, err = statsd.NewBuffered(c.Config.Addr.String, int(c.Config.BufferSize.Int64))
 
 	if err != nil {
-		c.Logger.Error(err)
+		c.Logger.Errorf("Couldn't make buffered client, %s", err)
 		return err
 	}
 
@@ -147,7 +147,7 @@ func (c *Collector) pushMetrics() {
 func (c *Collector) finish() {
 	// Close when context is done
 	if err := c.Client.Close(); err != nil {
-		c.Logger.Debugf("%s: Error closing the client, %+v", c.Type, err)
+		c.Logger.Warnf("%s: Error closing the client, %+v", c.Type, err)
 	}
 }
 
@@ -164,24 +164,28 @@ func (c *Collector) dispatch(entry *Sample) {
 		tagList = c.FilterTags(entry.Tags)
 	}
 
+	var err error
 	switch entry.Type {
 	case stats.Counter:
-		_ = c.Client.Count(entry.Metric, int64(entry.Value), tagList, 1)
+		err = c.Client.Count(entry.Metric, int64(entry.Value), tagList, 1)
 	case stats.Trend:
-		_ = c.Client.TimeInMilliseconds(entry.Metric, entry.Value, tagList, 1)
+		err = c.Client.TimeInMilliseconds(entry.Metric, entry.Value, tagList, 1)
 	case stats.Gauge:
-		_ = c.Client.Gauge(entry.Metric, entry.Value, tagList, 1)
+		err = c.Client.Gauge(entry.Metric, entry.Value, tagList, 1)
 	case stats.Rate:
 		if check := entry.Tags["check"]; check != "" {
-			_ = c.Client.Count(
+			err = c.Client.Count(
 				checkToString(check, entry.Value),
 				1,
 				tagList,
 				1,
 			)
 		} else {
-			_ = c.Client.Count(entry.Metric, int64(entry.Value), tagList, 1)
+			err = c.Client.Count(entry.Metric, int64(entry.Value), tagList, 1)
 		}
+	}
+	if err != nil {
+		c.Logger.Warnf("Error while sending metric %s: %s", entry.Metric, err)
 	}
 }
 
