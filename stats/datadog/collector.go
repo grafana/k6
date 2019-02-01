@@ -67,18 +67,12 @@ func (c Config) Apply(cfg Config) Config {
 
 // New creates a new statsd connector client
 func New(conf Config) (*common.Collector, error) {
-	cl, err := common.MakeClient(conf.Config, common.Datadog)
-	if err != nil {
-		return nil, err
-	}
-
 	var tagsWhitelist = sort.StringSlice(strings.Split(conf.TagWhitelist.String, ","))
 	for index := range tagsWhitelist {
 		tagsWhitelist[index] = strings.TrimSpace(tagsWhitelist[index])
 	}
 	tagsWhitelist.Sort()
 	return &common.Collector{
-		Client:     cl,
 		Config:     conf.Config,
 		Logger:     log.WithField("type", common.Datadog.String()),
 		Type:       common.Datadog,

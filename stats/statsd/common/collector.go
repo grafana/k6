@@ -54,6 +54,11 @@ type Collector struct {
 
 // Init sets up the collector
 func (c *Collector) Init() error {
+	cl, err := makeClient(c.Config, c.Type)
+	if err != nil {
+		return err
+	}
+	c.Client = cl
 	return nil
 }
 

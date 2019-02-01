@@ -27,13 +27,7 @@ import (
 
 // New creates a new statsd connector client
 func New(conf common.Config) (*common.Collector, error) {
-	cl, err := common.MakeClient(conf, common.StatsD)
-	if err != nil {
-		return nil, err
-	}
-
 	return &common.Collector{
-		Client: cl,
 		Config: conf,
 		Logger: log.WithField("type", common.StatsD.String()),
 		Type:   common.StatsD,

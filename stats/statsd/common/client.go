@@ -47,8 +47,8 @@ const (
 	Datadog
 )
 
-// MakeClient creates a new statsd buffered generic client
-func MakeClient(conf Config, cliType ClientType) (*statsd.Client, error) {
+// makeClient creates a new statsd buffered generic client
+func makeClient(conf Config, cliType ClientType) (*statsd.Client, error) {
 	if conf.Addr.String == "" {
 		return nil, fmt.Errorf(
 			"%s: connection string is invalid. Received: \"%+s\"",
