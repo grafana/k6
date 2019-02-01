@@ -21,16 +21,28 @@
 package common
 
 import (
+	"time"
+
 	"github.com/loadimpact/k6/lib/types"
 	null "gopkg.in/guregu/null.v3"
 )
 
 // Config defines the statsd configuration
 type Config struct {
-	Addr         null.String        `json:"addr,omitempty" default:"localhost:8125"`
-	BufferSize   null.Int           `json:"buffer_size,omitempty" default:"20"`
-	Namespace    null.String        `json:"namespace,omitempty" default:"k6."`
-	PushInterval types.NullDuration `json:"push_interval,omitempty" default:"1s" envconfig:"PUSH_INTERVAL"`
+	Addr         null.String        `json:"addr,omitempty" envconfig:"ADDR"`
+	BufferSize   null.Int           `json:"buffer_size,omitempty" envconfig:"BUFFER_SIZE"`
+	Namespace    null.String        `json:"namespace,omitempty" envconfig:"NAMESPACE"`
+	PushInterval types.NullDuration `json:"push_interval,omitempty" envconfig:"PUSH_INTERVAL"`
+}
+
+// NewConfig creates a new Config instance with default values for some fields.
+func NewConfig() Config {
+	return Config{
+		Addr:         null.StringFrom("localhost:8125"),
+		BufferSize:   null.IntFrom(20),
+		Namespace:    null.StringFrom("k6."),
+		PushInterval: types.NullDurationFrom(1 * time.Second),
+	}
 }
 
 // Apply saves config non-zero config values from the passed config in the receiver.

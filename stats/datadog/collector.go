@@ -21,59 +21,54 @@
 package datadog
 
 import (
-	"sort"
-	"strings"
-
+	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats/statsd/common"
-	null "gopkg.in/guregu/null.v3"
 )
 
-type tagHandler sort.StringSlice
+type tagHandler lib.TagSet
 
 func (t tagHandler) processTags(tags map[string]string) []string {
 	var res []string
 
 	for key, value := range tags {
-		if value != "" && t.contains(key) {
+		if value != "" && t[key] {
 			res = append(res, key+":"+value)
 		}
 	}
 	return res
 }
 
-func (t tagHandler) contains(key string) bool {
-	var n = ((sort.StringSlice)(t)).Search(key)
-	return n != len(t) && t[n] == key
-}
-
 // Config defines the datadog configuration
 type Config struct {
 	common.Config
 
-	TagWhitelist null.String `json:"tag_whitelist,omitempty" envconfig:"tag_whitelist" default:"status, method"`
+	TagWhitelist lib.TagSet `json:"tag_whitelist,omitempty" envconfig:"TAG_WHITELIST"`
 }
 
 // Apply saves config non-zero config values from the passed config in the receiver.
 func (c Config) Apply(cfg Config) Config {
 	c.Config.Apply(cfg.Config)
 
-	if cfg.TagWhitelist.Valid {
+	if cfg.TagWhitelist != nil {
 		c.TagWhitelist = cfg.TagWhitelist
 	}
 
 	return c
 }
 
+// NewConfig creates a new Config instance with default values for some fields.
+func NewConfig() Config {
+	return Config{
+		Config:       common.NewConfig(),
+		TagWhitelist: lib.GetTagSet("status, method", "group"),
+	}
+}
+
 // New creates a new statsd connector client
 func New(conf Config) (*common.Collector, error) {
-	var tagsWhitelist = sort.StringSlice(strings.Split(conf.TagWhitelist.String, ","))
-	for index := range tagsWhitelist {
-		tagsWhitelist[index] = strings.TrimSpace(tagsWhitelist[index])
-	}
-	tagsWhitelist.Sort()
 	return &common.Collector{
 		Config:      conf.Config,
 		Type:        "datadog",
-		ProcessTags: tagHandler(tagsWhitelist).processTags,
+		ProcessTags: tagHandler(conf.TagWhitelist).processTags,
 	}, nil
 }

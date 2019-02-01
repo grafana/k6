@@ -34,6 +34,7 @@ import (
 	jsonc "github.com/loadimpact/k6/stats/json"
 	"github.com/loadimpact/k6/stats/kafka"
 	"github.com/loadimpact/k6/stats/statsd"
+	"github.com/loadimpact/k6/stats/statsd/common"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 )
@@ -98,13 +99,13 @@ func newCollector(collectorName, arg string, src *lib.SourceData, conf Config) (
 			}
 			return kafka.New(config)
 		case collectorStatsD:
-			config := conf.Collectors.StatsD
+			config := common.NewConfig().Apply(conf.Collectors.StatsD)
 			if err := envconfig.Process("k6_statsd", &config); err != nil {
 				return nil, err
 			}
 			return statsd.New(config)
 		case collectorDatadog:
-			config := conf.Collectors.Datadog
+			config := datadog.NewConfig().Apply(conf.Collectors.Datadog)
 			if err := envconfig.Process("k6_datadog", &config); err != nil {
 				return nil, err
 			}
