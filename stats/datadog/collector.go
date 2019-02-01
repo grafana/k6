@@ -25,7 +25,6 @@ import (
 	"strings"
 
 	"github.com/loadimpact/k6/stats/statsd/common"
-	log "github.com/sirupsen/logrus"
 	null "gopkg.in/guregu/null.v3"
 )
 
@@ -74,7 +73,6 @@ func New(conf Config) (*common.Collector, error) {
 	tagsWhitelist.Sort()
 	return &common.Collector{
 		Config:     conf.Config,
-		Logger:     log.WithField("type", "datadog"),
 		Type:       "datadog",
 		FilterTags: tagHandler(tagsWhitelist).filterTags,
 	}, nil

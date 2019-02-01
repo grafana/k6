@@ -22,14 +22,12 @@ package statsd
 
 import (
 	"github.com/loadimpact/k6/stats/statsd/common"
-	log "github.com/sirupsen/logrus"
 )
 
 // New creates a new statsd connector client
 func New(conf common.Config) (*common.Collector, error) {
 	return &common.Collector{
 		Config: conf,
-		Logger: log.WithField("type", "statsd"),
 		Type:   "statsd",
 	}, nil
 }

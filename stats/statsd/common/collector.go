@@ -36,14 +36,14 @@ var _ lib.Collector = &Collector{}
 
 // Collector defines a collector struct
 type Collector struct {
-	Client *statsd.Client
 	Config Config
-	Logger *log.Entry
 	Type   string
 	// FilterTags will filter tags and will return a list representation of them if it's not set
 	// tags are not being sent
 	FilterTags func(map[string]string) []string
 
+	logger     *log.Entry
+	client     *statsd.Client
 	startTime  time.Time
 	buffer     []*Sample
 	bufferLock sync.Mutex
@@ -51,25 +51,26 @@ type Collector struct {
 
 // Init sets up the collector
 func (c *Collector) Init() (err error) {
+	c.logger = log.WithField("type", c.Type)
 	if address := c.Config.Addr.String; address == "" {
 		err = fmt.Errorf(
-			"%s: connection string is invalid. Received: \"%+s\"",
-			c.Type, address,
+			"connection string is invalid. Received: \"%+s\"",
+			address,
 		)
-		c.Logger.Error(err)
+		c.logger.Error(err)
 
 		return err
 	}
 
-	c.Client, err = statsd.NewBuffered(c.Config.Addr.String, int(c.Config.BufferSize.Int64))
+	c.client, err = statsd.NewBuffered(c.Config.Addr.String, int(c.Config.BufferSize.Int64))
 
 	if err != nil {
-		c.Logger.Errorf("Couldn't make buffered client, %s", err)
+		c.logger.Errorf("Couldn't make buffered client, %s", err)
 		return err
 	}
 
 	if namespace := c.Config.Namespace.String; namespace != "" {
-		c.Client.Namespace = namespace
+		c.client.Namespace = namespace
 	}
 
 	return nil
@@ -82,7 +83,7 @@ func (c *Collector) Link() string {
 
 // Run the collector
 func (c *Collector) Run(ctx context.Context) {
-	c.Logger.Debugf("%s: Running!", c.Type)
+	c.logger.Debugf("%s: Running!", c.Type)
 	ticker := time.NewTicker(time.Duration(c.Config.PushInterval.Duration))
 	c.startTime = time.Now()
 
@@ -133,59 +134,59 @@ func (c *Collector) pushMetrics() {
 	c.buffer = nil
 	c.bufferLock.Unlock()
 
-	c.Logger.
+	c.logger.
 		WithField("samples", len(buffer)).
-		Debugf("%s: Pushing metrics to server", c.Type)
+		Debug("Pushing metrics to server")
 
 	if err := c.commit(buffer); err != nil {
-		c.Logger.
+		c.logger.
 			WithError(err).
-			Errorf("%s: Couldn't commit a batch", c.Type)
+			Error("Couldn't commit a batch")
 	}
 }
 
 func (c *Collector) finish() {
 	// Close when context is done
-	if err := c.Client.Close(); err != nil {
-		c.Logger.Warnf("%s: Error closing the client, %+v", c.Type, err)
+	if err := c.client.Close(); err != nil {
+		c.logger.Warnf("Error closing the client, %+v", err)
 	}
 }
 
 func (c *Collector) commit(data []*Sample) error {
 	for _, entry := range data {
-		c.dispatch(entry)
+		if err := c.dispatch(entry); err != nil {
+			// No need to return error if just one metric didn't go through
+			c.logger.WithError(err).Warnf("Error while sending metric %s", entry.Metric)
+		}
 	}
-	return c.Client.Flush()
+	return c.client.Flush()
 }
 
-func (c *Collector) dispatch(entry *Sample) {
+func (c *Collector) dispatch(entry *Sample) error {
 	var tagList []string
 	if c.FilterTags != nil {
 		tagList = c.FilterTags(entry.Tags)
 	}
 
-	var err error
 	switch entry.Type {
 	case stats.Counter:
-		err = c.Client.Count(entry.Metric, int64(entry.Value), tagList, 1)
+		return c.client.Count(entry.Metric, int64(entry.Value), tagList, 1)
 	case stats.Trend:
-		err = c.Client.TimeInMilliseconds(entry.Metric, entry.Value, tagList, 1)
+		return c.client.TimeInMilliseconds(entry.Metric, entry.Value, tagList, 1)
 	case stats.Gauge:
-		err = c.Client.Gauge(entry.Metric, entry.Value, tagList, 1)
+		return c.client.Gauge(entry.Metric, entry.Value, tagList, 1)
 	case stats.Rate:
 		if check := entry.Tags["check"]; check != "" {
-			err = c.Client.Count(
+			return c.client.Count(
 				checkToString(check, entry.Value),
 				1,
 				tagList,
 				1,
 			)
-		} else {
-			err = c.Client.Count(entry.Metric, int64(entry.Value), tagList, 1)
 		}
-	}
-	if err != nil {
-		c.Logger.Warnf("Error while sending metric %s: %s", entry.Metric, err)
+		return c.client.Count(entry.Metric, int64(entry.Value), tagList, 1)
+	default:
+		return fmt.Errorf("Unsupported metric type %s", entry.Type)
 	}
 }
 
