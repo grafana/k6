@@ -74,8 +74,8 @@ func New(conf Config) (*common.Collector, error) {
 	tagsWhitelist.Sort()
 	return &common.Collector{
 		Config:     conf.Config,
-		Logger:     log.WithField("type", common.Datadog.String()),
-		Type:       common.Datadog,
+		Logger:     log.WithField("type", "datadog"),
+		Type:       "datadog",
 		FilterTags: tagHandler(tagsWhitelist).filterTags,
 	}, nil
 }

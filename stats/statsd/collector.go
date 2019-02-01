@@ -29,7 +29,7 @@ import (
 func New(conf common.Config) (*common.Collector, error) {
 	return &common.Collector{
 		Config: conf,
-		Logger: log.WithField("type", common.StatsD.String()),
-		Type:   common.StatsD,
+		Logger: log.WithField("type", "statsd"),
+		Type:   "statsd",
 	}, nil
 }

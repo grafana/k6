@@ -22,6 +22,7 @@ package common
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -42,7 +43,7 @@ type Collector struct {
 	Client *statsd.Client
 	Config Config
 	Logger *log.Entry
-	Type   ClientType
+	Type   string
 	// FilterTags will filter tags and will return a list representation of them if it's not set
 	// tags are not being sent
 	FilterTags func(map[string]string) []string
@@ -53,12 +54,28 @@ type Collector struct {
 }
 
 // Init sets up the collector
-func (c *Collector) Init() error {
-	cl, err := makeClient(c.Config, c.Type)
-	if err != nil {
+func (c *Collector) Init() (err error) {
+	if address := c.Config.Addr.String; address == "" {
+		err = fmt.Errorf(
+			"%s: connection string is invalid. Received: \"%+s\"",
+			c.Type, address,
+		)
+		c.Logger.Error(err)
+
 		return err
 	}
-	c.Client = cl
+
+	c.Client, err = statsd.NewBuffered(c.Config.Addr.String, int(c.Config.BufferSize.Int64))
+
+	if err != nil {
+		c.Logger.Error(err)
+		return err
+	}
+
+	if namespace := c.Config.Namespace.String; namespace != "" {
+		c.Client.Namespace = namespace
+	}
+
 	return nil
 }
 
@@ -69,7 +86,7 @@ func (c *Collector) Link() string {
 
 // Run the collector
 func (c *Collector) Run(ctx context.Context) {
-	c.Logger.Debugf("%s: Running!", c.Type.String())
+	c.Logger.Debugf("%s: Running!", c.Type)
 	ticker := time.NewTicker(pushInterval)
 	c.startTime = time.Now()
 
@@ -122,21 +139,19 @@ func (c *Collector) pushMetrics() {
 
 	c.Logger.
 		WithField("samples", len(buffer)).
-		Debugf("%s: Pushing metrics to server", c.Type.String())
+		Debugf("%s: Pushing metrics to server", c.Type)
 
 	if err := c.commit(buffer); err != nil {
 		c.Logger.
 			WithError(err).
-			Errorf("%s: Couldn't commit a batch", c.Type.String())
+			Errorf("%s: Couldn't commit a batch", c.Type)
 	}
 }
 
 func (c *Collector) finish() {
-	if c.Type == Datadog {
-	}
 	// Close when context is done
 	if err := c.Client.Close(); err != nil {
-		c.Logger.Debugf("%s: Error closing the client, %+v", c.Type.String(), err)
+		c.Logger.Debugf("%s: Error closing the client, %+v", c.Type, err)
 	}
 }
 
