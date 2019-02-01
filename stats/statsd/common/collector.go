@@ -21,7 +21,6 @@
 package common
 
 import (
-	"bytes"
 	"context"
 	"sync"
 	"time"
@@ -29,7 +28,6 @@ import (
 	"github.com/DataDog/datadog-go/statsd"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
-	"github.com/loadimpact/k6/ui"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -48,7 +46,6 @@ type Collector struct {
 	// FilterTags will filter tags and will return a list representation of them if it's not set
 	// tags are not being sent
 	FilterTags func(map[string]string) []string
-	Summary    map[string]*stats.Metric
 
 	startTime  time.Time
 	buffer     []*Sample
@@ -57,7 +54,6 @@ type Collector struct {
 
 // Init sets up the collector
 func (c *Collector) Init() error {
-	c.Summary = make(map[string]*stats.Metric)
 	return nil
 }
 
@@ -98,7 +94,6 @@ func (c *Collector) Collect(containers []stats.SampleContainer) {
 
 	for _, container := range containers {
 		for _, sample := range container.GetSamples() {
-			c.Summary[sample.Metric.Name] = sample.Metric
 			pointSamples = append(pointSamples, generateDataPoint(sample))
 		}
 	}
@@ -133,7 +128,6 @@ func (c *Collector) pushMetrics() {
 
 func (c *Collector) finish() {
 	if c.Type == Datadog {
-		c.sendSummaryData()
 	}
 	// Close when context is done
 	if err := c.Client.Close(); err != nil {
@@ -181,25 +175,4 @@ func checkToString(check string, value float64) string {
 		label = "fail"
 	}
 	return "check." + check + "." + label
-}
-
-func (c *Collector) sendSummaryData() {
-	c.Logger.Debugf("%s: Generating summary event", c.Type.String())
-	x := &bytes.Buffer{}
-	ui.SummarizeMetrics(x, "", time.Since(c.startTime), pushInterval.String(), c.Summary)
-	err := c.Client.SimpleEvent("[K6] Summary", x.String())
-	if err != nil {
-		c.Logger.
-			WithError(err).
-			Errorf("%s: Couldn't create event", c.Type.String())
-	} else {
-		err = c.Client.Flush()
-		if err != nil {
-			c.Logger.
-				WithError(err).
-				Errorf("%s: Couldn't send event", c.Type.String())
-		} else {
-			c.Logger.Debugf("%s: Summary event sent", c.Type.String())
-		}
-	}
 }
