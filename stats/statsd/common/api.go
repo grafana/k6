@@ -28,16 +28,19 @@ import (
 
 // Sample defines a sample type
 type Sample struct {
-	Type   stats.MetricType `json:"type"`
-	Metric string           `json:"metric"`
-	Data   SampleData       `json:"data"`
-	Group  string           `json:"group,omitempty"`
-	Check  string           `json:"check,omitempty"`
+	Type   stats.MetricType  `json:"type"`
+	Metric string            `json:"metric"`
+	Time   time.Time         `json:"time"`
+	Value  float64           `json:"value"`
+	Tags   map[string]string `json:"tags,omitempty"`
 }
 
-// SampleData defines a data sample type
-type SampleData struct {
-	Time  time.Time         `json:"time"`
-	Value float64           `json:"value"`
-	Tags  map[string]string `json:"tags,omitempty"`
+func generateDataPoint(sample stats.Sample) *Sample {
+	return &Sample{
+		Type:   sample.Metric.Type,
+		Metric: sample.Metric.Name,
+		Time:   sample.Time,
+		Value:  sample.Value,
+		Tags:   sample.Tags.CloneTags(),
+	}
 }

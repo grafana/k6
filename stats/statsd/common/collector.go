@@ -47,7 +47,7 @@ type Collector struct {
 	Type   ClientType
 	// FilterTags will filter tags and will return a list representation of them if it's not set
 	// tags are not being sent
-	FilterTags func(map[string]string, string) []string
+	FilterTags func(map[string]string) []string
 	Summary    map[string]*stats.Metric
 
 	startTime  time.Time
@@ -151,26 +151,26 @@ func (c *Collector) commit(data []*Sample) error {
 func (c *Collector) dispatch(entry *Sample) {
 	var tagList []string
 	if c.FilterTags != nil {
-		tagList = c.FilterTags(entry.Data.Tags, entry.Group)
+		tagList = c.FilterTags(entry.Tags)
 	}
 
 	switch entry.Type {
 	case stats.Counter:
-		_ = c.Client.Count(entry.Metric, int64(entry.Data.Value), tagList, 1)
+		_ = c.Client.Count(entry.Metric, int64(entry.Value), tagList, 1)
 	case stats.Trend:
-		_ = c.Client.TimeInMilliseconds(entry.Metric, entry.Data.Value, tagList, 1)
+		_ = c.Client.TimeInMilliseconds(entry.Metric, entry.Value, tagList, 1)
 	case stats.Gauge:
-		_ = c.Client.Gauge(entry.Metric, entry.Data.Value, tagList, 1)
+		_ = c.Client.Gauge(entry.Metric, entry.Value, tagList, 1)
 	case stats.Rate:
-		if entry.Check != "" {
+		if check := entry.Tags["check"]; check != "" {
 			_ = c.Client.Count(
-				checkToString(entry.Check, entry.Data.Value),
+				checkToString(check, entry.Value),
 				1,
 				tagList,
 				1,
 			)
 		} else {
-			_ = c.Client.Count(entry.Metric, int64(entry.Data.Value), tagList, 1)
+			_ = c.Client.Count(entry.Metric, int64(entry.Value), tagList, 1)
 		}
 	}
 }

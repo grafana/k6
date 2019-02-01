@@ -31,7 +31,7 @@ import (
 
 type tagHandler sort.StringSlice
 
-func (t tagHandler) filterTags(tags map[string]string, group string) []string {
+func (t tagHandler) filterTags(tags map[string]string) []string {
 	var res []string
 
 	for key, value := range tags {
@@ -39,7 +39,7 @@ func (t tagHandler) filterTags(tags map[string]string, group string) []string {
 			res = append(res, key+":"+value)
 		}
 	}
-	return append(res, "group:"+group)
+	return res
 }
 
 func (t tagHandler) contains(key string) bool {
