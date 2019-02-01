@@ -32,10 +32,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const (
-	pushInterval = 1 * time.Second
-)
-
 var _ lib.Collector = &Collector{}
 
 // Collector defines a collector struct
@@ -87,7 +83,7 @@ func (c *Collector) Link() string {
 // Run the collector
 func (c *Collector) Run(ctx context.Context) {
 	c.Logger.Debugf("%s: Running!", c.Type)
-	ticker := time.NewTicker(pushInterval)
+	ticker := time.NewTicker(time.Duration(c.Config.PushInterval.Duration))
 	c.startTime = time.Now()
 
 	for {

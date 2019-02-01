@@ -21,14 +21,16 @@
 package common
 
 import (
+	"github.com/loadimpact/k6/lib/types"
 	null "gopkg.in/guregu/null.v3"
 )
 
 // Config defines the statsd configuration
 type Config struct {
-	Addr       null.String `json:"addr,omitempty" default:"localhost:8125"`
-	BufferSize null.Int    `json:"buffer_size,omitempty" default:"20"`
-	Namespace  null.String `json:"namespace,omitempty" default:"k6."`
+	Addr         null.String        `json:"addr,omitempty" default:"localhost:8125"`
+	BufferSize   null.Int           `json:"buffer_size,omitempty" default:"20"`
+	Namespace    null.String        `json:"namespace,omitempty" default:"k6."`
+	PushInterval types.NullDuration `json:"push_interval,omitempty" default:"1s" envconfig:"PUSH_INTERVAL"`
 }
 
 // Apply returns config with defaults applied
@@ -36,11 +38,17 @@ func (c Config) Apply(cfg Config) Config {
 	if cfg.Addr.Valid {
 		c.Addr = cfg.Addr
 	}
+
 	if cfg.BufferSize.Valid {
 		c.BufferSize = cfg.BufferSize
 	}
+
 	if cfg.Namespace.Valid {
 		c.Namespace = cfg.Namespace
+	}
+
+	if cfg.PushInterval.Valid {
+		c.PushInterval = cfg.PushInterval
 	}
 
 	return c
