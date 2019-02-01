@@ -42,7 +42,7 @@ func (t tagHandler) processTags(tags map[string]string) []string {
 type Config struct {
 	common.Config
 
-	TagWhitelist lib.TagSet `json:"tag_whitelist,omitempty" envconfig:"TAG_WHITELIST"`
+	TagWhitelist lib.TagSet `json:"tagWhitelist,omitempty" envconfig:"TAG_WHITELIST"`
 }
 
 // Apply saves config non-zero config values from the passed config in the receiver.

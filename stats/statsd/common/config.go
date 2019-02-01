@@ -30,9 +30,9 @@ import (
 // Config defines the statsd configuration
 type Config struct {
 	Addr         null.String        `json:"addr,omitempty" envconfig:"ADDR"`
-	BufferSize   null.Int           `json:"buffer_size,omitempty" envconfig:"BUFFER_SIZE"`
+	BufferSize   null.Int           `json:"bufferSize,omitempty" envconfig:"BUFFER_SIZE"`
 	Namespace    null.String        `json:"namespace,omitempty" envconfig:"NAMESPACE"`
-	PushInterval types.NullDuration `json:"push_interval,omitempty" envconfig:"PUSH_INTERVAL"`
+	PushInterval types.NullDuration `json:"pushInterval,omitempty" envconfig:"PUSH_INTERVAL"`
 }
 
 // NewConfig creates a new Config instance with default values for some fields.
