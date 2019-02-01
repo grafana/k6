@@ -21,11 +21,13 @@
 package lib
 
 import (
+	"bytes"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"net"
 	"reflect"
+	"strings"
 
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
@@ -69,6 +71,16 @@ func (t *TagSet) UnmarshalJSON(data []byte) error {
 	}
 	if len(tags) != 0 {
 		*t = GetTagSet(tags...)
+	}
+	return nil
+}
+
+// UnmarshalText converts the tag list to tagset.
+func (t *TagSet) UnmarshalText(data []byte) error {
+	var list = bytes.Split(data, []byte(","))
+	*t = make(map[string]bool, len(list))
+	for _, key := range list {
+		(*t)[strings.TrimSpace(string(key))] = true
 	}
 	return nil
 }
