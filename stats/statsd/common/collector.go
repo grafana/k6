@@ -193,7 +193,7 @@ func (c *Collector) dispatch(entry *Sample) error {
 		}
 		return c.client.Count(entry.Metric, int64(entry.Value), tagList, 1)
 	default:
-		return fmt.Errorf("Unsupported metric type %s", entry.Type)
+		return fmt.Errorf("unsupported metric type %s", entry.Type)
 	}
 }
 
