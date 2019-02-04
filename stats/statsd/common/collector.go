@@ -153,11 +153,18 @@ func (c *Collector) finish() {
 }
 
 func (c *Collector) commit(data []*Sample) error {
+	var errorCount int
 	for _, entry := range data {
 		if err := c.dispatch(entry); err != nil {
 			// No need to return error if just one metric didn't go through
-			c.logger.WithError(err).Warnf("Error while sending metric %s", entry.Metric)
+			c.logger.WithError(err).Debugf("Error while sending metric %s", entry.Metric)
+			errorCount++
 		}
+	}
+	if errorCount != 0 {
+		c.logger.Warnf("Couldn't send %d out of %d metrics. Enable debug logging to see individual errors",
+			errorCount, len(data))
+
 	}
 	return c.client.Flush()
 }
