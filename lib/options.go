@@ -80,7 +80,11 @@ func (t *TagSet) UnmarshalText(data []byte) error {
 	var list = bytes.Split(data, []byte(","))
 	*t = make(map[string]bool, len(list))
 	for _, key := range list {
-		(*t)[strings.TrimSpace(string(key))] = true
+		key := strings.TrimSpace(string(key))
+		if key == "" {
+			continue
+		}
+		(*t)[key] = true
 	}
 	return nil
 }
