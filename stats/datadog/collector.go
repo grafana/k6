@@ -47,7 +47,7 @@ type Config struct {
 
 // Apply saves config non-zero config values from the passed config in the receiver.
 func (c Config) Apply(cfg Config) Config {
-	c.Config.Apply(cfg.Config)
+	c.Config = c.Config.Apply(cfg.Config)
 
 	if cfg.TagWhitelist != nil {
 		c.TagWhitelist = cfg.TagWhitelist
