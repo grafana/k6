@@ -24,15 +24,29 @@ func TestHTTP2Errors(t *testing.T) {
 	testMapOfErrorCodes(t, testTable)
 }
 
+type timeoutError bool
+
+func (t timeoutError) Timeout() bool {
+	return (bool)(t)
+}
+
+func (t timeoutError) Error() string {
+	return fmt.Sprintf("%t", t)
+}
+
 func TestTCPErrors(t *testing.T) {
 	var (
-		nonTCPError  = new(net.OpError)
-		econnreset   = new(net.OpError)
-		epipeerror   = new(net.OpError)
-		econnrefused = new(net.OpError)
-		tcperror     = new(net.OpError)
+		nonTCPError       = new(net.OpError)
+		econnreset        = new(net.OpError)
+		epipeerror        = new(net.OpError)
+		econnrefused      = new(net.OpError)
+		tcperror          = new(net.OpError)
+		timeoutedError    = new(net.OpError)
+		notTimeoutedError = new(net.OpError)
 	)
 	nonTCPError.Net = "something"
+
+	tcperror.Net = "tcp"
 
 	econnreset.Net = "tcp"
 	econnreset.Op = "write"
@@ -46,7 +60,13 @@ func TestTCPErrors(t *testing.T) {
 	econnrefused.Op = "dial"
 	econnrefused.Err = syscall.ECONNREFUSED
 
-	tcperror.Net = "tcp"
+	timeoutedError.Net = "tcp"
+	timeoutedError.Op = "dial"
+	timeoutedError.Err = timeoutError(true)
+
+	notTimeoutedError.Net = "tcp"
+	notTimeoutedError.Op = "dial"
+	notTimeoutedError.Err = timeoutError(false)
 
 	var testTable = map[errCode]error{
 		defaultNetNonTCPErrorCode: nonTCPError,
@@ -54,6 +74,8 @@ func TestTCPErrors(t *testing.T) {
 		tcpBrokenPipeErrorCode:    epipeerror,
 		tcpDialRefusedErrorCode:   econnrefused,
 		defaultTCPErrorCode:       tcperror,
+		tcpDialErrorCode:          notTimeoutedError,
+		tcpDialTimeoutErrorCode:   timeoutedError,
 	}
 
 	testMapOfErrorCodes(t, testTable)
