@@ -1,6 +1,8 @@
 package http
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"net"
 	"syscall"
@@ -15,11 +17,21 @@ func TestDefaultError(t *testing.T) {
 	// TODO find better way to test
 	testErrorCode(t, defaultErrorCode, fmt.Errorf("random error"))
 }
+
 func TestHTTP2Errors(t *testing.T) {
 	var testTable = map[errCode]error{
 		http2ConnectionErrorCode: new(http2.ConnectionError),
 		http2StreamErrorCode:     new(http2.StreamError),
 		http2GoAwayErrorCode:     new(http2.GoAwayError),
+	}
+	testMapOfErrorCodes(t, testTable)
+}
+
+func TestTLSErrors(t *testing.T) {
+	var testTable = map[errCode]error{
+		x509UnknownAuthorityErrorCode: new(x509.UnknownAuthorityError),
+		x509HostnameErrorCode:         new(x509.HostnameError),
+		defaultTLSErrorCode:           new(tls.RecordHeaderError),
 	}
 	testMapOfErrorCodes(t, testTable)
 }
