@@ -67,6 +67,7 @@ func TestDataDog(t *testing.T) {
 	myGauge := stats.New("my_gauge", stats.Gauge)
 	myTrend := stats.New("my_trend", stats.Trend)
 	myRate := stats.New("my_rate", stats.Rate)
+	myCheck := stats.New("my_check", stats.Rate)
 	var testMatrix = []struct {
 		input  []stats.SampleContainer
 		output string
@@ -106,6 +107,21 @@ func TestDataDog(t *testing.T) {
 				}),
 			},
 			output: "testing.things.my_rate:15|c|#tag1:value1",
+		},
+		{
+			input: []stats.SampleContainer{
+				newSample(myCheck, 16, map[string]string{
+					"tag1":  "value1",
+					"tag3":  "value3",
+					"check": "max<100",
+				}),
+				newSample(myCheck, 0, map[string]string{
+					"tag1":  "value1",
+					"tag3":  "value3",
+					"check": "max>100",
+				}),
+			},
+			output: "testing.things.check.max<100.pass:1|c|#tag1:value1\ntesting.things.check.max>100.fail:1|c|#tag1:value1",
 		},
 	}
 	for _, test := range testMatrix {
