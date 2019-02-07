@@ -36,6 +36,20 @@ func TestTLSErrors(t *testing.T) {
 	testMapOfErrorCodes(t, testTable)
 }
 
+func TestDNSErrors(t *testing.T) {
+	var (
+		defaultDNSError = new(net.DNSError)
+		noSuchHostError = new(net.DNSError)
+	)
+
+	noSuchHostError.Err = "no such host" // defined as private in go stdlib
+	var testTable = map[errCode]error{
+		defaultDNSErrorCode:    defaultDNSError,
+		dnsNoSuchHostErrorCode: noSuchHostError,
+	}
+	testMapOfErrorCodes(t, testTable)
+}
+
 type timeoutError bool
 
 func (t timeoutError) Timeout() bool {
