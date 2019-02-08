@@ -6,6 +6,7 @@ import (
 	"net"
 	"syscall"
 
+	"github.com/loadimpact/k6/lib/netext"
 	"github.com/pkg/errors"
 	"golang.org/x/net/http2"
 )
@@ -22,6 +23,7 @@ const (
 	// DNS errors
 	defaultDNSErrorCode    errCode = 1100
 	dnsNoSuchHostErrorCode errCode = 1101
+	blackListedIPErrorCode errCode = 1110
 	// tcp errors
 	defaultTCPErrorCode     errCode = 1200
 	tcpBrokenPipeErrorCode  errCode = 1201
@@ -43,6 +45,7 @@ var customErrorMsgMap = map[errCode]string{
 	tcpDialRefusedErrorCode:  "dial: connection refused",
 	tcpBrokenPipeErrorCode:   "write: broken pipe",
 	dnsNoSuchHostErrorCode:   "lookup: no such host",
+	blackListedIPErrorCode:   "ip is blacklisted",
 	http2GoAwayErrorCode:     "http2: received GoAway",
 	http2StreamErrorCode:     "http2: stream error",
 	http2ConnectionErrorCode: "http2: connection error",
@@ -58,6 +61,8 @@ func errorCodeForError(err error) errCode {
 		default:
 			return defaultDNSErrorCode
 		}
+	case netext.BlackListedIPError:
+		return blackListedIPErrorCode
 	case *http2.GoAwayError:
 		// TODO: Add different error for all errcode for goaway
 		return http2GoAwayErrorCode
