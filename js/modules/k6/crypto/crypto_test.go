@@ -40,7 +40,7 @@ func TestCryptoAlgorithms(t *testing.T) {
 	ctx := context.Background()
 	ctx = common.WithRuntime(ctx, rt)
 	rt.Set("crypto", common.Bind(rt, New(), &ctx))
-	
+
 	t.Run("RandomBytes", func(t *testing.T) {
 		_, err := common.RunString(rt, `
 		let bytes = crypto.randomBytes(5);
