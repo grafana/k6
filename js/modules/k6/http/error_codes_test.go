@@ -5,6 +5,8 @@ import (
 	"crypto/x509"
 	"fmt"
 	"net"
+	"runtime"
+	"strconv"
 	"syscall"
 	"testing"
 
@@ -55,7 +57,7 @@ func TestBlackListedIPError(t *testing.T) {
 	var err = netext.BlackListedIPError{}
 	testErrorCode(t, blackListedIPErrorCode, err)
 	var response = &Response{}
-	response.setErrorCode(blackListedIPErrorCode, err)
+	response.setError(err)
 	require.NotEqual(t, err.Error(), response.Error)
 }
 
@@ -67,6 +69,17 @@ func (t timeoutError) Timeout() bool {
 
 func (t timeoutError) Error() string {
 	return fmt.Sprintf("%t", t)
+}
+
+func TestUnknownNetErrno(t *testing.T) {
+	var err = new(net.OpError)
+	err.Op = "write"
+	err.Net = "tcp"
+	err.Err = syscall.EBFONT // Highly unlikely to actually need to do anything with this error
+	var expectedError = "write: unknown errno `" + strconv.Itoa(int(syscall.EBFONT)) + "` on " + runtime.GOOS + " with message `" + err.Err.Error() + "`"
+	var response = &Response{}
+	response.setError(err)
+	require.Equal(t, response.Error, expectedError)
 }
 
 func TestTCPErrors(t *testing.T) {
@@ -118,8 +131,11 @@ func TestTCPErrors(t *testing.T) {
 
 func testErrorCode(t *testing.T, code errCode, err error) {
 	t.Helper()
-	require.Equalf(t, code, errorCodeForError(err), "Wrong error code for error `%s`", err)
-	require.Equalf(t, code, errorCodeForError(errors.WithStack(err)), "Wrong error code for error `%s`", err)
+	result, _ := errorCodeForError(err)
+	require.Equalf(t, code, result, "Wrong error code for error `%s`", err)
+
+	result, _ = errorCodeForError(errors.WithStack(err))
+	require.Equalf(t, code, result, "Wrong error code for error `%s`", err)
 }
 
 func testMapOfErrorCodes(t *testing.T, testTable map[errCode]error) {

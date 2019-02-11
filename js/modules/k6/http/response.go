@@ -75,7 +75,16 @@ type Response struct {
 
 // This should be used instead of setting Error as it will correctly set ErrorCode as well
 func (res *Response) setError(err error) {
-	res.setErrorCode(errorCodeForError(err), err)
+	var errorCode, args = errorCodeForError(err)
+	res.ErrorCode = int(errorCode)
+	if errMsg, ok := customErrorMsgMap[errorCode]; ok {
+		if len(args) > 0 {
+			errMsg = fmt.Sprintf(errMsg, args...)
+		}
+		res.Error = errMsg
+	} else {
+		res.Error = err.Error()
+	}
 }
 
 // This should be used instead of setting Error as it will correctly set ErrorCode as well
@@ -84,17 +93,6 @@ func (res *Response) setStatusCode(statusCode int) {
 	if statusCode >= 400 && statusCode < 600 {
 		res.ErrorCode = 1000 + statusCode // TODO: Maybe this should not add 1000?
 		// TODO: maybe set the res.Error to some custom message
-	}
-}
-
-// setErrorCode should be used instead of directly setting the ErrorCode
-// it takes care of setting the Error correctly taking into account customErrorMsgMap
-func (res *Response) setErrorCode(errorCode errCode, err error) {
-	res.ErrorCode = int(errorCode)
-	if errMsg, ok := customErrorMsgMap[errorCode]; ok {
-		res.Error = errMsg
-	} else {
-		res.Error = err.Error()
 	}
 }
 
