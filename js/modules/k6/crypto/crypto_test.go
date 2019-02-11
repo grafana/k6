@@ -41,7 +41,7 @@ func TestCryptoAlgorithms(t *testing.T) {
 	ctx = common.WithRuntime(ctx, rt)
 	rt.Set("crypto", common.Bind(rt, New(), &ctx))
 
-	t.Run("RandomBytesValid", func(t *testing.T) {
+	t.Run("RandomBytesSuccess", func(t *testing.T) {
 		_, err := common.RunString(rt, `
 		let bytes = crypto.randomBytes(5);
 		if (bytes.length !== 5) {
@@ -51,7 +51,7 @@ func TestCryptoAlgorithms(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	t.Run("RandomBytesInvalid", func(t *testing.T) {
+	t.Run("RandomBytesInvalidSize", func(t *testing.T) {
 		_, err := common.RunString(rt, `
 		crypto.RandomBytes(-1);`)
 
