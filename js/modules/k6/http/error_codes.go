@@ -37,7 +37,7 @@ const (
 	x509HostnameErrorCode         errCode = 1311
 
 	// HTTP2 errors
-	defaultHTTP2ErrorCode errCode = 1600
+	// defaultHTTP2ErrorCode errCode = 1600 // commented because of golint
 	// HTTP2 GoAway errors
 	unknownHTTP2GoAwayErrorCode errCode = 1610
 	// errors till 1611 + 13 are other HTTP2 GoAway errors with a specific errCode
