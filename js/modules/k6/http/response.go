@@ -75,16 +75,12 @@ type Response struct {
 
 // This should be used instead of setting Error as it will correctly set ErrorCode as well
 func (res *Response) setError(err error) {
-	var errorCode, args = errorCodeForError(err)
+	var errorCode, errorMsg = errorCodeForError(err)
 	res.ErrorCode = int(errorCode)
-	if errMsg, ok := customErrorMsgMap[errorCode]; ok {
-		if len(args) > 0 {
-			errMsg = fmt.Sprintf(errMsg, args...)
-		}
-		res.Error = errMsg
-	} else {
-		res.Error = err.Error()
+	if errorMsg == "" {
+		errorMsg = err.Error()
 	}
+	res.Error = errorMsg
 }
 
 // This should be used instead of setting Error as it will correctly set ErrorCode as well

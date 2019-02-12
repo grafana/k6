@@ -3,6 +3,7 @@ package http
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
 	"net"
 	"runtime"
 	"syscall"
@@ -18,9 +19,6 @@ const (
 	// non specific
 	defaultErrorCode          errCode = 1000
 	defaultNetNonTCPErrorCode errCode = 1010
-	http2GoAwayErrorCode      errCode = 1091
-	http2StreamErrorCode      errCode = 1092
-	http2ConnectionErrorCode  errCode = 1093
 	// DNS errors
 	defaultDNSErrorCode    errCode = 1100
 	dnsNoSuchHostErrorCode errCode = 1101
@@ -37,83 +35,103 @@ const (
 	defaultTLSErrorCode           errCode = 1300
 	x509UnknownAuthorityErrorCode errCode = 1310
 	x509HostnameErrorCode         errCode = 1311
+
+	// HTTP2 errors
+	defaultHTTP2ErrorCode errCode = 1600
+	// HTTP2 GoAway errors
+	unknownHTTP2GoAwayErrorCode errCode = 1610
+	// errors till 1611 + 13 are other HTTP2 GoAway errors with a specific errCode
+
+	// HTTP2 Stream errors
+	unknownHTTP2StreamErrorCode errCode = 1630
+	// errors till 1631 + 13 are other HTTP2 Stream errors with a specific errCode
+
+	// HTTP2 Connection errors
+	unknownHTTP2ConnectionErrorCode errCode = 1650
+	// errors till 1651 + 13 are other HTTP2 Connection errors with a specific errCode
 )
 
-// If a given errorCode from above need to overwrite the error message this should be provided in
-// this map
-var customErrorMsgMap = map[errCode]string{
-	tcpResetByPeerErrorCode:  "write: connection reset by peer",
-	tcpDialTimeoutErrorCode:  "dial: i/o timeout",
-	tcpDialRefusedErrorCode:  "dial: connection refused",
-	tcpBrokenPipeErrorCode:   "write: broken pipe",
-	netUnknownErrnoErrorCode: "%s: unknown errno `%d` on %s with message `%s`",
-	dnsNoSuchHostErrorCode:   "lookup: no such host",
-	blackListedIPErrorCode:   "ip is blacklisted",
-	http2GoAwayErrorCode:     "http2: received GoAway",
-	http2StreamErrorCode:     "http2: stream error",
-	http2ConnectionErrorCode: "http2: connection error",
-	x509HostnameErrorCode:    "x509: certificate doesn't match hostname",
+var (
+	tcpResetByPeerErrorCodeMsg  = "write: connection reset by peer"
+	tcpDialTimeoutErrorCodeMsg  = "dial: i/o timeout"
+	tcpDialRefusedErrorCodeMsg  = "dial: connection refused"
+	tcpBrokenPipeErrorCodeMsg   = "write: broken pipe"
+	netUnknownErrnoErrorCodeMsg = "%s: unknown errno `%d` on %s with message `%s`"
+	dnsNoSuchHostErrorCodeMsg   = "lookup: no such host"
+	blackListedIPErrorCodeMsg   = "ip is blacklisted"
+	http2GoAwayErrorCodeMsg     = "http2: received GoAway with http2 ErrCode %s"
+	http2StreamErrorCodeMsg     = "http2: stream error with http2 ErrCode %s"
+	http2ConnectionErrorCodeMsg = "http2: connection error with http2 ErrCode %s"
+	x509HostnameErrorCodeMsg    = "x509: certificate doesn't match hostname"
+)
+
+func http2ErrCodeOffset(code http2.ErrCode) errCode {
+	if code > http2.ErrCodeHTTP11Required {
+		return 0
+	}
+	return 1 + errCode(code)
 }
 
-func errorCodeForError(err error) (errCode, []interface{}) {
+// returns the errorCode and a specific error message for given error. If errror message is empty
+// than the original error string should be used
+func errorCodeForError(err error) (errCode, string) {
 	switch e := errors.Cause(err).(type) {
 	case *net.DNSError:
 		switch e.Err {
 		case "no such host": // defined as private in the go stdlib
-			return dnsNoSuchHostErrorCode, nil
+			return dnsNoSuchHostErrorCode, dnsNoSuchHostErrorCodeMsg
 		default:
-			return defaultDNSErrorCode, nil
+			return defaultDNSErrorCode, ""
 		}
 	case netext.BlackListedIPError:
-		return blackListedIPErrorCode, nil
+		return blackListedIPErrorCode, blackListedIPErrorCodeMsg
 	case *http2.GoAwayError:
 		// TODO: Add different error for all errcode for goaway
-		return http2GoAwayErrorCode, nil
+		return unknownHTTP2GoAwayErrorCode + http2ErrCodeOffset(e.ErrCode), fmt.Sprintf(http2GoAwayErrorCodeMsg, e.ErrCode)
 	case *http2.StreamError:
 		// TODO: Add different error for all errcode for stream error
-		return http2StreamErrorCode, nil
+		return unknownHTTP2StreamErrorCode + http2ErrCodeOffset(e.Code), fmt.Sprintf(http2StreamErrorCodeMsg, e.Code)
 	case *http2.ConnectionError:
-		// TODO: Add different error for all errcode for connetion error
-		return http2ConnectionErrorCode, nil
+		return unknownHTTP2ConnectionErrorCode + http2ErrCodeOffset(http2.ErrCode(*e)), fmt.Sprintf(http2ConnectionErrorCodeMsg, http2.ErrCode(*e))
 	case *net.OpError:
 		if e.Net != "tcp" && e.Net != "tcp6" {
 			// TODO: figure out how this happens
-			return defaultNetNonTCPErrorCode, nil
+			return defaultNetNonTCPErrorCode, ""
 		}
 		if e.Op == "write" {
 			switch e.Err.Error() {
 			case syscall.ECONNRESET.Error():
-				return tcpResetByPeerErrorCode, nil
+				return tcpResetByPeerErrorCode, tcpResetByPeerErrorCodeMsg
 			case syscall.EPIPE.Error():
-				return tcpBrokenPipeErrorCode, nil
+				return tcpBrokenPipeErrorCode, tcpBrokenPipeErrorCodeMsg
 			}
 		}
 		if e.Op == "dial" {
 			if e.Timeout() {
-				return tcpDialTimeoutErrorCode, nil
+				return tcpDialTimeoutErrorCode, tcpDialTimeoutErrorCodeMsg
 			}
 			switch e.Err.Error() {
 			case syscall.ECONNREFUSED.Error():
-				return tcpDialRefusedErrorCode, nil
+				return tcpDialRefusedErrorCode, tcpDialRefusedErrorCodeMsg
 			}
-			return tcpDialErrorCode, nil
+			return tcpDialErrorCode, ""
 		}
 		switch inErr := e.Err.(type) {
 		case syscall.Errno:
-			return netUnknownErrnoErrorCode, []interface{}{
-				e.Op, (int)(inErr), runtime.GOOS, inErr.Error(),
-			}
+			return netUnknownErrnoErrorCode,
+				fmt.Sprintf(netUnknownErrnoErrorCodeMsg,
+					e.Op, (int)(inErr), runtime.GOOS, inErr.Error())
 		default:
-			return defaultTCPErrorCode, nil
+			return defaultTCPErrorCode, ""
 		}
 
 	case *x509.UnknownAuthorityError:
-		return x509UnknownAuthorityErrorCode, nil
+		return x509UnknownAuthorityErrorCode, x509HostnameErrorCodeMsg
 	case *x509.HostnameError:
-		return x509HostnameErrorCode, nil
+		return x509HostnameErrorCode, x509HostnameErrorCodeMsg
 	case *tls.RecordHeaderError:
-		return defaultTLSErrorCode, nil
+		return defaultTLSErrorCode, ""
 	default:
-		return defaultErrorCode, nil
+		return defaultErrorCode, ""
 	}
 }

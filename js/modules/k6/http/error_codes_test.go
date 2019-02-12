@@ -22,10 +22,16 @@ func TestDefaultError(t *testing.T) {
 }
 
 func TestHTTP2Errors(t *testing.T) {
+	var unknownErrorCode = 220
+	var connectionError = http2.ConnectionError(unknownErrorCode)
 	var testTable = map[errCode]error{
-		http2ConnectionErrorCode: new(http2.ConnectionError),
-		http2StreamErrorCode:     new(http2.StreamError),
-		http2GoAwayErrorCode:     new(http2.GoAwayError),
+		unknownHTTP2ConnectionErrorCode + 1: new(http2.ConnectionError),
+		unknownHTTP2StreamErrorCode + 1:     new(http2.StreamError),
+		unknownHTTP2GoAwayErrorCode + 1:     new(http2.GoAwayError),
+
+		unknownHTTP2ConnectionErrorCode: &connectionError,
+		unknownHTTP2StreamErrorCode:     &http2.StreamError{Code: 220},
+		unknownHTTP2GoAwayErrorCode:     &http2.GoAwayError{ErrCode: 220},
 	}
 	testMapOfErrorCodes(t, testTable)
 }
