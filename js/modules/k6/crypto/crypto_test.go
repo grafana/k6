@@ -61,7 +61,7 @@ func TestCryptoAlgorithms(t *testing.T) {
 
 	t.Run("RandomBytesInvalidSize", func(t *testing.T) {
 		_, err := common.RunString(rt, `
-		crypto.RandomBytes(-1);`)
+		crypto.randomBytes(-1);`)
 
 		assert.Error(t, err)
 	})
