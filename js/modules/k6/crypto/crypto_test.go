@@ -23,12 +23,20 @@ package crypto
 import (
 	"context"
 	"testing"
+	"crypto/rand"
+	"errors"
 
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/stretchr/testify/assert"
 )
+
+type MockReader struct {}
+
+func (MockReader) Read(p []byte) (n int, err error) {
+	return -1, errors.New("Contrived failure")
+}
 
 func TestCryptoAlgorithms(t *testing.T) {
 	if testing.Short() {
@@ -55,6 +63,16 @@ func TestCryptoAlgorithms(t *testing.T) {
 		_, err := common.RunString(rt, `
 		crypto.RandomBytes(-1);`)
 
+		assert.Error(t, err)
+	})
+	
+	t.Run("RandomBytesFailure", func(t *testing.T) {
+		SavedReader := rand.Reader
+		rand.Reader = MockReader{}
+		_, err := common.RunString(rt, `
+		crypto.randomBytes(5);`)
+		rand.Reader = SavedReader
+	
 		assert.Error(t, err)
 	})
 
