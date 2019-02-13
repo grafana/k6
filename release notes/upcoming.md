@@ -17,7 +17,7 @@ Some details:
 - The new outputs also support adding a `namespace` - a prefix before all the metric names. You can set it via the `K6_DATADOG_NAMESPACE` or `K6_STATSD_NAMESPACE` environment variables respectively. Its default value is `k6.` - notice the dot at the end.
 - You can configure how often data batches are sent via the  `K6_STATSD_PUSH_INTERVAL` / `K6_DATADOG_PUSH_INTEVAL` environment variables. The default value is `1s`.
 - Another performance tweak can be done by changing the default buffer size of 20 through `K6_STATSD_BUFFER_SIZE` / `K6_DATADOG_BUFFER_SIZE`.
-- In the case of Datadog, there is an additional configuration `K6_DATADOG_TAG_WHITELIST`, which by default is equal to `status,method,group`. This is a comma separated list of tags that should be sent to Datadog. All other metric tags that k6 emits are discarded. This is done because Datadog does indexing on top of the tags and some highly variable tags like `vu` and `iter` will lead to problems with the service.
+- In the case of Datadog, there is an additional configuration `K6_DATADOG_TAG_BLACKLIST`, which by default is equal to `` (nothing). This is a comma separated list of tags that should *NOT* be sent to Datadog. All other metric tags that k6 emits will be sent.
 
 Thanks to @ivoreis for their work on this!
 

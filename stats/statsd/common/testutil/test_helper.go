@@ -16,7 +16,7 @@ import (
 // BaseTest is a helper function to test statsd/datadog collector throughtly
 func BaseTest(t *testing.T,
 	getCollector func(common.Config) (*common.Collector, error),
-	updateResult func(input []stats.SampleContainer, output string) string,
+	checkResult func(t *testing.T, samples []stats.SampleContainer, expectedOutput, output string),
 ) {
 	t.Helper()
 	var (
@@ -128,6 +128,6 @@ func BaseTest(t *testing.T,
 		collector.Collect(test.input)
 		time.Sleep((time.Duration)(baseConfig.PushInterval.Duration))
 		output := <-ch
-		require.Equal(t, updateResult(test.input, test.output), output)
+		checkResult(t, test.input, test.output, output)
 	}
 }
