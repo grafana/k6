@@ -33,7 +33,8 @@ import (
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/guregu/null.v3"
+	"github.com/stretchr/testify/require"
+	null "gopkg.in/guregu/null.v3"
 )
 
 func TestOptions(t *testing.T) {
@@ -478,5 +479,25 @@ func TestOptionsEnv(t *testing.T) {
 				})
 			}
 		})
+	}
+}
+
+func TestTagSetTextUnmarshal(t *testing.T) {
+
+	var testMatrix = map[string]map[string]bool{
+		"":                         {},
+		"test":                     {"test": true},
+		"test1,test2":              {"test1": true, "test2": true},
+		"   test1  ,  test2  ":     {"test1": true, "test2": true},
+		"   test1  ,   ,  test2  ": {"test1": true, "test2": true},
+		"   test1  ,,  test2  ,,":  {"test1": true, "test2": true},
+	}
+
+	for input, expected := range testMatrix {
+		var set = new(TagSet)
+		err := set.UnmarshalText([]byte(input))
+		require.NoError(t, err)
+
+		require.Equal(t, (map[string]bool)(*set), expected)
 	}
 }
