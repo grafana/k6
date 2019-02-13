@@ -87,7 +87,7 @@ func (res *Response) setError(err error) {
 func (res *Response) setStatusCode(statusCode int) {
 	res.Status = statusCode
 	if statusCode >= 400 && statusCode < 600 {
-		res.ErrorCode = 1000 + statusCode // TODO: Maybe this should not add 1000?
+		res.ErrorCode = 1000 + statusCode
 		// TODO: maybe set the res.Error to some custom message
 	}
 }

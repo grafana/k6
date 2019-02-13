@@ -17,7 +17,6 @@ import (
 )
 
 func TestDefaultError(t *testing.T) {
-	// TODO find better way to test
 	testErrorCode(t, defaultErrorCode, fmt.Errorf("random error"))
 }
 
