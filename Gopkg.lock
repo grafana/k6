@@ -10,6 +10,14 @@
   revision = "4a21cbd618b459155f8b8ee7f4491cd54f5efa77"
 
 [[projects]]
+  digest = "1:6d83aad9c98e13079ad8a4dbc740892edf5384bcd07f1d789bb66cd8ecfae2cd"
+  name = "github.com/DataDog/datadog-go"
+  packages = ["statsd"]
+  pruneopts = "NUT"
+  revision = "e67964b4021ad3a334e748e8811eb3cd6becbc6e"
+  version = "2.1.0"
+
+[[projects]]
   branch = "master"
   digest = "1:7d8fe22a434ddfb29d95e10a0231eb2d96100b9eaaf7bff7312eee7df7a34bfa"
   name = "github.com/GeertJohan/go.rice"
@@ -644,6 +652,7 @@
   analyzer-version = 1
   input-imports = [
     "github.com/Azure/go-ntlmssp",
+    "github.com/DataDog/datadog-go/statsd",
     "github.com/GeertJohan/go.rice",
     "github.com/GeertJohan/go.rice/embedded",
     "github.com/PuerkitoBio/goquery",
