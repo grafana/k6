@@ -21,6 +21,18 @@ Some details:
 
 Thanks to @ivoreis for their work on this!
 
+### k6/crypto: Random bytes method (#922)
+This feature adds a method to return an array with a number of cryptographically random bytes. It will either return exactly the amount of bytes requested or will throw an exception if something went wrong.
+
+```js
+import crypto from "k6/crypto";
+
+export default function() {
+    var bytes = crypto.randomBytes(42);
+}
+```
+
+Thanks to @bookmoons for their work on this!
 
 ## Bugs fixed!
 
