@@ -21,17 +21,23 @@
 package common
 
 import (
+	"context"
 	"crypto/tls"
+	"net"
 	"net/http"
 	"net/http/cookiejar"
 
 	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
 	"github.com/oxtoacart/bpool"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 )
+
+// DialContexter is an interface that can dial with a context
+type DialContexter interface {
+	DialContext(ctx context.Context, network, addr string) (net.Conn, error)
+}
 
 // State provides the volatile state for a VU.
 type State struct {
@@ -46,7 +52,7 @@ type State struct {
 
 	// Networking equipment.
 	Transport http.RoundTripper
-	Dialer    *netext.Dialer
+	Dialer    DialContexter
 	CookieJar *cookiejar.Jar
 	TLSConfig *tls.Config
 
