@@ -29,6 +29,7 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
+	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/stats"
 	"github.com/pkg/errors"
@@ -67,7 +68,7 @@ func (*K6) RandomSeed(ctx context.Context, seed int64) {
 }
 
 func (*K6) Group(ctx context.Context, name string, fn goja.Callable) (goja.Value, error) {
-	state := common.GetState(ctx)
+	state := lib.GetState(ctx)
 	if state == nil {
 		return nil, ErrGroupInInitContext
 	}
@@ -111,7 +112,7 @@ func (*K6) Group(ctx context.Context, name string, fn goja.Callable) (goja.Value
 }
 
 func (*K6) Check(ctx context.Context, arg0, checks goja.Value, extras ...goja.Value) (bool, error) {
-	state := common.GetState(ctx)
+	state := lib.GetState(ctx)
 	if state == nil {
 		return false, ErrCheckInInitContext
 	}

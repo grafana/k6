@@ -390,7 +390,7 @@ func TestRequestWithBinaryFile(t *testing.T) {
 	logger.Level = log.DebugLevel
 	logger.Out = ioutil.Discard
 
-	state := &common.State{
+	state := &lib.State{
 		Options: lib.Options{},
 		Logger:  logger,
 		Group:   root,
@@ -406,7 +406,7 @@ func TestRequestWithBinaryFile(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	ctx = common.WithState(ctx, state)
+	ctx = lib.WithState(ctx, state)
 	ctx = common.WithRuntime(ctx, bi.Runtime)
 	*bi.Context = ctx
 

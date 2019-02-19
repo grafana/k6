@@ -35,6 +35,7 @@ import (
 	"github.com/dop251/goja"
 	"github.com/gorilla/websocket"
 	"github.com/loadimpact/k6/js/common"
+	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/stats"
 )
@@ -81,7 +82,7 @@ func New() *WS {
 
 func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTPResponse, error) {
 	rt := common.GetRuntime(ctx)
-	state := common.GetState(ctx)
+	state := lib.GetState(ctx)
 	if state == nil {
 		return nil, ErrWSInInitContext
 	}

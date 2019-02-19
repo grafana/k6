@@ -29,6 +29,7 @@ import (
 	"net/http/httputil"
 
 	"github.com/loadimpact/k6/js/common"
+	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/netext"
 	log "github.com/sirupsen/logrus"
 )
@@ -108,7 +109,7 @@ func (*HTTP) XCookieJar(ctx *context.Context) *HTTPCookieJar {
 }
 
 func (*HTTP) CookieJar(ctx context.Context) (*HTTPCookieJar, error) {
-	state := common.GetState(ctx)
+	state := lib.GetState(ctx)
 	if state == nil {
 		return nil, ErrJarForbiddenInInitContext
 	}
@@ -138,7 +139,7 @@ func (*HTTP) setRequestCookies(req *http.Request, reqCookies map[string][]*HTTPR
 	}
 }
 
-func (*HTTP) debugRequest(state *common.State, req *http.Request, description string) {
+func (*HTTP) debugRequest(state *lib.State, req *http.Request, description string) {
 	if state.Options.HttpDebug.String != "" {
 		dump, err := httputil.DumpRequestOut(req, state.Options.HttpDebug.String == "full")
 		if err != nil {
@@ -148,7 +149,7 @@ func (*HTTP) debugRequest(state *common.State, req *http.Request, description st
 	}
 }
 
-func (*HTTP) debugResponse(state *common.State, res *http.Response, description string) {
+func (*HTTP) debugResponse(state *lib.State, res *http.Response, description string) {
 	if state.Options.HttpDebug.String != "" && res != nil {
 		dump, err := httputil.DumpResponse(res, state.Options.HttpDebug.String == "full")
 		if err != nil {

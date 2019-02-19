@@ -44,6 +44,7 @@ import (
 	digest "github.com/Soontao/goHttpDigestClient"
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
+	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
 	log "github.com/sirupsen/logrus"
@@ -171,7 +172,7 @@ type parsedHTTPRequest struct {
 
 func (h *HTTP) parseRequest(ctx context.Context, method string, reqURL URL, body interface{}, params goja.Value) (*parsedHTTPRequest, error) {
 	rt := common.GetRuntime(ctx)
-	state := common.GetState(ctx)
+	state := lib.GetState(ctx)
 	if state == nil {
 		return nil, ErrHTTPForbiddenInInitContext
 	}
@@ -400,7 +401,7 @@ func (h *HTTP) parseRequest(ctx context.Context, method string, reqURL URL, body
 // request() shouldn't mess with the goja runtime or other thread-unsafe
 // things because it's called concurrently by Batch()
 func (h *HTTP) request(ctx context.Context, preq *parsedHTTPRequest) (*Response, error) {
-	state := common.GetState(ctx)
+	state := lib.GetState(ctx)
 
 	respReq := &Request{
 		Method:  preq.req.Method,
@@ -641,7 +642,7 @@ func (h *HTTP) request(ctx context.Context, preq *parsedHTTPRequest) (*Response,
 // Batch makes multiple simultaneous HTTP requests. The provideds reqsV should be an array of request
 // objects. Batch returns an array of responses and/or error
 func (h *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, error) {
-	state := common.GetState(ctx)
+	state := lib.GetState(ctx)
 	if state == nil {
 		return nil, ErrBatchForbiddenInInitContext
 	}

@@ -149,10 +149,10 @@ func TestStreamingApi(t *testing.T) {
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 
 	root, _ := lib.NewGroup("", nil)
-	state := &common.State{Group: root}
+	state := &lib.State{Group: root}
 
 	ctx := context.Background()
-	ctx = common.WithState(ctx, state)
+	ctx = lib.WithState(ctx, state)
 	ctx = common.WithRuntime(ctx, rt)
 
 	rt.Set("crypto", common.Bind(rt, New(), &ctx))
@@ -214,10 +214,10 @@ func TestOutputEncoding(t *testing.T) {
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 
 	root, _ := lib.NewGroup("", nil)
-	state := &common.State{Group: root}
+	state := &lib.State{Group: root}
 
 	ctx := context.Background()
-	ctx = common.WithState(ctx, state)
+	ctx = lib.WithState(ctx, state)
 	ctx = common.WithRuntime(ctx, rt)
 
 	rt.Set("crypto", common.Bind(rt, New(), &ctx))
@@ -275,10 +275,10 @@ func TestHMac(t *testing.T) {
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 
 	root, _ := lib.NewGroup("", nil)
-	state := &common.State{Group: root}
+	state := &lib.State{Group: root}
 
 	ctx := context.Background()
-	ctx = common.WithState(ctx, state)
+	ctx = lib.WithState(ctx, state)
 	ctx = common.WithRuntime(ctx, rt)
 
 	rt.Set("crypto", common.Bind(rt, New(), &ctx))

@@ -18,7 +18,7 @@
  *
  */
 
-package common
+package lib
 
 import (
 	"context"
@@ -27,7 +27,6 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 
-	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
 	"github.com/oxtoacart/bpool"
 	log "github.com/sirupsen/logrus"
@@ -42,13 +41,13 @@ type DialContexter interface {
 // State provides the volatile state for a VU.
 type State struct {
 	// Global options.
-	Options lib.Options
+	Options Options
 
 	// Logger. Avoid using the global logger.
 	Logger *log.Logger
 
 	// Current group; all emitted metrics are tagged with this.
-	Group *lib.Group
+	Group *Group
 
 	// Networking equipment.
 	Transport http.RoundTripper

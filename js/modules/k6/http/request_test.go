@@ -97,7 +97,7 @@ func assertRequestMetricsEmitted(t *testing.T, sampleContainers []stats.SampleCo
 	assert.True(t, seenReceiving, "url %s didn't emit Receiving", url)
 }
 
-func newRuntime(t *testing.T) (*testutils.HTTPMultiBin, *common.State, chan stats.SampleContainer, *goja.Runtime, *context.Context) {
+func newRuntime(t *testing.T) (*testutils.HTTPMultiBin, *lib.State, chan stats.SampleContainer, *goja.Runtime, *context.Context) {
 	tb := testutils.NewHTTPMultiBin(t)
 
 	root, err := lib.NewGroup("", nil)
@@ -118,7 +118,7 @@ func newRuntime(t *testing.T) (*testutils.HTTPMultiBin, *common.State, chan stat
 	}
 	samples := make(chan stats.SampleContainer, 1000)
 
-	state := &common.State{
+	state := &lib.State{
 		Options:   options,
 		Logger:    logger,
 		Group:     root,
@@ -130,7 +130,7 @@ func newRuntime(t *testing.T) (*testutils.HTTPMultiBin, *common.State, chan stat
 
 	ctx := new(context.Context)
 	*ctx = context.Background()
-	*ctx = common.WithState(*ctx, state)
+	*ctx = lib.WithState(*ctx, state)
 	*ctx = common.WithRuntime(*ctx, rt)
 	rt.Set("http", common.Bind(rt, New(), ctx))
 
