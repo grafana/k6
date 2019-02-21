@@ -1,4 +1,4 @@
-package http
+package netext
 
 import (
 	"crypto/tls"
@@ -8,7 +8,6 @@ import (
 	"runtime"
 	"syscall"
 
-	"github.com/loadimpact/k6/lib/netext"
 	"github.com/pkg/errors"
 	"golang.org/x/net/http2"
 )
@@ -83,7 +82,7 @@ func errorCodeForError(err error) (errCode, string) {
 		default:
 			return defaultDNSErrorCode, ""
 		}
-	case netext.BlackListedIPError:
+	case BlackListedIPError:
 		return blackListedIPErrorCode, blackListedIPErrorCodeMsg
 	case *http2.GoAwayError:
 		return unknownHTTP2GoAwayErrorCode + http2ErrCodeOffset(e.ErrCode), fmt.Sprintf(http2GoAwayErrorCodeMsg, e.ErrCode)

@@ -1,4 +1,4 @@
-package http
+package netext
 
 import (
 	"crypto/tls"
@@ -10,7 +10,6 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/loadimpact/k6/lib/netext"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/http2"
@@ -59,7 +58,7 @@ func TestDNSErrors(t *testing.T) {
 }
 
 func TestBlackListedIPError(t *testing.T) {
-	var err = netext.BlackListedIPError{}
+	var err = BlackListedIPError{}
 	testErrorCode(t, blackListedIPErrorCode, err)
 	var response = &Response{}
 	response.setError(err)
