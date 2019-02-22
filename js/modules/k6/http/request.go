@@ -125,30 +125,6 @@ func (h *HTTP) Request(ctx context.Context, method string, url goja.Value, args 
 	return responseFromNetext(resp), nil
 }
 
-// ResponseType is used in the request to specify how the response body should be treated
-// The conversion and validation methods are auto-generated with https://github.com/alvaroloes/enumer:
-//go:generate enumer -type=ResponseType -transform=snake -json -text -trimprefix ResponseType -output response_type_gen.go
-type ResponseType uint
-
-const (
-	// ResponseTypeText causes k6 to return the response body as a string. It works
-	// well for web pages and JSON documents, but it can cause issues with
-	// binary files since their data could be lost when they're converted in the
-	// UTF-16 strings JavaScript uses.
-	// This is the default value for backwards-compatibility, unless the global
-	// discardResponseBodies option is enabled.
-	ResponseTypeText ResponseType = iota
-	// ResponseTypeBinary causes k6 to return the response body as a []byte, suitable
-	// for working with binary files without lost data and needless string conversions.
-	ResponseTypeBinary
-	// ResponseTypeNone causes k6 to fully read the response body while immediately
-	// discarding the actual data - k6 would set the body of the returned HTTPResponse
-	// to null. This saves CPU and memory and is suitable for HTTP requests that we just
-	// want to  measure, but we don't care about their responses' contents. This is the
-	// default value for all requests if the global discardResponseBodies is enablled.
-	ResponseTypeNone
-)
-
 func (h *HTTP) parseRequest(ctx context.Context, method string, reqURL netext.URL, body interface{}, params goja.Value) (*netext.ParsedHTTPRequest, error) {
 	rt := common.GetRuntime(ctx)
 	state := lib.GetState(ctx)
