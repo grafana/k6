@@ -18,7 +18,7 @@
  *
  */
 
-package netext
+package httpext
 
 import (
 	"context"
@@ -35,6 +35,7 @@ import (
 	"time"
 
 	"github.com/loadimpact/k6/lib/metrics"
+	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
 	"github.com/mccutchen/go-httpbin/httpbin"
 	"github.com/pkg/errors"
@@ -52,7 +53,7 @@ func TestTracer(t *testing.T) {
 
 	transport, ok := srv.Client().Transport.(*http.Transport)
 	assert.True(t, ok)
-	transport.DialContext = NewDialer(net.Dialer{}).DialContext
+	transport.DialContext = netext.NewDialer(net.Dialer{}).DialContext
 
 	var prev int64
 	assertLaterOrZero := func(t *testing.T, val int64, canBeZero bool) {

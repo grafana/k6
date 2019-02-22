@@ -33,18 +33,18 @@ import (
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/js/modules/k6/html"
-	"github.com/loadimpact/k6/lib/netext"
+	"github.com/loadimpact/k6/lib/netext/httpext"
 )
 
 // Response is a representation of an HTTP response to be returned to the goja VM
-type Response netext.Response
+type Response httpext.Response
 
-// GetCtx returns the Context of the netext.Response
+// GetCtx returns the Context of the httpext.Response
 func (res *Response) GetCtx() context.Context {
-	return ((*netext.Response)(res)).GetCtx()
+	return ((*httpext.Response)(res)).GetCtx()
 }
 
-func responseFromNetext(resp *netext.Response) *Response {
+func responseFromNetext(resp *httpext.Response) *Response {
 	res := Response(*resp)
 	return &res
 }

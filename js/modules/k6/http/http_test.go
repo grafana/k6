@@ -25,7 +25,7 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
-	"github.com/loadimpact/k6/lib/netext"
+	"github.com/loadimpact/k6/lib/netext/httpext"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -44,7 +44,7 @@ func TestTagURL(t *testing.T) {
 	}
 	for expr, data := range testdata {
 		t.Run("expr="+expr, func(t *testing.T) {
-			tag, err := netext.NewURL(data.u, data.n)
+			tag, err := httpext.NewURL(data.u, data.n)
 			require.NoError(t, err)
 			v, err := common.RunString(rt, "http.url`"+expr+"`")
 			if assert.NoError(t, err) {

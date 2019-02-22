@@ -37,7 +37,7 @@ import (
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/netext"
+	"github.com/loadimpact/k6/lib/netext/httpext"
 	null "gopkg.in/guregu/null.v3"
 )
 
@@ -118,21 +118,21 @@ func (h *HTTP) Request(ctx context.Context, method string, url goja.Value, args 
 		return nil, err
 	}
 
-	resp, err := netext.Do(ctx, req)
+	resp, err := httpext.Do(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 	return responseFromNetext(resp), nil
 }
 
-func (h *HTTP) parseRequest(ctx context.Context, method string, reqURL netext.URL, body interface{}, params goja.Value) (*netext.ParsedHTTPRequest, error) {
+func (h *HTTP) parseRequest(ctx context.Context, method string, reqURL httpext.URL, body interface{}, params goja.Value) (*httpext.ParsedHTTPRequest, error) {
 	rt := common.GetRuntime(ctx)
 	state := lib.GetState(ctx)
 	if state == nil {
 		return nil, ErrHTTPForbiddenInInitContext
 	}
 
-	result := &netext.ParsedHTTPRequest{
+	result := &httpext.ParsedHTTPRequest{
 		URL: &reqURL,
 		Req: &http.Request{
 			Method: method,
@@ -142,13 +142,13 @@ func (h *HTTP) parseRequest(ctx context.Context, method string, reqURL netext.UR
 		Timeout:   60 * time.Second,
 		Throw:     state.Options.Throw.Bool,
 		Redirects: state.Options.MaxRedirects,
-		Cookies:   make(map[string]*netext.HTTPRequestCookie),
+		Cookies:   make(map[string]*httpext.HTTPRequestCookie),
 		Tags:      make(map[string]string),
 	}
 	if state.Options.DiscardResponseBodies.Bool {
-		result.ResponseType = netext.ResponseTypeNone
+		result.ResponseType = httpext.ResponseTypeNone
 	} else {
-		result.ResponseType = netext.ResponseTypeText
+		result.ResponseType = httpext.ResponseTypeText
 	}
 
 	formatFormVal := func(v interface{}) string {
@@ -274,7 +274,7 @@ func (h *HTTP) parseRequest(ctx context.Context, method string, reqURL netext.UR
 					}
 					switch cookieV.ExportType() {
 					case reflect.TypeOf(map[string]interface{}{}):
-						result.Cookies[key] = &netext.HTTPRequestCookie{Name: key, Value: "", Replace: false}
+						result.Cookies[key] = &httpext.HTTPRequestCookie{Name: key, Value: "", Replace: false}
 						cookie := cookieV.ToObject(rt)
 						for _, attr := range cookie.Keys() {
 							switch strings.ToLower(attr) {
@@ -285,7 +285,7 @@ func (h *HTTP) parseRequest(ctx context.Context, method string, reqURL netext.UR
 							}
 						}
 					default:
-						result.Cookies[key] = &netext.HTTPRequestCookie{Name: key, Value: cookieV.String(), Replace: false}
+						result.Cookies[key] = &httpext.HTTPRequestCookie{Name: key, Value: cookieV.String(), Replace: false}
 					}
 				}
 			case "headers":
@@ -336,7 +336,7 @@ func (h *HTTP) parseRequest(ctx context.Context, method string, reqURL netext.UR
 			case "throw":
 				result.Throw = params.Get(k).ToBoolean()
 			case "responseType":
-				responseType, err := netext.ResponseTypeString(params.Get(k).String())
+				responseType, err := httpext.ResponseTypeString(params.Get(k).String())
 				if err != nil {
 					return nil, err
 				}
@@ -364,7 +364,7 @@ func (h *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, error) 
 
 	reqs := reqsV.ToObject(rt)
 	keys := reqs.Keys()
-	parsedReqs := map[string]*netext.ParsedHTTPRequest{}
+	parsedReqs := map[string]*httpext.ParsedHTTPRequest{}
 	for _, key := range keys {
 		parsedReq, err := h.parseBatchRequest(ctx, key, reqs.Get(key))
 		if err != nil {
@@ -384,7 +384,7 @@ func (h *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, error) 
 		perHostLimiter = NewMultiSlotLimiter(int(state.Options.BatchPerHost.Int64))
 	)
 	for k, pr := range parsedReqs {
-		go func(key string, parsedReq *netext.ParsedHTTPRequest) {
+		go func(key string, parsedReq *httpext.ParsedHTTPRequest) {
 			globalLimiter.Begin()
 			defer globalLimiter.End()
 
@@ -393,7 +393,7 @@ func (h *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, error) 
 				defer hl.End()
 			}
 
-			res, err := netext.Do(ctx, parsedReq)
+			res, err := httpext.Do(ctx, parsedReq)
 			if err != nil {
 				errs <- err
 				return
@@ -416,12 +416,12 @@ func (h *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, error) 
 	return retval, err
 }
 
-func (h *HTTP) parseBatchRequest(ctx context.Context, key string, val goja.Value) (*netext.ParsedHTTPRequest, error) {
+func (h *HTTP) parseBatchRequest(ctx context.Context, key string, val goja.Value) (*httpext.ParsedHTTPRequest, error) {
 	var (
 		method = HTTP_METHOD_GET
 		ok     bool
 		err    error
-		reqURL netext.URL
+		reqURL httpext.URL
 		body   interface{}
 		params goja.Value
 		rt     = common.GetRuntime(ctx)

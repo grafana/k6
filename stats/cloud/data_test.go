@@ -27,9 +27,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/loadimpact/k6/lib/netext"
-
 	"github.com/loadimpact/k6/lib/metrics"
+	"github.com/loadimpact/k6/lib/netext/httpext"
 	"github.com/loadimpact/k6/stats"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -125,7 +124,7 @@ func TestSampleMarshaling(t *testing.T) {
 			fmt.Sprintf(`{"type":"Points","metric":"iter_li_all","data":{"time":"%d","type":"counter","tags":{"test":"mest"},"values":{"data_received":6789.1,"data_sent":1234.5,"iteration_duration":10000}}}`, expTimestamp),
 		},
 		{
-			NewSampleFromTrail(&netext.Trail{
+			NewSampleFromTrail(&httpext.Trail{
 				EndTime:        now,
 				Duration:       123000,
 				Blocked:        1000,

@@ -1,4 +1,4 @@
-package netext
+package httpext
 
 import (
 	"net"
@@ -6,19 +6,27 @@ import (
 	"strconv"
 
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
 	"github.com/pkg/errors"
 )
 
+// Transport is an implemenation of http.RoundTripper that will measure different metrics for each
+// roundtrip
 type Transport struct {
 	roundTripper http.RoundTripper
-	options      *lib.Options
-	tags         map[string]string
-	trail        *Trail
-	tlsInfo      TLSInfo
-	samplesCh    chan<- stats.SampleContainer
+	// TODO: maybe just take the SystemTags field as it is the only thing used
+	options   *lib.Options
+	tags      map[string]string
+	trail     *Trail
+	tlsInfo   netext.TLSInfo
+	samplesCh chan<- stats.SampleContainer
 }
 
+var _ http.RoundTripper = &Transport{}
+
+// NewTransport returns a new Transport wrapping around the provide Roundtripper and will send
+// samples on the provided channel adding the tags in accordance to the Options provided
 func NewTransport(transport http.RoundTripper, samplesCh chan<- stats.SampleContainer, options *lib.Options, tags map[string]string) *Transport {
 	return &Transport{
 		roundTripper: transport,
@@ -28,18 +36,22 @@ func NewTransport(transport http.RoundTripper, samplesCh chan<- stats.SampleCont
 	}
 }
 
+// SetOptions sets the options that should be used
 func (t *Transport) SetOptions(options *lib.Options) {
 	t.options = options
 }
 
+// GetTrail returns the Trail for the last request through the Transport
 func (t *Transport) GetTrail() *Trail {
 	return t.trail
 }
 
-func (t *Transport) TLSInfo() TLSInfo {
+// TLSInfo returns the TLSInfo of the last tls request through the transport
+func (t *Transport) TLSInfo() netext.TLSInfo {
 	return t.tlsInfo
 }
 
+// RoundTrip is the implementation of http.RoundTripper
 func (t *Transport) RoundTrip(req *http.Request) (res *http.Response, err error) {
 	if t.roundTripper == nil {
 		return nil, errors.New("No roundtrip defined")
@@ -78,7 +90,7 @@ func (t *Transport) RoundTrip(req *http.Request) (res *http.Response, err error)
 		}
 
 		if resp.TLS != nil {
-			tlsInfo, oscp := ParseTLSConnState(resp.TLS)
+			tlsInfo, oscp := netext.ParseTLSConnState(resp.TLS)
 			if t.options.SystemTags["tls_version"] {
 				tags["tls_version"] = tlsInfo.Version
 			}

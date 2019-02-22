@@ -1,4 +1,4 @@
-package netext
+package httpext
 
 import (
 	"bytes"
@@ -21,6 +21,7 @@ import (
 	ntlmssp "github.com/Azure/go-ntlmssp"
 	digest "github.com/Soontao/goHttpDigestClient"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
 	log "github.com/sirupsen/logrus"
 	null "gopkg.in/guregu/null.v3"
@@ -283,7 +284,7 @@ func Do(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error) {
 				Value:    c.Value,
 				Domain:   c.Domain,
 				Path:     c.Path,
-				HTTPOnly: c.HttpOnly,
+				HttpOnly: c.HttpOnly,
 				Secure:   c.Secure,
 				MaxAge:   c.MaxAge,
 				Expires:  c.Expires.UnixNano() / 1000000,
@@ -327,7 +328,7 @@ func (res *Response) setStatusCode(statusCode int) {
 }
 
 func (res *Response) setTLSInfo(tlsState *tls.ConnectionState) {
-	tlsInfo, oscp := ParseTLSConnState(tlsState)
+	tlsInfo, oscp := netext.ParseTLSConnState(tlsState)
 	res.TLSVersion = tlsInfo.Version
 	res.TLSCipherSuite = tlsInfo.CipherSuite
 	res.OCSP = oscp
@@ -405,7 +406,7 @@ type Response struct {
 	Timings        ResponseTimings          `json:"timings"`
 	TLSVersion     string                   `json:"tls_version"`
 	TLSCipherSuite string                   `json:"tls_cipher_suite"`
-	OCSP           OCSP                     `json:"ocsp"`
+	OCSP           netext.OCSP              `json:"ocsp"`
 	Error          string                   `json:"error"`
 	ErrorCode      int                      `json:"error_code"`
 	Request        Request                  `json:"request"`
@@ -440,7 +441,7 @@ type ResponseTimings struct {
 // HTTPCookie is a representation of an http cookies used in the Response object
 type HTTPCookie struct {
 	Name, Value, Domain, Path string
-	HTTPOnly, Secure          bool
+	HttpOnly, Secure          bool
 	MaxAge                    int
 	Expires                   int64
 }
