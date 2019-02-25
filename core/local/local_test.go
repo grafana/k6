@@ -23,6 +23,7 @@ package local
 import (
 	"context"
 	"net"
+	"runtime"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -431,6 +432,9 @@ func TestExecutorSetVUs(t *testing.T) {
 }
 
 func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip()
+	}
 	t.Parallel()
 	script := []byte(`
 	import { Counter } from "k6/metrics";
