@@ -73,8 +73,8 @@ var testCases = []configMapTestCase{
 			sched.IterationTimeout = types.NullDurationFrom(15 * time.Second)
 			sched.StartVUs = null.IntFrom(20)
 			sched.Stages = []Stage{
-				Stage{Target: null.IntFrom(30), Duration: types.NullDurationFrom(60 * time.Second)},
-				Stage{Target: null.IntFrom(10), Duration: types.NullDurationFrom(120 * time.Second)},
+				{Target: null.IntFrom(30), Duration: types.NullDurationFrom(60 * time.Second)},
+				{Target: null.IntFrom(10), Duration: types.NullDurationFrom(120 * time.Second)},
 			}
 			require.Equal(t, cm, ConfigMap{"varloops": sched})
 			assert.Equal(t, int64(30), cm["varloops"].GetMaxVUs())
@@ -160,8 +160,8 @@ var testCases = []configMapTestCase{
 			sched := NewVariableArrivalRateConfig("varrival")
 			sched.StartRate = null.IntFrom(10)
 			sched.Stages = []Stage{
-				Stage{Target: null.IntFrom(30), Duration: types.NullDurationFrom(180 * time.Second)},
-				Stage{Target: null.IntFrom(10), Duration: types.NullDurationFrom(300 * time.Second)},
+				{Target: null.IntFrom(30), Duration: types.NullDurationFrom(180 * time.Second)},
+				{Target: null.IntFrom(10), Duration: types.NullDurationFrom(300 * time.Second)},
 			}
 			sched.TimeUnit = types.NullDurationFrom(30 * time.Second)
 			sched.PreAllocatedVUs = null.IntFrom(20)
