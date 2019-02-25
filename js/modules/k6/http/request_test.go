@@ -469,7 +469,16 @@ func TestRequestAndBatch(t *testing.T) {
 				state.CookieJar = cookieJar
 				_, err = common.RunString(rt, sr(`
 				let res = http.request("GET", "HTTPBIN_URL/cookies/set?key=value", null, { redirects: 0 });
-				if (res.cookies.key[0].value != "value") { throw new Error("wrong cookie value: " + res.cookies.key[0].value); }
+				const props = ["name", "value", "domain", "path", "expires", "max_age", "secure", "http_only"];
+				let cookie = res.cookies.key[0];
+				for (let i = 0; i < props.length; i++) {
+					if (cookie[props[i]] === undefined) {
+						throw new Error("cookie property not found: " + props[i]);
+					}
+				}
+				if (Object.keys(cookie).length != props.length) {
+					throw new Error("cookie has more properties than expected: " + JSON.stringify(Object.keys(cookie)));
+				}
 				`))
 				assert.NoError(t, err)
 				assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/cookies/set?key=value"), "", 302, "")
