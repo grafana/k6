@@ -3,6 +3,7 @@ package httpext
 import (
 	"net"
 	"net/http"
+	"net/http/httptrace"
 	"strconv"
 
 	"github.com/loadimpact/k6/lib"
@@ -64,7 +65,7 @@ func (t *Transport) RoundTrip(req *http.Request) (res *http.Response, err error)
 
 	ctx := req.Context()
 	tracer := Tracer{}
-	reqWithTracer := req.WithContext(WithTracer(ctx, &tracer))
+	reqWithTracer := req.WithContext(httptrace.WithClientTrace(ctx, tracer.Trace()))
 
 	resp, err := t.roundTripper.RoundTrip(reqWithTracer)
 	trail := tracer.Done()
