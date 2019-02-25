@@ -1,7 +1,6 @@
 package scheduler
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -14,7 +13,7 @@ const constantLoopingVUsType = "constant-looping-vus"
 func init() {
 	RegisterConfigType(constantLoopingVUsType, func(name string, rawJSON []byte) (Config, error) {
 		config := NewConstantLoopingVUsConfig(name)
-		err := json.Unmarshal(rawJSON, &config)
+		err := strictJSONUnmarshal(rawJSON, &config)
 		return config, err
 	})
 }
@@ -32,7 +31,6 @@ type ConstantLoopingVUsConfig struct {
 
 // NewConstantLoopingVUsConfig returns a ConstantLoopingVUsConfig with default values
 func NewConstantLoopingVUsConfig(name string) ConstantLoopingVUsConfig {
-	//TODO: decide if we want interruptible or uninterruptible iterations here?
 	return ConstantLoopingVUsConfig{BaseConfig: NewBaseConfig(name, constantLoopingVUsType, false)}
 }
 
@@ -57,6 +55,21 @@ func (lcv ConstantLoopingVUsConfig) Validate() []error {
 	}
 
 	return errors
+}
+
+// GetMaxVUs returns the absolute maximum number of possible concurrently running VUs
+func (lcv ConstantLoopingVUsConfig) GetMaxVUs() int64 {
+	return lcv.VUs.Int64
+}
+
+// GetMaxDuration returns the maximum duration time for this scheduler, including
+// the specified iterationTimeout, if the iterations are uninterruptible
+func (lcv ConstantLoopingVUsConfig) GetMaxDuration() time.Duration {
+	maxDuration := lcv.Duration.Duration
+	if !lcv.Interruptible.Bool {
+		maxDuration += lcv.IterationTimeout.Duration
+	}
+	return time.Duration(maxDuration)
 }
 
 // Split divides the VUS as best it can, but keeps the same duration

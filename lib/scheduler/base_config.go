@@ -21,14 +21,11 @@ type BaseConfig struct {
 	Interruptible    null.Bool          `json:"interruptible"`
 	IterationTimeout types.NullDuration `json:"iterationTimeout"`
 	Env              map[string]string  `json:"env"`
-	Exec             string             `json:"exec"` // function name, externally validated
+	Exec             null.String        `json:"exec"` // function name, externally validated
 	Percentage       float64            `json:"-"`    // 100, unless Split() was called
 
-	// Future extensions: tags, distribution, others?
+	//TODO: future extensions like tags, distribution, others?
 }
-
-// Make sure we implement the Config interface, even with the BaseConfig!
-var _ Config = &BaseConfig{}
 
 // NewBaseConfig returns a default base config with the default values
 func NewBaseConfig(name, configType string, interruptible bool) BaseConfig {
@@ -56,6 +53,9 @@ func (bc BaseConfig) Validate() (errors []error) {
 			"percentage should be between %f and 100, but is %f", minPercentage, bc.Percentage,
 		))
 	}
+	if bc.Exec.Valid && bc.Exec.String == "" {
+		errors = append(errors, fmt.Errorf("exec value cannot be empty"))
+	}
 	// The actually reasonable checks:
 	if bc.StartTime.Valid && bc.StartTime.Duration < 0 {
 		errors = append(errors, fmt.Errorf("scheduler start time should be positive"))
@@ -80,16 +80,4 @@ func (bc BaseConfig) CopyWithPercentage(percentage float64) *BaseConfig {
 	c := bc
 	c.Percentage = percentage
 	return &c
-}
-
-// Split splits the BaseConfig with the accurate percentages
-func (bc BaseConfig) Split(percentages []float64) ([]Config, error) {
-	if err := checkPercentagesSum(percentages); err != nil {
-		return nil, err
-	}
-	configs := make([]Config, len(percentages))
-	for i, p := range percentages {
-		configs[i] = bc.CopyWithPercentage(p)
-	}
-	return configs, nil
 }

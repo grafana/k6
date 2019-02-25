@@ -1,7 +1,6 @@
 package scheduler
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -14,7 +13,7 @@ const perVUIterationsType = "per-vu-iterations"
 func init() {
 	RegisterConfigType(perVUIterationsType, func(name string, rawJSON []byte) (Config, error) {
 		config := NewPerVUIterationsConfig(name)
-		err := json.Unmarshal(rawJSON, &config)
+		err := strictJSONUnmarshal(rawJSON, &config)
 		return config, err
 	})
 }
@@ -60,4 +59,19 @@ func (pvic PerVUIteationsConfig) Validate() []error {
 	}
 
 	return errors
+}
+
+// GetMaxVUs returns the absolute maximum number of possible concurrently running VUs
+func (pvic PerVUIteationsConfig) GetMaxVUs() int64 {
+	return pvic.VUs.Int64
+}
+
+// GetMaxDuration returns the maximum duration time for this scheduler, including
+// the specified iterationTimeout, if the iterations are uninterruptible
+func (pvic PerVUIteationsConfig) GetMaxDuration() time.Duration {
+	maxDuration := pvic.MaxDuration.Duration
+	if !pvic.Interruptible.Bool {
+		maxDuration += pvic.IterationTimeout.Duration
+	}
+	return time.Duration(maxDuration)
 }

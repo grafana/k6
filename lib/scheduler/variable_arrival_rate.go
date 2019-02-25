@@ -1,7 +1,6 @@
 package scheduler
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -14,7 +13,7 @@ const variableArrivalRateType = "variable-arrival-rate"
 func init() {
 	RegisterConfigType(variableArrivalRateType, func(name string, rawJSON []byte) (Config, error) {
 		config := NewVariableArrivalRateConfig(name)
-		err := json.Unmarshal(rawJSON, &config)
+		err := strictJSONUnmarshal(rawJSON, &config)
 		return config, err
 	})
 }
@@ -23,9 +22,8 @@ func init() {
 type VariableArrivalRateConfig struct {
 	BaseConfig
 	StartRate null.Int           `json:"startRate"`
-	TimeUnit  types.NullDuration `json:"timeUnit"` //TODO: rename to something else?
-	Stages    json.RawMessage    `json:"stages"`   //TODO: figure out some equivalent to stages?
-	//TODO: maybe move common parts between this and the ConstantArrivalRateConfig in another struct?
+	TimeUnit  types.NullDuration `json:"timeUnit"`
+	Stages    []Stage            `json:"stages"`
 
 	// Initialize `PreAllocatedVUs` number of VUs, and if more than that are needed,
 	// they will be dynamically allocated, until `MaxVUs` is reached, which is an
@@ -39,7 +37,6 @@ func NewVariableArrivalRateConfig(name string) VariableArrivalRateConfig {
 	return VariableArrivalRateConfig{
 		BaseConfig: NewBaseConfig(name, variableArrivalRateType, false),
 		TimeUnit:   types.NewNullDuration(1*time.Second, false),
-		//TODO: set some default values for PreAllocatedVUs and MaxVUs?
 	}
 }
 
@@ -58,7 +55,7 @@ func (varc VariableArrivalRateConfig) Validate() []error {
 		errors = append(errors, fmt.Errorf("the timeUnit should be more than 0"))
 	}
 
-	//TODO: stages valiadtion
+	errors = append(errors, validateStages(varc.Stages)...)
 
 	if !varc.PreAllocatedVUs.Valid {
 		errors = append(errors, fmt.Errorf("the number of preAllocatedVUs isn't specified"))
@@ -73,4 +70,22 @@ func (varc VariableArrivalRateConfig) Validate() []error {
 	}
 
 	return errors
+}
+
+// GetMaxVUs returns the absolute maximum number of possible concurrently running VUs
+func (varc VariableArrivalRateConfig) GetMaxVUs() int64 {
+	return varc.MaxVUs.Int64
+}
+
+// GetMaxDuration returns the maximum duration time for this scheduler, including
+// the specified iterationTimeout, if the iterations are uninterruptible
+func (varc VariableArrivalRateConfig) GetMaxDuration() time.Duration {
+	var maxDuration types.Duration
+	for _, s := range varc.Stages {
+		maxDuration += s.Duration.Duration
+	}
+	if !varc.Interruptible.Bool {
+		maxDuration += varc.IterationTimeout.Duration
+	}
+	return time.Duration(maxDuration)
 }
