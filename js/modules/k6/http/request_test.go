@@ -535,11 +535,11 @@ func TestRequestAndBatch(t *testing.T) {
 					`))
 					assert.NoError(t, err)
 
-					redirectUrl, err := url.Parse(sr("HTTPBIN_URL"))
+					redirectURL, err := url.Parse(sr("HTTPBIN_URL"))
 					assert.NoError(t, err)
-					require.Len(t, cookieJar.Cookies(redirectUrl), 1)
-					assert.Equal(t, "key-foo", cookieJar.Cookies(redirectUrl)[0].Name)
-					assert.Equal(t, "value-bar", cookieJar.Cookies(redirectUrl)[0].Value)
+					require.Len(t, cookieJar.Cookies(redirectURL), 1)
+					assert.Equal(t, "key-foo", cookieJar.Cookies(redirectURL)[0].Name)
+					assert.Equal(t, "value-bar", cookieJar.Cookies(redirectURL)[0].Value)
 
 					assertRequestMetricsEmitted(
 						t,
@@ -561,12 +561,12 @@ func TestRequestAndBatch(t *testing.T) {
 					`))
 					assert.NoError(t, err)
 
-					redirectUrl, err := url.Parse(sr("HTTPSBIN_URL"))
+					redirectURL, err := url.Parse(sr("HTTPSBIN_URL"))
 					assert.NoError(t, err)
 
-					require.Len(t, cookieJar.Cookies(redirectUrl), 1)
-					assert.Equal(t, "key", cookieJar.Cookies(redirectUrl)[0].Name)
-					assert.Equal(t, "value", cookieJar.Cookies(redirectUrl)[0].Value)
+					require.Len(t, cookieJar.Cookies(redirectURL), 1)
+					assert.Equal(t, "key", cookieJar.Cookies(redirectURL)[0].Name)
+					assert.Equal(t, "value", cookieJar.Cookies(redirectURL)[0].Value)
 
 					assertRequestMetricsEmitted(
 						t,
