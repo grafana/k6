@@ -34,6 +34,11 @@ import (
 	"gopkg.in/guregu/null.v3"
 )
 
+// DefaultSchedulerName is used as the default key/ID of the scheduler config entries
+// that were created due to the use of the shortcut execution control options (i.e. duration+vus,
+// iterations+vus, or stages)
+const DefaultSchedulerName = "default"
+
 // DefaultSystemTagList includes all of the system tags emitted with metrics by default.
 // Other tags that are not enabled by default include: iter, vu, ocsp_status, ip
 var DefaultSystemTagList = []string{
@@ -189,7 +194,9 @@ type Options struct {
 
 	// Initial values for VUs, max VUs, duration cap, iteration cap, and stages.
 	// See the Runner or Executor interfaces for more information.
-	VUs        null.Int           `json:"vus" envconfig:"vus"`
+	VUs null.Int `json:"vus" envconfig:"vus"`
+
+	//TODO: deprecate this? or reuse it in the manual control "scheduler"?
 	VUsMax     null.Int           `json:"vusMax" envconfig:"vus_max"`
 	Duration   types.NullDuration `json:"duration" envconfig:"duration"`
 	Iterations null.Int           `json:"iterations" envconfig:"iterations"`
@@ -296,6 +303,23 @@ func (o Options) Apply(opts Options) Options {
 	if opts.VUsMax.Valid {
 		o.VUsMax = opts.VUsMax
 	}
+
+	// Specifying duration, iterations, stages, or execution in a "higher" config tier
+	// will overwrite all of the the previous execution settings (if any) from any
+	// "lower" config tiers
+	// Still, if more than one of those options is simultaneously specified in the same
+	// config tier, they will be preserved, so the validation after we've consolidated
+	// all of the options can return an error.
+	if opts.Duration.Valid || opts.Iterations.Valid || opts.Stages != nil || o.Execution != nil {
+		//TODO: uncomment this after we start using the new schedulers
+		/*
+			o.Duration = types.NewNullDuration(0, false)
+			o.Iterations = null.NewInt(0, false)
+			o.Stages = nil
+			o.Execution = nil
+		*/
+	}
+
 	if opts.Duration.Valid {
 		o.Duration = opts.Duration
 	}
@@ -310,12 +334,13 @@ func (o Options) Apply(opts Options) Options {
 			}
 		}
 	}
-
-	//TODO: handle o.Execution overwriting by plain vus/iterations/duration/stages options
-	if len(opts.Execution) > 0 {
+	// o.Execution can also be populated by the duration/iterations/stages config shortcuts, but
+	// that happens after the configuration from the different sources is consolidated. It can't
+	// happen here, because something like `K6_ITERATIONS=10 k6 run --vus 5 script.js` wont't
+	// work correctly at this level.
+	if opts.Execution != nil {
 		o.Execution = opts.Execution
 	}
-
 	if opts.SetupTimeout.Valid {
 		o.SetupTimeout = opts.SetupTimeout
 	}

@@ -134,3 +134,8 @@ func TestConfigApply(t *testing.T) {
 		assert.Equal(t, []string{"influxdb", "json"}, conf.Out)
 	})
 }
+
+func TestBuildExecutionConfig(t *testing.T) {
+	//TODO: test the current config building and constructing of the execution plan, and the emitted warnings
+	//TODO: test the future full overwriting of the duration/iterations/stages/execution options
+}

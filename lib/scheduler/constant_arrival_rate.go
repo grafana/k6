@@ -1,7 +1,6 @@
 package scheduler
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -14,7 +13,7 @@ const constantArrivalRateType = "constant-arrival-rate"
 func init() {
 	RegisterConfigType(constantArrivalRateType, func(name string, rawJSON []byte) (Config, error) {
 		config := NewConstantArrivalRateConfig(name)
-		err := json.Unmarshal(rawJSON, &config)
+		err := strictJSONUnmarshal(rawJSON, &config)
 		return config, err
 	})
 }
@@ -23,7 +22,7 @@ func init() {
 type ConstantArrivalRateConfig struct {
 	BaseConfig
 	Rate     null.Int           `json:"rate"`
-	TimeUnit types.NullDuration `json:"timeUnit"` //TODO: rename to something else?
+	TimeUnit types.NullDuration `json:"timeUnit"`
 	Duration types.NullDuration `json:"duration"`
 
 	// Initialize `PreAllocatedVUs` number of VUs, and if more than that are needed,
@@ -38,7 +37,6 @@ func NewConstantArrivalRateConfig(name string) ConstantArrivalRateConfig {
 	return ConstantArrivalRateConfig{
 		BaseConfig: NewBaseConfig(name, constantArrivalRateType, false),
 		TimeUnit:   types.NewNullDuration(1*time.Second, false),
-		//TODO: set some default values for PreAllocatedVUs and MaxVUs?
 	}
 }
 
@@ -54,7 +52,7 @@ func (carc ConstantArrivalRateConfig) Validate() []error {
 		errors = append(errors, fmt.Errorf("the iteration rate should be positive"))
 	}
 
-	if time.Duration(carc.TimeUnit.Duration) < 0 {
+	if time.Duration(carc.TimeUnit.Duration) <= 0 {
 		errors = append(errors, fmt.Errorf("the timeUnit should be more than 0"))
 	}
 
@@ -79,4 +77,19 @@ func (carc ConstantArrivalRateConfig) Validate() []error {
 	}
 
 	return errors
+}
+
+// GetMaxVUs returns the absolute maximum number of possible concurrently running VUs
+func (carc ConstantArrivalRateConfig) GetMaxVUs() int64 {
+	return carc.MaxVUs.Int64
+}
+
+// GetMaxDuration returns the maximum duration time for this scheduler, including
+// the specified iterationTimeout, if the iterations are uninterruptible
+func (carc ConstantArrivalRateConfig) GetMaxDuration() time.Duration {
+	maxDuration := carc.Duration.Duration
+	if !carc.Interruptible.Bool {
+		maxDuration += carc.IterationTimeout.Duration
+	}
+	return time.Duration(maxDuration)
 }
