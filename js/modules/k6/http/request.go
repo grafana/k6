@@ -118,7 +118,7 @@ func (h *HTTP) Request(ctx context.Context, method string, url goja.Value, args 
 		return nil, err
 	}
 
-	resp, err := httpext.Do(ctx, req)
+	resp, err := httpext.MakeRequest(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -393,7 +393,7 @@ func (h *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, error) 
 				defer hl.End()
 			}
 
-			res, err := httpext.Do(ctx, parsedReq)
+			res, err := httpext.MakeRequest(ctx, parsedReq)
 			if err != nil {
 				errs <- err
 				return

@@ -68,8 +68,8 @@ type ParsedHTTPRequest struct {
 	Tags          map[string]string
 }
 
-// Do makes http request for tor the provided ParsedHTTPRequest
-func Do(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error) {
+// MakeRequest makes http request for tor the provided ParsedHTTPRequest
+func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error) {
 	state := lib.GetState(ctx)
 
 	respReq := &Request{
