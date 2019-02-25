@@ -74,10 +74,6 @@ func (j HTTPCookieJar) Set(url, name, value string, opts goja.Value) (bool, erro
 		params := paramsV.ToObject(rt)
 		for _, k := range params.Keys() {
 			switch strings.ToLower(k) {
-			case "name":
-				c.Name = params.Get(k).String()
-			case "value":
-				c.Value = params.Get(k).String()
 			case "path":
 				c.Path = params.Get(k).String()
 			case "domain":
