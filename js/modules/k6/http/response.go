@@ -37,6 +37,7 @@ import (
 )
 
 // Response is a representation of an HTTP response to be returned to the goja VM
+// TODO: refactor after https://github.com/dop251/goja/issues/84
 type Response httpext.Response
 
 // GetCtx returns the Context of the httpext.Response
