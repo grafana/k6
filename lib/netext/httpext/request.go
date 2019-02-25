@@ -291,7 +291,7 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 				Value:    c.Value,
 				Domain:   c.Domain,
 				Path:     c.Path,
-				HttpOnly: c.HttpOnly,
+				HTTPOnly: c.HttpOnly,
 				Secure:   c.Secure,
 				MaxAge:   c.MaxAge,
 				Expires:  c.Expires.UnixNano() / 1000000,

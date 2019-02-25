@@ -50,7 +50,7 @@ type ResponseTimings struct {
 // HTTPCookie is a representation of an http cookies used in the Response object
 type HTTPCookie struct {
 	Name, Value, Domain, Path string
-	HttpOnly, Secure          bool
+	HTTPOnly, Secure          bool
 	MaxAge                    int
 	Expires                   int64
 }
