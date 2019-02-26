@@ -72,21 +72,6 @@ func (lcv ConstantLoopingVUsConfig) GetMaxDuration() time.Duration {
 	return time.Duration(maxDuration)
 }
 
-// Split divides the VUS as best it can, but keeps the same duration
-func (lcv ConstantLoopingVUsConfig) Split(percentages []float64) ([]Config, error) {
-	if err := checkPercentagesSum(percentages); err != nil {
-		return nil, err
-	}
-	configs := make([]Config, len(percentages))
-	for i, p := range percentages {
-		//TODO: figure out a better approach for the proportional distribution
-		// of the VUs (which are indivisible items)...
-		// Some sort of "pick closest match to percentage and adjust remaining"?
-		configs[i] = &ConstantLoopingVUsConfig{
-			BaseConfig: *lcv.BaseConfig.CopyWithPercentage(p),
-			VUs:        null.IntFrom(int64(float64(lcv.VUs.Int64) / p)),
-			Duration:   lcv.Duration,
-		}
-	}
-	return configs, nil
-}
+//TODO: figure out the most accurate algorithm for the proportional distribution
+// of the VUs (which are indivisible items)... Some sort of "pick closest match
+// to percentage and adjust remaining"?

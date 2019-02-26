@@ -9,5 +9,5 @@ type Config interface {
 	GetMaxVUs() int64
 	GetMaxDuration() time.Duration // includes max timeouts, to allow us to share VUs between schedulers in the future
 	//TODO: Split(percentages []float64) ([]Config, error)
-	//TODO: String() or some other method that would be used for priting descriptions of the currently running schedulers for the UI?
+	//TODO: String() method that could be used for priting descriptions of the currently running schedulers for the UI?
 }
