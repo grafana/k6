@@ -143,9 +143,9 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 					preq.ActiveJar.SetCookies(req.URL, respCookies)
 				}
 				req.Header.Del("Cookie")
-				mergedCookies := mergeCookies(req, preq.ActiveJar, preq.Cookies)
+				mergedCookies := MergeCookies(req, preq.ActiveJar, preq.Cookies)
 
-				setRequestCookies(req, mergedCookies)
+				SetRequestCookies(req, mergedCookies)
 			}
 
 			if l := len(via); int64(l) > preq.Redirects.Int64 {
@@ -315,7 +315,7 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 	return resp, nil
 }
 
-func mergeCookies(req *http.Request, jar *cookiejar.Jar, reqCookies map[string]*HTTPRequestCookie) map[string][]*HTTPRequestCookie {
+func MergeCookies(req *http.Request, jar *cookiejar.Jar, reqCookies map[string]*HTTPRequestCookie) map[string][]*HTTPRequestCookie {
 	allCookies := make(map[string][]*HTTPRequestCookie)
 	for _, c := range jar.Cookies(req.URL) {
 		allCookies[c.Name] = append(allCookies[c.Name], &HTTPRequestCookie{Name: c.Name, Value: c.Value})
@@ -330,7 +330,7 @@ func mergeCookies(req *http.Request, jar *cookiejar.Jar, reqCookies map[string]*
 	return allCookies
 }
 
-func setRequestCookies(req *http.Request, reqCookies map[string][]*HTTPRequestCookie) {
+func SetRequestCookies(req *http.Request, reqCookies map[string][]*HTTPRequestCookie) {
 	for _, cookies := range reqCookies {
 		for _, c := range cookies {
 			req.AddCookie(&http.Cookie{Name: c.Name, Value: c.Value})

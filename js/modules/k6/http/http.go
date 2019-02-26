@@ -22,13 +22,10 @@ package http
 
 import (
 	"context"
-	"net/http"
-	"net/http/cookiejar"
 
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/netext"
-	"github.com/loadimpact/k6/lib/netext/httpext"
 )
 
 const (
@@ -111,27 +108,4 @@ func (*HTTP) CookieJar(ctx context.Context) (*HTTPCookieJar, error) {
 		return nil, ErrJarForbiddenInInitContext
 	}
 	return &HTTPCookieJar{state.CookieJar, &ctx}, nil
-}
-
-func (*HTTP) mergeCookies(req *http.Request, jar *cookiejar.Jar, reqCookies map[string]*httpext.HTTPRequestCookie) map[string][]*httpext.HTTPRequestCookie {
-	allCookies := make(map[string][]*httpext.HTTPRequestCookie)
-	for _, c := range jar.Cookies(req.URL) {
-		allCookies[c.Name] = append(allCookies[c.Name], &httpext.HTTPRequestCookie{Name: c.Name, Value: c.Value})
-	}
-	for key, reqCookie := range reqCookies {
-		if jc := allCookies[key]; jc != nil && reqCookie.Replace {
-			allCookies[key] = []*httpext.HTTPRequestCookie{{Name: key, Value: reqCookie.Value}}
-		} else {
-			allCookies[key] = append(allCookies[key], &httpext.HTTPRequestCookie{Name: key, Value: reqCookie.Value})
-		}
-	}
-	return allCookies
-}
-
-func (*HTTP) setRequestCookies(req *http.Request, reqCookies map[string][]*httpext.HTTPRequestCookie) {
-	for _, cookies := range reqCookies {
-		for _, c := range cookies {
-			req.AddCookie(&http.Cookie{Name: c.Name, Value: c.Value})
-		}
-	}
 }
