@@ -19,7 +19,7 @@ type configMapTestCase struct {
 	customValidator       func(t *testing.T, cm ConfigMap)
 }
 
-var testCases = []configMapTestCase{
+var configMapTestCases = []configMapTestCase{
 	{"", true, false, nil},
 	{"1234", true, false, nil},
 	{"asdf", true, false, nil},
@@ -183,7 +183,8 @@ var testCases = []configMapTestCase{
 }
 
 func TestConfigMapParsingAndValidation(t *testing.T) {
-	for i, tc := range testCases {
+	t.Parallel()
+	for i, tc := range configMapTestCases {
 		tc := tc
 		t.Run(fmt.Sprintf("TestCase#%d", i), func(t *testing.T) {
 			var result ConfigMap
