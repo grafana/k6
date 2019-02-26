@@ -37,8 +37,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
-
 	"github.com/loadimpact/k6/api"
 	"github.com/loadimpact/k6/core"
 	"github.com/loadimpact/k6/core/local"
@@ -169,7 +167,6 @@ a commandline interface for interacting with it.`,
 		}
 
 		//TODO: move a bunch of the logic above to a config "constructor" and to the Validate() method
-		spew.Dump(conf.Execution)
 		if errList := conf.Validate(); len(errList) != 0 {
 
 			errMsg := []string{"There were problems with the specified script configuration:"}
