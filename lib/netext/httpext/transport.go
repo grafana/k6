@@ -12,9 +12,9 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Transport is an implemenation of http.RoundTripper that will measure different metrics for each
+// transport is an implemenation of http.RoundTripper that will measure different metrics for each
 // roundtrip
-type Transport struct {
+type transport struct {
 	roundTripper http.RoundTripper
 	// TODO: maybe just take the SystemTags field as it is the only thing used
 	options   *lib.Options
@@ -24,13 +24,13 @@ type Transport struct {
 	samplesCh chan<- stats.SampleContainer
 }
 
-var _ http.RoundTripper = &Transport{}
+var _ http.RoundTripper = &transport{}
 
 // NewTransport returns a new Transport wrapping around the provide Roundtripper and will send
 // samples on the provided channel adding the tags in accordance to the Options provided
-func NewTransport(transport http.RoundTripper, samplesCh chan<- stats.SampleContainer, options *lib.Options, tags map[string]string) *Transport {
-	return &Transport{
-		roundTripper: transport,
+func newTransport(roundTripper http.RoundTripper, samplesCh chan<- stats.SampleContainer, options *lib.Options, tags map[string]string) *transport {
+	return &transport{
+		roundTripper: roundTripper,
 		tags:         tags,
 		options:      options,
 		samplesCh:    samplesCh,
@@ -38,22 +38,22 @@ func NewTransport(transport http.RoundTripper, samplesCh chan<- stats.SampleCont
 }
 
 // SetOptions sets the options that should be used
-func (t *Transport) SetOptions(options *lib.Options) {
+func (t *transport) SetOptions(options *lib.Options) {
 	t.options = options
 }
 
 // GetTrail returns the Trail for the last request through the Transport
-func (t *Transport) GetTrail() *Trail {
+func (t *transport) GetTrail() *Trail {
 	return t.trail
 }
 
 // TLSInfo returns the TLSInfo of the last tls request through the transport
-func (t *Transport) TLSInfo() netext.TLSInfo {
+func (t *transport) TLSInfo() netext.TLSInfo {
 	return t.tlsInfo
 }
 
 // RoundTrip is the implementation of http.RoundTripper
-func (t *Transport) RoundTrip(req *http.Request) (res *http.Response, err error) {
+func (t *transport) RoundTrip(req *http.Request) (res *http.Response, err error) {
 	if t.roundTripper == nil {
 		return nil, errors.New("No roundtrip defined")
 	}

@@ -122,7 +122,7 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 		}
 	}
 
-	tracerTransport := NewTransport(state.Transport, state.Samples, &state.Options, tags)
+	tracerTransport := newTransport(state.Transport, state.Samples, &state.Options, tags)
 	var transport http.RoundTripper = tracerTransport
 	if preq.Auth == "ntlm" {
 		transport = ntlmssp.Negotiator{
