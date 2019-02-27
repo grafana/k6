@@ -33,7 +33,7 @@ import (
 )
 
 // A Trail represents detailed information about an HTTP request.
-// You'd typically get one from a Tracer.
+// You'd typically get one from a tracer.
 type Trail struct {
 	StartTime time.Time
 	EndTime   time.Time
@@ -95,12 +95,12 @@ func (tr *Trail) GetTime() time.Time {
 // Ensure that interfaces are implemented correctly
 var _ stats.ConnectedSampleContainer = &Trail{}
 
-// A Tracer wraps "net/http/httptrace" to collect granular timings for HTTP requests.
+// A tracer wraps "net/http/httptrace" to collect granular timings for HTTP requests.
 // Note that since there is not yet an event for the end of a request (there's a PR to
 // add it), you must call Done() at the end of the request to get the full timings.
-// It's NOT safe to reuse Tracers between requests.
+// It's NOT safe to reuse tracers between requests.
 // Cheers, love, the cavalry's here.
-type Tracer struct {
+type tracer struct {
 	getConn              int64
 	connectStart         int64
 	connectDone          int64
@@ -117,8 +117,8 @@ type Tracer struct {
 	protoErrors      []error
 }
 
-// Trace returns a premade ClientTrace that calls all of the Tracer's hooks.
-func (t *Tracer) Trace() *httptrace.ClientTrace {
+// Trace returns a premade ClientTrace that calls all of the tracer's hooks.
+func (t *tracer) Trace() *httptrace.ClientTrace {
 	return &httptrace.ClientTrace{
 		GetConn:              t.GetConn,
 		ConnectStart:         t.ConnectStart,
@@ -132,7 +132,7 @@ func (t *Tracer) Trace() *httptrace.ClientTrace {
 }
 
 // Add an error in a thread-safe way
-func (t *Tracer) addError(err error) {
+func (t *tracer) addError(err error) {
 	t.protoErrorsMutex.Lock()
 	defer t.protoErrorsMutex.Unlock()
 	t.protoErrors = append(t.protoErrors, err)
@@ -150,7 +150,7 @@ func now() int64 {
 // Keep in mind that GetConn won't be called if a connection
 // is reused though, for example when there's a redirect.
 // If it's called, it will be called before all other hooks.
-func (t *Tracer) GetConn(hostPort string) {
+func (t *tracer) GetConn(hostPort string) {
 	t.getConn = now()
 }
 
@@ -160,7 +160,7 @@ func (t *Tracer) GetConn(hostPort string) {
 //
 // If the connection is reused, this won't be called. Otherwise,
 // it will be called after GetConn() and before ConnectDone().
-func (t *Tracer) ConnectStart(network, addr string) {
+func (t *tracer) ConnectStart(network, addr string) {
 	// If using dual-stack dialing, it's possible to get this
 	// multiple times, so the atomic compareAndSwap ensures
 	// that only the first call's time is recorded
@@ -176,7 +176,7 @@ func (t *Tracer) ConnectStart(network, addr string) {
 // If the connection is reused, this won't be called. Otherwise,
 // it will be called after ConnectStart() and before either
 // TLSHandshakeStart() (for TLS connections) or GotConn().
-func (t *Tracer) ConnectDone(network, addr string, err error) {
+func (t *tracer) ConnectDone(network, addr string, err error) {
 	// If using dual-stack dialing, it's possible to get this
 	// multiple times, so the atomic compareAndSwap ensures
 	// that only the first call's time is recorded
@@ -193,7 +193,7 @@ func (t *Tracer) ConnectDone(network, addr string, err error) {
 //
 // If the connection is reused, this won't be called. Otherwise,
 // it will be called after ConnectDone() and before TLSHandshakeDone().
-func (t *Tracer) TLSHandshakeStart() {
+func (t *tracer) TLSHandshakeStart() {
 	atomic.CompareAndSwapInt64(&t.tlsHandshakeStart, 0, now())
 }
 
@@ -205,7 +205,7 @@ func (t *Tracer) TLSHandshakeStart() {
 // it will be called after TLSHandshakeStart() and before GotConn().
 // If the request was cancelled, this could be called after the
 // RoundTrip() method has returned.
-func (t *Tracer) TLSHandshakeDone(state tls.ConnectionState, err error) {
+func (t *tracer) TLSHandshakeDone(state tls.ConnectionState, err error) {
 	if err == nil {
 		atomic.CompareAndSwapInt64(&t.tlsHandshakeDone, 0, now())
 	} else {
@@ -220,7 +220,7 @@ func (t *Tracer) TLSHandshakeDone(state tls.ConnectionState, err error) {
 // This is the fist hook called for reused connections. For new
 // connections, it's called either after TLSHandshakeDone()
 // (for TLS connections) or after ConnectDone()
-func (t *Tracer) GotConn(info httptrace.GotConnInfo) {
+func (t *tracer) GotConn(info httptrace.GotConnInfo) {
 	now := now()
 
 	// This shouldn't be called multiple times so no synchronization here,
@@ -263,7 +263,7 @@ func (t *Tracer) GotConn(info httptrace.GotConnInfo) {
 // WroteRequest is called with the result of writing the
 // request and any body. It may be called multiple times
 // in the case of retried requests.
-func (t *Tracer) WroteRequest(info httptrace.WroteRequestInfo) {
+func (t *tracer) WroteRequest(info httptrace.WroteRequestInfo) {
 	if info.Err == nil {
 		atomic.StoreInt64(&t.wroteRequest, now())
 	} else {
@@ -275,12 +275,12 @@ func (t *Tracer) WroteRequest(info httptrace.WroteRequestInfo) {
 // headers is available.
 // If the request was cancelled, this could be called after the
 // RoundTrip() method has returned.
-func (t *Tracer) GotFirstResponseByte() {
+func (t *tracer) GotFirstResponseByte() {
 	atomic.CompareAndSwapInt64(&t.gotFirstResponseByte, 0, now())
 }
 
 // Done calculates all metrics and should be called when the request is finished.
-func (t *Tracer) Done() *Trail {
+func (t *tracer) Done() *Trail {
 	done := time.Now()
 
 	trail := Trail{
@@ -296,7 +296,7 @@ func (t *Tracer) Done() *Trail {
 	// actually be called after the http.Client or http.RoundTripper have
 	// already returned our result and we've called Done(). This happens
 	// mostly for cancelled requests, but we have to use atomics here as
-	// well (or use global Tracer locking) so we can avoid data races.
+	// well (or use global tracer locking) so we can avoid data races.
 	connectStart := atomic.LoadInt64(&t.connectStart)
 	connectDone := atomic.LoadInt64(&t.connectDone)
 	tlsHandshakeStart := atomic.LoadInt64(&t.tlsHandshakeStart)
