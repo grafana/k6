@@ -120,7 +120,7 @@ func NewHTTPMultiBin(t *testing.T) *HTTPMultiBin {
 	mux := http.NewServeMux()
 	mux.Handle("/ws-echo", getWebsocketEchoHandler(t))
 	mux.Handle("/ws-close", getWebsocketCloserHandler(t))
-	mux.Handle("/", httpbin.NewHTTPBin().Handler())
+	mux.Handle("/", httpbin.New().Handler())
 
 	// Initialize the HTTP server and get its details
 	httpSrv := httptest.NewServer(mux)
