@@ -47,7 +47,7 @@ func TestTracer(t *testing.T) {
 		t.Skip()
 	}
 	t.Parallel()
-	srv := httptest.NewTLSServer(httpbin.NewHTTPBin().Handler())
+	srv := httptest.NewTLSServer(httpbin.New().Handler())
 	defer srv.Close()
 
 	transport, ok := srv.Client().Transport.(*http.Transport)
@@ -146,7 +146,7 @@ func TestTracerNegativeHttpSendingValues(t *testing.T) {
 		t.Skip()
 	}
 	t.Parallel()
-	srv := httptest.NewTLSServer(httpbin.NewHTTPBin().Handler())
+	srv := httptest.NewTLSServer(httpbin.New().Handler())
 	defer srv.Close()
 
 	transport, ok := srv.Client().Transport.(*http.Transport)
@@ -190,7 +190,7 @@ func TestTracerNegativeHttpSendingValues(t *testing.T) {
 
 func TestTracerError(t *testing.T) {
 	t.Parallel()
-	srv := httptest.NewTLSServer(httpbin.NewHTTPBin().Handler())
+	srv := httptest.NewTLSServer(httpbin.New().Handler())
 	defer srv.Close()
 
 	tracer := &Tracer{}
@@ -207,7 +207,7 @@ func TestTracerError(t *testing.T) {
 
 func TestCancelledRequest(t *testing.T) {
 	t.Parallel()
-	srv := httptest.NewTLSServer(httpbin.NewHTTPBin().Handler())
+	srv := httptest.NewTLSServer(httpbin.New().Handler())
 	defer srv.Close()
 
 	cancelTest := func(t *testing.T) {

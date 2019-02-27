@@ -337,7 +337,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:a74203e799dbd148a873dc57fc2ef086b3a2c79d1390ab8a693992b1b25dadd7"
+  digest = "1:5a4a89d8e15fa92a2b9be9a49e854878a0b1d0aa0744bfa85210ff8725b57a47"
   name = "github.com/mccutchen/go-httpbin"
   packages = [
     "httpbin",
@@ -345,7 +345,7 @@
     "httpbin/digest",
   ]
   pruneopts = "NUT"
-  revision = "793a504652281c75a1f3dbaba99bdd2c3246fc3e"
+  revision = "c5cb2f4802fac63859778c72989fe88dce35fe35"
 
 [[projects]]
   branch = "master"
