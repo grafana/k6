@@ -22,13 +22,10 @@ package http
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
 	"strings"
-
-	"github.com/tidwall/gjson"
 
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
@@ -52,35 +49,13 @@ func responseFromNetext(resp *httpext.Response) *Response {
 
 // JSON parses the body of a response as json and returns it to the goja VM
 func (res *Response) JSON(selector ...string) goja.Value {
-	hasSelector := len(selector) > 0
-	var v interface{}
-	var body []byte
-	switch b := res.Body.(type) {
-	case []byte:
-		body = b
-	case string:
-		body = []byte(b)
-	default:
-		common.Throw(common.GetRuntime(res.GetCtx()), errors.New("invalid response type"))
-	}
-
-	if hasSelector {
-		if !gjson.ValidBytes(body) {
-			return goja.Undefined()
-		}
-
-		result := gjson.GetBytes(body, selector[0])
-
-		if !result.Exists() {
-			return goja.Undefined()
-		}
-		return common.GetRuntime(res.GetCtx()).ToValue(result.Value())
-	}
-
-	if err := json.Unmarshal(body, &v); err != nil {
+	v, err := ((*httpext.Response)(res)).JSON(selector...)
+	if err != nil {
 		common.Throw(common.GetRuntime(res.GetCtx()), err)
 	}
-
+	if v == nil {
+		return goja.Undefined()
+	}
 	return common.GetRuntime(res.GetCtx()).ToValue(v)
 }
 

@@ -3,12 +3,15 @@ package httpext
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"net/http"
 	"net/http/httputil"
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/netext"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"github.com/tidwall/gjson"
 )
 
 // ResponseType is used in the request to specify how the response body should be treated
@@ -74,6 +77,9 @@ type Response struct {
 	Error          string                   `json:"error"`
 	ErrorCode      int                      `json:"error_code"`
 	Request        Request                  `json:"request"`
+
+	cachedJSON    interface{}
+	validatedJSON bool
 }
 
 // This should be used instead of setting Error as it will correctly set ErrorCode as well
@@ -115,4 +121,46 @@ func debugResponse(state *lib.State, res *http.Response, description string) {
 		}
 		logDump(description, dump)
 	}
+}
+
+// JSON parses the body of a response as json and returns it to the goja VM
+func (res *Response) JSON(selector ...string) (interface{}, error) {
+	hasSelector := len(selector) > 0
+	if res.cachedJSON == nil || hasSelector {
+		var v interface{}
+		var body []byte
+		switch b := res.Body.(type) {
+		case []byte:
+			body = b
+		case string:
+			body = []byte(b)
+		default:
+			return nil, errors.New("invalid response type")
+		}
+
+		if hasSelector {
+
+			if !res.validatedJSON {
+				if !gjson.ValidBytes(body) {
+					return nil, nil
+				}
+				res.validatedJSON = true
+			}
+
+			result := gjson.GetBytes(body, selector[0])
+
+			if !result.Exists() {
+				return nil, nil
+			}
+			return result.Value(), nil
+		}
+
+		if err := json.Unmarshal(body, &v); err != nil {
+			return nil, err
+		}
+		res.validatedJSON = true
+		res.cachedJSON = v
+	}
+	return res.cachedJSON, nil
+
 }
