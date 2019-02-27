@@ -21,11 +21,15 @@
 package cloud
 
 import (
+	"bytes"
+	"compress/gzip"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 
@@ -68,6 +72,23 @@ func TestCreateTestRun(t *testing.T) {
 
 func TestPublishMetric(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		g, err := gzip.NewReader(r.Body)
+
+		require.NoError(t, err)
+		var buf bytes.Buffer
+		_, err = io.Copy(&buf, g)
+		require.NoError(t, err)
+		byteCount, err := strconv.Atoi(r.Header.Get("x-payload-byte-count"))
+		require.NoError(t, err)
+		require.Equal(t, buf.Len(), byteCount)
+
+		samplesCount, err := strconv.Atoi(r.Header.Get("x-payload-sample-count"))
+		require.NoError(t, err)
+		var samples []*Sample
+		err = json.Unmarshal(buf.Bytes(), &samples)
+		require.NoError(t, err)
+		require.Equal(t, len(samples), samplesCount)
+
 		fprintf(t, w, "")
 	}))
 	defer server.Close()
