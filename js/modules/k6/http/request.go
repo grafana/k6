@@ -346,8 +346,7 @@ func (h *HTTP) parseRequest(ctx context.Context, method string, reqURL httpext.U
 	}
 
 	if result.ActiveJar != nil {
-		result.MergedCookies = httpext.MergeCookies(result.Req, result.ActiveJar, result.Cookies)
-		httpext.SetRequestCookies(result.Req, result.MergedCookies)
+		httpext.SetRequestCookies(result.Req, result.ActiveJar, result.Cookies)
 	}
 
 	return result, nil

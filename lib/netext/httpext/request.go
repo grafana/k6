@@ -61,18 +61,26 @@ type Request struct {
 
 // ParsedHTTPRequest a represantion of a request after it has been parsed from a user script
 type ParsedHTTPRequest struct {
-	URL           *URL
-	Body          *bytes.Buffer
-	Req           *http.Request
-	Timeout       time.Duration
-	Auth          string
-	Throw         bool
-	ResponseType  ResponseType
-	Redirects     null.Int
-	ActiveJar     *cookiejar.Jar
-	Cookies       map[string]*HTTPRequestCookie
-	MergedCookies map[string][]*HTTPRequestCookie
-	Tags          map[string]string
+	URL          *URL
+	Body         *bytes.Buffer
+	Req          *http.Request
+	Timeout      time.Duration
+	Auth         string
+	Throw        bool
+	ResponseType ResponseType
+	Redirects    null.Int
+	ActiveJar    *cookiejar.Jar
+	Cookies      map[string]*HTTPRequestCookie
+	Tags         map[string]string
+}
+
+func stdCookiesToHTTPRequestCookies(cookies []*http.Cookie) map[string][]*HTTPRequestCookie {
+	var result = make(map[string][]*HTTPRequestCookie, len(cookies))
+	for _, cookie := range cookies {
+		result[cookie.Name] = append(result[cookie.Name],
+			&HTTPRequestCookie{Name: cookie.Name, Value: cookie.Value})
+	}
+	return result
 }
 
 // MakeRequest makes http request for tor the provided ParsedHTTPRequest
@@ -82,7 +90,7 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 	respReq := &Request{
 		Method:  preq.Req.Method,
 		URL:     preq.Req.URL.String(),
-		Cookies: preq.MergedCookies,
+		Cookies: stdCookiesToHTTPRequestCookies(preq.Req.Cookies()),
 		Headers: preq.Req.Header,
 	}
 	if preq.Body != nil {
@@ -143,9 +151,7 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 					preq.ActiveJar.SetCookies(req.URL, respCookies)
 				}
 				req.Header.Del("Cookie")
-				mergedCookies := MergeCookies(req, preq.ActiveJar, preq.Cookies)
-
-				SetRequestCookies(req, mergedCookies)
+				SetRequestCookies(req, preq.ActiveJar, preq.Cookies)
 			}
 
 			if l := len(via); int64(l) > preq.Redirects.Int64 {
@@ -315,24 +321,18 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 	return resp, nil
 }
 
-func MergeCookies(req *http.Request, jar *cookiejar.Jar, reqCookies map[string]*HTTPRequestCookie) map[string][]*HTTPRequestCookie {
-	allCookies := make(map[string][]*HTTPRequestCookie)
-	for _, c := range jar.Cookies(req.URL) {
-		allCookies[c.Name] = append(allCookies[c.Name], &HTTPRequestCookie{Name: c.Name, Value: c.Value})
-	}
+// SetRequestCookies sets the cookies of the requests getting those cookies both from the jar and
+// from the reqCookies map. The Replace field of the HTTPRequestCookie will be taken into account
+func SetRequestCookies(req *http.Request, jar *cookiejar.Jar, reqCookies map[string]*HTTPRequestCookie) {
+	var replacedCookies = make(map[string]struct{})
 	for key, reqCookie := range reqCookies {
-		if jc := allCookies[key]; jc != nil && reqCookie.Replace {
-			allCookies[key] = []*HTTPRequestCookie{{Name: key, Value: reqCookie.Value}}
-		} else {
-			allCookies[key] = append(allCookies[key], &HTTPRequestCookie{Name: key, Value: reqCookie.Value})
+		req.AddCookie(&http.Cookie{Name: key, Value: reqCookie.Value})
+		if reqCookie.Replace {
+			replacedCookies[key] = struct{}{}
 		}
 	}
-	return allCookies
-}
-
-func SetRequestCookies(req *http.Request, reqCookies map[string][]*HTTPRequestCookie) {
-	for _, cookies := range reqCookies {
-		for _, c := range cookies {
+	for _, c := range jar.Cookies(req.URL) {
+		if _, ok := replacedCookies[c.Name]; !ok {
 			req.AddCookie(&http.Cookie{Name: c.Name, Value: c.Value})
 		}
 	}
