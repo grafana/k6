@@ -122,7 +122,7 @@ func (h *HTTP) Request(ctx context.Context, method string, url goja.Value, args 
 	if err != nil {
 		return nil, err
 	}
-	return responseFromNetext(resp), nil
+	return responseFromHttpext(resp), nil
 }
 
 func (h *HTTP) parseRequest(ctx context.Context, method string, reqURL httpext.URL, body interface{}, params goja.Value) (*httpext.ParsedHTTPRequest, error) {
@@ -399,7 +399,7 @@ func (h *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, error) 
 			}
 
 			mutex.Lock()
-			_ = retval.Set(key, responseFromNetext(res))
+			_ = retval.Set(key, responseFromHttpext(res))
 			mutex.Unlock()
 
 			errs <- nil

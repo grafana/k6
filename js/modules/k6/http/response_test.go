@@ -386,7 +386,7 @@ func BenchmarkResponseJson(b *testing.B) {
 	for _, tc := range testCases {
 		b.Run(fmt.Sprintf("Selector %s ", tc.selector), func(b *testing.B) {
 			for n := 0; n < b.N; n++ {
-				resp := responseFromNetext(&httpext.Response{Body: jsonData})
+				resp := responseFromHttpext(&httpext.Response{Body: jsonData})
 				resp.JSON(tc.selector)
 			}
 		})
@@ -394,7 +394,7 @@ func BenchmarkResponseJson(b *testing.B) {
 
 	b.Run("Without selector", func(b *testing.B) {
 		for n := 0; n < b.N; n++ {
-			resp := responseFromNetext(&httpext.Response{Body: jsonData})
+			resp := responseFromHttpext(&httpext.Response{Body: jsonData})
 			resp.JSON()
 		}
 	})

@@ -42,7 +42,7 @@ func (res *Response) GetCtx() context.Context {
 	return ((*httpext.Response)(res)).GetCtx()
 }
 
-func responseFromNetext(resp *httpext.Response) *Response {
+func responseFromHttpext(resp *httpext.Response) *Response {
 	res := Response(*resp)
 	return &res
 }
