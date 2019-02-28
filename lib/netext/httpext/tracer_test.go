@@ -44,7 +44,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Testtracer(t *testing.T) {
+func TestTracer(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip()
 	}
@@ -72,29 +72,29 @@ func Testtracer(t *testing.T) {
 	for tnum, isReuse := range []bool{false, true, true} {
 		t.Run(fmt.Sprintf("Test #%d", tnum), func(t *testing.T) {
 			// Do not enable parallel testing, test relies on sequential execution
-			tr := &tracer{}
+			tracer := &Tracer{}
 			req, err := http.NewRequest("GET", srv.URL+"/get", nil)
 			require.NoError(t, err)
 
-			res, err := transport.RoundTrip(req.WithContext(httptrace.WithClientTrace(context.Background(), tr.Trace())))
+			res, err := transport.RoundTrip(req.WithContext(httptrace.WithClientTrace(context.Background(), tracer.Trace())))
 			require.NoError(t, err)
 
 			_, err = io.Copy(ioutil.Discard, res.Body)
 			assert.NoError(t, err)
 			assert.NoError(t, res.Body.Close())
-			trail := tr.Done()
+			trail := tracer.Done()
 			trail.SaveSamples(stats.IntoSampleTags(&map[string]string{"tag": "value"}))
 			samples := trail.GetSamples()
 
-			assert.Empty(t, tr.protoErrors)
-			assertLaterOrZero(t, tr.getConn, isReuse)
-			assertLaterOrZero(t, tr.connectStart, isReuse)
-			assertLaterOrZero(t, tr.connectDone, isReuse)
-			assertLaterOrZero(t, tr.tlsHandshakeStart, isReuse)
-			assertLaterOrZero(t, tr.tlsHandshakeDone, isReuse)
-			assertLaterOrZero(t, tr.gotConn, false)
-			assertLaterOrZero(t, tr.wroteRequest, false)
-			assertLaterOrZero(t, tr.gotFirstResponseByte, false)
+			assert.Empty(t, tracer.protoErrors)
+			assertLaterOrZero(t, tracer.getConn, isReuse)
+			assertLaterOrZero(t, tracer.connectStart, isReuse)
+			assertLaterOrZero(t, tracer.connectDone, isReuse)
+			assertLaterOrZero(t, tracer.tlsHandshakeStart, isReuse)
+			assertLaterOrZero(t, tracer.tlsHandshakeDone, isReuse)
+			assertLaterOrZero(t, tracer.gotConn, false)
+			assertLaterOrZero(t, tracer.wroteRequest, false)
+			assertLaterOrZero(t, tracer.gotFirstResponseByte, false)
 			assertLaterOrZero(t, now(), false)
 
 			assert.Equal(t, strings.TrimPrefix(srv.URL, "https://"), trail.ConnRemoteAddr.String())
@@ -143,7 +143,7 @@ func (c failingConn) Write(b []byte) (int, error) {
 	return c.Conn.Write(b)
 }
 
-func TesttracerNegativeHttpSendingValues(t *testing.T) {
+func TestTracerNegativeHttpSendingValues(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip()
 	}
@@ -164,47 +164,47 @@ func TesttracerNegativeHttpSendingValues(t *testing.T) {
 	require.NoError(t, err)
 
 	{
-		tr := &tracer{}
-		res, err := transport.RoundTrip(req.WithContext(httptrace.WithClientTrace(context.Background(), tr.Trace())))
+		tracer := &Tracer{}
+		res, err := transport.RoundTrip(req.WithContext(httptrace.WithClientTrace(context.Background(), tracer.Trace())))
 		require.NoError(t, err)
 		_, err = io.Copy(ioutil.Discard, res.Body)
 		assert.NoError(t, err)
 		assert.NoError(t, res.Body.Close())
-		tr.Done()
+		tracer.Done()
 	}
 
 	// make the next connection write fail
 	failOnConnWrite = true
 
 	{
-		tr := &tracer{}
-		res, err := transport.RoundTrip(req.WithContext(httptrace.WithClientTrace(context.Background(), tr.Trace())))
+		tracer := &Tracer{}
+		res, err := transport.RoundTrip(req.WithContext(httptrace.WithClientTrace(context.Background(), tracer.Trace())))
 		require.NoError(t, err)
 		_, err = io.Copy(ioutil.Discard, res.Body)
 		assert.NoError(t, err)
 		assert.NoError(t, res.Body.Close())
-		trail := tr.Done()
+		trail := tracer.Done()
 		trail.SaveSamples(nil)
 
 		require.True(t, trail.Sending > 0)
 	}
 }
 
-func TesttracerError(t *testing.T) {
+func TestTracerError(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewTLSServer(httpbin.NewHTTPBin().Handler())
 	defer srv.Close()
 
-	tr := &tracer{}
+	tracer := &Tracer{}
 	req, err := http.NewRequest("GET", srv.URL+"/get", nil)
 	require.NoError(t, err)
 
-	_, err = http.DefaultTransport.RoundTrip(req.WithContext(httptrace.WithClientTrace(context.Background(), tr.Trace())))
+	_, err = http.DefaultTransport.RoundTrip(req.WithContext(httptrace.WithClientTrace(context.Background(), tracer.Trace())))
 	assert.Error(t, err)
 
-	assert.Len(t, tr.protoErrors, 1)
-	assert.Error(t, tr.protoErrors[0])
-	assert.Equal(t, tr.protoErrors, tr.Done().Errors)
+	assert.Len(t, tracer.protoErrors, 1)
+	assert.Error(t, tracer.protoErrors[0])
+	assert.Equal(t, tracer.protoErrors, tracer.Done().Errors)
 }
 
 func TestCancelledRequest(t *testing.T) {
@@ -214,11 +214,11 @@ func TestCancelledRequest(t *testing.T) {
 
 	cancelTest := func(t *testing.T) {
 		t.Parallel()
-		tr := &tracer{}
+		tracer := &Tracer{}
 		req, err := http.NewRequest("GET", srv.URL+"/delay/1", nil)
 		require.NoError(t, err)
 
-		ctx, cancel := context.WithCancel(httptrace.WithClientTrace(req.Context(), tr.Trace()))
+		ctx, cancel := context.WithCancel(httptrace.WithClientTrace(req.Context(), tracer.Trace()))
 		req = req.WithContext(ctx)
 		go func() {
 			time.Sleep(time.Duration(rand.Int31n(50)) * time.Millisecond)
@@ -226,7 +226,7 @@ func TestCancelledRequest(t *testing.T) {
 		}()
 
 		resp, err := srv.Client().Transport.RoundTrip(req)
-		trail := tr.Done()
+		trail := tracer.Done()
 		if resp == nil && err == nil && len(trail.Errors) == 0 {
 			t.Errorf("Expected either a RoundTrip response, error or trail errors but got %#v, %#v and %#v", resp, err, trail.Errors)
 		}

@@ -84,11 +84,11 @@ func (t *transport) RoundTrip(req *http.Request) (res *http.Response, err error)
 	}
 
 	ctx := req.Context()
-	tr := tracer{}
-	reqWithtracer := req.WithContext(httptrace.WithClientTrace(ctx, tr.Trace()))
+	tracer := Tracer{}
+	reqWithTracer := req.WithContext(httptrace.WithClientTrace(ctx, tracer.Trace()))
 
-	resp, err := t.roundTripper.RoundTrip(reqWithtracer)
-	trail := tr.Done()
+	resp, err := t.roundTripper.RoundTrip(reqWithTracer)
+	trail := tracer.Done()
 	if err != nil {
 		if t.options.SystemTags["error"] {
 			tags["error"] = err.Error()
