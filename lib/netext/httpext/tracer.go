@@ -18,7 +18,7 @@
  *
  */
 
-package netext
+package httpext
 
 import (
 	"crypto/tls"

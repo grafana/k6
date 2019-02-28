@@ -22,31 +22,22 @@ package http
 
 import (
 	"bytes"
-	"compress/gzip"
-	"compress/zlib"
 	"context"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"mime/multipart"
-	"net"
 	"net/http"
-	"net/http/cookiejar"
 	"net/textproto"
 	"net/url"
 	"reflect"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	ntlmssp "github.com/Azure/go-ntlmssp"
-	digest "github.com/Soontao/goHttpDigestClient"
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
-	"github.com/loadimpact/k6/lib/netext"
-	"github.com/loadimpact/k6/stats"
-	log "github.com/sirupsen/logrus"
+	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/netext/httpext"
 	null "gopkg.in/guregu/null.v3"
 )
 
@@ -55,15 +46,6 @@ var ErrHTTPForbiddenInInitContext = common.NewInitContextError("Making http requ
 
 // ErrBatchForbiddenInInitContext is used when batch was made in the init context
 var ErrBatchForbiddenInInitContext = common.NewInitContextError("Using batch in the init context is not supported")
-
-// Request represent an http request
-type Request struct {
-	Method  string                          `json:"method"`
-	URL     string                          `json:"url"`
-	Headers map[string][]string             `json:"headers"`
-	Body    string                          `json:"body"`
-	Cookies map[string][]*HTTPRequestCookie `json:"cookies"`
-}
 
 // Get makes an HTTP GET request and returns a corresponding response by taking goja.Values as arguments
 func (h *HTTP) Get(ctx context.Context, url goja.Value, args ...goja.Value) (*Response, error) {
@@ -127,72 +109,37 @@ func (h *HTTP) Request(ctx context.Context, method string, url goja.Value, args 
 		return nil, err
 	}
 
-	return h.request(ctx, req)
+	resp, err := httpext.MakeRequest(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return responseFromHttpext(resp), nil
 }
 
-// ResponseType is used in the request to specify how the response body should be treated
-// The conversion and validation methods are auto-generated with https://github.com/alvaroloes/enumer:
-//go:generate enumer -type=ResponseType -transform=snake -json -text -trimprefix ResponseType -output response_type_gen.go
-type ResponseType uint
-
-const (
-	// ResponseTypeText causes k6 to return the response body as a string. It works
-	// well for web pages and JSON documents, but it can cause issues with
-	// binary files since their data could be lost when they're converted in the
-	// UTF-16 strings JavaScript uses.
-	// This is the default value for backwards-compatibility, unless the global
-	// discardResponseBodies option is enabled.
-	ResponseTypeText ResponseType = iota
-	// ResponseTypeBinary causes k6 to return the response body as a []byte, suitable
-	// for working with binary files without lost data and needless string conversions.
-	ResponseTypeBinary
-	// ResponseTypeNone causes k6 to fully read the response body while immediately
-	// discarding the actual data - k6 would set the body of the returned HTTPResponse
-	// to null. This saves CPU and memory and is suitable for HTTP requests that we just
-	// want to  measure, but we don't care about their responses' contents. This is the
-	// default value for all requests if the global discardResponseBodies is enablled.
-	ResponseTypeNone
-)
-
-type parsedHTTPRequest struct {
-	url           *URL
-	body          *bytes.Buffer
-	req           *http.Request
-	timeout       time.Duration
-	auth          string
-	throw         bool
-	responseType  ResponseType
-	redirects     null.Int
-	activeJar     *cookiejar.Jar
-	cookies       map[string]*HTTPRequestCookie
-	mergedCookies map[string][]*HTTPRequestCookie
-	tags          map[string]string
-}
-
-func (h *HTTP) parseRequest(ctx context.Context, method string, reqURL URL, body interface{}, params goja.Value) (*parsedHTTPRequest, error) {
+func (h *HTTP) parseRequest(ctx context.Context, method string, reqURL httpext.URL, body interface{}, params goja.Value) (*httpext.ParsedHTTPRequest, error) {
 	rt := common.GetRuntime(ctx)
-	state := common.GetState(ctx)
+	state := lib.GetState(ctx)
 	if state == nil {
 		return nil, ErrHTTPForbiddenInInitContext
 	}
 
-	result := &parsedHTTPRequest{
-		url: &reqURL,
-		req: &http.Request{
+	result := &httpext.ParsedHTTPRequest{
+		URL: &reqURL,
+		Req: &http.Request{
 			Method: method,
-			URL:    reqURL.URL,
+			URL:    reqURL.GetURL(),
 			Header: make(http.Header),
 		},
-		timeout:   60 * time.Second,
-		throw:     state.Options.Throw.Bool,
-		redirects: state.Options.MaxRedirects,
-		cookies:   make(map[string]*HTTPRequestCookie),
-		tags:      make(map[string]string),
+		Timeout:   60 * time.Second,
+		Throw:     state.Options.Throw.Bool,
+		Redirects: state.Options.MaxRedirects,
+		Cookies:   make(map[string]*httpext.HTTPRequestCookie),
+		Tags:      make(map[string]string),
 	}
 	if state.Options.DiscardResponseBodies.Bool {
-		result.responseType = ResponseTypeNone
+		result.ResponseType = httpext.ResponseTypeNone
 	} else {
-		result.responseType = ResponseTypeText
+		result.ResponseType = httpext.ResponseTypeText
 	}
 
 	formatFormVal := func(v interface{}) string {
@@ -206,14 +153,14 @@ func (h *HTTP) parseRequest(ctx context.Context, method string, reqURL URL, body
 			for k, v := range data {
 				bodyQuery.Set(k, formatFormVal(v))
 			}
-			result.body = bytes.NewBufferString(bodyQuery.Encode())
-			result.req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			result.Body = bytes.NewBufferString(bodyQuery.Encode())
+			result.Req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 			return nil
 		}
 
 		// handling multipart request
-		result.body = &bytes.Buffer{}
-		mpw := multipart.NewWriter(result.body)
+		result.Body = &bytes.Buffer{}
+		mpw := multipart.NewWriter(result.Body)
 
 		// For parameters of type common.FileData, created with open(file, "b"),
 		// we write the file boundary to the body buffer.
@@ -256,7 +203,7 @@ func (h *HTTP) parseRequest(ctx context.Context, method string, reqURL URL, body
 			return err
 		}
 
-		result.req.Header.Set("Content-Type", mpw.FormDataContentType())
+		result.Req.Header.Set("Content-Type", mpw.FormDataContentType())
 		return nil
 	}
 
@@ -276,25 +223,25 @@ func (h *HTTP) parseRequest(ctx context.Context, method string, reqURL URL, body
 				return nil, err
 			}
 		case string:
-			result.body = bytes.NewBufferString(data)
+			result.Body = bytes.NewBufferString(data)
 		case []byte:
-			result.body = bytes.NewBuffer(data)
+			result.Body = bytes.NewBuffer(data)
 		default:
 			return nil, fmt.Errorf("unknown request body type %T", body)
 		}
 	}
 
-	if result.body != nil {
-		result.req.Body = ioutil.NopCloser(result.body)
-		result.req.ContentLength = int64(result.body.Len())
+	if result.Body != nil {
+		result.Req.Body = ioutil.NopCloser(result.Body)
+		result.Req.ContentLength = int64(result.Body.Len())
 	}
 
 	if userAgent := state.Options.UserAgent; userAgent.String != "" {
-		result.req.Header.Set("User-Agent", userAgent.String)
+		result.Req.Header.Set("User-Agent", userAgent.String)
 	}
 
 	if state.CookieJar != nil {
-		result.activeJar = state.CookieJar
+		result.ActiveJar = state.CookieJar
 	}
 
 	// TODO: ditch goja.Value, reflections and Object and use a simple go map and type assertions?
@@ -318,18 +265,18 @@ func (h *HTTP) parseRequest(ctx context.Context, method string, reqURL URL, body
 					}
 					switch cookieV.ExportType() {
 					case reflect.TypeOf(map[string]interface{}{}):
-						result.cookies[key] = &HTTPRequestCookie{Name: key, Value: "", Replace: false}
+						result.Cookies[key] = &httpext.HTTPRequestCookie{Name: key, Value: "", Replace: false}
 						cookie := cookieV.ToObject(rt)
 						for _, attr := range cookie.Keys() {
 							switch strings.ToLower(attr) {
 							case "replace":
-								result.cookies[key].Replace = cookie.Get(attr).ToBoolean()
+								result.Cookies[key].Replace = cookie.Get(attr).ToBoolean()
 							case "value":
-								result.cookies[key].Value = cookie.Get(attr).String()
+								result.Cookies[key].Value = cookie.Get(attr).String()
 							}
 						}
 					default:
-						result.cookies[key] = &HTTPRequestCookie{Name: key, Value: cookieV.String(), Replace: false}
+						result.Cookies[key] = &httpext.HTTPRequestCookie{Name: key, Value: cookieV.String(), Replace: false}
 					}
 				}
 			case "headers":
@@ -345,9 +292,9 @@ func (h *HTTP) parseRequest(ctx context.Context, method string, reqURL URL, body
 					str := headers.Get(key).String()
 					switch strings.ToLower(key) {
 					case "host":
-						result.req.Host = str
+						result.Req.Host = str
 					default:
-						result.req.Header.Set(key, str)
+						result.Req.Header.Set(key, str)
 					}
 				}
 			case "jar":
@@ -357,10 +304,10 @@ func (h *HTTP) parseRequest(ctx context.Context, method string, reqURL URL, body
 				}
 				switch v := jarV.Export().(type) {
 				case *HTTPCookieJar:
-					result.activeJar = v.jar
+					result.ActiveJar = v.jar
 				}
 			case "redirects":
-				result.redirects = null.IntFrom(params.Get(k).ToInteger())
+				result.Redirects = null.IntFrom(params.Get(k).ToInteger())
 			case "tags":
 				tagsV := params.Get(k)
 				if goja.IsUndefined(tagsV) || goja.IsNull(tagsV) {
@@ -371,277 +318,35 @@ func (h *HTTP) parseRequest(ctx context.Context, method string, reqURL URL, body
 					continue
 				}
 				for _, key := range tagObj.Keys() {
-					result.tags[key] = tagObj.Get(key).String()
+					result.Tags[key] = tagObj.Get(key).String()
 				}
 			case "auth":
-				result.auth = params.Get(k).String()
+				result.Auth = params.Get(k).String()
 			case "timeout":
-				result.timeout = time.Duration(params.Get(k).ToFloat() * float64(time.Millisecond))
+				result.Timeout = time.Duration(params.Get(k).ToFloat() * float64(time.Millisecond))
 			case "throw":
-				result.throw = params.Get(k).ToBoolean()
+				result.Throw = params.Get(k).ToBoolean()
 			case "responseType":
-				responseType, err := ResponseTypeString(params.Get(k).String())
+				responseType, err := httpext.ResponseTypeString(params.Get(k).String())
 				if err != nil {
 					return nil, err
 				}
-				result.responseType = responseType
+				result.ResponseType = responseType
 			}
 		}
 	}
 
-	if result.activeJar != nil {
-		result.mergedCookies = h.mergeCookies(result.req, result.activeJar, result.cookies)
-		h.setRequestCookies(result.req, result.mergedCookies)
+	if result.ActiveJar != nil {
+		httpext.SetRequestCookies(result.Req, result.ActiveJar, result.Cookies)
 	}
 
 	return result, nil
 }
 
-// request() shouldn't mess with the goja runtime or other thread-unsafe
-// things because it's called concurrently by Batch()
-func (h *HTTP) request(ctx context.Context, preq *parsedHTTPRequest) (*Response, error) {
-	state := common.GetState(ctx)
-
-	respReq := &Request{
-		Method:  preq.req.Method,
-		URL:     preq.req.URL.String(),
-		Cookies: preq.mergedCookies,
-		Headers: preq.req.Header,
-	}
-	if preq.body != nil {
-		respReq.Body = preq.body.String()
-	}
-
-	tags := state.Options.RunTags.CloneTags()
-	for k, v := range preq.tags {
-		tags[k] = v
-	}
-
-	if state.Options.SystemTags["method"] {
-		tags["method"] = preq.req.Method
-	}
-	if state.Options.SystemTags["url"] {
-		tags["url"] = preq.url.URLString
-	}
-
-	// Only set the name system tag if the user didn't explicitly set it beforehand
-	if _, ok := tags["name"]; !ok && state.Options.SystemTags["name"] {
-		tags["name"] = preq.url.Name
-	}
-	if state.Options.SystemTags["group"] {
-		tags["group"] = state.Group.Path
-	}
-	if state.Options.SystemTags["vu"] {
-		tags["vu"] = strconv.FormatInt(state.Vu, 10)
-	}
-	if state.Options.SystemTags["iter"] {
-		tags["iter"] = strconv.FormatInt(state.Iteration, 10)
-	}
-
-	// Check rate limit *after* we've prepared a request; no need to wait with that part.
-	if rpsLimit := state.RPSLimit; rpsLimit != nil {
-		if err := rpsLimit.Wait(ctx); err != nil {
-			return nil, err
-		}
-	}
-
-	tracerTransport := netext.NewTransport(state.Transport, state.Samples, &state.Options, tags)
-	var transport http.RoundTripper = tracerTransport
-	if preq.auth == "ntlm" {
-		transport = ntlmssp.Negotiator{
-			RoundTripper: tracerTransport,
-		}
-	}
-
-	resp := &Response{ctx: ctx, URL: preq.url.URLString, Request: *respReq}
-	client := http.Client{
-		Transport: transport,
-		Timeout:   preq.timeout,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			h.debugResponse(state, req.Response, "RedirectResponse")
-
-			// Update active jar with cookies found in "Set-Cookie" header(s) of redirect response
-			if preq.activeJar != nil {
-				if respCookies := req.Response.Cookies(); len(respCookies) > 0 {
-					preq.activeJar.SetCookies(req.URL, respCookies)
-				}
-				req.Header.Del("Cookie")
-				mergedCookies := h.mergeCookies(req, preq.activeJar, preq.cookies)
-
-				h.setRequestCookies(req, mergedCookies)
-			}
-
-			if l := len(via); int64(l) > preq.redirects.Int64 {
-				if !preq.redirects.Valid {
-					url := req.URL
-					if l > 0 {
-						url = via[0].URL
-					}
-					state.Logger.WithFields(log.Fields{"url": url.String()}).Warnf("Stopped after %d redirects and returned the redirection; pass { redirects: n } in request params or set global maxRedirects to silence this", l)
-				}
-				return http.ErrUseLastResponse
-			}
-			h.debugRequest(state, req, "RedirectRequest")
-			return nil
-		},
-	}
-
-	// if digest authentication option is passed, make an initial request to get the authentication params to compute the authorization header
-	if preq.auth == "digest" {
-		username := preq.url.URL.User.Username()
-		password, _ := preq.url.URL.User.Password()
-
-		// removing user from URL to avoid sending the authorization header fo basic auth
-		preq.req.URL.User = nil
-
-		h.debugRequest(state, preq.req, "DigestRequest")
-		res, err := client.Do(preq.req.WithContext(ctx))
-		h.debugRequest(state, preq.req, "DigestResponse")
-		if err != nil {
-			// Do *not* log errors about the contex being cancelled.
-			select {
-			case <-ctx.Done():
-			default:
-				state.Logger.WithField("error", res).Warn("Digest request failed")
-			}
-
-			if preq.throw {
-				return nil, err
-			}
-
-			resp.setError(err)
-			return resp, nil
-		}
-
-		if res.StatusCode == http.StatusUnauthorized {
-			body := ""
-			if b, err := ioutil.ReadAll(res.Body); err == nil {
-				body = string(b)
-			}
-
-			challenge := digest.GetChallengeFromHeader(&res.Header)
-			challenge.ComputeResponse(preq.req.Method, preq.req.URL.RequestURI(), body, username, password)
-			authorization := challenge.ToAuthorizationStr()
-			preq.req.Header.Set(digest.KEY_AUTHORIZATION, authorization)
-		}
-	}
-
-	h.debugRequest(state, preq.req, "Request")
-	res, resErr := client.Do(preq.req.WithContext(ctx))
-	h.debugResponse(state, res, "Response")
-	if resErr == nil && res != nil {
-		switch res.Header.Get("Content-Encoding") {
-		case "deflate":
-			res.Body, resErr = zlib.NewReader(res.Body)
-		case "gzip":
-			res.Body, resErr = gzip.NewReader(res.Body)
-		}
-	}
-	if resErr == nil && res != nil {
-		if preq.responseType == ResponseTypeNone {
-			_, err := io.Copy(ioutil.Discard, res.Body)
-			if err != nil && err != io.EOF {
-				resErr = err
-			}
-			resp.Body = nil
-		} else {
-			// Binary or string
-			buf := state.BPool.Get()
-			buf.Reset()
-			defer state.BPool.Put(buf)
-			_, err := io.Copy(buf, res.Body)
-			if err != nil && err != io.EOF {
-				resErr = err
-			}
-
-			switch preq.responseType {
-			case ResponseTypeText:
-				resp.Body = buf.String()
-			case ResponseTypeBinary:
-				resp.Body = buf.Bytes()
-			default:
-				resErr = fmt.Errorf("unknown responseType %s", preq.responseType)
-			}
-		}
-		_ = res.Body.Close()
-	}
-
-	trail := tracerTransport.GetTrail()
-
-	if trail.ConnRemoteAddr != nil {
-		remoteHost, remotePortStr, _ := net.SplitHostPort(trail.ConnRemoteAddr.String())
-		remotePort, _ := strconv.Atoi(remotePortStr)
-		resp.RemoteIP = remoteHost
-		resp.RemotePort = remotePort
-	}
-	resp.Timings = ResponseTimings{
-		Duration:       stats.D(trail.Duration),
-		Blocked:        stats.D(trail.Blocked),
-		Connecting:     stats.D(trail.Connecting),
-		TLSHandshaking: stats.D(trail.TLSHandshaking),
-		Sending:        stats.D(trail.Sending),
-		Waiting:        stats.D(trail.Waiting),
-		Receiving:      stats.D(trail.Receiving),
-	}
-
-	if resErr != nil {
-		resp.setError(resErr)
-	} else {
-		if preq.activeJar != nil {
-			if rc := res.Cookies(); len(rc) > 0 {
-				preq.activeJar.SetCookies(res.Request.URL, rc)
-			}
-		}
-
-		resp.URL = res.Request.URL.String()
-		resp.setStatusCode(res.StatusCode)
-		resp.Proto = res.Proto
-
-		if res.TLS != nil {
-			resp.setTLSInfo(res.TLS)
-		}
-
-		resp.Headers = make(map[string]string, len(res.Header))
-		for k, vs := range res.Header {
-			resp.Headers[k] = strings.Join(vs, ", ")
-		}
-
-		resCookies := res.Cookies()
-		resp.Cookies = make(map[string][]*HTTPCookie, len(resCookies))
-		for _, c := range resCookies {
-			resp.Cookies[c.Name] = append(resp.Cookies[c.Name], &HTTPCookie{
-				Name:     c.Name,
-				Value:    c.Value,
-				Domain:   c.Domain,
-				Path:     c.Path,
-				HttpOnly: c.HttpOnly,
-				Secure:   c.Secure,
-				MaxAge:   c.MaxAge,
-				Expires:  c.Expires.UnixNano() / 1000000,
-			})
-		}
-	}
-
-	if resErr != nil {
-		// Do *not* log errors about the contex being cancelled.
-		select {
-		case <-ctx.Done():
-		default:
-			state.Logger.WithField("error", resErr).Warn("Request Failed")
-		}
-
-		if preq.throw {
-			return nil, resErr
-		}
-	}
-
-	return resp, nil
-}
-
 // Batch makes multiple simultaneous HTTP requests. The provideds reqsV should be an array of request
 // objects. Batch returns an array of responses and/or error
 func (h *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, error) {
-	state := common.GetState(ctx)
+	state := lib.GetState(ctx)
 	if state == nil {
 		return nil, ErrBatchForbiddenInInitContext
 	}
@@ -649,7 +354,7 @@ func (h *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, error) 
 
 	reqs := reqsV.ToObject(rt)
 	keys := reqs.Keys()
-	parsedReqs := map[string]*parsedHTTPRequest{}
+	parsedReqs := map[string]*httpext.ParsedHTTPRequest{}
 	for _, key := range keys {
 		parsedReq, err := h.parseBatchRequest(ctx, key, reqs.Get(key))
 		if err != nil {
@@ -669,23 +374,23 @@ func (h *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, error) 
 		perHostLimiter = NewMultiSlotLimiter(int(state.Options.BatchPerHost.Int64))
 	)
 	for k, pr := range parsedReqs {
-		go func(key string, parsedReq *parsedHTTPRequest) {
+		go func(key string, parsedReq *httpext.ParsedHTTPRequest) {
 			globalLimiter.Begin()
 			defer globalLimiter.End()
 
-			if hl := perHostLimiter.Slot(parsedReq.url.URL.Host); hl != nil {
+			if hl := perHostLimiter.Slot(parsedReq.URL.GetURL().Host); hl != nil {
 				hl.Begin()
 				defer hl.End()
 			}
 
-			res, err := h.request(ctx, parsedReq)
+			res, err := httpext.MakeRequest(ctx, parsedReq)
 			if err != nil {
 				errs <- err
 				return
 			}
 
 			mutex.Lock()
-			_ = retval.Set(key, res)
+			_ = retval.Set(key, responseFromHttpext(res))
 			mutex.Unlock()
 
 			errs <- nil
@@ -701,12 +406,12 @@ func (h *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, error) 
 	return retval, err
 }
 
-func (h *HTTP) parseBatchRequest(ctx context.Context, key string, val goja.Value) (*parsedHTTPRequest, error) {
+func (h *HTTP) parseBatchRequest(ctx context.Context, key string, val goja.Value) (*httpext.ParsedHTTPRequest, error) {
 	var (
 		method = HTTP_METHOD_GET
 		ok     bool
 		err    error
-		reqURL URL
+		reqURL httpext.URL
 		body   interface{}
 		params goja.Value
 		rt     = common.GetRuntime(ctx)

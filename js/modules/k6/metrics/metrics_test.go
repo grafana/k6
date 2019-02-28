@@ -68,7 +68,7 @@ func TestMetrics(t *testing.T) {
 					root, _ := lib.NewGroup("", nil)
 					child, _ := root.Group("child")
 					samples := make(chan stats.SampleContainer, 1000)
-					state := &common.State{
+					state := &lib.State{
 						Options: lib.Options{SystemTags: lib.GetTagSet("group")},
 						Group:   root,
 						Samples: samples,
@@ -86,7 +86,7 @@ func TestMetrics(t *testing.T) {
 					}
 
 					t.Run("ExitInit", func(t *testing.T) {
-						*ctxPtr = common.WithState(*ctxPtr, state)
+						*ctxPtr = lib.WithState(*ctxPtr, state)
 						_, err := common.RunString(rt, fmt.Sprintf(`new metrics.%s("my_metric")`, fn))
 						assert.EqualError(t, err, "GoError: metrics must be declared in the init context at apply (native)")
 					})

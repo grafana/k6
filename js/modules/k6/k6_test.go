@@ -112,10 +112,10 @@ func TestGroup(t *testing.T) {
 	assert.NoError(t, err)
 
 	rt := goja.New()
-	state := &common.State{Group: root, Samples: make(chan stats.SampleContainer, 1000)}
+	state := &lib.State{Group: root, Samples: make(chan stats.SampleContainer, 1000)}
 
 	ctx := context.Background()
-	ctx = common.WithState(ctx, state)
+	ctx = lib.WithState(ctx, state)
 	ctx = common.WithRuntime(ctx, rt)
 	rt.Set("k6", common.Bind(rt, New(), &ctx))
 
@@ -147,9 +147,9 @@ func TestCheck(t *testing.T) {
 	*ctx = baseCtx
 	rt.Set("k6", common.Bind(rt, New(), ctx))
 
-	getState := func() (*common.State, chan stats.SampleContainer) {
+	getState := func() (*lib.State, chan stats.SampleContainer) {
 		samples := make(chan stats.SampleContainer, 1000)
-		return &common.State{
+		return &lib.State{
 			Group: root,
 			Options: lib.Options{
 				SystemTags: lib.GetTagSet(lib.DefaultSystemTagList...),
@@ -159,7 +159,7 @@ func TestCheck(t *testing.T) {
 	}
 	t.Run("Object", func(t *testing.T) {
 		state, samples := getState()
-		*ctx = common.WithState(baseCtx, state)
+		*ctx = lib.WithState(baseCtx, state)
 
 		_, err := common.RunString(rt, `k6.check(null, { "check": true })`)
 		assert.NoError(t, err)
@@ -180,7 +180,7 @@ func TestCheck(t *testing.T) {
 
 		t.Run("Multiple", func(t *testing.T) {
 			state, samples := getState()
-			*ctx = common.WithState(baseCtx, state)
+			*ctx = lib.WithState(baseCtx, state)
 
 			_, err := common.RunString(rt, `k6.check(null, { "a": true, "b": false })`)
 			assert.NoError(t, err)
@@ -216,7 +216,7 @@ func TestCheck(t *testing.T) {
 
 	t.Run("Array", func(t *testing.T) {
 		state, samples := getState()
-		*ctx = common.WithState(baseCtx, state)
+		*ctx = lib.WithState(baseCtx, state)
 
 		_, err := common.RunString(rt, `k6.check(null, [ true ])`)
 		assert.NoError(t, err)
@@ -238,7 +238,7 @@ func TestCheck(t *testing.T) {
 
 	t.Run("Literal", func(t *testing.T) {
 		state, samples := getState()
-		*ctx = common.WithState(baseCtx, state)
+		*ctx = lib.WithState(baseCtx, state)
 
 		_, err := common.RunString(rt, `k6.check(null, 12345)`)
 		assert.NoError(t, err)
@@ -247,7 +247,7 @@ func TestCheck(t *testing.T) {
 
 	t.Run("Throws", func(t *testing.T) {
 		state, _ := getState()
-		*ctx = common.WithState(baseCtx, state)
+		*ctx = lib.WithState(baseCtx, state)
 
 		_, err := common.RunString(rt, `
 		k6.check(null, {
@@ -281,7 +281,7 @@ func TestCheck(t *testing.T) {
 				for value, succ := range testdata {
 					t.Run(value, func(t *testing.T) {
 						state, samples := getState()
-						*ctx = common.WithState(baseCtx, state)
+						*ctx = lib.WithState(baseCtx, state)
 
 						v, err := common.RunString(rt, fmt.Sprintf(tpl, value))
 						if assert.NoError(t, err) {
@@ -314,8 +314,8 @@ func TestCheck(t *testing.T) {
 			root, err := lib.NewGroup("", nil)
 			assert.NoError(t, err)
 
-			state := &common.State{Group: root, Samples: make(chan stats.SampleContainer, 1000)}
-			ctx2, cancel := context.WithCancel(common.WithState(baseCtx, state))
+			state := &lib.State{Group: root, Samples: make(chan stats.SampleContainer, 1000)}
+			ctx2, cancel := context.WithCancel(lib.WithState(baseCtx, state))
 			*ctx = ctx2
 
 			v, err := common.RunString(rt, `k6.check(null, { "check": true })`)
@@ -341,7 +341,7 @@ func TestCheck(t *testing.T) {
 
 	t.Run("Tags", func(t *testing.T) {
 		state, samples := getState()
-		*ctx = common.WithState(baseCtx, state)
+		*ctx = lib.WithState(baseCtx, state)
 
 		v, err := common.RunString(rt, `k6.check(null, {"check": true}, {a: 1, b: "2"})`)
 		if assert.NoError(t, err) {

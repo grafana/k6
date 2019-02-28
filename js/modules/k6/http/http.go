@@ -22,15 +22,10 @@ package http
 
 import (
 	"context"
-	"net/http"
-	"net/http/cookiejar"
-
-	"fmt"
-	"net/http/httputil"
 
 	"github.com/loadimpact/k6/js/common"
+	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/netext"
-	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -45,18 +40,6 @@ const (
 
 // ErrJarForbiddenInInitContext is used when a cookie jar was made in the init context
 var ErrJarForbiddenInInitContext = common.NewInitContextError("Making cookie jars in the init context is not supported")
-
-type HTTPCookie struct {
-	Name, Value, Domain, Path string
-	HttpOnly, Secure          bool
-	MaxAge                    int
-	Expires                   int64
-}
-
-type HTTPRequestCookie struct {
-	Name, Value string
-	Replace     bool
-}
 
 type HTTP struct {
 	SSL_3_0                            string `js:"SSL_3_0"`
@@ -108,56 +91,9 @@ func (*HTTP) XCookieJar(ctx *context.Context) *HTTPCookieJar {
 }
 
 func (*HTTP) CookieJar(ctx context.Context) (*HTTPCookieJar, error) {
-	state := common.GetState(ctx)
+	state := lib.GetState(ctx)
 	if state == nil {
 		return nil, ErrJarForbiddenInInitContext
 	}
 	return &HTTPCookieJar{state.CookieJar, &ctx}, nil
-}
-
-func (*HTTP) mergeCookies(req *http.Request, jar *cookiejar.Jar, reqCookies map[string]*HTTPRequestCookie) map[string][]*HTTPRequestCookie {
-	allCookies := make(map[string][]*HTTPRequestCookie)
-	for _, c := range jar.Cookies(req.URL) {
-		allCookies[c.Name] = append(allCookies[c.Name], &HTTPRequestCookie{Name: c.Name, Value: c.Value})
-	}
-	for key, reqCookie := range reqCookies {
-		if jc := allCookies[key]; jc != nil && reqCookie.Replace {
-			allCookies[key] = []*HTTPRequestCookie{{Name: key, Value: reqCookie.Value}}
-		} else {
-			allCookies[key] = append(allCookies[key], &HTTPRequestCookie{Name: key, Value: reqCookie.Value})
-		}
-	}
-	return allCookies
-}
-
-func (*HTTP) setRequestCookies(req *http.Request, reqCookies map[string][]*HTTPRequestCookie) {
-	for _, cookies := range reqCookies {
-		for _, c := range cookies {
-			req.AddCookie(&http.Cookie{Name: c.Name, Value: c.Value})
-		}
-	}
-}
-
-func (*HTTP) debugRequest(state *common.State, req *http.Request, description string) {
-	if state.Options.HttpDebug.String != "" {
-		dump, err := httputil.DumpRequestOut(req, state.Options.HttpDebug.String == "full")
-		if err != nil {
-			log.Fatal(err)
-		}
-		logDump(description, dump)
-	}
-}
-
-func (*HTTP) debugResponse(state *common.State, res *http.Response, description string) {
-	if state.Options.HttpDebug.String != "" && res != nil {
-		dump, err := httputil.DumpResponse(res, state.Options.HttpDebug.String == "full")
-		if err != nil {
-			log.Fatal(err)
-		}
-		logDump(description, dump)
-	}
-}
-
-func logDump(description string, dump []byte) {
-	fmt.Printf("%s:\n%s\n", description, dump)
 }

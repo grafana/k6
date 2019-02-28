@@ -402,7 +402,7 @@ func (u *VU) RunOnce(ctx context.Context) error {
 	return err
 }
 
-func (u *VU) runFn(ctx context.Context, group *lib.Group, fn goja.Callable, args ...goja.Value) (goja.Value, *common.State, error) {
+func (u *VU) runFn(ctx context.Context, group *lib.Group, fn goja.Callable, args ...goja.Value) (goja.Value, *lib.State, error) {
 	cookieJar, err := cookiejar.New(nil)
 	if err != nil {
 		return goja.Undefined(), nil, err
@@ -412,7 +412,7 @@ func (u *VU) runFn(ctx context.Context, group *lib.Group, fn goja.Callable, args
 		cookieJar = u.CookieJar
 	}
 
-	state := &common.State{
+	state := &lib.State{
 		Logger:    u.Runner.Logger,
 		Options:   u.Runner.Bundle.Options,
 		Group:     group,
@@ -428,7 +428,7 @@ func (u *VU) runFn(ctx context.Context, group *lib.Group, fn goja.Callable, args
 	}
 
 	newctx := common.WithRuntime(ctx, u.Runtime)
-	newctx = common.WithState(newctx, state)
+	newctx = lib.WithState(newctx, state)
 	*u.Context = newctx
 
 	u.Runtime.Set("__ITER", u.Iteration)

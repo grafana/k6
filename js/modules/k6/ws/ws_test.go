@@ -103,7 +103,7 @@ func TestSession(t *testing.T) {
 		DualStack: true,
 	})
 	samples := make(chan stats.SampleContainer, 1000)
-	state := &common.State{
+	state := &lib.State{
 		Group:  root,
 		Dialer: dialer,
 		Options: lib.Options{
@@ -113,7 +113,7 @@ func TestSession(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	ctx = common.WithState(ctx, state)
+	ctx = lib.WithState(ctx, state)
 	ctx = common.WithRuntime(ctx, rt)
 
 	rt.Set("ws", common.Bind(rt, New(), &ctx))
@@ -298,7 +298,7 @@ func TestErrors(t *testing.T) {
 		DualStack: true,
 	})
 	samples := make(chan stats.SampleContainer, 1000)
-	state := &common.State{
+	state := &lib.State{
 		Group:  root,
 		Dialer: dialer,
 		Options: lib.Options{
@@ -308,7 +308,7 @@ func TestErrors(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	ctx = common.WithState(ctx, state)
+	ctx = lib.WithState(ctx, state)
 	ctx = common.WithRuntime(ctx, rt)
 
 	rt.Set("ws", common.Bind(rt, New(), &ctx))
@@ -363,7 +363,7 @@ func TestSystemTags(t *testing.T) {
 	testedSystemTags := []string{"group", "status", "subproto", "url", "ip"}
 
 	samples := make(chan stats.SampleContainer, 1000)
-	state := &common.State{
+	state := &lib.State{
 		Group:   root,
 		Dialer:  dialer,
 		Options: lib.Options{SystemTags: lib.GetTagSet(testedSystemTags...)},
@@ -371,7 +371,7 @@ func TestSystemTags(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	ctx = common.WithState(ctx, state)
+	ctx = lib.WithState(ctx, state)
 	ctx = common.WithRuntime(ctx, rt)
 
 	rt.Set("ws", common.Bind(rt, New(), &ctx))
@@ -419,7 +419,7 @@ func TestTLSConfig(t *testing.T) {
 		DualStack: true,
 	})
 	samples := make(chan stats.SampleContainer, 1000)
-	state := &common.State{
+	state := &lib.State{
 		Group:  root,
 		Dialer: dialer,
 		Options: lib.Options{
@@ -429,7 +429,7 @@ func TestTLSConfig(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	ctx = common.WithState(ctx, state)
+	ctx = lib.WithState(ctx, state)
 	ctx = common.WithRuntime(ctx, rt)
 
 	rt.Set("ws", common.Bind(rt, New(), &ctx))
