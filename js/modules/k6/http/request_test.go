@@ -97,7 +97,7 @@ func assertRequestMetricsEmitted(t *testing.T, sampleContainers []stats.SampleCo
 	assert.True(t, seenReceiving, "url %s didn't emit Receiving", url)
 }
 
-func newRuntime(t *testing.T) (*testutils.HTTPMultiBin, *common.State, chan stats.SampleContainer, *goja.Runtime, *context.Context) {
+func newRuntime(t *testing.T) (*testutils.HTTPMultiBin, *lib.State, chan stats.SampleContainer, *goja.Runtime, *context.Context) {
 	tb := testutils.NewHTTPMultiBin(t)
 
 	root, err := lib.NewGroup("", nil)
@@ -118,7 +118,7 @@ func newRuntime(t *testing.T) (*testutils.HTTPMultiBin, *common.State, chan stat
 	}
 	samples := make(chan stats.SampleContainer, 1000)
 
-	state := &common.State{
+	state := &lib.State{
 		Options:   options,
 		Logger:    logger,
 		Group:     root,
@@ -130,7 +130,7 @@ func newRuntime(t *testing.T) (*testutils.HTTPMultiBin, *common.State, chan stat
 
 	ctx := new(context.Context)
 	*ctx = context.Background()
-	*ctx = common.WithState(*ctx, state)
+	*ctx = lib.WithState(*ctx, state)
 	*ctx = common.WithRuntime(*ctx, rt)
 	rt.Set("http", common.Bind(rt, New(), ctx))
 
@@ -469,7 +469,16 @@ func TestRequestAndBatch(t *testing.T) {
 				state.CookieJar = cookieJar
 				_, err = common.RunString(rt, sr(`
 				let res = http.request("GET", "HTTPBIN_URL/cookies/set?key=value", null, { redirects: 0 });
-				if (res.cookies.key[0].value != "value") { throw new Error("wrong cookie value: " + res.cookies.key[0].value); }
+				const props = ["name", "value", "domain", "path", "expires", "max_age", "secure", "http_only"];
+				let cookie = res.cookies.key[0];
+				for (let i = 0; i < props.length; i++) {
+					if (cookie[props[i]] === undefined) {
+						throw new Error("cookie property not found: " + props[i]);
+					}
+				}
+				if (Object.keys(cookie).length != props.length) {
+					throw new Error("cookie has more properties than expected: " + JSON.stringify(Object.keys(cookie)));
+				}
 				`))
 				assert.NoError(t, err)
 				assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/cookies/set?key=value"), "", 302, "")
@@ -535,11 +544,11 @@ func TestRequestAndBatch(t *testing.T) {
 					`))
 					assert.NoError(t, err)
 
-					redirectUrl, err := url.Parse(sr("HTTPBIN_URL"))
+					redirectURL, err := url.Parse(sr("HTTPBIN_URL"))
 					assert.NoError(t, err)
-					require.Len(t, cookieJar.Cookies(redirectUrl), 1)
-					assert.Equal(t, "key-foo", cookieJar.Cookies(redirectUrl)[0].Name)
-					assert.Equal(t, "value-bar", cookieJar.Cookies(redirectUrl)[0].Value)
+					require.Len(t, cookieJar.Cookies(redirectURL), 1)
+					assert.Equal(t, "key-foo", cookieJar.Cookies(redirectURL)[0].Name)
+					assert.Equal(t, "value-bar", cookieJar.Cookies(redirectURL)[0].Value)
 
 					assertRequestMetricsEmitted(
 						t,
@@ -561,12 +570,12 @@ func TestRequestAndBatch(t *testing.T) {
 					`))
 					assert.NoError(t, err)
 
-					redirectUrl, err := url.Parse(sr("HTTPSBIN_URL"))
+					redirectURL, err := url.Parse(sr("HTTPSBIN_URL"))
 					assert.NoError(t, err)
 
-					require.Len(t, cookieJar.Cookies(redirectUrl), 1)
-					assert.Equal(t, "key", cookieJar.Cookies(redirectUrl)[0].Name)
-					assert.Equal(t, "value", cookieJar.Cookies(redirectUrl)[0].Value)
+					require.Len(t, cookieJar.Cookies(redirectURL), 1)
+					assert.Equal(t, "key", cookieJar.Cookies(redirectURL)[0].Name)
+					assert.Equal(t, "value", cookieJar.Cookies(redirectURL)[0].Value)
 
 					assertRequestMetricsEmitted(
 						t,

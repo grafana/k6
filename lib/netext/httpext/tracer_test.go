@@ -18,7 +18,7 @@
  *
  */
 
-package netext
+package httpext
 
 import (
 	"context"
@@ -29,12 +29,14 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/http/httptrace"
 	"runtime"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/loadimpact/k6/lib/metrics"
+	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
 	"github.com/mccutchen/go-httpbin/httpbin"
 	"github.com/pkg/errors"
@@ -52,7 +54,7 @@ func TestTracer(t *testing.T) {
 
 	transport, ok := srv.Client().Transport.(*http.Transport)
 	assert.True(t, ok)
-	transport.DialContext = NewDialer(net.Dialer{}).DialContext
+	transport.DialContext = netext.NewDialer(net.Dialer{}).DialContext
 
 	var prev int64
 	assertLaterOrZero := func(t *testing.T, val int64, canBeZero bool) {
@@ -74,7 +76,7 @@ func TestTracer(t *testing.T) {
 			req, err := http.NewRequest("GET", srv.URL+"/get", nil)
 			require.NoError(t, err)
 
-			res, err := transport.RoundTrip(req.WithContext(WithTracer(context.Background(), tracer)))
+			res, err := transport.RoundTrip(req.WithContext(httptrace.WithClientTrace(context.Background(), tracer.Trace())))
 			require.NoError(t, err)
 
 			_, err = io.Copy(ioutil.Discard, res.Body)
@@ -163,7 +165,7 @@ func TestTracerNegativeHttpSendingValues(t *testing.T) {
 
 	{
 		tracer := &Tracer{}
-		res, err := transport.RoundTrip(req.WithContext(WithTracer(context.Background(), tracer)))
+		res, err := transport.RoundTrip(req.WithContext(httptrace.WithClientTrace(context.Background(), tracer.Trace())))
 		require.NoError(t, err)
 		_, err = io.Copy(ioutil.Discard, res.Body)
 		assert.NoError(t, err)
@@ -176,7 +178,7 @@ func TestTracerNegativeHttpSendingValues(t *testing.T) {
 
 	{
 		tracer := &Tracer{}
-		res, err := transport.RoundTrip(req.WithContext(WithTracer(context.Background(), tracer)))
+		res, err := transport.RoundTrip(req.WithContext(httptrace.WithClientTrace(context.Background(), tracer.Trace())))
 		require.NoError(t, err)
 		_, err = io.Copy(ioutil.Discard, res.Body)
 		assert.NoError(t, err)
@@ -197,7 +199,7 @@ func TestTracerError(t *testing.T) {
 	req, err := http.NewRequest("GET", srv.URL+"/get", nil)
 	require.NoError(t, err)
 
-	_, err = http.DefaultTransport.RoundTrip(req.WithContext(WithTracer(context.Background(), tracer)))
+	_, err = http.DefaultTransport.RoundTrip(req.WithContext(httptrace.WithClientTrace(context.Background(), tracer.Trace())))
 	assert.Error(t, err)
 
 	assert.Len(t, tracer.protoErrors, 1)
@@ -216,7 +218,7 @@ func TestCancelledRequest(t *testing.T) {
 		req, err := http.NewRequest("GET", srv.URL+"/delay/1", nil)
 		require.NoError(t, err)
 
-		ctx, cancel := context.WithCancel(WithTracer(req.Context(), tracer))
+		ctx, cancel := context.WithCancel(httptrace.WithClientTrace(req.Context(), tracer.Trace()))
 		req = req.WithContext(ctx)
 		go func() {
 			time.Sleep(time.Duration(rand.Int31n(50)) * time.Millisecond)
