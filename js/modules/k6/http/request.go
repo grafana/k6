@@ -47,15 +47,6 @@ var ErrHTTPForbiddenInInitContext = common.NewInitContextError("Making http requ
 // ErrBatchForbiddenInInitContext is used when batch was made in the init context
 var ErrBatchForbiddenInInitContext = common.NewInitContextError("Using batch in the init context is not supported")
 
-// Request represent an http request
-type Request struct {
-	Method  string                          `json:"method"`
-	URL     string                          `json:"url"`
-	Headers map[string][]string             `json:"headers"`
-	Body    string                          `json:"body"`
-	Cookies map[string][]*HTTPRequestCookie `json:"cookies"`
-}
-
 // Get makes an HTTP GET request and returns a corresponding response by taking goja.Values as arguments
 func (h *HTTP) Get(ctx context.Context, url goja.Value, args ...goja.Value) (*Response, error) {
 	// The body argument is always undefined for GETs and HEADs.

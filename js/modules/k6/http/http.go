@@ -41,18 +41,6 @@ const (
 // ErrJarForbiddenInInitContext is used when a cookie jar was made in the init context
 var ErrJarForbiddenInInitContext = common.NewInitContextError("Making cookie jars in the init context is not supported")
 
-type HTTPCookie struct {
-	Name, Value, Domain, Path string
-	HttpOnly, Secure          bool
-	MaxAge                    int
-	Expires                   int64
-}
-
-type HTTPRequestCookie struct {
-	Name, Value string
-	Replace     bool
-}
-
 type HTTP struct {
 	SSL_3_0                            string `js:"SSL_3_0"`
 	TLS_1_0                            string `js:"TLS_1_0"`
