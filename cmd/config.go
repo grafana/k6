@@ -196,13 +196,20 @@ func buildExecutionConfig(conf Config) (Config, error) {
 		}
 
 		if conf.Execution != nil {
+			//TODO: use a custom error type
 			return result, errors.New("specifying both duration and execution is not supported")
 		}
 
-		ds := scheduler.NewConstantLoopingVUsConfig(lib.DefaultSchedulerName)
-		ds.VUs = conf.VUs
-		ds.Duration = conf.Duration
-		result.Execution = scheduler.ConfigMap{lib.DefaultSchedulerName: ds}
+		if conf.Duration.Duration <= 0 {
+			//TODO: make this an error in the next version
+			log.Warnf("Specifying infinite duration in this way is deprecated and won't be supported in the future k6 versions")
+		} else {
+			ds := scheduler.NewConstantLoopingVUsConfig(lib.DefaultSchedulerName)
+			ds.VUs = conf.VUs
+			ds.Duration = conf.Duration
+			ds.Interruptible = null.NewBool(true, false) // Preserve backwards compatibility
+			result.Execution = scheduler.ConfigMap{lib.DefaultSchedulerName: ds}
+		}
 	} else if conf.Stages != nil {
 		if conf.Iterations.Valid {
 			//TODO: make this an error in the next version
@@ -220,21 +227,25 @@ func buildExecutionConfig(conf Config) (Config, error) {
 				ds.Stages = append(ds.Stages, scheduler.Stage{Duration: s.Duration, Target: s.Target})
 			}
 		}
+		ds.Interruptible = null.NewBool(true, false) // Preserve backwards compatibility
 		result.Execution = scheduler.ConfigMap{lib.DefaultSchedulerName: ds}
-	} else if conf.Iterations.Valid || conf.Execution == nil {
-		// Either shared iterations were explicitly specified via the shortcut option, or no execution
-		// parameters were specified in any way, which will run the default 1 iteration in 1 VU
-		if conf.Iterations.Valid && conf.Execution != nil {
+	} else if conf.Iterations.Valid {
+		if conf.Execution != nil {
 			return conf, errors.New("specifying both iterations and execution is not supported")
 		}
+		// TODO: maybe add a new flag that will be used as a shortcut to per-VU iterations?
 
 		ds := scheduler.NewSharedIterationsConfig(lib.DefaultSchedulerName)
 		ds.VUs = conf.VUs
-		if conf.Iterations.Valid { // TODO: fix where the default iterations value is set... sigh...
-			ds.Iterations = conf.Iterations
-		}
-
+		ds.Iterations = conf.Iterations
 		result.Execution = scheduler.ConfigMap{lib.DefaultSchedulerName: ds}
+	} else if conf.Execution == nil {
+		// If no execution parameters were specified, we'll create a per-VU iterations config
+		// with 1 VU and 1 iteration. We're choosing the per-VU config, since that one could also
+		// be executed both locally, and in the cloud.
+		result.Execution = scheduler.ConfigMap{
+			lib.DefaultSchedulerName: scheduler.NewPerVUIterationsConfig(lib.DefaultSchedulerName),
+		}
 	}
 
 	//TODO: validate the config; questions:
