@@ -50,7 +50,7 @@ type SharedIteationsConfig struct {
 func NewSharedIterationsConfig(name string) SharedIteationsConfig {
 	return SharedIteationsConfig{
 		BaseConfig:  NewBaseConfig(name, sharedIterationsType, false),
-		VUs:         null.NewInt(1, false), //TODO: set defaults in another place?
+		VUs:         null.NewInt(1, false),
 		Iterations:  null.NewInt(1, false),
 		MaxDuration: types.NewNullDuration(1*time.Hour, false),
 	}
