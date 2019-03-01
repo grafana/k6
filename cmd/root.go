@@ -100,12 +100,13 @@ func init() {
 		defaultConfigPathMsg = fmt.Sprintf(" (default %s)", filepath.Join(configFolders[0].Path, configFilename))
 	}
 
+	//TODO: figure out a better way to handle the CLI flags - global variables are not very testable... :/
 	RootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "enable debug logging")
 	RootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "disable progress updates")
 	RootCmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "disable colored output")
 	RootCmd.PersistentFlags().StringVar(&logFmt, "logformat", "", "log output format")
 	RootCmd.PersistentFlags().StringVarP(&address, "address", "a", "localhost:6565", "address for the api server")
-	RootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file"+defaultConfigPathMsg)
+	RootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file"+defaultConfigPathMsg) //TODO: figure out and fix?
 	must(cobra.MarkFlagFilename(RootCmd.PersistentFlags(), "config"))
 }
 

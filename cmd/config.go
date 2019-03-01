@@ -48,6 +48,7 @@ var configFile = os.Getenv("K6_CONFIG") // overridden by `-c` flag!
 
 // configFileFlagSet returns a FlagSet that contains flags needed for specifying a config file.
 func configFileFlagSet() *pflag.FlagSet {
+	//TODO: remove?
 	flags := pflag.NewFlagSet("", 0)
 	flags.StringVarP(&configFile, "config", "c", configFile, "specify config file to read")
 	return flags
