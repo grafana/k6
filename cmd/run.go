@@ -49,6 +49,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	null "gopkg.in/guregu/null.v3"
 )
 
@@ -65,6 +66,7 @@ const (
 )
 
 var (
+	//TODO: fix this, global variables are not very testable...
 	runType       = os.Getenv("K6_TYPE")
 	runNoSetup    = os.Getenv("K6_NO_SETUP") != ""
 	runNoTeardown = os.Getenv("K6_NO_TEARDOWN") != ""
@@ -472,16 +474,24 @@ a commandline interface for interacting with it.`,
 	},
 }
 
+func runCmdFlagSet() *pflag.FlagSet {
+	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
+	flags.SortFlags = false
+	flags.AddFlagSet(optionFlagSet())
+	flags.AddFlagSet(runtimeOptionFlagSet(true))
+	flags.AddFlagSet(configFlagSet())
+	//TODO: figure out a better way to handle the CLI flags - global variables are not very testable... :/
+	flags.StringVarP(&runType, "type", "t", runType, "override file `type`, \"js\" or \"archive\"")
+	flags.BoolVar(&runNoSetup, "no-setup", runNoSetup, "don't run setup()")
+	flags.BoolVar(&runNoTeardown, "no-teardown", runNoTeardown, "don't run teardown()")
+	return flags
+}
+
 func init() {
 	RootCmd.AddCommand(runCmd)
 
 	runCmd.Flags().SortFlags = false
-	runCmd.Flags().AddFlagSet(optionFlagSet())
-	runCmd.Flags().AddFlagSet(runtimeOptionFlagSet(true))
-	runCmd.Flags().AddFlagSet(configFlagSet())
-	runCmd.Flags().StringVarP(&runType, "type", "t", runType, "override file `type`, \"js\" or \"archive\"")
-	runCmd.Flags().BoolVar(&runNoSetup, "no-setup", runNoSetup, "don't run setup()")
-	runCmd.Flags().BoolVar(&runNoTeardown, "no-teardown", runNoTeardown, "don't run teardown()")
+	runCmd.Flags().AddFlagSet(runCmdFlagSet())
 }
 
 // Reads a source file from any supported destination.

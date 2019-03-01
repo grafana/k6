@@ -36,6 +36,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -235,10 +236,18 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 	},
 }
 
+func cloudCmdFlagSet() *pflag.FlagSet {
+	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
+	flags.SortFlags = false
+	flags.AddFlagSet(optionFlagSet())
+	flags.AddFlagSet(runtimeOptionFlagSet(false))
+	//TODO: figure out a better way to handle the CLI flags - global variables are not very testable... :/
+	flags.BoolVar(&exitOnRunning, "exit-on-running", exitOnRunning, "exits when test reaches the running status")
+	return flags
+}
+
 func init() {
 	RootCmd.AddCommand(cloudCmd)
 	cloudCmd.Flags().SortFlags = false
-	cloudCmd.Flags().AddFlagSet(optionFlagSet())
-	cloudCmd.Flags().AddFlagSet(runtimeOptionFlagSet(false))
-	cloudCmd.Flags().BoolVar(&exitOnRunning, "exit-on-running", exitOnRunning, "exits when test reaches the running status")
+	cloudCmd.Flags().AddFlagSet(cloudCmdFlagSet())
 }
