@@ -121,6 +121,9 @@ var configMapTestCases = []configMapTestCase{
 			assert.Equal(t, 3630*time.Second, cm["ishared"].GetMaxDuration())
 			assert.Empty(t, cm["ishared"].Validate())
 		}},
+	{`{"ishared": {"type": "shared-iterations"}}`, false, false, nil}, // Has 1 VU & 1 iter default values
+	{`{"ishared": {"type": "shared-iterations", "iterations": 20}}`, false, false, nil},
+	{`{"ishared": {"type": "shared-iterations", "vus": 10}}`, false, true, nil}, // error because VUs are more than iters
 	{`{"ishared": {"type": "shared-iterations", "iterations": 20, "vus": 10, "maxDuration": "30m"}}`, false, false, nil},
 	{`{"ishared": {"type": "shared-iterations", "iterations": 20, "vus": 10, "maxDuration": "-3m"}}`, false, true, nil},
 	{`{"ishared": {"type": "shared-iterations", "iterations": 20, "vus": 10, "maxDuration": "0s"}}`, false, true, nil},
@@ -139,9 +142,10 @@ var configMapTestCases = []configMapTestCase{
 			assert.Equal(t, 3630*time.Second, cm["ipervu"].GetMaxDuration())
 			assert.Empty(t, cm["ipervu"].Validate())
 		}},
+	{`{"ipervu": {"type": "per-vu-iterations"}}`, false, false, nil}, // Has 1 VU & 1 iter default values
+	{`{"ipervu": {"type": "per-vu-iterations", "iterations": 20}}`, false, false, nil},
+	{`{"ipervu": {"type": "per-vu-iterations", "vus": 10}}`, false, false, nil},
 	{`{"ipervu": {"type": "per-vu-iterations", "iterations": 20, "vus": 10}}`, false, false, nil},
-	{`{"ipervu": {"type": "per-vu-iterations", "iterations": 20}}`, false, true, nil},
-	{`{"ipervu": {"type": "per-vu-iterations", "vus": 10}}`, false, true, nil},
 	{`{"ipervu": {"type": "per-vu-iterations", "iterations": 20, "vus": 10, "maxDuration": "-3m"}}`, false, true, nil},
 	{`{"ipervu": {"type": "per-vu-iterations", "iterations": 20, "vus": 10, "maxDuration": "0s"}}`, false, true, nil},
 	{`{"ipervu": {"type": "per-vu-iterations", "iterations": 20, "vus": -10}}`, false, true, nil},
@@ -207,6 +211,7 @@ func TestConfigMapParsingAndValidation(t *testing.T) {
 	for i, tc := range configMapTestCases {
 		tc := tc
 		t.Run(fmt.Sprintf("TestCase#%d", i), func(t *testing.T) {
+			t.Logf(tc.rawJSON)
 			var result ConfigMap
 			err := json.Unmarshal([]byte(tc.rawJSON), &result)
 			if tc.expectParseError {
