@@ -25,11 +25,11 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/loadimpact/k6/lib/scheduler"
+	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/lib/types"
 
 	"github.com/spf13/afero"
@@ -97,33 +97,6 @@ func TestConfigCmd(t *testing.T) {
 	}
 }
 
-// A simple logrus hook that could be used to check if log messages were outputted
-type simpleLogrusHook struct {
-	mutex        sync.Mutex
-	levels       []log.Level
-	messageCache []log.Entry
-}
-
-func (smh *simpleLogrusHook) Levels() []log.Level {
-	return smh.levels
-}
-func (smh *simpleLogrusHook) Fire(e *log.Entry) error {
-	smh.mutex.Lock()
-	defer smh.mutex.Unlock()
-	smh.messageCache = append(smh.messageCache, *e)
-	return nil
-}
-
-func (smh *simpleLogrusHook) drain() []log.Entry {
-	smh.mutex.Lock()
-	defer smh.mutex.Unlock()
-	res := smh.messageCache
-	smh.messageCache = []log.Entry{}
-	return res
-}
-
-var _ log.Hook = &simpleLogrusHook{}
-
 // A helper funcion for setting arbitrary environment variables and
 // restoring the old ones at the end, usually by deferring the returned callback
 //TODO: remove these hacks when we improve the configuration... we shouldn't
@@ -156,7 +129,7 @@ func setEnv(t *testing.T, newEnv []string) (restoreEnv func()) {
 	}
 }
 
-var verifyOneIterPerOneVU = func(t *testing.T, c Config) {
+func verifyOneIterPerOneVU(t *testing.T, c Config) {
 	// No config anywhere should result in a 1 VU with a 1 uninterruptible iteration config
 	sched := c.Execution[lib.DefaultSchedulerName]
 	require.NotEmpty(t, sched)
@@ -169,7 +142,7 @@ var verifyOneIterPerOneVU = func(t *testing.T, c Config) {
 	//TODO: verify shortcut options as well?
 }
 
-var verifySharedIters = func(vus, iters int64) func(t *testing.T, c Config) {
+func verifySharedIters(vus, iters int64) func(t *testing.T, c Config) {
 	return func(t *testing.T, c Config) {
 		sched := c.Execution[lib.DefaultSchedulerName]
 		require.NotEmpty(t, sched)
@@ -182,7 +155,7 @@ var verifySharedIters = func(vus, iters int64) func(t *testing.T, c Config) {
 	}
 }
 
-var verifyConstantLoopingVUs = func(vus int64, duration time.Duration) func(t *testing.T, c Config) {
+func verifyConstantLoopingVUs(vus int64, duration time.Duration) func(t *testing.T, c Config) {
 	return func(t *testing.T, c Config) {
 		sched := c.Execution[lib.DefaultSchedulerName]
 		require.NotEmpty(t, sched)
@@ -197,6 +170,8 @@ var verifyConstantLoopingVUs = func(vus int64, duration time.Duration) func(t *t
 }
 
 func mostFlagSets() []*pflag.FlagSet {
+	//TODO: make this unneccesary... currently these are the only commands in which
+	// getConsolidatedConfig() is used, but they also have differences in their CLI flags :/
 	// sigh... compromises...
 	return []*pflag.FlagSet{runCmdFlagSet(), archiveCmdFlagSet(), cloudCmdFlagSet()}
 }
@@ -212,7 +187,8 @@ type opts struct {
 // exp contains the different events or errors we expect our test case to trigger.
 // for space and clarity, we use the fact that by default, all of the struct values are false
 type exp struct {
-	cliError           bool
+	cliParseError      bool
+	cliReadError       bool
 	consolidationError bool
 	validationErrors   bool
 	logWarning         bool //TODO: remove in the next version?
@@ -229,11 +205,11 @@ var configConsolidationTestCases = []configConsolidationTestCase{
 	// Check that no options will result in 1 VU 1 iter value for execution
 	{opts{}, exp{}, verifyOneIterPerOneVU},
 	// Verify some CLI errors
-	{opts{cli: []string{"--blah", "blah"}}, exp{cliError: true}, nil},
-	{opts{cli: []string{"--duration", "blah"}}, exp{cliError: true}, nil},
-	{opts{cli: []string{"--iterations", "blah"}}, exp{cliError: true}, nil},
-	{opts{cli: []string{"--execution", ""}}, exp{cliError: true}, nil},
-	{opts{cli: []string{"--stage", "10:20s"}}, exp{cliError: true}, nil},
+	{opts{cli: []string{"--blah", "blah"}}, exp{cliParseError: true}, nil},
+	{opts{cli: []string{"--duration", "blah"}}, exp{cliParseError: true}, nil},
+	{opts{cli: []string{"--iterations", "blah"}}, exp{cliParseError: true}, nil},
+	{opts{cli: []string{"--execution", ""}}, exp{cliParseError: true}, nil},
+	{opts{cli: []string{"--stage", "10:20s"}}, exp{cliReadError: true}, nil},
 	// Check if CLI shortcuts generate correct execution values
 	{opts{cli: []string{"--vus", "1", "--iterations", "5"}}, exp{}, verifySharedIters(1, 5)},
 	{opts{cli: []string{"-u", "2", "-i", "6"}}, exp{}, verifySharedIters(2, 6)},
@@ -261,36 +237,40 @@ var configConsolidationTestCases = []configConsolidationTestCase{
 }
 
 func TestConfigConsolidation(t *testing.T) {
-	logHook := simpleLogrusHook{levels: []log.Level{log.WarnLevel}}
+	// This test and its subtests shouldn't be ran in parallel, since they unfortunately have
+	// to mess with shared global objects (env vars, variables, the log, ... santa?)
+	logHook := testutils.SimpleLogrusHook{HookedLevels: []log.Level{log.WarnLevel}}
 	log.AddHook(&logHook)
 	log.SetOutput(ioutil.Discard)
 	defer log.SetOutput(os.Stderr)
 
 	runTestCase := func(t *testing.T, testCase configConsolidationTestCase, flagSet *pflag.FlagSet) {
 		t.Logf("Test with opts=%#v and exp=%#v\n", testCase.options, testCase.expected)
-		logHook.drain()
+		logHook.Drain()
 
 		restoreEnv := setEnv(t, testCase.options.env)
 		defer restoreEnv()
 
-		//TODO: also remove these hacks when we improve the configuration...
-		getTestCaseCliConf := func() (Config, error) {
-			if err := flagSet.Parse(testCase.options.cli); err != nil {
-				return Config{}, err
-			}
-			if flagSet.Lookup("out") != nil {
-				return getConfig(flagSet)
-			}
-			opts, errOpts := getOptions(flagSet)
-			return Config{Options: opts}, errOpts
-		}
-
-		cliConf, err := getTestCaseCliConf()
-		if testCase.expected.cliError {
-			require.Error(t, err)
+		cliErr := flagSet.Parse(testCase.options.cli)
+		if testCase.expected.cliParseError {
+			require.Error(t, cliErr)
 			return
 		}
-		require.NoError(t, err)
+		require.NoError(t, cliErr)
+
+		//TODO: remove these hacks when we improve the configuration...
+		var cliConf Config
+		if flagSet.Lookup("out") != nil {
+			cliConf, cliErr = getConfig(flagSet)
+		} else {
+			opts, errOpts := getOptions(flagSet)
+			cliConf, cliErr = Config{Options: opts}, errOpts
+		}
+		if testCase.expected.cliReadError {
+			require.Error(t, cliErr)
+			return
+		}
+		require.NoError(t, cliErr)
 
 		var runner lib.Runner
 		if testCase.options.runner != nil {
@@ -304,7 +284,7 @@ func TestConfigConsolidation(t *testing.T) {
 		}
 		require.NoError(t, err)
 
-		warnings := logHook.drain()
+		warnings := logHook.Drain()
 		if testCase.expected.logWarning {
 			assert.NotEmpty(t, warnings)
 		} else {
