@@ -129,7 +129,7 @@ var _ log.Hook = &simpleLogrusHook{}
 //TODO: remove these hacks when we improve the configuration... we shouldn't
 // have to mess with the global environment at all...
 func setEnv(t *testing.T, newEnv []string) (restoreEnv func()) {
-	actuallSetEnv := func(env []string) {
+	actuallSetEnv := func(env []string, abortOnSetErr bool) {
 		os.Clearenv()
 		for _, e := range env {
 			val := ""
@@ -137,14 +137,22 @@ func setEnv(t *testing.T, newEnv []string) (restoreEnv func()) {
 			if len(pair) > 1 {
 				val = pair[1]
 			}
-			require.NoError(t, os.Setenv(pair[0], val))
+			err := os.Setenv(pair[0], val)
+			if abortOnSetErr {
+				require.NoError(t, err)
+			} else if err != nil {
+				t.Logf(
+					"Received a non-aborting but unexpected error '%s' when setting env.var '%s' to '%s'",
+					err, pair[0], val,
+				)
+			}
 		}
 	}
 	oldEnv := os.Environ()
-	actuallSetEnv(newEnv)
+	actuallSetEnv(newEnv, true)
 
 	return func() {
-		actuallSetEnv(oldEnv)
+		actuallSetEnv(oldEnv, false)
 	}
 }
 
