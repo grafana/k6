@@ -22,7 +22,6 @@ package cmd
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"os"
 
 	"github.com/kelseyhightower/envconfig"
@@ -34,25 +33,11 @@ import (
 	"github.com/loadimpact/k6/stats/kafka"
 	"github.com/loadimpact/k6/stats/statsd/common"
 	"github.com/pkg/errors"
-	"github.com/shibukawa/configdir"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/spf13/pflag"
 	null "gopkg.in/guregu/null.v3"
 )
-
-const configFilename = "config.json"
-
-var configDirs = configdir.New("loadimpact", "k6")
-var configFile = os.Getenv("K6_CONFIG") // overridden by `-c` flag!
-
-// configFileFlagSet returns a FlagSet that contains flags needed for specifying a config file.
-func configFileFlagSet() *pflag.FlagSet {
-	//TODO: remove?
-	flags := pflag.NewFlagSet("", 0)
-	flags.StringVarP(&configFile, "config", "c", configFile, "specify config file to read")
-	return flags
-}
 
 // configFlagSet returns a FlagSet with the default run configuration flags.
 func configFlagSet() *pflag.FlagSet {
@@ -63,7 +48,6 @@ func configFlagSet() *pflag.FlagSet {
 	flags.Bool("no-usage-report", false, "don't send anonymous stats to the developers")
 	flags.Bool("no-thresholds", false, "don't run thresholds")
 	flags.Bool("no-summary", false, "don't show the summary at the end of the test")
-	flags.AddFlagSet(configFileFlagSet())
 	return flags
 }
 
@@ -130,41 +114,40 @@ func getConfig(flags *pflag.FlagSet) (Config, error) {
 	}, nil
 }
 
-// Reads a configuration file from disk.
-func readDiskConfig(fs afero.Fs) (Config, *configdir.Config, error) {
-	if configFile != "" {
-		data, err := ioutil.ReadFile(configFile)
-		if err != nil {
-			return Config{}, nil, err
-		}
-		var conf Config
-		err = json.Unmarshal(data, &conf)
-		return conf, nil, err
+// Reads a configuration file from disk and returns it and its path.
+func readDiskConfig(fs afero.Fs) (Config, string, error) {
+	realConfigFilePath := configFilePath
+	if realConfigFilePath == "" {
+		// The user didn't specify K6_CONFIG or --config, use the default path
+		realConfigFilePath = defaultConfigFilePath
 	}
 
-	cdir := configDirs.QueryFolderContainsFile(configFilename)
-	if cdir == nil {
-		return Config{}, configDirs.QueryFolders(configdir.Global)[0], nil
+	// Try to see if the file exists in the supplied filesystem
+	if _, err := fs.Stat(realConfigFilePath); err != nil {
+		if os.IsNotExist(err) && configFilePath == "" {
+			// If the file doesn't exist, but it was the default config file (i.e. the user
+			// didn't specify anything), silence the error
+			err = nil
+		}
+		return Config{}, realConfigFilePath, err
 	}
-	data, err := cdir.ReadFile(configFilename)
+
+	data, err := afero.ReadFile(fs, realConfigFilePath)
 	if err != nil {
-		return Config{}, cdir, err
+		return Config{}, realConfigFilePath, err
 	}
 	var conf Config
 	err = json.Unmarshal(data, &conf)
-	return conf, cdir, err
+	return conf, realConfigFilePath, err
 }
 
 // Writes configuration back to disk.
-func writeDiskConfig(fs afero.Fs, cdir *configdir.Config, conf Config) error {
+func writeDiskConfig(fs afero.Fs, configPath string, conf Config) error {
 	data, err := json.MarshalIndent(conf, "", "  ")
 	if err != nil {
 		return err
 	}
-	if configFile != "" {
-		return afero.WriteFile(fs, configFilename, data, 0644)
-	}
-	return cdir.WriteFile(configFilename, data)
+	return afero.WriteFile(fs, configPath, data, 0644)
 }
 
 // Reads configuration variables from the environment.

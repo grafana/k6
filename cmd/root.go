@@ -54,9 +54,12 @@ var (
 	stderr    = consoleWriter{colorable.NewColorableStderr(), stderrTTY, outMutex}
 )
 
-var (
-	cfgFile string
+const defaultConfigFileName = "config.json"
 
+var defaultConfigFilePath = defaultConfigFileName // Updated with the user's config folder in the init() function below
+var configFilePath = os.Getenv("K6_CONFIG")       // Overridden by `-c`/`--config` flag!
+
+var (
 	verbose bool
 	quiet   bool
 	noColor bool
@@ -94,10 +97,12 @@ func Execute() {
 }
 
 func init() {
-	defaultConfigPathMsg := ""
+	// TODO: find a better library... or better yet, simply port the few dozen lines of code for getting the
+	// per-user config folder in a cross-platform way
+	configDirs := configdir.New("loadimpact", "k6")
 	configFolders := configDirs.QueryFolders(configdir.Global)
 	if len(configFolders) > 0 {
-		defaultConfigPathMsg = fmt.Sprintf(" (default %s)", filepath.Join(configFolders[0].Path, configFilename))
+		defaultConfigFilePath = filepath.Join(configFolders[0].Path, defaultConfigFileName)
 	}
 
 	//TODO: figure out a better way to handle the CLI flags - global variables are not very testable... :/
@@ -106,7 +111,7 @@ func init() {
 	RootCmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "disable colored output")
 	RootCmd.PersistentFlags().StringVar(&logFmt, "logformat", "", "log output format")
 	RootCmd.PersistentFlags().StringVarP(&address, "address", "a", "localhost:6565", "address for the api server")
-	RootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file"+defaultConfigPathMsg) //TODO: figure out and fix?
+	RootCmd.PersistentFlags().StringVarP(&configFilePath, "config", "c", "", fmt.Sprintf("config file (default %s)", defaultConfigFilePath))
 	must(cobra.MarkFlagFilename(RootCmd.PersistentFlags(), "config"))
 }
 
