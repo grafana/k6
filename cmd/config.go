@@ -23,6 +23,7 @@ package cmd
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/loadimpact/k6/lib"
@@ -147,6 +148,11 @@ func writeDiskConfig(fs afero.Fs, configPath string, conf Config) error {
 	if err != nil {
 		return err
 	}
+
+	if err := fs.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
+		return err
+	}
+
 	return afero.WriteFile(fs, configPath, data, 0644)
 }
 
