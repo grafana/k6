@@ -26,6 +26,7 @@ import (
 	golog "log"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/fatih/color"
@@ -37,13 +38,13 @@ import (
 )
 
 var Version = "0.23.1"
-var Banner = `
-          /\      |‾‾|  /‾‾/  /‾/   
-     /\  /  \     |  |_/  /  / /    
-    /  \/    \    |      |  /  ‾‾\  
-   /          \   |  |‾\  \ | (_) | 
-  / __________ \  |__|  \__\ \___/ .io`
-
+var Banner = strings.Join([]string{
+	`          /\      |‾‾|  /‾‾/  /‾/   `,
+	`     /\  /  \     |  |_/  /  / /    `,
+	`    /  \/    \    |      |  /  ‾‾\  `,
+	`   /          \   |  |‾\  \ | (_) | `,
+	`  / __________ \  |__|  \__\ \___/ .io`,
+}, "\n")
 var BannerColor = color.New(color.FgCyan)
 
 var (
