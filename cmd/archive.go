@@ -96,7 +96,6 @@ func archiveCmdFlagSet() *pflag.FlagSet {
 	flags.SortFlags = false
 	flags.AddFlagSet(optionFlagSet())
 	flags.AddFlagSet(runtimeOptionFlagSet(false))
-	flags.AddFlagSet(configFileFlagSet())
 	//TODO: figure out a better way to handle the CLI flags - global variables are not very testable... :/
 	flags.StringVarP(&archiveOut, "archive-out", "O", archiveOut, "archive output filename")
 	return flags
