@@ -62,6 +62,7 @@ var defaultConfigFilePath = defaultConfigFileName // Updated with the user's con
 var configFilePath = os.Getenv("K6_CONFIG")       // Overridden by `-c`/`--config` flag!
 
 var (
+	//TODO: have environment variables for configuring these? hopefully after we move away from global vars though...
 	verbose bool
 	quiet   bool
 	noColor bool
@@ -106,7 +107,12 @@ func rootCmdPersistentFlagSet() *pflag.FlagSet {
 	flags.BoolVar(&noColor, "no-color", false, "disable colored output")
 	flags.StringVar(&logFmt, "logformat", "", "log output format")
 	flags.StringVarP(&address, "address", "a", "localhost:6565", "address for the api server")
-	flags.StringVarP(&configFilePath, "config", "c", "", fmt.Sprintf("config file (default %s)", defaultConfigFilePath))
+
+	//TODO: Fix... This default value needed, so both CLI flags and environment variables work
+	flags.StringVarP(&configFilePath, "config", "c", configFilePath, "JSON config file")
+	// And we also need to explicitly set the default value for the usage message here, so things
+	// like `K6_CONFIG="blah" k6 run -h` don't produce a weird usage message
+	flags.Lookup("config").DefValue = defaultConfigFilePath
 	must(cobra.MarkFlagFilename(flags, "config"))
 	return flags
 }
