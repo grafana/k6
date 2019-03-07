@@ -129,12 +129,25 @@ func mostFlagSets() []flagSetInit {
 	return result
 }
 
+type file struct {
+	filepath, contents string
+}
+
+func getFS(files []file) afero.Fs {
+	fs := afero.NewMemMapFs()
+	for _, f := range files {
+		must(afero.WriteFile(fs, f.filepath, []byte(f.contents), 0644)) // modes don't matter in the afero.MemMapFs
+	}
+	return fs
+}
+
 type flagSetInit func() *pflag.FlagSet
 
 type opts struct {
 	cli    []string
 	env    []string
 	runner *lib.Options
+	fs     afero.Fs
 
 	//TODO: remove this when the configuration is more reproducible and sane...
 	// We use a func, because initializing a FlagSet that points to variables
@@ -186,39 +199,55 @@ type configConsolidationTestCase struct {
 	customValidator func(t *testing.T, c Config)
 }
 
-var configConsolidationTestCases = []configConsolidationTestCase{
-	// Check that no options will result in 1 VU 1 iter value for execution
-	{opts{}, exp{}, verifyOneIterPerOneVU},
-	// Verify some CLI errors
-	{opts{cli: []string{"--blah", "blah"}}, exp{cliParseError: true}, nil},
-	{opts{cli: []string{"--duration", "blah"}}, exp{cliParseError: true}, nil},
-	{opts{cli: []string{"--iterations", "blah"}}, exp{cliParseError: true}, nil},
-	{opts{cli: []string{"--execution", ""}}, exp{cliParseError: true}, nil},
-	{opts{cli: []string{"--stage", "10:20s"}}, exp{cliReadError: true}, nil},
-	// Check if CLI shortcuts generate correct execution values
-	{opts{cli: []string{"--vus", "1", "--iterations", "5"}}, exp{}, verifySharedIters(1, 5)},
-	{opts{cli: []string{"-u", "2", "-i", "6"}}, exp{}, verifySharedIters(2, 6)},
-	{opts{cli: []string{"-u", "3", "-d", "30s"}}, exp{}, verifyConstantLoopingVUs(3, 30*time.Second)},
-	{opts{cli: []string{"-u", "4", "--duration", "60s"}}, exp{}, verifyConstantLoopingVUs(4, 1*time.Minute)},
-	//TODO: verify stages
-	// This should get a validation error since VUs are more than the shared iterations
-	{opts{cli: []string{"--vus", "10", "-i", "6"}}, exp{validationErrors: true}, verifySharedIters(10, 6)},
-	// These should emit a warning
-	{opts{cli: []string{"-u", "1", "-i", "6", "-d", "10s"}}, exp{logWarning: true}, nil},
-	{opts{cli: []string{"-u", "2", "-d", "10s", "-s", "10s:20"}}, exp{logWarning: true}, nil},
-	{opts{cli: []string{"-u", "3", "-i", "5", "-s", "10s:20"}}, exp{logWarning: true}, nil},
-	{opts{cli: []string{"-u", "3", "-d", "0"}}, exp{logWarning: true}, nil},
-	// Test if environment variable shortcuts are working as expected
-	{opts{env: []string{"K6_VUS=5", "K6_ITERATIONS=15"}}, exp{}, verifySharedIters(5, 15)},
-	{opts{env: []string{"K6_VUS=10", "K6_DURATION=20s"}}, exp{}, verifyConstantLoopingVUs(10, 20*time.Second)},
+func getConfigConsolidationTestCases() []configConsolidationTestCase {
+	// This is a function, because some of these test cases actually need for the init() functions
+	// to be executed, since they depend on defaultConfigFilePath
+	return []configConsolidationTestCase{
+		// Check that no options will result in 1 VU 1 iter value for execution
+		{opts{}, exp{}, verifyOneIterPerOneVU},
+		// Verify some CLI errors
+		{opts{cli: []string{"--blah", "blah"}}, exp{cliParseError: true}, nil},
+		{opts{cli: []string{"--duration", "blah"}}, exp{cliParseError: true}, nil},
+		{opts{cli: []string{"--iterations", "blah"}}, exp{cliParseError: true}, nil},
+		{opts{cli: []string{"--execution", ""}}, exp{cliParseError: true}, nil},
+		{opts{cli: []string{"--stage", "10:20s"}}, exp{cliReadError: true}, nil},
+		// Check if CLI shortcuts generate correct execution values
+		{opts{cli: []string{"--vus", "1", "--iterations", "5"}}, exp{}, verifySharedIters(1, 5)},
+		{opts{cli: []string{"-u", "2", "-i", "6"}}, exp{}, verifySharedIters(2, 6)},
+		{opts{cli: []string{"-u", "3", "-d", "30s"}}, exp{}, verifyConstantLoopingVUs(3, 30*time.Second)},
+		{opts{cli: []string{"-u", "4", "--duration", "60s"}}, exp{}, verifyConstantLoopingVUs(4, 1*time.Minute)},
+		//TODO: verify stages
+		// This should get a validation error since VUs are more than the shared iterations
+		{opts{cli: []string{"--vus", "10", "-i", "6"}}, exp{validationErrors: true}, verifySharedIters(10, 6)},
+		// These should emit a warning
+		{opts{cli: []string{"-u", "1", "-i", "6", "-d", "10s"}}, exp{logWarning: true}, nil},
+		{opts{cli: []string{"-u", "2", "-d", "10s", "-s", "10s:20"}}, exp{logWarning: true}, nil},
+		{opts{cli: []string{"-u", "3", "-i", "5", "-s", "10s:20"}}, exp{logWarning: true}, nil},
+		{opts{cli: []string{"-u", "3", "-d", "0"}}, exp{logWarning: true}, nil},
+		// Test if environment variable shortcuts are working as expected
+		{opts{env: []string{"K6_VUS=5", "K6_ITERATIONS=15"}}, exp{}, verifySharedIters(5, 15)},
+		{opts{env: []string{"K6_VUS=10", "K6_DURATION=20s"}}, exp{}, verifyConstantLoopingVUs(10, 20*time.Second)},
+		//TODO: more env var tests
 
-	//TODO: test combinations between options and levels
-	//TODO: test the future full overwriting of the duration/iterations/stages/execution options
+		// Test if JSON configs work as expected
+		{opts{fs: getFS([]file{{defaultConfigFilePath, `{"iterations": 77, "vus": 7}`}})}, exp{}, verifySharedIters(7, 77)},
+		{opts{fs: getFS([]file{{defaultConfigFilePath, `wrong-json`}})}, exp{consolidationError: true}, nil},
+		{opts{fs: getFS(nil), cli: []string{"--config", "/my/config.file"}}, exp{consolidationError: true}, nil},
+		{
+			opts{
+				fs:  getFS([]file{{"/my/config.file", `{"vus": 8, "duration": "2m"}`}}),
+				cli: []string{"--config", "/my/config.file"},
+			}, exp{}, verifyConstantLoopingVUs(8, 120*time.Second),
+		},
 
-	// Just in case, verify that no options will result in the same 1 vu 1 iter config
-	{opts{}, exp{}, verifyOneIterPerOneVU},
-	//TODO: test for differences between flagsets
-	//TODO: more tests in general...
+		//TODO: test combinations between options and levels
+		//TODO: test the future full overwriting of the duration/iterations/stages/execution options
+
+		// Just in case, verify that no options will result in the same 1 vu 1 iter config
+		{opts{}, exp{}, verifyOneIterPerOneVU},
+		//TODO: test for differences between flagsets
+		//TODO: more tests in general...
+	}
 }
 
 func runTestCase(t *testing.T, testCase configConsolidationTestCase, newFlagSet flagSetInit, logHook *testutils.SimpleLogrusHook) {
@@ -259,8 +288,12 @@ func runTestCase(t *testing.T, testCase configConsolidationTestCase, newFlagSet 
 	if testCase.options.runner != nil {
 		runner = &lib.MiniRunner{Options: *testCase.options.runner}
 	}
-	fs := afero.NewMemMapFs() //TODO: test JSON configs as well!
-	result, err := getConsolidatedConfig(fs, cliConf, runner)
+	if testCase.options.fs == nil {
+		t.Logf("Creating an empty FS for this test")
+		testCase.options.fs = afero.NewMemMapFs() // create an empty FS if it wasn't supplied
+	}
+
+	result, err := getConsolidatedConfig(testCase.options.fs, cliConf, runner)
 	if testCase.expected.consolidationError {
 		require.Error(t, err)
 		return
@@ -294,7 +327,7 @@ func TestConfigConsolidation(t *testing.T) {
 	log.SetOutput(ioutil.Discard)
 	defer log.SetOutput(os.Stderr)
 
-	for tcNum, testCase := range configConsolidationTestCases {
+	for tcNum, testCase := range getConfigConsolidationTestCases() {
 		flagSetInits := testCase.options.cliFlagSetInits
 		if flagSetInits == nil { // handle the most common case
 			flagSetInits = mostFlagSets()
