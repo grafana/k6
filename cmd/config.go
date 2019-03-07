@@ -115,7 +115,12 @@ func getConfig(flags *pflag.FlagSet) (Config, error) {
 	}, nil
 }
 
-// Reads a configuration file from disk and returns it and its path.
+// Reads the configuration file from the supplied filesystem and returns it and its path.
+// It will first try to see if the user eplicitly specified a custom config file and will
+// try to read that. If there's a custom config specified and it couldn't be read or parsed,
+// an error will be returned.
+// If there's no custom config specified and no file exists in the default config path, it will
+// return an empty config struct, the default config location and *no* error.
 func readDiskConfig(fs afero.Fs) (Config, string, error) {
 	realConfigFilePath := configFilePath
 	if realConfigFilePath == "" {
@@ -142,7 +147,8 @@ func readDiskConfig(fs afero.Fs) (Config, string, error) {
 	return conf, realConfigFilePath, err
 }
 
-// Writes configuration back to disk.
+// Serializes the configuration to a JSON file and writes it in the supplied
+// location on the supplied filesystem
 func writeDiskConfig(fs afero.Fs, configPath string, conf Config) error {
 	data, err := json.MarshalIndent(conf, "", "  ")
 	if err != nil {
