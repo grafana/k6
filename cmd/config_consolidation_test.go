@@ -21,6 +21,7 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -111,20 +112,62 @@ func verifyConstantLoopingVUs(vus int64, duration time.Duration) func(t *testing
 	}
 }
 
-func mostFlagSets() []*pflag.FlagSet {
+func mostFlagSets() []flagSetInit {
 	//TODO: make this unnecessary... currently these are the only commands in which
 	// getConsolidatedConfig() is used, but they also have differences in their CLI flags :/
 	// sigh... compromises...
-	return []*pflag.FlagSet{runCmdFlagSet(), archiveCmdFlagSet(), cloudCmdFlagSet()}
+	result := []flagSetInit{}
+	for i, fsi := range []flagSetInit{runCmdFlagSet, archiveCmdFlagSet, cloudCmdFlagSet} {
+		i, fsi := i, fsi // go...
+		result = append(result, func() *pflag.FlagSet {
+			flags := pflag.NewFlagSet(fmt.Sprintf("superContrivedFlags_%d", i), pflag.ContinueOnError)
+			flags.AddFlagSet(rootCmdPersistentFlagSet())
+			flags.AddFlagSet(fsi())
+			return flags
+		})
+	}
+	return result
 }
 
+type flagSetInit func() *pflag.FlagSet
+
 type opts struct {
-	cliFlagSets []*pflag.FlagSet
-	cli         []string
-	env         []string
-	runner      *lib.Options
-	//TODO: test the JSON config as well... after most of https://github.com/loadimpact/k6/issues/883#issuecomment-468646291 is fixed
+	cli    []string
+	env    []string
+	runner *lib.Options
+
+	//TODO: remove this when the configuration is more reproducible and sane...
+	// We use a func, because initializing a FlagSet that points to variables
+	// actually will change those variables to their default values :| In our
+	// case, this happens only some of the time, for global variables that
+	// are configurable only via CLI flags, but not environment variables.
+	//
+	// For the rest, their default value is their current value, since that
+	// has been set from the environment variable. That has a bunch of other
+	// issues on its own, and the func() doesn't help at all, and we need to
+	// use the resetStickyGlobalVars() hack on top of that...
+	cliFlagSetInits []flagSetInit
 }
+
+func resetStickyGlobalVars() {
+	//TODO: remove after fixing the config, obviously a dirty hack
+	exitOnRunning = false
+	configFilePath = ""
+	runType = ""
+	runNoSetup = false
+	runNoTeardown = false
+}
+
+// Something that makes the test also be a valid io.Writer, useful for passing it
+// as an output for logs and CLI flag help messages...
+type testOutput struct{ *testing.T }
+
+func (to testOutput) Write(p []byte) (n int, err error) {
+	to.Logf("%s", p)
+	return len(p), nil
+}
+
+var _ io.Writer = testOutput{}
 
 // exp contains the different events or errors we expect our test case to trigger.
 // for space and clarity, we use the fact that by default, all of the struct values are false
@@ -178,12 +221,18 @@ var configConsolidationTestCases = []configConsolidationTestCase{
 	//TODO: more tests in general...
 }
 
-func runTestCase(t *testing.T, testCase configConsolidationTestCase, flagSet *pflag.FlagSet, logHook *testutils.SimpleLogrusHook) {
+func runTestCase(t *testing.T, testCase configConsolidationTestCase, newFlagSet flagSetInit, logHook *testutils.SimpleLogrusHook) {
 	t.Logf("Test with opts=%#v and exp=%#v\n", testCase.options, testCase.expected)
+	log.SetOutput(testOutput{t})
 	logHook.Drain()
 
 	restoreEnv := setEnv(t, testCase.options.env)
 	defer restoreEnv()
+
+	flagSet := newFlagSet()
+	defer resetStickyGlobalVars()
+	flagSet.SetOutput(testOutput{t})
+	flagSet.PrintDefaults()
 
 	cliErr := flagSet.Parse(testCase.options.cli)
 	if testCase.expected.cliParseError {
@@ -246,11 +295,11 @@ func TestConfigConsolidation(t *testing.T) {
 	defer log.SetOutput(os.Stderr)
 
 	for tcNum, testCase := range configConsolidationTestCases {
-		flagSets := testCase.options.cliFlagSets
-		if flagSets == nil { // handle the most common case
-			flagSets = mostFlagSets()
+		flagSetInits := testCase.options.cliFlagSetInits
+		if flagSetInits == nil { // handle the most common case
+			flagSetInits = mostFlagSets()
 		}
-		for fsNum, flagSet := range flagSets {
+		for fsNum, flagSet := range flagSetInits {
 			// I want to paralelize this, but I cannot... due to global variables and other
 			// questionable architectural choices... :|
 			t.Run(
