@@ -242,8 +242,16 @@ func cloudCmdFlagSet() *pflag.FlagSet {
 	flags.SortFlags = false
 	flags.AddFlagSet(optionFlagSet())
 	flags.AddFlagSet(runtimeOptionFlagSet(false))
-	//TODO: figure out a better way to handle the CLI flags - global variables are not very testable... :/
+
+	//TODO: Figure out a better way to handle the CLI flags:
+	// - the default value is specified in this way so we don't overwrire whatever
+	//   was specified via the environment variable
+	// - global variables are not very testable... :/
 	flags.BoolVar(&exitOnRunning, "exit-on-running", exitOnRunning, "exits when test reaches the running status")
+	// We also need to explicitly set the default value for the usage message here, so setting
+	// K6_EXIT_ON_RUNNING=true won't affect the usage message
+	flags.Lookup("exit-on-running").DefValue = "false"
+
 	return flags
 }
 

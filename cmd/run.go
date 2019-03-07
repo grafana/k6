@@ -481,10 +481,21 @@ func runCmdFlagSet() *pflag.FlagSet {
 	flags.AddFlagSet(optionFlagSet())
 	flags.AddFlagSet(runtimeOptionFlagSet(true))
 	flags.AddFlagSet(configFlagSet())
-	//TODO: figure out a better way to handle the CLI flags - global variables are not very testable... :/
+
+	//TODO: Figure out a better way to handle the CLI flags:
+	// - the default values are specified in this way so we don't overwrire whatever
+	//   was specified via the environment variables
+	// - but we need to manually specify the DefValue, since that's the default value
+	//   that will be used in the help/usage message - if we don't set it, the environment
+	//   variables will affect the usage message
+	// - and finally, global variables are not very testable... :/
 	flags.StringVarP(&runType, "type", "t", runType, "override file `type`, \"js\" or \"archive\"")
+	flags.Lookup("type").DefValue = ""
 	flags.BoolVar(&runNoSetup, "no-setup", runNoSetup, "don't run setup()")
+	falseStr := "false" // avoiding goconst warnings...
+	flags.Lookup("no-setup").DefValue = falseStr
 	flags.BoolVar(&runNoTeardown, "no-teardown", runNoTeardown, "don't run teardown()")
+	flags.Lookup("no-teardown").DefValue = falseStr
 	return flags
 }
 
