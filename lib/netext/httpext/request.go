@@ -200,6 +200,8 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 		debugRequest(state, preq.Req, "DigestRequest")
 		res, err := client.Do(preq.Req.WithContext(ctx))
 		debugRequest(state, preq.Req, "DigestResponse")
+		resp.Error = tracerTransport.errorMsg
+		resp.ErrorCode = int(tracerTransport.errorCode)
 		if err != nil {
 			// Do *not* log errors about the contex being cancelled.
 			select {
@@ -208,11 +210,10 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 				state.Logger.WithField("error", res).Warn("Digest request failed")
 			}
 
-			if preq.Throw {
+			if preq.Throw || resp.Error == "" {
 				return nil, err
 			}
 
-			resp.setError(err)
 			return resp, nil
 		}
 
@@ -232,6 +233,8 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 	debugRequest(state, preq.Req, "Request")
 	res, resErr := client.Do(preq.Req.WithContext(ctx))
 	debugResponse(state, res, "Response")
+	resp.Error = tracerTransport.errorMsg
+	resp.ErrorCode = int(tracerTransport.errorCode)
 	if resErr == nil && res != nil {
 		switch res.Header.Get("Content-Encoding") {
 		case "deflate":
@@ -287,9 +290,7 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 		Receiving:      stats.D(trail.Receiving),
 	}
 
-	if resErr != nil {
-		resp.setError(resErr)
-	} else {
+	if resErr == nil {
 		if preq.ActiveJar != nil {
 			if rc := res.Cookies(); len(rc) > 0 {
 				preq.ActiveJar.SetCookies(res.Request.URL, rc)
@@ -297,7 +298,7 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 		}
 
 		resp.URL = res.Request.URL.String()
-		resp.setStatusCode(res.StatusCode)
+		resp.Status = res.StatusCode
 		resp.Proto = res.Proto
 
 		if res.TLS != nil {
@@ -333,7 +334,7 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 			state.Logger.WithField("error", resErr).Warn("Request Failed")
 		}
 
-		if preq.Throw {
+		if preq.Throw || resp.Error == "" {
 			return nil, resErr
 		}
 	}
