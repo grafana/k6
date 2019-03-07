@@ -35,6 +35,7 @@ import (
 	"github.com/shibukawa/configdir"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 var Version = "0.23.1"
@@ -97,6 +98,19 @@ func Execute() {
 	}
 }
 
+func rootCmdPersistentFlagSet() *pflag.FlagSet {
+	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
+	//TODO: figure out a better way to handle the CLI flags - global variables are not very testable... :/
+	flags.BoolVarP(&verbose, "verbose", "v", false, "enable debug logging")
+	flags.BoolVarP(&quiet, "quiet", "q", false, "disable progress updates")
+	flags.BoolVar(&noColor, "no-color", false, "disable colored output")
+	flags.StringVar(&logFmt, "logformat", "", "log output format")
+	flags.StringVarP(&address, "address", "a", "localhost:6565", "address for the api server")
+	flags.StringVarP(&configFilePath, "config", "c", "", fmt.Sprintf("config file (default %s)", defaultConfigFilePath))
+	must(cobra.MarkFlagFilename(flags, "config"))
+	return flags
+}
+
 func init() {
 	// TODO: find a better library... or better yet, simply port the few dozen lines of code for getting the
 	// per-user config folder in a cross-platform way
@@ -106,14 +120,7 @@ func init() {
 		defaultConfigFilePath = filepath.Join(configFolders[0].Path, defaultConfigFileName)
 	}
 
-	//TODO: figure out a better way to handle the CLI flags - global variables are not very testable... :/
-	RootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "enable debug logging")
-	RootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "disable progress updates")
-	RootCmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "disable colored output")
-	RootCmd.PersistentFlags().StringVar(&logFmt, "logformat", "", "log output format")
-	RootCmd.PersistentFlags().StringVarP(&address, "address", "a", "localhost:6565", "address for the api server")
-	RootCmd.PersistentFlags().StringVarP(&configFilePath, "config", "c", "", fmt.Sprintf("config file (default %s)", defaultConfigFilePath))
-	must(cobra.MarkFlagFilename(RootCmd.PersistentFlags(), "config"))
+	RootCmd.PersistentFlags().AddFlagSet(rootCmdPersistentFlagSet())
 }
 
 // fprintf panics when where's an error writing to the supplied io.Writer
