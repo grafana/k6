@@ -450,6 +450,94 @@ func TestRequestAndBatch(t *testing.T) {
 		assert.Error(t, err)
 	})
 
+	t.Run("ErrorCodes", func(t *testing.T) {
+		defer func(value null.Bool) {
+			state.Options.Throw = value
+		}(state.Options.Throw)
+		state.Options.Throw = null.BoolFrom(false)
+
+		var checkErrorCode = func(t testing.TB, tags *stats.SampleTags, code int, msg string) {
+			var errorMsg, ok = tags.Get("error")
+			if msg == "" {
+				assert.False(t, ok)
+			} else {
+				assert.Equal(t, msg, errorMsg)
+			}
+			errorCodeStr, ok := tags.Get("error_code")
+			if code == 0 {
+				assert.False(t, ok)
+			} else {
+				var errorCode, err = strconv.Atoi(errorCodeStr)
+				assert.NoError(t, err)
+				assert.Equal(t, code, errorCode)
+			}
+		}
+		var testCases = []struct {
+			name              string
+			status            int
+			moreSamples       int
+			expectedErrorCode int
+			expectedErrorMsg  string
+			script            string
+		}{
+			{
+				name:              "Unroutable",
+				expectedErrorCode: 1101,
+				expectedErrorMsg:  "lookup: no such host",
+				script:            `let res = http.request("GET", "http://sdafsgdhfjg/");`,
+			},
+
+			{
+				name:              "404",
+				status:            404,
+				expectedErrorCode: 1404,
+				script:            `let res = http.request("GET", "HTTPBIN_URL/status/404");`,
+			},
+			{
+				name:              "Unroutable redirect",
+				expectedErrorCode: 1101,
+				expectedErrorMsg:  "lookup: no such host",
+				moreSamples:       1,
+				script:            `let res = http.request("GET", "HTTPBIN_URL/redirect-to?url=http://dafsgdhfjg/");`,
+			},
+			{
+				name:              "Missing protocol",
+				expectedErrorCode: 1000,
+				expectedErrorMsg:  `unsupported protocol scheme ""`,
+				script:            `let res = http.request("GET", "dafsgdhfjg/");`,
+			},
+			{
+				name:   "Too many redirects",
+				status: 302,
+				script: `
+			let res = http.get("HTTPBIN_URL/redirect/1", {redirects: 0});
+			if (res.url != "HTTPBIN_URL/redirect/1") { throw new Error("incorrect URL: " + res.url) }`,
+			},
+		}
+
+		for _, testCase := range testCases {
+			// clear the Samples
+			stats.GetBufferedSamples(samples)
+			t.Run(testCase.name, func(t *testing.T) {
+				_, err := common.RunString(rt,
+					sr(testCase.script+"\n"+fmt.Sprintf(`
+			if (res.status != %d) { throw new Error("wrong status: "+ res.status);}
+			if (res.error != '%s') { throw new Error("wrong error: "+ res.error);}
+			if (res.error_code != %d) { throw new Error("wrong error_code: "+ res.error_code);}
+			`, testCase.status, testCase.expectedErrorMsg, testCase.expectedErrorCode)))
+				assert.NoError(t, err)
+				var cs = stats.GetBufferedSamples(samples)
+				assert.Len(t, cs, 1+testCase.moreSamples)
+				for _, c := range cs[len(cs)-1:] {
+					assert.NotZero(t, len(c.GetSamples()))
+					for _, sample := range c.GetSamples() {
+						checkErrorCode(t, sample.GetTags(), testCase.expectedErrorCode, testCase.expectedErrorMsg)
+					}
+				}
+			})
+		}
+	})
+
 	t.Run("Params", func(t *testing.T) {
 		for _, literal := range []string{`undefined`, `null`} {
 			t.Run(literal, func(t *testing.T) {
@@ -1175,6 +1263,11 @@ func TestSystemTags(t *testing.T) {
 			"error",
 			tb.Replacer.Replace(`http.get("http://127.0.0.1:56789");`),
 			tb.Replacer.Replace(`dial tcp 127.0.0.1:56789: ` + connectionRefusedErrorText),
+		},
+		{
+			"error_code",
+			tb.Replacer.Replace(`http.get("http://127.0.0.1:56789");`),
+			"1210",
 		},
 	}
 
