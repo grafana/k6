@@ -49,6 +49,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	null "gopkg.in/guregu/null.v3"
 )
 
@@ -65,6 +66,7 @@ const (
 )
 
 var (
+	//TODO: fix this, global variables are not very testable...
 	runType       = os.Getenv("K6_TYPE")
 	runNoSetup    = os.Getenv("K6_NO_SETUP") != ""
 	runNoTeardown = os.Getenv("K6_NO_TEARDOWN") != ""
@@ -98,7 +100,8 @@ a commandline interface for interacting with it.`,
   k6 run -o influxdb=http://1.2.3.4:8086/k6`[1:],
 	Args: exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		_, _ = BannerColor.Fprint(stdout, Banner+"\n\n")
+		//TODO: disable in quiet mode?
+		_, _ = BannerColor.Fprintf(stdout, "\n%s\n\n", Banner)
 
 		initBar := ui.ProgressBar{
 			Width: 60,
@@ -472,16 +475,35 @@ a commandline interface for interacting with it.`,
 	},
 }
 
+func runCmdFlagSet() *pflag.FlagSet {
+	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
+	flags.SortFlags = false
+	flags.AddFlagSet(optionFlagSet())
+	flags.AddFlagSet(runtimeOptionFlagSet(true))
+	flags.AddFlagSet(configFlagSet())
+
+	//TODO: Figure out a better way to handle the CLI flags:
+	// - the default values are specified in this way so we don't overwrire whatever
+	//   was specified via the environment variables
+	// - but we need to manually specify the DefValue, since that's the default value
+	//   that will be used in the help/usage message - if we don't set it, the environment
+	//   variables will affect the usage message
+	// - and finally, global variables are not very testable... :/
+	flags.StringVarP(&runType, "type", "t", runType, "override file `type`, \"js\" or \"archive\"")
+	flags.Lookup("type").DefValue = ""
+	flags.BoolVar(&runNoSetup, "no-setup", runNoSetup, "don't run setup()")
+	falseStr := "false" // avoiding goconst warnings...
+	flags.Lookup("no-setup").DefValue = falseStr
+	flags.BoolVar(&runNoTeardown, "no-teardown", runNoTeardown, "don't run teardown()")
+	flags.Lookup("no-teardown").DefValue = falseStr
+	return flags
+}
+
 func init() {
 	RootCmd.AddCommand(runCmd)
 
 	runCmd.Flags().SortFlags = false
-	runCmd.Flags().AddFlagSet(optionFlagSet())
-	runCmd.Flags().AddFlagSet(runtimeOptionFlagSet(true))
-	runCmd.Flags().AddFlagSet(configFlagSet())
-	runCmd.Flags().StringVarP(&runType, "type", "t", runType, "override file `type`, \"js\" or \"archive\"")
-	runCmd.Flags().BoolVar(&runNoSetup, "no-setup", runNoSetup, "don't run setup()")
-	runCmd.Flags().BoolVar(&runNoTeardown, "no-teardown", runNoTeardown, "don't run teardown()")
+	runCmd.Flags().AddFlagSet(runCmdFlagSet())
 }
 
 // Reads a source file from any supported destination.

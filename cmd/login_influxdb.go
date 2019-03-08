@@ -42,7 +42,7 @@ This will set the default server used when just "-o influxdb" is passed.`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fs := afero.NewOsFs()
-		config, cdir, err := readDiskConfig(fs)
+		config, configPath, err := readDiskConfig(fs)
 		if err != nil {
 			return err
 		}
@@ -105,7 +105,7 @@ This will set the default server used when just "-o influxdb" is passed.`,
 		}
 
 		config.Collectors.InfluxDB = conf
-		return writeDiskConfig(fs, cdir, config)
+		return writeDiskConfig(fs, configPath, config)
 	},
 }
 
