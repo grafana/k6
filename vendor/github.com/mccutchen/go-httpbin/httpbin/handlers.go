@@ -178,29 +178,29 @@ func (h *HTTPBin) Status(w http.ResponseWriter, r *http.Request) {
 		303: redirectHeaders,
 		305: redirectHeaders,
 		307: redirectHeaders,
-		401: &statusCase{
+		401: {
 			headers: map[string]string{
 				"WWW-Authenticate": `Basic realm="Fake Realm"`,
 			},
 		},
-		402: &statusCase{
+		402: {
 			body: []byte("Fuck you, pay me!"),
 			headers: map[string]string{
 				"X-More-Info": "http://vimeo.com/22053820",
 			},
 		},
-		406: &statusCase{
+		406: {
 			body: notAcceptableBody,
 			headers: map[string]string{
 				"Content-Type": jsonContentType,
 			},
 		},
-		407: &statusCase{
+		407: {
 			headers: map[string]string{
 				"Proxy-Authenticate": `Basic realm="Fake Realm"`,
 			},
 		},
-		418: &statusCase{
+		418: {
 			body: []byte("I'm a teapot!"),
 			headers: map[string]string{
 				"X-More-Info": "http://tools.ietf.org/html/rfc2324",
@@ -462,7 +462,7 @@ func (h *HTTPBin) Delay(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	delay, err := parseBoundedDuration(parts[2], 0, h.options.MaxDuration)
+	delay, err := parseBoundedDuration(parts[2], 0, h.MaxDuration)
 	if err != nil {
 		http.Error(w, "Invalid duration", http.StatusBadRequest)
 		return
@@ -490,7 +490,7 @@ func (h *HTTPBin) Drip(w http.ResponseWriter, r *http.Request) {
 
 	userDuration := q.Get("duration")
 	if userDuration != "" {
-		duration, err = parseBoundedDuration(userDuration, 0, h.options.MaxDuration)
+		duration, err = parseBoundedDuration(userDuration, 0, h.MaxDuration)
 		if err != nil {
 			http.Error(w, "Invalid duration", http.StatusBadRequest)
 			return
@@ -499,7 +499,7 @@ func (h *HTTPBin) Drip(w http.ResponseWriter, r *http.Request) {
 
 	userDelay := q.Get("delay")
 	if userDelay != "" {
-		delay, err = parseBoundedDuration(userDelay, 0, h.options.MaxDuration)
+		delay, err = parseBoundedDuration(userDelay, 0, h.MaxDuration)
 		if err != nil {
 			http.Error(w, "Invalid delay", http.StatusBadRequest)
 			return
@@ -509,7 +509,7 @@ func (h *HTTPBin) Drip(w http.ResponseWriter, r *http.Request) {
 	userNumBytes := q.Get("numbytes")
 	if userNumBytes != "" {
 		numbytes, err = strconv.ParseInt(userNumBytes, 10, 64)
-		if err != nil || numbytes <= 0 || numbytes > h.options.MaxMemory {
+		if err != nil || numbytes <= 0 || numbytes > h.MaxBodySize {
 			http.Error(w, "Invalid numbytes", http.StatusBadRequest)
 			return
 		}
@@ -524,7 +524,7 @@ func (h *HTTPBin) Drip(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if duration+delay > h.options.MaxDuration {
+	if duration+delay > h.MaxDuration {
 		http.Error(w, "Too much time", http.StatusBadRequest)
 		return
 	}
@@ -573,7 +573,7 @@ func (h *HTTPBin) Range(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("ETag", fmt.Sprintf("range%d", numBytes))
 	w.Header().Add("Accept-Ranges", "bytes")
 
-	if numBytes <= 0 || numBytes > h.options.MaxMemory {
+	if numBytes <= 0 || numBytes > h.MaxBodySize {
 		http.Error(w, "Invalid number of bytes", http.StatusBadRequest)
 		return
 	}

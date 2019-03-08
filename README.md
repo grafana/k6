@@ -349,8 +349,8 @@ Need help or want to contribute?
 
 Types of questions and where to ask:
 
-- How do I? -- [Stack Overflow](https://stackoverflow.com/questions/tagged/k6) (use tags: k6, javascript, load-testing)
-- I got this error, why? -- [Stack Overflow](https://stackoverflow.com/questions/tagged/k6)
+- How do I? -- [Stack Overflow](https://stackoverflow.com/questions/tagged/k6) (use tags: k6, javascript, load-testing) or the Discourse forum at [community.k6.io](https://community.k6.io/)
+- I got this error, why? -- [Stack Overflow](https://stackoverflow.com/questions/tagged/k6) or [community.k6.io](https://community.k6.io/)
 - I got this error and I'm sure it's a bug -- [file an issue](https://github.com/loadimpact/k6/issues)
 - I have an idea/request -- [file an issue](https://github.com/loadimpact/k6/issues)
 - Why do you? -- [Slack](https://k6.io/slack)
