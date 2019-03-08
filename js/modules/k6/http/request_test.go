@@ -456,6 +456,14 @@ func TestRequestAndBatch(t *testing.T) {
 		}(state.Options.Throw)
 		state.Options.Throw = null.BoolFrom(false)
 
+		tb.Mux.HandleFunc("/no-location-redirect", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(302)
+		}))
+		tb.Mux.HandleFunc("/bad-location-redirect", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Location", "h\t:/") // \n is forbidden
+			w.WriteHeader(302)
+		}))
+
 		var checkErrorCode = func(t testing.TB, tags *stats.SampleTags, code int, msg string) {
 			var errorMsg, ok = tags.Get("error")
 			if msg == "" {
@@ -473,12 +481,13 @@ func TestRequestAndBatch(t *testing.T) {
 			}
 		}
 		var testCases = []struct {
-			name              string
-			status            int
-			moreSamples       int
-			expectedErrorCode int
-			expectedErrorMsg  string
-			script            string
+			name                string
+			status              int
+			moreSamples         int
+			expectedErrorCode   int
+			expectedErrorMsg    string
+			expectedScriptError string
+			script              string
 		}{
 			{
 				name:              "Unroutable",
@@ -499,6 +508,20 @@ func TestRequestAndBatch(t *testing.T) {
 				expectedErrorMsg:  "lookup: no such host",
 				moreSamples:       1,
 				script:            `let res = http.request("GET", "HTTPBIN_URL/redirect-to?url=http://dafsgdhfjg/");`,
+			},
+			{
+				name:                "Non location redirect",
+				expectedErrorCode:   0,
+				expectedErrorMsg:    "",
+				script:              `let res = http.request("GET", "HTTPBIN_URL/no-location-redirect");`,
+				expectedScriptError: sr(`GoError: Get HTTPBIN_URL/no-location-redirect: 302 response missing Location header`),
+			},
+			{
+				name:                "Bad location redirect",
+				expectedErrorCode:   0,
+				expectedErrorMsg:    "",
+				script:              `let res = http.request("GET", "HTTPBIN_URL/bad-location-redirect");`,
+				expectedScriptError: sr("GoError: Get HTTPBIN_URL/bad-location-redirect: failed to parse Location header \"h\\t:/\": parse h\t:/: first path segment in URL cannot contain colon"),
 			},
 			{
 				name:              "Missing protocol",
@@ -525,7 +548,12 @@ func TestRequestAndBatch(t *testing.T) {
 			if (res.error != '%s') { throw new Error("wrong error: "+ res.error);}
 			if (res.error_code != %d) { throw new Error("wrong error_code: "+ res.error_code);}
 			`, testCase.status, testCase.expectedErrorMsg, testCase.expectedErrorCode)))
-				assert.NoError(t, err)
+				if testCase.expectedScriptError == "" {
+					require.NoError(t, err)
+				} else {
+					require.Error(t, err)
+					require.Equal(t, err.Error(), testCase.expectedScriptError)
+				}
 				var cs = stats.GetBufferedSamples(samples)
 				assert.Len(t, cs, 1+testCase.moreSamples)
 				for _, c := range cs[len(cs)-1:] {
