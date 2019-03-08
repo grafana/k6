@@ -1,5 +1,9 @@
 run:
   deadline: 5m
+  skip-files:
+  - ".*gen_elements.*\\.go$"
+  - ".*gen_test.*\\.go$"
+  - "rice-box.go$"
 
 issues:
   # Maximum issues count per one linter. Set to 0 to disable. Default is 50.
