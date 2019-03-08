@@ -116,7 +116,7 @@ func getConfig(flags *pflag.FlagSet) (Config, error) {
 }
 
 // Reads the configuration file from the supplied filesystem and returns it and its path.
-// It will first try to see if the user eplicitly specified a custom config file and will
+// It will first try to see if the user explicitly specified a custom config file and will
 // try to read that. If there's a custom config specified and it couldn't be read or parsed,
 // an error will be returned.
 // If there's no custom config specified and no file exists in the default config path, it will
@@ -235,15 +235,19 @@ func buildExecutionConfig(conf Config) (Config, error) {
 		ds.VUs = conf.VUs
 		ds.Iterations = conf.Iterations
 		result.Execution = scheduler.ConfigMap{lib.DefaultSchedulerName: ds}
-	} else if conf.Execution != nil {
-		//TODO: remove this warning in the next version
-		log.Warnf("The execution settings are not functional in this k6 release, they will be ignored")
 	} else {
-		// No execution parameters whatsoever were specified, so we'll create a per-VU iterations config
-		// with 1 VU and 1 iteration. We're choosing the per-VU config, since that one could also
-		// be executed both locally, and in the cloud.
-		result.Execution = scheduler.ConfigMap{
-			lib.DefaultSchedulerName: scheduler.NewPerVUIterationsConfig(lib.DefaultSchedulerName),
+		if conf.Execution != nil { // If someone set this, regardless if its empty
+			//TODO: remove this warning in the next version
+			log.Warnf("The execution settings are not functional in this k6 release, they will be ignored")
+		}
+
+		if len(conf.Execution) == 0 { // If unset or set to empty
+			// No execution parameters whatsoever were specified, so we'll create a per-VU iterations config
+			// with 1 VU and 1 iteration. We're choosing the per-VU config, since that one could also
+			// be executed both locally, and in the cloud.
+			result.Execution = scheduler.ConfigMap{
+				lib.DefaultSchedulerName: scheduler.NewPerVUIterationsConfig(lib.DefaultSchedulerName),
+			}
 		}
 	}
 

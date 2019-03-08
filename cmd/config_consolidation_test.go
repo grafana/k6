@@ -82,7 +82,6 @@ func verifyOneIterPerOneVU(t *testing.T, c Config) {
 	assert.Equal(t, null.NewBool(false, false), perVuIters.Interruptible)
 	assert.Equal(t, null.NewInt(1, false), perVuIters.Iterations)
 	assert.Equal(t, null.NewInt(1, false), perVuIters.VUs)
-	//TODO: verify shortcut options as well?
 }
 
 func verifySharedIters(vus, iters int64) func(t *testing.T, c Config) {
@@ -94,11 +93,12 @@ func verifySharedIters(vus, iters int64) func(t *testing.T, c Config) {
 		require.True(t, ok)
 		assert.Equal(t, null.NewInt(vus, true), sharedIterConfig.VUs)
 		assert.Equal(t, null.NewInt(iters, true), sharedIterConfig.Iterations)
-		//TODO: verify shortcut options as well?
+		assert.Equal(t, null.NewInt(vus, true), c.VUs)
+		assert.Equal(t, null.NewInt(iters, true), c.Iterations)
 	}
 }
 
-func verifyConstantLoopingVUs(vus int64, duration time.Duration) func(t *testing.T, c Config) {
+func verifyConstLoopingVUs(vus int64, duration time.Duration) func(t *testing.T, c Config) {
 	return func(t *testing.T, c Config) {
 		sched := c.Execution[lib.DefaultSchedulerName]
 		require.NotEmpty(t, sched)
@@ -108,8 +108,45 @@ func verifyConstantLoopingVUs(vus int64, duration time.Duration) func(t *testing
 		assert.Equal(t, null.NewBool(true, false), clvc.Interruptible)
 		assert.Equal(t, null.NewInt(vus, true), clvc.VUs)
 		assert.Equal(t, types.NullDurationFrom(duration), clvc.Duration)
-		//TODO: verify shortcut options as well?
+		assert.Equal(t, null.NewInt(vus, true), c.VUs)
+		assert.Equal(t, types.NullDurationFrom(duration), c.Duration)
 	}
+}
+
+func verifyVarLoopingVUs(startVus int64, startVUsSet bool, stages []scheduler.Stage) func(t *testing.T, c Config) {
+	return func(t *testing.T, c Config) {
+		sched := c.Execution[lib.DefaultSchedulerName]
+		require.NotEmpty(t, sched)
+		require.IsType(t, scheduler.VariableLoopingVUsConfig{}, sched)
+		clvc, ok := sched.(scheduler.VariableLoopingVUsConfig)
+		require.True(t, ok)
+		assert.Equal(t, null.NewBool(true, false), clvc.Interruptible)
+		assert.Equal(t, null.NewInt(startVus, startVUsSet), clvc.StartVUs)
+		assert.Equal(t, null.NewInt(startVus, startVUsSet), c.VUs)
+		assert.Equal(t, stages, clvc.Stages)
+		assert.Len(t, c.Stages, len(stages))
+		for i, s := range stages {
+			assert.Equal(t, s.Duration, c.Stages[i].Duration)
+			assert.Equal(t, s.Target, c.Stages[i].Target)
+		}
+	}
+}
+
+// A helper function that accepts (duration in second, VUs) pairs and returns
+// a valid slice of stage structs
+func buildStages(durationsAndVUs ...int64) []scheduler.Stage {
+	l := len(durationsAndVUs)
+	if l%2 != 0 {
+		panic("wrong len")
+	}
+	result := make([]scheduler.Stage, 0, l/2)
+	for i := 0; i < l; i += 2 {
+		result = append(result, scheduler.Stage{
+			Duration: types.NullDurationFrom(time.Duration(durationsAndVUs[i]) * time.Second),
+			Target:   null.IntFrom(durationsAndVUs[i+1]),
+		})
+	}
+	return result
 }
 
 func mostFlagSets() []flagSetInit {
@@ -139,6 +176,10 @@ func getFS(files []file) afero.Fs {
 		must(afero.WriteFile(fs, f.filepath, []byte(f.contents), 0644)) // modes don't matter in the afero.MemMapFs
 	}
 	return fs
+}
+
+func defaultConfig(jsonConfig string) afero.Fs {
+	return getFS([]file{{defaultConfigFilePath, jsonConfig}})
 }
 
 type flagSetInit func() *pflag.FlagSet
@@ -214,43 +255,106 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 		// Check if CLI shortcuts generate correct execution values
 		{opts{cli: []string{"--vus", "1", "--iterations", "5"}}, exp{}, verifySharedIters(1, 5)},
 		{opts{cli: []string{"-u", "2", "-i", "6"}}, exp{}, verifySharedIters(2, 6)},
-		{opts{cli: []string{"-u", "3", "-d", "30s"}}, exp{}, verifyConstantLoopingVUs(3, 30*time.Second)},
-		{opts{cli: []string{"-u", "4", "--duration", "60s"}}, exp{}, verifyConstantLoopingVUs(4, 1*time.Minute)},
-		//TODO: verify stages
+		{opts{cli: []string{"-u", "3", "-d", "30s"}}, exp{}, verifyConstLoopingVUs(3, 30*time.Second)},
+		{opts{cli: []string{"-u", "4", "--duration", "60s"}}, exp{}, verifyConstLoopingVUs(4, 1*time.Minute)},
+		{
+			opts{cli: []string{"--stage", "20s:10", "-s", "3m:5"}}, exp{},
+			verifyVarLoopingVUs(1, false, buildStages(20, 10, 180, 5)),
+		},
+		{
+			opts{cli: []string{"-s", "1m6s:5", "--vus", "10"}}, exp{},
+			verifyVarLoopingVUs(10, true, buildStages(66, 5)),
+		},
 		// This should get a validation error since VUs are more than the shared iterations
 		{opts{cli: []string{"--vus", "10", "-i", "6"}}, exp{validationErrors: true}, verifySharedIters(10, 6)},
 		// These should emit a warning
+		//TODO: in next version, those should be an error
 		{opts{cli: []string{"-u", "1", "-i", "6", "-d", "10s"}}, exp{logWarning: true}, nil},
 		{opts{cli: []string{"-u", "2", "-d", "10s", "-s", "10s:20"}}, exp{logWarning: true}, nil},
 		{opts{cli: []string{"-u", "3", "-i", "5", "-s", "10s:20"}}, exp{logWarning: true}, nil},
 		{opts{cli: []string{"-u", "3", "-d", "0"}}, exp{logWarning: true}, nil},
+		{
+			opts{runner: &lib.Options{
+				VUs:        null.IntFrom(5),
+				Duration:   types.NullDurationFrom(44 * time.Second),
+				Iterations: null.IntFrom(10),
+			}}, exp{logWarning: true}, nil,
+		},
+		{opts{fs: defaultConfig(`{"execution": {}}`)}, exp{logWarning: true}, verifyOneIterPerOneVU},
 		// Test if environment variable shortcuts are working as expected
 		{opts{env: []string{"K6_VUS=5", "K6_ITERATIONS=15"}}, exp{}, verifySharedIters(5, 15)},
-		{opts{env: []string{"K6_VUS=10", "K6_DURATION=20s"}}, exp{}, verifyConstantLoopingVUs(10, 20*time.Second)},
-		//TODO: more env var tests
-
+		{opts{env: []string{"K6_VUS=10", "K6_DURATION=20s"}}, exp{}, verifyConstLoopingVUs(10, 20*time.Second)},
+		{
+			opts{env: []string{"K6_STAGES=2m30s:11,1h1m:100"}}, exp{},
+			verifyVarLoopingVUs(1, false, buildStages(150, 11, 3660, 100)),
+		},
+		{
+			opts{env: []string{"K6_STAGES=100s:100,0m30s:0", "K6_VUS=0"}}, exp{},
+			verifyVarLoopingVUs(0, true, buildStages(100, 100, 30, 0)),
+		},
 		// Test if JSON configs work as expected
-		{opts{fs: getFS([]file{{defaultConfigFilePath, `{"iterations": 77, "vus": 7}`}})}, exp{}, verifySharedIters(7, 77)},
-		{opts{fs: getFS([]file{{defaultConfigFilePath, `wrong-json`}})}, exp{consolidationError: true}, nil},
+		{opts{fs: defaultConfig(`{"iterations": 77, "vus": 7}`)}, exp{}, verifySharedIters(7, 77)},
+		{opts{fs: defaultConfig(`wrong-json`)}, exp{consolidationError: true}, nil},
 		{opts{fs: getFS(nil), cli: []string{"--config", "/my/config.file"}}, exp{consolidationError: true}, nil},
+
+		// Test combinations between options and levels
 		{
 			opts{
 				fs:  getFS([]file{{"/my/config.file", `{"vus": 8, "duration": "2m"}`}}),
 				cli: []string{"--config", "/my/config.file"},
-			}, exp{}, verifyConstantLoopingVUs(8, 120*time.Second),
+			}, exp{}, verifyConstLoopingVUs(8, 120*time.Second),
+		},
+		{
+			opts{
+				runner: &lib.Options{VUs: null.IntFrom(5), Duration: types.NullDurationFrom(50 * time.Second)},
+				cli:    []string{"--iterations", "5"},
+			},
+			//TODO: this shouldn't be a warning in the next version, but the result will be different
+			exp{logWarning: true}, verifyConstLoopingVUs(5, 50*time.Second),
+		},
+		{
+			opts{
+				fs:     defaultConfig(`{"stages": [{"duration": "20s", "target": 10}]}`),
+				runner: &lib.Options{VUs: null.IntFrom(5)},
+			},
+			exp{},
+			verifyVarLoopingVUs(5, true, buildStages(20, 10)),
+		},
+		{
+			opts{
+				fs:     defaultConfig(`{"stages": [{"duration": "20s", "target": 10}]}`),
+				runner: &lib.Options{VUs: null.IntFrom(5)},
+				env:    []string{"K6_VUS=15", "K6_ITERATIONS=15"},
+			},
+			exp{logWarning: true}, //TODO: this won't be a warning in the next version, but the result will be different
+			verifyVarLoopingVUs(15, true, buildStages(20, 10)),
+		},
+		{
+			opts{
+				fs:     defaultConfig(`{"stages": [{"duration": "11s", "target": 11}]}`),
+				runner: &lib.Options{VUs: null.IntFrom(22)},
+				env:    []string{"K6_VUS=33"},
+				cli:    []string{"--stage", "44s:44", "-s", "55s:55"},
+			},
+			exp{},
+			verifyVarLoopingVUs(33, true, buildStages(44, 44, 55, 55)),
 		},
 
-		//TODO: test combinations between options and levels
 		//TODO: test the future full overwriting of the duration/iterations/stages/execution options
 
 		// Just in case, verify that no options will result in the same 1 vu 1 iter config
 		{opts{}, exp{}, verifyOneIterPerOneVU},
 		//TODO: test for differences between flagsets
-		//TODO: more tests in general...
+		//TODO: more tests in general, especially ones not related to execution parameters...
 	}
 }
 
-func runTestCase(t *testing.T, testCase configConsolidationTestCase, newFlagSet flagSetInit, logHook *testutils.SimpleLogrusHook) {
+func runTestCase(
+	t *testing.T,
+	testCase configConsolidationTestCase,
+	newFlagSet flagSetInit,
+	logHook *testutils.SimpleLogrusHook,
+) {
 	t.Logf("Test with opts=%#v and exp=%#v\n", testCase.options, testCase.expected)
 	log.SetOutput(testOutput{t})
 	logHook.Drain()
