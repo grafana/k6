@@ -62,6 +62,21 @@ jobs:
             export PATH=$GOPATH/bin:$PATH
             go test -race -timeout 600s ./...
 
+  test-go112:
+    docker:
+      - image: circleci/golang:1.12.0
+    environment:
+      GOPATH: /home/circleci/.go_workspace
+    working_directory: /home/circleci/.go_workspace/src/github.com/loadimpact/k6
+    steps:
+      - checkout
+      - run:
+          name: Run tests and code coverage
+          command: |
+            export GOMAXPROCS=4
+            export PATH=$GOPATH/bin:$PATH
+            go test -race -timeout 600s ./...
+
   build-docker-images:
     docker:
       - image: circleci/golang:1.11.5
@@ -162,6 +177,10 @@ workflows:
             tags:
               only: /.*/
       - test-go110:
+          filters:
+            tags:
+              only: /.*/
+      - test-go112:
           filters:
             tags:
               only: /.*/
