@@ -1,7 +1,7 @@
 /*
  *
  * k6 - a next-generation load testing tool
- * Copyright (C) 2016 Load Impact
+ * Copyright (C) 2019 Load Impact
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -83,8 +83,6 @@ func TestConfigCmd(t *testing.T) {
 	}
 }
 
-//TODO: write end-to-end configuration tests - how the config file, in-script options, environment variables and CLI flags are parsed and interact... and how the end result is then propagated back into the script
-
 func TestConfigEnv(t *testing.T) {
 	testdata := map[struct{ Name, Key string }]map[string]func(Config){
 		{"Linger", "K6_LINGER"}: {
@@ -133,9 +131,4 @@ func TestConfigApply(t *testing.T) {
 		conf = Config{}.Apply(Config{Out: []string{"influxdb", "json"}})
 		assert.Equal(t, []string{"influxdb", "json"}, conf.Out)
 	})
-}
-
-func TestBuildExecutionConfig(t *testing.T) {
-	//TODO: test the current config building and constructing of the execution plan, and the emitted warnings
-	//TODO: test the future full overwriting of the duration/iterations/stages/execution options
 }
