@@ -2,7 +2,7 @@ version: 2
 jobs:
   lint:
     docker:
-      - image: circleci/golang:1.11.2
+      - image: circleci/golang:1.11.5
     environment:
       GOPATH: /home/circleci/.go_workspace
     working_directory: /home/circleci/.go_workspace/src/github.com/loadimpact/k6
@@ -27,7 +27,7 @@ jobs:
 
   test:
     docker:
-      - image: circleci/golang:1.11.2
+      - image: circleci/golang:1.11.5
     environment:
       GOPATH: /home/circleci/.go_workspace
     working_directory: /home/circleci/.go_workspace/src/github.com/loadimpact/k6
@@ -49,7 +49,7 @@ jobs:
 
   test-go110:
     docker:
-      - image: circleci/golang:1.10.3
+      - image: circleci/golang:1.10.8
     environment:
       GOPATH: /home/circleci/.go_workspace
     working_directory: /home/circleci/.go_workspace/src/github.com/loadimpact/k6
@@ -64,7 +64,7 @@ jobs:
 
   build-docker-images:
     docker:
-      - image: circleci/golang:1.11.2
+      - image: circleci/golang:1.11.5
     environment:
       GOPATH: /home/circleci/.go_workspace
     working_directory: /home/circleci/.go_workspace/src/github.com/loadimpact/k6
@@ -108,7 +108,7 @@ jobs:
 
   build-linux-packages:
     docker:
-      - image: circleci/golang:1.11.2
+      - image: circleci/golang:1.11.5
     environment:
       GOPATH: /home/circleci/.go_workspace
     working_directory: /home/circleci/.go_workspace/src/github.com/loadimpact/k6
