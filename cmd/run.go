@@ -69,7 +69,7 @@ var (
 	runNoTeardown = os.Getenv("K6_NO_TEARDOWN") != ""
 )
 
-// runCmd represents the run command.
+// runCmd represents the run command
 var runCmd = &cobra.Command{
 	Use:   "run",
 	Short: "Start a load test",
