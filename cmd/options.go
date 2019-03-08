@@ -92,8 +92,9 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		DiscardResponseBodies: getNullBool(flags, "discard-response-bodies"),
 		// Default values for options without CLI flags:
 		// TODO: find a saner and more dev-friendly and error-proof way to handle options
-		SetupTimeout:            types.NullDuration{Duration: types.Duration(10 * time.Second), Valid: false},
-		TeardownTimeout:         types.NullDuration{Duration: types.Duration(10 * time.Second), Valid: false},
+		SetupTimeout:    types.NullDuration{Duration: types.Duration(10 * time.Second), Valid: false},
+		TeardownTimeout: types.NullDuration{Duration: types.Duration(10 * time.Second), Valid: false},
+
 		MetricSamplesBufferSize: null.NewInt(1000, false),
 	}
 
