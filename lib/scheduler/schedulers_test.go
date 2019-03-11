@@ -39,6 +39,7 @@ type configMapTestCase struct {
 	customValidator       func(t *testing.T, cm ConfigMap)
 }
 
+//nolint:lll,gochecknoglobals
 var configMapTestCases = []configMapTestCase{
 	{"", true, false, nil},
 	{"1234", true, false, nil},

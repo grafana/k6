@@ -58,7 +58,10 @@ func TestStrictJSONUnmarshal(t *testing.T) {
 		{`123`, true, &someElement{}, nil},
 		{`"blah"`, true, &someElement{}, nil},
 		{`null`, false, &someElement{}, &someElement{}},
-		{`{"data": 123, "props": {"test": "mest"}}`, false, &someElement{}, &someElement{123, map[string]string{"test": "mest"}}},
+		{
+			`{"data": 123, "props": {"test": "mest"}}`, false, &someElement{},
+			&someElement{123, map[string]string{"test": "mest"}},
+		},
 		{`{"data": 123, "props": {"test": "mest"}}asdg`, true, &someElement{}, nil},
 	}
 	for i, tc := range testCases {

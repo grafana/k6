@@ -38,7 +38,13 @@ import (
 	"github.com/spf13/pflag"
 )
 
+// Version contains the current semantic version of k6.
+//nolint:gochecknoglobals
 var Version = "0.23.1"
+
+// Banner contains the ASCII-art banner with the k6 logo and stylized website URL
+//TODO: make these into methods, only the version needs to be a variable
+//nolint:gochecknoglobals
 var Banner = strings.Join([]string{
 	`          /\      |‾‾|  /‾‾/  /‾/   `,
 	`     /\  /  \     |  |_/  /  / /    `,
@@ -58,8 +64,11 @@ var (
 
 const defaultConfigFileName = "config.json"
 
+//TODO: remove these global variables
+//nolint:gochecknoglobals
 var defaultConfigFilePath = defaultConfigFileName // Updated with the user's config folder in the init() function below
-var configFilePath = os.Getenv("K6_CONFIG")       // Overridden by `-c`/`--config` flag!
+//nolint:gochecknoglobals
+var configFilePath = os.Getenv("K6_CONFIG") // Overridden by `-c`/`--config` flag!
 
 var (
 	//TODO: have environment variables for configuring these? hopefully after we move away from global vars though...
