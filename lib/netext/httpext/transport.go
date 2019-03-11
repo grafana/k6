@@ -85,6 +85,7 @@ func (t *transport) RoundTrip(req *http.Request) (res *http.Response, err error)
 		return nil, errors.New("no roundtrip defined")
 	}
 
+	t.errorCode, t.errorMsg = 0, ""
 	tags := map[string]string{}
 	for k, v := range t.tags {
 		tags[k] = v

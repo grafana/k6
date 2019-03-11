@@ -715,6 +715,7 @@ func TestRequestAndBatch(t *testing.T) {
 					_, err := common.RunString(rt, fmt.Sprintf(`
 					let res = http.request("GET", "%s", null, { auth: "digest" });
 					if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+					if (res.error_code != 0) { throw new Error("wrong error code: " + res.error_code); }
 					`, url))
 					assert.NoError(t, err)
 
