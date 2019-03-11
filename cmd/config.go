@@ -33,7 +33,6 @@ import (
 	"github.com/loadimpact/k6/stats/influxdb"
 	"github.com/loadimpact/k6/stats/kafka"
 	"github.com/loadimpact/k6/stats/statsd/common"
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/spf13/pflag"
@@ -176,6 +175,14 @@ func readEnvConfig() (conf Config, err error) {
 	return conf, nil
 }
 
+type executionConflictConfigError string
+
+func (e executionConflictConfigError) Error() string {
+	return string(e)
+}
+
+var _ error = executionConflictConfigError("")
+
 // This checks for conflicting options and turns any shortcut options (i.e. duration, iterations,
 // stages) into the proper scheduler configuration
 func buildExecutionConfig(conf Config) (Config, error) {
@@ -183,22 +190,21 @@ func buildExecutionConfig(conf Config) (Config, error) {
 	switch {
 	case conf.Duration.Valid:
 		if conf.Iterations.Valid {
-			//TODO: make this an error in the next version
+			//TODO: make this an executionConflictConfigError in the next version
 			log.Warnf("Specifying both duration and iterations is deprecated and won't be supported in the future k6 versions")
 		}
 
 		if conf.Stages != nil {
-			//TODO: make this an error in the next version
+			//TODO: make this an executionConflictConfigError in the next version
 			log.Warnf("Specifying both duration and stages is deprecated and won't be supported in the future k6 versions")
 		}
 
 		if conf.Execution != nil {
-			//TODO: use a custom error type
-			return result, errors.New("specifying both duration and execution is not supported")
+			return result, executionConflictConfigError("specifying both duration and execution is not supported")
 		}
 
 		if conf.Duration.Duration <= 0 {
-			//TODO: make this an error in the next version
+			//TODO: make this an executionConflictConfigError in the next version
 			log.Warnf("Specifying infinite duration in this way is deprecated and won't be supported in the future k6 versions")
 		} else {
 			ds := scheduler.NewConstantLoopingVUsConfig(lib.DefaultSchedulerName)
@@ -210,12 +216,12 @@ func buildExecutionConfig(conf Config) (Config, error) {
 
 	case conf.Stages != nil:
 		if conf.Iterations.Valid {
-			//TODO: make this an error in the next version
+			//TODO: make this an executionConflictConfigError in the next version
 			log.Warnf("Specifying both iterations and stages is deprecated and won't be supported in the future k6 versions")
 		}
 
 		if conf.Execution != nil {
-			return conf, errors.New("specifying both stages and execution is not supported")
+			return conf, executionConflictConfigError("specifying both stages and execution is not supported")
 		}
 
 		ds := scheduler.NewVariableLoopingVUsConfig(lib.DefaultSchedulerName)
@@ -230,7 +236,7 @@ func buildExecutionConfig(conf Config) (Config, error) {
 
 	case conf.Iterations.Valid:
 		if conf.Execution != nil {
-			return conf, errors.New("specifying both iterations and execution is not supported")
+			return conf, executionConflictConfigError("specifying both iterations and execution is not supported")
 		}
 		// TODO: maybe add a new flag that will be used as a shortcut to per-VU iterations?
 
