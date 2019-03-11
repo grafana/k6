@@ -33,6 +33,7 @@ type ConfigMap map[string]Config
 // with the specified name and all default values correctly initialized
 type ConfigConstructor func(name string, rawJSON []byte) (Config, error)
 
+//nolint:gochecknoglobals
 var (
 	configTypesMutex   sync.RWMutex
 	configConstructors = make(map[string]ConfigConstructor)

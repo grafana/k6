@@ -180,7 +180,8 @@ func readEnvConfig() (conf Config, err error) {
 // stages) into the proper scheduler configuration
 func buildExecutionConfig(conf Config) (Config, error) {
 	result := conf
-	if conf.Duration.Valid {
+	switch {
+	case conf.Duration.Valid:
 		if conf.Iterations.Valid {
 			//TODO: make this an error in the next version
 			log.Warnf("Specifying both duration and iterations is deprecated and won't be supported in the future k6 versions")
@@ -206,7 +207,8 @@ func buildExecutionConfig(conf Config) (Config, error) {
 			ds.Interruptible = null.NewBool(true, false) // Preserve backwards compatibility
 			result.Execution = scheduler.ConfigMap{lib.DefaultSchedulerName: ds}
 		}
-	} else if conf.Stages != nil {
+
+	case conf.Stages != nil:
 		if conf.Iterations.Valid {
 			//TODO: make this an error in the next version
 			log.Warnf("Specifying both iterations and stages is deprecated and won't be supported in the future k6 versions")
@@ -225,7 +227,8 @@ func buildExecutionConfig(conf Config) (Config, error) {
 		}
 		ds.Interruptible = null.NewBool(true, false) // Preserve backwards compatibility
 		result.Execution = scheduler.ConfigMap{lib.DefaultSchedulerName: ds}
-	} else if conf.Iterations.Valid {
+
+	case conf.Iterations.Valid:
 		if conf.Execution != nil {
 			return conf, errors.New("specifying both iterations and execution is not supported")
 		}
@@ -235,7 +238,8 @@ func buildExecutionConfig(conf Config) (Config, error) {
 		ds.VUs = conf.VUs
 		ds.Iterations = conf.Iterations
 		result.Execution = scheduler.ConfigMap{lib.DefaultSchedulerName: ds}
-	} else {
+
+	default:
 		if conf.Execution != nil { // If someone set this, regardless if its empty
 			//TODO: remove this warning in the next version
 			log.Warnf("The execution settings are not functional in this k6 release, they will be ignored")
