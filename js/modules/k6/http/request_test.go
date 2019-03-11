@@ -590,6 +590,7 @@ func TestRequestAndBatch(t *testing.T) {
 				state.CookieJar = cookieJar
 				_, err = common.RunString(rt, sr(`
 				let res = http.request("GET", "HTTPBIN_URL/cookies/set?key=value", null, { redirects: 0 });
+				if (res.cookies.key[0].value != "value") { throw new Error("wrong cookie value: " + res.cookies.key[0].value); }
 				const props = ["name", "value", "domain", "path", "expires", "max_age", "secure", "http_only"];
 				let cookie = res.cookies.key[0];
 				for (let i = 0; i < props.length; i++) {
