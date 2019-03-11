@@ -119,7 +119,9 @@ func TestSetupDataMarshalling(t *testing.T) {
 		lib.RuntimeOptions{},
 	)
 
-	runner.SetOptions(lib.Options{
+	require.NoError(t, err)
+
+	err = runner.SetOptions(lib.Options{
 		SetupTimeout: types.NullDurationFrom(1 * time.Second),
 		Hosts:        tb.Dialer.Hosts,
 	})
