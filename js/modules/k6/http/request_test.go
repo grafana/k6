@@ -97,7 +97,9 @@ func assertRequestMetricsEmitted(t *testing.T, sampleContainers []stats.SampleCo
 	assert.True(t, seenReceiving, "url %s didn't emit Receiving", url)
 }
 
-func newRuntime(t *testing.T) (*testutils.HTTPMultiBin, *lib.State, chan stats.SampleContainer, *goja.Runtime, *context.Context) {
+func newRuntime(
+	t *testing.T,
+) (*testutils.HTTPMultiBin, *lib.State, chan stats.SampleContainer, *goja.Runtime, *context.Context) {
 	tb := testutils.NewHTTPMultiBin(t)
 
 	root, err := lib.NewGroup("", nil)
@@ -456,10 +458,10 @@ func TestRequestAndBatch(t *testing.T) {
 		}(state.Options.Throw)
 		state.Options.Throw = null.BoolFrom(false)
 
-		tb.Mux.HandleFunc("/no-location-redirect", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tb.Mux.HandleFunc("/no-location-redirect", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(302)
 		}))
-		tb.Mux.HandleFunc("/bad-location-redirect", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tb.Mux.HandleFunc("/bad-location-redirect", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("Location", "h\t:/") // \n is forbidden
 			w.WriteHeader(302)
 		}))
@@ -517,11 +519,13 @@ func TestRequestAndBatch(t *testing.T) {
 				expectedScriptError: sr(`GoError: Get HTTPBIN_URL/no-location-redirect: 302 response missing Location header`),
 			},
 			{
-				name:                "Bad location redirect",
-				expectedErrorCode:   0,
-				expectedErrorMsg:    "",
-				script:              `let res = http.request("GET", "HTTPBIN_URL/bad-location-redirect");`,
-				expectedScriptError: sr("GoError: Get HTTPBIN_URL/bad-location-redirect: failed to parse Location header \"h\\t:/\": parse h\t:/: first path segment in URL cannot contain colon"),
+				name:              "Bad location redirect",
+				expectedErrorCode: 0,
+				expectedErrorMsg:  "",
+				script:            `let res = http.request("GET", "HTTPBIN_URL/bad-location-redirect");`,
+				expectedScriptError: sr(
+					"GoError: Get HTTPBIN_URL/bad-location-redirect: failed to parse Location header" +
+						" \"h\\t:/\": parse h\t:/: first path segment in URL cannot contain colon"),
 			},
 			{
 				name:              "Missing protocol",
@@ -539,6 +543,7 @@ func TestRequestAndBatch(t *testing.T) {
 		}
 
 		for _, testCase := range testCases {
+			testCase := testCase
 			// clear the Samples
 			stats.GetBufferedSamples(samples)
 			t.Run(testCase.name, func(t *testing.T) {

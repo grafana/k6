@@ -50,7 +50,12 @@ var _ http.RoundTripper = &transport{}
 
 // NewTransport returns a new Transport wrapping around the provide Roundtripper and will send
 // samples on the provided channel adding the tags in accordance to the Options provided
-func newTransport(roundTripper http.RoundTripper, samplesCh chan<- stats.SampleContainer, options *lib.Options, tags map[string]string) *transport {
+func newTransport(
+	roundTripper http.RoundTripper,
+	samplesCh chan<- stats.SampleContainer,
+	options *lib.Options,
+	tags map[string]string,
+) *transport {
 	return &transport{
 		roundTripper: roundTripper,
 		tags:         tags,
@@ -77,7 +82,7 @@ func (t *transport) TLSInfo() netext.TLSInfo {
 // RoundTrip is the implementation of http.RoundTripper
 func (t *transport) RoundTrip(req *http.Request) (res *http.Response, err error) {
 	if t.roundTripper == nil {
-		return nil, errors.New("No roundtrip defined")
+		return nil, errors.New("no roundtrip defined")
 	}
 
 	tags := map[string]string{}
@@ -134,7 +139,8 @@ func (t *transport) RoundTrip(req *http.Request) (res *http.Response, err error)
 		}
 	}
 	if t.options.SystemTags["ip"] && trail.ConnRemoteAddr != nil {
-		if ip, _, err := net.SplitHostPort(trail.ConnRemoteAddr.String()); err == nil {
+		var ip string
+		if ip, _, err = net.SplitHostPort(trail.ConnRemoteAddr.String()); err == nil {
 			tags["ip"] = ip
 		}
 	}
