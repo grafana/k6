@@ -26,6 +26,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"go/build"
 	"io/ioutil"
 	stdlog "log"
 	"net"
@@ -824,6 +825,13 @@ func TestVUIntegrationHosts(t *testing.T) {
 }
 
 func TestVUIntegrationTLSConfig(t *testing.T) {
+	var unsupportedVersionErrorMsg = "remote error: tls: handshake failure"
+	for _, tag := range build.Default.ReleaseTags {
+		if tag == "go1.12" {
+			unsupportedVersionErrorMsg = "tls: no supported versions satisfy MinVersion and MaxVersion"
+			break
+		}
+	}
 	testdata := map[string]struct {
 		opts   lib.Options
 		errMsg string
@@ -850,7 +858,7 @@ func TestVUIntegrationTLSConfig(t *testing.T) {
 		},
 		"UnsupportedVersion": {
 			lib.Options{TLSVersion: &lib.TLSVersions{Min: tls.VersionSSL30, Max: tls.VersionSSL30}},
-			"GoError: Get https://sha256.badssl.com/: remote error: tls: handshake failure",
+			"GoError: Get https://sha256.badssl.com/: " + unsupportedVersionErrorMsg,
 		},
 	}
 	for name, data := range testdata {
