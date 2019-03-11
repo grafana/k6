@@ -512,7 +512,7 @@ func TestVURunContext(t *testing.T) {
 
 				assert.Equal(t, vu.Runtime, common.GetRuntime(*vu.Context), "incorrect runtime in context")
 
-				state := common.GetState(*vu.Context)
+				state := lib.GetState(*vu.Context)
 				if assert.NotNil(t, state) {
 					assert.Equal(t, null.IntFrom(10), state.Options.VUs)
 					assert.Equal(t, null.BoolFrom(true), state.Options.Throw)
@@ -587,6 +587,7 @@ func TestVUIntegrationGroups(t *testing.T) {
 
 	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range testdata {
+		r := r
 		t.Run(name, func(t *testing.T) {
 			vu, err := r.newVU(make(chan stats.SampleContainer, 100))
 			if !assert.NoError(t, err) {
@@ -598,17 +599,17 @@ func TestVUIntegrationGroups(t *testing.T) {
 			fnNestedCalled := false
 			vu.Runtime.Set("fnOuter", func() {
 				fnOuterCalled = true
-				assert.Equal(t, r.GetDefaultGroup(), common.GetState(*vu.Context).Group)
+				assert.Equal(t, r.GetDefaultGroup(), lib.GetState(*vu.Context).Group)
 			})
 			vu.Runtime.Set("fnInner", func() {
 				fnInnerCalled = true
-				g := common.GetState(*vu.Context).Group
+				g := lib.GetState(*vu.Context).Group
 				assert.Equal(t, "my group", g.Name)
 				assert.Equal(t, r.GetDefaultGroup(), g.Parent)
 			})
 			vu.Runtime.Set("fnNested", func() {
 				fnNestedCalled = true
-				g := common.GetState(*vu.Context).Group
+				g := lib.GetState(*vu.Context).Group
 				assert.Equal(t, "nested group", g.Name)
 				assert.Equal(t, "my group", g.Parent.Name)
 				assert.Equal(t, r.GetDefaultGroup(), g.Parent.Parent)

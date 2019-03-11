@@ -22,6 +22,7 @@ package netext
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"strings"
 	"sync/atomic"
@@ -30,7 +31,6 @@ import (
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/stats"
 
-	"github.com/pkg/errors"
 	"github.com/viki-org/dnscache"
 )
 
@@ -55,6 +55,16 @@ func NewDialer(dialer net.Dialer) *Dialer {
 	}
 }
 
+// BlackListedIPError is an error that is returned when a given IP is blacklisted
+type BlackListedIPError struct {
+	ip  net.IP
+	net *net.IPNet
+}
+
+func (b BlackListedIPError) Error() string {
+	return fmt.Sprintf("IP (%s) is in a blacklisted range (%s)", b.ip, b.net)
+}
+
 // DialContext wraps the net.Dialer.DialContext and handles the k6 specifics
 func (d *Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn, error) {
 	delimiter := strings.LastIndex(addr, ":")
@@ -72,7 +82,7 @@ func (d *Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn,
 
 	for _, net := range d.Blacklist {
 		if net.Contains(ip) {
-			return nil, errors.Errorf("IP (%s) is in a blacklisted range (%s)", ip, net)
+			return nil, BlackListedIPError{ip: ip, net: net}
 		}
 	}
 	ipStr := ip.String()

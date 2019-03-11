@@ -22,37 +22,30 @@ package http
 
 import (
 	"fmt"
-	"net/url"
 
 	"github.com/dop251/goja"
+	"github.com/loadimpact/k6/lib/netext/httpext"
 )
 
-// A URL wraps net.URL, and preserves the template (if any) the URL was constructed from.
-type URL struct {
-	URL       *url.URL `js:"-"`
-	Name      string   `js:"name"` // http://example.com/thing/${}/
-	URLString string   `js:"url"`  // http://example.com/thing/1234/
-}
-
 // ToURL tries to convert anything passed to it to a k6 URL struct
-func ToURL(u interface{}) (URL, error) {
+func ToURL(u interface{}) (httpext.URL, error) {
 	switch tu := u.(type) {
-	case URL:
+	case httpext.URL:
 		// Handling of http.url`http://example.com/{$id}`
 		return tu, nil
 	case string:
 		// Handling of "http://example.com/"
-		u, err := url.Parse(tu)
-		return URL{u, tu, tu}, err
+		return httpext.NewURL(tu, tu)
 	case goja.Value:
 		// Unwrap goja values
 		return ToURL(tu.Export())
 	default:
-		return URL{}, fmt.Errorf("invalid URL value '%#v'", u)
+		return httpext.URL{}, fmt.Errorf("invalid URL value '%#v'", u)
 	}
 }
 
-func (http *HTTP) Url(parts []string, pieces ...string) (URL, error) {
+// URL creates new URL from the provided parts
+func (http *HTTP) URL(parts []string, pieces ...string) (httpext.URL, error) {
 	var name, urlstr string
 	for i, part := range parts {
 		name += part
@@ -62,6 +55,5 @@ func (http *HTTP) Url(parts []string, pieces ...string) (URL, error) {
 			urlstr += pieces[i]
 		}
 	}
-	u, err := url.Parse(urlstr)
-	return URL{u, name, urlstr}, err
+	return httpext.NewURL(urlstr, name)
 }
