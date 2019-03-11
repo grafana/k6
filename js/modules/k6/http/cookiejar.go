@@ -33,6 +33,7 @@ import (
 	"github.com/pkg/errors"
 )
 
+// HTTPCookieJar is cookiejar.Jar wrapper to be used in js scripts
 type HTTPCookieJar struct {
 	jar *cookiejar.Jar
 	ctx *context.Context
@@ -46,6 +47,7 @@ func newCookieJar(ctxPtr *context.Context) *HTTPCookieJar {
 	return &HTTPCookieJar{jar, ctxPtr}
 }
 
+// CookiesForURL return the cookies for a given url as a map of key and values
 func (j HTTPCookieJar) CookiesForURL(url string) map[string][]string {
 	u, err := neturl.Parse(url)
 	if err != nil {
@@ -60,6 +62,7 @@ func (j HTTPCookieJar) CookiesForURL(url string) map[string][]string {
 	return objs
 }
 
+// Set sets a cookie for a particular url with the given name value and additional opts
 func (j HTTPCookieJar) Set(url, name, value string, opts goja.Value) (bool, error) {
 	rt := common.GetRuntime(*j.ctx)
 
@@ -74,10 +77,6 @@ func (j HTTPCookieJar) Set(url, name, value string, opts goja.Value) (bool, erro
 		params := paramsV.ToObject(rt)
 		for _, k := range params.Keys() {
 			switch strings.ToLower(k) {
-			case "name":
-				c.Name = params.Get(k).String()
-			case "value":
-				c.Value = params.Get(k).String()
 			case "path":
 				c.Path = params.Get(k).String()
 			case "domain":
