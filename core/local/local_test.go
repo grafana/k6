@@ -50,7 +50,14 @@ func TestExecutorRun(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	err := make(chan error, 1)
-	go func() { err <- e.Run(ctx, make(chan stats.SampleContainer, 100)) }()
+	samples := make(chan stats.SampleContainer, 100)
+	defer close(samples)
+	go func() {
+		for range samples {
+		}
+	}()
+
+	go func() { err <- e.Run(ctx, samples) }()
 	cancel()
 	assert.NoError(t, <-err)
 }
