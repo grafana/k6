@@ -76,10 +76,12 @@ var configMapTestCases = []configMapTestCase{
 			assert.Equal(t, int64(10), cm["someKey"].GetMaxVUs())
 			assert.Empty(t, cm["someKey"].Validate())
 		}},
+	{`{"aname": {"type": "constant-looping-vus", "duration": "60s"}}`, false, false, nil},
 	{`{"": {"type": "constant-looping-vus", "vus": 10, "duration": "60s"}}`, false, true, nil},
 	{`{"aname": {"type": "constant-looping-vus"}}`, false, true, nil},
+	{`{"aname": {"type": "constant-looping-vus", "vus": 0.5}}`, true, false, nil},
 	{`{"aname": {"type": "constant-looping-vus", "vus": 10}}`, false, true, nil},
-	{`{"aname": {"type": "constant-looping-vus", "duration": "60s"}}`, false, true, nil},
+	{`{"aname": {"type": "constant-looping-vus", "vus": 0, "duration": "60s"}}`, false, true, nil},
 	{`{"aname": {"type": "constant-looping-vus", "vus": -1, "duration": "60s"}}`, false, true, nil},
 	{`{"aname": {"type": "constant-looping-vus", "vus": 10, "duration": "0s"}}`, false, true, nil},
 	{`{"aname": {"type": "constant-looping-vus", "vus": 10, "duration": "10s", "startTime": "-10s"}}`, false, true, nil},
