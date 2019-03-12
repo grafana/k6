@@ -62,7 +62,7 @@ const (
 	teardownTimeoutErrorCode    = 101
 	genericTimeoutErrorCode     = 102
 	genericEngineErrorCode      = 103
-	//invalidOptionsErrorCode     = 104
+	invalidConfigErrorCode      = 104
 )
 
 var (
@@ -164,21 +164,16 @@ a commandline interface for interacting with it.`,
 			)
 		}
 
+		//TODO: move a bunch of the logic above to a config "constructor" and to the Validate() method
+
 		// If duration is explicitly set to 0, it means run forever.
+		//TODO: just... handle this differently, e.g. as a part of the manual executor
 		if conf.Duration.Valid && conf.Duration.Duration == 0 {
 			conf.Duration = types.NullDuration{}
 		}
 
-		//TODO: move a bunch of the logic above to a config "constructor" and to the Validate() method
-		if errList := conf.Validate(); len(errList) != 0 {
-
-			errMsg := []string{"There were problems with the specified script configuration:"}
-			for _, err := range errList {
-				errMsg = append(errMsg, fmt.Sprintf("\t- %s", err.Error()))
-			}
-			//TODO: re-enable exiting with validation errors
-			log.Warn(errors.New(strings.Join(errMsg, "\n")))
-			//return ExitCode{errors.New(strings.Join(errMsg, "\n")), invalidOptionsErrorCode}
+		if cerr := validateConfig(conf); cerr != nil {
+			return ExitCode{cerr, invalidConfigErrorCode}
 		}
 
 		// If summary trend stats are defined, update the UI to reflect them

@@ -76,6 +76,10 @@ An archive is a fully self-contained test run, and can be executed identically e
 			return err
 		}
 
+		if cerr := validateConfig(conf); cerr != nil {
+			return ExitCode{cerr, invalidConfigErrorCode}
+		}
+
 		err = r.SetOptions(conf.Options)
 		if err != nil {
 			return err
