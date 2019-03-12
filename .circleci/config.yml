@@ -75,7 +75,9 @@ jobs:
           command: |
             export GOMAXPROCS=4
             export PATH=$GOPATH/bin:$PATH
-            go test -race -timeout 600s ./...
+            for pkg in $(go list ./... | grep -v vendor); do
+                go test -race -timeout 600s $pkg
+            done
 
   build-docker-images:
     docker:
