@@ -84,21 +84,21 @@ func verifyOneIterPerOneVU(t *testing.T, c Config) {
 	assert.Equal(t, null.NewInt(1, false), perVuIters.VUs)
 }
 
-func verifySharedIters(vus, iters int64) func(t *testing.T, c Config) {
+func verifySharedIters(vus, iters null.Int) func(t *testing.T, c Config) {
 	return func(t *testing.T, c Config) {
 		sched := c.Execution[lib.DefaultSchedulerName]
 		require.NotEmpty(t, sched)
 		require.IsType(t, scheduler.SharedIteationsConfig{}, sched)
 		sharedIterConfig, ok := sched.(scheduler.SharedIteationsConfig)
 		require.True(t, ok)
-		assert.Equal(t, null.NewInt(vus, true), sharedIterConfig.VUs)
-		assert.Equal(t, null.NewInt(iters, true), sharedIterConfig.Iterations)
-		assert.Equal(t, null.NewInt(vus, true), c.VUs)
-		assert.Equal(t, null.NewInt(iters, true), c.Iterations)
+		assert.Equal(t, vus, sharedIterConfig.VUs)
+		assert.Equal(t, iters, sharedIterConfig.Iterations)
+		assert.Equal(t, vus, c.VUs)
+		assert.Equal(t, iters, c.Iterations)
 	}
 }
 
-func verifyConstLoopingVUs(vus int64, duration time.Duration) func(t *testing.T, c Config) {
+func verifyConstLoopingVUs(vus null.Int, duration time.Duration) func(t *testing.T, c Config) {
 	return func(t *testing.T, c Config) {
 		sched := c.Execution[lib.DefaultSchedulerName]
 		require.NotEmpty(t, sched)
@@ -106,14 +106,14 @@ func verifyConstLoopingVUs(vus int64, duration time.Duration) func(t *testing.T,
 		clvc, ok := sched.(scheduler.ConstantLoopingVUsConfig)
 		require.True(t, ok)
 		assert.Equal(t, null.NewBool(true, false), clvc.Interruptible)
-		assert.Equal(t, null.NewInt(vus, true), clvc.VUs)
+		assert.Equal(t, vus, clvc.VUs)
 		assert.Equal(t, types.NullDurationFrom(duration), clvc.Duration)
-		assert.Equal(t, null.NewInt(vus, true), c.VUs)
+		assert.Equal(t, vus, c.VUs)
 		assert.Equal(t, types.NullDurationFrom(duration), c.Duration)
 	}
 }
 
-func verifyVarLoopingVUs(startVus int64, startVUsSet bool, stages []scheduler.Stage) func(t *testing.T, c Config) {
+func verifyVarLoopingVUs(startVus null.Int, stages []scheduler.Stage) func(t *testing.T, c Config) {
 	return func(t *testing.T, c Config) {
 		sched := c.Execution[lib.DefaultSchedulerName]
 		require.NotEmpty(t, sched)
@@ -121,8 +121,8 @@ func verifyVarLoopingVUs(startVus int64, startVUsSet bool, stages []scheduler.St
 		clvc, ok := sched.(scheduler.VariableLoopingVUsConfig)
 		require.True(t, ok)
 		assert.Equal(t, null.NewBool(true, false), clvc.Interruptible)
-		assert.Equal(t, null.NewInt(startVus, startVUsSet), clvc.StartVUs)
-		assert.Equal(t, null.NewInt(startVus, startVUsSet), c.VUs)
+		assert.Equal(t, startVus, clvc.StartVUs)
+		assert.Equal(t, startVus, c.VUs)
 		assert.Equal(t, stages, clvc.Stages)
 		assert.Len(t, c.Stages, len(stages))
 		for i, s := range stages {
@@ -241,6 +241,7 @@ type configConsolidationTestCase struct {
 }
 
 func getConfigConsolidationTestCases() []configConsolidationTestCase {
+	I := null.IntFrom // shortcut for "Valid" (i.e. user-specified) ints
 	// This is a function, because some of these test cases actually need for the init() functions
 	// to be executed, since they depend on defaultConfigFilePath
 	return []configConsolidationTestCase{
@@ -253,20 +254,21 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 		{opts{cli: []string{"--execution", ""}}, exp{cliParseError: true}, nil},
 		{opts{cli: []string{"--stage", "10:20s"}}, exp{cliReadError: true}, nil},
 		// Check if CLI shortcuts generate correct execution values
-		{opts{cli: []string{"--vus", "1", "--iterations", "5"}}, exp{}, verifySharedIters(1, 5)},
-		{opts{cli: []string{"-u", "2", "-i", "6"}}, exp{}, verifySharedIters(2, 6)},
-		{opts{cli: []string{"-u", "3", "-d", "30s"}}, exp{}, verifyConstLoopingVUs(3, 30*time.Second)},
-		{opts{cli: []string{"-u", "4", "--duration", "60s"}}, exp{}, verifyConstLoopingVUs(4, 1*time.Minute)},
+		{opts{cli: []string{"--vus", "1", "--iterations", "5"}}, exp{}, verifySharedIters(I(1), I(5))},
+		{opts{cli: []string{"-u", "2", "-i", "6"}}, exp{}, verifySharedIters(I(2), I(6))},
+		{opts{cli: []string{"-d", "123s"}}, exp{}, verifyConstLoopingVUs(null.NewInt(1, false), 123*time.Second)},
+		{opts{cli: []string{"-u", "3", "-d", "30s"}}, exp{}, verifyConstLoopingVUs(I(3), 30*time.Second)},
+		{opts{cli: []string{"-u", "4", "--duration", "60s"}}, exp{}, verifyConstLoopingVUs(I(4), 1*time.Minute)},
 		{
 			opts{cli: []string{"--stage", "20s:10", "-s", "3m:5"}}, exp{},
-			verifyVarLoopingVUs(1, false, buildStages(20, 10, 180, 5)),
+			verifyVarLoopingVUs(null.NewInt(1, false), buildStages(20, 10, 180, 5)),
 		},
 		{
 			opts{cli: []string{"-s", "1m6s:5", "--vus", "10"}}, exp{},
-			verifyVarLoopingVUs(10, true, buildStages(66, 5)),
+			verifyVarLoopingVUs(null.NewInt(10, true), buildStages(66, 5)),
 		},
 		// This should get a validation error since VUs are more than the shared iterations
-		{opts{cli: []string{"--vus", "10", "-i", "6"}}, exp{validationErrors: true}, verifySharedIters(10, 6)},
+		{opts{cli: []string{"--vus", "10", "-i", "6"}}, exp{validationErrors: true}, verifySharedIters(I(10), I(6))},
 		// These should emit a warning
 		//TODO: in next version, those should be an error
 		{opts{cli: []string{"-u", "1", "-i", "6", "-d", "10s"}}, exp{logWarning: true}, nil},
@@ -282,18 +284,18 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 		},
 		{opts{fs: defaultConfig(`{"execution": {}}`)}, exp{logWarning: true}, verifyOneIterPerOneVU},
 		// Test if environment variable shortcuts are working as expected
-		{opts{env: []string{"K6_VUS=5", "K6_ITERATIONS=15"}}, exp{}, verifySharedIters(5, 15)},
-		{opts{env: []string{"K6_VUS=10", "K6_DURATION=20s"}}, exp{}, verifyConstLoopingVUs(10, 20*time.Second)},
+		{opts{env: []string{"K6_VUS=5", "K6_ITERATIONS=15"}}, exp{}, verifySharedIters(I(5), I(15))},
+		{opts{env: []string{"K6_VUS=10", "K6_DURATION=20s"}}, exp{}, verifyConstLoopingVUs(I(10), 20*time.Second)},
 		{
 			opts{env: []string{"K6_STAGES=2m30s:11,1h1m:100"}}, exp{},
-			verifyVarLoopingVUs(1, false, buildStages(150, 11, 3660, 100)),
+			verifyVarLoopingVUs(null.NewInt(1, false), buildStages(150, 11, 3660, 100)),
 		},
 		{
 			opts{env: []string{"K6_STAGES=100s:100,0m30s:0", "K6_VUS=0"}}, exp{},
-			verifyVarLoopingVUs(0, true, buildStages(100, 100, 30, 0)),
+			verifyVarLoopingVUs(null.NewInt(0, true), buildStages(100, 100, 30, 0)),
 		},
 		// Test if JSON configs work as expected
-		{opts{fs: defaultConfig(`{"iterations": 77, "vus": 7}`)}, exp{}, verifySharedIters(7, 77)},
+		{opts{fs: defaultConfig(`{"iterations": 77, "vus": 7}`)}, exp{}, verifySharedIters(I(7), I(77))},
 		{opts{fs: defaultConfig(`wrong-json`)}, exp{consolidationError: true}, nil},
 		{opts{fs: getFS(nil), cli: []string{"--config", "/my/config.file"}}, exp{consolidationError: true}, nil},
 
@@ -302,7 +304,15 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 			opts{
 				fs:  getFS([]file{{"/my/config.file", `{"vus": 8, "duration": "2m"}`}}),
 				cli: []string{"--config", "/my/config.file"},
-			}, exp{}, verifyConstLoopingVUs(8, 120*time.Second),
+			}, exp{}, verifyConstLoopingVUs(I(8), 120*time.Second),
+		},
+		{
+			opts{
+				fs:  defaultConfig(`{"stages": [{"duration": "20s", "target": 20}], "vus": 10}`),
+				env: []string{"K6_DURATION=15s"},
+				cli: []string{"--stage", ""},
+			},
+			exp{}, verifyConstLoopingVUs(I(10), 15*time.Second),
 		},
 		{
 			opts{
@@ -310,7 +320,7 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 				cli:    []string{"--iterations", "5"},
 			},
 			//TODO: this shouldn't be a warning in the next version, but the result will be different
-			exp{logWarning: true}, verifyConstLoopingVUs(5, 50*time.Second),
+			exp{logWarning: true}, verifyConstLoopingVUs(I(5), 50*time.Second),
 		},
 		{
 			opts{
@@ -318,7 +328,7 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 				runner: &lib.Options{VUs: null.IntFrom(5)},
 			},
 			exp{},
-			verifyVarLoopingVUs(5, true, buildStages(20, 10)),
+			verifyVarLoopingVUs(null.NewInt(5, true), buildStages(20, 10)),
 		},
 		{
 			opts{
@@ -327,7 +337,7 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 				env:    []string{"K6_VUS=15", "K6_ITERATIONS=15"},
 			},
 			exp{logWarning: true}, //TODO: this won't be a warning in the next version, but the result will be different
-			verifyVarLoopingVUs(15, true, buildStages(20, 10)),
+			verifyVarLoopingVUs(null.NewInt(15, true), buildStages(20, 10)),
 		},
 		{
 			opts{
@@ -337,7 +347,7 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 				cli:    []string{"--stage", "44s:44", "-s", "55s:55"},
 			},
 			exp{},
-			verifyVarLoopingVUs(33, true, buildStages(44, 44, 55, 55)),
+			verifyVarLoopingVUs(null.NewInt(33, true), buildStages(44, 44, 55, 55)),
 		},
 
 		//TODO: test the future full overwriting of the duration/iterations/stages/execution options

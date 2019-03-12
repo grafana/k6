@@ -77,8 +77,8 @@ func (bc BaseConfig) Validate() (errors []error) {
 		errors = append(errors, fmt.Errorf("exec value cannot be empty"))
 	}
 	// The actually reasonable checks:
-	if bc.StartTime.Valid && bc.StartTime.Duration < 0 {
-		errors = append(errors, fmt.Errorf("scheduler start time should be positive"))
+	if bc.StartTime.Duration < 0 {
+		errors = append(errors, fmt.Errorf("scheduler start time can't be negative"))
 	}
 	iterTimeout := time.Duration(bc.IterationTimeout.Duration)
 	if iterTimeout < 0 || iterTimeout > maxIterationTimeout {
