@@ -84,6 +84,7 @@ const (
 	http2StreamErrorCodeMsg     = "http2: stream error with http2 ErrCode %s"
 	http2ConnectionErrorCodeMsg = "http2: connection error with http2 ErrCode %s"
 	x509HostnameErrorCodeMsg    = "x509: certificate doesn't match hostname"
+	x509UnknownAuthority        = "x509: unknown authority"
 )
 
 func http2ErrCodeOffset(code http2.ErrCode) errCode {
@@ -148,7 +149,7 @@ func errorCodeForError(err error) (errCode, string) {
 		}
 
 	case *x509.UnknownAuthorityError:
-		return x509UnknownAuthorityErrorCode, x509HostnameErrorCodeMsg
+		return x509UnknownAuthorityErrorCode, x509UnknownAuthority
 	case *x509.HostnameError:
 		return x509HostnameErrorCode, x509HostnameErrorCodeMsg
 	case *tls.RecordHeaderError:
