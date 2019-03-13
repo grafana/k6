@@ -63,55 +63,55 @@ func (*Crypto) RandomBytes(ctx context.Context, size int) []byte {
 	return bytes
 }
 
-func (c *Crypto) Md4(ctx context.Context, input []byte, outputEncoding string) string {
+func (c *Crypto) Md4(ctx context.Context, input []byte, outputEncoding string) interface{} {
 	hasher := c.CreateHash(ctx, "md4")
 	hasher.Update(input)
 	return hasher.Digest(outputEncoding)
 }
 
-func (c *Crypto) Md5(ctx context.Context, input []byte, outputEncoding string) string {
+func (c *Crypto) Md5(ctx context.Context, input []byte, outputEncoding string) interface{} {
 	hasher := c.CreateHash(ctx, "md5")
 	hasher.Update(input)
 	return hasher.Digest(outputEncoding)
 }
 
-func (c *Crypto) Sha1(ctx context.Context, input []byte, outputEncoding string) string {
+func (c *Crypto) Sha1(ctx context.Context, input []byte, outputEncoding string) interface{} {
 	hasher := c.CreateHash(ctx, "sha1")
 	hasher.Update(input)
 	return hasher.Digest(outputEncoding)
 }
 
-func (c *Crypto) Sha256(ctx context.Context, input []byte, outputEncoding string) string {
+func (c *Crypto) Sha256(ctx context.Context, input []byte, outputEncoding string) interface{} {
 	hasher := c.CreateHash(ctx, "sha256")
 	hasher.Update(input)
 	return hasher.Digest(outputEncoding)
 }
 
-func (c *Crypto) Sha384(ctx context.Context, input []byte, outputEncoding string) string {
+func (c *Crypto) Sha384(ctx context.Context, input []byte, outputEncoding string) interface{} {
 	hasher := c.CreateHash(ctx, "sha384")
 	hasher.Update(input)
 	return hasher.Digest(outputEncoding)
 }
 
-func (c *Crypto) Sha512(ctx context.Context, input []byte, outputEncoding string) string {
+func (c *Crypto) Sha512(ctx context.Context, input []byte, outputEncoding string) interface{} {
 	hasher := c.CreateHash(ctx, "sha512")
 	hasher.Update(input)
 	return hasher.Digest(outputEncoding)
 }
 
-func (c *Crypto) Sha512_224(ctx context.Context, input []byte, outputEncoding string) string {
+func (c *Crypto) Sha512_224(ctx context.Context, input []byte, outputEncoding string) interface{} {
 	hasher := c.CreateHash(ctx, "sha512_224")
 	hasher.Update(input)
 	return hasher.Digest(outputEncoding)
 }
 
-func (c *Crypto) Sha512_256(ctx context.Context, input []byte, outputEncoding string) string {
+func (c *Crypto) Sha512_256(ctx context.Context, input []byte, outputEncoding string) interface{} {
 	hasher := c.CreateHash(ctx, "sha512_256")
 	hasher.Update(input)
 	return hasher.Digest(outputEncoding)
 }
 
-func (c *Crypto) Ripemd160(ctx context.Context, input []byte, outputEncoding string) string {
+func (c *Crypto) Ripemd160(ctx context.Context, input []byte, outputEncoding string) interface{} {
 	hasher := c.CreateHash(ctx, "ripemd160")
 	hasher.Update(input)
 	return hasher.Digest(outputEncoding)
@@ -152,7 +152,7 @@ func (hasher *Hasher) Update(input []byte) {
 	}
 }
 
-func (hasher *Hasher) Digest(outputEncoding string) string {
+func (hasher *Hasher) Digest(outputEncoding string) interface{} {
 	sum := hasher.hash.Sum(nil)
 
 	switch outputEncoding {
@@ -168,6 +168,9 @@ func (hasher *Hasher) Digest(outputEncoding string) string {
 	case "hex":
 		return hex.EncodeToString(sum)
 
+	case "binary", "":
+		return sum
+
 	default:
 		err := errors.New("Invalid output encoding: " + outputEncoding)
 		common.Throw(common.GetRuntime(hasher.ctx), err)
@@ -176,30 +179,34 @@ func (hasher *Hasher) Digest(outputEncoding string) string {
 	return ""
 }
 
-func (c Crypto) CreateHMAC(ctx context.Context, algorithm string, key string) *Hasher {
+// HexEncode returns a string with the hex representation of the provided byte array
+func (c Crypto) HexEncode(_ context.Context, data []byte) string {
+	return hex.EncodeToString(data)
+}
+
+func (c Crypto) CreateHMAC(ctx context.Context, algorithm string, key []byte) *Hasher {
 	hasher := Hasher{}
 	hasher.ctx = ctx
-	keyBuffer := []byte(key)
 
 	switch algorithm {
 	case "md4":
-		hasher.hash = hmac.New(md4.New, keyBuffer)
+		hasher.hash = hmac.New(md4.New, key)
 	case "md5":
-		hasher.hash = hmac.New(md5.New, keyBuffer)
+		hasher.hash = hmac.New(md5.New, key)
 	case "sha1":
-		hasher.hash = hmac.New(sha1.New, keyBuffer)
+		hasher.hash = hmac.New(sha1.New, key)
 	case "sha256":
-		hasher.hash = hmac.New(sha256.New, keyBuffer)
+		hasher.hash = hmac.New(sha256.New, key)
 	case "sha384":
-		hasher.hash = hmac.New(sha512.New384, keyBuffer)
+		hasher.hash = hmac.New(sha512.New384, key)
 	case "sha512_224":
-		hasher.hash = hmac.New(sha512.New512_224, keyBuffer)
+		hasher.hash = hmac.New(sha512.New512_224, key)
 	case "sha512_256":
-		hasher.hash = hmac.New(sha512.New512_256, keyBuffer)
+		hasher.hash = hmac.New(sha512.New512_256, key)
 	case "sha512":
-		hasher.hash = hmac.New(sha512.New, keyBuffer)
+		hasher.hash = hmac.New(sha512.New, key)
 	case "ripemd160":
-		hasher.hash = hmac.New(ripemd160.New, keyBuffer)
+		hasher.hash = hmac.New(ripemd160.New, key)
 	default:
 		err := errors.New("Invalid algorithm: " + algorithm)
 		common.Throw(common.GetRuntime(hasher.ctx), err)
@@ -208,7 +215,9 @@ func (c Crypto) CreateHMAC(ctx context.Context, algorithm string, key string) *H
 	return &hasher
 }
 
-func (c *Crypto) Hmac(ctx context.Context, algorithm string, key string, input []byte, outputEncoding string) string {
+func (c *Crypto) Hmac(
+	ctx context.Context, algorithm string, key []byte, input []byte, outputEncoding string,
+) interface{} {
 	hasher := c.CreateHMAC(ctx, algorithm, key)
 	hasher.Update(input)
 	return hasher.Digest(outputEncoding)
