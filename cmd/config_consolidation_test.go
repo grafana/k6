@@ -351,6 +351,18 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 		},
 
 		//TODO: test the future full overwriting of the duration/iterations/stages/execution options
+		{
+			opts{
+				fs: defaultConfig(`{
+					"execution": { "someKey": {
+						"type": "constant-looping-vus", "vus": 10, "duration": "60s", "interruptible": false,
+						"iterationTimeout": "10s", "startTime": "70s", "env": {"test": "mest"}, "exec": "someFunc"
+					}}}`),
+				env: []string{"K6_ITERATIONS=25"},
+				cli: []string{"--vus", "12"},
+			},
+			exp{}, verifySharedIters(I(12), I(25)),
+		},
 
 		// Just in case, verify that no options will result in the same 1 vu 1 iter config
 		{opts{}, exp{}, verifyOneIterPerOneVU},
