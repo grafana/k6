@@ -160,7 +160,10 @@ func TestSetupData(t *testing.T) {
 				rw := httptest.NewRecorder()
 				handler.ServeHTTP(rw, newRequestWithEngine(engine, method, "/v1/setup", bytes.NewBufferString(body)))
 				res := rw.Result()
-				assert.Equal(t, http.StatusOK, res.StatusCode)
+				if !assert.Equal(t, http.StatusOK, res.StatusCode) {
+					t.Logf("body: %s\n", rw.Body.String())
+					return
+				}
 
 				var doc jsonapi.Document
 				assert.NoError(t, json.Unmarshal(rw.Body.Bytes(), &doc))
