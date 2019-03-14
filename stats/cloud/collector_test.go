@@ -298,16 +298,19 @@ func TestCloudCollectorMaxPerPacket(t *testing.T) {
 	now := time.Now()
 	tags := stats.IntoSampleTags(&map[string]string{"test": "mest", "a": "b"})
 	var gotTheLimit = false
+	var m sync.Mutex
 
 	tb.Mux.HandleFunc(fmt.Sprintf("/v1/metrics/%s", collector.referenceID),
-		func(w http.ResponseWriter, r *http.Request) {
+		func(_ http.ResponseWriter, r *http.Request) {
 			body, err := ioutil.ReadAll(r.Body)
 			assert.NoError(t, err)
 			receivedSamples := []Sample{}
 			assert.NoError(t, json.Unmarshal(body, &receivedSamples))
 			assert.True(t, len(receivedSamples) <= maxMetricSamplesPerPackage)
 			if len(receivedSamples) == maxMetricSamplesPerPackage {
+				m.Lock()
 				gotTheLimit = true
+				m.Unlock()
 			}
 		})
 
