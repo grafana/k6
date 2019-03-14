@@ -168,7 +168,7 @@ func (hasher *Hasher) Digest(outputEncoding string) interface{} {
 	case "hex":
 		return hex.EncodeToString(sum)
 
-	case "binary", "":
+	case "binary":
 		return sum
 
 	default:

@@ -264,7 +264,6 @@ func TestOutputEncoding(t *testing.T) {
 		const correctBase64URL = "XrY7u-Ae7tCTyyK7j1rNww=="
 		const correctBase64RawURL = "XrY7u-Ae7tCTyyK7j1rNww";
 		const correctBinary = [94,182,59,187,224,30,238,208,147,203,34,187,143,90,205,195];
-		const correctDefaultEncoding = correctBinary;
 
 		let hasher = crypto.createHash("md5");
 		hasher.update("hello world");
@@ -305,12 +304,6 @@ func TestOutputEncoding(t *testing.T) {
 		if (!arraysEqual(resultBinary,  correctBinary)) {
 			throw new Error("Binary encoding mismatch: " + JSON.stringify(resultBinary));
 		}
-
-		const resultDefaultEncoding = hasher.digest();
-		if (!arraysEqual(resultDefaultEncoding,  correctDefaultEncoding)) {
-			throw new Error("Default encoding mismatch: " + JSON.stringify(resultDefaultEncoding));
-		}
-
 		`)
 
 		assert.NoError(t, err)
@@ -426,7 +419,7 @@ func TestAWSv4(t *testing.T) {
 	_, err := common.RunString(rt, `
 		let HexEncode = crypto.hexEncode;
 		let HmacSHA256 = function(data, key) {
-			return crypto.hmac("sha256",key, data);
+			return crypto.hmac("sha256",key, data, "binary");
 		};
 
 		let expectedKDate    = '969fbb94feb542b71ede6f87fe4d5fa29c789342b0f407474670f0c2489e0a0d'
@@ -462,17 +455,5 @@ func TestAWSv4(t *testing.T) {
 			throw new Error("Wrong kSigning: expected '" + expectedKSigning + "' got '" + hexKSigning + "'");
 		}
 		`)
-	assert.NoError(t, err)
-}
-
-func TestMissingOutputEncoding(t *testing.T) {
-	rt := goja.New()
-	rt.SetFieldNameMapper(common.FieldNameMapper{})
-	ctx := context.Background()
-	ctx = common.WithRuntime(ctx, rt)
-	rt.Set("crypto", common.Bind(rt, New(), &ctx))
-
-	_, err := common.RunString(rt, `
-	`)
 	assert.NoError(t, err)
 }
