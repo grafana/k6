@@ -447,7 +447,7 @@ a commandline interface for interacting with it.`,
 		}
 
 		// Print the end-of-test summary.
-		if !quiet && !conf.NoSummary.Bool {
+		if !conf.NoSummary.Bool {
 			fprintf(stdout, "\n")
 			ui.Summarize(stdout, "", ui.SummaryData{
 				Opts:    conf.Options,
