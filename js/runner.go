@@ -271,8 +271,8 @@ func (r *Runner) SetOptions(opts lib.Options) error {
 		r.RPSLimit = rate.NewLimiter(rate.Limit(rps.Int64), 1)
 	}
 
-	if consoleOutputFile := opts.ConsoleOutput; consoleOutputFile.Valid {
-		c, err := newFileConsole(consoleOutputFile.String)
+	if opts.ConsoleOutput.Valid {
+		c, err := newFileConsole(opts.ConsoleOutput.String)
 		if err != nil {
 			return err
 		}
