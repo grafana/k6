@@ -48,6 +48,8 @@ func newFileConsole(filepath string) (*console, error) {
 
 	l := log.New()
 	l.SetOutput(f)
+
+	//TODO: refactor to not rely on global variables, albeit external ones
 	l.SetFormatter(log.StandardLogger().Formatter)
 
 	return &console{l}, nil
