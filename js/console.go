@@ -48,6 +48,7 @@ func newFileConsole(filepath string) (*console, error) {
 
 	l := log.New()
 	l.SetOutput(f)
+	l.SetFormatter(log.StandardLogger().Formatter)
 
 	return &console{l}, nil
 }
