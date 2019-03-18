@@ -404,6 +404,19 @@ func TestNewBundleFromArchive(t *testing.T) {
 	assert.Equal(t, "hi!", v2.Export())
 }
 
+func TestOpenNotOpeningURLs(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	src := &lib.SourceData{
+		Filename: "/path/to/script.js",
+		Data: []byte(`
+			export let file = open("google.com");
+			export default function() { };
+		`),
+	}
+	_, err := NewBundle(src, fs, lib.RuntimeOptions{})
+	assert.Error(t, err)
+}
+
 func TestBundleInstantiate(t *testing.T) {
 	b, err := getSimpleBundle("/script.js", `
 		let val = true;
