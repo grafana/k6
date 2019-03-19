@@ -165,10 +165,21 @@ func (i *InitContext) compileImport(src, filename string) (*goja.Program, error)
 }
 
 func (i *InitContext) Open(name string, args ...string) (goja.Value, error) {
-	filename := loader.Resolve(i.pwd, name)
+	filename := name
+	if !filepath.IsAbs(name) {
+		filename = filepath.Join(i.pwd, name)
+	}
+	filename = filepath.ToSlash(filename)
+
 	data, ok := i.files[filename]
 	if !ok {
 		var err error
+		// Workaround for https://github.com/spf13/afero/issues/201
+		if isDir, err := afero.IsDir(i.fs, filename); err != nil {
+			return nil, err
+		} else if isDir {
+			return nil, errors.New("open can't be used with directories")
+		}
 		data, err = afero.ReadFile(i.fs, filename)
 		if err != nil {
 			return nil, err

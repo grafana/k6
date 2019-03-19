@@ -404,17 +404,101 @@ func TestNewBundleFromArchive(t *testing.T) {
 	assert.Equal(t, "hi!", v2.Export())
 }
 
-func TestOpenNotOpeningURLs(t *testing.T) {
-	fs := afero.NewMemMapFs()
-	src := &lib.SourceData{
-		Filename: "/path/to/script.js",
-		Data: []byte(`
-			export let file = open("google.com");
-			export default function() { };
+func TestOpen(t *testing.T) {
+	t.Run("paths", func(t *testing.T) {
+		var testCases = [...]struct {
+			name           string
+			openPath       string
+			pwd            string
+			isError        bool
+			isArchiveError bool
+		}{
+			{
+				name:     "notOpeningUrls",
+				openPath: "github.com",
+				isError:  true,
+			},
+			{
+				name:     "simple",
+				openPath: "file.txt",
+				pwd:      "/path/to",
+			},
+			{
+				name:     "simple with dot",
+				openPath: "./file.txt",
+				pwd:      "/path/to",
+			},
+			{
+				name:     "simple with two dots",
+				openPath: "../to/file.txt",
+				pwd:      "/path/not",
+			},
+			{
+				name:     "fullpath",
+				openPath: "/path/to/file.txt",
+				pwd:      "/path/to",
+			},
+			{
+				name:     "fullpath2",
+				openPath: "/path/to/file.txt",
+				pwd:      "/path",
+			},
+			{
+				name:     "file is dir",
+				openPath: "/path/to/",
+				isError:  true,
+			},
+			{
+				name:     "file is missing",
+				openPath: "/path/to/missing.txt",
+				isError:  true,
+			},
+		}
+		for _, tCase := range testCases {
+			tCase := tCase
+
+			t.Run(tCase.name, func(t *testing.T) {
+				fs := afero.NewMemMapFs()
+				assert.NoError(t, fs.MkdirAll("/path/to", 0755))
+				assert.NoError(t, afero.WriteFile(fs, "/path/to/file.txt", []byte(`hi`), 0644))
+				src := &lib.SourceData{
+					Filename: "/path/to/script.js",
+					Data: []byte(`
+			export let file = open("` + tCase.openPath + `");
+			export default function() { return file };
 		`),
-	}
-	_, err := NewBundle(src, fs, lib.RuntimeOptions{})
-	assert.Error(t, err)
+				}
+				sourceBundle, err := NewBundle(src, fs, lib.RuntimeOptions{})
+				if tCase.isError {
+					assert.Error(t, err)
+					return
+				}
+				if !assert.NoError(t, err) {
+					return
+				}
+				sourceBundle.BaseInitContext.pwd = tCase.pwd
+
+				arcBundle, err := NewBundleFromArchive(sourceBundle.makeArchive(), lib.RuntimeOptions{})
+				if !assert.NoError(t, err) {
+					return
+				}
+				for source, b := range map[string]*Bundle{"source": sourceBundle, "archive": arcBundle} {
+					b := b
+					t.Run(source, func(t *testing.T) {
+						bi, err := b.Instantiate()
+						if !assert.NoError(t, err) {
+							return
+						}
+						v, err := bi.Default(goja.Undefined())
+						if !assert.NoError(t, err) {
+							return
+						}
+						assert.Equal(t, "hi", v.Export())
+					})
+				}
+			})
+		}
+	})
 }
 
 func TestBundleInstantiate(t *testing.T) {
