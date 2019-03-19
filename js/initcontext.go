@@ -173,9 +173,13 @@ func (i *InitContext) Open(name string, args ...string) (goja.Value, error) {
 
 	data, ok := i.files[filename]
 	if !ok {
-		var err error
+		var (
+			err   error
+			isDir bool
+		)
+
 		// Workaround for https://github.com/spf13/afero/issues/201
-		if isDir, err := afero.IsDir(i.fs, filename); err != nil {
+		if isDir, err = afero.IsDir(i.fs, filename); err != nil {
 			return nil, err
 		} else if isDir {
 			return nil, errors.New("open can't be used with directories")
