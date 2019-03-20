@@ -166,8 +166,8 @@ func (i *InitContext) compileImport(src, filename string) (*goja.Program, error)
 
 func (i *InitContext) Open(name string, args ...string) (goja.Value, error) {
 	filename := name
-	if !filepath.IsAbs(name) {
-		filename = filepath.Join(i.pwd, name)
+	if filename[0] != '/' && filename[0] != filepath.Separator && !filepath.IsAbs(filename) {
+		filename = filepath.Join(i.pwd, filename)
 	}
 	filename = filepath.ToSlash(filename)
 

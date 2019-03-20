@@ -23,6 +23,9 @@ package js
 import (
 	"crypto/tls"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -31,6 +34,7 @@ import (
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -405,100 +409,127 @@ func TestNewBundleFromArchive(t *testing.T) {
 }
 
 func TestOpen(t *testing.T) {
-	t.Run("paths", func(t *testing.T) {
-		var testCases = [...]struct {
-			name           string
-			openPath       string
-			pwd            string
-			isError        bool
-			isArchiveError bool
-		}{
-			{
-				name:     "notOpeningUrls",
-				openPath: "github.com",
-				isError:  true,
-			},
-			{
-				name:     "simple",
-				openPath: "file.txt",
-				pwd:      "/path/to",
-			},
-			{
-				name:     "simple with dot",
-				openPath: "./file.txt",
-				pwd:      "/path/to",
-			},
-			{
-				name:     "simple with two dots",
-				openPath: "../to/file.txt",
-				pwd:      "/path/not",
-			},
-			{
-				name:     "fullpath",
-				openPath: "/path/to/file.txt",
-				pwd:      "/path/to",
-			},
-			{
-				name:     "fullpath2",
-				openPath: "/path/to/file.txt",
-				pwd:      "/path",
-			},
-			{
-				name:     "file is dir",
-				openPath: "/path/to/",
-				isError:  true,
-			},
-			{
-				name:     "file is missing",
-				openPath: "/path/to/missing.txt",
-				isError:  true,
-			},
-		}
-		for _, tCase := range testCases {
-			tCase := tCase
+	var testCases = [...]struct {
+		name           string
+		openPath       string
+		pwd            string
+		isError        bool
+		isArchiveError bool
+	}{
+		{
+			name:     "notOpeningUrls",
+			openPath: "github.com",
+			isError:  true,
+			pwd:      "/path/to",
+		},
+		{
+			name:     "simple",
+			openPath: "file.txt",
+			pwd:      "/path/to",
+		},
+		{
+			name:     "simple with dot",
+			openPath: "./file.txt",
+			pwd:      "/path/to",
+		},
+		{
+			name:     "simple with two dots",
+			openPath: "../to/file.txt",
+			pwd:      "/path/not",
+		},
+		{
+			name:     "fullpath",
+			openPath: "/path/to/file.txt",
+			pwd:      "/path/to",
+		},
+		{
+			name:     "fullpath2",
+			openPath: "/path/to/file.txt",
+			pwd:      "/path",
+		},
+		{
+			name:     "file is dir",
+			openPath: "/path/to/",
+			pwd:      "/path/to",
+			isError:  true,
+		},
+		{
+			name:     "file is missing",
+			openPath: "/path/to/missing.txt",
+			isError:  true,
+		},
+	}
+	fss := map[string]func() (afero.Fs, string, func()){
+		"MemMapFS": func() (afero.Fs, string, func()) {
+			fs := afero.NewMemMapFs()
+			require.NoError(t, fs.MkdirAll("/path/to", 0755))
+			require.NoError(t, afero.WriteFile(fs, "/path/to/file.txt", []byte(`hi`), 0644))
+			return fs, "", func() {}
+		},
+		"OsFS": func() (afero.Fs, string, func()) {
+			prefix, err := ioutil.TempDir("", "k6_open_test")
+			require.NoError(t, err)
+			fs := afero.NewOsFs()
+			require.NoError(t, fs.MkdirAll(filepath.Join(prefix, "/path/to"), 0755))
+			require.NoError(t, afero.WriteFile(fs, filepath.Join(prefix, "/path/to/file.txt"), []byte(`hi`), 0644))
+			return fs, prefix, func() { os.RemoveAll(prefix) }
+		},
+	}
 
-			t.Run(tCase.name, func(t *testing.T) {
-				fs := afero.NewMemMapFs()
-				assert.NoError(t, fs.MkdirAll("/path/to", 0755))
-				assert.NoError(t, afero.WriteFile(fs, "/path/to/file.txt", []byte(`hi`), 0644))
-				src := &lib.SourceData{
-					Filename: "/path/to/script.js",
-					Data: []byte(`
-			export let file = open("` + tCase.openPath + `");
+	for name, fsInit := range fss {
+		fs, prefix, cleanUp := fsInit()
+		defer cleanUp()
+		fs = afero.NewReadOnlyFs(fs)
+		t.Run(name, func(t *testing.T) {
+			fs = afero.NewReadOnlyFs(fs)
+			for _, tCase := range testCases {
+				tCase := tCase
+				var openPath = tCase.openPath
+				// if fullpath prepend prefix
+				if openPath[0] == '/' {
+					openPath = filepath.Join(prefix, openPath)
+				}
+
+				t.Run(tCase.name, func(t *testing.T) {
+					src := &lib.SourceData{
+						Filename: filepath.Join(prefix, "/path/to/script.js"),
+						Data: []byte(`
+			export let file = open("` + openPath + `");
 			export default function() { return file };
 		`),
-				}
-				sourceBundle, err := NewBundle(src, fs, lib.RuntimeOptions{})
-				if tCase.isError {
-					assert.Error(t, err)
-					return
-				}
-				if !assert.NoError(t, err) {
-					return
-				}
-				sourceBundle.BaseInitContext.pwd = tCase.pwd
+					}
+					sourceBundle, err := NewBundle(src, fs, lib.RuntimeOptions{})
+					if tCase.isError {
+						assert.Error(t, err)
+						return
+					}
+					if !assert.NoError(t, err) {
+						return
+					}
+					sourceBundle.BaseInitContext.pwd = filepath.Join(prefix, tCase.pwd)
 
-				arcBundle, err := NewBundleFromArchive(sourceBundle.makeArchive(), lib.RuntimeOptions{})
-				if !assert.NoError(t, err) {
-					return
-				}
-				for source, b := range map[string]*Bundle{"source": sourceBundle, "archive": arcBundle} {
-					b := b
-					t.Run(source, func(t *testing.T) {
-						bi, err := b.Instantiate()
-						if !assert.NoError(t, err) {
-							return
-						}
-						v, err := bi.Default(goja.Undefined())
-						if !assert.NoError(t, err) {
-							return
-						}
-						assert.Equal(t, "hi", v.Export())
-					})
-				}
-			})
-		}
-	})
+					arcBundle, err := NewBundleFromArchive(sourceBundle.makeArchive(), lib.RuntimeOptions{})
+					if !assert.NoError(t, err) {
+						return
+					}
+					for source, b := range map[string]*Bundle{"source": sourceBundle, "archive": arcBundle} {
+						b := b
+						t.Run(source, func(t *testing.T) {
+							bi, err := b.Instantiate()
+							if !assert.NoError(t, err) {
+								return
+							}
+							v, err := bi.Default(goja.Undefined())
+							if !assert.NoError(t, err) {
+								return
+							}
+							assert.Equal(t, "hi", v.Export())
+						})
+					}
+				})
+			}
+		})
+	}
 }
 
 func TestBundleInstantiate(t *testing.T) {
