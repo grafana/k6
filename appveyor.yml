@@ -10,6 +10,8 @@ environment:
   # specific to go
   VERSION: "%APPVEYOR_REPO_TAG_NAME:v=%"
   GOPATH: c:\gopath
+  GOVERSION: 1.12.1
+  GOMAXPROCS: 2
   CGO_ENABLED: '0'
   GOARCH: amd64
   BINTRAY_KEY:
@@ -21,10 +23,26 @@ environment:
 install:
   - choco install wixtoolset pandoc -y
   - refreshenv
-  # ensure wix is available in PATH
-  - set PATH=%WIX%\bin;%PATH%
-  # specific to go
-  - set PATH=%GOPATH%\bin;%PATH%
+  # ensure wix and go are available in PATH
+  - set PATH=C:\go\bin;%GOPATH%\bin;%WIX%\bin;%PATH%
+  - ps: |
+      Remove-Item 'C:\go' -Recurse -Force -ErrorAction Ignore
+      Remove-Item 'C:\go-x86' -Recurse -Force -ErrorAction Ignore
+
+      Write-Host "Downloading..."
+      $goDistPath = "$env:TEMP\go" + $env:GOVERSION + ".windows-amd64.zip"
+      (New-Object Net.WebClient).DownloadFile("https://dl.google.com/go/go" + $env:GOVERSION + ".windows-amd64.zip", $goDistPath)
+
+      Write-Host "Unpacking..."
+      7z x $goDistPath -oC:\gotmp-x64 | Out-Null
+      [IO.Directory]::Move('C:\gotmp-x64\go', 'C:\go')
+      Remove-Item 'C:\gotmp-x64' -Recurse -Force
+      del $goDistPath
+
+      Write-Host "Testing..."
+  - go version
+  - echo "NumCores:%NUMBER_OF_PROCESSORS%"
+  - systeminfo
 
 
 # build msi artifacts
@@ -32,6 +50,7 @@ build_script:
   # In case of non tag build, mock a version
   - if "%APPVEYOR_REPO_TAG%" == "false" (set VERSION="0.0.1")
   - pandoc -s -f markdown -t rtf -o packaging\LICENSE.rtf LICENSE.md
+  - go version
   - go build -a -ldflags "-s -w" -o packaging\k6.exe
   - cd packaging
   - candle.exe -arch x64 -dVERSION=%VERSION% k6.wxs
@@ -39,6 +58,7 @@ build_script:
 
 test_script:
   - cd %APPVEYOR_BUILD_FOLDER%
+  - go version
   - go test ./...
 
 deploy_script:
