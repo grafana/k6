@@ -389,7 +389,7 @@ func runTestCase(
 	flagSet := newFlagSet()
 	defer resetStickyGlobalVars()
 	flagSet.SetOutput(testOutput{t})
-	flagSet.PrintDefaults()
+	//flagSet.PrintDefaults()
 
 	cliErr := flagSet.Parse(testCase.options.cli)
 	if testCase.expected.cliParseError {
