@@ -15,7 +15,7 @@ environment:
   CGO_ENABLED: '0'
   GOARCH: amd64
   BINTRAY_KEY:
-    secure: /0S6SdBwfiuWEdY4SKJcZpxEV+QpsfJfqx3QqYbnK8vwmB2KMGqerGzQRnIrkbGD
+    secure: 0DFVlQR9tBvdTiULPdCw12VBf2Zzy/hpPiPtlKhHdaatIBdwB6i1HhPcgh0kDEBr
   GPG_PASSPHRASE:
     secure: CMQ+U+qVVdhIr1Eip5nGPbaGFggVvSjg/BpSY0EpLbQ=
 
@@ -49,10 +49,11 @@ install:
 build_script:
   # In case of non tag build, mock a version
   - if "%APPVEYOR_REPO_TAG%" == "false" (set VERSION="0.0.1")
+  - cd %APPVEYOR_BUILD_FOLDER%
   - pandoc -s -f markdown -t rtf -o packaging\LICENSE.rtf LICENSE.md
   - go version
   - go build -a -ldflags "-s -w" -o packaging\k6.exe
-  - cd packaging
+  - cd %APPVEYOR_BUILD_FOLDER%\packaging
   - candle.exe -arch x64 -dVERSION=%VERSION% k6.wxs
   - light.exe -ext WixUIExtension k6.wixobj
 
@@ -62,6 +63,7 @@ test_script:
   - go test ./...
 
 deploy_script:
+  - cd %APPVEYOR_BUILD_FOLDER%\packaging
   # Checking if the build has started by pushed tag
   - ps: |
       if ( $env:APPVEYOR_REPO_TAG -eq "false" ) { Exit-AppveyorBuild }
