@@ -2,7 +2,7 @@ version: 2
 jobs:
   lint:
     docker:
-      - image: circleci/golang:1.11.5
+      - image: circleci/golang:1.12
     environment:
       GOPATH: /home/circleci/.go_workspace
     working_directory: /home/circleci/.go_workspace/src/github.com/loadimpact/k6
@@ -11,9 +11,11 @@ jobs:
       - run:
           name: Check dependencies
           command: |
+            go version
             export PATH="$GOPATH/bin:$PATH"
             mkdir -p "$GOPATH/bin"
             curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+            dep version
             dep status
             dep ensure -update -dry-run
       - run:
@@ -27,7 +29,7 @@ jobs:
 
   test:
     docker:
-      - image: circleci/golang:1.11.5
+      - image: circleci/golang:1.12
     environment:
       GOPATH: /home/circleci/.go_workspace
     working_directory: /home/circleci/.go_workspace/src/github.com/loadimpact/k6
@@ -36,6 +38,7 @@ jobs:
       - run:
           name: Run tests and code coverage
           command: |
+            go version
             export GOMAXPROCS=4
             export PATH=$GOPATH/bin:$PATH
             echo "mode: set" > coverage.txt
@@ -47,41 +50,25 @@ jobs:
             bash <(curl -s https://codecov.io/bash)
 
 
-  test-go110:
+  test-prev-golang:
     docker:
-      - image: circleci/golang:1.10.8
+      - image: circleci/golang:1.11
     environment:
       GOPATH: /home/circleci/.go_workspace
     working_directory: /home/circleci/.go_workspace/src/github.com/loadimpact/k6
     steps:
       - checkout
       - run:
-          name: Run tests and code coverage
+          name: Run tests with previous Go version
           command: |
+            go version
             export GOMAXPROCS=4
             export PATH=$GOPATH/bin:$PATH
             go test -race -timeout 600s ./...
 
-  test-go112:
-    docker:
-      - image: circleci/golang:1.12.0
-    environment:
-      GOPATH: /home/circleci/.go_workspace
-    working_directory: /home/circleci/.go_workspace/src/github.com/loadimpact/k6
-    steps:
-      - checkout
-      - run:
-          name: Run tests and code coverage
-          command: |
-            export GOMAXPROCS=4
-            export PATH=$GOPATH/bin:$PATH
-            for pkg in $(go list ./... | grep -v vendor); do
-                go test -race -timeout 600s $pkg
-            done
-
   build-docker-images:
     docker:
-      - image: circleci/golang:1.11.5
+      - image: circleci/golang:1.12
     environment:
       GOPATH: /home/circleci/.go_workspace
     working_directory: /home/circleci/.go_workspace/src/github.com/loadimpact/k6
@@ -125,7 +112,7 @@ jobs:
 
   build-linux-packages:
     docker:
-      - image: circleci/golang:1.11.5
+      - image: circleci/golang:1.12
     environment:
       GOPATH: /home/circleci/.go_workspace
     working_directory: /home/circleci/.go_workspace/src/github.com/loadimpact/k6
@@ -178,11 +165,7 @@ workflows:
           filters:
             tags:
               only: /.*/
-      - test-go110:
-          filters:
-            tags:
-              only: /.*/
-      - test-go112:
+      - test-prev-golang:
           filters:
             tags:
               only: /.*/

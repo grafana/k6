@@ -99,7 +99,7 @@ If there isn't an official package for your operating system or architecture, or
 
 ### Build from source
 
-k6 is written in Go, so it's just a single statically-linked executable and very easy to build and distribute. To build from source you need **[Git](https://git-scm.com/downloads)** and **[Go](https://golang.org/doc/install)** (1.10 or newer). Follow these instructions:
+k6 is written in Go, so it's just a single statically-linked executable and very easy to build and distribute. To build from source you need **[Git](https://git-scm.com/downloads)** and **[Go](https://golang.org/doc/install)** (1.11 or newer). Follow these instructions:
 
 - Run `go get github.com/loadimpact/k6` which will:
   - git clone the repo and put the source in `$GOPATH/src/github.com/loadimpact/k6`
