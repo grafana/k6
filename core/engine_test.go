@@ -840,20 +840,20 @@ func TestEmittedMetricsWhenScalingDown(t *testing.T) {
 		export let options = {
 			systemTags: ["iter", "vu", "url"],
 
-			// Start with 2 VUs for 2 second and then quickly scale down to 1 for the next 2s and then quit
+			// Start with 2 VUs for 4 seconds and then quickly scale down to 1 for the next 4s and then quit
 			vus: 2,
 			vusMax: 2,
 			stages: [
-				{ duration: "2s", target: 2 },
+				{ duration: "4s", target: 2 },
 				{ duration: "1s", target: 1 },
-				{ duration: "1s", target: 1 },
+				{ duration: "3s", target: 1 },
 			],
 		};
 
 		export default function () {
 			console.log("VU " + __VU + " starting iteration #" + __ITER);
 			http.get("HTTPBIN_IP_URL/bytes/15000");
-			sleep(1.7);
+			sleep(3.1);
 			http.get("HTTPBIN_IP_URL/bytes/15000");
 			console.log("VU " + __VU + " ending iteration #" + __ITER);
 		};
@@ -913,7 +913,7 @@ func TestEmittedMetricsWhenScalingDown(t *testing.T) {
 	durationCount := float64(getMetricCount(collector, metrics.IterationDuration.Name))
 	assert.Equal(t, 3.0, durationCount)
 	durationSum := getMetricSum(collector, metrics.IterationDuration.Name)
-	assert.InDelta(t, 1.7, durationSum/(1000*durationCount), 0.1)
+	assert.InDelta(t, 3.35, durationSum/(1000*durationCount), 0.25)
 }
 
 func TestMinIterationDuration(t *testing.T) {
