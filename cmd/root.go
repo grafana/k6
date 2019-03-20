@@ -40,7 +40,7 @@ import (
 
 // Version contains the current semantic version of k6.
 //nolint:gochecknoglobals
-var Version = "0.23.1"
+var Version = "0.24.0"
 
 // Banner contains the ASCII-art banner with the k6 logo and stylized website URL
 //TODO: make these into methods, only the version needs to be a variable
