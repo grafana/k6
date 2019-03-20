@@ -16,7 +16,7 @@
     <a href="https://github.com/loadimpact/k6/releases">Download</a> ·
     <a href="#install">Install</a> ·
     <a href="https://docs.k6.io">Documentation</a> ·
-    <a href="https://k6.io/slack">Community</a>
+    <a href="https://community.k6.io/">Community</a>
 </p>
 
 ---
