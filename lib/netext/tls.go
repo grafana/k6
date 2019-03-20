@@ -33,9 +33,12 @@ type TLSInfo struct {
 	CipherSuite string
 }
 type OCSP struct {
-	ProducedAt, ThisUpdate, NextUpdate, RevokedAt int64
-	RevocationReason                              string
-	Status                                        string
+	ProducedAt       int64  `json:"produced_at"`
+	ThisUpdate       int64  `json:"this_update"`
+	NextUpdate       int64  `json:"next_update"`
+	RevokedAt        int64  `json:"revoked_at"`
+	RevocationReason string `json:"revocation_reason"`
+	Status           string `json:"status"`
 }
 
 func ParseTLSConnState(tlsState *tls.ConnectionState) (TLSInfo, OCSP) {

@@ -49,15 +49,24 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	null "gopkg.in/guregu/null.v3"
 )
 
 const (
 	typeJS      = "js"
 	typeArchive = "archive"
+
+	thresholdHaveFailedErroCode = 99
+	setupTimeoutErrorCode       = 100
+	teardownTimeoutErrorCode    = 101
+	genericTimeoutErrorCode     = 102
+	genericEngineErrorCode      = 103
+	invalidConfigErrorCode      = 104
 )
 
 var (
+	//TODO: fix this, global variables are not very testable...
 	runType       = os.Getenv("K6_TYPE")
 	runNoSetup    = os.Getenv("K6_NO_SETUP") != ""
 	runNoTeardown = os.Getenv("K6_NO_TEARDOWN") != ""
@@ -91,7 +100,8 @@ a commandline interface for interacting with it.`,
   k6 run -o influxdb=http://1.2.3.4:8086/k6`[1:],
 	Args: exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		_, _ = BannerColor.Fprint(stdout, Banner+"\n\n")
+		//TODO: disable in quiet mode?
+		_, _ = BannerColor.Fprintf(stdout, "\n%s\n\n", Banner)
 
 		initBar := ui.ProgressBar{
 			Width: 60,
@@ -154,9 +164,16 @@ a commandline interface for interacting with it.`,
 			)
 		}
 
+		//TODO: move a bunch of the logic above to a config "constructor" and to the Validate() method
+
 		// If duration is explicitly set to 0, it means run forever.
+		//TODO: just... handle this differently, e.g. as a part of the manual executor
 		if conf.Duration.Valid && conf.Duration.Duration == 0 {
 			conf.Duration = types.NullDuration{}
+		}
+
+		if cerr := validateConfig(conf); cerr != nil {
+			return ExitCode{cerr, invalidConfigErrorCode}
 		}
 
 		// If summary trend stats are defined, update the UI to reflect them
@@ -165,7 +182,9 @@ a commandline interface for interacting with it.`,
 		}
 
 		// Write options back to the runner too.
-		r.SetOptions(conf.Options)
+		if err = r.SetOptions(conf.Options); err != nil {
+			return err
+		}
 
 		// Create a local executor wrapping the runner.
 		fprintf(stdout, "%s executor\r", initBar.String())
@@ -187,6 +206,9 @@ a commandline interface for interacting with it.`,
 		// Configure the engine.
 		if conf.NoThresholds.Valid {
 			engine.NoThresholds = conf.NoThresholds.Bool
+		}
+		if conf.NoSummary.Valid {
+			engine.NoSummary = conf.NoSummary.Bool
 		}
 
 		// Create a collector and assign it to the engine if requested.
@@ -376,13 +398,29 @@ a commandline interface for interacting with it.`,
 				progress.Progress = prog
 				fprintf(stdout, "%s\x1b[0K\r", progress.String())
 			case err := <-errC:
-				if err != nil {
-					log.WithError(err).Error("Engine error")
-				} else {
-					log.Debug("Engine terminated cleanly")
-				}
 				cancel()
-				break mainLoop
+				if err == nil {
+					log.Debug("Engine terminated cleanly")
+					break mainLoop
+				}
+
+				switch e := errors.Cause(err).(type) {
+				case lib.TimeoutError:
+					switch string(e) {
+					case "setup":
+						log.WithError(err).Error("Setup timeout")
+						return ExitCode{errors.New("Setup timeout"), setupTimeoutErrorCode}
+					case "teardown":
+						log.WithError(err).Error("Teardown timeout")
+						return ExitCode{errors.New("Teardown timeout"), teardownTimeoutErrorCode}
+					default:
+						log.WithError(err).Error("Engine timeout")
+						return ExitCode{errors.New("Engine timeout"), genericTimeoutErrorCode}
+					}
+				default:
+					log.WithError(err).Error("Engine error")
+					return ExitCode{errors.New("Engine Error"), genericEngineErrorCode}
+				}
 			case sig := <-sigC:
 				log.WithField("sig", sig).Debug("Exiting in response to signal")
 				cancel()
@@ -409,7 +447,7 @@ a commandline interface for interacting with it.`,
 		}
 
 		// Print the end-of-test summary.
-		if !quiet {
+		if !conf.NoSummary.Bool {
 			fprintf(stdout, "\n")
 			ui.Summarize(stdout, "", ui.SummaryData{
 				Opts:    conf.Options,
@@ -426,22 +464,41 @@ a commandline interface for interacting with it.`,
 		}
 
 		if engine.IsTainted() {
-			return ExitCode{errors.New("some thresholds have failed"), 99}
+			return ExitCode{errors.New("some thresholds have failed"), thresholdHaveFailedErroCode}
 		}
 		return nil
 	},
+}
+
+func runCmdFlagSet() *pflag.FlagSet {
+	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
+	flags.SortFlags = false
+	flags.AddFlagSet(optionFlagSet())
+	flags.AddFlagSet(runtimeOptionFlagSet(true))
+	flags.AddFlagSet(configFlagSet())
+
+	//TODO: Figure out a better way to handle the CLI flags:
+	// - the default values are specified in this way so we don't overwrire whatever
+	//   was specified via the environment variables
+	// - but we need to manually specify the DefValue, since that's the default value
+	//   that will be used in the help/usage message - if we don't set it, the environment
+	//   variables will affect the usage message
+	// - and finally, global variables are not very testable... :/
+	flags.StringVarP(&runType, "type", "t", runType, "override file `type`, \"js\" or \"archive\"")
+	flags.Lookup("type").DefValue = ""
+	flags.BoolVar(&runNoSetup, "no-setup", runNoSetup, "don't run setup()")
+	falseStr := "false" // avoiding goconst warnings...
+	flags.Lookup("no-setup").DefValue = falseStr
+	flags.BoolVar(&runNoTeardown, "no-teardown", runNoTeardown, "don't run teardown()")
+	flags.Lookup("no-teardown").DefValue = falseStr
+	return flags
 }
 
 func init() {
 	RootCmd.AddCommand(runCmd)
 
 	runCmd.Flags().SortFlags = false
-	runCmd.Flags().AddFlagSet(optionFlagSet())
-	runCmd.Flags().AddFlagSet(runtimeOptionFlagSet(true))
-	runCmd.Flags().AddFlagSet(configFlagSet())
-	runCmd.Flags().StringVarP(&runType, "type", "t", runType, "override file `type`, \"js\" or \"archive\"")
-	runCmd.Flags().BoolVar(&runNoSetup, "no-setup", runNoSetup, "don't run setup()")
-	runCmd.Flags().BoolVar(&runNoTeardown, "no-teardown", runNoTeardown, "don't run teardown()")
+	runCmd.Flags().AddFlagSet(runCmdFlagSet())
 }
 
 // Reads a source file from any supported destination.

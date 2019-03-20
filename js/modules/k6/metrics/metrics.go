@@ -23,20 +23,39 @@ package metrics
 import (
 	"context"
 	"errors"
+	"fmt"
+	"regexp"
 	"time"
 
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
+	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
 )
+
+var nameRegexString = "^[\\p{L}\\p{N}\\._ !\\?/&#\\(\\)<>%-]{1,128}$"
+
+var compileNameRegex = regexp.MustCompile(nameRegexString)
+
+func checkName(name string) bool {
+	return compileNameRegex.Match([]byte(name))
+}
 
 type Metric struct {
 	metric *stats.Metric
 }
 
+// ErrMetricsAddInInitContext is error returned when adding to metric is done in the init context
+var ErrMetricsAddInInitContext = common.NewInitContextError("Adding to metrics in the init context is not supported")
+
 func newMetric(ctxPtr *context.Context, name string, t stats.MetricType, isTime []bool) (interface{}, error) {
-	if common.GetState(*ctxPtr) != nil {
-		return nil, errors.New("Metrics must be declared in the init context")
+	if lib.GetState(*ctxPtr) != nil {
+		return nil, errors.New("metrics must be declared in the init context")
+	}
+
+	//TODO: move verification outside the JS
+	if !checkName(name) {
+		return nil, common.NewInitContextError(fmt.Sprintf("Invalid metric name: '%s'", name))
 	}
 
 	valueType := stats.Default
@@ -48,8 +67,11 @@ func newMetric(ctxPtr *context.Context, name string, t stats.MetricType, isTime 
 	return common.Bind(rt, Metric{stats.New(name, t, valueType)}, ctxPtr), nil
 }
 
-func (m Metric) Add(ctx context.Context, v goja.Value, addTags ...map[string]string) {
-	state := common.GetState(ctx)
+func (m Metric) Add(ctx context.Context, v goja.Value, addTags ...map[string]string) (bool, error) {
+	state := lib.GetState(ctx)
+	if state == nil {
+		return false, ErrMetricsAddInInitContext
+	}
 
 	tags := state.Options.RunTags.CloneTags()
 	if state.Options.SystemTags["group"] {
@@ -68,6 +90,7 @@ func (m Metric) Add(ctx context.Context, v goja.Value, addTags ...map[string]str
 	}
 
 	stats.PushIfNotCancelled(ctx, state.Samples, stats.Sample{Time: time.Now(), Metric: m.metric, Value: vfloat, Tags: stats.IntoSampleTags(&tags)})
+	return true, nil
 }
 
 type Metrics struct{}

@@ -21,20 +21,29 @@
 package js
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"go/build"
 	"io/ioutil"
 	stdlog "log"
 	"net"
 	"net/http"
+	"os"
+	"runtime"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/loadimpact/k6/core"
 	"github.com/loadimpact/k6/core/local"
 	"github.com/loadimpact/k6/js/common"
+	"github.com/loadimpact/k6/js/modules/k6"
+	k6http "github.com/loadimpact/k6/js/modules/k6/http"
+	k6metrics "github.com/loadimpact/k6/js/modules/k6/metrics"
+	"github.com/loadimpact/k6/js/modules/k6/ws"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/testutils"
@@ -198,6 +207,7 @@ func TestOptionsPropagationToScript(t *testing.T) {
 	require.Equal(t, expScriptOptions, r1.GetOptions())
 
 	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{Env: map[string]string{"expectedSetupTimeout": "3s"}})
+
 	require.NoError(t, err)
 	require.Equal(t, expScriptOptions, r2.GetOptions())
 
@@ -217,6 +227,28 @@ func TestOptionsPropagationToScript(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMetricName(t *testing.T) {
+	tb := testutils.NewHTTPMultiBin(t)
+	defer tb.Cleanup()
+
+	script := []byte(tb.Replacer.Replace(`
+		import { Counter } from "k6/metrics";
+
+		let myCounter = new Counter("not ok name @");
+
+		export default function(data) {
+			myCounter.add(1);
+		}
+	`))
+
+	_, err := New(
+		&lib.SourceData{Filename: "/script.js", Data: script},
+		afero.NewMemMapFs(),
+		lib.RuntimeOptions{},
+	)
+	require.Error(t, err)
 }
 
 func TestSetupDataIsolation(t *testing.T) {
@@ -483,7 +515,7 @@ func TestVURunContext(t *testing.T) {
 
 				assert.Equal(t, vu.Runtime, common.GetRuntime(*vu.Context), "incorrect runtime in context")
 
-				state := common.GetState(*vu.Context)
+				state := lib.GetState(*vu.Context)
 				if assert.NotNil(t, state) {
 					assert.Equal(t, null.IntFrom(10), state.Options.VUs)
 					assert.Equal(t, null.BoolFrom(true), state.Options.Throw)
@@ -500,33 +532,41 @@ func TestVURunContext(t *testing.T) {
 }
 
 func TestVURunInterrupt(t *testing.T) {
+	//TODO: figure out why interrupt sometimes fails... data race in goja?
+	if runtime.GOOS == "windows" {
+		t.Skip()
+	}
+
 	r1, err := New(&lib.SourceData{
 		Filename: "/script.js",
 		Data: []byte(`
 		export default function() { while(true) {} }
 		`),
 	}, afero.NewMemMapFs(), lib.RuntimeOptions{})
-	if !assert.NoError(t, err) {
-		return
-	}
-	r1.SetOptions(lib.Options{Throw: null.BoolFrom(true)})
+	require.NoError(t, err)
+	require.NoError(t, r1.SetOptions(lib.Options{Throw: null.BoolFrom(true)}))
 
 	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{})
-	if !assert.NoError(t, err) {
-		return
-	}
-
+	require.NoError(t, err)
 	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range testdata {
+		name, r := name, r
 		t.Run(name, func(t *testing.T) {
-			vu, err := r.newVU(make(chan stats.SampleContainer, 100))
-			if !assert.NoError(t, err) {
-				return
-			}
 			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 			defer cancel()
+			samples := make(chan stats.SampleContainer, 100)
+			defer close(samples)
+			go func() {
+				for range samples {
+				}
+			}()
+
+			vu, err := r.newVU(samples)
+			require.NoError(t, err)
+
 			err = vu.RunOnce(ctx)
-			assert.EqualError(t, err, "context cancelled at /script.js:1:1(1)")
+			assert.Error(t, err)
+			assert.True(t, strings.HasPrefix(err.Error(), "context cancelled at "))
 		})
 	}
 }
@@ -558,6 +598,7 @@ func TestVUIntegrationGroups(t *testing.T) {
 
 	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range testdata {
+		r := r
 		t.Run(name, func(t *testing.T) {
 			vu, err := r.newVU(make(chan stats.SampleContainer, 100))
 			if !assert.NoError(t, err) {
@@ -569,17 +610,17 @@ func TestVUIntegrationGroups(t *testing.T) {
 			fnNestedCalled := false
 			vu.Runtime.Set("fnOuter", func() {
 				fnOuterCalled = true
-				assert.Equal(t, r.GetDefaultGroup(), common.GetState(*vu.Context).Group)
+				assert.Equal(t, r.GetDefaultGroup(), lib.GetState(*vu.Context).Group)
 			})
 			vu.Runtime.Set("fnInner", func() {
 				fnInnerCalled = true
-				g := common.GetState(*vu.Context).Group
+				g := lib.GetState(*vu.Context).Group
 				assert.Equal(t, "my group", g.Name)
 				assert.Equal(t, r.GetDefaultGroup(), g.Parent)
 			})
 			vu.Runtime.Set("fnNested", func() {
 				fnNestedCalled = true
-				g := common.GetState(*vu.Context).Group
+				g := lib.GetState(*vu.Context).Group
 				assert.Equal(t, "nested group", g.Name)
 				assert.Equal(t, "my group", g.Parent.Name)
 				assert.Equal(t, r.GetDefaultGroup(), g.Parent.Parent)
@@ -795,6 +836,13 @@ func TestVUIntegrationHosts(t *testing.T) {
 }
 
 func TestVUIntegrationTLSConfig(t *testing.T) {
+	var unsupportedVersionErrorMsg = "remote error: tls: handshake failure"
+	for _, tag := range build.Default.ReleaseTags {
+		if tag == "go1.12" {
+			unsupportedVersionErrorMsg = "tls: no supported versions satisfy MinVersion and MaxVersion"
+			break
+		}
+	}
 	testdata := map[string]struct {
 		opts   lib.Options
 		errMsg string
@@ -821,7 +869,7 @@ func TestVUIntegrationTLSConfig(t *testing.T) {
 		},
 		"UnsupportedVersion": {
 			lib.Options{TLSVersion: &lib.TLSVersions{Min: tls.VersionSSL30, Max: tls.VersionSSL30}},
-			"GoError: Get https://sha256.badssl.com/: remote error: tls: handshake failure",
+			"GoError: Get https://sha256.badssl.com/: " + unsupportedVersionErrorMsg,
 		},
 	}
 	for name, data := range testdata {
@@ -1151,7 +1199,7 @@ func TestVUIntegrationClientCerts(t *testing.T) {
 		return
 	}
 	r1.SetOptions(lib.Options{
-		Throw: null.BoolFrom(true),
+		Throw:                 null.BoolFrom(true),
 		InsecureSkipTLSVerify: null.BoolFrom(true),
 	})
 
@@ -1217,4 +1265,252 @@ func TestVUIntegrationClientCerts(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestHTTPRequestInInitContext(t *testing.T) {
+	tb := testutils.NewHTTPMultiBin(t)
+	defer tb.Cleanup()
+
+	_, err := New(&lib.SourceData{
+		Filename: "/script.js",
+		Data: []byte(tb.Replacer.Replace(`
+					import { check, fail } from "k6";
+					import http from "k6/http";
+					let res = http.get("HTTPBIN_URL/");
+					export default function() {
+						console.log(test);
+					}
+				`)),
+	}, afero.NewMemMapFs(), lib.RuntimeOptions{})
+	if assert.Error(t, err) {
+		assert.Equal(
+			t,
+			"GoError: "+k6http.ErrHTTPForbiddenInInitContext.Error(),
+			err.Error())
+	}
+}
+
+func TestInitContextForbidden(t *testing.T) {
+	var table = [...][3]string{
+		{
+			"http.request",
+			`import http from "k6/http";
+			 let res = http.get("HTTPBIN_URL");
+			 export default function() { console.log("p"); }`,
+			k6http.ErrHTTPForbiddenInInitContext.Error(),
+		},
+		{
+			"http.batch",
+			`import http from "k6/http";
+			 let res = http.batch("HTTPBIN_URL/something", "HTTPBIN_URL/else");
+			 export default function() { console.log("p"); }`,
+			k6http.ErrBatchForbiddenInInitContext.Error(),
+		},
+		{
+			"http.cookieJar",
+			`import http from "k6/http";
+			 let jar = http.cookieJar();
+			 export default function() { console.log("p"); }`,
+			k6http.ErrJarForbiddenInInitContext.Error(),
+		},
+		{
+			"check",
+			`import { check } from "k6";
+			 check("test", {'is test': (test) => test == "test"})
+			 export default function() { console.log("p"); }`,
+			k6.ErrCheckInInitContext.Error(),
+		},
+		{
+			"group",
+			`import { group } from "k6";
+			 group("group1", function () { console.log("group1");})
+			 export default function() { console.log("p"); }`,
+			k6.ErrGroupInInitContext.Error(),
+		},
+		{
+			"ws",
+			`import ws from "k6/ws";
+			 var url = "ws://echo.websocket.org";
+			 var params = { "tags": { "my_tag": "hello" } };
+			 var response = ws.connect(url, params, function (socket) {
+			   socket.on('open', function open() {
+					console.log('connected');
+			   })
+		   });
+
+			 export default function() { console.log("p"); }`,
+			ws.ErrWSInInitContext.Error(),
+		},
+		{
+			"metric",
+			`import { Counter } from "k6/metrics";
+			 let counter = Counter("myCounter");
+			 counter.add(1);
+			 export default function() { console.log("p"); }`,
+			k6metrics.ErrMetricsAddInInitContext.Error(),
+		},
+	}
+	tb := testutils.NewHTTPMultiBin(t)
+	defer tb.Cleanup()
+
+	for _, test := range table {
+		t.Run(test[0], func(t *testing.T) {
+			_, err := New(&lib.SourceData{
+				Filename: "/script.js",
+				Data:     []byte(tb.Replacer.Replace(test[1])),
+			}, afero.NewMemMapFs(), lib.RuntimeOptions{})
+			if assert.Error(t, err) {
+				assert.Equal(
+					t,
+					"GoError: "+test[2],
+					err.Error())
+			}
+		})
+	}
+}
+
+func TestArchiveRunningIntegraty(t *testing.T) {
+	tb := testutils.NewHTTPMultiBin(t)
+	defer tb.Cleanup()
+
+	fs := afero.NewMemMapFs()
+	require.NoError(t, afero.WriteFile(fs, "/home/somebody/test.json", []byte(`42`), os.ModePerm))
+	r1, err := New(&lib.SourceData{
+		Filename: "/script.js",
+		Data: []byte(tb.Replacer.Replace(`
+			let fput = open("/home/somebody/test.json");
+			export let options = { setupTimeout: "10s", teardownTimeout: "10s" };
+			export function setup() {
+				return JSON.parse(fput);
+			}
+			export default function(data) {
+				if (data != 42) {
+					throw new Error("incorrect answer " + data);
+				}
+			}
+		`)),
+	}, fs, lib.RuntimeOptions{})
+	require.NoError(t, err)
+
+	buf := bytes.NewBuffer(nil)
+	require.NoError(t, r1.MakeArchive().Write(buf))
+
+	arc, err := lib.ReadArchive(buf)
+	require.NoError(t, err)
+	r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
+	require.NoError(t, err)
+
+	runners := map[string]*Runner{"Source": r1, "Archive": r2}
+	for name, r := range runners {
+		t.Run(name, func(t *testing.T) {
+			ch := make(chan stats.SampleContainer, 100)
+			err = r.Setup(context.Background(), ch)
+			require.NoError(t, err)
+			vu, err := r.NewVU(ch)
+			require.NoError(t, err)
+			err = vu.RunOnce(context.Background())
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestArchiveNotPanicking(t *testing.T) {
+	tb := testutils.NewHTTPMultiBin(t)
+	defer tb.Cleanup()
+
+	fs := afero.NewMemMapFs()
+	require.NoError(t, afero.WriteFile(fs, "/non/existent", []byte(`42`), os.ModePerm))
+	r1, err := New(&lib.SourceData{
+		Filename: "/script.js",
+		Data: []byte(tb.Replacer.Replace(`
+			let fput = open("/non/existent");
+			export default function(data) {
+			}
+		`)),
+	}, fs, lib.RuntimeOptions{})
+	require.NoError(t, err)
+
+	arc := r1.MakeArchive()
+	arc.Files = make(map[string][]byte)
+	r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
+	require.NoError(t, err)
+
+	runners := map[string]*Runner{"Source": r1, "Archive": r2}
+	for name, r := range runners {
+		t.Run(name, func(t *testing.T) {
+			ch := make(chan stats.SampleContainer, 100)
+			_, err := r.NewVU(ch)
+			if name == "Source" {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+			}
+		})
+	}
+}
+
+func TestStuffNotPanicking(t *testing.T) {
+	tb := testutils.NewHTTPMultiBin(t)
+	defer tb.Cleanup()
+
+	r, err := New(&lib.SourceData{
+		Filename: "/script.js",
+		Data: []byte(tb.Replacer.Replace(`
+			import http from "k6/http";
+			import ws from "k6/ws";
+			import { group } from "k6";
+			import { parseHTML } from "k6/html";
+
+			export let options = { iterations: 1, vus: 1, vusMax: 1 };
+
+			export default function() {
+				const doc = parseHTML(http.get("HTTPBIN_URL/html").body);
+
+				let testCases = [
+					() => group(),
+					() => group("test"),
+					() => group("test", "wat"),
+					() => doc.find('p').each(),
+					() => doc.find('p').each("wat"),
+					() => doc.find('p').map(),
+					() => doc.find('p').map("wat"),
+					() => ws.connect("ws://HTTPBIN_IP:HTTPBIN_PORT/ws-echo"),
+				];
+
+				testCases.forEach(function(fn, idx) {
+					var hasException;
+					try {
+						fn();
+						hasException = false;
+					} catch (e) {
+						hasException = true;
+					}
+
+					if (hasException === false) {
+						throw new Error("Expected test case #" + idx + " to return an error");
+					} else if (hasException === undefined) {
+						throw new Error("Something strange happened with test case #" + idx);
+					}
+				});
+			}
+		`)),
+	}, afero.NewMemMapFs(), lib.RuntimeOptions{})
+	require.NoError(t, err)
+
+	ch := make(chan stats.SampleContainer, 1000)
+	vu, err := r.NewVU(ch)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	errC := make(chan error)
+	go func() { errC <- vu.RunOnce(ctx) }()
+
+	select {
+	case <-time.After(15 * time.Second):
+		cancel()
+		t.Fatal("Test timed out")
+	case err := <-errC:
+		cancel()
+		require.NoError(t, err)
+	}
 }

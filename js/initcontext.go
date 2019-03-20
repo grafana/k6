@@ -22,6 +22,7 @@ package js
 
 import (
 	"context"
+	"path/filepath"
 	"strings"
 
 	"github.com/dop251/goja"
@@ -62,7 +63,7 @@ func NewInitContext(rt *goja.Runtime, compiler *compiler.Compiler, ctxPtr *conte
 		compiler: compiler,
 		ctxPtr:   ctxPtr,
 		fs:       fs,
-		pwd:      pwd,
+		pwd:      filepath.ToSlash(pwd),
 
 		programs: make(map[string]programWithSource),
 		files:    make(map[string][]byte),
@@ -74,8 +75,9 @@ func newBoundInitContext(base *InitContext, ctxPtr *context.Context, rt *goja.Ru
 		runtime: rt,
 		ctxPtr:  ctxPtr,
 
-		fs:  nil,
-		pwd: base.pwd,
+		fs:       base.fs,
+		pwd:      base.pwd,
+		compiler: base.compiler,
 
 		programs: base.programs,
 		files:    base.files,
@@ -158,7 +160,7 @@ func (i *InitContext) requireFile(name string) (goja.Value, error) {
 }
 
 func (i *InitContext) compileImport(src, filename string) (*goja.Program, error) {
-	pgm, _, err := i.compiler.Compile(src, filename, "(function(){", "})()", true)
+	pgm, _, err := i.compiler.Compile(src, filename, "(function(){\n", "\n})()\n", true)
 	return pgm, err
 }
 

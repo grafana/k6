@@ -29,6 +29,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -43,9 +44,16 @@ import (
 
 // GetTLSClientConfig returns a TLS config that trusts the supplied
 // httptest.Server certificate as well as all the system root certificates
-func GetTLSClientConfig(t *testing.T, srv *httptest.Server) *tls.Config {
-	certs, err := x509.SystemCertPool()
-	require.NoError(t, err)
+func GetTLSClientConfig(t testing.TB, srv *httptest.Server) *tls.Config {
+	var err error
+
+	certs := x509.NewCertPool()
+
+	if runtime.GOOS != "windows" {
+		certs, err = x509.SystemCertPool()
+		require.NoError(t, err)
+	}
+
 	for _, c := range srv.TLS.Certificates {
 		roots, err := x509.ParseCertificates(c.Certificate[len(c.Certificate)-1])
 		require.NoError(t, err)
@@ -79,7 +87,7 @@ type HTTPMultiBin struct {
 	Cleanup         func()
 }
 
-func getWebsocketEchoHandler(t *testing.T) http.Handler {
+func getWebsocketEchoHandler(t testing.TB) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		t.Logf("[%p %s] Upgrading to websocket connection...", req, req.URL)
 		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, w.Header())
@@ -96,7 +104,7 @@ func getWebsocketEchoHandler(t *testing.T) http.Handler {
 		t.Logf("[%p %s] Wrote back message '%s' of type %d and closed the connection", req, req.URL, message, mt)
 	})
 }
-func getWebsocketCloserHandler(t *testing.T) http.Handler {
+func getWebsocketCloserHandler(t testing.TB) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, w.Header())
 		if !assert.NoError(t, err) {
@@ -107,12 +115,12 @@ func getWebsocketCloserHandler(t *testing.T) http.Handler {
 }
 
 // NewHTTPMultiBin returns a fully configured and running HTTPMultiBin
-func NewHTTPMultiBin(t *testing.T) *HTTPMultiBin {
+func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 	// Create a http.ServeMux and set the httpbin handler as the default
 	mux := http.NewServeMux()
 	mux.Handle("/ws-echo", getWebsocketEchoHandler(t))
 	mux.Handle("/ws-close", getWebsocketCloserHandler(t))
-	mux.Handle("/", httpbin.NewHTTPBin().Handler())
+	mux.Handle("/", httpbin.New().Handler())
 
 	// Initialize the HTTP server and get its details
 	httpSrv := httptest.NewServer(mux)

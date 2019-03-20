@@ -376,7 +376,7 @@ func TestNewBundleFromArchive(t *testing.T) {
 	}
 	assert.Equal(t, "hi!", v.Export())
 
-	arc := b.MakeArchive()
+	arc := b.makeArchive()
 	assert.Equal(t, "js", arc.Type)
 	assert.Equal(t, lib.Options{VUs: null.IntFrom(12345)}, arc.Options)
 	assert.Equal(t, "/path/to/script.js", arc.Filename)
@@ -456,7 +456,7 @@ func TestBundleEnv(t *testing.T) {
 		return
 	}
 
-	b2, err := NewBundleFromArchive(b1.MakeArchive(), lib.RuntimeOptions{})
+	b2, err := NewBundleFromArchive(b1.makeArchive(), lib.RuntimeOptions{})
 	if !assert.NoError(t, err) {
 		return
 	}

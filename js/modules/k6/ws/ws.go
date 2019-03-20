@@ -35,9 +35,13 @@ import (
 	"github.com/dop251/goja"
 	"github.com/gorilla/websocket"
 	"github.com/loadimpact/k6/js/common"
+	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/stats"
 )
+
+// ErrWSInInitContext is returned when websockets are using in the init context
+var ErrWSInInitContext = common.NewInitContextError("using websockets in the init context is not supported")
 
 type WS struct{}
 
@@ -63,11 +67,11 @@ type Socket struct {
 }
 
 type WSHTTPResponse struct {
-	URL     string
-	Status  int
-	Headers map[string]string
-	Body    string
-	Error   string
+	URL     string            `json:"url"`
+	Status  int               `json:"status"`
+	Headers map[string]string `json:"headers"`
+	Body    string            `json:"body"`
+	Error   string            `json:"error"`
 }
 
 const writeWait = 10 * time.Second
@@ -78,7 +82,10 @@ func New() *WS {
 
 func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTPResponse, error) {
 	rt := common.GetRuntime(ctx)
-	state := common.GetState(ctx)
+	state := lib.GetState(ctx)
+	if state == nil {
+		return nil, ErrWSInInitContext
+	}
 
 	// The params argument is optional
 	var callableV, paramsV goja.Value
@@ -90,13 +97,13 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 		paramsV = goja.Undefined()
 		callableV = args[0]
 	default:
-		return nil, errors.New("Invalid number of arguments to ws.connect")
+		return nil, errors.New("invalid number of arguments to ws.connect")
 	}
 
 	// Get the callable (required)
 	setupFn, isFunc := goja.AssertFunction(callableV)
 	if !isFunc {
-		return nil, errors.New("Last argument to ws.connect must be a function")
+		return nil, errors.New("last argument to ws.connect must be a function")
 	}
 
 	// Leave header to nil by default so we can pass it directly to the Dialer

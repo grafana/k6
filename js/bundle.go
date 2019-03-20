@@ -23,6 +23,7 @@ package js
 import (
 	"context"
 	"encoding/json"
+	"os"
 
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
@@ -54,7 +55,7 @@ type BundleInstance struct {
 	Default goja.Callable
 }
 
-// Creates a new bundle from a source file and a filesystem.
+// NewBundle creates a new bundle from a source file and a filesystem.
 func NewBundle(src *lib.SourceData, fs afero.Fs, rtOpts lib.RuntimeOptions) (*Bundle, error) {
 	compiler, err := compiler.New()
 	if err != nil {
@@ -130,6 +131,7 @@ func NewBundle(src *lib.SourceData, fs afero.Fs, rtOpts lib.RuntimeOptions) (*Bu
 	return &bundle, nil
 }
 
+// NewBundleFromArchive creates a new bundle from an lib.Archive.
 func NewBundleFromArchive(arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle, error) {
 	compiler, err := compiler.New()
 	if err != nil {
@@ -144,16 +146,7 @@ func NewBundleFromArchive(arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle,
 	if err != nil {
 		return nil, err
 	}
-
-	initctx := NewInitContext(goja.New(), compiler, new(context.Context), nil, arc.Pwd)
-	for filename, data := range arc.Scripts {
-		src := string(data)
-		pgm, err := initctx.compileImport(src, filename)
-		if err != nil {
-			return nil, err
-		}
-		initctx.programs[filename] = programWithSource{pgm, src}
-	}
+	initctx := NewInitContext(goja.New(), compiler, new(context.Context), arc.FS, arc.Pwd)
 	initctx.files = arc.Files
 
 	env := arc.Env
@@ -175,9 +168,10 @@ func NewBundleFromArchive(arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle,
 	}, nil
 }
 
-func (b *Bundle) MakeArchive() *lib.Archive {
+func (b *Bundle) makeArchive() *lib.Archive {
 	arc := &lib.Archive{
 		Type:     "js",
+		FS:       afero.NewMemMapFs(),
 		Options:  b.Options,
 		Filename: b.Filename,
 		Data:     []byte(b.Source),
@@ -192,6 +186,10 @@ func (b *Bundle) MakeArchive() *lib.Archive {
 	arc.Scripts = make(map[string][]byte, len(b.BaseInitContext.programs))
 	for name, pgm := range b.BaseInitContext.programs {
 		arc.Scripts[name] = []byte(pgm.src)
+		err := afero.WriteFile(arc.FS, name, []byte(pgm.src), os.ModePerm)
+		if err != nil {
+			return nil
+		}
 	}
 	arc.Files = b.BaseInitContext.files
 
@@ -226,7 +224,7 @@ func (b *Bundle) Instantiate() (bi *BundleInstance, instErr error) {
 	} else {
 		jsOptionsObj = jsOptions.ToObject(rt)
 	}
-	b.Options.ForEachValid("json", func(key string, val interface{}) {
+	b.Options.ForEachSpecified("json", func(key string, val interface{}) {
 		if err := jsOptionsObj.Set(key, val); err != nil {
 			instErr = err
 		}

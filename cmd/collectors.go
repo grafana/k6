@@ -29,9 +29,12 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats/cloud"
+	"github.com/loadimpact/k6/stats/datadog"
 	"github.com/loadimpact/k6/stats/influxdb"
 	jsonc "github.com/loadimpact/k6/stats/json"
 	"github.com/loadimpact/k6/stats/kafka"
+	"github.com/loadimpact/k6/stats/statsd"
+	"github.com/loadimpact/k6/stats/statsd/common"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 )
@@ -41,6 +44,8 @@ const (
 	collectorJSON     = "json"
 	collectorKafka    = "kafka"
 	collectorCloud    = "cloud"
+	collectorStatsD   = "statsd"
+	collectorDatadog  = "datadog"
 )
 
 func parseCollector(s string) (t, arg string) {
@@ -93,6 +98,18 @@ func newCollector(collectorName, arg string, src *lib.SourceData, conf Config) (
 				config = config.Apply(cmdConfig)
 			}
 			return kafka.New(config)
+		case collectorStatsD:
+			config := common.NewConfig().Apply(conf.Collectors.StatsD)
+			if err := envconfig.Process("k6_statsd", &config); err != nil {
+				return nil, err
+			}
+			return statsd.New(config)
+		case collectorDatadog:
+			config := datadog.NewConfig().Apply(conf.Collectors.Datadog)
+			if err := envconfig.Process("k6_datadog", &config); err != nil {
+				return nil, err
+			}
+			return datadog.New(config)
 		default:
 			return nil, errors.Errorf("unknown output type: %s", collectorName)
 		}
@@ -112,7 +129,7 @@ func newCollector(collectorName, arg string, src *lib.SourceData, conf Config) (
 	}
 	if len(missingRequiredTags) > 0 {
 		return collector, fmt.Errorf(
-			"The specified collector '%s' needs the following system tags enabled: %s",
+			"the specified collector '%s' needs the following system tags enabled: %s",
 			collectorName,
 			strings.Join(missingRequiredTags, ", "),
 		)

@@ -23,6 +23,7 @@ package local
 import (
 	"context"
 	"net"
+	"runtime"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -49,7 +50,14 @@ func TestExecutorRun(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	err := make(chan error, 1)
-	go func() { err <- e.Run(ctx, nil) }()
+	samples := make(chan stats.SampleContainer, 100)
+	defer close(samples)
+	go func() {
+		for range samples {
+		}
+	}()
+
+	go func() { err <- e.Run(ctx, samples) }()
 	cancel()
 	assert.NoError(t, <-err)
 }
@@ -431,6 +439,9 @@ func TestExecutorSetVUs(t *testing.T) {
 }
 
 func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip()
+	}
 	t.Parallel()
 	script := []byte(`
 	import { Counter } from "k6/metrics";

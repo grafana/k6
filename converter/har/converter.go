@@ -70,6 +70,10 @@ func Convert(h HAR, options lib.Options, minSleep, maxSleep uint, enableChecks b
 		return "", errors.Errorf("correlation requires --no-batch")
 	}
 
+	if h.Log == nil {
+		return "", errors.Errorf("invalid HAR file supplied, the 'log' property is missing")
+	}
+
 	if enableChecks {
 		fprint(w, "import { group, check, sleep } from 'k6';\n")
 	} else {
@@ -87,7 +91,7 @@ func Convert(h HAR, options lib.Options, minSleep, maxSleep uint, enableChecks b
 	}
 
 	fprint(w, "\nexport let options = {\n")
-	options.ForEachValid("json", func(key string, val interface{}) {
+	options.ForEachSpecified("json", func(key string, val interface{}) {
 		if valJSON, err := json.MarshalIndent(val, "    ", "    "); err != nil {
 			convertErr = err
 		} else {

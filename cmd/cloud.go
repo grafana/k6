@@ -21,6 +21,7 @@
 package cmd
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"os/signal"
@@ -35,6 +36,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -53,7 +55,8 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
         k6 cloud script.js`[1:],
 	Args: exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		_, _ = BannerColor.Fprint(stdout, Banner+"\n\n")
+		//TODO: disable in quiet mode?
+		_, _ = BannerColor.Fprintf(stdout, "\n%s\n\n", Banner)
 		initBar := ui.ProgressBar{
 			Width: 60,
 			Left:  func() string { return "    uploading script" },
@@ -92,7 +95,14 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 			return err
 		}
 
-		r.SetOptions(conf.Options)
+		if cerr := validateConfig(conf); cerr != nil {
+			return ExitCode{cerr, invalidConfigErrorCode}
+		}
+
+		err = r.SetOptions(conf.Options)
+		if err != nil {
+			return err
+		}
 
 		// Cloud config
 		cloudConfig := cloud.NewConfig().Apply(conf.Collectors.Cloud)
@@ -103,22 +113,57 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 			return errors.New("Not logged in, please use `k6 login cloud`.")
 		}
 
-		// Start cloud test run
-		client := cloud.NewClient(cloudConfig.Token.String, cloudConfig.Host.String, Version)
-
 		arc := r.MakeArchive()
-		if err := client.ValidateOptions(arc.Options); err != nil {
-			return err
-		}
-
+		// TODO: Fix this
+		// We reuse cloud.Config for parsing options.ext.loadimpact, but this probably shouldn't be
+		// done as the idea of options.ext is that they are extensible without touching k6. But in
+		// order for this to happen we shouldn't actually marshall cloud.Config on top of it because
+		// it will be missing some fields that aren't actually mentioned in the struct.
+		// So in order for use to copy the fields that we need for loadimpact's api we unmarshal in
+		// map[string]interface{} and copy what we need if it isn't set already
+		var tmpCloudConfig map[string]interface{}
 		if val, ok := arc.Options.External["loadimpact"]; ok {
-			if err := json.Unmarshal(val, &cloudConfig); err != nil {
+			var dec = json.NewDecoder(bytes.NewReader(val))
+			dec.UseNumber() // otherwise float64 are used
+			if err := dec.Decode(&tmpCloudConfig); err != nil {
 				return err
 			}
 		}
+
+		if err := cloud.MergeFromExternal(arc.Options.External, &cloudConfig); err != nil {
+			return err
+		}
+		if tmpCloudConfig == nil {
+			tmpCloudConfig = make(map[string]interface{}, 3)
+		}
+
+		if _, ok := tmpCloudConfig["token"]; !ok && cloudConfig.Token.Valid {
+			tmpCloudConfig["token"] = cloudConfig.Token
+		}
+		if _, ok := tmpCloudConfig["name"]; !ok && cloudConfig.Name.Valid {
+			tmpCloudConfig["name"] = cloudConfig.Name
+		}
+		if _, ok := tmpCloudConfig["projectID"]; !ok && cloudConfig.ProjectID.Valid {
+			tmpCloudConfig["projectID"] = cloudConfig.ProjectID
+		}
+
+		if arc.Options.External == nil {
+			arc.Options.External = make(map[string]json.RawMessage)
+		}
+		arc.Options.External["loadimpact"], err = json.Marshal(tmpCloudConfig)
+		if err != nil {
+			return err
+		}
+
 		name := cloudConfig.Name.String
 		if !cloudConfig.Name.Valid || cloudConfig.Name.String == "" {
 			name = filepath.Base(filename)
+		}
+
+		// Start cloud test run
+		client := cloud.NewClient(cloudConfig.Token.String, cloudConfig.Host.String, Version)
+		if err := client.ValidateOptions(arc.Options); err != nil {
+			return err
 		}
 
 		refID, err := client.StartCloudTestRun(name, cloudConfig.ProjectID.Int64, arc)
@@ -196,10 +241,26 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 	},
 }
 
+func cloudCmdFlagSet() *pflag.FlagSet {
+	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
+	flags.SortFlags = false
+	flags.AddFlagSet(optionFlagSet())
+	flags.AddFlagSet(runtimeOptionFlagSet(false))
+
+	//TODO: Figure out a better way to handle the CLI flags:
+	// - the default value is specified in this way so we don't overwrire whatever
+	//   was specified via the environment variable
+	// - global variables are not very testable... :/
+	flags.BoolVar(&exitOnRunning, "exit-on-running", exitOnRunning, "exits when test reaches the running status")
+	// We also need to explicitly set the default value for the usage message here, so setting
+	// K6_EXIT_ON_RUNNING=true won't affect the usage message
+	flags.Lookup("exit-on-running").DefValue = "false"
+
+	return flags
+}
+
 func init() {
 	RootCmd.AddCommand(cloudCmd)
 	cloudCmd.Flags().SortFlags = false
-	cloudCmd.Flags().AddFlagSet(optionFlagSet())
-	cloudCmd.Flags().AddFlagSet(runtimeOptionFlagSet(false))
-	cloudCmd.Flags().BoolVar(&exitOnRunning, "exit-on-running", exitOnRunning, "exits when test reaches the running status")
+	cloudCmd.Flags().AddFlagSet(cloudCmdFlagSet())
 }

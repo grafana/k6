@@ -21,11 +21,15 @@
 package cloud
 
 import (
+	"bytes"
+	"compress/gzip"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 
@@ -68,6 +72,23 @@ func TestCreateTestRun(t *testing.T) {
 
 func TestPublishMetric(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		g, err := gzip.NewReader(r.Body)
+
+		require.NoError(t, err)
+		var buf bytes.Buffer
+		_, err = io.Copy(&buf, g)
+		require.NoError(t, err)
+		byteCount, err := strconv.Atoi(r.Header.Get("x-payload-byte-count"))
+		require.NoError(t, err)
+		require.Equal(t, buf.Len(), byteCount)
+
+		samplesCount, err := strconv.Atoi(r.Header.Get("x-payload-sample-count"))
+		require.NoError(t, err)
+		var samples []*Sample
+		err = json.Unmarshal(buf.Bytes(), &samples)
+		require.NoError(t, err)
+		require.Equal(t, len(samples), samplesCount)
+
 		fprintf(t, w, "")
 	}))
 	defer server.Close()
@@ -123,7 +144,25 @@ func TestAuthorizedError(t *testing.T) {
 
 	assert.Equal(t, 1, called)
 	assert.Nil(t, resp)
-	assert.EqualError(t, err, "403 Not allowed [err code 5]")
+	assert.EqualError(t, err, "(403/E5) Not allowed")
+}
+
+func TestDetailsError(t *testing.T) {
+	called := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called++
+		w.WriteHeader(http.StatusForbidden)
+		fprintf(t, w, `{"error": {"code": 0, "message": "Validation failed", "details": { "name": ["Shorter than minimum length 2."]}}}`)
+	}))
+	defer server.Close()
+
+	client := NewClient("token", server.URL, "1.0")
+
+	resp, err := client.CreateTestRun(&TestRun{Name: "test"})
+
+	assert.Equal(t, 1, called)
+	assert.Nil(t, resp)
+	assert.EqualError(t, err, "(403) Validation failed\n name: Shorter than minimum length 2.")
 }
 
 func TestRetry(t *testing.T) {

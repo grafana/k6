@@ -29,6 +29,7 @@ import (
 
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/netext"
+	"github.com/loadimpact/k6/lib/netext/httpext"
 	"github.com/pkg/errors"
 
 	"gopkg.in/guregu/null.v3"
@@ -54,7 +55,7 @@ type Collector struct {
 	runStatus lib.RunStatus
 
 	bufferMutex      sync.Mutex
-	bufferHTTPTrails []*netext.Trail
+	bufferHTTPTrails []*httpext.Trail
 	bufferSamples    []*Sample
 
 	opts lib.Options
@@ -73,12 +74,32 @@ type Collector struct {
 // Verify that Collector implements lib.Collector
 var _ lib.Collector = &Collector{}
 
+// MergeFromExternal merges three fields from json in a loadimact key of the provided external map
+func MergeFromExternal(external map[string]json.RawMessage, conf *Config) error {
+	if val, ok := external["loadimpact"]; ok {
+		// TODO: Important! Separate configs and fix the whole 2 configs mess!
+		tmpConfig := Config{}
+		if err := json.Unmarshal(val, &tmpConfig); err != nil {
+			return err
+		}
+		// Only take out the ProjectID, Name and Token from the options.ext.loadimpact map:
+		if tmpConfig.ProjectID.Valid {
+			conf.ProjectID = tmpConfig.ProjectID
+		}
+		if tmpConfig.Name.Valid {
+			conf.Name = tmpConfig.Name
+		}
+		if tmpConfig.Token.Valid {
+			conf.Token = tmpConfig.Token
+		}
+	}
+	return nil
+}
+
 // New creates a new cloud collector
 func New(conf Config, src *lib.SourceData, opts lib.Options, version string) (*Collector, error) {
-	if val, ok := opts.External["loadimpact"]; ok {
-		if err := json.Unmarshal(val, &conf); err != nil {
-			return nil, err
-		}
+	if err := MergeFromExternal(opts.External, &conf); err != nil {
+		return nil, err
 	}
 
 	if conf.AggregationPeriod.Duration > 0 && (opts.SystemTags["vu"] || opts.SystemTags["iter"]) {
@@ -125,6 +146,8 @@ func New(conf Config, src *lib.SourceData, opts lib.Options, version string) (*C
 	}, nil
 }
 
+// Init is called between the collector's creation and the call to Run().
+// You should do any lengthy setup here rather than in New.
 func (c *Collector) Init() error {
 	thresholds := make(map[string][]string)
 
@@ -164,10 +187,13 @@ func (c *Collector) Init() error {
 	return nil
 }
 
+// Link return a link that is shown to the user.
 func (c *Collector) Link() string {
 	return URLForResults(c.referenceID, c.config)
 }
 
+// Run is called in a goroutine and starts the collector. Should commit samples to the backend
+// at regular intervals and when the context is terminated.
 func (c *Collector) Run(ctx context.Context) {
 	wg := sync.WaitGroup{}
 
@@ -209,21 +235,19 @@ func (c *Collector) Run(ctx context.Context) {
 	}
 }
 
-func (c *Collector) IsReady() bool {
-	return true
-}
-
+// Collect receives a set of samples. This method is never called concurrently, and only while
+// the context for Run() is valid, but should defer as much work as possible to Run().
 func (c *Collector) Collect(sampleContainers []stats.SampleContainer) {
 	if c.referenceID == "" {
 		return
 	}
 
 	newSamples := []*Sample{}
-	newHTTPTrails := []*netext.Trail{}
+	newHTTPTrails := []*httpext.Trail{}
 
 	for _, sampleContainer := range sampleContainers {
 		switch sc := sampleContainer.(type) {
-		case *netext.Trail:
+		case *httpext.Trail:
 			// Check if aggregation is enabled,
 			if c.config.AggregationPeriod.Duration > 0 {
 				newHTTPTrails = append(newHTTPTrails, sc)
@@ -431,11 +455,18 @@ func (c *Collector) pushMetrics() {
 		"samples": len(buffer),
 	}).Debug("Pushing metrics to cloud")
 
-	err := c.client.PushMetric(c.referenceID, c.config.NoCompress.Bool, buffer)
-	if err != nil {
-		log.WithFields(log.Fields{
-			"error": err,
-		}).Warn("Failed to send metrics to cloud")
+	for len(buffer) > 0 {
+		var size = len(buffer)
+		if size > int(c.config.MaxMetricSamplesPerPackage.Int64) {
+			size = int(c.config.MaxMetricSamplesPerPackage.Int64)
+		}
+		err := c.client.PushMetric(c.referenceID, c.config.NoCompress.Bool, buffer[:size])
+		if err != nil {
+			log.WithFields(log.Fields{
+				"error": err,
+			}).Warn("Failed to send metrics to cloud")
+		}
+		buffer = buffer[size:]
 	}
 }
 
@@ -449,8 +480,8 @@ func (c *Collector) testFinished() {
 	for name, thresholds := range c.thresholds {
 		thresholdResults[name] = make(map[string]bool)
 		for _, t := range thresholds {
-			thresholdResults[name][t.Source] = t.Failed
-			if t.Failed {
+			thresholdResults[name][t.Source] = t.LastFailed
+			if t.LastFailed {
 				testTainted = true
 			}
 		}
@@ -488,6 +519,7 @@ func (c *Collector) GetRequiredSystemTags() lib.TagSet {
 	return lib.GetTagSet("name", "method", "status", "error", "check", "group")
 }
 
+// SetRunStatus Set run status
 func (c *Collector) SetRunStatus(status lib.RunStatus) {
 	c.runStatus = status
 }

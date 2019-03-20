@@ -60,6 +60,7 @@ type Runner struct {
 	Resolver   *dnscache.Resolver
 	RPSLimit   *rate.Limiter
 
+	console   *console
 	setupData []byte
 }
 
@@ -94,14 +95,16 @@ func NewFromBundle(b *Bundle) (*Runner, error) {
 			KeepAlive: 30 * time.Second,
 			DualStack: true,
 		},
+		console:  newConsole(),
 		Resolver: dnscache.New(0),
 	}
-	r.SetOptions(r.Bundle.Options)
-	return r, nil
+
+	err = r.SetOptions(r.Bundle.Options)
+	return r, err
 }
 
 func (r *Runner) MakeArchive() *lib.Archive {
-	return r.Bundle.MakeArchive()
+	return r.Bundle.makeArchive()
 }
 
 func (r *Runner) NewVU(samplesOut chan<- stats.SampleContainer) (lib.VU, error) {
@@ -228,7 +231,7 @@ func (r *Runner) newVU(samplesOut chan<- stats.SampleContainer) (*VU, error) {
 		Dialer:         dialer,
 		CookieJar:      cookieJar,
 		TLSConfig:      tlsConfig,
-		Console:        NewConsole(),
+		Console:        r.console,
 		BPool:          bpool.NewBufferPool(100),
 		Samples:        samplesOut,
 	}
@@ -309,13 +312,24 @@ func (r *Runner) GetOptions() lib.Options {
 	return r.Bundle.Options
 }
 
-func (r *Runner) SetOptions(opts lib.Options) {
+func (r *Runner) SetOptions(opts lib.Options) error {
 	r.Bundle.Options = opts
 
 	r.RPSLimit = nil
 	if rps := opts.RPS; rps.Valid {
 		r.RPSLimit = rate.NewLimiter(rate.Limit(rps.Int64), 1)
 	}
+
+	if opts.ConsoleOutput.Valid {
+		c, err := newFileConsole(opts.ConsoleOutput.String)
+		if err != nil {
+			return err
+		}
+
+		r.console = c
+	}
+
+	return nil
 }
 
 // Runs an exported function in its own temporary VU, optionally with an argument. Execution is
@@ -335,6 +349,7 @@ func (r *Runner) runPart(ctx context.Context, out chan<- stats.SampleContainer, 
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	go func() {
 		<-ctx.Done()
 		vu.Runtime.Interrupt(errInterrupt)
@@ -346,7 +361,16 @@ func (r *Runner) runPart(ctx context.Context, out chan<- stats.SampleContainer, 
 	}
 
 	v, _, err := vu.runFn(ctx, group, fn, vu.Runtime.ToValue(arg))
-	cancel()
+
+	// deadline is reached so we have timeouted but this might've not been registered correctly
+	if deadline, ok := ctx.Deadline(); ok && time.Now().After(deadline) {
+		// we could have an error that is not errInterrupt in which case we should return it instead
+		if err, ok := err.(*goja.InterruptedError); ok && v != nil && err.Value() != errInterrupt {
+			return v, err
+		}
+		// otherwise we have timeouted
+		return v, lib.NewTimeoutError(name)
+	}
 	return v, err
 }
 
@@ -361,7 +385,7 @@ type VU struct {
 	ID        int64
 	Iteration int64
 
-	Console *Console
+	Console *console
 	BPool   *bpool.BufferPool
 
 	Samples chan<- stats.SampleContainer
@@ -398,6 +422,7 @@ func (u *VU) RunOnce(ctx context.Context) error {
 		}
 		u.interruptCancel = interCancel
 		u.interruptTrackedCtx = ctx
+		defer interCancel()
 		go func() {
 			select {
 			case <-interCtx.Done():
@@ -426,7 +451,9 @@ func (u *VU) RunOnce(ctx context.Context) error {
 	return err
 }
 
-func (u *VU) runFn(ctx context.Context, group *lib.Group, fn goja.Callable, args ...goja.Value) (goja.Value, *common.State, error) {
+func (u *VU) runFn(
+	ctx context.Context, group *lib.Group, fn goja.Callable, args ...goja.Value,
+) (goja.Value, *lib.State, error) {
 	cookieJar, err := cookiejar.New(nil)
 	if err != nil {
 		return goja.Undefined(), nil, err
@@ -436,7 +463,7 @@ func (u *VU) runFn(ctx context.Context, group *lib.Group, fn goja.Callable, args
 		cookieJar = u.CookieJar
 	}
 
-	state := &common.State{
+	state := &lib.State{
 		Logger:    u.Runner.Logger,
 		Options:   u.Runner.Bundle.Options,
 		Group:     group,
@@ -452,7 +479,7 @@ func (u *VU) runFn(ctx context.Context, group *lib.Group, fn goja.Callable, args
 	}
 
 	newctx := common.WithRuntime(ctx, u.Runtime)
-	newctx = common.WithState(newctx, state)
+	newctx = lib.WithState(newctx, state)
 	*u.Context = newctx
 
 	u.Runtime.Set("__ITER", u.Iteration)
@@ -487,6 +514,15 @@ func (u *VU) runFn(ctx context.Context, group *lib.Group, fn goja.Callable, args
 	}
 
 	state.Samples <- u.Dialer.GetTrail(startTime, endTime, isFullIteration, stats.IntoSampleTags(&tags))
+
+	// If MinIterationDuration is specified and the iteration wasn't cancelled
+	// and was less than it, sleep for the remainder
+	if isFullIteration && state.Options.MinIterationDuration.Valid {
+		durationDiff := time.Duration(state.Options.MinIterationDuration.Duration) - endTime.Sub(startTime)
+		if durationDiff > 0 {
+			time.Sleep(durationDiff)
+		}
+	}
 
 	return v, state, err
 }

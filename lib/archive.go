@@ -33,20 +33,34 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/spf13/afero"
 )
 
 var volumeRE = regexp.MustCompile(`^([a-zA-Z]):(.*)`)
-var sharedRE = regexp.MustCompile(`^//([^/]+)`) // matches a shared folder in Windows after backslack replacement. i.e //VMBOXSVR/k6/script.js
+var sharedRE = regexp.MustCompile(`^\\\\([^\\]+)`) // matches a shared folder in Windows before backslack replacement. i.e \\VMBOXSVR\k6\script.js
 var homeDirRE = regexp.MustCompile(`^(/[a-zA-Z])?/(Users|home|Documents and Settings)/(?:[^/]+)`)
 
-// Normalizes (to use a / path separator) and anonymizes a file path, by scrubbing usernames from home directories.
+// NormalizeAndAnonymizePath Normalizes (to use a / path separator) and anonymizes a file path, by scrubbing usernames from home directories.
 func NormalizeAndAnonymizePath(path string) string {
 	path = filepath.Clean(path)
 
 	p := volumeRE.ReplaceAllString(path, `/$1$2`)
-	p = strings.Replace(p, "\\", "/", -1)
 	p = sharedRE.ReplaceAllString(p, `/nobody`)
+	p = strings.Replace(p, "\\", "/", -1)
 	return homeDirRE.ReplaceAllString(p, `$1/$2/nobody`)
+}
+
+type normalizedFS struct {
+	afero.Fs
+}
+
+func (m *normalizedFS) Open(name string) (afero.File, error) {
+	return m.Fs.Open(NormalizeAndAnonymizePath(name))
+}
+
+func (m *normalizedFS) OpenFile(name string, flag int, mode os.FileMode) (afero.File, error) {
+	return m.Fs.OpenFile(NormalizeAndAnonymizePath(name), flag, mode)
 }
 
 // An Archive is a rollup of all resources and options needed to reproduce a test identically elsewhere.
@@ -68,6 +82,8 @@ type Archive struct {
 	Scripts map[string][]byte `json:"-"` // included scripts
 	Files   map[string][]byte `json:"-"` // non-script resources
 
+	FS afero.Fs `json:"-"`
+
 	// Environment variables
 	Env map[string]string `json:"env"`
 }
@@ -78,6 +94,7 @@ func ReadArchive(in io.Reader) (*Archive, error) {
 	arc := &Archive{
 		Scripts: make(map[string][]byte),
 		Files:   make(map[string][]byte),
+		FS:      &normalizedFS{Fs: afero.NewMemMapFs()},
 	}
 
 	for {
@@ -133,6 +150,11 @@ func ReadArchive(in io.Reader) (*Archive, error) {
 		}
 
 		dst[name] = data
+
+		err = afero.WriteFile(arc.FS, name, data, os.ModePerm)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return arc, nil

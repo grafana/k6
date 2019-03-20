@@ -16,7 +16,7 @@
     <a href="https://github.com/loadimpact/k6/releases">Download</a> ·
     <a href="#install">Install</a> ·
     <a href="https://docs.k6.io">Documentation</a> ·
-    <a href="https://k6.io/slack">Community</a>
+    <a href="https://community.k6.io/">Community</a>
 </p>
 
 ---
@@ -99,7 +99,7 @@ If there isn't an official package for your operating system or architecture, or
 
 ### Build from source
 
-k6 is written in Go, so it's just a single statically-linked executable and very easy to build and distribute. To build from source you need **[Git](https://git-scm.com/downloads)** and **[Go](https://golang.org/doc/install)** (1.10 or newer). Follow these instructions:
+k6 is written in Go, so it's just a single statically-linked executable and very easy to build and distribute. To build from source you need **[Git](https://git-scm.com/downloads)** and **[Go](https://golang.org/doc/install)** (1.11 or newer). Follow these instructions:
 
 - Run `go get github.com/loadimpact/k6` which will:
   - git clone the repo and put the source in `$GOPATH/src/github.com/loadimpact/k6`
@@ -133,7 +133,7 @@ For more information on how to get started running k6, please look at the [Runni
 Overview
 --------
 
-In this section we'll briefly explore some of the basic concepts and principles of how k6 works. If you want to learn more in-depth about the k6 scripting API, results output, and features, you can visit the full k6 documentation website at [https://docs.k6.io](docs.k6.io).
+In this section we'll briefly explore some of the basic concepts and principles of how k6 works. If you want to learn more in-depth about the k6 scripting API, results output, and features, you can visit the full k6 documentation website at [docs.k6.io](https://docs.k6.io).
 
 ### Init and VU stages
 
@@ -197,7 +197,6 @@ Configuration mechanisms do have an order of precedence. As presented, options a
 As shown above, there are several ways to configure the number of simultaneous virtual users k6 will launch. There are also different ways to specify how long those virtual users will be running. For simple tests you can:
 - Set the test duration by the `--duration`/`-d` CLI flag (or the `K6_DURATION` environment variable and the `duration` script/JSON option). For ease of use, `duration` is specified with human readable values like `1h30m10s` - `k6 run --duration 30s script.js`, `k6 cloud -d 15m10s script.js`, `export K6_DURATION=1h`, etc. If set to `0`, k6 wouldn't stop executing the script unless the user manually stops it.
 - Set the total number of script iterations with the `--iterations`/`-i` CLI flag (or the `K6_ITERATIONS` environment variable and the `iterations` script/JSON option). k6 will stop executing the script whenever the **total** number of iterations (i.e. the number of iterations across all VUs) reaches the specified number. So if you have `k6 run --iterations 10 --vus 10 script.js`, then each VU would make only a single iteration.
-- Set both the test duration and the total number of script iterations. In that case, k6 would stop the script execution whenever either one of the above conditions is reached first.
 
 For more complex cases, you can specify execution stages. They are a combination of `duration,target-VUs` pairs. These pairs instruct k6 to linearly ramp up, ramp down, or stay at the number of VUs specified for the period specified. Execution stages can be set via the `stages` script/JSON option as an array of `{ duration: ..., target: ... }` pairs, or with the `--stage`/`-s` CLI flags and the `K6_STAGE` environment variable via the `duration:target,duration:target...` syntax.
 
@@ -216,7 +215,7 @@ export let options = {
 ```
 Alternatively, you can use the CLI flags `--vus 5 --stage 3m:10,5m:10,10m:35,1m30s:0` or set the environment variables `K6_VUS=5 K6_STAGE="3m:10,5m:10,10m:35,1m30s:0"` to achieve the same results.
 
-For a complete list of supported k6 options, refer to the documentation at [https://docs.k6.io/docs/options](https://docs.k6.io/docs/options).
+For a complete list of supported k6 options, refer to the documentation at [docs.k6.io/docs/options](https://docs.k6.io/docs/options).
 
 _Hint: besides accessing the supplied [environment variables](https://docs.k6.io/docs/environment-variables) through the `__ENV` global object briefly mentioned above, you can also use the [execution context variables](https://docs.k6.io/docs/execution-context-variables) `__VU` and `__ITER` to access the current VU number and the number of the current iteration **for that VU**. These variables can be very useful if you want VUs to execute different scripts/scenarios or to aid in generating different data per VU. ```http.post("https://some.example.website/signup", {username: `testuser${__VU}@testsite.com`, /* ... */})```_
 
@@ -350,8 +349,8 @@ Need help or want to contribute?
 
 Types of questions and where to ask:
 
-- How do I? -- [Stack Overflow](https://stackoverflow.com/questions/tagged/k6) (use tags: k6, javascript, load-testing)
-- I got this error, why? -- [Stack Overflow](https://stackoverflow.com/questions/tagged/k6)
+- How do I? -- [Stack Overflow](https://stackoverflow.com/questions/tagged/k6) (use tags: k6, javascript, load-testing) or the Discourse forum at [community.k6.io](https://community.k6.io/)
+- I got this error, why? -- [Stack Overflow](https://stackoverflow.com/questions/tagged/k6) or [community.k6.io](https://community.k6.io/)
 - I got this error and I'm sure it's a bug -- [file an issue](https://github.com/loadimpact/k6/issues)
 - I have an idea/request -- [file an issue](https://github.com/loadimpact/k6/issues)
 - Why do you? -- [Slack](https://k6.io/slack)

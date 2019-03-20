@@ -22,21 +22,40 @@ package js
 
 import (
 	"context"
+	"os"
 	"strconv"
 
 	"github.com/dop251/goja"
 	log "github.com/sirupsen/logrus"
 )
 
-type Console struct {
+// console represents a JS console implemented as a logrus.Logger.
+type console struct {
 	Logger *log.Logger
 }
 
-func NewConsole() *Console {
-	return &Console{log.StandardLogger()}
+// Creates a console with the standard logrus logger.
+func newConsole() *console {
+	return &console{log.StandardLogger()}
 }
 
-func (c Console) log(ctx *context.Context, level log.Level, msgobj goja.Value, args ...goja.Value) {
+// Creates a console logger with its output set to the file at the provided `filepath`.
+func newFileConsole(filepath string) (*console, error) {
+	f, err := os.OpenFile(filepath, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
+	if err != nil {
+		return nil, err
+	}
+
+	l := log.New()
+	l.SetOutput(f)
+
+	//TODO: refactor to not rely on global variables, albeit external ones
+	l.SetFormatter(log.StandardLogger().Formatter)
+
+	return &console{l}, nil
+}
+
+func (c console) log(ctx *context.Context, level log.Level, msgobj goja.Value, args ...goja.Value) {
 	if ctx != nil && *ctx != nil {
 		select {
 		case <-(*ctx).Done():
@@ -63,22 +82,22 @@ func (c Console) log(ctx *context.Context, level log.Level, msgobj goja.Value, a
 	}
 }
 
-func (c Console) Log(ctx *context.Context, msg goja.Value, args ...goja.Value) {
+func (c console) Log(ctx *context.Context, msg goja.Value, args ...goja.Value) {
 	c.Info(ctx, msg, args...)
 }
 
-func (c Console) Debug(ctx *context.Context, msg goja.Value, args ...goja.Value) {
+func (c console) Debug(ctx *context.Context, msg goja.Value, args ...goja.Value) {
 	c.log(ctx, log.DebugLevel, msg, args...)
 }
 
-func (c Console) Info(ctx *context.Context, msg goja.Value, args ...goja.Value) {
+func (c console) Info(ctx *context.Context, msg goja.Value, args ...goja.Value) {
 	c.log(ctx, log.InfoLevel, msg, args...)
 }
 
-func (c Console) Warn(ctx *context.Context, msg goja.Value, args ...goja.Value) {
+func (c console) Warn(ctx *context.Context, msg goja.Value, args ...goja.Value) {
 	c.log(ctx, log.WarnLevel, msg, args...)
 }
 
-func (c Console) Error(ctx *context.Context, msg goja.Value, args ...goja.Value) {
+func (c console) Error(ctx *context.Context, msg goja.Value, args ...goja.Value) {
 	c.log(ctx, log.ErrorLevel, msg, args...)
 }

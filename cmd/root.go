@@ -26,6 +26,7 @@ import (
 	golog "log"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/fatih/color"
@@ -34,16 +35,23 @@ import (
 	"github.com/shibukawa/configdir"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
-var Version = "0.22.1"
-var Banner = `
-          /\      |‾‾|  /‾‾/  /‾/   
-     /\  /  \     |  |_/  /  / /   
-    /  \/    \    |      |  /  ‾‾\  
-   /          \   |  |‾\  \ | (_) | 
-  / __________ \  |__|  \__\ \___/ .io`
+// Version contains the current semantic version of k6.
+//nolint:gochecknoglobals
+var Version = "0.24.0"
 
+// Banner contains the ASCII-art banner with the k6 logo and stylized website URL
+//TODO: make these into methods, only the version needs to be a variable
+//nolint:gochecknoglobals
+var Banner = strings.Join([]string{
+	`          /\      |‾‾|  /‾‾/  /‾/   `,
+	`     /\  /  \     |  |_/  /  / /    `,
+	`    /  \/    \    |      |  /  ‾‾\  `,
+	`   /          \   |  |‾\  \ | (_) | `,
+	`  / __________ \  |__|  \__\ \___/ .io`,
+}, "\n")
 var BannerColor = color.New(color.FgCyan)
 
 var (
@@ -54,9 +62,16 @@ var (
 	stderr    = consoleWriter{colorable.NewColorableStderr(), stderrTTY, outMutex}
 )
 
-var (
-	cfgFile string
+const defaultConfigFileName = "config.json"
 
+//TODO: remove these global variables
+//nolint:gochecknoglobals
+var defaultConfigFilePath = defaultConfigFileName // Updated with the user's config folder in the init() function below
+//nolint:gochecknoglobals
+var configFilePath = os.Getenv("K6_CONFIG") // Overridden by `-c`/`--config` flag!
+
+var (
+	//TODO: have environment variables for configuring these? hopefully after we move away from global vars though...
 	verbose bool
 	quiet   bool
 	noColor bool
@@ -68,7 +83,7 @@ var (
 var RootCmd = &cobra.Command{
 	Use:           "k6",
 	Short:         "a next-generation load generator",
-	Long:          BannerColor.Sprint(Banner),
+	Long:          BannerColor.Sprintf("\n%s", Banner),
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
@@ -93,20 +108,34 @@ func Execute() {
 	}
 }
 
+func rootCmdPersistentFlagSet() *pflag.FlagSet {
+	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
+	//TODO: figure out a better way to handle the CLI flags - global variables are not very testable... :/
+	flags.BoolVarP(&verbose, "verbose", "v", false, "enable debug logging")
+	flags.BoolVarP(&quiet, "quiet", "q", false, "disable progress updates")
+	flags.BoolVar(&noColor, "no-color", false, "disable colored output")
+	flags.StringVar(&logFmt, "logformat", "", "log output format")
+	flags.StringVarP(&address, "address", "a", "localhost:6565", "address for the api server")
+
+	//TODO: Fix... This default value needed, so both CLI flags and environment variables work
+	flags.StringVarP(&configFilePath, "config", "c", configFilePath, "JSON config file")
+	// And we also need to explicitly set the default value for the usage message here, so things
+	// like `K6_CONFIG="blah" k6 run -h` don't produce a weird usage message
+	flags.Lookup("config").DefValue = defaultConfigFilePath
+	must(cobra.MarkFlagFilename(flags, "config"))
+	return flags
+}
+
 func init() {
-	defaultConfigPathMsg := ""
+	// TODO: find a better library... or better yet, simply port the few dozen lines of code for getting the
+	// per-user config folder in a cross-platform way
+	configDirs := configdir.New("loadimpact", "k6")
 	configFolders := configDirs.QueryFolders(configdir.Global)
 	if len(configFolders) > 0 {
-		defaultConfigPathMsg = fmt.Sprintf(" (default %s)", filepath.Join(configFolders[0].Path, configFilename))
+		defaultConfigFilePath = filepath.Join(configFolders[0].Path, defaultConfigFileName)
 	}
 
-	RootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "enable debug logging")
-	RootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "disable progress updates")
-	RootCmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "disable colored output")
-	RootCmd.PersistentFlags().StringVar(&logFmt, "logformat", "", "log output format")
-	RootCmd.PersistentFlags().StringVarP(&address, "address", "a", "localhost:6565", "address for the api server")
-	RootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file"+defaultConfigPathMsg)
-	must(cobra.MarkFlagFilename(RootCmd.PersistentFlags(), "config"))
+	RootCmd.PersistentFlags().AddFlagSet(rootCmdPersistentFlagSet())
 }
 
 // fprintf panics when where's an error writing to the supplied io.Writer

@@ -10,6 +10,14 @@
   revision = "4a21cbd618b459155f8b8ee7f4491cd54f5efa77"
 
 [[projects]]
+  digest = "1:6d83aad9c98e13079ad8a4dbc740892edf5384bcd07f1d789bb66cd8ecfae2cd"
+  name = "github.com/DataDog/datadog-go"
+  packages = ["statsd"]
+  pruneopts = "NUT"
+  revision = "e67964b4021ad3a334e748e8811eb3cd6becbc6e"
+  version = "2.1.0"
+
+[[projects]]
   branch = "master"
   digest = "1:7d8fe22a434ddfb29d95e10a0231eb2d96100b9eaaf7bff7312eee7df7a34bfa"
   name = "github.com/GeertJohan/go.rice"
@@ -265,6 +273,14 @@
   version = "v1.3.0"
 
 [[projects]]
+  digest = "1:4059c14e87a2de3a434430340521b5feece186c1469eff0834c29a63870de3ed"
+  name = "github.com/konsorten/go-windows-terminal-sequences"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "5c8c8bd35d3832f5d134ae1e1e375b69a4d25242"
+  version = "v1.0.1"
+
+[[projects]]
   digest = "1:2578ea84d8555a62f49e5f750848ec5d3bad2e5ba9e3977186e407c7501d3b95"
   name = "github.com/kubernetes/helm"
   packages = ["pkg/strvals"]
@@ -321,7 +337,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:a74203e799dbd148a873dc57fc2ef086b3a2c79d1390ab8a693992b1b25dadd7"
+  digest = "1:5a4a89d8e15fa92a2b9be9a49e854878a0b1d0aa0744bfa85210ff8725b57a47"
   name = "github.com/mccutchen/go-httpbin"
   packages = [
     "httpbin",
@@ -329,7 +345,7 @@
     "httpbin/digest",
   ]
   pruneopts = "NUT"
-  revision = "793a504652281c75a1f3dbaba99bdd2c3246fc3e"
+  revision = "c5cb2f4802fac63859778c72989fe88dce35fe35"
 
 [[projects]]
   branch = "master"
@@ -413,14 +429,14 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:f9e30881a5a427fe87c58273f511fb6a10ee2c8ea55d409d7256ede192f7f4b7"
+  digest = "1:88925026dc080b29f50bc9c917224dac3d4fa1df614df38429c3b373130c9a56"
   name = "github.com/sirupsen/logrus"
   packages = [
     ".",
     "hooks/test",
   ]
   pruneopts = "NUT"
-  revision = "90150a8ed11b6ce285e77e8af2b0109559ce4777"
+  revision = "7eeb7b7cbdeb0a582a5b7a1512d91f956f1674aa"
 
 [[projects]]
   branch = "master"
@@ -549,19 +565,19 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:3d87ae21dd01efa1a49fdc98479b49eb59dc6d57f480e3968cf2c36de07d745e"
+  digest = "1:e1ac31e25fd520610e39e9bb01dc7812b44085930118d76a0c7835a785ece07e"
   name = "golang.org/x/net"
   packages = [
     "context",
     "html",
     "html/atom",
+    "http/httpguts",
     "http2",
     "http2/hpack",
     "idna",
-    "lex/httplex",
   ]
   pruneopts = "NUT"
-  revision = "ae89d30ce0c63142b652837da33d782e2b0a9b25"
+  revision = "351d144fa1fc0bd934e2408202be0c29f25e35a0"
 
 [[projects]]
   branch = "master"
@@ -636,6 +652,7 @@
   analyzer-version = 1
   input-imports = [
     "github.com/Azure/go-ntlmssp",
+    "github.com/DataDog/datadog-go/statsd",
     "github.com/GeertJohan/go.rice",
     "github.com/GeertJohan/go.rice/embedded",
     "github.com/PuerkitoBio/goquery",

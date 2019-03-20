@@ -26,14 +26,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
-	null "gopkg.in/guregu/null.v3"
-
-	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/ui"
 	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
+	null "gopkg.in/guregu/null.v3"
 )
 
 var (
@@ -61,6 +60,7 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.Bool("insecure-skip-tls-verify", false, "skip verification of TLS certificates")
 	flags.Bool("no-connection-reuse", false, "disable keep-alive connections")
 	flags.Bool("no-vu-connection-reuse", false, "don't reuse connections between iterations")
+	flags.Duration("min-iteration-duration", 0, "minimum amount of time k6 will take executing a single iteration")
 	flags.BoolP("throw", "w", false, "throw warnings (like failed http requests) as errors")
 	flags.StringSlice("blacklist-ip", nil, "blacklist an `ip range` from being called")
 	flags.StringSlice("summary-trend-stats", nil, "define `stats` for trend metrics (response times), one or more as 'avg,p(95),...'")
@@ -68,6 +68,7 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.StringP("nic", "n", "", "define network interface(s) to be used (multiple interfaces list allowed with comma separator ) All IPs from the interface will be used during the test")
 	flags.StringSlice("system-tags", lib.DefaultSystemTagList, "only include these system tags in metrics")
 	flags.StringSlice("tag", nil, "add a `tag` to be applied to all samples, as `[name]=[value]`")
+	flags.String("console-output", "", "redirects the console logging to the provided output file")
 	flags.Bool("discard-response-bodies", false, "Read but don't process or save HTTP response bodies")
 	return flags
 }
@@ -87,6 +88,7 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		InsecureSkipTLSVerify: getNullBool(flags, "insecure-skip-tls-verify"),
 		NoConnectionReuse:     getNullBool(flags, "no-connection-reuse"),
 		NoVUConnectionReuse:   getNullBool(flags, "no-vu-connection-reuse"),
+		MinIterationDuration:  getNullDuration(flags, "min-iteration-duration"),
 		Throw:                 getNullBool(flags, "throw"),
 		DiscardResponseBodies: getNullBool(flags, "discard-response-bodies"),
 		Nic: getNullString(flags, "nic"),
@@ -174,6 +176,15 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 			parsedRunTags[name] = value
 		}
 		opts.RunTags = stats.IntoSampleTags(&parsedRunTags)
+	}
+
+	redirectConFile, err := flags.GetString("console-output")
+	if err != nil {
+		return opts, err
+	}
+
+	if redirectConFile != "" {
+		opts.ConsoleOutput = null.StringFrom(redirectConFile)
 	}
 
 	return opts, nil

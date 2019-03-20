@@ -99,11 +99,13 @@ func (c *Client) PushMetric(referenceID string, noCompress bool, samples []*Samp
 	}
 
 	var buf bytes.Buffer
+	var unzippedSize int
 	if samples != nil {
 		b, err := json.Marshal(&samples)
 		if err != nil {
 			return err
 		}
+		unzippedSize = len(b)
 		g := gzip.NewWriter(&buf)
 		if _, err = g.Write(b); err != nil {
 			return err
@@ -117,6 +119,8 @@ func (c *Client) PushMetric(referenceID string, noCompress bool, samples []*Samp
 		return err
 	}
 	req.Header.Set("Content-Encoding", "gzip")
+	req.Header.Set("x-payload-byte-count", strconv.Itoa(unzippedSize))
+	req.Header.Set("x-payload-sample-count", strconv.Itoa(len(samples)))
 	return c.Do(req, nil)
 }
 
