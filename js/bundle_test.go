@@ -26,6 +26,8 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -484,13 +486,16 @@ func TestOpen(t *testing.T) {
 			fs = afero.NewReadOnlyFs(fs)
 			for _, tCase := range testCases {
 				tCase := tCase
-				var openPath = tCase.openPath
-				// if fullpath prepend prefix
-				if openPath[0] == '/' {
-					openPath = filepath.Join(prefix, openPath)
-				}
 
-				t.Run(tCase.name, func(t *testing.T) {
+				var testFunc = func(t *testing.T) {
+					var openPath = tCase.openPath
+					// if fullpath prepend prefix
+					if openPath[0] == '/' || openPath[0] == '\\' {
+						openPath = filepath.Join(prefix, openPath)
+					}
+					if runtime.GOOS == "windows" {
+						openPath = strings.Replace(openPath, `\`, `\\`, -1)
+					}
 					src := &lib.SourceData{
 						Filename: filepath.Join(prefix, "/path/to/script.js"),
 						Data: []byte(`
@@ -526,7 +531,15 @@ func TestOpen(t *testing.T) {
 							assert.Equal(t, "hi", v.Export())
 						})
 					}
-				})
+				}
+
+				t.Run(tCase.name, testFunc)
+				if runtime.GOOS == "windows" {
+					// windowsify the testcase
+					tCase.openPath = strings.Replace(tCase.openPath, `/`, `\`, -1)
+					tCase.pwd = strings.Replace(tCase.pwd, `/`, `\`, -1)
+					t.Run(tCase.name+" with windows slash", testFunc)
+				}
 			}
 		})
 	}
