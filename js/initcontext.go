@@ -182,7 +182,7 @@ func (i *InitContext) Open(name string, args ...string) (goja.Value, error) {
 		if isDir, err = afero.IsDir(i.fs, filename); err != nil {
 			return nil, err
 		} else if isDir {
-			return nil, errors.New("open can't be used with directories")
+			return nil, errors.New("open() can't be used with directories")
 		}
 		data, err = afero.ReadFile(i.fs, filename)
 		if err != nil {
