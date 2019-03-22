@@ -498,7 +498,6 @@ func TestOpen(t *testing.T) {
 		defer cleanUp()
 		fs = afero.NewReadOnlyFs(fs)
 		t.Run(name, func(t *testing.T) {
-			fs = afero.NewReadOnlyFs(fs)
 			for _, tCase := range testCases {
 				tCase := tCase
 
@@ -527,25 +526,17 @@ func TestOpen(t *testing.T) {
 						assert.Error(t, err)
 						return
 					}
-					if !assert.NoError(t, err) {
-						return
-					}
+					require.NoError(t, err)
 
 					arcBundle, err := NewBundleFromArchive(sourceBundle.makeArchive(), lib.RuntimeOptions{})
-					if !assert.NoError(t, err) {
-						return
-					}
+
 					for source, b := range map[string]*Bundle{"source": sourceBundle, "archive": arcBundle} {
 						b := b
 						t.Run(source, func(t *testing.T) {
 							bi, err := b.Instantiate()
-							if !assert.NoError(t, err) {
-								return
-							}
+							require.NoError(t, err)
 							v, err := bi.Default(goja.Undefined())
-							if !assert.NoError(t, err) {
-								return
-							}
+							require.NoError(t, err)
 							assert.Equal(t, "hi", v.Export())
 						})
 					}
