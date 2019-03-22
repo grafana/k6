@@ -460,6 +460,21 @@ func TestOpen(t *testing.T) {
 			openPath: "/path/to/missing.txt",
 			isError:  true,
 		},
+		{
+			name:     "relative1",
+			openPath: "to/file.txt",
+			pwd:      "/path",
+		},
+		{
+			name:     "relative2",
+			openPath: "./path/to/file.txt",
+			pwd:      "/",
+		},
+		{
+			name:     "relative wonky",
+			openPath: "../path/to/file.txt",
+			pwd:      "/path",
+		},
 	}
 	fss := map[string]func() (afero.Fs, string, func()){
 		"MemMapFS": func() (afero.Fs, string, func()) {
@@ -496,8 +511,12 @@ func TestOpen(t *testing.T) {
 					if runtime.GOOS == "windows" {
 						openPath = strings.Replace(openPath, `\`, `\\`, -1)
 					}
+					var pwd = tCase.pwd
+					if pwd == "" {
+						pwd = "/path/to/"
+					}
 					src := &lib.SourceData{
-						Filename: filepath.Join(prefix, "/path/to/script.js"),
+						Filename: filepath.Join(prefix, filepath.Join(pwd, "script.js")),
 						Data: []byte(`
 			export let file = open("` + openPath + `");
 			export default function() { return file };
@@ -511,7 +530,6 @@ func TestOpen(t *testing.T) {
 					if !assert.NoError(t, err) {
 						return
 					}
-					sourceBundle.BaseInitContext.pwd = filepath.Join(prefix, tCase.pwd)
 
 					arcBundle, err := NewBundleFromArchive(sourceBundle.makeArchive(), lib.RuntimeOptions{})
 					if !assert.NoError(t, err) {
