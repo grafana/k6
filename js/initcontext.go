@@ -164,8 +164,7 @@ func (i *InitContext) compileImport(src, filename string) (*goja.Program, error)
 	return pgm, err
 }
 
-func (i *InitContext) Open(name string, args ...string) (goja.Value, error) {
-	filename := name
+func (i *InitContext) Open(filename string, args ...string) (goja.Value, error) {
 	if filename[0] != '/' && filename[0] != filepath.Separator && !filepath.IsAbs(filename) {
 		filename = filepath.Join(i.pwd, filename)
 	}
