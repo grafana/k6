@@ -164,6 +164,7 @@ func (i *InitContext) compileImport(src, filename string) (*goja.Program, error)
 	return pgm, err
 }
 
+// Open implements open() in the init context and will read and return the contents of a file
 func (i *InitContext) Open(filename string, args ...string) (goja.Value, error) {
 	if filename[0] != '/' && filename[0] != filepath.Separator && !filepath.IsAbs(filename) {
 		filename = filepath.Join(i.pwd, filename)

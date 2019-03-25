@@ -489,7 +489,7 @@ func TestOpen(t *testing.T) {
 			fs := afero.NewOsFs()
 			require.NoError(t, fs.MkdirAll(filepath.Join(prefix, "/path/to"), 0755))
 			require.NoError(t, afero.WriteFile(fs, filepath.Join(prefix, "/path/to/file.txt"), []byte(`hi`), 0644))
-			return fs, prefix, func() { os.RemoveAll(prefix) }
+			return fs, prefix, func() { require.NoError(t, os.RemoveAll(prefix)) }
 		},
 	}
 
@@ -529,6 +529,8 @@ func TestOpen(t *testing.T) {
 					require.NoError(t, err)
 
 					arcBundle, err := NewBundleFromArchive(sourceBundle.makeArchive(), lib.RuntimeOptions{})
+
+					require.NoError(t, err)
 
 					for source, b := range map[string]*Bundle{"source": sourceBundle, "archive": arcBundle} {
 						b := b
