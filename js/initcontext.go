@@ -163,12 +163,13 @@ func (i *InitContext) requireFile(name string) (goja.Value, error) {
 			}
 		}
 
+		pgm.exports = module.Get("exports")
+		i.programs[filename] = pgm
+
 		// Run the program.
 		if _, err := i.runtime.RunProgram(pgm.pgm); err != nil {
 			return goja.Undefined(), err
 		}
-		pgm.exports = module.Get("exports")
-		i.programs[filename] = pgm
 	}
 
 	return pgm.exports, nil

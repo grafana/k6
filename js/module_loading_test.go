@@ -183,3 +183,121 @@ func TestLoadGlobalVarsAreNotSharedBetweenVUs(t *testing.T) {
 		})
 	}
 }
+
+func TestLoadCycle(t *testing.T) {
+	// This is mostly the example from https://hacks.mozilla.org/2018/03/es-modules-a-cartoon-deep-dive/
+	fs := afero.NewMemMapFs()
+	require.NoError(t, afero.WriteFile(fs, "/counter.js", []byte(`
+			let message = require("./main.js").message;
+			exports.count = 5;
+			export function a() {
+				return message;
+			}
+	`), os.ModePerm))
+
+	require.NoError(t, afero.WriteFile(fs, "/main.js", []byte(`
+			let counter = require("./counter.js");
+			let count = counter.count;
+			let a = counter.a;
+			let message= "Eval complete";
+			exports.message = message;
+
+			export default function() {
+				if (count != 5) {
+					throw new Error("Wrong value of count "+ count);
+				}
+				let aMessage = a();
+				if (aMessage != message) {
+					throw new Error("Wrong value of a() "+ aMessage);
+				}
+			}
+	`), os.ModePerm))
+	data, err := afero.ReadFile(fs, "/main.js")
+	require.NoError(t, err)
+	r1, err := New(&lib.SourceData{
+		Filename: "/main.js",
+		Data:     data,
+	}, fs, lib.RuntimeOptions{})
+	require.NoError(t, err)
+
+	arc := r1.MakeArchive()
+	arc.Files = make(map[string][]byte)
+	r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
+	require.NoError(t, err)
+
+	runners := map[string]*Runner{"Source": r1, "Archive": r2}
+	for name, r := range runners {
+		r := r
+		t.Run(name, func(t *testing.T) {
+			ch := newDevNullSampleChannel()
+			defer close(ch)
+			vu, err := r.NewVU(ch)
+			require.NoError(t, err)
+			err = vu.RunOnce(context.Background())
+			require.NoError(t, err)
+		})
+	}
+
+}
+
+func TestLoadCycleBinding(t *testing.T) {
+	// This is mostly the example from
+	// http://2ality.com/2015/07/es6-module-exports.html#why-export-bindings
+	fs := afero.NewMemMapFs()
+	require.NoError(t, afero.WriteFile(fs, "/a.js", []byte(`
+		import {bar} from './b.js';
+		export function foo(a) {
+				if (a !== undefined) {
+					return "foo" + a;
+				}
+				return "foo" + bar(3);
+		}
+	`), os.ModePerm))
+
+	require.NoError(t, afero.WriteFile(fs, "/b.js", []byte(`
+		import {foo} from './a.js';
+		export function bar(a) {
+				if (a !== undefined) {
+					return "bar" + a;
+				}
+				return "bar" + foo(5);
+			}
+	`), os.ModePerm))
+
+	r1, err := New(&lib.SourceData{
+		Filename: "/main.js",
+		Data: []byte(`
+			import {foo} from './a.js';
+			import {bar} from './b.js';
+			export default function() {
+				let fooMessage = foo();
+				if (fooMessage != "foobar3") {
+					throw new Error("Wrong value of foo() "+ fooMessage);
+				}
+				let barMessage = bar();
+				if (barMessage != "barfoo5") {
+					throw new Error("Wrong value of bar() "+ barMessage);
+				}
+			}
+		`),
+	}, fs, lib.RuntimeOptions{})
+	require.NoError(t, err)
+
+	arc := r1.MakeArchive()
+	arc.Files = make(map[string][]byte)
+	r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
+	require.NoError(t, err)
+
+	runners := map[string]*Runner{"Source": r1, "Archive": r2}
+	for name, r := range runners {
+		r := r
+		t.Run(name, func(t *testing.T) {
+			ch := newDevNullSampleChannel()
+			defer close(ch)
+			vu, err := r.NewVU(ch)
+			require.NoError(t, err)
+			err = vu.RunOnce(context.Background())
+			require.NoError(t, err)
+		})
+	}
+}
