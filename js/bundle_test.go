@@ -475,6 +475,12 @@ func TestOpen(t *testing.T) {
 			openPath: "../path/to/file.txt",
 			pwd:      "/path",
 		},
+		{
+			name:     "empty open doesn't panic",
+			openPath: "",
+			pwd:      "/path",
+			isError:  true,
+		},
 	}
 	fss := map[string]func() (afero.Fs, string, func()){
 		"MemMapFS": func() (afero.Fs, string, func()) {
@@ -504,7 +510,7 @@ func TestOpen(t *testing.T) {
 				var testFunc = func(t *testing.T) {
 					var openPath = tCase.openPath
 					// if fullpath prepend prefix
-					if openPath[0] == '/' || openPath[0] == '\\' {
+					if openPath != "" && (openPath[0] == '/' || openPath[0] == '\\') {
 						openPath = filepath.Join(prefix, openPath)
 					}
 					if runtime.GOOS == "windows" {

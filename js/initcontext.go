@@ -166,6 +166,10 @@ func (i *InitContext) compileImport(src, filename string) (*goja.Program, error)
 
 // Open implements open() in the init context and will read and return the contents of a file
 func (i *InitContext) Open(filename string, args ...string) (goja.Value, error) {
+	if filename == "" {
+		return nil, errors.New("open() can't be used with an empty filename")
+	}
+
 	// Here IsAbs should be enough but unfortunately it doesn't handle absolute paths starting from
 	// the current drive on windows like `\users\noname\...`. Also it makes it more easy to test and
 	// will probably be need for archive execution under windows if always consider '/...' as an
