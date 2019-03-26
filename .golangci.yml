@@ -21,6 +21,10 @@ issues:
      linters:
        - dupl
 
+  exclude:
+   #TODO: remove this exclusion after https://github.com/golang/lint/issues/381
+   # is fixed by https://github.com/golang/lint/pull/380 or something else
+   - "should have a package comment, unless it's in another file for this package"
 
 linters-settings:
   govet:
