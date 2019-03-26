@@ -164,16 +164,39 @@ func (i *InitContext) compileImport(src, filename string) (*goja.Program, error)
 	return pgm, err
 }
 
-func (i *InitContext) Open(name string, args ...string) (goja.Value, error) {
-	filename := loader.Resolve(i.pwd, name)
+// Open implements open() in the init context and will read and return the contents of a file
+func (i *InitContext) Open(filename string, args ...string) (goja.Value, error) {
+	if filename == "" {
+		return nil, errors.New("open() can't be used with an empty filename")
+	}
+
+	// Here IsAbs should be enough but unfortunately it doesn't handle absolute paths starting from
+	// the current drive on windows like `\users\noname\...`. Also it makes it more easy to test and
+	// will probably be need for archive execution under windows if always consider '/...' as an
+	// absolute path.
+	if filename[0] != '/' && filename[0] != '\\' && !filepath.IsAbs(filename) {
+		filename = filepath.Join(i.pwd, filename)
+	}
+	filename = filepath.ToSlash(filename)
+
 	data, ok := i.files[filename]
 	if !ok {
-		data_, err := loader.Load(i.fs, i.pwd, name)
+		var (
+			err   error
+			isDir bool
+		)
+
+		// Workaround for https://github.com/spf13/afero/issues/201
+		if isDir, err = afero.IsDir(i.fs, filename); err != nil {
+			return nil, err
+		} else if isDir {
+			return nil, errors.New("open() can't be used with directories")
+		}
+		data, err = afero.ReadFile(i.fs, filename)
 		if err != nil {
 			return nil, err
 		}
-		i.files[filename] = data_.Data
-		data = data_.Data
+		i.files[filename] = data
 	}
 
 	if len(args) > 0 && args[0] == "b" {
