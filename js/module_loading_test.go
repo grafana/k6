@@ -123,7 +123,6 @@ func TestLoadDoesntBreakHTTPGet(t *testing.T) {
 			export default function(data) {
 				let resp = A();
 				if (resp.status != 200) {
-				throw new Error(JSON.stringify(resp));
 					throw new Error("wrong status "+ resp.status);
 				}
 			}
@@ -152,8 +151,6 @@ func TestLoadDoesntBreakHTTPGet(t *testing.T) {
 }
 
 func TestLoadGlobalVarsAreNotSharedBetweenVUs(t *testing.T) {
-	// This test that functions such as http.get which require context still work if they are called
-	// inside script that is imported
 	fs := afero.NewMemMapFs()
 	require.NoError(t, afero.WriteFile(fs, "/A.js", []byte(`
 		var globalVar = 0;
