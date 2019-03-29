@@ -357,6 +357,28 @@ func TestSetupDataNoSetup(t *testing.T) {
 	};`)
 }
 
+func TestConsoleInInitContext(t *testing.T) {
+	r1, err := getSimpleRunner("/script.js", `
+			console.log("1");
+			export default function(data) {
+			};
+		`)
+	require.NoError(t, err)
+
+	testdata := map[string]*Runner{"Source": r1}
+	for name, r := range testdata {
+		r := r
+		t.Run(name, func(t *testing.T) {
+			samples := make(chan stats.SampleContainer, 100)
+			vu, err := r.NewVU(samples)
+			if assert.NoError(t, err) {
+				err := vu.RunOnce(context.Background())
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestSetupDataNoReturn(t *testing.T) {
 	testSetupDataHelper(t, `
 	export let options = { setupTimeout: "1s", teardownTimeout: "1s" };
