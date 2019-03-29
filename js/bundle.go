@@ -246,6 +246,7 @@ func (b *Bundle) instantiate(rt *goja.Runtime, init *InitContext) error {
 	rt.Set("module", module)
 
 	rt.Set("__ENV", b.Env)
+	rt.Set("console", common.Bind(rt, newConsole(), init.ctxPtr))
 
 	*init.ctxPtr = common.WithRuntime(context.Background(), rt)
 	unbindInit := common.BindToGlobal(rt, common.Bind(rt, init, init.ctxPtr))
