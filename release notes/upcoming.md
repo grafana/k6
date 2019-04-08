@@ -2,11 +2,10 @@ TODO: Intro
 
 ## New Features!
 
-### Category: Title (#533)
+### HTTP: request body compression (#988)
 
-Description of feature.
+Now all http methods have an additional param called `compression`, with a single possible value `gzip`, which if set will send the body compressed as gzip. It will also correctly set both `Content-Encoding` and `Content-Length`.
 
-**Docs**: [Title](http://k6.readme.io/docs/TODO)
 
 ## Bugs fixed!
 
