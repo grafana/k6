@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"os"
 	"runtime"
 	"syscall"
 
@@ -132,12 +133,12 @@ func errorCodeForError(err error) (errCode, string) {
 			if e.Timeout() {
 				return tcpDialTimeoutErrorCode, tcpDialTimeoutErrorCodeMsg
 			}
-			switch e.Err.Error() {
-			case syscall.ECONNREFUSED.Error():
-				return tcpDialRefusedErrorCode, tcpDialRefusedErrorCodeMsg
-			default:
-				return tcpDialErrorCode, err.Error()
+			if iErr, ok := e.Err.(*os.SyscallError); ok {
+				if iErr.Err.Error() == syscall.ECONNREFUSED.Error() {
+					return tcpDialRefusedErrorCode, tcpDialRefusedErrorCodeMsg
+				}
 			}
+			return tcpDialErrorCode, err.Error()
 		}
 		switch inErr := e.Err.(type) {
 		case syscall.Errno:

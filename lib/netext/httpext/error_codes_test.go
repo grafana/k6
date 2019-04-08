@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"os"
 	"runtime"
 	"syscall"
 	"testing"
@@ -114,7 +115,7 @@ func TestTCPErrors(t *testing.T) {
 		nonTCPError       = &net.OpError{Net: "something", Err: errors.New("non tcp error")}
 		econnreset        = &net.OpError{Net: "tcp", Op: "write", Err: syscall.ECONNRESET}
 		epipeerror        = &net.OpError{Net: "tcp", Op: "write", Err: syscall.EPIPE}
-		econnrefused      = &net.OpError{Net: "tcp", Op: "dial", Err: syscall.ECONNREFUSED}
+		econnrefused      = &net.OpError{Net: "tcp", Op: "dial", Err: &os.SyscallError{Err: syscall.ECONNREFUSED}}
 		tcperror          = &net.OpError{Net: "tcp", Err: errors.New("tcp error")}
 		timeoutedError    = &net.OpError{Net: "tcp", Op: "dial", Err: timeoutError(true)}
 		notTimeoutedError = &net.OpError{Net: "tcp", Op: "dial", Err: timeoutError(false)}
