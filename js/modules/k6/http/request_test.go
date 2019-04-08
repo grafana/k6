@@ -1425,11 +1425,22 @@ func TestErrorCodes(t *testing.T) {
 			script:            `let res = http.request("GET", "dafsgdhfjg/");`,
 		},
 		{
-			name:   "Too many redirects",
-			status: 302,
+			name:        "Too many redirects",
+			status:      302,
+			moreSamples: 2,
 			script: `
-			let res = http.get("HTTPBIN_URL/redirect/1", {redirects: 0});
-			if (res.url != "HTTPBIN_URL/redirect/1") { throw new Error("incorrect URL: " + res.url) }`,
+			let res = http.get("HTTPBIN_URL/relative-redirect/3", {redirects: 2});
+			if (res.url != "HTTPBIN_URL/relative-redirect/1") { throw new Error("incorrect URL: " + res.url) }`,
+		},
+		{
+			name:              "Connection refused redirect",
+			status:            0,
+			moreSamples:       1,
+			expectedErrorMsg:  `dial tcp 127.0.0.1:1: connect: connection refused`,
+			expectedErrorCode: 1210,
+			script: `
+			let res = http.get("HTTPBIN_URL/redirect-to?url=http%3A%2F%2F127.0.0.1%3A1%2Fpesho");
+			if (res.url != "http://127.0.0.1:1/pesho") { throw new Error("incorrect URL: " + res.url) }`,
 		},
 	}
 
