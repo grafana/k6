@@ -1348,6 +1348,11 @@ func TestErrorCodes(t *testing.T) {
 	defer tb.Cleanup()
 	sr := tb.Replacer.Replace
 
+	var connectionRefusedErrorText = "connect: connection refused"
+	if runtime.GOOS == "windows" {
+		connectionRefusedErrorText = "connectex: No connection could be made because the target machine actively refused it."
+	}
+
 	// Handple paths with custom logic
 	tb.Mux.HandleFunc("/digest-auth/failure", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(2 * time.Second)
@@ -1436,7 +1441,7 @@ func TestErrorCodes(t *testing.T) {
 			name:              "Connection refused redirect",
 			status:            0,
 			moreSamples:       1,
-			expectedErrorMsg:  `dial tcp 127.0.0.1:1: connect: connection refused`,
+			expectedErrorMsg:  `dial tcp 127.0.0.1:1: ` + connectionRefusedErrorText,
 			expectedErrorCode: 1210,
 			script: `
 			let res = http.get("HTTPBIN_URL/redirect-to?url=http%3A%2F%2F127.0.0.1%3A1%2Fpesho");
