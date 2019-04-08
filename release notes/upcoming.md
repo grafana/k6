@@ -15,3 +15,5 @@ Description of feature.
   - don't make HTTP requests (#963)
   - correctly open simple filenames like `"file.json"` and paths such as `"relative/path/to.txt"` as relative (to the current working directory) paths; previously they had to start with a dot (i.e. `"./relative/path/to.txt"`) for that to happen
   - windows: work with paths starting with `/` or `\` as absolute from the current drive
+
+* JS: Correctly always set `response.url` to be the URL that was ultimately fetched (i.e. after any potential redirects), even if there were non http errors. (#990)
