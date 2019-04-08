@@ -22,8 +22,10 @@ package http
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/cookiejar"
@@ -1210,6 +1212,46 @@ func TestSystemTags(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRequestCompression(t *testing.T) {
+	t.Parallel()
+	tb, state, _, rt, _ := newRuntime(t)
+	defer tb.Cleanup()
+
+	// We don't expect any failed requests
+	state.Options.Throw = null.BoolFrom(true)
+
+	var text = `
+	Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+	Maecenas sed pharetra sapien. Nunc laoreet molestie ante ac gravida.
+	Etiam interdum dui viverra posuere egestas. Pellentesque at dolor tristique,
+	mattis turpis eget, commodo purus. Nunc orci aliquam.`
+
+	tb.Mux.HandleFunc("/compressed-text", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, r.Header.Get("Content-Encoding"), "gzip")
+
+		expectedLength, err := strconv.Atoi(r.Header.Get("Content-Length"))
+		require.NoError(t, err)
+
+		var compressedBuf bytes.Buffer
+		n, err := io.Copy(&compressedBuf, r.Body)
+		require.Equal(t, int(n), expectedLength)
+		require.NoError(t, err)
+
+		g, err := gzip.NewReader(&compressedBuf)
+		require.NoError(t, err)
+
+		var buf bytes.Buffer
+		_, err = io.Copy(&buf, g)
+		require.NoError(t, err)
+		require.Equal(t, text, buf.String())
+	}))
+
+	_, err := common.RunString(rt, tb.Replacer.Replace(`
+		http.post("HTTPBIN_URL/compressed-text", `+"`"+text+"`"+`,  {"compression": "gzip"});
+	`))
+	require.NoError(t, err)
 }
 
 func TestResponseTypes(t *testing.T) {
