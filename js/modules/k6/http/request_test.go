@@ -1248,10 +1248,21 @@ func TestRequestCompression(t *testing.T) {
 		require.Equal(t, text, buf.String())
 	}))
 
-	_, err := common.RunString(rt, tb.Replacer.Replace(`
+	t.Run("gzip", func(t *testing.T) {
+		_, err := common.RunString(rt, tb.Replacer.Replace(`
 		http.post("HTTPBIN_URL/compressed-text", `+"`"+text+"`"+`,  {"compression": "gzip"});
 	`))
-	require.NoError(t, err)
+		require.NoError(t, err)
+	})
+
+	t.Run("unsupported compression", func(t *testing.T) {
+		_, err := common.RunString(rt, tb.Replacer.Replace(`
+		http.post("HTTPBIN_URL/compressed-text", `+"`"+text+"`"+`,  {"compression": "George"});
+	`))
+		require.Error(t, err)
+		require.Equal(t, err.Error(),
+			`GoError: unknown compression algorithm George, only supported algorithm is gzip`)
+	})
 }
 
 func TestResponseTypes(t *testing.T) {
