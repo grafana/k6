@@ -320,9 +320,9 @@ func (h *HTTP) parseRequest(
 
 				var buf bytes.Buffer
 				var w = gzip.NewWriter(&buf)
+				defer func() { _ = w.Close() }()
 				var _, err = io.Copy(w, result.Req.Body)
 				if err != nil {
-					_ = w.Close() // just in case
 					return nil, err
 				}
 				if err = w.Close(); err != nil {
