@@ -134,8 +134,12 @@ func errorCodeForError(err error) (errCode, string) {
 				return tcpDialTimeoutErrorCode, tcpDialTimeoutErrorCodeMsg
 			}
 			if iErr, ok := e.Err.(*os.SyscallError); ok {
-				if iErr.Err.Error() == syscall.ECONNREFUSED.Error() {
-					return tcpDialRefusedErrorCode, tcpDialRefusedErrorCodeMsg
+				if errno, ok := iErr.Err.(syscall.Errno); ok {
+					if errno == syscall.ECONNREFUSED ||
+						// 10061 is some connection refused like thing on windows
+						(errno == 10061 && runtime.GOOS == "windows") {
+						return tcpDialRefusedErrorCode, tcpDialRefusedErrorCodeMsg
+					}
 				}
 			}
 			return tcpDialErrorCode, err.Error()
