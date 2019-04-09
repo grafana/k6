@@ -153,8 +153,9 @@ func getRandomIP(ifacesList string) (*net.IPAddr, error) {
 }
 
 func (r *Runner) newVU(samplesOut chan<- stats.SampleContainer) (*VU, error) {
+	var err error
 	// Instantiate a new bundle, make a VU out of it.
-	bi, err := r.Bundle.Instantiate()
+	bi, err = r.Bundle.Instantiate()
 	if err != nil {
 		return nil, err
 	}
@@ -174,7 +175,7 @@ func (r *Runner) newVU(samplesOut chan<- stats.SampleContainer) (*VU, error) {
 	nameToCert := make(map[string]*tls.Certificate)
 	for i, auth := range tlsAuth {
 		for _, name := range auth.Domains {
-			cert, err := auth.Certificate()
+			cert, err = auth.Certificate()
 			if err != nil {
 				return nil, err
 			}
@@ -189,7 +190,7 @@ func (r *Runner) newVU(samplesOut chan<- stats.SampleContainer) (*VU, error) {
 		Hosts:     r.Bundle.Options.Hosts,
 	}
 	if r.Bundle.Options.Nic.Valid {
-		randAddr, err := getRandomIP(r.Bundle.Options.Nic.ValueOrZero())
+		randAddr, err = getRandomIP(r.Bundle.Options.Nic.ValueOrZero())
 		if err != nil {
 			return nil, err
 		}
@@ -219,7 +220,7 @@ func (r *Runner) newVU(samplesOut chan<- stats.SampleContainer) (*VU, error) {
 	}
 	_ = http2.ConfigureTransport(transport)
 
-	cookieJar, err := cookiejar.New(nil)
+	cookieJar, err = cookiejar.New(nil)
 	if err != nil {
 		return nil, err
 	}
@@ -243,7 +244,7 @@ func (r *Runner) newVU(samplesOut chan<- stats.SampleContainer) (*VU, error) {
 	})
 
 	// Give the VU an initial sense of identity.
-	if err := vu.Reconfigure(0); err != nil {
+	if err = vu.Reconfigure(0); err != nil {
 		return nil, err
 	}
 
