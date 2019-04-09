@@ -7,9 +7,6 @@ trim_trailing_whitespace = true
 indent_style = tab
 indent_size = 4
 
-[*.go]
-trim_trailing_whitespace = false
-
 [*.md]
 indent_style = space
 trim_trailing_whitespace = false
