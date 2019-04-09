@@ -91,7 +91,7 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		MinIterationDuration:  getNullDuration(flags, "min-iteration-duration"),
 		Throw:                 getNullBool(flags, "throw"),
 		DiscardResponseBodies: getNullBool(flags, "discard-response-bodies"),
-		Nic: getNullString(flags, "nic"),
+		Nic:                   getNullString(flags, "nic"),
 
 		// Default values for options without CLI flags:
 		// TODO: find a saner and more dev-friendly and error-proof way to handle options
