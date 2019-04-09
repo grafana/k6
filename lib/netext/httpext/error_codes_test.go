@@ -116,6 +116,7 @@ func TestTCPErrors(t *testing.T) {
 		econnreset        = &net.OpError{Net: "tcp", Op: "write", Err: syscall.ECONNRESET}
 		epipeerror        = &net.OpError{Net: "tcp", Op: "write", Err: syscall.EPIPE}
 		econnrefused      = &net.OpError{Net: "tcp", Op: "dial", Err: &os.SyscallError{Err: syscall.ECONNREFUSED}}
+		errnounknown      = &net.OpError{Net: "tcp", Op: "dial", Err: &os.SyscallError{Err: syscall.E2BIG}}
 		tcperror          = &net.OpError{Net: "tcp", Err: errors.New("tcp error")}
 		timeoutedError    = &net.OpError{Net: "tcp", Op: "dial", Err: timeoutError(true)}
 		notTimeoutedError = &net.OpError{Net: "tcp", Op: "dial", Err: timeoutError(false)}
@@ -126,6 +127,7 @@ func TestTCPErrors(t *testing.T) {
 		tcpResetByPeerErrorCode:   econnreset,
 		tcpBrokenPipeErrorCode:    epipeerror,
 		tcpDialRefusedErrorCode:   econnrefused,
+		tcpDialUnknownErrnoCode:   errnounknown,
 		defaultTCPErrorCode:       tcperror,
 		tcpDialErrorCode:          notTimeoutedError,
 		tcpDialTimeoutErrorCode:   timeoutedError,

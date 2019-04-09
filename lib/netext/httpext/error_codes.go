@@ -52,6 +52,7 @@ const (
 	tcpDialErrorCode         errCode = 1210
 	tcpDialTimeoutErrorCode  errCode = 1211
 	tcpDialRefusedErrorCode  errCode = 1212
+	tcpDialUnknownErrnoCode  errCode = 1213
 	tcpResetByPeerErrorCode  errCode = 1220
 	// TLS errors
 	defaultTLSErrorCode           errCode = 1300
@@ -140,6 +141,8 @@ func errorCodeForError(err error) (errCode, string) {
 						(errno == 10061 && runtime.GOOS == "windows") {
 						return tcpDialRefusedErrorCode, tcpDialRefusedErrorCodeMsg
 					}
+					return tcpDialUnknownErrnoCode,
+						fmt.Sprintf("dial: unknown errno %d error with msg `%s`", errno, iErr.Err)
 				}
 			}
 			return tcpDialErrorCode, err.Error()
