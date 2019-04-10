@@ -4,8 +4,7 @@ TODO: Intro
 
 ### HTTP: request body compression (#988)
 
-Now all http methods have an additional param called `compression`, with a single possible value `gzip`, which if set will send the body compressed as gzip. It will also correctly set both `Content-Encoding` and `Content-Length`.
-
+Now all http methods have an additional param called `compression` that will make k6 to compress the body before sending it. It will also correctly set both `Content-Encoding` and `Content-Length`, except if they were not set previous to that. The current supported algorithms are `deflate` and `gzip` and any combination of the two separated by a comma (`,`).
 
 ## Bugs fixed!
 
