@@ -170,8 +170,16 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 			}
 
 			preq.Req.Body = ioutil.NopCloser(buf)
-			preq.Req.ContentLength = int64(buf.Len())
-			preq.Req.Header.Set("Content-Encoding", contentEncoding)
+			if preq.Req.Header.Get("Content-Length") == "" {
+				preq.Req.ContentLength = int64(buf.Len())
+			} else {
+				// TODO: print warning
+			}
+			if preq.Req.Header.Get("Content-Encoding") == "" {
+				preq.Req.Header.Set("Content-Encoding", contentEncoding)
+			} else {
+				// TODO: print warning
+			}
 		}
 		// TODO: maybe hide this behind of flag in order for this to not happen for big post/puts?
 		respReq.Body = preq.Body.String()

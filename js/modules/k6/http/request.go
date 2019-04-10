@@ -30,6 +30,7 @@ import (
 	"net/textproto"
 	"net/url"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -235,9 +236,20 @@ func (h *HTTP) parseRequest(
 		}
 	}
 
+	if contentLength := result.Req.Header.Get("Content-Length"); contentLength != "" {
+		length, err := strconv.Atoi(contentLength)
+		if err == nil {
+			result.Req.ContentLength = int64(length)
+		}
+		// maybe do something in the other case ... but no error
+	}
 	if result.Body != nil {
 		result.Req.Body = ioutil.NopCloser(result.Body)
-		result.Req.ContentLength = int64(result.Body.Len())
+		if result.Req.Header.Get("Content-Length") == "" {
+			result.Req.ContentLength = int64(result.Body.Len())
+		} else {
+			// TODO: print warning
+		}
 	}
 
 	if userAgent := state.Options.UserAgent; userAgent.String != "" {
