@@ -22,10 +22,8 @@ package http
 
 import (
 	"bytes"
-	"compress/gzip"
 	"context"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"mime/multipart"
 	"net/http"
@@ -313,25 +311,21 @@ func (h *HTTP) parseRequest(
 					result.ActiveJar = v.jar
 				}
 			case "compression":
-				var algo = params.Get(k).ToString().String()
-				if algo != "gzip" {
-					return nil, fmt.Errorf("unknown compression algorithm %s, only supported algorithm is gzip", algo)
+				var algosString = strings.TrimSpace(params.Get(k).ToString().String())
+				if algosString == "" {
+					continue
 				}
-
-				var buf bytes.Buffer
-				var w = gzip.NewWriter(&buf)
-				defer func() { _ = w.Close() }()
-				var _, err = io.Copy(w, result.Req.Body)
-				if err != nil {
-					return nil, err
+				var algos = strings.Split(algosString, ",")
+				var err error
+				result.Compressions = make([]httpext.CompressionType, len(algos))
+				for index, algo := range algos {
+					algo = strings.TrimSpace(algo)
+					result.Compressions[index], err = httpext.CompressionTypeString(algo)
+					if err != nil {
+						return nil, fmt.Errorf("unknown compression algorithm %s, supported algorithms are %s",
+							algo, httpext.CompressionTypeValues())
+					}
 				}
-				if err = w.Close(); err != nil {
-					return nil, err
-				}
-
-				result.Req.Header.Set("Content-Encoding", algo)
-				result.Req.Body = ioutil.NopCloser(&buf)
-				result.Req.ContentLength = int64(buf.Len())
 			case "redirects":
 				result.Redirects = null.IntFrom(params.Get(k).ToInteger())
 			case "tags":

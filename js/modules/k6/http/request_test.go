@@ -22,6 +22,7 @@ package http
 
 import (
 	"bytes"
+	"compress/flate"
 	"compress/gzip"
 	"context"
 	"fmt"
@@ -1228,41 +1229,91 @@ func TestRequestCompression(t *testing.T) {
 	Etiam interdum dui viverra posuere egestas. Pellentesque at dolor tristique,
 	mattis turpis eget, commodo purus. Nunc orci aliquam.`
 
+	var decompress = func(algo string, input io.Reader) io.Reader {
+		switch algo {
+		case "gzip":
+			w, err := gzip.NewReader(input)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return w
+		case "deflate":
+			return flate.NewReader(input)
+		default:
+			t.Fatal("unknown algorithm + " + algo)
+		}
+		return nil // unreachable
+	}
+
+	var expectedEncoding string
 	tb.Mux.HandleFunc("/compressed-text", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, r.Header.Get("Content-Encoding"), "gzip")
+		require.Equal(t, expectedEncoding, r.Header.Get("Content-Encoding"))
 
 		expectedLength, err := strconv.Atoi(r.Header.Get("Content-Length"))
 		require.NoError(t, err)
-
-		var compressedBuf bytes.Buffer
-		n, err := io.Copy(&compressedBuf, r.Body)
+		var algos = strings.Split(expectedEncoding, ", ")
+		var compressedBuf = new(bytes.Buffer)
+		n, err := io.Copy(compressedBuf, r.Body)
 		require.Equal(t, int(n), expectedLength)
 		require.NoError(t, err)
+		var prev io.Reader = compressedBuf
 
-		g, err := gzip.NewReader(&compressedBuf)
-		require.NoError(t, err)
+		if expectedEncoding != "" {
+			for i := len(algos) - 1; i >= 0; i-- {
+				prev = decompress(algos[i], prev)
+			}
+		}
 
 		var buf bytes.Buffer
-		_, err = io.Copy(&buf, g)
+		_, err = io.Copy(&buf, prev)
 		require.NoError(t, err)
 		require.Equal(t, text, buf.String())
 	}))
 
-	t.Run("gzip", func(t *testing.T) {
-		_, err := common.RunString(rt, tb.Replacer.Replace(`
-		http.post("HTTPBIN_URL/compressed-text", `+"`"+text+"`"+`,  {"compression": "gzip"});
+	var testCases = []struct {
+		name          string
+		compression   string
+		expectedError string
+	}{
+		{compression: ""},
+		{compression: "  "},
+		{compression: "gzip"},
+		{compression: "gzip, gzip"},
+		{compression: "gzip,   gzip "},
+		{compression: "gzip,gzip"},
+		{compression: "gzip, gzip, gzip, gzip, gzip, gzip, gzip"},
+		{compression: "deflate"},
+		{compression: "deflate, gzip"},
+		{compression: "gzip,deflate, gzip"},
+		{
+			compression:   "George",
+			expectedError: `unknown compression algorithm George`,
+		},
+		{
+			compression:   "gzip, George",
+			expectedError: `unknown compression algorithm George`,
+		},
+	}
+	for _, testCase := range testCases {
+		testCase := testCase
+		t.Run(testCase.compression, func(t *testing.T) {
+			var algos = strings.Split(testCase.compression, ",")
+			for i, algo := range algos {
+				algos[i] = strings.TrimSpace(algo)
+			}
+			expectedEncoding = strings.Join(algos, ", ")
+			_, err := common.RunString(rt, tb.Replacer.Replace(`
+		http.post("HTTPBIN_URL/compressed-text", `+"`"+text+"`"+`,  {"compression": "`+testCase.compression+`"});
 	`))
-		require.NoError(t, err)
-	})
+			if testCase.expectedError == "" {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), testCase.expectedError)
+			}
 
-	t.Run("unsupported compression", func(t *testing.T) {
-		_, err := common.RunString(rt, tb.Replacer.Replace(`
-		http.post("HTTPBIN_URL/compressed-text", `+"`"+text+"`"+`,  {"compression": "George"});
-	`))
-		require.Error(t, err)
-		require.Equal(t, err.Error(),
-			`GoError: unknown compression algorithm George, only supported algorithm is gzip`)
-	})
+		})
+	}
 }
 
 func TestResponseTypes(t *testing.T) {

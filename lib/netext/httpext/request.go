@@ -22,6 +22,7 @@ package httpext
 
 import (
 	"bytes"
+	"compress/flate"
 	"compress/gzip"
 	"compress/zlib"
 	"context"
@@ -70,6 +71,22 @@ func (u URL) GetURL() *url.URL {
 	return u.u
 }
 
+// CompressionType is used to specify what compression is to be used to compress the body of a
+// request
+// The conversion and validation methods are auto-generated with https://github.com/alvaroloes/enumer:
+//nolint: lll
+//go:generate enumer -type=CompressionType -transform=snake -json -text -trimprefix CompressionType -output compression_type_gen.go
+type CompressionType uint
+
+const (
+	// CompressionTypeGzip compresses through gzip
+	CompressionTypeGzip CompressionType = iota
+	// CompressionTypeDeflate compresses through flate
+	CompressionTypeDeflate
+	// TODO: add compress(lzw), brotli maybe bzip2 and others listed at
+	// https://en.wikipedia.org/wiki/HTTP_compression#Content-Encoding_tokens
+)
+
 // Request represent an http request
 type Request struct {
 	Method  string                          `json:"method"`
@@ -88,6 +105,7 @@ type ParsedHTTPRequest struct {
 	Auth         string
 	Throw        bool
 	ResponseType ResponseType
+	Compressions []CompressionType
 	Redirects    null.Int
 	ActiveJar    *cookiejar.Jar
 	Cookies      map[string]*HTTPRequestCookie
@@ -116,6 +134,46 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 		Headers: preq.Req.Header,
 	}
 	if preq.Body != nil {
+		if len(preq.Compressions) > 0 {
+			var contentEncoding string
+			var prevBuf = preq.Req.Body
+			var buf *bytes.Buffer
+			for _, compressionType := range preq.Compressions {
+				if buf != nil {
+					prevBuf = ioutil.NopCloser(buf)
+				}
+				buf = new(bytes.Buffer)
+
+				if contentEncoding != "" {
+					contentEncoding += ", "
+				}
+				contentEncoding += compressionType.String()
+				var w io.WriteCloser
+				switch compressionType {
+				case CompressionTypeGzip:
+					w = gzip.NewWriter(buf)
+				case CompressionTypeDeflate:
+					// Have the compression level as an option somewhere ?
+					// the error is only possible if we provide value outside of the range [-2, 9]
+					w, _ = flate.NewWriter(buf, flate.DefaultCompression)
+				default:
+					return nil, fmt.Errorf("unknown compressionType %s", compressionType)
+				}
+				defer func() { _ = w.Close() }()
+				var _, err = io.Copy(w, prevBuf)
+				if err != nil {
+					return nil, err
+				}
+				if err = w.Close(); err != nil {
+					return nil, err
+				}
+			}
+
+			preq.Req.Body = ioutil.NopCloser(buf)
+			preq.Req.ContentLength = int64(buf.Len())
+			preq.Req.Header.Set("Content-Encoding", contentEncoding)
+		}
+		// TODO: maybe hide this behind of flag in order for this to not happen for big post/puts?
 		respReq.Body = preq.Body.String()
 	}
 
