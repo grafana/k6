@@ -1157,10 +1157,6 @@ func TestSystemTags(t *testing.T) {
 
 	httpURL, err := url.Parse(tb.ServerHTTP.URL)
 	require.NoError(t, err)
-	var connectionRefusedErrorText = "connect: connection refused"
-	if runtime.GOOS == "windows" {
-		connectionRefusedErrorText = "connectex: No connection could be made because the target machine actively refused it."
-	}
 
 	testedSystemTags := []struct{ tag, code, expVal string }{
 		{"proto", httpGet, "HTTP/1.1"},
@@ -1177,13 +1173,13 @@ func TestSystemTags(t *testing.T) {
 		{"ocsp_status", httpsGet, "unknown"},
 		{
 			"error",
-			tb.Replacer.Replace(`http.get("http://127.0.0.1:56789");`),
-			tb.Replacer.Replace(`dial tcp 127.0.0.1:56789: ` + connectionRefusedErrorText),
+			tb.Replacer.Replace(`http.get("http://127.0.0.1:1");`),
+			`dial: connection refused`,
 		},
 		{
 			"error_code",
-			tb.Replacer.Replace(`http.get("http://127.0.0.1:56789");`),
-			"1210",
+			tb.Replacer.Replace(`http.get("http://127.0.0.1:1");`),
+			"1212",
 		},
 	}
 
@@ -1348,11 +1344,6 @@ func TestErrorCodes(t *testing.T) {
 	defer tb.Cleanup()
 	sr := tb.Replacer.Replace
 
-	var connectionRefusedErrorText = "connect: connection refused"
-	if runtime.GOOS == "windows" {
-		connectionRefusedErrorText = "connectex: No connection could be made because the target machine actively refused it."
-	}
-
 	// Handple paths with custom logic
 	tb.Mux.HandleFunc("/digest-auth/failure", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(2 * time.Second)
@@ -1441,8 +1432,8 @@ func TestErrorCodes(t *testing.T) {
 			name:              "Connection refused redirect",
 			status:            0,
 			moreSamples:       1,
-			expectedErrorMsg:  `dial tcp 127.0.0.1:1: ` + connectionRefusedErrorText,
-			expectedErrorCode: 1210,
+			expectedErrorMsg:  `dial: connection refused`,
+			expectedErrorCode: 1212,
 			script: `
 			let res = http.get("HTTPBIN_URL/redirect-to?url=http%3A%2F%2F127.0.0.1%3A1%2Fpesho");
 			if (res.url != "http://127.0.0.1:1/pesho") { throw new Error("incorrect URL: " + res.url) }`,
