@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"os"
 	"runtime"
 	"syscall"
 
@@ -51,6 +52,7 @@ const (
 	tcpDialErrorCode         errCode = 1210
 	tcpDialTimeoutErrorCode  errCode = 1211
 	tcpDialRefusedErrorCode  errCode = 1212
+	tcpDialUnknownErrnoCode  errCode = 1213
 	tcpResetByPeerErrorCode  errCode = 1220
 	// TLS errors
 	defaultTLSErrorCode           errCode = 1300
@@ -132,12 +134,20 @@ func errorCodeForError(err error) (errCode, string) {
 			if e.Timeout() {
 				return tcpDialTimeoutErrorCode, tcpDialTimeoutErrorCodeMsg
 			}
-			switch e.Err.Error() {
-			case syscall.ECONNREFUSED.Error():
-				return tcpDialRefusedErrorCode, tcpDialRefusedErrorCodeMsg
-			default:
-				return tcpDialErrorCode, err.Error()
+			if iErr, ok := e.Err.(*os.SyscallError); ok {
+				if errno, ok := iErr.Err.(syscall.Errno); ok {
+					if errno == syscall.ECONNREFUSED ||
+						// 10061 is some connection refused like thing on windows
+						// TODO: fix by moving to x/sys instead of syscall after
+						// https://github.com/golang/go/issues/31360 gets resolved
+						(errno == 10061 && runtime.GOOS == "windows") {
+						return tcpDialRefusedErrorCode, tcpDialRefusedErrorCodeMsg
+					}
+					return tcpDialUnknownErrnoCode,
+						fmt.Sprintf("dial: unknown errno %d error with msg `%s`", errno, iErr.Err)
+				}
 			}
+			return tcpDialErrorCode, err.Error()
 		}
 		switch inErr := e.Err.(type) {
 		case syscall.Errno:
