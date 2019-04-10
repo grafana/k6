@@ -138,6 +138,8 @@ func errorCodeForError(err error) (errCode, string) {
 				if errno, ok := iErr.Err.(syscall.Errno); ok {
 					if errno == syscall.ECONNREFUSED ||
 						// 10061 is some connection refused like thing on windows
+						// TODO: fix by moving to x/sys instead of syscall after
+						// https://github.com/golang/go/issues/31360 gets resolved
 						(errno == 10061 && runtime.GOOS == "windows") {
 						return tcpDialRefusedErrorCode, tcpDialRefusedErrorCodeMsg
 					}
