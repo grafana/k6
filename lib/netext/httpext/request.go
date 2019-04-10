@@ -165,6 +165,7 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 		Transport: transport,
 		Timeout:   preq.Timeout,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			resp.URL = req.URL.String()
 			debugResponse(state, req.Response, "RedirectResponse")
 
 			// Update active jar with cookies found in "Set-Cookie" header(s) of redirect response
