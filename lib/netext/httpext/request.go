@@ -75,7 +75,7 @@ func (u URL) GetURL() *url.URL {
 // request
 // The conversion and validation methods are auto-generated with https://github.com/alvaroloes/enumer:
 //nolint: lll
-//go:generate enumer -type=CompressionType -transform=snake -json -text -trimprefix CompressionType -output compression_type_gen.go
+//go:generate enumer -type=CompressionType -transform=snake -trimprefix CompressionType -output compression_type_gen.go
 type CompressionType uint
 
 const (
