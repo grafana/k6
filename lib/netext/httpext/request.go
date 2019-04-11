@@ -45,6 +45,10 @@ import (
 	null "gopkg.in/guregu/null.v3"
 )
 
+const compressionHeaderOverwriteMessage = "Both compression and the `%s` header were specified " +
+	"in the %s request for '%s', the custom header has precedence and won't be overwritten. " +
+	"This will likely result in invalid data being sent to the server."
+
 // HTTPRequestCookie is a representation of a cookie used for request objects
 type HTTPRequestCookie struct {
 	Name, Value string
@@ -183,14 +187,12 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 			if preq.Req.Header.Get("Content-Length") == "" {
 				preq.Req.ContentLength = length
 			} else {
-				// TODO: print line
-				state.Logger.Warning("Content-Length is specifically set - won't be reset due to compression being specified")
+				state.Logger.Warningf(compressionHeaderOverwriteMessage, "Content-Length", preq.Req.Method, preq.Req.URL)
 			}
 			if preq.Req.Header.Get("Content-Encoding") == "" {
 				preq.Req.Header.Set("Content-Encoding", contentEncoding)
 			} else {
-				// TODO: print line
-				state.Logger.Warning("Content-Encoding is specifically set - won't be reset due to compression being specified")
+				state.Logger.Warningf(compressionHeaderOverwriteMessage, "Content-Encoding", preq.Req.Method, preq.Req.URL)
 			}
 		}
 	}
