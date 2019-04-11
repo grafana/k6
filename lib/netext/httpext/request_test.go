@@ -1,6 +1,7 @@
 package httpext
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"net/http"
@@ -71,5 +72,17 @@ func TestMakeRequestError(t *testing.T) {
 		_, err = MakeRequest(ctx, preq)
 		require.Error(t, err)
 		require.Equal(t, err.Error(), badCloseMsg)
+	})
+
+	t.Run("bad compression algorithm body", func(t *testing.T) {
+		req, err := http.NewRequest("GET", "https://wont.be.used", new(bytes.Buffer))
+		require.NoError(t, err)
+		var preq = &ParsedHTTPRequest{
+			Req:          req,
+			Compressions: []CompressionType{CompressionType(13)},
+		}
+		_, err = MakeRequest(ctx, preq)
+		require.Error(t, err)
+		require.Equal(t, err.Error(), "unknown compressionType CompressionType(13)")
 	})
 }
