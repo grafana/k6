@@ -22,7 +22,6 @@ package httpext
 
 import (
 	"bytes"
-	"compress/flate"
 	"compress/gzip"
 	"compress/zlib"
 	"context"
@@ -153,9 +152,7 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 				case CompressionTypeGzip:
 					w = gzip.NewWriter(buf)
 				case CompressionTypeDeflate:
-					// Have the compression level as an option somewhere ?
-					// the error is only possible if we provide value outside of the range [-2, 9]
-					w, _ = flate.NewWriter(buf, flate.DefaultCompression)
+					w = zlib.NewWriter(buf)
 				default:
 					return nil, fmt.Errorf("unknown compressionType %s", compressionType)
 				}

@@ -22,8 +22,8 @@ package http
 
 import (
 	"bytes"
-	"compress/flate"
 	"compress/gzip"
+	"compress/zlib"
 	"context"
 	"fmt"
 	"io"
@@ -1238,7 +1238,11 @@ func TestRequestCompression(t *testing.T) {
 			}
 			return w
 		case "deflate":
-			return flate.NewReader(input)
+			w, err := zlib.NewReader(input)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return w
 		default:
 			t.Fatal("unknown algorithm " + algo)
 		}
@@ -1345,7 +1349,7 @@ func TestRequestCompression(t *testing.T) {
 			`))
 			require.Error(t, err)
 			// TODO: This probably shouldn't be like this
-			require.Contains(t, err.Error(), "http: ContentLength=12 with Body length 205")
+			require.Contains(t, err.Error(), "http: ContentLength=12 with Body length 211")
 		})
 	})
 }
