@@ -24,13 +24,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"mime/multipart"
 	"net/http"
 	"net/textproto"
 	"net/url"
 	"reflect"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -349,23 +347,6 @@ func (h *HTTP) parseRequest(
 				}
 				result.ResponseType = responseType
 			}
-		}
-	}
-
-	if contentLength := result.Req.Header.Get("Content-Length"); contentLength != "" {
-		length, err := strconv.Atoi(contentLength)
-		if err == nil {
-			result.Req.ContentLength = int64(length)
-		}
-		// TODO: maybe do something in the other case ... but no error
-	}
-	if result.Body != nil {
-		result.Req.Body = ioutil.NopCloser(result.Body)
-		if result.Req.Header.Get("Content-Length") == "" {
-			result.Req.ContentLength = int64(result.Body.Len())
-		} else {
-			// TODO: print line number, maybe don't print this at all ?
-			state.Logger.Warningf("Content-Length is specifically set won't reset it based on body length")
 		}
 	}
 

@@ -124,9 +124,9 @@ func stdCookiesToHTTPRequestCookies(cookies []*http.Cookie) map[string][]*HTTPRe
 	return result
 }
 
-func compressBody(algos []CompressionType, body io.Reader) (io.Reader, int64, string, error) {
+func compressBody(algos []CompressionType, body io.ReadCloser) (io.Reader, int64, string, error) {
 	var contentEncoding string
-	var prevBuf = body
+	var prevBuf io.Reader = body
 	var buf *bytes.Buffer
 	for _, compressionType := range algos {
 		if buf != nil {
@@ -158,7 +158,8 @@ func compressBody(algos []CompressionType, body io.Reader) (io.Reader, int64, st
 			return nil, 0, "", err
 		}
 	}
-	return buf, int64(buf.Len()), contentEncoding, nil
+
+	return buf, int64(buf.Len()), contentEncoding, body.Close()
 }
 
 // MakeRequest makes http request for tor the provided ParsedHTTPRequest
@@ -173,13 +174,25 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 		Cookies: stdCookiesToHTTPRequestCookies(preq.Req.Cookies()),
 		Headers: preq.Req.Header,
 	}
-	if preq.Req.Body != nil {
+
+	if contentLength := preq.Req.Header.Get("Content-Length"); contentLength != "" {
+		length, err := strconv.Atoi(contentLength)
+		if err == nil {
+			preq.Req.ContentLength = int64(length)
+		}
+		// TODO: maybe do something in the other case ... but no error
+	}
+
+	if preq.Body != nil {
+		preq.Req.Body = ioutil.NopCloser(preq.Body)
+
+		// TODO: maybe hide this behind of flag in order for this to not happen for big post/puts?
+		// should we set this after the compression? what will be the point ?
+		respReq.Body = preq.Body.String()
+
 		if len(preq.Compressions) > 0 {
 			compressedBody, length, contentEncoding, err := compressBody(preq.Compressions, preq.Req.Body)
 			if err != nil {
-				return nil, err
-			}
-			if err = preq.Req.Body.Close(); err != nil {
 				return nil, err
 			}
 
@@ -194,12 +207,11 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 			} else {
 				state.Logger.Warningf(compressionHeaderOverwriteMessage, "Content-Encoding", preq.Req.Method, preq.Req.URL)
 			}
+		} else if preq.Req.Header.Get("Content-Length") == "" {
+			preq.Req.ContentLength = int64(preq.Body.Len())
+		} else {
+			state.Logger.Warningf("Content-Length is specifically set won't reset it based on body length")
 		}
-	}
-
-	if preq.Body != nil {
-		// TODO: maybe hide this behind of flag in order for this to not happen for big post/puts?
-		respReq.Body = preq.Body.String()
 	}
 
 	tags := state.Options.RunTags.CloneTags()

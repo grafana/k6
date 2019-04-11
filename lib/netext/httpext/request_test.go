@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"testing"
 
@@ -46,39 +47,31 @@ func badCloseBody() io.ReadCloser {
 	}
 }
 
-func TestMakeRequestError(t *testing.T) {
-	var ctx, cancel = context.WithCancel(context.Background())
-	defer cancel()
-
+func TestCompressionBodyError(t *testing.T) {
+	var algos = []CompressionType{CompressionTypeGzip}
 	t.Run("bad read body", func(t *testing.T) {
-		req, err := http.NewRequest("GET", "https://wont.be.used", badReadBody())
-		require.NoError(t, err)
-		var preq = &ParsedHTTPRequest{
-			Req:          req,
-			Compressions: []CompressionType{CompressionTypeGzip},
-		}
-		_, err = MakeRequest(ctx, preq)
+		_, _, _, err := compressBody(algos, ioutil.NopCloser(badReadBody()))
 		require.Error(t, err)
 		require.Equal(t, err.Error(), badReadMsg)
 	})
 
 	t.Run("bad close body", func(t *testing.T) {
-		req, err := http.NewRequest("GET", "https://wont.be.used", badCloseBody())
-		require.NoError(t, err)
-		var preq = &ParsedHTTPRequest{
-			Req:          req,
-			Compressions: []CompressionType{CompressionTypeGzip},
-		}
-		_, err = MakeRequest(ctx, preq)
+		_, _, _, err := compressBody(algos, badCloseBody())
 		require.Error(t, err)
 		require.Equal(t, err.Error(), badCloseMsg)
 	})
+}
+
+func TestMakeRequestError(t *testing.T) {
+	var ctx, cancel = context.WithCancel(context.Background())
+	defer cancel()
 
 	t.Run("bad compression algorithm body", func(t *testing.T) {
-		req, err := http.NewRequest("GET", "https://wont.be.used", new(bytes.Buffer))
+		req, err := http.NewRequest("GET", "https://wont.be.used", nil)
 		require.NoError(t, err)
 		var preq = &ParsedHTTPRequest{
 			Req:          req,
+			Body:         new(bytes.Buffer),
 			Compressions: []CompressionType{CompressionType(13)},
 		}
 		_, err = MakeRequest(ctx, preq)
