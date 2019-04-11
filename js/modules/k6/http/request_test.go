@@ -1345,7 +1345,7 @@ func TestRequestCompression(t *testing.T) {
 			`))
 			require.Error(t, err)
 			// TODO: This probably shouldn't be like this
-			require.Contains(t, err.Error(), "http: ContentLength=261 with Body length 205")
+			require.Contains(t, err.Error(), "http: ContentLength=12 with Body length 205")
 		})
 	})
 }

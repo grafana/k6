@@ -173,12 +173,14 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 			if preq.Req.Header.Get("Content-Length") == "" {
 				preq.Req.ContentLength = int64(buf.Len())
 			} else {
-				// TODO: print warning
+				// TODO: print line
+				state.Logger.Warning("Content-Length is specifically set - won't be reset due to compression being specified")
 			}
 			if preq.Req.Header.Get("Content-Encoding") == "" {
 				preq.Req.Header.Set("Content-Encoding", contentEncoding)
 			} else {
-				// TODO: print warning
+				// TODO: print line
+				state.Logger.Warning("Content-Encoding is specifically set - won't be reset due to compression being specified")
 			}
 		}
 		// TODO: maybe hide this behind of flag in order for this to not happen for big post/puts?
