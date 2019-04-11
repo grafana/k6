@@ -1320,23 +1320,31 @@ func TestRequestCompression(t *testing.T) {
 	}
 
 	t.Run("custom set header", func(t *testing.T) {
+		expectedEncoding = "not, valid"
+		actualEncoding = "gzip, deflate"
 		t.Run("encoding", func(t *testing.T) {
-			expectedEncoding = "not, valid"
-			actualEncoding = "gzip, deflate"
 			_, err := common.RunString(rt, tb.Replacer.Replace(`
-http.post("HTTPBIN_URL/compressed-text", `+"`"+text+"`"+`,  {"compression": "`+actualEncoding+`", headers: {"Content-Encoding": "`+expectedEncoding+`"}});
-	`))
+				http.post("HTTPBIN_URL/compressed-text", `+"`"+text+"`"+`,
+					{"compression": "`+actualEncoding+`",
+					 "headers": {"Content-Encoding": "`+expectedEncoding+`"}
+					}
+				);
+			`))
 			require.NoError(t, err)
 
 		})
 
 		t.Run("encoding and length", func(t *testing.T) {
-			expectedEncoding = "not, valid"
-			actualEncoding = "gzip, deflate"
 			_, err := common.RunString(rt, tb.Replacer.Replace(`
-http.post("HTTPBIN_URL/compressed-text", `+"`"+text+"`"+`,  {"compression": "`+actualEncoding+`", headers: {"Content-Encoding": "`+expectedEncoding+`", "Content-Length": "12"}});
-	`))
+				http.post("HTTPBIN_URL/compressed-text", `+"`"+text+"`"+`,
+					{"compression": "`+actualEncoding+`",
+					 "headers": {"Content-Encoding": "`+expectedEncoding+`",
+								 "Content-Length": "12"}
+					}
+				);
+			`))
 			require.Error(t, err)
+			// TODO: This probably shouldn't be like this
 			require.Contains(t, err.Error(), "http: ContentLength=261 with Body length 205")
 		})
 	})
