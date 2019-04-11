@@ -169,12 +169,16 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 		Cookies: stdCookiesToHTTPRequestCookies(preq.Req.Cookies()),
 		Headers: preq.Req.Header,
 	}
-	if preq.Body != nil {
+	if preq.Req.Body != nil {
 		if len(preq.Compressions) > 0 {
 			compressedBody, length, contentEncoding, err := compressBody(preq.Compressions, preq.Req.Body)
 			if err != nil {
 				return nil, err
 			}
+			if err = preq.Req.Body.Close(); err != nil {
+				return nil, err
+			}
+
 			preq.Req.Body = ioutil.NopCloser(compressedBody)
 			if preq.Req.Header.Get("Content-Length") == "" {
 				preq.Req.ContentLength = length
@@ -189,6 +193,9 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 				state.Logger.Warning("Content-Encoding is specifically set - won't be reset due to compression being specified")
 			}
 		}
+	}
+
+	if preq.Body != nil {
 		// TODO: maybe hide this behind of flag in order for this to not happen for big post/puts?
 		respReq.Body = preq.Body.String()
 	}
