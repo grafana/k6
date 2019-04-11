@@ -67,12 +67,15 @@ func TestMakeRequestError(t *testing.T) {
 	defer cancel()
 
 	t.Run("bad compression algorithm body", func(t *testing.T) {
-		req, err := http.NewRequest("GET", "https://wont.be.used", nil)
+		var req, err = http.NewRequest("GET", "https://wont.be.used", nil)
+
 		require.NoError(t, err)
+		var badCompressionType = CompressionType(13)
+		require.False(t, badCompressionType.IsACompressionType())
 		var preq = &ParsedHTTPRequest{
 			Req:          req,
 			Body:         new(bytes.Buffer),
-			Compressions: []CompressionType{CompressionType(13)},
+			Compressions: []CompressionType{badCompressionType},
 		}
 		_, err = MakeRequest(ctx, preq)
 		require.Error(t, err)
