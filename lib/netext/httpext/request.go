@@ -120,6 +120,43 @@ func stdCookiesToHTTPRequestCookies(cookies []*http.Cookie) map[string][]*HTTPRe
 	return result
 }
 
+func compressBody(algos []CompressionType, body io.Reader) (io.Reader, int64, string, error) {
+	var contentEncoding string
+	var prevBuf = body
+	var buf *bytes.Buffer
+	for _, compressionType := range algos {
+		if buf != nil {
+			prevBuf = buf
+		}
+		buf = new(bytes.Buffer)
+
+		if contentEncoding != "" {
+			contentEncoding += ", "
+		}
+		contentEncoding += compressionType.String()
+		var w io.WriteCloser
+		switch compressionType {
+		case CompressionTypeGzip:
+			w = gzip.NewWriter(buf)
+		case CompressionTypeDeflate:
+			w = zlib.NewWriter(buf)
+		default:
+			return nil, 0, "", fmt.Errorf("unknown compressionType %s", compressionType)
+		}
+		// we don;t close in defer because zlib will write it's checksum again if it closes twice :(
+		var _, err = io.Copy(w, prevBuf)
+		if err != nil {
+			_ = w.Close()
+			return nil, 0, "", err
+		}
+
+		if err = w.Close(); err != nil {
+			return nil, 0, "", err
+		}
+	}
+	return buf, int64(buf.Len()), contentEncoding, nil
+}
+
 // MakeRequest makes http request for tor the provided ParsedHTTPRequest
 //TODO break this function up
 //nolint: gocyclo
@@ -134,41 +171,13 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 	}
 	if preq.Body != nil {
 		if len(preq.Compressions) > 0 {
-			var contentEncoding string
-			var prevBuf = preq.Req.Body
-			var buf *bytes.Buffer
-			for _, compressionType := range preq.Compressions {
-				if buf != nil {
-					prevBuf = ioutil.NopCloser(buf)
-				}
-				buf = new(bytes.Buffer)
-
-				if contentEncoding != "" {
-					contentEncoding += ", "
-				}
-				contentEncoding += compressionType.String()
-				var w io.WriteCloser
-				switch compressionType {
-				case CompressionTypeGzip:
-					w = gzip.NewWriter(buf)
-				case CompressionTypeDeflate:
-					w = zlib.NewWriter(buf)
-				default:
-					return nil, fmt.Errorf("unknown compressionType %s", compressionType)
-				}
-				defer func() { _ = w.Close() }()
-				var _, err = io.Copy(w, prevBuf)
-				if err != nil {
-					return nil, err
-				}
-				if err = w.Close(); err != nil {
-					return nil, err
-				}
+			compressedBody, length, contentEncoding, err := compressBody(preq.Compressions, preq.Req.Body)
+			if err != nil {
+				return nil, err
 			}
-
-			preq.Req.Body = ioutil.NopCloser(buf)
+			preq.Req.Body = ioutil.NopCloser(compressedBody)
 			if preq.Req.Header.Get("Content-Length") == "" {
-				preq.Req.ContentLength = int64(buf.Len())
+				preq.Req.ContentLength = length
 			} else {
 				// TODO: print line
 				state.Logger.Warning("Content-Length is specifically set - won't be reset due to compression being specified")
