@@ -190,7 +190,8 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 		// should we set this after the compression? what will be the point ?
 		respReq.Body = preq.Body.String()
 
-		if len(preq.Compressions) > 0 {
+		switch {
+		case len(preq.Compressions) > 0:
 			compressedBody, length, contentEncoding, err := compressBody(preq.Compressions, preq.Req.Body)
 			if err != nil {
 				return nil, err
@@ -207,9 +208,9 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 			} else {
 				state.Logger.Warningf(compressionHeaderOverwriteMessage, "Content-Encoding", preq.Req.Method, preq.Req.URL)
 			}
-		} else if preq.Req.Header.Get("Content-Length") == "" {
+		case preq.Req.Header.Get("Content-Length") == "":
 			preq.Req.ContentLength = int64(preq.Body.Len())
-		} else {
+		default:
 			state.Logger.Warningf("Content-Length is specifically set won't reset it based on body length")
 		}
 	}
