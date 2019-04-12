@@ -2,11 +2,9 @@ TODO: Intro
 
 ## New Features!
 
-### Category: Title (#533)
+### HTTP: request body compression (#988)
 
-Description of feature.
-
-**Docs**: [Title](http://k6.readme.io/docs/TODO)
+Now all http methods have an additional param called `compression` that will make k6 compress the body before sending it. It will also correctly set both `Content-Encoding` and `Content-Length`, unless they were manually set in the request `headers` by the user. The current supported algorithms are `deflate` and `gzip` and any combination of the two separated by a comma (`,`).
 
 ## Bugs fixed!
 
