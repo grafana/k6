@@ -349,7 +349,7 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 			default:
 				// We have not implemented a compression ... :(
 				resErr = fmt.Errorf(
-					"Unsupported compressionType %s for uncompression. This is a bug in k6 please report it",
+					"unsupported compressionType %s for uncompression. This is a bug in k6 please report it",
 					compression)
 			}
 		}
