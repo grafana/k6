@@ -210,9 +210,9 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 			}
 		case preq.Req.Header.Get("Content-Length") == "":
 			preq.Req.ContentLength = int64(preq.Body.Len())
-		default:
-			state.Logger.Warningf("Content-Length is specifically set won't reset it based on body length")
 		}
+		// TODO: print some message in case we have Content-Length set so that we can warn users
+		// that setting it manually can lead to bad requests
 	}
 
 	tags := state.Options.RunTags.CloneTags()
