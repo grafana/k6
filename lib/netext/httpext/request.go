@@ -147,7 +147,7 @@ func compressBody(algos []CompressionType, body io.ReadCloser) (io.Reader, int64
 		default:
 			return nil, 0, "", fmt.Errorf("unknown compressionType %s", compressionType)
 		}
-		// we don;t close in defer because zlib will write it's checksum again if it closes twice :(
+		// we don't close in defer because zlib will write it's checksum again if it closes twice :(
 		var _, err = io.Copy(w, prevBuf)
 		if err != nil {
 			_ = w.Close()
