@@ -339,11 +339,19 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 	resp.Error = tracerTransport.errorMsg
 	resp.ErrorCode = int(tracerTransport.errorCode)
 	if resErr == nil && res != nil {
-		switch res.Header.Get("Content-Encoding") {
-		case "deflate":
-			res.Body, resErr = zlib.NewReader(res.Body)
-		case "gzip":
-			res.Body, resErr = gzip.NewReader(res.Body)
+		compression, err := CompressionTypeString(strings.TrimSpace(res.Header.Get("Content-Encoding")))
+		if err == nil { // in case of error we just won't uncompress
+			switch compression {
+			case CompressionTypeDeflate:
+				res.Body, resErr = zlib.NewReader(res.Body)
+			case CompressionTypeGzip:
+				res.Body, resErr = gzip.NewReader(res.Body)
+			default:
+				// We have not implemented a compression ... :(
+				resErr = fmt.Errorf(
+					"Unsupported compressionType %s for uncompression. This is a bug in k6 please report it",
+					compression)
+			}
 		}
 	}
 	if resErr == nil && res != nil {
