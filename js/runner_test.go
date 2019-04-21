@@ -747,7 +747,7 @@ func TestVUIntegrationInsecureRequests(t *testing.T) {
 	}
 }
 
-func TestVUIntegrationBlacklist(t *testing.T) {
+func TestVUIntegrationBlacklistOption(t *testing.T) {
 	r1, err := New(&lib.SourceData{
 		Filename: "/script.js",
 		Data: []byte(`
@@ -759,13 +759,13 @@ func TestVUIntegrationBlacklist(t *testing.T) {
 		return
 	}
 
-	_, cidr, err := net.ParseCIDR("10.0.0.0/8")
+	cidr, err := lib.ParseCIDR("10.0.0.0/8")
 	if !assert.NoError(t, err) {
 		return
 	}
 	r1.SetOptions(lib.Options{
 		Throw:        null.BoolFrom(true),
-		BlacklistIPs: []*net.IPNet{cidr},
+		BlacklistIPs: []*lib.IPNet{cidr},
 	})
 
 	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{})
@@ -774,6 +774,43 @@ func TestVUIntegrationBlacklist(t *testing.T) {
 	}
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
+	for name, r := range runners {
+		t.Run(name, func(t *testing.T) {
+			vu, err := r.NewVU(make(chan stats.SampleContainer, 100))
+			if !assert.NoError(t, err) {
+				return
+			}
+			err = vu.RunOnce(context.Background())
+			assert.EqualError(t, err, "GoError: Get http://10.1.2.3/: IP (10.1.2.3) is in a blacklisted range (10.0.0.0/8)")
+		})
+	}
+}
+
+func TestVUIntegrationBlacklistScript(t *testing.T) {
+	r1, err := New(&lib.SourceData{
+		Filename: "/script.js",
+		Data: []byte(`
+					import http from "k6/http";
+
+					export let options = {
+						throw: true,
+						blacklistIPs: ["10.0.0.0/8"],
+					};
+
+					export default function() { http.get("http://10.1.2.3/"); }
+				`),
+	}, afero.NewMemMapFs(), lib.RuntimeOptions{})
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{})
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	runners := map[string]*Runner{"Source": r1, "Archive": r2}
+
 	for name, r := range runners {
 		t.Run(name, func(t *testing.T) {
 			vu, err := r.NewVU(make(chan stats.SampleContainer, 100))

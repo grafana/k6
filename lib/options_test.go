@@ -308,9 +308,11 @@ func TestOptions(t *testing.T) {
 	})
 	t.Run("BlacklistIPs", func(t *testing.T) {
 		opts := Options{}.Apply(Options{
-			BlacklistIPs: []*net.IPNet{{
-				IP:   net.IPv4zero,
-				Mask: net.CIDRMask(1, 1),
+			BlacklistIPs: []*IPNet{{
+				net.IPNet{
+					IP:   net.IPv4zero,
+					Mask: net.CIDRMask(1, 1),
+				},
 			}},
 		})
 		assert.NotNil(t, opts.BlacklistIPs)
@@ -511,5 +513,30 @@ func TestTagSetTextUnmarshal(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, (map[string]bool)(*set), expected)
+	}
+}
+
+func TestCIDRUnmarshal(t *testing.T) {
+
+	var testData = []struct {
+		input    string
+		expected *IPNet
+	}{
+		{"10.0.0.0/8", &IPNet{IPNet: net.IPNet{
+			IP:   net.ParseIP("10.0.0.0"),
+			Mask: net.IPv4Mask(255, 0, 0, 0),
+		}}},
+		{"fc00:1234:5678::/48", &IPNet{IPNet: net.IPNet{
+			IP:   net.ParseIP("fc00:1234:5678::"),
+			Mask: net.CIDRMask(48, 128),
+		}}},
+	}
+
+	for _, data := range testData {
+		actualIPNet := &IPNet{}
+		err := actualIPNet.UnmarshalJSON([]byte("\"" + data.input + "\""))
+		require.NoError(t, err)
+
+		assert.Equal(t, data.expected, actualIPNet)
 	}
 }
