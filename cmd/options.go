@@ -121,9 +121,9 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		return opts, err
 	}
 	for _, s := range blacklistIPStrings {
-		net, err := lib.ParseCIDR(s)
-		if err != nil {
-			return opts, errors.Wrap(err, "blacklist-ip")
+		net, parseErr := lib.ParseCIDR(s)
+		if parseErr != nil {
+			return opts, errors.Wrap(parseErr, "blacklist-ip")
 		}
 		opts.BlacklistIPs = append(opts.BlacklistIPs, net)
 	}

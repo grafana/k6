@@ -812,6 +812,7 @@ func TestVUIntegrationBlacklistScript(t *testing.T) {
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
 
 	for name, r := range runners {
+		r := r
 		t.Run(name, func(t *testing.T) {
 			vu, err := r.NewVU(make(chan stats.SampleContainer, 100))
 			if !assert.NoError(t, err) {

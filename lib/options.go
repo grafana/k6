@@ -211,7 +211,7 @@ type IPNet struct {
 }
 
 // UnmarshalJSON populates the IPNet from the given CIDR JSON
-func (ipnet *IPNet) UnmarshalJSON(b []byte) (err error) {
+func (ipnet *IPNet) UnmarshalJSON(b []byte) error {
 	var cidr string
 	if err := json.Unmarshal(b, &cidr); err != nil {
 		return err

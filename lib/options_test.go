@@ -519,24 +519,43 @@ func TestTagSetTextUnmarshal(t *testing.T) {
 func TestCIDRUnmarshal(t *testing.T) {
 
 	var testData = []struct {
-		input    string
-		expected *IPNet
+		input          string
+		expectedOutput *IPNet
+		expactFailure  bool
 	}{
-		{"10.0.0.0/8", &IPNet{IPNet: net.IPNet{
-			IP:   net.ParseIP("10.0.0.0"),
-			Mask: net.IPv4Mask(255, 0, 0, 0),
-		}}},
-		{"fc00:1234:5678::/48", &IPNet{IPNet: net.IPNet{
-			IP:   net.ParseIP("fc00:1234:5678::"),
-			Mask: net.CIDRMask(48, 128),
-		}}},
+		{
+			"10.0.0.0/8",
+			&IPNet{IPNet: net.IPNet{
+				IP:   net.ParseIP("10.0.0.0"),
+				Mask: net.IPv4Mask(255, 0, 0, 0),
+			}},
+			false,
+		},
+		{
+			"fc00:1234:5678::/48",
+			&IPNet{IPNet: net.IPNet{
+				IP:   net.ParseIP("fc00:1234:5678::"),
+				Mask: net.CIDRMask(48, 128),
+			}},
+			false,
+		},
+		{"10.0.0.0", nil, true},
+		{"fc00:1234:5678::", nil, true},
+		{"fc00::1234::/48", nil, true},
 	}
 
 	for _, data := range testData {
-		actualIPNet := &IPNet{}
-		err := actualIPNet.UnmarshalJSON([]byte("\"" + data.input + "\""))
-		require.NoError(t, err)
+		data := data
+		t.Run(data.input, func(t *testing.T) {
+			actualIPNet := &IPNet{}
+			err := actualIPNet.UnmarshalJSON([]byte("\"" + data.input + "\""))
 
-		assert.Equal(t, data.expected, actualIPNet)
+			if data.expactFailure {
+				require.EqualError(t, err, "Failed to parse CIDR: invalid CIDR address: "+data.input)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, data.expectedOutput, actualIPNet)
+			}
+		})
 	}
 }
