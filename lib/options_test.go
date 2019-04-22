@@ -526,7 +526,7 @@ func TestCIDRUnmarshal(t *testing.T) {
 		{
 			"10.0.0.0/8",
 			&IPNet{IPNet: net.IPNet{
-				IP:   net.ParseIP("10.0.0.0"),
+				IP:   net.IP{10, 0, 0, 0},
 				Mask: net.IPv4Mask(255, 0, 0, 0),
 			}},
 			false,

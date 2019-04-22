@@ -229,17 +229,12 @@ func (ipnet *IPNet) UnmarshalJSON(b []byte) error {
 
 // ParseCIDR creates an IPNet out of a CIDR string
 func ParseCIDR(s string) (*IPNet, error) {
-	ip, ipnet, err := net.ParseCIDR(s)
+	_, ipnet, err := net.ParseCIDR(s)
 	if err != nil {
 		return nil, err
 	}
 
-	return &IPNet{
-		IPNet: net.IPNet{
-			IP:   ip,
-			Mask: ipnet.Mask,
-		},
-	}, nil
+	return &IPNet{*ipnet}, nil
 }
 
 type Options struct {
