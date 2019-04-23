@@ -24,16 +24,12 @@ import (
 	"archive/tar"
 	"bytes"
 	"context"
-	"encoding/json"
-	"fmt"
 	"io"
 	"io/ioutil"
-	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
-	"runtime"
-	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -42,15 +38,14 @@ import (
 	"github.com/loadimpact/k6/core/local"
 	"github.com/loadimpact/k6/js"
 	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/ui"
+	"github.com/loadimpact/k6/ui/pb"
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	null "gopkg.in/guregu/null.v3"
 )
 
 const (
@@ -65,7 +60,7 @@ const (
 	invalidConfigErrorCode      = 104
 )
 
-	//TODO: fix this, global variables are not very testable...
+//TODO: fix this, global variables are not very testable...
 //nolint:gochecknoglobals
 var runType = os.Getenv("K6_TYPE")
 
@@ -100,13 +95,10 @@ a commandline interface for interacting with it.`,
 		//TODO: disable in quiet mode?
 		_, _ = BannerColor.Fprintf(stdout, "\n%s\n\n", Banner)
 
-		initBar := ui.ProgressBar{
-			Width: 60,
-			Left:  func() string { return "    init" },
-		}
+		initBar := pb.New(pb.WithConstLeft("   init"))
 
 		// Create the Runner.
-		fprintf(stdout, "%s runner\r", initBar.String())
+		fprintf(stdout, "%s runner\r", initBar.String()) //TODO
 		pwd, err := os.Getwd()
 		if err != nil {
 			return err
@@ -153,23 +145,33 @@ a commandline interface for interacting with it.`,
 			return err
 		}
 
+		//TODO: don't use a global... or maybe change the logger?
+		logger := logrus.StandardLogger()
+
+		ctx, cancel := context.WithCancel(context.Background()) //TODO: move even earlier?
+		defer cancel()
+
 		// Create a local executor wrapping the runner.
 		fprintf(stdout, "%s executor\r", initBar.String())
-		ex := local.New(r)
-		if runNoSetup {
-			ex.SetRunSetup(false)
-		}
-		if runNoTeardown {
-			ex.SetRunTeardown(false)
-		}
-
-		// Create an engine.
-		fprintf(stdout, "%s   engine\r", initBar.String())
-		engine, err := core.NewEngine(ex, conf.Options)
+		executor, err := local.New(r, logger)
 		if err != nil {
 			return err
 		}
 
+		executorState := executor.GetState()
+		initBar = executor.GetInitProgressBar()
+		progressBarWG := &sync.WaitGroup{}
+		progressBarWG.Add(1)
+		go showProgress(ctx, progressBarWG, conf, executor)
+
+		// Create an engine.
+		initBar.Modify(pb.WithConstProgress(0, "Init engine"))
+		engine, err := core.NewEngine(executor, conf.Options, logger)
+		if err != nil {
+			return err
+		}
+
+		//TODO: the engine should just probably have a copy of the config...
 		// Configure the engine.
 		if conf.NoThresholds.Valid {
 			engine.NoThresholds = conf.NoThresholds.Bool
@@ -179,10 +181,10 @@ a commandline interface for interacting with it.`,
 		}
 
 		// Create a collector and assign it to the engine if requested.
-		fprintf(stdout, "%s   collector\r", initBar.String())
+		initBar.Modify(pb.WithConstProgress(0, "Init metric outputs"))
 		for _, out := range conf.Out {
 			t, arg := parseCollector(out)
-			collector, err := newCollector(t, arg, src, conf)
+			collector, err := newCollector(t, arg, src, conf, executor.GetExecutionPlan())
 			if err != nil {
 				return err
 			}
@@ -193,12 +195,14 @@ a commandline interface for interacting with it.`,
 		}
 
 		// Create an API server.
-		fprintf(stdout, "%s   server\r", initBar.String())
-		go func() {
-			if err := api.ListenAndServe(address, engine); err != nil {
-				log.WithError(err).Warn("Error from API server")
-			}
-		}()
+		if address != "" {
+			initBar.Modify(pb.WithConstProgress(0, "Init API server"))
+			go func() {
+				if err := api.ListenAndServe(address, engine); err != nil {
+					logger.WithError(err).Warn("Error from API server")
+				}
+			}()
+		}
 
 		// Write the big banner.
 		{
@@ -218,39 +222,38 @@ a commandline interface for interacting with it.`,
 				}
 			}
 
-			fprintf(stdout, "  execution: %s\n", ui.ValueColor.Sprint("local"))
+			fprintf(stdout, "   executor: %s\n", ui.ValueColor.Sprint("local"))
 			fprintf(stdout, "     output: %s%s\n", ui.ValueColor.Sprint(out), ui.ExtraColor.Sprint(link))
 			fprintf(stdout, "     script: %s\n", ui.ValueColor.Sprint(filename))
 			fprintf(stdout, "\n")
 
-			duration := ui.GrayColor.Sprint("-")
-			iterations := ui.GrayColor.Sprint("-")
-			if conf.Duration.Valid {
-				duration = ui.ValueColor.Sprint(conf.Duration.Duration)
-			}
-			if conf.Iterations.Valid {
-				iterations = ui.ValueColor.Sprint(conf.Iterations.Int64)
-			}
-			vus := ui.ValueColor.Sprint(conf.VUs.Int64)
-			max := ui.ValueColor.Sprint(conf.VUsMax.Int64)
+			plan := executor.GetExecutionPlan()
+			schedulers := executor.GetSchedulers()
+			maxDuration, _ := lib.GetEndOffset(plan)
 
-			leftWidth := ui.StrWidth(duration)
-			if l := ui.StrWidth(vus); l > leftWidth {
-				leftWidth = l
+			fprintf(stdout, "  execution: %s\n", ui.ValueColor.Sprintf(
+				"(%.2f%%) %d schedulers, %d max VUs, %s max duration (incl. graceful stop):",
+				conf.ExecutionSegment.FloatLength()*100, len(schedulers),
+				lib.GetMaxPossibleVUs(plan), maxDuration),
+			)
+			for _, sched := range schedulers {
+				fprintf(stdout, "           * %s: %s\n",
+					sched.GetConfig().GetName(), sched.GetConfig().GetDescription(conf.ExecutionSegment))
 			}
-			durationPad := strings.Repeat(" ", leftWidth-ui.StrWidth(duration))
-			vusPad := strings.Repeat(" ", leftWidth-ui.StrWidth(vus))
-
-			fprintf(stdout, "    duration: %s,%s iterations: %s\n", duration, durationPad, iterations)
-			fprintf(stdout, "         vus: %s,%s max: %s\n", vus, vusPad, max)
 			fprintf(stdout, "\n")
 		}
 
 		// Run the engine with a cancellable context.
-		fprintf(stdout, "%s starting\r", initBar.String())
-		ctx, cancel := context.WithCancel(context.Background())
 		errC := make(chan error)
-		go func() { errC <- engine.Run(ctx) }()
+		go func() {
+			initBar.Modify(pb.WithConstProgress(0, "Init VUs"))
+			if err := engine.Init(ctx); err != nil {
+				errC <- err
+			} else {
+				initBar.Modify(pb.WithConstProgress(0, "Start test"))
+				errC <- engine.Run(ctx)
+			}
+		}()
 
 		// Trap Interrupts, SIGINTs and SIGTERMs.
 		sigC := make(chan os.Signal, 1)
@@ -259,64 +262,38 @@ a commandline interface for interacting with it.`,
 
 		// If the user hasn't opted out: report usage.
 		if !conf.NoUsageReport.Bool {
-			go func() {
-				u := "http://k6reports.loadimpact.com/"
-				mime := "application/json"
-				var endTSeconds float64
-				if endT := engine.Executor.GetEndTime(); endT.Valid {
-					endTSeconds = time.Duration(endT.Duration).Seconds()
-				}
-				var stagesEndTSeconds float64
-				if stagesEndT := lib.SumStages(engine.Executor.GetStages()); stagesEndT.Valid {
-					stagesEndTSeconds = time.Duration(stagesEndT.Duration).Seconds()
-				}
-				body, err := json.Marshal(map[string]interface{}{
-					"k6_version":  Version,
-					"vus_max":     engine.Executor.GetVUsMax(),
-					"iterations":  engine.Executor.GetEndIterations(),
-					"duration":    endTSeconds,
-					"st_duration": stagesEndTSeconds,
-					"goos":        runtime.GOOS,
-					"goarch":      runtime.GOARCH,
-				})
-				if err != nil {
-					panic(err) // This should never happen!!
-				}
-				_, _ = http.Post(u, mime, bytes.NewBuffer(body))
-			}()
-		}
-
-		// Prepare a progress bar.
-		progress := ui.ProgressBar{
-			Width: 60,
-			Left: func() string {
-				if engine.Executor.IsPaused() {
-					return "  paused"
-				} else if engine.Executor.IsRunning() {
-					return " running"
-				} else {
-					return "    done"
-				}
-			},
-			Right: func() string {
-				if endIt := engine.Executor.GetEndIterations(); endIt.Valid {
-					return fmt.Sprintf("%d / %d", engine.Executor.GetIterations(), endIt.Int64)
-				}
-				precision := 100 * time.Millisecond
-				atT := engine.Executor.GetTime()
-				stagesEndT := lib.SumStages(engine.Executor.GetStages())
-				endT := engine.Executor.GetEndTime()
-				if !endT.Valid || (stagesEndT.Valid && endT.Duration > stagesEndT.Duration) {
-					endT = stagesEndT
-				}
-				if endT.Valid {
-					return fmt.Sprintf("%s / %s",
-						(atT/precision)*precision,
-						(time.Duration(endT.Duration)/precision)*precision,
-					)
-				}
-				return ((atT / precision) * precision).String()
-			},
+			//TODO: fix
+			//TODO: move to a separate function
+			/*
+				go func() {
+					u := "http://k6reports.loadimpact.com/"
+					mime := "application/json"
+					var endTSeconds float64
+					if endT := engine.Executor.GetEndTime(); endT.Valid {
+						endTSeconds = time.Duration(endT.Duration).Seconds()
+					}
+					var stagesEndTSeconds float64
+					if stagesEndT := lib.SumStages(engine.Executor.GetStages()); stagesEndT.Valid {
+						stagesEndTSeconds = time.Duration(stagesEndT.Duration).Seconds()
+					}
+					body, err := json.Marshal(map[string]interface{}{
+						"k6_version":  Version,
+						"vus_max":     engine.Executor.GetVUsMax(),
+						"iterations":  engine.Executor.GetEndIterations(),
+						"duration":    endTSeconds,
+						"st_duration": stagesEndTSeconds,
+						"goos":        runtime.GOOS,
+						"goarch":      runtime.GOARCH,
+					})
+					if err != nil {
+						panic(err) // This should never happen!!
+					}
+					if err != nil {
+						panic(err) // This should never happen!!
+					}
+					_, _ = http.Post(u, mime, bytes.NewBuffer(body))
+				}()
+			*/
 		}
 
 		// Ticker for progress bar updates. Less frequent updates for non-TTYs, none if quiet.
@@ -333,41 +310,25 @@ a commandline interface for interacting with it.`,
 			select {
 			case <-ticker.C:
 				if quiet || !stdoutTTY {
-					l := log.WithFields(log.Fields{
-						"t": engine.Executor.GetTime(),
-						"i": engine.Executor.GetIterations(),
+					l := logrus.WithFields(logrus.Fields{
+						"t": executorState.GetCurrentTestRunDuration(),
+						"i": executorState.GetFullIterationCount(),
 					})
 					fn := l.Info
 					if quiet {
 						fn = l.Debug
 					}
-					if engine.Executor.IsPaused() {
+					if executorState.IsPaused() {
 						fn("Paused")
 					} else {
 						fn("Running")
 					}
 					break
 				}
-
-				var prog float64
-				if endIt := engine.Executor.GetEndIterations(); endIt.Valid {
-					prog = float64(engine.Executor.GetIterations()) / float64(endIt.Int64)
-				} else {
-					stagesEndT := lib.SumStages(engine.Executor.GetStages())
-					endT := engine.Executor.GetEndTime()
-					if !endT.Valid || (stagesEndT.Valid && endT.Duration > stagesEndT.Duration) {
-						endT = stagesEndT
-					}
-					if endT.Valid {
-						prog = float64(engine.Executor.GetTime()) / float64(endT.Duration)
-					}
-				}
-				progress.Progress = prog
-				fprintf(stdout, "%s\x1b[0K\r", progress.String())
 			case err := <-errC:
 				cancel()
 				if err == nil {
-					log.Debug("Engine terminated cleanly")
+					logger.Debug("Engine terminated cleanly")
 					break mainLoop
 				}
 
@@ -375,42 +336,44 @@ a commandline interface for interacting with it.`,
 				case lib.TimeoutError:
 					switch string(e) {
 					case "setup":
-						log.WithError(err).Error("Setup timeout")
+						logger.WithError(err).Error("Setup timeout")
 						return ExitCode{errors.New("Setup timeout"), setupTimeoutErrorCode}
 					case "teardown":
-						log.WithError(err).Error("Teardown timeout")
+						logger.WithError(err).Error("Teardown timeout")
 						return ExitCode{errors.New("Teardown timeout"), teardownTimeoutErrorCode}
 					default:
-						log.WithError(err).Error("Engine timeout")
+						logger.WithError(err).Error("Engine timeout")
 						return ExitCode{errors.New("Engine timeout"), genericTimeoutErrorCode}
 					}
 				default:
-					log.WithError(err).Error("Engine error")
+					logger.WithError(err).Error("Engine error")
 					return ExitCode{errors.New("Engine Error"), genericEngineErrorCode}
 				}
 			case sig := <-sigC:
-				log.WithField("sig", sig).Debug("Exiting in response to signal")
+				logger.WithField("sig", sig).Debug("Exiting in response to signal")
 				cancel()
+				//TODO: Actually exit on a second Ctrl+C, even if some of the iterations are stuck.
+				// This is currently problematic because of https://github.com/loadimpact/k6/issues/971,
+				// but with uninterruptible iterations it will be even more problematic.
 			}
 		}
 		if quiet || !stdoutTTY {
-			e := log.WithFields(log.Fields{
-				"t": engine.Executor.GetTime(),
-				"i": engine.Executor.GetIterations(),
+			e := logger.WithFields(logrus.Fields{
+				"t": executorState.GetCurrentTestRunDuration(),
+				"i": executorState.GetFullIterationCount(),
 			})
 			fn := e.Info
 			if quiet {
 				fn = e.Debug
 			}
 			fn("Test finished")
-		} else {
-			progress.Progress = 1
-			fprintf(stdout, "%s\x1b[0K\n", progress.String())
 		}
 
+		progressBarWG.Wait()
+
 		// Warn if no iterations could be completed.
-		if engine.Executor.GetIterations() == 0 {
-			log.Warn("No data generated, because no script iterations finished, consider making the test duration longer")
+		if executorState.GetFullIterationCount() == 0 {
+			logger.Warn("No data generated, because no script iterations finished, consider making the test duration longer")
 		}
 
 		// Print the end-of-test summary.
@@ -420,13 +383,13 @@ a commandline interface for interacting with it.`,
 				Opts:    conf.Options,
 				Root:    engine.Executor.GetRunner().GetDefaultGroup(),
 				Metrics: engine.Metrics,
-				Time:    engine.Executor.GetTime(),
+				Time:    executorState.GetCurrentTestRunDuration(),
 			})
 			fprintf(stdout, "\n")
 		}
 
 		if conf.Linger.Bool {
-			log.Info("Linger set; waiting for Ctrl+C...")
+			logger.Info("Linger set; waiting for Ctrl+C...")
 			<-sigC
 		}
 
