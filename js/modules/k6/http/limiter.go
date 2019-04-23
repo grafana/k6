@@ -65,6 +65,7 @@ type MultiSlotLimiter struct {
 }
 
 // NewMultiSlotLimiter initializes and returns a new MultiSlotLimiter with the given slot count
+//TODO: move to lib and use something better than a mutex? sync.Map perhaps?
 func NewMultiSlotLimiter(slots int) *MultiSlotLimiter {
 	return &MultiSlotLimiter{make(map[string]SlotLimiter), slots, sync.Mutex{}}
 }

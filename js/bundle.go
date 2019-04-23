@@ -198,6 +198,7 @@ func (b *Bundle) makeArchive() *lib.Archive {
 
 // Instantiate creates a new runtime from this bundle.
 func (b *Bundle) Instantiate() (bi *BundleInstance, instErr error) {
+	//TODO: actually use a real context here, so that the instantiation can be killed
 	// Placeholder for a real context.
 	ctxPtr := new(context.Context)
 

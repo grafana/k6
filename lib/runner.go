@@ -44,6 +44,7 @@ type Runner interface {
 	// Spawns a new VU. It's fine to make this function rather heavy, if it means a performance
 	// improvement at runtime. Remember, this is called once per VU and normally only at the start
 	// of a test - RunOnce() may be called hundreds of thousands of times, and must be fast.
+	//TODO: pass context.Context, so initialization can be killed properly...
 	NewVU(out chan<- stats.SampleContainer) (VU, error)
 
 	// Runs pre-test setup, if applicable.
@@ -76,10 +77,12 @@ type VU interface {
 
 	// Assign the VU a new ID. Called by the Executor upon creation, but may be called multiple
 	// times if the VU is recycled because the test was scaled down and then back up.
+	//TODO: support reconfiguring of env vars, tags and exec
 	Reconfigure(id int64) error
 }
 
 // MiniRunner wraps a function in a runner whose VUs will simply call that function.
+//TODO: move to testutils, or somewhere else that's not lib...
 type MiniRunner struct {
 	Fn         func(ctx context.Context, out chan<- stats.SampleContainer) error
 	SetupFn    func(ctx context.Context, out chan<- stats.SampleContainer) ([]byte, error)
