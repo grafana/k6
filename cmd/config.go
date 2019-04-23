@@ -37,7 +37,6 @@ import (
 	"github.com/loadimpact/k6/stats/influxdb"
 	"github.com/loadimpact/k6/stats/kafka"
 	"github.com/loadimpact/k6/stats/statsd/common"
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/spf13/pflag"
 	null "gopkg.in/guregu/null.v3"
@@ -71,6 +70,14 @@ type Config struct {
 		StatsD   common.Config   `json:"statsd"`
 		Datadog  datadog.Config  `json:"datadog"`
 	} `json:"collectors"`
+}
+
+// Validate checks if all of the specified options make sense
+func (c Config) Validate() []error {
+	errors := c.Options.Validate()
+	//TODO: validate all of the other options... that we should have already been validating...
+	//TODO: maybe integrate an external validation lib: https://github.com/avelino/awesome-go#validation
+	return errors
 }
 
 func (c Config) Apply(cfg Config) Config {
@@ -179,100 +186,6 @@ func readEnvConfig() (conf Config, err error) {
 	return conf, nil
 }
 
-type executionConflictConfigError string
-
-func (e executionConflictConfigError) Error() string {
-	return string(e)
-}
-
-var _ error = executionConflictConfigError("")
-
-// This checks for conflicting options and turns any shortcut options (i.e. duration, iterations,
-// stages) into the proper scheduler configuration
-func buildExecutionConfig(conf Config) (Config, error) {
-	result := conf
-	switch {
-	case conf.Duration.Valid:
-		if conf.Iterations.Valid {
-			//TODO: make this an executionConflictConfigError in the next version
-			log.Warnf("Specifying both duration and iterations is deprecated and won't be supported in the future k6 versions")
-		}
-
-		if len(conf.Stages) > 0 { // stages isn't nil (not set) and isn't explicitly set to empty
-			//TODO: make this an executionConflictConfigError in the next version
-			log.Warnf("Specifying both duration and stages is deprecated and won't be supported in the future k6 versions")
-		}
-
-		if conf.Execution != nil {
-			return result, executionConflictConfigError("specifying both duration and execution is not supported")
-		}
-
-		if conf.Duration.Duration <= 0 {
-			//TODO: make this an executionConflictConfigError in the next version
-			log.Warnf("Specifying infinite duration in this way is deprecated and won't be supported in the future k6 versions")
-		} else {
-			ds := scheduler.NewConstantLoopingVUsConfig(lib.DefaultSchedulerName)
-			ds.VUs = conf.VUs
-			ds.Duration = conf.Duration
-			ds.Interruptible = null.NewBool(true, false) // Preserve backwards compatibility
-			result.Execution = scheduler.ConfigMap{lib.DefaultSchedulerName: ds}
-		}
-
-	case len(conf.Stages) > 0: // stages isn't nil (not set) and isn't explicitly set to empty
-		if conf.Iterations.Valid {
-			//TODO: make this an executionConflictConfigError in the next version
-			log.Warnf("Specifying both iterations and stages is deprecated and won't be supported in the future k6 versions")
-		}
-
-		if conf.Execution != nil {
-			return conf, executionConflictConfigError("specifying both stages and execution is not supported")
-		}
-
-		ds := scheduler.NewVariableLoopingVUsConfig(lib.DefaultSchedulerName)
-		ds.StartVUs = conf.VUs
-		for _, s := range conf.Stages {
-			if s.Duration.Valid {
-				ds.Stages = append(ds.Stages, scheduler.Stage{Duration: s.Duration, Target: s.Target})
-			}
-		}
-		ds.Interruptible = null.NewBool(true, false) // Preserve backwards compatibility
-		result.Execution = scheduler.ConfigMap{lib.DefaultSchedulerName: ds}
-
-	case conf.Iterations.Valid:
-		if conf.Execution != nil {
-			return conf, executionConflictConfigError("specifying both iterations and execution is not supported")
-		}
-		// TODO: maybe add a new flag that will be used as a shortcut to per-VU iterations?
-
-		ds := scheduler.NewSharedIterationsConfig(lib.DefaultSchedulerName)
-		ds.VUs = conf.VUs
-		ds.Iterations = conf.Iterations
-		result.Execution = scheduler.ConfigMap{lib.DefaultSchedulerName: ds}
-
-	default:
-		if conf.Execution != nil { // If someone set this, regardless if its empty
-			//TODO: remove this warning in the next version
-			log.Warnf("The execution settings are not functional in this k6 release, they will be ignored")
-		}
-
-		if len(conf.Execution) == 0 { // If unset or set to empty
-			// No execution parameters whatsoever were specified, so we'll create a per-VU iterations config
-			// with 1 VU and 1 iteration. We're choosing the per-VU config, since that one could also
-			// be executed both locally, and in the cloud.
-			result.Execution = scheduler.ConfigMap{
-				lib.DefaultSchedulerName: scheduler.NewPerVUIterationsConfig(lib.DefaultSchedulerName),
-			}
-		}
-	}
-
-	//TODO: validate the config; questions:
-	// - separately validate the duration, iterations and stages for better error messages?
-	// - or reuse the execution validation somehow, at the end? or something mixed?
-	// - here or in getConsolidatedConfig() or somewhere else?
-
-	return result, nil
-}
-
 // Assemble the final consolidated configuration from all of the different sources:
 // - start with the CLI-provided options to get shadowed (non-Valid) defaults in there
 // - add the global file config options
@@ -302,11 +215,11 @@ func getConsolidatedConfig(fs afero.Fs, cliConf Config, runner lib.Runner) (conf
 	}
 	conf = conf.Apply(envConf).Apply(cliConf)
 
-	return buildExecutionConfig(conf)
+	conf.Options, err = scheduler.BuildExecutionConfig(conf.Options)
+
+	return conf, err
 }
 
-//TODO: remove ↓
-//nolint:unparam
 func validateConfig(conf Config) error {
 	errList := conf.Validate()
 	if len(errList) == 0 {
@@ -317,9 +230,6 @@ func validateConfig(conf Config) error {
 	for _, err := range errList {
 		errMsgParts = append(errMsgParts, fmt.Sprintf("\t- %s", err.Error()))
 	}
-	errMsg := errors.New(strings.Join(errMsgParts, "\n"))
 
-	//TODO: actually return the error here instead of warning, so k6 aborts on config validation errors
-	log.Warn(errMsg)
-	return nil
+	return errors.New(strings.Join(errMsgParts, "\n"))
 }

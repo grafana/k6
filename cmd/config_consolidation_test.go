@@ -21,7 +21,6 @@ package cmd
 
 import (
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -73,13 +72,12 @@ func setEnv(t *testing.T, newEnv []string) (restoreEnv func()) {
 }
 
 func verifyOneIterPerOneVU(t *testing.T, c Config) {
-	// No config anywhere should result in a 1 VU with a 1 uninterruptible iteration config
+	// No config anywhere should result in a 1 VU with a 1 iteration config
 	sched := c.Execution[lib.DefaultSchedulerName]
 	require.NotEmpty(t, sched)
 	require.IsType(t, scheduler.PerVUIteationsConfig{}, sched)
 	perVuIters, ok := sched.(scheduler.PerVUIteationsConfig)
 	require.True(t, ok)
-	assert.Equal(t, null.NewBool(false, false), perVuIters.Interruptible)
 	assert.Equal(t, null.NewInt(1, false), perVuIters.Iterations)
 	assert.Equal(t, null.NewInt(1, false), perVuIters.VUs)
 }
@@ -105,7 +103,6 @@ func verifyConstLoopingVUs(vus null.Int, duration time.Duration) func(t *testing
 		require.IsType(t, scheduler.ConstantLoopingVUsConfig{}, sched)
 		clvc, ok := sched.(scheduler.ConstantLoopingVUsConfig)
 		require.True(t, ok)
-		assert.Equal(t, null.NewBool(true, false), clvc.Interruptible)
 		assert.Equal(t, vus, clvc.VUs)
 		assert.Equal(t, types.NullDurationFrom(duration), clvc.Duration)
 		assert.Equal(t, vus, c.VUs)
@@ -120,7 +117,6 @@ func verifyVarLoopingVUs(startVus null.Int, stages []scheduler.Stage) func(t *te
 		require.IsType(t, scheduler.VariableLoopingVUsConfig{}, sched)
 		clvc, ok := sched.(scheduler.VariableLoopingVUsConfig)
 		require.True(t, ok)
-		assert.Equal(t, null.NewBool(true, false), clvc.Interruptible)
 		assert.Equal(t, startVus, clvc.StartVUs)
 		assert.Equal(t, startVus, c.VUs)
 		assert.Equal(t, stages, clvc.Stages)
@@ -208,20 +204,7 @@ func resetStickyGlobalVars() {
 	exitOnRunning = false
 	configFilePath = ""
 	runType = ""
-	runNoSetup = false
-	runNoTeardown = false
 }
-
-// Something that makes the test also be a valid io.Writer, useful for passing it
-// as an output for logs and CLI flag help messages...
-type testOutput struct{ *testing.T }
-
-func (to testOutput) Write(p []byte) (n int, err error) {
-	to.Logf("%s", p)
-	return len(p), nil
-}
-
-var _ io.Writer = testOutput{}
 
 // exp contains the different events or errors we expect our test case to trigger.
 // for space and clarity, we use the fact that by default, all of the struct values are false
@@ -230,7 +213,7 @@ type exp struct {
 	cliReadError       bool
 	consolidationError bool
 	validationErrors   bool
-	logWarning         bool //TODO: remove in the next version?
+	logWarning         bool
 }
 
 // A hell of a complicated test case, that still doesn't test things fully...
@@ -272,17 +255,17 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 		{opts{cli: []string{"-s", "10s:5", "-s", "10s:"}}, exp{validationErrors: true}, nil},
 		{opts{fs: defaultConfig(`{"stages": [{"duration": "20s"}], "vus": 10}`)}, exp{validationErrors: true}, nil},
 		// These should emit a warning
-		//TODO: in next version, those should be an error
-		{opts{cli: []string{"-u", "1", "-i", "6", "-d", "10s"}}, exp{logWarning: true}, nil},
-		{opts{cli: []string{"-u", "2", "-d", "10s", "-s", "10s:20"}}, exp{logWarning: true}, nil},
-		{opts{cli: []string{"-u", "3", "-i", "5", "-s", "10s:20"}}, exp{logWarning: true}, nil},
-		{opts{cli: []string{"-u", "3", "-d", "0"}}, exp{logWarning: true}, nil},
+		//TODO: these should probably emit a validation error?
+		{opts{cli: []string{"-u", "1", "-i", "6", "-d", "10s"}}, exp{consolidationError: true}, nil},
+		{opts{cli: []string{"-u", "2", "-d", "10s", "-s", "10s:20"}}, exp{consolidationError: true}, nil},
+		{opts{cli: []string{"-u", "3", "-i", "5", "-s", "10s:20"}}, exp{consolidationError: true}, nil},
+		{opts{cli: []string{"-u", "3", "-d", "0"}}, exp{consolidationError: true}, nil},
 		{
 			opts{runner: &lib.Options{
 				VUs:        null.IntFrom(5),
 				Duration:   types.NullDurationFrom(44 * time.Second),
 				Iterations: null.IntFrom(10),
-			}}, exp{logWarning: true}, nil,
+			}}, exp{consolidationError: true}, nil,
 		},
 		{opts{fs: defaultConfig(`{"execution": {}}`)}, exp{logWarning: true}, verifyOneIterPerOneVU},
 		// Test if environment variable shortcuts are working as expected
@@ -314,15 +297,14 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 				env: []string{"K6_DURATION=15s"},
 				cli: []string{"--stage", ""},
 			},
-			exp{}, verifyConstLoopingVUs(I(10), 15*time.Second),
+			exp{logWarning: true}, verifyOneIterPerOneVU,
 		},
 		{
 			opts{
 				runner: &lib.Options{VUs: null.IntFrom(5), Duration: types.NullDurationFrom(50 * time.Second)},
 				cli:    []string{"--iterations", "5"},
 			},
-			//TODO: this shouldn't be a warning in the next version, but the result will be different
-			exp{logWarning: true}, verifyConstLoopingVUs(I(5), 50*time.Second),
+			exp{}, verifySharedIters(I(5), I(5)),
 		},
 		{
 			opts{
@@ -330,16 +312,16 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 				runner: &lib.Options{VUs: null.IntFrom(5)},
 			},
 			exp{},
-			verifyVarLoopingVUs(null.NewInt(5, true), buildStages(20, 10)),
+			verifyVarLoopingVUs(I(5), buildStages(20, 10)),
 		},
 		{
 			opts{
 				fs:     defaultConfig(`{"stages": [{"duration": "20s", "target": 10}]}`),
 				runner: &lib.Options{VUs: null.IntFrom(5)},
-				env:    []string{"K6_VUS=15", "K6_ITERATIONS=15"},
+				env:    []string{"K6_VUS=15", "K6_ITERATIONS=17"},
 			},
-			exp{logWarning: true}, //TODO: this won't be a warning in the next version, but the result will be different
-			verifyVarLoopingVUs(null.NewInt(15, true), buildStages(20, 10)),
+			exp{},
+			verifySharedIters(I(15), I(17)),
 		},
 		{
 			opts{
@@ -357,14 +339,17 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 			opts{
 				fs: defaultConfig(`{
 					"execution": { "someKey": {
-						"type": "constant-looping-vus", "vus": 10, "duration": "60s", "interruptible": false,
-						"iterationTimeout": "10s", "startTime": "70s", "env": {"test": "mest"}, "exec": "someFunc"
+						"type": "constant-looping-vus", "vus": 10, "duration": "60s", "gracefulStop": "10s",
+						"startTime": "70s", "env": {"test": "mest"}, "exec": "someFunc"
 					}}}`),
 				env: []string{"K6_ITERATIONS=25"},
 				cli: []string{"--vus", "12"},
 			},
 			exp{}, verifySharedIters(I(12), I(25)),
 		},
+
+		//TODO: test manual execution
+		//TODO: test execution-segment
 
 		// Just in case, verify that no options will result in the same 1 vu 1 iter config
 		{opts{}, exp{}, verifyOneIterPerOneVU},
@@ -380,7 +365,8 @@ func runTestCase(
 	logHook *testutils.SimpleLogrusHook,
 ) {
 	t.Logf("Test with opts=%#v and exp=%#v\n", testCase.options, testCase.expected)
-	log.SetOutput(testOutput{t})
+	output := testutils.NewTestOutput(t)
+	log.SetOutput(output)
 	logHook.Drain()
 
 	restoreEnv := setEnv(t, testCase.options.env)
@@ -388,7 +374,7 @@ func runTestCase(
 
 	flagSet := newFlagSet()
 	defer resetStickyGlobalVars()
-	flagSet.SetOutput(testOutput{t})
+	flagSet.SetOutput(output)
 	//flagSet.PrintDefaults()
 
 	cliErr := flagSet.Parse(testCase.options.cli)
