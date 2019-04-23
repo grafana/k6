@@ -60,7 +60,10 @@ func parseCollector(s string) (t, arg string) {
 	}
 }
 
-func newCollector(collectorName, arg string, src *lib.SourceData, conf Config) (lib.Collector, error) {
+func newCollector(
+	collectorName, arg string, src *lib.SourceData, conf Config, executionPlan []lib.ExecutionStep,
+) (lib.Collector, error) {
+
 	getCollector := func() (lib.Collector, error) {
 		switch collectorName {
 		case collectorJSON:
@@ -84,7 +87,7 @@ func newCollector(collectorName, arg string, src *lib.SourceData, conf Config) (
 			if arg != "" {
 				config.Name = null.StringFrom(arg)
 			}
-			return cloud.New(config, src, conf.Options, Version)
+			return cloud.New(config, src, conf.Options, executionPlan, Version)
 		case collectorKafka:
 			config := kafka.NewConfig().Apply(conf.Collectors.Kafka)
 			if err := envconfig.Process("k6", &config); err != nil {

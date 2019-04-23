@@ -47,9 +47,10 @@ type Collector struct {
 	config      Config
 	referenceID string
 
-	duration   int64
-	thresholds map[string][]*stats.Threshold
-	client     *Client
+	executionPlan []lib.ExecutionStep
+	duration      int64 // in seconds
+	thresholds    map[string][]*stats.Threshold
+	client        *Client
 
 	anonymous bool
 	runStatus lib.RunStatus
@@ -97,7 +98,9 @@ func MergeFromExternal(external map[string]json.RawMessage, conf *Config) error 
 }
 
 // New creates a new cloud collector
-func New(conf Config, src *lib.SourceData, opts lib.Options, version string) (*Collector, error) {
+func New(
+	conf Config, src *lib.SourceData, opts lib.Options, executionPlan []lib.ExecutionStep, version string,
+) (*Collector, error) {
 	if err := MergeFromExternal(opts.External, &conf); err != nil {
 		return nil, err
 	}
@@ -118,15 +121,8 @@ func New(conf Config, src *lib.SourceData, opts lib.Options, version string) (*C
 		thresholds[name] = append(thresholds[name], t.Thresholds...)
 	}
 
-	// Sum test duration from options. -1 for unknown duration.
-	var duration int64 = -1
-	if len(opts.Stages) > 0 {
-		duration = sumStages(opts.Stages)
-	} else if opts.Duration.Valid {
-		duration = int64(time.Duration(opts.Duration.Duration).Seconds())
-	}
-
-	if duration == -1 {
+	duration, testEnds := lib.GetEndOffset(executionPlan)
+	if !testEnds {
 		return nil, errors.New("Tests with unspecified duration are not allowed when using Load Impact Insights")
 	}
 
@@ -136,13 +132,14 @@ func New(conf Config, src *lib.SourceData, opts lib.Options, version string) (*C
 	}
 
 	return &Collector{
-		config:      conf,
-		thresholds:  thresholds,
-		client:      NewClient(conf.Token.String, conf.Host.String, version),
-		anonymous:   !conf.Token.Valid,
-		duration:    duration,
-		opts:        opts,
-		aggrBuckets: map[int64]aggregationBucket{},
+		config:        conf,
+		thresholds:    thresholds,
+		client:        NewClient(conf.Token.String, conf.Host.String, version),
+		anonymous:     !conf.Token.Valid,
+		executionPlan: executionPlan,
+		duration:      int64(duration / time.Second),
+		opts:          opts,
+		aggrBuckets:   map[int64]aggregationBucket{},
 	}, nil
 }
 
@@ -156,11 +153,12 @@ func (c *Collector) Init() error {
 			thresholds[name] = append(thresholds[name], threshold.Source)
 		}
 	}
+	maxVUs := lib.GetMaxPossibleVUs(c.executionPlan)
 
 	testRun := &TestRun{
 		Name:       c.config.Name.String,
 		ProjectID:  c.config.ProjectID.Int64,
-		VUsMax:     c.opts.VUsMax.Int64,
+		VUsMax:     int64(maxVUs),
 		Thresholds: thresholds,
 		Duration:   c.duration,
 	}
@@ -503,15 +501,6 @@ func (c *Collector) testFinished() {
 			"error": err,
 		}).Warn("Failed to send test finished to cloud")
 	}
-}
-
-func sumStages(stages []lib.Stage) int64 {
-	var total time.Duration
-	for _, stage := range stages {
-		total += time.Duration(stage.Duration.Duration)
-	}
-
-	return int64(total.Seconds())
 }
 
 // GetRequiredSystemTags returns which sample tags are needed by this collector
