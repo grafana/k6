@@ -56,22 +56,28 @@ func HandlePatchStatus(rw http.ResponseWriter, r *http.Request, p httprouter.Par
 		return
 	}
 
-	if status.VUsMax.Valid {
-		if err := engine.Executor.SetVUsMax(status.VUsMax.Int64); err != nil {
-			apiError(rw, "Couldn't change cap", err.Error(), http.StatusBadRequest)
-			return
-		}
-	}
-	if status.VUs.Valid {
-		if err := engine.Executor.SetVUs(status.VUs.Int64); err != nil {
-			apiError(rw, "Couldn't scale", err.Error(), http.StatusBadRequest)
-			return
-		}
-	}
 	if status.Paused.Valid {
-		engine.Executor.SetPaused(status.Paused.Bool)
+		if err = engine.Executor.SetPaused(status.Paused.Bool); err != nil {
+			apiError(rw, "Pause error", err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 
+	/*
+		//TODO: handle manual executor update
+		if status.VUsMax.Valid {
+			if err := engine.Executor.SetVUsMax(status.VUsMax.Int64); err != nil {
+				apiError(rw, "Couldn't change cap", err.Error(), http.StatusBadRequest)
+				return
+			}
+		}
+		if status.VUs.Valid {
+			if err := engine.Executor.SetVUs(status.VUs.Int64); err != nil {
+				apiError(rw, "Couldn't scale", err.Error(), http.StatusBadRequest)
+				return
+			}
+		}
+	*/
 	data, err := jsonapi.Marshal(NewStatus(engine))
 	if err != nil {
 		apiError(rw, "Encoding error", err.Error(), http.StatusInternalServerError)

@@ -36,11 +36,12 @@ type Status struct {
 }
 
 func NewStatus(engine *core.Engine) Status {
+	executorState := engine.Executor.GetState()
 	return Status{
-		Paused:  null.BoolFrom(engine.Executor.IsPaused()),
-		VUs:     null.IntFrom(engine.Executor.GetVUs()),
-		VUsMax:  null.IntFrom(engine.Executor.GetVUsMax()),
-		Running: engine.Executor.IsRunning(),
+		Running: executorState.HasStarted(),
+		Paused:  null.BoolFrom(executorState.IsPaused()),
+		VUs:     null.IntFrom(int64(executorState.GetCurrentlyActiveVUsCount())),
+		VUsMax:  null.IntFrom(int64(executorState.GetInitializedVUsCount())),
 		Tainted: engine.IsTainted(),
 	}
 }

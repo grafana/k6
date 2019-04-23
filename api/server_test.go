@@ -26,12 +26,15 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/loadimpact/k6/api/common"
 	"github.com/loadimpact/k6/core"
+	"github.com/loadimpact/k6/core/local"
 	"github.com/loadimpact/k6/lib"
-	log "github.com/sirupsen/logrus"
 	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/urfave/negroni"
 )
 
@@ -51,7 +54,7 @@ func TestLogger(t *testing.T) {
 					r := httptest.NewRequest(method, "http://example.com"+path, nil)
 
 					l, hook := logtest.NewNullLogger()
-					l.Level = log.DebugLevel
+					l.Level = logrus.DebugLevel
 					NewLogger(l)(negroni.NewResponseWriter(rw), r, testHTTPHandler)
 
 					res := rw.Result()
@@ -63,7 +66,7 @@ func TestLogger(t *testing.T) {
 					}
 
 					e := hook.LastEntry()
-					assert.Equal(t, log.DebugLevel, e.Level)
+					assert.Equal(t, logrus.DebugLevel, e.Level)
 					assert.Equal(t, fmt.Sprintf("%s %s", method, path), e.Message)
 					assert.Equal(t, http.StatusOK, e.Data["status"])
 				})
@@ -73,10 +76,10 @@ func TestLogger(t *testing.T) {
 }
 
 func TestWithEngine(t *testing.T) {
-	engine, err := core.NewEngine(nil, lib.Options{})
-	if !assert.NoError(t, err) {
-		return
-	}
+	executor, err := local.New(&lib.MiniRunner{}, logrus.StandardLogger())
+	require.NoError(t, err)
+	engine, err := core.NewEngine(executor, lib.Options{}, logrus.StandardLogger())
+	require.NoError(t, err)
 
 	rw := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "http://example.com/", nil)

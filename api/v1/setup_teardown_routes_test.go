@@ -29,6 +29,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/loadimpact/k6/core"
 	"github.com/loadimpact/k6/core/local"
 	"github.com/loadimpact/k6/js"
@@ -140,14 +142,14 @@ func TestSetupData(t *testing.T) {
 			runner.SetOptions(lib.Options{
 				Paused:          null.BoolFrom(true),
 				VUs:             null.IntFrom(2),
-				VUsMax:          null.IntFrom(2),
 				Iterations:      null.IntFrom(3),
+				NoSetup:         null.BoolFrom(true),
 				SetupTimeout:    types.NullDurationFrom(1 * time.Second),
 				TeardownTimeout: types.NullDurationFrom(1 * time.Second),
 			})
-			executor := local.New(runner)
-			executor.SetRunSetup(false)
-			engine, err := core.NewEngine(executor, runner.GetOptions())
+			executor, err := local.New(runner, logrus.StandardLogger())
+			require.NoError(t, err)
+			engine, err := core.NewEngine(executor, runner.GetOptions(), logrus.StandardLogger())
 			require.NoError(t, err)
 
 			ctx, cancel := context.WithCancel(context.Background())

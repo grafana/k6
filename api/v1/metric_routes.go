@@ -34,7 +34,7 @@ func HandleGetMetrics(rw http.ResponseWriter, r *http.Request, p httprouter.Para
 
 	var t time.Duration
 	if engine.Executor != nil {
-		t = engine.Executor.GetTime()
+		t = engine.Executor.GetState().GetCurrentTestRunDuration()
 	}
 
 	metrics := make([]Metric, 0)
@@ -56,7 +56,7 @@ func HandleGetMetric(rw http.ResponseWriter, r *http.Request, p httprouter.Param
 
 	var t time.Duration
 	if engine.Executor != nil {
-		t = engine.Executor.GetTime()
+		t = engine.Executor.GetState().GetCurrentTestRunDuration()
 	}
 
 	var metric Metric
