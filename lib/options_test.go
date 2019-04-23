@@ -30,7 +30,6 @@ import (
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
-	"github.com/loadimpact/k6/lib/scheduler"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 	"github.com/stretchr/testify/assert"
@@ -48,11 +47,6 @@ func TestOptions(t *testing.T) {
 		opts := Options{}.Apply(Options{VUs: null.IntFrom(12345)})
 		assert.True(t, opts.VUs.Valid)
 		assert.Equal(t, int64(12345), opts.VUs.Int64)
-	})
-	t.Run("VUsMax", func(t *testing.T) {
-		opts := Options{}.Apply(Options{VUsMax: null.IntFrom(12345)})
-		assert.True(t, opts.VUsMax.Valid)
-		assert.Equal(t, int64(12345), opts.VUsMax.Int64)
 	})
 	t.Run("Duration", func(t *testing.T) {
 		opts := Options{}.Apply(Options{Duration: types.NullDurationFrom(2 * time.Minute)})
@@ -88,17 +82,7 @@ func TestOptions(t *testing.T) {
 		assert.Equal(t, oneStage, opts.Apply(Options{Stages: oneStage}).Stages)
 		assert.Equal(t, oneStage, Options{}.Apply(opts).Apply(Options{Stages: oneStage}).Apply(Options{Stages: oneStage}).Stages)
 	})
-	t.Run("Execution", func(t *testing.T) {
-		sched := scheduler.NewConstantLoopingVUsConfig("test")
-		sched.VUs = null.IntFrom(123)
-		sched.Duration = types.NullDurationFrom(3 * time.Minute)
-		opts := Options{}.Apply(Options{Execution: scheduler.ConfigMap{"test": sched}})
-		cs, ok := opts.Execution["test"].(scheduler.ConstantLoopingVUsConfig)
-		assert.True(t, ok)
-		assert.Equal(t, int64(123), cs.VUs.Int64)
-		assert.Equal(t, "3m0s", cs.Duration.String())
-	})
-	//TODO: test that any execution option overwrites any other lower-level options
+	// Execution overwriting is tested by the config consolidation test in cmd
 	t.Run("RPS", func(t *testing.T) {
 		opts := Options{}.Apply(Options{RPS: null.IntFrom(12345)})
 		assert.True(t, opts.RPS.Valid)
@@ -412,10 +396,6 @@ func TestOptionsEnv(t *testing.T) {
 			"false": null.BoolFrom(false),
 		},
 		{"VUs", "K6_VUS"}: {
-			"":    null.Int{},
-			"123": null.IntFrom(123),
-		},
-		{"VUsMax", "K6_VUS_MAX"}: {
 			"":    null.Int{},
 			"123": null.IntFrom(123),
 		},

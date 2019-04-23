@@ -29,7 +29,6 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/loadimpact/k6/lib/scheduler"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 	"github.com/pkg/errors"
@@ -213,16 +212,23 @@ type Options struct {
 	// See the Runner or Executor interfaces for more information.
 	VUs null.Int `json:"vus" envconfig:"vus"`
 
-	//TODO: deprecate this? or reuse it in the manual control "scheduler"?
-	VUsMax     null.Int           `json:"vusMax" envconfig:"vus_max"`
 	Duration   types.NullDuration `json:"duration" envconfig:"duration"`
 	Iterations null.Int           `json:"iterations" envconfig:"iterations"`
 	Stages     []Stage            `json:"stages" envconfig:"stages"`
 
-	Execution scheduler.ConfigMap `json:"execution,omitempty" envconfig:"-"`
+	// TODO: remove the `ignored:"true"` from the field tags, it's there so that
+	// the envconfig library will ignore those fields.
+	//
+	// We should support specifying execution segments via environment
+	// variables, but we currently can't, because envconfig has this nasty bug
+	// (among others): https://github.com/kelseyhightower/envconfig/issues/113
+	Execution        SchedulerConfigMap `json:"execution,omitempty" ignored:"true"`
+	ExecutionSegment *ExecutionSegment  `json:"executionSegment" ignored:"true"`
 
 	// Timeouts for the setup() and teardown() functions
+	NoSetup         null.Bool          `json:"noSetup" envconfig:"NO_SETUP"`
 	SetupTimeout    types.NullDuration `json:"setupTimeout" envconfig:"setup_timeout"`
+	NoTeardown      null.Bool          `json:"noTeardown" envconfig:"NO_TEARDOWN"`
 	TeardownTimeout types.NullDuration `json:"teardownTimeout" envconfig:"teardown_timeout"`
 
 	// Limit HTTP requests per second.
@@ -317,9 +323,6 @@ func (o Options) Apply(opts Options) Options {
 	if opts.VUs.Valid {
 		o.VUs = opts.VUs
 	}
-	if opts.VUsMax.Valid {
-		o.VUsMax = opts.VUsMax
-	}
 
 	// Specifying duration, iterations, stages, or execution in a "higher" config tier
 	// will overwrite all of the the previous execution settings (if any) from any
@@ -328,12 +331,10 @@ func (o Options) Apply(opts Options) Options {
 	// config tier, they will be preserved, so the validation after we've consolidated
 	// all of the options can return an error.
 	if opts.Duration.Valid || opts.Iterations.Valid || opts.Stages != nil || opts.Execution != nil {
-		//TODO: uncomment this after we start using the new schedulers
-		/*
-			o.Duration = types.NewNullDuration(0, false)
-			o.Iterations = null.NewInt(0, false)
-			o.Stages = nil
-		*/
+		//TODO: emit a warning or a notice log message if overwrite lower tier config options?
+		o.Duration = types.NewNullDuration(0, false)
+		o.Iterations = null.NewInt(0, false)
+		o.Stages = nil
 		o.Execution = nil
 	}
 
@@ -358,8 +359,17 @@ func (o Options) Apply(opts Options) Options {
 	if opts.Execution != nil {
 		o.Execution = opts.Execution
 	}
+	if opts.ExecutionSegment != nil {
+		o.ExecutionSegment = opts.ExecutionSegment
+	}
+	if opts.NoSetup.Valid {
+		o.NoSetup = opts.NoSetup
+	}
 	if opts.SetupTimeout.Valid {
 		o.SetupTimeout = opts.SetupTimeout
+	}
+	if opts.NoTeardown.Valid {
+		o.NoTeardown = opts.NoTeardown
 	}
 	if opts.TeardownTimeout.Valid {
 		o.TeardownTimeout = opts.TeardownTimeout

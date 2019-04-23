@@ -45,11 +45,18 @@ func optionFlagSet() *pflag.FlagSet {
 	flags := pflag.NewFlagSet("", 0)
 	flags.SortFlags = false
 	flags.Int64P("vus", "u", 1, "number of virtual users")
+
+	//TODO: delete in a few versions
 	flags.Int64P("max", "m", 0, "max available virtual users")
+	_ = flags.MarkDeprecated("max", "the global MaxVUs option is obsolete and doesn't affect the k6 script execution")
+
 	flags.DurationP("duration", "d", 0, "test duration limit")
 	flags.Int64P("iterations", "i", 0, "script total iteration limit (among all VUs)")
 	flags.StringSliceP("stage", "s", nil, "add a `stage`, as `[duration]:[target]`")
+	flags.String("execution-segment", "", "limit execution to the specified segment, e.g. 10%, 1/3, 0.2:2/3")
 	flags.BoolP("paused", "p", false, "start the test in a paused state")
+	flags.Bool("no-setup", false, "don't run setup()")
+	flags.Bool("no-teardown", false, "don't run teardown()")
 	flags.Int64("max-redirects", 10, "follow at most n redirects")
 	flags.Int64("batch", 20, "max parallel batch reqs")
 	flags.Int64("batch-per-host", 20, "max parallel batch reqs per host")
@@ -75,10 +82,11 @@ func optionFlagSet() *pflag.FlagSet {
 func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 	opts := lib.Options{
 		VUs:                   getNullInt64(flags, "vus"),
-		VUsMax:                getNullInt64(flags, "max"),
 		Duration:              getNullDuration(flags, "duration"),
 		Iterations:            getNullInt64(flags, "iterations"),
 		Paused:                getNullBool(flags, "paused"),
+		NoSetup:               getNullBool(flags, "no-setup"),
+		NoTeardown:            getNullBool(flags, "no-teardown"),
 		MaxRedirects:          getNullInt64(flags, "max-redirects"),
 		Batch:                 getNullInt64(flags, "batch"),
 		RPS:                   getNullInt64(flags, "rps"),
@@ -115,6 +123,19 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 			}
 			opts.Stages = append(opts.Stages, stage)
 		}
+	}
+
+	if flags.Lookup("execution-segment").Changed {
+		executionSegmentStr, err := flags.GetString("execution-segment")
+		if err != nil {
+			return opts, err
+		}
+		segment := new(lib.ExecutionSegment)
+		err = segment.UnmarshalText([]byte(executionSegmentStr))
+		if err != nil {
+			return opts, err
+		}
+		opts.ExecutionSegment = segment
 	}
 
 	blacklistIPStrings, err := flags.GetStringSlice("blacklist-ip")
