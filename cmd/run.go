@@ -261,10 +261,10 @@ a commandline interface for interacting with it.`,
 		defer signal.Stop(sigC)
 
 		// If the user hasn't opted out: report usage.
-		if !conf.NoUsageReport.Bool {
-			//TODO: fix
-			//TODO: move to a separate function
-			/*
+		//TODO: fix
+		//TODO: move to a separate function
+		/*
+			if !conf.NoUsageReport.Bool {
 				go func() {
 					u := "http://k6reports.loadimpact.com/"
 					mime := "application/json"
@@ -293,8 +293,8 @@ a commandline interface for interacting with it.`,
 					}
 					_, _ = http.Post(u, mime, bytes.NewBuffer(body))
 				}()
-			*/
-		}
+			}
+		*/
 
 		// Ticker for progress bar updates. Less frequent updates for non-TTYs, none if quiet.
 		updateFreq := 50 * time.Millisecond
@@ -323,7 +323,6 @@ a commandline interface for interacting with it.`,
 					} else {
 						fn("Running")
 					}
-					break
 				}
 			case err := <-errC:
 				cancel()
