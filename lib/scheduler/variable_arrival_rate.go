@@ -21,21 +21,36 @@
 package scheduler
 
 import (
+	"context"
 	"fmt"
+	"math"
+	"math/big"
+	"sync/atomic"
 	"time"
 
+	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/types"
+	"github.com/loadimpact/k6/stats"
+	"github.com/loadimpact/k6/ui/pb"
+	"github.com/sirupsen/logrus"
 	null "gopkg.in/guregu/null.v3"
 )
 
 const variableArrivalRateType = "variable-arrival-rate"
 
+// How often we can make arrival rate adjustments when processing stages
+// TODO: make configurable, in some bounds?
+const minIntervalBetweenRateAdjustments = 250 * time.Millisecond
+
 func init() {
-	RegisterConfigType(variableArrivalRateType, func(name string, rawJSON []byte) (Config, error) {
-		config := NewVariableArrivalRateConfig(name)
-		err := strictJSONUnmarshal(rawJSON, &config)
-		return config, err
-	})
+	lib.RegisterSchedulerConfigType(
+		variableArrivalRateType,
+		func(name string, rawJSON []byte) (lib.SchedulerConfig, error) {
+			config := NewVariableArrivalRateConfig(name)
+			err := lib.StrictJSONUnmarshal(rawJSON, &config)
+			return config, err
+		},
+	)
 }
 
 // VariableArrivalRateConfig stores config for the variable arrival-rate scheduler
@@ -55,13 +70,40 @@ type VariableArrivalRateConfig struct {
 // NewVariableArrivalRateConfig returns a VariableArrivalRateConfig with default values
 func NewVariableArrivalRateConfig(name string) VariableArrivalRateConfig {
 	return VariableArrivalRateConfig{
-		BaseConfig: NewBaseConfig(name, variableArrivalRateType, false),
+		BaseConfig: NewBaseConfig(name, variableArrivalRateType),
 		TimeUnit:   types.NewNullDuration(1*time.Second, false),
 	}
 }
 
-// Make sure we implement the Config interface
-var _ Config = &VariableArrivalRateConfig{}
+// Make sure we implement the lib.SchedulerConfig interface
+var _ lib.SchedulerConfig = &VariableArrivalRateConfig{}
+
+// GetPreAllocatedVUs is just a helper method that returns the scaled pre-allocated VUs.
+func (varc VariableArrivalRateConfig) GetPreAllocatedVUs(es *lib.ExecutionSegment) int64 {
+	return es.Scale(varc.PreAllocatedVUs.Int64)
+}
+
+// GetMaxVUs is just a helper method that returns the scaled max VUs.
+func (varc VariableArrivalRateConfig) GetMaxVUs(es *lib.ExecutionSegment) int64 {
+	return es.Scale(varc.MaxVUs.Int64)
+}
+
+// GetDescription returns a human-readable description of the scheduler options
+func (varc VariableArrivalRateConfig) GetDescription(es *lib.ExecutionSegment) string {
+	//TODO: something better? always show iterations per second?
+	maxVUsRange := fmt.Sprintf("maxVUs: %d", es.Scale(varc.PreAllocatedVUs.Int64))
+	if varc.MaxVUs.Int64 > varc.PreAllocatedVUs.Int64 {
+		maxVUsRange += fmt.Sprintf("-%d", es.Scale(varc.MaxVUs.Int64))
+	}
+	maxUnscaledRate := getStagesUnscaledMaxTarget(varc.StartRate.Int64, varc.Stages)
+	maxArrRatePerSec, _ := getArrivalRatePerSec(
+		getScaledArrivalRate(es, maxUnscaledRate, time.Duration(varc.TimeUnit.Duration)),
+	).Float64()
+
+	return fmt.Sprintf("Up to %.2f iterations/s for %s over %d stages%s",
+		maxArrRatePerSec, sumStagesDuration(varc.Stages),
+		len(varc.Stages), varc.getBaseInfo(maxVUsRange))
+}
 
 // Validate makes sure all options are configured and valid
 func (varc VariableArrivalRateConfig) Validate() []error {
@@ -92,20 +134,268 @@ func (varc VariableArrivalRateConfig) Validate() []error {
 	return errors
 }
 
-// GetMaxVUs returns the absolute maximum number of possible concurrently running VUs
-func (varc VariableArrivalRateConfig) GetMaxVUs() int64 {
-	return varc.MaxVUs.Int64
+// GetExecutionRequirements just reserves the number of specified VUs for the
+// whole duration of the scheduler, including the maximum waiting time for
+// iterations to gracefully stop.
+func (varc VariableArrivalRateConfig) GetExecutionRequirements(es *lib.ExecutionSegment) []lib.ExecutionStep {
+	return []lib.ExecutionStep{
+		{
+			TimeOffset:      0,
+			PlannedVUs:      uint64(es.Scale(varc.PreAllocatedVUs.Int64)),
+			MaxUnplannedVUs: uint64(es.Scale(varc.MaxVUs.Int64 - varc.PreAllocatedVUs.Int64)),
+		},
+		{
+			TimeOffset:      sumStagesDuration(varc.Stages) + time.Duration(varc.GracefulStop.Duration),
+			PlannedVUs:      0,
+			MaxUnplannedVUs: 0,
+		},
+	}
 }
 
-// GetMaxDuration returns the maximum duration time for this scheduler, including
-// the specified iterationTimeout, if the iterations are uninterruptible
-func (varc VariableArrivalRateConfig) GetMaxDuration() time.Duration {
-	var maxDuration types.Duration
-	for _, s := range varc.Stages {
-		maxDuration += s.Duration.Duration
+type rateChange struct {
+	// At what time should the rate below be applied.
+	timeOffset time.Duration
+	// Equals 1/rate: if rate was "1/5s", then this value, which is intended to
+	// be passed to time.NewTicker(), will be 5s. There's a special case when
+	// the rate is 0, for which we'll set Valid=false. That's because 0 isn't a
+	// valid ticker period and shouldn't be passed to time.NewTicker(). Instead,
+	// an empty or stopped ticker should be used.
+	tickerPeriod types.NullDuration
+}
+
+// A helper method to generate the plan how the rate changes would happen.
+func (varc VariableArrivalRateConfig) getPlannedRateChanges(segment *lib.ExecutionSegment) []rateChange {
+	timeUnit := time.Duration(varc.TimeUnit.Duration)
+	// Important note for accuracy: we must work with and scale only the
+	// rational numbers, never the raw target values directly. It matters most
+	// for the accuracy of the intermediate rate change values, but it's
+	// important even here.
+	//
+	// Say we have a desired rate growth from 1/sec to 2/sec over 1 minute, and
+	// we split the test into two segments of 20% and 80%. If we used the whole
+	// numbers for scaling, then the instance executing the first segment won't
+	// ever do even a single request, since scale(20%, 1) would be 0, whereas
+	// the rational value for scale(20%, 1/sec) is 0.2/sec, or rather 1/5sec...
+	currentRate := getScaledArrivalRate(segment, varc.StartRate.Int64, timeUnit)
+
+	rateChanges := []rateChange{}
+	timeFromStart := time.Duration(0)
+
+	for _, stage := range varc.Stages {
+		stageTargetRate := getScaledArrivalRate(segment, stage.Target.Int64, timeUnit)
+		stageDuration := time.Duration(stage.Duration.Duration)
+
+		if currentRate.Cmp(stageTargetRate) == 0 {
+			// We don't have to do anything but update the time offset
+			// if the rate wasn't changed in this stage
+			timeFromStart += stageDuration
+			continue
+		}
+
+		// Handle 0-duration stages, i.e. instant rate jumps
+		if stageDuration == 0 {
+			rateChanges = append(rateChanges, rateChange{
+				timeOffset:   timeFromStart,
+				tickerPeriod: getTickerPeriod(stageTargetRate),
+			})
+			currentRate = stageTargetRate
+			continue
+		}
+		// Basically, find out how many regular intervals with size of at least
+		// minIntervalBetweenRateAdjustments are in the stage's duration, and
+		// then use that number to calculate the actual step. All durations have
+		// nanosecond precision, so there isn't any actual loss of precision...
+		stepNumber := (stageDuration / minIntervalBetweenRateAdjustments)
+		if stepNumber > 1 {
+			stepInterval := stageDuration / stepNumber
+			for t := stepInterval; ; t += stepInterval {
+				if stageDuration-t < minIntervalBetweenRateAdjustments {
+					break
+				}
+
+				rateDiff := new(big.Rat).Sub(stageTargetRate, currentRate)
+				tArrivalRate := new(big.Rat).Add(
+					currentRate,
+					rateDiff.Mul(rateDiff, big.NewRat(int64(t), int64(stageDuration))),
+				)
+
+				rateChanges = append(rateChanges, rateChange{
+					timeOffset:   timeFromStart + t,
+					tickerPeriod: getTickerPeriod(tArrivalRate),
+				})
+			}
+		}
+		timeFromStart += stageDuration
+		rateChanges = append(rateChanges, rateChange{
+			timeOffset:   timeFromStart,
+			tickerPeriod: getTickerPeriod(stageTargetRate),
+		})
+		currentRate = stageTargetRate
 	}
-	if !varc.Interruptible.Bool {
-		maxDuration += varc.IterationTimeout.Duration
+
+	return rateChanges
+}
+
+// NewScheduler creates a new VariableArrivalRate scheduler
+func (varc VariableArrivalRateConfig) NewScheduler(
+	es *lib.ExecutorState, logger *logrus.Entry) (lib.Scheduler, error) {
+
+	return VariableArrivalRate{
+		BaseScheduler:      NewBaseScheduler(varc, es, logger),
+		config:             varc,
+		plannedRateChanges: varc.getPlannedRateChanges(es.Options.ExecutionSegment),
+	}, nil
+}
+
+// VariableArrivalRate tries to execute a specific number of iterations for a
+// specific period.
+//TODO: combine with the ConstantArrivalRate?
+type VariableArrivalRate struct {
+	*BaseScheduler
+	config             VariableArrivalRateConfig
+	plannedRateChanges []rateChange
+}
+
+// Make sure we implement the lib.Scheduler interface.
+var _ lib.Scheduler = &VariableArrivalRate{}
+
+// streamRateChanges is a helper method that emits rate change events at their
+// proper time.
+func (varr VariableArrivalRate) streamRateChanges(ctx context.Context, startTime time.Time) <-chan rateChange {
+	ch := make(chan rateChange)
+	go func() {
+		for _, step := range varr.plannedRateChanges {
+			offsetDiff := step.timeOffset - time.Since(startTime)
+			if offsetDiff > 0 { // wait until time of event arrives
+				select {
+				case <-ctx.Done():
+					return // exit if context is cancelled
+				case <-time.After(offsetDiff): //TODO: reuse a timer?
+					// do nothing
+				}
+			}
+			select {
+			case <-ctx.Done():
+				return // exit if context is cancelled
+			case ch <- step: // send the step
+			}
+		}
+	}()
+	return ch
+}
+
+// Run executes a specific number of iterations with each confugured VU.
+func (varr VariableArrivalRate) Run(ctx context.Context, out chan<- stats.SampleContainer) (err error) {
+	segment := varr.executorState.Options.ExecutionSegment
+	gracefulStop := varr.config.GetGracefulStop()
+	duration := sumStagesDuration(varr.config.Stages)
+	preAllocatedVUs := varr.config.GetPreAllocatedVUs(segment)
+	maxVUs := varr.config.GetMaxVUs(segment)
+
+	timeUnit := time.Duration(varr.config.TimeUnit.Duration)
+	startArrivalRate := getScaledArrivalRate(segment, varr.config.StartRate.Int64, timeUnit)
+
+	maxUnscaledRate := getStagesUnscaledMaxTarget(varr.config.StartRate.Int64, varr.config.Stages)
+	maxArrivalRatePerSec, _ := getArrivalRatePerSec(getScaledArrivalRate(segment, maxUnscaledRate, timeUnit)).Float64()
+	startTickerPeriod := getTickerPeriod(startArrivalRate)
+
+	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(ctx, duration, gracefulStop)
+	defer cancel()
+	ticker := &time.Ticker{}
+	if startTickerPeriod.Valid {
+		ticker = time.NewTicker(time.Duration(startTickerPeriod.Duration))
 	}
-	return time.Duration(maxDuration)
+
+	// Make sure the log and the progress bar have accurate information
+	varr.logger.WithFields(logrus.Fields{
+		"maxVUs": maxVUs, "preAllocatedVUs": preAllocatedVUs, "duration": duration, "numStages": len(varr.config.Stages),
+		"startTickerPeriod": startTickerPeriod.Duration, "type": varr.config.GetType(),
+	}).Debug("Starting scheduler run...")
+
+	// Pre-allocate VUs, but reserve space in the buffer for up to MaxVUs
+	vus := make(chan lib.VU, maxVUs)
+	for i := int64(0); i < preAllocatedVUs; i++ {
+		vu, err := varr.executorState.GetPlannedVU(ctx, varr.logger)
+		if err != nil {
+			return err
+		}
+		vus <- vu
+	}
+
+	initialisedVUs := new(uint64)
+	*initialisedVUs = uint64(preAllocatedVUs)
+
+	tickerPeriod := new(int64)
+	*tickerPeriod = int64(startTickerPeriod.Duration)
+
+	fmtStr := pb.GetFixedLengthFloatFormat(maxArrivalRatePerSec, 2) + " iters/s, " +
+		pb.GetFixedLengthIntFormat(maxVUs) + " out of " + pb.GetFixedLengthIntFormat(maxVUs) + " VUs active"
+	progresFn := func() (float64, string) {
+		currentInitialisedVUs := atomic.LoadUint64(initialisedVUs)
+		currentTickerPeriod := atomic.LoadInt64(tickerPeriod)
+		vusInBuffer := uint64(len(vus))
+
+		itersPerSec := 0.0
+		if currentTickerPeriod > 0 {
+			itersPerSec = float64(time.Second) / float64(currentTickerPeriod)
+		}
+		return math.Min(1, float64(time.Since(startTime))/float64(duration)), fmt.Sprintf(fmtStr,
+			itersPerSec, currentInitialisedVUs-vusInBuffer, currentInitialisedVUs,
+		)
+	}
+	varr.progress.Modify(pb.WithProgress(progresFn))
+	go trackProgress(ctx, maxDurationCtx, regDurationCtx, varr, progresFn)
+
+	regDurationDone := regDurationCtx.Done()
+	runIterationBasic := getIterationRunner(varr.executorState, varr.logger, out)
+	runIteration := func(vu lib.VU) {
+		runIterationBasic(maxDurationCtx, vu)
+		vus <- vu
+	}
+
+	remainingUnplannedVUs := maxVUs - preAllocatedVUs
+	// Make sure we put back planned and unplanned VUs back in the global
+	// buffer, and as an extra incentive, this replaces a waitgroup.
+	defer func() {
+		unplannedVUs := maxVUs - remainingUnplannedVUs
+		for i := int64(0); i < unplannedVUs; i++ {
+			varr.executorState.ReturnVU(<-vus)
+		}
+	}()
+
+	rateChangesStream := varr.streamRateChanges(maxDurationCtx, startTime)
+
+	for {
+		select {
+		case rateChange := <-rateChangesStream:
+			newPeriod := rateChange.tickerPeriod
+			ticker.Stop()
+			if newPeriod.Valid {
+				ticker = time.NewTicker(time.Duration(newPeriod.Duration))
+			}
+			atomic.StoreInt64(tickerPeriod, int64(newPeriod.Duration))
+		case <-ticker.C:
+			select {
+			case vu := <-vus:
+				// ideally, we get the VU from the buffer without any issues
+				go runIteration(vu)
+			default:
+				if remainingUnplannedVUs == 0 {
+					//TODO: emit an error metric?
+					varr.logger.Warningf("Insufficient VUs, reached %d active VUs and cannot allocate more", maxVUs)
+					break
+				}
+				remainingUnplannedVUs--
+				vu, err := varr.executorState.GetUnplannedVU(maxDurationCtx, varr.logger)
+				if err != nil {
+					remainingUnplannedVUs++
+					return err
+				}
+				atomic.AddUint64(initialisedVUs, 1)
+				go runIteration(vu)
+			}
+		case <-regDurationDone:
+			return nil
+		}
+	}
 }

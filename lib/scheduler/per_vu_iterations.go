@@ -21,19 +21,26 @@
 package scheduler
 
 import (
+	"context"
 	"fmt"
+	"sync"
+	"sync/atomic"
 	"time"
 
+	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/types"
+	"github.com/loadimpact/k6/stats"
+	"github.com/loadimpact/k6/ui/pb"
+	"github.com/sirupsen/logrus"
 	null "gopkg.in/guregu/null.v3"
 )
 
 const perVUIterationsType = "per-vu-iterations"
 
 func init() {
-	RegisterConfigType(perVUIterationsType, func(name string, rawJSON []byte) (Config, error) {
+	lib.RegisterSchedulerConfigType(perVUIterationsType, func(name string, rawJSON []byte) (lib.SchedulerConfig, error) {
 		config := NewPerVUIterationsConfig(name)
-		err := strictJSONUnmarshal(rawJSON, &config)
+		err := lib.StrictJSONUnmarshal(rawJSON, &config)
 		return config, err
 	})
 }
@@ -49,15 +56,35 @@ type PerVUIteationsConfig struct {
 // NewPerVUIterationsConfig returns a PerVUIteationsConfig with default values
 func NewPerVUIterationsConfig(name string) PerVUIteationsConfig {
 	return PerVUIteationsConfig{
-		BaseConfig:  NewBaseConfig(name, perVUIterationsType, false),
+		BaseConfig:  NewBaseConfig(name, perVUIterationsType),
 		VUs:         null.NewInt(1, false),
 		Iterations:  null.NewInt(1, false),
-		MaxDuration: types.NewNullDuration(1*time.Hour, false),
+		MaxDuration: types.NewNullDuration(10*time.Minute, false), //TODO: shorten?
 	}
 }
 
-// Make sure we implement the Config interface
-var _ Config = &PerVUIteationsConfig{}
+// Make sure we implement the lib.SchedulerConfig interface
+var _ lib.SchedulerConfig = &PerVUIteationsConfig{}
+
+// GetVUs returns the scaled VUs for the scheduler.
+func (pvic PerVUIteationsConfig) GetVUs(es *lib.ExecutionSegment) int64 {
+	return es.Scale(pvic.VUs.Int64)
+}
+
+// GetIterations returns the UNSCALED iteration count for the scheduler. It's
+// important to note that scaling per-VU iteration scheduler affects only the
+// number of VUs. If we also scaled the iterations, scaling would have quadratic
+// effects instead of just linear.
+func (pvic PerVUIteationsConfig) GetIterations() int64 {
+	return pvic.Iterations.Int64
+}
+
+// GetDescription returns a human-readable description of the scheduler options
+func (pvic PerVUIteationsConfig) GetDescription(es *lib.ExecutionSegment) string {
+	return fmt.Sprintf("%d iterations for each of %d VUs%s",
+		pvic.GetIterations(), pvic.GetVUs(es),
+		pvic.getBaseInfo(fmt.Sprintf("maxDuration: %s", pvic.MaxDuration.Duration)))
+}
 
 // Validate makes sure all options are configured and valid
 func (pvic PerVUIteationsConfig) Validate() []error {
@@ -79,17 +106,99 @@ func (pvic PerVUIteationsConfig) Validate() []error {
 	return errors
 }
 
-// GetMaxVUs returns the absolute maximum number of possible concurrently running VUs
-func (pvic PerVUIteationsConfig) GetMaxVUs() int64 {
-	return pvic.VUs.Int64
+// GetExecutionRequirements just reserves the number of specified VUs for the
+// whole duration of the scheduler, including the maximum waiting time for
+// iterations to gracefully stop.
+func (pvic PerVUIteationsConfig) GetExecutionRequirements(es *lib.ExecutionSegment) []lib.ExecutionStep {
+	return []lib.ExecutionStep{
+		{
+			TimeOffset: 0,
+			PlannedVUs: uint64(pvic.GetVUs(es)),
+		},
+		{
+			TimeOffset: time.Duration(pvic.MaxDuration.Duration + pvic.GracefulStop.Duration),
+			PlannedVUs: 0,
+		},
+	}
 }
 
-// GetMaxDuration returns the maximum duration time for this scheduler, including
-// the specified iterationTimeout, if the iterations are uninterruptible
-func (pvic PerVUIteationsConfig) GetMaxDuration() time.Duration {
-	maxDuration := pvic.MaxDuration.Duration
-	if !pvic.Interruptible.Bool {
-		maxDuration += pvic.IterationTimeout.Duration
+// NewScheduler creates a new PerVUIteations scheduler
+func (pvic PerVUIteationsConfig) NewScheduler(
+	es *lib.ExecutorState, logger *logrus.Entry) (lib.Scheduler, error) {
+
+	return PerVUIteations{
+		BaseScheduler: NewBaseScheduler(pvic, es, logger),
+		config:        pvic,
+	}, nil
+}
+
+// PerVUIteations executes a specific number of iterations with each VU.
+type PerVUIteations struct {
+	*BaseScheduler
+	config PerVUIteationsConfig
+}
+
+// Make sure we implement the lib.Scheduler interface.
+var _ lib.Scheduler = &PerVUIteations{}
+
+// Run executes a specific number of iterations with each confugured VU.
+func (pvi PerVUIteations) Run(ctx context.Context, out chan<- stats.SampleContainer) (err error) {
+	segment := pvi.executorState.Options.ExecutionSegment
+	numVUs := pvi.config.GetVUs(segment)
+	iterations := pvi.config.GetIterations()
+	duration := time.Duration(pvi.config.MaxDuration.Duration)
+	gracefulStop := pvi.config.GetGracefulStop()
+
+	_, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(ctx, duration, gracefulStop)
+	defer cancel()
+
+	// Make sure the log and the progress bar have accurate information
+	pvi.logger.WithFields(logrus.Fields{
+		"vus": numVUs, "iterations": iterations, "maxDuration": duration, "type": pvi.config.GetType(),
+	}).Debug("Starting scheduler run...")
+
+	totalIters := uint64(numVUs * iterations)
+	doneIters := new(uint64)
+	fmtStr := pb.GetFixedLengthIntFormat(int64(totalIters)) + "/%d iters, %d from each of %d VUs"
+	progresFn := func() (float64, string) {
+		currentDoneIters := atomic.LoadUint64(doneIters)
+		return float64(currentDoneIters) / float64(totalIters), fmt.Sprintf(
+			fmtStr, currentDoneIters, totalIters, iterations, numVUs,
+		)
 	}
-	return time.Duration(maxDuration)
+	pvi.progress.Modify(pb.WithProgress(progresFn))
+	go trackProgress(ctx, maxDurationCtx, regDurationCtx, pvi, progresFn)
+
+	// Actually schedule the VUs and iterations...
+	wg := sync.WaitGroup{}
+	regDurationDone := regDurationCtx.Done()
+	runIteration := getIterationRunner(pvi.executorState, pvi.logger, out)
+
+	handleVU := func(vu lib.VU) {
+		defer pvi.executorState.ReturnVU(vu)
+		defer wg.Done()
+
+		for i := int64(0); i < iterations; i++ {
+			select {
+			case <-regDurationDone:
+				return // don't make more iterations
+			default:
+				// continue looping
+			}
+			runIteration(maxDurationCtx, vu)
+			atomic.AddUint64(doneIters, 1)
+		}
+	}
+
+	for i := int64(0); i < numVUs; i++ {
+		wg.Add(1)
+		vu, err := pvi.executorState.GetPlannedVU(ctx, pvi.logger)
+		if err != nil {
+			return err
+		}
+		go handleVU(vu)
+	}
+
+	wg.Wait()
+	return nil
 }
