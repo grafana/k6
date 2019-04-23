@@ -23,6 +23,7 @@ package cmd
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -33,6 +34,7 @@ import (
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats/cloud"
 	"github.com/loadimpact/k6/ui"
+	"github.com/loadimpact/k6/ui/pb"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
@@ -57,11 +59,9 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 	RunE: func(cmd *cobra.Command, args []string) error {
 		//TODO: disable in quiet mode?
 		_, _ = BannerColor.Fprintf(stdout, "\n%s\n\n", Banner)
-		initBar := ui.ProgressBar{
-			Width: 60,
-			Left:  func() string { return "    uploading script" },
-		}
-		fprintf(stdout, "%s \r", initBar.String())
+
+		progressBar := pb.New(pb.WithConstLeft(" Init"))
+		printBar(progressBar, "Parsing script")
 
 		// Runner
 		pwd, err := os.Getwd()
@@ -81,11 +81,13 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 			return err
 		}
 
+		printBar(progressBar, "Getting script options")
 		r, err := newRunner(src, runType, fs, runtimeOptions)
 		if err != nil {
 			return err
 		}
 
+		printBar(progressBar, "Consolidating options")
 		cliOpts, err := getOptions(cmd.Flags())
 		if err != nil {
 			return err
@@ -113,6 +115,7 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 			return errors.New("Not logged in, please use `k6 login cloud`.")
 		}
 
+		printBar(progressBar, "Building the archive")
 		arc := r.MakeArchive()
 		// TODO: Fix this
 		// We reuse cloud.Config for parsing options.ext.loadimpact, but this probably shouldn't be
@@ -161,22 +164,28 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 		}
 
 		// Start cloud test run
+		printBar(progressBar, "Validating script options")
 		client := cloud.NewClient(cloudConfig.Token.String, cloudConfig.Host.String, Version)
 		if err := client.ValidateOptions(arc.Options); err != nil {
 			return err
 		}
 
+		printBar(progressBar, "Uploading archive")
 		refID, err := client.StartCloudTestRun(name, cloudConfig.ProjectID.Int64, arc)
 		if err != nil {
 			return err
 		}
+		progressBar.Modify(pb.WithConstLeft("   Run"))
+		printBar(progressBar, "Initializing the cloud test")
 
 		testURL := cloud.URLForResults(refID, cloudConfig)
 		fprintf(stdout, "\n\n")
-		fprintf(stdout, "     execution: %s\n", ui.ValueColor.Sprint("cloud"))
+		fprintf(stdout, "   executor: %s\n", ui.ValueColor.Sprint("cloud"))
 		fprintf(stdout, "     script: %s\n", ui.ValueColor.Sprint(filename))
 		fprintf(stdout, "     output: %s\n", ui.ValueColor.Sprint(testURL))
+		//TODO: print schedulers information
 		fprintf(stdout, "\n")
+		printBar(progressBar, "Initializing the cloud test")
 
 		// The quiet option hides the progress bar and disallow aborting the test
 		if quiet {
@@ -190,12 +199,15 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 
 		var progressErr error
 		testProgress := &cloud.TestProgressResponse{}
-		progress := ui.ProgressBar{
-			Width: 60,
-			Left: func() string {
-				return "  " + testProgress.RunStatusText
-			},
+		percentageFmt := "[" + pb.GetFixedLengthFloatFormat(100, 2) + "%%] %s"
+		progressBar.Modify(
+			pb.WithProgress(func() (float64, string) {
+				if testProgress.RunStatus < lib.RunStatusRunning {
+					return 0, testProgress.RunStatusText
 		}
+				return testProgress.Progress, fmt.Sprintf(percentageFmt, testProgress.Progress*100, testProgress.RunStatusText)
+			}),
+		)
 
 		ticker := time.NewTicker(time.Millisecond * 2000)
 		shouldExitLoop := false
@@ -209,8 +221,7 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 					if (testProgress.RunStatus > lib.RunStatusRunning) || (exitOnRunning && testProgress.RunStatus == lib.RunStatusRunning) {
 						shouldExitLoop = true
 					}
-					progress.Progress = testProgress.Progress
-					fprintf(stdout, "%s\x1b[0K\r", progress.String())
+					printBar(progressBar, "")
 				} else {
 					log.WithError(progressErr).Error("Test progress error")
 				}
