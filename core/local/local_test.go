@@ -22,20 +22,22 @@ package local
 
 import (
 	"context"
+	"errors"
 	"net"
 	"runtime"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/loadimpact/k6/lib/netext"
-
 	"github.com/loadimpact/k6/js"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
+	"github.com/loadimpact/k6/lib/netext"
+	"github.com/loadimpact/k6/lib/scheduler"
+	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
-	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
@@ -43,30 +45,61 @@ import (
 	null "gopkg.in/guregu/null.v3"
 )
 
-func TestExecutorRun(t *testing.T) {
-	e := New(nil)
-	assert.NoError(t, e.SetVUsMax(10))
-	assert.NoError(t, e.SetVUs(10))
+func newTestExecutor(
+	t *testing.T, runner lib.Runner, logger *logrus.Logger, opts lib.Options, //nolint: golint
+) (ctx context.Context, cancel func(), executor *Executor, samples chan stats.SampleContainer) {
+	if runner == nil {
+		runner = &lib.MiniRunner{}
+	}
+	ctx, cancel = context.WithCancel(context.Background())
+	newOpts, err := scheduler.BuildExecutionConfig(lib.Options{
+		MetricSamplesBufferSize: null.NewInt(200, false),
+	}.Apply(runner.GetOptions()).Apply(opts))
+	require.NoError(t, err)
+	require.Empty(t, newOpts.Validate())
 
-	ctx, cancel := context.WithCancel(context.Background())
-	err := make(chan error, 1)
-	samples := make(chan stats.SampleContainer, 100)
-	defer close(samples)
+	require.NoError(t, runner.SetOptions(newOpts))
+
+	if logger == nil {
+		logger = logrus.New()
+		logger.SetOutput(testutils.NewTestOutput(t))
+	}
+
+	executor, err = New(runner, logger)
+	require.NoError(t, err)
+
+	samples = make(chan stats.SampleContainer, newOpts.MetricSamplesBufferSize.Int64)
 	go func() {
-		for range samples {
+		for {
+			select {
+			case <-samples:
+			case <-ctx.Done():
+				return
+			}
 		}
 	}()
 
-	go func() { err <- e.Run(ctx, samples) }()
-	cancel()
+	require.NoError(t, executor.Init(ctx, samples))
+
+	return ctx, cancel, executor, samples
+}
+
+func TestExecutorRun(t *testing.T) {
+	t.Parallel()
+	ctx, cancel, executor, samples := newTestExecutor(t, nil, nil, lib.Options{})
+	defer cancel()
+
+	err := make(chan error, 1)
+	go func() { err <- executor.Run(ctx, samples) }()
 	assert.NoError(t, <-err)
 }
 
 func TestExecutorSetupTeardownRun(t *testing.T) {
+	t.Parallel()
 	t.Run("Normal", func(t *testing.T) {
 		setupC := make(chan struct{})
 		teardownC := make(chan struct{})
-		e := New(&lib.MiniRunner{
+		runner := &lib.MiniRunner{
 			SetupFn: func(ctx context.Context, out chan<- stats.SampleContainer) ([]byte, error) {
 				close(setupC)
 				return nil, nil
@@ -75,214 +108,259 @@ func TestExecutorSetupTeardownRun(t *testing.T) {
 				close(teardownC)
 				return nil
 			},
-		})
+		}
+		ctx, cancel, executor, samples := newTestExecutor(t, runner, nil, lib.Options{})
 
-		ctx, cancel := context.WithCancel(context.Background())
 		err := make(chan error, 1)
-		go func() { err <- e.Run(ctx, make(chan stats.SampleContainer, 100)) }()
-		cancel()
+		go func() { err <- executor.Run(ctx, samples) }()
+		defer cancel()
 		<-setupC
 		<-teardownC
 		assert.NoError(t, <-err)
 	})
 	t.Run("Setup Error", func(t *testing.T) {
-		e := New(&lib.MiniRunner{
+		runner := &lib.MiniRunner{
+			SetupFn: func(ctx context.Context, out chan<- stats.SampleContainer) ([]byte, error) {
+				return nil, errors.New("setup error")
+			},
+		}
+		ctx, cancel, executor, samples := newTestExecutor(t, runner, nil, lib.Options{})
+		defer cancel()
+		assert.EqualError(t, executor.Run(ctx, samples), "setup error")
+	})
+	t.Run("Don't Run Setup", func(t *testing.T) {
+		runner := &lib.MiniRunner{
 			SetupFn: func(ctx context.Context, out chan<- stats.SampleContainer) ([]byte, error) {
 				return nil, errors.New("setup error")
 			},
 			TeardownFn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
 				return errors.New("teardown error")
 			},
+		}
+		ctx, cancel, executor, samples := newTestExecutor(t, runner, nil, lib.Options{
+			NoSetup:    null.BoolFrom(true),
+			VUs:        null.IntFrom(1),
+			Iterations: null.IntFrom(1),
 		})
-		assert.EqualError(t, e.Run(context.Background(), make(chan stats.SampleContainer, 100)), "setup error")
-
-		t.Run("Don't Run Setup", func(t *testing.T) {
-			e := New(&lib.MiniRunner{
-				SetupFn: func(ctx context.Context, out chan<- stats.SampleContainer) ([]byte, error) {
-					return nil, errors.New("setup error")
-				},
-				TeardownFn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
-					return errors.New("teardown error")
-				},
-			})
-			e.SetRunSetup(false)
-			e.SetEndIterations(null.IntFrom(1))
-			assert.NoError(t, e.SetVUsMax(1))
-			assert.NoError(t, e.SetVUs(1))
-			assert.EqualError(t, e.Run(context.Background(), make(chan stats.SampleContainer, 100)), "teardown error")
-		})
+		defer cancel()
+		assert.EqualError(t, executor.Run(ctx, samples), "teardown error")
 	})
+
 	t.Run("Teardown Error", func(t *testing.T) {
-		e := New(&lib.MiniRunner{
+		runner := &lib.MiniRunner{
 			SetupFn: func(ctx context.Context, out chan<- stats.SampleContainer) ([]byte, error) {
 				return nil, nil
 			},
 			TeardownFn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
 				return errors.New("teardown error")
 			},
+		}
+		ctx, cancel, executor, samples := newTestExecutor(t, runner, nil, lib.Options{
+			VUs:        null.IntFrom(1),
+			Iterations: null.IntFrom(1),
 		})
-		e.SetEndIterations(null.IntFrom(1))
-		assert.NoError(t, e.SetVUsMax(1))
-		assert.NoError(t, e.SetVUs(1))
-		assert.EqualError(t, e.Run(context.Background(), make(chan stats.SampleContainer, 100)), "teardown error")
+		defer cancel()
 
-		t.Run("Don't Run Teardown", func(t *testing.T) {
-			e := New(&lib.MiniRunner{
-				SetupFn: func(ctx context.Context, out chan<- stats.SampleContainer) ([]byte, error) {
-					return nil, nil
-				},
-				TeardownFn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
-					return errors.New("teardown error")
-				},
-			})
-			e.SetRunTeardown(false)
-			e.SetEndIterations(null.IntFrom(1))
-			assert.NoError(t, e.SetVUsMax(1))
-			assert.NoError(t, e.SetVUs(1))
-			assert.NoError(t, e.Run(context.Background(), make(chan stats.SampleContainer, 100)))
+		assert.EqualError(t, executor.Run(ctx, samples), "teardown error")
+	})
+	t.Run("Don't Run Teardown", func(t *testing.T) {
+		runner := &lib.MiniRunner{
+			SetupFn: func(ctx context.Context, out chan<- stats.SampleContainer) ([]byte, error) {
+				return nil, nil
+			},
+			TeardownFn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
+				return errors.New("teardown error")
+			},
+		}
+		ctx, cancel, executor, samples := newTestExecutor(t, runner, nil, lib.Options{
+			NoTeardown: null.BoolFrom(true),
+			VUs:        null.IntFrom(1),
+			Iterations: null.IntFrom(1),
 		})
+		defer cancel()
+		assert.NoError(t, executor.Run(ctx, samples))
 	})
 }
 
-func TestExecutorSetLogger(t *testing.T) {
-	logger, _ := logtest.NewNullLogger()
-	e := New(nil)
-	e.SetLogger(logger)
-	assert.Equal(t, logger, e.GetLogger())
-}
-
 func TestExecutorStages(t *testing.T) {
+	t.Parallel()
 	testdata := map[string]struct {
 		Duration time.Duration
 		Stages   []lib.Stage
 	}{
 		"one": {
 			1 * time.Second,
-			[]lib.Stage{{Duration: types.NullDurationFrom(1 * time.Second)}},
+			[]lib.Stage{{Duration: types.NullDurationFrom(1 * time.Second), Target: null.IntFrom(1)}},
 		},
 		"two": {
 			2 * time.Second,
 			[]lib.Stage{
-				{Duration: types.NullDurationFrom(1 * time.Second)},
-				{Duration: types.NullDurationFrom(1 * time.Second)},
+				{Duration: types.NullDurationFrom(1 * time.Second), Target: null.IntFrom(1)},
+				{Duration: types.NullDurationFrom(1 * time.Second), Target: null.IntFrom(2)},
 			},
 		},
-		"two/targeted": {
-			2 * time.Second,
+		"four": {
+			4 * time.Second,
 			[]lib.Stage{
 				{Duration: types.NullDurationFrom(1 * time.Second), Target: null.IntFrom(5)},
-				{Duration: types.NullDurationFrom(1 * time.Second), Target: null.IntFrom(10)},
+				{Duration: types.NullDurationFrom(3 * time.Second), Target: null.IntFrom(10)},
 			},
 		},
 	}
 	for name, data := range testdata {
+		data := data
 		t.Run(name, func(t *testing.T) {
-			e := New(&lib.MiniRunner{
+			t.Parallel()
+			runner := &lib.MiniRunner{
 				Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
 					time.Sleep(100 * time.Millisecond)
 					return nil
 				},
-				Options: lib.Options{
-					MetricSamplesBufferSize: null.IntFrom(500),
-				},
+			}
+			ctx, cancel, executor, samples := newTestExecutor(t, runner, nil, lib.Options{
+				VUs:    null.IntFrom(1),
+				Stages: data.Stages,
 			})
-			assert.NoError(t, e.SetVUsMax(10))
-			e.SetStages(data.Stages)
-			assert.NoError(t, e.Run(context.Background(), make(chan stats.SampleContainer, 500)))
-			assert.True(t, e.GetTime() >= data.Duration)
+			defer cancel()
+			assert.NoError(t, executor.Run(ctx, samples))
+			assert.True(t, executor.GetState().GetCurrentTestRunDuration() >= data.Duration)
 		})
 	}
 }
 
 func TestExecutorEndTime(t *testing.T) {
-	e := New(&lib.MiniRunner{
+	t.Parallel()
+	runner := &lib.MiniRunner{
 		Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
 			time.Sleep(100 * time.Millisecond)
 			return nil
 		},
-		Options: lib.Options{MetricSamplesBufferSize: null.IntFrom(200)},
+	}
+	ctx, cancel, executor, samples := newTestExecutor(t, runner, nil, lib.Options{
+		VUs:      null.IntFrom(10),
+		Duration: types.NullDurationFrom(1 * time.Second),
 	})
-	assert.NoError(t, e.SetVUsMax(10))
-	assert.NoError(t, e.SetVUs(10))
-	e.SetEndTime(types.NullDurationFrom(1 * time.Second))
-	assert.Equal(t, types.NullDurationFrom(1*time.Second), e.GetEndTime())
+	defer cancel()
+
+	endTime, isFinal := lib.GetEndOffset(executor.GetExecutionPlan())
+	assert.Equal(t, 31*time.Second, endTime) // because of the default 30s gracefulStop
+	assert.True(t, isFinal)
 
 	startTime := time.Now()
-	assert.NoError(t, e.Run(context.Background(), make(chan stats.SampleContainer, 200)))
-	assert.True(t, time.Now().After(startTime.Add(1*time.Second)), "test did not take 1s")
+	assert.NoError(t, executor.Run(ctx, samples))
+	runTime := time.Since(startTime)
+	assert.True(t, runTime > 1*time.Second, "test did not take 1s")
+	assert.True(t, runTime < 10*time.Second, "took more than 10 seconds")
+}
 
-	t.Run("Runtime Errors", func(t *testing.T) {
-		e := New(&lib.MiniRunner{
-			Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
-				time.Sleep(10 * time.Millisecond)
-				return errors.New("hi")
-			},
-			Options: lib.Options{MetricSamplesBufferSize: null.IntFrom(200)},
-		})
-		assert.NoError(t, e.SetVUsMax(10))
-		assert.NoError(t, e.SetVUs(10))
-		e.SetEndTime(types.NullDurationFrom(100 * time.Millisecond))
-		assert.Equal(t, types.NullDurationFrom(100*time.Millisecond), e.GetEndTime())
+func TestExecutorRuntimeErrors(t *testing.T) {
+	t.Parallel()
+	runner := &lib.MiniRunner{
+		Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
+			time.Sleep(10 * time.Millisecond)
+			return errors.New("hi")
+		},
+		Options: lib.Options{
+			VUs:      null.IntFrom(10),
+			Duration: types.NullDurationFrom(1 * time.Second),
+		},
+	}
+	logger, hook := logtest.NewNullLogger()
+	ctx, cancel, executor, samples := newTestExecutor(t, runner, logger, lib.Options{})
+	defer cancel()
 
-		l, hook := logtest.NewNullLogger()
-		e.SetLogger(l)
+	endTime, isFinal := lib.GetEndOffset(executor.GetExecutionPlan())
+	assert.Equal(t, 31*time.Second, endTime) // because of the default 30s gracefulStop
+	assert.True(t, isFinal)
 
-		startTime := time.Now()
-		assert.NoError(t, e.Run(context.Background(), make(chan stats.SampleContainer, 200)))
-		assert.True(t, time.Now().After(startTime.Add(100*time.Millisecond)), "test did not take 100ms")
+	startTime := time.Now()
+	assert.NoError(t, executor.Run(ctx, samples))
+	runTime := time.Since(startTime)
+	assert.True(t, runTime > 1*time.Second, "test did not take 1s")
+	assert.True(t, runTime < 10*time.Second, "took more than 10 seconds")
 
-		assert.NotEmpty(t, hook.Entries)
-		for _, e := range hook.Entries {
-			assert.Equal(t, "hi", e.Message)
-		}
-	})
+	assert.NotEmpty(t, hook.Entries)
+	for _, e := range hook.Entries {
+		assert.Equal(t, "hi", e.Message)
+	}
+}
 
-	t.Run("End Errors", func(t *testing.T) {
-		e := New(&lib.MiniRunner{
-			Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
-				<-ctx.Done()
-				return errors.New("hi")
-			},
-			Options: lib.Options{MetricSamplesBufferSize: null.IntFrom(200)},
-		})
-		assert.NoError(t, e.SetVUsMax(10))
-		assert.NoError(t, e.SetVUs(10))
-		e.SetEndTime(types.NullDurationFrom(100 * time.Millisecond))
-		assert.Equal(t, types.NullDurationFrom(100*time.Millisecond), e.GetEndTime())
+func TestExecutorEndErrors(t *testing.T) {
+	t.Parallel()
 
-		l, hook := logtest.NewNullLogger()
-		e.SetLogger(l)
+	scheduler := scheduler.NewConstantLoopingVUsConfig("we_need_hard_stop")
+	scheduler.VUs = null.IntFrom(10)
+	scheduler.Duration = types.NullDurationFrom(1 * time.Second)
+	scheduler.GracefulStop = types.NullDurationFrom(0 * time.Second)
 
-		startTime := time.Now()
-		assert.NoError(t, e.Run(context.Background(), make(chan stats.SampleContainer, 200)))
-		assert.True(t, time.Now().After(startTime.Add(100*time.Millisecond)), "test did not take 100ms")
+	runner := &lib.MiniRunner{
+		Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
+			<-ctx.Done()
+			return errors.New("hi")
+		},
+		Options: lib.Options{
+			Execution: lib.SchedulerConfigMap{scheduler.GetName(): scheduler},
+		},
+	}
+	logger, hook := logtest.NewNullLogger()
+	ctx, cancel, executor, samples := newTestExecutor(t, runner, logger, lib.Options{})
+	defer cancel()
 
-		assert.Empty(t, hook.Entries)
-	})
+	endTime, isFinal := lib.GetEndOffset(executor.GetExecutionPlan())
+	assert.Equal(t, 1*time.Second, endTime) // because of the 0s gracefulStop
+	assert.True(t, isFinal)
+
+	startTime := time.Now()
+	assert.NoError(t, executor.Run(ctx, samples))
+	runTime := time.Since(startTime)
+	assert.True(t, runTime > 1*time.Second, "test did not take 1s")
+	assert.True(t, runTime < 10*time.Second, "took more than 10 seconds")
+
+	assert.Empty(t, hook.Entries)
 }
 
 func TestExecutorEndIterations(t *testing.T) {
+	t.Parallel()
 	metric := &stats.Metric{Name: "test_metric"}
 
-	var i int64
-	e := New(&lib.MiniRunner{Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
-		select {
-		case <-ctx.Done():
-		default:
-			atomic.AddInt64(&i, 1)
-		}
-		out <- stats.Sample{Metric: metric, Value: 1.0}
-		return nil
-	}})
-	assert.NoError(t, e.SetVUsMax(1))
-	assert.NoError(t, e.SetVUs(1))
-	e.SetEndIterations(null.IntFrom(100))
-	assert.Equal(t, null.IntFrom(100), e.GetEndIterations())
+	options, err := scheduler.BuildExecutionConfig(lib.Options{
+		VUs:        null.IntFrom(1),
+		Iterations: null.IntFrom(100),
+	})
+	require.NoError(t, err)
+	require.Empty(t, options.Validate())
 
-	samples := make(chan stats.SampleContainer, 201)
-	assert.NoError(t, e.Run(context.Background(), samples))
-	assert.Equal(t, int64(100), e.GetIterations())
+	var i int64
+	runner := &lib.MiniRunner{
+		Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
+			select {
+			case <-ctx.Done():
+			default:
+				atomic.AddInt64(&i, 1)
+			}
+			out <- stats.Sample{Metric: metric, Value: 1.0}
+			return nil
+		},
+		Options: options,
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	logger := logrus.New()
+	logger.SetOutput(testutils.NewTestOutput(t))
+
+	executor, err := New(runner, logger)
+	require.NoError(t, err)
+
+	samples := make(chan stats.SampleContainer, 300)
+	require.NoError(t, executor.Init(ctx, samples))
+	require.NoError(t, executor.Run(ctx, samples))
+
+	assert.Equal(t, uint64(100), executor.GetState().GetFullIterationCount())
+	assert.Equal(t, uint64(0), executor.GetState().GetPartialIterationCount())
 	assert.Equal(t, int64(100), i)
+	require.Equal(t, 200, len(samples))
 	for i := 0; i < 100; i++ {
 		mySample, ok := <-samples
 		require.True(t, ok)
@@ -297,53 +375,30 @@ func TestExecutorEndIterations(t *testing.T) {
 }
 
 func TestExecutorIsRunning(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	e := New(nil)
+	t.Parallel()
+	runner := &lib.MiniRunner{
+		Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
+			<-ctx.Done()
+			return nil
+		},
+	}
+	ctx, cancel, executor, _ := newTestExecutor(t, runner, nil, lib.Options{})
+	state := executor.GetState()
 
 	err := make(chan error)
-	go func() { err <- e.Run(ctx, nil) }()
-	for !e.IsRunning() {
+	go func() { err <- executor.Run(ctx, nil) }()
+	for !state.HasStarted() {
+		time.Sleep(10 * time.Microsecond)
 	}
 	cancel()
-	for e.IsRunning() {
+	for !state.HasEnded() {
+		time.Sleep(10 * time.Microsecond)
 	}
 	assert.NoError(t, <-err)
 }
 
-func TestExecutorSetVUsMax(t *testing.T) {
-	t.Run("Negative", func(t *testing.T) {
-		assert.EqualError(t, New(nil).SetVUsMax(-1), "vu cap can't be negative")
-	})
-
-	t.Run("Raise", func(t *testing.T) {
-		e := New(nil)
-
-		assert.NoError(t, e.SetVUsMax(50))
-		assert.Equal(t, int64(50), e.GetVUsMax())
-
-		assert.NoError(t, e.SetVUsMax(100))
-		assert.Equal(t, int64(100), e.GetVUsMax())
-
-		t.Run("Lower", func(t *testing.T) {
-			assert.NoError(t, e.SetVUsMax(50))
-			assert.Equal(t, int64(50), e.GetVUsMax())
-		})
-	})
-
-	t.Run("TooLow", func(t *testing.T) {
-		e := New(nil)
-		e.ctx = context.Background()
-
-		assert.NoError(t, e.SetVUsMax(100))
-		assert.Equal(t, int64(100), e.GetVUsMax())
-
-		assert.NoError(t, e.SetVUs(100))
-		assert.Equal(t, int64(100), e.GetVUs())
-
-		assert.EqualError(t, e.SetVUsMax(50), "can't lower vu cap (to 50) below vu count (100)")
-	})
-}
-
+/*
+//TODO: convert for the manual-execution scheduler
 func TestExecutorSetVUs(t *testing.T) {
 	t.Run("Negative", func(t *testing.T) {
 		assert.EqualError(t, New(nil).SetVUs(-1), "vu count can't be negative")
@@ -437,6 +492,7 @@ func TestExecutorSetVUs(t *testing.T) {
 		})
 	})
 }
+*/
 
 func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 	if runtime.GOOS == "windows" {
@@ -487,23 +543,29 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	options := lib.Options{
+	options, err := scheduler.BuildExecutionConfig(lib.Options{
+		Iterations:      null.IntFrom(2),
+		VUs:             null.IntFrom(1),
 		SystemTags:      lib.GetTagSet(lib.DefaultSystemTagList...),
 		SetupTimeout:    types.NullDurationFrom(4 * time.Second),
 		TeardownTimeout: types.NullDurationFrom(4 * time.Second),
-	}
-	runner.SetOptions(options)
+	}.Apply(runner.GetOptions()))
+	require.NoError(t, err)
+	require.NoError(t, runner.SetOptions(options))
 
-	executor := New(runner)
-	executor.SetEndIterations(null.IntFrom(2))
-	require.NoError(t, executor.SetVUsMax(1))
-	require.NoError(t, executor.SetVUs(1))
+	logger := logrus.New()
+	logger.SetOutput(testutils.NewTestOutput(t))
+
+	executor, err := New(runner, logger)
+	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
 	done := make(chan struct{})
 	sampleContainers := make(chan stats.SampleContainer)
 	go func() {
+		require.NoError(t, executor.Init(ctx, sampleContainers))
 		assert.NoError(t, executor.Run(ctx, sampleContainers))
 		close(done)
 	}()
