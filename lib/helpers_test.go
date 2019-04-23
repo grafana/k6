@@ -18,7 +18,7 @@
  *
  */
 
-package scheduler
+package lib
 
 import (
 	"fmt"
@@ -27,19 +27,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func TestCheckPercentagesSum(t *testing.T) {
-	t.Parallel()
-	assert.NoError(t, checkPercentagesSum([]float64{100}))
-	assert.NoError(t, checkPercentagesSum([]float64{50, 50}))
-	assert.NoError(t, checkPercentagesSum([]float64{100.0 / 3, 100.0 / 3, 100.0 / 3}))
-	assert.NoError(t, checkPercentagesSum([]float64{33.33, 33.33, 33.34}))
-
-	assert.Error(t, checkPercentagesSum([]float64{}))
-	assert.Error(t, checkPercentagesSum([]float64{100 / 3, 100 / 3, 100 / 3}))
-	assert.Error(t, checkPercentagesSum([]float64{33.33, 33.33, 33.33}))
-	assert.Error(t, checkPercentagesSum([]float64{40, 40, 40}))
-}
 
 func TestStrictJSONUnmarshal(t *testing.T) {
 	t.Parallel()
@@ -67,7 +54,7 @@ func TestStrictJSONUnmarshal(t *testing.T) {
 	for i, tc := range testCases {
 		tc := tc
 		t.Run(fmt.Sprintf("TestCase#%d", i), func(t *testing.T) {
-			err := strictJSONUnmarshal([]byte(tc.data), &tc.destination)
+			err := StrictJSONUnmarshal([]byte(tc.data), &tc.destination)
 			if tc.expectedError {
 				require.Error(t, err)
 				return
@@ -77,3 +64,5 @@ func TestStrictJSONUnmarshal(t *testing.T) {
 		})
 	}
 }
+
+//TODO: test EventStream very thoroughly
