@@ -196,18 +196,28 @@ func (car ConstantArrivalRate) Run(ctx context.Context, out chan<- stats.SampleC
 		"tickerPeriod": tickerPeriod, "type": car.config.GetType(),
 	}).Debug("Starting scheduler run...")
 
-	// Pre-allocate VUs, but reserve space in the buffer for up to MaxVUs
+	// Pre-allocate the VUs local shared buffer
 	vus := make(chan lib.VU, maxVUs)
+
+	initialisedVUs := uint64(0)
+	// Make sure we put back planned and unplanned VUs back in the global
+	// buffer, and as an extra incentive, this replaces a waitgroup.
+	defer func() {
+		// no need for atomics, since initialisedVUs is mutated only in the select{}
+		for i := uint64(0); i < initialisedVUs; i++ {
+			car.executorState.ReturnVU(<-vus)
+		}
+	}()
+
+	// Get the pre-allocated VUs in the local buffer
 	for i := int64(0); i < preAllocatedVUs; i++ {
-		vu, err := car.executorState.GetPlannedVU(ctx, car.logger)
+		vu, err := car.executorState.GetPlannedVU(car.logger)
 		if err != nil {
 			return err
 		}
+		initialisedVUs++
 		vus <- vu
 	}
-
-	initialisedVUs := new(uint64)
-	*initialisedVUs = uint64(preAllocatedVUs)
 
 	vusFmt := pb.GetFixedLengthIntFormat(maxVUs)
 	fmtStr := pb.GetFixedLengthFloatFormat(arrivalRatePerSec, 2) +
@@ -215,7 +225,7 @@ func (car ConstantArrivalRate) Run(ctx context.Context, out chan<- stats.SampleC
 
 	progresFn := func() (float64, string) {
 		spent := time.Since(startTime)
-		currentInitialisedVUs := atomic.LoadUint64(initialisedVUs)
+		currentInitialisedVUs := atomic.LoadUint64(&initialisedVUs)
 		vusInBuffer := uint64(len(vus))
 		return math.Min(1, float64(spent)/float64(duration)), fmt.Sprintf(fmtStr,
 			arrivalRatePerSec, currentInitialisedVUs-vusInBuffer, currentInitialisedVUs,
@@ -232,15 +242,6 @@ func (car ConstantArrivalRate) Run(ctx context.Context, out chan<- stats.SampleC
 	}
 
 	remainingUnplannedVUs := maxVUs - preAllocatedVUs
-	// Make sure we put back planned and unplanned VUs back in the global
-	// buffer, and as an extra incentive, this replaces a waitgroup.
-	defer func() {
-		unplannedVUs := maxVUs - remainingUnplannedVUs
-		for i := int64(0); i < unplannedVUs; i++ {
-			car.executorState.ReturnVU(<-vus)
-		}
-	}()
-
 	for {
 		select {
 		case <-ticker.C:
@@ -254,13 +255,12 @@ func (car ConstantArrivalRate) Run(ctx context.Context, out chan<- stats.SampleC
 					car.logger.Warningf("Insufficient VUs, reached %d active VUs and cannot allocate more", maxVUs)
 					break
 				}
-				remainingUnplannedVUs--
 				vu, err := car.executorState.GetUnplannedVU(maxDurationCtx, car.logger)
 				if err != nil {
-					remainingUnplannedVUs++
 					return err
 				}
-				atomic.AddUint64(initialisedVUs, 1)
+				remainingUnplannedVUs--
+				atomic.AddUint64(&initialisedVUs, 1)
 				go runIteration(vu)
 			}
 		case <-regDurationDone:

@@ -161,13 +161,15 @@ func (clv ConstantLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleCo
 	go trackProgress(ctx, maxDurationCtx, regDurationCtx, clv, progresFn)
 
 	// Actually schedule the VUs and iterations...
-	wg := sync.WaitGroup{}
+	activeVUs := &sync.WaitGroup{}
+	defer activeVUs.Wait()
+
 	regDurationDone := regDurationCtx.Done()
 	runIteration := getIterationRunner(clv.executorState, clv.logger, out)
 
 	handleVU := func(vu lib.VU) {
 		defer clv.executorState.ReturnVU(vu)
-		defer wg.Done()
+		defer activeVUs.Done()
 
 		for {
 			select {
@@ -181,14 +183,14 @@ func (clv ConstantLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleCo
 	}
 
 	for i := int64(0); i < numVUs; i++ {
-		wg.Add(1)
-		vu, err := clv.executorState.GetPlannedVU(ctx, clv.logger)
+		vu, err := clv.executorState.GetPlannedVU(clv.logger)
 		if err != nil {
+			cancel()
 			return err
 		}
+		activeVUs.Add(1)
 		go handleVU(vu)
 	}
 
-	wg.Wait()
 	return nil
 }

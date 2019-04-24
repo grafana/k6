@@ -500,14 +500,14 @@ func (vlv VariableLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleCo
 		"duration": regularDuration, "numStages": len(vlv.config.Stages)},
 	).Debug("Starting scheduler run...")
 
-	activeVUs := new(int64)
+	activeVUsCount := new(int64)
 	vusFmt := pb.GetFixedLengthIntFormat(int64(maxVUs))
 	progresFn := func() (float64, string) {
 		spent := time.Since(startTime)
 		if spent > regularDuration {
 			return 1, fmt.Sprintf("variable looping VUs for %s", regularDuration)
 		}
-		currentlyActiveVUs := atomic.LoadInt64(activeVUs)
+		currentlyActiveVUs := atomic.LoadInt64(activeVUsCount)
 		return float64(spent) / float64(regularDuration), fmt.Sprintf(
 			"currently "+vusFmt+" active looping VUs, %s/%s", currentlyActiveVUs,
 			pb.GetFixedLengthDuration(spent, regularDuration), regularDuration,
@@ -518,23 +518,24 @@ func (vlv VariableLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleCo
 
 	// Actually schedule the VUs and iterations, likely the most complicated
 	// scheduler among all of them...
-	wg := &sync.WaitGroup{}
+	activeVUs := &sync.WaitGroup{}
+	defer activeVUs.Wait()
 
 	runIteration := getIterationRunner(vlv.executorState, vlv.logger, out)
 	getVU := func() (lib.VU, error) {
-		vu, err := vlv.executorState.GetPlannedVU(maxDurationCtx, vlv.logger)
+		vu, err := vlv.executorState.GetPlannedVU(vlv.logger)
 		if err != nil {
 			cancel()
 		} else {
-			wg.Add(1)
-			atomic.AddInt64(activeVUs, 1)
+			activeVUs.Add(1)
+			atomic.AddInt64(activeVUsCount, 1)
 		}
 		return vu, err
 	}
 	returnVU := func(vu lib.VU) {
 		vlv.executorState.ReturnVU(vu)
-		atomic.AddInt64(activeVUs, -1)
-		wg.Done()
+		atomic.AddInt64(activeVUsCount, -1)
+		activeVUs.Done()
 	}
 
 	vuHandles := make([]*vuHandle, maxVUs)
@@ -606,8 +607,6 @@ func (vlv VariableLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleCo
 			}
 		}()
 	}
-
-	wg.Wait()
 
 	return nil
 }

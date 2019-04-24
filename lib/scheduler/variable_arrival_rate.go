@@ -312,18 +312,28 @@ func (varr VariableArrivalRate) Run(ctx context.Context, out chan<- stats.Sample
 		"startTickerPeriod": startTickerPeriod.Duration, "type": varr.config.GetType(),
 	}).Debug("Starting scheduler run...")
 
-	// Pre-allocate VUs, but reserve space in the buffer for up to MaxVUs
+	// Pre-allocate the VUs local shared buffer
 	vus := make(chan lib.VU, maxVUs)
+
+	initialisedVUs := uint64(0)
+	// Make sure we put back planned and unplanned VUs back in the global
+	// buffer, and as an extra incentive, this replaces a waitgroup.
+	defer func() {
+		// no need for atomics, since initialisedVUs is mutated only in the select{}
+		for i := uint64(0); i < initialisedVUs; i++ {
+			varr.executorState.ReturnVU(<-vus)
+		}
+	}()
+
+	// Get the pre-allocated VUs in the local buffer
 	for i := int64(0); i < preAllocatedVUs; i++ {
-		vu, err := varr.executorState.GetPlannedVU(ctx, varr.logger)
+		vu, err := varr.executorState.GetPlannedVU(varr.logger)
 		if err != nil {
 			return err
 		}
+		initialisedVUs++
 		vus <- vu
 	}
-
-	initialisedVUs := new(uint64)
-	*initialisedVUs = uint64(preAllocatedVUs)
 
 	tickerPeriod := new(int64)
 	*tickerPeriod = int64(startTickerPeriod.Duration)
@@ -331,7 +341,7 @@ func (varr VariableArrivalRate) Run(ctx context.Context, out chan<- stats.Sample
 	fmtStr := pb.GetFixedLengthFloatFormat(maxArrivalRatePerSec, 2) + " iters/s, " +
 		pb.GetFixedLengthIntFormat(maxVUs) + " out of " + pb.GetFixedLengthIntFormat(maxVUs) + " VUs active"
 	progresFn := func() (float64, string) {
-		currentInitialisedVUs := atomic.LoadUint64(initialisedVUs)
+		currentInitialisedVUs := atomic.LoadUint64(&initialisedVUs)
 		currentTickerPeriod := atomic.LoadInt64(tickerPeriod)
 		vusInBuffer := uint64(len(vus))
 
@@ -354,15 +364,6 @@ func (varr VariableArrivalRate) Run(ctx context.Context, out chan<- stats.Sample
 	}
 
 	remainingUnplannedVUs := maxVUs - preAllocatedVUs
-	// Make sure we put back planned and unplanned VUs back in the global
-	// buffer, and as an extra incentive, this replaces a waitgroup.
-	defer func() {
-		unplannedVUs := maxVUs - remainingUnplannedVUs
-		for i := int64(0); i < unplannedVUs; i++ {
-			varr.executorState.ReturnVU(<-vus)
-		}
-	}()
-
 	rateChangesStream := varr.streamRateChanges(maxDurationCtx, startTime)
 
 	for {
@@ -385,13 +386,12 @@ func (varr VariableArrivalRate) Run(ctx context.Context, out chan<- stats.Sample
 					varr.logger.Warningf("Insufficient VUs, reached %d active VUs and cannot allocate more", maxVUs)
 					break
 				}
-				remainingUnplannedVUs--
 				vu, err := varr.executorState.GetUnplannedVU(maxDurationCtx, varr.logger)
 				if err != nil {
-					remainingUnplannedVUs++
 					return err
 				}
-				atomic.AddUint64(initialisedVUs, 1)
+				remainingUnplannedVUs--
+				atomic.AddUint64(&initialisedVUs, 1)
 				go runIteration(vu)
 			}
 		case <-regDurationDone:

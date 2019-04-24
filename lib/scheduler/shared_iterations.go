@@ -175,14 +175,16 @@ func (si SharedIteations) Run(ctx context.Context, out chan<- stats.SampleContai
 	go trackProgress(ctx, maxDurationCtx, regDurationCtx, si, progresFn)
 
 	// Actually schedule the VUs and iterations...
-	wg := sync.WaitGroup{}
+	activeVUs := &sync.WaitGroup{}
+	defer activeVUs.Wait()
+
 	regDurationDone := regDurationCtx.Done()
 	runIteration := getIterationRunner(si.executorState, si.logger, out)
 
 	attemptedIters := new(uint64)
 	handleVU := func(vu lib.VU) {
 		defer si.executorState.ReturnVU(vu)
-		defer wg.Done()
+		defer activeVUs.Done()
 
 		for {
 			attemptedIterNumber := atomic.AddUint64(attemptedIters, 1)
@@ -202,14 +204,14 @@ func (si SharedIteations) Run(ctx context.Context, out chan<- stats.SampleContai
 	}
 
 	for i := int64(0); i < numVUs; i++ {
-		wg.Add(1)
-		vu, err := si.executorState.GetPlannedVU(ctx, si.logger)
+		vu, err := si.executorState.GetPlannedVU(si.logger)
 		if err != nil {
+			cancel()
 			return err
 		}
+		activeVUs.Add(1)
 		go handleVU(vu)
 	}
 
-	wg.Wait()
 	return nil
 }

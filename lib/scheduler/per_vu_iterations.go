@@ -170,13 +170,15 @@ func (pvi PerVUIteations) Run(ctx context.Context, out chan<- stats.SampleContai
 	go trackProgress(ctx, maxDurationCtx, regDurationCtx, pvi, progresFn)
 
 	// Actually schedule the VUs and iterations...
-	wg := sync.WaitGroup{}
+	activeVUs := &sync.WaitGroup{}
+	defer activeVUs.Wait()
+
 	regDurationDone := regDurationCtx.Done()
 	runIteration := getIterationRunner(pvi.executorState, pvi.logger, out)
 
 	handleVU := func(vu lib.VU) {
 		defer pvi.executorState.ReturnVU(vu)
-		defer wg.Done()
+		defer activeVUs.Done()
 
 		for i := int64(0); i < iterations; i++ {
 			select {
@@ -191,14 +193,14 @@ func (pvi PerVUIteations) Run(ctx context.Context, out chan<- stats.SampleContai
 	}
 
 	for i := int64(0); i < numVUs; i++ {
-		wg.Add(1)
-		vu, err := pvi.executorState.GetPlannedVU(ctx, pvi.logger)
+		vu, err := pvi.executorState.GetPlannedVU(pvi.logger)
 		if err != nil {
+			cancel()
 			return err
 		}
+		activeVUs.Add(1)
 		go handleVU(vu)
 	}
 
-	wg.Wait()
 	return nil
 }
