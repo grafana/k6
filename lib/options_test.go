@@ -309,10 +309,8 @@ func TestOptions(t *testing.T) {
 	t.Run("BlacklistIPs", func(t *testing.T) {
 		opts := Options{}.Apply(Options{
 			BlacklistIPs: []*IPNet{{
-				net.IPNet{
-					IP:   net.IPv4zero,
-					Mask: net.CIDRMask(1, 1),
-				},
+				IP:   net.IPv4zero,
+				Mask: net.CIDRMask(1, 1),
 			}},
 		})
 		assert.NotNil(t, opts.BlacklistIPs)
@@ -525,18 +523,18 @@ func TestCIDRUnmarshal(t *testing.T) {
 	}{
 		{
 			"10.0.0.0/8",
-			&IPNet{IPNet: net.IPNet{
+			&IPNet{
 				IP:   net.IP{10, 0, 0, 0},
 				Mask: net.IPv4Mask(255, 0, 0, 0),
-			}},
+			},
 			false,
 		},
 		{
 			"fc00:1234:5678::/48",
-			&IPNet{IPNet: net.IPNet{
+			&IPNet{
 				IP:   net.ParseIP("fc00:1234:5678::"),
 				Mask: net.CIDRMask(48, 128),
-			}},
+			},
 			false,
 		},
 		{"10.0.0.0", nil, true},
@@ -548,7 +546,7 @@ func TestCIDRUnmarshal(t *testing.T) {
 		data := data
 		t.Run(data.input, func(t *testing.T) {
 			actualIPNet := &IPNet{}
-			err := actualIPNet.UnmarshalJSON([]byte("\"" + data.input + "\""))
+			err := actualIPNet.UnmarshalText([]byte(data.input))
 
 			if data.expactFailure {
 				require.EqualError(t, err, "Failed to parse CIDR: invalid CIDR address: "+data.input)

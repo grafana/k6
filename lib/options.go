@@ -206,18 +206,15 @@ func (c *TLSAuth) Certificate() (*tls.Certificate, error) {
 }
 
 // IPNet is a wrapper around net.IPNet for JSON unmarshalling
-type IPNet struct {
-	net.IPNet
+type IPNet net.IPNet
+
+func (ipnet *IPNet) String() string {
+	return (*net.IPNet)(ipnet).String()
 }
 
-// UnmarshalJSON populates the IPNet from the given CIDR JSON
-func (ipnet *IPNet) UnmarshalJSON(b []byte) error {
-	var cidr string
-	if err := json.Unmarshal(b, &cidr); err != nil {
-		return err
-	}
-
-	newIPNet, err := ParseCIDR(cidr)
+// UnmarshalText populates the IPNet from the given CIDR
+func (ipnet *IPNet) UnmarshalText(b []byte) error {
+	newIPNet, err := ParseCIDR(string(b))
 	if err != nil {
 		return errors.Wrap(err, "Failed to parse CIDR")
 	}
@@ -234,7 +231,9 @@ func ParseCIDR(s string) (*IPNet, error) {
 		return nil, err
 	}
 
-	return &IPNet{*ipnet}, nil
+	parsedIPNet := IPNet(*ipnet)
+
+	return &parsedIPNet, nil
 }
 
 type Options struct {

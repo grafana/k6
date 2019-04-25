@@ -81,9 +81,9 @@ func (d *Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn,
 		}
 	}
 
-	for _, net := range d.Blacklist {
-		if net.Contains(ip) {
-			return nil, BlackListedIPError{ip: ip, net: net}
+	for _, ipnet := range d.Blacklist {
+		if (*net.IPNet)(ipnet).Contains(ip) {
+			return nil, BlackListedIPError{ip: ip, net: ipnet}
 		}
 	}
 	ipStr := ip.String()
