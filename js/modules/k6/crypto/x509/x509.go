@@ -55,6 +55,14 @@ func (X509) Parse(ctx context.Context, encoded string) (Certificate) {
 
 func MakeCertificate(parsed *x509.Certificate) (Certificate) {
 	return Certificate{
-		SignatureAlgorithm: parsed.SignatureAlgorithm.String(),
+		SignatureAlgorithm: SignatureAlgorithm(parsed.SignatureAlgorithm),
+	}
+}
+
+func SignatureAlgorithm(value x509.SignatureAlgorithm) (string) {
+	if (value == x509.UnknownSignatureAlgorithm) {
+		return "UnknownSignatureAlgorithm"
+	} else {
+		return value.String()
 	}
 }
