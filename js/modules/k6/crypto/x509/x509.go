@@ -22,6 +22,7 @@ package x509
 
 import (
 	"context"
+	"crypto/sha1"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
@@ -40,6 +41,7 @@ type Certificate struct {
 	NotAfter string `js:"notAfter"`
 	AltNames []string `js:"altNames"`
 	SignatureAlgorithm string `js:"signatureAlgorithm"`
+	FingerPrint []byte `js:"fingerPrint"`
 }
 
 type CertificateSubject struct {
@@ -87,6 +89,7 @@ func MakeCertificate(parsed *x509.Certificate) (Certificate) {
 		NotAfter: ISO8601(parsed.NotAfter),
 		AltNames: AltNames(parsed),
 		SignatureAlgorithm: SignatureAlgorithm(parsed.SignatureAlgorithm),
+		FingerPrint: FingerPrint(parsed),
 	}
 }
 
@@ -156,4 +159,9 @@ func SignatureAlgorithm(value x509.SignatureAlgorithm) (string) {
 	} else {
 		return value.String()
 	}
+}
+
+func FingerPrint(parsed *x509.Certificate) ([]byte) {
+	bytes := sha1.Sum(parsed.Raw)
+	return bytes[:]
 }

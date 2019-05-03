@@ -303,4 +303,19 @@ ddBqJe0XUeAX8Zr6EJ82
 		}`, pemTemplate))
 		assert.NoError(t, err)
 	})
+
+	t.Run("ParseFingerPrint", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const pem = %s;
+		const cert = x509.parse(pem);
+		const value = cert.fingerPrint;
+		const expected = [
+			85, 119, 3, 199, 150, 144, 202, 145, 178, 46,
+			205, 132, 37, 235, 251, 208, 139, 161, 143, 14
+		]
+		if (value.join("") !== expected.join("")) {
+			throw new Error("Bad fingerprint: " + value.join(":"));
+		}`, pemTemplate))
+		assert.NoError(t, err)
+	})
 }
