@@ -116,7 +116,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const pem = %s;
 		const cert = x509.parse(pem);
-		const value = cert.subject ? cert.subject.countryName : null;
+		const value = cert.subject ? cert.subject.country : null;
 		if (value !== "ZZ") {
 			throw new Error("Bad subject country: " + value);
 		}`, pemTemplate))
@@ -221,7 +221,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const pem = %s;
 		const cert = x509.parse(pem);
-		const value = cert.issuer ? cert.issuer.countryName : null;
+		const value = cert.issuer ? cert.issuer.country : null;
 		if (value !== "ZZ") {
 			throw new Error("Bad issuer country: " + value);
 		}`, pemTemplate))
