@@ -195,7 +195,7 @@ ltfk96gUo55F5PpIjQezwcLYjVLmjMF6PNWFQYXt
 	t.Run("ParseIssuer", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const pem = %s;
-		const cert = x509.parse(pem)
+		const cert = x509.parse(pem);
 		if (typeof cert.issuer !== "object") {
 			throw new Error("Bad issuer: " + typeof cert.issuer);
 		}`, pemTemplate))
