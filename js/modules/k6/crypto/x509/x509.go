@@ -39,6 +39,7 @@ type Certificate struct {
 
 type CertificateSubject struct {
 	CountryName string `js:"countryName"`
+	PostalCode string `js:"postalCode"`
 }
 
 func New() *X509 {
@@ -68,7 +69,16 @@ func MakeCertificate(parsed *x509.Certificate) (Certificate) {
 
 func MakeSubject(subject pkix.Name) (CertificateSubject) {
 	return CertificateSubject{
-		CountryName: subject.Country[0],
+		CountryName: First(subject.Country),
+		PostalCode: First(subject.PostalCode),
+	}
+}
+
+func First(values []string) (string) {
+	if (len(values) > 0) {
+		return values[0]
+	} else {
+		return ""
 	}
 }
 
