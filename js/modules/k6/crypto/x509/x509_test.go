@@ -118,4 +118,15 @@ rxYbUhqc
 		}`, pemTemplate))
 		assert.NoError(t, err)
 	})
+
+	t.Run("ParseSubjectProvince", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const pem = %s;
+		const cert = x509.parse(pem);
+		const value = cert.subject ? cert.subject.stateOrProvinceName : null;
+		if (value !== "Kopuncezis Krais") {
+			throw new Error("Bad province: " + value);
+		}`, pemTemplate))
+		assert.NoError(t, err)
+	})
 }
