@@ -51,6 +51,7 @@ type CertificateSubject struct {
 
 type CertificateIssuer struct {
 	CountryName string `js:"countryName"`
+	StateOrProvinceName string `js:"stateOrProvinceName"`
 }
 
 func New() *X509 {
@@ -95,6 +96,7 @@ func MakeSubject(subject pkix.Name) (CertificateSubject) {
 func MakeIssuer(issuer pkix.Name) (CertificateIssuer) {
 	return CertificateIssuer{
 		CountryName: First(issuer.Country),
+		StateOrProvinceName: First(issuer.Province),
 	}
 }
 
