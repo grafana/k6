@@ -104,7 +104,7 @@ ltfk96gUo55F5PpIjQezwcLYjVLmjMF6PNWFQYXt
 		const cert = x509.parse(pem);
 		const value = cert.subject ? cert.subject.commonName : null;
 		if (value !== "excouncil.zz") {
-			throw new Error("Bad common name: " + value);
+			throw new Error("Bad subject common name: " + value);
 		}`, pemTemplate))
 		assert.NoError(t, err)
 	})
@@ -115,7 +115,7 @@ ltfk96gUo55F5PpIjQezwcLYjVLmjMF6PNWFQYXt
 		const cert = x509.parse(pem);
 		const value = cert.subject ? cert.subject.countryName : null;
 		if (value !== "ZZ") {
-			throw new Error("Bad country: " + value);
+			throw new Error("Bad subject country: " + value);
 		}`, pemTemplate))
 		assert.NoError(t, err)
 	})
@@ -126,7 +126,7 @@ ltfk96gUo55F5PpIjQezwcLYjVLmjMF6PNWFQYXt
 		const cert = x509.parse(pem);
 		const value = cert.subject ? cert.subject.postalCode : null;
 		if (value !== "99999") {
-			throw new Error("Bad postal code: " + value);
+			throw new Error("Bad subject postal code: " + value);
 		}`, pemTemplate))
 		assert.NoError(t, err)
 	})
@@ -137,7 +137,7 @@ ltfk96gUo55F5PpIjQezwcLYjVLmjMF6PNWFQYXt
 		const cert = x509.parse(pem);
 		const value = cert.subject ? cert.subject.stateOrProvinceName : null;
 		if (value !== "Kopuncezis Krais") {
-			throw new Error("Bad province: " + value);
+			throw new Error("Bad subject province: " + value);
 		}`, pemTemplate))
 		assert.NoError(t, err)
 	})
@@ -148,7 +148,7 @@ ltfk96gUo55F5PpIjQezwcLYjVLmjMF6PNWFQYXt
 		const cert = x509.parse(pem);
 		const value = cert.subject ? cert.subject.localityName : null;
 		if (value !== "Ashtinok") {
-			throw new Error("Bad locality: " + value);
+			throw new Error("Bad subject locality: " + value);
 		}`, pemTemplate))
 		assert.NoError(t, err)
 	})
@@ -159,7 +159,7 @@ ltfk96gUo55F5PpIjQezwcLYjVLmjMF6PNWFQYXt
 		const cert = x509.parse(pem);
 		const value = cert.subject ? cert.subject.streetAddress : null;
 		if (value !== "221B Baker Street") {
-			throw new Error("Bad street address: " + value);
+			throw new Error("Bad subject street address: " + value);
 		}`, pemTemplate))
 		assert.NoError(t, err)
 	})
@@ -170,7 +170,7 @@ ltfk96gUo55F5PpIjQezwcLYjVLmjMF6PNWFQYXt
 		const cert = x509.parse(pem);
 		const value = cert.subject ? cert.subject.organizationName : null;
 		if (value !== "Exumbran Convention") {
-			throw new Error("Bad organization: " + value);
+			throw new Error("Bad subject organization: " + value);
 		}`, pemTemplate))
 		assert.NoError(t, err)
 	})
@@ -186,7 +186,9 @@ ltfk96gUo55F5PpIjQezwcLYjVLmjMF6PNWFQYXt
 			values[0] === "Exumbran Council" &&
 			values[1] === "Exumbran Janitorial Service"
 		)) {
-			throw new Error("Bad organizational unit: " + values.join(", "));
+			throw new Error(
+				"Bad subject organizational unit: " + values.join(", ")
+			);
 		}`, pemTemplate))
 		assert.NoError(t, err)
 	})
