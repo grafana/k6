@@ -23,6 +23,7 @@ package x509
 import (
 	"context"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/pem"
 	"errors"
 
@@ -32,7 +33,12 @@ import (
 type X509 struct{}
 
 type Certificate struct {
+	Subject CertificateSubject
 	SignatureAlgorithm string `js:"signatureAlgorithm"`
+}
+
+type CertificateSubject struct {
+	CountryName string `js:"countryName"`
 }
 
 func New() *X509 {
@@ -55,7 +61,14 @@ func (X509) Parse(ctx context.Context, encoded string) (Certificate) {
 
 func MakeCertificate(parsed *x509.Certificate) (Certificate) {
 	return Certificate{
+		Subject: MakeSubject(parsed.Subject),
 		SignatureAlgorithm: SignatureAlgorithm(parsed.SignatureAlgorithm),
+	}
+}
+
+func MakeSubject(subject pkix.Name) (CertificateSubject) {
+	return CertificateSubject{
+		CountryName: subject.Country[0],
 	}
 }
 

@@ -94,8 +94,29 @@ WGHBt5f8oA8IPXrCfzI=
 		const value = cert.signatureAlgorithm;
 		if (value !== "SHA256-RSA") {
 			throw new Error("Bad signature algorithm: " + value);
-		}
-		`, pemTemplate))
+		}`, pemTemplate))
+		assert.NoError(t, err)
+	})
+
+	t.Run("ParseSubject", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const pem = %s;
+		const cert = x509.parse(pem);
+		const value = cert.subject;
+		if (typeof value !== "object") {
+			throw new Error("Bad subject");
+		}`, pemTemplate))
+		assert.NoError(t, err)
+	})
+
+	t.Run("ParseSubjectCountry", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const pem = %s;
+		const cert = x509.parse(pem);
+		const value = cert.subject ? cert.subject.countryName : null;
+		if (value !== "ZZ") {
+			throw new Error("Bad country: " + value);
+		}`, pemTemplate))
 		assert.NoError(t, err)
 	})
 }
