@@ -39,13 +39,7 @@ func MakeRuntime() *goja.Runtime {
 	return rt
 }
 
-func TestParse(t *testing.T) {
-	if testing.Short() {
-		return
-	}
-
-	rt := MakeRuntime()
-
+func Material() (string) {
 	pem := `-----BEGIN CERTIFICATE-----
 MIIE6zCCA9OgAwIBAgICBNIwDQYJKoZIhvcNAQELBQAwgdsxCzAJBgNVBAYTAlpa
 MRkwFwYDVQQIExBLb3B1bmNlemlzIEtyYWlzMREwDwYDVQQHEwhBc2h0aW5vazEa
@@ -75,7 +69,16 @@ gzg3dNaCY65aH0cJE/dVwiS/F2XTr1zvr+uBPExgrA21+FSIlHM0Dot+VGKdCLEO
 xytSVXVn+cECQLg9hVn+Zx3XO2FA0eOzaWEONnUGghT/Ivw06lUxis5tkAoAU93d
 ddBqJe0XUeAX8Zr6EJ82
 -----END CERTIFICATE-----`
-	pemTemplate := fmt.Sprintf("`%s`", pem)
+	template := fmt.Sprintf("`%s`", pem)
+	return template
+}
+
+func TestParse(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+	rt := MakeRuntime()
+	pem := Material()
 
 	t.Run("Failure", func(t *testing.T) {
 		_, err := common.RunString(rt, `
@@ -91,7 +94,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		const value = cert.signatureAlgorithm;
 		if (value !== "SHA256-RSA") {
 			throw new Error("Bad signature algorithm: " + value);
-		}`, pemTemplate))
+		}`, pem))
 		assert.NoError(t, err)
 	})
 
@@ -101,7 +104,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		const cert = x509.parse(pem);
 		if (typeof cert.subject !== "object") {
 			throw new Error("Bad subject: " + typeof cert.subject);
-		}`, pemTemplate))
+		}`, pem))
 		assert.NoError(t, err)
 	})
 
@@ -112,7 +115,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		const value = cert.subject ? cert.subject.commonName : null;
 		if (value !== "excouncil.zz") {
 			throw new Error("Bad subject common name: " + value);
-		}`, pemTemplate))
+		}`, pem))
 		assert.NoError(t, err)
 	})
 
@@ -123,7 +126,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		const value = cert.subject ? cert.subject.country : null;
 		if (value !== "ZZ") {
 			throw new Error("Bad subject country: " + value);
-		}`, pemTemplate))
+		}`, pem))
 		assert.NoError(t, err)
 	})
 
@@ -134,7 +137,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		const value = cert.subject ? cert.subject.postalCode : null;
 		if (value !== "99999") {
 			throw new Error("Bad subject postal code: " + value);
-		}`, pemTemplate))
+		}`, pem))
 		assert.NoError(t, err)
 	})
 
@@ -145,7 +148,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		const value = cert.subject ? cert.subject.stateOrProvinceName : null;
 		if (value !== "Kopuncezis Krais") {
 			throw new Error("Bad subject province: " + value);
-		}`, pemTemplate))
+		}`, pem))
 		assert.NoError(t, err)
 	})
 
@@ -156,7 +159,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		const value = cert.subject ? cert.subject.localityName : null;
 		if (value !== "Ashtinok") {
 			throw new Error("Bad subject locality: " + value);
-		}`, pemTemplate))
+		}`, pem))
 		assert.NoError(t, err)
 	})
 
@@ -167,7 +170,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		const value = cert.subject ? cert.subject.streetAddress : null;
 		if (value !== "221B Baker Street") {
 			throw new Error("Bad subject street address: " + value);
-		}`, pemTemplate))
+		}`, pem))
 		assert.NoError(t, err)
 	})
 
@@ -178,7 +181,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		const value = cert.subject ? cert.subject.organizationName : null;
 		if (value !== "Exumbran Convention") {
 			throw new Error("Bad subject organization: " + value);
-		}`, pemTemplate))
+		}`, pem))
 		assert.NoError(t, err)
 	})
 
@@ -196,7 +199,7 @@ ddBqJe0XUeAX8Zr6EJ82
 			throw new Error(
 				"Bad subject organizational unit: " + values.join(", ")
 			);
-		}`, pemTemplate))
+		}`, pem))
 		assert.NoError(t, err)
 	})
 
@@ -206,7 +209,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		const cert = x509.parse(pem);
 		if (typeof cert.issuer !== "object") {
 			throw new Error("Bad issuer: " + typeof cert.issuer);
-		}`, pemTemplate))
+		}`, pem))
 		assert.NoError(t, err)
 	})
 
@@ -217,7 +220,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		const value = cert.issuer ? cert.issuer.commonName : null;
 		if (value !== "excouncil.zz") {
 			throw new Error("Bad issuer common name: " + value);
-		}`, pemTemplate))
+		}`, pem))
 		assert.NoError(t, err)
 	})
 
@@ -228,7 +231,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		const value = cert.issuer ? cert.issuer.country : null;
 		if (value !== "ZZ") {
 			throw new Error("Bad issuer country: " + value);
-		}`, pemTemplate))
+		}`, pem))
 		assert.NoError(t, err)
 	})
 
@@ -239,7 +242,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		const value = cert.issuer ? cert.issuer.stateOrProvinceName : null;
 		if (value !== "Kopuncezis Krais") {
 			throw new Error("Bad issuer province: " + value);
-		}`, pemTemplate))
+		}`, pem))
 		assert.NoError(t, err)
 	})
 
@@ -250,7 +253,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		const value = cert.issuer ? cert.issuer.localityName : null;
 		if (value !== "Ashtinok") {
 			throw new Error("Bad issuer locality: " + value);
-		}`, pemTemplate))
+		}`, pem))
 		assert.NoError(t, err)
 	})
 
@@ -261,7 +264,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		const value = cert.issuer ? cert.issuer.organizationName : null;
 		if (value !== "Exumbran Convention") {
 			throw new Error("Bad issuer organization: " + value);
-		}`, pemTemplate))
+		}`, pem))
 		assert.NoError(t, err)
 	})
 
@@ -272,7 +275,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		const value = cert.notBefore;
 		if (value !== "2019-01-01T00:00:00Z") {
 			throw new Error("Bad lower bound: " + value)
-		}`, pemTemplate))
+		}`, pem))
 		assert.NoError(t, err)
 	})
 
@@ -283,7 +286,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		const value = cert.notAfter;
 		if (value !== "2020-01-01T00:00:00Z") {
 			throw new Error("Bad upper bound: " + value);
-		}`, pemTemplate))
+		}`, pem))
 		assert.NoError(t, err)
 	})
 
@@ -304,7 +307,7 @@ ddBqJe0XUeAX8Zr6EJ82
 			values[7] === "http://learning.excouncil.zz/index.html"
 		)) {
 			throw new Error("Bad alt names: " + values.join(", "));
-		}`, pemTemplate))
+		}`, pem))
 		assert.NoError(t, err)
 	})
 
@@ -319,7 +322,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		]
 		if (value.join("") !== expected.join("")) {
 			throw new Error("Bad fingerprint: " + value.join(":"));
-		}`, pemTemplate))
+		}`, pem))
 		assert.NoError(t, err)
 	})
 
@@ -329,7 +332,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		const cert = x509.parse(pem);
 		if (typeof cert.publicKey !== "object") {
 			throw new Error("Bad public key: " + typeof cert.publicKey);
-		}`, pemTemplate))
+		}`, pem))
 		assert.NoError(t, err)
 	})
 
@@ -340,7 +343,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		const value = cert.publicKey ? cert.publicKey.algorithm : null;
 		if (value !== "RSA") {
 			throw new Error("Bad public key algorithm: " + value);
-		}`, pemTemplate))
+		}`, pem))
 		assert.NoError(t, err)
 	})
 
@@ -351,7 +354,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		const value = cert.publicKey ? cert.publicKey.e : null;
 		if (value !== 65537) {
 			throw new Error("Bad public key exponent: " + value);
-		}`, pemTemplate))
+		}`, pem))
 		assert.NoError(t, err)
 	})
 
@@ -382,7 +385,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		]
 		if (value.join(":") !== expected.join(":")) {
 			throw new Error("Bad public key modulus: " + value.join(":"));
-		}`, pemTemplate))
+		}`, pem))
 		assert.NoError(t, err)
 	})
 }
