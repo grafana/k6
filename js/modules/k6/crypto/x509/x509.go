@@ -34,6 +34,7 @@ type X509 struct{}
 
 type Certificate struct {
 	Subject CertificateSubject
+	Issuer CertificateIssuer
 	SignatureAlgorithm string `js:"signatureAlgorithm"`
 }
 
@@ -46,6 +47,10 @@ type CertificateSubject struct {
 	OrganizationName string `js:"organizationName"`
 	OrganizationalUnitName []string `js:"organizationalUnitName"`
 	CommonName string `js:"commonName"`
+}
+
+type CertificateIssuer struct {
+	CountryName string `js:"countryName"`
 }
 
 func New() *X509 {
@@ -69,6 +74,7 @@ func (X509) Parse(ctx context.Context, encoded string) (Certificate) {
 func MakeCertificate(parsed *x509.Certificate) (Certificate) {
 	return Certificate{
 		Subject: MakeSubject(parsed.Subject),
+		Issuer: MakeIssuer(parsed.Issuer),
 		SignatureAlgorithm: SignatureAlgorithm(parsed.SignatureAlgorithm),
 	}
 }
@@ -83,6 +89,12 @@ func MakeSubject(subject pkix.Name) (CertificateSubject) {
 		OrganizationName: First(subject.Organization),
 		OrganizationalUnitName: subject.OrganizationalUnit,
 		CommonName: subject.CommonName,
+	}
+}
+
+func MakeIssuer(issuer pkix.Name) (CertificateIssuer) {
+	return CertificateIssuer{
+		CountryName: First(issuer.Country),
 	}
 }
 

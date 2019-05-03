@@ -91,9 +91,8 @@ ltfk96gUo55F5PpIjQezwcLYjVLmjMF6PNWFQYXt
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const pem = %s;
 		const cert = x509.parse(pem);
-		const value = cert.subject;
-		if (typeof value !== "object") {
-			throw new Error("Bad subject");
+		if (typeof cert.subject !== "object") {
+			throw new Error("Bad subject: " + typeof cert.subject);
 		}`, pemTemplate))
 		assert.NoError(t, err)
 	})
@@ -189,6 +188,27 @@ ltfk96gUo55F5PpIjQezwcLYjVLmjMF6PNWFQYXt
 			throw new Error(
 				"Bad subject organizational unit: " + values.join(", ")
 			);
+		}`, pemTemplate))
+		assert.NoError(t, err)
+	})
+
+	t.Run("ParseIssuer", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const pem = %s;
+		const cert = x509.parse(pem)
+		if (typeof cert.issuer !== "object") {
+			throw new Error("Bad issuer: " + typeof cert.issuer);
+		}`, pemTemplate))
+		assert.NoError(t, err)
+	})
+
+	t.Run("ParseIssuerCountry", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const pem = %s;
+		const cert = x509.parse(pem);
+		const value = cert.issuer ? cert.issuer.countryName : null;
+		if (value !== "ZZ") {
+			throw new Error("Bad issuer country: " + value);
 		}`, pemTemplate))
 		assert.NoError(t, err)
 	})
