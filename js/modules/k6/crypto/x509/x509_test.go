@@ -40,6 +40,10 @@ func MakeRuntime() *goja.Runtime {
 }
 
 func TestParse(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+
 	rt := MakeRuntime()
 
 	pem := `-----BEGIN CERTIFICATE-----
