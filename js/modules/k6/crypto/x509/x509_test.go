@@ -98,6 +98,17 @@ ltfk96gUo55F5PpIjQezwcLYjVLmjMF6PNWFQYXt
 		assert.NoError(t, err)
 	})
 
+	t.Run("ParseSubjectCommonName", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const pem = %s;
+		const cert = x509.parse(pem);
+		const value = cert.subject ? cert.subject.commonName : null;
+		if (value !== "excouncil.zz") {
+			throw new Error("Bad common name: " + value);
+		}`, pemTemplate))
+		assert.NoError(t, err)
+	})
+
 	t.Run("ParseSubjectCountry", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const pem = %s;
