@@ -22,6 +22,7 @@ package x509
 
 import (
 	"context"
+	"crypto/rsa"
 	"crypto/sha1"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -66,6 +67,7 @@ type CertificateIssuer struct {
 
 type PublicKey struct {
 	Algorithm string
+	E int
 }
 
 func New() *X509 {
@@ -123,8 +125,10 @@ func MakeIssuer(issuer pkix.Name) (CertificateIssuer) {
 }
 
 func MakePublicKey(parsed *x509.Certificate) (PublicKey) {
+	key := parsed.PublicKey.(*rsa.PublicKey)
 	return PublicKey{
 		Algorithm: PublicKeyAlgorithm(parsed.PublicKeyAlgorithm),
+		E: key.E,
 	}
 }
 
