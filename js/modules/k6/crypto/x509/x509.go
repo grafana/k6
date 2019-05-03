@@ -42,6 +42,7 @@ type Certificate struct {
 	AltNames []string `js:"altNames"`
 	SignatureAlgorithm string `js:"signatureAlgorithm"`
 	FingerPrint []byte `js:"fingerPrint"`
+	PublicKey PublicKey `js:"publicKey"`
 }
 
 type CertificateSubject struct {
@@ -61,6 +62,10 @@ type CertificateIssuer struct {
 	StateOrProvinceName string `js:"stateOrProvinceName"`
 	LocalityName string `js:"localityName"`
 	OrganizationName string `js:"organizationName"`
+}
+
+type PublicKey struct {
+	Algorithm string
 }
 
 func New() *X509 {
@@ -90,6 +95,7 @@ func MakeCertificate(parsed *x509.Certificate) (Certificate) {
 		AltNames: AltNames(parsed),
 		SignatureAlgorithm: SignatureAlgorithm(parsed.SignatureAlgorithm),
 		FingerPrint: FingerPrint(parsed),
+		PublicKey: MakePublicKey(parsed),
 	}
 }
 
@@ -113,6 +119,12 @@ func MakeIssuer(issuer pkix.Name) (CertificateIssuer) {
 		StateOrProvinceName: First(issuer.Province),
 		LocalityName: First(issuer.Locality),
 		OrganizationName: First(issuer.Organization),
+	}
+}
+
+func MakePublicKey(parsed *x509.Certificate) (PublicKey) {
+	return PublicKey{
+		Algorithm: PublicKeyAlgorithm(parsed.PublicKeyAlgorithm),
 	}
 }
 
@@ -164,4 +176,12 @@ func SignatureAlgorithm(value x509.SignatureAlgorithm) (string) {
 func FingerPrint(parsed *x509.Certificate) ([]byte) {
 	bytes := sha1.Sum(parsed.Raw)
 	return bytes[:]
+}
+
+func PublicKeyAlgorithm(value x509.PublicKeyAlgorithm) (string) {
+	if (value == x509.UnknownPublicKeyAlgorithm) {
+		return "UnknownPublicKeyAlgorithm"
+	} else {
+		return value.String()
+	}
 }

@@ -318,4 +318,25 @@ ddBqJe0XUeAX8Zr6EJ82
 		}`, pemTemplate))
 		assert.NoError(t, err)
 	})
+
+	t.Run("PublicKey", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const pem = %s;
+		const cert = x509.parse(pem);
+		if (typeof cert.publicKey !== "object") {
+			throw new Error("Bad public key: " + typeof cert.publicKey);
+		}`, pemTemplate))
+		assert.NoError(t, err)
+	})
+
+	t.Run("PublicKeyAlgorithm", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const pem = %s;
+		const cert = x509.parse(pem);
+		const value = cert.publicKey ? cert.publicKey.algorithm : null;
+		if (value !== "RSA") {
+			throw new Error("Bad public key algorithm: " + value);
+		}`, pemTemplate))
+		assert.NoError(t, err)
+	})
 }
