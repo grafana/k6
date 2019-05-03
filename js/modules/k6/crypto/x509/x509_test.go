@@ -129,4 +129,15 @@ rxYbUhqc
 		}`, pemTemplate))
 		assert.NoError(t, err)
 	})
+
+	t.Run("ParseSubjectLocality", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const pem = %s;
+		const cert = x509.parse(pem);
+		const value = cert.subject ? cert.subject.localityName : null;
+		if (value !== "Ashtinok") {
+			throw new Error("Bad locality: " + value);
+		}`, pemTemplate))
+		assert.NoError(t, err)
+	})
 }
