@@ -73,14 +73,14 @@ ddBqJe0XUeAX8Zr6EJ82
 -----END CERTIFICATE-----`
 	pemTemplate := fmt.Sprintf("`%s`", pem)
 
-	t.Run("ParseFailure", func(t *testing.T) {
+	t.Run("Failure", func(t *testing.T) {
 		_, err := common.RunString(rt, `
 		x509.parse("bad-certificate");
 		`)
 		assert.Error(t, err)
 	})
 
-	t.Run("ParseSignatureAlgorithm", func(t *testing.T) {
+	t.Run("SignatureAlgorithm", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const pem = %s;
 		const cert = x509.parse(pem);
@@ -91,7 +91,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		assert.NoError(t, err)
 	})
 
-	t.Run("ParseSubject", func(t *testing.T) {
+	t.Run("Subject", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const pem = %s;
 		const cert = x509.parse(pem);
@@ -101,7 +101,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		assert.NoError(t, err)
 	})
 
-	t.Run("ParseSubjectCommonName", func(t *testing.T) {
+	t.Run("SubjectCommonName", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const pem = %s;
 		const cert = x509.parse(pem);
@@ -112,7 +112,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		assert.NoError(t, err)
 	})
 
-	t.Run("ParseSubjectCountry", func(t *testing.T) {
+	t.Run("SubjectCountry", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const pem = %s;
 		const cert = x509.parse(pem);
@@ -123,7 +123,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		assert.NoError(t, err)
 	})
 
-	t.Run("ParseSubjectPostalCode", func(t *testing.T) {
+	t.Run("SubjectPostalCode", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const pem = %s;
 		const cert = x509.parse(pem);
@@ -134,7 +134,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		assert.NoError(t, err)
 	})
 
-	t.Run("ParseSubjectProvince", func(t *testing.T) {
+	t.Run("SubjectProvince", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const pem = %s;
 		const cert = x509.parse(pem);
@@ -145,7 +145,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		assert.NoError(t, err)
 	})
 
-	t.Run("ParseSubjectLocality", func(t *testing.T) {
+	t.Run("SubjectLocality", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const pem = %s;
 		const cert = x509.parse(pem);
@@ -156,7 +156,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		assert.NoError(t, err)
 	})
 
-	t.Run("ParseSubjectStreetAddress", func(t *testing.T) {
+	t.Run("SubjectStreetAddress", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const pem = %s;
 		const cert = x509.parse(pem);
@@ -167,7 +167,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		assert.NoError(t, err)
 	})
 
-	t.Run("ParseSubjectOrganization", func(t *testing.T) {
+	t.Run("SubjectOrganization", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const pem = %s;
 		const cert = x509.parse(pem);
@@ -178,7 +178,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		assert.NoError(t, err)
 	})
 
-	t.Run("ParseSubjectOrganizationalUnit", func(t *testing.T) {
+	t.Run("SubjectOrganizationalUnit", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const pem = %s;
 		const cert = x509.parse(pem);
@@ -196,7 +196,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		assert.NoError(t, err)
 	})
 
-	t.Run("ParseIssuer", func(t *testing.T) {
+	t.Run("Issuer", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const pem = %s;
 		const cert = x509.parse(pem);
@@ -206,7 +206,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		assert.NoError(t, err)
 	})
 
-	t.Run("ParseIssuerCommonName", func(t *testing.T) {
+	t.Run("IssuerCommonName", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const pem = %s;
 		const cert = x509.parse(pem);
@@ -217,7 +217,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		assert.NoError(t, err)
 	})
 
-	t.Run("ParseIssuerCountry", func(t *testing.T) {
+	t.Run("IssuerCountry", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const pem = %s;
 		const cert = x509.parse(pem);
@@ -228,7 +228,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		assert.NoError(t, err)
 	})
 
-	t.Run("ParseIssuerProvince", func(t *testing.T) {
+	t.Run("IssuerProvince", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const pem = %s;
 		const cert = x509.parse(pem);
@@ -239,7 +239,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		assert.NoError(t, err)
 	})
 
-	t.Run("ParseIssuerLocality", func(t *testing.T) {
+	t.Run("IssuerLocality", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const pem = %s;
 		const cert = x509.parse(pem);
@@ -250,7 +250,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		assert.NoError(t, err)
 	})
 
-	t.Run("ParseIssuerOrganization", func(t *testing.T) {
+	t.Run("IssuerOrganization", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const pem = %s;
 		const cert = x509.parse(pem);
@@ -261,7 +261,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		assert.NoError(t, err)
 	})
 
-	t.Run("ParseNotBefore", func(t *testing.T) {
+	t.Run("NotBefore", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const pem = %s;
 		const cert = x509.parse(pem);
@@ -272,7 +272,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		assert.NoError(t, err)
 	})
 
-	t.Run("ParseNotAfter", func(t *testing.T) {
+	t.Run("NotAfter", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const pem = %s;
 		const cert = x509.parse(pem);
@@ -283,7 +283,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		assert.NoError(t, err)
 	})
 
-	t.Run("ParseAltNames", func(t *testing.T) {
+	t.Run("AltNames", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const pem = %s;
 		const cert = x509.parse(pem);
@@ -304,7 +304,7 @@ ddBqJe0XUeAX8Zr6EJ82
 		assert.NoError(t, err)
 	})
 
-	t.Run("ParseFingerPrint", func(t *testing.T) {
+	t.Run("FingerPrint", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const pem = %s;
 		const cert = x509.parse(pem);
