@@ -33,12 +33,12 @@ import (
 
 // Index of module implementations.
 var Index = map[string]interface{}{
-	"k6":               k6.New(),
-	"k6/crypto":   	    crypto.New(),
-	"k6/crypto/x509":   x509.New(),
-	"k6/encoding": 	    encoding.New(),
-	"k6/http":     	    http.New(),
-	"k6/metrics":  	    metrics.New(),
-	"k6/html":     	    html.New(),
-	"k6/ws":       	    ws.New(),
+	"k6":             k6.New(),
+	"k6/crypto":      crypto.New(),
+	"k6/crypto/x509": x509.New(),
+	"k6/encoding":    encoding.New(),
+	"k6/http":        http.New(),
+	"k6/metrics":     metrics.New(),
+	"k6/html":        html.New(),
+	"k6/ws":          ws.New(),
 }

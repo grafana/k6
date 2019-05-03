@@ -33,7 +33,6 @@ import (
 	"github.com/loadimpact/k6/js/common"
 )
 
-
 // X509 certificate functionality
 type X509 struct{}
 
