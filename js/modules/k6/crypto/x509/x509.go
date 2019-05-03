@@ -37,6 +37,7 @@ type Certificate struct {
 	Subject CertificateSubject
 	Issuer CertificateIssuer
 	NotBefore string `js:"notBefore"`
+	NotAfter string `js:"notAfter"`
 	SignatureAlgorithm string `js:"signatureAlgorithm"`
 }
 
@@ -82,6 +83,7 @@ func MakeCertificate(parsed *x509.Certificate) (Certificate) {
 		Subject: MakeSubject(parsed.Subject),
 		Issuer: MakeIssuer(parsed.Issuer),
 		NotBefore: ISO8601(parsed.NotBefore),
+		NotAfter: ISO8601(parsed.NotAfter),
 		SignatureAlgorithm: SignatureAlgorithm(parsed.SignatureAlgorithm),
 	}
 }
