@@ -39,7 +39,7 @@ func MakeRuntime() *goja.Runtime {
 	return rt
 }
 
-func Material() (string) {
+func Material() string {
 	pem := `-----BEGIN CERTIFICATE-----
 MIIE6zCCA9OgAwIBAgICBNIwDQYJKoZIhvcNAQELBQAwgdsxCzAJBgNVBAYTAlpa
 MRkwFwYDVQQIExBLb3B1bmNlemlzIEtyYWlzMREwDwYDVQQHEwhBc2h0aW5vazEa

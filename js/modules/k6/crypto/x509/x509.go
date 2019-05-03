@@ -33,69 +33,76 @@ import (
 	"github.com/loadimpact/k6/js/common"
 )
 
+
+// X509 certificate functionality
 type X509 struct{}
 
+// Certificate : an X.509 certificate
 type Certificate struct {
-	Subject Subject
-	Issuer Issuer
-	NotBefore string `js:"notBefore"`
-	NotAfter string `js:"notAfter"`
-	AltNames []string `js:"altNames"`
-	SignatureAlgorithm string `js:"signatureAlgorithm"`
-	FingerPrint []byte `js:"fingerPrint"`
-	PublicKey PublicKey `js:"publicKey"`
+	Subject            Subject
+	Issuer             Issuer
+	NotBefore          string    `js:"notBefore"`
+	NotAfter           string    `js:"notAfter"`
+	AltNames           []string  `js:"altNames"`
+	SignatureAlgorithm string    `js:"signatureAlgorithm"`
+	FingerPrint        []byte    `js:"fingerPrint"`
+	PublicKey          PublicKey `js:"publicKey"`
 }
 
+// Subject : a certificate subject
 type Subject struct {
-	CommonName string `js:"commonName"`
-	Country string
-	PostalCode string `js:"postalCode"`
-	StateOrProvinceName string `js:"stateOrProvinceName"`
-	LocalityName string `js:"localityName"`
-	StreetAddress string `js:"streetAddress"`
-	OrganizationName string `js:"organizationName"`
+	CommonName             string `js:"commonName"`
+	Country                string
+	PostalCode             string   `js:"postalCode"`
+	StateOrProvinceName    string   `js:"stateOrProvinceName"`
+	LocalityName           string   `js:"localityName"`
+	StreetAddress          string   `js:"streetAddress"`
+	OrganizationName       string   `js:"organizationName"`
 	OrganizationalUnitName []string `js:"organizationalUnitName"`
 }
 
+// Issuer : a certificate issuer
 type Issuer struct {
-	CommonName string `js:"commonName"`
-	Country string
+	CommonName          string `js:"commonName"`
+	Country             string
 	StateOrProvinceName string `js:"stateOrProvinceName"`
-	LocalityName string `js:"localityName"`
-	OrganizationName string `js:"organizationName"`
+	LocalityName        string `js:"localityName"`
+	OrganizationName    string `js:"organizationName"`
 }
 
+// PublicKey : a public key
 type PublicKey struct {
 	Algorithm string
-	E int
-	N []byte
+	E         int
+	N         []byte
 }
 
+// New : construct X509 interface
 func New() *X509 {
 	return &X509{}
 }
 
-func (X509) Parse(ctx context.Context, encoded string) (Certificate) {
+func (X509) Parse(ctx context.Context, encoded string) Certificate {
 	parsed := ParseCertificate(ctx, encoded)
 	return MakeCertificate(parsed)
 }
 
-func (X509) GetAltNames(ctx context.Context, encoded string) ([]string) {
+func (X509) GetAltNames(ctx context.Context, encoded string) []string {
 	parsed := ParseCertificate(ctx, encoded)
 	return AltNames(parsed)
 }
 
-func (X509) GetIssuer(ctx context.Context, encoded string) (Issuer) {
+func (X509) GetIssuer(ctx context.Context, encoded string) Issuer {
 	parsed := ParseCertificate(ctx, encoded)
 	return MakeIssuer(parsed.Issuer)
 }
 
-func (X509) GetSubject(ctx context.Context, encoded string) (Subject) {
+func (X509) GetSubject(ctx context.Context, encoded string) Subject {
 	parsed := ParseCertificate(ctx, encoded)
 	return MakeSubject(parsed.Subject)
 }
 
-func ParseCertificate(ctx context.Context, encoded string) (*x509.Certificate) {
+func ParseCertificate(ctx context.Context, encoded string) *x509.Certificate {
 	decoded, _ := pem.Decode([]byte(encoded))
 	if decoded == nil {
 		err := errors.New("failed to decode certificate PEM file")
@@ -109,64 +116,63 @@ func ParseCertificate(ctx context.Context, encoded string) (*x509.Certificate) {
 	return parsed
 }
 
-func MakeCertificate(parsed *x509.Certificate) (Certificate) {
+func MakeCertificate(parsed *x509.Certificate) Certificate {
 	return Certificate{
-		Subject: MakeSubject(parsed.Subject),
-		Issuer: MakeIssuer(parsed.Issuer),
-		NotBefore: ISO8601(parsed.NotBefore),
-		NotAfter: ISO8601(parsed.NotAfter),
-		AltNames: AltNames(parsed),
+		Subject:            MakeSubject(parsed.Subject),
+		Issuer:             MakeIssuer(parsed.Issuer),
+		NotBefore:          ISO8601(parsed.NotBefore),
+		NotAfter:           ISO8601(parsed.NotAfter),
+		AltNames:           AltNames(parsed),
 		SignatureAlgorithm: SignatureAlgorithm(parsed.SignatureAlgorithm),
-		FingerPrint: FingerPrint(parsed),
-		PublicKey: MakePublicKey(parsed),
+		FingerPrint:        FingerPrint(parsed),
+		PublicKey:          MakePublicKey(parsed),
 	}
 }
 
-func MakeSubject(subject pkix.Name) (Subject) {
+func MakeSubject(subject pkix.Name) Subject {
 	return Subject{
-		CommonName: subject.CommonName,
-		Country: First(subject.Country),
-		PostalCode: First(subject.PostalCode),
-		StateOrProvinceName: First(subject.Province),
-		LocalityName: First(subject.Locality),
-		StreetAddress: First(subject.StreetAddress),
-		OrganizationName: First(subject.Organization),
+		CommonName:             subject.CommonName,
+		Country:                First(subject.Country),
+		PostalCode:             First(subject.PostalCode),
+		StateOrProvinceName:    First(subject.Province),
+		LocalityName:           First(subject.Locality),
+		StreetAddress:          First(subject.StreetAddress),
+		OrganizationName:       First(subject.Organization),
 		OrganizationalUnitName: subject.OrganizationalUnit,
 	}
 }
 
-func MakeIssuer(issuer pkix.Name) (Issuer) {
+func MakeIssuer(issuer pkix.Name) Issuer {
 	return Issuer{
-		CommonName: issuer.CommonName,
-		Country: First(issuer.Country),
+		CommonName:          issuer.CommonName,
+		Country:             First(issuer.Country),
 		StateOrProvinceName: First(issuer.Province),
-		LocalityName: First(issuer.Locality),
-		OrganizationName: First(issuer.Organization),
+		LocalityName:        First(issuer.Locality),
+		OrganizationName:    First(issuer.Organization),
 	}
 }
 
-func MakePublicKey(parsed *x509.Certificate) (PublicKey) {
+func MakePublicKey(parsed *x509.Certificate) PublicKey {
 	key := parsed.PublicKey.(*rsa.PublicKey)
 	return PublicKey{
 		Algorithm: PublicKeyAlgorithm(parsed.PublicKeyAlgorithm),
-		E: key.E,
-		N: key.N.Bytes(),
+		E:         key.E,
+		N:         key.N.Bytes(),
 	}
 }
 
-func First(values []string) (string) {
-	if (len(values) > 0) {
+func First(values []string) string {
+	if len(values) > 0 {
 		return values[0]
-	} else {
-		return ""
 	}
+	return ""
 }
 
-func ISO8601(value time.Time) (string) {
+func ISO8601(value time.Time) string {
 	return value.Format(time.RFC3339)
 }
 
-func AltNames(parsed *x509.Certificate) ([]string) {
+func AltNames(parsed *x509.Certificate) []string {
 	var names []string
 	names = append(names, parsed.DNSNames...)
 	names = append(names, parsed.EmailAddresses...)
@@ -175,7 +181,7 @@ func AltNames(parsed *x509.Certificate) ([]string) {
 	return names
 }
 
-func IPAddresses(parsed *x509.Certificate) ([]string) {
+func IPAddresses(parsed *x509.Certificate) []string {
 	strings := make([]string, len(parsed.IPAddresses))
 	for i, item := range parsed.IPAddresses {
 		strings[i] = item.String()
@@ -183,7 +189,7 @@ func IPAddresses(parsed *x509.Certificate) ([]string) {
 	return strings
 }
 
-func URIs(parsed *x509.Certificate) ([]string) {
+func URIs(parsed *x509.Certificate) []string {
 	strings := make([]string, len(parsed.URIs))
 	for i, item := range parsed.URIs {
 		strings[i] = item.String()
@@ -191,23 +197,21 @@ func URIs(parsed *x509.Certificate) ([]string) {
 	return strings
 }
 
-func SignatureAlgorithm(value x509.SignatureAlgorithm) (string) {
-	if (value == x509.UnknownSignatureAlgorithm) {
+func SignatureAlgorithm(value x509.SignatureAlgorithm) string {
+	if value == x509.UnknownSignatureAlgorithm {
 		return "UnknownSignatureAlgorithm"
-	} else {
-		return value.String()
 	}
+	return value.String()
 }
 
-func FingerPrint(parsed *x509.Certificate) ([]byte) {
+func FingerPrint(parsed *x509.Certificate) []byte {
 	bytes := sha1.Sum(parsed.Raw)
 	return bytes[:]
 }
 
-func PublicKeyAlgorithm(value x509.PublicKeyAlgorithm) (string) {
-	if (value == x509.UnknownPublicKeyAlgorithm) {
+func PublicKeyAlgorithm(value x509.PublicKeyAlgorithm) string {
+	if value == x509.UnknownPublicKeyAlgorithm {
 		return "UnknownPublicKeyAlgorithm"
-	} else {
-		return value.String()
 	}
+	return value.String()
 }
