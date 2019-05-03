@@ -43,28 +43,29 @@ func TestParse(t *testing.T) {
 	rt := MakeRuntime()
 
 	pem := `-----BEGIN CERTIFICATE-----
-MIID8jCCAtqgAwIBAgICBNIwDQYJKoZIhvcNAQELBQAwgbcxCzAJBgNVBAYTAlpa
+MIIEOjCCAyKgAwIBAgICBNIwDQYJKoZIhvcNAQELBQAwgdsxCzAJBgNVBAYTAlpa
 MRkwFwYDVQQIExBLb3B1bmNlemlzIEtyYWlzMREwDwYDVQQHEwhBc2h0aW5vazEa
 MBgGA1UECRMRMjIxQiBCYWtlciBTdHJlZXQxDjAMBgNVBBETBTk5OTk5MRwwGgYD
-VQQKExNFeHVtYnJhbiBDb252ZW50aW9uMRkwFwYDVQQLExBFeHVtYnJhbiBDb3Vu
-Y2lsMRUwEwYDVQQDEwxleGNvdW5jaWwuenowIhgPMDAwMTAxMDEwMDAwMDBaGA8w
-MDAxMDEwMTAwMDAwMFowgbcxCzAJBgNVBAYTAlpaMRkwFwYDVQQIExBLb3B1bmNl
-emlzIEtyYWlzMREwDwYDVQQHEwhBc2h0aW5vazEaMBgGA1UECRMRMjIxQiBCYWtl
-ciBTdHJlZXQxDjAMBgNVBBETBTk5OTk5MRwwGgYDVQQKExNFeHVtYnJhbiBDb252
-ZW50aW9uMRkwFwYDVQQLExBFeHVtYnJhbiBDb3VuY2lsMRUwEwYDVQQDEwxleGNv
-dW5jaWwuenowggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDOIAR7WIw+
-Ci7FDsJjIKLsU5rmtEg9jDx+nnBHhIYoQH0ekNmDqaHjfQ9m2f0vNWl2zKT5bZ74
-wlK84ZQdLki9cYPwQ2xWInXDxaYr4SslPchZWyDlm9r1YUKcOsXww5YnkbmvuB/x
-tLpUv1jHMJXGMxCsWQbUPFLwHlSSPGGICb0mh+dppvXrLgeyS20P7m+tglDf2MZT
-/bkSADKvPJUzxopUUhmvgkBRLa00Z85pEzhECaV6wIhb+iOTzFqom0z1Yjab50Yx
-rIYSrVVXIh0wzqWOYq9BBruIBZG91+7UG4JP67wXl9YicOnb5M9EJNgwA2nPqgWY
-jzHFDPWTqsQfAgMBAAGjAjAAMA0GCSqGSIb3DQEBCwUAA4IBAQAEcrqIPcS6Fdj7
-zGcIcBGRIisnJZ6VnPR11977HU40lhz4mJZOjG1Xws6iTE75T5CSEX+YY0LxM6Z4
-oPFUB0fhxRX71d0MvE4EfiU/h+cvyjOvFPywCNfl+UUqYm3Pg1+KYxRXS/zsHo9S
-KDWX680pyoxoahLESf/XaU12mgC21ZlKCfkgZudknKh5laQTZKsrMqEvXNjSKmoz
-Ewk4pwoVKbp89/MQmr28GIwAAuWUZumTx5De+7C3gXqweYlZ2wH0/PwRG5WD04Pq
-kN9dNqkkyk3hVpu24y8D850/4k3CeA0AfFOXFXa6E6v5YGJ+8m0qcxvsGrPIt0K9
-rxYbUhqc
+VQQKExNFeHVtYnJhbiBDb252ZW50aW9uMT0wFwYDVQQLExBFeHVtYnJhbiBDb3Vu
+Y2lsMCIGA1UECxMbRXh1bWJyYW4gSmFuaXRvcmlhbCBTZXJ2aWNlMRUwEwYDVQQD
+EwxleGNvdW5jaWwuenowIhgPMDAwMTAxMDEwMDAwMDBaGA8wMDAxMDEwMTAwMDAw
+MFowgdsxCzAJBgNVBAYTAlpaMRkwFwYDVQQIExBLb3B1bmNlemlzIEtyYWlzMREw
+DwYDVQQHEwhBc2h0aW5vazEaMBgGA1UECRMRMjIxQiBCYWtlciBTdHJlZXQxDjAM
+BgNVBBETBTk5OTk5MRwwGgYDVQQKExNFeHVtYnJhbiBDb252ZW50aW9uMT0wFwYD
+VQQLExBFeHVtYnJhbiBDb3VuY2lsMCIGA1UECxMbRXh1bWJyYW4gSmFuaXRvcmlh
+bCBTZXJ2aWNlMRUwEwYDVQQDEwxleGNvdW5jaWwuenowggEiMA0GCSqGSIb3DQEB
+AQUAA4IBDwAwggEKAoIBAQCdOksn+apGPkW+qVluAxR0EdCNqmIUvyT+YBLAGA8o
+vhuxHpbwvLlUZhkYCPDow+SDAtbgODGLlUqpdPWAkCeaFSymLlr/Zounvd4UoTCh
+lB5Zj67nOCkOC2TNqiXM13J6VuST5wT0yow5Kue88fjTIJbvdktMKytFQcrU80JM
+HEv/oZek8pf1TDI7lPXXme2688xJnP3mSdbcjjH71BiFzK4CbDtbGMdUNShEh6WK
+ZIvH0KR5gwjkys80B+jXs27/iqcDCKhqsO6acFbY9twAybUB9twxrwacq4X1ACCl
+eKyifc7QMBOJh5PZJsVw/GpdOmsTH2sFTOagwvvQ8V0nAgMBAAGjAjAAMA0GCSqG
+SIb3DQEBCwUAA4IBAQBubUTtrqcdK8ULdJQi8gVMEPRoINXWqE3rsSWcRWYfANTL
+unjzeTgzRXMqz78QuTg4Gyt/vxcsn1NL2/pAPYTEiM7+RmF9+erZm3ZPBDoI4o2l
+ncM/qMGh06N7Bnc3HINkEwA7Gd+j1q9SWAiYKsrZa/Qvpi6RAAo7hgisuJeDB6xq
+dkPW2VCdXgM2B/fb2yrX1n3VsWU2UfIPEgGt7zPEx5hjn7qFWO3AX2NvbdC7oifc
+xxBhiUaXE50bAJQLwgy/qQ63IjYRnWPzYdZnZIMarpyHEgSln6715WkbdgxAnnGx
+ltfk96gUo55F5PpIjQezwcLYjVLmjMF6PNWFQYXt
 -----END CERTIFICATE-----`
 	pemTemplate := fmt.Sprintf("`%s`", pem)
 
@@ -159,6 +160,22 @@ rxYbUhqc
 		const value = cert.subject ? cert.subject.organizationName : null;
 		if (value !== "Exumbran Convention") {
 			throw new Error("Bad organization: " + value);
+		}`, pemTemplate))
+		assert.NoError(t, err)
+	})
+
+	t.Run("ParseSubjectOrganizationalUnit", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const pem = %s;
+		const cert = x509.parse(pem);
+		const values =
+			cert.subject ? cert.subject.organizationalUnitName : null;
+		if (!(
+			values.length === 2 &&
+			values[0] === "Exumbran Council" &&
+			values[1] === "Exumbran Janitorial Service"
+		)) {
+			throw new Error("Bad organizational unit: " + values.join(", "));
 		}`, pemTemplate))
 		assert.NoError(t, err)
 	})

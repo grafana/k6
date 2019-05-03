@@ -44,6 +44,7 @@ type CertificateSubject struct {
 	LocalityName string `js:"localityName"`
 	StreetAddress string `js:"streetAddress"`
 	OrganizationName string `js:"organizationName"`
+	OrganizationalUnitName []string `js:"organizationalUnitName"`
 }
 
 func New() *X509 {
@@ -79,6 +80,7 @@ func MakeSubject(subject pkix.Name) (CertificateSubject) {
 		LocalityName: First(subject.Locality),
 		StreetAddress: First(subject.StreetAddress),
 		OrganizationName: First(subject.Organization),
+		OrganizationalUnitName: subject.OrganizationalUnit,
 	}
 }
 
