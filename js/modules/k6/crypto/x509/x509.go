@@ -98,12 +98,12 @@ func (X509) GetSubject(ctx context.Context, encoded string) (Subject) {
 func ParseCertificate(ctx context.Context, encoded string) (*x509.Certificate) {
 	decoded, _ := pem.Decode([]byte(encoded))
 	if decoded == nil {
-		err := errors.New("Failed to decode certificate PEM file")
+		err := errors.New("failed to decode certificate PEM file")
 		common.Throw(common.GetRuntime(ctx), err)
 	}
 	parsed, err := x509.ParseCertificate(decoded.Bytes)
 	if err != nil {
-		err := errors.New("Failed to parse certificate")
+		err := errors.New("failed to parse certificate")
 		common.Throw(common.GetRuntime(ctx), err)
 	}
 	return parsed
