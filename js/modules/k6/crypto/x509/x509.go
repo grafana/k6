@@ -68,6 +68,7 @@ type CertificateIssuer struct {
 type PublicKey struct {
 	Algorithm string
 	E int
+	N []byte
 }
 
 func New() *X509 {
@@ -129,6 +130,7 @@ func MakePublicKey(parsed *x509.Certificate) (PublicKey) {
 	return PublicKey{
 		Algorithm: PublicKeyAlgorithm(parsed.PublicKeyAlgorithm),
 		E: key.E,
+		N: key.N.Bytes(),
 	}
 }
 
