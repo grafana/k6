@@ -140,4 +140,15 @@ rxYbUhqc
 		}`, pemTemplate))
 		assert.NoError(t, err)
 	})
+
+	t.Run("ParseSubjectStreetAddress", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const pem = %s;
+		const cert = x509.parse(pem);
+		const value = cert.subject ? cert.subject.streetAddress : null;
+		if (value !== "221B Baker Street") {
+			throw new Error("Bad street address: " + value);
+		}`, pemTemplate))
+		assert.NoError(t, err)
+	})
 }

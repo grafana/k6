@@ -42,6 +42,7 @@ type CertificateSubject struct {
 	PostalCode string `js:"postalCode"`
 	StateOrProvinceName string `js:"stateOrProvinceName"`
 	LocalityName string `js:"localityName"`
+	StreetAddress string `js:"streetAddress"`
 }
 
 func New() *X509 {
@@ -75,6 +76,7 @@ func MakeSubject(subject pkix.Name) (CertificateSubject) {
 		PostalCode: First(subject.PostalCode),
 		StateOrProvinceName: First(subject.Province),
 		LocalityName: First(subject.Locality),
+		StreetAddress: First(subject.StreetAddress),
 	}
 }
 
