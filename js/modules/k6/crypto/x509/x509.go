@@ -36,8 +36,8 @@ import (
 type X509 struct{}
 
 type Certificate struct {
-	Subject CertificateSubject
-	Issuer CertificateIssuer
+	Subject Subject
+	Issuer Issuer
 	NotBefore string `js:"notBefore"`
 	NotAfter string `js:"notAfter"`
 	AltNames []string `js:"altNames"`
@@ -46,7 +46,7 @@ type Certificate struct {
 	PublicKey PublicKey `js:"publicKey"`
 }
 
-type CertificateSubject struct {
+type Subject struct {
 	CommonName string `js:"commonName"`
 	Country string
 	PostalCode string `js:"postalCode"`
@@ -57,7 +57,7 @@ type CertificateSubject struct {
 	OrganizationalUnitName []string `js:"organizationalUnitName"`
 }
 
-type CertificateIssuer struct {
+type Issuer struct {
 	CommonName string `js:"commonName"`
 	Country string
 	StateOrProvinceName string `js:"stateOrProvinceName"`
@@ -76,6 +76,16 @@ func New() *X509 {
 }
 
 func (X509) Parse(ctx context.Context, encoded string) (Certificate) {
+	parsed := ParseCertificate(ctx, encoded)
+	return MakeCertificate(parsed)
+}
+
+func (X509) GetIssuer(ctx context.Context, encoded string) (Issuer) {
+	parsed := ParseCertificate(ctx, encoded)
+	return MakeIssuer(parsed.Issuer)
+}
+
+func ParseCertificate(ctx context.Context, encoded string) (*x509.Certificate) {
 	decoded, _ := pem.Decode([]byte(encoded))
 	if decoded == nil {
 		err := errors.New("Failed to decode certificate PEM file")
@@ -86,7 +96,7 @@ func (X509) Parse(ctx context.Context, encoded string) (Certificate) {
 		err := errors.New("Failed to parse certificate")
 		common.Throw(common.GetRuntime(ctx), err)
 	}
-	return MakeCertificate(parsed)
+	return parsed
 }
 
 func MakeCertificate(parsed *x509.Certificate) (Certificate) {
@@ -102,8 +112,8 @@ func MakeCertificate(parsed *x509.Certificate) (Certificate) {
 	}
 }
 
-func MakeSubject(subject pkix.Name) (CertificateSubject) {
-	return CertificateSubject{
+func MakeSubject(subject pkix.Name) (Subject) {
+	return Subject{
 		CommonName: subject.CommonName,
 		Country: First(subject.Country),
 		PostalCode: First(subject.PostalCode),
@@ -115,8 +125,8 @@ func MakeSubject(subject pkix.Name) (CertificateSubject) {
 	}
 }
 
-func MakeIssuer(issuer pkix.Name) (CertificateIssuer) {
-	return CertificateIssuer{
+func MakeIssuer(issuer pkix.Name) (Issuer) {
+	return Issuer{
 		CommonName: issuer.CommonName,
 		Country: First(issuer.Country),
 		StateOrProvinceName: First(issuer.Province),

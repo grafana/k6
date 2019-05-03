@@ -82,8 +82,7 @@ func TestParse(t *testing.T) {
 
 	t.Run("Failure", func(t *testing.T) {
 		_, err := common.RunString(rt, `
-		x509.parse("bad-certificate");
-		`)
+		x509.parse("bad-certificate");`)
 		assert.Error(t, err)
 	})
 
@@ -385,6 +384,37 @@ func TestParse(t *testing.T) {
 		]
 		if (value.join(":") !== expected.join(":")) {
 			throw new Error("Bad public key modulus: " + value.join(":"));
+		}`, pem))
+		assert.NoError(t, err)
+	})
+}
+
+func TestGetIssuer(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+	rt := MakeRuntime()
+	pem := Material()
+
+	t.Run("Failure", func(t *testing.T) {
+		_, err := common.RunString(rt, `
+		x509.getIssuer("bad-certificate");`)
+		assert.Error(t, err)
+	})
+
+	t.Run("Success", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const pem = %s;
+		const issuer = x509.getIssuer(pem);
+		if (!(
+			typeof issuer === "object" &&
+			issuer.commonName === "excouncil.zz" &&
+			issuer.country === "ZZ" &&
+			issuer.stateOrProvinceName === "Kopuncezis Krais" &&
+			issuer.localityName === "Ashtinok" &&
+			issuer.organizationName === "Exumbran Convention"
+		)) {
+			throw new Error("Bad getIssuer() result");
 		}`, pem))
 		assert.NoError(t, err)
 	})
