@@ -53,6 +53,7 @@ type CertificateIssuer struct {
 	CountryName string `js:"countryName"`
 	StateOrProvinceName string `js:"stateOrProvinceName"`
 	LocalityName string `js:"localityName"`
+	OrganizationName string `js:"organizationName"`
 }
 
 func New() *X509 {
@@ -99,6 +100,7 @@ func MakeIssuer(issuer pkix.Name) (CertificateIssuer) {
 		CountryName: First(issuer.Country),
 		StateOrProvinceName: First(issuer.Province),
 		LocalityName: First(issuer.Locality),
+		OrganizationName: First(issuer.Organization),
 	}
 }
 

@@ -234,4 +234,15 @@ ltfk96gUo55F5PpIjQezwcLYjVLmjMF6PNWFQYXt
 		}`, pemTemplate))
 		assert.NoError(t, err)
 	})
+
+	t.Run("ParseIssuerOrganization", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const pem = %s;
+		const cert = x509.parse(pem);
+		const value = cert.issuer ? cert.issuer.organizationName : null;
+		if (value !== "Exumbran Convention") {
+			throw new Error("Bad issuer organization: " + value);
+		}`, pemTemplate))
+		assert.NoError(t, err)
+	})
 }
