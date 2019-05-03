@@ -38,6 +38,7 @@ type Certificate struct {
 	Issuer CertificateIssuer
 	NotBefore string `js:"notBefore"`
 	NotAfter string `js:"notAfter"`
+	AltNames []string `js:"altNames"`
 	SignatureAlgorithm string `js:"signatureAlgorithm"`
 }
 
@@ -84,6 +85,7 @@ func MakeCertificate(parsed *x509.Certificate) (Certificate) {
 		Issuer: MakeIssuer(parsed.Issuer),
 		NotBefore: ISO8601(parsed.NotBefore),
 		NotAfter: ISO8601(parsed.NotAfter),
+		AltNames: AltNames(parsed),
 		SignatureAlgorithm: SignatureAlgorithm(parsed.SignatureAlgorithm),
 	}
 }
@@ -119,14 +121,39 @@ func First(values []string) (string) {
 	}
 }
 
+func ISO8601(value time.Time) (string) {
+	return value.Format(time.RFC3339)
+}
+
+func AltNames(parsed *x509.Certificate) ([]string) {
+	var names []string
+	names = append(names, parsed.DNSNames...)
+	names = append(names, parsed.EmailAddresses...)
+	names = append(names, IPAddresses(parsed)...)
+	names = append(names, URIs(parsed)...)
+	return names
+}
+
+func IPAddresses(parsed *x509.Certificate) ([]string) {
+	strings := make([]string, len(parsed.IPAddresses))
+	for i, item := range parsed.IPAddresses {
+		strings[i] = item.String()
+	}
+	return strings
+}
+
+func URIs(parsed *x509.Certificate) ([]string) {
+	strings := make([]string, len(parsed.URIs))
+	for i, item := range parsed.URIs {
+		strings[i] = item.String()
+	}
+	return strings
+}
+
 func SignatureAlgorithm(value x509.SignatureAlgorithm) (string) {
 	if (value == x509.UnknownSignatureAlgorithm) {
 		return "UnknownSignatureAlgorithm"
 	} else {
 		return value.String()
 	}
-}
-
-func ISO8601(value time.Time) (string) {
-	return value.Format(time.RFC3339)
 }

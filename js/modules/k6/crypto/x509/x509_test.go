@@ -43,7 +43,7 @@ func TestParse(t *testing.T) {
 	rt := MakeRuntime()
 
 	pem := `-----BEGIN CERTIFICATE-----
-MIIENjCCAx6gAwIBAgICBNIwDQYJKoZIhvcNAQELBQAwgdsxCzAJBgNVBAYTAlpa
+MIIE6zCCA9OgAwIBAgICBNIwDQYJKoZIhvcNAQELBQAwgdsxCzAJBgNVBAYTAlpa
 MRkwFwYDVQQIExBLb3B1bmNlemlzIEtyYWlzMREwDwYDVQQHEwhBc2h0aW5vazEa
 MBgGA1UECRMRMjIxQiBCYWtlciBTdHJlZXQxDjAMBgNVBBETBTk5OTk5MRwwGgYD
 VQQKExNFeHVtYnJhbiBDb252ZW50aW9uMT0wFwYDVQQLExBFeHVtYnJhbiBDb3Vu
@@ -54,18 +54,22 @@ BAcTCEFzaHRpbm9rMRowGAYDVQQJExEyMjFCIEJha2VyIFN0cmVldDEOMAwGA1UE
 ERMFOTk5OTkxHDAaBgNVBAoTE0V4dW1icmFuIENvbnZlbnRpb24xPTAXBgNVBAsT
 EEV4dW1icmFuIENvdW5jaWwwIgYDVQQLExtFeHVtYnJhbiBKYW5pdG9yaWFsIFNl
 cnZpY2UxFTATBgNVBAMTDGV4Y291bmNpbC56ejCCASIwDQYJKoZIhvcNAQEBBQAD
-ggEPADCCAQoCggEBALcTVKZ5qDpfpWCTsl7zdqqMG36WwkCOvRwIL3CK39ZN4kyC
-e6EeHG+tZQQZq/ZtOp60KLs3EiFCt8Y4mGbruiQJPYpKdKnlTPVbGmz+BmhJhf+U
-+Trr8TcYp7ORs6Iz23ZxbbdnW+eV/yTgPPVD/TGKLnLFeGdopRJf/tGBTKNS5k27
-NrtXYUH4QlkmLM0IF+L1nnfkS3eDpi5DdKoCCIv2KTA1j/2ZSOBx/8mGc+rp9noW
-bCSLnbBRsHaRkEMtpq+kYRcnza+iT3UaNUQl1SLoWAXBsgxk6HHC09g/csARwwU4
-2zhwh+NrBLgHJVqVM9cJe3n8hnfhHoRcLWjEVjECAwEAAaMCMAAwDQYJKoZIhvcN
-AQELBQADggEBAJqWfwlMcEA3KnUIk4Qt6LjE2ZCZvXWkFnm899Z95umCaD76DMu4
-nj8ttnV6smQk2s+ecKQr959T5FmWv1FlOJCJ8w7Ph946apXhNuS+8mUachSShi0J
-IPCnxw7uEZlPCzF6HgSEzcV47VD7SCDuyA20JmDT0dThKe9If76B96Ru7oItHF/S
-yuyUrdCYaFBop3o83ba7CoOEy3YvFaMOypjNOganQ9H1hKp8vdgXj+hcuPyBVM9F
-7UdusDcOB/IkTwUhRGfqqNXNoYA2NmaU7zxl1eglATElx7S7Z4oR6ikEQPCBXkcK
-jMozgMz/EFm4jeVg0ALoTa8+esYf82v4vlc=
+ggEPADCCAQoCggEBAN/56ke0JBw+VI2xdjUCry2nWZvYZ1Yg2CpcVH23Ztko/4Em
+y69i0ZOXavoMe+yHLVBQTP2UjQ0kTC+2OmSZcg2NYAxtfkpEd1gPNGtQdb6j5nga
+LIv13rzS7XtTW2Kg2uX0gB8Yi30ZuGy0F5WIL4yoM58jQZYHM4aKvOFpXAlbSIVG
+w4NpuL/GsYK/RgYln//0be6AigDJKVdDV6V2BP3RH7EBAXRADhET2QZ1Sxiu7IGG
+c/Xiy94RccXXivFjqURN8yR0RY+WPPVLyB7PjYuII324/64aBpQ4/Xz5nvl1A358
+WRtg0QDPmOmmUQf9m6VgHUgcrBhoRuXJa8ip3CMCAwEAAaOBtjCBszCBsAYDVR0R
+BIGoMIGlghNjb3VuY2lsLmV4dW1icmFuLnp6ghJhYm91dC5leGNvdW5jaWwuenqB
+FmlucXVpcmllc0BleGNvdW5jaWwuenqBEnByZXNzQGV4Y291bmNpbC56eocEwAAC
+AIcEwAACGYYZaHR0cDovL3ByZXNzLmV4Y291bmNpbC56eoYnaHR0cDovL2xlYXJu
+aW5nLmV4Y291bmNpbC56ei9pbmRleC5odG1sMA0GCSqGSIb3DQEBCwUAA4IBAQCI
+lVr5wEwAznmV/MxE5vc4gfHppYzszssPPvvGs0QjuDe9AbN26nEuriren2bcGbcS
+pVhl25tfIJd5rvgvWKz+nTQCEGVI4BDFio0Jt5+7CADOsSSFGYQIu0BrjA3vCs87
+gzg3dNaCY65aH0cJE/dVwiS/F2XTr1zvr+uBPExgrA21+FSIlHM0Dot+VGKdCLEO
+6HugOCDBdzKF2hsHeI5LvgXUX5zQ0gnsd93+QuxUmiN7QZZs8tDMD/+efo4OWvp/
+xytSVXVn+cECQLg9hVn+Zx3XO2FA0eOzaWEONnUGghT/Ivw06lUxis5tkAoAU93d
+ddBqJe0XUeAX8Zr6EJ82
 -----END CERTIFICATE-----`
 	pemTemplate := fmt.Sprintf("`%s`", pem)
 
@@ -275,6 +279,27 @@ jMozgMz/EFm4jeVg0ALoTa8+esYf82v4vlc=
 		const value = cert.notAfter;
 		if (value !== "2020-01-01T00:00:00Z") {
 			throw new Error("Bad upper bound: " + value);
+		}`, pemTemplate))
+		assert.NoError(t, err)
+	})
+
+	t.Run("ParseAltNames", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const pem = %s;
+		const cert = x509.parse(pem);
+		const values = cert.altNames;
+		if (!(
+			values.length === 8 &&
+			values[0] === "council.exumbran.zz" &&
+			values[1] === "about.excouncil.zz" &&
+			values[2] === "inquiries@excouncil.zz" &&
+			values[3] === "press@excouncil.zz" &&
+			values[4] === "192.0.2.0" &&
+			values[5] === "192.0.2.25" &&
+			values[6] === "http://press.excouncil.zz" &&
+			values[7] === "http://learning.excouncil.zz/index.html"
+		)) {
+			throw new Error("Bad alt names: " + values.join(", "));
 		}`, pemTemplate))
 		assert.NoError(t, err)
 	})
