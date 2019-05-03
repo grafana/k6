@@ -26,6 +26,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"errors"
+	"time"
 
 	"github.com/loadimpact/k6/js/common"
 )
@@ -35,6 +36,7 @@ type X509 struct{}
 type Certificate struct {
 	Subject CertificateSubject
 	Issuer CertificateIssuer
+	NotBefore string `js:"notBefore"`
 	SignatureAlgorithm string `js:"signatureAlgorithm"`
 }
 
@@ -79,6 +81,7 @@ func MakeCertificate(parsed *x509.Certificate) (Certificate) {
 	return Certificate{
 		Subject: MakeSubject(parsed.Subject),
 		Issuer: MakeIssuer(parsed.Issuer),
+		NotBefore: ISO8601(parsed.NotBefore),
 		SignatureAlgorithm: SignatureAlgorithm(parsed.SignatureAlgorithm),
 	}
 }
@@ -120,4 +123,8 @@ func SignatureAlgorithm(value x509.SignatureAlgorithm) (string) {
 	} else {
 		return value.String()
 	}
+}
+
+func ISO8601(value time.Time) (string) {
+	return value.Format(time.RFC3339)
 }
