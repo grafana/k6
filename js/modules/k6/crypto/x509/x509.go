@@ -37,7 +37,7 @@ import (
 // X509 certificate functionality
 type X509 struct{}
 
-// Certificate : an X.509 certificate
+// Certificate is an X.509 certificate
 type Certificate struct {
 	Subject            Subject
 	Issuer             Issuer
@@ -49,7 +49,7 @@ type Certificate struct {
 	PublicKey          PublicKey `js:"publicKey"`
 }
 
-// Subject : a certificate subject
+// Subject is a certificate subject
 type Subject struct {
 	CommonName             string `js:"commonName"`
 	Country                string
@@ -61,7 +61,7 @@ type Subject struct {
 	OrganizationalUnitName []string `js:"organizationalUnitName"`
 }
 
-// Issuer : a certificate issuer
+// Issuer is a certificate issuer
 type Issuer struct {
 	CommonName          string `js:"commonName"`
 	Country             string
@@ -70,33 +70,37 @@ type Issuer struct {
 	OrganizationName    string `js:"organizationName"`
 }
 
-// PublicKey : a public key
+// PublicKey is a public key
 type PublicKey struct {
 	Algorithm string
 	E         int
 	N         []byte
 }
 
-// New : construct X509 interface
+// New constructs the X509 interface
 func New() *X509 {
 	return &X509{}
 }
 
+// Parse produces an entire x.509 certificate
 func (X509) Parse(ctx context.Context, encoded string) Certificate {
 	parsed := parseCertificate(ctx, encoded)
 	return makeCertificate(parsed)
 }
 
+// GetAltNames extracts alt names
 func (X509) GetAltNames(ctx context.Context, encoded string) []string {
 	parsed := parseCertificate(ctx, encoded)
 	return altNames(parsed)
 }
 
+// GetIssuer extracts certificate issuer
 func (X509) GetIssuer(ctx context.Context, encoded string) Issuer {
 	parsed := parseCertificate(ctx, encoded)
 	return makeIssuer(parsed.Issuer)
 }
 
+// GetSubject extracts certificate subject
 func (X509) GetSubject(ctx context.Context, encoded string) Subject {
 	parsed := parseCertificate(ctx, encoded)
 	return makeSubject(parsed.Subject)
