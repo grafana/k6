@@ -389,6 +389,41 @@ func TestParse(t *testing.T) {
 	})
 }
 
+func TestGetAltNames(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+	rt := MakeRuntime()
+	pem := Material()
+
+	t.Run("Failure", func(t *testing.T) {
+		_, err := common.RunString(rt, `
+		x509.getAltNames("bad-certificate");`)
+		assert.Error(t, err)
+	})
+
+	t.Run("Success", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const pem = %s;
+		const altNames = x509.getAltNames(pem);
+		if (!(
+			Array.isArray(altNames) &&
+			altNames.length === 8 &&
+			altNames[0] === "council.exumbran.zz" &&
+			altNames[1] === "about.excouncil.zz" &&
+			altNames[2] === "inquiries@excouncil.zz" &&
+			altNames[3] === "press@excouncil.zz" &&
+			altNames[4] === "192.0.2.0" &&
+			altNames[5] === "192.0.2.25" &&
+			altNames[6] === "http://press.excouncil.zz" &&
+			altNames[7] === "http://learning.excouncil.zz/index.html"
+		)) {
+			throw new Error("Bad alt names");
+		}`, pem))
+		assert.NoError(t, err)
+	})
+}
+
 func TestGetIssuer(t *testing.T) {
 	if testing.Short() {
 		return

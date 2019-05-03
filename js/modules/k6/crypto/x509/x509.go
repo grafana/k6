@@ -80,6 +80,11 @@ func (X509) Parse(ctx context.Context, encoded string) (Certificate) {
 	return MakeCertificate(parsed)
 }
 
+func (X509) GetAltNames(ctx context.Context, encoded string) ([]string) {
+	parsed := ParseCertificate(ctx, encoded)
+	return AltNames(parsed)
+}
+
 func (X509) GetIssuer(ctx context.Context, encoded string) (Issuer) {
 	parsed := ParseCertificate(ctx, encoded)
 	return MakeIssuer(parsed.Issuer)
