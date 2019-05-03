@@ -414,7 +414,45 @@ func TestGetIssuer(t *testing.T) {
 			issuer.localityName === "Ashtinok" &&
 			issuer.organizationName === "Exumbran Convention"
 		)) {
-			throw new Error("Bad getIssuer() result");
+			throw new Error("Bad issuer");
+		}`, pem))
+		assert.NoError(t, err)
+	})
+}
+
+func TestGetSubject(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+	rt := MakeRuntime()
+	pem := Material()
+
+	t.Run("Failure", func(t *testing.T) {
+		_, err := common.RunString(rt, `
+		x509.getSubject("bad-certificate");`)
+		assert.Error(t, err)
+	})
+
+	t.Run("Success", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const pem = %s;
+		const subject = x509.getSubject(pem);
+		if (!(
+			typeof subject === "object" &&
+			subject.commonName === "excouncil.zz" &&
+			subject.country === "ZZ" &&
+			subject.postalCode === "99999" &&
+			subject.stateOrProvinceName === "Kopuncezis Krais" &&
+			subject.localityName === "Ashtinok" &&
+			subject.streetAddress === "221B Baker Street" &&
+			subject.organizationName === "Exumbran Convention" &&
+			Array.isArray(subject.organizationalUnitName) &&
+			subject.organizationalUnitName.length === 2 &&
+			subject.organizationalUnitName[0] === "Exumbran Council" &&
+			subject.organizationalUnitName[1] ===
+				"Exumbran Janitorial Service"
+		)) {
+			throw new Error("Bad subject");
 		}`, pem))
 		assert.NoError(t, err)
 	})

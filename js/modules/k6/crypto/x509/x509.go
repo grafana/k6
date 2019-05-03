@@ -85,6 +85,11 @@ func (X509) GetIssuer(ctx context.Context, encoded string) (Issuer) {
 	return MakeIssuer(parsed.Issuer)
 }
 
+func (X509) GetSubject(ctx context.Context, encoded string) (Subject) {
+	parsed := ParseCertificate(ctx, encoded)
+	return MakeSubject(parsed.Subject)
+}
+
 func ParseCertificate(ctx context.Context, encoded string) (*x509.Certificate) {
 	decoded, _ := pem.Decode([]byte(encoded))
 	if decoded == nil {
