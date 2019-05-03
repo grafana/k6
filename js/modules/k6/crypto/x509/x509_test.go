@@ -202,6 +202,17 @@ ltfk96gUo55F5PpIjQezwcLYjVLmjMF6PNWFQYXt
 		assert.NoError(t, err)
 	})
 
+	t.Run("ParseIssuerCommonName", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const pem = %s;
+		const cert = x509.parse(pem);
+		const value = cert.issuer ? cert.issuer.commonName : null;
+		if (value !== "excouncil.zz") {
+			throw new Error("Bad issuer common name: " + value);
+		}`, pemTemplate))
+		assert.NoError(t, err)
+	})
+
 	t.Run("ParseIssuerCountry", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const pem = %s;

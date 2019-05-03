@@ -39,6 +39,7 @@ type Certificate struct {
 }
 
 type CertificateSubject struct {
+	CommonName string `js:"commonName"`
 	CountryName string `js:"countryName"`
 	PostalCode string `js:"postalCode"`
 	StateOrProvinceName string `js:"stateOrProvinceName"`
@@ -46,10 +47,10 @@ type CertificateSubject struct {
 	StreetAddress string `js:"streetAddress"`
 	OrganizationName string `js:"organizationName"`
 	OrganizationalUnitName []string `js:"organizationalUnitName"`
-	CommonName string `js:"commonName"`
 }
 
 type CertificateIssuer struct {
+	CommonName string `js:"commonName"`
 	CountryName string `js:"countryName"`
 	StateOrProvinceName string `js:"stateOrProvinceName"`
 	LocalityName string `js:"localityName"`
@@ -84,6 +85,7 @@ func MakeCertificate(parsed *x509.Certificate) (Certificate) {
 
 func MakeSubject(subject pkix.Name) (CertificateSubject) {
 	return CertificateSubject{
+		CommonName: subject.CommonName,
 		CountryName: First(subject.Country),
 		PostalCode: First(subject.PostalCode),
 		StateOrProvinceName: First(subject.Province),
@@ -91,12 +93,12 @@ func MakeSubject(subject pkix.Name) (CertificateSubject) {
 		StreetAddress: First(subject.StreetAddress),
 		OrganizationName: First(subject.Organization),
 		OrganizationalUnitName: subject.OrganizationalUnit,
-		CommonName: subject.CommonName,
 	}
 }
 
 func MakeIssuer(issuer pkix.Name) (CertificateIssuer) {
 	return CertificateIssuer{
+		CommonName: issuer.CommonName,
 		CountryName: First(issuer.Country),
 		StateOrProvinceName: First(issuer.Province),
 		LocalityName: First(issuer.Locality),
