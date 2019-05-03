@@ -83,26 +83,26 @@ func New() *X509 {
 }
 
 func (X509) Parse(ctx context.Context, encoded string) Certificate {
-	parsed := ParseCertificate(ctx, encoded)
-	return MakeCertificate(parsed)
+	parsed := parseCertificate(ctx, encoded)
+	return makeCertificate(parsed)
 }
 
 func (X509) GetAltNames(ctx context.Context, encoded string) []string {
-	parsed := ParseCertificate(ctx, encoded)
-	return AltNames(parsed)
+	parsed := parseCertificate(ctx, encoded)
+	return altNames(parsed)
 }
 
 func (X509) GetIssuer(ctx context.Context, encoded string) Issuer {
-	parsed := ParseCertificate(ctx, encoded)
-	return MakeIssuer(parsed.Issuer)
+	parsed := parseCertificate(ctx, encoded)
+	return makeIssuer(parsed.Issuer)
 }
 
 func (X509) GetSubject(ctx context.Context, encoded string) Subject {
-	parsed := ParseCertificate(ctx, encoded)
-	return MakeSubject(parsed.Subject)
+	parsed := parseCertificate(ctx, encoded)
+	return makeSubject(parsed.Subject)
 }
 
-func ParseCertificate(ctx context.Context, encoded string) *x509.Certificate {
+func parseCertificate(ctx context.Context, encoded string) *x509.Certificate {
 	decoded, _ := pem.Decode([]byte(encoded))
 	if decoded == nil {
 		err := errors.New("failed to decode certificate PEM file")
@@ -116,72 +116,72 @@ func ParseCertificate(ctx context.Context, encoded string) *x509.Certificate {
 	return parsed
 }
 
-func MakeCertificate(parsed *x509.Certificate) Certificate {
+func makeCertificate(parsed *x509.Certificate) Certificate {
 	return Certificate{
-		Subject:            MakeSubject(parsed.Subject),
-		Issuer:             MakeIssuer(parsed.Issuer),
-		NotBefore:          ISO8601(parsed.NotBefore),
-		NotAfter:           ISO8601(parsed.NotAfter),
-		AltNames:           AltNames(parsed),
-		SignatureAlgorithm: SignatureAlgorithm(parsed.SignatureAlgorithm),
-		FingerPrint:        FingerPrint(parsed),
-		PublicKey:          MakePublicKey(parsed),
+		Subject:            makeSubject(parsed.Subject),
+		Issuer:             makeIssuer(parsed.Issuer),
+		NotBefore:          iso8601(parsed.NotBefore),
+		NotAfter:           iso8601(parsed.NotAfter),
+		AltNames:           altNames(parsed),
+		SignatureAlgorithm: signatureAlgorithm(parsed.SignatureAlgorithm),
+		FingerPrint:        fingerPrint(parsed),
+		PublicKey:          makePublicKey(parsed),
 	}
 }
 
-func MakeSubject(subject pkix.Name) Subject {
+func makeSubject(subject pkix.Name) Subject {
 	return Subject{
 		CommonName:             subject.CommonName,
-		Country:                First(subject.Country),
-		PostalCode:             First(subject.PostalCode),
-		StateOrProvinceName:    First(subject.Province),
-		LocalityName:           First(subject.Locality),
-		StreetAddress:          First(subject.StreetAddress),
-		OrganizationName:       First(subject.Organization),
+		Country:                first(subject.Country),
+		PostalCode:             first(subject.PostalCode),
+		StateOrProvinceName:    first(subject.Province),
+		LocalityName:           first(subject.Locality),
+		StreetAddress:          first(subject.StreetAddress),
+		OrganizationName:       first(subject.Organization),
 		OrganizationalUnitName: subject.OrganizationalUnit,
 	}
 }
 
-func MakeIssuer(issuer pkix.Name) Issuer {
+func makeIssuer(issuer pkix.Name) Issuer {
 	return Issuer{
 		CommonName:          issuer.CommonName,
-		Country:             First(issuer.Country),
-		StateOrProvinceName: First(issuer.Province),
-		LocalityName:        First(issuer.Locality),
-		OrganizationName:    First(issuer.Organization),
+		Country:             first(issuer.Country),
+		StateOrProvinceName: first(issuer.Province),
+		LocalityName:        first(issuer.Locality),
+		OrganizationName:    first(issuer.Organization),
 	}
 }
 
-func MakePublicKey(parsed *x509.Certificate) PublicKey {
+func makePublicKey(parsed *x509.Certificate) PublicKey {
 	key := parsed.PublicKey.(*rsa.PublicKey)
 	return PublicKey{
-		Algorithm: PublicKeyAlgorithm(parsed.PublicKeyAlgorithm),
+		Algorithm: publicKeyAlgorithm(parsed.PublicKeyAlgorithm),
 		E:         key.E,
 		N:         key.N.Bytes(),
 	}
 }
 
-func First(values []string) string {
+func first(values []string) string {
 	if len(values) > 0 {
 		return values[0]
 	}
 	return ""
 }
 
-func ISO8601(value time.Time) string {
+func iso8601(value time.Time) string {
 	return value.Format(time.RFC3339)
 }
 
-func AltNames(parsed *x509.Certificate) []string {
+func altNames(parsed *x509.Certificate) []string {
 	var names []string
 	names = append(names, parsed.DNSNames...)
 	names = append(names, parsed.EmailAddresses...)
-	names = append(names, IPAddresses(parsed)...)
-	names = append(names, URIs(parsed)...)
+	names = append(names, ipAddresses(parsed)...)
+	names = append(names, uris(parsed)...)
 	return names
 }
 
-func IPAddresses(parsed *x509.Certificate) []string {
+func ipAddresses(parsed *x509.Certificate) []string {
 	strings := make([]string, len(parsed.IPAddresses))
 	for i, item := range parsed.IPAddresses {
 		strings[i] = item.String()
@@ -189,7 +189,7 @@ func IPAddresses(parsed *x509.Certificate) []string {
 	return strings
 }
 
-func URIs(parsed *x509.Certificate) []string {
+func uris(parsed *x509.Certificate) []string {
 	strings := make([]string, len(parsed.URIs))
 	for i, item := range parsed.URIs {
 		strings[i] = item.String()
@@ -197,19 +197,19 @@ func URIs(parsed *x509.Certificate) []string {
 	return strings
 }
 
-func SignatureAlgorithm(value x509.SignatureAlgorithm) string {
+func signatureAlgorithm(value x509.SignatureAlgorithm) string {
 	if value == x509.UnknownSignatureAlgorithm {
 		return "UnknownSignatureAlgorithm"
 	}
 	return value.String()
 }
 
-func FingerPrint(parsed *x509.Certificate) []byte {
+func fingerPrint(parsed *x509.Certificate) []byte {
 	bytes := sha1.Sum(parsed.Raw)
 	return bytes[:]
 }
 
-func PublicKeyAlgorithm(value x509.PublicKeyAlgorithm) string {
+func publicKeyAlgorithm(value x509.PublicKeyAlgorithm) string {
 	if value == x509.UnknownPublicKeyAlgorithm {
 		return "UnknownPublicKeyAlgorithm"
 	}
