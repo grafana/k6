@@ -23,7 +23,7 @@ package x509
 import (
 	"context"
 	"crypto/rsa"
-	"crypto/sha1"
+	"crypto/sha1" // #nosec G505
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
@@ -208,7 +208,7 @@ func signatureAlgorithm(value x509.SignatureAlgorithm) string {
 }
 
 func fingerPrint(parsed *x509.Certificate) []byte {
-	bytes := sha1.Sum(parsed.Raw)
+	bytes := sha1.Sum(parsed.Raw) // #nosec G401
 	return bytes[:]
 }
 
