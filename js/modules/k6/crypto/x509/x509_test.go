@@ -727,7 +727,7 @@ func TestParsePublicKey(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	t.Run("SuccessRsa", func(t *testing.T) {
+	t.Run("SuccessRSA", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const pem = %s;
 		const publicKey = x509.parsePublicKey(pem);
