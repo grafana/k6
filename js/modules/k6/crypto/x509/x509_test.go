@@ -238,6 +238,17 @@ func template(value string) string {
 	return fmt.Sprintf("`%s`", value)
 }
 
+func testRsaPublicKey() string {
+	pem := `-----BEGIN PUBLIC KEY-----
+MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDXMLr/Y/vUtIFY75jj0YXfp6lQ
+7iEIbps3BvRE4isTpxs8fXLnLM8LAuJScxiKyrGnj8EMb7LIHkSMBlz6iVj9atY6
+EUEm/VHUnElNquzGyBA50TCfpv6NHPaTvOoB45yQbZ/YB4LO+CsT9eIMDZ4tcU9Z
++xD10ifJhhIwpZUFIQIDAQAB
+-----END PUBLIC KEY-----`
+	template := fmt.Sprintf("`%s`", pem)
+	return template
+}
+
 func TestParse(t *testing.T) {
 	if testing.Short() {
 		return
@@ -803,7 +814,7 @@ func TestParsePublicKey(t *testing.T) {
 	}
 	rt := makeRuntime()
 
-	t.Run("Failure", func(t *testing.T) {
+	t.Run("BadCertificate", func(t *testing.T) {
 		_, err := common.RunString(rt, `
 		x509.parsePublicKey("bad-public-key");`)
 		assert.Error(t, err)
