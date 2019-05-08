@@ -721,7 +721,7 @@ func TestParsePublicKey(t *testing.T) {
 	rt := makeRuntime()
 	rsa := testRsaPublicKey()
 
-	t.Run("BadCertificate", func(t *testing.T) {
+	t.Run("Failure", func(t *testing.T) {
 		_, err := common.RunString(rt, `
 		x509.parsePublicKey("bad-public-key");`)
 		assert.Error(t, err)
