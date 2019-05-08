@@ -151,8 +151,70 @@ MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDXMLr/Y/vUtIFY75jj0YXfp6lQ
 EUEm/VHUnElNquzGyBA50TCfpv6NHPaTvOoB45yQbZ/YB4LO+CsT9eIMDZ4tcU9Z
 +xD10ifJhhIwpZUFIQIDAQAB
 -----END PUBLIC KEY-----`
-	template := fmt.Sprintf("`%s`", pem)
-	return template
+	return template(pem)
+}
+
+func testRsaPrivateKeyClear() string {
+	pem := `-----BEGIN PRIVATE KEY-----
+MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCVpbjIX/vXqzDt
+4r8mbaV247wbF9zPIEPCcghvbPaFoKKiO4fHT0xx3otwNzPDWMleYK4y2drlpBEA
+Y0o0cgP9R+gCtzc9qperLJGPPQmanjFlhTClecRmOea2+FDIwlU+HXZPDIYpgmZW
+USCZzuzsoi2bN1yeOrx6jldk6CF9pJmHbGZofVEG6FOY41cbMwLgwxxDJLj3Cjkj
+q2OtaS5e11F0O4eADJNom5cyunBJf8gyZh1tYY1qBxtUi2ULuwEOz+1bkSycyXON
+YnEP91UOAy4fW+qbpOznO0vjHnBHtS0FKC67yekteO50YYLQ2QLlOe4pHnSMNZej
+DDMdhBthAgMBAAECggEAZfX1MelcIXUNsHe2/8rjW18NcnROyX1VTa3+m1TlnuR1
+Cw5+k8ku78LOxNWH2kirYzeCWTlgUOj5gIcmLxekKjWNGhSVedm63zFNuAfBfGze
+gSo/m++cZn56+R21hSQLinfufSuuWaf0bEl4afO4L/7MDh6pZ1Hjy6kiWKlk8EJk
+c2Cs2ndaoL+GZtiSAS/uwDDOuEdMrPomU6t5b+clH9Jv/qWaFMDJDKmm2hTFJDfa
+y5Jh8wVjiVYzl66dfLMCu1ALjyaEcYiASrk4YRB9FdYJJ1h5vHlQeIEppBAIJ7k4
+Qs5FYWVqM9ikoOSdOGRSiEt6GO/XcCl+nMGecbUqcQKBgQDE+qZWKEe97jmhpeP8
+SlWYEereqPLeA6Cr2UQQMYUKcPjqsPeqe8NVPOVy2bxcwasWiGnrZ1K/juhwJzrb
+dhjXDKtwGzlGh4cm/MmPxbPuhi6TJ96F1Ma1LmSRqbUummX/+LputHrmlof+s3oM
+LuDp5S9Bmxg8AgiXbsfw9V08HQKBgQDCfHlI1e8ETquL+g4Z49Maji2JxZI9iRw3
+Z3XIzFQ0fgY2jXq/cvnM6qR+GFY3NS1CQYneZIUnrY39FiD2lgmjZ6R/pBNsyxiQ
+KZliS2wQg9tUj+gF5+PwinoxxP8riYPxiHp5/Tyb8s8nhxt/EOg9hyXXR/vABL/y
+deLnTu1RFQKBgBk8M0seZfKDLobzBb4wl76frQNRiau/sznQ39NjRLQNvRX0Dgad
+TG0DHDIWivcnKI/+cfNijUtVN5oGrJepDY2fZec61Z+fhUUNZZUxsteAAT+BABUN
+KVfU1bWDlF6gESk16Ex+erBH4KxUufINn2rXnbI9+GDXsdoUqzDHfmZRAoGACIgj
+XfGcoai9188pbTNUYHbaQo/7QV3RchDE1wE3tHHO3ffI6bsmgDnO64Uvyw43JQ/w
+92Obf8kaUH73BTpBw/xY+Ax/maczNafNhcVfQT43kfcaK6AnnLbGc4Z71zIaKq9d
+CBr23LSDJ+3CZAme1owmOdJ7lcnfjchkIteQi50CgYArFB7Bxy+WgE8dlkCmyr7G
++snu8Vmtsyd3ZMdEwGloiFu9p7hQ/qhADUNDd/ZJpcjs+w21xFkWy+U7itom5Uge
+BSNW/tGC3Vc2vp8jUnS1ls2nnyavI9oEj0XV9+OT/5C9wpaTgSPRgj/tdTbJZ39m
+YF/N4uC4XF0bHV4+i3BbSw==
+-----END PRIVATE KEY-----`
+	return template(pem)
+}
+
+func testRsaPrivateKeyEncrypted() string {
+	pem := `-----BEGIN RSA PRIVATE KEY-----
+Proc-Type: 4,ENCRYPTED
+DEK-Info: DES-EDE3-CBC,5E7604C0869B553B
+
+2oK0ufH7OaayPDSyHJmwPotRz818dbiG+jPvnTjV1rFi7t0qF1NiewhC/MJgpC6u
+Db4Ze83Ar9BIcvSvwLpbgdjRzwu01mUGSnzmXEx6SN4pXmu9J8CnH+Ojo0QlOmDi
+Ixi4MsBTFhCy3ME0mc/MkUIgZV0VHiFhx4peEQlqL63bqoA3K+ur5NAlnOqvalJu
+Ol+auBXgS05M6dcvxjjTDZX/O6Hud9xU+lA/Jn56tzEpnvHMqBXqdrvthp81flVm
+ekw7+IlajCEFIDeetK6NFs4UpSy3Z6lkvwe1xpL0MrXUO7TSDY/0bBWAaEQDIXNP
+L4PVeweDbMMR/5ImkjP5S5088IrC2ULAMx0Eq4pYB7kK8/OXVYJs0XXvfoFv0qS4
+t4+2+X/rKzVSYaX5vkxNAzznKwVHGQY90GQx17Rqb7ItlmSISXVRVKfFlzMJSwem
+soZPo2+yKwLNM0zFS6N10zkw7CPvyRd00KPTUR7RHV2SyJY+RrWbruH5N66s1nTj
+CpW6U/SDZFnHHWzv0uwLHd4j7EN6CDHYt/SIuWq+GdRl26YfmmLdKYupG80O0OYN
+uKDa1E7zDOjKPTPDqcHfBVNILG5QNtb3DzK1ZWi4OHDFQnOtfdGbGFQU7evCLNQ3
+HDq+PO4x/ZAd+pdw6xxjG4e5QjQ0sjx7bqJPz3Z9cTtOOBmNyg7CAvcmoxfa9YHj
+DoCf4YtejwsH+o7I7FUAA0WAZ3w7NTSe1OHLhHoFEO6SIAuyYwCmSKolY7twbNKX
+p63k5DyefbWqosnWi+B8VkrZGr33OApBwMaS5yQzVyDg98f78pldQA==
+-----END RSA PRIVATE KEY-----`
+	return template(pem)
+}
+
+func testPassword() string {
+	value := "1234"
+	return fmt.Sprintf("\"%s\"", value)
+}
+
+func template(value string) string {
+	return fmt.Sprintf("`%s`", value)
 }
 
 func TestParse(t *testing.T) {
@@ -737,8 +799,55 @@ func TestParsePublicKey(t *testing.T) {
 			publicKey.rsa.e === 65537 &&
 			typeof publicKey.rsa.n === "object"
 		)) {
-			throw new Error("Bad RSA public key");
+			throw new Error("Bad result");
 		}`, rsa))
+		assert.NoError(t, err)
+	})
+}
+
+func TestParsePrivateKey(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+	rt := makeRuntime()
+	password := testPassword()
+	rsaClear := testRsaPrivateKeyClear()
+	rsaEncrypted := testRsaPrivateKeyEncrypted()
+
+	t.Run("Failure", func(t *testing.T) {
+		_, err := common.RunString(rt, `
+		x509.parsePrivateKey("bad-private-key");`)
+		assert.Error(t, err)
+	})
+
+	t.Run("SuccessClearRSA", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const pem = %s;
+		const privateKey = x509.parsePrivateKey(pem);
+		if (!(
+			privateKey.type === "RSA" &&
+			typeof privateKey.rsa === "object" &&
+			typeof privateKey.rsa.d === "object" &&
+			typeof privateKey.rsa.primes === "object"
+		)) {
+			throw new Error("Bad result");
+		}`, rsaClear))
+		assert.NoError(t, err)
+	})
+
+	t.Run("SuccessEncryptedRSA", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const pem = %s;
+		const password = %s;
+		const privateKey = x509.parsePrivateKey(pem, password);
+		if (!(
+			privateKey.type === "RSA" &&
+			typeof privateKey.rsa === "object" &&
+			typeof privateKey.rsa.d === "object" &&
+			typeof privateKey.rsa.primes === "object"
+		)) {
+			throw new Error("Bad result");
+		}`, rsaEncrypted, password))
 		assert.NoError(t, err)
 	})
 }

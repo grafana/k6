@@ -32,6 +32,8 @@ import (
 	"fmt"
 	"time"
 
+	"golang.org/x/crypto/ssh"
+
 	"github.com/loadimpact/k6/js/common"
 	"github.com/pkg/errors"
 )
@@ -92,6 +94,12 @@ type PublicKey struct {
 	RSA  *rsa.PublicKey `js:"rsa"`
 }
 
+// PrivateKey is used for encryption and signing
+type PrivateKey struct {
+	Type string
+	RSA  *rsa.PrivateKey `js:"rsa"`
+}
+
 // New constructs the X509 interface
 func New() *X509 {
 	return &X509{}
@@ -139,13 +147,30 @@ func (X509) GetSubject(ctx context.Context, encoded []byte) Subject {
 
 // ParsePublicKey parses a public key
 func (X509) ParsePublicKey(ctx context.Context, encoded string) PublicKey {
-	parsed, err := parsePublicKey(ctx, encoded)
+	parsed, err := parsePublicKey(encoded)
 	if err != nil {
 		throw(ctx, err)
 	}
-	constructed, err := makePublicKey(ctx, parsed)
+	constructed, err := makePublicKey(parsed)
 	if err != nil {
 		throw(ctx, err)
+	}
+	return constructed
+}
+
+// ParsePrivateKey parses an RSA private key
+func (X509) ParsePrivateKey(
+	ctx context.Context,
+	encoded string,
+	password string,
+) PrivateKey {
+	parsed, err := parsePrivateKey(encoded, password)
+	if err != nil {
+		throw(err)
+	}
+	constructed, err := makePrivateKey(parsed)
+	if err != nil {
+		throw(err)
 	}
 	return constructed
 }
@@ -300,6 +325,51 @@ func parsePublicKey(encoded string) (interface{}, err) {
 		return nil, err
 	}
 	return parsed, nil
+}
+
+func parsePrivateKey(encoded string, password string) (interface{}, error) {
+	if password == "" {
+		return parseClearPrivateKey(encoded)
+	}
+	return parseEncryptedPrivateKey(encoded, password)
+}
+
+func parseClearPrivateKey(encoded string) (interface{}, error) {
+	parsed, err := ssh.ParseRawPrivateKey([]byte(encoded))
+	if err != nil {
+		err = errors.Wrap(err, "failed to parse private key")
+		return nil, err
+	}
+	return parsed, err
+}
+
+func parseEncryptedPrivateKey(
+	encoded string,
+	password string,
+) (interface{}, error) {
+	parsed, err := ssh.ParseRawPrivateKeyWithPassphrase(
+		[]byte(encoded),
+		[]byte(password),
+	)
+	if err != nil {
+		err = errors.Wrap(err, "failed to parse private key")
+		return nil, err
+	}
+	return parsed, nil
+}
+
+func makePrivateKey(ctx context.Context, parsed interface{}) PrivateKey {
+	switch parsed.(type) {
+	case *rsa.PrivateKey:
+		return PrivateKey{
+			Type: "RSA",
+			RSA: parsed.(*rsa.PrivateKey),
+		}
+	default:
+		err := errors.New("unsupported private key type")
+		throw(ctx, err)
+		return PrivateKey{}
+	}
 }
 
 func throw(ctx context.Context, err error) {
