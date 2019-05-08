@@ -144,6 +144,17 @@ func template(value string) string {
 	return fmt.Sprintf("`%s`", value)
 }
 
+func testRsaPublicKey() string {
+	pem := `-----BEGIN PUBLIC KEY-----
+MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDXMLr/Y/vUtIFY75jj0YXfp6lQ
+7iEIbps3BvRE4isTpxs8fXLnLM8LAuJScxiKyrGnj8EMb7LIHkSMBlz6iVj9atY6
+EUEm/VHUnElNquzGyBA50TCfpv6NHPaTvOoB45yQbZ/YB4LO+CsT9eIMDZ4tcU9Z
++xD10ifJhhIwpZUFIQIDAQAB
+-----END PUBLIC KEY-----`
+	template := fmt.Sprintf("`%s`", pem)
+	return template
+}
+
 func TestParse(t *testing.T) {
 	if testing.Short() {
 		return
@@ -700,5 +711,34 @@ func TestMakeCertificate(t *testing.T) {
 	t.Run("UnsupportedKey", func(t *testing.T) {
 		_, err := makeCertificate(&gox509.Certificate{})
 		assert.EqualError(t, err, "unsupported public key algorithm")
+	})
+}
+
+func TestParsePublicKey(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+	rt := makeRuntime()
+	rsa := testRsaPublicKey()
+
+	t.Run("BadCertificate", func(t *testing.T) {
+		_, err := common.RunString(rt, `
+		x509.parsePublicKey("bad-public-key");`)
+		assert.Error(t, err)
+	})
+
+	t.Run("SuccessRsa", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const pem = %s;
+		const publicKey = x509.parsePublicKey(pem);
+		if (!(
+			publicKey.type === "RSA" &&
+			typeof publicKey.rsa === "object" &&
+			publicKey.rsa.e === 65537 &&
+			typeof publicKey.rsa.n === "object"
+		)) {
+			throw new Error("Bad RSA public key");
+		}`, rsa))
+		assert.NoError(t, err)
 	})
 }
