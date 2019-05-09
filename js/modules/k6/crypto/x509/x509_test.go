@@ -30,7 +30,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func MakeRuntime() *goja.Runtime {
+func makeRuntime() *goja.Runtime {
 	rt := goja.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 	ctx := context.Background()
@@ -39,7 +39,7 @@ func MakeRuntime() *goja.Runtime {
 	return rt
 }
 
-func Material() string {
+func material() string {
 	pem := `-----BEGIN CERTIFICATE-----
 MIIE6zCCA9OgAwIBAgICBNIwDQYJKoZIhvcNAQELBQAwgdsxCzAJBgNVBAYTAlpa
 MRkwFwYDVQQIExBLb3B1bmNlemlzIEtyYWlzMREwDwYDVQQHEwhBc2h0aW5vazEa
