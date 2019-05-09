@@ -23,6 +23,7 @@ package x509
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/dop251/goja"
@@ -41,6 +42,7 @@ func makeRuntime() *goja.Runtime {
 
 type Material struct {
 	certificate string
+	publicKey string
 }
 
 var material = Material{
@@ -73,6 +75,12 @@ gzg3dNaCY65aH0cJE/dVwiS/F2XTr1zvr+uBPExgrA21+FSIlHM0Dot+VGKdCLEO
 xytSVXVn+cECQLg9hVn+Zx3XO2FA0eOzaWEONnUGghT/Ivw06lUxis5tkAoAU93d
 ddBqJe0XUeAX8Zr6EJ82
 -----END CERTIFICATE-----`),
+	publicKey: template(`-----BEGIN PUBLIC KEY-----
+MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDXMLr/Y/vUtIFY75jj0YXfp6lQ
+7iEIbps3BvRE4isTpxs8fXLnLM8LAuJScxiKyrGnj8EMb7LIHkSMBlz6iVj9atY6
+EUEm/VHUnElNquzGyBA50TCfpv6NHPaTvOoB45yQbZ/YB4LO+CsT9eIMDZ4tcU9Z
++xD10ifJhhIwpZUFIQIDAQAB
+-----END PUBLIC KEY-----`),
 }
 
 func template(value string) string {
@@ -90,6 +98,18 @@ func TestParse(t *testing.T) {
 		x509.parse("bad-certificate");`)
 		assert.EqualError(
 			t, err, "GoError: failed to decode certificate PEM file")
+	})
+
+	t.Run("ParseFailure", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const pem = %s;
+		x509.parse(pem);`, material.publicKey))
+		if assert.Error(t, err) {
+			assert.True(t, strings.HasPrefix(
+				err.Error(),
+				"GoError: failed to parse certificate",
+			))
+		}
 	})
 
 	t.Run("SignatureAlgorithm", func(t *testing.T) {
