@@ -105,7 +105,7 @@ func executeVerify(
 	case "RSA":
 		return verifyRSA(ctx, signer.RSA, function, digest, signature, options)
 	default:
-		err := errors.New("unsupported cryptosystem")
+		err := errors.New("invalid public key")
 		throw(ctx, err)
 		return false
 	}
@@ -189,7 +189,7 @@ func executeSign(
 	case "RSA":
 		signature, err = signRSA(signer.RSA, function, digest, options)
 	default:
-		err = errors.New("unsupported cryptosystem")
+		err = errors.New("invalid private key")
 	}
 	if err != nil {
 		return "", err

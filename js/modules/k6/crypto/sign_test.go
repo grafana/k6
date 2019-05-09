@@ -183,7 +183,7 @@ func TestVerify(t *testing.T) {
 		const signature = %s;
 		const result = crypto.verify(signer, "SHA256", message, signature);
 		`, material.message, material.pkcsSignature))
-		assert.EqualError(t, err, "GoError: unsupported cryptosystem")
+		assert.EqualError(t, err, "GoError: invalid public key")
 	})
 
 	t.Run("RSA-PKCS", func(t *testing.T) {
@@ -227,7 +227,7 @@ func TestSign(t *testing.T) {
 		const signer = { type: "HyperQuantumAlgorithm" };
 		crypto.sign(signer, "SHA256", message, "hex");
 		`, material.message))
-		assert.EqualError(t, err, "GoError: unsupported cryptosystem")
+		assert.EqualError(t, err, "GoError: invalid private key")
 	})
 
 	t.Run("RSA-PKCS", func(t *testing.T) {
