@@ -23,6 +23,8 @@ package crypto
 import (
 	gocrypto "crypto"
 	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 
 	"github.com/pkg/errors"
@@ -39,4 +41,17 @@ func hashMessage(function gocrypto.Hash, message string) ([]byte, error) {
 		err := errors.New(msg)
 		return nil, err
 	}
+}
+
+func decodeSignature(encoded string) ([]byte, error) {
+	decoded, err := hex.DecodeString(encoded)
+	if err == nil {
+		return decoded, nil
+	}
+	decoded, err = base64.StdEncoding.DecodeString(encoded)
+	if err == nil {
+		return decoded, nil
+	}
+	err = errors.New("unrecognized signature encoding")
+	return nil, err
 }

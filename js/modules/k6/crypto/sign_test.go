@@ -60,3 +60,22 @@ func TestHashMessage(t *testing.T) {
 		assert.Equal(t, expected.SHA256, digest)
 	})
 }
+
+func TestDecodeSignature(t *testing.T) {
+	t.Run("BadFormat", func(t *testing.T) {
+		_, err := decodeSignature("bad-signature")
+		assert.EqualError(t, err, "unrecognized signature encoding")
+	})
+
+	t.Run("Base64", func(t *testing.T) {
+		signature, err := decodeSignature("AQIDBA==")
+		assert.NoError(t, err)
+		assert.Equal(t, bytes("01020304"), signature)
+	})
+
+	t.Run("Hex", func(t *testing.T) {
+		signature, err := decodeSignature("01020304")
+		assert.NoError(t, err)
+		assert.Equal(t, bytes("01020304"), signature)
+	})
+}
