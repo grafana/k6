@@ -39,8 +39,12 @@ func makeRuntime() *goja.Runtime {
 	return rt
 }
 
-func material() string {
-	pem := `-----BEGIN CERTIFICATE-----
+type Material struct {
+	certificate string
+}
+
+var material = Material{
+	certificate: template(`-----BEGIN CERTIFICATE-----
 MIIE6zCCA9OgAwIBAgICBNIwDQYJKoZIhvcNAQELBQAwgdsxCzAJBgNVBAYTAlpa
 MRkwFwYDVQQIExBLb3B1bmNlemlzIEtyYWlzMREwDwYDVQQHEwhBc2h0aW5vazEa
 MBgGA1UECRMRMjIxQiBCYWtlciBTdHJlZXQxDjAMBgNVBBETBTk5OTk5MRwwGgYD
@@ -68,17 +72,18 @@ gzg3dNaCY65aH0cJE/dVwiS/F2XTr1zvr+uBPExgrA21+FSIlHM0Dot+VGKdCLEO
 6HugOCDBdzKF2hsHeI5LvgXUX5zQ0gnsd93+QuxUmiN7QZZs8tDMD/+efo4OWvp/
 xytSVXVn+cECQLg9hVn+Zx3XO2FA0eOzaWEONnUGghT/Ivw06lUxis5tkAoAU93d
 ddBqJe0XUeAX8Zr6EJ82
------END CERTIFICATE-----`
-	template := fmt.Sprintf("`%s`", pem)
-	return template
+-----END CERTIFICATE-----`),
+}
+
+func template(value string) string {
+	return fmt.Sprintf("`%s`", value)
 }
 
 func TestParse(t *testing.T) {
 	if testing.Short() {
 		return
 	}
-	rt := MakeRuntime()
-	pem := Material()
+	rt := makeRuntime()
 
 	t.Run("DecodeFailure", func(t *testing.T) {
 		_, err := common.RunString(rt, `
@@ -94,7 +99,7 @@ func TestParse(t *testing.T) {
 		const value = cert.signatureAlgorithm;
 		if (value !== "SHA256-RSA") {
 			throw new Error("Bad signature algorithm: " + value);
-		}`, pem))
+		}`, material.certificate))
 		assert.NoError(t, err)
 	})
 
@@ -104,7 +109,7 @@ func TestParse(t *testing.T) {
 		const cert = x509.parse(pem);
 		if (typeof cert.subject !== "object") {
 			throw new Error("Bad subject: " + typeof cert.subject);
-		}`, pem))
+		}`, material.certificate))
 		assert.NoError(t, err)
 	})
 
@@ -115,7 +120,7 @@ func TestParse(t *testing.T) {
 		const value = cert.subject ? cert.subject.commonName : null;
 		if (value !== "excouncil.zz") {
 			throw new Error("Bad subject common name: " + value);
-		}`, pem))
+		}`, material.certificate))
 		assert.NoError(t, err)
 	})
 
@@ -126,7 +131,7 @@ func TestParse(t *testing.T) {
 		const value = cert.subject ? cert.subject.country : null;
 		if (value !== "ZZ") {
 			throw new Error("Bad subject country: " + value);
-		}`, pem))
+		}`, material.certificate))
 		assert.NoError(t, err)
 	})
 
@@ -137,7 +142,7 @@ func TestParse(t *testing.T) {
 		const value = cert.subject ? cert.subject.postalCode : null;
 		if (value !== "99999") {
 			throw new Error("Bad subject postal code: " + value);
-		}`, pem))
+		}`, material.certificate))
 		assert.NoError(t, err)
 	})
 
@@ -148,7 +153,7 @@ func TestParse(t *testing.T) {
 		const value = cert.subject ? cert.subject.stateOrProvinceName : null;
 		if (value !== "Kopuncezis Krais") {
 			throw new Error("Bad subject province: " + value);
-		}`, pem))
+		}`, material.certificate))
 		assert.NoError(t, err)
 	})
 
@@ -159,7 +164,7 @@ func TestParse(t *testing.T) {
 		const value = cert.subject ? cert.subject.localityName : null;
 		if (value !== "Ashtinok") {
 			throw new Error("Bad subject locality: " + value);
-		}`, pem))
+		}`, material.certificate))
 		assert.NoError(t, err)
 	})
 
@@ -170,7 +175,7 @@ func TestParse(t *testing.T) {
 		const value = cert.subject ? cert.subject.streetAddress : null;
 		if (value !== "221B Baker Street") {
 			throw new Error("Bad subject street address: " + value);
-		}`, pem))
+		}`, material.certificate))
 		assert.NoError(t, err)
 	})
 
@@ -181,7 +186,7 @@ func TestParse(t *testing.T) {
 		const value = cert.subject ? cert.subject.organizationName : null;
 		if (value !== "Exumbran Convention") {
 			throw new Error("Bad subject organization: " + value);
-		}`, pem))
+		}`, material.certificate))
 		assert.NoError(t, err)
 	})
 
@@ -199,7 +204,7 @@ func TestParse(t *testing.T) {
 			throw new Error(
 				"Bad subject organizational unit: " + values.join(", ")
 			);
-		}`, pem))
+		}`, material.certificate))
 		assert.NoError(t, err)
 	})
 
@@ -209,7 +214,7 @@ func TestParse(t *testing.T) {
 		const cert = x509.parse(pem);
 		if (typeof cert.issuer !== "object") {
 			throw new Error("Bad issuer: " + typeof cert.issuer);
-		}`, pem))
+		}`, material.certificate))
 		assert.NoError(t, err)
 	})
 
@@ -220,7 +225,7 @@ func TestParse(t *testing.T) {
 		const value = cert.issuer ? cert.issuer.commonName : null;
 		if (value !== "excouncil.zz") {
 			throw new Error("Bad issuer common name: " + value);
-		}`, pem))
+		}`, material.certificate))
 		assert.NoError(t, err)
 	})
 
@@ -231,7 +236,7 @@ func TestParse(t *testing.T) {
 		const value = cert.issuer ? cert.issuer.country : null;
 		if (value !== "ZZ") {
 			throw new Error("Bad issuer country: " + value);
-		}`, pem))
+		}`, material.certificate))
 		assert.NoError(t, err)
 	})
 
@@ -242,7 +247,7 @@ func TestParse(t *testing.T) {
 		const value = cert.issuer ? cert.issuer.stateOrProvinceName : null;
 		if (value !== "Kopuncezis Krais") {
 			throw new Error("Bad issuer province: " + value);
-		}`, pem))
+		}`, material.certificate))
 		assert.NoError(t, err)
 	})
 
@@ -253,7 +258,7 @@ func TestParse(t *testing.T) {
 		const value = cert.issuer ? cert.issuer.localityName : null;
 		if (value !== "Ashtinok") {
 			throw new Error("Bad issuer locality: " + value);
-		}`, pem))
+		}`, material.certificate))
 		assert.NoError(t, err)
 	})
 
@@ -264,7 +269,7 @@ func TestParse(t *testing.T) {
 		const value = cert.issuer ? cert.issuer.organizationName : null;
 		if (value !== "Exumbran Convention") {
 			throw new Error("Bad issuer organization: " + value);
-		}`, pem))
+		}`, material.certificate))
 		assert.NoError(t, err)
 	})
 
@@ -275,7 +280,7 @@ func TestParse(t *testing.T) {
 		const value = cert.notBefore;
 		if (value !== "2019-01-01T00:00:00Z") {
 			throw new Error("Bad lower bound: " + value)
-		}`, pem))
+		}`, material.certificate))
 		assert.NoError(t, err)
 	})
 
@@ -286,7 +291,7 @@ func TestParse(t *testing.T) {
 		const value = cert.notAfter;
 		if (value !== "2020-01-01T00:00:00Z") {
 			throw new Error("Bad upper bound: " + value);
-		}`, pem))
+		}`, material.certificate))
 		assert.NoError(t, err)
 	})
 
@@ -307,7 +312,7 @@ func TestParse(t *testing.T) {
 			values[7] === "http://learning.excouncil.zz/index.html"
 		)) {
 			throw new Error("Bad alt names: " + values.join(", "));
-		}`, pem))
+		}`, material.certificate))
 		assert.NoError(t, err)
 	})
 
@@ -322,7 +327,7 @@ func TestParse(t *testing.T) {
 		]
 		if (value.join("") !== expected.join("")) {
 			throw new Error("Bad fingerprint: " + value.join(":"));
-		}`, pem))
+		}`, material.certificate))
 		assert.NoError(t, err)
 	})
 
@@ -332,7 +337,7 @@ func TestParse(t *testing.T) {
 		const cert = x509.parse(pem);
 		if (typeof cert.publicKey !== "object") {
 			throw new Error("Bad public key: " + typeof cert.publicKey);
-		}`, pem))
+		}`, material.certificate))
 		assert.NoError(t, err)
 	})
 
@@ -343,7 +348,7 @@ func TestParse(t *testing.T) {
 		const value = cert.publicKey ? cert.publicKey.algorithm : null;
 		if (value !== "RSA") {
 			throw new Error("Bad public key algorithm: " + value);
-		}`, pem))
+		}`, material.certificate))
 		assert.NoError(t, err)
 	})
 
@@ -354,7 +359,7 @@ func TestParse(t *testing.T) {
 		const value = cert.publicKey ? cert.publicKey.e : null;
 		if (value !== 65537) {
 			throw new Error("Bad public key exponent: " + value);
-		}`, pem))
+		}`, material.certificate))
 		assert.NoError(t, err)
 	})
 
@@ -385,7 +390,7 @@ func TestParse(t *testing.T) {
 		]
 		if (value.join(":") !== expected.join(":")) {
 			throw new Error("Bad public key modulus: " + value.join(":"));
-		}`, pem))
+		}`, material.certificate))
 		assert.NoError(t, err)
 	})
 }
@@ -394,8 +399,7 @@ func TestGetAltNames(t *testing.T) {
 	if testing.Short() {
 		return
 	}
-	rt := MakeRuntime()
-	pem := Material()
+	rt := makeRuntime()
 
 	t.Run("Failure", func(t *testing.T) {
 		_, err := common.RunString(rt, `
@@ -420,7 +424,7 @@ func TestGetAltNames(t *testing.T) {
 			altNames[7] === "http://learning.excouncil.zz/index.html"
 		)) {
 			throw new Error("Bad alt names");
-		}`, pem))
+		}`, material.certificate))
 		assert.NoError(t, err)
 	})
 }
@@ -429,8 +433,7 @@ func TestGetIssuer(t *testing.T) {
 	if testing.Short() {
 		return
 	}
-	rt := MakeRuntime()
-	pem := Material()
+	rt := makeRuntime()
 
 	t.Run("Failure", func(t *testing.T) {
 		_, err := common.RunString(rt, `
@@ -451,7 +454,7 @@ func TestGetIssuer(t *testing.T) {
 			issuer.organizationName === "Exumbran Convention"
 		)) {
 			throw new Error("Bad issuer");
-		}`, pem))
+		}`, material.certificate))
 		assert.NoError(t, err)
 	})
 }
@@ -460,8 +463,7 @@ func TestGetSubject(t *testing.T) {
 	if testing.Short() {
 		return
 	}
-	rt := MakeRuntime()
-	pem := Material()
+	rt := makeRuntime()
 
 	t.Run("Failure", func(t *testing.T) {
 		_, err := common.RunString(rt, `
@@ -489,7 +491,7 @@ func TestGetSubject(t *testing.T) {
 				"Exumbran Janitorial Service"
 		)) {
 			throw new Error("Bad subject");
-		}`, pem))
+		}`, material.certificate))
 		assert.NoError(t, err)
 	})
 }
