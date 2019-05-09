@@ -50,6 +50,27 @@ func bytes (encoded string) []byte {
 	return decoded
 }
 
+func TestDecodeFunction(t *testing.T) {
+	t.Run("Unsupported", func(t *testing.T) {
+		_, err := decodeFunction("HyperQuantumHash")
+		assert.EqualError(
+			t, err, "unsupported hash function: HyperQuantumHash",
+		)
+	})
+
+	t.Run("SHA256", func(t *testing.T) {
+		function, err := decodeFunction("SHA256")
+		assert.NoError(t, err)
+		assert.Equal(t, gocrypto.SHA256, function)
+	})
+
+	t.Run("SHA512", func(t *testing.T) {
+		function, err := decodeFunction("SHA512")
+		assert.NoError(t, err)
+		assert.Equal(t, gocrypto.SHA512, function)
+	})
+}
+
 func TestHashMessage(t *testing.T) {
 	if testing.Short() {
 		return

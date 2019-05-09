@@ -30,6 +30,50 @@ import (
 	"github.com/pkg/errors"
 )
 
+func decodeFunction(encoded string) (gocrypto.Hash, error) {
+	switch encoded {
+	case "MD4":
+		return gocrypto.MD4, nil
+	case "MD5":
+		return gocrypto.MD5, nil
+	case "SHA1":
+		return gocrypto.SHA1, nil
+	case "SHA224":
+		return gocrypto.SHA224, nil
+	case "SHA256":
+		return gocrypto.SHA256, nil
+	case "SHA512":
+		return gocrypto.SHA512, nil
+	case "MD5SHA1":
+		return gocrypto.MD5SHA1, nil
+	case "RIPEMD160":
+		return gocrypto.RIPEMD160, nil
+	case "SHA3_224":
+		return gocrypto.SHA3_224, nil
+	case "SHA3_256":
+		return gocrypto.SHA3_256, nil
+	case "SHA3_384":
+		return gocrypto.SHA3_384, nil
+	case "SHA3_512":
+		return gocrypto.SHA3_512, nil
+	case "SHA512_224":
+		return gocrypto.SHA512_224, nil
+	case "SHA512_256":
+		return gocrypto.SHA512_256, nil
+	case "BLAKE2s_256":
+		return gocrypto.BLAKE2s_256, nil
+	case "BLAKE2b_256":
+		return gocrypto.BLAKE2b_256, nil
+	case "BLAKE2b_384":
+		return gocrypto.BLAKE2b_384, nil
+	case "BLAKE2b_512":
+		return gocrypto.BLAKE2b_512, nil
+	default:
+		err := errors.New("unsupported hash function: " + encoded)
+		return 0, err
+	}
+}
+
 func hashMessage(function gocrypto.Hash, message string) ([]byte, error) {
 	bytes := []byte(message)
 	switch function {
