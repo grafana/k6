@@ -23,6 +23,7 @@ package crypto
 import (
 	"context"
 	gocrypto "crypto"
+	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/base64"
@@ -49,6 +50,26 @@ func (Crypto) Verify(
 	function, digest, signature :=
 		prepareVerify(ctx, functionEncoded, message, signatureEncoded)
 	return executeVerify(ctx, &signer, function, digest, signature, options)
+}
+
+// Sign produces a message signature
+func (Crypto) Sign(
+	ctx context.Context,
+	signer x509.PrivateKey,
+	functionEncoded string,
+	message string,
+	format string,
+	options SigningOptions,
+) string {
+	function, digest, err := prepareSign(functionEncoded, message)
+	if err != nil {
+		throw(ctx, err)
+	}
+	signature, err := executeSign(&signer, function, digest, format, options)
+	if err != nil {
+		throw(ctx, err)
+	}
+	return signature
 }
 
 func prepareVerify(
@@ -140,6 +161,75 @@ func verifyPSS(
 	return true
 }
 
+func prepareSign(
+	functionEncoded string,
+	message string,
+) (gocrypto.Hash, []byte, error) {
+	function, err := decodeFunction(functionEncoded)
+	if err != nil {
+		return 0, nil, err
+	}
+	digest, err := hashMessage(function, message)
+	if err != nil {
+		return 0, nil, err
+	}
+	return function, digest, nil
+}
+
+func executeSign(
+	signer *x509.PrivateKey,
+	function gocrypto.Hash,
+	digest []byte,
+	format string,
+	options SigningOptions,
+) (string, error) {
+	var signature []byte
+	var err error
+	switch signer.Type {
+	case "RSA":
+		signature, err = signRSA(signer.RSA, function, digest, options)
+	default:
+		err = errors.New("unsupported cryptosystem")
+	}
+	if err != nil {
+		return "", err
+	}
+	encoded, err := encodeSignature(signature, format)
+	if err != nil {
+		return "", err
+	}
+	return encoded, nil
+}
+
+func signRSA(
+	signer *rsa.PrivateKey,
+	function gocrypto.Hash,
+	digest []byte,
+	options SigningOptions,
+) ([]byte, error) {
+	switch options["type"] {
+	case "":
+		return signPKCS(signer, function, digest)
+	default:
+		err := errors.New("unsupported type: " + options["type"])
+		return nil, err
+	}
+}
+
+func signPKCS(
+	signer *rsa.PrivateKey,
+	function gocrypto.Hash,
+	digest []byte,
+) ([]byte, error) {
+	signature, err := rsa.SignPKCS1v15(rand.Reader, signer, function, digest)
+	if err != nil {
+		err = errors.Wrap(err, "failed to sign message")
+		return nil, err
+	}
+	return signature, nil
+
+}
+
 func decodeInt(encoded string) (int) {
 	decoded, err := strconv.ParseInt(encoded, 10, 64)
 	if err != nil {
@@ -216,6 +306,20 @@ func decodeSignature(encoded string) ([]byte, error) {
 	}
 	err = errors.New("unrecognized signature encoding")
 	return nil, err
+}
+
+func encodeSignature(value []byte, format string) (string, error) {
+	switch format {
+	case "hex":
+		encoded := hex.EncodeToString(value)
+		return encoded, nil
+	case "base64":
+		encoded := base64.StdEncoding.EncodeToString(value)
+		return encoded, nil
+	default:
+		err := errors.New("unsupported signature encoding: " + format)
+		return "", err
+	}
 }
 
 func throw(ctx context.Context, err error) {

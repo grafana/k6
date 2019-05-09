@@ -36,6 +36,7 @@ import (
 type Material struct {
 	message string
 	rsaPublicKey string
+	rsaPrivateKey string
 	pkcsSignature string
 	pssSignature string
 }
@@ -62,6 +63,21 @@ MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDXMLr/Y/vUtIFY75jj0YXfp6lQ
 EUEm/VHUnElNquzGyBA50TCfpv6NHPaTvOoB45yQbZ/YB4LO+CsT9eIMDZ4tcU9Z
 +xD10ifJhhIwpZUFIQIDAQAB
 -----END PUBLIC KEY-----`),
+	rsaPrivateKey: template(`-----BEGIN RSA PRIVATE KEY-----
+MIICXgIBAAKBgQDXMLr/Y/vUtIFY75jj0YXfp6lQ7iEIbps3BvRE4isTpxs8fXLn
+LM8LAuJScxiKyrGnj8EMb7LIHkSMBlz6iVj9atY6EUEm/VHUnElNquzGyBA50TCf
+pv6NHPaTvOoB45yQbZ/YB4LO+CsT9eIMDZ4tcU9Z+xD10ifJhhIwpZUFIQIDAQAB
+AoGBAK42XF2gU2ObktAugUeG++vab5/+eS27ZduBvMX7mEY71jf9k8WGKERQ3GtF
+lMvgVz1Bi1eHImUS5Am8qQ+HnEtoD4ewyJKLwGB3tdAA6a2mGY+VoXvRK5GpcBeH
+PPGScTA2kJ7Al+ELGcgMuiQHrCLxxxpYNKB90dzE036zmXEBAkEA/0YgJYmBm4J7
+/6HQsrvtst6cxQ/JyLWQDvC8T4SONyC4UQWgLzf/eeAl/p09xmcchvV4/A9b5WeF
+qkT6V+rl0QJBANfNayXriYzG5YGeUTVEZqd3rIoeSl1g6WIavR6t0W+lgUDWxnJc
+buRhgUfDaPzlE6McGBxQPZYt3yrM0F167lECQArrAeb5GZ0AGLOXRSjP1tvGn6fi
+A/xcn5uz+ingfoCnGpsEhZRfbcLVrmpUaVb6BANVrmYBdim6osHkj1yBRHECQQCG
+5pp8cejiX9NIW7dYHRIuzdjF3nmONe6urRhb/TxXFpbd+WTESJPpoCo4uib/MBQ+
+eml4CZD2OGaxUqdOSHKBAkEAtruFjS0IhJstjoOrAS1p5ZAr8Noj5L1DEIgxfAD4
+8RbNsyVGZX59oURQ/NqyEs+ME4o/oXuoz8yVBdQqT8G93w==
+-----END RSA PRIVATE KEY-----`),
 	pkcsSignature: stringify(
 		"befd8b0a92a44b03324d1908b9e16d209328c38b14b71f8960f5c97c68a00437" +
 		"390cc42acab32ce70097a215163917ba28c3dbaa1a88a96e2443fa9abb442082" +
@@ -179,8 +195,7 @@ func TestVerify(t *testing.T) {
 		const result = crypto.verify(signer, "SHA256", message, signature);
 		if (!result) {
 			throw new Error("Verification failure");
-		}
-		`, material.message, material.rsaPublicKey, material.pkcsSignature))
+		}`, material.message, material.rsaPublicKey, material.pkcsSignature))
 		assert.NoError(t, err)
 	})
 
@@ -195,8 +210,37 @@ func TestVerify(t *testing.T) {
 			signer, "SHA256", message, signature, options);
 		if (!result) {
 			throw new Error("Verification failure");
-		}
-		`, material.message, material.rsaPublicKey, material.pssSignature))
+		}`, material.message, material.rsaPublicKey, material.pssSignature))
+		assert.NoError(t, err)
+	})
+}
+
+func TestSign(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+	rt := makeRuntime()
+
+	t.Run("UnsupportedType", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const message = %s;
+		const signer = { type: "HyperQuantumAlgorithm" };
+		crypto.sign(signer, "SHA256", message, "hex");
+		`, material.message))
+		assert.EqualError(t, err, "GoError: unsupported cryptosystem")
+	})
+
+	t.Run("RSA-PKCS", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const message = %s;
+		const priv = x509.parsePrivateKey(%s);
+		const pub = x509.parsePublicKey(%s);
+		const hash = "SHA256";
+		const signature = crypto.sign(priv, hash, message, "hex");
+		const result = crypto.verify(pub, hash, message, signature);
+		if (!result) {
+			throw new Error("Verification failure");
+		}`, material.message, material.rsaPrivateKey, material.rsaPublicKey))
 		assert.NoError(t, err)
 	})
 }
