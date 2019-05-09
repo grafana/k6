@@ -83,40 +83,52 @@ func New() *X509 {
 
 // Parse produces an entire X.509 certificate
 func (X509) Parse(ctx context.Context, encoded string) Certificate {
-	parsed := parseCertificate(ctx, encoded)
+	parsed, err := parseCertificate(encoded)
+	if err != nil {
+		throw(ctx, err)
+	}
 	return makeCertificate(parsed)
 }
 
 // GetAltNames extracts alt names
 func (X509) GetAltNames(ctx context.Context, encoded string) []string {
-	parsed := parseCertificate(ctx, encoded)
+	parsed, err := parseCertificate(encoded)
+	if err != nil {
+		throw(ctx, err)
+	}
 	return altNames(parsed)
 }
 
 // GetIssuer extracts certificate issuer
 func (X509) GetIssuer(ctx context.Context, encoded string) Issuer {
-	parsed := parseCertificate(ctx, encoded)
+	parsed, err := parseCertificate(encoded)
+	if err != nil {
+		throw(ctx, err)
+	}
 	return makeIssuer(parsed.Issuer)
 }
 
 // GetSubject extracts certificate subject
 func (X509) GetSubject(ctx context.Context, encoded string) Subject {
-	parsed := parseCertificate(ctx, encoded)
+	parsed, err := parseCertificate(encoded)
+	if err != nil {
+		throw(ctx, err)
+	}
 	return makeSubject(parsed.Subject)
 }
 
-func parseCertificate(ctx context.Context, encoded string) *x509.Certificate {
+func parseCertificate(encoded string) (*x509.Certificate, error) {
 	decoded, _ := pem.Decode([]byte(encoded))
 	if decoded == nil {
 		err := errors.New("failed to decode certificate PEM file")
-		throw(ctx, err)
+		return nil, err
 	}
 	parsed, err := x509.ParseCertificate(decoded.Bytes)
 	if err != nil {
 		err := errors.New("failed to parse certificate")
-		throw(ctx, err)
+		return nil, err
 	}
-	return parsed
+	return parsed, nil
 }
 
 func makeCertificate(parsed *x509.Certificate) Certificate {
