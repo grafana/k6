@@ -81,7 +81,7 @@ func New() *X509 {
 	return &X509{}
 }
 
-// Parse produces an entire x.509 certificate
+// Parse produces an entire X.509 certificate
 func (X509) Parse(ctx context.Context, encoded string) Certificate {
 	parsed := parseCertificate(ctx, encoded)
 	return makeCertificate(parsed)
