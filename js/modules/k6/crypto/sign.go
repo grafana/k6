@@ -151,9 +151,7 @@ func verifyPSS(
 	signature []byte,
 	options SigningOptions,
 ) bool {
-	config := rsa.PSSOptions{
-		SaltLength: decodeInt(options["saltLength"]),
-	}
+	config := decodePssOptions(options)
 	err := rsa.VerifyPSS(signer, function, digest, signature, &config)
 	if err != nil {
 		return false
@@ -210,6 +208,8 @@ func signRSA(
 	switch options["type"] {
 	case "":
 		return signPKCS(signer, function, digest)
+	case "pss":
+		return signPSS(signer, function, digest, options)
 	default:
 		err := errors.New("unsupported type: " + options["type"])
 		return nil, err
@@ -229,12 +229,34 @@ func signPKCS(
 	return signature, nil
 }
 
+func signPSS(
+	signer *rsa.PrivateKey,
+	function gocrypto.Hash,
+	digest []byte,
+	options SigningOptions,
+) ([]byte, error) {
+	config := decodePssOptions(options)
+	signature, err :=
+		rsa.SignPSS(rand.Reader, signer, function, digest, &config)
+	if err != nil {
+		err = errors.Wrap(err, "failed to sign message")
+		return nil, err
+	}
+	return signature, nil
+}
+
 func decodeInt(encoded string) (int) {
 	decoded, err := strconv.ParseInt(encoded, 10, 64)
 	if err != nil {
 		return 0
 	}
 	return int(decoded)
+}
+
+func decodePssOptions(options SigningOptions) rsa.PSSOptions{
+	return rsa.PSSOptions{
+		SaltLength: decodeInt(options["saltLength"]),
+	}
 }
 
 func decodeFunction(encoded string) (gocrypto.Hash, error) {

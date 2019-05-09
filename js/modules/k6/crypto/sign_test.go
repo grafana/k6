@@ -243,4 +243,19 @@ func TestSign(t *testing.T) {
 		}`, material.message, material.rsaPrivateKey, material.rsaPublicKey))
 		assert.NoError(t, err)
 	})
+
+	t.Run("RSA-PSS", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const message = %s;
+		const priv = x509.parsePrivateKey(%s);
+		const pub = x509.parsePublicKey(%s);
+		const hash = "SHA256";
+		const options = { type: "pss" };
+		const signature = crypto.sign(priv, hash, message, "hex", options);
+		const result = crypto.verify(pub, hash, message, signature, options);
+		if (!result) {
+			throw new Error("Verification failure");
+		}`, material.message, material.rsaPrivateKey, material.rsaPublicKey))
+		assert.NoError(t, err)
+	})
 }
