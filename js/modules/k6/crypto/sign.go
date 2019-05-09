@@ -28,16 +28,14 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"strconv"
 
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/js/modules/k6/crypto/x509"
 	"github.com/pkg/errors"
 )
 
-// SigningOptions communicates options for a signing operation
-type SigningOptions struct{
-	Type string
-}
+type SigningOptions map[string]string
 
 // Verify checks for a valid message signature
 func (Crypto) Verify(
@@ -50,7 +48,7 @@ func (Crypto) Verify(
 ) bool {
 	function, digest, signature :=
 		prepareVerify(ctx, functionEncoded, message, signatureEncoded)
-	return executeVerify(ctx, &signer, function, digest, signature, &options)
+	return executeVerify(ctx, &signer, function, digest, signature, options)
 }
 
 func prepareVerify(
@@ -80,7 +78,7 @@ func executeVerify(
 	function gocrypto.Hash,
 	digest []byte,
 	signature []byte,
-	options *SigningOptions,
+	options SigningOptions,
 ) bool {
 	switch signer.Type {
 	case "RSA":
@@ -98,13 +96,15 @@ func verifyRSA(
 	function gocrypto.Hash,
 	digest []byte,
 	signature []byte,
-	options *SigningOptions,
+	options SigningOptions,
 ) bool {
-	switch options.Type {
+	switch options["type"] {
 	case "":
 		return verifyPKCS(signer, function, digest, signature)
+	case "pss":
+		return verifyPSS(signer, function, digest, signature, options)
 	default:
-		err := errors.New("unsupported type: " + options.Type)
+		err := errors.New("unsupported type: " + options["type"])
 		throw(ctx, err)
 		return false
 	}
@@ -121,6 +121,31 @@ func verifyPKCS(
 		return false
 	}
 	return true
+}
+
+func verifyPSS(
+	signer *rsa.PublicKey,
+	function gocrypto.Hash,
+	digest []byte,
+	signature []byte,
+	options SigningOptions,
+) bool {
+	config := rsa.PSSOptions{
+		SaltLength: decodeInt(options["saltLength"]),
+	}
+	err := rsa.VerifyPSS(signer, function, digest, signature, &config)
+	if err != nil {
+		return false
+	}
+	return true
+}
+
+func decodeInt(encoded string) (int) {
+	decoded, err := strconv.ParseInt(encoded, 10, 64)
+	if err != nil {
+		return 0
+	}
+	return int(decoded)
 }
 
 func decodeFunction(encoded string) (gocrypto.Hash, error) {

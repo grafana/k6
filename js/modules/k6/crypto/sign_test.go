@@ -37,6 +37,7 @@ type Material struct {
 	message string
 	rsaPublicKey string
 	pkcsSignature string
+	pssSignature string
 }
 type Expected struct {
 	Digest ExpectedDigest
@@ -66,6 +67,11 @@ EUEm/VHUnElNquzGyBA50TCfpv6NHPaTvOoB45yQbZ/YB4LO+CsT9eIMDZ4tcU9Z
 		"390cc42acab32ce70097a215163917ba28c3dbaa1a88a96e2443fa9abb442082" +
 		"2d1e02dcb90b9499741e468316b49a71162871a62a606f07860656f3d33e7ad7" +
 		"95a68e21d50aac7d9d79a2e1214fffb36c06e056ebcfe32f30f61838b848f359"),
+	pssSignature: stringify(
+		"9f1d1a9fe59285a4e6c7bba0437bd9fc08aef515db2d7f764700753b93197a53" +
+		"f7dc31e37493f7e4a4d5f83958d409ca293accfc0e86d64b65e6049b1112fa19" +
+		"445f4ae536fe19dda069db8d68799883af7fea8f1aa638a40c82c4f025e1a94d" +
+		"c5e033d9d5f67bf740118f62a112140f317c1e7b1efa821a10359c933696376b"),
 }
 
 func bytes (encoded string) []byte {
@@ -175,6 +181,22 @@ func TestVerify(t *testing.T) {
 			throw new Error("Verification failure");
 		}
 		`, material.message, material.rsaPublicKey, material.pkcsSignature))
+		assert.NoError(t, err)
+	})
+
+	t.Run("RSA-PSS", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const message = %s;
+		const pem = %s;
+		const signer = x509.parsePublicKey(pem);
+		const signature = %s;
+		const options = { type: "pss" };
+		const result = crypto.verify(
+			signer, "SHA256", message, signature, options);
+		if (!result) {
+			throw new Error("Verification failure");
+		}
+		`, material.message, material.rsaPublicKey, material.pssSignature))
 		assert.NoError(t, err)
 	})
 }
