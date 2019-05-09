@@ -227,7 +227,6 @@ func signPKCS(
 		return nil, err
 	}
 	return signature, nil
-
 }
 
 func decodeInt(encoded string) (int) {
