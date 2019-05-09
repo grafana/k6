@@ -109,12 +109,12 @@ func parseCertificate(ctx context.Context, encoded string) *x509.Certificate {
 	decoded, _ := pem.Decode([]byte(encoded))
 	if decoded == nil {
 		err := errors.New("failed to decode certificate PEM file")
-		common.Throw(common.GetRuntime(ctx), err)
+		throw(ctx, err)
 	}
 	parsed, err := x509.ParseCertificate(decoded.Bytes)
 	if err != nil {
 		err := errors.New("failed to parse certificate")
-		common.Throw(common.GetRuntime(ctx), err)
+		throw(ctx, err)
 	}
 	return parsed
 }
@@ -217,4 +217,8 @@ func publicKeyAlgorithm(value x509.PublicKeyAlgorithm) string {
 		return "UnknownPublicKeyAlgorithm"
 	}
 	return value.String()
+}
+
+func throw(ctx context.Context, err error) {
+	common.Throw(common.GetRuntime(ctx), err)
 }
