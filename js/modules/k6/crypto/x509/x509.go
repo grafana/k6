@@ -27,10 +27,10 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"errors"
 	"time"
 
 	"github.com/loadimpact/k6/js/common"
+	"github.com/pkg/errors"
 )
 
 // X509 certificate functionality
@@ -125,7 +125,7 @@ func parseCertificate(encoded string) (*x509.Certificate, error) {
 	}
 	parsed, err := x509.ParseCertificate(decoded.Bytes)
 	if err != nil {
-		err := errors.New("failed to parse certificate")
+		err = errors.Wrap(err, "failed to parse certificate")
 		return nil, err
 	}
 	return parsed, nil
