@@ -29,14 +29,20 @@ import (
 )
 
 type Expected struct {
+	Digest ExpectedDigest
+}
+
+type ExpectedDigest struct {
 	SHA256 []byte
 }
 
 const message = "They know, get out now!"
 var expected = Expected{
-	SHA256: bytes(
-		"cec66fa2e0ad6286b01c5d975631664f54ad80e0ab46907769823e0c33264e8a",
-	),
+	Digest: ExpectedDigest{
+		SHA256: bytes(
+			"cec66fa2e0ad6286b01c5d975631664f54ad80e0ab46907769823e0c33264e8a",
+		),
+	},
 }
 
 func bytes (encoded string) []byte {
@@ -57,7 +63,7 @@ func TestHashMessage(t *testing.T) {
 	t.Run("SHA256", func(t *testing.T) {
 		digest, err := hashMessage(gocrypto.SHA256, message)
 		assert.NoError(t, err)
-		assert.Equal(t, expected.SHA256, digest)
+		assert.Equal(t, expected.Digest.SHA256, digest)
 	})
 }
 
