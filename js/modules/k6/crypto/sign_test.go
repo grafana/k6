@@ -47,13 +47,6 @@ type ExpectedDigest struct {
 	SHA256 []byte
 }
 
-var expected = Expected{
-	Digest: ExpectedDigest{
-		SHA256: bytes(
-			"cec66fa2e0ad6286b01c5d975631664f" +
-			"54ad80e0ab46907769823e0c33264e8a"),
-	},
-}
 const message = "They know, get out now!"
 var material = Material{
 	message: stringify(message),
@@ -88,6 +81,13 @@ eml4CZD2OGaxUqdOSHKBAkEAtruFjS0IhJstjoOrAS1p5ZAr8Noj5L1DEIgxfAD4
 		"f7dc31e37493f7e4a4d5f83958d409ca293accfc0e86d64b65e6049b1112fa19" +
 		"445f4ae536fe19dda069db8d68799883af7fea8f1aa638a40c82c4f025e1a94d" +
 		"c5e033d9d5f67bf740118f62a112140f317c1e7b1efa821a10359c933696376b"),
+}
+var expected = Expected{
+	Digest: ExpectedDigest{
+		SHA256: bytes(
+			"cec66fa2e0ad6286b01c5d975631664f" +
+			"54ad80e0ab46907769823e0c33264e8a"),
+	},
 }
 
 func bytes (encoded string) []byte {
