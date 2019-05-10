@@ -30,11 +30,13 @@ import (
 )
 
 type Material struct {
-	message       string
-	rsaPublicKey  string
-	rsaPrivateKey string
-	pkcsSignature string
-	pssSignature  string
+	message                string
+	rsaPublicKey           string
+	rsaPrivateKey          string
+	pkcsSignatureHex       string
+	pkcsSignatureBase64    string
+	pkcsSignatureByteArray string
+	pssSignature           string
 }
 type Expected struct {
 	digest          ExpectedDigest
@@ -47,6 +49,7 @@ type ExpectedDigest struct {
 }
 
 const message = "They know, get out now!"
+
 var material = Material{
 	message: stringify(message),
 	rsaPublicKey: template(`-----BEGIN PUBLIC KEY-----
@@ -70,12 +73,24 @@ A/xcn5uz+ingfoCnGpsEhZRfbcLVrmpUaVb6BANVrmYBdim6osHkj1yBRHECQQCG
 eml4CZD2OGaxUqdOSHKBAkEAtruFjS0IhJstjoOrAS1p5ZAr8Noj5L1DEIgxfAD4
 8RbNsyVGZX59oURQ/NqyEs+ME4o/oXuoz8yVBdQqT8G93w==
 -----END RSA PRIVATE KEY-----`),
-	pkcsSignature: stringify(
+	pkcsSignatureHex: stringify("" +
 		"befd8b0a92a44b03324d1908b9e16d209328c38b14b71f8960f5c97c68a00437" +
 		"390cc42acab32ce70097a215163917ba28c3dbaa1a88a96e2443fa9abb442082" +
 		"2d1e02dcb90b9499741e468316b49a71162871a62a606f07860656f3d33e7ad7" +
 		"95a68e21d50aac7d9d79a2e1214fffb36c06e056ebcfe32f30f61838b848f359"),
-	pssSignature: stringify(
+	pkcsSignatureBase64: stringify("" +
+		"vv2LCpKkSwMyTRkIueFtIJMow4sUtx+JYPXJfGigBDc5DMQqyrMs5wCXohUWORe6" +
+		"KMPbqhqIqW4kQ/qau0Qggi0eAty5C5SZdB5Ggxa0mnEWKHGmKmBvB4YGVvPTPnrX" +
+		"laaOIdUKrH2deaLhIU//s2wG4Fbrz+MvMPYYOLhI81k="),
+	pkcsSignatureByteArray: "" +
+		"[190,253,139,10,146,164,75,3,50,77,25,8,185,225,109,32,147,40,195," +
+		"139,20,183,31,137,96,245,201,124,104,160,4,55,57,12,196,42,202,179," +
+		"44,231,0,151,162,21,22,57,23,186,40,195,219,170,26,136,169,110,36," +
+		"67,250,154,187,68,32,130,45,30,2,220,185,11,148,153,116,30,70,131," +
+		"22,180,154,113,22,40,113,166,42,96,111,7,134,6,86,243,211,62,122," +
+		"215,149,166,142,33,213,10,172,125,157,121,162,225,33,79,255,179," +
+		"108,6,224,86,235,207,227,47,48,246,24,56,184,72,243,89]",
+	pssSignature: stringify("" +
 		"9f1d1a9fe59285a4e6c7bba0437bd9fc08aef515db2d7f764700753b93197a53" +
 		"f7dc31e37493f7e4a4d5f83958d409ca293accfc0e86d64b65e6049b1112fa19" +
 		"445f4ae536fe19dda069db8d68799883af7fea8f1aa638a40c82c4f025e1a94d" +
@@ -83,20 +98,20 @@ eml4CZD2OGaxUqdOSHKBAkEAtruFjS0IhJstjoOrAS1p5ZAr8Noj5L1DEIgxfAD4
 }
 var expected = Expected{
 	digest: ExpectedDigest{
-		SHA256: bytes(
+		SHA256: bytes("" +
 			"cec66fa2e0ad6286b01c5d975631664f" +
 			"54ad80e0ab46907769823e0c33264e8a"),
 	},
-	hexSignature: stringify(
+	hexSignature: stringify("" +
 		"befd8b0a92a44b03324d1908b9e16d209328c38b14b71f8960f5c97c68a00437" +
 		"390cc42acab32ce70097a215163917ba28c3dbaa1a88a96e2443fa9abb442082" +
 		"2d1e02dcb90b9499741e468316b49a71162871a62a606f07860656f3d33e7ad7" +
 		"95a68e21d50aac7d9d79a2e1214fffb36c06e056ebcfe32f30f61838b848f359"),
-	base64Signature: stringify(
+	base64Signature: stringify("" +
 		"vv2LCpKkSwMyTRkIueFtIJMow4sUtx+JYPXJfGigBDc5DMQqyrMs5wCXohUWORe6" +
 		"KMPbqhqIqW4kQ/qau0Qggi0eAty5C5SZdB5Ggxa0mnEWKHGmKmBvB4YGVvPTPnrX" +
 		"laaOIdUKrH2deaLhIU//s2wG4Fbrz+MvMPYYOLhI81k="),
-	binarySignature: stringify(
+	binarySignature: stringify("" +
 		"190:253:139:10:146:164:75:3:50:77:25:8:185:225:109:32:147:40:195" +
 		":139:20:183:31:137:96:245:201:124:104:160:4:55:57:12:196:42:202" +
 		":179:44:231:0:151:162:21:22:57:23:186:40:195:219:170:26:136:169" +
@@ -156,8 +171,59 @@ func TestVerify(t *testing.T) {
 		const signer = { type: "HyperQuantumAlgorithm" };
 		const signature = %s;
 		const result = crypto.verify(signer, "SHA256", message, signature);
-		`, material.message, material.pkcsSignature))
+		`, material.message, material.pkcsSignatureHex))
 		assert.EqualError(t, err, "GoError: invalid public key")
+	})
+
+	t.Run("HexSignature", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const message = %s;
+		const pem = %s;
+		const signer = x509.parsePublicKey(pem);
+		const signature = %s;
+		const result = crypto.verify(signer, "SHA256", message, signature);
+		if (!result) {
+			throw new Error("Verification failure");
+		}`,
+			material.message,
+			material.rsaPublicKey,
+			material.pkcsSignatureHex,
+		))
+		assert.NoError(t, err)
+	})
+
+	t.Run("Base64Signature", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const message = %s;
+		const pem = %s;
+		const signer = x509.parsePublicKey(pem);
+		const signature = %s;
+		const result = crypto.verify(signer, "SHA256", message, signature);
+		if (!result) {
+			throw new Error("Verification failure");
+		}`,
+			material.message,
+			material.rsaPublicKey,
+			material.pkcsSignatureBase64,
+		))
+		assert.NoError(t, err)
+	})
+
+	t.Run("ByteArraySignature", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const message = %s;
+		const pem = %s;
+		const signer = x509.parsePublicKey(pem);
+		const signature = %s;
+		const result = crypto.verify(signer, "SHA256", message, signature);
+		if (!result) {
+			throw new Error("Verification failure");
+		}`,
+			material.message,
+			material.rsaPublicKey,
+			material.pkcsSignatureByteArray,
+		))
+		assert.NoError(t, err)
 	})
 
 	t.Run("RSA-PKCS", func(t *testing.T) {
@@ -169,7 +235,11 @@ func TestVerify(t *testing.T) {
 		const result = crypto.verify(signer, "SHA256", message, signature);
 		if (!result) {
 			throw new Error("Verification failure");
-		}`, material.message, material.rsaPublicKey, material.pkcsSignature))
+		}`,
+			material.message,
+			material.rsaPublicKey,
+			material.pkcsSignatureHex,
+		))
 		assert.NoError(t, err)
 	})
 
@@ -184,7 +254,11 @@ func TestVerify(t *testing.T) {
 			signer, "SHA256", message, signature, options);
 		if (!result) {
 			throw new Error("Verification failure");
-		}`, material.message, material.rsaPublicKey, material.pssSignature))
+		}`,
+			material.message,
+			material.rsaPublicKey,
+			material.pssSignature,
+		))
 		assert.NoError(t, err)
 	})
 }

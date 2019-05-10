@@ -38,7 +38,7 @@ import (
 type SigningOptions map[string]string
 
 // Verifier verifies the signature of chunked input
-type Verifier struct{
+type Verifier struct {
 	function gocrypto.Hash
 	options  *SigningOptions
 }
@@ -89,7 +89,7 @@ func (Crypto) CreateVerify(
 	}
 	return Verifier{
 		function: function,
-		options: &options,
+		options:  &options,
 	}
 }
 
@@ -266,7 +266,7 @@ func signPSS(
 	return signature, nil
 }
 
-func decodeInt(encoded string) (int) {
+func decodeInt(encoded string) int {
 	decoded, err := strconv.ParseInt(encoded, 10, 64)
 	if err != nil {
 		return 0
@@ -274,7 +274,7 @@ func decodeInt(encoded string) (int) {
 	return int(decoded)
 }
 
-func decodePssOptions(options SigningOptions) rsa.PSSOptions{
+func decodePssOptions(options SigningOptions) rsa.PSSOptions {
 	return rsa.PSSOptions{
 		SaltLength: decodeInt(options["saltLength"]),
 	}
