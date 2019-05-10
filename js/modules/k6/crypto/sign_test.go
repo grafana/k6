@@ -335,6 +335,25 @@ func TestSign(t *testing.T) {
 		))
 		assert.NoError(t, err)
 	})
+
+	t.Run("DefaultOutput", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const message = %s;
+		const priv = x509.parsePrivateKey(%s);
+		const pub = x509.parsePublicKey(%s);
+		const hash = "SHA256";
+		const signature = crypto.sign(priv, hash, message);
+		const expected = %s;
+		if (signature.join(":") !== expected) {
+			throw new Error("Bad binary output");
+		}`,
+			material.message,
+			material.rsaPrivateKey,
+			material.rsaPublicKey,
+			expected.binarySignature,
+		))
+		assert.NoError(t, err)
+	})
 }
 
 func TestVerifier(t *testing.T) {
