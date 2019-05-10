@@ -26,22 +26,68 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestDecodeBinaryKnown(t *testing.T) {
+	t.Run("Unsupported", func(t *testing.T) {
+		_, err := decodeBinaryKnown([]byte{1,2,3}, "nucleaonic")
+		assert.EqualError(t, err, "unsupported binary encoding: nucleaonic")
+	})
+
+	t.Run("ByteArrayValid", func(t *testing.T) {
+		result, err := decodeBinaryKnown([]byte{1,2,3}, "binary")
+		assert.NoError(t, err)
+		assert.Equal(t, []byte{1,2,3}, result)
+	})
+
+	t.Run("ByteArrayInvalid", func(t *testing.T) {
+		_, err := decodeBinaryKnown("010203", "binary")
+		assert.EqualError(t, err, "not a byte array")
+	})
+
+	t.Run("HexValid", func(t *testing.T) {
+		result, err := decodeBinaryKnown("010203", "hex")
+		assert.NoError(t, err)
+		assert.Equal(t, []byte{1,2,3}, result)
+	})
+
+	t.Run("HexInvalid", func(t *testing.T) {
+		_, err := decodeBinaryKnown([]byte{1,2,3}, "hex")
+		assert.EqualError(t, err, "not a hex string")
+	})
+
+	t.Run("Base64Valid", func(t *testing.T) {
+		result, err := decodeBinaryKnown("AQID", "base64")
+		assert.NoError(t, err)
+		assert.Equal(t, []byte{1,2,3}, result)
+	})
+
+	t.Run("Base64Invalid", func(t *testing.T) {
+		_, err := decodeBinaryKnown([]byte{1,2,3}, "base64")
+		assert.EqualError(t, err, "not a base64 string")
+	})
+}
+
 func TestDecodeBinaryDetect(t *testing.T) {
-	t.Run("BadFormat", func(t *testing.T) {
-		_, err := decodeBinaryDetect("bad-signature")
+	t.Run("Unrecognized", func(t *testing.T) {
+		_, err := decodeBinaryDetect("bad-binary")
 		assert.EqualError(t, err, "unrecognized binary encoding")
 	})
 
-	t.Run("Hex", func(t *testing.T) {
-		result, err := decodeBinaryDetect("01020304")
+	t.Run("ByteArray", func(t *testing.T) {
+		result, err := decodeBinaryDetect([]byte{1,2,3})
 		assert.NoError(t, err)
-		assert.Equal(t, bytes("01020304"), result)
+		assert.Equal(t, []byte{1,2,3}, result)
+	})
+
+	t.Run("Hex", func(t *testing.T) {
+		result, err := decodeBinaryDetect("010203")
+		assert.NoError(t, err)
+		assert.Equal(t, []byte{1,2,3}, result)
 	})
 
 	t.Run("Base64", func(t *testing.T) {
-		result, err := decodeBinaryDetect("AQIDBA==")
+		result, err := decodeBinaryDetect("AQID")
 		assert.NoError(t, err)
-		assert.Equal(t, bytes("01020304"), result)
+		assert.Equal(t, []byte{1,2,3}, result)
 	})
 }
 
@@ -57,7 +103,7 @@ func TestEncodeBinary(t *testing.T) {
 		assert.Equal(t, []byte{1,2,3}, result)
 	})
 
-	t.Run("Binary", func(t *testing.T) {
+	t.Run("ByteArray", func(t *testing.T) {
 		result, err := encodeBinary([]byte{1,2,3}, "binary")
 		assert.NoError(t, err)
 		assert.Equal(t, []byte{1,2,3}, result)

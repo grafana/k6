@@ -27,12 +27,33 @@ import (
 	"github.com/pkg/errors"
 )
 
-func decodeBinaryDetect(encoded interface{}) ([]byte, error) {
-	return decodeBinaryDetectString(encoded.(string))
+func decodeBinary(encoded interface{}, format string) ([]byte, error) {
+	if format != "" {
+		return decodeBinaryKnown(encoded, format)
+	}
+	return decodeBinaryDetect(encoded)
 }
 
-func decodeBinaryDetectString(encoded string) ([]byte, error) {
-	decoded, err := decodeHex(encoded)
+func decodeBinaryKnown(encoded interface{}, format string) ([]byte, error) {
+	switch format {
+	case "binary":
+		return decodeBytes(encoded)
+	case "hex":
+		return decodeHex(encoded)
+	case "base64":
+		return decodeBase64(encoded)
+	default:
+		err := errors.New("unsupported binary encoding: " + format)
+		return nil, err
+	}
+}
+
+func decodeBinaryDetect(encoded interface{}) ([]byte, error) {
+	decoded, err := decodeBytes(encoded)
+	if err == nil {
+		return decoded, nil
+	}
+	decoded, err = decodeHex(encoded)
 	if err == nil {
 		return decoded, nil
 	}
@@ -44,11 +65,30 @@ func decodeBinaryDetectString(encoded string) ([]byte, error) {
 	return nil, err
 }
 
-func decodeHex(encoded string) ([]byte, error) {
+func decodeBytes(abstracted interface{}) ([]byte, error) {
+	decoded, ok := abstracted.([]byte)
+	if !ok {
+		err := errors.New("not a byte array")
+		return nil, err
+	}
+	return decoded, nil
+}
+
+func decodeHex(abstracted interface{}) ([]byte, error) {
+	encoded, ok := abstracted.(string)
+	if !ok {
+		err := errors.New("not a hex string")
+		return nil, err
+	}
 	return hex.DecodeString(encoded)
 }
 
-func decodeBase64(encoded string) ([]byte, error) {
+func decodeBase64(abstracted interface{}) ([]byte, error) {
+	encoded, ok := abstracted.(string)
+	if !ok {
+		err := errors.New("not a base64 string")
+		return nil, err
+	}
 	return base64.StdEncoding.DecodeString(encoded)
 }
 
