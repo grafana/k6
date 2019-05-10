@@ -54,7 +54,7 @@ type Certificate struct {
 
 // RDN is a component of an X.509 distinguished name
 type RDN struct {
-	Type string
+	Type  string
 	Value string
 }
 
@@ -83,7 +83,7 @@ type Issuer struct {
 
 // PublicKey is used for decryption and signature verification
 type PublicKey struct {
-	Type string
+	Type  string
 	DSA   *dsa.PublicKey   `js:"dsa"`
 	ECDSA *ecdsa.PublicKey `js:"ecdsa"`
 	RSA   *rsa.PublicKey   `js:"rsa"`
@@ -176,7 +176,7 @@ func makeSubject(subject pkix.Name) Subject {
 		StreetAddress:          first(subject.StreetAddress),
 		OrganizationName:       first(subject.Organization),
 		OrganizationalUnitName: subject.OrganizationalUnit,
-		Names:                  makeRdns(subject.Names),
+		Names: makeRdns(subject.Names),
 	}
 }
 
@@ -196,17 +196,17 @@ func makePublicKey(parsed interface{}) (PublicKey, error) {
 	case *dsa.PublicKey:
 		return PublicKey{
 			Type: "DSA",
-			DSA: parsed.(*dsa.PublicKey),
+			DSA:  parsed.(*dsa.PublicKey),
 		}, nil
 	case *ecdsa.PublicKey:
 		return PublicKey{
-			Type: "ECDSA",
+			Type:  "ECDSA",
 			ECDSA: parsed.(*ecdsa.PublicKey),
 		}, nil
 	case *rsa.PublicKey:
 		return PublicKey{
 			Type: "RSA",
-			RSA: parsed.(*rsa.PublicKey),
+			RSA:  parsed.(*rsa.PublicKey),
 		}, nil
 	default:
 		err := errors.New("unsupported public key type")
@@ -235,7 +235,7 @@ func makeRdns(names []pkix.AttributeTypeAndValue) []RDN {
 
 func makeRdn(name pkix.AttributeTypeAndValue) RDN {
 	return RDN{
-		Type: name.Type.String(),
+		Type:  name.Type.String(),
 		Value: fmt.Sprintf("%v", name.Value),
 	}
 }

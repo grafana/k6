@@ -41,10 +41,10 @@ func makeRuntime() *goja.Runtime {
 }
 
 type Material struct {
-	dsaCertificate string
+	dsaCertificate   string
 	ecdsaCertificate string
-	rsaCertificate string
-	publicKey string
+	rsaCertificate   string
+	publicKey        string
 }
 
 var material = Material{
