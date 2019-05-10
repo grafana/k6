@@ -27,6 +27,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"fmt"
 	"time"
 
 	"github.com/loadimpact/k6/js/common"
@@ -48,6 +49,12 @@ type Certificate struct {
 	PublicKey          PublicKey `js:"publicKey"`
 }
 
+// RDN is a component of an X.509 distinguished name
+type RDN struct {
+	Type string
+	Value string
+}
+
 // Subject is a certificate subject
 type Subject struct {
 	CommonName             string `js:"commonName"`
@@ -58,6 +65,7 @@ type Subject struct {
 	StreetAddress          string   `js:"streetAddress"`
 	OrganizationName       string   `js:"organizationName"`
 	OrganizationalUnitName []string `js:"organizationalUnitName"`
+	Names                  []RDN
 }
 
 // Issuer is a certificate issuer
@@ -154,6 +162,7 @@ func makeSubject(subject pkix.Name) Subject {
 		StreetAddress:          first(subject.StreetAddress),
 		OrganizationName:       first(subject.Organization),
 		OrganizationalUnitName: subject.OrganizationalUnit,
+		Names:                  makeRdns(subject.Names),
 	}
 }
 
@@ -185,6 +194,21 @@ func first(values []string) string {
 
 func iso8601(value time.Time) string {
 	return value.Format(time.RFC3339)
+}
+
+func makeRdns(names []pkix.AttributeTypeAndValue) []RDN {
+	var result = make([]RDN, len(names))
+	for i, name := range names {
+		result[i] = makeRdn(name)
+	}
+	return result
+}
+
+func makeRdn(name pkix.AttributeTypeAndValue) RDN {
+	return RDN{
+		Type: name.Type.String(),
+		Value: fmt.Sprintf("%v", name.Value),
+	}
 }
 
 func altNames(parsed *x509.Certificate) []string {
