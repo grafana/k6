@@ -51,7 +51,7 @@ func (Crypto) Verify(
 	signer x509.PublicKey,
 	functionEncoded string,
 	message string,
-	signatureEncoded string,
+	signatureEncoded interface{},
 	options SigningOptions,
 ) bool {
 	function, digest, signature :=
@@ -99,7 +99,7 @@ func prepareVerify(
 	ctx context.Context,
 	functionEncoded string,
 	message string,
-	signatureEncoded string,
+	signatureEncoded interface{},
 ) (gocrypto.Hash, []byte, []byte) {
 	function, err := decodeFunction(functionEncoded)
 	if err != nil {
@@ -339,12 +339,12 @@ func hashMessage(function gocrypto.Hash, message string) ([]byte, error) {
 	}
 }
 
-func decodeDataDetect(encoded string) ([]byte, error) {
-	decoded, err := hex.DecodeString(encoded)
+func decodeDataDetect(encoded interface{}) ([]byte, error) {
+	decoded, err := hex.DecodeString(encoded.(string))
 	if err == nil {
 		return decoded, nil
 	}
-	decoded, err = base64.StdEncoding.DecodeString(encoded)
+	decoded, err = base64.StdEncoding.DecodeString(encoded.(string))
 	if err == nil {
 		return decoded, nil
 	}
