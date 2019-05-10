@@ -34,15 +34,16 @@ import (
 )
 
 type Material struct {
-	message string
-	rsaPublicKey string
+	message       string
+	rsaPublicKey  string
 	rsaPrivateKey string
 	pkcsSignature string
-	pssSignature string
+	pssSignature  string
 }
 type Expected struct {
-	digest       ExpectedDigest
-	hexSignature string
+	digest          ExpectedDigest
+	hexSignature    string
+	base64Signature string
 }
 type ExpectedDigest struct {
 	SHA256 []byte
@@ -94,6 +95,10 @@ var expected = Expected{
 		"390cc42acab32ce70097a215163917ba28c3dbaa1a88a96e2443fa9abb442082" +
 		"2d1e02dcb90b9499741e468316b49a71162871a62a606f07860656f3d33e7ad7" +
 		"95a68e21d50aac7d9d79a2e1214fffb36c06e056ebcfe32f30f61838b848f359"),
+	base64Signature: stringify(
+		"vv2LCpKkSwMyTRkIueFtIJMow4sUtx+JYPXJfGigBDc5DMQqyrMs5wCXohUWORe6" +
+		"KMPbqhqIqW4kQ/qau0Qggi0eAty5C5SZdB5Ggxa0mnEWKHGmKmBvB4YGVvPTPnrX" +
+		"laaOIdUKrH2deaLhIU//s2wG4Fbrz+MvMPYYOLhI81k="),
 }
 
 func bytes (encoded string) []byte {
@@ -280,6 +285,25 @@ func TestSign(t *testing.T) {
 			material.rsaPrivateKey,
 			material.rsaPublicKey,
 			expected.hexSignature,
+		))
+		assert.NoError(t, err)
+	})
+
+	t.Run("Base64Output", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const message = %s;
+		const priv = x509.parsePrivateKey(%s);
+		const pub = x509.parsePublicKey(%s);
+		const hash = "SHA256";
+		const signature = crypto.sign(priv, hash, message, "base64");
+		const expected = %s;
+		if (signature !== expected) {
+			throw new Error("Bad Base64 output");
+		}`,
+			material.message,
+			material.rsaPrivateKey,
+			material.rsaPublicKey,
+			expected.base64Signature,
 		))
 		assert.NoError(t, err)
 	})
