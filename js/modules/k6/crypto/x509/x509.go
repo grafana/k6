@@ -88,12 +88,6 @@ type PublicKey struct {
 	Key       interface{}
 }
 
-// PublicKey is used for decryption and signature verification
-type PublicKey struct {
-	Type string
-	RSA  *rsa.PublicKey `js:"rsa"`
-}
-
 // PrivateKey is used for encryption and signing
 type PrivateKey struct {
 	Type string
@@ -166,11 +160,11 @@ func (X509) ParsePrivateKey(
 ) PrivateKey {
 	parsed, err := parsePrivateKey(encoded, password)
 	if err != nil {
-		throw(err)
+		throw(ctx, err)
 	}
 	constructed, err := makePrivateKey(parsed)
 	if err != nil {
-		throw(err)
+		throw(ctx, err)
 	}
 	return constructed
 }
@@ -313,7 +307,7 @@ func fingerPrint(parsed *x509.Certificate) []byte {
 	return bytes[:]
 }
 
-func parsePublicKey(encoded string) (interface{}, err) {
+func parsePublicKey(encoded string) (interface{}, error) {
 	decoded, _ := pem.Decode([]byte(encoded))
 	if decoded == nil {
 		err := errors.New("failed to decode public key PEM file")
@@ -358,17 +352,16 @@ func parseEncryptedPrivateKey(
 	return parsed, nil
 }
 
-func makePrivateKey(ctx context.Context, parsed interface{}) PrivateKey {
+func makePrivateKey(parsed interface{}) (PrivateKey, error) {
 	switch parsed.(type) {
 	case *rsa.PrivateKey:
 		return PrivateKey{
 			Type: "RSA",
-			RSA: parsed.(*rsa.PrivateKey),
-		}
+			RSA:  parsed.(*rsa.PrivateKey),
+		}, nil
 	default:
 		err := errors.New("unsupported private key type")
-		throw(ctx, err)
-		return PrivateKey{}
+		return PrivateKey{}, err
 	}
 }
 
