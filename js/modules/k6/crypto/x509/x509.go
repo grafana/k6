@@ -192,21 +192,21 @@ func makeIssuer(issuer pkix.Name) Issuer {
 }
 
 func makePublicKey(parsed interface{}) (PublicKey, error) {
-	switch parsed.(type) {
+	switch parsed := parsed.(type) {
 	case *dsa.PublicKey:
 		return PublicKey{
 			Type: "DSA",
-			DSA:  parsed.(*dsa.PublicKey),
+			DSA:  parsed,
 		}, nil
 	case *ecdsa.PublicKey:
 		return PublicKey{
 			Type:  "ECDSA",
-			ECDSA: parsed.(*ecdsa.PublicKey),
+			ECDSA: parsed,
 		}, nil
 	case *rsa.PublicKey:
 		return PublicKey{
 			Type: "RSA",
-			RSA:  parsed.(*rsa.PublicKey),
+			RSA:  parsed,
 		}, nil
 	default:
 		err := errors.New("unsupported public key type")
