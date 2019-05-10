@@ -46,6 +46,11 @@ func TestDecodeBinaryDetect(t *testing.T) {
 }
 
 func TestEncodeBinary(t *testing.T) {
+	t.Run("Unsupported", func(t *testing.T) {
+		_, err := encodeBinary([]byte{1,2,3}, "nucleonic")
+		assert.EqualError(t, err, "unsupported binary encoding: nucleonic")
+	})
+
 	t.Run("Default", func(t *testing.T) {
 		result, err := encodeBinary([]byte{1,2,3}, "")
 		assert.NoError(t, err)
