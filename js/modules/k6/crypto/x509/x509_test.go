@@ -42,6 +42,7 @@ func makeRuntime() *goja.Runtime {
 
 type Material struct {
 	dsaCertificate string
+	ecdsaCertificate string
 	rsaCertificate string
 	publicKey string
 }
@@ -79,6 +80,27 @@ JqGGJU+MCQZEoTAfBgNVHSMEGDAWgBSSb364iDHRI6/2JqGGJU+MCQZEoTAPBgNV
 HRMBAf8EBTADAQH/MAsGCWCGSAFlAwQDAgNIADBFAiEA1nr63IX9aaGUPeOUC0Bh
 w3Y7mpv5+sVgtoIi8ljxVSICIFCpEl70YjRVIUKL8N/lJwKxisrJ4+Xxg/DIeGP8
 L8GA
+-----END CERTIFICATE-----`),
+	ecdsaCertificate: template(`-----BEGIN CERTIFICATE-----
+MIIDXjCCAwWgAwIBAgICBNIwCgYIKoZIzj0EAwIwgdsxCzAJBgNVBAYTAlpaMRkw
+FwYDVQQIExBLb3B1bmNlemlzIEtyYWlzMREwDwYDVQQHEwhBc2h0aW5vazEaMBgG
+A1UECRMRMjIxQiBCYWtlciBTdHJlZXQxDjAMBgNVBBETBTk5OTk5MRwwGgYDVQQK
+ExNFeHVtYnJhbiBDb252ZW50aW9uMT0wFwYDVQQLExBFeHVtYnJhbiBDb3VuY2ls
+MCIGA1UECxMbRXh1bWJyYW4gSmFuaXRvcmlhbCBTZXJ2aWNlMRUwEwYDVQQDEwxl
+eGNvdW5jaWwuenowHhcNMTkwMTAxMDAwMDAwWhcNMjAwMTAxMDAwMDAwWjCB2zEL
+MAkGA1UEBhMCWloxGTAXBgNVBAgTEEtvcHVuY2V6aXMgS3JhaXMxETAPBgNVBAcT
+CEFzaHRpbm9rMRowGAYDVQQJExEyMjFCIEJha2VyIFN0cmVldDEOMAwGA1UEERMF
+OTk5OTkxHDAaBgNVBAoTE0V4dW1icmFuIENvbnZlbnRpb24xPTAXBgNVBAsTEEV4
+dW1icmFuIENvdW5jaWwwIgYDVQQLExtFeHVtYnJhbiBKYW5pdG9yaWFsIFNlcnZp
+Y2UxFTATBgNVBAMTDGV4Y291bmNpbC56ejBZMBMGByqGSM49AgEGCCqGSM49AwEH
+A0IABDKaRQKDiTs8QsKZMwh5rd91rjO66O5Dcc3I2taoQZu9mn+fbV/u4zi4dYAl
+lWrZak7ncRsdtyBmd0iMv12ZRKmjgbYwgbMwgbAGA1UdEQSBqDCBpYITY291bmNp
+bC5leHVtYnJhbi56eoISYWJvdXQuZXhjb3VuY2lsLnp6gRZpbnF1aXJpZXNAZXhj
+b3VuY2lsLnp6gRJwcmVzc0BleGNvdW5jaWwuenqHBMAAAgCHBMAAAhmGGWh0dHA6
+Ly9wcmVzcy5leGNvdW5jaWwuenqGJ2h0dHA6Ly9sZWFybmluZy5leGNvdW5jaWwu
+enovaW5kZXguaHRtbDAKBggqhkjOPQQDAgNHADBEAiA/X4Y+Zaw4ziqL4grkY+rm
+srWfS/JGxLvN49r68cczSwIgWEXFIHMwE+OhKC6z01mIPe2G2CguYHukWyL+BHtT
++20=
 -----END CERTIFICATE-----`),
 	rsaCertificate: template(`-----BEGIN CERTIFICATE-----
 MIIE6zCCA9OgAwIBAgICBNIwDQYJKoZIhvcNAQELBQAwgdsxCzAJBgNVBAYTAlpa
@@ -536,6 +558,23 @@ func TestParse(t *testing.T) {
 		)) {
 			throw new Error("Bad DSA public key");
 		}`, material.dsaCertificate))
+		assert.NoError(t, err)
+	})
+
+	t.Run("ECDSAPublicKey", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const pem = %s;
+		const cert = x509.parse(pem);
+		const value = cert.publicKey;
+		if (!(
+			value &&
+			value.type === "ECDSA" &&
+			typeof value.ecdsa.curve === "object" &&
+			typeof value.ecdsa.x === "object" &&
+			typeof value.ecdsa.y === "object"
+		)) {
+			throw new Error("Bad ECDSA public key");
+		}`, material.ecdsaCertificate))
 		assert.NoError(t, err)
 	})
 }

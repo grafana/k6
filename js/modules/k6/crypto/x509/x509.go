@@ -23,6 +23,7 @@ package x509
 import (
 	"context"
 	"crypto/dsa"
+	"crypto/ecdsa"
 	"crypto/rsa"
 	"crypto/sha1" // #nosec G505
 	"crypto/x509"
@@ -83,8 +84,9 @@ type Issuer struct {
 // PublicKey is used for decryption and signature verification
 type PublicKey struct {
 	Type string
-	DSA  *dsa.PublicKey `js:"dsa"`
-	RSA  *rsa.PublicKey `js:"rsa"`
+	DSA   *dsa.PublicKey   `js:"dsa"`
+	ECDSA *ecdsa.PublicKey `js:"ecdsa"`
+	RSA   *rsa.PublicKey   `js:"rsa"`
 }
 
 // New constructs the X509 interface
@@ -195,6 +197,11 @@ func makePublicKey(parsed interface{}) (PublicKey, error) {
 		return PublicKey{
 			Type: "DSA",
 			DSA: parsed.(*dsa.PublicKey),
+		}, nil
+	case *ecdsa.PublicKey:
+		return PublicKey{
+			Type: "ECDSA",
+			ECDSA: parsed.(*ecdsa.PublicKey),
 		}, nil
 	case *rsa.PublicKey:
 		return PublicKey{
