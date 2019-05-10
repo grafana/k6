@@ -26,8 +26,6 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
-	"encoding/base64"
-	"encoding/hex"
 	"fmt"
 	"strconv"
 
@@ -336,49 +334,6 @@ func hashMessage(function gocrypto.Hash, message string) ([]byte, error) {
 		msg := fmt.Sprintf("unsupported hash function: %d", function)
 		err := errors.New(msg)
 		return nil, err
-	}
-}
-
-func decodeBinaryDetect(encoded interface{}) ([]byte, error) {
-	return decodeBinaryDetectString(encoded.(string))
-}
-
-func decodeBinaryDetectString(encoded string) ([]byte, error) {
-	decoded, err := decodeHex(encoded)
-	if err == nil {
-		return decoded, nil
-	}
-	decoded, err = decodeBase64(encoded)
-	if err == nil {
-		return decoded, nil
-	}
-	err = errors.New("unrecognized binary encoding")
-	return nil, err
-}
-
-func decodeHex(encoded string) ([]byte, error) {
-	return hex.DecodeString(encoded)
-}
-
-func decodeBase64(encoded string) ([]byte, error) {
-	return base64.StdEncoding.DecodeString(encoded)
-}
-
-func encodeBinary(value []byte, format string) (interface{}, error) {
-	switch format {
-	case "":
-		fallthrough
-	case "binary":
-		return value, nil
-	case "hex":
-		encoded := hex.EncodeToString(value)
-		return encoded, nil
-	case "base64":
-		encoded := base64.StdEncoding.EncodeToString(value)
-		return encoded, nil
-	default:
-		err := errors.New("unsupported binary encoding: " + format)
-		return "", err
 	}
 }
 

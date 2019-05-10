@@ -171,25 +171,6 @@ func TestHashMessage(t *testing.T) {
 	})
 }
 
-func TestDecodeBinaryDetect(t *testing.T) {
-	t.Run("BadFormat", func(t *testing.T) {
-		_, err := decodeBinaryDetect("bad-signature")
-		assert.EqualError(t, err, "unrecognized binary encoding")
-	})
-
-	t.Run("Base64", func(t *testing.T) {
-		signature, err := decodeBinaryDetect("AQIDBA==")
-		assert.NoError(t, err)
-		assert.Equal(t, bytes("01020304"), signature)
-	})
-
-	t.Run("Hex", func(t *testing.T) {
-		signature, err := decodeBinaryDetect("01020304")
-		assert.NoError(t, err)
-		assert.Equal(t, bytes("01020304"), signature)
-	})
-}
-
 func TestVerify(t *testing.T) {
 	if testing.Short() {
 		return
