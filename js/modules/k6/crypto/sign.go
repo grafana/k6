@@ -344,7 +344,7 @@ func decodeDataDetect(encoded interface{}) ([]byte, error) {
 	if err == nil {
 		return decoded, nil
 	}
-	decoded, err = base64.StdEncoding.DecodeString(encoded.(string))
+	decoded, err = decodeBase64(encoded.(string))
 	if err == nil {
 		return decoded, nil
 	}
@@ -354,6 +354,10 @@ func decodeDataDetect(encoded interface{}) ([]byte, error) {
 
 func decodeHex(encoded string) ([]byte, error) {
 	return hex.DecodeString(encoded)
+}
+
+func decodeBase64(encoded string) ([]byte, error) {
+	return base64.StdEncoding.DecodeString(encoded)
 }
 
 func encodeSignature(value []byte, format string) (interface{}, error) {
