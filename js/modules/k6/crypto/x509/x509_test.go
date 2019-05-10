@@ -41,11 +41,45 @@ func makeRuntime() *goja.Runtime {
 }
 
 type Material struct {
+	dsaCertificate string
 	rsaCertificate string
 	publicKey string
 }
 
 var material = Material{
+	dsaCertificate: template(`-----BEGIN CERTIFICATE-----
+MIIFnzCCBUSgAwIBAgIJAPOE4rArGHVcMAsGCWCGSAFlAwQDAjCBsTELMAkGA1UE
+BhMCWloxGTAXBgNVBAgMEEtvcHVuY2V6aXMgS3JhaXMxETAPBgNVBAcMCEFzaHRp
+bm9rMRwwGgYDVQQKDBNFeHVtYnJhbiBDb252ZW50aW9uMRkwFwYDVQQLDBBFeHVt
+YnJhbiBDb3VuY2lsMRUwEwYDVQQDDAxleGNvdW5jaWwuenoxJDAiBgkqhkiG9w0B
+CQEWFWV4Y291bmNpbEBleGFtcGxlLmNvbTAeFw0xOTA1MTAwNDE2MDZaFw0xOTA2
+MDkwNDE2MDZaMIGxMQswCQYDVQQGEwJaWjEZMBcGA1UECAwQS29wdW5jZXppcyBL
+cmFpczERMA8GA1UEBwwIQXNodGlub2sxHDAaBgNVBAoME0V4dW1icmFuIENvbnZl
+bnRpb24xGTAXBgNVBAsMEEV4dW1icmFuIENvdW5jaWwxFTATBgNVBAMMDGV4Y291
+bmNpbC56ejEkMCIGCSqGSIb3DQEJARYVZXhjb3VuY2lsQGV4YW1wbGUuY29tMIID
+RjCCAjkGByqGSM44BAEwggIsAoIBAQCKv/tJtwgLJGrvas2YQmqgjfoQ5s9uQRO9
++9ELCu4Lstn9nsjmER/+CgXCrAQG/jUKdT6tpz9bUVYspcn+gF2YkDugSbMb4Uci
+FbWjuFSYD7xIe7APGprgogJZeNO6v9vFWLJak4d35Olej1HLQpVPtz5NdR9unh1a
+B9sODuRtnZDJsGWuEYbNN0nbjQReBLwbnJCRo5p8nL+FVfKmFGKC9KK3P3TNM6u5
+XU8KLlXZ40VNbtiIfzKr4aeHy8ob1+0Jy4nirxt2WJPxYW/tbawhHkJXB8R573CR
+oxH+2xx5WTsYjSIdI3h+mGufi+nmnO2YQguVMrCJ5AaGlrw7V/KRAiEA9d+jpJs9
+sAccw/DWAnRm+UuvcZ9CFT4ttoPc0UWLKmkCggEAVKjNXly/1gzzKUGZVqYSGwig
+ArV109g1vCWg4QavGgVLLqlbSxiz6+0kuLK6vauMipr0i57FRzh0EpZ6faahwQ/L
+bhqXQU+S55m5rFh1eUh428htlOhG5hQYe/EWiqD7nsWzl6z8+/Y5uuq6BksTLej3
+nQJWiLY09SNnKcjVZYe5vs+8ASx6vT2qkGV/UvEEKma1I+0MUDJcHFjnTNwUf7GT
+Rmtt7YgDlYX13e9ar89lSPxjXo+r3BSm5iNMC8eG3e91yoT0G4ShI6zf8LzZbaN2
+PK+Bwa+pBYEqvtp69G0NPO+jadx62HoAKFw+BXh2XU1fS09tX7Z2lfsIhIZSlQOC
+AQUAAoIBADJjifXbelASJEgBC9MNcFQM3aeLpMhSXcsIBR7mDGISnig84HwoqJT7
+6lQznzqBrGjYTaNEA6UC6XXda19wugKSDWJ6SvnMekkvOfIeqUom2sd43fYESXJZ
+X6gnbiqShNVwIK+aKpAWn1sqbWkzCcIL2BJdm7ETJeW3+yOXdLCa6p3JbZQSgVDZ
++GPviNHSX1hyF4FjQW2rrQix5RhEJSV988j6NEZFbuTf7INwpDOg9htRoRihRk3e
+h9kiR6iHl4ZUqSlefyVS40mzlKpPEXtKW2PFE6QLcQLPDzX+JjjAomgs/DIKia2T
+F+3H94NY/zOOcerq+BXwVYZmxhDSOrKjUzBRMB0GA1UdDgQWBBSSb364iDHRI6/2
+JqGGJU+MCQZEoTAfBgNVHSMEGDAWgBSSb364iDHRI6/2JqGGJU+MCQZEoTAPBgNV
+HRMBAf8EBTADAQH/MAsGCWCGSAFlAwQDAgNIADBFAiEA1nr63IX9aaGUPeOUC0Bh
+w3Y7mpv5+sVgtoIi8ljxVSICIFCpEl70YjRVIUKL8N/lJwKxisrJ4+Xxg/DIeGP8
+L8GA
+-----END CERTIFICATE-----`),
 	rsaCertificate: template(`-----BEGIN CERTIFICATE-----
 MIIE6zCCA9OgAwIBAgICBNIwDQYJKoZIhvcNAQELBQAwgdsxCzAJBgNVBAYTAlpa
 MRkwFwYDVQQIExBLb3B1bmNlemlzIEtyYWlzMREwDwYDVQQHEwhBc2h0aW5vazEa
@@ -486,6 +520,22 @@ func TestParse(t *testing.T) {
 		if (value.join(":") !== expected.join(":")) {
 			throw new Error("Bad RSA public key modulus: " + value.join(":"));
 		}`, material.rsaCertificate))
+		assert.NoError(t, err)
+	})
+
+	t.Run("DSAPublicKey", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const pem = %s;
+		const cert = x509.parse(pem);
+		const value = cert.publicKey;
+		if (!(
+			value &&
+			value.type === "DSA" &&
+			typeof value.dsa.parameters === "object" &&
+			typeof value.dsa.y === "object"
+		)) {
+			throw new Error("Bad DSA public key");
+		}`, material.dsaCertificate))
 		assert.NoError(t, err)
 	})
 }
