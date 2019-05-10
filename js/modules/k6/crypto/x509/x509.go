@@ -46,6 +46,7 @@ type Certificate struct {
 	AltNames           []string  `js:"altNames"`
 	SignatureAlgorithm string    `js:"signatureAlgorithm"`
 	FingerPrint        []byte    `js:"fingerPrint"`
+	PublicKeyAlgorithm string    `js:"publicKeyAlgorithm"`
 	PublicKey          PublicKey `js:"publicKey"`
 }
 
@@ -80,7 +81,6 @@ type Issuer struct {
 
 // PublicKey is a public key
 type PublicKey struct {
-	Algorithm string
 	E         int
 	N         []byte
 }
@@ -149,6 +149,7 @@ func makeCertificate(parsed *x509.Certificate) Certificate {
 		AltNames:           altNames(parsed),
 		SignatureAlgorithm: signatureAlgorithm(parsed.SignatureAlgorithm),
 		FingerPrint:        fingerPrint(parsed),
+		PublicKeyAlgorithm: publicKeyAlgorithm(parsed.PublicKeyAlgorithm),
 		PublicKey:          makePublicKey(parsed),
 	}
 }
@@ -181,7 +182,6 @@ func makeIssuer(issuer pkix.Name) Issuer {
 func makePublicKey(parsed *x509.Certificate) PublicKey {
 	key := parsed.PublicKey.(*rsa.PublicKey)
 	return PublicKey{
-		Algorithm: publicKeyAlgorithm(parsed.PublicKeyAlgorithm),
 		E:         key.E,
 		N:         key.N.Bytes(),
 	}
