@@ -259,3 +259,16 @@ func TestSign(t *testing.T) {
 		assert.NoError(t, err)
 	})
 }
+
+func TestVerifier(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+	rt := makeRuntime()
+
+	t.Run("Create", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const verifier = crypto.createVerify("SHA256");`))
+		assert.NoError(t, err)
+	})
+}

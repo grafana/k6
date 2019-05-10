@@ -39,6 +39,12 @@ import (
 // SigningOptions configures a sign or verify operation
 type SigningOptions map[string]string
 
+// Verifier verifies the signature of chunked input
+type Verifier struct{
+	function gocrypto.Hash
+	options  *SigningOptions
+}
+
 // Verify checks for a valid message signature
 func (Crypto) Verify(
 	ctx context.Context,
@@ -71,6 +77,22 @@ func (Crypto) Sign(
 		throw(ctx, err)
 	}
 	return signature
+}
+
+// CreateVerify creates a chunked verifier
+func (Crypto) CreateVerify(
+	ctx context.Context,
+	functionEncoded string,
+	options SigningOptions,
+) Verifier {
+	function, err := decodeFunction(functionEncoded)
+	if err != nil {
+		throw(ctx, err)
+	}
+	return Verifier{
+		function: function,
+		options: &options,
+	}
 }
 
 func prepareVerify(
