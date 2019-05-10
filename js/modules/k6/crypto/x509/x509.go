@@ -79,10 +79,10 @@ type Issuer struct {
 	Names               []RDN
 }
 
-// PublicKey is a public key
+// PublicKey is used for decryption and signature verification
 type PublicKey struct {
-	E         int
-	N         []byte
+	Type string
+	RSA  *rsa.PublicKey `js:"rsa"`
 }
 
 // New constructs the X509 interface
@@ -96,7 +96,11 @@ func (X509) Parse(ctx context.Context, encoded string) Certificate {
 	if err != nil {
 		throw(ctx, err)
 	}
-	return makeCertificate(parsed)
+	certificate, err := makeCertificate(parsed)
+	if err != nil {
+		throw(ctx, err)
+	}
+	return certificate
 }
 
 // GetAltNames extracts alt names
@@ -140,7 +144,11 @@ func parseCertificate(encoded string) (*x509.Certificate, error) {
 	return parsed, nil
 }
 
-func makeCertificate(parsed *x509.Certificate) Certificate {
+func makeCertificate(parsed *x509.Certificate) (Certificate, error) {
+	publicKey, err := makePublicKey(parsed.PublicKey)
+	if err != nil {
+		return Certificate{}, err
+	}
 	return Certificate{
 		Subject:            makeSubject(parsed.Subject),
 		Issuer:             makeIssuer(parsed.Issuer),
@@ -150,8 +158,8 @@ func makeCertificate(parsed *x509.Certificate) Certificate {
 		SignatureAlgorithm: signatureAlgorithm(parsed.SignatureAlgorithm),
 		FingerPrint:        fingerPrint(parsed),
 		PublicKeyAlgorithm: publicKeyAlgorithm(parsed.PublicKeyAlgorithm),
-		PublicKey:          makePublicKey(parsed),
-	}
+		PublicKey:          publicKey,
+	}, err
 }
 
 func makeSubject(subject pkix.Name) Subject {
@@ -179,11 +187,16 @@ func makeIssuer(issuer pkix.Name) Issuer {
 	}
 }
 
-func makePublicKey(parsed *x509.Certificate) PublicKey {
-	key := parsed.PublicKey.(*rsa.PublicKey)
-	return PublicKey{
-		E:         key.E,
-		N:         key.N.Bytes(),
+func makePublicKey(parsed interface{}) (PublicKey, error) {
+	switch parsed.(type) {
+	case *rsa.PublicKey:
+		return PublicKey{
+			Type: "RSA",
+			RSA: parsed.(*rsa.PublicKey),
+		}, nil
+	default:
+		err := errors.New("unsupported public key type")
+		return PublicKey{}, err
 	}
 }
 

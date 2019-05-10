@@ -41,12 +41,12 @@ func makeRuntime() *goja.Runtime {
 }
 
 type Material struct {
-	certificate string
+	rsaCertificate string
 	publicKey string
 }
 
 var material = Material{
-	certificate: template(`-----BEGIN CERTIFICATE-----
+	rsaCertificate: template(`-----BEGIN CERTIFICATE-----
 MIIE6zCCA9OgAwIBAgICBNIwDQYJKoZIhvcNAQELBQAwgdsxCzAJBgNVBAYTAlpa
 MRkwFwYDVQQIExBLb3B1bmNlemlzIEtyYWlzMREwDwYDVQQHEwhBc2h0aW5vazEa
 MBgGA1UECRMRMjIxQiBCYWtlciBTdHJlZXQxDjAMBgNVBBETBTk5OTk5MRwwGgYD
@@ -119,7 +119,7 @@ func TestParse(t *testing.T) {
 		const value = cert.signatureAlgorithm;
 		if (value !== "SHA256-RSA") {
 			throw new Error("Bad signature algorithm: " + value);
-		}`, material.certificate))
+		}`, material.rsaCertificate))
 		assert.NoError(t, err)
 	})
 
@@ -129,7 +129,7 @@ func TestParse(t *testing.T) {
 		const cert = x509.parse(pem);
 		if (typeof cert.subject !== "object") {
 			throw new Error("Bad subject: " + typeof cert.subject);
-		}`, material.certificate))
+		}`, material.rsaCertificate))
 		assert.NoError(t, err)
 	})
 
@@ -140,7 +140,7 @@ func TestParse(t *testing.T) {
 		const value = cert.subject ? cert.subject.commonName : null;
 		if (value !== "excouncil.zz") {
 			throw new Error("Bad subject common name: " + value);
-		}`, material.certificate))
+		}`, material.rsaCertificate))
 		assert.NoError(t, err)
 	})
 
@@ -151,7 +151,7 @@ func TestParse(t *testing.T) {
 		const value = cert.subject ? cert.subject.country : null;
 		if (value !== "ZZ") {
 			throw new Error("Bad subject country: " + value);
-		}`, material.certificate))
+		}`, material.rsaCertificate))
 		assert.NoError(t, err)
 	})
 
@@ -162,7 +162,7 @@ func TestParse(t *testing.T) {
 		const value = cert.subject ? cert.subject.postalCode : null;
 		if (value !== "99999") {
 			throw new Error("Bad subject postal code: " + value);
-		}`, material.certificate))
+		}`, material.rsaCertificate))
 		assert.NoError(t, err)
 	})
 
@@ -173,7 +173,7 @@ func TestParse(t *testing.T) {
 		const value = cert.subject ? cert.subject.stateOrProvinceName : null;
 		if (value !== "Kopuncezis Krais") {
 			throw new Error("Bad subject province: " + value);
-		}`, material.certificate))
+		}`, material.rsaCertificate))
 		assert.NoError(t, err)
 	})
 
@@ -184,7 +184,7 @@ func TestParse(t *testing.T) {
 		const value = cert.subject ? cert.subject.localityName : null;
 		if (value !== "Ashtinok") {
 			throw new Error("Bad subject locality: " + value);
-		}`, material.certificate))
+		}`, material.rsaCertificate))
 		assert.NoError(t, err)
 	})
 
@@ -195,7 +195,7 @@ func TestParse(t *testing.T) {
 		const value = cert.subject ? cert.subject.streetAddress : null;
 		if (value !== "221B Baker Street") {
 			throw new Error("Bad subject street address: " + value);
-		}`, material.certificate))
+		}`, material.rsaCertificate))
 		assert.NoError(t, err)
 	})
 
@@ -206,7 +206,7 @@ func TestParse(t *testing.T) {
 		const value = cert.subject ? cert.subject.organizationName : null;
 		if (value !== "Exumbran Convention") {
 			throw new Error("Bad subject organization: " + value);
-		}`, material.certificate))
+		}`, material.rsaCertificate))
 		assert.NoError(t, err)
 	})
 
@@ -224,7 +224,7 @@ func TestParse(t *testing.T) {
 			throw new Error(
 				"Bad subject organizational unit: " + values.join(", ")
 			);
-		}`, material.certificate))
+		}`, material.rsaCertificate))
 		assert.NoError(t, err)
 	})
 
@@ -253,7 +253,7 @@ func TestParse(t *testing.T) {
 			strings.includes("2.5.4.3: excouncil.zz")
 		)) {
 			throw new Error("Bad subject names");
-		}`, material.certificate))
+		}`, material.rsaCertificate))
 		assert.NoError(t, err)
 	})
 
@@ -263,7 +263,7 @@ func TestParse(t *testing.T) {
 		const cert = x509.parse(pem);
 		if (typeof cert.issuer !== "object") {
 			throw new Error("Bad issuer: " + typeof cert.issuer);
-		}`, material.certificate))
+		}`, material.rsaCertificate))
 		assert.NoError(t, err)
 	})
 
@@ -274,7 +274,7 @@ func TestParse(t *testing.T) {
 		const value = cert.issuer ? cert.issuer.commonName : null;
 		if (value !== "excouncil.zz") {
 			throw new Error("Bad issuer common name: " + value);
-		}`, material.certificate))
+		}`, material.rsaCertificate))
 		assert.NoError(t, err)
 	})
 
@@ -285,7 +285,7 @@ func TestParse(t *testing.T) {
 		const value = cert.issuer ? cert.issuer.country : null;
 		if (value !== "ZZ") {
 			throw new Error("Bad issuer country: " + value);
-		}`, material.certificate))
+		}`, material.rsaCertificate))
 		assert.NoError(t, err)
 	})
 
@@ -296,7 +296,7 @@ func TestParse(t *testing.T) {
 		const value = cert.issuer ? cert.issuer.stateOrProvinceName : null;
 		if (value !== "Kopuncezis Krais") {
 			throw new Error("Bad issuer province: " + value);
-		}`, material.certificate))
+		}`, material.rsaCertificate))
 		assert.NoError(t, err)
 	})
 
@@ -307,7 +307,7 @@ func TestParse(t *testing.T) {
 		const value = cert.issuer ? cert.issuer.localityName : null;
 		if (value !== "Ashtinok") {
 			throw new Error("Bad issuer locality: " + value);
-		}`, material.certificate))
+		}`, material.rsaCertificate))
 		assert.NoError(t, err)
 	})
 
@@ -318,7 +318,7 @@ func TestParse(t *testing.T) {
 		const value = cert.issuer ? cert.issuer.organizationName : null;
 		if (value !== "Exumbran Convention") {
 			throw new Error("Bad issuer organization: " + value);
-		}`, material.certificate))
+		}`, material.rsaCertificate))
 		assert.NoError(t, err)
 	})
 
@@ -347,7 +347,7 @@ func TestParse(t *testing.T) {
 			strings.includes("2.5.4.3: excouncil.zz")
 		)) {
 			throw new Error("Bad subject names");
-		}`, material.certificate))
+		}`, material.rsaCertificate))
 		assert.NoError(t, err)
 	})
 
@@ -358,7 +358,7 @@ func TestParse(t *testing.T) {
 		const value = cert.notBefore;
 		if (value !== "2019-01-01T00:00:00Z") {
 			throw new Error("Bad lower bound: " + value)
-		}`, material.certificate))
+		}`, material.rsaCertificate))
 		assert.NoError(t, err)
 	})
 
@@ -369,7 +369,7 @@ func TestParse(t *testing.T) {
 		const value = cert.notAfter;
 		if (value !== "2020-01-01T00:00:00Z") {
 			throw new Error("Bad upper bound: " + value);
-		}`, material.certificate))
+		}`, material.rsaCertificate))
 		assert.NoError(t, err)
 	})
 
@@ -390,7 +390,7 @@ func TestParse(t *testing.T) {
 			values[7] === "http://learning.excouncil.zz/index.html"
 		)) {
 			throw new Error("Bad alt names: " + values.join(", "));
-		}`, material.certificate))
+		}`, material.rsaCertificate))
 		assert.NoError(t, err)
 	})
 
@@ -405,7 +405,7 @@ func TestParse(t *testing.T) {
 		]
 		if (value.join("") !== expected.join("")) {
 			throw new Error("Bad fingerprint: " + value.join(":"));
-		}`, material.certificate))
+		}`, material.rsaCertificate))
 		assert.NoError(t, err)
 	})
 
@@ -416,7 +416,7 @@ func TestParse(t *testing.T) {
 		const value = cert.publicKeyAlgorithm
 		if (value !== "RSA") {
 			throw new Error("Bad public key algorithm: " + value);
-		}`, material.certificate))
+		}`, material.rsaCertificate))
 		assert.NoError(t, err)
 	})
 
@@ -426,26 +426,43 @@ func TestParse(t *testing.T) {
 		const cert = x509.parse(pem);
 		if (typeof cert.publicKey !== "object") {
 			throw new Error("Bad public key: " + typeof cert.publicKey);
-		}`, material.certificate))
+		}`, material.rsaCertificate))
 		assert.NoError(t, err)
 	})
 
-	t.Run("PublicKeyExponent", func(t *testing.T) {
+	t.Run("RSAPublicKey", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const pem = %s;
 		const cert = x509.parse(pem);
-		const value = cert.publicKey ? cert.publicKey.e : null;
+		const value = cert.publicKey;
+		if (!(
+			value &&
+			value.type === "RSA" &&
+			typeof value.rsa === "object" &&
+			typeof value.rsa.e === "number" &&
+			typeof value.rsa.n === "object"
+		)) {
+			throw new Error("Bad RSA public key");
+		}`, material.rsaCertificate))
+		assert.NoError(t, err)
+	})
+
+	t.Run("RSAPublicKeyExponent", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const pem = %s;
+		const cert = x509.parse(pem);
+		const value = cert.publicKey ? cert.publicKey.rsa.e : null;
 		if (value !== 65537) {
-			throw new Error("Bad public key exponent: " + value);
-		}`, material.certificate))
+			throw new Error("Bad RSA public key exponent: " + value);
+		}`, material.rsaCertificate))
 		assert.NoError(t, err)
 	})
 
-	t.Run("PublicKeyModulus", func(t *testing.T) {
+	t.Run("RSAPublicKeyModulus", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const pem = %s;
 		const cert = x509.parse(pem);
-		const value = cert.publicKey ? cert.publicKey.n : null;
+		const value = cert.publicKey ? cert.publicKey.rsa.n.bytes() : null;
 		const expected = [
 			223, 249, 234, 71, 180, 36, 28, 62, 84, 141, 177, 118, 53, 2, 175,
 			45, 167, 89, 155, 216, 103, 86, 32, 216, 42, 92, 84, 125, 183, 102,
@@ -467,8 +484,8 @@ func TestParse(t *testing.T) {
 			70, 229, 201, 107, 200, 169, 220, 35
 		]
 		if (value.join(":") !== expected.join(":")) {
-			throw new Error("Bad public key modulus: " + value.join(":"));
-		}`, material.certificate))
+			throw new Error("Bad RSA public key modulus: " + value.join(":"));
+		}`, material.rsaCertificate))
 		assert.NoError(t, err)
 	})
 }
@@ -502,7 +519,7 @@ func TestGetAltNames(t *testing.T) {
 			altNames[7] === "http://learning.excouncil.zz/index.html"
 		)) {
 			throw new Error("Bad alt names");
-		}`, material.certificate))
+		}`, material.rsaCertificate))
 		assert.NoError(t, err)
 	})
 }
@@ -534,7 +551,7 @@ func TestGetIssuer(t *testing.T) {
 			issuer.names.length === 9
 		)) {
 			throw new Error("Bad issuer");
-		}`, material.certificate))
+		}`, material.rsaCertificate))
 		assert.NoError(t, err)
 	})
 }
@@ -573,7 +590,7 @@ func TestGetSubject(t *testing.T) {
 			subject.names.length === 9
 		)) {
 			throw new Error("Bad subject");
-		}`, material.certificate))
+		}`, material.rsaCertificate))
 		assert.NoError(t, err)
 	})
 }
