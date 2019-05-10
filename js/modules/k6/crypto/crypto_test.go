@@ -30,8 +30,8 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
-	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/js/modules/k6/crypto/x509"
+	"github.com/loadimpact/k6/lib"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -41,7 +41,7 @@ func (MockReader) Read(p []byte) (n int, err error) {
 	return -1, errors.New("Contrived failure")
 }
 
-func bytes (encoded string) []byte {
+func bytes(encoded string) []byte {
 	decoded, _ := hex.DecodeString(encoded)
 	return decoded
 }
