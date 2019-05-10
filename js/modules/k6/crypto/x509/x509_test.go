@@ -46,6 +46,7 @@ type Material struct {
 	ecdsaCertificate       string
 	rsaCertificate         string
 	dsaPublicKey           string
+	ecdsaPublicKey         string
 	rsaPublicKey           string
 	privateKeyPassword     string
 	rsaPrivateKeyClear     string
@@ -155,6 +156,12 @@ SXJZX6gnbiqShNVwIK+aKpAWn1sqbWkzCcIL2BJdm7ETJeW3+yOXdLCa6p3JbZQS
 gVDZ+GPviNHSX1hyF4FjQW2rrQix5RhEJSV988j6NEZFbuTf7INwpDOg9htRoRih
 Rk3eh9kiR6iHl4ZUqSlefyVS40mzlKpPEXtKW2PFE6QLcQLPDzX+JjjAomgs/DIK
 ia2TF+3H94NY/zOOcerq+BXwVYZmxhDSOrI=
+-----END PUBLIC KEY-----`),
+	ecdsaPublicKey: template(`-----BEGIN PUBLIC KEY-----
+MIGbMBAGByqGSM49AgEGBSuBBAAjA4GGAAQBcX9o+j4axEZ3TzUq2DjuvAboLKTW
+lco1HZxjO51MNekI64fDkQIYp7PsbNM2lPvZQt3oglDHxlp2Au1qVcZAs1sBhd09
+cbsUjd2HQce8c8B+xoxp4H0PvCGeNxdDqo0ibuPjvutma0IxcJEidxgFRHZ868EU
+gl27czkKiDZRgtLjEDE=
 -----END PUBLIC KEY-----`),
 	rsaPublicKey: template(`-----BEGIN PUBLIC KEY-----
 MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDXMLr/Y/vUtIFY75jj0YXfp6lQ
@@ -800,6 +807,22 @@ func TestParsePublicKey(t *testing.T) {
 		)) {
 			throw new Error("Bad DSA public key");
 		}`, material.dsaPublicKey))
+		assert.NoError(t, err)
+	})
+
+	t.Run("SuccessECDSA", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const pem = %s;
+		const publicKey = x509.parsePublicKey(pem);
+		if (!(
+			publicKey &&
+			publicKey.type === "ECDSA" &&
+			typeof publicKey.ecdsa.curve === "object" &&
+			typeof publicKey.ecdsa.x === "object" &&
+			typeof publicKey.ecdsa.y === "object"
+		)) {
+			throw new Error("Bad ECDSA public key");
+		}`, material.ecdsaPublicKey))
 		assert.NoError(t, err)
 	})
 }
