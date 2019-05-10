@@ -21,15 +21,11 @@
 package crypto
 
 import (
-	"context"
 	gocrypto "crypto"
-	"encoding/hex"
 	"fmt"
 	"testing"
 
-	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
-	"github.com/loadimpact/k6/js/modules/k6/crypto/x509"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -108,29 +104,6 @@ var expected = Expected{
 		":30:70:131:22:180:154:113:22:40:113:166:42:96:111:7:134:6:86:243" +
 		":211:62:122:215:149:166:142:33:213:10:172:125:157:121:162:225:33" +
 		":79:255:179:108:6:224:86:235:207:227:47:48:246:24:56:184:72:243:89"),
-}
-
-func bytes (encoded string) []byte {
-	decoded, _ := hex.DecodeString(encoded)
-	return decoded
-}
-
-func stringify(value string) string {
-	return fmt.Sprintf(`"%s"`, value)
-}
-
-func template(value string) string {
-	return fmt.Sprintf("`%s`", value)
-}
-
-func makeRuntime() *goja.Runtime {
-	rt := goja.New()
-	rt.SetFieldNameMapper(common.FieldNameMapper{})
-	ctx := context.Background()
-	ctx = common.WithRuntime(ctx, rt)
-	rt.Set("crypto", common.Bind(rt, New(), &ctx))
-	rt.Set("x509", common.Bind(rt, x509.New(), &ctx))
-	return rt
 }
 
 func TestDecodeFunction(t *testing.T) {
