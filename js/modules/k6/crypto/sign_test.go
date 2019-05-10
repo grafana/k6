@@ -41,7 +41,8 @@ type Material struct {
 	pssSignature string
 }
 type Expected struct {
-	Digest ExpectedDigest
+	digest       ExpectedDigest
+	hexSignature string
 }
 type ExpectedDigest struct {
 	SHA256 []byte
@@ -83,11 +84,16 @@ eml4CZD2OGaxUqdOSHKBAkEAtruFjS0IhJstjoOrAS1p5ZAr8Noj5L1DEIgxfAD4
 		"c5e033d9d5f67bf740118f62a112140f317c1e7b1efa821a10359c933696376b"),
 }
 var expected = Expected{
-	Digest: ExpectedDigest{
+	digest: ExpectedDigest{
 		SHA256: bytes(
 			"cec66fa2e0ad6286b01c5d975631664f" +
 			"54ad80e0ab46907769823e0c33264e8a"),
 	},
+	hexSignature: stringify(
+		"befd8b0a92a44b03324d1908b9e16d209328c38b14b71f8960f5c97c68a00437" +
+		"390cc42acab32ce70097a215163917ba28c3dbaa1a88a96e2443fa9abb442082" +
+		"2d1e02dcb90b9499741e468316b49a71162871a62a606f07860656f3d33e7ad7" +
+		"95a68e21d50aac7d9d79a2e1214fffb36c06e056ebcfe32f30f61838b848f359"),
 }
 
 func bytes (encoded string) []byte {
@@ -147,7 +153,7 @@ func TestHashMessage(t *testing.T) {
 	t.Run("SHA256", func(t *testing.T) {
 		digest, err := hashMessage(gocrypto.SHA256, message)
 		assert.NoError(t, err)
-		assert.Equal(t, expected.Digest.SHA256, digest)
+		assert.Equal(t, expected.digest.SHA256, digest)
 	})
 }
 
@@ -256,6 +262,25 @@ func TestSign(t *testing.T) {
 		if (!result) {
 			throw new Error("Verification failure");
 		}`, material.message, material.rsaPrivateKey, material.rsaPublicKey))
+		assert.NoError(t, err)
+	})
+
+	t.Run("HexOutput", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const message = %s;
+		const priv = x509.parsePrivateKey(%s);
+		const pub = x509.parsePublicKey(%s);
+		const hash = "SHA256";
+		const signature = crypto.sign(priv, hash, message, "hex");
+		const expected = %s;
+		if (signature !== expected) {
+			throw new Error("Bad hex output");
+		}`,
+			material.message,
+			material.rsaPrivateKey,
+			material.rsaPublicKey,
+			expected.hexSignature,
+		))
 		assert.NoError(t, err)
 	})
 }

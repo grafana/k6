@@ -67,7 +67,7 @@ func (Crypto) Sign(
 	message string,
 	format string,
 	options SigningOptions,
-) string {
+) interface{} {
 	function, digest, err := prepareSign(functionEncoded, message)
 	if err != nil {
 		throw(ctx, err)
@@ -203,7 +203,7 @@ func executeSign(
 	digest []byte,
 	format string,
 	options SigningOptions,
-) (string, error) {
+) (interface{}, error) {
 	var signature []byte
 	var err error
 	switch signer.Type {
@@ -217,7 +217,7 @@ func executeSign(
 	}
 	encoded, err := encodeSignature(signature, format)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	return encoded, nil
 }
@@ -352,8 +352,12 @@ func decodeSignature(encoded string) ([]byte, error) {
 	return nil, err
 }
 
-func encodeSignature(value []byte, format string) (string, error) {
+func encodeSignature(value []byte, format string) (interface{}, error) {
 	switch format {
+	case "":
+		fallthrough
+	case "binary":
+		return value, nil
 	case "hex":
 		encoded := hex.EncodeToString(value)
 		return encoded, nil
