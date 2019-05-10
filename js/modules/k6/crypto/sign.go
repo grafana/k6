@@ -340,11 +340,15 @@ func hashMessage(function gocrypto.Hash, message string) ([]byte, error) {
 }
 
 func decodeDataDetect(encoded interface{}) ([]byte, error) {
-	decoded, err := decodeHex(encoded.(string))
+	return decodeDataDetectString(encoded.(string))
+}
+
+func decodeDataDetectString(encoded string) ([]byte, error) {
+	decoded, err := decodeHex(encoded
 	if err == nil {
 		return decoded, nil
 	}
-	decoded, err = decodeBase64(encoded.(string))
+	decoded, err = decodeBase64(encoded)
 	if err == nil {
 		return decoded, nil
 	}
