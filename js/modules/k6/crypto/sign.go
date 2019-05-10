@@ -215,7 +215,7 @@ func executeSign(
 	if err != nil {
 		return "", err
 	}
-	encoded, err := encodeSignature(signature, format)
+	encoded, err := encodeBinary(signature, format)
 	if err != nil {
 		return nil, err
 	}
@@ -364,7 +364,7 @@ func decodeBase64(encoded string) ([]byte, error) {
 	return base64.StdEncoding.DecodeString(encoded)
 }
 
-func encodeSignature(value []byte, format string) (interface{}, error) {
+func encodeBinary(value []byte, format string) (interface{}, error) {
 	switch format {
 	case "":
 		fallthrough
@@ -377,7 +377,7 @@ func encodeSignature(value []byte, format string) (interface{}, error) {
 		encoded := base64.StdEncoding.EncodeToString(value)
 		return encoded, nil
 	default:
-		err := errors.New("unsupported signature encoding: " + format)
+		err := errors.New("unsupported binary encoding: " + format)
 		return "", err
 	}
 }
