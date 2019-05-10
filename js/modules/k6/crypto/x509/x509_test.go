@@ -45,6 +45,7 @@ type Material struct {
 	dsaCertificate         string
 	ecdsaCertificate       string
 	rsaCertificate         string
+	dsaPublicKey           string
 	rsaPublicKey           string
 	privateKeyPassword     string
 	rsaPrivateKeyClear     string
@@ -135,6 +136,26 @@ gzg3dNaCY65aH0cJE/dVwiS/F2XTr1zvr+uBPExgrA21+FSIlHM0Dot+VGKdCLEO
 xytSVXVn+cECQLg9hVn+Zx3XO2FA0eOzaWEONnUGghT/Ivw06lUxis5tkAoAU93d
 ddBqJe0XUeAX8Zr6EJ82
 -----END CERTIFICATE-----`),
+	dsaPublicKey: template(`-----BEGIN PUBLIC KEY-----
+MIIDRjCCAjkGByqGSM44BAEwggIsAoIBAQCKv/tJtwgLJGrvas2YQmqgjfoQ5s9u
+QRO9+9ELCu4Lstn9nsjmER/+CgXCrAQG/jUKdT6tpz9bUVYspcn+gF2YkDugSbMb
+4UciFbWjuFSYD7xIe7APGprgogJZeNO6v9vFWLJak4d35Olej1HLQpVPtz5NdR9u
+nh1aB9sODuRtnZDJsGWuEYbNN0nbjQReBLwbnJCRo5p8nL+FVfKmFGKC9KK3P3TN
+M6u5XU8KLlXZ40VNbtiIfzKr4aeHy8ob1+0Jy4nirxt2WJPxYW/tbawhHkJXB8R5
+73CRoxH+2xx5WTsYjSIdI3h+mGufi+nmnO2YQguVMrCJ5AaGlrw7V/KRAiEA9d+j
+pJs9sAccw/DWAnRm+UuvcZ9CFT4ttoPc0UWLKmkCggEAVKjNXly/1gzzKUGZVqYS
+GwigArV109g1vCWg4QavGgVLLqlbSxiz6+0kuLK6vauMipr0i57FRzh0EpZ6faah
+wQ/LbhqXQU+S55m5rFh1eUh428htlOhG5hQYe/EWiqD7nsWzl6z8+/Y5uuq6BksT
+Lej3nQJWiLY09SNnKcjVZYe5vs+8ASx6vT2qkGV/UvEEKma1I+0MUDJcHFjnTNwU
+f7GTRmtt7YgDlYX13e9ar89lSPxjXo+r3BSm5iNMC8eG3e91yoT0G4ShI6zf8LzZ
+baN2PK+Bwa+pBYEqvtp69G0NPO+jadx62HoAKFw+BXh2XU1fS09tX7Z2lfsIhIZS
+lQOCAQUAAoIBADJjifXbelASJEgBC9MNcFQM3aeLpMhSXcsIBR7mDGISnig84Hwo
+qJT76lQznzqBrGjYTaNEA6UC6XXda19wugKSDWJ6SvnMekkvOfIeqUom2sd43fYE
+SXJZX6gnbiqShNVwIK+aKpAWn1sqbWkzCcIL2BJdm7ETJeW3+yOXdLCa6p3JbZQS
+gVDZ+GPviNHSX1hyF4FjQW2rrQix5RhEJSV988j6NEZFbuTf7INwpDOg9htRoRih
+Rk3eh9kiR6iHl4ZUqSlefyVS40mzlKpPEXtKW2PFE6QLcQLPDzX+JjjAomgs/DIK
+ia2TF+3H94NY/zOOcerq+BXwVYZmxhDSOrI=
+-----END PUBLIC KEY-----`),
 	rsaPublicKey: template(`-----BEGIN PUBLIC KEY-----
 MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDXMLr/Y/vUtIFY75jj0YXfp6lQ
 7iEIbps3BvRE4isTpxs8fXLnLM8LAuJScxiKyrGnj8EMb7LIHkSMBlz6iVj9atY6
@@ -764,6 +785,21 @@ func TestParsePublicKey(t *testing.T) {
 		)) {
 			throw new Error("Bad result");
 		}`, material.rsaPublicKey))
+		assert.NoError(t, err)
+	})
+
+	t.Run("SuccessDSA", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const pem = %s;
+		const publicKey = x509.parsePublicKey(pem);
+		if (!(
+			publicKey &&
+			publicKey.type === "DSA" &&
+			typeof publicKey.dsa.parameters === "object" &&
+			typeof publicKey.dsa.y === "object"
+		)) {
+			throw new Error("Bad DSA public key");
+		}`, material.dsaPublicKey))
 		assert.NoError(t, err)
 	})
 }
