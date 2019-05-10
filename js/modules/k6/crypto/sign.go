@@ -340,7 +340,7 @@ func hashMessage(function gocrypto.Hash, message string) ([]byte, error) {
 }
 
 func decodeDataDetect(encoded interface{}) ([]byte, error) {
-	decoded, err := hex.DecodeString(encoded.(string))
+	decoded, err := decodeHex(encoded.(string))
 	if err == nil {
 		return decoded, nil
 	}
@@ -350,6 +350,10 @@ func decodeDataDetect(encoded interface{}) ([]byte, error) {
 	}
 	err = errors.New("unrecognized binary data encoding")
 	return nil, err
+}
+
+func decodeHex(encoded string) ([]byte, error) {
+	return hex.DecodeString(encoded)
 }
 
 func encodeSignature(value []byte, format string) (interface{}, error) {
