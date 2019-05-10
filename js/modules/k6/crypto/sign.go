@@ -109,7 +109,7 @@ func prepareVerify(
 	if err != nil {
 		throw(ctx, err)
 	}
-	signature, err := decodeDataDetect(signatureEncoded)
+	signature, err := decodeBinaryDetect(signatureEncoded)
 	if err != nil {
 		throw(ctx, err)
 	}
@@ -339,12 +339,12 @@ func hashMessage(function gocrypto.Hash, message string) ([]byte, error) {
 	}
 }
 
-func decodeDataDetect(encoded interface{}) ([]byte, error) {
-	return decodeDataDetectString(encoded.(string))
+func decodeBinaryDetect(encoded interface{}) ([]byte, error) {
+	return decodeBinaryDetectString(encoded.(string))
 }
 
-func decodeDataDetectString(encoded string) ([]byte, error) {
-	decoded, err := decodeHex(encoded
+func decodeBinaryDetectString(encoded string) ([]byte, error) {
+	decoded, err := decodeHex(encoded)
 	if err == nil {
 		return decoded, nil
 	}
@@ -352,7 +352,7 @@ func decodeDataDetectString(encoded string) ([]byte, error) {
 	if err == nil {
 		return decoded, nil
 	}
-	err = errors.New("unrecognized binary data encoding")
+	err = errors.New("unrecognized binary encoding")
 	return nil, err
 }
 
