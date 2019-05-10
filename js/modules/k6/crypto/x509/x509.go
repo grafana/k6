@@ -75,6 +75,7 @@ type Issuer struct {
 	StateOrProvinceName string `js:"stateOrProvinceName"`
 	LocalityName        string `js:"localityName"`
 	OrganizationName    string `js:"organizationName"`
+	Names               []RDN
 }
 
 // PublicKey is a public key
@@ -173,6 +174,7 @@ func makeIssuer(issuer pkix.Name) Issuer {
 		StateOrProvinceName: first(issuer.Province),
 		LocalityName:        first(issuer.Locality),
 		OrganizationName:    first(issuer.Organization),
+		Names:               makeRdns(issuer.Names),
 	}
 }
 

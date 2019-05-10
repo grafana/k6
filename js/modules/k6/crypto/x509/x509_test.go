@@ -322,6 +322,35 @@ func TestParse(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("IssuerNames", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const pem = %s;
+		const cert = x509.parse(pem);
+		const values = cert.issuer ? cert.issuer.names : null;
+		const strings = values
+			? values.map(entry => entry.type + ": " + entry.value)
+			: null;
+		Array.prototype.includes =
+			function (value) { return this.indexOf(value) !== -1 }
+		if (!(
+			values &&
+			Array.isArray(values) &&
+			values.length === 9 &&
+			strings.includes("2.5.4.6: ZZ") &&
+			strings.includes("2.5.4.8: Kopuncezis Krais") &&
+			strings.includes("2.5.4.7: Ashtinok") &&
+			strings.includes("2.5.4.9: 221B Baker Street") &&
+			strings.includes("2.5.4.17: 99999") &&
+			strings.includes("2.5.4.10: Exumbran Convention") &&
+			strings.includes("2.5.4.11: Exumbran Council") &&
+			strings.includes("2.5.4.11: Exumbran Janitorial Service") &&
+			strings.includes("2.5.4.3: excouncil.zz")
+		)) {
+			throw new Error("Bad subject names");
+		}`, material.certificate))
+		assert.NoError(t, err)
+	})
+
 	t.Run("NotBefore", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const pem = %s;
