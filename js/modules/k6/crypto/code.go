@@ -66,11 +66,29 @@ func decodeBinaryDetect(encoded interface{}) ([]byte, error) {
 }
 
 func decodeBytes(abstracted interface{}) ([]byte, error) {
-	decoded, ok := abstracted.([]byte)
+	encoded, ok := abstracted.([]interface{})
 	if !ok {
 		err := errors.New("not a byte array")
 		return nil, err
 	}
+	decoded := make([]byte, len(encoded))
+	for i, itemAbstracted := range encoded {
+		itemDecoded, err := decodeByte(itemAbstracted)
+		if err != nil {
+			return nil, err
+		}
+		decoded[i] = itemDecoded
+	}
+	return decoded, nil
+}
+
+func decodeByte(abstracted interface{}) (byte, error) {
+	encoded, ok := abstracted.(int64)
+	if !ok {
+		err := errors.New("not a byte array")
+		return 0, err
+	}
+	decoded := byte(encoded)
 	return decoded, nil
 }
 

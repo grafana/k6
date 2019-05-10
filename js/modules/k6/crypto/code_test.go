@@ -28,14 +28,19 @@ import (
 
 func TestDecodeBinaryKnown(t *testing.T) {
 	t.Run("Unsupported", func(t *testing.T) {
-		_, err := decodeBinaryKnown([]byte{1,2,3}, "nucleaonic")
+		_, err := decodeBinaryKnown([]byte{1, 2, 3}, "nucleaonic")
 		assert.EqualError(t, err, "unsupported binary encoding: nucleaonic")
 	})
 
 	t.Run("ByteArrayValid", func(t *testing.T) {
-		result, err := decodeBinaryKnown([]byte{1,2,3}, "binary")
+		value := []interface{}{
+			interface{}(int64(1)),
+			interface{}(int64(2)),
+			interface{}(int64(3)),
+		}
+		result, err := decodeBinaryKnown(value, "binary")
 		assert.NoError(t, err)
-		assert.Equal(t, []byte{1,2,3}, result)
+		assert.Equal(t, []byte{1, 2, 3}, result)
 	})
 
 	t.Run("ByteArrayInvalid", func(t *testing.T) {
@@ -46,22 +51,22 @@ func TestDecodeBinaryKnown(t *testing.T) {
 	t.Run("HexValid", func(t *testing.T) {
 		result, err := decodeBinaryKnown("010203", "hex")
 		assert.NoError(t, err)
-		assert.Equal(t, []byte{1,2,3}, result)
+		assert.Equal(t, []byte{1, 2, 3}, result)
 	})
 
 	t.Run("HexInvalid", func(t *testing.T) {
-		_, err := decodeBinaryKnown([]byte{1,2,3}, "hex")
+		_, err := decodeBinaryKnown([]byte{1, 2, 3}, "hex")
 		assert.EqualError(t, err, "not a hex string")
 	})
 
 	t.Run("Base64Valid", func(t *testing.T) {
 		result, err := decodeBinaryKnown("AQID", "base64")
 		assert.NoError(t, err)
-		assert.Equal(t, []byte{1,2,3}, result)
+		assert.Equal(t, []byte{1, 2, 3}, result)
 	})
 
 	t.Run("Base64Invalid", func(t *testing.T) {
-		_, err := decodeBinaryKnown([]byte{1,2,3}, "base64")
+		_, err := decodeBinaryKnown([]byte{1, 2, 3}, "base64")
 		assert.EqualError(t, err, "not a base64 string")
 	})
 }
@@ -73,50 +78,55 @@ func TestDecodeBinaryDetect(t *testing.T) {
 	})
 
 	t.Run("ByteArray", func(t *testing.T) {
-		result, err := decodeBinaryDetect([]byte{1,2,3})
+		value := []interface{}{
+			interface{}(int64(1)),
+			interface{}(int64(2)),
+			interface{}(int64(3)),
+		}
+		result, err := decodeBinaryDetect(value)
 		assert.NoError(t, err)
-		assert.Equal(t, []byte{1,2,3}, result)
+		assert.Equal(t, []byte{1, 2, 3}, result)
 	})
 
 	t.Run("Hex", func(t *testing.T) {
 		result, err := decodeBinaryDetect("010203")
 		assert.NoError(t, err)
-		assert.Equal(t, []byte{1,2,3}, result)
+		assert.Equal(t, []byte{1, 2, 3}, result)
 	})
 
 	t.Run("Base64", func(t *testing.T) {
 		result, err := decodeBinaryDetect("AQID")
 		assert.NoError(t, err)
-		assert.Equal(t, []byte{1,2,3}, result)
+		assert.Equal(t, []byte{1, 2, 3}, result)
 	})
 }
 
 func TestEncodeBinary(t *testing.T) {
 	t.Run("Unsupported", func(t *testing.T) {
-		_, err := encodeBinary([]byte{1,2,3}, "nucleonic")
+		_, err := encodeBinary([]byte{1, 2, 3}, "nucleonic")
 		assert.EqualError(t, err, "unsupported binary encoding: nucleonic")
 	})
 
 	t.Run("Default", func(t *testing.T) {
-		result, err := encodeBinary([]byte{1,2,3}, "")
+		result, err := encodeBinary([]byte{1, 2, 3}, "")
 		assert.NoError(t, err)
-		assert.Equal(t, []byte{1,2,3}, result)
+		assert.Equal(t, []byte{1, 2, 3}, result)
 	})
 
 	t.Run("ByteArray", func(t *testing.T) {
-		result, err := encodeBinary([]byte{1,2,3}, "binary")
+		result, err := encodeBinary([]byte{1, 2, 3}, "binary")
 		assert.NoError(t, err)
-		assert.Equal(t, []byte{1,2,3}, result)
+		assert.Equal(t, []byte{1, 2, 3}, result)
 	})
 
 	t.Run("Hex", func(t *testing.T) {
-		result, err := encodeBinary([]byte{1,2,3}, "hex")
+		result, err := encodeBinary([]byte{1, 2, 3}, "hex")
 		assert.NoError(t, err)
 		assert.Equal(t, "010203", result)
 	})
 
 	t.Run("Base64", func(t *testing.T) {
-		result, err := encodeBinary([]byte{1,2,3}, "base64")
+		result, err := encodeBinary([]byte{1, 2, 3}, "base64")
 		assert.NoError(t, err)
 		assert.Equal(t, "AQID", result)
 	})
