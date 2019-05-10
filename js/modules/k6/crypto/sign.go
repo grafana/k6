@@ -36,6 +36,7 @@ import (
 	"github.com/pkg/errors"
 )
 
+// SigningOptions configures a sign or verify operation
 type SigningOptions map[string]string
 
 // Verify checks for a valid message signature
