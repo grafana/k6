@@ -94,12 +94,6 @@ type PrivateKey struct {
 	Key       interface{}
 }
 
-// PublicKey is used for decryption and signature verification
-type PublicKey struct {
-	Type string
-	RSA  *rsa.PublicKey `js:"rsa"`
-}
-
 // New constructs the X509 interface
 func New() *X509 {
 	return &X509{}
