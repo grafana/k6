@@ -33,14 +33,14 @@ func TestDecodeBinaryDetect(t *testing.T) {
 	})
 
 	t.Run("Base64", func(t *testing.T) {
-		signature, err := decodeBinaryDetect("AQIDBA==")
+		result, err := decodeBinaryDetect("AQIDBA==")
 		assert.NoError(t, err)
-		assert.Equal(t, bytes("01020304"), signature)
+		assert.Equal(t, bytes("01020304"), result)
 	})
 
 	t.Run("Hex", func(t *testing.T) {
-		signature, err := decodeBinaryDetect("01020304")
+		result, err := decodeBinaryDetect("01020304")
 		assert.NoError(t, err)
-		assert.Equal(t, bytes("01020304"), signature)
+		assert.Equal(t, bytes("01020304"), result)
 	})
 }
