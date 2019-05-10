@@ -529,7 +529,9 @@ func TestGetIssuer(t *testing.T) {
 			issuer.country === "ZZ" &&
 			issuer.stateOrProvinceName === "Kopuncezis Krais" &&
 			issuer.localityName === "Ashtinok" &&
-			issuer.organizationName === "Exumbran Convention"
+			issuer.organizationName === "Exumbran Convention" &&
+			Array.isArray(issuer.names) &&
+			issuer.names.length === 9
 		)) {
 			throw new Error("Bad issuer");
 		}`, material.certificate))
@@ -566,7 +568,9 @@ func TestGetSubject(t *testing.T) {
 			subject.organizationalUnitName.length === 2 &&
 			subject.organizationalUnitName[0] === "Exumbran Council" &&
 			subject.organizationalUnitName[1] ===
-				"Exumbran Janitorial Service"
+				"Exumbran Janitorial Service" &&
+			Array.isArray(subject.names) &&
+			subject.names.length === 9
 		)) {
 			throw new Error("Bad subject");
 		}`, material.certificate))
