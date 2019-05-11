@@ -39,6 +39,7 @@ type SigningOptions map[string]string
 
 // Verifier verifies the signature of chunked input
 type Verifier struct {
+	ctx      *context.Context
 	function gocrypto.Hash
 	options  *SigningOptions
 }
@@ -90,6 +91,7 @@ func (*Crypto) CreateVerify(
 		throw(ctx, err)
 	}
 	return Verifier{
+		ctx:      ctx,
 		function: function,
 		options:  &options,
 	}
