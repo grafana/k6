@@ -45,7 +45,7 @@ type Verifier struct {
 
 // Verify checks for a valid message signature
 func (Crypto) Verify(
-	ctx context.Context,
+	ctx *context.Context,
 	signer x509.PublicKey,
 	functionEncoded string,
 	plaintextEncoded interface{},
@@ -64,7 +64,7 @@ func (Crypto) Verify(
 
 // Sign produces a message signature
 func (Crypto) Sign(
-	ctx context.Context,
+	ctx *context.Context,
 	signer x509.PrivateKey,
 	functionEncoded string,
 	message string,
@@ -81,7 +81,7 @@ func (Crypto) Sign(
 
 // CreateVerify creates a chunked verifier
 func (Crypto) CreateVerify(
-	ctx context.Context,
+	ctx *context.Context,
 	functionEncoded string,
 	options SigningOptions,
 ) Verifier {
@@ -96,7 +96,7 @@ func (Crypto) CreateVerify(
 }
 
 func prepareVerify(
-	ctx context.Context,
+	ctx *context.Context,
 	functionEncoded string,
 	plaintextEncoded interface{},
 	signatureEncoded interface{},
@@ -188,7 +188,7 @@ func verifyPSS(
 }
 
 func prepareSign(
-	ctx context.Context,
+	ctx *context.Context,
 	functionEncoded string,
 	plaintextEncoded interface{},
 ) (gocrypto.Hash, []byte) {
@@ -348,6 +348,6 @@ func hashPlaintext(function gocrypto.Hash, plaintext []byte) ([]byte, error) {
 	}
 }
 
-func throw(ctx context.Context, err error) {
-	common.Throw(common.GetRuntime(ctx), err)
+func throw(ctx *context.Context, err error) {
+	common.Throw(common.GetRuntime(*ctx), err)
 }

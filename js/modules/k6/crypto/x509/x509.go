@@ -100,7 +100,7 @@ func New() *X509 {
 }
 
 // Parse produces an entire X.509 certificate
-func (X509) Parse(ctx context.Context, encoded []byte) Certificate {
+func (X509) Parse(ctx *context.Context, encoded string) Certificate {
 	parsed, err := parseCertificate(encoded)
 	if err != nil {
 		throw(ctx, err)
@@ -113,7 +113,7 @@ func (X509) Parse(ctx context.Context, encoded []byte) Certificate {
 }
 
 // GetAltNames extracts alt names
-func (X509) GetAltNames(ctx context.Context, encoded []byte) []string {
+func (X509) GetAltNames(ctx *context.Context, encoded string) []string {
 	parsed, err := parseCertificate(encoded)
 	if err != nil {
 		throw(ctx, err)
@@ -122,7 +122,7 @@ func (X509) GetAltNames(ctx context.Context, encoded []byte) []string {
 }
 
 // GetIssuer extracts certificate issuer
-func (X509) GetIssuer(ctx context.Context, encoded []byte) Issuer {
+func (X509) GetIssuer(ctx *context.Context, encoded string) Issuer {
 	parsed, err := parseCertificate(encoded)
 	if err != nil {
 		throw(ctx, err)
@@ -131,7 +131,7 @@ func (X509) GetIssuer(ctx context.Context, encoded []byte) Issuer {
 }
 
 // GetSubject extracts certificate subject
-func (X509) GetSubject(ctx context.Context, encoded []byte) Subject {
+func (X509) GetSubject(ctx *context.Context, encoded string) Subject {
 	parsed, err := parseCertificate(encoded)
 	if err != nil {
 		throw(ctx, err)
@@ -140,7 +140,7 @@ func (X509) GetSubject(ctx context.Context, encoded []byte) Subject {
 }
 
 // ParsePublicKey parses a public key
-func (X509) ParsePublicKey(ctx context.Context, encoded string) PublicKey {
+func (X509) ParsePublicKey(ctx *context.Context, encoded string) PublicKey {
 	parsed, err := parsePublicKey(encoded)
 	if err != nil {
 		throw(ctx, err)
@@ -154,7 +154,7 @@ func (X509) ParsePublicKey(ctx context.Context, encoded string) PublicKey {
 
 // ParsePrivateKey parses an RSA private key
 func (X509) ParsePrivateKey(
-	ctx context.Context,
+	ctx *context.Context,
 	encoded string,
 	password string,
 ) PrivateKey {
@@ -365,6 +365,6 @@ func makePrivateKey(parsed interface{}) (PrivateKey, error) {
 	}
 }
 
-func throw(ctx context.Context, err error) {
-	common.Throw(common.GetRuntime(ctx), err)
+func throw(ctx *context.Context, err error) {
+	common.Throw(common.GetRuntime(*ctx), err)
 }
