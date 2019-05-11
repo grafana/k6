@@ -139,14 +139,14 @@ func TestDecodeFunction(t *testing.T) {
 		)
 	})
 
-	t.Run("SHA256", func(t *testing.T) {
-		function, err := decodeFunction("SHA256")
+	t.Run("sha256", func(t *testing.T) {
+		function, err := decodeFunction("sha256")
 		assert.NoError(t, err)
 		assert.Equal(t, gocrypto.SHA256, function)
 	})
 
-	t.Run("SHA512", func(t *testing.T) {
-		function, err := decodeFunction("SHA512")
+	t.Run("sha512", func(t *testing.T) {
+		function, err := decodeFunction("sha512")
 		assert.NoError(t, err)
 		assert.Equal(t, gocrypto.SHA512, function)
 	})
@@ -162,7 +162,7 @@ func TestHashPlaintext(t *testing.T) {
 		assert.EqualError(t, err, "unsupported hash function: 0")
 	})
 
-	t.Run("SHA256", func(t *testing.T) {
+	t.Run("sha256", func(t *testing.T) {
 		digest, err := hashPlaintext(gocrypto.SHA256, material.messageBytes)
 		assert.NoError(t, err)
 		assert.Equal(t, expected.digest.SHA256, digest)
@@ -180,7 +180,7 @@ func TestVerify(t *testing.T) {
 		const message = %s;
 		const signer = { type: "HyperQuantumAlgorithm" };
 		const signature = %s;
-		const result = crypto.verify(signer, "SHA256", message, signature);
+		const result = crypto.verify(signer, "sha256", message, signature);
 		`, material.messageHex, material.pkcsSignatureHex))
 		assert.EqualError(t, err, "GoError: invalid public key")
 	})
@@ -191,7 +191,7 @@ func TestVerify(t *testing.T) {
 		const pem = %s;
 		const signer = x509.parsePublicKey(pem);
 		const signature = %s;
-		const result = crypto.verify(signer, "SHA256", message, signature);
+		const result = crypto.verify(signer, "sha256", message, signature);
 		if (!result) {
 			throw new Error("Verification failure");
 		}`,
@@ -208,7 +208,7 @@ func TestVerify(t *testing.T) {
 		const pem = %s;
 		const signer = x509.parsePublicKey(pem);
 		const signature = %s;
-		const result = crypto.verify(signer, "SHA256", message, signature);
+		const result = crypto.verify(signer, "sha256", message, signature);
 		if (!result) {
 			throw new Error("Verification failure");
 		}`,
@@ -225,7 +225,7 @@ func TestVerify(t *testing.T) {
 		const pem = %s;
 		const signer = x509.parsePublicKey(pem);
 		const signature = %s;
-		const result = crypto.verify(signer, "SHA256", message, signature);
+		const result = crypto.verify(signer, "sha256", message, signature);
 		if (!result) {
 			throw new Error("Verification failure");
 		}`,
@@ -242,7 +242,7 @@ func TestVerify(t *testing.T) {
 		const pem = %s;
 		const signer = x509.parsePublicKey(pem);
 		const signature = %s;
-		const result = crypto.verify(signer, "SHA256", message, signature);
+		const result = crypto.verify(signer, "sha256", message, signature);
 		if (!result) {
 			throw new Error("Verification failure");
 		}`,
@@ -261,7 +261,7 @@ func TestVerify(t *testing.T) {
 		const signature = %s;
 		const options = { type: "pss" };
 		const result = crypto.verify(
-			signer, "SHA256", message, signature, options);
+			signer, "sha256", message, signature, options);
 		if (!result) {
 			throw new Error("Verification failure");
 		}`,
@@ -285,7 +285,7 @@ func TestVerifyString(t *testing.T) {
 		const signer = x509.parsePublicKey(%s);
 		const signature = %s;
 		const verified = crypto.verifyString(
-			signer, "SHA256", message, signature);
+			signer, "sha256", message, signature);
 		if (!verified) {
 			throw new Error("Verification failure");
 		}`,
@@ -307,7 +307,7 @@ func TestSign(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const message = %s;
 		const signer = { type: "HyperQuantumAlgorithm" };
-		crypto.sign(signer, "SHA256", message, "hex");
+		crypto.sign(signer, "sha256", message, "hex");
 		`, material.messageHex))
 		assert.EqualError(t, err, "GoError: invalid private key")
 	})
@@ -317,7 +317,7 @@ func TestSign(t *testing.T) {
 		const message = %s;
 		const priv = x509.parsePrivateKey(%s);
 		const pub = x509.parsePublicKey(%s);
-		const hash = "SHA256";
+		const hash = "sha256";
 		const signature = crypto.sign(priv, hash, message, "hex");
 		const result = crypto.verify(pub, hash, message, signature);
 		if (!result) {
@@ -335,7 +335,7 @@ func TestSign(t *testing.T) {
 		const message = %s;
 		const priv = x509.parsePrivateKey(%s);
 		const pub = x509.parsePublicKey(%s);
-		const hash = "SHA256";
+		const hash = "sha256";
 		const options = { type: "pss" };
 		const signature = crypto.sign(priv, hash, message, "hex", options);
 		const result = crypto.verify(pub, hash, message, signature, options);
@@ -354,7 +354,7 @@ func TestSign(t *testing.T) {
 		const message = %s;
 		const priv = x509.parsePrivateKey(%s);
 		const pub = x509.parsePublicKey(%s);
-		const hash = "SHA256";
+		const hash = "sha256";
 		const signature = crypto.sign(priv, hash, message, "hex");
 		const expected = %s;
 		if (signature !== expected) {
@@ -373,7 +373,7 @@ func TestSign(t *testing.T) {
 		const message = %s;
 		const priv = x509.parsePrivateKey(%s);
 		const pub = x509.parsePublicKey(%s);
-		const hash = "SHA256";
+		const hash = "sha256";
 		const signature = crypto.sign(priv, hash, message, "base64");
 		const expected = %s;
 		if (signature !== expected) {
@@ -392,7 +392,7 @@ func TestSign(t *testing.T) {
 		const message = %s;
 		const priv = x509.parsePrivateKey(%s);
 		const pub = x509.parsePublicKey(%s);
-		const hash = "SHA256";
+		const hash = "sha256";
 		const signature = crypto.sign(priv, hash, message, "binary");
 		const expected = %s;
 		if (signature.join(":") !== expected) {
@@ -411,7 +411,7 @@ func TestSign(t *testing.T) {
 		const message = %s;
 		const priv = x509.parsePrivateKey(%s);
 		const pub = x509.parsePublicKey(%s);
-		const hash = "SHA256";
+		const hash = "sha256";
 		const signature = crypto.sign(priv, hash, message);
 		const expected = %s;
 		if (signature.join(":") !== expected) {
@@ -437,7 +437,7 @@ func TestSignString(t *testing.T) {
 		const message = %s;
 		const priv = x509.parsePrivateKey(%s);
 		const pub = x509.parsePublicKey(%s);
-		const hash = "SHA256";
+		const hash = "sha256";
 		const signature = crypto.signString(priv, hash, message, "hex");
 		const verified = crypto.verifyString(pub, hash, message, signature);
 		if (!verified) {
@@ -459,7 +459,7 @@ func TestVerifier(t *testing.T) {
 
 	t.Run("Create", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
-		crypto.createVerify("SHA256");`))
+		crypto.createVerify("sha256");`))
 		assert.NoError(t, err)
 	})
 
@@ -468,7 +468,7 @@ func TestVerifier(t *testing.T) {
 		const message = %s;
 		const pub = x509.parsePublicKey(%s);
 		const signature = %s;
-		const verifier = crypto.createVerify("SHA256");
+		const verifier = crypto.createVerify("sha256");
 		verifier.update(message);
 		const verified = verifier.verify(pub, signature);
 		if (!verified) {
@@ -485,7 +485,7 @@ func TestVerifier(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const pub = x509.parsePublicKey(%s);
 		const signature = %s;
-		const verifier = crypto.createVerify("SHA256");
+		const verifier = crypto.createVerify("sha256");
 		verifier.update(%s);
 		verifier.update(%s);
 		verifier.update(%s);
@@ -511,7 +511,7 @@ func TestSigner(t *testing.T) {
 
 	t.Run("Create", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
-		crypto.createSign("SHA256");`))
+		crypto.createSign("sha256");`))
 		assert.NoError(t, err)
 	})
 
@@ -519,7 +519,7 @@ func TestSigner(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const message = %s;
 		const priv = x509.parsePrivateKey(%s);
-		const signer = crypto.createSign("SHA256");
+		const signer = crypto.createSign("sha256");
 		signer.update(message);
 		const signature = signer.sign(priv, "hex");
 		const expected = %s;
@@ -536,7 +536,7 @@ func TestSigner(t *testing.T) {
 	t.Run("MultipleUpdates", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const priv = x509.parsePrivateKey(%s);
-		const signer = crypto.createSign("SHA256");
+		const signer = crypto.createSign("sha256");
 		signer.update(%s);
 		signer.update(%s);
 		signer.update(%s);
