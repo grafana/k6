@@ -137,7 +137,7 @@ func (verifier *Verifier) Verify(
 	signer x509.PublicKey,
 	signatureEncoded interface{},
 ) bool {
-	signature, err := decodeBinaryDetect(signatureEncoded)
+	signature, err := decodeSignature(signatureEncoded)
 	if err != nil {
 		throw(verifier.ctx, err)
 	}
@@ -199,7 +199,7 @@ func prepareVerify(
 	if err != nil {
 		throw(ctx, err)
 	}
-	plaintext, err := decodeBinaryDetect(plaintextEncoded)
+	plaintext, err := decodePlaintext(plaintextEncoded)
 	if err != nil {
 		throw(ctx, err)
 	}
@@ -207,7 +207,7 @@ func prepareVerify(
 	if err != nil {
 		throw(ctx, err)
 	}
-	signature, err := decodeBinaryDetect(signatureEncoded)
+	signature, err := decodeSignature(signatureEncoded)
 	if err != nil {
 		throw(ctx, err)
 	}
@@ -290,7 +290,7 @@ func prepareSign(
 	if err != nil {
 		throw(ctx, err)
 	}
-	plaintext, err := decodeBinaryDetect(plaintextEncoded)
+	plaintext, err := decodePlaintext(plaintextEncoded)
 	if err != nil {
 		throw(ctx, err)
 	}
@@ -440,6 +440,24 @@ func hashPlaintext(function gocrypto.Hash, plaintext []byte) ([]byte, error) {
 		err := errors.New(msg)
 		return nil, err
 	}
+}
+
+func decodeSignature(encoded interface{}) ([]byte, error) {
+	decoded, err := decodeBinaryDetect(encoded)
+	if err != nil {
+		err = errors.Wrap(err, "could not decode signature")
+		return nil, err
+	}
+	return decoded, nil
+}
+
+func decodePlaintext(encoded interface{}) ([]byte, error) {
+	decoded, err := decodeBinaryDetect(encoded)
+	if err != nil {
+		err = errors.Wrap(err, "could not decode data")
+		return nil, err
+	}
+	return decoded, nil
 }
 
 func throw(ctx *context.Context, err error) {
