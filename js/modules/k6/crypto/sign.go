@@ -158,6 +158,7 @@ func (verifier *Verifier) Verify(
 	return verified
 }
 
+// Update appends to a signer plaintext
 func (signer *Signer) Update(additionEncoded interface{}, format string) {
 	addition, err := decodeBinary(additionEncoded, format)
 	if err != nil {
@@ -166,6 +167,7 @@ func (signer *Signer) Update(additionEncoded interface{}, format string) {
 	signer.plaintext = append(signer.plaintext, addition...)
 }
 
+// Sign produces a signature of a signer plaintext
 func (signer *Signer) Sign(
 	key x509.PrivateKey,
 	format string,
