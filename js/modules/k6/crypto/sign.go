@@ -54,7 +54,12 @@ func (Crypto) Verify(
 ) bool {
 	function, digest, signature :=
 		prepareVerify(ctx, functionEncoded, plaintextEncoded, signatureEncoded)
-	return executeVerify(ctx, &signer, function, digest, signature, options)
+	verified, err :=
+		executeVerify(&signer, function, digest, signature, options)
+	if err != nil {
+		throw(ctx, err)
+	}
+	return verified
 }
 
 // Sign produces a message signature
@@ -119,40 +124,41 @@ func prepareVerify(
 }
 
 func executeVerify(
-	ctx context.Context,
 	signer *x509.PublicKey,
 	function gocrypto.Hash,
 	digest []byte,
 	signature []byte,
 	options SigningOptions,
-) bool {
+) (bool, error) {
 	switch signer.Type {
 	case "RSA":
-		return verifyRSA(ctx, signer.RSA, function, digest, signature, options)
+		verified, err :=
+			verifyRSA(signer.RSA, function, digest, signature, options)
+		if err != nil {
+			return false, err
+		}
+		return verified, nil
 	default:
 		err := errors.New("invalid public key")
-		throw(ctx, err)
-		return false
+		return false, err
 	}
 }
 
 func verifyRSA(
-	ctx context.Context,
 	signer *rsa.PublicKey,
 	function gocrypto.Hash,
 	digest []byte,
 	signature []byte,
 	options SigningOptions,
-) bool {
+) (bool, error) {
 	switch options["type"] {
 	case "":
-		return verifyPKCS(signer, function, digest, signature)
+		return verifyPKCS(signer, function, digest, signature), nil
 	case "pss":
-		return verifyPSS(signer, function, digest, signature, options)
+		return verifyPSS(signer, function, digest, signature, options), nil
 	default:
 		err := errors.New("unsupported type: " + options["type"])
-		throw(ctx, err)
-		return false
+		return false, err
 	}
 }
 
