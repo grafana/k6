@@ -425,6 +425,8 @@ func executeSign(
 	switch signer.Type {
 	case "RSA":
 		signature, err = signRSA(signer.RSA, function, digest, options)
+	case "DSA":
+		signature, err = signDSA(signer.DSA, digest)
 	default:
 		err = errors.New("invalid private key")
 	}
@@ -482,6 +484,19 @@ func signPSS(
 		return nil, err
 	}
 	return signature, nil
+}
+
+func signDSA(signer *dsa.PrivateKey, digest []byte) ([]byte, error) {
+	r, s, err := dsa.Sign(rand.Reader, signer, digest)
+	if err != nil {
+		return nil, err
+	}
+	signature := dsaSignature{R: r, S: s}
+	encoded, err := asn1.Marshal(signature)
+	if err != nil {
+		return nil, err
+	}
+	return encoded, nil
 }
 
 func decodeInt(encoded string) int {

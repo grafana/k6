@@ -385,6 +385,23 @@ func TestSign(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("DSA", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const message = %s;
+		const priv = x509.parsePrivateKey(%s);
+		const pub = x509.parsePublicKey(%s);
+		const signature = crypto.sign(priv, "sha256", message, "hex");
+		const verified = crypto.verify(pub, "sha256", message, signature);
+		if (!verified) {
+			throw new Error("Verification failure");
+		}`,
+			material.messageHex,
+			material.rsaPrivateKey,
+			material.rsaPublicKey,
+		))
+		assert.NoError(t, err)
+	})
+
 	t.Run("HexOutput", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const message = %s;

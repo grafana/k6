@@ -92,6 +92,7 @@ type PublicKey struct {
 type PrivateKey struct {
 	Type string
 	RSA  *rsa.PrivateKey `js:"rsa"`
+	DSA  *dsa.PrivateKey `js:"dsa"`
 }
 
 // New constructs the X509 interface
@@ -353,11 +354,16 @@ func parseEncryptedPrivateKey(
 }
 
 func makePrivateKey(parsed interface{}) (PrivateKey, error) {
-	switch parsed.(type) {
+	switch parsed := parsed.(type) {
+	case *dsa.PrivateKey:
+		return PrivateKey{
+			Type: "DSA",
+			DSA:  parsed,
+		}, nil
 	case *rsa.PrivateKey:
 		return PrivateKey{
 			Type: "RSA",
-			RSA:  parsed.(*rsa.PrivateKey),
+			RSA:  parsed,
 		}, nil
 	default:
 		err := errors.New("unsupported private key type")

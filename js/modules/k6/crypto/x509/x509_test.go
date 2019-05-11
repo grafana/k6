@@ -51,6 +51,7 @@ type Material struct {
 	privateKeyPassword     string
 	rsaPrivateKeyClear     string
 	rsaPrivateKeyEncrypted string
+	dsaPrivateKey          string
 }
 
 var material = Material{ //nolint:gochecknoglobals
@@ -203,6 +204,26 @@ HDq+PO4x/ZAd+pdw6xxjG4e5QjQ0sjx7bqJPz3Z9cTtOOBmNyg7CAvcmoxfa9YHj
 DoCf4YtejwsH+o7I7FUAA0WAZ3w7NTSe1OHLhHoFEO6SIAuyYwCmSKolY7twbNKX
 p63k5DyefbWqosnWi+B8VkrZGr33OApBwMaS5yQzVyDg98f78pldQA==
 -----END RSA PRIVATE KEY-----`),
+	dsaPrivateKey: template(`-----BEGIN DSA PRIVATE KEY-----
+MIIDVQIBAAKCAQEAir/7SbcICyRq72rNmEJqoI36EObPbkETvfvRCwruC7LZ/Z7I
+5hEf/goFwqwEBv41CnU+rac/W1FWLKXJ/oBdmJA7oEmzG+FHIhW1o7hUmA+8SHuw
+Dxqa4KICWXjTur/bxViyWpOHd+TpXo9Ry0KVT7c+TXUfbp4dWgfbDg7kbZ2QybBl
+rhGGzTdJ240EXgS8G5yQkaOafJy/hVXyphRigvSitz90zTOruV1PCi5V2eNFTW7Y
+iH8yq+Gnh8vKG9ftCcuJ4q8bdliT8WFv7W2sIR5CVwfEee9wkaMR/tsceVk7GI0i
+HSN4fphrn4vp5pztmEILlTKwieQGhpa8O1fykQIhAPXfo6SbPbAHHMPw1gJ0ZvlL
+r3GfQhU+LbaD3NFFiyppAoIBAFSozV5cv9YM8ylBmVamEhsIoAK1ddPYNbwloOEG
+rxoFSy6pW0sYs+vtJLiyur2rjIqa9IuexUc4dBKWen2mocEPy24al0FPkueZuaxY
+dXlIeNvIbZToRuYUGHvxFoqg+57Fs5es/Pv2ObrqugZLEy3o950CVoi2NPUjZynI
+1WWHub7PvAEser09qpBlf1LxBCpmtSPtDFAyXBxY50zcFH+xk0Zrbe2IA5WF9d3v
+Wq/PZUj8Y16Pq9wUpuYjTAvHht3vdcqE9BuEoSOs3/C82W2jdjyvgcGvqQWBKr7a
+evRtDTzvo2nceth6AChcPgV4dl1NX0tPbV+2dpX7CISGUpUCggEAMmOJ9dt6UBIk
+SAEL0w1wVAzdp4ukyFJdywgFHuYMYhKeKDzgfCiolPvqVDOfOoGsaNhNo0QDpQLp
+dd1rX3C6ApINYnpK+cx6SS858h6pSibax3jd9gRJcllfqCduKpKE1XAgr5oqkBaf
+WyptaTMJwgvYEl2bsRMl5bf7I5d0sJrqncltlBKBUNn4Y++I0dJfWHIXgWNBbaut
+CLHlGEQlJX3zyPo0RkVu5N/sg3CkM6D2G1GhGKFGTd6H2SJHqIeXhlSpKV5/JVLj
+SbOUqk8Re0pbY8UTpAtxAs8PNf4mOMCiaCz8MgqJrZMX7cf3g1j/M45x6ur4FfBV
+hmbGENI6sgIgYgr/yUCfYfJQlBj9d9WXfpeJxgiknTSkwB2hjJKsYBg=
+-----END DSA PRIVATE KEY-----`),
 }
 
 func template(value string) string {
@@ -867,6 +888,16 @@ func TestParsePrivateKey(t *testing.T) {
 		)) {
 			throw new Error("Bad result");
 		}`, material.rsaPrivateKeyEncrypted, material.privateKeyPassword))
+		assert.NoError(t, err)
+	})
+
+	t.Run("SuccessDSA", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const pem = %s;
+		const privateKey = x509.parsePrivateKey(pem);
+		if (privateKey.type !== "DSA") {
+			throw new Error("Bad result");
+		}`, material.dsaPrivateKey))
 		assert.NoError(t, err)
 	})
 }
