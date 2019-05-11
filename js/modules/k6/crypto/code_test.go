@@ -69,17 +69,6 @@ func TestDecodeBinaryKnown(t *testing.T) {
 		_, err := decodeBinaryKnown([]byte{1, 2, 3}, "base64")
 		assert.EqualError(t, err, "not a base64 string")
 	})
-
-	t.Run("StringValid", func(t *testing.T) {
-		result, err := decodeBinaryKnown("msg", "string")
-		assert.NoError(t, err)
-		assert.Equal(t, []byte{109, 115, 103}, result)
-	})
-
-	t.Run("StringInvalid", func(t *testing.T) {
-		_, err := decodeBinaryKnown([]byte{1, 2, 3}, "string")
-		assert.EqualError(t, err, "not a string")
-	})
 }
 
 func TestDecodeBinaryDetect(t *testing.T) {

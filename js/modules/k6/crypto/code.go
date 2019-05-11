@@ -42,8 +42,6 @@ func decodeBinaryKnown(encoded interface{}, format string) ([]byte, error) {
 		return decodeHex(encoded)
 	case "base64":
 		return decodeBase64(encoded)
-	case "string":
-		return decodeString(encoded)
 	default:
 		err := errors.New("unsupported binary encoding: " + format)
 		return nil, err
@@ -110,16 +108,6 @@ func decodeBase64(abstracted interface{}) ([]byte, error) {
 		return nil, err
 	}
 	return base64.StdEncoding.DecodeString(encoded)
-}
-
-func decodeString(abstracted interface{}) ([]byte, error) {
-	encoded, ok := abstracted.(string)
-	if !ok {
-		err := errors.New("not a string")
-		return nil, err
-	}
-	decoded := []byte(encoded)
-	return decoded, nil
 }
 
 func encodeBinary(value []byte, format string) (interface{}, error) {
