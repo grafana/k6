@@ -40,11 +40,13 @@ type Material struct {
 	rsaPrivateKey          string
 	dsaPublicKey           string
 	dsaPrivateKey          string
+	ecdsaPublicKey         string
 	pkcsSignatureHex       string
 	pkcsSignatureBase64    string
 	pkcsSignatureByteArray string
 	pssSignature           string
 	dsaSignature           string
+	ecdsaSignature         string
 }
 type Expected struct {
 	hexSignature    string
@@ -122,6 +124,12 @@ CLHlGEQlJX3zyPo0RkVu5N/sg3CkM6D2G1GhGKFGTd6H2SJHqIeXhlSpKV5/JVLj
 SbOUqk8Re0pbY8UTpAtxAs8PNf4mOMCiaCz8MgqJrZMX7cf3g1j/M45x6ur4FfBV
 hmbGENI6sgIgYgr/yUCfYfJQlBj9d9WXfpeJxgiknTSkwB2hjJKsYBg=
 -----END DSA PRIVATE KEY-----`),
+	ecdsaPublicKey: template(`-----BEGIN PUBLIC KEY-----
+MIGbMBAGByqGSM49AgEGBSuBBAAjA4GGAAQBcX9o+j4axEZ3TzUq2DjuvAboLKTW
+lco1HZxjO51MNekI64fDkQIYp7PsbNM2lPvZQt3oglDHxlp2Au1qVcZAs1sBhd09
+cbsUjd2HQce8c8B+xoxp4H0PvCGeNxdDqo0ibuPjvutma0IxcJEidxgFRHZ868EU
+gl27czkKiDZRgtLjEDE=
+-----END PUBLIC KEY-----`),
 	pkcsSignatureHex: stringify("" +
 		"befd8b0a92a44b03324d1908b9e16d209328c38b14b71f8960f5c97c68a00437" +
 		"390cc42acab32ce70097a215163917ba28c3dbaa1a88a96e2443fa9abb442082" +
@@ -147,6 +155,10 @@ hmbGENI6sgIgYgr/yUCfYfJQlBj9d9WXfpeJxgiknTSkwB2hjJKsYBg=
 	dsaSignature: stringify("" +
 		"MEUCIQCyOt6wOt5muIc9Id2LD/sq1zwvZXKX2dnBEwh6BcA/OAIgMaCJyX/KCWqo" +
 		"khCpc0x8THK/vBLrR8xKRBA2Ji6xlHo="),
+	ecdsaSignature: stringify("" +
+		"MIGIAkIB7qRptN3LJw48PgUXe5HmFcxZCjlN0k+X38kngixiQl6FUemtLpMgx74m" +
+		"+7F+OTepOVO+hKi0QHU05zqk8/mDe4wCQgH1eT04Gw2ggjxY+qBf2+RfVHlGk1un" +
+		"Qs6cZEu32hLYIfNmA8ujlIFeApRV5SohmAoeN7jqXewYGszPH82t4Nvmfw=="),
 }
 var expected = Expected{
 	hexSignature: stringify("" +
@@ -304,6 +316,22 @@ func TestVerify(t *testing.T) {
 			material.messageHex,
 			material.dsaPublicKey,
 			material.dsaSignature,
+		))
+		assert.NoError(t, err)
+	})
+
+	t.Run("ECDSA", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const message = %s;
+		const signer = x509.parsePublicKey(%s);
+		const signature = %s;
+		const verified = crypto.verify(signer, "sha1", message, signature);
+		if (!verified) {
+			throw new Error("Verification failure");
+		}`,
+			material.messageHex,
+			material.ecdsaPublicKey,
+			material.ecdsaSignature,
 		))
 		assert.NoError(t, err)
 	})

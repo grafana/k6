@@ -24,6 +24,7 @@ import (
 	"context"
 	gocrypto "crypto"
 	"crypto/dsa"
+	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/asn1"
@@ -57,6 +58,11 @@ type Signer struct {
 }
 
 type dsaSignature struct {
+	R *big.Int
+	S *big.Int
+}
+
+type ecdsaSignature struct {
 	R *big.Int
 	S *big.Int
 }
@@ -301,11 +307,13 @@ func executeVerify(
 	var verified bool = false
 	var err error = nil
 	switch signer.Type {
+	case "DSA":
+		verified, err = verifyDSA(signer.DSA, digest, signature)
+	case "ECDSA":
+		verified, err = verifyECDSA(signer.ECDSA, digest, signature)
 	case "RSA":
 		verified, err =
 			verifyRSA(signer.RSA, function, digest, signature, options)
-	case "DSA":
-		verified, err = verifyDSA(signer.DSA, digest, signature)
 	default:
 		err = errors.New("invalid public key")
 	}
@@ -373,6 +381,20 @@ func verifyDSA(
 		return false, err
 	}
 	verified := dsa.Verify(signer, digest, signature.R, signature.S)
+	return verified, nil
+}
+
+func verifyECDSA(
+	signer *ecdsa.PublicKey,
+	digest []byte,
+	signatureDer []byte,
+) (bool, error) {
+	var signature ecdsaSignature
+	_, err := asn1.Unmarshal(signatureDer, &signature)
+	if err != nil {
+		return false, err
+	}
+	verified := ecdsa.Verify(signer, digest, signature.R, signature.S)
 	return verified, nil
 }
 
