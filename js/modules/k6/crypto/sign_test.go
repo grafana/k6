@@ -44,13 +44,9 @@ type Material struct {
 	pssSignature           string
 }
 type Expected struct {
-	digest          ExpectedDigest
 	hexSignature    string
 	base64Signature string
 	binarySignature string
-}
-type ExpectedDigest struct {
-	SHA256 []byte
 }
 
 const message = "They know, get out now!"
@@ -107,11 +103,6 @@ eml4CZD2OGaxUqdOSHKBAkEAtruFjS0IhJstjoOrAS1p5ZAr8Noj5L1DEIgxfAD4
 		"c5e033d9d5f67bf740118f62a112140f317c1e7b1efa821a10359c933696376b"),
 }
 var expected = Expected{
-	digest: ExpectedDigest{
-		SHA256: dehex("" +
-			"cec66fa2e0ad6286b01c5d975631664f" +
-			"54ad80e0ab46907769823e0c33264e8a"),
-	},
 	hexSignature: stringify("" +
 		"befd8b0a92a44b03324d1908b9e16d209328c38b14b71f8960f5c97c68a00437" +
 		"390cc42acab32ce70097a215163917ba28c3dbaa1a88a96e2443fa9abb442082" +
@@ -149,23 +140,6 @@ func TestDecodeFunction(t *testing.T) {
 		function, err := decodeFunction("sha512")
 		assert.NoError(t, err)
 		assert.Equal(t, gocrypto.SHA512, function)
-	})
-}
-
-func TestHashPlaintext(t *testing.T) {
-	if testing.Short() {
-		return
-	}
-
-	t.Run("Unsupported", func(t *testing.T) {
-		_, err := hashPlaintext(0, material.messageBytes)
-		assert.EqualError(t, err, "unsupported hash function: 0")
-	})
-
-	t.Run("sha256", func(t *testing.T) {
-		digest, err := hashPlaintext(gocrypto.SHA256, material.messageBytes)
-		assert.NoError(t, err)
-		assert.Equal(t, expected.digest.SHA256, digest)
 	})
 }
 

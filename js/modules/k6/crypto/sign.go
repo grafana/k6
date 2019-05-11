@@ -25,8 +25,6 @@ import (
 	gocrypto "crypto"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha256"
-	"fmt"
 	"strconv"
 
 	"github.com/loadimpact/k6/js/common"
@@ -39,18 +37,20 @@ type SigningOptions map[string]string
 
 // Verifier verifies the signature of chunked input
 type Verifier struct {
-	ctx       *context.Context
-	function  gocrypto.Hash
-	options   SigningOptions
-	plaintext []byte
+	ctx             *context.Context
+	function        gocrypto.Hash
+	functionEncoded string
+	options         SigningOptions
+	plaintext       []byte
 }
 
 // Signer produces a signature of chunked input
 type Signer struct {
-	ctx       *context.Context
-	function  gocrypto.Hash
-	options   SigningOptions
-	plaintext []byte
+	ctx             *context.Context
+	function        gocrypto.Hash
+	functionEncoded string
+	options         SigningOptions
+	plaintext       []byte
 }
 
 // Verify checks for a valid message signature
@@ -137,9 +137,10 @@ func (*Crypto) CreateVerify(
 		throw(ctx, err)
 	}
 	return &Verifier{
-		ctx:      ctx,
-		function: function,
-		options:  options,
+		ctx:             ctx,
+		function:        function,
+		functionEncoded: functionEncoded,
+		options:         options,
 	}
 }
 
@@ -154,9 +155,10 @@ func (*Crypto) CreateSign(
 		throw(ctx, err)
 	}
 	return &Signer{
-		ctx:      ctx,
-		function: function,
-		options:  options,
+		ctx:             ctx,
+		function:        function,
+		functionEncoded: functionEncoded,
+		options:         options,
 	}
 }
 
@@ -178,7 +180,11 @@ func (verifier *Verifier) Verify(
 	if err != nil {
 		throw(verifier.ctx, err)
 	}
-	digest, err := hashPlaintext(verifier.function, verifier.plaintext)
+	digest, err := hashPlaintext(
+		verifier.ctx,
+		verifier.functionEncoded,
+		verifier.plaintext,
+	)
 	if err != nil {
 		throw(verifier.ctx, err)
 	}
@@ -209,7 +215,11 @@ func (signer *Signer) Sign(
 	key x509.PrivateKey,
 	format string,
 ) interface{} {
-	digest, err := hashPlaintext(signer.function, signer.plaintext)
+	digest, err := hashPlaintext(
+		signer.ctx,
+		signer.functionEncoded,
+		signer.plaintext,
+	)
 	if err != nil {
 		throw(signer.ctx, err)
 	}
@@ -240,7 +250,7 @@ func prepareVerify(
 	if err != nil {
 		throw(ctx, err)
 	}
-	digest, err := hashPlaintext(function, plaintext)
+	digest, err := hashPlaintext(ctx, functionEncoded, plaintext)
 	if err != nil {
 		throw(ctx, err)
 	}
@@ -262,7 +272,7 @@ func prepareVerifyString(
 		throw(ctx, err)
 	}
 	plaintext := []byte(plaintextEncoded)
-	digest, err := hashPlaintext(function, plaintext)
+	digest, err := hashPlaintext(ctx, functionEncoded, plaintext)
 	if err != nil {
 		throw(ctx, err)
 	}
@@ -353,7 +363,7 @@ func prepareSign(
 	if err != nil {
 		throw(ctx, err)
 	}
-	digest, err := hashPlaintext(function, plaintext)
+	digest, err := hashPlaintext(ctx, functionEncoded, plaintext)
 	if err != nil {
 		throw(ctx, err)
 	}
@@ -370,7 +380,7 @@ func prepareSignString(
 		throw(ctx, err)
 	}
 	plaintext := []byte(plaintextEncoded)
-	digest, err := hashPlaintext(function, plaintext)
+	digest, err := hashPlaintext(ctx, functionEncoded, plaintext)
 	if err != nil {
 		throw(ctx, err)
 	}
@@ -462,6 +472,7 @@ func decodePssOptions(options SigningOptions) rsa.PSSOptions {
 	}
 }
 
+// Uncomment cases to enable as hash functions are added
 func decodeFunction(encoded string) (gocrypto.Hash, error) {
 	switch encoded {
 	case "md4":
@@ -470,52 +481,58 @@ func decodeFunction(encoded string) (gocrypto.Hash, error) {
 		return gocrypto.MD5, nil
 	case "sha1":
 		return gocrypto.SHA1, nil
-	case "sha224":
-		return gocrypto.SHA224, nil
+	// case "sha224":
+	// 	return gocrypto.SHA224, nil
 	case "sha256":
 		return gocrypto.SHA256, nil
+	case "sha384":
+		return gocrypto.SHA384, nil
 	case "sha512":
 		return gocrypto.SHA512, nil
-	case "md5sha1":
-		return gocrypto.MD5SHA1, nil
+	// case "md5sha1":
+	// 	return gocrypto.MD5SHA1, nil
 	case "ripemd160":
 		return gocrypto.RIPEMD160, nil
-	case "sha3_224":
-		return gocrypto.SHA3_224, nil
-	case "sha3_256":
-		return gocrypto.SHA3_256, nil
-	case "sha3_384":
-		return gocrypto.SHA3_384, nil
-	case "sha3_512":
-		return gocrypto.SHA3_512, nil
+	// case "sha3_224":
+	// 	return gocrypto.SHA3_224, nil
+	// case "sha3_256":
+	// 	return gocrypto.SHA3_256, nil
+	// case "sha3_384":
+	// 	return gocrypto.SHA3_384, nil
+	// case "sha3_512":
+	// 	return gocrypto.SHA3_512, nil
 	case "sha512_224":
 		return gocrypto.SHA512_224, nil
 	case "sha512_256":
 		return gocrypto.SHA512_256, nil
-	case "blake2s_256":
-		return gocrypto.BLAKE2s_256, nil
-	case "blake2b_256":
-		return gocrypto.BLAKE2b_256, nil
-	case "blake2b_384":
-		return gocrypto.BLAKE2b_384, nil
-	case "blake2b_512":
-		return gocrypto.BLAKE2b_512, nil
+	// case "blake2s_256":
+	// 	return gocrypto.BLAKE2s_256, nil
+	// case "blake2b_256":
+	// 	return gocrypto.BLAKE2b_256, nil
+	// case "blake2b_384":
+	// 	return gocrypto.BLAKE2b_384, nil
+	// case "blake2b_512":
+	// 	return gocrypto.BLAKE2b_512, nil
 	default:
 		err := errors.New("unsupported hash function: " + encoded)
 		return 0, err
 	}
 }
 
-func hashPlaintext(function gocrypto.Hash, plaintext []byte) ([]byte, error) {
-	switch function {
-	case gocrypto.SHA256:
-		result := sha256.Sum256(plaintext)
-		return result[:], nil
-	default:
-		msg := fmt.Sprintf("unsupported hash function: %d", function)
-		err := errors.New(msg)
+func hashPlaintext(
+	ctx *context.Context,
+	function string,
+	plaintext []byte,
+) ([]byte, error) {
+	hasher := makeHasher(ctx, function)
+	hasher.Update(plaintext)
+	abstracted := hasher.Digest("binary")
+	digest, ok := abstracted.([]byte)
+	if !ok {
+		err := errors.New("could not hash data: invalid return value")
 		return nil, err
 	}
+	return digest, nil
 }
 
 func decodeSignature(encoded interface{}) ([]byte, error) {
