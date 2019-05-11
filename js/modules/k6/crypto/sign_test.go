@@ -31,6 +31,9 @@ import (
 
 type Material struct {
 	message                string
+	messagePart1           string
+	messagePart2           string
+	messagePart3           string
 	rsaPublicKey           string
 	rsaPrivateKey          string
 	pkcsSignatureHex       string
@@ -51,7 +54,10 @@ type ExpectedDigest struct {
 var message = []byte("They know, get out now!")
 
 var material = Material{
-	message: stringify(enhex(message)),
+	message:      stringify(enhex(message)),
+	messagePart1: stringify("54686579206b6e6f772c"),
+	messagePart2: stringify("206765"),
+	messagePart3: stringify("74206f7574206e6f7721"),
 	rsaPublicKey: template(`-----BEGIN PUBLIC KEY-----
 MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDXMLr/Y/vUtIFY75jj0YXfp6lQ
 7iEIbps3BvRE4isTpxs8fXLnLM8LAuJScxiKyrGnj8EMb7LIHkSMBlz6iVj9atY6
@@ -98,7 +104,7 @@ eml4CZD2OGaxUqdOSHKBAkEAtruFjS0IhJstjoOrAS1p5ZAr8Noj5L1DEIgxfAD4
 }
 var expected = Expected{
 	digest: ExpectedDigest{
-		SHA256: bytes("" +
+		SHA256: dehex("" +
 			"cec66fa2e0ad6286b01c5d975631664f" +
 			"54ad80e0ab46907769823e0c33264e8a"),
 	},
@@ -393,6 +399,45 @@ func TestVerifier(t *testing.T) {
 	t.Run("Create", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const verifier = crypto.createVerify("SHA256");`))
+		assert.NoError(t, err)
+	})
+
+	t.Run("SingleUpdate", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const message = %s;
+		const pub = x509.parsePublicKey(%s);
+		const signature = %s;
+		const verifier = crypto.createVerify("SHA256");
+		verifier.update(message);
+		const verified = verifier.verify(pub, signature);
+		if (!verified) {
+			throw new Error("Verification failed");
+		}`,
+			material.message,
+			material.rsaPublicKey,
+			material.pkcsSignatureHex,
+		))
+		assert.NoError(t, err)
+	})
+
+	t.Run("MultipleUpdates", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const pub = x509.parsePublicKey(%s);
+		const signature = %s;
+		const verifier = crypto.createVerify("SHA256");
+		verifier.update(%s);
+		verifier.update(%s);
+		verifier.update(%s);
+		const verified = verifier.verify(pub, signature);
+		if (!verified) {
+			throw new Error("Verification failed");
+		}`,
+			material.rsaPublicKey,
+			material.pkcsSignatureHex,
+			material.messagePart1,
+			material.messagePart2,
+			material.messagePart3,
+		))
 		assert.NoError(t, err)
 	})
 }

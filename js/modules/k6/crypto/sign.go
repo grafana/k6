@@ -39,9 +39,10 @@ type SigningOptions map[string]string
 
 // Verifier verifies the signature of chunked input
 type Verifier struct {
-	ctx      *context.Context
-	function gocrypto.Hash
-	options  *SigningOptions
+	ctx       *context.Context
+	function  gocrypto.Hash
+	options   SigningOptions
+	plaintext []byte
 }
 
 // Verify checks for a valid message signature
@@ -85,16 +86,51 @@ func (*Crypto) CreateVerify(
 	ctx *context.Context,
 	functionEncoded string,
 	options SigningOptions,
-) Verifier {
+) *Verifier {
 	function, err := decodeFunction(functionEncoded)
 	if err != nil {
 		throw(ctx, err)
 	}
-	return Verifier{
+	return &Verifier{
 		ctx:      ctx,
 		function: function,
-		options:  &options,
+		options:  options,
 	}
+}
+
+// Update appends to a verifier plaintext
+func (verifier *Verifier) Update(additionEncoded interface{}, format string) {
+	addition, err := decodeBinary(additionEncoded, format)
+	if err != nil {
+		throw(verifier.ctx, err)
+	}
+	verifier.plaintext = append(verifier.plaintext, addition...)
+}
+
+// Verify checks for a valid signature of a verifier plaintext
+func (verifier *Verifier) Verify(
+	signer x509.PublicKey,
+	signatureEncoded interface{},
+) bool {
+	signature, err := decodeBinaryDetect(signatureEncoded)
+	if err != nil {
+		throw(verifier.ctx, err)
+	}
+	digest, err := hashPlaintext(verifier.function, verifier.plaintext)
+	if err != nil {
+		throw(verifier.ctx, err)
+	}
+	verified, err := executeVerify(
+		&signer,
+		verifier.function,
+		digest,
+		signature,
+		verifier.options,
+	)
+	if err != nil {
+		throw(verifier.ctx, err)
+	}
+	return verified
 }
 
 func prepareVerify(
