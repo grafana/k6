@@ -96,11 +96,29 @@ func (*Crypto) Sign(
 	ctx *context.Context,
 	signer x509.PrivateKey,
 	functionEncoded string,
-	message string,
+	plaintextEncoded interface{},
 	format string,
 	options SigningOptions,
 ) interface{} {
-	function, digest := prepareSign(ctx, functionEncoded, message)
+	function, digest := prepareSign(ctx, functionEncoded, plaintextEncoded)
+	signature, err := executeSign(&signer, function, digest, format, options)
+	if err != nil {
+		throw(ctx, err)
+	}
+	return signature
+}
+
+// SignString products a signature of a string message
+func (*Crypto) SignString(
+	ctx *context.Context,
+	signer x509.PrivateKey,
+	functionEncoded string,
+	plaintextEncoded string,
+	format string,
+	options SigningOptions,
+) interface{} {
+	function, digest :=
+		prepareSignString(ctx, functionEncoded, plaintextEncoded)
 	signature, err := executeSign(&signer, function, digest, format, options)
 	if err != nil {
 		throw(ctx, err)
@@ -335,6 +353,23 @@ func prepareSign(
 	if err != nil {
 		throw(ctx, err)
 	}
+	digest, err := hashPlaintext(function, plaintext)
+	if err != nil {
+		throw(ctx, err)
+	}
+	return function, digest
+}
+
+func prepareSignString(
+	ctx *context.Context,
+	functionEncoded string,
+	plaintextEncoded string,
+) (gocrypto.Hash, []byte) {
+	function, err := decodeFunction(functionEncoded)
+	if err != nil {
+		throw(ctx, err)
+	}
+	plaintext := []byte(plaintextEncoded)
 	digest, err := hashPlaintext(function, plaintext)
 	if err != nil {
 		throw(ctx, err)

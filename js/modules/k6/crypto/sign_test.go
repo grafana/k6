@@ -322,7 +322,11 @@ func TestSign(t *testing.T) {
 		const result = crypto.verify(pub, hash, message, signature);
 		if (!result) {
 			throw new Error("Verification failure");
-		}`, material.messageHex, material.rsaPrivateKey, material.rsaPublicKey))
+		}`,
+			material.messageHex,
+			material.rsaPrivateKey,
+			material.rsaPublicKey,
+		))
 		assert.NoError(t, err)
 	})
 
@@ -337,7 +341,11 @@ func TestSign(t *testing.T) {
 		const result = crypto.verify(pub, hash, message, signature, options);
 		if (!result) {
 			throw new Error("Verification failure");
-		}`, material.messageHex, material.rsaPrivateKey, material.rsaPublicKey))
+		}`,
+			material.messageHex,
+			material.rsaPrivateKey,
+			material.rsaPublicKey,
+		))
 		assert.NoError(t, err)
 	})
 
@@ -413,6 +421,31 @@ func TestSign(t *testing.T) {
 			material.rsaPrivateKey,
 			material.rsaPublicKey,
 			expected.binarySignature,
+		))
+		assert.NoError(t, err)
+	})
+}
+
+func TestSignString(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+	rt := makeRuntime()
+
+	t.Run("Success", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const message = %s;
+		const priv = x509.parsePrivateKey(%s);
+		const pub = x509.parsePublicKey(%s);
+		const hash = "SHA256";
+		const signature = crypto.signString(priv, hash, message, "hex");
+		const verified = crypto.verifyString(pub, hash, message, signature);
+		if (!verified) {
+			throw new Error("Verification failure");
+		}`,
+			material.messageString,
+			material.rsaPrivateKey,
+			material.rsaPublicKey,
 		))
 		assert.NoError(t, err)
 	})
