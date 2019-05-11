@@ -56,7 +56,7 @@ func TestVerify(t *testing.T) {
 	}
 	rt := makeRuntime()
 
-	t.Run("UnsupportedType", func(t *testing.T) {
+	t.Run("InvalidKey", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const message = %s;
 		const signer = { type: "HyperQuantumAlgorithm" };
@@ -216,7 +216,7 @@ func TestSign(t *testing.T) {
 	}
 	rt := makeRuntime()
 
-	t.Run("UnsupportedType", func(t *testing.T) {
+	t.Run("InvalidKey", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const message = %s;
 		const signer = { type: "HyperQuantumAlgorithm" };

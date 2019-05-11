@@ -27,6 +27,7 @@ type Material struct {
 	messagePart1           string
 	messagePart2           string
 	messagePart3           string
+	ciphertext             string
 	rsaPublicKey           string
 	rsaPrivateKey          string
 	dsaPublicKey           string
@@ -55,6 +56,10 @@ var material = Material{ //nolint:gochecknoglobals
 	messagePart1:  stringify("54686579206b6e6f772c"),
 	messagePart2:  stringify("206765"),
 	messagePart3:  stringify("74206f7574206e6f7721"),
+	ciphertext: stringify("" +
+		"TsP6H2xYIAVCBmfnl3l77RC6gv9kpJz+jPD2SedkcxoLdMB47C+8z3X/6Zbqi2Ae" +
+		"bpBdWRvqqCVjH0+EZsDnlCCsYO4bYp6N+Av3Cq+VDVGLzN5OEwOPyTDUH8Dh3zV2" +
+		"c0In13ACkTFYY9lICumpOG+2iI97IbmFI3IPfeEBJ/s="),
 	rsaPublicKey: template(`-----BEGIN PUBLIC KEY-----
 MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDXMLr/Y/vUtIFY75jj0YXfp6lQ
 7iEIbps3BvRE4isTpxs8fXLnLM8LAuJScxiKyrGnj8EMb7LIHkSMBlz6iVj9atY6
