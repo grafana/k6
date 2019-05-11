@@ -100,31 +100,7 @@ func (c *Crypto) Ripemd160(ctx context.Context, input []byte, outputEncoding str
 }
 
 func (*Crypto) CreateHash(ctx context.Context, algorithm string) *Hasher {
-	hasher := Hasher{}
-	hasher.ctx = ctx
-
-	switch algorithm {
-	case "md4":
-		hasher.hash = md4.New()
-	case "md5":
-		hasher.hash = md5.New()
-	case "sha1":
-		hasher.hash = sha1.New()
-	case "sha256":
-		hasher.hash = sha256.New()
-	case "sha384":
-		hasher.hash = sha512.New384()
-	case "sha512_224":
-		hasher.hash = sha512.New512_224()
-	case "sha512_256":
-		hasher.hash = sha512.New512_256()
-	case "sha512":
-		hasher.hash = sha512.New()
-	case "ripemd160":
-		hasher.hash = ripemd160.New()
-	}
-
-	return &hasher
+	return makeHasher(&ctx, algorithm)
 }
 
 func (hasher *Hasher) Update(input []byte) {
@@ -159,6 +135,34 @@ func (hasher *Hasher) Digest(outputEncoding string) interface{} {
 	}
 
 	return ""
+}
+
+func makeHasher(ctx *context.Context, algorithm string) *Hasher {
+	hasher := Hasher{}
+	hasher.ctx = *ctx
+
+	switch algorithm {
+	case "md4":
+		hasher.hash = md4.New()
+	case "md5":
+		hasher.hash = md5.New()
+	case "sha1":
+		hasher.hash = sha1.New()
+	case "sha256":
+		hasher.hash = sha256.New()
+	case "sha384":
+		hasher.hash = sha512.New384()
+	case "sha512_224":
+		hasher.hash = sha512.New512_224()
+	case "sha512_256":
+		hasher.hash = sha512.New512_256()
+	case "sha512":
+		hasher.hash = sha512.New()
+	case "ripemd160":
+		hasher.hash = ripemd160.New()
+	}
+
+	return &hasher
 }
 
 func (c *Crypto) executeHash(
