@@ -45,6 +45,14 @@ type Verifier struct {
 	plaintext []byte
 }
 
+// Signer produces a signature of chunked input
+type Signer struct {
+	ctx       *context.Context
+	function  gocrypto.Hash
+	options   SigningOptions
+	plaintext []byte
+}
+
 // Verify checks for a valid message signature
 func (*Crypto) Verify(
 	ctx *context.Context,
@@ -98,6 +106,23 @@ func (*Crypto) CreateVerify(
 	}
 }
 
+// CreateSign creates a chunked signer
+func (*Crypto) CreateSign(
+	ctx *context.Context,
+	functionEncoded string,
+	options SigningOptions,
+) *Signer {
+	function, err := decodeFunction(functionEncoded)
+	if err != nil {
+		throw(ctx, err)
+	}
+	return &Signer{
+		ctx:      ctx,
+		function: function,
+		options:  options,
+	}
+}
+
 // Update appends to a verifier plaintext
 func (verifier *Verifier) Update(additionEncoded interface{}, format string) {
 	addition, err := decodeBinary(additionEncoded, format)
@@ -131,6 +156,35 @@ func (verifier *Verifier) Verify(
 		throw(verifier.ctx, err)
 	}
 	return verified
+}
+
+func (signer *Signer) Update(additionEncoded interface{}, format string) {
+	addition, err := decodeBinary(additionEncoded, format)
+	if err != nil {
+		throw(signer.ctx, err)
+	}
+	signer.plaintext = append(signer.plaintext, addition...)
+}
+
+func (signer *Signer) Sign(
+	key x509.PrivateKey,
+	format string,
+) interface{} {
+	digest, err := hashPlaintext(signer.function, signer.plaintext)
+	if err != nil {
+		throw(signer.ctx, err)
+	}
+	signature, err := executeSign(
+		&key,
+		signer.function,
+		digest,
+		format,
+		signer.options,
+	)
+	if err != nil {
+		throw(signer.ctx, err)
+	}
+	return signature
 }
 
 func prepareVerify(

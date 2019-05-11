@@ -398,7 +398,7 @@ func TestVerifier(t *testing.T) {
 
 	t.Run("Create", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
-		const verifier = crypto.createVerify("SHA256");`))
+		crypto.createVerify("SHA256");`))
 		assert.NoError(t, err)
 	})
 
@@ -437,6 +437,58 @@ func TestVerifier(t *testing.T) {
 			material.messagePart1,
 			material.messagePart2,
 			material.messagePart3,
+		))
+		assert.NoError(t, err)
+	})
+}
+
+func TestSigner(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+	rt := makeRuntime()
+
+	t.Run("Create", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		crypto.createSign("SHA256");`))
+		assert.NoError(t, err)
+	})
+
+	t.Run("SingleUpdate", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const message = %s;
+		const priv = x509.parsePrivateKey(%s);
+		const signer = crypto.createSign("SHA256");
+		signer.update(message);
+		const signature = signer.sign(priv, "hex");
+		const expected = %s;
+		if (signature !== expected) {
+			throw new Error("Incorrect signature: " + signature);
+		}`,
+			material.message,
+			material.rsaPrivateKey,
+			expected.hexSignature,
+		))
+		assert.NoError(t, err)
+	})
+
+	t.Run("MultipleUpdates", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const priv = x509.parsePrivateKey(%s);
+		const signer = crypto.createSign("SHA256");
+		signer.update(%s);
+		signer.update(%s);
+		signer.update(%s);
+		const signature = signer.sign(priv, "hex");
+		const expected = %s;
+		if (signature !== expected) {
+			throw new Error("Incorrect signature: " + signature);
+		}`,
+			material.rsaPrivateKey,
+			material.messagePart1,
+			material.messagePart2,
+			material.messagePart3,
+			expected.hexSignature,
 		))
 		assert.NoError(t, err)
 	})
