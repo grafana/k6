@@ -41,6 +41,7 @@ type Material struct {
 	dsaPublicKey           string
 	dsaPrivateKey          string
 	ecdsaPublicKey         string
+	ecdsaPrivateKey        string
 	pkcsSignatureHex       string
 	pkcsSignatureBase64    string
 	pkcsSignatureByteArray string
@@ -130,6 +131,13 @@ lco1HZxjO51MNekI64fDkQIYp7PsbNM2lPvZQt3oglDHxlp2Au1qVcZAs1sBhd09
 cbsUjd2HQce8c8B+xoxp4H0PvCGeNxdDqo0ibuPjvutma0IxcJEidxgFRHZ868EU
 gl27czkKiDZRgtLjEDE=
 -----END PUBLIC KEY-----`),
+	ecdsaPrivateKey: template(`-----BEGIN EC PRIVATE KEY-----
+MIHcAgEBBEIBrRcLjkYGU/3aWL05hmivvGCc2xIzRkZd6IUamAuL4pR1kMLlW0ui
+pYKpBBJhUY6ucUI5mPOzV7CcU9rCER/msb+gBwYFK4EEACOhgYkDgYYABAFxf2j6
+PhrERndPNSrYOO68BugspNaVyjUdnGM7nUw16Qjrh8ORAhins+xs0zaU+9lC3eiC
+UMfGWnYC7WpVxkCzWwGF3T1xuxSN3YdBx7xzwH7GjGngfQ+8IZ43F0OqjSJu4+O+
+62ZrQjFwkSJ3GAVEdnzrwRSCXbtzOQqINlGC0uMQMQ==
+-----END EC PRIVATE KEY-----`),
 	pkcsSignatureHex: stringify("" +
 		"befd8b0a92a44b03324d1908b9e16d209328c38b14b71f8960f5c97c68a00437" +
 		"390cc42acab32ce70097a215163917ba28c3dbaa1a88a96e2443fa9abb442082" +
@@ -426,6 +434,23 @@ func TestSign(t *testing.T) {
 			material.messageHex,
 			material.rsaPrivateKey,
 			material.rsaPublicKey,
+		))
+		assert.NoError(t, err)
+	})
+
+	t.Run("ECDSA", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const message = %s;
+		const priv = x509.parsePrivateKey(%s);
+		const pub = x509.parsePublicKey(%s);
+		const signature = crypto.sign(priv, "sha1", message, "hex")
+		const verified = crypto.verify(pub, "sha1", message, signature);
+		if (!verified) {
+			throw new Error("Verification failure");
+		}`,
+			material.messageHex,
+			material.ecdsaPrivateKey,
+			material.ecdsaPublicKey,
 		))
 		assert.NoError(t, err)
 	})

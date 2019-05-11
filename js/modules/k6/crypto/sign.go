@@ -445,10 +445,12 @@ func executeSign(
 	var signature []byte
 	var err error
 	switch signer.Type {
-	case "RSA":
-		signature, err = signRSA(signer.RSA, function, digest, options)
 	case "DSA":
 		signature, err = signDSA(signer.DSA, digest)
+	case "ECDSA":
+		signature, err = signECDSA(signer.ECDSA, digest)
+	case "RSA":
+		signature, err = signRSA(signer.RSA, function, digest, options)
 	default:
 		err = errors.New("invalid private key")
 	}
@@ -514,6 +516,19 @@ func signDSA(signer *dsa.PrivateKey, digest []byte) ([]byte, error) {
 		return nil, err
 	}
 	signature := dsaSignature{R: r, S: s}
+	encoded, err := asn1.Marshal(signature)
+	if err != nil {
+		return nil, err
+	}
+	return encoded, nil
+}
+
+func signECDSA(signer *ecdsa.PrivateKey, digest []byte) ([]byte, error) {
+	r, s, err := ecdsa.Sign(rand.Reader, signer, digest)
+	if err != nil {
+		return nil, err
+	}
+	signature := ecdsaSignature{R: r, S: s}
 	encoded, err := asn1.Marshal(signature)
 	if err != nil {
 		return nil, err

@@ -52,6 +52,7 @@ type Material struct {
 	rsaPrivateKeyClear     string
 	rsaPrivateKeyEncrypted string
 	dsaPrivateKey          string
+	ecdsaPrivateKey        string
 }
 
 var material = Material{ //nolint:gochecknoglobals
@@ -224,6 +225,13 @@ CLHlGEQlJX3zyPo0RkVu5N/sg3CkM6D2G1GhGKFGTd6H2SJHqIeXhlSpKV5/JVLj
 SbOUqk8Re0pbY8UTpAtxAs8PNf4mOMCiaCz8MgqJrZMX7cf3g1j/M45x6ur4FfBV
 hmbGENI6sgIgYgr/yUCfYfJQlBj9d9WXfpeJxgiknTSkwB2hjJKsYBg=
 -----END DSA PRIVATE KEY-----`),
+	ecdsaPrivateKey: template(`-----BEGIN EC PRIVATE KEY-----
+MIHcAgEBBEIBrRcLjkYGU/3aWL05hmivvGCc2xIzRkZd6IUamAuL4pR1kMLlW0ui
+pYKpBBJhUY6ucUI5mPOzV7CcU9rCER/msb+gBwYFK4EEACOhgYkDgYYABAFxf2j6
+PhrERndPNSrYOO68BugspNaVyjUdnGM7nUw16Qjrh8ORAhins+xs0zaU+9lC3eiC
+UMfGWnYC7WpVxkCzWwGF3T1xuxSN3YdBx7xzwH7GjGngfQ+8IZ43F0OqjSJu4+O+
+62ZrQjFwkSJ3GAVEdnzrwRSCXbtzOQqINlGC0uMQMQ==
+-----END EC PRIVATE KEY-----`),
 }
 
 func template(value string) string {
@@ -898,6 +906,16 @@ func TestParsePrivateKey(t *testing.T) {
 		if (privateKey.type !== "DSA") {
 			throw new Error("Bad result");
 		}`, material.dsaPrivateKey))
+		assert.NoError(t, err)
+	})
+
+	t.Run("SuccessECDSA", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const pem = %s;
+		const privateKey = x509.parsePrivateKey(pem);
+		if (privateKey.type !== "ECDSA") {
+			throw new Error("Bad result");
+		}`, material.ecdsaPrivateKey))
 		assert.NoError(t, err)
 	})
 }
