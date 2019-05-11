@@ -23,8 +23,11 @@ package crypto
 import (
 	"context"
 	gocrypto "crypto"
+	"crypto/dsa"
 	"crypto/rand"
 	"crypto/rsa"
+	"encoding/asn1"
+	"math/big"
 	"strconv"
 
 	"github.com/loadimpact/k6/js/common"
@@ -51,6 +54,11 @@ type Signer struct {
 	functionEncoded string
 	options         SigningOptions
 	plaintext       []byte
+}
+
+type dsaSignature struct {
+	R *big.Int
+	S *big.Int
 }
 
 // Verify checks for a valid message signature
@@ -290,18 +298,21 @@ func executeVerify(
 	signature []byte,
 	options SigningOptions,
 ) (bool, error) {
+	var verified bool = false
+	var err error = nil
 	switch signer.Type {
 	case "RSA":
-		verified, err :=
+		verified, err =
 			verifyRSA(signer.RSA, function, digest, signature, options)
-		if err != nil {
-			return false, err
-		}
-		return verified, nil
+	case "DSA":
+		verified, err = verifyDSA(signer.DSA, digest, signature)
 	default:
-		err := errors.New("invalid public key")
+		err = errors.New("invalid public key")
+	}
+	if err != nil {
 		return false, err
 	}
+	return verified, nil
 }
 
 func verifyRSA(
@@ -348,6 +359,21 @@ func verifyPSS(
 		return false
 	}
 	return true
+
+}
+
+func verifyDSA(
+	signer *dsa.PublicKey,
+	digest []byte,
+	signatureDer []byte,
+) (bool, error) {
+	var signature dsaSignature
+	_, err := asn1.Unmarshal(signatureDer, &signature)
+	if err != nil {
+		return false, err
+	}
+	verified := dsa.Verify(signer, digest, signature.R, signature.S)
+	return verified, nil
 }
 
 func prepareSign(

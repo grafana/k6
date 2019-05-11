@@ -38,10 +38,13 @@ type Material struct {
 	messagePart3           string
 	rsaPublicKey           string
 	rsaPrivateKey          string
+	dsaPublicKey           string
+	dsaPrivateKey          string
 	pkcsSignatureHex       string
 	pkcsSignatureBase64    string
 	pkcsSignatureByteArray string
 	pssSignature           string
+	dsaSignature           string
 }
 type Expected struct {
 	hexSignature    string
@@ -79,6 +82,46 @@ A/xcn5uz+ingfoCnGpsEhZRfbcLVrmpUaVb6BANVrmYBdim6osHkj1yBRHECQQCG
 eml4CZD2OGaxUqdOSHKBAkEAtruFjS0IhJstjoOrAS1p5ZAr8Noj5L1DEIgxfAD4
 8RbNsyVGZX59oURQ/NqyEs+ME4o/oXuoz8yVBdQqT8G93w==
 -----END RSA PRIVATE KEY-----`),
+	dsaPublicKey: template(`-----BEGIN PUBLIC KEY-----
+MIIDRjCCAjkGByqGSM44BAEwggIsAoIBAQCKv/tJtwgLJGrvas2YQmqgjfoQ5s9u
+QRO9+9ELCu4Lstn9nsjmER/+CgXCrAQG/jUKdT6tpz9bUVYspcn+gF2YkDugSbMb
+4UciFbWjuFSYD7xIe7APGprgogJZeNO6v9vFWLJak4d35Olej1HLQpVPtz5NdR9u
+nh1aB9sODuRtnZDJsGWuEYbNN0nbjQReBLwbnJCRo5p8nL+FVfKmFGKC9KK3P3TN
+M6u5XU8KLlXZ40VNbtiIfzKr4aeHy8ob1+0Jy4nirxt2WJPxYW/tbawhHkJXB8R5
+73CRoxH+2xx5WTsYjSIdI3h+mGufi+nmnO2YQguVMrCJ5AaGlrw7V/KRAiEA9d+j
+pJs9sAccw/DWAnRm+UuvcZ9CFT4ttoPc0UWLKmkCggEAVKjNXly/1gzzKUGZVqYS
+GwigArV109g1vCWg4QavGgVLLqlbSxiz6+0kuLK6vauMipr0i57FRzh0EpZ6faah
+wQ/LbhqXQU+S55m5rFh1eUh428htlOhG5hQYe/EWiqD7nsWzl6z8+/Y5uuq6BksT
+Lej3nQJWiLY09SNnKcjVZYe5vs+8ASx6vT2qkGV/UvEEKma1I+0MUDJcHFjnTNwU
+f7GTRmtt7YgDlYX13e9ar89lSPxjXo+r3BSm5iNMC8eG3e91yoT0G4ShI6zf8LzZ
+baN2PK+Bwa+pBYEqvtp69G0NPO+jadx62HoAKFw+BXh2XU1fS09tX7Z2lfsIhIZS
+lQOCAQUAAoIBADJjifXbelASJEgBC9MNcFQM3aeLpMhSXcsIBR7mDGISnig84Hwo
+qJT76lQznzqBrGjYTaNEA6UC6XXda19wugKSDWJ6SvnMekkvOfIeqUom2sd43fYE
+SXJZX6gnbiqShNVwIK+aKpAWn1sqbWkzCcIL2BJdm7ETJeW3+yOXdLCa6p3JbZQS
+gVDZ+GPviNHSX1hyF4FjQW2rrQix5RhEJSV988j6NEZFbuTf7INwpDOg9htRoRih
+Rk3eh9kiR6iHl4ZUqSlefyVS40mzlKpPEXtKW2PFE6QLcQLPDzX+JjjAomgs/DIK
+ia2TF+3H94NY/zOOcerq+BXwVYZmxhDSOrI=
+-----END PUBLIC KEY-----`),
+	dsaPrivateKey: template(`-----BEGIN DSA PRIVATE KEY-----
+MIIDVQIBAAKCAQEAir/7SbcICyRq72rNmEJqoI36EObPbkETvfvRCwruC7LZ/Z7I
+5hEf/goFwqwEBv41CnU+rac/W1FWLKXJ/oBdmJA7oEmzG+FHIhW1o7hUmA+8SHuw
+Dxqa4KICWXjTur/bxViyWpOHd+TpXo9Ry0KVT7c+TXUfbp4dWgfbDg7kbZ2QybBl
+rhGGzTdJ240EXgS8G5yQkaOafJy/hVXyphRigvSitz90zTOruV1PCi5V2eNFTW7Y
+iH8yq+Gnh8vKG9ftCcuJ4q8bdliT8WFv7W2sIR5CVwfEee9wkaMR/tsceVk7GI0i
+HSN4fphrn4vp5pztmEILlTKwieQGhpa8O1fykQIhAPXfo6SbPbAHHMPw1gJ0ZvlL
+r3GfQhU+LbaD3NFFiyppAoIBAFSozV5cv9YM8ylBmVamEhsIoAK1ddPYNbwloOEG
+rxoFSy6pW0sYs+vtJLiyur2rjIqa9IuexUc4dBKWen2mocEPy24al0FPkueZuaxY
+dXlIeNvIbZToRuYUGHvxFoqg+57Fs5es/Pv2ObrqugZLEy3o950CVoi2NPUjZynI
+1WWHub7PvAEser09qpBlf1LxBCpmtSPtDFAyXBxY50zcFH+xk0Zrbe2IA5WF9d3v
+Wq/PZUj8Y16Pq9wUpuYjTAvHht3vdcqE9BuEoSOs3/C82W2jdjyvgcGvqQWBKr7a
+evRtDTzvo2nceth6AChcPgV4dl1NX0tPbV+2dpX7CISGUpUCggEAMmOJ9dt6UBIk
+SAEL0w1wVAzdp4ukyFJdywgFHuYMYhKeKDzgfCiolPvqVDOfOoGsaNhNo0QDpQLp
+dd1rX3C6ApINYnpK+cx6SS858h6pSibax3jd9gRJcllfqCduKpKE1XAgr5oqkBaf
+WyptaTMJwgvYEl2bsRMl5bf7I5d0sJrqncltlBKBUNn4Y++I0dJfWHIXgWNBbaut
+CLHlGEQlJX3zyPo0RkVu5N/sg3CkM6D2G1GhGKFGTd6H2SJHqIeXhlSpKV5/JVLj
+SbOUqk8Re0pbY8UTpAtxAs8PNf4mOMCiaCz8MgqJrZMX7cf3g1j/M45x6ur4FfBV
+hmbGENI6sgIgYgr/yUCfYfJQlBj9d9WXfpeJxgiknTSkwB2hjJKsYBg=
+-----END DSA PRIVATE KEY-----`),
 	pkcsSignatureHex: stringify("" +
 		"befd8b0a92a44b03324d1908b9e16d209328c38b14b71f8960f5c97c68a00437" +
 		"390cc42acab32ce70097a215163917ba28c3dbaa1a88a96e2443fa9abb442082" +
@@ -101,6 +144,9 @@ eml4CZD2OGaxUqdOSHKBAkEAtruFjS0IhJstjoOrAS1p5ZAr8Noj5L1DEIgxfAD4
 		"f7dc31e37493f7e4a4d5f83958d409ca293accfc0e86d64b65e6049b1112fa19" +
 		"445f4ae536fe19dda069db8d68799883af7fea8f1aa638a40c82c4f025e1a94d" +
 		"c5e033d9d5f67bf740118f62a112140f317c1e7b1efa821a10359c933696376b"),
+	dsaSignature: stringify("" +
+		"MEUCIQCyOt6wOt5muIc9Id2LD/sq1zwvZXKX2dnBEwh6BcA/OAIgMaCJyX/KCWqo" +
+		"khCpc0x8THK/vBLrR8xKRBA2Ji6xlHo="),
 }
 var expected = Expected{
 	hexSignature: stringify("" +
@@ -242,6 +288,22 @@ func TestVerify(t *testing.T) {
 			material.messageHex,
 			material.rsaPublicKey,
 			material.pssSignature,
+		))
+		assert.NoError(t, err)
+	})
+
+	t.Run("DSA", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const message = %s;
+		const signer = x509.parsePublicKey(%s);
+		const signature = %s;
+		const verified = crypto.verify(signer, "sha256", message, signature);
+		if (!verified) {
+			throw new Error("Verification failure");
+		}`,
+			material.messageHex,
+			material.dsaPublicKey,
+			material.dsaSignature,
 		))
 		assert.NoError(t, err)
 	})
