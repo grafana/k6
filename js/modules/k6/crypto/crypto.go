@@ -64,39 +64,39 @@ func (*Crypto) RandomBytes(ctx context.Context, size int) []byte {
 }
 
 func (c *Crypto) Md4(ctx context.Context, input []byte, outputEncoding string) interface{} {
-	return c.executeHash(&ctx, "md4", input, outputEncoding)
+	return executeHash(&ctx, "md4", input, outputEncoding)
 }
 
 func (c *Crypto) Md5(ctx context.Context, input []byte, outputEncoding string) interface{} {
-	return c.executeHash(&ctx, "md5", input, outputEncoding)
+	return executeHash(&ctx, "md5", input, outputEncoding)
 }
 
 func (c *Crypto) Sha1(ctx context.Context, input []byte, outputEncoding string) interface{} {
-	return c.executeHash(&ctx, "sha1", input, outputEncoding)
+	return executeHash(&ctx, "sha1", input, outputEncoding)
 }
 
 func (c *Crypto) Sha256(ctx context.Context, input []byte, outputEncoding string) interface{} {
-	return c.executeHash(&ctx, "sha256", input, outputEncoding)
+	return executeHash(&ctx, "sha256", input, outputEncoding)
 }
 
 func (c *Crypto) Sha384(ctx context.Context, input []byte, outputEncoding string) interface{} {
-	return c.executeHash(&ctx, "sha384", input, outputEncoding)
+	return executeHash(&ctx, "sha384", input, outputEncoding)
 }
 
 func (c *Crypto) Sha512(ctx context.Context, input []byte, outputEncoding string) interface{} {
-	return c.executeHash(&ctx, "sha512", input, outputEncoding)
+	return executeHash(&ctx, "sha512", input, outputEncoding)
 }
 
 func (c *Crypto) Sha512_224(ctx context.Context, input []byte, outputEncoding string) interface{} {
-	return c.executeHash(&ctx, "sha512_224", input, outputEncoding)
+	return executeHash(&ctx, "sha512_224", input, outputEncoding)
 }
 
 func (c *Crypto) Sha512_256(ctx context.Context, input []byte, outputEncoding string) interface{} {
-	return c.executeHash(&ctx, "sha512_256", input, outputEncoding)
+	return executeHash(&ctx, "sha512_256", input, outputEncoding)
 }
 
 func (c *Crypto) Ripemd160(ctx context.Context, input []byte, outputEncoding string) interface{} {
-	return c.executeHash(&ctx, "ripemd160", input, outputEncoding)
+	return executeHash(&ctx, "ripemd160", input, outputEncoding)
 }
 
 func (*Crypto) CreateHash(ctx context.Context, algorithm string) *Hasher {
@@ -165,13 +165,13 @@ func makeHasher(ctx *context.Context, algorithm string) *Hasher {
 	return &hasher
 }
 
-func (c *Crypto) executeHash(
+func executeHash(
 	ctx *context.Context,
 	function string,
 	input []byte,
 	outputEncoding string,
 ) interface{} {
-	hasher := c.CreateHash(*ctx, function)
+	hasher := makeHasher(ctx, function)
 	hasher.Update(input)
 	return hasher.Digest(outputEncoding)
 }
