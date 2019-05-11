@@ -30,7 +30,9 @@ import (
 )
 
 type Material struct {
-	message                string
+	messageString          string
+	messageBytes           []byte
+	messageHex             string
 	messagePart1           string
 	messagePart2           string
 	messagePart3           string
@@ -51,13 +53,15 @@ type ExpectedDigest struct {
 	SHA256 []byte
 }
 
-var message = []byte("They know, get out now!")
+const message = "They know, get out now!"
 
 var material = Material{
-	message:      stringify(enhex(message)),
-	messagePart1: stringify("54686579206b6e6f772c"),
-	messagePart2: stringify("206765"),
-	messagePart3: stringify("74206f7574206e6f7721"),
+	messageString: stringify(message),
+	messageBytes:  []byte(message),
+	messageHex:    stringify(enhex([]byte(message))),
+	messagePart1:  stringify("54686579206b6e6f772c"),
+	messagePart2:  stringify("206765"),
+	messagePart3:  stringify("74206f7574206e6f7721"),
 	rsaPublicKey: template(`-----BEGIN PUBLIC KEY-----
 MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDXMLr/Y/vUtIFY75jj0YXfp6lQ
 7iEIbps3BvRE4isTpxs8fXLnLM8LAuJScxiKyrGnj8EMb7LIHkSMBlz6iVj9atY6
@@ -154,12 +158,12 @@ func TestHashPlaintext(t *testing.T) {
 	}
 
 	t.Run("Unsupported", func(t *testing.T) {
-		_, err := hashPlaintext(0, message)
+		_, err := hashPlaintext(0, material.messageBytes)
 		assert.EqualError(t, err, "unsupported hash function: 0")
 	})
 
 	t.Run("SHA256", func(t *testing.T) {
-		digest, err := hashPlaintext(gocrypto.SHA256, message)
+		digest, err := hashPlaintext(gocrypto.SHA256, material.messageBytes)
 		assert.NoError(t, err)
 		assert.Equal(t, expected.digest.SHA256, digest)
 	})
@@ -177,7 +181,7 @@ func TestVerify(t *testing.T) {
 		const signer = { type: "HyperQuantumAlgorithm" };
 		const signature = %s;
 		const result = crypto.verify(signer, "SHA256", message, signature);
-		`, material.message, material.pkcsSignatureHex))
+		`, material.messageHex, material.pkcsSignatureHex))
 		assert.EqualError(t, err, "GoError: invalid public key")
 	})
 
@@ -191,7 +195,7 @@ func TestVerify(t *testing.T) {
 		if (!result) {
 			throw new Error("Verification failure");
 		}`,
-			material.message,
+			material.messageHex,
 			material.rsaPublicKey,
 			material.pkcsSignatureHex,
 		))
@@ -208,7 +212,7 @@ func TestVerify(t *testing.T) {
 		if (!result) {
 			throw new Error("Verification failure");
 		}`,
-			material.message,
+			material.messageHex,
 			material.rsaPublicKey,
 			material.pkcsSignatureBase64,
 		))
@@ -225,7 +229,7 @@ func TestVerify(t *testing.T) {
 		if (!result) {
 			throw new Error("Verification failure");
 		}`,
-			material.message,
+			material.messageHex,
 			material.rsaPublicKey,
 			material.pkcsSignatureByteArray,
 		))
@@ -242,7 +246,7 @@ func TestVerify(t *testing.T) {
 		if (!result) {
 			throw new Error("Verification failure");
 		}`,
-			material.message,
+			material.messageHex,
 			material.rsaPublicKey,
 			material.pkcsSignatureHex,
 		))
@@ -261,9 +265,33 @@ func TestVerify(t *testing.T) {
 		if (!result) {
 			throw new Error("Verification failure");
 		}`,
-			material.message,
+			material.messageHex,
 			material.rsaPublicKey,
 			material.pssSignature,
+		))
+		assert.NoError(t, err)
+	})
+}
+
+func TestVerifyString(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+	rt := makeRuntime()
+
+	t.Run("Success", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const message = %s;
+		const signer = x509.parsePublicKey(%s);
+		const signature = %s;
+		const verified = crypto.verifyString(
+			signer, "SHA256", message, signature);
+		if (!verified) {
+			throw new Error("Verification failure");
+		}`,
+			material.messageString,
+			material.rsaPublicKey,
+			material.pkcsSignatureHex,
 		))
 		assert.NoError(t, err)
 	})
@@ -280,7 +308,7 @@ func TestSign(t *testing.T) {
 		const message = %s;
 		const signer = { type: "HyperQuantumAlgorithm" };
 		crypto.sign(signer, "SHA256", message, "hex");
-		`, material.message))
+		`, material.messageHex))
 		assert.EqualError(t, err, "GoError: invalid private key")
 	})
 
@@ -294,7 +322,7 @@ func TestSign(t *testing.T) {
 		const result = crypto.verify(pub, hash, message, signature);
 		if (!result) {
 			throw new Error("Verification failure");
-		}`, material.message, material.rsaPrivateKey, material.rsaPublicKey))
+		}`, material.messageHex, material.rsaPrivateKey, material.rsaPublicKey))
 		assert.NoError(t, err)
 	})
 
@@ -309,7 +337,7 @@ func TestSign(t *testing.T) {
 		const result = crypto.verify(pub, hash, message, signature, options);
 		if (!result) {
 			throw new Error("Verification failure");
-		}`, material.message, material.rsaPrivateKey, material.rsaPublicKey))
+		}`, material.messageHex, material.rsaPrivateKey, material.rsaPublicKey))
 		assert.NoError(t, err)
 	})
 
@@ -324,7 +352,7 @@ func TestSign(t *testing.T) {
 		if (signature !== expected) {
 			throw new Error("Bad hex output");
 		}`,
-			material.message,
+			material.messageHex,
 			material.rsaPrivateKey,
 			material.rsaPublicKey,
 			expected.hexSignature,
@@ -343,7 +371,7 @@ func TestSign(t *testing.T) {
 		if (signature !== expected) {
 			throw new Error("Bad Base64 output");
 		}`,
-			material.message,
+			material.messageHex,
 			material.rsaPrivateKey,
 			material.rsaPublicKey,
 			expected.base64Signature,
@@ -362,7 +390,7 @@ func TestSign(t *testing.T) {
 		if (signature.join(":") !== expected) {
 			throw new Error("Bad binary output");
 		}`,
-			material.message,
+			material.messageHex,
 			material.rsaPrivateKey,
 			material.rsaPublicKey,
 			expected.binarySignature,
@@ -381,7 +409,7 @@ func TestSign(t *testing.T) {
 		if (signature.join(":") !== expected) {
 			throw new Error("Bad binary output");
 		}`,
-			material.message,
+			material.messageHex,
 			material.rsaPrivateKey,
 			material.rsaPublicKey,
 			expected.binarySignature,
@@ -413,7 +441,7 @@ func TestVerifier(t *testing.T) {
 		if (!verified) {
 			throw new Error("Verification failed");
 		}`,
-			material.message,
+			material.messageHex,
 			material.rsaPublicKey,
 			material.pkcsSignatureHex,
 		))
@@ -465,7 +493,7 @@ func TestSigner(t *testing.T) {
 		if (signature !== expected) {
 			throw new Error("Incorrect signature: " + signature);
 		}`,
-			material.message,
+			material.messageHex,
 			material.rsaPrivateKey,
 			expected.hexSignature,
 		))

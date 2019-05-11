@@ -72,6 +72,25 @@ func (*Crypto) Verify(
 	return verified
 }
 
+// VerifyString checks for a valid signature of a string message
+func (surface *Crypto) VerifyString(
+	ctx *context.Context,
+	signer x509.PublicKey,
+	functionEncoded string,
+	plaintextEncoded string,
+	signatureEncoded interface{},
+	options SigningOptions,
+) bool {
+	function, digest, signature := prepareVerifyString(
+		ctx, functionEncoded, plaintextEncoded, signatureEncoded)
+	verified, err :=
+		executeVerify(&signer, function, digest, signature, options)
+	if err != nil {
+		throw(ctx, err)
+	}
+	return verified
+}
+
 // Sign produces a message signature
 func (*Crypto) Sign(
 	ctx *context.Context,
@@ -203,6 +222,28 @@ func prepareVerify(
 	if err != nil {
 		throw(ctx, err)
 	}
+	digest, err := hashPlaintext(function, plaintext)
+	if err != nil {
+		throw(ctx, err)
+	}
+	signature, err := decodeSignature(signatureEncoded)
+	if err != nil {
+		throw(ctx, err)
+	}
+	return function, digest, signature
+}
+
+func prepareVerifyString(
+	ctx *context.Context,
+	functionEncoded string,
+	plaintextEncoded string,
+	signatureEncoded interface{},
+) (gocrypto.Hash, []byte, []byte) {
+	function, err := decodeFunction(functionEncoded)
+	if err != nil {
+		throw(ctx, err)
+	}
+	plaintext := []byte(plaintextEncoded)
 	digest, err := hashPlaintext(function, plaintext)
 	if err != nil {
 		throw(ctx, err)
