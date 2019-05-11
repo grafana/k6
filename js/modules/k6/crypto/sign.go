@@ -71,10 +71,7 @@ func (Crypto) Sign(
 	format string,
 	options SigningOptions,
 ) interface{} {
-	function, digest, err := prepareSign(functionEncoded, message)
-	if err != nil {
-		throw(ctx, err)
-	}
+	function, digest := prepareSign(ctx, functionEncoded, message)
 	signature, err := executeSign(&signer, function, digest, format, options)
 	if err != nil {
 		throw(ctx, err)
@@ -191,22 +188,23 @@ func verifyPSS(
 }
 
 func prepareSign(
+	ctx context.Context,
 	functionEncoded string,
 	plaintextEncoded interface{},
-) (gocrypto.Hash, []byte, error) {
+) (gocrypto.Hash, []byte) {
 	function, err := decodeFunction(functionEncoded)
 	if err != nil {
-		return 0, nil, err
+		throw(ctx, err)
 	}
 	plaintext, err := decodeBinaryDetect(plaintextEncoded)
 	if err != nil {
-		return 0, nil, err
+		throw(ctx, err)
 	}
 	digest, err := hashPlaintext(function, plaintext)
 	if err != nil {
-		return 0, nil, err
+		throw(ctx, err)
 	}
-	return function, digest, nil
+	return function, digest
 }
 
 func executeSign(
