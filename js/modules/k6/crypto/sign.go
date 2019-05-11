@@ -44,7 +44,7 @@ type Verifier struct {
 }
 
 // Verify checks for a valid message signature
-func (Crypto) Verify(
+func (*Crypto) Verify(
 	ctx *context.Context,
 	signer x509.PublicKey,
 	functionEncoded string,
@@ -63,7 +63,7 @@ func (Crypto) Verify(
 }
 
 // Sign produces a message signature
-func (Crypto) Sign(
+func (*Crypto) Sign(
 	ctx *context.Context,
 	signer x509.PrivateKey,
 	functionEncoded string,
@@ -80,7 +80,7 @@ func (Crypto) Sign(
 }
 
 // CreateVerify creates a chunked verifier
-func (Crypto) CreateVerify(
+func (*Crypto) CreateVerify(
 	ctx *context.Context,
 	functionEncoded string,
 	options SigningOptions,
