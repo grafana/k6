@@ -31,7 +31,6 @@ import (
 	"math/big"
 	"strconv"
 
-	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/js/modules/k6/crypto/x509"
 	"github.com/pkg/errors"
 )

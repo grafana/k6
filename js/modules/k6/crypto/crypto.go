@@ -219,3 +219,7 @@ func (c *Crypto) Hmac(
 	hasher.Update(input)
 	return hasher.Digest(outputEncoding)
 }
+
+func throw(ctx *context.Context, err error) {
+	common.Throw(common.GetRuntime(*ctx), err)
+}
