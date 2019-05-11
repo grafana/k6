@@ -46,6 +46,10 @@ func bytes(encoded string) []byte {
 	return decoded
 }
 
+func enhex(value []byte) string {
+	return hex.EncodeToString(value)
+}
+
 func stringify(value string) string {
 	return fmt.Sprintf(`"%s"`, value)
 }

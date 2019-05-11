@@ -48,12 +48,12 @@ func (Crypto) Verify(
 	ctx context.Context,
 	signer x509.PublicKey,
 	functionEncoded string,
-	message string,
+	plaintextEncoded interface{},
 	signatureEncoded interface{},
 	options SigningOptions,
 ) bool {
 	function, digest, signature :=
-		prepareVerify(ctx, functionEncoded, message, signatureEncoded)
+		prepareVerify(ctx, functionEncoded, plaintextEncoded, signatureEncoded)
 	return executeVerify(ctx, &signer, function, digest, signature, options)
 }
 
@@ -96,14 +96,18 @@ func (Crypto) CreateVerify(
 func prepareVerify(
 	ctx context.Context,
 	functionEncoded string,
-	message string,
+	plaintextEncoded interface{},
 	signatureEncoded interface{},
 ) (gocrypto.Hash, []byte, []byte) {
 	function, err := decodeFunction(functionEncoded)
 	if err != nil {
 		throw(ctx, err)
 	}
-	digest, err := hashMessage(function, message)
+	plaintext, err := decodeBinaryDetect(plaintextEncoded)
+	if err != nil {
+		throw(ctx, err)
+	}
+	digest, err := hashPlaintext(function, plaintext)
 	if err != nil {
 		throw(ctx, err)
 	}
@@ -182,13 +186,17 @@ func verifyPSS(
 
 func prepareSign(
 	functionEncoded string,
-	message string,
+	plaintextEncoded interface{},
 ) (gocrypto.Hash, []byte, error) {
 	function, err := decodeFunction(functionEncoded)
 	if err != nil {
 		return 0, nil, err
 	}
-	digest, err := hashMessage(function, message)
+	plaintext, err := decodeBinaryDetect(plaintextEncoded)
+	if err != nil {
+		return 0, nil, err
+	}
+	digest, err := hashPlaintext(function, plaintext)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -324,11 +332,10 @@ func decodeFunction(encoded string) (gocrypto.Hash, error) {
 	}
 }
 
-func hashMessage(function gocrypto.Hash, message string) ([]byte, error) {
-	bytes := []byte(message)
+func hashPlaintext(function gocrypto.Hash, plaintext []byte) ([]byte, error) {
 	switch function {
 	case gocrypto.SHA256:
-		result := sha256.Sum256(bytes)
+		result := sha256.Sum256(plaintext)
 		return result[:], nil
 	default:
 		msg := fmt.Sprintf("unsupported hash function: %d", function)

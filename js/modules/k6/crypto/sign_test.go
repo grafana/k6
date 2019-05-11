@@ -48,10 +48,10 @@ type ExpectedDigest struct {
 	SHA256 []byte
 }
 
-const message = "They know, get out now!"
+var message = []byte("They know, get out now!")
 
 var material = Material{
-	message: stringify(message),
+	message: stringify(enhex(message)),
 	rsaPublicKey: template(`-----BEGIN PUBLIC KEY-----
 MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDXMLr/Y/vUtIFY75jj0YXfp6lQ
 7iEIbps3BvRE4isTpxs8fXLnLM8LAuJScxiKyrGnj8EMb7LIHkSMBlz6iVj9atY6
@@ -142,18 +142,18 @@ func TestDecodeFunction(t *testing.T) {
 	})
 }
 
-func TestHashMessage(t *testing.T) {
+func TestHashPlaintext(t *testing.T) {
 	if testing.Short() {
 		return
 	}
 
 	t.Run("Unsupported", func(t *testing.T) {
-		_, err := hashMessage(0, message)
+		_, err := hashPlaintext(0, message)
 		assert.EqualError(t, err, "unsupported hash function: 0")
 	})
 
 	t.Run("SHA256", func(t *testing.T) {
-		digest, err := hashMessage(gocrypto.SHA256, message)
+		digest, err := hashPlaintext(gocrypto.SHA256, message)
 		assert.NoError(t, err)
 		assert.Equal(t, expected.digest.SHA256, digest)
 	})
