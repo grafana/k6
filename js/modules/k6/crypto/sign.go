@@ -480,7 +480,7 @@ func executeSign(
 		err = errors.New("invalid private key")
 	}
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	encoded, err := encodeBinary(signature, format)
 	if err != nil {
