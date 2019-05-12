@@ -44,11 +44,36 @@ func (*Crypto) Decrypt(
 	ciphertext, function, label :=
 		prepareDecrypt(ctx, ciphertextEncoded, options)
 	plaintext, err :=
-		executeDecrypt(recipient, ciphertext, function, label, format, options)
+		executeDecrypt(recipient, ciphertext, function, label, options)
 	if err != nil {
 		throw(ctx, err)
 	}
-	return plaintext
+	encoded, err := encodeBinary(plaintext, format)
+	if err != nil {
+		throw(ctx, err)
+	}
+	return encoded
+}
+
+// Decrypt decrypts a message and interprets it as a UTF-8 string
+func (*Crypto) DecryptString(
+	ctx *context.Context,
+	recipient x509.PrivateKey,
+	ciphertextEncoded interface{},
+	options EncryptionOptions,
+) string {
+	ciphertext, function, label :=
+		prepareDecrypt(ctx, ciphertextEncoded, options)
+	plaintext, err :=
+		executeDecrypt(recipient, ciphertext, function, label, options)
+	if err != nil {
+		throw(ctx, err)
+	}
+	message, err := decodeString(plaintext)
+	if err != nil {
+		throw(ctx, err)
+	}
+	return message
 }
 
 func prepareDecrypt(
@@ -73,9 +98,8 @@ func executeDecrypt(
 	ciphertext []byte,
 	function *hash.Hash,
 	label []byte,
-	format string,
 	options EncryptionOptions,
-) (interface{}, error) {
+) ([]byte, error) {
 	var plaintext []byte
 	var err error
 	switch recipient.Type {
@@ -88,11 +112,7 @@ func executeDecrypt(
 	if err != nil {
 		return nil, err
 	}
-	encoded, err := encodeBinary(plaintext, format)
-	if err != nil {
-		return nil, err
-	}
-	return encoded, nil
+	return plaintext, nil
 }
 
 func decryptRSA(

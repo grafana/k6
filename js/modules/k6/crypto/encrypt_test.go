@@ -94,3 +94,26 @@ func TestDecrypt(t *testing.T) {
 		assert.NoError(t, err)
 	})
 }
+
+func TestDecryptString(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+	rt := makeRuntime()
+
+	t.Run("Success", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const recipient = x509.parsePrivateKey(%s);
+		const ciphertext = %s;
+		const message = crypto.decryptString(recipient, ciphertext);
+		const expected = %s;
+		if (message !== expected) {
+			throw new Error("Decrypted incorrect message");
+		}`,
+			material.rsaPrivateKey,
+			material.pkcsCiphertext,
+			material.messageString,
+		))
+		assert.NoError(t, err)
+	})
+}
