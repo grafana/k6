@@ -84,8 +84,8 @@ func (*Crypto) Encrypt(
 	format string,
 	options EncryptionOptions,
 ) interface{} {
-	plaintext := prepareEncrypt(ctx, plaintextEncoded)
-	ciphertext, err := executeEncrypt(&recipient, plaintext, options)
+	plaintext, function := prepareEncrypt(ctx, plaintextEncoded, options)
+	ciphertext, err := executeEncrypt(&recipient, plaintext, function, options)
 	if err != nil {
 		throw(ctx, err)
 	}
@@ -187,24 +187,31 @@ func decryptOAEP(
 func prepareEncrypt(
 	ctx *context.Context,
 	plaintextEncoded interface{},
-) []byte {
+	options EncryptionOptions,
+) ([]byte, *hash.Hash) {
 	plaintext, err := decodePlaintext(plaintextEncoded)
 	if err != nil {
 		throw(ctx, err)
 	}
-	return plaintext
+	function, err := makeEncryptionFunction(ctx, options["hash"])
+	if err != nil {
+		throw(ctx, err)
+	}
+	return plaintext, function
 }
 
 func executeEncrypt(
 	recipient *x509.PublicKey,
 	plaintext []byte,
+	function *hash.Hash,
 	options EncryptionOptions,
 ) ([]byte, error) {
 	var ciphertext []byte
 	var err error
 	switch recipient.Type {
 	case "RSA":
-		ciphertext, err = encryptRSA(recipient.RSA, plaintext, options)
+		ciphertext, err =
+			encryptRSA(recipient.RSA, plaintext, function, options)
 	default:
 		err = errors.New("invalid public key")
 	}
@@ -217,11 +224,14 @@ func executeEncrypt(
 func encryptRSA(
 	recipient *rsa.PublicKey,
 	plaintext []byte,
+	function *hash.Hash,
 	options EncryptionOptions,
 ) ([]byte, error) {
 	switch options["type"] {
 	case "":
 		return encryptPKCS(recipient, plaintext)
+	case "oaep":
+		return encryptOAEP(recipient, plaintext, function)
 	default:
 		err := errors.New("unsupported type: " + options["type"])
 		return nil, err
@@ -238,6 +248,24 @@ func encryptPKCS(
 		return nil, err
 	}
 	return ciphertext, err
+}
+
+func encryptOAEP(
+	recipient *rsa.PublicKey,
+	plaintext []byte,
+	function *hash.Hash,
+) ([]byte, error) {
+	ciphertext, err := rsa.EncryptOAEP(
+		*function,
+		rand.Reader,
+		recipient,
+		plaintext,
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return ciphertext, nil
 }
 
 func decodeCiphertext(encoded interface{}) ([]byte, error) {

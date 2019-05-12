@@ -149,4 +149,22 @@ func TestEncrypt(t *testing.T) {
 		))
 		assert.NoError(t, err)
 	})
+
+	t.Run("RSA-OAEP", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const priv = x509.parsePrivateKey(%s);
+		const pub = x509.parsePublicKey(%s);
+		const plaintext = %s;
+		const options = { type: "oaep" };
+		const ciphertext = crypto.encrypt(pub, plaintext, "binary", options);
+		const delivered = crypto.decrypt(priv, ciphertext, "hex", options);
+		if (delivered !== plaintext) {
+			throw new Error("Decrypted incorrect message");
+		}`,
+			material.rsaPrivateKey,
+			material.rsaPublicKey,
+			material.messageHex,
+		))
+		assert.NoError(t, err)
+	})
 }
