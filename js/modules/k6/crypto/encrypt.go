@@ -98,6 +98,28 @@ func (*Crypto) Encrypt(
 	return encoded
 }
 
+// Encrypt encrypts a string message for a recipient
+func (*Crypto) EncryptString(
+	ctx *context.Context,
+	recipient x509.PublicKey,
+	message string,
+	format string,
+	options EncryptionOptions,
+) interface{} {
+	plaintext := []byte(message)
+	function, label := prepareEncryptString(ctx, options)
+	ciphertext, err :=
+		executeEncrypt(&recipient, plaintext, function, label, options)
+	if err != nil {
+		throw(ctx, err)
+	}
+	encoded, err := encodeBinary(ciphertext, format)
+	if err != nil {
+		throw(ctx, err)
+	}
+	return encoded
+}
+
 func prepareDecrypt(
 	ctx *context.Context,
 	ciphertextEncoded interface{},
@@ -201,6 +223,18 @@ func prepareEncrypt(
 	}
 	label := decodeLabel(options["label"])
 	return plaintext, function, label
+}
+
+func prepareEncryptString(
+	ctx *context.Context,
+	options EncryptionOptions,
+) (*hash.Hash, []byte) {
+	function, err := makeEncryptionFunction(ctx, options["hash"])
+	if err != nil {
+		throw(ctx, err)
+	}
+	label := decodeLabel(options["label"])
+	return function, label
 }
 
 func executeEncrypt(

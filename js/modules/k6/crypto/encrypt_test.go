@@ -187,3 +187,27 @@ func TestEncrypt(t *testing.T) {
 		assert.NoError(t, err)
 	})
 }
+
+func TestEncryptString(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+	rt := makeRuntime()
+
+	t.Run("Success", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const message = %s;
+		const priv = x509.parsePrivateKey(%s);
+		const pub = x509.parsePublicKey(%s);
+		const ciphertext = crypto.encryptString(pub, message);
+		const delivered = crypto.decryptString(priv, ciphertext);
+		if (delivered !== message) {
+			throw new Error("Decrypted incorrect message");
+		}`,
+			material.messageString,
+			material.rsaPrivateKey,
+			material.rsaPublicKey,
+		))
+		assert.NoError(t, err)
+	})
+}
