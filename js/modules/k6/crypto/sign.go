@@ -660,7 +660,7 @@ func throw(ctx *context.Context, err error) {
 }
 
 func decodeSigningFunction(encoded string) (gocrypto.Hash, error) {
-	err := unsupportedSigningFunction(encoded)
+	err := unsupportedFunction(encoded)
 	if err != nil {
 		return 0, err
 	}
@@ -669,33 +669,4 @@ func decodeSigningFunction(encoded string) (gocrypto.Hash, error) {
 		return 0, err
 	}
 	return decoded, nil
-}
-
-// Remove cases to enable as functions are implemented
-func unsupportedSigningFunction(function string) error {
-	switch function {
-	case "sha224":
-		fallthrough
-	case "md5sha1":
-		fallthrough
-	case "sha3_224":
-		fallthrough
-	case "sha3_256":
-		fallthrough
-	case "sha3_384":
-		fallthrough
-	case "sha3_512":
-		fallthrough
-	case "blake2s_256":
-		fallthrough
-	case "blake2b_256":
-		fallthrough
-	case "blake2b_384":
-		fallthrough
-	case "blake2b_512":
-		err := errors.New("unsupported hash function: " + function)
-		return err
-	default:
-		return nil
-	}
 }
