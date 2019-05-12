@@ -152,7 +152,7 @@ func (*Crypto) CreateVerify(
 	functionEncoded string,
 	options SigningOptions,
 ) *Verifier {
-	function, err := decodeFunction(functionEncoded)
+	function, err := decodeSigningFunction(functionEncoded)
 	if err != nil {
 		throw(ctx, err)
 	}
@@ -170,7 +170,7 @@ func (*Crypto) CreateSign(
 	functionEncoded string,
 	options SigningOptions,
 ) *Signer {
-	function, err := decodeFunction(functionEncoded)
+	function, err := decodeSigningFunction(functionEncoded)
 	if err != nil {
 		throw(ctx, err)
 	}
@@ -267,7 +267,7 @@ func prepareVerify(
 	if err != nil {
 		throw(ctx, err)
 	}
-	function, err := decodeFunction(functionEncoded)
+	function, err := decodeSigningFunction(functionEncoded)
 	if err != nil {
 		throw(ctx, err)
 	}
@@ -297,7 +297,7 @@ func prepareVerifyString(
 	if err != nil {
 		throw(ctx, err)
 	}
-	function, err := decodeFunction(functionEncoded)
+	function, err := decodeSigningFunction(functionEncoded)
 	if err != nil {
 		throw(ctx, err)
 	}
@@ -420,7 +420,7 @@ func prepareSign(
 	if err != nil {
 		throw(ctx, err)
 	}
-	function, err := decodeFunction(functionEncoded)
+	function, err := decodeSigningFunction(functionEncoded)
 	if err != nil {
 		throw(ctx, err)
 	}
@@ -445,7 +445,7 @@ func prepareSignString(
 	if err != nil {
 		throw(ctx, err)
 	}
-	function, err := decodeFunction(functionEncoded)
+	function, err := decodeSigningFunction(functionEncoded)
 	if err != nil {
 		throw(ctx, err)
 	}
@@ -657,4 +657,45 @@ func validatePrivateKey(key *x509.PrivateKey) error {
 
 func throw(ctx *context.Context, err error) {
 	common.Throw(common.GetRuntime(*ctx), err)
+}
+
+func decodeSigningFunction(encoded string) (gocrypto.Hash, error) {
+	err := unsupportedSigningFunction(encoded)
+	if err != nil {
+		return 0, err
+	}
+	decoded, err := decodeFunction(encoded)
+	if err != nil {
+		return 0, err
+	}
+	return decoded, nil
+}
+
+// Remove cases to enable as functions are implemented
+func unsupportedSigningFunction(function string) error {
+	switch function {
+	case "sha224":
+		fallthrough
+	case "md5sha1":
+		fallthrough
+	case "sha3_224":
+		fallthrough
+	case "sha3_256":
+		fallthrough
+	case "sha3_384":
+		fallthrough
+	case "sha3_512":
+		fallthrough
+	case "blake2s_256":
+		fallthrough
+	case "blake2b_256":
+		fallthrough
+	case "blake2b_384":
+		fallthrough
+	case "blake2b_512":
+		err := errors.New("unsupported hash function: " + function)
+		return err
+	default:
+		return nil
+	}
 }
