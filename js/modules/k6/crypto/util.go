@@ -112,3 +112,12 @@ func makeFunction(ctx *context.Context, kind string) *hash.Hash {
 	hasher := makeHasher(ctx, kind)
 	return &hasher.hash
 }
+
+func decodePlaintext(encoded interface{}) ([]byte, error) {
+	decoded, err := decodeBinaryDetect(encoded)
+	if err != nil {
+		err = errors.Wrap(err, "could not decode plaintext")
+		return nil, err
+	}
+	return decoded, nil
+}

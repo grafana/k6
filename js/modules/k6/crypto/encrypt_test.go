@@ -36,8 +36,8 @@ func TestDecrypt(t *testing.T) {
 
 	t.Run("InvalidKey", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
-		const ciphertext = %s;
 		const recipient = { type: "HyperQuantumAlgorithm" };
+		const ciphertext = %s;
 		crypto.decrypt(recipient, ciphertext);
 		`, material.pkcsCiphertext))
 		assert.EqualError(t, err, "GoError: invalid private key")
@@ -113,6 +113,39 @@ func TestDecryptString(t *testing.T) {
 			material.rsaPrivateKey,
 			material.pkcsCiphertext,
 			material.messageString,
+		))
+		assert.NoError(t, err)
+	})
+}
+
+func TestEncrypt(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+	rt := makeRuntime()
+
+	t.Run("InvalidKey", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const recipient = { type: "HyperQuantumAlgorithm" };
+		const plaintext = %s;
+		crypto.encrypt(recipient, plaintext)
+		`, material.messageHex))
+		assert.EqualError(t, err, "GoError: invalid public key")
+	})
+
+	t.Run("RSA-PKCS", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const priv = x509.parsePrivateKey(%s);
+		const pub = x509.parsePublicKey(%s);
+		const plaintext = %s;
+		const ciphertext = crypto.encrypt(pub, plaintext);
+		const delivered = crypto.decrypt(priv, ciphertext, "hex");
+		if (delivered !== plaintext) {
+			throw new Error("Decrypted incorrect message");
+		}`,
+			material.rsaPrivateKey,
+			material.rsaPublicKey,
+			material.messageHex,
 		))
 		assert.NoError(t, err)
 	})

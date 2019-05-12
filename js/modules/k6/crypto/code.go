@@ -67,14 +67,27 @@ func decodeBinaryDetect(encoded interface{}) ([]byte, error) {
 }
 
 func decodeBytes(abstracted interface{}) ([]byte, error) {
-	encoded, ok := abstracted.([]interface{})
-	if !ok {
+	switch encoded := abstracted.(type) {
+	case []uint8:
+		return decodeInternalBytes(encoded), nil
+	case []interface{}:
+		return decodeExternalBytes(encoded)
+	default:
 		err := errors.New("not a byte array")
 		return nil, err
 	}
+}
+
+// Bytes originating in Go unmarshaled as slice of uint8
+func decodeInternalBytes(encoded []uint8) []byte {
+	return []byte(encoded)
+}
+
+// Bytes originating in JavaScript unmarshaled as slice of abstracted int64
+func decodeExternalBytes(encoded []interface{}) ([]byte, error) {
 	decoded := make([]byte, len(encoded))
 	for i, itemAbstracted := range encoded {
-		itemDecoded, err := decodeByte(itemAbstracted)
+		itemDecoded, err := decodeExternalByte(itemAbstracted)
 		if err != nil {
 			return nil, err
 		}
@@ -83,14 +96,13 @@ func decodeBytes(abstracted interface{}) ([]byte, error) {
 	return decoded, nil
 }
 
-func decodeByte(abstracted interface{}) (byte, error) {
+func decodeExternalByte(abstracted interface{}) (byte, error) {
 	encoded, ok := abstracted.(int64)
 	if !ok {
 		err := errors.New("not a byte array")
 		return 0, err
 	}
-	decoded := byte(encoded)
-	return decoded, nil
+	return byte(encoded), nil
 }
 
 func decodeHex(abstracted interface{}) ([]byte, error) {

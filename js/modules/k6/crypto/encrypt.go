@@ -44,7 +44,7 @@ func (*Crypto) Decrypt(
 	ciphertext, function, label :=
 		prepareDecrypt(ctx, ciphertextEncoded, options)
 	plaintext, err :=
-		executeDecrypt(recipient, ciphertext, function, label, options)
+		executeDecrypt(&recipient, ciphertext, function, label, options)
 	if err != nil {
 		throw(ctx, err)
 	}
@@ -65,7 +65,7 @@ func (*Crypto) DecryptString(
 	ciphertext, function, label :=
 		prepareDecrypt(ctx, ciphertextEncoded, options)
 	plaintext, err :=
-		executeDecrypt(recipient, ciphertext, function, label, options)
+		executeDecrypt(&recipient, ciphertext, function, label, options)
 	if err != nil {
 		throw(ctx, err)
 	}
@@ -74,6 +74,26 @@ func (*Crypto) DecryptString(
 		throw(ctx, err)
 	}
 	return message
+}
+
+// Encrypt encrypts a message for a recipient
+func (*Crypto) Encrypt(
+	ctx *context.Context,
+	recipient x509.PublicKey,
+	plaintextEncoded interface{},
+	format string,
+	options EncryptionOptions,
+) interface{} {
+	plaintext := prepareEncrypt(ctx, plaintextEncoded)
+	ciphertext, err := executeEncrypt(&recipient, plaintext, options)
+	if err != nil {
+		throw(ctx, err)
+	}
+	encoded, err := encodeBinary(ciphertext, format)
+	if err != nil {
+		throw(ctx, err)
+	}
+	return encoded
 }
 
 func prepareDecrypt(
@@ -94,7 +114,7 @@ func prepareDecrypt(
 }
 
 func executeDecrypt(
-	recipient x509.PrivateKey,
+	recipient *x509.PrivateKey,
 	ciphertext []byte,
 	function *hash.Hash,
 	label []byte,
@@ -162,6 +182,62 @@ func decryptOAEP(
 		return nil, err
 	}
 	return plaintext, nil
+}
+
+func prepareEncrypt(
+	ctx *context.Context,
+	plaintextEncoded interface{},
+) []byte {
+	plaintext, err := decodePlaintext(plaintextEncoded)
+	if err != nil {
+		throw(ctx, err)
+	}
+	return plaintext
+}
+
+func executeEncrypt(
+	recipient *x509.PublicKey,
+	plaintext []byte,
+	options EncryptionOptions,
+) ([]byte, error) {
+	var ciphertext []byte
+	var err error
+	switch recipient.Type {
+	case "RSA":
+		ciphertext, err = encryptRSA(recipient.RSA, plaintext, options)
+	default:
+		err = errors.New("invalid public key")
+	}
+	if err != nil {
+		return nil, err
+	}
+	return ciphertext, nil
+}
+
+func encryptRSA(
+	recipient *rsa.PublicKey,
+	plaintext []byte,
+	options EncryptionOptions,
+) ([]byte, error) {
+	switch options["type"] {
+	case "":
+		return encryptPKCS(recipient, plaintext)
+	default:
+		err := errors.New("unsupported type: " + options["type"])
+		return nil, err
+	}
+}
+
+func encryptPKCS(
+	recipient *rsa.PublicKey,
+	plaintext []byte,
+) ([]byte, error) {
+	ciphertext, err := rsa.EncryptPKCS1v15(rand.Reader, recipient, plaintext)
+	if err != nil {
+		err = errors.Wrap(err, "failed to encrypt")
+		return nil, err
+	}
+	return ciphertext, err
 }
 
 func decodeCiphertext(encoded interface{}) ([]byte, error) {
