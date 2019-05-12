@@ -27,7 +27,8 @@ type Material struct {
 	messagePart1           string
 	messagePart2           string
 	messagePart3           string
-	ciphertext             string
+	pkcsCiphertext         string
+	oaepCiphertext         string
 	rsaPublicKey           string
 	rsaPrivateKey          string
 	dsaPublicKey           string
@@ -56,10 +57,15 @@ var material = Material{ //nolint:gochecknoglobals
 	messagePart1:  stringify("54686579206b6e6f772c"),
 	messagePart2:  stringify("206765"),
 	messagePart3:  stringify("74206f7574206e6f7721"),
-	ciphertext: stringify("" +
+	pkcsCiphertext: stringify("" +
 		"TsP6H2xYIAVCBmfnl3l77RC6gv9kpJz+jPD2SedkcxoLdMB47C+8z3X/6Zbqi2Ae" +
 		"bpBdWRvqqCVjH0+EZsDnlCCsYO4bYp6N+Av3Cq+VDVGLzN5OEwOPyTDUH8Dh3zV2" +
 		"c0In13ACkTFYY9lICumpOG+2iI97IbmFI3IPfeEBJ/s="),
+	oaepCiphertext: stringify("" +
+		"d0b54b35b94e851ac4c24d54126740972b3a32547c7e6ee0a277f6e4adbd54e0" +
+		"c8ed934bf096983155e74fc1e5e76f0c02407a934312b85623b02461f5b47864" +
+		"e669048d97437c66f65ec2e65c7f646ded92dc1a6610d923075415ca6f1dcc2f" +
+		"b462614493750b086a6ce803bd0c26b41d9623e36ca5ce384765717d05cf8d0b"),
 	rsaPublicKey: template(`-----BEGIN PUBLIC KEY-----
 MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDXMLr/Y/vUtIFY75jj0YXfp6lQ
 7iEIbps3BvRE4isTpxs8fXLnLM8LAuJScxiKyrGnj8EMb7LIHkSMBlz6iVj9atY6

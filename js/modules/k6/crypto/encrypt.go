@@ -24,6 +24,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"hash"
 
 	"github.com/loadimpact/k6/js/modules/k6/crypto/x509"
 	"github.com/pkg/errors"
@@ -40,8 +41,9 @@ func (*Crypto) Decrypt(
 	format string,
 	options EncryptionOptions,
 ) interface{} {
-	ciphertext := prepareDecrypt(ctx, ciphertextEncoded)
-	plaintext, err := executeDecrypt(recipient, ciphertext, format, options)
+	ciphertext, function := prepareDecrypt(ctx, ciphertextEncoded, options)
+	plaintext, err :=
+		executeDecrypt(recipient, ciphertext, function, format, options)
 	if err != nil {
 		throw(ctx, err)
 	}
@@ -51,17 +53,23 @@ func (*Crypto) Decrypt(
 func prepareDecrypt(
 	ctx *context.Context,
 	ciphertextEncoded interface{},
-) []byte {
+	options EncryptionOptions,
+) ([]byte, *hash.Hash) {
 	ciphertext, err := decodeCiphertext(ciphertextEncoded)
 	if err != nil {
 		throw(ctx, err)
 	}
-	return ciphertext
+	function, err := makeEncryptionFunction(ctx, options["hash"])
+	if err != nil {
+		throw(ctx, err)
+	}
+	return ciphertext, function
 }
 
 func executeDecrypt(
 	recipient x509.PrivateKey,
 	ciphertext []byte,
+	function *hash.Hash,
 	format string,
 	options EncryptionOptions,
 ) (interface{}, error) {
@@ -69,7 +77,8 @@ func executeDecrypt(
 	var err error
 	switch recipient.Type {
 	case "RSA":
-		plaintext, err = decryptRSA(recipient.RSA, ciphertext, options)
+		plaintext, err =
+			decryptRSA(recipient.RSA, ciphertext, function, options)
 	default:
 		err = errors.New("invalid private key")
 	}
@@ -86,11 +95,14 @@ func executeDecrypt(
 func decryptRSA(
 	recipient *rsa.PrivateKey,
 	ciphertext []byte,
+	function *hash.Hash,
 	options EncryptionOptions,
 ) ([]byte, error) {
 	switch options["type"] {
 	case "":
 		return decryptPKCS(recipient, ciphertext)
+	case "oaep":
+		return decryptOAEP(recipient, ciphertext, function)
 	default:
 		err := errors.New("unsupported type: " + options["type"])
 		return nil, err
@@ -109,6 +121,24 @@ func decryptPKCS(
 	return plaintext, nil
 }
 
+func decryptOAEP(
+	recipient *rsa.PrivateKey,
+	ciphertext []byte,
+	function *hash.Hash,
+) ([]byte, error) {
+	plaintext, err := rsa.DecryptOAEP(
+		*function,
+		rand.Reader,
+		recipient,
+		ciphertext,
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return plaintext, nil
+}
+
 func decodeCiphertext(encoded interface{}) ([]byte, error) {
 	decoded, err := decodeBinaryDetect(encoded)
 	if err != nil {
@@ -116,4 +146,18 @@ func decodeCiphertext(encoded interface{}) ([]byte, error) {
 		return nil, err
 	}
 	return decoded, nil
+}
+
+func makeEncryptionFunction(
+	ctx *context.Context,
+	encoded string,
+) (*hash.Hash, error) {
+	if encoded == "" {
+		encoded = "sha256"
+	}
+	err := unsupportedFunction(encoded)
+	if err != nil {
+		return nil, err
+	}
+	return makeFunction(ctx, encoded), nil
 }

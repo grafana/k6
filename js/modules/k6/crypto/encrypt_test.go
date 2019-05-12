@@ -39,21 +39,38 @@ func TestDecrypt(t *testing.T) {
 		const ciphertext = %s;
 		const recipient = { type: "HyperQuantumAlgorithm" };
 		crypto.decrypt(recipient, ciphertext);
-		`, material.ciphertext))
+		`, material.pkcsCiphertext))
 		assert.EqualError(t, err, "GoError: invalid private key")
 	})
 
 	t.Run("RSA-PKCS", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
-		const ciphertext = %s;
 		const recipient = x509.parsePrivateKey(%s);
+		const ciphertext = %s;
 		const message = crypto.decrypt(recipient, ciphertext, "hex");
 		const expected = %s;
 		if (message !== expected) {
 			throw new Error("Decrypted incorrect message");
 		}`,
-			material.ciphertext,
 			material.rsaPrivateKey,
+			material.pkcsCiphertext,
+			material.messageHex,
+		))
+		assert.NoError(t, err)
+	})
+
+	t.Run("RSA-OAEP", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const recipient = x509.parsePrivateKey(%s);
+		const ciphertext = %s;
+		const options = { type: "oaep" };
+		const message = crypto.decrypt(recipient, ciphertext, "hex", options);
+		const expected = %s;
+		if (message !== expected) {
+			throw new Error("Decrypted incorrect message");
+		}`,
+			material.rsaPrivateKey,
+			material.oaepCiphertext,
 			material.messageHex,
 		))
 		assert.NoError(t, err)

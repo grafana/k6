@@ -23,6 +23,7 @@ package crypto
 import (
 	"context"
 	gocrypto "crypto"
+	"hash"
 
 	"github.com/loadimpact/k6/js/common"
 	"github.com/pkg/errors"
@@ -105,4 +106,9 @@ func unsupportedFunction(function string) error {
 	default:
 		return nil
 	}
+}
+
+func makeFunction(ctx *context.Context, kind string) *hash.Hash {
+	hasher := makeHasher(ctx, kind)
+	return &hasher.hash
 }
