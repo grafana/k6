@@ -75,4 +75,22 @@ func TestDecrypt(t *testing.T) {
 		))
 		assert.NoError(t, err)
 	})
+
+	t.Run("RSA-OAEP-Label", func(t *testing.T) {
+		_, err := common.RunString(rt, fmt.Sprintf(`
+		const recipient = x509.parsePrivateKey(%s);
+		const ciphertext = %s
+		const options = { type: "oaep", label: %s };
+		const message = crypto.decrypt(recipient, ciphertext, "hex", options);
+		const expected = %s;
+		if (message !== expected) {
+			throw new Error("Decrypted incorrect message");
+		}`,
+			material.rsaPrivateKey,
+			material.oaepLabeledCiphertext,
+			material.labelString,
+			material.messageHex,
+		))
+		assert.NoError(t, err)
+	})
 }

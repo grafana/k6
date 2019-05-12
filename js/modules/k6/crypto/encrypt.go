@@ -41,9 +41,10 @@ func (*Crypto) Decrypt(
 	format string,
 	options EncryptionOptions,
 ) interface{} {
-	ciphertext, function := prepareDecrypt(ctx, ciphertextEncoded, options)
+	ciphertext, function, label :=
+		prepareDecrypt(ctx, ciphertextEncoded, options)
 	plaintext, err :=
-		executeDecrypt(recipient, ciphertext, function, format, options)
+		executeDecrypt(recipient, ciphertext, function, label, format, options)
 	if err != nil {
 		throw(ctx, err)
 	}
@@ -54,7 +55,7 @@ func prepareDecrypt(
 	ctx *context.Context,
 	ciphertextEncoded interface{},
 	options EncryptionOptions,
-) ([]byte, *hash.Hash) {
+) ([]byte, *hash.Hash, []byte) {
 	ciphertext, err := decodeCiphertext(ciphertextEncoded)
 	if err != nil {
 		throw(ctx, err)
@@ -63,13 +64,15 @@ func prepareDecrypt(
 	if err != nil {
 		throw(ctx, err)
 	}
-	return ciphertext, function
+	label := decodeLabel(options["label"])
+	return ciphertext, function, label
 }
 
 func executeDecrypt(
 	recipient x509.PrivateKey,
 	ciphertext []byte,
 	function *hash.Hash,
+	label []byte,
 	format string,
 	options EncryptionOptions,
 ) (interface{}, error) {
@@ -78,7 +81,7 @@ func executeDecrypt(
 	switch recipient.Type {
 	case "RSA":
 		plaintext, err =
-			decryptRSA(recipient.RSA, ciphertext, function, options)
+			decryptRSA(recipient.RSA, ciphertext, function, label, options)
 	default:
 		err = errors.New("invalid private key")
 	}
@@ -96,13 +99,14 @@ func decryptRSA(
 	recipient *rsa.PrivateKey,
 	ciphertext []byte,
 	function *hash.Hash,
+	label []byte,
 	options EncryptionOptions,
 ) ([]byte, error) {
 	switch options["type"] {
 	case "":
 		return decryptPKCS(recipient, ciphertext)
 	case "oaep":
-		return decryptOAEP(recipient, ciphertext, function)
+		return decryptOAEP(recipient, ciphertext, function, label)
 	default:
 		err := errors.New("unsupported type: " + options["type"])
 		return nil, err
@@ -125,13 +129,14 @@ func decryptOAEP(
 	recipient *rsa.PrivateKey,
 	ciphertext []byte,
 	function *hash.Hash,
+	label []byte,
 ) ([]byte, error) {
 	plaintext, err := rsa.DecryptOAEP(
 		*function,
 		rand.Reader,
 		recipient,
 		ciphertext,
-		nil,
+		label,
 	)
 	if err != nil {
 		return nil, err
@@ -160,4 +165,8 @@ func makeEncryptionFunction(
 		return nil, err
 	}
 	return makeFunction(ctx, encoded), nil
+}
+
+func decodeLabel(encoded string) []byte {
+	return []byte(encoded)
 }

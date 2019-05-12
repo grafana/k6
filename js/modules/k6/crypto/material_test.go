@@ -27,8 +27,10 @@ type Material struct {
 	messagePart1           string
 	messagePart2           string
 	messagePart3           string
+	labelString            string
 	pkcsCiphertext         string
 	oaepCiphertext         string
+	oaepLabeledCiphertext  string
 	rsaPublicKey           string
 	rsaPrivateKey          string
 	dsaPublicKey           string
@@ -49,6 +51,7 @@ type Expected struct {
 }
 
 const message = "They know, get out now!"
+const label = "pizza-delivery"
 
 var material = Material{ //nolint:gochecknoglobals
 	messageString: stringify(message),
@@ -57,6 +60,7 @@ var material = Material{ //nolint:gochecknoglobals
 	messagePart1:  stringify("54686579206b6e6f772c"),
 	messagePart2:  stringify("206765"),
 	messagePart3:  stringify("74206f7574206e6f7721"),
+	labelString:   stringify(label),
 	pkcsCiphertext: stringify("" +
 		"TsP6H2xYIAVCBmfnl3l77RC6gv9kpJz+jPD2SedkcxoLdMB47C+8z3X/6Zbqi2Ae" +
 		"bpBdWRvqqCVjH0+EZsDnlCCsYO4bYp6N+Av3Cq+VDVGLzN5OEwOPyTDUH8Dh3zV2" +
@@ -66,6 +70,11 @@ var material = Material{ //nolint:gochecknoglobals
 		"c8ed934bf096983155e74fc1e5e76f0c02407a934312b85623b02461f5b47864" +
 		"e669048d97437c66f65ec2e65c7f646ded92dc1a6610d923075415ca6f1dcc2f" +
 		"b462614493750b086a6ce803bd0c26b41d9623e36ca5ce384765717d05cf8d0b"),
+	oaepLabeledCiphertext: stringify("" +
+		"a16f1330f4ddb7cb95a358a91f62808aaaa04dce95015e96d50a6bb0edb20769" +
+		"be6d988289727fd2c48eeadfb1aecc4f32c5d2263838f4d9eb27c29163dc222a" +
+		"0fa0de23f79f0c5e35bb66864039f64421ce7e1764b1ba5a5d02339cb1555cbe" +
+		"75d1df82c61dca95a73a68dd7f9fbaffdc793a30f82d388c9abb32dd4673865a"),
 	rsaPublicKey: template(`-----BEGIN PUBLIC KEY-----
 MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDXMLr/Y/vUtIFY75jj0YXfp6lQ
 7iEIbps3BvRE4isTpxs8fXLnLM8LAuJScxiKyrGnj8EMb7LIHkSMBlz6iVj9atY6
