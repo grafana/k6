@@ -23,6 +23,7 @@ package crypto
 import (
 	"encoding/base64"
 	"encoding/hex"
+	"unicode/utf8"
 
 	"github.com/pkg/errors"
 )
@@ -108,6 +109,14 @@ func decodeBase64(abstracted interface{}) ([]byte, error) {
 		return nil, err
 	}
 	return base64.StdEncoding.DecodeString(encoded)
+}
+
+func decodeString(encoded []byte) (string, error) {
+	if !utf8.Valid(encoded) {
+		err := errors.New("not a UTF-8 string")
+		return "", err
+	}
+	return string(encoded), nil
 }
 
 func encodeBinary(value []byte, format string) (interface{}, error) {

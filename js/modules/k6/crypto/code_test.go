@@ -101,6 +101,19 @@ func TestDecodeBinaryDetect(t *testing.T) {
 	})
 }
 
+func TestDecodeString(t *testing.T) {
+	t.Run("Invalid", func(t *testing.T) {
+		_, err := decodeString([]byte{0xc3, 0x28})
+		assert.EqualError(t, err, "not a UTF-8 string")
+	})
+
+	t.Run("Valid", func(t *testing.T) {
+		result, err := decodeString([]byte("tallyho"))
+		assert.NoError(t, err)
+		assert.Equal(t, "tallyho", result)
+	})
+}
+
 func TestEncodeBinary(t *testing.T) {
 	t.Run("Unsupported", func(t *testing.T) {
 		_, err := encodeBinary([]byte{1, 2, 3}, "nucleonic")
