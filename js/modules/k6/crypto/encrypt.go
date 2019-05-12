@@ -84,8 +84,10 @@ func (*Crypto) Encrypt(
 	format string,
 	options EncryptionOptions,
 ) interface{} {
-	plaintext, function := prepareEncrypt(ctx, plaintextEncoded, options)
-	ciphertext, err := executeEncrypt(&recipient, plaintext, function, options)
+	plaintext, function, label :=
+		prepareEncrypt(ctx, plaintextEncoded, options)
+	ciphertext, err :=
+		executeEncrypt(&recipient, plaintext, function, label, options)
 	if err != nil {
 		throw(ctx, err)
 	}
@@ -188,7 +190,7 @@ func prepareEncrypt(
 	ctx *context.Context,
 	plaintextEncoded interface{},
 	options EncryptionOptions,
-) ([]byte, *hash.Hash) {
+) ([]byte, *hash.Hash, []byte) {
 	plaintext, err := decodePlaintext(plaintextEncoded)
 	if err != nil {
 		throw(ctx, err)
@@ -197,13 +199,15 @@ func prepareEncrypt(
 	if err != nil {
 		throw(ctx, err)
 	}
-	return plaintext, function
+	label := decodeLabel(options["label"])
+	return plaintext, function, label
 }
 
 func executeEncrypt(
 	recipient *x509.PublicKey,
 	plaintext []byte,
 	function *hash.Hash,
+	label []byte,
 	options EncryptionOptions,
 ) ([]byte, error) {
 	var ciphertext []byte
@@ -211,7 +215,7 @@ func executeEncrypt(
 	switch recipient.Type {
 	case "RSA":
 		ciphertext, err =
-			encryptRSA(recipient.RSA, plaintext, function, options)
+			encryptRSA(recipient.RSA, plaintext, function, label, options)
 	default:
 		err = errors.New("invalid public key")
 	}
@@ -225,13 +229,14 @@ func encryptRSA(
 	recipient *rsa.PublicKey,
 	plaintext []byte,
 	function *hash.Hash,
+	label []byte,
 	options EncryptionOptions,
 ) ([]byte, error) {
 	switch options["type"] {
 	case "":
 		return encryptPKCS(recipient, plaintext)
 	case "oaep":
-		return encryptOAEP(recipient, plaintext, function)
+		return encryptOAEP(recipient, plaintext, function, label)
 	default:
 		err := errors.New("unsupported type: " + options["type"])
 		return nil, err
@@ -254,13 +259,14 @@ func encryptOAEP(
 	recipient *rsa.PublicKey,
 	plaintext []byte,
 	function *hash.Hash,
+	label []byte,
 ) ([]byte, error) {
 	ciphertext, err := rsa.EncryptOAEP(
 		*function,
 		rand.Reader,
 		recipient,
 		plaintext,
-		nil,
+		label,
 	)
 	if err != nil {
 		return nil, err
