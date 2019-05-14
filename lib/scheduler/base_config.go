@@ -31,6 +31,7 @@ import (
 )
 
 var schedulerNameWhitelist = regexp.MustCompile(`^[0-9a-zA-Z_-]+$`) //nolint:gochecknoglobals
+const schedulerNameErr = "the scheduler name should contain only numbers, latin letters, underscores, and dashes"
 
 // BaseConfig contains the common config fields for all schedulers
 type BaseConfig struct {
@@ -61,9 +62,7 @@ func (bc BaseConfig) Validate() (errors []error) {
 		errors = append(errors, fmt.Errorf("scheduler name shouldn't be empty"))
 	}
 	if !schedulerNameWhitelist.MatchString(bc.Name) {
-		errors = append(errors, fmt.Errorf(
-			"the scheduler name should contain only numbers, latin letters, underscores, and dashes",
-		))
+		errors = append(errors, fmt.Errorf(schedulerNameErr))
 	}
 	if bc.Exec.Valid && bc.Exec.String == "" {
 		errors = append(errors, fmt.Errorf("exec value cannot be empty"))

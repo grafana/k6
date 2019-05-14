@@ -93,7 +93,7 @@ func GetMaxPossibleVUs(steps []ExecutionStep) (result uint64) {
 
 // GetEndOffset returns the time offset of the last step of the execution plan,
 // and whether that step is a final one, i.e. whether the number of planned or
-// unplanned is 0
+// unplanned is 0.
 func GetEndOffset(steps []ExecutionStep) (lastStepOffset time.Duration, isFinal bool) {
 	if len(steps) == 0 {
 		return 0, true
@@ -142,8 +142,12 @@ func StreamExecutionSteps(
 			}
 			select {
 			case <-ctx.Done():
-				return // exit if context is cancelled
-			case ch <- step: // send the step
+				// exit if context is cancelled
+				return
+			case ch <- step:
+				// ... otherwise, just send the step - the out channel is
+				// unbuffered, so we don't need to worry whether the other side
+				// will keep reading after the context is done.
 			}
 		}
 

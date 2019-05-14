@@ -98,8 +98,7 @@ func renderMultipleBars(isTTY, goBack bool, pbs []*pb.ProgressBar) string {
 //TODO: show other information here?
 //TODO: add a no-progress option that will disable these
 //TODO: don't use global variables...
-func showProgress(ctx context.Context, wg *sync.WaitGroup, conf Config, executor *local.Executor) {
-	defer wg.Done()
+func showProgress(ctx context.Context, conf Config, executor *local.Executor) {
 	if quiet || conf.HttpDebug.Valid && conf.HttpDebug.String != "" {
 		return
 	}
