@@ -284,7 +284,7 @@ func (varr VariableArrivalRate) streamRateChanges(ctx context.Context, startTime
 	return ch
 }
 
-// Run executes a specific number of iterations with each confugured VU.
+// Run executes a variable number of iterations per second.
 func (varr VariableArrivalRate) Run(ctx context.Context, out chan<- stats.SampleContainer) (err error) {
 	segment := varr.executorState.Options.ExecutionSegment
 	gracefulStop := varr.config.GetGracefulStop()
@@ -321,13 +321,13 @@ func (varr VariableArrivalRate) Run(ctx context.Context, out chan<- stats.Sample
 	defer func() {
 		// no need for atomics, since initialisedVUs is mutated only in the select{}
 		for i := uint64(0); i < initialisedVUs; i++ {
-			varr.executorState.ReturnVU(<-vus)
+			varr.executorState.ReturnVU(<-vus, true)
 		}
 	}()
 
 	// Get the pre-allocated VUs in the local buffer
 	for i := int64(0); i < preAllocatedVUs; i++ {
-		vu, err := varr.executorState.GetPlannedVU(varr.logger)
+		vu, err := varr.executorState.GetPlannedVU(varr.logger, true)
 		if err != nil {
 			return err
 		}

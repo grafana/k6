@@ -21,11 +21,14 @@
 package v1
 
 import (
+	"fmt"
 	"io/ioutil"
 	"net/http"
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/loadimpact/k6/api/common"
+	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/scheduler"
 	"github.com/manyminds/api2go/jsonapi"
 )
 
@@ -39,6 +42,16 @@ func HandleGetStatus(rw http.ResponseWriter, r *http.Request, p httprouter.Param
 		return
 	}
 	_, _ = rw.Write(data)
+}
+
+func getFirstManualExecutionScheduler(executor lib.Executor) (*scheduler.ManualExecution, error) {
+	schedulers := executor.GetSchedulers()
+	for _, s := range schedulers {
+		if mex, ok := s.(*scheduler.ManualExecution); ok {
+			return mex, nil
+		}
+	}
+	return nil, fmt.Errorf("a manual-execution scheduler needs to be configured for live configuration updates")
 }
 
 func HandlePatchStatus(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
@@ -63,21 +76,27 @@ func HandlePatchStatus(rw http.ResponseWriter, r *http.Request, p httprouter.Par
 		}
 	}
 
-	/*
-		//TODO: handle manual executor update
+	if status.VUsMax.Valid || status.VUs.Valid {
+		//TODO: add ability to specify the actual scheduler id? though thus should
+		//likely be in the v2 REST API, where we could implement it in a way that
+		//may allow us to eventually support other scheduler types
+		scheduler, uptateErr := getFirstManualExecutionScheduler(engine.Executor)
+		if uptateErr != nil {
+			apiError(rw, "Execution config error", uptateErr.Error(), http.StatusInternalServerError)
+			return
+		}
+		newConfig := scheduler.GetCurrentConfig().ManualExecutionControlConfig
 		if status.VUsMax.Valid {
-			if err := engine.Executor.SetVUsMax(status.VUsMax.Int64); err != nil {
-				apiError(rw, "Couldn't change cap", err.Error(), http.StatusBadRequest)
-				return
-			}
+			newConfig.MaxVUs = status.VUsMax
 		}
 		if status.VUs.Valid {
-			if err := engine.Executor.SetVUs(status.VUs.Int64); err != nil {
-				apiError(rw, "Couldn't scale", err.Error(), http.StatusBadRequest)
-				return
-			}
+			newConfig.VUs = status.VUs
 		}
-	*/
+		if uptateErr := scheduler.UpdateConfig(r.Context(), newConfig); err != nil {
+			apiError(rw, "Config update error", uptateErr.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
 	data, err := jsonapi.Marshal(NewStatus(engine))
 	if err != nil {
 		apiError(rw, "Encoding error", err.Error(), http.StatusInternalServerError)

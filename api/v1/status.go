@@ -40,8 +40,8 @@ func NewStatus(engine *core.Engine) Status {
 	return Status{
 		Running: executorState.HasStarted(),
 		Paused:  null.BoolFrom(executorState.IsPaused()),
-		VUs:     null.IntFrom(int64(executorState.GetCurrentlyActiveVUsCount())),
-		VUsMax:  null.IntFrom(int64(executorState.GetInitializedVUsCount())),
+		VUs:     null.IntFrom(executorState.GetCurrentlyActiveVUsCount()),
+		VUsMax:  null.IntFrom(executorState.GetInitializedVUsCount()),
 		Tainted: engine.IsTainted(),
 	}
 }

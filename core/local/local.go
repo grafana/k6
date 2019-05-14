@@ -371,15 +371,19 @@ func (e *Executor) SetPaused(pause bool) error {
 	}
 
 	for _, sched := range e.schedulers {
-		if !sched.IsPausable() {
+		pausableSched, ok := sched.(lib.PausableScheduler)
+		if !ok {
 			return fmt.Errorf(
 				"%s scheduler '%s' doesn't support pause and resume operations after its start",
 				sched.GetConfig().GetType(), sched.GetConfig().GetName(),
 			)
 		}
-		if err := sched.LiveUpdate(pause, nil); err != nil {
+		if err := pausableSched.SetPaused(pause); err != nil {
 			return err
 		}
 	}
-	return nil
+	if pause {
+		return e.state.Pause()
+	}
+	return e.state.Resume()
 }

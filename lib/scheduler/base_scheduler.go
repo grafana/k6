@@ -22,7 +22,6 @@ package scheduler
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/ui/pb"
@@ -71,19 +70,4 @@ func (bs BaseScheduler) GetLogger() *logrus.Entry {
 // GetProgress just returns the progressbar pointer.
 func (bs BaseScheduler) GetProgress() *pb.ProgressBar {
 	return bs.progress
-}
-
-// IsPausable just returns false, since most schedulers are not pausable after
-// they have been started...
-func (BaseScheduler) IsPausable() bool {
-	return false
-}
-
-// LiveUpdate just returns false, since most schedulers' configs cannot be
-// updated in-flight.
-func (bs BaseScheduler) LiveUpdate(_ bool, _ lib.SchedulerConfig) error {
-	return fmt.Errorf(
-		"%s scheduler '%s' doesn't support pausing or live configuration updates",
-		bs.config.GetType(), bs.config.GetName(),
-	)
 }

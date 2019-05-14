@@ -172,7 +172,7 @@ type ConstantArrivalRate struct {
 // Make sure we implement the lib.Scheduler interface.
 var _ lib.Scheduler = &ConstantArrivalRate{}
 
-// Run executes a specific number of iterations with each confugured VU.
+// Run executes a constant number of iterations per second.
 //
 // TODO: Reuse the variable arrival rate method?
 func (car ConstantArrivalRate) Run(ctx context.Context, out chan<- stats.SampleContainer) (err error) {
@@ -205,13 +205,13 @@ func (car ConstantArrivalRate) Run(ctx context.Context, out chan<- stats.SampleC
 	defer func() {
 		// no need for atomics, since initialisedVUs is mutated only in the select{}
 		for i := uint64(0); i < initialisedVUs; i++ {
-			car.executorState.ReturnVU(<-vus)
+			car.executorState.ReturnVU(<-vus, true)
 		}
 	}()
 
 	// Get the pre-allocated VUs in the local buffer
 	for i := int64(0); i < preAllocatedVUs; i++ {
-		vu, err := car.executorState.GetPlannedVU(car.logger)
+		vu, err := car.executorState.GetPlannedVU(car.logger, true)
 		if err != nil {
 			return err
 		}

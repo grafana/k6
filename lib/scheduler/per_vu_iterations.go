@@ -177,7 +177,7 @@ func (pvi PerVUIteations) Run(ctx context.Context, out chan<- stats.SampleContai
 	runIteration := getIterationRunner(pvi.executorState, pvi.logger, out)
 
 	handleVU := func(vu lib.VU) {
-		defer pvi.executorState.ReturnVU(vu)
+		defer pvi.executorState.ReturnVU(vu, true)
 		defer activeVUs.Done()
 
 		for i := int64(0); i < iterations; i++ {
@@ -193,7 +193,7 @@ func (pvi PerVUIteations) Run(ctx context.Context, out chan<- stats.SampleContai
 	}
 
 	for i := int64(0); i < numVUs; i++ {
-		vu, err := pvi.executorState.GetPlannedVU(pvi.logger)
+		vu, err := pvi.executorState.GetPlannedVU(pvi.logger, true)
 		if err != nil {
 			cancel()
 			return err

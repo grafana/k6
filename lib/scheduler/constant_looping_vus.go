@@ -168,7 +168,7 @@ func (clv ConstantLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleCo
 	runIteration := getIterationRunner(clv.executorState, clv.logger, out)
 
 	handleVU := func(vu lib.VU) {
-		defer clv.executorState.ReturnVU(vu)
+		defer clv.executorState.ReturnVU(vu, true)
 		defer activeVUs.Done()
 
 		for {
@@ -183,7 +183,7 @@ func (clv ConstantLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleCo
 	}
 
 	for i := int64(0); i < numVUs; i++ {
-		vu, err := clv.executorState.GetPlannedVU(clv.logger)
+		vu, err := clv.executorState.GetPlannedVU(clv.logger, true)
 		if err != nil {
 			cancel()
 			return err

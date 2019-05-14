@@ -167,8 +167,10 @@ type ExecutorState struct {
 	// Total number of currently initialized VUs. Generally equal to
 	// currentVUIdentifier minus 1, since initializedVUs starts from 0 and is
 	// incremented only after a VU is initialized, while CurrentVUIdentifier is
-	// incremented before a VU is initialized.
-	initializedVUs *uint64
+	// incremented before a VU is initialized. It should always be greater than
+	// or equal to 0, but int64 is used for simplification of the used atomic
+	// arithmetic operations.
+	initializedVUs *int64
 
 	// Total number of unplanned VUs we haven't initialized yet. It starts
 	// being equal to GetMaxPossibleVUs(executionPlan)-GetMaxPlannedVUs(), and
@@ -182,8 +184,10 @@ type ExecutorState struct {
 
 	// The number of VUs that are currently executing the test script. This also
 	// includes any VUs that are in the process of gracefully winding down,
-	// either at the end of the test, or when VUs are ramping down.
-	activeVUs *uint64
+	// either at the end of the test, or when VUs are ramping down. It should
+	// always be greater than or equal to 0, but int64 is used for
+	// simplification of the used atomic arithmetic operations.
+	activeVUs *int64
 
 	// The total number of full (i.e uninterrupted) iterations that have been
 	// completed so far.
@@ -250,9 +254,9 @@ func NewExecutorState(options Options, maxPlannedVUs, maxPossibleVUs uint64) *Ex
 		vus:     make(chan VU, maxPossibleVUs),
 
 		currentVUIdentifier:       new(uint64),
-		initializedVUs:            new(uint64),
+		initializedVUs:            new(int64),
 		uninitializedUnplannedVUs: &maxUnplannedUninitializedVUs,
-		activeVUs:                 new(uint64),
+		activeVUs:                 new(int64),
 		fullIterationsCount:       new(uint64),
 		partialIterationsCount:    new(uint64),
 		startTime:                 new(int64),
@@ -277,8 +281,15 @@ func (es *ExecutorState) GetUniqueVUIdentifier() uint64 {
 // exported script options and for the execution of setup() and teardown()
 //
 // IMPORTANT: for UI/information purposes only, don't use for synchronization.
-func (es *ExecutorState) GetInitializedVUsCount() uint64 {
-	return atomic.LoadUint64(es.initializedVUs)
+func (es *ExecutorState) GetInitializedVUsCount() int64 {
+	return atomic.LoadInt64(es.initializedVUs)
+}
+
+// ModInitializedVUsCount changes the total number of currently initialized VUs.
+//
+// IMPORTANT: for UI/information purposes only, don't use for synchronization.
+func (es *ExecutorState) ModInitializedVUsCount(mod int64) int64 {
+	return atomic.AddInt64(es.initializedVUs, mod)
 }
 
 // GetCurrentlyActiveVUsCount returns the number of VUs that are currently
@@ -286,8 +297,15 @@ func (es *ExecutorState) GetInitializedVUsCount() uint64 {
 // of gracefullt winding down.
 //
 // IMPORTANT: for UI/information purposes only, don't use for synchronization.
-func (es *ExecutorState) GetCurrentlyActiveVUsCount() uint64 {
-	return atomic.LoadUint64(es.activeVUs)
+func (es *ExecutorState) GetCurrentlyActiveVUsCount() int64 {
+	return atomic.LoadInt64(es.activeVUs)
+}
+
+// ModCurrentlyActiveVUsCount changes the total number of currently active VUs.
+//
+// IMPORTANT: for UI/information purposes only, don't use for synchronization.
+func (es *ExecutorState) ModCurrentlyActiveVUsCount(mod int64) int64 {
+	return atomic.AddInt64(es.activeVUs, mod)
 }
 
 // GetFullIterationCount returns the total of full (i.e uninterrupted) iterations
@@ -458,11 +476,13 @@ func (es *ExecutorState) ResumeNotify() <-chan struct{} {
 // we reach that timeout more than MaxRetriesGetPlannedVU number of times, this
 // function will return an error, since we either have a bug with some
 // scheduler, or the machine is very, very overloaded.
-func (es *ExecutorState) GetPlannedVU(logger *logrus.Entry) (VU, error) {
+func (es *ExecutorState) GetPlannedVU(logger *logrus.Entry, modifyAtiveVUCount bool) (VU, error) {
 	for i := 1; i <= MaxRetriesGetPlannedVU; i++ {
 		select {
 		case vu := <-es.vus:
-			atomic.AddUint64(es.activeVUs, 1)
+			if modifyAtiveVUCount {
+				es.ModCurrentlyActiveVUsCount(+1)
+			}
 			//TODO: set environment and exec
 			return vu, nil
 		case <-time.After(MaxTimeToWaitForPlannedVU):
@@ -497,18 +517,28 @@ func (es *ExecutorState) GetUnplannedVU(ctx context.Context, logger *logrus.Entr
 	if remVUs < 0 {
 		logger.Debug("Reusing a previously initialized unplanned VU")
 		atomic.AddInt64(es.uninitializedUnplannedVUs, 1)
-		return es.GetPlannedVU(logger)
+		return es.GetPlannedVU(logger, true)
 	}
+
+	logger.Debug("Initializing an unplanned VU, this may affect test results")
+	vu, err := es.InitializeNewVU(ctx, logger)
+	if err != nil {
+		es.ModCurrentlyActiveVUsCount(+1)
+	}
+	return vu, err
+}
+
+// InitializeNewVU creates and returns a brand new VU, updating the relevant
+// tracking counters.
+func (es *ExecutorState) InitializeNewVU(ctx context.Context, logger *logrus.Entry) (VU, error) {
 	if es.initVUFunc == nil {
 		return nil, fmt.Errorf("initVUFunc wasn't set in the executor state")
 	}
-	logger.Debug("Initializing an unplanned VU, this may affect test results")
 	newVU, err := es.initVUFunc(ctx, logger)
 	if err != nil {
 		return nil, err
 	}
-	atomic.AddUint64(es.activeVUs, 1)
-	atomic.AddUint64(es.initializedVUs, 1)
+	es.ModInitializedVUsCount(+1)
 	return newVU, err
 }
 
@@ -516,14 +546,14 @@ func (es *ExecutorState) GetUnplannedVU(ctx context.Context, logger *logrus.Entr
 // increases the initialized VUs counter.
 func (es *ExecutorState) AddInitializedVU(vu VU) {
 	es.vus <- vu
-	atomic.AddUint64(es.initializedVUs, 1)
+	es.ModInitializedVUsCount(+1)
 }
 
 // ReturnVU is a helper function that puts VUs back into the buffer and
 // decreases the active VUs counter.
-func (es *ExecutorState) ReturnVU(vu VU) {
+func (es *ExecutorState) ReturnVU(vu VU, wasActive bool) {
 	es.vus <- vu
-	// From the official atomic.AddUint64() docs: "to subtract a signed positive
-	// constant value c from x, do AddUint64(&x, ^uint64(c-1))"
-	atomic.AddUint64(es.activeVUs, ^uint64(0))
+	if wasActive {
+		es.ModCurrentlyActiveVUsCount(-1)
+	}
 }

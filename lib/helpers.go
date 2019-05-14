@@ -72,10 +72,10 @@ func GetMaxPlannedVUs(steps []ExecutionStep) (result uint64) {
 //
 // As an example, imagine that you have a scheduler with MaxPlannedVUs=20 and
 // MaxUnaplannedVUs=0, followed immediately after by another scheduler with
-// MaxPlannedVUs=10 and MaxUnaplannedVUs=10. If you MaxPlannedVUs for the whole
-// test is 20, and MaxUnaplannedVUs, but since those schedulers won't run
-// concurrently, MaxVUs for the whole test is not 30, rather it's 20, since 20
-// VUs will be sufficient to run the test.
+// MaxPlannedVUs=10 and MaxUnaplannedVUs=10. The MaxPlannedVUs number for the
+// whole test is 20, and MaxUnaplannedVUs is 10, but since those schedulers
+// won't run concurrently, MaxVUs for the whole test is not 30, rather it's 20,
+// since 20 VUs will be sufficient to run the whole test.
 //
 // IMPORTANT 2: this has one very important exception. The manual execution
 // scheduler doesn't use the MaxUnplannedVUs (i.e. this function will return 0),
@@ -93,7 +93,7 @@ func GetMaxPossibleVUs(steps []ExecutionStep) (result uint64) {
 
 // GetEndOffset returns the time offset of the last step of the execution plan,
 // and whether that step is a final one, i.e. whether the number of planned or
-// unplanned
+// unplanned is 0
 func GetEndOffset(steps []ExecutionStep) (lastStepOffset time.Duration, isFinal bool) {
 	if len(steps) == 0 {
 		return 0, true
@@ -102,8 +102,12 @@ func GetEndOffset(steps []ExecutionStep) (lastStepOffset time.Duration, isFinal 
 	return lastStep.TimeOffset, (lastStep.PlannedVUs == 0 && lastStep.MaxUnplannedVUs == 0)
 }
 
-// A helper function for joining error messages into a single string
-func concatErrors(errors []error, separator string) string {
+// ConcatErrors is a a helper function for joining error messages into a single
+// string.
+//
+// TODO: use Go 2.0/xerrors style errors so we don't loose error type information and
+// metadata.
+func ConcatErrors(errors []error, separator string) string {
 	errStrings := make([]string, len(errors))
 	for i, e := range errors {
 		errStrings[i] = e.Error()

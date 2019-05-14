@@ -109,12 +109,22 @@ type Scheduler interface {
 	GetProgress() *pb.ProgressBar
 	GetLogger() *logrus.Entry
 
-	Init(ctx context.Context) error
+	Init(ctx context.Context) error //TODO: remove, since it's currently unused?
 	Run(ctx context.Context, engineOut chan<- stats.SampleContainer) error
+}
 
-	// Currently used only in the manual executor
-	IsPausable() bool // TODO: make a separate interfaces
-	LiveUpdate(pause bool, newConfig SchedulerConfig) error
+// PausableScheduler should be implemented by the schedulers that can be paused
+// and resumend in the middle of the test execution. Currently, only the manual
+// execution scheduler implements it.
+type PausableScheduler interface {
+	SetPaused(bool) error
+}
+
+// LiveUpdatableScheduler should be implemented for the schedulers whoose
+// configuration can be modified in the middle of the test execution. Currently,
+// only the manual execution scheduler implements it.
+type LiveUpdatableScheduler interface {
+	UpdateConfig(ctx context.Context, newConfig interface{}) error
 }
 
 // SchedulerConfigConstructor is a simple function that returns a concrete
@@ -182,7 +192,7 @@ func (scs SchedulerConfigMap) Validate() (errors []error) {
 	for name, scheduler := range scs {
 		if schedErr := scheduler.Validate(); len(schedErr) != 0 {
 			errors = append(errors,
-				fmt.Errorf("scheduler %s has errors: %s", name, concatErrors(schedErr, ", ")))
+				fmt.Errorf("scheduler %s has errors: %s", name, ConcatErrors(schedErr, ", ")))
 		}
 	}
 	return errors
