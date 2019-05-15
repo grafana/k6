@@ -114,7 +114,8 @@ func (*Crypto) Sign(
 	format string,
 	options SigningOptions,
 ) interface{} {
-	function, digest := prepareSign(ctx, functionEncoded, plaintextEncoded)
+	function, digest :=
+		prepareSign(ctx, &signer, functionEncoded, plaintextEncoded)
 	signature, err := executeSign(&signer, function, digest, format, options)
 	if err != nil {
 		throw(ctx, err)
@@ -132,7 +133,7 @@ func (*Crypto) SignString(
 	options SigningOptions,
 ) interface{} {
 	function, digest :=
-		prepareSignString(ctx, functionEncoded, plaintextEncoded)
+		prepareSignString(ctx, &signer, functionEncoded, plaintextEncoded)
 	signature, err := executeSign(&signer, function, digest, format, options)
 	if err != nil {
 		throw(ctx, err)
@@ -412,9 +413,14 @@ func verifyECDSA(
 
 func prepareSign(
 	ctx *context.Context,
+	signer *x509.PrivateKey,
 	functionEncoded string,
 	plaintextEncoded interface{},
 ) (gocrypto.Hash, []byte) {
+	err := validatePrivateKey(signer)
+	if err != nil {
+		throw(ctx, err)
+	}
 	function, err := decodeFunction(functionEncoded)
 	if err != nil {
 		throw(ctx, err)
@@ -432,9 +438,14 @@ func prepareSign(
 
 func prepareSignString(
 	ctx *context.Context,
+	signer *x509.PrivateKey,
 	functionEncoded string,
 	plaintextEncoded string,
 ) (gocrypto.Hash, []byte) {
+	err := validatePrivateKey(signer)
+	if err != nil {
+		throw(ctx, err)
+	}
 	function, err := decodeFunction(functionEncoded)
 	if err != nil {
 		throw(ctx, err)
@@ -665,6 +676,29 @@ func validatePublicKey(key *x509.PublicKey) error {
 		}
 	default:
 		return errors.New("invalid public key")
+	}
+	return nil
+}
+
+func validatePrivateKey(key *x509.PrivateKey) error {
+	switch key.Algorithm {
+	case "DSA":
+		_, ok := key.Key.(*dsa.PrivateKey)
+		if !ok {
+			return errors.New("invalid DSA private key")
+		}
+	case "ECDSA":
+		_, ok := key.Key.(*ecdsa.PrivateKey)
+		if !ok {
+			return errors.New("invalid ECDSA private key")
+		}
+	case "RSA":
+		_, ok := key.Key.(*rsa.PrivateKey)
+		if !ok {
+			return errors.New("invalid RSA private key")
+		}
+	default:
+		return errors.New("invalid private key")
 	}
 	return nil
 }
