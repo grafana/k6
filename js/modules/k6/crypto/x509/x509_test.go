@@ -484,9 +484,9 @@ func TestParse(t *testing.T) {
 			value &&
 			typeof value === "object" &&
 			value.algorithm === "RSA" &&
-			typeof value.rsa === "object" &&
-			typeof value.rsa.e === "number" &&
-			typeof value.rsa.n === "object"
+			typeof value.key === "object" &&
+			typeof value.key.e === "number" &&
+			typeof value.key.n === "object"
 		)) {
 			throw new Error("Bad RSA public key");
 		}`, material.rsaCertificate))
@@ -497,7 +497,7 @@ func TestParse(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const pem = %s;
 		const cert = x509.parse(pem);
-		const value = cert.publicKey ? cert.publicKey.rsa.e : null;
+		const value = cert.publicKey ? cert.publicKey.key.e : null;
 		if (value !== 65537) {
 			throw new Error("Bad RSA public key exponent: " + value);
 		}`, material.rsaCertificate))
@@ -508,7 +508,7 @@ func TestParse(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const pem = %s;
 		const cert = x509.parse(pem);
-		const value = cert.publicKey ? cert.publicKey.rsa.n.bytes() : null;
+		const value = cert.publicKey ? cert.publicKey.key.n.bytes() : null;
 		const expected = [
 			223, 249, 234, 71, 180, 36, 28, 62, 84, 141, 177, 118, 53, 2, 175,
 			45, 167, 89, 155, 216, 103, 86, 32, 216, 42, 92, 84, 125, 183, 102,
@@ -544,8 +544,8 @@ func TestParse(t *testing.T) {
 			value &&
 			typeof value === "object" &&
 			value.algorithm === "DSA" &&
-			typeof value.dsa.parameters === "object" &&
-			typeof value.dsa.y === "object"
+			typeof value.key.parameters === "object" &&
+			typeof value.key.y === "object"
 		)) {
 			throw new Error("Bad DSA public key");
 		}`, material.dsaCertificate))
@@ -561,9 +561,9 @@ func TestParse(t *testing.T) {
 			value &&
 			typeof value === "object" &&
 			value.algorithm === "ECDSA" &&
-			typeof value.ecdsa.curve === "object" &&
-			typeof value.ecdsa.x === "object" &&
-			typeof value.ecdsa.y === "object"
+			typeof value.key.curve === "object" &&
+			typeof value.key.x === "object" &&
+			typeof value.key.y === "object"
 		)) {
 			throw new Error("Bad ECDSA public key");
 		}`, material.ecdsaCertificate))

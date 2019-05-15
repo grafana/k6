@@ -83,9 +83,7 @@ type Issuer struct {
 // PublicKey is used for decryption and signature verification
 type PublicKey struct {
 	Algorithm string
-	DSA       *dsa.PublicKey   `js:"dsa"`
-	ECDSA     *ecdsa.PublicKey `js:"ecdsa"`
-	RSA       *rsa.PublicKey   `js:"rsa"`
+	Key       interface{}
 }
 
 // New constructs the X509 interface
@@ -190,26 +188,22 @@ func makeIssuer(issuer pkix.Name) Issuer {
 }
 
 func makePublicKey(parsed interface{}) (PublicKey, error) {
-	switch parsed := parsed.(type) {
+	var algorithm string
+	switch parsed.(type) {
 	case *dsa.PublicKey:
-		return PublicKey{
-			Algorithm: "DSA",
-			DSA:       parsed,
-		}, nil
+		algorithm = "DSA"
 	case *ecdsa.PublicKey:
-		return PublicKey{
-			Algorithm: "ECDSA",
-			ECDSA:     parsed,
-		}, nil
+		algorithm = "ECDSA"
 	case *rsa.PublicKey:
-		return PublicKey{
-			Algorithm: "RSA",
-			RSA:       parsed,
-		}, nil
+		algorithm = "RSA"
 	default:
-		err := errors.New("unsupported public key type")
+		err := errors.New("unsupported public key algorithm")
 		return PublicKey{}, err
 	}
+	return PublicKey{
+		Algorithm: algorithm,
+		Key:       parsed,
+	}, nil
 }
 
 func first(values []string) string {
@@ -273,13 +267,6 @@ func signatureAlgorithm(value x509.SignatureAlgorithm) string {
 func fingerPrint(parsed *x509.Certificate) []byte {
 	bytes := sha1.Sum(parsed.Raw) // #nosec G401
 	return bytes[:]
-}
-
-func publicKeyAlgorithm(value x509.PublicKeyAlgorithm) string {
-	if value == x509.UnknownPublicKeyAlgorithm {
-		return "UnknownPublicKeyAlgorithm"
-	}
-	return value.String()
 }
 
 func throw(ctx context.Context, err error) {
