@@ -47,7 +47,7 @@ type Material struct {
 	publicKey        string
 }
 
-var material = Material{
+var material = Material{ //nolint:gochecknoglobals
 	dsaCertificate: template(`-----BEGIN CERTIFICATE-----
 MIIFnzCCBUSgAwIBAgIJAPOE4rArGHVcMAsGCWCGSAFlAwQDAjCBsTELMAkGA1UE
 BhMCWloxGTAXBgNVBAgMEEtvcHVuY2V6aXMgS3JhaXMxETAPBgNVBAcMCEFzaHRp
