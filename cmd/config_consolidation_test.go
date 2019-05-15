@@ -254,8 +254,7 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 		{opts{cli: []string{"--vus", "10", "-i", "6"}}, exp{validationErrors: true}, verifySharedIters(I(10), I(6))},
 		{opts{cli: []string{"-s", "10s:5", "-s", "10s:"}}, exp{validationErrors: true}, nil},
 		{opts{fs: defaultConfig(`{"stages": [{"duration": "20s"}], "vus": 10}`)}, exp{validationErrors: true}, nil},
-		// These should emit a warning
-		//TODO: these should probably emit a validation error?
+		// These should emit a consolidation error
 		{opts{cli: []string{"-u", "1", "-i", "6", "-d", "10s"}}, exp{consolidationError: true}, nil},
 		{opts{cli: []string{"-u", "2", "-d", "10s", "-s", "10s:20"}}, exp{consolidationError: true}, nil},
 		{opts{cli: []string{"-u", "3", "-i", "5", "-s", "10s:20"}}, exp{consolidationError: true}, nil},
@@ -285,6 +284,8 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 		{opts{fs: getFS(nil), cli: []string{"--config", "/my/config.file"}}, exp{consolidationError: true}, nil},
 
 		// Test combinations between options and levels
+		{opts{cli: []string{"--vus", "1"}}, exp{}, verifyOneIterPerOneVU},
+		{opts{cli: []string{"--vus", "10"}}, exp{logWarning: true}, verifyOneIterPerOneVU},
 		{
 			opts{
 				fs:  getFS([]file{{"/my/config.file", `{"vus": 8, "duration": "2m"}`}}),

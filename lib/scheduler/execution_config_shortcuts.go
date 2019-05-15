@@ -23,7 +23,6 @@ package scheduler
 import (
 	"github.com/loadimpact/k6/lib"
 	"github.com/sirupsen/logrus"
-	null "gopkg.in/guregu/null.v3"
 )
 
 // ExecutionConflictError is a custom error type used for all of the errors in
@@ -111,8 +110,15 @@ func BuildExecutionConfig(opts lib.Options) (lib.Options, error) {
 
 	case len(opts.Execution) > 0:
 		// Do nothing, execution was explicitly specified
+
 	default:
 		// Check if we should emit some warnings
+		if opts.VUs.Valid && opts.VUs.Int64 != 1 {
+			logrus.Warnf(
+				"the `vus=%d` option will be ignored, it only works in conjunction with `iterations`, `duration`, or `stages`",
+				opts.VUs.Int64,
+			)
+		}
 		if opts.Stages != nil && len(opts.Stages) == 0 {
 			// No someone explicitly set stages to empty
 			logrus.Warnf("`stages` was explicitly set to an empty value, running the script with 1 iteration in 1 VU")
@@ -122,12 +128,10 @@ func BuildExecutionConfig(opts lib.Options) (lib.Options, error) {
 			logrus.Warnf("`execution` was explicitly set to an empty value, running the script with 1 iteration in 1 VU")
 		}
 		// No execution parameters whatsoever were specified, so we'll create a per-VU iterations config
-		// with 1 VU and 1 iteration. We're choosing the per-VU config, since that one could also
-		// be executed both locally, and in the cloud.
+		// with 1 VU and 1 iteration.
 		result.Execution = lib.SchedulerConfigMap{
 			lib.DefaultSchedulerName: NewPerVUIterationsConfig(lib.DefaultSchedulerName),
 		}
-		result.Iterations = null.NewInt(1, false)
 	}
 
 	//TODO: validate the config; questions:
