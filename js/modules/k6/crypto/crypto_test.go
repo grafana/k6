@@ -28,8 +28,6 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
-
-	"github.com/loadimpact/k6/js/modules/k6/crypto/x509"
 	"github.com/loadimpact/k6/lib"
 	"github.com/stretchr/testify/assert"
 )
@@ -38,29 +36,6 @@ type MockReader struct{}
 
 func (MockReader) Read(p []byte) (n int, err error) {
 	return -1, errors.New("Contrived failure")
-}
-
-func bytes(encoded string) []byte {
-	decoded, _ := hex.DecodeString(encoded)
-	return decoded
-}
-
-func stringify(value string) string {
-	return fmt.Sprintf(`"%s"`, value)
-}
-
-func template(value string) string {
-	return fmt.Sprintf("`%s`", value)
-}
-
-func makeRuntime() *goja.Runtime {
-	rt := goja.New()
-	rt.SetFieldNameMapper(common.FieldNameMapper{})
-	ctx := context.Background()
-	ctx = common.WithRuntime(ctx, rt)
-	rt.Set("crypto", common.Bind(rt, New(), &ctx))
-	rt.Set("x509", common.Bind(rt, x509.New(), &ctx))
-	return rt
 }
 
 func TestCryptoAlgorithms(t *testing.T) {

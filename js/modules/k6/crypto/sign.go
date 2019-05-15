@@ -600,65 +600,6 @@ func decodeSignature(encoded interface{}) ([]byte, error) {
 	return decoded, nil
 }
 
-func decodePlaintext(encoded interface{}) ([]byte, error) {
-	decoded, err := decodeBinaryDetect(encoded)
-	if err != nil {
-		err = errors.Wrap(err, "could not decode data")
-		return nil, err
-	}
-	return decoded, nil
-}
-
-func validatePublicKey(key *x509.PublicKey) error {
-	switch key.Algorithm {
-	case algorithmDSA:
-		_, ok := key.Key.(*dsa.PublicKey)
-		if !ok {
-			return errors.New("invalid DSA public key")
-		}
-	case algorithmECDSA:
-		_, ok := key.Key.(*ecdsa.PublicKey)
-		if !ok {
-			return errors.New("invalid ECDSA public key")
-		}
-	case algorithmRSA:
-		_, ok := key.Key.(*rsa.PublicKey)
-		if !ok {
-			return errors.New("invalid DSA public key")
-		}
-	default:
-		return errors.New("invalid public key")
-	}
-	return nil
-}
-
-func validatePrivateKey(key *x509.PrivateKey) error {
-	switch key.Algorithm {
-	case algorithmDSA:
-		_, ok := key.Key.(*dsa.PrivateKey)
-		if !ok {
-			return errors.New("invalid DSA private key")
-		}
-	case algorithmECDSA:
-		_, ok := key.Key.(*ecdsa.PrivateKey)
-		if !ok {
-			return errors.New("invalid ECDSA private key")
-		}
-	case algorithmRSA:
-		_, ok := key.Key.(*rsa.PrivateKey)
-		if !ok {
-			return errors.New("invalid RSA private key")
-		}
-	default:
-		return errors.New("invalid private key")
-	}
-	return nil
-}
-
-func throw(ctx *context.Context, err error) {
-	common.Throw(common.GetRuntime(*ctx), err)
-}
-
 func decodeSigningFunction(encoded string) (gocrypto.Hash, error) {
 	err := unsupportedFunction(encoded)
 	if err != nil {

@@ -23,9 +23,13 @@ package crypto
 import (
 	"context"
 	gocrypto "crypto"
+	"crypto/dsa"
+	"crypto/ecdsa"
+	"crypto/rsa"
 	"hash"
 
 	"github.com/loadimpact/k6/js/common"
+	"github.com/loadimpact/k6/js/modules/k6/crypto/x509"
 	"github.com/pkg/errors"
 )
 
@@ -120,4 +124,50 @@ func decodePlaintext(encoded interface{}) ([]byte, error) {
 		return nil, err
 	}
 	return decoded, nil
+}
+
+func validatePublicKey(key *x509.PublicKey) error {
+	switch key.Algorithm {
+	case "DSA":
+		_, ok := key.Key.(*dsa.PublicKey)
+		if !ok {
+			return errors.New("invalid DSA public key")
+		}
+	case "ECDSA":
+		_, ok := key.Key.(*ecdsa.PublicKey)
+		if !ok {
+			return errors.New("invalid ECDSA public key")
+		}
+	case "RSA":
+		_, ok := key.Key.(*rsa.PublicKey)
+		if !ok {
+			return errors.New("invalid DSA public key")
+		}
+	default:
+		return errors.New("invalid public key")
+	}
+	return nil
+}
+
+func validatePrivateKey(key *x509.PrivateKey) error {
+	switch key.Algorithm {
+	case "DSA":
+		_, ok := key.Key.(*dsa.PrivateKey)
+		if !ok {
+			return errors.New("invalid DSA private key")
+		}
+	case "ECDSA":
+		_, ok := key.Key.(*ecdsa.PrivateKey)
+		if !ok {
+			return errors.New("invalid ECDSA private key")
+		}
+	case "RSA":
+		_, ok := key.Key.(*rsa.PrivateKey)
+		if !ok {
+			return errors.New("invalid RSA private key")
+		}
+	default:
+		return errors.New("invalid private key")
+	}
+	return nil
 }
