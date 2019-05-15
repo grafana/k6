@@ -57,7 +57,7 @@ type Expected struct {
 
 const message = "They know, get out now!"
 
-var material = Material{
+var material = Material{ //nolint:gochecknoglobals
 	messageString: stringify(message),
 	messageBytes:  []byte(message),
 	messageHex:    stringify(enhex([]byte(message))),
