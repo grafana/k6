@@ -176,7 +176,7 @@ func makeSubject(subject pkix.Name) Subject {
 		StreetAddress:          first(subject.StreetAddress),
 		OrganizationName:       first(subject.Organization),
 		OrganizationalUnitName: subject.OrganizationalUnit,
-		Names: makeRdns(subject.Names),
+		Names:                  makeRdns(subject.Names),
 	}
 }
 
