@@ -76,8 +76,8 @@ func (*Crypto) Verify(
 	signatureEncoded interface{},
 	options SigningOptions,
 ) bool {
-	function, digest, signature :=
-		prepareVerify(ctx, functionEncoded, plaintextEncoded, signatureEncoded)
+	function, digest, signature := prepareVerify(
+		ctx, &signer, functionEncoded, plaintextEncoded, signatureEncoded)
 	verified, err :=
 		executeVerify(&signer, function, digest, signature, options)
 	if err != nil {
@@ -96,7 +96,7 @@ func (surface *Crypto) VerifyString(
 	options SigningOptions,
 ) bool {
 	function, digest, signature := prepareVerifyString(
-		ctx, functionEncoded, plaintextEncoded, signatureEncoded)
+		ctx, &signer, functionEncoded, plaintextEncoded, signatureEncoded)
 	verified, err :=
 		executeVerify(&signer, function, digest, signature, options)
 	if err != nil {
@@ -252,10 +252,15 @@ func (signer *Signer) Sign(
 
 func prepareVerify(
 	ctx *context.Context,
+	signer *x509.PublicKey,
 	functionEncoded string,
 	plaintextEncoded interface{},
 	signatureEncoded interface{},
 ) (gocrypto.Hash, []byte, []byte) {
+	err := validatePublicKey(signer)
+	if err != nil {
+		throw(ctx, err)
+	}
 	function, err := decodeFunction(functionEncoded)
 	if err != nil {
 		throw(ctx, err)
@@ -277,10 +282,15 @@ func prepareVerify(
 
 func prepareVerifyString(
 	ctx *context.Context,
+	signer *x509.PublicKey,
 	functionEncoded string,
 	plaintextEncoded string,
 	signatureEncoded interface{},
 ) (gocrypto.Hash, []byte, []byte) {
+	err := validatePublicKey(signer)
+	if err != nil {
+		throw(ctx, err)
+	}
 	function, err := decodeFunction(functionEncoded)
 	if err != nil {
 		throw(ctx, err)
@@ -631,6 +641,29 @@ func decodePlaintext(encoded interface{}) ([]byte, error) {
 		return nil, err
 	}
 	return decoded, nil
+}
+
+func validatePublicKey(key *x509.PublicKey) error {
+	switch key.Algorithm {
+	case "DSA":
+		_, ok := key.Key.(*dsa.PublicKey)
+		if !ok {
+			return errors.New("invalid DSA public key")
+		}
+	case "ECDSA":
+		_, ok := key.Key.(*ecdsa.PublicKey)
+		if !ok {
+			return errors.New("invalid ECDSA public key")
+		}
+	case "RSA":
+		_, ok := key.Key.(*rsa.PublicKey)
+		if !ok {
+			return errors.New("invalid DSA public key")
+		}
+	default:
+		return errors.New("invalid public key")
+	}
+	return nil
 }
 
 func throw(ctx *context.Context, err error) {
