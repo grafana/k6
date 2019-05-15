@@ -873,7 +873,7 @@ func TestParsePrivateKey(t *testing.T) {
 		const pem = %s;
 		const privateKey = x509.parsePrivateKey(pem);
 		if (!(
-			privateKey.type === "RSA" &&
+			privateKey.algorithm === "RSA" &&
 			typeof privateKey.rsa === "object" &&
 			typeof privateKey.rsa.d === "object" &&
 			typeof privateKey.rsa.primes === "object"
@@ -889,7 +889,7 @@ func TestParsePrivateKey(t *testing.T) {
 		const password = %s;
 		const privateKey = x509.parsePrivateKey(pem, password);
 		if (!(
-			privateKey.type === "RSA" &&
+			privateKey.algorithm === "RSA" &&
 			typeof privateKey.rsa === "object" &&
 			typeof privateKey.rsa.d === "object" &&
 			typeof privateKey.rsa.primes === "object"
@@ -903,7 +903,7 @@ func TestParsePrivateKey(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const pem = %s;
 		const privateKey = x509.parsePrivateKey(pem);
-		if (privateKey.type !== "DSA") {
+		if (privateKey.algorithm !== "DSA") {
 			throw new Error("Bad result");
 		}`, material.dsaPrivateKey))
 		assert.NoError(t, err)
@@ -913,7 +913,7 @@ func TestParsePrivateKey(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const pem = %s;
 		const privateKey = x509.parsePrivateKey(pem);
-		if (privateKey.type !== "ECDSA") {
+		if (privateKey.algorithm !== "ECDSA") {
 			throw new Error("Bad result");
 		}`, material.ecdsaPrivateKey))
 		assert.NoError(t, err)

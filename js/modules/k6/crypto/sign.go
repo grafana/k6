@@ -456,7 +456,7 @@ func executeSign(
 ) (interface{}, error) {
 	var signature []byte
 	var err error
-	switch signer.Type {
+	switch signer.Algorithm {
 	case "DSA":
 		signature, err = signDSA(signer.DSA, digest)
 	case "ECDSA":
