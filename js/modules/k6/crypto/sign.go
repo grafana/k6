@@ -458,11 +458,14 @@ func executeSign(
 	var err error
 	switch signer.Algorithm {
 	case "DSA":
-		signature, err = signDSA(signer.DSA, digest)
+		key := signer.Key.(*dsa.PrivateKey)
+		signature, err = signDSA(key, digest)
 	case "ECDSA":
-		signature, err = signECDSA(signer.ECDSA, digest)
+		key := signer.Key.(*ecdsa.PrivateKey)
+		signature, err = signECDSA(key, digest)
 	case "RSA":
-		signature, err = signRSA(signer.RSA, function, digest, options)
+		key := signer.Key.(*rsa.PrivateKey)
+		signature, err = signRSA(key, function, digest, options)
 	default:
 		err = errors.New("invalid private key")
 	}

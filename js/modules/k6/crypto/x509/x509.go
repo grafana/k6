@@ -91,9 +91,7 @@ type PublicKey struct {
 // PrivateKey is used for encryption and signing
 type PrivateKey struct {
 	Algorithm string
-	DSA       *dsa.PrivateKey   `js:"dsa"`
-	ECDSA     *ecdsa.PrivateKey `js:"ecdsa"`
-	RSA       *rsa.PrivateKey   `js:"rsa"`
+	Key       interface{}
 }
 
 // New constructs the X509 interface
@@ -355,26 +353,22 @@ func parseEncryptedPrivateKey(
 }
 
 func makePrivateKey(parsed interface{}) (PrivateKey, error) {
+	var algorithm string
 	switch parsed.(type) {
 	case *dsa.PrivateKey:
-		return PrivateKey{
-			Algorithm: "DSA",
-			DSA:       parsed.(*dsa.PrivateKey),
-		}, nil
+		algorithm = "DSA"
 	case *ecdsa.PrivateKey:
-		return PrivateKey{
-			Algorithm: "ECDSA",
-			ECDSA:     parsed.(*ecdsa.PrivateKey),
-		}, nil
+		algorithm = "ECDSA"
 	case *rsa.PrivateKey:
-		return PrivateKey{
-			Algorithm: "RSA",
-			RSA:       parsed.(*rsa.PrivateKey),
-		}, nil
+		algorithm = "RSA"
 	default:
 		err := errors.New("unsupported private key type")
 		return PrivateKey{}, err
 	}
+	return PrivateKey{
+		Algorithm: algorithm,
+		Key:       parsed,
+	}, nil
 }
 
 func throw(ctx *context.Context, err error) {

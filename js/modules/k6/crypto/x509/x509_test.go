@@ -874,9 +874,9 @@ func TestParsePrivateKey(t *testing.T) {
 		const privateKey = x509.parsePrivateKey(pem);
 		if (!(
 			privateKey.algorithm === "RSA" &&
-			typeof privateKey.rsa === "object" &&
-			typeof privateKey.rsa.d === "object" &&
-			typeof privateKey.rsa.primes === "object"
+			typeof privateKey.key === "object" &&
+			typeof privateKey.key.d === "object" &&
+			typeof privateKey.key.primes === "object"
 		)) {
 			throw new Error("Bad result");
 		}`, material.rsaPrivateKeyClear))
@@ -890,9 +890,9 @@ func TestParsePrivateKey(t *testing.T) {
 		const privateKey = x509.parsePrivateKey(pem, password);
 		if (!(
 			privateKey.algorithm === "RSA" &&
-			typeof privateKey.rsa === "object" &&
-			typeof privateKey.rsa.d === "object" &&
-			typeof privateKey.rsa.primes === "object"
+			typeof privateKey.key === "object" &&
+			typeof privateKey.key.d === "object" &&
+			typeof privateKey.key.primes === "object"
 		)) {
 			throw new Error("Bad result");
 		}`, material.rsaPrivateKeyEncrypted, material.privateKeyPassword))
