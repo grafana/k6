@@ -465,17 +465,6 @@ func TestParse(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	t.Run("PublicKeyAlgorithm", func(t *testing.T) {
-		_, err := common.RunString(rt, fmt.Sprintf(`
-		const pem = %s;
-		const cert = x509.parse(pem);
-		const value = cert.publicKeyAlgorithm
-		if (value !== "RSA") {
-			throw new Error("Bad public key algorithm: " + value);
-		}`, material.rsaCertificate))
-		assert.NoError(t, err)
-	})
-
 	t.Run("PublicKey", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const pem = %s;
@@ -493,7 +482,8 @@ func TestParse(t *testing.T) {
 		const value = cert.publicKey;
 		if (!(
 			value &&
-			value.type === "RSA" &&
+			typeof value === "object" &&
+			value.algorithm === "RSA" &&
 			typeof value.rsa === "object" &&
 			typeof value.rsa.e === "number" &&
 			typeof value.rsa.n === "object"
@@ -552,7 +542,8 @@ func TestParse(t *testing.T) {
 		const value = cert.publicKey;
 		if (!(
 			value &&
-			value.type === "DSA" &&
+			typeof value === "object" &&
+			value.algorithm === "DSA" &&
 			typeof value.dsa.parameters === "object" &&
 			typeof value.dsa.y === "object"
 		)) {
@@ -568,7 +559,8 @@ func TestParse(t *testing.T) {
 		const value = cert.publicKey;
 		if (!(
 			value &&
-			value.type === "ECDSA" &&
+			typeof value === "object" &&
+			value.algorithm === "ECDSA" &&
 			typeof value.ecdsa.curve === "object" &&
 			typeof value.ecdsa.x === "object" &&
 			typeof value.ecdsa.y === "object"

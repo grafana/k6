@@ -48,7 +48,6 @@ type Certificate struct {
 	AltNames           []string  `js:"altNames"`
 	SignatureAlgorithm string    `js:"signatureAlgorithm"`
 	FingerPrint        []byte    `js:"fingerPrint"`
-	PublicKeyAlgorithm string    `js:"publicKeyAlgorithm"`
 	PublicKey          PublicKey `js:"publicKey"`
 }
 
@@ -83,10 +82,10 @@ type Issuer struct {
 
 // PublicKey is used for decryption and signature verification
 type PublicKey struct {
-	Type  string
-	DSA   *dsa.PublicKey   `js:"dsa"`
-	ECDSA *ecdsa.PublicKey `js:"ecdsa"`
-	RSA   *rsa.PublicKey   `js:"rsa"`
+	Algorithm string
+	DSA       *dsa.PublicKey   `js:"dsa"`
+	ECDSA     *ecdsa.PublicKey `js:"ecdsa"`
+	RSA       *rsa.PublicKey   `js:"rsa"`
 }
 
 // New constructs the X509 interface
@@ -161,7 +160,6 @@ func makeCertificate(parsed *x509.Certificate) (Certificate, error) {
 		AltNames:           altNames(parsed),
 		SignatureAlgorithm: signatureAlgorithm(parsed.SignatureAlgorithm),
 		FingerPrint:        fingerPrint(parsed),
-		PublicKeyAlgorithm: publicKeyAlgorithm(parsed.PublicKeyAlgorithm),
 		PublicKey:          publicKey,
 	}, err
 }
@@ -195,18 +193,18 @@ func makePublicKey(parsed interface{}) (PublicKey, error) {
 	switch parsed := parsed.(type) {
 	case *dsa.PublicKey:
 		return PublicKey{
-			Type: "DSA",
-			DSA:  parsed,
+			Algorithm: "DSA",
+			DSA:       parsed,
 		}, nil
 	case *ecdsa.PublicKey:
 		return PublicKey{
-			Type:  "ECDSA",
-			ECDSA: parsed,
+			Algorithm: "ECDSA",
+			ECDSA:     parsed,
 		}, nil
 	case *rsa.PublicKey:
 		return PublicKey{
-			Type: "RSA",
-			RSA:  parsed,
+			Algorithm: "RSA",
+			RSA:       parsed,
 		}, nil
 	default:
 		err := errors.New("unsupported public key type")
