@@ -814,10 +814,10 @@ func TestParsePublicKey(t *testing.T) {
 		const pem = %s;
 		const publicKey = x509.parsePublicKey(pem);
 		if (!(
-			publicKey.type === "RSA" &&
-			typeof publicKey.rsa === "object" &&
-			publicKey.rsa.e === 65537 &&
-			typeof publicKey.rsa.n === "object"
+			publicKey.algorithm === "RSA" &&
+			typeof publicKey.key === "object" &&
+			publicKey.key.e === 65537 &&
+			typeof publicKey.key.n === "object"
 		)) {
 			throw new Error("Bad result");
 		}`, material.rsaPublicKey))
@@ -830,9 +830,9 @@ func TestParsePublicKey(t *testing.T) {
 		const publicKey = x509.parsePublicKey(pem);
 		if (!(
 			publicKey &&
-			publicKey.type === "DSA" &&
-			typeof publicKey.dsa.parameters === "object" &&
-			typeof publicKey.dsa.y === "object"
+			publicKey.algorithm === "DSA" &&
+			typeof publicKey.key.parameters === "object" &&
+			typeof publicKey.key.y === "object"
 		)) {
 			throw new Error("Bad DSA public key");
 		}`, material.dsaPublicKey))
@@ -845,10 +845,10 @@ func TestParsePublicKey(t *testing.T) {
 		const publicKey = x509.parsePublicKey(pem);
 		if (!(
 			publicKey &&
-			publicKey.type === "ECDSA" &&
-			typeof publicKey.ecdsa.curve === "object" &&
-			typeof publicKey.ecdsa.x === "object" &&
-			typeof publicKey.ecdsa.y === "object"
+			publicKey.algorithm === "ECDSA" &&
+			typeof publicKey.key.curve === "object" &&
+			typeof publicKey.key.x === "object" &&
+			typeof publicKey.key.y === "object"
 		)) {
 			throw new Error("Bad ECDSA public key");
 		}`, material.ecdsaPublicKey))

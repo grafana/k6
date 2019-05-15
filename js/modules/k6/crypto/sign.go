@@ -306,14 +306,16 @@ func executeVerify(
 ) (bool, error) {
 	var verified bool = false
 	var err error = nil
-	switch signer.Type {
+	switch signer.Algorithm {
 	case "DSA":
-		verified, err = verifyDSA(signer.DSA, digest, signature)
+		key := signer.Key.(*dsa.PublicKey)
+		verified, err = verifyDSA(key, digest, signature)
 	case "ECDSA":
-		verified, err = verifyECDSA(signer.ECDSA, digest, signature)
+		key := signer.Key.(*ecdsa.PublicKey)
+		verified, err = verifyECDSA(key, digest, signature)
 	case "RSA":
-		verified, err =
-			verifyRSA(signer.RSA, function, digest, signature, options)
+		key := signer.Key.(*rsa.PublicKey)
+		verified, err = verifyRSA(key, function, digest, signature, options)
 	default:
 		err = errors.New("invalid public key")
 	}
