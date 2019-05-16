@@ -688,3 +688,10 @@ func TestSignatureAlgorithm(t *testing.T) {
 		assert.Equal(t, "UnknownSignatureAlgorithm", result)
 	})
 }
+
+func TestMakePublicKey(t *testing.T) {
+	t.Run("Unsupported", func(t *testing.T) {
+		_, err := makePublicKey(nil)
+		assert.EqualError(t, err, "unsupported public key algorithm")
+	})
+}
