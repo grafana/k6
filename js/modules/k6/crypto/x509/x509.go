@@ -92,7 +92,7 @@ func New() *X509 {
 }
 
 // Parse produces an entire X.509 certificate
-func (X509) Parse(ctx context.Context, encoded string) Certificate {
+func (X509) Parse(ctx context.Context, encoded []byte) Certificate {
 	parsed, err := parseCertificate(encoded)
 	if err != nil {
 		throw(ctx, err)
@@ -105,7 +105,7 @@ func (X509) Parse(ctx context.Context, encoded string) Certificate {
 }
 
 // GetAltNames extracts alt names
-func (X509) GetAltNames(ctx context.Context, encoded string) []string {
+func (X509) GetAltNames(ctx context.Context, encoded []byte) []string {
 	parsed, err := parseCertificate(encoded)
 	if err != nil {
 		throw(ctx, err)
@@ -114,7 +114,7 @@ func (X509) GetAltNames(ctx context.Context, encoded string) []string {
 }
 
 // GetIssuer extracts certificate issuer
-func (X509) GetIssuer(ctx context.Context, encoded string) Issuer {
+func (X509) GetIssuer(ctx context.Context, encoded []byte) Issuer {
 	parsed, err := parseCertificate(encoded)
 	if err != nil {
 		throw(ctx, err)
@@ -123,7 +123,7 @@ func (X509) GetIssuer(ctx context.Context, encoded string) Issuer {
 }
 
 // GetSubject extracts certificate subject
-func (X509) GetSubject(ctx context.Context, encoded string) Subject {
+func (X509) GetSubject(ctx context.Context, encoded []byte) Subject {
 	parsed, err := parseCertificate(encoded)
 	if err != nil {
 		throw(ctx, err)
@@ -131,8 +131,8 @@ func (X509) GetSubject(ctx context.Context, encoded string) Subject {
 	return makeSubject(parsed.Subject)
 }
 
-func parseCertificate(encoded string) (*x509.Certificate, error) {
-	decoded, _ := pem.Decode([]byte(encoded))
+func parseCertificate(encoded []byte) (*x509.Certificate, error) {
+	decoded, _ := pem.Decode(encoded)
 	if decoded == nil {
 		err := errors.New("failed to decode certificate PEM file")
 		return nil, err
