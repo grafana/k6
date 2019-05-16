@@ -695,3 +695,10 @@ func TestMakePublicKey(t *testing.T) {
 		assert.EqualError(t, err, "unsupported public key algorithm")
 	})
 }
+
+func TestMakeCertificate(t *testing.T) {
+	t.Run("UnsupportedKey", func(t *testing.T) {
+		_, err := makeCertificate(&gox509.Certificate{})
+		assert.EqualError(t, err, "unsupported public key algorithm")
+	})
+}
