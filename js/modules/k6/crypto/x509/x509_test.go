@@ -22,6 +22,7 @@ package x509
 
 import (
 	"context"
+	gox509 "crypto/x509"
 	"fmt"
 	"strings"
 	"testing"
@@ -673,5 +674,17 @@ func TestGetSubject(t *testing.T) {
 			throw new Error("Bad subject");
 		}`, material.rsaCertificate))
 		assert.NoError(t, err)
+	})
+}
+
+func TestSignatureAlgorithm(t *testing.T) {
+	t.Run("Known", func(t *testing.T) {
+		result := signatureAlgorithm(gox509.MD5WithRSA)
+		assert.Equal(t, "MD5-RSA", result)
+	})
+
+	t.Run("Unknown", func(t *testing.T) {
+		result := signatureAlgorithm(gox509.UnknownSignatureAlgorithm)
+		assert.Equal(t, "UnknownSignatureAlgorithm", result)
 	})
 }
