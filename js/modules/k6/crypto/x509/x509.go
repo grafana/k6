@@ -159,7 +159,7 @@ func makeCertificate(parsed *x509.Certificate) (Certificate, error) {
 		SignatureAlgorithm: signatureAlgorithm(parsed.SignatureAlgorithm),
 		FingerPrint:        fingerPrint(parsed),
 		PublicKey:          publicKey,
-	}, err
+	}, nil
 }
 
 func makeSubject(subject pkix.Name) Subject {
