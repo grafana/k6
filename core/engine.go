@@ -103,7 +103,8 @@ func NewEngine(ex lib.Executor, o lib.Options, logger *logrus.Logger) (*Engine, 
 	return e, nil
 }
 
-// Init is used to initialize the executor. That's a costly operation, since it initializes all of
+// Init is used to initialize the executor. That's a costly operation, since it
+// initializes all of the planned VUs and could potentially take a long time.
 func (e *Engine) Init(ctx context.Context) error {
 	return e.Executor.Init(ctx, e.Samples)
 }
