@@ -32,8 +32,11 @@ import (
 	"fmt"
 	"time"
 
+<<<<<<< HEAD
 	"golang.org/x/crypto/ssh"
 
+=======
+>>>>>>> master
 	"github.com/loadimpact/k6/js/common"
 	"github.com/pkg/errors"
 )
@@ -88,19 +91,26 @@ type PublicKey struct {
 	Key       interface{}
 }
 
+<<<<<<< HEAD
 // PrivateKey is used for encryption and signing
 type PrivateKey struct {
 	Algorithm string
 	Key       interface{}
 }
 
+=======
+>>>>>>> master
 // New constructs the X509 interface
 func New() *X509 {
 	return &X509{}
 }
 
 // Parse produces an entire X.509 certificate
+<<<<<<< HEAD
 func (*X509) Parse(ctx *context.Context, encoded string) Certificate {
+=======
+func (X509) Parse(ctx context.Context, encoded []byte) Certificate {
+>>>>>>> master
 	parsed, err := parseCertificate(encoded)
 	if err != nil {
 		throw(ctx, err)
@@ -113,7 +123,11 @@ func (*X509) Parse(ctx *context.Context, encoded string) Certificate {
 }
 
 // GetAltNames extracts alt names
+<<<<<<< HEAD
 func (*X509) GetAltNames(ctx *context.Context, encoded string) []string {
+=======
+func (X509) GetAltNames(ctx context.Context, encoded []byte) []string {
+>>>>>>> master
 	parsed, err := parseCertificate(encoded)
 	if err != nil {
 		throw(ctx, err)
@@ -122,7 +136,11 @@ func (*X509) GetAltNames(ctx *context.Context, encoded string) []string {
 }
 
 // GetIssuer extracts certificate issuer
+<<<<<<< HEAD
 func (*X509) GetIssuer(ctx *context.Context, encoded string) Issuer {
+=======
+func (X509) GetIssuer(ctx context.Context, encoded []byte) Issuer {
+>>>>>>> master
 	parsed, err := parseCertificate(encoded)
 	if err != nil {
 		throw(ctx, err)
@@ -131,7 +149,11 @@ func (*X509) GetIssuer(ctx *context.Context, encoded string) Issuer {
 }
 
 // GetSubject extracts certificate subject
+<<<<<<< HEAD
 func (*X509) GetSubject(ctx *context.Context, encoded string) Subject {
+=======
+func (X509) GetSubject(ctx context.Context, encoded []byte) Subject {
+>>>>>>> master
 	parsed, err := parseCertificate(encoded)
 	if err != nil {
 		throw(ctx, err)
@@ -139,6 +161,7 @@ func (*X509) GetSubject(ctx *context.Context, encoded string) Subject {
 	return makeSubject(parsed.Subject)
 }
 
+<<<<<<< HEAD
 // ParsePublicKey parses a public key
 func (*X509) ParsePublicKey(ctx *context.Context, encoded string) PublicKey {
 	parsed, err := parsePublicKey(encoded)
@@ -171,6 +194,10 @@ func (*X509) ParsePrivateKey(
 
 func parseCertificate(encoded string) (*x509.Certificate, error) {
 	decoded, _ := pem.Decode([]byte(encoded))
+=======
+func parseCertificate(encoded []byte) (*x509.Certificate, error) {
+	decoded, _ := pem.Decode(encoded)
+>>>>>>> master
 	if decoded == nil {
 		err := errors.New("failed to decode certificate PEM file")
 		return nil, err
@@ -307,6 +334,7 @@ func fingerPrint(parsed *x509.Certificate) []byte {
 	return bytes[:]
 }
 
+<<<<<<< HEAD
 func parsePublicKey(encoded string) (interface{}, error) {
 	decoded, _ := pem.Decode([]byte(encoded))
 	if decoded == nil {
@@ -373,4 +401,8 @@ func makePrivateKey(parsed interface{}) (PrivateKey, error) {
 
 func throw(ctx *context.Context, err error) {
 	common.Throw(common.GetRuntime(*ctx), err)
+=======
+func throw(ctx context.Context, err error) {
+	common.Throw(common.GetRuntime(ctx), err)
+>>>>>>> master
 }
