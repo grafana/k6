@@ -42,7 +42,6 @@ func makeRuntime() *goja.Runtime {
 }
 
 type Material struct {
-<<<<<<< HEAD
 	dsaCertificate         string
 	ecdsaCertificate       string
 	rsaCertificate         string
@@ -54,12 +53,6 @@ type Material struct {
 	rsaPrivateKeyEncrypted string
 	dsaPrivateKey          string
 	ecdsaPrivateKey        string
-=======
-	dsaCertificate   string
-	ecdsaCertificate string
-	rsaCertificate   string
-	publicKey        string
->>>>>>> master
 }
 
 var material = Material{ //nolint:gochecknoglobals
@@ -146,7 +139,6 @@ gzg3dNaCY65aH0cJE/dVwiS/F2XTr1zvr+uBPExgrA21+FSIlHM0Dot+VGKdCLEO
 xytSVXVn+cECQLg9hVn+Zx3XO2FA0eOzaWEONnUGghT/Ivw06lUxis5tkAoAU93d
 ddBqJe0XUeAX8Zr6EJ82
 -----END CERTIFICATE-----`),
-<<<<<<< HEAD
 	dsaPublicKey: template(`-----BEGIN PUBLIC KEY-----
 MIIDRjCCAjkGByqGSM44BAEwggIsAoIBAQCKv/tJtwgLJGrvas2YQmqgjfoQ5s9u
 QRO9+9ELCu4Lstn9nsjmER/+CgXCrAQG/jUKdT6tpz9bUVYspcn+gF2YkDugSbMb
@@ -174,15 +166,11 @@ cbsUjd2HQce8c8B+xoxp4H0PvCGeNxdDqo0ibuPjvutma0IxcJEidxgFRHZ868EU
 gl27czkKiDZRgtLjEDE=
 -----END PUBLIC KEY-----`),
 	rsaPublicKey: template(`-----BEGIN PUBLIC KEY-----
-=======
-	publicKey: template(`-----BEGIN PUBLIC KEY-----
->>>>>>> master
 MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDXMLr/Y/vUtIFY75jj0YXfp6lQ
 7iEIbps3BvRE4isTpxs8fXLnLM8LAuJScxiKyrGnj8EMb7LIHkSMBlz6iVj9atY6
 EUEm/VHUnElNquzGyBA50TCfpv6NHPaTvOoB45yQbZ/YB4LO+CsT9eIMDZ4tcU9Z
 +xD10ifJhhIwpZUFIQIDAQAB
 -----END PUBLIC KEY-----`),
-<<<<<<< HEAD
 	privateKeyPassword: fmt.Sprintf(`"%s"`, "1234"),
 	rsaPrivateKeyClear: template(`-----BEGIN RSA PRIVATE KEY-----
 MIICXgIBAAKBgQDXMLr/Y/vUtIFY75jj0YXfp6lQ7iEIbps3BvRE4isTpxs8fXLn
@@ -244,8 +232,6 @@ PhrERndPNSrYOO68BugspNaVyjUdnGM7nUw16Qjrh8ORAhins+xs0zaU+9lC3eiC
 UMfGWnYC7WpVxkCzWwGF3T1xuxSN3YdBx7xzwH7GjGngfQ+8IZ43F0OqjSJu4+O+
 62ZrQjFwkSJ3GAVEdnzrwRSCXbtzOQqINlGC0uMQMQ==
 -----END EC PRIVATE KEY-----`),
-=======
->>>>>>> master
 }
 
 func template(value string) string {
@@ -268,11 +254,7 @@ func TestParse(t *testing.T) {
 	t.Run("ParseFailure", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
 		const pem = %s;
-<<<<<<< HEAD
 		x509.parse(pem);`, material.rsaPublicKey))
-=======
-		x509.parse(pem);`, material.publicKey))
->>>>>>> master
 		if assert.Error(t, err) {
 			assert.True(t, strings.HasPrefix(
 				err.Error(),
@@ -814,7 +796,6 @@ func TestMakeCertificate(t *testing.T) {
 		assert.EqualError(t, err, "unsupported public key algorithm")
 	})
 }
-<<<<<<< HEAD
 
 func TestParsePublicKey(t *testing.T) {
 	if testing.Short() {
@@ -938,5 +919,3 @@ func TestParsePrivateKey(t *testing.T) {
 		assert.NoError(t, err)
 	})
 }
-=======
->>>>>>> master
