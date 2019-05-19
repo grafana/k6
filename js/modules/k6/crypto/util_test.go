@@ -10,11 +10,6 @@ import (
 	"github.com/loadimpact/k6/js/modules/k6/crypto/x509"
 )
 
-func dehex(encoded string) []byte {
-	decoded, _ := hex.DecodeString(encoded)
-	return decoded
-}
-
 func enhex(value []byte) string {
 	return hex.EncodeToString(value)
 }
