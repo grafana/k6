@@ -145,9 +145,9 @@ func makeHasher(ctx *context.Context, algorithm string) *Hasher {
 	case "md4":
 		hasher.hash = md4.New()
 	case "md5":
-		hasher.hash = md5.New()
+		hasher.hash = md5.New() // #nosec G401
 	case "sha1":
-		hasher.hash = sha1.New()
+		hasher.hash = sha1.New() // #nosec G401
 	case "sha256":
 		hasher.hash = sha256.New()
 	case "sha384":
