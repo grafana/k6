@@ -168,7 +168,7 @@ UMfGWnYC7WpVxkCzWwGF3T1xuxSN3YdBx7xzwH7GjGngfQ+8IZ43F0OqjSJu4+O+
 		"+7F+OTepOVO+hKi0QHU05zqk8/mDe4wCQgH1eT04Gw2ggjxY+qBf2+RfVHlGk1un" +
 		"Qs6cZEu32hLYIfNmA8ujlIFeApRV5SohmAoeN7jqXewYGszPH82t4Nvmfw=="),
 }
-var expected = Expected{
+var expected = Expected{ //nolint:gochecknoglobals
 	hexSignature: stringify("" +
 		"befd8b0a92a44b03324d1908b9e16d209328c38b14b71f8960f5c97c68a00437" +
 		"390cc42acab32ce70097a215163917ba28c3dbaa1a88a96e2443fa9abb442082" +
