@@ -37,9 +37,9 @@ import (
 )
 
 const (
-	DSA   string = "DSA"
-	ECDSA string = "ECDSA"
-	RSA   string = "RSA"
+	dsa   string = "DSA"
+	ecdsa string = "ECDSA"
+	rsa   string = "RSA"
 )
 
 // SigningOptions configures a sign or verify operation
@@ -324,13 +324,13 @@ func executeVerify(
 	var verified = false
 	var err error
 	switch signer.Algorithm {
-	case DSA:
+	case dsa:
 		key := signer.Key.(*dsa.PublicKey)
 		verified, err = verifyDSA(key, digest, signature)
-	case ECDSA:
+	case ecdsa:
 		key := signer.Key.(*ecdsa.PublicKey)
 		verified, err = verifyECDSA(key, digest, signature)
-	case RSA:
+	case rsa:
 		key := signer.Key.(*rsa.PublicKey)
 		verified, err = verifyRSA(key, function, digest, signature, options)
 	default:
@@ -468,13 +468,13 @@ func executeSign(
 	var signature []byte
 	var err error
 	switch signer.Algorithm {
-	case DSA:
+	case dsa:
 		key := signer.Key.(*dsa.PrivateKey)
 		signature, err = signDSA(key, digest)
-	case ECDSA:
+	case ecdsa:
 		key := signer.Key.(*ecdsa.PrivateKey)
 		signature, err = signECDSA(key, digest)
-	case RSA:
+	case rsa:
 		key := signer.Key.(*rsa.PrivateKey)
 		signature, err = signRSA(key, function, digest, options)
 	default:
@@ -659,17 +659,17 @@ func decodePlaintext(encoded interface{}) ([]byte, error) {
 
 func validatePublicKey(key *x509.PublicKey) error {
 	switch key.Algorithm {
-	case DSA:
+	case dsa:
 		_, ok := key.Key.(*dsa.PublicKey)
 		if !ok {
 			return errors.New("invalid DSA public key")
 		}
-	case ECDSA:
+	case ecdsa:
 		_, ok := key.Key.(*ecdsa.PublicKey)
 		if !ok {
 			return errors.New("invalid ECDSA public key")
 		}
-	case RSA:
+	case rsa:
 		_, ok := key.Key.(*rsa.PublicKey)
 		if !ok {
 			return errors.New("invalid DSA public key")
@@ -682,17 +682,17 @@ func validatePublicKey(key *x509.PublicKey) error {
 
 func validatePrivateKey(key *x509.PrivateKey) error {
 	switch key.Algorithm {
-	case DSA:
+	case dsa:
 		_, ok := key.Key.(*dsa.PrivateKey)
 		if !ok {
 			return errors.New("invalid DSA private key")
 		}
-	case ECDSA:
+	case ecdsa:
 		_, ok := key.Key.(*ecdsa.PrivateKey)
 		if !ok {
 			return errors.New("invalid ECDSA private key")
 		}
-	case RSA:
+	case rsa:
 		_, ok := key.Key.(*rsa.PrivateKey)
 		if !ok {
 			return errors.New("invalid RSA private key")
