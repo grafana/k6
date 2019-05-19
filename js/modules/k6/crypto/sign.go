@@ -321,7 +321,7 @@ func executeVerify(
 	signature []byte,
 	options SigningOptions,
 ) (bool, error) {
-	var verified bool = false
+	var verified = false
 	var err error
 	switch signer.Algorithm {
 	case DSA:
