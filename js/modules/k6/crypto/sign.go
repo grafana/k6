@@ -367,10 +367,7 @@ func verifyPKCS(
 	signature []byte,
 ) bool {
 	err := rsa.VerifyPKCS1v15(signer, function, digest, signature)
-	if err != nil {
-		return false
-	}
-	return true
+	return err == nil
 }
 
 func verifyPSS(
@@ -382,10 +379,7 @@ func verifyPSS(
 ) bool {
 	config := decodePssOptions(options)
 	err := rsa.VerifyPSS(signer, function, digest, signature, &config)
-	if err != nil {
-		return false
-	}
-	return true
+	return err == nil
 
 }
 
