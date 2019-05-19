@@ -322,7 +322,7 @@ func executeVerify(
 	options SigningOptions,
 ) (bool, error) {
 	var verified bool = false
-	var err error = nil
+	var err error
 	switch signer.Algorithm {
 	case DSA:
 		key := signer.Key.(*dsa.PublicKey)
