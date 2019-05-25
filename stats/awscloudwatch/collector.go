@@ -51,6 +51,7 @@ func (c *Collector) Collect(containers []stats.SampleContainer) {
 				Value:  s.Value,
 				Time:   s.Time,
 				Metric: s.Metric.Name,
+				Tags:   s.Tags.CloneTags(),
 			})
 		}
 	}
@@ -76,6 +77,7 @@ type sample struct {
 	Metric string
 	Time   time.Time
 	Value  float64
+	Tags   map[string]string
 }
 
 type cloudWatchClient interface {

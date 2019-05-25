@@ -39,6 +39,12 @@ func TestCollector(t *testing.T) {
 			Metric: "http_req_duration",
 			Time:   at,
 			Value:  41427.507,
+			Tags: map[string]string{
+				"group":  "",
+				"method": "GET",
+				"proto":  "HTTP/1.1",
+				"status": "200",
+			},
 		}}, fakeClient.reportedSamples)
 	})
 }
