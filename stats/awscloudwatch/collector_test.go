@@ -25,9 +25,8 @@ func TestCollector(t *testing.T) {
 			},
 		}
 
-		collector, _ := New()
 		fakeClient := newFakeCloudwatchClient()
-		collector.client = fakeClient
+		collector := New(fakeClient)
 		ctx, cancelCollector := context.WithCancel(context.Background())
 
 		go collector.Run(ctx)
@@ -60,4 +59,8 @@ type fakeCloudwatchClient struct {
 func (fcl *fakeCloudwatchClient) reportSamples(samples []*sample) error {
 	fcl.reportedSamples = append(fcl.reportedSamples, samples...)
 	return nil
+}
+
+func (fcl *fakeCloudwatchClient) address() string {
+	return "fake"
 }

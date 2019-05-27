@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
+	log "github.com/sirupsen/logrus"
 	"sync"
 	"time"
 )
@@ -14,12 +15,12 @@ type Collector struct {
 	bufferLock      sync.Mutex
 }
 
-func New() (*Collector, error) {
-	return &Collector{}, nil
+func New(client cloudWatchClient) *Collector {
+	return &Collector{client: client}
 }
 
 func (c *Collector) Init() error {
-	panic("implement me")
+	return nil
 }
 
 func (c *Collector) Run(ctx context.Context) {
@@ -38,7 +39,10 @@ func (c *Collector) Run(ctx context.Context) {
 
 func (c *Collector) reportMetrics() {
 	c.bufferLock.Lock()
-	_ = c.client.reportSamples(c.bufferedSamples)
+	err := c.client.reportSamples(c.bufferedSamples)
+	if err != nil {
+		log.WithError(err).Error("Sending samples to CloudWatch")
+	}
 	c.bufferedSamples = nil
 	c.bufferLock.Unlock()
 }
@@ -62,16 +66,14 @@ func (c *Collector) Collect(containers []stats.SampleContainer) {
 }
 
 func (c *Collector) Link() string {
-	panic("implement me")
+	return c.client.address()
 }
 
 func (c *Collector) GetRequiredSystemTags() lib.TagSet {
-	panic("implement me")
+	return lib.TagSet{}
 }
 
-func (c *Collector) SetRunStatus(status lib.RunStatus) {
-	panic("implement me")
-}
+func (c *Collector) SetRunStatus(status lib.RunStatus) {}
 
 type sample struct {
 	Metric string
@@ -82,4 +84,5 @@ type sample struct {
 
 type cloudWatchClient interface {
 	reportSamples(samples []*sample) error
+	address() string
 }

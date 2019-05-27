@@ -22,6 +22,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/loadimpact/k6/stats/awscloudwatch"
 	"strings"
 
 	"gopkg.in/guregu/null.v3"
@@ -40,12 +41,13 @@ import (
 )
 
 const (
-	collectorInfluxDB = "influxdb"
-	collectorJSON     = "json"
-	collectorKafka    = "kafka"
-	collectorCloud    = "cloud"
-	collectorStatsD   = "statsd"
-	collectorDatadog  = "datadog"
+	collectorInfluxDB   = "influxdb"
+	collectorJSON       = "json"
+	collectorKafka      = "kafka"
+	collectorCloud      = "cloud"
+	collectorStatsD     = "statsd"
+	collectorDatadog    = "datadog"
+	collectorCloudWatch = "cloudwatch"
 )
 
 func parseCollector(s string) (t, arg string) {
@@ -110,6 +112,13 @@ func newCollector(collectorName, arg string, src *lib.SourceData, conf Config) (
 				return nil, err
 			}
 			return datadog.New(config)
+		case collectorCloudWatch:
+			client, err := awscloudwatch.NewClient(arg, awscloudwatch.NewCloudWatchClient)
+			if err != nil {
+				return nil, err
+			}
+
+			return awscloudwatch.New(client), nil
 		default:
 			return nil, errors.Errorf("unknown output type: %s", collectorName)
 		}

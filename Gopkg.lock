@@ -61,6 +61,46 @@
   version = "v1.0.0"
 
 [[projects]]
+  digest = "1:bd2e469eaa18860272b351a0a53bfece60165a2076c7b4ebee702169c35541a2"
+  name = "github.com/aws/aws-sdk-go"
+  packages = [
+    "aws",
+    "aws/awserr",
+    "aws/awsutil",
+    "aws/client",
+    "aws/client/metadata",
+    "aws/corehandlers",
+    "aws/credentials",
+    "aws/credentials/ec2rolecreds",
+    "aws/credentials/endpointcreds",
+    "aws/credentials/processcreds",
+    "aws/credentials/stscreds",
+    "aws/csm",
+    "aws/defaults",
+    "aws/ec2metadata",
+    "aws/endpoints",
+    "aws/request",
+    "aws/session",
+    "aws/signer/v4",
+    "internal/ini",
+    "internal/sdkio",
+    "internal/sdkrand",
+    "internal/sdkuri",
+    "internal/shareddefaults",
+    "private/protocol",
+    "private/protocol/json/jsonutil",
+    "private/protocol/query",
+    "private/protocol/query/queryutil",
+    "private/protocol/rest",
+    "private/protocol/xml/xmlutil",
+    "service/cloudwatch",
+    "service/sts",
+  ]
+  pruneopts = "NUT"
+  revision = "8943f83bb1e98c94710f767576fe17cc29adb4dd"
+  version = "v1.19.38"
+
+[[projects]]
   branch = "master"
   digest = "1:8a49786ec8f770dc1fdc251970f86e1f12b4938cf52b261ffa6f66158670c8c7"
   name = "github.com/daaku/go.zipexe"
@@ -247,6 +287,13 @@
   pruneopts = "NUT"
   revision = "6ac835404e7e64ea7299a6eebcce1ab1ef15fe3c"
   version = "v1.5.0"
+
+[[projects]]
+  digest = "1:1f2aebae7e7c856562355ec0198d8ca2fa222fb05e5b1b66632a1fce39631885"
+  name = "github.com/jmespath/go-jmespath"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "c2b33e84"
 
 [[projects]]
   branch = "master"
@@ -658,6 +705,9 @@
     "github.com/PuerkitoBio/goquery",
     "github.com/Shopify/sarama",
     "github.com/Soontao/goHttpDigestClient",
+    "github.com/aws/aws-sdk-go/aws",
+    "github.com/aws/aws-sdk-go/aws/session",
+    "github.com/aws/aws-sdk-go/service/cloudwatch",
     "github.com/dop251/goja",
     "github.com/dop251/goja/parser",
     "github.com/dustin/go-humanize",
