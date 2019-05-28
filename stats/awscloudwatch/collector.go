@@ -15,6 +15,7 @@ type Collector struct {
 	bufferLock      sync.Mutex
 }
 
+// New creates a new Collector
 func New(client cloudWatchClient) *Collector {
 	return &Collector{client: client}
 }

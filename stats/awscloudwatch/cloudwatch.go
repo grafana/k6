@@ -13,6 +13,7 @@ type client struct {
 	namespace string
 }
 
+// NewClient creates a new client with the CloudWatch client returned by clientFactory
 func NewClient(namespace string, clientFactory func() (*cloudwatch.CloudWatch, error)) (*client, error) {
 	svc, err := clientFactory()
 	if err != nil {
@@ -25,6 +26,7 @@ func NewClient(namespace string, clientFactory func() (*cloudwatch.CloudWatch, e
 	}, nil
 }
 
+// NewCloudWatchClient creates a new CloudWatch client
 func NewCloudWatchClient() (*cloudwatch.CloudWatch, error) {
 	sess, err := session.NewSession()
 	if err != nil {
@@ -34,32 +36,34 @@ func NewCloudWatchClient() (*cloudwatch.CloudWatch, error) {
 	return cloudwatch.New(sess), nil
 }
 
-func (c *client) reportSamples(samples []*sample) error {
-	if len(samples) == 0 {
-		return nil
-	}
+const maxMetricsPerCall = 20
 
+// reportSamples reports samples to CloudWatch.
+// It send samples on batches of max 20, which is the upper limit of metrics
+// accepted per request by CloudWatch
+func (c *client) reportSamples(samples []*sample) error {
 	samplesSent := 0
 	var lastError error
 
 	for samplesSent < len(samples) {
 		input := &cloudwatch.PutMetricDataInput{Namespace: &c.namespace}
-		upperLimit := samplesSent + 2
+		upperLimit := samplesSent + maxMetricsPerCall
 		if len(samples) < upperLimit {
 			upperLimit = len(samples)
 		}
 
 		for _, s := range samples[samplesSent:upperLimit] {
-			input.MetricData = append(input.MetricData, toInput(s))
+			input.MetricData = append(input.MetricData, toMetricDatum(s))
 			samplesSent++
 		}
 
 		_, err := c.PutMetricData(input)
 		if err != nil {
-			logrus.WithError(err).Debug("error metrics")
+			logrus.WithError(err).Debug("Error sending metrics to CloudWatch")
 			lastError = err
 		}
 	}
+
 	if lastError != nil {
 		return errors.Wrap(lastError, "Error sending metrics, activate debug to see individual one")
 	}
@@ -71,7 +75,7 @@ func (c *client) address() string {
 	return c.ClientInfo.Endpoint
 }
 
-func toInput(s *sample) *cloudwatch.MetricDatum {
+func toMetricDatum(s *sample) *cloudwatch.MetricDatum {
 	datum := &cloudwatch.MetricDatum{
 		Value:      &s.Value,
 		MetricName: &s.Metric,

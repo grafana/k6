@@ -14,6 +14,6 @@ func TestCloudWatchClient(t *testing.T) {
 
 	require.Equal(
 		t, []*cloudwatch.Dimension{{Name: aws.String("foo"), Value: aws.String("bar")}},
-		toInput(s).Dimensions,
+		toMetricDatum(s).Dimensions,
 	)
 }
