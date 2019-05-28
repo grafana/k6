@@ -59,13 +59,13 @@ func (c *client) reportSamples(samples []*sample) error {
 
 		_, err := c.PutMetricData(input)
 		if err != nil {
-			logrus.WithError(err).Debug("Error sending metrics to CloudWatch")
+			logrus.WithError(err).Warn("Error sending metrics to CloudWatch")
 			lastError = err
 		}
 	}
 
 	if lastError != nil {
-		return errors.Wrap(lastError, "Error sending metrics, activate debug to see individual one")
+		return errors.Wrap(lastError, "Error sending metrics")
 	}
 
 	return nil
