@@ -25,7 +25,7 @@ func (c *Collector) Init() error {
 }
 
 func (c *Collector) Run(ctx context.Context) {
-	ticker := time.NewTicker(time.Duration(1 * time.Second))
+	ticker := time.NewTicker(time.Second)
 
 	for {
 		select {
