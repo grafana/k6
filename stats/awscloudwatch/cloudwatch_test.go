@@ -1,19 +1,29 @@
 package awscloudwatch
 
 import (
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/cloudwatch"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
 
 func TestCloudWatchClient(t *testing.T) {
 	s := &sample{
-		Tags: map[string]string{"foo": "bar", "proto": "http"},
+		Tags: map[string]string{
+			"proto":       "http",
+			"subproto":    "http2",
+			"status":      "200",
+			"method":      "GET",
+			"url":         "https://github.com/loadimpact/k6",
+			"name":        "https://github.com/loadimpact/k6",
+			"group":       "",
+			"check":       "must be 200",
+			"error":       "Some error",
+			"error_code":  "abcd3",
+			"tls_version": "1.2",
+			"foo":         "bar",
+		},
 	}
 
 	require.Equal(
-		t, []*cloudwatch.Dimension{{Name: aws.String("foo"), Value: aws.String("bar")}},
-		toMetricDatum(s).Dimensions,
+		t, 10, len(toMetricDatum(s).Dimensions),
 	)
 }

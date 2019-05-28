@@ -75,6 +75,8 @@ func (c *client) address() string {
 	return c.ClientInfo.Endpoint
 }
 
+const maxNumberOfDimensions = 10
+
 func toMetricDatum(s *sample) *cloudwatch.MetricDatum {
 	datum := &cloudwatch.MetricDatum{
 		Value:      &s.Value,
@@ -85,6 +87,13 @@ func toMetricDatum(s *sample) *cloudwatch.MetricDatum {
 	var dims []*cloudwatch.Dimension
 
 	for name, value := range s.Tags {
+		if len(dims) == maxNumberOfDimensions {
+			logrus.WithField("tags", s.Tags).
+				WithField("dimensions_included", dims).
+				Warnf("More than 10 tags, just 10 will be reported to CloudWatch")
+			break
+		}
+
 		if value != "" {
 			dims = append(dims, &cloudwatch.Dimension{
 				Name:  aws.String(name),
