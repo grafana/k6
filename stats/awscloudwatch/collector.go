@@ -17,17 +17,17 @@ type Collector struct {
 	bufferLock      sync.Mutex
 }
 
-// Returns a new Collector
+// New returns a new Collector
 func New(client cloudWatchClient) *Collector {
 	return &Collector{client: client}
 }
 
-// Does nothing, as the client is injected in New constructor
+// Init does nothing, as the client is injected in New constructor
 func (c *Collector) Init() error {
 	return nil
 }
 
-// Reports metric every second and when context is done
+// Run send collected metrics every second and when context is done
 func (c *Collector) Run(ctx context.Context) {
 	ticker := time.NewTicker(time.Second)
 
@@ -52,7 +52,7 @@ func (c *Collector) reportMetrics() {
 	c.bufferLock.Unlock()
 }
 
-// Collects samples from containers
+// Collect collects samples from containers
 func (c *Collector) Collect(containers []stats.SampleContainer) {
 	var samples []*sample
 	for _, container := range containers {
@@ -71,17 +71,17 @@ func (c *Collector) Collect(containers []stats.SampleContainer) {
 	c.bufferLock.Unlock()
 }
 
-// Return link to AWS client address(i.e., regional monitoring)
+// Link returns link to AWS client address(i.e., regional monitoring)
 func (c *Collector) Link() string {
 	return c.client.address()
 }
 
-// No system tag is required
+// GetRequiredSystemTags returns a tag set without requirements
 func (c *Collector) GetRequiredSystemTags() lib.TagSet {
 	return lib.TagSet{}
 }
 
-// Does nothing
+// SetRunStatus does nothing
 func (c *Collector) SetRunStatus(status lib.RunStatus) {}
 
 type sample struct {
