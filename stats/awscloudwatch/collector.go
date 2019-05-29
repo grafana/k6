@@ -18,8 +18,13 @@ type Collector struct {
 }
 
 // New returns a new Collector
-func New(client cloudWatchClient) *Collector {
-	return &Collector{client: client}
+func New(clientFactory func() (cloudWatchClient, error)) (*Collector, error) {
+	client, err := clientFactory()
+	if err != nil {
+		return nil, err
+	}
+
+	return &Collector{client: client}, nil
 }
 
 // Init does nothing, as the client is injected in New constructor

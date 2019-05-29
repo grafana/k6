@@ -28,12 +28,14 @@ func TestCollector(t *testing.T) {
 		}
 
 		fakeClient := newFakeCloudwatchClient()
-		collector := New(fakeClient)
+		collector, _ := New(func() (cloudWatchClient, error) {
+			return fakeClient, nil
+		})
 		ctx, cancelCollector := context.WithCancel(context.Background())
 
 		go collector.Run(ctx)
 		collector.Collect(samples)
-		<-time.After(time.Second + time.Millisecond)
+		<-time.After(time.Second + 100*time.Millisecond)
 		cancelCollector()
 
 		require.Equal(t, []*sample{{

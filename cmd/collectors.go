@@ -114,12 +114,7 @@ func newCollector(collectorName, arg string, src *lib.SourceData, conf Config) (
 			}
 			return datadog.New(config)
 		case collectorCloudWatch:
-			client, err := awscloudwatch.NewClient(arg)
-			if err != nil {
-				return nil, err
-			}
-
-			return awscloudwatch.New(client), nil
+			return awscloudwatch.New(awscloudwatch.ClientFactory(arg))
 		default:
 			return nil, errors.Errorf("unknown output type: %s", collectorName)
 		}
