@@ -22,8 +22,9 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/loadimpact/k6/stats/awscloudwatch"
 	"strings"
+
+	"github.com/loadimpact/k6/stats/awscloudwatch"
 
 	"gopkg.in/guregu/null.v3"
 
