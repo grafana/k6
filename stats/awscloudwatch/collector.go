@@ -10,7 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// Collect collects metrics and send them to CloudWatch
+// Collector collects metrics and send them to CloudWatch
 type Collector struct {
 	client          cloudWatchClient
 	bufferedSamples []*sample
