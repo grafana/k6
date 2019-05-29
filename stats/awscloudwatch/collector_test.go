@@ -2,10 +2,11 @@ package awscloudwatch
 
 import (
 	"context"
-	"github.com/loadimpact/k6/stats"
-	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
+
+	"github.com/loadimpact/k6/stats"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCollector(t *testing.T) {

@@ -2,11 +2,12 @@ package awscloudwatch
 
 import (
 	"context"
+	"sync"
+	"time"
+
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
 	log "github.com/sirupsen/logrus"
-	"sync"
-	"time"
 )
 
 type Collector struct {
