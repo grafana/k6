@@ -14,20 +14,20 @@ type client struct {
 }
 
 // NewClient creates a new client with the CloudWatch client returned by clientFactory
-func NewClient(namespace string, clientFactory func() (*cloudwatch.CloudWatch, error)) (*client, error) {
-	svc, err := clientFactory()
+func NewClient(namespace string) (*client, error) {
+	cw, err := newCloudWatchClient()
 	if err != nil {
 		return nil, err
 	}
 
 	return &client{
-		CloudWatch: svc,
+		CloudWatch: cw,
 		namespace:  namespace,
 	}, nil
 }
 
-// NewCloudWatchClient creates a new CloudWatch client
-func NewCloudWatchClient() (*cloudwatch.CloudWatch, error) {
+// newCloudWatchClient creates a new CloudWatch client
+func newCloudWatchClient() (*cloudwatch.CloudWatch, error) {
 	sess, err := session.NewSession()
 	if err != nil {
 		return nil, err
