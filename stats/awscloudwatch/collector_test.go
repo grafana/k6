@@ -2,6 +2,7 @@ package awscloudwatch
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -32,7 +33,7 @@ func TestCollector(t *testing.T) {
 
 		go collector.Run(ctx)
 		collector.Collect(samples)
-		<-time.After(2 * time.Second)
+		<-time.After(time.Second + time.Millisecond)
 		cancelCollector()
 
 		require.Equal(t, []*sample{{
@@ -45,7 +46,7 @@ func TestCollector(t *testing.T) {
 				"proto":  "HTTP/1.1",
 				"status": "200",
 			},
-		}}, fakeClient.reportedSamples)
+		}}, fakeClient.reportedSamples())
 	})
 }
 
@@ -54,14 +55,26 @@ func newFakeCloudwatchClient() *fakeCloudwatchClient {
 }
 
 type fakeCloudwatchClient struct {
-	reportedSamples []*sample
+	samples []*sample
+	lock    sync.Mutex
 }
 
 func (fcl *fakeCloudwatchClient) reportSamples(samples []*sample) error {
-	fcl.reportedSamples = append(fcl.reportedSamples, samples...)
+	fcl.lock.Lock()
+	fcl.samples = append(fcl.samples, samples...)
+	fcl.lock.Unlock()
+
 	return nil
 }
 
 func (fcl *fakeCloudwatchClient) address() string {
 	return "fake"
+}
+
+func (fcl *fakeCloudwatchClient) reportedSamples() []*sample {
+	fcl.lock.Lock()
+	samples := fcl.samples
+	fcl.lock.Unlock()
+
+	return samples
 }
