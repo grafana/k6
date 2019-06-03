@@ -1,6 +1,6 @@
 version: 2
 jobs:
-  lint:
+  deps:
     docker:
       - image: circleci/golang:1.12
     environment:
@@ -18,14 +18,7 @@ jobs:
             dep version
             dep status
             dep ensure -update -dry-run
-      - run:
-          name: Run linter
-          command: |
-            export PATH=$GOPATH/bin:$PATH
-            go get -t ./...
-            go get -u github.com/alecthomas/gometalinter
-            gometalinter --install
-            gometalinter --deadline 10m --config gometalinter.json --vendor ./...
+
 
   test:
     docker:
@@ -157,7 +150,7 @@ workflows:
   version: 2
   test_and_build:
     jobs:
-      - lint:
+      - deps:
           filters:
             tags:
               only: /.*/
@@ -171,14 +164,14 @@ workflows:
               only: /.*/
       - build-docker-images:
           requires:
-            - lint
+            - deps
             - test
           filters:
             tags:
               only: /.*/
       - build-linux-packages:
           requires:
-            - lint
+            - deps
             - test
           filters:
             branches:

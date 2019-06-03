@@ -19,3 +19,4 @@ Now all http methods have an additional param called `compression` that will mak
 ## Internals
 
 * JS: VU initialization time and memory usage has been significantly decreased by caching the parsed version of the core-js library. Thanks, @matlockx! (#1038)
+* CI: removed the gometalinter check in CircleCI, since that project [was deprecated](https://github.com/alecthomas/gometalinter/issues/590) and now exclusively rely on [golangci-lint](https://github.com/golangci/golangci-lint). (#1039)
