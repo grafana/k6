@@ -15,3 +15,7 @@ Now all http methods have an additional param called `compression` that will mak
   - windows: work with paths starting with `/` or `\` as absolute from the current drive
 
 * JS: Correctly always set `response.url` to be the URL that was ultimately fetched (i.e. after any potential redirects), even if there were non http errors. (#990)
+
+## Internals
+
+* JS: VU initialization time and memory usage has been significantly decreased by caching the parsed version of the core-js library. Thanks, @matlockx! (#1038)
