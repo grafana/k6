@@ -1471,20 +1471,10 @@ func TestArchiveNotPanicking(t *testing.T) {
 	arc := r1.MakeArchive()
 	arc.Files = make(map[string][]byte)
 	r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
-	require.NoError(t, err)
-
-	runners := map[string]*Runner{"Source": r1, "Archive": r2}
-	for name, r := range runners {
-		t.Run(name, func(t *testing.T) {
-			ch := make(chan stats.SampleContainer, 100)
-			_, err := r.NewVU(ch)
-			if name == "Source" {
-				require.NoError(t, err)
-			} else {
-				require.Error(t, err)
-			}
-		})
-	}
+	// we do want this to error here as this is where we find out that a given file is not in the
+	// archive
+	require.Error(t, err)
+	require.Nil(t, r2)
 }
 
 func TestStuffNotPanicking(t *testing.T) {
