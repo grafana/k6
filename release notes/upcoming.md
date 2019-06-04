@@ -6,6 +6,14 @@ TODO: Intro
 
 Now all http methods have an additional param called `compression` that will make k6 compress the body before sending it. It will also correctly set both `Content-Encoding` and `Content-Length`, unless they were manually set in the request `headers` by the user. The current supported algorithms are `deflate` and `gzip` and any combination of the two separated by a comma (`,`).
 
+### New result outputs: CloudWatch (#1032)
+
+You can now output any metrics k6 collects to CloudWatch by running `k6 run --out cloudwatch=metrics_namespace`.
+Every tag associated with a metric will be sent as a [dimension](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_concepts.html#Dimension).
+CloudWatch **only accepts up to 10 dimensions**, the rest of the tags will be ignored. You may want to use **system-tags** option
+to reduce produced tags.
+
+
 ## Bugs fixed!
 
 * JS: Many fixes for `open()`: (#965)
