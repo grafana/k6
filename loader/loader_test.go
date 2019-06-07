@@ -61,8 +61,24 @@ func TestLoad(t *testing.T) {
 	})
 
 	t.Run("Protocol", func(t *testing.T) {
-		_, err := Load(nil, "/", sr("HTTPSBIN_URL/html"))
-		assert.EqualError(t, err, "imports should not contain a protocol")
+		t.Run("Missing", func(t *testing.T) {
+			_, err := Load(nil, "/", sr("HTTPSBIN_DOMAIN:HTTPSBIN_PORT/html"))
+			assert.NoError(t, err)
+			// TODO: check that warning was emitted
+		})
+		t.Run("WS", func(t *testing.T) {
+			var url = sr("ws://HTTPSBIN_DOMAIN:HTTPSBIN_PORT/html")
+			_, err := Load(nil, "/", url)
+			assert.EqualError(t, err,
+				"only supported schemes for imports are file and https, "+url+" has `ws`")
+		})
+
+		t.Run("HTTP", func(t *testing.T) {
+			var url = sr("http://HTTPSBIN_DOMAIN:HTTPSBIN_PORT/html")
+			_, err := Load(nil, "/", url)
+			assert.EqualError(t, err,
+				"only supported schemes for imports are file and https, "+url+" has `http`")
+		})
 	})
 
 	t.Run("Local", func(t *testing.T) {
@@ -92,31 +108,31 @@ func TestLoad(t *testing.T) {
 		})
 
 		t.Run("Remote Lifting Denied", func(t *testing.T) {
-			_, err := Load(fs, "example.com", "/etc/shadow")
-			assert.EqualError(t, err, "origin (example.com) not allowed to load local file: /etc/shadow")
+			_, err := Load(fs, "https://example.com", "file:///etc/shadow")
+			assert.EqualError(t, err, "origin (https://example.com) not allowed to load local file: file:///etc/shadow")
 		})
 	})
 
 	t.Run("Remote", func(t *testing.T) {
-		src, err := Load(nil, "/", sr("HTTPSBIN_DOMAIN:HTTPSBIN_PORT/html"))
+		src, err := Load(nil, "/", sr("HTTPSBIN_URL/html"))
 		if assert.NoError(t, err) {
-			assert.Equal(t, src.Filename, sr("HTTPSBIN_DOMAIN:HTTPSBIN_PORT/html"))
+			assert.Equal(t, src.Filename, sr("HTTPSBIN_URL/html"))
 			assert.Contains(t, string(src.Data), "Herman Melville - Moby-Dick")
 		}
 
 		t.Run("Absolute", func(t *testing.T) {
-			src, err := Load(nil, sr("HTTPSBIN_DOMAIN:HTTPSBIN_PORT"), sr("HTTPSBIN_DOMAIN:HTTPSBIN_PORT/robots.txt"))
+			src, err := Load(nil, sr("HTTPSBIN_URL"), sr("HTTPSBIN_URL/robots.txt"))
 			if assert.NoError(t, err) {
-				assert.Equal(t, src.Filename, sr("HTTPSBIN_DOMAIN:HTTPSBIN_PORT/robots.txt"))
+				assert.Equal(t, src.Filename, sr("HTTPSBIN_URL/robots.txt"))
 				assert.Equal(t, string(src.Data), "User-agent: *\nDisallow: /deny\n")
 			}
 		})
 
 		t.Run("Relative", func(t *testing.T) {
-			src, err := Load(nil, sr("HTTPSBIN_DOMAIN:HTTPSBIN_PORT"), "./robots.txt")
+			src, err := Load(nil, sr("HTTPSBIN_URL"), "./robots.txt")
 			if assert.NoError(t, err) {
-				assert.Equal(t, src.Filename, sr("HTTPSBIN_DOMAIN:HTTPSBIN_PORT/robots.txt"))
-				assert.Equal(t, string(src.Data), "User-agent: *\nDisallow: /deny\n")
+				assert.Equal(t, sr("HTTPSBIN_URL/robots.txt"), src.Filename)
+				assert.Equal(t, "User-agent: *\nDisallow: /deny\n", string(src.Data))
 			}
 		})
 	})
@@ -132,9 +148,9 @@ func TestLoad(t *testing.T) {
 	})
 
 	t.Run("No _k6=1 Fallback", func(t *testing.T) {
-		src, err := Load(nil, "/", sr("HTTPSBIN_DOMAIN:HTTPSBIN_PORT/raw/something"))
+		src, err := Load(nil, "/", sr("HTTPSBIN_URL/raw/something"))
 		if assert.NoError(t, err) {
-			assert.Equal(t, src.Filename, sr("HTTPSBIN_DOMAIN:HTTPSBIN_PORT/raw/something"))
+			assert.Equal(t, src.Filename, sr("HTTPSBIN_URL/raw/something"))
 			assert.Equal(t, responseStr, string(src.Data))
 		}
 	})
@@ -144,17 +160,18 @@ func TestLoad(t *testing.T) {
 	})
 
 	t.Run("Invalid", func(t *testing.T) {
-		src, err := Load(nil, "/", sr("HTTPSBIN_DOMAIN:HTTPSBIN_PORT/invalid"))
+		fs := afero.NewMemMapFs()
+		src, err := Load(fs, "/", sr("HTTPSBIN_URL/invalid"))
 		assert.Nil(t, src)
 		assert.Error(t, err)
 
 		t.Run("Host", func(t *testing.T) {
-			src, err := Load(nil, "/", "some-path-that-doesnt-exist.js")
+			src, err := Load(fs, "/", "some-path-that-doesnt-exist.js")
 			assert.Nil(t, src)
 			assert.Error(t, err)
 		})
 		t.Run("URL", func(t *testing.T) {
-			src, err := Load(nil, "/", "192.168.0.%31")
+			src, err := Load(fs, "/", "192.168.0.%31")
 			assert.Nil(t, src)
 			assert.Error(t, err)
 		})

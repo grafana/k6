@@ -1,7 +1,7 @@
 /*
  *
  * k6 - a next-generation load testing tool
- * Copyright (C) 2016 Load Impact
+ * Copyright (C) 2019 Load Impact
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -57,7 +57,7 @@ var (
 		`https://docs.k6.io/v1.0/docs/modules#section-using-local-modules-with-docker.`
 )
 
-// Resolves a relative path to an absolute one.
+// Resolve a relative path to an absolute one.
 func Resolve(pwd, name string) string {
 	if name[0] == '.' {
 		return filepath.ToSlash(filepath.Join(pwd, name))
@@ -65,7 +65,7 @@ func Resolve(pwd, name string) string {
 	return name
 }
 
-// Returns the directory for the path.
+// Dir returns the directory for the path.
 func Dir(name string) string {
 	if name == "-" {
 		return "/"
@@ -73,6 +73,7 @@ func Dir(name string) string {
 	return filepath.Dir(name)
 }
 
+// Load loads the provided name from the given fs or from the network if name is an https url
 func Load(fs afero.Fs, pwd, name string) (*lib.SourceData, error) {
 	log.WithFields(log.Fields{"pwd": pwd, "name": name}).Debug("Loading...")
 
@@ -81,30 +82,65 @@ func Load(fs afero.Fs, pwd, name string) (*lib.SourceData, error) {
 		return nil, errors.New("local or remote path required")
 	}
 
-	// Do not allow the protocol to be specified, it messes everything up.
-	if strings.Contains(name, "://") {
-		return nil, errors.New("imports should not contain a protocol")
-	}
+	var loadingFromRemoteScript = strings.HasPrefix(pwd, "https://")
 
-	// Do not allow remote-loaded scripts to lift arbitrary files off the user's machine.
-	if (name[0] == '/' && pwd[0] != '/') || (filepath.VolumeName(name) != "" && filepath.VolumeName(pwd) == "") {
-		return nil, errors.Errorf("origin (%s) not allowed to load local file: %s", pwd, name)
+	u, err := url.Parse(name)
+	if err != nil {
+		// this just means this is not parsable by url which still doesn't mean we can't resolve it ...
+		// But the only thing that makes sense is remoteScript withouth a scheme. or some strange
+		// symbols inside
+		log.WithField("name", name).WithField("error", err).Error("Couldn't parse")
+		data, newerr := loadUsingLoaders(name)
+		if newerr != nil {
+			if newerr == noLoaderMatched {
+				data, newerr = loadRemoteURLWithoutScheme(pwd, name)
+				if newerr != nil {
+					return nil, err // prefer original error
+				}
+				return data, nil
+			}
+			return nil, err // prefer original error
+		}
+		return data, nil
 	}
 
 	// If the file starts with ".", resolve it as a relative path.
-	name = Resolve(pwd, name)
 	log.WithField("name", name).Debug("Resolved...")
-
-	// If the resolved path starts with a "/" or has a volume, it's a local file.
-	if name[0] == '/' || filepath.VolumeName(name) != "" {
+	switch {
+	case loadingFromRemoteScript && u.Scheme == "file":
+		return nil, errors.Errorf("origin (%s) not allowed to load local file: %s", pwd, name)
+	case u.Scheme == "file" ||
+		(!loadingFromRemoteScript && u.Scheme == "" && u.Host == "" &&
+			(u.Path[0] == '.' || u.Path[0] == '/')):
+		name = Resolve(pwd, u.Path)
 		data, err := afero.ReadFile(fs, name)
 		if err != nil {
 			return nil, err
 		}
 		return &lib.SourceData{Filename: name, Data: data}, nil
-	}
+	case u.Scheme == "https" || (loadingFromRemoteScript && (u.Scheme == "" && u.Host == "")):
+		return loadRemoteURL(pwd, name)
+	case u.Scheme == "": // no scheme usually means specific loader ...
+		// If the file is from a known service, try loading from there.
+		data, err := loadUsingLoaders(name)
+		if err != nil {
+			if err == noLoaderMatched {
+				return loadRemoteURLWithoutScheme(pwd, name)
+			}
+			return nil, err
+		}
+		return data, nil
+	case u.Scheme != "" && u.Opaque != "": // we probably have host:port/something where host was parsed as scheme
 
-	// If the file is from a known service, try loading from there.
+		return loadRemoteURLWithoutScheme(pwd, name)
+	default:
+		return nil,
+			errors.Errorf("only supported schemes for imports are file and https, %s has `%s`",
+				name, u.Scheme)
+	}
+}
+
+func loadUsingLoaders(name string) (*lib.SourceData, error) {
 	loaderName, loader, loaderArgs := pickLoader(name)
 	if loader != nil {
 		u, err := loader(name, loaderArgs)
@@ -118,32 +154,61 @@ func Load(fs afero.Fs, pwd, name string) (*lib.SourceData, error) {
 		return &lib.SourceData{Filename: name, Data: data}, nil
 	}
 
-	// If it's not a file, check is it a remote location. HTTPS is enforced, because it's 2017, HTTPS is easy,
-	// running arbitrary, trivially MitM'd code (even sandboxed) is very, very bad.
-	origURL := "https://" + name
-	parsedURL, err := url.Parse(origURL)
+	return nil, noLoaderMatched
+}
+
+var noLoaderMatched = errors.New("no loader matched")
+
+// TODO: Loading schemeless moduleSpecifiers as urls is depricated and should be removed
+func loadRemoteURLWithoutScheme(pwd, name string) (*lib.SourceData, error) {
+	name = "https://" + name
+	data, err := loadRemoteURL(pwd, name)
+	if err != nil {
+		return nil, err
+	}
+
+	log.WithField("url", name).Warning(
+		"A url was resolved but it didn't have scheme. " +
+			"This will be deprecated in the future and all remote modules will " +
+			"need to explicitly use https as scheme")
+
+	return data, nil
+}
+
+func loadRemoteURL(pwd, name string) (*lib.SourceData, error) {
+	parsedURL, err := url.Parse(name)
 
 	if err != nil {
 		return nil, errors.Errorf(invalidScriptErrMsg, name)
+	}
+	if parsedURL.Host == "" && parsedURL.Scheme == "" {
+		var pwdURL *url.URL
+		pwdURL, err = url.Parse(pwd)
+		if err != nil {
+			return nil, errors.Errorf(invalidScriptErrMsg, name)
+		}
+		parsedURL, err = pwdURL.Parse(name)
+		if err != nil {
+			return nil, errors.Errorf(invalidScriptErrMsg, name)
+		}
 	}
 
 	if _, err = net.LookupHost(parsedURL.Hostname()); err != nil {
 		return nil, errors.Errorf(invalidScriptErrMsg, name)
 	}
 
-	// Load it and have a look.
-	url := origURL
-	if !strings.ContainsRune(url, '?') {
-		url += "?"
-	} else {
-		url += "&"
+	var oldQuery = parsedURL.RawQuery
+	if parsedURL.RawQuery != "" {
+		parsedURL.RawQuery += "&"
 	}
-	url += "_k6=1"
-	data, err := fetch(url)
+	parsedURL.RawQuery += "_k6=1"
 
+	data, err := fetch(parsedURL.String())
+
+	parsedURL.RawQuery = oldQuery
 	// If this fails, try to fetch without ?_k6=1 - some sources act weird around unknown GET args.
 	if err != nil {
-		data2, err2 := fetch(origURL)
+		data2, err2 := fetch(parsedURL.String())
 		if err2 != nil {
 			return nil, errors.Errorf(invalidScriptErrMsg, name)
 		}
@@ -154,7 +219,7 @@ func Load(fs afero.Fs, pwd, name string) (*lib.SourceData, error) {
 	// <meta name="k6-import" content="example.com/path/to/real/file.txt" />
 	// <meta name="k6-import" content="github.com/myusername/repo/file.txt" />
 
-	return &lib.SourceData{Filename: name, Data: data}, nil
+	return &lib.SourceData{Filename: parsedURL.String(), Data: data}, nil
 }
 
 func pickLoader(path string) (string, loaderFunc, []string) {
