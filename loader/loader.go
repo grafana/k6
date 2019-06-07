@@ -92,7 +92,7 @@ func Load(fs afero.Fs, pwd, name string) (*lib.SourceData, error) {
 		log.WithField("name", name).WithField("error", err).Error("Couldn't parse")
 		data, newerr := loadUsingLoaders(name)
 		if newerr != nil {
-			if newerr == noLoaderMatched {
+			if newerr == errNoLoaderMatched {
 				data, newerr = loadRemoteURLWithoutScheme(pwd, name)
 				if newerr != nil {
 					return nil, err // prefer original error
@@ -124,7 +124,7 @@ func Load(fs afero.Fs, pwd, name string) (*lib.SourceData, error) {
 		// If the file is from a known service, try loading from there.
 		data, err := loadUsingLoaders(name)
 		if err != nil {
-			if err == noLoaderMatched {
+			if err == errNoLoaderMatched {
 				return loadRemoteURLWithoutScheme(pwd, name)
 			}
 			return nil, err
@@ -154,10 +154,10 @@ func loadUsingLoaders(name string) (*lib.SourceData, error) {
 		return &lib.SourceData{Filename: name, Data: data}, nil
 	}
 
-	return nil, noLoaderMatched
+	return nil, errNoLoaderMatched
 }
 
-var noLoaderMatched = errors.New("no loader matched")
+var errNoLoaderMatched = errors.New("no loader matched")
 
 // TODO: Loading schemeless moduleSpecifiers as urls is depricated and should be removed
 func loadRemoteURLWithoutScheme(pwd, name string) (*lib.SourceData, error) {
