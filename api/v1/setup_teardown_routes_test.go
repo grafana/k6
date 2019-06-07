@@ -26,6 +26,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 
@@ -130,9 +131,10 @@ func TestSetupData(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
+		testCase := testCase
 		t.Run(testCase.name, func(t *testing.T) {
 			runner, err := js.New(
-				&lib.SourceData{Filename: "/script.js", Data: testCase.script},
+				&lib.SourceData{URL: &url.URL{Path: "/script.js"}, Data: testCase.script},
 				afero.NewMemMapFs(),
 				lib.RuntimeOptions{},
 			)

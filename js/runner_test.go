@@ -31,6 +31,7 @@ import (
 	stdlog "log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"runtime"
 	"strings"
@@ -60,7 +61,7 @@ import (
 func TestRunnerNew(t *testing.T) {
 	t.Run("Valid", func(t *testing.T) {
 		r, err := New(&lib.SourceData{
-			Filename: "/script.js",
+			URL: &url.URL{Path: "/script.js"},
 			Data: []byte(`
 			let counter = 0;
 			export default function() { counter++; }
@@ -85,8 +86,8 @@ func TestRunnerNew(t *testing.T) {
 
 	t.Run("Invalid", func(t *testing.T) {
 		_, err := New(&lib.SourceData{
-			Filename: "/script.js",
-			Data:     []byte(`blarg`),
+			URL:  &url.URL{Path: "/script.js"},
+			Data: []byte(`blarg`),
 		}, afero.NewMemMapFs(), lib.RuntimeOptions{})
 		assert.EqualError(t, err, "ReferenceError: blarg is not defined at /script.js:1:1(0)")
 	})
@@ -94,8 +95,8 @@ func TestRunnerNew(t *testing.T) {
 
 func TestRunnerGetDefaultGroup(t *testing.T) {
 	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
-		Data:     []byte(`export default function() {};`),
+		URL:  &url.URL{Path: "/script.js"},
+		Data: []byte(`export default function() {};`),
 	}, afero.NewMemMapFs(), lib.RuntimeOptions{})
 	if assert.NoError(t, err) {
 		assert.NotNil(t, r1.GetDefaultGroup())
@@ -109,8 +110,8 @@ func TestRunnerGetDefaultGroup(t *testing.T) {
 
 func TestRunnerOptions(t *testing.T) {
 	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
-		Data:     []byte(`export default function() {};`),
+		URL:  &url.URL{Path: "/script.js"},
+		Data: []byte(`export default function() {};`),
 	}, afero.NewMemMapFs(), lib.RuntimeOptions{})
 	if !assert.NoError(t, err) {
 		return
@@ -152,7 +153,7 @@ func TestOptionsSettingToScript(t *testing.T) {
 		t.Run(fmt.Sprintf("Variant#%d", i), func(t *testing.T) {
 			t.Parallel()
 			src := &lib.SourceData{
-				Filename: "/script.js",
+				URL: &url.URL{Path: "/script.js"},
 				Data: []byte(variant + `
 					export default function() {
 						if (!options) {
@@ -184,7 +185,7 @@ func TestOptionsSettingToScript(t *testing.T) {
 func TestOptionsPropagationToScript(t *testing.T) {
 	t.Parallel()
 	src := &lib.SourceData{
-		Filename: "/script.js",
+		URL: &url.URL{Path: "/script.js"},
 		Data: []byte(`
 			export let options = { setupTimeout: "1s", myOption: "test" };
 			export default function() {
@@ -244,7 +245,7 @@ func TestMetricName(t *testing.T) {
 	`))
 
 	_, err := New(
-		&lib.SourceData{Filename: "/script.js", Data: script},
+		&lib.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script},
 		afero.NewMemMapFs(),
 		lib.RuntimeOptions{},
 	)
@@ -288,7 +289,7 @@ func TestSetupDataIsolation(t *testing.T) {
 	`))
 
 	runner, err := New(
-		&lib.SourceData{Filename: "/script.js", Data: script},
+		&lib.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script},
 		afero.NewMemMapFs(),
 		lib.RuntimeOptions{},
 	)
@@ -350,7 +351,7 @@ func testSetupDataHelper(t *testing.T, src *lib.SourceData) {
 }
 func TestSetupDataReturnValue(t *testing.T) {
 	src := &lib.SourceData{
-		Filename: "/script.js",
+		URL: &url.URL{Path: "/script.js"},
 		Data: []byte(`
 			export let options = { setupTimeout: "1s", teardownTimeout: "1s" };
 			export function setup() {
@@ -374,7 +375,7 @@ func TestSetupDataReturnValue(t *testing.T) {
 
 func TestSetupDataNoSetup(t *testing.T) {
 	src := &lib.SourceData{
-		Filename: "/script.js",
+		URL: &url.URL{Path: "/script.js"},
 		Data: []byte(`
 			export let options = { setupTimeout: "1s", teardownTimeout: "1s" };
 			export default function(data) {
@@ -396,7 +397,7 @@ func TestSetupDataNoSetup(t *testing.T) {
 
 func TestSetupDataNoReturn(t *testing.T) {
 	src := &lib.SourceData{
-		Filename: "/script.js",
+		URL: &url.URL{Path: "/script.js"},
 		Data: []byte(`
 			export let options = { setupTimeout: "1s", teardownTimeout: "1s" };
 			export function setup() { }
@@ -424,11 +425,12 @@ func TestRunnerIntegrationImports(t *testing.T) {
 			"k6/html",
 		}
 		for _, mod := range modules {
+			mod := mod
 			t.Run(mod, func(t *testing.T) {
 				t.Run("Source", func(t *testing.T) {
 					_, err := New(&lib.SourceData{
-						Filename: "/script.js",
-						Data:     []byte(fmt.Sprintf(`import "%s"; export default function() {}`, mod)),
+						URL:  &url.URL{Path: "/script.js"},
+						Data: []byte(fmt.Sprintf(`import "%s"; export default function() {}`, mod)),
 					}, afero.NewMemMapFs(), lib.RuntimeOptions{})
 					assert.NoError(t, err)
 				})
@@ -438,8 +440,8 @@ func TestRunnerIntegrationImports(t *testing.T) {
 
 	t.Run("Files", func(t *testing.T) {
 		fs := afero.NewMemMapFs()
-		assert.NoError(t, fs.MkdirAll("/path/to", 0755))
-		assert.NoError(t, afero.WriteFile(fs, "/path/to/lib.js", []byte(`export default "hi!";`), 0644))
+		require.NoError(t, fs.MkdirAll("/path/to", 0755))
+		require.NoError(t, afero.WriteFile(fs, "/path/to/lib.js", []byte(`export default "hi!";`), 0644))
 
 		testdata := map[string]struct{ filename, path string }{
 			"Absolute":       {"/path/script.js", "/path/to/lib.js"},
@@ -449,33 +451,29 @@ func TestRunnerIntegrationImports(t *testing.T) {
 			"STDIN-Relative": {"-", "./path/to/lib.js"},
 		}
 		for name, data := range testdata {
+			name, data := name, data
 			t.Run(name, func(t *testing.T) {
 				r1, err := New(&lib.SourceData{
-					Filename: data.filename,
+					URL: &url.URL{Path: data.filename, Scheme: "file"},
 					Data: []byte(fmt.Sprintf(`
 					import hi from "%s";
 					export default function() {
 						if (hi != "hi!") { throw new Error("incorrect value"); }
 					}`, data.path)),
 				}, fs, lib.RuntimeOptions{})
-				if !assert.NoError(t, err) {
-					return
-				}
+				require.NoError(t, err)
 
 				r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{})
-				if !assert.NoError(t, err) {
-					return
-				}
+				require.NoError(t, err)
 
 				testdata := map[string]*Runner{"Source": r1, "Archive": r2}
 				for name, r := range testdata {
+					r := r
 					t.Run(name, func(t *testing.T) {
 						vu, err := r.NewVU(make(chan stats.SampleContainer, 100))
-						if !assert.NoError(t, err) {
-							return
-						}
+						require.NoError(t, err)
 						err = vu.RunOnce(context.Background())
-						assert.NoError(t, err)
+						require.NoError(t, err)
 					})
 				}
 			})
@@ -485,7 +483,7 @@ func TestRunnerIntegrationImports(t *testing.T) {
 
 func TestVURunContext(t *testing.T) {
 	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
+		URL: &url.URL{Path: "/script.js"},
 		Data: []byte(`
 		export let options = { vus: 10 };
 		export default function() { fn(); }
@@ -538,7 +536,7 @@ func TestVURunInterrupt(t *testing.T) {
 	}
 
 	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
+		URL: &url.URL{Path: "/script.js"},
 		Data: []byte(`
 		export default function() { while(true) {} }
 		`),
@@ -573,7 +571,7 @@ func TestVURunInterrupt(t *testing.T) {
 
 func TestVUIntegrationGroups(t *testing.T) {
 	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
+		URL: &url.URL{Path: "/script.js"},
 		Data: []byte(`
 		import { group } from "k6";
 		export default function() {
@@ -636,7 +634,7 @@ func TestVUIntegrationGroups(t *testing.T) {
 
 func TestVUIntegrationMetrics(t *testing.T) {
 	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
+		URL: &url.URL{Path: "/script.js"},
 		Data: []byte(`
 		import { group } from "k6";
 		import { Trend } from "k6/metrics";
@@ -710,7 +708,7 @@ func TestVUIntegrationInsecureRequests(t *testing.T) {
 	for name, data := range testdata {
 		t.Run(name, func(t *testing.T) {
 			r1, err := New(&lib.SourceData{
-				Filename: "/script.js",
+				URL: &url.URL{Path: "/script.js"},
 				Data: []byte(`
 					import http from "k6/http";
 					export default function() { http.get("https://expired.badssl.com/"); }
@@ -749,7 +747,7 @@ func TestVUIntegrationInsecureRequests(t *testing.T) {
 
 func TestVUIntegrationBlacklistOption(t *testing.T) {
 	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
+		URL: &url.URL{Path: "/script.js"},
 		Data: []byte(`
 					import http from "k6/http";
 					export default function() { http.get("http://10.1.2.3/"); }
@@ -788,7 +786,7 @@ func TestVUIntegrationBlacklistOption(t *testing.T) {
 
 func TestVUIntegrationBlacklistScript(t *testing.T) {
 	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
+		URL: &url.URL{Path: "/script.js"},
 		Data: []byte(`
 					import http from "k6/http";
 
@@ -829,7 +827,7 @@ func TestVUIntegrationHosts(t *testing.T) {
 	defer tb.Cleanup()
 
 	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
+		URL: &url.URL{Path: "/script.js"},
 		Data: []byte(tb.Replacer.Replace(`
 					import { check, fail } from "k6";
 					import http from "k6/http";
@@ -913,7 +911,7 @@ func TestVUIntegrationTLSConfig(t *testing.T) {
 	for name, data := range testdata {
 		t.Run(name, func(t *testing.T) {
 			r1, err := New(&lib.SourceData{
-				Filename: "/script.js",
+				URL: &url.URL{Path: "/script.js"},
 				Data: []byte(`
 					import http from "k6/http";
 					export default function() { http.get("https://sha256.badssl.com/"); }
@@ -952,7 +950,7 @@ func TestVUIntegrationTLSConfig(t *testing.T) {
 
 func TestVUIntegrationHTTP2(t *testing.T) {
 	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
+		URL: &url.URL{Path: "/script.js"},
 		Data: []byte(`
 			import http from "k6/http";
 			export default function() {
@@ -1002,7 +1000,7 @@ func TestVUIntegrationHTTP2(t *testing.T) {
 
 func TestVUIntegrationOpenFunctionError(t *testing.T) {
 	r, err := New(&lib.SourceData{
-		Filename: "/script.js",
+		URL: &url.URL{Path: "/script.js"},
 		Data: []byte(`
 			export default function() { open("/tmp/foo") }
 		`),
@@ -1021,7 +1019,7 @@ func TestVUIntegrationCookiesReset(t *testing.T) {
 	defer tb.Cleanup()
 
 	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
+		URL: &url.URL{Path: "/script.js"},
 		Data: []byte(tb.Replacer.Replace(`
 			import http from "k6/http";
 			export default function() {
@@ -1074,7 +1072,7 @@ func TestVUIntegrationCookiesNoReset(t *testing.T) {
 	defer tb.Cleanup()
 
 	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
+		URL: &url.URL{Path: "/script.js"},
 		Data: []byte(tb.Replacer.Replace(`
 			import http from "k6/http";
 			export default function() {
@@ -1131,7 +1129,7 @@ func TestVUIntegrationCookiesNoReset(t *testing.T) {
 
 func TestVUIntegrationVUID(t *testing.T) {
 	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
+		URL: &url.URL{Path: "/script.js"},
 		Data: []byte(`
 			export default function() {
 				if (__VU != 1234) { throw new Error("wrong __VU: " + __VU); }
@@ -1227,7 +1225,7 @@ func TestVUIntegrationClientCerts(t *testing.T) {
 	go func() { _ = srv.Serve(listener) }()
 
 	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
+		URL: &url.URL{Path: "/script.js"},
 		Data: []byte(fmt.Sprintf(`
 			import http from "k6/http";
 			export default function() { http.get("https://%s")}
@@ -1310,7 +1308,7 @@ func TestHTTPRequestInInitContext(t *testing.T) {
 	defer tb.Cleanup()
 
 	_, err := New(&lib.SourceData{
-		Filename: "/script.js",
+		URL: &url.URL{Path: "/script.js"},
 		Data: []byte(tb.Replacer.Replace(`
 					import { check, fail } from "k6";
 					import http from "k6/http";
@@ -1392,10 +1390,11 @@ func TestInitContextForbidden(t *testing.T) {
 	defer tb.Cleanup()
 
 	for _, test := range table {
+		test := test
 		t.Run(test[0], func(t *testing.T) {
 			_, err := New(&lib.SourceData{
-				Filename: "/script.js",
-				Data:     []byte(tb.Replacer.Replace(test[1])),
+				URL:  &url.URL{Path: "/script.js"},
+				Data: []byte(tb.Replacer.Replace(test[1])),
 			}, afero.NewMemMapFs(), lib.RuntimeOptions{})
 			if assert.Error(t, err) {
 				assert.Equal(
@@ -1414,7 +1413,7 @@ func TestArchiveRunningIntegraty(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	require.NoError(t, afero.WriteFile(fs, "/home/somebody/test.json", []byte(`42`), os.ModePerm))
 	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
+		URL: &url.URL{Path: "/script.js"},
 		Data: []byte(tb.Replacer.Replace(`
 			let fput = open("/home/somebody/test.json");
 			export let options = { setupTimeout: "10s", teardownTimeout: "10s" };
@@ -1459,7 +1458,7 @@ func TestArchiveNotPanicking(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	require.NoError(t, afero.WriteFile(fs, "/non/existent", []byte(`42`), os.ModePerm))
 	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
+		URL: &url.URL{Path: "/script.js"},
 		Data: []byte(tb.Replacer.Replace(`
 			let fput = open("/non/existent");
 			export default function(data) {
@@ -1469,7 +1468,7 @@ func TestArchiveNotPanicking(t *testing.T) {
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
-	arc.Files = make(map[string][]byte)
+	arc.FSes = map[string]afero.Fs{"file": afero.NewMemMapFs()}
 	r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
 	// we do want this to error here as this is where we find out that a given file is not in the
 	// archive
@@ -1482,7 +1481,7 @@ func TestStuffNotPanicking(t *testing.T) {
 	defer tb.Cleanup()
 
 	r, err := New(&lib.SourceData{
-		Filename: "/script.js",
+		URL: &url.URL{Path: "/script.js"},
 		Data: []byte(tb.Replacer.Replace(`
 			import http from "k6/http";
 			import ws from "k6/ws";

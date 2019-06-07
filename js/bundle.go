@@ -23,7 +23,8 @@ package js
 import (
 	"context"
 	"encoding/json"
-	"os"
+	"net/url"
+	"time"
 
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
@@ -38,7 +39,7 @@ import (
 // A Bundle is a self-contained bundle of scripts and resources.
 // You can use this to produce identical BundleInstance objects.
 type Bundle struct {
-	Filename string
+	Filename *url.URL
 	Source   string
 	Program  *goja.Program
 	Options  lib.Options
@@ -55,8 +56,24 @@ type BundleInstance struct {
 	Default goja.Callable
 }
 
+type cacheOnReadFs struct {
+	afero.Fs
+	cache afero.Fs
+}
+
+func newCacheOnReadFs(base, layer afero.Fs, cacheTime time.Duration) afero.Fs {
+	return cacheOnReadFs{
+		Fs:    afero.NewCacheOnReadFs(base, layer, cacheTime),
+		cache: layer,
+	}
+}
+
+func (c cacheOnReadFs) GetCachedFs() afero.Fs {
+	return c.cache
+}
+
 // NewBundle creates a new bundle from a source file and a filesystem.
-func NewBundle(src *lib.SourceData, fs afero.Fs, rtOpts lib.RuntimeOptions) (*Bundle, error) {
+func NewBundle(src *lib.SourceData, fileFS afero.Fs, rtOpts lib.RuntimeOptions) (*Bundle, error) {
 	compiler, err := compiler.New()
 	if err != nil {
 		return nil, err
@@ -64,7 +81,7 @@ func NewBundle(src *lib.SourceData, fs afero.Fs, rtOpts lib.RuntimeOptions) (*Bu
 
 	// Compile sources, both ES5 and ES6 are supported.
 	code := string(src.Data)
-	pgm, _, err := compiler.Compile(code, src.Filename, "", "", true)
+	pgm, _, err := compiler.Compile(code, src.URL.String(), "", "", true)
 	if err != nil {
 		return nil, err
 	}
@@ -73,15 +90,19 @@ func NewBundle(src *lib.SourceData, fs afero.Fs, rtOpts lib.RuntimeOptions) (*Bu
 	// written every time something is read from the real filesystem. This cache is then used for
 	// successive spawns to read from (they have no access to the real disk).
 	mirrorFS := afero.NewMemMapFs()
-	cachedFS := afero.NewCacheOnReadFs(fs, mirrorFS, 0)
+	cachedFS := newCacheOnReadFs(fileFS, mirrorFS, 0)
+	fses := map[string]afero.Fs{
+		"file":  cachedFS,
+		"https": afero.NewMemMapFs(),
+	}
 
 	// Make a bundle, instantiate it into a throwaway VM to populate caches.
 	rt := goja.New()
 	bundle := Bundle{
-		Filename:        src.Filename,
+		Filename:        src.URL,
 		Source:          code,
 		Program:         pgm,
-		BaseInitContext: NewInitContext(rt, compiler, new(context.Context), cachedFS, loader.Dir(src.Filename)),
+		BaseInitContext: NewInitContext(rt, compiler, new(context.Context), fses, loader.Dir(src.URL)),
 		Env:             rtOpts.Env,
 	}
 	if err := bundle.instantiate(rt, bundle.BaseInitContext); err != nil {
@@ -146,8 +167,17 @@ func NewBundleFromArchive(arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle,
 	if err != nil {
 		return nil, err
 	}
-	initctx := NewInitContext(goja.New(), compiler, new(context.Context), arc.FS, arc.Pwd)
-	initctx.files = arc.Files
+	pwdURL, err := loader.Resolve(&url.URL{Scheme: "file", Path: "/"}, arc.Pwd)
+	if err != nil {
+		return nil, err
+	}
+
+	filenameURL, err := loader.Resolve(pwdURL, arc.Filename)
+	if err != nil {
+		return nil, err
+	}
+
+	initctx := NewInitContext(goja.New(), compiler, new(context.Context), arc.FSes, pwdURL)
 
 	env := arc.Env
 	if env == nil {
@@ -159,7 +189,7 @@ func NewBundleFromArchive(arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle,
 	}
 
 	bundle := &Bundle{
-		Filename:        arc.Filename,
+		Filename:        filenameURL,
 		Source:          string(arc.Data),
 		Program:         pgm,
 		Options:         arc.Options,
@@ -175,27 +205,17 @@ func NewBundleFromArchive(arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle,
 func (b *Bundle) makeArchive() *lib.Archive {
 	arc := &lib.Archive{
 		Type:     "js",
-		FS:       afero.NewMemMapFs(),
+		FSes:     b.BaseInitContext.fses,
 		Options:  b.Options,
-		Filename: b.Filename,
+		Filename: b.Filename.String(),
 		Data:     []byte(b.Source),
-		Pwd:      b.BaseInitContext.pwd,
+		Pwd:      b.BaseInitContext.pwd.String(),
 		Env:      make(map[string]string, len(b.Env)),
 	}
 	// Copy env so changes in the archive are not reflected in the source Bundle
 	for k, v := range b.Env {
 		arc.Env[k] = v
 	}
-
-	arc.Scripts = make(map[string][]byte, len(b.BaseInitContext.programs))
-	for name, pgm := range b.BaseInitContext.programs {
-		arc.Scripts[name] = []byte(pgm.src)
-		err := afero.WriteFile(arc.FS, name, []byte(pgm.src), os.ModePerm)
-		if err != nil {
-			return nil
-		}
-	}
-	arc.Files = b.BaseInitContext.files
 
 	return arc
 }

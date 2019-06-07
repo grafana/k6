@@ -23,6 +23,7 @@ package local
 import (
 	"context"
 	"net"
+	"net/url"
 	"runtime"
 	"sync/atomic"
 	"testing"
@@ -481,7 +482,7 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 	}`)
 
 	runner, err := js.New(
-		&lib.SourceData{Filename: "/script.js", Data: script},
+		&lib.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script},
 		afero.NewMemMapFs(),
 		lib.RuntimeOptions{},
 	)

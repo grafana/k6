@@ -2,6 +2,7 @@ package js
 
 import (
 	"context"
+	"net/url"
 	"testing"
 
 	"github.com/loadimpact/k6/lib"
@@ -18,7 +19,7 @@ func BenchmarkHTTPRequests(b *testing.B) {
 	defer tb.Cleanup()
 
 	r, err := New(&lib.SourceData{
-		Filename: "/script.js",
+		URL: &url.URL{Path: "/script.js"},
 		Data: []byte(tb.Replacer.Replace(`
 			import http from "k6/http";
 			export default function() {

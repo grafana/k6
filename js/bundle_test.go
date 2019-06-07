@@ -24,6 +24,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io/ioutil"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -41,12 +42,15 @@ import (
 )
 
 func getSimpleBundle(filename, data string) (*Bundle, error) {
+	return getSimpleBundleWithFs(filename, data, afero.NewMemMapFs())
+}
+func getSimpleBundleWithFs(filename, data string, fs afero.Fs) (*Bundle, error) {
 	return NewBundle(
 		&lib.SourceData{
-			Filename: filename,
-			Data:     []byte(data),
+			URL:  &url.URL{Path: filename, Scheme: "file"},
+			Data: []byte(data),
 		},
-		afero.NewMemMapFs(),
+		fs,
 		lib.RuntimeOptions{},
 	)
 }
@@ -58,11 +62,11 @@ func TestNewBundle(t *testing.T) {
 	})
 	t.Run("Invalid", func(t *testing.T) {
 		_, err := getSimpleBundle("/script.js", "\x00")
-		assert.Contains(t, err.Error(), "SyntaxError: /script.js: Unexpected character '\x00' (1:0)\n> 1 | \x00\n")
+		assert.Contains(t, err.Error(), "SyntaxError: file:///script.js: Unexpected character '\x00' (1:0)\n> 1 | \x00\n")
 	})
 	t.Run("Error", func(t *testing.T) {
 		_, err := getSimpleBundle("/script.js", `throw new Error("aaaa");`)
-		assert.EqualError(t, err, "Error: aaaa at /script.js:1:7(3)")
+		assert.EqualError(t, err, "Error: aaaa at file:///script.js:1:7(3)")
 	})
 	t.Run("InvalidExports", func(t *testing.T) {
 		_, err := getSimpleBundle("/script.js", `exports = null`)
@@ -87,8 +91,8 @@ func TestNewBundle(t *testing.T) {
 	t.Run("stdin", func(t *testing.T) {
 		b, err := getSimpleBundle("-", `export default function() {};`)
 		if assert.NoError(t, err) {
-			assert.Equal(t, "-", b.Filename)
-			assert.Equal(t, "/", b.BaseInitContext.pwd)
+			assert.Equal(t, "file://-", b.Filename.String())
+			assert.Equal(t, "file:///", b.BaseInitContext.pwd.String())
 		}
 	})
 	t.Run("Options", func(t *testing.T) {
@@ -358,7 +362,7 @@ func TestNewBundleFromArchive(t *testing.T) {
 	assert.NoError(t, afero.WriteFile(fs, "/path/to/exclaim.js", []byte(`export default function(s) { return s + "!" };`), 0644))
 
 	src := &lib.SourceData{
-		Filename: "/path/to/script.js",
+		URL: &url.URL{Path: "/path/to/script.js", Scheme: "file"},
 		Data: []byte(`
 			import exclaim from "./exclaim.js";
 			export let options = { vus: 12345 };
@@ -385,13 +389,17 @@ func TestNewBundleFromArchive(t *testing.T) {
 	arc := b.makeArchive()
 	assert.Equal(t, "js", arc.Type)
 	assert.Equal(t, lib.Options{VUs: null.IntFrom(12345)}, arc.Options)
-	assert.Equal(t, "/path/to/script.js", arc.Filename)
+	assert.Equal(t, "file:///path/to/script.js", arc.Filename)
 	assert.Equal(t, string(src.Data), string(arc.Data))
-	assert.Equal(t, "/path/to", arc.Pwd)
-	assert.Len(t, arc.Scripts, 1)
-	assert.Equal(t, `export default function(s) { return s + "!" };`, string(arc.Scripts["/path/to/exclaim.js"]))
-	assert.Len(t, arc.Files, 1)
-	assert.Equal(t, `hi`, string(arc.Files["/path/to/file.txt"]))
+	assert.Equal(t, "file:///path/to/", arc.Pwd)
+
+	exclaimData, err := afero.ReadFile(arc.FSes["file"], "/path/to/exclaim.js")
+	assert.NoError(t, err)
+	assert.Equal(t, `export default function(s) { return s + "!" };`, string(exclaimData))
+
+	fileData, err := afero.ReadFile(arc.FSes["file"], "/path/to/file.txt")
+	assert.NoError(t, err)
+	assert.Equal(t, `hi`, string(fileData))
 
 	b2, err := NewBundleFromArchive(arc, lib.RuntimeOptions{})
 	if !assert.NoError(t, err) {
@@ -521,7 +529,7 @@ func TestOpen(t *testing.T) {
 						pwd = "/path/to/"
 					}
 					src := &lib.SourceData{
-						Filename: filepath.Join(prefix, filepath.Join(pwd, "script.js")),
+						URL: &url.URL{Scheme: "file", Path: filepath.Join(prefix, filepath.Join(pwd, "script.js"))},
 						Data: []byte(`
 			export let file = open("` + openPath + `");
 			export default function() { return file };
@@ -600,7 +608,7 @@ func TestBundleEnv(t *testing.T) {
 
 	b1, err := NewBundle(
 		&lib.SourceData{
-			Filename: "/script.js",
+			URL: &url.URL{Path: "/script.js"},
 			Data: []byte(`
 				export default function() {
 					if (__ENV.TEST_A !== "1") { throw new Error("Invalid TEST_A: " + __ENV.TEST_A); }

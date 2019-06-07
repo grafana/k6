@@ -27,6 +27,7 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"sync"
 	"testing"
 	"time"
@@ -135,8 +136,8 @@ func TestCloudCollector(t *testing.T) {
 	defer tb.Cleanup()
 
 	script := &lib.SourceData{
-		Data:     []byte(""),
-		Filename: "/script.js",
+		Data: []byte(""),
+		URL:  &url.URL{Path: "/script.js"},
 	}
 
 	options := lib.Options{
@@ -281,8 +282,8 @@ func TestCloudCollectorMaxPerPacket(t *testing.T) {
 	defer tb.Cleanup()
 
 	script := &lib.SourceData{
-		Data:     []byte(""),
-		Filename: "/script.js",
+		Data: []byte(""),
+		URL:  &url.URL{Path: "/script.js"},
 	}
 
 	options := lib.Options{

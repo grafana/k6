@@ -23,6 +23,7 @@ package cmd
 import (
 	"bytes"
 	"fmt"
+	"net/url"
 	"os"
 	"runtime"
 	"strings"
@@ -220,8 +221,8 @@ func TestEnvVars(t *testing.T) {
 
 			runner, err := newRunner(
 				&lib.SourceData{
-					Data:     []byte(jsCode),
-					Filename: "/script.js",
+					Data: []byte(jsCode),
+					URL:  &url.URL{Path: "/script.js"},
 				},
 				typeJS,
 				afero.NewOsFs(),
@@ -234,16 +235,15 @@ func TestEnvVars(t *testing.T) {
 			assert.NoError(t, archive.Write(archiveBuf))
 
 			getRunnerErr := func(rtOpts lib.RuntimeOptions) (lib.Runner, error) {
-				r, err := newRunner(
+				return newRunner(
 					&lib.SourceData{
-						Data:     []byte(archiveBuf.Bytes()),
-						Filename: "/script.tar",
+						Data: archiveBuf.Bytes(),
+						URL:  &url.URL{Path: "/script.js"},
 					},
 					typeArchive,
 					afero.NewOsFs(),
 					rtOpts,
 				)
-				return r, err
 			}
 
 			_, err = getRunnerErr(lib.RuntimeOptions{})

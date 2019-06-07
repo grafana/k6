@@ -24,6 +24,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -37,9 +38,12 @@ import (
 	"github.com/spf13/afero"
 )
 
-var volumeRE = regexp.MustCompile(`^([a-zA-Z]):(.*)`)
-var sharedRE = regexp.MustCompile(`^\\\\([^\\]+)`) // matches a shared folder in Windows before backslack replacement. i.e \\VMBOXSVR\k6\script.js
-var homeDirRE = regexp.MustCompile(`^(/[a-zA-Z])?/(Users|home|Documents and Settings)/(?:[^/]+)`)
+//nolint: gochecknoglobals, lll
+var (
+	volumeRE  = regexp.MustCompile(`^/?([a-zA-Z]):(.*)`)
+	sharedRE  = regexp.MustCompile(`^\\\\([^\\]+)`) // matches a shared folder in Windows before backslack replacement. i.e \\VMBOXSVR\k6\script.js
+	homeDirRE = regexp.MustCompile(`^(/[a-zA-Z])?/(Users|home|Documents and Settings)/(?:[^/]+)`)
+)
 
 // NormalizeAndAnonymizePath Normalizes (to use a / path separator) and anonymizes a file path, by scrubbing usernames from home directories.
 func NormalizeAndAnonymizePath(path string) string {
@@ -82,25 +86,29 @@ type Archive struct {
 	// Working directory for resolving relative paths.
 	Pwd string `json:"pwd"`
 
-	// Archived filesystem.
-	Scripts map[string][]byte `json:"-"` // included scripts
-	Files   map[string][]byte `json:"-"` // non-script resources
-
-	FS afero.Fs `json:"-"`
+	FSes map[string]afero.Fs `json:"-"`
 
 	// Environment variables
 	Env map[string]string `json:"env"`
 }
 
-// Reads an archive created by Archive.Write from a reader.
-func ReadArchive(in io.Reader) (*Archive, error) {
-	r := tar.NewReader(in)
-	arc := &Archive{
-		Scripts: make(map[string][]byte),
-		Files:   make(map[string][]byte),
-		FS:      &normalizedFS{Fs: afero.NewMemMapFs()},
+func (arc *Archive) getFs(name string) afero.Fs {
+	fs, ok := arc.FSes[name]
+	if !ok {
+		fs = afero.NewMemMapFs()
+		if name == "file" {
+			fs = &normalizedFS{fs}
+		}
+		arc.FSes[name] = fs
 	}
 
+	return fs
+}
+
+// ReadArchive reads an archive created by Archive.Write from a reader.
+func ReadArchive(in io.Reader) (*Archive, error) {
+	r := tar.NewReader(in)
+	arc := &Archive{FSes: make(map[string]afero.Fs, 2)}
 	for {
 		hdr, err := r.Next()
 		if err != nil {
@@ -109,7 +117,7 @@ func ReadArchive(in io.Reader) (*Archive, error) {
 			}
 			return nil, err
 		}
-		if hdr.Typeflag != tar.TypeReg && hdr.Typeflag != tar.TypeRegA {
+		if hdr.Typeflag != tar.TypeReg && hdr.Typeflag != tar.TypeRegA && hdr.Typeflag != tar.TypeDir {
 			continue
 		}
 
@@ -129,6 +137,7 @@ func ReadArchive(in io.Reader) (*Archive, error) {
 			continue
 		case "data":
 			arc.Data = data
+			continue
 		}
 
 		// Path separator normalization for older archives (<=0.20.0)
@@ -138,28 +147,36 @@ func ReadArchive(in io.Reader) (*Archive, error) {
 			continue
 		}
 		pfx := normPath[:idx]
-		name := normPath[idx+1:]
-		if name != "" && name[0] == '_' {
-			name = name[1:]
-		}
+		name := normPath[idx:]
 
-		var dst map[string][]byte
 		switch pfx {
-		case "files":
-			dst = arc.Files
-		case "scripts":
-			dst = arc.Scripts
+		case "files", "scripts": // old archives
+			// in old archives (pre 0.25.0) names without "_" at the beginning were  https, the ones with "_" are local files
+			pfx = "https"
+			if len(name) >= 2 && name[0:2] == "/_" {
+				pfx = "file"
+				name = name[2:]
+			}
+			fallthrough
+		case "https", "file":
+			fs := arc.getFs(pfx)
+			if hdr.Typeflag == tar.TypeDir {
+				err = fs.Mkdir(name, os.FileMode(hdr.Mode))
+			} else {
+				err = afero.WriteFile(fs, name, data, os.FileMode(hdr.Mode))
+			}
+			if err != nil {
+				return nil, err
+			}
+			err = fs.Chtimes(name, hdr.AccessTime, hdr.ModTime)
+			if err != nil {
+				return nil, err
+			}
 		default:
-			continue
-		}
-
-		dst[name] = data
-
-		err = afero.WriteFile(arc.FS, name, data, os.ModePerm)
-		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("unknown file prefix `%s` for file `%s`", pfx, normPath)
 		}
 	}
+	// TODO write the data to pwd in the appropriate archive
 
 	return arc, nil
 }
@@ -171,7 +188,6 @@ func ReadArchive(in io.Reader) (*Archive, error) {
 // the current one.
 func (arc *Archive) Write(out io.Writer) error {
 	w := tar.NewWriter(out)
-	t := time.Now()
 
 	metaArc := *arc
 	metaArc.Filename = NormalizeAndAnonymizePath(metaArc.Filename)
@@ -184,10 +200,10 @@ func (arc *Archive) Write(out io.Writer) error {
 		Name:     "metadata.json",
 		Mode:     0644,
 		Size:     int64(len(metadata)),
-		ModTime:  t,
+		ModTime:  time.Now(),
 		Typeflag: tar.TypeReg,
 	})
-	if _, err := w.Write(metadata); err != nil {
+	if _, err = w.Write(metadata); err != nil {
 		return err
 	}
 
@@ -195,27 +211,20 @@ func (arc *Archive) Write(out io.Writer) error {
 		Name:     "data",
 		Mode:     0644,
 		Size:     int64(len(arc.Data)),
-		ModTime:  t,
+		ModTime:  time.Now(),
 		Typeflag: tar.TypeReg,
 	})
-	if _, err := w.Write(arc.Data); err != nil {
+	if _, err = w.Write(arc.Data); err != nil {
 		return err
 	}
-
-	arcfs := []struct {
-		name  string
-		files map[string][]byte
-	}{
-		{"scripts", arc.Scripts},
-		{"files", arc.Files},
-	}
-	for _, entry := range arcfs {
-		_ = w.WriteHeader(&tar.Header{
-			Name:     entry.name,
-			Mode:     0755,
-			ModTime:  t,
-			Typeflag: tar.TypeDir,
-		})
+	for _, name := range [...]string{"file", "https"} {
+		fs, ok := arc.FSes[name]
+		if !ok {
+			continue
+		}
+		if cachedfs, ok := fs.(interface{ GetCachedFs() afero.Fs }); ok {
+			fs = cachedfs.GetCachedFs()
+		}
 
 		// A couple of things going on here:
 		// - You can't just create file entries, you need to create directory entries too.
@@ -225,21 +234,33 @@ func (arc *Archive) Write(out io.Writer) error {
 		// - We don't want to leak private information (eg. usernames) in archives, so make sure to
 		//   anonymize paths before stuffing them in a shareable archive.
 		foundDirs := make(map[string]bool)
-		paths := make([]string, 0, len(entry.files))
-		files := make(map[string][]byte, len(entry.files))
-		for filePath, data := range entry.files {
-			filePath = NormalizeAndAnonymizePath(filePath)
-			files[filePath] = data
-			paths = append(paths, filePath)
-			dir := path.Dir(filePath)
-			for {
-				foundDirs[dir] = true
-				idx := strings.LastIndexByte(dir, os.PathSeparator)
-				if idx == -1 {
-					break
+		paths := make([]string, 0, 10)
+		infos := make(map[string]os.FileInfo) // ... fix this ?
+		files := make(map[string][]byte)
+		err = afero.Walk(fs, "/",
+			filepath.WalkFunc(func(filePath string, info os.FileInfo, err error) error {
+				if err != nil {
+					return err
 				}
-				dir = dir[:idx]
-			}
+				normalizedPath := NormalizeAndAnonymizePath(filePath)
+				infos[normalizedPath] = info
+				if info.IsDir() {
+					foundDirs[normalizedPath] = true
+					return nil
+				}
+
+				files[normalizedPath], err = afero.ReadFile(fs, filePath)
+				if err != nil {
+					return err
+				}
+				paths = append(paths, normalizedPath)
+				return nil
+			}))
+		if err != nil {
+			return err
+		}
+		if len(files) == 0 {
+			continue // we don't need to write anything for this fs, if this is not done the root will be written
 		}
 		dirs := make([]string, 0, len(foundDirs))
 		for dirpath := range foundDirs {
@@ -248,31 +269,28 @@ func (arc *Archive) Write(out io.Writer) error {
 		sort.Strings(paths)
 		sort.Strings(dirs)
 
-		for _, dirpath := range dirs {
-			if dirpath == "" || dirpath[0] == '/' {
-				dirpath = "_" + dirpath
-			}
+		for _, dirPath := range dirs {
 			_ = w.WriteHeader(&tar.Header{
-				Name:     path.Clean(entry.name + "/" + dirpath),
-				Mode:     0755,
-				ModTime:  t,
-				Typeflag: tar.TypeDir,
+				Name:       path.Clean(name + "/" + dirPath),
+				Mode:       int64(infos[dirPath].Mode()),
+				AccessTime: infos[dirPath].ModTime(),
+				ChangeTime: infos[dirPath].ModTime(),
+				ModTime:    infos[dirPath].ModTime(),
+				Typeflag:   tar.TypeDir,
 			})
 		}
 
 		for _, filePath := range paths {
-			data := files[filePath]
-			if filePath[0] == '/' {
-				filePath = "_" + filePath
-			}
 			_ = w.WriteHeader(&tar.Header{
-				Name:     path.Clean(entry.name + "/" + filePath),
-				Mode:     0644,
-				Size:     int64(len(data)),
-				ModTime:  t,
-				Typeflag: tar.TypeReg,
+				Name:       path.Clean(name + "/" + filePath),
+				Mode:       int64(infos[filePath].Mode()),
+				Size:       int64(len(files[filePath])),
+				AccessTime: infos[filePath].ModTime(),
+				ChangeTime: infos[filePath].ModTime(),
+				ModTime:    infos[filePath].ModTime(),
+				Typeflag:   tar.TypeReg,
 			})
-			if _, err := w.Write(data); err != nil {
+			if _, err := w.Write(files[filePath]); err != nil {
 				return err
 			}
 		}

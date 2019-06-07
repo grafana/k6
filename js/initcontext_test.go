@@ -27,6 +27,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"path/filepath"
 	"testing"
 	"time"
@@ -40,6 +41,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestInitContextRequire(t *testing.T) {
@@ -111,25 +113,20 @@ func TestInitContextRequire(t *testing.T) {
 		t.Run("Nonexistent", func(t *testing.T) {
 			path := filepath.FromSlash("/nonexistent.js")
 			_, err := getSimpleBundle("/script.js", `import "/nonexistent.js"; export default function() {}`)
-			assert.EqualError(t, err, fmt.Sprintf("GoError: open %s: file does not exist", path))
+			assert.Contains(t, err.Error(), fmt.Sprintf(`"file://%s" couldn't be found on local disk`, path))
 		})
 		t.Run("Invalid", func(t *testing.T) {
 			fs := afero.NewMemMapFs()
 			assert.NoError(t, afero.WriteFile(fs, "/file.js", []byte{0x00}, 0755))
-			_, err := NewBundle(&lib.SourceData{
-				Filename: "/script.js",
-				Data:     []byte(`import "/file.js"; export default function() {}`),
-			}, fs, lib.RuntimeOptions{})
-			assert.Contains(t, err.Error(), "SyntaxError: /file.js: Unexpected character '\x00' (1:0)\n> 1 | \x00\n")
+			_, err := getSimpleBundleWithFs("/script.js", `import "/file.js"; export default function() {}`, fs)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "SyntaxError: file:///file.js: Unexpected character '\x00' (1:0)\n> 1 | \x00\n")
 		})
 		t.Run("Error", func(t *testing.T) {
 			fs := afero.NewMemMapFs()
 			assert.NoError(t, afero.WriteFile(fs, "/file.js", []byte(`throw new Error("aaaa")`), 0755))
-			_, err := NewBundle(&lib.SourceData{
-				Filename: "/script.js",
-				Data:     []byte(`import "/file.js"; export default function() {}`),
-			}, fs, lib.RuntimeOptions{})
-			assert.EqualError(t, err, "Error: aaaa at /file.js:2:7(4)")
+			_, err := getSimpleBundleWithFs("/script.js", `import "/file.js"; export default function() {}`, fs)
+			assert.EqualError(t, err, "Error: aaaa at file:///file.js:2:7(4)")
 		})
 
 		imports := map[string]struct {
@@ -164,6 +161,7 @@ func TestInitContextRequire(t *testing.T) {
 		for libName, data := range imports {
 			t.Run("lib=\""+libName+"\"", func(t *testing.T) {
 				for constName, constPath := range data.ConstPaths {
+					constName, constPath := constName, constPath
 					name := "inline"
 					if constName != "" {
 						name = "const=\"" + constName + "\""
@@ -171,7 +169,7 @@ func TestInitContextRequire(t *testing.T) {
 					t.Run(name, func(t *testing.T) {
 						fs := afero.NewMemMapFs()
 						src := &lib.SourceData{
-							Filename: `/path/to/script.js`,
+							URL: &url.URL{Path: "/path/to/script.js", Scheme: "file"},
 							Data: []byte(fmt.Sprintf(`
 								import fn from "%s";
 								let v = fn();
@@ -200,7 +198,7 @@ func TestInitContextRequire(t *testing.T) {
 							return
 						}
 						if constPath != "" {
-							assert.Contains(t, b.BaseInitContext.programs, constPath)
+							assert.Contains(t, b.BaseInitContext.programs, "file://"+constPath)
 						}
 
 						_, err = b.Instantiate()
@@ -217,7 +215,7 @@ func TestInitContextRequire(t *testing.T) {
 			assert.NoError(t, afero.WriteFile(fs, "/a.js", []byte(`const myvar = "a";`), 0644))
 			assert.NoError(t, afero.WriteFile(fs, "/b.js", []byte(`const myvar = "b";`), 0644))
 			b, err := NewBundle(&lib.SourceData{
-				Filename: "/script.js",
+				URL: &url.URL{Path: "/script.js", Scheme: "file"},
 				Data: []byte(`
 				import "./a.js";
 				import "./b.js";
@@ -254,7 +252,7 @@ func createAndReadFile(t *testing.T, file string, content []byte, expectedLength
 	}
 
 	b, err := NewBundle(&lib.SourceData{
-		Filename: "/path/to/script.js",
+		URL: &url.URL{Path: "/path/to/script.js"},
 		Data: []byte(fmt.Sprintf(`
 				export let data = open("/path/to/%s"%s);
 				var expectedLength = %d;
@@ -325,8 +323,8 @@ func TestInitContextOpen(t *testing.T) {
 		fs := afero.NewMemMapFs()
 		path := filepath.FromSlash("/nonexistent.txt")
 		_, err := NewBundle(&lib.SourceData{
-			Filename: "/script.js",
-			Data:     []byte(`open("/nonexistent.txt"); export default function() {}`),
+			URL:  &url.URL{Path: "/script.js"},
+			Data: []byte(`open("/nonexistent.txt"); export default function() {}`),
 		}, fs, lib.RuntimeOptions{})
 		assert.EqualError(t, err, fmt.Sprintf("GoError: open %s: file does not exist", path))
 	})
@@ -364,7 +362,7 @@ func TestRequestWithBinaryFile(t *testing.T) {
 	assert.NoError(t, afero.WriteFile(fs, "/path/to/file.bin", []byte("hi!"), 0644))
 
 	b, err := NewBundle(&lib.SourceData{
-		Filename: "/path/to/script.js",
+		URL: &url.URL{Path: "/path/to/script.js"},
 		Data: []byte(fmt.Sprintf(`
 			import http from "k6/http";
 			let binFile = open("/path/to/file.bin", "b");

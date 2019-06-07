@@ -24,6 +24,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -40,10 +41,10 @@ const GroupSeparator = "::"
 // Error emitted if you attempt to instantiate a Group or Check that contains the separator.
 var ErrNameContainsGroupSeparator = errors.New("group and check names may not contain '::'")
 
-// Wraps a source file; data and filename.
+// SourceData wraps a source file; data and filename.
 type SourceData struct {
-	Data     []byte
-	Filename string
+	Data []byte
+	URL  *url.URL
 }
 
 // StageFields defines the fields used for a Stage; this is a dumb hack to make the JSON code

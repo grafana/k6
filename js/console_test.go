@@ -24,6 +24,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"net/url"
 	"os"
 	"testing"
 
@@ -91,7 +92,7 @@ func TestConsole(t *testing.T) {
 			for args, result := range argsets {
 				t.Run(args, func(t *testing.T) {
 					r, err := New(&lib.SourceData{
-						Filename: "/script",
+						URL: &url.URL{Path: "/script"},
 						Data: []byte(fmt.Sprintf(
 							`export default function() { console.%s(%s); }`,
 							name, args,
@@ -180,7 +181,7 @@ func TestFileConsole(t *testing.T) {
 
 							}
 							r, err := New(&lib.SourceData{
-								Filename: "/script",
+								URL: &url.URL{Path: "/script"},
 								Data: []byte(fmt.Sprintf(
 									`export default function() { console.%s(%s); }`,
 									name, args,

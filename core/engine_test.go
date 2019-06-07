@@ -23,6 +23,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"testing"
 	"time"
 
@@ -556,7 +557,7 @@ func TestSentReceivedMetrics(t *testing.T) {
 
 	runTest := func(t *testing.T, ts testScript, tc testCase, noConnReuse bool) (float64, float64) {
 		r, err := js.New(
-			&lib.SourceData{Filename: "/script.js", Data: []byte(ts.Code)},
+			&lib.SourceData{URL: &url.URL{Path: "/script.js"}, Data: []byte(ts.Code)},
 			afero.NewMemMapFs(),
 			lib.RuntimeOptions{},
 		)
@@ -697,7 +698,7 @@ func TestRunTags(t *testing.T) {
 	`))
 
 	r, err := js.New(
-		&lib.SourceData{Filename: "/script.js", Data: script},
+		&lib.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script},
 		afero.NewMemMapFs(),
 		lib.RuntimeOptions{},
 	)
@@ -797,7 +798,7 @@ func TestSetupTeardownThresholds(t *testing.T) {
 	`))
 
 	runner, err := js.New(
-		&lib.SourceData{Filename: "/script.js", Data: script},
+		&lib.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script},
 		afero.NewMemMapFs(),
 		lib.RuntimeOptions{},
 	)
@@ -860,7 +861,7 @@ func TestEmittedMetricsWhenScalingDown(t *testing.T) {
 	`))
 
 	runner, err := js.New(
-		&lib.SourceData{Filename: "/script.js", Data: script},
+		&lib.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script},
 		afero.NewMemMapFs(),
 		lib.RuntimeOptions{},
 	)
@@ -920,7 +921,7 @@ func TestMinIterationDuration(t *testing.T) {
 	t.Parallel()
 
 	runner, err := js.New(
-		&lib.SourceData{Filename: "/script.js", Data: []byte(`
+		&lib.SourceData{URL: &url.URL{Path: "/script.js"}, Data: []byte(`
 		import { Counter } from "k6/metrics";
 
 		let testCounter = new Counter("testcounter");

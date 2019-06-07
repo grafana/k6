@@ -29,9 +29,9 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"syscall"
@@ -508,13 +508,14 @@ func readSource(src, pwd string, fs afero.Fs, stdin io.Reader) (*lib.SourceData,
 		if err != nil {
 			return nil, err
 		}
-		return &lib.SourceData{Filename: "-", Data: data}, nil
+		return &lib.SourceData{URL: &url.URL{Path: "-", Scheme: "file"}, Data: data}, nil
 	}
-	abspath := filepath.Join(pwd, src)
-	if ok, _ := afero.Exists(fs, abspath); ok {
-		src = abspath
+	pwdURL := &url.URL{Scheme: "file", Path: pwd}
+	srcURL, err := loader.Resolve(pwdURL, src)
+	if err != nil {
+		return nil, err
 	}
-	return loader.Load(fs, pwd, src)
+	return loader.Load(map[string]afero.Fs{"file": fs, "https": afero.NewMemMapFs()}, srcURL, src)
 }
 
 // Creates a new runner.

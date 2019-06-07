@@ -22,6 +22,7 @@ package k6_test
 
 import (
 	"context"
+	"net/url"
 	"testing"
 	"time"
 
@@ -114,7 +115,7 @@ func TestSetupDataMarshalling(t *testing.T) {
 	`))
 
 	runner, err := js.New(
-		&lib.SourceData{Filename: "/script.js", Data: script},
+		&lib.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script},
 		afero.NewMemMapFs(),
 		lib.RuntimeOptions{},
 	)

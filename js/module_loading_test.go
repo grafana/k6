@@ -22,6 +22,7 @@ package js
 
 import (
 	"context"
+	"net/url"
 	"os"
 	"testing"
 
@@ -66,7 +67,7 @@ func TestLoadOnceGlobalVars(t *testing.T) {
 		}
 	`), os.ModePerm))
 	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
+		URL: &url.URL{Path: "/script.js", Scheme: "file"},
 		Data: []byte(`
 			import { A } from "./A.js";
 			import { B } from "./B.js";
@@ -84,7 +85,6 @@ func TestLoadOnceGlobalVars(t *testing.T) {
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
-	arc.Files = make(map[string][]byte)
 	r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
 	require.NoError(t, err)
 
@@ -116,7 +116,7 @@ func TestLoadDoesntBreakHTTPGet(t *testing.T) {
 		}
 	`)), os.ModePerm))
 	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
+		URL: &url.URL{Path: "/script.js", Scheme: "file"},
 		Data: []byte(`
 			import { A } from "./A.js";
 
@@ -132,7 +132,6 @@ func TestLoadDoesntBreakHTTPGet(t *testing.T) {
 
 	require.NoError(t, r1.SetOptions(lib.Options{Hosts: tb.Dialer.Hosts}))
 	arc := r1.MakeArchive()
-	arc.Files = make(map[string][]byte)
 	r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
 	require.NoError(t, err)
 
@@ -160,7 +159,7 @@ func TestLoadGlobalVarsAreNotSharedBetweenVUs(t *testing.T) {
 		}
 	`), os.ModePerm))
 	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
+		URL: &url.URL{Path: "/script.js", Scheme: "file"},
 		Data: []byte(`
 			import { A } from "./A.js";
 
@@ -177,7 +176,6 @@ func TestLoadGlobalVarsAreNotSharedBetweenVUs(t *testing.T) {
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
-	arc.Files = make(map[string][]byte)
 	r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
 	require.NoError(t, err)
 
@@ -232,13 +230,12 @@ func TestLoadCycle(t *testing.T) {
 	data, err := afero.ReadFile(fs, "/main.js")
 	require.NoError(t, err)
 	r1, err := New(&lib.SourceData{
-		Filename: "/main.js",
-		Data:     data,
+		URL:  &url.URL{Path: "/main.js", Scheme: "file"},
+		Data: data,
 	}, fs, lib.RuntimeOptions{})
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
-	arc.Files = make(map[string][]byte)
 	r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
 	require.NoError(t, err)
 
@@ -282,7 +279,7 @@ func TestLoadCycleBinding(t *testing.T) {
 	`), os.ModePerm))
 
 	r1, err := New(&lib.SourceData{
-		Filename: "/main.js",
+		URL: &url.URL{Path: "/main.js", Scheme: "file"},
 		Data: []byte(`
 			import {foo} from './a.js';
 			import {bar} from './b.js';
@@ -301,7 +298,6 @@ func TestLoadCycleBinding(t *testing.T) {
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
-	arc.Files = make(map[string][]byte)
 	r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
 	require.NoError(t, err)
 
@@ -342,7 +338,7 @@ func TestBrowserified(t *testing.T) {
 	`), os.ModePerm))
 
 	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
+		URL: &url.URL{Path: "/script.js", Scheme: "file"},
 		Data: []byte(`
 			import {alpha, bravo } from "./browserified.js";
 
@@ -366,7 +362,6 @@ func TestBrowserified(t *testing.T) {
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
-	arc.Files = make(map[string][]byte)
 	r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
 	require.NoError(t, err)
 
