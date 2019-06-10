@@ -325,10 +325,17 @@ func (t *Tracer) Done() *Trail {
 			trail.Sending = time.Duration(wroteRequest - gotConn)
 		}
 
-		if gotFirstResponseByte != 0 && gotFirstResponseByte > wroteRequest {
-			// For some requests, especially HTTP/2, the server starts responding before the
-			// client has finished sending the full request
-			trail.Waiting = time.Duration(gotFirstResponseByte - wroteRequest)
+		if gotFirstResponseByte != 0 {
+			// We started receiving at least some response back
+
+			if gotFirstResponseByte > wroteRequest {
+				// For some requests, especially HTTP/2, the server starts responding before the
+				// client has finished sending the full request
+				trail.Waiting = time.Duration(gotFirstResponseByte - wroteRequest)
+			}
+		} else {
+			// The server never responded to our request
+			trail.Waiting = done.Sub(time.Unix(0, wroteRequest))
 		}
 	}
 	if gotFirstResponseByte != 0 {

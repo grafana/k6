@@ -1610,3 +1610,97 @@ func TestErrorCodes(t *testing.T) {
 		})
 	}
 }
+
+func TestResponseWaitingAndReceivingTimings(t *testing.T) {
+	t.Parallel()
+	tb, state, _, rt, _ := newRuntime(t)
+	defer tb.Cleanup()
+
+	// We don't expect any failed requests
+	state.Options.Throw = null.BoolFrom(true)
+
+	tb.Mux.HandleFunc("/slow-response", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		flusher, ok := w.(http.Flusher)
+		require.True(t, ok)
+
+		time.Sleep(1200 * time.Millisecond)
+		n, err := w.Write([]byte("1st bytes!"))
+		assert.NoError(t, err)
+		assert.Equal(t, 10, n)
+
+		flusher.Flush()
+		time.Sleep(1200 * time.Millisecond)
+
+		n, err = w.Write([]byte("2nd bytes!"))
+		assert.NoError(t, err)
+		assert.Equal(t, 10, n)
+	}))
+
+	_, err := common.RunString(rt, tb.Replacer.Replace(`
+		let resp = http.get("HTTPBIN_URL/slow-response");
+
+		if (resp.timings.waiting < 1000) {
+			throw new Error("expected waiting time to be over 1000ms but was " + resp.timings.waiting);
+		}
+
+		if (resp.timings.receiving < 1000) {
+			throw new Error("expected receiving time to be over 1000ms but was " + resp.timings.receiving);
+		}
+
+		if (resp.body !== "1st bytes!2nd bytes!") {
+			throw new Error("wrong response body: " + resp.body);
+		}
+	`))
+	assert.NoError(t, err)
+}
+
+func TestResponseTimingsWhenTimeout(t *testing.T) {
+	t.Parallel()
+	tb, state, _, rt, _ := newRuntime(t)
+	defer tb.Cleanup()
+
+	// We expect a failed request
+	state.Options.Throw = null.BoolFrom(false)
+
+	_, err := common.RunString(rt, tb.Replacer.Replace(`
+		let resp = http.get("http://httpbin.org/delay/10", { timeout: 2500 });
+
+		if (resp.timings.waiting < 2000) {
+			throw new Error("expected waiting time to be over 2000ms but was " + resp.timings.waiting);
+		}
+
+		if (resp.timings.duration < 2000) {
+			throw new Error("expected duration time to be over 2000ms but was " + resp.timings.duration);
+		}
+	`))
+	assert.NoError(t, err)
+}
+
+func TestNoResponseBodyMangling(t *testing.T) {
+	t.Parallel()
+	tb, state, _, rt, _ := newRuntime(t)
+	defer tb.Cleanup()
+
+	// We don't expect any failed requests
+	state.Options.Throw = null.BoolFrom(true)
+
+	_, err := common.RunString(rt, tb.Replacer.Replace(`
+	    const batchSize = 100;
+
+		let requests = [];
+
+		for (let i = 0; i < batchSize; i++) {
+			requests.push(["GET", "HTTPBIN_URL/get?req=" + i, null, { responseType: (i % 2 ? "binary" : "text") }]);
+		}
+
+		let responses = http.batch(requests);
+
+		for (let i = 0; i < batchSize; i++) {
+			let reqNumber = parseInt(responses[i].json().args.req[0], 10);
+			if (i !== reqNumber) {
+				throw new Error("Response " + i + " has " + reqNumber + ", expected " + i)
+			}
+		}
+	`))
+	assert.NoError(t, err)
+}

@@ -21,29 +21,48 @@
 package httpext
 
 import (
+	"context"
 	"net"
 	"net/http"
 	"net/http/httptrace"
 	"strconv"
+	"sync"
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
-	"github.com/pkg/errors"
 )
 
-// transport is an implemenation of http.RoundTripper that will measure different metrics for each
-// roundtrip
+// transport is an implemenation of http.RoundTripper that will measure and emit
+// different metrics for each roundtrip
 type transport struct {
-	roundTripper http.RoundTripper
-	// TODO: maybe just take the SystemTags field as it is the only thing used
-	options   *lib.Options
-	tags      map[string]string
-	trail     *Trail
-	errorMsg  string
-	errorCode errCode
-	tlsInfo   netext.TLSInfo
-	samplesCh chan<- stats.SampleContainer
+	state *lib.State
+	tags  map[string]string
+
+	lastRequest     *unfinishedRequest
+	lastRequestLock *sync.Mutex
+}
+
+// unfinishedRequest stores the request and the raw result returned from the
+// underlying http.RoundTripper, but before its body has been read
+type unfinishedRequest struct {
+	ctx      context.Context
+	tracer   *Tracer
+	request  *http.Request
+	response *http.Response
+	err      error
+}
+
+// finishedRequest is produced once the request has been finalized; it is
+// triggered either by a subsequent RoundTrip, or for the last request in the
+// chain - by the MakeRequest function manually calling the transport method
+// processLastSavedRequest(), after reading the HTTP response body.
+type finishedRequest struct {
+	*unfinishedRequest
+	trcerTrail *Trail
+	tlsInfo    netext.TLSInfo
+	errorCode  errCode
+	errorMsg   string
 }
 
 var _ http.RoundTripper = &transport{}
@@ -51,104 +70,126 @@ var _ http.RoundTripper = &transport{}
 // NewTransport returns a new Transport wrapping around the provide Roundtripper and will send
 // samples on the provided channel adding the tags in accordance to the Options provided
 func newTransport(
-	roundTripper http.RoundTripper,
-	samplesCh chan<- stats.SampleContainer,
-	options *lib.Options,
+	state *lib.State,
 	tags map[string]string,
 ) *transport {
 	return &transport{
-		roundTripper: roundTripper,
-		tags:         tags,
-		options:      options,
-		samplesCh:    samplesCh,
+		state:           state,
+		tags:            tags,
+		lastRequestLock: new(sync.Mutex),
 	}
 }
 
-// SetOptions sets the options that should be used
-func (t *transport) SetOptions(options *lib.Options) {
-	t.options = options
-}
+// Helper method to finish the tracer trail, assemble the tag values and emits
+// the metric samples for the supplied unfinished request.
+func (t *transport) measureAndEmitMetrics(unfReq *unfinishedRequest) *finishedRequest {
+	trail := unfReq.tracer.Done()
 
-// GetTrail returns the Trail for the last request through the Transport
-func (t *transport) GetTrail() *Trail {
-	return t.trail
-}
-
-// TLSInfo returns the TLSInfo of the last tls request through the transport
-func (t *transport) TLSInfo() netext.TLSInfo {
-	return t.tlsInfo
-}
-
-// RoundTrip is the implementation of http.RoundTripper
-func (t *transport) RoundTrip(req *http.Request) (res *http.Response, err error) {
-	if t.roundTripper == nil {
-		return nil, errors.New("no roundtrip defined")
-	}
-
-	t.errorCode, t.errorMsg = 0, ""
 	tags := map[string]string{}
 	for k, v := range t.tags {
 		tags[k] = v
 	}
 
-	ctx := req.Context()
-	tracer := Tracer{}
-	reqWithTracer := req.WithContext(httptrace.WithClientTrace(ctx, tracer.Trace()))
+	result := &finishedRequest{
+		unfinishedRequest: unfReq,
+		trcerTrail:        trail,
+	}
 
-	resp, err := t.roundTripper.RoundTrip(reqWithTracer)
-	trail := tracer.Done()
-	if err != nil {
-		t.errorCode, t.errorMsg = errorCodeForError(err)
-		if t.options.SystemTags["error"] {
-			tags["error"] = t.errorMsg
+	enabledTags := t.state.Options.SystemTags
+	if unfReq.err != nil {
+		result.errorCode, result.errorMsg = errorCodeForError(unfReq.err)
+		if enabledTags["error"] {
+			tags["error"] = result.errorMsg
 		}
 
-		if t.options.SystemTags["error_code"] {
-			tags["error_code"] = strconv.Itoa(int(t.errorCode))
+		if enabledTags["error_code"] {
+			tags["error_code"] = strconv.Itoa(int(result.errorCode))
 		}
 
-		if t.options.SystemTags["status"] {
+		if enabledTags["status"] {
 			tags["status"] = "0"
 		}
 	} else {
-		if t.options.SystemTags["url"] {
-			tags["url"] = req.URL.String()
+		if enabledTags["url"] {
+			tags["url"] = unfReq.request.URL.String()
 		}
-		if t.options.SystemTags["status"] {
-			tags["status"] = strconv.Itoa(resp.StatusCode)
+		if enabledTags["status"] {
+			tags["status"] = strconv.Itoa(unfReq.response.StatusCode)
 		}
-		if resp.StatusCode >= 400 {
-			if t.options.SystemTags["error_code"] {
-				t.errorCode = errCode(1000 + resp.StatusCode)
-				tags["error_code"] = strconv.Itoa(int(t.errorCode))
+		if unfReq.response.StatusCode >= 400 {
+			if enabledTags["error_code"] {
+				result.errorCode = errCode(1000 + unfReq.response.StatusCode)
+				tags["error_code"] = strconv.Itoa(int(result.errorCode))
 			}
 		}
-		if t.options.SystemTags["proto"] {
-			tags["proto"] = resp.Proto
+		if enabledTags["proto"] {
+			tags["proto"] = unfReq.response.Proto
 		}
 
-		if resp.TLS != nil {
-			tlsInfo, oscp := netext.ParseTLSConnState(resp.TLS)
-			if t.options.SystemTags["tls_version"] {
+		if unfReq.response.TLS != nil {
+			tlsInfo, oscp := netext.ParseTLSConnState(unfReq.response.TLS)
+			if enabledTags["tls_version"] {
 				tags["tls_version"] = tlsInfo.Version
 			}
-			if t.options.SystemTags["ocsp_status"] {
+			if enabledTags["ocsp_status"] {
 				tags["ocsp_status"] = oscp.Status
 			}
-
-			t.tlsInfo = tlsInfo
+			result.tlsInfo = tlsInfo
 		}
 	}
-	if t.options.SystemTags["ip"] && trail.ConnRemoteAddr != nil {
-		var ip string
-		if ip, _, err = net.SplitHostPort(trail.ConnRemoteAddr.String()); err == nil {
+	if enabledTags["ip"] && trail.ConnRemoteAddr != nil {
+		if ip, _, err := net.SplitHostPort(trail.ConnRemoteAddr.String()); err == nil {
 			tags["ip"] = ip
 		}
 	}
 
-	t.trail = trail
 	trail.SaveSamples(stats.IntoSampleTags(&tags))
-	stats.PushIfNotCancelled(ctx, t.samplesCh, trail)
+	stats.PushIfNotCancelled(unfReq.ctx, t.state.Samples, trail)
+
+	return result
+}
+
+func (t *transport) saveCurrentRequest(currentRequest *unfinishedRequest) {
+	t.lastRequestLock.Lock()
+	unprocessedRequest := t.lastRequest
+	t.lastRequest = currentRequest
+	t.lastRequestLock.Unlock()
+
+	if unprocessedRequest != nil {
+		// This shouldn't happen, since we have one transport per request, but just in case...
+		t.state.Logger.Warnf("TracerTransport: unexpected unprocessed request for %s", unprocessedRequest.request.URL)
+		t.measureAndEmitMetrics(unprocessedRequest)
+	}
+}
+
+func (t *transport) processLastSavedRequest() *finishedRequest {
+	t.lastRequestLock.Lock()
+	unprocessedRequest := t.lastRequest
+	t.lastRequest = nil
+	t.lastRequestLock.Unlock()
+
+	if unprocessedRequest != nil {
+		return t.measureAndEmitMetrics(unprocessedRequest)
+	}
+	return nil
+}
+
+// RoundTrip is the implementation of http.RoundTripper
+func (t *transport) RoundTrip(req *http.Request) (*http.Response, error) {
+	t.processLastSavedRequest()
+
+	ctx := req.Context()
+	tracer := &Tracer{}
+	reqWithTracer := req.WithContext(httptrace.WithClientTrace(ctx, tracer.Trace()))
+	resp, err := t.state.Transport.RoundTrip(reqWithTracer)
+
+	t.saveCurrentRequest(&unfinishedRequest{
+		ctx:      ctx,
+		tracer:   tracer,
+		request:  req,
+		response: resp,
+		err:      err,
+	})
 
 	return resp, err
 }
