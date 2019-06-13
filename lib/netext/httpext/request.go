@@ -202,7 +202,7 @@ func readResponseBody(
 	buf.Reset()
 	_, err := io.Copy(buf, resp.Body)
 	_ = resp.Body.Close()
-	if err != nil && err != io.EOF {
+	if err != nil {
 		respErr = err
 	}
 

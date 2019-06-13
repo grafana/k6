@@ -1756,7 +1756,7 @@ func BenchmarkHandlingOfResponseBodies(b *testing.B) {
 	`)
 
 	testResponseType := func(responseType string) func(b *testing.B) {
-		testCode := strings.ReplaceAll(testCodeTemplate, "TEST_RESPONSE_TYPE", responseType)
+		testCode := strings.Replace(testCodeTemplate, "TEST_RESPONSE_TYPE", responseType, -1)
 		return func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				_, err := common.RunString(rt, testCode)
