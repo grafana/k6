@@ -101,7 +101,7 @@ func assertRequestMetricsEmitted(t *testing.T, sampleContainers []stats.SampleCo
 }
 
 func newRuntime(
-	t *testing.T,
+	t testing.TB,
 ) (*testutils.HTTPMultiBin, *lib.State, chan stats.SampleContainer, *goja.Runtime, *context.Context) {
 	tb := testutils.NewHTTPMultiBin(t)
 
@@ -134,8 +134,7 @@ func newRuntime(
 	}
 
 	ctx := new(context.Context)
-	*ctx = context.Background()
-	*ctx = lib.WithState(*ctx, state)
+	*ctx = lib.WithState(tb.Context, state)
 	*ctx = common.WithRuntime(*ctx, rt)
 	rt.Set("http", common.Bind(rt, New(), ctx))
 
@@ -265,7 +264,7 @@ func TestRequestAndBatch(t *testing.T) {
 			`))
 			endTime := time.Now()
 			assert.EqualError(t, err, sr("GoError: Get HTTPBIN_URL/delay/10: net/http: request canceled (Client.Timeout exceeded while awaiting headers)"))
-			assert.WithinDuration(t, startTime.Add(1*time.Second), endTime, 1*time.Second)
+			assert.WithinDuration(t, startTime.Add(1*time.Second), endTime, 2*time.Second)
 
 			logEntry := hook.LastEntry()
 			if assert.NotNil(t, logEntry) {
@@ -1609,4 +1608,167 @@ func TestErrorCodes(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestResponseWaitingAndReceivingTimings(t *testing.T) {
+	t.Parallel()
+	tb, state, _, rt, _ := newRuntime(t)
+	defer tb.Cleanup()
+
+	// We don't expect any failed requests
+	state.Options.Throw = null.BoolFrom(true)
+
+	tb.Mux.HandleFunc("/slow-response", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		flusher, ok := w.(http.Flusher)
+		require.True(t, ok)
+
+		time.Sleep(1200 * time.Millisecond)
+		n, err := w.Write([]byte("1st bytes!"))
+		assert.NoError(t, err)
+		assert.Equal(t, 10, n)
+
+		flusher.Flush()
+		time.Sleep(1200 * time.Millisecond)
+
+		n, err = w.Write([]byte("2nd bytes!"))
+		assert.NoError(t, err)
+		assert.Equal(t, 10, n)
+	}))
+
+	_, err := common.RunString(rt, tb.Replacer.Replace(`
+		let resp = http.get("HTTPBIN_URL/slow-response");
+
+		if (resp.timings.waiting < 1000) {
+			throw new Error("expected waiting time to be over 1000ms but was " + resp.timings.waiting);
+		}
+
+		if (resp.timings.receiving < 1000) {
+			throw new Error("expected receiving time to be over 1000ms but was " + resp.timings.receiving);
+		}
+
+		if (resp.body !== "1st bytes!2nd bytes!") {
+			throw new Error("wrong response body: " + resp.body);
+		}
+	`))
+	assert.NoError(t, err)
+}
+
+func TestResponseTimingsWhenTimeout(t *testing.T) {
+	t.Parallel()
+	tb, state, _, rt, _ := newRuntime(t)
+	defer tb.Cleanup()
+
+	// We expect a failed request
+	state.Options.Throw = null.BoolFrom(false)
+
+	_, err := common.RunString(rt, tb.Replacer.Replace(`
+		let resp = http.get("http://httpbin.org/delay/10", { timeout: 2500 });
+
+		if (resp.timings.waiting < 2000) {
+			throw new Error("expected waiting time to be over 2000ms but was " + resp.timings.waiting);
+		}
+
+		if (resp.timings.duration < 2000) {
+			throw new Error("expected duration time to be over 2000ms but was " + resp.timings.duration);
+		}
+	`))
+	assert.NoError(t, err)
+}
+
+func TestNoResponseBodyMangling(t *testing.T) {
+	t.Parallel()
+	tb, state, _, rt, _ := newRuntime(t)
+	defer tb.Cleanup()
+
+	// We don't expect any failed requests
+	state.Options.Throw = null.BoolFrom(true)
+
+	_, err := common.RunString(rt, tb.Replacer.Replace(`
+	    const batchSize = 100;
+
+		let requests = [];
+
+		for (let i = 0; i < batchSize; i++) {
+			requests.push(["GET", "HTTPBIN_URL/get?req=" + i, null, { responseType: (i % 2 ? "binary" : "text") }]);
+		}
+
+		let responses = http.batch(requests);
+
+		for (let i = 0; i < batchSize; i++) {
+			let reqNumber = parseInt(responses[i].json().args.req[0], 10);
+			if (i !== reqNumber) {
+				throw new Error("Response " + i + " has " + reqNumber + ", expected " + i)
+			}
+		}
+	`))
+	assert.NoError(t, err)
+}
+
+func BenchmarkHandlingOfResponseBodies(b *testing.B) {
+	tb, state, samples, rt, _ := newRuntime(b)
+	defer tb.Cleanup()
+
+	state.BPool = bpool.NewBufferPool(100)
+
+	go func() {
+		ctxDone := tb.Context.Done()
+		for {
+			select {
+			case <-samples:
+			case <-ctxDone:
+				return
+			}
+		}
+	}()
+
+	mbData := bytes.Repeat([]byte("0123456789"), 100000)
+	tb.Mux.HandleFunc("/1mbdata", http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+		_, err := resp.Write(mbData)
+		if err != nil {
+			b.Error(err)
+		}
+	}))
+
+	testCodeTemplate := tb.Replacer.Replace(`
+		http.get("HTTPBIN_URL/", { responseType: "TEST_RESPONSE_TYPE" });
+		http.post("HTTPBIN_URL/post", { responseType: "TEST_RESPONSE_TYPE" });
+		http.batch([
+			["GET", "HTTPBIN_URL/gzip", null, { responseType: "TEST_RESPONSE_TYPE" }],
+			["GET", "HTTPBIN_URL/gzip", null, { responseType: "TEST_RESPONSE_TYPE" }],
+			["GET", "HTTPBIN_URL/deflate", null, { responseType: "TEST_RESPONSE_TYPE" }],
+			["GET", "HTTPBIN_URL/deflate", null, { responseType: "TEST_RESPONSE_TYPE" }],
+			["GET", "HTTPBIN_URL/redirect/5", null, { responseType: "TEST_RESPONSE_TYPE" }], // 6 requests
+			["GET", "HTTPBIN_URL/get", null, { responseType: "TEST_RESPONSE_TYPE" }],
+			["GET", "HTTPBIN_URL/html", null, { responseType: "TEST_RESPONSE_TYPE" }],
+			["GET", "HTTPBIN_URL/bytes/100000", null, { responseType: "TEST_RESPONSE_TYPE" }],
+			["GET", "HTTPBIN_URL/image/png", null, { responseType: "TEST_RESPONSE_TYPE" }],
+			["GET", "HTTPBIN_URL/image/jpeg", null, { responseType: "TEST_RESPONSE_TYPE" }],
+			["GET", "HTTPBIN_URL/image/jpeg", null, { responseType: "TEST_RESPONSE_TYPE" }],
+			["GET", "HTTPBIN_URL/image/webp", null, { responseType: "TEST_RESPONSE_TYPE" }],
+			["GET", "HTTPBIN_URL/image/svg", null, { responseType: "TEST_RESPONSE_TYPE" }],
+			["GET", "HTTPBIN_URL/forms/post", null, { responseType: "TEST_RESPONSE_TYPE" }],
+			["GET", "HTTPBIN_URL/bytes/100000", null, { responseType: "TEST_RESPONSE_TYPE" }],
+			["GET", "HTTPBIN_URL/stream-bytes/100000", null, { responseType: "TEST_RESPONSE_TYPE" }],
+		]);
+		http.get("HTTPBIN_URL/get", { responseType: "TEST_RESPONSE_TYPE" });
+		http.get("HTTPBIN_URL/get", { responseType: "TEST_RESPONSE_TYPE" });
+		http.get("HTTPBIN_URL/1mbdata", { responseType: "TEST_RESPONSE_TYPE" });
+	`)
+
+	testResponseType := func(responseType string) func(b *testing.B) {
+		testCode := strings.Replace(testCodeTemplate, "TEST_RESPONSE_TYPE", responseType, -1)
+		return func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				_, err := common.RunString(rt, testCode)
+				if err != nil {
+					b.Error(err)
+				}
+			}
+		}
+	}
+
+	b.ResetTimer()
+	b.Run("text", testResponseType("text"))
+	b.Run("binary", testResponseType("binary"))
+	b.Run("none", testResponseType("none"))
 }
