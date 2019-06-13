@@ -101,7 +101,7 @@ func assertRequestMetricsEmitted(t *testing.T, sampleContainers []stats.SampleCo
 }
 
 func newRuntime(
-	t *testing.T,
+	t testing.TB,
 ) (*testutils.HTTPMultiBin, *lib.State, chan stats.SampleContainer, *goja.Runtime, *context.Context) {
 	tb := testutils.NewHTTPMultiBin(t)
 
@@ -134,8 +134,7 @@ func newRuntime(
 	}
 
 	ctx := new(context.Context)
-	*ctx = context.Background()
-	*ctx = lib.WithState(*ctx, state)
+	*ctx = lib.WithState(tb.Context, state)
 	*ctx = common.WithRuntime(*ctx, rt)
 	rt.Set("http", common.Bind(rt, New(), ctx))
 
@@ -265,7 +264,7 @@ func TestRequestAndBatch(t *testing.T) {
 			`))
 			endTime := time.Now()
 			assert.EqualError(t, err, sr("GoError: Get HTTPBIN_URL/delay/10: net/http: request canceled (Client.Timeout exceeded while awaiting headers)"))
-			assert.WithinDuration(t, startTime.Add(1*time.Second), endTime, 1*time.Second)
+			assert.WithinDuration(t, startTime.Add(1*time.Second), endTime, 2*time.Second)
 
 			logEntry := hook.LastEntry()
 			if assert.NotNil(t, logEntry) {
@@ -1703,4 +1702,73 @@ func TestNoResponseBodyMangling(t *testing.T) {
 		}
 	`))
 	assert.NoError(t, err)
+}
+
+func BenchmarkHandlingOfResponseBodies(b *testing.B) {
+	tb, state, samples, rt, _ := newRuntime(b)
+	defer tb.Cleanup()
+
+	state.BPool = bpool.NewBufferPool(100)
+
+	go func() {
+		ctxDone := tb.Context.Done()
+		for {
+			select {
+			case <-samples:
+			case <-ctxDone:
+				return
+			}
+		}
+	}()
+
+	mbData := bytes.Repeat([]byte("0123456789"), 100000)
+	tb.Mux.HandleFunc("/1mbdata", http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+		_, err := resp.Write(mbData)
+		if err != nil {
+			b.Error(err)
+		}
+	}))
+
+	testCodeTemplate := tb.Replacer.Replace(`
+		http.get("HTTPBIN_URL/", { responseType: "TEST_RESPONSE_TYPE" });
+		http.post("HTTPBIN_URL/post", { responseType: "TEST_RESPONSE_TYPE" });
+		http.batch([
+			["GET", "HTTPBIN_URL/gzip", null, { responseType: "TEST_RESPONSE_TYPE" }],
+			["GET", "HTTPBIN_URL/gzip", null, { responseType: "TEST_RESPONSE_TYPE" }],
+			["GET", "HTTPBIN_URL/deflate", null, { responseType: "TEST_RESPONSE_TYPE" }],
+			["GET", "HTTPBIN_URL/deflate", null, { responseType: "TEST_RESPONSE_TYPE" }],
+			["GET", "HTTPBIN_URL/redirect/5", null, { responseType: "TEST_RESPONSE_TYPE" }], // 6 requests
+			["GET", "HTTPBIN_URL/get", null, { responseType: "TEST_RESPONSE_TYPE" }],
+			["GET", "HTTPBIN_URL/html", null, { responseType: "TEST_RESPONSE_TYPE" }],
+			["GET", "HTTPBIN_URL/bytes/100000", null, { responseType: "TEST_RESPONSE_TYPE" }],
+			["GET", "HTTPBIN_URL/image/png", null, { responseType: "TEST_RESPONSE_TYPE" }],
+			["GET", "HTTPBIN_URL/image/jpeg", null, { responseType: "TEST_RESPONSE_TYPE" }],
+			["GET", "HTTPBIN_URL/image/jpeg", null, { responseType: "TEST_RESPONSE_TYPE" }],
+			["GET", "HTTPBIN_URL/image/webp", null, { responseType: "TEST_RESPONSE_TYPE" }],
+			["GET", "HTTPBIN_URL/image/svg", null, { responseType: "TEST_RESPONSE_TYPE" }],
+			["GET", "HTTPBIN_URL/forms/post", null, { responseType: "TEST_RESPONSE_TYPE" }],
+			["GET", "HTTPBIN_URL/bytes/100000", null, { responseType: "TEST_RESPONSE_TYPE" }],
+			["GET", "HTTPBIN_URL/stream-bytes/100000", null, { responseType: "TEST_RESPONSE_TYPE" }],
+		]);
+		http.get("HTTPBIN_URL/get", { responseType: "TEST_RESPONSE_TYPE" });
+		http.get("HTTPBIN_URL/get", { responseType: "TEST_RESPONSE_TYPE" });
+		http.get("HTTPBIN_URL/1mbdata", { responseType: "TEST_RESPONSE_TYPE" });
+	`)
+
+	testResponseType := func(responseType string) func(b *testing.B) {
+		testCode := strings.ReplaceAll(testCodeTemplate, "TEST_RESPONSE_TYPE", responseType)
+		return func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				_, err := common.RunString(rt, testCode)
+				if err != nil {
+					b.Error(err)
+				}
+			}
+		}
+	}
+
+	b.ResetTimer()
+	b.Run("text", testResponseType("text"))
+	b.Run("binary", testResponseType("binary"))
+	b.Run("none", testResponseType("none"))
 }

@@ -170,6 +170,15 @@ func readResponseBody(
 		return nil, respErr
 	}
 
+	if respType == ResponseTypeNone {
+		_, err := io.Copy(ioutil.Discard, resp.Body)
+		_ = resp.Body.Close()
+		if err != nil {
+			respErr = err
+		}
+		return nil, respErr
+	}
+
 	// Transperently decompress the body if it's has a content-encoding we
 	// support. If not, simply return it as it is.
 	contentEncoding := strings.TrimSpace(resp.Header.Get("Content-Encoding"))
@@ -188,16 +197,8 @@ func readResponseBody(
 		}
 	}
 
-	if respType == ResponseTypeNone {
-		_, err := io.Copy(ioutil.Discard, resp.Body)
-		_ = resp.Body.Close()
-		if err != nil && err != io.EOF {
-			respErr = err
-		}
-		return nil, respErr
-	}
-
 	buf := state.BPool.Get()
+	defer state.BPool.Put(buf)
 	buf.Reset()
 	_, err := io.Copy(buf, resp.Body)
 	_ = resp.Body.Close()
@@ -210,14 +211,14 @@ func readResponseBody(
 	switch respType {
 	case ResponseTypeText:
 		result = buf.String()
-		state.BPool.Put(buf)
 	case ResponseTypeBinary:
-		result = buf.Bytes()
-		// We don't return the buffer to the pool, because the byte
-		// slice could still point to its underlying slice.
+		// Copy the data to a new slice before we return the buffer to the pool,
+		// because buf.Bytes() points to the underlying buffer byte slice.
+		binData := make([]byte, buf.Len())
+		copy(binData, buf.Bytes())
+		result = binData
 	default:
 		respErr = fmt.Errorf("unknown responseType %s", respType)
-		state.BPool.Put(buf)
 	}
 
 	return result, respErr
@@ -226,7 +227,7 @@ func readResponseBody(
 func updateK6Response(k6Response *Response, finishedReq *finishedRequest) {
 	k6Response.ErrorCode = int(finishedReq.errorCode)
 	k6Response.Error = finishedReq.errorMsg
-	trail := finishedReq.trcerTrail
+	trail := finishedReq.trail
 
 	if trail.ConnRemoteAddr != nil {
 		remoteHost, remotePortStr, _ := net.SplitHostPort(trail.ConnRemoteAddr.String())
@@ -374,7 +375,11 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 	// if digest authentication option is passed, make an initial request
 	// to get the authentication params to compute the authorization header
 	if preq.Auth == "digest" {
-		// TODO: refactor this as a separate transport, like how NTLM auth works
+		// TODO: fix - this is very broken! we're always making 2 HTTP requests
+		// when digest authentication is enabled... we should refactor it as a
+		// separate transport, like how NTLM auth works
+		//
+		// Github issue: https://github.com/loadimpact/k6/issues/800
 		username := preq.URL.u.User.Username()
 		password, _ := preq.URL.u.User.Password()
 
@@ -414,8 +419,6 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 			authorization := challenge.ToAuthorizationStr()
 			preq.Req.Header.Set(digest.KEY_AUTHORIZATION, authorization)
 		}
-		// TODO: fix - this is very broken! we're always making 2 HTTP requests
-		// when digest authentication is enabled...
 	}
 
 	debugRequest(state, preq.Req, "Request")

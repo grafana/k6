@@ -59,10 +59,10 @@ type unfinishedRequest struct {
 // processLastSavedRequest(), after reading the HTTP response body.
 type finishedRequest struct {
 	*unfinishedRequest
-	trcerTrail *Trail
-	tlsInfo    netext.TLSInfo
-	errorCode  errCode
-	errorMsg   string
+	trail     *Trail
+	tlsInfo   netext.TLSInfo
+	errorCode errCode
+	errorMsg  string
 }
 
 var _ http.RoundTripper = &transport{}
@@ -92,7 +92,7 @@ func (t *transport) measureAndEmitMetrics(unfReq *unfinishedRequest) *finishedRe
 
 	result := &finishedRequest{
 		unfinishedRequest: unfReq,
-		trcerTrail:        trail,
+		trail:             trail,
 	}
 
 	enabledTags := t.state.Options.SystemTags
