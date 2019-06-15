@@ -49,12 +49,14 @@ func (c *Collector) Run(ctx context.Context) {
 
 func (c *Collector) reportMetrics() {
 	c.bufferLock.Lock()
-	err := c.client.reportSamples(c.bufferedSamples)
+	samples := c.bufferedSamples
+	c.bufferedSamples = nil
+	c.bufferLock.Unlock()
+
+	err := c.client.reportSamples(samples)
 	if err != nil {
 		log.WithError(err).Error("Sending samples to CloudWatch")
 	}
-	c.bufferedSamples = nil
-	c.bufferLock.Unlock()
 }
 
 // Collect collects samples from containers
