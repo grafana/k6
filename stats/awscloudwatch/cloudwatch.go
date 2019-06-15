@@ -4,13 +4,15 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/cloudwatch"
+	"github.com/aws/aws-sdk-go/service/cloudwatch/cloudwatchiface"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
 type client struct {
-	*cloudwatch.CloudWatch
+	cloudwatchiface.CloudWatchAPI
 	namespace string
+	endpoint  string
 }
 
 // ClientFactory returns a function that creates the AWS CloudWatch client
@@ -22,8 +24,9 @@ func ClientFactory(namespace string) func() (cloudWatchClient, error) {
 		}
 
 		return &client{
-			CloudWatch: cw,
-			namespace:  namespace,
+			CloudWatchAPI: cw,
+			namespace:     namespace,
+			endpoint:      cw.Endpoint,
 		}, nil
 	}
 }
@@ -74,7 +77,7 @@ func (c *client) reportSamples(samples []*sample) error {
 }
 
 func (c *client) address() string {
-	return c.ClientInfo.Endpoint
+	return c.endpoint
 }
 
 const maxNumberOfDimensions = 10

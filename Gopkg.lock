@@ -61,7 +61,7 @@
   version = "v1.0.0"
 
 [[projects]]
-  digest = "1:bd2e469eaa18860272b351a0a53bfece60165a2076c7b4ebee702169c35541a2"
+  digest = "1:67e91db1e3e59678919e2d6c7a04e38a38e2d914c5cc0904c232a8965936f8c8"
   name = "github.com/aws/aws-sdk-go"
   packages = [
     "aws",
@@ -94,6 +94,7 @@
     "private/protocol/rest",
     "private/protocol/xml/xmlutil",
     "service/cloudwatch",
+    "service/cloudwatch/cloudwatchiface",
     "service/sts",
   ]
   pruneopts = "NUT"
@@ -706,8 +707,10 @@
     "github.com/Shopify/sarama",
     "github.com/Soontao/goHttpDigestClient",
     "github.com/aws/aws-sdk-go/aws",
+    "github.com/aws/aws-sdk-go/aws/request",
     "github.com/aws/aws-sdk-go/aws/session",
     "github.com/aws/aws-sdk-go/service/cloudwatch",
+    "github.com/aws/aws-sdk-go/service/cloudwatch/cloudwatchiface",
     "github.com/dop251/goja",
     "github.com/dop251/goja/parser",
     "github.com/dustin/go-humanize",
