@@ -10,14 +10,14 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// Collector collects metrics and send them to CloudWatch
+// Collector collects metrics and sends them to CloudWatch
 type Collector struct {
 	client          cloudWatchClient
 	bufferedSamples []*sample
 	bufferLock      sync.Mutex
 }
 
-// New returns a new Collector
+// New returns a new AWS CloudWatch Collector
 func New(clientFactory func() (cloudWatchClient, error)) (*Collector, error) {
 	client, err := clientFactory()
 	if err != nil {

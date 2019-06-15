@@ -13,7 +13,7 @@ type client struct {
 	namespace string
 }
 
-// ClientFactory return a function to create client
+// ClientFactory returns a function that creates the AWS CloudWatch client
 func ClientFactory(namespace string) func() (cloudWatchClient, error) {
 	return func() (cloudWatchClient, error) {
 		cw, err := newCloudWatchClient()
@@ -41,7 +41,7 @@ func newCloudWatchClient() (*cloudwatch.CloudWatch, error) {
 const maxMetricsPerCall = 20
 
 // reportSamples reports samples to CloudWatch.
-// It send samples on batches of max 20, which is the upper limit of metrics
+// It sends samples in batches of max 20, which is the upper limit of metrics
 // accepted per request by CloudWatch
 func (c *client) reportSamples(samples []*sample) error {
 	samplesSent := 0
