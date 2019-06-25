@@ -79,7 +79,6 @@ func verifyOneIterPerOneVU(t *testing.T, c Config) {
 	require.IsType(t, scheduler.PerVUIteationsConfig{}, sched)
 	perVuIters, ok := sched.(scheduler.PerVUIteationsConfig)
 	require.True(t, ok)
-	assert.Equal(t, null.NewBool(false, false), perVuIters.Interruptible)
 	assert.Equal(t, null.NewInt(1, false), perVuIters.Iterations)
 	assert.Equal(t, null.NewInt(1, false), perVuIters.VUs)
 }
@@ -105,7 +104,6 @@ func verifyConstLoopingVUs(vus null.Int, duration time.Duration) func(t *testing
 		require.IsType(t, scheduler.ConstantLoopingVUsConfig{}, sched)
 		clvc, ok := sched.(scheduler.ConstantLoopingVUsConfig)
 		require.True(t, ok)
-		assert.Equal(t, null.NewBool(true, false), clvc.Interruptible)
 		assert.Equal(t, vus, clvc.VUs)
 		assert.Equal(t, types.NullDurationFrom(duration), clvc.Duration)
 		assert.Equal(t, vus, c.VUs)
@@ -120,7 +118,6 @@ func verifyVarLoopingVUs(startVus null.Int, stages []scheduler.Stage) func(t *te
 		require.IsType(t, scheduler.VariableLoopingVUsConfig{}, sched)
 		clvc, ok := sched.(scheduler.VariableLoopingVUsConfig)
 		require.True(t, ok)
-		assert.Equal(t, null.NewBool(true, false), clvc.Interruptible)
 		assert.Equal(t, startVus, clvc.StartVUs)
 		assert.Equal(t, startVus, c.VUs)
 		assert.Equal(t, stages, clvc.Stages)
@@ -229,6 +226,7 @@ type exp struct {
 	cliParseError      bool
 	cliReadError       bool
 	consolidationError bool
+	derivationError    bool
 	validationErrors   bool
 	logWarning         bool //TODO: remove in the next version?
 }
@@ -365,7 +363,42 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 			},
 			exp{}, verifySharedIters(I(12), I(25)),
 		},
-
+		{
+			opts{
+				fs: defaultConfig(`
+					{
+						"execution": {
+							"default": {
+								"type": "constant-looping-vus",
+								"vus": 10,
+								"duration": "60s"
+							}
+						},
+						"vus": 20,
+						"duration": "60s"
+					}`,
+				),
+			},
+			exp{derivationError: true}, nil,
+		},
+		{
+			opts{
+				fs: defaultConfig(`
+					{
+						"execution": {
+							"default": {
+								"type": "constant-looping-vus",
+								"vus": 10,
+								"duration": "60s"
+							}
+						},
+						"vus": 10,
+						"duration": "60s"
+					}`,
+				),
+			},
+			exp{logWarning: true}, verifyConstLoopingVUs(I(10), 60*time.Second),
+		},
 		// Just in case, verify that no options will result in the same 1 vu 1 iter config
 		{opts{}, exp{}, verifyOneIterPerOneVU},
 		//TODO: test for differences between flagsets
@@ -421,8 +454,15 @@ func runTestCase(
 		testCase.options.fs = afero.NewMemMapFs() // create an empty FS if it wasn't supplied
 	}
 
-	result, err := getConsolidatedConfig(testCase.options.fs, cliConf, runner)
+	consolidatedConfig, err := getConsolidatedConfig(testCase.options.fs, cliConf, runner)
 	if testCase.expected.consolidationError {
+		require.Error(t, err)
+		return
+	}
+	require.NoError(t, err)
+
+	derivedConfig, err := deriveExecutionConfig(consolidatedConfig)
+	if testCase.expected.derivationError {
 		require.Error(t, err)
 		return
 	}
@@ -435,7 +475,7 @@ func runTestCase(
 		assert.Empty(t, warnings)
 	}
 
-	validationErrors := result.Validate()
+	validationErrors := derivedConfig.Validate()
 	if testCase.expected.validationErrors {
 		assert.NotEmpty(t, validationErrors)
 	} else {
@@ -443,7 +483,7 @@ func runTestCase(
 	}
 
 	if testCase.customValidator != nil {
-		testCase.customValidator(t, result)
+		testCase.customValidator(t, derivedConfig)
 	}
 }
 
