@@ -96,7 +96,8 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 			return err
 		}
 
-		if cerr := validateConfig(conf); cerr != nil {
+		derivedConf, cerr := deriveAndValidateConfig(conf)
+		if cerr != nil {
 			return ExitCode{cerr, invalidConfigErrorCode}
 		}
 
@@ -106,7 +107,7 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 		}
 
 		// Cloud config
-		cloudConfig := cloud.NewConfig().Apply(conf.Collectors.Cloud)
+		cloudConfig := cloud.NewConfig().Apply(derivedConf.Collectors.Cloud)
 		if err := envconfig.Process("k6", &cloudConfig); err != nil {
 			return err
 		}

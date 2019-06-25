@@ -173,7 +173,8 @@ a commandline interface for interacting with it.`,
 			conf.Duration = types.NullDuration{}
 		}
 
-		if cerr := validateConfig(conf); cerr != nil {
+		conf, cerr := deriveAndValidateConfig(conf)
+		if cerr != nil {
 			return ExitCode{cerr, invalidConfigErrorCode}
 		}
 
