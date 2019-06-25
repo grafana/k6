@@ -90,6 +90,8 @@ type Archive struct {
 
 	// Environment variables
 	Env map[string]string `json:"env"`
+
+	K6Version string `json:"k6version"`
 }
 
 // Reads an archive created by Archive.Write from a reader.

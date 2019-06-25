@@ -31,6 +31,7 @@ import (
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/stats/cloud"
 	"github.com/loadimpact/k6/ui"
 	"github.com/pkg/errors"
@@ -56,7 +57,7 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 	Args: exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		//TODO: disable in quiet mode?
-		_, _ = BannerColor.Fprintf(stdout, "\n%s\n\n", Banner)
+		_, _ = BannerColor.Fprintf(stdout, "\n%s\n\n", consts.Banner)
 		initBar := ui.ProgressBar{
 			Width: 60,
 			Left:  func() string { return "    uploading script" },
@@ -161,7 +162,7 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 		}
 
 		// Start cloud test run
-		client := cloud.NewClient(cloudConfig.Token.String, cloudConfig.Host.String, Version)
+		client := cloud.NewClient(cloudConfig.Token.String, cloudConfig.Host.String, consts.Version)
 		if err := client.ValidateOptions(arc.Options); err != nil {
 			return err
 		}
