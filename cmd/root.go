@@ -26,10 +26,10 @@ import (
 	golog "log"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 
 	"github.com/fatih/color"
+	"github.com/loadimpact/k6/lib/consts"
 	"github.com/mattn/go-colorable"
 	"github.com/mattn/go-isatty"
 	"github.com/shibukawa/configdir"
@@ -38,20 +38,6 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// Version contains the current semantic version of k6.
-//nolint:gochecknoglobals
-var Version = "0.24.0"
-
-// Banner contains the ASCII-art banner with the k6 logo and stylized website URL
-//TODO: make these into methods, only the version needs to be a variable
-//nolint:gochecknoglobals
-var Banner = strings.Join([]string{
-	`          /\      |‾‾|  /‾‾/  /‾/   `,
-	`     /\  /  \     |  |_/  /  / /    `,
-	`    /  \/    \    |      |  /  ‾‾\  `,
-	`   /          \   |  |‾\  \ | (_) | `,
-	`  / __________ \  |__|  \__\ \___/ .io`,
-}, "\n")
 var BannerColor = color.New(color.FgCyan)
 
 var (
@@ -83,7 +69,7 @@ var (
 var RootCmd = &cobra.Command{
 	Use:           "k6",
 	Short:         "a next-generation load generator",
-	Long:          BannerColor.Sprintf("\n%s", Banner),
+	Long:          BannerColor.Sprintf("\n%s", consts.Banner),
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
