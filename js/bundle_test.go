@@ -31,6 +31,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/loadimpact/k6/lib/consts"
+
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/types"
@@ -392,6 +394,7 @@ func TestNewBundleFromArchive(t *testing.T) {
 	assert.Equal(t, `export default function(s) { return s + "!" };`, string(arc.Scripts["/path/to/exclaim.js"]))
 	assert.Len(t, arc.Files, 1)
 	assert.Equal(t, `hi`, string(arc.Files["/path/to/file.txt"]))
+	assert.Equal(t, consts.Version, arc.K6Version)
 
 	b2, err := NewBundleFromArchive(arc, lib.RuntimeOptions{})
 	if !assert.NoError(t, err) {

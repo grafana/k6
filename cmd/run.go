@@ -42,6 +42,7 @@ import (
 	"github.com/loadimpact/k6/core/local"
 	"github.com/loadimpact/k6/js"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/ui"
@@ -101,7 +102,7 @@ a commandline interface for interacting with it.`,
 	Args: exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		//TODO: disable in quiet mode?
-		_, _ = BannerColor.Fprintf(stdout, "\n%s\n\n", Banner)
+		_, _ = BannerColor.Fprintf(stdout, "\n%s\n\n", consts.Banner)
 
 		initBar := ui.ProgressBar{
 			Width: 60,
@@ -304,7 +305,7 @@ a commandline interface for interacting with it.`,
 					stagesEndTSeconds = time.Duration(stagesEndT.Duration).Seconds()
 				}
 				body, err := json.Marshal(map[string]interface{}{
-					"k6_version":  Version,
+					"k6_version":  consts.Version,
 					"vus_max":     engine.Executor.GetVUsMax(),
 					"iterations":  engine.Executor.GetEndIterations(),
 					"duration":    endTSeconds,
