@@ -265,21 +265,27 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 			opts{cli: []string{"-s", "1m6s:5", "--vus", "10"}}, exp{},
 			verifyVarLoopingVUs(null.NewInt(10, true), buildStages(66, 5)),
 		},
+		{opts{cli: []string{"-u", "1", "-i", "6", "-d", "10s"}}, exp{}, func(t *testing.T, c Config) {
+			verifySharedIters(I(1), I(6))(t, c)
+			sharedIterConfig := c.Execution[lib.DefaultSchedulerName].(scheduler.SharedIteationsConfig)
+			assert.Equal(t, time.Duration(sharedIterConfig.MaxDuration.Duration), 10*time.Second)
+		}},
 		// This should get a validation error since VUs are more than the shared iterations
 		{opts{cli: []string{"--vus", "10", "-i", "6"}}, exp{validationErrors: true}, verifySharedIters(I(10), I(6))},
 		{opts{cli: []string{"-s", "10s:5", "-s", "10s:"}}, exp{validationErrors: true}, nil},
 		{opts{fs: defaultConfig(`{"stages": [{"duration": "20s"}], "vus": 10}`)}, exp{validationErrors: true}, nil},
 		// These should emit a warning
 		//TODO: in next version, those should be an error
-		{opts{cli: []string{"-u", "1", "-i", "6", "-d", "10s"}}, exp{logWarning: true}, nil},
 		{opts{cli: []string{"-u", "2", "-d", "10s", "-s", "10s:20"}}, exp{logWarning: true}, nil},
 		{opts{cli: []string{"-u", "3", "-i", "5", "-s", "10s:20"}}, exp{logWarning: true}, nil},
 		{opts{cli: []string{"-u", "3", "-d", "0"}}, exp{logWarning: true}, nil},
 		{
 			opts{runner: &lib.Options{
-				VUs:        null.IntFrom(5),
-				Duration:   types.NullDurationFrom(44 * time.Second),
-				Iterations: null.IntFrom(10),
+				VUs:      null.IntFrom(5),
+				Duration: types.NullDurationFrom(44 * time.Second),
+				Stages: []lib.Stage{
+					{Duration: types.NullDurationFrom(3 * time.Second), Target: I(20)},
+				},
 			}}, exp{logWarning: true}, nil,
 		},
 		{opts{fs: defaultConfig(`{"execution": {}}`)}, exp{logWarning: true}, verifyOneIterPerOneVU},
@@ -317,7 +323,7 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 		{
 			opts{
 				runner: &lib.Options{VUs: null.IntFrom(5), Duration: types.NullDurationFrom(50 * time.Second)},
-				cli:    []string{"--iterations", "5"},
+				cli:    []string{"--stage", "5s:5"},
 			},
 			//TODO: this shouldn't be a warning in the next version, but the result will be different
 			exp{logWarning: true}, verifyConstLoopingVUs(I(5), 50*time.Second),
@@ -337,7 +343,7 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 				env:    []string{"K6_VUS=15", "K6_ITERATIONS=15"},
 			},
 			exp{logWarning: true}, //TODO: this won't be a warning in the next version, but the result will be different
-			verifyVarLoopingVUs(null.NewInt(15, true), buildStages(20, 10)),
+			verifySharedIters(I(15), I(15)),
 		},
 		{
 			opts{

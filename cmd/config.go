@@ -207,10 +207,13 @@ func getVariableLoopingVUsExecution(stages []lib.Stage, startVUs null.Int) sched
 	return scheduler.ConfigMap{lib.DefaultSchedulerName: ds}
 }
 
-func getSharedIterationsExecution(iterations null.Int, vus null.Int) scheduler.ConfigMap {
+func getSharedIterationsExecution(iterations null.Int, duration types.NullDuration, vus null.Int) scheduler.ConfigMap {
 	ds := scheduler.NewSharedIterationsConfig(lib.DefaultSchedulerName)
 	ds.VUs = vus
 	ds.Iterations = iterations
+	if duration.Valid {
+		ds.MaxDuration = duration
+	}
 	return scheduler.ConfigMap{lib.DefaultSchedulerName: ds}
 }
 
@@ -234,12 +237,19 @@ func checkExecutionMismatch(observedExecution, derivedExecution scheduler.Config
 func deriveExecutionConfig(conf Config) (Config, error) {
 	result := conf
 	switch {
-	case conf.Duration.Valid:
-		if conf.Iterations.Valid {
+	case conf.Iterations.Valid:
+		if len(conf.Stages) > 0 { // stages isn't nil (not set) and isn't explicitly set to empty
 			//TODO: make this an executionConflictConfigError in the next version
-			log.Warnf("Specifying both duration and iterations is deprecated and won't be supported in the future k6 versions")
+			log.Warnf("Specifying both iterations and stages is deprecated and won't be supported in the future k6 versions")
 		}
 
+		result.Execution = getSharedIterationsExecution(conf.Iterations, conf.Duration, conf.VUs)
+		if err := checkExecutionMismatch(conf.Execution, result.Execution, "iterations"); err != nil {
+			return conf, err
+		}
+		// TODO: maybe add a new flag that will be used as a shortcut to per-VU iterations?
+
+	case conf.Duration.Valid:
 		if len(conf.Stages) > 0 { // stages isn't nil (not set) and isn't explicitly set to empty
 			//TODO: make this an executionConflictConfigError in the next version
 			log.Warnf("Specifying both duration and stages is deprecated and won't be supported in the future k6 versions")
@@ -258,22 +268,10 @@ func deriveExecutionConfig(conf Config) (Config, error) {
 		}
 
 	case len(conf.Stages) > 0: // stages isn't nil (not set) and isn't explicitly set to empty
-		if conf.Iterations.Valid {
-			//TODO: make this an executionConflictConfigError in the next version
-			log.Warnf("Specifying both iterations and stages is deprecated and won't be supported in the future k6 versions")
-		}
-
 		result.Execution = getVariableLoopingVUsExecution(conf.Stages, conf.VUs)
 		if err := checkExecutionMismatch(conf.Execution, result.Execution, "stages"); err != nil {
 			return conf, err
 		}
-
-	case conf.Iterations.Valid:
-		result.Execution = getSharedIterationsExecution(conf.Iterations, conf.VUs)
-		if err := checkExecutionMismatch(conf.Execution, result.Execution, "iterations"); err != nil {
-			return conf, err
-		}
-		// TODO: maybe add a new flag that will be used as a shortcut to per-VU iterations?
 
 	default:
 		if conf.Execution != nil { // If someone set this, regardless if its empty
