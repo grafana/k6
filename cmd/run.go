@@ -32,6 +32,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"syscall"
@@ -510,7 +511,7 @@ func readSource(src, pwd string, fs afero.Fs, stdin io.Reader) (*lib.SourceData,
 		}
 		return &lib.SourceData{URL: &url.URL{Path: "-", Scheme: "file"}, Data: data}, nil
 	}
-	pwdURL := &url.URL{Scheme: "file", Path: pwd}
+	pwdURL := &url.URL{Scheme: "file", Path: filepath.ToSlash(filepath.Clean(pwd))}
 	srcURL, err := loader.Resolve(pwdURL, src)
 	if err != nil {
 		return nil, err

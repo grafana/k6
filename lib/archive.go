@@ -160,6 +160,7 @@ func ReadArchive(in io.Reader) (*Archive, error) {
 			fallthrough
 		case "https", "file":
 			fs := arc.getFs(pfx)
+			name = filepath.FromSlash(name)
 			if hdr.Typeflag == tar.TypeDir {
 				err = fs.Mkdir(name, os.FileMode(hdr.Mode))
 			} else {
@@ -271,7 +272,7 @@ func (arc *Archive) Write(out io.Writer) error {
 
 		for _, dirPath := range dirs {
 			_ = w.WriteHeader(&tar.Header{
-				Name:       path.Clean(name + "/" + dirPath),
+				Name:       path.Clean(path.Join(name, dirPath)),
 				Mode:       int64(infos[dirPath].Mode()),
 				AccessTime: infos[dirPath].ModTime(),
 				ChangeTime: infos[dirPath].ModTime(),
@@ -282,7 +283,7 @@ func (arc *Archive) Write(out io.Writer) error {
 
 		for _, filePath := range paths {
 			_ = w.WriteHeader(&tar.Header{
-				Name:       path.Clean(name + "/" + filePath),
+				Name:       path.Clean(path.Join(name, filePath)),
 				Mode:       int64(infos[filePath].Mode()),
 				Size:       int64(len(files[filePath])),
 				AccessTime: infos[filePath].ModTime(),

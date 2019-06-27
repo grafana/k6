@@ -40,7 +40,7 @@ func TestDir(t *testing.T) {
 	}
 	for name, dir := range testdata {
 		nameURL := &url.URL{Scheme: "file", Path: name}
-		dirURL := &url.URL{Scheme: "file", Path: dir}
+		dirURL := &url.URL{Scheme: "file", Path: filepath.ToSlash(dir)}
 		t.Run("path="+name, func(t *testing.T) {
 			assert.Equal(t, dirURL, Dir(nameURL))
 		})
@@ -137,7 +137,7 @@ func TestLoad(t *testing.T) {
 			require.NoError(t, err)
 
 			_, err = Load(fses, pathURL, path)
-			assert.EqualError(t, err, fmt.Sprintf(fileSchemeCouldntBeLoadedMsg, "file://"+path))
+			assert.EqualError(t, err, fmt.Sprintf(fileSchemeCouldntBeLoadedMsg, "file://"+filepath.ToSlash(path)))
 		})
 
 	})

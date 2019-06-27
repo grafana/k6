@@ -24,6 +24,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
 	"testing"
 
@@ -110,7 +111,7 @@ func diffFSesDir(t *testing.T, first, second afero.Fs, dirname string) {
 
 	require.ElementsMatch(t, getInfoNames(firstInfos), getInfoNames(secondInfos), "directory: "+dirname)
 	for _, info := range firstInfos {
-		path := dirname + "/" + info.Name()
+		path := filepath.Join(dirname, info.Name())
 		if info.IsDir() {
 			diffFSesDir(t, first, second, path)
 			continue
@@ -158,8 +159,6 @@ func TestArchiveReadWrite(t *testing.T) {
 
 		arc2, err := ReadArchive(buf)
 		require.NoError(t, err)
-
-		// arc2.FSes["file"] = arc2.FSes["file"].(*normalizedFS).Fs
 
 		arc2FSes := arc2.FSes
 		arc2.FSes = nil
