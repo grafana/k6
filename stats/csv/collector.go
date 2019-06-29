@@ -33,11 +33,11 @@ import (
 	"github.com/spf13/afero"
 )
 
+// Collector saving output to csv implements the lib.Collector interface
 type Collector struct {
 	outfile io.WriteCloser
 	fname   string
-	restags []string
-	header  bool
+	resTags []string
 }
 
 // Verify that Collector implements lib.Collector
@@ -50,6 +50,7 @@ type nopCloser struct {
 
 func (nopCloser) Close() error { return nil }
 
+// New Creates new instance of CSV collector
 func New(fs afero.Fs, fname string, tags lib.TagSet) (*Collector, error) {
 	if fname == "" || fname == "-" {
 		return &Collector{
@@ -63,51 +64,53 @@ func New(fs afero.Fs, fname string, tags lib.TagSet) (*Collector, error) {
 		return nil, err
 	}
 
-	restags := []string{}
+	resTags := []string{}
 	for tag, flag := range tags {
 		if flag {
-			restags = append(restags, tag)
+			resTags = append(resTags, tag)
 		}
 	}
 
 	return &Collector{
 		outfile: logfile,
 		fname:   fname,
-		restags: restags,
-		header:  true,
+		resTags: resTags,
 	}, nil
 }
 
+// Init writes column names to csv file
 func (c *Collector) Init() error {
+	header := MakeHeader(c.resTags)
+	c.WriteToCSV(header)
 	return nil
 }
 
+// SetRunStatus does nothing
 func (c *Collector) SetRunStatus(status lib.RunStatus) {}
 
+// Run just blocks until the context is done
 func (c *Collector) Run(ctx context.Context) {
 	log.WithField("filename", c.fname).Debug("CSV: Writing CSV metrics")
 	<-ctx.Done()
 	_ = c.outfile.Close()
 }
 
+// Collect Writes samples to the csv file
 func (c *Collector) Collect(scs []stats.SampleContainer) {
-	if c.header {
-		header := MakeHeader(c.restags)
-		c.WriteToCSV(header)
-		c.header = false
-	}
 	for _, sc := range scs {
 		for _, sample := range sc.GetSamples() {
-			row := SampleToRow(&sample, c.restags)
+			row := SampleToRow(&sample, c.resTags)
 			c.WriteToCSV(row)
 		}
 	}
 }
 
+// Link returns a dummy string, it's only included to satisfy the lib.Collector interface
 func (c *Collector) Link() string {
 	return ""
 }
 
+// WriteToCSV writes row to csv file
 func (c *Collector) WriteToCSV(row []string) {
 	writer := csv.NewWriter(c.outfile)
 	defer writer.Flush()
@@ -117,11 +120,13 @@ func (c *Collector) WriteToCSV(row []string) {
 	}
 }
 
+// MakeHeader creates list of column names for csv file
 func MakeHeader(tags []string) []string {
 	return append([]string{"metric_name", "timestamp", "metric_value"}, tags...)
 }
 
-func SampleToRow(sample *stats.Sample, restags []string) []string {
+// SampleToRow converts sample into array of strings
+func SampleToRow(sample *stats.Sample, resTags []string) []string {
 	if sample == nil {
 		return nil
 	}
@@ -130,10 +135,10 @@ func SampleToRow(sample *stats.Sample, restags []string) []string {
 	row = append(row, sample.Metric.Name)
 	row = append(row, fmt.Sprintf("%d", sample.Time.Unix()))
 	row = append(row, fmt.Sprintf("%f", sample.Value))
-	sample_tags := sample.Tags.CloneTags()
+	sampleTags := sample.Tags.CloneTags()
 
-	for _, tag := range restags {
-		row = append(row, sample_tags[tag])
+	for _, tag := range resTags {
+		row = append(row, sampleTags[tag])
 	}
 
 	return row
