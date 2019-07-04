@@ -120,7 +120,7 @@ func ReadArchive(in io.Reader) (*Archive, error) {
 			}
 			return nil, err
 		}
-		if hdr.Typeflag != tar.TypeReg && hdr.Typeflag != tar.TypeRegA && hdr.Typeflag != tar.TypeDir {
+		if hdr.Typeflag != tar.TypeReg && hdr.Typeflag != tar.TypeRegA {
 			continue
 		}
 
@@ -131,7 +131,7 @@ func ReadArchive(in io.Reader) (*Archive, error) {
 
 		switch hdr.Name {
 		case "metadata.json":
-			if err := json.Unmarshal(data, &arc); err != nil {
+			if err = json.Unmarshal(data, &arc); err != nil {
 				return nil, err
 			}
 			// Path separator normalization for older archives (<=0.20.0)
@@ -164,11 +164,7 @@ func ReadArchive(in io.Reader) (*Archive, error) {
 		case "https", "file":
 			fs := arc.getFs(pfx)
 			name = filepath.FromSlash(name)
-			if hdr.Typeflag == tar.TypeDir {
-				err = fs.Mkdir(name, os.FileMode(hdr.Mode))
-			} else {
-				err = afero.WriteFile(fs, name, data, os.FileMode(hdr.Mode))
-			}
+			err = afero.WriteFile(fs, name, data, os.FileMode(hdr.Mode))
 			if err != nil {
 				return nil, err
 			}
