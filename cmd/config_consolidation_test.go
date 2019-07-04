@@ -79,7 +79,6 @@ func verifyOneIterPerOneVU(t *testing.T, c Config) {
 	require.IsType(t, scheduler.PerVUIteationsConfig{}, sched)
 	perVuIters, ok := sched.(scheduler.PerVUIteationsConfig)
 	require.True(t, ok)
-	assert.Equal(t, null.NewBool(false, false), perVuIters.Interruptible)
 	assert.Equal(t, null.NewInt(1, false), perVuIters.Iterations)
 	assert.Equal(t, null.NewInt(1, false), perVuIters.VUs)
 }
@@ -105,7 +104,6 @@ func verifyConstLoopingVUs(vus null.Int, duration time.Duration) func(t *testing
 		require.IsType(t, scheduler.ConstantLoopingVUsConfig{}, sched)
 		clvc, ok := sched.(scheduler.ConstantLoopingVUsConfig)
 		require.True(t, ok)
-		assert.Equal(t, null.NewBool(true, false), clvc.Interruptible)
 		assert.Equal(t, vus, clvc.VUs)
 		assert.Equal(t, types.NullDurationFrom(duration), clvc.Duration)
 		assert.Equal(t, vus, c.VUs)
@@ -120,7 +118,6 @@ func verifyVarLoopingVUs(startVus null.Int, stages []scheduler.Stage) func(t *te
 		require.IsType(t, scheduler.VariableLoopingVUsConfig{}, sched)
 		clvc, ok := sched.(scheduler.VariableLoopingVUsConfig)
 		require.True(t, ok)
-		assert.Equal(t, null.NewBool(true, false), clvc.Interruptible)
 		assert.Equal(t, startVus, clvc.StartVUs)
 		assert.Equal(t, startVus, c.VUs)
 		assert.Equal(t, stages, clvc.Stages)
@@ -229,6 +226,7 @@ type exp struct {
 	cliParseError      bool
 	cliReadError       bool
 	consolidationError bool
+	derivationError    bool
 	validationErrors   bool
 	logWarning         bool //TODO: remove in the next version?
 }
@@ -267,21 +265,27 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 			opts{cli: []string{"-s", "1m6s:5", "--vus", "10"}}, exp{},
 			verifyVarLoopingVUs(null.NewInt(10, true), buildStages(66, 5)),
 		},
+		{opts{cli: []string{"-u", "1", "-i", "6", "-d", "10s"}}, exp{}, func(t *testing.T, c Config) {
+			verifySharedIters(I(1), I(6))(t, c)
+			sharedIterConfig := c.Execution[lib.DefaultSchedulerName].(scheduler.SharedIteationsConfig)
+			assert.Equal(t, time.Duration(sharedIterConfig.MaxDuration.Duration), 10*time.Second)
+		}},
 		// This should get a validation error since VUs are more than the shared iterations
 		{opts{cli: []string{"--vus", "10", "-i", "6"}}, exp{validationErrors: true}, verifySharedIters(I(10), I(6))},
 		{opts{cli: []string{"-s", "10s:5", "-s", "10s:"}}, exp{validationErrors: true}, nil},
 		{opts{fs: defaultConfig(`{"stages": [{"duration": "20s"}], "vus": 10}`)}, exp{validationErrors: true}, nil},
 		// These should emit a warning
 		//TODO: in next version, those should be an error
-		{opts{cli: []string{"-u", "1", "-i", "6", "-d", "10s"}}, exp{logWarning: true}, nil},
 		{opts{cli: []string{"-u", "2", "-d", "10s", "-s", "10s:20"}}, exp{logWarning: true}, nil},
 		{opts{cli: []string{"-u", "3", "-i", "5", "-s", "10s:20"}}, exp{logWarning: true}, nil},
 		{opts{cli: []string{"-u", "3", "-d", "0"}}, exp{logWarning: true}, nil},
 		{
 			opts{runner: &lib.Options{
-				VUs:        null.IntFrom(5),
-				Duration:   types.NullDurationFrom(44 * time.Second),
-				Iterations: null.IntFrom(10),
+				VUs:      null.IntFrom(5),
+				Duration: types.NullDurationFrom(44 * time.Second),
+				Stages: []lib.Stage{
+					{Duration: types.NullDurationFrom(3 * time.Second), Target: I(20)},
+				},
 			}}, exp{logWarning: true}, nil,
 		},
 		{opts{fs: defaultConfig(`{"execution": {}}`)}, exp{logWarning: true}, verifyOneIterPerOneVU},
@@ -319,7 +323,7 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 		{
 			opts{
 				runner: &lib.Options{VUs: null.IntFrom(5), Duration: types.NullDurationFrom(50 * time.Second)},
-				cli:    []string{"--iterations", "5"},
+				cli:    []string{"--stage", "5s:5"},
 			},
 			//TODO: this shouldn't be a warning in the next version, but the result will be different
 			exp{logWarning: true}, verifyConstLoopingVUs(I(5), 50*time.Second),
@@ -339,7 +343,7 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 				env:    []string{"K6_VUS=15", "K6_ITERATIONS=15"},
 			},
 			exp{logWarning: true}, //TODO: this won't be a warning in the next version, but the result will be different
-			verifyVarLoopingVUs(null.NewInt(15, true), buildStages(20, 10)),
+			verifySharedIters(I(15), I(15)),
 		},
 		{
 			opts{
@@ -365,7 +369,42 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 			},
 			exp{}, verifySharedIters(I(12), I(25)),
 		},
-
+		{
+			opts{
+				fs: defaultConfig(`
+					{
+						"execution": {
+							"default": {
+								"type": "constant-looping-vus",
+								"vus": 10,
+								"duration": "60s"
+							}
+						},
+						"vus": 20,
+						"duration": "60s"
+					}`,
+				),
+			},
+			exp{derivationError: true}, nil,
+		},
+		{
+			opts{
+				fs: defaultConfig(`
+					{
+						"execution": {
+							"default": {
+								"type": "constant-looping-vus",
+								"vus": 10,
+								"duration": "60s"
+							}
+						},
+						"vus": 10,
+						"duration": "60s"
+					}`,
+				),
+			},
+			exp{logWarning: true}, verifyConstLoopingVUs(I(10), 60*time.Second),
+		},
 		// Just in case, verify that no options will result in the same 1 vu 1 iter config
 		{opts{}, exp{}, verifyOneIterPerOneVU},
 		//TODO: test for differences between flagsets
@@ -421,8 +460,15 @@ func runTestCase(
 		testCase.options.fs = afero.NewMemMapFs() // create an empty FS if it wasn't supplied
 	}
 
-	result, err := getConsolidatedConfig(testCase.options.fs, cliConf, runner)
+	consolidatedConfig, err := getConsolidatedConfig(testCase.options.fs, cliConf, runner)
 	if testCase.expected.consolidationError {
+		require.Error(t, err)
+		return
+	}
+	require.NoError(t, err)
+
+	derivedConfig, err := deriveExecutionConfig(consolidatedConfig)
+	if testCase.expected.derivationError {
 		require.Error(t, err)
 		return
 	}
@@ -435,7 +481,7 @@ func runTestCase(
 		assert.Empty(t, warnings)
 	}
 
-	validationErrors := result.Validate()
+	validationErrors := derivedConfig.Validate()
 	if testCase.expected.validationErrors {
 		assert.NotEmpty(t, validationErrors)
 	} else {
@@ -443,7 +489,7 @@ func runTestCase(
 	}
 
 	if testCase.customValidator != nil {
-		testCase.customValidator(t, result)
+		testCase.customValidator(t, derivedConfig)
 	}
 }
 

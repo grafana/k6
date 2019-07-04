@@ -32,10 +32,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/loadimpact/k6/lib/fsext"
-
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/consts"
+	"github.com/loadimpact/k6/lib/fsext"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
@@ -413,6 +413,7 @@ func TestNewBundleFromArchive(t *testing.T) {
 	fileData, err := afero.ReadFile(arc.FSes["file"], "/path/to/file.txt")
 	assert.NoError(t, err)
 	assert.Equal(t, `hi`, string(fileData))
+	assert.Equal(t, consts.Version, arc.K6Version)
 
 	b2, err := NewBundleFromArchive(arc, lib.RuntimeOptions{})
 	if !assert.NoError(t, err) {

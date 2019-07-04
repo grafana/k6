@@ -315,8 +315,8 @@ export default function () {
     group("Static Assets", function () {
         // Execute multiple requests in parallel like a browser, to fetch some static resources
         let resps = http.batch([
-            ["GET", "https://test.loadimpact.com/style.css", { tags: { staticAsset: "yes" } }],
-            ["GET", "https://test.loadimpact.com/images/logo.png", { tags: { staticAsset: "yes" } }]
+            ["GET", "https://test.loadimpact.com/style.css", null, { tags: { staticAsset: "yes" } }],
+            ["GET", "https://test.loadimpact.com/images/logo.png", null, { tags: { staticAsset: "yes" } }]
         ]);
         // Combine check() call with failure tracking
         failureRate.add(!check(resps, {

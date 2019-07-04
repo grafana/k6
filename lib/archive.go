@@ -91,6 +91,8 @@ type Archive struct {
 
 	// Environment variables
 	Env map[string]string `json:"env"`
+
+	K6Version string `json:"k6version"`
 }
 
 func (arc *Archive) getFs(name string) afero.Fs {

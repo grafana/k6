@@ -28,6 +28,7 @@ import (
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/stats/cloud"
 	"github.com/loadimpact/k6/stats/datadog"
 	"github.com/loadimpact/k6/stats/influxdb"
@@ -84,7 +85,7 @@ func newCollector(collectorName, arg string, src *lib.SourceData, conf Config) (
 			if arg != "" {
 				config.Name = null.StringFrom(arg)
 			}
-			return cloud.New(config, src, conf.Options, Version)
+			return cloud.New(config, src, conf.Options, consts.Version)
 		case collectorKafka:
 			config := kafka.NewConfig().Apply(conf.Collectors.Kafka)
 			if err := envconfig.Process("k6", &config); err != nil {

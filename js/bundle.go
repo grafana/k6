@@ -25,6 +25,8 @@ import (
 	"encoding/json"
 	"net/url"
 
+	"github.com/loadimpact/k6/lib/consts"
+
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/js/compiler"
@@ -176,13 +178,14 @@ func NewBundleFromArchive(arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle,
 
 func (b *Bundle) makeArchive() *lib.Archive {
 	arc := &lib.Archive{
-		Type:     "js",
-		FSes:     b.BaseInitContext.fses,
-		Options:  b.Options,
-		Filename: b.Filename.String(),
-		Data:     []byte(b.Source),
-		Pwd:      b.BaseInitContext.pwd.String(),
-		Env:      make(map[string]string, len(b.Env)),
+		Type:      "js",
+		FSes:      b.BaseInitContext.fses,
+		Options:   b.Options,
+		Filename:  b.Filename.String(),
+		Data:      []byte(b.Source),
+		Pwd:       b.BaseInitContext.pwd.String(),
+		Env:       make(map[string]string, len(b.Env)),
+		K6Version: consts.Version,
 	}
 	// Copy env so changes in the archive are not reflected in the source Bundle
 	for k, v := range b.Env {
