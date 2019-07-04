@@ -32,7 +32,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/loadimpact/k6/lib/fsext"
 
 	"github.com/dop251/goja"
@@ -516,7 +515,6 @@ func TestOpen(t *testing.T) {
 			require.NoError(t, err)
 			fs := afero.NewOsFs()
 			filePath := filepath.Join(prefix, "/path/to/file.txt")
-			spew.Dump(filePath)
 			require.NoError(t, fs.MkdirAll(filepath.Join(prefix, "/path/to"), 0755))
 			require.NoError(t, afero.WriteFile(fs, filePath, []byte(`hi`), 0644))
 			if isWindows {
@@ -622,11 +620,11 @@ func TestBundleEnv(t *testing.T) {
 		"TEST_B": "",
 	}}
 	data := `
-export default function() {
-	if (__ENV.TEST_A !== "1") { throw new Error("Invalid TEST_A: " + __ENV.TEST_A); }
-	if (__ENV.TEST_B !== "") { throw new Error("Invalid TEST_B: " + __ENV.TEST_B); }
-}
-`
+		export default function() {
+			if (__ENV.TEST_A !== "1") { throw new Error("Invalid TEST_A: " + __ENV.TEST_A); }
+			if (__ENV.TEST_B !== "") { throw new Error("Invalid TEST_B: " + __ENV.TEST_B); }
+		}
+	`
 	b1, err := getSimpleBundleWithOptions("/script.js", data, rtOpts)
 	if !assert.NoError(t, err) {
 		return
