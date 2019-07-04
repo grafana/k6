@@ -21,6 +21,7 @@
 package csv
 
 import (
+	"bytes"
 	"context"
 	"encoding/csv"
 	"fmt"
@@ -35,9 +36,11 @@ import (
 
 // Collector saving output to csv implements the lib.Collector interface
 type Collector struct {
-	outfile io.WriteCloser
-	fname   string
-	resTags []string
+	outfile     io.WriteCloser
+	fname       string
+	resTags     []string
+	ignoredTags []string
+	csvWriter   *csv.Writer
 }
 
 // Verify that Collector implements lib.Collector
@@ -52,10 +55,24 @@ func (nopCloser) Close() error { return nil }
 
 // New Creates new instance of CSV collector
 func New(fs afero.Fs, fname string, tags lib.TagSet) (*Collector, error) {
+	resTags := []string{}
+	ignoredTags := []string{}
+	for tag, flag := range tags {
+		if flag {
+			resTags = append(resTags, tag)
+		} else {
+			ignoredTags = append(ignoredTags, tag)
+		}
+	}
+
 	if fname == "" || fname == "-" {
+		logfile := nopCloser{os.Stdout}
 		return &Collector{
-			outfile: nopCloser{os.Stdout},
-			fname:   "-",
+			outfile:     logfile,
+			fname:       "-",
+			resTags:     resTags,
+			ignoredTags: ignoredTags,
+			csvWriter:   csv.NewWriter(logfile),
 		}, nil
 	}
 
@@ -64,24 +81,23 @@ func New(fs afero.Fs, fname string, tags lib.TagSet) (*Collector, error) {
 		return nil, err
 	}
 
-	resTags := []string{}
-	for tag, flag := range tags {
-		if flag {
-			resTags = append(resTags, tag)
-		}
-	}
-
 	return &Collector{
-		outfile: logfile,
-		fname:   fname,
-		resTags: resTags,
+		outfile:     logfile,
+		fname:       fname,
+		resTags:     resTags,
+		ignoredTags: ignoredTags,
+		csvWriter:   csv.NewWriter(logfile),
 	}, nil
 }
 
 // Init writes column names to csv file
 func (c *Collector) Init() error {
 	header := MakeHeader(c.resTags)
-	c.WriteToCSV(header)
+	err := c.csvWriter.Write(header)
+	if err != nil {
+		log.WithField("filename", c.fname).Error("CSV: Error writing column names to file")
+	}
+	c.csvWriter.Flush()
 	return nil
 }
 
@@ -92,6 +108,7 @@ func (c *Collector) SetRunStatus(status lib.RunStatus) {}
 func (c *Collector) Run(ctx context.Context) {
 	log.WithField("filename", c.fname).Debug("CSV: Writing CSV metrics")
 	<-ctx.Done()
+	c.csvWriter.Flush()
 	_ = c.outfile.Close()
 }
 
@@ -99,10 +116,14 @@ func (c *Collector) Run(ctx context.Context) {
 func (c *Collector) Collect(scs []stats.SampleContainer) {
 	for _, sc := range scs {
 		for _, sample := range sc.GetSamples() {
-			row := SampleToRow(&sample, c.resTags)
-			c.WriteToCSV(row)
+			row := SampleToRow(&sample, c.resTags, c.ignoredTags)
+			err := c.csvWriter.Write(row)
+			if err != nil {
+				log.WithField("filename", c.fname).Error("CSV: Error writing to file")
+			}
 		}
 	}
+	c.csvWriter.Flush()
 }
 
 // Link returns a dummy string, it's only included to satisfy the lib.Collector interface
@@ -110,23 +131,14 @@ func (c *Collector) Link() string {
 	return ""
 }
 
-// WriteToCSV writes row to csv file
-func (c *Collector) WriteToCSV(row []string) {
-	writer := csv.NewWriter(c.outfile)
-	defer writer.Flush()
-	err := writer.Write(row)
-	if err != nil {
-		log.WithField("filename", c.fname).Error("CSV: Error writing to file")
-	}
-}
-
 // MakeHeader creates list of column names for csv file
 func MakeHeader(tags []string) []string {
+	tags = append(tags, "extra_tags")
 	return append([]string{"metric_name", "timestamp", "metric_value"}, tags...)
 }
 
 // SampleToRow converts sample into array of strings
-func SampleToRow(sample *stats.Sample, resTags []string) []string {
+func SampleToRow(sample *stats.Sample, resTags []string, ignoredTags []string) []string {
 	if sample == nil {
 		return nil
 	}
@@ -140,6 +152,37 @@ func SampleToRow(sample *stats.Sample, resTags []string) []string {
 	for _, tag := range resTags {
 		row = append(row, sampleTags[tag])
 	}
+
+	extraTags := bytes.Buffer{}
+	prev := false
+	for tag, val := range sampleTags {
+		extra := true
+		for _, resTag := range resTags {
+			if tag == resTag {
+				extra = false
+				break
+			}
+		}
+		if extra {
+			for _, ignoredTag := range ignoredTags {
+				if tag == ignoredTag {
+					extra = false
+					break
+				}
+			}
+		}
+
+		if extra {
+			if prev {
+				extraTags.WriteString("&")
+			}
+			extraTags.WriteString(tag)
+			extraTags.WriteString("=")
+			extraTags.WriteString(val)
+			prev = true
+		}
+	}
+	row = append(row, extraTags.String())
 
 	return row
 }
