@@ -107,10 +107,12 @@ func Dir(old *url.URL) *url.URL {
 	return old.ResolveReference(&url.URL{Path: "./"})
 }
 
-// Load loads the provided moduleSpecifier from the given filesystems which are map of filesystems for a given scheme which
-// is they key of the map. If the scheme is https then a request will be made if the files is not
-// found in the map and written to the map.
-func Load(filesystems map[string]afero.Fs, moduleSpecifier *url.URL, originalModuleSpecifier string) (*lib.SourceData, error) {
+// Load loads the provided moduleSpecifier from the given filesystems which are map of afero.Fs
+// for a given scheme which is they key of the map. If the scheme is https then a request will
+// be made if the files is not found in the map and written to the map.
+func Load(
+	filesystems map[string]afero.Fs, moduleSpecifier *url.URL, originalModuleSpecifier string,
+) (*lib.SourceData, error) {
 	log.WithFields(
 		log.Fields{
 			"moduleSpecifier":          moduleSpecifier,
