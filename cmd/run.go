@@ -43,6 +43,7 @@ import (
 	"github.com/loadimpact/k6/core/local"
 	"github.com/loadimpact/k6/js"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/fsext"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/ui"
@@ -116,8 +117,8 @@ a commandline interface for interacting with it.`,
 			return err
 		}
 		filename := args[0]
-		fs := afero.NewOsFs()
-		src, err := readSource(filename, pwd, fs, os.Stdin)
+		filesystems := createFilesystems()
+		src, err := readSource(filename, pwd, filesystems, os.Stdin)
 		if err != nil {
 			return err
 		}
@@ -127,7 +128,7 @@ a commandline interface for interacting with it.`,
 			return err
 		}
 
-		r, err := newRunner(src, runType, fs, runtimeOptions)
+		r, err := newRunner(src, runType, filesystems, runtimeOptions)
 		if err != nil {
 			return err
 		}
@@ -138,7 +139,7 @@ a commandline interface for interacting with it.`,
 		if err != nil {
 			return err
 		}
-		conf, err := getConsolidatedConfig(fs, cliConf, r)
+		conf, err := getConsolidatedConfig(filesystems["file"], cliConf, r)
 		if err != nil {
 			return err
 		}
@@ -502,8 +503,21 @@ func init() {
 	runCmd.Flags().AddFlagSet(runCmdFlagSet())
 }
 
+func createFilesystems() map[string]afero.Fs {
+	// We want to eliminate disk access at runtime, so we set up a memory mapped cache that's
+	// written every time something is read from the real filesystem. This cache is then used for
+	// successive spawns to read from (they have no access to the real disk).
+	// Also initialize the same for `https` but the caching is handled manually in the loader package
+	return map[string]afero.Fs{
+		"file": fsext.NewCacheOnReadFs(
+			fsext.NewUnprependPathFs(afero.NewOsFs(), afero.FilePathSeparator),
+			afero.NewMemMapFs(), 0),
+		"https": afero.NewMemMapFs(),
+	}
+}
+
 // Reads a source file from any supported destination.
-func readSource(src, pwd string, fs afero.Fs, stdin io.Reader) (*lib.SourceData, error) {
+func readSource(src, pwd string, filesystems map[string]afero.Fs, stdin io.Reader) (*lib.SourceData, error) {
 	if src == "-" {
 		data, err := ioutil.ReadAll(stdin)
 		if err != nil {
@@ -511,21 +525,23 @@ func readSource(src, pwd string, fs afero.Fs, stdin io.Reader) (*lib.SourceData,
 		}
 		return &lib.SourceData{URL: &url.URL{Path: "-", Scheme: "file"}, Data: data}, nil
 	}
-	pwdURL := &url.URL{Scheme: "file", Path: filepath.ToSlash(filepath.Clean(pwd))}
-	srcURL, err := loader.Resolve(pwdURL, src)
+	pwdURL := &url.URL{Scheme: "file", Path: filepath.ToSlash(filepath.Clean(pwd)) + "/"}
+	srcURL, err := loader.Resolve(pwdURL, filepath.ToSlash(src))
 	if err != nil {
 		return nil, err
 	}
-	return loader.Load(map[string]afero.Fs{"file": fs, "https": afero.NewMemMapFs()}, srcURL, src)
+	return loader.Load(filesystems, srcURL, src)
 }
 
 // Creates a new runner.
-func newRunner(src *lib.SourceData, typ string, fs afero.Fs, rtOpts lib.RuntimeOptions) (lib.Runner, error) {
+func newRunner(
+	src *lib.SourceData, typ string, filesystems map[string]afero.Fs, rtOpts lib.RuntimeOptions,
+) (lib.Runner, error) {
 	switch typ {
 	case "":
-		return newRunner(src, detectType(src.Data), fs, rtOpts)
+		return newRunner(src, detectType(src.Data), filesystems, rtOpts)
 	case typeJS:
-		return js.New(src, fs, rtOpts)
+		return js.New(src, filesystems, rtOpts)
 	case typeArchive:
 		arc, err := lib.ReadArchive(bytes.NewReader(src.Data))
 		if err != nil {

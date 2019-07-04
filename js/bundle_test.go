@@ -32,6 +32,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
+	"github.com/loadimpact/k6/lib/fsext"
+
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/types"
@@ -41,16 +44,30 @@ import (
 	"gopkg.in/guregu/null.v3"
 )
 
+const isWindows = runtime.GOOS == "windows"
+
 func getSimpleBundle(filename, data string) (*Bundle, error) {
 	return getSimpleBundleWithFs(filename, data, afero.NewMemMapFs())
 }
+
+func getSimpleBundleWithOptions(filename, data string, options lib.RuntimeOptions) (*Bundle, error) {
+	return NewBundle(
+		&lib.SourceData{
+			URL:  &url.URL{Path: filename, Scheme: "file"},
+			Data: []byte(data),
+		},
+		map[string]afero.Fs{"file": afero.NewMemMapFs(), "https": afero.NewMemMapFs()},
+		options,
+	)
+}
+
 func getSimpleBundleWithFs(filename, data string, fs afero.Fs) (*Bundle, error) {
 	return NewBundle(
 		&lib.SourceData{
 			URL:  &url.URL{Path: filename, Scheme: "file"},
 			Data: []byte(data),
 		},
-		fs,
+		map[string]afero.Fs{"file": fs, "https": afero.NewMemMapFs()},
 		lib.RuntimeOptions{},
 	)
 }
@@ -361,16 +378,13 @@ func TestNewBundleFromArchive(t *testing.T) {
 	assert.NoError(t, afero.WriteFile(fs, "/path/to/file.txt", []byte(`hi`), 0644))
 	assert.NoError(t, afero.WriteFile(fs, "/path/to/exclaim.js", []byte(`export default function(s) { return s + "!" };`), 0644))
 
-	src := &lib.SourceData{
-		URL: &url.URL{Path: "/path/to/script.js", Scheme: "file"},
-		Data: []byte(`
+	data := `
 			import exclaim from "./exclaim.js";
 			export let options = { vus: 12345 };
 			export let file = open("./file.txt");
 			export default function() { return exclaim(file); };
-		`),
-	}
-	b, err := NewBundle(src, fs, lib.RuntimeOptions{})
+		`
+	b, err := getSimpleBundleWithFs("/path/to/script.js", data, fs)
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -390,7 +404,7 @@ func TestNewBundleFromArchive(t *testing.T) {
 	assert.Equal(t, "js", arc.Type)
 	assert.Equal(t, lib.Options{VUs: null.IntFrom(12345)}, arc.Options)
 	assert.Equal(t, "file:///path/to/script.js", arc.Filename)
-	assert.Equal(t, string(src.Data), string(arc.Data))
+	assert.Equal(t, data, string(arc.Data))
 	assert.Equal(t, "file:///path/to/", arc.Pwd)
 
 	exclaimData, err := afero.ReadFile(arc.FSes["file"], "/path/to/exclaim.js")
@@ -501,8 +515,13 @@ func TestOpen(t *testing.T) {
 			prefix, err := ioutil.TempDir("", "k6_open_test")
 			require.NoError(t, err)
 			fs := afero.NewOsFs()
+			filePath := filepath.Join(prefix, "/path/to/file.txt")
+			spew.Dump(filePath)
 			require.NoError(t, fs.MkdirAll(filepath.Join(prefix, "/path/to"), 0755))
-			require.NoError(t, afero.WriteFile(fs, filepath.Join(prefix, "/path/to/file.txt"), []byte(`hi`), 0644))
+			require.NoError(t, afero.WriteFile(fs, filePath, []byte(`hi`), 0644))
+			if isWindows {
+				fs = fsext.NewUnprependPathFs(fs, afero.FilePathSeparator)
+			}
 			return fs, prefix, func() { require.NoError(t, os.RemoveAll(prefix)) }
 		},
 	}
@@ -521,21 +540,18 @@ func TestOpen(t *testing.T) {
 					if openPath != "" && (openPath[0] == '/' || openPath[0] == '\\') {
 						openPath = filepath.Join(prefix, openPath)
 					}
-					if runtime.GOOS == "windows" {
+					if isWindows {
 						openPath = strings.Replace(openPath, `\`, `\\`, -1)
 					}
 					var pwd = tCase.pwd
 					if pwd == "" {
 						pwd = "/path/to/"
 					}
-					src := &lib.SourceData{
-						URL: &url.URL{Scheme: "file", Path: filepath.Join(prefix, filepath.Join(pwd, "script.js"))},
-						Data: []byte(`
-			export let file = open("` + openPath + `");
-			export default function() { return file };
-		`),
-					}
-					sourceBundle, err := NewBundle(src, fs, lib.RuntimeOptions{})
+					data := `
+						export let file = open("` + openPath + `");
+						export default function() { return file };`
+
+					sourceBundle, err := getSimpleBundleWithFs(filepath.ToSlash(filepath.Join(prefix, pwd, "script.js")), data, fs)
 					if tCase.isError {
 						assert.Error(t, err)
 						return
@@ -559,7 +575,7 @@ func TestOpen(t *testing.T) {
 				}
 
 				t.Run(tCase.name, testFunc)
-				if runtime.GOOS == "windows" {
+				if isWindows {
 					// windowsify the testcase
 					tCase.openPath = strings.Replace(tCase.openPath, `/`, `\`, -1)
 					tCase.pwd = strings.Replace(tCase.pwd, `/`, `\`, -1)
@@ -605,19 +621,13 @@ func TestBundleEnv(t *testing.T) {
 		"TEST_A": "1",
 		"TEST_B": "",
 	}}
-
-	b1, err := NewBundle(
-		&lib.SourceData{
-			URL: &url.URL{Path: "/script.js"},
-			Data: []byte(`
-				export default function() {
-					if (__ENV.TEST_A !== "1") { throw new Error("Invalid TEST_A: " + __ENV.TEST_A); }
-					if (__ENV.TEST_B !== "") { throw new Error("Invalid TEST_B: " + __ENV.TEST_B); }
-				}
-			`),
-		},
-		afero.NewMemMapFs(), rtOpts,
-	)
+	data := `
+export default function() {
+	if (__ENV.TEST_A !== "1") { throw new Error("Invalid TEST_A: " + __ENV.TEST_A); }
+	if (__ENV.TEST_B !== "") { throw new Error("Invalid TEST_B: " + __ENV.TEST_B); }
+}
+`
+	b1, err := getSimpleBundleWithOptions("/script.js", data, rtOpts)
 	if !assert.NoError(t, err) {
 		return
 	}

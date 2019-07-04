@@ -24,7 +24,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/url"
-	"time"
 
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
@@ -56,24 +55,8 @@ type BundleInstance struct {
 	Default goja.Callable
 }
 
-type cacheOnReadFs struct {
-	afero.Fs
-	cache afero.Fs
-}
-
-func newCacheOnReadFs(base, layer afero.Fs, cacheTime time.Duration) afero.Fs {
-	return cacheOnReadFs{
-		Fs:    afero.NewCacheOnReadFs(base, layer, cacheTime),
-		cache: layer,
-	}
-}
-
-func (c cacheOnReadFs) GetCachedFs() afero.Fs {
-	return c.cache
-}
-
 // NewBundle creates a new bundle from a source file and a filesystem.
-func NewBundle(src *lib.SourceData, fileFS afero.Fs, rtOpts lib.RuntimeOptions) (*Bundle, error) {
+func NewBundle(src *lib.SourceData, filesystems map[string]afero.Fs, rtOpts lib.RuntimeOptions) (*Bundle, error) {
 	compiler, err := compiler.New()
 	if err != nil {
 		return nil, err
@@ -85,24 +68,13 @@ func NewBundle(src *lib.SourceData, fileFS afero.Fs, rtOpts lib.RuntimeOptions) 
 	if err != nil {
 		return nil, err
 	}
-
-	// We want to eliminate disk access at runtime, so we set up a memory mapped cache that's
-	// written every time something is read from the real filesystem. This cache is then used for
-	// successive spawns to read from (they have no access to the real disk).
-	mirrorFS := afero.NewMemMapFs()
-	cachedFS := newCacheOnReadFs(fileFS, mirrorFS, 0)
-	fses := map[string]afero.Fs{
-		"file":  cachedFS,
-		"https": afero.NewMemMapFs(),
-	}
-
 	// Make a bundle, instantiate it into a throwaway VM to populate caches.
 	rt := goja.New()
 	bundle := Bundle{
 		Filename:        src.URL,
 		Source:          code,
 		Program:         pgm,
-		BaseInitContext: NewInitContext(rt, compiler, new(context.Context), fses, loader.Dir(src.URL)),
+		BaseInitContext: NewInitContext(rt, compiler, new(context.Context), filesystems, loader.Dir(src.URL)),
 		Env:             rtOpts.Env,
 	}
 	if err := bundle.instantiate(rt, bundle.BaseInitContext); err != nil {

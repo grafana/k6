@@ -30,7 +30,6 @@ import (
 	"testing"
 
 	"github.com/loadimpact/k6/lib"
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -225,7 +224,7 @@ func TestEnvVars(t *testing.T) {
 					URL:  &url.URL{Path: "/script.js"},
 				},
 				typeJS,
-				afero.NewOsFs(),
+				nil,
 				rtOpts,
 			)
 			require.NoError(t, err)
@@ -241,7 +240,7 @@ func TestEnvVars(t *testing.T) {
 						URL:  &url.URL{Path: "/script.js"},
 					},
 					typeArchive,
-					afero.NewOsFs(),
+					nil,
 					rtOpts,
 				)
 			}

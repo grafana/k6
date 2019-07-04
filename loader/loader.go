@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -116,7 +117,7 @@ func Load(fses map[string]afero.Fs, moduleSpecifier *url.URL, originalModuleSpec
 			"original moduleSpecifier": originalModuleSpecifier,
 		}).Debug("Loading...")
 
-	pathOnFs := filepath.Clean(moduleSpecifier.String()[len(moduleSpecifier.Scheme)+len(":/"):])
+	pathOnFs := filepath.FromSlash(path.Clean(moduleSpecifier.String()[len(moduleSpecifier.Scheme)+len(":/"):]))
 	data, err := afero.ReadFile(fses[moduleSpecifier.Scheme], pathOnFs)
 
 	if err != nil {

@@ -69,7 +69,29 @@ func TestConsoleContext(t *testing.T) {
 		assert.Equal(t, "b", entry.Message)
 	}
 }
+func getSimpleRunner(path, data string) (*Runner, error) {
+	return getSimpleRunnerWithFileFs(path, data, afero.NewMemMapFs())
+}
 
+func getSimpleRunnerWithOptions(path, data string, options lib.RuntimeOptions) (*Runner, error) {
+	return New(&lib.SourceData{
+		URL:  &url.URL{Path: path, Scheme: "file"},
+		Data: []byte(data),
+	}, map[string]afero.Fs{
+		"file":  afero.NewMemMapFs(),
+		"https": afero.NewMemMapFs()},
+		options)
+}
+
+func getSimpleRunnerWithFileFs(path, data string, fileFs afero.Fs) (*Runner, error) {
+	return New(&lib.SourceData{
+		URL:  &url.URL{Path: path, Scheme: "file"},
+		Data: []byte(data),
+	}, map[string]afero.Fs{
+		"file":  fileFs,
+		"https": afero.NewMemMapFs()},
+		lib.RuntimeOptions{})
+}
 func TestConsole(t *testing.T) {
 	levels := map[string]log.Level{
 		"log":   log.InfoLevel,
@@ -88,16 +110,15 @@ func TestConsole(t *testing.T) {
 		`{}`:               {Message: "[object Object]"},
 	}
 	for name, level := range levels {
+		name, level := name, level
 		t.Run(name, func(t *testing.T) {
 			for args, result := range argsets {
+				args, result := args, result
 				t.Run(args, func(t *testing.T) {
-					r, err := New(&lib.SourceData{
-						URL: &url.URL{Path: "/script"},
-						Data: []byte(fmt.Sprintf(
-							`export default function() { console.%s(%s); }`,
-							name, args,
-						)),
-					}, afero.NewMemMapFs(), lib.RuntimeOptions{})
+					r, err := getSimpleRunner("/script.js", fmt.Sprintf(
+						`export default function() { console.%s(%s); }`,
+						name, args,
+					))
 					assert.NoError(t, err)
 
 					samples := make(chan stats.SampleContainer, 100)
@@ -180,13 +201,11 @@ func TestFileConsole(t *testing.T) {
 								}
 
 							}
-							r, err := New(&lib.SourceData{
-								URL: &url.URL{Path: "/script"},
-								Data: []byte(fmt.Sprintf(
+							r, err := getSimpleRunner("/script",
+								fmt.Sprintf(
 									`export default function() { console.%s(%s); }`,
 									name, args,
-								)),
-							}, afero.NewMemMapFs(), lib.RuntimeOptions{})
+								))
 							assert.NoError(t, err)
 
 							err = r.SetOptions(lib.Options{

@@ -197,9 +197,11 @@ func (i *InitContext) Open(filename string, args ...string) (goja.Value, error) 
 	if filename[0] != '/' && filename[0] != '\\' && !filepath.IsAbs(filename) {
 		filename = filepath.Join(i.pwd.Path, filename)
 	}
-	filename = filepath.ToSlash(filename)
+	filename = filepath.Clean(filename)
 	fs := i.fses["file"]
-
+	if filename[0:1] != afero.FilePathSeparator {
+		filename = afero.FilePathSeparator + filename
+	}
 	// Workaround for https://github.com/spf13/afero/issues/201
 	if isDir, err := afero.IsDir(fs, filename); err != nil {
 		return nil, err

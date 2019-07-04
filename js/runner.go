@@ -62,8 +62,9 @@ type Runner struct {
 	setupData []byte
 }
 
-func New(src *lib.SourceData, fs afero.Fs, rtOpts lib.RuntimeOptions) (*Runner, error) {
-	bundle, err := NewBundle(src, fs, rtOpts)
+// New returns a new Runner for the provide source
+func New(src *lib.SourceData, filesystems map[string]afero.Fs, rtOpts lib.RuntimeOptions) (*Runner, error) {
+	bundle, err := NewBundle(src, filesystems, rtOpts)
 	if err != nil {
 		return nil, err
 	}

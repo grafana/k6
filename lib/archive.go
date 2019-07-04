@@ -35,12 +35,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/loadimpact/k6/lib/fsext"
 	"github.com/spf13/afero"
 )
 
 //nolint: gochecknoglobals, lll
 var (
-	volumeRE  = regexp.MustCompile(`^/?([a-zA-Z]):(.*)`)
+	volumeRE  = regexp.MustCompile(`^[/\\]?([a-zA-Z]):(.*)`)
 	sharedRE  = regexp.MustCompile(`^\\\\([^\\]+)`) // matches a shared folder in Windows before backslack replacement. i.e \\VMBOXSVR\k6\script.js
 	homeDirRE = regexp.MustCompile(`^(/[a-zA-Z])?/(Users|home|Documents and Settings)/(?:[^/]+)`)
 )
@@ -219,12 +220,12 @@ func (arc *Archive) Write(out io.Writer) error {
 		return err
 	}
 	for _, name := range [...]string{"file", "https"} {
-		fs, ok := arc.FSes[name]
+		filesystem, ok := arc.FSes[name]
 		if !ok {
 			continue
 		}
-		if cachedfs, ok := fs.(interface{ GetCachedFs() afero.Fs }); ok {
-			fs = cachedfs.GetCachedFs()
+		if cachedfs, ok := filesystem.(fsext.CacheOnReadFs); ok {
+			filesystem = cachedfs.GetCachingFs()
 		}
 
 		// A couple of things going on here:
@@ -238,25 +239,28 @@ func (arc *Archive) Write(out io.Writer) error {
 		paths := make([]string, 0, 10)
 		infos := make(map[string]os.FileInfo) // ... fix this ?
 		files := make(map[string][]byte)
-		err = afero.Walk(fs, "/",
+
+		err = fsext.Walk(filesystem, afero.FilePathSeparator,
 			filepath.WalkFunc(func(filePath string, info os.FileInfo, err error) error {
 				if err != nil {
 					return err
 				}
 				normalizedPath := NormalizeAndAnonymizePath(filePath)
+
 				infos[normalizedPath] = info
 				if info.IsDir() {
 					foundDirs[normalizedPath] = true
 					return nil
 				}
 
-				files[normalizedPath], err = afero.ReadFile(fs, filePath)
+				files[normalizedPath], err = afero.ReadFile(filesystem, filePath)
 				if err != nil {
 					return err
 				}
 				paths = append(paths, normalizedPath)
 				return nil
 			}))
+
 		if err != nil {
 			return err
 		}

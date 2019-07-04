@@ -81,7 +81,8 @@ func getMapKeys(m map[string]afero.Fs) []string {
 }
 
 func diffMapFSes(t *testing.T, first, second map[string]afero.Fs) bool {
-	require.ElementsMatch(t, getMapKeys(first), getMapKeys(second), "fs map keys don't match")
+	require.ElementsMatch(t, getMapKeys(first), getMapKeys(second),
+		"fs map keys don't match %s, %s", getMapKeys(first), getMapKeys(second))
 	for key, fs := range first {
 		secondFs := second[key]
 		diffFSes(t, fs, secondFs)
@@ -173,7 +174,7 @@ func TestArchiveReadWrite(t *testing.T) {
 			Pwd, PwdNormAnon string
 		}{
 			{"/home/myname", "/home/nobody"},
-			{"/C:/Users/Administrator", "/C/Users/nobody"},
+			{filepath.FromSlash("/C:/Users/Administrator"), "/C/Users/nobody"},
 		}
 		for _, entry := range testdata {
 			arc1 := &Archive{
@@ -223,7 +224,7 @@ func TestArchiveReadWrite(t *testing.T) {
 			}
 
 			buf := bytes.NewBuffer(nil)
-			assert.NoError(t, arc1.Write(buf))
+			require.NoError(t, arc1.Write(buf))
 
 			arc1FSes := arc1Anon.FSes
 			arc1Anon.FSes = nil
