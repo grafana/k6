@@ -80,19 +80,19 @@ func getMapKeys(m map[string]afero.Fs) []string {
 	return keys
 }
 
-func diffMapFSes(t *testing.T, first, second map[string]afero.Fs) bool {
+func diffMapFilesystems(t *testing.T, first, second map[string]afero.Fs) bool {
 	require.ElementsMatch(t, getMapKeys(first), getMapKeys(second),
 		"fs map keys don't match %s, %s", getMapKeys(first), getMapKeys(second))
 	for key, fs := range first {
 		secondFs := second[key]
-		diffFSes(t, fs, secondFs)
+		diffFilesystems(t, fs, secondFs)
 	}
 
 	return true
 }
 
-func diffFSes(t *testing.T, first, second afero.Fs) {
-	diffFSesDir(t, first, second, "/")
+func diffFilesystems(t *testing.T, first, second afero.Fs) {
+	diffFilesystemsDir(t, first, second, "/")
 }
 
 func getInfoNames(infos []os.FileInfo) []string {
@@ -103,7 +103,7 @@ func getInfoNames(infos []os.FileInfo) []string {
 	return names
 }
 
-func diffFSesDir(t *testing.T, first, second afero.Fs, dirname string) {
+func diffFilesystemsDir(t *testing.T, first, second afero.Fs, dirname string) {
 	firstInfos, err := afero.ReadDir(first, dirname)
 	require.NoError(t, err, dirname)
 
@@ -114,7 +114,7 @@ func diffFSesDir(t *testing.T, first, second afero.Fs, dirname string) {
 	for _, info := range firstInfos {
 		path := filepath.Join(dirname, info.Name())
 		if info.IsDir() {
-			diffFSesDir(t, first, second, path)
+			diffFilesystemsDir(t, first, second, path)
 			continue
 		}
 		firstData, err := afero.ReadFile(first, path)
@@ -138,7 +138,7 @@ func TestArchiveReadWrite(t *testing.T) {
 			Filename: "/path/to/script.js",
 			Data:     []byte(`// contents...`),
 			Pwd:      "/path/to",
-			FSes: map[string]afero.Fs{
+			Filesystems: map[string]afero.Fs{
 				"file": makeMemMapFs(t, map[string][]byte{
 					"/path/to/a.js":      []byte(`// a contents`),
 					"/path/to/b.js":      []byte(`// b contents`),
@@ -155,18 +155,18 @@ func TestArchiveReadWrite(t *testing.T) {
 		buf := bytes.NewBuffer(nil)
 		require.NoError(t, arc1.Write(buf))
 
-		arc1FSes := arc1.FSes
-		arc1.FSes = nil
+		arc1Filesystems := arc1.Filesystems
+		arc1.Filesystems = nil
 
 		arc2, err := ReadArchive(buf)
 		require.NoError(t, err)
 
-		arc2FSes := arc2.FSes
-		arc2.FSes = nil
+		arc2Filesystems := arc2.Filesystems
+		arc2.Filesystems = nil
 
 		assert.Equal(t, arc1, arc2)
 
-		diffMapFSes(t, arc1FSes, arc2FSes)
+		diffMapFilesystems(t, arc1Filesystems, arc2Filesystems)
 	})
 
 	t.Run("Anonymized", func(t *testing.T) {
@@ -186,7 +186,7 @@ func TestArchiveReadWrite(t *testing.T) {
 				Filename: fmt.Sprintf("%s/script.js", entry.Pwd),
 				Data:     []byte(`// contents...`),
 				Pwd:      entry.Pwd,
-				FSes: map[string]afero.Fs{
+				Filesystems: map[string]afero.Fs{
 					"file": makeMemMapFs(t, map[string][]byte{
 						fmt.Sprintf("%s/a.js", entry.Pwd):      []byte(`// a contents`),
 						fmt.Sprintf("%s/b.js", entry.Pwd):      []byte(`// b contents`),
@@ -209,7 +209,7 @@ func TestArchiveReadWrite(t *testing.T) {
 				Data:     []byte(`// contents...`),
 				Pwd:      entry.PwdNormAnon,
 
-				FSes: map[string]afero.Fs{
+				Filesystems: map[string]afero.Fs{
 					"file": makeMemMapFs(t, map[string][]byte{
 						fmt.Sprintf("%s/a.js", entry.PwdNormAnon):      []byte(`// a contents`),
 						fmt.Sprintf("%s/b.js", entry.PwdNormAnon):      []byte(`// b contents`),
@@ -226,17 +226,17 @@ func TestArchiveReadWrite(t *testing.T) {
 			buf := bytes.NewBuffer(nil)
 			require.NoError(t, arc1.Write(buf))
 
-			arc1FSes := arc1Anon.FSes
-			arc1Anon.FSes = nil
+			arc1Filesystems := arc1Anon.Filesystems
+			arc1Anon.Filesystems = nil
 
 			arc2, err := ReadArchive(buf)
 			assert.NoError(t, err)
 
-			arc2FSes := arc2.FSes
-			arc2.FSes = nil
+			arc2Filesystems := arc2.Filesystems
+			arc2.Filesystems = nil
 
 			assert.Equal(t, arc1Anon, arc2)
-			diffMapFSes(t, arc1FSes, arc2FSes)
+			diffMapFilesystems(t, arc1Filesystems, arc2Filesystems)
 		}
 	})
 }

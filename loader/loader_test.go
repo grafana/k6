@@ -101,10 +101,10 @@ func TestLoad(t *testing.T) {
 	}()
 
 	t.Run("Local", func(t *testing.T) {
-		fses := make(map[string]afero.Fs)
-		fses["file"] = afero.NewMemMapFs()
-		assert.NoError(t, fses["file"].MkdirAll("/path/to", 0755))
-		assert.NoError(t, afero.WriteFile(fses["file"], "/path/to/file.txt", []byte("hi"), 0644))
+		filesystems := make(map[string]afero.Fs)
+		filesystems["file"] = afero.NewMemMapFs()
+		assert.NoError(t, filesystems["file"].MkdirAll("/path/to", 0755))
+		assert.NoError(t, afero.WriteFile(filesystems["file"], "/path/to/file.txt", []byte("hi"), 0644))
 
 		testdata := map[string]struct{ pwd, path string }{
 			"Absolute": {"/path/", "/path/to/file.txt"},
@@ -120,7 +120,7 @@ func TestLoad(t *testing.T) {
 				moduleURL, err := Resolve(pwdURL, data.path)
 				require.NoError(t, err)
 
-				src, err := Load(fses, moduleURL, data.path)
+				src, err := Load(filesystems, moduleURL, data.path)
 				require.NoError(t, err)
 
 				assert.Equal(t, "file:///path/to/file.txt", src.URL.String())
@@ -136,14 +136,14 @@ func TestLoad(t *testing.T) {
 			pathURL, err := Resolve(root, "/nonexistent")
 			require.NoError(t, err)
 
-			_, err = Load(fses, pathURL, path)
+			_, err = Load(filesystems, pathURL, path)
 			assert.EqualError(t, err, fmt.Sprintf(fileSchemeCouldntBeLoadedMsg, "file://"+filepath.ToSlash(path)))
 		})
 
 	})
 
 	t.Run("Remote", func(t *testing.T) {
-		fses := map[string]afero.Fs{"https": afero.NewMemMapFs()}
+		filesystems := map[string]afero.Fs{"https": afero.NewMemMapFs()}
 		t.Run("From local", func(t *testing.T) {
 			root, err := url.Parse("file:///")
 			require.NoError(t, err)
@@ -152,7 +152,7 @@ func TestLoad(t *testing.T) {
 			moduleSpecifierURL, err := Resolve(root, moduleSpecifier)
 			require.NoError(t, err)
 
-			src, err := Load(fses, moduleSpecifierURL, moduleSpecifier)
+			src, err := Load(filesystems, moduleSpecifierURL, moduleSpecifier)
 			require.NoError(t, err)
 			assert.Equal(t, src.URL, moduleSpecifierURL)
 			assert.Contains(t, string(src.Data), "Herman Melville - Moby-Dick")
@@ -166,7 +166,7 @@ func TestLoad(t *testing.T) {
 			moduleSpecifierURL, err := Resolve(pwdURL, moduleSpecifier)
 			require.NoError(t, err)
 
-			src, err := Load(fses, moduleSpecifierURL, moduleSpecifier)
+			src, err := Load(filesystems, moduleSpecifierURL, moduleSpecifier)
 			require.NoError(t, err)
 			assert.Equal(t, src.URL.String(), sr("HTTPSBIN_URL/robots.txt"))
 			assert.Equal(t, string(src.Data), "User-agent: *\nDisallow: /deny\n")
@@ -180,7 +180,7 @@ func TestLoad(t *testing.T) {
 			moduleSpecifierURL, err := Resolve(pwdURL, moduleSpecifier)
 			require.NoError(t, err)
 
-			src, err := Load(fses, moduleSpecifierURL, moduleSpecifier)
+			src, err := Load(filesystems, moduleSpecifierURL, moduleSpecifier)
 			require.NoError(t, err)
 			assert.Equal(t, sr("HTTPSBIN_URL/robots.txt"), src.URL.String())
 			assert.Equal(t, "User-agent: *\nDisallow: /deny\n", string(src.Data))
@@ -205,8 +205,8 @@ func TestLoad(t *testing.T) {
 		moduleSpecifierURL, err := Resolve(root, moduleSpecifier)
 		require.NoError(t, err)
 
-		fses := map[string]afero.Fs{"https": afero.NewMemMapFs()}
-		src, err := Load(fses, moduleSpecifierURL, moduleSpecifier)
+		filesystems := map[string]afero.Fs{"https": afero.NewMemMapFs()}
+		src, err := Load(filesystems, moduleSpecifierURL, moduleSpecifier)
 
 		require.NoError(t, err)
 		assert.Equal(t, src.URL.String(), sr("HTTPSBIN_URL/raw/something"))
@@ -234,14 +234,14 @@ func TestLoad(t *testing.T) {
 			{"HOST", "some-path-that-doesnt-exist.js"},
 		}
 
-		fses := map[string]afero.Fs{"https": afero.NewMemMapFs()}
+		filesystems := map[string]afero.Fs{"https": afero.NewMemMapFs()}
 		for _, data := range testData {
 			moduleSpecifier := data.moduleSpecifier
 			t.Run(data.name, func(t *testing.T) {
 				moduleSpecifierURL, err := Resolve(root, moduleSpecifier)
 				require.NoError(t, err)
 
-				_, err = Load(fses, moduleSpecifierURL, moduleSpecifier)
+				_, err = Load(filesystems, moduleSpecifierURL, moduleSpecifier)
 				require.Error(t, err)
 			})
 		}

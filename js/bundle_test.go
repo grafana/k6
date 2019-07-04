@@ -406,11 +406,11 @@ func TestNewBundleFromArchive(t *testing.T) {
 	assert.Equal(t, data, string(arc.Data))
 	assert.Equal(t, "file:///path/to/", arc.Pwd)
 
-	exclaimData, err := afero.ReadFile(arc.FSes["file"], "/path/to/exclaim.js")
+	exclaimData, err := afero.ReadFile(arc.Filesystems["file"], "/path/to/exclaim.js")
 	assert.NoError(t, err)
 	assert.Equal(t, `export default function(s) { return s + "!" };`, string(exclaimData))
 
-	fileData, err := afero.ReadFile(arc.FSes["file"], "/path/to/file.txt")
+	fileData, err := afero.ReadFile(arc.Filesystems["file"], "/path/to/file.txt")
 	assert.NoError(t, err)
 	assert.Equal(t, `hi`, string(fileData))
 	assert.Equal(t, consts.Version, arc.K6Version)

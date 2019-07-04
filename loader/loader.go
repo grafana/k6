@@ -107,10 +107,10 @@ func Dir(old *url.URL) *url.URL {
 	return old.ResolveReference(&url.URL{Path: "./"})
 }
 
-// Load loads the provided moduleSpecifier from the given fses which are map of fses for a given scheme which
+// Load loads the provided moduleSpecifier from the given filesystems which are map of filesystems for a given scheme which
 // is they key of the map. If the scheme is https then a request will be made if the files is not
 // found in the map and written to the map.
-func Load(fses map[string]afero.Fs, moduleSpecifier *url.URL, originalModuleSpecifier string) (*lib.SourceData, error) {
+func Load(filesystems map[string]afero.Fs, moduleSpecifier *url.URL, originalModuleSpecifier string) (*lib.SourceData, error) {
 	log.WithFields(
 		log.Fields{
 			"moduleSpecifier":          moduleSpecifier,
@@ -118,7 +118,7 @@ func Load(fses map[string]afero.Fs, moduleSpecifier *url.URL, originalModuleSpec
 		}).Debug("Loading...")
 
 	pathOnFs := filepath.FromSlash(path.Clean(moduleSpecifier.String()[len(moduleSpecifier.Scheme)+len(":/"):]))
-	data, err := afero.ReadFile(fses[moduleSpecifier.Scheme], pathOnFs)
+	data, err := afero.ReadFile(filesystems[moduleSpecifier.Scheme], pathOnFs)
 
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -130,7 +130,7 @@ func Load(fses map[string]afero.Fs, moduleSpecifier *url.URL, originalModuleSpec
 				}
 				// TODO maybe make an afero.Fs which makes request directly and than use CacheOnReadFs
 				// on top of as with the `file` scheme fs
-				_ = afero.WriteFile(fses[moduleSpecifier.Scheme], pathOnFs, result.Data, 0644)
+				_ = afero.WriteFile(filesystems[moduleSpecifier.Scheme], pathOnFs, result.Data, 0644)
 				return result, nil
 			}
 			return nil, errors.Errorf(fileSchemeCouldntBeLoadedMsg, moduleSpecifier)

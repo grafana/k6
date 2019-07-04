@@ -151,7 +151,7 @@ func NewBundleFromArchive(arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle,
 		return nil, err
 	}
 
-	initctx := NewInitContext(goja.New(), compiler, new(context.Context), arc.FSes, pwdURL)
+	initctx := NewInitContext(goja.New(), compiler, new(context.Context), arc.Filesystems, pwdURL)
 
 	env := arc.Env
 	if env == nil {
@@ -178,14 +178,14 @@ func NewBundleFromArchive(arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle,
 
 func (b *Bundle) makeArchive() *lib.Archive {
 	arc := &lib.Archive{
-		Type:      "js",
-		FSes:      b.BaseInitContext.fses,
-		Options:   b.Options,
-		Filename:  b.Filename.String(),
-		Data:      []byte(b.Source),
-		Pwd:       b.BaseInitContext.pwd.String(),
-		Env:       make(map[string]string, len(b.Env)),
-		K6Version: consts.Version,
+		Type:        "js",
+		Filesystems: b.BaseInitContext.filesystems,
+		Options:     b.Options,
+		Filename:    b.Filename.String(),
+		Data:        []byte(b.Source),
+		Pwd:         b.BaseInitContext.pwd.String(),
+		Env:         make(map[string]string, len(b.Env)),
+		K6Version:   consts.Version,
 	}
 	// Copy env so changes in the archive are not reflected in the source Bundle
 	for k, v := range b.Env {

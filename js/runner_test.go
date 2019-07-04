@@ -1347,7 +1347,7 @@ func TestArchiveNotPanicking(t *testing.T) {
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
-	arc.FSes = map[string]afero.Fs{"file": afero.NewMemMapFs()}
+	arc.Filesystems = map[string]afero.Fs{"file": afero.NewMemMapFs()}
 	r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
 	// we do want this to error here as this is where we find out that a given file is not in the
 	// archive

@@ -51,8 +51,8 @@ type InitContext struct {
 	ctxPtr *context.Context
 
 	// Filesystem to load files and scripts from with the map key being the scheme
-	fses map[string]afero.Fs
-	pwd  *url.URL
+	filesystems map[string]afero.Fs
+	pwd         *url.URL
 
 	// Cache of loaded programs and files.
 	programs map[string]programWithSource
@@ -60,14 +60,14 @@ type InitContext struct {
 
 // NewInitContext creates a new initcontext with the provided arguments
 func NewInitContext(
-	rt *goja.Runtime, compiler *compiler.Compiler, ctxPtr *context.Context, fses map[string]afero.Fs, pwd *url.URL,
+	rt *goja.Runtime, compiler *compiler.Compiler, ctxPtr *context.Context, filesystems map[string]afero.Fs, pwd *url.URL,
 ) *InitContext {
 	return &InitContext{
-		runtime:  rt,
-		compiler: compiler,
-		ctxPtr:   ctxPtr,
-		fses:     fses,
-		pwd:      pwd,
+		runtime:     rt,
+		compiler:    compiler,
+		ctxPtr:      ctxPtr,
+		filesystems: filesystems,
+		pwd:         pwd,
 
 		programs: make(map[string]programWithSource),
 	}
@@ -88,9 +88,9 @@ func newBoundInitContext(base *InitContext, ctxPtr *context.Context, rt *goja.Ru
 		runtime: rt,
 		ctxPtr:  ctxPtr,
 
-		fses:     base.fses,
-		pwd:      base.pwd,
-		compiler: base.compiler,
+		filesystems: base.filesystems,
+		pwd:         base.pwd,
+		compiler:    base.compiler,
 
 		programs: programs,
 	}
@@ -151,7 +151,7 @@ func (i *InitContext) requireFile(name string) (goja.Value, error) {
 		i.runtime.Set("module", module)
 		if pgm.pgm == nil {
 			// Load the sources; the loader takes care of remote loading, etc.
-			data, err := loader.Load(i.fses, fileURL, name)
+			data, err := loader.Load(i.filesystems, fileURL, name)
 			if err != nil {
 				return goja.Undefined(), err
 			}
@@ -198,7 +198,7 @@ func (i *InitContext) Open(filename string, args ...string) (goja.Value, error) 
 		filename = filepath.Join(i.pwd.Path, filename)
 	}
 	filename = filepath.Clean(filename)
-	fs := i.fses["file"]
+	fs := i.filesystems["file"]
 	if filename[0:1] != afero.FilePathSeparator {
 		filename = afero.FilePathSeparator + filename
 	}

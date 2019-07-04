@@ -87,7 +87,7 @@ type Archive struct {
 	// Working directory for resolving relative paths.
 	Pwd string `json:"pwd"`
 
-	FSes map[string]afero.Fs `json:"-"`
+	Filesystems map[string]afero.Fs `json:"-"`
 
 	// Environment variables
 	Env map[string]string `json:"env"`
@@ -96,13 +96,13 @@ type Archive struct {
 }
 
 func (arc *Archive) getFs(name string) afero.Fs {
-	fs, ok := arc.FSes[name]
+	fs, ok := arc.Filesystems[name]
 	if !ok {
 		fs = afero.NewMemMapFs()
 		if name == "file" {
 			fs = &normalizedFS{fs}
 		}
-		arc.FSes[name] = fs
+		arc.Filesystems[name] = fs
 	}
 
 	return fs
@@ -111,7 +111,7 @@ func (arc *Archive) getFs(name string) afero.Fs {
 // ReadArchive reads an archive created by Archive.Write from a reader.
 func ReadArchive(in io.Reader) (*Archive, error) {
 	r := tar.NewReader(in)
-	arc := &Archive{FSes: make(map[string]afero.Fs, 2)}
+	arc := &Archive{Filesystems: make(map[string]afero.Fs, 2)}
 	for {
 		hdr, err := r.Next()
 		if err != nil {
@@ -222,7 +222,7 @@ func (arc *Archive) Write(out io.Writer) error {
 		return err
 	}
 	for _, name := range [...]string{"file", "https"} {
-		filesystem, ok := arc.FSes[name]
+		filesystem, ok := arc.Filesystems[name]
 		if !ok {
 			continue
 		}
