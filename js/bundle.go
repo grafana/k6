@@ -58,7 +58,7 @@ type BundleInstance struct {
 }
 
 // NewBundle creates a new bundle from a source file and a filesystem.
-func NewBundle(src *lib.SourceData, filesystems map[string]afero.Fs, rtOpts lib.RuntimeOptions) (*Bundle, error) {
+func NewBundle(src *loader.SourceData, filesystems map[string]afero.Fs, rtOpts lib.RuntimeOptions) (*Bundle, error) {
 	compiler, err := compiler.New()
 	if err != nil {
 		return nil, err
@@ -137,21 +137,12 @@ func NewBundleFromArchive(arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle,
 		return nil, errors.Errorf("expected bundle type 'js', got '%s'", arc.Type)
 	}
 
-	pgm, _, err := compiler.Compile(string(arc.Data), arc.Filename, "", "", true)
-	if err != nil {
-		return nil, err
-	}
-	pwdURL, err := loader.Resolve(&url.URL{Scheme: "file", Path: "/"}, arc.Pwd)
+	pgm, _, err := compiler.Compile(string(arc.Data), arc.FilenameURL.String(), "", "", true)
 	if err != nil {
 		return nil, err
 	}
 
-	filenameURL, err := loader.Resolve(pwdURL, arc.Filename)
-	if err != nil {
-		return nil, err
-	}
-
-	initctx := NewInitContext(goja.New(), compiler, new(context.Context), arc.Filesystems, pwdURL)
+	initctx := NewInitContext(goja.New(), compiler, new(context.Context), arc.Filesystems, arc.PwdURL)
 
 	env := arc.Env
 	if env == nil {
@@ -163,7 +154,7 @@ func NewBundleFromArchive(arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle,
 	}
 
 	bundle := &Bundle{
-		Filename:        filenameURL,
+		Filename:        arc.FilenameURL,
 		Source:          string(arc.Data),
 		Program:         pgm,
 		Options:         arc.Options,
@@ -181,9 +172,9 @@ func (b *Bundle) makeArchive() *lib.Archive {
 		Type:        "js",
 		Filesystems: b.BaseInitContext.filesystems,
 		Options:     b.Options,
-		Filename:    b.Filename.String(),
+		FilenameURL: b.Filename,
 		Data:        []byte(b.Source),
-		Pwd:         b.BaseInitContext.pwd.String(),
+		PwdURL:      b.BaseInitContext.pwd,
 		Env:         make(map[string]string, len(b.Env)),
 		K6Version:   consts.Version,
 	}

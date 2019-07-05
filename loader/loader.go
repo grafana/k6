@@ -31,11 +31,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/loadimpact/k6/lib"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 )
+
+// SourceData wraps a source file; data and filename.
+type SourceData struct {
+	Data []byte
+	URL  *url.URL
+}
 
 type loaderFunc func(path string, parts []string) (string, error)
 
@@ -112,7 +117,7 @@ func Dir(old *url.URL) *url.URL {
 // be made if the files is not found in the map and written to the map.
 func Load(
 	filesystems map[string]afero.Fs, moduleSpecifier *url.URL, originalModuleSpecifier string,
-) (*lib.SourceData, error) {
+) (*SourceData, error) {
 	log.WithFields(
 		log.Fields{
 			"moduleSpecifier":          moduleSpecifier,
@@ -125,7 +130,7 @@ func Load(
 	if err != nil {
 		if os.IsNotExist(err) {
 			if moduleSpecifier.Scheme == "https" {
-				var result *lib.SourceData
+				var result *SourceData
 				result, err = loadRemoteURL(moduleSpecifier)
 				if err != nil {
 					return nil, errors.Errorf(httpsSchemeCouldntBeLoadedMsg, originalModuleSpecifier, moduleSpecifier, err)
@@ -140,7 +145,7 @@ func Load(
 		return nil, err
 	}
 
-	return &lib.SourceData{URL: moduleSpecifier, Data: data}, nil
+	return &SourceData{URL: moduleSpecifier, Data: data}, nil
 }
 
 func resolveUsingLoaders(name string) (string, error) {
@@ -152,7 +157,7 @@ func resolveUsingLoaders(name string) (string, error) {
 	return "", errNoLoaderMatched
 }
 
-func loadRemoteURL(u *url.URL) (*lib.SourceData, error) {
+func loadRemoteURL(u *url.URL) (*SourceData, error) {
 	var oldQuery = u.RawQuery
 	if u.RawQuery != "" {
 		u.RawQuery += "&"
@@ -174,7 +179,7 @@ func loadRemoteURL(u *url.URL) (*lib.SourceData, error) {
 	// <meta name="k6-import" content="example.com/path/to/real/file.txt" />
 	// <meta name="k6-import" content="github.com/myusername/repo/file.txt" />
 
-	return &lib.SourceData{URL: u, Data: data}, nil
+	return &SourceData{URL: u, Data: data}, nil
 }
 
 func pickLoader(path string) (string, loaderFunc, []string) {

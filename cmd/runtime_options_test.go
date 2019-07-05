@@ -30,6 +30,7 @@ import (
 	"testing"
 
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/loader"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -219,7 +220,7 @@ func TestEnvVars(t *testing.T) {
 			}
 
 			runner, err := newRunner(
-				&lib.SourceData{
+				&loader.SourceData{
 					Data: []byte(jsCode),
 					URL:  &url.URL{Path: "/script.js"},
 				},
@@ -235,7 +236,7 @@ func TestEnvVars(t *testing.T) {
 
 			getRunnerErr := func(rtOpts lib.RuntimeOptions) (lib.Runner, error) {
 				return newRunner(
-					&lib.SourceData{
+					&loader.SourceData{
 						Data: archiveBuf.Bytes(),
 						URL:  &url.URL{Path: "/script.js"},
 					},

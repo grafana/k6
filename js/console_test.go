@@ -33,6 +33,7 @@ import (
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/stats"
 	log "github.com/sirupsen/logrus"
 	logtest "github.com/sirupsen/logrus/hooks/test"
@@ -74,7 +75,7 @@ func getSimpleRunner(path, data string) (*Runner, error) {
 }
 
 func getSimpleRunnerWithOptions(path, data string, options lib.RuntimeOptions) (*Runner, error) {
-	return New(&lib.SourceData{
+	return New(&loader.SourceData{
 		URL:  &url.URL{Path: path, Scheme: "file"},
 		Data: []byte(data),
 	}, map[string]afero.Fs{
@@ -84,7 +85,7 @@ func getSimpleRunnerWithOptions(path, data string, options lib.RuntimeOptions) (
 }
 
 func getSimpleRunnerWithFileFs(path, data string, fileFs afero.Fs) (*Runner, error) {
-	return New(&lib.SourceData{
+	return New(&loader.SourceData{
 		URL:  &url.URL{Path: path, Scheme: "file"},
 		Data: []byte(data),
 	}, map[string]afero.Fs{

@@ -18,7 +18,7 @@
  *
  */
 
-package loader
+package loader_test
 
 import (
 	"fmt"
@@ -28,6 +28,7 @@ import (
 	"testing"
 
 	"github.com/loadimpact/k6/lib/testutils"
+	"github.com/loadimpact/k6/loader"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -42,7 +43,7 @@ func TestDir(t *testing.T) {
 		nameURL := &url.URL{Scheme: "file", Path: name}
 		dirURL := &url.URL{Scheme: "file", Path: filepath.ToSlash(dir)}
 		t.Run("path="+name, func(t *testing.T) {
-			assert.Equal(t, dirURL, Dir(nameURL))
+			assert.Equal(t, dirURL, loader.Dir(nameURL))
 		})
 	}
 }
@@ -50,7 +51,7 @@ func TestDir(t *testing.T) {
 func TestResolve(t *testing.T) {
 
 	t.Run("Blank", func(t *testing.T) {
-		_, err := Resolve(nil, "")
+		_, err := loader.Resolve(nil, "")
 		assert.EqualError(t, err, "local or remote path required")
 	})
 
@@ -59,21 +60,21 @@ func TestResolve(t *testing.T) {
 		require.NoError(t, err)
 
 		t.Run("Missing", func(t *testing.T) {
-			u, err := Resolve(root, "example.com/html")
+			u, err := loader.Resolve(root, "example.com/html")
 			require.NoError(t, err)
 			assert.Equal(t, u.String(), "https://example.com/html")
 			// TODO: check that warning was emitted
 		})
 		t.Run("WS", func(t *testing.T) {
 			moduleSpecifier := "ws://example.com/html"
-			_, err := Resolve(root, moduleSpecifier)
+			_, err := loader.Resolve(root, moduleSpecifier)
 			assert.EqualError(t, err,
 				"only supported schemes for imports are file and https, "+moduleSpecifier+" has `ws`")
 		})
 
 		t.Run("HTTP", func(t *testing.T) {
 			moduleSpecifier := "http://example.com/html"
-			_, err := Resolve(root, moduleSpecifier)
+			_, err := loader.Resolve(root, moduleSpecifier)
 			assert.EqualError(t, err,
 				"only supported schemes for imports are file and https, "+moduleSpecifier+" has `http`")
 		})
@@ -83,7 +84,7 @@ func TestResolve(t *testing.T) {
 		pwdURL, err := url.Parse("https://example.com")
 		require.NoError(t, err)
 
-		_, err = Resolve(pwdURL, "file:///etc/shadow")
+		_, err = loader.Resolve(pwdURL, "file:///etc/shadow")
 		assert.EqualError(t, err, "origin (https://example.com) not allowed to load local file: file:///etc/shadow")
 	})
 
@@ -117,10 +118,10 @@ func TestLoad(t *testing.T) {
 				pwdURL, err := url.Parse("file://" + data.pwd)
 				require.NoError(t, err)
 
-				moduleURL, err := Resolve(pwdURL, data.path)
+				moduleURL, err := loader.Resolve(pwdURL, data.path)
 				require.NoError(t, err)
 
-				src, err := Load(filesystems, moduleURL, data.path)
+				src, err := loader.Load(filesystems, moduleURL, data.path)
 				require.NoError(t, err)
 
 				assert.Equal(t, "file:///path/to/file.txt", src.URL.String())
@@ -133,11 +134,14 @@ func TestLoad(t *testing.T) {
 			require.NoError(t, err)
 
 			path := filepath.FromSlash("/nonexistent")
-			pathURL, err := Resolve(root, "/nonexistent")
+			pathURL, err := loader.Resolve(root, "/nonexistent")
 			require.NoError(t, err)
 
-			_, err = Load(filesystems, pathURL, path)
-			assert.EqualError(t, err, fmt.Sprintf(fileSchemeCouldntBeLoadedMsg, "file://"+filepath.ToSlash(path)))
+			_, err = loader.Load(filesystems, pathURL, path)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(),
+				fmt.Sprintf(`The moduleSpecifier "file://%s" couldn't be found on local disk. `,
+					filepath.ToSlash(path)))
 		})
 
 	})
@@ -149,10 +153,10 @@ func TestLoad(t *testing.T) {
 			require.NoError(t, err)
 
 			moduleSpecifier := sr("HTTPSBIN_URL/html")
-			moduleSpecifierURL, err := Resolve(root, moduleSpecifier)
+			moduleSpecifierURL, err := loader.Resolve(root, moduleSpecifier)
 			require.NoError(t, err)
 
-			src, err := Load(filesystems, moduleSpecifierURL, moduleSpecifier)
+			src, err := loader.Load(filesystems, moduleSpecifierURL, moduleSpecifier)
 			require.NoError(t, err)
 			assert.Equal(t, src.URL, moduleSpecifierURL)
 			assert.Contains(t, string(src.Data), "Herman Melville - Moby-Dick")
@@ -163,10 +167,10 @@ func TestLoad(t *testing.T) {
 			require.NoError(t, err)
 
 			moduleSpecifier := sr("HTTPSBIN_URL/robots.txt")
-			moduleSpecifierURL, err := Resolve(pwdURL, moduleSpecifier)
+			moduleSpecifierURL, err := loader.Resolve(pwdURL, moduleSpecifier)
 			require.NoError(t, err)
 
-			src, err := Load(filesystems, moduleSpecifierURL, moduleSpecifier)
+			src, err := loader.Load(filesystems, moduleSpecifierURL, moduleSpecifier)
 			require.NoError(t, err)
 			assert.Equal(t, src.URL.String(), sr("HTTPSBIN_URL/robots.txt"))
 			assert.Equal(t, string(src.Data), "User-agent: *\nDisallow: /deny\n")
@@ -177,10 +181,10 @@ func TestLoad(t *testing.T) {
 			require.NoError(t, err)
 
 			moduleSpecifier := ("./robots.txt")
-			moduleSpecifierURL, err := Resolve(pwdURL, moduleSpecifier)
+			moduleSpecifierURL, err := loader.Resolve(pwdURL, moduleSpecifier)
 			require.NoError(t, err)
 
-			src, err := Load(filesystems, moduleSpecifierURL, moduleSpecifier)
+			src, err := loader.Load(filesystems, moduleSpecifierURL, moduleSpecifier)
 			require.NoError(t, err)
 			assert.Equal(t, sr("HTTPSBIN_URL/robots.txt"), src.URL.String())
 			assert.Equal(t, "User-agent: *\nDisallow: /deny\n", string(src.Data))
@@ -202,11 +206,11 @@ func TestLoad(t *testing.T) {
 		require.NoError(t, err)
 
 		moduleSpecifier := sr("HTTPSBIN_URL/raw/something")
-		moduleSpecifierURL, err := Resolve(root, moduleSpecifier)
+		moduleSpecifierURL, err := loader.Resolve(root, moduleSpecifier)
 		require.NoError(t, err)
 
 		filesystems := map[string]afero.Fs{"https": afero.NewMemMapFs()}
-		src, err := Load(filesystems, moduleSpecifierURL, moduleSpecifier)
+		src, err := loader.Load(filesystems, moduleSpecifierURL, moduleSpecifier)
 
 		require.NoError(t, err)
 		assert.Equal(t, src.URL.String(), sr("HTTPSBIN_URL/raw/something"))
@@ -222,7 +226,7 @@ func TestLoad(t *testing.T) {
 		require.NoError(t, err)
 
 		t.Run("IP URL", func(t *testing.T) {
-			_, err := Resolve(root, "192.168.0.%31")
+			_, err := loader.Resolve(root, "192.168.0.%31")
 			require.Error(t, err)
 			require.Contains(t, err.Error(), `invalid URL escape "%31"`)
 		})
@@ -238,10 +242,10 @@ func TestLoad(t *testing.T) {
 		for _, data := range testData {
 			moduleSpecifier := data.moduleSpecifier
 			t.Run(data.name, func(t *testing.T) {
-				moduleSpecifierURL, err := Resolve(root, moduleSpecifier)
+				moduleSpecifierURL, err := loader.Resolve(root, moduleSpecifier)
 				require.NoError(t, err)
 
-				_, err = Load(filesystems, moduleSpecifierURL, moduleSpecifier)
+				_, err = loader.Load(filesystems, moduleSpecifierURL, moduleSpecifier)
 				require.Error(t, err)
 			})
 		}

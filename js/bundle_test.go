@@ -37,6 +37,7 @@ import (
 	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/lib/fsext"
 	"github.com/loadimpact/k6/lib/types"
+	"github.com/loadimpact/k6/loader"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -51,7 +52,7 @@ func getSimpleBundle(filename, data string) (*Bundle, error) {
 
 func getSimpleBundleWithOptions(filename, data string, options lib.RuntimeOptions) (*Bundle, error) {
 	return NewBundle(
-		&lib.SourceData{
+		&loader.SourceData{
 			URL:  &url.URL{Path: filename, Scheme: "file"},
 			Data: []byte(data),
 		},
@@ -62,7 +63,7 @@ func getSimpleBundleWithOptions(filename, data string, options lib.RuntimeOption
 
 func getSimpleBundleWithFs(filename, data string, fs afero.Fs) (*Bundle, error) {
 	return NewBundle(
-		&lib.SourceData{
+		&loader.SourceData{
 			URL:  &url.URL{Path: filename, Scheme: "file"},
 			Data: []byte(data),
 		},
@@ -402,9 +403,9 @@ func TestNewBundleFromArchive(t *testing.T) {
 	arc := b.makeArchive()
 	assert.Equal(t, "js", arc.Type)
 	assert.Equal(t, lib.Options{VUs: null.IntFrom(12345)}, arc.Options)
-	assert.Equal(t, "file:///path/to/script.js", arc.Filename)
+	assert.Equal(t, "file:///path/to/script.js", arc.FilenameURL.String())
 	assert.Equal(t, data, string(arc.Data))
-	assert.Equal(t, "file:///path/to/", arc.Pwd)
+	assert.Equal(t, "file:///path/to/", arc.PwdURL.String())
 
 	exclaimData, err := afero.ReadFile(arc.Filesystems["file"], "/path/to/exclaim.js")
 	assert.NoError(t, err)

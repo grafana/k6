@@ -30,6 +30,7 @@ import (
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/lib/types"
+	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/stats"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -114,7 +115,7 @@ func TestSetupDataMarshalling(t *testing.T) {
 	`))
 
 	runner, err := js.New(
-		&lib.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script},
+		&loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script},
 		nil,
 		lib.RuntimeOptions{},
 	)

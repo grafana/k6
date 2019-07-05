@@ -34,6 +34,7 @@ import (
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/netext"
+	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/stats"
 	"github.com/oxtoacart/bpool"
 	"github.com/pkg/errors"
@@ -63,7 +64,7 @@ type Runner struct {
 }
 
 // New returns a new Runner for the provide source
-func New(src *lib.SourceData, filesystems map[string]afero.Fs, rtOpts lib.RuntimeOptions) (*Runner, error) {
+func New(src *loader.SourceData, filesystems map[string]afero.Fs, rtOpts lib.RuntimeOptions) (*Runner, error) {
 	bundle, err := NewBundle(src, filesystems, rtOpts)
 	if err != nil {
 		return nil, err

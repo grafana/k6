@@ -35,6 +35,7 @@ import (
 	"github.com/loadimpact/k6/js"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/types"
+	"github.com/loadimpact/k6/loader"
 	"github.com/manyminds/api2go/jsonapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -133,7 +134,7 @@ func TestSetupData(t *testing.T) {
 		testCase := testCase
 		t.Run(testCase.name, func(t *testing.T) {
 			runner, err := js.New(
-				&lib.SourceData{URL: &url.URL{Path: "/script.js"}, Data: testCase.script},
+				&loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: testCase.script},
 				nil,
 				lib.RuntimeOptions{},
 			)

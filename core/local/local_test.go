@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/loadimpact/k6/lib/netext"
+	"github.com/loadimpact/k6/loader"
 
 	"github.com/loadimpact/k6/js"
 	"github.com/loadimpact/k6/lib"
@@ -481,7 +482,7 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 	}`)
 
 	runner, err := js.New(
-		&lib.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script},
+		&loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script},
 		nil,
 		lib.RuntimeOptions{},
 	)

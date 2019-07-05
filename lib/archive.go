@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -36,6 +37,7 @@ import (
 	"time"
 
 	"github.com/loadimpact/k6/lib/fsext"
+	"github.com/loadimpact/k6/loader"
 	"github.com/spf13/afero"
 )
 
@@ -80,12 +82,16 @@ type Archive struct {
 	// Options to use.
 	Options Options `json:"options"`
 
+	// TODO: rewrite the encoding, decoding of json to use another type with only the fields it
+	// needs in order to remove Filename and Pwd from this
 	// Filename and contents of the main file being executed.
-	Filename string `json:"filename"`
-	Data     []byte `json:"-"`
+	Filename    string   `json:"filename"` // only for json
+	FilenameURL *url.URL `json:"-"`
+	Data        []byte   `json:"-"`
 
 	// Working directory for resolving relative paths.
-	Pwd string `json:"pwd"`
+	Pwd    string   `json:"pwd"` // only for json
+	PwdURL *url.URL `json:"-"`
 
 	Filesystems map[string]afero.Fs `json:"-"`
 
@@ -135,8 +141,29 @@ func ReadArchive(in io.Reader) (*Archive, error) {
 				return nil, err
 			}
 			// Path separator normalization for older archives (<=0.20.0)
-			arc.Filename = NormalizeAndAnonymizePath(arc.Filename)
-			arc.Pwd = NormalizeAndAnonymizePath(arc.Pwd)
+			if arc.K6Version == "" {
+				arc.Filename = NormalizeAndAnonymizePath(arc.Filename)
+				arc.Pwd = NormalizeAndAnonymizePath(arc.Pwd)
+				arc.PwdURL, err = loader.Resolve(&url.URL{Scheme: "file", Path: "/"}, arc.Pwd)
+				if err != nil {
+					return nil, err
+				}
+				arc.FilenameURL, err = loader.Resolve(&url.URL{Scheme: "file", Path: "/"}, arc.Filename)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				arc.FilenameURL, err = url.Parse(arc.Filename)
+				if err != nil {
+					return nil, err
+				}
+
+				arc.PwdURL, err = url.Parse(arc.Pwd)
+				if err != nil {
+					return nil, err
+				}
+			}
+
 			continue
 		case "data":
 			arc.Data = data
@@ -181,6 +208,12 @@ func ReadArchive(in io.Reader) (*Archive, error) {
 	return arc, nil
 }
 
+func normalizeAndAnonymizeURL(u *url.URL) {
+	if u.Scheme == "file" {
+		u.Path = NormalizeAndAnonymizePath(u.Path)
+	}
+}
+
 // Write serialises the archive to a writer.
 //
 // The format should be treated as opaque; currently it is simply a TAR rollup, but this may
@@ -190,8 +223,10 @@ func (arc *Archive) Write(out io.Writer) error {
 	w := tar.NewWriter(out)
 
 	metaArc := *arc
-	metaArc.Filename = NormalizeAndAnonymizePath(metaArc.Filename)
-	metaArc.Pwd = NormalizeAndAnonymizePath(metaArc.Pwd)
+	normalizeAndAnonymizeURL(metaArc.FilenameURL)
+	normalizeAndAnonymizeURL(metaArc.PwdURL)
+	metaArc.Filename = metaArc.FilenameURL.String()
+	metaArc.Pwd = metaArc.PwdURL.String()
 	metadata, err := metaArc.json()
 	if err != nil {
 		return err

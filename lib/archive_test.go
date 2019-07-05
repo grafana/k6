@@ -23,11 +23,13 @@ package lib
 import (
 	"bytes"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
 
+	"github.com/loadimpact/k6/lib/consts"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -130,14 +132,15 @@ func diffFilesystemsDir(t *testing.T, first, second afero.Fs, dirname string) {
 func TestArchiveReadWrite(t *testing.T) {
 	t.Run("Roundtrip", func(t *testing.T) {
 		arc1 := &Archive{
-			Type: "js",
+			Type:      "js",
+			K6Version: consts.Version,
 			Options: Options{
 				VUs:        null.IntFrom(12345),
 				SystemTags: GetTagSet(DefaultSystemTagList...),
 			},
-			Filename: "/path/to/script.js",
-			Data:     []byte(`// contents...`),
-			Pwd:      "/path/to",
+			FilenameURL: &url.URL{Scheme: "file", Path: "/path/to/script.js"},
+			Data:        []byte(`// contents...`),
+			PwdURL:      &url.URL{Scheme: "file", Path: "/path/to"},
 			Filesystems: map[string]afero.Fs{
 				"file": makeMemMapFs(t, map[string][]byte{
 					"/path/to/a.js":      []byte(`// a contents`),
@@ -163,6 +166,8 @@ func TestArchiveReadWrite(t *testing.T) {
 
 		arc2Filesystems := arc2.Filesystems
 		arc2.Filesystems = nil
+		arc2.Filename = ""
+		arc2.Pwd = ""
 
 		assert.Equal(t, arc1, arc2)
 
@@ -183,9 +188,10 @@ func TestArchiveReadWrite(t *testing.T) {
 					VUs:        null.IntFrom(12345),
 					SystemTags: GetTagSet(DefaultSystemTagList...),
 				},
-				Filename: fmt.Sprintf("%s/script.js", entry.Pwd),
-				Data:     []byte(`// contents...`),
-				Pwd:      entry.Pwd,
+				FilenameURL: &url.URL{Scheme: "file", Path: fmt.Sprintf("%s/script.js", entry.Pwd)},
+				K6Version:   consts.Version,
+				Data:        []byte(`// contents...`),
+				PwdURL:      &url.URL{Scheme: "file", Path: entry.Pwd},
 				Filesystems: map[string]afero.Fs{
 					"file": makeMemMapFs(t, map[string][]byte{
 						fmt.Sprintf("%s/a.js", entry.Pwd):      []byte(`// a contents`),
@@ -205,9 +211,10 @@ func TestArchiveReadWrite(t *testing.T) {
 					VUs:        null.IntFrom(12345),
 					SystemTags: GetTagSet(DefaultSystemTagList...),
 				},
-				Filename: fmt.Sprintf("%s/script.js", entry.PwdNormAnon),
-				Data:     []byte(`// contents...`),
-				Pwd:      entry.PwdNormAnon,
+				FilenameURL: &url.URL{Scheme: "file", Path: fmt.Sprintf("%s/script.js", entry.PwdNormAnon)},
+				K6Version:   consts.Version,
+				Data:        []byte(`// contents...`),
+				PwdURL:      &url.URL{Scheme: "file", Path: entry.PwdNormAnon},
 
 				Filesystems: map[string]afero.Fs{
 					"file": makeMemMapFs(t, map[string][]byte{
@@ -231,6 +238,8 @@ func TestArchiveReadWrite(t *testing.T) {
 
 			arc2, err := ReadArchive(buf)
 			assert.NoError(t, err)
+			arc2.Filename = ""
+			arc2.Pwd = ""
 
 			arc2Filesystems := arc2.Filesystems
 			arc2.Filesystems = nil

@@ -33,6 +33,7 @@ import (
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/lib/types"
+	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/stats/dummy"
 	log "github.com/sirupsen/logrus"
@@ -556,7 +557,7 @@ func TestSentReceivedMetrics(t *testing.T) {
 
 	runTest := func(t *testing.T, ts testScript, tc testCase, noConnReuse bool) (float64, float64) {
 		r, err := js.New(
-			&lib.SourceData{URL: &url.URL{Path: "/script.js"}, Data: []byte(ts.Code)},
+			&loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: []byte(ts.Code)},
 			nil,
 			lib.RuntimeOptions{},
 		)
@@ -697,7 +698,7 @@ func TestRunTags(t *testing.T) {
 	`))
 
 	r, err := js.New(
-		&lib.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script},
+		&loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script},
 		nil,
 		lib.RuntimeOptions{},
 	)
@@ -797,7 +798,7 @@ func TestSetupTeardownThresholds(t *testing.T) {
 	`))
 
 	runner, err := js.New(
-		&lib.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script},
+		&loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script},
 		nil,
 		lib.RuntimeOptions{},
 	)
@@ -860,7 +861,7 @@ func TestEmittedMetricsWhenScalingDown(t *testing.T) {
 	`))
 
 	runner, err := js.New(
-		&lib.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script},
+		&loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script},
 		nil,
 		lib.RuntimeOptions{},
 	)
@@ -920,7 +921,7 @@ func TestMinIterationDuration(t *testing.T) {
 	t.Parallel()
 
 	runner, err := js.New(
-		&lib.SourceData{URL: &url.URL{Path: "/script.js"}, Data: []byte(`
+		&loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: []byte(`
 		import { Counter } from "k6/metrics";
 
 		let testCounter = new Counter("testcounter");

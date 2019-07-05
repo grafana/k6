@@ -510,22 +510,24 @@ func createFilesystems() map[string]afero.Fs {
 	// written every time something is read from the real filesystem. This cache is then used for
 	// successive spawns to read from (they have no access to the real disk).
 	// Also initialize the same for `https` but the caching is handled manually in the loader package
+	osfs := afero.NewOsFs()
+	if runtime.GOOS == "windows" {
+		osfs = fsext.NewUnprependPathFs(osfs, afero.FilePathSeparator)
+	}
 	return map[string]afero.Fs{
-		"file": fsext.NewCacheOnReadFs(
-			fsext.NewUnprependPathFs(afero.NewOsFs(), afero.FilePathSeparator),
-			afero.NewMemMapFs(), 0),
+		"file":  fsext.NewCacheOnReadFs(osfs, afero.NewMemMapFs(), 0),
 		"https": afero.NewMemMapFs(),
 	}
 }
 
 // Reads a source file from any supported destination.
-func readSource(src, pwd string, filesystems map[string]afero.Fs, stdin io.Reader) (*lib.SourceData, error) {
+func readSource(src, pwd string, filesystems map[string]afero.Fs, stdin io.Reader) (*loader.SourceData, error) {
 	if src == "-" {
 		data, err := ioutil.ReadAll(stdin)
 		if err != nil {
 			return nil, err
 		}
-		return &lib.SourceData{URL: &url.URL{Path: "-", Scheme: "file"}, Data: data}, nil
+		return &loader.SourceData{URL: &url.URL{Path: "-", Scheme: "file"}, Data: data}, nil
 	}
 	pwdURL := &url.URL{Scheme: "file", Path: filepath.ToSlash(filepath.Clean(pwd)) + "/"}
 	srcURL, err := loader.Resolve(pwdURL, filepath.ToSlash(src))
@@ -537,7 +539,7 @@ func readSource(src, pwd string, filesystems map[string]afero.Fs, stdin io.Reade
 
 // Creates a new runner.
 func newRunner(
-	src *lib.SourceData, typ string, filesystems map[string]afero.Fs, rtOpts lib.RuntimeOptions,
+	src *loader.SourceData, typ string, filesystems map[string]afero.Fs, rtOpts lib.RuntimeOptions,
 ) (lib.Runner, error) {
 	switch typ {
 	case "":

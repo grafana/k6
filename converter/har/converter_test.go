@@ -27,6 +27,7 @@ import (
 
 	"github.com/loadimpact/k6/js"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/loader"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -55,7 +56,7 @@ func TestBuildK6RequestObject(t *testing.T) {
 	}
 	v, err := buildK6RequestObject(req)
 	assert.NoError(t, err)
-	_, err = js.New(&lib.SourceData{
+	_, err = js.New(&loader.SourceData{
 		URL:  &url.URL{Path: "/script.js"},
 		Data: []byte(fmt.Sprintf("export default function() { res = http.batch([%v]); }", v)),
 	}, nil, lib.RuntimeOptions{})
