@@ -21,8 +21,10 @@
 package csv
 
 import (
+	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -35,10 +37,10 @@ import (
 
 func TestMakeHeader(t *testing.T) {
 	testdata := map[string][]string{
-		"One tag": []string{
+		"One tag": {
 			"tag1",
 		},
-		"Two tags": []string{
+		"Two tags": {
 			"tag1", "tag2",
 		},
 	}
@@ -57,7 +59,7 @@ func TestMakeHeader(t *testing.T) {
 
 func TestSampleToRow(t *testing.T) {
 	testSamples := []stats.Sample{
-		stats.Sample{
+		{
 			Time:   time.Now(),
 			Metric: stats.New("my_metric", stats.Gauge),
 			Value:  1,
@@ -67,7 +69,7 @@ func TestSampleToRow(t *testing.T) {
 				"tag3": "val3",
 			}),
 		},
-		stats.Sample{
+		{
 			Time:   time.Now(),
 			Metric: stats.New("my_metric", stats.Gauge),
 			Value:  1,
@@ -82,17 +84,17 @@ func TestSampleToRow(t *testing.T) {
 	}
 
 	enabledTags := map[string][][]string{
-		"One tag": [][]string{
-			[]string{"tag1"},
-			[]string{"tag2"},
+		"One tag": {
+			{"tag1"},
+			{"tag2"},
 		},
-		"Two tags": [][]string{
-			[]string{"tag1", "tag2"},
-			[]string{},
+		"Two tags": {
+			{"tag1", "tag2"},
+			{},
 		},
-		"Two tags, one ignored": [][]string{
-			[]string{"tag1", "tag2"},
-			[]string{"tag3"},
+		"Two tags, one ignored": {
+			{"tag1", "tag2"},
+			{"tag3"},
 		},
 	}
 
@@ -108,7 +110,6 @@ func TestSampleToRow(t *testing.T) {
 		}
 	}
 }
-
 func TestCollect(t *testing.T) {
 	testSamples := []stats.SampleContainer{
 		stats.Sample{
@@ -133,17 +134,80 @@ func TestCollect(t *testing.T) {
 			}),
 		},
 	}
-
 	t.Run("Collect", func(t *testing.T) {
 		mem := afero.NewMemMapFs()
 		collector, err := New(mem, "path", lib.TagSet{"tag1": true, "tag2": false, "tag3": true})
 		assert.NoError(t, err)
 		assert.NotNil(t, collector)
 
-		err = collector.Init()
-		assert.NoError(t, err)
-
 		collector.Collect(testSamples)
+
+		assert.Equal(t, len(testSamples), len(collector.buffer))
+	})
+}
+
+func TestRun(t *testing.T) {
+	t.Run("Run", func(t *testing.T) {
+		collector, err := New(afero.NewMemMapFs(), "path", lib.TagSet{"tag1": true, "tag2": false, "tag3": true})
+		assert.NoError(t, err)
+		assert.NotNil(t, collector)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			collector.Init()
+			collector.Run(ctx)
+		}()
+		cancel()
+		wg.Wait()
+	})
+}
+
+func TestRunCollect(t *testing.T) {
+	testSamples := []stats.SampleContainer{
+		stats.Sample{
+			Time:   time.Unix(1562324643, 0),
+			Metric: stats.New("my_metric", stats.Gauge),
+			Value:  1,
+			Tags: stats.NewSampleTags(map[string]string{
+				"tag1": "val1",
+				"tag2": "val2",
+				"tag3": "val3",
+			}),
+		},
+		stats.Sample{
+			Time:   time.Unix(1562324644, 0),
+			Metric: stats.New("my_metric", stats.Gauge),
+			Value:  1,
+			Tags: stats.NewSampleTags(map[string]string{
+				"tag1": "val1",
+				"tag2": "val2",
+				"tag3": "val3",
+				"tag4": "val4",
+			}),
+		},
+	}
+
+	t.Run("Run and Collect", func(t *testing.T) {
+		mem := afero.NewMemMapFs()
+		collector, err := New(mem, "path", lib.TagSet{"tag1": true, "tag2": false, "tag3": true})
+		assert.NoError(t, err)
+		assert.NotNil(t, collector)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			collector.Run(ctx)
+			wg.Done()
+		}()
+		collector.Init()
+		collector.Collect(testSamples)
+		time.Sleep(1 * time.Second)
+		cancel()
+		wg.Wait()
 		csvbytes, _ := afero.ReadFile(mem, "path")
 		csvstr := fmt.Sprintf("%s", csvbytes)
 		assert.Equal(t,

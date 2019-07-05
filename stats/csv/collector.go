@@ -27,11 +27,17 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
+	"time"
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
+)
+
+const (
+	saveInterval = 1 * time.Second
 )
 
 // Collector saving output to csv implements the lib.Collector interface
@@ -41,6 +47,9 @@ type Collector struct {
 	resTags     []string
 	ignoredTags []string
 	csvWriter   *csv.Writer
+	csvLock     sync.Mutex
+	buffer      []stats.Sample
+	bufferLock  sync.Mutex
 }
 
 // Verify that Collector implements lib.Collector
@@ -106,24 +115,49 @@ func (c *Collector) SetRunStatus(status lib.RunStatus) {}
 
 // Run just blocks until the context is done
 func (c *Collector) Run(ctx context.Context) {
-	log.WithField("filename", c.fname).Debug("CSV: Writing CSV metrics")
-	<-ctx.Done()
-	c.csvWriter.Flush()
-	_ = c.outfile.Close()
-}
-
-// Collect Writes samples to the csv file
-func (c *Collector) Collect(scs []stats.SampleContainer) {
-	for _, sc := range scs {
-		for _, sample := range sc.GetSamples() {
-			row := SampleToRow(&sample, c.resTags, c.ignoredTags)
-			err := c.csvWriter.Write(row)
-			if err != nil {
-				log.WithField("filename", c.fname).Error("CSV: Error writing to file")
-			}
+	ticker := time.NewTicker(saveInterval)
+	for {
+		select {
+		case <-ticker.C:
+			c.WriteToFile()
+		case <-ctx.Done():
+			c.WriteToFile()
+			c.outfile.Close()
+			return
 		}
 	}
-	c.csvWriter.Flush()
+}
+
+// Collect Saves samples to buffer
+func (c *Collector) Collect(scs []stats.SampleContainer) {
+	c.bufferLock.Lock()
+	defer c.bufferLock.Unlock()
+	for _, sc := range scs {
+		c.buffer = append(c.buffer, sc.GetSamples()...)
+	}
+}
+
+// WriteToFile Writes samples to the csv file
+func (c *Collector) WriteToFile() {
+	c.bufferLock.Lock()
+	samples := c.buffer
+	c.buffer = nil
+	c.bufferLock.Unlock()
+
+	if len(samples) > 0 {
+		c.csvLock.Lock()
+		defer c.csvLock.Unlock()
+		for _, sc := range samples {
+			for _, sample := range sc.GetSamples() {
+				row := SampleToRow(&sample, c.resTags, c.ignoredTags)
+				err := c.csvWriter.Write(row)
+				if err != nil {
+					log.WithField("filename", c.fname).Error("CSV: Error writing to file")
+				}
+			}
+		}
+		c.csvWriter.Flush()
+	}
 }
 
 // Link returns a dummy string, it's only included to satisfy the lib.Collector interface
