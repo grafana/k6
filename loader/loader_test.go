@@ -81,11 +81,21 @@ func TestResolve(t *testing.T) {
 	})
 
 	t.Run("Remote Lifting Denied", func(t *testing.T) {
-		pwdURL, err := url.Parse("https://example.com")
+		pwdURL, err := url.Parse("https://example.com/")
 		require.NoError(t, err)
 
 		_, err = loader.Resolve(pwdURL, "file:///etc/shadow")
-		assert.EqualError(t, err, "origin (https://example.com) not allowed to load local file: file:///etc/shadow")
+		assert.EqualError(t, err, "origin (https://example.com/) not allowed to load local file: file:///etc/shadow")
+	})
+
+	t.Run("Fixes missing slash in pwd", func(t *testing.T) {
+		pwdURL, err := url.Parse("https://example.com/path/to")
+		require.NoError(t, err)
+
+		moduleURL, err := loader.Resolve(pwdURL, "./something")
+		require.NoError(t, err)
+		require.Equal(t, "https://example.com/path/to/something", moduleURL.String())
+		require.Equal(t, "https://example.com/path/to/", pwdURL.String())
 	})
 
 }

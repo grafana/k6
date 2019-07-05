@@ -72,6 +72,12 @@ func Resolve(pwd *url.URL, moduleSpecifier string) (*url.URL, error) {
 		return nil, errors.New("local or remote path required")
 	}
 
+	// we always want for the pwd to end in a slash, but filepath/path.Clean strips it so we readd
+	// it if it's missing
+	if !strings.HasSuffix(pwd.Path, "/") {
+		pwd.Path += "/"
+	}
+
 	if moduleSpecifier[0] == '.' || moduleSpecifier[0] == '/' {
 		return pwd.Parse(moduleSpecifier)
 	}
