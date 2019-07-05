@@ -520,7 +520,7 @@ func TestOpen(t *testing.T) {
 			require.NoError(t, fs.MkdirAll(filepath.Join(prefix, "/path/to"), 0755))
 			require.NoError(t, afero.WriteFile(fs, filePath, []byte(`hi`), 0644))
 			if isWindows {
-				fs = fsext.NewUnprependPathFs(fs, afero.FilePathSeparator)
+				fs = fsext.NewTrimFilePathSeparatorFs(fs)
 			}
 			return fs, prefix, func() { require.NoError(t, os.RemoveAll(prefix)) }
 		},

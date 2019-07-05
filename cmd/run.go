@@ -515,7 +515,7 @@ func createFilesystems() map[string]afero.Fs {
 		// This is done so that we can continue to use paths with /|"\" through the code but also to
 		// be easier to travers the cachedFs later as it doesn't work very well if you have windows
 		// volumes
-		osfs = fsext.NewUnprependPathFs(osfs, afero.FilePathSeparator)
+		osfs = fsext.NewTrimFilePathSeparatorFs(osfs)
 	}
 	return map[string]afero.Fs{
 		"file":  fsext.NewCacheOnReadFs(osfs, afero.NewMemMapFs(), 0),
