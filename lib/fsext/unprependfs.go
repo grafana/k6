@@ -25,6 +25,11 @@ type ChangePathFile struct {
 	fn ChangePathFunc
 }
 
+// NewChangePathFs return a ChangePathFs where all paths will be change with the provided funcs
+func NewChangePathFs(source afero.Fs, fn ChangePathFunc) *ChangePathFs {
+	return &ChangePathFs{source: source, fn: fn}
+}
+
 // ChangePathFunc is the function that will be called by ChangePathFs to change the path
 type ChangePathFunc func(name string) (path string, err error)
 

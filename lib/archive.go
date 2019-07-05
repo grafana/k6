@@ -58,20 +58,10 @@ func NormalizeAndAnonymizePath(path string) string {
 	return homeDirRE.ReplaceAllString(p, `$1/$2/nobody`)
 }
 
-type normalizedFS struct {
-	afero.Fs
-}
-
-func (m *normalizedFS) Open(name string) (afero.File, error) {
-	return m.Fs.Open(NormalizeAndAnonymizePath(name))
-}
-
-func (m *normalizedFS) OpenFile(name string, flag int, mode os.FileMode) (afero.File, error) {
-	return m.Fs.OpenFile(NormalizeAndAnonymizePath(name), flag, mode)
-}
-
-func (m *normalizedFS) Stat(name string) (os.FileInfo, error) {
-	return m.Fs.Stat(NormalizeAndAnonymizePath(name))
+func newNormalizedFs(fs afero.Fs) afero.Fs {
+	return fsext.NewChangePathFs(fs, fsext.ChangePathFunc(func(name string) (string, error) {
+		return NormalizeAndAnonymizePath(name), nil
+	}))
 }
 
 // An Archive is a rollup of all resources and options needed to reproduce a test identically elsewhere.
@@ -106,7 +96,7 @@ func (arc *Archive) getFs(name string) afero.Fs {
 	if !ok {
 		fs = afero.NewMemMapFs()
 		if name == "file" {
-			fs = &normalizedFS{fs}
+			fs = newNormalizedFs(fs)
 		}
 		arc.Filesystems[name] = fs
 	}
