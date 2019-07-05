@@ -23,6 +23,7 @@ package cmd
 import (
 	"os"
 
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -70,7 +71,7 @@ An archive is a fully self-contained test run, and can be executed identically e
 		if err != nil {
 			return err
 		}
-		conf, err := getConsolidatedConfig(filesystems["file"], Config{Options: cliOpts}, r)
+		conf, err := getConsolidatedConfig(afero.NewOsFs(), Config{Options: cliOpts}, r)
 		if err != nil {
 			return err
 		}

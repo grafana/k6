@@ -140,7 +140,7 @@ a commandline interface for interacting with it.`,
 		if err != nil {
 			return err
 		}
-		conf, err := getConsolidatedConfig(filesystems["file"], cliConf, r)
+		conf, err := getConsolidatedConfig(afero.NewOsFs(), cliConf, r)
 		if err != nil {
 			return err
 		}

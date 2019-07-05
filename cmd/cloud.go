@@ -35,6 +35,7 @@ import (
 	"github.com/loadimpact/k6/stats/cloud"
 	"github.com/loadimpact/k6/ui"
 	"github.com/pkg/errors"
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -90,7 +91,7 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 		if err != nil {
 			return err
 		}
-		conf, err := getConsolidatedConfig(filesystems["file"], Config{Options: cliOpts}, r)
+		conf, err := getConsolidatedConfig(afero.NewOsFs(), Config{Options: cliOpts}, r)
 		if err != nil {
 			return err
 		}
