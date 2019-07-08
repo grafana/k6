@@ -39,12 +39,16 @@ func TestGithub(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, expectedEndSrc, src)
 
-	pathURL, err := url.Parse(src)
+	var root = &url.URL{Scheme: "https", Host: "example.com", Path: "/something/"}
+	resolvedURL, err := Resolve(root, path)
 	require.NoError(t, err)
+	require.Empty(t, resolvedURL.Scheme)
+	require.Equal(t, path, resolvedURL.Opaque)
 	t.Run("not cached", func(t *testing.T) {
-		data, err := Load(map[string]afero.Fs{"https": afero.NewMemMapFs()}, pathURL, path)
+		data, err := Load(map[string]afero.Fs{"https": afero.NewMemMapFs()}, resolvedURL, path)
 		require.NoError(t, err)
-		assert.Equal(t, expectedEndSrc, data.URL.String())
+		assert.Equal(t, data.URL, resolvedURL)
+		assert.Equal(t, path, data.URL.String())
 		assert.NotEmpty(t, data.Data)
 	})
 
@@ -52,12 +56,29 @@ func TestGithub(t *testing.T) {
 		fs := afero.NewMemMapFs()
 		testData := []byte("test data")
 
-		err := afero.WriteFile(fs, "/raw.githubusercontent.com/github/gitignore/master/Go.gitignore", testData, 0644)
+		err := afero.WriteFile(fs, "/github.com/github/gitignore/Go.gitignore", testData, 0644)
 		require.NoError(t, err)
 
-		data, err := Load(map[string]afero.Fs{"https": fs}, pathURL, path)
+		data, err := Load(map[string]afero.Fs{"https": fs}, resolvedURL, path)
 		require.NoError(t, err)
-		assert.Equal(t, expectedEndSrc, data.URL.String())
+		assert.Equal(t, path, data.URL.String())
 		assert.Equal(t, data.Data, testData)
+	})
+
+	t.Run("relative", func(t *testing.T) {
+		var tests = map[string]string{
+			"./something.else":  "github.com/github/gitignore/something.else",
+			"../something.else": "github.com/github/something.else",
+			"/something.else":   "github.com/something.else",
+		}
+		for relative, expected := range tests {
+			relativeURL, err := Resolve(Dir(resolvedURL), relative)
+			require.NoError(t, err)
+			assert.Equal(t, expected, relativeURL.String())
+		}
+	})
+
+	t.Run("dir", func(t *testing.T) {
+		require.Equal(t, &url.URL{Opaque: "github.com/github/gitignore"}, Dir(resolvedURL))
 	})
 }

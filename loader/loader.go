@@ -74,11 +74,23 @@ func Resolve(pwd *url.URL, moduleSpecifier string) (*url.URL, error) {
 
 	// we always want for the pwd to end in a slash, but filepath/path.Clean strips it so we readd
 	// it if it's missing
-	if !strings.HasSuffix(pwd.Path, "/") {
+	if pwd.Opaque != "" {
+		if !strings.HasSuffix(pwd.Opaque, "/") {
+			pwd.Opaque += "/"
+		}
+	} else if !strings.HasSuffix(pwd.Path, "/") {
 		pwd.Path += "/"
 	}
 
 	if moduleSpecifier[0] == '.' || moduleSpecifier[0] == '/' {
+		if pwd.Opaque != "" { // this is a loader reference
+			parts := strings.SplitN(pwd.Opaque, "/", 2)
+			if moduleSpecifier[0] == '/' {
+				return &url.URL{Opaque: path.Join(parts[0], moduleSpecifier)}, nil
+			}
+			return &url.URL{Opaque: path.Join(parts[0], path.Join(path.Dir(parts[1]), moduleSpecifier))}, nil
+		}
+
 		return pwd.Parse(moduleSpecifier)
 	}
 
@@ -97,9 +109,10 @@ func Resolve(pwd *url.URL, moduleSpecifier string) (*url.URL, error) {
 		}
 		return u, err
 	}
-
-	stringURL, err := resolveUsingLoaders(moduleSpecifier)
-	if err == errNoLoaderMatched {
+	// here we only care if a loader is pickable, if it is and later there is an error in the loading
+	// from it we don't want to try another resolve
+	_, loader, _ := pickLoader(moduleSpecifier)
+	if loader == nil {
 		log.WithField("url", moduleSpecifier).Warning(
 			"A url was resolved but it didn't have scheme. " +
 				"This will be deprecated in the future and all remote modules will " +
@@ -107,14 +120,14 @@ func Resolve(pwd *url.URL, moduleSpecifier string) (*url.URL, error) {
 
 		return url.Parse("https://" + moduleSpecifier)
 	}
-	if err != nil {
-		return nil, err
-	}
-	return url.Parse(stringURL)
+	return &url.URL{Opaque: moduleSpecifier}, nil
 }
 
 // Dir returns the directory for the path.
 func Dir(old *url.URL) *url.URL {
+	if old.Opaque != "" { // loader
+		return &url.URL{Opaque: path.Join(old.Opaque, "../")}
+	}
 	return old.ResolveReference(&url.URL{Path: "./"})
 }
 
@@ -131,6 +144,27 @@ func Load(
 		}).Debug("Loading...")
 
 	pathOnFs := filepath.FromSlash(path.Clean(moduleSpecifier.String()[len(moduleSpecifier.Scheme)+len(":/"):]))
+	if moduleSpecifier.Opaque != "" { // This is loader
+		pathOnFs = filepath.Join(afero.FilePathSeparator, moduleSpecifier.Opaque)
+		data, err := afero.ReadFile(filesystems["https"], pathOnFs)
+		if err != nil {
+			var finalModuleSpecifierURL *url.URL
+			finalModuleSpecifierURL, err = resolveUsingLoaders(moduleSpecifier.Opaque)
+			if err != nil {
+				return nil, err
+			}
+
+			var result *SourceData
+			result, err = loadRemoteURL(finalModuleSpecifierURL)
+			if err != nil { // TODO: have a separateError
+				return nil, errors.Errorf(httpsSchemeCouldntBeLoadedMsg, originalModuleSpecifier, finalModuleSpecifierURL, err)
+			}
+			_ = afero.WriteFile(filesystems["https"], pathOnFs, result.Data, 0644)
+			result.URL = moduleSpecifier
+			return result, nil
+		}
+		return &SourceData{URL: moduleSpecifier, Data: data}, nil
+	}
 	data, err := afero.ReadFile(filesystems[moduleSpecifier.Scheme], pathOnFs)
 
 	if err != nil {
@@ -154,13 +188,17 @@ func Load(
 	return &SourceData{URL: moduleSpecifier, Data: data}, nil
 }
 
-func resolveUsingLoaders(name string) (string, error) {
+func resolveUsingLoaders(name string) (*url.URL, error) {
 	_, loader, loaderArgs := pickLoader(name)
 	if loader != nil {
-		return loader(name, loaderArgs)
+		urlString, err := loader(name, loaderArgs)
+		if err != nil {
+			return nil, err
+		}
+		return url.Parse(urlString)
 	}
 
-	return "", errNoLoaderMatched
+	return nil, errNoLoaderMatched
 }
 
 func loadRemoteURL(u *url.URL) (*SourceData, error) {

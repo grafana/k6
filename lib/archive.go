@@ -134,24 +134,14 @@ func ReadArchive(in io.Reader) (*Archive, error) {
 			if arc.K6Version == "" {
 				arc.Filename = NormalizeAndAnonymizePath(arc.Filename)
 				arc.Pwd = NormalizeAndAnonymizePath(arc.Pwd)
-				arc.PwdURL, err = loader.Resolve(&url.URL{Scheme: "file", Path: "/"}, arc.Pwd)
-				if err != nil {
-					return nil, err
-				}
-				arc.FilenameURL, err = loader.Resolve(&url.URL{Scheme: "file", Path: "/"}, arc.Filename)
-				if err != nil {
-					return nil, err
-				}
-			} else {
-				arc.FilenameURL, err = url.Parse(arc.Filename)
-				if err != nil {
-					return nil, err
-				}
-
-				arc.PwdURL, err = url.Parse(arc.Pwd)
-				if err != nil {
-					return nil, err
-				}
+			}
+			arc.PwdURL, err = loader.Resolve(&url.URL{Scheme: "file", Path: "/"}, arc.Pwd)
+			if err != nil {
+				return nil, err
+			}
+			arc.FilenameURL, err = loader.Resolve(&url.URL{Scheme: "file", Path: "/"}, arc.Filename)
+			if err != nil {
+				return nil, err
 			}
 
 			continue

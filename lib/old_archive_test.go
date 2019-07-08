@@ -3,6 +3,7 @@ package lib
 import (
 	"archive/tar"
 	"bytes"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -112,4 +113,53 @@ func TestUnknownPrefix(t *testing.T) {
 	require.Error(t, err)
 	require.Equal(t, err.Error(),
 		"unknown file prefix `strange` for file `strange/something`")
+}
+
+func TestFilenamePwdResolve(t *testing.T) {
+	var tests = []struct {
+		Filename, Pwd                       string
+		expectedFilenameURL, expectedPwdURL *url.URL
+	}{
+		{
+			Filename:            "/home/nobody/something.js",
+			Pwd:                 "/home/nobody",
+			expectedFilenameURL: &url.URL{Scheme: "file", Path: "/home/nobody/something.js"},
+			expectedPwdURL:      &url.URL{Scheme: "file", Path: "/home/nobody"},
+		},
+		{
+			Filename:            "github.com/loadimpact/k6/samples/http2.js",
+			Pwd:                 "github.com/loadimpact/k6/samples",
+			expectedFilenameURL: &url.URL{Opaque: "github.com/loadimpact/k6/samples/http2.js"},
+			expectedPwdURL:      &url.URL{Opaque: "github.com/loadimpact/k6/samples"},
+		},
+		{
+			Filename:            "cdnjs.com/libraries/Faker",
+			Pwd:                 "/home/nobody",
+			expectedFilenameURL: &url.URL{Opaque: "cdnjs.com/libraries/Faker"},
+			expectedPwdURL:      &url.URL{Scheme: "file", Path: "/home/nobody"},
+		},
+		{
+			Filename:            "example.com/something/dot.js",
+			Pwd:                 "example.com/something/",
+			expectedFilenameURL: &url.URL{Host: "example.com", Scheme: "https", Path: "/something/dot.js"},
+			expectedPwdURL:      &url.URL{Host: "example.com", Scheme: "https", Path: "/something"},
+		},
+	}
+
+	for _, test := range tests {
+		metadata := `{
+		"Filename": "` + test.Filename + `",
+		"Pwd": "` + test.Pwd + `"
+	}`
+
+		buf, err := dumpMakeMapFsToBuf(makeMemMapFs(t, map[string][]byte{
+			"/metadata.json": []byte(metadata),
+		}))
+		require.NoError(t, err)
+
+		arc, err := ReadArchive(buf)
+		require.NoError(t, err)
+		require.Equal(t, test.expectedFilenameURL, arc.FilenameURL)
+		require.Equal(t, test.expectedPwdURL, arc.PwdURL)
+	}
 }
