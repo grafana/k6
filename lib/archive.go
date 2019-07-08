@@ -253,28 +253,24 @@ func (arc *Archive) Write(out io.Writer) error {
 		infos := make(map[string]os.FileInfo) // ... fix this ?
 		files := make(map[string][]byte)
 
-		err = fsext.Walk(filesystem, afero.FilePathSeparator,
-			filepath.WalkFunc(func(filePath string, info os.FileInfo, err error) error {
-				if err != nil {
-					return err
-				}
-				normalizedPath := NormalizeAndAnonymizePath(filePath)
+		walkFunc := filepath.WalkFunc(func(filePath string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			normalizedPath := NormalizeAndAnonymizePath(filePath)
 
-				infos[normalizedPath] = info
-				if info.IsDir() {
-					foundDirs[normalizedPath] = true
-					return nil
-				}
-
-				files[normalizedPath], err = afero.ReadFile(filesystem, filePath)
-				if err != nil {
-					return err
-				}
-				paths = append(paths, normalizedPath)
+			infos[normalizedPath] = info
+			if info.IsDir() {
+				foundDirs[normalizedPath] = true
 				return nil
-			}))
+			}
 
-		if err != nil {
+			paths = append(paths, normalizedPath)
+			files[normalizedPath], err = afero.ReadFile(filesystem, filePath)
+			return err
+		})
+
+		if err = fsext.Walk(filesystem, afero.FilePathSeparator, walkFunc); err != nil {
 			return err
 		}
 		if len(files) == 0 {
