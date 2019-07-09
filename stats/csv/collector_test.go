@@ -47,6 +47,7 @@ func TestMakeHeader(t *testing.T) {
 
 	for testname, tags := range testdata {
 		t.Run(testname, func(t *testing.T) {
+			tags := tags
 			header := MakeHeader(tags)
 			assert.Equal(t, len(tags)+4, len(header))
 			assert.Equal(t, "metric_name", header[0])
@@ -99,11 +100,14 @@ func TestSampleToRow(t *testing.T) {
 	}
 
 	for testname, tags := range enabledTags {
+		eTags := tags[0]
+		iTags := tags[1]
 		for _, sample := range testSamples {
 			t.Run(testname, func(t *testing.T) {
-				row := SampleToRow(&sample, tags[0], tags[1])
-				assert.Equal(t, len(tags[0])+4, len(row))
-				for _, tag := range tags[1] {
+				sample := sample
+				row := SampleToRow(&sample, eTags, iTags)
+				assert.Equal(t, len(eTags)+4, len(row))
+				for _, tag := range iTags {
 					assert.False(t, strings.Contains(row[len(row)-1], tag))
 				}
 			})
@@ -157,7 +161,8 @@ func TestRun(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			collector.Init()
+			err := collector.Init()
+			assert.NoError(t, err)
 			collector.Run(ctx)
 		}()
 		cancel()
@@ -203,7 +208,8 @@ func TestRunCollect(t *testing.T) {
 			collector.Run(ctx)
 			wg.Done()
 		}()
-		collector.Init()
+		err = collector.Init()
+		assert.NoError(t, err)
 		collector.Collect(testSamples)
 		time.Sleep(1 * time.Second)
 		cancel()

@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"sync"
 	"time"
 
@@ -73,6 +74,7 @@ func New(fs afero.Fs, fname string, tags lib.TagSet) (*Collector, error) {
 			ignoredTags = append(ignoredTags, tag)
 		}
 	}
+	sort.Strings(resTags)
 
 	if fname == "" || fname == "-" {
 		logfile := nopCloser{os.Stdout}
@@ -122,7 +124,10 @@ func (c *Collector) Run(ctx context.Context) {
 			c.WriteToFile()
 		case <-ctx.Done():
 			c.WriteToFile()
-			c.outfile.Close()
+			err := c.outfile.Close()
+			if err != nil {
+				log.WithField("filename", c.fname).Error("CSV: Error closing the file")
+			}
 			return
 		}
 	}
@@ -149,6 +154,7 @@ func (c *Collector) WriteToFile() {
 		defer c.csvLock.Unlock()
 		for _, sc := range samples {
 			for _, sample := range sc.GetSamples() {
+				sample := sample
 				row := SampleToRow(&sample, c.resTags, c.ignoredTags)
 				err := c.csvWriter.Write(row)
 				if err != nil {
@@ -208,11 +214,23 @@ func SampleToRow(sample *stats.Sample, resTags []string, ignoredTags []string) [
 
 		if extra {
 			if prev {
-				extraTags.WriteString("&")
+				_, err := extraTags.WriteString("&")
+				if err != nil {
+					break
+				}
 			}
-			extraTags.WriteString(tag)
-			extraTags.WriteString("=")
-			extraTags.WriteString(val)
+			_, err := extraTags.WriteString(tag)
+			if err != nil {
+				break
+			}
+			_, err = extraTags.WriteString("=")
+			if err != nil {
+				break
+			}
+			_, err = extraTags.WriteString(val)
+			if err != nil {
+				break
+			}
 			prev = true
 		}
 	}
