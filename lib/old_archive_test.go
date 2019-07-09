@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func dumpMakeMapFsToBuf(fs afero.Fs) (*bytes.Buffer, error) {
+func dumpMemMapFsToBuf(fs afero.Fs) (*bytes.Buffer, error) {
 	var b = bytes.NewBuffer(nil)
 	var w = tar.NewWriter(b)
 	err := fsext.Walk(fs, afero.FilePathSeparator,
@@ -74,7 +74,7 @@ func TestOldArchive(t *testing.T) {
 		"/scripts/_/C/something/path2":                          []byte(`windows script`),
 		"/scripts/_/absolulte/path2":                            []byte(`unix script`),
 	})
-	buf, err := dumpMakeMapFsToBuf(fs)
+	buf, err := dumpMemMapFsToBuf(fs)
 	require.NoError(t, err)
 
 	var (
@@ -106,7 +106,7 @@ func TestUnknownPrefix(t *testing.T) {
 	fs := makeMemMapFs(t, map[string][]byte{
 		"/strange/something": []byte(`github file`),
 	})
-	buf, err := dumpMakeMapFsToBuf(fs)
+	buf, err := dumpMemMapFsToBuf(fs)
 	require.NoError(t, err)
 
 	_, err = ReadArchive(buf)
@@ -152,7 +152,7 @@ func TestFilenamePwdResolve(t *testing.T) {
 		"Pwd": "` + test.Pwd + `"
 	}`
 
-		buf, err := dumpMakeMapFsToBuf(makeMemMapFs(t, map[string][]byte{
+		buf, err := dumpMemMapFsToBuf(makeMemMapFs(t, map[string][]byte{
 			"/metadata.json": []byte(metadata),
 		}))
 		require.NoError(t, err)
