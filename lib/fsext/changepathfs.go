@@ -22,7 +22,7 @@ type ChangePathFs struct {
 // ChangePathFile is a file from ChangePathFs
 type ChangePathFile struct {
 	afero.File
-	fn ChangePathFunc
+	originalName string
 }
 
 // NewChangePathFs return a ChangePathFs where all paths will be change with the provided funcs
@@ -42,31 +42,30 @@ func NewTrimFilePathSeparatorFs(source afero.Fs) *ChangePathFs {
 		}
 
 		return filepath.Clean(strings.TrimPrefix(name, afero.FilePathSeparator)), nil
-
 	})}
 }
 
 // Name Returns the name of the file
 func (f *ChangePathFile) Name() string {
-	// error shouldn't be possible
-	name, _ := f.fn(f.File.Name())
-	return name
+	return f.originalName
 }
 
 //Chtimes changes the access and modification times of the named file
 func (b *ChangePathFs) Chtimes(name string, atime, mtime time.Time) (err error) {
-	if name, err = b.fn(name); err != nil {
+	var newName string
+	if newName, err = b.fn(name); err != nil {
 		return &os.PathError{Op: "chtimes", Path: name, Err: err}
 	}
-	return b.source.Chtimes(name, atime, mtime)
+	return b.source.Chtimes(newName, atime, mtime)
 }
 
 // Chmod changes the mode of the named file to mode.
 func (b *ChangePathFs) Chmod(name string, mode os.FileMode) (err error) {
-	if name, err = b.fn(name); err != nil {
+	var newName string
+	if newName, err = b.fn(name); err != nil {
 		return &os.PathError{Op: "chmod", Path: name, Err: err}
 	}
-	return b.source.Chmod(name, mode)
+	return b.source.Chmod(newName, mode)
 }
 
 // Name return the name of this FileSystem
@@ -77,105 +76,115 @@ func (b *ChangePathFs) Name() string {
 // Stat returns a FileInfo describing the named file, or an error, if any
 // happens.
 func (b *ChangePathFs) Stat(name string) (fi os.FileInfo, err error) {
-	if name, err = b.fn(name); err != nil {
+	var newName string
+	if newName, err = b.fn(name); err != nil {
 		return nil, &os.PathError{Op: "stat", Path: name, Err: err}
 	}
-	return b.source.Stat(name)
+	return b.source.Stat(newName)
 }
 
 // Rename renames a file.
-func (b *ChangePathFs) Rename(oldname, newname string) (err error) {
-	if oldname, err = b.fn(oldname); err != nil {
-		return &os.PathError{Op: "rename", Path: oldname, Err: err}
+func (b *ChangePathFs) Rename(oldName, newName string) (err error) {
+	var newOldName, newNewName string
+	if newOldName, err = b.fn(oldName); err != nil {
+		return &os.PathError{Op: "rename", Path: oldName, Err: err}
 	}
-	if newname, err = b.fn(newname); err != nil {
-		return &os.PathError{Op: "rename", Path: newname, Err: err}
+	if newNewName, err = b.fn(newName); err != nil {
+		return &os.PathError{Op: "rename", Path: newName, Err: err}
 	}
-	return b.source.Rename(oldname, newname)
+	return b.source.Rename(newOldName, newNewName)
 }
 
 // RemoveAll removes a directory path and any children it contains. It
 // does not fail if the path does not exist (return nil).
 func (b *ChangePathFs) RemoveAll(name string) (err error) {
-	if name, err = b.fn(name); err != nil {
+	var newName string
+	if newName, err = b.fn(name); err != nil {
 		return &os.PathError{Op: "remove_all", Path: name, Err: err}
 	}
-	return b.source.RemoveAll(name)
+	return b.source.RemoveAll(newName)
 }
 
 // Remove removes a file identified by name, returning an error, if any
 // happens.
 func (b *ChangePathFs) Remove(name string) (err error) {
-	if name, err = b.fn(name); err != nil {
+	var newName string
+	if newName, err = b.fn(name); err != nil {
 		return &os.PathError{Op: "remove", Path: name, Err: err}
 	}
-	return b.source.Remove(name)
+	return b.source.Remove(newName)
 }
 
 // OpenFile opens a file using the given flags and the given mode.
 func (b *ChangePathFs) OpenFile(name string, flag int, mode os.FileMode) (f afero.File, err error) {
-	if name, err = b.fn(name); err != nil {
+	var newName string
+	if newName, err = b.fn(name); err != nil {
 		return nil, &os.PathError{Op: "openfile", Path: name, Err: err}
 	}
-	sourcef, err := b.source.OpenFile(name, flag, mode)
+	sourcef, err := b.source.OpenFile(newName, flag, mode)
 	if err != nil {
 		return nil, err
 	}
-	return &ChangePathFile{File: sourcef, fn: b.fn}, nil
+	return &ChangePathFile{File: sourcef, originalName: name}, nil
 }
 
 // Open opens a file, returning it or an error, if any happens.
 func (b *ChangePathFs) Open(name string) (f afero.File, err error) {
-	if name, err = b.fn(name); err != nil {
+	var newName string
+	if newName, err = b.fn(name); err != nil {
 		return nil, &os.PathError{Op: "open", Path: name, Err: err}
 	}
-	sourcef, err := b.source.Open(name)
+	sourcef, err := b.source.Open(newName)
 	if err != nil {
 		return nil, err
 	}
-	return &ChangePathFile{File: sourcef, fn: b.fn}, nil
+	return &ChangePathFile{File: sourcef, originalName: name}, nil
 }
 
 // Mkdir creates a directory in the filesystem, return an error if any
 // happens.
 func (b *ChangePathFs) Mkdir(name string, mode os.FileMode) (err error) {
-	if name, err = b.fn(name); err != nil {
+	var newName string
+	if newName, err = b.fn(name); err != nil {
 		return &os.PathError{Op: "mkdir", Path: name, Err: err}
 	}
-	return b.source.Mkdir(name, mode)
+	return b.source.Mkdir(newName, mode)
 }
 
 // MkdirAll creates a directory path and all parents that does not exist
 // yet.
 func (b *ChangePathFs) MkdirAll(name string, mode os.FileMode) (err error) {
-	if name, err = b.fn(name); err != nil {
+	var newName string
+	if newName, err = b.fn(name); err != nil {
 		return &os.PathError{Op: "mkdir", Path: name, Err: err}
 	}
-	return b.source.MkdirAll(name, mode)
+	return b.source.MkdirAll(newName, mode)
 }
 
 // Create creates a file in the filesystem, returning the file and an
 // error, if any happens
 func (b *ChangePathFs) Create(name string) (f afero.File, err error) {
-	if name, err = b.fn(name); err != nil {
+	var newName string
+	if newName, err = b.fn(name); err != nil {
 		return nil, &os.PathError{Op: "create", Path: name, Err: err}
 	}
-	sourcef, err := b.source.Create(name)
+	sourcef, err := b.source.Create(newName)
 	if err != nil {
 		return nil, err
 	}
-	return &ChangePathFile{File: sourcef, fn: b.fn}, nil
+	return &ChangePathFile{File: sourcef, originalName: name}, nil
 }
 
 // LstatIfPossible implements the afero.Lstater interface
 func (b *ChangePathFs) LstatIfPossible(name string) (os.FileInfo, bool, error) {
-	name, err := b.fn(name)
+	var newName string
+	newName, err := b.fn(name)
 	if err != nil {
 		return nil, false, &os.PathError{Op: "lstat", Path: name, Err: err}
 	}
 	if lstater, ok := b.source.(afero.Lstater); ok {
-		return lstater.LstatIfPossible(name)
+		return lstater.LstatIfPossible(newName)
 	}
-	fi, err := b.source.Stat(name)
+	fi, err := b.source.Stat(newName)
 	return fi, false, err
 }
