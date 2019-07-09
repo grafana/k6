@@ -46,8 +46,8 @@ func TestMakeHeader(t *testing.T) {
 	}
 
 	for testname, tags := range testdata {
+		tags := tags
 		t.Run(testname, func(t *testing.T) {
-			tags := tags
 			header := MakeHeader(tags)
 			assert.Equal(t, len(tags)+4, len(header))
 			assert.Equal(t, "metric_name", header[0])
@@ -103,8 +103,8 @@ func TestSampleToRow(t *testing.T) {
 		eTags := tags[0]
 		iTags := tags[1]
 		for _, sample := range testSamples {
+			sample := sample
 			t.Run(testname, func(t *testing.T) {
-				sample := sample
 				row := SampleToRow(&sample, eTags, iTags)
 				assert.Equal(t, len(eTags)+4, len(row))
 				for _, tag := range iTags {
