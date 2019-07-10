@@ -217,7 +217,9 @@ func TestRunCollect(t *testing.T) {
 		csvbytes, _ := afero.ReadFile(mem, "path")
 		csvstr := fmt.Sprintf("%s", csvbytes)
 		assert.Equal(t,
-			"metric_name,timestamp,metric_value,tag1,tag3,extra_tags\nmy_metric,1562324643,1.000000,val1,val3,\nmy_metric,1562324644,1.000000,val1,val3,tag4=val4\n",
+			"metric_name,timestamp,metric_value,tag1,tag3,extra_tags\n"+
+				"my_metric,1562324643,1.000000,val1,val3,\n"+
+				"my_metric,1562324644,1.000000,val1,val3,tag4=val4\n",
 			csvstr)
 	})
 }
