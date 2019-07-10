@@ -47,7 +47,7 @@ func TestChangePathFs(t *testing.T) {
 
 	t.Run("MkdirAll", func(t *testing.T) {
 		require.NoError(t, c.MkdirAll("/another/pattth/too", 0644))
-		checkErrorPath(t, c.Mkdir("/notanother/pattth/too", 0644), "/notanother/pattth/too")
+		checkErrorPath(t, c.MkdirAll("/notanother/pattth/too", 0644), "/notanother/pattth/too")
 	})
 
 	t.Run("Open", func(t *testing.T) {
