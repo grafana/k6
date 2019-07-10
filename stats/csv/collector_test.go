@@ -46,15 +46,16 @@ func TestMakeHeader(t *testing.T) {
 	}
 
 	for testname, tags := range testdata {
-		tags := tags
-		t.Run(testname, func(t *testing.T) {
-			header := MakeHeader(tags)
-			assert.Equal(t, len(tags)+4, len(header))
-			assert.Equal(t, "metric_name", header[0])
-			assert.Equal(t, "timestamp", header[1])
-			assert.Equal(t, "metric_value", header[2])
-			assert.Equal(t, "extra_tags", header[len(header)-1])
-		})
+		func(testname string, tags []string) {
+			t.Run(testname, func(t *testing.T) {
+				header := MakeHeader(tags)
+				assert.Equal(t, len(tags)+4, len(header))
+				assert.Equal(t, "metric_name", header[0])
+				assert.Equal(t, "timestamp", header[1])
+				assert.Equal(t, "metric_value", header[2])
+				assert.Equal(t, "extra_tags", header[len(header)-1])
+			})
+		}(testname, tags)
 	}
 }
 
@@ -100,17 +101,16 @@ func TestSampleToRow(t *testing.T) {
 	}
 
 	for testname, tags := range enabledTags {
-		eTags := tags[0]
-		iTags := tags[1]
 		for _, sample := range testSamples {
-			sample := sample
-			t.Run(testname, func(t *testing.T) {
-				row := SampleToRow(&sample, eTags, iTags)
-				assert.Equal(t, len(eTags)+4, len(row))
-				for _, tag := range iTags {
-					assert.False(t, strings.Contains(row[len(row)-1], tag))
-				}
-			})
+			func(testname string, sample stats.Sample, resTags []string, ignoredTags []string) {
+				t.Run(testname, func(t *testing.T) {
+					row := SampleToRow(&sample, resTags, ignoredTags)
+					assert.Equal(t, len(resTags)+4, len(row))
+					for _, tag := range ignoredTags {
+						assert.False(t, strings.Contains(row[len(row)-1], tag))
+					}
+				})
+			}(testname, sample, tags[0], tags[1])
 		}
 	}
 }

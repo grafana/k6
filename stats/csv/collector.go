@@ -154,12 +154,13 @@ func (c *Collector) WriteToFile() {
 		defer c.csvLock.Unlock()
 		for _, sc := range samples {
 			for _, sample := range sc.GetSamples() {
-				sample := sample
-				row := SampleToRow(&sample, c.resTags, c.ignoredTags)
-				err := c.csvWriter.Write(row)
-				if err != nil {
-					log.WithField("filename", c.fname).Error("CSV: Error writing to file")
-				}
+				func(sample stats.Sample) {
+					row := SampleToRow(&sample, c.resTags, c.ignoredTags)
+					err := c.csvWriter.Write(row)
+					if err != nil {
+						log.WithField("filename", c.fname).Error("CSV: Error writing to file")
+					}
+				}(sample)
 			}
 		}
 		c.csvWriter.Flush()
