@@ -91,6 +91,16 @@ func TestChangePathFs(t *testing.T) {
 		checkErrorPath(t, c.Chmod("/notanother/path/to/file.txt", mode), "/notanother/path/to/file.txt")
 	})
 
+	t.Run("LstatIfPossible", func(t *testing.T) {
+		info, ok, err := c.LstatIfPossible(filePath)
+		require.NoError(t, err)
+		require.False(t, ok)
+		require.Equal(t, "file.txt", info.Name())
+
+		_, _, err = c.LstatIfPossible("/notanother/path/to/file.txt")
+		checkErrorPath(t, err, "/notanother/path/to/file.txt")
+	})
+
 	t.Run("Rename", func(t *testing.T) {
 		info, err := c.Stat(filePath)
 		require.NoError(t, err)
