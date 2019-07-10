@@ -60,7 +60,7 @@ func TestMakeHeader(t *testing.T) {
 }
 
 func TestSampleToRow(t *testing.T) {
-	testSamples := []stats.Sample{
+	testSamples := []*stats.Sample{
 		{
 			Time:   time.Now(),
 			Metric: stats.New("my_metric", stats.Gauge),
@@ -83,6 +83,7 @@ func TestSampleToRow(t *testing.T) {
 				"tag5": "val5",
 			}),
 		},
+		nil,
 	}
 
 	enabledTags := map[string][][]string{
@@ -102,12 +103,17 @@ func TestSampleToRow(t *testing.T) {
 
 	for testname, tags := range enabledTags {
 		for _, sample := range testSamples {
-			func(testname string, sample stats.Sample, resTags []string, ignoredTags []string) {
+			func(testname string, sample *stats.Sample, resTags []string, ignoredTags []string) {
 				t.Run(testname, func(t *testing.T) {
-					row := SampleToRow(&sample, resTags, ignoredTags)
-					assert.Equal(t, len(resTags)+4, len(row))
-					for _, tag := range ignoredTags {
-						assert.False(t, strings.Contains(row[len(row)-1], tag))
+					row := SampleToRow(sample, resTags, ignoredTags)
+					if row != nil {
+						assert.Equal(t, len(resTags)+4, len(row))
+						for _, tag := range ignoredTags {
+							assert.False(t, strings.Contains(row[len(row)-1], tag))
+						}
+					} else {
+						assert.Nil(t, row)
+						assert.Nil(t, sample)
 					}
 				})
 			}(testname, sample, tags[0], tags[1])
@@ -222,4 +228,96 @@ func TestRunCollect(t *testing.T) {
 				"my_metric,1562324644,1.000000,val1,val3,tag4=val4\n",
 			csvstr)
 	})
+}
+
+func TestNew(t *testing.T) {
+	configs := []struct {
+		fname string
+		tags  lib.TagSet
+	}{
+		{
+			fname: "name",
+			tags: lib.TagSet{
+				"tag1": true,
+				"tag2": false,
+				"tag3": true,
+			},
+		},
+		{
+			fname: "-",
+			tags: lib.TagSet{
+				"tag1": true,
+			},
+		},
+		{
+			fname: "",
+			tags: lib.TagSet{
+				"tag1": false,
+				"tag2": false,
+			},
+		},
+	}
+	expected := []struct {
+		fname       string
+		resTags     []string
+		ignoredTags []string
+	}{
+		{
+			fname: "name",
+			resTags: []string{
+				"tag1", "tag3",
+			},
+			ignoredTags: []string{
+				"tag2",
+			},
+		},
+		{
+			fname: "-",
+			resTags: []string{
+				"tag1",
+			},
+			ignoredTags: []string{},
+		},
+		{
+			fname:   "-",
+			resTags: []string{},
+			ignoredTags: []string{
+				"tag1", "tag2",
+			},
+		},
+	}
+
+	for i := range configs {
+		func(config struct {
+			fname string
+			tags  lib.TagSet
+		}, expected struct {
+			fname       string
+			resTags     []string
+			ignoredTags []string
+		}) {
+			t.Run(config.fname, func(t *testing.T) {
+				collector, err := New(afero.NewMemMapFs(), config.fname, config.tags)
+				assert.NoError(t, err)
+				assert.NotNil(t, collector)
+				assert.Equal(t, expected.fname, collector.fname)
+				assert.Equal(t, expected.resTags, collector.resTags)
+				assert.Equal(t, expected.ignoredTags, collector.ignoredTags)
+			})
+		}(configs[i], expected[i])
+	}
+}
+
+func TestGetRequiredSystemTags(t *testing.T) {
+	collector, err := New(afero.NewMemMapFs(), "path", lib.TagSet{"tag1": true, "tag2": false, "tag3": true})
+	assert.NoError(t, err)
+	assert.NotNil(t, collector)
+	assert.Equal(t, lib.TagSet{}, collector.GetRequiredSystemTags())
+}
+
+func TestLink(t *testing.T) {
+	collector, err := New(afero.NewMemMapFs(), "path", lib.TagSet{"tag1": true, "tag2": false, "tag3": true})
+	assert.NoError(t, err)
+	assert.NotNil(t, collector)
+	assert.Equal(t, "", collector.Link())
 }
