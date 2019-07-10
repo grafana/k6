@@ -30,6 +30,7 @@ import (
 	"testing"
 
 	"github.com/loadimpact/k6/lib/consts"
+	"github.com/loadimpact/k6/lib/fsext"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -258,4 +259,37 @@ func TestArchiveJSONEscape(t *testing.T) {
 	b, err := arc.json()
 	assert.NoError(t, err)
 	assert.Contains(t, string(b), "test<.js")
+}
+
+func TestUsingCacheFromCacheOnReadFs(t *testing.T) {
+	var base = afero.NewMemMapFs()
+	var cached = afero.NewMemMapFs()
+	// we specifically have different contents in both places
+	require.NoError(t, afero.WriteFile(base, "/wrong", []byte(`ooops`), 0644))
+	require.NoError(t, afero.WriteFile(cached, "/correct", []byte(`test`), 0644))
+
+	arc := &Archive{
+		Type:        "js",
+		FilenameURL: &url.URL{Scheme: "file", Path: "/somewhere"},
+		K6Version:   consts.Version,
+		Data:        []byte(`// contents...`),
+		PwdURL:      &url.URL{Scheme: "file", Path: "/"},
+		Filesystems: map[string]afero.Fs{
+			"file": fsext.NewCacheOnReadFs(base, cached, 0),
+		},
+	}
+
+	buf := bytes.NewBuffer(nil)
+	require.NoError(t, arc.Write(buf))
+
+	newArc, err := ReadArchive(buf)
+	assert.NoError(t, err)
+
+	data, err := afero.ReadFile(newArc.Filesystems["file"], "/correct")
+	require.NoError(t, err)
+	require.Equal(t, string(data), "test")
+
+	data, err = afero.ReadFile(newArc.Filesystems["file"], "/wrong")
+	require.Error(t, err)
+	require.Nil(t, data)
 }
