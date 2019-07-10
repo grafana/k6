@@ -66,6 +66,9 @@ func TestChangePathFs(t *testing.T) {
 
 		_, err = c.OpenFile("/notanother/path/to/file.txt", os.O_RDWR, 0644)
 		checkErrorPath(t, err, "/notanother/path/to/file.txt")
+
+		_, err = c.OpenFile("/another/nonexistant", os.O_RDWR, 0644)
+		require.True(t, os.IsNotExist(err))
 	})
 
 	t.Run("Stat Chmod Chtimes", func(t *testing.T) {
