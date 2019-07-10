@@ -23,6 +23,7 @@ package csv
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -301,7 +302,11 @@ func TestNew(t *testing.T) {
 				assert.NoError(t, err)
 				assert.NotNil(t, collector)
 				assert.Equal(t, expected.fname, collector.fname)
+				sort.Strings(expected.resTags)
+				sort.Strings(collector.resTags)
 				assert.Equal(t, expected.resTags, collector.resTags)
+				sort.Strings(expected.ignoredTags)
+				sort.Strings(collector.ignoredTags)
 				assert.Equal(t, expected.ignoredTags, collector.ignoredTags)
 			})
 		}(configs[i], expected[i])
