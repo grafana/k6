@@ -52,7 +52,7 @@ func runtimeOptionFlagSet(includeSysEnv bool) *pflag.FlagSet {
 	flags := pflag.NewFlagSet("", 0)
 	flags.SortFlags = false
 	flags.Bool("include-system-env-vars", includeSysEnv, "pass the real system environment variables to the runtime")
-	flags.StringSliceP("env", "e", nil, "add/override environment variable with `VAR=value`")
+	flags.StringArrayP("env", "e", nil, "add/override environment variable with `VAR=value`")
 	return flags
 }
 
@@ -68,7 +68,7 @@ func getRuntimeOptions(flags *pflag.FlagSet) (lib.RuntimeOptions, error) {
 	}
 
 	// Set/overwrite environment variables with custom user-supplied values
-	envVars, err := flags.GetStringSlice("env")
+	envVars, err := flags.GetStringArray("env")
 	if err != nil {
 		return opts, err
 	}
