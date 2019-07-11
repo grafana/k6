@@ -180,6 +180,14 @@ var envVarTestCases = []EnvVarTest{
 		false,
 		map[string]string{"test1": "value 1", "test2": "value 2"},
 	},
+	{
+		"valid env vars with special chars",
+		true,
+		map[string]string{"test1": "value 1"},
+		[]string{"--env", "test2=value,2", "-e", `test3= ,  ,,, value, ,, 2!'@#,"`},
+		false,
+		map[string]string{"test1": "value 1", "test2": "value,2", "test3": ` ,  ,,, value, ,, 2!'@#,"`},
+	},
 }
 
 func TestEnvVars(t *testing.T) {
@@ -206,7 +214,7 @@ func TestEnvVars(t *testing.T) {
 			jsCode := "export default function() {\n"
 			for key, val := range tc.expEnv {
 				jsCode += fmt.Sprintf(
-					"if (__ENV.%s !== '%s') { throw new Error('Invalid %s: ' + __ENV.%s); }\n",
+					"if (__ENV.%s !== `%s`) { throw new Error('Invalid %s: ' + __ENV.%s); }\n",
 					key, val, key, key,
 				)
 			}
