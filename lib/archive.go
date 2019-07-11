@@ -199,10 +199,14 @@ func normalizeAndAnonymizeURL(u *url.URL) {
 }
 
 func getURLPathOnFs(u *url.URL) (scheme string, pathOnFs string) {
-	if u.Opaque != "" {
-		return "https", "/" + u.Opaque
+	scheme = "https"
+	if u.Scheme != "" {
+		scheme = u.Scheme
 	}
-	return u.Scheme, path.Clean(u.String()[len(u.Scheme)+len(":/"):])
+	if u.Opaque != "" {
+		return scheme, "/" + u.Opaque
+	}
+	return scheme, path.Clean(u.String()[len(u.Scheme)+len(":/"):])
 }
 
 // Write serialises the archive to a writer.

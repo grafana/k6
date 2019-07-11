@@ -62,8 +62,8 @@ func TestResolve(t *testing.T) {
 		t.Run("Missing", func(t *testing.T) {
 			u, err := loader.Resolve(root, "example.com/html")
 			require.NoError(t, err)
-			assert.Equal(t, u.String(), "https://example.com/html")
-			// TODO: check that warning was emitted
+			assert.Equal(t, u.String(), "//example.com/html")
+			// TODO: check that warning will be emited if Loaded
 		})
 		t.Run("WS", func(t *testing.T) {
 			moduleSpecifier := "ws://example.com/html"

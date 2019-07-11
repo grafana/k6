@@ -133,7 +133,7 @@ func TestUnknownPrefix(t *testing.T) {
 
 func TestFilenamePwdResolve(t *testing.T) {
 	var tests = []struct {
-		Filename, Pwd                       string
+		Filename, Pwd, version              string
 		expectedFilenameURL, expectedPwdURL *url.URL
 	}{
 		{
@@ -157,15 +157,23 @@ func TestFilenamePwdResolve(t *testing.T) {
 		{
 			Filename:            "example.com/something/dot.js",
 			Pwd:                 "example.com/something/",
+			expectedFilenameURL: &url.URL{Host: "example.com", Scheme: "", Path: "/something/dot.js"},
+			expectedPwdURL:      &url.URL{Host: "example.com", Scheme: "", Path: "/something"},
+		},
+		{
+			Filename:            "https://example.com/something/dot.js",
+			Pwd:                 "https://example.com/something",
 			expectedFilenameURL: &url.URL{Host: "example.com", Scheme: "https", Path: "/something/dot.js"},
 			expectedPwdURL:      &url.URL{Host: "example.com", Scheme: "https", Path: "/something"},
+			version:             "0.25.0",
 		},
 	}
 
 	for _, test := range tests {
 		metadata := `{
-		"Filename": "` + test.Filename + `",
-		"Pwd": "` + test.Pwd + `"
+		"filename": "` + test.Filename + `",
+		"pwd": "` + test.Pwd + `",
+		"k6version": "` + test.version + `"
 	}`
 
 		buf, err := dumpMemMapFsToBuf(makeMemMapFs(t, map[string][]byte{
