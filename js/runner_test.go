@@ -1296,8 +1296,7 @@ func TestArchiveRunningIntegraty(t *testing.T) {
 	defer tb.Cleanup()
 
 	fs := afero.NewMemMapFs()
-	require.NoError(t, afero.WriteFile(fs, "/home/somebody/test.json", []byte(`42`), os.ModePerm))
-	r1, err := getSimpleRunnerWithFileFs("/script.js", tb.Replacer.Replace(`
+	data := tb.Replacer.Replace(`
 			let fput = open("/home/somebody/test.json");
 			export let options = { setupTimeout: "10s", teardownTimeout: "10s" };
 			export function setup() {
@@ -1308,7 +1307,10 @@ func TestArchiveRunningIntegraty(t *testing.T) {
 					throw new Error("incorrect answer " + data);
 				}
 			}
-		`), fs)
+		`)
+	require.NoError(t, afero.WriteFile(fs, "/home/somebody/test.json", []byte(`42`), os.ModePerm))
+	require.NoError(t, afero.WriteFile(fs, "/script.js", []byte(data), os.ModePerm))
+	r1, err := getSimpleRunnerWithFileFs("/script.js", data, fs)
 	require.NoError(t, err)
 
 	buf := bytes.NewBuffer(nil)

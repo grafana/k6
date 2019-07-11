@@ -183,7 +183,11 @@ func ReadArchive(in io.Reader) (*Archive, error) {
 			return nil, fmt.Errorf("unknown file prefix `%s` for file `%s`", pfx, normPath)
 		}
 	}
-	// TODO write the data to pwd in the appropriate archive
+	scheme, pathOnFs := getURLPathOnFs(arc.FilenameURL)
+	err := afero.WriteFile(arc.getFs(scheme), pathOnFs, arc.Data, 0644) // TODO fix the mode ?
+	if err != nil {
+		return nil, err
+	}
 
 	return arc, nil
 }
@@ -192,6 +196,13 @@ func normalizeAndAnonymizeURL(u *url.URL) {
 	if u.Scheme == "file" {
 		u.Path = NormalizeAndAnonymizePath(u.Path)
 	}
+}
+
+func getURLPathOnFs(u *url.URL) (scheme string, pathOnFs string) {
+	if u.Opaque != "" {
+		return "https", "/" + u.Opaque
+	}
+	return u.Scheme, path.Clean(u.String()[len(u.Scheme)+len(":/"):])
 }
 
 // Write serialises the archive to a writer.
@@ -208,6 +219,8 @@ func (arc *Archive) Write(out io.Writer) error {
 	normalizeAndAnonymizeURL(metaArc.PwdURL)
 	metaArc.Filename = metaArc.FilenameURL.String()
 	metaArc.Pwd = metaArc.PwdURL.String()
+	var actualDataPath = path.Join(getURLPathOnFs(metaArc.FilenameURL))
+	var madeLinkToData bool
 	metadata, err := metaArc.json()
 	if err != nil {
 		return err
@@ -296,19 +309,38 @@ func (arc *Archive) Write(out io.Writer) error {
 		}
 
 		for _, filePath := range paths {
-			_ = w.WriteHeader(&tar.Header{
-				Name:       path.Clean(path.Join(name, filePath)),
-				Mode:       0644, // MemMapFs is buggy
-				Size:       int64(len(files[filePath])),
-				AccessTime: infos[filePath].ModTime(),
-				ChangeTime: infos[filePath].ModTime(),
-				ModTime:    infos[filePath].ModTime(),
-				Typeflag:   tar.TypeReg,
-			})
-			if _, err := w.Write(files[filePath]); err != nil {
+			var fullFilePath = path.Clean(path.Join(name, filePath))
+			// we either have opaque
+			if fullFilePath == actualDataPath {
+				madeLinkToData = true
+				err = w.WriteHeader(&tar.Header{
+					Name:     fullFilePath,
+					Size:     0,
+					Typeflag: tar.TypeLink,
+					Linkname: "data",
+				})
+			} else {
+				err = w.WriteHeader(&tar.Header{
+					Name:       fullFilePath,
+					Mode:       0644, // MemMapFs is buggy
+					Size:       int64(len(files[filePath])),
+					AccessTime: infos[filePath].ModTime(),
+					ChangeTime: infos[filePath].ModTime(),
+					ModTime:    infos[filePath].ModTime(),
+					Typeflag:   tar.TypeReg,
+				})
+				if err == nil {
+					_, err = w.Write(files[filePath])
+				}
+			}
+			if err != nil {
 				return err
 			}
 		}
+	}
+	if !madeLinkToData {
+		// This should never happen we should always link to `data` from inside the file/https directories
+		return fmt.Errorf("archive creation failed because the main script wasn't present in the cached filesystem")
 	}
 
 	return w.Close()

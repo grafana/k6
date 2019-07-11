@@ -31,6 +31,7 @@ import (
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/loader"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -219,13 +220,15 @@ func TestEnvVars(t *testing.T) {
 				}
 			}
 
+			fs := afero.NewMemMapFs()
+			require.NoError(t, afero.WriteFile(fs, "/script.js", []byte(jsCode), 0644))
 			runner, err := newRunner(
 				&loader.SourceData{
 					Data: []byte(jsCode),
-					URL:  &url.URL{Path: "/script.js"},
+					URL:  &url.URL{Path: "/script.js", Scheme: "file"},
 				},
 				typeJS,
-				nil,
+				map[string]afero.Fs{"file": fs},
 				rtOpts,
 			)
 			require.NoError(t, err)

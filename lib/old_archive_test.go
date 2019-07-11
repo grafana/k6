@@ -59,47 +59,63 @@ func dumpMemMapFsToBuf(fs afero.Fs) (*bytes.Buffer, error) {
 }
 
 func TestOldArchive(t *testing.T) {
-	fs := makeMemMapFs(t, map[string][]byte{
-		// files
-		"/files/github.com/loadimpact/k6/samples/example.js": []byte(`github file`),
-		"/files/cdnjs.com/packages/Faker":                    []byte(`faker file`),
-		"/files/example.com/path/to.js":                      []byte(`example.com file`),
-		"/files/_/C/something/path":                          []byte(`windows file`),
-		"/files/_/absolulte/path":                            []byte(`unix file`),
+	var testCases = map[string]string{
+		// map of filename to data for each main file tested
+		"github.com/loadimpact/k6/samples/example.js": `github file`,
+		"cdnjs.com/packages/Faker":                    `faker file`,
+		"C:/something/path2":                          `windows script`,
+		"/absolulte/path2":                            `unix script`,
+	}
+	for filename, data := range testCases {
+		filename, data := filename, data
+		t.Run(filename, func(t *testing.T) {
+			metadata := `{"filename": "` + filename + `"}`
+			fs := makeMemMapFs(t, map[string][]byte{
+				// files
+				"/files/github.com/loadimpact/k6/samples/example.js": []byte(`github file`),
+				"/files/cdnjs.com/packages/Faker":                    []byte(`faker file`),
+				"/files/example.com/path/to.js":                      []byte(`example.com file`),
+				"/files/_/C/something/path":                          []byte(`windows file`),
+				"/files/_/absolulte/path":                            []byte(`unix file`),
 
-		// scripts
-		"/scripts/github.com/loadimpact/k6/samples/example.js2": []byte(`github script`),
-		"/scripts/cdnjs.com/packages/Faker2":                    []byte(`faker script`),
-		"/scripts/example.com/path/too.js":                      []byte(`example.com script`),
-		"/scripts/_/C/something/path2":                          []byte(`windows script`),
-		"/scripts/_/absolulte/path2":                            []byte(`unix script`),
-	})
-	buf, err := dumpMemMapFsToBuf(fs)
-	require.NoError(t, err)
+				// scripts
+				"/scripts/github.com/loadimpact/k6/samples/example.js2": []byte(`github script`),
+				"/scripts/cdnjs.com/packages/Faker2":                    []byte(`faker script`),
+				"/scripts/example.com/path/too.js":                      []byte(`example.com script`),
+				"/scripts/_/C/something/path2":                          []byte(`windows script`),
+				"/scripts/_/absolulte/path2":                            []byte(`unix script`),
+				"/data":                                                 []byte(data),
+				"/metadata.json":                                        []byte(metadata),
+			})
 
-	var (
-		expectedFilesystems = map[string]afero.Fs{
-			"file": makeMemMapFs(t, map[string][]byte{
-				"/C:/something/path":  []byte(`windows file`),
-				"/absolulte/path":     []byte(`unix file`),
-				"/C:/something/path2": []byte(`windows script`),
-				"/absolulte/path2":    []byte(`unix script`),
-			}),
-			"https": makeMemMapFs(t, map[string][]byte{
-				"/example.com/path/to.js":                       []byte(`example.com file`),
-				"/example.com/path/too.js":                      []byte(`example.com script`),
-				"/github.com/loadimpact/k6/samples/example.js":  []byte(`github file`),
-				"/cdnjs.com/packages/Faker":                     []byte(`faker file`),
-				"/github.com/loadimpact/k6/samples/example.js2": []byte(`github script`),
-				"/cdnjs.com/packages/Faker2":                    []byte(`faker script`),
-			}),
-		}
-	)
+			buf, err := dumpMemMapFsToBuf(fs)
+			require.NoError(t, err)
 
-	arc, err := ReadArchive(buf)
-	require.NoError(t, err)
+			var (
+				expectedFilesystems = map[string]afero.Fs{
+					"file": makeMemMapFs(t, map[string][]byte{
+						"/C:/something/path":  []byte(`windows file`),
+						"/absolulte/path":     []byte(`unix file`),
+						"/C:/something/path2": []byte(`windows script`),
+						"/absolulte/path2":    []byte(`unix script`),
+					}),
+					"https": makeMemMapFs(t, map[string][]byte{
+						"/example.com/path/to.js":                       []byte(`example.com file`),
+						"/example.com/path/too.js":                      []byte(`example.com script`),
+						"/github.com/loadimpact/k6/samples/example.js":  []byte(`github file`),
+						"/cdnjs.com/packages/Faker":                     []byte(`faker file`),
+						"/github.com/loadimpact/k6/samples/example.js2": []byte(`github script`),
+						"/cdnjs.com/packages/Faker2":                    []byte(`faker script`),
+					}),
+				}
+			)
 
-	diffMapFilesystems(t, expectedFilesystems, arc.Filesystems)
+			arc, err := ReadArchive(buf)
+			require.NoError(t, err)
+
+			diffMapFilesystems(t, expectedFilesystems, arc.Filesystems)
+		})
+	}
 }
 
 func TestUnknownPrefix(t *testing.T) {

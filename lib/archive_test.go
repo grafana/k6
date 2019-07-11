@@ -139,8 +139,8 @@ func TestArchiveReadWrite(t *testing.T) {
 				VUs:        null.IntFrom(12345),
 				SystemTags: GetTagSet(DefaultSystemTagList...),
 			},
-			FilenameURL: &url.URL{Scheme: "file", Path: "/path/to/script.js"},
-			Data:        []byte(`// contents...`),
+			FilenameURL: &url.URL{Scheme: "file", Path: "/path/to/a.js"},
+			Data:        []byte(`// a contents`),
 			PwdURL:      &url.URL{Scheme: "file", Path: "/path/to"},
 			Filesystems: map[string]afero.Fs{
 				"file": makeMemMapFs(t, map[string][]byte{
@@ -189,9 +189,9 @@ func TestArchiveReadWrite(t *testing.T) {
 					VUs:        null.IntFrom(12345),
 					SystemTags: GetTagSet(DefaultSystemTagList...),
 				},
-				FilenameURL: &url.URL{Scheme: "file", Path: fmt.Sprintf("%s/script.js", entry.Pwd)},
+				FilenameURL: &url.URL{Scheme: "file", Path: fmt.Sprintf("%s/a.js", entry.Pwd)},
 				K6Version:   consts.Version,
-				Data:        []byte(`// contents...`),
+				Data:        []byte(`// a contents`),
 				PwdURL:      &url.URL{Scheme: "file", Path: entry.Pwd},
 				Filesystems: map[string]afero.Fs{
 					"file": makeMemMapFs(t, map[string][]byte{
@@ -212,9 +212,9 @@ func TestArchiveReadWrite(t *testing.T) {
 					VUs:        null.IntFrom(12345),
 					SystemTags: GetTagSet(DefaultSystemTagList...),
 				},
-				FilenameURL: &url.URL{Scheme: "file", Path: fmt.Sprintf("%s/script.js", entry.PwdNormAnon)},
+				FilenameURL: &url.URL{Scheme: "file", Path: fmt.Sprintf("%s/a.js", entry.PwdNormAnon)},
 				K6Version:   consts.Version,
-				Data:        []byte(`// contents...`),
+				Data:        []byte(`// a contents`),
 				PwdURL:      &url.URL{Scheme: "file", Path: entry.PwdNormAnon},
 
 				Filesystems: map[string]afero.Fs{
@@ -270,9 +270,9 @@ func TestUsingCacheFromCacheOnReadFs(t *testing.T) {
 
 	arc := &Archive{
 		Type:        "js",
-		FilenameURL: &url.URL{Scheme: "file", Path: "/somewhere"},
+		FilenameURL: &url.URL{Scheme: "file", Path: "/correct"},
 		K6Version:   consts.Version,
-		Data:        []byte(`// contents...`),
+		Data:        []byte(`test`),
 		PwdURL:      &url.URL{Scheme: "file", Path: "/"},
 		Filesystems: map[string]afero.Fs{
 			"file": fsext.NewCacheOnReadFs(base, cached, 0),
@@ -283,7 +283,7 @@ func TestUsingCacheFromCacheOnReadFs(t *testing.T) {
 	require.NoError(t, arc.Write(buf))
 
 	newArc, err := ReadArchive(buf)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	data, err := afero.ReadFile(newArc.Filesystems["file"], "/correct")
 	require.NoError(t, err)
