@@ -202,6 +202,7 @@ func normalizeAndAnonymizeURL(u *url.URL) {
 func (arc *Archive) Write(out io.Writer) error {
 	w := tar.NewWriter(out)
 
+	now := time.Now()
 	metaArc := *arc
 	normalizeAndAnonymizeURL(metaArc.FilenameURL)
 	normalizeAndAnonymizeURL(metaArc.PwdURL)
@@ -215,7 +216,7 @@ func (arc *Archive) Write(out io.Writer) error {
 		Name:     "metadata.json",
 		Mode:     0644,
 		Size:     int64(len(metadata)),
-		ModTime:  time.Now(),
+		ModTime:  now,
 		Typeflag: tar.TypeReg,
 	})
 	if _, err = w.Write(metadata); err != nil {
@@ -226,7 +227,7 @@ func (arc *Archive) Write(out io.Writer) error {
 		Name:     "data",
 		Mode:     0644,
 		Size:     int64(len(arc.Data)),
-		ModTime:  time.Now(),
+		ModTime:  now,
 		Typeflag: tar.TypeReg,
 	})
 	if _, err = w.Write(arc.Data); err != nil {
@@ -286,10 +287,10 @@ func (arc *Archive) Write(out io.Writer) error {
 		for _, dirPath := range dirs {
 			_ = w.WriteHeader(&tar.Header{
 				Name:       path.Clean(path.Join(name, dirPath)),
-				Mode:       int64(infos[dirPath].Mode()),
-				AccessTime: infos[dirPath].ModTime(),
-				ChangeTime: infos[dirPath].ModTime(),
-				ModTime:    infos[dirPath].ModTime(),
+				Mode:       0755, // MemMapFs is buggy
+				AccessTime: now,  // MemMapFs is buggy
+				ChangeTime: now,  // MemMapFs is buggy
+				ModTime:    now,  // MemMapFs is buggy
 				Typeflag:   tar.TypeDir,
 			})
 		}
@@ -297,7 +298,7 @@ func (arc *Archive) Write(out io.Writer) error {
 		for _, filePath := range paths {
 			_ = w.WriteHeader(&tar.Header{
 				Name:       path.Clean(path.Join(name, filePath)),
-				Mode:       int64(infos[filePath].Mode()),
+				Mode:       0644, // MemMapFs is buggy
 				Size:       int64(len(files[filePath])),
 				AccessTime: infos[filePath].ModTime(),
 				ChangeTime: infos[filePath].ModTime(),
