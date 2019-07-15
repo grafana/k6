@@ -311,3 +311,13 @@ func TestArchiveWithDataNotInFS(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "the main script wasn't present in the cached filesystem")
 }
+
+func TestMalformedMetadata(t *testing.T) {
+	var fs = afero.NewMemMapFs()
+	require.NoError(t, afero.WriteFile(fs, "/metadata.json", []byte("{,}"), 0644))
+	var b, err = dumpMemMapFsToBuf(fs)
+	require.NoError(t, err)
+	_, err = ReadArchive(b)
+	require.Error(t, err)
+	require.Equal(t, err.Error(), `invalid character ',' looking for beginning of object key string`)
+}
