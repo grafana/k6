@@ -135,6 +135,7 @@ func TestFilenamePwdResolve(t *testing.T) {
 	var tests = []struct {
 		Filename, Pwd, version              string
 		expectedFilenameURL, expectedPwdURL *url.URL
+		expectedError                       string
 	}{
 		{
 			Filename:            "/home/nobody/something.js",
@@ -167,6 +168,19 @@ func TestFilenamePwdResolve(t *testing.T) {
 			expectedPwdURL:      &url.URL{Host: "example.com", Scheme: "https", Path: "/something"},
 			version:             "0.25.0",
 		},
+		{
+			Filename:      "ftps://example.com/something/dot.js",
+			Pwd:           "https://example.com/something",
+			expectedError: "only supported schemes for imports are file and https",
+			version:       "0.25.0",
+		},
+
+		{
+			Filename:      "https://example.com/something/dot.js",
+			Pwd:           "ftps://example.com/something",
+			expectedError: "only supported schemes for imports are file and https",
+			version:       "0.25.0",
+		},
 	}
 
 	for _, test := range tests {
@@ -182,8 +196,13 @@ func TestFilenamePwdResolve(t *testing.T) {
 		require.NoError(t, err)
 
 		arc, err := ReadArchive(buf)
-		require.NoError(t, err)
-		require.Equal(t, test.expectedFilenameURL, arc.FilenameURL)
-		require.Equal(t, test.expectedPwdURL, arc.PwdURL)
+		if test.expectedError != "" {
+			require.Error(t, err)
+			require.Contains(t, err.Error(), test.expectedError)
+		} else {
+			require.NoError(t, err)
+			require.Equal(t, test.expectedFilenameURL, arc.FilenameURL)
+			require.Equal(t, test.expectedPwdURL, arc.PwdURL)
+		}
 	}
 }
