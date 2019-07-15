@@ -81,14 +81,17 @@ func Resolve(pwd *url.URL, moduleSpecifier string) (*url.URL, error) {
 	} else if !strings.HasSuffix(pwd.Path, "/") {
 		pwd.Path += "/"
 	}
-
-	if moduleSpecifier[0] == '.' || moduleSpecifier[0] == '/' {
+	if moduleSpecifier[0] == '.' || moduleSpecifier[0] == '/' || filepath.IsAbs(moduleSpecifier) {
 		if pwd.Opaque != "" { // this is a loader reference
 			parts := strings.SplitN(pwd.Opaque, "/", 2)
 			if moduleSpecifier[0] == '/' {
 				return &url.URL{Opaque: path.Join(parts[0], moduleSpecifier)}, nil
 			}
 			return &url.URL{Opaque: path.Join(parts[0], path.Join(path.Dir(parts[1]), moduleSpecifier))}, nil
+		}
+
+		if filepath.VolumeName(moduleSpecifier) != "" {
+			return pwd.Parse("/" + filepath.ToSlash(moduleSpecifier))
 		}
 
 		return pwd.Parse(moduleSpecifier)
@@ -157,7 +160,11 @@ func Load(
 		scheme = "https"
 	}
 
-	pathOnFs = filepath.FromSlash(pathOnFs)
+	pathOnFs, err := url.PathUnescape(filepath.FromSlash(pathOnFs))
+	if err != nil {
+		return nil, err
+	}
+
 	data, err := afero.ReadFile(filesystems[scheme], pathOnFs)
 
 	if err != nil {

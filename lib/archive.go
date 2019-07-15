@@ -232,7 +232,10 @@ func (arc *Archive) Write(out io.Writer) error {
 	normalizeAndAnonymizeURL(metaArc.PwdURL)
 	metaArc.Filename = getURLtoString(metaArc.FilenameURL)
 	metaArc.Pwd = getURLtoString(metaArc.PwdURL)
-	var actualDataPath = path.Join(getURLPathOnFs(metaArc.FilenameURL))
+	var actualDataPath, err = url.PathUnescape(path.Join(getURLPathOnFs(metaArc.FilenameURL)))
+	if err != nil {
+		return err
+	}
 	var madeLinkToData bool
 	metadata, err := metaArc.json()
 	if err != nil {

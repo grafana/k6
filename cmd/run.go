@@ -532,12 +532,13 @@ func readSource(src, pwd string, filesystems map[string]afero.Fs, stdin io.Reade
 		}
 		return &loader.SourceData{URL: &url.URL{Path: "-", Scheme: "file"}, Data: data}, nil
 	}
-	pwdURL := &url.URL{Scheme: "file", Path: filepath.ToSlash(filepath.Clean(pwd)) + "/"}
-	srcLocalPath := filepath.Join(pwd, src)
+	srcLocalPath := filepath.Clean(afero.FilePathSeparator + filepath.Join(pwd, src))
 	if ok, _ := afero.Exists(filesystems["file"], srcLocalPath); ok {
 		// there is file on the local disk ... lets use it :)
-		return loader.Load(filesystems, &url.URL{Scheme: "file", Path: srcLocalPath}, src)
+		return loader.Load(filesystems, &url.URL{Scheme: "file", Path: filepath.ToSlash(srcLocalPath)}, src)
 	}
+
+	pwdURL := &url.URL{Scheme: "file", Path: filepath.ToSlash(filepath.Clean(pwd)) + "/"}
 	srcURL, err := loader.Resolve(pwdURL, filepath.ToSlash(src))
 	if err != nil {
 		return nil, err
