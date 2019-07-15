@@ -143,41 +143,42 @@ func Load(
 			"original moduleSpecifier": originalModuleSpecifier,
 		}).Debug("Loading...")
 
+	var pathOnFs string
+	switch {
+	case moduleSpecifier.Opaque != "": // This is loader
+		pathOnFs = filepath.Join(afero.FilePathSeparator, moduleSpecifier.Opaque)
+	case moduleSpecifier.Scheme == "":
+		pathOnFs = path.Clean(moduleSpecifier.String())
+	default:
+		pathOnFs = path.Clean(moduleSpecifier.String()[len(moduleSpecifier.Scheme)+len(":/"):])
+	}
 	scheme := moduleSpecifier.Scheme
 	if scheme == "" {
 		scheme = "https"
 	}
 
-	var pathOnFs string
-	if moduleSpecifier.Opaque != "" { // This is loader
-		pathOnFs = filepath.Join(afero.FilePathSeparator, moduleSpecifier.Opaque)
-	} else if scheme == "" {
-		pathOnFs = path.Clean(moduleSpecifier.String())
-	} else {
-		pathOnFs = path.Clean(moduleSpecifier.String()[len(moduleSpecifier.Scheme)+len(":/"):])
-	}
-
 	pathOnFs = filepath.FromSlash(pathOnFs)
-
 	data, err := afero.ReadFile(filesystems[scheme], pathOnFs)
 
 	if err != nil {
 		if os.IsNotExist(err) {
 			if scheme == "https" {
 				var finalModuleSpecifierURL = &url.URL{}
-				if moduleSpecifier.Opaque != "" { // This is loader
+
+				switch {
+				case moduleSpecifier.Opaque != "": // This is loader
 					finalModuleSpecifierURL, err = resolveUsingLoaders(moduleSpecifier.Opaque)
 					if err != nil {
 						return nil, err
 					}
-				} else if moduleSpecifier.Scheme == "" {
+				case moduleSpecifier.Scheme == "":
 					log.WithField("url", moduleSpecifier).Warning(
 						"A url was resolved but it didn't have scheme. " +
 							"This will be deprecated in the future and all remote modules will " +
 							"need to explicitly use `https` as scheme")
 					*finalModuleSpecifierURL = *moduleSpecifier
-					finalModuleSpecifierURL.Scheme = "https"
-				} else {
+					finalModuleSpecifierURL.Scheme = scheme
+				default:
 					finalModuleSpecifierURL = moduleSpecifier
 				}
 				var result *SourceData

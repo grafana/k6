@@ -200,13 +200,22 @@ func normalizeAndAnonymizeURL(u *url.URL) {
 
 func getURLPathOnFs(u *url.URL) (scheme string, pathOnFs string) {
 	scheme = "https"
-	if u.Scheme != "" {
+	switch {
+	case u.Opaque != "":
+		return scheme, "/" + u.Opaque
+	case u.Scheme == "":
+		return scheme, path.Clean(u.String()[len("//"):])
+	default:
 		scheme = u.Scheme
 	}
-	if u.Opaque != "" {
-		return scheme, "/" + u.Opaque
-	}
 	return scheme, path.Clean(u.String()[len(u.Scheme)+len(":/"):])
+}
+
+func getURLtoString(u *url.URL) string {
+	if u.Opaque == "" && u.Scheme == "" {
+		return u.String()[len("//"):] // https url without a scheme
+	}
+	return u.String()
 }
 
 // Write serialises the archive to a writer.
@@ -221,8 +230,8 @@ func (arc *Archive) Write(out io.Writer) error {
 	metaArc := *arc
 	normalizeAndAnonymizeURL(metaArc.FilenameURL)
 	normalizeAndAnonymizeURL(metaArc.PwdURL)
-	metaArc.Filename = metaArc.FilenameURL.String()
-	metaArc.Pwd = metaArc.PwdURL.String()
+	metaArc.Filename = getURLtoString(metaArc.FilenameURL)
+	metaArc.Pwd = getURLtoString(metaArc.PwdURL)
 	var actualDataPath = path.Join(getURLPathOnFs(metaArc.FilenameURL))
 	var madeLinkToData bool
 	metadata, err := metaArc.json()
