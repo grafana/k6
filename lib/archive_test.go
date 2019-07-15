@@ -293,3 +293,21 @@ func TestUsingCacheFromCacheOnReadFs(t *testing.T) {
 	require.Error(t, err)
 	require.Nil(t, data)
 }
+
+func TestArchiveWithDataNotInFS(t *testing.T) {
+	t.Parallel()
+
+	arc := &Archive{
+		Type:        "js",
+		FilenameURL: &url.URL{Scheme: "file", Path: "/script"},
+		K6Version:   consts.Version,
+		Data:        []byte(`test`),
+		PwdURL:      &url.URL{Scheme: "file", Path: "/"},
+		Filesystems: nil,
+	}
+
+	buf := bytes.NewBuffer(nil)
+	err := arc.Write(buf)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "the main script wasn't present in the cached filesystem")
+}
