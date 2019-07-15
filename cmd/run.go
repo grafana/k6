@@ -513,7 +513,7 @@ func createFilesystems() map[string]afero.Fs {
 	osfs := afero.NewOsFs()
 	if runtime.GOOS == "windows" {
 		// This is done so that we can continue to use paths with /|"\" through the code but also to
-		// be easier to travers the cachedFs later as it doesn't work very well if you have windows
+		// be easier to traverse the cachedFs later as it doesn't work very well if you have windows
 		// volumes
 		osfs = fsext.NewTrimFilePathSeparatorFs(osfs)
 	}
