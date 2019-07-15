@@ -72,29 +72,34 @@ func Resolve(pwd *url.URL, moduleSpecifier string) (*url.URL, error) {
 		return nil, errors.New("local or remote path required")
 	}
 
-	// we always want for the pwd to end in a slash, but filepath/path.Clean strips it so we readd
-	// it if it's missing
-	if pwd.Opaque != "" {
-		if !strings.HasSuffix(pwd.Opaque, "/") {
-			pwd.Opaque += "/"
-		}
-	} else if !strings.HasSuffix(pwd.Path, "/") {
-		pwd.Path += "/"
-	}
 	if moduleSpecifier[0] == '.' || moduleSpecifier[0] == '/' || filepath.IsAbs(moduleSpecifier) {
 		if pwd.Opaque != "" { // this is a loader reference
 			parts := strings.SplitN(pwd.Opaque, "/", 2)
 			if moduleSpecifier[0] == '/' {
 				return &url.URL{Opaque: path.Join(parts[0], moduleSpecifier)}, nil
 			}
-			return &url.URL{Opaque: path.Join(parts[0], path.Join(path.Dir(parts[1]), moduleSpecifier))}, nil
+			return &url.URL{Opaque: path.Join(parts[0], path.Join(path.Dir(parts[1]+"/"), moduleSpecifier))}, nil
 		}
 
+		// The file is in format like C:/something/path.js. But this will be decoded as scheme `C`
+		// ... which is not what we want we want it to be decode as file:///C:/something/path.js
 		if filepath.VolumeName(moduleSpecifier) != "" {
-			return pwd.Parse("/" + filepath.ToSlash(moduleSpecifier))
+			moduleSpecifier = "/" + moduleSpecifier
 		}
 
-		return pwd.Parse(moduleSpecifier)
+		// we always want for the pwd to end in a slash, but filepath/path.Clean strips it so we readd
+		// it if it's missing
+		var finalPwd = pwd
+		if pwd.Opaque != "" {
+			if !strings.HasSuffix(pwd.Opaque, "/") {
+				finalPwd = &url.URL{Opaque: pwd.Opaque + "/"}
+			}
+		} else if !strings.HasSuffix(pwd.Path, "/") {
+			finalPwd = &url.URL{}
+			*finalPwd = *pwd
+			finalPwd.Path += "/"
+		}
+		return finalPwd.Parse(moduleSpecifier)
 	}
 
 	if strings.Contains(moduleSpecifier, "://") {

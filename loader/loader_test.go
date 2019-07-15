@@ -95,7 +95,7 @@ func TestResolve(t *testing.T) {
 		moduleURL, err := loader.Resolve(pwdURL, "./something")
 		require.NoError(t, err)
 		require.Equal(t, "https://example.com/path/to/something", moduleURL.String())
-		require.Equal(t, "https://example.com/path/to/", pwdURL.String())
+		require.Equal(t, "https://example.com/path/to", pwdURL.String())
 	})
 
 }
