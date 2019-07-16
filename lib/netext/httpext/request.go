@@ -39,11 +39,12 @@ import (
 
 	ntlmssp "github.com/Azure/go-ntlmssp"
 	digest "github.com/Soontao/goHttpDigestClient"
+	"github.com/andybalholm/brotli"
+	"github.com/klauspost/compress/zstd"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
 	log "github.com/sirupsen/logrus"
 	null "gopkg.in/guregu/null.v3"
-	"github.com/klauspost/compress/zstd"
 )
 
 const compressionHeaderOverwriteMessage = "Both compression and the `%s` header were specified " +
@@ -87,8 +88,11 @@ const (
 	CompressionTypeGzip CompressionType = iota
 	// CompressionTypeDeflate compresses through flate
 	CompressionTypeDeflate
+	// CompressionTypeZstd compresses through zstd
 	CompressionTypeZstd
-	// TODO: add compress(lzw), brotli maybe bzip2 and others listed at
+	// CompressionTypeBr compresses through brotli
+	CompressionTypeBr
+	// TODO: add compress(lzw), maybe bzip2 and others listed at
 	// https://en.wikipedia.org/wiki/HTTP_compression#Content-Encoding_tokens
 )
 
@@ -148,6 +152,8 @@ func compressBody(algos []CompressionType, body io.ReadCloser) (io.Reader, int64
 			w = zlib.NewWriter(buf)
 		case CompressionTypeZstd:
 			w, _ = zstd.NewWriter(buf)
+		case CompressionTypeBr:
+			w = brotli.NewWriter(buf)
 		default:
 			return nil, 0, "", fmt.Errorf("unknown compressionType %s", compressionType)
 		}
@@ -199,6 +205,10 @@ func readResponseBody(
 			// interface, so this defer and wrapping is needed
 			defer zstdecoder.Close()
 			resp.Body = ioutil.NopCloser(zstdecoder)
+		case CompressionTypeBr:
+			brotlireader := brotli.NewReader(resp.Body)
+			// brotli.Reader doesn't implement io.ReadCloser, so wrap it
+			resp.Body = ioutil.NopCloser(brotlireader)
 		default:
 			// We have not implemented a compression ... :(
 			respErr = fmt.Errorf(
