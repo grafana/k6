@@ -32,6 +32,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/consts"
+	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/stats/cloud"
 	"github.com/loadimpact/k6/ui"
 	"github.com/pkg/errors"
@@ -72,7 +73,7 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 
 		filename := args[0]
 		filesystems := createFilesystems()
-		src, err := readSource(filename, pwd, filesystems, os.Stdin)
+		src, err := loader.ReadSource(filename, pwd, filesystems, os.Stdin)
 		if err != nil {
 			return err
 		}

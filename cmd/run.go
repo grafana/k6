@@ -26,13 +26,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"io/ioutil"
 	"net/http"
-	"net/url"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"syscall"
@@ -119,7 +115,7 @@ a commandline interface for interacting with it.`,
 		}
 		filename := args[0]
 		filesystems := createFilesystems()
-		src, err := readSource(filename, pwd, filesystems, os.Stdin)
+		src, err := loader.ReadSource(filename, pwd, filesystems, os.Stdin)
 		if err != nil {
 			return err
 		}
@@ -521,39 +517,6 @@ func createFilesystems() map[string]afero.Fs {
 		"file":  fsext.NewCacheOnReadFs(osfs, afero.NewMemMapFs(), 0),
 		"https": afero.NewMemMapFs(),
 	}
-}
-
-// Reads a source file from any supported destination.
-func readSource(src, pwd string, filesystems map[string]afero.Fs, stdin io.Reader) (*loader.SourceData, error) {
-	if src == "-" {
-		data, err := ioutil.ReadAll(stdin)
-		if err != nil {
-			return nil, err
-		}
-		err = afero.WriteFile(filesystems["file"].(fsext.CacheOnReadFs).GetCachingFs(), "/-", data, 0644)
-		if err != nil {
-			return nil, errors.Wrap(err, "caching data read from -")
-		}
-		return &loader.SourceData{URL: &url.URL{Path: "/-", Scheme: "file"}, Data: data}, err
-	}
-	var srcLocalPath string
-	if filepath.IsAbs(src) {
-		srcLocalPath = src
-	} else {
-		srcLocalPath = filepath.Join(pwd, src)
-	}
-	srcLocalPath = filepath.Clean(afero.FilePathSeparator + srcLocalPath)
-	if ok, _ := afero.Exists(filesystems["file"], srcLocalPath); ok {
-		// there is file on the local disk ... lets use it :)
-		return loader.Load(filesystems, &url.URL{Scheme: "file", Path: filepath.ToSlash(srcLocalPath)}, src)
-	}
-
-	pwdURL := &url.URL{Scheme: "file", Path: filepath.ToSlash(filepath.Clean(pwd)) + "/"}
-	srcURL, err := loader.Resolve(pwdURL, filepath.ToSlash(src))
-	if err != nil {
-		return nil, err
-	}
-	return loader.Load(filesystems, srcURL, src)
 }
 
 // Creates a new runner.

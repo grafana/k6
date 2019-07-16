@@ -23,6 +23,7 @@ package cmd
 import (
 	"os"
 
+	"github.com/loadimpact/k6/loader"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -52,7 +53,7 @@ An archive is a fully self-contained test run, and can be executed identically e
 		}
 		filename := args[0]
 		filesystems := createFilesystems()
-		src, err := readSource(filename, pwd, filesystems, os.Stdin)
+		src, err := loader.ReadSource(filename, pwd, filesystems, os.Stdin)
 		if err != nil {
 			return err
 		}

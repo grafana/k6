@@ -28,6 +28,7 @@ import (
 
 	"github.com/loadimpact/k6/js"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/loader"
 	"github.com/spf13/cobra"
 )
 
@@ -43,7 +44,7 @@ var inspectCmd = &cobra.Command{
 			return err
 		}
 		filesystems := createFilesystems()
-		src, err := readSource(args[0], pwd, filesystems, os.Stdin)
+		src, err := loader.ReadSource(args[0], pwd, filesystems, os.Stdin)
 		if err != nil {
 			return err
 		}
