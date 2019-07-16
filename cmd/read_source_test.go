@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/loadimpact/k6/lib/fsext"
 	"github.com/loadimpact/k6/loader"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
@@ -30,12 +31,13 @@ func TestReadSourceSTDINCache(t *testing.T) {
 	var data = []byte(`test contents`)
 	var r = bytes.NewReader(data)
 	var fs = afero.NewMemMapFs()
-	sourceData, err := readSource("-", "", map[string]afero.Fs{"file": fs}, r)
+	sourceData, err := readSource("-", "/path/to/pwd",
+		map[string]afero.Fs{"file": fsext.NewCacheOnReadFs(nil, fs, 0)}, r)
 	require.NoError(t, err)
 	require.Equal(t, &loader.SourceData{
-		URL:  &url.URL{Scheme: "file", Path: "-"},
+		URL:  &url.URL{Scheme: "file", Path: "/-"},
 		Data: data}, sourceData)
-	fileData, err := afero.ReadFile(fs, "-")
+	fileData, err := afero.ReadFile(fs, "/-")
 	require.NoError(t, err)
 	require.Equal(t, data, fileData)
 }

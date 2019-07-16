@@ -530,8 +530,11 @@ func readSource(src, pwd string, filesystems map[string]afero.Fs, stdin io.Reade
 		if err != nil {
 			return nil, err
 		}
-		err = afero.WriteFile(filesystems["file"], "-", data, 0644)
-		return &loader.SourceData{URL: &url.URL{Path: "-", Scheme: "file"}, Data: data}, err
+		err = afero.WriteFile(filesystems["file"].(fsext.CacheOnReadFs).GetCachingFs(), "/-", data, 0644)
+		if err != nil {
+			return nil, errors.Wrap(err, "caching data read from -")
+		}
+		return &loader.SourceData{URL: &url.URL{Path: "/-", Scheme: "file"}, Data: data}, err
 	}
 	var srcLocalPath string
 	if filepath.IsAbs(src) {

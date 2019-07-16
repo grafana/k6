@@ -369,3 +369,31 @@ func TestStrangePaths(t *testing.T) {
 		diffMapFilesystems(t, arc1Filesystems, arc2Filesystems)
 	}
 }
+
+func TestStdinArchive(t *testing.T) {
+	var fs = afero.NewMemMapFs()
+	// we specifically have different contents in both places
+	require.NoError(t, afero.WriteFile(fs, "/-", []byte(`test`), 0644))
+
+	arc := &Archive{
+		Type:        "js",
+		FilenameURL: &url.URL{Scheme: "file", Path: "/-"},
+		K6Version:   consts.Version,
+		Data:        []byte(`test`),
+		PwdURL:      &url.URL{Scheme: "file", Path: "/"},
+		Filesystems: map[string]afero.Fs{
+			"file": fs,
+		},
+	}
+
+	buf := bytes.NewBuffer(nil)
+	require.NoError(t, arc.Write(buf))
+
+	newArc, err := ReadArchive(buf)
+	require.NoError(t, err)
+
+	data, err := afero.ReadFile(newArc.Filesystems["file"], "/-")
+	require.NoError(t, err)
+	require.Equal(t, string(data), "test")
+
+}
