@@ -52,7 +52,7 @@ An archive is a fully self-contained test run, and can be executed identically e
 			return err
 		}
 		filename := args[0]
-		filesystems := createFilesystems()
+		filesystems := loader.CreateFilesystems()
 		src, err := loader.ReadSource(filename, pwd, filesystems, os.Stdin)
 		if err != nil {
 			return err

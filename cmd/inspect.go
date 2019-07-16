@@ -43,7 +43,7 @@ var inspectCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		filesystems := createFilesystems()
+		filesystems := loader.CreateFilesystems()
 		src, err := loader.ReadSource(args[0], pwd, filesystems, os.Stdin)
 		if err != nil {
 			return err
