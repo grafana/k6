@@ -273,6 +273,20 @@
   version = "v1.3.0"
 
 [[projects]]
+  digest = "1:a1eb0245eb436bd1949fdb00f6b2d925874fa0d2c5e709779f3c50fe281b9eee"
+  name = "github.com/klauspost/compress"
+  packages = [
+    "fse",
+    "huff0",
+    "snappy",
+    "zstd",
+    "zstd/internal/xxhash",
+  ]
+  pruneopts = "NUT"
+  revision = "315059c39568ee89ae0c118bc6dc7306041543c3"
+  version = "v1.7.2"
+
+[[projects]]
   digest = "1:4059c14e87a2de3a434430340521b5feece186c1469eff0834c29a63870de3ed"
   name = "github.com/konsorten/go-windows-terminal-sequences"
   packages = ["."]
@@ -666,6 +680,7 @@
     "github.com/influxdata/influxdb/client/v2",
     "github.com/julienschmidt/httprouter",
     "github.com/kelseyhightower/envconfig",
+    "github.com/klauspost/compress/zstd",
     "github.com/kubernetes/helm/pkg/strvals",
     "github.com/manyminds/api2go",
     "github.com/manyminds/api2go/jsonapi",

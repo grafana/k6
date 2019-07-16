@@ -25,7 +25,9 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -36,8 +38,10 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/klauspost/compress/zstd"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/mccutchen/go-httpbin/httpbin"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/http2"
@@ -89,6 +93,11 @@ type HTTPMultiBin struct {
 	Cleanup         func()
 }
 
+type jsonBody struct {
+	Header      http.Header `json:"headers"`
+	Compression string      `json:"compression"`
+}
+
 func getWebsocketEchoHandler(t testing.TB) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		t.Logf("[%p %s] Upgrading to websocket connection...", req, req.URL)
@@ -116,12 +125,38 @@ func getWebsocketCloserHandler(t testing.TB) http.Handler {
 	})
 }
 
+func writeJSON(w io.Writer, v interface{}) error {
+	e := json.NewEncoder(w)
+	e.SetIndent("", "  ")
+	return errors.Wrap(e.Encode(v), "failed to encode JSON")
+}
+
+func getZstdHandler(t testing.TB) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Add("Content-Encoding", "zstd")
+
+		data := jsonBody{
+			Header:      req.Header,
+			Compression: "zstd",
+		}
+
+		ww, err := zstd.NewWriter(w)
+		defer ww.Close()
+		err = writeJSON(ww, data)
+		if !assert.NoError(t, err) {
+			return
+		}
+	})
+}
+
 // NewHTTPMultiBin returns a fully configured and running HTTPMultiBin
 func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 	// Create a http.ServeMux and set the httpbin handler as the default
 	mux := http.NewServeMux()
 	mux.Handle("/ws-echo", getWebsocketEchoHandler(t))
 	mux.Handle("/ws-close", getWebsocketCloserHandler(t))
+	mux.Handle("/zstd", getZstdHandler(t))
 	mux.Handle("/", httpbin.New().Handler())
 
 	// Initialize the HTTP server and get its details

@@ -43,6 +43,7 @@ import (
 	"github.com/loadimpact/k6/stats"
 	log "github.com/sirupsen/logrus"
 	null "gopkg.in/guregu/null.v3"
+	"github.com/klauspost/compress/zstd"
 )
 
 const compressionHeaderOverwriteMessage = "Both compression and the `%s` header were specified " +
@@ -86,6 +87,7 @@ const (
 	CompressionTypeGzip CompressionType = iota
 	// CompressionTypeDeflate compresses through flate
 	CompressionTypeDeflate
+	CompressionTypeZstd
 	// TODO: add compress(lzw), brotli maybe bzip2 and others listed at
 	// https://en.wikipedia.org/wiki/HTTP_compression#Content-Encoding_tokens
 )
@@ -144,6 +146,8 @@ func compressBody(algos []CompressionType, body io.ReadCloser) (io.Reader, int64
 			w = gzip.NewWriter(buf)
 		case CompressionTypeDeflate:
 			w = zlib.NewWriter(buf)
+		case CompressionTypeZstd:
+			w, _ = zstd.NewWriter(buf)
 		default:
 			return nil, 0, "", fmt.Errorf("unknown compressionType %s", compressionType)
 		}
@@ -188,6 +192,13 @@ func readResponseBody(
 			resp.Body, respErr = zlib.NewReader(resp.Body)
 		case CompressionTypeGzip:
 			resp.Body, respErr = gzip.NewReader(resp.Body)
+		case CompressionTypeZstd:
+			var zstdecoder *zstd.Decoder
+			zstdecoder, respErr = zstd.NewReader(resp.Body)
+			// zstd.Decoder.Close() doesn't fully implement the io.ReadCloser
+			// interface, so this defer and wrapping is needed
+			defer zstdecoder.Close()
+			resp.Body = ioutil.NopCloser(zstdecoder)
 		default:
 			// We have not implemented a compression ... :(
 			respErr = fmt.Errorf(

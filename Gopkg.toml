@@ -94,3 +94,7 @@
   [[prune.project]]
     name = "github.com/spf13/cobra"
     unused-packages = false
+
+[[constraint]]
+  name = "github.com/klauspost/compress"
+  version = "1.7.2"
