@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -320,4 +321,51 @@ func TestMalformedMetadata(t *testing.T) {
 	_, err = ReadArchive(b)
 	require.Error(t, err)
 	require.Equal(t, err.Error(), `invalid character ',' looking for beginning of object key string`)
+}
+
+func TestStrangePaths(t *testing.T) {
+	var pathsToChange = []string{
+		`/path/with spaces/a.js`,
+		`/path/with spaces/a.js`,
+		`/path/with日本語/b.js`,
+		`/path/with spaces and 日本語/file1.txt`,
+	}
+	for _, pathToChange := range pathsToChange {
+		otherMap := make(map[string][]byte, len(pathsToChange))
+		for _, other := range pathsToChange {
+			otherMap[other] = []byte(`// ` + other + ` contents`)
+		}
+		arc1 := &Archive{
+			Type:      "js",
+			K6Version: consts.Version,
+			Options: Options{
+				VUs:        null.IntFrom(12345),
+				SystemTags: GetTagSet(DefaultSystemTagList...),
+			},
+			FilenameURL: &url.URL{Scheme: "file", Path: pathToChange},
+			Data:        []byte(`// ` + pathToChange + ` contents`),
+			PwdURL:      &url.URL{Scheme: "file", Path: path.Dir(pathToChange)},
+			Filesystems: map[string]afero.Fs{
+				"file": makeMemMapFs(t, otherMap),
+			},
+		}
+
+		buf := bytes.NewBuffer(nil)
+		require.NoError(t, arc1.Write(buf), pathToChange)
+
+		arc1Filesystems := arc1.Filesystems
+		arc1.Filesystems = nil
+
+		arc2, err := ReadArchive(buf)
+		require.NoError(t, err, pathToChange)
+
+		arc2Filesystems := arc2.Filesystems
+		arc2.Filesystems = nil
+		arc2.Filename = ""
+		arc2.Pwd = ""
+
+		assert.Equal(t, arc1, arc2, pathToChange)
+
+		diffMapFilesystems(t, arc1Filesystems, arc2Filesystems)
+	}
 }

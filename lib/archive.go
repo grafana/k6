@@ -184,7 +184,12 @@ func ReadArchive(in io.Reader) (*Archive, error) {
 		}
 	}
 	scheme, pathOnFs := getURLPathOnFs(arc.FilenameURL)
-	err := afero.WriteFile(arc.getFs(scheme), pathOnFs, arc.Data, 0644) // TODO fix the mode ?
+	var err error
+	pathOnFs, err = url.PathUnescape(pathOnFs)
+	if err != nil {
+		return nil, err
+	}
+	err = afero.WriteFile(arc.getFs(scheme), pathOnFs, arc.Data, 0644) // TODO fix the mode ?
 	if err != nil {
 		return nil, err
 	}
