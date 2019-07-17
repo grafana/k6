@@ -3,9 +3,13 @@
 // license that can be found in the LICENSE file.
 
 // Package ripemd160 implements the RIPEMD-160 hash algorithm.
+//
+// Deprecated: RIPEMD-160 is a legacy hash and should not be used for new
+// applications. Also, this package does not and will not provide an optimized
+// implementation. Instead, use a modern hash like SHA-256 (from crypto/sha256).
 package ripemd160 // import "golang.org/x/crypto/ripemd160"
 
-// RIPEMD-160 is designed by by Hans Dobbertin, Antoon Bosselaers, and Bart
+// RIPEMD-160 is designed by Hans Dobbertin, Antoon Bosselaers, and Bart
 // Preneel with specifications available at:
 // http://homes.esat.kuleuven.be/~cosicart/pdf/AB-9601/AB-9601.pdf.
 
