@@ -121,6 +121,27 @@ type ParsedHTTPRequest struct {
 	Tags         map[string]string
 }
 
+// Matches non-compliant io.Closer implementations (e.g. zstd.Decoder)
+type ncloser interface {
+	Close()
+}
+
+type readCloser struct {
+	io.Reader
+}
+
+// Close readers with differing Close() implementations
+func (r readCloser) Close() error {
+	var err error
+	switch v := r.Reader.(type) {
+	case io.Closer:
+		err = v.Close()
+	case ncloser:
+		v.Close()
+	}
+	return err
+}
+
 func stdCookiesToHTTPRequestCookies(cookies []*http.Cookie) map[string][]*HTTPRequestCookie {
 	var result = make(map[string][]*HTTPRequestCookie, len(cookies))
 	for _, cookie := range cookies {
@@ -189,26 +210,33 @@ func readResponseBody(
 		return nil, respErr
 	}
 
-	// Transperently decompress the body if it's has a content-encoding we
+	rc := &readCloser{resp.Body}
+	// Ensure that the entire response body is read and closed, e.g. in case of decoding errors
+	defer func(respBody io.ReadCloser) {
+		_, _ = io.Copy(ioutil.Discard, respBody)
+		_ = respBody.Close()
+	}(resp.Body)
+
+	// Transparently decompress the body if it's has a content-encoding we
 	// support. If not, simply return it as it is.
 	contentEncoding := strings.TrimSpace(resp.Header.Get("Content-Encoding"))
 	if compression, err := CompressionTypeString(contentEncoding); err == nil {
+		var decoder io.ReadCloser
 		switch compression {
 		case CompressionTypeDeflate:
-			resp.Body, respErr = zlib.NewReader(resp.Body)
+			decoder, respErr = zlib.NewReader(resp.Body)
+			rc = &readCloser{decoder}
 		case CompressionTypeGzip:
-			resp.Body, respErr = gzip.NewReader(resp.Body)
+			decoder, respErr = gzip.NewReader(resp.Body)
+			rc = &readCloser{decoder}
 		case CompressionTypeZstd:
 			var zstdecoder *zstd.Decoder
 			zstdecoder, respErr = zstd.NewReader(resp.Body)
-			// zstd.Decoder.Close() doesn't fully implement the io.ReadCloser
-			// interface, so this defer and wrapping is needed
-			defer zstdecoder.Close()
-			resp.Body = ioutil.NopCloser(zstdecoder)
+			rc = &readCloser{zstdecoder}
 		case CompressionTypeBr:
-			brotlireader := brotli.NewReader(resp.Body)
-			// brotli.Reader doesn't implement io.ReadCloser, so wrap it
-			resp.Body = ioutil.NopCloser(brotlireader)
+			var brdecoder *brotli.Reader
+			brdecoder = brotli.NewReader(resp.Body)
+			rc = &readCloser{brdecoder}
 		default:
 			// We have not implemented a compression ... :(
 			respErr = fmt.Errorf(
@@ -221,8 +249,11 @@ func readResponseBody(
 	buf := state.BPool.Get()
 	defer state.BPool.Put(buf)
 	buf.Reset()
-	_, err := io.Copy(buf, resp.Body)
-	_ = resp.Body.Close()
+	_, err := io.Copy(buf, rc.Reader)
+	if err != nil {
+		respErr = err
+	}
+	err = rc.Close()
 	if err != nil {
 		respErr = err
 	}
