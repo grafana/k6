@@ -22,6 +22,7 @@ package netext
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -32,7 +33,7 @@ import (
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/stats"
 
-	"github.com/viki-org/dnscache"
+	"github.com/domainr/dnsr"
 )
 
 // Dialer wraps net.Dialer and provides k6 specific functionality -
@@ -40,7 +41,8 @@ import (
 type Dialer struct {
 	net.Dialer
 
-	Resolver  *dnscache.Resolver
+	Resolver  *dnsr.Resolver
+	Metacache map[string]bool // IPv4 last seen
 	Blacklist []*lib.IPNet
 	Hosts     map[string]net.IP
 
@@ -51,8 +53,9 @@ type Dialer struct {
 // NewDialer constructs a new Dialer and initializes its cache.
 func NewDialer(dialer net.Dialer) *Dialer {
 	return &Dialer{
-		Dialer:   dialer,
-		Resolver: dnscache.New(0),
+		Dialer:    dialer,
+		Resolver:  dnsr.NewExpiring(0),
+		Metacache: make(map[string]bool),
 	}
 }
 
@@ -75,7 +78,7 @@ func (d *Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn,
 	ip, ok := d.Hosts[host]
 	if !ok {
 		var err error
-		ip, err = d.Resolver.FetchOne(host)
+		ip, err = d.fetch(host)
 		if err != nil {
 			return nil, err
 		}
@@ -96,6 +99,73 @@ func (d *Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn,
 	}
 	conn = &Conn{conn, &d.BytesRead, &d.BytesWritten}
 	return conn, err
+}
+
+// fetch attempts name resolution in the most efficient order.
+// Prefers IPv4 if last resolution produced it.
+// Otherwise prefers IPv6.
+func (d *Dialer) fetch(host string) (net.IP, error) {
+	if d.Metacache[host] {
+		return d.fetch4(host)
+	} else {
+		return d.fetch6(host)
+	}
+}
+
+// fetch6 attempts to resolve to IPv6 then IPv4.
+// Used on first resolution, if last resolution failed,
+// or if last resolution produced IPv6.
+func (d *Dialer) fetch6(host string) (net.IP, error) {
+	ips, err := d.Resolver.ResolveErr(host, "AAAA")
+	if err != nil {
+		return net.IPv6zero, err
+	}
+	if len(ips) > 0 {
+		ip := net.ParseIP(ips[0].Value)
+		if ip != nil {
+			return ip, nil
+		}
+	}
+	ips, err = d.Resolver.ResolveErr(host, "A")
+	if err != nil {
+		return net.IPv4zero, err
+	}
+	if len(ips) > 0 {
+		ip := net.ParseIP(ips[0].Value)
+		if ip != nil {
+			d.Metacache[host] = true
+			return ip, nil
+		}
+	}
+	return net.IPv4zero, errors.New("unable to resolve host address `" + host + "`")
+}
+
+// fetch4 attempts to resolve to IPv4 then IPv6.
+// Used if last resolution produced IPv4.
+// Prevents hitting network looking for IPv6 for names with only IPv4.
+func (d *Dialer) fetch4(host string) (net.IP, error) {
+	ips, err := d.Resolver.ResolveErr(host, "A")
+	if err != nil {
+		return net.IPv4zero, err
+	}
+	if len(ips) > 0 {
+		ip := net.ParseIP(ips[0].Value)
+		if ip != nil {
+			return ip, nil
+		}
+	}
+	d.Metacache[host] = false
+	ips, err = d.Resolver.ResolveErr(host, "AAAA")
+	if err != nil {
+		return net.IPv6zero, err
+	}
+	if len(ips) > 0 {
+		ip := net.ParseIP(ips[0].Value)
+		if ip != nil {
+			return ip, nil
+		}
+	}
+	return net.IPv6zero, errors.New("unable to resolve host address `" + host + "`")
 }
 
 // GetTrail creates a new NetTrail instance with the Dialer
