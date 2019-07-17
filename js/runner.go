@@ -30,6 +30,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/domainr/dnsr"
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
@@ -39,7 +40,6 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
-	"github.com/viki-org/dnscache"
 	"golang.org/x/net/http2"
 	"golang.org/x/time/rate"
 )
@@ -55,7 +55,7 @@ type Runner struct {
 	defaultGroup *lib.Group
 
 	BaseDialer net.Dialer
-	Resolver   *dnscache.Resolver
+	Resolver   *dnsr.Resolver
 	RPSLimit   *rate.Limiter
 
 	console   *console
@@ -94,7 +94,7 @@ func NewFromBundle(b *Bundle) (*Runner, error) {
 			DualStack: true,
 		},
 		console:  newConsole(),
-		Resolver: dnscache.New(0),
+		Resolver: dnsr.NewExpiring(0),
 	}
 
 	err = r.SetOptions(r.Bundle.Options)
@@ -147,6 +147,7 @@ func (r *Runner) newVU(samplesOut chan<- stats.SampleContainer) (*VU, error) {
 	dialer := &netext.Dialer{
 		Dialer:    r.BaseDialer,
 		Resolver:  r.Resolver,
+		Metacache: make(map[string]bool),
 		Blacklist: r.Bundle.Options.BlacklistIPs,
 		Hosts:     r.Bundle.Options.Hosts,
 	}
