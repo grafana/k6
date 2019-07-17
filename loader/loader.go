@@ -87,7 +87,7 @@ func Resolve(pwd *url.URL, moduleSpecifier string) (*url.URL, error) {
 			moduleSpecifier = "/" + moduleSpecifier
 		}
 
-		// we always want for the pwd to end in a slash, but filepath/path.Clean strips it so we readd
+		// we always want for the pwd to end in a slash, but filepath/path.Clean strips it so we read
 		// it if it's missing
 		var finalPwd = pwd
 		if pwd.Opaque != "" {
