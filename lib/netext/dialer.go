@@ -132,7 +132,7 @@ func (d *Dialer) lookup6(host string) (net.IP, error) {
 		return net.IPv6zero, err
 	}
 	if len(ips) > 0 {
-		ip := net.ParseIP(ips[0].Value)
+		ip := findIP(ips, false)
 		if ip != nil {
 			return ip, nil
 		}
@@ -142,7 +142,7 @@ func (d *Dialer) lookup6(host string) (net.IP, error) {
 		return net.IPv4zero, err
 	}
 	if len(ips) > 0 {
-		ip := net.ParseIP(ips[0].Value)
+		ip := findIP(ips, true)
 		if ip != nil {
 			d.IP4[host] = true
 			return ip, nil
@@ -160,7 +160,7 @@ func (d *Dialer) lookup4(host string) (net.IP, error) {
 		return net.IPv4zero, err
 	}
 	if len(ips) > 0 {
-		ip := net.ParseIP(ips[0].Value)
+		ip := findIP(ips, true)
 		if ip != nil {
 			return ip, nil
 		}
@@ -171,12 +171,58 @@ func (d *Dialer) lookup4(host string) (net.IP, error) {
 		return net.IPv6zero, err
 	}
 	if len(ips) > 0 {
-		ip := net.ParseIP(ips[0].Value)
+		ip := findIP(ips, false)
 		if ip != nil {
 			return ip, nil
 		}
 	}
 	return net.IPv6zero, errors.New("unable to resolve host address `" + host + "`")
+}
+
+// findIP returns the first IP address in a qtype record found in rrs.
+// Returns nil if no IP address is found.
+func findIP(rrs []dnsr.RR, ip4 bool) net.IP {
+	for _, rr := range rrs {
+		ip := extractIP(rr, ip4)
+		if ip != nil {
+			return ip
+		}
+	}
+	return nil
+}
+
+// extractIP extracts an IP address of the specified version from rr.
+// Returns nil if record is wrong type or address parsing fails.
+func extractIP(rr dnsr.RR, ip4 bool) net.IP {
+	if ip4 {
+		return extractIP4(rr)
+	} else {
+		return extractIP6(rr)
+	}
+}
+
+// extractIP6 extracts an IPv6 address from rr.
+// Returns nil if record is not type AAAA or address parsing fails.
+func extractIP6(rr dnsr.RR) net.IP {
+	if rr.Type == "AAAA" {
+		ip := net.ParseIP(rr.Value)
+		if ip != nil {
+			return ip
+		}
+	}
+	return nil
+}
+
+// extractIP4 extracts an IPv4 address from rr.
+// Returns nil if record is not type A or address parsing fails.
+func extractIP4(rr dnsr.RR) net.IP {
+	if rr.Type == "A" {
+		ip := net.ParseIP(rr.Value)
+		if ip != nil {
+			return ip
+		}
+	}
+	return nil
 }
 
 // GetTrail creates a new NetTrail instance with the Dialer
