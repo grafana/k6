@@ -106,27 +106,27 @@ func (d *Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn,
 func (d *Dialer) translate(host string) (net.IP, error) {
 	ip := net.ParseIP(host)
 	if ip == nil {
-		return d.fetch(host)
+		return d.lookup(host)
 	} else {
 		return ip, nil
 	}
 }
 
-// fetch attempts name resolution in the most efficient order.
+// lookup attempts name resolution in the most efficient order.
 // Prefers IPv4 if last resolution produced it.
 // Otherwise prefers IPv6.
-func (d *Dialer) fetch(host string) (net.IP, error) {
+func (d *Dialer) lookup(host string) (net.IP, error) {
 	if d.Metacache[host] {
-		return d.fetch4(host)
+		return d.lookup4(host)
 	} else {
-		return d.fetch6(host)
+		return d.lookup6(host)
 	}
 }
 
-// fetch6 attempts to resolve to IPv6 then IPv4.
+// lookup6 attempts to resolve to IPv6 then IPv4.
 // Used on first resolution, if last resolution failed,
 // or if last resolution produced IPv6.
-func (d *Dialer) fetch6(host string) (net.IP, error) {
+func (d *Dialer) lookup6(host string) (net.IP, error) {
 	ips, err := d.Resolver.ResolveErr(host, "AAAA")
 	if err != nil {
 		return net.IPv6zero, err
@@ -151,10 +151,10 @@ func (d *Dialer) fetch6(host string) (net.IP, error) {
 	return net.IPv4zero, errors.New("unable to resolve host address `" + host + "`")
 }
 
-// fetch4 attempts to resolve to IPv4 then IPv6.
+// lookup4 attempts to resolve to IPv4 then IPv6.
 // Used if last resolution produced IPv4.
 // Prevents hitting network looking for IPv6 for names with only IPv4.
-func (d *Dialer) fetch4(host string) (net.IP, error) {
+func (d *Dialer) lookup4(host string) (net.IP, error) {
 	ips, err := d.Resolver.ResolveErr(host, "A")
 	if err != nil {
 		return net.IPv4zero, err
