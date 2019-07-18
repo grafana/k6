@@ -19,14 +19,14 @@ func makeTestDialer() *Dialer {
 func TestResolution(t *testing.T) {
 	t.Run("never resolved", func(t *testing.T) {
 		dialer := makeTestDialer()
-		require.False(t, dialer.Metacache["example.com"])
+		require.False(t, dialer.IP4["example.com"])
 	})
 
 	t.Run("resolution failure", func(t *testing.T) {
 		dialer := makeTestDialer()
 		_, err := dialer.fetch("example.badtld")
 		require.Error(t, err)
-		require.False(t, dialer.Metacache["example.badtld"])
+		require.False(t, dialer.IP4["example.badtld"])
 	})
 
 	t.Run("resolve ipv6", func(t *testing.T) {
@@ -34,7 +34,7 @@ func TestResolution(t *testing.T) {
 		ip, err := dialer.fetch("example.com")
 		require.NoError(t, err)
 		require.True(t, ip.To4() == nil)
-		require.False(t, dialer.Metacache["example.com"])
+		require.False(t, dialer.IP4["example.com"])
 	})
 
 	t.Run("resolve ipv4", func(t *testing.T) {
@@ -42,6 +42,6 @@ func TestResolution(t *testing.T) {
 		ip, err := dialer.fetch("httpbin.org")
 		require.NoError(t, err)
 		require.True(t, ip.To4() != nil)
-		require.True(t, dialer.Metacache["httpbin.org"])
+		require.True(t, dialer.IP4["httpbin.org"])
 	})
 }

@@ -42,7 +42,7 @@ type Dialer struct {
 	net.Dialer
 
 	Resolver  *dnsr.Resolver
-	Metacache map[string]bool // IPv4 last seen
+	IP4       map[string]bool // IPv4 last seen
 	Blacklist []*lib.IPNet
 	Hosts     map[string]net.IP
 
@@ -53,9 +53,9 @@ type Dialer struct {
 // NewDialer constructs a new Dialer and initializes its cache.
 func NewDialer(dialer net.Dialer) *Dialer {
 	return &Dialer{
-		Dialer:    dialer,
-		Resolver:  dnsr.NewExpiring(0),
-		Metacache: make(map[string]bool),
+		Dialer:   dialer,
+		Resolver: dnsr.NewExpiring(0),
+		IP4:      make(map[string]bool),
 	}
 }
 
@@ -116,7 +116,7 @@ func (d *Dialer) resolve(host string) (net.IP, error) {
 // Prefers IPv4 if last resolution produced it.
 // Otherwise prefers IPv6.
 func (d *Dialer) lookup(host string) (net.IP, error) {
-	if d.Metacache[host] {
+	if d.IP4[host] {
 		return d.lookup4(host)
 	} else {
 		return d.lookup6(host)
@@ -144,7 +144,7 @@ func (d *Dialer) lookup6(host string) (net.IP, error) {
 	if len(ips) > 0 {
 		ip := net.ParseIP(ips[0].Value)
 		if ip != nil {
-			d.Metacache[host] = true
+			d.IP4[host] = true
 			return ip, nil
 		}
 	}
@@ -165,7 +165,7 @@ func (d *Dialer) lookup4(host string) (net.IP, error) {
 			return ip, nil
 		}
 	}
-	d.Metacache[host] = false
+	d.IP4[host] = false
 	ips, err = d.Resolver.ResolveErr(host, "AAAA")
 	if err != nil {
 		return net.IPv6zero, err
