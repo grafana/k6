@@ -101,7 +101,7 @@ func (d *Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn,
 	return conn, err
 }
 
-// resolve converts a host string into an IP address.
+// resolve maps a host string to an IP address.
 // Host string may be an IP address string or a domain name.
 func (d *Dialer) resolve(host string) (net.IP, error) {
 	ip := net.ParseIP(host)
