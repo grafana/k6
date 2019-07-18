@@ -41,11 +41,13 @@ const (
 // ErrJarForbiddenInInitContext is used when a cookie jar was made in the init context
 var ErrJarForbiddenInInitContext = common.NewInitContextError("Making cookie jars in the init context is not supported")
 
+//nolint: golint
 type HTTP struct {
 	SSL_3_0                            string `js:"SSL_3_0"`
 	TLS_1_0                            string `js:"TLS_1_0"`
 	TLS_1_1                            string `js:"TLS_1_1"`
 	TLS_1_2                            string `js:"TLS_1_2"`
+	TLS_1_3                            string `js:"TLS_1_3"`
 	OCSP_STATUS_GOOD                   string `js:"OCSP_STATUS_GOOD"`
 	OCSP_STATUS_REVOKED                string `js:"OCSP_STATUS_REVOKED"`
 	OCSP_STATUS_SERVER_FAILED          string `js:"OCSP_STATUS_SERVER_FAILED"`
@@ -69,6 +71,7 @@ func New() *HTTP {
 		TLS_1_0:                            netext.TLS_1_0,
 		TLS_1_1:                            netext.TLS_1_1,
 		TLS_1_2:                            netext.TLS_1_2,
+		TLS_1_3:                            netext.TLS_1_3,
 		OCSP_STATUS_GOOD:                   netext.OCSP_STATUS_GOOD,
 		OCSP_STATUS_REVOKED:                netext.OCSP_STATUS_REVOKED,
 		OCSP_STATUS_SERVER_FAILED:          netext.OCSP_STATUS_SERVER_FAILED,
