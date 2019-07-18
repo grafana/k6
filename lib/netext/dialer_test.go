@@ -18,11 +18,15 @@ func makeTestDialer() *Dialer {
 
 func TestLookup(t *testing.T) {
 	t.Run("never resolved", func(t *testing.T) {
+		ip6 = true
+		ip4 = true
 		dialer := makeTestDialer()
 		require.False(t, dialer.IP4["example.com."])
 	})
 
 	t.Run("resolution failure", func(t *testing.T) {
+		ip6 = true
+		ip4 = true
 		dialer := makeTestDialer()
 		_, _, err := dialer.lookup("example.badtld.")
 		require.Error(t, err)
@@ -30,6 +34,8 @@ func TestLookup(t *testing.T) {
 	})
 
 	t.Run("find ipv6", func(t *testing.T) {
+		ip6 = true
+		ip4 = false
 		dialer := makeTestDialer()
 		ip, _, err := dialer.lookup("example.com.")
 		require.NoError(t, err)
@@ -38,6 +44,8 @@ func TestLookup(t *testing.T) {
 	})
 
 	t.Run("find ipv4", func(t *testing.T) {
+		ip6 = true
+		ip4 = true
 		dialer := makeTestDialer()
 		ip, _, err := dialer.lookup("httpbin.org.")
 		require.NoError(t, err)
@@ -48,6 +56,8 @@ func TestLookup(t *testing.T) {
 
 func TestResolution(t *testing.T) {
 	t.Run("follow CNAMEs", func(t *testing.T) {
+		ip6 = true
+		ip4 = true
 		dialer := makeTestDialer()
 		ip, err := dialer.resolve("http2.akamai.com", 3)
 		require.NoError(t, err)

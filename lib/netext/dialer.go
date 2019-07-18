@@ -37,6 +37,9 @@ import (
 	"github.com/miekg/dns"
 )
 
+var ip6 bool
+var ip4 bool
+
 // Dialer wraps net.Dialer and provides k6 specific functionality -
 // tracing, blacklists and DNS cache and aliases.
 type Dialer struct {
@@ -77,6 +80,35 @@ type BlackListedIPError struct {
 
 func (b BlackListedIPError) Error() string {
 	return fmt.Sprintf("IP (%s) is in a blacklisted range (%s)", b.ip, b.net)
+}
+
+// init detects available IP network versions.
+func init() {
+	ip6 = false
+	ip4 = false
+	addresses, err := net.InterfaceAddrs()
+	if err != nil {
+		panic(err)
+	}
+	for _, abstract := range addresses {
+		switch concrete := abstract.(type) {
+		case *net.IPNet:
+			detectInterface(concrete.IP)
+		case *net.IPAddr:
+			detectInterface(concrete.IP)
+		}
+	}
+}
+
+// detectInterface detects an available IP network interface.
+// Records the IP version available in package config.
+func detectInterface(address net.IP) {
+	if !address.IsUnspecified() && !address.IsLoopback() {
+		if address.To4() == nil {
+			ip6 = true
+		}
+		ip4 = true
+	}
 }
 
 // DialContext wraps the net.Dialer.DialContext and handles the k6 specifics
@@ -200,11 +232,45 @@ func (d *Dialer) canonicalName(name string, depth uint8) (string, error) {
 // lookup performs a single lookup in the most efficient order.
 // Prefers IPv4 if last resolution produced it.
 // Otherwise prefers IPv6.
+// Package config constrains to only IP versions available on the system.
 func (d *Dialer) lookup(host string) (net.IP, *dnsr.RR, error) {
-	if d.IP4[host] {
-		return d.lookup46(host)
+	if ip6 && ip4 {
+		// Both versions available
+		if d.IP4[host] {
+			return d.lookup46(host)
+		}
+		return d.lookup64(host)
 	}
-	return d.lookup64(host)
+	if ip6 {
+		// Only v6 available
+		ip, cname, err := d.lookup6(host)
+		if err != nil {
+			return nil, nil, err
+		}
+		if ip != nil {
+			return ip, nil, nil
+		}
+		if cname != nil {
+			return nil, cname, nil
+		}
+		return nil, nil, errors.New("unable to resolve host address `" + host + "`")
+	}
+	if ip4 {
+		// Only v4 available
+		ip, cname, err := d.lookup4(host)
+		if err != nil {
+			return nil, nil, err
+		}
+		if ip != nil {
+			return ip, nil, nil
+		}
+		if cname != nil {
+			return nil, cname, nil
+		}
+		return nil, nil, errors.New("unable to resolve host address `" + host + "`")
+	}
+	// Neither version available
+	return nil, nil, errors.New("network interface unavailable")
 }
 
 // lookup64 performs a single lookup preferring IPv6.
