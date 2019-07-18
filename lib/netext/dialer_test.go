@@ -24,14 +24,14 @@ func TestResolution(t *testing.T) {
 
 	t.Run("resolution failure", func(t *testing.T) {
 		dialer := makeTestDialer()
-		_, err := dialer.fetch("example.badtld")
+		_, err := dialer.lookup("example.badtld")
 		require.Error(t, err)
 		require.False(t, dialer.IP4["example.badtld"])
 	})
 
 	t.Run("resolve ipv6", func(t *testing.T) {
 		dialer := makeTestDialer()
-		ip, err := dialer.fetch("example.com")
+		ip, err := dialer.lookup("example.com")
 		require.NoError(t, err)
 		require.True(t, ip.To4() == nil)
 		require.False(t, dialer.IP4["example.com"])
@@ -39,7 +39,7 @@ func TestResolution(t *testing.T) {
 
 	t.Run("resolve ipv4", func(t *testing.T) {
 		dialer := makeTestDialer()
-		ip, err := dialer.fetch("httpbin.org")
+		ip, err := dialer.lookup("httpbin.org")
 		require.NoError(t, err)
 		require.True(t, ip.To4() != nil)
 		require.True(t, dialer.IP4["httpbin.org"])
