@@ -1171,7 +1171,7 @@ func TestSystemTags(t *testing.T) {
 		{"group", httpGet, ""},
 		{"vu", httpGet, "0"},
 		{"iter", httpGet, "0"},
-		{"tls_version", httpsGet, "tls1.2"},
+		{"tls_version", httpsGet, expectedTLSVersion},
 		{"ocsp_status", httpsGet, "unknown"},
 		{
 			"error",
@@ -1186,6 +1186,7 @@ func TestSystemTags(t *testing.T) {
 	}
 
 	state.Options.Throw = null.BoolFrom(false)
+	state.Options.Apply(lib.Options{TLSVersion: &lib.TLSVersions{Max: lib.TLSVersion13}})
 
 	for num, tc := range testedSystemTags {
 		t.Run(fmt.Sprintf("TC %d with only %s", num, tc.tag), func(t *testing.T) {

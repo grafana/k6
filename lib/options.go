@@ -143,6 +143,10 @@ func (v *TLSVersions) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+func (v *TLSVersions) isTLS13() bool {
+	return v.Min == TLSVersion13 || v.Max == TLSVersion13
+}
+
 // A list of TLS cipher suites.
 // Marshals and unmarshals from a list of names, eg. "TLS_ECDHE_RSA_WITH_RC4_128_SHA".
 // BUG: This currently doesn't marshal back to JSON properly!!
@@ -421,6 +425,9 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.TLSVersion != nil {
 		o.TLSVersion = opts.TLSVersion
+		if o.TLSVersion.isTLS13() {
+			enableTLS13()
+		}
 	}
 	if opts.TLSAuth != nil {
 		o.TLSAuth = opts.TLSAuth

@@ -7,6 +7,7 @@ import (
 	"golang.org/x/crypto/ocsp"
 )
 
+//nolint: golint
 const (
 	OCSP_STATUS_GOOD                   = "good"
 	OCSP_STATUS_REVOKED                = "revoked"
@@ -26,6 +27,7 @@ const (
 	TLS_1_0                            = "tls1.0"
 	TLS_1_1                            = "tls1.1"
 	TLS_1_2                            = "tls1.2"
+	TLS_1_3                            = "tls1.3"
 )
 
 type TLSInfo struct {
@@ -52,6 +54,8 @@ func ParseTLSConnState(tlsState *tls.ConnectionState) (TLSInfo, OCSP) {
 		tlsInfo.Version = TLS_1_1
 	case tls.VersionTLS12:
 		tlsInfo.Version = TLS_1_2
+	case lib.TLSVersion13:
+		tlsInfo.Version = TLS_1_3
 	}
 
 	tlsInfo.CipherSuite = lib.SupportedTLSCipherSuitesToString[tlsState.CipherSuite]
