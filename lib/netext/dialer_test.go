@@ -16,7 +16,7 @@ func makeTestDialer() *Dialer {
 	})
 }
 
-func TestResolution(t *testing.T) {
+func TestLookup(t *testing.T) {
 	t.Run("never resolved", func(t *testing.T) {
 		dialer := makeTestDialer()
 		require.False(t, dialer.IP4["example.com"])
