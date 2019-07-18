@@ -34,6 +34,7 @@ import (
 	"github.com/loadimpact/k6/stats"
 
 	"github.com/domainr/dnsr"
+	"github.com/miekg/dns"
 )
 
 // Dialer wraps net.Dialer and provides k6 specific functionality -
@@ -43,11 +44,19 @@ type Dialer struct {
 
 	Resolver  *dnsr.Resolver
 	IP4       map[string]bool // IPv4 last seen
+	CNAME     map[string]CanonicalName
 	Blacklist []*lib.IPNet
 	Hosts     map[string]net.IP
 
 	BytesRead    int64
 	BytesWritten int64
+}
+
+// CanonicalName is an expiring CNAME value.
+type CanonicalName struct {
+	Name   string
+	TTL    time.Duration
+	Expiry time.Time
 }
 
 // NewDialer constructs a new Dialer and initializes its cache.
@@ -56,6 +65,7 @@ func NewDialer(dialer net.Dialer) *Dialer {
 		Dialer:   dialer,
 		Resolver: dnsr.NewExpiring(0),
 		IP4:      make(map[string]bool),
+		CNAME:    make(map[string]CanonicalName),
 	}
 }
 
@@ -78,7 +88,7 @@ func (d *Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn,
 	ip, ok := d.Hosts[host]
 	if !ok {
 		var err error
-		ip, err = d.resolve(host)
+		ip, err = d.resolve(host, 10)
 		if err != nil {
 			return nil, err
 		}
@@ -103,107 +113,227 @@ func (d *Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn,
 
 // resolve maps a host string to an IP address.
 // Host string may be an IP address string or a domain name.
-func (d *Dialer) resolve(host string) (net.IP, error) {
+// Follows CNAME chain up to depth steps.
+func (d *Dialer) resolve(host string, depth uint8) (net.IP, error) {
 	ip := net.ParseIP(host)
-	if ip == nil {
-		return d.lookup(host)
-	} else {
+	if ip != nil {
 		return ip, nil
 	}
+	host, err := d.canonicalName(host, depth)
+	if err != nil {
+		return nil, err
+	}
+	observed := make(map[string]struct{})
+	return d.resolveName(host, host, depth, observed)
 }
 
-// lookup attempts name resolution in the most efficient order.
+// resolveName maps a domain name to an IP address.
+// Follows CNAME chain up to depth steps.
+// Fails on CNAME chain cycle.
+func (d *Dialer) resolveName(
+	requested string,
+	name string,
+	depth uint8,
+	observed map[string]struct{},
+) (net.IP, error) {
+	ip, cname, err := d.lookup(name)
+	if err != nil {
+		// Lookup error
+		return nil, err
+	}
+	if ip != nil {
+		// Found IP address
+		return ip, nil
+	}
+	if cname == nil {
+		// Found nothing
+		return nil, errors.New("unable to resolve host address `" + requested + "`")
+	}
+	if depth == 0 {
+		// Long CNAME chain
+		return nil, errors.New("CNAME chain too long for `" + requested + "`")
+	}
+	if _, ok := observed[cname.Value]; ok {
+		// CNAME chain cycle
+		return nil, errors.New("cycle in CNAME chain for `" + requested + "`")
+	}
+	// Found CNAME
+	observed[cname.Value] = struct{}{}
+	d.CNAME[name] = CanonicalName{
+		Name:   cname.Value,
+		TTL:    cname.TTL,
+		Expiry: cname.Expiry,
+	}
+	return d.resolveName(requested, cname.Value, depth-1, observed)
+}
+
+// canonicalName reports the best current knowledge about a canonical name.
+// Follows CNAME chain up to depth steps.
+// Purges expired CNAME entries.
+// Fails on a cycle.
+func (d *Dialer) canonicalName(name string, depth uint8) (string, error) {
+	cname := normalName(name)
+	observed := make(map[string]struct{})
+	observed[cname] = struct{}{}
+	now := time.Now()
+	for entry, ok := d.CNAME[cname]; ok; entry, ok = d.CNAME[cname] {
+		if now.After(entry.Expiry) {
+			// Expired entry
+			delete(d.CNAME, cname)
+			return cname, nil
+		}
+		if depth == 0 {
+			// Long chain
+			return "", errors.New("CNAME chain too long for `" + name + "`")
+		}
+		cname = entry.Name
+		if _, ok := observed[cname]; ok {
+			// Cycle
+			return "", errors.New("cycle in CNAME chain for `" + name + "`")
+		}
+		observed[cname] = struct{}{}
+		depth--
+	}
+	return cname, nil
+}
+
+// lookup performs a single lookup in the most efficient order.
 // Prefers IPv4 if last resolution produced it.
 // Otherwise prefers IPv6.
-func (d *Dialer) lookup(host string) (net.IP, error) {
+func (d *Dialer) lookup(host string) (net.IP, *dnsr.RR, error) {
 	if d.IP4[host] {
-		return d.lookup4(host)
-	} else {
-		return d.lookup6(host)
+		return d.lookup46(host)
 	}
+	return d.lookup64(host)
 }
 
-// lookup6 attempts to resolve to IPv6 then IPv4.
+// lookup64 performs a single lookup preferring IPv6.
 // Used on first resolution, if last resolution failed,
 // or if last resolution produced IPv6.
-func (d *Dialer) lookup6(host string) (net.IP, error) {
-	ips, err := d.Resolver.ResolveErr(host, "AAAA")
+func (d *Dialer) lookup64(host string) (net.IP, *dnsr.RR, error) {
+	ip, cname, err := d.lookup6(host)
 	if err != nil {
-		return net.IPv6zero, err
+		return nil, nil, err
 	}
-	if len(ips) > 0 {
-		ip := findIP(ips, false)
-		if ip != nil {
-			return ip, nil
-		}
+	if ip != nil {
+		return ip, nil, nil
 	}
-	ips, err = d.Resolver.ResolveErr(host, "A")
+	if cname != nil {
+		return nil, cname, nil
+	}
+	ip, cname, err = d.lookup4(host)
 	if err != nil {
-		return net.IPv4zero, err
+		return nil, nil, err
 	}
-	if len(ips) > 0 {
-		ip := findIP(ips, true)
-		if ip != nil {
-			d.IP4[host] = true
-			return ip, nil
-		}
+	if ip != nil {
+		d.IP4[host] = true
+		return ip, nil, nil
 	}
-	return net.IPv4zero, errors.New("unable to resolve host address `" + host + "`")
+	if cname != nil {
+		return nil, cname, nil
+	}
+	return nil, nil, errors.New("unable to resolve host address `" + host + "`")
 }
 
-// lookup4 attempts to resolve to IPv4 then IPv6.
+// lookup46 performs a single lookup preferring IPv4.
 // Used if last resolution produced IPv4.
 // Prevents hitting network looking for IPv6 for names with only IPv4.
-func (d *Dialer) lookup4(host string) (net.IP, error) {
-	ips, err := d.Resolver.ResolveErr(host, "A")
+func (d *Dialer) lookup46(host string) (net.IP, *dnsr.RR, error) {
+	ip, cname, err := d.lookup4(host)
 	if err != nil {
-		return net.IPv4zero, err
+		return nil, nil, err
 	}
-	if len(ips) > 0 {
-		ip := findIP(ips, true)
-		if ip != nil {
-			return ip, nil
-		}
+	if ip != nil {
+		return ip, nil, nil
+	}
+	if cname != nil {
+		return nil, cname, nil
 	}
 	d.IP4[host] = false
-	ips, err = d.Resolver.ResolveErr(host, "AAAA")
+	ip, cname, err = d.lookup6(host)
 	if err != nil {
-		return net.IPv6zero, err
+		return nil, nil, err
 	}
-	if len(ips) > 0 {
-		ip := findIP(ips, false)
+	if ip != nil {
+		return ip, nil, nil
+	}
+	if cname != nil {
+		return nil, cname, nil
+	}
+	return nil, nil, errors.New("unable to resolve host address `" + host + "`")
+}
+
+// lookup6 performs a single lookup for IPv6.
+func (d *Dialer) lookup6(host string) (net.IP, *dnsr.RR, error) {
+	rrs, err := d.Resolver.ResolveErr(host, "AAAA")
+	if err != nil {
+		return nil, nil, err
+	}
+	if len(rrs) > 0 {
+		ip, cname := findIP6(rrs)
+		if ip != nil {
+			return ip, nil, nil
+		}
+		if cname != nil {
+			return nil, cname, nil
+		}
+	}
+	return nil, nil, nil
+}
+
+// lookup4 performs a single lookup for IPv4.
+func (d *Dialer) lookup4(host string) (net.IP, *dnsr.RR, error) {
+	rrs, err := d.Resolver.ResolveErr(host, "A")
+	if err != nil {
+		return nil, nil, err
+	}
+	if len(rrs) > 0 {
+		ip, cname := findIP4(rrs)
+		if ip != nil {
+			return ip, nil, nil
+		}
+		if cname != nil {
+			return nil, cname, nil
+		}
+	}
+	return nil, nil, nil
+}
+
+// findIP6 returns the first IPv6 address found in rrs.
+// Alternately returns a CNAME record if found.
+func findIP6(rrs []dnsr.RR) (net.IP, *dnsr.RR) {
+	var cname *dnsr.RR = nil
+	for _, rr := range rrs {
+		ip := extractIP6(&rr)
 		if ip != nil {
 			return ip, nil
 		}
-	}
-	return net.IPv6zero, errors.New("unable to resolve host address `" + host + "`")
-}
-
-// findIP returns the first IP address in a qtype record found in rrs.
-// Returns nil if no IP address is found.
-func findIP(rrs []dnsr.RR, ip4 bool) net.IP {
-	for _, rr := range rrs {
-		ip := extractIP(rr, ip4)
-		if ip != nil {
-			return ip
+		if rr.Type == "CNAME" {
+			cname = &rr
 		}
 	}
-	return nil
+	return nil, cname
 }
 
-// extractIP extracts an IP address of the specified version from rr.
-// Returns nil if record is wrong type or address parsing fails.
-func extractIP(rr dnsr.RR, ip4 bool) net.IP {
-	if ip4 {
-		return extractIP4(rr)
-	} else {
-		return extractIP6(rr)
+// findIP4 returns the first IPv4 address found in rrs.
+// Alternately returns a CNAME record if found.
+func findIP4(rrs []dnsr.RR) (net.IP, *dnsr.RR) {
+	var cname *dnsr.RR = nil
+	for _, rr := range rrs {
+		ip := extractIP4(&rr)
+		if ip != nil {
+			return ip, nil
+		}
+		if rr.Type == "CNAME" {
+			cname = &rr
+		}
 	}
+	return nil, cname
 }
 
 // extractIP6 extracts an IPv6 address from rr.
 // Returns nil if record is not type AAAA or address parsing fails.
-func extractIP6(rr dnsr.RR) net.IP {
+func extractIP6(rr *dnsr.RR) net.IP {
 	if rr.Type == "AAAA" {
 		ip := net.ParseIP(rr.Value)
 		if ip != nil {
@@ -215,7 +345,7 @@ func extractIP6(rr dnsr.RR) net.IP {
 
 // extractIP4 extracts an IPv4 address from rr.
 // Returns nil if record is not type A or address parsing fails.
-func extractIP4(rr dnsr.RR) net.IP {
+func extractIP4(rr *dnsr.RR) net.IP {
 	if rr.Type == "A" {
 		ip := net.ParseIP(rr.Value)
 		if ip != nil {
@@ -223,6 +353,11 @@ func extractIP4(rr dnsr.RR) net.IP {
 		}
 	}
 	return nil
+}
+
+// normalName normalizes a domain name.
+func normalName(name string) string {
+	return dns.Fqdn(strings.ToLower(name))
 }
 
 // GetTrail creates a new NetTrail instance with the Dialer

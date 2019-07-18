@@ -148,6 +148,7 @@ func (r *Runner) newVU(samplesOut chan<- stats.SampleContainer) (*VU, error) {
 		Dialer:    r.BaseDialer,
 		Resolver:  r.Resolver,
 		IP4:       make(map[string]bool),
+		CNAME:     make(map[string]netext.CanonicalName),
 		Blacklist: r.Bundle.Options.BlacklistIPs,
 		Hosts:     r.Bundle.Options.Hosts,
 	}
