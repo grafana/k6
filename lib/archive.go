@@ -45,7 +45,7 @@ import (
 var (
 	volumeRE  = regexp.MustCompile(`^[/\\]?([a-zA-Z]):(.*)`)
 	sharedRE  = regexp.MustCompile(`^\\\\([^\\]+)`) // matches a shared folder in Windows before backslack replacement. i.e \\VMBOXSVR\k6\script.js
-	homeDirRE = regexp.MustCompile(`^(/[a-zA-Z])?/(Users|home|Documents and Settings)/(?:[^/]+)`)
+	homeDirRE = regexp.MustCompile(`(?i)^(/[a-zA-Z])?/(Users|home|Documents and Settings)/(?:[^/]+)`)
 )
 
 // NormalizeAndAnonymizePath Normalizes (to use a / path separator) and anonymizes a file path, by scrubbing usernames from home directories.

@@ -50,6 +50,8 @@ func TestNormalizeAndAnonymizePath(t *testing.T) {
 		"\\NOTSHARED\\dir\\dir\\myfile.txt":                   "/NOTSHARED/dir/dir/myfile.txt",
 		"C:\\Users\\myname\\dir\\myfile.txt":                  "/C/Users/nobody/dir/myfile.txt",
 		"D:\\Documents and Settings\\myname\\dir\\myfile.txt": "/D/Documents and Settings/nobody/dir/myfile.txt",
+		"C:\\uSers\\myname\\dir\\myfile.txt":                  "/C/uSers/nobody/dir/myfile.txt",
+		"D:\\doCUMENts aND Settings\\myname\\dir\\myfile.txt": "/D/doCUMENts aND Settings/nobody/dir/myfile.txt",
 	}
 	// TODO: fix this - the issue is that filepath.Clean replaces `/` with whatever the path
 	// separator is on the current OS and as such this gets confused for shared folder on
