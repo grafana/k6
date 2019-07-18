@@ -78,7 +78,7 @@ func (d *Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn,
 	ip, ok := d.Hosts[host]
 	if !ok {
 		var err error
-		ip, err = d.translate(host)
+		ip, err = d.resolve(host)
 		if err != nil {
 			return nil, err
 		}
@@ -101,9 +101,9 @@ func (d *Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn,
 	return conn, err
 }
 
-// translate converts a host string into an IP address.
+// resolve converts a host string into an IP address.
 // Host string may be an IP address string or a domain name.
-func (d *Dialer) translate(host string) (net.IP, error) {
+func (d *Dialer) resolve(host string) (net.IP, error) {
 	ip := net.ParseIP(host)
 	if ip == nil {
 		return d.lookup(host)
