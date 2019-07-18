@@ -84,6 +84,11 @@ func (b BlackListedIPError) Error() string {
 
 // init detects available IP network versions.
 func init() {
+	detectInterfaces()
+}
+
+// detectInterfaces detects available IP network versions.
+func detectInterfaces() {
 	ip6 = false
 	ip4 = false
 	addresses, err := net.InterfaceAddrs()

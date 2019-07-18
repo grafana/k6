@@ -2,6 +2,7 @@ package netext
 
 import (
 	"net"
+	"os"
 	"testing"
 	"time"
 
@@ -14,6 +15,12 @@ func makeTestDialer() *Dialer {
 		KeepAlive: 60 * time.Second,
 		DualStack: true,
 	})
+}
+
+func TestMain(m *testing.M) {
+	exitCode := m.Run()
+	detectInterfaces() // Reset network interfaces config
+	os.Exit(exitCode)
 }
 
 func TestLookup(t *testing.T) {
