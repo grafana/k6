@@ -53,6 +53,14 @@
   revision = "6d28bb1415c5d06b76a4dcc4bb6e0dd39ce61af9"
 
 [[projects]]
+  branch = "master"
+  digest = "1:98012c5c875e178d2c803326167f60e78d84da918b34b5f62301b51061d712e5"
+  name = "github.com/andybalholm/brotli"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "71eb68cc467c35a70c4b3d0c46b590260fe3f303"
+
+[[projects]]
   digest = "1:fc86904a62ac4bfff8cfbe94f42231ce3d8cea8fe2506d5293eaef468f8eaecf"
   name = "github.com/andybalholm/cascadia"
   packages = ["."]
@@ -189,6 +197,17 @@
   version = "v2.1.2"
 
 [[projects]]
+  branch = "master"
+  digest = "1:8f251d09f52a8920bdba202b0c18a24cafb4f70f94b9afd8d02bf7643cfc99a0"
+  name = "github.com/golang/gddo"
+  packages = [
+    "httputil",
+    "httputil/header",
+  ]
+  pruneopts = "NUT"
+  revision = "af0f2af80721261f4d211b2c9563f7b46b2aab06"
+
+[[projects]]
   digest = "1:9f35c1344b56e5868d511d231f215edd0650aa572664f856444affdd256e43e4"
   name = "github.com/golang/protobuf"
   packages = ["proto"]
@@ -271,6 +290,20 @@
   pruneopts = "NUT"
   revision = "f611eb38b3875cc3bd991ca91c51d06446afa14c"
   version = "v1.3.0"
+
+[[projects]]
+  digest = "1:a1eb0245eb436bd1949fdb00f6b2d925874fa0d2c5e709779f3c50fe281b9eee"
+  name = "github.com/klauspost/compress"
+  packages = [
+    "fse",
+    "huff0",
+    "snappy",
+    "zstd",
+    "zstd/internal/xxhash",
+  ]
+  pruneopts = "NUT"
+  revision = "315059c39568ee89ae0c118bc6dc7306041543c3"
+  version = "v1.7.2"
 
 [[projects]]
   digest = "1:4059c14e87a2de3a434430340521b5feece186c1469eff0834c29a63870de3ed"
@@ -658,6 +691,7 @@
     "github.com/PuerkitoBio/goquery",
     "github.com/Shopify/sarama",
     "github.com/Soontao/goHttpDigestClient",
+    "github.com/andybalholm/brotli",
     "github.com/dop251/goja",
     "github.com/dop251/goja/parser",
     "github.com/dustin/go-humanize",
@@ -666,6 +700,7 @@
     "github.com/influxdata/influxdb/client/v2",
     "github.com/julienschmidt/httprouter",
     "github.com/kelseyhightower/envconfig",
+    "github.com/klauspost/compress/zstd",
     "github.com/kubernetes/helm/pkg/strvals",
     "github.com/manyminds/api2go",
     "github.com/manyminds/api2go/jsonapi",

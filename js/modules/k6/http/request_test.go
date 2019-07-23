@@ -37,7 +37,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/andybalholm/brotli"
 	"github.com/dop251/goja"
+	"github.com/klauspost/compress/zstd"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
@@ -310,6 +312,24 @@ func TestRequestAndBatch(t *testing.T) {
 				let res = http.get("HTTPBIN_URL/deflate");
 				if (res.json()['deflated'] != true) {
 					throw new Error("unexpected body data: " + res.json()['deflated'])
+				}
+			`))
+			assert.NoError(t, err)
+		})
+		t.Run("zstd", func(t *testing.T) {
+			_, err := common.RunString(rt, sr(`
+				let res = http.get("HTTPSBIN_IP_URL/zstd");
+				if (res.json()['compression'] != 'zstd') {
+					throw new Error("unexpected body data: " + res.json()['compression'])
+				}
+			`))
+			assert.NoError(t, err)
+		})
+		t.Run("brotli", func(t *testing.T) {
+			_, err := common.RunString(rt, sr(`
+				let res = http.get("HTTPSBIN_IP_URL/brotli");
+				if (res.json()['compression'] != 'br') {
+					throw new Error("unexpected body data: " + res.json()['compression'])
 				}
 			`))
 			assert.NoError(t, err)
@@ -1227,6 +1247,9 @@ func TestRequestCompression(t *testing.T) {
 
 	var decompress = func(algo string, input io.Reader) io.Reader {
 		switch algo {
+		case "br":
+			w := brotli.NewReader(input)
+			return w
 		case "gzip":
 			w, err := gzip.NewReader(input)
 			if err != nil {
@@ -1235,6 +1258,12 @@ func TestRequestCompression(t *testing.T) {
 			return w
 		case "deflate":
 			w, err := zlib.NewReader(input)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return w
+		case "zstd":
+			w, err := zstd.NewReader(input)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1288,6 +1317,10 @@ func TestRequestCompression(t *testing.T) {
 		{compression: "deflate"},
 		{compression: "deflate, gzip"},
 		{compression: "gzip,deflate, gzip"},
+		{compression: "zstd"},
+		{compression: "zstd, gzip, deflate"},
+		{compression: "br"},
+		{compression: "br, gzip, deflate"},
 		{
 			compression:   "George",
 			expectedError: `unknown compression algorithm George`,
