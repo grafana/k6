@@ -24,6 +24,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/url"
+	"runtime"
 
 	"github.com/loadimpact/k6/lib/consts"
 
@@ -177,6 +178,7 @@ func (b *Bundle) makeArchive() *lib.Archive {
 		PwdURL:      b.BaseInitContext.pwd,
 		Env:         make(map[string]string, len(b.Env)),
 		K6Version:   consts.Version,
+		Goos:        runtime.GOOS,
 	}
 	// Copy env so changes in the archive are not reflected in the source Bundle
 	for k, v := range b.Env {
