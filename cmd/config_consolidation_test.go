@@ -389,6 +389,21 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 		},
 		// Just in case, verify that no options will result in the same 1 vu 1 iter config
 		{opts{}, exp{}, verifyOneIterPerOneVU},
+
+		// Test system tags
+		{opts{}, exp{}, func(t *testing.T, c Config) {
+			assert.Equal(t, lib.GetTagSet(lib.DefaultSystemTagList...), c.Options.SystemTags)
+		}},
+		{opts{cli: []string{"--system-tags", `""`}}, exp{}, func(t *testing.T, c Config) {
+			assert.Equal(t, lib.GetTagSet(), c.Options.SystemTags)
+		}},
+		{
+			opts{runner: &lib.Options{SystemTags: lib.GetTagSet([]string{"proto", "url"}...)}},
+			exp{},
+			func(t *testing.T, c Config) {
+				assert.Equal(t, lib.GetTagSet("proto", "url"), c.Options.SystemTags)
+			},
+		},
 		//TODO: test for differences between flagsets
 		//TODO: more tests in general, especially ones not related to execution parameters...
 	}
