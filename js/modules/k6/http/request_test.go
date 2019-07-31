@@ -393,15 +393,15 @@ func TestRequestAndBatch(t *testing.T) {
 	})
 	t.Run("HTTP/2", func(t *testing.T) {
 		stats.GetBufferedSamples(samples) // Clean up buffered samples from previous tests
-		_, err := common.RunString(rt, `
-		let res = http.request("GET", "https://http2.akamai.com/demo");
+		_, err := common.RunString(rt, sr(`
+		let res = http.request("GET", "HTTP2BIN_URL/get");
 		if (res.status != 200) { throw new Error("wrong status: " + res.status) }
 		if (res.proto != "HTTP/2.0") { throw new Error("wrong proto: " + res.proto) }
-		`)
+		`))
 		assert.NoError(t, err)
 
 		bufSamples := stats.GetBufferedSamples(samples)
-		assertRequestMetricsEmitted(t, bufSamples, "GET", "https://http2.akamai.com/demo", "", 200, "")
+		assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTP2BIN_URL/get"), "", 200, "")
 		for _, sampleC := range bufSamples {
 			for _, sample := range sampleC.GetSamples() {
 				proto, ok := sample.Tags.Get("proto")
