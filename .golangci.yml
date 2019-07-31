@@ -38,7 +38,7 @@ linters-settings:
   dupl:
     threshold: 150
   goconst:
-    min-len: 5
+    min-len: 10
     min-occurrences: 4
 
 linters:

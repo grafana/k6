@@ -32,7 +32,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -59,13 +58,10 @@ import (
 
 func TestRunnerNew(t *testing.T) {
 	t.Run("Valid", func(t *testing.T) {
-		r, err := New(&lib.SourceData{
-			Filename: "/script.js",
-			Data: []byte(`
+		r, err := getSimpleRunner("/script.js", `
 			let counter = 0;
 			export default function() { counter++; }
-		`),
-		}, afero.NewMemMapFs(), lib.RuntimeOptions{})
+		`)
 		assert.NoError(t, err)
 
 		t.Run("NewVU", func(t *testing.T) {
@@ -84,19 +80,13 @@ func TestRunnerNew(t *testing.T) {
 	})
 
 	t.Run("Invalid", func(t *testing.T) {
-		_, err := New(&lib.SourceData{
-			Filename: "/script.js",
-			Data:     []byte(`blarg`),
-		}, afero.NewMemMapFs(), lib.RuntimeOptions{})
-		assert.EqualError(t, err, "ReferenceError: blarg is not defined at /script.js:1:1(0)")
+		_, err := getSimpleRunner("/script.js", `blarg`)
+		assert.EqualError(t, err, "ReferenceError: blarg is not defined at file:///script.js:1:1(0)")
 	})
 }
 
 func TestRunnerGetDefaultGroup(t *testing.T) {
-	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
-		Data:     []byte(`export default function() {};`),
-	}, afero.NewMemMapFs(), lib.RuntimeOptions{})
+	r1, err := getSimpleRunner("/script.js", `export default function() {};`)
 	if assert.NoError(t, err) {
 		assert.NotNil(t, r1.GetDefaultGroup())
 	}
@@ -108,10 +98,7 @@ func TestRunnerGetDefaultGroup(t *testing.T) {
 }
 
 func TestRunnerOptions(t *testing.T) {
-	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
-		Data:     []byte(`export default function() {};`),
-	}, afero.NewMemMapFs(), lib.RuntimeOptions{})
+	r1, err := getSimpleRunner("/script.js", `export default function() {};`)
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -151,9 +138,7 @@ func TestOptionsSettingToScript(t *testing.T) {
 		variant := variant
 		t.Run(fmt.Sprintf("Variant#%d", i), func(t *testing.T) {
 			t.Parallel()
-			src := &lib.SourceData{
-				Filename: "/script.js",
-				Data: []byte(variant + `
+			data := variant + `
 					export default function() {
 						if (!options) {
 							throw new Error("Expected options to be defined!");
@@ -161,10 +146,9 @@ func TestOptionsSettingToScript(t *testing.T) {
 						if (options.teardownTimeout != __ENV.expectedTeardownTimeout) {
 							throw new Error("expected teardownTimeout to be " + __ENV.expectedTeardownTimeout + " but it was " + options.teardownTimeout);
 						}
-					};
-				`),
-			}
-			r, err := New(src, afero.NewMemMapFs(), lib.RuntimeOptions{Env: map[string]string{"expectedTeardownTimeout": "4s"}})
+					};`
+			r, err := getSimpleRunnerWithOptions("/script.js", data,
+				lib.RuntimeOptions{Env: map[string]string{"expectedTeardownTimeout": "4s"}})
 			require.NoError(t, err)
 
 			newOptions := lib.Options{TeardownTimeout: types.NullDurationFrom(4 * time.Second)}
@@ -183,9 +167,7 @@ func TestOptionsSettingToScript(t *testing.T) {
 
 func TestOptionsPropagationToScript(t *testing.T) {
 	t.Parallel()
-	src := &lib.SourceData{
-		Filename: "/script.js",
-		Data: []byte(`
+	data := `
 			export let options = { setupTimeout: "1s", myOption: "test" };
 			export default function() {
 				if (options.external) {
@@ -197,12 +179,11 @@ func TestOptionsPropagationToScript(t *testing.T) {
 				if (options.setupTimeout != __ENV.expectedSetupTimeout) {
 					throw new Error("expected setupTimeout to be " + __ENV.expectedSetupTimeout + " but it was " + options.setupTimeout);
 				}
-			};
-		`),
-	}
+			};`
 
 	expScriptOptions := lib.Options{SetupTimeout: types.NullDurationFrom(1 * time.Second)}
-	r1, err := New(src, afero.NewMemMapFs(), lib.RuntimeOptions{Env: map[string]string{"expectedSetupTimeout": "1s"}})
+	r1, err := getSimpleRunnerWithOptions("/script.js", data,
+		lib.RuntimeOptions{Env: map[string]string{"expectedSetupTimeout": "1s"}})
 	require.NoError(t, err)
 	require.Equal(t, expScriptOptions, r1.GetOptions())
 
@@ -233,7 +214,7 @@ func TestMetricName(t *testing.T) {
 	tb := testutils.NewHTTPMultiBin(t)
 	defer tb.Cleanup()
 
-	script := []byte(tb.Replacer.Replace(`
+	script := tb.Replacer.Replace(`
 		import { Counter } from "k6/metrics";
 
 		let myCounter = new Counter("not ok name @");
@@ -241,13 +222,9 @@ func TestMetricName(t *testing.T) {
 		export default function(data) {
 			myCounter.add(1);
 		}
-	`))
+	`)
 
-	_, err := New(
-		&lib.SourceData{Filename: "/script.js", Data: script},
-		afero.NewMemMapFs(),
-		lib.RuntimeOptions{},
-	)
+	_, err := getSimpleRunner("/script.js", script)
 	require.Error(t, err)
 }
 
@@ -255,7 +232,7 @@ func TestSetupDataIsolation(t *testing.T) {
 	tb := testutils.NewHTTPMultiBin(t)
 	defer tb.Cleanup()
 
-	script := []byte(tb.Replacer.Replace(`
+	script := tb.Replacer.Replace(`
 		import { Counter } from "k6/metrics";
 
 		export let options = {
@@ -285,13 +262,9 @@ func TestSetupDataIsolation(t *testing.T) {
 			}
 			myCounter.add(1);
 		}
-	`))
+	`)
 
-	runner, err := New(
-		&lib.SourceData{Filename: "/script.js", Data: script},
-		afero.NewMemMapFs(),
-		lib.RuntimeOptions{},
-	)
+	runner, err := getSimpleRunner("/script.js", script)
 	require.NoError(t, err)
 
 	engine, err := core.NewEngine(local.New(runner), runner.GetOptions())
@@ -322,13 +295,13 @@ func TestSetupDataIsolation(t *testing.T) {
 	require.Equal(t, 501, count, "mycounter should be the number of iterations + 1 for the teardown")
 }
 
-func testSetupDataHelper(t *testing.T, src *lib.SourceData) {
+func testSetupDataHelper(t *testing.T, data string) {
 	t.Helper()
 	expScriptOptions := lib.Options{
 		SetupTimeout:    types.NullDurationFrom(1 * time.Second),
 		TeardownTimeout: types.NullDurationFrom(1 * time.Second),
 	}
-	r1, err := New(src, afero.NewMemMapFs(), lib.RuntimeOptions{})
+	r1, err := getSimpleRunner("/script.js", data) // TODO fix this
 	require.NoError(t, err)
 	require.Equal(t, expScriptOptions, r1.GetOptions())
 
@@ -349,71 +322,56 @@ func testSetupDataHelper(t *testing.T, src *lib.SourceData) {
 	}
 }
 func TestSetupDataReturnValue(t *testing.T) {
-	src := &lib.SourceData{
-		Filename: "/script.js",
-		Data: []byte(`
-			export let options = { setupTimeout: "1s", teardownTimeout: "1s" };
-			export function setup() {
-				return 42;
-			}
-			export default function(data) {
-				if (data != 42) {
-					throw new Error("default: wrong data: " + JSON.stringify(data))
-				}
-			};
-
-			export function teardown(data) {
-				if (data != 42) {
-					throw new Error("teardown: wrong data: " + JSON.stringify(data))
-				}
-			};
-		`),
+	testSetupDataHelper(t, `
+	export let options = { setupTimeout: "1s", teardownTimeout: "1s" };
+	export function setup() {
+		return 42;
 	}
-	testSetupDataHelper(t, src)
+	export default function(data) {
+		if (data != 42) {
+			throw new Error("default: wrong data: " + JSON.stringify(data))
+		}
+	};
+
+	export function teardown(data) {
+		if (data != 42) {
+			throw new Error("teardown: wrong data: " + JSON.stringify(data))
+		}
+	};`)
 }
 
 func TestSetupDataNoSetup(t *testing.T) {
-	src := &lib.SourceData{
-		Filename: "/script.js",
-		Data: []byte(`
-			export let options = { setupTimeout: "1s", teardownTimeout: "1s" };
-			export default function(data) {
-				if (data !== undefined) {
-					throw new Error("default: wrong data: " + JSON.stringify(data))
-				}
-			};
+	testSetupDataHelper(t, `
+	export let options = { setupTimeout: "1s", teardownTimeout: "1s" };
+	export default function(data) {
+		if (data !== undefined) {
+			throw new Error("default: wrong data: " + JSON.stringify(data))
+		}
+	};
 
-			export function teardown(data) {
-				if (data !== undefined) {
-					console.log(data);
-					throw new Error("teardown: wrong data: " + JSON.stringify(data))
-				}
-			};
-		`),
-	}
-	testSetupDataHelper(t, src)
+	export function teardown(data) {
+		if (data !== undefined) {
+			console.log(data);
+			throw new Error("teardown: wrong data: " + JSON.stringify(data))
+		}
+	};`)
 }
 
 func TestSetupDataNoReturn(t *testing.T) {
-	src := &lib.SourceData{
-		Filename: "/script.js",
-		Data: []byte(`
-			export let options = { setupTimeout: "1s", teardownTimeout: "1s" };
-			export function setup() { }
-			export default function(data) {
-				if (data !== undefined) {
-					throw new Error("default: wrong data: " + JSON.stringify(data))
-				}
-			};
+	testSetupDataHelper(t, `
+	export let options = { setupTimeout: "1s", teardownTimeout: "1s" };
+	export function setup() { }
+	export default function(data) {
+		if (data !== undefined) {
+			throw new Error("default: wrong data: " + JSON.stringify(data))
+		}
+	};
 
-			export function teardown(data) {
-				if (data !== undefined) {
-					throw new Error("teardown: wrong data: " + JSON.stringify(data))
-				}
-			};
-		`),
-	}
-	testSetupDataHelper(t, src)
+	export function teardown(data) {
+		if (data !== undefined) {
+			throw new Error("teardown: wrong data: " + JSON.stringify(data))
+		}
+	};`)
 }
 func TestRunnerIntegrationImports(t *testing.T) {
 	t.Run("Modules", func(t *testing.T) {
@@ -424,12 +382,10 @@ func TestRunnerIntegrationImports(t *testing.T) {
 			"k6/html",
 		}
 		for _, mod := range modules {
+			mod := mod
 			t.Run(mod, func(t *testing.T) {
 				t.Run("Source", func(t *testing.T) {
-					_, err := New(&lib.SourceData{
-						Filename: "/script.js",
-						Data:     []byte(fmt.Sprintf(`import "%s"; export default function() {}`, mod)),
-					}, afero.NewMemMapFs(), lib.RuntimeOptions{})
+					_, err := getSimpleRunner("/script.js", fmt.Sprintf(`import "%s"; export default function() {}`, mod))
 					assert.NoError(t, err)
 				})
 			})
@@ -438,8 +394,8 @@ func TestRunnerIntegrationImports(t *testing.T) {
 
 	t.Run("Files", func(t *testing.T) {
 		fs := afero.NewMemMapFs()
-		assert.NoError(t, fs.MkdirAll("/path/to", 0755))
-		assert.NoError(t, afero.WriteFile(fs, "/path/to/lib.js", []byte(`export default "hi!";`), 0644))
+		require.NoError(t, fs.MkdirAll("/path/to", 0755))
+		require.NoError(t, afero.WriteFile(fs, "/path/to/lib.js", []byte(`export default "hi!";`), 0644))
 
 		testdata := map[string]struct{ filename, path string }{
 			"Absolute":       {"/path/script.js", "/path/to/lib.js"},
@@ -449,33 +405,26 @@ func TestRunnerIntegrationImports(t *testing.T) {
 			"STDIN-Relative": {"-", "./path/to/lib.js"},
 		}
 		for name, data := range testdata {
+			name, data := name, data
 			t.Run(name, func(t *testing.T) {
-				r1, err := New(&lib.SourceData{
-					Filename: data.filename,
-					Data: []byte(fmt.Sprintf(`
+				r1, err := getSimpleRunnerWithFileFs(data.filename, fmt.Sprintf(`
 					import hi from "%s";
 					export default function() {
 						if (hi != "hi!") { throw new Error("incorrect value"); }
-					}`, data.path)),
-				}, fs, lib.RuntimeOptions{})
-				if !assert.NoError(t, err) {
-					return
-				}
+					}`, data.path), fs)
+				require.NoError(t, err)
 
 				r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{})
-				if !assert.NoError(t, err) {
-					return
-				}
+				require.NoError(t, err)
 
 				testdata := map[string]*Runner{"Source": r1, "Archive": r2}
 				for name, r := range testdata {
+					r := r
 					t.Run(name, func(t *testing.T) {
 						vu, err := r.NewVU(make(chan stats.SampleContainer, 100))
-						if !assert.NoError(t, err) {
-							return
-						}
+						require.NoError(t, err)
 						err = vu.RunOnce(context.Background())
-						assert.NoError(t, err)
+						require.NoError(t, err)
 					})
 				}
 			})
@@ -484,16 +433,11 @@ func TestRunnerIntegrationImports(t *testing.T) {
 }
 
 func TestVURunContext(t *testing.T) {
-	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
-		Data: []byte(`
+	r1, err := getSimpleRunner("/script.js", `
 		export let options = { vus: 10 };
 		export default function() { fn(); }
-		`),
-	}, afero.NewMemMapFs(), lib.RuntimeOptions{})
-	if !assert.NoError(t, err) {
-		return
-	}
+		`)
+	require.NoError(t, err)
 	r1.SetOptions(r1.GetOptions().Apply(lib.Options{Throw: null.BoolFrom(true)}))
 
 	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{})
@@ -533,16 +477,13 @@ func TestVURunContext(t *testing.T) {
 
 func TestVURunInterrupt(t *testing.T) {
 	//TODO: figure out why interrupt sometimes fails... data race in goja?
-	if runtime.GOOS == "windows" {
+	if isWindows {
 		t.Skip()
 	}
 
-	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
-		Data: []byte(`
+	r1, err := getSimpleRunner("/script.js", `
 		export default function() { while(true) {} }
-		`),
-	}, afero.NewMemMapFs(), lib.RuntimeOptions{})
+		`)
 	require.NoError(t, err)
 	require.NoError(t, r1.SetOptions(lib.Options{Throw: null.BoolFrom(true)}))
 
@@ -572,9 +513,7 @@ func TestVURunInterrupt(t *testing.T) {
 }
 
 func TestVUIntegrationGroups(t *testing.T) {
-	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
-		Data: []byte(`
+	r1, err := getSimpleRunner("/script.js", `
 		import { group } from "k6";
 		export default function() {
 			fnOuter();
@@ -585,16 +524,11 @@ func TestVUIntegrationGroups(t *testing.T) {
 				})
 			});
 		}
-		`),
-	}, afero.NewMemMapFs(), lib.RuntimeOptions{})
-	if !assert.NoError(t, err) {
-		return
-	}
+		`)
+	require.NoError(t, err)
 
 	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{})
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range testdata {
@@ -635,23 +569,16 @@ func TestVUIntegrationGroups(t *testing.T) {
 }
 
 func TestVUIntegrationMetrics(t *testing.T) {
-	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
-		Data: []byte(`
+	r1, err := getSimpleRunner("/script.js", `
 		import { group } from "k6";
 		import { Trend } from "k6/metrics";
 		let myMetric = new Trend("my_metric");
 		export default function() { myMetric.add(5); }
-		`),
-	}, afero.NewMemMapFs(), lib.RuntimeOptions{})
-	if !assert.NoError(t, err) {
-		return
-	}
+		`)
+	require.NoError(t, err)
 
 	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{})
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range testdata {
@@ -709,23 +636,15 @@ func TestVUIntegrationInsecureRequests(t *testing.T) {
 	}
 	for name, data := range testdata {
 		t.Run(name, func(t *testing.T) {
-			r1, err := New(&lib.SourceData{
-				Filename: "/script.js",
-				Data: []byte(`
+			r1, err := getSimpleRunner("/script.js", `
 					import http from "k6/http";
 					export default function() { http.get("https://expired.badssl.com/"); }
-				`),
-			}, afero.NewMemMapFs(), lib.RuntimeOptions{})
-			if !assert.NoError(t, err) {
-				return
-			}
+				`)
+			require.NoError(t, err)
 			r1.SetOptions(lib.Options{Throw: null.BoolFrom(true)}.Apply(data.opts))
 
 			r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{})
-			if !assert.NoError(t, err) {
-				return
-			}
-
+			require.NoError(t, err)
 			runners := map[string]*Runner{"Source": r1, "Archive": r2}
 			for name, r := range runners {
 				t.Run(name, func(t *testing.T) {
@@ -748,18 +667,14 @@ func TestVUIntegrationInsecureRequests(t *testing.T) {
 }
 
 func TestVUIntegrationBlacklistOption(t *testing.T) {
-	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
-		Data: []byte(`
+	r1, err := getSimpleRunner("/script.js", `
 					import http from "k6/http";
 					export default function() { http.get("http://10.1.2.3/"); }
-				`),
-	}, afero.NewMemMapFs(), lib.RuntimeOptions{})
-	if !assert.NoError(t, err) {
-		return
-	}
+				`)
+	require.NoError(t, err)
 
 	cidr, err := lib.ParseCIDR("10.0.0.0/8")
+
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -787,9 +702,7 @@ func TestVUIntegrationBlacklistOption(t *testing.T) {
 }
 
 func TestVUIntegrationBlacklistScript(t *testing.T) {
-	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
-		Data: []byte(`
+	r1, err := getSimpleRunner("/script.js", `
 					import http from "k6/http";
 
 					export let options = {
@@ -798,8 +711,7 @@ func TestVUIntegrationBlacklistScript(t *testing.T) {
 					};
 
 					export default function() { http.get("http://10.1.2.3/"); }
-				`),
-	}, afero.NewMemMapFs(), lib.RuntimeOptions{})
+				`)
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -828,9 +740,8 @@ func TestVUIntegrationHosts(t *testing.T) {
 	tb := testutils.NewHTTPMultiBin(t)
 	defer tb.Cleanup()
 
-	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
-		Data: []byte(tb.Replacer.Replace(`
+	r1, err := getSimpleRunner("/script.js",
+		tb.Replacer.Replace(`
 					import { check, fail } from "k6";
 					import http from "k6/http";
 					export default function() {
@@ -839,8 +750,7 @@ func TestVUIntegrationHosts(t *testing.T) {
 							"is correct IP": (r) => r.remote_ip === "127.0.0.1"
 						}) || fail("failed to override dns");
 					}
-				`)),
-	}, afero.NewMemMapFs(), lib.RuntimeOptions{})
+				`))
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -912,13 +822,10 @@ func TestVUIntegrationTLSConfig(t *testing.T) {
 	}
 	for name, data := range testdata {
 		t.Run(name, func(t *testing.T) {
-			r1, err := New(&lib.SourceData{
-				Filename: "/script.js",
-				Data: []byte(`
+			r1, err := getSimpleRunner("/script.js", `
 					import http from "k6/http";
 					export default function() { http.get("https://sha256.badssl.com/"); }
-				`),
-			}, afero.NewMemMapFs(), lib.RuntimeOptions{})
+				`)
 			if !assert.NoError(t, err) {
 				return
 			}
@@ -951,17 +858,14 @@ func TestVUIntegrationTLSConfig(t *testing.T) {
 }
 
 func TestVUIntegrationHTTP2(t *testing.T) {
-	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
-		Data: []byte(`
+	r1, err := getSimpleRunner("/script.js", `
 			import http from "k6/http";
 			export default function() {
 				let res = http.request("GET", "https://http2.akamai.com/demo");
 				if (res.status != 200) { throw new Error("wrong status: " + res.status) }
 				if (res.proto != "HTTP/2.0") { throw new Error("wrong proto: " + res.proto) }
 			}
-		`),
-	}, afero.NewMemMapFs(), lib.RuntimeOptions{})
+		`)
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -1001,12 +905,9 @@ func TestVUIntegrationHTTP2(t *testing.T) {
 }
 
 func TestVUIntegrationOpenFunctionError(t *testing.T) {
-	r, err := New(&lib.SourceData{
-		Filename: "/script.js",
-		Data: []byte(`
+	r, err := getSimpleRunner("/script.js", `
 			export default function() { open("/tmp/foo") }
-		`),
-	}, afero.NewMemMapFs(), lib.RuntimeOptions{})
+		`)
 	assert.NoError(t, err)
 
 	vu, err := r.NewVU(make(chan stats.SampleContainer, 100))
@@ -1020,9 +921,7 @@ func TestVUIntegrationCookiesReset(t *testing.T) {
 	tb := testutils.NewHTTPMultiBin(t)
 	defer tb.Cleanup()
 
-	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
-		Data: []byte(tb.Replacer.Replace(`
+	r1, err := getSimpleRunner("/script.js", tb.Replacer.Replace(`
 			import http from "k6/http";
 			export default function() {
 				let url = "HTTPBIN_URL";
@@ -1038,8 +937,7 @@ func TestVUIntegrationCookiesReset(t *testing.T) {
 					throw new Error("wrong cookies: " + res.body);
 				}
 			}
-		`)),
-	}, afero.NewMemMapFs(), lib.RuntimeOptions{})
+		`))
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -1073,9 +971,7 @@ func TestVUIntegrationCookiesNoReset(t *testing.T) {
 	tb := testutils.NewHTTPMultiBin(t)
 	defer tb.Cleanup()
 
-	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
-		Data: []byte(tb.Replacer.Replace(`
+	r1, err := getSimpleRunner("/script.js", tb.Replacer.Replace(`
 			import http from "k6/http";
 			export default function() {
 				let url = "HTTPBIN_URL";
@@ -1095,8 +991,7 @@ func TestVUIntegrationCookiesNoReset(t *testing.T) {
 					}
 				}
 			}
-		`)),
-	}, afero.NewMemMapFs(), lib.RuntimeOptions{})
+		`))
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -1130,14 +1025,11 @@ func TestVUIntegrationCookiesNoReset(t *testing.T) {
 }
 
 func TestVUIntegrationVUID(t *testing.T) {
-	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
-		Data: []byte(`
+	r1, err := getSimpleRunner("/script.js", `
 			export default function() {
 				if (__VU != 1234) { throw new Error("wrong __VU: " + __VU); }
 			}`,
-		),
-	}, afero.NewMemMapFs(), lib.RuntimeOptions{})
+	)
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -1226,13 +1118,10 @@ func TestVUIntegrationClientCerts(t *testing.T) {
 	}
 	go func() { _ = srv.Serve(listener) }()
 
-	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
-		Data: []byte(fmt.Sprintf(`
+	r1, err := getSimpleRunner("/script.js", fmt.Sprintf(`
 			import http from "k6/http";
 			export default function() { http.get("https://%s")}
-		`, listener.Addr().String())),
-	}, afero.NewMemMapFs(), lib.RuntimeOptions{})
+		`, listener.Addr().String()))
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -1309,17 +1198,14 @@ func TestHTTPRequestInInitContext(t *testing.T) {
 	tb := testutils.NewHTTPMultiBin(t)
 	defer tb.Cleanup()
 
-	_, err := New(&lib.SourceData{
-		Filename: "/script.js",
-		Data: []byte(tb.Replacer.Replace(`
+	_, err := getSimpleRunner("/script.js", tb.Replacer.Replace(`
 					import { check, fail } from "k6";
 					import http from "k6/http";
 					let res = http.get("HTTPBIN_URL/");
 					export default function() {
 						console.log(test);
 					}
-				`)),
-	}, afero.NewMemMapFs(), lib.RuntimeOptions{})
+				`))
 	if assert.Error(t, err) {
 		assert.Equal(
 			t,
@@ -1392,11 +1278,9 @@ func TestInitContextForbidden(t *testing.T) {
 	defer tb.Cleanup()
 
 	for _, test := range table {
+		test := test
 		t.Run(test[0], func(t *testing.T) {
-			_, err := New(&lib.SourceData{
-				Filename: "/script.js",
-				Data:     []byte(tb.Replacer.Replace(test[1])),
-			}, afero.NewMemMapFs(), lib.RuntimeOptions{})
+			_, err := getSimpleRunner("/script.js", tb.Replacer.Replace(test[1]))
 			if assert.Error(t, err) {
 				assert.Equal(
 					t,
@@ -1412,10 +1296,7 @@ func TestArchiveRunningIntegraty(t *testing.T) {
 	defer tb.Cleanup()
 
 	fs := afero.NewMemMapFs()
-	require.NoError(t, afero.WriteFile(fs, "/home/somebody/test.json", []byte(`42`), os.ModePerm))
-	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
-		Data: []byte(tb.Replacer.Replace(`
+	data := tb.Replacer.Replace(`
 			let fput = open("/home/somebody/test.json");
 			export let options = { setupTimeout: "10s", teardownTimeout: "10s" };
 			export function setup() {
@@ -1426,8 +1307,10 @@ func TestArchiveRunningIntegraty(t *testing.T) {
 					throw new Error("incorrect answer " + data);
 				}
 			}
-		`)),
-	}, fs, lib.RuntimeOptions{})
+		`)
+	require.NoError(t, afero.WriteFile(fs, "/home/somebody/test.json", []byte(`42`), os.ModePerm))
+	require.NoError(t, afero.WriteFile(fs, "/script.js", []byte(data), os.ModePerm))
+	r1, err := getSimpleRunnerWithFileFs("/script.js", data, fs)
 	require.NoError(t, err)
 
 	buf := bytes.NewBuffer(nil)
@@ -1458,18 +1341,15 @@ func TestArchiveNotPanicking(t *testing.T) {
 
 	fs := afero.NewMemMapFs()
 	require.NoError(t, afero.WriteFile(fs, "/non/existent", []byte(`42`), os.ModePerm))
-	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
-		Data: []byte(tb.Replacer.Replace(`
+	r1, err := getSimpleRunnerWithFileFs("/script.js", tb.Replacer.Replace(`
 			let fput = open("/non/existent");
 			export default function(data) {
 			}
-		`)),
-	}, fs, lib.RuntimeOptions{})
+		`), fs)
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
-	arc.Files = make(map[string][]byte)
+	arc.Filesystems = map[string]afero.Fs{"file": afero.NewMemMapFs()}
 	r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
 	// we do want this to error here as this is where we find out that a given file is not in the
 	// archive
@@ -1481,9 +1361,7 @@ func TestStuffNotPanicking(t *testing.T) {
 	tb := testutils.NewHTTPMultiBin(t)
 	defer tb.Cleanup()
 
-	r, err := New(&lib.SourceData{
-		Filename: "/script.js",
-		Data: []byte(tb.Replacer.Replace(`
+	r, err := getSimpleRunner("/script.js", tb.Replacer.Replace(`
 			import http from "k6/http";
 			import ws from "k6/ws";
 			import { group } from "k6";
@@ -1521,8 +1399,7 @@ func TestStuffNotPanicking(t *testing.T) {
 					}
 				});
 			}
-		`)),
-	}, afero.NewMemMapFs(), lib.RuntimeOptions{})
+		`))
 	require.NoError(t, err)
 
 	ch := make(chan stats.SampleContainer, 1000)

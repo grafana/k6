@@ -28,7 +28,7 @@ import (
 
 	"github.com/loadimpact/k6/js"
 	"github.com/loadimpact/k6/lib"
-	"github.com/spf13/afero"
+	"github.com/loadimpact/k6/loader"
 	"github.com/spf13/cobra"
 )
 
@@ -43,8 +43,8 @@ var inspectCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		fs := afero.NewOsFs()
-		src, err := readSource(args[0], pwd, fs, os.Stdin)
+		filesystems := loader.CreateFilesystems()
+		src, err := loader.ReadSource(args[0], pwd, filesystems, os.Stdin)
 		if err != nil {
 			return err
 		}
@@ -59,20 +59,24 @@ var inspectCmd = &cobra.Command{
 			return err
 		}
 
-		var opts lib.Options
+		var (
+			opts lib.Options
+			b    *js.Bundle
+		)
 		switch typ {
 		case typeArchive:
-			arc, err := lib.ReadArchive(bytes.NewBuffer(src.Data))
+			var arc *lib.Archive
+			arc, err = lib.ReadArchive(bytes.NewBuffer(src.Data))
 			if err != nil {
 				return err
 			}
-			b, err := js.NewBundleFromArchive(arc, runtimeOptions)
+			b, err = js.NewBundleFromArchive(arc, runtimeOptions)
 			if err != nil {
 				return err
 			}
 			opts = b.Options
 		case typeJS:
-			b, err := js.NewBundle(src, fs, runtimeOptions)
+			b, err = js.NewBundle(src, filesystems, runtimeOptions)
 			if err != nil {
 				return err
 			}

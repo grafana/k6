@@ -30,6 +30,7 @@ import (
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/lib/netext/httpext"
+	"github.com/loadimpact/k6/loader"
 	"github.com/pkg/errors"
 
 	"gopkg.in/guregu/null.v3"
@@ -97,7 +98,7 @@ func MergeFromExternal(external map[string]json.RawMessage, conf *Config) error 
 }
 
 // New creates a new cloud collector
-func New(conf Config, src *lib.SourceData, opts lib.Options, version string) (*Collector, error) {
+func New(conf Config, src *loader.SourceData, opts lib.Options, version string) (*Collector, error) {
 	if err := MergeFromExternal(opts.External, &conf); err != nil {
 		return nil, err
 	}
@@ -107,7 +108,7 @@ func New(conf Config, src *lib.SourceData, opts lib.Options, version string) (*C
 	}
 
 	if !conf.Name.Valid || conf.Name.String == "" {
-		conf.Name = null.StringFrom(filepath.Base(src.Filename))
+		conf.Name = null.StringFrom(filepath.Base(src.URL.Path))
 	}
 	if conf.Name.String == "-" {
 		conf.Name = null.StringFrom(TestName)

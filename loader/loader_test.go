@@ -18,31 +18,87 @@
  *
  */
 
-package loader
+package loader_test
 
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"testing"
 
 	"github.com/loadimpact/k6/lib/testutils"
+	"github.com/loadimpact/k6/loader"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDir(t *testing.T) {
 	testdata := map[string]string{
-		"/path/to/file.txt": filepath.FromSlash("/path/to"),
+		"/path/to/file.txt": filepath.FromSlash("/path/to/"),
 		"-":                 "/",
 	}
 	for name, dir := range testdata {
+		nameURL := &url.URL{Scheme: "file", Path: name}
+		dirURL := &url.URL{Scheme: "file", Path: filepath.ToSlash(dir)}
 		t.Run("path="+name, func(t *testing.T) {
-			assert.Equal(t, dir, Dir(name))
+			assert.Equal(t, dirURL, loader.Dir(nameURL))
 		})
 	}
 }
 
+func TestResolve(t *testing.T) {
+
+	t.Run("Blank", func(t *testing.T) {
+		_, err := loader.Resolve(nil, "")
+		assert.EqualError(t, err, "local or remote path required")
+	})
+
+	t.Run("Protocol", func(t *testing.T) {
+		root, err := url.Parse("file:///")
+		require.NoError(t, err)
+
+		t.Run("Missing", func(t *testing.T) {
+			u, err := loader.Resolve(root, "example.com/html")
+			require.NoError(t, err)
+			assert.Equal(t, u.String(), "//example.com/html")
+			// TODO: check that warning will be emitted if Loaded
+		})
+		t.Run("WS", func(t *testing.T) {
+			moduleSpecifier := "ws://example.com/html"
+			_, err := loader.Resolve(root, moduleSpecifier)
+			assert.EqualError(t, err,
+				"only supported schemes for imports are file and https, "+moduleSpecifier+" has `ws`")
+		})
+
+		t.Run("HTTP", func(t *testing.T) {
+			moduleSpecifier := "http://example.com/html"
+			_, err := loader.Resolve(root, moduleSpecifier)
+			assert.EqualError(t, err,
+				"only supported schemes for imports are file and https, "+moduleSpecifier+" has `http`")
+		})
+	})
+
+	t.Run("Remote Lifting Denied", func(t *testing.T) {
+		pwdURL, err := url.Parse("https://example.com/")
+		require.NoError(t, err)
+
+		_, err = loader.Resolve(pwdURL, "file:///etc/shadow")
+		assert.EqualError(t, err, "origin (https://example.com/) not allowed to load local file: file:///etc/shadow")
+	})
+
+	t.Run("Fixes missing slash in pwd", func(t *testing.T) {
+		pwdURL, err := url.Parse("https://example.com/path/to")
+		require.NoError(t, err)
+
+		moduleURL, err := loader.Resolve(pwdURL, "./something")
+		require.NoError(t, err)
+		require.Equal(t, "https://example.com/path/to/something", moduleURL.String())
+		require.Equal(t, "https://example.com/path/to", pwdURL.String())
+	})
+
+}
 func TestLoad(t *testing.T) {
 	tb := testutils.NewHTTPMultiBin(t)
 	sr := tb.Replacer.Replace
@@ -55,69 +111,93 @@ func TestLoad(t *testing.T) {
 		http.DefaultTransport = oldHTTPTransport
 	}()
 
-	t.Run("Blank", func(t *testing.T) {
-		_, err := Load(nil, "/", "")
-		assert.EqualError(t, err, "local or remote path required")
-	})
-
-	t.Run("Protocol", func(t *testing.T) {
-		_, err := Load(nil, "/", sr("HTTPSBIN_URL/html"))
-		assert.EqualError(t, err, "imports should not contain a protocol")
-	})
-
 	t.Run("Local", func(t *testing.T) {
-		fs := afero.NewMemMapFs()
-		assert.NoError(t, fs.MkdirAll("/path/to", 0755))
-		assert.NoError(t, afero.WriteFile(fs, "/path/to/file.txt", []byte("hi"), 0644))
+		filesystems := make(map[string]afero.Fs)
+		filesystems["file"] = afero.NewMemMapFs()
+		assert.NoError(t, filesystems["file"].MkdirAll("/path/to", 0755))
+		assert.NoError(t, afero.WriteFile(filesystems["file"], "/path/to/file.txt", []byte("hi"), 0644))
 
 		testdata := map[string]struct{ pwd, path string }{
-			"Absolute": {"/path", "/path/to/file.txt"},
-			"Relative": {"/path", "./to/file.txt"},
-			"Adjacent": {"/path/to", "./file.txt"},
+			"Absolute": {"/path/", "/path/to/file.txt"},
+			"Relative": {"/path/", "./to/file.txt"},
+			"Adjacent": {"/path/to/", "./file.txt"},
 		}
 		for name, data := range testdata {
+			data := data
 			t.Run(name, func(t *testing.T) {
-				src, err := Load(fs, data.pwd, data.path)
-				if assert.NoError(t, err) {
-					assert.Equal(t, "/path/to/file.txt", src.Filename)
-					assert.Equal(t, "hi", string(src.Data))
-				}
+				pwdURL, err := url.Parse("file://" + data.pwd)
+				require.NoError(t, err)
+
+				moduleURL, err := loader.Resolve(pwdURL, data.path)
+				require.NoError(t, err)
+
+				src, err := loader.Load(filesystems, moduleURL, data.path)
+				require.NoError(t, err)
+
+				assert.Equal(t, "file:///path/to/file.txt", src.URL.String())
+				assert.Equal(t, "hi", string(src.Data))
 			})
 		}
 
 		t.Run("Nonexistent", func(t *testing.T) {
+			root, err := url.Parse("file:///")
+			require.NoError(t, err)
+
 			path := filepath.FromSlash("/nonexistent")
-			_, err := Load(fs, "/", "/nonexistent")
-			assert.EqualError(t, err, fmt.Sprintf("open %s: file does not exist", path))
+			pathURL, err := loader.Resolve(root, "/nonexistent")
+			require.NoError(t, err)
+
+			_, err = loader.Load(filesystems, pathURL, path)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(),
+				fmt.Sprintf(`The moduleSpecifier "file://%s" couldn't be found on local disk. `,
+					filepath.ToSlash(path)))
 		})
 
-		t.Run("Remote Lifting Denied", func(t *testing.T) {
-			_, err := Load(fs, "example.com", "/etc/shadow")
-			assert.EqualError(t, err, "origin (example.com) not allowed to load local file: /etc/shadow")
-		})
 	})
 
 	t.Run("Remote", func(t *testing.T) {
-		src, err := Load(nil, "/", sr("HTTPSBIN_DOMAIN:HTTPSBIN_PORT/html"))
-		if assert.NoError(t, err) {
-			assert.Equal(t, src.Filename, sr("HTTPSBIN_DOMAIN:HTTPSBIN_PORT/html"))
+		filesystems := map[string]afero.Fs{"https": afero.NewMemMapFs()}
+		t.Run("From local", func(t *testing.T) {
+			root, err := url.Parse("file:///")
+			require.NoError(t, err)
+
+			moduleSpecifier := sr("HTTPSBIN_URL/html")
+			moduleSpecifierURL, err := loader.Resolve(root, moduleSpecifier)
+			require.NoError(t, err)
+
+			src, err := loader.Load(filesystems, moduleSpecifierURL, moduleSpecifier)
+			require.NoError(t, err)
+			assert.Equal(t, src.URL, moduleSpecifierURL)
 			assert.Contains(t, string(src.Data), "Herman Melville - Moby-Dick")
-		}
+		})
 
 		t.Run("Absolute", func(t *testing.T) {
-			src, err := Load(nil, sr("HTTPSBIN_DOMAIN:HTTPSBIN_PORT"), sr("HTTPSBIN_DOMAIN:HTTPSBIN_PORT/robots.txt"))
-			if assert.NoError(t, err) {
-				assert.Equal(t, src.Filename, sr("HTTPSBIN_DOMAIN:HTTPSBIN_PORT/robots.txt"))
-				assert.Equal(t, string(src.Data), "User-agent: *\nDisallow: /deny\n")
-			}
+			pwdURL, err := url.Parse(sr("HTTPSBIN_URL"))
+			require.NoError(t, err)
+
+			moduleSpecifier := sr("HTTPSBIN_URL/robots.txt")
+			moduleSpecifierURL, err := loader.Resolve(pwdURL, moduleSpecifier)
+			require.NoError(t, err)
+
+			src, err := loader.Load(filesystems, moduleSpecifierURL, moduleSpecifier)
+			require.NoError(t, err)
+			assert.Equal(t, src.URL.String(), sr("HTTPSBIN_URL/robots.txt"))
+			assert.Equal(t, string(src.Data), "User-agent: *\nDisallow: /deny\n")
 		})
 
 		t.Run("Relative", func(t *testing.T) {
-			src, err := Load(nil, sr("HTTPSBIN_DOMAIN:HTTPSBIN_PORT"), "./robots.txt")
-			if assert.NoError(t, err) {
-				assert.Equal(t, src.Filename, sr("HTTPSBIN_DOMAIN:HTTPSBIN_PORT/robots.txt"))
-				assert.Equal(t, string(src.Data), "User-agent: *\nDisallow: /deny\n")
-			}
+			pwdURL, err := url.Parse(sr("HTTPSBIN_URL"))
+			require.NoError(t, err)
+
+			moduleSpecifier := ("./robots.txt")
+			moduleSpecifierURL, err := loader.Resolve(pwdURL, moduleSpecifier)
+			require.NoError(t, err)
+
+			src, err := loader.Load(filesystems, moduleSpecifierURL, moduleSpecifier)
+			require.NoError(t, err)
+			assert.Equal(t, sr("HTTPSBIN_URL/robots.txt"), src.URL.String())
+			assert.Equal(t, "User-agent: *\nDisallow: /deny\n", string(src.Data))
 		})
 	})
 
@@ -132,11 +212,19 @@ func TestLoad(t *testing.T) {
 	})
 
 	t.Run("No _k6=1 Fallback", func(t *testing.T) {
-		src, err := Load(nil, "/", sr("HTTPSBIN_DOMAIN:HTTPSBIN_PORT/raw/something"))
-		if assert.NoError(t, err) {
-			assert.Equal(t, src.Filename, sr("HTTPSBIN_DOMAIN:HTTPSBIN_PORT/raw/something"))
-			assert.Equal(t, responseStr, string(src.Data))
-		}
+		root, err := url.Parse("file:///")
+		require.NoError(t, err)
+
+		moduleSpecifier := sr("HTTPSBIN_URL/raw/something")
+		moduleSpecifierURL, err := loader.Resolve(root, moduleSpecifier)
+		require.NoError(t, err)
+
+		filesystems := map[string]afero.Fs{"https": afero.NewMemMapFs()}
+		src, err := loader.Load(filesystems, moduleSpecifierURL, moduleSpecifier)
+
+		require.NoError(t, err)
+		assert.Equal(t, src.URL.String(), sr("HTTPSBIN_URL/raw/something"))
+		assert.Equal(t, responseStr, string(src.Data))
 	})
 
 	tb.Mux.HandleFunc("/invalid", func(w http.ResponseWriter, r *http.Request) {
@@ -144,19 +232,32 @@ func TestLoad(t *testing.T) {
 	})
 
 	t.Run("Invalid", func(t *testing.T) {
-		src, err := Load(nil, "/", sr("HTTPSBIN_DOMAIN:HTTPSBIN_PORT/invalid"))
-		assert.Nil(t, src)
-		assert.Error(t, err)
+		root, err := url.Parse("file:///")
+		require.NoError(t, err)
 
-		t.Run("Host", func(t *testing.T) {
-			src, err := Load(nil, "/", "some-path-that-doesnt-exist.js")
-			assert.Nil(t, src)
-			assert.Error(t, err)
+		t.Run("IP URL", func(t *testing.T) {
+			_, err := loader.Resolve(root, "192.168.0.%31")
+			require.Error(t, err)
+			require.Contains(t, err.Error(), `invalid URL escape "%31"`)
 		})
-		t.Run("URL", func(t *testing.T) {
-			src, err := Load(nil, "/", "192.168.0.%31")
-			assert.Nil(t, src)
-			assert.Error(t, err)
-		})
+
+		var testData = [...]struct {
+			name, moduleSpecifier string
+		}{
+			{"URL", sr("HTTPSBIN_URL/invalid")},
+			{"HOST", "some-path-that-doesnt-exist.js"},
+		}
+
+		filesystems := map[string]afero.Fs{"https": afero.NewMemMapFs()}
+		for _, data := range testData {
+			moduleSpecifier := data.moduleSpecifier
+			t.Run(data.name, func(t *testing.T) {
+				moduleSpecifierURL, err := loader.Resolve(root, moduleSpecifier)
+				require.NoError(t, err)
+
+				_, err = loader.Load(filesystems, moduleSpecifierURL, moduleSpecifier)
+				require.Error(t, err)
+			})
+		}
 	})
 }

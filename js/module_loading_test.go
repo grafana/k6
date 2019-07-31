@@ -65,9 +65,7 @@ func TestLoadOnceGlobalVars(t *testing.T) {
 			return C();
 		}
 	`), os.ModePerm))
-	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
-		Data: []byte(`
+	r1, err := getSimpleRunnerWithFileFs("/script.js", `
 			import { A } from "./A.js";
 			import { B } from "./B.js";
 
@@ -79,12 +77,10 @@ func TestLoadOnceGlobalVars(t *testing.T) {
 					throw new Error("A() != B()    (" + A() + ") != (" + B() + ")");
 				}
 			}
-		`),
-	}, fs, lib.RuntimeOptions{})
+		`, fs)
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
-	arc.Files = make(map[string][]byte)
 	r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
 	require.NoError(t, err)
 
@@ -115,9 +111,7 @@ func TestLoadDoesntBreakHTTPGet(t *testing.T) {
 			return http.get("HTTPBIN_URL/get");
 		}
 	`)), os.ModePerm))
-	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
-		Data: []byte(`
+	r1, err := getSimpleRunnerWithFileFs("/script.js", `
 			import { A } from "./A.js";
 
 			export default function(data) {
@@ -126,13 +120,11 @@ func TestLoadDoesntBreakHTTPGet(t *testing.T) {
 					throw new Error("wrong status "+ resp.status);
 				}
 			}
-		`),
-	}, fs, lib.RuntimeOptions{})
+		`, fs)
 	require.NoError(t, err)
 
 	require.NoError(t, r1.SetOptions(lib.Options{Hosts: tb.Dialer.Hosts}))
 	arc := r1.MakeArchive()
-	arc.Files = make(map[string][]byte)
 	r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
 	require.NoError(t, err)
 
@@ -159,9 +151,7 @@ func TestLoadGlobalVarsAreNotSharedBetweenVUs(t *testing.T) {
 			return globalVar;
 		}
 	`), os.ModePerm))
-	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
-		Data: []byte(`
+	r1, err := getSimpleRunnerWithFileFs("/script.js", `
 			import { A } from "./A.js";
 
 			export default function(data) {
@@ -172,12 +162,10 @@ func TestLoadGlobalVarsAreNotSharedBetweenVUs(t *testing.T) {
 					throw new Error("wrong value of a " + a);
 				}
 			}
-		`),
-	}, fs, lib.RuntimeOptions{})
+		`, fs)
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
-	arc.Files = make(map[string][]byte)
 	r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
 	require.NoError(t, err)
 
@@ -231,14 +219,10 @@ func TestLoadCycle(t *testing.T) {
 	`), os.ModePerm))
 	data, err := afero.ReadFile(fs, "/main.js")
 	require.NoError(t, err)
-	r1, err := New(&lib.SourceData{
-		Filename: "/main.js",
-		Data:     data,
-	}, fs, lib.RuntimeOptions{})
+	r1, err := getSimpleRunnerWithFileFs("/main.js", string(data), fs)
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
-	arc.Files = make(map[string][]byte)
 	r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
 	require.NoError(t, err)
 
@@ -281,9 +265,7 @@ func TestLoadCycleBinding(t *testing.T) {
 			}
 	`), os.ModePerm))
 
-	r1, err := New(&lib.SourceData{
-		Filename: "/main.js",
-		Data: []byte(`
+	r1, err := getSimpleRunnerWithFileFs("/main.js", `
 			import {foo} from './a.js';
 			import {bar} from './b.js';
 			export default function() {
@@ -296,12 +278,10 @@ func TestLoadCycleBinding(t *testing.T) {
 					throw new Error("Wrong value of bar() "+ barMessage);
 				}
 			}
-		`),
-	}, fs, lib.RuntimeOptions{})
+		`, fs)
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
-	arc.Files = make(map[string][]byte)
 	r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
 	require.NoError(t, err)
 
@@ -341,9 +321,7 @@ func TestBrowserified(t *testing.T) {
 		});
 	`), os.ModePerm))
 
-	r1, err := New(&lib.SourceData{
-		Filename: "/script.js",
-		Data: []byte(`
+	r1, err := getSimpleRunnerWithFileFs("/script.js", `
 			import {alpha, bravo } from "./browserified.js";
 
 			export default function(data) {
@@ -361,12 +339,10 @@ func TestBrowserified(t *testing.T) {
 					throw new Error("bravo.B() != 'b'    (" + bravo.B() + ") != 'b'");
 				}
 			}
-		`),
-	}, fs, lib.RuntimeOptions{})
+		`, fs)
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
-	arc.Files = make(map[string][]byte)
 	r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
 	require.NoError(t, err)
 

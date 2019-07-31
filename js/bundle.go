@@ -23,7 +23,8 @@ package js
 import (
 	"context"
 	"encoding/json"
-	"os"
+	"net/url"
+	"runtime"
 
 	"github.com/loadimpact/k6/lib/consts"
 
@@ -40,7 +41,7 @@ import (
 // A Bundle is a self-contained bundle of scripts and resources.
 // You can use this to produce identical BundleInstance objects.
 type Bundle struct {
-	Filename string
+	Filename *url.URL
 	Source   string
 	Program  *goja.Program
 	Options  lib.Options
@@ -58,7 +59,7 @@ type BundleInstance struct {
 }
 
 // NewBundle creates a new bundle from a source file and a filesystem.
-func NewBundle(src *lib.SourceData, fs afero.Fs, rtOpts lib.RuntimeOptions) (*Bundle, error) {
+func NewBundle(src *loader.SourceData, filesystems map[string]afero.Fs, rtOpts lib.RuntimeOptions) (*Bundle, error) {
 	compiler, err := compiler.New()
 	if err != nil {
 		return nil, err
@@ -66,24 +67,17 @@ func NewBundle(src *lib.SourceData, fs afero.Fs, rtOpts lib.RuntimeOptions) (*Bu
 
 	// Compile sources, both ES5 and ES6 are supported.
 	code := string(src.Data)
-	pgm, _, err := compiler.Compile(code, src.Filename, "", "", true)
+	pgm, _, err := compiler.Compile(code, src.URL.String(), "", "", true)
 	if err != nil {
 		return nil, err
 	}
-
-	// We want to eliminate disk access at runtime, so we set up a memory mapped cache that's
-	// written every time something is read from the real filesystem. This cache is then used for
-	// successive spawns to read from (they have no access to the real disk).
-	mirrorFS := afero.NewMemMapFs()
-	cachedFS := afero.NewCacheOnReadFs(fs, mirrorFS, 0)
-
 	// Make a bundle, instantiate it into a throwaway VM to populate caches.
 	rt := goja.New()
 	bundle := Bundle{
-		Filename:        src.Filename,
+		Filename:        src.URL,
 		Source:          code,
 		Program:         pgm,
-		BaseInitContext: NewInitContext(rt, compiler, new(context.Context), cachedFS, loader.Dir(src.Filename)),
+		BaseInitContext: NewInitContext(rt, compiler, new(context.Context), filesystems, loader.Dir(src.URL)),
 		Env:             rtOpts.Env,
 	}
 	if err := bundle.instantiate(rt, bundle.BaseInitContext); err != nil {
@@ -144,12 +138,12 @@ func NewBundleFromArchive(arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle,
 		return nil, errors.Errorf("expected bundle type 'js', got '%s'", arc.Type)
 	}
 
-	pgm, _, err := compiler.Compile(string(arc.Data), arc.Filename, "", "", true)
+	pgm, _, err := compiler.Compile(string(arc.Data), arc.FilenameURL.String(), "", "", true)
 	if err != nil {
 		return nil, err
 	}
-	initctx := NewInitContext(goja.New(), compiler, new(context.Context), arc.FS, arc.Pwd)
-	initctx.files = arc.Files
+
+	initctx := NewInitContext(goja.New(), compiler, new(context.Context), arc.Filesystems, arc.PwdURL)
 
 	env := arc.Env
 	if env == nil {
@@ -161,7 +155,7 @@ func NewBundleFromArchive(arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle,
 	}
 
 	bundle := &Bundle{
-		Filename:        arc.Filename,
+		Filename:        arc.FilenameURL,
 		Source:          string(arc.Data),
 		Program:         pgm,
 		Options:         arc.Options,
@@ -176,29 +170,20 @@ func NewBundleFromArchive(arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle,
 
 func (b *Bundle) makeArchive() *lib.Archive {
 	arc := &lib.Archive{
-		Type:      "js",
-		FS:        afero.NewMemMapFs(),
-		Options:   b.Options,
-		Filename:  b.Filename,
-		Data:      []byte(b.Source),
-		Pwd:       b.BaseInitContext.pwd,
-		Env:       make(map[string]string, len(b.Env)),
-		K6Version: consts.Version,
+		Type:        "js",
+		Filesystems: b.BaseInitContext.filesystems,
+		Options:     b.Options,
+		FilenameURL: b.Filename,
+		Data:        []byte(b.Source),
+		PwdURL:      b.BaseInitContext.pwd,
+		Env:         make(map[string]string, len(b.Env)),
+		K6Version:   consts.Version,
+		Goos:        runtime.GOOS,
 	}
 	// Copy env so changes in the archive are not reflected in the source Bundle
 	for k, v := range b.Env {
 		arc.Env[k] = v
 	}
-
-	arc.Scripts = make(map[string][]byte, len(b.BaseInitContext.programs))
-	for name, pgm := range b.BaseInitContext.programs {
-		arc.Scripts[name] = []byte(pgm.src)
-		err := afero.WriteFile(arc.FS, name, []byte(pgm.src), os.ModePerm)
-		if err != nil {
-			return nil
-		}
-	}
-	arc.Files = b.BaseInitContext.files
 
 	return arc
 }

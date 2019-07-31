@@ -26,6 +26,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 
@@ -34,8 +35,8 @@ import (
 	"github.com/loadimpact/k6/js"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/types"
+	"github.com/loadimpact/k6/loader"
 	"github.com/manyminds/api2go/jsonapi"
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	null "gopkg.in/guregu/null.v3"
@@ -130,10 +131,11 @@ func TestSetupData(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
+		testCase := testCase
 		t.Run(testCase.name, func(t *testing.T) {
 			runner, err := js.New(
-				&lib.SourceData{Filename: "/script.js", Data: testCase.script},
-				afero.NewMemMapFs(),
+				&loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: testCase.script},
+				nil,
 				lib.RuntimeOptions{},
 			)
 			require.NoError(t, err)
