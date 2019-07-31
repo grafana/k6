@@ -61,12 +61,12 @@ Install
 Install with [Homebrew](https://brew.sh/) by running:
 
 ```bash
-brew install loadimpact/k6/k6
+brew install k6
 ```
 
 ### Windows
 
-You can manually download and install the [latest `.msi` installation package](https://dl.bintray.com/loadimpact/windows/k6-latest-amd64.msi) or, if you use the [chocolatey package manager](https://chocolatey.org/), follow [these instructions](https://bintray.com/repo/buildSettings?repoPath=%2Floadimpact%2Fchoco) to set up the k6 repository.
+You can manually download and install the [official `.msi` installation package](https://dl.bintray.com/loadimpact/windows/k6-v0.25.0-amd64.msi) or, if you use the [chocolatey package manager](https://chocolatey.org/), follow [these instructions](https://bintray.com/repo/buildSettings?repoPath=%2Floadimpact%2Fchoco) to set up the k6 repository.
 
 ### Linux
 
