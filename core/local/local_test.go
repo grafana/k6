@@ -23,12 +23,14 @@ package local
 import (
 	"context"
 	"net"
+	"net/url"
 	"runtime"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/loadimpact/k6/lib/netext"
+	"github.com/loadimpact/k6/loader"
 
 	"github.com/loadimpact/k6/js"
 	"github.com/loadimpact/k6/lib"
@@ -37,7 +39,6 @@ import (
 	"github.com/loadimpact/k6/stats"
 	"github.com/pkg/errors"
 	logtest "github.com/sirupsen/logrus/hooks/test"
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	null "gopkg.in/guregu/null.v3"
@@ -481,8 +482,8 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 	}`)
 
 	runner, err := js.New(
-		&lib.SourceData{Filename: "/script.js", Data: script},
-		afero.NewMemMapFs(),
+		&loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script},
+		nil,
 		lib.RuntimeOptions{},
 	)
 	require.NoError(t, err)

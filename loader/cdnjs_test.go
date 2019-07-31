@@ -21,10 +21,12 @@
 package loader
 
 import (
+	"net/url"
 	"testing"
 
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCDNJS(t *testing.T) {
@@ -61,19 +63,28 @@ func TestCDNJS(t *testing.T) {
 			`^https://cdnjs.cloudflare.com/ajax/libs/Faker/0.7.2/MinFaker.js$`,
 		},
 	}
+
+	var root = &url.URL{Scheme: "https", Host: "example.com", Path: "/something/"}
 	for path, expected := range paths {
+		path, expected := path, expected
 		t.Run(path, func(t *testing.T) {
 			name, loader, parts := pickLoader(path)
 			assert.Equal(t, "cdnjs", name)
 			assert.Equal(t, expected.parts, parts)
+
 			src, err := loader(path, parts)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Regexp(t, expected.src, src)
-			data, err := Load(afero.NewMemMapFs(), "/", path)
-			if assert.NoError(t, err) {
-				assert.Equal(t, path, data.Filename)
-				assert.NotEmpty(t, data.Data)
-			}
+
+			resolvedURL, err := Resolve(root, path)
+			require.NoError(t, err)
+			require.Empty(t, resolvedURL.Scheme)
+			require.Equal(t, path, resolvedURL.Opaque)
+
+			data, err := Load(map[string]afero.Fs{"https": afero.NewMemMapFs()}, resolvedURL, path)
+			require.NoError(t, err)
+			assert.Equal(t, resolvedURL, data.URL)
+			assert.NotEmpty(t, data.Data)
 		})
 	}
 
@@ -92,9 +103,14 @@ func TestCDNJS(t *testing.T) {
 		assert.Equal(t, "cdnjs", name)
 		assert.Equal(t, []string{"Faker", "3.1.0", "nonexistent.js"}, parts)
 		src, err := loader(path, parts)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "https://cdnjs.cloudflare.com/ajax/libs/Faker/3.1.0/nonexistent.js", src)
-		_, err = Load(afero.NewMemMapFs(), "/", path)
-		assert.EqualError(t, err, "cdnjs: not found: https://cdnjs.cloudflare.com/ajax/libs/Faker/3.1.0/nonexistent.js")
+
+		pathURL, err := url.Parse(src)
+		require.NoError(t, err)
+
+		_, err = Load(map[string]afero.Fs{"https": afero.NewMemMapFs()}, pathURL, path)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "not found: https://cdnjs.cloudflare.com/ajax/libs/Faker/3.1.0/nonexistent.js")
 	})
 }

@@ -22,6 +22,7 @@ package js
 
 import (
 	"context"
+	"net/url"
 	"path/filepath"
 	"strings"
 
@@ -49,28 +50,26 @@ type InitContext struct {
 	// Pointer to a context that bridged modules are invoked with.
 	ctxPtr *context.Context
 
-	// Filesystem to load files and scripts from.
-	fs  afero.Fs
-	pwd string
+	// Filesystem to load files and scripts from with the map key being the scheme
+	filesystems map[string]afero.Fs
+	pwd         *url.URL
 
 	// Cache of loaded programs and files.
 	programs map[string]programWithSource
-	files    map[string][]byte
 }
 
 // NewInitContext creates a new initcontext with the provided arguments
 func NewInitContext(
-	rt *goja.Runtime, compiler *compiler.Compiler, ctxPtr *context.Context, fs afero.Fs, pwd string,
+	rt *goja.Runtime, compiler *compiler.Compiler, ctxPtr *context.Context, filesystems map[string]afero.Fs, pwd *url.URL,
 ) *InitContext {
 	return &InitContext{
-		runtime:  rt,
-		compiler: compiler,
-		ctxPtr:   ctxPtr,
-		fs:       fs,
-		pwd:      filepath.ToSlash(pwd),
+		runtime:     rt,
+		compiler:    compiler,
+		ctxPtr:      ctxPtr,
+		filesystems: filesystems,
+		pwd:         pwd,
 
 		programs: make(map[string]programWithSource),
-		files:    make(map[string][]byte),
 	}
 }
 
@@ -89,12 +88,11 @@ func newBoundInitContext(base *InitContext, ctxPtr *context.Context, rt *goja.Ru
 		runtime: rt,
 		ctxPtr:  ctxPtr,
 
-		fs:       base.fs,
-		pwd:      base.pwd,
-		compiler: base.compiler,
+		filesystems: base.filesystems,
+		pwd:         base.pwd,
+		compiler:    base.compiler,
 
 		programs: programs,
-		files:    base.files,
 	}
 }
 
@@ -130,12 +128,15 @@ func (i *InitContext) requireModule(name string) (goja.Value, error) {
 func (i *InitContext) requireFile(name string) (goja.Value, error) {
 	// Resolve the file path, push the target directory as pwd to make relative imports work.
 	pwd := i.pwd
-	filename := loader.Resolve(pwd, name)
+	fileURL, err := loader.Resolve(pwd, name)
+	if err != nil {
+		return nil, err
+	}
 
 	// First, check if we have a cached program already.
-	pgm, ok := i.programs[filename]
+	pgm, ok := i.programs[fileURL.String()]
 	if !ok || pgm.exports == nil {
-		i.pwd = loader.Dir(filename)
+		i.pwd = loader.Dir(fileURL)
 		defer func() { i.pwd = pwd }()
 
 		// Swap the importing scope's exports out, then put it back again.
@@ -150,21 +151,22 @@ func (i *InitContext) requireFile(name string) (goja.Value, error) {
 		i.runtime.Set("module", module)
 		if pgm.pgm == nil {
 			// Load the sources; the loader takes care of remote loading, etc.
-			data, err := loader.Load(i.fs, pwd, name)
+			data, err := loader.Load(i.filesystems, fileURL, name)
 			if err != nil {
 				return goja.Undefined(), err
 			}
+
 			pgm.src = string(data.Data)
 
 			// Compile the sources; this handles ES5 vs ES6 automatically.
-			pgm.pgm, err = i.compileImport(pgm.src, data.Filename)
+			pgm.pgm, err = i.compileImport(pgm.src, data.URL.String())
 			if err != nil {
 				return goja.Undefined(), err
 			}
 		}
 
 		pgm.exports = module.Get("exports")
-		i.programs[filename] = pgm
+		i.programs[fileURL.String()] = pgm
 
 		// Run the program.
 		if _, err := i.runtime.RunProgram(pgm.pgm); err != nil {
@@ -193,28 +195,22 @@ func (i *InitContext) Open(filename string, args ...string) (goja.Value, error) 
 	// will probably be need for archive execution under windows if always consider '/...' as an
 	// absolute path.
 	if filename[0] != '/' && filename[0] != '\\' && !filepath.IsAbs(filename) {
-		filename = filepath.Join(i.pwd, filename)
+		filename = filepath.Join(i.pwd.Path, filename)
 	}
-	filename = filepath.ToSlash(filename)
-
-	data, ok := i.files[filename]
-	if !ok {
-		var (
-			err   error
-			isDir bool
-		)
-
-		// Workaround for https://github.com/spf13/afero/issues/201
-		if isDir, err = afero.IsDir(i.fs, filename); err != nil {
-			return nil, err
-		} else if isDir {
-			return nil, errors.New("open() can't be used with directories")
-		}
-		data, err = afero.ReadFile(i.fs, filename)
-		if err != nil {
-			return nil, err
-		}
-		i.files[filename] = data
+	filename = filepath.Clean(filename)
+	fs := i.filesystems["file"]
+	if filename[0:1] != afero.FilePathSeparator {
+		filename = afero.FilePathSeparator + filename
+	}
+	// Workaround for https://github.com/spf13/afero/issues/201
+	if isDir, err := afero.IsDir(fs, filename); err != nil {
+		return nil, err
+	} else if isDir {
+		return nil, errors.New("open() can't be used with directories")
+	}
+	data, err := afero.ReadFile(fs, filename)
+	if err != nil {
+		return nil, err
 	}
 
 	if len(args) > 0 && args[0] == "b" {

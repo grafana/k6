@@ -21,23 +21,64 @@
 package loader
 
 import (
+	"net/url"
 	"testing"
 
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGithub(t *testing.T) {
 	path := "github.com/github/gitignore/Go.gitignore"
+	expectedEndSrc := "https://raw.githubusercontent.com/github/gitignore/master/Go.gitignore"
 	name, loader, parts := pickLoader(path)
 	assert.Equal(t, "github", name)
 	assert.Equal(t, []string{"github", "gitignore", "Go.gitignore"}, parts)
 	src, err := loader(path, parts)
 	assert.NoError(t, err)
-	assert.Equal(t, "https://raw.githubusercontent.com/github/gitignore/master/Go.gitignore", src)
-	data, err := Load(afero.NewMemMapFs(), "/", path)
-	if assert.NoError(t, err) {
-		assert.Equal(t, path, data.Filename)
+	assert.Equal(t, expectedEndSrc, src)
+
+	var root = &url.URL{Scheme: "https", Host: "example.com", Path: "/something/"}
+	resolvedURL, err := Resolve(root, path)
+	require.NoError(t, err)
+	require.Empty(t, resolvedURL.Scheme)
+	require.Equal(t, path, resolvedURL.Opaque)
+	t.Run("not cached", func(t *testing.T) {
+		data, err := Load(map[string]afero.Fs{"https": afero.NewMemMapFs()}, resolvedURL, path)
+		require.NoError(t, err)
+		assert.Equal(t, data.URL, resolvedURL)
+		assert.Equal(t, path, data.URL.String())
 		assert.NotEmpty(t, data.Data)
-	}
+	})
+
+	t.Run("cached", func(t *testing.T) {
+		fs := afero.NewMemMapFs()
+		testData := []byte("test data")
+
+		err := afero.WriteFile(fs, "/github.com/github/gitignore/Go.gitignore", testData, 0644)
+		require.NoError(t, err)
+
+		data, err := Load(map[string]afero.Fs{"https": fs}, resolvedURL, path)
+		require.NoError(t, err)
+		assert.Equal(t, path, data.URL.String())
+		assert.Equal(t, data.Data, testData)
+	})
+
+	t.Run("relative", func(t *testing.T) {
+		var tests = map[string]string{
+			"./something.else":  "github.com/github/gitignore/something.else",
+			"../something.else": "github.com/github/something.else",
+			"/something.else":   "github.com/something.else",
+		}
+		for relative, expected := range tests {
+			relativeURL, err := Resolve(Dir(resolvedURL), relative)
+			require.NoError(t, err)
+			assert.Equal(t, expected, relativeURL.String())
+		}
+	})
+
+	t.Run("dir", func(t *testing.T) {
+		require.Equal(t, &url.URL{Opaque: "github.com/github/gitignore"}, Dir(resolvedURL))
+	})
 }
