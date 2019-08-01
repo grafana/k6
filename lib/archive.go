@@ -109,6 +109,9 @@ func (arc *Archive) getFs(name string) afero.Fs {
 func ReadArchive(in io.Reader) (*Archive, error) {
 	r := tar.NewReader(in)
 	arc := &Archive{Filesystems: make(map[string]afero.Fs, 2)}
+	// initialize both fses
+	_ = arc.getFs("https")
+	_ = arc.getFs("file")
 	for {
 		hdr, err := r.Next()
 		if err != nil {

@@ -21,6 +21,7 @@
 package js
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"testing"
@@ -351,6 +352,44 @@ func TestBrowserified(t *testing.T) {
 		r := r
 		t.Run(name, func(t *testing.T) {
 			ch := make(chan stats.SampleContainer, 100)
+			defer close(ch)
+			vu, err := r.NewVU(ch)
+			require.NoError(t, err)
+			err = vu.RunOnce(context.Background())
+			require.NoError(t, err)
+		})
+	}
+}
+func TestLoadingUnexistingModuleDoesntPanic(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	data := `var b;
+			try {
+				b = eval("require('buffer')");
+			} catch (err) {
+				b = "correct";
+			}
+			export default function() {
+				if (b != "correct") {
+					throw new Error("wrong b "+ JSON.stringify(b));
+				}
+			}`
+	require.NoError(t, afero.WriteFile(fs, "/script.js", []byte(data), 0644))
+	r1, err := getSimpleRunnerWithFileFs("/script.js", data, fs)
+	require.NoError(t, err)
+
+	arc := r1.MakeArchive()
+	var buf = &bytes.Buffer{}
+	require.NoError(t, arc.Write(buf))
+	arc, err = lib.ReadArchive(buf)
+	require.NoError(t, err)
+	r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
+	require.NoError(t, err)
+
+	runners := map[string]*Runner{"Source": r1, "Archive": r2}
+	for name, r := range runners {
+		r := r
+		t.Run(name, func(t *testing.T) {
+			ch := newDevNullSampleChannel()
 			defer close(ch)
 			vu, err := r.NewVU(ch)
 			require.NoError(t, err)

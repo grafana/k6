@@ -368,6 +368,7 @@ func TestStrangePaths(t *testing.T) {
 
 		assert.Equal(t, arc1, arc2, pathToChange)
 
+		arc1Filesystems["https"] = afero.NewMemMapFs()
 		diffMapFilesystems(t, arc1Filesystems, arc2Filesystems)
 	}
 }
