@@ -138,17 +138,10 @@ func (i *InitContext) requireFile(name string) (goja.Value, error) {
 	if !ok || pgm.module == nil {
 		i.pwd = loader.Dir(fileURL)
 		defer func() { i.pwd = pwd }()
-
-		// Swap the importing scope's exports out, then put it back again.
-		oldExports := i.runtime.Get("exports")
-		defer i.runtime.Set("exports", oldExports)
-		oldModule := i.runtime.Get("module")
-		defer i.runtime.Set("module", oldModule)
 		exports := i.runtime.NewObject()
-		i.runtime.Set("exports", exports)
 		pgm.module = i.runtime.NewObject()
 		_ = pgm.module.Set("exports", exports)
-		i.runtime.Set("module", pgm.module)
+
 		if pgm.pgm == nil {
 			// Load the sources; the loader takes care of remote loading, etc.
 			data, err := loader.Load(i.filesystems, fileURL, name)
@@ -168,9 +161,15 @@ func (i *InitContext) requireFile(name string) (goja.Value, error) {
 		i.programs[fileURL.String()] = pgm
 
 		// Run the program.
-		if _, err := i.runtime.RunProgram(pgm.pgm); err != nil {
+		f, err := i.runtime.RunProgram(pgm.pgm)
+		if err != nil {
 			delete(i.programs, fileURL.String())
 			return goja.Undefined(), err
+		}
+		if call, ok := goja.AssertFunction(f); ok {
+			if _, err = call(exports, pgm.module, exports); err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -178,7 +177,7 @@ func (i *InitContext) requireFile(name string) (goja.Value, error) {
 }
 
 func (i *InitContext) compileImport(src, filename string) (*goja.Program, error) {
-	pgm, _, err := i.compiler.Compile(src, filename, "(function(){\n", "\n})()\n", true)
+	pgm, _, err := i.compiler.Compile(src, filename, "(function(module, exports){\n", "\n})\n", true)
 	return pgm, err
 }
 
