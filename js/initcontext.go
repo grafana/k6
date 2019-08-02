@@ -36,9 +36,9 @@ import (
 )
 
 type programWithSource struct {
-	pgm     *goja.Program
-	src     string
-	exports goja.Value
+	pgm    *goja.Program
+	src    string
+	module *goja.Object
 }
 
 // InitContext provides APIs for use in the init context.
@@ -135,7 +135,7 @@ func (i *InitContext) requireFile(name string) (goja.Value, error) {
 
 	// First, check if we have a cached program already.
 	pgm, ok := i.programs[fileURL.String()]
-	if !ok || pgm.exports == nil {
+	if !ok || pgm.module == nil {
 		i.pwd = loader.Dir(fileURL)
 		defer func() { i.pwd = pwd }()
 
@@ -146,9 +146,9 @@ func (i *InitContext) requireFile(name string) (goja.Value, error) {
 		defer i.runtime.Set("module", oldModule)
 		exports := i.runtime.NewObject()
 		i.runtime.Set("exports", exports)
-		module := i.runtime.NewObject()
-		_ = module.Set("exports", exports)
-		i.runtime.Set("module", module)
+		pgm.module = i.runtime.NewObject()
+		_ = pgm.module.Set("exports", exports)
+		i.runtime.Set("module", pgm.module)
 		if pgm.pgm == nil {
 			// Load the sources; the loader takes care of remote loading, etc.
 			data, err := loader.Load(i.filesystems, fileURL, name)
@@ -165,18 +165,16 @@ func (i *InitContext) requireFile(name string) (goja.Value, error) {
 			}
 		}
 
-		pgm.exports = module.Get("exports")
 		i.programs[fileURL.String()] = pgm
 
 		// Run the program.
 		if _, err := i.runtime.RunProgram(pgm.pgm); err != nil {
+			delete(i.programs, fileURL.String())
 			return goja.Undefined(), err
 		}
-
-		pgm.exports = module.Get("exports")
 	}
 
-	return pgm.exports, nil
+	return pgm.module.Get("exports"), nil
 }
 
 func (i *InitContext) compileImport(src, filename string) (*goja.Program, error) {
