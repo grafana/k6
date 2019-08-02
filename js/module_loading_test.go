@@ -121,6 +121,49 @@ func TestLoadOnceGlobalVars(t *testing.T) {
 	}
 }
 
+func TestLoadExportsIsUsableInModule(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	require.NoError(t, afero.WriteFile(fs, "/A.js", []byte(`
+		export function A() {
+			return "A";
+		}
+		export function B() {
+			return exports.A() + "B";
+		}
+	`), os.ModePerm))
+	r1, err := getSimpleRunnerWithFileFs("/script.js", `
+			import { A, B } from "./A.js";
+
+			export default function(data) {
+				if (A() != "A") {
+					throw new Error("wrong value of A() " + A());
+				}
+
+				if (B() != "AB") {
+					throw new Error("wrong value of B() " + B());
+				}
+			}
+		`, fs)
+	require.NoError(t, err)
+
+	arc := r1.MakeArchive()
+	r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
+	require.NoError(t, err)
+
+	runners := map[string]*Runner{"Source": r1, "Archive": r2}
+	for name, r := range runners {
+		r := r
+		t.Run(name, func(t *testing.T) {
+			ch := newDevNullSampleChannel()
+			defer close(ch)
+			vu, err := r.NewVU(ch)
+			require.NoError(t, err)
+			err = vu.RunOnce(context.Background())
+			require.NoError(t, err)
+		})
+	}
+}
+
 func TestLoadDoesntBreakHTTPGet(t *testing.T) {
 	// This test that functions such as http.get which require context still work if they are called
 	// inside script that is imported
