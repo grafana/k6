@@ -10,4 +10,5 @@ Description of feature.
 
 ## Bugs fixed!
 
-* Category: description of bug. (#PR)
+* HTTP: Use Request's GetBody in order to be able to get the body multiple times for a single
+  request as needed in 308 redirects of posts and if the server sends GOAWAY with no error (#1093)
