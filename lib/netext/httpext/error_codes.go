@@ -35,6 +35,10 @@ import (
 	"golang.org/x/net/http2"
 )
 
+// TODO: mave rename the type errorCode, so we can have errCode variables? and
+// also the constants would probably be better of if `ErrorCode` was a prefix,
+// not a suffix - they would be much easier for auto-autocompletion at least...
+
 type errCode uint32
 
 const (
@@ -72,6 +76,10 @@ const (
 	// HTTP2 Connection errors
 	unknownHTTP2ConnectionErrorCode errCode = 1650
 	// errors till 1651 + 13 are other HTTP2 Connection errors with a specific errCode
+
+	// Custom k6 content errors, i.e. when the magic fails
+	//defaultContentError errCode = 1700 // reserved for future use
+	responseDecompressionErrorCode errCode = 1701
 )
 
 const (
@@ -99,6 +107,8 @@ func http2ErrCodeOffset(code http2.ErrCode) errCode {
 // errorCodeForError returns the errorCode and a specific error message for given error.
 func errorCodeForError(err error) (errCode, string) {
 	switch e := errors.Cause(err).(type) {
+	case K6Error:
+		return e.Code, e.Message
 	case *net.DNSError:
 		switch e.Err {
 		case "no such host": // defined as private in the go stdlib
@@ -169,4 +179,28 @@ func errorCodeForError(err error) (errCode, string) {
 	default:
 		return defaultErrorCode, err.Error()
 	}
+}
+
+// K6Error is a helper struct that enhances Go errors with custom k6-specific
+// error-codes and more user-readable error messages.
+type K6Error struct {
+	Code          errCode
+	Message       string
+	OriginalError error
+}
+
+// NewK6Error is the constructor for K6Error
+func NewK6Error(code errCode, msg string, originalErr error) K6Error {
+	return K6Error{code, msg, originalErr}
+}
+
+// Error implements the `error` interface, so K6Errors are normal Go errors.
+func (k6Err K6Error) Error() string {
+	return k6Err.Message
+}
+
+// Unwrap implements the `xerrors.Wrapper` interface, so K6Errors are a bit
+// future-proof Go 2 errors.
+func (k6Err K6Error) Unwrap() error {
+	return k6Err.OriginalError
 }

@@ -1592,20 +1592,16 @@ func TestErrorCodes(t *testing.T) {
 			script:            `let res = http.request("GET", "HTTPBIN_URL/redirect-to?url=http://dafsgdhfjg/");`,
 		},
 		{
-			name:                "Non location redirect",
-			expectedErrorCode:   0,
-			expectedErrorMsg:    "",
-			script:              `let res = http.request("GET", "HTTPBIN_URL/no-location-redirect");`,
-			expectedScriptError: sr(`GoError: Get HTTPBIN_URL/no-location-redirect: 302 response missing Location header`),
+			name:              "Non location redirect",
+			expectedErrorCode: 1000,
+			expectedErrorMsg:  "302 response missing Location header",
+			script:            `let res = http.request("GET", "HTTPBIN_URL/no-location-redirect");`,
 		},
 		{
 			name:              "Bad location redirect",
-			expectedErrorCode: 0,
-			expectedErrorMsg:  "",
+			expectedErrorCode: 1000,
+			expectedErrorMsg:  "failed to parse Location header \"h\\t:/\": parse h\t:/: net/url: invalid control character in URL", //nolint: lll
 			script:            `let res = http.request("GET", "HTTPBIN_URL/bad-location-redirect");`,
-			expectedScriptError: sr(
-				"GoError: Get HTTPBIN_URL/bad-location-redirect: failed to parse Location header" +
-					" \"h\\t:/\": parse h\t:/: net/url: invalid control character in URL"),
 		},
 		{
 			name:              "Missing protocol",
@@ -1641,7 +1637,7 @@ func TestErrorCodes(t *testing.T) {
 			_, err := common.RunString(rt,
 				sr(testCase.script+"\n"+fmt.Sprintf(`
 			if (res.status != %d) { throw new Error("wrong status: "+ res.status);}
-			if (res.error != '%s') { throw new Error("wrong error: "+ res.error);}
+			if (res.error != %q) { throw new Error("wrong error: '" + res.error + "'");}
 			if (res.error_code != %d) { throw new Error("wrong error_code: "+ res.error_code);}
 			`, testCase.status, testCase.expectedErrorMsg, testCase.expectedErrorCode)))
 			if testCase.expectedScriptError == "" {
@@ -1823,4 +1819,30 @@ func BenchmarkHandlingOfResponseBodies(b *testing.B) {
 	b.Run("text", testResponseType("text"))
 	b.Run("binary", testResponseType("binary"))
 	b.Run("none", testResponseType("none"))
+}
+
+func TestErrorsWithDecompression(t *testing.T) {
+	t.Parallel()
+	tb, state, _, rt, _ := newRuntime(t)
+	defer tb.Cleanup()
+
+	state.Options.Throw = null.BoolFrom(false)
+
+	tb.Mux.HandleFunc("/broken-archive", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		enc := r.URL.Query()["encoding"][0]
+		w.Header().Set("Content-Encoding", enc)
+		_, _ = fmt.Fprintf(w, "Definitely not %s, but it's all cool...", enc)
+	}))
+
+	_, err := common.RunString(rt, tb.Replacer.Replace(`
+		function handleResponseEncodingError (encoding) {
+			let resp = http.get("HTTPBIN_URL/broken-archive?encoding=" + encoding);
+			if (resp.error_code != 1701) {
+				throw new Error("Expected error_code 1701 for '" + encoding +"', but got " + resp.error_code);
+			}
+		}
+
+		["gzip", "deflate", "br", "zstd"].forEach(handleResponseEncodingError);
+	`))
+	assert.NoError(t, err)
 }
