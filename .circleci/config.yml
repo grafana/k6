@@ -32,11 +32,11 @@ jobs:
           name: Run tests and code coverage
           command: |
             go version
-            export GOMAXPROCS=4
+            export GOMAXPROCS=2
             export PATH=$GOPATH/bin:$PATH
             echo "mode: set" > coverage.txt
             for pkg in $(go list ./... | grep -v vendor); do
-                go test -race -timeout 600s  --coverpkg="$(go list ./... | tr '\n' ',')" -coverprofile=$(echo $pkg | tr / -).coverage $pkg
+                go test -race -timeout 800s  --coverpkg="$(go list ./... | tr '\n' ',')" -coverprofile=$(echo $pkg | tr / -).coverage $pkg
             done
             grep -h -v "^mode:" *.coverage >> coverage.txt
             rm -f *.coverage
@@ -55,9 +55,9 @@ jobs:
           name: Run tests with previous Go version
           command: |
             go version
-            export GOMAXPROCS=4
+            export GOMAXPROCS=2
             export PATH=$GOPATH/bin:$PATH
-            go test -race -timeout 600s ./...
+            go test -parallel 2 -race -timeout 800s ./...
 
   build-docker-images:
     docker:
