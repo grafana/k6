@@ -52,7 +52,7 @@ func (t digestTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	noAuthResponse, err := t.originalTransport.RoundTrip(req)
 	if err != nil || noAuthResponse.StatusCode != http.StatusUnauthorized {
 		// If there was an error, or if the remote server didn't respond with
-		// status 401, we simply return, so the upsteam code can deal with it.
+		// status 401, we simply return, so the upstream code can deal with it.
 		return noAuthResponse, err
 	}
 
@@ -79,6 +79,6 @@ func (t digestTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		}
 	}
 
-	// Actually make the HTTP request with the propper Authorization
+	// Actually make the HTTP request with the proper Authorization
 	return t.originalTransport.RoundTrip(req)
 }
