@@ -45,6 +45,7 @@ import (
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/stats"
+	"github.com/mccutchen/go-httpbin/httpbin"
 	"github.com/oxtoacart/bpool"
 	"github.com/sirupsen/logrus"
 	logtest "github.com/sirupsen/logrus/hooks/test"
@@ -1845,4 +1846,37 @@ func TestErrorsWithDecompression(t *testing.T) {
 		["gzip", "deflate", "br", "zstd"].forEach(handleResponseEncodingError);
 	`))
 	assert.NoError(t, err)
+}
+
+func TestDigestAuthWithBody(t *testing.T) {
+	t.Parallel()
+	tb, state, samples, rt, _ := newRuntime(t)
+	defer tb.Cleanup()
+
+	state.Options.Throw = null.BoolFrom(true)
+
+	tb.Mux.HandleFunc("/digest-auth-with-post/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "POST", r.Method)
+		body, err := ioutil.ReadAll(r.Body)
+		require.NoError(t, err)
+		require.Equal(t, "super secret body", string(body))
+		httpbin.New().DigestAuth(w, r) // this doesn't read the body
+	}))
+
+	// TODO: fix, the metric tags shouldn't have credentials (https://github.com/loadimpact/k6/issues/1103)
+	urlWithCreds := tb.Replacer.Replace(
+		"http://testuser:testpwd@HTTPBIN_IP:HTTPBIN_PORT/digest-auth-with-post/auth/testuser/testpwd",
+	)
+
+	_, err := common.RunString(rt, fmt.Sprintf(`
+		let res = http.post(%q, "super secret body", { auth: "digest" });
+		if (res.status !== 200) { throw new Error("wrong status: " + res.status); }
+		if (res.error_code !== 0) { throw new Error("wrong error code: " + res.error_code); }
+	`, urlWithCreds))
+	require.NoError(t, err)
+
+	expectedURL := tb.Replacer.Replace("HTTPBIN_IP_URL/digest-auth-with-post/auth/testuser/testpwd")
+	sampleContainers := stats.GetBufferedSamples(samples)
+	assertRequestMetricsEmitted(t, sampleContainers[0:1], "POST", expectedURL, urlWithCreds, 401, "")
+	assertRequestMetricsEmitted(t, sampleContainers[1:2], "POST", expectedURL, urlWithCreds, 200, "")
 }
