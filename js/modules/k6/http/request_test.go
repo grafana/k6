@@ -1854,6 +1854,7 @@ func TestDigestAuthWithBody(t *testing.T) {
 	defer tb.Cleanup()
 
 	state.Options.Throw = null.BoolFrom(true)
+	state.Options.HttpDebug = null.StringFrom("full")
 
 	tb.Mux.HandleFunc("/digest-auth-with-post/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, "POST", r.Method)
