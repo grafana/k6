@@ -35,7 +35,7 @@ import (
 	"golang.org/x/net/http2"
 )
 
-// TODO: mave rename the type errorCode, so we can have errCode variables? and
+// TODO: maybe rename the type errorCode, so we can have errCode variables? and
 // also the constants would probably be better of if `ErrorCode` was a prefix,
 // not a suffix - they would be much easier for auto-autocompletion at least...
 

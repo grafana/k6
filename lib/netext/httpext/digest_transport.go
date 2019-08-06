@@ -31,7 +31,7 @@ type digestTransport struct {
 	originalTransport http.RoundTripper
 }
 
-// RoundTrip is handles digest auth by behaving like an http.RoundTripper
+// RoundTrip handles digest auth by behaving like an http.RoundTripper
 //
 // TODO: fix - this is a preliminary solution and is somewhat broken! we're
 // always making 2 HTTP requests when digest authentication is enabled... we
