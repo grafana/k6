@@ -31,14 +31,12 @@ import (
 	"net"
 	"net/http"
 	"net/http/cookiejar"
-	"net/http/httputil"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
 	ntlmssp "github.com/Azure/go-ntlmssp"
-	digest "github.com/Soontao/goHttpDigestClient"
 	"github.com/andybalholm/brotli"
 	"github.com/klauspost/compress/zstd"
 	"github.com/loadimpact/k6/lib"
@@ -193,6 +191,43 @@ func compressBody(algos []CompressionType, body io.ReadCloser) (*bytes.Buffer, s
 	return buf, contentEncoding, body.Close()
 }
 
+//nolint:gochecknoglobals
+var decompressionErrors = [...]error{
+	zlib.ErrChecksum, zlib.ErrDictionary, zlib.ErrHeader,
+	gzip.ErrChecksum, gzip.ErrHeader,
+	//TODO: handle brotli errors - currently unexported
+	zstd.ErrReservedBlockType, zstd.ErrCompressedSizeTooBig, zstd.ErrBlockTooSmall, zstd.ErrMagicMismatch,
+	zstd.ErrWindowSizeExceeded, zstd.ErrWindowSizeTooSmall, zstd.ErrDecoderSizeExceeded, zstd.ErrUnknownDictionary,
+	zstd.ErrFrameSizeExceeded, zstd.ErrCRCMismatch, zstd.ErrDecoderClosed,
+}
+
+func newDecompressionError(originalErr error) K6Error {
+	return NewK6Error(
+		responseDecompressionErrorCode,
+		fmt.Sprintf("error decompressing response body (%s)", originalErr.Error()),
+		originalErr,
+	)
+}
+
+func wrapDecompressionError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	// TODO: something more optimized? for example, we won't get zstd errors if
+	// we don't use it... maybe the code that builds the decompression readers
+	// could also add an appropriate error-wrapper layer?
+	for _, decErr := range decompressionErrors {
+		if err == decErr {
+			return newDecompressionError(err)
+		}
+	}
+	if strings.HasPrefix(err.Error(), "brotli: ") { //TODO: submit an upstream patch and fix...
+		return newDecompressionError(err)
+	}
+	return err
+}
+
 func readResponseBody(
 	state *lib.State, respType ResponseType, resp *http.Response, respErr error,
 ) (interface{}, error) {
@@ -220,30 +255,30 @@ func readResponseBody(
 	// Transparently decompress the body if it's has a content-encoding we
 	// support. If not, simply return it as it is.
 	contentEncoding := strings.TrimSpace(resp.Header.Get("Content-Encoding"))
+	//TODO: support stacked compressions, e.g. `deflate, gzip`
 	if compression, err := CompressionTypeString(contentEncoding); err == nil {
-		var decoder io.ReadCloser
+		var decoder io.Reader
+		var err error
 		switch compression {
 		case CompressionTypeDeflate:
-			decoder, respErr = zlib.NewReader(resp.Body)
-			rc = &readCloser{decoder}
+			decoder, err = zlib.NewReader(resp.Body)
 		case CompressionTypeGzip:
-			decoder, respErr = gzip.NewReader(resp.Body)
-			rc = &readCloser{decoder}
+			decoder, err = gzip.NewReader(resp.Body)
 		case CompressionTypeZstd:
-			var zstdecoder *zstd.Decoder
-			zstdecoder, respErr = zstd.NewReader(resp.Body)
-			rc = &readCloser{zstdecoder}
+			decoder, err = zstd.NewReader(resp.Body)
 		case CompressionTypeBr:
-			var brdecoder *brotli.Reader
-			brdecoder = brotli.NewReader(resp.Body)
-			rc = &readCloser{brdecoder}
+			decoder = brotli.NewReader(resp.Body)
 		default:
 			// We have not implemented a compression ... :(
-			respErr = fmt.Errorf(
-				"unsupported compression type %s for decompression - this is a bug in k6, please report it",
+			err = fmt.Errorf(
+				"unsupported compression type %s - this is a bug in k6, please report it",
 				compression,
 			)
 		}
+		if err != nil {
+			return nil, newDecompressionError(err)
+		}
+		rc = &readCloser{decoder}
 	}
 
 	buf := state.BPool.Get()
@@ -251,11 +286,12 @@ func readResponseBody(
 	buf.Reset()
 	_, err := io.Copy(buf, rc.Reader)
 	if err != nil {
-		respErr = err
+		respErr = wrapDecompressionError(err)
 	}
+
 	err = rc.Close()
-	if err != nil {
-		respErr = err
+	if err != nil && respErr == nil { // Don't overwrite previous errors
+		respErr = wrapDecompressionError(err)
 	}
 
 	var result interface{}
@@ -276,6 +312,7 @@ func readResponseBody(
 	return result, respErr
 }
 
+//TODO: move as a response method? or constructor?
 func updateK6Response(k6Response *Response, finishedReq *finishedRequest) {
 	k6Response.ErrorCode = int(finishedReq.errorCode)
 	k6Response.Error = finishedReq.errorMsg
@@ -394,10 +431,18 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 
 	tracerTransport := newTransport(state, tags)
 	var transport http.RoundTripper = tracerTransport
-	if preq.Auth == "ntlm" {
-		transport = ntlmssp.Negotiator{
-			RoundTripper: tracerTransport,
+
+	if state.Options.HttpDebug.String != "" {
+		transport = httpDebugTransport{
+			originalTransport: transport,
+			httpDebugOption:   state.Options.HttpDebug.String,
 		}
+	}
+
+	if preq.Auth == "digest" {
+		transport = digestTransport{originalTransport: transport}
+	} else if preq.Auth == "ntlm" {
+		transport = ntlmssp.Negotiator{RoundTripper: transport}
 	}
 
 	resp := &Response{ctx: ctx, URL: preq.URL.URL, Request: *respReq}
@@ -406,7 +451,6 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 		Timeout:   preq.Timeout,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			resp.URL = req.URL.String()
-			debugResponse(state, req.Response, "RedirectResponse")
 
 			// Update active jar with cookies found in "Set-Cookie" header(s) of redirect response
 			if preq.ActiveJar != nil {
@@ -429,67 +473,15 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 				}
 				return http.ErrUseLastResponse
 			}
-			debugRequest(state, req, "RedirectRequest")
 			return nil
 		},
 	}
 
-	// if digest authentication option is passed, make an initial request
-	// to get the authentication params to compute the authorization header
-	if preq.Auth == "digest" {
-		// TODO: fix - this is very broken! we're always making 2 HTTP requests
-		// when digest authentication is enabled... we should refactor it as a
-		// separate transport, like how NTLM auth works
-		//
-		// Github issue: https://github.com/loadimpact/k6/issues/800
-		username := preq.URL.u.User.Username()
-		password, _ := preq.URL.u.User.Password()
-
-		// removing user from URL to avoid sending the authorization header fo basic auth
-		preq.Req.URL.User = nil
-
-		debugRequest(state, preq.Req, "DigestRequest")
-		res, err := client.Do(preq.Req.WithContext(ctx))
-		debugResponse(state, res, "DigestResponse")
-		body, err := readResponseBody(state, ResponseTypeText, res, err)
-		finishedReq := tracerTransport.processLastSavedRequest()
-		if finishedReq != nil {
-			resp.ErrorCode = int(finishedReq.errorCode)
-			resp.Error = finishedReq.errorMsg
-		}
-
-		if err != nil {
-			// Do *not* log errors about the contex being cancelled.
-			select {
-			case <-ctx.Done():
-			default:
-				state.Logger.WithField("error", err).Warn("Digest request failed")
-			}
-
-			// In case we have an error but resp.Error is not set it means the error is not from
-			// the transport. For all such errors currently we just return them as if throw is true
-			if preq.Throw || resp.Error == "" {
-				return nil, err
-			}
-
-			return resp, nil
-		}
-
-		if res.StatusCode == http.StatusUnauthorized {
-			challenge := digest.GetChallengeFromHeader(&res.Header)
-			challenge.ComputeResponse(preq.Req.Method, preq.Req.URL.RequestURI(), body.(string), username, password)
-			authorization := challenge.ToAuthorizationStr()
-			preq.Req.Header.Set(digest.KEY_AUTHORIZATION, authorization)
-		}
-	}
-
-	debugRequest(state, preq.Req, "Request")
 	mreq := preq.Req.WithContext(ctx)
 	res, resErr := client.Do(mreq)
-	debugResponse(state, res, "Response")
 
 	resp.Body, resErr = readResponseBody(state, preq.ResponseType, res, resErr)
-	finishedReq := tracerTransport.processLastSavedRequest()
+	finishedReq := tracerTransport.processLastSavedRequest(wrapDecompressionError(resErr))
 	if finishedReq != nil {
 		updateK6Response(resp, finishedReq)
 	}
@@ -538,9 +530,7 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 			state.Logger.WithField("error", resErr).Warn("Request Failed")
 		}
 
-		// In case we have an error but resp.Error is not set it means the error is not from
-		// the transport. For all such errors currently we just return them as if throw is true
-		if preq.Throw || resp.Error == "" {
+		if preq.Throw {
 			return nil, resErr
 		}
 	}
@@ -563,17 +553,4 @@ func SetRequestCookies(req *http.Request, jar *cookiejar.Jar, reqCookies map[str
 			req.AddCookie(&http.Cookie{Name: c.Name, Value: c.Value})
 		}
 	}
-}
-
-func debugRequest(state *lib.State, req *http.Request, description string) {
-	if state.Options.HttpDebug.String != "" {
-		dump, err := httputil.DumpRequestOut(req, state.Options.HttpDebug.String == "full")
-		if err != nil {
-			log.Fatal(err)
-		}
-		logDump(description, dump)
-	}
-}
-func logDump(description string, dump []byte) {
-	fmt.Printf("%s:\n%s\n", description, dump)
 }
