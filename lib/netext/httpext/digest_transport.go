@@ -40,16 +40,19 @@ type digestTransport struct {
 //
 // Github issue: https://github.com/loadimpact/k6/issues/800
 func (t digestTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	// Make an initial request authentication params to compute the
+	// Make the initial request authentication params to compute the
 	// authorization header
 	username := req.URL.User.Username()
 	password, _ := req.URL.User.Password()
 
-	// Removing user from URL to avoid sending the authorization header fo basic auth
+	// Remove the user data from the URL to avoid sending the authorization
+	// header for basic auth
 	req.URL.User = nil
 
 	noAuthResponse, err := t.originalTransport.RoundTrip(req)
 	if err != nil || noAuthResponse.StatusCode != http.StatusUnauthorized {
+		// If there was an error, or if the remote server didn't respond with
+		// status 401, we simply return, so the upsteam code can deal with it.
 		return noAuthResponse, err
 	}
 
@@ -59,16 +62,23 @@ func (t digestTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 	_ = noAuthResponse.Body.Close()
 
+	// Calculate the Authorization header
+	// TODO: determine if we actually need the body, since I'm not sure that's
+	// what the `entity` means... maybe a moot point if we change the used
+	// digest auth library...
 	challenge := digest.GetChallengeFromHeader(&noAuthResponse.Header)
 	challenge.ComputeResponse(req.Method, req.URL.RequestURI(), string(respBody), username, password)
 	authorization := challenge.ToAuthorizationStr()
-
 	req.Header.Set(digest.KEY_AUTHORIZATION, authorization)
+
 	if req.GetBody != nil {
+		// Reset the request body if we need to
 		req.Body, err = req.GetBody()
 		if err != nil {
 			return nil, err
 		}
 	}
+
+	// Actually make the HTTP request with the propper Authorization
 	return t.originalTransport.RoundTrip(req)
 }

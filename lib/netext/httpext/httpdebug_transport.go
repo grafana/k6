@@ -41,7 +41,6 @@ type httpDebugTransport struct {
 //  - https://github.com/loadimpact/k6/issues/1042
 //  - https://github.com/loadimpact/k6/issues/774
 func (t httpDebugTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	// Make an initial reques
 	t.debugRequest(req)
 	resp, err := t.originalTransport.RoundTrip(req)
 	t.debugResponse(resp)
