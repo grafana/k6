@@ -24,13 +24,9 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
-	"net/http"
-	"net/http/httputil"
 
-	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 )
 
@@ -113,16 +109,6 @@ func (res *Response) setTLSInfo(tlsState *tls.ConnectionState) {
 // GetCtx return the response context
 func (res *Response) GetCtx() context.Context {
 	return res.ctx
-}
-
-func debugResponse(state *lib.State, res *http.Response, description string) {
-	if state.Options.HttpDebug.String != "" && res != nil {
-		dump, err := httputil.DumpResponse(res, state.Options.HttpDebug.String == "full")
-		if err != nil {
-			log.Fatal(err)
-		}
-		logDump(description, dump)
-	}
 }
 
 // JSON parses the body of a response as json and returns it to the goja VM

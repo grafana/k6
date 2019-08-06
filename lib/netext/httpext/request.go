@@ -31,7 +31,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/cookiejar"
-	"net/http/httputil"
 	"net/url"
 	"strconv"
 	"strings"
@@ -433,11 +432,12 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 	tracerTransport := newTransport(state, tags)
 	var transport http.RoundTripper = tracerTransport
 
-	// TODO: if HttpDebug is enabled, inject the debug transport here? or use
-	// something like a virtual proxy for more accurate results, so we can catch
-	// things like HTTP/2 and exact headers? Connected issues:
-	// https://github.com/loadimpact/k6/issues/986,
-	// https://github.com/loadimpact/k6/issues/1042
+	if state.Options.HttpDebug.String != "" {
+		transport = httpDebugTransport{
+			originalTransport: transport,
+			httpDebugOption:   state.Options.HttpDebug.String,
+		}
+	}
 
 	if preq.Auth == "digest" {
 		transport = digestTransport{originalTransport: transport}
@@ -451,7 +451,6 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 		Timeout:   preq.Timeout,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			resp.URL = req.URL.String()
-			debugResponse(state, req.Response, "RedirectResponse")
 
 			// Update active jar with cookies found in "Set-Cookie" header(s) of redirect response
 			if preq.ActiveJar != nil {
@@ -474,15 +473,12 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 				}
 				return http.ErrUseLastResponse
 			}
-			debugRequest(state, req, "RedirectRequest")
 			return nil
 		},
 	}
 
-	debugRequest(state, preq.Req, "Request")
 	mreq := preq.Req.WithContext(ctx)
 	res, resErr := client.Do(mreq)
-	debugResponse(state, res, "Response")
 
 	resp.Body, resErr = readResponseBody(state, preq.ResponseType, res, resErr)
 	finishedReq := tracerTransport.processLastSavedRequest(wrapDecompressionError(resErr))
@@ -557,17 +553,4 @@ func SetRequestCookies(req *http.Request, jar *cookiejar.Jar, reqCookies map[str
 			req.AddCookie(&http.Cookie{Name: c.Name, Value: c.Value})
 		}
 	}
-}
-
-func debugRequest(state *lib.State, req *http.Request, description string) {
-	if state.Options.HttpDebug.String != "" {
-		dump, err := httputil.DumpRequestOut(req, state.Options.HttpDebug.String == "full")
-		if err != nil {
-			log.Fatal(err)
-		}
-		logDump(description, dump)
-	}
-}
-func logDump(description string, dump []byte) {
-	fmt.Printf("%s:\n%s\n", description, dump)
 }
