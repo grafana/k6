@@ -162,13 +162,20 @@ func (t *transport) saveCurrentRequest(currentRequest *unfinishedRequest) {
 	}
 }
 
-func (t *transport) processLastSavedRequest() *finishedRequest {
+func (t *transport) processLastSavedRequest(lastErr error) *finishedRequest {
 	t.lastRequestLock.Lock()
 	unprocessedRequest := t.lastRequest
 	t.lastRequest = nil
 	t.lastRequestLock.Unlock()
 
 	if unprocessedRequest != nil {
+		// We don't want to overwrite any previous errors, but if there were
+		// none and we (i.e. the MakeRequest() function) have one, save it
+		// before we emit the metrics.
+		if unprocessedRequest.err == nil && lastErr != nil {
+			unprocessedRequest.err = lastErr
+		}
+
 		return t.measureAndEmitMetrics(unprocessedRequest)
 	}
 	return nil
@@ -176,7 +183,7 @@ func (t *transport) processLastSavedRequest() *finishedRequest {
 
 // RoundTrip is the implementation of http.RoundTripper
 func (t *transport) RoundTrip(req *http.Request) (*http.Response, error) {
-	t.processLastSavedRequest()
+	t.processLastSavedRequest(nil)
 
 	ctx := req.Context()
 	tracer := &Tracer{}
