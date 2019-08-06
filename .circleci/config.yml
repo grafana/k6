@@ -57,7 +57,7 @@ jobs:
             go version
             export GOMAXPROCS=2
             export PATH=$GOPATH/bin:$PATH
-            go test -parallel 2 -race -timeout 800s ./...
+            go test -p 2 -race -timeout 800s ./...
 
   build-docker-images:
     docker:
