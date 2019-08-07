@@ -390,13 +390,13 @@ func buildK6RequestObject(req *Request) (string, error) {
 func buildK6Headers(headers []Header) []string {
 	var h []string
 	if len(headers) > 0 {
-		m := make(map[string]Header)
+		ignored := map[string]bool{"cookie": true, "content-length": true}
 		for _, header := range headers {
 			name := strings.ToLower(header.Name)
-			_, exists := m[name]
-			// Avoid SPDY's, duplicated or cookie headers
-			if !exists && name[0] != ':' && name != "cookie" {
-				m[strings.ToLower(header.Name)] = header
+			_, isIgnored := ignored[name]
+			// Avoid SPDY's, duplicated or ignored headers
+			if !isIgnored && name[0] != ':' {
+				ignored[name] = true
 				h = append(h, fmt.Sprintf("%q: %q", header.Name, header.Value))
 			}
 		}

@@ -52,8 +52,7 @@ export default function() {
 					"Accept": "application/json; charset=utf-8",
 					"Content-Type": "application/json",
 					"Accept-Encoding": "gzip;q=1.0,deflate;q=0.6,identity;q=0.3",
-					"Host": "some-host.example.com",
-					"Content-Length": "2042"
+					"Host": "some-host.example.com"
 				}
 			}
 		)
@@ -178,8 +177,7 @@ export default function() {
 					"Content-Type": "application/vnd.checkout.client-order-v1+json",
 					"Accept": "application/vnd.checkout.server-order-v1+json",
 					"Accept-Encoding": "gzip;q=1.0,deflate;q=0.6,identity;q=0.3",
-					"Host": "some-other-host.example.com",
-					"Content-Length": "4351"
+					"Host": "some-other-host.example.com"
 				}
 			}
 		)
@@ -284,8 +282,7 @@ export default function() {
 					"Content-Type": "application/vnd.checkout.client-order-v1+json",
 					"Accept": "application/vnd.checkout.server-order-v1+json",
 					"Accept-Encoding": "gzip;q=1.0,deflate;q=0.6,identity;q=0.3",
-					"Host": "some-other-host.example.com",
-					"Content-Length": "5003"
+					"Host": "some-other-host.example.com"
 				}
 			}
 		)
@@ -388,8 +385,7 @@ export default function() {
 					"Content-Type": "application/vnd.checkout.client-order-v1+json",
 					"Accept": "application/vnd.checkout.server-order-v1+json",
 					"Accept-Encoding": "gzip;q=1.0,deflate;q=0.6,identity;q=0.3",
-					"Host": "some-other-host.example.com",
-					"Content-Length": "4774"
+					"Host": "some-other-host.example.com"
 				}
 			}
 		)

@@ -1395,9 +1395,8 @@ func TestRequestCompression(t *testing.T) {
 					}
 				);
 			`))
-			require.Error(t, err)
-			// TODO: This probably shouldn't be like this
-			require.Contains(t, err.Error(), "http: ContentLength=12 with Body length 211")
+			require.NoError(t, err)
+			// TODO: test for warnings with the log hook
 		})
 	})
 }
