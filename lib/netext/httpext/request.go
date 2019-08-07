@@ -45,10 +45,6 @@ import (
 	null "gopkg.in/guregu/null.v3"
 )
 
-const compressionHeaderOverwriteMessage = "Both compression and the `%s` header were specified " +
-	"in the %s request for '%s', the custom header has precedence and won't be overwritten. " +
-	"This will likely result in invalid data being sent to the server."
-
 // HTTPRequestCookie is a representation of a cookie used for request objects
 type HTTPRequestCookie struct {
 	Name, Value string
@@ -346,47 +342,31 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 		Headers: preq.Req.Header,
 	}
 
-	if contentLength := preq.Req.Header.Get("Content-Length"); contentLength != "" {
-		length, err := strconv.Atoi(contentLength)
-		if err == nil {
-			preq.Req.ContentLength = int64(length)
-		}
-		// TODO: maybe do something in the other case ... but no error
-	}
-
 	if preq.Body != nil {
-
 		// TODO: maybe hide this behind of flag in order for this to not happen for big post/puts?
 		// should we set this after the compression? what will be the point ?
 		respReq.Body = preq.Body.String()
 
-		switch {
-		case len(preq.Compressions) > 0:
-			var (
-				contentEncoding string
-				err             error
-			)
-			preq.Body, contentEncoding, err = compressBody(preq.Compressions, ioutil.NopCloser(preq.Body))
+		if len(preq.Compressions) > 0 {
+			compressedBody, contentEncoding, err := compressBody(preq.Compressions, ioutil.NopCloser(preq.Body))
 			if err != nil {
 				return nil, err
 			}
+			preq.Body = compressedBody
 
-			if preq.Req.Header.Get("Content-Length") == "" {
-				preq.Req.ContentLength = int64(preq.Body.Len())
-			} else {
-				state.Logger.Warningf(compressionHeaderOverwriteMessage, "Content-Length", preq.Req.Method, preq.Req.URL)
-			}
-			if preq.Req.Header.Get("Content-Encoding") == "" {
+			currentContentEncoding := preq.Req.Header.Get("Content-Encoding")
+			if currentContentEncoding == "" {
 				preq.Req.Header.Set("Content-Encoding", contentEncoding)
-			} else {
-				state.Logger.Warningf(compressionHeaderOverwriteMessage, "Content-Encoding", preq.Req.Method, preq.Req.URL)
+			} else if currentContentEncoding != contentEncoding {
+				state.Logger.Warningf(
+					"There's a mismatch between the desired `compression` the manually set `Content-Encoding` header "+
+						"in the %s request for '%s', the custom header has precedence and won't be overwritten. "+
+						"This may result in invalid data being sent to the server.", preq.Req.Method, preq.Req.URL,
+				)
 			}
-		case preq.Req.Header.Get("Content-Length") == "":
-			preq.Req.ContentLength = int64(preq.Body.Len())
 		}
-		// TODO: print some message in case we have Content-Length set so that we can warn users
-		// that setting it manually can lead to bad requests
 
+		preq.Req.ContentLength = int64(preq.Body.Len()) // This will make Go set the content-length header
 		preq.Req.GetBody = func() (io.ReadCloser, error) {
 			//  using `Bytes()` should reuse the same buffer and as such help with the memory usage. We
 			//  should not be writing to it any way so there shouldn't be way to corrupt it (?)
@@ -394,6 +374,20 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 		}
 		// as per the documentation using GetBody still requires setting the Body.
 		preq.Req.Body, _ = preq.Req.GetBody()
+	}
+
+	if contentLengthHeader := preq.Req.Header.Get("Content-Length"); contentLengthHeader != "" {
+		// The content-length header was set by the user, delete it (since Go
+		// will set it automatically) and warn if there were differences
+		preq.Req.Header.Del("Content-Length")
+		length, err := strconv.Atoi(contentLengthHeader)
+		if err != nil || preq.Req.ContentLength != int64(length) {
+			state.Logger.Warnf(
+				"The specified Content-Length header %q in the %s request for %s "+
+					"doesn't match the actual request body length of %d, so it will be ignored!",
+				contentLengthHeader, preq.Req.Method, preq.Req.URL, length,
+			)
+		}
 	}
 
 	tags := state.Options.RunTags.CloneTags()
