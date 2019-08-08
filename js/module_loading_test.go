@@ -43,30 +43,50 @@ func newDevNullSampleChannel() chan stats.SampleContainer {
 }
 
 func TestLoadOnceGlobalVars(t *testing.T) {
-	fs := afero.NewMemMapFs()
-	require.NoError(t, afero.WriteFile(fs, "/C.js", []byte(`
-		var globalVar;
-		if (!globalVar) {
-			globalVar = Math.random();
-		}
-		export function C() {
-			return globalVar;
-		}
-	`), os.ModePerm))
+	var testCases = map[string]string{
+		"module.exports": `
+			var globalVar;
+			if (!globalVar) {
+				globalVar = Math.random();
+			}
+			function C() {
+				return globalVar;
+			}
+			module.exports = {
+				C: C,
+			}
+		`,
+		"direct export": `
 
-	require.NoError(t, afero.WriteFile(fs, "/A.js", []byte(`
+			var globalVar;
+			if (!globalVar) {
+				globalVar = Math.random();
+			}
+			export function C() {
+				return globalVar;
+			}
+		`,
+	}
+	for name, data := range testCases {
+		cData := data
+		t.Run(name, func(t *testing.T) {
+
+			fs := afero.NewMemMapFs()
+			require.NoError(t, afero.WriteFile(fs, "/C.js", []byte(cData), os.ModePerm))
+
+			require.NoError(t, afero.WriteFile(fs, "/A.js", []byte(`
 		import { C } from "./C.js";
 		export function A() {
 			return C();
 		}
 	`), os.ModePerm))
-	require.NoError(t, afero.WriteFile(fs, "/B.js", []byte(`
-		import { C } from "./C.js";
+			require.NoError(t, afero.WriteFile(fs, "/B.js", []byte(`
+		var  c = require("./C.js");
 		export function B() {
-			return C();
+			return c.C();
 		}
 	`), os.ModePerm))
-	r1, err := getSimpleRunnerWithFileFs("/script.js", `
+			r1, err := getSimpleRunnerWithFileFs("/script.js", `
 			import { A } from "./A.js";
 			import { B } from "./B.js";
 
@@ -76,6 +96,51 @@ func TestLoadOnceGlobalVars(t *testing.T) {
 				}
 				if (A() != B()) {
 					throw new Error("A() != B()    (" + A() + ") != (" + B() + ")");
+				}
+			}
+		`, fs)
+			require.NoError(t, err)
+
+			arc := r1.MakeArchive()
+			r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
+			require.NoError(t, err)
+
+			runners := map[string]*Runner{"Source": r1, "Archive": r2}
+			for name, r := range runners {
+				r := r
+				t.Run(name, func(t *testing.T) {
+					ch := newDevNullSampleChannel()
+					defer close(ch)
+					vu, err := r.NewVU(ch)
+					require.NoError(t, err)
+					err = vu.RunOnce(context.Background())
+					require.NoError(t, err)
+				})
+			}
+		})
+	}
+}
+
+func TestLoadExportsIsUsableInModule(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	require.NoError(t, afero.WriteFile(fs, "/A.js", []byte(`
+		export function A() {
+			return "A";
+		}
+		export function B() {
+			return exports.A() + "B";
+		}
+	`), os.ModePerm))
+	r1, err := getSimpleRunnerWithFileFs("/script.js", `
+			import { A, B } from "./A.js";
+
+			export default function(data) {
+				if (A() != "A") {
+					throw new Error("wrong value of A() " + A());
+				}
+
+				if (B() != "AB") {
+					throw new Error("wrong value of B() " + B());
 				}
 			}
 		`, fs)
