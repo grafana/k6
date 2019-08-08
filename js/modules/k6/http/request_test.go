@@ -1255,6 +1255,9 @@ func TestRequestCompression(t *testing.T) {
 	tb, state, _, rt, _ := newRuntime(t)
 	defer tb.Cleanup()
 
+	logHook := testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.WarnLevel}}
+	state.Logger.AddHook(&logHook)
+
 	// We don't expect any failed requests
 	state.Options.Throw = null.BoolFrom(true)
 
@@ -1374,6 +1377,8 @@ func TestRequestCompression(t *testing.T) {
 	t.Run("custom set header", func(t *testing.T) {
 		expectedEncoding = "not, valid"
 		actualEncoding = "gzip, deflate"
+
+		logHook.Drain()
 		t.Run("encoding", func(t *testing.T) {
 			_, err := common.RunString(rt, tb.Replacer.Replace(`
 				http.post("HTTPBIN_URL/compressed-text", `+"`"+text+"`"+`,
@@ -1383,7 +1388,7 @@ func TestRequestCompression(t *testing.T) {
 				);
 			`))
 			require.NoError(t, err)
-
+			require.NotEmpty(t, logHook.Drain())
 		})
 
 		t.Run("encoding and length", func(t *testing.T) {
@@ -1396,7 +1401,40 @@ func TestRequestCompression(t *testing.T) {
 				);
 			`))
 			require.NoError(t, err)
-			// TODO: test for warnings with the log hook
+			require.NotEmpty(t, logHook.Drain())
+		})
+
+		expectedEncoding = actualEncoding
+		t.Run("correct encoding", func(t *testing.T) {
+			_, err := common.RunString(rt, tb.Replacer.Replace(`
+				http.post("HTTPBIN_URL/compressed-text", `+"`"+text+"`"+`,
+					{"compression": "`+actualEncoding+`",
+					 "headers": {"Content-Encoding": "`+actualEncoding+`"}
+					}
+				);
+			`))
+			require.NoError(t, err)
+			require.Empty(t, logHook.Drain())
+		})
+
+		//TODO: move to some other test?
+		t.Run("correct length", func(t *testing.T) {
+			_, err := common.RunString(rt, tb.Replacer.Replace(
+				`http.post("HTTPBIN_URL/post", "0123456789", { "headers": {"Content-Length": "10"}});`,
+			))
+			require.NoError(t, err)
+			require.Empty(t, logHook.Drain())
+		})
+
+		t.Run("content-length is set", func(t *testing.T) {
+			_, err := common.RunString(rt, tb.Replacer.Replace(`
+				let resp = http.post("HTTPBIN_URL/post", "0123456789");
+				if (resp.json().headers["Content-Length"][0] != "10") {
+					throw new Error("content-length not set: " + JSON.stringify(resp.json().headers));
+				}
+			`))
+			require.NoError(t, err)
+			require.Empty(t, logHook.Drain())
 		})
 	})
 }

@@ -385,7 +385,7 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 			state.Logger.Warnf(
 				"The specified Content-Length header %q in the %s request for %s "+
 					"doesn't match the actual request body length of %d, so it will be ignored!",
-				contentLengthHeader, preq.Req.Method, preq.Req.URL, length,
+				contentLengthHeader, preq.Req.Method, preq.Req.URL, preq.Req.ContentLength,
 			)
 		}
 	}
