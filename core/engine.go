@@ -26,12 +26,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sirupsen/logrus"
+	"gopkg.in/guregu/null.v3"
+
 	"github.com/loadimpact/k6/core/local"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/stats"
-	log "github.com/sirupsen/logrus"
-	"gopkg.in/guregu/null.v3"
 )
 
 const (
@@ -55,7 +56,7 @@ type Engine struct {
 	NoThresholds bool
 	NoSummary    bool
 
-	logger *log.Logger
+	logger *logrus.Logger
 
 	Metrics     map[string]*stats.Metric
 	MetricsLock sync.Mutex
@@ -81,7 +82,7 @@ func NewEngine(ex lib.Executor, o lib.Options) (*Engine, error) {
 		Metrics:  make(map[string]*stats.Metric),
 		Samples:  make(chan stats.SampleContainer, o.MetricSamplesBufferSize.Int64),
 	}
-	e.SetLogger(log.StandardLogger())
+	e.SetLogger(logrus.StandardLogger())
 
 	if err := ex.SetVUsMax(o.VUsMax.Int64); err != nil {
 		return nil, err
@@ -124,7 +125,7 @@ func (e *Engine) Run(ctx context.Context) error {
 
 	e.logger.Debug("Engine: Starting with parameters...")
 	for i, st := range e.Executor.GetStages() {
-		fields := make(log.Fields)
+		fields := make(logrus.Fields)
 		if st.Target.Valid {
 			fields["tgt"] = st.Target.Int64
 		}
@@ -134,7 +135,7 @@ func (e *Engine) Run(ctx context.Context) error {
 		e.logger.WithFields(fields).Debugf(" - stage #%d", i)
 	}
 
-	fields := make(log.Fields)
+	fields := make(logrus.Fields)
 	if endTime := e.Executor.GetEndTime(); endTime.Valid {
 		fields["time"] = endTime.Duration
 	}
@@ -252,12 +253,14 @@ func (e *Engine) IsTainted() bool {
 	return e.thresholdsTainted
 }
 
-func (e *Engine) SetLogger(l *log.Logger) {
+// SetLogger sets Engine's loggger.
+func (e *Engine) SetLogger(l *logrus.Logger) {
 	e.logger = l
 	e.Executor.SetLogger(l)
 }
 
-func (e *Engine) GetLogger() *log.Logger {
+// GetLogger returns Engine's current logger.
+func (e *Engine) GetLogger() *logrus.Logger {
 	return e.logger
 }
 

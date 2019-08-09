@@ -26,13 +26,14 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/loadimpact/k6/api/common"
-	"github.com/loadimpact/k6/core"
-	"github.com/loadimpact/k6/lib"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/urfave/negroni"
+
+	"github.com/loadimpact/k6/api/common"
+	"github.com/loadimpact/k6/core"
+	"github.com/loadimpact/k6/lib"
 )
 
 func testHTTPHandler(rw http.ResponseWriter, r *http.Request) {
@@ -51,7 +52,7 @@ func TestLogger(t *testing.T) {
 					r := httptest.NewRequest(method, "http://example.com"+path, nil)
 
 					l, hook := logtest.NewNullLogger()
-					l.Level = log.DebugLevel
+					l.Level = logrus.DebugLevel
 					NewLogger(l)(negroni.NewResponseWriter(rw), r, testHTTPHandler)
 
 					res := rw.Result()
@@ -63,7 +64,7 @@ func TestLogger(t *testing.T) {
 					}
 
 					e := hook.LastEntry()
-					assert.Equal(t, log.DebugLevel, e.Level)
+					assert.Equal(t, logrus.DebugLevel, e.Level)
 					assert.Equal(t, fmt.Sprintf("%s %s", method, path), e.Message)
 					assert.Equal(t, http.StatusOK, e.Data["status"])
 				})

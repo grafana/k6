@@ -26,10 +26,11 @@ import (
 	"io"
 	"os"
 
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/afero"
+
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
-	log "github.com/sirupsen/logrus"
-	"github.com/spf13/afero"
 )
 
 type Collector struct {
@@ -82,7 +83,7 @@ func (c *Collector) Init() error {
 func (c *Collector) SetRunStatus(status lib.RunStatus) {}
 
 func (c *Collector) Run(ctx context.Context) {
-	log.WithField("filename", c.fname).Debug("JSON: Writing JSON metrics")
+	logrus.WithField("filename", c.fname).Debug("JSON: Writing JSON metrics")
 	<-ctx.Done()
 	_ = c.outfile.Close()
 }
@@ -97,7 +98,7 @@ func (c *Collector) HandleMetric(m *stats.Metric) {
 	row, err := json.Marshal(env)
 
 	if env == nil || err != nil {
-		log.WithField("filename", c.fname).Warning(
+		logrus.WithField("filename", c.fname).Warning(
 			"JSON: Envelope is nil or Metric couldn't be marshalled to JSON")
 		return
 	}
@@ -105,7 +106,7 @@ func (c *Collector) HandleMetric(m *stats.Metric) {
 	row = append(row, '\n')
 	_, err = c.outfile.Write(row)
 	if err != nil {
-		log.WithField("filename", c.fname).Error("JSON: Error writing to file")
+		logrus.WithField("filename", c.fname).Error("JSON: Error writing to file")
 	}
 }
 
@@ -119,14 +120,14 @@ func (c *Collector) Collect(scs []stats.SampleContainer) {
 
 			if err != nil || env == nil {
 				// Skip metric if it can't be made into JSON or envelope is null.
-				log.WithField("filename", c.fname).Warning(
+				logrus.WithField("filename", c.fname).Warning(
 					"JSON: Envelope is nil or Sample couldn't be marshalled to JSON")
 				continue
 			}
 			row = append(row, '\n')
 			_, err = c.outfile.Write(row)
 			if err != nil {
-				log.WithField("filename", c.fname).Error("JSON: Error writing to file")
+				logrus.WithField("filename", c.fname).Error("JSON: Error writing to file")
 				continue
 			}
 		}

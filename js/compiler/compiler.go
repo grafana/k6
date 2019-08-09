@@ -26,11 +26,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GeertJohan/go.rice"
+	rice "github.com/GeertJohan/go.rice"
 	"github.com/dop251/goja"
 	"github.com/dop251/goja/parser"
 	"github.com/mitchellh/mapstructure"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -105,7 +105,7 @@ func (c *Compiler) Transform(src, filename string) (code string, srcmap SourceMa
 	if err != nil {
 		return code, srcmap, err
 	}
-	log.WithField("t", time.Since(startTime)).Debug("Babel: Transformed")
+	logrus.WithField("t", time.Since(startTime)).Debug("Babel: Transformed")
 	vO := v.ToObject(c.vm)
 
 	if err := c.vm.ExportTo(vO.Get("code"), &code); err != nil {

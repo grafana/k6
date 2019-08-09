@@ -31,18 +31,19 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
+	"github.com/oxtoacart/bpool"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/afero"
+	"github.com/viki-org/dnscache"
+	"golang.org/x/net/http2"
+	"golang.org/x/time/rate"
+
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/stats"
-	"github.com/oxtoacart/bpool"
-	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
-	"github.com/spf13/afero"
-	"github.com/viki-org/dnscache"
-	"golang.org/x/net/http2"
-	"golang.org/x/time/rate"
 )
 
 var errInterrupt = errors.New("context cancelled")
@@ -52,7 +53,7 @@ var _ lib.Runner = &Runner{}
 
 type Runner struct {
 	Bundle       *Bundle
-	Logger       *log.Logger
+	Logger       *logrus.Logger
 	defaultGroup *lib.Group
 
 	BaseDialer net.Dialer
@@ -88,7 +89,7 @@ func NewFromBundle(b *Bundle) (*Runner, error) {
 
 	r := &Runner{
 		Bundle:       b,
-		Logger:       log.StandardLogger(),
+		Logger:       logrus.StandardLogger(),
 		defaultGroup: defaultGroup,
 		BaseDialer: net.Dialer{
 			Timeout:   30 * time.Second,
