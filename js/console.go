@@ -26,17 +26,17 @@ import (
 	"strconv"
 
 	"github.com/dop251/goja"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 // console represents a JS console implemented as a logrus.Logger.
 type console struct {
-	Logger *log.Logger
+	Logger *logrus.Logger
 }
 
 // Creates a console with the standard logrus logger.
 func newConsole() *console {
-	return &console{log.StandardLogger()}
+	return &console{logrus.StandardLogger()}
 }
 
 // Creates a console logger with its output set to the file at the provided `filepath`.
@@ -46,16 +46,16 @@ func newFileConsole(filepath string) (*console, error) {
 		return nil, err
 	}
 
-	l := log.New()
+	l := logrus.New()
 	l.SetOutput(f)
 
 	//TODO: refactor to not rely on global variables, albeit external ones
-	l.SetFormatter(log.StandardLogger().Formatter)
+	l.SetFormatter(logrus.StandardLogger().Formatter)
 
 	return &console{l}, nil
 }
 
-func (c console) log(ctx *context.Context, level log.Level, msgobj goja.Value, args ...goja.Value) {
+func (c console) log(ctx *context.Context, level logrus.Level, msgobj goja.Value, args ...goja.Value) {
 	if ctx != nil && *ctx != nil {
 		select {
 		case <-(*ctx).Done():
@@ -64,20 +64,20 @@ func (c console) log(ctx *context.Context, level log.Level, msgobj goja.Value, a
 		}
 	}
 
-	fields := make(log.Fields)
+	fields := make(logrus.Fields)
 	for i, arg := range args {
 		fields[strconv.Itoa(i)] = arg.String()
 	}
 	msg := msgobj.ToString()
 	e := c.Logger.WithFields(fields)
 	switch level {
-	case log.DebugLevel:
+	case logrus.DebugLevel:
 		e.Debug(msg)
-	case log.InfoLevel:
+	case logrus.InfoLevel:
 		e.Info(msg)
-	case log.WarnLevel:
+	case logrus.WarnLevel:
 		e.Warn(msg)
-	case log.ErrorLevel:
+	case logrus.ErrorLevel:
 		e.Error(msg)
 	}
 }
@@ -87,17 +87,17 @@ func (c console) Log(ctx *context.Context, msg goja.Value, args ...goja.Value) {
 }
 
 func (c console) Debug(ctx *context.Context, msg goja.Value, args ...goja.Value) {
-	c.log(ctx, log.DebugLevel, msg, args...)
+	c.log(ctx, logrus.DebugLevel, msg, args...)
 }
 
 func (c console) Info(ctx *context.Context, msg goja.Value, args ...goja.Value) {
-	c.log(ctx, log.InfoLevel, msg, args...)
+	c.log(ctx, logrus.InfoLevel, msg, args...)
 }
 
 func (c console) Warn(ctx *context.Context, msg goja.Value, args ...goja.Value) {
-	c.log(ctx, log.WarnLevel, msg, args...)
+	c.log(ctx, logrus.WarnLevel, msg, args...)
 }
 
 func (c console) Error(ctx *context.Context, msg goja.Value, args ...goja.Value) {
-	c.log(ctx, log.ErrorLevel, msg, args...)
+	c.log(ctx, logrus.ErrorLevel, msg, args...)
 }

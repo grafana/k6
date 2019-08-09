@@ -22,14 +22,18 @@ package cmd
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"errors"
-
 	"github.com/kelseyhightower/envconfig"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/afero"
+	"github.com/spf13/pflag"
+	null "gopkg.in/guregu/null.v3"
+
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/scheduler"
 	"github.com/loadimpact/k6/lib/types"
@@ -38,10 +42,6 @@ import (
 	"github.com/loadimpact/k6/stats/influxdb"
 	"github.com/loadimpact/k6/stats/kafka"
 	"github.com/loadimpact/k6/stats/statsd/common"
-	log "github.com/sirupsen/logrus"
-	"github.com/spf13/afero"
-	"github.com/spf13/pflag"
-	null "gopkg.in/guregu/null.v3"
 )
 
 // configFlagSet returns a FlagSet with the default run configuration flags.
@@ -224,7 +224,7 @@ func deriveExecutionConfig(conf Config) (Config, error) {
 	case conf.Iterations.Valid:
 		if len(conf.Stages) > 0 { // stages isn't nil (not set) and isn't explicitly set to empty
 			//TODO: make this an executionConflictConfigError in the next version
-			log.Warnf("Specifying both iterations and stages is deprecated and won't be supported in the future k6 versions")
+			logrus.Warn("Specifying both iterations and stages is deprecated and won't be supported in the future k6 versions")
 		}
 
 		result.Execution = getSharedIterationsExecution(conf.Iterations, conf.Duration, conf.VUs)
@@ -233,12 +233,13 @@ func deriveExecutionConfig(conf Config) (Config, error) {
 	case conf.Duration.Valid:
 		if len(conf.Stages) > 0 { // stages isn't nil (not set) and isn't explicitly set to empty
 			//TODO: make this an executionConflictConfigError in the next version
-			log.Warnf("Specifying both duration and stages is deprecated and won't be supported in the future k6 versions")
+			logrus.Warn("Specifying both duration and stages is deprecated and won't be supported in the future k6 versions")
 		}
 
 		if conf.Duration.Duration <= 0 {
 			//TODO: make this an executionConflictConfigError in the next version
-			log.Warnf("Specifying infinite duration in this way is deprecated and won't be supported in the future k6 versions")
+			msg := "Specifying infinite duration in this way is deprecated and won't be supported in the future k6 versions"
+			logrus.Warn(msg)
 		} else {
 			result.Execution = getConstantLoopingVUsExecution(conf.Duration, conf.VUs)
 		}
@@ -249,7 +250,7 @@ func deriveExecutionConfig(conf Config) (Config, error) {
 	default:
 		if conf.Execution != nil { // If someone set this, regardless if its empty
 			//TODO: remove this warning in the next version
-			log.Warnf("The execution settings are not functional in this k6 release, they will be ignored")
+			logrus.Warn("The execution settings are not functional in this k6 release, they will be ignored")
 		}
 
 		if len(conf.Execution) == 0 { // If unset or set to empty
@@ -337,6 +338,6 @@ func validateConfig(conf Config) error {
 	errMsg := errors.New(strings.Join(errMsgParts, "\n"))
 
 	//TODO: actually return the error here instead of warning, so k6 aborts on config validation errors
-	log.Warn(errMsg)
+	logrus.Warn(errMsg)
 	return nil
 }

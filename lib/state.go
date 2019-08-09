@@ -27,10 +27,11 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 
-	"github.com/loadimpact/k6/stats"
 	"github.com/oxtoacart/bpool"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
+
+	"github.com/loadimpact/k6/stats"
 )
 
 // DialContexter is an interface that can dial with a context
@@ -44,7 +45,7 @@ type State struct {
 	Options Options
 
 	// Logger. Avoid using the global logger.
-	Logger *log.Logger
+	Logger *logrus.Logger
 
 	// Current group; all emitted metrics are tagged with this.
 	Group *Group

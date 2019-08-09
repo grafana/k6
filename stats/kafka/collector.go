@@ -27,11 +27,12 @@ import (
 	"time"
 
 	"github.com/Shopify/sarama"
+	"github.com/sirupsen/logrus"
+
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/stats/influxdb"
 	jsonc "github.com/loadimpact/k6/stats/json"
-	log "github.com/sirupsen/logrus"
 )
 
 // Collector implements the lib.Collector interface and should be used only for testing
@@ -61,7 +62,7 @@ func (c *Collector) Init() error { return nil }
 
 // Run just blocks until the context is done
 func (c *Collector) Run(ctx context.Context) {
-	log.Debug("Kafka: Running!")
+	logrus.Debug("Kafka: Running!")
 	ticker := time.NewTicker(time.Duration(c.Config.PushInterval.Duration))
 	for {
 		select {
@@ -72,7 +73,7 @@ func (c *Collector) Run(ctx context.Context) {
 
 			err := c.Producer.Close()
 			if err != nil {
-				log.WithError(err).Error("Kafka: Failed to close producer.")
+				logrus.WithError(err).Error("Kafka: Failed to close producer.")
 			}
 			return
 		}
@@ -146,20 +147,20 @@ func (c *Collector) pushMetrics() {
 	// Format the samples
 	formattedSamples, err := c.formatSamples(samples)
 	if err != nil {
-		log.WithError(err).Error("Kafka: Couldn't format the samples")
+		logrus.WithError(err).Error("Kafka: Couldn't format the samples")
 		return
 	}
 
 	// Send the samples
-	log.Debug("Kafka: Delivering...")
+	logrus.Debug("Kafka: Delivering...")
 
 	for _, sample := range formattedSamples {
 		msg := &sarama.ProducerMessage{Topic: c.Config.Topic.String, Value: sarama.StringEncoder(sample)}
 		partition, offset, err := c.Producer.SendMessage(msg)
 		if err != nil {
-			log.WithError(err).Error("Kafka: failed to send message.")
+			logrus.WithError(err).Error("Kafka: failed to send message.")
 		} else {
-			log.WithFields(log.Fields{
+			logrus.WithFields(logrus.Fields{
 				"partition": partition,
 				"offset":    offset,
 			}).Debug("Kafka: message sent.")
@@ -167,5 +168,5 @@ func (c *Collector) pushMetrics() {
 	}
 
 	t := time.Since(startTime)
-	log.WithField("t", t).Debug("Kafka: Delivered!")
+	logrus.WithField("t", t).Debug("Kafka: Delivered!")
 }
