@@ -28,17 +28,17 @@ import (
 	"os"
 	"testing"
 
+	"github.com/dop251/goja"
+	"github.com/sirupsen/logrus"
+	logtest "github.com/sirupsen/logrus/hooks/test"
+	"github.com/spf13/afero"
+	"github.com/stretchr/testify/assert"
 	null "gopkg.in/guregu/null.v3"
 
-	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/stats"
-	log "github.com/sirupsen/logrus"
-	logtest "github.com/sirupsen/logrus/hooks/test"
-	"github.com/spf13/afero"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestConsoleContext(t *testing.T) {
@@ -94,20 +94,20 @@ func getSimpleRunnerWithFileFs(path, data string, fileFs afero.Fs) (*Runner, err
 		lib.RuntimeOptions{})
 }
 func TestConsole(t *testing.T) {
-	levels := map[string]log.Level{
-		"log":   log.InfoLevel,
-		"debug": log.DebugLevel,
-		"info":  log.InfoLevel,
-		"warn":  log.WarnLevel,
-		"error": log.ErrorLevel,
+	levels := map[string]logrus.Level{
+		"log":   logrus.InfoLevel,
+		"debug": logrus.DebugLevel,
+		"info":  logrus.InfoLevel,
+		"warn":  logrus.WarnLevel,
+		"error": logrus.ErrorLevel,
 	}
 	argsets := map[string]struct {
 		Message string
-		Data    log.Fields
+		Data    logrus.Fields
 	}{
 		`"string"`:         {Message: "string"},
-		`"string","a","b"`: {Message: "string", Data: log.Fields{"0": "a", "1": "b"}},
-		`"string",1,2`:     {Message: "string", Data: log.Fields{"0": "1", "1": "2"}},
+		`"string","a","b"`: {Message: "string", Data: logrus.Fields{"0": "a", "1": "b"}},
+		`"string",1,2`:     {Message: "string", Data: logrus.Fields{"0": "1", "1": "2"}},
 		`{}`:               {Message: "[object Object]"},
 	}
 	for name, level := range levels {
@@ -127,7 +127,7 @@ func TestConsole(t *testing.T) {
 					assert.NoError(t, err)
 
 					logger, hook := logtest.NewNullLogger()
-					logger.Level = log.DebugLevel
+					logger.Level = logrus.DebugLevel
 					vu.Console.Logger = logger
 
 					err = vu.RunOnce(context.Background())
@@ -140,7 +140,7 @@ func TestConsole(t *testing.T) {
 
 						data := result.Data
 						if data == nil {
-							data = make(log.Fields)
+							data = make(logrus.Fields)
 						}
 						assert.Equal(t, data, entry.Data)
 					}
@@ -152,20 +152,20 @@ func TestConsole(t *testing.T) {
 
 func TestFileConsole(t *testing.T) {
 	var (
-		levels = map[string]log.Level{
-			"log":   log.InfoLevel,
-			"debug": log.DebugLevel,
-			"info":  log.InfoLevel,
-			"warn":  log.WarnLevel,
-			"error": log.ErrorLevel,
+		levels = map[string]logrus.Level{
+			"log":   logrus.InfoLevel,
+			"debug": logrus.DebugLevel,
+			"info":  logrus.InfoLevel,
+			"warn":  logrus.WarnLevel,
+			"error": logrus.ErrorLevel,
 		}
 		argsets = map[string]struct {
 			Message string
-			Data    log.Fields
+			Data    logrus.Fields
 		}{
 			`"string"`:         {Message: "string"},
-			`"string","a","b"`: {Message: "string", Data: log.Fields{"0": "a", "1": "b"}},
-			`"string",1,2`:     {Message: "string", Data: log.Fields{"0": "1", "1": "2"}},
+			`"string","a","b"`: {Message: "string", Data: logrus.Fields{"0": "a", "1": "b"}},
+			`"string",1,2`:     {Message: "string", Data: logrus.Fields{"0": "1", "1": "2"}},
 			`{}`:               {Message: "[object Object]"},
 		}
 		preExisting = map[string]bool{
@@ -218,7 +218,7 @@ func TestFileConsole(t *testing.T) {
 							vu, err := r.newVU(samples)
 							assert.NoError(t, err)
 
-							vu.Console.Logger.Level = log.DebugLevel
+							vu.Console.Logger.Level = logrus.DebugLevel
 							hook := logtest.NewLocal(vu.Console.Logger)
 
 							err = vu.RunOnce(context.Background())
@@ -235,7 +235,7 @@ func TestFileConsole(t *testing.T) {
 
 								data := result.Data
 								if data == nil {
-									data = make(log.Fields)
+									data = make(logrus.Fields)
 								}
 								assert.Equal(t, data, entry.Data)
 

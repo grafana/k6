@@ -39,10 +39,11 @@ import (
 	ntlmssp "github.com/Azure/go-ntlmssp"
 	"github.com/andybalholm/brotli"
 	"github.com/klauspost/compress/zstd"
+	"github.com/sirupsen/logrus"
+	null "gopkg.in/guregu/null.v3"
+
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
-	log "github.com/sirupsen/logrus"
-	null "gopkg.in/guregu/null.v3"
 )
 
 // HTTPRequestCookie is a representation of a cookie used for request objects
@@ -461,7 +462,7 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 					if l > 0 {
 						url = via[0].URL
 					}
-					state.Logger.WithFields(log.Fields{"url": url.String()}).Warnf(
+					state.Logger.WithFields(logrus.Fields{"url": url.String()}).Warnf(
 						"Stopped after %d redirects and returned the redirection; pass { redirects: n }"+
 							" in request params or set global maxRedirects to silence this", l)
 				}

@@ -34,6 +34,13 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/afero"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+	null "gopkg.in/guregu/null.v3"
+
 	"github.com/loadimpact/k6/api"
 	"github.com/loadimpact/k6/core"
 	"github.com/loadimpact/k6/core/local"
@@ -43,12 +50,6 @@ import (
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/ui"
-	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
-	"github.com/spf13/afero"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
-	null "gopkg.in/guregu/null.v3"
 )
 
 const (
@@ -156,7 +157,7 @@ a commandline interface for interacting with it.`,
 		}
 
 		if conf.Iterations.Valid && conf.Iterations.Int64 < conf.VUsMax.Int64 {
-			log.Warnf(
+			logrus.Warnf(
 				"All iterations (%d in this test run) are shared between all VUs, so some of the %d VUs will not execute even a single iteration!",
 				conf.Iterations.Int64, conf.VUsMax.Int64,
 			)
@@ -228,7 +229,7 @@ a commandline interface for interacting with it.`,
 		fprintf(stdout, "%s   server\r", initBar.String())
 		go func() {
 			if err := api.ListenAndServe(address, engine); err != nil {
-				log.WithError(err).Warn("Error from API server")
+				logrus.WithError(err).Warn("Error from API server")
 			}
 		}()
 
@@ -365,7 +366,7 @@ a commandline interface for interacting with it.`,
 			select {
 			case <-ticker.C:
 				if quiet || !stdoutTTY {
-					l := log.WithFields(log.Fields{
+					l := logrus.WithFields(logrus.Fields{
 						"t": engine.Executor.GetTime(),
 						"i": engine.Executor.GetIterations(),
 					})
@@ -399,7 +400,7 @@ a commandline interface for interacting with it.`,
 			case err := <-errC:
 				cancel()
 				if err == nil {
-					log.Debug("Engine terminated cleanly")
+					logrus.Debug("Engine terminated cleanly")
 					break mainLoop
 				}
 
@@ -407,26 +408,26 @@ a commandline interface for interacting with it.`,
 				case lib.TimeoutError:
 					switch string(e) {
 					case "setup":
-						log.WithError(err).Error("Setup timeout")
+						logrus.WithError(err).Error("Setup timeout")
 						return ExitCode{errors.New("Setup timeout"), setupTimeoutErrorCode}
 					case "teardown":
-						log.WithError(err).Error("Teardown timeout")
+						logrus.WithError(err).Error("Teardown timeout")
 						return ExitCode{errors.New("Teardown timeout"), teardownTimeoutErrorCode}
 					default:
-						log.WithError(err).Error("Engine timeout")
+						logrus.WithError(err).Error("Engine timeout")
 						return ExitCode{errors.New("Engine timeout"), genericTimeoutErrorCode}
 					}
 				default:
-					log.WithError(err).Error("Engine error")
+					logrus.WithError(err).Error("Engine error")
 					return ExitCode{errors.New("Engine Error"), genericEngineErrorCode}
 				}
 			case sig := <-sigC:
-				log.WithField("sig", sig).Debug("Exiting in response to signal")
+				logrus.WithField("sig", sig).Debug("Exiting in response to signal")
 				cancel()
 			}
 		}
 		if quiet || !stdoutTTY {
-			e := log.WithFields(log.Fields{
+			e := logrus.WithFields(logrus.Fields{
 				"t": engine.Executor.GetTime(),
 				"i": engine.Executor.GetIterations(),
 			})
@@ -442,7 +443,7 @@ a commandline interface for interacting with it.`,
 
 		// Warn if no iterations could be completed.
 		if engine.Executor.GetIterations() == 0 {
-			log.Warn("No data generated, because no script iterations finished, consider making the test duration longer")
+			logrus.Warn("No data generated, because no script iterations finished, consider making the test duration longer")
 		}
 
 		// Print the end-of-test summary.
@@ -458,7 +459,7 @@ a commandline interface for interacting with it.`,
 		}
 
 		if conf.Linger.Bool {
-			log.Info("Linger set; waiting for Ctrl+C...")
+			logrus.Info("Linger set; waiting for Ctrl+C...")
 			<-sigC
 		}
 

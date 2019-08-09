@@ -24,10 +24,11 @@ import (
 	"context"
 	"time"
 
+	"github.com/sirupsen/logrus"
+	null "gopkg.in/guregu/null.v3"
+
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
-	log "github.com/sirupsen/logrus"
-	null "gopkg.in/guregu/null.v3"
 )
 
 // An Executor is in charge of scheduling VUs created by a wrapped Runner, but decouples how you
@@ -46,8 +47,8 @@ type Executor interface {
 	GetRunner() Runner
 
 	// Get and set the logger. This is propagated to the Runner.
-	GetLogger() *log.Logger
-	SetLogger(l *log.Logger)
+	GetLogger() *logrus.Logger
+	SetLogger(l *logrus.Logger)
 
 	// Get and set the list of stages.
 	GetStages() []Stage

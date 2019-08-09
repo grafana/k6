@@ -24,11 +24,12 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/loadimpact/k6/api/common"
-	"github.com/loadimpact/k6/api/v1"
-	"github.com/loadimpact/k6/core"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/negroni"
+
+	"github.com/loadimpact/k6/api/common"
+	v1 "github.com/loadimpact/k6/api/v1"
+	"github.com/loadimpact/k6/core"
 )
 
 func NewHandler() http.Handler {
@@ -45,13 +46,14 @@ func ListenAndServe(addr string, engine *core.Engine) error {
 	n := negroni.New()
 	n.Use(negroni.NewRecovery())
 	n.UseFunc(WithEngine(engine))
-	n.UseFunc(NewLogger(log.StandardLogger()))
+	n.UseFunc(NewLogger(logrus.StandardLogger()))
 	n.UseHandler(mux)
 
 	return http.ListenAndServe(addr, n)
 }
 
-func NewLogger(l *log.Logger) negroni.HandlerFunc {
+// NewLogger returns the middleware which logs response status for request.
+func NewLogger(l *logrus.Logger) negroni.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
 		next(rw, r)
 
@@ -71,7 +73,7 @@ func HandlePing() http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		rw.Header().Add("Content-Type", "text/plain; charset=utf-8")
 		if _, err := fmt.Fprint(rw, "ok"); err != nil {
-			log.WithError(err).Error("Error while printing ok")
+			logrus.WithError(err).Error("Error while printing ok")
 		}
 	})
 }

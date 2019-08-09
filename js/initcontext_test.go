@@ -32,15 +32,16 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
+	"github.com/oxtoacart/bpool"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/afero"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
-	"github.com/oxtoacart/bpool"
-	log "github.com/sirupsen/logrus"
-	"github.com/spf13/afero"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestInitContextRequire(t *testing.T) {
@@ -369,8 +370,8 @@ func TestRequestWithBinaryFile(t *testing.T) {
 	root, err := lib.NewGroup("", nil)
 	assert.NoError(t, err)
 
-	logger := log.New()
-	logger.Level = log.DebugLevel
+	logger := logrus.New()
+	logger.Level = logrus.DebugLevel
 	logger.Out = ioutil.Discard
 
 	state := &lib.State{

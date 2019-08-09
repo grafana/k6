@@ -23,19 +23,20 @@ package cmd
 import (
 	"fmt"
 	"io"
-	golog "log"
+	"log"
 	"os"
 	"path/filepath"
 	"sync"
 
 	"github.com/fatih/color"
-	"github.com/loadimpact/k6/lib/consts"
 	"github.com/mattn/go-colorable"
 	"github.com/mattn/go-isatty"
 	"github.com/shibukawa/configdir"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
+	"github.com/loadimpact/k6/lib/consts"
 )
 
 var BannerColor = color.New(color.FgCyan)
@@ -78,7 +79,7 @@ var RootCmd = &cobra.Command{
 			stdout.Writer = colorable.NewNonColorable(os.Stdout)
 			stderr.Writer = colorable.NewNonColorable(os.Stderr)
 		}
-		golog.SetOutput(log.StandardLogger().Writer())
+		log.SetOutput(logrus.StandardLogger().Writer())
 	},
 }
 
@@ -86,7 +87,7 @@ var RootCmd = &cobra.Command{
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
 	if err := RootCmd.Execute(); err != nil {
-		log.Error(err.Error())
+		logrus.Error(err.Error())
 		if e, ok := err.(ExitCode); ok {
 			os.Exit(e.Code)
 		}
@@ -137,26 +138,26 @@ func fprintf(w io.Writer, format string, a ...interface{}) (n int) {
 type RawFormater struct{}
 
 // Format renders a single log entry
-func (f RawFormater) Format(entry *log.Entry) ([]byte, error) {
+func (f RawFormater) Format(entry *logrus.Entry) ([]byte, error) {
 	return append([]byte(entry.Message), '\n'), nil
 }
 
 func setupLoggers(logFmt string) {
 	if verbose {
-		log.SetLevel(log.DebugLevel)
+		logrus.SetLevel(logrus.DebugLevel)
 	}
-	log.SetOutput(stderr)
+	logrus.SetOutput(stderr)
 
 	switch logFmt {
 	case "raw":
-		log.SetFormatter(&RawFormater{})
-		log.Debug("Logger format: RAW")
+		logrus.SetFormatter(&RawFormater{})
+		logrus.Debug("Logger format: RAW")
 	case "json":
-		log.SetFormatter(&log.JSONFormatter{})
-		log.Debug("Logger format: JSON")
+		logrus.SetFormatter(&logrus.JSONFormatter{})
+		logrus.Debug("Logger format: JSON")
 	default:
-		log.SetFormatter(&log.TextFormatter{ForceColors: stderrTTY, DisableColors: noColor})
-		log.Debug("Logger format: TEXT")
+		logrus.SetFormatter(&logrus.TextFormatter{ForceColors: stderrTTY, DisableColors: noColor})
+		logrus.Debug("Logger format: TEXT")
 	}
 
 }

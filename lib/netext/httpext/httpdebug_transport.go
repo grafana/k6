@@ -25,7 +25,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 type httpDebugTransport struct {
@@ -50,7 +50,7 @@ func (t httpDebugTransport) RoundTrip(req *http.Request) (*http.Response, error)
 func (t httpDebugTransport) debugRequest(req *http.Request) {
 	dump, err := httputil.DumpRequestOut(req, t.httpDebugOption == "full")
 	if err != nil {
-		log.Fatal(err) //TODO: fix...
+		logrus.Fatal(err) //TODO: fix...
 	}
 	fmt.Printf("Request:\n%s\n", dump) //TODO: fix...
 }
@@ -59,7 +59,7 @@ func (t httpDebugTransport) debugResponse(res *http.Response) {
 	if res != nil {
 		dump, err := httputil.DumpResponse(res, t.httpDebugOption == "full")
 		if err != nil {
-			log.Fatal(err) //TODO: fix...
+			logrus.Fatal(err) //TODO: fix...
 		}
 		fmt.Printf("Response:\n%s\n", dump) //TODO: fix...
 	}
