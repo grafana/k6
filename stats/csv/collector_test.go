@@ -47,16 +47,15 @@ func TestMakeHeader(t *testing.T) {
 	}
 
 	for testname, tags := range testdata {
-		func(testname string, tags []string) {
-			t.Run(testname, func(t *testing.T) {
-				header := MakeHeader(tags)
-				assert.Equal(t, len(tags)+4, len(header))
-				assert.Equal(t, "metric_name", header[0])
-				assert.Equal(t, "timestamp", header[1])
-				assert.Equal(t, "metric_value", header[2])
-				assert.Equal(t, "extra_tags", header[len(header)-1])
-			})
-		}(testname, tags)
+		testname, tags := testname, tags
+		t.Run(testname, func(t *testing.T) {
+			header := MakeHeader(tags)
+			assert.Equal(t, len(tags)+4, len(header))
+			assert.Equal(t, "metric_name", header[0])
+			assert.Equal(t, "timestamp", header[1])
+			assert.Equal(t, "metric_value", header[2])
+			assert.Equal(t, "extra_tags", header[len(header)-1])
+		})
 	}
 }
 
@@ -84,7 +83,6 @@ func TestSampleToRow(t *testing.T) {
 				"tag5": "val5",
 			}),
 		},
-		nil,
 	}
 
 	enabledTags := map[string][][]string{
@@ -104,20 +102,19 @@ func TestSampleToRow(t *testing.T) {
 
 	for testname, tags := range enabledTags {
 		for _, sample := range testSamples {
-			func(testname string, sample *stats.Sample, resTags []string, ignoredTags []string) {
-				t.Run(testname, func(t *testing.T) {
-					row := SampleToRow(sample, resTags, ignoredTags)
-					if row != nil {
-						assert.Equal(t, len(resTags)+4, len(row))
-						for _, tag := range ignoredTags {
-							assert.False(t, strings.Contains(row[len(row)-1], tag))
-						}
-					} else {
-						assert.Nil(t, row)
-						assert.Nil(t, sample)
+			testname, sample, resTags, ignoredTags := testname, sample, tags[0], tags[1]
+			t.Run(testname, func(t *testing.T) {
+				row := SampleToRow(sample, resTags, ignoredTags, make([]string, 0, 3+len(resTags)+1))
+				if row != nil {
+					assert.Equal(t, len(resTags)+4, len(row))
+					for _, tag := range ignoredTags {
+						assert.False(t, strings.Contains(row[len(row)-1], tag))
 					}
-				})
-			}(testname, sample, tags[0], tags[1])
+				} else {
+					assert.Nil(t, row)
+					assert.Nil(t, sample)
+				}
+			})
 		}
 	}
 }
@@ -145,36 +142,33 @@ func TestCollect(t *testing.T) {
 			}),
 		},
 	}
-	t.Run("Collect", func(t *testing.T) {
-		mem := afero.NewMemMapFs()
-		collector, err := New(mem, "path", lib.TagSet{"tag1": true, "tag2": false, "tag3": true})
-		assert.NoError(t, err)
-		assert.NotNil(t, collector)
 
-		collector.Collect(testSamples)
+	mem := afero.NewMemMapFs()
+	collector, err := New(mem, "path", lib.TagSet{"tag1": true, "tag2": false, "tag3": true})
+	assert.NoError(t, err)
+	assert.NotNil(t, collector)
 
-		assert.Equal(t, len(testSamples), len(collector.buffer))
-	})
+	collector.Collect(testSamples)
+
+	assert.Equal(t, len(testSamples), len(collector.buffer))
 }
 
 func TestRun(t *testing.T) {
-	t.Run("Run", func(t *testing.T) {
-		collector, err := New(afero.NewMemMapFs(), "path", lib.TagSet{"tag1": true, "tag2": false, "tag3": true})
-		assert.NoError(t, err)
-		assert.NotNil(t, collector)
+	collector, err := New(afero.NewMemMapFs(), "path", lib.TagSet{"tag1": true, "tag2": false, "tag3": true})
+	assert.NoError(t, err)
+	assert.NotNil(t, collector)
 
-		ctx, cancel := context.WithCancel(context.Background())
-		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			err := collector.Init()
-			assert.NoError(t, err)
-			collector.Run(ctx)
-		}()
-		cancel()
-		wg.Wait()
-	})
+	ctx, cancel := context.WithCancel(context.Background())
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		err := collector.Init()
+		assert.NoError(t, err)
+		collector.Run(ctx)
+	}()
+	cancel()
+	wg.Wait()
 }
 
 func TestRunCollect(t *testing.T) {
@@ -202,33 +196,31 @@ func TestRunCollect(t *testing.T) {
 		},
 	}
 
-	t.Run("Run and Collect", func(t *testing.T) {
-		mem := afero.NewMemMapFs()
-		collector, err := New(mem, "path", lib.TagSet{"tag1": true, "tag2": false, "tag3": true})
-		assert.NoError(t, err)
-		assert.NotNil(t, collector)
+	mem := afero.NewMemMapFs()
+	collector, err := New(mem, "path", lib.TagSet{"tag1": true, "tag2": false, "tag3": true})
+	assert.NoError(t, err)
+	assert.NotNil(t, collector)
 
-		ctx, cancel := context.WithCancel(context.Background())
-		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
-			collector.Run(ctx)
-			wg.Done()
-		}()
-		err = collector.Init()
-		assert.NoError(t, err)
-		collector.Collect(testSamples)
-		time.Sleep(1 * time.Second)
-		cancel()
-		wg.Wait()
-		csvbytes, _ := afero.ReadFile(mem, "path")
-		csvstr := fmt.Sprintf("%s", csvbytes)
-		assert.Equal(t,
-			"metric_name,timestamp,metric_value,tag1,tag3,extra_tags\n"+
-				"my_metric,1562324643,1.000000,val1,val3,\n"+
-				"my_metric,1562324644,1.000000,val1,val3,tag4=val4\n",
-			csvstr)
-	})
+	ctx, cancel := context.WithCancel(context.Background())
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		collector.Run(ctx)
+		wg.Done()
+	}()
+	err = collector.Init()
+	assert.NoError(t, err)
+	collector.Collect(testSamples)
+	time.Sleep(1 * time.Second)
+	cancel()
+	wg.Wait()
+	csvbytes, _ := afero.ReadFile(mem, "path")
+	csvstr := fmt.Sprintf("%s", csvbytes)
+	assert.Equal(t,
+		"metric_name,timestamp,metric_value,tag1,tag3,extra_tags\n"+
+			"my_metric,1562324643,1.000000,val1,val3,\n"+
+			"my_metric,1562324644,1.000000,val1,val3,tag4=val4\n",
+		csvstr)
 }
 
 func TestNew(t *testing.T) {
@@ -289,27 +281,19 @@ func TestNew(t *testing.T) {
 	}
 
 	for i := range configs {
-		func(config struct {
-			fname string
-			tags  lib.TagSet
-		}, expected struct {
-			fname       string
-			resTags     []string
-			ignoredTags []string
-		}) {
-			t.Run(config.fname, func(t *testing.T) {
-				collector, err := New(afero.NewMemMapFs(), config.fname, config.tags)
-				assert.NoError(t, err)
-				assert.NotNil(t, collector)
-				assert.Equal(t, expected.fname, collector.fname)
-				sort.Strings(expected.resTags)
-				sort.Strings(collector.resTags)
-				assert.Equal(t, expected.resTags, collector.resTags)
-				sort.Strings(expected.ignoredTags)
-				sort.Strings(collector.ignoredTags)
-				assert.Equal(t, expected.ignoredTags, collector.ignoredTags)
-			})
-		}(configs[i], expected[i])
+		config, expected := configs[i], expected[i]
+		t.Run(config.fname, func(t *testing.T) {
+			collector, err := New(afero.NewMemMapFs(), config.fname, config.tags)
+			assert.NoError(t, err)
+			assert.NotNil(t, collector)
+			assert.Equal(t, expected.fname, collector.fname)
+			sort.Strings(expected.resTags)
+			sort.Strings(collector.resTags)
+			assert.Equal(t, expected.resTags, collector.resTags)
+			sort.Strings(expected.ignoredTags)
+			sort.Strings(collector.ignoredTags)
+			assert.Equal(t, expected.ignoredTags, collector.ignoredTags)
+		})
 	}
 }
 
@@ -324,5 +308,5 @@ func TestLink(t *testing.T) {
 	collector, err := New(afero.NewMemMapFs(), "path", lib.TagSet{"tag1": true, "tag2": false, "tag3": true})
 	assert.NoError(t, err)
 	assert.NotNil(t, collector)
-	assert.Equal(t, "", collector.Link())
+	assert.Equal(t, "path", collector.Link())
 }

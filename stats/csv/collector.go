@@ -33,7 +33,7 @@ import (
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 )
 
@@ -51,6 +51,7 @@ type Collector struct {
 	csvLock     sync.Mutex
 	buffer      []stats.Sample
 	bufferLock  sync.Mutex
+	row         []string
 }
 
 // Verify that Collector implements lib.Collector
@@ -75,6 +76,7 @@ func New(fs afero.Fs, fname string, tags lib.TagSet) (*Collector, error) {
 		}
 	}
 	sort.Strings(resTags)
+	sort.Strings(ignoredTags)
 
 	if fname == "" || fname == "-" {
 		logfile := nopCloser{os.Stdout}
@@ -84,6 +86,7 @@ func New(fs afero.Fs, fname string, tags lib.TagSet) (*Collector, error) {
 			resTags:     resTags,
 			ignoredTags: ignoredTags,
 			csvWriter:   csv.NewWriter(logfile),
+			row:         make([]string, 0, 3+len(resTags)+1),
 		}, nil
 	}
 
@@ -98,6 +101,7 @@ func New(fs afero.Fs, fname string, tags lib.TagSet) (*Collector, error) {
 		resTags:     resTags,
 		ignoredTags: ignoredTags,
 		csvWriter:   csv.NewWriter(logfile),
+		row:         make([]string, 0, 3+len(resTags)+1),
 	}, nil
 }
 
@@ -106,7 +110,7 @@ func (c *Collector) Init() error {
 	header := MakeHeader(c.resTags)
 	err := c.csvWriter.Write(header)
 	if err != nil {
-		log.WithField("filename", c.fname).Error("CSV: Error writing column names to file")
+		logrus.WithField("filename", c.fname).Error("CSV: Error writing column names to file")
 	}
 	c.csvWriter.Flush()
 	return nil
@@ -126,7 +130,7 @@ func (c *Collector) Run(ctx context.Context) {
 			c.WriteToFile()
 			err := c.outfile.Close()
 			if err != nil {
-				log.WithField("filename", c.fname).Error("CSV: Error closing the file")
+				logrus.WithField("filename", c.fname).Error("CSV: Error closing the file")
 			}
 			return
 		}
@@ -154,13 +158,15 @@ func (c *Collector) WriteToFile() {
 		defer c.csvLock.Unlock()
 		for _, sc := range samples {
 			for _, sample := range sc.GetSamples() {
-				func(sample stats.Sample) {
-					row := SampleToRow(&sample, c.resTags, c.ignoredTags)
+				sample := sample
+				if &sample != nil {
+					row := c.row[:0]
+					row = SampleToRow(&sample, c.resTags, c.ignoredTags, row)
 					err := c.csvWriter.Write(row)
 					if err != nil {
-						log.WithField("filename", c.fname).Error("CSV: Error writing to file")
+						logrus.WithField("filename", c.fname).Error("CSV: Error writing to file")
 					}
-				}(sample)
+				}
 			}
 		}
 		c.csvWriter.Flush()
@@ -169,7 +175,7 @@ func (c *Collector) WriteToFile() {
 
 // Link returns a dummy string, it's only included to satisfy the lib.Collector interface
 func (c *Collector) Link() string {
-	return ""
+	return c.fname
 }
 
 // MakeHeader creates list of column names for csv file
@@ -179,12 +185,7 @@ func MakeHeader(tags []string) []string {
 }
 
 // SampleToRow converts sample into array of strings
-func SampleToRow(sample *stats.Sample, resTags []string, ignoredTags []string) []string {
-	if sample == nil {
-		return nil
-	}
-
-	row := []string{}
+func SampleToRow(sample *stats.Sample, resTags []string, ignoredTags []string, row []string) []string {
 	row = append(row, sample.Metric.Name)
 	row = append(row, fmt.Sprintf("%d", sample.Time.Unix()))
 	row = append(row, fmt.Sprintf("%f", sample.Value))
@@ -197,23 +198,7 @@ func SampleToRow(sample *stats.Sample, resTags []string, ignoredTags []string) [
 	extraTags := bytes.Buffer{}
 	prev := false
 	for tag, val := range sampleTags {
-		extra := true
-		for _, resTag := range resTags {
-			if tag == resTag {
-				extra = false
-				break
-			}
-		}
-		if extra {
-			for _, ignoredTag := range ignoredTags {
-				if tag == ignoredTag {
-					extra = false
-					break
-				}
-			}
-		}
-
-		if extra {
+		if sort.SearchStrings(resTags, tag) == len(resTags) && sort.SearchStrings(ignoredTags, tag) == len(ignoredTags) {
 			if prev {
 				_, err := extraTags.WriteString("&")
 				if err != nil {
