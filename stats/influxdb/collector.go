@@ -26,11 +26,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/influxdata/influxdb/client/v2"
-	"github.com/sirupsen/logrus"
-
+	client "github.com/influxdata/influxdb1-client/v2"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
+	"github.com/sirupsen/logrus"
 )
 
 // Verify that Collector implements lib.Collector
@@ -116,6 +115,7 @@ func (c *Collector) commit() {
 		<-c.semaphoreCh
 	}()
 	logrus.Debug("InfluxDB: Committing...")
+	logrus.WithField("samples", len(samples)).Debug("InfluxDB: Writing...")
 
 	batch, err := c.batchFromSamples(samples)
 	if err != nil {
