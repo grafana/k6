@@ -22,6 +22,7 @@ package influxdb
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
 
@@ -32,10 +33,6 @@ import (
 	"github.com/loadimpact/k6/stats"
 )
 
-const (
-	pushInterval = 1 * time.Second
-)
-
 // Verify that Collector implements lib.Collector
 var _ lib.Collector = &Collector{}
 
@@ -44,8 +41,10 @@ type Collector struct {
 	Config    Config
 	BatchConf client.BatchPointsConfig
 
-	buffer     []stats.Sample
-	bufferLock sync.Mutex
+	buffer      []stats.Sample
+	bufferLock  sync.Mutex
+	wg          sync.WaitGroup
+	semaphoreCh chan struct{}
 }
 
 func New(conf Config) (*Collector, error) {
@@ -54,10 +53,14 @@ func New(conf Config) (*Collector, error) {
 		return nil, err
 	}
 	batchConf := MakeBatchConfig(conf)
+	if conf.ConcurrentWrites.Int64 <= 0 {
+		return nil, errors.New("influxdb's ConcurrentWrites must be a positive number")
+	}
 	return &Collector{
-		Client:    cl,
-		Config:    conf,
-		BatchConf: batchConf,
+		Client:      cl,
+		Config:      conf,
+		BatchConf:   batchConf,
+		semaphoreCh: make(chan struct{}, conf.ConcurrentWrites.Int64),
 	}, nil
 }
 
@@ -74,13 +77,16 @@ func (c *Collector) Init() error {
 
 func (c *Collector) Run(ctx context.Context) {
 	logrus.Debug("InfluxDB: Running!")
-	ticker := time.NewTicker(pushInterval)
+	ticker := time.NewTicker(time.Duration(c.Config.PushInterval.Duration))
 	for {
 		select {
 		case <-ticker.C:
-			c.commit()
+			c.wg.Add(1)
+			go c.commit()
 		case <-ctx.Done():
-			c.commit()
+			c.wg.Add(1)
+			go c.commit()
+			c.wg.Wait()
 			return
 		}
 	}
@@ -99,11 +105,16 @@ func (c *Collector) Link() string {
 }
 
 func (c *Collector) commit() {
+	defer c.wg.Done()
 	c.bufferLock.Lock()
 	samples := c.buffer
 	c.buffer = nil
 	c.bufferLock.Unlock()
-
+	// let first get the data and then wait our turn
+	c.semaphoreCh <- struct{}{}
+	defer func() {
+		<-c.semaphoreCh
+	}()
 	logrus.Debug("InfluxDB: Committing...")
 
 	batch, err := c.batchFromSamples(samples)
