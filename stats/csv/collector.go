@@ -37,21 +37,18 @@ import (
 	"github.com/spf13/afero"
 )
 
-const (
-	saveInterval = 1 * time.Second
-)
-
 // Collector saving output to csv implements the lib.Collector interface
 type Collector struct {
-	outfile     io.WriteCloser
-	fname       string
-	resTags     []string
-	ignoredTags []string
-	csvWriter   *csv.Writer
-	csvLock     sync.Mutex
-	buffer      []stats.Sample
-	bufferLock  sync.Mutex
-	row         []string
+	outfile      io.WriteCloser
+	fname        string
+	resTags      []string
+	ignoredTags  []string
+	csvWriter    *csv.Writer
+	csvLock      sync.Mutex
+	buffer       []stats.Sample
+	bufferLock   sync.Mutex
+	row          []string
+	saveInterval time.Duration
 }
 
 // Verify that Collector implements lib.Collector
@@ -65,7 +62,7 @@ type nopCloser struct {
 func (nopCloser) Close() error { return nil }
 
 // New Creates new instance of CSV collector
-func New(fs afero.Fs, fname string, tags lib.TagSet) (*Collector, error) {
+func New(fs afero.Fs, tags lib.TagSet, config Config) (*Collector, error) {
 	resTags := []string{}
 	ignoredTags := []string{}
 	for tag, flag := range tags {
@@ -78,15 +75,19 @@ func New(fs afero.Fs, fname string, tags lib.TagSet) (*Collector, error) {
 	sort.Strings(resTags)
 	sort.Strings(ignoredTags)
 
+	saveInterval := time.Duration(config.SaveInterval.Duration)
+	fname := config.FileName.String
+
 	if fname == "" || fname == "-" {
 		logfile := nopCloser{os.Stdout}
 		return &Collector{
-			outfile:     logfile,
-			fname:       "-",
-			resTags:     resTags,
-			ignoredTags: ignoredTags,
-			csvWriter:   csv.NewWriter(logfile),
-			row:         make([]string, 0, 3+len(resTags)+1),
+			outfile:      logfile,
+			fname:        "-",
+			resTags:      resTags,
+			ignoredTags:  ignoredTags,
+			csvWriter:    csv.NewWriter(logfile),
+			row:          make([]string, 0, 3+len(resTags)+1),
+			saveInterval: saveInterval,
 		}, nil
 	}
 
@@ -96,12 +97,13 @@ func New(fs afero.Fs, fname string, tags lib.TagSet) (*Collector, error) {
 	}
 
 	return &Collector{
-		outfile:     logfile,
-		fname:       fname,
-		resTags:     resTags,
-		ignoredTags: ignoredTags,
-		csvWriter:   csv.NewWriter(logfile),
-		row:         make([]string, 0, 3+len(resTags)+1),
+		outfile:      logfile,
+		fname:        fname,
+		resTags:      resTags,
+		ignoredTags:  ignoredTags,
+		csvWriter:    csv.NewWriter(logfile),
+		row:          make([]string, 0, 3+len(resTags)+1),
+		saveInterval: saveInterval,
 	}, nil
 }
 
@@ -121,7 +123,7 @@ func (c *Collector) SetRunStatus(status lib.RunStatus) {}
 
 // Run just blocks until the context is done
 func (c *Collector) Run(ctx context.Context) {
-	ticker := time.NewTicker(saveInterval)
+	ticker := time.NewTicker(c.saveInterval)
 	for {
 		select {
 		case <-ticker.C:

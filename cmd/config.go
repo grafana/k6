@@ -35,6 +35,7 @@ import (
 	"github.com/loadimpact/k6/lib/scheduler"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats/cloud"
+	"github.com/loadimpact/k6/stats/csv"
 	"github.com/loadimpact/k6/stats/datadog"
 	"github.com/loadimpact/k6/stats/influxdb"
 	"github.com/loadimpact/k6/stats/kafka"
@@ -72,6 +73,7 @@ type Config struct {
 		Cloud    cloud.Config    `json:"cloud"`
 		StatsD   common.Config   `json:"statsd"`
 		Datadog  datadog.Config  `json:"datadog"`
+		CSV      csv.Config      `json:"csv"`
 	} `json:"collectors"`
 }
 
@@ -97,6 +99,7 @@ func (c Config) Apply(cfg Config) Config {
 	c.Collectors.Kafka = c.Collectors.Kafka.Apply(cfg.Collectors.Kafka)
 	c.Collectors.StatsD = c.Collectors.StatsD.Apply(cfg.Collectors.StatsD)
 	c.Collectors.Datadog = c.Collectors.Datadog.Apply(cfg.Collectors.Datadog)
+	c.Collectors.CSV = c.Collectors.CSV.Apply(cfg.Collectors.CSV)
 	return c
 }
 

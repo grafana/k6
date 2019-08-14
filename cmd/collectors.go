@@ -114,7 +114,18 @@ func newCollector(collectorName, arg string, src *lib.SourceData, conf Config) (
 			}
 			return datadog.New(config)
 		case collectorCSV:
-			return csv.New(afero.NewOsFs(), arg, conf.SystemTags)
+			config := csv.NewConfig().Apply(conf.Collectors.CSV)
+			if err := envconfig.Process("k6", &config); err != nil {
+				return nil, err
+			}
+			if arg != "" {
+				cmdConfig, err := csv.ParseArg(arg)
+				if err != nil {
+					return nil, err
+				}
+				config = config.Apply(cmdConfig)
+			}
+			return csv.New(afero.NewOsFs(), conf.SystemTags, config)
 		default:
 			return nil, errors.Errorf("unknown output type: %s", collectorName)
 		}
