@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/loadimpact/k6/lib/fsext"
+	"github.com/loadimpact/k6/lib/scheduler"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 )
@@ -69,7 +70,7 @@ func TestOldArchive(t *testing.T) {
 	for filename, data := range testCases {
 		filename, data := filename, data
 		t.Run(filename, func(t *testing.T) {
-			metadata := `{"filename": "` + filename + `"}`
+			metadata := `{"filename": "` + filename + `", "options": {}}`
 			fs := makeMemMapFs(t, map[string][]byte{
 				// files
 				"/files/github.com/loadimpact/k6/samples/example.js": []byte(`github file`),
@@ -187,7 +188,8 @@ func TestFilenamePwdResolve(t *testing.T) {
 		metadata := `{
 		"filename": "` + test.Filename + `",
 		"pwd": "` + test.Pwd + `",
-		"k6version": "` + test.version + `"
+		"k6version": "` + test.version + `",
+		"options": {}
 	}`
 
 		buf, err := dumpMemMapFsToBuf(makeMemMapFs(t, map[string][]byte{
@@ -203,6 +205,84 @@ func TestFilenamePwdResolve(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, test.expectedFilenameURL, arc.FilenameURL)
 			require.Equal(t, test.expectedPwdURL, arc.PwdURL)
+		}
+	}
+}
+
+func TestDerivedExecutionDiscarding(t *testing.T) {
+	var emptyConfigMap scheduler.ConfigMap
+	var tests = []struct {
+		metadata     string
+		expExecution interface{}
+		expError     string
+	}{
+		{
+			metadata: `{
+				"filename": "/test.js", "pwd": "/",
+				"options": { "execution": { "something": "invalid" } }
+			}`,
+			expExecution: emptyConfigMap,
+		},
+		{
+			metadata: `{
+				"filename": "/test.js", "pwd": "/",
+				"k6version": "0.24.0",
+				"options": { "execution": { "something": "invalid" } }
+			}`,
+			expExecution: emptyConfigMap,
+		},
+		{
+			metadata: `blah`,
+			expError: "invalid character",
+		},
+		{
+			metadata: `{
+				"filename": "/test.js", "pwd": "/",
+				"k6version": "0.24.0"
+			}`,
+			expError: "missing options key",
+		},
+		{
+			metadata: `{
+				"filename": "/test.js", "pwd": "/",
+				"k6version": "0.24.0",
+				"options": "something invalid"
+			}`,
+			expError: "wrong options type in metadata.json",
+		},
+		{
+			metadata: `{
+				"filename": "/test.js", "pwd": "/",
+				"k6version": "0.25.0",
+				"options": { "execution": { "something": "invalid" } }
+			}`,
+			expError: "cannot unmarshal string",
+		},
+		{
+			metadata: `{
+				"filename": "/test.js", "pwd": "/",
+				"k6version": "0.25.0",
+				"options": { "execution": { "default": { "type": "per-vu-iterations" } } }
+			}`,
+			expExecution: scheduler.ConfigMap{
+				DefaultSchedulerName: scheduler.NewPerVUIterationsConfig(DefaultSchedulerName),
+			},
+		},
+	}
+
+	for _, test := range tests {
+		buf, err := dumpMemMapFsToBuf(makeMemMapFs(t, map[string][]byte{
+			"/metadata.json": []byte(test.metadata),
+		}))
+		require.NoError(t, err)
+
+		arc, err := ReadArchive(buf)
+		if test.expError != "" {
+			require.Error(t, err)
+			require.Contains(t, err.Error(), test.expError)
+		} else {
+			require.NoError(t, err)
+			require.Equal(t, test.expExecution, arc.Options.Execution)
 		}
 	}
 }
