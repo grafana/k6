@@ -160,7 +160,7 @@ func (c *Collector) commit() {
 			}
 		}
 	}
-	logrus.WithField("filename", c.fname).WithField("t", time.Now().Sub(start)).
+	logrus.WithField("filename", c.fname).WithField("t", time.Since(start)).
 		WithField("count", count).Debug("JSON: Wrote JSON metrics")
 }
 
