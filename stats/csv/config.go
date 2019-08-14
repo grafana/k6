@@ -52,6 +52,7 @@ func NewConfig() Config {
 	}
 }
 
+// Apply merges two configs by overwriting properties in the old config
 func (c Config) Apply(cfg Config) Config {
 	if cfg.FileName.Valid {
 		c.FileName = cfg.FileName
@@ -79,7 +80,7 @@ func ParseArg(arg string) (Config, error) {
 	}
 
 	if v, ok := params["save_interval"].(string); ok {
-		err := c.SaveInterval.UnmarshalText([]byte(v))
+		err = c.SaveInterval.UnmarshalText([]byte(v))
 		if err != nil {
 			return c, err
 		}

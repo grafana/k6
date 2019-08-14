@@ -104,8 +104,10 @@ func TestSampleToRow(t *testing.T) {
 	}
 
 	for testname, tags := range enabledTags {
+		testname := testname
+		resTags, ignoredTags := tags[0], tags[1]
 		for _, sample := range testSamples {
-			testname, sample, resTags, ignoredTags := testname, sample, tags[0], tags[1]
+			sample := sample
 			t.Run(testname, func(t *testing.T) {
 				row := SampleToRow(sample, resTags, ignoredTags, make([]string, 0, 3+len(resTags)+1))
 				if row != nil {
@@ -147,7 +149,11 @@ func TestCollect(t *testing.T) {
 	}
 
 	mem := afero.NewMemMapFs()
-	collector, err := New(mem, lib.TagSet{"tag1": true, "tag2": false, "tag3": true}, Config{FileName: null.StringFrom("name"), SaveInterval: types.NewNullDuration(time.Duration(1), true)})
+	collector, err := New(
+		mem,
+		lib.TagSet{"tag1": true, "tag2": false, "tag3": true},
+		Config{FileName: null.StringFrom("name"), SaveInterval: types.NewNullDuration(time.Duration(1), true)},
+	)
 	assert.NoError(t, err)
 	assert.NotNil(t, collector)
 
@@ -157,7 +163,11 @@ func TestCollect(t *testing.T) {
 }
 
 func TestRun(t *testing.T) {
-	collector, err := New(afero.NewMemMapFs(), lib.TagSet{"tag1": true, "tag2": false, "tag3": true}, Config{FileName: null.StringFrom("name"), SaveInterval: types.NewNullDuration(time.Duration(1), true)})
+	collector, err := New(
+		afero.NewMemMapFs(),
+		lib.TagSet{"tag1": true, "tag2": false, "tag3": true},
+		Config{FileName: null.StringFrom("name"), SaveInterval: types.NewNullDuration(time.Duration(1), true)},
+	)
 	assert.NoError(t, err)
 	assert.NotNil(t, collector)
 
@@ -200,7 +210,11 @@ func TestRunCollect(t *testing.T) {
 	}
 
 	mem := afero.NewMemMapFs()
-	collector, err := New(mem, lib.TagSet{"tag1": true, "tag2": false, "tag3": true}, Config{FileName: null.StringFrom("path"), SaveInterval: types.NewNullDuration(time.Duration(1), true)})
+	collector, err := New(
+		mem,
+		lib.TagSet{"tag1": true, "tag2": false, "tag3": true},
+		Config{FileName: null.StringFrom("path"), SaveInterval: types.NewNullDuration(time.Duration(1), true)},
+	)
 	assert.NoError(t, err)
 	assert.NotNil(t, collector)
 
@@ -301,14 +315,22 @@ func TestNew(t *testing.T) {
 }
 
 func TestGetRequiredSystemTags(t *testing.T) {
-	collector, err := New(afero.NewMemMapFs(), lib.TagSet{"tag1": true, "tag2": false, "tag3": true}, Config{FileName: null.StringFrom("name"), SaveInterval: types.NewNullDuration(time.Duration(1), true)})
+	collector, err := New(
+		afero.NewMemMapFs(),
+		lib.TagSet{"tag1": true, "tag2": false, "tag3": true},
+		Config{FileName: null.StringFrom("name"), SaveInterval: types.NewNullDuration(time.Duration(1), true)},
+	)
 	assert.NoError(t, err)
 	assert.NotNil(t, collector)
 	assert.Equal(t, lib.TagSet{}, collector.GetRequiredSystemTags())
 }
 
 func TestLink(t *testing.T) {
-	collector, err := New(afero.NewMemMapFs(), lib.TagSet{"tag1": true, "tag2": false, "tag3": true}, Config{FileName: null.StringFrom("path"), SaveInterval: types.NewNullDuration(time.Duration(1), true)})
+	collector, err := New(
+		afero.NewMemMapFs(),
+		lib.TagSet{"tag1": true, "tag2": false, "tag3": true},
+		Config{FileName: null.StringFrom("path"), SaveInterval: types.NewNullDuration(time.Duration(1), true)},
+	)
 	assert.NoError(t, err)
 	assert.NotNil(t, collector)
 	assert.Equal(t, "path", collector.Link())

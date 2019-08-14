@@ -38,11 +38,11 @@ func TestNewConfig(t *testing.T) {
 
 func TestApply(t *testing.T) {
 	configs := []Config{
-		Config{
+		{
 			FileName:     null.StringFrom(""),
 			SaveInterval: types.NullDurationFrom(2 * time.Second),
 		},
-		Config{
+		{
 			FileName:     null.StringFrom("newPath"),
 			SaveInterval: types.NewNullDuration(time.Duration(1), false),
 		},
@@ -81,11 +81,11 @@ func TestParseArg(t *testing.T) {
 	}
 
 	expected := []Config{
-		Config{
+		{
 			FileName:     null.StringFrom("test_file.csv"),
 			SaveInterval: types.NullDurationFrom(1 * time.Second),
 		},
-		Config{
+		{
 			FileName:     null.StringFrom("test.csv"),
 			SaveInterval: types.NullDurationFrom(5 * time.Second),
 		},

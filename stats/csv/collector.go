@@ -161,13 +161,11 @@ func (c *Collector) WriteToFile() {
 		for _, sc := range samples {
 			for _, sample := range sc.GetSamples() {
 				sample := sample
-				if &sample != nil {
-					row := c.row[:0]
-					row = SampleToRow(&sample, c.resTags, c.ignoredTags, row)
-					err := c.csvWriter.Write(row)
-					if err != nil {
-						logrus.WithField("filename", c.fname).Error("CSV: Error writing to file")
-					}
+				row := c.row[:0]
+				row = SampleToRow(&sample, c.resTags, c.ignoredTags, row)
+				err := c.csvWriter.Write(row)
+				if err != nil {
+					logrus.WithField("filename", c.fname).Error("CSV: Error writing to file")
 				}
 			}
 		}
