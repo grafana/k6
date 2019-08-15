@@ -27,16 +27,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/scheduler"
-	"github.com/loadimpact/k6/lib/testutils"
-	"github.com/loadimpact/k6/lib/types"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	null "gopkg.in/guregu/null.v3"
+
+	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/scheduler"
+	"github.com/loadimpact/k6/lib/testutils"
+	"github.com/loadimpact/k6/lib/types"
 )
 
 // A helper funcion for setting arbitrary environment variables and
@@ -212,6 +213,7 @@ type exp struct {
 	cliParseError      bool
 	cliReadError       bool
 	consolidationError bool
+	derivationError    bool
 	validationErrors   bool
 	logWarning         bool
 }
@@ -250,21 +252,27 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 			opts{cli: []string{"-s", "1m6s:5", "--vus", "10"}}, exp{},
 			verifyVarLoopingVUs(null.NewInt(10, true), buildStages(66, 5)),
 		},
+		{opts{cli: []string{"-u", "1", "-i", "6", "-d", "10s"}}, exp{}, func(t *testing.T, c Config) {
+			verifySharedIters(I(1), I(6))(t, c)
+			sharedIterConfig := c.Execution[lib.DefaultSchedulerName].(scheduler.SharedIteationsConfig)
+			assert.Equal(t, time.Duration(sharedIterConfig.MaxDuration.Duration), 10*time.Second)
+		}},
 		// This should get a validation error since VUs are more than the shared iterations
 		{opts{cli: []string{"--vus", "10", "-i", "6"}}, exp{validationErrors: true}, verifySharedIters(I(10), I(6))},
 		{opts{cli: []string{"-s", "10s:5", "-s", "10s:"}}, exp{validationErrors: true}, nil},
 		{opts{fs: defaultConfig(`{"stages": [{"duration": "20s"}], "vus": 10}`)}, exp{validationErrors: true}, nil},
 		// These should emit a consolidation error
-		{opts{cli: []string{"-u", "1", "-i", "6", "-d", "10s"}}, exp{consolidationError: true}, nil},
-		{opts{cli: []string{"-u", "2", "-d", "10s", "-s", "10s:20"}}, exp{consolidationError: true}, nil},
-		{opts{cli: []string{"-u", "3", "-i", "5", "-s", "10s:20"}}, exp{consolidationError: true}, nil},
-		{opts{cli: []string{"-u", "3", "-d", "0"}}, exp{consolidationError: true}, nil},
+		{opts{cli: []string{"-u", "2", "-d", "10s", "-s", "10s:20"}}, exp{derivationError: true}, nil},
+		{opts{cli: []string{"-u", "3", "-i", "5", "-s", "10s:20"}}, exp{derivationError: true}, nil},
+		{opts{cli: []string{"-u", "3", "-d", "0"}}, exp{derivationError: true}, nil},
 		{
 			opts{runner: &lib.Options{
-				VUs:        null.IntFrom(5),
-				Duration:   types.NullDurationFrom(44 * time.Second),
-				Iterations: null.IntFrom(10),
-			}}, exp{consolidationError: true}, nil,
+				VUs:      null.IntFrom(5),
+				Duration: types.NullDurationFrom(44 * time.Second),
+				Stages: []lib.Stage{
+					{Duration: types.NullDurationFrom(3 * time.Second), Target: I(20)},
+				},
+			}}, exp{derivationError: true}, nil,
 		},
 		{opts{fs: defaultConfig(`{"execution": {}}`)}, exp{logWarning: true}, verifyOneIterPerOneVU},
 		// Test if environment variable shortcuts are working as expected
@@ -303,9 +311,9 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 		{
 			opts{
 				runner: &lib.Options{VUs: null.IntFrom(5), Duration: types.NullDurationFrom(50 * time.Second)},
-				cli:    []string{"--iterations", "5"},
+				cli:    []string{"--stage", "5s:5"},
 			},
-			exp{}, verifySharedIters(I(5), I(5)),
+			exp{}, verifyVarLoopingVUs(I(5), buildStages(5, 5)),
 		},
 		{
 			opts{
@@ -354,6 +362,21 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 
 		// Just in case, verify that no options will result in the same 1 vu 1 iter config
 		{opts{}, exp{}, verifyOneIterPerOneVU},
+
+		// Test system tags
+		{opts{}, exp{}, func(t *testing.T, c Config) {
+			assert.Equal(t, lib.GetTagSet(lib.DefaultSystemTagList...), c.Options.SystemTags)
+		}},
+		{opts{cli: []string{"--system-tags", `""`}}, exp{}, func(t *testing.T, c Config) {
+			assert.Equal(t, lib.GetTagSet(), c.Options.SystemTags)
+		}},
+		{
+			opts{runner: &lib.Options{SystemTags: lib.GetTagSet([]string{"proto", "url"}...)}},
+			exp{},
+			func(t *testing.T, c Config) {
+				assert.Equal(t, lib.GetTagSet("proto", "url"), c.Options.SystemTags)
+			},
+		},
 		//TODO: test for differences between flagsets
 		//TODO: more tests in general, especially ones not related to execution parameters...
 	}
@@ -367,7 +390,7 @@ func runTestCase(
 ) {
 	t.Logf("Test with opts=%#v and exp=%#v\n", testCase.options, testCase.expected)
 	output := testutils.NewTestOutput(t)
-	log.SetOutput(output)
+	logrus.SetOutput(output)
 	logHook.Drain()
 
 	restoreEnv := setEnv(t, testCase.options.env)
@@ -408,8 +431,16 @@ func runTestCase(
 		testCase.options.fs = afero.NewMemMapFs() // create an empty FS if it wasn't supplied
 	}
 
-	result, err := getConsolidatedConfig(testCase.options.fs, cliConf, runner)
+	consolidatedConfig, err := getConsolidatedConfig(testCase.options.fs, cliConf, runner)
 	if testCase.expected.consolidationError {
+		require.Error(t, err)
+		return
+	}
+	require.NoError(t, err)
+
+	derivedConfig := consolidatedConfig
+	derivedConfig.Options, err = scheduler.DeriveExecutionFromShortcuts(consolidatedConfig.Options)
+	if testCase.expected.derivationError {
 		require.Error(t, err)
 		return
 	}
@@ -422,7 +453,7 @@ func runTestCase(
 		assert.Empty(t, warnings)
 	}
 
-	validationErrors := result.Validate()
+	validationErrors := derivedConfig.Validate()
 	if testCase.expected.validationErrors {
 		assert.NotEmpty(t, validationErrors)
 	} else {
@@ -430,17 +461,17 @@ func runTestCase(
 	}
 
 	if testCase.customValidator != nil {
-		testCase.customValidator(t, result)
+		testCase.customValidator(t, derivedConfig)
 	}
 }
 
 func TestConfigConsolidation(t *testing.T) {
 	// This test and its subtests shouldn't be ran in parallel, since they unfortunately have
 	// to mess with shared global objects (env vars, variables, the log, ... santa?)
-	logHook := testutils.SimpleLogrusHook{HookedLevels: []log.Level{log.WarnLevel}}
-	log.AddHook(&logHook)
-	log.SetOutput(ioutil.Discard)
-	defer log.SetOutput(os.Stderr)
+	logHook := testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.WarnLevel}}
+	logrus.AddHook(&logHook)
+	logrus.SetOutput(ioutil.Discard)
+	defer logrus.SetOutput(os.Stderr)
 
 	for tcNum, testCase := range getConfigConsolidationTestCases() {
 		flagSetInits := testCase.options.cliFlagSetInits

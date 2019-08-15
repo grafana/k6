@@ -24,6 +24,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"net/url"
 	"runtime"
 	"sync/atomic"
 	"testing"
@@ -36,10 +37,10 @@ import (
 	"github.com/loadimpact/k6/lib/scheduler"
 	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/lib/types"
+	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/stats"
 	"github.com/sirupsen/logrus"
 	logtest "github.com/sirupsen/logrus/hooks/test"
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	null "gopkg.in/guregu/null.v3"
@@ -52,7 +53,7 @@ func newTestExecutor(
 		runner = &lib.MiniRunner{}
 	}
 	ctx, cancel = context.WithCancel(context.Background())
-	newOpts, err := scheduler.BuildExecutionConfig(lib.Options{
+	newOpts, err := scheduler.DeriveExecutionFromShortcuts(lib.Options{
 		MetricSamplesBufferSize: null.NewInt(200, false),
 	}.Apply(runner.GetOptions()).Apply(opts))
 	require.NoError(t, err)
@@ -323,7 +324,7 @@ func TestExecutorEndIterations(t *testing.T) {
 	t.Parallel()
 	metric := &stats.Metric{Name: "test_metric"}
 
-	options, err := scheduler.BuildExecutionConfig(lib.Options{
+	options, err := scheduler.DeriveExecutionFromShortcuts(lib.Options{
 		VUs:        null.IntFrom(1),
 		Iterations: null.IntFrom(100),
 	})
@@ -536,14 +537,10 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 		counter.add(6, { place: "defaultAfterSleep" });
 	}`)
 
-	runner, err := js.New(
-		&lib.SourceData{Filename: "/script.js", Data: script},
-		afero.NewMemMapFs(),
-		lib.RuntimeOptions{},
-	)
+	runner, err := js.New(&loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script}, nil, lib.RuntimeOptions{})
 	require.NoError(t, err)
 
-	options, err := scheduler.BuildExecutionConfig(lib.Options{
+	options, err := scheduler.DeriveExecutionFromShortcuts(lib.Options{
 		Iterations:      null.IntFrom(2),
 		VUs:             null.IntFrom(1),
 		SystemTags:      lib.GetTagSet(lib.DefaultSystemTagList...),

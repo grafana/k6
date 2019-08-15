@@ -61,12 +61,12 @@ Install
 Install with [Homebrew](https://brew.sh/) by running:
 
 ```bash
-brew install loadimpact/k6/k6
+brew install k6
 ```
 
 ### Windows
 
-You can manually download and install the [latest `.msi` installation package](https://dl.bintray.com/loadimpact/windows/k6-latest-amd64.msi) or, if you use the [chocolatey package manager](https://chocolatey.org/), follow [these instructions](https://bintray.com/repo/buildSettings?repoPath=%2Floadimpact%2Fchoco) to set up the k6 repository.
+You can manually download and install the [official `.msi` installation package](https://dl.bintray.com/loadimpact/windows/k6-v0.25.1-amd64.msi) or, if you use the [chocolatey package manager](https://chocolatey.org/), follow [these instructions](https://bintray.com/repo/buildSettings?repoPath=%2Floadimpact%2Fchoco) to set up the k6 repository.
 
 ### Linux
 
@@ -315,8 +315,8 @@ export default function () {
     group("Static Assets", function () {
         // Execute multiple requests in parallel like a browser, to fetch some static resources
         let resps = http.batch([
-            ["GET", "https://test.loadimpact.com/style.css", { tags: { staticAsset: "yes" } }],
-            ["GET", "https://test.loadimpact.com/images/logo.png", { tags: { staticAsset: "yes" } }]
+            ["GET", "https://test.loadimpact.com/style.css", null, { tags: { staticAsset: "yes" } }],
+            ["GET", "https://test.loadimpact.com/images/logo.png", null, { tags: { staticAsset: "yes" } }]
         ]);
         // Combine check() call with failure tracking
         failureRate.add(!check(resps, {

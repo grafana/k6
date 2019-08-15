@@ -1,6 +1,6 @@
 version: 2
 jobs:
-  lint:
+  deps:
     docker:
       - image: circleci/golang:1.12
     environment:
@@ -14,18 +14,11 @@ jobs:
             go version
             export PATH="$GOPATH/bin:$PATH"
             mkdir -p "$GOPATH/bin"
-            curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+            curl --fail https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
             dep version
             dep status
             dep ensure -update -dry-run
-      - run:
-          name: Run linter
-          command: |
-            export PATH=$GOPATH/bin:$PATH
-            go get -t ./...
-            go get -u github.com/alecthomas/gometalinter
-            gometalinter --install
-            gometalinter --deadline 10m --config gometalinter.json --vendor ./...
+
 
   test:
     docker:
@@ -39,15 +32,15 @@ jobs:
           name: Run tests and code coverage
           command: |
             go version
-            export GOMAXPROCS=4
+            export GOMAXPROCS=2
             export PATH=$GOPATH/bin:$PATH
             echo "mode: set" > coverage.txt
             for pkg in $(go list ./... | grep -v vendor); do
-                go test -race -timeout 600s  --coverpkg="$(go list ./... | tr '\n' ',')" -coverprofile=$(echo $pkg | tr / -).coverage $pkg
+                go test -race -timeout 800s  --coverpkg="$(go list ./... | tr '\n' ',')" -coverprofile=$(echo $pkg | tr / -).coverage $pkg
             done
             grep -h -v "^mode:" *.coverage >> coverage.txt
             rm -f *.coverage
-            bash <(curl -s https://codecov.io/bash)
+            bash <(curl --fail -s https://codecov.io/bash)
 
 
   test-prev-golang:
@@ -62,9 +55,9 @@ jobs:
           name: Run tests with previous Go version
           command: |
             go version
-            export GOMAXPROCS=4
+            export GOMAXPROCS=2
             export PATH=$GOPATH/bin:$PATH
-            go test -race -timeout 600s ./...
+            go test -p 2 -race -timeout 800s ./...
 
   build-docker-images:
     docker:
@@ -150,14 +143,14 @@ jobs:
           command: |
             export VERSION=${CIRCLE_TAG:1}
             # Publishing deb
-            curl -H "X-GPG-PASSPHRASE: $GPG_PASSPHRASE" -T dist/k6-v$VERSION-amd64.deb "https://$BINTRAY_USER:$BINTRAY_KEY@api.bintray.com/content/loadimpact/deb/k6/$VERSION/k6-v$VERSION-amd64.deb;deb_distribution=stable;deb_component=main;deb_architecture=amd64;publish=1;override=1"
+            curl --fail -H "X-GPG-PASSPHRASE: $GPG_PASSPHRASE" -T dist/k6-v$VERSION-amd64.deb "https://$BINTRAY_USER:$BINTRAY_KEY@api.bintray.com/content/loadimpact/deb/k6/$VERSION/k6-v$VERSION-amd64.deb;deb_distribution=stable;deb_component=main;deb_architecture=amd64;publish=1;override=1"
             # Publishing rpm
-            curl -H "X-GPG-PASSPHRASE: $GPG_PASSPHRASE" -T dist/k6-v$VERSION-amd64.rpm "https://$BINTRAY_USER:$BINTRAY_KEY@api.bintray.com/content/loadimpact/rpm/k6/$VERSION/k6-v$VERSION-amd64.rpm?publish=1&override=1"
+            curl --fail -H "X-GPG-PASSPHRASE: $GPG_PASSPHRASE" -T dist/k6-v$VERSION-amd64.rpm "https://$BINTRAY_USER:$BINTRAY_KEY@api.bintray.com/content/loadimpact/rpm/k6/$VERSION/k6-v$VERSION-amd64.rpm?publish=1&override=1"
 workflows:
   version: 2
   test_and_build:
     jobs:
-      - lint:
+      - deps:
           filters:
             tags:
               only: /.*/
@@ -171,14 +164,14 @@ workflows:
               only: /.*/
       - build-docker-images:
           requires:
-            - lint
+            - deps
             - test
           filters:
             tags:
               only: /.*/
       - build-linux-packages:
           requires:
-            - lint
+            - deps
             - test
           filters:
             branches:

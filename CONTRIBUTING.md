@@ -56,14 +56,13 @@ go build
 
 **Running the linter**:
 
-We make use of the [gometalinter](https://github.com/alecthomas/gometalinter) tool to lint the code in CI. To run it locally, first install it:
+We make use of the [golangci-lint](https://github.com/golangci/golangci-lint) tool to lint the code in CI. To run it locally, first install it:
 ```bash
-go get -u github.com/alecthomas/gometalinter
-gometalinter --install
+go get -u github.com/golangci/golangci-lint/cmd/golangci-lint
 ```
 then run:
 ```
-gometalinter --deadline 10m --config gometalinter.json --vendor ./...
+golangci-lint run --out-format=tab --new-from-rev master ./...
 ```
 
 If you've added new dependencies you might also want to check and make sure all dependencies exists in `vendor/` folder by running:
@@ -106,7 +105,7 @@ As you'd expect, please adhere to good ol' `gofmt` (there are plugins for most e
 Continuous integration will catch all of this if you don't, and it's fine to just fix linter complaints with another commit, but you can also run the linter yourself:
 
 ```
-gometalinter --config gometalinter.json --deadline 10m ./...
+golangci-lint run --out-format=tab --new-from-rev master ./...
 ```
 
 Comments in the source should wrap at 100 characters, but there's no maximum length or need to be brief here - please include anything one might need to know in order to understand the code, that you could reasonably expect any reader to not already know (you probably don't need to explain what a goroutine is).

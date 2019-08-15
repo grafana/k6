@@ -22,14 +22,17 @@ package cmd
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"errors"
-
 	"github.com/kelseyhightower/envconfig"
+	"github.com/spf13/afero"
+	"github.com/spf13/pflag"
+	null "gopkg.in/guregu/null.v3"
+
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/scheduler"
 	"github.com/loadimpact/k6/stats/cloud"
@@ -37,9 +40,6 @@ import (
 	"github.com/loadimpact/k6/stats/influxdb"
 	"github.com/loadimpact/k6/stats/kafka"
 	"github.com/loadimpact/k6/stats/statsd/common"
-	"github.com/spf13/afero"
-	"github.com/spf13/pflag"
-	null "gopkg.in/guregu/null.v3"
 )
 
 // configFlagSet returns a FlagSet with the default run configuration flags.
@@ -214,10 +214,29 @@ func getConsolidatedConfig(fs afero.Fs, cliConf Config, runner lib.Runner) (conf
 		conf = conf.Apply(Config{Options: runner.GetOptions()})
 	}
 	conf = conf.Apply(envConf).Apply(cliConf)
+	conf = applyDefault(conf)
 
-	conf.Options, err = scheduler.BuildExecutionConfig(conf.Options)
+	return conf, nil
+}
 
-	return conf, err
+// applyDefault applys default options value if it is not specified by any mechenisms. This happens with types
+// which does not support by "gopkg.in/guregu/null.v3".
+//
+// Note that if you add option default value here, also add it in command line argument help text.
+func applyDefault(conf Config) Config {
+	if conf.Options.SystemTags == nil {
+		conf = conf.Apply(Config{Options: lib.Options{SystemTags: lib.GetTagSet(lib.DefaultSystemTagList...)}})
+	}
+	return conf
+}
+
+func deriveAndValidateConfig(conf Config) (result Config, err error) {
+	result = conf
+	result.Options, err = scheduler.DeriveExecutionFromShortcuts(conf.Options)
+	if err != nil {
+		return result, err
+	}
+	return result, validateConfig(result)
 }
 
 func validateConfig(conf Config) error {

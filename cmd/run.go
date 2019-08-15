@@ -24,28 +24,27 @@ import (
 	"archive/tar"
 	"bytes"
 	"context"
-	"io"
-	"io/ioutil"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/afero"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"github.com/loadimpact/k6/api"
 	"github.com/loadimpact/k6/core"
 	"github.com/loadimpact/k6/core/local"
 	"github.com/loadimpact/k6/js"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/ui"
 	"github.com/loadimpact/k6/ui/pb"
-	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/afero"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 )
 
 const (
@@ -93,7 +92,7 @@ a commandline interface for interacting with it.`,
 	Args: exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		//TODO: disable in quiet mode?
-		_, _ = BannerColor.Fprintf(stdout, "\n%s\n\n", Banner)
+		_, _ = BannerColor.Fprintf(stdout, "\n%s\n\n", consts.Banner)
 
 		initBar := pb.New(pb.WithConstLeft("   init"))
 
@@ -104,8 +103,8 @@ a commandline interface for interacting with it.`,
 			return err
 		}
 		filename := args[0]
-		fs := afero.NewOsFs()
-		src, err := readSource(filename, pwd, fs, os.Stdin)
+		filesystems := loader.CreateFilesystems()
+		src, err := loader.ReadSource(filename, pwd, filesystems, os.Stdin)
 		if err != nil {
 			return err
 		}
@@ -115,7 +114,7 @@ a commandline interface for interacting with it.`,
 			return err
 		}
 
-		r, err := newRunner(src, runType, fs, runtimeOptions)
+		r, err := newRunner(src, runType, filesystems, runtimeOptions)
 		if err != nil {
 			return err
 		}
@@ -126,12 +125,13 @@ a commandline interface for interacting with it.`,
 		if err != nil {
 			return err
 		}
-		conf, err := getConsolidatedConfig(fs, cliConf, r)
+		conf, err := getConsolidatedConfig(afero.NewOsFs(), cliConf, r)
 		if err != nil {
 			return err
 		}
 
-		if cerr := validateConfig(conf); cerr != nil {
+		conf, cerr := deriveAndValidateConfig(conf)
+		if cerr != nil {
 			return ExitCode{cerr, invalidConfigErrorCode}
 		}
 
@@ -425,29 +425,15 @@ func init() {
 	runCmd.Flags().AddFlagSet(runCmdFlagSet())
 }
 
-// Reads a source file from any supported destination.
-func readSource(src, pwd string, fs afero.Fs, stdin io.Reader) (*lib.SourceData, error) {
-	if src == "-" {
-		data, err := ioutil.ReadAll(stdin)
-		if err != nil {
-			return nil, err
-		}
-		return &lib.SourceData{Filename: "-", Data: data}, nil
-	}
-	abspath := filepath.Join(pwd, src)
-	if ok, _ := afero.Exists(fs, abspath); ok {
-		src = abspath
-	}
-	return loader.Load(fs, pwd, src)
-}
-
 // Creates a new runner.
-func newRunner(src *lib.SourceData, typ string, fs afero.Fs, rtOpts lib.RuntimeOptions) (lib.Runner, error) {
+func newRunner(
+	src *loader.SourceData, typ string, filesystems map[string]afero.Fs, rtOpts lib.RuntimeOptions,
+) (lib.Runner, error) {
 	switch typ {
 	case "":
-		return newRunner(src, detectType(src.Data), fs, rtOpts)
+		return newRunner(src, detectType(src.Data), filesystems, rtOpts)
 	case typeJS:
-		return js.New(src, fs, rtOpts)
+		return js.New(src, filesystems, rtOpts)
 	case typeArchive:
 		arc, err := lib.ReadArchive(bytes.NewReader(src.Data))
 		if err != nil {

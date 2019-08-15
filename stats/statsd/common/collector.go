@@ -27,9 +27,10 @@ import (
 	"time"
 
 	"github.com/DataDog/datadog-go/statsd"
+	"github.com/sirupsen/logrus"
+
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
-	log "github.com/sirupsen/logrus"
 )
 
 var _ lib.Collector = &Collector{}
@@ -42,7 +43,7 @@ type Collector struct {
 	// of those tags that should be sent. No tags are send in case of ProcessTags being null
 	ProcessTags func(map[string]string) []string
 
-	logger     *log.Entry
+	logger     *logrus.Entry
 	client     *statsd.Client
 	startTime  time.Time
 	buffer     []*Sample
@@ -51,7 +52,7 @@ type Collector struct {
 
 // Init sets up the collector
 func (c *Collector) Init() (err error) {
-	c.logger = log.WithField("type", c.Type)
+	c.logger = logrus.WithField("type", c.Type)
 	if address := c.Config.Addr.String; address == "" {
 		err = fmt.Errorf(
 			"connection string is invalid. Received: \"%+s\"",

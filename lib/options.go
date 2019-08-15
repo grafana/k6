@@ -142,6 +142,10 @@ func (v *TLSVersions) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+func (v *TLSVersions) isTLS13() bool {
+	return v.Min == TLSVersion13 || v.Max == TLSVersion13
+}
+
 // A list of TLS cipher suites.
 // Marshals and unmarshals from a list of names, eg. "TLS_ECDHE_RSA_WITH_RC4_128_SHA".
 // BUG: This currently doesn't marshal back to JSON properly!!
@@ -204,6 +208,37 @@ func (c *TLSAuth) Certificate() (*tls.Certificate, error) {
 	return c.certificate, nil
 }
 
+// IPNet is a wrapper around net.IPNet for JSON unmarshalling
+type IPNet net.IPNet
+
+func (ipnet *IPNet) String() string {
+	return (*net.IPNet)(ipnet).String()
+}
+
+// UnmarshalText populates the IPNet from the given CIDR
+func (ipnet *IPNet) UnmarshalText(b []byte) error {
+	newIPNet, err := ParseCIDR(string(b))
+	if err != nil {
+		return errors.Wrap(err, "Failed to parse CIDR")
+	}
+
+	*ipnet = *newIPNet
+
+	return nil
+}
+
+// ParseCIDR creates an IPNet out of a CIDR string
+func ParseCIDR(s string) (*IPNet, error) {
+	_, ipnet, err := net.ParseCIDR(s)
+	if err != nil {
+		return nil, err
+	}
+
+	parsedIPNet := IPNet(*ipnet)
+
+	return &parsedIPNet, nil
+}
+
 type Options struct {
 	// Should the test start in a paused state?
 	Paused null.Bool `json:"paused" envconfig:"paused"`
@@ -264,7 +299,7 @@ type Options struct {
 	Thresholds map[string]stats.Thresholds `json:"thresholds" envconfig:"thresholds"`
 
 	// Blacklist IP ranges that tests may not contact. Mainly useful in hosted setups.
-	BlacklistIPs []*net.IPNet `json:"blacklistIPs" envconfig:"blacklist_ips"`
+	BlacklistIPs []*IPNet `json:"blacklistIPs" envconfig:"blacklist_ips"`
 
 	// Hosts overrides dns entries for given hosts
 	Hosts map[string]net.IP `json:"hosts" envconfig:"hosts"`
@@ -400,6 +435,9 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.TLSVersion != nil {
 		o.TLSVersion = opts.TLSVersion
+		if o.TLSVersion.isTLS13() {
+			enableTLS13()
+		}
 	}
 	if opts.TLSAuth != nil {
 		o.TLSAuth = opts.TLSAuth

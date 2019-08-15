@@ -24,19 +24,21 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"net/url"
 	"os"
 	"testing"
 
-	null "gopkg.in/guregu/null.v3"
-
 	"github.com/dop251/goja"
-	"github.com/loadimpact/k6/js/common"
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/stats"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
+	null "gopkg.in/guregu/null.v3"
+
+	"github.com/loadimpact/k6/js/common"
+	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/loader"
+	"github.com/loadimpact/k6/stats"
 )
 
 func TestConsoleContext(t *testing.T) {
@@ -68,35 +70,56 @@ func TestConsoleContext(t *testing.T) {
 		assert.Equal(t, "b", entry.Message)
 	}
 }
+func getSimpleRunner(path, data string) (*Runner, error) {
+	return getSimpleRunnerWithFileFs(path, data, afero.NewMemMapFs())
+}
 
+func getSimpleRunnerWithOptions(path, data string, options lib.RuntimeOptions) (*Runner, error) {
+	return New(&loader.SourceData{
+		URL:  &url.URL{Path: path, Scheme: "file"},
+		Data: []byte(data),
+	}, map[string]afero.Fs{
+		"file":  afero.NewMemMapFs(),
+		"https": afero.NewMemMapFs()},
+		options)
+}
+
+func getSimpleRunnerWithFileFs(path, data string, fileFs afero.Fs) (*Runner, error) {
+	return New(&loader.SourceData{
+		URL:  &url.URL{Path: path, Scheme: "file"},
+		Data: []byte(data),
+	}, map[string]afero.Fs{
+		"file":  fileFs,
+		"https": afero.NewMemMapFs()},
+		lib.RuntimeOptions{})
+}
 func TestConsole(t *testing.T) {
-	levels := map[string]log.Level{
-		"log":   log.InfoLevel,
-		"debug": log.DebugLevel,
-		"info":  log.InfoLevel,
-		"warn":  log.WarnLevel,
-		"error": log.ErrorLevel,
+	levels := map[string]logrus.Level{
+		"log":   logrus.InfoLevel,
+		"debug": logrus.DebugLevel,
+		"info":  logrus.InfoLevel,
+		"warn":  logrus.WarnLevel,
+		"error": logrus.ErrorLevel,
 	}
 	argsets := map[string]struct {
 		Message string
-		Data    log.Fields
+		Data    logrus.Fields
 	}{
 		`"string"`:         {Message: "string"},
-		`"string","a","b"`: {Message: "string", Data: log.Fields{"0": "a", "1": "b"}},
-		`"string",1,2`:     {Message: "string", Data: log.Fields{"0": "1", "1": "2"}},
+		`"string","a","b"`: {Message: "string", Data: logrus.Fields{"0": "a", "1": "b"}},
+		`"string",1,2`:     {Message: "string", Data: logrus.Fields{"0": "1", "1": "2"}},
 		`{}`:               {Message: "[object Object]"},
 	}
 	for name, level := range levels {
+		name, level := name, level
 		t.Run(name, func(t *testing.T) {
 			for args, result := range argsets {
+				args, result := args, result
 				t.Run(args, func(t *testing.T) {
-					r, err := New(&lib.SourceData{
-						Filename: "/script",
-						Data: []byte(fmt.Sprintf(
-							`export default function() { console.%s(%s); }`,
-							name, args,
-						)),
-					}, afero.NewMemMapFs(), lib.RuntimeOptions{})
+					r, err := getSimpleRunner("/script.js", fmt.Sprintf(
+						`export default function() { console.%s(%s); }`,
+						name, args,
+					))
 					assert.NoError(t, err)
 
 					samples := make(chan stats.SampleContainer, 100)
@@ -104,7 +127,7 @@ func TestConsole(t *testing.T) {
 					assert.NoError(t, err)
 
 					logger, hook := logtest.NewNullLogger()
-					logger.Level = log.DebugLevel
+					logger.Level = logrus.DebugLevel
 					vu.Console.Logger = logger
 
 					err = vu.RunOnce(context.Background())
@@ -117,7 +140,7 @@ func TestConsole(t *testing.T) {
 
 						data := result.Data
 						if data == nil {
-							data = make(log.Fields)
+							data = make(logrus.Fields)
 						}
 						assert.Equal(t, data, entry.Data)
 					}
@@ -129,20 +152,20 @@ func TestConsole(t *testing.T) {
 
 func TestFileConsole(t *testing.T) {
 	var (
-		levels = map[string]log.Level{
-			"log":   log.InfoLevel,
-			"debug": log.DebugLevel,
-			"info":  log.InfoLevel,
-			"warn":  log.WarnLevel,
-			"error": log.ErrorLevel,
+		levels = map[string]logrus.Level{
+			"log":   logrus.InfoLevel,
+			"debug": logrus.DebugLevel,
+			"info":  logrus.InfoLevel,
+			"warn":  logrus.WarnLevel,
+			"error": logrus.ErrorLevel,
 		}
 		argsets = map[string]struct {
 			Message string
-			Data    log.Fields
+			Data    logrus.Fields
 		}{
 			`"string"`:         {Message: "string"},
-			`"string","a","b"`: {Message: "string", Data: log.Fields{"0": "a", "1": "b"}},
-			`"string",1,2`:     {Message: "string", Data: log.Fields{"0": "1", "1": "2"}},
+			`"string","a","b"`: {Message: "string", Data: logrus.Fields{"0": "a", "1": "b"}},
+			`"string",1,2`:     {Message: "string", Data: logrus.Fields{"0": "1", "1": "2"}},
 			`{}`:               {Message: "[object Object]"},
 		}
 		preExisting = map[string]bool{
@@ -179,13 +202,11 @@ func TestFileConsole(t *testing.T) {
 								}
 
 							}
-							r, err := New(&lib.SourceData{
-								Filename: "/script",
-								Data: []byte(fmt.Sprintf(
+							r, err := getSimpleRunner("/script",
+								fmt.Sprintf(
 									`export default function() { console.%s(%s); }`,
 									name, args,
-								)),
-							}, afero.NewMemMapFs(), lib.RuntimeOptions{})
+								))
 							assert.NoError(t, err)
 
 							err = r.SetOptions(lib.Options{
@@ -197,7 +218,7 @@ func TestFileConsole(t *testing.T) {
 							vu, err := r.newVU(samples)
 							assert.NoError(t, err)
 
-							vu.Console.Logger.Level = log.DebugLevel
+							vu.Console.Logger.Level = logrus.DebugLevel
 							hook := logtest.NewLocal(vu.Console.Logger)
 
 							err = vu.RunOnce(context.Background())
@@ -214,7 +235,7 @@ func TestFileConsole(t *testing.T) {
 
 								data := result.Data
 								if data == nil {
-									data = make(log.Fields)
+									data = make(logrus.Fields)
 								}
 								assert.Equal(t, data, entry.Data)
 

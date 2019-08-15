@@ -23,14 +23,26 @@
 package lib
 
 import (
+	"sync"
+
 	"github.com/GeertJohan/go.rice"
 	"github.com/dop251/goja"
 )
 
+//nolint:gochecknoglobals
+var (
+	once   sync.Once
+	coreJs *goja.Program
+)
+
 func GetCoreJS() *goja.Program {
-	return goja.MustCompile(
-		"core-js/shim.min.js",
-		rice.MustFindBox("core-js").MustString("shim.min.js"),
-		true,
-	)
+	once.Do(func() {
+		coreJs = goja.MustCompile(
+			"core-js/shim.min.js",
+			rice.MustFindBox("core-js").MustString("shim.min.js"),
+			true,
+		)
+	})
+
+	return coreJs
 }

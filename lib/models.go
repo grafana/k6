@@ -40,12 +40,6 @@ const GroupSeparator = "::"
 // Error emitted if you attempt to instantiate a Group or Check that contains the separator.
 var ErrNameContainsGroupSeparator = errors.New("group and check names may not contain '::'")
 
-// Wraps a source file; data and filename.
-type SourceData struct {
-	Data     []byte
-	Filename string
-}
-
 // StageFields defines the fields used for a Stage; this is a dumb hack to make the JSON code
 // cleaner. pls fix.
 type StageFields struct {
