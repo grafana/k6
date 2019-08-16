@@ -149,9 +149,9 @@ func TestSetupData(t *testing.T) {
 				SetupTimeout:    types.NullDurationFrom(1 * time.Second),
 				TeardownTimeout: types.NullDurationFrom(1 * time.Second),
 			})
-			executor, err := local.New(runner, logrus.StandardLogger())
+			execScheduler, err := local.NewExecutionScheduler(runner, logrus.StandardLogger())
 			require.NoError(t, err)
-			engine, err := core.NewEngine(executor, runner.GetOptions(), logrus.StandardLogger())
+			engine, err := core.NewEngine(execScheduler, runner.GetOptions(), logrus.StandardLogger())
 			require.NoError(t, err)
 
 			ctx, cancel := context.WithCancel(context.Background())
@@ -181,7 +181,7 @@ func TestSetupData(t *testing.T) {
 				checkSetup(setupRun[0], setupRun[1], setupRun[2])
 			}
 
-			engine.Executor.SetPaused(false)
+			require.NoError(t, engine.ExecutionScheduler.SetPaused(false))
 
 			select {
 			case <-time.After(10 * time.Second):

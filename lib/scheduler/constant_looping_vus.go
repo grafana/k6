@@ -37,9 +37,9 @@ import (
 const constantLoopingVUsType = "constant-looping-vus"
 
 func init() {
-	lib.RegisterSchedulerConfigType(
+	lib.RegisterExecutorConfigType(
 		constantLoopingVUsType,
-		func(name string, rawJSON []byte) (lib.SchedulerConfig, error) {
+		func(name string, rawJSON []byte) (lib.ExecutorConfig, error) {
 			config := NewConstantLoopingVUsConfig(name)
 			err := lib.StrictJSONUnmarshal(rawJSON, &config)
 			return config, err
@@ -66,15 +66,15 @@ func NewConstantLoopingVUsConfig(name string) ConstantLoopingVUsConfig {
 	}
 }
 
-// Make sure we implement the lib.SchedulerConfig interface
-var _ lib.SchedulerConfig = &ConstantLoopingVUsConfig{}
+// Make sure we implement the lib.ExecutorConfig interface
+var _ lib.ExecutorConfig = &ConstantLoopingVUsConfig{}
 
-// GetVUs returns the scaled VUs for the scheduler.
+// GetVUs returns the scaled VUs for the executor.
 func (clvc ConstantLoopingVUsConfig) GetVUs(es *lib.ExecutionSegment) int64 {
 	return es.Scale(clvc.VUs.Int64)
 }
 
-// GetDescription returns a human-readable description of the scheduler options
+// GetDescription returns a human-readable description of the executor options
 func (clvc ConstantLoopingVUsConfig) GetDescription(es *lib.ExecutionSegment) string {
 	return fmt.Sprintf("%d looping VUs for %s%s",
 		clvc.GetVUs(es), clvc.Duration.Duration, clvc.getBaseInfo())
@@ -99,7 +99,7 @@ func (clvc ConstantLoopingVUsConfig) Validate() []error {
 }
 
 // GetExecutionRequirements just reserves the number of specified VUs for the
-// whole duration of the scheduler, including the maximum waiting time for
+// whole duration of the executor, including the maximum waiting time for
 // iterations to gracefully stop.
 func (clvc ConstantLoopingVUsConfig) GetExecutionRequirements(es *lib.ExecutionSegment) []lib.ExecutionStep {
 	return []lib.ExecutionStep{
@@ -114,28 +114,28 @@ func (clvc ConstantLoopingVUsConfig) GetExecutionRequirements(es *lib.ExecutionS
 	}
 }
 
-// NewScheduler creates a new ConstantLoopingVUs scheduler
-func (clvc ConstantLoopingVUsConfig) NewScheduler(es *lib.ExecutorState, logger *logrus.Entry) (lib.Scheduler, error) {
+// NewExecutor creates a new ConstantLoopingVUs executor
+func (clvc ConstantLoopingVUsConfig) NewExecutor(es *lib.ExecutionState, logger *logrus.Entry) (lib.Executor, error) {
 	return ConstantLoopingVUs{
-		BaseScheduler: NewBaseScheduler(clvc, es, logger),
-		config:        clvc,
+		BaseExecutor: NewBaseExecutor(clvc, es, logger),
+		config:       clvc,
 	}, nil
 }
 
 // ConstantLoopingVUs maintains a constant number of VUs running for the
 // specified duration.
 type ConstantLoopingVUs struct {
-	*BaseScheduler
+	*BaseExecutor
 	config ConstantLoopingVUsConfig
 }
 
-// Make sure we implement the lib.Scheduler interface.
-var _ lib.Scheduler = &ConstantLoopingVUs{}
+// Make sure we implement the lib.Executor interface.
+var _ lib.Executor = &ConstantLoopingVUs{}
 
 // Run constantly loops through as many iterations as possible on a fixed number
 // of VUs for the specified duration.
 func (clv ConstantLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleContainer) (err error) {
-	segment := clv.executorState.Options.ExecutionSegment
+	segment := clv.executionState.Options.ExecutionSegment
 	numVUs := clv.config.GetVUs(segment)
 	duration := time.Duration(clv.config.Duration.Duration)
 	gracefulStop := clv.config.GetGracefulStop()
@@ -146,7 +146,7 @@ func (clv ConstantLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleCo
 	// Make sure the log and the progress bar have accurate information
 	clv.logger.WithFields(
 		logrus.Fields{"vus": numVUs, "duration": duration, "type": clv.config.GetType()},
-	).Debug("Starting scheduler run...")
+	).Debug("Starting executor run...")
 
 	progresFn := func() (float64, string) {
 		spent := time.Since(startTime)
@@ -165,10 +165,10 @@ func (clv ConstantLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleCo
 	defer activeVUs.Wait()
 
 	regDurationDone := regDurationCtx.Done()
-	runIteration := getIterationRunner(clv.executorState, clv.logger, out)
+	runIteration := getIterationRunner(clv.executionState, clv.logger, out)
 
 	handleVU := func(vu lib.VU) {
-		defer clv.executorState.ReturnVU(vu, true)
+		defer clv.executionState.ReturnVU(vu, true)
 		defer activeVUs.Done()
 
 		for {
@@ -183,7 +183,7 @@ func (clv ConstantLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleCo
 	}
 
 	for i := int64(0); i < numVUs; i++ {
-		vu, err := clv.executorState.GetPlannedVU(clv.logger, true)
+		vu, err := clv.executionState.GetPlannedVU(clv.logger, true)
 		if err != nil {
 			cancel()
 			return err

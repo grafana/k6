@@ -30,10 +30,10 @@ import (
 	null "gopkg.in/guregu/null.v3"
 )
 
-var schedulerNameWhitelist = regexp.MustCompile(`^[0-9a-zA-Z_-]+$`) //nolint:gochecknoglobals
-const schedulerNameErr = "the scheduler name should contain only numbers, latin letters, underscores, and dashes"
+var executorNameWhitelist = regexp.MustCompile(`^[0-9a-zA-Z_-]+$`) //nolint:gochecknoglobals
+const executorNameErr = "the executor name should contain only numbers, latin letters, underscores, and dashes"
 
-// BaseConfig contains the common config fields for all schedulers
+// BaseConfig contains the common config fields for all executors
 type BaseConfig struct {
 	Name         string             `json:"-"` // set via the JS object key
 	Type         string             `json:"type"`
@@ -59,10 +59,10 @@ func (bc BaseConfig) Validate() (errors []error) {
 	// Some just-in-case checks, since those things are likely checked in other places or
 	// even assigned by us:
 	if bc.Name == "" {
-		errors = append(errors, fmt.Errorf("scheduler name shouldn't be empty"))
+		errors = append(errors, fmt.Errorf("executor name shouldn't be empty"))
 	}
-	if !schedulerNameWhitelist.MatchString(bc.Name) {
-		errors = append(errors, fmt.Errorf(schedulerNameErr))
+	if !executorNameWhitelist.MatchString(bc.Name) {
+		errors = append(errors, fmt.Errorf(executorNameErr))
 	}
 	if bc.Exec.Valid && bc.Exec.String == "" {
 		errors = append(errors, fmt.Errorf("exec value cannot be empty"))
@@ -80,24 +80,24 @@ func (bc BaseConfig) Validate() (errors []error) {
 	return errors
 }
 
-// GetName returns the name of the scheduler.
+// GetName returns the name of the executor.
 func (bc BaseConfig) GetName() string {
 	return bc.Name
 }
 
-// GetType returns the scheduler's type as a string ID.
+// GetType returns the executor's type as a string ID.
 func (bc BaseConfig) GetType() string {
 	return bc.Type
 }
 
 // GetStartTime returns the starting time, relative to the beginning of the
-// actual test, that this scheduler is supposed to execute.
+// actual test, that this executor is supposed to execute.
 func (bc BaseConfig) GetStartTime() time.Duration {
 	return time.Duration(bc.StartTime.Duration)
 }
 
 // GetGracefulStop returns how long k6 is supposed to wait for any still
-// running iterations to finish executing at the end of the normal scheduler
+// running iterations to finish executing at the end of the normal executor
 // duration, before it actually kills them.
 //
 // Of course, that doesn't count when the user manually interrupts the test,
@@ -107,7 +107,7 @@ func (bc BaseConfig) GetGracefulStop() time.Duration {
 }
 
 // GetEnv returns any specific environment key=value pairs that
-// are configured for the scheduler.
+// are configured for the executor.
 func (bc BaseConfig) GetEnv() map[string]string {
 	return bc.Env
 }
@@ -117,7 +117,7 @@ func (bc BaseConfig) GetExec() null.String {
 	return bc.Exec
 }
 
-// IsDistributable returns true since by default all schedulers could be run in
+// IsDistributable returns true since by default all executors could be run in
 // a distributed manner.
 func (bc BaseConfig) IsDistributable() bool {
 	return true

@@ -35,15 +35,14 @@ import (
 	"gopkg.in/guregu/null.v3"
 )
 
-// DefaultSchedulerName is used as the default key/ID of the scheduler config entries
+// DefaultExecutorName is used as the default key/ID of the executor config entries
 // that were created due to the use of the shortcut execution control options (i.e. duration+vus,
 // iterations+vus, or stages)
-const DefaultSchedulerName = "default"
+const DefaultExecutorName = "default"
 
 // DefaultSystemTagList includes all of the system tags emitted with metrics by default.
 // Other tags that are not enabled by default include: iter, vu, ocsp_status, ip
 var DefaultSystemTagList = []string{
-
 	"proto", "subproto", "status", "method", "url", "name", "group", "check", "error", "error_code", "tls_version",
 }
 
@@ -243,10 +242,9 @@ type Options struct {
 	// Should the test start in a paused state?
 	Paused null.Bool `json:"paused" envconfig:"paused"`
 
-	// Initial values for VUs, max VUs, duration cap, iteration cap, and stages.
-	// See the Runner or Executor interfaces for more information.
-	VUs null.Int `json:"vus" envconfig:"vus"`
-
+	// Execution shortcut options - see the execution option below for all
+	// possibilities and the executors and ExecutionScheduler for more info.
+	VUs        null.Int           `json:"vus" envconfig:"vus"`
 	Duration   types.NullDuration `json:"duration" envconfig:"duration"`
 	Iterations null.Int           `json:"iterations" envconfig:"iterations"`
 	Stages     []Stage            `json:"stages" envconfig:"stages"`
@@ -257,8 +255,8 @@ type Options struct {
 	// We should support specifying execution segments via environment
 	// variables, but we currently can't, because envconfig has this nasty bug
 	// (among others): https://github.com/kelseyhightower/envconfig/issues/113
-	Execution        SchedulerConfigMap `json:"execution,omitempty" ignored:"true"`
-	ExecutionSegment *ExecutionSegment  `json:"executionSegment" ignored:"true"`
+	Execution        ExecutorConfigMap `json:"execution,omitempty" ignored:"true"`
+	ExecutionSegment *ExecutionSegment `json:"executionSegment" ignored:"true"`
 
 	// Timeouts for the setup() and teardown() functions
 	NoSetup         null.Bool          `json:"noSetup" envconfig:"NO_SETUP"`

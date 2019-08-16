@@ -37,37 +37,37 @@ func (e ExecutionConflictError) Error() string {
 
 var _ error = ExecutionConflictError("")
 
-func getConstantLoopingVUsExecution(duration types.NullDuration, vus null.Int) lib.SchedulerConfigMap {
-	ds := NewConstantLoopingVUsConfig(lib.DefaultSchedulerName)
+func getConstantLoopingVUsExecution(duration types.NullDuration, vus null.Int) lib.ExecutorConfigMap {
+	ds := NewConstantLoopingVUsConfig(lib.DefaultExecutorName)
 	ds.VUs = vus
 	ds.Duration = duration
-	return lib.SchedulerConfigMap{lib.DefaultSchedulerName: ds}
+	return lib.ExecutorConfigMap{lib.DefaultExecutorName: ds}
 }
 
-func getVariableLoopingVUsExecution(stages []lib.Stage, startVUs null.Int) lib.SchedulerConfigMap {
-	ds := NewVariableLoopingVUsConfig(lib.DefaultSchedulerName)
+func getVariableLoopingVUsExecution(stages []lib.Stage, startVUs null.Int) lib.ExecutorConfigMap {
+	ds := NewVariableLoopingVUsConfig(lib.DefaultExecutorName)
 	ds.StartVUs = startVUs
 	for _, s := range stages {
 		if s.Duration.Valid {
 			ds.Stages = append(ds.Stages, Stage{Duration: s.Duration, Target: s.Target})
 		}
 	}
-	return lib.SchedulerConfigMap{lib.DefaultSchedulerName: ds}
+	return lib.ExecutorConfigMap{lib.DefaultExecutorName: ds}
 }
 
-func getSharedIterationsExecution(iters null.Int, duration types.NullDuration, vus null.Int) lib.SchedulerConfigMap {
-	ds := NewSharedIterationsConfig(lib.DefaultSchedulerName)
+func getSharedIterationsExecution(iters null.Int, duration types.NullDuration, vus null.Int) lib.ExecutorConfigMap {
+	ds := NewSharedIterationsConfig(lib.DefaultExecutorName)
 	ds.VUs = vus
 	ds.Iterations = iters
 	if duration.Valid {
 		ds.MaxDuration = duration
 	}
-	return lib.SchedulerConfigMap{lib.DefaultSchedulerName: ds}
+	return lib.ExecutorConfigMap{lib.DefaultExecutorName: ds}
 }
 
 // DeriveExecutionFromShortcuts checks for conflicting options and turns any
 // shortcut options (i.e. duration, iterations, stages) into the proper
-// long-form scheduler configuration in the execution property.
+// long-form executor configuration in the execution property.
 func DeriveExecutionFromShortcuts(opts lib.Options) (lib.Options, error) {
 	result := opts
 
@@ -99,7 +99,7 @@ func DeriveExecutionFromShortcuts(opts lib.Options) (lib.Options, error) {
 		if opts.Duration.Duration <= 0 {
 			//TODO: move this validation to Validate()?
 			return result, ExecutionConflictError(
-				"`duration` should be more than 0, for infinite duration use the manual-execution scheduler",
+				"`duration` should be more than 0, for infinite duration use the externally-controlled executor",
 			)
 		}
 		result.Execution = getConstantLoopingVUsExecution(opts.Duration, opts.VUs)
@@ -133,8 +133,8 @@ func DeriveExecutionFromShortcuts(opts lib.Options) (lib.Options, error) {
 		}
 		// No execution parameters whatsoever were specified, so we'll create a per-VU iterations config
 		// with 1 VU and 1 iteration.
-		result.Execution = lib.SchedulerConfigMap{
-			lib.DefaultSchedulerName: NewPerVUIterationsConfig(lib.DefaultSchedulerName),
+		result.Execution = lib.ExecutorConfigMap{
+			lib.DefaultExecutorName: NewPerVUIterationsConfig(lib.DefaultExecutorName),
 		}
 	}
 

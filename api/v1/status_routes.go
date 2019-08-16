@@ -44,14 +44,17 @@ func HandleGetStatus(rw http.ResponseWriter, r *http.Request, p httprouter.Param
 	_, _ = rw.Write(data)
 }
 
-func getFirstManualExecutionScheduler(executor lib.Executor) (*scheduler.ManualExecution, error) {
-	schedulers := executor.GetSchedulers()
-	for _, s := range schedulers {
-		if mex, ok := s.(*scheduler.ManualExecution); ok {
+func getFirstExternallyControlledExecutor(
+	execScheduler lib.ExecutionScheduler,
+) (*scheduler.ExternallyControlled, error) {
+
+	executors := execScheduler.GetExecutors()
+	for _, s := range executors {
+		if mex, ok := s.(*scheduler.ExternallyControlled); ok {
 			return mex, nil
 		}
 	}
-	return nil, fmt.Errorf("a manual-execution scheduler needs to be configured for live configuration updates")
+	return nil, fmt.Errorf("a externally-controlled executor needs to be configured for live configuration updates")
 }
 
 func HandlePatchStatus(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
@@ -70,29 +73,29 @@ func HandlePatchStatus(rw http.ResponseWriter, r *http.Request, p httprouter.Par
 	}
 
 	if status.Paused.Valid {
-		if err = engine.Executor.SetPaused(status.Paused.Bool); err != nil {
+		if err = engine.ExecutionScheduler.SetPaused(status.Paused.Bool); err != nil {
 			apiError(rw, "Pause error", err.Error(), http.StatusInternalServerError)
 			return
 		}
 	}
 
 	if status.VUsMax.Valid || status.VUs.Valid {
-		//TODO: add ability to specify the actual scheduler id? though thus should
+		//TODO: add ability to specify the actual executor id? though thus should
 		//likely be in the v2 REST API, where we could implement it in a way that
-		//may allow us to eventually support other scheduler types
-		scheduler, uptateErr := getFirstManualExecutionScheduler(engine.Executor)
+		//may allow us to eventually support other executor types
+		executor, uptateErr := getFirstExternallyControlledExecutor(engine.ExecutionScheduler)
 		if uptateErr != nil {
 			apiError(rw, "Execution config error", uptateErr.Error(), http.StatusInternalServerError)
 			return
 		}
-		newConfig := scheduler.GetCurrentConfig().ManualExecutionControlConfig
+		newConfig := executor.GetCurrentConfig().ExternallyControlledConfigParams
 		if status.VUsMax.Valid {
 			newConfig.MaxVUs = status.VUsMax
 		}
 		if status.VUs.Valid {
 			newConfig.VUs = status.VUs
 		}
-		if uptateErr := scheduler.UpdateConfig(r.Context(), newConfig); err != nil {
+		if uptateErr := executor.UpdateConfig(r.Context(), newConfig); err != nil {
 			apiError(rw, "Config update error", uptateErr.Error(), http.StatusInternalServerError)
 			return
 		}

@@ -33,80 +33,81 @@ import (
 	"github.com/pkg/errors"
 )
 
-// An Executor is in charge of initializing schedulers and using them to
-// initialize and schedule VUs created by a wrapped Runner. It decouples how a
-// swarm of VUs is controlled from the details of how or even where they're
+// An ExecutionScheduler is in charge of initializing executors and using them
+// to initialize and schedule VUs created by a wrapped Runner. It decouples how
+// a swarm of VUs is controlled from the details of how or even where they're
 // scheduled.
 //
-// The core/local executor schedules VUs on the local machine, but the same
-// interface may be implemented to control a test running on a cluster or in the
-// cloud.
-//TODO: flesh out the interface after actually having more than one implementation...
-type Executor interface {
+// The core/local execution scheduler schedules VUs on the local machine, but
+// the same interface may be implemented to control a test running on a cluster
+// or in the cloud.
+//
+// TODO: flesh out the interface after actually having more than one
+// implementation...
+type ExecutionScheduler interface {
 	// Returns the wrapped runner. May return nil if not applicable, eg.
 	// if we're remote controlling a test running on another machine.
 	GetRunner() Runner
 
-	// Return the ExecutorState instance from which different statistics for the
+	// Return the ExecutionState instance from which different statistics for the
 	// current state of the runner could be retrieved.
-	GetState() *ExecutorState
+	GetState() *ExecutionState
 
-	// Return the instances of the configured schedulers
-	GetSchedulers() []Scheduler
+	// Return the instances of the configured executors
+	GetExecutors() []Executor
 
-	// Init initializes all schedulers, including all of their needed VUs.
+	// Init initializes all executors, including all of their needed VUs.
 	Init(ctx context.Context, engineOut chan<- stats.SampleContainer) error
 
-	// Run the Executor, funneling generated metric samples through the supplied
-	// out channel.
+	// Run the ExecutionScheduler, funneling the generated metric samples
+	// through the supplied out channel.
 	Run(ctx context.Context, engineOut chan<- stats.SampleContainer) error
 
 	// Pause a test, or start/resume it. To check if a test is paused, use
 	// GetState().IsPaused().
 	//
-	// Currently, any test can be started in a paused state. This will cause k6
-	// to initialize all needed VUs, but it won't actually start the test.
-	// Later, the test can be started for real be resuming/unpausing it from the
-	// REST API.
+	// Currently, any executor, so any test, can be started in a paused state.
+	// This will cause k6 to initialize all needed VUs, but it won't actually
+	// start the test. Later, the test can be started for real be
+	// resuming/unpausing it from the REST API.
 	//
 	// After a test is actually started, it may become impossible to pause it
 	// again. That is denoted by having SetPaused(true) return an error. The
-	// likely cause is that some of the schedulers for the test don't support
+	// likely cause is that some of the executors for the test don't support
 	// pausing after the test has been started.
 	//
-	// IMPORTANT: Currently only the manual scheduler can be paused and resumed
-	// multiple times in the middle of the test execution! Even then, "pausing"
-	// is a bit misleading, since k6 won't pause in the middle of the currently
-	// executing iterations. It will allow the currently in progress iterations
-	// to finish, and it just won't start any new ones nor will it increment
-	// the value returned by GetCurrentTestRunDuration().
+	// IMPORTANT: Currently only the externally controlled executor can be
+	// paused and resumed multiple times in the middle of the test execution!
+	// Even then, "pausing" is a bit misleading, since k6 won't pause in the
+	// middle of the currently executing iterations. It will allow the currently
+	// in progress iterations to finish, and it just won't start any new ones
+	// nor will it increment the value returned by GetCurrentTestRunDuration().
 	SetPaused(paused bool) error
 }
 
-// MaxTimeToWaitForPlannedVU specifies the maximum allowable time for a
-// scheduler to wait for a planned VU to be retrieved from the
-// ExecutorState.PlannedVUs buffer. If it's exceeded, k6 will emit a warning log
-// message, since it either means that there's a bug in the k6 scheduling code,
-// or that the machine is overloaded and the scheduling code suffers from
-// delays.
+// MaxTimeToWaitForPlannedVU specifies the maximum allowable time for a executor
+// to wait for a planned VU to be retrieved from the ExecutionState.PlannedVUs
+// buffer. If it's exceeded, k6 will emit a warning log message, since it either
+// means that there's a bug in the k6 scheduling code, or that the machine is
+// overloaded and the scheduling code suffers from delays.
 //
-// Critically, exceeding this time *doesn't* result in an aborted test
-// or any test errors, and the scheduler will continue to try and borrow the VU
+// Critically, exceeding this time *doesn't* result in an aborted test or any
+// test errors, and the executor will continue to try and borrow the VU
 // (potentially resulting in further warnings). We likely should emit a k6
-// metric about it in the future.
-// TODO: emit a metric every time this is exceeded?
+// metric about it in the future. TODO: emit a metric every time this is
+// exceeded?
 const MaxTimeToWaitForPlannedVU = 400 * time.Millisecond
 
 // MaxRetriesGetPlannedVU how many times we should wait for
 // MaxTimeToWaitForPlannedVU before we actually return an error.
 const MaxRetriesGetPlannedVU = 5
 
-// ExecutorState contains a few different things:
-//  -  Some convenience items, that are needed by all schedulers, like the
+// ExecutionState contains a few different things:
+//  -  Some convenience items, that are needed by all executors, like the
 //     execution segment and the unique VU ID generator. By keeping those here,
-//     we can just pass the ExecutorState to the different schedulers, instead of
+//     we can just pass the ExecutionState to the different executors, instead of
 //     individually passing them each item.
-//  -  Mutable counters that different schedulers modify and other parts of
+//  -  Mutable counters that different executors modify and other parts of
 //     k6 can read, e.g. for the vus and vus_max metrics k6 emits every second.
 //  -  Pausing controls and statistics.
 //
@@ -119,8 +120,8 @@ const MaxRetriesGetPlannedVU = 5
 // The only functionality indended for synchronization is the one revolving
 // around pausing, and uninitializedUnplannedVUs for restrictring the number of
 // unplanned VUs being initialized.
-type ExecutorState struct {
-	// A copy of the options, so the different schedulers have access to them.
+type ExecutionState struct {
+	// A copy of the options, so the different executors have access to them.
 	// They will need to access things like the current execution segment, the
 	// per-run metrics tags, etc.
 	//
@@ -130,24 +131,24 @@ type ExecutorState struct {
 	Options Options
 
 	// vus is the shared channel buffer that contains all of the VUs that have
-	// been initialized and aren't currently being used by a scheduler.
+	// been initialized and aren't currently being used by a executor.
 	//
 	// It contains both pre-initialized (i.e. planned) VUs, as well as any
 	// unplanned VUs. Planned VUs are initialized before a test begins, while
 	// unplanned VUS can be initialized in the middle of the test run by a
-	// scheduler and have been relinquished after it has finished working with
+	// executor and have been relinquished after it has finished working with
 	// them. Usually, unplanned VUs are initialized by one of the arrival-rate
-	// schedulers, after they have exhausted their PreAllocatedVUs. After the
-	// scheduler is done with the VUs, it will put in this channel, so it could
-	// potentially be reused by other schedulers further along in the test.
+	// executors, after they have exhausted their PreAllocatedVUs. After the
+	// executor is done with the VUs, it will put in this channel, so it could
+	// potentially be reused by other executors further along in the test.
 	//
-	// Different schedulers cooperatively borrow VUs from here when they are
+	// Different executors cooperatively borrow VUs from here when they are
 	// needed and return them when they are done with them. There's no central
-	// enforcement of correctness, i.e. that a scheduler takes more VUs from
+	// enforcement of correctness, i.e. that a executor takes more VUs from
 	// here than its execution plan has stipulated. The correctness guarantee
-	// lies with the actual schedulers - bugs in one can affect others.
+	// lies with the actual executors - bugs in one can affect others.
 	//
-	// That's why the field is private and we force schedulers to use the
+	// That's why the field is private and we force executors to use the
 	// GetPlannedVU(), GetUnplannedVU(), and ReturnVU() methods instead of work
 	// directly with the channel. These methods will emit a warning or can even
 	// return an error if retrieving a VU takes more than
@@ -178,7 +179,7 @@ type ExecutorState struct {
 	// no more unplanned VUs can be initialized.
 	uninitializedUnplannedVUs *int64
 
-	// Injected when the executor's init function is called, used for
+	// Injected when the execution scheduler's Init function is called, used for
 	// initializing unplanned VUs.
 	initVUFunc InitVUFunc
 
@@ -196,7 +197,8 @@ type ExecutorState struct {
 	// The total number of iterations that have been interrupted during their
 	// execution. The potential interruption causes vary - end of a specified
 	// script `duration`, scaling down of VUs via `stages`, a user hitting
-	// Ctrl+C, change of `vus` via the manual executor's REST API, etc.
+	// Ctrl+C, change of `vus` via the externally controlled executor's REST
+	// API, etc.
 	partialIterationsCount *uint64
 
 	// A nanosecond UNIX timestamp that is set when the test is actually
@@ -209,8 +211,8 @@ type ExecutorState struct {
 	// used to denote that the test hasn't ended yet...
 	endTime *int64
 
-	// Stuff related to pausing follows. Read the docs in Executor for more
-	// information regarding how pausing works in k6.
+	// Stuff related to pausing follows. Read the docs in ExecutionScheduler for
+	// more information regarding how pausing works in k6.
 	//
 	// When we pause the execution in the middle of the test, we save the
 	// current timestamp in currentPauseTime. When we resume the execution, we
@@ -240,16 +242,16 @@ type ExecutorState struct {
 	resumeNotify        chan struct{}
 }
 
-// NewExecutorState initializes all of the pointers in the ExecutorState
+// NewExecutionState initializes all of the pointers in the ExecutionState
 // with zeros. It also makes sure that the initial state is unpaused, by
 // setting resumeNotify to an already closed channel.
-func NewExecutorState(options Options, maxPlannedVUs, maxPossibleVUs uint64) *ExecutorState {
+func NewExecutionState(options Options, maxPlannedVUs, maxPossibleVUs uint64) *ExecutionState {
 	resumeNotify := make(chan struct{})
-	close(resumeNotify) // By default the ExecutorState starts unpaused
+	close(resumeNotify) // By default the ExecutionState starts unpaused
 
 	maxUnplannedUninitializedVUs := int64(maxPossibleVUs - maxPlannedVUs)
 
-	return &ExecutorState{
+	return &ExecutionState{
 		Options: options,
 		vus:     make(chan VU, maxPossibleVUs),
 
@@ -270,7 +272,7 @@ func NewExecutorState(options Options, maxPlannedVUs, maxPossibleVUs uint64) *Ex
 
 // GetUniqueVUIdentifier returns an auto-incrementing unique VU ID, used for __VU.
 // It starts from 1 (for backwards compatibility...)
-func (es *ExecutorState) GetUniqueVUIdentifier() uint64 {
+func (es *ExecutionState) GetUniqueVUIdentifier() uint64 {
 	return atomic.AddUint64(es.currentVUIdentifier, 1)
 }
 
@@ -281,14 +283,14 @@ func (es *ExecutorState) GetUniqueVUIdentifier() uint64 {
 // exported script options and for the execution of setup() and teardown()
 //
 // IMPORTANT: for UI/information purposes only, don't use for synchronization.
-func (es *ExecutorState) GetInitializedVUsCount() int64 {
+func (es *ExecutionState) GetInitializedVUsCount() int64 {
 	return atomic.LoadInt64(es.initializedVUs)
 }
 
 // ModInitializedVUsCount changes the total number of currently initialized VUs.
 //
 // IMPORTANT: for UI/information purposes only, don't use for synchronization.
-func (es *ExecutorState) ModInitializedVUsCount(mod int64) int64 {
+func (es *ExecutionState) ModInitializedVUsCount(mod int64) int64 {
 	return atomic.AddInt64(es.initializedVUs, mod)
 }
 
@@ -297,14 +299,14 @@ func (es *ExecutorState) ModInitializedVUsCount(mod int64) int64 {
 // of gracefullt winding down.
 //
 // IMPORTANT: for UI/information purposes only, don't use for synchronization.
-func (es *ExecutorState) GetCurrentlyActiveVUsCount() int64 {
+func (es *ExecutionState) GetCurrentlyActiveVUsCount() int64 {
 	return atomic.LoadInt64(es.activeVUs)
 }
 
 // ModCurrentlyActiveVUsCount changes the total number of currently active VUs.
 //
 // IMPORTANT: for UI/information purposes only, don't use for synchronization.
-func (es *ExecutorState) ModCurrentlyActiveVUsCount(mod int64) int64 {
+func (es *ExecutionState) ModCurrentlyActiveVUsCount(mod int64) int64 {
 	return atomic.AddInt64(es.activeVUs, mod)
 }
 
@@ -312,7 +314,7 @@ func (es *ExecutorState) ModCurrentlyActiveVUsCount(mod int64) int64 {
 // that have been completed so far.
 //
 // IMPORTANT: for UI/information purposes only, don't use for synchronization.
-func (es *ExecutorState) GetFullIterationCount() uint64 {
+func (es *ExecutionState) GetFullIterationCount() uint64 {
 	return atomic.LoadUint64(es.fullIterationsCount)
 }
 
@@ -320,7 +322,7 @@ func (es *ExecutorState) GetFullIterationCount() uint64 {
 // by the provided amount.
 //
 // IMPORTANT: for UI/information purposes only, don't use for synchronization.
-func (es *ExecutorState) AddFullIterations(count uint64) uint64 {
+func (es *ExecutionState) AddFullIterations(count uint64) uint64 {
 	return atomic.AddUint64(es.fullIterationsCount, count)
 }
 
@@ -328,7 +330,7 @@ func (es *ExecutorState) AddFullIterations(count uint64) uint64 {
 // iterations that have been completed so far.
 //
 // IMPORTANT: for UI/information purposes only, don't use for synchronization.
-func (es *ExecutorState) GetPartialIterationCount() uint64 {
+func (es *ExecutionState) GetPartialIterationCount() uint64 {
 	return atomic.LoadUint64(es.partialIterationsCount)
 }
 
@@ -336,7 +338,7 @@ func (es *ExecutorState) GetPartialIterationCount() uint64 {
 // iterations by the provided amount.
 //
 // IMPORTANT: for UI/information purposes only, don't use for synchronization.
-func (es *ExecutorState) AddPartialIterations(count uint64) uint64 {
+func (es *ExecutionState) AddPartialIterations(count uint64) uint64 {
 	return atomic.AddUint64(es.partialIterationsCount, count)
 }
 
@@ -344,9 +346,9 @@ func (es *ExecutorState) AddPartialIterations(count uint64) uint64 {
 //
 // CAUTION: Calling MarkStarted() a second time for the same execution state will
 // result in a panic!
-func (es *ExecutorState) MarkStarted() {
+func (es *ExecutionState) MarkStarted() {
 	if !atomic.CompareAndSwapInt64(es.startTime, 0, time.Now().UnixNano()) {
-		panic("the executor was started a second time")
+		panic("the execution scheduler was started a second time")
 	}
 }
 
@@ -354,9 +356,9 @@ func (es *ExecutorState) MarkStarted() {
 //
 // CAUTION: Calling MarkEnded() a second time for the same execution state will
 // result in a panic!
-func (es *ExecutorState) MarkEnded() {
+func (es *ExecutionState) MarkEnded() {
 	if !atomic.CompareAndSwapInt64(es.endTime, 0, time.Now().UnixNano()) {
-		panic("the executor was started a second time")
+		panic("the execution scheduler was stopped a second time")
 	}
 }
 
@@ -364,20 +366,20 @@ func (es *ExecutorState) MarkEnded() {
 // It will return false while a test is in the init phase, or if it has
 // been initially paused. But if will return true if a test is paused
 // midway through its execution (see above for details regarind the
-// feasibility of that pausing for normal schedulers).
-func (es *ExecutorState) HasStarted() bool {
+// feasibility of that pausing for normal executors).
+func (es *ExecutionState) HasStarted() bool {
 	return atomic.LoadInt64(es.startTime) != 0
 }
 
 // HasEnded returns true if the test has finished executing. It will return
 // false until MarkEnded() is called.
-func (es *ExecutorState) HasEnded() bool {
+func (es *ExecutionState) HasEnded() bool {
 	return atomic.LoadInt64(es.endTime) != 0
 }
 
 // IsPaused quickly returns whether the test is currently paused, by reading
 // the atomic currentPauseTime timestamp
-func (es *ExecutorState) IsPaused() bool {
+func (es *ExecutionState) IsPaused() bool {
 	return atomic.LoadInt64(es.currentPauseTime) != 0
 }
 
@@ -387,7 +389,7 @@ func (es *ExecutorState) IsPaused() bool {
 // And if it's currently running, it will return the time since the start time.
 //
 // IMPORTANT: for UI/information purposes only, don't use for synchronization.
-func (es *ExecutorState) GetCurrentTestRunDuration() time.Duration {
+func (es *ExecutionState) GetCurrentTestRunDuration() time.Duration {
 	startTime := atomic.LoadInt64(es.startTime)
 	if startTime == 0 {
 		// The test hasn't started yet
@@ -416,7 +418,7 @@ func (es *ExecutorState) GetCurrentTestRunDuration() time.Duration {
 // the current timestamp in currentPauseTime, and makes a new
 // channel for resumeNotify.
 // Pause can return an error if the test was already paused.
-func (es *ExecutorState) Pause() error {
+func (es *ExecutionState) Pause() error {
 	es.pauseStateLock.Lock()
 	defer es.pauseStateLock.Unlock()
 
@@ -431,7 +433,7 @@ func (es *ExecutorState) Pause() error {
 // yet started, it calculates the duration between now and
 // the old currentPauseTime and adds it to
 // Resume will emit an error if the test wasn't paused.
-func (es *ExecutorState) Resume() error {
+func (es *ExecutionState) Resume() error {
 	es.pauseStateLock.Lock()
 	defer es.pauseStateLock.Unlock()
 
@@ -464,7 +466,7 @@ func (es *ExecutorState) Resume() error {
 //   if executionState.IsPaused() {
 //       <-executionState.ResumeNotify()
 //   }
-func (es *ExecutorState) ResumeNotify() <-chan struct{} {
+func (es *ExecutionState) ResumeNotify() <-chan struct{} {
 	es.pauseStateLock.RLock()
 	defer es.pauseStateLock.RUnlock()
 	return es.resumeNotify
@@ -475,8 +477,8 @@ func (es *ExecutorState) ResumeNotify() <-chan struct{} {
 // doesn't happen for MaxTimeToWaitForPlannedVU, a warning will be printed. If
 // we reach that timeout more than MaxRetriesGetPlannedVU number of times, this
 // function will return an error, since we either have a bug with some
-// scheduler, or the machine is very, very overloaded.
-func (es *ExecutorState) GetPlannedVU(logger *logrus.Entry, modifyAtiveVUCount bool) (VU, error) {
+// executor, or the machine is very, very overloaded.
+func (es *ExecutionState) GetPlannedVU(logger *logrus.Entry, modifyAtiveVUCount bool) (VU, error) {
 	for i := 1; i <= MaxRetriesGetPlannedVU; i++ {
 		select {
 		case vu := <-es.vus:
@@ -495,11 +497,12 @@ func (es *ExecutorState) GetPlannedVU(logger *logrus.Entry, modifyAtiveVUCount b
 	)
 }
 
-// SetInitVUFunc is called by the executor's init function, and it's used for
-// setting the "constructor" function used for the initializing unplanned VUs.
+// SetInitVUFunc is called by the execution scheduler's init function, and it's
+// used for setting the "constructor" function used for the initializing
+// unplanned VUs.
 //
 // TODO: figure out a better dependency injection method?
-func (es *ExecutorState) SetInitVUFunc(initVUFunc InitVUFunc) {
+func (es *ExecutionState) SetInitVUFunc(initVUFunc InitVUFunc) {
 	es.initVUFunc = initVUFunc
 }
 
@@ -508,11 +511,11 @@ func (es *ExecutorState) SetInitVUFunc(initVUFunc InitVUFunc) {
 // been initialized, it returns one from the global vus buffer.
 //
 // IMPORTANT: GetUnplannedVU() doesn't do any checking if the requesting
-// scheduler is actually allowed to have the VU at this particular time.
-// Schedulers are trusted to correctly declare their needs (via their
+// executor is actually allowed to have the VU at this particular time.
+// Executors are trusted to correctly declare their needs (via their
 // GetExecutionRequirements() methods) and then to never ask for more VUs than
 // they have specified in those requirements.
-func (es *ExecutorState) GetUnplannedVU(ctx context.Context, logger *logrus.Entry) (VU, error) {
+func (es *ExecutionState) GetUnplannedVU(ctx context.Context, logger *logrus.Entry) (VU, error) {
 	remVUs := atomic.AddInt64(es.uninitializedUnplannedVUs, -1)
 	if remVUs < 0 {
 		logger.Debug("Reusing a previously initialized unplanned VU")
@@ -530,9 +533,9 @@ func (es *ExecutorState) GetUnplannedVU(ctx context.Context, logger *logrus.Entr
 
 // InitializeNewVU creates and returns a brand new VU, updating the relevant
 // tracking counters.
-func (es *ExecutorState) InitializeNewVU(ctx context.Context, logger *logrus.Entry) (VU, error) {
+func (es *ExecutionState) InitializeNewVU(ctx context.Context, logger *logrus.Entry) (VU, error) {
 	if es.initVUFunc == nil {
-		return nil, fmt.Errorf("initVUFunc wasn't set in the executor state")
+		return nil, fmt.Errorf("initVUFunc wasn't set in the execution state")
 	}
 	newVU, err := es.initVUFunc(ctx, logger)
 	if err != nil {
@@ -544,14 +547,14 @@ func (es *ExecutorState) InitializeNewVU(ctx context.Context, logger *logrus.Ent
 
 // AddInitializedVU is a helper function that adds VUs into the buffer and
 // increases the initialized VUs counter.
-func (es *ExecutorState) AddInitializedVU(vu VU) {
+func (es *ExecutionState) AddInitializedVU(vu VU) {
 	es.vus <- vu
 	es.ModInitializedVUsCount(+1)
 }
 
 // ReturnVU is a helper function that puts VUs back into the buffer and
 // decreases the active VUs counter.
-func (es *ExecutorState) ReturnVU(vu VU, wasActive bool) {
+func (es *ExecutionState) ReturnVU(vu VU, wasActive bool) {
 	es.vus <- vu
 	if wasActive {
 		es.ModCurrentlyActiveVUsCount(-1)

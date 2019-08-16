@@ -36,9 +36,9 @@ import (
 )
 
 func TestGetStatus(t *testing.T) {
-	executor, err := local.New(&lib.MiniRunner{}, logrus.StandardLogger())
+	execScheduler, err := local.NewExecutionScheduler(&lib.MiniRunner{}, logrus.StandardLogger())
 	require.NoError(t, err)
-	engine, err := core.NewEngine(executor, lib.Options{}, logrus.StandardLogger())
+	engine, err := core.NewEngine(execScheduler, lib.Options{}, logrus.StandardLogger())
 	require.NoError(t, err)
 
 	rw := httptest.NewRecorder()
@@ -65,7 +65,7 @@ func TestGetStatus(t *testing.T) {
 	})
 }
 
-//TODO: fix after the manual executor
+//TODO: fix after the externally-controlled executor
 /*
 func TestPatchStatus(t *testing.T) {
 	testdata := map[string]struct {

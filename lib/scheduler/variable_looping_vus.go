@@ -43,9 +43,9 @@ const variableLoopingVUsType = "variable-looping-vus"
 const minIntervalBetweenVUAdjustments = 100 * time.Millisecond
 
 func init() {
-	lib.RegisterSchedulerConfigType(
+	lib.RegisterExecutorConfigType(
 		variableLoopingVUsType,
-		func(name string, rawJSON []byte) (lib.SchedulerConfig, error) {
+		func(name string, rawJSON []byte) (lib.ExecutorConfig, error) {
 			config := NewVariableLoopingVUsConfig(name)
 			err := lib.StrictJSONUnmarshal(rawJSON, &config)
 			return config, err
@@ -60,7 +60,7 @@ type Stage struct {
 	//TODO: add a progression function?
 }
 
-// VariableLoopingVUsConfig stores the configuration for the stages scheduler
+// VariableLoopingVUsConfig stores the configuration for the stages executor
 type VariableLoopingVUsConfig struct {
 	BaseConfig
 	StartVUs         null.Int           `json:"startVUs"`
@@ -77,8 +77,8 @@ func NewVariableLoopingVUsConfig(name string) VariableLoopingVUsConfig {
 	}
 }
 
-// Make sure we implement the lib.SchedulerConfig interface
-var _ lib.SchedulerConfig = &VariableLoopingVUsConfig{}
+// Make sure we implement the lib.ExecutorConfig interface
+var _ lib.ExecutorConfig = &VariableLoopingVUsConfig{}
 
 // GetStartVUs is just a helper method that returns the scaled starting VUs.
 func (vlvc VariableLoopingVUsConfig) GetStartVUs(es *lib.ExecutionSegment) int64 {
@@ -91,7 +91,7 @@ func (vlvc VariableLoopingVUsConfig) GetGracefulRampDown() time.Duration {
 	return time.Duration(vlvc.GracefulRampDown.Duration)
 }
 
-// GetDescription returns a human-readable description of the scheduler options
+// GetDescription returns a human-readable description of the executor options
 func (vlvc VariableLoopingVUsConfig) GetDescription(es *lib.ExecutionSegment) string {
 	maxVUs := es.Scale(getStagesUnscaledMaxTarget(vlvc.StartVUs.Int64, vlvc.Stages))
 	return fmt.Sprintf("Up to %d looping VUs for %s over %d stages%s",
@@ -110,15 +110,15 @@ func (vlvc VariableLoopingVUsConfig) Validate() []error {
 }
 
 // getRawExecutionSteps calculates and returns as execution steps the number of
-// actively running VUs the scheduler should have at every moment.
+// actively running VUs the executor should have at every moment.
 //
 // It doesn't take into account graceful ramp-downs. It also doesn't deal with
-// the end-of-scheduler drop to 0 VUs, whether graceful or not. These are
+// the end-of-executor drop to 0 VUs, whether graceful or not. These are
 // handled by GetExecutionRequirements(), which internally uses this method and
 // reserveVUsForGracefulRampDowns().
 //
 // The zeroEnd argument tells the method if we should artificially add a step
-// with 0 VUs at offset sum(stages.duration), i.e. when the scheduler is
+// with 0 VUs at offset sum(stages.duration), i.e. when the executor is
 // supposed to end.
 //
 // It's also important to note how scaling works. Say, we ramp up from 0 to 10
@@ -287,15 +287,15 @@ func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(es *lib.ExecutionSegme
 
 // If the graceful ramp-downs are enabled, we need to reserve any VUs that may
 // potentially have to finish running iterations when we're scaling their number
-// down. This would prevent attempts from other schedulers to use them while the
+// down. This would prevent attempts from other executors to use them while the
 // iterations are finishing up during their allotted gracefulRampDown periods.
 //
 // But we also need to be careful to not over-allocate more VUs than we actually
 // need. We should never have more PlannedVUs than the max(startVUs,
 // stage[n].target), even if we're quickly scaling VUs up and down multiple
 // times, one after the other. In those cases, any previously reserved VUs
-// finishing up interrupted iterations should be reused by the scheduler,
-// instead of new ones being requested from the executor.
+// finishing up interrupted iterations should be reused by the executor,
+// instead of new ones being requested from the execution state.
 //
 // Here's an example with graceful ramp-town (i.e. "uninterruptible"
 // iterations), where stars represent actively scheduled VUs and dots are used
@@ -317,7 +317,7 @@ func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(es *lib.ExecutionSegme
 // We start with 4 VUs, scale to 6, scale down to 1, scale up to 5, scale down
 // to 1 again, scale up to 4, back to 1, and finally back down to 0. If our
 // gracefulStop timeout was 30s (the default), then we'll stay with 6 PlannedVUs
-// until t=32 in the test above, and the actual scheduler could run until t=52.
+// until t=32 in the test above, and the actual executor could run until t=52.
 // See TestVariableLoopingVUsConfigExecutionPlanExample() for the above example
 // as a unit test.
 //
@@ -327,11 +327,11 @@ func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(es *lib.ExecutionSegme
 // VUs from faliing down for the configured gracefulRampDown period.
 //
 // Finishing up the test, i.e. making sure we have a step with 0 VUs at time
-// schedulerEndOffset, is not handled here. Instead GetExecutionRequirements()
+// executorEndOffset, is not handled here. Instead GetExecutionRequirements()
 // takes care of that. But to make its job easier, this method won't add any
-// steps with an offset that's greater or equal to schedulerEndOffset.
+// steps with an offset that's greater or equal to executorEndOffset.
 func (vlvc VariableLoopingVUsConfig) reserveVUsForGracefulRampDowns(
-	rawSteps []lib.ExecutionStep, schedulerEndOffset time.Duration) []lib.ExecutionStep {
+	rawSteps []lib.ExecutionStep, executorEndOffset time.Duration) []lib.ExecutionStep {
 
 	rawStepsLen := len(rawSteps)
 	gracefulRampDownPeriod := vlvc.GetGracefulRampDown()
@@ -368,8 +368,8 @@ func (vlvc VariableLoopingVUsConfig) reserveVUsForGracefulRampDowns(
 		//    Both their planned VUs and their gracefulRampDown periods will
 		//    be lower than what we're going to set from that new rawStep -
 		//    we've basically found a new upward slope or equal value again.
-		//  - We reach schedulerEndOffset, in which case we are done - we can't
-		//    add any new steps, since those will be after the scheduler end
+		//  - We reach executorEndOffset, in which case we are done - we can't
+		//    add any new steps, since those will be after the executor end
 		//    offset.
 		//  - We reach the end of the rawSteps, or we don't find any higher or
 		//    equal steps to prevStep in the next gracefulRampDown period. So
@@ -398,10 +398,10 @@ func (vlvc VariableLoopingVUsConfig) reserveVUsForGracefulRampDowns(
 			continue
 		}
 
-		// We've reached the absolute scheduler end offset, and we were already
+		// We've reached the absolute executor end offset, and we were already
 		// on a downward "slope" (i.e. the previous planned VUs are more than
 		// the current planned VUs), so nothing more we can do here.
-		if timeOffsetWithTimeout >= schedulerEndOffset {
+		if timeOffsetWithTimeout >= executorEndOffset {
 			break
 		}
 
@@ -416,7 +416,7 @@ func (vlvc VariableLoopingVUsConfig) reserveVUsForGracefulRampDowns(
 }
 
 // GetExecutionRequirements very dynamically reserves exactly the number of
-// required VUs for this scheduler at every moment of the test.
+// required VUs for this executor at every moment of the test.
 //
 // If gracefulRampDown is specified, it will also be taken into account, and the
 // number of needed VUs to handle that will also be reserved. See the
@@ -432,29 +432,29 @@ func (vlvc VariableLoopingVUsConfig) reserveVUsForGracefulRampDowns(
 //     - If the user manually ramped down VUs at the end of the test (i.e. the
 //       last stage's target is 0), then this will have no effect.
 //     - If the last stage's target is more than 0, the VUs at the end of the
-//       scheduler's life will have more time to finish their last iterations.
+//       executor's life will have more time to finish their last iterations.
 func (vlvc VariableLoopingVUsConfig) GetExecutionRequirements(es *lib.ExecutionSegment) []lib.ExecutionStep {
 	steps := vlvc.getRawExecutionSteps(es, false)
 
-	schedulerEndOffset := sumStagesDuration(vlvc.Stages) + time.Duration(vlvc.GracefulStop.Duration)
+	executorEndOffset := sumStagesDuration(vlvc.Stages) + time.Duration(vlvc.GracefulStop.Duration)
 	// Handle graceful ramp-downs, if we have them
 	if vlvc.GracefulRampDown.Duration > 0 {
-		steps = vlvc.reserveVUsForGracefulRampDowns(steps, schedulerEndOffset)
+		steps = vlvc.reserveVUsForGracefulRampDowns(steps, executorEndOffset)
 	}
 
 	// If the last PlannedVUs value wasn't 0, add a last step with 0
 	if steps[len(steps)-1].PlannedVUs != 0 {
-		steps = append(steps, lib.ExecutionStep{TimeOffset: schedulerEndOffset, PlannedVUs: 0})
+		steps = append(steps, lib.ExecutionStep{TimeOffset: executorEndOffset, PlannedVUs: 0})
 	}
 
 	return steps
 }
 
-// NewScheduler creates a new VariableLoopingVUs scheduler
-func (vlvc VariableLoopingVUsConfig) NewScheduler(es *lib.ExecutorState, logger *logrus.Entry) (lib.Scheduler, error) {
+// NewExecutor creates a new VariableLoopingVUs executor
+func (vlvc VariableLoopingVUsConfig) NewExecutor(es *lib.ExecutionState, logger *logrus.Entry) (lib.Executor, error) {
 	return VariableLoopingVUs{
-		BaseScheduler: NewBaseScheduler(vlvc, es, logger),
-		config:        vlvc,
+		BaseExecutor: NewBaseExecutor(vlvc, es, logger),
+		config:       vlvc,
 	}, nil
 }
 
@@ -462,12 +462,12 @@ func (vlvc VariableLoopingVUsConfig) NewScheduler(es *lib.ExecutorState, logger 
 // loops iterations with a variable number of VUs for the sum of all of the
 // specified stages' duration.
 type VariableLoopingVUs struct {
-	*BaseScheduler
+	*BaseExecutor
 	config VariableLoopingVUsConfig
 }
 
-// Make sure we implement the lib.Scheduler interface.
-var _ lib.Scheduler = &VariableLoopingVUs{}
+// Make sure we implement the lib.Executor interface.
+var _ lib.Executor = &VariableLoopingVUs{}
 
 // Run constantly loops through as many iterations as possible on a variable
 // number of VUs for the specified stages.
@@ -476,7 +476,7 @@ var _ lib.Scheduler = &VariableLoopingVUs{}
 // of a less complex way to implement it (besides the old "increment by 100ms
 // and see what happens)... :/ so maybe see how it can be spit?
 func (vlv VariableLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleContainer) (err error) {
-	segment := vlv.executorState.Options.ExecutionSegment
+	segment := vlv.executionState.Options.ExecutionSegment
 	rawExecutionSteps := vlv.config.getRawExecutionSteps(segment, true)
 	regularDuration, isFinal := lib.GetEndOffset(rawExecutionSteps)
 	if !isFinal {
@@ -498,7 +498,7 @@ func (vlv VariableLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleCo
 	vlv.logger.WithFields(logrus.Fields{
 		"type": vlv.config.GetType(), "startVUs": vlv.config.GetStartVUs(segment), "maxVUs": maxVUs,
 		"duration": regularDuration, "numStages": len(vlv.config.Stages)},
-	).Debug("Starting scheduler run...")
+	).Debug("Starting executor run...")
 
 	activeVUsCount := new(int64)
 	vusFmt := pb.GetFixedLengthIntFormat(int64(maxVUs))
@@ -517,13 +517,13 @@ func (vlv VariableLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleCo
 	go trackProgress(ctx, maxDurationCtx, regDurationCtx, vlv, progresFn)
 
 	// Actually schedule the VUs and iterations, likely the most complicated
-	// scheduler among all of them...
+	// executor among all of them...
 	activeVUs := &sync.WaitGroup{}
 	defer activeVUs.Wait()
 
-	runIteration := getIterationRunner(vlv.executorState, vlv.logger, out)
+	runIteration := getIterationRunner(vlv.executionState, vlv.logger, out)
 	getVU := func() (lib.VU, error) {
-		vu, err := vlv.executorState.GetPlannedVU(vlv.logger, true)
+		vu, err := vlv.executionState.GetPlannedVU(vlv.logger, true)
 		if err != nil {
 			cancel()
 		} else {
@@ -533,7 +533,7 @@ func (vlv VariableLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleCo
 		return vu, err
 	}
 	returnVU := func(vu lib.VU) {
-		vlv.executorState.ReturnVU(vu, true)
+		vlv.executionState.ReturnVU(vu, true)
 		atomic.AddInt64(activeVUsCount, -1)
 		activeVUs.Done()
 	}

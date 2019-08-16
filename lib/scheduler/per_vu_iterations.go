@@ -38,7 +38,7 @@ import (
 const perVUIterationsType = "per-vu-iterations"
 
 func init() {
-	lib.RegisterSchedulerConfigType(perVUIterationsType, func(name string, rawJSON []byte) (lib.SchedulerConfig, error) {
+	lib.RegisterExecutorConfigType(perVUIterationsType, func(name string, rawJSON []byte) (lib.ExecutorConfig, error) {
 		config := NewPerVUIterationsConfig(name)
 		err := lib.StrictJSONUnmarshal(rawJSON, &config)
 		return config, err
@@ -63,23 +63,23 @@ func NewPerVUIterationsConfig(name string) PerVUIteationsConfig {
 	}
 }
 
-// Make sure we implement the lib.SchedulerConfig interface
-var _ lib.SchedulerConfig = &PerVUIteationsConfig{}
+// Make sure we implement the lib.ExecutorConfig interface
+var _ lib.ExecutorConfig = &PerVUIteationsConfig{}
 
-// GetVUs returns the scaled VUs for the scheduler.
+// GetVUs returns the scaled VUs for the executor.
 func (pvic PerVUIteationsConfig) GetVUs(es *lib.ExecutionSegment) int64 {
 	return es.Scale(pvic.VUs.Int64)
 }
 
-// GetIterations returns the UNSCALED iteration count for the scheduler. It's
-// important to note that scaling per-VU iteration scheduler affects only the
+// GetIterations returns the UNSCALED iteration count for the executor. It's
+// important to note that scaling per-VU iteration executor affects only the
 // number of VUs. If we also scaled the iterations, scaling would have quadratic
 // effects instead of just linear.
 func (pvic PerVUIteationsConfig) GetIterations() int64 {
 	return pvic.Iterations.Int64
 }
 
-// GetDescription returns a human-readable description of the scheduler options
+// GetDescription returns a human-readable description of the executor options
 func (pvic PerVUIteationsConfig) GetDescription(es *lib.ExecutionSegment) string {
 	return fmt.Sprintf("%d iterations for each of %d VUs%s",
 		pvic.GetIterations(), pvic.GetVUs(es),
@@ -107,7 +107,7 @@ func (pvic PerVUIteationsConfig) Validate() []error {
 }
 
 // GetExecutionRequirements just reserves the number of specified VUs for the
-// whole duration of the scheduler, including the maximum waiting time for
+// whole duration of the executor, including the maximum waiting time for
 // iterations to gracefully stop.
 func (pvic PerVUIteationsConfig) GetExecutionRequirements(es *lib.ExecutionSegment) []lib.ExecutionStep {
 	return []lib.ExecutionStep{
@@ -122,28 +122,28 @@ func (pvic PerVUIteationsConfig) GetExecutionRequirements(es *lib.ExecutionSegme
 	}
 }
 
-// NewScheduler creates a new PerVUIteations scheduler
-func (pvic PerVUIteationsConfig) NewScheduler(
-	es *lib.ExecutorState, logger *logrus.Entry) (lib.Scheduler, error) {
+// NewExecutor creates a new PerVUIteations executor
+func (pvic PerVUIteationsConfig) NewExecutor(
+	es *lib.ExecutionState, logger *logrus.Entry) (lib.Executor, error) {
 
 	return PerVUIteations{
-		BaseScheduler: NewBaseScheduler(pvic, es, logger),
-		config:        pvic,
+		BaseExecutor: NewBaseExecutor(pvic, es, logger),
+		config:       pvic,
 	}, nil
 }
 
 // PerVUIteations executes a specific number of iterations with each VU.
 type PerVUIteations struct {
-	*BaseScheduler
+	*BaseExecutor
 	config PerVUIteationsConfig
 }
 
-// Make sure we implement the lib.Scheduler interface.
-var _ lib.Scheduler = &PerVUIteations{}
+// Make sure we implement the lib.Executor interface.
+var _ lib.Executor = &PerVUIteations{}
 
 // Run executes a specific number of iterations with each confugured VU.
 func (pvi PerVUIteations) Run(ctx context.Context, out chan<- stats.SampleContainer) (err error) {
-	segment := pvi.executorState.Options.ExecutionSegment
+	segment := pvi.executionState.Options.ExecutionSegment
 	numVUs := pvi.config.GetVUs(segment)
 	iterations := pvi.config.GetIterations()
 	duration := time.Duration(pvi.config.MaxDuration.Duration)
@@ -155,7 +155,7 @@ func (pvi PerVUIteations) Run(ctx context.Context, out chan<- stats.SampleContai
 	// Make sure the log and the progress bar have accurate information
 	pvi.logger.WithFields(logrus.Fields{
 		"vus": numVUs, "iterations": iterations, "maxDuration": duration, "type": pvi.config.GetType(),
-	}).Debug("Starting scheduler run...")
+	}).Debug("Starting executor run...")
 
 	totalIters := uint64(numVUs * iterations)
 	doneIters := new(uint64)
@@ -174,10 +174,10 @@ func (pvi PerVUIteations) Run(ctx context.Context, out chan<- stats.SampleContai
 	defer activeVUs.Wait()
 
 	regDurationDone := regDurationCtx.Done()
-	runIteration := getIterationRunner(pvi.executorState, pvi.logger, out)
+	runIteration := getIterationRunner(pvi.executionState, pvi.logger, out)
 
 	handleVU := func(vu lib.VU) {
-		defer pvi.executorState.ReturnVU(vu, true)
+		defer pvi.executionState.ReturnVU(vu, true)
 		defer activeVUs.Done()
 
 		for i := int64(0); i < iterations; i++ {
@@ -193,7 +193,7 @@ func (pvi PerVUIteations) Run(ctx context.Context, out chan<- stats.SampleContai
 	}
 
 	for i := int64(0); i < numVUs; i++ {
-		vu, err := pvi.executorState.GetPlannedVU(pvi.logger, true)
+		vu, err := pvi.executionState.GetPlannedVU(pvi.logger, true)
 		if err != nil {
 			cancel()
 			return err

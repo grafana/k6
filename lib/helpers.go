@@ -47,7 +47,7 @@ func StrictJSONUnmarshal(data []byte, v interface{}) error {
 }
 
 // GetMaxPlannedVUs returns the maximum number of planned VUs at any stage of
-// the scheduler execution plan.
+// the execution plan.
 func GetMaxPlannedVUs(steps []ExecutionStep) (result uint64) {
 	for _, s := range steps {
 		stepMaxPlannedVUs := s.PlannedVUs
@@ -59,26 +59,25 @@ func GetMaxPlannedVUs(steps []ExecutionStep) (result uint64) {
 }
 
 // GetMaxPossibleVUs returns the maximum number of planned + unplanned (i.e.
-// initialized mid-test) VUs at any stage of the scheduler execution plan.
-// Unplanned VUs are possible in some schedulers, like the arrival-rate ones, as
-// a way to have a low number of pre-allocated VUs, but be able to initialize
-// new ones in the middle of the test, if needed. For example, if the remote
-// system starts responding very slowly and all of the pre-allocated VUs are
-// waiting for it.
+// initialized mid-test) VUs at any stage of the execution plan. Unplanned VUs
+// are possible in some executors, like the arrival-rate ones, as a way to have
+// a low number of pre-allocated VUs, but be able to initialize new ones in the
+// middle of the test, if needed. For example, if the remote system starts
+// responding very slowly and all of the pre-allocated VUs are waiting for it.
 //
 // IMPORTANT 1: Getting planned and unplanned VUs separately for the whole
 // duration of a test can often lead to mistakes. That's why this function is
 // called GetMaxPossibleVUs() and why there is no GetMaxUnplannedVUs() function.
 //
-// As an example, imagine that you have a scheduler with MaxPlannedVUs=20 and
-// MaxUnaplannedVUs=0, followed immediately after by another scheduler with
+// As an example, imagine that you have a executor with MaxPlannedVUs=20 and
+// MaxUnaplannedVUs=0, followed immediately after by another executor with
 // MaxPlannedVUs=10 and MaxUnaplannedVUs=10. The MaxPlannedVUs number for the
-// whole test is 20, and MaxUnaplannedVUs is 10, but since those schedulers
-// won't run concurrently, MaxVUs for the whole test is not 30, rather it's 20,
-// since 20 VUs will be sufficient to run the whole test.
+// whole test is 20, and MaxUnaplannedVUs is 10, but since those executors won't
+// run concurrently, MaxVUs for the whole test is not 30, rather it's 20, since
+// 20 VUs will be sufficient to run the whole test.
 //
-// IMPORTANT 2: this has one very important exception. The manual execution
-// scheduler doesn't use the MaxUnplannedVUs (i.e. this function will return 0),
+// IMPORTANT 2: this has one very important exception. The externally controlled
+// executor doesn't use the MaxUnplannedVUs (i.e. this function will return 0),
 // since their initialization and usage is directly controlled by the user and
 // is effectively bounded only by the resources of the machine k6 is running on.
 func GetMaxPossibleVUs(steps []ExecutionStep) (result uint64) {

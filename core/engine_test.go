@@ -69,10 +69,10 @@ func newTestEngine(t *testing.T, ctx context.Context, runner lib.Runner, opts li
 	logger := logrus.New()
 	logger.SetOutput(testutils.NewTestOutput(t))
 
-	executor, err := local.New(runner, logger)
+	execScheduler, err := local.NewExecutionScheduler(runner, logger)
 	require.NoError(t, err)
 
-	engine, err := NewEngine(executor, opts, logger)
+	engine, err := NewEngine(execScheduler, opts, logger)
 	require.NoError(t, err)
 
 	require.NoError(t, engine.Init(ctx))
@@ -102,7 +102,7 @@ func TestEngineRun(t *testing.T) {
 			Iterations: null.IntFrom(100),
 		})
 		assert.NoError(t, e.Run(context.Background()))
-		assert.Equal(t, uint64(100), e.Executor.GetState().GetFullIterationCount())
+		assert.Equal(t, uint64(100), e.ExecutionScheduler.GetState().GetFullIterationCount())
 	})
 	// Make sure samples are discarded after context close (using "cutoff" timestamp in local.go)
 	t.Run("collects samples", func(t *testing.T) {

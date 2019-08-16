@@ -277,9 +277,9 @@ func TestSetupDataIsolation(t *testing.T) {
 	options := runner.GetOptions()
 	require.Empty(t, options.Validate())
 
-	executor, err := local.New(runner, logrus.StandardLogger())
+	execScheduler, err := local.NewExecutionScheduler(runner, logrus.StandardLogger())
 	require.NoError(t, err)
-	engine, err := core.NewEngine(executor, options, logrus.StandardLogger())
+	engine, err := core.NewEngine(execScheduler, options, logrus.StandardLogger())
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())

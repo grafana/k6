@@ -37,13 +37,13 @@ import (
 	null "gopkg.in/guregu/null.v3"
 )
 
-const manualExecutionType = "manual-execution"
+const externallyControlledType = "externally-controlled"
 
 func init() {
-	lib.RegisterSchedulerConfigType(
-		manualExecutionType,
-		func(name string, rawJSON []byte) (lib.SchedulerConfig, error) {
-			config := ManualExecutionConfig{BaseConfig: NewBaseConfig(name, manualExecutionType)}
+	lib.RegisterExecutorConfigType(
+		externallyControlledType,
+		func(name string, rawJSON []byte) (lib.ExecutorConfig, error) {
+			config := ExternallyControlledConfig{BaseConfig: NewBaseConfig(name, externallyControlledType)}
 			err := lib.StrictJSONUnmarshal(rawJSON, &config)
 			if err != nil {
 				return config, err
@@ -56,16 +56,16 @@ func init() {
 	)
 }
 
-// ManualExecutionControlConfig contains all of the options that actually
-// determine the scheduling of VUs in the manual execution scheduler.
-type ManualExecutionControlConfig struct {
+// ExternallyControlledConfigParams contains all of the options that actually
+// determine the scheduling of VUs in the externally controlled executor.
+type ExternallyControlledConfigParams struct {
 	VUs      null.Int           `json:"vus"`
 	Duration types.NullDuration `json:"duration"`
 	MaxVUs   null.Int           `json:"maxVUs"`
 }
 
 // Validate just checks the control options in isolation.
-func (mecc ManualExecutionControlConfig) Validate() (errors []error) {
+func (mecc ExternallyControlledConfigParams) Validate() (errors []error) {
 	if mecc.VUs.Int64 < 0 {
 		errors = append(errors, fmt.Errorf("the number of VUs shouldn't be negative"))
 	}
@@ -88,48 +88,48 @@ func (mecc ManualExecutionControlConfig) Validate() (errors []error) {
 	return errors
 }
 
-// ManualExecutionConfig stores the number of currently active VUs, the max
-// number of VUs and the scheduler duration. The duration can be 0, which means
+// ExternallyControlledConfig stores the number of currently active VUs, the max
+// number of VUs and the executor duration. The duration can be 0, which means
 // "infinite duration", i.e. the user has to manually abort the script.
-type ManualExecutionConfig struct {
+type ExternallyControlledConfig struct {
 	BaseConfig
-	ManualExecutionControlConfig
+	ExternallyControlledConfigParams
 }
 
-// Make sure we implement the lib.SchedulerConfig interface
-var _ lib.SchedulerConfig = &ManualExecutionConfig{}
+// Make sure we implement the lib.ExecutorConfig interface
+var _ lib.ExecutorConfig = &ExternallyControlledConfig{}
 
-// GetDescription returns a human-readable description of the scheduler options
-func (mec ManualExecutionConfig) GetDescription(_ *lib.ExecutionSegment) string {
+// GetDescription returns a human-readable description of the executor options
+func (mec ExternallyControlledConfig) GetDescription(_ *lib.ExecutionSegment) string {
 	duration := "infinite"
 	if mec.Duration.Duration != 0 {
 		duration = mec.Duration.String()
 	}
 	return fmt.Sprintf(
-		"Manually controlled execution with %d VUs, %d max VUs, %s duration",
+		"Externally controlled execution with %d VUs, %d max VUs, %s duration",
 		mec.VUs.Int64, mec.MaxVUs.Int64, duration,
 	)
 }
 
 // Validate makes sure all options are configured and valid
-func (mec ManualExecutionConfig) Validate() []error {
-	errors := append(mec.BaseConfig.Validate(), mec.ManualExecutionControlConfig.Validate()...)
+func (mec ExternallyControlledConfig) Validate() []error {
+	errors := append(mec.BaseConfig.Validate(), mec.ExternallyControlledConfigParams.Validate()...)
 	if mec.GracefulStop.Valid {
 		errors = append(errors, fmt.Errorf(
-			"gracefulStop is not supported by the manual execution scheduler",
+			"gracefulStop is not supported by the externally controlled executor",
 		))
 	}
 	return errors
 }
 
 // GetExecutionRequirements just reserves the specified number of max VUs for
-// the whole duration of the scheduler, so these VUs can be initialized in the
+// the whole duration of the executor, so these VUs can be initialized in the
 // beginning of the test.
 //
-// Importantly, if 0 (i.e. infinite) duration is configured, this scheduler
+// Importantly, if 0 (i.e. infinite) duration is configured, this executor
 // doesn't emit the last step to relinquish these VUs.
 //
-// Also, the manual execution scheduler doesn't set MaxUnplannedVUs in the
+// Also, the externally controlled executor doesn't set MaxUnplannedVUs in the
 // returned steps, since their initialization and usage is directly controlled
 // by the user and is effectively bounded only by the resources of the machine
 // k6 is running on.
@@ -137,8 +137,9 @@ func (mec ManualExecutionConfig) Validate() []error {
 // This is not a problem, because the MaxUnplannedVUs are mostly meant to be
 // used for calculating the maximum possble number of initialized VUs at any
 // point during a test run. That's used for sizing purposes and for user qouta
-// checking in the cloud execution, where the manual scheduler isn't supported.
-func (mec ManualExecutionConfig) GetExecutionRequirements(es *lib.ExecutionSegment) []lib.ExecutionStep {
+// checking in the cloud execution, where the externally controlled executor
+// isn't supported.
+func (mec ExternallyControlledConfig) GetExecutionRequirements(es *lib.ExecutionSegment) []lib.ExecutionStep {
 	startVUs := lib.ExecutionStep{
 		TimeOffset:      0,
 		PlannedVUs:      uint64(es.Scale(mec.MaxVUs.Int64)), // use
@@ -158,26 +159,24 @@ func (mec ManualExecutionConfig) GetExecutionRequirements(es *lib.ExecutionSegme
 }
 
 // IsDistributable simply returns false because there's no way to reliably
-// distribute the manual execution scheduler.
-func (ManualExecutionConfig) IsDistributable() bool {
+// distribute the externally controlled executor.
+func (ExternallyControlledConfig) IsDistributable() bool {
 	return false
 }
 
-// NewScheduler creates a new ManualExecution "scheduler"
-func (mec ManualExecutionConfig) NewScheduler(
-	es *lib.ExecutorState, logger *logrus.Entry) (lib.Scheduler, error) {
-
-	return &ManualExecution{
+// NewExecutor creates a new ExternallyControlled executor
+func (mec ExternallyControlledConfig) NewExecutor(es *lib.ExecutionState, logger *logrus.Entry) (lib.Executor, error) {
+	return &ExternallyControlled{
 		startConfig:          mec,
-		currentControlConfig: mec.ManualExecutionControlConfig,
+		currentControlConfig: mec.ExternallyControlledConfigParams,
 		configLock:           &sync.RWMutex{},
 		newControlConfigs:    make(chan updateConfigEvent),
 		pauseEvents:          make(chan pauseEvent),
 		hasStarted:           make(chan struct{}),
 
-		executorState: es,
-		logger:        logger,
-		progress:      pb.New(pb.WithLeft(mec.GetName)),
+		executionState: es,
+		logger:         logger,
+		progress:       pb.New(pb.WithLeft(mec.GetName)),
 	}, nil
 }
 
@@ -187,71 +186,71 @@ type pauseEvent struct {
 }
 
 type updateConfigEvent struct {
-	newConfig ManualExecutionControlConfig
+	newConfig ExternallyControlledConfigParams
 	err       chan error
 }
 
-// ManualExecution is an implementation of the old k6 scheduler that could be
+// ExternallyControlled is an implementation of the old k6 executor that could be
 // controlled externally, via the k6 REST API. It implements both the
-// lib.PausableScheduler and the lib.LiveUpdatableScheduler interfaces.
-type ManualExecution struct {
-	startConfig          ManualExecutionConfig
-	currentControlConfig ManualExecutionControlConfig
+// lib.PausableExecutor and the lib.LiveUpdatableExecutor interfaces.
+type ExternallyControlled struct {
+	startConfig          ExternallyControlledConfig
+	currentControlConfig ExternallyControlledConfigParams
 	configLock           *sync.RWMutex
 	newControlConfigs    chan updateConfigEvent
 	pauseEvents          chan pauseEvent
 	hasStarted           chan struct{}
 
-	executorState *lib.ExecutorState
-	logger        *logrus.Entry
-	progress      *pb.ProgressBar
+	executionState *lib.ExecutionState
+	logger         *logrus.Entry
+	progress       *pb.ProgressBar
 }
 
 // Make sure we implement all the interfaces
-var _ lib.Scheduler = &ManualExecution{}
-var _ lib.PausableScheduler = &ManualExecution{}
-var _ lib.LiveUpdatableScheduler = &ManualExecution{}
+var _ lib.Executor = &ExternallyControlled{}
+var _ lib.PausableExecutor = &ExternallyControlled{}
+var _ lib.LiveUpdatableExecutor = &ExternallyControlled{}
 
-// GetCurrentConfig just returns the scheduler's current configuration.
-func (mex *ManualExecution) GetCurrentConfig() ManualExecutionConfig {
+// GetCurrentConfig just returns the executor's current configuration.
+func (mex *ExternallyControlled) GetCurrentConfig() ExternallyControlledConfig {
 	mex.configLock.RLock()
 	defer mex.configLock.RUnlock()
-	return ManualExecutionConfig{
-		BaseConfig:                   mex.startConfig.BaseConfig,
-		ManualExecutionControlConfig: mex.currentControlConfig,
+	return ExternallyControlledConfig{
+		BaseConfig:                       mex.startConfig.BaseConfig,
+		ExternallyControlledConfigParams: mex.currentControlConfig,
 	}
 }
 
-// GetConfig just returns the scheduler's current configuration, it's basically
+// GetConfig just returns the executor's current configuration, it's basically
 // an alias of GetCurrentConfig that implements the more generic interface.
-func (mex *ManualExecution) GetConfig() lib.SchedulerConfig {
+func (mex *ExternallyControlled) GetConfig() lib.ExecutorConfig {
 	return mex.GetCurrentConfig()
 }
 
-// GetProgress just returns the scheduler's progress bar instance.
-func (mex ManualExecution) GetProgress() *pb.ProgressBar {
+// GetProgress just returns the executor's progress bar instance.
+func (mex ExternallyControlled) GetProgress() *pb.ProgressBar {
 	return mex.progress
 }
 
-// GetLogger just returns the scheduler's logger instance.
-func (mex ManualExecution) GetLogger() *logrus.Entry {
+// GetLogger just returns the executor's logger instance.
+func (mex ExternallyControlled) GetLogger() *logrus.Entry {
 	return mex.logger
 }
 
 // Init doesn't do anything...
-func (mex ManualExecution) Init(ctx context.Context) error {
+func (mex ExternallyControlled) Init(ctx context.Context) error {
 	return nil
 }
 
-// SetPaused pauses or resumes the scheduler.
-func (mex *ManualExecution) SetPaused(paused bool) error {
+// SetPaused pauses or resumes the executor.
+func (mex *ExternallyControlled) SetPaused(paused bool) error {
 	select {
 	case <-mex.hasStarted:
 		event := pauseEvent{isPaused: paused, err: make(chan error)}
 		mex.pauseEvents <- event
 		return <-event.err
 	default:
-		return fmt.Errorf("cannot pause the manual scheduler before it has started")
+		return fmt.Errorf("cannot pause the externally controlled executor before it has started")
 	}
 }
 
@@ -259,23 +258,23 @@ func (mex *ManualExecution) SetPaused(paused bool) error {
 // possible to update the configuration even when k6 is paused, either in the
 // beginning (i.e. when running k6 with --paused) or in the middle of the script
 // execution.
-func (mex *ManualExecution) UpdateConfig(ctx context.Context, newConf interface{}) error {
-	newManualConfig, ok := newConf.(ManualExecutionControlConfig)
+func (mex *ExternallyControlled) UpdateConfig(ctx context.Context, newConf interface{}) error {
+	newConfigParams, ok := newConf.(ExternallyControlledConfigParams)
 	if !ok {
 		return errors.New("invalid config type")
 	}
-	if errs := newManualConfig.Validate(); len(errs) != 0 {
+	if errs := newConfigParams.Validate(); len(errs) != 0 {
 		return fmt.Errorf("invalid confiuguration supplied: %s", lib.ConcatErrors(errs, ", "))
 	}
 
-	if newManualConfig.Duration != mex.startConfig.Duration {
-		return fmt.Errorf("the manual scheduler duration cannot be changed")
+	if newConfigParams.Duration != mex.startConfig.Duration {
+		return fmt.Errorf("the externally controlled executor duration cannot be changed")
 	}
-	if newManualConfig.MaxVUs.Int64 < mex.startConfig.MaxVUs.Int64 {
-		// This limitation is because the manual execution scheduler is still a
-		// scheduler that participates in the overall k6 scheduling. Thus, any
-		// VUs that were explicitly specified by the user in the config may be
-		// reused from or by other schedulers.
+	if newConfigParams.MaxVUs.Int64 < mex.startConfig.MaxVUs.Int64 {
+		// This limitation is because the externally controlled executor is
+		// still a executor that participates in the overall k6 scheduling.
+		// Thus, any VUs that were explicitly specified by the user in the
+		// config may be reused from or by other executors.
 		return fmt.Errorf(
 			"the new number of max VUs cannot be lower than the starting number of max VUs (%d)",
 			mex.startConfig.MaxVUs.Int64,
@@ -286,21 +285,21 @@ func (mex *ManualExecution) UpdateConfig(ctx context.Context, newConf interface{
 	select {
 	case <-mex.hasStarted:
 		mex.configLock.Unlock()
-		event := updateConfigEvent{newConfig: newManualConfig, err: make(chan error)}
+		event := updateConfigEvent{newConfig: newConfigParams, err: make(chan error)}
 		mex.newControlConfigs <- event
 		return <-event.err
 	case <-ctx.Done():
 		mex.configLock.Unlock()
 		return ctx.Err()
 	default:
-		mex.currentControlConfig = newManualConfig
+		mex.currentControlConfig = newConfigParams
 		mex.configLock.Unlock()
 		return nil
 	}
 }
 
 // This is a helper function that is used in run for non-infinite durations.
-func (mex *ManualExecution) stopWhenDurationIsReached(ctx context.Context, duration time.Duration, cancel func()) {
+func (mex *ExternallyControlled) stopWhenDurationIsReached(ctx context.Context, duration time.Duration, cancel func()) {
 	ctxDone := ctx.Done()
 	checkInterval := time.NewTicker(100 * time.Millisecond)
 	for {
@@ -311,7 +310,7 @@ func (mex *ManualExecution) stopWhenDurationIsReached(ctx context.Context, durat
 
 		//TODO: something more optimized that sleeps for pauses?
 		case <-checkInterval.C:
-			if mex.executorState.GetCurrentTestRunDuration() >= duration {
+			if mex.executionState.GetCurrentTestRunDuration() >= duration {
 				cancel()
 				return
 			}
@@ -320,7 +319,7 @@ func (mex *ManualExecution) stopWhenDurationIsReached(ctx context.Context, durat
 }
 
 // manualVUHandle is a wrapper around the vuHandle helper, used in the
-// variable-looping-vus scheduler. Here, instead of using its getVU and returnVU
+// variable-looping-vus executor. Here, instead of using its getVU and returnVU
 // methods to retrieve and return a VU from the global buffer, we use them to
 // accurately update the local and global active VU counters and to ensure that
 // the pausing and reducing VUs operations wait for VUs to fully finish
@@ -336,7 +335,7 @@ type manualVUHandle struct {
 }
 
 func newManualVUHandle(
-	parentCtx context.Context, state *lib.ExecutorState, localActiveVUsCount *int64, vu lib.VU, logger *logrus.Entry,
+	parentCtx context.Context, state *lib.ExecutionState, localActiveVUsCount *int64, vu lib.VU, logger *logrus.Entry,
 ) *manualVUHandle {
 
 	wg := sync.WaitGroup{}
@@ -365,7 +364,7 @@ func newManualVUHandle(
 // until the test is manually stopped.
 //
 //TODO: split this up? somehow... :/
-func (mex *ManualExecution) Run(parentCtx context.Context, out chan<- stats.SampleContainer) (err error) {
+func (mex *ExternallyControlled) Run(parentCtx context.Context, out chan<- stats.SampleContainer) (err error) {
 	mex.configLock.RLock()
 	// Safely get the current config - it's important that the close of the
 	// hasStarted channel is inside of the lock, so that there are no data races
@@ -374,7 +373,7 @@ func (mex *ManualExecution) Run(parentCtx context.Context, out chan<- stats.Samp
 	close(mex.hasStarted)
 	mex.configLock.RUnlock()
 
-	segment := mex.executorState.Options.ExecutionSegment
+	segment := mex.executionState.Options.ExecutionSegment
 	duration := time.Duration(currentControlConfig.Duration.Duration)
 
 	ctx, cancel := context.WithCancel(parentCtx)
@@ -384,22 +383,22 @@ func (mex *ManualExecution) Run(parentCtx context.Context, out chan<- stats.Samp
 	}
 
 	mex.logger.WithFields(
-		logrus.Fields{"type": manualExecutionType, "duration": duration},
-	).Debug("Starting scheduler run...")
+		logrus.Fields{"type": externallyControlledType, "duration": duration},
+	).Debug("Starting executor run...")
 
 	// Retrieve and initialize the (scaled) number of MaxVUs from the global VU
 	// buffer that the user originally specified in the JS config.
 	startMaxVUs := segment.Scale(mex.startConfig.MaxVUs.Int64)
 	vuHandles := make([]*manualVUHandle, startMaxVUs)
 	activeVUsCount := new(int64)
-	runIteration := getIterationRunner(mex.executorState, mex.logger, out)
+	runIteration := getIterationRunner(mex.executionState, mex.logger, out)
 	for i := int64(0); i < startMaxVUs; i++ { // get the initial planned VUs from the common buffer
-		vu, vuGetErr := mex.executorState.GetPlannedVU(mex.logger, false)
+		vu, vuGetErr := mex.executionState.GetPlannedVU(mex.logger, false)
 		if vuGetErr != nil {
 			return vuGetErr
 		}
 		vuHandle := newManualVUHandle(
-			parentCtx, mex.executorState, activeVUsCount, vu, mex.logger.WithField("vuNum", i),
+			parentCtx, mex.executionState, activeVUsCount, vu, mex.logger.WithField("vuNum", i),
 		)
 		go vuHandle.runLoopsIfPossible(runIteration)
 		vuHandles[i] = vuHandle
@@ -409,7 +408,7 @@ func (mex *ManualExecution) Run(parentCtx context.Context, out chan<- stats.Samp
 	maxVUs := new(int64)
 	*maxVUs = startMaxVUs
 	progresFn := func() (float64, string) {
-		spent := mex.executorState.GetCurrentTestRunDuration()
+		spent := mex.executionState.GetCurrentTestRunDuration()
 		progress := 0.0
 		if duration > 0 {
 			progress = math.Min(1, float64(spent)/float64(duration))
@@ -432,7 +431,7 @@ func (mex *ManualExecution) Run(parentCtx context.Context, out chan<- stats.Samp
 			vuHandles[i].wg.Wait()
 		}
 	}
-	handleConfigChange := func(oldControlConfig, newControlConfig ManualExecutionControlConfig) error {
+	handleConfigChange := func(oldControlConfig, newControlConfig ExternallyControlledConfigParams) error {
 		oldActiveVUs := segment.Scale(oldControlConfig.VUs.Int64)
 		oldMaxVUs := segment.Scale(oldControlConfig.MaxVUs.Int64)
 		newActiveVUs := segment.Scale(newControlConfig.VUs.Int64)
@@ -444,12 +443,12 @@ func (mex *ManualExecution) Run(parentCtx context.Context, out chan<- stats.Samp
 		}).Debug("Updating execution configuration...")
 
 		for i := oldMaxVUs; i < newMaxVUs; i++ {
-			vu, vuInitErr := mex.executorState.InitializeNewVU(ctx, mex.logger)
+			vu, vuInitErr := mex.executionState.InitializeNewVU(ctx, mex.logger)
 			if vuInitErr != nil {
 				return vuInitErr
 			}
 			vuHandle := newManualVUHandle(
-				ctx, mex.executorState, activeVUsCount, vu, mex.logger.WithField("vuNum", i),
+				ctx, mex.executionState, activeVUsCount, vu, mex.logger.WithField("vuNum", i),
 			)
 			go vuHandle.runLoopsIfPossible(runIteration)
 			vuHandles = append(vuHandles, vuHandle)
@@ -474,9 +473,9 @@ func (mex *ManualExecution) Run(parentCtx context.Context, out chan<- stats.Samp
 				vuHandles[i].cancelVU()
 				if i < startMaxVUs {
 					// return the initial planned VUs to the common buffer
-					mex.executorState.ReturnVU(vuHandles[i].vu, false)
+					mex.executionState.ReturnVU(vuHandles[i].vu, false)
 				} else {
-					mex.executorState.ModInitializedVUsCount(-1)
+					mex.executionState.ModInitializedVUsCount(-1)
 				}
 				vuHandles[i] = nil
 			}
@@ -487,12 +486,12 @@ func (mex *ManualExecution) Run(parentCtx context.Context, out chan<- stats.Samp
 		return nil
 	}
 
-	err = handleConfigChange(ManualExecutionControlConfig{MaxVUs: mex.startConfig.MaxVUs}, currentControlConfig)
+	err = handleConfigChange(ExternallyControlledConfigParams{MaxVUs: mex.startConfig.MaxVUs}, currentControlConfig)
 	if err != nil {
 		return err
 	}
 	defer func() {
-		err = handleConfigChange(currentControlConfig, ManualExecutionControlConfig{})
+		err = handleConfigChange(currentControlConfig, ExternallyControlledConfigParams{})
 	}()
 
 	for {

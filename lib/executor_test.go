@@ -29,8 +29,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestExecutorStateVUIDs(t *testing.T) {
-	es := NewExecutorState(Options{}, 0, 0) //TODO: fix
+func TestExecutionStateVUIDs(t *testing.T) {
+	es := NewExecutionState(Options{}, 0, 0) //TODO: fix
 	assert.Equal(t, uint64(1), es.GetUniqueVUIdentifier())
 	assert.Equal(t, uint64(2), es.GetUniqueVUIdentifier())
 	assert.Equal(t, uint64(3), es.GetUniqueVUIdentifier())

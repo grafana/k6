@@ -76,9 +76,9 @@ func TestLogger(t *testing.T) {
 }
 
 func TestWithEngine(t *testing.T) {
-	executor, err := local.New(&lib.MiniRunner{}, logrus.StandardLogger())
+	execScheduler, err := local.NewExecutionScheduler(&lib.MiniRunner{}, logrus.StandardLogger())
 	require.NoError(t, err)
-	engine, err := core.NewEngine(executor, lib.Options{}, logrus.StandardLogger())
+	engine, err := core.NewEngine(execScheduler, lib.Options{}, logrus.StandardLogger())
 	require.NoError(t, err)
 
 	rw := httptest.NewRecorder()

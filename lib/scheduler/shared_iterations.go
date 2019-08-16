@@ -38,9 +38,9 @@ import (
 const sharedIterationsType = "shared-iterations"
 
 func init() {
-	lib.RegisterSchedulerConfigType(
+	lib.RegisterExecutorConfigType(
 		sharedIterationsType,
-		func(name string, rawJSON []byte) (lib.SchedulerConfig, error) {
+		func(name string, rawJSON []byte) (lib.ExecutorConfig, error) {
 			config := NewSharedIterationsConfig(name)
 			err := lib.StrictJSONUnmarshal(rawJSON, &config)
 			return config, err
@@ -66,20 +66,20 @@ func NewSharedIterationsConfig(name string) SharedIteationsConfig {
 	}
 }
 
-// Make sure we implement the lib.SchedulerConfig interface
-var _ lib.SchedulerConfig = &SharedIteationsConfig{}
+// Make sure we implement the lib.ExecutorConfig interface
+var _ lib.ExecutorConfig = &SharedIteationsConfig{}
 
-// GetVUs returns the scaled VUs for the scheduler.
+// GetVUs returns the scaled VUs for the executor.
 func (sic SharedIteationsConfig) GetVUs(es *lib.ExecutionSegment) int64 {
 	return es.Scale(sic.VUs.Int64)
 }
 
-// GetIterations returns the scaled iteration count for the scheduler.
+// GetIterations returns the scaled iteration count for the executor.
 func (sic SharedIteationsConfig) GetIterations(es *lib.ExecutionSegment) int64 {
 	return es.Scale(sic.Iterations.Int64)
 }
 
-// GetDescription returns a human-readable description of the scheduler options
+// GetDescription returns a human-readable description of the executor options
 func (sic SharedIteationsConfig) GetDescription(es *lib.ExecutionSegment) string {
 	return fmt.Sprintf("%d iterations shared among %d VUs%s",
 		sic.GetIterations(es), sic.GetVUs(es),
@@ -110,7 +110,7 @@ func (sic SharedIteationsConfig) Validate() []error {
 }
 
 // GetExecutionRequirements just reserves the number of specified VUs for the
-// whole duration of the scheduler, including the maximum waiting time for
+// whole duration of the executor, including the maximum waiting time for
 // iterations to gracefully stop.
 func (sic SharedIteationsConfig) GetExecutionRequirements(es *lib.ExecutionSegment) []lib.ExecutionStep {
 	return []lib.ExecutionStep{
@@ -125,30 +125,30 @@ func (sic SharedIteationsConfig) GetExecutionRequirements(es *lib.ExecutionSegme
 	}
 }
 
-// NewScheduler creates a new SharedIteations scheduler
-func (sic SharedIteationsConfig) NewScheduler(
-	es *lib.ExecutorState, logger *logrus.Entry) (lib.Scheduler, error) {
+// NewExecutor creates a new SharedIteations executor
+func (sic SharedIteationsConfig) NewExecutor(
+	es *lib.ExecutionState, logger *logrus.Entry) (lib.Executor, error) {
 
 	return SharedIteations{
-		BaseScheduler: NewBaseScheduler(sic, es, logger),
-		config:        sic,
+		BaseExecutor: NewBaseExecutor(sic, es, logger),
+		config:       sic,
 	}, nil
 }
 
 // SharedIteations executes a specific total number of iterations, which are
 // all shared by the configured VUs.
 type SharedIteations struct {
-	*BaseScheduler
+	*BaseExecutor
 	config SharedIteationsConfig
 }
 
-// Make sure we implement the lib.Scheduler interface.
-var _ lib.Scheduler = &PerVUIteations{}
+// Make sure we implement the lib.Executor interface.
+var _ lib.Executor = &PerVUIteations{}
 
 // Run executes a specific total number of iterations, which are all shared by
 // the configured VUs.
 func (si SharedIteations) Run(ctx context.Context, out chan<- stats.SampleContainer) (err error) {
-	segment := si.executorState.Options.ExecutionSegment
+	segment := si.executionState.Options.ExecutionSegment
 	numVUs := si.config.GetVUs(segment)
 	iterations := si.config.GetIterations(segment)
 	duration := time.Duration(si.config.MaxDuration.Duration)
@@ -160,7 +160,7 @@ func (si SharedIteations) Run(ctx context.Context, out chan<- stats.SampleContai
 	// Make sure the log and the progress bar have accurate information
 	si.logger.WithFields(logrus.Fields{
 		"vus": numVUs, "iterations": iterations, "maxDuration": duration, "type": si.config.GetType(),
-	}).Debug("Starting scheduler run...")
+	}).Debug("Starting executor run...")
 
 	totalIters := uint64(iterations)
 	doneIters := new(uint64)
@@ -179,11 +179,11 @@ func (si SharedIteations) Run(ctx context.Context, out chan<- stats.SampleContai
 	defer activeVUs.Wait()
 
 	regDurationDone := regDurationCtx.Done()
-	runIteration := getIterationRunner(si.executorState, si.logger, out)
+	runIteration := getIterationRunner(si.executionState, si.logger, out)
 
 	attemptedIters := new(uint64)
 	handleVU := func(vu lib.VU) {
-		defer si.executorState.ReturnVU(vu, true)
+		defer si.executionState.ReturnVU(vu, true)
 		defer activeVUs.Done()
 
 		for {
@@ -204,7 +204,7 @@ func (si SharedIteations) Run(ctx context.Context, out chan<- stats.SampleContai
 	}
 
 	for i := int64(0); i < numVUs; i++ {
-		vu, err := si.executorState.GetPlannedVU(si.logger, true)
+		vu, err := si.executionState.GetPlannedVU(si.logger, true)
 		if err != nil {
 			cancel()
 			return err

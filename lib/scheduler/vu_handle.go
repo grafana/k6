@@ -29,7 +29,7 @@ import (
 	"github.com/loadimpact/k6/lib"
 )
 
-// This is a helper type used in schedulers where we have to dynamically control
+// This is a helper type used in executors where we have to dynamically control
 // the number of VUs that are simultaneously running. For the moment, it is used in the VariableLoopingVUs and
 //
 // TODO: something simpler?
@@ -103,7 +103,7 @@ func (vh *vuHandle) hardStop() {
 //TODO: simplify this somehow - I feel like there should be a better way to
 //implement this logic... maybe with sync.Cond?
 func (vh *vuHandle) runLoopsIfPossible(runIter func(context.Context, lib.VU)) {
-	schedulerDone := vh.parentCtx.Done()
+	executorDone := vh.parentCtx.Done()
 
 	var vu lib.VU
 	defer func() {
@@ -119,15 +119,15 @@ mainLoop:
 		canStartIter, ctx := vh.canStartIter, vh.ctx
 		vh.mutex.RUnlock()
 
-		// Wait for either the scheduler to be done, or for us to be unpaused
+		// Wait for either the executor to be done, or for us to be unpaused
 		select {
 		case <-canStartIter:
 			// Best case, we're currently running, so we do nothing here, we
 			// just continue straight ahead.
-		case <-schedulerDone:
-			return // The whole scheduler is done, nothing more to do.
+		case <-executorDone:
+			return // The whole executor is done, nothing more to do.
 		default:
-			// We're not running, but the scheduler isn't done yet, so we wait
+			// We're not running, but the executor isn't done yet, so we wait
 			// for either one of those conditions. But before that, we'll return
 			// our VU to the pool, if we have it.
 			if vu != nil {
@@ -141,15 +141,15 @@ mainLoop:
 				// hardStop was called, start a fresh iteration to get the new
 				// context and signal channel
 				continue mainLoop
-			case <-schedulerDone:
-				return // The whole scheduler is done, nothing more to do.
+			case <-executorDone:
+				return // The whole executor is done, nothing more to do.
 			}
 		}
 
 		// Probably not needed, but just in case - if both running and
-		// schedulerDone were actice, check that the scheduler isn't done.
+		// executorDone were actice, check that the executor isn't done.
 		select {
-		case <-schedulerDone:
+		case <-executorDone:
 			return
 		default:
 		}

@@ -43,9 +43,9 @@ func TestGetGroups(t *testing.T) {
 	g2, err := g1.Group("group 2")
 	assert.NoError(t, err)
 
-	executor, err := local.New(&lib.MiniRunner{Group: g0}, logrus.StandardLogger())
+	execScheduler, err := local.NewExecutionScheduler(&lib.MiniRunner{Group: g0}, logrus.StandardLogger())
 	require.NoError(t, err)
-	engine, err := core.NewEngine(executor, lib.Options{}, logrus.StandardLogger())
+	engine, err := core.NewEngine(execScheduler, lib.Options{}, logrus.StandardLogger())
 	require.NoError(t, err)
 
 	t.Run("list", func(t *testing.T) {

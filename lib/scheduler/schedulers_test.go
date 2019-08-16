@@ -36,7 +36,7 @@ import (
 type exp struct {
 	parseError      bool
 	validationError bool
-	custom          func(t *testing.T, cm lib.SchedulerConfigMap)
+	custom          func(t *testing.T, cm lib.ExecutorConfigMap)
 }
 
 type configMapTestCase struct {
@@ -51,11 +51,11 @@ var configMapTestCases = []configMapTestCase{
 	{"asdf", exp{parseError: true}},
 	{"'adsf'", exp{parseError: true}},
 	{"[]", exp{parseError: true}},
-	{"{}", exp{custom: func(t *testing.T, cm lib.SchedulerConfigMap) {
-		assert.Equal(t, cm, lib.SchedulerConfigMap{})
+	{"{}", exp{custom: func(t *testing.T, cm lib.ExecutorConfigMap) {
+		assert.Equal(t, cm, lib.ExecutorConfigMap{})
 	}}},
 	{"{}asdf", exp{parseError: true}},
-	{"null", exp{custom: func(t *testing.T, cm lib.SchedulerConfigMap) {
+	{"null", exp{custom: func(t *testing.T, cm lib.ExecutorConfigMap) {
 		assert.Nil(t, cm)
 	}}},
 	{`{"someKey": {}}`, exp{parseError: true}},
@@ -66,7 +66,7 @@ var configMapTestCases = []configMapTestCase{
 	// Validation errors for constant-looping-vus and the base config
 	{`{"someKey": {"type": "constant-looping-vus", "vus": 10, "duration": "60s",
 		"gracefulStop": "10s", "startTime": "70s", "env": {"test": "mest"}, "exec": "someFunc"}}`,
-		exp{custom: func(t *testing.T, cm lib.SchedulerConfigMap) {
+		exp{custom: func(t *testing.T, cm lib.ExecutorConfigMap) {
 			sched := NewConstantLoopingVUsConfig("someKey")
 			sched.VUs = null.IntFrom(10)
 			sched.Duration = types.NullDurationFrom(1 * time.Minute)
@@ -74,7 +74,7 @@ var configMapTestCases = []configMapTestCase{
 			sched.StartTime = types.NullDurationFrom(70 * time.Second)
 			sched.Exec = null.StringFrom("someFunc")
 			sched.Env = map[string]string{"test": "mest"}
-			require.Equal(t, cm, lib.SchedulerConfigMap{"someKey": sched})
+			require.Equal(t, cm, lib.ExecutorConfigMap{"someKey": sched})
 			require.Equal(t, sched.BaseConfig.Name, cm["someKey"].GetName())
 			require.Equal(t, sched.BaseConfig.Type, cm["someKey"].GetType())
 			require.Equal(t, sched.BaseConfig.GetGracefulStop(), cm["someKey"].GetGracefulStop())
@@ -119,7 +119,7 @@ var configMapTestCases = []configMapTestCase{
 	// variable-looping-vus
 	{`{"varloops": {"type": "variable-looping-vus", "startVUs": 20, "gracefulStop": "15s", "gracefulRampDown": "10s",
 		    "startTime": "23s", "stages": [{"duration": "60s", "target": 30}, {"duration": "130s", "target": 10}]}}`,
-		exp{custom: func(t *testing.T, cm lib.SchedulerConfigMap) {
+		exp{custom: func(t *testing.T, cm lib.ExecutorConfigMap) {
 			sched := NewVariableLoopingVUsConfig("varloops")
 			sched.GracefulStop = types.NullDurationFrom(15 * time.Second)
 			sched.GracefulRampDown = types.NullDurationFrom(10 * time.Second)
@@ -129,7 +129,7 @@ var configMapTestCases = []configMapTestCase{
 				{Target: null.IntFrom(30), Duration: types.NullDurationFrom(60 * time.Second)},
 				{Target: null.IntFrom(10), Duration: types.NullDurationFrom(130 * time.Second)},
 			}
-			require.Equal(t, cm, lib.SchedulerConfigMap{"varloops": sched})
+			require.Equal(t, cm, lib.ExecutorConfigMap{"varloops": sched})
 
 			assert.Empty(t, cm["varloops"].Validate())
 			assert.Empty(t, cm.Validate())
@@ -161,7 +161,7 @@ var configMapTestCases = []configMapTestCase{
 	{`{"varloops": {"type": "variable-looping-vus"}}`, exp{validationError: true}},
 	// shared-iterations
 	{`{"ishared": {"type": "shared-iterations", "iterations": 22, "vus": 12, "maxDuration": "100s"}}`,
-		exp{custom: func(t *testing.T, cm lib.SchedulerConfigMap) {
+		exp{custom: func(t *testing.T, cm lib.ExecutorConfigMap) {
 			sched := NewSharedIterationsConfig("ishared")
 			sched.Iterations = null.IntFrom(22)
 			sched.MaxDuration = types.NullDurationFrom(100 * time.Second)
@@ -194,7 +194,7 @@ var configMapTestCases = []configMapTestCase{
 	{`{"ishared": {"type": "shared-iterations", "iterations": 20, "vus": 30}}`, exp{validationError: true}},
 	// per-vu-iterations
 	{`{"ipervu": {"type": "per-vu-iterations", "iterations": 23, "vus": 13, "gracefulStop": 0}}`,
-		exp{custom: func(t *testing.T, cm lib.SchedulerConfigMap) {
+		exp{custom: func(t *testing.T, cm lib.ExecutorConfigMap) {
 			sched := NewPerVUIterationsConfig("ipervu")
 			sched.Iterations = null.IntFrom(23)
 			sched.GracefulStop = types.NullDurationFrom(0)
@@ -227,7 +227,7 @@ var configMapTestCases = []configMapTestCase{
 
 	// constant-arrival-rate
 	{`{"carrival": {"type": "constant-arrival-rate", "rate": 30, "timeUnit": "1m", "duration": "10m", "preAllocatedVUs": 20, "maxVUs": 30}}`,
-		exp{custom: func(t *testing.T, cm lib.SchedulerConfigMap) {
+		exp{custom: func(t *testing.T, cm lib.ExecutorConfigMap) {
 			sched := NewConstantArrivalRateConfig("carrival")
 			sched.Rate = null.IntFrom(30)
 			sched.Duration = types.NullDurationFrom(10 * time.Minute)
@@ -265,7 +265,7 @@ var configMapTestCases = []configMapTestCase{
 	// variable-arrival-rate
 	{`{"varrival": {"type": "variable-arrival-rate", "startRate": 10, "timeUnit": "30s", "preAllocatedVUs": 20,
 		"maxVUs": 50, "stages": [{"duration": "3m", "target": 30}, {"duration": "5m", "target": 10}]}}`,
-		exp{custom: func(t *testing.T, cm lib.SchedulerConfigMap) {
+		exp{custom: func(t *testing.T, cm lib.ExecutorConfigMap) {
 			sched := NewVariableArrivalRateConfig("varrival")
 			sched.StartRate = null.IntFrom(10)
 			sched.Stages = []Stage{
@@ -275,7 +275,7 @@ var configMapTestCases = []configMapTestCase{
 			sched.TimeUnit = types.NullDurationFrom(30 * time.Second)
 			sched.PreAllocatedVUs = null.IntFrom(20)
 			sched.MaxVUs = null.IntFrom(50)
-			require.Equal(t, cm, lib.SchedulerConfigMap{"varrival": sched})
+			require.Equal(t, cm, lib.ExecutorConfigMap{"varrival": sched})
 
 			assert.Empty(t, cm["varrival"].Validate())
 			assert.Empty(t, cm.Validate())
@@ -302,7 +302,7 @@ var configMapTestCases = []configMapTestCase{
 	{`{"varrival": {"type": "variable-arrival-rate", "preAllocatedVUs": 20, "maxVUs": 50, "stages": []}}`, exp{validationError: true}},
 	{`{"varrival": {"type": "variable-arrival-rate", "preAllocatedVUs": 20, "maxVUs": 50, "stages": [{"duration": "5m", "target": 10}], "timeUnit": "-1s"}}`, exp{validationError: true}},
 	{`{"varrival": {"type": "variable-arrival-rate", "preAllocatedVUs": 30, "maxVUs": 20, "stages": [{"duration": "5m", "target": 10}]}}`, exp{validationError: true}},
-	//TODO: more tests of mixed schedulers and execution plans
+	//TODO: more tests of mixed executors and execution plans
 }
 
 func TestConfigMapParsingAndValidation(t *testing.T) {
@@ -311,7 +311,7 @@ func TestConfigMapParsingAndValidation(t *testing.T) {
 		tc := tc
 		t.Run(fmt.Sprintf("TestCase#%d", i), func(t *testing.T) {
 			t.Logf(tc.rawJSON)
-			var result lib.SchedulerConfigMap
+			var result lib.ExecutorConfigMap
 			err := json.Unmarshal([]byte(tc.rawJSON), &result)
 			if tc.expected.parseError {
 				require.Error(t, err)

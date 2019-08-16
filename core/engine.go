@@ -50,8 +50,8 @@ type Engine struct {
 	runLock sync.Mutex // y tho? TODO: remove?
 
 	//TODO: make most of the stuff here private!
-	Executor      lib.Executor
-	executorState *lib.ExecutorState
+	ExecutionScheduler lib.ExecutionScheduler
+	executionState     *lib.ExecutionState
 
 	Options      lib.Options
 	Collectors   []lib.Collector
@@ -74,14 +74,14 @@ type Engine struct {
 }
 
 // NewEngine instantiates a new Engine, without doing any heavy initialization.
-func NewEngine(ex lib.Executor, o lib.Options, logger *logrus.Logger) (*Engine, error) {
+func NewEngine(ex lib.ExecutionScheduler, o lib.Options, logger *logrus.Logger) (*Engine, error) {
 	if ex == nil {
-		return nil, errors.New("missing executor instance")
+		return nil, errors.New("missing ExecutionScheduler instance")
 	}
 
 	e := &Engine{
-		Executor:      ex,
-		executorState: ex.GetState(),
+		ExecutionScheduler: ex,
+		executionState:     ex.GetState(),
 
 		Options: o,
 		Metrics: make(map[string]*stats.Metric),
@@ -103,10 +103,10 @@ func NewEngine(ex lib.Executor, o lib.Options, logger *logrus.Logger) (*Engine, 
 	return e, nil
 }
 
-// Init is used to initialize the executor. That's a costly operation, since it
+// Init is used to initialize the execuction scheduler. That's a costly operation, since it
 // initializes all of the planned VUs and could potentially take a long time.
 func (e *Engine) Init(ctx context.Context) error {
-	return e.Executor.Init(ctx, e.Samples)
+	return e.ExecutionScheduler.Init(ctx, e.Samples)
 }
 
 func (e *Engine) setRunStatus(status lib.RunStatus) {
@@ -158,12 +158,12 @@ func (e *Engine) Run(ctx context.Context) error {
 		}()
 	}
 
-	// Run the executor.
+	// Run the execution scheduler.
 	errC := make(chan error)
 	subwg.Add(1)
 	go func() {
-		errC <- e.Executor.Run(subctx, e.Samples)
-		e.logger.Debug("Engine: Executor terminated")
+		errC <- e.ExecutionScheduler.Run(subctx, e.Samples)
+		e.logger.Debug("Engine: Execution scheduler terminated")
 		subwg.Done()
 	}()
 
@@ -213,11 +213,11 @@ func (e *Engine) Run(ctx context.Context) error {
 		case err := <-errC:
 			errC = nil
 			if err != nil {
-				e.logger.WithError(err).Debug("run: executor returned an error")
+				e.logger.WithError(err).Debug("run: execution scheduler returned an error")
 				e.setRunStatus(lib.RunStatusAbortedSystem)
 				return err
 			}
-			e.logger.Debug("run: executor terminated")
+			e.logger.Debug("run: execution scheduler terminated")
 			return nil
 		case <-ctx.Done():
 			e.logger.Debug("run: context expired; exiting...")
@@ -246,18 +246,18 @@ func (e *Engine) runMetricsEmission(ctx context.Context) {
 func (e *Engine) emitMetrics() {
 	t := time.Now()
 
-	executorState := e.Executor.GetState()
+	executionState := e.ExecutionScheduler.GetState()
 	e.processSamples([]stats.SampleContainer{stats.ConnectedSamples{
 		Samples: []stats.Sample{
 			{
 				Time:   t,
 				Metric: metrics.VUs,
-				Value:  float64(executorState.GetCurrentlyActiveVUsCount()),
+				Value:  float64(executionState.GetCurrentlyActiveVUsCount()),
 				Tags:   e.Options.RunTags,
 			}, {
 				Time:   t,
 				Metric: metrics.VUsMax,
-				Value:  float64(executorState.GetInitializedVUsCount()),
+				Value:  float64(executionState.GetInitializedVUsCount()),
 				Tags:   e.Options.RunTags,
 			},
 		},
@@ -282,7 +282,7 @@ func (e *Engine) processThresholds(abort func()) {
 	e.MetricsLock.Lock()
 	defer e.MetricsLock.Unlock()
 
-	t := e.executorState.GetCurrentTestRunDuration()
+	t := e.executionState.GetCurrentTestRunDuration()
 	abortOnFail := false
 
 	e.thresholdsTainted = false

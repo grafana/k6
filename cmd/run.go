@@ -151,25 +151,25 @@ a commandline interface for interacting with it.`,
 		ctx, cancel := context.WithCancel(context.Background()) //TODO: move even earlier?
 		defer cancel()
 
-		// Create a local executor wrapping the runner.
-		fprintf(stdout, "%s executor\r", initBar.String())
-		executor, err := local.New(r, logger)
+		// Create a local execution scheduler wrapping the runner.
+		fprintf(stdout, "%s execution scheduler\r", initBar.String())
+		execScheduler, err := local.NewExecutionScheduler(r, logger)
 		if err != nil {
 			return err
 		}
 
-		executorState := executor.GetState()
-		initBar = executor.GetInitProgressBar()
+		executionState := execScheduler.GetState()
+		initBar = execScheduler.GetInitProgressBar()
 		progressBarWG := &sync.WaitGroup{}
 		progressBarWG.Add(1)
 		go func() {
-			showProgress(ctx, conf, executor)
+			showProgress(ctx, conf, execScheduler)
 			progressBarWG.Done()
 		}()
 
 		// Create an engine.
 		initBar.Modify(pb.WithConstProgress(0, "Init engine"))
-		engine, err := core.NewEngine(executor, conf.Options, logger)
+		engine, err := core.NewEngine(execScheduler, conf.Options, logger)
 		if err != nil {
 			return err
 		}
@@ -187,7 +187,7 @@ a commandline interface for interacting with it.`,
 		initBar.Modify(pb.WithConstProgress(0, "Init metric outputs"))
 		for _, out := range conf.Out {
 			t, arg := parseCollector(out)
-			collector, err := newCollector(t, arg, src, conf, executor.GetExecutionPlan())
+			collector, err := newCollector(t, arg, src, conf, execScheduler.GetExecutionPlan())
 			if err != nil {
 				return err
 			}
@@ -230,16 +230,16 @@ a commandline interface for interacting with it.`,
 			fprintf(stdout, "     script: %s\n", ui.ValueColor.Sprint(filename))
 			fprintf(stdout, "\n")
 
-			plan := executor.GetExecutionPlan()
-			schedulers := executor.GetSchedulers()
+			plan := execScheduler.GetExecutionPlan()
+			executors := execScheduler.GetExecutors()
 			maxDuration, _ := lib.GetEndOffset(plan)
 
 			fprintf(stdout, "  execution: %s\n", ui.ValueColor.Sprintf(
-				"(%.2f%%) %d schedulers, %d max VUs, %s max duration (incl. graceful stop):",
-				conf.ExecutionSegment.FloatLength()*100, len(schedulers),
+				"(%.2f%%) %d executors, %d max VUs, %s max duration (incl. graceful stop):",
+				conf.ExecutionSegment.FloatLength()*100, len(executors),
 				lib.GetMaxPossibleVUs(plan), maxDuration),
 			)
-			for _, sched := range schedulers {
+			for _, sched := range executors {
 				fprintf(stdout, "           * %s: %s\n",
 					sched.GetConfig().GetName(), sched.GetConfig().GetDescription(conf.ExecutionSegment))
 			}
@@ -311,14 +311,14 @@ a commandline interface for interacting with it.`,
 			case <-ticker.C:
 				if quiet || !stdoutTTY {
 					l := logrus.WithFields(logrus.Fields{
-						"t": executorState.GetCurrentTestRunDuration(),
-						"i": executorState.GetFullIterationCount(),
+						"t": executionState.GetCurrentTestRunDuration(),
+						"i": executionState.GetFullIterationCount(),
 					})
 					fn := l.Info
 					if quiet {
 						fn = l.Debug
 					}
-					if executorState.IsPaused() {
+					if executionState.IsPaused() {
 						fn("Paused")
 					} else {
 						fn("Running")
@@ -358,8 +358,8 @@ a commandline interface for interacting with it.`,
 		}
 		if quiet || !stdoutTTY {
 			e := logger.WithFields(logrus.Fields{
-				"t": executorState.GetCurrentTestRunDuration(),
-				"i": executorState.GetFullIterationCount(),
+				"t": executionState.GetCurrentTestRunDuration(),
+				"i": executionState.GetFullIterationCount(),
 			})
 			fn := e.Info
 			if quiet {
@@ -371,7 +371,7 @@ a commandline interface for interacting with it.`,
 		progressBarWG.Wait()
 
 		// Warn if no iterations could be completed.
-		if executorState.GetFullIterationCount() == 0 {
+		if executionState.GetFullIterationCount() == 0 {
 			logger.Warn("No data generated, because no script iterations finished, consider making the test duration longer")
 		}
 
@@ -380,9 +380,9 @@ a commandline interface for interacting with it.`,
 			fprintf(stdout, "\n")
 			ui.Summarize(stdout, "", ui.SummaryData{
 				Opts:    conf.Options,
-				Root:    engine.Executor.GetRunner().GetDefaultGroup(),
+				Root:    engine.ExecutionScheduler.GetRunner().GetDefaultGroup(),
 				Metrics: engine.Metrics,
-				Time:    executorState.GetCurrentTestRunDuration(),
+				Time:    executionState.GetCurrentTestRunDuration(),
 			})
 			fprintf(stdout, "\n")
 		}

@@ -106,7 +106,7 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 
 		//TODO: warn about lack of support for --no-setup and --no-teardown in the cloud?
 		//TODO: validate for usage of execution segment
-		//TODO: validate for manual exacution (i.e. schedulers that aren't distributable)
+		//TODO: validate for externally controlled executor (i.e. executors that aren't distributable)
 		//TODO: move those validations to a separate function and reuse validateConfig()?
 
 		err = r.SetOptions(conf.Options)
@@ -191,7 +191,7 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 		fprintf(stdout, "   executor: %s\n", ui.ValueColor.Sprint("cloud"))
 		fprintf(stdout, "     script: %s\n", ui.ValueColor.Sprint(filename))
 		fprintf(stdout, "     output: %s\n", ui.ValueColor.Sprint(testURL))
-		//TODO: print schedulers information
+		//TODO: print executors information
 		fprintf(stdout, "\n")
 		printBar(progressBar, "Initializing the cloud test")
 

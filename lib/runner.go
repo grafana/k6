@@ -30,12 +30,14 @@ import (
 var _ Runner = &MiniRunner{}
 var _ VU = &MiniRunnerVU{}
 
-// A Runner is a factory for VUs. It should precompute as much as possible upon creation (parse
-// ASTs, load files into memory, etc.), so that spawning VUs becomes as fast as possible.
-// The Runner doesn't actually *do* anything in itself, the Executor is responsible for wrapping
-// and scheduling these VUs for execution.
+// A Runner is a factory for VUs. It should precompute as much as possible upon
+// creation (parse ASTs, load files into memory, etc.), so that spawning VUs
+// becomes as fast as possible. The Runner doesn't actually *do* anything in
+// itself, the ExecutionScheduler is responsible for wrapping and scheduling
+// these VUs for execution.
 //
-// TODO: Rename this to something more obvious? This name made sense a very long time ago.
+// TODO: Rename this to something more obvious? This name made sense a very long
+// time ago.
 type Runner interface {
 	// Creates an Archive of the runner. There should be a corresponding NewFromArchive() function
 	// that will restore the runner from the archive.

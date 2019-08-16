@@ -28,46 +28,46 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// BaseScheduler is a helper struct that contains common properties and methods
-// between most schedulers. It is intended to be used as an anonymous struct
-// inside of most of the schedulers, for the purpose of reducing boilerplate
+// BaseExecutor is a helper struct that contains common properties and methods
+// between most executors. It is intended to be used as an anonymous struct
+// inside of most of the executors, for the purpose of reducing boilerplate
 // code.
-type BaseScheduler struct {
-	config        lib.SchedulerConfig
-	executorState *lib.ExecutorState
-	logger        *logrus.Entry
-	progress      *pb.ProgressBar
+type BaseExecutor struct {
+	config         lib.ExecutorConfig
+	executionState *lib.ExecutionState
+	logger         *logrus.Entry
+	progress       *pb.ProgressBar
 }
 
-// NewBaseScheduler just returns an initialized BaseScheduler
-func NewBaseScheduler(config lib.SchedulerConfig, es *lib.ExecutorState, logger *logrus.Entry) *BaseScheduler {
-	return &BaseScheduler{
-		config:        config,
-		executorState: es,
-		logger:        logger,
+// NewBaseExecutor just returns an initialized BaseExecutor
+func NewBaseExecutor(config lib.ExecutorConfig, es *lib.ExecutionState, logger *logrus.Entry) *BaseExecutor {
+	return &BaseExecutor{
+		config:         config,
+		executionState: es,
+		logger:         logger,
 		progress: pb.New(
 			pb.WithLeft(config.GetName),
 		),
 	}
 }
 
-// Init doesn't do anything for most schedulers, since initialization of all
+// Init doesn't do anything for most executors, since initialization of all
 // planned VUs is handled by the executor.
-func (bs *BaseScheduler) Init(_ context.Context) error {
+func (bs *BaseExecutor) Init(_ context.Context) error {
 	return nil
 }
 
-// GetConfig returns the configuration with which this scheduler was launched.
-func (bs BaseScheduler) GetConfig() lib.SchedulerConfig {
+// GetConfig returns the configuration with which this executor was launched.
+func (bs BaseExecutor) GetConfig() lib.ExecutorConfig {
 	return bs.config
 }
 
-// GetLogger returns the scheduler logger entry.
-func (bs BaseScheduler) GetLogger() *logrus.Entry {
+// GetLogger returns the executor logger entry.
+func (bs BaseExecutor) GetLogger() *logrus.Entry {
 	return bs.logger
 }
 
 // GetProgress just returns the progressbar pointer.
-func (bs BaseScheduler) GetProgress() *pb.ProgressBar {
+func (bs BaseExecutor) GetProgress() *pb.ProgressBar {
 	return bs.progress
 }

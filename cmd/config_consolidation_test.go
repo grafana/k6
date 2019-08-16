@@ -74,7 +74,7 @@ func setEnv(t *testing.T, newEnv []string) (restoreEnv func()) {
 
 func verifyOneIterPerOneVU(t *testing.T, c Config) {
 	// No config anywhere should result in a 1 VU with a 1 iteration config
-	sched := c.Execution[lib.DefaultSchedulerName]
+	sched := c.Execution[lib.DefaultExecutorName]
 	require.NotEmpty(t, sched)
 	require.IsType(t, scheduler.PerVUIteationsConfig{}, sched)
 	perVuIters, ok := sched.(scheduler.PerVUIteationsConfig)
@@ -85,7 +85,7 @@ func verifyOneIterPerOneVU(t *testing.T, c Config) {
 
 func verifySharedIters(vus, iters null.Int) func(t *testing.T, c Config) {
 	return func(t *testing.T, c Config) {
-		sched := c.Execution[lib.DefaultSchedulerName]
+		sched := c.Execution[lib.DefaultExecutorName]
 		require.NotEmpty(t, sched)
 		require.IsType(t, scheduler.SharedIteationsConfig{}, sched)
 		sharedIterConfig, ok := sched.(scheduler.SharedIteationsConfig)
@@ -99,7 +99,7 @@ func verifySharedIters(vus, iters null.Int) func(t *testing.T, c Config) {
 
 func verifyConstLoopingVUs(vus null.Int, duration time.Duration) func(t *testing.T, c Config) {
 	return func(t *testing.T, c Config) {
-		sched := c.Execution[lib.DefaultSchedulerName]
+		sched := c.Execution[lib.DefaultExecutorName]
 		require.NotEmpty(t, sched)
 		require.IsType(t, scheduler.ConstantLoopingVUsConfig{}, sched)
 		clvc, ok := sched.(scheduler.ConstantLoopingVUsConfig)
@@ -113,7 +113,7 @@ func verifyConstLoopingVUs(vus null.Int, duration time.Duration) func(t *testing
 
 func verifyVarLoopingVUs(startVus null.Int, stages []scheduler.Stage) func(t *testing.T, c Config) {
 	return func(t *testing.T, c Config) {
-		sched := c.Execution[lib.DefaultSchedulerName]
+		sched := c.Execution[lib.DefaultExecutorName]
 		require.NotEmpty(t, sched)
 		require.IsType(t, scheduler.VariableLoopingVUsConfig{}, sched)
 		clvc, ok := sched.(scheduler.VariableLoopingVUsConfig)
@@ -254,7 +254,7 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 		},
 		{opts{cli: []string{"-u", "1", "-i", "6", "-d", "10s"}}, exp{}, func(t *testing.T, c Config) {
 			verifySharedIters(I(1), I(6))(t, c)
-			sharedIterConfig := c.Execution[lib.DefaultSchedulerName].(scheduler.SharedIteationsConfig)
+			sharedIterConfig := c.Execution[lib.DefaultExecutorName].(scheduler.SharedIteationsConfig)
 			assert.Equal(t, time.Duration(sharedIterConfig.MaxDuration.Duration), 10*time.Second)
 		}},
 		// This should get a validation error since VUs are more than the shared iterations
@@ -357,7 +357,7 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 			exp{}, verifySharedIters(I(12), I(25)),
 		},
 
-		//TODO: test manual execution
+		//TODO: test the externally controlled executor
 		//TODO: test execution-segment
 
 		// Just in case, verify that no options will result in the same 1 vu 1 iter config

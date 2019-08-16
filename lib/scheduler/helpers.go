@@ -76,9 +76,9 @@ func validateStages(stages []Stage) []error {
 }
 
 // getIterationRunner is a helper function that returns an iteration executor
-// closure. It takes care of updating metrics, executor stat statistics and
+// closure. It takes care of updating metrics, execution state statistics, and
 // warning messages.
-func getIterationRunner(executorState *lib.ExecutorState, logger *logrus.Entry, out chan<- stats.SampleContainer,
+func getIterationRunner(executionState *lib.ExecutionState, logger *logrus.Entry, out chan<- stats.SampleContainer,
 ) func(context.Context, lib.VU) {
 
 	return func(ctx context.Context, vu lib.VU) {
@@ -91,7 +91,7 @@ func getIterationRunner(executorState *lib.ExecutorState, logger *logrus.Entry, 
 		select {
 		case <-ctx.Done():
 			// Don't log errors or emit iterations metrics from cancelled iterations
-			executorState.AddPartialIterations(1)
+			executionState.AddPartialIterations(1)
 		default:
 			if err != nil {
 				if s, ok := err.(fmt.Stringer); ok {
@@ -106,19 +106,19 @@ func getIterationRunner(executorState *lib.ExecutorState, logger *logrus.Entry, 
 				Time:   time.Now(),
 				Metric: metrics.Iterations,
 				Value:  1,
-				Tags:   executorState.Options.RunTags,
+				Tags:   executionState.Options.RunTags,
 			}
-			executorState.AddFullIterations(1)
+			executionState.AddFullIterations(1)
 		}
 	}
 }
 
 // getDurationContexts is used to create sub-contexts that can restrict a
-// scheduler to only run for its allotted time.
+// executor to only run for its allotted time.
 //
-// If the scheduler doesn't have a graceful stop period for iterations, then
+// If the executor doesn't have a graceful stop period for iterations, then
 // both returned sub-contexts will be the same one, with a timeout equal to
-// supplied regular scheduler duration.
+// supplied regular executor duration.
 //
 // But if a graceful stop is enabled, then the first returned context (and the
 // cancel func) will be for the "outer" sub-context. Its timeout will include
@@ -130,7 +130,7 @@ func getIterationRunner(executorState *lib.ExecutorState, logger *logrus.Entry, 
 //  - As long as the regDurationCtx isn't done, new iterations can be started.
 //  - After regDurationCtx is done, no new iterations should be started; every
 //    VU that finishes an iteration from now on can be returned to the buffer
-//    pool in the executor state struct.
+//    pool in the ExecutionState struct.
 //  - After maxDurationCtx is done, any VUs with iterations will be
 //    interrupted by the context's closing and will be returned to the buffer.
 //  - If you want to interrupt the execution of all VUs prematurely (e.g. there
@@ -153,10 +153,10 @@ func getDurationContexts(parentCtx context.Context, regularDuration, gracefulSto
 }
 
 // trackProgress is a helper function that monitors certain end-events in a
-// scheduler and updates it's progressbar accordingly.
+// executor and updates it's progressbar accordingly.
 func trackProgress(
 	parentCtx, maxDurationCtx, regDurationCtx context.Context,
-	sched lib.Scheduler, snapshot func() (float64, string),
+	sched lib.Executor, snapshot func() (float64, string),
 ) {
 	progressBar := sched.GetProgress()
 	logger := sched.GetLogger()

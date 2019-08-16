@@ -209,7 +209,7 @@ func TestFilenamePwdResolve(t *testing.T) {
 }
 
 func TestDerivedExecutionDiscarding(t *testing.T) {
-	var emptyConfigMap SchedulerConfigMap
+	var emptyConfigMap ExecutorConfigMap
 	var tests = []struct {
 		metadata     string
 		expExecution interface{}
