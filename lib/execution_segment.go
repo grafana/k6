@@ -185,6 +185,49 @@ func (es *ExecutionSegment) Split(numParts int64) ([]*ExecutionSegment, error) {
 
 //TODO: add a NewFromString() method
 
+// Equal returns true only if the two execution segments have the same from and
+// to values.
+func (es *ExecutionSegment) Equal(other *ExecutionSegment) bool {
+	if es == other {
+		return true
+	}
+	thisFrom, otherFrom, thisTo, otherTo := zeroRat, zeroRat, oneRat, oneRat
+	if es != nil {
+		thisFrom, thisTo = es.from, es.to
+	}
+	if other != nil {
+		otherFrom, otherTo = other.from, other.to
+	}
+	return thisFrom.Cmp(otherFrom) == 0 && thisTo.Cmp(otherTo) == 0
+}
+
+// SubSegment returns a new execution sub-segment - if a is (1/2:1] and b is
+// (0:1/2], then a.SubSegment(b) will return a new segment (1/2, 3/4].
+//
+// The basic formula for c = a.SubSegment(b) is:
+//    c.from = a.from + b.from * (a.to - a.from)
+//    c.to = c.from + (b.to - b.from) * (a.to - a.from)
+func (es *ExecutionSegment) SubSegment(child *ExecutionSegment) *ExecutionSegment {
+	if child == nil {
+		return es // 100% sub-segment is the original segment
+	}
+
+	parentFrom, parentLength := zeroRat, oneRat
+	if es != nil {
+		parentFrom, parentLength = es.from, es.length
+	}
+
+	resultFrom := new(big.Rat).Mul(parentLength, child.from)
+	resultFrom.Add(resultFrom, parentFrom)
+
+	resultLength := new(big.Rat).Mul(parentLength, child.length)
+	return &ExecutionSegment{
+		from:   resultFrom,
+		length: resultLength,
+		to:     new(big.Rat).Add(resultFrom, resultLength),
+	}
+}
+
 // helper function for rounding (up) of rational numbers to big.Int values
 func roundUp(rat *big.Rat) *big.Int {
 	quo, rem := new(big.Int).QuoRem(rat.Num(), rat.Denom(), new(big.Int))
