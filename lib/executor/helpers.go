@@ -91,7 +91,7 @@ func getIterationRunner(executionState *lib.ExecutionState, logger *logrus.Entry
 		select {
 		case <-ctx.Done():
 			// Don't log errors or emit iterations metrics from cancelled iterations
-			executionState.AddPartialIterations(1)
+			executionState.AddInterruptedIterations(1)
 		default:
 			if err != nil {
 				if s, ok := err.(fmt.Stringer); ok {

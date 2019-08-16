@@ -199,7 +199,7 @@ type ExecutionState struct {
 	// script `duration`, scaling down of VUs via `stages`, a user hitting
 	// Ctrl+C, change of `vus` via the externally controlled executor's REST
 	// API, etc.
-	partialIterationsCount *uint64
+	interruptedIterationsCount *uint64
 
 	// A nanosecond UNIX timestamp that is set when the test is actually
 	// started. The default 0 value is used to denote that the test hasn't
@@ -255,18 +255,18 @@ func NewExecutionState(options Options, maxPlannedVUs, maxPossibleVUs uint64) *E
 		Options: options,
 		vus:     make(chan VU, maxPossibleVUs),
 
-		currentVUIdentifier:       new(uint64),
-		initializedVUs:            new(int64),
-		uninitializedUnplannedVUs: &maxUnplannedUninitializedVUs,
-		activeVUs:                 new(int64),
-		fullIterationsCount:       new(uint64),
-		partialIterationsCount:    new(uint64),
-		startTime:                 new(int64),
-		endTime:                   new(int64),
-		currentPauseTime:          new(int64),
-		pauseStateLock:            sync.RWMutex{},
-		totalPausedDuration:       0, // Accessed only behind the pauseStateLock
-		resumeNotify:              resumeNotify,
+		currentVUIdentifier:        new(uint64),
+		initializedVUs:             new(int64),
+		uninitializedUnplannedVUs:  &maxUnplannedUninitializedVUs,
+		activeVUs:                  new(int64),
+		fullIterationsCount:        new(uint64),
+		interruptedIterationsCount: new(uint64),
+		startTime:                  new(int64),
+		endTime:                    new(int64),
+		currentPauseTime:           new(int64),
+		pauseStateLock:             sync.RWMutex{},
+		totalPausedDuration:        0, // Accessed only behind the pauseStateLock
+		resumeNotify:               resumeNotify,
 	}
 }
 
@@ -331,15 +331,15 @@ func (es *ExecutionState) AddFullIterations(count uint64) uint64 {
 //
 // IMPORTANT: for UI/information purposes only, don't use for synchronization.
 func (es *ExecutionState) GetPartialIterationCount() uint64 {
-	return atomic.LoadUint64(es.partialIterationsCount)
+	return atomic.LoadUint64(es.interruptedIterationsCount)
 }
 
-// AddPartialIterations increments the number of partial (i.e interrupted)
+// AddInterruptedIterations increments the number of partial (i.e interrupted)
 // iterations by the provided amount.
 //
 // IMPORTANT: for UI/information purposes only, don't use for synchronization.
-func (es *ExecutionState) AddPartialIterations(count uint64) uint64 {
-	return atomic.AddUint64(es.partialIterationsCount, count)
+func (es *ExecutionState) AddInterruptedIterations(count uint64) uint64 {
+	return atomic.AddUint64(es.interruptedIterationsCount, count)
 }
 
 // MarkStarted saves the current timestamp as the test start time.
