@@ -104,7 +104,6 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 			return ExitCode{cerr, invalidConfigErrorCode}
 		}
 
-		//TODO: warn about lack of support for --no-setup and --no-teardown in the cloud?
 		//TODO: validate for usage of execution segment
 		//TODO: validate for externally controlled executor (i.e. executors that aren't distributable)
 		//TODO: move those validations to a separate function and reuse validateConfig()?
