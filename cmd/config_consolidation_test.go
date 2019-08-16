@@ -35,7 +35,7 @@ import (
 	null "gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/scheduler"
+	"github.com/loadimpact/k6/lib/executor"
 	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/lib/types"
 )
@@ -74,10 +74,10 @@ func setEnv(t *testing.T, newEnv []string) (restoreEnv func()) {
 
 func verifyOneIterPerOneVU(t *testing.T, c Config) {
 	// No config anywhere should result in a 1 VU with a 1 iteration config
-	sched := c.Execution[lib.DefaultExecutorName]
-	require.NotEmpty(t, sched)
-	require.IsType(t, scheduler.PerVUIteationsConfig{}, sched)
-	perVuIters, ok := sched.(scheduler.PerVUIteationsConfig)
+	exec := c.Execution[lib.DefaultExecutorName]
+	require.NotEmpty(t, exec)
+	require.IsType(t, executor.PerVUIteationsConfig{}, exec)
+	perVuIters, ok := exec.(executor.PerVUIteationsConfig)
 	require.True(t, ok)
 	assert.Equal(t, null.NewInt(1, false), perVuIters.Iterations)
 	assert.Equal(t, null.NewInt(1, false), perVuIters.VUs)
@@ -85,10 +85,10 @@ func verifyOneIterPerOneVU(t *testing.T, c Config) {
 
 func verifySharedIters(vus, iters null.Int) func(t *testing.T, c Config) {
 	return func(t *testing.T, c Config) {
-		sched := c.Execution[lib.DefaultExecutorName]
-		require.NotEmpty(t, sched)
-		require.IsType(t, scheduler.SharedIteationsConfig{}, sched)
-		sharedIterConfig, ok := sched.(scheduler.SharedIteationsConfig)
+		exec := c.Execution[lib.DefaultExecutorName]
+		require.NotEmpty(t, exec)
+		require.IsType(t, executor.SharedIteationsConfig{}, exec)
+		sharedIterConfig, ok := exec.(executor.SharedIteationsConfig)
 		require.True(t, ok)
 		assert.Equal(t, vus, sharedIterConfig.VUs)
 		assert.Equal(t, iters, sharedIterConfig.Iterations)
@@ -99,10 +99,10 @@ func verifySharedIters(vus, iters null.Int) func(t *testing.T, c Config) {
 
 func verifyConstLoopingVUs(vus null.Int, duration time.Duration) func(t *testing.T, c Config) {
 	return func(t *testing.T, c Config) {
-		sched := c.Execution[lib.DefaultExecutorName]
-		require.NotEmpty(t, sched)
-		require.IsType(t, scheduler.ConstantLoopingVUsConfig{}, sched)
-		clvc, ok := sched.(scheduler.ConstantLoopingVUsConfig)
+		exec := c.Execution[lib.DefaultExecutorName]
+		require.NotEmpty(t, exec)
+		require.IsType(t, executor.ConstantLoopingVUsConfig{}, exec)
+		clvc, ok := exec.(executor.ConstantLoopingVUsConfig)
 		require.True(t, ok)
 		assert.Equal(t, vus, clvc.VUs)
 		assert.Equal(t, types.NullDurationFrom(duration), clvc.Duration)
@@ -111,12 +111,12 @@ func verifyConstLoopingVUs(vus null.Int, duration time.Duration) func(t *testing
 	}
 }
 
-func verifyVarLoopingVUs(startVus null.Int, stages []scheduler.Stage) func(t *testing.T, c Config) {
+func verifyVarLoopingVUs(startVus null.Int, stages []executor.Stage) func(t *testing.T, c Config) {
 	return func(t *testing.T, c Config) {
-		sched := c.Execution[lib.DefaultExecutorName]
-		require.NotEmpty(t, sched)
-		require.IsType(t, scheduler.VariableLoopingVUsConfig{}, sched)
-		clvc, ok := sched.(scheduler.VariableLoopingVUsConfig)
+		exec := c.Execution[lib.DefaultExecutorName]
+		require.NotEmpty(t, exec)
+		require.IsType(t, executor.VariableLoopingVUsConfig{}, exec)
+		clvc, ok := exec.(executor.VariableLoopingVUsConfig)
 		require.True(t, ok)
 		assert.Equal(t, startVus, clvc.StartVUs)
 		assert.Equal(t, startVus, c.VUs)
@@ -131,14 +131,14 @@ func verifyVarLoopingVUs(startVus null.Int, stages []scheduler.Stage) func(t *te
 
 // A helper function that accepts (duration in second, VUs) pairs and returns
 // a valid slice of stage structs
-func buildStages(durationsAndVUs ...int64) []scheduler.Stage {
+func buildStages(durationsAndVUs ...int64) []executor.Stage {
 	l := len(durationsAndVUs)
 	if l%2 != 0 {
 		panic("wrong len")
 	}
-	result := make([]scheduler.Stage, 0, l/2)
+	result := make([]executor.Stage, 0, l/2)
 	for i := 0; i < l; i += 2 {
-		result = append(result, scheduler.Stage{
+		result = append(result, executor.Stage{
 			Duration: types.NullDurationFrom(time.Duration(durationsAndVUs[i]) * time.Second),
 			Target:   null.IntFrom(durationsAndVUs[i+1]),
 		})
@@ -254,7 +254,7 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 		},
 		{opts{cli: []string{"-u", "1", "-i", "6", "-d", "10s"}}, exp{}, func(t *testing.T, c Config) {
 			verifySharedIters(I(1), I(6))(t, c)
-			sharedIterConfig := c.Execution[lib.DefaultExecutorName].(scheduler.SharedIteationsConfig)
+			sharedIterConfig := c.Execution[lib.DefaultExecutorName].(executor.SharedIteationsConfig)
 			assert.Equal(t, time.Duration(sharedIterConfig.MaxDuration.Duration), 10*time.Second)
 		}},
 		// This should get a validation error since VUs are more than the shared iterations
@@ -439,7 +439,7 @@ func runTestCase(
 	require.NoError(t, err)
 
 	derivedConfig := consolidatedConfig
-	derivedConfig.Options, err = scheduler.DeriveExecutionFromShortcuts(consolidatedConfig.Options)
+	derivedConfig.Options, err = executor.DeriveExecutionFromShortcuts(consolidatedConfig.Options)
 	if testCase.expected.derivationError {
 		require.Error(t, err)
 		return

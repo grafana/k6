@@ -18,7 +18,7 @@
  *
  */
 
-package scheduler
+package executor
 
 import (
 	"github.com/loadimpact/k6/lib"

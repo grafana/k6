@@ -28,7 +28,7 @@ import (
 	"github.com/julienschmidt/httprouter"
 	"github.com/loadimpact/k6/api/common"
 	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/scheduler"
+	"github.com/loadimpact/k6/lib/executor"
 	"github.com/manyminds/api2go/jsonapi"
 )
 
@@ -46,11 +46,11 @@ func HandleGetStatus(rw http.ResponseWriter, r *http.Request, p httprouter.Param
 
 func getFirstExternallyControlledExecutor(
 	execScheduler lib.ExecutionScheduler,
-) (*scheduler.ExternallyControlled, error) {
+) (*executor.ExternallyControlled, error) {
 
 	executors := execScheduler.GetExecutors()
 	for _, s := range executors {
-		if mex, ok := s.(*scheduler.ExternallyControlled); ok {
+		if mex, ok := s.(*executor.ExternallyControlled); ok {
 			return mex, nil
 		}
 	}

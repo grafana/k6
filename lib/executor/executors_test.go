@@ -18,7 +18,7 @@
  *
  */
 
-package scheduler
+package executor
 
 import (
 	"encoding/json"

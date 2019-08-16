@@ -46,8 +46,8 @@ import (
 	k6metrics "github.com/loadimpact/k6/js/modules/k6/metrics"
 	"github.com/loadimpact/k6/js/modules/k6/ws"
 	"github.com/loadimpact/k6/lib"
+	_ "github.com/loadimpact/k6/lib/executor" //TODO: figure out something better
 	"github.com/loadimpact/k6/lib/metrics"
-	_ "github.com/loadimpact/k6/lib/scheduler" //TODO: figure out something better
 	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"

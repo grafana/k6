@@ -189,10 +189,10 @@ func (scs *ExecutorConfigMap) UnmarshalJSON(data []byte) error {
 
 // Validate checks if all of the specified executor options make sense
 func (scs ExecutorConfigMap) Validate() (errors []error) {
-	for name, executor := range scs {
-		if schedErr := executor.Validate(); len(schedErr) != 0 {
+	for name, exec := range scs {
+		if execErr := exec.Validate(); len(execErr) != 0 {
 			errors = append(errors,
-				fmt.Errorf("executor %s has errors: %s", name, ConcatErrors(schedErr, ", ")))
+				fmt.Errorf("executor %s has errors: %s", name, ConcatErrors(execErr, ", ")))
 		}
 	}
 	return errors

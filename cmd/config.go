@@ -34,7 +34,7 @@ import (
 	null "gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/scheduler"
+	"github.com/loadimpact/k6/lib/executor"
 	"github.com/loadimpact/k6/stats/cloud"
 	"github.com/loadimpact/k6/stats/datadog"
 	"github.com/loadimpact/k6/stats/influxdb"
@@ -232,7 +232,7 @@ func applyDefault(conf Config) Config {
 
 func deriveAndValidateConfig(conf Config) (result Config, err error) {
 	result = conf
-	result.Options, err = scheduler.DeriveExecutionFromShortcuts(conf.Options)
+	result.Options, err = executor.DeriveExecutionFromShortcuts(conf.Options)
 	if err != nil {
 		return result, err
 	}
