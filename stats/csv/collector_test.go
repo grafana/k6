@@ -24,7 +24,6 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -63,64 +62,122 @@ func TestMakeHeader(t *testing.T) {
 }
 
 func TestSampleToRow(t *testing.T) {
-	testSamples := []*stats.Sample{
+	testData := []struct {
+		testname    string
+		sample      *stats.Sample
+		resTags     []string
+		ignoredTags []string
+	}{
 		{
-			Time:   time.Now(),
-			Metric: stats.New("my_metric", stats.Gauge),
-			Value:  1,
-			Tags: stats.NewSampleTags(map[string]string{
-				"tag1": "val1",
-				"tag2": "val2",
-				"tag3": "val3",
-			}),
+			testname: "One res tag, one ignored tag, one extra tag",
+			sample: &stats.Sample{
+				Time:   time.Now(),
+				Metric: stats.New("my_metric", stats.Gauge),
+				Value:  1,
+				Tags: stats.NewSampleTags(map[string]string{
+					"tag1": "val1",
+					"tag2": "val2",
+					"tag3": "val3",
+				}),
+			},
+			resTags:     []string{"tag1"},
+			ignoredTags: []string{"tag2"},
 		},
 		{
-			Time:   time.Now(),
-			Metric: stats.New("my_metric", stats.Gauge),
-			Value:  1,
-			Tags: stats.NewSampleTags(map[string]string{
-				"tag1": "val1",
-				"tag2": "val2",
-				"tag3": "val3",
-				"tag4": "val4",
-				"tag5": "val5",
-			}),
+			testname: "Two res tags, three extra tags",
+			sample: &stats.Sample{
+				Time:   time.Now(),
+				Metric: stats.New("my_metric", stats.Gauge),
+				Value:  1,
+				Tags: stats.NewSampleTags(map[string]string{
+					"tag1": "val1",
+					"tag2": "val2",
+					"tag3": "val3",
+					"tag4": "val4",
+					"tag5": "val5",
+				}),
+			},
+			resTags:     []string{"tag1", "tag2"},
+			ignoredTags: []string{},
+		},
+		{
+			testname: "Two res tags, two ignored",
+			sample: &stats.Sample{
+				Time:   time.Now(),
+				Metric: stats.New("my_metric", stats.Gauge),
+				Value:  1,
+				Tags: stats.NewSampleTags(map[string]string{
+					"tag1": "val1",
+					"tag2": "val2",
+					"tag3": "val3",
+					"tag4": "val4",
+					"tag5": "val5",
+					"tag6": "val6",
+				}),
+			},
+			resTags:     []string{"tag1", "tag3"},
+			ignoredTags: []string{"tag4", "tag6"},
 		},
 	}
 
-	enabledTags := map[string][][]string{
-		"One tag": {
-			{"tag1"},
-			{"tag2"},
+	expected := []struct {
+		baseRow  []string
+		extraRow []string
+	}{
+		{
+			baseRow: []string{
+				"my_metric",
+				fmt.Sprintf("%d", time.Now().Unix()),
+				"1.000000",
+				"val1",
+			},
+			extraRow: []string{
+				"tag3=val3",
+			},
 		},
-		"Two tags": {
-			{"tag1", "tag2"},
-			{},
+		{
+			baseRow: []string{
+				"my_metric",
+				fmt.Sprintf("%d", time.Now().Unix()),
+				"1.000000",
+				"val1",
+				"val2",
+			},
+			extraRow: []string{
+				"tag3=val3",
+				"tag4=val4",
+				"tag5=val5",
+			},
 		},
-		"Two tags, one ignored": {
-			{"tag1", "tag2"},
-			{"tag3"},
+		{
+			baseRow: []string{
+				"my_metric",
+				fmt.Sprintf("%d", time.Now().Unix()),
+				"1.000000",
+				"val1",
+				"val3",
+			},
+			extraRow: []string{
+				"tag2=val2",
+				"tag5=val5",
+			},
 		},
 	}
 
-	for testname, tags := range enabledTags {
-		testname := testname
-		resTags, ignoredTags := tags[0], tags[1]
-		for _, sample := range testSamples {
-			sample := sample
-			t.Run(testname, func(t *testing.T) {
-				row := SampleToRow(sample, resTags, ignoredTags, make([]string, 0, 3+len(resTags)+1))
-				if row != nil {
-					assert.Equal(t, len(resTags)+4, len(row))
-					for _, tag := range ignoredTags {
-						assert.False(t, strings.Contains(row[len(row)-1], tag))
-					}
-				} else {
-					assert.Nil(t, row)
-					assert.Nil(t, sample)
-				}
-			})
-		}
+	for i := range testData {
+		testname, sample := testData[i].testname, testData[i].sample
+		resTags, ignoredTags := testData[i].resTags, testData[i].ignoredTags
+		expectedRow := expected[i]
+
+		t.Run(testname, func(t *testing.T) {
+			row := SampleToRow(sample, resTags, ignoredTags, make([]string, 0, 3+len(resTags)+1))
+			for ind, cell := range expectedRow.baseRow {
+				assert.Equal(t, cell, row[ind])
+			}
+			for _, cell := range expectedRow.extraRow {
+				assert.Contains(t, row[len(row)-1], cell)
+			}
+		})
 	}
 }
 func TestCollect(t *testing.T) {

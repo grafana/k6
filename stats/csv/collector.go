@@ -198,23 +198,22 @@ func SampleToRow(sample *stats.Sample, resTags []string, ignoredTags []string, r
 	extraTags := bytes.Buffer{}
 	prev := false
 	for tag, val := range sampleTags {
-		if sort.SearchStrings(resTags, tag) == len(resTags) && sort.SearchStrings(ignoredTags, tag) == len(ignoredTags) {
+		if !IsStringInSlice(resTags, tag) && !IsStringInSlice(ignoredTags, tag) {
 			if prev {
-				_, err := extraTags.WriteString("&")
-				if err != nil {
+				if _, err := extraTags.WriteString("&"); err != nil {
 					break
 				}
 			}
-			_, err := extraTags.WriteString(tag)
-			if err != nil {
+
+			if _, err := extraTags.WriteString(tag); err != nil {
 				break
 			}
-			_, err = extraTags.WriteString("=")
-			if err != nil {
+
+			if _, err := extraTags.WriteString("="); err != nil {
 				break
 			}
-			_, err = extraTags.WriteString(val)
-			if err != nil {
+
+			if _, err := extraTags.WriteString(val); err != nil {
 				break
 			}
 			prev = true
@@ -223,6 +222,20 @@ func SampleToRow(sample *stats.Sample, resTags []string, ignoredTags []string, r
 	row = append(row, extraTags.String())
 
 	return row
+}
+
+// IsStringInSlice returns whether the string is contained within a string slice
+func IsStringInSlice(slice []string, str string) bool {
+	if sort.SearchStrings(slice, str) == len(slice) {
+		return false
+	}
+
+	for _, item := range slice {
+		if item == str {
+			return true
+		}
+	}
+	return false
 }
 
 // GetRequiredSystemTags returns which sample tags are needed by this collector
