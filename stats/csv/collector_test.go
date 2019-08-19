@@ -71,7 +71,7 @@ func TestSampleToRow(t *testing.T) {
 		{
 			testname: "One res tag, one ignored tag, one extra tag",
 			sample: &stats.Sample{
-				Time:   time.Now(),
+				Time:   time.Unix(1562324644, 0),
 				Metric: stats.New("my_metric", stats.Gauge),
 				Value:  1,
 				Tags: stats.NewSampleTags(map[string]string{
@@ -86,7 +86,7 @@ func TestSampleToRow(t *testing.T) {
 		{
 			testname: "Two res tags, three extra tags",
 			sample: &stats.Sample{
-				Time:   time.Now(),
+				Time:   time.Unix(1562324644, 0),
 				Metric: stats.New("my_metric", stats.Gauge),
 				Value:  1,
 				Tags: stats.NewSampleTags(map[string]string{
@@ -103,7 +103,7 @@ func TestSampleToRow(t *testing.T) {
 		{
 			testname: "Two res tags, two ignored",
 			sample: &stats.Sample{
-				Time:   time.Now(),
+				Time:   time.Unix(1562324644, 0),
 				Metric: stats.New("my_metric", stats.Gauge),
 				Value:  1,
 				Tags: stats.NewSampleTags(map[string]string{
@@ -127,7 +127,7 @@ func TestSampleToRow(t *testing.T) {
 		{
 			baseRow: []string{
 				"my_metric",
-				fmt.Sprintf("%d", time.Now().Unix()),
+				"1562324644",
 				"1.000000",
 				"val1",
 			},
@@ -138,7 +138,7 @@ func TestSampleToRow(t *testing.T) {
 		{
 			baseRow: []string{
 				"my_metric",
-				fmt.Sprintf("%d", time.Now().Unix()),
+				"1562324644",
 				"1.000000",
 				"val1",
 				"val2",
@@ -152,7 +152,7 @@ func TestSampleToRow(t *testing.T) {
 		{
 			baseRow: []string{
 				"my_metric",
-				fmt.Sprintf("%d", time.Now().Unix()),
+				"1562324644",
 				"1.000000",
 				"val1",
 				"val3",
