@@ -226,16 +226,10 @@ func SampleToRow(sample *stats.Sample, resTags []string, ignoredTags []string, r
 
 // IsStringInSlice returns whether the string is contained within a string slice
 func IsStringInSlice(slice []string, str string) bool {
-	if sort.SearchStrings(slice, str) == len(slice) {
+	if index := sort.SearchStrings(slice, str); index == len(slice) || slice[index] != str {
 		return false
 	}
-
-	for _, item := range slice {
-		if item == str {
-			return true
-		}
-	}
-	return false
+	return true
 }
 
 // GetRequiredSystemTags returns which sample tags are needed by this collector
