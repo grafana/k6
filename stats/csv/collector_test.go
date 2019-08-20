@@ -170,7 +170,7 @@ func TestSampleToRow(t *testing.T) {
 		expectedRow := expected[i]
 
 		t.Run(testname, func(t *testing.T) {
-			row := SampleToRow(sample, resTags, ignoredTags, make([]string, 3+len(resTags)+1, 3+len(resTags)+1))
+			row := SampleToRow(sample, resTags, ignoredTags, make([]string, 3+len(resTags)+1))
 			for ind, cell := range expectedRow.baseRow {
 				assert.Equal(t, cell, row[ind])
 			}

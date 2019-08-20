@@ -86,7 +86,7 @@ func New(fs afero.Fs, tags lib.TagSet, config Config) (*Collector, error) {
 			resTags:      resTags,
 			ignoredTags:  ignoredTags,
 			csvWriter:    csv.NewWriter(logfile),
-			row:          make([]string, 3+len(resTags)+1, 3+len(resTags)+1),
+			row:          make([]string, 3+len(resTags)+1),
 			saveInterval: saveInterval,
 		}, nil
 	}
@@ -102,7 +102,7 @@ func New(fs afero.Fs, tags lib.TagSet, config Config) (*Collector, error) {
 		resTags:      resTags,
 		ignoredTags:  ignoredTags,
 		csvWriter:    csv.NewWriter(logfile),
-		row:          make([]string, 3+len(resTags)+1, 3+len(resTags)+1),
+		row:          make([]string, 3+len(resTags)+1),
 		saveInterval: saveInterval,
 	}, nil
 }
