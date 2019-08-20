@@ -86,7 +86,7 @@ func New(fs afero.Fs, tags lib.TagSet, config Config) (*Collector, error) {
 			resTags:      resTags,
 			ignoredTags:  ignoredTags,
 			csvWriter:    csv.NewWriter(logfile),
-			row:          make([]string, 0, 3+len(resTags)+1),
+			row:          make([]string, 3+len(resTags)+1, 3+len(resTags)+1),
 			saveInterval: saveInterval,
 		}, nil
 	}
@@ -102,7 +102,7 @@ func New(fs afero.Fs, tags lib.TagSet, config Config) (*Collector, error) {
 		resTags:      resTags,
 		ignoredTags:  ignoredTags,
 		csvWriter:    csv.NewWriter(logfile),
-		row:          make([]string, 0, 3+len(resTags)+1),
+		row:          make([]string, 3+len(resTags)+1, 3+len(resTags)+1),
 		saveInterval: saveInterval,
 	}, nil
 }
@@ -161,8 +161,7 @@ func (c *Collector) WriteToFile() {
 		for _, sc := range samples {
 			for _, sample := range sc.GetSamples() {
 				sample := sample
-				row := c.row[:0]
-				row = SampleToRow(&sample, c.resTags, c.ignoredTags, row)
+				row := SampleToRow(&sample, c.resTags, c.ignoredTags, c.row)
 				err := c.csvWriter.Write(row)
 				if err != nil {
 					logrus.WithField("filename", c.fname).Error("CSV: Error writing to file")
@@ -186,13 +185,13 @@ func MakeHeader(tags []string) []string {
 
 // SampleToRow converts sample into array of strings
 func SampleToRow(sample *stats.Sample, resTags []string, ignoredTags []string, row []string) []string {
-	row = append(row, sample.Metric.Name)
-	row = append(row, fmt.Sprintf("%d", sample.Time.Unix()))
-	row = append(row, fmt.Sprintf("%f", sample.Value))
+	row[0] = sample.Metric.Name
+	row[1] = fmt.Sprintf("%d", sample.Time.Unix())
+	row[2] = fmt.Sprintf("%f", sample.Value)
 	sampleTags := sample.Tags.CloneTags()
 
-	for _, tag := range resTags {
-		row = append(row, sampleTags[tag])
+	for ind, tag := range resTags {
+		row[ind+3] = sampleTags[tag]
 	}
 
 	extraTags := bytes.Buffer{}
@@ -219,7 +218,7 @@ func SampleToRow(sample *stats.Sample, resTags []string, ignoredTags []string, r
 			prev = true
 		}
 	}
-	row = append(row, extraTags.String())
+	row[len(row)-1] = extraTags.String()
 
 	return row
 }
