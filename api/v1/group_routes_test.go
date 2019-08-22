@@ -65,34 +65,33 @@ func TestGetGroups(t *testing.T) {
 			}
 		})
 
-		// t.Run("groups", func(t *testing.T) {
-		// 	var groups []Group
-		// 	assert.NoError(t, jsonapi.Unmarshal(body, &groups))
-		// 	if assert.Len(t, groups, 3) {
-		// 		for _, g := range groups {
-		// 			switch g.ID {
-		// 			case g0.ID:
-		// 				assert.Equal(t, "", g.Name)
-		// 				assert.Nil(t, g.Parent)
-		// 				assert.Equal(t, "", g.ParentID)
-		// 				assert.Len(t, g.GroupIDs, 1)
-		// 				assert.EqualValues(t, []string{g1.ID}, g.GroupIDs)
-		// 			case g1.ID:
-		// 				assert.Equal(t, "group 1", g.Name)
-		// 				assert.Nil(t, g.Parent)
-		// 				assert.Equal(t, g0.ID, g.ParentID)
-		// 				assert.EqualValues(t, []string{g2.ID}, g.GroupIDs)
-		// 			case g2.ID:
-		// 				assert.Equal(t, "group 2", g.Name)
-		// 				assert.Nil(t, g.Parent)
-		// 				assert.Equal(t, g1.ID, g.ParentID)
-		// 				assert.EqualValues(t, []string{}, g.GroupIDs)
-		// 			default:
-		// 				assert.Fail(t, "Unknown ID: "+g.ID)
-		// 			}
-		// 		}
-		// 	}
-		// })
+		t.Run("groups", func(t *testing.T) {
+			var groups []Group
+			require.NoError(t, jsonapi.Unmarshal(body, &groups))
+			require.Len(t, groups, 3)
+			for _, g := range groups {
+				switch g.ID {
+				case g0.ID:
+					assert.Equal(t, "", g.Name)
+					assert.Nil(t, g.Parent)
+					assert.Equal(t, "", g.ParentID)
+					assert.Len(t, g.GroupIDs, 1)
+					assert.EqualValues(t, []string{g1.ID}, g.GroupIDs)
+				case g1.ID:
+					assert.Equal(t, "group 1", g.Name)
+					assert.Nil(t, g.Parent)
+					assert.Equal(t, g0.ID, g.ParentID)
+					assert.EqualValues(t, []string{g2.ID}, g.GroupIDs)
+				case g2.ID:
+					assert.Equal(t, "group 2", g.Name)
+					assert.Nil(t, g.Parent)
+					assert.Equal(t, g1.ID, g.ParentID)
+					assert.EqualValues(t, []string{}, g.GroupIDs)
+				default:
+					assert.Fail(t, "Unknown ID: "+g.ID)
+				}
+			}
+		})
 	})
 	for _, gp := range []*lib.Group{g0, g1, g2} {
 		t.Run(gp.Name, func(t *testing.T) {
