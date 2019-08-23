@@ -125,7 +125,10 @@ func NewGroup(name string, parent *Group) (*Group, error) {
 	}
 
 	path := name
-	if parent != nil {
+	// The top-most user-defined group has the default group as parent,
+	// yet we don't want to prefix it with the group separator.
+	// See https://github.com/loadimpact/k6/issues/948
+	if parent != nil && parent.Path != "" {
 		path = parent.Path + GroupSeparator + path
 	}
 

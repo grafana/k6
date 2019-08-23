@@ -163,7 +163,7 @@ func TestResponse(t *testing.T) {
 				if (res.body.indexOf("Herman Melville - Moby-Dick") == -1) { throw new Error("wrong body: " + res.body); }
 			`))
 			assert.NoError(t, err)
-			assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/html"), "", 200, "::my group")
+			assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/html"), "", 200, "my group")
 		})
 	})
 	t.Run("Json", func(t *testing.T) {
@@ -196,7 +196,7 @@ func TestResponse(t *testing.T) {
 	        if (value != undefined)
 				{ throw new Error("Expected undefined, but got: " + value); }
 
-			value = res.json("glossary.null") 
+			value = res.json("glossary.null")
 	        if (value != null)
 				{ throw new Error("Expected null, but got: " + value); }
 
@@ -212,8 +212,8 @@ func TestResponse(t *testing.T) {
 	        if (value != true)
 				{ throw new Error("Expected boolean true, but got: " + value); }
 
-			value = res.json("glossary.GlossDiv.GlossList.GlossEntry.GlossDef.title") 
-	        if (value != "example glossary") 
+			value = res.json("glossary.GlossDiv.GlossList.GlossEntry.GlossDef.title")
+	        if (value != "example glossary")
 				{ throw new Error("Expected 'example glossary'', but got: " + value); }
 
 			value =	res.json("glossary.friends.#.first")[0]

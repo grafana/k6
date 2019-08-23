@@ -88,3 +88,14 @@ func TestDataRaces(t *testing.T) {
 		assert.Equal(t, group1, group2, "Groups are the same")
 	})
 }
+
+func TestNewGroup(t *testing.T) {
+	t.Run("NoGroupSeparatorOnMainUserGroup", func(t *testing.T) {
+		defaultGroup, _ := NewGroup("", nil)
+		assert.Equal(t, "", defaultGroup.Path)
+		mainUserGroup, _ := NewGroup("mainGroup", defaultGroup)
+		assert.Equal(t, "mainGroup", mainUserGroup.Path)
+		nestedUserGroup, _ := NewGroup("nestedGroup", mainUserGroup)
+		assert.Equal(t, "mainGroup::nestedGroup", nestedUserGroup.Path)
+	})
+}
