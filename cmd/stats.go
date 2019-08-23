@@ -25,6 +25,7 @@ import (
 
 	"github.com/loadimpact/k6/api/v1/client"
 	"github.com/loadimpact/k6/ui"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -42,7 +43,8 @@ var statsCmd = &cobra.Command{
 		}
 		metrics, err := c.Metrics(context.Background())
 		if err != nil {
-			return err
+			logrus.WithError(err).Debug("failed to get metrics")
+			return errNoTestRunning
 		}
 		ui.Dump(stdout, metrics)
 		return nil

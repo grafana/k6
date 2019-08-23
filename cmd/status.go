@@ -25,8 +25,12 @@ import (
 
 	"github.com/loadimpact/k6/api/v1/client"
 	"github.com/loadimpact/k6/ui"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
+
+var errNoTestRunning = errors.New("no test running")
 
 // statusCmd represents the status command
 var statusCmd = &cobra.Command{
@@ -42,7 +46,8 @@ var statusCmd = &cobra.Command{
 		}
 		status, err := c.Status(context.Background())
 		if err != nil {
-			return err
+			logrus.WithError(err).Debug("failed to get status")
+			return errNoTestRunning
 		}
 		ui.Dump(stdout, status)
 		return nil
