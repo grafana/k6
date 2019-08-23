@@ -432,14 +432,13 @@ func (s *Socket) closeConnection(code int) error {
 	s.shutdownOnce.Do(func() {
 		rt := common.GetRuntime(s.ctx)
 
-		writeErr := s.conn.WriteControl(websocket.CloseMessage,
+		err = s.conn.WriteControl(websocket.CloseMessage,
 			websocket.FormatCloseMessage(code, ""),
 			time.Now().Add(writeWait),
 		)
-		if writeErr != nil {
+		if err != nil {
 			// Just call the handler, we'll try to close the connection anyway
 			s.handleEvent("error", rt.ToValue(err))
-			err = writeErr
 		}
 
 		// trigger `close` event when the client closes the connection
