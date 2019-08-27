@@ -324,6 +324,25 @@ func TestErrors(t *testing.T) {
 		assert.Error(t, err)
 	})
 
+	t.Run("invalid_url_message_panic", func(t *testing.T) {
+		// Attempting to send a message to a non-existent socket shouldn't panic
+		_, err := common.RunString(rt, `
+		let res = ws.connect("INVALID", function(socket){
+			socket.send("new message");
+		});
+		`)
+		assert.Error(t, err)
+	})
+
+	t.Run("error_in_setup", func(t *testing.T) {
+		_, err := common.RunString(rt, `
+		let res = ws.connect("ws://demos.kaazing.com/echo", function(socket){
+			throw new Error("error in setup");
+		});
+		`)
+		assert.Error(t, err)
+	})
+
 	t.Run("send_after_close", func(t *testing.T) {
 		_, err := common.RunString(rt, `
 		let hasError = false;
