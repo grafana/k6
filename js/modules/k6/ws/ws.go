@@ -192,16 +192,16 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 		}
 	}
 
-	// Run the user-provided set up function
-	if _, err := setupFn(goja.Undefined(), rt.ToValue(&socket)); err != nil {
-		return nil, err
-	}
-
 	if connErr != nil {
 		// Pass the error to the user script before exiting immediately
 		socket.handleEvent("error", rt.ToValue(connErr))
 
 		return nil, connErr
+	}
+
+	// Run the user-provided set up function
+	if _, err := setupFn(goja.Undefined(), rt.ToValue(&socket)); err != nil {
+		return nil, err
 	}
 
 	wsResponse, wsRespErr := wrapHTTPResponse(httpResponse)
