@@ -82,3 +82,26 @@ func TestMakeRequestError(t *testing.T) {
 		require.Equal(t, err.Error(), "unknown compressionType CompressionType(13)")
 	})
 }
+
+func TestCleanURL(t *testing.T) {
+	testCases := []struct {
+		url      string
+		expected string
+	}{
+		{"https://example.com/", "https://example.com/"},
+		{"https://example.com/${}", "https://example.com/${}"},
+		{"https://user:pass@example.com/", "https://example.com/"},
+		{"https://user:pass@example.com/path?a=1&b=2", "https://example.com/path?a=1&b=2"},
+		{"https://user:pass@example.com/${}", "https://example.com/${}"},
+		{"@malformed/url", "@malformed/url"},
+		{"not a url", "not a url"},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.url, func(t *testing.T) {
+			res := cleanURL(tc.url)
+			require.Equal(t, tc.expected, res)
+		})
+	}
+}

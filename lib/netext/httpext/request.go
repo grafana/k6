@@ -23,6 +23,7 @@ package httpext
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net"
@@ -64,6 +65,19 @@ func NewURL(urlString, name string) (URL, error) {
 // GetURL returns the internal url.URL
 func (u URL) GetURL() *url.URL {
 	return u.u
+}
+
+// Return a sanitized URL, clean of e.g. user credentials
+func cleanURL(urlString string) string {
+	idxEnd := strings.Index(urlString, "@")
+	if idxEnd == -1 {
+		return urlString
+	}
+	idxStart := strings.Index(urlString[:idxEnd], "/")
+	if idxStart != -1 {
+		return fmt.Sprintf("%s%s", urlString[0:idxStart+2], urlString[idxEnd+1:])
+	}
+	return urlString
 }
 
 // Request represent an http request
@@ -212,12 +226,12 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 		tags["method"] = preq.Req.Method
 	}
 	if state.Options.SystemTags["url"] {
-		tags["url"] = preq.URL.URL
+		tags["url"] = cleanURL(preq.URL.URL)
 	}
 
 	// Only set the name system tag if the user didn't explicitly set it beforehand
 	if _, ok := tags["name"]; !ok && state.Options.SystemTags["name"] {
-		tags["name"] = preq.URL.Name
+		tags["name"] = cleanURL(preq.URL.Name)
 	}
 	if state.Options.SystemTags["group"] {
 		tags["group"] = state.Group.Path

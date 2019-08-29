@@ -113,7 +113,7 @@ func (t *transport) measureAndEmitMetrics(unfReq *unfinishedRequest) *finishedRe
 		}
 	} else {
 		if enabledTags["url"] {
-			tags["url"] = unfReq.request.URL.String()
+			tags["url"] = cleanURL(unfReq.request.URL.String())
 		}
 		if enabledTags["status"] {
 			tags["status"] = strconv.Itoa(unfReq.response.StatusCode)
