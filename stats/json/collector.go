@@ -98,7 +98,7 @@ func (c *Collector) Init() error {
 func (c *Collector) SetRunStatus(status lib.RunStatus) {}
 
 func (c *Collector) Run(ctx context.Context) {
-	logrus.Debug("InfluxDB: Running!")
+	logrus.Debug("JSON output: Running!")
 	ticker := time.NewTicker(time.Millisecond * 100)
 	defer func() {
 		_ = c.closeFn()
