@@ -123,7 +123,7 @@ func (c *Collector) HandleMetric(m *stats.Metric) {
 	err := c.encoder.Encode(WrapMetric(m))
 
 	if err != nil {
-		logrus.WithField("filename", c.fname).WithField("error", err).Warning(
+		logrus.WithField("filename", c.fname).WithError(err).Warning(
 			"JSON: Envelope is nil or Metric couldn't be marshalled to JSON")
 		return
 	}
@@ -154,7 +154,7 @@ func (c *Collector) commit() {
 			err := c.encoder.Encode(WrapSample(&sample))
 			if err != nil {
 				// Skip metric if it can't be made into JSON or envelope is null.
-				logrus.WithField("filename", c.fname).WithField("error", err).Warning(
+				logrus.WithField("filename", c.fname).WithError(err).Warning(
 					"JSON: Sample couldn't be marshalled to JSON")
 				continue
 			}
