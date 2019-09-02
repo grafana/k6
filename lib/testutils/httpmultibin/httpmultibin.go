@@ -18,8 +18,8 @@
  *
  */
 
-// Package testutils is indended only for use in tests, do not import in production code!
-package testutils
+// Package httpmultibin is indended only for use in tests, do not import in production code!
+package httpmultibin
 
 import (
 	"context"

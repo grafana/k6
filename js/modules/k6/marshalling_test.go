@@ -28,7 +28,7 @@ import (
 
 	"github.com/loadimpact/k6/js"
 	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/testutils"
+	"github.com/loadimpact/k6/lib/testutils/httpmultibin"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/stats"
@@ -37,7 +37,7 @@ import (
 )
 
 func TestSetupDataMarshalling(t *testing.T) {
-	tb := testutils.NewHTTPMultiBin(t)
+	tb := httpmultibin.NewHTTPMultiBin(t)
 	defer tb.Cleanup()
 
 	script := []byte(tb.Replacer.Replace(`

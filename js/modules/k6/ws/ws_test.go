@@ -29,7 +29,7 @@ import (
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
-	"github.com/loadimpact/k6/lib/testutils"
+	"github.com/loadimpact/k6/lib/testutils/httpmultibin"
 	"github.com/loadimpact/k6/stats"
 	"github.com/stretchr/testify/assert"
 )
@@ -83,7 +83,7 @@ func assertMetricEmitted(t *testing.T, metric *stats.Metric, sampleContainers []
 func TestSession(t *testing.T) {
 	//TODO: split and paralelize tests
 	t.Parallel()
-	tb := testutils.NewHTTPMultiBin(t)
+	tb := httpmultibin.NewHTTPMultiBin(t)
 	defer tb.Cleanup()
 	sr := tb.Replacer.Replace
 
@@ -279,7 +279,7 @@ func TestSession(t *testing.T) {
 
 func TestErrors(t *testing.T) {
 	t.Parallel()
-	tb := testutils.NewHTTPMultiBin(t)
+	tb := httpmultibin.NewHTTPMultiBin(t)
 	defer tb.Cleanup()
 	sr := tb.Replacer.Replace
 
@@ -357,7 +357,7 @@ func TestErrors(t *testing.T) {
 }
 
 func TestSystemTags(t *testing.T) {
-	tb := testutils.NewHTTPMultiBin(t)
+	tb := httpmultibin.NewHTTPMultiBin(t)
 	defer tb.Cleanup()
 
 	sr := tb.Replacer.Replace
@@ -422,7 +422,7 @@ func TestTLSConfig(t *testing.T) {
 	root, err := lib.NewGroup("", nil)
 	assert.NoError(t, err)
 
-	tb := testutils.NewHTTPMultiBin(t)
+	tb := httpmultibin.NewHTTPMultiBin(t)
 	defer tb.Cleanup()
 
 	sr := tb.Replacer.Replace
