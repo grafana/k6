@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/testutils"
+	"github.com/loadimpact/k6/lib/testutils/httpmultibin"
 	"github.com/loadimpact/k6/stats"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v3"
@@ -13,7 +13,7 @@ import (
 
 func BenchmarkHTTPRequests(b *testing.B) {
 	b.StopTimer()
-	tb := testutils.NewHTTPMultiBin(b)
+	tb := httpmultibin.NewHTTPMultiBin(b)
 	defer tb.Cleanup()
 
 	r, err := getSimpleRunner("/script.js", tb.Replacer.Replace(`
