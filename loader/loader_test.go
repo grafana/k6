@@ -27,7 +27,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/loadimpact/k6/lib/testutils"
+	"github.com/loadimpact/k6/lib/testutils/httpmultibin"
 	"github.com/loadimpact/k6/loader"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
@@ -100,7 +100,7 @@ func TestResolve(t *testing.T) {
 
 }
 func TestLoad(t *testing.T) {
-	tb := testutils.NewHTTPMultiBin(t)
+	tb := httpmultibin.NewHTTPMultiBin(t)
 	sr := tb.Replacer.Replace
 
 	oldHTTPTransport := http.DefaultTransport
