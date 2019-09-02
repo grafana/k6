@@ -104,19 +104,26 @@ func getWebsocketEchoHandler(t testing.TB) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		t.Logf("[%p %s] Upgrading to websocket connection...", req, req.URL)
 		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, w.Header())
-		if !assert.NoError(t, err) {
-			return
-		}
+		require.NoError(t, err)
 		t.Logf("[%p %s] Upgraded...", req, req.URL)
 
-		mt, message, err := conn.ReadMessage()
-		t.Logf("[%p %s] Read message '%s' of type %d (error '%v')", req, req.URL, message, mt, err)
-		assert.NoError(t, err)
-		assert.NoError(t, conn.WriteMessage(mt, message))
-		assert.NoError(t, conn.Close())
-		t.Logf("[%p %s] Wrote back message '%s' of type %d and closed the connection", req, req.URL, message, mt)
+		for {
+			mt, message, err := conn.ReadMessage()
+			t.Logf("[%p %s] Read message '%s' of type %d (error '%v')", req, req.URL, message, mt, err)
+			if err != nil {
+				break
+			}
+			err = conn.WriteMessage(mt, message)
+
+			t.Logf("[%p %s] Wrote back message '%s' of type %d and closed the connection", req, req.URL, message, mt)
+
+			if err != nil {
+				break
+			}
+		}
 	})
 }
+
 func getWebsocketCloserHandler(t testing.TB) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, w.Header())
@@ -238,11 +245,13 @@ func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 			"HTTPBIN_IP_URL", httpSrv.URL,
 			"HTTPBIN_DOMAIN", httpDomain,
 			"HTTPBIN_URL", fmt.Sprintf("http://%s:%s", httpDomain, httpURL.Port()),
+			"WSBIN_URL", fmt.Sprintf("ws://%s:%s", httpDomain, httpURL.Port()),
 			"HTTPBIN_IP", httpIP.String(),
 			"HTTPBIN_PORT", httpURL.Port(),
 			"HTTPSBIN_IP_URL", httpsSrv.URL,
 			"HTTPSBIN_DOMAIN", httpsDomain,
 			"HTTPSBIN_URL", fmt.Sprintf("https://%s:%s", httpsDomain, httpsURL.Port()),
+			"WSSBIN_URL", fmt.Sprintf("wss://%s:%s", httpsDomain, httpsURL.Port()),
 			"HTTPSBIN_IP", httpsIP.String(),
 			"HTTPSBIN_PORT", httpsURL.Port(),
 		),
