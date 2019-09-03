@@ -532,7 +532,7 @@ func (es *ExecutionState) GetUnplannedVU(ctx context.Context, logger *logrus.Ent
 
 	logger.Debug("Initializing an unplanned VU, this may affect test results")
 	vu, err := es.InitializeNewVU(ctx, logger)
-	if err != nil {
+	if err == nil {
 		es.ModCurrentlyActiveVUsCount(+1)
 	}
 	return vu, err
