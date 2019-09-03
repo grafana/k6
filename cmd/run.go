@@ -176,11 +176,6 @@ a commandline interface for interacting with it.`,
 			return ExitCode{cerr, invalidConfigErrorCode}
 		}
 
-		// If summary trend stats are defined, update the UI to reflect them
-		if len(conf.SummaryTrendStats) > 0 {
-			ui.UpdateTrendColumns(conf.SummaryTrendStats)
-		}
-
 		// Write options back to the runner too.
 		if err = r.SetOptions(conf.Options); err != nil {
 			return err
@@ -448,12 +443,15 @@ a commandline interface for interacting with it.`,
 		// Print the end-of-test summary.
 		if !conf.NoSummary.Bool {
 			fprintf(stdout, "\n")
-			ui.Summarize(stdout, "", ui.SummaryData{
-				Opts:    conf.Options,
-				Root:    engine.Executor.GetRunner().GetDefaultGroup(),
-				Metrics: engine.Metrics,
-				Time:    engine.Executor.GetTime(),
+
+			s := ui.NewSummary(conf.SummaryTrendStats)
+			s.SummarizeMetrics(stdout, "", ui.SummaryData{
+				Metrics:   engine.Metrics,
+				RootGroup: engine.Executor.GetRunner().GetDefaultGroup(),
+				Time:      engine.Executor.GetTime(),
+				TimeUnit:  conf.Options.SummaryTimeUnit.String,
 			})
+
 			fprintf(stdout, "\n")
 		}
 

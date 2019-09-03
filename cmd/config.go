@@ -44,6 +44,7 @@ import (
 	"github.com/loadimpact/k6/stats/influxdb"
 	"github.com/loadimpact/k6/stats/kafka"
 	"github.com/loadimpact/k6/stats/statsd/common"
+	"github.com/loadimpact/k6/ui"
 )
 
 // configFlagSet returns a FlagSet with the default run configuration flags.
@@ -309,16 +310,28 @@ func getConsolidatedConfig(fs afero.Fs, cliConf Config, runner lib.Runner) (conf
 	conf = conf.Apply(envConf).Apply(cliConf)
 	conf = applyDefault(conf)
 
+	// TODO(imiric): Move this validation where it makes sense in the configuration
+	// refactor of #883. This repeats the trend stats validation already done
+	// for CLI flags in cmd.getOptions, in case other configuration sources
+	// (e.g. env vars) overrode our default value. This is not done in
+	// lib.Options.Validate to avoid circular imports.
+	if err = ui.ValidateSummary(conf.SummaryTrendStats); err != nil {
+		return conf, err
+	}
+
 	return conf, nil
 }
 
-// applyDefault applys default options value if it is not specified by any mechenisms. This happens with types
-// which does not support by "gopkg.in/guregu/null.v3".
+// applyDefault applies the default options value if it is not specified.
+// This happens with types which are not supported by "gopkg.in/guregu/null.v3".
 //
 // Note that if you add option default value here, also add it in command line argument help text.
 func applyDefault(conf Config) Config {
 	if conf.Options.SystemTags == nil {
 		conf = conf.Apply(Config{Options: lib.Options{SystemTags: &stats.DefaultSystemTagSet}})
+	}
+	if len(conf.Options.SummaryTrendStats) == 0 {
+		conf = conf.Apply(Config{Options: lib.Options{SummaryTrendStats: lib.DefaultSummaryTrendStats}})
 	}
 	return conf
 }
