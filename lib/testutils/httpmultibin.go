@@ -100,48 +100,30 @@ type jsonBody struct {
 	Compression string      `json:"compression"`
 }
 
-func getWebsocketEchoHandler(t testing.TB) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		t.Logf("[%p %s] Upgrading to websocket connection...", req, req.URL)
-		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, w.Header())
-		require.NoError(t, err)
-		t.Logf("[%p %s] Upgraded...", req, req.URL)
+func websocketEchoHandler(w http.ResponseWriter, req *http.Request) {
+	conn, err := (&websocket.Upgrader{}).Upgrade(w, req, w.Header())
+	if err != nil {
+		return
+	}
 
-		for {
-			mt, message, err := conn.ReadMessage()
-			select {
-			case <-req.Context().Done():
-				return
-			default:
-			}
-			t.Logf("[%p %s] Read message '%s' of type %d (error '%v')", req, req.URL, message, mt, err)
-			if err != nil {
-				break
-			}
-			err = conn.WriteMessage(mt, message)
-			select {
-			case <-req.Context().Done():
-				return
-			default:
-			}
-
-			t.Logf("[%p %s] Wrote back message '%s' of type %d and closed the connection", req, req.URL, message, mt)
-
-			if err != nil {
-				break
-			}
+	for {
+		mt, message, err := conn.ReadMessage()
+		if err != nil {
+			break
 		}
-	})
+		err = conn.WriteMessage(mt, message)
+		if err != nil {
+			break
+		}
+	}
 }
 
-func getWebsocketCloserHandler(t testing.TB) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, w.Header())
-		if !assert.NoError(t, err) {
-			return
-		}
-		assert.NoError(t, conn.Close())
-	})
+func websocketCloserHandler(w http.ResponseWriter, req *http.Request) {
+	conn, err := (&websocket.Upgrader{}).Upgrade(w, req, w.Header())
+	if err != nil {
+		return
+	}
+	_ = conn.Close()
 }
 
 func writeJSON(w io.Writer, v interface{}) error {
@@ -207,8 +189,8 @@ func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 	// Create a http.ServeMux and set the httpbin handler as the default
 	mux := http.NewServeMux()
 	mux.Handle("/brotli", getEncodedHandler(t, httpext.CompressionTypeBr))
-	mux.Handle("/ws-echo", getWebsocketEchoHandler(t))
-	mux.Handle("/ws-close", getWebsocketCloserHandler(t))
+	mux.HandleFunc("/ws-echo", websocketEchoHandler)
+	mux.HandleFunc("/ws-close", websocketCloserHandler)
 	mux.Handle("/zstd", getEncodedHandler(t, httpext.CompressionTypeZstd))
 	mux.Handle("/zstd-br", getZstdBrHandler(t))
 	mux.Handle("/", httpbin.New().Handler())
