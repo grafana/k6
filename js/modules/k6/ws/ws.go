@@ -201,6 +201,7 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 
 	// Run the user-provided set up function
 	if _, err := setupFn(goja.Undefined(), rt.ToValue(&socket)); err != nil {
+		_ = socket.closeConnection(websocket.CloseGoingAway)
 		return nil, err
 	}
 
