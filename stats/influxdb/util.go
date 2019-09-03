@@ -23,7 +23,7 @@ package influxdb
 import (
 	"strings"
 
-	client "github.com/influxdata/influxdb/client/v2"
+	client "github.com/influxdata/influxdb1-client/v2"
 	null "gopkg.in/guregu/null.v3"
 )
 
