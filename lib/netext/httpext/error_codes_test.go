@@ -101,10 +101,10 @@ func TestUnknownNetErrno(t *testing.T) {
 	var err = new(net.OpError)
 	err.Op = "write"
 	err.Net = "tcp"
-	err.Err = syscall.EBFONT // Highly unlikely to actually need to do anything with this error
+	err.Err = syscall.ENOTRECOVERABLE // Highly unlikely to actually need to do anything with this error
 	var expectedError = fmt.Sprintf(
 		"write: unknown errno `%d` on %s with message `%s`",
-		syscall.EBFONT, runtime.GOOS, err.Err)
+		syscall.ENOTRECOVERABLE, runtime.GOOS, err.Err)
 	var errorCode, errorMsg = errorCodeForError(err)
 	require.Equal(t, expectedError, errorMsg)
 	require.Equal(t, netUnknownErrnoErrorCode, errorCode)
