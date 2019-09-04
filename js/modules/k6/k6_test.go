@@ -246,7 +246,7 @@ func TestCheck(t *testing.T) {
 	})
 
 	t.Run("Throws", func(t *testing.T) {
-		state, _ := getState()
+		state, samples := getState()
 		*ctx = lib.WithState(baseCtx, state)
 
 		_, err := common.RunString(rt, `
@@ -256,6 +256,20 @@ func TestCheck(t *testing.T) {
 		})
 		`)
 		assert.EqualError(t, err, "Error: error A at a (<eval>:3:27(6))")
+
+		bufSamples := stats.GetBufferedSamples(samples)
+		if assert.Len(t, bufSamples, 1) {
+			sample, ok := bufSamples[0].(stats.Sample)
+			require.True(t, ok)
+
+			assert.NotZero(t, sample.Time)
+			assert.Equal(t, metrics.Checks, sample.Metric)
+			assert.Equal(t, float64(0), sample.Value)
+			assert.Equal(t, map[string]string{
+				"group": "",
+				"check": "a",
+			}, sample.Tags.CloneTags())
+		}
 	})
 
 	t.Run("Types", func(t *testing.T) {

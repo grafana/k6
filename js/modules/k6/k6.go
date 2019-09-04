@@ -138,6 +138,7 @@ func (*K6) Check(ctx context.Context, arg0, checks goja.Value, extras ...goja.Va
 	}
 
 	succ := true
+	var exc error
 	obj := checks.ToObject(rt)
 	for _, name := range obj.Keys() {
 		val := obj.Get(name)
@@ -160,10 +161,11 @@ func (*K6) Check(ctx context.Context, arg0, checks goja.Value, extras ...goja.Va
 		fn, ok := goja.AssertFunction(val)
 		if ok {
 			tmpVal, err := fn(goja.Undefined(), arg0)
-			if err != nil {
-				return false, err
-			}
 			val = tmpVal
+			if err != nil {
+				val = rt.ToValue(false)
+				exc = err
+			}
 		}
 
 		sampleTags := stats.IntoSampleTags(&tags)
@@ -181,6 +183,10 @@ func (*K6) Check(ctx context.Context, arg0, checks goja.Value, extras ...goja.Va
 				// A single failure makes the return value false.
 				succ = false
 			}
+		}
+
+		if exc != nil {
+			return succ, exc
 		}
 	}
 
