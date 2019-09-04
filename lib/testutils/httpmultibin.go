@@ -100,31 +100,30 @@ type jsonBody struct {
 	Compression string      `json:"compression"`
 }
 
-func getWebsocketEchoHandler(t testing.TB) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		t.Logf("[%p %s] Upgrading to websocket connection...", req, req.URL)
-		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, w.Header())
-		if !assert.NoError(t, err) {
-			return
-		}
-		t.Logf("[%p %s] Upgraded...", req, req.URL)
+func websocketEchoHandler(w http.ResponseWriter, req *http.Request) {
+	conn, err := (&websocket.Upgrader{}).Upgrade(w, req, w.Header())
+	if err != nil {
+		return
+	}
 
+	for {
 		mt, message, err := conn.ReadMessage()
-		t.Logf("[%p %s] Read message '%s' of type %d (error '%v')", req, req.URL, message, mt, err)
-		assert.NoError(t, err)
-		assert.NoError(t, conn.WriteMessage(mt, message))
-		assert.NoError(t, conn.Close())
-		t.Logf("[%p %s] Wrote back message '%s' of type %d and closed the connection", req, req.URL, message, mt)
-	})
-}
-func getWebsocketCloserHandler(t testing.TB) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, w.Header())
-		if !assert.NoError(t, err) {
-			return
+		if err != nil {
+			break
 		}
-		assert.NoError(t, conn.Close())
-	})
+		err = conn.WriteMessage(mt, message)
+		if err != nil {
+			break
+		}
+	}
+}
+
+func websocketCloserHandler(w http.ResponseWriter, req *http.Request) {
+	conn, err := (&websocket.Upgrader{}).Upgrade(w, req, w.Header())
+	if err != nil {
+		return
+	}
+	_ = conn.Close()
 }
 
 func writeJSON(w io.Writer, v interface{}) error {
@@ -190,8 +189,8 @@ func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 	// Create a http.ServeMux and set the httpbin handler as the default
 	mux := http.NewServeMux()
 	mux.Handle("/brotli", getEncodedHandler(t, httpext.CompressionTypeBr))
-	mux.Handle("/ws-echo", getWebsocketEchoHandler(t))
-	mux.Handle("/ws-close", getWebsocketCloserHandler(t))
+	mux.HandleFunc("/ws-echo", websocketEchoHandler)
+	mux.HandleFunc("/ws-close", websocketCloserHandler)
 	mux.Handle("/zstd", getEncodedHandler(t, httpext.CompressionTypeZstd))
 	mux.Handle("/zstd-br", getZstdBrHandler(t))
 	mux.Handle("/", httpbin.New().Handler())
@@ -238,11 +237,13 @@ func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 			"HTTPBIN_IP_URL", httpSrv.URL,
 			"HTTPBIN_DOMAIN", httpDomain,
 			"HTTPBIN_URL", fmt.Sprintf("http://%s:%s", httpDomain, httpURL.Port()),
+			"WSBIN_URL", fmt.Sprintf("ws://%s:%s", httpDomain, httpURL.Port()),
 			"HTTPBIN_IP", httpIP.String(),
 			"HTTPBIN_PORT", httpURL.Port(),
 			"HTTPSBIN_IP_URL", httpsSrv.URL,
 			"HTTPSBIN_DOMAIN", httpsDomain,
 			"HTTPSBIN_URL", fmt.Sprintf("https://%s:%s", httpsDomain, httpsURL.Port()),
+			"WSSBIN_URL", fmt.Sprintf("wss://%s:%s", httpsDomain, httpsURL.Port()),
 			"HTTPSBIN_IP", httpsIP.String(),
 			"HTTPSBIN_PORT", httpsURL.Port(),
 		),
