@@ -27,7 +27,7 @@ import (
 	"testing"
 
 	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/testutils"
+	"github.com/loadimpact/k6/lib/testutils/httpmultibin"
 	"github.com/loadimpact/k6/stats"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
@@ -168,7 +168,7 @@ func TestLoadDoesntBreakHTTPGet(t *testing.T) {
 	// This test that functions such as http.get which require context still work if they are called
 	// inside script that is imported
 
-	tb := testutils.NewHTTPMultiBin(t)
+	tb := httpmultibin.NewHTTPMultiBin(t)
 	defer tb.Cleanup()
 	fs := afero.NewMemMapFs()
 	require.NoError(t, afero.WriteFile(fs, "/A.js", []byte(tb.Replacer.Replace(`

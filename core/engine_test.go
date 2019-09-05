@@ -36,6 +36,7 @@ import (
 	"github.com/loadimpact/k6/lib/executor"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/testutils"
+	"github.com/loadimpact/k6/lib/testutils/httpmultibin"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/stats"
@@ -355,7 +356,7 @@ const expectedHeaderMaxLength = 500
 
 func TestSentReceivedMetrics(t *testing.T) {
 	t.Parallel()
-	tb := testutils.NewHTTPMultiBin(t)
+	tb := httpmultibin.NewHTTPMultiBin(t)
 	defer tb.Cleanup()
 	tr := tb.Replacer.Replace
 
@@ -482,7 +483,7 @@ func TestSentReceivedMetrics(t *testing.T) {
 
 func TestRunTags(t *testing.T) {
 	t.Parallel()
-	tb := testutils.NewHTTPMultiBin(t)
+	tb := httpmultibin.NewHTTPMultiBin(t)
 	defer tb.Cleanup()
 
 	runTagsMap := map[string]string{"foo": "bar", "test": "mest", "over": "written"}
@@ -601,7 +602,7 @@ func TestRunTags(t *testing.T) {
 
 func TestSetupTeardownThresholds(t *testing.T) {
 	t.Parallel()
-	tb := testutils.NewHTTPMultiBin(t)
+	tb := httpmultibin.NewHTTPMultiBin(t)
 	defer tb.Cleanup()
 
 	script := []byte(tb.Replacer.Replace(`
@@ -665,7 +666,7 @@ func TestSetupTeardownThresholds(t *testing.T) {
 
 func TestEmittedMetricsWhenScalingDown(t *testing.T) {
 	t.Parallel()
-	tb := testutils.NewHTTPMultiBin(t)
+	tb := httpmultibin.NewHTTPMultiBin(t)
 	defer tb.Cleanup()
 
 	script := []byte(tb.Replacer.Replace(`

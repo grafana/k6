@@ -28,7 +28,7 @@ import (
 
 	"github.com/loadimpact/k6/js"
 	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/testutils"
+	"github.com/loadimpact/k6/lib/testutils/httpmultibin"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/stats"
@@ -37,7 +37,7 @@ import (
 )
 
 func TestSetupDataMarshalling(t *testing.T) {
-	tb := testutils.NewHTTPMultiBin(t)
+	tb := httpmultibin.NewHTTPMultiBin(t)
 	defer tb.Cleanup()
 
 	script := []byte(tb.Replacer.Replace(`
@@ -54,7 +54,7 @@ func TestSetupDataMarshalling(t *testing.T) {
 		export function setup() {
 			let res = http.get("HTTPBIN_URL/html");
 			let html_selection = html.parseHTML(res.body);
-			let ws_res = ws.connect("ws://HTTPBIN_DOMAIN:HTTPBIN_PORT/ws-echo", function(socket){
+			let ws_res = ws.connect("WSBIN_URL/ws-echo", function(socket){
 				socket.on("open", function() {
 					socket.send("test")
 				})

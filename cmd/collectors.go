@@ -31,6 +31,7 @@ import (
 	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/stats/cloud"
+	"github.com/loadimpact/k6/stats/csv"
 	"github.com/loadimpact/k6/stats/datadog"
 	"github.com/loadimpact/k6/stats/influxdb"
 	jsonc "github.com/loadimpact/k6/stats/json"
@@ -48,6 +49,7 @@ const (
 	collectorCloud    = "cloud"
 	collectorStatsD   = "statsd"
 	collectorDatadog  = "datadog"
+	collectorCSV      = "csv"
 )
 
 func parseCollector(s string) (t, arg string) {
@@ -115,6 +117,19 @@ func newCollector(
 				return nil, err
 			}
 			return datadog.New(config)
+		case collectorCSV:
+			config := csv.NewConfig().Apply(conf.Collectors.CSV)
+			if err := envconfig.Process("k6", &config); err != nil {
+				return nil, err
+			}
+			if arg != "" {
+				cmdConfig, err := csv.ParseArg(arg)
+				if err != nil {
+					return nil, err
+				}
+				config = config.Apply(cmdConfig)
+			}
+			return csv.New(afero.NewOsFs(), conf.SystemTags, config)
 		default:
 			return nil, errors.Errorf("unknown output type: %s", collectorName)
 		}

@@ -44,6 +44,7 @@ import (
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/testutils"
+	"github.com/loadimpact/k6/lib/testutils/httpmultibin"
 	"github.com/loadimpact/k6/stats"
 	"github.com/mccutchen/go-httpbin/httpbin"
 	"github.com/oxtoacart/bpool"
@@ -105,8 +106,8 @@ func assertRequestMetricsEmitted(t *testing.T, sampleContainers []stats.SampleCo
 
 func newRuntime(
 	t testing.TB,
-) (*testutils.HTTPMultiBin, *lib.State, chan stats.SampleContainer, *goja.Runtime, *context.Context) {
-	tb := testutils.NewHTTPMultiBin(t)
+) (*httpmultibin.HTTPMultiBin, *lib.State, chan stats.SampleContainer, *goja.Runtime, *context.Context) {
+	tb := httpmultibin.NewHTTPMultiBin(t)
 
 	root, err := lib.NewGroup("", nil)
 	require.NoError(t, err)
@@ -153,7 +154,7 @@ func TestRequestAndBatch(t *testing.T) {
 	defer tb.Cleanup()
 	sr := tb.Replacer.Replace
 
-	// Handple paths with custom logic
+	// Handle paths with custom logic
 	tb.Mux.HandleFunc("/digest-auth/failure", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(2 * time.Second)
 	}))
@@ -349,6 +350,15 @@ func TestRequestAndBatch(t *testing.T) {
 				let res = http.get("HTTPSBIN_IP_URL/brotli");
 				if (res.json()['compression'] != 'br') {
 					throw new Error("unexpected body data: " + res.json()['compression'])
+				}
+			`))
+			assert.NoError(t, err)
+		})
+		t.Run("zstd-br", func(t *testing.T) {
+			_, err := common.RunString(rt, sr(`
+				let res = http.get("HTTPSBIN_IP_URL/zstd-br");
+				if (res.json()['compression'] != 'zstd, br') {
+					throw new Error("unexpected compression: " + res.json()['compression'])
 				}
 			`))
 			assert.NoError(t, err)

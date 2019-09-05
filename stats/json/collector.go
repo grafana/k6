@@ -21,10 +21,13 @@
 package json
 
 import (
+	"compress/gzip"
 	"context"
 	"encoding/json"
-	"io"
 	"os"
+	"strings"
+	"sync"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
@@ -34,20 +37,18 @@ import (
 )
 
 type Collector struct {
-	outfile     io.WriteCloser
+	closeFn     func() error
 	fname       string
 	seenMetrics []string
+
+	encoder *json.Encoder
+
+	buffer     []stats.Sample
+	bufferLock sync.Mutex
 }
 
 // Verify that Collector implements lib.Collector
 var _ lib.Collector = &Collector{}
-
-// Similar to ioutil.NopCloser, but for writers
-type nopCloser struct {
-	io.Writer
-}
-
-func (nopCloser) Close() error { return nil }
 
 func (c *Collector) HasSeenMetric(str string) bool {
 	for _, n := range c.seenMetrics {
@@ -59,21 +60,35 @@ func (c *Collector) HasSeenMetric(str string) bool {
 }
 
 func New(fs afero.Fs, fname string) (*Collector, error) {
-	if fname == "" || fname == "-" {
-		return &Collector{
-			outfile: nopCloser{os.Stdout},
-			fname:   "-",
-		}, nil
+	var c = &Collector{
+		fname: fname,
 	}
-
-	logfile, err := fs.Create(fname)
+	if fname == "" || fname == "-" {
+		c.encoder = json.NewEncoder(os.Stdout)
+		c.closeFn = func() error {
+			return nil
+		}
+		return c, nil
+	}
+	logfile, err := fs.Create(c.fname)
 	if err != nil {
 		return nil, err
 	}
-	return &Collector{
-		outfile: logfile,
-		fname:   fname,
-	}, nil
+
+	if strings.HasSuffix(c.fname, ".gz") {
+		var outfile = gzip.NewWriter(logfile)
+
+		c.closeFn = func() error {
+			_ = outfile.Close()
+			return logfile.Close()
+		}
+		c.encoder = json.NewEncoder(outfile)
+	} else {
+		c.closeFn = logfile.Close
+		c.encoder = json.NewEncoder(logfile)
+	}
+
+	return c, nil
 }
 
 func (c *Collector) Init() error {
@@ -83,9 +98,20 @@ func (c *Collector) Init() error {
 func (c *Collector) SetRunStatus(status lib.RunStatus) {}
 
 func (c *Collector) Run(ctx context.Context) {
-	logrus.WithField("filename", c.fname).Debug("JSON: Writing JSON metrics")
-	<-ctx.Done()
-	_ = c.outfile.Close()
+	logrus.Debug("JSON output: Running!")
+	ticker := time.NewTicker(time.Millisecond * 100)
+	defer func() {
+		_ = c.closeFn()
+	}()
+	for {
+		select {
+		case <-ticker.C:
+			c.commit()
+		case <-ctx.Done():
+			c.commit()
+			return
+		}
+	}
 }
 
 func (c *Collector) HandleMetric(m *stats.Metric) {
@@ -94,44 +120,48 @@ func (c *Collector) HandleMetric(m *stats.Metric) {
 	}
 
 	c.seenMetrics = append(c.seenMetrics, m.Name)
-	env := WrapMetric(m)
-	row, err := json.Marshal(env)
+	err := c.encoder.Encode(WrapMetric(m))
 
-	if env == nil || err != nil {
-		logrus.WithField("filename", c.fname).Warning(
+	if err != nil {
+		logrus.WithField("filename", c.fname).WithError(err).Warning(
 			"JSON: Envelope is nil or Metric couldn't be marshalled to JSON")
 		return
-	}
-
-	row = append(row, '\n')
-	_, err = c.outfile.Write(row)
-	if err != nil {
-		logrus.WithField("filename", c.fname).Error("JSON: Error writing to file")
 	}
 }
 
 func (c *Collector) Collect(scs []stats.SampleContainer) {
+	c.bufferLock.Lock()
+	defer c.bufferLock.Unlock()
 	for _, sc := range scs {
+		c.buffer = append(c.buffer, sc.GetSamples()...)
+	}
+}
+
+func (c *Collector) commit() {
+	c.bufferLock.Lock()
+	samples := c.buffer
+	c.buffer = nil
+	c.bufferLock.Unlock()
+	logrus.WithField("filename", c.fname).Debug("JSON: Writing JSON metrics")
+	var start = time.Now()
+	var count int
+	for _, sc := range samples {
+		var samples = sc.GetSamples()
+		count += len(samples)
 		for _, sample := range sc.GetSamples() {
+			sample := sample
 			c.HandleMetric(sample.Metric)
-
-			env := WrapSample(&sample)
-			row, err := json.Marshal(env)
-
-			if err != nil || env == nil {
-				// Skip metric if it can't be made into JSON or envelope is null.
-				logrus.WithField("filename", c.fname).Warning(
-					"JSON: Envelope is nil or Sample couldn't be marshalled to JSON")
-				continue
-			}
-			row = append(row, '\n')
-			_, err = c.outfile.Write(row)
+			err := c.encoder.Encode(WrapSample(&sample))
 			if err != nil {
-				logrus.WithField("filename", c.fname).Error("JSON: Error writing to file")
+				// Skip metric if it can't be made into JSON or envelope is null.
+				logrus.WithField("filename", c.fname).WithError(err).Warning(
+					"JSON: Sample couldn't be marshalled to JSON")
 				continue
 			}
 		}
 	}
+	logrus.WithField("filename", c.fname).WithField("t", time.Since(start)).
+		WithField("count", count).Debug("JSON: Wrote JSON metrics")
 }
 
 func (c *Collector) Link() string {

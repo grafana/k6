@@ -80,6 +80,11 @@ const jsonData = `{"glossary": {
 	  "GlossSeeAlso": ["GML","XML"]},
 	"GlossSee": "markup"}}}}}`
 
+const invalidJSONData = `{			
+	"a":"apple",
+	"t":testing"
+}`
+
 func myFormHandler(w http.ResponseWriter, r *http.Request) {
 	var body []byte
 	var err error
@@ -110,6 +115,14 @@ func jsonHandler(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(body)
 }
 
+func invalidJSONHandler(w http.ResponseWriter, r *http.Request) {
+	body := []byte(invalidJSONData)
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(body)))
+	w.WriteHeader(200)
+	_, _ = w.Write(body)
+}
+
 func TestResponse(t *testing.T) {
 	tb, state, samples, rt, _ := newRuntime(t)
 	defer tb.Cleanup()
@@ -118,6 +131,7 @@ func TestResponse(t *testing.T) {
 
 	tb.Mux.HandleFunc("/myforms/get", myFormHandler)
 	tb.Mux.HandleFunc("/json", jsonHandler)
+	tb.Mux.HandleFunc("/invalidjson", invalidJSONHandler)
 
 	t.Run("Html", func(t *testing.T) {
 		_, err := common.RunString(rt, sr(`
@@ -178,7 +192,14 @@ func TestResponse(t *testing.T) {
 
 		t.Run("Invalid", func(t *testing.T) {
 			_, err := common.RunString(rt, sr(`http.request("GET", "HTTPBIN_URL/html").json();`))
-			assert.EqualError(t, err, "GoError: invalid character '<' looking for beginning of value")
+			//nolint:lll
+			assert.EqualError(t, err, "GoError: cannot parse json due to an error at line 1, character 2 , error: invalid character '<' looking for beginning of value")
+		})
+
+		t.Run("Invalid", func(t *testing.T) {
+			_, err := common.RunString(rt, sr(`http.request("GET", "HTTPBIN_URL/invalidjson").json();`))
+			//nolint:lll
+			assert.EqualError(t, err, "GoError: cannot parse json due to an error at line 3, character 9 , error: invalid character 'e' in literal true (expecting 'r')")
 		})
 	})
 	t.Run("JsonSelector", func(t *testing.T) {

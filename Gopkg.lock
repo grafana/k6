@@ -256,16 +256,16 @@
   version = "v1.0"
 
 [[projects]]
-  digest = "1:32b1db7dd0c6cee1e65ab3841b7f8d8a9f0a6d97f85229137efee95a0dfcfddd"
-  name = "github.com/influxdata/influxdb"
+  branch = "master"
+  digest = "1:50708c8fc92aec981df5c446581cf9f90ba9e2a5692118e0ce75d4534aaa14a2"
+  name = "github.com/influxdata/influxdb1-client"
   packages = [
-    "client/v2",
     "models",
     "pkg/escape",
+    "v2",
   ]
   pruneopts = "NUT"
-  revision = "6ac835404e7e64ea7299a6eebcce1ab1ef15fe3c"
-  version = "v1.5.0"
+  revision = "8ff2fc3824fcb533795f9a2f233275f0bb18d6c5"
 
 [[projects]]
   branch = "master"
@@ -697,7 +697,7 @@
     "github.com/dustin/go-humanize",
     "github.com/fatih/color",
     "github.com/gorilla/websocket",
-    "github.com/influxdata/influxdb/client/v2",
+    "github.com/influxdata/influxdb1-client/v2",
     "github.com/julienschmidt/httprouter",
     "github.com/kelseyhightower/envconfig",
     "github.com/klauspost/compress/zstd",
