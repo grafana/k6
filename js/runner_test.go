@@ -1165,7 +1165,8 @@ func TestVUIntegrationClientCerts(t *testing.T) {
 				vu, err := r.NewVU(make(chan stats.SampleContainer, 100))
 				if assert.NoError(t, err) {
 					err := vu.RunOnce(context.Background())
-					assert.EqualError(t, err, fmt.Sprintf("GoError: Get https://%s: remote error: tls: bad certificate", listener.Addr().String()))
+					require.NotNil(t, err)
+					assert.Contains(t, err.Error(), "remote error: tls: bad certificate")
 				}
 			})
 		}
