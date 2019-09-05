@@ -87,7 +87,7 @@ func Accept4(fd, flags int) (nfd int, sa Sockaddr, err error) {
 	if len > SizeofSockaddrAny {
 		panic("RawSockaddrAny too small")
 	}
-	sa, err = anyToSockaddr(&rsa)
+	sa, err = anyToSockaddr(fd, &rsa)
 	if err != nil {
 		Close(nfd)
 		nfd = 0
@@ -143,11 +143,11 @@ func IoctlSetInt(fd int, req uint, value int) error {
 	return ioctl(fd, req, uintptr(value))
 }
 
-func IoctlSetWinsize(fd int, req uint, value *Winsize) error {
+func ioctlSetWinsize(fd int, req uint, value *Winsize) error {
 	return ioctl(fd, req, uintptr(unsafe.Pointer(value)))
 }
 
-func IoctlSetTermios(fd int, req uint, value *Termios) error {
+func ioctlSetTermios(fd int, req uint, value *Termios) error {
 	return ioctl(fd, req, uintptr(unsafe.Pointer(value)))
 }
 
@@ -251,10 +251,12 @@ func Uname(uname *Utsname) error {
 //sys	Fchdir(fd int) (err error)
 //sys	Fchflags(fd int, flags int) (err error)
 //sys	Fchmod(fd int, mode uint32) (err error)
+//sys	Fchmodat(dirfd int, path string, mode uint32, flags int) (err error)
 //sys	Fchown(fd int, uid int, gid int) (err error)
 //sys	Flock(fd int, how int) (err error)
 //sys	Fpathconf(fd int, name int) (val int, err error)
 //sys	Fstat(fd int, stat *Stat_t) (err error)
+//sys	Fstatat(fd int, path string, stat *Stat_t, flags int) (err error)
 //sys	Fstatfs(fd int, stat *Statfs_t) (err error)
 //sys	Fsync(fd int) (err error)
 //sys	Ftruncate(fd int, length int64) (err error)
