@@ -26,6 +26,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"net/http"
 	"reflect"
 	"strings"
 
@@ -337,6 +338,9 @@ type Options struct {
 
 	// Redirect console logging to a file
 	ConsoleOutput null.String `json:"-" envconfig:"console_output"`
+
+	// Proxy CONNECT headers
+	ProxyHeaders http.Header `json:"proxyHeaders" envconfig:"proxy_headers"`
 }
 
 // Returns the result of overwriting any fields with any that are set on the argument.
@@ -479,6 +483,10 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.ConsoleOutput.Valid {
 		o.ConsoleOutput = opts.ConsoleOutput
+	}
+
+	if opts.ProxyHeaders != nil {
+		o.ProxyHeaders = opts.ProxyHeaders
 	}
 
 	return o

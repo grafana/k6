@@ -170,6 +170,7 @@ func (r *Runner) newVU(samplesOut chan<- stats.SampleContainer) (*VU, error) {
 		DisableKeepAlives:   r.Bundle.Options.NoConnectionReuse.Bool,
 		MaxIdleConns:        int(r.Bundle.Options.Batch.Int64),
 		MaxIdleConnsPerHost: int(r.Bundle.Options.BatchPerHost.Int64),
+		ProxyConnectHeader:  r.Bundle.Options.ProxyHeaders,
 	}
 	_ = http2.ConfigureTransport(transport)
 
