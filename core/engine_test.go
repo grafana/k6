@@ -618,10 +618,10 @@ func TestSentReceivedMetrics(t *testing.T) {
 			reuseSent, reuseReceived := runTest(t, ts, tc, false)
 
 			if noReuseSent < reuseSent {
-				t.Errorf("noReuseSent=%f is greater than reuseSent=%f", noReuseSent, reuseSent)
+				t.Errorf("reuseSent=%f is greater than noReuseSent=%f", reuseSent, noReuseSent)
 			}
 			if noReuseReceived < reuseReceived {
-				t.Errorf("noReuseReceived=%f is greater than reuseReceived=%f", noReuseReceived, reuseReceived)
+				t.Errorf("reuseReceived=%f is greater than noReuseReceived=%f", reuseReceived, noReuseReceived)
 			}
 		}
 	}
