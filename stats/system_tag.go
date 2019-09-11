@@ -1,4 +1,4 @@
-package tagset
+package stats
 
 import (
 	"bytes"
@@ -6,15 +6,15 @@ import (
 	"strings"
 )
 
-// TagSet is a bitmask that is used to keep track
+// SystemTagSet is a bitmask that is used to keep track
 // which system tags should be included with which metrics.
-//go:generate enumer -type=TagSet -transform=snake -output tagset_gen.go
-type TagSet uint32
+//go:generate enumer -type=SystemTagSet -transform=snake -output system_tag_set_gen.go
+type SystemTagSet uint32
 
 //nolint: golint
 const (
 	// Default system tags includes all of the system tags emitted with metrics by default.
-	Proto TagSet = 1 << iota
+	Proto SystemTagSet = 1 << iota
 	SubProto
 	Status
 	Method
@@ -34,30 +34,30 @@ const (
 )
 
 // Add adds a tag to tag set.
-func (ts *TagSet) Add(tag TagSet) {
+func (ts *SystemTagSet) Add(tag SystemTagSet) {
 	*ts |= tag
 }
 
 // Has checks a tag included in tag set.
-func (ts *TagSet) Has(tag TagSet) bool {
+func (ts *SystemTagSet) Has(tag SystemTagSet) bool {
 	return *ts&tag != 0
 }
 
-// FromList converts list of tags to TagSet
-func FromList(tags []string) *TagSet {
-	ts := TagSet(0)
+// ToSystemTagSet converts list of tags to SystemTagSet
+func ToSystemTagSet(tags []string) *SystemTagSet {
+	ts := SystemTagSet(0)
 	for _, tag := range tags {
-		if v, err := TagSetString(tag); err == nil {
+		if v, err := SystemTagSetString(tag); err == nil {
 			ts.Add(v)
 		}
 	}
 	return &ts
 }
 
-// MarshalJSON converts the TagSet to a list (JS array).
-func (ts *TagSet) MarshalJSON() ([]byte, error) {
+// MarshalJSON converts the SystemTagSet to a list (JS array).
+func (ts *SystemTagSet) MarshalJSON() ([]byte, error) {
 	var tags []string
-	for _, tag := range TagSetValues() {
+	for _, tag := range SystemTagSetValues() {
 		if ts.Has(tag) {
 			tags = append(tags, tag.String())
 		}
@@ -66,19 +66,19 @@ func (ts *TagSet) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON converts the tag list back to expected tag set.
-func (ts *TagSet) UnmarshalJSON(data []byte) error {
+func (ts *SystemTagSet) UnmarshalJSON(data []byte) error {
 	var tags []string
 	if err := json.Unmarshal(data, &tags); err != nil {
 		return err
 	}
 	if len(tags) != 0 {
-		*ts = *FromList(tags)
+		*ts = *ToSystemTagSet(tags)
 	}
 	return nil
 }
 
-// UnmarshalText converts the tag list to TagSet.
-func (ts *TagSet) UnmarshalText(data []byte) error {
+// UnmarshalText converts the tag list to SystemTagSet.
+func (ts *SystemTagSet) UnmarshalText(data []byte) error {
 	var list = bytes.Split(data, []byte(","))
 
 	for _, key := range list {
@@ -86,7 +86,7 @@ func (ts *TagSet) UnmarshalText(data []byte) error {
 		if key == "" {
 			continue
 		}
-		if v, err := TagSetString(key); err == nil {
+		if v, err := SystemTagSetString(key); err == nil {
 			ts.Add(v)
 		}
 	}
