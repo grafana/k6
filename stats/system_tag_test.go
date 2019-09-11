@@ -1,4 +1,4 @@
-package tagset
+package stats
 
 import (
 	"encoding/json"
@@ -8,9 +8,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestTagSetMarshalJSON(t *testing.T) {
+func TestSystemTagSetMarshalJSON(t *testing.T) {
 	var tests = []struct {
-		tagset   TagSet
+		tagset   SystemTagSet
 		expected string
 	}{
 		{IP, `["ip"]`},
@@ -26,17 +26,17 @@ func TestTagSetMarshalJSON(t *testing.T) {
 
 }
 
-func TestTagSet_UnmarshalJSON(t *testing.T) {
+func TestSystemTagSet_UnmarshalJSON(t *testing.T) {
 	var tests = []struct {
 		tags []byte
-		sets []TagSet
+		sets []SystemTagSet
 	}{
-		{[]byte(`[]`), []TagSet{}},
-		{[]byte(`["ip", "proto"]`), []TagSet{IP, Proto}},
+		{[]byte(`[]`), []SystemTagSet{}},
+		{[]byte(`["ip", "proto"]`), []SystemTagSet{IP, Proto}},
 	}
 
 	for _, tc := range tests {
-		ts := new(TagSet)
+		ts := new(SystemTagSet)
 		require.Nil(t, json.Unmarshal(tc.tags, ts))
 		for _, tag := range tc.sets {
 			assert.True(t, ts.Has(tag))
@@ -45,8 +45,8 @@ func TestTagSet_UnmarshalJSON(t *testing.T) {
 
 }
 
-func TestTagSetTextUnmarshal(t *testing.T) {
-	var testMatrix = map[string]TagSet{
+func TestSystemTagSetTextUnmarshal(t *testing.T) {
+	var testMatrix = map[string]SystemTagSet{
 		"":                      0,
 		"ip":                    IP,
 		"ip,proto":              IP | Proto,
@@ -56,7 +56,7 @@ func TestTagSetTextUnmarshal(t *testing.T) {
 	}
 
 	for input, expected := range testMatrix {
-		var set = new(TagSet)
+		var set = new(SystemTagSet)
 		err := set.UnmarshalText([]byte(input))
 		require.NoError(t, err)
 		require.Equal(t, expected, *set)
