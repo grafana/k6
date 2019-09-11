@@ -12,6 +12,7 @@ environment:
   GOPATH: c:\gopath
   GOVERSION: 1.13
   GOMAXPROCS: 2
+  GO111MODULE: on
   CGO_ENABLED: '0'
   GOARCH: amd64
   BINTRAY_KEY:
