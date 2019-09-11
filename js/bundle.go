@@ -27,6 +27,7 @@ import (
 	"runtime"
 
 	"github.com/loadimpact/k6/lib/consts"
+	"gopkg.in/guregu/null.v3"
 
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
@@ -217,6 +218,18 @@ func (b *Bundle) Instantiate() (bi *BundleInstance, instErr error) {
 		jsOptionsObj = jsOptions.ToObject(rt)
 	}
 	b.Options.ForEachSpecified("json", func(key string, val interface{}) {
+		switch v := val.(type) {
+		case null.Bool:
+			val = v.ValueOrZero()
+		case null.Float:
+			val = v.ValueOrZero()
+		case null.Int:
+			val = v.ValueOrZero()
+		case null.String:
+			val = v.ValueOrZero()
+		case null.Time:
+			val = v.ValueOrZero()
+		}
 		if err := jsOptionsObj.Set(key, val); err != nil {
 			instErr = err
 		}

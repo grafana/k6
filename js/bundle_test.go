@@ -588,6 +588,9 @@ func TestOpen(t *testing.T) {
 
 func TestBundleInstantiate(t *testing.T) {
 	b, err := getSimpleBundle("/script.js", `
+		export let options = {
+			vus: 5,
+		};
 		let val = true;
 		export default function() { return val; }
 	`)
@@ -613,6 +616,13 @@ func TestBundleInstantiate(t *testing.T) {
 		if assert.NoError(t, err) {
 			assert.Equal(t, false, v.Export())
 		}
+	})
+
+	t.Run("Options", func(t *testing.T) {
+		// Ensure `options` properties are correctly marshalled
+		jsOptions := bi.Runtime.Get("options").ToObject(bi.Runtime)
+		val := jsOptions.Get("vus").Export()
+		assert.Equal(t, int64(5), val)
 	})
 }
 
