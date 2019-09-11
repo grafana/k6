@@ -1,30 +1,11 @@
 version: 2
 jobs:
-  deps:
-    docker:
-      - image: circleci/golang:1.13
-    environment:
-      GOPATH: /home/circleci/.go_workspace
-    working_directory: /home/circleci/.go_workspace/src/github.com/loadimpact/k6
-    steps:
-      - checkout
-      - run:
-          name: Check dependencies
-          command: |
-            go version
-            export PATH="$GOPATH/bin:$PATH"
-            mkdir -p "$GOPATH/bin"
-            curl --fail https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
-            dep version
-            dep status
-            dep ensure -update -dry-run
-
-
   test:
     docker:
       - image: circleci/golang:1.13
     environment:
       GOPATH: /home/circleci/.go_workspace
+      GO111MODULE: on
     working_directory: /home/circleci/.go_workspace/src/github.com/loadimpact/k6
     steps:
       - checkout
@@ -48,6 +29,7 @@ jobs:
       - image: circleci/golang:1.12
     environment:
       GOPATH: /home/circleci/.go_workspace
+      GO111MODULE: on
     working_directory: /home/circleci/.go_workspace/src/github.com/loadimpact/k6
     steps:
       - checkout
