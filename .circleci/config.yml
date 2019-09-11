@@ -16,8 +16,8 @@ jobs:
             export PATH=$GOPATH/bin:$PATH
             export GO111MODULE=on
             echo "mode: set" > coverage.txt
-            go test -race -timeout 800s ./...
-            # bash <(curl --fail -s https://codecov.io/bash)
+            go test -timeout 800s -coverpkg="github.com/loadimpact/k6/..." -coverprofile="coverage.txt" ./...
+            bash <(curl --fail -s https://codecov.io/bash)
 
 
   test-prev-golang:
