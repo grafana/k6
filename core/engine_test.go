@@ -540,7 +540,7 @@ func TestSentReceivedMetrics(t *testing.T) {
 		{tr(`import ws from "k6/ws";
 			let data = "0123456789".repeat(100);
 			export default function() {
-				ws.connect("ws://HTTPBIN_IP:HTTPBIN_PORT/ws-echo", null, function (socket) {
+				ws.connect("WSBIN_URL/ws-echo", null, function (socket) {
 					socket.on('open', function open() {
 						socket.send(data);
 					});
@@ -618,10 +618,10 @@ func TestSentReceivedMetrics(t *testing.T) {
 			reuseSent, reuseReceived := runTest(t, ts, tc, false)
 
 			if noReuseSent < reuseSent {
-				t.Errorf("noReuseSent=%f is greater than reuseSent=%f", noReuseSent, reuseSent)
+				t.Errorf("reuseSent=%f is greater than noReuseSent=%f", reuseSent, noReuseSent)
 			}
 			if noReuseReceived < reuseReceived {
-				t.Errorf("noReuseReceived=%f is greater than reuseReceived=%f", noReuseReceived, reuseReceived)
+				t.Errorf("reuseReceived=%f is greater than noReuseReceived=%f", reuseReceived, noReuseReceived)
 			}
 		}
 	}
@@ -667,7 +667,7 @@ func TestRunTags(t *testing.T) {
 			})
 
 			group("websockets", function() {
-				var response = ws.connect("wss://HTTPSBIN_IP:HTTPSBIN_PORT/ws-echo", params, function (socket) {
+				var response = ws.connect("WSBIN_URL/ws-echo", params, function (socket) {
 					socket.on('open', function open() {
 						console.log('ws open and say hello');
 						socket.send("hello");
