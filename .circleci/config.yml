@@ -132,10 +132,6 @@ workflows:
   version: 2
   test_and_build:
     jobs:
-      - deps:
-          filters:
-            tags:
-              only: /.*/
       - test:
           filters:
             tags:
@@ -146,14 +142,12 @@ workflows:
               only: /.*/
       - build-docker-images:
           requires:
-            - deps
             - test
           filters:
             tags:
               only: /.*/
       - build-linux-packages:
           requires:
-            - deps
             - test
           filters:
             branches:
