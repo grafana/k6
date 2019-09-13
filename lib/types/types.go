@@ -30,6 +30,8 @@ import (
 	null "gopkg.in/guregu/null.v3"
 )
 
+// NullDecoder converts data with expected type f to a guregu/null value
+// of equivalent type t. It returns an error if a type mismatch occurs.
 func NullDecoder(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
 	typeFrom := f.String()
 	typeTo := t.String()
@@ -88,6 +90,7 @@ func (d Duration) String() string {
 	return time.Duration(d).String()
 }
 
+// UnmarshalText converts text data to Duration
 func (d *Duration) UnmarshalText(data []byte) error {
 	v, err := time.ParseDuration(string(data))
 	if err != nil {
@@ -97,6 +100,7 @@ func (d *Duration) UnmarshalText(data []byte) error {
 	return nil
 }
 
+// UnmarshalJSON converts JSON data to Duration
 func (d *Duration) UnmarshalJSON(data []byte) error {
 	if len(data) > 0 && data[0] == '"' {
 		var str string
@@ -121,6 +125,7 @@ func (d *Duration) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// MarshalJSON returns the JSON representation of d
 func (d Duration) MarshalJSON() ([]byte, error) {
 	return json.Marshal(d.String())
 }
@@ -137,11 +142,12 @@ func NewNullDuration(d time.Duration, valid bool) NullDuration {
 	return NullDuration{Duration(d), valid}
 }
 
-// Creates a valid NullDuration from a time.Duration.
+// NullDurationFrom returns a new valid NullDuration from a time.Duration.
 func NullDurationFrom(d time.Duration) NullDuration {
 	return NullDuration{Duration(d), true}
 }
 
+// UnmarshalText converts text data to a valid NullDuration
 func (d *NullDuration) UnmarshalText(data []byte) error {
 	if len(data) == 0 {
 		*d = NullDuration{}
@@ -154,6 +160,7 @@ func (d *NullDuration) UnmarshalText(data []byte) error {
 	return nil
 }
 
+// UnmarshalJSON converts JSON data to a valid NullDuration
 func (d *NullDuration) UnmarshalJSON(data []byte) error {
 	if bytes.Equal(data, []byte(`null`)) {
 		d.Valid = false
@@ -166,6 +173,7 @@ func (d *NullDuration) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// MarshalJSON returns the JSON representation of d
 func (d NullDuration) MarshalJSON() ([]byte, error) {
 	if !d.Valid {
 		return []byte(`null`), nil
