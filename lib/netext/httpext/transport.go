@@ -67,8 +67,10 @@ type finishedRequest struct {
 
 var _ http.RoundTripper = &transport{}
 
-// NewTransport returns a new Transport wrapping around the provide Roundtripper and will send
-// samples on the provided channel adding the tags in accordance to the Options provided
+// newTransport returns a new http.RoundTripper implementation that wraps around
+// the provided state's Transport. It uses a httpext.Tracer to measure all HTTP
+// requests made through it and annotates and emits the recorded metric samples
+// through the state.Samples channel.
 func newTransport(
 	state *lib.State,
 	tags map[string]string,
