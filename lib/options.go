@@ -500,11 +500,20 @@ func (o Options) ForEachSpecified(structTag string, callback func(key string, va
 	for i := 0; i < structType.NumField(); i++ {
 		fieldType := structType.Field(i)
 		fieldVal := structVal.Field(i)
+		value := fieldVal.Interface()
 
 		shouldCall := false
 		switch fieldType.Type.Kind() {
 		case reflect.Struct:
+			// Unpack any guregu/null values
 			shouldCall = fieldVal.FieldByName("Valid").Bool()
+			valOrZero := fieldVal.MethodByName("ValueOrZero")
+			if shouldCall && valOrZero.IsValid() {
+				value = valOrZero.Call([]reflect.Value{})[0].Interface()
+				if v, ok := value.(types.Duration); ok {
+					value = v.String()
+				}
+			}
 		case reflect.Slice:
 			shouldCall = fieldVal.Len() > 0
 		case reflect.Map:
@@ -521,7 +530,7 @@ func (o Options) ForEachSpecified(structTag string, callback func(key string, va
 				key = fieldType.Name
 			}
 
-			callback(key, fieldVal.Interface())
+			callback(key, value)
 		}
 	}
 }
