@@ -17,6 +17,7 @@ type SystemTagMap map[string]bool
 
 // DefaultSystemTagList includes all of the system tags emitted with metrics by default.
 // Other tags that are not enabled by default include: iter, vu, ocsp_status, ip
+//nolint:gochecknoglobals
 var DefaultSystemTagList = []string{
 	TagProto.String(),
 	TagSubProto.String(),

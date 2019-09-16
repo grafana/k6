@@ -62,7 +62,7 @@ type nopCloser struct {
 func (nopCloser) Close() error { return nil }
 
 // New Creates new instance of CSV collector
-func New(fs afero.Fs, tags lib.TagSet, config Config) (*Collector, error) {
+func New(fs afero.Fs, tags stats.SystemTagMap, config Config) (*Collector, error) {
 	resTags := []string{}
 	ignoredTags := []string{}
 	for tag, flag := range tags {
@@ -232,6 +232,6 @@ func IsStringInSlice(slice []string, str string) bool {
 }
 
 // GetRequiredSystemTags returns which sample tags are needed by this collector
-func (c *Collector) GetRequiredSystemTags() lib.TagSet {
-	return lib.TagSet{} // There are no required tags for this collector
+func (c *Collector) GetRequiredSystemTags() stats.SystemTagSet {
+	return stats.SystemTagSet(0) // There are no required tags for this collector
 }

@@ -33,7 +33,6 @@ import (
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 
-	"github.com/loadimpact/k6/lib"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 )
@@ -208,7 +207,7 @@ func TestCollect(t *testing.T) {
 	mem := afero.NewMemMapFs()
 	collector, err := New(
 		mem,
-		lib.TagSet{"tag1": true, "tag2": false, "tag3": true},
+		stats.SystemTagMap{"tag1": true, "tag2": false, "tag3": true},
 		Config{FileName: null.StringFrom("name"), SaveInterval: types.NewNullDuration(time.Duration(1), true)},
 	)
 	assert.NoError(t, err)
@@ -222,7 +221,7 @@ func TestCollect(t *testing.T) {
 func TestRun(t *testing.T) {
 	collector, err := New(
 		afero.NewMemMapFs(),
-		lib.TagSet{"tag1": true, "tag2": false, "tag3": true},
+		stats.SystemTagMap{"tag1": true, "tag2": false, "tag3": true},
 		Config{FileName: null.StringFrom("name"), SaveInterval: types.NewNullDuration(time.Duration(1), true)},
 	)
 	assert.NoError(t, err)
@@ -269,7 +268,7 @@ func TestRunCollect(t *testing.T) {
 	mem := afero.NewMemMapFs()
 	collector, err := New(
 		mem,
-		lib.TagSet{"tag1": true, "tag2": false, "tag3": true},
+		stats.SystemTagMap{"tag1": true, "tag2": false, "tag3": true},
 		Config{FileName: null.StringFrom("path"), SaveInterval: types.NewNullDuration(time.Duration(1), true)},
 	)
 	assert.NoError(t, err)
@@ -300,11 +299,11 @@ func TestRunCollect(t *testing.T) {
 func TestNew(t *testing.T) {
 	configs := []struct {
 		cfg  Config
-		tags lib.TagSet
+		tags stats.SystemTagMap
 	}{
 		{
 			cfg: Config{FileName: null.StringFrom("name"), SaveInterval: types.NewNullDuration(time.Duration(1), true)},
-			tags: lib.TagSet{
+			tags: stats.SystemTagMap{
 				"tag1": true,
 				"tag2": false,
 				"tag3": true,
@@ -312,13 +311,13 @@ func TestNew(t *testing.T) {
 		},
 		{
 			cfg: Config{FileName: null.StringFrom("-"), SaveInterval: types.NewNullDuration(time.Duration(1), true)},
-			tags: lib.TagSet{
+			tags: stats.SystemTagMap{
 				"tag1": true,
 			},
 		},
 		{
 			cfg: Config{FileName: null.StringFrom(""), SaveInterval: types.NewNullDuration(time.Duration(1), true)},
-			tags: lib.TagSet{
+			tags: stats.SystemTagMap{
 				"tag1": false,
 				"tag2": false,
 			},
@@ -374,18 +373,18 @@ func TestNew(t *testing.T) {
 func TestGetRequiredSystemTags(t *testing.T) {
 	collector, err := New(
 		afero.NewMemMapFs(),
-		lib.TagSet{"tag1": true, "tag2": false, "tag3": true},
+		stats.SystemTagMap{"tag1": true, "tag2": false, "tag3": true},
 		Config{FileName: null.StringFrom("name"), SaveInterval: types.NewNullDuration(time.Duration(1), true)},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, collector)
-	assert.Equal(t, lib.TagSet{}, collector.GetRequiredSystemTags())
+	assert.Equal(t, stats.SystemTagSet(0), collector.GetRequiredSystemTags())
 }
 
 func TestLink(t *testing.T) {
 	collector, err := New(
 		afero.NewMemMapFs(),
-		lib.TagSet{"tag1": true, "tag2": false, "tag3": true},
+		stats.SystemTagMap{"tag1": true, "tag2": false, "tag3": true},
 		Config{FileName: null.StringFrom("path"), SaveInterval: types.NewNullDuration(time.Duration(1), true)},
 	)
 	assert.NoError(t, err)
