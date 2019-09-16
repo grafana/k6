@@ -8,29 +8,46 @@ import (
 
 // SystemTagSet is a bitmask that is used to keep track
 // which system tags should be included with which metrics.
-//go:generate enumer -type=SystemTagSet -transform=snake -output system_tag_set_gen.go
+//go:generate enumer -type=SystemTagSet -transform=snake -trimprefix=Tag -output system_tag_set_gen.go
 type SystemTagSet uint32
+
+// DefaultSystemTagList includes all of the system tags emitted with metrics by default.
+// Other tags that are not enabled by default include: iter, vu, ocsp_status, ip
+var DefaultSystemTagList = []string{
+	TagProto.String(),
+	TagSubProto.String(),
+	TagStatus.String(),
+	TagMethod.String(),
+	TagURL.String(),
+	TagName.String(),
+	TagGroup.String(),
+	TagCheck.String(),
+	TagCheck.String(),
+	TagError.String(),
+	TagErrorCode.String(),
+	TagTLSVersion.String(),
+}
 
 //nolint: golint
 const (
 	// Default system tags includes all of the system tags emitted with metrics by default.
-	Proto SystemTagSet = 1 << iota
-	SubProto
-	Status
-	Method
-	URL
-	Name
-	Group
-	Check
-	Error
-	ErrorCode
-	TLSVersion
+	TagProto SystemTagSet = 1 << iota
+	TagSubProto
+	TagStatus
+	TagMethod
+	TagURL
+	TagName
+	TagGroup
+	TagCheck
+	TagError
+	TagErrorCode
+	TagTLSVersion
 
 	// System tags not enabled by default.
-	Iter
-	VU
-	OCSPStatus
-	IP
+	TagIter
+	TagVU
+	TagOCSPStatus
+	TagIP
 )
 
 // Add adds a tag to tag set.
@@ -74,6 +91,7 @@ func (ts *SystemTagSet) UnmarshalJSON(data []byte) error {
 	if len(tags) != 0 {
 		*ts = *ToSystemTagSet(tags)
 	}
+
 	return nil
 }
 
