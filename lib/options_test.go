@@ -357,32 +357,32 @@ func TestOptions(t *testing.T) {
 		assert.Equal(t, Options{}, opts)
 	})
 	t.Run("SystemTags", func(t *testing.T) {
-		opts := Options{}.Apply(Options{SystemTags: GetTagSet("tag")})
+		opts := Options{}.Apply(Options{SystemTags: stats.ToSystemTagSet([]string{stats.TagProto.String()})})
 		assert.NotNil(t, opts.SystemTags)
 		assert.NotEmpty(t, opts.SystemTags)
-		assert.True(t, opts.SystemTags["tag"])
+		assert.True(t, opts.SystemTags.Has(stats.TagProto))
 
 		t.Run("JSON", func(t *testing.T) {
 			t.Run("Array", func(t *testing.T) {
 				var opts Options
 				jsonStr := `{"systemTags":["url"]}`
 				assert.NoError(t, json.Unmarshal([]byte(jsonStr), &opts))
-				assert.Equal(t, GetTagSet("url"), opts.SystemTags)
+				assert.Equal(t, *stats.ToSystemTagSet([]string{stats.TagURL.String()}), *opts.SystemTags)
 
 				t.Run("Roundtrip", func(t *testing.T) {
 					data, err := json.Marshal(opts.SystemTags)
 					assert.NoError(t, err)
 					assert.Equal(t, `["url"]`, string(data))
-					var vers2 TagSet
+					var vers2 stats.SystemTagSet
 					assert.NoError(t, json.Unmarshal(data, &vers2))
-					assert.Equal(t, vers2, opts.SystemTags)
+					assert.Equal(t, vers2, *opts.SystemTags)
 				})
 			})
 			t.Run("Blank", func(t *testing.T) {
 				var opts Options
 				jsonStr := `{"systemTags":[]}`
 				assert.NoError(t, json.Unmarshal([]byte(jsonStr), &opts))
-				assert.Nil(t, opts.SystemTags)
+				assert.Equal(t, stats.SystemTagSet(0), *opts.SystemTags)
 			})
 		})
 	})
@@ -491,26 +491,6 @@ func TestOptionsEnv(t *testing.T) {
 				})
 			}
 		})
-	}
-}
-
-func TestTagSetTextUnmarshal(t *testing.T) {
-
-	var testMatrix = map[string]map[string]bool{
-		"":                         {},
-		"test":                     {"test": true},
-		"test1,test2":              {"test1": true, "test2": true},
-		"   test1  ,  test2  ":     {"test1": true, "test2": true},
-		"   test1  ,   ,  test2  ": {"test1": true, "test2": true},
-		"   test1  ,,  test2  ,,":  {"test1": true, "test2": true},
-	}
-
-	for input, expected := range testMatrix {
-		var set = new(TagSet)
-		err := set.UnmarshalText([]byte(input))
-		require.NoError(t, err)
-
-		require.Equal(t, (map[string]bool)(*set), expected)
 	}
 }
 

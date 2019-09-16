@@ -37,6 +37,7 @@ import (
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/scheduler"
 	"github.com/loadimpact/k6/lib/types"
+	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/stats/cloud"
 	"github.com/loadimpact/k6/stats/csv"
 	"github.com/loadimpact/k6/stats/datadog"
@@ -313,7 +314,7 @@ func getConsolidatedConfig(fs afero.Fs, cliConf Config, runner lib.Runner) (conf
 // Note that if you add option default value here, also add it in command line argument help text.
 func applyDefault(conf Config) Config {
 	if conf.Options.SystemTags == nil {
-		conf = conf.Apply(Config{Options: lib.Options{SystemTags: lib.GetTagSet(lib.DefaultSystemTagList...)}})
+		conf = conf.Apply(Config{Options: lib.Options{SystemTags: stats.ToSystemTagSet(stats.DefaultSystemTagList)}})
 	}
 	return conf
 }

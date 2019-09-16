@@ -21,13 +21,11 @@
 package lib
 
 import (
-	"bytes"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"net"
 	"reflect"
-	"strings"
 
 	"github.com/loadimpact/k6/lib/scheduler"
 	"github.com/loadimpact/k6/lib/types"
@@ -40,61 +38,6 @@ import (
 // that were created due to the use of the shortcut execution control options (i.e. duration+vus,
 // iterations+vus, or stages)
 const DefaultSchedulerName = "default"
-
-// DefaultSystemTagList includes all of the system tags emitted with metrics by default.
-// Other tags that are not enabled by default include: iter, vu, ocsp_status, ip
-var DefaultSystemTagList = []string{
-
-	"proto", "subproto", "status", "method", "url", "name", "group", "check", "error", "error_code", "tls_version",
-}
-
-// TagSet is a string to bool map (for lookup efficiency) that is used to keep track
-// which system tags should be included with with metrics.
-type TagSet map[string]bool
-
-// GetTagSet converts a the passed string tag names into the expected string to bool map.
-func GetTagSet(tags ...string) TagSet {
-	result := TagSet{}
-	for _, tag := range tags {
-		result[tag] = true
-	}
-	return result
-}
-
-// MarshalJSON converts the tags map to a list (JS array).
-func (t TagSet) MarshalJSON() ([]byte, error) {
-	var tags []string
-	for tag := range t {
-		tags = append(tags, tag)
-	}
-	return json.Marshal(tags)
-}
-
-// UnmarshalJSON converts the tag list back to a the expected set (string to bool map).
-func (t *TagSet) UnmarshalJSON(data []byte) error {
-	var tags []string
-	if err := json.Unmarshal(data, &tags); err != nil {
-		return err
-	}
-	if len(tags) != 0 {
-		*t = GetTagSet(tags...)
-	}
-	return nil
-}
-
-// UnmarshalText converts the tag list to tagset.
-func (t *TagSet) UnmarshalText(data []byte) error {
-	var list = bytes.Split(data, []byte(","))
-	*t = make(map[string]bool, len(list))
-	for _, key := range list {
-		key := strings.TrimSpace(string(key))
-		if key == "" {
-			continue
-		}
-		(*t)[key] = true
-	}
-	return nil
-}
 
 // Describes a TLS version. Serialised to/from JSON as a string, eg. "tls1.2".
 type TLSVersion int
@@ -321,7 +264,7 @@ type Options struct {
 	SummaryTimeUnit null.String `json:"summaryTimeUnit" envconfig:"summary_time_unit"`
 
 	// Which system tags to include with metrics ("method", "vu" etc.)
-	SystemTags TagSet `json:"systemTags" envconfig:"system_tags"`
+	SystemTags *stats.SystemTagSet `json:"systemTags" envconfig:"system_tags"`
 
 	// Tags to be applied to all samples for this running
 	RunTags *stats.SampleTags `json:"tags" envconfig:"tags"`

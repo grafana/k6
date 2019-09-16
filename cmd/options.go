@@ -69,7 +69,7 @@ func optionFlagSet() *pflag.FlagSet {
 	// set it to nil here, and add the default in applyDefault() instead.
 	systemTagsCliHelpText := fmt.Sprintf(
 		"only include these system tags in metrics (default %s)",
-		lib.DefaultSystemTagList,
+		stats.DefaultSystemTagList,
 	)
 	flags.StringSlice("system-tags", nil, systemTagsCliHelpText)
 	flags.StringSlice("tag", nil, "add a `tag` to be applied to all samples, as `[name]=[value]`")
@@ -128,7 +128,7 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		if err != nil {
 			return opts, err
 		}
-		opts.SystemTags = lib.GetTagSet(systemTagList...)
+		opts.SystemTags = stats.ToSystemTagSet(systemTagList)
 	}
 
 	blacklistIPStrings, err := flags.GetStringSlice("blacklist-ip")

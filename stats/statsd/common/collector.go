@@ -101,8 +101,8 @@ func (c *Collector) Run(ctx context.Context) {
 }
 
 // GetRequiredSystemTags Return the required system sample tags for the specific collector
-func (c *Collector) GetRequiredSystemTags() lib.TagSet {
-	return lib.TagSet{} // no tags are required
+func (c *Collector) GetRequiredSystemTags() stats.SystemTagSet {
+	return stats.SystemTagSet(0) // no tags are required
 }
 
 // SetRunStatus does nothing in statsd collector

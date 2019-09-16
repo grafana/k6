@@ -122,7 +122,7 @@ func newRuntime(
 		MaxRedirects: null.IntFrom(10),
 		UserAgent:    null.StringFrom("TestUserAgent"),
 		Throw:        null.BoolFrom(true),
-		SystemTags:   lib.GetTagSet(lib.DefaultSystemTagList...),
+		SystemTags:   stats.ToSystemTagSet(stats.DefaultSystemTagList),
 		//HttpDebug:    null.StringFrom("full"),
 	}
 	samples := make(chan stats.SampleContainer, 1000)
@@ -1242,8 +1242,9 @@ func TestSystemTags(t *testing.T) {
 	state.Options.Apply(lib.Options{TLSVersion: &lib.TLSVersions{Max: lib.TLSVersion13}})
 
 	for num, tc := range testedSystemTags {
+		tc := tc
 		t.Run(fmt.Sprintf("TC %d with only %s", num, tc.tag), func(t *testing.T) {
-			state.Options.SystemTags = lib.GetTagSet(tc.tag)
+			state.Options.SystemTags = stats.ToSystemTagSet([]string{tc.tag})
 
 			_, err := common.RunString(rt, tc.code)
 			assert.NoError(t, err)

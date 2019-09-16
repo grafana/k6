@@ -65,7 +65,7 @@ type Collector interface {
 	Link() string
 
 	// Return the required system sample tags for the specific collector
-	GetRequiredSystemTags() TagSet
+	GetRequiredSystemTags() stats.SystemTagSet
 
 	// Set run status
 	SetRunStatus(status RunStatus)
