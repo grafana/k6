@@ -470,13 +470,13 @@ func (u *VU) runFn(
 	}
 
 	tags := state.Options.RunTags.CloneTags()
-	if state.Options.SystemTags["vu"] {
+	if state.Options.SystemTags.Has(stats.TagVU) {
 		tags["vu"] = strconv.FormatInt(u.ID, 10)
 	}
-	if state.Options.SystemTags["iter"] {
+	if state.Options.SystemTags.Has(stats.TagIter) {
 		tags["iter"] = strconv.FormatInt(iter, 10)
 	}
-	if state.Options.SystemTags["group"] {
+	if state.Options.SystemTags.Has(stats.TagGroup) {
 		tags["group"] = group.Path
 	}
 

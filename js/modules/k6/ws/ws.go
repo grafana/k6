@@ -146,10 +146,10 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 
 	}
 
-	if state.Options.SystemTags["url"] {
+	if state.Options.SystemTags.Has(stats.TagURL) {
 		tags["url"] = url
 	}
-	if state.Options.SystemTags["group"] {
+	if state.Options.SystemTags.Has(stats.TagGroup) {
 		tags["group"] = state.Group.Path
 	}
 
@@ -186,7 +186,7 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 		done:               make(chan struct{}),
 	}
 
-	if state.Options.SystemTags["ip"] && conn.RemoteAddr() != nil {
+	if state.Options.SystemTags.Has(stats.TagIP) && conn.RemoteAddr() != nil {
 		if ip, _, err := net.SplitHostPort(conn.RemoteAddr().String()); err == nil {
 			tags["ip"] = ip
 		}
@@ -213,10 +213,10 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 
 	defer func() { _ = conn.Close() }()
 
-	if state.Options.SystemTags["status"] {
+	if state.Options.SystemTags.Has(stats.TagStatus) {
 		tags["status"] = strconv.Itoa(httpResponse.StatusCode)
 	}
-	if state.Options.SystemTags["subproto"] {
+	if state.Options.SystemTags.Has(stats.TagSubProto) {
 		tags["subproto"] = httpResponse.Header.Get("Sec-WebSocket-Protocol")
 	}
 

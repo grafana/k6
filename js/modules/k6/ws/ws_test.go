@@ -97,7 +97,12 @@ func TestSession(t *testing.T) {
 		Group:  root,
 		Dialer: tb.Dialer,
 		Options: lib.Options{
-			SystemTags: lib.GetTagSet("url", "proto", "status", "subproto"),
+			SystemTags: stats.ToSystemTagSet([]string{
+				stats.TagURL.String(),
+				stats.TagProto.String(),
+				stats.TagStatus.String(),
+				stats.TagSubProto.String(),
+			}),
 		},
 		Samples:   samples,
 		TLSConfig: tb.TLSClientConfig,
@@ -293,7 +298,7 @@ func TestErrors(t *testing.T) {
 		Group:  root,
 		Dialer: tb.Dialer,
 		Options: lib.Options{
-			SystemTags: lib.GetTagSet(lib.DefaultSystemTagList...),
+			SystemTags: stats.ToSystemTagSet(stats.DefaultSystemTagList),
 		},
 		Samples: samples,
 	}
@@ -405,7 +410,7 @@ func TestSystemTags(t *testing.T) {
 	state := &lib.State{
 		Group:     root,
 		Dialer:    tb.Dialer,
-		Options:   lib.Options{SystemTags: lib.GetTagSet(testedSystemTags...)},
+		Options:   lib.Options{SystemTags: stats.ToSystemTagSet(testedSystemTags)},
 		Samples:   samples,
 		TLSConfig: tb.TLSClientConfig,
 	}
@@ -417,10 +422,9 @@ func TestSystemTags(t *testing.T) {
 	rt.Set("ws", common.Bind(rt, New(), &ctx))
 
 	for _, expectedTag := range testedSystemTags {
+		expectedTag := expectedTag
 		t.Run("only "+expectedTag, func(t *testing.T) {
-			state.Options.SystemTags = map[string]bool{
-				expectedTag: true,
-			}
+			state.Options.SystemTags = stats.ToSystemTagSet([]string{expectedTag})
 			_, err := common.RunString(rt, sr(`
 			let res = ws.connect("WSBIN_URL/ws-echo", function(socket){
 				socket.on("open", function() {
@@ -463,7 +467,13 @@ func TestTLSConfig(t *testing.T) {
 		Group:  root,
 		Dialer: tb.Dialer,
 		Options: lib.Options{
-			SystemTags: lib.GetTagSet("url", "proto", "status", "subproto", "ip"),
+			SystemTags: stats.ToSystemTagSet([]string{
+				stats.TagURL.String(),
+				stats.TagProto.String(),
+				stats.TagStatus.String(),
+				stats.TagSubProto.String(),
+				stats.TagIP.String(),
+			}),
 		},
 		Samples: samples,
 	}

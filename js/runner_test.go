@@ -893,7 +893,7 @@ func TestVUIntegrationHTTP2(t *testing.T) {
 	}
 	r1.SetOptions(lib.Options{
 		Throw:      null.BoolFrom(true),
-		SystemTags: lib.GetTagSet("proto"),
+		SystemTags: stats.ToSystemTagSet([]string{stats.TagProto.String()}),
 	})
 
 	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{})

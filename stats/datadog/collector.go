@@ -21,18 +21,19 @@
 package datadog
 
 import (
-	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/stats/statsd/common"
 )
 
-type tagHandler lib.TagSet
+type tagHandler stats.SystemTagSet
 
 func (t tagHandler) processTags(tags map[string]string) []string {
 	var res []string
-
 	for key, value := range tags {
-		if value != "" && !t[key] {
-			res = append(res, key+":"+value)
+		if v, err := stats.SystemTagSetString(key); err == nil {
+			if value != "" && t&tagHandler(v) != 0 {
+				res = append(res, key+":"+value)
+			}
 		}
 	}
 	return res
@@ -42,7 +43,7 @@ func (t tagHandler) processTags(tags map[string]string) []string {
 type Config struct {
 	common.Config
 
-	TagBlacklist lib.TagSet `json:"tagBlacklist,omitempty" envconfig:"TAG_BLACKLIST"`
+	TagBlacklist *stats.SystemTagSet `json:"tagBlacklist,omitempty" envconfig:"TAG_BLACKLIST"`
 }
 
 // Apply saves config non-zero config values from the passed config in the receiver.
@@ -60,7 +61,7 @@ func (c Config) Apply(cfg Config) Config {
 func NewConfig() Config {
 	return Config{
 		Config:       common.NewConfig(),
-		TagBlacklist: lib.GetTagSet(),
+		TagBlacklist: stats.ToSystemTagSet([]string{}),
 	}
 }
 
@@ -69,6 +70,6 @@ func New(conf Config) (*common.Collector, error) {
 	return &common.Collector{
 		Config:      conf.Config,
 		Type:        "datadog",
-		ProcessTags: tagHandler(conf.TagBlacklist).processTags,
+		ProcessTags: tagHandler(*conf.TagBlacklist).processTags,
 	}, nil
 }

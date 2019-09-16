@@ -91,13 +91,13 @@ func (*K6) Group(ctx context.Context, name string, fn goja.Callable) (goja.Value
 	t := time.Now()
 
 	tags := state.Options.RunTags.CloneTags()
-	if state.Options.SystemTags["group"] {
+	if state.Options.SystemTags.Has(stats.TagGroup) {
 		tags["group"] = g.Path
 	}
-	if state.Options.SystemTags["vu"] {
+	if state.Options.SystemTags.Has(stats.TagVU) {
 		tags["vu"] = strconv.FormatInt(state.Vu, 10)
 	}
-	if state.Options.SystemTags["iter"] {
+	if state.Options.SystemTags.Has(stats.TagIter) {
 		tags["iter"] = strconv.FormatInt(state.Iteration, 10)
 	}
 
@@ -121,7 +121,7 @@ func (*K6) Check(ctx context.Context, arg0, checks goja.Value, extras ...goja.Va
 
 	// Prepare tags, make sure the `group` tag can't be overwritten.
 	commonTags := state.Options.RunTags.CloneTags()
-	if state.Options.SystemTags["group"] {
+	if state.Options.SystemTags.Has(stats.TagGroup) {
 		commonTags["group"] = state.Group.Path
 	}
 	if len(extras) > 0 {
@@ -130,10 +130,10 @@ func (*K6) Check(ctx context.Context, arg0, checks goja.Value, extras ...goja.Va
 			commonTags[k] = obj.Get(k).String()
 		}
 	}
-	if state.Options.SystemTags["vu"] {
+	if state.Options.SystemTags.Has(stats.TagVU) {
 		commonTags["vu"] = strconv.FormatInt(state.Vu, 10)
 	}
-	if state.Options.SystemTags["iter"] {
+	if state.Options.SystemTags.Has(stats.TagIter) {
 		commonTags["iter"] = strconv.FormatInt(state.Iteration, 10)
 	}
 
@@ -153,7 +153,7 @@ func (*K6) Check(ctx context.Context, arg0, checks goja.Value, extras ...goja.Va
 		if err != nil {
 			return false, err
 		}
-		if state.Options.SystemTags["check"] {
+		if state.Options.SystemTags.Has(stats.TagCheck) {
 			tags["check"] = check.Name
 		}
 

@@ -100,47 +100,47 @@ func (t *transport) measureAndEmitMetrics(unfReq *unfinishedRequest) *finishedRe
 	enabledTags := t.state.Options.SystemTags
 	if unfReq.err != nil {
 		result.errorCode, result.errorMsg = errorCodeForError(unfReq.err)
-		if enabledTags["error"] {
+		if enabledTags.Has(stats.TagError) {
 			tags["error"] = result.errorMsg
 		}
 
-		if enabledTags["error_code"] {
+		if enabledTags.Has(stats.TagErrorCode) {
 			tags["error_code"] = strconv.Itoa(int(result.errorCode))
 		}
 
-		if enabledTags["status"] {
+		if enabledTags.Has(stats.TagStatus) {
 			tags["status"] = "0"
 		}
 	} else {
-		if enabledTags["url"] {
+		if enabledTags.Has(stats.TagURL) {
 			u := URL{u: unfReq.request.URL, URL: unfReq.request.URL.String()}
 			tags["url"] = u.Clean()
 		}
-		if enabledTags["status"] {
+		if enabledTags.Has(stats.TagStatus) {
 			tags["status"] = strconv.Itoa(unfReq.response.StatusCode)
 		}
 		if unfReq.response.StatusCode >= 400 {
-			if enabledTags["error_code"] {
+			if enabledTags.Has(stats.TagErrorCode) {
 				result.errorCode = errCode(1000 + unfReq.response.StatusCode)
 				tags["error_code"] = strconv.Itoa(int(result.errorCode))
 			}
 		}
-		if enabledTags["proto"] {
+		if enabledTags.Has(stats.TagProto) {
 			tags["proto"] = unfReq.response.Proto
 		}
 
 		if unfReq.response.TLS != nil {
 			tlsInfo, oscp := netext.ParseTLSConnState(unfReq.response.TLS)
-			if enabledTags["tls_version"] {
+			if enabledTags.Has(stats.TagTLSVersion) {
 				tags["tls_version"] = tlsInfo.Version
 			}
-			if enabledTags["ocsp_status"] {
+			if enabledTags.Has(stats.TagOCSPStatus) {
 				tags["ocsp_status"] = oscp.Status
 			}
 			result.tlsInfo = tlsInfo
 		}
 	}
-	if enabledTags["ip"] && trail.ConnRemoteAddr != nil {
+	if enabledTags.Has(stats.TagIP) && trail.ConnRemoteAddr != nil {
 		if ip, _, err := net.SplitHostPort(trail.ConnRemoteAddr.String()); err == nil {
 			tags["ip"] = ip
 		}

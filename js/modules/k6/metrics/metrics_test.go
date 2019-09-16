@@ -69,7 +69,7 @@ func TestMetrics(t *testing.T) {
 					child, _ := root.Group("child")
 					samples := make(chan stats.SampleContainer, 1000)
 					state := &lib.State{
-						Options: lib.Options{SystemTags: lib.GetTagSet("group")},
+						Options: lib.Options{SystemTags: stats.ToSystemTagSet([]string{stats.TagGroup.String()})},
 						Group:   root,
 						Samples: samples,
 					}
