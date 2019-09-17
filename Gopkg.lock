@@ -454,14 +454,6 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:41618aee8828e62dfe62d44f579c06892d0e98907d1c6d5bcd83bfe8536ec5a3"
-  name = "github.com/shibukawa/configdir"
-  packages = ["."]
-  pruneopts = "NUT"
-  revision = "e180dbdc8da04c4fa04272e875ce64949f38bd3e"
-
-[[projects]]
-  branch = "master"
   digest = "1:88925026dc080b29f50bc9c917224dac3d4fa1df614df38429c3b373130c9a56"
   name = "github.com/sirupsen/logrus"
   packages = [
@@ -712,7 +704,6 @@
     "github.com/pkg/errors",
     "github.com/pmezard/go-difflib/difflib",
     "github.com/serenize/snaker",
-    "github.com/shibukawa/configdir",
     "github.com/sirupsen/logrus",
     "github.com/sirupsen/logrus/hooks/test",
     "github.com/spf13/afero",
