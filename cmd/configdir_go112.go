@@ -28,7 +28,8 @@ import (
 	"runtime"
 )
 
-// TODO(cuonglm): remove this when last supported version bump to go1.13
+// This code is copied from os.UserConfigDir() as of go1.13
+// https://github.com/golang/go/blob/release-branch.go1.13/src/os/file.go#L419
 func configDir() (string, error) {
 	var dir string
 
