@@ -113,8 +113,8 @@ func TestUnknownNetErrno(t *testing.T) {
 func TestTCPErrors(t *testing.T) {
 	var (
 		nonTCPError       = &net.OpError{Net: "something", Err: errors.New("non tcp error")}
-		econnreset        = &net.OpError{Net: "tcp", Op: "write", Err: syscall.ECONNRESET}
-		epipeerror        = &net.OpError{Net: "tcp", Op: "write", Err: syscall.EPIPE}
+		econnreset        = &net.OpError{Net: "tcp", Op: "write", Err: &os.SyscallError{Err: syscall.ECONNRESET}}
+		epipeerror        = &net.OpError{Net: "tcp", Op: "write", Err: &os.SyscallError{Err: syscall.EPIPE}}
 		econnrefused      = &net.OpError{Net: "tcp", Op: "dial", Err: &os.SyscallError{Err: syscall.ECONNREFUSED}}
 		errnounknown      = &net.OpError{Net: "tcp", Op: "dial", Err: &os.SyscallError{Err: syscall.E2BIG}}
 		tcperror          = &net.OpError{Net: "tcp", Err: errors.New("tcp error")}
