@@ -396,6 +396,11 @@ func TestOptions(t *testing.T) {
 		opts := Options{}.Apply(Options{RunTags: tags})
 		assert.Equal(t, tags, opts.RunTags)
 	})
+	t.Run("AnonymizeQueryStringValues", func(t *testing.T) {
+		opts := Options{}.Apply(Options{AnonymizeQueryStringValues: null.BoolFrom(true)})
+		assert.True(t, opts.AnonymizeQueryStringValues.Valid)
+		assert.True(t, opts.AnonymizeQueryStringValues.Bool)
+	})
 	t.Run("DiscardResponseBodies", func(t *testing.T) {
 		opts := Options{}.Apply(Options{DiscardResponseBodies: null.BoolFrom(true)})
 		assert.True(t, opts.DiscardResponseBodies.Valid)
