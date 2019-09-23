@@ -326,6 +326,8 @@ type Options struct {
 	// Tags to be applied to all samples for this running
 	RunTags *stats.SampleTags `json:"tags" envconfig:"tags"`
 
+	AnonymizeQueryStringValues null.Bool `json:"anonymizeQueryStringValues" envconfig:"anonymize_query_string_values"`
+
 	// Buffer size of the channel for metric samples; 0 means unbuffered
 	MetricSamplesBufferSize null.Int `json:"metricSamplesBufferSize" envconfig:"metric_samples_buffer_size"`
 
@@ -470,6 +472,9 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if !opts.RunTags.IsEmpty() {
 		o.RunTags = opts.RunTags
+	}
+	if opts.AnonymizeQueryStringValues.Valid {
+		o.AnonymizeQueryStringValues = opts.AnonymizeQueryStringValues
 	}
 	if opts.MetricSamplesBufferSize.Valid {
 		o.MetricSamplesBufferSize = opts.MetricSamplesBufferSize

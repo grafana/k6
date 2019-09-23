@@ -29,6 +29,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -217,7 +218,12 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 
 	// Only set the name system tag if the user didn't explicitly set it beforehand
 	if _, ok := tags["name"]; !ok && state.Options.SystemTags["name"] {
-		tags["name"] = preq.URL.Name
+		var name = preq.URL.Name
+		if state.Options.AnonymizeQueryStringValues.Bool {
+			var qsValueRegex = regexp.MustCompile("=[^&]*")
+			name = qsValueRegex.ReplaceAllString(name, "=[]")
+		}
+		tags["name"] = name
 	}
 	if state.Options.SystemTags["group"] {
 		tags["group"] = state.Group.Path
