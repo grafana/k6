@@ -884,6 +884,36 @@ func TestRequestAndBatch(t *testing.T) {
 					}
 				}
 			})
+
+			t.Run("anonymizeQueryStringValues", func(t *testing.T) {
+				t.Run("disabled", func(t *testing.T) {
+					oldOpts := state.Options
+					defer func() { state.Options = oldOpts }()
+					state.Options.AnonymizeQueryStringValues = null.BoolFrom(false)
+
+					_, err := common.RunString(rt, sr(`
+					let res = http.get("HTTPBIN_URL/get?a=1&b=some-value&c=https%3A%2F%2Fsome-url.com%3Fa%3D1");
+					if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+					`))
+					assert.NoError(t, err)
+
+					assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/get?a=1&b=some-value&c=https%3A%2F%2Fsome-url.com%3Fa%3D1"), "", 200, "")
+				})
+
+				t.Run("enabled", func(t *testing.T) {
+					oldOpts := state.Options
+					defer func() { state.Options = oldOpts }()
+					state.Options.AnonymizeQueryStringValues = null.BoolFrom(true)
+
+					_, err := common.RunString(rt, sr(`
+					let res = http.get("HTTPBIN_URL/get?a=1&b=some-value&c=https%3A%2F%2Fsome-url.com%3Fa%3D1");
+					if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+					`))
+					assert.NoError(t, err)
+
+					assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/get?a=1&b=some-value&c=https%3A%2F%2Fsome-url.com%3Fa%3D1"), sr("HTTPBIN_URL/get?a=[]&b=[]&c=[]"), 200, "")
+				})
+			})
 		})
 	})
 
