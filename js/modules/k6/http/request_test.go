@@ -897,7 +897,9 @@ func TestRequestAndBatch(t *testing.T) {
 					`))
 					assert.NoError(t, err)
 
-					assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/get?a=1&b=some-value&c=https%3A%2F%2Fsome-url.com%3Fa%3D1"), "", 200, "")
+					assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), "GET",
+						sr("HTTPBIN_URL/get?a=1&b=some-value&c=https%3A%2F%2Fsome-url.com%3Fa%3D1"),
+						"", 200, "")
 				})
 
 				t.Run("enabled", func(t *testing.T) {
@@ -911,7 +913,9 @@ func TestRequestAndBatch(t *testing.T) {
 					`))
 					assert.NoError(t, err)
 
-					assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/get?a=1&b=some-value&c=https%3A%2F%2Fsome-url.com%3Fa%3D1"), sr("HTTPBIN_URL/get?a=[]&b=[]&c=[]"), 200, "")
+					assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), "GET",
+						sr("HTTPBIN_URL/get?a=1&b=some-value&c=https%3A%2F%2Fsome-url.com%3Fa%3D1"),
+						sr("HTTPBIN_URL/get?a=[]&b=[]&c=[]"), 200, "")
 				})
 			})
 		})
