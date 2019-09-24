@@ -55,6 +55,8 @@ type URL struct {
 	URL  string // http://example.com/thing/1234/
 }
 
+var QueryStringValueRegex = regexp.MustCompile("=[^&]*")
+
 // NewURL returns a new URL for the provided url and name. The error is returned if the url provided
 // can't be parsed
 func NewURL(urlString, name string) (URL, error) {
@@ -220,8 +222,7 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 	if _, ok := tags["name"]; !ok && state.Options.SystemTags["name"] {
 		var name = preq.URL.Name
 		if state.Options.AnonymizeQueryStringValues.Bool {
-			var qsValueRegex = regexp.MustCompile("=[^&]*")
-			name = qsValueRegex.ReplaceAllString(name, "=[]")
+			name = QueryStringValueRegex.ReplaceAllString(name, "=[]")
 		}
 		tags["name"] = name
 	}
