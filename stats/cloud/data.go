@@ -136,13 +136,6 @@ func NewSampleFromTrail(trail *httpext.Trail) *Sample {
 			Values: map[string]float64{
 				metrics.HTTPReqs.Name:        1,
 				metrics.HTTPReqDuration.Name: stats.D(trail.Duration),
-
-				metrics.HTTPReqBlocked.Name:        stats.D(trail.Blocked),
-				metrics.HTTPReqConnecting.Name:     stats.D(trail.Connecting),
-				metrics.HTTPReqTLSHandshaking.Name: stats.D(trail.TLSHandshaking),
-				metrics.HTTPReqSending.Name:        stats.D(trail.Sending),
-				metrics.HTTPReqWaiting.Name:        stats.D(trail.Waiting),
-				metrics.HTTPReqReceiving.Name:      stats.D(trail.Receiving),
 			},
 		},
 	}
@@ -156,12 +149,12 @@ type SampleDataAggregatedHTTPReqs struct {
 	Tags   *stats.SampleTags `json:"tags,omitempty"`
 	Values struct {
 		Duration       AggregatedMetric `json:"http_req_duration"`
-		Blocked        AggregatedMetric `json:"http_req_blocked"`
-		Connecting     AggregatedMetric `json:"http_req_connecting"`
-		TLSHandshaking AggregatedMetric `json:"http_req_tls_handshaking"`
-		Sending        AggregatedMetric `json:"http_req_sending"`
-		Waiting        AggregatedMetric `json:"http_req_waiting"`
-		Receiving      AggregatedMetric `json:"http_req_receiving"`
+		Blocked        AggregatedMetric `json:"-"`
+		Connecting     AggregatedMetric `json:"-"`
+		TLSHandshaking AggregatedMetric `json:"-"`
+		Sending        AggregatedMetric `json:"-"`
+		Waiting        AggregatedMetric `json:"-"`
+		Receiving      AggregatedMetric `json:"-"`
 	} `json:"values"`
 }
 
