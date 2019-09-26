@@ -115,7 +115,8 @@ func rootCmdPersistentFlagSet() *pflag.FlagSet {
 func init() {
 	confDir, err := configDir()
 	if err != nil {
-		panic(err)
+		logrus.WithError(err).Warn("could not get config directory")
+		confDir = ".config"
 	}
 	defaultConfigFilePath = filepath.Join(
 		confDir,
