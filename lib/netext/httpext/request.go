@@ -49,16 +49,43 @@ type HTTPRequestCookie struct {
 
 // A URL wraps net.URL, and preserves the template (if any) the URL was constructed from.
 type URL struct {
-	u    *url.URL
-	Name string // http://example.com/thing/${}/
-	URL  string // http://example.com/thing/1234/
+	u        *url.URL
+	Name     string // http://example.com/thing/${}/
+	URL      string // http://example.com/thing/1234/
+	CleanURL string // URL with masked user credentials, used for output
 }
 
 // NewURL returns a new URL for the provided url and name. The error is returned if the url provided
 // can't be parsed
 func NewURL(urlString, name string) (URL, error) {
 	u, err := url.Parse(urlString)
-	return URL{u: u, Name: name, URL: urlString}, err
+	newURL := URL{u: u, Name: name, URL: urlString}
+	newURL.CleanURL = newURL.Clean()
+	if urlString == name {
+		newURL.Name = newURL.CleanURL
+	}
+	return newURL, err
+}
+
+// Clean returns an output-safe representation of URL
+func (u URL) Clean() string {
+	if u.CleanURL != "" {
+		return u.CleanURL
+	}
+
+	out := u.URL
+
+	if u.u != nil && u.u.User != nil {
+		schemeIndex := strings.Index(out, "://")
+		atIndex := strings.Index(out, "@")
+		if _, passwordOk := u.u.User.Password(); passwordOk {
+			out = out[:schemeIndex+3] + "****:****" + out[atIndex:]
+		} else {
+			out = out[:schemeIndex+3] + "****" + out[atIndex:]
+		}
+	}
+
+	return out
 }
 
 // GetURL returns the internal url.URL
@@ -212,7 +239,7 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 		tags["method"] = preq.Req.Method
 	}
 	if state.Options.SystemTags["url"] {
-		tags["url"] = preq.URL.URL
+		tags["url"] = preq.URL.Clean()
 	}
 
 	// Only set the name system tag if the user didn't explicitly set it beforehand
