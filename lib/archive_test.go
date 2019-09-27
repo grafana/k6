@@ -142,7 +142,7 @@ func TestArchiveReadWrite(t *testing.T) {
 			K6Version: consts.Version,
 			Options: Options{
 				VUs:        null.IntFrom(12345),
-				SystemTags: stats.ToSystemTagSet(stats.DefaultSystemTagList),
+				SystemTags: &stats.DefaultSystemTagSet,
 			},
 			FilenameURL: &url.URL{Scheme: "file", Path: "/path/to/a.js"},
 			Data:        []byte(`// a contents`),
@@ -192,7 +192,7 @@ func TestArchiveReadWrite(t *testing.T) {
 				Type: "js",
 				Options: Options{
 					VUs:        null.IntFrom(12345),
-					SystemTags: stats.ToSystemTagSet(stats.DefaultSystemTagList),
+					SystemTags: &stats.DefaultSystemTagSet,
 				},
 				FilenameURL: &url.URL{Scheme: "file", Path: fmt.Sprintf("%s/a.js", entry.Pwd)},
 				K6Version:   consts.Version,
@@ -215,7 +215,7 @@ func TestArchiveReadWrite(t *testing.T) {
 				Type: "js",
 				Options: Options{
 					VUs:        null.IntFrom(12345),
-					SystemTags: stats.ToSystemTagSet(stats.DefaultSystemTagList),
+					SystemTags: &stats.DefaultSystemTagSet,
 				},
 				FilenameURL: &url.URL{Scheme: "file", Path: fmt.Sprintf("%s/a.js", entry.PwdNormAnon)},
 				K6Version:   consts.Version,
@@ -344,7 +344,7 @@ func TestStrangePaths(t *testing.T) {
 			K6Version: consts.Version,
 			Options: Options{
 				VUs:        null.IntFrom(12345),
-				SystemTags: stats.ToSystemTagSet(stats.DefaultSystemTagList),
+				SystemTags: &stats.DefaultSystemTagSet,
 			},
 			FilenameURL: &url.URL{Scheme: "file", Path: pathToChange},
 			Data:        []byte(`// ` + pathToChange + ` contents`),

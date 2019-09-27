@@ -36,22 +36,21 @@ const (
 	TagIP
 )
 
-// DefaultSystemTagList includes all of the system tags emitted with metrics by default.
+// DefaultSystemTagSet includes all of the system tags emitted with metrics by default.
 // Other tags that are not enabled by default include: iter, vu, ocsp_status, ip
 //nolint:gochecknoglobals
-var DefaultSystemTagList = []string{
-	TagProto.String(),
-	TagSubProto.String(),
-	TagStatus.String(),
-	TagMethod.String(),
-	TagURL.String(),
-	TagName.String(),
-	TagGroup.String(),
-	TagCheck.String(),
-	TagCheck.String(),
-	TagError.String(),
-	TagErrorCode.String(),
-	TagTLSVersion.String(),
+var DefaultSystemTagSet = TagProto | TagSubProto | TagStatus | TagMethod | TagURL | TagName | TagGroup |
+	TagCheck | TagCheck | TagError | TagErrorCode | TagTLSVersion
+
+// ToTagSet converts a system tag map to tag set
+func (tm SystemTagMap) ToTagSet() SystemTagSet {
+	ts := SystemTagSet(0)
+	for tag, ok := range tm {
+		if v, err := SystemTagSetString(tag); err == nil && ok {
+			ts.Add(v)
+		}
+	}
+	return ts
 }
 
 // Add adds a tag to tag set.

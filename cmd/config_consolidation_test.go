@@ -394,7 +394,7 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 
 		// Test system tags
 		{opts{}, exp{}, func(t *testing.T, c Config) {
-			assert.Equal(t, stats.ToSystemTagSet(stats.DefaultSystemTagList), c.Options.SystemTags)
+			assert.Equal(t, &stats.DefaultSystemTagSet, c.Options.SystemTags)
 		}},
 		{opts{cli: []string{"--system-tags", `""`}}, exp{}, func(t *testing.T, c Config) {
 			assert.Equal(t, stats.SystemTagSet(0), *c.Options.SystemTags)

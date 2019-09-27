@@ -152,7 +152,7 @@ func TestCheck(t *testing.T) {
 		return &lib.State{
 			Group: root,
 			Options: lib.Options{
-				SystemTags: stats.ToSystemTagSet(stats.DefaultSystemTagList),
+				SystemTags: &stats.DefaultSystemTagSet,
 			},
 			Samples: samples,
 		}, samples
