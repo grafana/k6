@@ -43,7 +43,7 @@ func (t tagHandler) processTags(tags map[string]string) []string {
 type Config struct {
 	common.Config
 
-	TagBlacklist *stats.SystemTagSet `json:"tagBlacklist,omitempty" envconfig:"TAG_BLACKLIST"`
+	TagBlacklist stats.SystemTagMap `json:"tagBlacklist,omitempty" envconfig:"TAG_BLACKLIST"`
 }
 
 // Apply saves config non-zero config values from the passed config in the receiver.
@@ -61,7 +61,7 @@ func (c Config) Apply(cfg Config) Config {
 func NewConfig() Config {
 	return Config{
 		Config:       common.NewConfig(),
-		TagBlacklist: stats.ToSystemTagSet([]string{}),
+		TagBlacklist: stats.SystemTagMap{},
 	}
 }
 
@@ -70,6 +70,6 @@ func New(conf Config) (*common.Collector, error) {
 	return &common.Collector{
 		Config:      conf.Config,
 		Type:        "datadog",
-		ProcessTags: tagHandler(*conf.TagBlacklist).processTags,
+		ProcessTags: tagHandler(conf.TagBlacklist.ToTagSet()).processTags,
 	}, nil
 }

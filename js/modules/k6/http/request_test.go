@@ -122,7 +122,7 @@ func newRuntime(
 		MaxRedirects: null.IntFrom(10),
 		UserAgent:    null.StringFrom("TestUserAgent"),
 		Throw:        null.BoolFrom(true),
-		SystemTags:   stats.ToSystemTagSet(stats.DefaultSystemTagList),
+		SystemTags:   &stats.DefaultSystemTagSet,
 		//HttpDebug:    null.StringFrom("full"),
 	}
 	samples := make(chan stats.SampleContainer, 1000)

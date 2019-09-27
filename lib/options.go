@@ -264,6 +264,7 @@ type Options struct {
 	SummaryTimeUnit null.String `json:"summaryTimeUnit" envconfig:"summary_time_unit"`
 
 	// Which system tags to include with metrics ("method", "vu" etc.)
+	// Use pointer for identifying whether user provide any tag or not.
 	SystemTags *stats.SystemTagSet `json:"systemTags" envconfig:"system_tags"`
 
 	// Tags to be applied to all samples for this running
