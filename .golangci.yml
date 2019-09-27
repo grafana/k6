@@ -45,4 +45,5 @@ linters:
   enable-all: true
   disable:
   - gochecknoinits
+  - godox
   fast: false

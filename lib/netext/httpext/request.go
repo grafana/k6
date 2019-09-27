@@ -23,6 +23,7 @@ package httpext
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net"
@@ -313,6 +314,15 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 
 	mreq := preq.Req.WithContext(ctx)
 	res, resErr := client.Do(mreq)
+
+	// TODO(imiric): It would be safer to check for a writeable
+	// response body here instead of status code, but those are
+	// wrapped in a read-only body when using client timeouts and are
+	// unusable until https://github.com/golang/go/issues/31391 is fixed.
+	if res != nil && res.StatusCode == http.StatusSwitchingProtocols {
+		_ = res.Body.Close()
+		return nil, fmt.Errorf("unsupported response status: %s", res.Status)
+	}
 
 	resp.Body, resErr = readResponseBody(state, preq.ResponseType, res, resErr)
 	finishedReq := tracerTransport.processLastSavedRequest(wrapDecompressionError(resErr))
