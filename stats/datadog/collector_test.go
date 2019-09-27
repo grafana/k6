@@ -11,11 +11,11 @@ import (
 )
 
 func TestCollector(t *testing.T) {
-	var tagSet = stats.ToSystemTagSet([]string{stats.TagProto.String(), stats.TagGroup.String()})
-	var handler = tagHandler(*tagSet)
+	var tagMap = stats.SystemTagMap{stats.TagProto.String(): true, stats.TagGroup.String(): true}
+	var handler = tagHandler(tagMap.ToTagSet())
 	testutil.BaseTest(t, func(config common.Config) (*common.Collector, error) {
 		return New(NewConfig().Apply(Config{
-			TagBlacklist: tagSet,
+			TagBlacklist: tagMap,
 			Config:       config,
 		}))
 	}, func(t *testing.T, containers []stats.SampleContainer, expectedOutput, output string) {

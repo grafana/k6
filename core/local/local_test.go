@@ -489,7 +489,7 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 	require.NoError(t, err)
 
 	options := lib.Options{
-		SystemTags:      stats.ToSystemTagSet(stats.DefaultSystemTagList),
+		SystemTags:      &stats.DefaultSystemTagSet,
 		SetupTimeout:    types.NullDurationFrom(4 * time.Second),
 		TeardownTimeout: types.NullDurationFrom(4 * time.Second),
 	}

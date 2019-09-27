@@ -298,7 +298,7 @@ func TestErrors(t *testing.T) {
 		Group:  root,
 		Dialer: tb.Dialer,
 		Options: lib.Options{
-			SystemTags: stats.ToSystemTagSet(stats.DefaultSystemTagList),
+			SystemTags: &stats.DefaultSystemTagSet,
 		},
 		Samples: samples,
 	}
