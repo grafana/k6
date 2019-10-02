@@ -80,12 +80,12 @@ func HandlePatchStatus(rw http.ResponseWriter, r *http.Request, p httprouter.Par
 	}
 
 	if status.VUsMax.Valid || status.VUs.Valid {
-		//TODO: add ability to specify the actual executor id? though thus should
+		//TODO: add ability to specify the actual executor id? Though this should
 		//likely be in the v2 REST API, where we could implement it in a way that
-		//may allow us to eventually support other executor types
-		executor, uptateErr := getFirstExternallyControlledExecutor(engine.ExecutionScheduler)
-		if uptateErr != nil {
-			apiError(rw, "Execution config error", uptateErr.Error(), http.StatusInternalServerError)
+		//may allow us to eventually support other executor types.
+		executor, updateErr := getFirstExternallyControlledExecutor(engine.ExecutionScheduler)
+		if updateErr != nil {
+			apiError(rw, "Execution config error", updateErr.Error(), http.StatusInternalServerError)
 			return
 		}
 		newConfig := executor.GetCurrentConfig().ExternallyControlledConfigParams
@@ -95,8 +95,8 @@ func HandlePatchStatus(rw http.ResponseWriter, r *http.Request, p httprouter.Par
 		if status.VUs.Valid {
 			newConfig.VUs = status.VUs
 		}
-		if uptateErr := executor.UpdateConfig(r.Context(), newConfig); err != nil {
-			apiError(rw, "Config update error", uptateErr.Error(), http.StatusInternalServerError)
+		if updateErr := executor.UpdateConfig(r.Context(), newConfig); err != nil {
+			apiError(rw, "Config update error", updateErr.Error(), http.StatusInternalServerError)
 			return
 		}
 	}

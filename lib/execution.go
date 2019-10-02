@@ -68,7 +68,7 @@ type ExecutionScheduler interface {
 	//
 	// Currently, any executor, so any test, can be started in a paused state.
 	// This will cause k6 to initialize all needed VUs, but it won't actually
-	// start the test. Later, the test can be started for real be
+	// start the test. Later, the test can be started for real by
 	// resuming/unpausing it from the REST API.
 	//
 	// After a test is actually started, it may become impossible to pause it
@@ -118,7 +118,7 @@ const MaxRetriesGetPlannedVU = 5
 // involving atomics...
 //
 // The only functionality indended for synchronization is the one revolving
-// around pausing, and uninitializedUnplannedVUs for restrictring the number of
+// around pausing, and uninitializedUnplannedVUs for restricting the number of
 // unplanned VUs being initialized.
 type ExecutionState struct {
 	// A copy of the options, so the different executors have access to them.
@@ -206,9 +206,9 @@ type ExecutionState struct {
 	// started yet...
 	startTime *int64
 
-	// A nanosecond UNIX timestamp that is set when the ends, either by an early
-	// context cancel or at its regularly scheduled time. The default 0 value is
-	// used to denote that the test hasn't ended yet...
+	// A nanosecond UNIX timestamp that is set when the test ends, either
+	// by an early context cancel or at its regularly scheduled time.
+	// The default 0 value is used to denote that the test hasn't ended yet.
 	endTime *int64
 
 	// Stuff related to pausing follows. Read the docs in ExecutionScheduler for
@@ -296,7 +296,7 @@ func (es *ExecutionState) ModInitializedVUsCount(mod int64) int64 {
 
 // GetCurrentlyActiveVUsCount returns the number of VUs that are currently
 // executing the test script. This also includes any VUs that are in the process
-// of gracefullt winding down.
+// of gracefully winding down.
 //
 // IMPORTANT: for UI/information purposes only, don't use for synchronization.
 func (es *ExecutionState) GetCurrentlyActiveVUsCount() int64 {
@@ -365,7 +365,7 @@ func (es *ExecutionState) MarkEnded() {
 // HasStarted returns true if the test has actually started executing.
 // It will return false while a test is in the init phase, or if it has
 // been initially paused. But if will return true if a test is paused
-// midway through its execution (see above for details regarind the
+// midway through its execution (see above for details regarding the
 // feasibility of that pausing for normal executors).
 func (es *ExecutionState) HasStarted() bool {
 	return atomic.LoadInt64(es.startTime) != 0
@@ -478,11 +478,11 @@ func (es *ExecutionState) ResumeNotify() <-chan struct{} {
 // we reach that timeout more than MaxRetriesGetPlannedVU number of times, this
 // function will return an error, since we either have a bug with some
 // executor, or the machine is very, very overloaded.
-func (es *ExecutionState) GetPlannedVU(logger *logrus.Entry, modifyAtiveVUCount bool) (VU, error) {
+func (es *ExecutionState) GetPlannedVU(logger *logrus.Entry, modifyActiveVUCount bool) (VU, error) {
 	for i := 1; i <= MaxRetriesGetPlannedVU; i++ {
 		select {
 		case vu := <-es.vus:
-			if modifyAtiveVUCount {
+			if modifyActiveVUCount {
 				es.ModCurrentlyActiveVUsCount(+1)
 			}
 			//TODO: set environment and exec

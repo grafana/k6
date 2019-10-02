@@ -72,7 +72,7 @@ func (mecc ExternallyControlledConfigParams) Validate() (errors []error) {
 
 	if mecc.MaxVUs.Int64 < mecc.VUs.Int64 {
 		errors = append(errors, fmt.Errorf(
-			"the specified maxVUs (%d) should more than or equal to the the number of active VUs (%d)",
+			"the specified maxVUs (%d) should be more than or equal to the the number of active VUs (%d)",
 			mecc.MaxVUs.Int64, mecc.VUs.Int64,
 		))
 	}
@@ -264,7 +264,7 @@ func (mex *ExternallyControlled) UpdateConfig(ctx context.Context, newConf inter
 		return errors.New("invalid config type")
 	}
 	if errs := newConfigParams.Validate(); len(errs) != 0 {
-		return fmt.Errorf("invalid confiuguration supplied: %s", lib.ConcatErrors(errs, ", "))
+		return fmt.Errorf("invalid configuration supplied: %s", lib.ConcatErrors(errs, ", "))
 	}
 
 	if newConfigParams.Duration != mex.startConfig.Duration {
