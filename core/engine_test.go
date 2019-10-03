@@ -726,7 +726,7 @@ func TestEmittedMetricsWhenScalingDown(t *testing.T) {
 		require.False(t, engine.IsTainted())
 	}
 
-	// The 3.1 sleep in the default function would cause the first VU to comlete 2 full iterations
+	// The 3.1 sleep in the default function would cause the first VU to complete 2 full iterations
 	// and stat executing its third one, while the second VU will only fully complete 1 iteration
 	// and will be canceled in the middle of its second one.
 	assert.Equal(t, 3.0, getMetricSum(collector, metrics.Iterations.Name))
