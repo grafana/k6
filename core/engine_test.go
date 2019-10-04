@@ -502,6 +502,7 @@ func getMetricCount(collector *dummy.Collector, name string) (result uint) {
 
 const expectedHeaderMaxLength = 500
 
+// FIXME: This test is too brittle, consider simplifying.
 func TestSentReceivedMetrics(t *testing.T) {
 	t.Parallel()
 	tb := httpmultibin.NewHTTPMultiBin(t)
@@ -532,10 +533,14 @@ func TestSentReceivedMetrics(t *testing.T) {
 					file: http.file(data, "test.txt")
 				});
 			}`), 1, 1000, 100},
+		// NOTE(imiric): This needs to keep testing against /ws-echo-invalid because
+		// this test is highly sensitive to metric data, and slightly differing
+		// WS server implementations might introduce flakiness.
+		// See https://github.com/loadimpact/k6/pull/1149
 		{tr(`import ws from "k6/ws";
 			let data = "0123456789".repeat(100);
 			export default function() {
-				ws.connect("WSBIN_URL/ws-echo", null, function (socket) {
+				ws.connect("WSBIN_URL/ws-echo-invalid", null, function (socket) {
 					socket.on('open', function open() {
 						socket.send(data);
 					});
