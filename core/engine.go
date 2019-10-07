@@ -110,10 +110,6 @@ func NewEngine(ex lib.Executor, o lib.Options) (*Engine, error) {
 }
 
 func (e *Engine) setRunStatus(status lib.RunStatus) {
-	if len(e.Collectors) == 0 {
-		return
-	}
-
 	for _, c := range e.Collectors {
 		c.SetRunStatus(status)
 	}
@@ -146,14 +142,13 @@ func (e *Engine) Run(ctx context.Context) error {
 
 	collectorwg := sync.WaitGroup{}
 	collectorctx, collectorcancel := context.WithCancel(context.Background())
-	if len(e.Collectors) > 0 {
-		for _, collector := range e.Collectors {
-			collectorwg.Add(1)
-			go func(collector lib.Collector) {
-				collector.Run(collectorctx)
-				collectorwg.Done()
-			}(collector)
-		}
+
+	for _, collector := range e.Collectors {
+		collectorwg.Add(1)
+		go func(collector lib.Collector) {
+			collector.Run(collectorctx)
+			collectorwg.Done()
+		}(collector)
 	}
 
 	subctx, subcancel := context.WithCancel(context.Background())
@@ -205,9 +200,8 @@ func (e *Engine) Run(ctx context.Context) error {
 		for sc := range e.Samples {
 			sampleContainers = append(sampleContainers, sc)
 		}
-		if len(sampleContainers) > 0 {
-			e.processSamples(sampleContainers)
-		}
+
+		e.processSamples(sampleContainers)
 
 		// Emit final metrics.
 		e.emitMetrics()
@@ -226,10 +220,8 @@ func (e *Engine) Run(ctx context.Context) error {
 	for {
 		select {
 		case <-ticker.C:
-			if len(sampleContainers) > 0 {
-				e.processSamples(sampleContainers)
-				sampleContainers = []stats.SampleContainer{}
-			}
+			e.processSamples(sampleContainers)
+			sampleContainers = []stats.SampleContainer{}
 		case sc := <-e.Samples:
 			sampleContainers = append(sampleContainers, sc)
 		case err := <-errC:
@@ -382,8 +374,8 @@ func (e *Engine) processSamplesForMetrics(sampleCointainers []stats.SampleContai
 	}
 }
 
-func (e *Engine) processSamples(sampleCointainers []stats.SampleContainer) {
-	if len(sampleCointainers) == 0 {
+func (e *Engine) processSamples(sampleContainers []stats.SampleContainer) {
+	if len(sampleContainers) == 0 {
 		return
 	}
 
@@ -393,12 +385,10 @@ func (e *Engine) processSamples(sampleCointainers []stats.SampleContainer) {
 
 	// TODO: run this and the below code in goroutines?
 	if !(e.NoSummary && e.NoThresholds) {
-		e.processSamplesForMetrics(sampleCointainers)
+		e.processSamplesForMetrics(sampleContainers)
 	}
 
-	if len(e.Collectors) > 0 {
-		for _, collector := range e.Collectors {
-			collector.Collect(sampleCointainers)
-		}
+	for _, collector := range e.Collectors {
+		collector.Collect(sampleContainers)
 	}
 }
