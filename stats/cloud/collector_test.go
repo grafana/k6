@@ -459,6 +459,18 @@ func TestCloudCollectorStopSendingMetric(t *testing.T) {
 	_, ok := <-collector.stopSendingMetricsCh
 	require.False(t, ok)
 	require.Equal(t, max, count)
+
+	nBufferSamples := len(collector.bufferSamples)
+	nBufferHTTPTrails := len(collector.bufferHTTPTrails)
+	collector.Collect([]stats.SampleContainer{stats.Sample{
+		Time:   now,
+		Metric: metrics.VUs,
+		Tags:   stats.NewSampleTags(tags.CloneTags()),
+		Value:  1.0,
+	}})
+	if nBufferSamples != len(collector.bufferSamples) || nBufferHTTPTrails != len(collector.bufferHTTPTrails) {
+		t.Errorf("Collector still collects data after stop sending metrics")
+	}
 }
 
 func TestCloudCollectorAggregationPeriodZeroNoBlock(t *testing.T) {
