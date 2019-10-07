@@ -106,7 +106,7 @@ func stringToRat(s string) (*big.Rat, error) {
 //
 // The parsing logic is that values with a colon, i.e. ':', are full segments:
 //  `1/2:3/4`, `0.5:0.75`, `50%:75%`, and even `2/4:75%` should be (1/2, 3/4]
-// And values without a hyphen are the end of a first segment:
+// And values without a colon are the end of a first segment:
 //  `20%`, `0.2`,  and `1/5` should be converted to (0, 1/5]
 // empty values should probably be treated as "1", i.e. the whole execution
 func (es *ExecutionSegment) UnmarshalText(text []byte) (err error) {
@@ -159,7 +159,7 @@ func (es *ExecutionSegment) FloatLength() float64 {
 	return res
 }
 
-// Split evenly dividies the execution segment into the specified number of
+// Split evenly divides the execution segment into the specified number of
 // equal consecutive execution sub-segments.
 func (es *ExecutionSegment) Split(numParts int64) ([]*ExecutionSegment, error) {
 	if numParts < 1 {
