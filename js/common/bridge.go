@@ -107,7 +107,9 @@ type FieldNameMapper struct{}
 
 // FieldName is part of the goja.FieldNameMapper interface
 // https://godoc.org/github.com/dop251/goja#FieldNameMapper
-func (FieldNameMapper) FieldName(t reflect.Type, f reflect.StructField) string { return FieldName(t, f) }
+func (FieldNameMapper) FieldName(t reflect.Type, f reflect.StructField) string {
+	return FieldName(t, f)
+}
 
 // MethodName is part of the goja.FieldNameMapper interface
 // https://godoc.org/github.com/dop251/goja#FieldNameMapper
