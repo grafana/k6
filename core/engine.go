@@ -220,8 +220,10 @@ func (e *Engine) Run(ctx context.Context) error {
 	for {
 		select {
 		case <-ticker.C:
-			e.processSamples(sampleContainers)
-			sampleContainers = []stats.SampleContainer{}
+			if len(sampleContainers) > 0 {
+				e.processSamples(sampleContainers)
+				sampleContainers = []stats.SampleContainer{}
+			}
 		case sc := <-e.Samples:
 			sampleContainers = append(sampleContainers, sc)
 		case err := <-errC:
