@@ -246,7 +246,7 @@ func (e *ExecutionScheduler) Init(ctx context.Context, engineOut chan<- stats.Sa
 		logger.Debugf("Initialized executor %s", executorConfig.GetName())
 	}
 
-	logger.Debugf("Initization completed")
+	logger.Debugf("Initialization completed")
 	return nil
 }
 

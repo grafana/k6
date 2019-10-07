@@ -70,9 +70,9 @@ func GetMaxPlannedVUs(steps []ExecutionStep) (result uint64) {
 // called GetMaxPossibleVUs() and why there is no GetMaxUnplannedVUs() function.
 //
 // As an example, imagine that you have a executor with MaxPlannedVUs=20 and
-// MaxUnaplannedVUs=0, followed immediately after by another executor with
-// MaxPlannedVUs=10 and MaxUnaplannedVUs=10. The MaxPlannedVUs number for the
-// whole test is 20, and MaxUnaplannedVUs is 10, but since those executors won't
+// MaxUnplannedVUs=0, followed immediately after by another executor with
+// MaxPlannedVUs=10 and MaxUnplannedVUs=10. The MaxPlannedVUs number for the
+// whole test is 20, and MaxUnplannedVUs is 10, but since those executors won't
 // run concurrently, MaxVUs for the whole test is not 30, rather it's 20, since
 // 20 VUs will be sufficient to run the whole test.
 //
