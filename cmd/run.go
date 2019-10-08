@@ -56,12 +56,12 @@ const (
 	typeJS      = "js"
 	typeArchive = "archive"
 
-	thresholdHaveFailedErroCode = 99
-	setupTimeoutErrorCode       = 100
-	teardownTimeoutErrorCode    = 101
-	genericTimeoutErrorCode     = 102
-	genericEngineErrorCode      = 103
-	invalidConfigErrorCode      = 104
+	thresholdHaveFailedErrorCode = 99
+	setupTimeoutErrorCode        = 100
+	teardownTimeoutErrorCode     = 101
+	genericTimeoutErrorCode      = 102
+	genericEngineErrorCode       = 103
+	invalidConfigErrorCode       = 104
 )
 
 var (
@@ -173,7 +173,7 @@ a commandline interface for interacting with it.`,
 
 		conf, cerr := deriveAndValidateConfig(conf)
 		if cerr != nil {
-			return ExitCode{cerr, invalidConfigErrorCode}
+			return ExitCode{error: cerr, Code: invalidConfigErrorCode}
 		}
 
 		// Write options back to the runner too.
@@ -402,18 +402,15 @@ a commandline interface for interacting with it.`,
 				case lib.TimeoutError:
 					switch e.Place() {
 					case "setup":
-						logrus.WithField("hint", e.Hint()).Error(err)
-						return ExitCode{errors.New("Setup timeout"), setupTimeoutErrorCode}
+						return ExitCode{error: err, Code: setupTimeoutErrorCode, Hint: e.Hint()}
 					case "teardown":
-						logrus.WithField("hint", e.Hint()).Error(err)
-						return ExitCode{errors.New("Teardown timeout"), teardownTimeoutErrorCode}
+						return ExitCode{error: err, Code: teardownTimeoutErrorCode, Hint: e.Hint()}
 					default:
-						logrus.WithError(err).Error("Engine timeout")
-						return ExitCode{errors.New("Engine timeout"), genericTimeoutErrorCode}
+						return ExitCode{error: err, Code: genericTimeoutErrorCode}
 					}
 				default:
-					logrus.WithError(err).Error("Engine error")
-					return ExitCode{errors.New("Engine Error"), genericEngineErrorCode}
+					//nolint:golint
+					return ExitCode{error: errors.New("Engine error"), Code: genericEngineErrorCode, Hint: err.Error()}
 				}
 			case sig := <-sigC:
 				logrus.WithField("sig", sig).Debug("Exiting in response to signal")
@@ -461,7 +458,7 @@ a commandline interface for interacting with it.`,
 		}
 
 		if engine.IsTainted() {
-			return ExitCode{errors.New("some thresholds have failed"), thresholdHaveFailedErroCode}
+			return ExitCode{error: errors.New("some thresholds have failed"), Code: thresholdHaveFailedErrorCode}
 		}
 		return nil
 	},
