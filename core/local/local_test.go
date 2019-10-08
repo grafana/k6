@@ -645,3 +645,86 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 		}
 	}
 }
+
+// Just a lib.PausableExecutor implementation that can return an error
+type pausableExecutor struct {
+	lib.Executor
+	err error
+}
+
+func (p pausableExecutor) SetPaused(bool) error {
+	return p.err
+}
+
+func TestSetPaused(t *testing.T) {
+	t.Run("second pause is an error", func(t *testing.T) {
+		var runner = &lib.MiniRunner{}
+		logger := logrus.New()
+		logger.SetOutput(testutils.NewTestOutput(t))
+		var sched, err = NewExecutionScheduler(runner, logger)
+		require.NoError(t, err)
+		sched.executors = []lib.Executor{pausableExecutor{err: nil}}
+
+		require.NoError(t, sched.SetPaused(true))
+		err = sched.SetPaused(true)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "execution is already paused")
+	})
+
+	t.Run("unpause at the start is an error", func(t *testing.T) {
+		var runner = &lib.MiniRunner{}
+		logger := logrus.New()
+		logger.SetOutput(testutils.NewTestOutput(t))
+		var sched, err = NewExecutionScheduler(runner, logger)
+		require.NoError(t, err)
+		sched.executors = []lib.Executor{pausableExecutor{err: nil}}
+		err = sched.SetPaused(false)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "execution wasn't paused")
+	})
+
+	t.Run("second unpause is an error", func(t *testing.T) {
+		var runner = &lib.MiniRunner{}
+		logger := logrus.New()
+		logger.SetOutput(testutils.NewTestOutput(t))
+		var sched, err = NewExecutionScheduler(runner, logger)
+		require.NoError(t, err)
+		sched.executors = []lib.Executor{pausableExecutor{err: nil}}
+		require.NoError(t, sched.SetPaused(true))
+		require.NoError(t, sched.SetPaused(false))
+		err = sched.SetPaused(false)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "execution wasn't paused")
+	})
+
+	t.Run("an error on pausing is propagated", func(t *testing.T) {
+		var runner = &lib.MiniRunner{}
+		logger := logrus.New()
+		logger.SetOutput(testutils.NewTestOutput(t))
+		var sched, err = NewExecutionScheduler(runner, logger)
+		require.NoError(t, err)
+		var expectedErr = errors.New("testing pausable executor error")
+		sched.executors = []lib.Executor{pausableExecutor{err: expectedErr}}
+		err = sched.SetPaused(true)
+		require.Error(t, err)
+		require.Equal(t, err, expectedErr)
+	})
+
+	t.Run("can't pause unpausable executor", func(t *testing.T) {
+		var runner = &lib.MiniRunner{}
+		options, err := executor.DeriveExecutionFromShortcuts(lib.Options{
+			Iterations: null.IntFrom(2),
+			VUs:        null.IntFrom(1),
+		}.Apply(runner.GetOptions()))
+		require.NoError(t, err)
+		require.NoError(t, runner.SetOptions(options))
+
+		logger := logrus.New()
+		logger.SetOutput(testutils.NewTestOutput(t))
+		sched, err := NewExecutionScheduler(runner, logger)
+		require.NoError(t, err)
+		err = sched.SetPaused(true)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "doesn't support pause and resume operations after its start")
+	})
+}
