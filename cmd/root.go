@@ -86,11 +86,16 @@ var RootCmd = &cobra.Command{
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
 	if err := RootCmd.Execute(); err != nil {
-		logrus.Error(err.Error())
+		code := -1
+		var logger logrus.FieldLogger = logrus.StandardLogger()
 		if e, ok := err.(ExitCode); ok {
-			os.Exit(e.Code)
+			code = e.Code
+			if e.Hint != "" {
+				logger = logger.WithField("hint", e.Hint)
+			}
 		}
-		os.Exit(-1)
+		logger.Error(err)
+		os.Exit(code)
 	}
 }
 
