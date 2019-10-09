@@ -214,16 +214,16 @@ func (varc VariableArrivalRateConfig) getPlannedRateChanges(segment *lib.Executi
 		// nanosecond precision, so there isn't any actual loss of precision...
 		stepNumber := (stageDuration / minIntervalBetweenRateAdjustments)
 		if stepNumber > 1 {
+			rateDiff := new(big.Rat).Sub(stageTargetRate, currentRate)
 			stepInterval := stageDuration / stepNumber
 			for t := stepInterval; ; t += stepInterval {
 				if stageDuration-t < minIntervalBetweenRateAdjustments {
 					break
 				}
 
-				rateDiff := new(big.Rat).Sub(stageTargetRate, currentRate)
 				tArrivalRate := new(big.Rat).Add(
 					currentRate,
-					rateDiff.Mul(rateDiff, big.NewRat(int64(t), int64(stageDuration))),
+					new(big.Rat).Mul(rateDiff, big.NewRat(int64(t), int64(stageDuration))),
 				)
 
 				rateChanges = append(rateChanges, rateChange{

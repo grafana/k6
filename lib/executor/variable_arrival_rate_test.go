@@ -168,6 +168,37 @@ func TestGetPlannedRateChanges(t *testing.T) {
 	}
 }
 
+func BenchmarkGetPlannedRateChanges(b *testing.B) {
+	var config = VariableArrivalRateConfig{
+		TimeUnit:  types.NullDurationFrom(time.Second),
+		StartRate: null.IntFrom(0),
+		Stages: []Stage{
+			{
+				Duration: types.NullDurationFrom(5 * time.Minute),
+				Target:   null.IntFrom(5000),
+			},
+			{
+				Duration: types.NullDurationFrom(50 * time.Minute),
+				Target:   null.IntFrom(5000),
+			},
+			{
+				Duration: types.NullDurationFrom(5 * time.Minute),
+				Target:   null.IntFrom(0),
+			},
+		},
+	}
+
+	var es *lib.ExecutionSegment
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			changes := config.getPlannedRateChanges(es)
+
+			require.Equal(b, time.Duration(0),
+				changes[0].timeOffset%minIntervalBetweenRateAdjustments, "%+v", changes[0])
+		}
+	})
+}
+
 func initializeVUs(
 	ctx context.Context, t testing.TB, logEntry *logrus.Entry, es *lib.ExecutionState, number int,
 ) {
