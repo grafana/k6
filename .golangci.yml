@@ -15,11 +15,15 @@ issues:
   exclude-use-default: false
 
   exclude-rules:
-   # Exclude duplicate code checking in test files (due to common repeats in
-   # test setup code)
-   - path: _test\.go
+   # Exclude duplicate code and function length and complexity checking in test
+   # files (due to common repeats and long functions in test code)
+   - path: _test\.go #TODO: also exclude all go-generated files by giving them common names? *_gen.go?
      linters:
+       - gocyclo
        - dupl
+       #TODO - gocognit
+       - funlen
+       - lll
 
   exclude:
    #TODO: remove this exclusion after https://github.com/golang/lint/issues/381
@@ -40,10 +44,17 @@ linters-settings:
   goconst:
     min-len: 10
     min-occurrences: 4
+  funlen:
+    lines: 80
+    statements: 60
 
 linters:
   enable-all: true
   disable:
   - gochecknoinits
   - godox
+  #TODO - wsl
   fast: false
+
+service:
+  golangci-lint-version: 1.19.x  #TODO: upgrade to 1.20
