@@ -145,7 +145,6 @@ func (e *ExecutionScheduler) initVU(
 	vuID := e.state.GetUniqueVUIdentifier()
 	if err := vu.Reconfigure(int64(vuID)); err != nil {
 		return nil, fmt.Errorf("error while reconfiguring VU #%d: '%s'", vuID, err)
-
 	}
 	logger.Debugf("Initialized VU #%d", vuID)
 	return vu, nil
@@ -182,27 +181,31 @@ func (e *ExecutionScheduler) Init(ctx context.Context, engineOut chan<- stats.Sa
 		"executorsCount": len(e.executors),
 	}).Debugf("Start of initialization")
 
+	// Initialize VUs concurrently
 	doneInits := make(chan error, vusToInitialize) // poor man's early-return waitgroup
 	//TODO: make this an option?
 	initConcurrency := runtime.NumCPU()
-	limiter := make(chan struct{}, initConcurrency)
+	limiter := make(chan struct{})
 	subctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	initPlannedVU := func() {
-		newVU, err := e.initVU(ctx, logger, engineOut)
-		if err == nil {
-			e.state.AddInitializedVU(newVU)
-			<-limiter
-		}
-		doneInits <- err
+	for i := 0; i < initConcurrency; i++ {
+		go func() {
+			for range limiter {
+				newVU, err := e.initVU(ctx, logger, engineOut)
+				if err == nil {
+					e.state.AddInitializedVU(newVU)
+				}
+				doneInits <- err
+			}
+		}()
 	}
 
 	go func() {
+		defer close(limiter)
 		for vuNum := uint64(0); vuNum < vusToInitialize; vuNum++ {
 			select {
 			case limiter <- struct{}{}:
-				go initPlannedVU()
 			case <-subctx.Done():
 				return
 			}
