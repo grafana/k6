@@ -21,7 +21,7 @@
 package v1
 
 import (
-	"fmt"
+	"errors"
 	"io/ioutil"
 	"net/http"
 
@@ -53,7 +53,7 @@ func getFirstExternallyControlledExecutor(
 			return mex, nil
 		}
 	}
-	return nil, fmt.Errorf("a externally-controlled executor needs to be configured for live configuration updates")
+	return nil, errors.New("a externally-controlled executor needs to be configured for live configuration updates")
 }
 
 func HandlePatchStatus(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {

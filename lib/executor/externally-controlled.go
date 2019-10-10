@@ -281,7 +281,7 @@ func (mex *ExternallyControlled) UpdateConfig(ctx context.Context, newConf inter
 		)
 	}
 
-	mex.configLock.Lock()
+	mex.configLock.Lock() // guard against a simultaneous start of the test (which will close hasStarted)
 	select {
 	case <-mex.hasStarted:
 		mex.configLock.Unlock()
