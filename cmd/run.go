@@ -211,17 +211,16 @@ a commandline interface for interacting with it.`,
 		{
 			out := "-"
 			link := ""
-			if engine.Collectors != nil {
-				for idx, collector := range engine.Collectors {
-					if out != "-" {
-						out = out + "; " + conf.Out[idx]
-					} else {
-						out = conf.Out[idx]
-					}
 
-					if l := collector.Link(); l != "" {
-						link = link + " (" + l + ")"
-					}
+			for idx, collector := range engine.Collectors {
+				if out != "-" {
+					out = out + "; " + conf.Out[idx]
+				} else {
+					out = conf.Out[idx]
+				}
+
+				if l := collector.Link(); l != "" {
+					link = link + " (" + l + ")"
 				}
 			}
 
@@ -333,12 +332,12 @@ a commandline interface for interacting with it.`,
 
 				switch e := errors.Cause(err).(type) {
 				case lib.TimeoutError:
-					switch string(e) {
+					switch e.Place() {
 					case "setup":
-						logger.WithError(err).Error("Setup timeout")
+						logger.WithField("hint", e.Hint()).Error(err)
 						return ExitCode{errors.New("Setup timeout"), setupTimeoutErrorCode}
 					case "teardown":
-						logger.WithError(err).Error("Teardown timeout")
+						logger.WithField("hint", e.Hint()).Error(err)
 						return ExitCode{errors.New("Teardown timeout"), teardownTimeoutErrorCode}
 					default:
 						logger.WithError(err).Error("Engine timeout")

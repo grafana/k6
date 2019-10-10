@@ -106,15 +106,17 @@ func websocketEchoHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	for {
-		mt, message, err := conn.ReadMessage()
-		if err != nil {
-			break
-		}
-		err = conn.WriteMessage(mt, message)
-		if err != nil {
-			break
-		}
+	mt, message, err := conn.ReadMessage()
+	if err != nil {
+		return
+	}
+	err = conn.WriteMessage(mt, message)
+	if err != nil {
+		return
+	}
+	err = conn.Close()
+	if err != nil {
+		return
 	}
 }
 

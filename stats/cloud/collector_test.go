@@ -355,3 +355,186 @@ func TestCloudCollectorMaxPerPacket(t *testing.T) {
 	wg.Wait()
 	require.True(t, gotTheLimit)
 }
+
+func TestCloudCollectorStopSendingMetric(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	tb.Mux.HandleFunc("/v1/tests", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := fmt.Fprint(w, `{
+			"reference_id": "12",
+			"config": {
+				"metricPushInterval": "200ms",
+				"aggregationPeriod": "100ms",
+				"maxMetricSamplesPerPackage": 20,
+				"aggregationCalcInterval": "100ms",
+				"aggregationWaitPeriod": "100ms"
+			}
+		}`)
+		require.NoError(t, err)
+	}))
+	defer tb.Cleanup()
+
+	script := &loader.SourceData{
+		Data: []byte(""),
+		URL:  &url.URL{Path: "/script.js"},
+	}
+
+	options := lib.Options{
+		Duration: types.NullDurationFrom(1 * time.Second),
+	}
+
+	config := NewConfig().Apply(Config{
+		Host:       null.StringFrom(tb.ServerHTTP.URL),
+		NoCompress: null.BoolFrom(true),
+	})
+	collector, err := New(config, script, options, "1.0")
+	require.NoError(t, err)
+	now := time.Now()
+	tags := stats.IntoSampleTags(&map[string]string{"test": "mest", "a": "b"})
+
+	count := 1
+	max := 5
+	tb.Mux.HandleFunc(fmt.Sprintf("/v1/metrics/%s", collector.referenceID),
+		func(w http.ResponseWriter, r *http.Request) {
+			count++
+			if count == max {
+				type payload struct {
+					Error ErrorResponse `json:"error"`
+				}
+				res := &payload{}
+				res.Error = ErrorResponse{Code: 4}
+				w.Header().Set("Content-Type", "application/json")
+				data, err := json.Marshal(res)
+				if err != nil {
+					t.Fatal(err)
+				}
+				w.WriteHeader(http.StatusForbidden)
+				_, _ = w.Write(data)
+				return
+			}
+			body, err := ioutil.ReadAll(r.Body)
+			assert.NoError(t, err)
+			receivedSamples := []Sample{}
+			assert.NoError(t, json.Unmarshal(body, &receivedSamples))
+		})
+
+	require.NoError(t, collector.Init())
+	ctx, cancel := context.WithCancel(context.Background())
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		collector.Run(ctx)
+		wg.Done()
+	}()
+
+	collector.Collect([]stats.SampleContainer{stats.Sample{
+		Time:   now,
+		Metric: metrics.VUs,
+		Tags:   stats.NewSampleTags(tags.CloneTags()),
+		Value:  1.0,
+	}})
+	for j := time.Duration(1); j <= 200; j++ {
+		var container = make([]stats.SampleContainer, 0, 500)
+		for i := time.Duration(1); i <= 50; i++ {
+			container = append(container, &httpext.Trail{
+				Blocked:        i % 200 * 100 * time.Millisecond,
+				Connecting:     i % 200 * 200 * time.Millisecond,
+				TLSHandshaking: i % 200 * 300 * time.Millisecond,
+				Sending:        i * i * 400 * time.Millisecond,
+				Waiting:        500 * time.Millisecond,
+				Receiving:      600 * time.Millisecond,
+
+				EndTime:      now.Add(i * 100),
+				ConnDuration: 500 * time.Millisecond,
+				Duration:     j * i * 1500 * time.Millisecond,
+				Tags:         stats.NewSampleTags(tags.CloneTags()),
+			})
+		}
+		collector.Collect(container)
+	}
+
+	cancel()
+	wg.Wait()
+	require.Equal(t, lib.RunStatusQueued, collector.runStatus)
+	_, ok := <-collector.stopSendingMetricsCh
+	require.False(t, ok)
+	require.Equal(t, max, count)
+
+	nBufferSamples := len(collector.bufferSamples)
+	nBufferHTTPTrails := len(collector.bufferHTTPTrails)
+	collector.Collect([]stats.SampleContainer{stats.Sample{
+		Time:   now,
+		Metric: metrics.VUs,
+		Tags:   stats.NewSampleTags(tags.CloneTags()),
+		Value:  1.0,
+	}})
+	if nBufferSamples != len(collector.bufferSamples) || nBufferHTTPTrails != len(collector.bufferHTTPTrails) {
+		t.Errorf("Collector still collects data after stop sending metrics")
+	}
+}
+
+func TestCloudCollectorAggregationPeriodZeroNoBlock(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	tb.Mux.HandleFunc("/v1/tests", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := fmt.Fprintf(w, `{
+			"reference_id": "123",
+			"config": {
+				"metricPushInterval": "10ms",
+				"aggregationPeriod": "0ms",
+				"aggregationCalcInterval": "40ms",
+				"aggregationWaitPeriod": "5ms"
+			}
+		}`)
+		require.NoError(t, err)
+	}))
+	defer tb.Cleanup()
+
+	script := &loader.SourceData{
+		Data: []byte(""),
+		URL:  &url.URL{Path: "/script.js"},
+	}
+
+	options := lib.Options{
+		Duration: types.NullDurationFrom(1 * time.Second),
+	}
+
+	config := NewConfig().Apply(Config{
+		Host:       null.StringFrom(tb.ServerHTTP.URL),
+		NoCompress: null.BoolFrom(true),
+	})
+	collector, err := New(config, script, options, "1.0")
+	require.NoError(t, err)
+
+	assert.True(t, collector.config.Host.Valid)
+	assert.Equal(t, tb.ServerHTTP.URL, collector.config.Host.String)
+	assert.True(t, collector.config.NoCompress.Valid)
+	assert.True(t, collector.config.NoCompress.Bool)
+	assert.False(t, collector.config.MetricPushInterval.Valid)
+	assert.False(t, collector.config.AggregationPeriod.Valid)
+	assert.False(t, collector.config.AggregationWaitPeriod.Valid)
+
+	require.NoError(t, collector.Init())
+	assert.Equal(t, "123", collector.referenceID)
+	assert.True(t, collector.config.MetricPushInterval.Valid)
+	assert.Equal(t, types.Duration(10*time.Millisecond), collector.config.MetricPushInterval.Duration)
+	assert.True(t, collector.config.AggregationPeriod.Valid)
+	assert.Equal(t, types.Duration(0), collector.config.AggregationPeriod.Duration)
+	assert.True(t, collector.config.AggregationWaitPeriod.Valid)
+	assert.Equal(t, types.Duration(5*time.Millisecond), collector.config.AggregationWaitPeriod.Duration)
+
+	expSamples := make(chan []Sample)
+	tb.Mux.HandleFunc(fmt.Sprintf("/v1/metrics/%s", collector.referenceID), getSampleChecker(t, expSamples))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		collector.Run(ctx)
+		wg.Done()
+	}()
+
+	cancel()
+	wg.Wait()
+	require.Equal(t, lib.RunStatusQueued, collector.runStatus)
+}

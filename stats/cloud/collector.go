@@ -23,6 +23,7 @@ package cloud
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"path/filepath"
 	"sync"
 	"time"
@@ -70,6 +71,8 @@ type Collector struct {
 	// checks basically O(1). And even if for some reason there are occasional metrics with past times that
 	// don't fit in the chosen ring buffer size, we could just send them along to the buffer unaggregated
 	aggrBuckets map[int64]aggregationBucket
+
+	stopSendingMetricsCh chan struct{}
 }
 
 // Verify that Collector implements lib.Collector
@@ -140,6 +143,7 @@ func New(
 		duration:      int64(duration / time.Second),
 		opts:          opts,
 		aggrBuckets:   map[int64]aggregationBucket{},
+		stopSendingMetricsCh: make(chan struct{}),
 	}, nil
 }
 
@@ -194,22 +198,28 @@ func (c *Collector) Link() string {
 // at regular intervals and when the context is terminated.
 func (c *Collector) Run(ctx context.Context) {
 	wg := sync.WaitGroup{}
-
+	quit := ctx.Done()
+	aggregationPeriod := time.Duration(c.config.AggregationPeriod.Duration)
 	// If enabled, start periodically aggregating the collected HTTP trails
-	if c.config.AggregationPeriod.Duration > 0 {
+	if aggregationPeriod > 0 {
 		wg.Add(1)
-		aggregationTicker := time.NewTicker(time.Duration(c.config.AggregationCalcInterval.Duration))
+		aggregationTicker := time.NewTicker(aggregationPeriod)
+		aggregationWaitPeriod := time.Duration(c.config.AggregationWaitPeriod.Duration)
+		signalQuit := make(chan struct{})
+		quit = signalQuit
 
 		go func() {
+			defer wg.Done()
 			for {
 				select {
+				case <-c.stopSendingMetricsCh:
+					return
 				case <-aggregationTicker.C:
-					c.aggregateHTTPTrails(time.Duration(c.config.AggregationWaitPeriod.Duration))
+					c.aggregateHTTPTrails(aggregationWaitPeriod)
 				case <-ctx.Done():
 					c.aggregateHTTPTrails(0)
 					c.flushHTTPTrails()
-					c.pushMetrics()
-					wg.Done()
+					close(signalQuit)
 					return
 				}
 			}
@@ -224,11 +234,16 @@ func (c *Collector) Run(ctx context.Context) {
 	pushTicker := time.NewTicker(time.Duration(c.config.MetricPushInterval.Duration))
 	for {
 		select {
-		case <-pushTicker.C:
-			c.pushMetrics()
-		case <-ctx.Done():
+		case <-c.stopSendingMetricsCh:
+			return
+		default:
+		}
+		select {
+		case <-quit:
 			c.pushMetrics()
 			return
+		case <-pushTicker.C:
+			c.pushMetrics()
 		}
 	}
 }
@@ -236,6 +251,12 @@ func (c *Collector) Run(ctx context.Context) {
 // Collect receives a set of samples. This method is never called concurrently, and only while
 // the context for Run() is valid, but should defer as much work as possible to Run().
 func (c *Collector) Collect(sampleContainers []stats.SampleContainer) {
+	select {
+	case <-c.stopSendingMetricsCh:
+		return
+	default:
+	}
+
 	if c.referenceID == "" {
 		return
 	}
@@ -439,6 +460,19 @@ func (c *Collector) flushHTTPTrails() {
 	c.aggrBuckets = map[int64]aggregationBucket{}
 	c.bufferSamples = append(c.bufferSamples, newSamples...)
 }
+
+func (c *Collector) shouldStopSendingMetrics(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	if errResp, ok := err.(ErrorResponse); ok && errResp.Response != nil {
+		return errResp.Response.StatusCode == http.StatusForbidden && errResp.Code == 4
+	}
+
+	return false
+}
+
 func (c *Collector) pushMetrics() {
 	c.bufferMutex.Lock()
 	if len(c.bufferSamples) == 0 {
@@ -460,9 +494,12 @@ func (c *Collector) pushMetrics() {
 		}
 		err := c.client.PushMetric(c.referenceID, c.config.NoCompress.Bool, buffer[:size])
 		if err != nil {
-			logrus.WithFields(logrus.Fields{
-				"error": err,
-			}).Warn("Failed to send metrics to cloud")
+			if c.shouldStopSendingMetrics(err) {
+				logrus.WithError(err).Warn("Stopped sending metrics to cloud due to an error")
+				close(c.stopSendingMetricsCh)
+				break
+			}
+			logrus.WithError(err).Warn("Failed to send metrics to cloud")
 		}
 		buffer = buffer[size:]
 	}
@@ -491,7 +528,7 @@ func (c *Collector) testFinished() {
 	}).Debug("Sending test finished")
 
 	runStatus := lib.RunStatusFinished
-	if c.runStatus != 0 {
+	if c.runStatus != lib.RunStatusQueued {
 		runStatus = c.runStatus
 	}
 

@@ -31,7 +31,6 @@ import (
 	"github.com/fatih/color"
 	"github.com/mattn/go-colorable"
 	"github.com/mattn/go-isatty"
-	"github.com/shibukawa/configdir"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -128,13 +127,17 @@ func rootCmdPersistentFlagSet() *pflag.FlagSet {
 }
 
 func init() {
-	// TODO: find a better library... or better yet, simply port the few dozen lines of code for getting the
-	// per-user config folder in a cross-platform way
-	configDirs := configdir.New("loadimpact", "k6")
-	configFolders := configDirs.QueryFolders(configdir.Global)
-	if len(configFolders) > 0 {
-		defaultConfigFilePath = filepath.Join(configFolders[0].Path, defaultConfigFileName)
+	confDir, err := configDir()
+	if err != nil {
+		logrus.WithError(err).Warn("could not get config directory")
+		confDir = ".config"
 	}
+	defaultConfigFilePath = filepath.Join(
+		confDir,
+		"loadimpact",
+		"k6",
+		defaultConfigFileName,
+	)
 
 	RootCmd.PersistentFlags().AddFlagSet(rootCmdPersistentFlagSet())
 }

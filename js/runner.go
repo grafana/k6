@@ -46,7 +46,12 @@ import (
 	"github.com/loadimpact/k6/stats"
 )
 
-var errInterrupt = errors.New("context cancelled")
+//nolint:gochecknoglobals
+var (
+	errInterrupt  = errors.New("context cancelled")
+	stageSetup    = "setup"
+	stageTeardown = "teardown"
+)
 
 // Ensure Runner implements the lib.Runner interface
 var _ lib.Runner = &Runner{}
@@ -211,9 +216,9 @@ func (r *Runner) Setup(ctx context.Context, out chan<- stats.SampleContainer) er
 	)
 	defer setupCancel()
 
-	v, err := r.runPart(setupCtx, out, "setup", nil)
+	v, err := r.runPart(setupCtx, out, stageSetup, nil)
 	if err != nil {
-		return errors.Wrap(err, "setup")
+		return errors.Wrap(err, stageSetup)
 	}
 	// r.setupData = nil is special it means undefined from this moment forward
 	if goja.IsUndefined(v) {
@@ -223,7 +228,7 @@ func (r *Runner) Setup(ctx context.Context, out chan<- stats.SampleContainer) er
 
 	r.setupData, err = json.Marshal(v.Export())
 	if err != nil {
-		return errors.Wrap(err, "setup")
+		return errors.Wrap(err, stageSetup)
 	}
 	var tmp interface{}
 	return json.Unmarshal(r.setupData, &tmp)
@@ -249,12 +254,12 @@ func (r *Runner) Teardown(ctx context.Context, out chan<- stats.SampleContainer)
 	var data interface{}
 	if r.setupData != nil {
 		if err := json.Unmarshal(r.setupData, &data); err != nil {
-			return errors.Wrap(err, "Teardown")
+			return errors.Wrap(err, stageTeardown)
 		}
 	} else {
 		data = goja.Undefined()
 	}
-	_, err := r.runPart(teardownCtx, out, "teardown", data)
+	_, err := r.runPart(teardownCtx, out, stageTeardown, data)
 	return err
 }
 
@@ -326,9 +331,21 @@ func (r *Runner) runPart(ctx context.Context, out chan<- stats.SampleContainer, 
 			return v, err
 		}
 		// otherwise we have timeouted
-		return v, lib.NewTimeoutError(name)
+		return v, lib.NewTimeoutError(name, r.timeoutErrorDuration(name))
 	}
 	return v, err
+}
+
+// timeoutErrorDuration returns the timeout duration for given stage.
+func (r *Runner) timeoutErrorDuration(stage string) time.Duration {
+	d := time.Duration(0)
+	switch stage {
+	case stageSetup:
+		return time.Duration(r.Bundle.Options.SetupTimeout.Duration)
+	case stageTeardown:
+		return time.Duration(r.Bundle.Options.TeardownTimeout.Duration)
+	}
+	return d
 }
 
 type VU struct {

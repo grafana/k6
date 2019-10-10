@@ -6,9 +6,14 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"testing"
 
+	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/stats"
 	"github.com/pkg/errors"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -80,5 +85,56 @@ func TestMakeRequestError(t *testing.T) {
 		_, err = MakeRequest(ctx, preq)
 		require.Error(t, err)
 		require.Equal(t, err.Error(), "unknown compressionType CompressionType(13)")
+	})
+
+	t.Run("invalid upgrade response", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Add("Connection", "Upgrade")
+			w.Header().Add("Upgrade", "h2c")
+			w.WriteHeader(http.StatusSwitchingProtocols)
+		}))
+		defer srv.Close()
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		state := &lib.State{
+			Options:   lib.Options{RunTags: &stats.SampleTags{}},
+			Transport: srv.Client().Transport,
+		}
+		ctx = lib.WithState(ctx, state)
+		req, _ := http.NewRequest("GET", srv.URL, nil)
+		var preq = &ParsedHTTPRequest{Req: req, URL: &URL{u: req.URL}, Body: new(bytes.Buffer)}
+
+		res, err := MakeRequest(ctx, preq)
+
+		assert.Nil(t, res)
+		assert.EqualError(t, err, "unsupported response status: 101 Switching Protocols")
+	})
+}
+
+func TestURL(t *testing.T) {
+	t.Run("Clean", func(t *testing.T) {
+		testCases := []struct {
+			url      string
+			expected string
+		}{
+			{"https://example.com/", "https://example.com/"},
+			{"https://example.com/${}", "https://example.com/${}"},
+			{"https://user@example.com/", "https://****@example.com/"},
+			{"https://user:pass@example.com/", "https://****:****@example.com/"},
+			{"https://user:pass@example.com/path?a=1&b=2", "https://****:****@example.com/path?a=1&b=2"},
+			{"https://user:pass@example.com/${}/${}", "https://****:****@example.com/${}/${}"},
+			{"@malformed/url", "@malformed/url"},
+			{"not a url", "not a url"},
+		}
+
+		for _, tc := range testCases {
+			tc := tc
+			t.Run(tc.url, func(t *testing.T) {
+				u, err := url.Parse(tc.url)
+				require.NoError(t, err)
+				ut := URL{u: u, URL: tc.url}
+				require.Equal(t, tc.expected, ut.Clean())
+			})
+		}
 	})
 }
