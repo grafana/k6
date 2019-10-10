@@ -373,20 +373,28 @@ func (s Selection) Is(v goja.Value) bool {
 	}
 }
 
-func (s Selection) Map(v goja.Value) (result []string) {
+func (s Selection) Map(v goja.Value) []string {
 	gojaFn, isFn := goja.AssertFunction(v)
 	if !isFn {
 		common.Throw(s.rt, errors.New("Argument to map() must be a function"))
 	}
 
-	fn := func(idx int, sel *goquery.Selection) string {
+	fn := func(idx int, sel *Selection) string {
 		if fnRes, fnErr := gojaFn(v, s.rt.ToValue(idx), s.rt.ToValue(sel)); fnErr == nil {
 			return fnRes.String()
 		}
 		return ""
 	}
 
-	return s.sel.Map(fn)
+	// Mimics goquery.Selector.Map function.
+	// We can not use s.sel.Map directly, otherwise, goja will see the function body elements as type
+	// *gohtml.Selection instead of our *Selection wrapper, so goja runtime will call wrong methods.
+	// See issue #1195
+	result := make([]string, len(s.sel.Nodes))
+	for i, n := range s.sel.Nodes {
+		result[i] = fn(i, &Selection{rt: s.rt, sel: &goquery.Selection{Nodes: []*gohtml.Node{n}}})
+	}
+	return result
 }
 
 func (s Selection) Slice(start int, def ...int) Selection {
