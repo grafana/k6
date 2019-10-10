@@ -267,10 +267,10 @@ func (mex *ExternallyControlled) UpdateConfig(ctx context.Context, newConf inter
 		return fmt.Errorf("invalid configuration supplied: %s", lib.ConcatErrors(errs, ", "))
 	}
 
-	if newConfigParams.Duration != mex.startConfig.Duration {
+	if newConfigParams.Duration.Valid && newConfigParams.Duration != mex.startConfig.Duration {
 		return fmt.Errorf("the externally controlled executor duration cannot be changed")
 	}
-	if newConfigParams.MaxVUs.Int64 < mex.startConfig.MaxVUs.Int64 {
+	if newConfigParams.MaxVUs.Valid && newConfigParams.MaxVUs.Int64 < mex.startConfig.MaxVUs.Int64 {
 		// This limitation is because the externally controlled executor is
 		// still a executor that participates in the overall k6 scheduling.
 		// Thus, any VUs that were explicitly specified by the user in the
