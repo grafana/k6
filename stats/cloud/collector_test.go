@@ -387,7 +387,7 @@ func TestCloudCollectorStopSendingMetric(t *testing.T) {
 		Host:       null.StringFrom(tb.ServerHTTP.URL),
 		NoCompress: null.BoolFrom(true),
 	})
-	collector, err := New(config, script, options, "1.0")
+	collector, err := New(config, script, options, []lib.ExecutionStep{}, "1.0")
 	require.NoError(t, err)
 	now := time.Now()
 	tags := stats.IntoSampleTags(&map[string]string{"test": "mest", "a": "b"})
@@ -503,7 +503,7 @@ func TestCloudCollectorAggregationPeriodZeroNoBlock(t *testing.T) {
 		Host:       null.StringFrom(tb.ServerHTTP.URL),
 		NoCompress: null.BoolFrom(true),
 	})
-	collector, err := New(config, script, options, "1.0")
+	collector, err := New(config, script, options, []lib.ExecutionStep{}, "1.0")
 	require.NoError(t, err)
 
 	assert.True(t, collector.config.Host.Valid)
