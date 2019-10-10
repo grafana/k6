@@ -154,8 +154,8 @@ func (carc ConstantArrivalRateConfig) GetExecutionRequirements(es *lib.Execution
 
 // NewExecutor creates a new ConstantArrivalRate executor
 func (carc ConstantArrivalRateConfig) NewExecutor(
-	es *lib.ExecutionState, logger *logrus.Entry) (lib.Executor, error) {
-
+	es *lib.ExecutionState, logger *logrus.Entry,
+) (lib.Executor, error) {
 	return ConstantArrivalRate{
 		BaseExecutor: NewBaseExecutor(carc, es, logger),
 		config:       carc,
@@ -175,7 +175,7 @@ var _ lib.Executor = &ConstantArrivalRate{}
 // Run executes a constant number of iterations per second.
 //
 // TODO: Reuse the variable arrival rate method?
-func (car ConstantArrivalRate) Run(ctx context.Context, out chan<- stats.SampleContainer) (err error) {
+func (car ConstantArrivalRate) Run(ctx context.Context, out chan<- stats.SampleContainer) (err error) { //nolint:funlen
 	segment := car.executionState.Options.ExecutionSegment
 	gracefulStop := car.config.GetGracefulStop()
 	duration := time.Duration(car.config.Duration.Duration)

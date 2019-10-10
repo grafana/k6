@@ -126,7 +126,6 @@ func ConcatErrors(errors []error, separator string) string {
 func StreamExecutionSteps(
 	ctx context.Context, startTime time.Time, steps []ExecutionStep, closeChanWhenDone bool,
 ) <-chan ExecutionStep {
-
 	ch := make(chan ExecutionStep)
 	go func() {
 		for _, step := range steps {

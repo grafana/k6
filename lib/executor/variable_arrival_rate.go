@@ -238,8 +238,8 @@ func (varc VariableArrivalRateConfig) getPlannedRateChanges(segment *lib.Executi
 
 // NewExecutor creates a new VariableArrivalRate executor
 func (varc VariableArrivalRateConfig) NewExecutor(
-	es *lib.ExecutionState, logger *logrus.Entry) (lib.Executor, error) {
-
+	es *lib.ExecutionState, logger *logrus.Entry,
+) (lib.Executor, error) {
 	return VariableArrivalRate{
 		BaseExecutor:       NewBaseExecutor(varc, es, logger),
 		config:             varc,
@@ -285,7 +285,7 @@ func (varr VariableArrivalRate) streamRateChanges(ctx context.Context, startTime
 }
 
 // Run executes a variable number of iterations per second.
-func (varr VariableArrivalRate) Run(ctx context.Context, out chan<- stats.SampleContainer) (err error) {
+func (varr VariableArrivalRate) Run(ctx context.Context, out chan<- stats.SampleContainer) (err error) { //nolint:funlen
 	segment := varr.executionState.Options.ExecutionSegment
 	gracefulStop := varr.config.GetGracefulStop()
 	duration := sumStagesDuration(varr.config.Stages)

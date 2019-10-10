@@ -48,17 +48,17 @@ func init() {
 	)
 }
 
-// SharedIteationsConfig stores the number of VUs iterations, as well as maxDuration settings
-type SharedIteationsConfig struct {
+// SharedIterationsConfig stores the number of VUs iterations, as well as maxDuration settings
+type SharedIterationsConfig struct {
 	BaseConfig
 	VUs         null.Int           `json:"vus"`
 	Iterations  null.Int           `json:"iterations"`
 	MaxDuration types.NullDuration `json:"maxDuration"`
 }
 
-// NewSharedIterationsConfig returns a SharedIteationsConfig with default values
-func NewSharedIterationsConfig(name string) SharedIteationsConfig {
-	return SharedIteationsConfig{
+// NewSharedIterationsConfig returns a SharedIterationsConfig with default values
+func NewSharedIterationsConfig(name string) SharedIterationsConfig {
+	return SharedIterationsConfig{
 		BaseConfig:  NewBaseConfig(name, sharedIterationsType),
 		VUs:         null.NewInt(1, false),
 		Iterations:  null.NewInt(1, false),
@@ -67,27 +67,27 @@ func NewSharedIterationsConfig(name string) SharedIteationsConfig {
 }
 
 // Make sure we implement the lib.ExecutorConfig interface
-var _ lib.ExecutorConfig = &SharedIteationsConfig{}
+var _ lib.ExecutorConfig = &SharedIterationsConfig{}
 
 // GetVUs returns the scaled VUs for the executor.
-func (sic SharedIteationsConfig) GetVUs(es *lib.ExecutionSegment) int64 {
+func (sic SharedIterationsConfig) GetVUs(es *lib.ExecutionSegment) int64 {
 	return es.Scale(sic.VUs.Int64)
 }
 
 // GetIterations returns the scaled iteration count for the executor.
-func (sic SharedIteationsConfig) GetIterations(es *lib.ExecutionSegment) int64 {
+func (sic SharedIterationsConfig) GetIterations(es *lib.ExecutionSegment) int64 {
 	return es.Scale(sic.Iterations.Int64)
 }
 
 // GetDescription returns a human-readable description of the executor options
-func (sic SharedIteationsConfig) GetDescription(es *lib.ExecutionSegment) string {
+func (sic SharedIterationsConfig) GetDescription(es *lib.ExecutionSegment) string {
 	return fmt.Sprintf("%d iterations shared among %d VUs%s",
 		sic.GetIterations(es), sic.GetVUs(es),
 		sic.getBaseInfo(fmt.Sprintf("maxDuration: %s", sic.MaxDuration.Duration)))
 }
 
 // Validate makes sure all options are configured and valid
-func (sic SharedIteationsConfig) Validate() []error {
+func (sic SharedIterationsConfig) Validate() []error {
 	errors := sic.BaseConfig.Validate()
 	if sic.VUs.Int64 <= 0 {
 		errors = append(errors, fmt.Errorf("the number of VUs should be more than 0"))
@@ -112,7 +112,7 @@ func (sic SharedIteationsConfig) Validate() []error {
 // GetExecutionRequirements just reserves the number of specified VUs for the
 // whole duration of the executor, including the maximum waiting time for
 // iterations to gracefully stop.
-func (sic SharedIteationsConfig) GetExecutionRequirements(es *lib.ExecutionSegment) []lib.ExecutionStep {
+func (sic SharedIterationsConfig) GetExecutionRequirements(es *lib.ExecutionSegment) []lib.ExecutionStep {
 	return []lib.ExecutionStep{
 		{
 			TimeOffset: 0,
@@ -125,29 +125,29 @@ func (sic SharedIteationsConfig) GetExecutionRequirements(es *lib.ExecutionSegme
 	}
 }
 
-// NewExecutor creates a new SharedIteations executor
-func (sic SharedIteationsConfig) NewExecutor(
-	es *lib.ExecutionState, logger *logrus.Entry) (lib.Executor, error) {
-
-	return SharedIteations{
+// NewExecutor creates a new SharedIterations executor
+func (sic SharedIterationsConfig) NewExecutor(
+	es *lib.ExecutionState, logger *logrus.Entry,
+) (lib.Executor, error) {
+	return SharedIterations{
 		BaseExecutor: NewBaseExecutor(sic, es, logger),
 		config:       sic,
 	}, nil
 }
 
-// SharedIteations executes a specific total number of iterations, which are
+// SharedIterations executes a specific total number of iterations, which are
 // all shared by the configured VUs.
-type SharedIteations struct {
+type SharedIterations struct {
 	*BaseExecutor
-	config SharedIteationsConfig
+	config SharedIterationsConfig
 }
 
 // Make sure we implement the lib.Executor interface.
-var _ lib.Executor = &PerVUIteations{}
+var _ lib.Executor = &PerVUIterations{}
 
 // Run executes a specific total number of iterations, which are all shared by
 // the configured VUs.
-func (si SharedIteations) Run(ctx context.Context, out chan<- stats.SampleContainer) (err error) {
+func (si SharedIterations) Run(ctx context.Context, out chan<- stats.SampleContainer) (err error) {
 	segment := si.executionState.Options.ExecutionSegment
 	numVUs := si.config.GetVUs(segment)
 	iterations := si.config.GetIterations(segment)

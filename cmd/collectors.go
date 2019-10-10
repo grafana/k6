@@ -67,7 +67,6 @@ func parseCollector(s string) (t, arg string) {
 func newCollector(
 	collectorName, arg string, src *loader.SourceData, conf Config, executionPlan []lib.ExecutionStep,
 ) (lib.Collector, error) {
-
 	getCollector := func() (lib.Collector, error) {
 		switch collectorName {
 		case collectorJSON:

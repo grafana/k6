@@ -135,7 +135,6 @@ func (e *ExecutionScheduler) GetExecutionPlan() []lib.ExecutionStep {
 func (e *ExecutionScheduler) initVU(
 	_ context.Context, logger *logrus.Entry, engineOut chan<- stats.SampleContainer,
 ) (lib.VU, error) {
-
 	vu, err := e.runner.NewVU(engineOut)
 	if err != nil {
 		return nil, fmt.Errorf("error while initializing a VU: '%s'", err)

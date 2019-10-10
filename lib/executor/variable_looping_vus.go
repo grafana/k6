@@ -185,6 +185,7 @@ func (vlvc VariableLoopingVUsConfig) Validate() []error {
 //       00000000001111111111222   (t/10)
 //
 // More information: https://github.com/loadimpact/k6/issues/997#issuecomment-484416866
+//nolint:funlen
 func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(es *lib.ExecutionSegment, zeroEnd bool) []lib.ExecutionStep {
 	// For accurate results, calculations are done with the unscaled values, and
 	// the values are scaled only before we add them to the steps result slice
@@ -330,9 +331,9 @@ func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(es *lib.ExecutionSegme
 // executorEndOffset, is not handled here. Instead GetExecutionRequirements()
 // takes care of that. But to make its job easier, this method won't add any
 // steps with an offset that's greater or equal to executorEndOffset.
-func (vlvc VariableLoopingVUsConfig) reserveVUsForGracefulRampDowns(
-	rawSteps []lib.ExecutionStep, executorEndOffset time.Duration) []lib.ExecutionStep {
-
+func (vlvc VariableLoopingVUsConfig) reserveVUsForGracefulRampDowns( //nolint:funlen
+	rawSteps []lib.ExecutionStep, executorEndOffset time.Duration,
+) []lib.ExecutionStep {
 	rawStepsLen := len(rawSteps)
 	gracefulRampDownPeriod := vlvc.GetGracefulRampDown()
 	newSteps := []lib.ExecutionStep{}
@@ -475,7 +476,7 @@ var _ lib.Executor = &VariableLoopingVUs{}
 // TODO: split up? since this does a ton of things, unfortunately I can't think
 // of a less complex way to implement it (besides the old "increment by 100ms
 // and see what happens)... :/ so maybe see how it can be spit?
-func (vlv VariableLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleContainer) (err error) {
+func (vlv VariableLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleContainer) (err error) { //nolint:funlen
 	segment := vlv.executionState.Options.ExecutionSegment
 	rawExecutionSteps := vlv.config.getRawExecutionSteps(segment, true)
 	regularDuration, isFinal := lib.GetEndOffset(rawExecutionSteps)

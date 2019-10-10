@@ -289,7 +289,6 @@ func (scs ExecutorConfigMap) GetFullExecutionRequirements(executionSegment *Exec
 		if stepsLen == 0 ||
 			consolidatedSteps[stepsLen-1].PlannedVUs != newPlannedVUs ||
 			consolidatedSteps[stepsLen-1].MaxUnplannedVUs != newMaxUnplannedVUs {
-
 			consolidatedSteps = append(consolidatedSteps, ExecutionStep{
 				TimeOffset:      currentTimeOffset,
 				PlannedVUs:      newPlannedVUs,
