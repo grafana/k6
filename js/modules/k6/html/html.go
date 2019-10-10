@@ -381,7 +381,8 @@ func (s Selection) Map(v goja.Value) []string {
 	}
 
 	fn := func(idx int, sel *goquery.Selection) string {
-		if fnRes, fnErr := gojaFn(v, s.rt.ToValue(idx), s.rt.ToValue(&Selection{sel: sel, URL: s.URL, rt: s.rt})); fnErr == nil {
+		selection := &Selection{sel: sel, URL: s.URL, rt: s.rt}
+		if fnRes, fnErr := gojaFn(v, s.rt.ToValue(idx), s.rt.ToValue(selection)); fnErr == nil {
 			return fnRes.String()
 		}
 		return ""
