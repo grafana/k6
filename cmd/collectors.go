@@ -64,6 +64,8 @@ func parseCollector(s string) (t, arg string) {
 	}
 }
 
+//TODO: totally refactor this...
+//nolint:funlen
 func newCollector(
 	collectorName, arg string, src *loader.SourceData, conf Config, executionPlan []lib.ExecutionStep,
 ) (lib.Collector, error) {
