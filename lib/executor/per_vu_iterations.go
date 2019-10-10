@@ -177,8 +177,8 @@ func (pvi PerVUIterations) Run(ctx context.Context, out chan<- stats.SampleConta
 	runIteration := getIterationRunner(pvi.executionState, pvi.logger, out)
 
 	handleVU := func(vu lib.VU) {
-		defer pvi.executionState.ReturnVU(vu, true)
 		defer activeVUs.Done()
+		defer pvi.executionState.ReturnVU(vu, true)
 
 		for i := int64(0); i < iterations; i++ {
 			select {
