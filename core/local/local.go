@@ -226,6 +226,9 @@ func (e *ExecutionScheduler) Init(ctx context.Context, engineOut chan<- stats.Sa
 		select {
 		case err := <-doneInits:
 			if err != nil {
+				logger.WithError(err).Debug("VU initialization returned with an error, aborting...")
+				// the context's cancel() is called in a defer above and will
+				// abort any in-flight VU initializations
 				return err
 			}
 			atomic.AddUint64(initializedVUs, 1)
