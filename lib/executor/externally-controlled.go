@@ -358,12 +358,119 @@ func newManualVUHandle(
 	}
 }
 
+// externallyControlledRunState is created and initialized by the Run() method
+// of the externally controlled executor. It is used to track and modify various
+// details of the execution, including handling of live config changes.
+type externallyControlledRunState struct {
+	ctx             context.Context
+	executor        *ExternallyControlled
+	startMaxVUs     int64             // the scaled number of initially configured MaxVUs
+	duration        time.Duration     // the total duration of the executor, could be 0 for infinite
+	activeVUsCount  *int64            // the current number of active VUs, used only for the progress display
+	maxVUs          *int64            // the current number of initialized VUs
+	vuHandles       []*manualVUHandle // handles for manipulating and tracking all of the VUs
+	currentlyPaused bool              // whether the executor is currently paused
+
+	runIteration func(context.Context, lib.VU) // a helper closure function that runs a single iteration
+}
+
+// retrieveAndInitStartMaxVUs gets and initializes the (scaled) number of MaxVUs
+// from the global VU buffer. These are the VUs that the user originally
+// specified in the JS config, and that the ExecutionScheduler pre-initialized
+// for us.
+func (rs *externallyControlledRunState) retrieveStartMaxVUs() error {
+	for i := int64(0); i < rs.startMaxVUs; i++ { // get the initial planned VUs from the common buffer
+		vu, vuGetErr := rs.executor.executionState.GetPlannedVU(rs.executor.logger, false)
+		if vuGetErr != nil {
+			return vuGetErr
+		}
+		vuHandle := newManualVUHandle(
+			rs.ctx, rs.executor.executionState, rs.activeVUsCount, vu, rs.executor.logger.WithField("vuNum", i),
+		)
+		go vuHandle.runLoopsIfPossible(rs.runIteration)
+		rs.vuHandles[i] = vuHandle
+	}
+	return nil
+}
+
+func (rs *externallyControlledRunState) progresFn() (float64, string) {
+	spent := rs.executor.executionState.GetCurrentTestRunDuration()
+	progress := 0.0
+	if rs.duration > 0 {
+		progress = math.Min(1, float64(spent)/float64(rs.duration))
+	}
+	//TODO: simulate spinner for the other case or cycle 0-100?
+	currentActiveVUs := atomic.LoadInt64(rs.activeVUsCount)
+	currentMaxVUs := atomic.LoadInt64(rs.maxVUs)
+	vusFmt := pb.GetFixedLengthIntFormat(currentMaxVUs)
+	return progress, fmt.Sprintf(
+		"currently "+vusFmt+" out of "+vusFmt+" active looping VUs, %s/%s", currentActiveVUs, currentMaxVUs,
+		pb.GetFixedLengthDuration(spent, rs.duration), rs.duration,
+	)
+}
+
+func (rs *externallyControlledRunState) handleConfigChange(oldCfg, newCfg ExternallyControlledConfigParams) error {
+	executionState := rs.executor.executionState
+	segment := executionState.Options.ExecutionSegment
+	oldActiveVUs := segment.Scale(oldCfg.VUs.Int64)
+	oldMaxVUs := segment.Scale(oldCfg.MaxVUs.Int64)
+	newActiveVUs := segment.Scale(newCfg.VUs.Int64)
+	newMaxVUs := segment.Scale(newCfg.MaxVUs.Int64)
+
+	rs.executor.logger.WithFields(logrus.Fields{
+		"oldActiveVUs": oldActiveVUs, "oldMaxVUs": oldMaxVUs,
+		"newActiveVUs": newActiveVUs, "newMaxVUs": newMaxVUs,
+	}).Debug("Updating execution configuration...")
+
+	for i := oldMaxVUs; i < newMaxVUs; i++ {
+		vu, vuInitErr := executionState.InitializeNewVU(rs.ctx, rs.executor.logger)
+		if vuInitErr != nil {
+			return vuInitErr
+		}
+		vuHandle := newManualVUHandle(
+			rs.ctx, executionState, rs.activeVUsCount, vu, rs.executor.logger.WithField("vuNum", i),
+		)
+		go vuHandle.runLoopsIfPossible(rs.runIteration)
+		rs.vuHandles = append(rs.vuHandles, vuHandle)
+	}
+
+	if oldActiveVUs < newActiveVUs {
+		for i := oldActiveVUs; i < newActiveVUs; i++ {
+			if !rs.currentlyPaused {
+				rs.vuHandles[i].start()
+			}
+		}
+	} else {
+		for i := newActiveVUs; i < oldActiveVUs; i++ {
+			rs.vuHandles[i].hardStop()
+		}
+		for i := newActiveVUs; i < oldActiveVUs; i++ {
+			rs.vuHandles[i].wg.Wait()
+		}
+	}
+
+	if oldMaxVUs > newMaxVUs {
+		for i := newMaxVUs; i < oldMaxVUs; i++ {
+			rs.vuHandles[i].cancelVU()
+			if i < rs.startMaxVUs {
+				// return the initial planned VUs to the common buffer
+				executionState.ReturnVU(rs.vuHandles[i].vu, false)
+			} else {
+				executionState.ModInitializedVUsCount(-1)
+			}
+			rs.vuHandles[i] = nil
+		}
+		rs.vuHandles = rs.vuHandles[:newMaxVUs]
+	}
+
+	atomic.StoreInt64(rs.maxVUs, newMaxVUs)
+	return nil
+}
+
 // Run constantly loops through as many iterations as possible on a variable
 // dynamically controlled number of VUs either for the specified duration, or
 // until the test is manually stopped.
-//
-//TODO: split this up? somehow... :/
-//nolint:funlen
+// nolint:funlen
 func (mex *ExternallyControlled) Run(parentCtx context.Context, out chan<- stats.SampleContainer) (err error) {
 	mex.configLock.RLock()
 	// Safely get the current config - it's important that the close of the
@@ -373,11 +480,10 @@ func (mex *ExternallyControlled) Run(parentCtx context.Context, out chan<- stats
 	close(mex.hasStarted)
 	mex.configLock.RUnlock()
 
-	segment := mex.executionState.Options.ExecutionSegment
-	duration := time.Duration(currentControlConfig.Duration.Duration)
-
 	ctx, cancel := context.WithCancel(parentCtx)
 	defer cancel()
+
+	duration := time.Duration(currentControlConfig.Duration.Duration)
 	if duration > 0 { // Only keep track of duration if it's not infinite
 		go mex.stopWhenDurationIsReached(ctx, duration, cancel)
 	}
@@ -386,111 +492,34 @@ func (mex *ExternallyControlled) Run(parentCtx context.Context, out chan<- stats
 		logrus.Fields{"type": externallyControlledType, "duration": duration},
 	).Debug("Starting executor run...")
 
-	// Retrieve and initialize the (scaled) number of MaxVUs from the global VU
-	// buffer that the user originally specified in the JS config.
-	startMaxVUs := segment.Scale(mex.startConfig.MaxVUs.Int64)
-	vuHandles := make([]*manualVUHandle, startMaxVUs)
-	activeVUsCount := new(int64)
-	runIteration := getIterationRunner(mex.executionState, mex.logger, out)
-	for i := int64(0); i < startMaxVUs; i++ { // get the initial planned VUs from the common buffer
-		vu, vuGetErr := mex.executionState.GetPlannedVU(mex.logger, false)
-		if vuGetErr != nil {
-			return vuGetErr
-		}
-		vuHandle := newManualVUHandle(
-			parentCtx, mex.executionState, activeVUsCount, vu, mex.logger.WithField("vuNum", i),
-		)
-		go vuHandle.runLoopsIfPossible(runIteration)
-		vuHandles[i] = vuHandle
+	startMaxVUs := mex.executionState.Options.ExecutionSegment.Scale(mex.startConfig.MaxVUs.Int64)
+	runState := &externallyControlledRunState{
+		ctx:             ctx,
+		executor:        mex,
+		startMaxVUs:     startMaxVUs,
+		duration:        duration,
+		vuHandles:       make([]*manualVUHandle, startMaxVUs),
+		currentlyPaused: false,
+		activeVUsCount:  new(int64),
+		maxVUs:          new(int64),
+		runIteration:    getIterationRunner(mex.executionState, mex.logger, out),
+	}
+	*runState.maxVUs = startMaxVUs
+	if err = runState.retrieveStartMaxVUs(); err != nil {
+		return err
 	}
 
-	// Keep track of the progress
-	maxVUs := new(int64)
-	*maxVUs = startMaxVUs
-	progresFn := func() (float64, string) {
-		spent := mex.executionState.GetCurrentTestRunDuration()
-		progress := 0.0
-		if duration > 0 {
-			progress = math.Min(1, float64(spent)/float64(duration))
-		}
-		//TODO: simulate spinner for the other case or cycle 0-100?
-		currentActiveVUs := atomic.LoadInt64(activeVUsCount)
-		currentMaxVUs := atomic.LoadInt64(maxVUs)
-		vusFmt := pb.GetFixedLengthIntFormat(currentMaxVUs)
-		return progress, fmt.Sprintf(
-			"currently "+vusFmt+" out of "+vusFmt+" active looping VUs, %s/%s", currentActiveVUs, currentMaxVUs,
-			pb.GetFixedLengthDuration(spent, duration), duration,
-		)
-	}
-	mex.progress.Modify(pb.WithProgress(progresFn))
-	go trackProgress(parentCtx, ctx, ctx, mex, progresFn)
+	mex.progress.Modify(pb.WithProgress(runState.progresFn)) // Keep track of the progress
+	go trackProgress(parentCtx, ctx, ctx, mex, runState.progresFn)
 
-	currentlyPaused := false
-	waitVUs := func(from, to int64) {
-		for i := from; i < to; i++ {
-			vuHandles[i].wg.Wait()
-		}
-	}
-	handleConfigChange := func(oldControlConfig, newControlConfig ExternallyControlledConfigParams) error {
-		oldActiveVUs := segment.Scale(oldControlConfig.VUs.Int64)
-		oldMaxVUs := segment.Scale(oldControlConfig.MaxVUs.Int64)
-		newActiveVUs := segment.Scale(newControlConfig.VUs.Int64)
-		newMaxVUs := segment.Scale(newControlConfig.MaxVUs.Int64)
-
-		mex.logger.WithFields(logrus.Fields{
-			"oldActiveVUs": oldActiveVUs, "oldMaxVUs": oldMaxVUs,
-			"newActiveVUs": newActiveVUs, "newMaxVUs": newMaxVUs,
-		}).Debug("Updating execution configuration...")
-
-		for i := oldMaxVUs; i < newMaxVUs; i++ {
-			vu, vuInitErr := mex.executionState.InitializeNewVU(ctx, mex.logger)
-			if vuInitErr != nil {
-				return vuInitErr
-			}
-			vuHandle := newManualVUHandle(
-				ctx, mex.executionState, activeVUsCount, vu, mex.logger.WithField("vuNum", i),
-			)
-			go vuHandle.runLoopsIfPossible(runIteration)
-			vuHandles = append(vuHandles, vuHandle)
-		}
-
-		if oldActiveVUs < newActiveVUs {
-			for i := oldActiveVUs; i < newActiveVUs; i++ {
-				if !currentlyPaused {
-					vuHandles[i].start()
-				}
-			}
-		} else {
-			for i := newActiveVUs; i < oldActiveVUs; i++ {
-				vuHandles[i].hardStop()
-			}
-			waitVUs(newActiveVUs, oldActiveVUs)
-		}
-
-		if oldMaxVUs > newMaxVUs {
-			for i := newMaxVUs; i < oldMaxVUs; i++ {
-				vuHandles[i].cancelVU()
-				if i < startMaxVUs {
-					// return the initial planned VUs to the common buffer
-					mex.executionState.ReturnVU(vuHandles[i].vu, false)
-				} else {
-					mex.executionState.ModInitializedVUsCount(-1)
-				}
-				vuHandles[i] = nil
-			}
-			vuHandles = vuHandles[:newMaxVUs]
-		}
-
-		atomic.StoreInt64(maxVUs, newMaxVUs)
-		return nil
-	}
-
-	err = handleConfigChange(ExternallyControlledConfigParams{MaxVUs: mex.startConfig.MaxVUs}, currentControlConfig)
+	err = runState.handleConfigChange( // Start by setting MaxVUs to the starting MaxVUs
+		ExternallyControlledConfigParams{MaxVUs: mex.startConfig.MaxVUs}, currentControlConfig,
+	)
 	if err != nil {
 		return err
 	}
-	defer func() {
-		err = handleConfigChange(currentControlConfig, ExternallyControlledConfigParams{})
+	defer func() { // Make sure we release the VUs at the end
+		err = runState.handleConfigChange(currentControlConfig, ExternallyControlledConfigParams{})
 	}()
 
 	for {
@@ -498,7 +527,7 @@ func (mex *ExternallyControlled) Run(parentCtx context.Context, out chan<- stats
 		case <-ctx.Done():
 			return nil
 		case updateConfigEvent := <-mex.newControlConfigs:
-			err := handleConfigChange(currentControlConfig, updateConfigEvent.newConfig)
+			err := runState.handleConfigChange(currentControlConfig, updateConfigEvent.newConfig)
 			if err != nil {
 				updateConfigEvent.err <- err
 				return err
@@ -510,22 +539,24 @@ func (mex *ExternallyControlled) Run(parentCtx context.Context, out chan<- stats
 			updateConfigEvent.err <- nil
 
 		case pauseEvent := <-mex.pauseEvents:
-			if pauseEvent.isPaused == currentlyPaused {
+			if pauseEvent.isPaused == runState.currentlyPaused {
 				pauseEvent.err <- nil
 				continue
 			}
 			activeVUs := currentControlConfig.VUs.Int64
 			if pauseEvent.isPaused {
 				for i := int64(0); i < activeVUs; i++ {
-					vuHandles[i].gracefulStop()
+					runState.vuHandles[i].gracefulStop()
 				}
-				waitVUs(0, activeVUs)
+				for i := int64(0); i < activeVUs; i++ {
+					runState.vuHandles[i].wg.Wait()
+				}
 			} else {
 				for i := int64(0); i < activeVUs; i++ {
-					vuHandles[i].start()
+					runState.vuHandles[i].start()
 				}
 			}
-			currentlyPaused = pauseEvent.isPaused
+			runState.currentlyPaused = pauseEvent.isPaused
 			pauseEvent.err <- nil
 		}
 	}
