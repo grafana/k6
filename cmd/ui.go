@@ -46,7 +46,8 @@ type consoleWriter struct {
 func (w *consoleWriter) Write(p []byte) (n int, err error) {
 	origLen := len(p)
 	if w.IsTTY {
-		//TODO: check how cross-platform this is...
+		// Add a TTY code to erase till the end of line with each new line
+		// TODO: check how cross-platform this is...
 		p = bytes.Replace(p, []byte{'\n'}, []byte{'\x1b', '[', '0', 'K', '\n'}, -1)
 	}
 
@@ -66,7 +67,11 @@ func (w *consoleWriter) Write(p []byte) (n int, err error) {
 func printBar(bar *pb.ProgressBar, rightText string) {
 	end := "\n"
 	if stdout.IsTTY {
-		//TODO: check for cross platform support
+		// If we're in a TTY, instead of printing the bar and going to the next
+		// line, erase everything till the end of the line and return to the
+		// start, so that the next print will overwrite the same line.
+		//
+		// TODO: check for cross platform support
 		end = "\x1b[0K\r"
 	}
 	fprintf(stdout, "%s %s%s", bar.String(), rightText, end)

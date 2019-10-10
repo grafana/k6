@@ -112,6 +112,9 @@ func stringToRat(s string) (*big.Rat, error) {
 func (es *ExecutionSegment) UnmarshalText(text []byte) (err error) {
 	from := zeroRat
 	toStr := string(text)
+	if toStr == "" {
+		toStr = "1" // an empty string means a full 0:1 execution segment
+	}
 	if strings.ContainsRune(toStr, ':') {
 		fromToStr := strings.SplitN(toStr, ":", 2)
 		toStr = fromToStr[1]

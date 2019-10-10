@@ -86,7 +86,11 @@ type ExecutorConfig interface {
 	IsDistributable() bool
 
 	GetEnv() map[string]string
-	GetExec() null.String //TODO: use interface{} so plain http requests can be specified?
+	// Allows us to get the non-default function the executor should run, if it
+	// has been specified.
+	//
+	// TODO: use interface{} so plain http requests can be specified?
+	GetExec() null.String
 
 	// Calculates the VU requirements in different stages of the executor's
 	// execution, including any extensions caused by waiting for iterations to
