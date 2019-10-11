@@ -624,7 +624,7 @@ func TestRequestAndBatch(t *testing.T) {
 					`))
 					assert.NoError(t, err)
 
-					redirectURL, err := url.Parse(sr("HTTPSBIN_URL"))
+					redirectURL, err := url.Parse(sr("HTTPSBIN_URL/cookies"))
 					assert.NoError(t, err)
 
 					require.Len(t, cookieJar.Cookies(redirectURL), 1)
