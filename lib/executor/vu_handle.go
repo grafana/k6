@@ -147,7 +147,7 @@ mainLoop:
 		}
 
 		// Probably not needed, but just in case - if both running and
-		// executorDone were actice, check that the executor isn't done.
+		// executorDone were active, check that the executor isn't done.
 		select {
 		case <-executorDone:
 			return

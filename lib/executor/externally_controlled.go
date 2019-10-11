@@ -135,7 +135,7 @@ func (mec ExternallyControlledConfig) Validate() []error {
 // k6 is running on.
 //
 // This is not a problem, because the MaxUnplannedVUs are mostly meant to be
-// used for calculating the maximum possble number of initialized VUs at any
+// used for calculating the maximum possible number of initialized VUs at any
 // point during a test run. That's used for sizing purposes and for user qouta
 // checking in the cloud execution, where the externally controlled executor
 // isn't supported.
@@ -374,7 +374,7 @@ type externallyControlledRunState struct {
 	runIteration func(context.Context, lib.VU) // a helper closure function that runs a single iteration
 }
 
-// retrieveAndInitStartMaxVUs gets and initializes the (scaled) number of MaxVUs
+// retrieveStartMaxVUs gets and initializes the (scaled) number of MaxVUs
 // from the global VU buffer. These are the VUs that the user originally
 // specified in the JS config, and that the ExecutionScheduler pre-initialized
 // for us.
