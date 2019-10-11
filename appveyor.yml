@@ -60,7 +60,7 @@ build_script:
 test_script:
   - cd %APPVEYOR_BUILD_FOLDER%
   - go version
-  - go test ./...
+  - go test -p 1 ./...
 
 deploy_script:
   - cd %APPVEYOR_BUILD_FOLDER%\packaging
