@@ -201,7 +201,7 @@ func getTickerPeriod(scaledArrivalRate *big.Rat) types.NullDuration {
 	// Basically, the ticker rate is time.Duration(1/arrivalRate). Considering
 	// that time.Duration is represented as int64 nanoseconds, no meaningful
 	// precision is likely to be lost here...
-	result, _ := new(big.Rat).SetFrac(scaledArrivalRate.Denom(), scaledArrivalRate.Num()).Float64()
+	result, _ := new(big.Rat).Inv(scaledArrivalRate).Float64()
 	return types.NewNullDuration(time.Duration(result), true)
 }
 
