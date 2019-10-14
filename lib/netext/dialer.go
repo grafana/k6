@@ -116,6 +116,12 @@ func (d *Dialer) GetTrail(startTime, endTime time.Time, fullIteration bool, tags
 			Value:  float64(bytesRead),
 			Tags:   tags,
 		},
+		{
+			Time:   endTime,
+			Metric: metrics.Iterations,
+			Value:  1,
+			Tags:   tags,
+		},
 	}
 	if fullIteration {
 		samples = append(samples, stats.Sample{
