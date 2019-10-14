@@ -62,7 +62,7 @@ type nopCloser struct {
 func (nopCloser) Close() error { return nil }
 
 // New Creates new instance of CSV collector
-func New(fs afero.Fs, tags stats.SystemTagMap, config Config) (*Collector, error) {
+func New(fs afero.Fs, tags stats.TagSet, config Config) (*Collector, error) {
 	resTags := []string{}
 	ignoredTags := []string{}
 	for tag, flag := range tags {
