@@ -98,9 +98,11 @@ func (clvc ConstantLoopingVUsConfig) Validate() []error {
 	return errors
 }
 
-// GetExecutionRequirements just reserves the number of specified VUs for the
-// whole duration of the executor, including the maximum waiting time for
-// iterations to gracefully stop.
+// GetExecutionRequirements returns the number of required VUs to run the
+// executor for its whole duration (disregarding any startTime), including the
+// maximum waiting time for any iterations to gracefully stop. This is used by
+// the execution scheduler in its VU reservation calculations, so it knows how
+// many VUs to pre-initialize.
 func (clvc ConstantLoopingVUsConfig) GetExecutionRequirements(es *lib.ExecutionSegment) []lib.ExecutionStep {
 	return []lib.ExecutionStep{
 		{

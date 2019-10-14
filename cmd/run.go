@@ -97,7 +97,7 @@ a commandline interface for interacting with it.`,
 		initBar := pb.New(pb.WithConstLeft("   init"))
 
 		// Create the Runner.
-		fprintf(stdout, "%s runner\r", initBar.String()) //TODO
+		fprintf(stdout, "%s runner\r", initBar.String()) //TODO use printBar()
 		pwd, err := os.Getwd()
 		if err != nil {
 			return err
