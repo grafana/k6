@@ -401,13 +401,13 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 		}},
 		{
 			opts{runner: &lib.Options{
-				SystemTags: stats.ToSystemTagSet([]string{stats.TagSubProto.String(), stats.TagURL.String()})},
+				SystemTags: stats.NewSystemTagSet(stats.TagSubProto, stats.TagURL)},
 			},
 			exp{},
 			func(t *testing.T, c Config) {
 				assert.Equal(
 					t,
-					*stats.ToSystemTagSet([]string{stats.TagSubProto.String(), stats.TagURL.String()}),
+					*stats.NewSystemTagSet(stats.TagSubProto, stats.TagURL),
 					*c.Options.SystemTags,
 				)
 			},
