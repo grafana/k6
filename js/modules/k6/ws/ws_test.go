@@ -97,12 +97,12 @@ func TestSession(t *testing.T) {
 		Group:  root,
 		Dialer: tb.Dialer,
 		Options: lib.Options{
-			SystemTags: stats.ToSystemTagSet([]string{
-				stats.TagURL.String(),
-				stats.TagProto.String(),
-				stats.TagStatus.String(),
-				stats.TagSubProto.String(),
-			}),
+			SystemTags: stats.NewSystemTagSet(
+				stats.TagURL,
+				stats.TagProto,
+				stats.TagStatus,
+				stats.TagSubProto,
+			),
 		},
 		Samples:   samples,
 		TLSConfig: tb.TLSClientConfig,
@@ -467,13 +467,13 @@ func TestTLSConfig(t *testing.T) {
 		Group:  root,
 		Dialer: tb.Dialer,
 		Options: lib.Options{
-			SystemTags: stats.ToSystemTagSet([]string{
-				stats.TagURL.String(),
-				stats.TagProto.String(),
-				stats.TagStatus.String(),
-				stats.TagSubProto.String(),
-				stats.TagIP.String(),
-			}),
+			SystemTags: stats.NewSystemTagSet(
+				stats.TagURL,
+				stats.TagProto,
+				stats.TagStatus,
+				stats.TagSubProto,
+				stats.TagIP,
+			),
 		},
 		Samples: samples,
 	}
