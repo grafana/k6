@@ -185,9 +185,6 @@ func getScaledArrivalRate(es *lib.ExecutionSegment, rate int64, period time.Dura
 	return es.InPlaceScaleRat(big.NewRat(rate, int64(period)))
 }
 
-// just a cached value to avoid allocating it every getTickerPeriod() call
-var zero = big.NewInt(0) //nolint:gochecknoglobals
-
 // getTickerPeriod is just a helper function that returns the ticker interval
 // we need for given arrival-rate parameters.
 //
@@ -195,7 +192,7 @@ var zero = big.NewInt(0) //nolint:gochecknoglobals
 // and 0 isn't a valid ticker period. This happens so we don't divide by 0 when
 // the arrival-rate period is 0. This case has to be handled separately.
 func getTickerPeriod(scaledArrivalRate *big.Rat) types.NullDuration {
-	if scaledArrivalRate.Num().Cmp(zero) == 0 {
+	if scaledArrivalRate.Sign() == 0 {
 		return types.NewNullDuration(0, false)
 	}
 	// Basically, the ticker rate is time.Duration(1/arrivalRate). Considering
