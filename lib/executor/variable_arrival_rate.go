@@ -183,6 +183,9 @@ func (varc VariableArrivalRateConfig) getPlannedRateChanges(segment *lib.Executi
 	rateChanges := []rateChange{}
 	timeFromStart := time.Duration(0)
 
+	var tArrivalRate = new(big.Rat)
+	var tArrivalRateStep = new(big.Rat)
+	var stepCoef = new(big.Rat)
 	for _, stage := range varc.Stages {
 		stageTargetRate := getScaledArrivalRate(segment, stage.Target.Int64, timeUnit)
 		stageDuration := time.Duration(stage.Duration.Duration)
@@ -221,9 +224,12 @@ func (varc VariableArrivalRateConfig) getPlannedRateChanges(segment *lib.Executi
 					break
 				}
 
-				tArrivalRate := new(big.Rat).Add(
+				tArrivalRate.Add(
 					currentRate,
-					new(big.Rat).Mul(rateDiff, big.NewRat(int64(t), int64(stageDuration))),
+					tArrivalRateStep.Mul(
+						rateDiff,
+						stepCoef.SetFrac64(int64(t), int64(stageDuration)),
+					),
 				)
 
 				rateChanges = append(rateChanges, rateChange{
