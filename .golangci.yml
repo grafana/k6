@@ -21,7 +21,7 @@ issues:
      linters:
        - gocyclo
        - dupl
-       #TODO - gocognit
+       - gocognit
        - funlen
        - lll
 
@@ -53,7 +53,7 @@ linters:
   disable:
   - gochecknoinits
   - godox
-  #TODO - wsl
+  - wsl
   fast: false
 
 service:
