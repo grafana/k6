@@ -423,7 +423,10 @@ func (u *VU) RunOnce(ctx context.Context) error {
 	// If MinIterationDuration is specified and the iteration wasn't cancelled
 	// and was less than it, sleep for the remainder
 	if isFullIteration && u.Runner.Bundle.Options.MinIterationDuration.Valid {
-		time.Sleep(time.Duration(u.Runner.Bundle.Options.MinIterationDuration.Duration) - totalTime)
+		durationDiff := time.Duration(u.Runner.Bundle.Options.MinIterationDuration.Duration) - totalTime
+		if durationDiff > 0 {
+			time.Sleep(durationDiff)
+		}
 	}
 
 	return err
