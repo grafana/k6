@@ -28,6 +28,7 @@ import (
 	"github.com/loadimpact/k6/lib"
 	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
+	"gopkg.in/guregu/null.v3"
 )
 
 var userEnvVarName = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
@@ -52,6 +53,12 @@ func runtimeOptionFlagSet(includeSysEnv bool) *pflag.FlagSet {
 	flags := pflag.NewFlagSet("", 0)
 	flags.SortFlags = false
 	flags.Bool("include-system-env-vars", includeSysEnv, "pass the real system environment variables to the runtime")
+	flags.String("compatibility-mode", "extended",
+		`JavaScript compiler compatibility mode, "extended" or "base"
+base: pure Golang JS VM supporting ES5.1+
+extended: base + Babel with ES2015 preset + core.js v2,
+          slower and memory consuming but with greater JS support
+`)
 	flags.StringArrayP("env", "e", nil, "add/override environment variable with `VAR=value`")
 	return flags
 }
@@ -59,6 +66,7 @@ func runtimeOptionFlagSet(includeSysEnv bool) *pflag.FlagSet {
 func getRuntimeOptions(flags *pflag.FlagSet) (lib.RuntimeOptions, error) {
 	opts := lib.RuntimeOptions{
 		IncludeSystemEnvVars: getNullBool(flags, "include-system-env-vars"),
+		CompatibilityMode:    getNullString(flags, "compatibility-mode"),
 		Env:                  make(map[string]string),
 	}
 
@@ -80,6 +88,12 @@ func getRuntimeOptions(flags *pflag.FlagSet) (lib.RuntimeOptions, error) {
 			return opts, errors.Errorf("Invalid environment variable name '%s'", k)
 		}
 		opts.Env[k] = v
+	}
+
+	// Fallback to env
+	compatMode := opts.Env["K6_COMPATIBILITY_MODE"]
+	if !opts.CompatibilityMode.Valid && compatMode != "" {
+		opts.CompatibilityMode = null.StringFrom(compatMode)
 	}
 
 	return opts, nil
