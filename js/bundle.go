@@ -60,25 +60,27 @@ type BundleInstance struct {
 
 // NewBundle creates a new bundle from a source file and a filesystem.
 func NewBundle(src *loader.SourceData, filesystems map[string]afero.Fs, rtOpts lib.RuntimeOptions) (*Bundle, error) {
-	compiler, err := compiler.New()
+	compatMode, err := lib.ValidateCompatibilityMode(rtOpts.CompatibilityMode.String)
 	if err != nil {
 		return nil, err
 	}
 
 	// Compile sources, both ES5 and ES6 are supported.
 	code := string(src.Data)
-	pgm, _, err := compiler.Compile(code, src.URL.String(), "", "", true)
+	c := compiler.New()
+	pgm, _, err := c.Compile(code, src.URL.String(), "", "", true, compatMode)
 	if err != nil {
 		return nil, err
 	}
 	// Make a bundle, instantiate it into a throwaway VM to populate caches.
 	rt := goja.New()
 	bundle := Bundle{
-		Filename:        src.URL,
-		Source:          code,
-		Program:         pgm,
-		BaseInitContext: NewInitContext(rt, compiler, new(context.Context), filesystems, loader.Dir(src.URL)),
-		Env:             rtOpts.Env,
+		Filename: src.URL,
+		Source:   code,
+		Program:  pgm,
+		BaseInitContext: NewInitContext(rt, c, compatMode, new(context.Context),
+			filesystems, loader.Dir(src.URL)),
+		Env: rtOpts.Env,
 	}
 	if err := bundle.instantiate(rt, bundle.BaseInitContext); err != nil {
 		return nil, err
@@ -129,7 +131,7 @@ func NewBundle(src *loader.SourceData, filesystems map[string]afero.Fs, rtOpts l
 
 // NewBundleFromArchive creates a new bundle from an lib.Archive.
 func NewBundleFromArchive(arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle, error) {
-	compiler, err := compiler.New()
+	compatMode, err := lib.ValidateCompatibilityMode(rtOpts.CompatibilityMode.String)
 	if err != nil {
 		return nil, err
 	}
@@ -138,12 +140,14 @@ func NewBundleFromArchive(arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle,
 		return nil, errors.Errorf("expected bundle type 'js', got '%s'", arc.Type)
 	}
 
-	pgm, _, err := compiler.Compile(string(arc.Data), arc.FilenameURL.String(), "", "", true)
+	c := compiler.New()
+	pgm, _, err := c.Compile(string(arc.Data), arc.FilenameURL.String(), "", "", true, compatMode)
 	if err != nil {
 		return nil, err
 	}
 
-	initctx := NewInitContext(goja.New(), compiler, new(context.Context), arc.Filesystems, arc.PwdURL)
+	initctx := NewInitContext(goja.New(), c, compatMode,
+		new(context.Context), arc.Filesystems, arc.PwdURL)
 
 	env := arc.Env
 	if env == nil {
@@ -235,8 +239,10 @@ func (b *Bundle) instantiate(rt *goja.Runtime, init *InitContext) error {
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 	rt.SetRandSource(common.NewRandSource())
 
-	if _, err := rt.RunProgram(jslib.GetCoreJS()); err != nil {
-		return err
+	if init.compatibilityMode == compiler.CompatibilityModeExtended {
+		if _, err := rt.RunProgram(jslib.GetCoreJS()); err != nil {
+			return err
+		}
 	}
 
 	exports := rt.NewObject()

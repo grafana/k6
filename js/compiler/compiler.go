@@ -44,103 +44,120 @@ var (
 		"highlightCode": false,
 	}
 
-	compilerInstance *Compiler
-	once             sync.Once
+	once        sync.Once // nolint:gochecknoglobals
+	globalBabel *babel    // nolint:gochecknoglobals
 )
 
-// A Compiler uses Babel to compile ES6 code into something ES5-compatible.
-type Compiler struct {
-	vm *goja.Runtime
+// CompatibilityMode specifies the JS compatibility mode
+// nolint:lll
+//go:generate enumer -type=CompatibilityMode -transform=snake -trimprefix CompatibilityMode -output compatibility_mode_gen.go
+type CompatibilityMode uint8
 
-	// JS pointers.
+const (
+	// CompatibilityModeExtended achieves ES6+ compatibility with Babel and core.js
+	CompatibilityModeExtended CompatibilityMode = iota + 1
+	// CompatibilityModeBase is standard goja ES5.1+
+	CompatibilityModeBase
+)
+
+// A Compiler compiles JavaScript source code (ES5.1 or ES6) into a goja.Program
+type Compiler struct{}
+
+// New returns a new Compiler
+func New() *Compiler {
+	return &Compiler{}
+}
+
+// Transform the given code into ES5
+func (c *Compiler) Transform(src, filename string) (code string, srcmap *SourceMap, err error) {
+	var b *babel
+	if b, err = newBabel(); err != nil {
+		return
+	}
+
+	return b.Transform(src, filename)
+}
+
+// Compile the program in the given CompatibilityMode, optionally running pre and post code.
+func (c *Compiler) Compile(src, filename, pre, post string,
+	strict bool, compatMode CompatibilityMode) (*goja.Program, string, error) {
+	code := pre + src + post
+	ast, err := parser.ParseFile(nil, filename, code, 0)
+	if err != nil {
+		if compatMode == CompatibilityModeExtended {
+			code, _, err = c.Transform(src, filename)
+			if err != nil {
+				return nil, code, err
+			}
+			return c.Compile(code, filename, pre, post, strict, compatMode)
+		}
+		return nil, src, err
+	}
+	pgm, err := goja.CompileAST(ast, strict)
+	return pgm, code, err
+}
+
+type babel struct {
+	vm        *goja.Runtime
 	this      goja.Value
 	transform goja.Callable
 	mutex     sync.Mutex //TODO: cache goja.CompileAST() in an init() function?
 }
 
-// Constructs a new compiler.
-func New() (*Compiler, error) {
+func newBabel() (*babel, error) {
 	var err error
+
 	once.Do(func() {
-		compilerInstance, err = new()
+		conf := rice.Config{
+			LocateOrder: []rice.LocateMethod{rice.LocateEmbedded},
+		}
+		babelSrc := conf.MustFindBox("lib").MustString("babel.min.js")
+		vm := goja.New()
+		if _, err = vm.RunString(babelSrc); err != nil {
+			return
+		}
+
+		this := vm.Get("Babel")
+		bObj := this.ToObject(vm)
+		globalBabel = &babel{vm: vm, this: this}
+		if err = vm.ExportTo(bObj.Get("transform"), &globalBabel.transform); err != nil {
+			return
+		}
 	})
 
-	return compilerInstance, err
+	return globalBabel, err
 }
 
-func new() (*Compiler, error) {
-	conf := rice.Config{
-		LocateOrder: []rice.LocateMethod{rice.LocateEmbedded},
-	}
-
-	babelSrc := conf.MustFindBox("lib").MustString("babel.min.js")
-
-	c := &Compiler{vm: goja.New()}
-	if _, err := c.vm.RunString(babelSrc); err != nil {
-		return nil, err
-	}
-
-	c.this = c.vm.Get("Babel")
-	thisObj := c.this.ToObject(c.vm)
-	if err := c.vm.ExportTo(thisObj.Get("transform"), &c.transform); err != nil {
-		return nil, err
-	}
-
-	return c, nil
-}
-
-// Transform the given code into ES5.
-func (c *Compiler) Transform(src, filename string) (code string, srcmap SourceMap, err error) {
+// Transform the given code into ES5, while synchronizing to ensure only a single
+// bundle instance / Goja VM is in use at a time.
+func (b *babel) Transform(src, filename string) (string, *SourceMap, error) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
 	opts := make(map[string]interface{})
 	for k, v := range DefaultOpts {
 		opts[k] = v
 	}
 	opts["filename"] = filename
 
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-
 	startTime := time.Now()
-	v, err := c.transform(c.this, c.vm.ToValue(src), c.vm.ToValue(opts))
+	v, err := b.transform(b.this, b.vm.ToValue(src), b.vm.ToValue(opts))
 	if err != nil {
-		return code, srcmap, err
+		return "", nil, err
 	}
 	logrus.WithField("t", time.Since(startTime)).Debug("Babel: Transformed")
-	vO := v.ToObject(c.vm)
 
-	if err := c.vm.ExportTo(vO.Get("code"), &code); err != nil {
-		return code, srcmap, err
+	vO := v.ToObject(b.vm)
+	var code string
+	if err = b.vm.ExportTo(vO.Get("code"), &code); err != nil {
+		return code, nil, err
 	}
-
-	var rawmap map[string]interface{}
-	if err := c.vm.ExportTo(vO.Get("map"), &rawmap); err != nil {
-		return code, srcmap, err
+	var rawMap map[string]interface{}
+	if err = b.vm.ExportTo(vO.Get("map"), &rawMap); err != nil {
+		return code, nil, err
 	}
-	if err := mapstructure.Decode(rawmap, &srcmap); err != nil {
-		return code, srcmap, err
+	var srcMap SourceMap
+	if err = mapstructure.Decode(rawMap, &srcMap); err != nil {
+		return code, &srcMap, err
 	}
-
-	return code, srcmap, nil
-}
-
-// Compiles the program, first trying ES5, then ES6.
-func (c *Compiler) Compile(src, filename string, pre, post string, strict bool) (*goja.Program, string, error) {
-	return c.compile(src, filename, pre, post, strict, true)
-}
-
-func (c *Compiler) compile(src, filename string, pre, post string, strict, tryBabel bool) (*goja.Program, string, error) {
-	code := pre + src + post
-	ast, err := parser.ParseFile(nil, filename, code, 0)
-	if err != nil {
-		if tryBabel {
-			code, _, err := c.Transform(src, filename)
-			if err != nil {
-				return nil, code, err
-			}
-			return c.compile(code, filename, pre, post, strict, false)
-		}
-		return nil, src, err
-	}
-	pgm, err := goja.CompileAST(ast, strict)
-	return pgm, code, err
+	return code, &srcMap, err
 }
