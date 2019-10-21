@@ -167,7 +167,14 @@ func TestDetailsError(t *testing.T) {
 
 func TestRetry(t *testing.T) {
 	called := 0
+	idempotencyKey := ""
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotK6IdempotencyKey := r.Header.Get(k6IdempotencyKeyHeader)
+		if idempotencyKey == "" {
+			idempotencyKey = gotK6IdempotencyKey
+		}
+		assert.NotEmpty(t, gotK6IdempotencyKey)
+		assert.Equal(t, idempotencyKey, gotK6IdempotencyKey)
 		called++
 		w.WriteHeader(500)
 	}))
@@ -184,7 +191,14 @@ func TestRetry(t *testing.T) {
 
 func TestRetrySuccessOnSecond(t *testing.T) {
 	called := 1
+	idempotencyKey := ""
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotK6IdempotencyKey := r.Header.Get(k6IdempotencyKeyHeader)
+		if idempotencyKey == "" {
+			idempotencyKey = gotK6IdempotencyKey
+		}
+		assert.NotEmpty(t, gotK6IdempotencyKey)
+		assert.Equal(t, idempotencyKey, gotK6IdempotencyKey)
 		called++
 		if called == 2 {
 			fprintf(t, w, `{"reference_id": "1"}`)
@@ -201,4 +215,31 @@ func TestRetrySuccessOnSecond(t *testing.T) {
 	assert.Equal(t, 2, called)
 	assert.NotNil(t, resp)
 	assert.Nil(t, err)
+}
+
+func TestIdempotencyKey(t *testing.T) {
+	const idempotencyKey = "xxx"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotK6IdempotencyKey := r.Header.Get(k6IdempotencyKeyHeader)
+		switch r.Method {
+		case http.MethodPost:
+			assert.NotEmpty(t, gotK6IdempotencyKey)
+			assert.Equal(t, idempotencyKey, gotK6IdempotencyKey)
+		default:
+			assert.Empty(t, gotK6IdempotencyKey)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	client := NewClient("token", server.URL, "1.0")
+	client.retryInterval = 1 * time.Millisecond
+	req, err := client.NewRequest(http.MethodPost, server.URL, nil)
+	assert.NoError(t, err)
+	req.Header.Set(k6IdempotencyKeyHeader, idempotencyKey)
+	assert.NoError(t, client.Do(req, nil))
+
+	req, err = client.NewRequest(http.MethodGet, server.URL, nil)
+	assert.NoError(t, err)
+	assert.NoError(t, client.Do(req, nil))
 }
