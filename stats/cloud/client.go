@@ -33,11 +33,11 @@ import (
 )
 
 const (
-	// Default request timeout
-	RequestTimeout = 10 * time.Second
-	// Retry interval
+	// RequestTimeout is the default cloud request timeout
+	RequestTimeout = 20 * time.Second
+	// RetryInterval is the default cloud request retry interval
 	RetryInterval = 500 * time.Millisecond
-	// Retry attempts
+	// MaxRetries specifies max retry attempts
 	MaxRetries = 3
 )
 
