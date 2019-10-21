@@ -89,7 +89,7 @@ func (c *Client) Do(req *http.Request, v interface{}) error {
 			return err
 		}
 
-		if cerr := req.Body.Close(); cerr != nil && err == nil {
+		if cerr := req.Body.Close(); cerr != nil {
 			err = cerr
 		}
 	}
