@@ -18,6 +18,7 @@ jobs:
             dep version
             dep status
             dep ensure -update -dry-run
+            dep check
 
 
   test:
