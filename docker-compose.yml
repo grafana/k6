@@ -6,7 +6,7 @@ networks:
 
 services:
   influxdb:
-    image: influxdb:1.5.4
+    image: influxdb:latest
     networks:
       - k6
       - grafana
@@ -16,7 +16,7 @@ services:
       - INFLUXDB_DB=k6
 
   grafana:
-    image: grafana/grafana:6.4.1
+    image: grafana/grafana:latest
     networks:
       - grafana
     ports:
@@ -29,7 +29,7 @@ services:
       - ./datasource.yaml:/etc/grafana/provisioning/datasources/datasource.yaml
 
   k6:
-    build: .
+    image: loadimpact/k6:latest
     networks:
       - k6
     ports:
