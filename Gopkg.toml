@@ -29,10 +29,6 @@
 
 [[constraint]]
   branch = "master"
-  name = "github.com/shibukawa/configdir"
-
-[[constraint]]
-  branch = "master"
   name = "github.com/sirupsen/logrus"
 
 [[constraint]]
