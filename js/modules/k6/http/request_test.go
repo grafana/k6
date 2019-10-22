@@ -641,7 +641,53 @@ func TestRequestAndBatch(t *testing.T) {
 						"",
 					)
 				})
+				t.Run("set cookie after redirect and before second redirect", func(t *testing.T) {
+					cookieJar, err := cookiejar.New(nil)
+					require.NoError(t, err)
+					state.CookieJar = cookieJar
 
+					// TODO figure out a way to remove this ?
+					tb.Mux.HandleFunc("/set-cookie-and-redirect", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						cookie := http.Cookie{
+							Name:   "key-foo",
+							Value:  "value-bar",
+							Path:   "/set-cookie-and-redirect",
+							Domain: sr("HTTPSBIN_DOMAIN"),
+						}
+
+						http.SetCookie(w, &cookie)
+						http.Redirect(w, r, sr("HTTPBIN_IP_URL/get"), http.StatusMovedPermanently)
+					}))
+
+					_, err = common.RunString(rt, sr(`
+						let res = http.request("GET", "HTTPBIN_IP_URL/redirect-to?url=HTTPSBIN_URL/set-cookie-and-redirect");
+						if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+					`))
+					require.NoError(t, err)
+
+					redirectURL, err := url.Parse(sr("HTTPSBIN_URL/set-cookie-and-redirect"))
+					require.NoError(t, err)
+
+					require.Len(t, cookieJar.Cookies(redirectURL), 1)
+					require.Equal(t, "key-foo", cookieJar.Cookies(redirectURL)[0].Name)
+					require.Equal(t, "value-bar", cookieJar.Cookies(redirectURL)[0].Value)
+
+					for _, cookieLessURL := range []string{"HTTPSBIN_URL", "HTTPBIN_IP_URL/redirect-to", "HTTPBIN_IP_URL/get"} {
+						redirectURL, err = url.Parse(sr(cookieLessURL))
+						require.NoError(t, err)
+						require.Empty(t, cookieJar.Cookies(redirectURL))
+					}
+
+					assertRequestMetricsEmitted(
+						t,
+						stats.GetBufferedSamples(samples),
+						"GET",
+						sr("HTTPBIN_IP_URL/get"),
+						sr("HTTPBIN_IP_URL/redirect-to?url=HTTPSBIN_URL/set-cookie-and-redirect"),
+						200,
+						"",
+					)
+				})
 			})
 
 			t.Run("domain", func(t *testing.T) {
