@@ -290,7 +290,7 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 			// Update active jar with cookies found in "Set-Cookie" header(s) of redirect response
 			if preq.ActiveJar != nil {
 				if respCookies := req.Response.Cookies(); len(respCookies) > 0 {
-					preq.ActiveJar.SetCookies(req.URL, respCookies)
+					preq.ActiveJar.SetCookies(via[len(via)-1].URL, respCookies)
 				}
 				req.Header.Del("Cookie")
 				SetRequestCookies(req, preq.ActiveJar, preq.Cookies)
