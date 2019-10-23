@@ -330,7 +330,7 @@ func applyDefault(conf Config) Config {
 	if conf.Options.SystemTags == nil {
 		conf = conf.Apply(Config{Options: lib.Options{SystemTags: &stats.DefaultSystemTagSet}})
 	}
-	if len(conf.Options.SummaryTrendStats) == 0 {
+	if conf.Options.SummaryTrendStats == nil {
 		conf = conf.Apply(Config{Options: lib.Options{SummaryTrendStats: lib.DefaultSummaryTrendStats}})
 	}
 	return conf
