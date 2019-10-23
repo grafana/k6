@@ -1793,7 +1793,7 @@ func TestResponseTimingsWhenTimeout(t *testing.T) {
 	state.Options.Throw = null.BoolFrom(false)
 
 	_, err := common.RunString(rt, tb.Replacer.Replace(`
-		let resp = http.get("http://httpbin.org/delay/10", { timeout: 2500 });
+		let resp = http.get("HTTPBIN_URL/delay/10", { timeout: 2500 });
 
 		if (resp.timings.waiting < 2000) {
 			throw new Error("expected waiting time to be over 2000ms but was " + resp.timings.waiting);
