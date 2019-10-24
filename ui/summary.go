@@ -46,8 +46,9 @@ const (
 var (
 	errStatEmptyString            = errors.New("invalid stat, empty string")
 	errStatUnknownFormat          = errors.New("invalid stat, unknown format")
-	errPercentileStatInvalidValue = errors.New("invalid percentile stat value, accepts a number")
-	staticResolvers               = map[string]func(s *stats.TrendSink) interface{}{
+	errPercentileStatInvalidValue = errors.New(
+		"invalid percentile stat value, accepts a number between 0 and 100")
+	staticResolvers = map[string]func(s *stats.TrendSink) interface{}{
 		"avg":   func(s *stats.TrendSink) interface{} { return s.Avg },
 		"min":   func(s *stats.TrendSink) interface{} { return s.Min },
 		"med":   func(s *stats.TrendSink) interface{} { return s.Med },
@@ -127,7 +128,7 @@ func validatePercentile(stat string) (float64, error) {
 
 	percentile, err := strconv.ParseFloat(stat[2:len(stat)-1], 64)
 
-	if err != nil {
+	if err != nil || ((0 > percentile) || (percentile > 100)) {
 		return 0, errPercentileStatInvalidValue
 	}
 
