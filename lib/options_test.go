@@ -124,10 +124,10 @@ func TestOptions(t *testing.T) {
 		assert.True(t, opts.BatchPerHost.Valid)
 		assert.Equal(t, int64(12345), opts.BatchPerHost.Int64)
 	})
-	t.Run("HttpDebug", func(t *testing.T) {
-		opts := Options{}.Apply(Options{HttpDebug: null.StringFrom("foo")})
-		assert.True(t, opts.HttpDebug.Valid)
-		assert.Equal(t, "foo", opts.HttpDebug.String)
+	t.Run("HTTPDebug", func(t *testing.T) {
+		opts := Options{}.Apply(Options{HTTPDebug: null.StringFrom("foo")})
+		assert.True(t, opts.HTTPDebug.Valid)
+		assert.Equal(t, "foo", opts.HTTPDebug.String)
 	})
 	t.Run("InsecureSkipTLSVerify", func(t *testing.T) {
 		opts := Options{}.Apply(Options{InsecureSkipTLSVerify: null.BoolFrom(true)})

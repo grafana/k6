@@ -123,7 +123,7 @@ func newRuntime(
 		UserAgent:    null.StringFrom("TestUserAgent"),
 		Throw:        null.BoolFrom(true),
 		SystemTags:   &stats.DefaultSystemTagSet,
-		//HttpDebug:    null.StringFrom("full"),
+		//HTTPDebug:    null.StringFrom("full"),
 	}
 	samples := make(chan stats.SampleContainer, 1000)
 
@@ -1936,7 +1936,7 @@ func TestDigestAuthWithBody(t *testing.T) {
 	defer tb.Cleanup()
 
 	state.Options.Throw = null.BoolFrom(true)
-	state.Options.HttpDebug = null.StringFrom("full")
+	state.Options.HTTPDebug = null.StringFrom("full")
 
 	tb.Mux.HandleFunc("/digest-auth-with-post/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, "POST", r.Method)

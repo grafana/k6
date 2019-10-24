@@ -25,10 +25,10 @@ import null "gopkg.in/guregu/null.v3"
 // RuntimeOptions are settings passed onto the goja JS runtime
 type RuntimeOptions struct {
 	// Whether to pass the actual system environment variables to the JS runtime
-	IncludeSystemEnvVars null.Bool `json:"includeSystemEnvVars" envconfig:"include_system_env_vars"`
+	IncludeSystemEnvVars null.Bool `json:"includeSystemEnvVars" envconfig:"K6_include_system_env_vars"`
 
 	// Environment variables passed onto the runner
-	Env map[string]string `json:"env" envconfig:"env"`
+	Env map[string]string `json:"env" envconfig:"K6_env"`
 }
 
 // Apply overwrites the receiver RuntimeOptions' fields with any that are set
