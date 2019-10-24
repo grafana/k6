@@ -96,7 +96,7 @@ func TestConfigEnv(t *testing.T) {
 			"false": func(c Config) { assert.Equal(t, null.BoolFrom(false), c.NoUsageReport) },
 		},
 		{"Out", "K6_OUT"}: {
-			"":         func(c Config) { assert.Equal(t, []string{""}, c.Out) },
+			"":         func(c Config) { assert.Equal(t, []string{}, c.Out) },
 			"influxdb": func(c Config) { assert.Equal(t, []string{"influxdb"}, c.Out) },
 		},
 	}
