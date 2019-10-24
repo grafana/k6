@@ -102,3 +102,7 @@
 [[constraint]]
   branch = "master"
   name = "github.com/andybalholm/brotli"
+
+[[constraint]]
+  name = "github.com/kelseyhightower/envconfig"
+  version = "^1.4.0"
