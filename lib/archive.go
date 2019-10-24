@@ -88,6 +88,8 @@ type Archive struct {
 	// Environment variables
 	Env map[string]string `json:"env"`
 
+	CompatibilityMode string `json:"compatibilityMode"`
+
 	K6Version string `json:"k6version"`
 	Goos      string `json:"goos"`
 }
