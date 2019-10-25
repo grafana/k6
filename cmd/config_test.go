@@ -107,7 +107,7 @@ func TestConfigEnv(t *testing.T) {
 				t.Run(`"`+value+`"`, func(t *testing.T) {
 					assert.NoError(t, os.Setenv(field.Key, value))
 					var config Config
-					assert.NoError(t, envconfig.Process("k6", &config))
+					assert.NoError(t, envconfig.Process("", &config))
 					fn(config)
 				})
 			}

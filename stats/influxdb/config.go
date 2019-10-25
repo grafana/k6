@@ -35,20 +35,20 @@ import (
 
 type Config struct {
 	// Connection.
-	Addr             null.String        `json:"addr" envconfig:"INFLUXDB_ADDR"`
-	Username         null.String        `json:"username,omitempty" envconfig:"INFLUXDB_USERNAME"`
-	Password         null.String        `json:"password,omitempty" envconfig:"INFLUXDB_PASSWORD"`
-	Insecure         null.Bool          `json:"insecure,omitempty" envconfig:"INFLUXDB_INSECURE"`
-	PayloadSize      null.Int           `json:"payloadSize,omitempty" envconfig:"INFLUXDB_PAYLOAD_SIZE"`
-	PushInterval     types.NullDuration `json:"pushInterval,omitempty" envconfig:"INFLUXDB_PUSH_INTERVAL"`
-	ConcurrentWrites null.Int           `json:"concurrentWrites,omitempty" envconfig:"INFLUXDB_CONCURRENT_WRITES"`
+	Addr             null.String        `json:"addr" envconfig:"K6_INFLUXDB_ADDR"`
+	Username         null.String        `json:"username,omitempty" envconfig:"K6_INFLUXDB_USERNAME"`
+	Password         null.String        `json:"password,omitempty" envconfig:"K6_INFLUXDB_PASSWORD"`
+	Insecure         null.Bool          `json:"insecure,omitempty" envconfig:"K6_INFLUXDB_INSECURE"`
+	PayloadSize      null.Int           `json:"payloadSize,omitempty" envconfig:"K6_INFLUXDB_PAYLOAD_SIZE"`
+	PushInterval     types.NullDuration `json:"pushInterval,omitempty" envconfig:"K6_INFLUXDB_PUSH_INTERVAL"`
+	ConcurrentWrites null.Int           `json:"concurrentWrites,omitempty" envconfig:"K6_INFLUXDB_CONCURRENT_WRITES"`
 
 	// Samples.
-	DB           null.String `json:"db" envconfig:"INFLUXDB_DB"`
-	Precision    null.String `json:"precision,omitempty" envconfig:"INFLUXDB_PRECISION"`
-	Retention    null.String `json:"retention,omitempty" envconfig:"INFLUXDB_RETENTION"`
-	Consistency  null.String `json:"consistency,omitempty" envconfig:"INFLUXDB_CONSISTENCY"`
-	TagsAsFields []string    `json:"tagsAsFields,omitempty" envconfig:"INFLUXDB_TAGS_AS_FIELDS"`
+	DB           null.String `json:"db" envconfig:"K6_INFLUXDB_DB"`
+	Precision    null.String `json:"precision,omitempty" envconfig:"K6_INFLUXDB_PRECISION"`
+	Retention    null.String `json:"retention,omitempty" envconfig:"K6_INFLUXDB_RETENTION"`
+	Consistency  null.String `json:"consistency,omitempty" envconfig:"K6_INFLUXDB_CONSISTENCY"`
+	TagsAsFields []string    `json:"tagsAsFields,omitempty" envconfig:"K6_INFLUXDB_TAGS_AS_FIELDS"`
 }
 
 func NewConfig() *Config {

@@ -61,11 +61,11 @@ func configFlagSet() *pflag.FlagSet {
 type Config struct {
 	lib.Options
 
-	Out           []string  `json:"out" envconfig:"out"`
-	Linger        null.Bool `json:"linger" envconfig:"linger"`
-	NoUsageReport null.Bool `json:"noUsageReport" envconfig:"no_usage_report"`
-	NoThresholds  null.Bool `json:"noThresholds" envconfig:"no_thresholds"`
-	NoSummary     null.Bool `json:"noSummary" envconfig:"no_summary"`
+	Out           []string  `json:"out" envconfig:"K6_OUT"`
+	Linger        null.Bool `json:"linger" envconfig:"K6_LINGER"`
+	NoUsageReport null.Bool `json:"noUsageReport" envconfig:"K6_NO_USAGE_REPORT"`
+	NoThresholds  null.Bool `json:"noThresholds" envconfig:"K6_NO_THRESHOLDS"`
+	NoSummary     null.Bool `json:"noSummary" envconfig:"K6_NO_SUMMARY"`
 
 	Collectors struct {
 		InfluxDB influxdb.Config `json:"influxdb"`
@@ -174,10 +174,12 @@ func writeDiskConfig(fs afero.Fs, configPath string, conf Config) error {
 func readEnvConfig() (conf Config, err error) {
 	// TODO: replace envconfig and refactor the whole configuration from the groun up :/
 	for _, err := range []error{
-		envconfig.Process("k6", &conf),
-		envconfig.Process("k6", &conf.Collectors.Cloud),
-		envconfig.Process("k6", &conf.Collectors.InfluxDB),
-		envconfig.Process("k6", &conf.Collectors.Kafka),
+		envconfig.Process("", &conf),
+		envconfig.Process("", &conf.Collectors.Cloud),
+		envconfig.Process("", &conf.Collectors.InfluxDB),
+		envconfig.Process("", &conf.Collectors.Kafka),
+		envconfig.Process("k6_statsd", &conf.Collectors.StatsD),
+		envconfig.Process("k6_datadog", &conf.Collectors.Datadog),
 	} {
 		return conf, err
 	}
@@ -288,6 +290,8 @@ func getConsolidatedConfig(fs afero.Fs, cliConf Config, runner lib.Runner) (conf
 	cliConf.Collectors.InfluxDB = influxdb.NewConfig().Apply(cliConf.Collectors.InfluxDB)
 	cliConf.Collectors.Cloud = cloud.NewConfig().Apply(cliConf.Collectors.Cloud)
 	cliConf.Collectors.Kafka = kafka.NewConfig().Apply(cliConf.Collectors.Kafka)
+	cliConf.Collectors.StatsD = common.NewConfig().Apply(cliConf.Collectors.StatsD)
+	cliConf.Collectors.Datadog = datadog.NewConfig().Apply(cliConf.Collectors.Datadog)
 
 	fileConf, _, err := readDiskConfig(fs)
 	if err != nil {
