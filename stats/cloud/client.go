@@ -85,9 +85,7 @@ func (c *Client) NewRequest(method, url string, data interface{}) (*http.Request
 		return nil, err
 	}
 
-	if shouldAddIdempotencyKey(req) {
-		req.Header.Set(k6IdempotencyKeyHeader, randomStrHex())
-	}
+	c.prepareHeaders(req)
 
 	return req, nil
 }
@@ -106,8 +104,6 @@ func (c *Client) Do(req *http.Request, v interface{}) error {
 			err = cerr
 		}
 	}
-
-	c.prepareHeaders(req)
 
 	for i := 1; i <= c.retries; i++ {
 		if len(originalBody) > 0 {
@@ -131,9 +127,15 @@ func (c *Client) prepareHeaders(req *http.Request) {
 	if req.Header.Get("Content-Type") == "" {
 		req.Header.Set("Content-Type", "application/json")
 	}
+
 	if c.token != "" {
 		req.Header.Set("Authorization", fmt.Sprintf("Token %s", c.token))
 	}
+
+	if shouldAddIdempotencyKey(req) {
+		req.Header.Set(k6IdempotencyKeyHeader, randomStrHex())
+	}
+
 	req.Header.Set("User-Agent", "k6cloud/"+c.version)
 }
 
