@@ -107,6 +107,8 @@ func (c *Client) Do(req *http.Request, v interface{}) error {
 		}
 	}
 
+	c.prepareHeader(req)
+
 	for i := 1; i <= c.retries; i++ {
 		if len(originalBody) > 0 {
 			req.Body = ioutil.NopCloser(bytes.NewBuffer(originalBody))
@@ -125,7 +127,7 @@ func (c *Client) Do(req *http.Request, v interface{}) error {
 	return err
 }
 
-func (c *Client) do(req *http.Request, v interface{}, attempt int) (retry bool, err error) {
+func (c *Client) prepareHeader(req *http.Request) {
 	if req.Header.Get("Content-Type") == "" {
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -133,6 +135,9 @@ func (c *Client) do(req *http.Request, v interface{}, attempt int) (retry bool, 
 		req.Header.Set("Authorization", fmt.Sprintf("Token %s", c.token))
 	}
 	req.Header.Set("User-Agent", "k6cloud/"+c.version)
+}
+
+func (c *Client) do(req *http.Request, v interface{}, attempt int) (retry bool, err error) {
 	resp, err := c.client.Do(req)
 
 	defer func() {
