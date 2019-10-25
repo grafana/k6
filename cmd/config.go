@@ -61,11 +61,11 @@ func configFlagSet() *pflag.FlagSet {
 type Config struct {
 	lib.Options
 
-	Out           []string  `json:"out" envconfig:"K6_out"`
-	Linger        null.Bool `json:"linger" envconfig:"K6_linger"`
-	NoUsageReport null.Bool `json:"noUsageReport" envconfig:"K6_no_usage_report"`
-	NoThresholds  null.Bool `json:"noThresholds" envconfig:"K6_no_thresholds"`
-	NoSummary     null.Bool `json:"noSummary" envconfig:"K6_no_summary"`
+	Out           []string  `json:"out" envconfig:"K6_OUT"`
+	Linger        null.Bool `json:"linger" envconfig:"K6_LINGER"`
+	NoUsageReport null.Bool `json:"noUsageReport" envconfig:"K6_NO_USAGE_REPORT"`
+	NoThresholds  null.Bool `json:"noThresholds" envconfig:"K6_NO_THRESHOLDS"`
+	NoSummary     null.Bool `json:"noSummary" envconfig:"K6_NO_SUMMARY"`
 
 	Collectors struct {
 		InfluxDB influxdb.Config `json:"influxdb"`
