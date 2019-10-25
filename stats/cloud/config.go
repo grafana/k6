@@ -28,21 +28,22 @@ import (
 )
 
 // Config holds all the necessary data and options for sending metrics to the Load Impact cloud.
+//nolint: lll
 type Config struct {
 	// TODO: refactor common stuff between cloud execution and output
-	Token           null.String `json:"token" envconfig:"CLOUD_TOKEN"`
+	Token           null.String `json:"token" envconfig:"K6_CLOUD_TOKEN"`
 	DeprecatedToken null.String `json:"-" envconfig:"K6CLOUD_TOKEN"`
-	ProjectID       null.Int    `json:"projectID" envconfig:"CLOUD_PROJECT_ID"`
-	Name            null.String `json:"name" envconfig:"CLOUD_NAME"`
+	ProjectID       null.Int    `json:"projectID" envconfig:"K6_CLOUD_PROJECT_ID"`
+	Name            null.String `json:"name" envconfig:"K6_CLOUD_NAME"`
 
-	Host       null.String `json:"host" envconfig:"CLOUD_HOST"`
-	WebAppURL  null.String `json:"webAppURL" envconfig:"CLOUD_WEB_APP_URL"`
-	NoCompress null.Bool   `json:"noCompress" envconfig:"CLOUD_NO_COMPRESS"`
+	Host       null.String `json:"host" envconfig:"K6_CLOUD_HOST"`
+	WebAppURL  null.String `json:"webAppURL" envconfig:"K6_CLOUD_WEB_APP_URL"`
+	NoCompress null.Bool   `json:"noCompress" envconfig:"K6_CLOUD_NO_COMPRESS"`
 
-	MaxMetricSamplesPerPackage null.Int `json:"maxMetricSamplesPerPackage" envconfig:"CLOUD_MAX_METRIC_SAMPLES_PER_PACKAGE"`
+	MaxMetricSamplesPerPackage null.Int `json:"maxMetricSamplesPerPackage" envconfig:"K6_CLOUD_MAX_METRIC_SAMPLES_PER_PACKAGE"`
 
 	// The time interval between periodic API calls for sending samples to the cloud ingest service.
-	MetricPushInterval types.NullDuration `json:"metricPushInterval" envconfig:"CLOUD_METRIC_PUSH_INTERVAL"`
+	MetricPushInterval types.NullDuration `json:"metricPushInterval" envconfig:"K6_CLOUD_METRIC_PUSH_INTERVAL"`
 
 	// Aggregation docs:
 	//
@@ -103,23 +104,23 @@ type Config struct {
 	//       on the next MetricPushInterval event.
 
 	// If specified and is greater than 0, sample aggregation with that period is enabled
-	AggregationPeriod types.NullDuration `json:"aggregationPeriod" envconfig:"CLOUD_AGGREGATION_PERIOD"`
+	AggregationPeriod types.NullDuration `json:"aggregationPeriod" envconfig:"K6_CLOUD_AGGREGATION_PERIOD"`
 
 	// If aggregation is enabled, this is how often new HTTP trails will be sorted into buckets and sub-buckets and aggregated.
-	AggregationCalcInterval types.NullDuration `json:"aggregationCalcInterval" envconfig:"CLOUD_AGGREGATION_CALC_INTERVAL"`
+	AggregationCalcInterval types.NullDuration `json:"aggregationCalcInterval" envconfig:"K6_CLOUD_AGGREGATION_CALC_INTERVAL"`
 
 	// If aggregation is enabled, this specifies how long we'll wait for period samples to accumulate before trying to aggregate them.
-	AggregationWaitPeriod types.NullDuration `json:"aggregationWaitPeriod" envconfig:"CLOUD_AGGREGATION_WAIT_PERIOD"`
+	AggregationWaitPeriod types.NullDuration `json:"aggregationWaitPeriod" envconfig:"K6_CLOUD_AGGREGATION_WAIT_PERIOD"`
 
 	// If aggregation is enabled, but the collected samples for a certain AggregationPeriod after AggregationPushDelay has passed are less than this number, they won't be aggregated.
-	AggregationMinSamples null.Int `json:"aggregationMinSamples" envconfig:"CLOUD_AGGREGATION_MIN_SAMPLES"`
+	AggregationMinSamples null.Int `json:"aggregationMinSamples" envconfig:"K6_CLOUD_AGGREGATION_MIN_SAMPLES"`
 
 	// If this is enabled and a sub-bucket has more than AggregationMinSamples HTTP trails in it, they would all be
 	// aggregated without attempting to find and separate any outlier metrics first.
 	// IMPORTANT: This is intended for testing purposes only or, in extreme cases, when the result precision
 	// isn't very important and the improved aggregation percentage would be worth the potentially huge loss
 	// of metric granularity and possible masking of any outlier samples.
-	AggregationSkipOutlierDetection null.Bool `json:"aggregationSkipOutlierDetection" envconfig:"CLOUD_AGGREGATION_SKIP_OUTLIER_DETECTION"`
+	AggregationSkipOutlierDetection null.Bool `json:"aggregationSkipOutlierDetection" envconfig:"K6_CLOUD_AGGREGATION_SKIP_OUTLIER_DETECTION"`
 
 	// If aggregation and outlier detection are enabled, this option specifies the
 	// number of HTTP trails in a sub-bucket that determine which quartile-calculating
@@ -131,19 +132,19 @@ type Config struct {
 	//   QuickSelect-based (https://en.wikipedia.org/wiki/Quickselect) algorithm will
 	//   be used. It doesn't support interpolation, so there's a small loss of precision
 	//   in the outlier detection, but it's not as resource-heavy as the sorting algorithm.
-	AggregationOutlierAlgoThreshold null.Int `json:"aggregationOutlierAlgoThreshold" envconfig:"CLOUD_AGGREGATION_OUTLIER_ALGO_THRESHOLD"`
+	AggregationOutlierAlgoThreshold null.Int `json:"aggregationOutlierAlgoThreshold" envconfig:"K6_CLOUD_AGGREGATION_OUTLIER_ALGO_THRESHOLD"`
 
 	// The radius (as a fraction) from the median at which to sample Q1 and Q3.
 	// By default it's one quarter (0.25) and if set to something different, the Q in IQR
 	// won't make much sense... But this would allow us to select tighter sample groups for
 	// aggregation if we want.
-	AggregationOutlierIqrRadius null.Float `json:"aggregationOutlierIqrRadius" envconfig:"CLOUD_AGGREGATION_OUTLIER_IQR_RADIUS"`
+	AggregationOutlierIqrRadius null.Float `json:"aggregationOutlierIqrRadius" envconfig:"K6_CLOUD_AGGREGATION_OUTLIER_IQR_RADIUS"`
 
 	// Connection or request times with how many IQRs below Q1 to consier as non-aggregatable outliers.
-	AggregationOutlierIqrCoefLower null.Float `json:"aggregationOutlierIqrCoefLower" envconfig:"CLOUD_AGGREGATION_OUTLIER_IQR_COEF_LOWER"`
+	AggregationOutlierIqrCoefLower null.Float `json:"aggregationOutlierIqrCoefLower" envconfig:"K6_CLOUD_AGGREGATION_OUTLIER_IQR_COEF_LOWER"`
 
 	// Connection or request times with how many IQRs above Q3 to consier as non-aggregatable outliers.
-	AggregationOutlierIqrCoefUpper null.Float `json:"aggregationOutlierIqrCoefUpper" envconfig:"CLOUD_AGGREGATION_OUTLIER_IQR_COEF_UPPER"`
+	AggregationOutlierIqrCoefUpper null.Float `json:"aggregationOutlierIqrCoefUpper" envconfig:"K6_CLOUD_AGGREGATION_OUTLIER_IQR_COEF_UPPER"`
 }
 
 // NewConfig creates a new Config instance with default values for some fields.

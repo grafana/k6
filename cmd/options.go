@@ -89,7 +89,7 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		Batch:                 getNullInt64(flags, "batch"),
 		RPS:                   getNullInt64(flags, "rps"),
 		UserAgent:             getNullString(flags, "user-agent"),
-		HttpDebug:             getNullString(flags, "http-debug"),
+		HTTPDebug:             getNullString(flags, "http-debug"),
 		InsecureSkipTLSVerify: getNullBool(flags, "insecure-skip-tls-verify"),
 		NoConnectionReuse:     getNullBool(flags, "no-connection-reuse"),
 		NoVUConnectionReuse:   getNullBool(flags, "no-vu-connection-reuse"),
