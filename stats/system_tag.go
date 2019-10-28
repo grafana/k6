@@ -71,12 +71,13 @@ func (i SystemTagSet) Map() TagSet {
 	return m
 }
 
-// SetString is returns comma separeted list of the string representation of all values in the set
+// SetString returns comma separeted list of the string representation of all values in the set
 func (i SystemTagSet) SetString() string {
-	m := i.Map()
-	var keys = make([]string, 0, len(m))
-	for key := range m {
-		keys = append(keys, key)
+	var keys []string
+	for _, tag := range SystemTagSetValues() {
+		if i.Has(tag) {
+			keys = append(keys, tag.String())
+		}
 	}
 	sort.Strings(keys)
 	return strings.Join(keys, ",")
