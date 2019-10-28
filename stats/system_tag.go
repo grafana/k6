@@ -3,7 +3,6 @@ package stats
 import (
 	"bytes"
 	"encoding/json"
-	"sort"
 	"strings"
 )
 
@@ -79,7 +78,6 @@ func (i SystemTagSet) SetString() string {
 			keys = append(keys, tag.String())
 		}
 	}
-	sort.Strings(keys)
 	return strings.Join(keys, ",")
 }
 
