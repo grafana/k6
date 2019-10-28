@@ -3,6 +3,7 @@ package stats
 import (
 	"bytes"
 	"encoding/json"
+	"sort"
 	"strings"
 )
 
@@ -60,7 +61,7 @@ func (i *SystemTagSet) Has(tag SystemTagSet) bool {
 }
 
 // Map returns the TagSet with current value from SystemTagSet
-func (i *SystemTagSet) Map() TagSet {
+func (i SystemTagSet) Map() TagSet {
 	m := TagSet{}
 	for _, tag := range SystemTagSetValues() {
 		if i.Has(tag) {
@@ -68,6 +69,17 @@ func (i *SystemTagSet) Map() TagSet {
 		}
 	}
 	return m
+}
+
+// SetString is returns comma separeted list of the string representation of all values in the set
+func (i SystemTagSet) SetString() string {
+	m := i.Map()
+	var keys = make([]string, 0, len(m))
+	for key := range m {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return strings.Join(keys, ",")
 }
 
 // ToSystemTagSet converts list of tags to SystemTagSet
