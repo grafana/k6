@@ -60,7 +60,7 @@ func (i *SystemTagSet) Has(tag SystemTagSet) bool {
 }
 
 // Map returns the TagSet with current value from SystemTagSet
-func (i *SystemTagSet) Map() TagSet {
+func (i SystemTagSet) Map() TagSet {
 	m := TagSet{}
 	for _, tag := range SystemTagSetValues() {
 		if i.Has(tag) {
@@ -68,6 +68,17 @@ func (i *SystemTagSet) Map() TagSet {
 		}
 	}
 	return m
+}
+
+// SetString returns comma separated list of the string representation of all values in the set
+func (i SystemTagSet) SetString() string {
+	var keys []string
+	for _, tag := range SystemTagSetValues() {
+		if i.Has(tag) {
+			keys = append(keys, tag.String())
+		}
+	}
+	return strings.Join(keys, ",")
 }
 
 // ToSystemTagSet converts list of tags to SystemTagSet
