@@ -70,7 +70,7 @@ func (i SystemTagSet) Map() TagSet {
 	return m
 }
 
-// SetString returns comma separeted list of the string representation of all values in the set
+// SetString returns comma separated list of the string representation of all values in the set
 func (i SystemTagSet) SetString() string {
 	var keys []string
 	for _, tag := range SystemTagSetValues() {
