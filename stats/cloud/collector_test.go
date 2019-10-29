@@ -51,6 +51,10 @@ func tagEqual(expected, got *stats.SampleTags) bool {
 	expectedMap := expected.CloneTags()
 	gotMap := got.CloneTags()
 
+	if len(expectedMap) != len(gotMap) {
+		return false
+	}
+
 	for k, v := range gotMap {
 		if k == "url" {
 			if expectedMap["name"] != v {
