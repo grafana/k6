@@ -347,6 +347,7 @@ func (c *Collector) aggregateHTTPTrails(waitPeriod time.Duration) {
 				if trailTags.IsEqual(sbTags) {
 					subBucketKey = sbTags
 					subBucket = sb
+					break
 				}
 			}
 		}
