@@ -111,13 +111,22 @@ func TestNewBundle(t *testing.T) {
 			assert.Equal(t, "file:///", b.BaseInitContext.pwd.String())
 		}
 	})
-	t.Run("CompatibilityModeBase", func(t *testing.T) {
-		t.Run("ok/Minimal", func(t *testing.T) {
-			rtOpts := lib.RuntimeOptions{CompatibilityMode: null.StringFrom(compiler.CompatibilityModeBase.String())}
-			_, err := getSimpleBundle("/script.js", `module.exports.default = function() {};`, rtOpts)
+	t.Run("CompatibilityMode", func(t *testing.T) {
+		t.Run("Extended/ok/CoreJS", func(t *testing.T) {
+			rtOpts := lib.RuntimeOptions{
+				CompatibilityMode: null.StringFrom(compiler.CompatibilityModeExtended.String())}
+			_, err := getSimpleBundle("/script.js",
+				`export default function() {}; new Set([1, 2, 3, 2, 1]);`, rtOpts)
 			assert.NoError(t, err)
 		})
-		t.Run("err", func(t *testing.T) {
+		t.Run("Base/ok/Minimal", func(t *testing.T) {
+			rtOpts := lib.RuntimeOptions{
+				CompatibilityMode: null.StringFrom(compiler.CompatibilityModeBase.String())}
+			_, err := getSimpleBundle("/script.js",
+				`module.exports.default = function() {};`, rtOpts)
+			assert.NoError(t, err)
+		})
+		t.Run("Base/err", func(t *testing.T) {
 			testCases := []struct {
 				name       string
 				compatMode string
@@ -126,13 +135,17 @@ func TestNewBundle(t *testing.T) {
 			}{
 				{"InvalidCompat", "es1", `export default function() {};`,
 					`invalid compatibility mode "es1". Use: "extended", "base"`},
-				// ES6 modules are not supported
+				// ES2015 modules are not supported
 				{"Modules", "base", `export default function() {};`,
 					"file:///script.js: Line 1:1 Unexpected reserved word"},
 				// Arrow functions are not supported
 				{"ArrowFuncs", "base",
 					`module.exports.default = function() {}; () => {};`,
 					"file:///script.js: Line 1:42 Unexpected token ) (and 1 more errors)"},
+				// ES2015 objects polyfilled by core.js are not supported
+				{"CoreJS", "base",
+					`module.exports.default = function() {}; new Set([1, 2, 3, 2, 1]);`,
+					"ReferenceError: Set is not defined at file:///script.js:1:45(5)"},
 			}
 
 			for _, tc := range testCases {
