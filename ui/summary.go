@@ -21,6 +21,7 @@
 package ui
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"sort"
@@ -383,4 +384,45 @@ func (s *Summary) SummarizeMetrics(w io.Writer, indent string, data SummaryData)
 	}
 
 	s.summarizeMetrics(w, indent+"  ", data.Time, data.TimeUnit, data.Metrics)
+}
+
+func newJSONEncoder(w io.Writer) *json.Encoder {
+	encoder := json.NewEncoder(w)
+	encoder.SetIndent("", "    ")
+	return encoder
+}
+
+func summarizeGroupJSON(w io.Writer, group *lib.Group) error {
+	return newJSONEncoder(w).Encode(group)
+}
+
+func summarizeMetricsJSON(w io.Writer, t time.Duration, timeUnit string, metrics map[string]*stats.Metric) error {
+	data := make(map[string]interface{})
+	for name, m := range metrics {
+		m.Sink.Calc()
+		if sink, ok := m.Sink.(*stats.TrendSink); ok {
+			data[name] = sink.Format(t)
+			continue
+		}
+		data[name] = m.Sink.Format(t)
+		_, extra := nonTrendMetricValueForSum(t, timeUnit, m)
+		if len(extra) > 1 {
+			extraData := make(map[string]interface{})
+			extraData["value"] = m.Sink.Format(t)["value"]
+			extraData["extra"] = extra
+			data[name] = extraData
+		}
+	}
+
+	return newJSONEncoder(w).Encode(data)
+}
+
+// SummarizeMetricsJSON summarizes a dataset in JSON format.
+func (s *Summary) SummarizeMetricsJSON(w io.Writer, data SummaryData) error {
+	if data.RootGroup != nil {
+		if err := summarizeGroupJSON(w, data.RootGroup); err != nil {
+			return err
+		}
+	}
+	return summarizeMetricsJSON(w, data.Time, data.TimeUnit, data.Metrics)
 }
