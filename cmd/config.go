@@ -56,17 +56,23 @@ func configFlagSet() *pflag.FlagSet {
 	flags.Bool("no-usage-report", false, "don't send anonymous stats to the developers")
 	flags.Bool("no-thresholds", false, "don't run thresholds")
 	flags.Bool("no-summary", false, "don't show the summary at the end of the test")
+	flags.String(
+		"summary-export",
+		"",
+		"output summary to file in json format, empty string means output is ignored",
+	)
 	return flags
 }
 
 type Config struct {
 	lib.Options
 
-	Out           []string  `json:"out" envconfig:"K6_OUT"`
-	Linger        null.Bool `json:"linger" envconfig:"K6_LINGER"`
-	NoUsageReport null.Bool `json:"noUsageReport" envconfig:"K6_NO_USAGE_REPORT"`
-	NoThresholds  null.Bool `json:"noThresholds" envconfig:"K6_NO_THRESHOLDS"`
-	NoSummary     null.Bool `json:"noSummary" envconfig:"K6_NO_SUMMARY"`
+	Out           []string    `json:"out" envconfig:"K6_OUT"`
+	Linger        null.Bool   `json:"linger" envconfig:"K6_LINGER"`
+	NoUsageReport null.Bool   `json:"noUsageReport" envconfig:"K6_NO_USAGE_REPORT"`
+	NoThresholds  null.Bool   `json:"noThresholds" envconfig:"K6_NO_THRESHOLDS"`
+	NoSummary     null.Bool   `json:"noSummary" envconfig:"K6_NO_SUMMARY"`
+	SummaryExport null.String `json:"summaryExport" envconfig:"K6_SUMMARY_EXPORT"`
 
 	Collectors struct {
 		InfluxDB influxdb.Config `json:"influxdb"`
@@ -95,6 +101,9 @@ func (c Config) Apply(cfg Config) Config {
 	if cfg.NoSummary.Valid {
 		c.NoSummary = cfg.NoSummary
 	}
+	if cfg.SummaryExport.Valid {
+		c.SummaryExport = cfg.SummaryExport
+	}
 	c.Collectors.InfluxDB = c.Collectors.InfluxDB.Apply(cfg.Collectors.InfluxDB)
 	c.Collectors.Cloud = c.Collectors.Cloud.Apply(cfg.Collectors.Cloud)
 	c.Collectors.Kafka = c.Collectors.Kafka.Apply(cfg.Collectors.Kafka)
@@ -121,6 +130,7 @@ func getConfig(flags *pflag.FlagSet) (Config, error) {
 		NoUsageReport: getNullBool(flags, "no-usage-report"),
 		NoThresholds:  getNullBool(flags, "no-thresholds"),
 		NoSummary:     getNullBool(flags, "no-summary"),
+		SummaryExport: getNullString(flags, "summary-export"),
 	}, nil
 }
 
