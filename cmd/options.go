@@ -63,7 +63,14 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.Duration("min-iteration-duration", 0, "minimum amount of time k6 will take executing a single iteration")
 	flags.BoolP("throw", "w", false, "throw warnings (like failed http requests) as errors")
 	flags.StringSlice("blacklist-ip", nil, "blacklist an `ip range` from being called")
-	flags.StringSlice("summary-trend-stats", nil, "define `stats` for trend metrics (response times), one or more as 'avg,p(95),...'")
+
+	// The comment about system-tags also applies for summary-trend-stats. The default values
+	// are set in applyDefault().
+	sumTrendStatsHelp := fmt.Sprintf(
+		"define `stats` for trend metrics (response times), one or more as 'avg,p(95),...' (default '%s')",
+		strings.Join(lib.DefaultSummaryTrendStats, ","),
+	)
+	flags.StringSlice("summary-trend-stats", nil, sumTrendStatsHelp)
 	flags.String("summary-time-unit", "", "define the time unit used to display the trend stats. Possible units are: 's', 'ms' and 'us'")
 	// system-tags must have a default value, but we can't specify it here, otherwiese, it will always override others.
 	// set it to nil here, and add the default in applyDefault() instead.
@@ -143,16 +150,15 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		opts.BlacklistIPs = append(opts.BlacklistIPs, net)
 	}
 
-	trendStatStrings, err := flags.GetStringSlice("summary-trend-stats")
-	if err != nil {
-		return opts, err
-	}
-	for _, s := range trendStatStrings {
-		if err := ui.VerifyTrendColumnStat(s); err != nil {
-			return opts, errors.Wrapf(err, "stat '%s'", s)
+	if flags.Changed("summary-trend-stats") {
+		trendStats, errSts := flags.GetStringSlice("summary-trend-stats")
+		if errSts != nil {
+			return opts, errSts
 		}
-
-		opts.SummaryTrendStats = append(opts.SummaryTrendStats, s)
+		if errSts = ui.ValidateSummary(trendStats); err != nil {
+			return opts, errSts
+		}
+		opts.SummaryTrendStats = trendStats
 	}
 
 	summaryTimeUnit, err := flags.GetString("summary-time-unit")

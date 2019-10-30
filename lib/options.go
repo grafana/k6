@@ -39,6 +39,10 @@ import (
 // iterations+vus, or stages)
 const DefaultSchedulerName = "default"
 
+// DefaultSummaryTrendStats are the default trend columns shown in the test summary output
+// nolint: gochecknoglobals
+var DefaultSummaryTrendStats = []string{"avg", "min", "med", "max", "p(90)", "p(95)"}
+
 // Describes a TLS version. Serialised to/from JSON as a string, eg. "tls1.2".
 type TLSVersion int
 

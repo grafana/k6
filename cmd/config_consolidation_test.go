@@ -412,6 +412,27 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 				)
 			},
 		},
+		// Test summary trend stats
+		{opts{}, exp{}, func(t *testing.T, c Config) {
+			assert.Equal(t, lib.DefaultSummaryTrendStats, c.Options.SummaryTrendStats)
+		}},
+		{opts{cli: []string{"--summary-trend-stats", ""}}, exp{}, func(t *testing.T, c Config) {
+			assert.Equal(t, []string{}, c.Options.SummaryTrendStats)
+		}},
+		{opts{cli: []string{"--summary-trend-stats", "coun"}}, exp{consolidationError: true}, nil},
+		{opts{cli: []string{"--summary-trend-stats", "med,avg,p("}}, exp{consolidationError: true}, nil},
+		{opts{cli: []string{"--summary-trend-stats", "med,avg,p(-1)"}}, exp{consolidationError: true}, nil},
+		{opts{cli: []string{"--summary-trend-stats", "med,avg,p(101)"}}, exp{consolidationError: true}, nil},
+		{opts{cli: []string{"--summary-trend-stats", "med,avg,p(99.999)"}}, exp{}, func(t *testing.T, c Config) {
+			assert.Equal(t, []string{"med", "avg", "p(99.999)"}, c.Options.SummaryTrendStats)
+		}},
+		{
+			opts{runner: &lib.Options{SummaryTrendStats: []string{"avg", "p(90)", "count"}}},
+			exp{},
+			func(t *testing.T, c Config) {
+				assert.Equal(t, []string{"avg", "p(90)", "count"}, c.Options.SummaryTrendStats)
+			},
+		},
 		//TODO: test for differences between flagsets
 		//TODO: more tests in general, especially ones not related to execution parameters...
 	}
