@@ -28,6 +28,7 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
+	"sort"
 	"sync"
 	"testing"
 	"time"
@@ -141,6 +142,20 @@ func skewTrail(t httpext.Trail, minCoef, maxCoef float64) httpext.Trail {
 
 func TestCloudCollector(t *testing.T) {
 	t.Parallel()
+
+	getTestRunner := func(minSamples int) func(t *testing.T) {
+		return func(t *testing.T) {
+			t.Parallel()
+			runCloudCollectorTestCase(t, minSamples)
+		}
+	}
+
+	for tcNum, minSamples := range []int{60, 75, 100} {
+		t.Run(fmt.Sprintf("tc%d_minSamples%d", tcNum, minSamples), getTestRunner(minSamples))
+	}
+}
+
+func runCloudCollectorTestCase(t *testing.T, minSamples int) {
 	tb := httpmultibin.NewHTTPMultiBin(t)
 	tb.Mux.HandleFunc("/v1/tests", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, err := fmt.Fprintf(w, `{
@@ -149,9 +164,10 @@ func TestCloudCollector(t *testing.T) {
 				"metricPushInterval": "10ms",
 				"aggregationPeriod": "30ms",
 				"aggregationCalcInterval": "40ms",
-				"aggregationWaitPeriod": "5ms"
+				"aggregationWaitPeriod": "5ms",
+				"aggregationMinSamples": %d
 			}
-		}`)
+		}`, minSamples)
 		require.NoError(t, err)
 	}))
 	defer tb.Cleanup()
@@ -198,6 +214,9 @@ func TestCloudCollector(t *testing.T) {
 
 	expSamples := make(chan []Sample)
 	tb.Mux.HandleFunc(fmt.Sprintf("/v1/metrics/%s", collector.referenceID), getSampleChecker(t, expSamples))
+	tb.Mux.HandleFunc(fmt.Sprintf("/v1/tests/%s", collector.referenceID), func(rw http.ResponseWriter, _ *http.Request) {
+		rw.WriteHeader(http.StatusOK) // silence a test warning
+	})
 
 	ctx, cancel := context.WithCancel(context.Background())
 	wg := sync.WaitGroup{}
@@ -240,13 +259,17 @@ func TestCloudCollector(t *testing.T) {
 	collector.Collect([]stats.SampleContainer{&simpleTrail})
 	expSamples <- []Sample{*NewSampleFromTrail(&simpleTrail)}
 
-	smallSkew := 0.05
+	smallSkew := 0.02
 
 	trails := []stats.SampleContainer{}
+	durations := make([]time.Duration, len(trails))
 	for i := int64(0); i < collector.config.AggregationMinSamples.Int64; i++ {
 		similarTrail := skewTrail(simpleTrail, 1.0, 1.0+smallSkew)
 		trails = append(trails, &similarTrail)
+		durations = append(durations, similarTrail.Duration)
 	}
+	sort.Slice(durations, func(i, j int) bool { return durations[i] < durations[j] })
+	t.Logf("Sorted durations: %#v", durations) // Useful to debug any failures, doesn't get in the way otherwise
 
 	checkAggrMetric := func(normal time.Duration, aggr AggregatedMetric) {
 		assert.True(t, aggr.Min <= aggr.Avg)
