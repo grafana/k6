@@ -161,8 +161,12 @@ func NewConfig() Config {
 		AggregationMinSamples:           null.NewInt(25, false),
 		AggregationOutlierAlgoThreshold: null.NewInt(75, false),
 		AggregationOutlierIqrRadius:     null.NewFloat(0.25, false),
-		AggregationOutlierIqrCoefLower:  null.NewFloat(1.5, false),
-		AggregationOutlierIqrCoefUpper:  null.NewFloat(1.3, false),
+
+		// Since we're measuring durations, the upper coefficient is slightly
+		// lower, since outliers from that side are more interesting than ones
+		// close to zero.
+		AggregationOutlierIqrCoefLower: null.NewFloat(1.5, false),
+		AggregationOutlierIqrCoefUpper: null.NewFloat(1.3, false),
 	}
 }
 
