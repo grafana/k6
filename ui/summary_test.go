@@ -26,10 +26,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"gopkg.in/guregu/null.v3"
+
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
-	"github.com/stretchr/testify/assert"
-	"gopkg.in/guregu/null.v3"
 )
 
 func TestSummary(t *testing.T) {
@@ -163,4 +165,81 @@ func createTestMetrics() map[string]*stats.Metric {
 	metrics["my_trend"] = &stats.Metric{Name: "my_trend", Type: stats.Trend, Contains: stats.Time, Sink: sink}
 
 	return metrics
+}
+
+func TestSummarizeMetricsJSON(t *testing.T) {
+	metrics := createTestMetrics()
+	expected := `{
+    "root_group": {
+        "name": "",
+        "path": "",
+        "id": "d41d8cd98f00b204e9800998ecf8427e",
+        "groups": {
+            "child": {
+            "name": "child",
+            "path": "::child",
+            "id": "f41cbb53a398ec1c9fb3d33e20c9b040",
+            "groups": {},
+            "checks": {
+                "check1": {
+                    "name": "check1",
+                    "path": "::child::check1",
+                    "id": "6289a7a06253a1c3f6137dfb25695563",
+                    "passes": 5,
+                    "fails": 10
+                    }
+                }
+            }
+        },
+        "checks": {}
+    },
+    "metrics": {
+        "checks": {
+            "extra": [
+                "✓ 3",
+                "✗ 0"
+            ],
+            "value": 0
+        },
+        "http_reqs": {
+            "count": 3,
+            "rate": 3
+        },
+        "my_trend": {
+            "avg": 15,
+            "max": 20,
+            "med": 15,
+            "min": 10,
+            "p(90)": 19,
+            "p(95)": 19.5
+        },
+        "vus": {
+            "extra": [
+                "min=1",
+                "max=1"
+            ],
+            "value": 1
+        }
+    }
+}
+`
+	rootG, _ := lib.NewGroup("", nil)
+	childG, _ := rootG.Group("child")
+	check, _ := lib.NewCheck("check1", childG)
+	check.Passes = 5
+	check.Fails = 10
+	childG.Checks["check1"] = check
+
+	s := NewSummary([]string{"avg", "min", "med", "max", "p(90)", "p(95)", "p(99.9)"})
+	data := SummaryData{
+		Metrics:   metrics,
+		RootGroup: rootG,
+		Time:      time.Second,
+		TimeUnit:  "",
+	}
+
+	var w bytes.Buffer
+	err := s.SummarizeMetricsJSON(&w, data)
+	require.Nil(t, err)
+	require.JSONEq(t, expected, w.String())
 }
