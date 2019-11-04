@@ -319,7 +319,7 @@ func (r *Runner) runPart(ctx context.Context, out chan<- stats.SampleContainer, 
 		return goja.Undefined(), err
 	}
 
-	v, _, _, err := vu.runFn(ctx, group, fn, vu.Runtime.ToValue(arg))
+	v, _, _, err := vu.runFn(ctx, group, false, fn, vu.Runtime.ToValue(arg))
 
 	// deadline is reached so we have timeouted but this might've not been registered correctly
 	if deadline, ok := ctx.Deadline(); ok && time.Now().After(deadline) {
@@ -418,7 +418,7 @@ func (u *VU) RunOnce(ctx context.Context) error {
 	}
 
 	// Call the default function.
-	_, isFullIteration, totalTime, err := u.runFn(ctx, u.Runner.defaultGroup, u.Default, u.setupData)
+	_, isFullIteration, totalTime, err := u.runFn(ctx, u.Runner.defaultGroup, true, u.Default, u.setupData)
 
 	// If MinIterationDuration is specified and the iteration wasn't cancelled
 	// and was less than it, sleep for the remainder
@@ -433,7 +433,7 @@ func (u *VU) RunOnce(ctx context.Context) error {
 }
 
 func (u *VU) runFn(
-	ctx context.Context, group *lib.Group, fn goja.Callable, args ...goja.Value,
+	ctx context.Context, group *lib.Group, isDefault bool, fn goja.Callable, args ...goja.Value,
 ) (goja.Value, bool, time.Duration, error) {
 	cookieJar, err := cookiejar.New(nil)
 	if err != nil {
@@ -494,7 +494,7 @@ func (u *VU) runFn(
 		u.Transport.CloseIdleConnections()
 	}
 
-	state.Samples <- u.Dialer.GetTrail(startTime, endTime, isFullIteration, stats.IntoSampleTags(&tags))
+	state.Samples <- u.Dialer.GetTrail(startTime, endTime, isFullIteration, isDefault, stats.IntoSampleTags(&tags))
 
 	return v, isFullIteration, endTime.Sub(startTime), err
 }

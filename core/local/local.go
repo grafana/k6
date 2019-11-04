@@ -32,7 +32,6 @@ import (
 	null "gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 )
@@ -298,17 +297,6 @@ func (e *Executor) Run(parent context.Context, engineOut chan<- stats.SampleCont
 		case <-iterDone:
 			// Every iteration ends with a write to iterDone. Check if we've hit the end point.
 			// If not, make sure to include an Iterations bump in the list!
-			var tags *stats.SampleTags
-			if e.Runner != nil {
-				tags = e.Runner.GetOptions().RunTags
-			}
-			engineOut <- stats.Sample{
-				Time:   time.Now(),
-				Metric: metrics.Iterations,
-				Value:  1,
-				Tags:   tags,
-			}
-
 			end := atomic.LoadInt64(&e.endIters)
 			at := atomic.AddInt64(&e.iters, 1)
 			if end >= 0 && at >= end {
