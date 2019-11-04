@@ -288,12 +288,6 @@ func TestExecutorEndIterations(t *testing.T) {
 		mySample, ok := <-samples
 		require.True(t, ok)
 		assert.Equal(t, stats.Sample{Metric: metric, Value: 1.0}, mySample)
-		sample, ok := <-samples
-		require.True(t, ok)
-		iterSample, ok := (sample).(stats.Sample)
-		require.True(t, ok)
-		assert.Equal(t, metrics.Iterations, iterSample.Metric)
-		assert.Equal(t, float64(1), iterSample.Value)
 	}
 }
 
@@ -560,28 +554,27 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 			Value:  expValue,
 		}
 	}
-	getDummyTrail := func(group string) stats.SampleContainer {
-		return netext.NewDialer(net.Dialer{}).GetTrail(time.Now(), time.Now(), true, getTags("group", group))
+	getDummyTrail := func(group string, emitIterations bool) stats.SampleContainer {
+		return netext.NewDialer(net.Dialer{}).GetTrail(time.Now(), time.Now(),
+			true, emitIterations, getTags("group", group))
 	}
 
 	// Initially give a long time (5s) for the executor to start
 	expectIn(0, 5000, getSample(1, testCounter, "group", "::setup", "place", "setupBeforeSleep"))
 	expectIn(900, 1100, getSample(2, testCounter, "group", "::setup", "place", "setupAfterSleep"))
-	expectIn(0, 100, getDummyTrail("::setup"))
+	expectIn(0, 100, getDummyTrail("::setup", false))
 
 	expectIn(0, 100, getSample(5, testCounter, "group", "", "place", "defaultBeforeSleep"))
 	expectIn(900, 1100, getSample(6, testCounter, "group", "", "place", "defaultAfterSleep"))
-	expectIn(0, 100, getDummyTrail(""))
-	expectIn(0, 100, getSample(1, metrics.Iterations))
+	expectIn(0, 100, getDummyTrail("", true))
 
 	expectIn(0, 100, getSample(5, testCounter, "group", "", "place", "defaultBeforeSleep"))
 	expectIn(900, 1100, getSample(6, testCounter, "group", "", "place", "defaultAfterSleep"))
-	expectIn(0, 100, getDummyTrail(""))
-	expectIn(0, 100, getSample(1, metrics.Iterations))
+	expectIn(0, 100, getDummyTrail("", true))
 
 	expectIn(0, 1000, getSample(3, testCounter, "group", "::teardown", "place", "teardownBeforeSleep"))
 	expectIn(900, 1100, getSample(4, testCounter, "group", "::teardown", "place", "teardownAfterSleep"))
-	expectIn(0, 100, getDummyTrail("::teardown"))
+	expectIn(0, 100, getDummyTrail("::teardown", false))
 
 	for {
 		select {
