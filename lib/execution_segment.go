@@ -37,7 +37,7 @@ import (
 // that we'll lose a VU along the way...
 //
 // The most important part is that if work is split between multiple k6 instances,
-// each k6 instance can precisely and reproducably calculate its share of the work,
+// each k6 instance can precisely and reproducibly calculate its share of the work,
 // just by knowing its own segment. There won't be a need to schedule the
 // execution from a master node, or to even know how many other k6 instances are
 // running!

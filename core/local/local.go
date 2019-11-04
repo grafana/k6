@@ -115,7 +115,7 @@ func (e *ExecutionScheduler) GetExecutors() []lib.Executor {
 	return e.executors
 }
 
-// GetInitProgressBar returns a the progress bar assotiated with the Init
+// GetInitProgressBar returns the progress bar associated with the Init
 // function. After the Init is done, it is "hijacked" to display real-time
 // execution statistics as a text bar.
 func (e *ExecutionScheduler) GetInitProgressBar() *pb.ProgressBar {
