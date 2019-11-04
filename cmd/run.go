@@ -456,19 +456,19 @@ a commandline interface for interacting with it.`,
 			fprintf(stdout, "\n")
 		}
 
-		if conf.SummaryExport.Valid && conf.SummaryExport.String != "" {
+		if conf.SummaryExport.ValueOrZero() != "" {
 			f, err := os.Create(conf.SummaryExport.String)
 			if err != nil {
-				logrus.Error("failed to create summary export file")
+				logrus.WithError(err).Error("failed to create summary export file")
 			} else {
 				defer func() {
 					if err := f.Close(); err != nil {
-						logrus.WithError(err).Fatal("failed to close summary output file")
+						logrus.WithError(err).Fatal("failed to close summary export file")
 					}
 				}()
 				s := ui.NewSummary(conf.SummaryTrendStats)
 				if err := s.SummarizeMetricsJSON(f, data); err != nil {
-					logrus.WithError(err).Fatal("failed to make summary export")
+					logrus.WithError(err).Fatal("failed to make json summary export file")
 				}
 			}
 		}
