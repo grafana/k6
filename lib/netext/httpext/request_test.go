@@ -138,3 +138,12 @@ func TestURL(t *testing.T) {
 		}
 	})
 }
+
+func BenchmarkWrapDecompressionError(b *testing.B) {
+	err := errors.New("error")
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = wrapDecompressionError(err)
+	}
+}
