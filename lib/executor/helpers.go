@@ -153,7 +153,7 @@ func getDurationContexts(parentCtx context.Context, regularDuration, gracefulSto
 }
 
 // trackProgress is a helper function that monitors certain end-events in a
-// executor and updates it's progressbar accordingly.
+// executor and updates its progressbar accordingly.
 func trackProgress(
 	parentCtx, maxDurationCtx, regDurationCtx context.Context,
 	sched lib.Executor, snapshot func() (float64, string),
@@ -189,7 +189,7 @@ func getScaledArrivalRate(es *lib.ExecutionSegment, rate int64, period time.Dura
 	return es.InPlaceScaleRat(big.NewRat(rate, int64(period)))
 }
 
-// just a cached value to avoid allocationg it every getTickerPeriod() call
+// just a cached value to avoid allocating it every getTickerPeriod() call
 var zero = big.NewInt(0) //nolint:gochecknoglobals
 
 // getTickerPeriod is just a helper function that returns the ticker interval*

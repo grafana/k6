@@ -202,7 +202,7 @@ func (car ConstantArrivalRate) Run(ctx context.Context, out chan<- stats.SampleC
 	vus := make(chan lib.VU, maxVUs)
 
 	initialisedVUs := uint64(0)
-	// Make sure we put back planned and unplanned VUs back in the global
+	// Make sure we put planned and unplanned VUs back in the global
 	// buffer, and as an extra incentive, this replaces a waitgroup.
 	defer func() {
 		// no need for atomics, since initialisedVUs is mutated only in the select{}
