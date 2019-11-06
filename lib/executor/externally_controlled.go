@@ -272,7 +272,7 @@ func (mex *ExternallyControlled) UpdateConfig(ctx context.Context, newConf inter
 	}
 	if newConfigParams.MaxVUs.Valid && newConfigParams.MaxVUs.Int64 < mex.startConfig.MaxVUs.Int64 {
 		// This limitation is because the externally controlled executor is
-		// still a executor that participates in the overall k6 scheduling.
+		// still an executor that participates in the overall k6 scheduling.
 		// Thus, any VUs that were explicitly specified by the user in the
 		// config may be reused from or by other executors.
 		return fmt.Errorf(

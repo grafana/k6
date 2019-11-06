@@ -85,7 +85,7 @@ type ExecutionScheduler interface {
 	SetPaused(paused bool) error
 }
 
-// MaxTimeToWaitForPlannedVU specifies the maximum allowable time for a executor
+// MaxTimeToWaitForPlannedVU specifies the maximum allowable time for an executor
 // to wait for a planned VU to be retrieved from the ExecutionState.PlannedVUs
 // buffer. If it's exceeded, k6 will emit a warning log message, since it either
 // means that there's a bug in the k6 scheduling code, or that the machine is

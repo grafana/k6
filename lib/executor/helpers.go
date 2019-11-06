@@ -113,12 +113,12 @@ func getIterationRunner(
 	}
 }
 
-// getDurationContexts is used to create sub-contexts that can restrict a
+// getDurationContexts is used to create sub-contexts that can restrict an
 // executor to only run for its allotted time.
 //
 // If the executor doesn't have a graceful stop period for iterations, then
 // both returned sub-contexts will be the same one, with a timeout equal to
-// supplied regular executor duration.
+// the supplied regular executor duration.
 //
 // But if a graceful stop is enabled, then the first returned context (and the
 // cancel func) will be for the "outer" sub-context. Its timeout will include
@@ -152,7 +152,7 @@ func getDurationContexts(parentCtx context.Context, regularDuration, gracefulSto
 	return startTime, maxDurationCtx, regDurationCtx, maxDurationCancel
 }
 
-// trackProgress is a helper function that monitors certain end-events in a
+// trackProgress is a helper function that monitors certain end-events in an
 // executor and updates its progressbar accordingly.
 func trackProgress(
 	parentCtx, maxDurationCtx, regDurationCtx context.Context,
@@ -192,7 +192,7 @@ func getScaledArrivalRate(es *lib.ExecutionSegment, rate int64, period time.Dura
 // just a cached value to avoid allocating it every getTickerPeriod() call
 var zero = big.NewInt(0) //nolint:gochecknoglobals
 
-// getTickerPeriod is just a helper function that returns the ticker interval*
+// getTickerPeriod is just a helper function that returns the ticker interval
 // we need for given arrival-rate parameters.
 //
 // It's possible for this function to return a zero duration (i.e. valid=false)

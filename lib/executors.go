@@ -49,13 +49,13 @@ var (
 // separately.
 //
 // A slice [{t1, v1}, {t2, v2}, {t3, v3}, ..., {tn, vn}] of execution steps
-// means that a executor will need 0 VUs until t1, it will need v1 number of
+// means that an executor will need 0 VUs until t1, it will need v1 number of
 // VUs from time t1 until t2, need v2 number of VUs from time t2 to t3, and so
 // on. t1 is usually 0, tn is usually the same as GetMaxDuration() and vn is
 // usually 0.
 //
 // Keep in mind that t(i) may be exactly equal to t(i+i), when there's an abrupt
-// transition in the number of VUs required by a executor. For example, the
+// transition in the number of VUs required by an executor. For example, the
 // variable-looping-vus executor may have 0-duration stages, or it may scale up
 // VUs in its last stage right until the end. These
 //

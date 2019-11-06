@@ -69,7 +69,7 @@ func GetMaxPlannedVUs(steps []ExecutionStep) (result uint64) {
 // duration of a test can often lead to mistakes. That's why this function is
 // called GetMaxPossibleVUs() and why there is no GetMaxUnplannedVUs() function.
 //
-// As an example, imagine that you have a executor with MaxPlannedVUs=20 and
+// As an example, imagine that you have an executor with MaxPlannedVUs=20 and
 // MaxUnplannedVUs=0, followed immediately after by another executor with
 // MaxPlannedVUs=10 and MaxUnplannedVUs=10. The MaxPlannedVUs number for the
 // whole test is 20, and MaxUnplannedVUs is 10, but since those executors won't
