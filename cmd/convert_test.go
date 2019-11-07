@@ -138,7 +138,7 @@ func TestIntegrationConvertCmd(t *testing.T) {
 
 		defaultFs = afero.NewMemMapFs()
 
-		err = afero.WriteFile(defaultFs, harFile, []byte(har), 0644)
+		err = afero.WriteFile(defaultFs, harFile, har, 0644)
 		assert.NoError(t, err)
 
 		buf := &bytes.Buffer{}
