@@ -156,7 +156,7 @@ func (vlvc VariableLoopingVUsConfig) Validate() []error {
 // And the chart for the other execution segment would look like this:
 //
 // VUs  ^
-//     5|          y
+//     5|          Y
 //     4|        YYYYY
 //     3|      YYYYYYYYY
 //     2|    YYYYYYYYYYYYY
