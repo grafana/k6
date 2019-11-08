@@ -75,32 +75,46 @@ func TestApply(t *testing.T) {
 }
 
 func TestParseArg(t *testing.T) {
-	args := []string{
-		"test_file.csv",
-		"file_name=test.csv,save_interval=5s",
+	cases := map[string]struct {
+		config      Config
+		expectedErr bool
+	}{
+		"test_file.csv": {
+			config: Config{
+				FileName:     null.StringFrom("test_file.csv"),
+				SaveInterval: types.NullDurationFrom(1 * time.Second),
+			},
+		},
+		"save_interval=5s": {
+			config: Config{
+				SaveInterval: types.NullDurationFrom(5 * time.Second),
+			},
+		},
+		"file_name=test.csv,save_interval=5s": {
+			config: Config{
+				FileName:     null.StringFrom("test.csv"),
+				SaveInterval: types.NullDurationFrom(5 * time.Second),
+			},
+		},
+		"filename=test.csv,save_interval=5s": {
+			expectedErr: true,
+		},
 	}
 
-	expected := []Config{
-		{
-			FileName:     null.StringFrom("test_file.csv"),
-			SaveInterval: types.NullDurationFrom(1 * time.Second),
-		},
-		{
-			FileName:     null.StringFrom("test.csv"),
-			SaveInterval: types.NullDurationFrom(5 * time.Second),
-		},
-	}
+	for arg, testCase := range cases {
+		arg := arg
+		testCase := testCase
 
-	for i := range args {
-		arg := args[i]
-		expected := expected[i]
-
-		t.Run(expected.FileName.String+"_"+expected.SaveInterval.String(), func(t *testing.T) {
+		t.Run(arg, func(t *testing.T) {
 			config, err := ParseArg(arg)
 
-			assert.Nil(t, err)
-			assert.Equal(t, expected.FileName.String, config.FileName.String)
-			assert.Equal(t, expected.SaveInterval.String(), config.SaveInterval.String())
+			if testCase.expectedErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+			assert.Equal(t, testCase.config.FileName.String, config.FileName.String)
+			assert.Equal(t, testCase.config.SaveInterval.String(), config.SaveInterval.String())
 		})
 	}
 }
