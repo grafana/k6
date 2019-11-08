@@ -3,22 +3,29 @@ version: '3.4'
 networks:
   k6:
   grafana:
+  timescaledb:
 
 services:
-  influxdb:
-    image: influxdb:latest
+  timescaledb:
+    image: timescale/timescaledb:latest
+    command: postgres -c shared_preload_libraries=timescaledb
     networks:
       - k6
       - grafana
+      - timescaledb
     ports:
-      - "8086:8086"
+      - "5432:5432"
     environment:
-      - INFLUXDB_DB=k6
+      - PGDATA=/var/lib/postgresql/data/timescaledb
+      - POSTGRES_DB=k6
+      - POSTGRES_USER=k6
+      - POSTGRES_PASSWORD=k6
 
   grafana:
     image: grafana/grafana:latest
     networks:
       - grafana
+      - timescaledb
     ports:
       - "3000:3000"
     environment:
@@ -35,6 +42,6 @@ services:
     ports:
       - "6565:6565"
     environment:
-      - K6_OUT=influxdb=http://influxdb:8086/k6
+      - K6_OUT=timescaledb=postgresql://timescaledb:5432/k6
     volumes:
       - ./samples:/scripts
