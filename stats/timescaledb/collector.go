@@ -28,7 +28,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx"
-	"github.com/jackc/pgx/pgxpool"
+	"github.com/jackc/pgx/pgtype"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
 	"github.com/sirupsen/logrus"
@@ -43,7 +43,7 @@ type dbThreshold struct {
 }
 
 type Collector struct {
-	Pool   *pgxpool.Pool
+	Pool   *pgx.ConnPool
 	Config Config
 
 	thresholds  map[string][]*dbThreshold
@@ -76,12 +76,13 @@ const databaseSchema = `CREATE TABLE IF NOT EXISTS samples (
 
 // New creates a new instance of the TimescaleDB collector by parsing the user supplied config
 func New(conf Config, opts lib.Options) (*Collector, error) {
-	pconf, err := pgxpool.ParseConfig(conf.URL.String)
+	connParams, err := pgx.ParseURI(conf.URL.String)
 	if err != nil {
 		fmt.Printf("TimescaleDB: Unable to parse config: %v", err)
 		return nil, err
 	}
-	pool, err := pgxpool.ConnectConfig(context.Background(), pconf)
+	config := pgx.ConnPoolConfig{ConnConfig: connParams}
+	pool, err := pgx.NewConnPool(config)
 	if err != nil {
 		fmt.Printf("TimescaleDB: Unable to create connection pool: %v", err)
 		return nil, err
@@ -107,15 +108,15 @@ func New(conf Config, opts lib.Options) (*Collector, error) {
 
 // Init creates a connection pool as well as database and schema if not already present
 func (c *Collector) Init() error {
-	conn, err := c.Pool.Acquire(context.Background())
+	conn, err := c.Pool.Acquire()
 	if err != nil {
 		logrus.WithError(err).Error("TimescaleDB: Couldn't acquire connection")
 	}
-	_, err = conn.Exec(context.Background(), "CREATE DATABASE "+c.Config.db.String)
+	_, err = conn.Exec("CREATE DATABASE "+c.Config.db.String)
 	if err != nil {
 		logrus.WithError(err).Debug("TimescaleDB: Couldn't create database; most likely harmless")
 	}
-	_, err = conn.Exec(context.Background(), databaseSchema)
+	_, err = conn.Exec(databaseSchema)
 	if err != nil {
 		logrus.WithError(err).Debug("TimescaleDB: Couldn't create database schema; most likely harmless")
 	}
@@ -124,7 +125,7 @@ func (c *Collector) Init() error {
 	for name, t := range c.thresholds {
 		for _, threshold := range t {
 			metric, _, tags := stats.ParseThresholdName(name)
-			err = conn.QueryRow(context.Background(), "INSERT INTO thresholds (metric, tags, threshold, abort_on_fail, delay_abort_eval, last_failed) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
+			err = conn.QueryRow("INSERT INTO thresholds (metric, tags, threshold, abort_on_fail, delay_abort_eval, last_failed) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
 				metric, tags, threshold.threshold.Source, threshold.threshold.AbortOnFail, threshold.threshold.AbortGracePeriod.String(), threshold.threshold.LastFailed).Scan(&threshold.id)
 			if err != nil {
 				logrus.WithError(err).Debug("TimescaleDB: Failed to insert threshold")
@@ -132,7 +133,7 @@ func (c *Collector) Init() error {
 		}
 	}
 
-	conn.Release()
+	c.Pool.Release(conn)
 	return nil
 }
 
@@ -185,33 +186,34 @@ func (c *Collector) commit() {
 
 	// Batch insert samples
 	startTime := time.Now()
-	batch := &pgx.Batch{}
+	batch := c.Pool.BeginBatch()
 	for _, s := range samples {
 		tags := s.Tags.CloneTags()
 		batch.Queue("INSERT INTO samples (ts, metric, value, tags) VALUES ($1, $2, $3, $4)",
-			s.Time, s.Metric.Name, s.Value, tags)
+			[]interface{}{s.Time, s.Metric.Name, s.Value, tags},
+			[]pgtype.OID{pgtype.TimestamptzOID, pgtype.VarcharOID, pgtype.Float4OID, pgtype.JSONBOID},
+			nil)
 	}
 
 	// Batch threshold updates (update pass/fail status)
 	for _, t := range c.thresholds {
 		for _, threshold := range t {
 			batch.Queue("UPDATE thresholds SET last_failed = $1 WHERE id = $2",
-				threshold.threshold.LastFailed, threshold.id)
+				[]interface{}{threshold.threshold.LastFailed, threshold.id},
+				[]pgtype.OID{pgtype.BoolOID, pgtype.Int4OID},
+				nil)
 		}
 	}
 
-	conn, err := c.Pool.Acquire(context.Background())
-	if err != nil {
-		logrus.WithError(err).Error("TimescaleDB: Couldn't acquire connection to write samples")
-	} else {
-		br := conn.SendBatch(context.Background(), batch)
-		if _, err := br.Exec(); err != nil {
-			logrus.WithError(err).Error("TimescaleDB: Couldn't write samples and update thresholds")
-		}
-		conn.Release()
-		t := time.Since(startTime)
-		logrus.WithField("t", t).Debug("TimescaleDB: Batch written!")
+	if err := batch.Send(context.Background(), nil); err != nil {
+		logrus.WithError(err).Error("TimescaleDB: Couldn't send batch of inserts")
 	}
+	if err := batch.Close(); err != nil {
+		logrus.WithError(err).Error("TimescaleDB: Couldn't close batch and release connection")
+	}
+
+	t := time.Since(startTime)
+	logrus.WithField("t", t).Debug("TimescaleDB: Batch written!")
 }
 
 // GetRequiredSystemTags returns which sample tags are needed by this collector

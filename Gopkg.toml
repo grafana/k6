@@ -102,3 +102,7 @@
 [[constraint]]
   name = "github.com/kelseyhightower/envconfig"
   version = "^1.4.0"
+
+[[constraint]]
+  name = "github.com/jackc/pgx"
+  version = "3.6.0"

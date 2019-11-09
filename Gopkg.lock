@@ -268,6 +268,21 @@
   revision = "8ff2fc3824fcb533795f9a2f233275f0bb18d6c5"
 
 [[projects]]
+  digest = "1:1fc8263832e8a4edce40f88149a2935b153f1d17c21cde79d57ec30b531767a8"
+  name = "github.com/jackc/pgx"
+  packages = [
+    ".",
+    "chunkreader",
+    "internal/sanitize",
+    "pgio",
+    "pgproto3",
+    "pgtype",
+  ]
+  pruneopts = "NUT"
+  revision = "c73e7d75061bb42b0282945710f344cfe1113d10"
+  version = "v3.6.0"
+
+[[projects]]
   branch = "master"
   digest = "1:9a2761d838e0576046f6f9523df4de34d40536c9907eded54fa304bd478b363f"
   name = "github.com/julienschmidt/httprouter"
@@ -575,13 +590,14 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:5710f443edd59a8b20c6786b23b3fc873ff9267ec050dd520ec2416db884b3fe"
+  digest = "1:d4a7f68ed7665911d7ea2c6f450092a19c8d1ede480199bb738f93880103f517"
   name = "golang.org/x/crypto"
   packages = [
     "acme",
     "acme/autocert",
     "md4",
     "ocsp",
+    "pbkdf2",
     "ripemd160",
     "ssh/terminal",
   ]
@@ -616,7 +632,7 @@
   revision = "c28acc882ebcbfbe8ce9f0f14b9ac26ee138dd51"
 
 [[projects]]
-  digest = "1:0a6ace3c8a521f2c8861e89b8a22fc869c831e9bf6ad21fc62eb59afa16a8bff"
+  digest = "1:c2e7b4db30dcac53185444d043d824dd0a8d774abdc06e67d94dc9e5db6686dc"
   name = "golang.org/x/text"
   packages = [
     "cases",
@@ -629,12 +645,15 @@
     "internal/triegen",
     "internal/ucd",
     "language",
+    "runes",
     "secure/bidirule",
+    "secure/precis",
     "transform",
     "unicode/bidi",
     "unicode/cldr",
     "unicode/norm",
     "unicode/rangetable",
+    "width",
   ]
   pruneopts = "NUT"
   revision = "f21a4dfb5e38f5895301dc265a8def02365cc3d0"
@@ -690,6 +709,8 @@
     "github.com/fatih/color",
     "github.com/gorilla/websocket",
     "github.com/influxdata/influxdb1-client/v2",
+    "github.com/jackc/pgx",
+    "github.com/jackc/pgx/pgtype",
     "github.com/julienschmidt/httprouter",
     "github.com/kelseyhightower/envconfig",
     "github.com/klauspost/compress/zstd",
