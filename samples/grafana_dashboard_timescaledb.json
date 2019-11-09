@@ -1,4 +1,46 @@
 {
+  "__inputs": [
+    {
+      "name": "DS_MYTIMESCALEDB",
+      "label": "mytimescaledb",
+      "description": "",
+      "type": "datasource",
+      "pluginId": "postgres",
+      "pluginName": "PostgreSQL"
+    }
+  ],
+  "__requires": [
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "6.4.4"
+    },
+    {
+      "type": "panel",
+      "id": "graph",
+      "name": "Graph",
+      "version": ""
+    },
+    {
+      "type": "datasource",
+      "id": "postgres",
+      "name": "PostgreSQL",
+      "version": "1.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "singlestat",
+      "name": "Singlestat",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "table",
+      "name": "Table",
+      "version": ""
+    }
+  ],
   "annotations": {
     "list": [
       {
@@ -15,8 +57,8 @@
   "editable": true,
   "gnetId": null,
   "graphTooltip": 0,
-  "id": 1,
-  "iteration": 1572651508334,
+  "id": null,
+  "iteration": 1573225832310,
   "links": [],
   "panels": [
     {
@@ -28,7 +70,7 @@
         "rgba(237, 129, 40, 0.89)",
         "#d44a3a"
       ],
-      "datasource": "PostgreSQL",
+      "datasource": "${DS_MYTIMESCALEDB}",
       "format": "none",
       "gauge": {
         "maxValue": 100,
@@ -111,7 +153,7 @@
         "rgba(237, 129, 40, 0.89)",
         "#d44a3a"
       ],
-      "datasource": "PostgreSQL",
+      "datasource": "${DS_MYTIMESCALEDB}",
       "format": "none",
       "gauge": {
         "maxValue": 100,
@@ -213,7 +255,7 @@
         "rgba(237, 129, 40, 0.89)",
         "#d44a3a"
       ],
-      "datasource": "PostgreSQL",
+      "datasource": "${DS_MYTIMESCALEDB}",
       "format": "none",
       "gauge": {
         "maxValue": 100,
@@ -295,7 +337,7 @@
         "rgba(237, 129, 40, 0.89)",
         "#d44a3a"
       ],
-      "datasource": "PostgreSQL",
+      "datasource": "${DS_MYTIMESCALEDB}",
       "format": "none",
       "gauge": {
         "maxValue": 100,
@@ -376,7 +418,7 @@
         "rgba(237, 129, 40, 0.89)",
         "#d44a3a"
       ],
-      "datasource": "PostgreSQL",
+      "datasource": "${DS_MYTIMESCALEDB}",
       "format": "none",
       "gauge": {
         "maxValue": 100,
@@ -455,7 +497,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "PostgreSQL",
+      "datasource": "${DS_MYTIMESCALEDB}",
       "description": "The 95th percentile response time of the target system, with success responses separated from error responses.",
       "fill": 1,
       "fillGradient": 0,
@@ -552,7 +594,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "PostgreSQL",
+      "datasource": "${DS_MYTIMESCALEDB}",
       "description": "Request rate, with successful responses separated from failed ones.",
       "fill": 1,
       "fillGradient": 0,
@@ -700,7 +742,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "PostgreSQL",
+      "datasource": "${DS_MYTIMESCALEDB}",
       "description": "Failure rate.",
       "fill": 1,
       "fillGradient": 0,
@@ -841,7 +883,7 @@
     },
     {
       "columns": [],
-      "datasource": "PostgreSQL",
+      "datasource": "${DS_MYTIMESCALEDB}",
       "fontSize": "100%",
       "gridPos": {
         "h": 7,
@@ -932,7 +974,7 @@
     },
     {
       "columns": [],
-      "datasource": "PostgreSQL",
+      "datasource": "${DS_MYTIMESCALEDB}",
       "fontSize": "100%",
       "gridPos": {
         "h": 7,
@@ -984,7 +1026,7 @@
     },
     {
       "columns": [],
-      "datasource": "PostgreSQL",
+      "datasource": "${DS_MYTIMESCALEDB}",
       "fontSize": "100%",
       "gridPos": {
         "h": 7,
@@ -1050,7 +1092,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  tags->>'url' AS \"URL\",\n  tags->>'method' AS \"method\",\n  CASE \n    WHEN (tags->>'status')::int = 0 AND (tags->>'error_code')::int >= 1000 AND (tags->>'error_code')::int <= 1099 THEN tags->>'error_code' || ' (General)'\n    WHEN (tags->>'status')::int = 0 AND (tags->>'error_code')::int = 1101 THEN tags->>'error_code' || ' (DNS no such host)'\n    WHEN (tags->>'status')::int = 0 AND (tags->>'error_code')::int = 1110 THEN tags->>'error_code' || ' (DNS blacklisted IP)'\n    WHEN (tags->>'status')::int = 0 AND (tags->>'error_code')::int >= 1100 AND (tags->>'error_code')::int <= 1199 THEN tags->>'error_code' || ' (DNS)'\n    WHEN (tags->>'status')::int = 0 AND (tags->>'error_code')::int = 1211 THEN tags->>'error_code' || ' (TCP connection timeout)'\n    WHEN (tags->>'status')::int = 0 AND (tags->>'error_code')::int = 1212 THEN tags->>'error_code' || ' (TCP connection refused)'\n    WHEN (tags->>'status')::int = 0 AND (tags->>'error_code')::int = 1213 THEN tags->>'error_code' || ' (TCP connection error)'\n    WHEN (tags->>'status')::int = 0 AND (tags->>'error_code')::int >= 1200 AND (tags->>'error_code')::int <= 1299 THEN tags->>'error_code' || ' (TCP)'\n    WHEN (tags->>'status')::int = 0 AND (tags->>'error_code')::int = 1311 THEN tags->>'error_code' || ' (TLS cert not matching hostname)'\n    WHEN (tags->>'status')::int = 0 AND (tags->>'error_code')::int >= 1300 AND (tags->>'error_code')::int <= 1399 THEN tags->>'error_code' || ' (TLS)'\n    WHEN (tags->>'status')::int = 0 AND (tags->>'error_code')::int >= 1600 AND (tags->>'error_code')::int <= 1699 THEN tags->>'error_code' || ' (HTTP/2)'\n    WHEN (tags->>'status')::int = 0 THEN tags->>'error_code'\n    ELSE tags->>'status'\n  END AS \"status\",\n  percentile_cont(0.95) WITHIN GROUP (ORDER BY value) AS \"95th\",\n  percentile_cont(0.99) WITHIN GROUP (ORDER BY value) AS \"99th\",\n  MAX(value) AS \"max\"\nFROM\n  samples\nWHERE\n  $__timeFilter(ts)\n  AND metric = 'http_req_duration'\n  AND (CASE WHEN $testid != '<all>' THEN tags->>'testid' = $testid ELSE true END)\nGROUP BY 1, 2, 3\nORDER BY 6 DESC\nLIMIT 100",
+          "rawSql": "SELECT\n  tags->>'url' AS \"URL\",\n  tags->>'method' AS \"method\",\n  CASE \n    WHEN (tags->>'status')::int = 0 AND (tags->>'error_code')::int >= 1000 AND (tags->>'error_code')::int <= 1099 THEN tags->>'error_code' || ' (General)'\n    WHEN (tags->>'status')::int = 0 AND (tags->>'error_code')::int = 1101 THEN tags->>'error_code' || ' (DNS no such host)'\n    WHEN (tags->>'status')::int = 0 AND (tags->>'error_code')::int = 1110 THEN tags->>'error_code' || ' (DNS blacklisted IP)'\n    WHEN (tags->>'status')::int = 0 AND (tags->>'error_code')::int >= 1100 AND (tags->>'error_code')::int <= 1199 THEN tags->>'error_code' || ' (DNS)'\n    WHEN (tags->>'status')::int = 0 AND (tags->>'error_code')::int = 1211 THEN tags->>'error_code' || ' (TCP connection timeout)'\n    WHEN (tags->>'status')::int = 0 AND (tags->>'error_code')::int = 1212 THEN tags->>'error_code' || ' (TCP connection refused)'\n    WHEN (tags->>'status')::int = 0 AND (tags->>'error_code')::int = 1213 THEN tags->>'error_code' || ' (TCP connection error)'\n    WHEN (tags->>'status')::int = 0 AND (tags->>'error_code')::int >= 1200 AND (tags->>'error_code')::int <= 1299 THEN tags->>'error_code' || ' (TCP)'\n    WHEN (tags->>'status')::int = 0 AND (tags->>'error_code')::int = 1311 THEN tags->>'error_code' || ' (TLS cert not matching hostname)'\n    WHEN (tags->>'status')::int = 0 AND (tags->>'error_code')::int >= 1300 AND (tags->>'error_code')::int <= 1399 THEN tags->>'error_code' || ' (TLS)'\n    WHEN (tags->>'status')::int = 0 AND (tags->>'error_code')::int >= 1600 AND (tags->>'error_code')::int <= 1699 THEN tags->>'error_code' || ' (HTTP/2)'\n    WHEN (tags->>'status')::int = 0 THEN tags->>'error_code'\n    ELSE tags->>'status'\n  END AS \"status\",\n  COUNT(*) AS count,\n  percentile_cont(0.95) WITHIN GROUP (ORDER BY value) AS \"95th\",\n  percentile_cont(0.99) WITHIN GROUP (ORDER BY value) AS \"99th\",\n  MAX(value) AS \"max\"\nFROM\n  samples\nWHERE\n  $__timeFilter(ts)\n  AND metric = 'http_req_duration'\n  AND (CASE WHEN $testid != '<all>' THEN tags->>'testid' = $testid ELSE true END)\nGROUP BY 1, 2, 3\nORDER BY 6 DESC\nLIMIT 100",
           "refId": "A",
           "select": [
             [
@@ -1072,7 +1114,7 @@
           ]
         }
       ],
-      "title": "Slowest URLs",
+      "title": "URLs",
       "transform": "table",
       "type": "table"
     },
@@ -1081,7 +1123,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "PostgreSQL",
+      "datasource": "${DS_MYTIMESCALEDB}",
       "description": "Breakdown of response time into its constituent parts.",
       "fill": 1,
       "fillGradient": 0,
@@ -1202,7 +1244,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "PostgreSQL",
+      "datasource": "${DS_MYTIMESCALEDB}",
       "description": "Data sent and received per second.",
       "fill": 1,
       "fillGradient": 0,
@@ -1293,7 +1335,7 @@
       }
     }
   ],
-  "refresh": false,
+  "refresh": "5s",
   "schemaVersion": 20,
   "style": "dark",
   "tags": [],
@@ -1301,12 +1343,8 @@
     "list": [
       {
         "allValue": "'<all>'",
-        "current": {
-          "tags": [],
-          "text": "All",
-          "value": "$__all"
-        },
-        "datasource": "PostgreSQL",
+        "current": {},
+        "datasource": "${DS_MYTIMESCALEDB}",
         "definition": "",
         "hide": 0,
         "includeAll": true,
@@ -1328,8 +1366,8 @@
     ]
   },
   "time": {
-    "from": "2019-11-02T00:08:16.760Z",
-    "to": "2019-11-02T00:12:46.992Z"
+    "from": "now-5m",
+    "to": "now"
   },
   "timepicker": {
     "refresh_intervals": [
@@ -1359,5 +1397,5 @@
   "timezone": "",
   "title": "Open Source Load Testing Stack",
   "uid": "a21-pyAWz",
-  "version": 5
+  "version": 2
 }
