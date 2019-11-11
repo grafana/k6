@@ -148,6 +148,8 @@ func createTestMetrics() map[string]*stats.Metric {
 
 	countMetric := stats.New("http_reqs", stats.Counter)
 	countMetric.Tainted = null.BoolFrom(true)
+	countMetric.Thresholds = stats.Thresholds{Thresholds: []*stats.Threshold{{Source: "rate<100"}}}
+
 	checksMetric := stats.New("checks", stats.Rate)
 	checksMetric.Tainted = null.BoolFrom(false)
 	sink := &stats.TrendSink{}
@@ -162,7 +164,21 @@ func createTestMetrics() map[string]*stats.Metric {
 	metrics["vus"] = gaugeMetric
 	metrics["http_reqs"] = countMetric
 	metrics["checks"] = checksMetric
-	metrics["my_trend"] = &stats.Metric{Name: "my_trend", Type: stats.Trend, Contains: stats.Time, Sink: sink}
+	metrics["my_trend"] = &stats.Metric{
+		Name:     "my_trend",
+		Type:     stats.Trend,
+		Contains: stats.Time,
+		Sink:     sink,
+		Tainted:  null.BoolFrom(true),
+		Thresholds: stats.Thresholds{
+			Thresholds: []*stats.Threshold{
+				{
+					Source:     "my_trend<1000",
+					LastFailed: true,
+				},
+			},
+		},
+	}
 
 	return metrics
 }
@@ -176,17 +192,17 @@ func TestSummarizeMetricsJSON(t *testing.T) {
         "id": "d41d8cd98f00b204e9800998ecf8427e",
         "groups": {
             "child": {
-            "name": "child",
-            "path": "::child",
-            "id": "f41cbb53a398ec1c9fb3d33e20c9b040",
-            "groups": {},
-            "checks": {
-                "check1": {
-                    "name": "check1",
-                    "path": "::child::check1",
-                    "id": "6289a7a06253a1c3f6137dfb25695563",
-                    "passes": 5,
-                    "fails": 10
+                "name": "child",
+                "path": "::child",
+                "id": "f41cbb53a398ec1c9fb3d33e20c9b040",
+                "groups": {},
+                "checks": {
+                    "check1": {
+                        "name": "check1",
+                        "path": "::child::check1",
+                        "id": "6289a7a06253a1c3f6137dfb25695563",
+                        "passes": 5,
+                        "fails": 10
                     }
                 }
             }
@@ -195,15 +211,16 @@ func TestSummarizeMetricsJSON(t *testing.T) {
     },
     "metrics": {
         "checks": {
-            "extra": [
-                "✓ 3",
-                "✗ 0"
-            ],
-            "value": 0
+            "value": 0,
+            "passes": 3,
+            "fails": 0
         },
         "http_reqs": {
             "count": 3,
-            "rate": 3
+            "rate": 3,
+            "thresholds": {
+                "rate<100": false
+            }
         },
         "my_trend": {
             "avg": 15,
@@ -211,14 +228,15 @@ func TestSummarizeMetricsJSON(t *testing.T) {
             "med": 15,
             "min": 10,
             "p(90)": 19,
-            "p(95)": 19.5
+            "p(95)": 19.5,
+            "thresholds": {
+                "my_trend<1000": true
+            }
         },
         "vus": {
-            "extra": [
-                "min=1",
-                "max=1"
-            ],
-            "value": 1
+            "value": 1,
+            "min": 1,
+            "max": 1
         }
     }
 }
