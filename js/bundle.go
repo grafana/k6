@@ -133,13 +133,13 @@ func NewBundle(src *loader.SourceData, filesystems map[string]afero.Fs, rtOpts l
 
 // NewBundleFromArchive creates a new bundle from an lib.Archive.
 func NewBundleFromArchive(arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle, error) {
-	compatMode, err := lib.ValidateCompatibilityMode(rtOpts.CompatibilityMode.String)
-	if err != nil {
-		return nil, err
-	}
-
 	if arc.Type != "js" {
 		return nil, errors.Errorf("expected bundle type 'js', got '%s'", arc.Type)
+	}
+
+	compatMode, err := lib.ValidateCompatibilityMode(arc.CompatibilityMode)
+	if err != nil {
+		return nil, err
 	}
 
 	c := compiler.New()
@@ -160,11 +160,6 @@ func NewBundleFromArchive(arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle,
 		env[k] = v
 	}
 
-	cm, err := compiler.CompatibilityModeString(arc.CompatibilityMode)
-	if err != nil {
-		return nil, err
-	}
-
 	bundle := &Bundle{
 		Filename:          arc.FilenameURL,
 		Source:            string(arc.Data),
@@ -172,7 +167,7 @@ func NewBundleFromArchive(arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle,
 		Options:           arc.Options,
 		BaseInitContext:   initctx,
 		Env:               env,
-		CompatibilityMode: cm,
+		CompatibilityMode: compatMode,
 	}
 	if err := bundle.instantiate(bundle.BaseInitContext.runtime, bundle.BaseInitContext); err != nil {
 		return nil, err

@@ -426,42 +426,76 @@ func TestNewBundleFromArchive(t *testing.T) {
 		}
 		return b.makeArchive(), nil
 	}
-	testCases := []struct {
-		cm   compiler.CompatibilityMode
-		code string
-	}{
-		{compiler.CompatibilityModeExtended, `
+
+	t.Run("ok", func(t *testing.T) {
+		testCases := []struct {
+			compatMode, code string
+		}{
+			// An empty value will assume "extended"
+			{"", `
 				export let options = { vus: 12345 };
 				export default function() { return "hi!"; };`},
-		{compiler.CompatibilityModeBase, `
+			{compiler.CompatibilityModeExtended.String(), `
+				export let options = { vus: 12345 };
+				export default function() { return "hi!"; };`},
+			{compiler.CompatibilityModeBase.String(), `
 				module.exports.options = { vus: 12345 };
 				module.exports.default = function() { return "hi!" };`},
-	}
+		}
 
-	for _, tc := range testCases {
-		tc := tc
-		t.Run(tc.cm.String(), func(t *testing.T) {
-			rtOpts := lib.RuntimeOptions{CompatibilityMode: null.StringFrom(tc.cm.String())}
-			arc, err := getArchive(tc.code, rtOpts)
-			assert.NoError(t, err)
-			b, err := NewBundleFromArchive(arc, rtOpts)
-			if !assert.NoError(t, err) {
-				return
-			}
-			assert.Equal(t, lib.Options{VUs: null.IntFrom(12345)}, b.Options)
-			assert.Equal(t, tc.cm, b.CompatibilityMode)
+		for _, tc := range testCases {
+			tc := tc
+			t.Run(tc.compatMode, func(t *testing.T) {
+				rtOpts := lib.RuntimeOptions{CompatibilityMode: null.StringFrom(tc.compatMode)}
+				arc, err := getArchive(tc.code, rtOpts)
+				assert.NoError(t, err)
+				b, err := NewBundleFromArchive(arc, rtOpts)
+				if !assert.NoError(t, err) {
+					return
+				}
+				assert.Equal(t, lib.Options{VUs: null.IntFrom(12345)}, b.Options)
+				expCM := tc.compatMode
+				if expCM == "" {
+					expCM = compiler.CompatibilityModeExtended.String()
+				}
+				assert.Equal(t, expCM, b.CompatibilityMode.String())
 
-			bi, err := b.Instantiate()
-			if !assert.NoError(t, err) {
-				return
-			}
-			val, err := bi.Default(goja.Undefined())
-			if !assert.NoError(t, err) {
-				return
-			}
-			assert.Equal(t, "hi!", val.Export())
-		})
-	}
+				bi, err := b.Instantiate()
+				if !assert.NoError(t, err) {
+					return
+				}
+				val, err := bi.Default(goja.Undefined())
+				if !assert.NoError(t, err) {
+					return
+				}
+				assert.Equal(t, "hi!", val.Export())
+			})
+		}
+	})
+	t.Run("err", func(t *testing.T) {
+		testCases := []struct {
+			compatMode, code, expErr string
+		}{
+			// Incompatible mode
+			{compiler.CompatibilityModeBase.String(), `
+				export let options = { vus: 12345 };
+				export default function() { return "hi!"; };`,
+				"file://script.js: Line 2:5 Unexpected reserved word (and 2 more errors)"},
+			{"wrongcompat", `
+				export let options = { vus: 12345 };
+				export default function() { return "hi!"; };`,
+				`invalid compatibility mode "wrongcompat". Use: "extended", "base"`},
+		}
+
+		for _, tc := range testCases {
+			tc := tc
+			t.Run(tc.compatMode, func(t *testing.T) {
+				rtOpts := lib.RuntimeOptions{CompatibilityMode: null.StringFrom(tc.compatMode)}
+				_, err := getArchive(tc.code, rtOpts)
+				assert.EqualError(t, err, tc.expErr)
+			})
+		}
+	})
 }
 
 func TestOpen(t *testing.T) {
