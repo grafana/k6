@@ -59,7 +59,7 @@ func configFlagSet() *pflag.FlagSet {
 	flags.String(
 		"summary-export",
 		"",
-		"output summary to file in json format, empty string means output is ignored",
+		"output the end-of-test summary report to JSON file",
 	)
 	return flags
 }
