@@ -243,6 +243,25 @@ func nonTrendMetricValueForSum(t time.Duration, timeUnit string, m *stats.Metric
 	}
 }
 
+func nonTrendMetricValueForSumJSON(t time.Duration, m *stats.Metric) map[string]interface{} {
+	data := make(map[string]interface{})
+	switch sink := m.Sink.(type) {
+	case *stats.CounterSink:
+		rate := 0.0
+		if t > 0 {
+			rate = sink.Value / (float64(t) / float64(time.Second))
+		}
+		data["rate"] = rate
+	case *stats.GaugeSink:
+		data["min"] = sink.Min
+		data["max"] = sink.Max
+	case *stats.RateSink:
+		data["passes"] = sink.Trues
+		data["fails"] = sink.Total - sink.Trues
+	}
+	return data
+}
+
 func displayNameForMetric(m *stats.Metric) string {
 	if m.Sub.Parent != "" {
 		return "{ " + m.Sub.Suffix + " }"
@@ -397,15 +416,35 @@ func (s *Summary) SummarizeMetricsJSON(w io.Writer, data SummaryData) error {
 
 		sinkData := m.Sink.Format(data.Time)
 		metricsData[name] = sinkData
+
+		var thresholds map[string]interface{}
+		if len(m.Thresholds.Thresholds) > 0 {
+			sinkDataWithThreshold := make(map[string]interface{})
+			for k, v := range sinkData {
+				sinkDataWithThreshold[k] = v
+			}
+			thresholds = make(map[string]interface{})
+			for _, threshold := range m.Thresholds.Thresholds {
+				thresholds[threshold.Source] = threshold.LastFailed
+			}
+			sinkDataWithThreshold["thresholds"] = thresholds
+			metricsData[name] = sinkDataWithThreshold
+		}
+
 		if _, ok := m.Sink.(*stats.TrendSink); ok {
 			continue
 		}
 
-		_, extra := nonTrendMetricValueForSum(data.Time, data.TimeUnit, m)
+		extra := nonTrendMetricValueForSumJSON(data.Time, m)
 		if len(extra) > 1 {
 			extraData := make(map[string]interface{})
 			extraData["value"] = sinkData["value"]
-			extraData["extra"] = extra
+			if thresholds != nil {
+				extraData["thresholds"] = thresholds
+			}
+			for k, v := range extra {
+				extraData[k] = v
+			}
 			metricsData[name] = extraData
 		}
 	}
