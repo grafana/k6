@@ -110,7 +110,7 @@ func New(conf Config, src *loader.SourceData, opts lib.Options, version string) 
 	}
 
 	if !conf.Name.Valid || conf.Name.String == "" {
-		conf.Name = null.StringFrom(filepath.Base(src.URL.Path))
+		conf.Name = null.StringFrom(filepath.Base(src.URL.String()))
 	}
 	if conf.Name.String == "-" {
 		conf.Name = null.StringFrom(TestName)
