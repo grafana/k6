@@ -41,7 +41,7 @@ func TestSummary(t *testing.T) {
 				"   ✓ checks......: 100.00% ✓ 3   ✗ 0  \n"
 			countOut = "   ✗ http_reqs...: 3       3/s\n"
 			gaugeOut = "     vus.........: 1       min=1 max=1\n"
-			trendOut = "     my_trend....: avg=15ms min=10ms med=15ms max=20ms p(90)=19ms " +
+			trendOut = "   ✗ my_trend....: avg=15ms min=10ms med=15ms max=20ms p(90)=19ms " +
 				"p(95)=19.5ms p(99.9)=19.99ms\n"
 		)
 
@@ -52,8 +52,8 @@ func TestSummary(t *testing.T) {
 		}{
 			{[]string{"avg", "min", "med", "max", "p(90)", "p(95)", "p(99.9)"},
 				checksOut + countOut + trendOut + gaugeOut},
-			{[]string{"count"}, checksOut + countOut + "     my_trend....: count=3\n" + gaugeOut},
-			{[]string{"avg", "count"}, checksOut + countOut + "     my_trend....: avg=15ms count=3\n" + gaugeOut},
+			{[]string{"count"}, checksOut + countOut + "   ✗ my_trend....: count=3\n" + gaugeOut},
+			{[]string{"avg", "count"}, checksOut + countOut + "   ✗ my_trend....: avg=15ms count=3\n" + gaugeOut},
 		}
 
 		rootG, _ := lib.NewGroup("", nil)
