@@ -22,6 +22,7 @@ package js
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"path/filepath"
 	"strings"
@@ -208,7 +209,7 @@ func (i *InitContext) Open(filename string, args ...string) (goja.Value, error) 
 	if isDir, err := afero.IsDir(fs, filename); err != nil {
 		return nil, err
 	} else if isDir {
-		return nil, errors.New("open() can't be used with directories")
+		return nil, fmt.Errorf("open() can't be used with directories, path: %q", filename)
 	}
 	data, err := afero.ReadFile(fs, filename)
 	if err != nil {
