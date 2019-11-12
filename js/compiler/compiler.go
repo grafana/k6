@@ -91,7 +91,7 @@ func (c *Compiler) Compile(src, filename, pre, post string,
 			}
 			return c.Compile(code, filename, pre, post, strict, compatMode)
 		}
-		return nil, src, err
+		return nil, code, err
 	}
 	pgm, err := goja.CompileAST(ast, strict)
 	return pgm, code, err
