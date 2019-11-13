@@ -79,6 +79,7 @@ var RootCmd = &cobra.Command{
 			stderr.Writer = colorable.NewNonColorable(os.Stderr)
 		}
 		log.SetOutput(logrus.StandardLogger().Writer())
+		logrus.Debugf("k6 version: v%s", consts.FullVersion())
 	},
 }
 
