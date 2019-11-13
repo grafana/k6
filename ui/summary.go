@@ -450,6 +450,7 @@ func (s *Summary) SummarizeMetricsJSON(w io.Writer, data SummaryData) error {
 	}
 	m["metrics"] = metricsData
 	encoder := json.NewEncoder(w)
+	encoder.SetEscapeHTML(false)
 	encoder.SetIndent("", "    ")
 
 	return encoder.Encode(m)
