@@ -259,5 +259,6 @@ func TestSummarizeMetricsJSON(t *testing.T) {
 	var w bytes.Buffer
 	err := s.SummarizeMetricsJSON(&w, data)
 	require.Nil(t, err)
+	require.Contains(t, w.String(), "<")
 	require.JSONEq(t, expected, w.String())
 }
