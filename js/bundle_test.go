@@ -33,6 +33,7 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
+	"github.com/loadimpact/k6/js/compiler"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/lib/fsext"
@@ -41,34 +42,31 @@ import (
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/guregu/null.v3"
+	null "gopkg.in/guregu/null.v3"
 )
 
 const isWindows = runtime.GOOS == "windows"
 
-func getSimpleBundle(filename, data string) (*Bundle, error) {
-	return getSimpleBundleWithFs(filename, data, afero.NewMemMapFs())
-}
-
-func getSimpleBundleWithOptions(filename, data string, options lib.RuntimeOptions) (*Bundle, error) {
-	return NewBundle(
-		&loader.SourceData{
-			URL:  &url.URL{Path: filename, Scheme: "file"},
-			Data: []byte(data),
-		},
-		map[string]afero.Fs{"file": afero.NewMemMapFs(), "https": afero.NewMemMapFs()},
-		options,
+func getSimpleBundle(filename, data string, opts ...interface{}) (*Bundle, error) {
+	var (
+		fs     = afero.NewMemMapFs()
+		rtOpts = lib.RuntimeOptions{}
 	)
-}
-
-func getSimpleBundleWithFs(filename, data string, fs afero.Fs) (*Bundle, error) {
+	for _, o := range opts {
+		switch opt := o.(type) {
+		case afero.Fs:
+			fs = opt
+		case lib.RuntimeOptions:
+			rtOpts = opt
+		}
+	}
 	return NewBundle(
 		&loader.SourceData{
 			URL:  &url.URL{Path: filename, Scheme: "file"},
 			Data: []byte(data),
 		},
 		map[string]afero.Fs{"file": fs, "https": afero.NewMemMapFs()},
-		lib.RuntimeOptions{},
+		rtOpts,
 	)
 }
 
@@ -112,6 +110,53 @@ func TestNewBundle(t *testing.T) {
 			assert.Equal(t, "file://-", b.Filename.String())
 			assert.Equal(t, "file:///", b.BaseInitContext.pwd.String())
 		}
+	})
+	t.Run("CompatibilityMode", func(t *testing.T) {
+		t.Run("Extended/ok/CoreJS", func(t *testing.T) {
+			rtOpts := lib.RuntimeOptions{
+				CompatibilityMode: null.StringFrom(compiler.CompatibilityModeExtended.String())}
+			_, err := getSimpleBundle("/script.js",
+				`export default function() {}; new Set([1, 2, 3, 2, 1]);`, rtOpts)
+			assert.NoError(t, err)
+		})
+		t.Run("Base/ok/Minimal", func(t *testing.T) {
+			rtOpts := lib.RuntimeOptions{
+				CompatibilityMode: null.StringFrom(compiler.CompatibilityModeBase.String())}
+			_, err := getSimpleBundle("/script.js",
+				`module.exports.default = function() {};`, rtOpts)
+			assert.NoError(t, err)
+		})
+		t.Run("Base/err", func(t *testing.T) {
+			testCases := []struct {
+				name       string
+				compatMode string
+				code       string
+				expErr     string
+			}{
+				{"InvalidCompat", "es1", `export default function() {};`,
+					`invalid compatibility mode "es1". Use: "extended", "base"`},
+				// ES2015 modules are not supported
+				{"Modules", "base", `export default function() {};`,
+					"file:///script.js: Line 1:1 Unexpected reserved word"},
+				// Arrow functions are not supported
+				{"ArrowFuncs", "base",
+					`module.exports.default = function() {}; () => {};`,
+					"file:///script.js: Line 1:42 Unexpected token ) (and 1 more errors)"},
+				// ES2015 objects polyfilled by core.js are not supported
+				{"CoreJS", "base",
+					`module.exports.default = function() {}; new Set([1, 2, 3, 2, 1]);`,
+					"ReferenceError: Set is not defined at file:///script.js:1:45(5)"},
+			}
+
+			for _, tc := range testCases {
+				tc := tc
+				t.Run(tc.name, func(t *testing.T) {
+					rtOpts := lib.RuntimeOptions{CompatibilityMode: null.StringFrom(tc.compatMode)}
+					_, err := getSimpleBundle("/script.js", tc.code, rtOpts)
+					assert.EqualError(t, err, tc.expErr)
+				})
+			}
+		})
 	})
 	t.Run("Options", func(t *testing.T) {
 		t.Run("Empty", func(t *testing.T) {
@@ -374,64 +419,83 @@ func TestNewBundle(t *testing.T) {
 }
 
 func TestNewBundleFromArchive(t *testing.T) {
-	fs := afero.NewMemMapFs()
-	assert.NoError(t, fs.MkdirAll("/path/to", 0755))
-	assert.NoError(t, afero.WriteFile(fs, "/path/to/file.txt", []byte(`hi`), 0644))
-	assert.NoError(t, afero.WriteFile(fs, "/path/to/exclaim.js", []byte(`export default function(s) { return s + "!" };`), 0644))
-
-	data := `
-			import exclaim from "./exclaim.js";
-			export let options = { vus: 12345 };
-			export let file = open("./file.txt");
-			export default function() { return exclaim(file); };
-		`
-	b, err := getSimpleBundleWithFs("/path/to/script.js", data, fs)
-	if !assert.NoError(t, err) {
-		return
+	getArchive := func(data string, rtOpts lib.RuntimeOptions) (*lib.Archive, error) {
+		b, err := getSimpleBundle("script.js", data, rtOpts)
+		if err != nil {
+			return nil, err
+		}
+		return b.makeArchive(), nil
 	}
-	assert.Equal(t, lib.Options{VUs: null.IntFrom(12345)}, b.Options)
 
-	bi, err := b.Instantiate()
-	if !assert.NoError(t, err) {
-		return
-	}
-	v, err := bi.Default(goja.Undefined())
-	if !assert.NoError(t, err) {
-		return
-	}
-	assert.Equal(t, "hi!", v.Export())
+	t.Run("ok", func(t *testing.T) {
+		testCases := []struct {
+			compatMode, code string
+		}{
+			// An empty value will assume "extended"
+			{"", `
+				export let options = { vus: 12345 };
+				export default function() { return "hi!"; };`},
+			{compiler.CompatibilityModeExtended.String(), `
+				export let options = { vus: 12345 };
+				export default function() { return "hi!"; };`},
+			{compiler.CompatibilityModeBase.String(), `
+				module.exports.options = { vus: 12345 };
+				module.exports.default = function() { return "hi!" };`},
+		}
 
-	arc := b.makeArchive()
-	assert.Equal(t, "js", arc.Type)
-	assert.Equal(t, lib.Options{VUs: null.IntFrom(12345)}, arc.Options)
-	assert.Equal(t, "file:///path/to/script.js", arc.FilenameURL.String())
-	assert.Equal(t, data, string(arc.Data))
-	assert.Equal(t, "file:///path/to/", arc.PwdURL.String())
+		for _, tc := range testCases {
+			tc := tc
+			t.Run(tc.compatMode, func(t *testing.T) {
+				rtOpts := lib.RuntimeOptions{CompatibilityMode: null.StringFrom(tc.compatMode)}
+				arc, err := getArchive(tc.code, rtOpts)
+				assert.NoError(t, err)
+				b, err := NewBundleFromArchive(arc, rtOpts)
+				if !assert.NoError(t, err) {
+					return
+				}
+				assert.Equal(t, lib.Options{VUs: null.IntFrom(12345)}, b.Options)
+				expCM := tc.compatMode
+				if expCM == "" {
+					expCM = compiler.CompatibilityModeExtended.String()
+				}
+				assert.Equal(t, expCM, b.CompatibilityMode.String())
 
-	exclaimData, err := afero.ReadFile(arc.Filesystems["file"], "/path/to/exclaim.js")
-	assert.NoError(t, err)
-	assert.Equal(t, `export default function(s) { return s + "!" };`, string(exclaimData))
+				bi, err := b.Instantiate()
+				if !assert.NoError(t, err) {
+					return
+				}
+				val, err := bi.Default(goja.Undefined())
+				if !assert.NoError(t, err) {
+					return
+				}
+				assert.Equal(t, "hi!", val.Export())
+			})
+		}
+	})
+	t.Run("err", func(t *testing.T) {
+		testCases := []struct {
+			compatMode, code, expErr string
+		}{
+			// Incompatible mode
+			{compiler.CompatibilityModeBase.String(), `
+				export let options = { vus: 12345 };
+				export default function() { return "hi!"; };`,
+				"file://script.js: Line 2:5 Unexpected reserved word (and 2 more errors)"},
+			{"wrongcompat", `
+				export let options = { vus: 12345 };
+				export default function() { return "hi!"; };`,
+				`invalid compatibility mode "wrongcompat". Use: "extended", "base"`},
+		}
 
-	fileData, err := afero.ReadFile(arc.Filesystems["file"], "/path/to/file.txt")
-	assert.NoError(t, err)
-	assert.Equal(t, `hi`, string(fileData))
-	assert.Equal(t, consts.Version, arc.K6Version)
-
-	b2, err := NewBundleFromArchive(arc, lib.RuntimeOptions{})
-	if !assert.NoError(t, err) {
-		return
-	}
-	assert.Equal(t, lib.Options{VUs: null.IntFrom(12345)}, b2.Options)
-
-	bi2, err := b.Instantiate()
-	if !assert.NoError(t, err) {
-		return
-	}
-	v2, err := bi2.Default(goja.Undefined())
-	if !assert.NoError(t, err) {
-		return
-	}
-	assert.Equal(t, "hi!", v2.Export())
+		for _, tc := range testCases {
+			tc := tc
+			t.Run(tc.compatMode, func(t *testing.T) {
+				rtOpts := lib.RuntimeOptions{CompatibilityMode: null.StringFrom(tc.compatMode)}
+				_, err := getArchive(tc.code, rtOpts)
+				assert.EqualError(t, err, tc.expErr)
+			})
+		}
+	})
 }
 
 func TestOpen(t *testing.T) {
@@ -552,7 +616,7 @@ func TestOpen(t *testing.T) {
 						export let file = open("` + openPath + `");
 						export default function() { return file };`
 
-					sourceBundle, err := getSimpleBundleWithFs(filepath.ToSlash(filepath.Join(prefix, pwd, "script.js")), data, fs)
+					sourceBundle, err := getSimpleBundle(filepath.ToSlash(filepath.Join(prefix, pwd, "script.js")), data, fs)
 					if tCase.isError {
 						assert.Error(t, err)
 						return
@@ -651,7 +715,7 @@ func TestBundleEnv(t *testing.T) {
 			if (__ENV.TEST_B !== "") { throw new Error("Invalid TEST_B: " + __ENV.TEST_B); }
 		}
 	`
-	b1, err := getSimpleBundleWithOptions("/script.js", data, rtOpts)
+	b1, err := getSimpleBundle("/script.js", data, rtOpts)
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -672,6 +736,59 @@ func TestBundleEnv(t *testing.T) {
 				_, err := bi.Default(goja.Undefined())
 				assert.NoError(t, err)
 			}
+		})
+	}
+}
+
+func TestBundleMakeArchive(t *testing.T) {
+	testCases := []struct {
+		cm      compiler.CompatibilityMode
+		script  string
+		exclaim string
+	}{
+		{compiler.CompatibilityModeExtended, `
+				import exclaim from "./exclaim.js";
+				export let options = { vus: 12345 };
+				export let file = open("./file.txt");
+				export default function() { return exclaim(file); };`,
+			`export default function(s) { return s + "!" };`},
+		{compiler.CompatibilityModeBase, `
+				var exclaim = require("./exclaim.js");
+				module.exports.options = { vus: 12345 };
+				module.exports.file = open("./file.txt");
+				module.exports.default = function() { return exclaim(module.exports.file); };`,
+			`module.exports.default = function(s) { return s + "!" };`},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.cm.String(), func(t *testing.T) {
+			fs := afero.NewMemMapFs()
+			_ = fs.MkdirAll("/path/to", 0755)
+			_ = afero.WriteFile(fs, "/path/to/file.txt", []byte(`hi`), 0644)
+			_ = afero.WriteFile(fs, "/path/to/exclaim.js", []byte(tc.exclaim), 0644)
+
+			rtOpts := lib.RuntimeOptions{CompatibilityMode: null.StringFrom(tc.cm.String())}
+			b, err := getSimpleBundle("/path/to/script.js", tc.script, fs, rtOpts)
+			assert.NoError(t, err)
+
+			arc := b.makeArchive()
+
+			assert.Equal(t, "js", arc.Type)
+			assert.Equal(t, lib.Options{VUs: null.IntFrom(12345)}, arc.Options)
+			assert.Equal(t, "file:///path/to/script.js", arc.FilenameURL.String())
+			assert.Equal(t, tc.script, string(arc.Data))
+			assert.Equal(t, "file:///path/to/", arc.PwdURL.String())
+
+			exclaimData, err := afero.ReadFile(arc.Filesystems["file"], "/path/to/exclaim.js")
+			assert.NoError(t, err)
+			assert.Equal(t, tc.exclaim, string(exclaimData))
+
+			fileData, err := afero.ReadFile(arc.Filesystems["file"], "/path/to/file.txt")
+			assert.NoError(t, err)
+			assert.Equal(t, `hi`, string(fileData))
+			assert.Equal(t, consts.Version, arc.K6Version)
+			assert.Equal(t, tc.cm.String(), arc.CompatibilityMode)
 		})
 	}
 }

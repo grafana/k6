@@ -48,7 +48,8 @@ type Bundle struct {
 
 	BaseInitContext *InitContext
 
-	Env map[string]string
+	Env               map[string]string
+	CompatibilityMode compiler.CompatibilityMode
 }
 
 // A BundleInstance is a self-contained instance of a Bundle.
@@ -60,25 +61,28 @@ type BundleInstance struct {
 
 // NewBundle creates a new bundle from a source file and a filesystem.
 func NewBundle(src *loader.SourceData, filesystems map[string]afero.Fs, rtOpts lib.RuntimeOptions) (*Bundle, error) {
-	compiler, err := compiler.New()
+	compatMode, err := lib.ValidateCompatibilityMode(rtOpts.CompatibilityMode.String)
 	if err != nil {
 		return nil, err
 	}
 
 	// Compile sources, both ES5 and ES6 are supported.
 	code := string(src.Data)
-	pgm, _, err := compiler.Compile(code, src.URL.String(), "", "", true)
+	c := compiler.New()
+	pgm, _, err := c.Compile(code, src.URL.String(), "", "", true, compatMode)
 	if err != nil {
 		return nil, err
 	}
 	// Make a bundle, instantiate it into a throwaway VM to populate caches.
 	rt := goja.New()
 	bundle := Bundle{
-		Filename:        src.URL,
-		Source:          code,
-		Program:         pgm,
-		BaseInitContext: NewInitContext(rt, compiler, new(context.Context), filesystems, loader.Dir(src.URL)),
-		Env:             rtOpts.Env,
+		Filename: src.URL,
+		Source:   code,
+		Program:  pgm,
+		BaseInitContext: NewInitContext(rt, c, compatMode, new(context.Context),
+			filesystems, loader.Dir(src.URL)),
+		Env:               rtOpts.Env,
+		CompatibilityMode: compatMode,
 	}
 	if err := bundle.instantiate(rt, bundle.BaseInitContext); err != nil {
 		return nil, err
@@ -129,21 +133,23 @@ func NewBundle(src *loader.SourceData, filesystems map[string]afero.Fs, rtOpts l
 
 // NewBundleFromArchive creates a new bundle from an lib.Archive.
 func NewBundleFromArchive(arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle, error) {
-	compiler, err := compiler.New()
-	if err != nil {
-		return nil, err
-	}
-
 	if arc.Type != "js" {
 		return nil, errors.Errorf("expected bundle type 'js', got '%s'", arc.Type)
 	}
 
-	pgm, _, err := compiler.Compile(string(arc.Data), arc.FilenameURL.String(), "", "", true)
+	compatMode, err := lib.ValidateCompatibilityMode(arc.CompatibilityMode)
 	if err != nil {
 		return nil, err
 	}
 
-	initctx := NewInitContext(goja.New(), compiler, new(context.Context), arc.Filesystems, arc.PwdURL)
+	c := compiler.New()
+	pgm, _, err := c.Compile(string(arc.Data), arc.FilenameURL.String(), "", "", true, compatMode)
+	if err != nil {
+		return nil, err
+	}
+
+	initctx := NewInitContext(goja.New(), c, compatMode,
+		new(context.Context), arc.Filesystems, arc.PwdURL)
 
 	env := arc.Env
 	if env == nil {
@@ -155,12 +161,13 @@ func NewBundleFromArchive(arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle,
 	}
 
 	bundle := &Bundle{
-		Filename:        arc.FilenameURL,
-		Source:          string(arc.Data),
-		Program:         pgm,
-		Options:         arc.Options,
-		BaseInitContext: initctx,
-		Env:             env,
+		Filename:          arc.FilenameURL,
+		Source:            string(arc.Data),
+		Program:           pgm,
+		Options:           arc.Options,
+		BaseInitContext:   initctx,
+		Env:               env,
+		CompatibilityMode: compatMode,
 	}
 	if err := bundle.instantiate(bundle.BaseInitContext.runtime, bundle.BaseInitContext); err != nil {
 		return nil, err
@@ -170,15 +177,16 @@ func NewBundleFromArchive(arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle,
 
 func (b *Bundle) makeArchive() *lib.Archive {
 	arc := &lib.Archive{
-		Type:        "js",
-		Filesystems: b.BaseInitContext.filesystems,
-		Options:     b.Options,
-		FilenameURL: b.Filename,
-		Data:        []byte(b.Source),
-		PwdURL:      b.BaseInitContext.pwd,
-		Env:         make(map[string]string, len(b.Env)),
-		K6Version:   consts.Version,
-		Goos:        runtime.GOOS,
+		Type:              "js",
+		Filesystems:       b.BaseInitContext.filesystems,
+		Options:           b.Options,
+		FilenameURL:       b.Filename,
+		Data:              []byte(b.Source),
+		PwdURL:            b.BaseInitContext.pwd,
+		Env:               make(map[string]string, len(b.Env)),
+		CompatibilityMode: b.CompatibilityMode.String(),
+		K6Version:         consts.Version,
+		Goos:              runtime.GOOS,
 	}
 	// Copy env so changes in the archive are not reflected in the source Bundle
 	for k, v := range b.Env {
@@ -235,8 +243,10 @@ func (b *Bundle) instantiate(rt *goja.Runtime, init *InitContext) error {
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 	rt.SetRandSource(common.NewRandSource())
 
-	if _, err := rt.RunProgram(jslib.GetCoreJS()); err != nil {
-		return err
+	if init.compatibilityMode == compiler.CompatibilityModeExtended {
+		if _, err := rt.RunProgram(jslib.GetCoreJS()); err != nil {
+			return err
+		}
 	}
 
 	exports := rt.NewObject()
