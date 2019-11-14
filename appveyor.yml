@@ -52,7 +52,7 @@ build_script:
   - cd %APPVEYOR_BUILD_FOLDER%
   - pandoc -s -f markdown -t rtf -o packaging\LICENSE.rtf LICENSE.md
   - go version
-  - go build -a -ldflags "-s -w" -o packaging\k6.exe
+  - go build -a -trimpath -ldflags "-s -w" -o packaging\k6.exe
   - cd %APPVEYOR_BUILD_FOLDER%\packaging
   - candle.exe -arch x64 -dVERSION=%VERSION% k6.wxs
   - light.exe -ext WixUIExtension k6.wixobj
