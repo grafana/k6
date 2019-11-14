@@ -139,7 +139,7 @@ jobs:
             cd $GOPATH/src/github.com/loadimpact/k6
 
             echo "Building k6..."
-            CGO_ENABLED=0 GOARCH=$ARCH go build -a -ldflags '-s -w' -o /tmp/k6
+            CGO_ENABLED=0 GOARCH=$ARCH go build -a -trimpath -ldflags '-s -w' -o /tmp/k6
             echo "Done!"
 
             VERSION=${CIRCLE_TAG:1} ./packaging/gen-packages.sh
