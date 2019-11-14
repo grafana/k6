@@ -28,7 +28,7 @@ build_dist() {
 	local DIR="k6-${VERSION}-${ALIAS}"
 
 	local BUILD_ENV=("${@:4}")
-	local BUILD_ARGS=(-o "dist/$DIR/k6${SUFFIX}")
+	local BUILD_ARGS=(-o "dist/$DIR/k6${SUFFIX}" -trimpath)
 
 	if [ -n "$VERSION_DETAILS" ]; then
 		BUILD_ARGS+=(-ldflags "-X github.com/loadimpact/k6/lib/consts.VersionDetails=$VERSION_DETAILS")
