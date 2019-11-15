@@ -441,13 +441,13 @@ func (u *VU) RunOnce(ctx context.Context) error {
 func (u *VU) runFn(
 	ctx context.Context, group *lib.Group, isDefault bool, fn goja.Callable, args ...goja.Value,
 ) (goja.Value, bool, time.Duration, error) {
-	cookieJar, err := cookiejar.New(nil)
-	if err != nil {
-		return goja.Undefined(), false, time.Duration(0), err
-	}
-
-	if u.Runner.Bundle.Options.NoCookiesReset.Valid && u.Runner.Bundle.Options.NoCookiesReset.Bool {
-		cookieJar = u.CookieJar
+	cookieJar := u.CookieJar
+	if !u.Runner.Bundle.Options.NoCookiesReset.ValueOrZero() {
+		var err error
+		cookieJar, err = cookiejar.New(nil)
+		if err != nil {
+			return goja.Undefined(), false, time.Duration(0), err
+		}
 	}
 
 	state := &lib.State{
