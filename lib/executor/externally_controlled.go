@@ -122,17 +122,17 @@ func (mec ExternallyControlledConfig) Validate() []error {
 	return errors
 }
 
-// GetExecutionRequirements just reserves the specified number of max VUs for
-// the whole duration of the executor, so these VUs can be initialized in the
-// beginning of the test.
+// GetExecutionRequirements reserves the configured number of max VUs for the
+// whole duration of the executor, so these VUs can be externally initialized in
+// the beginning of the test.
 //
 // Importantly, if 0 (i.e. infinite) duration is configured, this executor
 // doesn't emit the last step to relinquish these VUs.
 //
 // Also, the externally controlled executor doesn't set MaxUnplannedVUs in the
 // returned steps, since their initialization and usage is directly controlled
-// by the user and is effectively bounded only by the resources of the machine
-// k6 is running on.
+// by the user, can be changed during the test runtime, and is effectively
+// bounded only by the resources of the machine k6 is running on.
 //
 // This is not a problem, because the MaxUnplannedVUs are mostly meant to be
 // used for calculating the maximum possible number of initialized VUs at any

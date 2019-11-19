@@ -42,8 +42,8 @@ var (
 	executorConfigConstructors = make(map[string]ExecutorConfigConstructor)
 )
 
-// ExecutionStep is used by different executors to specify the planned number
-// of VUs they will need at a particular time. The times are relative to their
+// ExecutionStep is used by different executors to specify the planned number of
+// VUs they will need at a particular time. The times are relative to their
 // StartTime, i.e. they don't take into account the specific starting time of
 // the executor, as that will be considered by the external execution executor
 // separately.
@@ -57,7 +57,9 @@ var (
 // Keep in mind that t(i) may be exactly equal to t(i+i), when there's an abrupt
 // transition in the number of VUs required by an executor. For example, the
 // variable-looping-vus executor may have 0-duration stages, or it may scale up
-// VUs in its last stage right until the end. These
+// VUs in its last stage right until the end. These immediate transitions cannot
+// be ignored, since the gracefulStop/gracefulRampDown options potentially allow
+// any started iterations to finish.
 //
 // []ExecutionStep is also used by the ExecutorConfigMap, to represent the
 // amount of needed VUs among all executors, during the whole execution of a

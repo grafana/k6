@@ -474,10 +474,17 @@ func (es *ExecutionState) ResumeNotify() <-chan struct{} {
 
 // GetPlannedVU tries to get a pre-initialized VU from the buffer channel. This
 // shouldn't fail and should generally be an instantaneous action, but if it
-// doesn't happen for MaxTimeToWaitForPlannedVU, a warning will be printed. If
-// we reach that timeout more than MaxRetriesGetPlannedVU number of times, this
-// function will return an error, since we either have a bug with some
-// executor, or the machine is very, very overloaded.
+// doesn't happen for MaxTimeToWaitForPlannedVU (for example, because the system
+// is overloaded), a warning will be printed. If we reach that timeout more than
+// MaxRetriesGetPlannedVU number of times, this function will return an error,
+// since we either have a bug with some executor, or the machine is very, very
+// overloaded.
+//
+// If modifyActiveVUCount is true, the method would also increment the counter
+// for active VUs. In most cases, that's the desired behavior, but some
+// executors might have to retrieve their reserved VUs without using them
+// immediately - for example, the the externally-controlled executor when the
+// configured maxVUs number is greater than the configured starting VUs.
 func (es *ExecutionState) GetPlannedVU(logger *logrus.Entry, modifyActiveVUCount bool) (VU, error) {
 	for i := 1; i <= MaxRetriesGetPlannedVU; i++ {
 		select {

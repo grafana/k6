@@ -30,7 +30,8 @@ import (
 )
 
 // This is a helper type used in executors where we have to dynamically control
-// the number of VUs that are simultaneously running. For the moment, it is used in the VariableLoopingVUs and
+// the number of VUs that are simultaneously running. For the moment, it is used
+// in the VariableLoopingVUs and the ExternallyControlled executors.
 //
 // TODO: something simpler?
 type vuHandle struct {
