@@ -22,10 +22,15 @@ package ws
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/dop251/goja"
+	"github.com/gorilla/websocket"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
@@ -97,7 +102,12 @@ func TestSession(t *testing.T) {
 		Group:  root,
 		Dialer: tb.Dialer,
 		Options: lib.Options{
-			SystemTags: lib.GetTagSet("url", "proto", "status", "subproto"),
+			SystemTags: stats.NewSystemTagSet(
+				stats.TagURL,
+				stats.TagProto,
+				stats.TagStatus,
+				stats.TagSubproto,
+			),
 		},
 		Samples:   samples,
 		TLSConfig: tb.TLSClientConfig,
@@ -259,7 +269,7 @@ func TestSession(t *testing.T) {
 	assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSBIN_URL/ws-echo"), 101, "")
 	assertMetricEmitted(t, metrics.WSPing, samplesBuf, sr("WSBIN_URL/ws-echo"))
 
-	t.Run("close", func(t *testing.T) {
+	t.Run("client_close", func(t *testing.T) {
 		_, err := common.RunString(rt, sr(`
 		let closed = false;
 		let res = ws.connect("WSBIN_URL/ws-echo", function(socket){
@@ -275,6 +285,36 @@ func TestSession(t *testing.T) {
 		assert.NoError(t, err)
 	})
 	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-echo"), 101, "")
+
+	serverCloseTests := []struct {
+		name     string
+		endpoint string
+	}{
+		{"server_close_ok", "/ws-echo"},
+		// Ensure we correctly handle invalid WS server
+		// implementations that close the connection prematurely
+		// without sending a close control frame first.
+		{"server_close_invalid", "/ws-close-invalid"},
+	}
+
+	for _, tc := range serverCloseTests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := common.RunString(rt, sr(fmt.Sprintf(`
+			let closed = false;
+			let res = ws.connect("WSBIN_URL%s", function(socket){
+				socket.on("open", function() {
+					socket.send("test");
+				})
+				socket.on("close", function() {
+					closed = true;
+				})
+			});
+			if (!closed) { throw new Error ("close event not fired"); }
+			`, tc.endpoint)))
+			assert.NoError(t, err)
+		})
+	}
 }
 
 func TestErrors(t *testing.T) {
@@ -293,7 +333,7 @@ func TestErrors(t *testing.T) {
 		Group:  root,
 		Dialer: tb.Dialer,
 		Options: lib.Options{
-			SystemTags: lib.GetTagSet(lib.DefaultSystemTagList...),
+			SystemTags: &stats.DefaultSystemTagSet,
 		},
 		Samples: samples,
 	}
@@ -327,7 +367,7 @@ func TestErrors(t *testing.T) {
 
 	t.Run("error_in_setup", func(t *testing.T) {
 		_, err := common.RunString(rt, sr(`
-		let res = ws.connect("WSBIN_URL/ws-echo", function(socket){
+		let res = ws.connect("WSBIN_URL/ws-echo-invalid", function(socket){
 			throw new Error("error in setup");
 		});
 		`))
@@ -337,7 +377,7 @@ func TestErrors(t *testing.T) {
 	t.Run("send_after_close", func(t *testing.T) {
 		_, err := common.RunString(rt, sr(`
 		let hasError = false;
-		let res = ws.connect("WSBIN_URL/ws-echo", function(socket){
+		let res = ws.connect("WSBIN_URL/ws-echo-invalid", function(socket){
 			socket.on("open", function() {
 				socket.close();
 				socket.send("test");
@@ -352,7 +392,7 @@ func TestErrors(t *testing.T) {
 		}
 		`))
 		assert.NoError(t, err)
-		assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-echo"), 101, "")
+		assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-echo-invalid"), 101, "")
 	})
 
 	t.Run("error on close", func(t *testing.T) {
@@ -405,7 +445,7 @@ func TestSystemTags(t *testing.T) {
 	state := &lib.State{
 		Group:     root,
 		Dialer:    tb.Dialer,
-		Options:   lib.Options{SystemTags: lib.GetTagSet(testedSystemTags...)},
+		Options:   lib.Options{SystemTags: stats.ToSystemTagSet(testedSystemTags)},
 		Samples:   samples,
 		TLSConfig: tb.TLSClientConfig,
 	}
@@ -417,10 +457,9 @@ func TestSystemTags(t *testing.T) {
 	rt.Set("ws", common.Bind(rt, New(), &ctx))
 
 	for _, expectedTag := range testedSystemTags {
+		expectedTag := expectedTag
 		t.Run("only "+expectedTag, func(t *testing.T) {
-			state.Options.SystemTags = map[string]bool{
-				expectedTag: true,
-			}
+			state.Options.SystemTags = stats.ToSystemTagSet([]string{expectedTag})
 			_, err := common.RunString(rt, sr(`
 			let res = ws.connect("WSBIN_URL/ws-echo", function(socket){
 				socket.on("open", function() {
@@ -463,7 +502,13 @@ func TestTLSConfig(t *testing.T) {
 		Group:  root,
 		Dialer: tb.Dialer,
 		Options: lib.Options{
-			SystemTags: lib.GetTagSet("url", "proto", "status", "subproto", "ip"),
+			SystemTags: stats.NewSystemTagSet(
+				stats.TagURL,
+				stats.TagProto,
+				stats.TagStatus,
+				stats.TagSubproto,
+				stats.TagIP,
+			),
 		},
 		Samples: samples,
 	}
@@ -503,4 +548,57 @@ func TestTLSConfig(t *testing.T) {
 		assert.NoError(t, err)
 	})
 	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSSBIN_URL/ws-close"), 101, "")
+}
+
+func TestReadPump(t *testing.T) {
+	var closeCode int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := (&websocket.Upgrader{}).Upgrade(w, r, w.Header())
+		assert.NoError(t, err)
+		closeMsg := websocket.FormatCloseMessage(closeCode, "")
+		_ = conn.WriteControl(websocket.CloseMessage, closeMsg, time.Now().Add(time.Second))
+	}))
+	defer srv.Close()
+
+	closeCodes := []int{websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseInternalServerErr}
+
+	numAsserts := 0
+	srvURL := "ws://" + srv.Listener.Addr().String()
+
+	// Ensure readPump returns the response close code sent by the server
+	for _, code := range closeCodes {
+		code := code
+		t.Run(strconv.Itoa(code), func(t *testing.T) {
+			closeCode = code
+			conn, resp, err := websocket.DefaultDialer.Dial(srvURL, nil)
+			assert.NoError(t, err)
+			defer func() {
+				_ = resp.Body.Close()
+				_ = conn.Close()
+			}()
+
+			msgChan := make(chan []byte)
+			errChan := make(chan error)
+			closeChan := make(chan int)
+			go readPump(conn, msgChan, errChan, closeChan)
+
+		readChans:
+			for {
+				select {
+				case responseCode := <-closeChan:
+					assert.Equal(t, code, responseCode)
+					numAsserts++
+					break readChans
+				case <-errChan:
+					continue
+				case <-time.After(time.Second):
+					t.Errorf("Read timed out")
+					break readChans
+				}
+			}
+		})
+	}
+
+	// Ensure all close code asserts passed
+	assert.Equal(t, numAsserts, len(closeCodes))
 }

@@ -51,12 +51,12 @@ const (
 	typeJS      = "js"
 	typeArchive = "archive"
 
-	thresholdHaveFailedErroCode = 99
-	setupTimeoutErrorCode       = 100
-	teardownTimeoutErrorCode    = 101
-	genericTimeoutErrorCode     = 102
-	genericEngineErrorCode      = 103
-	invalidConfigErrorCode      = 104
+	thresholdHaveFailedErrorCode = 99
+	setupTimeoutErrorCode        = 100
+	teardownTimeoutErrorCode     = 101
+	genericTimeoutErrorCode      = 102
+	genericEngineErrorCode       = 103
+	invalidConfigErrorCode       = 104
 )
 
 //TODO: fix this, global variables are not very testable...
@@ -132,12 +132,7 @@ a commandline interface for interacting with it.`,
 
 		conf, cerr := deriveAndValidateConfig(conf)
 		if cerr != nil {
-			return ExitCode{cerr, invalidConfigErrorCode}
-		}
-
-		// If summary trend stats are defined, update the UI to reflect them
-		if len(conf.SummaryTrendStats) > 0 {
-			ui.UpdateTrendColumns(conf.SummaryTrendStats)
+			return ExitCode{error: cerr, Code: invalidConfigErrorCode}
 		}
 
 		// Write options back to the runner too.
@@ -181,6 +176,9 @@ a commandline interface for interacting with it.`,
 		}
 		if conf.NoSummary.Valid {
 			engine.NoSummary = conf.NoSummary.Bool
+		}
+		if conf.SummaryExport.Valid {
+			engine.SummaryExport = conf.SummaryExport.String != ""
 		}
 
 		// Create a collector and assign it to the engine if requested.
@@ -301,7 +299,7 @@ a commandline interface for interacting with it.`,
 			updateFreq = 1 * time.Second
 		}
 		ticker := time.NewTicker(updateFreq)
-		if quiet || conf.HttpDebug.Valid && conf.HttpDebug.String != "" {
+		if quiet || conf.HTTPDebug.Valid && conf.HTTPDebug.String != "" {
 			ticker.Stop()
 		}
 	mainLoop:
@@ -334,18 +332,15 @@ a commandline interface for interacting with it.`,
 				case lib.TimeoutError:
 					switch e.Place() {
 					case "setup":
-						logger.WithField("hint", e.Hint()).Error(err)
-						return ExitCode{errors.New("Setup timeout"), setupTimeoutErrorCode}
+						return ExitCode{error: err, Code: setupTimeoutErrorCode, Hint: e.Hint()}
 					case "teardown":
-						logger.WithField("hint", e.Hint()).Error(err)
-						return ExitCode{errors.New("Teardown timeout"), teardownTimeoutErrorCode}
+						return ExitCode{error: err, Code: teardownTimeoutErrorCode, Hint: e.Hint()}
 					default:
-						logger.WithError(err).Error("Engine timeout")
-						return ExitCode{errors.New("Engine timeout"), genericTimeoutErrorCode}
+						return ExitCode{error: err, Code: genericTimeoutErrorCode}
 					}
 				default:
-					logger.WithError(err).Error("Engine error")
-					return ExitCode{errors.New("Engine Error"), genericEngineErrorCode}
+					//nolint:golint
+					return ExitCode{error: errors.New("Engine error"), Code: genericEngineErrorCode, Hint: err.Error()}
 				}
 			case sig := <-sigC:
 				logger.WithField("sig", sig).Debug("Exiting in response to signal")
@@ -374,16 +369,37 @@ a commandline interface for interacting with it.`,
 			logger.Warn("No data generated, because no script iterations finished, consider making the test duration longer")
 		}
 
+		data := ui.SummaryData{
+			Metrics:   engine.Metrics,
+			RootGroup: engine.ExecutionScheduler.GetRunner().GetDefaultGroup(),
+			Time:      executionState.GetCurrentTestRunDuration(),
+			TimeUnit:  conf.Options.SummaryTimeUnit.String,
+		}
 		// Print the end-of-test summary.
 		if !conf.NoSummary.Bool {
 			fprintf(stdout, "\n")
-			ui.Summarize(stdout, "", ui.SummaryData{
-				Opts:    conf.Options,
-				Root:    engine.ExecutionScheduler.GetRunner().GetDefaultGroup(),
-				Metrics: engine.Metrics,
-				Time:    executionState.GetCurrentTestRunDuration(),
-			})
+
+			s := ui.NewSummary(conf.SummaryTrendStats)
+			s.SummarizeMetrics(stdout, "", data)
+
 			fprintf(stdout, "\n")
+		}
+
+		if conf.SummaryExport.ValueOrZero() != "" {
+			f, err := os.Create(conf.SummaryExport.String)
+			if err != nil {
+				logrus.WithError(err).Error("failed to create summary export file")
+			} else {
+				defer func() {
+					if err := f.Close(); err != nil {
+						logrus.WithError(err).Error("failed to close summary export file")
+					}
+				}()
+				s := ui.NewSummary(conf.SummaryTrendStats)
+				if err := s.SummarizeMetricsJSON(f, data); err != nil {
+					logrus.WithError(err).Error("failed to make summary export file")
+				}
+			}
 		}
 
 		if conf.Linger.Bool {
@@ -392,7 +408,7 @@ a commandline interface for interacting with it.`,
 		}
 
 		if engine.IsTainted() {
-			return ExitCode{errors.New("some thresholds have failed"), thresholdHaveFailedErroCode}
+			return ExitCode{error: errors.New("some thresholds have failed"), Code: thresholdHaveFailedErrorCode}
 		}
 		return nil
 	},

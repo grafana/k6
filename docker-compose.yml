@@ -1,27 +1,40 @@
-version: '3'
+version: '3.4'
+
+networks:
+  k6:
+  grafana:
+
 services:
   influxdb:
-    build:
-      context: .
-      dockerfile: Dockerfile.influxdb
+    image: influxdb:latest
+    networks:
+      - k6
+      - grafana
     ports:
       - "8086:8086"
+    environment:
+      - INFLUXDB_DB=k6
+
   grafana:
-    build:
-      context: .
-      dockerfile: Dockerfile.grafana
-    links:
-      - influxdb
+    image: grafana/grafana:latest
+    networks:
+      - grafana
+    ports:
+      - "3000:3000"
     environment:
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_BASIC_ENABLED=false
-    ports:
-      - "3000:3000"
+    volumes:
+      - ./grafana-datasource.yaml:/etc/grafana/provisioning/datasources/datasource.yaml
+
   k6:
-    build: .
+    image: loadimpact/k6:latest
+    networks:
+      - k6
     ports:
       - "6565:6565"
     environment:
       - K6_OUT=influxdb=http://influxdb:8086/k6
-    command: 'version'
+    volumes:
+      - ./samples:/scripts

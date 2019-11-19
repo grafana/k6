@@ -21,13 +21,11 @@
 package lib
 
 import (
-	"bytes"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"net"
 	"reflect"
-	"strings"
 
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
@@ -40,59 +38,9 @@ import (
 // iterations+vus, or stages)
 const DefaultExecutorName = "default"
 
-// DefaultSystemTagList includes all of the system tags emitted with metrics by default.
-// Other tags that are not enabled by default include: iter, vu, ocsp_status, ip
-var DefaultSystemTagList = []string{
-	"proto", "subproto", "status", "method", "url", "name", "group", "check", "error", "error_code", "tls_version",
-}
-
-// TagSet is a string to bool map (for lookup efficiency) that is used to keep track
-// which system tags should be included with with metrics.
-type TagSet map[string]bool
-
-// GetTagSet converts a the passed string tag names into the expected string to bool map.
-func GetTagSet(tags ...string) TagSet {
-	result := TagSet{}
-	for _, tag := range tags {
-		result[tag] = true
-	}
-	return result
-}
-
-// MarshalJSON converts the tags map to a list (JS array).
-func (t TagSet) MarshalJSON() ([]byte, error) {
-	var tags []string
-	for tag := range t {
-		tags = append(tags, tag)
-	}
-	return json.Marshal(tags)
-}
-
-// UnmarshalJSON converts the tag list back to a the expected set (string to bool map).
-func (t *TagSet) UnmarshalJSON(data []byte) error {
-	var tags []string
-	if err := json.Unmarshal(data, &tags); err != nil {
-		return err
-	}
-	if len(tags) != 0 {
-		*t = GetTagSet(tags...)
-	}
-	return nil
-}
-
-// UnmarshalText converts the tag list to tagset.
-func (t *TagSet) UnmarshalText(data []byte) error {
-	var list = bytes.Split(data, []byte(","))
-	*t = make(map[string]bool, len(list))
-	for _, key := range list {
-		key := strings.TrimSpace(string(key))
-		if key == "" {
-			continue
-		}
-		(*t)[key] = true
-	}
-	return nil
-}
+// DefaultSummaryTrendStats are the default trend columns shown in the test summary output
+// nolint: gochecknoglobals
+var DefaultSummaryTrendStats = []string{"avg", "min", "med", "max", "p(90)", "p(95)"}
 
 // Describes a TLS version. Serialised to/from JSON as a string, eg. "tls1.2".
 type TLSVersion int
@@ -240,14 +188,14 @@ func ParseCIDR(s string) (*IPNet, error) {
 
 type Options struct {
 	// Should the test start in a paused state?
-	Paused null.Bool `json:"paused" envconfig:"paused"`
+	Paused null.Bool `json:"paused" envconfig:"K6_PAUSED"`
 
-	// Execution shortcut options - see the execution option below for all
-	// possibilities and the executors and ExecutionScheduler for more info.
-	VUs        null.Int           `json:"vus" envconfig:"vus"`
-	Duration   types.NullDuration `json:"duration" envconfig:"duration"`
-	Iterations null.Int           `json:"iterations" envconfig:"iterations"`
-	Stages     []Stage            `json:"stages" envconfig:"stages"`
+	// Initial values for VUs, max VUs, duration cap, iteration cap, and stages.
+	// See the Runner or Executor interfaces for more information.
+	VUs null.Int `json:"vus" envconfig:"K6_VUS"`
+	Duration   types.NullDuration `json:"duration" envconfig:"K6_DURATION"`
+	Iterations null.Int           `json:"iterations" envconfig:"K6_ITERATIONS"`
+	Stages     []Stage            `json:"stages" envconfig:"K6_STAGES"`
 
 	// TODO: remove the `ignored:"true"` from the field tags, it's there so that
 	// the envconfig library will ignore those fields.
@@ -260,87 +208,88 @@ type Options struct {
 
 	// Timeouts for the setup() and teardown() functions
 	NoSetup         null.Bool          `json:"noSetup" envconfig:"NO_SETUP"`
-	SetupTimeout    types.NullDuration `json:"setupTimeout" envconfig:"setup_timeout"`
+	SetupTimeout    types.NullDuration `json:"setupTimeout" envconfig:"K6_SETUP_TIMEOUT"`
 	NoTeardown      null.Bool          `json:"noTeardown" envconfig:"NO_TEARDOWN"`
-	TeardownTimeout types.NullDuration `json:"teardownTimeout" envconfig:"teardown_timeout"`
+	TeardownTimeout types.NullDuration `json:"teardownTimeout" envconfig:"K6_TEARDOWN_TIMEOUT"`
 
 	// Limit HTTP requests per second.
-	RPS null.Int `json:"rps" envconfig:"rps"`
+	RPS null.Int `json:"rps" envconfig:"K6_RPS"`
 
 	// How many HTTP redirects do we follow?
-	MaxRedirects null.Int `json:"maxRedirects" envconfig:"max_redirects"`
+	MaxRedirects null.Int `json:"maxRedirects" envconfig:"K6_MAX_REDIRECTS"`
 
 	// Default User Agent string for HTTP requests.
-	UserAgent null.String `json:"userAgent" envconfig:"user_agent"`
+	UserAgent null.String `json:"userAgent" envconfig:"K6_USER_AGENT"`
 
 	// How many batch requests are allowed in parallel, in total and per host?
-	Batch        null.Int `json:"batch" envconfig:"batch"`
-	BatchPerHost null.Int `json:"batchPerHost" envconfig:"batch_per_host"`
+	Batch        null.Int `json:"batch" envconfig:"K6_BATCH"`
+	BatchPerHost null.Int `json:"batchPerHost" envconfig:"K6_BATCH_PER_HOST"`
 
 	// Should all HTTP requests and responses be logged (excluding body)?
-	HttpDebug null.String `json:"httpDebug" envconfig:"http_debug"`
+	HTTPDebug null.String `json:"httpDebug" envconfig:"K6_HTTP_DEBUG"`
 
 	// Accept invalid or untrusted TLS certificates.
-	InsecureSkipTLSVerify null.Bool `json:"insecureSkipTLSVerify" envconfig:"insecure_skip_tls_verify"`
+	InsecureSkipTLSVerify null.Bool `json:"insecureSkipTLSVerify" envconfig:"K6_INSECURE_SKIP_TLS_VERIFY"`
 
 	// Specify TLS versions and cipher suites, and present client certificates.
-	TLSCipherSuites *TLSCipherSuites `json:"tlsCipherSuites" envconfig:"tls_cipher_suites"`
-	TLSVersion      *TLSVersions     `json:"tlsVersion" envconfig:"tls_version"`
-	TLSAuth         []*TLSAuth       `json:"tlsAuth" envconfig:"tlsauth"`
+	TLSCipherSuites *TLSCipherSuites `json:"tlsCipherSuites" envconfig:"K6_TLS_CIPHER_SUITES"`
+	TLSVersion      *TLSVersions     `json:"tlsVersion" envconfig:"K6_TLS_VERSION"`
+	TLSAuth         []*TLSAuth       `json:"tlsAuth" envconfig:"K6_TLSAUTH"`
 
 	// Throw warnings (eg. failed HTTP requests) as errors instead of simply logging them.
-	Throw null.Bool `json:"throw" envconfig:"throw"`
+	Throw null.Bool `json:"throw" envconfig:"K6_THROW"`
 
 	// Define thresholds; these take the form of 'metric=["snippet1", "snippet2"]'.
 	// To create a threshold on a derived metric based on tag queries ("submetrics"), create a
 	// metric on a nonexistent metric named 'real_metric{tagA:valueA,tagB:valueB}'.
-	Thresholds map[string]stats.Thresholds `json:"thresholds" envconfig:"thresholds"`
+	Thresholds map[string]stats.Thresholds `json:"thresholds" envconfig:"K6_THRESHOLDS"`
 
 	// Blacklist IP ranges that tests may not contact. Mainly useful in hosted setups.
-	BlacklistIPs []*IPNet `json:"blacklistIPs" envconfig:"blacklist_ips"`
+	BlacklistIPs []*IPNet `json:"blacklistIPs" envconfig:"K6_BLACKLIST_IPS"`
 
 	// Hosts overrides dns entries for given hosts
-	Hosts map[string]net.IP `json:"hosts" envconfig:"hosts"`
+	Hosts map[string]net.IP `json:"hosts" envconfig:"K6_HOSTS"`
 
 	// Disable keep-alive connections
-	NoConnectionReuse null.Bool `json:"noConnectionReuse" envconfig:"no_connection_reuse"`
+	NoConnectionReuse null.Bool `json:"noConnectionReuse" envconfig:"K6_NO_CONNECTION_REUSE"`
 
 	// Do not reuse connections between VU iterations. This gives more realistic results (depending
 	// on what you're looking for), but you need to raise various kernel limits or you'll get
 	// errors about running out of file handles or sockets, or being unable to bind addresses.
-	NoVUConnectionReuse null.Bool `json:"noVUConnectionReuse" envconfig:"no_vu_connection_reuse"`
+	NoVUConnectionReuse null.Bool `json:"noVUConnectionReuse" envconfig:"K6_NO_VU_CONNECTION_REUSE"`
 
 	// MinIterationDuration can be used to force VUs to pause between iterations if a specific
 	// iteration is shorter than the specified value.
-	MinIterationDuration types.NullDuration `json:"minIterationDuration" envconfig:"min_iteration_duration"`
+	MinIterationDuration types.NullDuration `json:"minIterationDuration" envconfig:"K6_MIN_ITERATION_DURATION"`
 
 	// These values are for third party collectors' benefit.
 	// Can't be set through env vars.
 	External map[string]json.RawMessage `json:"ext" ignored:"true"`
 
 	// Summary trend stats for trend metrics (response times) in CLI output
-	SummaryTrendStats []string `json:"summaryTrendStats" envconfig:"summary_trend_stats"`
+	SummaryTrendStats []string `json:"summaryTrendStats" envconfig:"K6_SUMMARY_TREND_STATS"`
 
 	// Summary time unit for summary metrics (response times) in CLI output
-	SummaryTimeUnit null.String `json:"summaryTimeUnit" envconfig:"summary_time_unit"`
+	SummaryTimeUnit null.String `json:"summaryTimeUnit" envconfig:"K6_SUMMARY_TIME_UNIT"`
 
 	// Which system tags to include with metrics ("method", "vu" etc.)
-	SystemTags TagSet `json:"systemTags" envconfig:"system_tags"`
+	// Use pointer for identifying whether user provide any tag or not.
+	SystemTags *stats.SystemTagSet `json:"systemTags" envconfig:"K6_SYSTEM_TAGS"`
 
 	// Tags to be applied to all samples for this running
-	RunTags *stats.SampleTags `json:"tags" envconfig:"tags"`
+	RunTags *stats.SampleTags `json:"tags" envconfig:"K6_TAGS"`
 
 	// Buffer size of the channel for metric samples; 0 means unbuffered
-	MetricSamplesBufferSize null.Int `json:"metricSamplesBufferSize" envconfig:"metric_samples_buffer_size"`
+	MetricSamplesBufferSize null.Int `json:"metricSamplesBufferSize" envconfig:"K6_METRIC_SAMPLES_BUFFER_SIZE"`
 
 	// Do not reset cookies after a VU iteration
-	NoCookiesReset null.Bool `json:"noCookiesReset" envconfig:"no_cookies_reset"`
+	NoCookiesReset null.Bool `json:"noCookiesReset" envconfig:"K6_NO_COOKIES_RESET"`
 
 	// Discard Http Responses Body
-	DiscardResponseBodies null.Bool `json:"discardResponseBodies" envconfig:"discard_response_bodies"`
+	DiscardResponseBodies null.Bool `json:"discardResponseBodies" envconfig:"K6_DISCARD_RESPONSE_BODIES"`
 
 	// Redirect console logging to a file
-	ConsoleOutput null.String `json:"-" envconfig:"console_output"`
+	ConsoleOutput null.String `json:"-" envconfig:"K6_CONSOLE_OUTPUT"`
 }
 
 // Returns the result of overwriting any fields with any that are set on the argument.
@@ -422,8 +371,8 @@ func (o Options) Apply(opts Options) Options {
 	if opts.BatchPerHost.Valid {
 		o.BatchPerHost = opts.BatchPerHost
 	}
-	if opts.HttpDebug.Valid {
-		o.HttpDebug = opts.HttpDebug
+	if opts.HTTPDebug.Valid {
+		o.HTTPDebug = opts.HTTPDebug
 	}
 	if opts.InsecureSkipTLSVerify.Valid {
 		o.InsecureSkipTLSVerify = opts.InsecureSkipTLSVerify

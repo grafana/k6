@@ -22,6 +22,7 @@ package js
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"path/filepath"
 	"strings"
@@ -56,20 +57,23 @@ type InitContext struct {
 
 	// Cache of loaded programs and files.
 	programs map[string]programWithSource
+
+	compatibilityMode compiler.CompatibilityMode
 }
 
 // NewInitContext creates a new initcontext with the provided arguments
 func NewInitContext(
-	rt *goja.Runtime, compiler *compiler.Compiler, ctxPtr *context.Context, filesystems map[string]afero.Fs, pwd *url.URL,
+	rt *goja.Runtime, c *compiler.Compiler, compatMode compiler.CompatibilityMode,
+	ctxPtr *context.Context, filesystems map[string]afero.Fs, pwd *url.URL,
 ) *InitContext {
 	return &InitContext{
-		runtime:     rt,
-		compiler:    compiler,
-		ctxPtr:      ctxPtr,
-		filesystems: filesystems,
-		pwd:         pwd,
-
-		programs: make(map[string]programWithSource),
+		runtime:           rt,
+		compiler:          c,
+		ctxPtr:            ctxPtr,
+		filesystems:       filesystems,
+		pwd:               pwd,
+		programs:          make(map[string]programWithSource),
+		compatibilityMode: compatMode,
 	}
 }
 
@@ -92,7 +96,8 @@ func newBoundInitContext(base *InitContext, ctxPtr *context.Context, rt *goja.Ru
 		pwd:         base.pwd,
 		compiler:    base.compiler,
 
-		programs: programs,
+		programs:          programs,
+		compatibilityMode: base.compatibilityMode,
 	}
 }
 
@@ -177,7 +182,8 @@ func (i *InitContext) requireFile(name string) (goja.Value, error) {
 }
 
 func (i *InitContext) compileImport(src, filename string) (*goja.Program, error) {
-	pgm, _, err := i.compiler.Compile(src, filename, "(function(module, exports){\n", "\n})\n", true)
+	pgm, _, err := i.compiler.Compile(src, filename,
+		"(function(module, exports){\n", "\n})\n", true, i.compatibilityMode)
 	return pgm, err
 }
 
@@ -203,7 +209,7 @@ func (i *InitContext) Open(filename string, args ...string) (goja.Value, error) 
 	if isDir, err := afero.IsDir(fs, filename); err != nil {
 		return nil, err
 	} else if isDir {
-		return nil, errors.New("open() can't be used with directories")
+		return nil, fmt.Errorf("open() can't be used with directories, path: %q", filename)
 	}
 	data, err := afero.ReadFile(fs, filename)
 	if err != nil {

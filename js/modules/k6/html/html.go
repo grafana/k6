@@ -373,14 +373,16 @@ func (s Selection) Is(v goja.Value) bool {
 	}
 }
 
-func (s Selection) Map(v goja.Value) (result []string) {
+// Map implements ES5 Array.prototype.map
+func (s Selection) Map(v goja.Value) []string {
 	gojaFn, isFn := goja.AssertFunction(v)
 	if !isFn {
 		common.Throw(s.rt, errors.New("Argument to map() must be a function"))
 	}
 
 	fn := func(idx int, sel *goquery.Selection) string {
-		if fnRes, fnErr := gojaFn(v, s.rt.ToValue(idx), s.rt.ToValue(sel)); fnErr == nil {
+		selection := &Selection{sel: sel, URL: s.URL, rt: s.rt}
+		if fnRes, fnErr := gojaFn(v, s.rt.ToValue(idx), s.rt.ToValue(selection)); fnErr == nil {
 			return fnRes.String()
 		}
 		return ""

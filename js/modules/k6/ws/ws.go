@@ -146,10 +146,10 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 
 	}
 
-	if state.Options.SystemTags["url"] {
+	if state.Options.SystemTags.Has(stats.TagURL) {
 		tags["url"] = url
 	}
-	if state.Options.SystemTags["group"] {
+	if state.Options.SystemTags.Has(stats.TagGroup) {
 		tags["group"] = state.Group.Path
 	}
 
@@ -186,7 +186,7 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 		done:               make(chan struct{}),
 	}
 
-	if state.Options.SystemTags["ip"] && conn.RemoteAddr() != nil {
+	if state.Options.SystemTags.Has(stats.TagIP) && conn.RemoteAddr() != nil {
 		if ip, _, err := net.SplitHostPort(conn.RemoteAddr().String()); err == nil {
 			tags["ip"] = ip
 		}
@@ -213,15 +213,22 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 
 	defer func() { _ = conn.Close() }()
 
-	if state.Options.SystemTags["status"] {
+	if state.Options.SystemTags.Has(stats.TagStatus) {
 		tags["status"] = strconv.Itoa(httpResponse.StatusCode)
 	}
-	if state.Options.SystemTags["subproto"] {
+	if state.Options.SystemTags.Has(stats.TagSubproto) {
 		tags["subproto"] = httpResponse.Header.Get("Sec-WebSocket-Protocol")
 	}
 
 	// The connection is now open, emit the event
 	socket.handleEvent("open")
+
+	// Make the default close handler a noop to avoid duplicate closes,
+	// since we use custom closing logic to call user's event
+	// handlers and for cleanup. See closeConnection.
+	// closeConnection is not set directly as a handler here to
+	// avoid race conditions when calling the Goja runtime.
+	conn.SetCloseHandler(func(code int, text string) error { return nil })
 
 	// Pass ping/pong events through the main control loop
 	pingChan := make(chan string)
@@ -262,9 +269,8 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 		case readErr := <-readErrChan:
 			socket.handleEvent("error", rt.ToValue(readErr))
 
-		case readClose := <-readCloseChan:
-			// handle server close
-			socket.handleEvent("close", rt.ToValue(readClose))
+		case code := <-readCloseChan:
+			_ = socket.closeConnection(code)
 
 		case scheduledFn := <-socket.scheduled:
 			if _, err := scheduledFn(goja.Undefined()); err != nil {
@@ -425,7 +431,8 @@ func (s *Socket) Close(args ...goja.Value) {
 	_ = s.closeConnection(code)
 }
 
-// Attempts to close the websocket gracefully
+// closeConnection cleanly closes the WebSocket connection.
+// Returns an error if sending the close control frame fails.
 func (s *Socket) closeConnection(code int) error {
 	var err error
 
@@ -437,15 +444,16 @@ func (s *Socket) closeConnection(code int) error {
 			time.Now().Add(writeWait),
 		)
 		if err != nil {
-			// Just call the handler, we'll try to close the connection anyway
+			// Call the user-defined error handler
 			s.handleEvent("error", rt.ToValue(err))
 		}
 
-		// trigger `close` event when the client closes the connection
+		// Call the user-defined close handler
 		s.handleEvent("close", rt.ToValue(code))
+
 		_ = s.conn.Close()
 
-		// Stops the main control loop
+		// Stop the main control loop
 		close(s.done)
 	})
 
@@ -454,21 +462,19 @@ func (s *Socket) closeConnection(code int) error {
 
 // Wraps conn.ReadMessage in a channel
 func readPump(conn *websocket.Conn, readChan chan []byte, errorChan chan error, closeChan chan int) {
-	defer func() { _ = conn.Close() }()
-
 	for {
 		_, message, err := conn.ReadMessage()
 		if err != nil {
-
-			if websocket.IsCloseError(err, websocket.CloseNormalClosure) {
-				closeChan <- err.(*websocket.CloseError).Code
-			} else if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway) {
-				// Emit the error if it is not CloseNormalClosure
-				// and the error is not  originated from closing the socket ourselves with `CloseGoingAway`
+			if websocket.IsUnexpectedCloseError(
+				err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
+				// Report an unexpected closure
 				errorChan <- err
 			}
-
-			//CloseGoingAway errors are ignored
+			code := websocket.CloseGoingAway
+			if e, ok := err.(*websocket.CloseError); ok {
+				code = e.Code
+			}
+			closeChan <- code
 			return
 		}
 

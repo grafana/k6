@@ -21,27 +21,19 @@
 package csv
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
-	"github.com/kubernetes/helm/pkg/strvals"
 	"github.com/loadimpact/k6/lib/types"
-	"github.com/mitchellh/mapstructure"
 	"gopkg.in/guregu/null.v3"
 )
 
 // Config is the config for the csv collector
 type Config struct {
 	// Samples.
-	FileName     null.String        `json:"file_name" envconfig:"CSV_FILENAME"`
-	SaveInterval types.NullDuration `json:"save_interval" envconfig:"CSV_SAVE_INTERVAL"`
-}
-
-// config is a duplicate of ConfigFields as we can not mapstructure.Decode into
-// null types so we duplicate the struct with primitive types to Decode into
-type config struct {
-	FileName     string `json:"file_name" mapstructure:"file_name" envconfig:"CSV_FILENAME"`
-	SaveInterval string `json:"save_interval" mapstructure:"save_interval" envconfig:"CSV_SAVE_INTERVAL"`
+	FileName     null.String        `json:"file_name" envconfig:"K6_CSV_FILENAME"`
+	SaveInterval types.NullDuration `json:"save_interval" envconfig:"K6_CSV_SAVE_INTERVAL"`
 }
 
 // NewConfig creates a new Config instance with default values for some fields.
@@ -73,26 +65,24 @@ func ParseArg(arg string) (Config, error) {
 		return c, nil
 	}
 
-	params, err := strvals.Parse(arg)
-
-	if err != nil {
-		return c, err
-	}
-
-	if v, ok := params["save_interval"].(string); ok {
-		err = c.SaveInterval.UnmarshalText([]byte(v))
-		if err != nil {
-			return c, err
+	pairs := strings.Split(arg, ",")
+	for _, pair := range pairs {
+		r := strings.SplitN(pair, "=", 2)
+		if len(r) != 2 {
+			return c, fmt.Errorf("couldn't parse %q as argument for csv output", arg)
+		}
+		switch r[0] {
+		case "save_interval":
+			err := c.SaveInterval.UnmarshalText([]byte(r[1]))
+			if err != nil {
+				return c, err
+			}
+		case "file_name":
+			c.FileName = null.StringFrom(r[1])
+		default:
+			return c, fmt.Errorf("unknown key %q as argument for csv output", r[0])
 		}
 	}
-
-	var cfg config
-	err = mapstructure.Decode(params, &cfg)
-	if err != nil {
-		return c, err
-	}
-
-	c.FileName = null.StringFrom(cfg.FileName)
 
 	return c, nil
 }

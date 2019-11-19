@@ -361,17 +361,11 @@ func TestExecutionSchedulerEndIterations(t *testing.T) {
 	assert.Equal(t, uint64(100), execScheduler.GetState().GetFullIterationCount())
 	assert.Equal(t, uint64(0), execScheduler.GetState().GetPartialIterationCount())
 	assert.Equal(t, int64(100), i)
-	require.Equal(t, 200, len(samples))
+	require.Equal(t, 100, len(samples)) //TODO: change to 200 https://github.com/loadimpact/k6/issues/1250
 	for i := 0; i < 100; i++ {
 		mySample, ok := <-samples
 		require.True(t, ok)
 		assert.Equal(t, stats.Sample{Metric: metric, Value: 1.0}, mySample)
-		sample, ok := <-samples
-		require.True(t, ok)
-		iterSample, ok := (sample).(stats.Sample)
-		require.True(t, ok)
-		assert.Equal(t, metrics.Iterations, iterSample.Metric)
-		assert.Equal(t, float64(1), iterSample.Value)
 	}
 }
 
@@ -540,13 +534,13 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 	runner, err := js.New(&loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script}, nil, lib.RuntimeOptions{})
 	require.NoError(t, err)
 
-	options, err := executor.DeriveExecutionFromShortcuts(lib.Options{
+	options, err := executor.DeriveExecutionFromShortcuts(runner.GetOptions().Apply(lib.Options{
 		Iterations:      null.IntFrom(2),
 		VUs:             null.IntFrom(1),
-		SystemTags:      lib.GetTagSet(lib.DefaultSystemTagList...),
+		SystemTags:      &stats.DefaultSystemTagSet,
 		SetupTimeout:    types.NullDurationFrom(4 * time.Second),
 		TeardownTimeout: types.NullDurationFrom(4 * time.Second),
-	}.Apply(runner.GetOptions()))
+	}))
 	require.NoError(t, err)
 	require.NoError(t, runner.SetOptions(options))
 
@@ -618,28 +612,27 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 			Value:  expValue,
 		}
 	}
-	getDummyTrail := func(group string) stats.SampleContainer {
-		return netext.NewDialer(net.Dialer{}).GetTrail(time.Now(), time.Now(), true, getTags("group", group))
+	getDummyTrail := func(group string, emitIterations bool) stats.SampleContainer {
+		return netext.NewDialer(net.Dialer{}).GetTrail(time.Now(), time.Now(),
+			true, emitIterations, getTags("group", group))
 	}
 
 	// Initially give a long time (5s) for the execScheduler to start
 	expectIn(0, 5000, getSample(1, testCounter, "group", "::setup", "place", "setupBeforeSleep"))
 	expectIn(900, 1100, getSample(2, testCounter, "group", "::setup", "place", "setupAfterSleep"))
-	expectIn(0, 100, getDummyTrail("::setup"))
+	expectIn(0, 100, getDummyTrail("::setup", false))
 
 	expectIn(0, 100, getSample(5, testCounter, "group", "", "place", "defaultBeforeSleep"))
 	expectIn(900, 1100, getSample(6, testCounter, "group", "", "place", "defaultAfterSleep"))
-	expectIn(0, 100, getDummyTrail(""))
-	expectIn(0, 100, getSample(1, metrics.Iterations))
+	expectIn(0, 100, getDummyTrail("", true))
 
 	expectIn(0, 100, getSample(5, testCounter, "group", "", "place", "defaultBeforeSleep"))
 	expectIn(900, 1100, getSample(6, testCounter, "group", "", "place", "defaultAfterSleep"))
-	expectIn(0, 100, getDummyTrail(""))
-	expectIn(0, 100, getSample(1, metrics.Iterations))
+	expectIn(0, 100, getDummyTrail("", true))
 
 	expectIn(0, 1000, getSample(3, testCounter, "group", "::teardown", "place", "teardownBeforeSleep"))
 	expectIn(900, 1100, getSample(4, testCounter, "group", "::teardown", "place", "teardownAfterSleep"))
-	expectIn(0, 100, getDummyTrail("::teardown"))
+	expectIn(0, 100, getDummyTrail("::teardown", false))
 
 	for {
 		select {

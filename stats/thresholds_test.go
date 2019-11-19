@@ -163,6 +163,7 @@ func TestThresholdsRunAll(t *testing.T) {
 	for name, data := range testdata {
 		t.Run(name, func(t *testing.T) {
 			ts, err := NewThresholds(data.srcs)
+			assert.Nil(t, err)
 			ts.Thresholds[0].AbortOnFail = data.abort
 			ts.Thresholds[0].AbortGracePeriod = data.grace
 

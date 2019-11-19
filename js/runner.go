@@ -321,7 +321,7 @@ func (r *Runner) runPart(ctx context.Context, out chan<- stats.SampleContainer, 
 		return goja.Undefined(), err
 	}
 
-	v, _, err := vu.runFn(ctx, group, fn, vu.Runtime.ToValue(arg))
+	v, _, _, err := vu.runFn(ctx, group, false, fn, vu.Runtime.ToValue(arg))
 
 	// deadline is reached so we have timeouted but this might've not been registered correctly
 	if deadline, ok := ctx.Deadline(); ok && time.Now().After(deadline) {
@@ -421,16 +421,26 @@ func (u *VU) RunOnce(ctx context.Context) error {
 	}
 
 	// Call the default function.
-	_, _, err := u.runFn(ctx, u.Runner.defaultGroup, u.Default, u.setupData)
+	_, isFullIteration, totalTime, err := u.runFn(ctx, u.Runner.defaultGroup, true, u.Default, u.setupData)
+
+	// If MinIterationDuration is specified and the iteration wasn't cancelled
+	// and was less than it, sleep for the remainder
+	if isFullIteration && u.Runner.Bundle.Options.MinIterationDuration.Valid {
+		durationDiff := time.Duration(u.Runner.Bundle.Options.MinIterationDuration.Duration) - totalTime
+		if durationDiff > 0 {
+			time.Sleep(durationDiff)
+		}
+	}
+
 	return err
 }
 
 func (u *VU) runFn(
-	ctx context.Context, group *lib.Group, fn goja.Callable, args ...goja.Value,
-) (goja.Value, *lib.State, error) {
+	ctx context.Context, group *lib.Group, isDefault bool, fn goja.Callable, args ...goja.Value,
+) (goja.Value, bool, time.Duration, error) {
 	cookieJar, err := cookiejar.New(nil)
 	if err != nil {
-		return goja.Undefined(), nil, err
+		return goja.Undefined(), false, time.Duration(0), err
 	}
 
 	if u.Runner.Bundle.Options.NoCookiesReset.Valid && u.Runner.Bundle.Options.NoCookiesReset.Bool {
@@ -473,13 +483,13 @@ func (u *VU) runFn(
 	}
 
 	tags := state.Options.RunTags.CloneTags()
-	if state.Options.SystemTags["vu"] {
+	if state.Options.SystemTags.Has(stats.TagVU) {
 		tags["vu"] = strconv.FormatInt(u.ID, 10)
 	}
-	if state.Options.SystemTags["iter"] {
+	if state.Options.SystemTags.Has(stats.TagIter) {
 		tags["iter"] = strconv.FormatInt(iter, 10)
 	}
-	if state.Options.SystemTags["group"] {
+	if state.Options.SystemTags.Has(stats.TagGroup) {
 		tags["group"] = group.Path
 	}
 
@@ -487,16 +497,7 @@ func (u *VU) runFn(
 		u.Transport.CloseIdleConnections()
 	}
 
-	state.Samples <- u.Dialer.GetTrail(startTime, endTime, isFullIteration, stats.IntoSampleTags(&tags))
+	state.Samples <- u.Dialer.GetTrail(startTime, endTime, isFullIteration, isDefault, stats.IntoSampleTags(&tags))
 
-	// If MinIterationDuration is specified and the iteration wasn't cancelled
-	// and was less than it, sleep for the remainder
-	if isFullIteration && state.Options.MinIterationDuration.Valid {
-		durationDiff := time.Duration(state.Options.MinIterationDuration.Duration) - endTime.Sub(startTime)
-		if durationDiff > 0 {
-			time.Sleep(durationDiff)
-		}
-	}
-
-	return v, state, err
+	return v, isFullIteration, endTime.Sub(startTime), err
 }

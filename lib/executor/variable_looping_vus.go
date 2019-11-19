@@ -476,7 +476,8 @@ var _ lib.Executor = &VariableLoopingVUs{}
 // TODO: split up? since this does a ton of things, unfortunately I can't think
 // of a less complex way to implement it (besides the old "increment by 100ms
 // and see what happens)... :/ so maybe see how it can be spit?
-func (vlv VariableLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleContainer) (err error) { //nolint:funlen
+// nolint:funlen,gocognit
+func (vlv VariableLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleContainer) (err error) {
 	segment := vlv.executionState.Options.ExecutionSegment
 	rawExecutionSteps := vlv.config.getRawExecutionSteps(segment, true)
 	regularDuration, isFinal := lib.GetEndOffset(rawExecutionSteps)

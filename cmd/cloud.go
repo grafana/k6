@@ -31,18 +31,24 @@ import (
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
+	"github.com/pkg/errors"
+	"github.com/spf13/afero"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/stats/cloud"
 	"github.com/loadimpact/k6/ui"
 	"github.com/loadimpact/k6/ui/pb"
-	"github.com/pkg/errors"
-	"github.com/spf13/afero"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 
 	"github.com/sirupsen/logrus"
+)
+
+const (
+	cloudFailedToGetProgressErrorCode = 98
+	cloudTestRunFailedErrorCode       = 99
 )
 
 var (
@@ -101,7 +107,7 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 
 		derivedConf, cerr := deriveAndValidateConfig(conf)
 		if cerr != nil {
-			return ExitCode{cerr, invalidConfigErrorCode}
+			return ExitCode{error: cerr, Code: invalidConfigErrorCode}
 		}
 
 		//TODO: validate for usage of execution segment
@@ -115,7 +121,7 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 
 		// Cloud config
 		cloudConfig := cloud.NewConfig().Apply(derivedConf.Collectors.Cloud)
-		if err := envconfig.Process("k6", &cloudConfig); err != nil {
+		if err = envconfig.Process("", &cloudConfig); err != nil {
 			return err
 		}
 		if !cloudConfig.Token.Valid {
@@ -246,13 +252,15 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 		}
 
 		if testProgress == nil {
-			return ExitCode{errors.New("Test progress error"), 98}
+			//nolint:golint
+			return ExitCode{error: errors.New("Test progress error"), Code: cloudFailedToGetProgressErrorCode}
 		}
 
 		fprintf(stdout, "     test status: %s\n", ui.ValueColor.Sprint(testProgress.RunStatusText))
 
 		if testProgress.ResultStatus == cloud.ResultStatusFailed {
-			return ExitCode{errors.New("The test has failed"), 99}
+			//nolint:golint
+			return ExitCode{error: errors.New("The test has failed"), Code: cloudTestRunFailedErrorCode}
 		}
 
 		return nil

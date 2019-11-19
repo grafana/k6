@@ -33,7 +33,7 @@ var versionCmd = &cobra.Command{
 	Short: "Show application version",
 	Long:  `Show the application version and exit.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("k6 v" + consts.Version)
+		fmt.Println("k6 v" + consts.FullVersion())
 	},
 }
 

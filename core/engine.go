@@ -53,10 +53,11 @@ type Engine struct {
 	ExecutionScheduler lib.ExecutionScheduler
 	executionState     *lib.ExecutionState
 
-	Options      lib.Options
-	Collectors   []lib.Collector
-	NoThresholds bool
-	NoSummary    bool
+	Options       lib.Options
+	Collectors    []lib.Collector
+	NoThresholds  bool
+	NoSummary     bool
+	SummaryExport bool
 
 	logger *logrus.Logger
 
@@ -354,7 +355,7 @@ func (e *Engine) processSamples(sampleContainers []stats.SampleContainer) {
 	defer e.MetricsLock.Unlock()
 
 	// TODO: run this and the below code in goroutines?
-	if !(e.NoSummary && e.NoThresholds) {
+	if !(e.NoSummary && e.NoThresholds && !e.SummaryExport) {
 		e.processSamplesForMetrics(sampleContainers)
 	}
 

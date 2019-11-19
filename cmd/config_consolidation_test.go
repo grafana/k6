@@ -38,6 +38,7 @@ import (
 	"github.com/loadimpact/k6/lib/executor"
 	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/lib/types"
+	"github.com/loadimpact/k6/stats"
 )
 
 // A helper funcion for setting arbitrary environment variables and
@@ -365,16 +366,43 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 
 		// Test system tags
 		{opts{}, exp{}, func(t *testing.T, c Config) {
-			assert.Equal(t, lib.GetTagSet(lib.DefaultSystemTagList...), c.Options.SystemTags)
+			assert.Equal(t, &stats.DefaultSystemTagSet, c.Options.SystemTags)
 		}},
 		{opts{cli: []string{"--system-tags", `""`}}, exp{}, func(t *testing.T, c Config) {
-			assert.Equal(t, lib.GetTagSet(), c.Options.SystemTags)
+			assert.Equal(t, stats.SystemTagSet(0), *c.Options.SystemTags)
 		}},
 		{
-			opts{runner: &lib.Options{SystemTags: lib.GetTagSet([]string{"proto", "url"}...)}},
+			opts{runner: &lib.Options{
+				SystemTags: stats.NewSystemTagSet(stats.TagSubproto, stats.TagURL)},
+			},
 			exp{},
 			func(t *testing.T, c Config) {
-				assert.Equal(t, lib.GetTagSet("proto", "url"), c.Options.SystemTags)
+				assert.Equal(
+					t,
+					*stats.NewSystemTagSet(stats.TagSubproto, stats.TagURL),
+					*c.Options.SystemTags,
+				)
+			},
+		},
+		// Test summary trend stats
+		{opts{}, exp{}, func(t *testing.T, c Config) {
+			assert.Equal(t, lib.DefaultSummaryTrendStats, c.Options.SummaryTrendStats)
+		}},
+		{opts{cli: []string{"--summary-trend-stats", ""}}, exp{}, func(t *testing.T, c Config) {
+			assert.Equal(t, []string{}, c.Options.SummaryTrendStats)
+		}},
+		{opts{cli: []string{"--summary-trend-stats", "coun"}}, exp{consolidationError: true}, nil},
+		{opts{cli: []string{"--summary-trend-stats", "med,avg,p("}}, exp{consolidationError: true}, nil},
+		{opts{cli: []string{"--summary-trend-stats", "med,avg,p(-1)"}}, exp{consolidationError: true}, nil},
+		{opts{cli: []string{"--summary-trend-stats", "med,avg,p(101)"}}, exp{consolidationError: true}, nil},
+		{opts{cli: []string{"--summary-trend-stats", "med,avg,p(99.999)"}}, exp{}, func(t *testing.T, c Config) {
+			assert.Equal(t, []string{"med", "avg", "p(99.999)"}, c.Options.SummaryTrendStats)
+		}},
+		{
+			opts{runner: &lib.Options{SummaryTrendStats: []string{"avg", "p(90)", "count"}}},
+			exp{},
+			func(t *testing.T, c Config) {
+				assert.Equal(t, []string{"avg", "p(90)", "count"}, c.Options.SummaryTrendStats)
 			},
 		},
 		//TODO: test for differences between flagsets

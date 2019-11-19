@@ -4,7 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/stats/statsd/common"
 	"github.com/loadimpact/k6/stats/statsd/common/testutil"
@@ -12,11 +11,11 @@ import (
 )
 
 func TestCollector(t *testing.T) {
-	var tagSet = lib.GetTagSet("tag1", "tag2")
-	var handler = tagHandler(tagSet)
+	var tagMap = stats.TagSet{"tag1": true, "tag2": true}
+	var handler = tagHandler(tagMap)
 	testutil.BaseTest(t, func(config common.Config) (*common.Collector, error) {
 		return New(NewConfig().Apply(Config{
-			TagBlacklist: tagSet,
+			TagBlacklist: tagMap,
 			Config:       config,
 		}))
 	}, func(t *testing.T, containers []stats.SampleContainer, expectedOutput, output string) {

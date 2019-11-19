@@ -475,7 +475,7 @@ func (rs *externallyControlledRunState) handleConfigChange(oldCfg, newCfg Extern
 // Run constantly loops through as many iterations as possible on a variable
 // dynamically controlled number of VUs either for the specified duration, or
 // until the test is manually stopped.
-// nolint:funlen
+// nolint:funlen,gocognit
 func (mex *ExternallyControlled) Run(parentCtx context.Context, out chan<- stats.SampleContainer) (err error) {
 	mex.configLock.RLock()
 	// Safely get the current config - it's important that the close of the

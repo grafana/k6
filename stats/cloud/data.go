@@ -213,7 +213,7 @@ func (am *AggregatedMetric) Add(t time.Duration) {
 	am.sumD += t
 }
 
-// Calc populates the float fields for min and max and calulates the average value
+// Calc populates the float fields for min and max and calculates the average value
 func (am *AggregatedMetric) Calc(count float64) {
 	am.Min = stats.D(am.minD)
 	am.Max = stats.D(am.maxD)
@@ -254,12 +254,14 @@ func (d durations) SortGetNormalBounds(radius, iqrLowerCoef, iqrUpperCoef float6
 		return floor + time.Duration(float64(ceil-floor)*posDiff)
 	}
 
-	radius = math.Min(0.5, radius)
-	q1 := getValue(0.5 - radius)
-	q3 := getValue(0.5 + radius)
-	iqr := float64(q3 - q1)
-	min = q1 - time.Duration(iqrLowerCoef*iqr)
-	max = q3 + time.Duration(iqrUpperCoef*iqr)
+	// See https://en.wikipedia.org/wiki/Quartile#Outliers for details
+	radius = math.Min(0.5, radius) // guard against a radius greater than 50%, see AggregationOutlierIqrRadius
+	q1 := getValue(0.5 - radius)   // get Q1, the (interpolated) value at a `radius` distance before the median
+	q3 := getValue(0.5 + radius)   // get Q3, the (interpolated) value at a `radius` distance after the median
+	iqr := float64(q3 - q1)        // calculate the interquartile range (IQR)
+
+	min = q1 - time.Duration(iqrLowerCoef*iqr) // lower fence, anything below this is an outlier
+	max = q3 + time.Duration(iqrUpperCoef*iqr) // upper fence, anything above this is an outlier
 	return
 }
 

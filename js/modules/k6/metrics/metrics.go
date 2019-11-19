@@ -74,7 +74,7 @@ func (m Metric) Add(ctx context.Context, v goja.Value, addTags ...map[string]str
 	}
 
 	tags := state.Options.RunTags.CloneTags()
-	if state.Options.SystemTags["group"] {
+	if state.Options.SystemTags.Has(stats.TagGroup) {
 		tags["group"] = state.Group.Path
 	}
 

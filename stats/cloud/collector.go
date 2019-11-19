@@ -108,12 +108,12 @@ func New(
 		return nil, err
 	}
 
-	if conf.AggregationPeriod.Duration > 0 && (opts.SystemTags["vu"] || opts.SystemTags["iter"]) {
+	if conf.AggregationPeriod.Duration > 0 && (opts.SystemTags.Has(stats.TagVU) || opts.SystemTags.Has(stats.TagIter)) {
 		return nil, errors.New("Aggregation cannot be enabled if the 'vu' or 'iter' system tag is also enabled")
 	}
 
 	if !conf.Name.Valid || conf.Name.String == "" {
-		conf.Name = null.StringFrom(filepath.Base(src.URL.Path))
+		conf.Name = null.StringFrom(filepath.Base(src.URL.String()))
 	}
 	if conf.Name.String == "-" {
 		conf.Name = null.StringFrom(TestName)
@@ -248,6 +248,24 @@ func (c *Collector) Run(ctx context.Context) {
 	}
 }
 
+func useCloudTags(source *httpext.Trail) *httpext.Trail {
+	name, nameExist := source.Tags.Get("name")
+	url, urlExist := source.Tags.Get("url")
+	if !nameExist || !urlExist || name == url {
+		return source
+	}
+
+	newTags := source.Tags.CloneTags()
+	newTags["url"] = name
+
+	dest := new(httpext.Trail)
+	*dest = *source
+	dest.Tags = stats.IntoSampleTags(&newTags)
+	dest.Samples = nil
+
+	return dest
+}
+
 // Collect receives a set of samples. This method is never called concurrently, and only while
 // the context for Run() is valid, but should defer as much work as possible to Run().
 func (c *Collector) Collect(sampleContainers []stats.SampleContainer) {
@@ -267,6 +285,7 @@ func (c *Collector) Collect(sampleContainers []stats.SampleContainer) {
 	for _, sampleContainer := range sampleContainers {
 		switch sc := sampleContainer.(type) {
 		case *httpext.Trail:
+			sc = useCloudTags(sc)
 			// Check if aggregation is enabled,
 			if c.config.AggregationPeriod.Duration > 0 {
 				newHTTPTrails = append(newHTTPTrails, sc)
@@ -282,6 +301,7 @@ func (c *Collector) Collect(sampleContainers []stats.SampleContainer) {
 
 			if sc.FullIteration {
 				values[metrics.IterationDuration.Name] = stats.D(sc.EndTime.Sub(sc.StartTime))
+				values[metrics.Iterations.Name] = 1
 			}
 
 			newSamples = append(newSamples, &Sample{
@@ -345,6 +365,7 @@ func (c *Collector) aggregateHTTPTrails(waitPeriod time.Duration) {
 				if trailTags.IsEqual(sbTags) {
 					subBucketKey = sbTags
 					subBucket = sb
+					break
 				}
 			}
 		}
@@ -541,8 +562,8 @@ func (c *Collector) testFinished() {
 }
 
 // GetRequiredSystemTags returns which sample tags are needed by this collector
-func (c *Collector) GetRequiredSystemTags() lib.TagSet {
-	return lib.GetTagSet("name", "method", "status", "error", "check", "group")
+func (c *Collector) GetRequiredSystemTags() stats.SystemTagSet {
+	return stats.TagName | stats.TagMethod | stats.TagStatus | stats.TagError | stats.TagCheck | stats.TagGroup
 }
 
 // SetRunStatus Set run status

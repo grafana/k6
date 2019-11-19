@@ -29,7 +29,6 @@ import (
 	"github.com/loadimpact/k6/ui/pb"
 
 	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 	"github.com/sirupsen/logrus"
@@ -76,10 +75,12 @@ func validateStages(stages []Stage) []error {
 }
 
 // getIterationRunner is a helper function that returns an iteration executor
-// closure. It takes care of updating metrics, execution state statistics, and
+// closure. It takes care of updating the execution state statistics and
 // warning messages.
+//
+// TODO: emit the end-of-test iteration metrics here (https://github.com/loadimpact/k6/issues/1250)
 func getIterationRunner(
-	executionState *lib.ExecutionState, logger *logrus.Entry, out chan<- stats.SampleContainer,
+	executionState *lib.ExecutionState, logger *logrus.Entry, _ chan<- stats.SampleContainer,
 ) func(context.Context, lib.VU) {
 	return func(ctx context.Context, vu lib.VU) {
 		err := vu.RunOnce(ctx)
@@ -102,12 +103,7 @@ func getIterationRunner(
 				//TODO: investigate context cancelled errors
 			}
 
-			out <- stats.Sample{
-				Time:   time.Now(),
-				Metric: metrics.Iterations,
-				Value:  1,
-				Tags:   executionState.Options.RunTags,
-			}
+			//TODO: move emission of end-of-iteration metrics here?
 			executionState.AddFullIterations(1)
 		}
 	}

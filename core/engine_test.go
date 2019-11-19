@@ -24,6 +24,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"runtime"
 	"testing"
 	"time"
 
@@ -44,6 +45,8 @@ import (
 	"github.com/sirupsen/logrus"
 	null "gopkg.in/guregu/null.v3"
 )
+
+const isWindows = runtime.GOOS == "windows"
 
 // Wrapper around NewEngine that applies a logger and manages the options.
 func newTestEngine(t *testing.T, ctx context.Context, runner lib.Runner, opts lib.Options) *Engine { //nolint: golint
@@ -349,6 +352,7 @@ func getMetricCount(collector *dummy.Collector, name string) (result uint) {
 
 const expectedHeaderMaxLength = 500
 
+// FIXME: This test is too brittle, consider simplifying.
 func TestSentReceivedMetrics(t *testing.T) {
 	t.Parallel()
 	tb := httpmultibin.NewHTTPMultiBin(t)
@@ -379,10 +383,14 @@ func TestSentReceivedMetrics(t *testing.T) {
 					file: http.file(data, "test.txt")
 				});
 			}`), 1, 1000, 100},
+		// NOTE(imiric): This needs to keep testing against /ws-echo-invalid because
+		// this test is highly sensitive to metric data, and slightly differing
+		// WS server implementations might introduce flakiness.
+		// See https://github.com/loadimpact/k6/pull/1149
 		{tr(`import ws from "k6/ws";
 			let data = "0123456789".repeat(100);
 			export default function() {
-				ws.connect("WSBIN_URL/ws-echo", null, function (socket) {
+				ws.connect("WSBIN_URL/ws-echo-invalid", null, function (socket) {
 					socket.on('open', function open() {
 						socket.send(data);
 					});
@@ -407,6 +415,7 @@ func TestSentReceivedMetrics(t *testing.T) {
 		require.NoError(t, err)
 
 		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		engine := newTestEngine(t, ctx, r, lib.Options{
 			Iterations:            null.IntFrom(tc.Iterations),
 			VUs:                   null.IntFrom(tc.VUs),
@@ -423,10 +432,8 @@ func TestSentReceivedMetrics(t *testing.T) {
 
 		select {
 		case <-time.After(10 * time.Second):
-			cancel()
 			t.Fatal("Test timed out")
 		case err := <-errC:
-			cancel()
 			require.NoError(t, err)
 		}
 
@@ -543,12 +550,14 @@ func TestRunTags(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	engine := newTestEngine(t, ctx, r, lib.Options{
 		Iterations:            null.IntFrom(3),
 		VUs:                   null.IntFrom(2),
 		Hosts:                 tb.Dialer.Hosts,
 		RunTags:               runTags,
-		SystemTags:            lib.GetTagSet(lib.DefaultSystemTagList...),
+		SystemTags:            &stats.DefaultSystemTagSet,
 		InsecureSkipTLSVerify: null.BoolFrom(true),
 	})
 
@@ -560,10 +569,8 @@ func TestRunTags(t *testing.T) {
 
 	select {
 	case <-time.After(10 * time.Second):
-		cancel()
 		t.Fatal("Test timed out")
 	case err := <-errC:
-		cancel()
 		require.NoError(t, err)
 	}
 
@@ -638,8 +645,9 @@ func TestSetupTeardownThresholds(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	engine := newTestEngine(t, ctx, runner, lib.Options{
-		SystemTags:      lib.GetTagSet(lib.DefaultSystemTagList...),
+		SystemTags:      &stats.DefaultSystemTagSet,
 		SetupTimeout:    types.NullDurationFrom(3 * time.Second),
 		TeardownTimeout: types.NullDurationFrom(3 * time.Second),
 		VUs:             null.IntFrom(3),
@@ -650,10 +658,8 @@ func TestSetupTeardownThresholds(t *testing.T) {
 
 	select {
 	case <-time.After(10 * time.Second):
-		cancel()
 		t.Fatal("Test timed out")
 	case err := <-errC:
-		cancel()
 		require.NoError(t, err)
 		require.False(t, engine.IsTainted())
 	}
@@ -703,6 +709,7 @@ func TestEmittedMetricsWhenScalingDown(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	engine := newTestEngine(t, ctx, runner, lib.Options{})
 
 	collector := &dummy.Collector{}
@@ -713,10 +720,8 @@ func TestEmittedMetricsWhenScalingDown(t *testing.T) {
 
 	select {
 	case <-time.After(10 * time.Second):
-		cancel()
 		t.Fatal("Test timed out")
 	case err := <-errC:
-		cancel()
 		require.NoError(t, err)
 		require.False(t, engine.IsTainted())
 	}
@@ -753,16 +758,100 @@ func TestEmittedMetricsWhenScalingDown(t *testing.T) {
 	assert.InDelta(t, 3.35, durationSum/(1000*durationCount), 0.25)
 }
 
-func TestMinIterationDuration(t *testing.T) {
+func TestMetricsEmission(t *testing.T) {
+	if !isWindows {
+		t.Parallel()
+	}
+
+	testCases := []struct {
+		method             string
+		minIterDuration    string
+		defaultBody        string
+		expCount, expIters float64
+	}{
+		// Since emission of Iterations happens before the minIterationDuration
+		// sleep is done, we expect to receive metrics for all executions of
+		// the `default` function, despite of the lower overall duration setting.
+		{"minIterationDuration", `"300ms"`, "testCounter.add(1);", 16.0, 16.0},
+		// With the manual sleep method and no minIterationDuration, the last
+		// `default` execution will be cutoff by the duration setting, so only
+		// 3 sets of metrics are expected.
+		{"sleepBeforeCounterAdd", "null", "sleep(0.3); testCounter.add(1); ", 12.0, 12.0},
+		// The counter should be sent, but the last iteration will be incomplete
+		{"sleepAfterCounterAdd", "null", "testCounter.add(1); sleep(0.3); ", 16.0, 12.0},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.method, func(t *testing.T) {
+			if !isWindows {
+				t.Parallel()
+			}
+			runner, err := js.New(
+				&loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: []byte(fmt.Sprintf(`
+				import { sleep } from "k6";
+				import { Counter } from "k6/metrics";
+
+				let testCounter = new Counter("testcounter");
+
+				export let options = {
+					execution: {
+						we_need_hard_stop: {
+							type: "constant-looping-vus",
+							vus: 4,
+							duration: "1s",
+							gracefulStop: "0s",
+						},
+					},
+					minIterationDuration: %s,
+				};
+
+				export default function() {
+					%s
+				}
+				`, tc.minIterDuration, tc.defaultBody))},
+				nil,
+				lib.RuntimeOptions{},
+			)
+			require.NoError(t, err)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			engine := newTestEngine(t, ctx, runner, runner.GetOptions())
+
+			collector := &dummy.Collector{}
+			engine.Collectors = []lib.Collector{collector}
+
+			errC := make(chan error)
+			go func() { errC <- engine.Run(ctx) }()
+
+			select {
+			case <-time.After(10 * time.Second):
+				t.Fatal("Test timed out")
+			case err := <-errC:
+				require.NoError(t, err)
+				require.False(t, engine.IsTainted())
+			}
+
+			assert.Equal(t, tc.expIters, getMetricSum(collector, metrics.Iterations.Name))
+			assert.Equal(t, tc.expCount, getMetricSum(collector, "testcounter"))
+		})
+	}
+}
+
+//nolint: funlen
+func TestMinIterationDurationInSetupTeardownStage(t *testing.T) {
 	t.Parallel()
+	setupScript := `
+		import { sleep } from "k6";
 
-	runner, err := js.New(
-		&loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: []byte(`
-		import { Counter } from "k6/metrics";
-
-		let testCounter = new Counter("testcounter");
+		export function setup() {
+			sleep(1);
+		}
 
 		export let options = {
+			minIterationDuration: "2s",
 			execution: {
 				we_need_hard_stop: {
 					type: "constant-looping-vus",
@@ -771,39 +860,64 @@ func TestMinIterationDuration(t *testing.T) {
 					gracefulStop: "0s",
 				},
 			},
-			minIterationDuration: "1s",
+			setupTimeout: "2s",
 		};
 
 		export default function () {
-			testCounter.add(1);
-		};`)},
-		nil,
-		lib.RuntimeOptions{},
-	)
-	require.NoError(t, err)
+		};`
+	teardownScript := `
+		import { sleep } from "k6";
 
-	ctx, cancel := context.WithCancel(context.Background())
-	engine := newTestEngine(t, ctx, runner, lib.Options{})
+		export let options = {
+			minIterationDuration: "2s",
+			execution: {
+				we_need_hard_stop: {
+					type: "constant-looping-vus",
+					vus: 2,
+					duration: "1.9s",
+					gracefulStop: "0s",
+				},
+			},
+			teardownTimeout: "2s",
+		};
 
-	collector := &dummy.Collector{}
-	engine.Collectors = []lib.Collector{collector}
+		export default function () {
+		};
 
-	errC := make(chan error)
-	go func() { errC <- engine.Run(ctx) }()
-
-	select {
-	case <-time.After(10 * time.Second):
-		cancel()
-		t.Fatal("Test timed out")
-	case err := <-errC:
-		cancel()
-		require.NoError(t, err)
-		require.False(t, engine.IsTainted())
+		export function teardown() {
+			sleep(1);
+		}
+`
+	tests := []struct {
+		name, script string
+	}{
+		{"Test setup", setupScript},
+		{"Test teardown", teardownScript},
 	}
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			runner, err := js.New(
+				&loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: []byte(tc.script)},
+				nil,
+				lib.RuntimeOptions{},
+			)
+			require.NoError(t, err)
 
-	// Only 2 full iterations are expected to be completed due to the 1 second minIterationDuration
-	assert.Equal(t, 2.0, getMetricSum(collector, metrics.Iterations.Name))
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
-	// But we expect the custom counter to be added to 4 times
-	assert.Equal(t, 4.0, getMetricSum(collector, "testcounter"))
+			engine := newTestEngine(t, ctx, runner, runner.GetOptions())
+
+			errC := make(chan error)
+			go func() { errC <- engine.Run(ctx) }()
+			select {
+			case <-time.After(10 * time.Second):
+				t.Fatal("Test timed out")
+			case err := <-errC:
+				require.NoError(t, err)
+				require.False(t, engine.IsTainted())
+			}
+		})
+	}
 }

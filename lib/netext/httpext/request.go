@@ -236,24 +236,24 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 		tags[k] = v
 	}
 
-	if state.Options.SystemTags["method"] {
+	if state.Options.SystemTags.Has(stats.TagMethod) {
 		tags["method"] = preq.Req.Method
 	}
-	if state.Options.SystemTags["url"] {
+	if state.Options.SystemTags.Has(stats.TagURL) {
 		tags["url"] = preq.URL.Clean()
 	}
 
 	// Only set the name system tag if the user didn't explicitly set it beforehand
-	if _, ok := tags["name"]; !ok && state.Options.SystemTags["name"] {
+	if _, ok := tags["name"]; !ok && state.Options.SystemTags.Has(stats.TagName) {
 		tags["name"] = preq.URL.Name
 	}
-	if state.Options.SystemTags["group"] {
+	if state.Options.SystemTags.Has(stats.TagGroup) {
 		tags["group"] = state.Group.Path
 	}
-	if state.Options.SystemTags["vu"] {
+	if state.Options.SystemTags.Has(stats.TagVU) {
 		tags["vu"] = strconv.FormatInt(state.Vu, 10)
 	}
-	if state.Options.SystemTags["iter"] {
+	if state.Options.SystemTags.Has(stats.TagIter) {
 		tags["iter"] = strconv.FormatInt(state.Iteration, 10)
 	}
 
@@ -267,10 +267,10 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 	tracerTransport := newTransport(state, tags)
 	var transport http.RoundTripper = tracerTransport
 
-	if state.Options.HttpDebug.String != "" {
+	if state.Options.HTTPDebug.String != "" {
 		transport = httpDebugTransport{
 			originalTransport: transport,
-			httpDebugOption:   state.Options.HttpDebug.String,
+			httpDebugOption:   state.Options.HTTPDebug.String,
 		}
 	}
 
@@ -290,7 +290,7 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 			// Update active jar with cookies found in "Set-Cookie" header(s) of redirect response
 			if preq.ActiveJar != nil {
 				if respCookies := req.Response.Cookies(); len(respCookies) > 0 {
-					preq.ActiveJar.SetCookies(req.URL, respCookies)
+					preq.ActiveJar.SetCookies(via[len(via)-1].URL, respCookies)
 				}
 				req.Header.Del("Cookie")
 				SetRequestCookies(req, preq.ActiveJar, preq.Cookies)

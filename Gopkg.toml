@@ -29,10 +29,6 @@
 
 [[constraint]]
   branch = "master"
-  name = "github.com/shibukawa/configdir"
-
-[[constraint]]
-  branch = "master"
   name = "github.com/sirupsen/logrus"
 
 [[constraint]]
@@ -102,3 +98,7 @@
 [[constraint]]
   branch = "master"
   name = "github.com/andybalholm/brotli"
+
+[[constraint]]
+  name = "github.com/kelseyhightower/envconfig"
+  version = "^1.4.0"
