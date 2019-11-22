@@ -242,10 +242,10 @@ func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(es *lib.ExecutionSegme
 		//
 		// IMPORTANT: we have to be very careful of rounding errors,
 		// both from the step duration and from the VUs. It's especially
-		// importatnt that the scaling via the execution segment should
+		// important that the scaling via the execution segment should
 		// happen AFTER the rest of the calculations have been done and
 		// we've rounded the global "global" number of VUs.
-		for t := stepInterval; ; t += stepInterval { // Skip step the first step, since we've already added that
+		for t := stepInterval; ; t += stepInterval { // Skip the first step, since we've already added that
 			if time.Duration(abs(int64(stageDuration-t))) < minIntervalBetweenVUAdjustments {
 				// Skip the last step of the stage, add it below to correct any minor clock skew
 				break
@@ -298,7 +298,7 @@ func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(es *lib.ExecutionSegme
 // finishing up interrupted iterations should be reused by the executor,
 // instead of new ones being requested from the execution state.
 //
-// Here's an example with graceful ramp-town (i.e. "uninterruptible"
+// Here's an example with graceful ramp-down (i.e. "uninterruptible"
 // iterations), where stars represent actively scheduled VUs and dots are used
 // for VUs that are potentially finishing up iterations:
 //
@@ -325,7 +325,7 @@ func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(es *lib.ExecutionSegme
 // The algorithm we use below to reserve VUs so that ramping-down VUs can finish
 // their last iterations is pretty simple. It just traverses the raw execution
 // steps and whenever there's a scaling down of VUs, it prevents the number of
-// VUs from faliing down for the configured gracefulRampDown period.
+// VUs from decreasing for the configured gracefulRampDown period.
 //
 // Finishing up the test, i.e. making sure we have a step with 0 VUs at time
 // executorEndOffset, is not handled here. Instead GetExecutionRequirements()
@@ -341,7 +341,7 @@ func (vlvc VariableLoopingVUsConfig) reserveVUsForGracefulRampDowns( //nolint:fu
 	lastPlannedVUs := uint64(0)
 	for rawStepNum := 0; rawStepNum < rawStepsLen; rawStepNum++ {
 		rawStep := rawSteps[rawStepNum]
-		// Add the first step or any step where the number of planned VUs us
+		// Add the first step or any step where the number of planned VUs is
 		// greater than the ones in the previous step. We don't need to worry
 		// about reserving time for ramping-down VUs when the number of planned
 		// VUs is growing. That's because the gracefulRampDown period is a fixed
@@ -358,7 +358,7 @@ func (vlvc VariableLoopingVUsConfig) reserveVUsForGracefulRampDowns( //nolint:fu
 			continue
 		}
 
-		// If we're here, we have a downward "slope" - thelastPlannedVUs are
+		// If we're here, we have a downward "slope" - the lastPlannedVUs are
 		// more than the current rawStep's planned VUs. We're going to look
 		// forward in time (up to gracefulRampDown) and inspect the rawSteps.
 		// There are a 3 possibilities:
@@ -475,7 +475,7 @@ var _ lib.Executor = &VariableLoopingVUs{}
 //
 // TODO: split up? since this does a ton of things, unfortunately I can't think
 // of a less complex way to implement it (besides the old "increment by 100ms
-// and see what happens)... :/ so maybe see how it can be spit?
+// and see what happens)... :/ so maybe see how it can be split?
 // nolint:funlen,gocognit
 func (vlv VariableLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleContainer) (err error) {
 	segment := vlv.executionState.Options.ExecutionSegment
