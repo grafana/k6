@@ -99,7 +99,7 @@ func (pb *ProgressBar) Modify(options ...ProgressBarOption) {
 
 // String locks the progressbar struct for reading and calls all of its methods
 // to assemble the progress bar and return it as a string.
-//TODO: something prettier? paddings, right-alighment of the left column, line trimming by terminal size
+//TODO: something prettier? paddings, right-alignment of the left column, line trimming by terminal size
 func (pb *ProgressBar) String() string {
 	pb.mutex.RLock()
 	defer pb.mutex.RUnlock()

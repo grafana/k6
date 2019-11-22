@@ -43,7 +43,7 @@ func GetFixedLengthIntFormat(maxValue int64) (formatStr string) {
 }
 
 // GetFixedLengthFloatFormat returns "%0__.__f" format argument for fmt
-// functions that will produce a  base-10 right-aligned zero-padded string
+// functions that will produce a base-10 right-aligned zero-padded string
 // representation of the supplied float value, with the specified decimal
 // precision. The number of characters (i.e. the actual number + maybe dot and
 // precision + how many zeros it will be padded on the left with) in the
@@ -67,7 +67,7 @@ func GetFixedLengthFloatFormat(maxValue float64, precision uint) (formatStr stri
 // GetFixedLengthDuration takes a *positive* duration and its max value and
 // returns a string with a fixed width so we can prevent UI elements jumping
 // around. The format is "___d__h__m__s.s", but leading values can be omitted
-// based on the maxDuration value, the results can be: "___h__m__s.s"
+// based on the maxDuration value, the results can be: "___h__m__s.s".
 //
 // This is code was inspired by the Go stdlib's time.Duration.String() code.
 // TODO: more flexibility - negative values or variable precision?
