@@ -33,6 +33,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -530,6 +531,56 @@ func TestVURunInterrupt(t *testing.T) {
 			err = vu.RunOnce(ctx)
 			assert.Error(t, err)
 			assert.True(t, strings.HasPrefix(err.Error(), "context cancelled at "))
+		})
+	}
+}
+
+func TestVURunInterruptDoesntPanic(t *testing.T) {
+	//TODO: figure out why interrupt sometimes fails... data race in goja?
+	if isWindows {
+		t.Skip()
+	}
+
+	r1, err := getSimpleRunner("/script.js", `
+		export default function() { while(true) {} }
+		`)
+	require.NoError(t, err)
+	require.NoError(t, r1.SetOptions(lib.Options{Throw: null.BoolFrom(true)}))
+
+	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{})
+	require.NoError(t, err)
+	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
+	for name, r := range testdata {
+		name, r := name, r
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Minute)
+			defer cancel()
+			samples := make(chan stats.SampleContainer, 100)
+			defer close(samples)
+			go func() {
+				for range samples {
+				}
+			}()
+			var wg sync.WaitGroup
+
+			vu, err := r.newVU(samples)
+			require.NoError(t, err)
+			for i := 0; i < 1000; i++ {
+				wg.Add(1)
+				newCtx, newCancel := context.WithCancel(ctx)
+				var ch = make(chan struct{})
+				go func() {
+					defer wg.Done()
+					close(ch)
+					vuErr := vu.RunOnce(newCtx)
+					assert.Error(t, vuErr)
+					assert.Contains(t, vuErr.Error(), "context cancelled")
+				}()
+				<-ch
+				time.Sleep(time.Millisecond * 1) // NOTE: increase this in case of problems ;)
+				newCancel()
+			}
+			wg.Wait()
 		})
 	}
 }
