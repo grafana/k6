@@ -28,6 +28,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/dop251/goja"
@@ -193,6 +194,7 @@ func (r *Runner) newVU(samplesOut chan<- stats.SampleContainer) (*VU, error) {
 		Console:        r.console,
 		BPool:          bpool.NewBufferPool(100),
 		Samples:        samplesOut,
+		m:              &sync.Mutex{},
 	}
 	vu.Runtime.Set("console", common.Bind(vu.Runtime, vu.Console, vu.Context))
 	common.BindToGlobal(vu.Runtime, map[string]interface{}{
@@ -372,6 +374,8 @@ type VU struct {
 	// goroutine per call.
 	interruptTrackedCtx context.Context
 	interruptCancel     context.CancelFunc
+
+	m *sync.Mutex
 }
 
 // Verify that VU implements lib.VU
@@ -385,6 +389,8 @@ func (u *VU) Reconfigure(id int64) error {
 }
 
 func (u *VU) RunOnce(ctx context.Context) error {
+	u.m.Lock()
+	defer u.m.Unlock()
 	// Track the context and interrupt JS execution if it's cancelled.
 	if u.interruptTrackedCtx != ctx {
 		interCtx, interCancel := context.WithCancel(context.Background())
