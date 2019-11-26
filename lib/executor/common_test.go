@@ -3,6 +3,7 @@ package executor
 import (
 	"context"
 	"io/ioutil"
+	"math/rand"
 	"testing"
 
 	"github.com/loadimpact/k6/lib"
@@ -12,10 +13,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func setupExecutor(t *testing.T, config lib.ExecutorConfig, vuFn func(context.Context, chan<- stats.SampleContainer) error) (
-	context.Context, context.CancelFunc, lib.Executor, *testutils.SimpleLogrusHook) {
+func setupExecutor(
+	t *testing.T, config lib.ExecutorConfig,
+	vuFn func(context.Context, chan<- stats.SampleContainer) error,
+	logLevels []logrus.Level,
+) (context.Context, context.CancelFunc, lib.Executor, *testutils.SimpleLogrusHook) {
 	ctx, cancel := context.WithCancel(context.Background())
-	logHook := &testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.WarnLevel}}
+	logHook := &testutils.SimpleLogrusHook{HookedLevels: logLevels}
 	testLog := logrus.New()
 	testLog.AddHook(logHook)
 	testLog.SetOutput(ioutil.Discard)
@@ -25,8 +29,8 @@ func setupExecutor(t *testing.T, config lib.ExecutorConfig, vuFn func(context.Co
 		Fn: vuFn,
 	}
 
-	es.SetInitVUFunc(func(_ context.Context, _ *logrus.Entry) (lib.VU, error) {
-		return &lib.MiniRunnerVU{R: runner}, nil
+	es.SetInitVUFunc(func(_ context.Context, logger *logrus.Entry) (lib.VU, error) {
+		return &lib.MiniRunnerVU{R: runner, ID: rand.Int63(), Logger: logger}, nil
 	})
 
 	initializeVUs(ctx, t, logEntry, es, 10)

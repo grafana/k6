@@ -22,8 +22,10 @@ package lib
 
 import (
 	"context"
+	"math/rand"
 
 	"github.com/loadimpact/k6/stats"
+	"github.com/sirupsen/logrus"
 )
 
 // Ensure mock implementations conform to the interfaces.
@@ -97,7 +99,7 @@ type MiniRunner struct {
 }
 
 func (r MiniRunner) VU(out chan<- stats.SampleContainer) *MiniRunnerVU {
-	return &MiniRunnerVU{R: r, Out: out}
+	return &MiniRunnerVU{R: r, Out: out, ID: rand.Int63()}
 }
 
 func (r MiniRunner) MakeArchive() *Archive {
@@ -105,6 +107,9 @@ func (r MiniRunner) MakeArchive() *Archive {
 }
 
 func (r MiniRunner) NewVU(out chan<- stats.SampleContainer) (VU, error) {
+	// XXX: This method isn't called by the new executors.
+	// Confirm whether this was intentional and if other methods of
+	// the Runner interface are unused.
 	return r.VU(out), nil
 }
 
@@ -150,14 +155,21 @@ func (r *MiniRunner) SetOptions(opts Options) error {
 
 // A VU spawned by a MiniRunner.
 type MiniRunnerVU struct {
-	R   MiniRunner
-	Out chan<- stats.SampleContainer
-	ID  int64
+	R      MiniRunner
+	Out    chan<- stats.SampleContainer
+	ID     int64
+	Logger *logrus.Entry
 }
 
 func (vu MiniRunnerVU) RunOnce(ctx context.Context) error {
 	if vu.R.Fn == nil {
 		return nil
+	}
+	// HACK: fixme, we shouldn't rely on logging for testing
+	if vu.Logger != nil {
+		vu.Logger.WithFields(
+			logrus.Fields{"vu_id": vu.ID},
+		).Info("running function")
 	}
 	return vu.R.Fn(ctx, vu.Out)
 }
