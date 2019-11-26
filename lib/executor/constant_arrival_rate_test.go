@@ -2,7 +2,6 @@ package executor
 
 import (
 	"context"
-	"io/ioutil"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -17,43 +16,21 @@ import (
 	null "gopkg.in/guregu/null.v3"
 )
 
-func testConstantArrivalRateSetup(t *testing.T, vuFn func(context.Context, chan<- stats.SampleContainer) error) (
-	context.Context, context.CancelFunc, lib.Executor, *testutils.SimpleLogrusHook) {
-	ctx, cancel := context.WithCancel(context.Background())
-	var config = ConstantArrivalRateConfig{
+func getTestConstantArrivalRateConfig() ConstantArrivalRateConfig {
+	return ConstantArrivalRateConfig{
 		TimeUnit:        types.NullDurationFrom(time.Second),
 		Rate:            null.IntFrom(50),
 		Duration:        types.NullDurationFrom(5 * time.Second),
 		PreAllocatedVUs: null.IntFrom(10),
 		MaxVUs:          null.IntFrom(20),
 	}
-	logHook := &testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.WarnLevel}}
-	testLog := logrus.New()
-	testLog.AddHook(logHook)
-	testLog.SetOutput(ioutil.Discard)
-	logEntry := logrus.NewEntry(testLog)
-	es := lib.NewExecutionState(lib.Options{}, 10, 50)
-	runner := lib.MiniRunner{
-		Fn: vuFn,
-	}
-
-	es.SetInitVUFunc(func(_ context.Context, _ *logrus.Entry) (lib.VU, error) {
-		return &lib.MiniRunnerVU{R: runner}, nil
-	})
-
-	initializeVUs(ctx, t, logEntry, es, 10)
-
-	executor, err := config.NewExecutor(es, logEntry)
-	require.NoError(t, err)
-	err = executor.Init(ctx)
-	require.NoError(t, err)
-	return ctx, cancel, executor, logHook
 }
 
 func TestConstantArrivalRateRunNotEnoughAllocatedVUsWarn(t *testing.T) {
 	t.Parallel()
-	var ctx, cancel, executor, logHook = testConstantArrivalRateSetup(
-		t, func(ctx context.Context, out chan<- stats.SampleContainer) error {
+	var ctx, cancel, executor, logHook = setupExecutor(
+		t, getTestConstantArrivalRateConfig(),
+		func(ctx context.Context, out chan<- stats.SampleContainer) error {
 			time.Sleep(time.Second)
 			return nil
 		})
@@ -74,8 +51,9 @@ func TestConstantArrivalRateRunNotEnoughAllocatedVUsWarn(t *testing.T) {
 func TestConstantArrivalRateRunCorrectRate(t *testing.T) {
 	t.Parallel()
 	var count int64
-	var ctx, cancel, executor, logHook = testConstantArrivalRateSetup(
-		t, func(ctx context.Context, out chan<- stats.SampleContainer) error {
+	var ctx, cancel, executor, logHook = setupExecutor(
+		t, getTestConstantArrivalRateConfig(),
+		func(ctx context.Context, out chan<- stats.SampleContainer) error {
 			atomic.AddInt64(&count, 1)
 			return nil
 		})
@@ -103,11 +81,17 @@ func TestConstantArrivalRateRunCorrectRate(t *testing.T) {
 func TestArrivalRateCancel(t *testing.T) {
 	t.Parallel()
 	var mat = map[string]func(
-		t *testing.T,
-		vuFn func(context.Context, chan<- stats.SampleContainer) error,
+		*testing.T,
+		func(context.Context, chan<- stats.SampleContainer) error,
 	) (context.Context, context.CancelFunc, lib.Executor, *testutils.SimpleLogrusHook){
-		"constant": testConstantArrivalRateSetup,
-		"variable": testVariableArrivalRateSetup,
+		"constant": func(t *testing.T, vuFn func(ctx context.Context, out chan<- stats.SampleContainer) error) (
+			context.Context, context.CancelFunc, lib.Executor, *testutils.SimpleLogrusHook) {
+			return setupExecutor(t, getTestConstantArrivalRateConfig(), vuFn)
+		},
+		"variable": func(t *testing.T, vuFn func(ctx context.Context, out chan<- stats.SampleContainer) error) (
+			context.Context, context.CancelFunc, lib.Executor, *testutils.SimpleLogrusHook) {
+			return setupExecutor(t, getTestVariableArrivalRateConfig(), vuFn)
+		},
 	}
 	for name, fn := range mat {
 		fn := fn
