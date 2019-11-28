@@ -228,7 +228,6 @@ func TestVariableArrivalRateRunNotEnoughAllocatedVUsWarn(t *testing.T) {
 			time.Sleep(time.Second)
 			return nil
 		},
-		[]logrus.Level{logrus.WarnLevel},
 	)
 	defer cancel()
 	var engineOut = make(chan stats.SampleContainer, 1000)
@@ -253,7 +252,6 @@ func TestVariableArrivalRateRunCorrectRate(t *testing.T) {
 			atomic.AddInt64(&count, 1)
 			return nil
 		},
-		[]logrus.Level{logrus.WarnLevel},
 	)
 	defer cancel()
 	var wg sync.WaitGroup
