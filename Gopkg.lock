@@ -97,7 +97,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:9af09d68bd80a20b3fae068ab7c6476c9b53a145963b57df6d508180aabae7b9"
+  digest = "1:a96fa4c60aed526368ef2ee9ee40e1eb89b1901792a7bd29865cf120651ce034"
   name = "github.com/dop251/goja"
   packages = [
     ".",
@@ -107,7 +107,7 @@
     "token",
   ]
   pruneopts = "NUT"
-  revision = "9183045acc25574e0dd2ad37d5e7f978b1a4de12"
+  revision = "007eef3bc40fd33b3dbb80ec16da59e8b63b8572"
 
 [[projects]]
   branch = "master"
