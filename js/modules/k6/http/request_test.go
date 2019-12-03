@@ -123,6 +123,8 @@ func newRuntime(
 		UserAgent:    null.StringFrom("TestUserAgent"),
 		Throw:        null.BoolFrom(true),
 		SystemTags:   &stats.DefaultSystemTagSet,
+		Batch:        null.IntFrom(20),
+		BatchPerHost: null.IntFrom(20),
 		//HTTPDebug:    null.StringFrom("full"),
 	}
 	samples := make(chan stats.SampleContainer, 1000)
@@ -1048,7 +1050,7 @@ func TestRequestAndBatch(t *testing.T) {
 				if (res[key].status != 200) { throw new Error("wrong status: " + res[key].status); }
 				if (res[key].url != reqs[key][1]) { throw new Error("wrong url: " + res[key].url); }
 			}`))
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			bufSamples := stats.GetBufferedSamples(samples)
 			assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_URL/"), "", 200, "")
 			assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_IP_URL/"), "", 200, "")
