@@ -48,12 +48,12 @@ func (r *Runtime) arrayproto_push(call FunctionCall) Value {
 }
 
 func (r *Runtime) arrayproto_pop_generic(obj *Object, call FunctionCall) Value {
-	l := int(toLength(obj.self.getStr("length")))
+	l := toLength(obj.self.getStr("length"))
 	if l == 0 {
 		obj.self.putStr("length", intToValue(0), true)
 		return _undefined
 	}
-	idx := intToValue(int64(l - 1))
+	idx := intToValue(l - 1)
 	val := obj.self.get(idx)
 	obj.self.delete(idx, true)
 	obj.self.putStr("length", idx, true)
