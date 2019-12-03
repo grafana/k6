@@ -574,6 +574,7 @@ func TestSentReceivedMetrics(t *testing.T) {
 			Hosts:                 tb.Dialer.Hosts,
 			InsecureSkipTLSVerify: null.BoolFrom(true),
 			NoVUConnectionReuse:   null.BoolFrom(noConnReuse),
+			Batch:                 null.IntFrom(20),
 		}
 
 		r.SetOptions(options)
