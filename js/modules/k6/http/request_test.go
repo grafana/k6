@@ -275,13 +275,14 @@ func TestRequestAndBatch(t *testing.T) {
 				})
 			`))
 			endTime := time.Now()
-			assert.EqualError(t, err, sr("GoError: Get HTTPBIN_URL/delay/10: net/http: request canceled (Client.Timeout exceeded while awaiting headers)"))
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "Client.Timeout exceeded while awaiting headers")
 			assert.WithinDuration(t, startTime.Add(1*time.Second), endTime, 2*time.Second)
 
 			logEntry := hook.LastEntry()
 			if assert.NotNil(t, logEntry) {
 				assert.Equal(t, logrus.WarnLevel, logEntry.Level)
-				assert.EqualError(t, logEntry.Data["error"].(error), sr("Get HTTPBIN_URL/delay/10: net/http: request canceled (Client.Timeout exceeded while awaiting headers)"))
+				assert.Contains(t, logEntry.Data["error"].(error).Error(), "Client.Timeout exceeded while awaiting headers")
 				assert.Equal(t, "Request Failed", logEntry.Message)
 			}
 		})
@@ -412,7 +413,8 @@ func TestRequestAndBatch(t *testing.T) {
 	t.Run("TLS", func(t *testing.T) {
 		t.Run("cert_expired", func(t *testing.T) {
 			_, err := common.RunString(rt, `http.get("https://expired.badssl.com/");`)
-			assert.EqualError(t, err, "GoError: Get https://expired.badssl.com/: x509: certificate has expired or is not yet valid")
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "x509: certificate has expired or is not yet valid")
 		})
 		tlsVersionTests := []struct {
 			Name, URL, Version string
@@ -461,12 +463,13 @@ func TestRequestAndBatch(t *testing.T) {
 		defer hook.Reset()
 
 		_, err := common.RunString(rt, `http.request("", "");`)
-		assert.EqualError(t, err, "GoError: Get : unsupported protocol scheme \"\"")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unsupported protocol scheme")
 
 		logEntry := hook.LastEntry()
 		if assert.NotNil(t, logEntry) {
 			assert.Equal(t, logrus.WarnLevel, logEntry.Level)
-			assert.Equal(t, "Get : unsupported protocol scheme \"\"", logEntry.Data["error"].(error).Error())
+			assert.Contains(t, logEntry.Data["error"].(error).Error(), "unsupported protocol scheme")
 			assert.Equal(t, "Request Failed", logEntry.Message)
 		}
 
@@ -478,12 +481,13 @@ func TestRequestAndBatch(t *testing.T) {
 				let res = http.request("", "", { throw: false });
 				throw new Error(res.error);
 			`)
-			assert.EqualError(t, err, "GoError: Get : unsupported protocol scheme \"\"")
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "unsupported protocol scheme")
 
 			logEntry := hook.LastEntry()
 			if assert.NotNil(t, logEntry) {
 				assert.Equal(t, logrus.WarnLevel, logEntry.Level)
-				assert.EqualError(t, logEntry.Data["error"].(error), "Get : unsupported protocol scheme \"\"")
+				assert.Contains(t, logEntry.Data["error"].(error).Error(), "unsupported protocol scheme")
 				assert.Equal(t, "Request Failed", logEntry.Message)
 			}
 		})
