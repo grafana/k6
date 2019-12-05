@@ -147,7 +147,7 @@ func (t *transport) measureAndEmitMetrics(unfReq *unfinishedRequest) *finishedRe
 	}
 
 	trail.SaveSamples(stats.IntoSampleTags(&tags))
-	stats.PushIfNotCancelled(unfReq.ctx, t.state.Samples, trail)
+	stats.PushIfNotDone(unfReq.ctx, t.state.Samples, trail)
 
 	return result
 }
