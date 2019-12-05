@@ -387,13 +387,11 @@ func GetBufferedSamples(input <-chan SampleContainer) (result []SampleContainer)
 	}
 }
 
-// PushIfNotCancelled first checks if the supplied context is cancelled and doesn't push
+// PushIfNotDone first checks if the supplied context is done and doesn't push
 // the sample container if it is.
-func PushIfNotCancelled(ctx context.Context, output chan<- SampleContainer, sample SampleContainer) bool {
-	select {
-	case <-ctx.Done():
+func PushIfNotDone(ctx context.Context, output chan<- SampleContainer, sample SampleContainer) bool {
+	if ctx.Err() != nil {
 		return false
-	default: // Do nothing
 	}
 	output <- sample
 	return true
