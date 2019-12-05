@@ -94,6 +94,7 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		Paused:                getNullBool(flags, "paused"),
 		MaxRedirects:          getNullInt64(flags, "max-redirects"),
 		Batch:                 getNullInt64(flags, "batch"),
+		BatchPerHost:          getNullInt64(flags, "batch-per-host"),
 		RPS:                   getNullInt64(flags, "rps"),
 		UserAgent:             getNullString(flags, "user-agent"),
 		HTTPDebug:             getNullString(flags, "http-debug"),
