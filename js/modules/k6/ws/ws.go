@@ -289,7 +289,7 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 
 			sampleTags := stats.IntoSampleTags(&tags)
 
-			stats.PushIfNotCancelled(ctx, state.Samples, stats.ConnectedSamples{
+			stats.PushIfNotDone(ctx, state.Samples, stats.ConnectedSamples{
 				Samples: []stats.Sample{
 					{Metric: metrics.WSSessions, Time: start, Tags: sampleTags, Value: 1},
 					{Metric: metrics.WSConnecting, Time: start, Tags: sampleTags, Value: connectionDuration},
@@ -300,7 +300,7 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 			})
 
 			for _, msgSentTimestamp := range socket.msgSentTimestamps {
-				stats.PushIfNotCancelled(ctx, state.Samples, stats.Sample{
+				stats.PushIfNotDone(ctx, state.Samples, stats.Sample{
 					Metric: metrics.WSMessagesSent,
 					Time:   msgSentTimestamp,
 					Tags:   sampleTags,
@@ -309,7 +309,7 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 			}
 
 			for _, msgReceivedTimestamp := range socket.msgReceivedTimestamps {
-				stats.PushIfNotCancelled(ctx, state.Samples, stats.Sample{
+				stats.PushIfNotDone(ctx, state.Samples, stats.Sample{
 					Metric: metrics.WSMessagesReceived,
 					Time:   msgReceivedTimestamp,
 					Tags:   sampleTags,
@@ -318,7 +318,7 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 			}
 
 			for _, pingDelta := range socket.pingTimestamps {
-				stats.PushIfNotCancelled(ctx, state.Samples, stats.Sample{
+				stats.PushIfNotDone(ctx, state.Samples, stats.Sample{
 					Metric: metrics.WSPing,
 					Time:   pingDelta.pong,
 					Tags:   sampleTags,
