@@ -29,7 +29,7 @@ import (
 
 // BatchParsedHTTPRequest extends the normal parsed HTTP request with a pointer
 // to a Response object, so that the batch goroutines can concurrently store the
-// reponses they receive, without any locking.
+// responses they receive, without any locking.
 type BatchParsedHTTPRequest struct {
 	*ParsedHTTPRequest
 	Response *Response // this is modified by MakeBatchRequests()
@@ -39,7 +39,7 @@ type BatchParsedHTTPRequest struct {
 // min(reqCount, globalLimit) goroutines that asynchronously process all
 // requests coming from the requests channel. Responses are recorded in the
 // pointers contained in each BatchParsedHTTPRequest object, so they need to be
-// pre-initialized. In adition, each processed request would emit either a nil
+// pre-initialized. In addition, each processed request would emit either a nil
 // value, or an error, via the returned errors channel. The goroutines exit when
 // the requests channel is closed.
 func MakeBatchRequests(
