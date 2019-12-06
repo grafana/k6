@@ -276,13 +276,13 @@ func TestRequestAndBatch(t *testing.T) {
 			`))
 			endTime := time.Now()
 			require.Error(t, err)
-			assert.Contains(t, err.Error(), "Client.Timeout exceeded while awaiting headers")
+			assert.Contains(t, err.Error(), "context deadline exceeded")
 			assert.WithinDuration(t, startTime.Add(1*time.Second), endTime, 2*time.Second)
 
 			logEntry := hook.LastEntry()
 			if assert.NotNil(t, logEntry) {
 				assert.Equal(t, logrus.WarnLevel, logEntry.Level)
-				assert.Contains(t, logEntry.Data["error"].(error).Error(), "Client.Timeout exceeded while awaiting headers")
+				assert.Contains(t, logEntry.Data["error"].(error).Error(), "context deadline exceeded")
 				assert.Equal(t, "Request Failed", logEntry.Message)
 			}
 		})
