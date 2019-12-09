@@ -477,12 +477,9 @@ func (u *VU) runFn(
 	v, err := fn(goja.Undefined(), args...) // Actually run the JS script
 	endTime := time.Now()
 
-	var isFullIteration bool
-	select {
-	case <-ctx.Done():
+	isFullIteration := true
+	if ctx.Err() != nil {
 		isFullIteration = false
-	default:
-		isFullIteration = true
 	}
 
 	tags := state.Options.RunTags.CloneTags()

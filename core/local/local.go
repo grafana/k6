@@ -57,33 +57,26 @@ func (h *vuHandle) run(logger *logrus.Logger, flow <-chan int64, iterDone chan<-
 	h.RUnlock()
 
 	for {
-		select {
-		case _, ok := <-flow:
-			if !ok {
-				return
-			}
-		case <-ctx.Done():
+		if _, ok := <-flow; !ok || ctx.Err() != nil {
 			return
 		}
 
 		if h.vu != nil {
 			err := h.vu.RunOnce(ctx)
-			select {
-			case <-ctx.Done():
-			// Don't log errors or emit iterations metrics from cancelled iterations
-			default:
-				if err != nil {
-					if s, ok := err.(fmt.Stringer); ok {
-						logger.Error(s.String())
-					} else {
-						logger.Error(err.Error())
-					}
-				}
-				iterDone <- struct{}{}
+			if ctx.Err() != nil {
+				// Don't log errors or emit iterations metrics from cancelled iterations
+				return
 			}
-		} else {
-			iterDone <- struct{}{}
+			if err != nil {
+				errMsg := err.Error()
+				if s, ok := err.(fmt.Stringer); ok {
+					errMsg = s.String()
+				}
+				logger.Error(errMsg)
+			}
 		}
+		iterDone <- struct{}{}
+
 	}
 }
 
