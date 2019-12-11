@@ -47,10 +47,9 @@ var (
 )
 
 var convertCmd = &cobra.Command{
-	Use:        "convert",
-	Short:      "Convert a HAR file to a k6 script",
-	Long:       "Convert a HAR (HTTP Archive) file to a k6 script",
-	Deprecated: "please use har-to-k6 (https://github.com/loadimpact/har-to-k6) instead.",
+	Use:   "convert",
+	Short: "Convert a HAR file to a k6 script",
+	Long:  "Convert a HAR (HTTP Archive) file to a k6 script",
 	Example: `
   # Convert a HAR file to a k6 script.
   k6 convert -O har-session.js session.har
