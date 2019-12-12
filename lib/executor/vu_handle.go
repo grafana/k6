@@ -68,7 +68,7 @@ func newStoppedVUHandle(
 
 func (vh *vuHandle) start() {
 	vh.mutex.Lock()
-	vh.logger.Debugf("Start")
+	vh.logger.Debug("Start")
 	close(vh.canStartIter)
 	vh.mutex.Unlock()
 }
@@ -78,25 +78,23 @@ func (vh *vuHandle) gracefulStop() {
 	select {
 	case <-vh.canStartIter:
 		vh.canStartIter = make(chan struct{})
-		vh.logger.Debugf("Graceful stop")
+		vh.logger.Debug("Graceful stop")
 	default:
-		// do nothing, the signalling channel was already closed by either
-		// hardStop() or gracefulStop()
+		// do nothing, the signalling channel was already initialized by hardStop()
 	}
 	vh.mutex.Unlock()
 }
 
 func (vh *vuHandle) hardStop() {
 	vh.mutex.Lock()
-	vh.logger.Debugf("Hard stop")
+	vh.logger.Debug("Hard stop")
 	vh.cancel()                                          // cancel the previous context
 	vh.ctx, vh.cancel = context.WithCancel(vh.parentCtx) // create a new context
 	select {                                             // if needed,
 	case <-vh.canStartIter:
 		vh.canStartIter = make(chan struct{})
 	default:
-		// do nothing, the signalling channel was already closed by either
-		// hardStop() or gracefulStop()
+		// do nothing, the signalling channel was already initialized by gracefulStop()
 	}
 	vh.mutex.Unlock()
 }
@@ -110,7 +108,6 @@ func (vh *vuHandle) runLoopsIfPossible(runIter func(context.Context, lib.VU)) {
 	defer func() {
 		if vu != nil {
 			vh.returnVU(vu)
-			vu = nil
 		}
 	}()
 
@@ -120,13 +117,14 @@ mainLoop:
 		canStartIter, ctx := vh.canStartIter, vh.ctx
 		vh.mutex.RUnlock()
 
-		// Wait for either the executor to be done, or for us to be unpaused
+		// Wait for either the executor to be done, or for us to be un-paused
 		select {
 		case <-canStartIter:
 			// Best case, we're currently running, so we do nothing here, we
 			// just continue straight ahead.
 		case <-executorDone:
-			return // The whole executor is done, nothing more to do.
+			// The whole executor is done, nothing more to do.
+			return
 		default:
 			// We're not running, but the executor isn't done yet, so we wait
 			// for either one of those conditions. But before that, we'll return
@@ -143,7 +141,8 @@ mainLoop:
 				// context and signal channel
 				continue mainLoop
 			case <-executorDone:
-				return // The whole executor is done, nothing more to do.
+				// The whole executor is done, nothing more to do.
+				return
 			}
 		}
 
@@ -155,7 +154,8 @@ mainLoop:
 		default:
 		}
 
-		if vu == nil { // Ensure we have a VU
+		// Ensure we have a VU
+		if vu == nil {
 			freshVU, err := vh.getVU()
 			if err != nil {
 				return
