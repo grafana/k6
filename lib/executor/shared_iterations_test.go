@@ -22,6 +22,7 @@ package executor
 
 import (
 	"context"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -42,6 +43,7 @@ func getTestSharedIterationsConfig() SharedIterationsConfig {
 	}
 }
 
+// Baseline test
 func TestSharedIterationsRun(t *testing.T) {
 	t.Parallel()
 	var doneIters uint64
@@ -57,4 +59,49 @@ func TestSharedIterationsRun(t *testing.T) {
 	err := executor.Run(ctx, nil)
 	require.NoError(t, err)
 	assert.Equal(t, uint64(100), doneIters)
+}
+
+// Test that when one VU "slows down", others will pick up the workload.
+// This is the reverse behavior of the PerVUIterations executor.
+func TestSharedIterationsRunVariableVU(t *testing.T) {
+	t.Parallel()
+	var (
+		result   sync.Map
+		slowVUID int64
+	)
+	es := lib.NewExecutionState(lib.Options{}, 10, 50)
+	var ctx, cancel, executor, _ = setupExecutor(
+		t, getTestSharedIterationsConfig(), es,
+		simpleRunner(func(ctx context.Context) error {
+			time.Sleep(10 * time.Millisecond) // small wait to stabilize the test
+			state := lib.GetState(ctx)
+			// Pick one VU randomly and always slow it down.
+			sid := atomic.LoadInt64(&slowVUID)
+			if sid == int64(0) {
+				atomic.StoreInt64(&slowVUID, state.Vu)
+			}
+			if sid == state.Vu {
+				time.Sleep(200 * time.Millisecond)
+			}
+			currIter, _ := result.LoadOrStore(state.Vu, uint64(0))
+			result.Store(state.Vu, currIter.(uint64)+1)
+			return nil
+		}),
+	)
+	defer cancel()
+	err := executor.Run(ctx, nil)
+	require.NoError(t, err)
+
+	var totalIters uint64
+	result.Range(func(key, value interface{}) bool {
+		totalIters += value.(uint64)
+		return true
+	})
+
+	// The slow VU should complete 2 iterations given these timings,
+	// while the rest should randomly complete the other 98 iterations.
+	val, ok := result.Load(slowVUID)
+	assert.True(t, ok)
+	assert.Equal(t, uint64(2), val)
+	assert.Equal(t, uint64(100), totalIters)
 }
