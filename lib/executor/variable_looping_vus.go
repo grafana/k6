@@ -28,12 +28,13 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/sirupsen/logrus"
+	null "gopkg.in/guregu/null.v3"
+
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/ui/pb"
-	"github.com/sirupsen/logrus"
-	null "gopkg.in/guregu/null.v3"
 )
 
 const variableLoopingVUsType = "variable-looping-vus"
@@ -429,7 +430,7 @@ func (vlvc VariableLoopingVUsConfig) reserveVUsForGracefulRampDowns( //nolint:fu
 // added after it will be ignored. Thus:
 //   - gracefulStop can be less than gracefulRampDown and can cut the graceful
 //     ramp-down periods of the last VUs short.
-//   - gracefulRampDown can be more than gracefulRampDown:
+//   - gracefulRampDown can be more than gracefulStop:
 //     - If the user manually ramped down VUs at the end of the test (i.e. the
 //       last stage's target is 0), then this will have no effect.
 //     - If the last stage's target is more than 0, the VUs at the end of the
