@@ -230,11 +230,15 @@ func (mex *ExternallyControlled) GetConfig() lib.ExecutorConfig {
 
 // GetProgress just returns the executor's progress bar instance.
 func (mex ExternallyControlled) GetProgress() *pb.ProgressBar {
+	mex.configLock.RLock()
+	defer mex.configLock.RUnlock()
 	return mex.progress
 }
 
 // GetLogger just returns the executor's logger instance.
 func (mex ExternallyControlled) GetLogger() *logrus.Entry {
+	mex.configLock.RLock()
+	defer mex.configLock.RUnlock()
 	return mex.logger
 }
 
