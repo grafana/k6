@@ -91,7 +91,7 @@ func (vh *vuHandle) hardStop() {
 	vh.logger.Debugf("Hard stop")
 	vh.cancel()                                          // cancel the previous context
 	vh.ctx, vh.cancel = context.WithCancel(vh.parentCtx) // create a new context
-	select {                                             // if needed,
+	select {
 	case <-vh.canStartIter:
 		vh.canStartIter = make(chan struct{})
 	default:
