@@ -29,6 +29,7 @@ import (
 	"github.com/loadimpact/k6/core"
 	"github.com/loadimpact/k6/core/local"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/manyminds/api2go/jsonapi"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -36,7 +37,7 @@ import (
 )
 
 func TestGetStatus(t *testing.T) {
-	execScheduler, err := local.NewExecutionScheduler(&lib.MiniRunner{}, logrus.StandardLogger())
+	execScheduler, err := local.NewExecutionScheduler(&testutils.MiniRunner{}, logrus.StandardLogger())
 	require.NoError(t, err)
 	engine, err := core.NewEngine(execScheduler, lib.Options{}, logrus.StandardLogger())
 	require.NoError(t, err)

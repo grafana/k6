@@ -8,7 +8,6 @@ import (
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/types"
-	"github.com/loadimpact/k6/stats"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	null "gopkg.in/guregu/null.v3"
@@ -27,12 +26,12 @@ func TestPerVUIterations(t *testing.T) {
 	var result sync.Map
 	var ctx, cancel, executor, _ = setupExecutor(
 		t, getTestPerVUIterationsConfig(),
-		func(ctx context.Context, out chan<- stats.SampleContainer) error {
+		simpleRunner(func(ctx context.Context) error {
 			state := lib.GetState(ctx)
 			currIter, _ := result.LoadOrStore(state.Vu, uint64(0))
 			result.Store(state.Vu, currIter.(uint64)+1)
 			return nil
-		},
+		}),
 	)
 	defer cancel()
 	err := executor.Run(ctx, nil)
