@@ -27,12 +27,13 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/sirupsen/logrus"
+	null "gopkg.in/guregu/null.v3"
+
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/ui/pb"
-	"github.com/sirupsen/logrus"
-	null "gopkg.in/guregu/null.v3"
 )
 
 const sharedIterationsType = "shared-iterations"
@@ -145,7 +146,7 @@ type SharedIterations struct {
 }
 
 // Make sure we implement the lib.Executor interface.
-var _ lib.Executor = &PerVUIterations{}
+var _ lib.Executor = &SharedIterations{}
 
 // Run executes a specific total number of iterations, which are all shared by
 // the configured VUs.
