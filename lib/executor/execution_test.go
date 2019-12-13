@@ -18,7 +18,7 @@
  *
  */
 
-package lib
+package executor
 
 import (
 	"context"
@@ -28,6 +28,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -36,7 +37,7 @@ import (
 
 func TestExecutionStateVUIDs(t *testing.T) {
 	t.Parallel()
-	es := NewExecutionState(Options{}, 0, 0)
+	es := lib.NewExecutionState(lib.Options{}, 0, 0)
 	assert.Equal(t, uint64(1), es.GetUniqueVUIdentifier())
 	assert.Equal(t, uint64(2), es.GetUniqueVUIdentifier())
 	assert.Equal(t, uint64(3), es.GetUniqueVUIdentifier())
@@ -56,7 +57,7 @@ func TestExecutionStateVUIDs(t *testing.T) {
 
 func TestExecutionStateGettingVUsWhenNonAreAvailable(t *testing.T) {
 	t.Parallel()
-	es := NewExecutionState(Options{}, 0, 0)
+	es := lib.NewExecutionState(lib.Options{}, 0, 0)
 	logHook := &testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.WarnLevel}}
 	testLog := logrus.New()
 	testLog.AddHook(logHook)
@@ -66,7 +67,7 @@ func TestExecutionStateGettingVUsWhenNonAreAvailable(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "could not get a VU from the buffer in")
 	entries := logHook.Drain()
-	require.Equal(t, MaxRetriesGetPlannedVU, len(entries))
+	require.Equal(t, lib.MaxRetriesGetPlannedVU, len(entries))
 	for _, entry := range entries {
 		require.Contains(t, entry.Message, "Could not get a VU from the buffer for ")
 	}
@@ -80,9 +81,9 @@ func TestExecutionStateGettingVUs(t *testing.T) {
 	testLog.SetOutput(ioutil.Discard)
 	logEntry := logrus.NewEntry(testLog)
 
-	es := NewExecutionState(Options{}, 10, 20)
-	es.SetInitVUFunc(func(_ context.Context, _ *logrus.Entry) (VU, error) {
-		return &MiniRunnerVU{}, nil
+	es := lib.NewExecutionState(lib.Options{}, 10, 20)
+	es.SetInitVUFunc(func(_ context.Context, _ *logrus.Entry) (lib.VU, error) {
+		return &testutils.MiniRunnerVU{}, nil
 	})
 
 	for i := 0; i < 10; i++ {
@@ -112,7 +113,7 @@ func TestExecutionStateGettingVUs(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "could not get a VU from the buffer in")
 	entries := logHook.Drain()
-	require.Equal(t, MaxRetriesGetPlannedVU, len(entries))
+	require.Equal(t, lib.MaxRetriesGetPlannedVU, len(entries))
 	for _, entry := range entries {
 		require.Contains(t, entry.Message, "Could not get a VU from the buffer for ")
 	}
@@ -134,7 +135,7 @@ func TestExecutionStateGettingVUs(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "could not get a VU from the buffer in")
 	entries = logHook.Drain()
-	require.Equal(t, MaxRetriesGetPlannedVU, len(entries))
+	require.Equal(t, lib.MaxRetriesGetPlannedVU, len(entries))
 	for _, entry := range entries {
 		require.Contains(t, entry.Message, "Could not get a VU from the buffer for ")
 	}
@@ -142,7 +143,7 @@ func TestExecutionStateGettingVUs(t *testing.T) {
 
 func TestMarkStartedPanicsOnSecondRun(t *testing.T) {
 	t.Parallel()
-	es := NewExecutionState(Options{}, 0, 0)
+	es := lib.NewExecutionState(lib.Options{}, 0, 0)
 	require.False(t, es.HasStarted())
 	es.MarkStarted()
 	require.True(t, es.HasStarted())
@@ -151,7 +152,7 @@ func TestMarkStartedPanicsOnSecondRun(t *testing.T) {
 
 func TestMarkEnded(t *testing.T) {
 	t.Parallel()
-	es := NewExecutionState(Options{}, 0, 0)
+	es := lib.NewExecutionState(lib.Options{}, 0, 0)
 	require.False(t, es.HasEnded())
 	es.MarkEnded()
 	require.True(t, es.HasEnded())

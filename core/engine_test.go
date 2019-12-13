@@ -51,7 +51,7 @@ const isWindows = runtime.GOOS == "windows"
 // Wrapper around NewEngine that applies a logger and manages the options.
 func newTestEngine(t *testing.T, ctx context.Context, runner lib.Runner, opts lib.Options) *Engine { //nolint: golint
 	if runner == nil {
-		runner = &lib.MiniRunner{}
+		runner = &testutils.MiniRunner{}
 	}
 	if ctx == nil {
 		ctx = context.Background()
@@ -109,7 +109,7 @@ func TestEngineRun(t *testing.T) {
 
 		signalChan := make(chan interface{})
 
-		runner := &lib.MiniRunner{Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
+		runner := &testutils.MiniRunner{Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
 			stats.PushIfNotDone(ctx, out, stats.Sample{Metric: testMetric, Time: time.Now(), Value: 1})
 			close(signalChan)
 			<-ctx.Done()
@@ -158,7 +158,7 @@ func TestEngineAtTime(t *testing.T) {
 func TestEngineCollector(t *testing.T) {
 	testMetric := stats.New("test_metric", stats.Trend)
 
-	runner := &lib.MiniRunner{Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
+	runner := &testutils.MiniRunner{Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
 		out <- stats.Sample{Metric: testMetric}
 		return nil
 	}}

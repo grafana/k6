@@ -224,10 +224,10 @@ func TestVariableArrivalRateRunNotEnoughAllocatedVUsWarn(t *testing.T) {
 	t.Parallel()
 	var ctx, cancel, executor, logHook = setupExecutor(
 		t, getTestVariableArrivalRateConfig(),
-		func(ctx context.Context, out chan<- stats.SampleContainer) error {
+		simpleRunner(func(ctx context.Context) error {
 			time.Sleep(time.Second)
 			return nil
-		},
+		}),
 	)
 	defer cancel()
 	var engineOut = make(chan stats.SampleContainer, 1000)
@@ -248,10 +248,10 @@ func TestVariableArrivalRateRunCorrectRate(t *testing.T) {
 	var count int64
 	var ctx, cancel, executor, logHook = setupExecutor(
 		t, getTestVariableArrivalRateConfig(),
-		func(ctx context.Context, out chan<- stats.SampleContainer) error {
+		simpleRunner(func(ctx context.Context) error {
 			atomic.AddInt64(&count, 1)
 			return nil
-		},
+		}),
 	)
 	defer cancel()
 	var wg sync.WaitGroup

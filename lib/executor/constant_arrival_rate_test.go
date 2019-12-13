@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 	"github.com/sirupsen/logrus"
@@ -30,10 +29,10 @@ func TestConstantArrivalRateRunNotEnoughAllocatedVUsWarn(t *testing.T) {
 	t.Parallel()
 	var ctx, cancel, executor, logHook = setupExecutor(
 		t, getTestConstantArrivalRateConfig(),
-		func(ctx context.Context, out chan<- stats.SampleContainer) error {
+		simpleRunner(func(ctx context.Context) error {
 			time.Sleep(time.Second)
 			return nil
-		},
+		}),
 	)
 	defer cancel()
 	var engineOut = make(chan stats.SampleContainer, 1000)
@@ -54,10 +53,10 @@ func TestConstantArrivalRateRunCorrectRate(t *testing.T) {
 	var count int64
 	var ctx, cancel, executor, logHook = setupExecutor(
 		t, getTestConstantArrivalRateConfig(),
-		func(ctx context.Context, out chan<- stats.SampleContainer) error {
+		simpleRunner(func(ctx context.Context) error {
 			atomic.AddInt64(&count, 1)
 			return nil
-		},
+		}),
 	)
 	defer cancel()
 	var wg sync.WaitGroup
@@ -82,34 +81,26 @@ func TestConstantArrivalRateRunCorrectRate(t *testing.T) {
 
 func TestArrivalRateCancel(t *testing.T) {
 	t.Parallel()
-	var mat = map[string]func(
-		*testing.T,
-		func(context.Context, chan<- stats.SampleContainer) error,
-	) (context.Context, context.CancelFunc, lib.Executor, *testutils.SimpleLogrusHook){
-		"constant": func(t *testing.T, vuFn func(ctx context.Context, out chan<- stats.SampleContainer) error) (
-			context.Context, context.CancelFunc, lib.Executor, *testutils.SimpleLogrusHook) {
-			return setupExecutor(t, getTestConstantArrivalRateConfig(), vuFn)
-		},
-		"variable": func(t *testing.T, vuFn func(ctx context.Context, out chan<- stats.SampleContainer) error) (
-			context.Context, context.CancelFunc, lib.Executor, *testutils.SimpleLogrusHook) {
-			return setupExecutor(t, getTestVariableArrivalRateConfig(), vuFn)
-		},
+
+	var testCases = map[string]lib.ExecutorConfig{
+		"constant": getTestConstantArrivalRateConfig(),
+		"variable": getTestVariableArrivalRateConfig(),
 	}
-	for name, fn := range mat {
-		fn := fn
+	for name, config := range testCases {
+		config := config
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			var ch = make(chan struct{})
 			var errCh = make(chan error, 1)
 			var weAreDoneCh = make(chan struct{})
-			var ctx, cancel, executor, logHook = fn(
-				t, func(ctx context.Context, out chan<- stats.SampleContainer) error {
-					select {
-					case <-ch:
-						<-ch
-					default:
-					}
-					return nil
-				})
+			var ctx, cancel, executor, logHook = setupExecutor(t, config, simpleRunner(func(ctx context.Context) error {
+				select {
+				case <-ch:
+					<-ch
+				default:
+				}
+				return nil
+			}))
 			defer cancel()
 			var wg sync.WaitGroup
 			wg.Add(1)

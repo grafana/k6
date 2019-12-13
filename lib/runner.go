@@ -22,14 +22,9 @@ package lib
 
 import (
 	"context"
-	"math/rand"
 
 	"github.com/loadimpact/k6/stats"
 )
-
-// Ensure mock implementations conform to the interfaces.
-var _ Runner = &MiniRunner{}
-var _ VU = &MiniRunnerVU{}
 
 // A Runner is a factory for VUs. It should precompute as much as possible upon
 // creation (parse ASTs, load files into memory, etc.), so that spawning VUs
@@ -82,101 +77,4 @@ type VU interface {
 	// times if the VU is recycled because the test was scaled down and then back up.
 	//TODO: support reconfiguring of env vars, tags and exec
 	Reconfigure(id int64) error
-}
-
-// MiniRunner wraps a function in a runner whose VUs will simply call that function.
-//TODO: move to testutils, or somewhere else that's not lib...
-type MiniRunner struct {
-	Fn         func(ctx context.Context, out chan<- stats.SampleContainer) error
-	SetupFn    func(ctx context.Context, out chan<- stats.SampleContainer) ([]byte, error)
-	TeardownFn func(ctx context.Context, out chan<- stats.SampleContainer) error
-
-	setupData []byte
-
-	Group   *Group
-	Options Options
-}
-
-func (r MiniRunner) VU(out chan<- stats.SampleContainer) *MiniRunnerVU {
-	return &MiniRunnerVU{R: r, Out: out, ID: rand.Int63()}
-}
-
-func (r MiniRunner) MakeArchive() *Archive {
-	return nil
-}
-
-func (r MiniRunner) NewVU(out chan<- stats.SampleContainer) (VU, error) {
-	// XXX: This method isn't called by the new executors.
-	// Confirm whether this was intentional and if other methods of
-	// the Runner interface are unused.
-	return r.VU(out), nil
-}
-
-func (r *MiniRunner) Setup(ctx context.Context, out chan<- stats.SampleContainer) (err error) {
-	if fn := r.SetupFn; fn != nil {
-		r.setupData, err = fn(ctx, out)
-	}
-	return
-}
-
-// GetSetupData returns json representation of the setup data if setup() is specified and run, nil otherwise
-func (r MiniRunner) GetSetupData() []byte {
-	return r.setupData
-}
-
-// SetSetupData saves the externally supplied setup data as json in the runner
-func (r *MiniRunner) SetSetupData(data []byte) {
-	r.setupData = data
-}
-
-func (r MiniRunner) Teardown(ctx context.Context, out chan<- stats.SampleContainer) error {
-	if fn := r.TeardownFn; fn != nil {
-		return fn(ctx, out)
-	}
-	return nil
-}
-
-func (r MiniRunner) GetDefaultGroup() *Group {
-	if r.Group == nil {
-		r.Group = &Group{}
-	}
-	return r.Group
-}
-
-func (r MiniRunner) GetOptions() Options {
-	return r.Options
-}
-
-func (r *MiniRunner) SetOptions(opts Options) error {
-	r.Options = opts
-	return nil
-}
-
-// A VU spawned by a MiniRunner.
-type MiniRunnerVU struct {
-	R         MiniRunner
-	Out       chan<- stats.SampleContainer
-	ID        int64
-	Iteration int64
-}
-
-func (vu MiniRunnerVU) RunOnce(ctx context.Context) error {
-	if vu.R.Fn == nil {
-		return nil
-	}
-
-	state := &State{
-		Vu:        vu.ID,
-		Iteration: vu.Iteration,
-	}
-	newctx := WithState(ctx, state)
-
-	vu.Iteration++
-
-	return vu.R.Fn(newctx, vu.Out)
-}
-
-func (vu *MiniRunnerVU) Reconfigure(id int64) error {
-	vu.ID = id
-	return nil
 }
