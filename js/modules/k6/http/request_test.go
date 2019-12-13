@@ -449,11 +449,11 @@ func TestRequestAndBatch(t *testing.T) {
 		}
 		t.Run("ocsp_stapled_good", func(t *testing.T) {
 			_, err := common.RunString(rt, `
-			let res = http.request("GET", "https://stackoverflow.com/");
+			let res = http.request("GET", "https://www.microsoft.com/");
 			if (res.ocsp.status != http.OCSP_STATUS_GOOD) { throw new Error("wrong ocsp stapled response status: " + res.ocsp.status); }
 			`)
 			assert.NoError(t, err)
-			assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), "GET", "https://stackoverflow.com/", "", 200, "")
+			assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), "GET", "https://www.microsoft.com/", "", 200, "")
 		})
 	})
 	t.Run("Invalid", func(t *testing.T) {
