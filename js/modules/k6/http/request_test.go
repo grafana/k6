@@ -123,6 +123,8 @@ func newRuntime(
 		UserAgent:    null.StringFrom("TestUserAgent"),
 		Throw:        null.BoolFrom(true),
 		SystemTags:   &stats.DefaultSystemTagSet,
+		Batch:        null.IntFrom(20),
+		BatchPerHost: null.IntFrom(20),
 		//HTTPDebug:    null.StringFrom("full"),
 	}
 	samples := make(chan stats.SampleContainer, 1000)
@@ -273,13 +275,14 @@ func TestRequestAndBatch(t *testing.T) {
 				})
 			`))
 			endTime := time.Now()
-			assert.EqualError(t, err, sr("GoError: Get HTTPBIN_URL/delay/10: net/http: request canceled (Client.Timeout exceeded while awaiting headers)"))
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "context deadline exceeded")
 			assert.WithinDuration(t, startTime.Add(1*time.Second), endTime, 2*time.Second)
 
 			logEntry := hook.LastEntry()
 			if assert.NotNil(t, logEntry) {
 				assert.Equal(t, logrus.WarnLevel, logEntry.Level)
-				assert.EqualError(t, logEntry.Data["error"].(error), sr("Get HTTPBIN_URL/delay/10: net/http: request canceled (Client.Timeout exceeded while awaiting headers)"))
+				assert.Contains(t, logEntry.Data["error"].(error).Error(), "context deadline exceeded")
 				assert.Equal(t, "Request Failed", logEntry.Message)
 			}
 		})
@@ -410,7 +413,8 @@ func TestRequestAndBatch(t *testing.T) {
 	t.Run("TLS", func(t *testing.T) {
 		t.Run("cert_expired", func(t *testing.T) {
 			_, err := common.RunString(rt, `http.get("https://expired.badssl.com/");`)
-			assert.EqualError(t, err, "GoError: Get https://expired.badssl.com/: x509: certificate has expired or is not yet valid")
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "x509: certificate has expired or is not yet valid")
 		})
 		tlsVersionTests := []struct {
 			Name, URL, Version string
@@ -447,11 +451,11 @@ func TestRequestAndBatch(t *testing.T) {
 		}
 		t.Run("ocsp_stapled_good", func(t *testing.T) {
 			_, err := common.RunString(rt, `
-			let res = http.request("GET", "https://stackoverflow.com/");
+			let res = http.request("GET", "https://www.microsoft.com/");
 			if (res.ocsp.status != http.OCSP_STATUS_GOOD) { throw new Error("wrong ocsp stapled response status: " + res.ocsp.status); }
 			`)
 			assert.NoError(t, err)
-			assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), "GET", "https://stackoverflow.com/", "", 200, "")
+			assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), "GET", "https://www.microsoft.com/", "", 200, "")
 		})
 	})
 	t.Run("Invalid", func(t *testing.T) {
@@ -459,12 +463,13 @@ func TestRequestAndBatch(t *testing.T) {
 		defer hook.Reset()
 
 		_, err := common.RunString(rt, `http.request("", "");`)
-		assert.EqualError(t, err, "GoError: Get : unsupported protocol scheme \"\"")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unsupported protocol scheme")
 
 		logEntry := hook.LastEntry()
 		if assert.NotNil(t, logEntry) {
 			assert.Equal(t, logrus.WarnLevel, logEntry.Level)
-			assert.Equal(t, "Get : unsupported protocol scheme \"\"", logEntry.Data["error"].(error).Error())
+			assert.Contains(t, logEntry.Data["error"].(error).Error(), "unsupported protocol scheme")
 			assert.Equal(t, "Request Failed", logEntry.Message)
 		}
 
@@ -476,12 +481,13 @@ func TestRequestAndBatch(t *testing.T) {
 				let res = http.request("", "", { throw: false });
 				throw new Error(res.error);
 			`)
-			assert.EqualError(t, err, "GoError: Get : unsupported protocol scheme \"\"")
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "unsupported protocol scheme")
 
 			logEntry := hook.LastEntry()
 			if assert.NotNil(t, logEntry) {
 				assert.Equal(t, logrus.WarnLevel, logEntry.Level)
-				assert.EqualError(t, logEntry.Data["error"].(error), "Get : unsupported protocol scheme \"\"")
+				assert.Contains(t, logEntry.Data["error"].(error).Error(), "unsupported protocol scheme")
 				assert.Equal(t, "Request Failed", logEntry.Message)
 			}
 		})
@@ -1037,6 +1043,10 @@ func TestRequestAndBatch(t *testing.T) {
 	}
 
 	t.Run("Batch", func(t *testing.T) {
+		t.Run("error", func(t *testing.T) {
+			_, err := common.RunString(rt, `let res = http.batch("https://somevalidurl.com");`)
+			require.Error(t, err)
+		})
 		t.Run("GET", func(t *testing.T) {
 			_, err := common.RunString(rt, sr(`
 			let reqs = [
@@ -1048,7 +1058,7 @@ func TestRequestAndBatch(t *testing.T) {
 				if (res[key].status != 200) { throw new Error("wrong status: " + res[key].status); }
 				if (res[key].url != reqs[key][1]) { throw new Error("wrong url: " + res[key].url); }
 			}`))
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			bufSamples := stats.GetBufferedSamples(samples)
 			assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_URL/"), "", 200, "")
 			assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_IP_URL/"), "", 200, "")

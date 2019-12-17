@@ -89,7 +89,8 @@ func (m Metric) Add(ctx context.Context, v goja.Value, addTags ...map[string]str
 		vfloat = 1.0
 	}
 
-	stats.PushIfNotCancelled(ctx, state.Samples, stats.Sample{Time: time.Now(), Metric: m.metric, Value: vfloat, Tags: stats.IntoSampleTags(&tags)})
+	sample := stats.Sample{Time: time.Now(), Metric: m.metric, Value: vfloat, Tags: stats.IntoSampleTags(&tags)}
+	stats.PushIfNotDone(ctx, state.Samples, sample)
 	return true, nil
 }
 

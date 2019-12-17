@@ -1,15 +1,15 @@
 package parser
 
 import (
+	"encoding/base64"
 	"github.com/dop251/goja/ast"
 	"github.com/dop251/goja/file"
 	"github.com/dop251/goja/token"
 	"github.com/go-sourcemap/sourcemap"
-	"encoding/base64"
-	"strings"
-	"os"
 	"io/ioutil"
 	"net/url"
+	"os"
+	"strings"
 )
 
 func (self *_parser) parseBlockStatement() *ast.BlockStatement {
@@ -483,6 +483,9 @@ func (self *_parser) parseDoWhileStatement() ast.Statement {
 	self.expect(token.LEFT_PARENTHESIS)
 	node.Test = self.parseExpression()
 	self.expect(token.RIGHT_PARENTHESIS)
+	if self.token == token.SEMICOLON {
+		self.next()
+	}
 
 	return node
 }
@@ -555,7 +558,7 @@ func (self *_parser) parseProgram() *ast.Program {
 }
 
 func (self *_parser) parseSourceMap() *sourcemap.Consumer {
-	lastLine := self.str[strings.LastIndexByte(self.str, '\n') + 1:]
+	lastLine := self.str[strings.LastIndexByte(self.str, '\n')+1:]
 	if strings.HasPrefix(lastLine, "//# sourceMappingURL") {
 		urlIndex := strings.Index(lastLine, "=")
 		urlStr := lastLine[urlIndex+1:]

@@ -765,6 +765,11 @@ func (o *Object) MarshalJSON() ([]byte, error) {
 	return ctx.buf.Bytes(), nil
 }
 
+// ClassName returns the class name
+func (o *Object) ClassName() string {
+	return o.self.className()
+}
+
 func (o valueUnresolved) throw() {
 	o.r.throwReferenceError(o.ref)
 }
