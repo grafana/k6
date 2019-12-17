@@ -18,7 +18,7 @@
  *
  */
 
-package http
+package lib
 
 import (
 	"sync"

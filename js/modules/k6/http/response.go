@@ -21,7 +21,6 @@
 package http
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net/url"
@@ -34,22 +33,18 @@ import (
 )
 
 // Response is a representation of an HTTP response to be returned to the goja VM
-// TODO: refactor after https://github.com/dop251/goja/issues/84
-type Response httpext.Response
-
-// GetCtx returns the Context of the httpext.Response
-func (res *Response) GetCtx() context.Context {
-	return ((*httpext.Response)(res)).GetCtx()
+type Response struct {
+	*httpext.Response `js:"-"`
 }
 
 func responseFromHttpext(resp *httpext.Response) *Response {
-	res := Response(*resp)
+	res := Response{resp}
 	return &res
 }
 
 // JSON parses the body of a response as json and returns it to the goja VM
 func (res *Response) JSON(selector ...string) goja.Value {
-	v, err := ((*httpext.Response)(res)).JSON(selector...)
+	v, err := res.Response.JSON(selector...)
 	if err != nil {
 		common.Throw(common.GetRuntime(res.GetCtx()), err)
 	}

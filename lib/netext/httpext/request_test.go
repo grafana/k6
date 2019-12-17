@@ -9,10 +9,12 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -96,13 +98,21 @@ func TestMakeRequestError(t *testing.T) {
 		defer srv.Close()
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
+		logger := logrus.New()
+		logger.Level = logrus.DebugLevel
 		state := &lib.State{
 			Options:   lib.Options{RunTags: &stats.SampleTags{}},
 			Transport: srv.Client().Transport,
+			Logger:    logger,
 		}
 		ctx = lib.WithState(ctx, state)
 		req, _ := http.NewRequest("GET", srv.URL, nil)
-		var preq = &ParsedHTTPRequest{Req: req, URL: &URL{u: req.URL}, Body: new(bytes.Buffer)}
+		var preq = &ParsedHTTPRequest{
+			Req:     req,
+			URL:     &URL{u: req.URL},
+			Body:    new(bytes.Buffer),
+			Timeout: 10 * time.Second,
+		}
 
 		res, err := MakeRequest(ctx, preq)
 
@@ -137,6 +147,37 @@ func TestURL(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestMakeRequestTimeout(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(100 * time.Millisecond)
+	}))
+	defer srv.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	samples := make(chan stats.SampleContainer, 10)
+	logger := logrus.New()
+	logger.Level = logrus.DebugLevel
+	state := &lib.State{
+		Options:   lib.Options{RunTags: &stats.SampleTags{}},
+		Transport: srv.Client().Transport,
+		Samples:   samples,
+		Logger:    logger,
+	}
+	ctx = lib.WithState(ctx, state)
+	req, _ := http.NewRequest("GET", srv.URL, nil)
+	var preq = &ParsedHTTPRequest{
+		Req:     req,
+		URL:     &URL{u: req.URL},
+		Body:    new(bytes.Buffer),
+		Timeout: 10 * time.Millisecond,
+	}
+
+	res, err := MakeRequest(ctx, preq)
+	require.NoError(t, err)
+	assert.NotNil(t, res)
+	assert.Len(t, samples, 1)
 }
 
 func BenchmarkWrapDecompressionError(b *testing.B) {

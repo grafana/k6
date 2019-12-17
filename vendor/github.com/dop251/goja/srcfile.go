@@ -5,6 +5,7 @@ import (
 	"github.com/go-sourcemap/sourcemap"
 	"sort"
 	"strings"
+	"sync"
 )
 
 type Position struct {
@@ -16,6 +17,7 @@ type SrcFile struct {
 	src  string
 
 	lineOffsets       []int
+	lineOffsetsLock   sync.Mutex
 	lastScannedOffset int
 	sourceMap         *sourcemap.Consumer
 }
@@ -30,15 +32,21 @@ func NewSrcFile(name, src string, sourceMap *sourcemap.Consumer) *SrcFile {
 
 func (f *SrcFile) Position(offset int) Position {
 	var line int
+	var lineOffsets []int
+	f.lineOffsetsLock.Lock()
 	if offset > f.lastScannedOffset {
 		line = f.scanTo(offset)
+		lineOffsets = f.lineOffsets
+		f.lineOffsetsLock.Unlock()
 	} else {
-		line = sort.Search(len(f.lineOffsets), func(x int) bool { return f.lineOffsets[x] > offset }) - 1
+		lineOffsets = f.lineOffsets
+		f.lineOffsetsLock.Unlock()
+		line = sort.Search(len(lineOffsets), func(x int) bool { return lineOffsets[x] > offset }) - 1
 	}
 
 	var lineStart int
 	if line >= 0 {
-		lineStart = f.lineOffsets[line]
+		lineStart = lineOffsets[line]
 	}
 
 	row := line + 2

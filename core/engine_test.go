@@ -110,10 +110,10 @@ func TestEngineRun(t *testing.T) {
 		signalChan := make(chan interface{})
 
 		runner := &lib.MiniRunner{Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
-			stats.PushIfNotCancelled(ctx, out, stats.Sample{Metric: testMetric, Time: time.Now(), Value: 1})
+			stats.PushIfNotDone(ctx, out, stats.Sample{Metric: testMetric, Time: time.Now(), Value: 1})
 			close(signalChan)
 			<-ctx.Done()
-			stats.PushIfNotCancelled(ctx, out, stats.Sample{Metric: testMetric, Time: time.Now(), Value: 1})
+			stats.PushIfNotDone(ctx, out, stats.Sample{Metric: testMetric, Time: time.Now(), Value: 1})
 			return nil
 		}}
 
@@ -422,6 +422,7 @@ func TestSentReceivedMetrics(t *testing.T) {
 			Hosts:                 tb.Dialer.Hosts,
 			InsecureSkipTLSVerify: null.BoolFrom(true),
 			NoVUConnectionReuse:   null.BoolFrom(noConnReuse),
+			Batch:                 null.IntFrom(20),
 		})
 
 		collector := &dummy.Collector{}

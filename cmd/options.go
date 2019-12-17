@@ -59,7 +59,7 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.Bool("no-teardown", false, "don't run teardown()")
 	flags.Int64("max-redirects", 10, "follow at most n redirects")
 	flags.Int64("batch", 20, "max parallel batch reqs")
-	flags.Int64("batch-per-host", 20, "max parallel batch reqs per host")
+	flags.Int64("batch-per-host", 6, "max parallel batch reqs per host")
 	flags.Int64("rps", 0, "limit requests per second")
 	flags.String("user-agent", fmt.Sprintf("k6/%s (https://k6.io/)", consts.Version), "user agent for http requests")
 	flags.String("http-debug", "", "log all HTTP requests and responses. Excludes body by default. To include body use '--http-debug=full'")
@@ -102,6 +102,7 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		NoTeardown:            getNullBool(flags, "no-teardown"),
 		MaxRedirects:          getNullInt64(flags, "max-redirects"),
 		Batch:                 getNullInt64(flags, "batch"),
+		BatchPerHost:          getNullInt64(flags, "batch-per-host"),
 		RPS:                   getNullInt64(flags, "rps"),
 		UserAgent:             getNullString(flags, "user-agent"),
 		HTTPDebug:             getNullString(flags, "http-debug"),
