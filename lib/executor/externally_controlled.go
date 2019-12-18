@@ -29,12 +29,13 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/sirupsen/logrus"
+	null "gopkg.in/guregu/null.v3"
+
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/ui/pb"
-	"github.com/sirupsen/logrus"
-	null "gopkg.in/guregu/null.v3"
 )
 
 const externallyControlledType = "externally-controlled"
@@ -167,16 +168,13 @@ func (ExternallyControlledConfig) IsDistributable() bool {
 // NewExecutor creates a new ExternallyControlled executor
 func (mec ExternallyControlledConfig) NewExecutor(es *lib.ExecutionState, logger *logrus.Entry) (lib.Executor, error) {
 	return &ExternallyControlled{
-		startConfig:          mec,
+		BaseExecutor:         NewBaseExecutor(mec, es, logger),
+		config:               mec,
 		currentControlConfig: mec.ExternallyControlledConfigParams,
 		configLock:           &sync.RWMutex{},
 		newControlConfigs:    make(chan updateConfigEvent),
 		pauseEvents:          make(chan pauseEvent),
 		hasStarted:           make(chan struct{}),
-
-		executionState: es,
-		logger:         logger,
-		progress:       pb.New(pb.WithLeft(mec.GetName)),
 	}, nil
 }
 
@@ -194,16 +192,13 @@ type updateConfigEvent struct {
 // controlled externally, via the k6 REST API. It implements both the
 // lib.PausableExecutor and the lib.LiveUpdatableExecutor interfaces.
 type ExternallyControlled struct {
-	startConfig          ExternallyControlledConfig
+	*BaseExecutor
+	config               ExternallyControlledConfig
 	currentControlConfig ExternallyControlledConfigParams
 	configLock           *sync.RWMutex
 	newControlConfigs    chan updateConfigEvent
 	pauseEvents          chan pauseEvent
 	hasStarted           chan struct{}
-
-	executionState *lib.ExecutionState
-	logger         *logrus.Entry
-	progress       *pb.ProgressBar
 }
 
 // Make sure we implement all the interfaces
@@ -216,7 +211,7 @@ func (mex *ExternallyControlled) GetCurrentConfig() ExternallyControlledConfig {
 	mex.configLock.RLock()
 	defer mex.configLock.RUnlock()
 	return ExternallyControlledConfig{
-		BaseConfig:                       mex.startConfig.BaseConfig,
+		BaseConfig:                       mex.config.BaseConfig,
 		ExternallyControlledConfigParams: mex.currentControlConfig,
 	}
 }
@@ -267,17 +262,17 @@ func (mex *ExternallyControlled) UpdateConfig(ctx context.Context, newConf inter
 		return fmt.Errorf("invalid configuration supplied: %s", lib.ConcatErrors(errs, ", "))
 	}
 
-	if newConfigParams.Duration.Valid && newConfigParams.Duration != mex.startConfig.Duration {
+	if newConfigParams.Duration.Valid && newConfigParams.Duration != mex.config.Duration {
 		return fmt.Errorf("the externally controlled executor duration cannot be changed")
 	}
-	if newConfigParams.MaxVUs.Valid && newConfigParams.MaxVUs.Int64 < mex.startConfig.MaxVUs.Int64 {
+	if newConfigParams.MaxVUs.Valid && newConfigParams.MaxVUs.Int64 < mex.config.MaxVUs.Int64 {
 		// This limitation is because the externally controlled executor is
 		// still an executor that participates in the overall k6 scheduling.
 		// Thus, any VUs that were explicitly specified by the user in the
 		// config may be reused from or by other executors.
 		return fmt.Errorf(
 			"the new number of max VUs cannot be lower than the starting number of max VUs (%d)",
-			mex.startConfig.MaxVUs.Int64,
+			mex.config.MaxVUs.Int64,
 		)
 	}
 
@@ -497,7 +492,7 @@ func (mex *ExternallyControlled) Run(parentCtx context.Context, out chan<- stats
 		logrus.Fields{"type": externallyControlledType, "duration": duration},
 	).Debug("Starting executor run...")
 
-	startMaxVUs := mex.executionState.Options.ExecutionSegment.Scale(mex.startConfig.MaxVUs.Int64)
+	startMaxVUs := mex.executionState.Options.ExecutionSegment.Scale(mex.config.MaxVUs.Int64)
 	runState := &externallyControlledRunState{
 		ctx:             ctx,
 		executor:        mex,
@@ -518,7 +513,7 @@ func (mex *ExternallyControlled) Run(parentCtx context.Context, out chan<- stats
 	go trackProgress(parentCtx, ctx, ctx, mex, runState.progresFn)
 
 	err = runState.handleConfigChange( // Start by setting MaxVUs to the starting MaxVUs
-		ExternallyControlledConfigParams{MaxVUs: mex.startConfig.MaxVUs}, currentControlConfig,
+		ExternallyControlledConfigParams{MaxVUs: mex.config.MaxVUs}, currentControlConfig,
 	)
 	if err != nil {
 		return err
