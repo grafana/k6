@@ -6,11 +6,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	null "gopkg.in/guregu/null.v3"
+
+	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/types"
 )
 
 func getTestPerVUIterationsConfig() PerVUIterationsConfig {
@@ -24,8 +25,9 @@ func getTestPerVUIterationsConfig() PerVUIterationsConfig {
 func TestPerVUIterations(t *testing.T) {
 	t.Parallel()
 	var result sync.Map
+	es := lib.NewExecutionState(lib.Options{}, 10, 50)
 	var ctx, cancel, executor, _ = setupExecutor(
-		t, getTestPerVUIterationsConfig(),
+		t, getTestPerVUIterationsConfig(), es,
 		simpleRunner(func(ctx context.Context) error {
 			state := lib.GetState(ctx)
 			currIter, _ := result.LoadOrStore(state.Vu, uint64(0))

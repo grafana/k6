@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	null "gopkg.in/guregu/null.v3"
 
+	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/types"
 )
 
@@ -24,8 +25,9 @@ func getTestSharedIterationsConfig() SharedIterationsConfig {
 func TestSharedIterationsRun(t *testing.T) {
 	t.Parallel()
 	var doneIters uint64
+	es := lib.NewExecutionState(lib.Options{}, 10, 50)
 	var ctx, cancel, executor, _ = setupExecutor(
-		t, getTestSharedIterationsConfig(),
+		t, getTestSharedIterationsConfig(), es,
 		simpleRunner(func(ctx context.Context) error {
 			atomic.AddUint64(&doneIters, 1)
 			return nil
