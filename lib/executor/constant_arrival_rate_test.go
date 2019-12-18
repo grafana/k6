@@ -38,6 +38,23 @@ import (
 	"github.com/loadimpact/k6/stats"
 )
 
+func newExecutionSegmentFromString(str string) *lib.ExecutionSegment {
+	r, err := lib.NewExecutionSegmentFromString(str)
+	if err != nil {
+		panic(err)
+	}
+	return r
+}
+
+func newExecutionSegmentSequenceFromString(str string) *lib.ExecutionSegmentSequence {
+	r, err := lib.NewExecutionSegmentSequenceFromString(str)
+
+	if err != nil {
+		panic(err)
+	}
+	return &r
+}
+
 func getTestConstantArrivalRateConfig() ConstantArrivalRateConfig {
 	return ConstantArrivalRateConfig{
 		TimeUnit:        types.NullDurationFrom(time.Second),
@@ -109,18 +126,6 @@ func TestConstantArrivalRateRunCorrectRate(t *testing.T) {
 }
 
 func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
-	newExecutionSegmentFromString := func(str string) *lib.ExecutionSegment {
-		r, err := lib.NewExecutionSegmentFromString(str)
-		require.NoError(t, err)
-		return r
-	}
-
-	newExecutionSegmentSequenceFromString := func(str string) *lib.ExecutionSegmentSequence {
-		r, err := lib.NewExecutionSegmentSequenceFromString(str)
-		require.NoError(t, err)
-		return &r
-	}
-
 	var tests = []struct {
 		segment  *lib.ExecutionSegment
 		sequence *lib.ExecutionSegmentSequence

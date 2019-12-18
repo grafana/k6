@@ -24,7 +24,6 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"math/big"
 	"sync/atomic"
 	"time"
 
@@ -38,10 +37,6 @@ import (
 )
 
 const variableArrivalRateType = "variable-arrival-rate"
-
-// How often we can make arrival rate adjustments when processing stages
-// TODO: make configurable, in some bounds?
-const minIntervalBetweenRateAdjustments = 250 * time.Millisecond
 
 func init() {
 	lib.RegisterExecutorConfigType(
@@ -155,109 +150,13 @@ func (varc VariableArrivalRateConfig) GetExecutionRequirements(et *lib.Execution
 	}
 }
 
-type rateChange struct {
-	// At what time should the rate below be applied.
-	timeOffset time.Duration
-	// Equals 1/rate: if rate was "1/5s", then this value, which is intended to
-	// be passed to time.NewTicker(), will be 5s. There's a special case when
-	// the rate is 0, for which we'll set Valid=false. That's because 0 isn't a
-	// valid ticker period and shouldn't be passed to time.NewTicker(). Instead,
-	// an empty or stopped ticker should be used.
-	tickerPeriod types.NullDuration
-}
-
-// A helper method to generate the plan how the rate changes would happen.
-func (varc VariableArrivalRateConfig) getPlannedRateChanges(et *lib.ExecutionTuple) []rateChange {
-	timeUnit := time.Duration(varc.TimeUnit.Duration)
-	// Important note for accuracy: we must work with and scale only the
-	// rational numbers, never the raw target values directly. It matters most
-	// for the accuracy of the intermediate rate change values, but it's
-	// important even here.
-	//
-	// Say we have a desired rate growth from 1/sec to 2/sec over 1 minute, and
-	// we split the test into two segments of 20% and 80%. If we used the whole
-	// numbers for scaling, then the instance executing the first segment won't
-	// ever do even a single request, since scale(20%, 1) would be 0, whereas
-	// the rational value for scale(20%, 1/sec) is 0.2/sec, or rather 1/5sec...
-	currentRate := getScaledArrivalRate(et.ES, varc.StartRate.Int64, timeUnit)
-
-	rateChanges := []rateChange{}
-	timeFromStart := time.Duration(0)
-
-	var tArrivalRate = new(big.Rat)
-	var tArrivalRateStep = new(big.Rat)
-	var stepCoef = new(big.Rat)
-	for _, stage := range varc.Stages {
-		stageTargetRate := getScaledArrivalRate(et.ES, stage.Target.Int64, timeUnit)
-		stageDuration := time.Duration(stage.Duration.Duration)
-
-		if currentRate.Cmp(stageTargetRate) == 0 {
-			// We don't have to do anything but update the time offset
-			// if the rate wasn't changed in this stage
-			timeFromStart += stageDuration
-			continue
-		}
-
-		// Handle 0-duration stages, i.e. instant rate jumps
-		if stageDuration == 0 {
-			// check if the last set change is for the same time and overwrite it
-			if len(rateChanges) > 0 && rateChanges[len(rateChanges)-1].timeOffset == timeFromStart {
-				rateChanges[len(rateChanges)-1].tickerPeriod = getTickerPeriod(stageTargetRate)
-			} else {
-				rateChanges = append(rateChanges, rateChange{
-					timeOffset:   timeFromStart,
-					tickerPeriod: getTickerPeriod(stageTargetRate),
-				})
-			}
-			currentRate = stageTargetRate
-			continue
-		}
-		// Basically, find out how many regular intervals with size of at least
-		// minIntervalBetweenRateAdjustments are in the stage's duration, and
-		// then use that number to calculate the actual step. All durations have
-		// nanosecond precision, so there isn't any actual loss of precision...
-		stepNumber := (stageDuration / minIntervalBetweenRateAdjustments)
-		if stepNumber > 1 {
-			rateDiff := new(big.Rat).Sub(stageTargetRate, currentRate)
-			stepInterval := stageDuration / stepNumber
-			for t := stepInterval; ; t += stepInterval {
-				if stageDuration-t < minIntervalBetweenRateAdjustments {
-					break
-				}
-
-				tArrivalRate.Add(
-					currentRate,
-					tArrivalRateStep.Mul(
-						rateDiff,
-						stepCoef.SetFrac64(int64(t), int64(stageDuration)),
-					),
-				)
-
-				rateChanges = append(rateChanges, rateChange{
-					timeOffset:   timeFromStart + t,
-					tickerPeriod: getTickerPeriod(tArrivalRate),
-				})
-			}
-		}
-		timeFromStart += stageDuration
-		rateChanges = append(rateChanges, rateChange{
-			timeOffset:   timeFromStart,
-			tickerPeriod: getTickerPeriod(stageTargetRate),
-		})
-		currentRate = stageTargetRate
-	}
-
-	return rateChanges
-}
-
 // NewExecutor creates a new VariableArrivalRate executor
 func (varc VariableArrivalRateConfig) NewExecutor(
 	es *lib.ExecutionState, logger *logrus.Entry,
 ) (lib.Executor, error) {
 	return VariableArrivalRate{
-		BaseExecutor:       NewBaseExecutor(varc, es, logger),
-		config:             varc,
-		plannedRateChanges: varc.getPlannedRateChanges(es.ExecutionTuple),
+		BaseExecutor: NewBaseExecutor(varc, es, logger),
+		config:       varc,
 	}, nil
 }
 
@@ -271,59 +170,74 @@ func (varc VariableArrivalRateConfig) HasWork(et *lib.ExecutionTuple) bool {
 //TODO: combine with the ConstantArrivalRate?
 type VariableArrivalRate struct {
 	*BaseExecutor
-	config             VariableArrivalRateConfig
-	plannedRateChanges []rateChange
+	config VariableArrivalRateConfig
 }
 
 // Make sure we implement the lib.Executor interface.
 var _ lib.Executor = &VariableArrivalRate{}
 
-// streamRateChanges is a helper method that emits rate change events at their
-// proper time.
-func (varr VariableArrivalRate) streamRateChanges(ctx context.Context, startTime time.Time) <-chan rateChange {
-	ch := make(chan rateChange)
-	go func() {
-		for _, step := range varr.plannedRateChanges {
-			offsetDiff := step.timeOffset - time.Since(startTime)
-			if offsetDiff > 0 { // wait until time of event arrives
-				select {
-				case <-ctx.Done():
-					return // exit if context is cancelled
-				case <-time.After(offsetDiff): //TODO: reuse a timer?
-					// do nothing
-				}
+func (varc VariableArrivalRateConfig) cal(et *lib.ExecutionTuple, ch chan<- time.Duration) {
+	// TODO: add inline comments with explanation of what is happening
+	// for now just link to https://github.com/loadimpact/k6/issues/1299#issuecomment-575661084
+	// TODO: rewrite this as state based functions/lambdas or something, drop the channel and let the user call
+	// it and precalculate the values, something like the `next` below
+	start, offsets, _ := et.GetStripedOffsets(et.ES)
+	li := -1
+	// TODO: move this to a utility function, or directly what GetStripedOffsets uses once we see everywhere we will use it
+	next := func() int64 {
+		li++
+		return offsets[li%len(offsets)]
+	}
+	defer close(ch) // TODO: maybe this is not a good design - closing a channel we get
+	var (
+		stageStart                   time.Duration
+		timeUnit                     = time.Duration(varc.TimeUnit.Duration).Nanoseconds() // TODO: test
+		doneSoFar, endCount, to, dur float64
+		from                         = float64(varc.StartRate.ValueOrZero()) / float64(timeUnit)
+		i                            = float64(start + 1)
+	)
+
+	for _, stage := range varc.Stages {
+		to = float64(stage.Target.ValueOrZero()) / float64(timeUnit)
+		dur = float64(time.Duration(stage.Duration.Duration).Nanoseconds())
+		if from != to { // ramp up/down
+			endCount += dur * ((to-from)/2 + from)
+			for ; i <= endCount; i += float64(next()) {
+				// TODO: try to twist this in a way to be able to get i (the only changing part)
+				// somewhere where it is less in the middle of the equation
+				x := (from*dur - math.Sqrt(dur*(from*from*dur+2*(i-doneSoFar)*(to-from)))) / (from - to)
+
+				ch <- time.Duration(x) + stageStart
 			}
-			select {
-			case <-ctx.Done():
-				return // exit if context is cancelled
-			case ch <- step: // send the step
+		} else {
+			endCount += dur * to
+			for ; i <= endCount; i += float64(next()) {
+				ch <- time.Duration((i-doneSoFar)/to) + stageStart
 			}
 		}
-	}()
-	return ch
+		doneSoFar = endCount
+		from = to
+		stageStart += time.Duration(stage.Duration.Duration)
+	}
 }
 
 // Run executes a variable number of iterations per second.
 func (varr VariableArrivalRate) Run(ctx context.Context, out chan<- stats.SampleContainer) (err error) { //nolint:funlen
-	segment := varr.executionState.Options.ExecutionSegment
+	segment := varr.executionState.ExecutionTuple.ES
 	gracefulStop := varr.config.GetGracefulStop()
 	duration := sumStagesDuration(varr.config.Stages)
 	preAllocatedVUs := varr.config.GetPreAllocatedVUs(varr.executionState.ExecutionTuple)
 	maxVUs := varr.config.GetMaxVUs(varr.executionState.ExecutionTuple)
 
+	// TODO: refactor and simplify
 	timeUnit := time.Duration(varr.config.TimeUnit.Duration)
 	startArrivalRate := getScaledArrivalRate(segment, varr.config.StartRate.Int64, timeUnit)
-
 	maxUnscaledRate := getStagesUnscaledMaxTarget(varr.config.StartRate.Int64, varr.config.Stages)
 	maxArrivalRatePerSec, _ := getArrivalRatePerSec(getScaledArrivalRate(segment, maxUnscaledRate, timeUnit)).Float64()
 	startTickerPeriod := getTickerPeriod(startArrivalRate)
 
 	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(ctx, duration, gracefulStop)
 	defer cancel()
-	ticker := &time.Ticker{}
-	if startTickerPeriod.Valid {
-		ticker = time.NewTicker(time.Duration(startTickerPeriod.Duration))
-	}
 
 	// Make sure the log and the progress bar have accurate information
 	varr.logger.WithFields(logrus.Fields{
@@ -346,7 +260,8 @@ func (varr VariableArrivalRate) Run(ctx context.Context, out chan<- stats.Sample
 
 	// Get the pre-allocated VUs in the local buffer
 	for i := int64(0); i < preAllocatedVUs; i++ {
-		vu, err := varr.executionState.GetPlannedVU(varr.logger, true)
+		var vu lib.VU
+		vu, err = varr.executionState.GetPlannedVU(varr.logger, true)
 		if err != nil {
 			return err
 		}
@@ -354,15 +269,14 @@ func (varr VariableArrivalRate) Run(ctx context.Context, out chan<- stats.Sample
 		vus <- vu
 	}
 
-	tickerPeriod := new(int64)
-	*tickerPeriod = int64(startTickerPeriod.Duration)
+	tickerPeriod := int64(startTickerPeriod.Duration)
 
 	vusFmt := pb.GetFixedLengthIntFormat(maxVUs)
 	itersFmt := pb.GetFixedLengthFloatFormat(maxArrivalRatePerSec, 0) + " iters/s"
 
 	progresFn := func() (float64, []string) {
 		currentInitialisedVUs := atomic.LoadUint64(&initialisedVUs)
-		currentTickerPeriod := atomic.LoadInt64(tickerPeriod)
+		currentTickerPeriod := atomic.LoadInt64(&tickerPeriod)
 		vusInBuffer := uint64(len(vus))
 		progVUs := fmt.Sprintf(vusFmt+"/"+vusFmt+" VUs",
 			currentInitialisedVUs-vusInBuffer, currentInitialisedVUs)
@@ -386,49 +300,59 @@ func (varr VariableArrivalRate) Run(ctx context.Context, out chan<- stats.Sample
 
 		return math.Min(1, float64(spent)/float64(duration)), right
 	}
+
 	varr.progress.Modify(pb.WithProgress(progresFn))
 	go trackProgress(ctx, maxDurationCtx, regDurationCtx, varr, progresFn)
 
 	regDurationDone := regDurationCtx.Done()
-	runIterationBasic := getIterationRunner(varr.executionState, varr.logger, out)
-	runIteration := func(vu lib.VU) {
-		runIterationBasic(maxDurationCtx, vu)
-		vus <- vu
-	}
+	runIteration := getIterationRunner(varr.executionState, varr.logger, out)
 
 	remainingUnplannedVUs := maxVUs - preAllocatedVUs
-	rateChangesStream := varr.streamRateChanges(maxDurationCtx, startTime)
 
-	for {
+	var timer = time.NewTimer(time.Hour)
+	var start = time.Now()
+	var ch = make(chan time.Duration, 10) // buffer 10 iteration times ahead
+	var prevTime time.Duration
+	go varr.config.cal(varr.executionState.ExecutionTuple, ch)
+	for nextTime := range ch {
 		select {
-		case rateChange := <-rateChangesStream:
-			newPeriod := rateChange.tickerPeriod
-			ticker.Stop()
-			if newPeriod.Valid {
-				ticker = time.NewTicker(time.Duration(newPeriod.Duration))
-			}
-			atomic.StoreInt64(tickerPeriod, int64(newPeriod.Duration))
-		case <-ticker.C:
-			select {
-			case vu := <-vus:
-				// ideally, we get the VU from the buffer without any issues
-				go runIteration(vu)
-			default:
-				if remainingUnplannedVUs == 0 {
-					//TODO: emit an error metric?
-					varr.logger.Warningf("Insufficient VUs, reached %d active VUs and cannot allocate more", maxVUs)
-					break
-				}
-				vu, err := varr.executionState.GetUnplannedVU(maxDurationCtx, varr.logger)
-				if err != nil {
-					return err
-				}
-				remainingUnplannedVUs--
-				atomic.AddUint64(&initialisedVUs, 1)
-				go runIteration(vu)
-			}
 		case <-regDurationDone:
 			return nil
+		default:
 		}
+		atomic.StoreInt64(&tickerPeriod, int64(nextTime-prevTime))
+		prevTime = nextTime
+		b := time.Until(start.Add(nextTime))
+		if b > 0 { // TODO: have a minimal ?
+			timer.Reset(b)
+			select {
+			case <-timer.C:
+			case <-regDurationDone:
+				return nil
+			}
+		}
+
+		var vu lib.VU
+		select {
+		case vu = <-vus:
+			// ideally, we get the VU from the buffer without any issues
+		default:
+			if remainingUnplannedVUs == 0 {
+				//TODO: emit an error metric?
+				varr.logger.Warningf("Insufficient VUs, reached %d active VUs and cannot allocate more", maxVUs)
+				continue
+			}
+			vu, err = varr.executionState.GetUnplannedVU(maxDurationCtx, varr.logger)
+			if err != nil {
+				return err
+			}
+			remainingUnplannedVUs--
+			atomic.AddUint64(&initialisedVUs, 1)
+		}
+		go func(vu lib.VU) {
+			runIteration(maxDurationCtx, vu)
+			vus <- vu
+		}(vu)
 	}
+	return nil
 }
