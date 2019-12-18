@@ -152,13 +152,13 @@ func getDurationContexts(parentCtx context.Context, regularDuration, gracefulSto
 // executor and updates its progressbar accordingly.
 func trackProgress(
 	parentCtx, maxDurationCtx, regDurationCtx context.Context,
-	sched lib.Executor, snapshot func() (float64, string),
+	exec lib.Executor, snapshot func() (float64, string),
 ) {
-	progressBar := sched.GetProgress()
-	logger := sched.GetLogger()
+	progressBar := exec.GetProgress()
+	logger := exec.GetLogger()
 
 	<-regDurationCtx.Done() // Wait for the regular context to be over
-	gracefulStop := sched.GetConfig().GetGracefulStop()
+	gracefulStop := exec.GetConfig().GetGracefulStop()
 	if parentCtx.Err() == nil && gracefulStop > 0 {
 		p, right := snapshot()
 		logger.WithField("gracefulStop", gracefulStop).Debug(
