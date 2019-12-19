@@ -587,7 +587,7 @@ func TestVURunInterruptDoesntPanic(t *testing.T) {
 					defer wg.Done()
 					close(ch)
 					vuErr := vu.RunOnce(newCtx)
-					assert.Error(t, vuErr)
+					require.Error(t, vuErr)
 					assert.Contains(t, vuErr.Error(), "context cancelled")
 				}()
 				<-ch

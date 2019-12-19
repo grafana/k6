@@ -438,6 +438,13 @@ func (u *VU) RunOnce(ctx context.Context) error {
 		}
 	}
 
+	// u.Runtime.Interrupt only interrupts JS script, not the go code which run it. So there might be
+	// a race condition that an interrupted iteration was recognized as full iteration. Detect that case
+	// here and masking the interrupted error.
+	if gErr, ok := err.(*goja.InterruptedError); ok && isFullIteration && gErr.Value() == errInterrupt {
+		return nil
+	}
+
 	return err
 }
 
