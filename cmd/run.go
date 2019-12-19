@@ -97,7 +97,7 @@ a commandline interface for interacting with it.`,
 		initBar := pb.New(pb.WithConstLeft("   init"))
 
 		// Create the Runner.
-		fprintf(stdout, "%s runner\r", initBar.String()) //TODO use printBar()
+		printBar(initBar, "runner")
 		pwd, err := os.Getwd()
 		if err != nil {
 			return err
@@ -119,7 +119,7 @@ a commandline interface for interacting with it.`,
 			return err
 		}
 
-		fprintf(stdout, "%s options\r", initBar.String())
+		printBar(initBar, "options")
 
 		cliConf, err := getConfig(cmd.Flags())
 		if err != nil {
@@ -147,7 +147,7 @@ a commandline interface for interacting with it.`,
 		defer cancel()
 
 		// Create a local execution scheduler wrapping the runner.
-		fprintf(stdout, "%s execution scheduler\r", initBar.String())
+		printBar(initBar, "execution scheduler")
 		execScheduler, err := local.NewExecutionScheduler(r, logger)
 		if err != nil {
 			return err
