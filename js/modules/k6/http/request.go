@@ -96,7 +96,7 @@ func (h *HTTP) Request(ctx context.Context, method string, url goja.Value, args 
 	var params goja.Value
 
 	if len(args) > 0 {
-		body = args[0].Export()
+		body = common.ExportBytes(common.GetRuntime(ctx), args[0])
 	}
 	if len(args) > 1 {
 		params = args[1]
