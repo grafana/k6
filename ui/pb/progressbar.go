@@ -114,10 +114,10 @@ func (pb *ProgressBar) Modify(options ...ProgressBarOption) {
 	}
 }
 
-// String locks the progressbar struct for reading and calls all of its methods
+// Render locks the progressbar struct for reading and calls all of its methods
 // to assemble the progress bar and return it as a string.
-//TODO: something prettier? paddings, right-alignment of the left column, line trimming by terminal size
-func (pb *ProgressBar) String(leftPad int) string {
+// - leftPad sets the padding between the left text and the opening square bracket.
+func (pb *ProgressBar) Render(leftPad int) string {
 	pb.mutex.RLock()
 	defer pb.mutex.RUnlock()
 
