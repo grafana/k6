@@ -30,8 +30,12 @@ import (
 	"time"
 
 	"github.com/loadimpact/k6/core/local"
+	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/ui/pb"
 )
+
+// TODO: Make configurable
+const maxLeftLength = 30
 
 // A writer that syncs writes with a mutex and, if the output is a TTY, clears before newlines.
 type consoleWriter struct {
@@ -74,7 +78,7 @@ func printBar(bar *pb.ProgressBar, rightText string) {
 		// TODO: check for cross platform support
 		end = "\x1b[0K\r"
 	}
-	fprintf(stdout, "%s %s%s", bar.Render(0), rightText, end)
+	fprintf(stdout, "%s %s%s", bar.Render(0, 0), rightText, end)
 }
 
 func renderMultipleBars(isTTY, goBack bool, pbs []*pb.ProgressBar) string {
@@ -91,12 +95,14 @@ func renderMultipleBars(isTTY, goBack bool, pbs []*pb.ProgressBar) string {
 			leftPad = len(l)
 		}
 	}
+	// Floor padding to maximum left text length
+	leftPad = int(lib.Min(int64(leftPad), maxLeftLength))
 
 	pbsCount := len(pbs)
 	result := make([]string, pbsCount+2)
 	result[0] = lineEnd // start with an empty line
 	for i, pb := range pbs {
-		result[i+1] = pb.Render(leftPad) + lineEnd
+		result[i+1] = pb.Render(leftPad, maxLeftLength) + lineEnd
 	}
 	if isTTY && goBack {
 		// Go back to the beginning

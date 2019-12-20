@@ -93,14 +93,21 @@ func (pb *ProgressBar) Left() string {
 	pb.mutex.RLock()
 	defer pb.mutex.RUnlock()
 
-	return pb.renderLeft(0)
+	return pb.renderLeft(0, 0)
 }
 
-func (pb *ProgressBar) renderLeft(pad int) string {
+// renderLeft renders the left part of the progressbar, applying the
+// given padding and trimming text exceeding maxLen length,
+// replacing it with an ellipsis.
+func (pb *ProgressBar) renderLeft(pad, maxLen int) string {
 	var left string
 	if pb.left != nil {
+		l := pb.left()
+		if maxLen > 0 && len(l) > maxLen {
+			l = l[:maxLen-3] + "..."
+		}
 		padFmt := fmt.Sprintf("%%-%ds", pad)
-		left = fmt.Sprintf(padFmt, pb.left())
+		left = fmt.Sprintf(padFmt, l)
 	}
 	return left
 }
@@ -116,8 +123,12 @@ func (pb *ProgressBar) Modify(options ...ProgressBarOption) {
 
 // Render locks the progressbar struct for reading and calls all of its methods
 // to assemble the progress bar and return it as a string.
-// - leftPad sets the padding between the left text and the opening square bracket.
-func (pb *ProgressBar) Render(leftPad int) string {
+// - leftPad sets the padding between the left text and the opening
+//   square bracket.
+// - leftMax sets the maximum character length of the left text.
+//   Characters exceeding this length will be replaced with a single ellipsis.
+//   Passing <=0 disables trimming.
+func (pb *ProgressBar) Render(leftPad, leftMax int) string {
 	pb.mutex.RLock()
 	defer pb.mutex.RUnlock()
 
@@ -153,5 +164,6 @@ func (pb *ProgressBar) Render(leftPad int) string {
 		padding = pb.color.Sprint(strings.Repeat("-", space-filled))
 	}
 
-	return fmt.Sprintf("%s [%s%s%s]%s", pb.renderLeft(leftPad), filling, caret, padding, right)
+	return fmt.Sprintf("%s [%s%s%s]%s",
+		pb.renderLeft(leftPad, leftMax), filling, caret, padding, right)
 }
