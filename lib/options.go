@@ -292,6 +292,8 @@ type Options struct {
 
 	// Redirect console logging to a file
 	ConsoleOutput null.String `json:"-" envconfig:"K6_CONSOLE_OUTPUT"`
+
+	Nic null.String `json:"nic" envconfig:"nic"`
 }
 
 // Returns the result of overwriting any fields with any that are set on the argument.
@@ -442,6 +444,9 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.ConsoleOutput.Valid {
 		o.ConsoleOutput = opts.ConsoleOutput
+	}
+	if opts.Nic.Valid {
+		o.Nic = opts.Nic
 	}
 
 	return o

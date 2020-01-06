@@ -120,6 +120,42 @@ func (r *Runner) NewVU(id int64, samplesOut chan<- stats.SampleContainer) (lib.I
 	return lib.InitializedVU(vu), nil
 }
 
+func getRandomIP(ifacesList string) (*net.IPAddr, error) {
+	var addresses []net.Addr
+
+	for _, ifaceName := range strings.Split(ifacesList, ",") {
+		targetIf, err := net.InterfaceByName(ifaceName)
+		if err != nil {
+			return nil, errors.New("Cannot find network interface '" + ifaceName + "'")
+		}
+
+		addrs, err := targetIf.Addrs()
+		if err != nil {
+			return nil, errors.New("Cannot get addresses on network interface '" + ifaceName + "'")
+		}
+
+		addresses = append(addresses, addrs...)
+	}
+
+	if len(addresses) == 0 {
+		return nil, errors.New("Cannot find any usable addresses on network interface(s) '" + ifacesList + "'")
+	}
+
+	rand.Shuffle(len(addresses), func(i, j int) { addresses[i], addresses[j] = addresses[j], addresses[i] })
+
+	tip, _, err := net.ParseCIDR(addresses[0].String())
+	if err != nil {
+		return nil, errors.New("Cannot parse IP address from string '" + addresses[0].String() + "'")
+	}
+
+	localAddr, err := net.ResolveIPAddr("ip", tip.String())
+	if err != nil {
+		return nil, errors.New("Cannot resolve IP '" + addresses[0].String() + "'")
+	}
+
+	return localAddr, nil
+}
+
 // nolint:funlen
 func (r *Runner) newVU(id int64, samplesOut chan<- stats.SampleContainer) (*VU, error) {
 	// Instantiate a new bundle, make a VU out of it.
@@ -157,6 +193,17 @@ func (r *Runner) newVU(id int64, samplesOut chan<- stats.SampleContainer) (*VU, 
 		Resolver:  r.Resolver,
 		Blacklist: r.Bundle.Options.BlacklistIPs,
 		Hosts:     r.Bundle.Options.Hosts,
+	}
+	if r.Bundle.Options.Nic.Valid {
+		randAddr, err := getRandomIP(r.Bundle.Options.Nic.ValueOrZero())
+		if err != nil {
+			return nil, err
+		}
+
+		localTcpAddr := net.TCPAddr {
+			IP: randAddr.IP,
+		}
+		dialer.Dialer.localAddr = &localTcpAddr
 	}
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: r.Bundle.Options.InsecureSkipTLSVerify.Bool,
