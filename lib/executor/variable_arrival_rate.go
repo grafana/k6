@@ -326,7 +326,7 @@ func (varr VariableArrivalRate) Run(ctx context.Context, out chan<- stats.Sample
 	}).Debug("Starting executor run...")
 
 	// Pre-allocate the VUs local shared buffer
-	vus := make(chan lib.VU, maxVUs)
+	vus := make(chan lib.InitializedVU, maxVUs)
 
 	initialisedVUs := uint64(0)
 	// Make sure we put back planned and unplanned VUs back in the global
@@ -334,7 +334,7 @@ func (varr VariableArrivalRate) Run(ctx context.Context, out chan<- stats.Sample
 	defer func() {
 		// no need for atomics, since initialisedVUs is mutated only in the select{}
 		for i := uint64(0); i < initialisedVUs; i++ {
-			varr.executionState.ReturnVU(<-vus, true)
+			varr.executionState.ReturnVU(<-vus)
 		}
 	}()
 
@@ -371,8 +371,8 @@ func (varr VariableArrivalRate) Run(ctx context.Context, out chan<- stats.Sample
 
 	regDurationDone := regDurationCtx.Done()
 	runIterationBasic := getIterationRunner(varr.executionState, varr.logger, out)
-	runIteration := func(vu lib.VU) {
-		runIterationBasic(maxDurationCtx, vu)
+	runIteration := func(vu lib.InitializedVU) {
+		runIterationBasic(maxDurationCtx, vu.Activate(&lib.VUActivationParams{Ctx: maxDurationCtx}))
 		vus <- vu
 	}
 

@@ -199,7 +199,7 @@ func (car ConstantArrivalRate) Run(ctx context.Context, out chan<- stats.SampleC
 	}).Debug("Starting executor run...")
 
 	// Pre-allocate the VUs local shared buffer
-	vus := make(chan lib.VU, maxVUs)
+	vus := make(chan lib.InitializedVU, maxVUs)
 
 	initialisedVUs := uint64(0)
 	// Make sure we put planned and unplanned VUs back in the global
@@ -207,7 +207,7 @@ func (car ConstantArrivalRate) Run(ctx context.Context, out chan<- stats.SampleC
 	defer func() {
 		// no need for atomics, since initialisedVUs is mutated only in the select{}
 		for i := uint64(0); i < initialisedVUs; i++ {
-			car.executionState.ReturnVU(<-vus, true)
+			car.executionState.ReturnVU(<-vus)
 		}
 	}()
 
@@ -238,8 +238,8 @@ func (car ConstantArrivalRate) Run(ctx context.Context, out chan<- stats.SampleC
 
 	regDurationDone := regDurationCtx.Done()
 	runIterationBasic := getIterationRunner(car.executionState, car.logger, out)
-	runIteration := func(vu lib.VU) {
-		runIterationBasic(maxDurationCtx, vu)
+	runIteration := func(vu lib.InitializedVU) {
+		runIterationBasic(maxDurationCtx, vu.Activate(&lib.VUActivationParams{Ctx: maxDurationCtx}))
 		vus <- vu
 	}
 

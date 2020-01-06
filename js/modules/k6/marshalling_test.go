@@ -134,9 +134,9 @@ func TestSetupDataMarshalling(t *testing.T) {
 	if !assert.NoError(t, runner.Setup(context.Background(), samples)) {
 		return
 	}
-	vu, err := runner.NewVU(samples)
+	vu, err := runner.NewVU(context.Background(), 0, samples)
 	if assert.NoError(t, err) {
-		err := vu.RunOnce(context.Background())
+		err := vu.Activate(&lib.VUActivationParams{Ctx: context.Background()}).RunOnce()
 		assert.NoError(t, err)
 	}
 }

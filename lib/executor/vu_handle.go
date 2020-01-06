@@ -37,8 +37,8 @@ import (
 type vuHandle struct {
 	mutex     *sync.RWMutex
 	parentCtx context.Context
-	getVU     func() (lib.VU, error)
-	returnVU  func(lib.VU)
+	getVU     func() (lib.InitializedVU, error)
+	returnVU  func(vu lib.InitializedVU)
 
 	canStartIter chan struct{}
 
@@ -48,7 +48,10 @@ type vuHandle struct {
 }
 
 func newStoppedVUHandle(
-	parentCtx context.Context, getVU func() (lib.VU, error), returnVU func(lib.VU), logger *logrus.Entry,
+	parentCtx context.Context,
+	getVU func() (lib.InitializedVU, error),
+	returnVU func(lib.InitializedVU),
+	logger *logrus.Entry,
 ) *vuHandle {
 	lock := &sync.RWMutex{}
 	ctx, cancel := context.WithCancel(parentCtx)
@@ -101,10 +104,10 @@ func (vh *vuHandle) hardStop() {
 
 //TODO: simplify this somehow - I feel like there should be a better way to
 //implement this logic... maybe with sync.Cond?
-func (vh *vuHandle) runLoopsIfPossible(runIter func(context.Context, lib.VU)) {
+func (vh *vuHandle) runLoopsIfPossible(runIter func(context.Context, lib.ActiveVU)) {
 	executorDone := vh.parentCtx.Done()
 
-	var vu lib.VU
+	var vu lib.InitializedVU
 	defer func() {
 		if vu != nil {
 			vh.returnVU(vu)
@@ -163,6 +166,6 @@ mainLoop:
 			vu = freshVU
 		}
 
-		runIter(ctx, vu)
+		runIter(ctx, vu.Activate(&lib.VUActivationParams{Ctx: ctx}))
 	}
 }

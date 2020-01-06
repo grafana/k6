@@ -82,7 +82,7 @@ func TestExecutionStateGettingVUs(t *testing.T) {
 	logEntry := logrus.NewEntry(testLog)
 
 	es := lib.NewExecutionState(lib.Options{}, 10, 20)
-	es.SetInitVUFunc(func(_ context.Context, _ *logrus.Entry) (lib.VU, error) {
+	es.SetInitVUFunc(func(_ context.Context, _ *logrus.Entry) (lib.InitializedVU, error) {
 		return &testutils.MiniRunnerVU{}, nil
 	})
 
@@ -91,7 +91,7 @@ func TestExecutionStateGettingVUs(t *testing.T) {
 		vu, err := es.InitializeNewVU(context.Background(), logEntry)
 		require.NoError(t, err)
 		require.EqualValues(t, i+1, es.GetInitializedVUsCount())
-		es.ReturnVU(vu, false)
+		es.ReturnVU(vu)
 		require.EqualValues(t, 0, es.GetCurrentlyActiveVUsCount())
 		require.EqualValues(t, i+1, es.GetInitializedVUsCount())
 	}

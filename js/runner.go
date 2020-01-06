@@ -28,7 +28,6 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/dop251/goja"
@@ -114,15 +113,17 @@ func (r *Runner) MakeArchive() *lib.Archive {
 	return r.Bundle.makeArchive()
 }
 
-func (r *Runner) NewVU(samplesOut chan<- stats.SampleContainer) (lib.VU, error) {
-	vu, err := r.newVU(samplesOut)
+// NewVU returns a initialized VU, which is ready for work.
+func (r *Runner) NewVU(_ context.Context, id int64, samples chan<- stats.SampleContainer) (lib.InitializedVU, error) {
+	vu, err := r.newVU(id, samples)
 	if err != nil {
 		return nil, err
 	}
-	return lib.VU(vu), nil
+	return lib.InitializedVU(vu), nil
 }
 
-func (r *Runner) newVU(samplesOut chan<- stats.SampleContainer) (*VU, error) {
+//nolint: lll, funclen
+func (r *Runner) newVU(id int64, samples chan<- stats.SampleContainer) (*VU, error) {
 	// Instantiate a new bundle, make a VU out of it.
 	bi, err := r.Bundle.Instantiate()
 	if err != nil {
@@ -185,6 +186,8 @@ func (r *Runner) newVU(samplesOut chan<- stats.SampleContainer) (*VU, error) {
 	}
 
 	vu := &VU{
+		ID:             id,
+		Iteration:      0,
 		BundleInstance: *bi,
 		Runner:         r,
 		Transport:      transport,
@@ -193,8 +196,7 @@ func (r *Runner) newVU(samplesOut chan<- stats.SampleContainer) (*VU, error) {
 		TLSConfig:      tlsConfig,
 		Console:        r.console,
 		BPool:          bpool.NewBufferPool(100),
-		Samples:        samplesOut,
-		m:              &sync.Mutex{},
+		Samples:        samples,
 	}
 	vu.Runtime.Set("console", common.Bind(vu.Runtime, vu.Console, vu.Context))
 	common.BindToGlobal(vu.Runtime, map[string]interface{}{
@@ -203,10 +205,7 @@ func (r *Runner) newVU(samplesOut chan<- stats.SampleContainer) (*VU, error) {
 		},
 	})
 
-	// Give the VU an initial sense of identity.
-	if err := vu.Reconfigure(0); err != nil {
-		return nil, err
-	}
+	vu.Runtime.Set("__VU", vu.ID)
 
 	return vu, nil
 }
@@ -261,6 +260,7 @@ func (r *Runner) Teardown(ctx context.Context, out chan<- stats.SampleContainer)
 	} else {
 		data = goja.Undefined()
 	}
+
 	_, err := r.runPart(teardownCtx, out, stageTeardown, data)
 	return err
 }
@@ -298,7 +298,7 @@ func (r *Runner) SetOptions(opts lib.Options) error {
 // Runs an exported function in its own temporary VU, optionally with an argument. Execution is
 // interrupted if the context expires. No error is returned if the part does not exist.
 func (r *Runner) runPart(ctx context.Context, out chan<- stats.SampleContainer, name string, arg interface{}) (goja.Value, error) {
-	vu, err := r.newVU(out)
+	vu, err := r.newVU(0, out)
 	if err != nil {
 		return goja.Undefined(), err
 	}
@@ -368,50 +368,33 @@ type VU struct {
 
 	setupData goja.Value
 
-	// A VU will track the last context it was called with for cancellation.
-	// Note that interruptTrackedCtx is the context that is currently being tracked, while
-	// interruptCancel cancels an unrelated context that terminates the tracking goroutine
-	// without triggering an interrupt (for if the context changes).
-	// There are cleaner ways of handling the interruption problem, but this is a hot path that
-	// needs to be called thousands of times per second, which rules out anything that spawns a
-	// goroutine per call.
-	interruptTrackedCtx context.Context
-	interruptCancel     context.CancelFunc
-
-	m *sync.Mutex
+	activeCtx context.Context
 }
 
 // Verify that VU implements lib.VU
-var _ lib.VU = &VU{}
+var _ lib.InitializedVU = &VU{}
+var _ lib.ActiveVU = &VU{}
 
-func (u *VU) Reconfigure(id int64) error {
-	u.ID = id
+// Activate actives an initialized VU, return an active VU, which is ready to do the work.
+// It's the caller responsibility to pass context via lib.VUActivationParams.
+func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 	u.Iteration = 0
-	u.Runtime.Set("__VU", u.ID)
-	return nil
+	u.activeCtx = params.Ctx
+
+	go func() {
+		<-params.Ctx.Done()
+		u.Runtime.Interrupt(errInterrupt)
+
+		if params.DeactivateCallback != nil {
+			params.DeactivateCallback()
+		}
+	}()
+
+	return u
 }
 
-func (u *VU) RunOnce(ctx context.Context) error {
-	u.m.Lock()
-	defer u.m.Unlock()
-	// Track the context and interrupt JS execution if it's cancelled.
-	if u.interruptTrackedCtx != ctx {
-		interCtx, interCancel := context.WithCancel(context.Background())
-		if u.interruptCancel != nil {
-			u.interruptCancel()
-		}
-		u.interruptCancel = interCancel
-		u.interruptTrackedCtx = ctx
-		defer interCancel()
-		go func() {
-			select {
-			case <-interCtx.Done():
-			case <-ctx.Done():
-				u.Runtime.Interrupt(errInterrupt)
-			}
-		}()
-	}
-
+// RunOnce runs the VU once.
+func (u *VU) RunOnce() error {
 	// Unmarshall the setupData only the first time for each VU so that VUs are isolated but we
 	// still don't use too much CPU in the middle test
 	if u.setupData == nil {
@@ -427,7 +410,9 @@ func (u *VU) RunOnce(ctx context.Context) error {
 	}
 
 	// Call the default function.
-	_, isFullIteration, totalTime, err := u.runFn(ctx, u.Runner.defaultGroup, true, u.Default, u.setupData)
+	_, isFullIteration, totalTime, err := u.runFn(
+		u.activeCtx, u.Runner.defaultGroup, true, u.Default, u.setupData,
+	)
 
 	// If MinIterationDuration is specified and the iteration wasn't cancelled
 	// and was less than it, sleep for the remainder
@@ -442,7 +427,11 @@ func (u *VU) RunOnce(ctx context.Context) error {
 }
 
 func (u *VU) runFn(
-	ctx context.Context, group *lib.Group, isDefault bool, fn goja.Callable, args ...goja.Value,
+	ctx context.Context,
+	group *lib.Group,
+	isDefault bool,
+	fn goja.Callable,
+	args ...goja.Value,
 ) (goja.Value, bool, time.Duration, error) {
 	cookieJar := u.CookieJar
 	if !u.Runner.Bundle.Options.NoCookiesReset.ValueOrZero() {

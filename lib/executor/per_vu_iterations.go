@@ -178,9 +178,23 @@ func (pvi PerVUIterations) Run(ctx context.Context, out chan<- stats.SampleConta
 	regDurationDone := regDurationCtx.Done()
 	runIteration := getIterationRunner(pvi.executionState, pvi.logger, out)
 
-	handleVU := func(vu lib.VU) {
+	handleVU := func(initializedVU lib.InitializedVU) {
+		// This is probably not strictly needed, but with it, we can return some
+		// VUs to the buffer sooner
+		ctx, cancel := context.WithCancel(maxDurationCtx)
+		defer cancel()
+
+		// TODO: some of this should probably be in a helper function, since
+		// it's going to be repeated in all executors...
+		vu := initializedVU.Activate(&lib.VUActivationParams{
+			Ctx: ctx,
+			DeactivateCallback: func() {
+				pvi.executionState.ModCurrentlyActiveVUsCount(-1)
+				pvi.executionState.ReturnVU(initializedVU)
+			},
+		})
+		pvi.executionState.ModCurrentlyActiveVUsCount(+1)
 		defer activeVUs.Done()
-		defer pvi.executionState.ReturnVU(vu, true)
 
 		for i := int64(0); i < iterations; i++ {
 			select {

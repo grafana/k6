@@ -326,7 +326,7 @@ func (mex *ExternallyControlled) stopWhenDurationIsReached(ctx context.Context, 
 // executing their current iterations before returning.
 type manualVUHandle struct {
 	*vuHandle
-	vu lib.VU
+	vu lib.InitializedVU
 	wg *sync.WaitGroup
 
 	// This is the cancel of the local context, used to kill its goroutine when
@@ -335,16 +335,20 @@ type manualVUHandle struct {
 }
 
 func newManualVUHandle(
-	parentCtx context.Context, state *lib.ExecutionState, localActiveVUsCount *int64, vu lib.VU, logger *logrus.Entry,
+	parentCtx context.Context,
+	state *lib.ExecutionState,
+	localActiveVUsCount *int64,
+	vu lib.InitializedVU,
+	logger *logrus.Entry,
 ) *manualVUHandle {
 	wg := sync.WaitGroup{}
-	getVU := func() (lib.VU, error) {
+	getVU := func() (lib.InitializedVU, error) {
 		wg.Add(1)
 		state.ModCurrentlyActiveVUsCount(+1)
 		atomic.AddInt64(localActiveVUsCount, +1)
 		return vu, nil
 	}
-	returnVU := func(_ lib.VU) {
+	returnVU := func(_ lib.InitializedVU) {
 		state.ModCurrentlyActiveVUsCount(-1)
 		atomic.AddInt64(localActiveVUsCount, -1)
 		wg.Done()
@@ -371,7 +375,7 @@ type externallyControlledRunState struct {
 	vuHandles       []*manualVUHandle // handles for manipulating and tracking all of the VUs
 	currentlyPaused bool              // whether the executor is currently paused
 
-	runIteration func(context.Context, lib.VU) // a helper closure function that runs a single iteration
+	runIteration func(context.Context, lib.ActiveVU) // a helper closure function that runs a single iteration
 }
 
 // retrieveStartMaxVUs gets and initializes the (scaled) number of MaxVUs
@@ -459,7 +463,7 @@ func (rs *externallyControlledRunState) handleConfigChange(oldCfg, newCfg Extern
 			rs.vuHandles[i].cancelVU()
 			if i < rs.startMaxVUs {
 				// return the initial planned VUs to the common buffer
-				executionState.ReturnVU(rs.vuHandles[i].vu, false)
+				executionState.ReturnVU(rs.vuHandles[i].vu)
 			} else {
 				executionState.ModInitializedVUsCount(-1)
 			}

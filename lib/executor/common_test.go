@@ -33,8 +33,8 @@ func setupExecutor(t *testing.T, config lib.ExecutorConfig, runner lib.Runner) (
 	logEntry := logrus.NewEntry(testLog)
 	es := lib.NewExecutionState(lib.Options{}, 10, 50)
 
-	es.SetInitVUFunc(func(_ context.Context, logger *logrus.Entry) (lib.VU, error) {
-		return runner.NewVU(engineOut)
+	es.SetInitVUFunc(func(ctx context.Context, logger *logrus.Entry) (lib.InitializedVU, error) {
+		return runner.NewVU(ctx, 0, engineOut)
 	})
 
 	initializeVUs(ctx, t, logEntry, es, 10)
@@ -55,7 +55,7 @@ func initializeVUs(
 		vu, err := es.InitializeNewVU(ctx, logEntry)
 		require.NoError(t, err)
 		require.EqualValues(t, i+1, es.GetInitializedVUsCount())
-		es.ReturnVU(vu, false)
+		es.ReturnVU(vu)
 		require.EqualValues(t, 0, es.GetCurrentlyActiveVUsCount())
 		require.EqualValues(t, i+1, es.GetInitializedVUsCount())
 	}

@@ -111,9 +111,9 @@ func TestLoadOnceGlobalVars(t *testing.T) {
 				t.Run(name, func(t *testing.T) {
 					ch := newDevNullSampleChannel()
 					defer close(ch)
-					vu, err := r.NewVU(ch)
+					vu, err := r.NewVU(context.Background(), 0, ch)
 					require.NoError(t, err)
-					err = vu.RunOnce(context.Background())
+					err = vu.Activate(&lib.VUActivationParams{Ctx: context.Background()}).RunOnce()
 					require.NoError(t, err)
 				})
 			}
@@ -156,9 +156,9 @@ func TestLoadExportsIsUsableInModule(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ch := newDevNullSampleChannel()
 			defer close(ch)
-			vu, err := r.NewVU(ch)
+			vu, err := r.NewVU(context.Background(), 0, ch)
 			require.NoError(t, err)
-			err = vu.RunOnce(context.Background())
+			err = vu.Activate(&lib.VUActivationParams{Ctx: context.Background()}).RunOnce()
 			require.NoError(t, err)
 		})
 	}
@@ -200,9 +200,9 @@ func TestLoadDoesntBreakHTTPGet(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ch := newDevNullSampleChannel()
 			defer close(ch)
-			vu, err := r.NewVU(ch)
+			vu, err := r.NewVU(context.Background(), 0, ch)
 			require.NoError(t, err)
-			err = vu.RunOnce(context.Background())
+			err = vu.Activate(&lib.VUActivationParams{Ctx: context.Background()}).RunOnce()
 			require.NoError(t, err)
 		})
 	}
@@ -241,15 +241,15 @@ func TestLoadGlobalVarsAreNotSharedBetweenVUs(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ch := newDevNullSampleChannel()
 			defer close(ch)
-			vu, err := r.NewVU(ch)
+			vu, err := r.NewVU(context.Background(), 0, ch)
 			require.NoError(t, err)
-			err = vu.RunOnce(context.Background())
+			err = vu.Activate(&lib.VUActivationParams{Ctx: context.Background()}).RunOnce()
 			require.NoError(t, err)
 
 			// run a second VU
-			vu, err = r.NewVU(ch)
+			vu, err = r.NewVU(context.Background(), 0, ch)
 			require.NoError(t, err)
-			err = vu.RunOnce(context.Background())
+			err = vu.Activate(&lib.VUActivationParams{Ctx: context.Background()}).RunOnce()
 			require.NoError(t, err)
 		})
 	}
@@ -298,9 +298,9 @@ func TestLoadCycle(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ch := newDevNullSampleChannel()
 			defer close(ch)
-			vu, err := r.NewVU(ch)
+			vu, err := r.NewVU(context.Background(), 0, ch)
 			require.NoError(t, err)
-			err = vu.RunOnce(context.Background())
+			err = vu.Activate(&lib.VUActivationParams{Ctx: context.Background()}).RunOnce()
 			require.NoError(t, err)
 		})
 	}
@@ -357,9 +357,9 @@ func TestLoadCycleBinding(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ch := newDevNullSampleChannel()
 			defer close(ch)
-			vu, err := r.NewVU(ch)
+			vu, err := r.NewVU(context.Background(), 0, ch)
 			require.NoError(t, err)
-			err = vu.RunOnce(context.Background())
+			err = vu.Activate(&lib.VUActivationParams{Ctx: context.Background()}).RunOnce()
 			require.NoError(t, err)
 		})
 	}
@@ -418,9 +418,9 @@ func TestBrowserified(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ch := make(chan stats.SampleContainer, 100)
 			defer close(ch)
-			vu, err := r.NewVU(ch)
+			vu, err := r.NewVU(context.Background(), 0, ch)
 			require.NoError(t, err)
-			err = vu.RunOnce(context.Background())
+			err = vu.Activate(&lib.VUActivationParams{Ctx: context.Background()}).RunOnce()
 			require.NoError(t, err)
 		})
 	}
@@ -456,9 +456,9 @@ func TestLoadingUnexistingModuleDoesntPanic(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ch := newDevNullSampleChannel()
 			defer close(ch)
-			vu, err := r.NewVU(ch)
+			vu, err := r.NewVU(context.Background(), 0, ch)
 			require.NoError(t, err)
-			err = vu.RunOnce(context.Background())
+			err = vu.Activate(&lib.VUActivationParams{Ctx: context.Background()}).RunOnce()
 			require.NoError(t, err)
 		})
 	}

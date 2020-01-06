@@ -107,7 +107,7 @@ type ExecutorConfig interface {
 
 // InitVUFunc is just a shorthand so we don't have to type the function
 // signature every time.
-type InitVUFunc func(context.Context, *logrus.Entry) (VU, error)
+type InitVUFunc func(context.Context, *logrus.Entry) (InitializedVU, error)
 
 // Executor is the interface all executors should implement
 type Executor interface {

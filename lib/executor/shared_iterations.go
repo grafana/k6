@@ -185,10 +185,15 @@ func (si SharedIterations) Run(ctx context.Context, out chan<- stats.SampleConta
 	runIteration := getIterationRunner(si.executionState, si.logger, out)
 
 	attemptedIters := new(uint64)
-	handleVU := func(vu lib.VU) {
+	handleVU := func(vu lib.InitializedVU) {
 		defer activeVUs.Done()
-		defer si.executionState.ReturnVU(vu, true)
 
+		activeVU := vu.Activate(&lib.VUActivationParams{
+			Ctx: ctx,
+			DeactivateCallback: func() {
+				si.executionState.ReturnVU(vu)
+			},
+		})
 		for {
 			select {
 			case <-regDurationDone:
@@ -202,7 +207,7 @@ func (si SharedIterations) Run(ctx context.Context, out chan<- stats.SampleConta
 				return
 			}
 
-			runIteration(maxDurationCtx, vu)
+			runIteration(maxDurationCtx, activeVU)
 			atomic.AddUint64(doneIters, 1)
 		}
 	}

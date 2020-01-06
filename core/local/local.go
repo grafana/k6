@@ -133,19 +133,16 @@ func (e *ExecutionScheduler) GetExecutionPlan() []lib.ExecutionStep {
 // any unplanned VUs themselves.
 //TODO: actually use the context...
 func (e *ExecutionScheduler) initVU(
-	_ context.Context, logger *logrus.Entry, engineOut chan<- stats.SampleContainer,
-) (lib.VU, error) {
-	vu, err := e.runner.NewVU(engineOut)
+	ctx context.Context, logger *logrus.Entry, engineOut chan<- stats.SampleContainer,
+) (lib.InitializedVU, error) {
+	// Get the VU ID here, so that the VUs are (mostly) ordered by their
+	// number in the channel buffer
+	vuID := e.state.GetUniqueVUIdentifier()
+	vu, err := e.runner.NewVU(ctx, int64(vuID), engineOut)
 	if err != nil {
 		return nil, fmt.Errorf("error while initializing a VU: '%s'", err)
 	}
 
-	// Get the VU ID here, so that the VUs are (mostly) ordered by their
-	// number in the channel buffer
-	vuID := e.state.GetUniqueVUIdentifier()
-	if err := vu.Reconfigure(int64(vuID)); err != nil {
-		return nil, fmt.Errorf("error while reconfiguring VU #%d: '%s'", vuID, err)
-	}
 	logger.Debugf("Initialized VU #%d", vuID)
 	return vu, nil
 }
@@ -237,7 +234,7 @@ func (e *ExecutionScheduler) Init(ctx context.Context, engineOut chan<- stats.Sa
 		}
 	}
 
-	e.state.SetInitVUFunc(func(ctx context.Context, logger *logrus.Entry) (lib.VU, error) {
+	e.state.SetInitVUFunc(func(ctx context.Context, logger *logrus.Entry) (lib.InitializedVU, error) {
 		return e.initVU(ctx, logger, engineOut)
 	})
 

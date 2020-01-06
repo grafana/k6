@@ -525,7 +525,7 @@ func (vlv VariableLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleCo
 	defer activeVUs.Wait()
 
 	runIteration := getIterationRunner(vlv.executionState, vlv.logger, out)
-	getVU := func() (lib.VU, error) {
+	getVU := func() (lib.InitializedVU, error) {
 		vu, err := vlv.executionState.GetPlannedVU(vlv.logger, true)
 		if err != nil {
 			cancel()
@@ -535,8 +535,8 @@ func (vlv VariableLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleCo
 		}
 		return vu, err
 	}
-	returnVU := func(vu lib.VU) {
-		vlv.executionState.ReturnVU(vu, true)
+	returnVU := func(vu lib.InitializedVU) {
+		vlv.executionState.ReturnVU(vu)
 		atomic.AddInt64(activeVUsCount, -1)
 		activeVUs.Done()
 	}
