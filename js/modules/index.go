@@ -41,4 +41,5 @@ var Index = map[string]interface{}{
 	"k6/metrics":     metrics.New(),
 	"k6/html":        html.New(),
 	"k6/ws":          ws.New(),
+	"k6/socketio":    ws.NewSocketIO(),
 }

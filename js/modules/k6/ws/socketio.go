@@ -21,14 +21,35 @@ package ws
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"net/http"
+	"reflect"
+	"sync"
+	"time"
 
 	"github.com/dop251/goja"
+	"github.com/gorilla/websocket"
+	"github.com/loadimpact/k6/js/common"
+	"github.com/loadimpact/k6/lib"
 )
 
+type WSIO struct{}
+
 type SocketIO struct {
-	RequestHeader http.Header
+	requestHeaders        *http.Header
+	ctx                   context.Context
+	conn                  *websocket.Conn
+	eventHandlers         map[string][]goja.Callable
+	scheduled             chan goja.Callable
+	done                  chan struct{}
+	shutdownOnce          sync.Once
+	tags                  map[string]string
+	msgSentTimestamps     []time.Time
+	msgReceivedTimestamps []time.Time
+
+	pingSendTimestamps map[string]time.Time
+	pingSendCounter    int
+	pingTimestamps     []pingDelta
 }
 
 const (
@@ -46,17 +67,123 @@ const (
 	NOOP    = "6"
 )
 
-func NewSocketIO() *SocketIO {
+func NewSocketIO() *WSIO {
+	return &WSIO{}
+}
+
+func (*WSIO) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTPResponse, error) {
+	validateParamArguments(ctx, args...)
+	rt, state := initConnectState(ctx)
+	socket := newWebSocketIO(ctx)
+	socket.tags = state.Options.RunTags.CloneTags()
+	callableV, paramsV := socket.extractParams(args...)
+	socket.parseConnectOptions(rt, paramsV)
+
+	callableV(goja.Undefined(), rt.ToValue(&socket))
+	return nil, nil
+}
+
+func newWebSocketIO(ctx context.Context) (socket *SocketIO) {
 	return &SocketIO{
-		RequestHeader: http.Header{
-			"sample":  []string{"1", "2", "3"},
-			"another": []string{"Hoang", "Ngoc", "Minh"},
-		},
+		requestHeaders:     &http.Header{},
+		ctx:                ctx,
+		tags:               make(map[string]string),
+		eventHandlers:      make(map[string][]goja.Callable),
+		pingSendTimestamps: make(map[string]time.Time),
+		scheduled:          make(chan goja.Callable),
+		done:               make(chan struct{}),
 	}
 }
-func (s *SocketIO) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTPResponse, error) {
-	fmt.Println(s.RequestHeader)
-	return nil, nil
+
+func initConnectState(ctx context.Context) (rt *goja.Runtime, state *lib.State) {
+	rt = common.GetRuntime(ctx)
+	state = lib.GetState(ctx)
+	if state == nil {
+		panic(common.NewInitContextError("using websockets in the init context is not supported"))
+	}
+	return
+}
+
+func (s *SocketIO) extractParams(args ...goja.Value) (callableV goja.Callable, paramsV goja.Value) {
+	var callFunc goja.Value
+	for _, v := range args {
+		argType := v.ExportType()
+		switch argType.Kind() {
+		case reflect.Map:
+			paramsV = v
+			break
+		case reflect.Func:
+			callFunc = v
+			break
+		default:
+			common.Throw(common.GetRuntime(s.ctx), errors.New("Invalid argument types. Allowing Map and Function types"))
+		}
+	}
+	callableV = validateCallableParam(s.ctx, callFunc)
+	return
+}
+
+func validateParamArguments(ctx context.Context, args ...goja.Value) {
+	switch len(args) {
+	case 1, 2:
+		return
+	default:
+		common.Throw(common.GetRuntime(ctx), errors.New("invalid number of arguments to ws.connect. Method is required 3 params ( url, params, callback )"))
+	}
+}
+
+func validateCallableParam(ctx context.Context, callableParam goja.Value) (setupFn goja.Callable) {
+	callableFunc, isFunc := goja.AssertFunction(callableParam)
+	if !isFunc {
+		common.Throw(common.GetRuntime(ctx), errors.New("last argument to ws.connect must be a function"))
+	}
+	return callableFunc
+}
+
+func (s *SocketIO) parseConnectOptions(rt *goja.Runtime, params goja.Value) {
+	if params == nil {
+		return
+	}
+	paramsObject := params.ToObject(rt)
+	for _, key := range paramsObject.Keys() {
+		switch key {
+		case "headers":
+			s.setSocketHeaders(paramsObject, rt)
+			break
+		case "cookies":
+			break
+		case "tags", "tag":
+			break
+		default:
+			break
+		}
+	}
+}
+
+func (s *SocketIO) setSocketHeaders(paramsObject *goja.Object, rt *goja.Runtime) {
+	headersV := paramsObject.Get("headers")
+	if goja.IsUndefined(headersV) || goja.IsNull(headersV) {
+		return
+	}
+	headersObj := headersV.ToObject(rt)
+	for _, key := range headersObj.Keys() {
+		s.requestHeaders.Set(key, headersObj.Get(key).String())
+	}
+}
+
+func (s *SocketIO) setSocketCookies(paramsObject *goja.Object, rt *goja.Runtime) {
+
+}
+
+func (s *SocketIO) setSocketTags(paramsObject *goja.Object, rt *goja.Runtime) {
+	tagsV := paramsObject.Get("tags")
+	if goja.IsUndefined(tagsV) || goja.IsNull(tagsV) {
+		return
+	}
+	tagsObj := tagsV.ToObject(rt)
+	for _, key := range tagsObj.Keys() {
+		s.tags[key] = tagsObj.Get(key).String()
+	}
 }
 
 // package ws
