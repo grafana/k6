@@ -79,7 +79,7 @@ func (*WSIO) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHT
 	socket := newWebSocketIO(ctx)
 	socket.tags = state.Options.RunTags.CloneTags()
 	callbackFunction, socketOptions := socket.extractParams(args...)
-	dialer := createSocketIODialer()
+	dialer := createSocketIODialer(state)
 	socket.configureSocketOptions(rt, socketOptions, &dialer)
 	callbackFunction(goja.Undefined(), rt.ToValue(&socket))
 	return nil, nil
