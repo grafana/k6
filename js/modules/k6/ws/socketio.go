@@ -21,7 +21,9 @@ package ws
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
+	"fmt"
 	"net/http"
 	"reflect"
 	"sync"
@@ -76,15 +78,15 @@ func (*WSIO) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHT
 	rt, state := initConnectState(ctx)
 	socket := newWebSocketIO(ctx)
 	socket.tags = state.Options.RunTags.CloneTags()
-	callableV, paramsV := socket.extractParams(args...)
-	socket.parseConnectOptions(rt, paramsV)
-
-	callableV(goja.Undefined(), rt.ToValue(&socket))
+	callbackFunction, socketOptions := socket.extractParams(args...)
+	dialer := createSocketIODialer()
+	socket.configureSocketOptions(rt, socketOptions, &dialer)
+	callbackFunction(goja.Undefined(), rt.ToValue(&socket))
 	return nil, nil
 }
 
-func newWebSocketIO(ctx context.Context) (socket *SocketIO) {
-	return &SocketIO{
+func newWebSocketIO(ctx context.Context) (socket SocketIO) {
+	return SocketIO{
 		requestHeaders:     &http.Header{},
 		ctx:                ctx,
 		tags:               make(map[string]string),
@@ -140,7 +142,7 @@ func validateCallableParam(ctx context.Context, callableParam goja.Value) (setup
 	return callableFunc
 }
 
-func (s *SocketIO) parseConnectOptions(rt *goja.Runtime, params goja.Value) {
+func (s *SocketIO) configureSocketOptions(rt *goja.Runtime, params goja.Value, dialer *websocket.Dialer) {
 	if params == nil {
 		return
 	}
@@ -151,8 +153,10 @@ func (s *SocketIO) parseConnectOptions(rt *goja.Runtime, params goja.Value) {
 			s.setSocketHeaders(paramsObject, rt)
 			break
 		case "cookies":
+			s.setSocketCookies(paramsObject, rt, dialer)
 			break
-		case "tags", "tag":
+		case "tags":
+			s.setSocketTags(paramsObject, rt)
 			break
 		default:
 			break
@@ -171,8 +175,9 @@ func (s *SocketIO) setSocketHeaders(paramsObject *goja.Object, rt *goja.Runtime)
 	}
 }
 
-func (s *SocketIO) setSocketCookies(paramsObject *goja.Object, rt *goja.Runtime) {
-
+func (s *SocketIO) setSocketCookies(paramsObject *goja.Object, rt *goja.Runtime, dialer *websocket.Dialer) {
+	cookiesV := paramsObject.Get("cookies")
+	fmt.Println(cookiesV)
 }
 
 func (s *SocketIO) setSocketTags(paramsObject *goja.Object, rt *goja.Runtime) {
@@ -184,6 +189,21 @@ func (s *SocketIO) setSocketTags(paramsObject *goja.Object, rt *goja.Runtime) {
 	for _, key := range tagsObj.Keys() {
 		s.tags[key] = tagsObj.Get(key).String()
 	}
+}
+
+func createSocketIODialer(state *lib.State) (dialer websocket.Dialer) {
+	tlsConfig := createTlsConfig(state)
+	return websocket.Dialer{
+		TLSClientConfig: tlsConfig,
+	}
+}
+
+func createTlsConfig(state *lib.State) (tlsConfig *tls.Config) {
+	if state.TLSConfig != nil {
+		tlsConfig = state.TLSConfig.Clone()
+		tlsConfig.NextProtos = []string{"http/1.1"}
+	}
+	return
 }
 
 // package ws
