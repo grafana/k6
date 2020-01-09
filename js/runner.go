@@ -200,10 +200,10 @@ func (r *Runner) newVU(id int64, samplesOut chan<- stats.SampleContainer) (*VU, 
 			return nil, err
 		}
 
-		localTcpAddr := net.TCPAddr {
+		localTCPAddr := net.TCPAddr {
 			IP: randAddr.IP,
 		}
-		dialer.Dialer.localAddr = &localTcpAddr
+		dialer.Dialer.LocalAddr = &localTCPAddr
 	}
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: r.Bundle.Options.InsecureSkipTLSVerify.Bool,
