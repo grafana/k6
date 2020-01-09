@@ -25,10 +25,13 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"strconv"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/dop251/goja"
