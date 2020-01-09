@@ -20,4 +20,21 @@
 
 package pb
 
-//TODO
+import (
+	"fmt"
+	"sync/atomic"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
+
+// See https://github.com/loadimpact/k6/issues/1295 for details.
+func TestProgressBarStringShouldNotPanic(t *testing.T) {
+	fmtStr := GetFixedLengthIntFormat(int64(0)) + "/%d shared iters among %d VUs"
+	progresFn := func() (float64, string) {
+		val := atomic.LoadUint64(new(uint64))
+		return float64(val) / float64(0), fmt.Sprintf(fmtStr, val, 0, 0)
+	}
+	pb := &ProgressBar{progress: progresFn, width: 40}
+	assert.NotPanics(t, func() { _ = pb.String() })
+}

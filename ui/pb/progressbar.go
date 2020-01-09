@@ -124,18 +124,18 @@ func (pb *ProgressBar) String() string {
 
 	filling := ""
 	caret := ""
+	padding := ""
+	// pb.progress() can make progress become NaN, cause filled overflow.
+	// So only do calculation when filled is a safe value.
 	if filled > 0 {
+		filling = strings.Repeat("=", filled)
 		if filled < space {
 			filling = strings.Repeat("=", filled-1)
 			caret = ">"
-		} else {
-			filling = strings.Repeat("=", filled)
 		}
-	}
-
-	padding := ""
-	if space > filled {
-		padding = pb.color.Sprint(strings.Repeat("-", space-filled))
+		if space > filled {
+			padding = pb.color.Sprint(strings.Repeat("-", space-filled))
+		}
 	}
 
 	return fmt.Sprintf("%s[%s%s%s]%s", left, filling, caret, padding, right)
