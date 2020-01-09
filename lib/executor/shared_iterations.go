@@ -148,6 +148,11 @@ type SharedIterations struct {
 // Make sure we implement the lib.Executor interface.
 var _ lib.Executor = &SharedIterations{}
 
+// HasWork reports whether there is any works for give execution segment.
+func (sic SharedIterationsConfig) HasWork(es *lib.ExecutionSegment) bool {
+	return sic.GetVUs(es) > 0 && sic.GetIterations(es) > 0
+}
+
 // Run executes a specific total number of iterations, which are all shared by
 // the configured VUs.
 func (si SharedIterations) Run(ctx context.Context, out chan<- stats.SampleContainer) (err error) {

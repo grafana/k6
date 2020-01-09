@@ -164,6 +164,11 @@ func (carc ConstantArrivalRateConfig) NewExecutor(
 	}, nil
 }
 
+// HasWork reports whether there is any works for give execution segment.
+func (carc ConstantArrivalRateConfig) HasWork(es *lib.ExecutionSegment) bool {
+	return carc.GetMaxVUs(es) > 0
+}
+
 // ConstantArrivalRate tries to execute a specific number of iterations for a
 // specific period.
 type ConstantArrivalRate struct {

@@ -40,12 +40,13 @@ type ExecutionScheduler struct {
 	options lib.Options
 	logger  *logrus.Logger
 
-	initProgress   *pb.ProgressBar
-	executors      []lib.Executor // sorted by (startTime, ID)
-	executionPlan  []lib.ExecutionStep
-	maxDuration    time.Duration // cached value derived from the execution plan
-	maxPossibleVUs uint64        // cached value derived from the execution plan
-	state          *lib.ExecutionState
+	initProgress    *pb.ProgressBar
+	executors       []lib.Executor // sorted by (startTime, ID)
+	executorConfigs []lib.ExecutorConfig
+	executionPlan   []lib.ExecutionStep
+	maxDuration     time.Duration // cached value derived from the execution plan
+	maxPossibleVUs  uint64        // cached value derived from the execution plan
+	state           *lib.ExecutionState
 }
 
 // Check to see if we implement the lib.ExecutionScheduler interface
@@ -67,13 +68,20 @@ func NewExecutionScheduler(runner lib.Runner, logger *logrus.Logger) (*Execution
 
 	executorConfigs := options.Execution.GetSortedConfigs()
 	executors := make([]lib.Executor, len(executorConfigs))
-	for i, sc := range executorConfigs {
+	// Only take executor which has works.
+	n := 0
+	for _, sc := range executorConfigs {
+		if !sc.HasWork(executionState.Options.ExecutionSegment) {
+			continue
+		}
 		s, err := sc.NewExecutor(executionState, logger.WithField("executor", sc.GetName()))
 		if err != nil {
 			return nil, err
 		}
-		executors[i] = s
+		executors[n] = s
+		n++
 	}
+	executors = executors[:n]
 
 	if options.Paused.Bool {
 		if err := executionState.Pause(); err != nil {
@@ -86,12 +94,13 @@ func NewExecutionScheduler(runner lib.Runner, logger *logrus.Logger) (*Execution
 		logger:  logger,
 		options: options,
 
-		initProgress:   pb.New(pb.WithConstLeft("Init")),
-		executors:      executors,
-		executionPlan:  executionPlan,
-		maxDuration:    maxDuration,
-		maxPossibleVUs: maxPossibleVUs,
-		state:          executionState,
+		initProgress:    pb.New(pb.WithConstLeft("Init")),
+		executors:       executors,
+		executorConfigs: executorConfigs,
+		executionPlan:   executionPlan,
+		maxDuration:     maxDuration,
+		maxPossibleVUs:  maxPossibleVUs,
+		state:           executionState,
 	}, nil
 }
 
@@ -113,6 +122,11 @@ func (e *ExecutionScheduler) GetState() *lib.ExecutionState {
 // their (startTime, name) in an ascending order.
 func (e *ExecutionScheduler) GetExecutors() []lib.Executor {
 	return e.executors
+}
+
+// GetExecutorConfigs returns the slice of executor configs.
+func (e *ExecutionScheduler) GetExecutorConfigs() []lib.ExecutorConfig {
+	return e.executorConfigs
 }
 
 // GetInitProgressBar returns the progress bar associated with the Init

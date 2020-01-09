@@ -180,6 +180,11 @@ func (mec ExternallyControlledConfig) NewExecutor(es *lib.ExecutionState, logger
 	}, nil
 }
 
+// HasWork reports whether there is any works for give execution segment.
+func (mec ExternallyControlledConfig) HasWork(es *lib.ExecutionSegment) bool {
+	return es.Scale(mec.MaxVUs.Int64) > 0
+}
+
 type pauseEvent struct {
 	isPaused bool
 	err      chan error

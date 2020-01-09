@@ -228,17 +228,17 @@ a commandline interface for interacting with it.`,
 			fprintf(stdout, "\n")
 
 			plan := execScheduler.GetExecutionPlan()
-			executors := execScheduler.GetExecutors()
+			executorConfigs := execScheduler.GetExecutorConfigs()
 			maxDuration, _ := lib.GetEndOffset(plan)
 
 			fprintf(stdout, "  execution: %s\n", ui.ValueColor.Sprintf(
-				"(%.2f%%) %d executors, %d max VUs, %s max duration (incl. graceful stop):",
-				conf.ExecutionSegment.FloatLength()*100, len(executors),
+				"(%.2f%%) %d executorConfigs, %d max VUs, %s max duration (incl. graceful stop):",
+				conf.ExecutionSegment.FloatLength()*100, len(executorConfigs),
 				lib.GetMaxPossibleVUs(plan), maxDuration),
 			)
-			for _, sched := range executors {
+			for _, ec := range executorConfigs {
 				fprintf(stdout, "           * %s: %s\n",
-					sched.GetConfig().GetName(), sched.GetConfig().GetDescription(conf.ExecutionSegment))
+					ec.GetName(), ec.GetDescription(conf.ExecutionSegment))
 			}
 			fprintf(stdout, "\n")
 		}

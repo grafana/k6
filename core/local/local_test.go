@@ -728,3 +728,56 @@ func TestSetPaused(t *testing.T) {
 		require.Contains(t, err.Error(), "doesn't support pause and resume operations after its start")
 	})
 }
+
+func TestNewExecutionSchedulerHasWork(t *testing.T) {
+	t.Parallel()
+	script := []byte(`
+import http from 'k6/http';
+
+export let options = {
+    executionSegment: "2/4:3/4",
+    execution: {
+        shared_iters1: {
+            type: "shared-iterations",
+            vus: 3,
+            iterations: 3,
+        },
+        shared_iters2: {
+            type: "shared-iterations",
+            vus: 4,
+            iterations: 4,
+        },
+        constant_arr_rate: {
+            type: "constant-arrival-rate",
+            rate: 3,
+            timeUnit: "1s",
+            duration: "20s",
+            preAllocatedVUs: 4,
+            maxVUs: 4,
+        },
+    },
+};
+
+export default function() {
+  const response = http.get("http://test.loadimpact.com");
+};`)
+
+	runner, err := js.New(
+		&loader.SourceData{
+			URL:  &url.URL{Path: "/script.js"},
+			Data: script,
+		},
+		nil,
+		lib.RuntimeOptions{},
+	)
+	require.NoError(t, err)
+
+	logger := logrus.New()
+	logger.SetOutput(testutils.NewTestOutput(t))
+
+	execScheduler, err := NewExecutionScheduler(runner, logger)
+	require.NoError(t, err)
+
+	assert.Len(t, execScheduler.executors, 2)
+	assert.Len(t, execScheduler.executorConfigs, 3)
+}
