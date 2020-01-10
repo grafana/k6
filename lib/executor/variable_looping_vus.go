@@ -460,7 +460,7 @@ func (vlvc VariableLoopingVUsConfig) NewExecutor(es *lib.ExecutionState, logger 
 	}, nil
 }
 
-// HasWork reports whether there is any works for give execution segment.
+// HasWork reports whether there is any work to be done for the given execution segment.
 func (vlvc VariableLoopingVUsConfig) HasWork(es *lib.ExecutionSegment) bool {
 	return lib.GetMaxPlannedVUs(vlvc.GetExecutionRequirements(es)) > 0
 }

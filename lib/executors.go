@@ -104,7 +104,7 @@ type ExecutorConfig interface {
 
 	NewExecutor(*ExecutionState, *logrus.Entry) (Executor, error)
 
-	// HasWork reports whether there is any work to do with given segment.
+	// HasWork reports whether there is any work for the executor to do with a given segment.
 	HasWork(*ExecutionSegment) bool
 }
 

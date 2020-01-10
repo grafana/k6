@@ -260,7 +260,7 @@ func (varc VariableArrivalRateConfig) NewExecutor(
 	}, nil
 }
 
-// HasWork reports whether there is any works for give execution segment.
+// HasWork reports whether there is any work to be done for the given execution segment.
 func (varc VariableArrivalRateConfig) HasWork(es *lib.ExecutionSegment) bool {
 	return varc.GetMaxVUs(es) > 0
 }

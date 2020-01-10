@@ -116,7 +116,7 @@ func (clvc ConstantLoopingVUsConfig) GetExecutionRequirements(es *lib.ExecutionS
 	}
 }
 
-// HasWork reports whether there is any works for give execution segment.
+// HasWork reports whether there is any work to be done for the given execution segment.
 func (clvc ConstantLoopingVUsConfig) HasWork(es *lib.ExecutionSegment) bool {
 	return clvc.GetVUs(es) > 0
 }

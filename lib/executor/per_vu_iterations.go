@@ -134,7 +134,7 @@ func (pvic PerVUIterationsConfig) NewExecutor(
 	}, nil
 }
 
-// HasWork reports whether there is any works for give execution segment.
+// HasWork reports whether there is any work to be done for the given execution segment.
 func (pvic PerVUIterationsConfig) HasWork(es *lib.ExecutionSegment) bool {
 	return pvic.GetVUs(es) > 0 && pvic.GetIterations() > 0
 }

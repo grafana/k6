@@ -148,7 +148,7 @@ type SharedIterations struct {
 // Make sure we implement the lib.Executor interface.
 var _ lib.Executor = &SharedIterations{}
 
-// HasWork reports whether there is any works for give execution segment.
+// HasWork reports whether there is any work to be done for the given execution segment.
 func (sic SharedIterationsConfig) HasWork(es *lib.ExecutionSegment) bool {
 	return sic.GetVUs(es) > 0 && sic.GetIterations(es) > 0
 }

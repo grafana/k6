@@ -68,7 +68,7 @@ func NewExecutionScheduler(runner lib.Runner, logger *logrus.Logger) (*Execution
 
 	executorConfigs := options.Execution.GetSortedConfigs()
 	executors := make([]lib.Executor, len(executorConfigs))
-	// Only take executor which has works.
+	// Only take executors which have work.
 	n := 0
 	for _, sc := range executorConfigs {
 		if !sc.HasWork(executionState.Options.ExecutionSegment) {
@@ -118,13 +118,14 @@ func (e *ExecutionScheduler) GetState() *lib.ExecutionState {
 	return e.state
 }
 
-// GetExecutors returns the slice of configured executor instances, sorted by
-// their (startTime, name) in an ascending order.
+// GetExecutors returns the slice of configured executor instances which
+// have work, sorted by their (startTime, name) in an ascending order.
 func (e *ExecutionScheduler) GetExecutors() []lib.Executor {
 	return e.executors
 }
 
-// GetExecutorConfigs returns the slice of executor configs.
+// GetExecutorConfigs returns the slice of all executor configs, sorted by
+// their (startTime, name) in an ascending order.
 func (e *ExecutionScheduler) GetExecutorConfigs() []lib.ExecutorConfig {
 	return e.executorConfigs
 }
