@@ -79,7 +79,7 @@ func TestProgressBarRender(t *testing.T) {
 		t.Run(tc.expected, func(t *testing.T) {
 			pbar := New(tc.options...)
 			assert.NotNil(t, pbar)
-			assert.Equal(t, tc.expected, pbar.Render(0, 0))
+			assert.Equal(t, tc.expected, pbar.Render(0))
 		})
 	}
 }
@@ -87,18 +87,15 @@ func TestProgressBarRender(t *testing.T) {
 func TestProgressBarRenderPaddingMaxLeft(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
-		padding  int
 		maxLen   int
 		left     string
 		expected string
 	}{
-		{-1, 0, "left", "left [--------------------------------------]"},
-		{0, 0, "left", "left [--------------------------------------]"},
-		{10, 0, "left", "left       [--------------------------------------]"},
-		{0, 10, "left_truncated",
+		{-1, "left", "left [--------------------------------------]"},
+		{0, "left", "left [--------------------------------------]"},
+		{10, "left", "left       [--------------------------------------]"},
+		{10, "left_truncated",
 			"left_tr... [--------------------------------------]"},
-		{20, 10, "left_truncated_padding",
-			"left_tr...           [--------------------------------------]"},
 	}
 
 	for _, tc := range testCases {
@@ -106,7 +103,7 @@ func TestProgressBarRenderPaddingMaxLeft(t *testing.T) {
 		t.Run(tc.left, func(t *testing.T) {
 			pbar := New(WithLeft(func() string { return tc.left }))
 			assert.NotNil(t, pbar)
-			assert.Equal(t, tc.expected, pbar.Render(tc.padding, tc.maxLen))
+			assert.Equal(t, tc.expected, pbar.Render(tc.maxLen))
 		})
 	}
 }
