@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: k6 Community Forum
+    url: https://community.k6.io/
+    about: Please ask and answer questions here.
