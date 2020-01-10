@@ -67,9 +67,8 @@ func NewExecutionScheduler(runner lib.Runner, logger *logrus.Logger) (*Execution
 	maxDuration, _ := lib.GetEndOffset(executionPlan) // we don't care if the end offset is final
 
 	executorConfigs := options.Execution.GetSortedConfigs()
-	executors := make([]lib.Executor, len(executorConfigs))
+	executors := make([]lib.Executor, 0, len(executorConfigs))
 	// Only take executors which have work.
-	n := 0
 	for _, sc := range executorConfigs {
 		if !sc.HasWork(executionState.Options.ExecutionSegment) {
 			continue
@@ -78,10 +77,8 @@ func NewExecutionScheduler(runner lib.Runner, logger *logrus.Logger) (*Execution
 		if err != nil {
 			return nil, err
 		}
-		executors[n] = s
-		n++
+		executors = append(executors, s)
 	}
-	executors = executors[:n]
 
 	if options.Paused.Bool {
 		if err := executionState.Pause(); err != nil {
