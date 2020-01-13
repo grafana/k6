@@ -41,8 +41,8 @@ type ExecutionScheduler struct {
 	logger  *logrus.Logger
 
 	initProgress    *pb.ProgressBar
-	executors       []lib.Executor // sorted by (startTime, ID)
-	executorConfigs []lib.ExecutorConfig
+	executorConfigs []lib.ExecutorConfig // sorted by (startTime, ID)
+	executors       []lib.Executor       // sorted by (startTime, ID), excludes executors with no work
 	executionPlan   []lib.ExecutionStep
 	maxDuration     time.Duration // cached value derived from the execution plan
 	maxPossibleVUs  uint64        // cached value derived from the execution plan
