@@ -39,6 +39,7 @@ import (
 type WSIO struct{}
 
 type SocketIO struct {
+	rt                    *goja.Runtime
 	ctx                   *context.Context
 	callbackFunction      *goja.Callable
 	socketOptions         *goja.Value
@@ -79,22 +80,24 @@ func NewSocketIO() *WSIO {
 
 func (*WSIO) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTPResponse, error) {
 	validateParamArguments(ctx, args...)
-	rt, state := initConnectState(ctx)
-	socket := newWebSocketIO(ctx, state)
+	// rt, state := initConnectState(ctx)
+	socket := newWebSocketIO(ctx)
 	socket.extractParams(args...)
-	socket.configureSocketHeadersAndTags(rt, socket.socketOptions)
+	socket.configureSocketHeadersAndTags(socket.socketOptions)
 	dialer := socket.createSocketIODialer()
-	socket.configureSocketCookies(rt, socket.socketOptions, &dialer)
+	socket.configureSocketCookies(socket.socketOptions, &dialer)
 	conn, httpResponse, connErr := dialer.Dial(url, socket.requestHeaders.Clone())
 	fmt.Println(conn)
 	fmt.Println(httpResponse)
 	fmt.Println(connErr)
-	(*socket.callbackFunction)(goja.Undefined(), rt.ToValue(&socket))
+	(*socket.callbackFunction)(goja.Undefined(), socket.rt.ToValue(&socket))
 	return nil, nil
 }
 
-func newWebSocketIO(initCtx context.Context, initState *lib.State) (socket SocketIO) {
+func newWebSocketIO(initCtx context.Context) (socket SocketIO) {
+	initRuntime, initState := initConnectState(initCtx)
 	return SocketIO{
+		rt:                 initRuntime,
 		requestHeaders:     &http.Header{},
 		ctx:                &initCtx,
 		state:              initState,
@@ -150,18 +153,18 @@ func validateCallableParam(ctx *context.Context, callableParam *goja.Value) (set
 	return &callableFunc
 }
 
-func (s *SocketIO) configureSocketHeadersAndTags(rt *goja.Runtime, params *goja.Value) {
+func (s *SocketIO) configureSocketHeadersAndTags(params *goja.Value) {
 	if params == nil {
 		return
 	}
-	paramsObject := (*params).ToObject(rt)
+	paramsObject := (*params).ToObject(s.rt)
 	for _, key := range paramsObject.Keys() {
 		switch key {
 		case "headers":
-			s.setSocketHeaders(paramsObject, rt)
+			s.setSocketHeaders(paramsObject, s.rt)
 			break
 		case "tags":
-			s.setSocketTags(paramsObject, rt)
+			s.setSocketTags(paramsObject, s.rt)
 			break
 		default:
 			break
@@ -169,15 +172,15 @@ func (s *SocketIO) configureSocketHeadersAndTags(rt *goja.Runtime, params *goja.
 	}
 }
 
-func (s *SocketIO) configureSocketCookies(rt *goja.Runtime, params *goja.Value, dialer *websocket.Dialer) {
+func (s *SocketIO) configureSocketCookies(params *goja.Value, dialer *websocket.Dialer) {
 	if params == nil {
 		return
 	}
-	paramsObject := (*params).ToObject(rt)
+	paramsObject := (*params).ToObject(s.rt)
 	for _, key := range paramsObject.Keys() {
 		switch key {
 		case "cookies":
-			s.setSocketCookies(paramsObject, rt, dialer)
+			s.setSocketCookies(paramsObject, s.rt, dialer)
 			break
 		default:
 			break
