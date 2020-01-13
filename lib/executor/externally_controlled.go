@@ -405,7 +405,7 @@ func (rs *externallyControlledRunState) progresFn() (float64, string) {
 	currentMaxVUs := atomic.LoadInt64(rs.maxVUs)
 	vusFmt := pb.GetFixedLengthIntFormat(currentMaxVUs)
 	return progress, fmt.Sprintf(
-		"currently "+vusFmt+" out of "+vusFmt+" active looping VUs, %s/%s", currentActiveVUs, currentMaxVUs,
+		vusFmt+"/"+vusFmt+" VUs\t%s/%s", currentActiveVUs, currentMaxVUs,
 		pb.GetFixedLengthDuration(spent, rs.duration), rs.duration,
 	)
 }

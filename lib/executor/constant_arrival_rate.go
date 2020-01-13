@@ -27,12 +27,13 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/sirupsen/logrus"
+	null "gopkg.in/guregu/null.v3"
+
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/ui/pb"
-	"github.com/sirupsen/logrus"
-	null "gopkg.in/guregu/null.v3"
 )
 
 const constantArrivalRateType = "constant-arrival-rate"
@@ -227,15 +228,14 @@ func (car ConstantArrivalRate) Run(ctx context.Context, out chan<- stats.SampleC
 	}
 
 	vusFmt := pb.GetFixedLengthIntFormat(maxVUs)
-	fmtStr := pb.GetFixedLengthFloatFormat(arrivalRatePerSec, 2) +
-		" iters/s, " + vusFmt + " out of " + vusFmt + " VUs active"
+	fmtStr := vusFmt + "/" + vusFmt + " VUs\t" + pb.GetFixedLengthFloatFormat(arrivalRatePerSec, 0) + " iters/s"
 
 	progresFn := func() (float64, string) {
 		spent := time.Since(startTime)
 		currentInitialisedVUs := atomic.LoadUint64(&initialisedVUs)
 		vusInBuffer := uint64(len(vus))
 		return math.Min(1, float64(spent)/float64(duration)), fmt.Sprintf(fmtStr,
-			arrivalRatePerSec, currentInitialisedVUs-vusInBuffer, currentInitialisedVUs,
+			currentInitialisedVUs-vusInBuffer, currentInitialisedVUs, arrivalRatePerSec,
 		)
 	}
 	car.progress.Modify(pb.WithProgress(progresFn))

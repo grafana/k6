@@ -26,12 +26,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sirupsen/logrus"
+	null "gopkg.in/guregu/null.v3"
+
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/ui/pb"
-	"github.com/sirupsen/logrus"
-	null "gopkg.in/guregu/null.v3"
 )
 
 const constantLoopingVUsType = "constant-looping-vus"
@@ -158,10 +159,10 @@ func (clv ConstantLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleCo
 	progresFn := func() (float64, string) {
 		spent := time.Since(startTime)
 		if spent > duration {
-			return 1, fmt.Sprintf("constant looping %d VUs for %s", numVUs, duration)
+			return 1, fmt.Sprintf("%d VUs\t%s", numVUs, duration)
 		}
 		return float64(spent) / float64(duration), fmt.Sprintf(
-			"constant looping %d VUs, %s/%s", numVUs, pb.GetFixedLengthDuration(spent, duration), duration,
+			"%d VUs\t%s/%s", numVUs, pb.GetFixedLengthDuration(spent, duration), duration,
 		)
 	}
 	clv.progress.Modify(pb.WithProgress(progresFn))

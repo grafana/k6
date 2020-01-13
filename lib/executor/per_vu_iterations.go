@@ -27,12 +27,13 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/sirupsen/logrus"
+	null "gopkg.in/guregu/null.v3"
+
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/ui/pb"
-	"github.com/sirupsen/logrus"
-	null "gopkg.in/guregu/null.v3"
 )
 
 const perVUIterationsType = "per-vu-iterations"
@@ -166,11 +167,14 @@ func (pvi PerVUIterations) Run(ctx context.Context, out chan<- stats.SampleConta
 
 	totalIters := uint64(numVUs * iterations)
 	doneIters := new(uint64)
-	fmtStr := pb.GetFixedLengthIntFormat(int64(totalIters)) + "/%d iters, %d from each of %d VUs"
+
+	vusFmt := pb.GetFixedLengthIntFormat(int64(numVUs))
+	itersFmt := pb.GetFixedLengthIntFormat(int64(totalIters))
+	fmtStr := vusFmt + " VUs\t" + itersFmt + "/" + itersFmt + " iters, %d per VU"
 	progresFn := func() (float64, string) {
 		currentDoneIters := atomic.LoadUint64(doneIters)
 		return float64(currentDoneIters) / float64(totalIters), fmt.Sprintf(
-			fmtStr, currentDoneIters, totalIters, iterations, numVUs,
+			fmtStr, numVUs, currentDoneIters, totalIters, iterations,
 		)
 	}
 	pvi.progress.Modify(pb.WithProgress(progresFn))

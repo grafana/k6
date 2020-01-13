@@ -28,12 +28,13 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/sirupsen/logrus"
+	null "gopkg.in/guregu/null.v3"
+
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/ui/pb"
-	"github.com/sirupsen/logrus"
-	null "gopkg.in/guregu/null.v3"
 )
 
 const variableArrivalRateType = "variable-arrival-rate"
@@ -356,8 +357,9 @@ func (varr VariableArrivalRate) Run(ctx context.Context, out chan<- stats.Sample
 	tickerPeriod := new(int64)
 	*tickerPeriod = int64(startTickerPeriod.Duration)
 
-	fmtStr := pb.GetFixedLengthFloatFormat(maxArrivalRatePerSec, 2) + " iters/s, " +
-		pb.GetFixedLengthIntFormat(maxVUs) + " out of " + pb.GetFixedLengthIntFormat(maxVUs) + " VUs active"
+	vusFmt := pb.GetFixedLengthIntFormat(maxVUs)
+	fmtStr := vusFmt + "/" + vusFmt + " VUs\t" + pb.GetFixedLengthFloatFormat(maxArrivalRatePerSec, 0) + " iters/s"
+
 	progresFn := func() (float64, string) {
 		currentInitialisedVUs := atomic.LoadUint64(&initialisedVUs)
 		currentTickerPeriod := atomic.LoadInt64(tickerPeriod)
@@ -368,7 +370,7 @@ func (varr VariableArrivalRate) Run(ctx context.Context, out chan<- stats.Sample
 			itersPerSec = float64(time.Second) / float64(currentTickerPeriod)
 		}
 		return math.Min(1, float64(time.Since(startTime))/float64(duration)), fmt.Sprintf(fmtStr,
-			itersPerSec, currentInitialisedVUs-vusInBuffer, currentInitialisedVUs,
+			currentInitialisedVUs-vusInBuffer, currentInitialisedVUs, itersPerSec,
 		)
 	}
 	varr.progress.Modify(pb.WithProgress(progresFn))
