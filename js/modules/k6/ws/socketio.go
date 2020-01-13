@@ -130,7 +130,7 @@ func (s *SocketIO) extractParams(args ...goja.Value) {
 			common.Throw(common.GetRuntime(*s.ctx), errors.New("Invalid argument types. Allowing Map and Function types"))
 		}
 	}
-	s.callbackFunction = validateCallableParam(*s.ctx, callFunc)
+	s.callbackFunction = validateCallableParam(s.ctx, &callFunc)
 }
 
 func validateParamArguments(ctx context.Context, args ...goja.Value) {
@@ -142,10 +142,10 @@ func validateParamArguments(ctx context.Context, args ...goja.Value) {
 	}
 }
 
-func validateCallableParam(ctx context.Context, callableParam goja.Value) (setupFn *goja.Callable) {
-	callableFunc, isFunc := goja.AssertFunction(callableParam)
+func validateCallableParam(ctx *context.Context, callableParam *goja.Value) (setupFn *goja.Callable) {
+	callableFunc, isFunc := goja.AssertFunction(*callableParam)
 	if !isFunc {
-		common.Throw(common.GetRuntime(ctx), errors.New("last argument to ws.connect must be a function"))
+		common.Throw(common.GetRuntime(*ctx), errors.New("last argument to ws.connect must be a function"))
 	}
 	return &callableFunc
 }
