@@ -64,7 +64,7 @@ import socket from "k6/socketio";
 
 export default function() {
 	socket.connect(
-		"sample url",
+		"wss://connector.athenka.com/socket.io/?EIO=3&transport=websocket",
 		{
 			headers: {
 				key1: ["1", "2", "3"],

@@ -24,6 +24,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"reflect"
 	"sync"
@@ -40,6 +41,7 @@ type WSIO struct{}
 type SocketIO struct {
 	requestHeaders        *http.Header
 	ctx                   context.Context
+	state                 *lib.State
 	conn                  *websocket.Conn
 	eventHandlers         map[string][]goja.Callable
 	scheduled             chan goja.Callable
@@ -76,20 +78,22 @@ func NewSocketIO() *WSIO {
 func (*WSIO) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTPResponse, error) {
 	validateParamArguments(ctx, args...)
 	rt, state := initConnectState(ctx)
-	socket := newWebSocketIO(ctx)
-	socket.tags = state.Options.RunTags.CloneTags()
+	socket := newWebSocketIO(ctx, state)
 	callbackFunction, socketOptions := socket.extractParams(args...)
-	dialer := createSocketIODialer(state)
-	socket.configureSocketOptions(rt, socketOptions, &dialer)
+	socket.configureSocketHeadersAndTags(rt, socketOptions)
+	dialer := socket.createSocketIODialer()
+	socket.configureSocketCookies(rt, socketOptions, &dialer)
+	conn, httpResponse, connErr := dialer.Dial(url, socket.requestHeaders.Clone())
 	callbackFunction(goja.Undefined(), rt.ToValue(&socket))
 	return nil, nil
 }
 
-func newWebSocketIO(ctx context.Context) (socket SocketIO) {
+func newWebSocketIO(initCtx context.Context, initState *lib.State) (socket SocketIO) {
 	return SocketIO{
 		requestHeaders:     &http.Header{},
-		ctx:                ctx,
-		tags:               make(map[string]string),
+		ctx:                initCtx,
+		state:              initState,
+		tags:               initState.Options.RunTags.CloneTags(),
 		eventHandlers:      make(map[string][]goja.Callable),
 		pingSendTimestamps: make(map[string]time.Time),
 		scheduled:          make(chan goja.Callable),
@@ -142,7 +146,7 @@ func validateCallableParam(ctx context.Context, callableParam goja.Value) (setup
 	return callableFunc
 }
 
-func (s *SocketIO) configureSocketOptions(rt *goja.Runtime, params goja.Value, dialer *websocket.Dialer) {
+func (s *SocketIO) configureSocketHeadersAndTags(rt *goja.Runtime, params goja.Value) {
 	if params == nil {
 		return
 	}
@@ -152,11 +156,24 @@ func (s *SocketIO) configureSocketOptions(rt *goja.Runtime, params goja.Value, d
 		case "headers":
 			s.setSocketHeaders(paramsObject, rt)
 			break
-		case "cookies":
-			s.setSocketCookies(paramsObject, rt, dialer)
-			break
 		case "tags":
 			s.setSocketTags(paramsObject, rt)
+			break
+		default:
+			break
+		}
+	}
+}
+
+func (s *SocketIO) configureSocketCookies(rt *goja.Runtime, params goja.Value, dialer *websocket.Dialer) {
+	if params == nil {
+		return
+	}
+	paramsObject := params.ToObject(rt)
+	for _, key := range paramsObject.Keys() {
+		switch key {
+		case "cookies":
+			s.setSocketCookies(paramsObject, rt, dialer)
 			break
 		default:
 			break
@@ -191,16 +208,21 @@ func (s *SocketIO) setSocketTags(paramsObject *goja.Object, rt *goja.Runtime) {
 	}
 }
 
-func createSocketIODialer(state *lib.State) (dialer websocket.Dialer) {
-	tlsConfig := createTlsConfig(state)
+func (s *SocketIO) createSocketIODialer() (dialer websocket.Dialer) {
 	return websocket.Dialer{
-		TLSClientConfig: tlsConfig,
+		NetDial:         s.createDialer,
+		Proxy:           http.ProxyFromEnvironment,
+		TLSClientConfig: s.createTlsConfig(),
 	}
 }
 
-func createTlsConfig(state *lib.State) (tlsConfig *tls.Config) {
-	if state.TLSConfig != nil {
-		tlsConfig = state.TLSConfig.Clone()
+func (s *SocketIO) createDialer(network, address string) (net.Conn, error) {
+	return s.state.Dialer.DialContext(s.ctx, network, address)
+}
+
+func (s *SocketIO) createTlsConfig() (tlsConfig *tls.Config) {
+	if s.state.TLSConfig != nil {
+		tlsConfig = s.state.TLSConfig.Clone()
 		tlsConfig.NextProtos = []string{"http/1.1"}
 	}
 	return
