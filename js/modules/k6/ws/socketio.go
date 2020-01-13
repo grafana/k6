@@ -39,8 +39,10 @@ import (
 type WSIO struct{}
 
 type SocketIO struct {
+	ctx                   *context.Context
+	callbackFunction      *goja.Callable
+	socketOptions         *goja.Value
 	requestHeaders        *http.Header
-	ctx                   context.Context
 	state                 *lib.State
 	conn                  *websocket.Conn
 	eventHandlers         map[string][]goja.Callable
@@ -79,19 +81,22 @@ func (*WSIO) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHT
 	validateParamArguments(ctx, args...)
 	rt, state := initConnectState(ctx)
 	socket := newWebSocketIO(ctx, state)
-	callbackFunction, socketOptions := socket.extractParams(args...)
-	socket.configureSocketHeadersAndTags(rt, socketOptions)
+	socket.extractParams(args...)
+	socket.configureSocketHeadersAndTags(rt, socket.socketOptions)
 	dialer := socket.createSocketIODialer()
-	socket.configureSocketCookies(rt, socketOptions, &dialer)
+	socket.configureSocketCookies(rt, socket.socketOptions, &dialer)
 	conn, httpResponse, connErr := dialer.Dial(url, socket.requestHeaders.Clone())
-	callbackFunction(goja.Undefined(), rt.ToValue(&socket))
+	fmt.Println(conn)
+	fmt.Println(httpResponse)
+	fmt.Println(connErr)
+	(*socket.callbackFunction)(goja.Undefined(), rt.ToValue(&socket))
 	return nil, nil
 }
 
 func newWebSocketIO(initCtx context.Context, initState *lib.State) (socket SocketIO) {
 	return SocketIO{
 		requestHeaders:     &http.Header{},
-		ctx:                initCtx,
+		ctx:                &initCtx,
 		state:              initState,
 		tags:               initState.Options.RunTags.CloneTags(),
 		eventHandlers:      make(map[string][]goja.Callable),
@@ -110,23 +115,22 @@ func initConnectState(ctx context.Context) (rt *goja.Runtime, state *lib.State) 
 	return
 }
 
-func (s *SocketIO) extractParams(args ...goja.Value) (callableV goja.Callable, paramsV goja.Value) {
+func (s *SocketIO) extractParams(args ...goja.Value) {
 	var callFunc goja.Value
 	for _, v := range args {
 		argType := v.ExportType()
 		switch argType.Kind() {
 		case reflect.Map:
-			paramsV = v
+			s.socketOptions = &v
 			break
 		case reflect.Func:
 			callFunc = v
 			break
 		default:
-			common.Throw(common.GetRuntime(s.ctx), errors.New("Invalid argument types. Allowing Map and Function types"))
+			common.Throw(common.GetRuntime(*s.ctx), errors.New("Invalid argument types. Allowing Map and Function types"))
 		}
 	}
-	callableV = validateCallableParam(s.ctx, callFunc)
-	return
+	s.callbackFunction = validateCallableParam(*s.ctx, callFunc)
 }
 
 func validateParamArguments(ctx context.Context, args ...goja.Value) {
@@ -138,19 +142,19 @@ func validateParamArguments(ctx context.Context, args ...goja.Value) {
 	}
 }
 
-func validateCallableParam(ctx context.Context, callableParam goja.Value) (setupFn goja.Callable) {
+func validateCallableParam(ctx context.Context, callableParam goja.Value) (setupFn *goja.Callable) {
 	callableFunc, isFunc := goja.AssertFunction(callableParam)
 	if !isFunc {
 		common.Throw(common.GetRuntime(ctx), errors.New("last argument to ws.connect must be a function"))
 	}
-	return callableFunc
+	return &callableFunc
 }
 
-func (s *SocketIO) configureSocketHeadersAndTags(rt *goja.Runtime, params goja.Value) {
+func (s *SocketIO) configureSocketHeadersAndTags(rt *goja.Runtime, params *goja.Value) {
 	if params == nil {
 		return
 	}
-	paramsObject := params.ToObject(rt)
+	paramsObject := (*params).ToObject(rt)
 	for _, key := range paramsObject.Keys() {
 		switch key {
 		case "headers":
@@ -165,11 +169,11 @@ func (s *SocketIO) configureSocketHeadersAndTags(rt *goja.Runtime, params goja.V
 	}
 }
 
-func (s *SocketIO) configureSocketCookies(rt *goja.Runtime, params goja.Value, dialer *websocket.Dialer) {
+func (s *SocketIO) configureSocketCookies(rt *goja.Runtime, params *goja.Value, dialer *websocket.Dialer) {
 	if params == nil {
 		return
 	}
-	paramsObject := params.ToObject(rt)
+	paramsObject := (*params).ToObject(rt)
 	for _, key := range paramsObject.Keys() {
 		switch key {
 		case "cookies":
@@ -217,7 +221,7 @@ func (s *SocketIO) createSocketIODialer() (dialer websocket.Dialer) {
 }
 
 func (s *SocketIO) createDialer(network, address string) (net.Conn, error) {
-	return s.state.Dialer.DialContext(s.ctx, network, address)
+	return s.state.Dialer.DialContext(*s.ctx, network, address)
 }
 
 func (s *SocketIO) createTlsConfig() (tlsConfig *tls.Config) {
