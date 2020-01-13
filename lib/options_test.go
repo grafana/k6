@@ -386,6 +386,12 @@ func TestOptions(t *testing.T) {
 		assert.True(t, opts.DiscardResponseBodies.Valid)
 		assert.True(t, opts.DiscardResponseBodies.Bool)
 	})
+	t.Run("Nic", func(t *testing.T) {
+		opts := Options{}.Apply(Options{Nic: null.StringFrom("eth0")})
+		assert.True(t, opts.Nic.Valid)
+		assert.Equal(t, "eth0", opts.Nic.String)
+	})
+
 }
 
 func TestOptionsEnv(t *testing.T) {
@@ -460,6 +466,10 @@ func TestOptionsEnv(t *testing.T) {
 		},
 		// Thresholds
 		// External
+		{"Nic", "K6_NIC"}: {
+			"":     null.String{},
+			"eth0": null.StringFrom("eth0"),
+		},
 	}
 	for field, data := range testdata {
 		field, data := field, data
