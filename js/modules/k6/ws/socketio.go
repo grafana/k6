@@ -37,8 +37,18 @@ import (
 )
 
 type WSIO struct{}
+type SocketIORunner struct {
+	rt               *goja.Runtime
+	ctx              *context.Context
+	callbackFunction *goja.Callable
+	socketOptions    *goja.Value
+	requestHeaders   *http.Header
+	state            *lib.State
+	conn             *websocket.Conn
+}
 
 type SocketIO struct {
+	SocketIORunner
 	rt                    *goja.Runtime
 	ctx                   *context.Context
 	callbackFunction      *goja.Callable
@@ -94,9 +104,11 @@ func (*WSIO) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHT
 	return nil, nil
 }
 
-func newWebSocketIO(initCtx context.Context) (socket SocketIO) {
+func newWebSocketIO(initCtx context.Context) SocketIO {
+	// TODO: Reduce props fields
 	initRuntime, initState := initConnectState(initCtx)
 	return SocketIO{
+		SocketIORunner:     newWebSocketIORunner(initCtx),
 		rt:                 initRuntime,
 		requestHeaders:     &http.Header{},
 		ctx:                &initCtx,
@@ -106,6 +118,16 @@ func newWebSocketIO(initCtx context.Context) (socket SocketIO) {
 		pingSendTimestamps: make(map[string]time.Time),
 		scheduled:          make(chan goja.Callable),
 		done:               make(chan struct{}),
+	}
+}
+
+func newWebSocketIORunner(initCtx context.Context) SocketIORunner {
+	initRuntime, initState := initConnectState(initCtx)
+	return SocketIORunner{
+		rt:             initRuntime,
+		requestHeaders: &http.Header{},
+		ctx:            &initCtx,
+		state:          initState,
 	}
 }
 
