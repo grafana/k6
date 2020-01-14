@@ -91,16 +91,13 @@ a commandline interface for interacting with it.`,
   k6 run -o influxdb=http://1.2.3.4:8086/k6`[1:],
 	Args: exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		//TODO: don't use a global... or maybe change the logger?
-		logger := logrus.StandardLogger()
-
 		//TODO: disable in quiet mode?
 		_, _ = BannerColor.Fprintf(stdout, "\n%s\n\n", consts.Banner)
 
 		initBar := pb.New(pb.WithConstLeft("   init"))
 
 		// Create the Runner.
-		printBar(initBar, "runner", logger)
+		printBar(initBar, "runner")
 		pwd, err := os.Getwd()
 		if err != nil {
 			return err
@@ -122,7 +119,7 @@ a commandline interface for interacting with it.`,
 			return err
 		}
 
-		printBar(initBar, "options", logger)
+		printBar(initBar, "options")
 
 		cliConf, err := getConfig(cmd.Flags())
 		if err != nil {
@@ -143,11 +140,14 @@ a commandline interface for interacting with it.`,
 			return err
 		}
 
+		//TODO: don't use a global... or maybe change the logger?
+		logger := logrus.StandardLogger()
+
 		ctx, cancel := context.WithCancel(context.Background()) //TODO: move even earlier?
 		defer cancel()
 
 		// Create a local execution scheduler wrapping the runner.
-		printBar(initBar, "execution scheduler", logger)
+		printBar(initBar, "execution scheduler")
 		execScheduler, err := local.NewExecutionScheduler(r, logger)
 		if err != nil {
 			return err
@@ -158,7 +158,7 @@ a commandline interface for interacting with it.`,
 		progressBarWG := &sync.WaitGroup{}
 		progressBarWG.Add(1)
 		go func() {
-			showProgress(ctx, conf, execScheduler, logger)
+			showProgress(ctx, conf, execScheduler)
 			progressBarWG.Done()
 		}()
 

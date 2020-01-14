@@ -65,13 +65,11 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
         k6 cloud script.js`[1:],
 	Args: exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		logger := logrus.StandardLogger()
-
 		//TODO: disable in quiet mode?
 		_, _ = BannerColor.Fprintf(stdout, "\n%s\n\n", consts.Banner)
 
 		progressBar := pb.New(pb.WithConstLeft(" Init"))
-		printBar(progressBar, "Parsing script", logger)
+		printBar(progressBar, "Parsing script")
 
 		// Runner
 		pwd, err := os.Getwd()
@@ -91,13 +89,13 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 			return err
 		}
 
-		printBar(progressBar, "Getting script options", logger)
+		printBar(progressBar, "Getting script options")
 		r, err := newRunner(src, runType, filesystems, runtimeOptions)
 		if err != nil {
 			return err
 		}
 
-		printBar(progressBar, "Consolidating options", logger)
+		printBar(progressBar, "Consolidating options")
 		cliOpts, err := getOptions(cmd.Flags())
 		if err != nil {
 			return err
@@ -130,7 +128,7 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 			return errors.New("Not logged in, please use `k6 login cloud`.")
 		}
 
-		printBar(progressBar, "Building the archive", logger)
+		printBar(progressBar, "Building the archive")
 		arc := r.MakeArchive()
 		// TODO: Fix this
 		// We reuse cloud.Config for parsing options.ext.loadimpact, but this probably shouldn't be
@@ -179,19 +177,19 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 		}
 
 		// Start cloud test run
-		printBar(progressBar, "Validating script options", logger)
+		printBar(progressBar, "Validating script options")
 		client := cloud.NewClient(cloudConfig.Token.String, cloudConfig.Host.String, consts.Version)
 		if err := client.ValidateOptions(arc.Options); err != nil {
 			return err
 		}
 
-		printBar(progressBar, "Uploading archive", logger)
+		printBar(progressBar, "Uploading archive")
 		refID, err := client.StartCloudTestRun(name, cloudConfig.ProjectID.Int64, arc)
 		if err != nil {
 			return err
 		}
 		progressBar.Modify(pb.WithConstLeft("   Run"))
-		printBar(progressBar, "Initializing the cloud test", logger)
+		printBar(progressBar, "Initializing the cloud test")
 
 		testURL := cloud.URLForResults(refID, cloudConfig)
 		fprintf(stdout, "\n\n")
@@ -200,7 +198,7 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 		fprintf(stdout, "     output: %s\n", ui.ValueColor.Sprint(testURL))
 		//TODO: print executors information
 		fprintf(stdout, "\n")
-		printBar(progressBar, "Initializing the cloud test", logger)
+		printBar(progressBar, "Initializing the cloud test")
 
 		// The quiet option hides the progress bar and disallow aborting the test
 		if quiet {
@@ -236,7 +234,7 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 					if (testProgress.RunStatus > lib.RunStatusRunning) || (exitOnRunning && testProgress.RunStatus == lib.RunStatusRunning) {
 						shouldExitLoop = true
 					}
-					printBar(progressBar, "", logger)
+					printBar(progressBar, "")
 				} else {
 					logrus.WithError(progressErr).Error("Test progress error")
 				}

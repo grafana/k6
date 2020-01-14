@@ -29,8 +29,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/loadimpact/k6/core/local"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/ui/pb"
@@ -70,7 +68,7 @@ func (w *consoleWriter) Write(p []byte) (n int, err error) {
 	return origLen, err
 }
 
-func printBar(bar *pb.ProgressBar, rightText string, logger *logrus.Logger) {
+func printBar(bar *pb.ProgressBar, rightText string) {
 	end := "\n"
 	if stdout.IsTTY {
 		// If we're in a TTY, instead of printing the bar and going to the next
@@ -80,11 +78,10 @@ func printBar(bar *pb.ProgressBar, rightText string, logger *logrus.Logger) {
 		// TODO: check for cross platform support
 		end = "\x1b[0K\r"
 	}
-	fprintf(stdout, "%s %s%s", bar.Render(0, logger), rightText, end)
+	fprintf(stdout, "%s %s%s", bar.Render(0), rightText, end)
 }
 
-func renderMultipleBars(isTTY, goBack bool, leftMax int, pbs []*pb.ProgressBar,
-	logger *logrus.Logger) string {
+func renderMultipleBars(isTTY, goBack bool, leftMax int, pbs []*pb.ProgressBar) string {
 	lineEnd := "\n"
 	if isTTY {
 		//TODO: check for cross platform support
@@ -95,7 +92,7 @@ func renderMultipleBars(isTTY, goBack bool, leftMax int, pbs []*pb.ProgressBar,
 	result := make([]string, pbsCount+2)
 	result[0] = lineEnd // start with an empty line
 	for i, pb := range pbs {
-		result[i+1] = pb.Render(leftMax, logger) + lineEnd
+		result[i+1] = pb.Render(leftMax) + lineEnd
 	}
 	if isTTY && goBack {
 		// Go back to the beginning
@@ -110,10 +107,7 @@ func renderMultipleBars(isTTY, goBack bool, leftMax int, pbs []*pb.ProgressBar,
 //TODO: show other information here?
 //TODO: add a no-progress option that will disable these
 //TODO: don't use global variables...
-func showProgress(
-	ctx context.Context, conf Config, execScheduler *local.ExecutionScheduler,
-	logger *logrus.Logger,
-) {
+func showProgress(ctx context.Context, conf Config, execScheduler *local.ExecutionScheduler) {
 	if quiet || conf.HTTPDebug.Valid && conf.HTTPDebug.String != "" {
 		return
 	}
@@ -137,7 +131,7 @@ func showProgress(
 	leftLen = int(lib.Min(int64(leftLen), maxLeftLength))
 
 	// For flicker-free progressbars!
-	progressBarsLastRender := []byte(renderMultipleBars(stdoutTTY, true, leftLen, pbs, logger))
+	progressBarsLastRender := []byte(renderMultipleBars(stdoutTTY, true, leftLen, pbs))
 	progressBarsPrint := func() {
 		_, _ = stdout.Writer.Write(progressBarsLastRender)
 	}
@@ -158,7 +152,7 @@ func showProgress(
 			stderr.PersistentText = nil
 			if ctx.Err() != nil {
 				// Render a last plain-text progressbar in an error
-				progressBarsLastRender = []byte(renderMultipleBars(stdoutTTY, false, leftLen, pbs, logger))
+				progressBarsLastRender = []byte(renderMultipleBars(stdoutTTY, false, leftLen, pbs))
 				progressBarsPrint()
 			}
 			outMutex.Unlock()
@@ -170,7 +164,7 @@ func showProgress(
 	for {
 		select {
 		case <-ticker.C:
-			barText := renderMultipleBars(stdoutTTY, true, leftLen, pbs, logger)
+			barText := renderMultipleBars(stdoutTTY, true, leftLen, pbs)
 			outMutex.Lock()
 			progressBarsLastRender = []byte(barText)
 			progressBarsPrint()
