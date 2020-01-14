@@ -8,10 +8,10 @@ labels: bug
 
 ## Environment
 <!--- Provide as much information about your environment as possible: output from `k6 version`,
-      OCI runtime and image information if using containers, etc. -->
+      OCI runtime and image information if using containers, cloud execution environment, etc. -->
 - k6 version:
 - OS and version:
-- Docker version and image:
+- Docker version and image, if applicable:
 
 
 ## Expected Behavior
