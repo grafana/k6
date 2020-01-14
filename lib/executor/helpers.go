@@ -28,10 +28,11 @@ import (
 
 	"github.com/loadimpact/k6/ui/pb"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
-	"github.com/sirupsen/logrus"
 )
 
 func sumStagesDuration(stages []Stage) (result time.Duration) {
@@ -152,7 +153,7 @@ func getDurationContexts(parentCtx context.Context, regularDuration, gracefulSto
 // executor and updates its progressbar accordingly.
 func trackProgress(
 	parentCtx, maxDurationCtx, regDurationCtx context.Context,
-	exec lib.Executor, snapshot func() (float64, string),
+	exec lib.Executor, snapshot func() (float64, []string),
 ) {
 	progressBar := exec.GetProgress()
 	logger := exec.GetLogger()
@@ -164,16 +165,20 @@ func trackProgress(
 		logger.WithField("gracefulStop", gracefulStop).Debug(
 			"Regular duration is done, waiting for iterations to gracefully finish",
 		)
-		progressBar.Modify(pb.WithConstProgress(p, right+", gracefully stopping..."))
+		progressBar.Modify(
+			pb.WithStatus(pb.Stopping),
+			pb.WithConstProgress(p, right...),
+		)
 	}
 
 	<-maxDurationCtx.Done()
 	p, right := snapshot()
+	constProg := pb.WithConstProgress(p, right...)
 	select {
 	case <-parentCtx.Done():
-		progressBar.Modify(pb.WithConstProgress(p, right+" interrupted!"))
+		progressBar.Modify(pb.WithStatus(pb.Interrupted), constProg)
 	default:
-		progressBar.Modify(pb.WithConstProgress(p, right+" done!"))
+		progressBar.Modify(pb.WithStatus(pb.Done), constProg)
 	}
 }
 

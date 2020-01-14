@@ -29,9 +29,10 @@ import (
 
 	"github.com/loadimpact/k6/ui/pb"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
-	"github.com/sirupsen/logrus"
 )
 
 // ExecutionScheduler is the local implementation of lib.ExecutionScheduler
@@ -290,10 +291,13 @@ func (e *ExecutionScheduler) runExecutor(
 	// Check if we have to wait before starting the actual executor execution
 	if executorStartTime > 0 {
 		startTime := time.Now()
-		executorProgress.Modify(pb.WithProgress(func() (float64, string) {
-			remWait := (executorStartTime - time.Since(startTime))
-			return 0, fmt.Sprintf("waiting %s", pb.GetFixedLengthDuration(remWait, executorStartTime))
-		}))
+		executorProgress.Modify(
+			pb.WithStatus(pb.Waiting),
+			pb.WithProgress(func() (float64, string) {
+				remWait := (executorStartTime - time.Since(startTime))
+				return 0, fmt.Sprintf("waiting %s", pb.GetFixedLengthDuration(remWait, executorStartTime))
+			}),
+		)
 
 		executorLogger.Debugf("Waiting for executor start time...")
 		select {
@@ -305,7 +309,10 @@ func (e *ExecutionScheduler) runExecutor(
 		}
 	}
 
-	executorProgress.Modify(pb.WithConstProgress(0, "started"))
+	executorProgress.Modify(
+		pb.WithStatus(pb.Running),
+		pb.WithConstProgress(0, "started"),
+	)
 	executorLogger.Debugf("Starting executor")
 	err := executor.Run(runCtx, engineOut) // executor should handle context cancel itself
 	if err == nil {
