@@ -7,8 +7,11 @@ labels: bug
 <!--- Provide a general summary of the issue in the Title above -->
 
 ## Environment
-<!--- Output from `k6 version`, e.g. `k6 v0.26.0-dev (dev build, go1.13.4, linux/amd64)` -->
+<!--- Provide as much information about your environment as possible: output from `k6 version`,
+      OCI runtime and image information if using containers, etc. -->
 - k6 version:
+- OS and version:
+- Docker version and image:
 
 
 ## Expected Behavior
