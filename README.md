@@ -344,18 +344,13 @@ k6 comes with several built-in modules for things like making (and measuring) [H
 You can, of course, also write your own ES6 modules and `import` them in your scripts, potentially reusing code across an organization. The situation with importing JavaScript libraries is a bit more complicated. You can potentially use **some** JS libraries in k6, even ones intended for Node.js if you use browserify, though if they depend on network/OS-related APIs, they likely won't work. You can find more details and instructions about writing or importing JS modules [here](https://docs.k6.io/docs/modules).
 
 
-Need help or want to contribute?
---------------------------------
+Support
+-------
 
-Types of questions and where to ask:
+To get help about usage, report bugs, suggest features, and discuss k6 with other users see [SUPPORT.md](SUPPORT.md).
 
-- How do I? -- [Stack Overflow](https://stackoverflow.com/questions/tagged/k6) (use tags: k6, javascript, load-testing) or the Discourse forum at [community.k6.io](https://community.k6.io/)
-- I got this error, why? -- [Stack Overflow](https://stackoverflow.com/questions/tagged/k6) or [community.k6.io](https://community.k6.io/)
-- I got this error and I'm sure it's a bug -- [file an issue](https://github.com/loadimpact/k6/issues)
-- I have an idea/request -- [file an issue](https://github.com/loadimpact/k6/issues)
-- Why do you? -- [Slack](https://k6.io/slack)
-- When will you? -- [Slack](https://k6.io/slack)
 
-If your questions are about any of the commercial Load Impact services like managed cloud execution and Load Impact Insights, you can contact <support@loadimpact.com> or write in the `#loadimpact` channel in [Slack](https://k6.io/slack).
+Contributing
+------------
 
 If you want to contribute or help with the development of k6, start by reading [CONTRIBUTING.md](https://github.com/loadimpact/k6/blob/master/CONTRIBUTING.md). Before you start coding, especially when it comes to big changes and features, it might be a good idea to first discuss your plans and implementation details with the k6 maintainers. You can do this either in the [github issue](https://github.com/loadimpact/k6/issues) for the problem you're solving (create one if it doesn't exist) or in the `#developers` channel on [Slack](https://k6.io/slack).
