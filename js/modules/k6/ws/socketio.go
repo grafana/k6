@@ -26,7 +26,10 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/http/cookiejar"
+	"net/url"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 
@@ -34,39 +37,40 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/netext/httpext"
 )
 
 type WSIO struct{}
+
 type SocketIORunner struct {
-	rt               *goja.Runtime
+	runtime          *goja.Runtime
 	ctx              *context.Context
-	callbackFunction *goja.Callable
-	socketOptions    *goja.Value
+	callbackFunction goja.Callable
+	socketOptions    goja.Value
 	requestHeaders   *http.Header
 	state            *lib.State
 	conn             *websocket.Conn
+	dialer           *websocket.Dialer
+	url              *url.URL
 }
 
-type SocketIO struct {
-	SocketIORunner
-	rt                    *goja.Runtime
-	ctx                   *context.Context
-	callbackFunction      *goja.Callable
-	socketOptions         *goja.Value
-	requestHeaders        *http.Header
-	state                 *lib.State
-	conn                  *websocket.Conn
-	eventHandlers         map[string][]goja.Callable
-	scheduled             chan goja.Callable
-	done                  chan struct{}
-	shutdownOnce          sync.Once
-	tags                  map[string]string
+type SocketIOMetrics struct {
 	msgSentTimestamps     []time.Time
 	msgReceivedTimestamps []time.Time
 
 	pingSendTimestamps map[string]time.Time
 	pingSendCounter    int
 	pingTimestamps     []pingDelta
+}
+
+type SocketIO struct {
+	runner        SocketIORunner
+	metrics       SocketIOMetrics
+	eventHandlers map[string][]goja.Callable
+	scheduled     chan goja.Callable
+	done          chan struct{}
+	shutdownOnce  sync.Once
+	tags          map[string]string
 }
 
 const (
@@ -90,44 +94,52 @@ func NewSocketIO() *WSIO {
 
 func (*WSIO) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTPResponse, error) {
 	validateParamArguments(ctx, args...)
-	// rt, state := initConnectState(ctx)
-	socket := newWebSocketIO(ctx)
+	socket := newWebSocketIO(ctx, url)
 	socket.extractParams(args...)
-	socket.configureSocketHeadersAndTags(socket.socketOptions)
-	dialer := socket.createSocketIODialer()
-	socket.configureSocketCookies(socket.socketOptions, &dialer)
-	conn, httpResponse, connErr := dialer.Dial(url, socket.requestHeaders.Clone())
-	fmt.Println(conn)
-	fmt.Println(httpResponse)
-	fmt.Println(connErr)
-	(*socket.callbackFunction)(goja.Undefined(), socket.rt.ToValue(&socket))
+	socket.configureSocketOptions(socket.runner.socketOptions)
+	socket.createSocketIODialer()
+	//socket.configureSocketCookies(&socket.runner.socketOptions)
+	socket.runner.dialer.Dial(url, socket.runner.requestHeaders.Clone())
+	// fmt.Println(conn)
+	// fmt.Println(httpResponse)
+	// fmt.Println(connErr)
+	(socket.runner.callbackFunction)(goja.Undefined(), socket.runner.runtime.ToValue(&socket))
 	return nil, nil
 }
 
-func newWebSocketIO(initCtx context.Context) SocketIO {
-	// TODO: Reduce props fields
-	initRuntime, initState := initConnectState(initCtx)
+func newWebSocketIO(initCtx context.Context, url string) SocketIO {
+	initRunner := newWebSocketIORunner(initCtx, url)
+	initMetrics := newWebSocketIOMetrics()
 	return SocketIO{
-		SocketIORunner:     newWebSocketIORunner(initCtx),
-		rt:                 initRuntime,
-		requestHeaders:     &http.Header{},
-		ctx:                &initCtx,
-		state:              initState,
-		tags:               initState.Options.RunTags.CloneTags(),
-		eventHandlers:      make(map[string][]goja.Callable),
-		pingSendTimestamps: make(map[string]time.Time),
-		scheduled:          make(chan goja.Callable),
-		done:               make(chan struct{}),
+		runner:        initRunner,
+		metrics:       initMetrics,
+		tags:          initRunner.state.Options.RunTags.CloneTags(),
+		eventHandlers: make(map[string][]goja.Callable),
+		scheduled:     make(chan goja.Callable),
+		done:          make(chan struct{}),
 	}
 }
 
-func newWebSocketIORunner(initCtx context.Context) SocketIORunner {
+func newWebSocketIORunner(initCtx context.Context, rawUrl string) SocketIORunner {
 	initRuntime, initState := initConnectState(initCtx)
+	u, err := url.Parse(rawUrl)
+	isInvalidUrl := len(strings.TrimSpace(u.Hostname())) == 0
+	if err != nil || isInvalidUrl {
+		msg := fmt.Sprintf("URL [%s] is invalid", rawUrl)
+		panic(common.NewInitContextError(msg))
+	}
 	return SocketIORunner{
-		rt:             initRuntime,
+		runtime:        initRuntime,
 		requestHeaders: &http.Header{},
 		ctx:            &initCtx,
 		state:          initState,
+		url:            u,
+	}
+}
+
+func newWebSocketIOMetrics() SocketIOMetrics {
+	return SocketIOMetrics{
+		pingSendTimestamps: make(map[string]time.Time),
 	}
 }
 
@@ -146,16 +158,17 @@ func (s *SocketIO) extractParams(args ...goja.Value) {
 		argType := v.ExportType()
 		switch argType.Kind() {
 		case reflect.Map:
-			s.socketOptions = &v
-			break
+			s.runner.socketOptions = v
+			continue
 		case reflect.Func:
 			callFunc = v
-			break
+			continue
 		default:
-			common.Throw(common.GetRuntime(*s.ctx), errors.New("Invalid argument types. Allowing Map and Function types"))
+			common.Throw(common.GetRuntime(*s.runner.ctx), errors.New("Invalid argument types. Allowing Map and Function types"))
+			continue
 		}
 	}
-	s.callbackFunction = validateCallableParam(s.ctx, &callFunc)
+	s.runner.callbackFunction = validateCallableParam(s.runner.ctx, callFunc)
 }
 
 func validateParamArguments(ctx context.Context, args ...goja.Value) {
@@ -167,91 +180,113 @@ func validateParamArguments(ctx context.Context, args ...goja.Value) {
 	}
 }
 
-func validateCallableParam(ctx *context.Context, callableParam *goja.Value) (setupFn *goja.Callable) {
-	callableFunc, isFunc := goja.AssertFunction(*callableParam)
+func validateCallableParam(ctx *context.Context, callableParam goja.Value) (setupFn goja.Callable) {
+	callableFunc, isFunc := goja.AssertFunction(callableParam)
 	if !isFunc {
 		common.Throw(common.GetRuntime(*ctx), errors.New("last argument to ws.connect must be a function"))
 	}
-	return &callableFunc
+	return callableFunc
 }
 
-func (s *SocketIO) configureSocketHeadersAndTags(params *goja.Value) {
+func (s *SocketIO) configureSocketOptions(params goja.Value) {
 	if params == nil {
 		return
 	}
-	paramsObject := (*params).ToObject(s.rt)
+	paramsObject := params.ToObject(s.runner.runtime)
 	for _, key := range paramsObject.Keys() {
 		switch key {
 		case "headers":
-			s.setSocketHeaders(paramsObject, s.rt)
-			break
+			s.setSocketHeaders(paramsObject)
+			continue
 		case "tags":
-			s.setSocketTags(paramsObject, s.rt)
-			break
-		default:
-			break
-		}
-	}
-}
-
-func (s *SocketIO) configureSocketCookies(params *goja.Value, dialer *websocket.Dialer) {
-	if params == nil {
-		return
-	}
-	paramsObject := (*params).ToObject(s.rt)
-	for _, key := range paramsObject.Keys() {
-		switch key {
+			s.setSocketTags(paramsObject)
+			continue
 		case "cookies":
-			s.setSocketCookies(paramsObject, s.rt, dialer)
+			s.setSocketCookies(paramsObject)
 			break
 		default:
-			break
+			continue
 		}
 	}
 }
 
-func (s *SocketIO) setSocketHeaders(paramsObject *goja.Object, rt *goja.Runtime) {
+func (s *SocketIO) setSocketHeaders(paramsObject *goja.Object) {
 	headersV := paramsObject.Get("headers")
 	if goja.IsUndefined(headersV) || goja.IsNull(headersV) {
 		return
 	}
-	headersObj := headersV.ToObject(rt)
+	headersObj := headersV.ToObject(s.runner.runtime)
 	for _, key := range headersObj.Keys() {
-		s.requestHeaders.Set(key, headersObj.Get(key).String())
+		s.runner.requestHeaders.Set(key, headersObj.Get(key).String())
 	}
 }
 
-func (s *SocketIO) setSocketCookies(paramsObject *goja.Object, rt *goja.Runtime, dialer *websocket.Dialer) {
+func (s *SocketIO) setSocketCookies(paramsObject *goja.Object) {
 	cookiesV := paramsObject.Get("cookies")
-	fmt.Println(cookiesV)
+	if goja.IsUndefined(cookiesV) || goja.IsNull(cookiesV) {
+		return
+	}
+	cookiesObject := cookiesV.ToObject(s.runner.runtime)
+	if cookiesObject == nil {
+		return
+	}
+	requestCookies := make(map[string]*httpext.HTTPRequestCookie)
+	for _, key := range cookiesObject.Keys() {
+		cookieV := cookiesObject.Get(key)
+		if goja.IsUndefined(cookieV) || goja.IsNull(cookieV) {
+			continue
+		}
+		switch cookieV.ExportType() {
+		case reflect.TypeOf(map[string]interface{}{}):
+			requestCookies[key] = &httpext.HTTPRequestCookie{Name: key, Value: "", Replace: false}
+			cookie := cookieV.ToObject(s.runner.runtime)
+			for _, attr := range cookie.Keys() {
+				switch strings.ToLower(attr) {
+				case "replace":
+					requestCookies[key].Replace = cookie.Get(attr).ToBoolean()
+				case "value":
+					requestCookies[key].Value = cookie.Get(attr).String()
+				}
+			}
+		default:
+			requestCookies[key] = &httpext.HTTPRequestCookie{Name: key, Value: cookieV.String(), Replace: false}
+		}
+	}
+	cookies := []string{}
+	for _, value := range requestCookies {
+		cookies = append(cookies, fmt.Sprintf("%s=%s", value.Name, value.Value))
+	}
+	s.runner.requestHeaders.Set("cookie", strings.Join(cookies, ";"))
 }
 
-func (s *SocketIO) setSocketTags(paramsObject *goja.Object, rt *goja.Runtime) {
+func (s *SocketIO) setSocketTags(paramsObject *goja.Object) {
 	tagsV := paramsObject.Get("tags")
 	if goja.IsUndefined(tagsV) || goja.IsNull(tagsV) {
 		return
 	}
-	tagsObj := tagsV.ToObject(rt)
+	tagsObj := tagsV.ToObject(s.runner.runtime)
 	for _, key := range tagsObj.Keys() {
 		s.tags[key] = tagsObj.Get(key).String()
 	}
 }
 
-func (s *SocketIO) createSocketIODialer() (dialer websocket.Dialer) {
-	return websocket.Dialer{
+func (s *SocketIO) createSocketIODialer() {
+	jar, _ := cookiejar.New(nil)
+	s.runner.dialer = &websocket.Dialer{
 		NetDial:         s.createDialer,
 		Proxy:           http.ProxyFromEnvironment,
 		TLSClientConfig: s.createTlsConfig(),
+		Jar:             jar,
 	}
 }
 
 func (s *SocketIO) createDialer(network, address string) (net.Conn, error) {
-	return s.state.Dialer.DialContext(*s.ctx, network, address)
+	return s.runner.state.Dialer.DialContext(*s.runner.ctx, network, address)
 }
 
 func (s *SocketIO) createTlsConfig() (tlsConfig *tls.Config) {
-	if s.state.TLSConfig != nil {
-		tlsConfig = s.state.TLSConfig.Clone()
+	if s.runner.state.TLSConfig != nil {
+		tlsConfig = s.runner.state.TLSConfig.Clone()
 		tlsConfig.NextProtos = []string{"http/1.1"}
 	}
 	return

@@ -64,14 +64,18 @@ import socket from "k6/socketio";
 
 export default function() {
 	socket.connect(
-		"wss://connector.athenka.com/socket.io/?EIO=3&transport=websocket",
+		"ws://localhost:3000/socket.io/?EIO=3&transport=websocket",
 		{
 			headers: {
 				key1: ["1", "2", "3"],
 				key2: ["m", "i", "n", "h"],
 				anotherlongkey: ["test", "domain", "path", "duration"]
 			},
-			cookie: ["sample", "sadsa", "sadsa"]
+			cookies: {
+				sample1: "abc",
+				sample2: "abcxyz",
+				anotherCookieKey: { value: "hehe", replace: true }
+			}
 		},
 		function(socket) {
 			console.log("abc function");
