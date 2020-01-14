@@ -460,6 +460,11 @@ func (vlvc VariableLoopingVUsConfig) NewExecutor(es *lib.ExecutionState, logger 
 	}, nil
 }
 
+// HasWork reports whether there is any work to be done for the given execution segment.
+func (vlvc VariableLoopingVUsConfig) HasWork(es *lib.ExecutionSegment) bool {
+	return lib.GetMaxPlannedVUs(vlvc.GetExecutionRequirements(es)) > 0
+}
+
 // VariableLoopingVUs handles the old "stages" execution configuration - it
 // loops iterations with a variable number of VUs for the sum of all of the
 // specified stages' duration.

@@ -116,6 +116,11 @@ func (clvc ConstantLoopingVUsConfig) GetExecutionRequirements(es *lib.ExecutionS
 	}
 }
 
+// HasWork reports whether there is any work to be done for the given execution segment.
+func (clvc ConstantLoopingVUsConfig) HasWork(es *lib.ExecutionSegment) bool {
+	return clvc.GetVUs(es) > 0
+}
+
 // NewExecutor creates a new ConstantLoopingVUs executor
 func (clvc ConstantLoopingVUsConfig) NewExecutor(es *lib.ExecutionState, logger *logrus.Entry) (lib.Executor, error) {
 	return ConstantLoopingVUs{
