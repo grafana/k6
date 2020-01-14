@@ -70,7 +70,11 @@ func NewExecutionScheduler(runner lib.Runner, logger *logrus.Logger) (*Execution
 	executors := make([]lib.Executor, 0, len(executorConfigs))
 	// Only take executors which have work.
 	for _, sc := range executorConfigs {
-		if !sc.HasWork(executionState.Options.ExecutionSegment) {
+		if !sc.HasWork(options.ExecutionSegment) {
+			logger.Warnf(
+				"Executor '%s' is disabled for segment %s due to lack of work!",
+				sc.GetName(), options.ExecutionSegment,
+			)
 			continue
 		}
 		s, err := sc.NewExecutor(executionState, logger.WithField("executor", sc.GetName()))
