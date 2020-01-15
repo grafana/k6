@@ -510,16 +510,16 @@ func (vlv VariableLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleCo
 
 	activeVUsCount := new(int64)
 	vusFmt := pb.GetFixedLengthIntFormat(int64(maxVUs))
-	progresFn := func() (float64, string) {
+	progresFn := func() (float64, []string) {
 		spent := time.Since(startTime)
 		currentlyActiveVUs := atomic.LoadInt64(activeVUsCount)
+		vus := fmt.Sprintf(vusFmt+"/"+vusFmt+" VUs", currentlyActiveVUs, maxVUs)
 		if spent > regularDuration {
-			return 1, fmt.Sprintf(vusFmt+"/"+vusFmt+" VUs\t%s", currentlyActiveVUs, maxVUs, regularDuration)
+			return 1, []string{vus, regularDuration.String()}
 		}
-		return float64(spent) / float64(regularDuration), fmt.Sprintf(
-			vusFmt+"/"+vusFmt+" VUs\t%s/%s", currentlyActiveVUs, maxVUs,
-			pb.GetFixedLengthDuration(spent, regularDuration), regularDuration,
-		)
+		progVUs := fmt.Sprintf(vusFmt+"/"+vusFmt+" VUs", currentlyActiveVUs, maxVUs)
+		progDur := fmt.Sprintf("%s/%s", pb.GetFixedLengthDuration(spent, regularDuration), regularDuration)
+		return float64(spent) / float64(regularDuration), []string{progVUs, progDur}
 	}
 	vlv.progress.Modify(pb.WithProgress(progresFn))
 	go trackProgress(ctx, maxDurationCtx, regDurationCtx, vlv, progresFn)

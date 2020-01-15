@@ -228,15 +228,15 @@ func (car ConstantArrivalRate) Run(ctx context.Context, out chan<- stats.SampleC
 	}
 
 	vusFmt := pb.GetFixedLengthIntFormat(maxVUs)
-	fmtStr := vusFmt + "/" + vusFmt + " VUs\t" + pb.GetFixedLengthFloatFormat(arrivalRatePerSec, 0) + " iters/s"
-
-	progresFn := func() (float64, string) {
+	progresFn := func() (float64, []string) {
 		spent := time.Since(startTime)
 		currentInitialisedVUs := atomic.LoadUint64(&initialisedVUs)
 		vusInBuffer := uint64(len(vus))
-		return math.Min(1, float64(spent)/float64(duration)), fmt.Sprintf(fmtStr,
-			currentInitialisedVUs-vusInBuffer, currentInitialisedVUs, arrivalRatePerSec,
-		)
+		progVUs := fmt.Sprintf(vusFmt+"/"+vusFmt+" VUs",
+			currentInitialisedVUs-vusInBuffer, currentInitialisedVUs)
+		progIters := fmt.Sprintf(
+			pb.GetFixedLengthFloatFormat(arrivalRatePerSec, 0)+" iters/s", arrivalRatePerSec)
+		return math.Min(1, float64(spent)/float64(duration)), []string{progVUs, progIters}
 	}
 	car.progress.Modify(pb.WithProgress(progresFn))
 	go trackProgress(ctx, maxDurationCtx, regDurationCtx, car, progresFn)

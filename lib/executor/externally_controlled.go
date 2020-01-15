@@ -394,7 +394,7 @@ func (rs *externallyControlledRunState) retrieveStartMaxVUs() error {
 	return nil
 }
 
-func (rs *externallyControlledRunState) progresFn() (float64, string) {
+func (rs *externallyControlledRunState) progresFn() (float64, []string) {
 	spent := rs.executor.executionState.GetCurrentTestRunDuration()
 	progress := 0.0
 	if rs.duration > 0 {
@@ -404,10 +404,9 @@ func (rs *externallyControlledRunState) progresFn() (float64, string) {
 	currentActiveVUs := atomic.LoadInt64(rs.activeVUsCount)
 	currentMaxVUs := atomic.LoadInt64(rs.maxVUs)
 	vusFmt := pb.GetFixedLengthIntFormat(currentMaxVUs)
-	return progress, fmt.Sprintf(
-		vusFmt+"/"+vusFmt+" VUs\t%s/%s", currentActiveVUs, currentMaxVUs,
-		pb.GetFixedLengthDuration(spent, rs.duration), rs.duration,
-	)
+	progVUs := fmt.Sprintf(vusFmt+"/"+vusFmt+" VUs", currentActiveVUs, currentMaxVUs)
+	progDur := fmt.Sprintf("%s/%s", pb.GetFixedLengthDuration(spent, rs.duration), rs.duration)
+	return progress, []string{progVUs, progDur}
 }
 
 func (rs *externallyControlledRunState) handleConfigChange(oldCfg, newCfg ExternallyControlledConfigParams) error {

@@ -156,14 +156,16 @@ func (clv ConstantLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleCo
 		logrus.Fields{"vus": numVUs, "duration": duration, "type": clv.config.GetType()},
 	).Debug("Starting executor run...")
 
-	progresFn := func() (float64, string) {
+	progresFn := func() (float64, []string) {
 		spent := time.Since(startTime)
+		right := []string{fmt.Sprintf("%d VUs", numVUs)}
 		if spent > duration {
-			return 1, fmt.Sprintf("%d VUs\t%s", numVUs, duration)
+			right = append(right, duration.String())
+			return 1, right
 		}
-		return float64(spent) / float64(duration), fmt.Sprintf(
-			"%d VUs\t%s/%s", numVUs, pb.GetFixedLengthDuration(spent, duration), duration,
-		)
+		right = append(right, fmt.Sprintf("%s/%s",
+			pb.GetFixedLengthDuration(spent, duration), duration))
+		return float64(spent) / float64(duration), right
 	}
 	clv.progress.Modify(pb.WithProgress(progresFn))
 	go trackProgress(ctx, maxDurationCtx, regDurationCtx, clv, progresFn)

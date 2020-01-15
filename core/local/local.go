@@ -232,10 +232,10 @@ func (e *ExecutionScheduler) Init(ctx context.Context, engineOut chan<- stats.Sa
 	initializedVUs := new(uint64)
 	vusFmt := pb.GetFixedLengthIntFormat(int64(vusToInitialize))
 	e.initProgress.Modify(
-		pb.WithProgress(func() (float64, string) {
+		pb.WithProgress(func() (float64, []string) {
 			doneVUs := atomic.LoadUint64(initializedVUs)
-			return float64(doneVUs) / float64(vusToInitialize),
-				fmt.Sprintf(vusFmt+"/%d VUs initialized", doneVUs, vusToInitialize)
+			right := fmt.Sprintf(vusFmt+"/%d VUs initialized", doneVUs, vusToInitialize)
+			return float64(doneVUs) / float64(vusToInitialize), []string{right}
 		}),
 	)
 
@@ -293,9 +293,9 @@ func (e *ExecutionScheduler) runExecutor(
 		startTime := time.Now()
 		executorProgress.Modify(
 			pb.WithStatus(pb.Waiting),
-			pb.WithProgress(func() (float64, string) {
+			pb.WithProgress(func() (float64, []string) {
 				remWait := (executorStartTime - time.Since(startTime))
-				return 0, fmt.Sprintf("waiting %s", pb.GetFixedLengthDuration(remWait, executorStartTime))
+				return 0, []string{"waiting", pb.GetFixedLengthDuration(remWait, executorStartTime)}
 			}),
 		)
 

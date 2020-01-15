@@ -358,9 +358,9 @@ func (varr VariableArrivalRate) Run(ctx context.Context, out chan<- stats.Sample
 	*tickerPeriod = int64(startTickerPeriod.Duration)
 
 	vusFmt := pb.GetFixedLengthIntFormat(maxVUs)
-	fmtStr := vusFmt + "/" + vusFmt + " VUs\t" + pb.GetFixedLengthFloatFormat(maxArrivalRatePerSec, 0) + " iters/s"
+	itersFmt := pb.GetFixedLengthFloatFormat(maxArrivalRatePerSec, 0) + " iters/s"
 
-	progresFn := func() (float64, string) {
+	progresFn := func() (float64, []string) {
 		currentInitialisedVUs := atomic.LoadUint64(&initialisedVUs)
 		currentTickerPeriod := atomic.LoadInt64(tickerPeriod)
 		vusInBuffer := uint64(len(vus))
@@ -369,9 +369,11 @@ func (varr VariableArrivalRate) Run(ctx context.Context, out chan<- stats.Sample
 		if currentTickerPeriod > 0 {
 			itersPerSec = float64(time.Second) / float64(currentTickerPeriod)
 		}
-		return math.Min(1, float64(time.Since(startTime))/float64(duration)), fmt.Sprintf(fmtStr,
-			currentInitialisedVUs-vusInBuffer, currentInitialisedVUs, itersPerSec,
-		)
+		return math.Min(1, float64(time.Since(startTime))/float64(duration)), []string{
+			fmt.Sprintf(vusFmt+"/"+vusFmt+" VUs",
+				currentInitialisedVUs-vusInBuffer, currentInitialisedVUs),
+			fmt.Sprintf(itersFmt, itersPerSec),
+		}
 	}
 	varr.progress.Modify(pb.WithProgress(progresFn))
 	go trackProgress(ctx, maxDurationCtx, regDurationCtx, varr, progresFn)

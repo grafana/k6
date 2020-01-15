@@ -60,7 +60,7 @@ type ProgressBar struct {
 	status Status
 
 	left     func() string
-	progress func() (progress float64, right string)
+	progress func() (progress float64, right []string)
 	hijack   func() string
 }
 
@@ -68,12 +68,12 @@ type ProgressBar struct {
 // parameters, either in the constructor or via the Modify() method.
 type ProgressBarOption func(*ProgressBar)
 
-// WithLeft modifies the function that returns the left progressbar padding.
+// WithLeft modifies the function that returns the left progressbar value.
 func WithLeft(left func() string) ProgressBarOption {
 	return func(pb *ProgressBar) { pb.left = left }
 }
 
-// WithConstLeft sets the left progressbar padding to the supplied const.
+// WithConstLeft sets the left progressbar value to the supplied const.
 func WithConstLeft(left string) ProgressBarOption {
 	return func(pb *ProgressBar) {
 		pb.left = func() string { return left }
@@ -86,7 +86,7 @@ func WithLogger(logger *logrus.Entry) ProgressBarOption {
 }
 
 // WithProgress modifies the progress calculation function.
-func WithProgress(progress func() (float64, string)) ProgressBarOption {
+func WithProgress(progress func() (float64, []string)) ProgressBarOption {
 	return func(pb *ProgressBar) { pb.progress = progress }
 }
 
@@ -95,14 +95,14 @@ func WithStatus(status Status) ProgressBarOption {
 	return func(pb *ProgressBar) { pb.status = status }
 }
 
-// WithConstProgress sets the progress and right padding to the supplied consts.
-func WithConstProgress(progress float64, right string) ProgressBarOption {
+// WithConstProgress sets the progress and right values to the supplied consts.
+func WithConstProgress(progress float64, right ...string) ProgressBarOption {
 	return func(pb *ProgressBar) {
-		pb.progress = func() (float64, string) { return progress, right }
+		pb.progress = func() (float64, []string) { return progress, right }
 	}
 }
 
-// WithHijack replaces the progressbar String function with the argument.
+// WithHijack replaces the progressbar Render function with the argument.
 func WithHijack(hijack func() string) ProgressBarOption {
 	return func(pb *ProgressBar) { pb.hijack = hijack }
 }
@@ -127,9 +127,8 @@ func (pb *ProgressBar) Left() string {
 	return pb.renderLeft(0)
 }
 
-// renderLeft renders the left part of the progressbar, applying the
-// given padding and trimming text exceeding maxLen length,
-// replacing it with an ellipsis.
+// renderLeft renders the left part of the progressbar, replacing text
+// exceeding maxLen with an ellipsis.
 func (pb *ProgressBar) renderLeft(maxLen int) string {
 	var left string
 	if pb.left != nil {
@@ -137,8 +136,7 @@ func (pb *ProgressBar) renderLeft(maxLen int) string {
 		if maxLen > 0 && len(l) > maxLen {
 			l = l[:maxLen-3] + "..."
 		}
-		padFmt := fmt.Sprintf("%%-%ds", maxLen)
-		left = fmt.Sprintf(padFmt, l)
+		left = l
 	}
 	return left
 }
@@ -152,27 +150,45 @@ func (pb *ProgressBar) Modify(options ...ProgressBarOption) {
 	}
 }
 
-// Render locks the progressbar struct for reading and calls all of its methods
-// to assemble the progress bar and return it as a string.
+// ProgressBarRender stores the different rendered parts of the
+// progress bar UI.
+type ProgressBarRender struct {
+	Left, Status, Progress, Hijack string
+	Right                          []string
+}
+
+func (pbr ProgressBarRender) String() string {
+	if pbr.Hijack != "" {
+		return pbr.Hijack
+	}
+	var right string
+	if len(pbr.Right) > 0 {
+		right = " " + strings.Join(pbr.Right, "  ")
+	}
+	return fmt.Sprintf("%s %-1s %s%s",
+		pbr.Left, pbr.Status, pbr.Progress, right)
+}
+
+// Render locks the progressbar struct for reading and calls all of
+// its methods to return the final output. A struct is returned over a
+// plain string to allow dynamic padding and positioning of elements
+// depending on other elements on the screen.
 // - leftMax defines the maximum character length of the left-side
-//   text, as well as the padding between the text and the opening
-//   square bracket. Characters exceeding this length will be replaced
-//   with a single ellipsis. Passing <=0 disables this.
-func (pb *ProgressBar) Render(leftMax int) string {
+//   text. Characters exceeding this length will be replaced with a
+//   single ellipsis. Passing <=0 disables this.
+func (pb *ProgressBar) Render(leftMax int) ProgressBarRender {
 	pb.mutex.RLock()
 	defer pb.mutex.RUnlock()
 
+	var out ProgressBarRender
 	if pb.hijack != nil {
-		return pb.hijack()
+		out.Hijack = pb.hijack()
+		return out
 	}
 
-	var (
-		progress float64
-		right    string
-	)
+	var progress float64
 	if pb.progress != nil {
-		progress, right = pb.progress()
-		right = " " + right
+		progress, out.Right = pb.progress()
 		progressClamped := Clampf(progress, 0, 1)
 		if progress != progressClamped {
 			progress = progressClamped
@@ -201,6 +217,13 @@ func (pb *ProgressBar) Render(leftMax int) string {
 		padding = pb.color.Sprint(strings.Repeat("-", space-filled))
 	}
 
-	return fmt.Sprintf("%s%2s [%s%s%s]%s",
-		pb.renderLeft(leftMax), pb.status, filling, caret, padding, right)
+	out.Left = pb.renderLeft(leftMax)
+	status := string(pb.status)
+	if c, ok := statusColors[pb.status]; ok {
+		status = c.Sprint(pb.status)
+	}
+	out.Status = fmt.Sprintf("%-1s", status)
+	out.Progress = fmt.Sprintf("[%s%s%s]", filling, caret, padding)
+
+	return out
 }

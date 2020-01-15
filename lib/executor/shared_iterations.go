@@ -172,14 +172,15 @@ func (si SharedIterations) Run(ctx context.Context, out chan<- stats.SampleConta
 
 	totalIters := uint64(iterations)
 	doneIters := new(uint64)
-	vusFmt := pb.GetFixedLengthIntFormat(int64(numVUs))
+	vusFmt := pb.GetFixedLengthIntFormat(numVUs)
 	itersFmt := pb.GetFixedLengthIntFormat(int64(totalIters))
-	fmtStr := vusFmt + " VUs\t" + itersFmt + "/" + itersFmt + " shared iters"
-	progresFn := func() (float64, string) {
+	progresFn := func() (float64, []string) {
 		currentDoneIters := atomic.LoadUint64(doneIters)
-		return float64(currentDoneIters) / float64(totalIters), fmt.Sprintf(
-			fmtStr, numVUs, currentDoneIters, totalIters,
-		)
+		return float64(currentDoneIters) / float64(totalIters), []string{
+			fmt.Sprintf(vusFmt+" VUs", numVUs),
+			fmt.Sprintf(itersFmt+"/"+itersFmt+" shared iters",
+				currentDoneIters, totalIters),
+		}
 	}
 	si.progress.Modify(pb.WithProgress(progresFn))
 	go trackProgress(ctx, maxDurationCtx, regDurationCtx, si, progresFn)
