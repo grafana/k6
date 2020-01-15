@@ -29,8 +29,9 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/loadimpact/k6/stats"
 	"github.com/pkg/errors"
+
+	"github.com/loadimpact/k6/stats"
 )
 
 // An ExecutionScheduler is in charge of initializing executors and using them
@@ -117,7 +118,7 @@ const MaxRetriesGetPlannedVU = 5
 // races, because the Go data race detector can't detect any data races
 // involving atomics...
 //
-// The only functionality indended for synchronization is the one revolving
+// The only functionality intended for synchronization is the one revolving
 // around pausing, and uninitializedUnplannedVUs for restricting the number of
 // unplanned VUs being initialized.
 type ExecutionState struct {

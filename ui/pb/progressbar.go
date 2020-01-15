@@ -26,6 +26,7 @@ import (
 	"sync"
 
 	"github.com/fatih/color"
+	"github.com/sirupsen/logrus"
 )
 
 const defaultWidth = 40
@@ -34,9 +35,10 @@ const defaultBarColor = color.Faint
 // ProgressBar is just a simple thread-safe progressbar implementation with
 // callbacks.
 type ProgressBar struct {
-	mutex sync.RWMutex
-	width int
-	color *color.Color
+	mutex  sync.RWMutex
+	width  int
+	color  *color.Color
+	logger *logrus.Entry
 
 	left     func() string
 	progress func() (progress float64, right string)
@@ -57,6 +59,11 @@ func WithConstLeft(left string) ProgressBarOption {
 	return func(pb *ProgressBar) {
 		pb.left = func() string { return left }
 	}
+}
+
+// WithLogger modifies the logger instance
+func WithLogger(logger *logrus.Entry) ProgressBarOption {
+	return func(pb *ProgressBar) { pb.logger = logger }
 }
 
 // WithProgress modifies the progress calculation function.
@@ -88,6 +95,30 @@ func New(options ...ProgressBarOption) *ProgressBar {
 	return pb
 }
 
+// Left returns the left part of the progressbar in a thread-safe way.
+func (pb *ProgressBar) Left() string {
+	pb.mutex.RLock()
+	defer pb.mutex.RUnlock()
+
+	return pb.renderLeft(0)
+}
+
+// renderLeft renders the left part of the progressbar, applying the
+// given padding and trimming text exceeding maxLen length,
+// replacing it with an ellipsis.
+func (pb *ProgressBar) renderLeft(maxLen int) string {
+	var left string
+	if pb.left != nil {
+		l := pb.left()
+		if maxLen > 0 && len(l) > maxLen {
+			l = l[:maxLen-3] + "..."
+		}
+		padFmt := fmt.Sprintf("%%-%ds", maxLen)
+		left = fmt.Sprintf(padFmt, l)
+	}
+	return left
+}
+
 // Modify changes the progressbar options in a thread-safe way.
 func (pb *ProgressBar) Modify(options ...ProgressBarOption) {
 	pb.mutex.Lock()
@@ -97,10 +128,13 @@ func (pb *ProgressBar) Modify(options ...ProgressBarOption) {
 	}
 }
 
-// String locks the progressbar struct for reading and calls all of its methods
+// Render locks the progressbar struct for reading and calls all of its methods
 // to assemble the progress bar and return it as a string.
-//TODO: something prettier? paddings, right-alignment of the left column, line trimming by terminal size
-func (pb *ProgressBar) String() string {
+// - leftMax defines the maximum character length of the left-side
+//   text, as well as the padding between the text and the opening
+//   square bracket. Characters exceeding this length will be replaced
+//   with a single ellipsis. Passing <=0 disables this.
+func (pb *ProgressBar) Render(leftMax int) string {
 	pb.mutex.RLock()
 	defer pb.mutex.RUnlock()
 
@@ -108,15 +142,20 @@ func (pb *ProgressBar) String() string {
 		return pb.hijack()
 	}
 
-	var left, right string
-	if pb.left != nil {
-		left = pb.left() + " "
-	}
-
-	var progress float64
+	var (
+		progress float64
+		right    string
+	)
 	if pb.progress != nil {
 		progress, right = pb.progress()
 		right = " " + right
+		progressClamped := Clampf(progress, 0, 1)
+		if progress != progressClamped {
+			progress = progressClamped
+			if pb.logger != nil {
+				pb.logger.Warnf("progress value %.2f exceeds valid range, clamped between 0 and 1", progress)
+			}
+		}
 	}
 
 	space := pb.width - 2
@@ -138,5 +177,6 @@ func (pb *ProgressBar) String() string {
 		padding = pb.color.Sprint(strings.Repeat("-", space-filled))
 	}
 
-	return fmt.Sprintf("%s[%s%s%s]%s", left, filling, caret, padding, right)
+	return fmt.Sprintf("%s [%s%s%s]%s",
+		pb.renderLeft(leftMax), filling, caret, padding, right)
 }
