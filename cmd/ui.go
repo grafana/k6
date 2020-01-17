@@ -25,9 +25,15 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
+
+	"golang.org/x/crypto/ssh/terminal"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/loadimpact/k6/core/local"
 	"github.com/loadimpact/k6/lib"
@@ -78,12 +84,14 @@ func printBar(bar *pb.ProgressBar, rightText string) {
 		// TODO: check for cross platform support
 		end = "\x1b[0K\r"
 	}
-	rendered := bar.Render(0)
+	rendered := bar.Render(0, 0)
 	// Only output the left and middle part of the progress bar
-	fprintf(stdout, "%s %s %s%s", rendered.Left, rendered.Progress, rightText, end)
+	fprintf(stdout, "%s %s %s%s", rendered.Left, rendered.Progress(), rightText, end)
 }
 
-func renderMultipleBars(isTTY, goBack bool, leftMax int, pbs []*pb.ProgressBar) string {
+func renderMultipleBars(
+	isTTY, goBack bool, maxLeft, widthDelta int, pbs []*pb.ProgressBar,
+) (string, int) {
 	lineEnd := "\n"
 	if isTTY {
 		//TODO: check for cross platform support
@@ -91,6 +99,7 @@ func renderMultipleBars(isTTY, goBack bool, leftMax int, pbs []*pb.ProgressBar) 
 	}
 
 	var (
+		longestLine int
 		// Maximum length of each right side column except last,
 		// used to calculate the padding between columns.
 		maxRColumnLen = make([]int, 2)
@@ -104,10 +113,9 @@ func renderMultipleBars(isTTY, goBack bool, leftMax int, pbs []*pb.ProgressBar) 
 	// First pass to render all progressbars and get the maximum
 	// lengths of right-side columns.
 	for i, pb := range pbs {
-		rend := pb.Render(leftMax)
+		rend := pb.Render(maxLeft, widthDelta)
 		for i := range rend.Right {
-			// Don't calculate for last column, since there's nothing to align
-			// after it (yet?).
+			// Skip last column, since there's nothing to align after it (yet?).
 			if i == len(rend.Right)-1 {
 				break
 			}
@@ -126,8 +134,8 @@ func renderMultipleBars(isTTY, goBack bool, leftMax int, pbs []*pb.ProgressBar) 
 			continue
 		}
 		var leftText, rightText string
-		leftPadFmt := fmt.Sprintf("%%-%ds %%s ", leftMax)
-		leftText = fmt.Sprintf(leftPadFmt, rend.Left, rend.Status)
+		leftPadFmt := fmt.Sprintf("%%-%ds", maxLeft)
+		leftText = fmt.Sprintf(leftPadFmt, rend.Left)
 		for i := range rend.Right {
 			rpad := 0
 			if len(maxRColumnLen) > i {
@@ -136,7 +144,20 @@ func renderMultipleBars(isTTY, goBack bool, leftMax int, pbs []*pb.ProgressBar) 
 			rightPadFmt := fmt.Sprintf(" %%-%ds", rpad+1)
 			rightText += fmt.Sprintf(rightPadFmt, rend.Right[i])
 		}
-		result[i+1] = leftText + rend.Progress + rightText + lineEnd
+		// Get visible line length, without ANSI escape sequences (color)
+		status := fmt.Sprintf(" %s ", rend.Status())
+		line := leftText + status + rend.Progress() + rightText
+		lineRuneLen := utf8.RuneCountInString(line)
+		if lineRuneLen > longestLine {
+			longestLine = lineRuneLen
+		}
+		if !noColor {
+			rend.Color = true
+			status = fmt.Sprintf(" %s ", rend.Status())
+			line = fmt.Sprintf(leftPadFmt+"%s%s%s",
+				rend.Left, status, rend.Progress(), rightText)
+		}
+		result[i+1] = line + lineEnd
 	}
 
 	if isTTY && goBack {
@@ -146,13 +167,18 @@ func renderMultipleBars(isTTY, goBack bool, leftMax int, pbs []*pb.ProgressBar) 
 	} else {
 		result[pbsCount+1] = "\n"
 	}
-	return strings.Join(result, "")
+
+	return strings.Join(result, ""), longestLine
 }
 
 //TODO: show other information here?
 //TODO: add a no-progress option that will disable these
 //TODO: don't use global variables...
-func showProgress(ctx context.Context, conf Config, execScheduler *local.ExecutionScheduler) {
+// nolint:funlen
+func showProgress(
+	ctx context.Context, conf Config, execScheduler *local.ExecutionScheduler,
+	logger *logrus.Logger,
+) {
 	if quiet || conf.HTTPDebug.Valid && conf.HTTPDebug.String != "" {
 		return
 	}
@@ -162,6 +188,12 @@ func showProgress(ctx context.Context, conf Config, execScheduler *local.Executi
 		pbs = append(pbs, s.GetProgress())
 	}
 
+	termWidth, _, err := terminal.GetSize(int(os.Stdout.Fd()))
+	if err != nil {
+		logger.WithError(err).Warn("error getting terminal size")
+		termWidth = 80 // TODO: something safer, return error?
+	}
+
 	// Get the longest left side string length, to align progress bars
 	// horizontally and trim excess text.
 	var leftLen int64
@@ -169,13 +201,20 @@ func showProgress(ctx context.Context, conf Config, execScheduler *local.Executi
 		l := pb.Left()
 		leftLen = lib.Max(int64(len(l)), leftLen)
 	}
-
 	// Limit to maximum left text length
-	leftMax := int(lib.Min(leftLen, maxLeftLength))
+	maxLeft := int(lib.Min(leftLen, maxLeftLength))
 
-	// For flicker-free progressbars!
-	progressBarsLastRender := []byte(renderMultipleBars(stdoutTTY, true, leftMax, pbs))
-	progressBarsPrint := func() {
+	var widthDelta int
+	var progressBarsLastRender []byte
+	// default responsive render
+	renderProgressBars := func(goBack bool) {
+		barText, longestLine := renderMultipleBars(stdoutTTY, goBack, maxLeft, widthDelta, pbs)
+		// -1 to allow some "breathing room" near the edge
+		widthDelta = termWidth - longestLine - 1
+		progressBarsLastRender = []byte(barText)
+	}
+
+	printProgressBars := func() {
 		_, _ = stdout.Writer.Write(progressBarsLastRender)
 	}
 
@@ -185,35 +224,28 @@ func showProgress(ctx context.Context, conf Config, execScheduler *local.Executi
 	//description in the TODO message in cmd/root.go)
 	if stdoutTTY && !noColor {
 		updateFreq = 100 * time.Millisecond
-		outMutex.Lock()
-		stdout.PersistentText = progressBarsPrint
-		stderr.PersistentText = progressBarsPrint
-		outMutex.Unlock()
-		defer func() {
-			outMutex.Lock()
-			stdout.PersistentText = nil
-			stderr.PersistentText = nil
-			if ctx.Err() != nil {
-				// Render a last plain-text progressbar in an error
-				progressBarsLastRender = []byte(renderMultipleBars(stdoutTTY, false, leftMax, pbs))
-				progressBarsPrint()
-			}
-			outMutex.Unlock()
-		}()
 	}
 
 	ctxDone := ctx.Done()
 	ticker := time.NewTicker(updateFreq)
+	sigwinch := NotifyWindowResize()
+	fd := int(os.Stdout.Fd())
 	for {
 		select {
-		case <-ticker.C:
-			barText := renderMultipleBars(stdoutTTY, true, leftMax, pbs)
-			outMutex.Lock()
-			progressBarsLastRender = []byte(barText)
-			progressBarsPrint()
-			outMutex.Unlock()
 		case <-ctxDone:
+			renderProgressBars(false)
+			printProgressBars()
 			return
+		case <-ticker.C:
+			// Optional "polling" method, platform dependent.
+			termWidth, _, _ = GetTermSize(fd, termWidth)
+		case <-sigwinch:
+			// More efficient SIGWINCH method on *nix.
+			termWidth, _, _ = terminal.GetSize(fd)
 		}
+		renderProgressBars(true)
+		outMutex.Lock()
+		printProgressBars()
+		outMutex.Unlock()
 	}
 }
