@@ -63,7 +63,7 @@
 import socket from "k6/socketio";
 
 export default function() {
-	socket.connect(
+	const response = socket.connect(
 		"ws://localhost:3000/socket.io/?EIO=3&transport=websocket",
 		{
 			headers: {
@@ -74,7 +74,8 @@ export default function() {
 			cookies: {
 				sample1: "abc",
 				sample2: "abcxyz",
-				anotherCookieKey: { value: "hehe", replace: true }
+				anotherCookieKey: { value: "hehe", replace: true },
+				minhhoangcookie: `he abc asd sdsadsad ${Date.now()}`
 			}
 		},
 		function(socket) {
@@ -82,4 +83,6 @@ export default function() {
 			console.log(JSON.stringify(socket));
 		}
 	);
+
+	console.log(JSON.stringify(response));
 }

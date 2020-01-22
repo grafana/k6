@@ -22,6 +22,7 @@ package ws
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -38,6 +39,7 @@ import (
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/netext/httpext"
+	"github.com/loadimpact/k6/stats"
 )
 
 type WSIO struct{}
@@ -52,9 +54,12 @@ type SocketIORunner struct {
 	conn             *websocket.Conn
 	dialer           *websocket.Dialer
 	url              *url.URL
+	response         *WSHTTPResponse
 }
 
 type SocketIOMetrics struct {
+	connectionStart       time.Time
+	connectionEnd         time.Time
 	msgSentTimestamps     []time.Time
 	msgReceivedTimestamps []time.Time
 
@@ -95,16 +100,35 @@ func NewSocketIO() *WSIO {
 func (*WSIO) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTPResponse, error) {
 	validateParamArguments(ctx, args...)
 	socket := newWebSocketIO(ctx, url)
-	socket.extractParams(args...)
-	socket.configureSocketOptions(socket.runner.socketOptions)
-	socket.createSocketIODialer()
-	//socket.configureSocketCookies(&socket.runner.socketOptions)
-	socket.runner.dialer.Dial(url, socket.runner.requestHeaders.Clone())
-	// fmt.Println(conn)
-	// fmt.Println(httpResponse)
-	// fmt.Println(connErr)
+	socket.setUpSocketIO(args...)
+	if err := socket.startConnect(); err != nil {
+		return nil, err
+	}
+	defer socket.close()
 	(socket.runner.callbackFunction)(goja.Undefined(), socket.runner.runtime.ToValue(&socket))
-	return nil, nil
+	return socket.runner.response, nil
+}
+
+func (s *SocketIO) startConnect() error {
+	s.metrics.connectionStart = time.Now()
+	err := s.connect()
+	s.metrics.connectionEnd = time.Now()
+	return err
+}
+
+func (s *SocketIO) connect() error {
+	conn, response, err := s.runner.dialer.Dial(s.runner.url.String(), s.runner.requestHeaders.Clone())
+	if err != nil {
+		return err
+	}
+	wsResponse, wsRespErr := wrapHTTPResponse(response)
+	if wsRespErr != nil {
+		return wsRespErr
+	}
+	s.runner.conn = conn
+	s.runner.response = wsResponse
+	s.runner.response.URL = s.runner.url.String()
+	return nil
 }
 
 func newWebSocketIO(initCtx context.Context, url string) SocketIO {
@@ -152,7 +176,14 @@ func initConnectState(ctx context.Context) (rt *goja.Runtime, state *lib.State) 
 	return
 }
 
-func (s *SocketIO) extractParams(args ...goja.Value) {
+func (s *SocketIO) setUpSocketIO(args ...goja.Value) {
+	s.extractSocketOptions(args...)
+	s.configureSocketOptions(s.runner.socketOptions)
+	s.createSocketIODialer()
+	s.initDefaultTags()
+}
+
+func (s *SocketIO) extractSocketOptions(args ...goja.Value) {
 	var callFunc goja.Value
 	for _, v := range args {
 		argType := v.ExportType()
@@ -230,28 +261,7 @@ func (s *SocketIO) setSocketCookies(paramsObject *goja.Object) {
 	if cookiesObject == nil {
 		return
 	}
-	requestCookies := make(map[string]*httpext.HTTPRequestCookie)
-	for _, key := range cookiesObject.Keys() {
-		cookieV := cookiesObject.Get(key)
-		if goja.IsUndefined(cookieV) || goja.IsNull(cookieV) {
-			continue
-		}
-		switch cookieV.ExportType() {
-		case reflect.TypeOf(map[string]interface{}{}):
-			requestCookies[key] = &httpext.HTTPRequestCookie{Name: key, Value: "", Replace: false}
-			cookie := cookieV.ToObject(s.runner.runtime)
-			for _, attr := range cookie.Keys() {
-				switch strings.ToLower(attr) {
-				case "replace":
-					requestCookies[key].Replace = cookie.Get(attr).ToBoolean()
-				case "value":
-					requestCookies[key].Value = cookie.Get(attr).String()
-				}
-			}
-		default:
-			requestCookies[key] = &httpext.HTTPRequestCookie{Name: key, Value: cookieV.String(), Replace: false}
-		}
-	}
+	requestCookies := s.extractCookiesValues(cookiesObject)
 	cookies := []string{}
 	for _, value := range requestCookies {
 		cookies = append(cookies, fmt.Sprintf("%s=%s", value.Name, value.Value))
@@ -291,6 +301,264 @@ func (s *SocketIO) createTlsConfig() (tlsConfig *tls.Config) {
 	}
 	return
 }
+
+func (s *SocketIO) extractCookiesValues(cookiesObject *goja.Object) (requestCookies map[string]*httpext.HTTPRequestCookie) {
+	requestCookies = make(map[string]*httpext.HTTPRequestCookie)
+	for _, key := range cookiesObject.Keys() {
+		cookieV := cookiesObject.Get(key)
+		if goja.IsUndefined(cookieV) || goja.IsNull(cookieV) {
+			continue
+		}
+		switch cookieV.ExportType() {
+		case reflect.TypeOf(map[string]interface{}{}):
+			requestCookies[key] = &httpext.HTTPRequestCookie{Name: key, Value: "", Replace: false}
+			cookie := cookieV.ToObject(s.runner.runtime)
+			for _, attr := range cookie.Keys() {
+				switch strings.ToLower(attr) {
+				case "replace":
+					requestCookies[key].Replace = cookie.Get(attr).ToBoolean()
+				case "value":
+					requestCookies[key].Value = cookie.Get(attr).String()
+				}
+			}
+		default:
+			requestCookies[key] = &httpext.HTTPRequestCookie{Name: key, Value: cookieV.String(), Replace: false}
+		}
+	}
+	return
+}
+
+func (s *SocketIO) initDefaultTags() {
+	if s.runner.state.Options.SystemTags.Has(stats.TagURL) {
+		s.tags["url"] = s.runner.url.String()
+	}
+	if s.runner.state.Options.SystemTags.Has(stats.TagGroup) {
+		s.tags["group"] = s.runner.state.Group.Path
+	}
+}
+
+func (s *SocketIO) close() {
+	s.runner.conn.Close()
+}
+
+func (s *SocketIO) OnSocketIO(event string, handler goja.Value) {
+	if handler, ok := goja.AssertFunction(handler); ok {
+		s.eventHandlers[event] = append(s.eventHandlers[event], handler)
+	}
+}
+
+func (s *SocketIO) handleEvent(event string, args ...goja.Value) {
+	s.eventHandlersProcess(s.eventHandlers, event, args)
+}
+
+func (s *SocketIO) eventHandlersProcess(evenHandlers map[string][]goja.Callable, event string, args []goja.Value) {
+	s.eventSocketIOHandlersProcess(evenHandlers, args)
+}
+
+func (s *SocketIO) eventSocketIOHandlersProcess(evenHandlers map[string][]goja.Callable, args []goja.Value) {
+	event, message, err := s.getSocketIOData(args)
+	if err != nil {
+		common.Throw(common.GetRuntime(*s.runner.ctx), err)
+	} else {
+		s.handlersProcess(evenHandlers, event, message)
+	}
+}
+
+/**
+ * Parsing the raw message from server to get event name
+ * TODO: The current method assumes the webserver return socketIO message data in the first item in the array
+ *
+ *
+**/
+func (s *SocketIO) getSocketIOData(args []goja.Value) (event string, message []goja.Value, err error) {
+	if len(args) == 0 {
+		event = "message"
+		message = args
+	} else {
+		event, message, err = s.handleSocketIOResponse(args[0].String())
+	}
+	return
+}
+
+func (s *SocketIO) handleSocketIOResponse(rawResponse string) (eventName string, messageResponse []goja.Value, err error) {
+	var start int
+	socketIOCode := rawResponse[0:2]
+	var v interface{}
+	for i, c := range rawResponse {
+		if c == '[' {
+			start = i
+			break
+		}
+	}
+	rt := common.GetRuntime(*s.runner.ctx)
+	switch socketIOCode {
+	case "42":
+		fmt.Println("COMMON_MSG: ", rawResponse)
+		responseData := rawResponse[start:len(rawResponse)]
+		json.Unmarshal([]byte(responseData), &v)
+		eventName = (v.([]interface{})[0]).(string)
+		responseMap := (v.([]interface{})[1])
+		response, error := json.MarshalIndent(responseMap, "", "  ")
+		if error != nil {
+			err = error
+		}
+		messageResponse = []goja.Value{rt.ToValue(string(response))}
+		return
+	default:
+		fmt.Println("ANOTHER_MSG: ", rawResponse)
+		return "handshake", []goja.Value{rt.ToValue(string(rawResponse))}, nil
+	}
+	return "error", []goja.Value{rt.ToValue(string("Error"))}, errors.New("Can't parse response data")
+}
+
+func (s *SocketIO) handlersProcess(evenHandlers map[string][]goja.Callable, event string, args []goja.Value) {
+	if handlers, ok := evenHandlers[event]; ok {
+		for _, handler := range handlers {
+			if _, err := handler(goja.Undefined(), args...); err != nil {
+				common.Throw(common.GetRuntime(*s.runner.ctx), err)
+			}
+		}
+	}
+}
+
+/**
+ * Allow k6.io send message to socket.io protocol
+ * Ex:
+ export default function() {
+  var url = 'ws://localhost:3000/socket.io/?EIO=3&transport=websocket';
+  var params = { tags: { my_tag: 'hello' } };
+  ws.connect(url, params, function(socket) {
+    socket.on('open', function open() {
+      console.log('connected');
+      socket.sendSocketIO('message', 'Hello! websocket test' + __VU);
+    });
+
+    socket.setTimeout(() => {
+      console.log('End socket test after 2s');
+      socket.close();
+    }, 10000);
+  });
+}
+ *
+**/
+func (s *SocketIO) SendSocketIO(event, message string) {
+	const commonMessage = 42
+	msg := fmt.Sprintf("%d[\"%s\",%s]", commonMessage, event, message)
+	s.Send(msg)
+}
+
+func (s *SocketIO) Send(message string) {
+	// NOTE: No binary message support for the time being since goja doesn't
+	// support typed arrays.
+	rt := common.GetRuntime(*s.runner.ctx)
+
+	writeData := []byte(message)
+	if err := s.runner.conn.WriteMessage(websocket.TextMessage, writeData); err != nil {
+		s.handleEvent("error", rt.ToValue(err))
+	}
+
+	s.metrics.msgSentTimestamps = append(s.metrics.msgSentTimestamps, time.Now())
+}
+
+// func (s *SocketIO) Ping() {
+// 	rt := common.GetRuntime(s.ctx)
+// 	deadline := time.Now().Add(writeWait)
+// 	pingID := strconv.Itoa(s.pingSendCounter)
+// 	data := []byte(pingID)
+
+// 	err := s.conn.WriteControl(websocket.PingMessage, data, deadline)
+// 	if err != nil {
+// 		s.handleEvent("error", rt.ToValue(err))
+// 		return
+// 	}
+
+// 	s.pingSendTimestamps[pingID] = time.Now()
+// 	s.pingSendCounter++
+// }
+
+// func (s *SocketIO) trackPong(pingID string) {
+// 	pongTimestamp := time.Now()
+
+// 	if _, ok := s.pingSendTimestamps[pingID]; !ok {
+// 		// We received a pong for a ping we didn't send; ignore
+// 		// (this shouldn't happen with a compliant server)
+// 		return
+// 	}
+// 	pingTimestamp := s.pingSendTimestamps[pingID]
+
+// 	s.pingTimestamps = append(s.pingTimestamps, pingDelta{pingTimestamp, pongTimestamp})
+// }
+
+func (s *SocketIO) SetTimeout(fn goja.Callable, timeoutMs int) {
+	// Starts a goroutine, blocks once on the timeout and pushes the callable
+	// back to the main loop through the scheduled channel
+	go func() {
+		select {
+		case <-time.After(time.Duration(timeoutMs) * time.Millisecond):
+			s.scheduled <- fn
+
+		case <-s.done:
+			return
+		}
+	}()
+}
+
+func (s *SocketIO) SetInterval(fn goja.Callable, intervalMs int) {
+	// Starts a goroutine, blocks forever on the ticker and pushes the callable
+	// back to the main loop through the scheduled channel
+	go func() {
+		ticker := time.NewTicker(time.Duration(intervalMs) * time.Millisecond)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				s.scheduled <- fn
+
+			case <-s.done:
+				return
+			}
+		}
+	}()
+}
+
+// func (s *SocketIO) Close(args ...goja.Value) {
+// 	code := websocket.CloseGoingAway
+// 	if len(args) > 0 {
+// 		code = int(args[0].ToInteger())
+// 	}
+
+// 	_ = s.closeConnection(code)
+// }
+
+// // closeConnection cleanly closes the WebSocket connection.
+// // Returns an error if sending the close control frame fails.
+// func (s *SocketIO) closeConnection(code int) error {
+// 	var err error
+
+// 	s.shutdownOnce.Do(func() {
+// 		rt := common.GetRuntime(s.ctx)
+
+// 		err = s.conn.WriteControl(websocket.CloseMessage,
+// 			websocket.FormatCloseMessage(code, ""),
+// 			time.Now().Add(writeWait),
+// 		)
+// 		if err != nil {
+// 			// Call the user-defined error handler
+// 			s.handleEvent("error", rt.ToValue(err))
+// 		}
+
+// 		// Call the user-defined close handler
+// 		s.handleEvent("close", rt.ToValue(code))
+
+// 		_ = s.conn.Close()
+
+// 		// Stop the main control loop
+// 		close(s.done)
+// 	})
+
+// 	return err
+// }
 
 // package ws
 
