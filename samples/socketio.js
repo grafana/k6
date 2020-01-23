@@ -81,6 +81,10 @@ export default function() {
 		function(socket) {
 			console.log("abc function");
 			console.log(JSON.stringify(socket));
+			socket.setTimeout(() => {
+				console.log("close connection");
+				socket.close();
+			}, 3000);
 		}
 	);
 

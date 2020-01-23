@@ -30,6 +30,7 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -38,6 +39,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/netext/httpext"
 	"github.com/loadimpact/k6/stats"
 )
@@ -106,6 +108,103 @@ func (*WSIO) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHT
 	}
 	defer socket.close()
 	(socket.runner.callbackFunction)(goja.Undefined(), socket.runner.runtime.ToValue(&socket))
+	socket.handleEvent("open")
+	socket.runner.conn.SetCloseHandler(func(code int, text string) error { return nil })
+	pingChan := make(chan string)
+	pongChan := make(chan string)
+	socket.runner.conn.SetPingHandler(func(msg string) error { pingChan <- msg; return nil })
+	socket.runner.conn.SetPongHandler(func(pingID string) error { pongChan <- pingID; return nil })
+
+	readDataChan := make(chan []byte)
+	readCloseChan := make(chan int)
+	readErrChan := make(chan error)
+
+	// Wraps a couple of channels around conn.ReadMessage
+	go readPump(socket.runner.conn, readDataChan, readErrChan, readCloseChan)
+	for {
+		select {
+		case pingData := <-pingChan:
+			// Handle pings received from the server
+			// - trigger the `ping` event
+			// - reply with pong (needed when `SetPingHandler` is overwritten)
+			err := socket.runner.conn.WriteControl(websocket.PongMessage, []byte(pingData), time.Now().Add(writeWait))
+			if err != nil {
+				socket.handleEvent("error", socket.runner.runtime.ToValue(err))
+			}
+			socket.handleEvent("ping")
+
+		case pingID := <-pongChan:
+			// Handle pong responses to our pings
+			socket.trackPong(pingID)
+			socket.handleEvent("pong")
+
+		case readData := <-readDataChan:
+			socket.metrics.msgReceivedTimestamps = append(socket.metrics.msgReceivedTimestamps, time.Now())
+			socket.handleEvent("message", socket.runner.runtime.ToValue(string(readData)))
+
+		case readErr := <-readErrChan:
+			socket.handleEvent("error", socket.runner.runtime.ToValue(readErr))
+
+		case code := <-readCloseChan:
+			_ = socket.closeConnection(code)
+
+		case scheduledFn := <-socket.scheduled:
+			if _, err := scheduledFn(goja.Undefined()); err != nil {
+				return nil, err
+			}
+
+		case <-ctx.Done():
+			// VU is shutting down during an interrupt
+			// socket events will not be forwarded to the VU
+			_ = socket.closeConnection(websocket.CloseGoingAway)
+
+		case <-socket.done:
+			// This is the final exit point normally triggered by closeConnection
+			end := time.Now()
+			sessionDuration := stats.D(end.Sub(socket.metrics.connectionStart))
+
+			sampleTags := stats.IntoSampleTags(&socket.tags)
+
+			stats.PushIfNotDone(ctx, socket.runner.state.Samples, stats.ConnectedSamples{
+				Samples: []stats.Sample{
+					{Metric: metrics.WSSessions, Time: socket.metrics.connectionStart, Tags: sampleTags, Value: 1},
+					{Metric: metrics.WSConnecting, Time: socket.metrics.connectionStart, Tags: sampleTags, Value: stats.D(socket.metrics.connectionEnd.Sub(socket.metrics.connectionStart))},
+					{Metric: metrics.WSSessionDuration, Time: socket.metrics.connectionStart, Tags: sampleTags, Value: sessionDuration},
+				},
+				Tags: sampleTags,
+				Time: socket.metrics.connectionStart,
+			})
+
+			for _, msgSentTimestamp := range socket.metrics.msgSentTimestamps {
+				stats.PushIfNotDone(ctx, socket.runner.state.Samples, stats.Sample{
+					Metric: metrics.WSMessagesSent,
+					Time:   msgSentTimestamp,
+					Tags:   sampleTags,
+					Value:  1,
+				})
+			}
+
+			for _, msgReceivedTimestamp := range socket.metrics.msgReceivedTimestamps {
+				stats.PushIfNotDone(ctx, socket.runner.state.Samples, stats.Sample{
+					Metric: metrics.WSMessagesReceived,
+					Time:   msgReceivedTimestamp,
+					Tags:   sampleTags,
+					Value:  1,
+				})
+			}
+
+			for _, pingDelta := range socket.metrics.pingTimestamps {
+				stats.PushIfNotDone(ctx, socket.runner.state.Samples, stats.Sample{
+					Metric: metrics.WSPing,
+					Time:   pingDelta.pong,
+					Tags:   sampleTags,
+					Value:  stats.D(pingDelta.pong.Sub(pingDelta.ping)),
+				})
+			}
+
+			return socket.runner.response, nil
+		}
+	}
 	return socket.runner.response, nil
 }
 
@@ -460,34 +559,45 @@ func (s *SocketIO) Send(message string) {
 	s.metrics.msgSentTimestamps = append(s.metrics.msgSentTimestamps, time.Now())
 }
 
-// func (s *SocketIO) Ping() {
-// 	rt := common.GetRuntime(s.ctx)
-// 	deadline := time.Now().Add(writeWait)
-// 	pingID := strconv.Itoa(s.pingSendCounter)
-// 	data := []byte(pingID)
+func (s *SocketIO) trackPong(pingID string) {
+	pongTimestamp := time.Now()
 
-// 	err := s.conn.WriteControl(websocket.PingMessage, data, deadline)
-// 	if err != nil {
-// 		s.handleEvent("error", rt.ToValue(err))
-// 		return
-// 	}
+	if _, ok := s.metrics.pingSendTimestamps[pingID]; !ok {
+		// We received a pong for a ping we didn't send; ignore
+		// (this shouldn't happen with a compliant server)
+		return
+	}
+	pingTimestamp := s.metrics.pingSendTimestamps[pingID]
 
-// 	s.pingSendTimestamps[pingID] = time.Now()
-// 	s.pingSendCounter++
-// }
+	s.metrics.pingTimestamps = append(s.metrics.pingTimestamps, pingDelta{pingTimestamp, pongTimestamp})
+}
 
-// func (s *SocketIO) trackPong(pingID string) {
-// 	pongTimestamp := time.Now()
+func (s *SocketIO) closeConnection(code int) error {
+	var err error
 
-// 	if _, ok := s.pingSendTimestamps[pingID]; !ok {
-// 		// We received a pong for a ping we didn't send; ignore
-// 		// (this shouldn't happen with a compliant server)
-// 		return
-// 	}
-// 	pingTimestamp := s.pingSendTimestamps[pingID]
+	s.shutdownOnce.Do(func() {
+		rt := common.GetRuntime(*s.runner.ctx)
 
-// 	s.pingTimestamps = append(s.pingTimestamps, pingDelta{pingTimestamp, pongTimestamp})
-// }
+		err = s.runner.conn.WriteControl(websocket.CloseMessage,
+			websocket.FormatCloseMessage(code, ""),
+			time.Now().Add(writeWait),
+		)
+		if err != nil {
+			// Call the user-defined error handler
+			s.handleEvent("error", rt.ToValue(err))
+		}
+
+		// Call the user-defined close handler
+		s.handleEvent("close", rt.ToValue(code))
+
+		_ = s.runner.conn.Close()
+
+		// Stop the main control loop
+		close(s.done)
+	})
+
+	return err
+}
 
 func (s *SocketIO) SetTimeout(fn goja.Callable, timeoutMs int) {
 	// Starts a goroutine, blocks once on the timeout and pushes the callable
@@ -522,14 +632,60 @@ func (s *SocketIO) SetInterval(fn goja.Callable, intervalMs int) {
 	}()
 }
 
-// func (s *SocketIO) Close(args ...goja.Value) {
-// 	code := websocket.CloseGoingAway
-// 	if len(args) > 0 {
-// 		code = int(args[0].ToInteger())
+func (s *SocketIO) Close(args ...goja.Value) {
+	code := websocket.CloseGoingAway
+	if len(args) > 0 {
+		code = int(args[0].ToInteger())
+	}
+
+	_ = s.closeConnection(code)
+}
+
+func (s *SocketIO) Ping() {
+	rt := common.GetRuntime(*s.runner.ctx)
+	deadline := time.Now().Add(writeWait)
+	pingID := strconv.Itoa(s.metrics.pingSendCounter)
+	data := []byte(pingID)
+
+	err := s.runner.conn.WriteControl(websocket.PingMessage, data, deadline)
+	if err != nil {
+		s.handleEvent("error", rt.ToValue(err))
+		return
+	}
+
+	s.metrics.pingSendTimestamps[pingID] = time.Now()
+	s.metrics.pingSendCounter++
+}
+
+// func (s *SocketIO) Ping() {
+// 	rt := common.GetRuntime(s.ctx)
+// 	deadline := time.Now().Add(writeWait)
+// 	pingID := strconv.Itoa(s.pingSendCounter)
+// 	data := []byte(pingID)
+
+// 	err := s.conn.WriteControl(websocket.PingMessage, data, deadline)
+// 	if err != nil {
+// 		s.handleEvent("error", rt.ToValue(err))
+// 		return
 // 	}
 
-// 	_ = s.closeConnection(code)
+// 	s.pingSendTimestamps[pingID] = time.Now()
+// 	s.pingSendCounter++
 // }
+
+// func (s *SocketIO) trackPong(pingID string) {
+// 	pongTimestamp := time.Now()
+
+// 	if _, ok := s.pingSendTimestamps[pingID]; !ok {
+// 		// We received a pong for a ping we didn't send; ignore
+// 		// (this shouldn't happen with a compliant server)
+// 		return
+// 	}
+// 	pingTimestamp := s.pingSendTimestamps[pingID]
+
+// 	s.pingTimestamps = append(s.pingTimestamps, pingDelta{pingTimestamp, pongTimestamp})
+// }
+
 
 // // closeConnection cleanly closes the WebSocket connection.
 // // Returns an error if sending the close control frame fails.
