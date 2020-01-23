@@ -18,6 +18,8 @@
  *
  */
 
+// go:generate enumer -type=UIMode -transform=snake -trimprefix=UIMode -output ui_mode_gen.go
+
 package cmd
 
 import (
@@ -40,8 +42,23 @@ import (
 	"github.com/loadimpact/k6/ui/pb"
 )
 
-// TODO: Make configurable
-const maxLeftLength = 30
+// UIMode defines various rendering methods
+type UIMode uint8
+
+//nolint: golint
+const (
+	// max length of left-side progress bar text before trimming is forced
+	maxLeftLength           = 30
+	UIModeResponsive UIMode = iota + 1
+	UIModeCompact
+	UIModeFull
+)
+
+// Decode implements envconfig.Decoder
+func (i *UIMode) Decode(value string) (err error) {
+	*i, err = UIModeString(value)
+	return
+}
 
 // A writer that syncs writes with a mutex and, if the output is a TTY, clears before newlines.
 type consoleWriter struct {
@@ -176,8 +193,8 @@ func renderMultipleBars(
 //TODO: don't use global variables...
 // nolint:funlen
 func showProgress(
-	ctx context.Context, conf Config, execScheduler *local.ExecutionScheduler,
-	logger *logrus.Logger,
+	ctx context.Context, conf Config,
+	execScheduler *local.ExecutionScheduler, logger *logrus.Logger,
 ) {
 	if quiet || conf.HTTPDebug.Valid && conf.HTTPDebug.String != "" {
 		return
@@ -212,6 +229,17 @@ func showProgress(
 		// -1 to allow some "breathing room" near the edge
 		widthDelta = termWidth - longestLine - 1
 		progressBarsLastRender = []byte(barText)
+	}
+
+	if conf.UIMode.String == UIModeCompact.String() {
+		widthDelta = -pb.DefaultWidth
+	}
+
+	if conf.UIMode.String != UIModeResponsive.String() {
+		renderProgressBars = func(goBack bool) {
+			barText, _ := renderMultipleBars(stdoutTTY, goBack, maxLeft, widthDelta, pbs)
+			progressBarsLastRender = []byte(barText)
+		}
 	}
 
 	printProgressBars := func() {

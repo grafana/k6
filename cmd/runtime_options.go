@@ -25,10 +25,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/loadimpact/k6/lib"
 	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 	"gopkg.in/guregu/null.v3"
+
+	"github.com/loadimpact/k6/lib"
 )
 
 // TODO: move this whole file out of the cmd package? maybe when fixing

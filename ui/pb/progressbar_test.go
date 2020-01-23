@@ -80,7 +80,7 @@ func TestProgressBarRender(t *testing.T) {
 			WithHijack(func() string { return "progressbar hijack!" }),
 		}, 0, "progressbar hijack!"},
 		{[]ProgressBarOption{WithConstProgress(0.25, "")},
-			-defaultWidth, "   [  25% ] "},
+			-DefaultWidth, "   [  25% ] "},
 	}
 
 	for _, tc := range testCases {

@@ -377,6 +377,10 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 		},
 		// TODO: test for differences between flagsets
 		// TODO: more tests in general, especially ones not related to execution parameters...
+		{opts{cli: []string{"--ui-mode", "compact"}}, exp{}, func(t *testing.T, c Config) {
+			assert.Equal(t, UIModeCompact.String(), c.UIMode.String)
+		}},
+		{opts{cli: []string{"--ui-mode", "blah"}}, exp{validationErrors: true}, nil},
 	}
 }
 
