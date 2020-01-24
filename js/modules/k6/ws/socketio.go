@@ -86,14 +86,15 @@ const (
 	SOCKET_IO_PATH         = "/socket.io/?EIO=3&transport=websocket"
 )
 const (
-	OPEN          = "0"
-	CLOSE         = "1"
-	PING          = "2"
-	PONG          = "3"
-	MESSAGE       = "4"
-	EMPTY_MESSAGE = "40"
-	UPGRADE       = "5"
-	NOOP          = "6"
+	OPEN           = "0"
+	CLOSE          = "1"
+	PING           = "2"
+	PONG           = "3"
+	MESSAGE        = "4"
+	EMPTY_MESSAGE  = "40"
+	COMMON_MESSAGE = "42"
+	UPGRADE        = "5"
+	NOOP           = "6"
 )
 
 func NewSocketIO() *WSIO {
@@ -469,33 +470,48 @@ func (s *SocketIO) eventSocketIOHandlersProcess(event string, args []goja.Value)
  *
  *
 **/
-func (s *SocketIO) getSocketIOData(event string, args []goja.Value) (e string, message []goja.Value, err error) {
+func (s *SocketIO) getSocketIOData(event string, args []goja.Value) (channelName string, message []goja.Value, err error) {
 	if len(args) == 0 {
-		e = event
+		channelName = event
 		message = args
 	} else {
-		e, message, err = s.handleSocketIOResponse(args[0].String())
+		channelName, message, err = s.handleSocketIOResponse(args[0].String())
 	}
 	return
 }
 
 func (s *SocketIO) handleSocketIOResponse(rawResponse string) (eventName string, messageResponse []goja.Value, err error) {
-	var start int
+	var startRawResponseCharIndex int
 	socketIOCode := rawResponse[0:1]
-	var v interface{}
 	for i, c := range rawResponse {
 		if c == '[' {
-			start = i
+			startRawResponseCharIndex = i
 			break
 		}
 	}
+	return s.handleSocketIOResponseProcess(socketIOCode, rawResponse, startRawResponseCharIndex)
+}
+
+func (s *SocketIO) handleSocketIOResponseProcess(socketIOCode, rawResponse string, startRawResponseCharIndex int) (eventName string, messageResponse []goja.Value, err error) {
+	var v interface{}
 	rt := common.GetRuntime(*s.runner.ctx)
 	switch socketIOCode {
 	case MESSAGE:
-		responseData := rawResponse[start:len(rawResponse)]
-		if responseData == EMPTY_MESSAGE {
-			return "message", []goja.Value{rt.ToValue(string(rawResponse))}, nil
-		}
+		responseData := rawResponse[startRawResponseCharIndex:len(rawResponse)]
+		return s.commonMessageResponseProcess(rawResponse, responseData, v)
+	case OPEN:
+		return "open", []goja.Value{rt.ToValue(string(rawResponse))}, nil
+	default:
+		return "handshake", []goja.Value{rt.ToValue(string(rawResponse))}, nil
+	}
+}
+
+func (s *SocketIO) commonMessageResponseProcess(rawResponse, responseData string, v interface{}) (eventName string, messageResponse []goja.Value, err error) {
+	rt := common.GetRuntime(*s.runner.ctx)
+	switch responseData {
+	case EMPTY_MESSAGE:
+		return "message", []goja.Value{rt.ToValue(string(rawResponse))}, nil
+	default:
 		json.Unmarshal([]byte(responseData), &v)
 		eventName = (v.([]interface{})[0]).(string)
 		responseMap := (v.([]interface{})[1])
@@ -505,13 +521,8 @@ func (s *SocketIO) handleSocketIOResponse(rawResponse string) (eventName string,
 		}
 		messageResponse = []goja.Value{rt.ToValue(string(response))}
 		return
-	case OPEN:
-		return "open", []goja.Value{rt.ToValue(string(rawResponse))}, nil
-	default:
-		return "handshake", []goja.Value{rt.ToValue(string(rawResponse))}, nil
 	}
 }
-
 func (s *SocketIO) handlersProcess(event string, args []goja.Value) {
 	if handlers, ok := s.eventHandlers[event]; ok {
 		for _, handler := range handlers {
@@ -523,12 +534,11 @@ func (s *SocketIO) handlersProcess(event string, args []goja.Value) {
 }
 
 func (s *SocketIO) Send(event, message string) {
-	const commonMessage = 42
 	// NOTE: No binary message support for the time being since goja doesn't
 	// support typed arrays.
 	rt := common.GetRuntime(*s.runner.ctx)
 
-	writeData := []byte(fmt.Sprintf("%d[\"%s\",%s]", commonMessage, event, message))
+	writeData := []byte(fmt.Sprintf("%s[\"%s\",%s]", COMMON_MESSAGE, event, message))
 	if err := s.runner.conn.WriteMessage(websocket.TextMessage, writeData); err != nil {
 		s.handleEvent("error", rt.ToValue(err))
 	}

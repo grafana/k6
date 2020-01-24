@@ -41,8 +41,7 @@ export default function() {
 		});
 
 		socket.on("message", function(data) {
-			console.log(data);
-			data && console.log("message response: ", JSON.parse(data));
+			console.log("message response: ", data);
 		});
 
 		socket.on("close", function() {
@@ -52,7 +51,7 @@ export default function() {
 		socket.setTimeout(() => {
 			console.log("End socket test after 15s");
 			socket.close();
-		}, 15000);
+		}, 5000);
 	});
 	// console.log(JSON.stringify(response));
 	// response.body = responseMessage;
