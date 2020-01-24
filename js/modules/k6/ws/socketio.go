@@ -109,7 +109,7 @@ func (*WSIO) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHT
 	}
 	defer socket.close()
 	(socket.runner.callbackFunction)(goja.Undefined(), socket.runner.runtime.ToValue(&socket))
-	socket.handleEvent("open")
+	//socket.handleEvent("open")
 	socket.runner.conn.SetCloseHandler(func(code int, text string) error { return nil })
 	pingChan := make(chan string)
 	pongChan := make(chan string)
@@ -455,7 +455,7 @@ func (s *SocketIO) eventHandlersProcess(event string, args []goja.Value) {
 }
 
 func (s *SocketIO) eventSocketIOHandlersProcess(event string, args []goja.Value) {
-	event, message, err := s.getSocketIOData(args)
+	event, message, err := s.getSocketIOData(event, args)
 	if err != nil {
 		common.Throw(common.GetRuntime(*s.runner.ctx), err)
 	} else {
@@ -469,12 +469,12 @@ func (s *SocketIO) eventSocketIOHandlersProcess(event string, args []goja.Value)
  *
  *
 **/
-func (s *SocketIO) getSocketIOData(args []goja.Value) (event string, message []goja.Value, err error) {
+func (s *SocketIO) getSocketIOData(event string, args []goja.Value) (e string, message []goja.Value, err error) {
 	if len(args) == 0 {
-		event = "message"
+		e = event
 		message = args
 	} else {
-		event, message, err = s.handleSocketIOResponse(args[0].String())
+		e, message, err = s.handleSocketIOResponse(args[0].String())
 	}
 	return
 }
@@ -505,8 +505,8 @@ func (s *SocketIO) handleSocketIOResponse(rawResponse string) (eventName string,
 		}
 		messageResponse = []goja.Value{rt.ToValue(string(response))}
 		return
-	case "0":
-		return OPEN, []goja.Value{rt.ToValue(string(rawResponse))}, nil
+	case OPEN:
+		return "open", []goja.Value{rt.ToValue(string(rawResponse))}, nil
 	default:
 		return "handshake", []goja.Value{rt.ToValue(string(rawResponse))}, nil
 	}
