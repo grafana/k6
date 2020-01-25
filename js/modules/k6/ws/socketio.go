@@ -22,7 +22,6 @@ package ws
 import (
 	"context"
 	"crypto/tls"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -180,9 +179,8 @@ func (socket *SocketIO) pongHandler(pingID string) {
 
 func (socket *SocketIO) receiveDataHandler(readData string) {
 	socket.metrics.msgReceivedTimestamps = append(socket.metrics.msgReceivedTimestamps, time.Now())
-	event, _, _ := socket.handleSocketIOResponse(string(readData))
-	socket.handleEvent(event, socket.runner.runtime.ToValue(string(readData)))
-
+	event, responseData := parseResponse(readData, socket.runner.runtime)
+	socket.handleEvent(event, responseData...)
 }
 
 func (socket *SocketIO) readErrorHandler(readErr error) {
@@ -516,77 +514,9 @@ func (s *SocketIO) handleEvent(event string, args ...goja.Value) {
 }
 
 func (s *SocketIO) eventHandlersProcess(event string, args []goja.Value) {
-	s.eventSocketIOHandlersProcess(event, args)
+	s.handlersProcess(event, args)
 }
 
-func (s *SocketIO) eventSocketIOHandlersProcess(event string, args []goja.Value) {
-	event, message, err := s.getSocketIOData(event, args)
-	if err != nil {
-		common.Throw(common.GetRuntime(*s.runner.ctx), err)
-	} else {
-		s.handlersProcess(event, message)
-	}
-}
-
-/**
- * Parsing the raw message from server to get event name
- * TODO: The current method assumes the webserver return socketIO message data in the first item in the array
- *
- *
-**/
-func (s *SocketIO) getSocketIOData(event string, args []goja.Value) (channelName string, message []goja.Value, err error) {
-	if len(args) == 0 {
-		channelName = event
-		message = args
-	} else {
-		channelName, message, err = s.handleSocketIOResponse(args[0].String())
-	}
-	return
-}
-
-func (s *SocketIO) handleSocketIOResponse(rawResponse string) (eventName string, messageResponse []goja.Value, err error) {
-	var startRawResponseCharIndex int
-	socketIOCode := rawResponse[0:1]
-	for i, c := range rawResponse {
-		if c == '[' {
-			startRawResponseCharIndex = i
-			break
-		}
-	}
-	return s.handleSocketIOResponseProcess(socketIOCode, rawResponse, startRawResponseCharIndex)
-}
-
-func (s *SocketIO) handleSocketIOResponseProcess(socketIOCode, rawResponse string, startRawResponseCharIndex int) (eventName string, messageResponse []goja.Value, err error) {
-	rt := common.GetRuntime(*s.runner.ctx)
-	switch socketIOCode {
-	case MESSAGE:
-		responseData := rawResponse[startRawResponseCharIndex:len(rawResponse)]
-		return s.commonMessageResponseProcess(rawResponse, responseData)
-	case OPEN:
-		return "open", []goja.Value{rt.ToValue(string(rawResponse))}, nil
-	default:
-		return "handshake", []goja.Value{rt.ToValue(string(rawResponse))}, nil
-	}
-}
-
-func (s *SocketIO) commonMessageResponseProcess(rawResponse, responseData string) (eventName string, messageResponse []goja.Value, err error) {
-	var v interface{}
-	rt := common.GetRuntime(*s.runner.ctx)
-	switch responseData {
-	case EMPTY_MESSAGE:
-		return "message", []goja.Value{rt.ToValue(string(rawResponse))}, nil
-	default:
-		json.Unmarshal([]byte(responseData), &v)
-		eventName = (v.([]interface{})[0]).(string)
-		responseMap := (v.([]interface{})[1])
-		response, error := json.MarshalIndent(responseMap, "", "  ")
-		if error != nil {
-			err = error
-		}
-		messageResponse = []goja.Value{rt.ToValue(string(response))}
-		return
-	}
-}
 func (s *SocketIO) handlersProcess(event string, args []goja.Value) {
 	if handlers, ok := s.eventHandlers[event]; ok {
 		for _, handler := range handlers {
@@ -706,4 +636,67 @@ func (s *SocketIO) Ping() {
 
 	s.metrics.pingSendTimestamps[pingID] = time.Now()
 	s.metrics.pingSendCounter++
+}
+
+func parseResponse(rawResponse string, rt *goja.Runtime) (eventName string, messageResponse []goja.Value) {
+	eventCode := getEventCode(rawResponse)
+	eventName, responseData, err := getEventData(eventCode, rawResponse)
+	if err != nil {
+		common.Throw(rt, err)
+	}
+	messageResponse = []goja.Value{rt.ToValue(string(responseData))}
+	return
+}
+
+func getEventCode(rawResponse string) (eventCode string) {
+	eventCode = rawResponse[0:1]
+	switch eventCode {
+	case MESSAGE:
+		return rawResponse[0:2]
+	default:
+		return
+	}
+}
+
+func getEventData(eventCode, rawResponse string) (eventName, restText string, err error) {
+	var start, end, rest int
+	switch eventCode {
+	case OPEN:
+		return "open", rawResponse, nil
+	case EMPTY_MESSAGE:
+		return "message", rawResponse, nil
+	default:
+		start, end, rest, err = decodeData(rawResponse)
+		invalidPacket := err != nil || (end < start) || (rest >= len(rawResponse))
+		if invalidPacket {
+			return "", "", errors.New("Wrong packet")
+		}
+	}
+	return rawResponse[start:end], rawResponse[rest : len(rawResponse)-1], nil
+}
+
+func decodeData(rawResponse string) (start, end, rest int, err error) {
+	var countQuote int
+	for i, c := range rawResponse {
+		if c == '"' {
+			switch countQuote {
+			case 0:
+				start = i + 1
+			case 1:
+				end = i
+				rest = i + 1
+			default:
+				return 0, 0, 0, errors.New("Wrong packet")
+			}
+			countQuote++
+		}
+		if c == ',' {
+			if countQuote < 2 {
+				continue
+			}
+			rest = i + 1
+			break
+		}
+	}
+	return
 }

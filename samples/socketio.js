@@ -30,7 +30,7 @@ export default function() {
 		});
 
 		socket.on("handshake", function(data) {
-			console.log("message handshake", data);
+			//console.log("message handshake", data);
 			// const msg1 =
 			// 	'{"chatId":"259b75a0-6dd4-4b6c-ba92-3d2a0df0d759-af8b1908-2678-4827-9b69-85bdaf851597","conversationId":"91a0f951-7907-4b0d-b81d-44b1da00407f","senderId":"af8b1908-2678-4827-9b69-85bdaf851597"}';
 			// const msg2 =
@@ -44,7 +44,8 @@ export default function() {
 			console.log("message response: ", data);
 		});
 
-		socket.on("close", function() {
+		socket.on("close", function(data) {
+			console.log("hehehe check ", data);
 			console.log("disconnected");
 		});
 
