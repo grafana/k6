@@ -24,7 +24,6 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -64,10 +63,9 @@ type SocketIOMetrics struct {
 	msgSentTimestamps     []time.Time
 	msgReceivedTimestamps []time.Time
 
-	pingSendTimestamps  map[string]time.Time
-	pingSendCounter     int
-	pingTimestamps      []pingDelta
-	pushErrorRateMetric func(value float64, socket *SocketIO)
+	pingSendTimestamps map[string]time.Time
+	pingSendCounter    int
+	pingTimestamps     []pingDelta
 }
 
 type SocketIO struct {
@@ -114,11 +112,9 @@ func (*WSIO) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHT
 	socket := newWebSocketIO(ctx, url)
 	socket.setUpSocketIO(args...)
 	if err := socket.startConnect(); err != nil {
-		socket.metrics.pushErrorRateMetric(1, &socket)
 		return nil, err
 	}
 	defer socket.close()
-	socket.metrics.pushErrorRateMetric(0, &socket)
 	(socket.runner.callbackFunction)(goja.Undefined(), socket.runner.runtime.ToValue(&socket))
 	socket.runner.conn.SetCloseHandler(func(code int, text string) error { return nil })
 	eventLoopDataChan := newEventLoopData()
@@ -146,12 +142,10 @@ func (s *SocketIO) eventLoopHandler(ctx context.Context, eventLoopDataChan Event
 			s.readErrorHandler(readErr)
 
 		case code := <-eventLoopDataChan.readCloseChan:
-			// _ = socket.closeConnection(code)
 			s.closeConnectionHandler(code)
 
 		case scheduledFn := <-s.scheduled:
 			if err := s.gojaCallbackFuncHandler(scheduledFn); err != nil {
-				s.metrics.pushErrorRateMetric(1, s)
 				return nil, err
 			}
 
@@ -163,101 +157,6 @@ func (s *SocketIO) eventLoopHandler(ctx context.Context, eventLoopDataChan Event
 		case <-s.done:
 			return s.doneHandler(ctx)
 		}
-	}
-}
-func (s *SocketIO) pingHandler(pingData string) {
-	// Handle pings received from the server
-	// - trigger the `ping` event
-	// - reply with pong (needed when `SetPingHandler` is overwritten)
-	err := s.runner.conn.WriteControl(websocket.PongMessage, []byte(pingData), time.Now().Add(writeWait))
-	if err != nil {
-		s.handleEvent("error", s.runner.runtime.ToValue(err))
-	}
-	s.handleEvent("ping")
-}
-
-func (s *SocketIO) pongHandler(pingID string) {
-	s.trackPong(pingID)
-	s.handleEvent("pong")
-}
-
-func (s *SocketIO) receiveDataHandler(readData string) {
-	s.metrics.msgReceivedTimestamps = append(s.metrics.msgReceivedTimestamps, time.Now())
-	event, responseData := parseResponse(readData, s.runner.runtime)
-	s.handleEvent(event, responseData...)
-}
-
-func (s *SocketIO) readErrorHandler(readErr error) {
-	s.handleEvent("error", s.runner.runtime.ToValue(readErr))
-	s.metrics.pushErrorRateMetric(1, s)
-}
-
-func (s *SocketIO) gojaCallbackFuncHandler(scheduledFn goja.Callable) (err error) {
-	if _, err = scheduledFn(goja.Undefined()); err != nil {
-		return err
-	}
-	return
-}
-
-func (s *SocketIO) closeConnectionHandler(code int) {
-	_ = s.closeConnection(code)
-}
-
-func (s *SocketIO) doneHandler(ctx context.Context) (*WSHTTPResponse, error) {
-	// This is the final exit point normally triggered by closeConnection
-	end := time.Now()
-	sessionDuration := stats.D(end.Sub(s.metrics.connectionStart))
-
-	sampleTags := stats.IntoSampleTags(&s.tags)
-	s.pushOverviewMetrics(ctx, sampleTags, sessionDuration)
-	s.pushSentMetrics(ctx, sampleTags)
-	s.pushReceivedMetrics(ctx, sampleTags)
-	s.pushPingMetrics(ctx, sampleTags)
-	return s.runner.response, nil
-}
-
-func (s *SocketIO) pushOverviewMetrics(ctx context.Context, sampleTags *stats.SampleTags, sessionDuration float64) {
-	stats.PushIfNotDone(ctx, s.runner.state.Samples, stats.ConnectedSamples{
-		Samples: []stats.Sample{
-			{Metric: metrics.WSSessions, Time: s.metrics.connectionStart, Tags: sampleTags, Value: 1},
-			{Metric: metrics.WSConnecting, Time: s.metrics.connectionStart, Tags: sampleTags, Value: stats.D(s.metrics.connectionEnd.Sub(s.metrics.connectionStart))},
-			{Metric: metrics.WSSessionDuration, Time: s.metrics.connectionStart, Tags: sampleTags, Value: sessionDuration},
-		},
-		Tags: sampleTags,
-		Time: s.metrics.connectionStart,
-	})
-}
-
-func (s *SocketIO) pushSentMetrics(ctx context.Context, sampleTags *stats.SampleTags) {
-	for _, msgSentTimestamp := range s.metrics.msgSentTimestamps {
-		stats.PushIfNotDone(ctx, s.runner.state.Samples, stats.Sample{
-			Metric: metrics.WSMessagesSent,
-			Time:   msgSentTimestamp,
-			Tags:   sampleTags,
-			Value:  1,
-		})
-	}
-}
-
-func (s *SocketIO) pushReceivedMetrics(ctx context.Context, sampleTags *stats.SampleTags) {
-	for _, msgReceivedTimestamp := range s.metrics.msgReceivedTimestamps {
-		stats.PushIfNotDone(ctx, s.runner.state.Samples, stats.Sample{
-			Metric: metrics.WSMessagesReceived,
-			Time:   msgReceivedTimestamp,
-			Tags:   sampleTags,
-			Value:  1,
-		})
-	}
-}
-
-func (s *SocketIO) pushPingMetrics(ctx context.Context, sampleTags *stats.SampleTags) {
-	for _, pingDelta := range s.metrics.pingTimestamps {
-		stats.PushIfNotDone(ctx, s.runner.state.Samples, stats.Sample{
-			Metric: metrics.WSPing,
-			Time:   pingDelta.pong,
-			Tags:   sampleTags,
-			Value:  stats.D(pingDelta.pong.Sub(pingDelta.ping)),
-		})
 	}
 }
 
@@ -314,12 +213,8 @@ func newWebSocketIORunner(initCtx context.Context, rawUrl string) SocketIORunner
 }
 
 func newWebSocketIOMetrics() SocketIOMetrics {
-	errorRateMetrics := stats.New("ws_connect_error_rate", stats.Rate)
 	return SocketIOMetrics{
 		pingSendTimestamps: make(map[string]time.Time),
-		pushErrorRateMetric: func(value float64, socket *SocketIO) {
-			stats.PushIfNotDone(*socket.runner.ctx, socket.runner.state.Samples, stats.Sample{Time: time.Now(), Metric: errorRateMetrics, Tags: stats.IntoSampleTags(&socket.tags), Value: value})
-		},
 	}
 }
 
@@ -449,15 +344,10 @@ func (s *SocketIO) setSocketTags(paramsObject *goja.Object) {
 func (s *SocketIO) createSocketIODialer() {
 	jar, _ := cookiejar.New(nil)
 	s.runner.dialer = &websocket.Dialer{
-		NetDial:         s.createDialer,
 		Proxy:           http.ProxyFromEnvironment,
 		TLSClientConfig: s.createTlsConfig(),
 		Jar:             jar,
 	}
-}
-
-func (s *SocketIO) createDialer(network, address string) (net.Conn, error) {
-	return s.runner.state.Dialer.DialContext(*s.runner.ctx, network, address)
 }
 
 func (s *SocketIO) createTlsConfig() (tlsConfig *tls.Config) {
@@ -503,6 +393,101 @@ func (s *SocketIO) initDefaultTags() {
 	}
 }
 
+func (s *SocketIO) pingHandler(pingData string) {
+	// Handle pings received from the server
+	// - trigger the `ping` event
+	// - reply with pong (needed when `SetPingHandler` is overwritten)
+	err := s.runner.conn.WriteControl(websocket.PongMessage, []byte(pingData), time.Now().Add(writeWait))
+	if err != nil {
+		s.handleEvent("error", s.runner.runtime.ToValue(err))
+	}
+	s.handleEvent("ping")
+}
+
+func (s *SocketIO) pongHandler(pingID string) {
+	s.trackPong(pingID)
+	s.handleEvent("pong")
+}
+
+func (s *SocketIO) receiveDataHandler(readData string) {
+	s.metrics.msgReceivedTimestamps = append(s.metrics.msgReceivedTimestamps, time.Now())
+	event, responseData := parseResponse(readData, s.runner.runtime)
+	s.handleEvent(event, responseData...)
+}
+
+func (s *SocketIO) readErrorHandler(readErr error) {
+	s.handleEvent("error", s.runner.runtime.ToValue(readErr))
+}
+
+func (s *SocketIO) gojaCallbackFuncHandler(scheduledFn goja.Callable) (err error) {
+	if _, err = scheduledFn(goja.Undefined()); err != nil {
+		return err
+	}
+	return
+}
+
+func (s *SocketIO) closeConnectionHandler(code int) {
+	s.closeConnection(code)
+}
+
+func (s *SocketIO) doneHandler(ctx context.Context) (*WSHTTPResponse, error) {
+	// This is the final exit point normally triggered by closeConnection
+	end := time.Now()
+	sessionDuration := stats.D(end.Sub(s.metrics.connectionStart))
+
+	sampleTags := stats.IntoSampleTags(&s.tags)
+	s.pushOverviewMetrics(ctx, sampleTags, sessionDuration)
+	s.pushSentMetrics(ctx, sampleTags)
+	s.pushReceivedMetrics(ctx, sampleTags)
+	s.pushPingMetrics(ctx, sampleTags)
+	return s.runner.response, nil
+}
+
+func (s *SocketIO) pushOverviewMetrics(ctx context.Context, sampleTags *stats.SampleTags, sessionDuration float64) {
+	stats.PushIfNotDone(ctx, s.runner.state.Samples, stats.ConnectedSamples{
+		Samples: []stats.Sample{
+			{Metric: metrics.WSSessions, Time: s.metrics.connectionStart, Tags: sampleTags, Value: 1},
+			{Metric: metrics.WSConnecting, Time: s.metrics.connectionStart, Tags: sampleTags, Value: stats.D(s.metrics.connectionEnd.Sub(s.metrics.connectionStart))},
+			{Metric: metrics.WSSessionDuration, Time: s.metrics.connectionStart, Tags: sampleTags, Value: sessionDuration},
+		},
+		Tags: sampleTags,
+		Time: s.metrics.connectionStart,
+	})
+}
+
+func (s *SocketIO) pushSentMetrics(ctx context.Context, sampleTags *stats.SampleTags) {
+	for _, msgSentTimestamp := range s.metrics.msgSentTimestamps {
+		stats.PushIfNotDone(ctx, s.runner.state.Samples, stats.Sample{
+			Metric: metrics.WSMessagesSent,
+			Time:   msgSentTimestamp,
+			Tags:   sampleTags,
+			Value:  1,
+		})
+	}
+}
+
+func (s *SocketIO) pushReceivedMetrics(ctx context.Context, sampleTags *stats.SampleTags) {
+	for _, msgReceivedTimestamp := range s.metrics.msgReceivedTimestamps {
+		stats.PushIfNotDone(ctx, s.runner.state.Samples, stats.Sample{
+			Metric: metrics.WSMessagesReceived,
+			Time:   msgReceivedTimestamp,
+			Tags:   sampleTags,
+			Value:  1,
+		})
+	}
+}
+
+func (s *SocketIO) pushPingMetrics(ctx context.Context, sampleTags *stats.SampleTags) {
+	for _, pingDelta := range s.metrics.pingTimestamps {
+		stats.PushIfNotDone(ctx, s.runner.state.Samples, stats.Sample{
+			Metric: metrics.WSPing,
+			Time:   pingDelta.pong,
+			Tags:   sampleTags,
+			Value:  stats.D(pingDelta.pong.Sub(pingDelta.ping)),
+		})
+	}
+}
+
 func (s *SocketIO) close() {
 	s.runner.conn.Close()
 }
@@ -539,7 +524,6 @@ func (s *SocketIO) Send(event, message string) {
 	writeData := []byte(fmt.Sprintf("%s[\"%s\",%s]", COMMON_MESSAGE, event, message))
 	if err := s.runner.conn.WriteMessage(websocket.TextMessage, writeData); err != nil {
 		s.handleEvent("error", rt.ToValue(err))
-		s.metrics.pushErrorRateMetric(1, s)
 	}
 
 	s.metrics.msgSentTimestamps = append(s.metrics.msgSentTimestamps, time.Now())
@@ -571,13 +555,12 @@ func (s *SocketIO) closeConnection(code int) error {
 		if err != nil {
 			// Call the user-defined error handler
 			s.handleEvent("error", rt.ToValue(err))
-			s.metrics.pushErrorRateMetric(1, s)
 		}
 
 		// Call the user-defined close handler
 		s.handleEvent("close", rt.ToValue(code))
 
-		_ = s.runner.conn.Close()
+		s.runner.conn.Close()
 
 		// Stop the main control loop
 		close(s.done)
@@ -625,7 +608,7 @@ func (s *SocketIO) Close(args ...goja.Value) {
 		code = int(args[0].ToInteger())
 	}
 
-	_ = s.closeConnection(code)
+	s.closeConnection(code)
 }
 
 func (s *SocketIO) Ping() {
@@ -637,7 +620,6 @@ func (s *SocketIO) Ping() {
 	err := s.runner.conn.WriteControl(websocket.PingMessage, data, deadline)
 	if err != nil {
 		s.handleEvent("error", rt.ToValue(err))
-		s.metrics.pushErrorRateMetric(1, s)
 		return
 	}
 
