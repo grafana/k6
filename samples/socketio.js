@@ -53,7 +53,7 @@ export default function() {
 			socket.close();
 		}, 5000);
 	});
-	// console.log(JSON.stringify(response));
+	console.log(JSON.stringify(response));
 	// response.body = responseMessage;
 	// check(response, { 'status is 101': (r) => r && r.status === 101 });
 	// check(response, {

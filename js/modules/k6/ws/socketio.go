@@ -80,6 +80,14 @@ type SocketIO struct {
 	tags          map[string]string
 }
 
+type EventLoopDataChannel struct {
+	pingChan      chan string
+	pongChan      chan string
+	readDataChan  chan []byte
+	readCloseChan chan int
+	readErrChan   chan error
+}
+
 const (
 	SOCKET_PROTOCOL        = "ws://"
 	SOCKET_SECURE_PROTOCOL = "wss://"
@@ -110,102 +118,148 @@ func (*WSIO) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHT
 	}
 	defer socket.close()
 	(socket.runner.callbackFunction)(goja.Undefined(), socket.runner.runtime.ToValue(&socket))
-	//socket.handleEvent("open")
 	socket.runner.conn.SetCloseHandler(func(code int, text string) error { return nil })
-	pingChan := make(chan string)
-	pongChan := make(chan string)
-	socket.runner.conn.SetPingHandler(func(msg string) error { pingChan <- msg; return nil })
-	socket.runner.conn.SetPongHandler(func(pingID string) error { pongChan <- pingID; return nil })
-
-	readDataChan := make(chan []byte)
-	readCloseChan := make(chan int)
-	readErrChan := make(chan error)
+	eventLoopDataChan := newEventLoopData()
+	socket.runner.conn.SetPingHandler(func(msg string) error { eventLoopDataChan.pingChan <- msg; return nil })
+	socket.runner.conn.SetPongHandler(func(pingID string) error { eventLoopDataChan.pongChan <- pingID; return nil })
 
 	// Wraps a couple of channels around conn.ReadMessage
-	go readPump(socket.runner.conn, readDataChan, readErrChan, readCloseChan)
+	go readPump(socket.runner.conn, eventLoopDataChan.readDataChan, eventLoopDataChan.readErrChan, eventLoopDataChan.readCloseChan)
+	return socket.eventLoopHandler(ctx, eventLoopDataChan)
+}
+
+func (socket *SocketIO) eventLoopHandler(ctx context.Context, eventLoopDataChan EventLoopDataChannel) (*WSHTTPResponse, error) {
 	for {
 		select {
-		case pingData := <-pingChan:
-			// Handle pings received from the server
-			// - trigger the `ping` event
-			// - reply with pong (needed when `SetPingHandler` is overwritten)
-			err := socket.runner.conn.WriteControl(websocket.PongMessage, []byte(pingData), time.Now().Add(writeWait))
-			if err != nil {
-				socket.handleEvent("error", socket.runner.runtime.ToValue(err))
-			}
-			socket.handleEvent("ping")
+		case pingData := <-eventLoopDataChan.pingChan:
+			socket.pingHandler(pingData)
 
-		case pingID := <-pongChan:
-			// Handle pong responses to our pings
-			socket.trackPong(pingID)
-			socket.handleEvent("pong")
+		case pingID := <-eventLoopDataChan.pongChan:
+			socket.pongHandler(pingID)
 
-		case readData := <-readDataChan:
-			socket.metrics.msgReceivedTimestamps = append(socket.metrics.msgReceivedTimestamps, time.Now())
-			socket.handleEvent("message", socket.runner.runtime.ToValue(string(readData)))
+		case readData := <-eventLoopDataChan.readDataChan:
+			socket.receiveDataHandler(string(readData))
 
-		case readErr := <-readErrChan:
-			socket.handleEvent("error", socket.runner.runtime.ToValue(readErr))
+		case readErr := <-eventLoopDataChan.readErrChan:
+			socket.readErrorHandler(readErr)
 
-		case code := <-readCloseChan:
-			_ = socket.closeConnection(code)
+		case code := <-eventLoopDataChan.readCloseChan:
+			// _ = socket.closeConnection(code)
+			socket.closeConnectionHandler(code)
 
 		case scheduledFn := <-socket.scheduled:
-			if _, err := scheduledFn(goja.Undefined()); err != nil {
+			if err := socket.gojaCallbackFuncHandler(scheduledFn); err != nil {
 				return nil, err
 			}
 
 		case <-ctx.Done():
 			// VU is shutting down during an interrupt
 			// socket events will not be forwarded to the VU
-			_ = socket.closeConnection(websocket.CloseGoingAway)
+			socket.closeConnectionHandler(websocket.CloseGoingAway)
 
 		case <-socket.done:
-			// This is the final exit point normally triggered by closeConnection
-			end := time.Now()
-			sessionDuration := stats.D(end.Sub(socket.metrics.connectionStart))
-
-			sampleTags := stats.IntoSampleTags(&socket.tags)
-
-			stats.PushIfNotDone(ctx, socket.runner.state.Samples, stats.ConnectedSamples{
-				Samples: []stats.Sample{
-					{Metric: metrics.WSSessions, Time: socket.metrics.connectionStart, Tags: sampleTags, Value: 1},
-					{Metric: metrics.WSConnecting, Time: socket.metrics.connectionStart, Tags: sampleTags, Value: stats.D(socket.metrics.connectionEnd.Sub(socket.metrics.connectionStart))},
-					{Metric: metrics.WSSessionDuration, Time: socket.metrics.connectionStart, Tags: sampleTags, Value: sessionDuration},
-				},
-				Tags: sampleTags,
-				Time: socket.metrics.connectionStart,
-			})
-
-			for _, msgSentTimestamp := range socket.metrics.msgSentTimestamps {
-				stats.PushIfNotDone(ctx, socket.runner.state.Samples, stats.Sample{
-					Metric: metrics.WSMessagesSent,
-					Time:   msgSentTimestamp,
-					Tags:   sampleTags,
-					Value:  1,
-				})
-			}
-
-			for _, msgReceivedTimestamp := range socket.metrics.msgReceivedTimestamps {
-				stats.PushIfNotDone(ctx, socket.runner.state.Samples, stats.Sample{
-					Metric: metrics.WSMessagesReceived,
-					Time:   msgReceivedTimestamp,
-					Tags:   sampleTags,
-					Value:  1,
-				})
-			}
-
-			for _, pingDelta := range socket.metrics.pingTimestamps {
-				stats.PushIfNotDone(ctx, socket.runner.state.Samples, stats.Sample{
-					Metric: metrics.WSPing,
-					Time:   pingDelta.pong,
-					Tags:   sampleTags,
-					Value:  stats.D(pingDelta.pong.Sub(pingDelta.ping)),
-				})
-			}
-
-			return socket.runner.response, nil
+			return socket.doneHandler(ctx)
 		}
+	}
+}
+func (socket *SocketIO) pingHandler(pingData string) {
+	// Handle pings received from the server
+	// - trigger the `ping` event
+	// - reply with pong (needed when `SetPingHandler` is overwritten)
+	err := socket.runner.conn.WriteControl(websocket.PongMessage, []byte(pingData), time.Now().Add(writeWait))
+	if err != nil {
+		socket.handleEvent("error", socket.runner.runtime.ToValue(err))
+	}
+	socket.handleEvent("ping")
+}
+
+func (socket *SocketIO) pongHandler(pingID string) {
+	socket.trackPong(pingID)
+	socket.handleEvent("pong")
+}
+
+func (socket *SocketIO) receiveDataHandler(readData string) {
+	socket.metrics.msgReceivedTimestamps = append(socket.metrics.msgReceivedTimestamps, time.Now())
+	event, _, _ := socket.handleSocketIOResponse(string(readData))
+	socket.handleEvent(event, socket.runner.runtime.ToValue(string(readData)))
+
+}
+
+func (socket *SocketIO) readErrorHandler(readErr error) {
+	socket.handleEvent("error", socket.runner.runtime.ToValue(readErr))
+}
+
+func (socket *SocketIO) gojaCallbackFuncHandler(scheduledFn goja.Callable) (err error) {
+	if _, err = scheduledFn(goja.Undefined()); err != nil {
+		return err
+	}
+	return
+}
+
+func (socket *SocketIO) closeConnectionHandler(code int) {
+	switch code {
+	case websocket.CloseGoingAway:
+		_ = socket.closeConnection(code)
+	default:
+		_ = socket.closeConnection(code)
+	}
+}
+
+func (socket *SocketIO) doneHandler(ctx context.Context) (*WSHTTPResponse, error) {
+	// This is the final exit point normally triggered by closeConnection
+	end := time.Now()
+	sessionDuration := stats.D(end.Sub(socket.metrics.connectionStart))
+
+	sampleTags := stats.IntoSampleTags(&socket.tags)
+	socket.pushOverviewMetrics(ctx, sampleTags, sessionDuration)
+	socket.pushSentMetrics(ctx, sampleTags)
+	socket.pushReceivedMetrics(ctx, sampleTags)
+	socket.pushPingMetrics(ctx, sampleTags)
+	return socket.runner.response, nil
+}
+
+func (socket *SocketIO) pushOverviewMetrics(ctx context.Context, sampleTags *stats.SampleTags, sessionDuration float64) {
+	stats.PushIfNotDone(ctx, socket.runner.state.Samples, stats.ConnectedSamples{
+		Samples: []stats.Sample{
+			{Metric: metrics.WSSessions, Time: socket.metrics.connectionStart, Tags: sampleTags, Value: 1},
+			{Metric: metrics.WSConnecting, Time: socket.metrics.connectionStart, Tags: sampleTags, Value: stats.D(socket.metrics.connectionEnd.Sub(socket.metrics.connectionStart))},
+			{Metric: metrics.WSSessionDuration, Time: socket.metrics.connectionStart, Tags: sampleTags, Value: sessionDuration},
+		},
+		Tags: sampleTags,
+		Time: socket.metrics.connectionStart,
+	})
+}
+
+func (socket *SocketIO) pushSentMetrics(ctx context.Context, sampleTags *stats.SampleTags) {
+	for _, msgSentTimestamp := range socket.metrics.msgSentTimestamps {
+		stats.PushIfNotDone(ctx, socket.runner.state.Samples, stats.Sample{
+			Metric: metrics.WSMessagesSent,
+			Time:   msgSentTimestamp,
+			Tags:   sampleTags,
+			Value:  1,
+		})
+	}
+}
+
+func (socket *SocketIO) pushReceivedMetrics(ctx context.Context, sampleTags *stats.SampleTags) {
+	for _, msgReceivedTimestamp := range socket.metrics.msgReceivedTimestamps {
+		stats.PushIfNotDone(ctx, socket.runner.state.Samples, stats.Sample{
+			Metric: metrics.WSMessagesReceived,
+			Time:   msgReceivedTimestamp,
+			Tags:   sampleTags,
+			Value:  1,
+		})
+	}
+}
+
+func (socket *SocketIO) pushPingMetrics(ctx context.Context, sampleTags *stats.SampleTags) {
+	for _, pingDelta := range socket.metrics.pingTimestamps {
+		stats.PushIfNotDone(ctx, socket.runner.state.Samples, stats.Sample{
+			Metric: metrics.WSPing,
+			Time:   pingDelta.pong,
+			Tags:   sampleTags,
+			Value:  stats.D(pingDelta.pong.Sub(pingDelta.ping)),
+		})
 	}
 }
 
@@ -264,6 +318,16 @@ func newWebSocketIORunner(initCtx context.Context, rawUrl string) SocketIORunner
 func newWebSocketIOMetrics() SocketIOMetrics {
 	return SocketIOMetrics{
 		pingSendTimestamps: make(map[string]time.Time),
+	}
+}
+
+func newEventLoopData() EventLoopDataChannel {
+	return EventLoopDataChannel{
+		pingChan:      make(chan string),
+		pongChan:      make(chan string),
+		readDataChan:  make(chan []byte),
+		readCloseChan: make(chan int),
+		readErrChan:   make(chan error),
 	}
 }
 
@@ -493,12 +557,11 @@ func (s *SocketIO) handleSocketIOResponse(rawResponse string) (eventName string,
 }
 
 func (s *SocketIO) handleSocketIOResponseProcess(socketIOCode, rawResponse string, startRawResponseCharIndex int) (eventName string, messageResponse []goja.Value, err error) {
-	var v interface{}
 	rt := common.GetRuntime(*s.runner.ctx)
 	switch socketIOCode {
 	case MESSAGE:
 		responseData := rawResponse[startRawResponseCharIndex:len(rawResponse)]
-		return s.commonMessageResponseProcess(rawResponse, responseData, v)
+		return s.commonMessageResponseProcess(rawResponse, responseData)
 	case OPEN:
 		return "open", []goja.Value{rt.ToValue(string(rawResponse))}, nil
 	default:
@@ -506,7 +569,8 @@ func (s *SocketIO) handleSocketIOResponseProcess(socketIOCode, rawResponse strin
 	}
 }
 
-func (s *SocketIO) commonMessageResponseProcess(rawResponse, responseData string, v interface{}) (eventName string, messageResponse []goja.Value, err error) {
+func (s *SocketIO) commonMessageResponseProcess(rawResponse, responseData string) (eventName string, messageResponse []goja.Value, err error) {
+	var v interface{}
 	rt := common.GetRuntime(*s.runner.ctx)
 	switch responseData {
 	case EMPTY_MESSAGE:
