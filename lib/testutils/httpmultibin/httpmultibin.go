@@ -100,6 +100,44 @@ type jsonBody struct {
 	Compression string      `json:"compression"`
 }
 
+func getWebsocketIOHandler(echo bool, closePrematurely bool) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, w.Header())
+		if err != nil {
+			return
+		}
+		if echo {
+			messageType, r, e := conn.NextReader()
+			if e != nil {
+				return
+			}
+			var wc io.WriteCloser
+			wc, err = conn.NextWriter(messageType)
+			if err != nil {
+				return
+			}
+			if _, err = io.Copy(wc, r); err != nil {
+				return
+			}
+			if err = wc.Close(); err != nil {
+				return
+			}
+		}
+		// closePrematurely=true mimics an invalid WS server that doesn't
+		// send a close control frame before closing the connection.
+		if !closePrematurely {
+			closeMsg := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")
+			_ = conn.WriteControl(websocket.CloseMessage, closeMsg, time.Now().Add(time.Second))
+			// Wait for response control frame
+			<-time.After(time.Second)
+		}
+		err = conn.Close()
+		if err != nil {
+			return
+		}
+	})
+}
+
 func getWebsocketHandler(echo bool, closePrematurely bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, w.Header())
@@ -207,6 +245,7 @@ func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 	mux.Handle("/ws-echo-invalid", getWebsocketHandler(true, true))
 	mux.Handle("/ws-close", getWebsocketHandler(false, false))
 	mux.Handle("/ws-close-invalid", getWebsocketHandler(false, true))
+	mux.Handle("/wsio-echo", getWebsocketIOHandler(true, false))
 	mux.Handle("/zstd", getEncodedHandler(t, httpext.CompressionTypeZstd))
 	mux.Handle("/zstd-br", getZstdBrHandler(t))
 	mux.Handle("/", httpbin.New().Handler())
