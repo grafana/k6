@@ -466,7 +466,7 @@ func TestSystemTags(t *testing.T) {
 					socket.send("test")
 				})
 				socket.on("message", function (data){
-					if (!data=="test") {
+					if (data!=="test") {
 						throw new Error ("echo'd data doesn't match our message!");
 					}
 					socket.close()
