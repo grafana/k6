@@ -64,10 +64,10 @@ type SocketIOMetrics struct {
 	msgSentTimestamps     []time.Time
 	msgReceivedTimestamps []time.Time
 
-	pingSendTimestamps map[string]time.Time
-	pingSendCounter    int
-	pingTimestamps     []pingDelta
-	errorRate          *stats.Metric
+	pingSendTimestamps  map[string]time.Time
+	pingSendCounter     int
+	pingTimestamps      []pingDelta
+	pushErrorRateMetric func(value float64, socket *SocketIO)
 }
 
 type SocketIO struct {
@@ -114,10 +114,11 @@ func (*WSIO) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHT
 	socket := newWebSocketIO(ctx, url)
 	socket.setUpSocketIO(args...)
 	if err := socket.startConnect(); err != nil {
-		stats.PushIfNotDone(*socket.runner.ctx, socket.runner.state.Samples, stats.Sample{Time: time.Now(), Metric: socket.metrics.errorRate, Tags: stats.IntoSampleTags(&socket.tags), Value: 1})
+		socket.metrics.pushErrorRateMetric(1, &socket)
 		return nil, err
 	}
 	defer socket.close()
+	socket.metrics.pushErrorRateMetric(0, &socket)
 	(socket.runner.callbackFunction)(goja.Undefined(), socket.runner.runtime.ToValue(&socket))
 	socket.runner.conn.SetCloseHandler(func(code int, text string) error { return nil })
 	eventLoopDataChan := newEventLoopData()
@@ -150,7 +151,7 @@ func (s *SocketIO) eventLoopHandler(ctx context.Context, eventLoopDataChan Event
 
 		case scheduledFn := <-s.scheduled:
 			if err := s.gojaCallbackFuncHandler(scheduledFn); err != nil {
-				stats.PushIfNotDone(ctx, s.runner.state.Samples, stats.Sample{Time: time.Now(), Metric: s.metrics.errorRate, Tags: stats.IntoSampleTags(&s.tags), Value: 1})
+				s.metrics.pushErrorRateMetric(1, s)
 				return nil, err
 			}
 
@@ -188,7 +189,7 @@ func (s *SocketIO) receiveDataHandler(readData string) {
 
 func (s *SocketIO) readErrorHandler(readErr error) {
 	s.handleEvent("error", s.runner.runtime.ToValue(readErr))
-	stats.PushIfNotDone(*s.runner.ctx, s.runner.state.Samples, stats.Sample{Time: time.Now(), Metric: s.metrics.errorRate, Tags: stats.IntoSampleTags(&s.tags), Value: 1})
+	s.metrics.pushErrorRateMetric(1, s)
 }
 
 func (s *SocketIO) gojaCallbackFuncHandler(scheduledFn goja.Callable) (err error) {
@@ -313,9 +314,12 @@ func newWebSocketIORunner(initCtx context.Context, rawUrl string) SocketIORunner
 }
 
 func newWebSocketIOMetrics() SocketIOMetrics {
+	errorRateMetrics := stats.New("ws_connect_error_rate", stats.Rate)
 	return SocketIOMetrics{
 		pingSendTimestamps: make(map[string]time.Time),
-		errorRate:          stats.New("ws_connect_error_rate", stats.Rate),
+		pushErrorRateMetric: func(value float64, socket *SocketIO) {
+			stats.PushIfNotDone(*socket.runner.ctx, socket.runner.state.Samples, stats.Sample{Time: time.Now(), Metric: errorRateMetrics, Tags: stats.IntoSampleTags(&socket.tags), Value: value})
+		},
 	}
 }
 
@@ -535,7 +539,7 @@ func (s *SocketIO) Send(event, message string) {
 	writeData := []byte(fmt.Sprintf("%s[\"%s\",%s]", COMMON_MESSAGE, event, message))
 	if err := s.runner.conn.WriteMessage(websocket.TextMessage, writeData); err != nil {
 		s.handleEvent("error", rt.ToValue(err))
-		stats.PushIfNotDone(*s.runner.ctx, s.runner.state.Samples, stats.Sample{Time: time.Now(), Metric: s.metrics.errorRate, Tags: stats.IntoSampleTags(&s.tags), Value: 1})
+		s.metrics.pushErrorRateMetric(1, s)
 	}
 
 	s.metrics.msgSentTimestamps = append(s.metrics.msgSentTimestamps, time.Now())
@@ -567,7 +571,7 @@ func (s *SocketIO) closeConnection(code int) error {
 		if err != nil {
 			// Call the user-defined error handler
 			s.handleEvent("error", rt.ToValue(err))
-			stats.PushIfNotDone(*s.runner.ctx, s.runner.state.Samples, stats.Sample{Time: time.Now(), Metric: s.metrics.errorRate, Tags: stats.IntoSampleTags(&s.tags), Value: 1})
+			s.metrics.pushErrorRateMetric(1, s)
 		}
 
 		// Call the user-defined close handler
@@ -633,7 +637,7 @@ func (s *SocketIO) Ping() {
 	err := s.runner.conn.WriteControl(websocket.PingMessage, data, deadline)
 	if err != nil {
 		s.handleEvent("error", rt.ToValue(err))
-		stats.PushIfNotDone(*s.runner.ctx, s.runner.state.Samples, stats.Sample{Time: time.Now(), Metric: s.metrics.errorRate, Tags: stats.IntoSampleTags(&s.tags), Value: 1})
+		s.metrics.pushErrorRateMetric(1, s)
 		return
 	}
 

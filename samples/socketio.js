@@ -7,7 +7,9 @@ export default function() {
 	// var url = 'ws://demos.kaazing.com/echo';
 	// var url = 'ws://localhost:3000/socket.io/?EIO=3&transport=websocket';
 	var url =
-		"wss://connector.athenka.com/socket.io/?EIO=3&transport=websocket";
+		Math.random() >= 0.5
+			? "wss://connector.athenka.com/socket.io/?EIO=3&transport=websocket"
+			: "wss://connector.athenkasdasdsa.com/socket.io/?EIO=3&transport=websocket";
 	var params = { tags: { my_tag: "hello" } };
 	var response = ws.connect(url, params, function(socket) {
 		socket.on("open", function open() {
