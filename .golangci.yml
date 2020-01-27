@@ -54,6 +54,7 @@ linters:
   - gochecknoinits
   - godox
   - wsl
+  - gomnd
   fast: false
 
 service:

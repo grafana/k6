@@ -51,12 +51,16 @@ type ExecutionSegment struct {
 }
 
 // Ensure we implement those interfaces
-var _ encoding.TextUnmarshaler = &ExecutionSegment{}
-var _ fmt.Stringer = &ExecutionSegment{}
+var (
+	_ encoding.TextUnmarshaler = &ExecutionSegment{}
+	_ fmt.Stringer             = &ExecutionSegment{}
+)
 
 // Helpful "constants" so we don't initialize them in every function call
-var zeroRat, oneRat = big.NewRat(0, 1), big.NewRat(1, 1) //nolint:gochecknoglobals
-var oneBigInt, twoBigInt = big.NewInt(1), big.NewInt(2)  //nolint:gochecknoglobals
+var (
+	zeroRat, oneRat      = big.NewRat(0, 1), big.NewRat(1, 1) //nolint:gochecknoglobals
+	oneBigInt, twoBigInt = big.NewInt(1), big.NewInt(2)       //nolint:gochecknoglobals
+)
 
 // NewExecutionSegment validates the supplied arguments (basically, that 0 <=
 // from < to <= 1) and either returns an error, or it returns a
@@ -95,12 +99,11 @@ func stringToRat(s string) (*big.Rat, error) {
 	return rat, nil
 }
 
-// UnmarshalText implements the encoding.TextUnmarshaler interface, so that
-// execution segments can be specified as CLI flags, environment variables, and
-// JSON strings.
+// NewExecutionSegmentFromString validates the supplied string value and returns
+// the newly created ExecutionSegment or and error from it.
 //
 // We are able to parse both single percentage/float/fraction values, and actual
-// (from; to] segments. For the single values, we just treat them as the
+// (from: to] segments. For the single values, we just treat them as the
 // beginning segment - thus the execution segment can be used as a shortcut for
 // quickly running an arbitrarily scaled-down version of a test.
 //
@@ -109,9 +112,8 @@ func stringToRat(s string) (*big.Rat, error) {
 // And values without a colon are the end of a first segment:
 //  `20%`, `0.2`,  and `1/5` should be converted to (0, 1/5]
 // empty values should probably be treated as "1", i.e. the whole execution
-func (es *ExecutionSegment) UnmarshalText(text []byte) (err error) {
+func NewExecutionSegmentFromString(toStr string) (result *ExecutionSegment, err error) {
 	from := zeroRat
-	toStr := string(text)
 	if toStr == "" {
 		toStr = "1" // an empty string means a full 0:1 execution segment
 	}
@@ -119,16 +121,23 @@ func (es *ExecutionSegment) UnmarshalText(text []byte) (err error) {
 		fromToStr := strings.SplitN(toStr, ":", 2)
 		toStr = fromToStr[1]
 		if from, err = stringToRat(fromToStr[0]); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	to, err := stringToRat(toStr)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	segment, err := NewExecutionSegment(from, to)
+	return NewExecutionSegment(from, to)
+}
+
+// UnmarshalText implements the encoding.TextUnmarshaler interface, so that
+// execution segments can be specified as CLI flags, environment variables, and
+// JSON strings. It is a wrapper for the NewExecutionFromString() constructor.
+func (es *ExecutionSegment) UnmarshalText(text []byte) (err error) {
+	segment, err := NewExecutionSegmentFromString(string(text))
 	if err != nil {
 		return err
 	}
@@ -194,8 +203,6 @@ func (es *ExecutionSegment) Split(numParts int64) ([]*ExecutionSegment, error) {
 
 	return results, nil
 }
-
-//TODO: add a NewFromString() method
 
 // Equal returns true only if the two execution segments have the same from and
 // to values.
@@ -292,4 +299,98 @@ func (es *ExecutionSegment) CopyScaleRat(value *big.Rat) *big.Rat {
 		return value
 	}
 	return new(big.Rat).Mul(value, es.length)
+}
+
+// ExecutionSegmentSequence represents an ordered chain of execution segments,
+// where the end of one segment is the beginning of the next. It can serialized
+// as a comma-separated string of rational numbers "r1,r2,r3,...,rn", which
+// represents the sequence (r1, r2], (r2, r3], (r3, r4], ..., (r{n-1}, rn].
+// The empty value should be treated as if there is a single (0, 1] segment.
+type ExecutionSegmentSequence []*ExecutionSegment
+
+// NewExecutionSegmentSequence validates the that the supplied execution
+// segments are non-overlapping and without gaps. It will return a new execution
+// segment sequence if that is true, and an error if it's not.
+func NewExecutionSegmentSequence(segments ...*ExecutionSegment) (ExecutionSegmentSequence, error) {
+	if len(segments) > 2 {
+		to := segments[0].to
+		for i, segment := range segments[1:] {
+			if segment.from.Cmp(to) != 0 {
+				return nil, fmt.Errorf(
+					"the start value %s of segment #%d should be equal to the end value of the previous one, but it is %s",
+					segment.from, i+1, to,
+				)
+			}
+			to = segment.to
+		}
+	}
+	return ExecutionSegmentSequence(segments), nil
+}
+
+// NewExecutionSegmentSequenceFromString parses strings of the format
+// "r1,r2,r3,...,rn", which represents the sequences like (r1, r2], (r2, r3],
+// (r3, r4], ..., (r{n-1}, rn].
+func NewExecutionSegmentSequenceFromString(strSeq string) (ExecutionSegmentSequence, error) {
+	var segments []*ExecutionSegment
+	if len(strSeq) != 0 {
+		points := strings.Split(strSeq, ",")
+		if len(points) < 2 {
+			return nil, fmt.Errorf("at least 2 points are needed for an execution segment sequence, %d given", len(points))
+		}
+		start := points[0]
+
+		segments = make([]*ExecutionSegment, 0, len(points)-1)
+		for _, point := range points[1:] {
+			segment, errl := NewExecutionSegmentFromString(start + ":" + point)
+			if errl != nil {
+				return nil, errl
+			}
+			segments = append(segments, segment)
+			start = point
+		}
+	}
+
+	return NewExecutionSegmentSequence(segments...)
+}
+
+// UnmarshalText implements the encoding.TextUnmarshaler interface, so that
+// execution segment sequences can be specified as CLI flags, environment
+// variables, and JSON strings.
+func (ess *ExecutionSegmentSequence) UnmarshalText(text []byte) (err error) {
+	seq, err := NewExecutionSegmentSequenceFromString(string(text))
+	if err != nil {
+		return err
+	}
+	*ess = seq
+	return nil
+}
+
+// MarshalText implements the encoding.TextMarshaler interface, so is used for
+// text and JSON encoding of the execution segment sequences.
+func (ess ExecutionSegmentSequence) MarshalText() ([]byte, error) {
+	return []byte(ess.String()), nil
+}
+
+// String just implements the fmt.Stringer interface, encoding the sequence of
+// segments as "start1,end1,end2,end3,...,endn".
+func (ess ExecutionSegmentSequence) String() string {
+	result := make([]string, 0, len(ess)+1)
+	for i, s := range ess {
+		if i == 0 {
+			result = append(result, s.from.RatString())
+		}
+		result = append(result, s.to.RatString())
+	}
+	return strings.Join(result, ",")
+}
+
+// GetStripedOffsets returns everything that you need in order to execute only
+// the iterations that belong to the supplied segment...
+//
+// TODO: add a more detailed algorithm description
+func (ess ExecutionSegmentSequence) GetStripedOffsets(segment *ExecutionSegment) (int, []int, error) {
+	start := 0
+	offsets := []int{}
+	// TODO: basically https://docs.google.com/spreadsheets/d/1V_ivN2xuaMJIgOf1HkpOw1ex8QOhxp960itGGiRrNzo/edit
+	return start, offsets, fmt.Errorf("not implemented")
 }
