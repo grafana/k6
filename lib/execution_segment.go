@@ -24,6 +24,7 @@ import (
 	"encoding"
 	"fmt"
 	"math/big"
+	"sort"
 	"strings"
 )
 
@@ -394,13 +395,82 @@ func (ess ExecutionSegmentSequence) String() string {
 	return strings.Join(result, ",")
 }
 
+func (ess ExecutionSegmentSequence) Len() int {
+	return len(ess)
+}
+
+func (ess ExecutionSegmentSequence) Less(i, j int) bool {
+	// Yes this Less is actually More, but we want it sorted in descending order and the alternative is to reverse it after sort
+	return ess[i].length.Cmp(ess[j].length) > 0
+}
+
+func (ess ExecutionSegmentSequence) Swap(i, j int) {
+	ess[i], ess[j] = ess[j], ess[i]
+}
+
+var _ sort.Interface = ExecutionSegmentSequence{}
+
+// lowest common denominator based on https://rosettacode.org/wiki/Least_common_multiple#Go
+func (ess ExecutionSegmentSequence) lcd() int64 {
+	var m, n, z big.Int
+	z = *ess[0].length.Denom()
+	for _, seg := range ess[1:] {
+		m = z
+		n = *seg.length.Denom()
+		z.Mul(z.Div(&m, z.GCD(nil, nil, &m, &n)), &n)
+	}
+
+	return z.Int64()
+}
+
 // GetStripedOffsets returns everything that you need in order to execute only
 // the iterations that belong to the supplied segment...
 //
 // TODO: add a more detailed algorithm description
-func (ess ExecutionSegmentSequence) GetStripedOffsets(segment *ExecutionSegment) (int, []int, error) {
-	start := 0
-	offsets := []int{}
-	// TODO: basically https://docs.google.com/spreadsheets/d/1V_ivN2xuaMJIgOf1HkpOw1ex8QOhxp960itGGiRrNzo/edit
-	return start, offsets, fmt.Errorf("not implemented")
+// TODO: basically https://docs.google.com/spreadsheets/d/1V_ivN2xuaMJIgOf1HkpOw1ex8QOhxp960itGGiRrNzo/edit
+func (ess ExecutionSegmentSequence) GetStripedOffsets(segment *ExecutionSegment) (int64, []int64, error) {
+	// TODO check if ExecutionSegmentSequence actually starts from 0 and goes to 1 ?
+	var matchingSegment *ExecutionSegment
+	for _, seg := range ess {
+		if seg.Equal(segment) {
+			matchingSegment = seg
+			break
+		}
+	}
+	if matchingSegment == nil {
+		return -1, nil, fmt.Errorf("missing segment %s inside segment sequence %s", segment, ess) // TODO: make a seperate error ?
+	}
+	sort.Stable(ess) // TODO: Use Stable ? copy the sequence ?
+
+	var numerators = make([]int64, len(ess))
+	var soonest = make([]*big.Rat, len(ess))
+	var lcd = ess.lcd()
+
+	for i := range ess {
+		numerators[i] = ess[i].length.Num().Int64() * (lcd / ess[i].length.Denom().Int64())
+		soonest[i] = big.NewRat(0, 1)
+	}
+
+	start := int64(-1)
+	var offsets []int64 // TODO we can preallocate this
+
+	for i := int64(0); i < lcd; i++ {
+		var iRat = big.NewRat(i, 1)
+		for index, value := range soonest {
+			if iRat.Cmp(value) >= 0 {
+				value.Add(value, big.NewRat(lcd, numerators[index]))
+				if ess[index] == matchingSegment { // TODO: this can be done for all segments and then we only get what we care about
+					if start < 0 {
+						start = i
+					} else {
+						offsets = append(offsets, i)
+					}
+					// we can stop iterating the moment len(offsets) + 1 = numerator and we have set start ...
+				}
+				break
+			}
+		}
+	}
+
+	return start, offsets, nil
 }

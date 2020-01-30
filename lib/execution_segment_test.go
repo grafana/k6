@@ -433,3 +433,44 @@ func TestExecutionSegmentScaleConsistency(t *testing.T) {
 		})
 	}
 }
+
+func TestGetStripedOffsets(t *testing.T) {
+	t.Parallel()
+	testCases := []struct {
+		seq      string
+		seg      string
+		start    int64
+		offsets  []int64
+		expError string
+	}{
+		{seq: "0,0.3,0.5,0.6,0.7,0.8,0.9,1", seg: "0:0.2", expError: "missing segment"},
+		{seq: "0,0.3,0.5,0.6,0.7,0.8,0.9,1", seg: "0:0.3", start: 0, offsets: []int64{4, 7}},
+		{seq: "0,0.3,0.5,0.6,0.7,0.8,0.9,1", seg: "0.3:0.5", start: 1, offsets: []int64{5}},
+		{seq: "0,0.3,0.5,0.6,0.7,0.8,0.9,1", seg: "0.5:0.6", start: 2},
+		{seq: "0,0.3,0.5,0.6,0.7,0.8,0.9,1", seg: "0.6:0.7", start: 3},
+		{seq: "0,0.3,0.5,0.6,0.7,0.8,0.9,1", seg: "0.8:0.9", start: 8},
+		{seq: "0,0.3,0.5,0.6,0.7,0.8,0.9,1", seg: "0.9:1", start: 9},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(fmt.Sprintf("seq:%s;segment:%s", tc.seq, tc.seg), func(t *testing.T) {
+			result, err := NewExecutionSegmentSequenceFromString(tc.seq)
+			require.NoError(t, err)
+			segment, err := NewExecutionSegmentFromString(tc.seg)
+			require.NoError(t, err)
+			start, offsets, err := result.GetStripedOffsets(segment)
+			if len(tc.expError) != 0 {
+				require.Error(t, err, tc.expError)
+				require.Contains(t, err.Error(), tc.expError)
+				return
+			}
+			require.NoError(t, err)
+
+			assert.Equal(t, tc.start, start)
+			assert.Equal(t, tc.offsets, offsets)
+		})
+	}
+}
+
+// TODO: test with randomized things
