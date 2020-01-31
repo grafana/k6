@@ -48,6 +48,7 @@ const (
 var statusColors = map[Status]*color.Color{
 	Interrupted: color.New(color.FgRed),
 	Done:        color.New(color.FgGreen),
+	Waiting:     color.New(defaultBarColor),
 }
 
 // ProgressBar is a simple thread-safe progressbar implementation with
