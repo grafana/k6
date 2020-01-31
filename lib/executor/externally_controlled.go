@@ -395,18 +395,29 @@ func (rs *externallyControlledRunState) retrieveStartMaxVUs() error {
 }
 
 func (rs *externallyControlledRunState) progresFn() (float64, []string) {
-	spent := rs.executor.executionState.GetCurrentTestRunDuration()
-	progress := 0.0
-	if rs.duration > 0 {
-		progress = math.Min(1, float64(spent)/float64(rs.duration))
-	}
 	//TODO: simulate spinner for the other case or cycle 0-100?
 	currentActiveVUs := atomic.LoadInt64(rs.activeVUsCount)
 	currentMaxVUs := atomic.LoadInt64(rs.maxVUs)
 	vusFmt := pb.GetFixedLengthIntFormat(currentMaxVUs)
 	progVUs := fmt.Sprintf(vusFmt+"/"+vusFmt+" VUs", currentActiveVUs, currentMaxVUs)
-	progDur := fmt.Sprintf("%s/%s", pb.GetFixedLengthDuration(spent, rs.duration), rs.duration)
-	return progress, []string{progVUs, progDur}
+
+	right := []string{progVUs, rs.duration.String(), ""}
+
+	spent := rs.executor.executionState.GetCurrentTestRunDuration()
+	if spent > rs.duration {
+		return 1, right
+	}
+
+	progress := 0.0
+	if rs.duration > 0 {
+		progress = math.Min(1, float64(spent)/float64(rs.duration))
+	}
+
+	spentDuration := pb.GetFixedLengthDuration(spent, rs.duration)
+	progDur := fmt.Sprintf("%s/%s", spentDuration, rs.duration)
+	right[1] = progDur
+
+	return progress, right
 }
 
 func (rs *externallyControlledRunState) handleConfigChange(oldCfg, newCfg ExternallyControlledConfigParams) error {

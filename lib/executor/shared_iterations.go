@@ -162,7 +162,7 @@ func (si SharedIterations) Run(ctx context.Context, out chan<- stats.SampleConta
 	duration := time.Duration(si.config.MaxDuration.Duration)
 	gracefulStop := si.config.GetGracefulStop()
 
-	_, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(ctx, duration, gracefulStop)
+	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(ctx, duration, gracefulStop)
 	defer cancel()
 
 	// Make sure the log and the progress bar have accurate information
@@ -175,12 +175,16 @@ func (si SharedIterations) Run(ctx context.Context, out chan<- stats.SampleConta
 	vusFmt := pb.GetFixedLengthIntFormat(numVUs)
 	itersFmt := pb.GetFixedLengthIntFormat(int64(totalIters))
 	progresFn := func() (float64, []string) {
+		spent := time.Since(startTime)
+		progVUs := fmt.Sprintf(vusFmt+" VUs", numVUs)
 		currentDoneIters := atomic.LoadUint64(doneIters)
-		return float64(currentDoneIters) / float64(totalIters), []string{
-			fmt.Sprintf(vusFmt+" VUs", numVUs),
-			fmt.Sprintf(itersFmt+"/"+itersFmt+" shared iters",
-				currentDoneIters, totalIters),
-		}
+		progIters := fmt.Sprintf(itersFmt+"/"+itersFmt+" shared iters",
+			currentDoneIters, totalIters)
+		spentDuration := pb.GetFixedLengthDuration(spent, duration)
+		progDur := fmt.Sprintf("%s/%s", spentDuration, duration)
+		right := []string{progVUs, progDur, progIters}
+
+		return float64(currentDoneIters) / float64(totalIters), right
 	}
 	si.progress.Modify(pb.WithProgress(progresFn))
 	go trackProgress(ctx, maxDurationCtx, regDurationCtx, si, progresFn)

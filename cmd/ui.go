@@ -93,7 +93,7 @@ func renderMultipleBars(isTTY, goBack bool, leftMax int, pbs []*pb.ProgressBar) 
 	var (
 		// Maximum length of each right side column except last,
 		// used to calculate the padding between columns.
-		maxRColumnLen = make([]int, 1)
+		maxRColumnLen = make([]int, 2)
 		pbsCount      = len(pbs)
 		rendered      = make([]pb.ProgressBarRender, pbsCount)
 		result        = make([]string, pbsCount+2)

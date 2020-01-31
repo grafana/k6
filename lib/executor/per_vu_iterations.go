@@ -157,7 +157,7 @@ func (pvi PerVUIterations) Run(ctx context.Context, out chan<- stats.SampleConta
 	duration := time.Duration(pvi.config.MaxDuration.Duration)
 	gracefulStop := pvi.config.GetGracefulStop()
 
-	_, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(ctx, duration, gracefulStop)
+	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(ctx, duration, gracefulStop)
 	defer cancel()
 
 	// Make sure the log and the progress bar have accurate information
@@ -171,12 +171,21 @@ func (pvi PerVUIterations) Run(ctx context.Context, out chan<- stats.SampleConta
 	vusFmt := pb.GetFixedLengthIntFormat(numVUs)
 	itersFmt := pb.GetFixedLengthIntFormat(int64(totalIters))
 	progresFn := func() (float64, []string) {
+		spent := time.Since(startTime)
+		progVUs := fmt.Sprintf(vusFmt+" VUs", numVUs)
 		currentDoneIters := atomic.LoadUint64(doneIters)
-		return float64(currentDoneIters) / float64(totalIters), []string{
-			fmt.Sprintf(vusFmt+" VUs", numVUs),
-			fmt.Sprintf(itersFmt+"/"+itersFmt+" iters, %d per VU",
-				currentDoneIters, totalIters, iterations),
+		progIters := fmt.Sprintf(itersFmt+"/"+itersFmt+" iters, %d per VU",
+			currentDoneIters, totalIters, iterations)
+		right := []string{progVUs, duration.String(), progIters}
+		if spent > duration {
+			return 1, right
 		}
+
+		spentDuration := pb.GetFixedLengthDuration(spent, duration)
+		progDur := fmt.Sprintf("%s/%s", spentDuration, duration)
+		right[1] = progDur
+
+		return float64(currentDoneIters) / float64(totalIters), right
 	}
 	pvi.progress.Modify(pb.WithProgress(progresFn))
 	go trackProgress(ctx, maxDurationCtx, regDurationCtx, pvi, progresFn)
