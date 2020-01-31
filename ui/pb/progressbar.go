@@ -33,15 +33,15 @@ const defaultWidth = 40
 const defaultBarColor = color.Faint
 
 // Status of the progress bar
-type Status string
+type Status rune
 
 // Progress bar status symbols
 const (
-	Running     Status = " "
-	Waiting     Status = "•"
-	Stopping    Status = "↓"
-	Interrupted Status = "✗"
-	Done        Status = "✓"
+	Running     Status = ' '
+	Waiting     Status = '•'
+	Stopping    Status = '↓'
+	Interrupted Status = '✗'
+	Done        Status = '✓'
 )
 
 //nolint:gochecknoglobals
@@ -219,11 +219,16 @@ func (pb *ProgressBar) Render(leftMax int) ProgressBarRender {
 	}
 
 	out.Left = pb.renderLeft(leftMax)
-	status := string(pb.status)
-	if c, ok := statusColors[pb.status]; ok {
-		status = c.Sprint(pb.status)
+
+	switch c, ok := statusColors[pb.status]; {
+	case ok:
+		out.Status = c.Sprint(string(pb.status))
+	case pb.status > 0:
+		out.Status = string(pb.status)
+	default:
+		out.Status = " "
 	}
-	out.Status = fmt.Sprintf("%-1s", status)
+
 	out.Progress = fmt.Sprintf("[%s%s%s]", filling, caret, padding)
 
 	return out
