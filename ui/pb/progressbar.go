@@ -166,8 +166,7 @@ func (pbr ProgressBarRender) String() string {
 	if len(pbr.Right) > 0 {
 		right = " " + strings.Join(pbr.Right, "  ")
 	}
-	return fmt.Sprintf("%s %-1s %s%s",
-		pbr.Left, pbr.Status, pbr.Progress, right)
+	return pbr.Left + " " + pbr.Status + " " + pbr.Progress + right
 }
 
 // Render locks the progressbar struct for reading and calls all of
