@@ -170,16 +170,11 @@ func (s *SocketIO) startConnect() error {
 
 func (s *SocketIO) connect() error {
 	conn, response, err := s.runner.dialer.Dial(s.runner.url.String(), s.runner.requestHeaders.Clone())
+	s.pushSessionMetrics(response)
 	if err != nil {
 		return err
 	}
 	wsResponse, wsRespErr := wrapHTTPResponse(response)
-	if s.runner.state.Options.SystemTags.Has(stats.TagStatus) {
-		s.tags["status"] = strconv.Itoa(response.StatusCode)
-	}
-	if s.runner.state.Options.SystemTags.Has(stats.TagSubproto) {
-		s.tags["subproto"] = response.Header.Get("Sec-WebSocket-Protocol")
-	}
 	if wsRespErr != nil {
 		return wsRespErr
 	}
@@ -350,6 +345,7 @@ func (s *SocketIO) setSocketTags(paramsObject *goja.Object) {
 
 func (s *SocketIO) createSocketIODialer() {
 	jar, _ := cookiejar.New(nil)
+	// Create NetDial with k6 context for using in case stub domain in unittest
 	dialer := func(network, address string) (net.Conn, error) {
 		return s.runner.state.Dialer.DialContext(*s.runner.ctx, network, address)
 	}
@@ -452,6 +448,15 @@ func (s *SocketIO) doneHandler(ctx context.Context) (*WSHTTPResponse, error) {
 	s.pushReceivedMetrics(ctx, sampleTags)
 	s.pushPingMetrics(ctx, sampleTags)
 	return s.runner.response, nil
+}
+
+func (s *SocketIO) pushSessionMetrics(response *http.Response) {
+	if s.runner.state.Options.SystemTags.Has(stats.TagStatus) {
+		s.tags["status"] = strconv.Itoa(response.StatusCode)
+	}
+	if s.runner.state.Options.SystemTags.Has(stats.TagSubproto) {
+		s.tags["subproto"] = response.Header.Get("Sec-WebSocket-Protocol")
+	}
 }
 
 func (s *SocketIO) pushOverviewMetrics(ctx context.Context, sampleTags *stats.SampleTags, sessionDuration float64) {

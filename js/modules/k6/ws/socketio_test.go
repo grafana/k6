@@ -101,17 +101,16 @@ func TestSocketIOSession(t *testing.T) {
 
 	rt.Set("ws", common.Bind(rt, NewSocketIO(), &ctx))
 
-	t.Run("connect_ws", func(t *testing.T) {
-		_, err := common.RunString(rt, sr(`
-		let res = ws.connect("WSBIN_URL/ws-echo", function(socket){
-			socket.close()
-		});
-		if (res.status != 101) { throw new Error("connection failed with status: " + res.status); }
-		`))
-		fmt.Println(err)
-		assert.NoError(t, err)
-	})
-	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-echo"), 101, "")
+	// t.Run("connect_ws", func(t *testing.T) {
+	// 	_, err := common.RunString(rt, sr(`
+	// 	let res = ws.connect("WSBIN_URL/ws-echo", function(socket){
+	// 		socket.close()
+	// 	});
+	// 	if (res.status != 101) { throw new Error("connection failed with status: " + res.status); }
+	// 	`))
+	// 	assert.NoError(t, err)
+	// })
+	// assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-echo"), 101, "")
 
 	// t.Run("connect_wss", func(t *testing.T) {
 	// 	_, err := common.RunString(rt, sr(`
@@ -124,20 +123,20 @@ func TestSocketIOSession(t *testing.T) {
 	// })
 	// assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSSBIN_URL/ws-echo"), 101, "")
 
-	// t.Run("open", func(t *testing.T) {
-	// 	_, err := common.RunString(rt, sr(`
-	// 	let opened = false;
-	// 	let res = ws.connect("WSBIN_URL/ws-echo", function(socket){
-	// 		socket.on("open", function() {
-	// 			opened = true;
-	// 			socket.close()
-	// 		})
-	// 	});
-	// 	if (!opened) { throw new Error ("open event not fired"); }
-	// 	`))
-	// 	assert.NoError(t, err)
-	// })
-	// assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-echo"), 101, "")
+	t.Run("open", func(t *testing.T) {
+		_, err := common.RunString(rt, sr(`
+		let opened = false;
+		let res = ws.connect("WSBIN_URL/ws-echo", function(socket){
+			socket.on("open", function() {
+				opened = true;
+				socket.close()
+			})
+		});
+		if (!opened) { throw new Error ("open event not fired"); }
+		`))
+		assert.NoError(t, err)
+	})
+	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-echo"), 101, "")
 
 	// t.Run("send_receive", func(t *testing.T) {
 	// 	_, err := common.RunString(rt, sr(`
