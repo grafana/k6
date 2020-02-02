@@ -24,6 +24,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -173,6 +174,12 @@ func (s *SocketIO) connect() error {
 		return err
 	}
 	wsResponse, wsRespErr := wrapHTTPResponse(response)
+	if s.runner.state.Options.SystemTags.Has(stats.TagStatus) {
+		s.tags["status"] = strconv.Itoa(response.StatusCode)
+	}
+	if s.runner.state.Options.SystemTags.Has(stats.TagSubproto) {
+		s.tags["subproto"] = response.Header.Get("Sec-WebSocket-Protocol")
+	}
 	if wsRespErr != nil {
 		return wsRespErr
 	}
@@ -343,10 +350,14 @@ func (s *SocketIO) setSocketTags(paramsObject *goja.Object) {
 
 func (s *SocketIO) createSocketIODialer() {
 	jar, _ := cookiejar.New(nil)
+	dialer := func(network, address string) (net.Conn, error) {
+		return s.runner.state.Dialer.DialContext(*s.runner.ctx, network, address)
+	}
 	s.runner.dialer = &websocket.Dialer{
 		Proxy:           http.ProxyFromEnvironment,
 		TLSClientConfig: s.createTlsConfig(),
 		Jar:             jar,
+		NetDial:         dialer,
 	}
 }
 
@@ -516,12 +527,19 @@ func (s *SocketIO) handlersProcess(event string, args []goja.Value) {
 	}
 }
 
-func (s *SocketIO) Send(event, message string) {
+func (s *SocketIO) Send(event string, message goja.Value) {
 	// NOTE: No binary message support for the time being since goja doesn't
 	// support typed arrays.
 	rt := common.GetRuntime(*s.runner.ctx)
-
-	writeData := []byte(fmt.Sprintf("%s[\"%s\",%s]", COMMON_MESSAGE, event, message))
+	messageObject := message.ToObject(rt)
+	var writeData []byte
+	jsonByte, invalidJSON := messageObject.MarshalJSON()
+	isSendDataAsString := invalidJSON != nil
+	if isSendDataAsString {
+		writeData = []byte(fmt.Sprintf("%s[\"%s\",\"%s\"]", COMMON_MESSAGE, event, message.String()))
+	} else {
+		writeData = []byte(fmt.Sprintf("%s[\"%s\",%s]", COMMON_MESSAGE, event, string(jsonByte)))
+	}
 	if err := s.runner.conn.WriteMessage(websocket.TextMessage, writeData); err != nil {
 		s.handleEvent("error", rt.ToValue(err))
 	}
@@ -633,7 +651,7 @@ func parseResponse(rawResponse string, rt *goja.Runtime) (eventName string, mess
 	if err != nil {
 		common.Throw(rt, err)
 	}
-	messageResponse = []goja.Value{rt.ToValue(string(responseData))}
+	messageResponse = []goja.Value{rt.ToValue(responseData)}
 	return
 }
 
@@ -661,7 +679,13 @@ func getEventData(eventCode, rawResponse string) (eventName, restText string, er
 			return "", "", errors.New("Wrong packet")
 		}
 	}
+	// Index -2 from the string to check if the character is double quote or not
+	isStringResponse := strings.HasPrefix(string(rawResponse[rest]), "\"") && strings.HasSuffix(string(rawResponse[len(rawResponse)-2]), "\"")
+	if isStringResponse {
+		return rawResponse[start:end], rawResponse[rest+1 : len(rawResponse)-2], nil
+	}
 	return rawResponse[start:end], rawResponse[rest : len(rawResponse)-1], nil
+
 }
 
 func decodeData(rawResponse string) (start, end, rest int, err error) {

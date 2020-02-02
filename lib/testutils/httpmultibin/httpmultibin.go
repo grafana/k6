@@ -245,7 +245,7 @@ func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 	mux.Handle("/ws-echo-invalid", getWebsocketHandler(true, true))
 	mux.Handle("/ws-close", getWebsocketHandler(false, false))
 	mux.Handle("/ws-close-invalid", getWebsocketHandler(false, true))
-	mux.Handle("/wsio-echo", getWebsocketIOHandler(true, false))
+	// mux.Handle("/wsio-echo", getWebsocketIOHandler(true, false))
 	mux.Handle("/zstd", getEncodedHandler(t, httpext.CompressionTypeZstd))
 	mux.Handle("/zstd-br", getZstdBrHandler(t))
 	mux.Handle("/", httpbin.New().Handler())
