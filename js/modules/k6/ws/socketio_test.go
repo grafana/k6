@@ -68,154 +68,16 @@ func assertSocketIOMetricEmitted(t *testing.T, metric *stats.Metric, sampleConta
 }
 
 func TestSocketIOSession(t *testing.T) {
-	//TODO: split and paralelize tests
 	t.Parallel()
-	tb := httpmultibin.NewHTTPMultiBin(t)
+	sr, rt, samples, tb := setUpTest(t)
 	defer tb.Cleanup()
-	sr := tb.Replacer.Replace
-
-	root, err := lib.NewGroup("", nil)
-	assert.NoError(t, err)
-
-	rt := goja.New()
-	rt.SetFieldNameMapper(common.FieldNameMapper{})
-	samples := make(chan stats.SampleContainer, 1000)
-	state := &lib.State{
-		Group:  root,
-		Dialer: tb.Dialer,
-		Options: lib.Options{
-			SystemTags: stats.NewSystemTagSet(
-				stats.TagURL,
-				stats.TagProto,
-				stats.TagStatus,
-				stats.TagSubproto,
-			),
-		},
-		Samples:   samples,
-		TLSConfig: tb.TLSClientConfig,
-	}
-
-	ctx := context.Background()
-	ctx = lib.WithState(ctx, state)
-	ctx = common.WithRuntime(ctx, rt)
-
-	rt.Set("ws", common.Bind(rt, NewSocketIO(), &ctx))
-
-	// t.Run("connect_ws", func(t *testing.T) {
-	// 	_, err := common.RunString(rt, sr(`
-	// 	let res = ws.connect("WSBIN_URL/ws-echo", function(socket){
-	// 		socket.close()
-	// 	});
-	// 	if (res.status != 101) { throw new Error("connection failed with status: " + res.status); }
-	// 	`))
-	// 	assert.NoError(t, err)
-	// })
-	// assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-echo"), 101, "")
-
-	// t.Run("connect_wss", func(t *testing.T) {
-	// 	_, err := common.RunString(rt, sr(`
-	// 	let res = ws.connect("WSSBIN_URL/ws-echo", function(socket){
-	// 		socket.close()
-	// 	});
-	// 	if (res.status != 101) { throw new Error("TLS connection failed with status: " + res.status); }
-	// 	`))
-	// 	assert.NoError(t, err)
-	// })
-	// assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSSBIN_URL/ws-echo"), 101, "")
-
-	t.Run("open", func(t *testing.T) {
-		_, err := common.RunString(rt, sr(`
-		let opened = false;
-		let res = ws.connect("WSBIN_URL/ws-echo", function(socket){
-			socket.on("open", function() {
-				opened = true;
-				socket.close()
-			})
-		});
-		if (!opened) { throw new Error ("open event not fired"); }
-		`))
-		assert.NoError(t, err)
-	})
-	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-echo"), 101, "")
-
-	// t.Run("send_receive", func(t *testing.T) {
-	// 	_, err := common.RunString(rt, sr(`
-	// 	let res = ws.connect("WSBIN_URL/ws-echo", function(socket){
-	// 		socket.on("open", function() {
-	// 			socket.send("test")
-	// 		})
-	// 		socket.on("message", function (data){
-	// 			if (!data=="test") {
-	// 				throw new Error ("echo'd data doesn't match our message!");
-	// 			}
-	// 			socket.close()
-	// 		});
-	// 	});
-	// 	`))
-	// 	assert.NoError(t, err)
-	// })
-
-	// samplesBuf := stats.GetBufferedSamples(samples)
-	// assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSBIN_URL/ws-echo"), 101, "")
-	// assertMetricEmitted(t, metrics.WSMessagesSent, samplesBuf, sr("WSBIN_URL/ws-echo"))
-	// assertMetricEmitted(t, metrics.WSMessagesReceived, samplesBuf, sr("WSBIN_URL/ws-echo"))
-
-	// t.Run("interval", func(t *testing.T) {
-	// 	_, err := common.RunString(rt, sr(`
-	// 	let counter = 0;
-	// 	let res = ws.connect("WSBIN_URL/ws-echo", function(socket){
-	// 		socket.setInterval(function () {
-	// 			counter += 1;
-	// 			if (counter > 2) { socket.close(); }
-	// 		}, 100);
-	// 	});
-	// 	if (counter < 3) {throw new Error ("setInterval should have been called at least 3 times, counter=" + counter);}
-	// 	`))
-	// 	assert.NoError(t, err)
-	// })
-	// assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-echo"), 101, "")
-
-	// t.Run("timeout", func(t *testing.T) {
-	// 	_, err := common.RunString(rt, sr(`
-	// 	let start = new Date().getTime();
-	// 	let ellapsed = new Date().getTime() - start;
-	// 	let res = ws.connect("WSBIN_URL/ws-echo", function(socket){
-	// 		socket.setTimeout(function () {
-	// 			ellapsed = new Date().getTime() - start;
-	// 			socket.close();
-	// 		}, 500);
-	// 	});
-	// 	if (ellapsed > 3000 || ellapsed < 500) {
-	// 		throw new Error ("setTimeout occurred after " + ellapsed + "ms, expected 500<T<3000");
-	// 	}
-	// 	`))
-	// 	assert.NoError(t, err)
-	// })
-	// assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-echo"), 101, "")
-
-	// t.Run("ping", func(t *testing.T) {
-	// 	_, err := common.RunString(rt, sr(`
-	// 	let pongReceived = false;
-	// 	let res = ws.connect("WSBIN_URL/ws-echo", function(socket){
-	// 		socket.on("open", function(data) {
-	// 			socket.ping();
-	// 		});
-	// 		socket.on("pong", function() {
-	// 			pongReceived = true;
-	// 			socket.close();
-	// 		});
-	// 		socket.setTimeout(function (){socket.close();}, 3000);
-	// 	});
-	// 	if (!pongReceived) {
-	// 		throw new Error ("sent ping but didn't get pong back");
-	// 	}
-	// 	`))
-	// 	assert.NoError(t, err)
-	// })
-
-	// samplesBuf = stats.GetBufferedSamples(samples)
-	// assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSBIN_URL/ws-echo"), 101, "")
-	// assertMetricEmitted(t, metrics.WSPing, samplesBuf, sr("WSBIN_URL/ws-echo"))
+	testConnectWSS(t, rt, sr, samples)
+	testConnectWS(t, rt, sr, samples)
+	testOpenEventHandler(t, rt, sr, samples)
+	testSendReciveData(t, rt, sr, samples)
+	testIntervalHandler(t, rt, sr, samples)
+	testTimeoutHandler(t, rt, sr, samples)
+	testPingHandler(t, rt, sr, samples)
 
 	// t.Run("multiple_handlers", func(t *testing.T) {
 	// 	_, err := common.RunString(rt, sr(`
@@ -583,4 +445,170 @@ func TestSocketIOReadPump(t *testing.T) {
 
 	// Ensure all close code asserts passed
 	assert.Equal(t, numAsserts, len(closeCodes))
+}
+
+func setUpTest(t *testing.T) (func(string) string, *goja.Runtime, chan stats.SampleContainer, *httpmultibin.HTTPMultiBin) {
+	//t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+
+	sr := tb.Replacer.Replace
+
+	root, err := lib.NewGroup("", nil)
+	assert.NoError(t, err)
+
+	rt := goja.New()
+	rt.SetFieldNameMapper(common.FieldNameMapper{})
+	samples := make(chan stats.SampleContainer, 1000)
+	state := &lib.State{
+		Group:  root,
+		Dialer: tb.Dialer,
+		Options: lib.Options{
+			SystemTags: stats.NewSystemTagSet(
+				stats.TagURL,
+				stats.TagProto,
+				stats.TagStatus,
+				stats.TagSubproto,
+			),
+		},
+		Samples:   samples,
+		TLSConfig: tb.TLSClientConfig,
+	}
+
+	ctx := context.Background()
+	ctx = lib.WithState(ctx, state)
+	ctx = common.WithRuntime(ctx, rt)
+
+	rt.Set("ws", common.Bind(rt, NewSocketIO(), &ctx))
+	return sr, rt, samples, tb
+}
+
+func testConnectWS(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
+	tt.Run("connect_ws", func(t *testing.T) {
+		_, err := common.RunString(rt, sr(`
+		let res = ws.connect("WSBIN_URL/wsio-echo", function(socket){
+			socket.close()
+		});
+		if (res.status != 101) { throw new Error("connection failed with status: " + res.status); }
+		`))
+		assert.NoError(t, err)
+	})
+	assertSessionMetricsEmitted(tt, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/wsio-echo"), 101, "")
+}
+
+func testConnectWSS(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
+	tt.Run("connect_wss", func(t *testing.T) {
+		_, err := common.RunString(rt, sr(`
+		let res = ws.connect("WSSBIN_URL/wsio-ssl", function(socket){
+			socket.close()
+		});
+		if (res.status != 101) { throw new Error("TLS connection failed with status: " + res.status); }
+		`))
+		assert.NoError(t, err)
+	})
+	assertSessionMetricsEmitted(tt, stats.GetBufferedSamples(samples), "", sr("WSSBIN_URL/wsio-ssl"), 101, "")
+}
+
+func testOpenEventHandler(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
+	tt.Run("open", func(t *testing.T) {
+		_, err := common.RunString(rt, sr(`
+		let opened = false;
+		let res = ws.connect("WSBIN_URL/wsio-open", function(socket){
+			socket.on("open", function() {
+				opened = true;
+				socket.close()
+			})
+		});
+		if (!opened) { throw new Error ("open event not fired"); }
+		`))
+		assert.NoError(t, err)
+	})
+	assertSessionMetricsEmitted(tt, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/wsio-open"), 101, "")
+}
+
+func testSendReciveData(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
+	tt.Run("send_receive", func(t *testing.T) {
+		_, err := common.RunString(rt, sr(`
+		let res = ws.connect("WSBIN_URL/wsio-echo-data", function(socket){
+			socket.on("open", function (){
+				socket.send("testChannel","test")
+			});
+			socket.on("testChannel", function (data){
+				if (data!=="test") {
+					throw new Error ("echo data doesn't match our message!");
+				}
+				socket.close()
+			});
+			socket.on("message", function (data){
+					throw new Error ("echo data doesn't match our channel event!");
+			});
+		});
+		`))
+		assert.NoError(t, err)
+	})
+	samplesBuf := stats.GetBufferedSamples(samples)
+	assertSessionMetricsEmitted(tt, samplesBuf, "", sr("WSBIN_URL/wsio-echo-data"), 101, "")
+	assertMetricEmitted(tt, metrics.WSMessagesSent, samplesBuf, sr("WSBIN_URL/wsio-echo-data"))
+	assertMetricEmitted(tt, metrics.WSMessagesReceived, samplesBuf, sr("WSBIN_URL/wsio-echo-data"))
+}
+
+func testIntervalHandler(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
+	tt.Run("interval", func(t *testing.T) {
+		_, err := common.RunString(rt, sr(`
+		let counter = 0;
+		let res = ws.connect("WSBIN_URL/wsio-echo", function(socket){
+			socket.setInterval(function () {
+				counter += 1;
+				if (counter > 2) { socket.close(); }
+			}, 100);
+		});
+		if (counter < 3) {throw new Error ("setInterval should have been called at least 3 times, counter=" + counter);}
+		`))
+		assert.NoError(t, err)
+	})
+	assertSessionMetricsEmitted(tt, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/wsio-echo"), 101, "")
+}
+
+func testTimeoutHandler(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
+	tt.Run("timeout", func(t *testing.T) {
+		_, err := common.RunString(rt, sr(`
+		let start = new Date().getTime();
+		let ellapsed = new Date().getTime() - start;
+		let res = ws.connect("WSBIN_URL/wsio-echo", function(socket){
+			socket.setTimeout(function () {
+				ellapsed = new Date().getTime() - start;
+				socket.close();
+			}, 500);
+		});
+		if (ellapsed > 3000 || ellapsed < 500) {
+			throw new Error ("setTimeout occurred after " + ellapsed + "ms, expected 500<T<3000");
+		}
+		`))
+		assert.NoError(t, err)
+	})
+	assertSessionMetricsEmitted(tt, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/wsio-echo"), 101, "")
+}
+
+func testPingHandler(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
+	tt.Run("ping", func(t *testing.T) {
+		_, err := common.RunString(rt, sr(`
+		let pongReceived = false;
+		let res = ws.connect("WSBIN_URL/wsio-ping", function(socket){
+			socket.on("open", function(data) {
+				socket.ping();
+			});
+			socket.on("pong", function() {
+				pongReceived = true;
+				socket.close();
+			});
+			socket.setTimeout(function (){socket.close();}, 3000);
+		});
+		if (!pongReceived) {
+			throw new Error ("sent ping but didn't get pong back");
+		}
+		`))
+		assert.NoError(t, err)
+	})
+	samplesBuf := stats.GetBufferedSamples(samples)
+	assertSessionMetricsEmitted(tt, samplesBuf, "", sr("WSBIN_URL/wsio-ping"), 101, "")
+	assertMetricEmitted(tt, metrics.WSPing, samplesBuf, sr("WSBIN_URL/wsio-ping"))
 }

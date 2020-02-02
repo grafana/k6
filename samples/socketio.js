@@ -12,6 +12,7 @@ export default function() {
 	// 		: "wss://connector.athenkasdasdsa.com/socket.io/?EIO=3&transport=websocket";
 	var params = { tags: { my_tag: "hello" } };
 	var response = ws.connect(url, params, function(socket) {
+		let counter = 0;
 		socket.on("open", function open() {
 			console.log("connected");
 			// const msg1 =
@@ -21,10 +22,16 @@ export default function() {
 			// socket.send("conversationInfo", msg1);
 			// socket.send("message", msg2);
 			//socket.sendSocketIO('message', 'Hello! websocket test' + __VU);
-			socket.send("message", { sample: "key1" });
-			socket.send("message", "hi, this is sample sample channel");
+			// socket.send("message", { sample: "key1" });
+			// socket.send("message", "hi, this is sample sample channel");
 		});
-
+		socket.setInterval(function() {
+			counter++;
+			if (counter > 2) {
+				socket.close();
+			}
+			socket.send("message", "hi, this is sample sample channel");
+		}, 100);
 		socket.on("ping", function() {
 			console.log("PING!");
 		});
