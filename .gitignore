@@ -14,3 +14,5 @@ test.debug
 .vagrant
 
 *.DS_Store
+go.mod
+go.sum
