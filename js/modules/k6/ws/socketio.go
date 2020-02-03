@@ -170,10 +170,11 @@ func (s *SocketIO) startConnect() error {
 
 func (s *SocketIO) connect() error {
 	conn, response, err := s.runner.dialer.Dial(s.runner.url.String(), s.runner.requestHeaders.Clone())
-	s.pushSessionMetrics(response)
 	if err != nil {
+		s.handleEvent("error", s.runner.runtime.ToValue(err))
 		return err
 	}
+	s.pushSessionMetrics(response)
 	wsResponse, wsRespErr := wrapHTTPResponse(response)
 	if wsRespErr != nil {
 		return wsRespErr
@@ -199,12 +200,7 @@ func newWebSocketIO(initCtx context.Context, url string) SocketIO {
 
 func newWebSocketIORunner(initCtx context.Context, rawUrl string) SocketIORunner {
 	initRuntime, initState := initConnectState(initCtx)
-	u, err := url.Parse(rawUrl)
-	isInvalidUrl := len(strings.TrimSpace(u.Hostname())) == 0
-	if err != nil || isInvalidUrl {
-		msg := fmt.Sprintf("URL [%s] is invalid", rawUrl)
-		panic(common.NewInitContextError(msg))
-	}
+	u, _ := url.Parse(rawUrl)
 	return SocketIORunner{
 		runtime:        initRuntime,
 		requestHeaders: &http.Header{},
@@ -535,6 +531,9 @@ func (s *SocketIO) handlersProcess(event string, args []goja.Value) {
 func (s *SocketIO) Send(event string, message goja.Value) {
 	// NOTE: No binary message support for the time being since goja doesn't
 	// support typed arrays.
+	if missingArguments := len(event) == 0 || message == nil; missingArguments {
+		common.Throw(common.GetRuntime(*s.runner.ctx), errors.New("invalid number of arguments to ws.send. Method is required 2 params ( channelName, message )"))
+	}
 	rt := common.GetRuntime(*s.runner.ctx)
 	messageObject := message.ToObject(rt)
 	var writeData []byte

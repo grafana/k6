@@ -24,6 +24,7 @@ package httpmultibin
 import (
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -47,6 +48,10 @@ func getConnectSocketIORequest() http.Handler {
 		if err != nil {
 			return
 		}
+		closeMsg := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")
+		_ = conn.WriteControl(websocket.CloseMessage, closeMsg, time.Now().Add(time.Second))
+		// Wait for response control frame
+		<-time.After(time.Second)
 		err = conn.Close()
 		if err != nil {
 			return
@@ -60,6 +65,32 @@ func getSentReceivedSocketIORequest() http.Handler {
 		conn.WriteMessage(websocket.TextMessage, []byte{'0'})
 		_, data, _ := conn.ReadMessage()
 		conn.WriteMessage(websocket.TextMessage, data)
+		if err != nil {
+			return
+		}
+		err = conn.Close()
+		if err != nil {
+			return
+		}
+	})
+}
+
+func getInvalidCloseSocketHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, w.Header())
+		conn.WriteMessage(websocket.TextMessage, []byte{'0'})
+		messageType, r, e := conn.NextReader()
+		if e != nil {
+			return
+		}
+		var wc io.WriteCloser
+		wc, err = conn.NextWriter(messageType)
+		if err != nil {
+			return
+		}
+		if _, err = io.Copy(wc, r); err != nil {
+			return
+		}
 		if err != nil {
 			return
 		}

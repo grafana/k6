@@ -78,195 +78,122 @@ func TestSocketIOSession(t *testing.T) {
 	testIntervalHandler(t, rt, sr, samples)
 	testTimeoutHandler(t, rt, sr, samples)
 	testPingHandler(t, rt, sr, samples)
-
-	// t.Run("multiple_handlers", func(t *testing.T) {
-	// 	_, err := common.RunString(rt, sr(`
-	// 	let pongReceived = false;
-	// 	let otherPongReceived = false;
-
-	// 	let res = ws.connect("WSBIN_URL/ws-echo", function(socket){
-	// 		socket.on("open", function(data) {
-	// 			socket.ping();
-	// 		});
-	// 		socket.on("pong", function() {
-	// 			pongReceived = true;
-	// 			if (otherPongReceived) {
-	// 				socket.close();
-	// 			}
-	// 		});
-	// 		socket.on("pong", function() {
-	// 			otherPongReceived = true;
-	// 			if (pongReceived) {
-	// 				socket.close();
-	// 			}
-	// 		});
-	// 		socket.setTimeout(function (){socket.close();}, 3000);
-	// 	});
-	// 	if (!pongReceived || !otherPongReceived) {
-	// 		throw new Error ("sent ping but didn't get pong back");
-	// 	}
-	// 	`))
-	// 	assert.NoError(t, err)
-	// })
-
-	// samplesBuf = stats.GetBufferedSamples(samples)
-	// assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSBIN_URL/ws-echo"), 101, "")
-	// assertMetricEmitted(t, metrics.WSPing, samplesBuf, sr("WSBIN_URL/ws-echo"))
-
-	// t.Run("client_close", func(t *testing.T) {
-	// 	_, err := common.RunString(rt, sr(`
-	// 	let closed = false;
-	// 	let res = ws.connect("WSBIN_URL/ws-echo", function(socket){
-	// 		socket.on("open", function() {
-	// 						socket.close()
-	// 		})
-	// 		socket.on("close", function() {
-	// 						closed = true;
-	// 		})
-	// 	});
-	// 	if (!closed) { throw new Error ("close event not fired"); }
-	// 	`))
-	// 	assert.NoError(t, err)
-	// })
-	// assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-echo"), 101, "")
-
-	// serverCloseTests := []struct {
-	// 	name     string
-	// 	endpoint string
-	// }{
-	// 	{"server_close_ok", "/ws-echo"},
-	// 	// Ensure we correctly handle invalid WS server
-	// 	// implementations that close the connection prematurely
-	// 	// without sending a close control frame first.
-	// 	{"server_close_invalid", "/ws-close-invalid"},
-	// }
-
-	// for _, tc := range serverCloseTests {
-	// 	tc := tc
-	// 	t.Run(tc.name, func(t *testing.T) {
-	// 		_, err := common.RunString(rt, sr(fmt.Sprintf(`
-	// 		let closed = false;
-	// 		let res = ws.connect("WSBIN_URL%s", function(socket){
-	// 			socket.on("open", function() {
-	// 				socket.send("test");
-	// 			})
-	// 			socket.on("close", function() {
-	// 				closed = true;
-	// 			})
-	// 		});
-	// 		if (!closed) { throw new Error ("close event not fired"); }
-	// 		`, tc.endpoint)))
-	// 		assert.NoError(t, err)
-	// 	})
-	// }
+	testMultipleHandler(t, rt, sr, samples)
+	testClientCloserHandler(t, rt, sr, samples)
+	testClientCloserWithoutSendCloseRequestHandler(t, rt, sr, samples)
+	testServerClosePrematurely(t, rt, sr, samples)
 }
 
 func TestSocketIOErrors(t *testing.T) {
 	t.Parallel()
-	tb := httpmultibin.NewHTTPMultiBin(t)
+	sr, rt, samples, tb := setUpTest(t)
 	defer tb.Cleanup()
-	sr := tb.Replacer.Replace
+	testPanicWithInvalidURL(t, rt, sr, samples)
+	// t.Parallel()
+	// tb := httpmultibin.NewHTTPMultiBin(t)
+	// defer tb.Cleanup()
+	// sr := tb.Replacer.Replace
 
-	root, err := lib.NewGroup("", nil)
-	assert.NoError(t, err)
+	// root, err := lib.NewGroup("", nil)
+	// assert.NoError(t, err)
 
-	rt := goja.New()
-	rt.SetFieldNameMapper(common.FieldNameMapper{})
-	samples := make(chan stats.SampleContainer, 1000)
-	state := &lib.State{
-		Group:  root,
-		Dialer: tb.Dialer,
-		Options: lib.Options{
-			SystemTags: &stats.DefaultSystemTagSet,
-		},
-		Samples: samples,
-	}
+	// rt := goja.New()
+	// rt.SetFieldNameMapper(common.FieldNameMapper{})
+	// samples := make(chan stats.SampleContainer, 1000)
+	// state := &lib.State{
+	// 	Group:  root,
+	// 	Dialer: tb.Dialer,
+	// 	Options: lib.Options{
+	// 		SystemTags: &stats.DefaultSystemTagSet,
+	// 	},
+	// 	Samples: samples,
+	// }
 
-	ctx := context.Background()
-	ctx = lib.WithState(ctx, state)
-	ctx = common.WithRuntime(ctx, rt)
+	// ctx := context.Background()
+	// ctx = lib.WithState(ctx, state)
+	// ctx = common.WithRuntime(ctx, rt)
 
-	rt.Set("ws", common.Bind(rt, NewSocketIO(), &ctx))
+	// rt.Set("ws", common.Bind(rt, NewSocketIO(), &ctx))
 
-	t.Run("invalid_url", func(t *testing.T) {
-		_, err := common.RunString(rt, `
-		let res = ws.connect("INVALID", function(socket){
-			socket.on("open", function() {
-				socket.close();
-			});
-		});
-		`)
-		assert.Error(t, err)
-	})
+	// t.Run("invalid_url", func(t *testing.T) {
+	// 	_, err := common.RunString(rt, `
+	// 	let res = ws.connect("INVALID", function(socket){
+	// 		socket.on("open", function() {
+	// 			socket.close();
+	// 		});
+	// 	});
+	// 	`)
+	// 	assert.Error(t, err)
+	// })
 
-	t.Run("invalid_url_message_panic", func(t *testing.T) {
-		// Attempting to send a message to a non-existent socket shouldn't panic
-		_, err := common.RunString(rt, `
-		let res = ws.connect("INVALID", function(socket){
-			socket.send("new message");
-		});
-		`)
-		assert.Error(t, err)
-	})
+	// t.Run("invalid_url_message_panic", func(t *testing.T) {
+	// 	// Attempting to send a message to a non-existent socket shouldn't panic
+	// 	_, err := common.RunString(rt, `
+	// 	let res = ws.connect("INVALID", function(socket){
+	// 		socket.send("new message");
+	// 	});
+	// 	`)
+	// 	assert.Error(t, err)
+	// })
 
-	t.Run("error_in_setup", func(t *testing.T) {
-		_, err := common.RunString(rt, sr(`
-		let res = ws.connect("WSBIN_URL/ws-echo-invalid", function(socket){
-			throw new Error("error in setup");
-		});
-		`))
-		assert.Error(t, err)
-	})
+	// t.Run("error_in_setup", func(t *testing.T) {
+	// 	_, err := common.RunString(rt, sr(`
+	// 	let res = ws.connect("WSBIN_URL/ws-echo-invalid", function(socket){
+	// 		throw new Error("error in setup");
+	// 	});
+	// 	`))
+	// 	assert.Error(t, err)
+	// })
 
-	t.Run("send_after_close", func(t *testing.T) {
-		_, err := common.RunString(rt, sr(`
-		let hasError = false;
-		let res = ws.connect("WSBIN_URL/ws-echo-invalid", function(socket){
-			socket.on("open", function() {
-				socket.close();
-				socket.send("test");
-			});
+	// t.Run("send_after_close", func(t *testing.T) {
+	// 	_, err := common.RunString(rt, sr(`
+	// 	let hasError = false;
+	// 	let res = ws.connect("WSBIN_URL/ws-echo-invalid", function(socket){
+	// 		socket.on("open", function() {
+	// 			socket.close();
+	// 			socket.send("test");
+	// 		});
 
-			socket.on("error", function(errorEvent) {
-				hasError = true;
-			});
-		});
-		if (!hasError) {
-			throw new Error ("no error emitted for send after close");
-		}
-		`))
-		assert.NoError(t, err)
-		assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-echo-invalid"), 101, "")
-	})
+	// 		socket.on("error", function(errorEvent) {
+	// 			hasError = true;
+	// 		});
+	// 	});
+	// 	if (!hasError) {
+	// 		throw new Error ("no error emitted for send after close");
+	// 	}
+	// 	`))
+	// 	assert.NoError(t, err)
+	// 	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-echo-invalid"), 101, "")
+	// })
 
-	t.Run("error on close", func(t *testing.T) {
-		_, err := common.RunString(rt, sr(`
-		var closed = false;
-		let res = ws.connect("WSBIN_URL/ws-close", function(socket){
-			socket.on('open', function open() {
-				socket.setInterval(function timeout() {
-				  socket.ping();
-				}, 1000);
-			});
+	// t.Run("error on close", func(t *testing.T) {
+	// 	_, err := common.RunString(rt, sr(`
+	// 	var closed = false;
+	// 	let res = ws.connect("WSBIN_URL/ws-close", function(socket){
+	// 		socket.on('open', function open() {
+	// 			socket.setInterval(function timeout() {
+	// 			  socket.ping();
+	// 			}, 1000);
+	// 		});
 
-			socket.on("ping", function() {
-				socket.close();
-			});
+	// 		socket.on("ping", function() {
+	// 			socket.close();
+	// 		});
 
-			socket.on("error", function(errorEvent) {
-				if (errorEvent == null) {
-					throw new Error(JSON.stringify(errorEvent));
-				}
-				if (!closed) {
-					closed = true;
-				    socket.close();
-				}
-			});
-		});
-		`))
-		assert.NoError(t, err)
-		assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-close"), 101, "")
-	})
+	// 		socket.on("error", function(errorEvent) {
+	// 			if (errorEvent == null) {
+	// 				throw new Error(JSON.stringify(errorEvent));
+	// 			}
+	// 			if (!closed) {
+	// 				closed = true;
+	// 			    socket.close();
+	// 			}
+	// 		});
+	// 	});
+	// 	`))
+	// 	assert.NoError(t, err)
+	// 	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-close"), 101, "")
+	// })
 }
 
 func TestSocketIOSystemTags(t *testing.T) {
@@ -611,4 +538,120 @@ func testPingHandler(tt *testing.T, rt *goja.Runtime, sr func(string) string, sa
 	samplesBuf := stats.GetBufferedSamples(samples)
 	assertSessionMetricsEmitted(tt, samplesBuf, "", sr("WSBIN_URL/wsio-ping"), 101, "")
 	assertMetricEmitted(tt, metrics.WSPing, samplesBuf, sr("WSBIN_URL/wsio-ping"))
+}
+
+func testMultipleHandler(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
+	tt.Run("multiple_handlers", func(t *testing.T) {
+		_, err := common.RunString(rt, sr(`
+		let pongReceived = false;
+		let otherPongReceived = false;
+
+		let res = ws.connect("WSBIN_URL/wsio-echo", function(socket){
+			socket.on("open", function(data) {
+				socket.ping();
+			});
+			socket.on("pong", function() {
+				pongReceived = true;
+				if (otherPongReceived) {
+					socket.close();
+				}
+			});
+			socket.on("pong", function() {
+				otherPongReceived = true;
+				if (pongReceived) {
+					socket.close();
+				}
+			});
+			socket.setTimeout(function (){socket.close();}, 3000);
+		});
+		if (!pongReceived || !otherPongReceived) {
+			throw new Error ("sent ping but didn't get pong back");
+		}
+		`))
+		assert.NoError(t, err)
+	})
+
+	samplesBuf := stats.GetBufferedSamples(samples)
+	assertSessionMetricsEmitted(tt, samplesBuf, "", sr("WSBIN_URL/wsio-echo"), 101, "")
+	assertMetricEmitted(tt, metrics.WSPing, samplesBuf, sr("WSBIN_URL/wsio-echo"))
+}
+
+func testClientCloserHandler(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
+	tt.Run("client_close", func(t *testing.T) {
+		_, err := common.RunString(rt, sr(`
+		let closed = false;
+		let res = ws.connect("WSBIN_URL/wsio-echo", function(socket){
+			socket.on("open", function() {
+							socket.close()
+			})
+			socket.on("close", function() {
+							closed = true;
+			})
+		});
+		if (!closed) { throw new Error ("close event not fired"); }
+		`))
+		assert.NoError(t, err)
+	})
+	assertSessionMetricsEmitted(tt, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/wsio-echo"), 101, "")
+}
+
+func testClientCloserWithoutSendCloseRequestHandler(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
+	tt.Run("server_close_ok", func(t *testing.T) {
+		_, err := common.RunString(rt, sr(`
+			let closed = false;
+			let res = ws.connect("WSBIN_URL/wsio-echo", function(socket){
+				socket.on("open", function() {
+					socket.send("message","test");
+				})
+				socket.on("close", function() {
+					closed = true;
+				})
+			});
+			if (!closed) { throw new Error ("close event not fired"); }
+			`))
+		assert.NoError(t, err)
+	})
+}
+
+func testServerClosePrematurely(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
+	tt.Run("server_close_invalid", func(t *testing.T) {
+		_, err := common.RunString(rt, sr(`
+			let closed = false;
+			let res = ws.connect("WSBIN_URL/wsio-close-invalid", function(socket){
+				socket.on("open", function() {
+					socket.send("message","test");
+				})
+				socket.on("close", function() {
+					closed = true;
+				})
+			});
+			if (!closed) { throw new Error ("close event not fired"); }
+			`))
+		assert.NoError(t, err)
+	})
+}
+
+func testPanicWithInvalidURL(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
+	tt.Run("invalid_url", func(t *testing.T) {
+		_, err := common.RunString(rt, `
+		let res = ws.connect("INVALID", function(socket){
+			socket.on("open", function() {
+				socket.close();
+			});
+		});
+		`)
+		assert.Error(t, err)
+	})
+
+	// tt.Run("panic_invalid_url", func(t *testing.T) {
+	// 	assert.Panics(t, func() {
+	// 		common.RunString(rt, `
+	// 	let res = ws.connect("INVALID", function(socket){
+	// 		socket.on("open", function() {
+	// 			socket.close();
+	// 		});
+	// 	});
+	// 	`)
+	// 	}, "The code did not panic with invalid URL")
+	// })
 }
