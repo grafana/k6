@@ -434,12 +434,14 @@ func (ess ExecutionSegmentSequence) GetStripedOffsets(segment *ExecutionSegment)
 		})
 
 	var numerators = make([]int64, len(ess))
+	var numeratorChanges = make([]*big.Rat, len(ess))
 	var soonest = make([]*big.Rat, len(ess))
 	var lcd = ess.lcd()
 
 	for i := range ess {
 		numerators[i] = ess[i].length.Num().Int64() * (lcd / ess[i].length.Denom().Int64())
 		soonest[i] = big.NewRat(0, 1)
+		numeratorChanges[i] = big.NewRat(lcd, numerators[i])
 	}
 
 	start := int64(-1)
@@ -449,7 +451,7 @@ func (ess ExecutionSegmentSequence) GetStripedOffsets(segment *ExecutionSegment)
 		var iRat = big.NewRat(i, 1)
 		for index, value := range soonest {
 			if iRat.Cmp(value) >= 0 {
-				value.Add(value, big.NewRat(lcd, numerators[index]))
+				value.Add(value, numeratorChanges[index])
 				if ess[index] == matchingSegment {
 					// TODO: this can be done for all segments and then we only get what we care about
 					if start < 0 {
