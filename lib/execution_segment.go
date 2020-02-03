@@ -395,21 +395,6 @@ func (ess ExecutionSegmentSequence) String() string {
 	return strings.Join(result, ",")
 }
 
-func (ess ExecutionSegmentSequence) Len() int {
-	return len(ess)
-}
-
-func (ess ExecutionSegmentSequence) Less(i, j int) bool {
-	// Yes this Less is actually More, but we want it sorted in descending order and the alternative is to reverse it after sort
-	return ess[i].length.Cmp(ess[j].length) > 0
-}
-
-func (ess ExecutionSegmentSequence) Swap(i, j int) {
-	ess[i], ess[j] = ess[j], ess[i]
-}
-
-var _ sort.Interface = ExecutionSegmentSequence{}
-
 // lowest common denominator based on https://rosettacode.org/wiki/Least_common_multiple#Go
 func (ess ExecutionSegmentSequence) lcd() int64 {
 	var m, n, z big.Int
@@ -440,7 +425,13 @@ func (ess ExecutionSegmentSequence) GetStripedOffsets(segment *ExecutionSegment)
 	if matchingSegment == nil {
 		return -1, nil, fmt.Errorf("missing segment %s inside segment sequence %s", segment, ess) // TODO: make a seperate error ?
 	}
-	sort.Stable(ess) // TODO: Use Stable ? copy the sequence ?
+
+	ess = append([]*ExecutionSegment{}, ess...)
+	sort.SliceStable(ess,
+		func(i, j int) bool {
+			// Yes this Less is actually More, but we want it sorted in descending order and the alternative is to reverse it after sort
+			return ess[i].length.Cmp(ess[j].length) > 0
+		})
 
 	var numerators = make([]int64, len(ess))
 	var soonest = make([]*big.Rat, len(ess))
