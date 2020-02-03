@@ -450,7 +450,8 @@ func (ess ExecutionSegmentSequence) GetStripedOffsets(segment *ExecutionSegment)
 		for index, value := range soonest {
 			if iRat.Cmp(value) >= 0 {
 				value.Add(value, big.NewRat(lcd, numerators[index]))
-				if ess[index] == matchingSegment { // TODO: this can be done for all segments and then we only get what we care about
+				if ess[index] == matchingSegment {
+					// TODO: this can be done for all segments and then we only get what we care about
 					if start < 0 {
 						start = i
 					} else {
