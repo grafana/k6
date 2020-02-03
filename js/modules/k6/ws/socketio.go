@@ -116,7 +116,9 @@ func (*WSIO) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHT
 		return nil, err
 	}
 	defer socket.close()
-	(socket.runner.callbackFunction)(goja.Undefined(), socket.runner.runtime.ToValue(&socket))
+	if err := invokeSocketCallBackFunc(&socket); err != nil {
+		return nil, err
+	}
 	socket.runner.conn.SetCloseHandler(func(code int, text string) error { return nil })
 	eventLoopDataChan := newEventLoopData()
 	socket.runner.conn.SetPingHandler(func(msg string) error { eventLoopDataChan.pingChan <- msg; return nil })
@@ -125,6 +127,14 @@ func (*WSIO) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHT
 	// Wraps a couple of channels around conn.ReadMessage
 	go readPump(socket.runner.conn, eventLoopDataChan.readDataChan, eventLoopDataChan.readErrChan, eventLoopDataChan.readCloseChan)
 	return socket.eventLoopHandler(ctx, eventLoopDataChan)
+}
+
+func invokeSocketCallBackFunc(s *SocketIO) (err error) {
+	if _, err = (s.runner.callbackFunction)(goja.Undefined(), s.runner.runtime.ToValue(s)); err != nil {
+		_ = s.closeConnection(websocket.CloseGoingAway)
+		return
+	}
+	return
 }
 
 func (s *SocketIO) eventLoopHandler(ctx context.Context, eventLoopDataChan EventLoopDataChannel) (*WSHTTPResponse, error) {
@@ -171,8 +181,9 @@ func (s *SocketIO) startConnect() error {
 func (s *SocketIO) connect() error {
 	conn, response, err := s.runner.dialer.Dial(s.runner.url.String(), s.runner.requestHeaders.Clone())
 	if err != nil {
+		errMsg := fmt.Sprintf("%s with url: %s", err.Error(), s.runner.url.String())
 		s.handleEvent("error", s.runner.runtime.ToValue(err))
-		return err
+		return errors.New(errMsg)
 	}
 	s.pushSessionMetrics(response)
 	wsResponse, wsRespErr := wrapHTTPResponse(response)

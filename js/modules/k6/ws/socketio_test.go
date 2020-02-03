@@ -88,62 +88,10 @@ func TestSocketIOErrors(t *testing.T) {
 	t.Parallel()
 	sr, rt, samples, tb := setUpTest(t)
 	defer tb.Cleanup()
-	testPanicWithInvalidURL(t, rt, sr, samples)
-	// t.Parallel()
-	// tb := httpmultibin.NewHTTPMultiBin(t)
-	// defer tb.Cleanup()
-	// sr := tb.Replacer.Replace
-
-	// root, err := lib.NewGroup("", nil)
-	// assert.NoError(t, err)
-
-	// rt := goja.New()
-	// rt.SetFieldNameMapper(common.FieldNameMapper{})
-	// samples := make(chan stats.SampleContainer, 1000)
-	// state := &lib.State{
-	// 	Group:  root,
-	// 	Dialer: tb.Dialer,
-	// 	Options: lib.Options{
-	// 		SystemTags: &stats.DefaultSystemTagSet,
-	// 	},
-	// 	Samples: samples,
-	// }
-
-	// ctx := context.Background()
-	// ctx = lib.WithState(ctx, state)
-	// ctx = common.WithRuntime(ctx, rt)
-
-	// rt.Set("ws", common.Bind(rt, NewSocketIO(), &ctx))
-
-	// t.Run("invalid_url", func(t *testing.T) {
-	// 	_, err := common.RunString(rt, `
-	// 	let res = ws.connect("INVALID", function(socket){
-	// 		socket.on("open", function() {
-	// 			socket.close();
-	// 		});
-	// 	});
-	// 	`)
-	// 	assert.Error(t, err)
-	// })
-
-	// t.Run("invalid_url_message_panic", func(t *testing.T) {
-	// 	// Attempting to send a message to a non-existent socket shouldn't panic
-	// 	_, err := common.RunString(rt, `
-	// 	let res = ws.connect("INVALID", function(socket){
-	// 		socket.send("new message");
-	// 	});
-	// 	`)
-	// 	assert.Error(t, err)
-	// })
-
-	// t.Run("error_in_setup", func(t *testing.T) {
-	// 	_, err := common.RunString(rt, sr(`
-	// 	let res = ws.connect("WSBIN_URL/ws-echo-invalid", function(socket){
-	// 		throw new Error("error in setup");
-	// 	});
-	// 	`))
-	// 	assert.Error(t, err)
-	// })
+	testErrorWithInvalidURL(t, rt, sr, samples)
+	testErrorMsgWithInvalidURL(t, rt, sr, samples)
+	testErrorWithMissingChannelName(t, rt, sr, samples)
+	testErrorInSetup(t, rt, sr, samples)
 
 	// t.Run("send_after_close", func(t *testing.T) {
 	// 	_, err := common.RunString(rt, sr(`
@@ -631,7 +579,7 @@ func testServerClosePrematurely(tt *testing.T, rt *goja.Runtime, sr func(string)
 	})
 }
 
-func testPanicWithInvalidURL(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
+func testErrorWithInvalidURL(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
 	tt.Run("invalid_url", func(t *testing.T) {
 		_, err := common.RunString(rt, `
 		let res = ws.connect("INVALID", function(socket){
@@ -641,17 +589,45 @@ func testPanicWithInvalidURL(tt *testing.T, rt *goja.Runtime, sr func(string) st
 		});
 		`)
 		assert.Error(t, err)
+		assert.Equal(t, "GoError: malformed ws or wss URL with url: INVALID", err.Error())
 	})
+}
 
-	// tt.Run("panic_invalid_url", func(t *testing.T) {
-	// 	assert.Panics(t, func() {
-	// 		common.RunString(rt, `
-	// 	let res = ws.connect("INVALID", function(socket){
-	// 		socket.on("open", function() {
-	// 			socket.close();
-	// 		});
-	// 	});
-	// 	`)
-	// 	}, "The code did not panic with invalid URL")
-	// })
+func testErrorMsgWithInvalidURL(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
+	tt.Run("invalid_url_with_send_message", func(t *testing.T) {
+		// Attempting to send a message to a non-existent socket shouldn't panic
+		_, err := common.RunString(rt, `
+		let res = ws.connect("INVALID", function(socket){
+			socket.send("sample channel","new message");
+		});
+		`)
+		assert.Error(t, err)
+		assert.Equal(t, "GoError: malformed ws or wss URL with url: INVALID", err.Error())
+	})
+}
+
+func testErrorWithMissingChannelName(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
+	tt.Run("send_receive", func(t *testing.T) {
+		_, err := common.RunString(rt, sr(`
+		let res = ws.connect("WSBIN_URL/wsio-echo-data", function(socket){
+			socket.on("open", function (){
+				socket.send("test")
+			});
+		});
+		`))
+		assert.Error(t, err)
+		assert.Equal(t, "GoError: invalid number of arguments to ws.send. Method is required 2 params ( channelName, message )", err.Error())
+	})
+}
+
+func testErrorInSetup(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
+	tt.Run("error_in_setup", func(t *testing.T) {
+		_, err := common.RunString(rt, sr(`
+		let res = ws.connect("WSBIN_URL/wsio-echo-data", function(socket){
+			throw new Error("error in setup socket callback func");
+		});
+		`))
+		assert.Error(t, err)
+		assert.Equal(t, "Error: error in setup socket callback func at <eval>:3:8(4)", err.Error())
+	})
 }
