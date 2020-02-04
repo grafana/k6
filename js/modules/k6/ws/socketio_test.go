@@ -217,59 +217,6 @@ func TestSocketIOErrors(t *testing.T) {
 // 	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSSBIN_URL/ws-close"), 101, "")
 // }
 
-// func TestSocketIOReadPump(t *testing.T) {
-// 	var closeCode int
-// 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-// 		conn, err := (&websocket.Upgrader{}).Upgrade(w, r, w.Header())
-// 		assert.NoError(t, err)
-// 		closeMsg := websocket.FormatCloseMessage(closeCode, "")
-// 		_ = conn.WriteControl(websocket.CloseMessage, closeMsg, time.Now().Add(time.Second))
-// 	}))
-// 	defer srv.Close()
-
-// 	closeCodes := []int{websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseInternalServerErr}
-
-// 	numAsserts := 0
-// 	srvURL := "ws://" + srv.Listener.Addr().String()
-
-// 	// Ensure readPump returns the response close code sent by the server
-// 	for _, code := range closeCodes {
-// 		code := code
-// 		t.Run(strconv.Itoa(code), func(t *testing.T) {
-// 			closeCode = code
-// 			conn, resp, err := websocket.DefaultDialer.Dial(srvURL, nil)
-// 			assert.NoError(t, err)
-// 			defer func() {
-// 				_ = resp.Body.Close()
-// 				_ = conn.Close()
-// 			}()
-
-// 			msgChan := make(chan []byte)
-// 			errChan := make(chan error)
-// 			closeChan := make(chan int)
-// 			go readPump(conn, msgChan, errChan, closeChan)
-
-// 		readChans:
-// 			for {
-// 				select {
-// 				case responseCode := <-closeChan:
-// 					assert.Equal(t, code, responseCode)
-// 					numAsserts++
-// 					break readChans
-// 				case <-errChan:
-// 					continue
-// 				case <-time.After(time.Second):
-// 					t.Errorf("Read timed out")
-// 					break readChans
-// 				}
-// 			}
-// 		})
-// 	}
-
-// 	// Ensure all close code asserts passed
-// 	assert.Equal(t, numAsserts, len(closeCodes))
-// }
-
 func setUpTest(t *testing.T) (func(string) string, *goja.Runtime, chan stats.SampleContainer, *httpmultibin.HTTPMultiBin) {
 	tb := httpmultibin.NewHTTPMultiBin(t)
 
