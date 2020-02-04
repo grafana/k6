@@ -29,10 +29,13 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-func getConnectSocketIORequest() http.Handler {
+const writeWait = 10 * time.Second
+
+func getConnectSocketIORequest(closePrematurely bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, w.Header())
 		conn.WriteMessage(websocket.TextMessage, []byte{'0'})
+		conn.WriteControl(websocket.PingMessage, []byte{'2'}, time.Now().Add(writeWait))
 		messageType, r, e := conn.NextReader()
 		if e != nil {
 			return
@@ -48,25 +51,11 @@ func getConnectSocketIORequest() http.Handler {
 		if err != nil {
 			return
 		}
-		closeMsg := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")
-		_ = conn.WriteControl(websocket.CloseMessage, closeMsg, time.Now().Add(time.Second))
-		// Wait for response control frame
-		<-time.After(time.Second)
-		err = conn.Close()
-		if err != nil {
-			return
-		}
-	})
-}
-
-func getSentReceivedSocketIORequest() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, w.Header())
-		conn.WriteMessage(websocket.TextMessage, []byte{'0'})
-		_, data, _ := conn.ReadMessage()
-		conn.WriteMessage(websocket.TextMessage, data)
-		if err != nil {
-			return
+		if !closePrematurely {
+			closeMsg := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")
+			_ = conn.WriteControl(websocket.CloseMessage, closeMsg, time.Now().Add(time.Second))
+			// Wait for response control frame
+			<-time.After(time.Second)
 		}
 		err = conn.Close()
 		if err != nil {

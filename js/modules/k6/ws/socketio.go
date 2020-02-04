@@ -548,13 +548,11 @@ func (s *SocketIO) Send(event string, message goja.Value) {
 	rt := common.GetRuntime(*s.runner.ctx)
 	messageObject := message.ToObject(rt)
 	var writeData []byte
-	jsonByte, invalidJSON := messageObject.MarshalJSON()
-	isSendDataAsString := invalidJSON != nil
-	if isSendDataAsString {
-		writeData = []byte(fmt.Sprintf("%s[\"%s\",\"%s\"]", COMMON_MESSAGE, event, message.String()))
-	} else {
-		writeData = []byte(fmt.Sprintf("%s[\"%s\",%s]", COMMON_MESSAGE, event, string(jsonByte)))
+	jsonByte, err := messageObject.MarshalJSON()
+	if err != nil {
+		s.handleEvent("error", rt.ToValue(err))
 	}
+	writeData = []byte(fmt.Sprintf("%s[\"%s\",%s]", COMMON_MESSAGE, event, string(jsonByte)))
 	if err := s.runner.conn.WriteMessage(websocket.TextMessage, writeData); err != nil {
 		s.handleEvent("error", rt.ToValue(err))
 	}
@@ -655,7 +653,6 @@ func (s *SocketIO) Ping() {
 		s.handleEvent("error", rt.ToValue(err))
 		return
 	}
-
 	s.metrics.pingSendTimestamps[pingID] = time.Now()
 	s.metrics.pingSendCounter++
 }
@@ -687,6 +684,10 @@ func getEventData(eventCode, rawResponse string) (eventName, restText string, er
 		return "open", rawResponse, nil
 	case EMPTY_MESSAGE:
 		return "message", rawResponse, nil
+	case PONG:
+		return "pong", rawResponse, nil
+	case PING:
+		return "ping", rawResponse, nil
 	default:
 		start, end, rest, err = decodeData(rawResponse)
 		invalidPacket := err != nil || (end < start) || (rest >= len(rawResponse))
