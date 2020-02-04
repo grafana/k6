@@ -2,7 +2,6 @@ package ws
 
 import (
 	"context"
-	"strconv"
 	"testing"
 
 	"github.com/dop251/goja"
@@ -14,51 +13,51 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func assertSocketIOSessionMetricsEmitted(t *testing.T, sampleContainers []stats.SampleContainer, subprotocol, url string, status int, group string) {
-	seenSessions := false
-	seenSessionDuration := false
-	seenConnecting := false
+// func assertSocketIOSessionMetricsEmitted(t *testing.T, sampleContainers []stats.SampleContainer, subprotocol, url string, status int, group string) {
+// 	seenSessions := false
+// 	seenSessionDuration := false
+// 	seenConnecting := false
 
-	for _, sampleContainer := range sampleContainers {
-		for _, sample := range sampleContainer.GetSamples() {
-			tags := sample.Tags.CloneTags()
-			if tags["url"] == url {
-				switch sample.Metric {
-				case metrics.WSConnecting:
-					seenConnecting = true
-				case metrics.WSSessionDuration:
-					seenSessionDuration = true
-				case metrics.WSSessions:
-					seenSessions = true
-				}
+// 	for _, sampleContainer := range sampleContainers {
+// 		for _, sample := range sampleContainer.GetSamples() {
+// 			tags := sample.Tags.CloneTags()
+// 			if tags["url"] == url {
+// 				switch sample.Metric {
+// 				case metrics.WSConnecting:
+// 					seenConnecting = true
+// 				case metrics.WSSessionDuration:
+// 					seenSessionDuration = true
+// 				case metrics.WSSessions:
+// 					seenSessions = true
+// 				}
 
-				assert.Equal(t, strconv.Itoa(status), tags["status"])
-				assert.Equal(t, subprotocol, tags["subproto"])
-				assert.Equal(t, group, tags["group"])
-			}
-		}
-	}
-	assert.True(t, seenConnecting, "url %s didn't emit Connecting", url)
-	assert.True(t, seenSessions, "url %s didn't emit Sessions", url)
-	assert.True(t, seenSessionDuration, "url %s didn't emit SessionDuration", url)
-}
+// 				assert.Equal(t, strconv.Itoa(status), tags["status"])
+// 				assert.Equal(t, subprotocol, tags["subproto"])
+// 				assert.Equal(t, group, tags["group"])
+// 			}
+// 		}
+// 	}
+// 	assert.True(t, seenConnecting, "url %s didn't emit Connecting", url)
+// 	assert.True(t, seenSessions, "url %s didn't emit Sessions", url)
+// 	assert.True(t, seenSessionDuration, "url %s didn't emit SessionDuration", url)
+// }
 
-func assertSocketIOMetricEmitted(t *testing.T, metric *stats.Metric, sampleContainers []stats.SampleContainer, url string) {
-	seenMetric := false
+// func assertSocketIOMetricEmitted(t *testing.T, metric *stats.Metric, sampleContainers []stats.SampleContainer, url string) {
+// 	seenMetric := false
 
-	for _, sampleContainer := range sampleContainers {
-		for _, sample := range sampleContainer.GetSamples() {
-			surl, ok := sample.Tags.Get("url")
-			assert.True(t, ok)
-			if surl == url {
-				if sample.Metric == metric {
-					seenMetric = true
-				}
-			}
-		}
-	}
-	assert.True(t, seenMetric, "url %s didn't emit %s", url, metric.Name)
-}
+// 	for _, sampleContainer := range sampleContainers {
+// 		for _, sample := range sampleContainer.GetSamples() {
+// 			surl, ok := sample.Tags.Get("url")
+// 			assert.True(t, ok)
+// 			if surl == url {
+// 				if sample.Metric == metric {
+// 					seenMetric = true
+// 				}
+// 			}
+// 		}
+// 	}
+// 	assert.True(t, seenMetric, "url %s didn't emit %s", url, metric.Name)
+// }
 
 func TestSocketIOSession(t *testing.T) {
 	t.Parallel()
@@ -69,6 +68,7 @@ func TestSocketIOSession(t *testing.T) {
 	testOpenEventHandler(t, rt, sr, samples)
 	testSendReciveStringData(t, rt, sr, samples)
 	testSendReciveJSONData(t, rt, sr, samples)
+	testSendReciveEmptyData(t, rt, sr, samples)
 	testIntervalHandler(t, rt, sr, samples)
 	testTimeoutHandler(t, rt, sr, samples)
 	testPingHandler(t, rt, sr, samples)
@@ -83,61 +83,13 @@ func TestSocketIOErrors(t *testing.T) {
 	t.Parallel()
 	sr, rt, samples, tb := setUpTest(t)
 	defer tb.Cleanup()
-	testErrorWithInvalidURL(t, rt, sr, samples)
-	testErrorMsgWithInvalidURL(t, rt, sr, samples)
-	testErrorWithMissingChannelName(t, rt, sr, samples)
-	testErrorInSetup(t, rt, sr, samples)
-	testErrorSendAfterClose(t, rt, sr, samples)
-
-	// t.Run("send_after_close", func(t *testing.T) {
-	// 	_, err := common.RunString(rt, sr(`
-	// 	let hasError = false;
-	// 	let res = ws.connect("WSBIN_URL/ws-echo-invalid", function(socket){
-	// 		socket.on("open", function() {
-	// 			socket.close();
-	// 			socket.send("test");
-	// 		});
-
-	// 		socket.on("error", function(errorEvent) {
-	// 			hasError = true;
-	// 		});
-	// 	});
-	// 	if (!hasError) {
-	// 		throw new Error ("no error emitted for send after close");
-	// 	}
-	// 	`))
-	// 	assert.NoError(t, err)
-	// 	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-echo-invalid"), 101, "")
-	// })
-
-	// t.Run("error on close", func(t *testing.T) {
-	// 	_, err := common.RunString(rt, sr(`
-	// 	var closed = false;
-	// 	let res = ws.connect("WSBIN_URL/ws-close", function(socket){
-	// 		socket.on('open', function open() {
-	// 			socket.setInterval(function timeout() {
-	// 			  socket.ping();
-	// 			}, 1000);
-	// 		});
-
-	// 		socket.on("ping", function() {
-	// 			socket.close();
-	// 		});
-
-	// 		socket.on("error", function(errorEvent) {
-	// 			if (errorEvent == null) {
-	// 				throw new Error(JSON.stringify(errorEvent));
-	// 			}
-	// 			if (!closed) {
-	// 				closed = true;
-	// 			    socket.close();
-	// 			}
-	// 		});
-	// 	});
-	// 	`))
-	// 	assert.NoError(t, err)
-	// 	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-close"), 101, "")
-	// })
+	testThrowErrorWithInvalidURL(t, rt, sr, samples)
+	testThrowErrorMsgWithInvalidURL(t, rt, sr, samples)
+	testThrowErrorWithMissingChannelName(t, rt, sr, samples)
+	testThrowErrorInInterval(t, rt, sr, samples)
+	testThrowErrorInSetup(t, rt, sr, samples)
+	testThrowErrorSendAfterClose(t, rt, sr, samples)
+	testThrowErrorOnClose(t, rt, sr, samples)
 }
 
 // func TestSocketIOSystemTags(t *testing.T) {
@@ -319,7 +271,6 @@ func TestSocketIOErrors(t *testing.T) {
 // }
 
 func setUpTest(t *testing.T) (func(string) string, *goja.Runtime, chan stats.SampleContainer, *httpmultibin.HTTPMultiBin) {
-	//t.Parallel()
 	tb := httpmultibin.NewHTTPMultiBin(t)
 
 	sr := tb.Replacer.Replace
@@ -397,7 +348,7 @@ func testOpenEventHandler(tt *testing.T, rt *goja.Runtime, sr func(string) strin
 }
 
 func testSendReciveStringData(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
-	tt.Run("send_receive", func(t *testing.T) {
+	tt.Run("send_receive_string", func(t *testing.T) {
 		_, err := common.RunString(rt, sr(`
 		let res = ws.connect("WSBIN_URL/wsio-echo-data", function(socket){
 			socket.on("open", function (){
@@ -422,7 +373,7 @@ func testSendReciveStringData(tt *testing.T, rt *goja.Runtime, sr func(string) s
 }
 
 func testSendReciveJSONData(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
-	tt.Run("send_receive", func(t *testing.T) {
+	tt.Run("send_receive_json", func(t *testing.T) {
 		_, err := common.RunString(rt, sr(`
 		let res = ws.connect("WSBIN_URL/wsio-echo-data", function(socket){
 			socket.on("open", function (){
@@ -445,6 +396,26 @@ func testSendReciveJSONData(tt *testing.T, rt *goja.Runtime, sr func(string) str
 	assertSessionMetricsEmitted(tt, samplesBuf, "", sr("WSBIN_URL/wsio-echo-data"), 101, "")
 	assertMetricEmitted(tt, metrics.WSMessagesSent, samplesBuf, sr("WSBIN_URL/wsio-echo-data"))
 	assertMetricEmitted(tt, metrics.WSMessagesReceived, samplesBuf, sr("WSBIN_URL/wsio-echo-data"))
+}
+
+func testSendReciveEmptyData(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
+	tt.Run("send_receive_empty", func(t *testing.T) {
+		_, err := common.RunString(rt, sr(`
+		var reciveData = false;
+		let res = ws.connect("WSBIN_URL/wsio-echo-empty-data", function(socket){
+			socket.on("emptyMessage", function (data){
+				reciveData = true;
+			});
+			socket.on("message", function (data){
+					throw new Error ("echo data doesn't match our channel event! " + data);
+			});
+		});
+		if (!reciveData) throw new Error ("Empty data doesn't recieve!");
+		`))
+		assert.NoError(t, err)
+	})
+	samplesBuf := stats.GetBufferedSamples(samples)
+	assertSessionMetricsEmitted(tt, samplesBuf, "", sr("WSBIN_URL/wsio-echo-empty-data"), 101, "")
 }
 
 func testIntervalHandler(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
@@ -494,9 +465,8 @@ func testPingHandler(tt *testing.T, rt *goja.Runtime, sr func(string) string, sa
 			});
 			socket.on("pong", function() {
 				pongReceived = true;
-				socket.close();
 			});
-			socket.setTimeout(function (){socket.close();}, 3000);
+			socket.setTimeout(function (){socket.close();}, 300);
 		});
 		if (!pongReceived) {
 			throw new Error ("sent ping but didn't get pong back");
@@ -521,17 +491,11 @@ func testMultipleHandler(tt *testing.T, rt *goja.Runtime, sr func(string) string
 			});
 			socket.on("pong", function() {
 				pongReceived = true;
-				if (otherPongReceived) {
-					socket.close();
-				}
 			});
 			socket.on("pong", function() {
 				otherPongReceived = true;
-				if (pongReceived) {
-					socket.close();
-				}
 			});
-			socket.setTimeout(function (){socket.close();}, 3000);
+			socket.setTimeout(function (){socket.close();}, 300);
 		});
 		if (!pongReceived || !otherPongReceived) {
 			throw new Error ("sent ping but didn't get pong back");
@@ -600,7 +564,7 @@ func testServerClosePrematurely(tt *testing.T, rt *goja.Runtime, sr func(string)
 	})
 }
 
-func testErrorWithInvalidURL(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
+func testThrowErrorWithInvalidURL(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
 	tt.Run("invalid_url", func(t *testing.T) {
 		_, err := common.RunString(rt, `
 		let res = ws.connect("INVALID", function(socket){
@@ -614,7 +578,7 @@ func testErrorWithInvalidURL(tt *testing.T, rt *goja.Runtime, sr func(string) st
 	})
 }
 
-func testErrorMsgWithInvalidURL(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
+func testThrowErrorMsgWithInvalidURL(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
 	tt.Run("invalid_url_with_send_message", func(t *testing.T) {
 		// Attempting to send a message to a non-existent socket shouldn't panic
 		_, err := common.RunString(rt, `
@@ -627,7 +591,7 @@ func testErrorMsgWithInvalidURL(tt *testing.T, rt *goja.Runtime, sr func(string)
 	})
 }
 
-func testErrorWithMissingChannelName(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
+func testThrowErrorWithMissingChannelName(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
 	tt.Run("send_receive", func(t *testing.T) {
 		_, err := common.RunString(rt, sr(`
 		let res = ws.connect("WSBIN_URL/wsio-echo-data", function(socket){
@@ -641,7 +605,7 @@ func testErrorWithMissingChannelName(tt *testing.T, rt *goja.Runtime, sr func(st
 	})
 }
 
-func testErrorInSetup(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
+func testThrowErrorInSetup(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
 	tt.Run("error_in_setup", func(t *testing.T) {
 		_, err := common.RunString(rt, sr(`
 		let res = ws.connect("WSBIN_URL/wsio-echo-data", function(socket){
@@ -653,7 +617,7 @@ func testErrorInSetup(tt *testing.T, rt *goja.Runtime, sr func(string) string, s
 	})
 }
 
-func testErrorSendAfterClose(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
+func testThrowErrorSendAfterClose(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
 	tt.Run("send_after_close", func(t *testing.T) {
 		_, err := common.RunString(rt, sr(`
 		let hasError = false;
@@ -673,5 +637,54 @@ func testErrorSendAfterClose(tt *testing.T, rt *goja.Runtime, sr func(string) st
 		`))
 		assert.NoError(t, err)
 		assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/wsio-echo-invalid"), 101, "")
+	})
+}
+
+func testThrowErrorInInterval(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
+	tt.Run("interval_error", func(t *testing.T) {
+		_, err := common.RunString(rt, sr(`
+		let counter = 0;
+		let hasError = false;
+		let res = ws.connect("WSBIN_URL/wsio-echo", function(socket){
+			socket.setInterval(function () {
+				counter += 1;
+				if (counter > 2) { 
+					throw new Error ("Throw error in interval function");
+				}
+			}, 100);
+		});
+		`))
+		assert.Error(t, err)
+	})
+}
+
+func testThrowErrorOnClose(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
+	tt.Run("error_on_close", func(t *testing.T) {
+		_, err := common.RunString(rt, sr(`
+		var closed = false;
+		let res = ws.connect("WSBIN_URL/wsio-echo", function(socket){
+			socket.on('open', function open() {
+				socket.setInterval(function timeout() {
+				  socket.ping();
+				}, 1000);
+			});
+
+			socket.on("ping", function() {
+				socket.close();
+			});
+
+			socket.on("error", function(errorEvent) {
+				if (errorEvent == null) {
+					throw new Error(JSON.stringify(errorEvent));
+				}
+				if (!closed) {
+					closed = true;
+				    socket.close();
+				}
+			});
+		});
+		`))
+		assert.NoError(t, err)
+		assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/wsio-echo"), 101, "")
 	})
 }

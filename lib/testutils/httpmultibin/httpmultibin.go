@@ -177,6 +177,43 @@ func getEncodedHandler(t testing.TB, compressionType httpext.CompressionType) ht
 	})
 }
 
+func getConnectSocketIORequest(emptyData, closePrematurely bool) http.Handler {
+	writeWait := 10 * time.Second
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, w.Header())
+		conn.WriteMessage(websocket.TextMessage, []byte{'0'})
+		conn.WriteControl(websocket.PingMessage, []byte{'2'}, time.Now().Add(writeWait))
+		conn.WriteMessage(websocket.TextMessage, []byte{'4', '0'})
+		conn.WriteMessage(websocket.TextMessage, []byte{'2'})
+		conn.WriteMessage(websocket.TextMessage, []byte{'3'})
+		if !emptyData {
+			messageType, data, _ := conn.ReadMessage()
+			conn.WriteMessage(websocket.TextMessage, data)
+			_, err = conn.NextWriter(messageType)
+			if err != nil {
+				return
+			}
+		}
+		// messageType, data, _ := conn.ReadMessage()
+		// fmt.Println(data)
+		// conn.WriteMessage(websocket.TextMessage, data)
+		// _, err = conn.NextWriter(messageType)
+		// if err != nil {
+		// 	return
+		// }
+		if !closePrematurely {
+			closeMsg := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")
+			_ = conn.WriteControl(websocket.CloseMessage, closeMsg, time.Now().Add(time.Second))
+			// Wait for response control frame
+			<-time.After(time.Second)
+		}
+		err = conn.Close()
+		if err != nil {
+			return
+		}
+	})
+}
+
 func getZstdBrHandler(t testing.TB) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		encoding := "zstd, br"
@@ -207,13 +244,14 @@ func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 	mux.Handle("/ws-echo-invalid", getWebsocketHandler(true, true))
 	mux.Handle("/ws-close", getWebsocketHandler(false, false))
 	mux.Handle("/ws-close-invalid", getWebsocketHandler(false, true))
-	mux.Handle("/wsio-open", getConnectSocketIORequest(false))
-	mux.Handle("/wsio-echo", getConnectSocketIORequest(false))
-	mux.Handle("/wsio-echo-data", getConnectSocketIORequest(false))
-	mux.Handle("/wsio-ping", getConnectSocketIORequest(false))
-	mux.Handle("/wsio-ssl", getConnectSocketIORequest(false))
-	mux.Handle("/wsio-close-invalid", getInvalidCloseSocketHandler())
-	mux.Handle("/wsio-echo-invalid", getConnectSocketIORequest(true))
+	mux.Handle("/wsio-open", getConnectSocketIORequest(false, false))
+	mux.Handle("/wsio-echo", getConnectSocketIORequest(false, false))
+	mux.Handle("/wsio-echo-data", getConnectSocketIORequest(false, false))
+	mux.Handle("/wsio-echo-empty-data", getConnectSocketIORequest(true, false))
+	mux.Handle("/wsio-ping", getConnectSocketIORequest(false, false))
+	mux.Handle("/wsio-ssl", getConnectSocketIORequest(false, false))
+	mux.Handle("/wsio-close-invalid", getConnectSocketIORequest(false, true))
+	mux.Handle("/wsio-echo-invalid", getConnectSocketIORequest(false, true))
 	mux.Handle("/zstd", getEncodedHandler(t, httpext.CompressionTypeZstd))
 	mux.Handle("/zstd-br", getZstdBrHandler(t))
 	mux.Handle("/", httpbin.New().Handler())

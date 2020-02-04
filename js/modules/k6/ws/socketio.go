@@ -683,7 +683,7 @@ func getEventData(eventCode, rawResponse string) (eventName, restText string, er
 	case OPEN:
 		return "open", rawResponse, nil
 	case EMPTY_MESSAGE:
-		return "message", rawResponse, nil
+		return "emptyMessage", rawResponse, nil
 	case PONG:
 		return "pong", rawResponse, nil
 	case PING:
