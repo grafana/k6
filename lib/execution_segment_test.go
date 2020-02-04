@@ -441,17 +441,18 @@ func TestGetStripedOffsets(t *testing.T) {
 		seg      string
 		start    int64
 		offsets  []int64
+		lcd      int64
 		expError string
 	}{
 		{seq: "0,0.3,0.5,0.6,0.7,0.8,0.9,1", seg: "0:0.2", expError: "missing segment"},
-		{seq: "0,0.3,0.5,0.6,0.7,0.8,0.9,1", seg: "0:0.3", start: 0, offsets: []int64{4, 7}},
-		{seq: "0,0.3,0.5,0.6,0.7,0.8,0.9,1", seg: "0.3:0.5", start: 1, offsets: []int64{5}},
-		{seq: "0,0.3,0.5,0.6,0.7,0.8,0.9,1", seg: "0.5:0.6", start: 2},
-		{seq: "0,0.3,0.5,0.6,0.7,0.8,0.9,1", seg: "0.6:0.7", start: 3},
-		{seq: "0,0.3,0.5,0.6,0.7,0.8,0.9,1", seg: "0.8:0.9", start: 8},
-		{seq: "0,0.3,0.5,0.6,0.7,0.8,0.9,1", seg: "0.9:1", start: 9},
-		{seq: "0,0.2,0.5,0.6,0.7,0.8,0.9,1", seg: "0.9:1", start: 9},
-		{seq: "0,0.2,0.5,0.6,0.7,0.8,0.9,1", seg: "0:0.2", start: 1, offsets: []int64{5}},
+		{seq: "0,0.3,0.5,0.6,0.7,0.8,0.9,1", seg: "0:0.3", start: 0, offsets: []int64{4, 3}, lcd: 10},
+		{seq: "0,0.3,0.5,0.6,0.7,0.8,0.9,1", seg: "0.3:0.5", start: 1, offsets: []int64{4}, lcd: 10},
+		{seq: "0,0.3,0.5,0.6,0.7,0.8,0.9,1", seg: "0.5:0.6", start: 2, lcd: 10},
+		{seq: "0,0.3,0.5,0.6,0.7,0.8,0.9,1", seg: "0.6:0.7", start: 3, lcd: 10},
+		{seq: "0,0.3,0.5,0.6,0.7,0.8,0.9,1", seg: "0.8:0.9", start: 8, lcd: 10},
+		{seq: "0,0.3,0.5,0.6,0.7,0.8,0.9,1", seg: "0.9:1", start: 9, lcd: 10},
+		{seq: "0,0.2,0.5,0.6,0.7,0.8,0.9,1", seg: "0.9:1", start: 9, lcd: 10},
+		{seq: "0,0.2,0.5,0.6,0.7,0.8,0.9,1", seg: "0:0.2", start: 1, offsets: []int64{4}, lcd: 10},
 	}
 
 	for _, tc := range testCases {
@@ -461,7 +462,7 @@ func TestGetStripedOffsets(t *testing.T) {
 			require.NoError(t, err)
 			segment, err := NewExecutionSegmentFromString(tc.seg)
 			require.NoError(t, err)
-			start, offsets, err := ess.GetStripedOffsets(segment)
+			start, offsets, lcd, err := ess.GetStripedOffsets(segment)
 			if len(tc.expError) != 0 {
 				require.Error(t, err, tc.expError)
 				require.Contains(t, err.Error(), tc.expError)
@@ -471,6 +472,7 @@ func TestGetStripedOffsets(t *testing.T) {
 
 			assert.Equal(t, tc.start, start)
 			assert.Equal(t, tc.offsets, offsets)
+			assert.Equal(t, tc.lcd, lcd)
 
 			ess2, err := NewExecutionSegmentSequenceFromString(tc.seq)
 			require.NoError(t, err)
@@ -490,7 +492,7 @@ func BenchmarkGetStripedOffsets(b *testing.B) {
 			sequence := generateRandomSequence(length, r)
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				_, _, err := sequence.GetStripedOffsets(sequence[int(r.Int63())%len(sequence)])
+				_, _, _, err := sequence.GetStripedOffsets(sequence[int(r.Int63())%len(sequence)])
 				require.NoError(b, err)
 			}
 		})
@@ -500,7 +502,6 @@ func BenchmarkGetStripedOffsets(b *testing.B) {
 func BenchmarkGetStripedOffsetsEven(b *testing.B) {
 	var lengths = [...]int64{10, 100, 1000}
 	generateSequence := func(n int64) ExecutionSegmentSequence {
-		// try to randomly generate an executionsegmentsequence
 		var err error
 		var ess = ExecutionSegmentSequence(make([]*ExecutionSegment, n))
 		var numerators = make([]int64, n)
@@ -525,7 +526,7 @@ func BenchmarkGetStripedOffsetsEven(b *testing.B) {
 			sequence := generateSequence(length)
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				_, _, err := sequence.GetStripedOffsets(sequence[111233%len(sequence)])
+				_, _, _, err := sequence.GetStripedOffsets(sequence[111233%len(sequence)])
 				require.NoError(b, err)
 			}
 		})
