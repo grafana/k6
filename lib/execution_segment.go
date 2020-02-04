@@ -452,9 +452,9 @@ func (ess ExecutionSegmentSequence) GetStripedOffsets(segment *ExecutionSegment)
 
 OUTER:
 	for i := int64(0); i < lcd; i++ {
-		var iRat = big.NewRat(i, 1)
 		for index, value := range soonest {
-			if iRat.Cmp(value) >= 0 {
+			num, denom := value.Num().Int64(), value.Denom().Int64()
+			if i > num/denom || (i == num/denom && num%denom == 0) {
 				value.Add(value, numeratorChanges[index])
 				if ess[index] == matchingSegment {
 					// TODO: this can be done for all segments and then we only get what we care about
