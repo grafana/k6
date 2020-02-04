@@ -447,6 +447,7 @@ func (ess ExecutionSegmentSequence) GetStripedOffsets(segment *ExecutionSegment)
 	start := int64(-1)
 	var offsets []int64 // TODO we can preallocate this
 
+OUTER:
 	for i := int64(0); i < lcd; i++ {
 		var iRat = big.NewRat(i, 1)
 		for index, value := range soonest {
@@ -463,7 +464,9 @@ func (ess ExecutionSegmentSequence) GetStripedOffsets(segment *ExecutionSegment)
 						}
 						offsets = append(offsets, i-prev)
 					}
-					// we can stop iterating the moment len(offsets) + 1 = numerator and we have set start ...
+					if int64(len(offsets)) == numerators[index]-1 {
+						break OUTER
+					}
 				}
 				break
 			}
