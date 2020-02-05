@@ -324,6 +324,13 @@ func TestSegmentExecutionFloatLength(t *testing.T) {
 
 func TestExecutionSegmentSequences(t *testing.T) {
 	t.Parallel()
+
+	_, err := NewExecutionSegmentSequence(stringToES(t, "0:1/3"), stringToES(t, "1/2:1"))
+	assert.Error(t, err)
+}
+
+func TestExecutionSegmentStringSequences(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		seq         string
 		expSegments []string
@@ -337,6 +344,7 @@ func TestExecutionSegmentSequences(t *testing.T) {
 		{seq: "-0.5,1", expError: true},
 		{seq: "1/2,1/2", expError: true},
 		{seq: "1/2,1/3", expError: true},
+		{seq: "0,1,1/2", expError: true},
 		{seq: "0.5,1", expSegments: []string{"1/2:1"}},
 		{seq: "1/2,1", expSegments: []string{"1/2:1"}, canReverse: true},
 		{seq: "1/3,2/3", expSegments: []string{"1/3:2/3"}, canReverse: true},
@@ -344,6 +352,9 @@ func TestExecutionSegmentSequences(t *testing.T) {
 		{seq: "0,1/3,2/3,1", expSegments: []string{"0:1/3", "1/3:2/3", "2/3:1"}, canReverse: true},
 		{seq: "0.5,0.7", expSegments: []string{"1/2:7/10"}},
 		{seq: "0.5,0.7,1", expSegments: []string{"1/2:7/10", "7/10:1"}},
+		{seq: "0,1/13,2/13,1/3,1/2,3/4,1", expSegments: []string{
+			"0:1/13", "1/13:2/13", "2/13:1/3", "1/3:1/2", "1/2:3/4", "3/4:1",
+		}, canReverse: true},
 	}
 
 	for _, tc := range testCases {
