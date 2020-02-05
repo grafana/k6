@@ -2,6 +2,7 @@ package ws
 
 import (
 	"context"
+	"crypto/tls"
 	"testing"
 
 	"github.com/dop251/goja"
@@ -13,56 +14,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// func assertSocketIOSessionMetricsEmitted(t *testing.T, sampleContainers []stats.SampleContainer, subprotocol, url string, status int, group string) {
-// 	seenSessions := false
-// 	seenSessionDuration := false
-// 	seenConnecting := false
-
-// 	for _, sampleContainer := range sampleContainers {
-// 		for _, sample := range sampleContainer.GetSamples() {
-// 			tags := sample.Tags.CloneTags()
-// 			if tags["url"] == url {
-// 				switch sample.Metric {
-// 				case metrics.WSConnecting:
-// 					seenConnecting = true
-// 				case metrics.WSSessionDuration:
-// 					seenSessionDuration = true
-// 				case metrics.WSSessions:
-// 					seenSessions = true
-// 				}
-
-// 				assert.Equal(t, strconv.Itoa(status), tags["status"])
-// 				assert.Equal(t, subprotocol, tags["subproto"])
-// 				assert.Equal(t, group, tags["group"])
-// 			}
-// 		}
-// 	}
-// 	assert.True(t, seenConnecting, "url %s didn't emit Connecting", url)
-// 	assert.True(t, seenSessions, "url %s didn't emit Sessions", url)
-// 	assert.True(t, seenSessionDuration, "url %s didn't emit SessionDuration", url)
-// }
-
-// func assertSocketIOMetricEmitted(t *testing.T, metric *stats.Metric, sampleContainers []stats.SampleContainer, url string) {
-// 	seenMetric := false
-
-// 	for _, sampleContainer := range sampleContainers {
-// 		for _, sample := range sampleContainer.GetSamples() {
-// 			surl, ok := sample.Tags.Get("url")
-// 			assert.True(t, ok)
-// 			if surl == url {
-// 				if sample.Metric == metric {
-// 					seenMetric = true
-// 				}
-// 			}
-// 		}
-// 	}
-// 	assert.True(t, seenMetric, "url %s didn't emit %s", url, metric.Name)
-// }
-
 func TestSocketIOSession(t *testing.T) {
 	t.Parallel()
-	sr, rt, samples, tb := setUpTest(t)
+	sr, rt, samples, tb, _ := setUpTest(t)
 	defer tb.Cleanup()
+
 	testConnectWSS(t, rt, sr, samples)
 	testConnectWS(t, rt, sr, samples)
 	testOpenEventHandler(t, rt, sr, samples)
@@ -79,10 +35,10 @@ func TestSocketIOSession(t *testing.T) {
 }
 
 func TestSocketIOErrors(t *testing.T) {
-
 	t.Parallel()
-	sr, rt, samples, tb := setUpTest(t)
+	sr, rt, samples, tb, _ := setUpTest(t)
 	defer tb.Cleanup()
+
 	testThrowErrorWithInvalidURL(t, rt, sr, samples)
 	testThrowErrorMsgWithInvalidURL(t, rt, sr, samples)
 	testThrowErrorWithMissingChannelName(t, rt, sr, samples)
@@ -92,132 +48,27 @@ func TestSocketIOErrors(t *testing.T) {
 	testThrowErrorOnClose(t, rt, sr, samples)
 }
 
-// func TestSocketIOSystemTags(t *testing.T) {
-// 	tb := httpmultibin.NewHTTPMultiBin(t)
-// 	defer tb.Cleanup()
+func TestSocketIOTLSConfig(t *testing.T) {
+	t.Parallel()
+	sr, rt, samples, tb, state := setUpTest(t)
+	defer tb.Cleanup()
 
-// 	sr := tb.Replacer.Replace
+	testInsecureSkipVerify(t, rt, sr, samples, state)
+	testCustomCertificates(t, rt, sr, samples, state, tb)
+}
 
-// 	root, err := lib.NewGroup("", nil)
-// 	assert.NoError(t, err)
+func TestSocketIOHeaders(t *testing.T) {
+	t.Parallel()
+	sr, rt, samples, tb, _ := setUpTest(t)
+	defer tb.Cleanup()
 
-// 	rt := goja.New()
-// 	rt.SetFieldNameMapper(common.FieldNameMapper{})
+	testSetCookies(t, rt, sr, samples)
+	testSetUndefinedCookies(t, rt, sr, samples)
+	testSetHeaders(t, rt, sr, samples)
+	testSetUndefinedHeaders(t, rt, sr, samples)
+}
 
-// 	//TODO: test for actual tag values after removing the dependency on the
-// 	// external service demos.kaazing.com (https://github.com/loadimpact/k6/issues/537)
-// 	testedSystemTags := []string{"group", "status", "subproto", "url", "ip"}
-
-// 	samples := make(chan stats.SampleContainer, 1000)
-// 	state := &lib.State{
-// 		Group:     root,
-// 		Dialer:    tb.Dialer,
-// 		Options:   lib.Options{SystemTags: stats.ToSystemTagSet(testedSystemTags)},
-// 		Samples:   samples,
-// 		TLSConfig: tb.TLSClientConfig,
-// 	}
-
-// 	ctx := context.Background()
-// 	ctx = lib.WithState(ctx, state)
-// 	ctx = common.WithRuntime(ctx, rt)
-
-// 	rt.Set("ws", common.Bind(rt, NewSocketIO(), &ctx))
-
-// 	for _, expectedTag := range testedSystemTags {
-// 		expectedTag := expectedTag
-// 		t.Run("only "+expectedTag, func(t *testing.T) {
-// 			state.Options.SystemTags = stats.ToSystemTagSet([]string{expectedTag})
-// 			_, err := common.RunString(rt, sr(`
-// 			let res = ws.connect("WSBIN_URL/ws-echo", function(socket){
-// 				socket.on("open", function() {
-// 					socket.send("test")
-// 				})
-// 				socket.on("message", function (data){
-// 					if (data!=="test") {
-// 						throw new Error ("echo'd data doesn't match our message!");
-// 					}
-// 					socket.close()
-// 				});
-// 			});
-// 			`))
-// 			assert.NoError(t, err)
-
-// 			for _, sampleContainer := range stats.GetBufferedSamples(samples) {
-// 				for _, sample := range sampleContainer.GetSamples() {
-// 					for emittedTag := range sample.Tags.CloneTags() {
-// 						assert.Equal(t, expectedTag, emittedTag)
-// 					}
-// 				}
-// 			}
-// 		})
-// 	}
-// }
-
-// func TestSocketIOTLSConfig(t *testing.T) {
-// 	root, err := lib.NewGroup("", nil)
-// 	assert.NoError(t, err)
-
-// 	tb := httpmultibin.NewHTTPMultiBin(t)
-// 	defer tb.Cleanup()
-
-// 	sr := tb.Replacer.Replace
-
-// 	rt := goja.New()
-// 	rt.SetFieldNameMapper(common.FieldNameMapper{})
-// 	samples := make(chan stats.SampleContainer, 1000)
-// 	state := &lib.State{
-// 		Group:  root,
-// 		Dialer: tb.Dialer,
-// 		Options: lib.Options{
-// 			SystemTags: stats.NewSystemTagSet(
-// 				stats.TagURL,
-// 				stats.TagProto,
-// 				stats.TagStatus,
-// 				stats.TagSubproto,
-// 				stats.TagIP,
-// 			),
-// 		},
-// 		Samples: samples,
-// 	}
-
-// 	ctx := context.Background()
-// 	ctx = lib.WithState(ctx, state)
-// 	ctx = common.WithRuntime(ctx, rt)
-
-// 	rt.Set("ws", common.Bind(rt, NewSocketIO(), &ctx))
-
-// 	t.Run("insecure skip verify", func(t *testing.T) {
-// 		state.TLSConfig = &tls.Config{
-// 			InsecureSkipVerify: true,
-// 		}
-
-// 		_, err := common.RunString(rt, sr(`
-// 		let res = ws.connect("WSSBIN_URL/ws-close", function(socket){
-// 			socket.close()
-// 		});
-// 		if (res.status != 101) { throw new Error("TLS connection failed with status: " + res.status); }
-// 		`))
-// 		assert.NoError(t, err)
-// 	})
-// 	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSSBIN_URL/ws-close"), 101, "")
-
-// 	t.Run("custom certificates", func(t *testing.T) {
-// 		state.TLSConfig = tb.TLSClientConfig
-
-// 		_, err := common.RunString(rt, sr(`
-// 			let res = ws.connect("WSSBIN_URL/ws-close", function(socket){
-// 				socket.close()
-// 			});
-// 			if (res.status != 101) {
-// 				throw new Error("TLS connection failed with status: " + res.status);
-// 			}
-// 		`))
-// 		assert.NoError(t, err)
-// 	})
-// 	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSSBIN_URL/ws-close"), 101, "")
-// }
-
-func setUpTest(t *testing.T) (func(string) string, *goja.Runtime, chan stats.SampleContainer, *httpmultibin.HTTPMultiBin) {
+func setUpTest(t *testing.T) (func(string) string, *goja.Runtime, chan stats.SampleContainer, *httpmultibin.HTTPMultiBin, *lib.State) {
 	tb := httpmultibin.NewHTTPMultiBin(t)
 
 	sr := tb.Replacer.Replace
@@ -248,7 +99,7 @@ func setUpTest(t *testing.T) (func(string) string, *goja.Runtime, chan stats.Sam
 	ctx = common.WithRuntime(ctx, rt)
 
 	rt.Set("ws", common.Bind(rt, NewSocketIO(), &ctx))
-	return sr, rt, samples, tb
+	return sr, rt, samples, tb, state
 }
 
 func testConnectWS(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
@@ -633,5 +484,105 @@ func testThrowErrorOnClose(tt *testing.T, rt *goja.Runtime, sr func(string) stri
 		`))
 		assert.NoError(t, err)
 		assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/wsio-echo"), 101, "")
+	})
+}
+
+func testCustomCertificates(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer, state *lib.State, tb *httpmultibin.HTTPMultiBin) {
+	tt.Run("custom_certificates", func(t *testing.T) {
+		state.TLSConfig = tb.TLSClientConfig
+
+		_, err := common.RunString(rt, sr(`
+				let res = ws.connect("WSSBIN_URL/wsio-open", function(socket){
+				socket.close()
+			});
+			if (res.status != 101) {
+				throw new Error("TLS connection failed with status: " + res.status);
+			}
+		`))
+		assert.NoError(t, err)
+	})
+	assertSessionMetricsEmitted(tt, stats.GetBufferedSamples(samples), "", sr("WSSBIN_URL/wsio-open"), 101, "")
+}
+
+func testInsecureSkipVerify(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer, state *lib.State) {
+	tt.Run("insecure skip verify", func(t *testing.T) {
+		state.TLSConfig = &tls.Config{
+			InsecureSkipVerify: true,
+		}
+		_, err := common.RunString(rt, sr(`
+		let res = ws.connect("WSSBIN_URL/wsio-open", function(socket){
+			socket.close()
+		});
+		if (res.status != 101) { throw new Error("TLS connection failed with status: " + res.status); }
+		`))
+		assert.NoError(t, err)
+	})
+	assertSessionMetricsEmitted(tt, stats.GetBufferedSamples(samples), "", sr("WSSBIN_URL/wsio-open"), 101, "")
+}
+
+func testSetCookies(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
+	tt.Run("set_cookies", func(t *testing.T) {
+		value, err := common.RunString(rt, sr(`
+		function check(){
+		let res = ws.connect("WSBIN_URL/wsio-echo", {cookies:{sampleA: { value: "a", replace: true },sampleB: { value: "b", replace: false },sampleC: "c", sampleD: undefined}},function(socket){
+				socket.close()
+		});
+		return res
+		}
+		check()
+		`))
+		cookieValue := value.ToObject(rt).Get("headers").ToObject(rt).Get("Cookie").ToObject(rt).String()
+		assert.NoError(t, err)
+		assert.Equal(t, "sampleA=a;sampleB=b;sampleC=c", cookieValue)
+
+	})
+}
+
+func testSetUndefinedCookies(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
+	tt.Run("set_undefined_cookies", func(t *testing.T) {
+		_, err := common.RunString(rt, sr(`
+		function check(){
+		let res = ws.connect("WSBIN_URL/wsio-echo", {cookies:undefined},function(socket){
+				socket.close()
+		});
+		return res
+		}
+		check()
+		`))
+		assert.NoError(t, err)
+	})
+}
+
+func testSetHeaders(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
+	tt.Run("set_headers", func(t *testing.T) {
+		value, err := common.RunString(rt, sr(`
+		function check(){
+		let res = ws.connect("WSBIN_URL/wsio-echo", {headers:{key1: ["1", "2", "3"],key2: ["4", "5", "6"],key3: undefined}},function(socket){
+				socket.close()
+		});
+		return res
+		}
+		check()
+		`))
+		headerKey1 := value.ToObject(rt).Get("headers").ToObject(rt).Get("Key1").ToObject(rt).String()
+		headerKey2 := value.ToObject(rt).Get("headers").ToObject(rt).Get("Key2").ToObject(rt).String()
+		assert.NoError(t, err)
+		assert.Equal(t, "1,2,3", headerKey1)
+		assert.Equal(t, "4,5,6", headerKey2)
+	})
+}
+
+func testSetUndefinedHeaders(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
+	tt.Run("set_undefined_headers", func(t *testing.T) {
+		_, err := common.RunString(rt, sr(`
+		function check(){
+		let res = ws.connect("WSBIN_URL/wsio-echo", {headers:undefined},function(socket){
+				socket.close()
+		});
+		return res
+		}
+		check()
+		`))
+		assert.NoError(t, err)
 	})
 }
