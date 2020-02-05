@@ -54,7 +54,8 @@ linters:
   - gochecknoinits
   - godox
   - wsl
+  - gomnd
   fast: false
 
 service:
-  golangci-lint-version: 1.20.x
+  golangci-lint-version: 1.23.x

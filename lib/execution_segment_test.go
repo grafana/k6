@@ -29,10 +29,11 @@ import (
 )
 
 func stringToES(t *testing.T, str string) *ExecutionSegment {
-	var es = new(ExecutionSegment)
+	es := new(ExecutionSegment)
 	require.NoError(t, es.UnmarshalText([]byte(str)))
 	return es
 }
+
 func TestExecutionSegmentEquals(t *testing.T) {
 	t.Parallel()
 
@@ -44,7 +45,7 @@ func TestExecutionSegmentEquals(t *testing.T) {
 	})
 
 	t.Run("To it's self", func(t *testing.T) {
-		var es = stringToES(t, "1/2:2/3")
+		es := stringToES(t, "1/2:2/3")
 		require.True(t, es.Equal(es))
 	})
 }
@@ -76,7 +77,7 @@ func TestExecutionSegmentNew(t *testing.T) {
 
 func TestExecutionSegmentUnmarshalText(t *testing.T) {
 	t.Parallel()
-	var testCases = []struct {
+	testCases := []struct {
 		input  string
 		output *ExecutionSegment
 		isErr  bool
@@ -98,7 +99,7 @@ func TestExecutionSegmentUnmarshalText(t *testing.T) {
 	for _, testCase := range testCases {
 		testCase := testCase
 		t.Run(testCase.input, func(t *testing.T) {
-			var es = new(ExecutionSegment)
+			es := new(ExecutionSegment)
 			err := es.UnmarshalText([]byte(testCase.input))
 			if testCase.isErr {
 				require.Error(t, err)
@@ -116,10 +117,10 @@ func TestExecutionSegmentUnmarshalText(t *testing.T) {
 
 	t.Run("Unmarshal nilSegment.String", func(t *testing.T) {
 		var nilEs *ExecutionSegment
-		var nilEsStr = nilEs.String()
+		nilEsStr := nilEs.String()
 		require.Equal(t, "0:1", nilEsStr)
 
-		var es = new(ExecutionSegment)
+		es := new(ExecutionSegment)
 		err := es.UnmarshalText([]byte(nilEsStr))
 		require.NoError(t, err)
 		require.True(t, es.Equal(nilEs))
@@ -186,7 +187,7 @@ func TestExecutionSegmentSplit(t *testing.T) {
 
 func TestExecutionSegmentScale(t *testing.T) {
 	t.Parallel()
-	var es = new(ExecutionSegment)
+	es := new(ExecutionSegment)
 	require.NoError(t, es.UnmarshalText([]byte("0.5")))
 	require.Equal(t, int64(1), es.Scale(2))
 	require.Equal(t, int64(2), es.Scale(3))
@@ -198,9 +199,9 @@ func TestExecutionSegmentScale(t *testing.T) {
 
 func TestExecutionSegmentCopyScaleRat(t *testing.T) {
 	t.Parallel()
-	var es = new(ExecutionSegment)
-	var twoRat = big.NewRat(2, 1)
-	var threeRat = big.NewRat(3, 1)
+	es := new(ExecutionSegment)
+	twoRat := big.NewRat(2, 1)
+	threeRat := big.NewRat(3, 1)
 	require.NoError(t, es.UnmarshalText([]byte("0.5")))
 	require.Equal(t, oneRat, es.CopyScaleRat(twoRat))
 	require.Equal(t, big.NewRat(3, 2), es.CopyScaleRat(threeRat))
@@ -216,10 +217,10 @@ func TestExecutionSegmentCopyScaleRat(t *testing.T) {
 
 func TestExecutionSegmentInPlaceScaleRat(t *testing.T) {
 	t.Parallel()
-	var es = new(ExecutionSegment)
-	var twoRat = big.NewRat(2, 1)
-	var threeRat = big.NewRat(3, 1)
-	var threeSecondsRat = big.NewRat(3, 2)
+	es := new(ExecutionSegment)
+	twoRat := big.NewRat(2, 1)
+	threeRat := big.NewRat(3, 1)
+	threeSecondsRat := big.NewRat(3, 2)
 	require.NoError(t, es.UnmarshalText([]byte("0.5")))
 	require.Equal(t, oneRat, es.InPlaceScaleRat(twoRat))
 	require.Equal(t, oneRat, twoRat)
@@ -245,7 +246,7 @@ func TestExecutionSegmentInPlaceScaleRat(t *testing.T) {
 
 func TestExecutionSegmentSubSegment(t *testing.T) {
 	t.Parallel()
-	var testCases = []struct {
+	testCases := []struct {
 		name              string
 		base, sub, result *ExecutionSegment
 	}{
@@ -281,7 +282,7 @@ func TestExecutionSegmentSubSegment(t *testing.T) {
 
 func TestSplitBadSegment(t *testing.T) {
 	t.Parallel()
-	var es = &ExecutionSegment{from: oneRat, to: zeroRat}
+	es := &ExecutionSegment{from: oneRat, to: zeroRat}
 	_, err := es.Split(5)
 	require.Error(t, err)
 }
@@ -293,7 +294,7 @@ func TestSegmentExecutionFloatLength(t *testing.T) {
 		require.Equal(t, 1.0, nilEs.FloatLength())
 	})
 
-	var testCases = []struct {
+	testCases := []struct {
 		es       *ExecutionSegment
 		expected float64
 	}{
@@ -320,3 +321,62 @@ func TestSegmentExecutionFloatLength(t *testing.T) {
 		})
 	}
 }
+
+func TestExecutionSegmentSequences(t *testing.T) {
+	t.Parallel()
+
+	_, err := NewExecutionSegmentSequence(stringToES(t, "0:1/3"), stringToES(t, "1/2:1"))
+	assert.Error(t, err)
+}
+
+func TestExecutionSegmentStringSequences(t *testing.T) {
+	t.Parallel()
+	testCases := []struct {
+		seq         string
+		expSegments []string
+		expError    bool
+		canReverse  bool
+		// TODO: checks for least common denominator and maybe striped partitioning
+	}{
+		{seq: "", expSegments: nil},
+		{seq: "0.5", expError: true},
+		{seq: "1,1", expError: true},
+		{seq: "-0.5,1", expError: true},
+		{seq: "1/2,1/2", expError: true},
+		{seq: "1/2,1/3", expError: true},
+		{seq: "0,1,1/2", expError: true},
+		{seq: "0.5,1", expSegments: []string{"1/2:1"}},
+		{seq: "1/2,1", expSegments: []string{"1/2:1"}, canReverse: true},
+		{seq: "1/3,2/3", expSegments: []string{"1/3:2/3"}, canReverse: true},
+		{seq: "0,1/3,2/3", expSegments: []string{"0:1/3", "1/3:2/3"}, canReverse: true},
+		{seq: "0,1/3,2/3,1", expSegments: []string{"0:1/3", "1/3:2/3", "2/3:1"}, canReverse: true},
+		{seq: "0.5,0.7", expSegments: []string{"1/2:7/10"}},
+		{seq: "0.5,0.7,1", expSegments: []string{"1/2:7/10", "7/10:1"}},
+		{seq: "0,1/13,2/13,1/3,1/2,3/4,1", expSegments: []string{
+			"0:1/13", "1/13:2/13", "2/13:1/3", "1/3:1/2", "1/2:3/4", "3/4:1",
+		}, canReverse: true},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.seq, func(t *testing.T) {
+			result, err := NewExecutionSegmentSequenceFromString(tc.seq)
+			if tc.expError {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, len(tc.expSegments), len(result))
+			for i, expStrSeg := range tc.expSegments {
+				expSeg, errl := NewExecutionSegmentFromString(expStrSeg)
+				require.NoError(t, errl)
+				assert.Truef(t, expSeg.Equal(result[i]), "Segment %d (%s) should be equal to %s", i, result[i], expSeg)
+			}
+			if tc.canReverse {
+				assert.Equal(t, result.String(), tc.seq)
+			}
+		})
+	}
+}
+
+// TODO: test with randomized things
