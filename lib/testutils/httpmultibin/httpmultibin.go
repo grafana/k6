@@ -198,13 +198,6 @@ func getConnectSocketIORequest(emptyData, closePrematurely bool) http.Handler {
 				return
 			}
 		}
-		// messageType, data, _ := conn.ReadMessage()
-		// fmt.Println(data)
-		// conn.WriteMessage(websocket.TextMessage, data)
-		// _, err = conn.NextWriter(messageType)
-		// if err != nil {
-		// 	return
-		// }
 		if !closePrematurely {
 			closeMsg := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")
 			_ = conn.WriteControl(websocket.CloseMessage, closeMsg, time.Now().Add(time.Second))
