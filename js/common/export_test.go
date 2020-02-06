@@ -223,6 +223,18 @@ func BenchmarkExportBytes(b *testing.B) {
 			assert.NoError(b, err)
 		}
 	})
+	b.Run("allocate ArrayBuffer(1000)", func(b *testing.B) {
+		jsSrc := `
+			var asdf = new ArrayBuffer(1000);
+			`
+		pgm, err := goja.Compile("testing", jsSrc, true)
+		assert.NoError(b, err)
+		b.ResetTimer()
+		for i:= 0; i<b.N; i++ {
+			_, err = rt.RunProgram(pgm)
+			assert.NoError(b, err)
+		}
+	})
 	b.Run("call example.byteSlice(1000)", func(b *testing.B) {
 		jsSrc := `
 			var asdf = example.byteSlice(1000);
