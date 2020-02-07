@@ -33,7 +33,6 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
-	"github.com/loadimpact/k6/js/compiler"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/lib/fsext"
@@ -114,14 +113,16 @@ func TestNewBundle(t *testing.T) {
 	t.Run("CompatibilityMode", func(t *testing.T) {
 		t.Run("Extended/ok/CoreJS", func(t *testing.T) {
 			rtOpts := lib.RuntimeOptions{
-				CompatibilityMode: null.StringFrom(compiler.CompatibilityModeExtended.String())}
+				CompatibilityMode: null.StringFrom(lib.CompatibilityModeExtended.String()),
+			}
 			_, err := getSimpleBundle("/script.js",
 				`export default function() {}; new Set([1, 2, 3, 2, 1]);`, rtOpts)
 			assert.NoError(t, err)
 		})
 		t.Run("Base/ok/Minimal", func(t *testing.T) {
 			rtOpts := lib.RuntimeOptions{
-				CompatibilityMode: null.StringFrom(compiler.CompatibilityModeBase.String())}
+				CompatibilityMode: null.StringFrom(lib.CompatibilityModeBase.String()),
+			}
 			_, err := getSimpleBundle("/script.js",
 				`module.exports.default = function() {};`, rtOpts)
 			assert.NoError(t, err)
@@ -133,19 +134,27 @@ func TestNewBundle(t *testing.T) {
 				code       string
 				expErr     string
 			}{
-				{"InvalidCompat", "es1", `export default function() {};`,
-					`invalid compatibility mode "es1". Use: "extended", "base"`},
+				{
+					"InvalidCompat", "es1", `export default function() {};`,
+					`invalid compatibility mode "es1". Use: "extended", "base"`,
+				},
 				// ES2015 modules are not supported
-				{"Modules", "base", `export default function() {};`,
-					"file:///script.js: Line 1:1 Unexpected reserved word"},
+				{
+					"Modules", "base", `export default function() {};`,
+					"file:///script.js: Line 1:1 Unexpected reserved word",
+				},
 				// Arrow functions are not supported
-				{"ArrowFuncs", "base",
+				{
+					"ArrowFuncs", "base",
 					`module.exports.default = function() {}; () => {};`,
-					"file:///script.js: Line 1:42 Unexpected token ) (and 1 more errors)"},
+					"file:///script.js: Line 1:42 Unexpected token ) (and 1 more errors)",
+				},
 				// ES2015 objects polyfilled by core.js are not supported
-				{"CoreJS", "base",
+				{
+					"CoreJS", "base",
 					`module.exports.default = function() {}; new Set([1, 2, 3, 2, 1]);`,
-					"ReferenceError: Set is not defined at file:///script.js:1:45(5)"},
+					"ReferenceError: Set is not defined at file:///script.js:1:45(5)",
+				},
 			}
 
 			for _, tc := range testCases {
@@ -386,7 +395,6 @@ func TestNewBundle(t *testing.T) {
 					assert.Equal(t, b.Options.TLSVersion.Min, lib.TLSVersion(tls.VersionSSL30))
 					assert.Equal(t, b.Options.TLSVersion.Max, lib.TLSVersion(tls.VersionSSL30))
 				}
-
 			})
 		})
 		t.Run("Thresholds", func(t *testing.T) {
@@ -424,10 +432,10 @@ func TestNewBundleFromArchive(t *testing.T) {
 			{"", `
 				export let options = { vus: 12345 };
 				export default function() { return "hi!"; };`},
-			{compiler.CompatibilityModeExtended.String(), `
+			{lib.CompatibilityModeExtended.String(), `
 				export let options = { vus: 12345 };
 				export default function() { return "hi!"; };`},
-			{compiler.CompatibilityModeBase.String(), `
+			{lib.CompatibilityModeBase.String(), `
 				module.exports.options = { vus: 12345 };
 				module.exports.default = function() { return "hi!" };`},
 		}
@@ -445,7 +453,7 @@ func TestNewBundleFromArchive(t *testing.T) {
 				assert.Equal(t, lib.Options{VUs: null.IntFrom(12345)}, b.Options)
 				expCM := tc.compatMode
 				if expCM == "" {
-					expCM = compiler.CompatibilityModeExtended.String()
+					expCM = lib.CompatibilityModeExtended.String()
 				}
 				assert.Equal(t, expCM, b.CompatibilityMode.String())
 
@@ -466,14 +474,18 @@ func TestNewBundleFromArchive(t *testing.T) {
 			compatMode, code, expErr string
 		}{
 			// Incompatible mode
-			{compiler.CompatibilityModeBase.String(), `
+			{
+				lib.CompatibilityModeBase.String(), `
 				export let options = { vus: 12345 };
 				export default function() { return "hi!"; };`,
-				"file://script.js: Line 2:5 Unexpected reserved word (and 2 more errors)"},
-			{"wrongcompat", `
+				"file://script.js: Line 2:5 Unexpected reserved word (and 2 more errors)",
+			},
+			{
+				"wrongcompat", `
 				export let options = { vus: 12345 };
 				export default function() { return "hi!"; };`,
-				`invalid compatibility mode "wrongcompat". Use: "extended", "base"`},
+				`invalid compatibility mode "wrongcompat". Use: "extended", "base"`,
+			},
 		}
 
 		for _, tc := range testCases {
@@ -488,7 +500,7 @@ func TestNewBundleFromArchive(t *testing.T) {
 }
 
 func TestOpen(t *testing.T) {
-	var testCases = [...]struct {
+	testCases := [...]struct {
 		name           string
 		openPath       string
 		pwd            string
@@ -588,8 +600,8 @@ func TestOpen(t *testing.T) {
 			for _, tCase := range testCases {
 				tCase := tCase
 
-				var testFunc = func(t *testing.T) {
-					var openPath = tCase.openPath
+				testFunc := func(t *testing.T) {
+					openPath := tCase.openPath
 					// if fullpath prepend prefix
 					if openPath != "" && (openPath[0] == '/' || openPath[0] == '\\') {
 						openPath = filepath.Join(prefix, openPath)
@@ -597,7 +609,7 @@ func TestOpen(t *testing.T) {
 					if isWindows {
 						openPath = strings.Replace(openPath, `\`, `\\`, -1)
 					}
-					var pwd = tCase.pwd
+					pwd := tCase.pwd
 					if pwd == "" {
 						pwd = "/path/to/"
 					}
@@ -731,22 +743,26 @@ func TestBundleEnv(t *testing.T) {
 
 func TestBundleMakeArchive(t *testing.T) {
 	testCases := []struct {
-		cm      compiler.CompatibilityMode
+		cm      lib.CompatibilityMode
 		script  string
 		exclaim string
 	}{
-		{compiler.CompatibilityModeExtended, `
+		{
+			lib.CompatibilityModeExtended, `
 				import exclaim from "./exclaim.js";
 				export let options = { vus: 12345 };
 				export let file = open("./file.txt");
 				export default function() { return exclaim(file); };`,
-			`export default function(s) { return s + "!" };`},
-		{compiler.CompatibilityModeBase, `
+			`export default function(s) { return s + "!" };`,
+		},
+		{
+			lib.CompatibilityModeBase, `
 				var exclaim = require("./exclaim.js");
 				module.exports.options = { vus: 12345 };
 				module.exports.file = open("./file.txt");
 				module.exports.default = function() { return exclaim(module.exports.file); };`,
-			`module.exports.default = function(s) { return s + "!" };`},
+			`module.exports.default = function(s) { return s + "!" };`,
+		},
 	}
 
 	for _, tc := range testCases {

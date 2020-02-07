@@ -24,8 +24,19 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/loadimpact/k6/js/compiler"
 	null "gopkg.in/guregu/null.v3"
+)
+
+// CompatibilityMode specifies the JS compatibility mode
+// nolint:lll
+//go:generate enumer -type=CompatibilityMode -transform=snake -trimprefix CompatibilityMode -output compatibility_mode_gen.go
+type CompatibilityMode uint8
+
+const (
+	// CompatibilityModeExtended achieves ES6+ compatibility with Babel and core.js
+	CompatibilityModeExtended CompatibilityMode = iota + 1
+	// CompatibilityModeBase is standard goja ES5.1+
+	CompatibilityModeBase
 )
 
 // RuntimeOptions are settings passed onto the goja JS runtime
@@ -34,6 +45,7 @@ type RuntimeOptions struct {
 	IncludeSystemEnvVars null.Bool `json:"includeSystemEnvVars" envconfig:"K6_INCLUDE_SYSTEM_ENV_VARS"`
 
 	// JS compatibility mode: "extended" (Goja+Babel+core.js) or "base" (plain Goja)
+	// TODO: maybe use CompatibilityMode directly? this seems strange...
 	CompatibilityMode null.String `json:"compatibilityMode"`
 
 	// Environment variables passed onto the runner
@@ -56,13 +68,13 @@ func (o RuntimeOptions) Apply(opts RuntimeOptions) RuntimeOptions {
 }
 
 // ValidateCompatibilityMode checks if the provided val is a valid compatibility mode
-func ValidateCompatibilityMode(val string) (cm compiler.CompatibilityMode, err error) {
+func ValidateCompatibilityMode(val string) (cm CompatibilityMode, err error) {
 	if val == "" {
-		return compiler.CompatibilityModeExtended, nil
+		return CompatibilityModeExtended, nil
 	}
-	if cm, err = compiler.CompatibilityModeString(val); err != nil {
+	if cm, err = CompatibilityModeString(val); err != nil {
 		var compatValues []string
-		for _, v := range compiler.CompatibilityModeValues() {
+		for _, v := range CompatibilityModeValues() {
 			compatValues = append(compatValues, v.String())
 		}
 		err = fmt.Errorf(`invalid compatibility mode "%s". Use: "%s"`,
