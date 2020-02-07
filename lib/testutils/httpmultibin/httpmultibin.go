@@ -178,22 +178,22 @@ func getEncodedHandler(t testing.TB, compressionType httpext.CompressionType) ht
 }
 
 func getConnectSocketIORequest(emptyData, closePrematurely bool) http.Handler {
-	writeWait := 10 * time.Second
+	const writeWait = 10 * time.Second
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		responseCookies := w.Header().Clone()
 		responseCookies.Add("Cookie", req.Header.Get("Cookie"))
 		responseCookies.Add("key1", req.Header.Get("key1"))
 		responseCookies.Add("key2", req.Header.Get("key2"))
-		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, responseCookies)
-		conn.WriteMessage(websocket.TextMessage, []byte{'0'})
-		conn.WriteControl(websocket.PingMessage, []byte{'2'}, time.Now().Add(writeWait))
-		conn.WriteMessage(websocket.TextMessage, []byte{'4', '0'})
-		conn.WriteMessage(websocket.TextMessage, []byte{'2'})
-		conn.WriteMessage(websocket.TextMessage, []byte{'3'})
+		conn, _ := (&websocket.Upgrader{}).Upgrade(w, req, responseCookies)
+		_ = conn.WriteMessage(websocket.TextMessage, []byte{'0'})
+		_ = conn.WriteControl(websocket.PingMessage, []byte{'2'}, time.Now().Add(writeWait))
+		_ = conn.WriteMessage(websocket.TextMessage, []byte{'4', '0'})
+		_ = conn.WriteMessage(websocket.TextMessage, []byte{'2'})
+		_ = conn.WriteMessage(websocket.TextMessage, []byte{'3'})
 		if !emptyData {
 			messageType, data, _ := conn.ReadMessage()
-			conn.WriteMessage(websocket.TextMessage, data)
-			_, err = conn.NextWriter(messageType)
+			_ = conn.WriteMessage(websocket.TextMessage, data)
+			_, err := conn.NextWriter(messageType)
 			if err != nil {
 				return
 			}
@@ -204,7 +204,7 @@ func getConnectSocketIORequest(emptyData, closePrematurely bool) http.Handler {
 			// Wait for response control frame
 			<-time.After(time.Second)
 		}
-		err = conn.Close()
+		err := conn.Close()
 		if err != nil {
 			return
 		}

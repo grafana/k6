@@ -24,14 +24,14 @@ func TestSocketIOSession(t *testing.T) {
 	testOpenEventHandler(t, rt, sr, samples)
 	testSendReciveStringData(t, rt, sr, samples)
 	testSendReciveJSONData(t, rt, sr, samples)
-	testSendReciveEmptyData(t, rt, sr, samples)
+	testSendReceiveEmptyData(t, rt, sr, samples)
 	testIntervalHandler(t, rt, sr, samples)
 	testTimeoutHandler(t, rt, sr, samples)
 	testPingHandler(t, rt, sr, samples)
 	testMultipleHandler(t, rt, sr, samples)
 	testClientCloserHandler(t, rt, sr, samples)
-	testClientCloserWithoutSendCloseRequestHandler(t, rt, sr, samples)
-	testServerClosePrematurely(t, rt, sr, samples)
+	testClientCloserWithoutSendCloseRequestHandler(t, rt, sr)
+	testServerClosePrematurely(t, rt, sr)
 }
 
 func TestSocketIOErrors(t *testing.T) {
@@ -39,11 +39,11 @@ func TestSocketIOErrors(t *testing.T) {
 	sr, rt, samples, tb, _ := setUpTest(t)
 	defer tb.Cleanup()
 
-	testThrowErrorWithInvalidURL(t, rt, sr, samples)
-	testThrowErrorMsgWithInvalidURL(t, rt, sr, samples)
-	testThrowErrorWithMissingChannelName(t, rt, sr, samples)
-	testThrowErrorInInterval(t, rt, sr, samples)
-	testThrowErrorInSetup(t, rt, sr, samples)
+	testThrowErrorWithInvalidURL(t, rt)
+	testThrowErrorMsgWithInvalidURL(t, rt)
+	testThrowErrorWithMissingChannelName(t, rt, sr)
+	testThrowErrorInInterval(t, rt, sr)
+	testThrowErrorInSetup(t, rt, sr)
 	testThrowErrorSendAfterClose(t, rt, sr, samples)
 	testThrowErrorOnClose(t, rt, sr, samples)
 }
@@ -59,13 +59,13 @@ func TestSocketIOTLSConfig(t *testing.T) {
 
 func TestSocketIOHeaders(t *testing.T) {
 	t.Parallel()
-	sr, rt, samples, tb, _ := setUpTest(t)
+	sr, rt, _, tb, _ := setUpTest(t)
 	defer tb.Cleanup()
 
-	testSetCookies(t, rt, sr, samples)
-	testSetUndefinedCookies(t, rt, sr, samples)
-	testSetHeaders(t, rt, sr, samples)
-	testSetUndefinedHeaders(t, rt, sr, samples)
+	testSetCookies(t, rt, sr)
+	testSetUndefinedCookies(t, rt, sr)
+	testSetHeaders(t, rt, sr)
+	testSetUndefinedHeaders(t, rt, sr)
 }
 
 func setUpTest(t *testing.T) (func(string) string, *goja.Runtime, chan stats.SampleContainer, *httpmultibin.HTTPMultiBin, *lib.State) {
@@ -78,7 +78,8 @@ func setUpTest(t *testing.T) (func(string) string, *goja.Runtime, chan stats.Sam
 
 	rt := goja.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
-	samples := make(chan stats.SampleContainer, 1000)
+	const chanLen = 1000
+	samples := make(chan stats.SampleContainer, chanLen)
 	state := &lib.State{
 		Group:  root,
 		Dialer: tb.Dialer,
@@ -196,19 +197,19 @@ func testSendReciveJSONData(tt *testing.T, rt *goja.Runtime, sr func(string) str
 	assertMetricEmitted(tt, metrics.WSMessagesReceived, samplesBuf, sr("WSBIN_URL/wsio-echo-data"))
 }
 
-func testSendReciveEmptyData(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
+func testSendReceiveEmptyData(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
 	tt.Run("send_receive_empty", func(t *testing.T) {
 		_, err := common.RunString(rt, sr(`
-		var reciveData = false;
+		var receiveData = false;
 		let res = ws.connect("WSBIN_URL/wsio-echo-empty-data", function(socket){
 			socket.on("emptyMessage", function (data){
-				reciveData = true;
+				receiveData = true;
 			});
 			socket.on("message", function (data){
 					throw new Error ("echo data doesn't match our channel event! " + data);
 			});
 		});
-		if (!reciveData) throw new Error ("Empty data doesn't recieve!");
+		if (!receiveData) throw new Error ("Empty data doesn't receive!");
 		`))
 		assert.NoError(t, err)
 	})
@@ -326,7 +327,7 @@ func testClientCloserHandler(tt *testing.T, rt *goja.Runtime, sr func(string) st
 	assertSessionMetricsEmitted(tt, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/wsio-echo"), 101, "")
 }
 
-func testClientCloserWithoutSendCloseRequestHandler(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
+func testClientCloserWithoutSendCloseRequestHandler(tt *testing.T, rt *goja.Runtime, sr func(string) string) {
 	tt.Run("server_close_ok", func(t *testing.T) {
 		_, err := common.RunString(rt, sr(`
 			let closed = false;
@@ -344,7 +345,7 @@ func testClientCloserWithoutSendCloseRequestHandler(tt *testing.T, rt *goja.Runt
 	})
 }
 
-func testServerClosePrematurely(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
+func testServerClosePrematurely(tt *testing.T, rt *goja.Runtime, sr func(string) string) {
 	tt.Run("server_close_invalid", func(t *testing.T) {
 		_, err := common.RunString(rt, sr(`
 			let closed = false;
@@ -362,7 +363,7 @@ func testServerClosePrematurely(tt *testing.T, rt *goja.Runtime, sr func(string)
 	})
 }
 
-func testThrowErrorWithInvalidURL(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
+func testThrowErrorWithInvalidURL(tt *testing.T, rt *goja.Runtime) {
 	tt.Run("invalid_url", func(t *testing.T) {
 		_, err := common.RunString(rt, `
 		let res = ws.connect("INVALID", function(socket){
@@ -376,7 +377,7 @@ func testThrowErrorWithInvalidURL(tt *testing.T, rt *goja.Runtime, sr func(strin
 	})
 }
 
-func testThrowErrorMsgWithInvalidURL(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
+func testThrowErrorMsgWithInvalidURL(tt *testing.T, rt *goja.Runtime) {
 	tt.Run("invalid_url_with_send_message", func(t *testing.T) {
 		// Attempting to send a message to a non-existent socket shouldn't panic
 		_, err := common.RunString(rt, `
@@ -389,7 +390,7 @@ func testThrowErrorMsgWithInvalidURL(tt *testing.T, rt *goja.Runtime, sr func(st
 	})
 }
 
-func testThrowErrorWithMissingChannelName(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
+func testThrowErrorWithMissingChannelName(tt *testing.T, rt *goja.Runtime, sr func(string) string) {
 	tt.Run("send_receive", func(t *testing.T) {
 		_, err := common.RunString(rt, sr(`
 		let res = ws.connect("WSBIN_URL/wsio-echo-data", function(socket){
@@ -403,7 +404,7 @@ func testThrowErrorWithMissingChannelName(tt *testing.T, rt *goja.Runtime, sr fu
 	})
 }
 
-func testThrowErrorInSetup(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
+func testThrowErrorInSetup(tt *testing.T, rt *goja.Runtime, sr func(string) string) {
 	tt.Run("error_in_setup", func(t *testing.T) {
 		_, err := common.RunString(rt, sr(`
 		let res = ws.connect("WSBIN_URL/wsio-echo-data", function(socket){
@@ -438,7 +439,7 @@ func testThrowErrorSendAfterClose(tt *testing.T, rt *goja.Runtime, sr func(strin
 	})
 }
 
-func testThrowErrorInInterval(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
+func testThrowErrorInInterval(tt *testing.T, rt *goja.Runtime, sr func(string) string) {
 	tt.Run("interval_error", func(t *testing.T) {
 		_, err := common.RunString(rt, sr(`
 		let counter = 0;
@@ -446,7 +447,7 @@ func testThrowErrorInInterval(tt *testing.T, rt *goja.Runtime, sr func(string) s
 		let res = ws.connect("WSBIN_URL/wsio-echo", function(socket){
 			socket.setInterval(function () {
 				counter += 1;
-				if (counter > 2) { 
+				if (counter > 2) {
 					throw new Error ("Throw error in interval function");
 				}
 			}, 100);
@@ -520,7 +521,7 @@ func testInsecureSkipVerify(tt *testing.T, rt *goja.Runtime, sr func(string) str
 	assertSessionMetricsEmitted(tt, stats.GetBufferedSamples(samples), "", sr("WSSBIN_URL/wsio-open"), 101, "")
 }
 
-func testSetCookies(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
+func testSetCookies(tt *testing.T, rt *goja.Runtime, sr func(string) string) {
 	tt.Run("set_cookies", func(t *testing.T) {
 		value, err := common.RunString(rt, sr(`
 		function check(){
@@ -533,12 +534,13 @@ func testSetCookies(tt *testing.T, rt *goja.Runtime, sr func(string) string, sam
 		`))
 		cookieValue := value.ToObject(rt).Get("headers").ToObject(rt).Get("Cookie").ToObject(rt).String()
 		assert.NoError(t, err)
-		assert.Equal(t, "sampleA=a;sampleB=b;sampleC=c", cookieValue)
-
+		assert.Contains(t, cookieValue, "sampleA=a")
+		assert.Contains(t, cookieValue, "sampleB=b")
+		assert.Contains(t, cookieValue, "sampleC=c")
 	})
 }
 
-func testSetUndefinedCookies(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
+func testSetUndefinedCookies(tt *testing.T, rt *goja.Runtime, sr func(string) string) {
 	tt.Run("set_undefined_cookies", func(t *testing.T) {
 		_, err := common.RunString(rt, sr(`
 		function check(){
@@ -553,7 +555,7 @@ func testSetUndefinedCookies(tt *testing.T, rt *goja.Runtime, sr func(string) st
 	})
 }
 
-func testSetHeaders(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
+func testSetHeaders(tt *testing.T, rt *goja.Runtime, sr func(string) string) {
 	tt.Run("set_headers", func(t *testing.T) {
 		value, err := common.RunString(rt, sr(`
 		function check(){
@@ -572,7 +574,7 @@ func testSetHeaders(tt *testing.T, rt *goja.Runtime, sr func(string) string, sam
 	})
 }
 
-func testSetUndefinedHeaders(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer) {
+func testSetUndefinedHeaders(tt *testing.T, rt *goja.Runtime, sr func(string) string) {
 	tt.Run("set_undefined_headers", func(t *testing.T) {
 		_, err := common.RunString(rt, sr(`
 		function check(){

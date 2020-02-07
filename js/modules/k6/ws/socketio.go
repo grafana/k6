@@ -17,6 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
+
 package ws
 
 import (
@@ -88,20 +89,12 @@ type EventLoopDataChannel struct {
 }
 
 const (
-	SOCKET_PROTOCOL        = "ws://"
-	SOCKET_SECURE_PROTOCOL = "wss://"
-	SOCKET_IO_PATH         = "/socket.io/?EIO=3&transport=websocket"
-)
-const (
-	OPEN           = "0"
-	CLOSE          = "1"
-	PING           = "2"
-	PONG           = "3"
-	MESSAGE        = "4"
-	EMPTY_MESSAGE  = "40"
-	COMMON_MESSAGE = "42"
-	UPGRADE        = "5"
-	NOOP           = "6"
+	openCode          = "0"
+	pingCode          = "2"
+	pongCode          = "3"
+	messageCode       = "4"
+	emptyMessageCode  = "40"
+	commonMessageCode = "42"
 )
 
 func NewSocketIO() *WSIO {
@@ -125,7 +118,10 @@ func (*WSIO) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHT
 	socket.runner.conn.SetPongHandler(func(pingID string) error { eventLoopDataChan.pongChan <- pingID; return nil })
 
 	// Wraps a couple of channels around conn.ReadMessage
-	go readPump(socket.runner.conn, eventLoopDataChan.readDataChan, eventLoopDataChan.readErrChan, eventLoopDataChan.readCloseChan)
+	go readPump(socket.runner.conn,
+		eventLoopDataChan.readDataChan,
+		eventLoopDataChan.readErrChan,
+		eventLoopDataChan.readCloseChan)
 	return socket.eventLoopHandler(ctx, eventLoopDataChan)
 }
 
@@ -137,7 +133,8 @@ func invokeSocketCallBackFunc(s *SocketIO) (err error) {
 	return
 }
 
-func (s *SocketIO) eventLoopHandler(ctx context.Context, eventLoopDataChan EventLoopDataChannel) (*WSHTTPResponse, error) {
+func (s *SocketIO) eventLoopHandler(ctx context.Context,
+	eventLoopDataChan EventLoopDataChannel) (*WSHTTPResponse, error) {
 	for {
 		select {
 		case pingData := <-eventLoopDataChan.pingChan:
@@ -209,9 +206,9 @@ func newWebSocketIO(initCtx context.Context, url string) SocketIO {
 	}
 }
 
-func newWebSocketIORunner(initCtx context.Context, rawUrl string) SocketIORunner {
+func newWebSocketIORunner(initCtx context.Context, rawURL string) SocketIORunner {
 	initRuntime, initState := initConnectState(initCtx)
-	u, _ := url.Parse(rawUrl)
+	u, _ := url.Parse(rawURL)
 	return SocketIORunner{
 		runtime:        initRuntime,
 		requestHeaders: &http.Header{},
@@ -265,7 +262,7 @@ func (s *SocketIO) extractSocketOptions(args ...goja.Value) {
 			callFunc = v
 			continue
 		default:
-			common.Throw(common.GetRuntime(*s.runner.ctx), errors.New("Invalid argument types. Allowing Map and Function types"))
+			common.Throw(common.GetRuntime(*s.runner.ctx), errors.New("invalid argument types, allowing Map and Function types"))
 			continue
 		}
 	}
@@ -273,11 +270,16 @@ func (s *SocketIO) extractSocketOptions(args ...goja.Value) {
 }
 
 func validateParamArguments(ctx context.Context, args ...goja.Value) {
+	const (
+		singleArg  = 1
+		doubleArgs = 2
+	)
 	switch len(args) {
-	case 1, 2:
+	case singleArg, doubleArgs:
 		return
 	default:
-		common.Throw(common.GetRuntime(ctx), errors.New("invalid number of arguments to ws.connect. Method is required 3 params ( url, params, callback )"))
+		common.Throw(common.GetRuntime(ctx),
+			errors.New("invalid number of arguments to ws.connect, method is required 3 params ( url, params, callback )"))
 	}
 }
 
@@ -304,7 +306,7 @@ func (s *SocketIO) configureSocketOptions(params goja.Value) {
 			continue
 		case "cookies":
 			s.setSocketCookies(paramsObject)
-			break
+			continue
 		default:
 			continue
 		}
@@ -358,13 +360,13 @@ func (s *SocketIO) createSocketIODialer() {
 	}
 	s.runner.dialer = &websocket.Dialer{
 		Proxy:           http.ProxyFromEnvironment,
-		TLSClientConfig: s.createTlsConfig(),
+		TLSClientConfig: s.createTLSConfig(),
 		Jar:             jar,
 		NetDial:         dialer,
 	}
 }
 
-func (s *SocketIO) createTlsConfig() (tlsConfig *tls.Config) {
+func (s *SocketIO) createTLSConfig() (tlsConfig *tls.Config) {
 	if s.runner.state.TLSConfig != nil {
 		tlsConfig = s.runner.state.TLSConfig.Clone()
 		tlsConfig.NextProtos = []string{"http/1.1"}
@@ -372,7 +374,8 @@ func (s *SocketIO) createTlsConfig() (tlsConfig *tls.Config) {
 	return
 }
 
-func (s *SocketIO) extractCookiesValues(cookiesObject *goja.Object) (requestCookies map[string]*httpext.HTTPRequestCookie) {
+func (s *SocketIO) extractCookiesValues(cookiesObject *goja.Object) (
+	requestCookies map[string]*httpext.HTTPRequestCookie) {
 	requestCookies = make(map[string]*httpext.HTTPRequestCookie)
 	for _, key := range cookiesObject.Keys() {
 		cookieV := cookiesObject.Get(key)
@@ -441,7 +444,7 @@ func (s *SocketIO) gojaCallbackFuncHandler(scheduledFn goja.Callable) (err error
 }
 
 func (s *SocketIO) closeConnectionHandler(code int) {
-	s.closeConnection(code)
+	_ = s.closeConnection(code)
 }
 
 func (s *SocketIO) doneHandler(ctx context.Context) (*WSHTTPResponse, error) {
@@ -470,7 +473,8 @@ func (s *SocketIO) pushOverviewMetrics(ctx context.Context, sampleTags *stats.Sa
 	stats.PushIfNotDone(ctx, s.runner.state.Samples, stats.ConnectedSamples{
 		Samples: []stats.Sample{
 			{Metric: metrics.WSSessions, Time: s.metrics.connectionStart, Tags: sampleTags, Value: 1},
-			{Metric: metrics.WSConnecting, Time: s.metrics.connectionStart, Tags: sampleTags, Value: stats.D(s.metrics.connectionEnd.Sub(s.metrics.connectionStart))},
+			{Metric: metrics.WSConnecting, Time: s.metrics.connectionStart, Tags: sampleTags,
+				Value: stats.D(s.metrics.connectionEnd.Sub(s.metrics.connectionStart))},
 			{Metric: metrics.WSSessionDuration, Time: s.metrics.connectionStart, Tags: sampleTags, Value: sessionDuration},
 		},
 		Tags: sampleTags,
@@ -512,7 +516,7 @@ func (s *SocketIO) pushPingMetrics(ctx context.Context, sampleTags *stats.Sample
 }
 
 func (s *SocketIO) close() {
-	s.runner.conn.Close()
+	_ = s.runner.conn.Close()
 }
 
 func (s *SocketIO) On(event string, handler goja.Value) {
@@ -543,7 +547,8 @@ func (s *SocketIO) Send(event string, message goja.Value) {
 	// NOTE: No binary message support for the time being since goja doesn't
 	// support typed arrays.
 	if missingArguments := len(event) == 0 || message == nil; missingArguments {
-		common.Throw(common.GetRuntime(*s.runner.ctx), errors.New("invalid number of arguments to ws.send. Method is required 2 params ( channelName, message )"))
+		common.Throw(common.GetRuntime(*s.runner.ctx),
+			errors.New("invalid number of arguments to ws.send. Method is required 2 params ( channelName, message )"))
 	}
 	rt := common.GetRuntime(*s.runner.ctx)
 	messageObject := message.ToObject(rt)
@@ -552,7 +557,7 @@ func (s *SocketIO) Send(event string, message goja.Value) {
 	if err != nil {
 		s.handleEvent("error", rt.ToValue(err))
 	}
-	writeData = []byte(fmt.Sprintf("%s[\"%s\",%s]", COMMON_MESSAGE, event, string(jsonByte)))
+	writeData = []byte(fmt.Sprintf("%s[\"%s\",%s]", commonMessageCode, event, string(jsonByte)))
 	if err := s.runner.conn.WriteMessage(websocket.TextMessage, writeData); err != nil {
 		s.handleEvent("error", rt.ToValue(err))
 	}
@@ -591,7 +596,7 @@ func (s *SocketIO) closeConnection(code int) error {
 		// Call the user-defined close handler
 		s.handleEvent("close", rt.ToValue(code))
 
-		s.runner.conn.Close()
+		_ = s.runner.conn.Close()
 
 		// Stop the main control loop
 		close(s.done)
@@ -639,7 +644,7 @@ func (s *SocketIO) Close(args ...goja.Value) {
 		code = int(args[0].ToInteger())
 	}
 
-	s.closeConnection(code)
+	_ = s.closeConnection(code)
 }
 
 func (s *SocketIO) Ping() {
@@ -670,7 +675,7 @@ func parseResponse(rawResponse string, rt *goja.Runtime) (eventName string, mess
 func getEventCode(rawResponse string) (eventCode string) {
 	eventCode = rawResponse[0:1]
 	switch eventCode {
-	case MESSAGE:
+	case messageCode:
 		return rawResponse[0:2]
 	default:
 		return
@@ -680,47 +685,53 @@ func getEventCode(rawResponse string) (eventCode string) {
 func getEventData(eventCode, rawResponse string) (eventName, restText string, err error) {
 	var start, end, rest int
 	switch eventCode {
-	case OPEN:
+	case openCode:
 		return "open", rawResponse, nil
-	case EMPTY_MESSAGE:
+	case emptyMessageCode:
 		return "emptyMessage", rawResponse, nil
-	case PONG:
+	case pongCode:
 		return "pong", rawResponse, nil
-	case PING:
+	case pingCode:
 		return "ping", rawResponse, nil
 	default:
 		start, end, rest, err = decodeData(rawResponse)
 		invalidPacket := err != nil || (end < start) || (rest >= len(rawResponse))
 		if invalidPacket {
-			return "", "", errors.New("Wrong packet")
+			return "", "", errors.New("wrong packet")
 		}
 	}
 	// Index -2 from the string to check if the character is double quote or not
-	isStringResponse := strings.HasPrefix(string(rawResponse[rest]), "\"") && strings.HasSuffix(string(rawResponse[len(rawResponse)-2]), "\"")
+	isStringResponse := strings.HasPrefix(string(rawResponse[rest]), "\"") &&
+		strings.HasSuffix(string(rawResponse[len(rawResponse)-2]), "\"")
 	if isStringResponse {
 		return rawResponse[start:end], rawResponse[rest+1 : len(rawResponse)-2], nil
 	}
 	return rawResponse[start:end], rawResponse[rest : len(rawResponse)-1], nil
-
 }
 
 func decodeData(rawResponse string) (start, end, rest int, err error) {
 	var countQuote int
+	const (
+		startQuote = 0
+		endQuote   = 1
+		maximumQuote = 2
+	)
+
 	for i, c := range rawResponse {
 		if c == '"' {
 			switch countQuote {
-			case 0:
+			case startQuote:
 				start = i + 1
-			case 1:
+			case endQuote:
 				end = i
 				rest = i + 1
 			default:
-				return 0, 0, 0, errors.New("Wrong packet")
+				return 0, 0, 0, errors.New("wrong packet")
 			}
 			countQuote++
 		}
 		if c == ',' {
-			if countQuote < 2 {
+			if countQuote < maximumQuote {
 				continue
 			}
 			rest = i + 1
