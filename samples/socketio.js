@@ -1,7 +1,4 @@
-// import ws from "k6/ws";
 import ws from "k6/socketio";
-import { check, sleep } from "k6";
-// const conversationMessages = ['Hi', 'Hello', 'Another message'];
 
 export default function() {
 	const url =
