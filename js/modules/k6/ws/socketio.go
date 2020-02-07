@@ -71,13 +71,14 @@ type SocketIOMetrics struct {
 }
 
 type SocketIO struct {
-	runner        SocketIORunner
-	metrics       SocketIOMetrics
-	eventHandlers map[string][]goja.Callable
-	scheduled     chan goja.Callable
-	done          chan struct{}
-	shutdownOnce  sync.Once
-	tags          map[string]string
+	runner            SocketIORunner
+	metrics           SocketIOMetrics
+	eventHandlers     map[string][]goja.Callable
+	scheduled         chan goja.Callable
+	done              chan struct{}
+	shutdownOnce      sync.Once
+	tags              map[string]string
+	eventLoopDataChan EventLoopDataChannel
 }
 
 type EventLoopDataChannel struct {
@@ -113,16 +114,16 @@ func (*WSIO) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHT
 		return nil, err
 	}
 	socket.runner.conn.SetCloseHandler(func(code int, text string) error { return nil })
-	eventLoopDataChan := newEventLoopData()
-	socket.runner.conn.SetPingHandler(func(msg string) error { eventLoopDataChan.pingChan <- msg; return nil })
-	socket.runner.conn.SetPongHandler(func(pingID string) error { eventLoopDataChan.pongChan <- pingID; return nil })
+	//eventLoopDataChan := newEventLoopData()
+	socket.runner.conn.SetPingHandler(func(msg string) error { socket.eventLoopDataChan.pingChan <- msg; return nil })
+	socket.runner.conn.SetPongHandler(func(pingID string) error { socket.eventLoopDataChan.pongChan <- pingID; return nil })
 
 	// Wraps a couple of channels around conn.ReadMessage
 	go readPump(socket.runner.conn,
-		eventLoopDataChan.readDataChan,
-		eventLoopDataChan.readErrChan,
-		eventLoopDataChan.readCloseChan)
-	return socket.eventLoopHandler(ctx, eventLoopDataChan)
+		socket.eventLoopDataChan.readDataChan,
+		socket.eventLoopDataChan.readErrChan,
+		socket.eventLoopDataChan.readCloseChan)
+	return socket.eventLoopHandler(ctx, socket.eventLoopDataChan)
 }
 
 func invokeSocketCallBackFunc(s *SocketIO) (err error) {
@@ -197,12 +198,13 @@ func newWebSocketIO(initCtx context.Context, url string) SocketIO {
 	initRunner := newWebSocketIORunner(initCtx, url)
 	initMetrics := newWebSocketIOMetrics()
 	return SocketIO{
-		runner:        initRunner,
-		metrics:       initMetrics,
-		tags:          initRunner.state.Options.RunTags.CloneTags(),
-		eventHandlers: make(map[string][]goja.Callable),
-		scheduled:     make(chan goja.Callable),
-		done:          make(chan struct{}),
+		runner:            initRunner,
+		metrics:           initMetrics,
+		tags:              initRunner.state.Options.RunTags.CloneTags(),
+		eventHandlers:     make(map[string][]goja.Callable),
+		scheduled:         make(chan goja.Callable),
+		done:              make(chan struct{}),
+		eventLoopDataChan: newEventLoopData(),
 	}
 }
 
@@ -712,8 +714,8 @@ func getEventData(eventCode, rawResponse string) (eventName, restText string, er
 func decodeData(rawResponse string) (start, end, rest int, err error) {
 	var countQuote int
 	const (
-		startQuote = 0
-		endQuote   = 1
+		startQuote   = 0
+		endQuote     = 1
 		maximumQuote = 2
 	)
 
