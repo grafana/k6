@@ -180,7 +180,7 @@ func getEncodedHandler(t testing.TB, compressionType httpext.CompressionType) ht
 func getConnectSocketIORequest(emptyData, closePrematurely bool) http.Handler {
 	const writeWait = 10 * time.Second
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		responseCookies := w.Header().Clone()
+		responseCookies := w.Header()
 		responseCookies.Add("Cookie", req.Header.Get("Cookie"))
 		responseCookies.Add("key1", req.Header.Get("key1"))
 		responseCookies.Add("key2", req.Header.Get("key2"))

@@ -508,7 +508,7 @@ func testCustomCertificates(tt *testing.T, rt *goja.Runtime, sr func(string) str
 func testInsecureSkipVerify(tt *testing.T, rt *goja.Runtime, sr func(string) string, samples chan stats.SampleContainer, state *lib.State) {
 	tt.Run("insecure skip verify", func(t *testing.T) {
 		state.TLSConfig = &tls.Config{
-			InsecureSkipVerify: true,
+			InsecureSkipVerify: true, //nolint:gosec
 		}
 		_, err := common.RunString(rt, sr(`
 		let res = ws.connect("WSSBIN_URL/wsio-open", function(socket){
