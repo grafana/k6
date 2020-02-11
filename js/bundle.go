@@ -255,7 +255,11 @@ func (b *Bundle) instantiate(rt *goja.Runtime, init *InitContext) error {
 	_ = module.Set("exports", exports)
 	rt.Set("module", module)
 
-	rt.Set("__ENV", b.Env)
+	env := make(map[string]string, len(b.Env))
+	for key, value := range b.Env {
+		env[key] = value
+	}
+	rt.Set("__ENV", env)
 	rt.Set("console", common.Bind(rt, newConsole(), init.ctxPtr))
 
 	*init.ctxPtr = common.WithRuntime(context.Background(), rt)
