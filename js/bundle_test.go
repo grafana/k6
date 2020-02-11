@@ -740,6 +740,48 @@ func TestBundleEnv(t *testing.T) {
 	}
 }
 
+func TestBundleNotSharable(t *testing.T) {
+	data := `
+		export default function() {
+			if (__ITER == 0) {
+				if (typeof __ENV.something !== "undefined") {
+					throw new Error("invalid something: " + __ENV.something + " should be undefined");
+				}
+				__ENV.something = __VU;
+			} else if (__ENV.something != __VU) {
+				throw new Error("invalid something: " + __ENV.something+ " should be "+ __VU);
+			}
+		}
+	`
+	b1, err := getSimpleBundle("/script.js", data)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	b2, err := NewBundleFromArchive(b1.makeArchive(), lib.RuntimeOptions{})
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	bundles := map[string]*Bundle{"Source": b1, "Archive": b2}
+	vus, iters := 10, 1000
+	for name, b := range bundles {
+		b := b
+		t.Run(name, func(t *testing.T) {
+			for i := 0; i < vus; i++ {
+				bi, err := b.Instantiate()
+				bi.Runtime.Set("__VU", i)
+				require.NoError(t, err)
+				for j := 0; j < iters; j++ {
+					bi.Runtime.Set("__ITER", j)
+					_, err := bi.Default(goja.Undefined())
+					assert.NoError(t, err)
+				}
+			}
+		})
+	}
+}
+
 func TestBundleMakeArchive(t *testing.T) {
 	testCases := []struct {
 		cm      compiler.CompatibilityMode
