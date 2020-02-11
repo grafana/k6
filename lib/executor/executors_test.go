@@ -26,11 +26,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	null "gopkg.in/guregu/null.v3"
+
+	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/types"
 )
 
 type exp struct {
@@ -428,4 +429,70 @@ func TestVariableLoopingVUsConfigExecutionPlanExample(t *testing.T) {
 	// Try a zero GracefulStop and GracefulRampDown, i.e. raw steps with 0 end cap
 	conf.GracefulRampDown = types.NullDurationFrom(0 * time.Second)
 	assert.Equal(t, rawStepsZeroEnd, conf.GetExecutionRequirements(nil))
+}
+
+func TestVariableLoopingVUsRampDownFix(t *testing.T) {
+	t.Parallel()
+	conf := NewVariableLoopingVUsConfig("rampdownFix")
+	conf.StartVUs = null.IntFrom(0)
+	conf.Stages = []Stage{
+		{Target: null.IntFrom(20), Duration: types.NullDurationFrom(20 * time.Second)},
+		{Target: null.IntFrom(0), Duration: types.NullDurationFrom(20 * time.Second)},
+	}
+
+	// helper to generate expected test data
+	genStage := func(timeStart, timeOffset time.Duration, vusStart, vusOffset, count int) []lib.ExecutionStep {
+		out := make([]lib.ExecutionStep, count)
+		out[0] = lib.ExecutionStep{TimeOffset: timeStart, PlannedVUs: uint64(vusStart)}
+		for i := 1; i < count; i++ {
+			out[i] = lib.ExecutionStep{
+				TimeOffset: out[i-1].TimeOffset + timeOffset,
+				PlannedVUs: out[i-1].PlannedVUs + uint64(vusOffset),
+			}
+		}
+		return out
+	}
+
+	expRawSteps := genStage(0, time.Second, 0, 1, 20)
+	for _, step := range genStage(20*time.Second, time.Second, 20, -1, 21) {
+		expRawSteps = append(expRawSteps, step)
+	}
+
+	rawSteps := conf.getRawExecutionSteps(nil, false)
+	assert.Equal(t, expRawSteps, rawSteps)
+	endOffset, isFinal := lib.GetEndOffset(rawSteps)
+	assert.Equal(t, 40*time.Second, endOffset)
+	assert.Equal(t, true, isFinal)
+
+	expEqualStopRampdown := genStage(0, time.Second, 0, 1, 21)
+	for _, step := range genStage(51*time.Second, time.Second, 19, -1, 20) {
+		expEqualStopRampdown = append(expEqualStopRampdown, step)
+	}
+
+	// GracefulStop and GracefulRampDown equal to the default 30 sec
+	require.Equal(t, expEqualStopRampdown, conf.GetExecutionRequirements(nil))
+
+	// A longer GracefulStop than GracefulRampDown doesn't change the execution plan.
+	conf.GracefulStop = types.NullDurationFrom(80 * time.Second)
+	require.Equal(t, expEqualStopRampdown, conf.GetExecutionRequirements(nil))
+
+	// Try a much shorter GracefulStop than GracefulRampDown
+	conf.GracefulStop = types.NullDurationFrom(3 * time.Second)
+	expShorterStopRampdown := genStage(0, time.Second, 0, 1, 21)
+	expShorterStopRampdown = append(expShorterStopRampdown,
+		lib.ExecutionStep{TimeOffset: 43 * time.Second, PlannedVUs: 0})
+	require.Equal(t, expShorterStopRampdown, conf.GetExecutionRequirements(nil))
+
+	// // Try a zero GracefulStop
+	// conf.GracefulStop = types.NullDurationFrom(0 * time.Second)
+	// assert.Equal(t, []lib.ExecutionStep{
+	// 	{TimeOffset: 0 * time.Second, PlannedVUs: 4},
+	// 	{TimeOffset: 1 * time.Second, PlannedVUs: 5},
+	// 	{TimeOffset: 2 * time.Second, PlannedVUs: 6},
+	// 	{TimeOffset: 23 * time.Second, PlannedVUs: 0},
+	// }, conf.GetExecutionRequirements(nil))
+
+	// // Try a zero GracefulStop and GracefulRampDown, i.e. raw steps with 0 end cap
+	// conf.GracefulRampDown = types.NullDurationFrom(0 * time.Second)
+	// assert.Equal(t, rawSteps, conf.GetExecutionRequirements(nil))
 }

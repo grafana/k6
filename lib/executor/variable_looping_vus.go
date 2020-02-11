@@ -382,13 +382,13 @@ func (vlvc VariableLoopingVUsConfig) reserveVUsForGracefulRampDowns( //nolint:fu
 		skippedToNewRawStep := false
 		timeOffsetWithTimeout := rawStep.TimeOffset + gracefulRampDownPeriod
 
-		for advStepNum := rawStepNum + 1; advStepNum < rawStepsLen; advStepNum++ {
-			advStep := rawSteps[advStepNum]
-			if advStep.TimeOffset > timeOffsetWithTimeout {
+		for nextStepNum := rawStepNum + 1; nextStepNum < rawStepsLen; nextStepNum++ {
+			nextStep := rawSteps[nextStepNum]
+			if nextStep.TimeOffset > timeOffsetWithTimeout {
 				break
 			}
-			if advStep.PlannedVUs >= lastPlannedVUs {
-				rawStepNum = advStepNum - 1
+			if nextStep.PlannedVUs >= lastPlannedVUs {
+				rawStepNum = nextStepNum - 1
 				skippedToNewRawStep = true
 				break
 			}
@@ -422,7 +422,7 @@ func (vlvc VariableLoopingVUsConfig) reserveVUsForGracefulRampDowns( //nolint:fu
 //
 // If gracefulRampDown is specified, it will also be taken into account, and the
 // number of needed VUs to handle that will also be reserved. See the
-// documentation of reserveGracefulVUScalingDown() for more details.
+// documentation of reserveVUsForGracefulRampDowns() for more details.
 //
 // On the other hand, gracefulStop is handled here. To facilitate it, we'll
 // ensure that the last execution step will have 0 VUs and will be at time
