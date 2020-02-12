@@ -573,7 +573,9 @@ func (vlv VariableLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleCo
 	}
 
 	handleNewMaxAllowedVUs := func(newMaxAllowedVUs uint64) {
-		if newMaxAllowedVUs < currentMaxAllowedVUs {
+		if newMaxAllowedVUs > currentMaxAllowedVUs {
+			handleNewScheduledVUs(newMaxAllowedVUs)
+		} else {
 			for vuNum := newMaxAllowedVUs; vuNum < currentMaxAllowedVUs; vuNum++ {
 				vuHandles[vuNum].hardStop()
 			}
@@ -590,11 +592,6 @@ func (vlv VariableLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleCo
 				}
 				handleNewScheduledVUs(step.PlannedVUs)
 			case step := <-gracefulLimitEvents:
-				if step.PlannedVUs > currentScheduledVUs {
-					// Handle the case where a value is read from the
-					// gracefulLimitEvents channel before rawStepEvents
-					handleNewScheduledVUs(step.PlannedVUs)
-				}
 				handleNewMaxAllowedVUs(step.PlannedVUs)
 			case <-ctx.Done():
 				return false
