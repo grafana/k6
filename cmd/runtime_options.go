@@ -21,8 +21,8 @@
 package cmd
 
 import (
-	"os"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/loadimpact/k6/lib"
@@ -30,6 +30,10 @@ import (
 	"github.com/spf13/pflag"
 	"gopkg.in/guregu/null.v3"
 )
+
+// TODO: move this whole file out of the cmd package? maybe when fixing
+// https://github.com/loadimpact/k6/issues/883, since this code is fairly
+// self-contained and easily testable now, without any global dependencies...
 
 var userEnvVarName = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
 
@@ -40,9 +44,9 @@ func parseEnvKeyValue(kv string) (string, string) {
 	return kv, ""
 }
 
-func collectEnv() map[string]string {
-	env := make(map[string]string)
-	for _, kv := range os.Environ() {
+func buildEnvMap(environ []string) map[string]string {
+	env := make(map[string]string, len(environ))
+	for _, kv := range environ {
 		k, v := parseEnvKeyValue(kv)
 		env[k] = v
 	}
@@ -63,16 +67,35 @@ extended: base + Babel with ES2015 preset + core.js v2,
 	return flags
 }
 
-func getRuntimeOptions(flags *pflag.FlagSet) (lib.RuntimeOptions, error) {
+func getRuntimeOptions(flags *pflag.FlagSet, environment map[string]string) (lib.RuntimeOptions, error) {
 	opts := lib.RuntimeOptions{
 		IncludeSystemEnvVars: getNullBool(flags, "include-system-env-vars"),
 		CompatibilityMode:    getNullString(flags, "compatibility-mode"),
 		Env:                  make(map[string]string),
 	}
 
-	// If enabled, gather the actual system environment variables
-	if opts.IncludeSystemEnvVars.Bool {
-		opts.Env = collectEnv()
+	if !opts.CompatibilityMode.Valid { // If not explicitly set via CLI flags, look for an environment variable
+		if envVar, ok := environment["K6_COMPATIBILITY_MODE"]; ok {
+			opts.CompatibilityMode = null.StringFrom(envVar)
+		}
+	}
+	if _, err := lib.ValidateCompatibilityMode(opts.CompatibilityMode.String); err != nil {
+		// some early validation
+		return opts, err
+	}
+
+	if !opts.IncludeSystemEnvVars.Valid { // If not explicitly set via CLI flags, look for an environment variable
+		if envVar, ok := environment["K6_INCLUDE_SYSTEM_ENV_VARS"]; ok {
+			val, err := strconv.ParseBool(envVar)
+			if err != nil {
+				return opts, err
+			}
+			opts.IncludeSystemEnvVars = null.BoolFrom(val)
+		}
+	}
+
+	if opts.IncludeSystemEnvVars.Bool { // If enabled, gather the actual system environment variables
+		opts.Env = environment
 	}
 
 	// Set/overwrite environment variables with custom user-supplied values
@@ -80,7 +103,6 @@ func getRuntimeOptions(flags *pflag.FlagSet) (lib.RuntimeOptions, error) {
 	if err != nil {
 		return opts, err
 	}
-
 	for _, kv := range envVars {
 		k, v := parseEnvKeyValue(kv)
 		// Allow only alphanumeric ASCII variable names for now
@@ -88,12 +110,6 @@ func getRuntimeOptions(flags *pflag.FlagSet) (lib.RuntimeOptions, error) {
 			return opts, errors.Errorf("Invalid environment variable name '%s'", k)
 		}
 		opts.Env[k] = v
-	}
-
-	// Fallback to env
-	compatMode := opts.Env["K6_COMPATIBILITY_MODE"]
-	if !opts.CompatibilityMode.Valid && compatMode != "" {
-		opts.CompatibilityMode = null.StringFrom(compatMode)
 	}
 
 	return opts, nil
