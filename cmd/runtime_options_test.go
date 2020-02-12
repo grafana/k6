@@ -24,7 +24,6 @@ import (
 	"bytes"
 	"fmt"
 	"net/url"
-	"strings"
 	"testing"
 
 	"gopkg.in/guregu/null.v3"
@@ -216,26 +215,25 @@ func testRuntimeOptionsCase(t *testing.T, tc runtimeOptionsTestCase) {
 	compatMode, err := lib.ValidateCompatibilityMode(rtOpts.CompatibilityMode.String)
 	require.NoError(t, err)
 
-	jsCodeLines := make([]string, 0, len(tc.expEnv)+2)
+	jsCode := new(bytes.Buffer)
 	if compatMode == lib.CompatibilityModeExtended {
-		jsCodeLines = append(jsCodeLines, "export default function() {")
+		fmt.Fprint(jsCode, "export default function() {")
 	} else {
-		jsCodeLines = append(jsCodeLines, "module.exports.default = function() {")
+		fmt.Fprint(jsCode, "module.exports.default = function() {")
 	}
 
 	for key, val := range tc.expEnv {
-		jsCodeLines = append(jsCodeLines, fmt.Sprintf(
+		fmt.Fprintf(jsCode,
 			"if (__ENV.%s !== `%s`) { throw new Error('Invalid %s: ' + __ENV.%s); }",
 			key, val, key, key,
-		))
+		)
 	}
-	jsCodeLines = append(jsCodeLines, "}")
-	jsCode := []byte(strings.Join(jsCodeLines, "\n"))
+	fmt.Fprint(jsCode, "}")
 
 	fs := afero.NewMemMapFs()
-	require.NoError(t, afero.WriteFile(fs, "/script.js", jsCode, 0644))
+	require.NoError(t, afero.WriteFile(fs, "/script.js", jsCode.Bytes(), 0644))
 	runner, err := newRunner(
-		&loader.SourceData{Data: jsCode, URL: &url.URL{Path: "/script.js", Scheme: "file"}},
+		&loader.SourceData{Data: jsCode.Bytes(), URL: &url.URL{Path: "/script.js", Scheme: "file"}},
 		typeJS,
 		map[string]afero.Fs{"file": fs},
 		rtOpts,
@@ -244,7 +242,7 @@ func testRuntimeOptionsCase(t *testing.T, tc runtimeOptionsTestCase) {
 
 	archive := runner.MakeArchive()
 	archiveBuf := &bytes.Buffer{}
-	assert.NoError(t, archive.Write(archiveBuf))
+	require.NoError(t, archive.Write(archiveBuf))
 
 	getRunnerErr := func(rtOpts lib.RuntimeOptions) (lib.Runner, error) {
 		return newRunner(
