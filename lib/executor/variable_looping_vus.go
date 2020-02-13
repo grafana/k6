@@ -113,11 +113,6 @@ func (vlvc VariableLoopingVUsConfig) Validate() []error {
 // getRawExecutionSteps calculates and returns as execution steps the number of
 // actively running VUs the executor should have at every moment.
 //
-// It doesn't take into account graceful ramp-downs. It also doesn't deal with
-// the end-of-executor drop to 0 VUs, whether graceful or not. These are
-// handled by GetExecutionRequirements(), which internally uses this method and
-// reserveVUsForGracefulRampDowns().
-//
 // The zeroEnd argument tells the method if we should artificially add a step
 // with 0 VUs at offset sum(stages.duration), i.e. when the executor is
 // supposed to end.
@@ -261,9 +256,6 @@ func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(es *lib.ExecutionSegme
 				continue
 			}
 
-			// VU reservation for gracefully ramping down is handled as a
-			// separate method: reserveVUsForGracefulRampDowns()
-
 			steps = append(steps, lib.ExecutionStep{
 				TimeOffset: timeFromStart + t,
 				PlannedVUs: uint64(stepScaledVus),
@@ -287,147 +279,13 @@ func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(es *lib.ExecutionSegme
 	return steps
 }
 
-// If the graceful ramp-downs are enabled, we need to reserve any VUs that may
-// potentially have to finish running iterations when we're scaling their number
-// down. This would prevent attempts from other executors to use them while the
-// iterations are finishing up during their allotted gracefulRampDown periods.
+// GetExecutionRequirements returns a concrete execution plan with exact
+// number of VUs required at any point in time during the test execution,
+// taking into account gracefulStop.
 //
-// But we also need to be careful to not over-allocate more VUs than we actually
-// need. We should never have more PlannedVUs than the max(startVUs,
-// stage[n].target), even if we're quickly scaling VUs up and down multiple
-// times, one after the other. In those cases, any previously reserved VUs
-// finishing up interrupted iterations should be reused by the executor,
-// instead of new ones being requested from the execution state.
-//
-// Here's an example with graceful ramp-down (i.e. "uninterruptible"
-// iterations), where stars represent actively scheduled VUs and dots are used
-// for VUs that are potentially finishing up iterations:
-//
-//
-//      ^
-//      |
-// VUs 6|  *..............................
-//     5| ***.......*..............................
-//     4|*****.....***.....**..............................
-//     3|******...*****...***..............................
-//     2|*******.*******.****..............................
-//     1|***********************..............................
-//     0--------------------------------------------------------> time(s)
-//       012345678901234567890123456789012345678901234567890123   (t%10)
-//       000000000011111111112222222222333333333344444444445555   (t/10)
-//
-// We start with 4 VUs, scale to 6, scale down to 1, scale up to 5, scale down
-// to 1 again, scale up to 4, back to 1, and finally back down to 0. If our
-// gracefulStop timeout was 30s (the default), then we'll stay with 6 PlannedVUs
-// until t=32 in the test above, and the actual executor could run until t=52.
-// See TestVariableLoopingVUsConfigExecutionPlanExample() for the above example
-// as a unit test.
-//
-// The algorithm we use below to reserve VUs so that ramping-down VUs can finish
-// their last iterations is pretty simple. It just traverses the raw execution
-// steps and whenever there's a scaling down of VUs, it prevents the number of
-// VUs from decreasing for the configured gracefulRampDown period.
-//
-// Finishing up the test, i.e. making sure we have a step with 0 VUs at time
-// executorEndOffset, is not handled here. Instead GetExecutionRequirements()
-// takes care of that. But to make its job easier, this method won't add any
-// steps with an offset that's greater or equal to executorEndOffset.
-func (vlvc VariableLoopingVUsConfig) reserveVUsForGracefulRampDowns( //nolint:funlen
-	rawSteps []lib.ExecutionStep, executorEndOffset time.Duration,
-) []lib.ExecutionStep {
-	rawStepsLen := len(rawSteps)
-	gracefulRampDownPeriod := vlvc.GetGracefulRampDown()
-	newSteps := []lib.ExecutionStep{}
-
-	lastPlannedVUs := uint64(0)
-	for rawStepNum := 0; rawStepNum < rawStepsLen; rawStepNum++ {
-		rawStep := rawSteps[rawStepNum]
-		// Add the first step or any step where the number of planned VUs is
-		// greater than the ones in the previous step. We don't need to worry
-		// about reserving time for ramping-down VUs when the number of planned
-		// VUs is growing. That's because the gracefulRampDown period is a fixed
-		// value and any timeouts from early steps with fewer VUs will get
-		// overshadowed by timeouts from latter steps with more VUs.
-		if rawStepNum == 0 || rawStep.PlannedVUs > lastPlannedVUs {
-			newSteps = append(newSteps, rawStep)
-			lastPlannedVUs = rawStep.PlannedVUs
-			continue
-		}
-
-		// We simply skip steps with the same number of planned VUs
-		if rawStep.PlannedVUs == lastPlannedVUs {
-			continue
-		}
-
-		// If we're here, we have a downward "slope" - the lastPlannedVUs are
-		// more than the current rawStep's planned VUs. We're going to look
-		// forward in time (up to gracefulRampDown) and inspect the rawSteps.
-		// There are a 3 possibilities:
-		//  - We find a new step within the gracefulRampDown period which has
-		//    the same number of VUs or greater than lastPlannedVUs. Which
-		//    means that we can just advance rawStepNum to that number and we
-		//    don't need to worry about any of the raw steps in the middle!
-		//    Both their planned VUs and their gracefulRampDown periods will
-		//    be lower than what we're going to set from that new rawStep -
-		//    we've basically found a new upward slope or equal value again.
-		//  - We reach executorEndOffset, in which case we are done - we can't
-		//    add any new steps, since those will be after the executor end
-		//    offset.
-		//  - We reach the end of the rawSteps, or we don't find any higher or
-		//    equal steps to prevStep in the next gracefulRampDown period. So
-		//    we'll simply try to add an entry into newSteps with the values
-		//    {prevStep.TimeOffset + gracefulRampDown, rawStep.PlannedVUs} and
-		//    we'll continue with traversing the following rawSteps.
-
-		skippedToNewRawStep := false
-		timeOffsetWithTimeout := rawStep.TimeOffset + gracefulRampDownPeriod
-
-		for nextStepNum := rawStepNum + 1; nextStepNum < rawStepsLen; nextStepNum++ {
-			nextStep := rawSteps[nextStepNum]
-			if nextStep.TimeOffset > timeOffsetWithTimeout {
-				break
-			}
-			if nextStep.PlannedVUs >= lastPlannedVUs {
-				rawStepNum = nextStepNum - 1
-				skippedToNewRawStep = true
-				break
-			}
-		}
-
-		// Nothing more to do here, found a new "slope" with equal or grater
-		// PlannedVUs in the gracefulRampDownPeriod window, so we go to it.
-		if skippedToNewRawStep {
-			continue
-		}
-
-		// We've reached the absolute executor end offset, and we were already
-		// on a downward "slope" (i.e. the previous planned VUs are more than
-		// the current planned VUs), so nothing more we can do here.
-		if timeOffsetWithTimeout >= executorEndOffset {
-			break
-		}
-
-		newSteps = append(newSteps, lib.ExecutionStep{
-			TimeOffset: timeOffsetWithTimeout,
-			PlannedVUs: rawStep.PlannedVUs,
-		})
-		lastPlannedVUs = rawStep.PlannedVUs
-	}
-
-	return newSteps
-}
-
-// GetExecutionRequirements very dynamically reserves exactly the number of
-// required VUs for this executor at every moment of the test.
-//
-// If gracefulRampDown is specified, it will also be taken into account, and the
-// number of needed VUs to handle that will also be reserved. See the
-// documentation of reserveVUsForGracefulRampDowns() for more details.
-//
-// On the other hand, gracefulStop is handled here. To facilitate it, we'll
-// ensure that the last execution step will have 0 VUs and will be at time
-// offset (sum(stages.Duration)+gracefulStop). Any steps that would've been
-// added after it will be ignored. Thus:
+// gracefulStop is handled here to ensure that the last execution step
+// will have 0 VUs and will be at time offset (sum(stages.Duration)+gracefulStop).
+// Any steps that would've been added after it will be ignored. Thus:
 //   - gracefulStop can be less than gracefulRampDown and can cut the graceful
 //     ramp-down periods of the last VUs short.
 //   - gracefulRampDown can be more than gracefulStop:
@@ -439,10 +297,6 @@ func (vlvc VariableLoopingVUsConfig) GetExecutionRequirements(es *lib.ExecutionS
 	steps := vlvc.getRawExecutionSteps(es, false)
 
 	executorEndOffset := sumStagesDuration(vlvc.Stages) + time.Duration(vlvc.GracefulStop.Duration)
-	// Handle graceful ramp-downs, if we have them
-	if vlvc.GracefulRampDown.Duration > 0 {
-		steps = vlvc.reserveVUsForGracefulRampDowns(steps, executorEndOffset)
-	}
 
 	// If the last PlannedVUs value wasn't 0, add a last step with 0
 	if steps[len(steps)-1].PlannedVUs != 0 {
@@ -478,10 +332,6 @@ var _ lib.Executor = &VariableLoopingVUs{}
 
 // Run constantly loops through as many iterations as possible on a variable
 // number of VUs for the specified stages.
-//
-// TODO: split up? since this does a ton of things, unfortunately I can't think
-// of a less complex way to implement it (besides the old "increment by 100ms
-// and see what happens)... :/ so maybe see how it can be split?
 // nolint:funlen,gocognit
 func (vlv VariableLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleContainer) (err error) {
 	segment := vlv.executionState.Options.ExecutionSegment
@@ -524,8 +374,6 @@ func (vlv VariableLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleCo
 	vlv.progress.Modify(pb.WithProgress(progresFn))
 	go trackProgress(ctx, maxDurationCtx, regDurationCtx, vlv, progresFn)
 
-	// Actually schedule the VUs and iterations, likely the most complicated
-	// executor among all of them...
 	activeVUs := &sync.WaitGroup{}
 	defer activeVUs.Wait()
 
@@ -553,65 +401,59 @@ func (vlv VariableLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleCo
 		vuHandles[i] = vuHandle
 	}
 
-	rawStepEvents := lib.StreamExecutionSteps(ctx, startTime, rawExecutionSteps, true)
-	gracefulLimitEvents := lib.StreamExecutionSteps(ctx, startTime, gracefulExecutionSteps, false)
+	gracefulRampDownPeriod := vlv.config.GetGracefulRampDown()
+	var rampDowns uint64
+	hardStopVU := func(vuNum uint64) {
+		spent := time.Since(startTime)
+		delay := gracefulRampDownPeriod
+		if spent+delay > maxDuration {
+			delay = maxDuration - spent
+		}
+		if delay > 0 {
+			time.AfterFunc(delay, func() {
+				if rampDowns > 1 {
+					vuHandles[vuNum].hardStop()
+				}
+			})
+		} else {
+			vuHandles[vuNum].hardStop()
+		}
+	}
 
-	// 0 <= currentScheduledVUs <= currentMaxAllowedVUs <= maxVUs
-	var currentScheduledVUs, currentMaxAllowedVUs uint64
-
-	handleNewScheduledVUs := func(newScheduledVUs uint64) {
-		if newScheduledVUs > currentScheduledVUs {
-			for vuNum := currentScheduledVUs; vuNum < newScheduledVUs; vuNum++ {
+	handleVUs := func(newVUs, currentVUs uint64) {
+		if newVUs > currentVUs {
+			rampDowns = 0
+			for vuNum := currentVUs; vuNum < newVUs; vuNum++ {
 				vuHandles[vuNum].start()
 			}
 		} else {
-			for vuNum := newScheduledVUs; vuNum < currentScheduledVUs; vuNum++ {
+			rampDowns++
+			for vuNum := newVUs; vuNum < currentVUs; vuNum++ {
 				vuHandles[vuNum].gracefulStop()
+				hardStopVU(vuNum)
 			}
 		}
-		currentScheduledVUs = newScheduledVUs
 	}
 
-	handleNewMaxAllowedVUs := func(newMaxAllowedVUs uint64) {
-		if newMaxAllowedVUs > currentMaxAllowedVUs {
-			handleNewScheduledVUs(newMaxAllowedVUs)
-		} else {
-			for vuNum := newMaxAllowedVUs; vuNum < currentMaxAllowedVUs; vuNum++ {
-				vuHandles[vuNum].hardStop()
-			}
-		}
-		currentMaxAllowedVUs = newMaxAllowedVUs
-	}
+	var currentScheduledVUs uint64
+	rawStepEvents := lib.StreamExecutionSteps(ctx, startTime, rawExecutionSteps, true)
 
-	handleAllRawSteps := func() bool {
+	func() {
 		for {
 			select {
 			case step, ok := <-rawStepEvents:
 				if !ok {
-					return true
-				}
-				handleNewScheduledVUs(step.PlannedVUs)
-			case step := <-gracefulLimitEvents:
-				handleNewMaxAllowedVUs(step.PlannedVUs)
-			case <-ctx.Done():
-				return false
-			}
-		}
-	}
-
-	if handleAllRawSteps() {
-		// Handle any remaining graceful stops
-		go func() {
-			for {
-				select {
-				case step := <-gracefulLimitEvents:
-					handleNewMaxAllowedVUs(step.PlannedVUs)
-				case <-maxDurationCtx.Done():
 					return
 				}
+				handleVUs(step.PlannedVUs, currentScheduledVUs)
+				currentScheduledVUs = step.PlannedVUs
+			case <-ctx.Done():
+				return
+			case <-maxDurationCtx.Done():
+				return
 			}
-		}()
-	}
+		}
+	}()
 
 	return nil
 }
