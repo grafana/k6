@@ -54,7 +54,7 @@ var inspectCmd = &cobra.Command{
 			typ = detectType(src.Data)
 		}
 
-		runtimeOptions, err := getRuntimeOptions(cmd.Flags())
+		runtimeOptions, err := getRuntimeOptions(cmd.Flags(), buildEnvMap(os.Environ()))
 		if err != nil {
 			return err
 		}

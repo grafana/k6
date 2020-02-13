@@ -38,6 +38,7 @@ import (
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/lib/testutils/httpmultibin"
+	"github.com/loadimpact/k6/lib/testutils/minirunner"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/stats"
@@ -51,7 +52,7 @@ const isWindows = runtime.GOOS == "windows"
 // Wrapper around NewEngine that applies a logger and manages the options.
 func newTestEngine(t *testing.T, ctx context.Context, runner lib.Runner, opts lib.Options) *Engine { //nolint: golint
 	if runner == nil {
-		runner = &testutils.MiniRunner{}
+		runner = &minirunner.MiniRunner{}
 	}
 	if ctx == nil {
 		ctx = context.Background()
@@ -109,7 +110,7 @@ func TestEngineRun(t *testing.T) {
 
 		signalChan := make(chan interface{})
 
-		runner := &testutils.MiniRunner{Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
+		runner := &minirunner.MiniRunner{Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
 			stats.PushIfNotDone(ctx, out, stats.Sample{Metric: testMetric, Time: time.Now(), Value: 1})
 			close(signalChan)
 			<-ctx.Done()
@@ -158,7 +159,7 @@ func TestEngineAtTime(t *testing.T) {
 func TestEngineCollector(t *testing.T) {
 	testMetric := stats.New("test_metric", stats.Trend)
 
-	runner := &testutils.MiniRunner{Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
+	runner := &minirunner.MiniRunner{Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
 		out <- stats.Sample{Metric: testMetric}
 		return nil
 	}}
@@ -339,6 +340,7 @@ func getMetricSum(collector *dummy.Collector, name string) (result float64) {
 	}
 	return
 }
+
 func getMetricCount(collector *dummy.Collector, name string) (result uint) {
 	for _, sc := range collector.SampleContainers {
 		for _, s := range sc.GetSamples() {

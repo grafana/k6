@@ -29,6 +29,7 @@ import (
 	rice "github.com/GeertJohan/go.rice"
 	"github.com/dop251/goja"
 	"github.com/dop251/goja/parser"
+	"github.com/loadimpact/k6/lib"
 	"github.com/mitchellh/mapstructure"
 	"github.com/sirupsen/logrus"
 )
@@ -46,18 +47,6 @@ var (
 
 	once        sync.Once // nolint:gochecknoglobals
 	globalBabel *babel    // nolint:gochecknoglobals
-)
-
-// CompatibilityMode specifies the JS compatibility mode
-// nolint:lll
-//go:generate enumer -type=CompatibilityMode -transform=snake -trimprefix CompatibilityMode -output compatibility_mode_gen.go
-type CompatibilityMode uint8
-
-const (
-	// CompatibilityModeExtended achieves ES6+ compatibility with Babel and core.js
-	CompatibilityModeExtended CompatibilityMode = iota + 1
-	// CompatibilityModeBase is standard goja ES5.1+
-	CompatibilityModeBase
 )
 
 // A Compiler compiles JavaScript source code (ES5.1 or ES6) into a goja.Program
@@ -80,11 +69,11 @@ func (c *Compiler) Transform(src, filename string) (code string, srcmap *SourceM
 
 // Compile the program in the given CompatibilityMode, optionally running pre and post code.
 func (c *Compiler) Compile(src, filename, pre, post string,
-	strict bool, compatMode CompatibilityMode) (*goja.Program, string, error) {
+	strict bool, compatMode lib.CompatibilityMode) (*goja.Program, string, error) {
 	code := pre + src + post
 	ast, err := parser.ParseFile(nil, filename, code, 0)
 	if err != nil {
-		if compatMode == CompatibilityModeExtended {
+		if compatMode == lib.CompatibilityModeExtended {
 			code, _, err = c.Transform(src, filename)
 			if err != nil {
 				return nil, code, err
@@ -101,7 +90,7 @@ type babel struct {
 	vm        *goja.Runtime
 	this      goja.Value
 	transform goja.Callable
-	mutex     sync.Mutex //TODO: cache goja.CompileAST() in an init() function?
+	mutex     sync.Mutex // TODO: cache goja.CompileAST() in an init() function?
 }
 
 func newBabel() (*babel, error) {

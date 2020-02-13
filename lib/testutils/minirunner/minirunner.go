@@ -18,7 +18,7 @@
  *
  */
 
-package testutils
+package minirunner
 
 import (
 	"context"
@@ -29,8 +29,10 @@ import (
 )
 
 // Ensure mock implementations conform to the interfaces.
-var _ lib.Runner = &MiniRunner{}
-var _ lib.VU = &MiniRunnerVU{}
+var (
+	_ lib.Runner = &MiniRunner{}
+	_ lib.VU     = &VU{}
+)
 
 // MiniRunner partially implements the lib.Runner interface, but instead of
 // using a real JS runtime, it allows us to directly specify the options and
@@ -53,10 +55,10 @@ func (r MiniRunner) MakeArchive() *lib.Archive {
 	return nil
 }
 
-// NewVU returns a new MiniRunnerVU with an incremental ID.
+// NewVU returns a new VU with an incremental ID.
 func (r *MiniRunner) NewVU(out chan<- stats.SampleContainer) (lib.VU, error) {
 	nextVUNum := atomic.AddInt64(&r.NextVUID, 1)
-	return &MiniRunnerVU{R: r, Out: out, ID: nextVUNum - 1}, nil
+	return &VU{R: r, Out: out, ID: nextVUNum - 1}, nil
 }
 
 // Setup calls the supplied mock setup() function, if present.
@@ -105,8 +107,8 @@ func (r *MiniRunner) SetOptions(opts lib.Options) error {
 	return nil
 }
 
-// MiniRunnerVU is a mock VU, spawned by a MiniRunner.
-type MiniRunnerVU struct {
+// VU is a mock VU, spawned by a MiniRunner.
+type VU struct {
 	R         *MiniRunner
 	Out       chan<- stats.SampleContainer
 	ID        int64
@@ -114,7 +116,7 @@ type MiniRunnerVU struct {
 }
 
 // RunOnce runs the mock default function once, incrementing its iteration.
-func (vu MiniRunnerVU) RunOnce(ctx context.Context) error {
+func (vu VU) RunOnce(ctx context.Context) error {
 	if vu.R.Fn == nil {
 		return nil
 	}
@@ -131,7 +133,7 @@ func (vu MiniRunnerVU) RunOnce(ctx context.Context) error {
 }
 
 // Reconfigure changes the VU ID.
-func (vu *MiniRunnerVU) Reconfigure(id int64) error {
+func (vu *VU) Reconfigure(id int64) error {
 	vu.ID = id
 	return nil
 }

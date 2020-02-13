@@ -31,6 +31,7 @@ import (
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/js/compiler"
 	"github.com/loadimpact/k6/js/modules"
+	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/loader"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
@@ -58,12 +59,12 @@ type InitContext struct {
 	// Cache of loaded programs and files.
 	programs map[string]programWithSource
 
-	compatibilityMode compiler.CompatibilityMode
+	compatibilityMode lib.CompatibilityMode
 }
 
 // NewInitContext creates a new initcontext with the provided arguments
 func NewInitContext(
-	rt *goja.Runtime, c *compiler.Compiler, compatMode compiler.CompatibilityMode,
+	rt *goja.Runtime, c *compiler.Compiler, compatMode lib.CompatibilityMode,
 	ctxPtr *context.Context, filesystems map[string]afero.Fs, pwd *url.URL,
 ) *InitContext {
 	return &InitContext{
@@ -81,7 +82,7 @@ func newBoundInitContext(base *InitContext, ctxPtr *context.Context, rt *goja.Ru
 	// we don't copy the exports as otherwise they will be shared and we don't want this.
 	// this means that all the files will be executed again but once again only once per compilation
 	// of the main file.
-	var programs = make(map[string]programWithSource, len(base.programs))
+	programs := make(map[string]programWithSource, len(base.programs))
 	for key, program := range base.programs {
 		programs[key] = programWithSource{
 			src: program.src,

@@ -49,7 +49,7 @@ type Bundle struct {
 	BaseInitContext *InitContext
 
 	Env               map[string]string
-	CompatibilityMode compiler.CompatibilityMode
+	CompatibilityMode lib.CompatibilityMode
 }
 
 // A BundleInstance is a self-contained instance of a Bundle.
@@ -137,7 +137,13 @@ func NewBundleFromArchive(arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle,
 		return nil, errors.Errorf("expected bundle type 'js', got '%s'", arc.Type)
 	}
 
-	compatMode, err := lib.ValidateCompatibilityMode(arc.CompatibilityMode)
+	compatModeStr := arc.CompatibilityMode
+	if rtOpts.CompatibilityMode.Valid {
+		// `k6 run --compatibility-mode=whatever archive.tar` should  override
+		// whatever value is in the archive
+		compatModeStr = rtOpts.CompatibilityMode.String
+	}
+	compatMode, err := lib.ValidateCompatibilityMode(compatModeStr)
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +204,7 @@ func (b *Bundle) makeArchive() *lib.Archive {
 
 // Instantiate creates a new runtime from this bundle.
 func (b *Bundle) Instantiate() (bi *BundleInstance, instErr error) {
-	//TODO: actually use a real context here, so that the instantiation can be killed
+	// TODO: actually use a real context here, so that the instantiation can be killed
 	// Placeholder for a real context.
 	ctxPtr := new(context.Context)
 
@@ -244,7 +250,7 @@ func (b *Bundle) instantiate(rt *goja.Runtime, init *InitContext) error {
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 	rt.SetRandSource(common.NewRandSource())
 
-	if init.compatibilityMode == compiler.CompatibilityModeExtended {
+	if init.compatibilityMode == lib.CompatibilityModeExtended {
 		if _, err := rt.RunProgram(jslib.GetCoreJS()); err != nil {
 			return err
 		}

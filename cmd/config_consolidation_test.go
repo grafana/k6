@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"strings"
 	"testing"
 	"time"
 
@@ -37,41 +36,10 @@ import (
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/executor"
 	"github.com/loadimpact/k6/lib/testutils"
+	"github.com/loadimpact/k6/lib/testutils/minirunner"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 )
-
-// A helper funcion for setting arbitrary environment variables and
-// restoring the old ones at the end, usually by deferring the returned callback
-//TODO: remove these hacks when we improve the configuration... we shouldn't
-// have to mess with the global environment at all...
-func setEnv(t *testing.T, newEnv []string) (restoreEnv func()) {
-	actuallSetEnv := func(env []string, abortOnSetErr bool) {
-		os.Clearenv()
-		for _, e := range env {
-			val := ""
-			pair := strings.SplitN(e, "=", 2)
-			if len(pair) > 1 {
-				val = pair[1]
-			}
-			err := os.Setenv(pair[0], val)
-			if abortOnSetErr {
-				require.NoError(t, err)
-			} else if err != nil {
-				t.Logf(
-					"Received a non-aborting but unexpected error '%s' when setting env.var '%s' to '%s'",
-					err, pair[0], val,
-				)
-			}
-		}
-	}
-	oldEnv := os.Environ()
-	actuallSetEnv(newEnv, true)
-
-	return func() {
-		actuallSetEnv(oldEnv, false)
-	}
-}
 
 func verifyOneIterPerOneVU(t *testing.T, c Config) {
 	// No config anywhere should result in a 1 VU with a 1 iteration config
@@ -148,7 +116,7 @@ func buildStages(durationsAndVUs ...int64) []executor.Stage {
 }
 
 func mostFlagSets() []flagSetInit {
-	//TODO: make this unnecessary... currently these are the only commands in which
+	// TODO: make this unnecessary... currently these are the only commands in which
 	// getConsolidatedConfig() is used, but they also have differences in their CLI flags :/
 	// sigh... compromises...
 	result := []flagSetInit{}
@@ -188,7 +156,7 @@ type opts struct {
 	runner *lib.Options
 	fs     afero.Fs
 
-	//TODO: remove this when the configuration is more reproducible and sane...
+	// TODO: remove this when the configuration is more reproducible and sane...
 	// We use a func, because initializing a FlagSet that points to variables
 	// actually will change those variables to their default values :| In our
 	// case, this happens only some of the time, for global variables that
@@ -202,7 +170,7 @@ type opts struct {
 }
 
 func resetStickyGlobalVars() {
-	//TODO: remove after fixing the config, obviously a dirty hack
+	// TODO: remove after fixing the config, obviously a dirty hack
 	exitOnRunning = false
 	configFilePath = ""
 	runType = ""
@@ -344,7 +312,7 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 			verifyVarLoopingVUs(null.NewInt(33, true), buildStages(44, 44, 55, 55)),
 		},
 
-		//TODO: test the future full overwriting of the duration/iterations/stages/execution options
+		// TODO: test the future full overwriting of the duration/iterations/stages/execution options
 		{
 			opts{
 				fs: defaultConfig(`{
@@ -358,8 +326,8 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 			exp{}, verifySharedIters(I(12), I(25)),
 		},
 
-		//TODO: test the externally controlled executor
-		//TODO: test execution-segment
+		// TODO: test the externally controlled executor
+		// TODO: test execution-segment
 
 		// Just in case, verify that no options will result in the same 1 vu 1 iter config
 		{opts{}, exp{}, verifyOneIterPerOneVU},
@@ -372,8 +340,10 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 			assert.Equal(t, stats.SystemTagSet(0), *c.Options.SystemTags)
 		}},
 		{
-			opts{runner: &lib.Options{
-				SystemTags: stats.NewSystemTagSet(stats.TagSubproto, stats.TagURL)},
+			opts{
+				runner: &lib.Options{
+					SystemTags: stats.NewSystemTagSet(stats.TagSubproto, stats.TagURL),
+				},
 			},
 			exp{},
 			func(t *testing.T, c Config) {
@@ -405,8 +375,8 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 				assert.Equal(t, []string{"avg", "p(90)", "count"}, c.Options.SummaryTrendStats)
 			},
 		},
-		//TODO: test for differences between flagsets
-		//TODO: more tests in general, especially ones not related to execution parameters...
+		// TODO: test for differences between flagsets
+		// TODO: more tests in general, especially ones not related to execution parameters...
 	}
 }
 
@@ -421,13 +391,13 @@ func runTestCase(
 	logrus.SetOutput(output)
 	logHook.Drain()
 
-	restoreEnv := setEnv(t, testCase.options.env)
+	restoreEnv := testutils.SetEnv(t, testCase.options.env)
 	defer restoreEnv()
 
 	flagSet := newFlagSet()
 	defer resetStickyGlobalVars()
 	flagSet.SetOutput(output)
-	//flagSet.PrintDefaults()
+	// flagSet.PrintDefaults()
 
 	cliErr := flagSet.Parse(testCase.options.cli)
 	if testCase.expected.cliParseError {
@@ -436,7 +406,7 @@ func runTestCase(
 	}
 	require.NoError(t, cliErr)
 
-	//TODO: remove these hacks when we improve the configuration...
+	// TODO: remove these hacks when we improve the configuration...
 	var cliConf Config
 	if flagSet.Lookup("out") != nil {
 		cliConf, cliErr = getConfig(flagSet)
@@ -452,7 +422,7 @@ func runTestCase(
 
 	var runner lib.Runner
 	if testCase.options.runner != nil {
-		runner = &testutils.MiniRunner{Options: *testCase.options.runner}
+		runner = &minirunner.MiniRunner{Options: *testCase.options.runner}
 	}
 	if testCase.options.fs == nil {
 		t.Logf("Creating an empty FS for this test")

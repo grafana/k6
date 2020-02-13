@@ -21,10 +21,11 @@
 package cmd
 
 import (
-	"os"
+	"fmt"
 	"testing"
 
 	"github.com/kelseyhightower/envconfig"
+	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v3"
 )
@@ -41,7 +42,6 @@ type testCmdTest struct {
 }
 
 func TestConfigCmd(t *testing.T) {
-
 	testdata := []testCmdData{
 		{
 			Name: "Out",
@@ -101,11 +101,13 @@ func TestConfigEnv(t *testing.T) {
 		},
 	}
 	for field, data := range testdata {
-		os.Clearenv()
+		field, data := field, data
 		t.Run(field.Name, func(t *testing.T) {
 			for value, fn := range data {
+				value, fn := value, fn
 				t.Run(`"`+value+`"`, func(t *testing.T) {
-					assert.NoError(t, os.Setenv(field.Key, value))
+					restore := testutils.SetEnv(t, []string{fmt.Sprintf("%s=%s", field.Key, value)})
+					defer restore()
 					var config Config
 					assert.NoError(t, envconfig.Process("", &config))
 					fn(config)

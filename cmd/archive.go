@@ -58,7 +58,7 @@ An archive is a fully self-contained test run, and can be executed identically e
 			return err
 		}
 
-		runtimeOptions, err := getRuntimeOptions(cmd.Flags())
+		runtimeOptions, err := getRuntimeOptions(cmd.Flags(), buildEnvMap(os.Environ()))
 		if err != nil {
 			return err
 		}
