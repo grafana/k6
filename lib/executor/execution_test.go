@@ -30,6 +30,7 @@ import (
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/testutils"
+	"github.com/loadimpact/k6/lib/testutils/minirunner"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -83,7 +84,7 @@ func TestExecutionStateGettingVUs(t *testing.T) {
 
 	es := lib.NewExecutionState(lib.Options{}, 10, 20)
 	es.SetInitVUFunc(func(_ context.Context, _ *logrus.Entry) (lib.VU, error) {
-		return &testutils.MiniRunnerVU{}, nil
+		return &minirunner.VU{}, nil
 	})
 
 	for i := 0; i < 10; i++ {

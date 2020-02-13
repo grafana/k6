@@ -7,13 +7,14 @@ import (
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/testutils"
+	"github.com/loadimpact/k6/lib/testutils/minirunner"
 	"github.com/loadimpact/k6/stats"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
 
 func simpleRunner(vuFn func(context.Context) error) lib.Runner {
-	return &testutils.MiniRunner{
+	return &minirunner.MiniRunner{
 		Fn: func(ctx context.Context, _ chan<- stats.SampleContainer) error {
 			return vuFn(ctx)
 		},
@@ -24,7 +25,7 @@ func setupExecutor(t *testing.T, config lib.ExecutorConfig, runner lib.Runner) (
 	context.Context, context.CancelFunc, lib.Executor, *testutils.SimpleLogrusHook,
 ) {
 	ctx, cancel := context.WithCancel(context.Background())
-	engineOut := make(chan stats.SampleContainer, 100) //TODO: return this for more complicated tests?
+	engineOut := make(chan stats.SampleContainer, 100) // TODO: return this for more complicated tests?
 
 	logHook := &testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.WarnLevel}}
 	testLog := logrus.New()

@@ -36,6 +36,7 @@ import (
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/lib/testutils"
+	"github.com/loadimpact/k6/lib/testutils/minirunner"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/stats"
@@ -50,7 +51,7 @@ func newTestExecutionScheduler(
 	t *testing.T, runner lib.Runner, logger *logrus.Logger, opts lib.Options, //nolint: golint
 ) (ctx context.Context, cancel func(), execScheduler *ExecutionScheduler, samples chan stats.SampleContainer) {
 	if runner == nil {
-		runner = &testutils.MiniRunner{}
+		runner = &minirunner.MiniRunner{}
 	}
 	ctx, cancel = context.WithCancel(context.Background())
 	newOpts, err := executor.DeriveExecutionFromShortcuts(lib.Options{
@@ -100,7 +101,7 @@ func TestExecutionSchedulerSetupTeardownRun(t *testing.T) {
 	t.Run("Normal", func(t *testing.T) {
 		setupC := make(chan struct{})
 		teardownC := make(chan struct{})
-		runner := &testutils.MiniRunner{
+		runner := &minirunner.MiniRunner{
 			SetupFn: func(ctx context.Context, out chan<- stats.SampleContainer) ([]byte, error) {
 				close(setupC)
 				return nil, nil
@@ -120,7 +121,7 @@ func TestExecutionSchedulerSetupTeardownRun(t *testing.T) {
 		assert.NoError(t, <-err)
 	})
 	t.Run("Setup Error", func(t *testing.T) {
-		runner := &testutils.MiniRunner{
+		runner := &minirunner.MiniRunner{
 			SetupFn: func(ctx context.Context, out chan<- stats.SampleContainer) ([]byte, error) {
 				return nil, errors.New("setup error")
 			},
@@ -130,7 +131,7 @@ func TestExecutionSchedulerSetupTeardownRun(t *testing.T) {
 		assert.EqualError(t, execScheduler.Run(ctx, samples), "setup error")
 	})
 	t.Run("Don't Run Setup", func(t *testing.T) {
-		runner := &testutils.MiniRunner{
+		runner := &minirunner.MiniRunner{
 			SetupFn: func(ctx context.Context, out chan<- stats.SampleContainer) ([]byte, error) {
 				return nil, errors.New("setup error")
 			},
@@ -148,7 +149,7 @@ func TestExecutionSchedulerSetupTeardownRun(t *testing.T) {
 	})
 
 	t.Run("Teardown Error", func(t *testing.T) {
-		runner := &testutils.MiniRunner{
+		runner := &minirunner.MiniRunner{
 			SetupFn: func(ctx context.Context, out chan<- stats.SampleContainer) ([]byte, error) {
 				return nil, nil
 			},
@@ -165,7 +166,7 @@ func TestExecutionSchedulerSetupTeardownRun(t *testing.T) {
 		assert.EqualError(t, execScheduler.Run(ctx, samples), "teardown error")
 	})
 	t.Run("Don't Run Teardown", func(t *testing.T) {
-		runner := &testutils.MiniRunner{
+		runner := &minirunner.MiniRunner{
 			SetupFn: func(ctx context.Context, out chan<- stats.SampleContainer) ([]byte, error) {
 				return nil, nil
 			},
@@ -212,7 +213,7 @@ func TestExecutionSchedulerStages(t *testing.T) {
 		data := data
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			runner := &testutils.MiniRunner{
+			runner := &minirunner.MiniRunner{
 				Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
 					time.Sleep(100 * time.Millisecond)
 					return nil
@@ -231,7 +232,7 @@ func TestExecutionSchedulerStages(t *testing.T) {
 
 func TestExecutionSchedulerEndTime(t *testing.T) {
 	t.Parallel()
-	runner := &testutils.MiniRunner{
+	runner := &minirunner.MiniRunner{
 		Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
 			time.Sleep(100 * time.Millisecond)
 			return nil
@@ -256,7 +257,7 @@ func TestExecutionSchedulerEndTime(t *testing.T) {
 
 func TestExecutionSchedulerRuntimeErrors(t *testing.T) {
 	t.Parallel()
-	runner := &testutils.MiniRunner{
+	runner := &minirunner.MiniRunner{
 		Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
 			time.Sleep(10 * time.Millisecond)
 			return errors.New("hi")
@@ -294,7 +295,7 @@ func TestExecutionSchedulerEndErrors(t *testing.T) {
 	exec.Duration = types.NullDurationFrom(1 * time.Second)
 	exec.GracefulStop = types.NullDurationFrom(0 * time.Second)
 
-	runner := &testutils.MiniRunner{
+	runner := &minirunner.MiniRunner{
 		Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
 			<-ctx.Done()
 			return errors.New("hi")
@@ -332,7 +333,7 @@ func TestExecutionSchedulerEndIterations(t *testing.T) {
 	require.Empty(t, options.Validate())
 
 	var i int64
-	runner := &testutils.MiniRunner{
+	runner := &minirunner.MiniRunner{
 		Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
 			select {
 			case <-ctx.Done():
@@ -361,7 +362,7 @@ func TestExecutionSchedulerEndIterations(t *testing.T) {
 	assert.Equal(t, uint64(100), execScheduler.GetState().GetFullIterationCount())
 	assert.Equal(t, uint64(0), execScheduler.GetState().GetPartialIterationCount())
 	assert.Equal(t, int64(100), i)
-	require.Equal(t, 100, len(samples)) //TODO: change to 200 https://github.com/loadimpact/k6/issues/1250
+	require.Equal(t, 100, len(samples)) // TODO: change to 200 https://github.com/loadimpact/k6/issues/1250
 	for i := 0; i < 100; i++ {
 		mySample, ok := <-samples
 		require.True(t, ok)
@@ -371,7 +372,7 @@ func TestExecutionSchedulerEndIterations(t *testing.T) {
 
 func TestExecutionSchedulerIsRunning(t *testing.T) {
 	t.Parallel()
-	runner := &testutils.MiniRunner{
+	runner := &minirunner.MiniRunner{
 		Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
 			<-ctx.Done()
 			return nil
@@ -404,7 +405,7 @@ func TestExecutionSchedulerSetVUs(t *testing.T) {
 	})
 
 	t.Run("Raise", func(t *testing.T) {
-		e := New(&testutils.MiniRunner{Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
+		e := New(&minirunner.MiniRunner{Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
 			return nil
 		}})
 		e.ctx = context.Background()
@@ -416,7 +417,7 @@ func TestExecutionSchedulerSetVUs(t *testing.T) {
 			for i, handle := range e.vus {
 				num++
 				if assert.NotNil(t, handle.vu, "vu %d lacks impl", i) {
-					assert.Equal(t, int64(0), handle.vu.(*testutils.MiniRunnerVU).ID)
+					assert.Equal(t, int64(0), handle.vu.(*minirunner.VU).ID)
 				}
 				assert.Nil(t, handle.ctx, "vu %d has ctx", i)
 				assert.Nil(t, handle.cancel, "vu %d has cancel", i)
@@ -431,11 +432,11 @@ func TestExecutionSchedulerSetVUs(t *testing.T) {
 			for i, handle := range e.vus {
 				if i < 50 {
 					assert.NotNil(t, handle.cancel, "vu %d lacks cancel", i)
-					assert.Equal(t, int64(i+1), handle.vu.(*testutils.MiniRunnerVU).ID)
+					assert.Equal(t, int64(i+1), handle.vu.(*minirunner.VU).ID)
 					num++
 				} else {
 					assert.Nil(t, handle.cancel, "vu %d has cancel", i)
-					assert.Equal(t, int64(0), handle.vu.(*testutils.MiniRunnerVU).ID)
+					assert.Equal(t, int64(0), handle.vu.(*minirunner.VU).ID)
 				}
 			}
 			assert.Equal(t, 50, num)
@@ -447,7 +448,7 @@ func TestExecutionSchedulerSetVUs(t *testing.T) {
 			num := 0
 			for i, handle := range e.vus {
 				assert.NotNil(t, handle.cancel, "vu %d lacks cancel", i)
-				assert.Equal(t, int64(i+1), handle.vu.(*testutils.MiniRunnerVU).ID)
+				assert.Equal(t, int64(i+1), handle.vu.(*minirunner.VU).ID)
 				num++
 			}
 			assert.Equal(t, 100, num)
@@ -465,7 +466,7 @@ func TestExecutionSchedulerSetVUs(t *testing.T) {
 					} else {
 						assert.Nil(t, handle.cancel, "vu %d has cancel", i)
 					}
-					assert.Equal(t, int64(i+1), handle.vu.(*testutils.MiniRunnerVU).ID)
+					assert.Equal(t, int64(i+1), handle.vu.(*minirunner.VU).ID)
 				}
 				assert.Equal(t, 50, num)
 			}
@@ -477,9 +478,9 @@ func TestExecutionSchedulerSetVUs(t *testing.T) {
 					for i, handle := range e.vus {
 						assert.NotNil(t, handle.cancel, "vu %d lacks cancel", i)
 						if i < 50 {
-							assert.Equal(t, int64(i+1), handle.vu.(*testutils.MiniRunnerVU).ID)
+							assert.Equal(t, int64(i+1), handle.vu.(*minirunner.VU).ID)
 						} else {
-							assert.Equal(t, int64(50+i+1), handle.vu.(*testutils.MiniRunnerVU).ID)
+							assert.Equal(t, int64(50+i+1), handle.vu.(*minirunner.VU).ID)
 						}
 					}
 				}
@@ -658,10 +659,10 @@ func (p pausableExecutor) SetPaused(bool) error {
 
 func TestSetPaused(t *testing.T) {
 	t.Run("second pause is an error", func(t *testing.T) {
-		var runner = &testutils.MiniRunner{}
+		runner := &minirunner.MiniRunner{}
 		logger := logrus.New()
 		logger.SetOutput(testutils.NewTestOutput(t))
-		var sched, err = NewExecutionScheduler(runner, logger)
+		sched, err := NewExecutionScheduler(runner, logger)
 		require.NoError(t, err)
 		sched.executors = []lib.Executor{pausableExecutor{err: nil}}
 
@@ -672,10 +673,10 @@ func TestSetPaused(t *testing.T) {
 	})
 
 	t.Run("unpause at the start is an error", func(t *testing.T) {
-		var runner = &testutils.MiniRunner{}
+		runner := &minirunner.MiniRunner{}
 		logger := logrus.New()
 		logger.SetOutput(testutils.NewTestOutput(t))
-		var sched, err = NewExecutionScheduler(runner, logger)
+		sched, err := NewExecutionScheduler(runner, logger)
 		require.NoError(t, err)
 		sched.executors = []lib.Executor{pausableExecutor{err: nil}}
 		err = sched.SetPaused(false)
@@ -684,10 +685,10 @@ func TestSetPaused(t *testing.T) {
 	})
 
 	t.Run("second unpause is an error", func(t *testing.T) {
-		var runner = &testutils.MiniRunner{}
+		runner := &minirunner.MiniRunner{}
 		logger := logrus.New()
 		logger.SetOutput(testutils.NewTestOutput(t))
-		var sched, err = NewExecutionScheduler(runner, logger)
+		sched, err := NewExecutionScheduler(runner, logger)
 		require.NoError(t, err)
 		sched.executors = []lib.Executor{pausableExecutor{err: nil}}
 		require.NoError(t, sched.SetPaused(true))
@@ -698,12 +699,12 @@ func TestSetPaused(t *testing.T) {
 	})
 
 	t.Run("an error on pausing is propagated", func(t *testing.T) {
-		var runner = &testutils.MiniRunner{}
+		runner := &minirunner.MiniRunner{}
 		logger := logrus.New()
 		logger.SetOutput(testutils.NewTestOutput(t))
-		var sched, err = NewExecutionScheduler(runner, logger)
+		sched, err := NewExecutionScheduler(runner, logger)
 		require.NoError(t, err)
-		var expectedErr = errors.New("testing pausable executor error")
+		expectedErr := errors.New("testing pausable executor error")
 		sched.executors = []lib.Executor{pausableExecutor{err: expectedErr}}
 		err = sched.SetPaused(true)
 		require.Error(t, err)
@@ -711,7 +712,7 @@ func TestSetPaused(t *testing.T) {
 	})
 
 	t.Run("can't pause unpausable executor", func(t *testing.T) {
-		var runner = &testutils.MiniRunner{}
+		runner := &minirunner.MiniRunner{}
 		options, err := executor.DeriveExecutionFromShortcuts(lib.Options{
 			Iterations: null.IntFrom(2),
 			VUs:        null.IntFrom(1),
