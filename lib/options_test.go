@@ -23,13 +23,14 @@ package lib
 import (
 	"crypto/tls"
 	"encoding/json"
+	"fmt"
 	"net"
-	"os"
 	"reflect"
 	"testing"
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
+	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 	"github.com/stretchr/testify/assert"
@@ -130,7 +131,6 @@ func TestOptions(t *testing.T) {
 		}
 
 		t.Run("JSON", func(t *testing.T) {
-
 			t.Run("String", func(t *testing.T) {
 				var opts Options
 				jsonStr := `{"tlsCipherSuites":["TLS_ECDHE_RSA_WITH_RC4_128_SHA"]}`
@@ -385,7 +385,6 @@ func TestOptions(t *testing.T) {
 		assert.True(t, opts.DiscardResponseBodies.Valid)
 		assert.True(t, opts.DiscardResponseBodies.Bool)
 	})
-
 }
 
 func TestOptionsEnv(t *testing.T) {
@@ -409,8 +408,10 @@ func TestOptionsEnv(t *testing.T) {
 		},
 		{"Stages", "K6_STAGES"}: {
 			// "": []Stage{},
-			"1s": []Stage{{
-				Duration: types.NullDurationFrom(1 * time.Second)},
+			"1s": []Stage{
+				{
+					Duration: types.NullDurationFrom(1 * time.Second),
+				},
 			},
 			"1s:100": []Stage{
 				{Duration: types.NullDurationFrom(1 * time.Second), Target: null.IntFrom(100)},
@@ -460,11 +461,13 @@ func TestOptionsEnv(t *testing.T) {
 		// External
 	}
 	for field, data := range testdata {
-		os.Clearenv()
+		field, data := field, data
 		t.Run(field.Name, func(t *testing.T) {
 			for str, val := range data {
+				str, val := str, val
 				t.Run(`"`+str+`"`, func(t *testing.T) {
-					assert.NoError(t, os.Setenv(field.Key, str))
+					restore := testutils.SetEnv(t, []string{fmt.Sprintf("%s=%s", field.Key, str)})
+					defer restore()
 					var opts Options
 					assert.NoError(t, envconfig.Process("k6", &opts))
 					assert.Equal(t, val, reflect.ValueOf(opts).FieldByName(field.Name).Interface())
@@ -475,8 +478,7 @@ func TestOptionsEnv(t *testing.T) {
 }
 
 func TestCIDRUnmarshal(t *testing.T) {
-
-	var testData = []struct {
+	testData := []struct {
 		input          string
 		expectedOutput *IPNet
 		expactFailure  bool
