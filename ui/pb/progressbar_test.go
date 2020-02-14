@@ -44,39 +44,44 @@ func TestProgressBarRender(t *testing.T) {
 		expected string
 	}{
 		{[]ProgressBarOption{WithLeft(func() string { return "left" })},
-			"left [--------------------------------------]"},
+			"left   [--------------------------------------]"},
 		{[]ProgressBarOption{WithConstLeft("constLeft")},
-			"constLeft [--------------------------------------]"},
+			"constLeft   [--------------------------------------]"},
 		{[]ProgressBarOption{
 			WithLeft(func() string { return "left" }),
-			WithProgress(func() (float64, string) { return 0, "right" }),
+			WithStatus(Done),
 		},
-			"left [--------------------------------------] right"},
+			"left ✓ [--------------------------------------]"},
 		{[]ProgressBarOption{
 			WithLeft(func() string { return "left" }),
-			WithProgress(func() (float64, string) { return 0.5, "right" }),
+			WithProgress(func() (float64, []string) { return 0, []string{"right"} }),
 		},
-			"left [==================>-------------------] right"},
+			"left   [--------------------------------------] right"},
 		{[]ProgressBarOption{
 			WithLeft(func() string { return "left" }),
-			WithProgress(func() (float64, string) { return 1.0, "right" }),
+			WithProgress(func() (float64, []string) { return 0.5, []string{"right"} }),
 		},
-			"left [======================================] right"},
+			"left   [==================>-------------------] right"},
 		{[]ProgressBarOption{
 			WithLeft(func() string { return "left" }),
-			WithProgress(func() (float64, string) { return -1, "right" }),
+			WithProgress(func() (float64, []string) { return 1.0, []string{"right"} }),
 		},
-			"left [--------------------------------------] right"},
+			"left   [======================================] right"},
 		{[]ProgressBarOption{
 			WithLeft(func() string { return "left" }),
-			WithProgress(func() (float64, string) { return 2, "right" }),
+			WithProgress(func() (float64, []string) { return -1, []string{"right"} }),
 		},
-			"left [======================================] right"},
+			"left   [--------------------------------------] right"},
+		{[]ProgressBarOption{
+			WithLeft(func() string { return "left" }),
+			WithProgress(func() (float64, []string) { return 2, []string{"right"} }),
+		},
+			"left   [======================================] right"},
 		{[]ProgressBarOption{
 			WithLeft(func() string { return "left" }),
 			WithConstProgress(0.2, "constProgress"),
 		},
-			"left [======>-------------------------------] constProgress"},
+			"left   [======>-------------------------------] constProgress"},
 		{[]ProgressBarOption{
 			WithHijack(func() string { return "progressbar hijack!" }),
 		},
@@ -88,7 +93,7 @@ func TestProgressBarRender(t *testing.T) {
 		t.Run(tc.expected, func(t *testing.T) {
 			pbar := New(tc.options...)
 			assert.NotNil(t, pbar)
-			assert.Equal(t, tc.expected, pbar.Render(0))
+			assert.Equal(t, tc.expected, pbar.Render(0).String())
 		})
 	}
 }
@@ -101,12 +106,10 @@ func TestProgressBarRenderPaddingMaxLeft(t *testing.T) {
 		left     string
 		expected string
 	}{
-		{-1, "left", "left [--------------------------------------]"},
-		{0, "left", "left [--------------------------------------]"},
-		{15, "left_pad",
-			"left_pad        [--------------------------------------]"},
+		{-1, "left", "left   [--------------------------------------]"},
+		{0, "left", "left   [--------------------------------------]"},
 		{10, "left_truncated",
-			"left_tr... [--------------------------------------]"},
+			"left_tr...   [--------------------------------------]"},
 	}
 
 	for _, tc := range testCases {
@@ -114,7 +117,7 @@ func TestProgressBarRenderPaddingMaxLeft(t *testing.T) {
 		t.Run(tc.left, func(t *testing.T) {
 			pbar := New(WithLeft(func() string { return tc.left }))
 			assert.NotNil(t, pbar)
-			assert.Equal(t, tc.expected, pbar.Render(tc.maxLen))
+			assert.Equal(t, tc.expected, pbar.Render(tc.maxLen).String())
 		})
 	}
 }

@@ -28,12 +28,13 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/sirupsen/logrus"
+	null "gopkg.in/guregu/null.v3"
+
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/ui/pb"
-	"github.com/sirupsen/logrus"
-	null "gopkg.in/guregu/null.v3"
 )
 
 const variableArrivalRateType = "variable-arrival-rate"
@@ -356,20 +357,34 @@ func (varr VariableArrivalRate) Run(ctx context.Context, out chan<- stats.Sample
 	tickerPeriod := new(int64)
 	*tickerPeriod = int64(startTickerPeriod.Duration)
 
-	fmtStr := pb.GetFixedLengthFloatFormat(maxArrivalRatePerSec, 2) + " iters/s, " +
-		pb.GetFixedLengthIntFormat(maxVUs) + " out of " + pb.GetFixedLengthIntFormat(maxVUs) + " VUs active"
-	progresFn := func() (float64, string) {
+	vusFmt := pb.GetFixedLengthIntFormat(maxVUs)
+	itersFmt := pb.GetFixedLengthFloatFormat(maxArrivalRatePerSec, 0) + " iters/s"
+
+	progresFn := func() (float64, []string) {
 		currentInitialisedVUs := atomic.LoadUint64(&initialisedVUs)
 		currentTickerPeriod := atomic.LoadInt64(tickerPeriod)
 		vusInBuffer := uint64(len(vus))
+		progVUs := fmt.Sprintf(vusFmt+"/"+vusFmt+" VUs",
+			currentInitialisedVUs-vusInBuffer, currentInitialisedVUs)
 
 		itersPerSec := 0.0
 		if currentTickerPeriod > 0 {
 			itersPerSec = float64(time.Second) / float64(currentTickerPeriod)
 		}
-		return math.Min(1, float64(time.Since(startTime))/float64(duration)), fmt.Sprintf(fmtStr,
-			itersPerSec, currentInitialisedVUs-vusInBuffer, currentInitialisedVUs,
-		)
+		progIters := fmt.Sprintf(itersFmt, itersPerSec)
+
+		right := []string{progVUs, duration.String(), progIters}
+
+		spent := time.Since(startTime)
+		if spent > duration {
+			return 1, right
+		}
+
+		spentDuration := pb.GetFixedLengthDuration(spent, duration)
+		progDur := fmt.Sprintf("%s/%s", spentDuration, duration)
+		right[1] = progDur
+
+		return math.Min(1, float64(spent)/float64(duration)), right
 	}
 	varr.progress.Modify(pb.WithProgress(progresFn))
 	go trackProgress(ctx, maxDurationCtx, regDurationCtx, varr, progresFn)
