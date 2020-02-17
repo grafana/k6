@@ -150,8 +150,8 @@ type Config struct {
 // NewConfig creates a new Config instance with default values for some fields.
 func NewConfig() Config {
 	return Config{
-		Host:                       null.NewString("https://ingest.loadimpact.com", false),
-		WebAppURL:                  null.NewString("https://app.loadimpact.com", false),
+		Host:                       null.NewString("https://ingest.k6.io", false),
+		WebAppURL:                  null.NewString("https://app.k6.io", false),
 		MetricPushInterval:         types.NewNullDuration(1*time.Second, false),
 		MaxMetricSamplesPerPackage: null.NewInt(100000, false),
 		// Aggregation is disabled by default, since AggregationPeriod has no default value
