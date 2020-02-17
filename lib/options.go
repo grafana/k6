@@ -192,7 +192,7 @@ type Options struct {
 
 	// Initial values for VUs, max VUs, duration cap, iteration cap, and stages.
 	// See the Runner or Executor interfaces for more information.
-	VUs null.Int `json:"vus" envconfig:"K6_VUS"`
+	VUs        null.Int           `json:"vus" envconfig:"K6_VUS"`
 	Duration   types.NullDuration `json:"duration" envconfig:"K6_DURATION"`
 	Iterations null.Int           `json:"iterations" envconfig:"K6_ITERATIONS"`
 	Stages     []Stage            `json:"stages" envconfig:"K6_STAGES"`
@@ -203,8 +203,9 @@ type Options struct {
 	// We should support specifying execution segments via environment
 	// variables, but we currently can't, because envconfig has this nasty bug
 	// (among others): https://github.com/kelseyhightower/envconfig/issues/113
-	Execution        ExecutorConfigMap `json:"execution,omitempty" ignored:"true"`
-	ExecutionSegment *ExecutionSegment `json:"executionSegment" ignored:"true"`
+	Execution        ExecutorConfigMap         `json:"execution,omitempty" ignored:"true"`
+	ExecutionSegment *ExecutionSegment         `json:"executionSegment" ignored:"true"`
+	ESS              *ExecutionSegmentSequence `json:"executionSegmentSequence" ignored:"true"`
 
 	// Timeouts for the setup() and teardown() functions
 	NoSetup         null.Bool          `json:"noSetup" envconfig:"NO_SETUP"`
