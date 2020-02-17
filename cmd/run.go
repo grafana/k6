@@ -290,7 +290,7 @@ a commandline interface for interacting with it.`,
 		// If the user hasn't opted out: report usage.
 		if !conf.NoUsageReport.Bool {
 			go func() {
-				u := "http://k6reports.loadimpact.com/"
+				u := "https://reports.k6.io/"
 				mime := "application/json"
 				var endTSeconds float64
 				if endT := engine.Executor.GetEndTime(); endT.Valid {
