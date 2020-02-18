@@ -1,3 +1,23 @@
+/*
+ *
+ * k6 - a next-generation load testing tool
+ * Copyright (C) 2019 Load Impact
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
 package executor
 
 import (
@@ -7,12 +27,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/types"
-	"github.com/loadimpact/k6/stats"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	null "gopkg.in/guregu/null.v3"
+
+	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/types"
+	"github.com/loadimpact/k6/stats"
 )
 
 func getTestConstantArrivalRateConfig() ConstantArrivalRateConfig {
@@ -27,8 +48,9 @@ func getTestConstantArrivalRateConfig() ConstantArrivalRateConfig {
 
 func TestConstantArrivalRateRunNotEnoughAllocatedVUsWarn(t *testing.T) {
 	t.Parallel()
+	es := lib.NewExecutionState(lib.Options{}, 10, 50)
 	var ctx, cancel, executor, logHook = setupExecutor(
-		t, getTestConstantArrivalRateConfig(),
+		t, getTestConstantArrivalRateConfig(), es,
 		simpleRunner(func(ctx context.Context) error {
 			time.Sleep(time.Second)
 			return nil
@@ -51,8 +73,9 @@ func TestConstantArrivalRateRunNotEnoughAllocatedVUsWarn(t *testing.T) {
 func TestConstantArrivalRateRunCorrectRate(t *testing.T) {
 	t.Parallel()
 	var count int64
+	es := lib.NewExecutionState(lib.Options{}, 10, 50)
 	var ctx, cancel, executor, logHook = setupExecutor(
-		t, getTestConstantArrivalRateConfig(),
+		t, getTestConstantArrivalRateConfig(), es,
 		simpleRunner(func(ctx context.Context) error {
 			atomic.AddInt64(&count, 1)
 			return nil
@@ -93,14 +116,16 @@ func TestArrivalRateCancel(t *testing.T) {
 			var ch = make(chan struct{})
 			var errCh = make(chan error, 1)
 			var weAreDoneCh = make(chan struct{})
-			var ctx, cancel, executor, logHook = setupExecutor(t, config, simpleRunner(func(ctx context.Context) error {
-				select {
-				case <-ch:
-					<-ch
-				default:
-				}
-				return nil
-			}))
+			es := lib.NewExecutionState(lib.Options{}, 10, 50)
+			var ctx, cancel, executor, logHook = setupExecutor(
+				t, config, es, simpleRunner(func(ctx context.Context) error {
+					select {
+					case <-ch:
+						<-ch
+					default:
+					}
+					return nil
+				}))
 			defer cancel()
 			var wg sync.WaitGroup
 			wg.Add(1)
