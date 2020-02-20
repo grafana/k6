@@ -444,15 +444,31 @@ func TestGetStripedOffsets(t *testing.T) {
 		lcd      int64
 		expError string
 	}{
+		// full sequences
 		{seq: "0,0.3,0.5,0.6,0.7,0.8,0.9,1", seg: "0:0.2", expError: "missing segment"},
-		{seq: "0,0.3,0.5,0.6,0.7,0.8,0.9,1", seg: "0:0.3", start: 0, offsets: []int64{4, 3}, lcd: 10},
-		{seq: "0,0.3,0.5,0.6,0.7,0.8,0.9,1", seg: "0.3:0.5", start: 1, offsets: []int64{4}, lcd: 10},
-		{seq: "0,0.3,0.5,0.6,0.7,0.8,0.9,1", seg: "0.5:0.6", start: 2, lcd: 10},
-		{seq: "0,0.3,0.5,0.6,0.7,0.8,0.9,1", seg: "0.6:0.7", start: 3, lcd: 10},
-		{seq: "0,0.3,0.5,0.6,0.7,0.8,0.9,1", seg: "0.8:0.9", start: 8, lcd: 10},
-		{seq: "0,0.3,0.5,0.6,0.7,0.8,0.9,1", seg: "0.9:1", start: 9, lcd: 10},
-		{seq: "0,0.2,0.5,0.6,0.7,0.8,0.9,1", seg: "0.9:1", start: 9, lcd: 10},
-		{seq: "0,0.2,0.5,0.6,0.7,0.8,0.9,1", seg: "0:0.2", start: 1, offsets: []int64{4}, lcd: 10},
+		{seq: "0,0.3,0.5,0.6,0.7,0.8,0.9,1", seg: "0:0.3", start: 0, offsets: []int64{4, 3, 3}, lcd: 10},
+		{seq: "0,0.3,0.5,0.6,0.7,0.8,0.9,1", seg: "0.3:0.5", start: 1, offsets: []int64{4, 6}, lcd: 10},
+		{seq: "0,0.3,0.5,0.6,0.7,0.8,0.9,1", seg: "0.5:0.6", start: 2, offsets: []int64{10}, lcd: 10},
+		{seq: "0,0.3,0.5,0.6,0.7,0.8,0.9,1", seg: "0.6:0.7", start: 3, offsets: []int64{10}, lcd: 10},
+		{seq: "0,0.3,0.5,0.6,0.7,0.8,0.9,1", seg: "0.8:0.9", start: 8, offsets: []int64{10}, lcd: 10},
+		{seq: "0,0.3,0.5,0.6,0.7,0.8,0.9,1", seg: "0.9:1", start: 9, offsets: []int64{10}, lcd: 10},
+		{seq: "0,0.2,0.5,0.6,0.7,0.8,0.9,1", seg: "0.9:1", start: 9, offsets: []int64{10}, lcd: 10},
+		{seq: "0,0.2,0.5,0.6,0.7,0.8,0.9,1", seg: "0:0.2", start: 1, offsets: []int64{4, 6}, lcd: 10},
+		{seq: "0,0.2,0.5,0.6,0.7,0.8,0.9,1", seg: "0.6:0.7", start: 3, offsets: []int64{10}, lcd: 10},
+		// not full sequences
+		{seq: "0,0.2,0.5", seg: "0:0.2", start: 1, offsets: []int64{4, 6}, lcd: 10},
+		{seq: "0,0.2,0.5", seg: "0.2:0.5", start: 0, offsets: []int64{4, 3, 3}, lcd: 10},
+		{seq: "0,2/5,4/5", seg: "0:2/5", start: 0, offsets: []int64{3, 2}, lcd: 5},
+		{seq: "0,2/5,4/5", seg: "2/5:4/5", start: 1, offsets: []int64{3, 2}, lcd: 5},
+		// no sequence
+		{seg: "0:0.2", start: 0, offsets: []int64{5}, lcd: 5},
+		{seg: "0:1/5", start: 0, offsets: []int64{5}, lcd: 5},
+		{seg: "0:2/10", start: 0, offsets: []int64{5}, lcd: 5},
+		{seg: "0:0.4", start: 0, offsets: []int64{3, 2}, lcd: 5},
+		{seg: "0:2/5", start: 0, offsets: []int64{3, 2}, lcd: 5},
+		{seg: "2/5:4/5", start: 0, offsets: []int64{3, 2}, lcd: 5}, // this is the same as the previous one as there is no sequence
+		{seg: "0:4/10", start: 0, offsets: []int64{3, 2}, lcd: 5},
+		{seg: "1/10:5/10", start: 0, offsets: []int64{3, 2}, lcd: 5},
 	}
 
 	for _, tc := range testCases {
