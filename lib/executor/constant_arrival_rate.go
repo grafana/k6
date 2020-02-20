@@ -24,6 +24,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"math/big"
 	"sync/atomic"
 	"time"
 
@@ -196,7 +197,6 @@ func (car ConstantArrivalRate) Run(ctx context.Context, out chan<- stats.SampleC
 
 	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(ctx, duration, gracefulStop)
 	defer cancel()
-	ticker := time.NewTicker(tickerPeriod) // the rate can't be 0 because of the validation
 
 	// Make sure the log and the progress bar have accurate information
 	car.logger.WithFields(logrus.Fields{
@@ -260,9 +260,25 @@ func (car ConstantArrivalRate) Run(ctx context.Context, out chan<- stats.SampleC
 	}
 
 	remainingUnplannedVUs := maxVUs - preAllocatedVUs
-	for {
+	start, offsets, _, err := car.executionState.Options.ESS.GetStripedOffsets(segment)
+	if err != nil {
+		return err
+	}
+	startTime = time.Now()
+	timer := time.NewTimer(time.Hour * 24)
+	// here the we need the not scaled one
+	notScaledTickerPeriod := time.Duration(
+		getTickerPeriod(
+			big.NewRat(
+				car.config.Rate.Int64,
+				int64(time.Duration(car.config.TimeUnit.Duration)),
+			)).Duration)
+
+	for li, gi := 0, start; ; li, gi = li+1, gi+offsets[li%len(offsets)] {
+		var t = notScaledTickerPeriod*time.Duration(gi) - time.Since(startTime)
+		timer.Reset(t)
 		select {
-		case <-ticker.C:
+		case <-timer.C:
 			select {
 			case vu := <-vus:
 				// ideally, we get the VU from the buffer without any issues

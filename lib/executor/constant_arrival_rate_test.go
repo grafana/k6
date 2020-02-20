@@ -22,12 +22,14 @@ package executor
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	null "gopkg.in/guregu/null.v3"
 
@@ -100,6 +102,121 @@ func TestConstantArrivalRateRunCorrectRate(t *testing.T) {
 	wg.Wait()
 	require.NoError(t, err)
 	require.Empty(t, logHook.Drain())
+}
+
+func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
+	newExecutionSegmentFromString := func(str string) *lib.ExecutionSegment {
+		r, err := lib.NewExecutionSegmentFromString(str)
+		require.NoError(t, err)
+		return r
+	}
+
+	newExecutionSegmentSequenceFromString := func(str string) *lib.ExecutionSegmentSequence {
+		r, err := lib.NewExecutionSegmentSequenceFromString(str)
+		require.NoError(t, err)
+		return &r
+	}
+
+	var tests = []struct {
+		segment  *lib.ExecutionSegment
+		sequence *lib.ExecutionSegmentSequence
+		start    time.Duration
+		step     time.Duration
+	}{
+		{
+			segment: newExecutionSegmentFromString("0:1/3"),
+			start:   time.Millisecond * 00,
+			step:    time.Millisecond * 60,
+		},
+		{
+			segment: newExecutionSegmentFromString("1/3:2/3"),
+			start:   time.Millisecond * 00,
+			step:    time.Millisecond * 60,
+		},
+		{
+			segment: newExecutionSegmentFromString("2/3:1"),
+			start:   time.Millisecond * 00,
+			step:    time.Millisecond * 60,
+		},
+		{
+			segment: newExecutionSegmentFromString("1/6:3/6"),
+			start:   time.Millisecond * 00,
+			step:    time.Millisecond * 60,
+		},
+		{
+			segment:  newExecutionSegmentFromString("1/6:3/6"),
+			sequence: &lib.ExecutionSegmentSequence{},
+			start:    time.Millisecond * 00,
+			step:     time.Millisecond * 60,
+		},
+		// sequences
+		{
+			segment:  newExecutionSegmentFromString("0:1/3"),
+			sequence: newExecutionSegmentSequenceFromString("0,1/3,2/3,1"),
+			start:    time.Millisecond * 00,
+			step:     time.Millisecond * 60,
+		},
+		{
+			segment:  newExecutionSegmentFromString("1/3:2/3"),
+			sequence: newExecutionSegmentSequenceFromString("0,1/3,2/3,1"),
+			start:    time.Millisecond * 20,
+			step:     time.Millisecond * 60,
+		},
+		{
+			segment:  newExecutionSegmentFromString("2/3:1"),
+			sequence: newExecutionSegmentSequenceFromString("0,1/3,2/3,1"),
+			start:    time.Millisecond * 40,
+			step:     time.Millisecond * 60,
+		},
+	}
+	for _, test := range tests {
+		test := test
+
+		t.Run(fmt.Sprintf("segment %s sequence %s", test.segment, test.sequence), func(t *testing.T) {
+			t.Parallel()
+			es := lib.NewExecutionState(lib.Options{
+				ExecutionSegment: test.segment,
+				ESS:              test.sequence,
+			}, 10, 50)
+			var count int64
+			var startTime = time.Now()
+			var ctx, cancel, executor, logHook = setupExecutor(
+				t, getTestConstantArrivalRateConfig(), es,
+				simpleRunner(func(ctx context.Context) error {
+					current := atomic.AddInt64(&count, 1)
+					expectedTime := test.start + time.Duration(current-1)*test.step
+					assert.WithinDuration(t,
+						startTime.Add(expectedTime),
+						time.Now(),
+						time.Millisecond*10,
+						"%d expectedTime %s", current, expectedTime,
+					)
+
+					return nil
+				}),
+			)
+			defer cancel()
+			var wg sync.WaitGroup
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				// check that we got around the amount of VU iterations as we would expect
+				var currentCount int64
+
+				for i := 0; i < 5; i++ {
+					time.Sleep(time.Second)
+					currentCount = atomic.LoadInt64(&count)
+					assert.InDelta(t, (i+1)*17, currentCount, 2)
+				}
+			}()
+			startTime = time.Now()
+			var engineOut = make(chan stats.SampleContainer, 1000)
+			err := executor.Run(ctx, engineOut)
+			wg.Wait()
+			require.NoError(t, err)
+			require.Empty(t, logHook.Drain())
+		})
+	}
 }
 
 func TestArrivalRateCancel(t *testing.T) {
