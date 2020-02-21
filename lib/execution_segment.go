@@ -447,23 +447,20 @@ func (ess *ExecutionSegmentSequence) GetStripedOffsets(segment *ExecutionSegment
 
 // This is only needed in order to sort all three at the same time
 type sortInterfaceWrapper struct { // TODO: rename ?
-	numerators []int64
-	steps      []*big.Rat
 	ess        ExecutionSegmentSequence
+	numerators []int64
 	lcd        int64
 }
 
 func newWrapper(ess ExecutionSegmentSequence) sortInterfaceWrapper {
 	var result = sortInterfaceWrapper{
-		numerators: make([]int64, len(ess)),
-		steps:      make([]*big.Rat, len(ess)),
-		lcd:        ess.lcd(),
 		ess:        ess,
+		numerators: make([]int64, len(ess)),
+		lcd:        ess.lcd(),
 	}
 
 	for i := range ess {
 		result.numerators[i] = ess[i].length.Num().Int64() * (result.lcd / ess[i].length.Denom().Int64())
-		result.steps[i] = big.NewRat(result.lcd, result.numerators[i])
 	}
 
 	sort.Stable(result)
@@ -482,16 +479,20 @@ func (e sortInterfaceWrapper) indexOf(segment *ExecutionSegment) int {
 
 func (e sortInterfaceWrapper) strippedOffsetsFor(segmentIndex int) (int64, []int64) {
 	var offsets = make([]int64, 0, e.numerators[segmentIndex]+1)
-	var soonest = make([]*big.Rat, len(e.ess))
-	for i := range e.ess {
-		soonest[i] = big.NewRat(0, 1)
-	}
+	var chosenCounts = make([]int64, len(e.ess))
+	// Here instead of calculating steps which need to be big.Rat, we use the fact that
+	// the steps are always the length of the segment inverted which also is lcd/numerator
+	// So instead of creating and adding up big.Rat we just multiply the step by the amount
+	// of times given segment has been chosen which is count * lcd / numerator and use that
+	// this both saves on a lot of big.Rat allocations and also on a lot of unneeded calculations
+	// with them.
 
 	for i := int64(0); i < e.lcd; i++ {
-		for index, value := range soonest {
-			num, denom := value.Num().Int64(), value.Denom().Int64()
+		for index, chosenCount := range chosenCounts {
+			num := chosenCount * e.lcd
+			denom := e.numerators[index]
 			if i > num/denom || (i == num/denom && num%denom == 0) {
-				value.Add(value, e.steps[index])
+				chosenCounts[index]++
 				if index == segmentIndex {
 					prev := int64(0)
 					if len(offsets) > 0 {
@@ -527,6 +528,5 @@ func (e sortInterfaceWrapper) Less(i, j int) bool {
 // Swap swaps the elements with indexes i and j.
 func (e sortInterfaceWrapper) Swap(i, j int) {
 	e.numerators[i], e.numerators[j] = e.numerators[j], e.numerators[i]
-	e.steps[i], e.steps[j] = e.steps[j], e.steps[i]
 	e.ess[i], e.ess[j] = e.ess[j], e.ess[i]
 }
