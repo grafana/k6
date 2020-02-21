@@ -395,20 +395,33 @@ func (ess ExecutionSegmentSequence) String() string {
 	return strings.Join(result, ",")
 }
 
-// lowest common denominator based on https://rosettacode.org/wiki/Least_common_multiple#Go
+// lowest common denominator
+// https://en.wikipedia.org/wiki/Least_common_multiple#Using_the_greatest_common_divisor
 func (ess ExecutionSegmentSequence) lcd() int64 {
-	var m, n, z big.Int
-	z = *ess[0].length.Denom()
+	var acc = ess[0].length.Denom().Int64()
+	var n int64
 	for _, seg := range ess[1:] {
-		m = z
-		n = *seg.length.Denom()
-		if m.Cmp(&n) == 0 {
+		n = seg.length.Denom().Int64()
+		if acc == n || acc%n == 0 { // short circuit
 			continue
 		}
-		z.Mul(z.Div(&m, z.GCD(nil, nil, &m, &n)), &n)
+		acc = acc * n / gcd(acc, n)
 	}
 
-	return z.Int64()
+	return acc
+}
+
+// Greatest common divisor
+// https://en.wikipedia.org/wiki/Euclidean_algorithm
+func gcd(a, b int64) int64 {
+	for a != b {
+		if a > b {
+			a -= b
+		} else {
+			b -= a
+		}
+	}
+	return a
 }
 
 // GetStripedOffsets returns everything that you need in order to execute only
