@@ -147,7 +147,7 @@ There are two reasons for this. The first is, of course: performance. If you rea
 
 But there's another, more interesting reason. By forcing all imports and file reads into the init context, we design for distributed execution. We know which files will be needed, so we distribute only those files to each node in the cluster. We know which modules will be imported, so we can bundle them up in an [archive](https://docs.k6.io/docs/archives-for-bundling-sharing-test) from the get-go. And, tying into the performance point above, the other nodes don't even need writable file systems - everything can be kept in-memory.
 
-This means that if your script works when it's executed with `k6 run` locally, it should also work without any modifications in a distributed execution environment like `k6 cloud` (that executes it in the Load Impact cloud infrastructure) or, in the future, with the [planned](https://github.com/loadimpact/k6/wiki/Roadmap) k6 native cluster execution mode.
+This means that if your script works when it's executed with `k6 run` locally, it should also work without any modifications in a distributed execution environment like `k6 cloud` (that executes it in the commercial [k6 cloud infrastructure](https://k6.io/cloud)) or, in the future, with the [planned](https://github.com/loadimpact/k6/wiki/Roadmap) k6 native cluster execution mode.
 
 ### Script execution
 
