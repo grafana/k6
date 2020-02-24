@@ -199,7 +199,10 @@ func (r *Runner) newVU(samplesOut chan<- stats.SampleContainer) (*VU, error) {
 	vu.Runtime.Set("console", common.Bind(vu.Runtime, vu.Console, vu.Context))
 	common.BindToGlobal(vu.Runtime, map[string]interface{}{
 		"open": func() {
-			common.Throw(vu.Runtime, errors.New("\"open\" function is only available to the init code (aka global scope), see https://docs.k6.io/docs/test-life-cycle for more information"))
+			common.Throw(vu.Runtime, errors.New(
+				`The "open()" function is only available to init code (aka the global scope), see `+
+					` https://k6.io/docs/using-k6/test-life-cycle for more information`,
+			))
 		},
 	})
 

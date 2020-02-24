@@ -481,7 +481,7 @@ func (h *HTTP) parseBatchRequest(
 		}
 
 	case map[string]interface{}:
-		// Handling of {method: "GET", url: "http://test.loadimpact.com"}
+		// Handling of {method: "GET", url: "https://test.k6.io"}
 		if murl, ok := data["url"]; !ok {
 			return nil, fmt.Errorf("batch request %q doesn't have an url key", key)
 		} else if reqURL, err = ToURL(murl); err != nil {
