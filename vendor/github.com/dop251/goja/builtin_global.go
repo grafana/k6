@@ -6,9 +6,12 @@ import (
 	"math"
 	"regexp"
 	"strconv"
+	"strings"
 	"unicode/utf16"
 	"unicode/utf8"
 )
+
+const hexUpper = "0123456789ABCDEF"
 
 var (
 	parseFloatRegexp = regexp.MustCompile(`^([+-]?(?:Infinity|[0-9]*\.?[0-9]*(?:[eE][+-]?[0-9]+)?))`)
@@ -100,14 +103,14 @@ func (r *Runtime) _encode(uriString valueString, unescaped *[256]bool) valueStri
 			n := utf8.EncodeRune(utf8Buf, rn)
 			for _, b := range utf8Buf[:n] {
 				buf[i] = '%'
-				buf[i+1] = "0123456789ABCDEF"[b>>4]
-				buf[i+2] = "0123456789ABCDEF"[b&15]
+				buf[i+1] = hexUpper[b>>4]
+				buf[i+2] = hexUpper[b&15]
 				i += 3
 			}
 		} else if !unescaped[rn] {
 			buf[i] = '%'
-			buf[i+1] = "0123456789ABCDEF"[rn>>4]
-			buf[i+2] = "0123456789ABCDEF"[rn&15]
+			buf[i+1] = hexUpper[rn>>4]
+			buf[i+2] = hexUpper[rn&15]
 			i += 3
 		} else {
 			buf[i] = byte(rn)
@@ -233,6 +236,94 @@ func (r *Runtime) builtin_encodeURIComponent(call FunctionCall) Value {
 	return r._encode(uriString, &uriUnescaped)
 }
 
+func (r *Runtime) builtin_escape(call FunctionCall) Value {
+	s := call.Argument(0).ToString()
+	var sb strings.Builder
+	l := s.length()
+	for i := int64(0); i < l; i++ {
+		r := uint16(s.charAt(i))
+		if r >= 'A' && r <= 'Z' || r >= 'a' && r <= 'z' || r >= '0' && r <= '9' ||
+			r == '@' || r == '*' || r == '_' || r == '+' || r == '-' || r == '.' || r == '/' {
+			sb.WriteByte(byte(r))
+		} else if r <= 0xff {
+			sb.WriteByte('%')
+			sb.WriteByte(hexUpper[r>>4])
+			sb.WriteByte(hexUpper[r&0xf])
+		} else {
+			sb.WriteString("%u")
+			sb.WriteByte(hexUpper[r>>12])
+			sb.WriteByte(hexUpper[(r>>8)&0xf])
+			sb.WriteByte(hexUpper[(r>>4)&0xf])
+			sb.WriteByte(hexUpper[r&0xf])
+		}
+	}
+	return asciiString(sb.String())
+}
+
+func (r *Runtime) builtin_unescape(call FunctionCall) Value {
+	s := call.Argument(0).ToString()
+	l := s.length()
+	_, unicode := s.(unicodeString)
+	var asciiBuf []byte
+	var unicodeBuf []uint16
+	if unicode {
+		unicodeBuf = make([]uint16, 0, l)
+	} else {
+		asciiBuf = make([]byte, 0, l)
+	}
+	for i := int64(0); i < l; {
+		r := s.charAt(i)
+		if r == '%' {
+			if i <= l-6 && s.charAt(i+1) == 'u' {
+				c0 := s.charAt(i + 2)
+				c1 := s.charAt(i + 3)
+				c2 := s.charAt(i + 4)
+				c3 := s.charAt(i + 5)
+				if c0 <= 0xff && ishex(byte(c0)) &&
+					c1 <= 0xff && ishex(byte(c1)) &&
+					c2 <= 0xff && ishex(byte(c2)) &&
+					c3 <= 0xff && ishex(byte(c3)) {
+					r = rune(unhex(byte(c0)))<<12 |
+						rune(unhex(byte(c1)))<<8 |
+						rune(unhex(byte(c2)))<<4 |
+						rune(unhex(byte(c3)))
+					i += 5
+					goto out
+				}
+			}
+			if i <= l-3 {
+				c0 := s.charAt(i + 1)
+				c1 := s.charAt(i + 2)
+				if c0 <= 0xff && ishex(byte(c0)) &&
+					c1 <= 0xff && ishex(byte(c1)) {
+					r = rune(unhex(byte(c0))<<4 | unhex(byte(c1)))
+					i += 2
+				}
+			}
+		}
+	out:
+		if r >= utf8.RuneSelf && !unicode {
+			unicodeBuf = make([]uint16, 0, l)
+			for _, b := range asciiBuf {
+				unicodeBuf = append(unicodeBuf, uint16(b))
+			}
+			asciiBuf = nil
+			unicode = true
+		}
+		if unicode {
+			unicodeBuf = append(unicodeBuf, uint16(r))
+		} else {
+			asciiBuf = append(asciiBuf, byte(r))
+		}
+		i++
+	}
+	if unicode {
+		return unicodeString(unicodeBuf)
+	}
+
+	return asciiString(asciiBuf)
+}
+
 func (r *Runtime) initGlobalObject() {
 	o := r.globalObject.self
 	o._putProp("NaN", _NaN, false, false, false)
@@ -247,6 +338,8 @@ func (r *Runtime) initGlobalObject() {
 	o._putProp("decodeURIComponent", r.newNativeFunc(r.builtin_decodeURIComponent, nil, "decodeURIComponent", nil, 1), true, false, true)
 	o._putProp("encodeURI", r.newNativeFunc(r.builtin_encodeURI, nil, "encodeURI", nil, 1), true, false, true)
 	o._putProp("encodeURIComponent", r.newNativeFunc(r.builtin_encodeURIComponent, nil, "encodeURIComponent", nil, 1), true, false, true)
+	o._putProp("escape", r.newNativeFunc(r.builtin_escape, nil, "escape", nil, 1), true, false, true)
+	o._putProp("unescape", r.newNativeFunc(r.builtin_unescape, nil, "unescape", nil, 1), true, false, true)
 
 	o._putProp("toString", r.newNativeFunc(func(FunctionCall) Value {
 		return stringGlobalObject
