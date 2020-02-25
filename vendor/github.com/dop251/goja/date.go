@@ -6,6 +6,7 @@ import (
 
 const (
 	dateTimeLayout       = "Mon Jan 02 2006 15:04:05 GMT-0700 (MST)"
+	utcDateTimeLayout    = "Mon, 02 Jan 2006 15:04:05 GMT"
 	isoDateTimeLayout    = "2006-01-02T15:04:05.000Z"
 	dateLayout           = "Mon Jan 02 2006"
 	timeLayout           = "15:04:05 GMT-0700 (MST)"

@@ -88,7 +88,7 @@ func (r *unresolvedRef) get() Value {
 	panic("Unreachable")
 }
 
-func (r *unresolvedRef) set(v Value) {
+func (r *unresolvedRef) set(Value) {
 	r.get()
 }
 
@@ -230,7 +230,7 @@ func (s *stash) getByIdx(idx uint32) Value {
 	return _undefined
 }
 
-func (s *stash) getByName(name string, vm *vm) (v Value, exists bool) {
+func (s *stash) getByName(name string, _ *vm) (v Value, exists bool) {
 	if s.obj != nil {
 		v = s.obj.getStr(name)
 		if v == nil {
@@ -313,6 +313,10 @@ func (vm *vm) Interrupt(v interface{}) {
 	vm.interruptLock.Unlock()
 }
 
+func (vm *vm) ClearInterrupt() {
+	atomic.StoreUint32(&vm.interrupted, 0)
+}
+
 func (vm *vm) captureStack(stack []stackFrame, ctxOffset int) []stackFrame {
 	// Unroll the context stack
 	stack = append(stack, stackFrame{prg: vm.prg, pc: vm.pc, funcName: vm.funcName})
@@ -342,12 +346,12 @@ func (vm *vm) try(f func()) (ex *Exception) {
 
 				// Restore other stacks
 				iterTail := vm.iterStack[iterLen:]
-				for i, _ := range iterTail {
+				for i := range iterTail {
 					iterTail[i] = iterStackItem{}
 				}
 				vm.iterStack = vm.iterStack[:iterLen]
 				refTail := vm.refStack[refLen:]
-				for i, _ := range refTail {
+				for i := range refTail {
 					refTail[i] = nil
 				}
 				vm.refStack = vm.refStack[:refLen]
@@ -450,11 +454,10 @@ func (r *Runtime) toObject(v Value, args ...interface{}) *Object {
 		return obj
 	}
 	if len(args) > 0 {
-		r.typeErrorResult(true, args)
+		panic(r.NewTypeError(args...))
 	} else {
-		r.typeErrorResult(true, "Value is not an object: %s", v.ToString())
+		panic(r.NewTypeError("Value is not an object: %s", v.String()))
 	}
-	panic("Unreachable")
 }
 
 func (r *Runtime) toCallee(v Value) *Object {
@@ -482,25 +485,10 @@ func (_newStash) exec(vm *vm) {
 	vm.pc++
 }
 
-type _noop struct{}
-
-var noop _noop
-
-func (_noop) exec(vm *vm) {
-	vm.pc++
-}
-
 type loadVal uint32
 
 func (l loadVal) exec(vm *vm) {
 	vm.push(vm.prg.values[l])
-	vm.pc++
-}
-
-type loadVal1 uint32
-
-func (l *loadVal1) exec(vm *vm) {
-	vm.push(vm.prg.values[*l])
 	vm.pc++
 }
 
@@ -971,7 +959,7 @@ type _setElem struct{}
 var setElem _setElem
 
 func (_setElem) exec(vm *vm) {
-	obj := vm.r.toObject(vm.stack[vm.sp-3])
+	obj := vm.stack[vm.sp-3].ToObject(vm.r)
 	propName := vm.stack[vm.sp-2]
 	val := vm.stack[vm.sp-1]
 
@@ -1052,8 +1040,7 @@ type setProp string
 
 func (p setProp) exec(vm *vm) {
 	val := vm.stack[vm.sp-1]
-
-	vm.r.toObject(vm.stack[vm.sp-2]).self.putStr(string(p), val, false)
+	vm.stack[vm.sp-2].ToObject(vm.r).self.putStr(string(p), val, false)
 	vm.stack[vm.sp-2] = val
 	vm.sp--
 	vm.pc++
@@ -1134,7 +1121,7 @@ func (g getProp) exec(vm *vm) {
 	v := vm.stack[vm.sp-1]
 	obj := v.baseObject(vm.r)
 	if obj == nil {
-		vm.r.typeErrorResult(true, "Cannot read property '%s' of undefined", g)
+		panic(vm.r.NewTypeError("Cannot read property '%s' of undefined", g))
 	}
 	prop := obj.self.getPropStr(string(g))
 	if prop1, ok := prop.(*valueProperty); ok {
@@ -1155,7 +1142,7 @@ func (g getPropCallee) exec(vm *vm) {
 	v := vm.stack[vm.sp-1]
 	obj := v.baseObject(vm.r)
 	if obj == nil {
-		vm.r.typeErrorResult(true, "Cannot read property '%s' of undefined", g)
+		panic(vm.r.NewTypeError("Cannot read property '%s' of undefined", g))
 	}
 	prop := obj.self.getPropStr(string(g))
 	if prop1, ok := prop.(*valueProperty); ok {
@@ -1179,7 +1166,7 @@ func (_getElem) exec(vm *vm) {
 	obj := v.baseObject(vm.r)
 	propName := vm.stack[vm.sp-1]
 	if obj == nil {
-		vm.r.typeErrorResult(true, "Cannot read property '%s' of undefined", propName.String())
+		panic(vm.r.NewTypeError("Cannot read property '%s' of undefined", propName.String()))
 	}
 
 	prop := obj.self.getProp(propName)
@@ -1475,62 +1462,6 @@ func (s setGlobal) exec(vm *vm) {
 	vm.pc++
 }
 
-type setVarStrict struct {
-	name string
-	idx  uint32
-}
-
-func (s setVarStrict) exec(vm *vm) {
-	v := vm.peek()
-
-	level := int(s.idx >> 24)
-	idx := uint32(s.idx & 0x00FFFFFF)
-	stash := vm.stash
-	name := s.name
-	for i := 0; i < level; i++ {
-		if stash.put(name, v) {
-			goto end
-		}
-		stash = stash.outer
-	}
-
-	if stash != nil {
-		stash.putByIdx(idx, v)
-	} else {
-		o := vm.r.globalObject.self
-		if o.hasOwnPropertyStr(name) {
-			o.putStr(name, v, true)
-		} else {
-			vm.r.throwReferenceError(name)
-		}
-	}
-
-end:
-	vm.pc++
-}
-
-type setVar1Strict string
-
-func (s setVar1Strict) exec(vm *vm) {
-	v := vm.peek()
-	var o objectImpl
-
-	name := string(s)
-	for stash := vm.stash; stash != nil; stash = stash.outer {
-		if stash.put(name, v) {
-			goto end
-		}
-	}
-	o = vm.r.globalObject.self
-	if o.hasOwnPropertyStr(name) {
-		o.putStr(name, v, true)
-	} else {
-		vm.r.throwReferenceError(name)
-	}
-end:
-	vm.pc++
-}
-
 type setGlobalStrict string
 
 func (s setGlobalStrict) exec(vm *vm) {
@@ -1731,15 +1662,6 @@ func (_pop) exec(vm *vm) {
 	vm.pc++
 }
 
-type _swap struct{}
-
-var swap _swap
-
-func (_swap) exec(vm *vm) {
-	vm.stack[vm.sp-1], vm.stack[vm.sp-2] = vm.stack[vm.sp-2], vm.stack[vm.sp-1]
-	vm.pc++
-}
-
 func (vm *vm) callEval(n int, strict bool) {
 	if vm.r.toObject(vm.stack[vm.sp-n-1]) == vm.r.global.Eval {
 		if n > 0 {
@@ -1883,7 +1805,7 @@ func (e enterFunc) exec(vm *vm) {
 	} else {
 		copy(vm.stash.values, vm.stack[vm.sp-vm.args:])
 		vv := vm.stash.values[vm.args:]
-		for i, _ := range vv {
+		for i := range vv {
 			vv[i] = _undefined
 		}
 	}
@@ -1929,7 +1851,7 @@ func (e enterFuncStashless) exec(vm *vm) {
 		vm.sp += int(ss)
 		vm.stack.expand(vm.sp)
 		s := vm.stack[sp:vm.sp]
-		for i, _ := range s {
+		for i := range s {
 			s[i] = _undefined
 		}
 	}
