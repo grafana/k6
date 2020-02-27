@@ -23,6 +23,7 @@ package lib
 import (
 	"encoding"
 	"fmt"
+	"math"
 	"math/big"
 	"strings"
 )
@@ -259,27 +260,25 @@ func roundUp(rat *big.Rat) *big.Int {
 
 // Scale proportionally scales the supplied value, according to the execution
 // segment's position and size of the work.
+// This implements the first proposal from #997:
+//   floor( (value * from) % 1 + value * length )
 func (es *ExecutionSegment) Scale(value int64) int64 {
 	if es == nil { // no execution segment, i.e. 100%
 		return value
 	}
-	// Instead of the first proposal that used remainders and floor:
-	//    floor( (value * from) % 1 + value * length )
-	// We're using an alternative approach with rounding that (hopefully) has
-	// the same properties, but it's simpler and has better precision:
-	//    round( (value * from) - round(value * from) + (value * (to - from)) )?
-	// which reduces to:
-	//    round( (value * to) - round(value * from) )?
-
-	toValue := big.NewRat(value, 1)
-	toValue.Mul(toValue, es.to)
-
 	fromValue := big.NewRat(value, 1)
 	fromValue.Mul(fromValue, es.from)
 
-	toValue.Sub(toValue, new(big.Rat).SetFrac(roundUp(fromValue), oneBigInt))
+	rem := new(big.Int).Rem(fromValue.Num(), fromValue.Denom())
+	fromRem := big.NewRat(rem.Int64(), fromValue.Denom().Int64())
 
-	return roundUp(toValue).Int64()
+	lenValue := big.NewRat(value, 1)
+	lenValue.Mul(lenValue, es.length)
+
+	fromRem.Add(fromRem, lenValue)
+
+	total, _ := fromRem.Float64()
+	return int64(math.Floor(total))
 }
 
 // InPlaceScaleRat scales rational numbers in-place - it changes the passed
