@@ -477,6 +477,14 @@ func TestExecutionSegmentScaleNoWobble(t *testing.T) {
 	}
 }
 
+func BenchmarkExecutionSegmentScale(b *testing.B) {
+	es, err := NewExecutionSegmentFromString("73/716:431/588")
+	require.NoError(b, err)
+	for n := 0; n < b.N; n++ {
+		es.Scale(5)
+	}
+}
+
 func TestMain(m *testing.M) {
 	rand.Seed(time.Now().UnixNano())
 	os.Exit(m.Run())
