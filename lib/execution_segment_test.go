@@ -445,6 +445,38 @@ func TestExecutionSegmentScaleConsistency(t *testing.T) {
 	}
 }
 
+func TestExecutionSegmentScaleNoWobble(t *testing.T) {
+	t.Parallel()
+
+	requireSegmentScaleGreater := func(t *testing.T, es *ExecutionSegment) {
+		var i, lastResult int64
+		for i = 1; i < 1000; i++ {
+			result := es.Scale(i)
+			require.GreaterOrEqual(t, result, lastResult)
+			lastResult = result
+		}
+	}
+
+	// Baseline full segment test
+	t.Run("0:1", func(t *testing.T) {
+		es, err := NewExecutionSegment(zeroRat, oneRat)
+		require.NoError(t, err)
+		requireSegmentScaleGreater(t, es)
+	})
+
+	// Random segments
+	const numTests = 10
+	for i := 0; i < numTests; i++ {
+		seq, err := genRandomExecutionSegmentSequence(rand.Intn(3) + 2)
+		require.NoError(t, err)
+
+		es := seq[rand.Intn(len(seq))]
+		t.Run(es.String(), func(t *testing.T) {
+			requireSegmentScaleGreater(t, es)
+		})
+	}
+}
+
 func TestMain(m *testing.M) {
 	rand.Seed(time.Now().UnixNano())
 	os.Exit(m.Run())
