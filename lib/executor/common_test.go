@@ -58,8 +58,8 @@ func setupExecutor(t *testing.T, config lib.ExecutorConfig, es *lib.ExecutionSta
 		return runner.NewVU(engineOut)
 	})
 
-	segment := es.Options.ExecutionSegment
-	maxVUs := lib.GetMaxPossibleVUs(config.GetExecutionRequirements(segment))
+	et := lib.NewExecutionTuple(es.Options.ExecutionSegment, es.Options.ExecutionSegmentSequence)
+	maxVUs := lib.GetMaxPossibleVUs(config.GetExecutionRequirements(et))
 	initializeVUs(ctx, t, logEntry, es, maxVUs)
 
 	executor, err := config.NewExecutor(es, logEntry)

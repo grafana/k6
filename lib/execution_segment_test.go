@@ -188,16 +188,58 @@ func TestExecutionSegmentSplit(t *testing.T) {
 	assert.Equal(t, "7/16:1/2", segments[3].String())
 }
 
-func TestExecutionSegmentScale(t *testing.T) {
+func TestExecutionSegmentFailures(t *testing.T) {
+	t.Parallel()
+	es := new(ExecutionSegment)
+	require.NoError(t, es.UnmarshalText([]byte("0:0.25")))
+	require.Equal(t, int64(1), es.Scale(2))
+	require.Equal(t, int64(1), es.Scale(3))
+
+	require.NoError(t, es.UnmarshalText([]byte("0.25:0.5")))
+	require.Equal(t, int64(0), es.Scale(2))
+	require.Equal(t, int64(1), es.Scale(3))
+
+	require.NoError(t, es.UnmarshalText([]byte("0.5:0.75")))
+	require.Equal(t, int64(1), es.Scale(2))
+	require.Equal(t, int64(0), es.Scale(3))
+
+	require.NoError(t, es.UnmarshalText([]byte("0.75:1")))
+	require.Equal(t, int64(0), es.Scale(2))
+	require.Equal(t, int64(1), es.Scale(3))
+}
+
+func TestExecutionTupleScale(t *testing.T) {
 	t.Parallel()
 	es := new(ExecutionSegment)
 	require.NoError(t, es.UnmarshalText([]byte("0.5")))
-	require.Equal(t, int64(1), es.Scale(2))
-	require.Equal(t, int64(2), es.Scale(3))
+	et := NewExecutionTuple(es, nil)
+	require.Equal(t, int64(1), et.ScaleInt64(2))
+	require.Equal(t, int64(2), et.ScaleInt64(3))
 
 	require.NoError(t, es.UnmarshalText([]byte("0.5:1.0")))
-	require.Equal(t, int64(1), es.Scale(2))
-	require.Equal(t, int64(1), es.Scale(3))
+	et = NewExecutionTuple(es, nil)
+	require.Equal(t, int64(1), et.ScaleInt64(2))
+	require.Equal(t, int64(1), et.ScaleInt64(3))
+
+	ess, err := NewExecutionSegmentSequenceFromString("0,0.5,1")
+	require.NoError(t, err)
+	require.NoError(t, es.UnmarshalText([]byte("0.5")))
+	et = NewExecutionTuple(es, &ess)
+	require.Equal(t, int64(1), et.ScaleInt64(2))
+	require.Equal(t, int64(2), et.ScaleInt64(3))
+
+	require.NoError(t, es.UnmarshalText([]byte("0.5:1.0")))
+	et = NewExecutionTuple(es, &ess)
+	require.Equal(t, int64(1), et.ScaleInt64(2))
+	require.Equal(t, int64(1), et.ScaleInt64(3))
+}
+func TestBigScale(t *testing.T) {
+	es := new(ExecutionSegment)
+	ess, err := NewExecutionSegmentSequenceFromString("0,7/20,7/10,1")
+	require.NoError(t, err)
+	require.NoError(t, es.UnmarshalText([]byte("0:7/20")))
+	et := NewExecutionTuple(es, &ess)
+	require.Equal(t, int64(18), et.ScaleInt64(50))
 }
 
 func TestExecutionSegmentCopyScaleRat(t *testing.T) {
@@ -437,15 +479,13 @@ func TestExecutionSegmentScaleConsistency(t *testing.T) {
 func TestGetStripedOffsets(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
-		seq      string
-		seg      string
-		start    int64
-		offsets  []int64
-		lcd      int64
-		expError string
+		seq     string
+		seg     string
+		start   int64
+		offsets []int64
+		lcd     int64
 	}{
 		// full sequences
-		{seq: "0,0.3,0.5,0.6,0.7,0.8,0.9,1", seg: "0:0.2", expError: "missing segment"},
 		{seq: "0,0.3,0.5,0.6,0.7,0.8,0.9,1", seg: "0:0.3", start: 0, offsets: []int64{4, 3, 3}, lcd: 10},
 		{seq: "0,0.3,0.5,0.6,0.7,0.8,0.9,1", seg: "0.3:0.5", start: 1, offsets: []int64{4, 6}, lcd: 10},
 		{seq: "0,0.3,0.5,0.6,0.7,0.8,0.9,1", seg: "0.5:0.6", start: 2, offsets: []int64{10}, lcd: 10},
@@ -456,19 +496,19 @@ func TestGetStripedOffsets(t *testing.T) {
 		{seq: "0,0.2,0.5,0.6,0.7,0.8,0.9,1", seg: "0:0.2", start: 1, offsets: []int64{4, 6}, lcd: 10},
 		{seq: "0,0.2,0.5,0.6,0.7,0.8,0.9,1", seg: "0.6:0.7", start: 3, offsets: []int64{10}, lcd: 10},
 		// not full sequences
-		{seq: "0,0.2,0.5", seg: "0:0.2", start: 1, offsets: []int64{4, 6}, lcd: 10},
-		{seq: "0,0.2,0.5", seg: "0.2:0.5", start: 0, offsets: []int64{4, 3, 3}, lcd: 10},
+		{seq: "0,0.2,0.5", seg: "0:0.2", start: 3, offsets: []int64{6, 4}, lcd: 10},
+		{seq: "0,0.2,0.5", seg: "0.2:0.5", start: 1, offsets: []int64{4, 2, 4}, lcd: 10},
 		{seq: "0,2/5,4/5", seg: "0:2/5", start: 0, offsets: []int64{3, 2}, lcd: 5},
 		{seq: "0,2/5,4/5", seg: "2/5:4/5", start: 1, offsets: []int64{3, 2}, lcd: 5},
 		// no sequence
-		{seg: "0:0.2", start: 0, offsets: []int64{5}, lcd: 5},
-		{seg: "0:1/5", start: 0, offsets: []int64{5}, lcd: 5},
-		{seg: "0:2/10", start: 0, offsets: []int64{5}, lcd: 5},
-		{seg: "0:0.4", start: 0, offsets: []int64{3, 2}, lcd: 5},
-		{seg: "0:2/5", start: 0, offsets: []int64{3, 2}, lcd: 5},
-		{seg: "2/5:4/5", start: 0, offsets: []int64{3, 2}, lcd: 5}, // this is the same as the previous one as there is no sequence
-		{seg: "0:4/10", start: 0, offsets: []int64{3, 2}, lcd: 5},
-		{seg: "1/10:5/10", start: 0, offsets: []int64{3, 2}, lcd: 5},
+		{seg: "0:0.2", start: 1, offsets: []int64{5}, lcd: 5},
+		{seg: "0:1/5", start: 1, offsets: []int64{5}, lcd: 5},
+		{seg: "0:2/10", start: 1, offsets: []int64{5}, lcd: 5},
+		{seg: "0:0.4", start: 1, offsets: []int64{2, 3}, lcd: 5},
+		{seg: "0:2/5", start: 1, offsets: []int64{2, 3}, lcd: 5},
+		{seg: "2/5:4/5", start: 1, offsets: []int64{3, 2}, lcd: 5},
+		{seg: "0:4/10", start: 1, offsets: []int64{2, 3}, lcd: 5},
+		{seg: "1/10:5/10", start: 1, offsets: []int64{2, 2, 4, 2}, lcd: 10},
 	}
 
 	for _, tc := range testCases {
@@ -478,13 +518,8 @@ func TestGetStripedOffsets(t *testing.T) {
 			require.NoError(t, err)
 			segment, err := NewExecutionSegmentFromString(tc.seg)
 			require.NoError(t, err)
-			start, offsets, lcd, err := ess.GetStripedOffsets(segment)
-			if len(tc.expError) != 0 {
-				require.Error(t, err, tc.expError)
-				require.Contains(t, err.Error(), tc.expError)
-				return
-			}
-			require.NoError(t, err)
+			et := NewExecutionTuple(segment, &ess)
+			start, offsets, lcd := et.GetStripedOffsets(segment)
 
 			assert.Equal(t, tc.start, start)
 			assert.Equal(t, tc.offsets, offsets)
@@ -492,7 +527,7 @@ func TestGetStripedOffsets(t *testing.T) {
 
 			ess2, err := NewExecutionSegmentSequenceFromString(tc.seq)
 			require.NoError(t, err)
-			assert.Equal(t, ess, ess2)
+			assert.Equal(t, ess.String(), ess2.String())
 		})
 	}
 }
@@ -527,11 +562,13 @@ func BenchmarkGetStripedOffsets(b *testing.B) {
 	for _, length := range lengths {
 		length := length
 		b.Run(fmt.Sprintf("length%d,seed%d", length, seed), func(b *testing.B) {
-			sequence := generateRandomSequence(length, r)
+			sequence, err := generateRandomSequence(length, r)
+			require.NoError(b, err)
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				_, _, _, err := sequence.GetStripedOffsets(sequence[int(r.Int63())%len(sequence)])
-				require.NoError(b, err)
+				segment := sequence[int(r.Int63())%len(sequence)]
+				et := NewExecutionTuple(segment, &sequence)
+				_, _, _ = et.GetStripedOffsets(segment)
 			}
 		})
 	}
@@ -564,8 +601,194 @@ func BenchmarkGetStripedOffsetsEven(b *testing.B) {
 			sequence := generateSequence(length)
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				_, _, _, err := sequence.GetStripedOffsets(sequence[111233%len(sequence)])
-				require.NoError(b, err)
+				segment := sequence[111233%len(sequence)]
+				et := NewExecutionTuple(segment, &sequence)
+				_, _, _ = et.GetStripedOffsets(segment)
+			}
+		})
+	}
+}
+
+func TestGetNewExecutionTupleBesedOnValue(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		seq      string
+		seg      string
+		value    int64
+		expected string
+	}{
+		// full sequences
+		{seq: "0,1/3,2/3,1", seg: "0:1/3", value: 20, expected: "0,7/20,7/10,1"},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(fmt.Sprintf("seq:%s;segment:%s", tc.seq, tc.seg), func(t *testing.T) {
+			ess, err := NewExecutionSegmentSequenceFromString(tc.seq)
+			require.NoError(t, err)
+
+			segment, err := NewExecutionSegmentFromString(tc.seg)
+			require.NoError(t, err)
+
+			et := NewExecutionTuple(segment, &ess)
+			newET := et.GetNewExecutionTupleBasedOnValue(tc.value)
+			require.Equal(t, tc.expected, newET.sequence.String())
+		})
+	}
+}
+
+func mustNewExecutionSegment(str string) *ExecutionSegment {
+	res, err := NewExecutionSegmentFromString(str)
+	if err != nil {
+		panic(err)
+	}
+	return res
+}
+
+func mustNewExecutionSegmentSequence(str string) *ExecutionSegmentSequence {
+	res, err := NewExecutionSegmentSequenceFromString(str)
+	if err != nil {
+		panic(err)
+	}
+	return &res
+}
+
+func TestNewExecutionTuple(t *testing.T) {
+	var testCases = []struct {
+		seg           *ExecutionSegment
+		seq           *ExecutionSegmentSequence
+		scaleTests    map[int64]int64
+		newScaleTests map[int64]map[int64]int64 // this is for after calling GetNewExecutionTupleBasedOnValue
+	}{
+		{
+			// both segment and sequence are nil
+			scaleTests: map[int64]int64{
+				50: 50,
+				1:  1,
+				0:  0,
+			},
+			newScaleTests: map[int64]map[int64]int64{
+				50: {50: 50, 1: 1, 0: 0},
+				1:  {50: 50, 1: 1, 0: 0},
+				0:  {50: 0, 1: 0, 0: 0},
+			},
+		},
+		{
+			seg: mustNewExecutionSegment("0:1"),
+			// nil sequence
+			scaleTests: map[int64]int64{
+				50: 50,
+				1:  1,
+				0:  0,
+			},
+			newScaleTests: map[int64]map[int64]int64{
+				50: {50: 50, 1: 1, 0: 0},
+				1:  {50: 50, 1: 1, 0: 0},
+				0:  {50: 0, 1: 0, 0: 0},
+			},
+		},
+		{
+			seg: mustNewExecutionSegment("0:1"),
+			seq: mustNewExecutionSegmentSequence("0,1"),
+			scaleTests: map[int64]int64{
+				50: 50,
+				1:  1,
+				0:  0,
+			},
+			newScaleTests: map[int64]map[int64]int64{
+				50: {50: 50, 1: 1, 0: 0},
+				1:  {50: 50, 1: 1, 0: 0},
+				0:  {50: 0, 1: 0, 0: 0},
+			},
+		},
+		{
+			seg: mustNewExecutionSegment("0:1"),
+			seq: mustNewExecutionSegmentSequence(""),
+			scaleTests: map[int64]int64{
+				50: 50,
+				1:  1,
+				0:  0,
+			},
+			newScaleTests: map[int64]map[int64]int64{
+				50: {50: 50, 1: 1, 0: 0},
+				1:  {50: 50, 1: 1, 0: 0},
+				0:  {50: 0, 1: 0, 0: 0},
+			},
+		},
+		{
+			seg: mustNewExecutionSegment("0:1/3"),
+			seq: mustNewExecutionSegmentSequence("0,1/3,2/3,1"),
+			scaleTests: map[int64]int64{
+				50: 17,
+				3:  1,
+				2:  1,
+				1:  1,
+				0:  0,
+			},
+			newScaleTests: map[int64]map[int64]int64{
+				50: {50: 17, 1: 1, 0: 0},
+				20: {50: 18, 1: 1, 0: 0},
+				3:  {50: 17, 1: 1, 0: 0},
+				2:  {50: 25, 1: 1, 0: 0},
+				1:  {50: 50, 1: 1, 0: 0},
+				0:  {50: 0, 1: 0, 0: 0},
+			},
+		},
+		{
+			seg: mustNewExecutionSegment("1/3:2/3"),
+			seq: mustNewExecutionSegmentSequence("0,1/3,2/3,1"),
+			scaleTests: map[int64]int64{
+				50: 17,
+				3:  1,
+				2:  1,
+				1:  0,
+				0:  0,
+			},
+			newScaleTests: map[int64]map[int64]int64{
+				50: {50: 17, 1: 0, 0: 0},
+				20: {50: 17, 1: 0, 0: 0},
+				3:  {50: 17, 1: 0, 0: 0},
+				2:  {50: 25, 1: 0, 0: 0},
+				1:  {50: 0, 1: 0, 0: 0},
+				0:  {50: 0, 1: 0, 0: 0},
+			},
+		},
+		{
+			seg: mustNewExecutionSegment("2/3:1"),
+			seq: mustNewExecutionSegmentSequence("0,1/3,2/3,1"),
+			scaleTests: map[int64]int64{
+				50: 16,
+				3:  1,
+				2:  0,
+				1:  0,
+				0:  0,
+			},
+			newScaleTests: map[int64]map[int64]int64{
+				50: {50: 16, 1: 0, 0: 0},
+				20: {50: 15, 1: 0, 0: 0},
+				3:  {50: 16, 1: 0, 0: 0},
+				2:  {50: 0, 1: 0, 0: 0},
+				1:  {50: 0, 1: 0, 0: 0},
+				0:  {50: 0, 1: 0, 0: 0},
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		testCase := testCase
+		t.Run(fmt.Sprintf("seg:'%s',seq:'%s'", testCase.seg, testCase.seq), func(t *testing.T) {
+			et := NewExecutionTuple(testCase.seg, testCase.seq)
+			for scaleValue, result := range testCase.scaleTests {
+				require.Equal(t, result, et.ScaleInt64(scaleValue), "%d->%d", scaleValue, result)
+			}
+
+			for value, newResult := range testCase.newScaleTests {
+				newET := et.GetNewExecutionTupleBasedOnValue(value)
+				for scaleValue, result := range newResult {
+					require.Equal(t, result, newET.ScaleInt64(scaleValue),
+						"getNewExecutionTupleBasedOnValue(%d)%d->%d", value, scaleValue, result)
+				}
 			}
 		})
 	}

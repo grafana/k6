@@ -203,9 +203,9 @@ type Options struct {
 	// We should support specifying execution segments via environment
 	// variables, but we currently can't, because envconfig has this nasty bug
 	// (among others): https://github.com/kelseyhightower/envconfig/issues/113
-	Execution        ExecutorConfigMap         `json:"execution,omitempty" ignored:"true"`
-	ExecutionSegment *ExecutionSegment         `json:"executionSegment" ignored:"true"`
-	ESS              *ExecutionSegmentSequence `json:"executionSegmentSequence" ignored:"true"`
+	Execution                ExecutorConfigMap         `json:"execution,omitempty" ignored:"true"`
+	ExecutionSegment         *ExecutionSegment         `json:"executionSegment" ignored:"true"`
+	ExecutionSegmentSequence *ExecutionSegmentSequence `json:"executionSegmentSequence" ignored:"true"`
 
 	// Timeouts for the setup() and teardown() functions
 	NoSetup         null.Bool          `json:"noSetup" envconfig:"NO_SETUP"`
@@ -345,6 +345,10 @@ func (o Options) Apply(opts Options) Options {
 	if opts.ExecutionSegment != nil {
 		o.ExecutionSegment = opts.ExecutionSegment
 	}
+
+	if opts.ExecutionSegmentSequence != nil {
+		o.ExecutionSegmentSequence = opts.ExecutionSegmentSequence
+	}
 	if opts.NoSetup.Valid {
 		o.NoSetup = opts.NoSetup
 	}
@@ -446,7 +450,22 @@ func (o Options) Apply(opts Options) Options {
 func (o Options) Validate() []error {
 	//TODO: validate all of the other options... that we should have already been validating...
 	//TODO: maybe integrate an external validation lib: https://github.com/avelino/awesome-go#validation
-	return o.Execution.Validate()
+	var errors []error
+	if o.ExecutionSegmentSequence != nil {
+		var segmentFound bool
+		for _, segment := range *o.ExecutionSegmentSequence {
+			if o.ExecutionSegment.Equal(segment) {
+				segmentFound = true
+				break
+			}
+		}
+		if !segmentFound {
+			errors = append(errors,
+				fmt.Errorf("provided segment %s can't be found in sequence %s",
+					o.ExecutionSegment, o.ExecutionSegmentSequence))
+		}
+	}
+	return append(errors, o.Execution.Validate()...)
 }
 
 // ForEachSpecified enumerates all struct fields and calls the supplied function with each

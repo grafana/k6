@@ -82,8 +82,8 @@ func NewVariableLoopingVUsConfig(name string) VariableLoopingVUsConfig {
 var _ lib.ExecutorConfig = &VariableLoopingVUsConfig{}
 
 // GetStartVUs is just a helper method that returns the scaled starting VUs.
-func (vlvc VariableLoopingVUsConfig) GetStartVUs(es *lib.ExecutionSegment) int64 {
-	return es.Scale(vlvc.StartVUs.Int64)
+func (vlvc VariableLoopingVUsConfig) GetStartVUs(et *lib.ExecutionTuple) int64 {
+	return et.ES.Scale(vlvc.StartVUs.Int64)
 }
 
 // GetGracefulRampDown is just a helper method that returns the graceful
@@ -93,8 +93,8 @@ func (vlvc VariableLoopingVUsConfig) GetGracefulRampDown() time.Duration {
 }
 
 // GetDescription returns a human-readable description of the executor options
-func (vlvc VariableLoopingVUsConfig) GetDescription(es *lib.ExecutionSegment) string {
-	maxVUs := es.Scale(getStagesUnscaledMaxTarget(vlvc.StartVUs.Int64, vlvc.Stages))
+func (vlvc VariableLoopingVUsConfig) GetDescription(et *lib.ExecutionTuple) string {
+	maxVUs := et.ES.Scale(getStagesUnscaledMaxTarget(vlvc.StartVUs.Int64, vlvc.Stages))
 	return fmt.Sprintf("Up to %d looping VUs for %s over %d stages%s",
 		maxVUs, sumStagesDuration(vlvc.Stages), len(vlvc.Stages),
 		vlvc.getBaseInfo(fmt.Sprintf("gracefulRampDown: %s", vlvc.GetGracefulRampDown())))
@@ -435,8 +435,8 @@ func (vlvc VariableLoopingVUsConfig) reserveVUsForGracefulRampDowns( //nolint:fu
 //       last stage's target is 0), then this will have no effect.
 //     - If the last stage's target is more than 0, the VUs at the end of the
 //       executor's life will have more time to finish their last iterations.
-func (vlvc VariableLoopingVUsConfig) GetExecutionRequirements(es *lib.ExecutionSegment) []lib.ExecutionStep {
-	steps := vlvc.getRawExecutionSteps(es, false)
+func (vlvc VariableLoopingVUsConfig) GetExecutionRequirements(et *lib.ExecutionTuple) []lib.ExecutionStep {
+	steps := vlvc.getRawExecutionSteps(et.ES, false)
 
 	executorEndOffset := sumStagesDuration(vlvc.Stages) + time.Duration(vlvc.GracefulStop.Duration)
 	// Handle graceful ramp-downs, if we have them
@@ -461,8 +461,8 @@ func (vlvc VariableLoopingVUsConfig) NewExecutor(es *lib.ExecutionState, logger 
 }
 
 // HasWork reports whether there is any work to be done for the given execution segment.
-func (vlvc VariableLoopingVUsConfig) HasWork(es *lib.ExecutionSegment) bool {
-	return lib.GetMaxPlannedVUs(vlvc.GetExecutionRequirements(es)) > 0
+func (vlvc VariableLoopingVUsConfig) HasWork(et *lib.ExecutionTuple) bool {
+	return lib.GetMaxPlannedVUs(vlvc.GetExecutionRequirements(et)) > 0
 }
 
 // VariableLoopingVUs handles the old "stages" execution configuration - it
@@ -491,7 +491,7 @@ func (vlv VariableLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleCo
 		return fmt.Errorf("%s expected raw end offset at %s to be final", vlv.config.GetName(), regularDuration)
 	}
 
-	gracefulExecutionSteps := vlv.config.GetExecutionRequirements(segment)
+	gracefulExecutionSteps := vlv.config.GetExecutionRequirements(vlv.executionState.ExecutionTuple)
 	maxDuration, isFinal := lib.GetEndOffset(gracefulExecutionSteps)
 	if !isFinal {
 		return fmt.Errorf("%s expected graceful end offset at %s to be final", vlv.config.GetName(), maxDuration)
@@ -504,7 +504,7 @@ func (vlv VariableLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleCo
 
 	// Make sure the log and the progress bar have accurate information
 	vlv.logger.WithFields(logrus.Fields{
-		"type": vlv.config.GetType(), "startVUs": vlv.config.GetStartVUs(segment), "maxVUs": maxVUs,
+		"type": vlv.config.GetType(), "startVUs": vlv.config.GetStartVUs(vlv.executionState.ExecutionTuple), "maxVUs": maxVUs,
 		"duration": regularDuration, "numStages": len(vlv.config.Stages)},
 	).Debug("Starting executor run...")
 

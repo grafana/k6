@@ -97,15 +97,15 @@ type ExecutorConfig interface {
 	// Calculates the VU requirements in different stages of the executor's
 	// execution, including any extensions caused by waiting for iterations to
 	// finish with graceful stops or ramp-downs.
-	GetExecutionRequirements(*ExecutionSegment) []ExecutionStep
+	GetExecutionRequirements(*ExecutionTuple) []ExecutionStep
 
 	// Return a human-readable description of the executor
-	GetDescription(es *ExecutionSegment) string
+	GetDescription(*ExecutionTuple) string
 
 	NewExecutor(*ExecutionState, *logrus.Entry) (Executor, error)
 
 	// HasWork reports whether there is any work for the executor to do with a given segment.
-	HasWork(*ExecutionSegment) bool
+	HasWork(*ExecutionTuple) bool
 }
 
 // InitVUFunc is just a shorthand so we don't have to type the function
@@ -243,7 +243,7 @@ func (scs ExecutorConfigMap) GetSortedConfigs() []ExecutorConfig {
 // the configured executors. It takes into account their start times and their
 // individual VU requirements and calculates the total VU requirements for each
 // moment in the test execution.
-func (scs ExecutorConfigMap) GetFullExecutionRequirements(executionSegment *ExecutionSegment) []ExecutionStep {
+func (scs ExecutorConfigMap) GetFullExecutionRequirements(et *ExecutionTuple) []ExecutionStep {
 	sortedConfigs := scs.GetSortedConfigs()
 
 	// Combine the steps and requirements from all different executors, and
@@ -256,7 +256,7 @@ func (scs ExecutorConfigMap) GetFullExecutionRequirements(executionSegment *Exec
 	trackedSteps := []trackedStep{}
 	for configID, config := range sortedConfigs { // orderly iteration over a slice
 		configStartTime := config.GetStartTime()
-		configSteps := config.GetExecutionRequirements(executionSegment)
+		configSteps := config.GetExecutionRequirements(et)
 		for _, cs := range configSteps {
 			cs.TimeOffset += configStartTime // add the executor start time to the step time offset
 			trackedSteps = append(trackedSteps, trackedStep{cs, configID})
