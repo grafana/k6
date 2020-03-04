@@ -24,8 +24,11 @@ import (
 	"archive/tar"
 	"bytes"
 	"context"
+	"encoding/json"
+	"net/http"
 	"os"
 	"os/signal"
+	"runtime"
 	"sync"
 	"syscall"
 	"time"
@@ -260,39 +263,6 @@ a commandline interface for interacting with it.`,
 		signal.Notify(sigC, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer signal.Stop(sigC)
 
-		// If the user hasn't opted out: report usage.
-		//TODO: fix
-		//TODO: move to a separate function
-		/*
-			if !conf.NoUsageReport.Bool {
-				go func() {
-					u := "http://k6reports.loadimpact.com/"
-					mime := "application/json"
-					var endTSeconds float64
-					if endT := engine.Executor.GetEndTime(); endT.Valid {
-						endTSeconds = time.Duration(endT.Duration).Seconds()
-					}
-					var stagesEndTSeconds float64
-					if stagesEndT := lib.SumStages(engine.Executor.GetStages()); stagesEndT.Valid {
-						stagesEndTSeconds = time.Duration(stagesEndT.Duration).Seconds()
-					}
-					body, err := json.Marshal(map[string]interface{}{
-						"k6_version":  Version,
-						"vus_max":     engine.Executor.GetVUsMax(),
-						"iterations":  engine.Executor.GetEndIterations(),
-						"duration":    endTSeconds,
-						"st_duration": stagesEndTSeconds,
-						"goos":        runtime.GOOS,
-						"goarch":      runtime.GOARCH,
-					})
-					if err != nil {
-						panic(err) // This should never happen!!
-					}
-					_, _ = http.Post(u, mime, bytes.NewBuffer(body))
-				}()
-			}
-		*/
-
 		// Ticker for progress bar updates. Less frequent updates for non-TTYs, none if quiet.
 		updateFreq := 50 * time.Millisecond
 		if !stdoutTTY {
@@ -369,6 +339,10 @@ a commandline interface for interacting with it.`,
 			logger.Warn("No data generated, because no script iterations finished, consider making the test duration longer")
 		}
 
+		if !conf.NoUsageReport.Bool {
+			_ = reportUsage(execScheduler)
+		}
+
 		data := ui.SummaryData{
 			Metrics:   engine.Metrics,
 			RootGroup: engine.ExecutionScheduler.GetRunner().GetDefaultGroup(),
@@ -412,6 +386,36 @@ a commandline interface for interacting with it.`,
 		}
 		return nil
 	},
+}
+
+func reportUsage(execScheduler *local.ExecutionScheduler) error {
+	execPlan := execScheduler.GetExecutionPlan()
+	executorConfigs := execScheduler.GetExecutorConfigs()
+	execState := execScheduler.GetState()
+
+	executors := make(map[string]int)
+	for _, ec := range executorConfigs {
+		executors[ec.GetType()]++
+	}
+
+	body, err := json.Marshal(map[string]interface{}{
+		"k6_version": consts.Version,
+		"executors":  executors,
+		"vus_max":    lib.GetMaxPossibleVUs(execPlan),
+		"iterations": execState.GetFullIterationCount(),
+		"duration":   execState.GetCurrentTestRunDuration().String(),
+		"goos":       runtime.GOOS,
+		"goarch":     runtime.GOARCH,
+	})
+	if err != nil {
+		return err
+	}
+
+	res, err := http.Post("https://reports.k6.io/", "application/json", bytes.NewBuffer(body))
+	defer func() {
+		_ = res.Body.Close()
+	}()
+	return err
 }
 
 func runCmdFlagSet() *pflag.FlagSet {
