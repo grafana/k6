@@ -23,7 +23,6 @@ package lib
 import (
 	"encoding"
 	"fmt"
-	"math"
 	"math/big"
 	"strings"
 )
@@ -277,8 +276,8 @@ func (es *ExecutionSegment) Scale(value int64) int64 {
 
 	fromRem.Add(fromRem, lenValue)
 
-	total, _ := fromRem.Float64()
-	return int64(math.Floor(total))
+	quo := new(big.Int).Quo(fromRem.Num(), fromRem.Denom())
+	return quo.Int64()
 }
 
 // InPlaceScaleRat scales rational numbers in-place - it changes the passed
