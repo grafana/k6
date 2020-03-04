@@ -195,12 +195,12 @@ func TestExecutionSegmentScale(t *testing.T) {
 	es := new(ExecutionSegment)
 	require.NoError(t, es.UnmarshalText([]byte("0.5")))
 	require.Equal(t, int64(1), es.Scale(2))
-	require.Equal(t, int64(1), es.Scale(3))
+	require.Equal(t, int64(2), es.Scale(3))
 	require.Equal(t, int64(5), es.Scale(10))
 
 	require.NoError(t, es.UnmarshalText([]byte("0.5:1.0")))
 	require.Equal(t, int64(1), es.Scale(2))
-	require.Equal(t, int64(2), es.Scale(3))
+	require.Equal(t, int64(1), es.Scale(3))
 	require.Equal(t, int64(5), es.Scale(10))
 }
 
