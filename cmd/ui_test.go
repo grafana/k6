@@ -71,7 +71,7 @@ left 2   [   0% ] right 2  000
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			pbs := createTestProgressBars(3, tc.padding, 1)
-			out, longestLine := renderMultipleBars(false, false, 6+tc.padding, tc.widthDelta, pbs)
+			out, longestLine := renderMultipleBars(false, false, 6+tc.padding, 80, tc.widthDelta, pbs)
 			assert.Equal(t, tc.expOut, out)
 			assert.Equal(t, tc.expLongLine, longestLine)
 		})

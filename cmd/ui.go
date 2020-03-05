@@ -48,11 +48,14 @@ type UIMode uint8
 
 //nolint: golint
 const (
-	// max length of left-side progress bar text before trimming is forced
+	// Max length of left-side progress bar text before trimming is forced
 	maxLeftLength           = 30
 	UIModeResponsive UIMode = iota + 1
 	UIModeCompact
 	UIModeFull
+	// Amount of padding in chars between rendered progress
+	// bar text and right-side terminal window edge.
+	termPadding = 1
 )
 
 // Decode implements envconfig.Decoder
@@ -107,8 +110,9 @@ func printBar(bar *pb.ProgressBar, rightText string) {
 	fprintf(stdout, "%s %s %s%s", rendered.Left, rendered.Progress(), rightText, end)
 }
 
+//nolint: funlen
 func renderMultipleBars(
-	isTTY, goBack bool, maxLeft, widthDelta int, pbs []*pb.ProgressBar,
+	isTTY, goBack bool, maxLeft, termWidth, widthDelta int, pbs []*pb.ProgressBar,
 ) (string, int) {
 	lineEnd := "\n"
 	if isTTY {
@@ -117,6 +121,10 @@ func renderMultipleBars(
 	}
 
 	var (
+		// Amount of times line lengths exceed termWidth.
+		// Needed to factor into the amount of lines to jump
+		// back with [A and avoid scrollback issues.
+		lineBreaks  int
 		longestLine int
 		// Maximum length of each right side column except last,
 		// used to calculate the padding between columns.
@@ -149,6 +157,8 @@ func renderMultipleBars(
 		rend := rendered[i]
 		if rend.Hijack != "" {
 			result[i+1] = rend.Hijack + lineEnd
+			runeCount := utf8.RuneCountInString(rend.Hijack)
+			lineBreaks += (runeCount - termPadding) / termWidth
 			continue
 		}
 		var leftText, rightText string
@@ -165,10 +175,11 @@ func renderMultipleBars(
 		// Get visible line length, without ANSI escape sequences (color)
 		status := fmt.Sprintf(" %s ", rend.Status())
 		line := leftText + status + rend.Progress() + rightText
-		lineRuneLen := utf8.RuneCountInString(line)
-		if lineRuneLen > longestLine {
-			longestLine = lineRuneLen
+		lineRuneCount := utf8.RuneCountInString(line)
+		if lineRuneCount > longestLine {
+			longestLine = lineRuneCount
 		}
+		lineBreaks += (lineRuneCount - termPadding) / termWidth
 		if !noColor {
 			rend.Color = true
 			status = fmt.Sprintf(" %s ", rend.Status())
@@ -179,11 +190,11 @@ func renderMultipleBars(
 	}
 
 	if isTTY && goBack {
-		// Go back to the beginning
+		// Clear screen and go back to the beginning
 		//TODO: check for cross platform support
-		result[pbsCount+1] = fmt.Sprintf("\r\x1b[%dA", pbsCount+1)
+		result[pbsCount+1] = fmt.Sprintf("\r\x1b[J\x1b[%dA", pbsCount+lineBreaks+1)
 	} else {
-		result[pbsCount+1] = "\n"
+		result[pbsCount+1] = lineEnd
 	}
 
 	return strings.Join(result, ""), longestLine
@@ -226,9 +237,8 @@ func showProgress(
 	var progressBarsLastRender []byte
 	// default responsive render
 	renderProgressBars := func(goBack bool) {
-		barText, longestLine := renderMultipleBars(stdoutTTY, goBack, maxLeft, widthDelta, pbs)
-		// -1 to allow some "breathing room" near the edge
-		widthDelta = termWidth - longestLine - 1
+		barText, longestLine := renderMultipleBars(stdoutTTY, goBack, maxLeft, termWidth, widthDelta, pbs)
+		widthDelta = termWidth - longestLine - termPadding
 		progressBarsLastRender = []byte(barText)
 	}
 
@@ -238,7 +248,7 @@ func showProgress(
 
 	if conf.UIMode.String != UIModeResponsive.String() {
 		renderProgressBars = func(goBack bool) {
-			barText, _ := renderMultipleBars(stdoutTTY, goBack, maxLeft, widthDelta, pbs)
+			barText, _ := renderMultipleBars(stdoutTTY, goBack, maxLeft, termWidth, widthDelta, pbs)
 			progressBarsLastRender = []byte(barText)
 		}
 	}
