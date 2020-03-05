@@ -28,6 +28,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"strings"
 	"sync"
 	"time"
@@ -254,23 +255,41 @@ func showProgress(
 		updateFreq = 100 * time.Millisecond
 	}
 
+	var (
+		fd              = int(os.Stdout.Fd())
+		ticker          = time.NewTicker(updateFreq)
+		updateTermWidth func()
+		winchSignal     = getWinchSignal()
+	)
+	// On platforms that have SIGWINCH (*nix), progress bar resizing will be
+	// more responsive. On others (Windows), we fallback to resize on every tick.
+	if winchSignal != nil {
+		winch := make(chan os.Signal, 1)
+		signal.Notify(winch, winchSignal)
+		updateTermWidth = func() {
+			select {
+			case <-ticker.C:
+			case <-winch:
+				termWidth, _, _ = terminal.GetSize(fd)
+			}
+		}
+	} else {
+		updateTermWidth = func() {
+			<-ticker.C
+			termWidth, _, _ = terminal.GetSize(fd)
+		}
+	}
+
 	ctxDone := ctx.Done()
-	ticker := time.NewTicker(updateFreq)
-	sigwinch := NotifyWindowResize()
-	fd := int(os.Stdout.Fd())
 	for {
 		select {
 		case <-ctxDone:
 			renderProgressBars(false)
 			printProgressBars()
 			return
-		case <-ticker.C:
-			// Optional "polling" method, platform dependent.
-			termWidth, _, _ = GetTermSize(fd, termWidth)
-		case <-sigwinch:
-			// More efficient SIGWINCH method on *nix.
-			termWidth, _, _ = terminal.GetSize(fd)
+		default:
 		}
+		updateTermWidth()
 		renderProgressBars(true)
 		outMutex.Lock()
 		printProgressBars()
