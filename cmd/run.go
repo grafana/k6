@@ -405,7 +405,7 @@ func reportUsage(execScheduler *local.ExecutionScheduler, wg *sync.WaitGroup) er
 	}
 
 	body, err := json.Marshal(map[string]interface{}{
-		"k6_version": consts.Version,
+		"k6_version": consts.FullVersion(),
 		"executors":  executors,
 		"vus_init":   execState.GetInitializedVUsCount(),
 		"vus_max":    lib.GetMaxPossibleVUs(execPlan),
