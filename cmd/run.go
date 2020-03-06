@@ -339,8 +339,12 @@ a commandline interface for interacting with it.`,
 			logger.Warn("No data generated, because no script iterations finished, consider making the test duration longer")
 		}
 
+		reportWg := &sync.WaitGroup{}
 		if !conf.NoUsageReport.Bool {
-			_ = reportUsage(execScheduler)
+			reportWg.Add(1)
+			go func() {
+				_ = reportUsage(execScheduler, reportWg)
+			}()
 		}
 
 		data := ui.SummaryData{
@@ -381,6 +385,8 @@ a commandline interface for interacting with it.`,
 			<-sigC
 		}
 
+		reportWg.Wait()
+
 		if engine.IsTainted() {
 			return ExitCode{error: errors.New("some thresholds have failed"), Code: thresholdHaveFailedErrorCode}
 		}
@@ -388,7 +394,7 @@ a commandline interface for interacting with it.`,
 	},
 }
 
-func reportUsage(execScheduler *local.ExecutionScheduler) error {
+func reportUsage(execScheduler *local.ExecutionScheduler, wg *sync.WaitGroup) error {
 	execPlan := execScheduler.GetExecutionPlan()
 	executorConfigs := execScheduler.GetExecutorConfigs()
 	execState := execScheduler.GetState()
@@ -414,6 +420,7 @@ func reportUsage(execScheduler *local.ExecutionScheduler) error {
 	res, err := http.Post("https://reports.k6.io/", "application/json", bytes.NewBuffer(body))
 	defer func() {
 		_ = res.Body.Close()
+		wg.Done()
 	}()
 	return err
 }
