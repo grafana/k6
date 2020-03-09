@@ -336,6 +336,7 @@ func testSetupDataHelper(t *testing.T, data string) {
 		})
 	}
 }
+
 func TestSetupDataReturnValue(t *testing.T) {
 	testSetupDataHelper(t, `
 	export let options = { setupTimeout: "1s", teardownTimeout: "1s" };
@@ -410,6 +411,7 @@ func TestSetupDataNoReturn(t *testing.T) {
 		}
 	};`)
 }
+
 func TestRunnerIntegrationImports(t *testing.T) {
 	t.Run("Modules", func(t *testing.T) {
 		modules := []string{
@@ -513,7 +515,7 @@ func TestVURunContext(t *testing.T) {
 }
 
 func TestVURunInterrupt(t *testing.T) {
-	//TODO: figure out why interrupt sometimes fails... data race in goja?
+	// TODO: figure out why interrupt sometimes fails... data race in goja?
 	if isWindows {
 		t.Skip()
 	}
@@ -550,7 +552,7 @@ func TestVURunInterrupt(t *testing.T) {
 }
 
 func TestVURunInterruptDoesntPanic(t *testing.T) {
-	//TODO: figure out why interrupt sometimes fails... data race in goja?
+	// TODO: figure out why interrupt sometimes fails... data race in goja?
 	if isWindows {
 		t.Skip()
 	}
@@ -582,7 +584,7 @@ func TestVURunInterruptDoesntPanic(t *testing.T) {
 			for i := 0; i < 1000; i++ {
 				wg.Add(1)
 				newCtx, newCancel := context.WithCancel(ctx)
-				var ch = make(chan struct{})
+				ch := make(chan struct{})
 				go func() {
 					defer wg.Done()
 					close(ch)
@@ -878,7 +880,7 @@ func TestVUIntegrationHosts(t *testing.T) {
 }
 
 func TestVUIntegrationTLSConfig(t *testing.T) {
-	var unsupportedVersionErrorMsg = "remote error: tls: handshake failure"
+	unsupportedVersionErrorMsg := "remote error: tls: handshake failure"
 	for _, tag := range build.Default.ReleaseTags {
 		if tag == "go1.12" {
 			unsupportedVersionErrorMsg = "tls: no supported versions satisfy MinVersion and MaxVersion"
@@ -1009,11 +1011,11 @@ func TestVUIntegrationOpenFunctionError(t *testing.T) {
 	vu, err := r.NewVU(make(chan stats.SampleContainer, 100))
 	assert.NoError(t, err)
 	err = vu.RunOnce(context.Background())
-	assert.EqualError(t, err, "GoError: \"open\" function is only available to the init code (aka global scope), see https://docs.k6.io/docs/test-life-cycle for more information")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "only available to init code")
 }
 
 func TestVUIntegrationCookiesReset(t *testing.T) {
-
 	tb := httpmultibin.NewHTTPMultiBin(t)
 	defer tb.Cleanup()
 
@@ -1312,7 +1314,7 @@ func TestHTTPRequestInInitContext(t *testing.T) {
 }
 
 func TestInitContextForbidden(t *testing.T) {
-	var table = [...][3]string{
+	table := [...][3]string{
 		{
 			"http.request",
 			`import http from "k6/http";

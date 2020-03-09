@@ -152,7 +152,7 @@ func (r *Runtime) dateproto_toUTCString(call FunctionCall) Value {
 	obj := r.toObject(call.This)
 	if d, ok := obj.self.(*dateObject); ok {
 		if d.isSet {
-			return asciiString(d.time.In(time.UTC).Format(dateTimeLayout))
+			return asciiString(d.time.In(time.UTC).Format(utcDateTimeLayout))
 		} else {
 			return stringInvalidDate
 		}

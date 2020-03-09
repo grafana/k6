@@ -1627,7 +1627,7 @@ func checkErrorCode(t testing.TB, tags *stats.SampleTags, code int, msg string) 
 	if msg == "" {
 		assert.False(t, ok)
 	} else {
-		assert.Equal(t, msg, errorMsg)
+		assert.Contains(t, errorMsg, msg)
 	}
 	errorCodeStr, ok := tags.Get("error_code")
 	if code == 0 {
@@ -1693,7 +1693,7 @@ func TestErrorCodes(t *testing.T) {
 		{
 			name:              "Bad location redirect",
 			expectedErrorCode: 1000,
-			expectedErrorMsg:  "failed to parse Location header \"h\\t:/\": parse h\t:/: net/url: invalid control character in URL", //nolint: lll
+			expectedErrorMsg:  "failed to parse Location header \"h\\t:/\": ",
 			script:            `let res = http.request("GET", "HTTPBIN_URL/bad-location-redirect");`,
 		},
 		{
@@ -1730,7 +1730,7 @@ func TestErrorCodes(t *testing.T) {
 			_, err := common.RunString(rt,
 				sr(testCase.script+"\n"+fmt.Sprintf(`
 			if (res.status != %d) { throw new Error("wrong status: "+ res.status);}
-			if (res.error != %q) { throw new Error("wrong error: '" + res.error + "'");}
+			if (res.error.indexOf(%q, 0) === -1) { throw new Error("wrong error: '" + res.error + "'");}
 			if (res.error_code != %d) { throw new Error("wrong error_code: "+ res.error_code);}
 			`, testCase.status, testCase.expectedErrorMsg, testCase.expectedErrorCode)))
 			if testCase.expectedScriptError == "" {

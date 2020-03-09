@@ -62,7 +62,7 @@ var (
 		`local directory (-v /local/path/:/inside/docker/path) containing ` +
 		`your script and modules so that they're accessible by k6 from ` +
 		`inside of the container, see ` +
-		`https://docs.k6.io/v1.0/docs/modules#section-using-local-modules-with-docker.`
+		`https://k6.io/docs/using-k6/modules#using-local-modules-with-docker`
 	errNoLoaderMatched = errors.New("no loader matched")
 )
 

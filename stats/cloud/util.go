@@ -27,5 +27,5 @@ func URLForResults(refID string, config Config) string {
 	if config.Token.String == "" {
 		path = "anonymous"
 	}
-	return fmt.Sprintf("%s/k6/%s/%s", config.WebAppURL.String, path, refID)
+	return fmt.Sprintf("%s/%s/%s", config.WebAppURL.String, path, refID)
 }
