@@ -150,6 +150,12 @@ func New(
 // Init is called between the collector's creation and the call to Run().
 // You should do any lengthy setup here rather than in New.
 func (c *Collector) Init() error {
+	if c.config.PushRefID.Valid {
+		c.referenceID = c.config.PushRefID.String
+		logrus.WithField("referenceId", c.referenceID).Debug("Cloud: directly pushing metrics without init")
+		return nil
+	}
+
 	thresholds := make(map[string][]string)
 
 	for name, t := range c.thresholds {
@@ -527,7 +533,7 @@ func (c *Collector) pushMetrics() {
 }
 
 func (c *Collector) testFinished() {
-	if c.referenceID == "" {
+	if c.referenceID == "" || c.config.PushRefID.Valid {
 		return
 	}
 
