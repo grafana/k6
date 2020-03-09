@@ -37,6 +37,7 @@ type Config struct {
 	Name            null.String `json:"name" envconfig:"K6_CLOUD_NAME"`
 
 	Host       null.String `json:"host" envconfig:"K6_CLOUD_HOST"`
+	PushRefID  null.String `json:"pushRefID" envconfig:"K6_CLOUD_PUSH_REF_ID"`
 	WebAppURL  null.String `json:"webAppURL" envconfig:"K6_CLOUD_WEB_APP_URL"`
 	NoCompress null.Bool   `json:"noCompress" envconfig:"K6_CLOUD_NO_COMPRESS"`
 
