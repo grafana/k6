@@ -103,6 +103,24 @@ const MaxTimeToWaitForPlannedVU = 400 * time.Millisecond
 // MaxTimeToWaitForPlannedVU before we actually return an error.
 const MaxRetriesGetPlannedVU = 5
 
+// ExecutionStatus is similar to RunStatus, but more fine grained and concerns
+// only local execution.
+type ExecutionStatus uint32
+
+// Possible execution status values
+const (
+	ExecutionStatusCreated ExecutionStatus = iota
+	ExecutionStatusInitVUs
+	ExecutionStatusInitExecutors
+	ExecutionStatusInitDone
+	ExecutionStatusPausedBeforeRun
+	ExecutionStatusStarted
+	ExecutionStatusSetup
+	ExecutionStatusRunning
+	ExecutionStatusTeardown
+	ExecutionStatusEnded
+)
+
 // ExecutionState contains a few different things:
 //  -  Some convenience items, that are needed by all executors, like the
 //     execution segment and the unique VU ID generator. By keeping those here,
@@ -161,7 +179,7 @@ type ExecutionState struct {
 	// (for backwards compatibility...)
 	currentVUIdentifier *uint64
 
-	//TODO: add something similar, but for iterations? Currently, there isn't
+	// TODO: add something similar, but for iterations? Currently, there isn't
 	// a straightforward way to get a unique sequential identifier per iteration
 	// in the context of a single k6 instance. Combining __VU and __ITER gives us
 	// a unique identifier, but it's unwieldy and somewhat cumbersome.
@@ -201,6 +219,11 @@ type ExecutionState struct {
 	// Ctrl+C, change of `vus` via the externally controlled executor's REST
 	// API, etc.
 	interruptedIterationsCount *uint64
+
+	// A machine-readable indicator in which the current state of the test
+	// execution is currently stored. Useful for the REST API and external
+	// observability of the k6 test run progress.
+	executionStatus *uint32
 
 	// A nanosecond UNIX timestamp that is set when the test is actually
 	// started. The default 0 value is used to denote that the test hasn't
@@ -256,6 +279,7 @@ func NewExecutionState(options Options, maxPlannedVUs, maxPossibleVUs uint64) *E
 		Options: options,
 		vus:     make(chan VU, maxPossibleVUs),
 
+		executionStatus:            new(uint32),
 		currentVUIdentifier:        new(uint64),
 		initializedVUs:             new(int64),
 		uninitializedUnplannedVUs:  &maxUnplannedUninitializedVUs,
@@ -343,6 +367,19 @@ func (es *ExecutionState) AddInterruptedIterations(count uint64) uint64 {
 	return atomic.AddUint64(es.interruptedIterationsCount, count)
 }
 
+// SetExecutionStatus changes the current execution status to the supplied value
+// and returns the current value.
+func (es *ExecutionState) SetExecutionStatus(newStatus ExecutionStatus) (oldStatus ExecutionStatus) {
+	return ExecutionStatus(atomic.SwapUint32(es.executionStatus, uint32(newStatus)))
+}
+
+// GetCurrentExecutionStatus returns the current execution status. Don't use
+// this for synchronization unless you've made the k6 behavior somewhat
+// predictable with options like --paused or --linger.
+func (es *ExecutionState) GetCurrentExecutionStatus() ExecutionStatus {
+	return ExecutionStatus(atomic.LoadUint32(es.executionStatus))
+}
+
 // MarkStarted saves the current timestamp as the test start time.
 //
 // CAUTION: Calling MarkStarted() a second time for the same execution state will
@@ -351,6 +388,7 @@ func (es *ExecutionState) MarkStarted() {
 	if !atomic.CompareAndSwapInt64(es.startTime, 0, time.Now().UnixNano()) {
 		panic("the execution scheduler was started a second time")
 	}
+	es.SetExecutionStatus(ExecutionStatusStarted)
 }
 
 // MarkEnded saves the current timestamp as the test end time.
@@ -361,6 +399,7 @@ func (es *ExecutionState) MarkEnded() {
 	if !atomic.CompareAndSwapInt64(es.endTime, 0, time.Now().UnixNano()) {
 		panic("the execution scheduler was stopped a second time")
 	}
+	es.SetExecutionStatus(ExecutionStatusEnded)
 }
 
 // HasStarted returns true if the test has actually started executing.
@@ -493,7 +532,7 @@ func (es *ExecutionState) GetPlannedVU(logger *logrus.Entry, modifyActiveVUCount
 			if modifyActiveVUCount {
 				es.ModCurrentlyActiveVUsCount(+1)
 			}
-			//TODO: set environment and exec
+			// TODO: set environment and exec
 			return vu, nil
 		case <-time.After(MaxTimeToWaitForPlannedVU):
 			logger.Warnf("Could not get a VU from the buffer for %s", time.Duration(i)*MaxTimeToWaitForPlannedVU)
