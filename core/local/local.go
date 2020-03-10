@@ -187,27 +187,13 @@ func (e *ExecutionScheduler) getRunStats() string {
 	)
 }
 
-// Init concurrently initializes all of the planned VUs and then sequentially
-// initializes all of the configured executors.
-func (e *ExecutionScheduler) Init(ctx context.Context, engineOut chan<- stats.SampleContainer) error {
-	logger := e.logger.WithField("phase", "local-execution-scheduler-init")
-
-	vusToInitialize := lib.GetMaxPlannedVUs(e.executionPlan)
-	logger.WithFields(logrus.Fields{
-		"neededVUs":      vusToInitialize,
-		"executorsCount": len(e.executors),
-	}).Debugf("Start of initialization")
-
-	// Initialize VUs concurrently
-	doneInits := make(chan error, vusToInitialize) // poor man's early-return waitgroup
-	// TODO: make this an option?
-	initConcurrency := runtime.NumCPU()
+func (e *ExecutionScheduler) initVUsConcurrently(
+	ctx context.Context, engineOut chan<- stats.SampleContainer, count uint64, concurrency int, logger *logrus.Entry,
+) chan error {
+	doneInits := make(chan error, count) // poor man's early-return waitgroup
 	limiter := make(chan struct{})
-	subctx, cancel := context.WithCancel(ctx)
-	defer cancel()
 
-	e.state.SetExecutionStatus(lib.ExecutionStatusInitVUs)
-	for i := 0; i < initConcurrency; i++ {
+	for i := 0; i < concurrency; i++ {
 		go func() {
 			for range limiter {
 				newVU, err := e.initVU(ctx, logger, engineOut)
@@ -221,14 +207,35 @@ func (e *ExecutionScheduler) Init(ctx context.Context, engineOut chan<- stats.Sa
 
 	go func() {
 		defer close(limiter)
-		for vuNum := uint64(0); vuNum < vusToInitialize; vuNum++ {
+		for vuNum := uint64(0); vuNum < count; vuNum++ {
 			select {
 			case limiter <- struct{}{}:
-			case <-subctx.Done():
+			case <-ctx.Done():
 				return
 			}
 		}
 	}()
+
+	return doneInits
+}
+
+// Init concurrently initializes all of the planned VUs and then sequentially
+// initializes all of the configured executors.
+func (e *ExecutionScheduler) Init(ctx context.Context, engineOut chan<- stats.SampleContainer) error {
+	logger := e.logger.WithField("phase", "local-execution-scheduler-init")
+
+	vusToInitialize := lib.GetMaxPlannedVUs(e.executionPlan)
+	logger.WithFields(logrus.Fields{
+		"neededVUs":      vusToInitialize,
+		"executorsCount": len(e.executors),
+	}).Debugf("Start of initialization")
+
+	subctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// Initialize VUs concurrently
+	e.state.SetExecutionStatus(lib.ExecutionStatusInitVUs)
+	doneInits := e.initVUsConcurrently(subctx, engineOut, vusToInitialize, runtime.NumCPU(), logger)
 
 	initializedVUs := new(uint64)
 	vusFmt := pb.GetFixedLengthIntFormat(int64(vusToInitialize))
