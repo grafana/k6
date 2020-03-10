@@ -59,7 +59,8 @@ type Engine struct {
 	NoSummary     bool
 	SummaryExport bool
 
-	logger *logrus.Logger
+	logger   *logrus.Logger
+	stopChan chan struct{}
 
 	Metrics     map[string]*stats.Metric
 	MetricsLock sync.Mutex
@@ -84,10 +85,11 @@ func NewEngine(ex lib.ExecutionScheduler, o lib.Options, logger *logrus.Logger) 
 		ExecutionScheduler: ex,
 		executionState:     ex.GetState(),
 
-		Options: o,
-		Metrics: make(map[string]*stats.Metric),
-		Samples: make(chan stats.SampleContainer, o.MetricSamplesBufferSize.Int64),
-		logger:  logger,
+		Options:  o,
+		Metrics:  make(map[string]*stats.Metric),
+		Samples:  make(chan stats.SampleContainer, o.MetricSamplesBufferSize.Int64),
+		stopChan: make(chan struct{}),
+		logger:   logger,
 	}
 
 	e.thresholds = o.Thresholds
@@ -218,12 +220,31 @@ func (e *Engine) Run(ctx context.Context) error {
 			e.logger.Debug("run: context expired; exiting...")
 			e.setRunStatus(lib.RunStatusAbortedUser)
 			return nil
+		case <-e.stopChan:
+			e.logger.Debug("run: stopped by user; exiting...")
+			e.setRunStatus(lib.RunStatusAbortedUser)
+			return nil
 		}
 	}
 }
 
 func (e *Engine) IsTainted() bool {
 	return e.thresholdsTainted
+}
+
+// Stop closes a signal channel, forcing a running Engine to return
+func (e *Engine) Stop() {
+	close(e.stopChan)
+}
+
+// IsStopped returns a bool indicating whether the Engine has been stopped
+func (e *Engine) IsStopped() bool {
+	select {
+	case <-e.stopChan:
+		return true
+	default:
+		return false
+	}
 }
 
 func (e *Engine) runMetricsEmission(ctx context.Context) {
