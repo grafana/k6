@@ -22,22 +22,24 @@ package v1
 
 import (
 	"github.com/loadimpact/k6/core"
+	"github.com/loadimpact/k6/lib"
 	"gopkg.in/guregu/null.v3"
 )
 
 type Status struct {
-	Paused null.Bool `json:"paused" yaml:"paused"`
-	VUs    null.Int  `json:"vus" yaml:"vus"`
-	VUsMax null.Int  `json:"vus-max" yaml:"vus-max"`
+	Status lib.ExecutionStatus `json:"status" yaml:"status"`
 
-	// Readonly.
-	Running bool `json:"running" yaml:"running"`
-	Tainted bool `json:"tainted" yaml:"tainted"`
+	Paused  null.Bool `json:"paused" yaml:"paused"`
+	VUs     null.Int  `json:"vus" yaml:"vus"`
+	VUsMax  null.Int  `json:"vus-max" yaml:"vus-max"`
+	Running bool      `json:"running" yaml:"running"`
+	Tainted bool      `json:"tainted" yaml:"tainted"`
 }
 
 func NewStatus(engine *core.Engine) Status {
 	executionState := engine.ExecutionScheduler.GetState()
 	return Status{
+		Status:  executionState.GetCurrentExecutionStatus(),
 		Running: executionState.HasStarted() && !executionState.HasEnded(),
 		Paused:  null.BoolFrom(executionState.IsPaused()),
 		VUs:     null.IntFrom(executionState.GetCurrentlyActiveVUsCount()),
