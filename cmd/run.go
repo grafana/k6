@@ -419,7 +419,9 @@ func reportUsage(execScheduler *local.ExecutionScheduler, wg *sync.WaitGroup) er
 	client := http.Client{Timeout: 3 * time.Second}
 	res, err := client.Post("https://reports.k6.io/", "application/json", bytes.NewBuffer(body))
 	defer func() {
-		_ = res.Body.Close()
+		if err == nil {
+			_ = res.Body.Close()
+		}
 		wg.Done()
 	}()
 
