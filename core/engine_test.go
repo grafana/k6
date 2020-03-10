@@ -156,6 +156,20 @@ func TestEngineAtTime(t *testing.T) {
 	assert.NoError(t, e.Run(ctx))
 }
 
+func TestEngineStopped(t *testing.T) {
+	e := newTestEngine(t, nil, nil, lib.Options{
+		VUs:      null.IntFrom(1),
+		Duration: types.NullDurationFrom(20 * time.Second),
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	assert.NoError(t, e.Run(ctx))
+	assert.Equal(t, false, e.IsStopped(), "engine should be running")
+	e.Stop()
+	assert.Equal(t, true, e.IsStopped(), "engine should be stopped")
+}
+
 func TestEngineCollector(t *testing.T) {
 	testMetric := stats.New("test_metric", stats.Trend)
 

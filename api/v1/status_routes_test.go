@@ -62,6 +62,7 @@ func TestGetStatus(t *testing.T) {
 		assert.True(t, status.Paused.Valid)
 		assert.True(t, status.VUs.Valid)
 		assert.True(t, status.VUsMax.Valid)
+		assert.False(t, status.Stopped)
 		assert.False(t, status.Tainted)
 	})
 }
