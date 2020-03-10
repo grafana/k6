@@ -320,6 +320,15 @@ a commandline interface for interacting with it.`,
 				// but with uninterruptible iterations it will be even more problematic.
 			}
 		}
+
+		reportWg := &sync.WaitGroup{}
+		if !conf.NoUsageReport.Bool {
+			reportWg.Add(1)
+			go func() {
+				_ = reportUsage(execScheduler, reportWg)
+			}()
+		}
+
 		if quiet || !stdoutTTY {
 			e := logger.WithFields(logrus.Fields{
 				"t": executionState.GetCurrentTestRunDuration(),
@@ -337,14 +346,6 @@ a commandline interface for interacting with it.`,
 		// Warn if no iterations could be completed.
 		if executionState.GetFullIterationCount() == 0 {
 			logger.Warn("No data generated, because no script iterations finished, consider making the test duration longer")
-		}
-
-		reportWg := &sync.WaitGroup{}
-		if !conf.NoUsageReport.Bool {
-			reportWg.Add(1)
-			go func() {
-				_ = reportUsage(execScheduler, reportWg)
-			}()
 		}
 
 		data := ui.SummaryData{
@@ -395,9 +396,8 @@ a commandline interface for interacting with it.`,
 }
 
 func reportUsage(execScheduler *local.ExecutionScheduler, wg *sync.WaitGroup) error {
-	execPlan := execScheduler.GetExecutionPlan()
-	executorConfigs := execScheduler.GetExecutorConfigs()
 	execState := execScheduler.GetState()
+	executorConfigs := execScheduler.GetExecutorConfigs()
 
 	executors := make(map[string]int)
 	for _, ec := range executorConfigs {
@@ -405,10 +405,9 @@ func reportUsage(execScheduler *local.ExecutionScheduler, wg *sync.WaitGroup) er
 	}
 
 	body, err := json.Marshal(map[string]interface{}{
-		"k6_version": consts.FullVersion(),
+		"k6_version": consts.Version,
 		"executors":  executors,
-		"vus_init":   execState.GetInitializedVUsCount(),
-		"vus_max":    lib.GetMaxPossibleVUs(execPlan),
+		"vus_max":    execState.GetInitializedVUsCount(),
 		"iterations": execState.GetFullIterationCount(),
 		"duration":   execState.GetCurrentTestRunDuration().String(),
 		"goos":       runtime.GOOS,
@@ -417,12 +416,13 @@ func reportUsage(execScheduler *local.ExecutionScheduler, wg *sync.WaitGroup) er
 	if err != nil {
 		return err
 	}
-
-	res, err := http.Post("https://reports.k6.io/", "application/json", bytes.NewBuffer(body))
+	client := http.Client{Timeout: 3 * time.Second}
+	res, err := client.Post("https://reports.k6.io/", "application/json", bytes.NewBuffer(body))
 	defer func() {
 		_ = res.Body.Close()
 		wg.Done()
 	}()
+
 	return err
 }
 
