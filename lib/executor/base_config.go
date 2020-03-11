@@ -30,6 +30,11 @@ import (
 	null "gopkg.in/guregu/null.v3"
 )
 
+// DefaultGracefulStopValue is the graceful top value for all executors, unless
+// it's manually changed by the gracefulStop in each one.
+// TODO?: Discard? Or make this actually user-configurable somehow? hello #883...
+var DefaultGracefulStopValue = 30 * time.Second //nolint:gochecknoglobals
+
 var executorNameWhitelist = regexp.MustCompile(`^[0-9a-zA-Z_-]+$`) //nolint:gochecknoglobals
 const executorNameErr = "the executor name should contain only numbers, latin letters, underscores, and dashes"
 
@@ -42,7 +47,7 @@ type BaseConfig struct {
 	Env          map[string]string  `json:"env"`
 	Exec         null.String        `json:"exec"` // function name, externally validated
 
-	//TODO: future extensions like tags, distribution, others?
+	// TODO: future extensions like tags, distribution, others?
 }
 
 // NewBaseConfig returns a default base config with the default values
@@ -50,7 +55,7 @@ func NewBaseConfig(name, configType string) BaseConfig {
 	return BaseConfig{
 		Name:         name,
 		Type:         configType,
-		GracefulStop: types.NewNullDuration(30*time.Second, false),
+		GracefulStop: types.NewNullDuration(DefaultGracefulStopValue, false),
 	}
 }
 
