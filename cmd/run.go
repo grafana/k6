@@ -321,8 +321,9 @@ a commandline interface for interacting with it.`,
 			}
 		}
 
-		reportCh := make(chan struct{})
+		var reportCh chan struct{}
 		if !conf.NoUsageReport.Bool {
+			reportCh = make(chan struct{})
 			go func() {
 				_ = reportUsage(execScheduler)
 				close(reportCh)
@@ -386,9 +387,11 @@ a commandline interface for interacting with it.`,
 			<-sigC
 		}
 
-		select {
-		case <-reportCh:
-		case <-time.After(3 * time.Second):
+		if reportCh != nil {
+			select {
+			case <-reportCh:
+			case <-time.After(3 * time.Second):
+			}
 		}
 
 		if engine.IsTainted() {
