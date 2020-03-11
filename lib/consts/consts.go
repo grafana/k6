@@ -13,7 +13,7 @@ var Version = "0.26.1" //nolint:gochecknoglobals
 // VersionDetails can be set externally as part of the build process
 var VersionDetails = "" // nolint:gochecknoglobals
 
-// FullVersion returns the maximully full version and build information for
+// FullVersion returns the maximally full version and build information for
 // the currently running k6 executable.
 func FullVersion() string {
 	goVersionArch := fmt.Sprintf("%s, %s/%s", runtime.Version(), runtime.GOOS, runtime.GOARCH)
@@ -29,7 +29,7 @@ func FullVersion() string {
 }
 
 // Banner contains the ASCII-art banner with the k6 logo and stylized website URL
-//TODO: make these into methods, only the version needs to be a variable
+// TODO: make these into methods, only the version needs to be a variable
 //nolint:gochecknoglobals
 var Banner = strings.Join([]string{
 	`          /\      |‾‾|  /‾‾/  /‾/   `,
