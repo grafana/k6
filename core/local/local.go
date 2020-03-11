@@ -233,7 +233,6 @@ func (e *ExecutionScheduler) Init(ctx context.Context, engineOut chan<- stats.Sa
 	subctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	// Initialize VUs concurrently
 	e.state.SetExecutionStatus(lib.ExecutionStatusInitVUs)
 	doneInits := e.initVUsConcurrently(subctx, engineOut, vusToInitialize, runtime.NumCPU(), logger)
 
