@@ -126,7 +126,7 @@ func TestExecutionStateGettingVUs(t *testing.T) {
 		require.Contains(t, entry.Message, "Could not get a VU from the buffer for ")
 	}
 
-	// Test getting uninitiazed vus will work
+	// Test getting uninitialized vus will work
 	for i := 0; i < 10; i++ {
 		require.EqualValues(t, 10+i, es.GetCurrentlyActiveVUsCount())
 		vu, err = es.GetUnplannedVU(context.Background(), logEntry)

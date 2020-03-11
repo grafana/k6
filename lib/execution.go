@@ -527,7 +527,7 @@ func (es *ExecutionState) ResumeNotify() <-chan struct{} {
 // If modifyActiveVUCount is true, the method would also increment the counter
 // for active VUs. In most cases, that's the desired behavior, but some
 // executors might have to retrieve their reserved VUs without using them
-// immediately - for example, the the externally-controlled executor when the
+// immediately - for example, the externally-controlled executor when the
 // configured maxVUs number is greater than the configured starting VUs.
 func (es *ExecutionState) GetPlannedVU(logger *logrus.Entry, modifyActiveVUCount bool) (VU, error) {
 	for i := 1; i <= MaxRetriesGetPlannedVU; i++ {
