@@ -321,11 +321,11 @@ a commandline interface for interacting with it.`,
 			}
 		}
 
-		reportWg := &sync.WaitGroup{}
+		reportCh := make(chan struct{})
 		if !conf.NoUsageReport.Bool {
-			reportWg.Add(1)
 			go func() {
-				_ = reportUsage(execScheduler, reportWg)
+				_ = reportUsage(execScheduler)
+				close(reportCh)
 			}()
 		}
 
@@ -386,7 +386,10 @@ a commandline interface for interacting with it.`,
 			<-sigC
 		}
 
-		reportWg.Wait()
+		select {
+		case <-reportCh:
+		case <-time.After(3 * time.Second):
+		}
 
 		if engine.IsTainted() {
 			return ExitCode{error: errors.New("some thresholds have failed"), Code: thresholdHaveFailedErrorCode}
@@ -395,7 +398,7 @@ a commandline interface for interacting with it.`,
 	},
 }
 
-func reportUsage(execScheduler *local.ExecutionScheduler, wg *sync.WaitGroup) error {
+func reportUsage(execScheduler *local.ExecutionScheduler) error {
 	execState := execScheduler.GetState()
 	executorConfigs := execScheduler.GetExecutorConfigs()
 
@@ -416,13 +419,11 @@ func reportUsage(execScheduler *local.ExecutionScheduler, wg *sync.WaitGroup) er
 	if err != nil {
 		return err
 	}
-	client := http.Client{Timeout: 3 * time.Second}
-	res, err := client.Post("https://reports.k6.io/", "application/json", bytes.NewBuffer(body))
+	res, err := http.Post("https://reports.k6.io/", "application/json", bytes.NewBuffer(body))
 	defer func() {
 		if err == nil {
 			_ = res.Body.Close()
 		}
-		wg.Done()
 	}()
 
 	return err
