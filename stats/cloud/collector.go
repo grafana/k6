@@ -299,7 +299,7 @@ func (c *Collector) Collect(sampleContainers []stats.SampleContainer) {
 				newSamples = append(newSamples, NewSampleFromTrail(sc))
 			}
 		case *netext.NetTrail:
-			//TODO: aggregate?
+			// TODO: aggregate?
 			values := map[string]float64{
 				metrics.DataSent.Name:     float64(sc.BytesWritten),
 				metrics.DataReceived.Name: float64(sc.BytesRead),
@@ -317,7 +317,8 @@ func (c *Collector) Collect(sampleContainers []stats.SampleContainer) {
 					Time:   Timestamp(sc.GetTime()),
 					Tags:   sc.GetTags(),
 					Values: values,
-				}})
+				},
+			})
 		default:
 			for _, sample := range sampleContainer.GetSamples() {
 				newSamples = append(newSamples, &Sample{
@@ -515,7 +516,7 @@ func (c *Collector) pushMetrics() {
 	}).Debug("Pushing metrics to cloud")
 
 	for len(buffer) > 0 {
-		var size = len(buffer)
+		size := len(buffer)
 		if size > int(c.config.MaxMetricSamplesPerPackage.Int64) {
 			size = int(c.config.MaxMetricSamplesPerPackage.Int64)
 		}
