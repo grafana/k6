@@ -29,10 +29,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/loadimpact/k6/stats"
-	"github.com/loadimpact/k6/ui/pb"
 	"github.com/sirupsen/logrus"
 	null "gopkg.in/guregu/null.v3"
+
+	"github.com/loadimpact/k6/stats"
+	"github.com/loadimpact/k6/ui/pb"
 )
 
 //TODO: remove globals and use some type of explicit dependency injection?
@@ -110,7 +111,7 @@ type ExecutorConfig interface {
 
 // InitVUFunc is just a shorthand so we don't have to type the function
 // signature every time.
-type InitVUFunc func(context.Context, *logrus.Entry) (VU, error)
+type InitVUFunc func(context.Context, *logrus.Entry) (InitializedVU, error)
 
 // Executor is the interface all executors should implement
 type Executor interface {
