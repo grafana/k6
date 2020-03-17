@@ -183,7 +183,7 @@ var configMapTestCases = []configMapTestCase{
 			assert.Empty(t, cm["varloops"].Validate())
 			assert.Empty(t, cm.Validate())
 
-			assert.Equal(t, "Up to 11 looping VUs for 20s over 3 stages (gracefulRampDown: 0s)", cm["varloops"].GetDescription(nil))
+			assert.Equal(t, "Up to 11 looping VUs for 20s over 4 stages (gracefulRampDown: 0s)", cm["varloops"].GetDescription(nil))
 
 			schedReqs := cm.GetFullExecutionRequirements(nil)
 			assert.Equal(t, uint64(11), lib.GetMaxPlannedVUs(schedReqs))
