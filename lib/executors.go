@@ -266,17 +266,11 @@ func (scs ExecutorConfigMap) GetFullExecutionRequirements(executionSegment *Exec
 	// sorting algorithm, since there could be steps with the same time from
 	// the same executor and their order is important.
 	sort.SliceStable(trackedSteps, func(a, b int) bool {
-		switch {
-		case trackedSteps[a].TimeOffset < trackedSteps[b].TimeOffset:
-			return true
-		case trackedSteps[a].TimeOffset == trackedSteps[b].TimeOffset:
-			if trackedSteps[a].configID == trackedSteps[b].configID {
-				return trackedSteps[a].PlannedVUs < trackedSteps[b].PlannedVUs
-			}
+		if trackedSteps[a].TimeOffset == trackedSteps[b].TimeOffset {
 			return trackedSteps[a].configID < trackedSteps[b].configID
-		default:
-			return false
 		}
+
+		return trackedSteps[a].TimeOffset < trackedSteps[b].TimeOffset
 	})
 
 	// Go through all of the sorted steps from all of the executors, and
@@ -309,15 +303,14 @@ func (scs ExecutorConfigMap) GetFullExecutionRequirements(executionSegment *Exec
 		}
 	}
 	for _, step := range trackedSteps {
+		// TODO: optimize by skipping some steps
 		// If the time offset is different, create a new step with the current values
-		if step.TimeOffset != currentTimeOffset {
-			addCurrentStepIfDifferent()
-			currentTimeOffset = step.TimeOffset
-		}
+
+		currentTimeOffset = step.TimeOffset
 		currentPlannedVUs[step.configID] = step.PlannedVUs
 		currentMaxUnplannedVUs[step.configID] = step.MaxUnplannedVUs
+		addCurrentStepIfDifferent()
 	}
-	addCurrentStepIfDifferent() // Add the last step
 	return consolidatedSteps
 }
 
