@@ -123,14 +123,17 @@ func TestConsole(t *testing.T) {
 					assert.NoError(t, err)
 
 					samples := make(chan stats.SampleContainer, 100)
-					vu, err := r.newVU(samples)
+					initVU, err := r.newVU(1, samples)
 					assert.NoError(t, err)
+
+					vu := initVU.Activate(&lib.VUActivationParams{RunContext: context.Background()})
 
 					logger, hook := logtest.NewNullLogger()
 					logger.Level = logrus.DebugLevel
-					vu.Console.Logger = logger
+					jsVU := vu.(*VU)
+					jsVU.Console.Logger = logger
 
-					err = vu.RunOnce(context.Background())
+					err = vu.RunOnce()
 					assert.NoError(t, err)
 
 					entry := hook.LastEntry()
@@ -215,13 +218,15 @@ func TestFileConsole(t *testing.T) {
 							assert.NoError(t, err)
 
 							samples := make(chan stats.SampleContainer, 100)
-							vu, err := r.newVU(samples)
+							initVU, err := r.newVU(1, samples)
 							assert.NoError(t, err)
 
-							vu.Console.Logger.Level = logrus.DebugLevel
-							hook := logtest.NewLocal(vu.Console.Logger)
+							vu := initVU.Activate(&lib.VUActivationParams{RunContext: context.Background()})
+							jsVU := vu.(*VU)
+							jsVU.Console.Logger.Level = logrus.DebugLevel
+							hook := logtest.NewLocal(jsVU.Console.Logger)
 
-							err = vu.RunOnce(context.Background())
+							err = vu.RunOnce()
 							assert.NoError(t, err)
 
 							// Test if the file was created.

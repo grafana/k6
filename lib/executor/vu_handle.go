@@ -48,7 +48,8 @@ type vuHandle struct {
 }
 
 func newStoppedVUHandle(
-	parentCtx context.Context, getVU func() (lib.InitializedVU, error), returnVU func(lib.InitializedVU), logger *logrus.Entry,
+	parentCtx context.Context, getVU func() (lib.InitializedVU, error),
+	returnVU func(lib.InitializedVU), logger *logrus.Entry,
 ) *vuHandle {
 	lock := &sync.RWMutex{}
 	ctx, cancel := context.WithCancel(parentCtx)
