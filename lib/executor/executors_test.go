@@ -151,6 +151,45 @@ var configMapTestCases = []configMapTestCase{
 			assert.Equal(t, uint64(30), lib.GetMaxPossibleVUs(schedReqs))
 		}},
 	},
+	{`{"varloops": {"type": "variable-looping-vus", "startVUs": 1, "gracefulStop": "0s", "gracefulRampDown": "10s",
+			"stages": [{"duration": "10s", "target": 10}]}}`,
+		exp{custom: func(t *testing.T, cm lib.ExecutorConfigMap) {
+			assert.Empty(t, cm["varloops"].Validate())
+			assert.Empty(t, cm.Validate())
+
+			assert.Equal(t, "Up to 10 looping VUs for 10s over 1 stages (gracefulRampDown: 10s)", cm["varloops"].GetDescription(nil))
+
+			schedReqs := cm["varloops"].GetExecutionRequirements(nil)
+			assert.Equal(t, uint64(10), lib.GetMaxPlannedVUs(schedReqs))
+			assert.Equal(t, uint64(10), lib.GetMaxPossibleVUs(schedReqs))
+		}},
+	},
+	{`{"varloops": {"type": "variable-looping-vus", "startVUs": 1, "gracefulStop": "0s", "gracefulRampDown": "0s",
+			"stages": [{"duration": "10s", "target": 10}, {"duration": "0s", "target": 1}, {"duration": "10s", "target": 5}]}}`,
+		exp{custom: func(t *testing.T, cm lib.ExecutorConfigMap) {
+			assert.Empty(t, cm["varloops"].Validate())
+			assert.Empty(t, cm.Validate())
+
+			assert.Equal(t, "Up to 10 looping VUs for 20s over 3 stages (gracefulRampDown: 0s)", cm["varloops"].GetDescription(nil))
+
+			schedReqs := cm.GetFullExecutionRequirements(nil)
+			assert.Equal(t, uint64(10), lib.GetMaxPlannedVUs(schedReqs))
+			assert.Equal(t, uint64(10), lib.GetMaxPossibleVUs(schedReqs))
+		}},
+	},
+	{`{"varloops": {"type": "variable-looping-vus", "startVUs": 1, "gracefulStop": "0s", "gracefulRampDown": "0s",
+			"stages": [{"duration": "10s", "target": 10}, {"duration": "0s", "target": 11},{"duration": "0s", "target": 1}, {"duration": "10s", "target": 5}]}}`,
+		exp{custom: func(t *testing.T, cm lib.ExecutorConfigMap) {
+			assert.Empty(t, cm["varloops"].Validate())
+			assert.Empty(t, cm.Validate())
+
+			assert.Equal(t, "Up to 11 looping VUs for 20s over 4 stages (gracefulRampDown: 0s)", cm["varloops"].GetDescription(nil))
+
+			schedReqs := cm.GetFullExecutionRequirements(nil)
+			assert.Equal(t, uint64(11), lib.GetMaxPlannedVUs(schedReqs))
+			assert.Equal(t, uint64(11), lib.GetMaxPossibleVUs(schedReqs))
+		}},
+	},
 	{`{"varloops": {"type": "variable-looping-vus", "startVUs": 0, "stages": [{"duration": "60s", "target": 0}]}}`, exp{}},
 	{`{"varloops": {"type": "variable-looping-vus", "startVUs": -1, "stages": [{"duration": "60s", "target": 30}]}}`, exp{validationError: true}},
 	{`{"varloops": {"type": "variable-looping-vus", "startVUs": 2, "stages": [{"duration": "-60s", "target": 30}]}}`, exp{validationError: true}},
