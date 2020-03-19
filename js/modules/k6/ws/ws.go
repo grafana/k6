@@ -171,6 +171,22 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 	connectionEnd := time.Now()
 	connectionDuration := stats.D(connectionEnd.Sub(start))
 
+	if state.Options.SystemTags.Has(stats.TagIP) && conn.RemoteAddr() != nil {
+		if ip, _, err := net.SplitHostPort(conn.RemoteAddr().String()); err == nil {
+			tags["ip"] = ip
+		}
+	}
+
+	if httpResponse != nil {
+		if state.Options.SystemTags.Has(stats.TagStatus) {
+			tags["status"] = strconv.Itoa(httpResponse.StatusCode)
+		}
+
+		if state.Options.SystemTags.Has(stats.TagSubproto) {
+			tags["subproto"] = httpResponse.Header.Get("Sec-WebSocket-Protocol")
+		}
+	}
+
 	socket := Socket{
 		ctx:                ctx,
 		conn:               conn,
@@ -179,13 +195,17 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 		scheduled:          make(chan goja.Callable),
 		done:               make(chan struct{}),
 		samplesOutput:      state.Samples,
+		sampleTags:         stats.IntoSampleTags(&tags),
 	}
 
-	if state.Options.SystemTags.Has(stats.TagIP) && conn.RemoteAddr() != nil {
-		if ip, _, err := net.SplitHostPort(conn.RemoteAddr().String()); err == nil {
-			tags["ip"] = ip
-		}
-	}
+	stats.PushIfNotDone(ctx, state.Samples, stats.ConnectedSamples{
+		Samples: []stats.Sample{
+			{Metric: metrics.WSSessions, Time: start, Tags: socket.sampleTags, Value: 1},
+			{Metric: metrics.WSConnecting, Time: start, Tags: socket.sampleTags, Value: connectionDuration},
+		},
+		Tags: socket.sampleTags,
+		Time: start,
+	})
 
 	if connErr != nil {
 		// Pass the error to the user script before exiting immediately
@@ -207,15 +227,6 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 	wsResponse.URL = url
 
 	defer func() { _ = conn.Close() }()
-
-	if state.Options.SystemTags.Has(stats.TagStatus) {
-		tags["status"] = strconv.Itoa(httpResponse.StatusCode)
-	}
-	if state.Options.SystemTags.Has(stats.TagSubproto) {
-		tags["subproto"] = httpResponse.Header.Get("Sec-WebSocket-Protocol")
-	}
-
-	socket.sampleTags = stats.IntoSampleTags(&tags)
 
 	// The connection is now open, emit the event
 	socket.handleEvent("open")
@@ -264,8 +275,7 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 				Metric: metrics.WSMessagesReceived,
 				Time:   time.Now(),
 				Tags:   socket.sampleTags,
-
-				Value: 1,
+				Value:  1,
 			})
 			socket.handleEvent("message", rt.ToValue(string(readData)))
 
@@ -290,14 +300,11 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 			end := time.Now()
 			sessionDuration := stats.D(end.Sub(start))
 
-			stats.PushIfNotDone(ctx, state.Samples, stats.ConnectedSamples{
-				Samples: []stats.Sample{
-					{Metric: metrics.WSSessions, Time: start, Tags: socket.sampleTags, Value: 1},
-					{Metric: metrics.WSConnecting, Time: start, Tags: socket.sampleTags, Value: connectionDuration},
-					{Metric: metrics.WSSessionDuration, Time: start, Tags: socket.sampleTags, Value: sessionDuration},
-				},
-				Tags: socket.sampleTags,
-				Time: start,
+			stats.PushIfNotDone(ctx, state.Samples, stats.Sample{
+				Metric: metrics.WSSessionDuration,
+				Tags:   socket.sampleTags,
+				Time:   start,
+				Value:  sessionDuration,
 			})
 
 			return wsResponse, nil
