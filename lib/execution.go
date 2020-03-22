@@ -105,6 +105,7 @@ const MaxRetriesGetPlannedVU = 5
 
 // ExecutionStatus is similar to RunStatus, but more fine grained and concerns
 // only local execution.
+//go:generate enumer -type=ExecutionStatus -trimprefix ExecutionStatus -output execution_status_gen.go
 type ExecutionStatus uint32
 
 // Possible execution status values
