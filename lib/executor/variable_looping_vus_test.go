@@ -23,7 +23,6 @@ package executor
 import (
 	"context"
 	"fmt"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -64,35 +63,35 @@ func TestVariableLoopingVUsRun(t *testing.T) {
 	var ctx, cancel, executor, _ = setupExecutor(
 		t, config, es,
 		simpleRunner(func(ctx context.Context) error {
-			time.Sleep(200 * time.Millisecond)
+			// Sleeping for a weird duration somewhat offset from the
+			// executor ticks to hopefully keep race conditions out of
+			// our control from failing the test.
+			time.Sleep(300 * time.Millisecond)
 			atomic.AddInt64(&iterCount, 1)
 			return nil
 		}),
 	)
 	defer cancel()
 
-	var (
-		wg     sync.WaitGroup
-		result []int64
-	)
+	sampleTimes := []time.Duration{
+		500 * time.Millisecond,
+		1000 * time.Millisecond,
+		700 * time.Millisecond,
+	}
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		time.Sleep(100 * time.Millisecond)
-		result = append(result, es.GetCurrentlyActiveVUsCount())
-		time.Sleep(1 * time.Second)
-		result = append(result, es.GetCurrentlyActiveVUsCount())
-		time.Sleep(1 * time.Second)
-		result = append(result, es.GetCurrentlyActiveVUsCount())
-	}()
+	errCh := make(chan error)
+	go func() { errCh <- executor.Run(ctx, nil) }()
 
-	err := executor.Run(ctx, nil)
+	var result = make([]int64, len(sampleTimes))
+	for i, d := range sampleTimes {
+		time.Sleep(d)
+		result[i] = es.GetCurrentlyActiveVUsCount()
+	}
 
-	wg.Wait()
-	require.NoError(t, err)
+	require.NoError(t, <-errCh)
+
 	assert.Equal(t, []int64{5, 3, 0}, result)
-	assert.Equal(t, int64(40), iterCount)
+	assert.Equal(t, int64(29), iterCount)
 }
 
 // Ensure there's no wobble of VUs during graceful ramp-down, without segments.
