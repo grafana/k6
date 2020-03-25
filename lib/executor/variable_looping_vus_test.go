@@ -22,7 +22,6 @@ package executor
 
 import (
 	"context"
-	"fmt"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -153,17 +152,12 @@ func TestVariableLoopingVUsRampDownNoWobble(t *testing.T) {
 	assert.Equal(t, int64(10), result[1])
 	assert.Equal(t, int64(0), result[len(result)-1])
 
-	var curr int64
-	last := result[2]
-	// Check all ramp-down samples for wobble
+	vuChanges := []int64{result[2]}
+	// Check ramp-down consistency
 	for i := 3; i < len(result[2:]); i++ {
-		curr = result[i]
-		// Detect ramp-ups, missteps (e.g. 7 -> 4), but ignore pauses (repeats)
-		if curr > last || (curr != last && curr != last-1) {
-			assert.FailNow(t,
-				fmt.Sprintf("ramping down wobble bug - "+
-					"current: %d, previous: %d\nVU samples: %v", curr, last, result))
+		if result[i] != result[i-1] {
+			vuChanges = append(vuChanges, result[i])
 		}
-		last = curr
 	}
+	assert.Equal(t, []int64{10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0}, vuChanges)
 }
