@@ -24,8 +24,6 @@ import (
 	"fmt"
 	"math/big"
 	"math/rand"
-	"os"
-	"sort"
 	"testing"
 	"time"
 
@@ -384,42 +382,31 @@ func TestExecutionSegmentStringSequences(t *testing.T) {
 	}
 }
 
-// Return a randomly distributed sequence of numSegments amount of
+// Return a randomly distributed sequence of n amount of
 // execution segments whose length totals 1.
-func genRandomExecutionSegmentSequence(numSegments int) (ExecutionSegmentSequence, error) {
-	const denom int = 1000
-
-	bounds := make(map[int]struct{}, numSegments-1)
-	for i := 0; i < numSegments-1; i++ {
-		b := rand.Intn(denom-1) + 1
-		// Avoid duplicates
-		if _, ok := bounds[b]; ok {
-			numSegments++
-			continue
+func generateRandomSequence(n int64, r *rand.Rand) (ExecutionSegmentSequence, error) {
+	var err error
+	var ess = ExecutionSegmentSequence(make([]*ExecutionSegment, n))
+	var numerators = make([]int64, n)
+	var denominator int64
+	for i := int64(0); i < n; i++ {
+		for numerators[i] == 0 {
+			numerators[i] = r.Int63n(n)
+			denominator += numerators[i]
 		}
-		bounds[b] = struct{}{}
 	}
-
-	nums := make([]int, 0, len(bounds)+2)
-	for k := range bounds {
-		nums = append(nums, k)
+	ess[0], err = NewExecutionSegment(big.NewRat(0, 1), big.NewRat(numerators[0], denominator))
+	if err != nil {
+		return nil, err
 	}
-	nums = append(nums, []int{0, denom}...)
-
-	sort.Ints(nums)
-
-	segments := make([]*ExecutionSegment, 0, len(bounds)+1)
-	denom64 := int64(denom)
-	for i := 0; i < len(nums)-1; i++ {
-		from, to := big.NewRat(int64(nums[i]), denom64), big.NewRat(int64(nums[i+1]), denom64)
-		segment, err := NewExecutionSegment(from, to)
+	for i := int64(1); i < n; i++ {
+		ess[i], err = NewExecutionSegment(ess[i-1].to, new(big.Rat).Add(big.NewRat(numerators[i], denominator), ess[i-1].to))
 		if err != nil {
 			return nil, err
 		}
-		segments = append(segments, segment)
 	}
 
-	return NewExecutionSegmentSequence(segments...)
+	return ess, nil
 }
 
 // Ensure that the sum of scaling all execution segments in
@@ -427,10 +414,14 @@ func genRandomExecutionSegmentSequence(numSegments int) (ExecutionSegmentSequenc
 func TestExecutionSegmentScaleConsistency(t *testing.T) {
 	t.Parallel()
 
+	seed := time.Now().UnixNano()
+	r := rand.New(rand.NewSource(seed))
+	t.Logf("Random source seeded with %d\n", seed)
+
 	const numTests = 10
 	for i := 0; i < numTests; i++ {
 		scale := rand.Int31n(99) + 2
-		seq, err := genRandomExecutionSegmentSequence(rand.Intn(9) + 2)
+		seq, err := generateRandomSequence(r.Int63n(9)+2, r)
 		require.NoError(t, err)
 
 		t.Run(fmt.Sprintf("%d_%s", scale, seq), func(t *testing.T) {
@@ -441,9 +432,4 @@ func TestExecutionSegmentScaleConsistency(t *testing.T) {
 			assert.Equal(t, int64(scale), total)
 		})
 	}
-}
-
-func TestMain(m *testing.M) {
-	rand.Seed(time.Now().UnixNano())
-	os.Exit(m.Run())
 }
