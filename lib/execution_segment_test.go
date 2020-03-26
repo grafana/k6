@@ -21,8 +21,13 @@
 package lib
 
 import (
+	"fmt"
 	"math/big"
+	"math/rand"
+	"os"
+	"sort"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -379,4 +384,66 @@ func TestExecutionSegmentStringSequences(t *testing.T) {
 	}
 }
 
-// TODO: test with randomized things
+// Return a randomly distributed sequence of numSegments amount of
+// execution segments whose length totals 1.
+func genRandomExecutionSegmentSequence(numSegments int) (ExecutionSegmentSequence, error) {
+	const denom int = 1000
+
+	bounds := make(map[int]struct{}, numSegments-1)
+	for i := 0; i < numSegments-1; i++ {
+		b := rand.Intn(denom-1) + 1
+		// Avoid duplicates
+		if _, ok := bounds[b]; ok {
+			numSegments++
+			continue
+		}
+		bounds[b] = struct{}{}
+	}
+
+	nums := make([]int, 0, len(bounds)+2)
+	for k := range bounds {
+		nums = append(nums, k)
+	}
+	nums = append(nums, []int{0, denom}...)
+
+	sort.Ints(nums)
+
+	segments := make([]*ExecutionSegment, 0, len(bounds)+1)
+	denom64 := int64(denom)
+	for i := 0; i < len(nums)-1; i++ {
+		from, to := big.NewRat(int64(nums[i]), denom64), big.NewRat(int64(nums[i+1]), denom64)
+		segment, err := NewExecutionSegment(from, to)
+		if err != nil {
+			return nil, err
+		}
+		segments = append(segments, segment)
+	}
+
+	return NewExecutionSegmentSequence(segments...)
+}
+
+// Ensure that the sum of scaling all execution segments in
+// the same sequence with scaling factor M results in M itself.
+func TestExecutionSegmentScaleConsistency(t *testing.T) {
+	t.Parallel()
+
+	const numTests = 10
+	for i := 0; i < numTests; i++ {
+		scale := rand.Int31n(99) + 2
+		seq, err := genRandomExecutionSegmentSequence(rand.Intn(9) + 2)
+		require.NoError(t, err)
+
+		t.Run(fmt.Sprintf("%d_%s", scale, seq), func(t *testing.T) {
+			var total int64
+			for _, segment := range seq {
+				total += segment.Scale(int64(scale))
+			}
+			assert.Equal(t, int64(scale), total)
+		})
+	}
+}
+
+func TestMain(m *testing.M) {
+	rand.Seed(time.Now().UnixNano())
+	os.Exit(m.Run())
+}
