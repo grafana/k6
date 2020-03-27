@@ -260,13 +260,17 @@ func showProgress(
 	}
 
 	var (
-		fd              = int(os.Stdout.Fd())
-		ticker          = time.NewTicker(updateFreq)
-		updateTermWidth func()
-		winchSignal     = getWinchSignal()
+		fd          = int(os.Stdout.Fd())
+		ticker      = time.NewTicker(updateFreq)
+		winchSignal = getWinchSignal()
 	)
-	// On platforms that have SIGWINCH (*nix), progress bar resizing will be
-	// more responsive. On others (Windows), we fallback to resize on every tick.
+
+	// Default ticker-based progress bar resizing
+	updateTermWidth := func() {
+		<-ticker.C
+		termWidth, _, _ = terminal.GetSize(fd)
+	}
+	// More responsive progress bar resizing on platforms with SIGWINCH (*nix)
 	if winchSignal != nil {
 		winch := make(chan os.Signal, 1)
 		signal.Notify(winch, winchSignal)
@@ -276,11 +280,6 @@ func showProgress(
 			case <-winch:
 				termWidth, _, _ = terminal.GetSize(fd)
 			}
-		}
-	} else {
-		updateTermWidth = func() {
-			<-ticker.C
-			termWidth, _, _ = terminal.GetSize(fd)
 		}
 	}
 
