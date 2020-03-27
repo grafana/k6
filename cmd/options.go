@@ -90,12 +90,6 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.StringSlice("tag", nil, "add a `tag` to be applied to all samples, as `[name]=[value]`")
 	flags.String("console-output", "", "redirects the console logging to the provided output file")
 	flags.Bool("discard-response-bodies", false, "Read but don't process or save HTTP response bodies")
-	flags.String("ui-mode", UIModeResponsive.String(),
-		`Change the way the UI is rendered. Options:
-	compact: show compact fixed-length progress bars with percentages
-	responsive: resize progress bars to fit terminal window
-	full: show full fixed-length progress bars
-	`)
 	return flags
 }
 
@@ -125,7 +119,6 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		TeardownTimeout: types.NullDuration{Duration: types.Duration(60 * time.Second), Valid: false},
 
 		MetricSamplesBufferSize: null.NewInt(1000, false),
-		UIMode:                  getNullString(flags, "ui-mode"),
 	}
 
 	// Using Changed() because GetStringSlice() doesn't differentiate between empty and no value
