@@ -161,7 +161,7 @@ a commandline interface for interacting with it.`,
 		progressBarWG := &sync.WaitGroup{}
 		progressBarWG.Add(1)
 		go func() {
-			showProgress(ctx, conf, execScheduler)
+			showProgress(ctx, conf, execScheduler, logger)
 			progressBarWG.Done()
 		}()
 
@@ -262,35 +262,9 @@ a commandline interface for interacting with it.`,
 		sigC := make(chan os.Signal, 1)
 		signal.Notify(sigC, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer signal.Stop(sigC)
-
-		// Ticker for progress bar updates. Less frequent updates for non-TTYs, none if quiet.
-		updateFreq := 50 * time.Millisecond
-		if !stdoutTTY {
-			updateFreq = 1 * time.Second
-		}
-		ticker := time.NewTicker(updateFreq)
-		if quiet || conf.HTTPDebug.Valid && conf.HTTPDebug.String != "" {
-			ticker.Stop()
-		}
 	mainLoop:
 		for {
 			select {
-			case <-ticker.C:
-				if quiet || !stdoutTTY {
-					l := logrus.WithFields(logrus.Fields{
-						"t": executionState.GetCurrentTestRunDuration(),
-						"i": executionState.GetFullIterationCount(),
-					})
-					fn := l.Info
-					if quiet {
-						fn = l.Debug
-					}
-					if executionState.IsPaused() {
-						fn("Paused")
-					} else {
-						fn("Running")
-					}
-				}
 			case err := <-errC:
 				cancel()
 				if err == nil {

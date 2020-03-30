@@ -29,8 +29,23 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const defaultWidth = 40
-const defaultBarColor = color.Faint
+//nolint:gochecknoglobals
+var (
+	colorFaint   = color.New(color.Faint)
+	statusColors = map[Status]*color.Color{
+		Interrupted: color.New(color.FgRed),
+		Done:        color.New(color.FgGreen),
+		Waiting:     colorFaint,
+	}
+)
+
+const (
+	// DefaultWidth of the progress bar
+	DefaultWidth = 40
+	// threshold below which progress should be rendered as
+	// percentages instead of filling bars
+	minWidth = 8
+)
 
 // Status of the progress bar
 type Status rune
@@ -44,19 +59,11 @@ const (
 	Done        Status = '✓'
 )
 
-//nolint:gochecknoglobals
-var statusColors = map[Status]*color.Color{
-	Interrupted: color.New(color.FgRed),
-	Done:        color.New(color.FgGreen),
-	Waiting:     color.New(defaultBarColor),
-}
-
 // ProgressBar is a simple thread-safe progressbar implementation with
 // callbacks.
 type ProgressBar struct {
 	mutex  sync.RWMutex
 	width  int
-	color  *color.Color
 	logger *logrus.Entry
 	status Status
 
@@ -113,8 +120,7 @@ func WithHijack(hijack func() string) ProgressBarOption {
 func New(options ...ProgressBarOption) *ProgressBar {
 	pb := &ProgressBar{
 		mutex: sync.RWMutex{},
-		width: defaultWidth,
-		color: color.New(defaultBarColor),
+		width: DefaultWidth,
 	}
 	pb.Modify(options...)
 	return pb
@@ -152,10 +158,44 @@ func (pb *ProgressBar) Modify(options ...ProgressBarOption) {
 }
 
 // ProgressBarRender stores the different rendered parts of the
-// progress bar UI.
+// progress bar UI to allow dynamic positioning and padding of
+// elements in the terminal output (e.g. for responsive progress
+// bars).
 type ProgressBarRender struct {
-	Left, Status, Progress, Hijack string
-	Right                          []string
+	Color                                   bool
+	progress, progressFill, progressPadding string
+	Left, Hijack                            string
+	status                                  Status
+	Right                                   []string
+}
+
+// Status returns an optionally colorized status string
+func (pbr *ProgressBarRender) Status() string {
+	status := " "
+
+	if pbr.status > 0 {
+		status = string(pbr.status)
+		if c, ok := statusColors[pbr.status]; pbr.Color && ok {
+			status = c.Sprint(status)
+		}
+	}
+
+	return status
+}
+
+// Progress returns an assembled and optionally colorized progress string
+func (pbr *ProgressBarRender) Progress() string {
+	var body string
+	if pbr.progress != "" {
+		body = fmt.Sprintf(" %s ", pbr.progress)
+	} else {
+		padding := pbr.progressPadding
+		if pbr.Color {
+			padding = colorFaint.Sprint(pbr.progressPadding)
+		}
+		body = pbr.progressFill + padding
+	}
+	return fmt.Sprintf("[%s]", body)
 }
 
 func (pbr ProgressBarRender) String() string {
@@ -166,17 +206,21 @@ func (pbr ProgressBarRender) String() string {
 	if len(pbr.Right) > 0 {
 		right = " " + strings.Join(pbr.Right, "  ")
 	}
-	return pbr.Left + " " + pbr.Status + " " + pbr.Progress + right
+	return pbr.Left + " " + pbr.Status() + " " + pbr.Progress() + right
 }
 
 // Render locks the progressbar struct for reading and calls all of
 // its methods to return the final output. A struct is returned over a
 // plain string to allow dynamic padding and positioning of elements
 // depending on other elements on the screen.
-// - leftMax defines the maximum character length of the left-side
+// - maxLeft defines the maximum character length of the left-side
 //   text. Characters exceeding this length will be replaced with a
 //   single ellipsis. Passing <=0 disables this.
-func (pb *ProgressBar) Render(leftMax int) ProgressBarRender {
+// - widthDelta changes the progress bar width the specified amount of
+//   characters. E.g. passing -2 would shorten the width by 2 chars.
+//   If the resulting width is lower than minWidth, progress will be
+//   rendered as a percentage instead of a filling bar.
+func (pb *ProgressBar) Render(maxLeft, widthDelta int) ProgressBarRender {
 	pb.mutex.RLock()
 	defer pb.mutex.RUnlock()
 
@@ -198,37 +242,36 @@ func (pb *ProgressBar) Render(leftMax int) ProgressBarRender {
 		}
 	}
 
-	space := pb.width - 2
-	filled := int(float64(space) * progress)
+	width := Clampf(float64(pb.width+widthDelta), minWidth, DefaultWidth)
+	pb.width = int(width)
 
-	filling := ""
-	caret := ""
-	if filled > 0 {
-		if filled < space {
-			filling = strings.Repeat("=", filled-1)
-			caret = ">"
-		} else {
-			filling = strings.Repeat("=", filled)
+	if pb.width > minWidth {
+		space := pb.width - 2
+		filled := int(float64(space) * progress)
+
+		filling := ""
+		caret := ""
+		if filled > 0 {
+			if filled < space {
+				filling = strings.Repeat("=", filled-1)
+				caret = ">"
+			} else {
+				filling = strings.Repeat("=", filled)
+			}
 		}
+
+		out.progressPadding = ""
+		if space > filled {
+			out.progressPadding = strings.Repeat("-", space-filled)
+		}
+
+		out.progressFill = filling + caret
+	} else {
+		out.progress = fmt.Sprintf("%3.f%%", progress*100)
 	}
 
-	padding := ""
-	if space > filled {
-		padding = pb.color.Sprint(strings.Repeat("-", space-filled))
-	}
-
-	out.Left = pb.renderLeft(leftMax)
-
-	switch c, ok := statusColors[pb.status]; {
-	case ok:
-		out.Status = c.Sprint(string(pb.status))
-	case pb.status > 0:
-		out.Status = string(pb.status)
-	default:
-		out.Status = " "
-	}
-
-	out.Progress = fmt.Sprintf("[%s%s%s]", filling, caret, padding)
+	out.Left = pb.renderLeft(maxLeft)
+	out.status = pb.status
 
 	return out
 }

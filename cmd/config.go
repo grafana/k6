@@ -87,6 +87,7 @@ func (c Config) Validate() []error {
 	errors := c.Options.Validate()
 	//TODO: validate all of the other options... that we should have already been validating...
 	//TODO: maybe integrate an external validation lib: https://github.com/avelino/awesome-go#validation
+
 	return errors
 }
 
