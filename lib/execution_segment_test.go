@@ -21,8 +21,11 @@
 package lib
 
 import (
+	"fmt"
 	"math/big"
+	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -379,4 +382,54 @@ func TestExecutionSegmentStringSequences(t *testing.T) {
 	}
 }
 
-// TODO: test with randomized things
+// Return a randomly distributed sequence of n amount of
+// execution segments whose length totals 1.
+func generateRandomSequence(n int64, r *rand.Rand) (ExecutionSegmentSequence, error) {
+	var err error
+	var ess = ExecutionSegmentSequence(make([]*ExecutionSegment, n))
+	var numerators = make([]int64, n)
+	var denominator int64
+	for i := int64(0); i < n; i++ {
+		for numerators[i] == 0 {
+			numerators[i] = r.Int63n(n)
+			denominator += numerators[i]
+		}
+	}
+	ess[0], err = NewExecutionSegment(big.NewRat(0, 1), big.NewRat(numerators[0], denominator))
+	if err != nil {
+		return nil, err
+	}
+	for i := int64(1); i < n; i++ {
+		ess[i], err = NewExecutionSegment(ess[i-1].to, new(big.Rat).Add(big.NewRat(numerators[i], denominator), ess[i-1].to))
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return ess, nil
+}
+
+// Ensure that the sum of scaling all execution segments in
+// the same sequence with scaling factor M results in M itself.
+func TestExecutionSegmentScaleConsistency(t *testing.T) {
+	t.Parallel()
+
+	seed := time.Now().UnixNano()
+	r := rand.New(rand.NewSource(seed))
+	t.Logf("Random source seeded with %d\n", seed)
+
+	const numTests = 10
+	for i := 0; i < numTests; i++ {
+		scale := rand.Int31n(99) + 2
+		seq, err := generateRandomSequence(r.Int63n(9)+2, r)
+		require.NoError(t, err)
+
+		t.Run(fmt.Sprintf("%d_%s", scale, seq), func(t *testing.T) {
+			var total int64
+			for _, segment := range seq {
+				total += segment.Scale(int64(scale))
+			}
+			assert.Equal(t, int64(scale), total)
+		})
+	}
+}
