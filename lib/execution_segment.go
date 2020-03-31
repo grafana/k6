@@ -509,7 +509,7 @@ outer:
 type ExecutionTuple struct { // TODO rename
 	ES *ExecutionSegment // TODO unexport this as well?
 
-	// TODO: have the index of the segment, cached?
+	esIndex      int
 	sequence     ExecutionSegmentSequence
 	offsetsCache [][]int64
 	lcd          int64
@@ -531,30 +531,36 @@ func fillSequence(sequence ExecutionSegmentSequence) ExecutionSegmentSequence {
 }
 
 // NewExecutionTuple returns a new ExecutionTuple for the provided segment and sequence
-func NewExecutionTuple(segment *ExecutionSegment, sequence *ExecutionSegmentSequence) *ExecutionTuple {
-	if segment == nil { // TODO: try to do something better, maybe have bool flag in the ExecutionTuple or something
-		// this is needed in order to know that a segment == nil means that after
-		// GetNewExecutionTupleBasedOnValues the original segment scaled to 0 length one and as such
-		// should it be used it should always get 0 as values
-		segment = newExecutionSegment(zeroRat, oneRat)
-	}
+func NewExecutionTuple(segment *ExecutionSegment, sequence *ExecutionSegmentSequence) (*ExecutionTuple, error) {
 	et := ExecutionTuple{
 		once: new(sync.Once),
 		ES:   segment,
 	}
 	if sequence == nil || len(*sequence) == 0 {
 		if segment == nil || segment.length.Cmp(oneRat) == 0 {
-			et.sequence = ExecutionSegmentSequence{segment}
+			// here we replace it with a not nil as we otherwise will need to check it everywhere
+			et.sequence = ExecutionSegmentSequence{newExecutionSegment(zeroRat, oneRat)}
 		} else {
 			et.sequence = fillSequence(ExecutionSegmentSequence{segment})
 		}
 	} else {
 		et.sequence = fillSequence(*sequence)
 	}
-	return &et
+
+	et.esIndex = et.find(segment)
+	if et.esIndex == -1 {
+		return nil, fmt.Errorf("coulnd't find segment %s in sequence %s", segment, sequence)
+	}
+	return &et, nil
 }
 
 func (et *ExecutionTuple) find(segment *ExecutionSegment) int {
+	if segment == nil {
+		if len(et.sequence) == 1 {
+			return 0
+		}
+		return -1
+	}
 	index := sort.Search(len(et.sequence), func(i int) bool {
 		return et.sequence[i].from.Cmp(segment.from) >= 0
 	})
@@ -567,15 +573,17 @@ func (et *ExecutionTuple) find(segment *ExecutionSegment) int {
 
 // ScaleInt64 scales the provided value based on the ExecutionTuple
 func (et *ExecutionTuple) ScaleInt64(value int64) int64 {
-	return et.scaleInt64With(value, et.ES)
+	if et.esIndex == -1 {
+		return 0
+	}
+	et.once.Do(et.fillCache)
+	offsets := et.offsetsCache[et.esIndex]
+	return scaleInt64(value, offsets[0], offsets[1:], et.lcd)
 }
 
 // scaleInt64With scales the provided value based on the ExecutionTuples'
 // sequence and the segment provided
 func (et *ExecutionTuple) scaleInt64With(value int64, es *ExecutionSegment) int64 {
-	if es == nil {
-		return 0
-	}
 	start, offsets, lcd := et.GetStripedOffsets(es)
 	return scaleInt64(value, start, offsets, lcd)
 }
@@ -636,28 +644,30 @@ func (et *ExecutionTuple) GetStripedOffsets(segment *ExecutionSegment) (int64, [
 // the sequence.
 func (et *ExecutionTuple) GetNewExecutionTupleBasedOnValue(value int64) *ExecutionTuple {
 	var (
-		newESS = make(ExecutionSegmentSequence, 0, len(et.sequence)) // this can be smaller
-		newES  *ExecutionSegment
+		newESS  = make(ExecutionSegmentSequence, 0, len(et.sequence)) // this can be smaller
+		newES   *ExecutionSegment
+		esIndex = -1
 	)
 	et.once.Do(et.fillCache)
 	var prev int64
-	for i, es := range et.sequence {
+	for i := range et.sequence {
 		offsets := et.offsetsCache[i]
 		newValue := scaleInt64(value, offsets[0], offsets[1:], et.lcd)
-		// TODO optimize this, somewhat
 		if newValue == 0 {
 			continue
 		}
 		var currentES = newExecutionSegment(big.NewRat(prev, value), big.NewRat(prev+newValue, value))
 		prev += newValue
-		if es.Equal(et.ES) {
+		if i == et.esIndex {
 			newES = currentES
+			esIndex = len(newESS)
 		}
 		newESS = append(newESS, currentES)
 	}
 	return &ExecutionTuple{
-		ES:       newES, // in case newES is nil we want to keep it that way
+		ES:       newES,
 		sequence: newESS,
+		esIndex:  esIndex,
 		once:     new(sync.Once),
 	}
 }

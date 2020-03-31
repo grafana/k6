@@ -212,24 +212,28 @@ func TestExecutionTupleScale(t *testing.T) {
 	t.Parallel()
 	es := new(ExecutionSegment)
 	require.NoError(t, es.UnmarshalText([]byte("0.5")))
-	et := NewExecutionTuple(es, nil)
+	et, err := NewExecutionTuple(es, nil)
+	require.NoError(t, err)
 	require.Equal(t, int64(1), et.ScaleInt64(2))
 	require.Equal(t, int64(2), et.ScaleInt64(3))
 
 	require.NoError(t, es.UnmarshalText([]byte("0.5:1.0")))
-	et = NewExecutionTuple(es, nil)
+	et, err = NewExecutionTuple(es, nil)
+	require.NoError(t, err)
 	require.Equal(t, int64(1), et.ScaleInt64(2))
 	require.Equal(t, int64(1), et.ScaleInt64(3))
 
 	ess, err := NewExecutionSegmentSequenceFromString("0,0.5,1")
 	require.NoError(t, err)
 	require.NoError(t, es.UnmarshalText([]byte("0.5")))
-	et = NewExecutionTuple(es, &ess)
+	et, err = NewExecutionTuple(es, &ess)
+	require.NoError(t, err)
 	require.Equal(t, int64(1), et.ScaleInt64(2))
 	require.Equal(t, int64(2), et.ScaleInt64(3))
 
 	require.NoError(t, es.UnmarshalText([]byte("0.5:1.0")))
-	et = NewExecutionTuple(es, &ess)
+	et, err = NewExecutionTuple(es, &ess)
+	require.NoError(t, err)
 	require.Equal(t, int64(1), et.ScaleInt64(2))
 	require.Equal(t, int64(1), et.ScaleInt64(3))
 }
@@ -238,7 +242,8 @@ func TestBigScale(t *testing.T) {
 	ess, err := NewExecutionSegmentSequenceFromString("0,7/20,7/10,1")
 	require.NoError(t, err)
 	require.NoError(t, es.UnmarshalText([]byte("0:7/20")))
-	et := NewExecutionTuple(es, &ess)
+	et, err := NewExecutionTuple(es, &ess)
+	require.NoError(t, err)
 	require.Equal(t, int64(18), et.ScaleInt64(50))
 }
 
@@ -518,7 +523,9 @@ func TestGetStripedOffsets(t *testing.T) {
 			require.NoError(t, err)
 			segment, err := NewExecutionSegmentFromString(tc.seg)
 			require.NoError(t, err)
-			et := NewExecutionTuple(segment, &ess)
+			et, err := NewExecutionTuple(segment, &ess)
+			require.NoError(t, err)
+
 			start, offsets, lcd := et.GetStripedOffsets(segment)
 
 			assert.Equal(t, tc.start, start)
@@ -567,7 +574,8 @@ func BenchmarkGetStripedOffsets(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				segment := sequence[int(r.Int63())%len(sequence)]
-				et := NewExecutionTuple(segment, &sequence)
+				et, err := NewExecutionTuple(segment, &sequence)
+				require.NoError(b, err)
 				_, _, _ = et.GetStripedOffsets(segment)
 			}
 		})
@@ -602,7 +610,8 @@ func BenchmarkGetStripedOffsetsEven(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				segment := sequence[111233%len(sequence)]
-				et := NewExecutionTuple(segment, &sequence)
+				et, err := NewExecutionTuple(segment, &sequence)
+				require.NoError(b, err)
 				_, _, _ = et.GetStripedOffsets(segment)
 			}
 		})
@@ -631,7 +640,8 @@ func TestGetNewExecutionTupleBesedOnValue(t *testing.T) {
 			segment, err := NewExecutionSegmentFromString(tc.seg)
 			require.NoError(t, err)
 
-			et := NewExecutionTuple(segment, &ess)
+			et, err := NewExecutionTuple(segment, &ess)
+			require.NoError(t, err)
 			newET := et.GetNewExecutionTupleBasedOnValue(tc.value)
 			require.Equal(t, tc.expected, newET.sequence.String())
 		})
@@ -778,7 +788,8 @@ func TestNewExecutionTuple(t *testing.T) {
 	for _, testCase := range testCases {
 		testCase := testCase
 		t.Run(fmt.Sprintf("seg:'%s',seq:'%s'", testCase.seg, testCase.seq), func(t *testing.T) {
-			et := NewExecutionTuple(testCase.seg, testCase.seq)
+			et, err := NewExecutionTuple(testCase.seg, testCase.seq)
+			require.NoError(t, err)
 			for scaleValue, result := range testCase.scaleTests {
 				require.Equal(t, result, et.ScaleInt64(scaleValue), "%d->%d", scaleValue, result)
 			}

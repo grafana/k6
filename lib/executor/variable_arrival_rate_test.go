@@ -61,7 +61,9 @@ func TestGetPlannedRateChanges0DurationStage(t *testing.T) {
 			},
 		},
 	}
-	changes := config.getPlannedRateChanges(lib.NewExecutionTuple(nil, nil))
+	et, err := lib.NewExecutionTuple(nil, nil)
+	require.NoError(t, err)
+	changes := config.getPlannedRateChanges(et)
 	require.Equal(t, 2, len(changes))
 	require.Equal(t, time.Duration(0), changes[0].timeOffset)
 	require.Equal(t, types.NullDurationFrom(time.Millisecond*20), changes[0].tickerPeriod)
@@ -113,7 +115,9 @@ func TestGetPlannedRateChangesZeroDurationStart(t *testing.T) {
 		},
 	}
 
-	changes := config.getPlannedRateChanges(lib.NewExecutionTuple(nil, nil))
+	et, err := lib.NewExecutionTuple(nil, nil)
+	require.NoError(t, err)
+	changes := config.getPlannedRateChanges(et)
 	var expectedTickerPeriod types.Duration
 	for i, change := range changes {
 		switch {
@@ -165,7 +169,9 @@ func TestGetPlannedRateChanges(t *testing.T) {
 		},
 	}
 
-	changes := config.getPlannedRateChanges(lib.NewExecutionTuple(nil, nil))
+	et, err := lib.NewExecutionTuple(nil, nil)
+	require.NoError(t, err)
+	changes := config.getPlannedRateChanges(et)
 	var expectedTickerPeriod types.Duration
 	for i, change := range changes {
 		switch {
@@ -205,8 +211,10 @@ func BenchmarkGetPlannedRateChanges(b *testing.B) {
 	}
 
 	b.RunParallel(func(pb *testing.PB) {
+		et, err := lib.NewExecutionTuple(nil, nil)
+		require.NoError(b, err)
 		for pb.Next() {
-			changes := config.getPlannedRateChanges(lib.NewExecutionTuple(nil, nil))
+			changes := config.getPlannedRateChanges(et)
 
 			require.Equal(b, time.Duration(0),
 				changes[0].timeOffset%minIntervalBetweenRateAdjustments, "%+v", changes[0])
@@ -239,7 +247,9 @@ func getTestVariableArrivalRateConfig() VariableArrivalRateConfig {
 
 func TestVariableArrivalRateRunNotEnoughAllocatedVUsWarn(t *testing.T) {
 	t.Parallel()
-	es := lib.NewExecutionState(lib.Options{}, 10, 50)
+	et, err := lib.NewExecutionTuple(nil, nil)
+	require.NoError(t, err)
+	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
 	var ctx, cancel, executor, logHook = setupExecutor(
 		t, getTestVariableArrivalRateConfig(), es,
 		simpleRunner(func(ctx context.Context) error {
@@ -249,7 +259,7 @@ func TestVariableArrivalRateRunNotEnoughAllocatedVUsWarn(t *testing.T) {
 	)
 	defer cancel()
 	var engineOut = make(chan stats.SampleContainer, 1000)
-	err := executor.Run(ctx, engineOut)
+	err = executor.Run(ctx, engineOut)
 	require.NoError(t, err)
 	entries := logHook.Drain()
 	require.NotEmpty(t, entries)
@@ -264,7 +274,9 @@ func TestVariableArrivalRateRunNotEnoughAllocatedVUsWarn(t *testing.T) {
 func TestVariableArrivalRateRunCorrectRate(t *testing.T) {
 	t.Parallel()
 	var count int64
-	es := lib.NewExecutionState(lib.Options{}, 10, 50)
+	et, err := lib.NewExecutionTuple(nil, nil)
+	require.NoError(t, err)
+	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
 	var ctx, cancel, executor, logHook = setupExecutor(
 		t, getTestVariableArrivalRateConfig(), es,
 		simpleRunner(func(ctx context.Context) error {
@@ -295,7 +307,7 @@ func TestVariableArrivalRateRunCorrectRate(t *testing.T) {
 		require.InDelta(t, 50, currentCount, 2)
 	}()
 	var engineOut = make(chan stats.SampleContainer, 1000)
-	err := executor.Run(ctx, engineOut)
+	err = executor.Run(ctx, engineOut)
 	wg.Wait()
 	require.NoError(t, err)
 	require.Empty(t, logHook.Drain())

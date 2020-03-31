@@ -87,7 +87,8 @@ var configMapTestCases = []configMapTestCase{
 			assert.Empty(t, cm["someKey"].Validate())
 			assert.Empty(t, cm.Validate())
 
-			et := lib.NewExecutionTuple(nil, nil)
+			et, err := lib.NewExecutionTuple(nil, nil)
+			require.NoError(t, err)
 			assert.Equal(t, "10 looping VUs for 1m0s (exec: someFunc, startTime: 1m10s, gracefulStop: 10s)", cm["someKey"].GetDescription(et))
 
 			schedReqs := cm["someKey"].GetExecutionRequirements(et)
@@ -135,7 +136,8 @@ var configMapTestCases = []configMapTestCase{
 			assert.Empty(t, cm["varloops"].Validate())
 			assert.Empty(t, cm.Validate())
 
-			et := lib.NewExecutionTuple(nil, nil)
+			et, err := lib.NewExecutionTuple(nil, nil)
+			require.NoError(t, err)
 			assert.Equal(t, "Up to 30 looping VUs for 3m10s over 2 stages (gracefulRampDown: 10s, startTime: 23s, gracefulStop: 15s)", cm["varloops"].GetDescription(et))
 
 			schedReqs := cm["varloops"].GetExecutionRequirements(et)
@@ -159,7 +161,8 @@ var configMapTestCases = []configMapTestCase{
 			assert.Empty(t, cm["varloops"].Validate())
 			assert.Empty(t, cm.Validate())
 
-			et := lib.NewExecutionTuple(nil, nil)
+			et, err := lib.NewExecutionTuple(nil, nil)
+			require.NoError(t, err)
 			assert.Equal(t, "Up to 10 looping VUs for 10s over 1 stages (gracefulRampDown: 10s)", cm["varloops"].GetDescription(et))
 
 			schedReqs := cm["varloops"].GetExecutionRequirements(et)
@@ -173,7 +176,8 @@ var configMapTestCases = []configMapTestCase{
 			assert.Empty(t, cm["varloops"].Validate())
 			assert.Empty(t, cm.Validate())
 
-			et := lib.NewExecutionTuple(nil, nil)
+			et, err := lib.NewExecutionTuple(nil, nil)
+			require.NoError(t, err)
 			assert.Equal(t, "Up to 10 looping VUs for 20s over 3 stages (gracefulRampDown: 0s)", cm["varloops"].GetDescription(et))
 
 			schedReqs := cm.GetFullExecutionRequirements(et)
@@ -187,7 +191,8 @@ var configMapTestCases = []configMapTestCase{
 			assert.Empty(t, cm["varloops"].Validate())
 			assert.Empty(t, cm.Validate())
 
-			et := lib.NewExecutionTuple(nil, nil)
+			et, err := lib.NewExecutionTuple(nil, nil)
+			require.NoError(t, err)
 			assert.Equal(t, "Up to 11 looping VUs for 20s over 4 stages (gracefulRampDown: 0s)", cm["varloops"].GetDescription(et))
 
 			schedReqs := cm.GetFullExecutionRequirements(et)
@@ -214,7 +219,8 @@ var configMapTestCases = []configMapTestCase{
 			assert.Empty(t, cm["ishared"].Validate())
 			assert.Empty(t, cm.Validate())
 
-			et := lib.NewExecutionTuple(nil, nil)
+			et, err := lib.NewExecutionTuple(nil, nil)
+			require.NoError(t, err)
 			assert.Equal(t, "22 iterations shared among 12 VUs (maxDuration: 1m40s, gracefulStop: 30s)", cm["ishared"].GetDescription(et))
 
 			schedReqs := cm["ishared"].GetExecutionRequirements(et)
@@ -248,7 +254,8 @@ var configMapTestCases = []configMapTestCase{
 			assert.Empty(t, cm["ipervu"].Validate())
 			assert.Empty(t, cm.Validate())
 
-			et := lib.NewExecutionTuple(nil, nil)
+			et, err := lib.NewExecutionTuple(nil, nil)
+			require.NoError(t, err)
 			assert.Equal(t, "23 iterations for each of 13 VUs (maxDuration: 10m0s)", cm["ipervu"].GetDescription(et))
 
 			schedReqs := cm["ipervu"].GetExecutionRequirements(et)
@@ -274,7 +281,8 @@ var configMapTestCases = []configMapTestCase{
 	// constant-arrival-rate
 	{`{"carrival": {"type": "constant-arrival-rate", "rate": 30, "timeUnit": "1m", "duration": "10m", "preAllocatedVUs": 20, "maxVUs": 30}}`,
 		exp{custom: func(t *testing.T, cm lib.ExecutorConfigMap) {
-			et := lib.NewExecutionTuple(nil, nil)
+			et, err := lib.NewExecutionTuple(nil, nil)
+			require.NoError(t, err)
 			sched := NewConstantArrivalRateConfig("carrival")
 			sched.Rate = null.IntFrom(30)
 			sched.Duration = types.NullDurationFrom(10 * time.Minute)
@@ -327,7 +335,8 @@ var configMapTestCases = []configMapTestCase{
 			assert.Empty(t, cm["varrival"].Validate())
 			assert.Empty(t, cm.Validate())
 
-			et := lib.NewExecutionTuple(nil, nil)
+			et, err := lib.NewExecutionTuple(nil, nil)
+			require.NoError(t, err)
 			assert.Equal(t, "Up to 1.00 iterations/s for 8m0s over 2 stages (maxVUs: 20-50, gracefulStop: 30s)", cm["varrival"].GetDescription(et))
 
 			schedReqs := cm["varrival"].GetExecutionRequirements(et)
@@ -382,7 +391,8 @@ func TestConfigMapParsingAndValidation(t *testing.T) {
 
 func TestVariableLoopingVUsConfigExecutionPlanExample(t *testing.T) {
 	t.Parallel()
-	et := lib.NewExecutionTuple(nil, nil)
+	et, err := lib.NewExecutionTuple(nil, nil)
+	require.NoError(t, err)
 	conf := NewVariableLoopingVUsConfig("test")
 	conf.StartVUs = null.IntFrom(4)
 	conf.Stages = []Stage{

@@ -58,7 +58,9 @@ func TestVariableLoopingVUsRun(t *testing.T) {
 	}
 
 	var iterCount int64
-	es := lib.NewExecutionState(lib.Options{}, 10, 50)
+	et, err := lib.NewExecutionTuple(nil, nil)
+	require.NoError(t, err)
+	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
 	var ctx, cancel, executor, _ = setupExecutor(
 		t, config, es,
 		simpleRunner(func(ctx context.Context) error {
@@ -114,7 +116,9 @@ func TestVariableLoopingVUsRampDownNoWobble(t *testing.T) {
 		},
 	}
 
-	es := lib.NewExecutionState(lib.Options{}, 10, 50)
+	et, err := lib.NewExecutionTuple(nil, nil)
+	require.NoError(t, err)
+	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
 	var ctx, cancel, executor, _ = setupExecutor(
 		t, config, es,
 		simpleRunner(func(ctx context.Context) error {

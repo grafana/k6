@@ -60,12 +60,15 @@ var _ lib.ExecutionScheduler = &ExecutionScheduler{}
 func NewExecutionScheduler(runner lib.Runner, logger *logrus.Logger) (*ExecutionScheduler, error) {
 	options := runner.GetOptions()
 	// TODO figure out a way to give it to executionStage that is not terrible
-	et := lib.NewExecutionTuple(options.ExecutionSegment, options.ExecutionSegmentSequence)
+	et, err := lib.NewExecutionTuple(options.ExecutionSegment, options.ExecutionSegmentSequence)
+	if err != nil {
+		return nil, err
+	}
 	executionPlan := options.Execution.GetFullExecutionRequirements(et)
 	maxPlannedVUs := lib.GetMaxPlannedVUs(executionPlan)
 	maxPossibleVUs := lib.GetMaxPossibleVUs(executionPlan)
 
-	executionState := lib.NewExecutionState(options, maxPlannedVUs, maxPossibleVUs)
+	executionState := lib.NewExecutionState(options, et, maxPlannedVUs, maxPossibleVUs)
 	maxDuration, _ := lib.GetEndOffset(executionPlan) // we don't care if the end offset is final
 
 	executorConfigs := options.Execution.GetSortedConfigs()
