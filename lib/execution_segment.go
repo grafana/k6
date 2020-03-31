@@ -77,11 +77,16 @@ func NewExecutionSegment(from, to *big.Rat) (*ExecutionSegment, error) {
 	if to.Cmp(oneRat) > 0 {
 		return nil, fmt.Errorf("segment end value shouldn't be more than 1 but was %s", to.FloatString(2))
 	}
+	return newExecutionSegment(from, to), nil
+}
+
+// newExecutionSegment just creates an ExecutionSegment without validating the arguments
+func newExecutionSegment(from, to *big.Rat) *ExecutionSegment {
 	return &ExecutionSegment{
 		from:   from,
 		to:     to,
 		length: new(big.Rat).Sub(to, from),
-	}, nil
+	}
 }
 
 // stringToRat is a helper function that tries to convert a string to a rational
@@ -513,22 +518,13 @@ type ExecutionTuple struct { // TODO rename
 }
 
 func fillSequence(sequence ExecutionSegmentSequence) ExecutionSegmentSequence {
-	// TODO: discuss if we want to get the lcd of the sequence and fill with it elements of length 1/lcd ?
 	if sequence[0].from.Cmp(zeroRat) != 0 {
-		es, err := NewExecutionSegment(zeroRat, sequence[0].from)
-		if err != nil {
-			panic(err) // this really can't happen
-		}
-
+		es := newExecutionSegment(zeroRat, sequence[0].from)
 		sequence = append(ExecutionSegmentSequence{es}, sequence...)
 	}
 
 	if sequence[len(sequence)-1].to.Cmp(oneRat) != 0 {
-		es, err := NewExecutionSegment(sequence[len(sequence)-1].to, oneRat)
-		if err != nil {
-			panic(err) // this really can't happen
-		}
-
+		es := newExecutionSegment(sequence[len(sequence)-1].to, oneRat)
 		sequence = append(sequence, es)
 	}
 	return sequence
@@ -540,7 +536,7 @@ func NewExecutionTuple(segment *ExecutionSegment, sequence *ExecutionSegmentSequ
 		// this is needed in order to know that a segment == nil means that after
 		// GetNewExecutionTupleBasedOnValues the original segment scaled to 0 length one and as such
 		// should it be used it should always get 0 as values
-		segment, _ = NewExecutionSegmentFromString("0:1")
+		segment = newExecutionSegment(zeroRat, oneRat)
 	}
 	et := ExecutionTuple{
 		once: new(sync.Once),
@@ -652,10 +648,7 @@ func (et *ExecutionTuple) GetNewExecutionTupleBasedOnValue(value int64) *Executi
 		if newValue == 0 {
 			continue
 		}
-		var currentES, err = NewExecutionSegmentFromString(fmt.Sprintf("%d/%d:%d/%d", prev, value, prev+newValue, value))
-		if err != nil {
-			panic(err) // TODO this really can't happen but during the optimization it will probably disappear
-		}
+		var currentES = newExecutionSegment(big.NewRat(prev, value), big.NewRat(prev+newValue, value))
 		prev += newValue
 		if es.Equal(et.ES) {
 			newES = currentES
