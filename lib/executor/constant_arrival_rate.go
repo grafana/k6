@@ -152,7 +152,7 @@ func (carc ConstantArrivalRateConfig) GetExecutionRequirements(et *lib.Execution
 		{
 			TimeOffset:      0,
 			PlannedVUs:      uint64(et.ScaleInt64(carc.PreAllocatedVUs.Int64)),
-			MaxUnplannedVUs: uint64(et.ScaleInt64(carc.MaxVUs.Int64 - carc.PreAllocatedVUs.Int64)),
+			MaxUnplannedVUs: uint64(et.ScaleInt64(carc.MaxVUs.Int64) - et.ScaleInt64(carc.PreAllocatedVUs.Int64)),
 		}, {
 			TimeOffset:      time.Duration(carc.Duration.Duration + carc.GracefulStop.Duration),
 			PlannedVUs:      0,
@@ -165,7 +165,7 @@ func (carc ConstantArrivalRateConfig) GetExecutionRequirements(et *lib.Execution
 func (carc ConstantArrivalRateConfig) NewExecutor(
 	es *lib.ExecutionState, logger *logrus.Entry,
 ) (lib.Executor, error) {
-	return ConstantArrivalRate{
+	return &ConstantArrivalRate{
 		BaseExecutor: NewBaseExecutor(carc, es, logger),
 		config:       carc,
 	}, nil
@@ -181,21 +181,28 @@ func (carc ConstantArrivalRateConfig) HasWork(et *lib.ExecutionTuple) bool {
 type ConstantArrivalRate struct {
 	*BaseExecutor
 	config ConstantArrivalRateConfig
+	et     *lib.ExecutionTuple
 }
 
 // Make sure we implement the lib.Executor interface.
 var _ lib.Executor = &ConstantArrivalRate{}
 
+// Init values needed for the execution
+func (car *ConstantArrivalRate) Init(ctx context.Context) error {
+	car.et = car.BaseExecutor.executionState.ExecutionTuple.GetNewExecutionTupleBasedOnValue(car.config.MaxVUs.Int64)
+	// TODO mvoe the preallocation of VUs here ?
+	return nil
+}
+
 // Run executes a constant number of iterations per second.
 //
 // TODO: Reuse the variable arrival rate method?
 func (car ConstantArrivalRate) Run(ctx context.Context, out chan<- stats.SampleContainer) (err error) { //nolint:funlen
-	newET := car.BaseExecutor.executionState.ExecutionTuple.GetNewExecutionTupleBasedOnValue(car.config.MaxVUs.Int64)
 	gracefulStop := car.config.GetGracefulStop()
 	duration := time.Duration(car.config.Duration.Duration)
 	preAllocatedVUs := car.config.GetPreAllocatedVUs(car.executionState.ExecutionTuple)
 	maxVUs := car.config.GetMaxVUs(car.executionState.ExecutionTuple)
-	arrivalRate := getScaledArrivalRate(newET.ES, car.config.Rate.Int64, time.Duration(car.config.TimeUnit.Duration))
+	arrivalRate := getScaledArrivalRate(car.et.ES, car.config.Rate.Int64, time.Duration(car.config.TimeUnit.Duration))
 	tickerPeriod := time.Duration(getTickerPeriod(arrivalRate).Duration)
 	arrivalRatePerSec, _ := getArrivalRatePerSec(arrivalRate).Float64()
 
@@ -254,7 +261,7 @@ func (car ConstantArrivalRate) Run(ctx context.Context, out chan<- stats.SampleC
 		return math.Min(1, float64(spent)/float64(duration)), right
 	}
 	car.progress.Modify(pb.WithProgress(progresFn))
-	go trackProgress(ctx, maxDurationCtx, regDurationCtx, car, progresFn)
+	go trackProgress(ctx, maxDurationCtx, regDurationCtx, &car, progresFn)
 
 	regDurationDone := regDurationCtx.Done()
 	runIterationBasic := getIterationRunner(car.executionState, car.logger, out)
@@ -264,7 +271,7 @@ func (car ConstantArrivalRate) Run(ctx context.Context, out chan<- stats.SampleC
 	}
 
 	remainingUnplannedVUs := maxVUs - preAllocatedVUs
-	start, offsets, _ := newET.GetStripedOffsets(newET.ES)
+	start, offsets, _ := car.et.GetStripedOffsets(car.et.ES)
 	startTime = time.Now()
 	timer := time.NewTimer(time.Hour * 24)
 	// here the we need the not scaled one
