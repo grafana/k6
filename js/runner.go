@@ -353,14 +353,13 @@ func (r *Runner) timeoutErrorDuration(stage string) time.Duration {
 type VU struct {
 	BundleInstance
 
-	Runner     *Runner
-	RunContext *context.Context
-	Transport  *http.Transport
-	Dialer     *netext.Dialer
-	CookieJar  *cookiejar.Jar
-	TLSConfig  *tls.Config
-	ID         int64
-	Iteration  int64
+	Runner    *Runner
+	Transport *http.Transport
+	Dialer    *netext.Dialer
+	CookieJar *cookiejar.Jar
+	TLSConfig *tls.Config
+	ID        int64
+	Iteration int64
 
 	Console *console
 	BPool   *bpool.BufferPool
@@ -371,13 +370,18 @@ type VU struct {
 }
 
 // Verify that interfaces are implemented
-var _ lib.ActiveVU = &VU{}
+var _ lib.ActiveVU = &ActiveVU{}
 var _ lib.InitializedVU = &VU{}
+
+// ActiveVU holds a VU and its activation parameters
+type ActiveVU struct {
+	*VU
+	*lib.VUActivationParams
+}
 
 // Activate the VU so it will be able to run code
 func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 	u.Runtime.ClearInterrupt()
-	u.RunContext = &params.RunContext
 	// u.Env = params.Env
 
 	go func() {
@@ -388,11 +392,11 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 		}
 	}()
 
-	return lib.ActiveVU(u)
+	return &ActiveVU{u, params}
 }
 
 // RunOnce runs the default function once.
-func (u *VU) RunOnce() error {
+func (u *ActiveVU) RunOnce() error {
 	// Unmarshall the setupData only the first time for each VU so that VUs are isolated but we
 	// still don't use too much CPU in the middle test
 	if u.setupData == nil {
@@ -408,7 +412,7 @@ func (u *VU) RunOnce() error {
 	}
 
 	// Call the default function.
-	_, isFullIteration, totalTime, err := u.runFn(*u.RunContext, u.Runner.defaultGroup, true, u.Default, u.setupData)
+	_, isFullIteration, totalTime, err := u.runFn(u.RunContext, u.Runner.defaultGroup, true, u.Default, u.setupData)
 
 	// If MinIterationDuration is specified and the iteration wasn't cancelled
 	// and was less than it, sleep for the remainder
