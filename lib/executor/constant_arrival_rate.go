@@ -190,7 +190,6 @@ var _ lib.Executor = &ConstantArrivalRate{}
 // Init values needed for the execution
 func (car *ConstantArrivalRate) Init(ctx context.Context) error {
 	car.et = car.BaseExecutor.executionState.ExecutionTuple.GetNewExecutionTupleBasedOnValue(car.config.MaxVUs.Int64)
-	// TODO mvoe the preallocation of VUs here ?
 	return nil
 }
 
@@ -202,6 +201,7 @@ func (car ConstantArrivalRate) Run(ctx context.Context, out chan<- stats.SampleC
 	duration := time.Duration(car.config.Duration.Duration)
 	preAllocatedVUs := car.config.GetPreAllocatedVUs(car.executionState.ExecutionTuple)
 	maxVUs := car.config.GetMaxVUs(car.executionState.ExecutionTuple)
+	// TODO: refactor and simplify
 	arrivalRate := getScaledArrivalRate(car.et.ES, car.config.Rate.Int64, time.Duration(car.config.TimeUnit.Duration))
 	tickerPeriod := time.Duration(getTickerPeriod(arrivalRate).Duration)
 	arrivalRatePerSec, _ := getArrivalRatePerSec(arrivalRate).Float64()
