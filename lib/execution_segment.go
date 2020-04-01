@@ -576,6 +576,9 @@ func (et *ExecutionTuple) ScaleInt64(value int64) int64 {
 	if et.esIndex == -1 {
 		return 0
 	}
+	if len(et.sequence) == 1 {
+		return value
+	}
 	et.once.Do(et.fillCache)
 	offsets := et.offsetsCache[et.esIndex]
 	return scaleInt64(value, offsets[0], offsets[1:], et.lcd)
@@ -583,7 +586,7 @@ func (et *ExecutionTuple) ScaleInt64(value int64) int64 {
 
 // scaleInt64With scales the provided value based on the ExecutionTuples'
 // sequence and the segment provided
-func (et *ExecutionTuple) scaleInt64With(value int64, es *ExecutionSegment) int64 {
+func (et *ExecutionTuple) scaleInt64With(value int64, es *ExecutionSegment) int64 { //nolint:unused
 	start, offsets, lcd := et.GetStripedOffsets(es)
 	return scaleInt64(value, start, offsets, lcd)
 }
