@@ -93,9 +93,10 @@ func TestExecutionStateGettingVUs(t *testing.T) {
 		return &minirunner.VU{}, nil
 	})
 
+	var vu lib.VU
 	for i := 0; i < 10; i++ {
 		require.EqualValues(t, i, es.GetInitializedVUsCount())
-		vu, err := es.InitializeNewVU(context.Background(), logEntry)
+		vu, err = es.InitializeNewVU(context.Background(), logEntry)
 		require.NoError(t, err)
 		require.EqualValues(t, i+1, es.GetInitializedVUsCount())
 		es.ReturnVU(vu, false)
@@ -106,7 +107,7 @@ func TestExecutionStateGettingVUs(t *testing.T) {
 	// Test getting initialized VUs is okay :)
 	for i := 0; i < 10; i++ {
 		require.EqualValues(t, i, es.GetCurrentlyActiveVUsCount())
-		vu, err := es.GetPlannedVU(logEntry, true)
+		vu, err = es.GetPlannedVU(logEntry, true)
 		require.NoError(t, err)
 		require.Empty(t, logHook.Drain())
 		require.NotNil(t, vu)
@@ -115,7 +116,7 @@ func TestExecutionStateGettingVUs(t *testing.T) {
 	}
 
 	// Check that getting 1 more planned VU will error out
-	vu, err := es.GetPlannedVU(logEntry, true)
+	vu, err = es.GetPlannedVU(logEntry, true)
 	require.Nil(t, vu)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "could not get a VU from the buffer in")
