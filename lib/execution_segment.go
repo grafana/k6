@@ -549,7 +549,7 @@ func NewExecutionTuple(segment *ExecutionSegment, sequence *ExecutionSegmentSequ
 
 	et.esIndex = et.find(segment)
 	if et.esIndex == -1 {
-		return nil, fmt.Errorf("coulnd't find segment %s in sequence %s", segment, sequence)
+		return nil, fmt.Errorf("couldn't find segment %s in sequence %s", segment, sequence)
 	}
 	return &et, nil
 }
