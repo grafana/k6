@@ -71,19 +71,19 @@ func NewSharedIterationsConfig(name string) SharedIterationsConfig {
 var _ lib.ExecutorConfig = &SharedIterationsConfig{}
 
 // GetVUs returns the scaled VUs for the executor.
-func (sic SharedIterationsConfig) GetVUs(es *lib.ExecutionSegment) int64 {
-	return es.Scale(sic.VUs.Int64)
+func (sic SharedIterationsConfig) GetVUs(et *lib.ExecutionTuple) int64 {
+	return et.ES.Scale(sic.VUs.Int64)
 }
 
 // GetIterations returns the scaled iteration count for the executor.
-func (sic SharedIterationsConfig) GetIterations(es *lib.ExecutionSegment) int64 {
-	return es.Scale(sic.Iterations.Int64)
+func (sic SharedIterationsConfig) GetIterations(et *lib.ExecutionTuple) int64 {
+	return et.ES.Scale(sic.Iterations.Int64)
 }
 
 // GetDescription returns a human-readable description of the executor options
-func (sic SharedIterationsConfig) GetDescription(es *lib.ExecutionSegment) string {
+func (sic SharedIterationsConfig) GetDescription(et *lib.ExecutionTuple) string {
 	return fmt.Sprintf("%d iterations shared among %d VUs%s",
-		sic.GetIterations(es), sic.GetVUs(es),
+		sic.GetIterations(et), sic.GetVUs(et),
 		sic.getBaseInfo(fmt.Sprintf("maxDuration: %s", sic.MaxDuration.Duration)))
 }
 
@@ -115,11 +115,11 @@ func (sic SharedIterationsConfig) Validate() []error {
 // maximum waiting time for any iterations to gracefully stop. This is used by
 // the execution scheduler in its VU reservation calculations, so it knows how
 // many VUs to pre-initialize.
-func (sic SharedIterationsConfig) GetExecutionRequirements(es *lib.ExecutionSegment) []lib.ExecutionStep {
+func (sic SharedIterationsConfig) GetExecutionRequirements(et *lib.ExecutionTuple) []lib.ExecutionStep {
 	return []lib.ExecutionStep{
 		{
 			TimeOffset: 0,
-			PlannedVUs: uint64(sic.GetVUs(es)),
+			PlannedVUs: uint64(sic.GetVUs(et)),
 		},
 		{
 			TimeOffset: time.Duration(sic.MaxDuration.Duration + sic.GracefulStop.Duration),
@@ -149,16 +149,15 @@ type SharedIterations struct {
 var _ lib.Executor = &SharedIterations{}
 
 // HasWork reports whether there is any work to be done for the given execution segment.
-func (sic SharedIterationsConfig) HasWork(es *lib.ExecutionSegment) bool {
-	return sic.GetVUs(es) > 0 && sic.GetIterations(es) > 0
+func (sic SharedIterationsConfig) HasWork(et *lib.ExecutionTuple) bool {
+	return sic.GetVUs(et) > 0 && sic.GetIterations(et) > 0
 }
 
 // Run executes a specific total number of iterations, which are all shared by
 // the configured VUs.
 func (si SharedIterations) Run(ctx context.Context, out chan<- stats.SampleContainer) (err error) {
-	segment := si.executionState.Options.ExecutionSegment
-	numVUs := si.config.GetVUs(segment)
-	iterations := si.config.GetIterations(segment)
+	numVUs := si.config.GetVUs(si.executionState.ExecutionTuple)
+	iterations := si.config.GetIterations(si.executionState.ExecutionTuple)
 	duration := time.Duration(si.config.MaxDuration.Duration)
 	gracefulStop := si.config.GetGracefulStop()
 

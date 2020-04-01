@@ -71,14 +71,14 @@ func NewConstantLoopingVUsConfig(name string) ConstantLoopingVUsConfig {
 var _ lib.ExecutorConfig = &ConstantLoopingVUsConfig{}
 
 // GetVUs returns the scaled VUs for the executor.
-func (clvc ConstantLoopingVUsConfig) GetVUs(es *lib.ExecutionSegment) int64 {
-	return es.Scale(clvc.VUs.Int64)
+func (clvc ConstantLoopingVUsConfig) GetVUs(et *lib.ExecutionTuple) int64 {
+	return et.ES.Scale(clvc.VUs.Int64)
 }
 
 // GetDescription returns a human-readable description of the executor options
-func (clvc ConstantLoopingVUsConfig) GetDescription(es *lib.ExecutionSegment) string {
+func (clvc ConstantLoopingVUsConfig) GetDescription(et *lib.ExecutionTuple) string {
 	return fmt.Sprintf("%d looping VUs for %s%s",
-		clvc.GetVUs(es), clvc.Duration.Duration, clvc.getBaseInfo())
+		clvc.GetVUs(et), clvc.Duration.Duration, clvc.getBaseInfo())
 }
 
 // Validate makes sure all options are configured and valid
@@ -104,11 +104,11 @@ func (clvc ConstantLoopingVUsConfig) Validate() []error {
 // maximum waiting time for any iterations to gracefully stop. This is used by
 // the execution scheduler in its VU reservation calculations, so it knows how
 // many VUs to pre-initialize.
-func (clvc ConstantLoopingVUsConfig) GetExecutionRequirements(es *lib.ExecutionSegment) []lib.ExecutionStep {
+func (clvc ConstantLoopingVUsConfig) GetExecutionRequirements(et *lib.ExecutionTuple) []lib.ExecutionStep {
 	return []lib.ExecutionStep{
 		{
 			TimeOffset: 0,
-			PlannedVUs: uint64(clvc.GetVUs(es)),
+			PlannedVUs: uint64(clvc.GetVUs(et)),
 		},
 		{
 			TimeOffset: time.Duration(clvc.Duration.Duration + clvc.GracefulStop.Duration),
@@ -118,8 +118,8 @@ func (clvc ConstantLoopingVUsConfig) GetExecutionRequirements(es *lib.ExecutionS
 }
 
 // HasWork reports whether there is any work to be done for the given execution segment.
-func (clvc ConstantLoopingVUsConfig) HasWork(es *lib.ExecutionSegment) bool {
-	return clvc.GetVUs(es) > 0
+func (clvc ConstantLoopingVUsConfig) HasWork(et *lib.ExecutionTuple) bool {
+	return clvc.GetVUs(et) > 0
 }
 
 // NewExecutor creates a new ConstantLoopingVUs executor
@@ -143,8 +143,7 @@ var _ lib.Executor = &ConstantLoopingVUs{}
 // Run constantly loops through as many iterations as possible on a fixed number
 // of VUs for the specified duration.
 func (clv ConstantLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleContainer) (err error) {
-	segment := clv.executionState.Options.ExecutionSegment
-	numVUs := clv.config.GetVUs(segment)
+	numVUs := clv.config.GetVUs(clv.executionState.ExecutionTuple)
 	duration := time.Duration(clv.config.Duration.Duration)
 	gracefulStop := clv.config.GetGracefulStop()
 

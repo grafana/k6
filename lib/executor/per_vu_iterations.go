@@ -68,8 +68,8 @@ func NewPerVUIterationsConfig(name string) PerVUIterationsConfig {
 var _ lib.ExecutorConfig = &PerVUIterationsConfig{}
 
 // GetVUs returns the scaled VUs for the executor.
-func (pvic PerVUIterationsConfig) GetVUs(es *lib.ExecutionSegment) int64 {
-	return es.Scale(pvic.VUs.Int64)
+func (pvic PerVUIterationsConfig) GetVUs(et *lib.ExecutionTuple) int64 {
+	return et.ES.Scale(pvic.VUs.Int64)
 }
 
 // GetIterations returns the UNSCALED iteration count for the executor. It's
@@ -81,9 +81,9 @@ func (pvic PerVUIterationsConfig) GetIterations() int64 {
 }
 
 // GetDescription returns a human-readable description of the executor options
-func (pvic PerVUIterationsConfig) GetDescription(es *lib.ExecutionSegment) string {
+func (pvic PerVUIterationsConfig) GetDescription(et *lib.ExecutionTuple) string {
 	return fmt.Sprintf("%d iterations for each of %d VUs%s",
-		pvic.GetIterations(), pvic.GetVUs(es),
+		pvic.GetIterations(), pvic.GetVUs(et),
 		pvic.getBaseInfo(fmt.Sprintf("maxDuration: %s", pvic.MaxDuration.Duration)))
 }
 
@@ -112,11 +112,11 @@ func (pvic PerVUIterationsConfig) Validate() []error {
 // maximum waiting time for any iterations to gracefully stop. This is used by
 // the execution scheduler in its VU reservation calculations, so it knows how
 // many VUs to pre-initialize.
-func (pvic PerVUIterationsConfig) GetExecutionRequirements(es *lib.ExecutionSegment) []lib.ExecutionStep {
+func (pvic PerVUIterationsConfig) GetExecutionRequirements(et *lib.ExecutionTuple) []lib.ExecutionStep {
 	return []lib.ExecutionStep{
 		{
 			TimeOffset: 0,
-			PlannedVUs: uint64(pvic.GetVUs(es)),
+			PlannedVUs: uint64(pvic.GetVUs(et)),
 		},
 		{
 			TimeOffset: time.Duration(pvic.MaxDuration.Duration + pvic.GracefulStop.Duration),
@@ -136,8 +136,8 @@ func (pvic PerVUIterationsConfig) NewExecutor(
 }
 
 // HasWork reports whether there is any work to be done for the given execution segment.
-func (pvic PerVUIterationsConfig) HasWork(es *lib.ExecutionSegment) bool {
-	return pvic.GetVUs(es) > 0 && pvic.GetIterations() > 0
+func (pvic PerVUIterationsConfig) HasWork(et *lib.ExecutionTuple) bool {
+	return pvic.GetVUs(et) > 0 && pvic.GetIterations() > 0
 }
 
 // PerVUIterations executes a specific number of iterations with each VU.
@@ -151,8 +151,7 @@ var _ lib.Executor = &PerVUIterations{}
 
 // Run executes a specific number of iterations with each configured VU.
 func (pvi PerVUIterations) Run(ctx context.Context, out chan<- stats.SampleContainer) (err error) {
-	segment := pvi.executionState.Options.ExecutionSegment
-	numVUs := pvi.config.GetVUs(segment)
+	numVUs := pvi.config.GetVUs(pvi.executionState.ExecutionTuple)
 	iterations := pvi.config.GetIterations()
 	duration := time.Duration(pvi.config.MaxDuration.Duration)
 	gracefulStop := pvi.config.GetGracefulStop()

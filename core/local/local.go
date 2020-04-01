@@ -59,19 +59,22 @@ var _ lib.ExecutionScheduler = &ExecutionScheduler{}
 // doesn't initialize the executors and it doesn't initialize or run VUs.
 func NewExecutionScheduler(runner lib.Runner, logger *logrus.Logger) (*ExecutionScheduler, error) {
 	options := runner.GetOptions()
-
-	executionPlan := options.Execution.GetFullExecutionRequirements(options.ExecutionSegment)
+	et, err := lib.NewExecutionTuple(options.ExecutionSegment, options.ExecutionSegmentSequence)
+	if err != nil {
+		return nil, err
+	}
+	executionPlan := options.Execution.GetFullExecutionRequirements(et)
 	maxPlannedVUs := lib.GetMaxPlannedVUs(executionPlan)
 	maxPossibleVUs := lib.GetMaxPossibleVUs(executionPlan)
 
-	executionState := lib.NewExecutionState(options, maxPlannedVUs, maxPossibleVUs)
+	executionState := lib.NewExecutionState(options, et, maxPlannedVUs, maxPossibleVUs)
 	maxDuration, _ := lib.GetEndOffset(executionPlan) // we don't care if the end offset is final
 
 	executorConfigs := options.Execution.GetSortedConfigs()
 	executors := make([]lib.Executor, 0, len(executorConfigs))
 	// Only take executors which have work.
 	for _, sc := range executorConfigs {
-		if !sc.HasWork(options.ExecutionSegment) {
+		if !sc.HasWork(et) {
 			logger.Warnf(
 				"Executor '%s' is disabled for segment %s due to lack of work!",
 				sc.GetName(), options.ExecutionSegment,

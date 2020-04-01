@@ -241,7 +241,7 @@ a commandline interface for interacting with it.`,
 			)
 			for _, ec := range executorConfigs {
 				fprintf(stdout, "           * %s: %s\n",
-					ec.GetName(), ec.GetDescription(conf.ExecutionSegment))
+					ec.GetName(), ec.GetDescription(execScheduler.GetState().ExecutionTuple))
 			}
 			fprintf(stdout, "\n")
 		}

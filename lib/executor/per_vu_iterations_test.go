@@ -47,7 +47,9 @@ func getTestPerVUIterationsConfig() PerVUIterationsConfig {
 func TestPerVUIterationsRun(t *testing.T) {
 	t.Parallel()
 	var result sync.Map
-	es := lib.NewExecutionState(lib.Options{}, 10, 50)
+	et, err := lib.NewExecutionTuple(nil, nil)
+	require.NoError(t, err)
+	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
 	var ctx, cancel, executor, _ = setupExecutor(
 		t, getTestPerVUIterationsConfig(), es,
 		simpleRunner(func(ctx context.Context) error {
@@ -58,7 +60,7 @@ func TestPerVUIterationsRun(t *testing.T) {
 		}),
 	)
 	defer cancel()
-	err := executor.Run(ctx, nil)
+	err = executor.Run(ctx, nil)
 	require.NoError(t, err)
 
 	var totalIters uint64
@@ -79,7 +81,9 @@ func TestPerVUIterationsRunVariableVU(t *testing.T) {
 		result   sync.Map
 		slowVUID int64
 	)
-	es := lib.NewExecutionState(lib.Options{}, 10, 50)
+	et, err := lib.NewExecutionTuple(nil, nil)
+	require.NoError(t, err)
+	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
 	var ctx, cancel, executor, _ = setupExecutor(
 		t, getTestPerVUIterationsConfig(), es,
 		simpleRunner(func(ctx context.Context) error {
@@ -98,7 +102,7 @@ func TestPerVUIterationsRunVariableVU(t *testing.T) {
 		}),
 	)
 	defer cancel()
-	err := executor.Run(ctx, nil)
+	err = executor.Run(ctx, nil)
 	require.NoError(t, err)
 
 	val, ok := result.Load(slowVUID)
