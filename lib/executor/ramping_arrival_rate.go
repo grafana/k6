@@ -252,44 +252,13 @@ func (varr *RampingArrivalRate) Init(ctx context.Context) error {
 // possibly be refactored if need for this arises.
 func (varc RampingArrivalRateConfig) cal(et *lib.ExecutionTuple, ch chan<- time.Duration) {
 	start, offsets, _ := et.GetStripedOffsets()
-	li := -1
-	// TODO: move this to a utility function, or directly what GetStripedOffsets uses once we see everywhere we will use it
-	next := func() int64 {
-		li++
-		return offsets[li%len(offsets)]
-	}
-	defer close(ch) // TODO: maybe this is not a good design - closing a channel we get
-	var (
-		stageStart                   time.Duration
-		timeUnit                     = float64(varc.TimeUnit.Duration)
-		doneSoFar, endCount, to, dur float64
-		from                         = float64(varc.StartRate.ValueOrZero()) / timeUnit
-		// start .. starts at 0 but the algorithm works with area so we need to start from 1 not 0
-		i = float64(start + 1)
-	)
+	timeUnit := time.Duration(varc.TimeUnit.Duration).Nanoseconds()
+	state := newStageTransitionCalculator(start, offsets, varc.StartRate.ValueOrZero(), timeUnit, varc.Stages)
 
-	for _, stage := range varc.Stages {
-		to = float64(stage.Target.ValueOrZero()) / timeUnit
-		dur = float64(stage.Duration.Duration)
-		if from != to { // ramp up/down
-			endCount += dur * ((to-from)/2 + from)
-			for ; i <= endCount; i += float64(next()) {
-				// TODO: try to twist this in a way to be able to get i (the only changing part)
-				// somewhere where it is less in the middle of the equation
-				x := (from*dur - noNegativeSqrt(dur*(from*from*dur+2*(i-doneSoFar)*(to-from)))) / (from - to)
-
-				ch <- time.Duration(x) + stageStart
-			}
-		} else {
-			endCount += dur * to
-			for ; i <= endCount; i += float64(next()) {
-				ch <- time.Duration((i-doneSoFar)/to) + stageStart
-			}
-		}
-		doneSoFar = endCount
-		from = to
-		stageStart += stage.Duration.TimeDuration()
-	}
+	go func() {
+		defer close(ch) // TODO: maybe this is not a good design - closing a channel we receive
+		state.loop(func(t time.Duration) { ch <- t })
+	}()
 }
 
 // This is needed because, on some platforms (arm64), sometimes, even though we
@@ -455,7 +424,7 @@ func (varr RampingArrivalRate) Run(
 	var prevTime time.Duration
 	shownWarning := false
 	metricTags := varr.getMetricTags(nil)
-	go varr.config.cal(varr.et, ch)
+	varr.config.cal(varr.et, ch)
 	droppedIterationMetric := builtinMetrics.DroppedIterations
 	for nextTime := range ch {
 		select {

@@ -596,7 +596,7 @@ func TestCompareCalImplementation(t *testing.T) {
 	chRat := make(chan time.Duration, 20)
 	ch := make(chan time.Duration, 20)
 	go config.calRat(et, chRat)
-	go config.cal(et, ch)
+	config.cal(et, ch)
 	count := 0
 	var diff int
 	for c := range ch {
