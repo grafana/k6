@@ -531,19 +531,19 @@ func (vlv VariableLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleCo
 
 	runIteration := getIterationRunner(vlv.executionState, vlv.logger)
 	getVU := func() (lib.InitializedVU, error) {
-		initVU, err := vlv.executionState.GetPlannedVU(vlv.logger, true)
+		initVU, err := vlv.executionState.GetPlannedVU(vlv.logger, false)
 		if err != nil {
 			cancel()
-			return nil, err
+		} else {
+			activeVUs.Add(1)
+			atomic.AddInt64(activeVUsCount, 1)
 		}
-		activeVUs.Add(1)
-		atomic.AddInt64(activeVUsCount, 1)
-		return initVU, nil
+		return initVU, err
 	}
 	returnVU := func(initVU lib.InitializedVU) {
-		activeVUs.Done()
+		vlv.executionState.ReturnVU(initVU, false)
 		atomic.AddInt64(activeVUsCount, -1)
-		vlv.executionState.ReturnVU(initVU, true)
+		activeVUs.Done()
 	}
 
 	vuHandles := make([]*vuHandle, maxVUs)
@@ -563,10 +563,12 @@ func (vlv VariableLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleCo
 		if newScheduledVUs > currentScheduledVUs {
 			for vuNum := currentScheduledVUs; vuNum < newScheduledVUs; vuNum++ {
 				vuHandles[vuNum].start()
+				vlv.executionState.ModCurrentlyActiveVUsCount(+1)
 			}
 		} else {
 			for vuNum := newScheduledVUs; vuNum < currentScheduledVUs; vuNum++ {
 				vuHandles[vuNum].gracefulStop()
+				vlv.executionState.ModCurrentlyActiveVUsCount(-1)
 			}
 		}
 		currentScheduledVUs = newScheduledVUs
