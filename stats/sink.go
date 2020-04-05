@@ -155,6 +155,7 @@ func (t *TrendSink) Format(tt time.Duration) map[string]float64 {
 		"med":   t.Med,
 		"p(90)": t.P(0.90),
 		"p(95)": t.P(0.95),
+		"p(99)": t.P(0.99),
 	}
 }
 
