@@ -1,0 +1,11 @@
+language: go
+
+services:
+  - docker
+
+before_install:
+  - docker build -t rzp_k6:${TRAVIS_COMMIT} .
+
+script:
+  - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+  - docker push rzp_k6:${TRAVIS_COMMIT}
