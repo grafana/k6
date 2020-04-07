@@ -22,7 +22,6 @@ package minirunner
 
 import (
 	"context"
-	"sync/atomic"
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
@@ -57,9 +56,8 @@ func (r MiniRunner) MakeArchive() *lib.Archive {
 }
 
 // NewVU returns a new VU with an incremental ID.
-func (r *MiniRunner) NewVU(_ int64, out chan<- stats.SampleContainer) (lib.InitializedVU, error) {
-	nextVUNum := atomic.AddInt64(&r.NextVUID, 1)
-	return &VU{R: r, Out: out, ID: nextVUNum - 1}, nil
+func (r *MiniRunner) NewVU(id int64, out chan<- stats.SampleContainer) (lib.InitializedVU, error) {
+	return &VU{R: r, Out: out, ID: id}, nil
 }
 
 // Setup calls the supplied mock setup() function, if present.

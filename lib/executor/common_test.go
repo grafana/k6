@@ -55,7 +55,7 @@ func setupExecutor(t *testing.T, config lib.ExecutorConfig, es *lib.ExecutionSta
 	logEntry := logrus.NewEntry(testLog)
 
 	es.SetInitVUFunc(func(_ context.Context, logger *logrus.Entry) (lib.InitializedVU, error) {
-		return runner.NewVU(1, engineOut)
+		return runner.NewVU(int64(es.GetUniqueVUIdentifier()), engineOut)
 	})
 
 	et, err := lib.NewExecutionTuple(es.Options.ExecutionSegment, es.Options.ExecutionSegmentSequence)
