@@ -45,7 +45,9 @@ func BenchmarkHTTPRequests(b *testing.B) {
 	if !assert.NoError(b, err) {
 		return
 	}
-	vu := initVU.Activate(&lib.VUActivationParams{RunContext: context.Background()})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		err = vu.RunOnce()
