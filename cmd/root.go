@@ -107,7 +107,7 @@ func rootCmdPersistentFlagSet() *pflag.FlagSet {
 	flags.BoolVarP(&quiet, "quiet", "q", false, "disable progress updates")
 	flags.BoolVar(&noColor, "no-color", false, "disable colored output")
 	flags.StringVar(&logFmt, "logformat", "", "log output format")
-	flags.StringVarP(&address, "address", "a", "localhost:6565", "address for the api server")
+	flags.StringVarP(&address, "address", "a", "0.0.0.0:6565", "address for the api server")
 
 	//TODO: Fix... This default value needed, so both CLI flags and environment variables work
 	flags.StringVarP(&configFilePath, "config", "c", configFilePath, "JSON config file")
