@@ -181,7 +181,7 @@ func (e *Exporter) collect(ch chan<- prometheus.Metric) error {
 		} else if d.Name == "checks" {
 			ch <- prometheus.MustNewConstMetric(e.checks, prometheus.GaugeValue, float64(d.Sample["value"]))
 		} else if d.Name == "http_reqs" {
-			ch <- prometheus.MustNewConstMetric(e.httpReqs, prometheus.GaugeValue, float64(d.Sample["value"]))
+			ch <- prometheus.MustNewConstMetric(e.httpReqs, prometheus.GaugeValue, float64(d.Sample["rate"]))
 		} else if d.Name == "http_req_blocked" {
 			ch <- prometheus.MustNewConstMetric(e.httpReqBlocked, prometheus.GaugeValue, d.Sample["min"], "min")
 			ch <- prometheus.MustNewConstMetric(e.httpReqBlocked, prometheus.GaugeValue, d.Sample["max"], "max")
