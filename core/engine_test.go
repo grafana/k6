@@ -929,7 +929,6 @@ func TestMinIterationDurationInSetupTeardownStage(t *testing.T) {
 			require.NoError(t, err)
 
 			engine, run, wait := newTestEngine(t, nil, runner, runner.GetOptions())
-			defer wait()
 
 			errC := make(chan error)
 			go func() { errC <- run() }()
@@ -938,6 +937,7 @@ func TestMinIterationDurationInSetupTeardownStage(t *testing.T) {
 				t.Fatal("Test timed out")
 			case err := <-errC:
 				require.NoError(t, err)
+				wait()
 				require.False(t, engine.IsTainted())
 			}
 		})
