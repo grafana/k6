@@ -60,6 +60,8 @@ func NewLogger(l *logrus.Logger) negroni.HandlerFunc {
 		next(rw, r)
 
 		res := rw.(negroni.ResponseWriter)
+		l.SetOutput(os.Stdout)
+		l.SetLevel(log.WarnLevel)
 		l.WithField("status", res.Status()).Debugf("%s %s", r.Method, r.URL.Path)
 	}
 }
