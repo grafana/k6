@@ -23,6 +23,7 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"os"
 
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/negroni"
@@ -61,7 +62,6 @@ func NewLogger(l *logrus.Logger) negroni.HandlerFunc {
 
 		res := rw.(negroni.ResponseWriter)
 		l.SetOutput(os.Stdout)
-		l.SetLevel(log.WarnLevel)
 		l.WithField("status", res.Status()).Debugf("%s %s", r.Method, r.URL.Path)
 	}
 }
