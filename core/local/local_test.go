@@ -92,7 +92,7 @@ func TestExecutionSchedulerRun(t *testing.T) {
 	defer cancel()
 
 	err := make(chan error, 1)
-	go func() { err <- execScheduler.Run(ctx, samples) }()
+	go func() { err <- execScheduler.Run(ctx, ctx, samples) }()
 	assert.NoError(t, <-err)
 }
 
@@ -114,7 +114,7 @@ func TestExecutionSchedulerSetupTeardownRun(t *testing.T) {
 		ctx, cancel, execScheduler, samples := newTestExecutionScheduler(t, runner, nil, lib.Options{})
 
 		err := make(chan error, 1)
-		go func() { err <- execScheduler.Run(ctx, samples) }()
+		go func() { err <- execScheduler.Run(ctx, ctx, samples) }()
 		defer cancel()
 		<-setupC
 		<-teardownC
@@ -128,7 +128,7 @@ func TestExecutionSchedulerSetupTeardownRun(t *testing.T) {
 		}
 		ctx, cancel, execScheduler, samples := newTestExecutionScheduler(t, runner, nil, lib.Options{})
 		defer cancel()
-		assert.EqualError(t, execScheduler.Run(ctx, samples), "setup error")
+		assert.EqualError(t, execScheduler.Run(ctx, ctx, samples), "setup error")
 	})
 	t.Run("Don't Run Setup", func(t *testing.T) {
 		runner := &minirunner.MiniRunner{
@@ -145,7 +145,7 @@ func TestExecutionSchedulerSetupTeardownRun(t *testing.T) {
 			Iterations: null.IntFrom(1),
 		})
 		defer cancel()
-		assert.EqualError(t, execScheduler.Run(ctx, samples), "teardown error")
+		assert.EqualError(t, execScheduler.Run(ctx, ctx, samples), "teardown error")
 	})
 
 	t.Run("Teardown Error", func(t *testing.T) {
@@ -163,7 +163,7 @@ func TestExecutionSchedulerSetupTeardownRun(t *testing.T) {
 		})
 		defer cancel()
 
-		assert.EqualError(t, execScheduler.Run(ctx, samples), "teardown error")
+		assert.EqualError(t, execScheduler.Run(ctx, ctx, samples), "teardown error")
 	})
 	t.Run("Don't Run Teardown", func(t *testing.T) {
 		runner := &minirunner.MiniRunner{
@@ -180,7 +180,7 @@ func TestExecutionSchedulerSetupTeardownRun(t *testing.T) {
 			Iterations: null.IntFrom(1),
 		})
 		defer cancel()
-		assert.NoError(t, execScheduler.Run(ctx, samples))
+		assert.NoError(t, execScheduler.Run(ctx, ctx, samples))
 	})
 }
 
@@ -224,7 +224,7 @@ func TestExecutionSchedulerStages(t *testing.T) {
 				Stages: data.Stages,
 			})
 			defer cancel()
-			assert.NoError(t, execScheduler.Run(ctx, samples))
+			assert.NoError(t, execScheduler.Run(ctx, ctx, samples))
 			assert.True(t, execScheduler.GetState().GetCurrentTestRunDuration() >= data.Duration)
 		})
 	}
@@ -249,7 +249,7 @@ func TestExecutionSchedulerEndTime(t *testing.T) {
 	assert.True(t, isFinal)
 
 	startTime := time.Now()
-	assert.NoError(t, execScheduler.Run(ctx, samples))
+	assert.NoError(t, execScheduler.Run(ctx, ctx, samples))
 	runTime := time.Since(startTime)
 	assert.True(t, runTime > 1*time.Second, "test did not take 1s")
 	assert.True(t, runTime < 10*time.Second, "took more than 10 seconds")
@@ -276,7 +276,7 @@ func TestExecutionSchedulerRuntimeErrors(t *testing.T) {
 	assert.True(t, isFinal)
 
 	startTime := time.Now()
-	assert.NoError(t, execScheduler.Run(ctx, samples))
+	assert.NoError(t, execScheduler.Run(ctx, ctx, samples))
 	runTime := time.Since(startTime)
 	assert.True(t, runTime > 1*time.Second, "test did not take 1s")
 	assert.True(t, runTime < 10*time.Second, "took more than 10 seconds")
@@ -313,7 +313,7 @@ func TestExecutionSchedulerEndErrors(t *testing.T) {
 	assert.True(t, isFinal)
 
 	startTime := time.Now()
-	assert.NoError(t, execScheduler.Run(ctx, samples))
+	assert.NoError(t, execScheduler.Run(ctx, ctx, samples))
 	runTime := time.Since(startTime)
 	assert.True(t, runTime > 1*time.Second, "test did not take 1s")
 	assert.True(t, runTime < 10*time.Second, "took more than 10 seconds")
@@ -357,7 +357,7 @@ func TestExecutionSchedulerEndIterations(t *testing.T) {
 
 	samples := make(chan stats.SampleContainer, 300)
 	require.NoError(t, execScheduler.Init(ctx, samples))
-	require.NoError(t, execScheduler.Run(ctx, samples))
+	require.NoError(t, execScheduler.Run(ctx, ctx, samples))
 
 	assert.Equal(t, uint64(100), execScheduler.GetState().GetFullIterationCount())
 	assert.Equal(t, uint64(0), execScheduler.GetState().GetPartialIterationCount())
@@ -382,7 +382,7 @@ func TestExecutionSchedulerIsRunning(t *testing.T) {
 	state := execScheduler.GetState()
 
 	err := make(chan error)
-	go func() { err <- execScheduler.Run(ctx, nil) }()
+	go func() { err <- execScheduler.Run(ctx, ctx, nil) }()
 	for !state.HasStarted() {
 		time.Sleep(10 * time.Microsecond)
 	}
@@ -558,7 +558,7 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 	sampleContainers := make(chan stats.SampleContainer)
 	go func() {
 		require.NoError(t, execScheduler.Init(ctx, sampleContainers))
-		assert.NoError(t, execScheduler.Run(ctx, sampleContainers))
+		assert.NoError(t, execScheduler.Run(ctx, ctx, sampleContainers))
 		close(done)
 	}()
 

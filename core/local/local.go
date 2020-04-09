@@ -337,7 +337,7 @@ func (e *ExecutionScheduler) runExecutor(
 
 // Run the ExecutionScheduler, funneling all generated metric samples through the supplied
 // out channel.
-func (e *ExecutionScheduler) Run(ctx context.Context, engineOut chan<- stats.SampleContainer) error {
+func (e *ExecutionScheduler) Run(globalCtx, runCtx context.Context, engineOut chan<- stats.SampleContainer) error {
 	executorsCount := len(e.executors)
 	logger := e.logger.WithField("phase", "local-execution-scheduler-run")
 	e.initProgress.Modify(pb.WithConstLeft("Run"))
@@ -349,7 +349,7 @@ func (e *ExecutionScheduler) Run(ctx context.Context, engineOut chan<- stats.Sam
 		select {
 		case <-e.state.ResumeNotify():
 			// continue
-		case <-ctx.Done():
+		case <-runCtx.Done():
 			return nil
 		}
 	}
@@ -362,7 +362,7 @@ func (e *ExecutionScheduler) Run(ctx context.Context, engineOut chan<- stats.Sam
 
 	runResults := make(chan error, executorsCount) // nil values are successful runs
 
-	runCtx, cancel := context.WithCancel(ctx)
+	runSubCtx, cancel := context.WithCancel(runCtx)
 	defer cancel() // just in case, and to shut up go vet...
 
 	// Run setup() before any executors, if it's not disabled
@@ -370,7 +370,7 @@ func (e *ExecutionScheduler) Run(ctx context.Context, engineOut chan<- stats.Sam
 		logger.Debug("Running setup()")
 		e.state.SetExecutionStatus(lib.ExecutionStatusSetup)
 		e.initProgress.Modify(pb.WithConstProgress(1, "setup()"))
-		if err := e.runner.Setup(runCtx, engineOut); err != nil {
+		if err := e.runner.Setup(runSubCtx, engineOut); err != nil {
 			logger.WithField("error", err).Debug("setup() aborted by error")
 			return err
 		}
@@ -381,7 +381,7 @@ func (e *ExecutionScheduler) Run(ctx context.Context, engineOut chan<- stats.Sam
 	logger.Debug("Start all executors...")
 	e.state.SetExecutionStatus(lib.ExecutionStatusRunning)
 	for _, exec := range e.executors {
-		go e.runExecutor(runCtx, runResults, engineOut, exec)
+		go e.runExecutor(runSubCtx, runResults, engineOut, exec)
 	}
 
 	// Wait for all executors to finish
@@ -399,7 +399,11 @@ func (e *ExecutionScheduler) Run(ctx context.Context, engineOut chan<- stats.Sam
 	if !e.options.NoTeardown.Bool {
 		logger.Debug("Running teardown()")
 		e.state.SetExecutionStatus(lib.ExecutionStatusTeardown)
-		if err := e.runner.Teardown(ctx, engineOut); err != nil {
+		e.initProgress.Modify(pb.WithConstProgress(1, "teardown()"))
+
+		// We run teardown() with the global context, so it isn't interrupted by
+		// aborts caused by thresholds or even Ctrl+C (unless used twice).
+		if err := e.runner.Teardown(globalCtx, engineOut); err != nil {
 			logger.WithField("error", err).Debug("teardown() aborted by error")
 			return err
 		}

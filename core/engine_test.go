@@ -50,12 +50,16 @@ import (
 const isWindows = runtime.GOOS == "windows"
 
 // Wrapper around NewEngine that applies a logger and manages the options.
-func newTestEngine(t *testing.T, ctx context.Context, runner lib.Runner, opts lib.Options) *Engine { //nolint: golint
+func newTestEngine( //nolint:golint
+	t *testing.T, runCtx context.Context, runner lib.Runner, opts lib.Options,
+) (engine *Engine, run func() error, wait func()) {
 	if runner == nil {
 		runner = &minirunner.MiniRunner{}
 	}
-	if ctx == nil {
-		ctx = context.Background()
+	globalCtx, globalCancel := context.WithCancel(context.Background())
+	var runCancel func()
+	if runCtx == nil {
+		runCtx, runCancel = context.WithCancel(globalCtx)
 	}
 
 	newOpts, err := executor.DeriveExecutionFromShortcuts(lib.Options{
@@ -72,12 +76,19 @@ func newTestEngine(t *testing.T, ctx context.Context, runner lib.Runner, opts li
 	execScheduler, err := local.NewExecutionScheduler(runner, logger)
 	require.NoError(t, err)
 
-	engine, err := NewEngine(execScheduler, opts, logger)
+	engine, err = NewEngine(execScheduler, opts, logger)
 	require.NoError(t, err)
 
-	require.NoError(t, engine.Init(ctx))
+	run, waitFn, err := engine.Init(globalCtx, runCtx)
+	require.NoError(t, err)
 
-	return engine
+	return engine, run, func() {
+		if runCancel != nil {
+			runCancel()
+		}
+		globalCancel()
+		waitFn()
+	}
 }
 
 func TestNewEngine(t *testing.T) {
@@ -87,21 +98,32 @@ func TestNewEngine(t *testing.T) {
 func TestEngineRun(t *testing.T) {
 	logrus.SetLevel(logrus.DebugLevel)
 	t.Run("exits with context", func(t *testing.T) {
-		duration := 100 * time.Millisecond
-		e := newTestEngine(t, nil, nil, lib.Options{})
+		done := make(chan struct{})
+		runner := &minirunner.MiniRunner{Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
+			<-ctx.Done()
+			close(done)
+			return nil
+		}}
 
+		duration := 100 * time.Millisecond
 		ctx, cancel := context.WithTimeout(context.Background(), duration)
 		defer cancel()
+
+		_, run, wait := newTestEngine(t, ctx, runner, lib.Options{})
+		defer wait()
+
 		startTime := time.Now()
-		assert.NoError(t, e.Run(ctx))
+		assert.NoError(t, run())
 		assert.WithinDuration(t, startTime.Add(duration), time.Now(), 100*time.Millisecond)
+		<-done
 	})
 	t.Run("exits with executor", func(t *testing.T) {
-		e := newTestEngine(t, nil, nil, lib.Options{
+		e, run, wait := newTestEngine(t, nil, nil, lib.Options{
 			VUs:        null.IntFrom(10),
 			Iterations: null.IntFrom(100),
 		})
-		assert.NoError(t, e.Run(context.Background()))
+		defer wait()
+		assert.NoError(t, run())
 		assert.Equal(t, uint64(100), e.ExecutionScheduler.GetState().GetFullIterationCount())
 	})
 	// Make sure samples are discarded after context close (using "cutoff" timestamp in local.go)
@@ -119,7 +141,7 @@ func TestEngineRun(t *testing.T) {
 		}}
 
 		ctx, cancel := context.WithCancel(context.Background())
-		e := newTestEngine(t, ctx, runner, lib.Options{
+		e, run, wait := newTestEngine(t, ctx, runner, lib.Options{
 			VUs:        null.IntFrom(1),
 			Iterations: null.IntFrom(1),
 		})
@@ -128,10 +150,11 @@ func TestEngineRun(t *testing.T) {
 		e.Collectors = []lib.Collector{c}
 
 		errC := make(chan error)
-		go func() { errC <- e.Run(ctx) }()
+		go func() { errC <- run() }()
 		<-signalChan
 		cancel()
 		assert.NoError(t, <-errC)
+		wait()
 
 		found := 0
 		for _, s := range c.Samples {
@@ -146,25 +169,27 @@ func TestEngineRun(t *testing.T) {
 }
 
 func TestEngineAtTime(t *testing.T) {
-	e := newTestEngine(t, nil, nil, lib.Options{
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	_, run, wait := newTestEngine(t, ctx, nil, lib.Options{
 		VUs:      null.IntFrom(2),
 		Duration: types.NullDurationFrom(20 * time.Second),
 	})
+	defer wait()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
-	defer cancel()
-	assert.NoError(t, e.Run(ctx))
+	assert.NoError(t, run())
 }
 
 func TestEngineStopped(t *testing.T) {
-	e := newTestEngine(t, nil, nil, lib.Options{
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	e, run, wait := newTestEngine(t, ctx, nil, lib.Options{
 		VUs:      null.IntFrom(1),
 		Duration: types.NullDurationFrom(20 * time.Second),
 	})
+	defer wait()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
-	defer cancel()
-	assert.NoError(t, e.Run(ctx))
+	assert.NoError(t, run())
 	assert.Equal(t, false, e.IsStopped(), "engine should be running")
 	e.Stop()
 	assert.Equal(t, true, e.IsStopped(), "engine should be stopped")
@@ -178,12 +203,13 @@ func TestEngineCollector(t *testing.T) {
 		return nil
 	}}
 
-	e := newTestEngine(t, nil, runner, lib.Options{VUs: null.IntFrom(1), Iterations: null.IntFrom(1)})
+	e, run, wait := newTestEngine(t, nil, runner, lib.Options{VUs: null.IntFrom(1), Iterations: null.IntFrom(1)})
 
 	c := &dummy.Collector{}
 	e.Collectors = []lib.Collector{c}
 
-	assert.NoError(t, e.Run(context.Background()))
+	assert.NoError(t, run())
+	wait()
 
 	cSamples := []stats.Sample{}
 	for _, sample := range c.Samples {
@@ -206,7 +232,8 @@ func TestEngine_processSamples(t *testing.T) {
 	metric := stats.New("my_metric", stats.Gauge)
 
 	t.Run("metric", func(t *testing.T) {
-		e := newTestEngine(t, nil, nil, lib.Options{})
+		e, _, wait := newTestEngine(t, nil, nil, lib.Options{})
+		defer wait()
 
 		e.processSamples(
 			[]stats.SampleContainer{stats.Sample{Metric: metric, Value: 1.25, Tags: stats.IntoSampleTags(&map[string]string{"a": "1"})}},
@@ -218,11 +245,12 @@ func TestEngine_processSamples(t *testing.T) {
 		ths, err := stats.NewThresholds([]string{`1+1==2`})
 		assert.NoError(t, err)
 
-		e := newTestEngine(t, nil, nil, lib.Options{
+		e, _, wait := newTestEngine(t, nil, nil, lib.Options{
 			Thresholds: map[string]stats.Thresholds{
 				"my_metric{a:1}": ths,
 			},
 		})
+		defer wait()
 
 		sms := e.submetrics["my_metric"]
 		assert.Len(t, sms, 1)
@@ -238,60 +266,54 @@ func TestEngine_processSamples(t *testing.T) {
 	})
 }
 
-func TestEngine_runThresholds(t *testing.T) {
+func TestEngineThresholdsWillAbort(t *testing.T) {
 	metric := stats.New("my_metric", stats.Gauge)
-	thresholds := make(map[string]stats.Thresholds, 1)
 
 	ths, err := stats.NewThresholds([]string{"1+1==3"})
 	assert.NoError(t, err)
+	ths.Thresholds[0].AbortOnFail = true
 
-	t.Run("aborted", func(t *testing.T) {
-		ths.Thresholds[0].AbortOnFail = true
-		thresholds[metric.Name] = ths
-		e := newTestEngine(t, nil, nil, lib.Options{Thresholds: thresholds})
+	thresholds := map[string]stats.Thresholds{metric.Name: ths}
 
-		e.processSamples(
-			[]stats.SampleContainer{stats.Sample{Metric: metric, Value: 1.25, Tags: stats.IntoSampleTags(&map[string]string{"a": "1"})}},
-		)
+	e, _, wait := newTestEngine(t, nil, nil, lib.Options{Thresholds: thresholds})
+	defer wait()
 
-		ctx, cancel := context.WithCancel(context.Background())
-		aborted := false
+	e.processSamples(
+		[]stats.SampleContainer{stats.Sample{Metric: metric, Value: 1.25, Tags: stats.IntoSampleTags(&map[string]string{"a": "1"})}},
+	)
+	assert.True(t, e.processThresholds())
+}
 
-		cancelFunc := func() {
-			cancel()
-			aborted = true
-		}
+func TestEngineAbortedByThresholds(t *testing.T) {
+	metric := stats.New("my_metric", stats.Gauge)
 
-		e.runThresholds(ctx, cancelFunc)
+	ths, err := stats.NewThresholds([]string{"1+1==3"})
+	assert.NoError(t, err)
+	ths.Thresholds[0].AbortOnFail = true
 
-		assert.True(t, aborted)
-	})
+	thresholds := map[string]stats.Thresholds{metric.Name: ths}
 
-	t.Run("canceled", func(t *testing.T) {
-		ths.Abort = false
-		thresholds[metric.Name] = ths
-		e := newTestEngine(t, nil, nil, lib.Options{Thresholds: thresholds})
+	done := make(chan struct{})
+	runner := &minirunner.MiniRunner{Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
+		out <- stats.Sample{Metric: metric, Value: 1.25, Tags: stats.IntoSampleTags(&map[string]string{"a": "1"})}
+		<-ctx.Done()
+		close(done)
+		return nil
+	}}
 
-		e.processSamples(
-			[]stats.SampleContainer{stats.Sample{Metric: metric, Value: 1.25, Tags: stats.IntoSampleTags(&map[string]string{"a": "1"})}},
-		)
+	_, run, wait := newTestEngine(t, nil, runner, lib.Options{Thresholds: thresholds})
+	defer wait()
 
-		ctx, cancel := context.WithCancel(context.Background())
-		cancel()
+	go func() {
+		assert.NoError(t, run())
+	}()
 
-		done := make(chan struct{})
-		go func() {
-			defer close(done)
-			e.runThresholds(ctx, cancel)
-		}()
-
-		select {
-		case <-done:
-			return
-		case <-time.After(1 * time.Second):
-			assert.Fail(t, "Test should have completed within a second")
-		}
-	})
+	select {
+	case <-done:
+		return
+	case <-time.After(10 * time.Second):
+		assert.Fail(t, "Test should have completed within 10 seconds")
+	}
 }
 
 func TestEngine_processThresholds(t *testing.T) {
@@ -313,6 +335,7 @@ func TestEngine_processThresholds(t *testing.T) {
 	}
 
 	for name, data := range testdata {
+		name, data := name, data
 		t.Run(name, func(t *testing.T) {
 			thresholds := make(map[string]stats.Thresholds, len(data.ths))
 			for m, srcs := range data.ths {
@@ -322,24 +345,15 @@ func TestEngine_processThresholds(t *testing.T) {
 				thresholds[m] = ths
 			}
 
-			e := newTestEngine(t, nil, nil, lib.Options{Thresholds: thresholds})
+			e, _, wait := newTestEngine(t, nil, nil, lib.Options{Thresholds: thresholds})
+			defer wait()
 
 			e.processSamples(
 				[]stats.SampleContainer{stats.Sample{Metric: metric, Value: 1.25, Tags: stats.IntoSampleTags(&map[string]string{"a": "1"})}},
 			)
 
-			abortCalled := false
-
-			abortFunc := func() {
-				abortCalled = true
-			}
-
-			e.processThresholds(abortFunc)
-
+			assert.Equal(t, data.abort, e.processThresholds())
 			assert.Equal(t, data.pass, !e.IsTainted())
-			if data.abort {
-				assert.True(t, abortCalled)
-			}
 		})
 	}
 }
@@ -430,9 +444,7 @@ func TestSentReceivedMetrics(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		engine := newTestEngine(t, ctx, r, lib.Options{
+		engine, run, wait := newTestEngine(t, nil, r, lib.Options{
 			Iterations:            null.IntFrom(tc.Iterations),
 			VUs:                   null.IntFrom(tc.VUs),
 			Hosts:                 tb.Dialer.Hosts,
@@ -445,7 +457,7 @@ func TestSentReceivedMetrics(t *testing.T) {
 		engine.Collectors = []lib.Collector{collector}
 
 		errC := make(chan error)
-		go func() { errC <- engine.Run(ctx) }()
+		go func() { errC <- run() }()
 
 		select {
 		case <-time.After(10 * time.Second):
@@ -453,6 +465,7 @@ func TestSentReceivedMetrics(t *testing.T) {
 		case err := <-errC:
 			require.NoError(t, err)
 		}
+		wait()
 
 		checkData := func(name string, expected int64) float64 {
 			data := getMetricSum(collector, name)
@@ -566,10 +579,7 @@ func TestRunTags(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	engine := newTestEngine(t, ctx, r, lib.Options{
+	engine, run, wait := newTestEngine(t, nil, r, lib.Options{
 		Iterations:            null.IntFrom(3),
 		VUs:                   null.IntFrom(2),
 		Hosts:                 tb.Dialer.Hosts,
@@ -577,12 +587,13 @@ func TestRunTags(t *testing.T) {
 		SystemTags:            &stats.DefaultSystemTagSet,
 		InsecureSkipTLSVerify: null.BoolFrom(true),
 	})
+	defer wait()
 
 	collector := &dummy.Collector{}
 	engine.Collectors = []lib.Collector{collector}
 
 	errC := make(chan error)
-	go func() { errC <- engine.Run(ctx) }()
+	go func() { errC <- run() }()
 
 	select {
 	case <-time.After(10 * time.Second):
@@ -661,17 +672,16 @@ func TestSetupTeardownThresholds(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	engine := newTestEngine(t, ctx, runner, lib.Options{
+	engine, run, wait := newTestEngine(t, nil, runner, lib.Options{
 		SystemTags:      &stats.DefaultSystemTagSet,
 		SetupTimeout:    types.NullDurationFrom(3 * time.Second),
 		TeardownTimeout: types.NullDurationFrom(3 * time.Second),
 		VUs:             null.IntFrom(3),
 	})
+	defer wait()
 
 	errC := make(chan error)
-	go func() { errC <- engine.Run(ctx) }()
+	go func() { errC <- run() }()
 
 	select {
 	case <-time.After(10 * time.Second):
@@ -725,15 +735,14 @@ func TestEmittedMetricsWhenScalingDown(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	engine := newTestEngine(t, ctx, runner, lib.Options{})
+	engine, run, wait := newTestEngine(t, nil, runner, lib.Options{})
+	defer wait()
 
 	collector := &dummy.Collector{}
 	engine.Collectors = []lib.Collector{collector}
 
 	errC := make(chan error)
-	go func() { errC <- engine.Run(ctx) }()
+	go func() { errC <- run() }()
 
 	select {
 	case <-time.After(10 * time.Second):
@@ -832,16 +841,14 @@ func TestMetricsEmission(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			engine := newTestEngine(t, ctx, runner, runner.GetOptions())
+			engine, run, wait := newTestEngine(t, nil, runner, runner.GetOptions())
+			defer wait()
 
 			collector := &dummy.Collector{}
 			engine.Collectors = []lib.Collector{collector}
 
 			errC := make(chan error)
-			go func() { errC <- engine.Run(ctx) }()
+			go func() { errC <- run() }()
 
 			select {
 			case <-time.After(10 * time.Second):
@@ -921,13 +928,11 @@ func TestMinIterationDurationInSetupTeardownStage(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			engine := newTestEngine(t, ctx, runner, runner.GetOptions())
+			engine, run, wait := newTestEngine(t, nil, runner, runner.GetOptions())
+			defer wait()
 
 			errC := make(chan error)
-			go func() { errC <- engine.Run(ctx) }()
+			go func() { errC <- run() }()
 			select {
 			case <-time.After(10 * time.Second):
 				t.Fatal("Test timed out")
