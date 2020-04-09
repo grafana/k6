@@ -587,7 +587,6 @@ func TestRunTags(t *testing.T) {
 		SystemTags:            &stats.DefaultSystemTagSet,
 		InsecureSkipTLSVerify: null.BoolFrom(true),
 	})
-	defer wait()
 
 	collector := &dummy.Collector{}
 	engine.Collectors = []lib.Collector{collector}
@@ -601,6 +600,7 @@ func TestRunTags(t *testing.T) {
 	case err := <-errC:
 		require.NoError(t, err)
 	}
+	wait()
 
 	systemMetrics := []*stats.Metric{
 		metrics.VUs, metrics.VUsMax, metrics.Iterations, metrics.IterationDuration,
@@ -736,7 +736,6 @@ func TestEmittedMetricsWhenScalingDown(t *testing.T) {
 	require.NoError(t, err)
 
 	engine, run, wait := newTestEngine(t, nil, runner, lib.Options{})
-	defer wait()
 
 	collector := &dummy.Collector{}
 	engine.Collectors = []lib.Collector{collector}
@@ -749,6 +748,7 @@ func TestEmittedMetricsWhenScalingDown(t *testing.T) {
 		t.Fatal("Test timed out")
 	case err := <-errC:
 		require.NoError(t, err)
+		wait()
 		require.False(t, engine.IsTainted())
 	}
 
@@ -842,7 +842,6 @@ func TestMetricsEmission(t *testing.T) {
 			require.NoError(t, err)
 
 			engine, run, wait := newTestEngine(t, nil, runner, runner.GetOptions())
-			defer wait()
 
 			collector := &dummy.Collector{}
 			engine.Collectors = []lib.Collector{collector}
@@ -855,6 +854,7 @@ func TestMetricsEmission(t *testing.T) {
 				t.Fatal("Test timed out")
 			case err := <-errC:
 				require.NoError(t, err)
+				wait()
 				require.False(t, engine.IsTainted())
 			}
 

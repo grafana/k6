@@ -300,8 +300,8 @@ func TestSetupDataIsolation(t *testing.T) {
 	case err := <-errC:
 		cancel()
 		require.NoError(t, err)
-		require.False(t, engine.IsTainted())
 		wait()
+		require.False(t, engine.IsTainted())
 	}
 	var count int
 	for _, s := range collector.Samples {
