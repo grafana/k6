@@ -7,6 +7,10 @@ import (
 	"unicode/utf8"
 )
 
+const (
+	__proto__ = "__proto__"
+)
+
 var (
 	stringTrue         valueString = asciiString("true")
 	stringFalse        valueString = asciiString("false")
@@ -22,7 +26,7 @@ var (
 	stringPlusInfinity             = asciiString("+Infinity")
 	stringNegInfinity              = asciiString("-Infinity")
 	stringEmpty        valueString = asciiString("")
-	string__proto__    valueString = asciiString("__proto__")
+	string__proto__    valueString = asciiString(__proto__)
 
 	stringError          valueString = asciiString("Error")
 	stringTypeError      valueString = asciiString("TypeError")
