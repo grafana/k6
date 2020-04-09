@@ -89,9 +89,6 @@ func (o *objectGoReflect) get(n Value) Value {
 func (o *objectGoReflect) _getField(jsName string) reflect.Value {
 	if info, exists := o.valueTypeInfo.Fields[jsName]; exists {
 		v := o.value.FieldByIndex(info.Index)
-		if info.Anonymous {
-			v = v.Addr()
-		}
 		return v
 	}
 
@@ -145,9 +142,13 @@ func (o *objectGoReflect) getPropStr(name string) Value {
 func (o *objectGoReflect) getOwnProp(name string) Value {
 	if o.value.Kind() == reflect.Struct {
 		if v := o._getField(name); v.IsValid() {
+			canSet := v.CanSet()
+			if (v.Kind() == reflect.Struct || v.Kind() == reflect.Slice) && v.CanAddr() {
+				v = v.Addr()
+			}
 			return &valueProperty{
 				value:      o.val.runtime.ToValue(v.Interface()),
-				writable:   v.CanSet(),
+				writable:   canSet,
 				enumerable: true,
 			}
 		}

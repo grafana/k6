@@ -2,6 +2,7 @@ package goja
 
 import (
 	"bytes"
+	"math"
 	"sort"
 	"strings"
 )
@@ -860,10 +861,20 @@ func (ctx *arraySortCtx) sortCompare(x, y Value) int {
 	}
 
 	if ctx.compare != nil {
-		return int(ctx.compare(FunctionCall{
+		f := ctx.compare(FunctionCall{
 			This:      _undefined,
 			Arguments: []Value{x, y},
-		}).ToInteger())
+		}).ToFloat()
+		if f > 0 {
+			return 1
+		}
+		if f < 0 {
+			return -1
+		}
+		if math.Signbit(f) {
+			return -1
+		}
+		return 0
 	}
 	return strings.Compare(x.String(), y.String())
 }
