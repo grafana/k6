@@ -39,10 +39,6 @@ import (
 
 const variableLoopingVUsType = "variable-looping-vus"
 
-// How often we can make VU adjustments when processing stages
-// TODO: make configurable, in some bounds?
-const minIntervalBetweenVUAdjustments = 100 * time.Millisecond
-
 func init() {
 	lib.RegisterExecutorConfigType(
 		variableLoopingVUsType,
@@ -200,10 +196,17 @@ func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple
 	}
 
 	// Reserve the scaled StartVUs at the beginning
-	prevScaledVUs := et.ES.Scale(vlvc.StartVUs.Int64)
+	prevScaledVUs := et.ScaleInt64(vlvc.StartVUs.Int64)
 	steps := []lib.ExecutionStep{{TimeOffset: 0, PlannedVUs: uint64(prevScaledVUs)}}
 	timeFromStart := time.Duration(0)
 	totalDuration := time.Duration(0)
+
+	addStep := func(step lib.ExecutionStep) {
+		if len(steps) == 0 || steps[len(steps)-1].PlannedVUs != step.PlannedVUs {
+			steps = append(steps, step)
+			prevScaledVUs = int64(step.PlannedVUs)
+		}
+	}
 
 	for _, stage := range vlvc.Stages {
 		stageEndVUs := stage.Target.Int64
@@ -221,18 +224,14 @@ func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple
 		// Handle 0-duration stages, i.e. instant VU jumps
 		if stageDuration == 0 {
 			fromVUs = stageEndVUs
-			prevScaledVUs = et.ES.Scale(stageEndVUs)
-			steps = append(steps, lib.ExecutionStep{
+			addStep(lib.ExecutionStep{
 				TimeOffset: timeFromStart,
-				PlannedVUs: uint64(prevScaledVUs),
+				PlannedVUs: uint64(et.ScaleInt64(stageEndVUs)),
 			})
 			continue
 		}
 
-		// For each stage, limit any VU adjustments between the previous
-		// number of VUs and the stage's target to happen at most once
-		// every minIntervalBetweenVUAdjustments. No floats or ratios,
-		// since nanoseconds should be good enough for anyone... :)
+		// No floats or ratios,since nanoseconds should be good enough for anyone... :)
 		stepInterval := stageDuration / time.Duration(stageVUAbsDiff)
 
 		// Loop through the potential steps, adding an item to the
@@ -247,29 +246,22 @@ func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple
 			stepGlobalVUs := fromVUs + int64(
 				math.Round((float64(t)*float64(stageEndVUs-fromVUs))/float64(stageDuration)),
 			)
-			stepScaledVus := et.ES.Scale(stepGlobalVUs)
-
-			if stepScaledVus == prevScaledVUs {
-				// only add steps when there's a change in the number of VUs
-				continue
-			}
 
 			// VU reservation for gracefully ramping down is handled as a
 			// separate method: reserveVUsForGracefulRampDowns()
 
-			steps = append(steps, lib.ExecutionStep{
+			addStep(lib.ExecutionStep{
 				TimeOffset: timeFromStart + t,
-				PlannedVUs: uint64(stepScaledVus),
+				PlannedVUs: uint64(et.ScaleInt64(stepGlobalVUs)),
 			})
-			prevScaledVUs = stepScaledVus
 		}
 
 		fromVUs = stageEndVUs
-		prevScaledVUs = et.ES.Scale(stageEndVUs)
 		timeFromStart += stageDuration
-		steps = append(steps, lib.ExecutionStep{
+
+		addStep(lib.ExecutionStep{
 			TimeOffset: timeFromStart,
-			PlannedVUs: uint64(prevScaledVUs),
+			PlannedVUs: uint64(et.ScaleInt64(stageEndVUs)),
 		})
 	}
 
