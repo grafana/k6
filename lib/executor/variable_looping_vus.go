@@ -234,9 +234,6 @@ func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple
 		// every minIntervalBetweenVUAdjustments. No floats or ratios,
 		// since nanoseconds should be good enough for anyone... :)
 		stepInterval := stageDuration / time.Duration(stageVUAbsDiff)
-		if stepInterval < minIntervalBetweenVUAdjustments {
-			stepInterval = minIntervalBetweenVUAdjustments
-		}
 
 		// Loop through the potential steps, adding an item to the
 		// result only when there's a change in the number of VUs.
@@ -246,11 +243,7 @@ func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple
 		// important that the scaling via the execution segment should
 		// happen AFTER the rest of the calculations have been done and
 		// we've rounded the global "global" number of VUs.
-		for t := stepInterval; ; t += stepInterval { // Skip the first step, since we've already added that
-			if time.Duration(abs(int64(stageDuration-t))) < minIntervalBetweenVUAdjustments {
-				// Skip the last step of the stage, add it below to correct any minor clock skew
-				break
-			}
+		for t := stepInterval; t < stageDuration; t += stepInterval { // Skip the first step, since we've already added that
 			stepGlobalVUs := fromVUs + int64(
 				math.Round((float64(t)*float64(stageEndVUs-fromVUs))/float64(stageDuration)),
 			)
