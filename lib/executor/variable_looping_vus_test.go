@@ -344,3 +344,176 @@ func TestVariableLoopingVUsConfigExecutionPlanExampleOneThird(t *testing.T) {
 	conf.GracefulRampDown = types.NullDurationFrom(0 * time.Second)
 	assert.Equal(t, rawStepsZeroEnd, conf.GetExecutionRequirements(et))
 }
+
+func TestVariableLoopingVUsConfigExecutionPlanExecutionTupleTests(t *testing.T) {
+	t.Parallel()
+
+	conf := NewVariableLoopingVUsConfig("test")
+	conf.StartVUs = null.IntFrom(4)
+	conf.Stages = []Stage{
+		{Target: null.IntFrom(6), Duration: types.NullDurationFrom(2 * time.Second)},
+		{Target: null.IntFrom(1), Duration: types.NullDurationFrom(5 * time.Second)},
+		{Target: null.IntFrom(5), Duration: types.NullDurationFrom(4 * time.Second)},
+		{Target: null.IntFrom(1), Duration: types.NullDurationFrom(4 * time.Second)},
+		{Target: null.IntFrom(4), Duration: types.NullDurationFrom(3 * time.Second)},
+		{Target: null.IntFrom(4), Duration: types.NullDurationFrom(2 * time.Second)},
+		{Target: null.IntFrom(1), Duration: types.NullDurationFrom(0 * time.Second)},
+		{Target: null.IntFrom(1), Duration: types.NullDurationFrom(3 * time.Second)},
+	}
+	/*
+
+			Graph of the above:
+			^
+		8	|
+		7	|
+		6	| +
+		5	|/ \       +
+		4	+   \     / \     +-+
+		3	|    \   /   \   /  |
+		2	|     \ /     \ /   |
+		1	|      +       +    +--+
+		0	+------------------------------------------------------------->
+		    0123456789012345678901234567890
+
+	*/
+
+	testCases := []struct {
+		expectedSteps []lib.ExecutionStep
+		et            *lib.ExecutionTuple
+	}{
+		{
+			et: mustNewExecutionTuple(nil, nil),
+			expectedSteps: []lib.ExecutionStep{
+				{TimeOffset: 0 * time.Second, PlannedVUs: 4},
+				{TimeOffset: 1 * time.Second, PlannedVUs: 5},
+				{TimeOffset: 2 * time.Second, PlannedVUs: 6},
+				{TimeOffset: 3 * time.Second, PlannedVUs: 5},
+				{TimeOffset: 4 * time.Second, PlannedVUs: 4},
+				{TimeOffset: 5 * time.Second, PlannedVUs: 3},
+				{TimeOffset: 6 * time.Second, PlannedVUs: 2},
+				{TimeOffset: 7 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 8 * time.Second, PlannedVUs: 2},
+				{TimeOffset: 9 * time.Second, PlannedVUs: 3},
+				{TimeOffset: 10 * time.Second, PlannedVUs: 4},
+				{TimeOffset: 11 * time.Second, PlannedVUs: 5},
+				{TimeOffset: 12 * time.Second, PlannedVUs: 4},
+				{TimeOffset: 13 * time.Second, PlannedVUs: 3},
+				{TimeOffset: 14 * time.Second, PlannedVUs: 2},
+				{TimeOffset: 15 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 16 * time.Second, PlannedVUs: 2},
+				{TimeOffset: 17 * time.Second, PlannedVUs: 3},
+				{TimeOffset: 18 * time.Second, PlannedVUs: 4},
+				{TimeOffset: 20 * time.Second, PlannedVUs: 1},
+			},
+		},
+		{
+			et: mustNewExecutionTuple(newExecutionSegmentFromString("0:1/3"), nil),
+			expectedSteps: []lib.ExecutionStep{
+				{TimeOffset: 0 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 1 * time.Second, PlannedVUs: 2},
+				{TimeOffset: 4 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 7 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 8 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 11 * time.Second, PlannedVUs: 2},
+				{TimeOffset: 12 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 15 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 16 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 20 * time.Second, PlannedVUs: 0},
+			},
+		},
+		{
+			et: mustNewExecutionTuple(newExecutionSegmentFromString("0:1/3"), newExecutionSegmentSequenceFromString("0,1/3,1")),
+			expectedSteps: []lib.ExecutionStep{
+				{TimeOffset: 0 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 1 * time.Second, PlannedVUs: 2},
+				{TimeOffset: 4 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 7 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 8 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 11 * time.Second, PlannedVUs: 2},
+				{TimeOffset: 12 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 15 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 16 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 20 * time.Second, PlannedVUs: 0},
+			},
+		},
+		{
+			et: mustNewExecutionTuple(newExecutionSegmentFromString("1/3:2/3"), nil),
+			expectedSteps: []lib.ExecutionStep{
+				{TimeOffset: 0 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 1 * time.Second, PlannedVUs: 2},
+				{TimeOffset: 4 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 7 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 8 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 11 * time.Second, PlannedVUs: 2},
+				{TimeOffset: 12 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 15 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 16 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 20 * time.Second, PlannedVUs: 0},
+			},
+		},
+		{
+			et: mustNewExecutionTuple(newExecutionSegmentFromString("2/3:1"), nil),
+			expectedSteps: []lib.ExecutionStep{
+				{TimeOffset: 0 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 1 * time.Second, PlannedVUs: 2},
+				{TimeOffset: 4 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 7 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 8 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 11 * time.Second, PlannedVUs: 2},
+				{TimeOffset: 12 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 15 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 16 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 20 * time.Second, PlannedVUs: 0},
+			},
+		},
+		{
+			et: mustNewExecutionTuple(newExecutionSegmentFromString("0:1/3"), newExecutionSegmentSequenceFromString("0,1/3,2/3,1")),
+			expectedSteps: []lib.ExecutionStep{
+				{TimeOffset: 0 * time.Second, PlannedVUs: 2},
+				{TimeOffset: 5 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 10 * time.Second, PlannedVUs: 2},
+				{TimeOffset: 13 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 18 * time.Second, PlannedVUs: 2},
+				{TimeOffset: 20 * time.Second, PlannedVUs: 1},
+			},
+		},
+		{
+			et: mustNewExecutionTuple(newExecutionSegmentFromString("1/3:2/3"), newExecutionSegmentSequenceFromString("0,1/3,2/3,1")),
+			expectedSteps: []lib.ExecutionStep{
+				{TimeOffset: 0 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 1 * time.Second, PlannedVUs: 2},
+				{TimeOffset: 4 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 7 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 8 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 11 * time.Second, PlannedVUs: 2},
+				{TimeOffset: 12 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 15 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 16 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 20 * time.Second, PlannedVUs: 0},
+			},
+		},
+		{
+			et: mustNewExecutionTuple(newExecutionSegmentFromString("2/3:1"), newExecutionSegmentSequenceFromString("0,1/3,2/3,1")),
+			expectedSteps: []lib.ExecutionStep{
+				{TimeOffset: 0 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 2 * time.Second, PlannedVUs: 2},
+				{TimeOffset: 3 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 6 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 9 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 14 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 17 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 20 * time.Second, PlannedVUs: 0},
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		et := testCase.et
+		expectedSteps := testCase.expectedSteps
+
+		t.Run(et.String(), func(t *testing.T) {
+			rawStepsNoZeroEnd := conf.getRawExecutionSteps(et, false)
+			assert.Equal(t, expectedSteps, rawStepsNoZeroEnd)
+		})
+	}
+}
