@@ -165,3 +165,184 @@ func TestVariableLoopingVUsRampDownNoWobble(t *testing.T) {
 	}
 	assert.Equal(t, []int64{10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0}, vuChanges)
 }
+
+func TestVariableLoopingVUsConfigExecutionPlanExample(t *testing.T) {
+	t.Parallel()
+	et, err := lib.NewExecutionTuple(nil, nil)
+	require.NoError(t, err)
+	conf := NewVariableLoopingVUsConfig("test")
+	conf.StartVUs = null.IntFrom(4)
+	conf.Stages = []Stage{
+		{Target: null.IntFrom(6), Duration: types.NullDurationFrom(2 * time.Second)},
+		{Target: null.IntFrom(1), Duration: types.NullDurationFrom(5 * time.Second)},
+		{Target: null.IntFrom(5), Duration: types.NullDurationFrom(4 * time.Second)},
+		{Target: null.IntFrom(1), Duration: types.NullDurationFrom(4 * time.Second)},
+		{Target: null.IntFrom(4), Duration: types.NullDurationFrom(3 * time.Second)},
+		{Target: null.IntFrom(4), Duration: types.NullDurationFrom(2 * time.Second)},
+		{Target: null.IntFrom(1), Duration: types.NullDurationFrom(0 * time.Second)},
+		{Target: null.IntFrom(1), Duration: types.NullDurationFrom(3 * time.Second)},
+	}
+
+	expRawStepsNoZeroEnd := []lib.ExecutionStep{
+		{TimeOffset: 0 * time.Second, PlannedVUs: 4},
+		{TimeOffset: 1 * time.Second, PlannedVUs: 5},
+		{TimeOffset: 2 * time.Second, PlannedVUs: 6},
+		{TimeOffset: 3 * time.Second, PlannedVUs: 5},
+		{TimeOffset: 4 * time.Second, PlannedVUs: 4},
+		{TimeOffset: 5 * time.Second, PlannedVUs: 3},
+		{TimeOffset: 6 * time.Second, PlannedVUs: 2},
+		{TimeOffset: 7 * time.Second, PlannedVUs: 1},
+		{TimeOffset: 8 * time.Second, PlannedVUs: 2},
+		{TimeOffset: 9 * time.Second, PlannedVUs: 3},
+		{TimeOffset: 10 * time.Second, PlannedVUs: 4},
+		{TimeOffset: 11 * time.Second, PlannedVUs: 5},
+		{TimeOffset: 12 * time.Second, PlannedVUs: 4},
+		{TimeOffset: 13 * time.Second, PlannedVUs: 3},
+		{TimeOffset: 14 * time.Second, PlannedVUs: 2},
+		{TimeOffset: 15 * time.Second, PlannedVUs: 1},
+		{TimeOffset: 16 * time.Second, PlannedVUs: 2},
+		{TimeOffset: 17 * time.Second, PlannedVUs: 3},
+		{TimeOffset: 18 * time.Second, PlannedVUs: 4},
+		{TimeOffset: 20 * time.Second, PlannedVUs: 1},
+	}
+	rawStepsNoZeroEnd := conf.getRawExecutionSteps(et, false)
+	assert.Equal(t, expRawStepsNoZeroEnd, rawStepsNoZeroEnd)
+	endOffset, isFinal := lib.GetEndOffset(rawStepsNoZeroEnd)
+	assert.Equal(t, 20*time.Second, endOffset)
+	assert.Equal(t, false, isFinal)
+
+	rawStepsZeroEnd := conf.getRawExecutionSteps(et, true)
+	assert.Equal(t,
+		append(expRawStepsNoZeroEnd, lib.ExecutionStep{TimeOffset: 23 * time.Second, PlannedVUs: 0}),
+		rawStepsZeroEnd,
+	)
+	endOffset, isFinal = lib.GetEndOffset(rawStepsZeroEnd)
+	assert.Equal(t, 23*time.Second, endOffset)
+	assert.Equal(t, true, isFinal)
+
+	// GracefulStop and GracefulRampDown equal to the default 30 sec
+	assert.Equal(t, []lib.ExecutionStep{
+		{TimeOffset: 0 * time.Second, PlannedVUs: 4},
+		{TimeOffset: 1 * time.Second, PlannedVUs: 5},
+		{TimeOffset: 2 * time.Second, PlannedVUs: 6},
+		{TimeOffset: 33 * time.Second, PlannedVUs: 5},
+		{TimeOffset: 42 * time.Second, PlannedVUs: 4},
+		{TimeOffset: 50 * time.Second, PlannedVUs: 1},
+		{TimeOffset: 53 * time.Second, PlannedVUs: 0},
+	}, conf.GetExecutionRequirements(et))
+
+	// Try a longer GracefulStop than the GracefulRampDown
+	conf.GracefulStop = types.NullDurationFrom(80 * time.Second)
+	assert.Equal(t, []lib.ExecutionStep{
+		{TimeOffset: 0 * time.Second, PlannedVUs: 4},
+		{TimeOffset: 1 * time.Second, PlannedVUs: 5},
+		{TimeOffset: 2 * time.Second, PlannedVUs: 6},
+		{TimeOffset: 33 * time.Second, PlannedVUs: 5},
+		{TimeOffset: 42 * time.Second, PlannedVUs: 4},
+		{TimeOffset: 50 * time.Second, PlannedVUs: 1},
+		{TimeOffset: 103 * time.Second, PlannedVUs: 0},
+	}, conf.GetExecutionRequirements(et))
+
+	// Try a much shorter GracefulStop than the GracefulRampDown
+	conf.GracefulStop = types.NullDurationFrom(3 * time.Second)
+	assert.Equal(t, []lib.ExecutionStep{
+		{TimeOffset: 0 * time.Second, PlannedVUs: 4},
+		{TimeOffset: 1 * time.Second, PlannedVUs: 5},
+		{TimeOffset: 2 * time.Second, PlannedVUs: 6},
+		{TimeOffset: 26 * time.Second, PlannedVUs: 0},
+	}, conf.GetExecutionRequirements(et))
+
+	// Try a zero GracefulStop
+	conf.GracefulStop = types.NullDurationFrom(0 * time.Second)
+	assert.Equal(t, []lib.ExecutionStep{
+		{TimeOffset: 0 * time.Second, PlannedVUs: 4},
+		{TimeOffset: 1 * time.Second, PlannedVUs: 5},
+		{TimeOffset: 2 * time.Second, PlannedVUs: 6},
+		{TimeOffset: 23 * time.Second, PlannedVUs: 0},
+	}, conf.GetExecutionRequirements(et))
+
+	// Try a zero GracefulStop and GracefulRampDown, i.e. raw steps with 0 end cap
+	conf.GracefulRampDown = types.NullDurationFrom(0 * time.Second)
+	assert.Equal(t, rawStepsZeroEnd, conf.GetExecutionRequirements(et))
+}
+
+func TestVariableLoopingVUsConfigExecutionPlanExampleOneThird(t *testing.T) {
+	t.Parallel()
+	et, err := lib.NewExecutionTuple(newExecutionSegmentFromString("0:1/3"), nil)
+	require.NoError(t, err)
+	conf := NewVariableLoopingVUsConfig("test")
+	conf.StartVUs = null.IntFrom(4)
+	conf.Stages = []Stage{
+		{Target: null.IntFrom(6), Duration: types.NullDurationFrom(2 * time.Second)},
+		{Target: null.IntFrom(1), Duration: types.NullDurationFrom(5 * time.Second)},
+		{Target: null.IntFrom(5), Duration: types.NullDurationFrom(4 * time.Second)},
+		{Target: null.IntFrom(1), Duration: types.NullDurationFrom(4 * time.Second)},
+		{Target: null.IntFrom(4), Duration: types.NullDurationFrom(3 * time.Second)},
+		{Target: null.IntFrom(4), Duration: types.NullDurationFrom(2 * time.Second)},
+		{Target: null.IntFrom(1), Duration: types.NullDurationFrom(0 * time.Second)},
+		{Target: null.IntFrom(1), Duration: types.NullDurationFrom(3 * time.Second)},
+	}
+
+	expRawStepsNoZeroEnd := []lib.ExecutionStep{
+		{TimeOffset: 0 * time.Second, PlannedVUs: 1},
+		{TimeOffset: 1 * time.Second, PlannedVUs: 2},
+		{TimeOffset: 2 * time.Second, PlannedVUs: 2},
+		{TimeOffset: 4 * time.Second, PlannedVUs: 1},
+		{TimeOffset: 7 * time.Second, PlannedVUs: 0},
+		{TimeOffset: 8 * time.Second, PlannedVUs: 1},
+		{TimeOffset: 11 * time.Second, PlannedVUs: 2},
+		{TimeOffset: 12 * time.Second, PlannedVUs: 1},
+		{TimeOffset: 15 * time.Second, PlannedVUs: 0},
+		{TimeOffset: 16 * time.Second, PlannedVUs: 1},
+		{TimeOffset: 18 * time.Second, PlannedVUs: 1},
+		{TimeOffset: 20 * time.Second, PlannedVUs: 0},
+	}
+	rawStepsNoZeroEnd := conf.getRawExecutionSteps(et, false)
+	assert.Equal(t, expRawStepsNoZeroEnd, rawStepsNoZeroEnd)
+	endOffset, isFinal := lib.GetEndOffset(rawStepsNoZeroEnd)
+	assert.Equal(t, 20*time.Second, endOffset)
+	assert.Equal(t, true, isFinal)
+
+	rawStepsZeroEnd := conf.getRawExecutionSteps(et, true)
+	assert.Equal(t, expRawStepsNoZeroEnd, rawStepsZeroEnd)
+	endOffset, isFinal = lib.GetEndOffset(rawStepsZeroEnd)
+	assert.Equal(t, 20*time.Second, endOffset)
+	assert.Equal(t, true, isFinal)
+
+	// GracefulStop and GracefulRampDown equal to the default 30 sec
+	assert.Equal(t, []lib.ExecutionStep{
+		{TimeOffset: 0 * time.Second, PlannedVUs: 1},
+		{TimeOffset: 1 * time.Second, PlannedVUs: 2},
+		{TimeOffset: 42 * time.Second, PlannedVUs: 1},
+		{TimeOffset: 50 * time.Second, PlannedVUs: 0},
+	}, conf.GetExecutionRequirements(et))
+
+	// Try a longer GracefulStop than the GracefulRampDown
+	conf.GracefulStop = types.NullDurationFrom(80 * time.Second)
+	assert.Equal(t, []lib.ExecutionStep{
+		{TimeOffset: 0 * time.Second, PlannedVUs: 1},
+		{TimeOffset: 1 * time.Second, PlannedVUs: 2},
+		{TimeOffset: 42 * time.Second, PlannedVUs: 1},
+		{TimeOffset: 50 * time.Second, PlannedVUs: 0},
+	}, conf.GetExecutionRequirements(et))
+
+	// Try a much shorter GracefulStop than the GracefulRampDown
+	conf.GracefulStop = types.NullDurationFrom(3 * time.Second)
+	assert.Equal(t, []lib.ExecutionStep{
+		{TimeOffset: 0 * time.Second, PlannedVUs: 1},
+		{TimeOffset: 1 * time.Second, PlannedVUs: 2},
+		{TimeOffset: 26 * time.Second, PlannedVUs: 0},
+	}, conf.GetExecutionRequirements(et))
+
+	// Try a zero GracefulStop
+	conf.GracefulStop = types.NullDurationFrom(0 * time.Second)
+	assert.Equal(t, []lib.ExecutionStep{
+		{TimeOffset: 0 * time.Second, PlannedVUs: 1},
+		{TimeOffset: 1 * time.Second, PlannedVUs: 2},
+		{TimeOffset: 23 * time.Second, PlannedVUs: 0},
+	}, conf.GetExecutionRequirements(et))
+
+	// Try a zero GracefulStop and GracefulRampDown, i.e. raw steps with 0 end cap
+	conf.GracefulRampDown = types.NullDurationFrom(0 * time.Second)
+	assert.Equal(t, rawStepsZeroEnd, conf.GetExecutionRequirements(et))
+}
