@@ -187,7 +187,7 @@ func (vlvc VariableLoopingVUsConfig) Validate() []error {
 //
 // More information: https://github.com/loadimpact/k6/issues/997#issuecomment-484416866
 //nolint:funlen
-func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(es *lib.ExecutionSegment, zeroEnd bool) []lib.ExecutionStep {
+func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple, zeroEnd bool) []lib.ExecutionStep {
 	// For accurate results, calculations are done with the unscaled values, and
 	// the values are scaled only before we add them to the steps result slice
 	fromVUs := vlvc.StartVUs.Int64
@@ -200,7 +200,7 @@ func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(es *lib.ExecutionSegme
 	}
 
 	// Reserve the scaled StartVUs at the beginning
-	prevScaledVUs := es.Scale(vlvc.StartVUs.Int64)
+	prevScaledVUs := et.ES.Scale(vlvc.StartVUs.Int64)
 	steps := []lib.ExecutionStep{{TimeOffset: 0, PlannedVUs: uint64(prevScaledVUs)}}
 	timeFromStart := time.Duration(0)
 	totalDuration := time.Duration(0)
@@ -221,7 +221,7 @@ func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(es *lib.ExecutionSegme
 		// Handle 0-duration stages, i.e. instant VU jumps
 		if stageDuration == 0 {
 			fromVUs = stageEndVUs
-			prevScaledVUs = es.Scale(stageEndVUs)
+			prevScaledVUs = et.ES.Scale(stageEndVUs)
 			steps = append(steps, lib.ExecutionStep{
 				TimeOffset: timeFromStart,
 				PlannedVUs: uint64(prevScaledVUs),
@@ -254,7 +254,7 @@ func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(es *lib.ExecutionSegme
 			stepGlobalVUs := fromVUs + int64(
 				math.Round((float64(t)*float64(stageEndVUs-fromVUs))/float64(stageDuration)),
 			)
-			stepScaledVus := es.Scale(stepGlobalVUs)
+			stepScaledVus := et.ES.Scale(stepGlobalVUs)
 
 			if stepScaledVus == prevScaledVUs {
 				// only add steps when there's a change in the number of VUs
@@ -272,7 +272,7 @@ func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(es *lib.ExecutionSegme
 		}
 
 		fromVUs = stageEndVUs
-		prevScaledVUs = es.Scale(stageEndVUs)
+		prevScaledVUs = et.ES.Scale(stageEndVUs)
 		timeFromStart += stageDuration
 		steps = append(steps, lib.ExecutionStep{
 			TimeOffset: timeFromStart,
@@ -436,7 +436,7 @@ func (vlvc VariableLoopingVUsConfig) reserveVUsForGracefulRampDowns( //nolint:fu
 //     - If the last stage's target is more than 0, the VUs at the end of the
 //       executor's life will have more time to finish their last iterations.
 func (vlvc VariableLoopingVUsConfig) GetExecutionRequirements(et *lib.ExecutionTuple) []lib.ExecutionStep {
-	steps := vlvc.getRawExecutionSteps(et.ES, false)
+	steps := vlvc.getRawExecutionSteps(et, false)
 
 	executorEndOffset := sumStagesDuration(vlvc.Stages) + time.Duration(vlvc.GracefulStop.Duration)
 	// Handle graceful ramp-downs, if we have them
@@ -484,8 +484,7 @@ var _ lib.Executor = &VariableLoopingVUs{}
 // and see what happens)... :/ so maybe see how it can be split?
 // nolint:funlen,gocognit
 func (vlv VariableLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleContainer) (err error) {
-	segment := vlv.executionState.Options.ExecutionSegment
-	rawExecutionSteps := vlv.config.getRawExecutionSteps(segment, true)
+	rawExecutionSteps := vlv.config.getRawExecutionSteps(vlv.executionState.ExecutionTuple, true)
 	regularDuration, isFinal := lib.GetEndOffset(rawExecutionSteps)
 	if !isFinal {
 		return fmt.Errorf("%s expected raw end offset at %s to be final", vlv.config.GetName(), regularDuration)
