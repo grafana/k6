@@ -23,7 +23,6 @@ package executor
 import (
 	"context"
 	"fmt"
-	"math"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -188,13 +187,6 @@ func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple
 	// the values are scaled only before we add them to the steps result slice
 	fromVUs := vlvc.StartVUs.Int64
 
-	abs := func(n int64) int64 { // sigh...
-		if n < 0 {
-			return -n
-		}
-		return n
-	}
-
 	// Reserve the scaled StartVUs at the beginning
 	prevScaledVUs := et.ScaleInt64(vlvc.StartVUs.Int64)
 	steps := []lib.ExecutionStep{{TimeOffset: 0, PlannedVUs: uint64(prevScaledVUs)}}
@@ -213,47 +205,22 @@ func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple
 		stageDuration := time.Duration(stage.Duration.Duration)
 		totalDuration += stageDuration
 
-		stageVUAbsDiff := abs(stageEndVUs - fromVUs)
-		if stageVUAbsDiff == 0 {
-			// We don't have to do anything but update the time offset
-			// if the number of VUs wasn't changed in this stage
-			timeFromStart += stageDuration
-			continue
-		}
-
-		// Handle 0-duration stages, i.e. instant VU jumps
-		if stageDuration == 0 {
-			fromVUs = stageEndVUs
-			addStep(lib.ExecutionStep{
-				TimeOffset: timeFromStart,
-				PlannedVUs: uint64(et.ScaleInt64(stageEndVUs)),
-			})
-			continue
-		}
-
-		// No floats or ratios,since nanoseconds should be good enough for anyone... :)
-		stepInterval := stageDuration / time.Duration(stageVUAbsDiff)
-
-		// Loop through the potential steps, adding an item to the
-		// result only when there's a change in the number of VUs.
-		//
-		// IMPORTANT: we have to be very careful of rounding errors,
-		// both from the step duration and from the VUs. It's especially
-		// important that the scaling via the execution segment should
-		// happen AFTER the rest of the calculations have been done and
-		// we've rounded the global "global" number of VUs.
-		for t := stepInterval; t < stageDuration; t += stepInterval { // Skip the first step, since we've already added that
-			stepGlobalVUs := fromVUs + int64(
-				math.Round((float64(t)*float64(stageEndVUs-fromVUs))/float64(stageDuration)),
-			)
-
-			// VU reservation for gracefully ramping down is handled as a
-			// separate method: reserveVUsForGracefulRampDowns()
-
-			addStep(lib.ExecutionStep{
-				TimeOffset: timeFromStart + t,
-				PlannedVUs: uint64(et.ScaleInt64(stepGlobalVUs)),
-			})
+		stageVUDiff := stageEndVUs - fromVUs
+		if stageDuration != 0 && stageVUDiff != 0 {
+			var sign int64 = 1
+			if stageVUDiff < 0 {
+				sign = -1
+			}
+			// Loop through the potential steps, adding an item to the
+			// result only when there's a change in the number of VUs.
+			for i := sign; i != stageVUDiff; i += sign { // Skip the first step, since we've already added that
+				// VU reservation for gracefully ramping down is handled as a
+				// separate method: reserveVUsForGracefulRampDowns()
+				addStep(lib.ExecutionStep{
+					TimeOffset: timeFromStart + (stageDuration*time.Duration(i))/time.Duration(stageVUDiff),
+					PlannedVUs: uint64(et.ScaleInt64(fromVUs + i)),
+				})
+			}
 		}
 
 		fromVUs = stageEndVUs
