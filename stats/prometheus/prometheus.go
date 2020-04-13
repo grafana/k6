@@ -161,9 +161,9 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 // as Prometheus metrics.
 // It implements prometheus.Collector.
 func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
-	e.mutex.Lock() // To protect metrics from concurrent collects.
-    logrus.Warn("Taking lock")
-	defer e.mutex.Unlock()
+//	e.mutex.Lock() // To protect metrics from concurrent collects.
+  //  logrus.Warn("Taking lock")
+//	defer e.mutex.Unlock()
 	if err := e.collect(ch); err != nil {
 	    logrus.WithError(err).Error("failed to collect metrics")
 	}
