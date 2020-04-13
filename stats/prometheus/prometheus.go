@@ -5,10 +5,9 @@ import (
 	"net/http"
 	"sync"
 	"time"
-    "fmt"
-	"github.com/cloudflare/cfssl/log"
 	"github.com/loadimpact/k6/api/common"
 	"github.com/loadimpact/k6/api/v1"
+	"github.com/sirupsen/logrus"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -24,6 +23,7 @@ var (
 )
 
 func HandlePrometheusMetrics() http.Handler {
+	logrus.Warn("Starting prometheus")
 	exporter := NewExporter()
 	prometheus.MustRegister(exporter)
 	prometheus.MustRegister(version.NewCollector("k6_exporter"))
@@ -162,11 +162,10 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 // It implements prometheus.Collector.
 func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	e.mutex.Lock() // To protect metrics from concurrent collects.
-	fmt.Println("taking mutex locks")
+    logrus.Warn("Taking lock")
 	defer e.mutex.Unlock()
 	if err := e.collect(ch); err != nil {
-	    fmt.Println("Error scraping k6: %s",err)
-		log.Errorf("Error scraping k6: %s", err)
+	    logrus.WithError(err).Error("failed to collect metrics")
 	}
 }
 
