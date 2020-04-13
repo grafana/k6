@@ -188,14 +188,12 @@ func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple
 	fromVUs := vlvc.StartVUs.Int64
 
 	// Reserve the scaled StartVUs at the beginning
-	prevScaledVUs := et.ScaleInt64(vlvc.StartVUs.Int64)
-	steps := []lib.ExecutionStep{{TimeOffset: 0, PlannedVUs: uint64(prevScaledVUs)}}
+	steps := []lib.ExecutionStep{{TimeOffset: 0, PlannedVUs: uint64(et.ScaleInt64(vlvc.StartVUs.Int64))}}
 	timeFromStart := time.Duration(0)
 
 	addStep := func(step lib.ExecutionStep) {
-		if len(steps) == 0 || steps[len(steps)-1].PlannedVUs != step.PlannedVUs {
+		if steps[len(steps)-1].PlannedVUs != step.PlannedVUs {
 			steps = append(steps, step)
-			prevScaledVUs = int64(step.PlannedVUs)
 		}
 	}
 
