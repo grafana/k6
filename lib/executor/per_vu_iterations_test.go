@@ -37,6 +37,7 @@ import (
 
 func getTestPerVUIterationsConfig() PerVUIterationsConfig {
 	return PerVUIterationsConfig{
+		BaseConfig:  BaseConfig{GracefulStop: types.NullDurationFrom(1 * time.Second)},
 		VUs:         null.IntFrom(10),
 		Iterations:  null.IntFrom(100),
 		MaxDuration: types.NullDurationFrom(3 * time.Second),

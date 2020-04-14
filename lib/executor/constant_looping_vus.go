@@ -177,8 +177,6 @@ func (clv ConstantLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleCo
 	runIteration := getIterationRunner(clv.executionState, clv.logger)
 
 	handleVU := func(initVU lib.InitializedVU) {
-		defer activeVUs.Done()
-
 		ctx, cancel := context.WithCancel(maxDurationCtx)
 		defer cancel()
 
@@ -186,6 +184,7 @@ func (clv ConstantLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleCo
 			RunContext: ctx,
 			DeactivateCallback: func() {
 				clv.executionState.ReturnVU(initVU, true)
+				activeVUs.Done()
 			},
 		})
 

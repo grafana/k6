@@ -48,7 +48,7 @@ func getTestExternallyControlledConfig() ExternallyControlledConfig {
 
 func TestExternallyControlledRun(t *testing.T) {
 	t.Parallel()
-	var doneIters uint64
+	doneIters := new(uint64)
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
 	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
@@ -56,7 +56,7 @@ func TestExternallyControlledRun(t *testing.T) {
 		t, getTestExternallyControlledConfig(), es,
 		simpleRunner(func(ctx context.Context) error {
 			time.Sleep(200 * time.Millisecond)
-			atomic.AddUint64(&doneIters, 1)
+			atomic.AddUint64(doneIters, 1)
 			return nil
 		}),
 	)
@@ -107,6 +107,6 @@ func TestExternallyControlledRun(t *testing.T) {
 	<-doneCh
 	wg.Wait()
 	require.NoError(t, <-errCh)
-	assert.Equal(t, uint64(50), doneIters)
+	assert.Equal(t, uint64(50), atomic.LoadUint64(doneIters))
 	assert.Equal(t, []int64{2, 4, 8, 0}, resultVUCount)
 }

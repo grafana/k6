@@ -31,7 +31,7 @@ import (
 var (
 	_ lib.Runner        = &MiniRunner{}
 	_ lib.InitializedVU = &VU{}
-	_ lib.ActiveVU      = &VU{}
+	_ lib.ActiveVU      = &ActiveVU{}
 )
 
 // MiniRunner partially implements the lib.Runner interface, but instead of
@@ -108,21 +108,32 @@ func (r *MiniRunner) SetOptions(opts lib.Options) error {
 
 // VU is a mock VU, spawned by a MiniRunner.
 type VU struct {
-	R          *MiniRunner
-	RunContext *context.Context
-	Out        chan<- stats.SampleContainer
-	ID         int64
-	Iteration  int64
+	R         *MiniRunner
+	Out       chan<- stats.SampleContainer
+	ID        int64
+	Iteration int64
+}
+
+// ActiveVU holds a VU and its activation parameters
+type ActiveVU struct {
+	*VU
+	*lib.VUActivationParams
 }
 
 // Activate the VU so it will be able to run code
 func (vu *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
-	vu.RunContext = &params.RunContext
-	return lib.ActiveVU(vu)
+	go func() {
+		<-params.RunContext.Done()
+		if params.DeactivateCallback != nil {
+			params.DeactivateCallback()
+		}
+	}()
+
+	return &ActiveVU{vu, params}
 }
 
 // RunOnce runs the mock default function once, incrementing its iteration.
-func (vu *VU) RunOnce() error {
+func (vu *ActiveVU) RunOnce() error {
 	if vu.R.Fn == nil {
 		return nil
 	}
@@ -131,7 +142,7 @@ func (vu *VU) RunOnce() error {
 		Vu:        vu.ID,
 		Iteration: vu.Iteration,
 	}
-	newctx := lib.WithState(*vu.RunContext, state)
+	newctx := lib.WithState(vu.RunContext, state)
 
 	vu.Iteration++
 

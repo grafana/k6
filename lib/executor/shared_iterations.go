@@ -197,8 +197,6 @@ func (si SharedIterations) Run(ctx context.Context, out chan<- stats.SampleConta
 
 	attemptedIters := new(uint64)
 	handleVU := func(initVU lib.InitializedVU) {
-		defer activeVUs.Done()
-
 		ctx, cancel := context.WithCancel(maxDurationCtx)
 		defer cancel()
 
@@ -206,6 +204,7 @@ func (si SharedIterations) Run(ctx context.Context, out chan<- stats.SampleConta
 			RunContext: ctx,
 			DeactivateCallback: func() {
 				si.executionState.ReturnVU(initVU, true)
+				activeVUs.Done()
 			},
 		})
 

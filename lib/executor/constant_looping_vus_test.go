@@ -36,8 +36,9 @@ import (
 
 func getTestConstantLoopingVUsConfig() ConstantLoopingVUsConfig {
 	return ConstantLoopingVUsConfig{
-		VUs:      null.IntFrom(10),
-		Duration: types.NullDurationFrom(1 * time.Second),
+		BaseConfig: BaseConfig{GracefulStop: types.NullDurationFrom(1 * time.Second)},
+		VUs:        null.IntFrom(10),
+		Duration:   types.NullDurationFrom(1 * time.Second),
 	}
 }
 

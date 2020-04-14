@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -217,22 +218,30 @@ func (car ConstantArrivalRate) Run(ctx context.Context, out chan<- stats.SampleC
 
 	// Pre-allocate the VUs local shared buffer
 	activeVUs := make(chan lib.ActiveVU, maxVUs)
-
 	activeVUsCount := uint64(0)
-	// Make sure we put planned and unplanned VUs back in the global
-	// buffer, and as an extra incentive, this replaces a waitgroup.
+
+	activeVUsWg := &sync.WaitGroup{}
+	defer activeVUsWg.Wait()
+	// Make sure we put planned and unplanned VUs back in the global buffer
 	defer func() {
-		// no need for atomics, since initialisedVUs is mutated only in the select{}
-		for i := uint64(0); i < activeVUsCount; i++ {
+		currActiveVUs := atomic.LoadUint64(&activeVUsCount)
+		for i := uint64(0); i < currActiveVUs; i++ {
 			vu := <-activeVUs
 			car.executionState.ReturnVU(vu.(lib.InitializedVU), false)
 		}
 	}()
 
 	activateVU := func(initVU lib.InitializedVU) lib.ActiveVU {
-		activeVU := initVU.Activate(&lib.VUActivationParams{RunContext: maxDurationCtx})
+		activeVUsWg.Add(1)
+		activeVU := initVU.Activate(&lib.VUActivationParams{
+			RunContext: maxDurationCtx,
+			DeactivateCallback: func() {
+				car.executionState.ReturnVU(initVU, true)
+				activeVUsWg.Done()
+			},
+		})
 		car.executionState.ModCurrentlyActiveVUsCount(+1)
-		activeVUsCount++
+		atomic.AddUint64(&activeVUsCount, 1)
 		return activeVU
 	}
 
