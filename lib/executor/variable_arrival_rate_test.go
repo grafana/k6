@@ -192,28 +192,31 @@ func mustNewExecutionTuple(seg *lib.ExecutionSegment, seq *lib.ExecutionSegmentS
 func TestVariableArrivalRateCal(t *testing.T) {
 	t.Parallel()
 
-	var config = VariableArrivalRateConfig{
-		TimeUnit:  types.NullDurationFrom(time.Second),
-		StartRate: null.IntFrom(0),
-		Stages: []Stage{ // TODO make this even bigger and longer .. will need more time
-			{
-				Duration: types.NullDurationFrom(time.Second * 5),
-				Target:   null.IntFrom(1),
+	var (
+		defaultTimeUnit = time.Second
+		config          = VariableArrivalRateConfig{
+			StartRate: null.IntFrom(0),
+			Stages: []Stage{ // TODO make this even bigger and longer .. will need more time
+				{
+					Duration: types.NullDurationFrom(time.Second * 5),
+					Target:   null.IntFrom(1),
+				},
+				{
+					Duration: types.NullDurationFrom(time.Second * 1),
+					Target:   null.IntFrom(1),
+				},
+				{
+					Duration: types.NullDurationFrom(time.Second * 5),
+					Target:   null.IntFrom(0),
+				},
 			},
-			{
-				Duration: types.NullDurationFrom(time.Second * 1),
-				Target:   null.IntFrom(1),
-			},
-			{
-				Duration: types.NullDurationFrom(time.Second * 5),
-				Target:   null.IntFrom(0),
-			},
-		},
-	}
+		}
+	)
 
 	testCases := []struct {
 		expectedTimes []time.Duration
 		et            *lib.ExecutionTuple
+		timeUnit      time.Duration
 	}{
 		{
 			expectedTimes: []time.Duration{time.Millisecond * 3162, time.Millisecond * 4472, time.Millisecond * 5500, time.Millisecond * 6527, time.Millisecond * 7837, time.Second * 11},
@@ -247,12 +250,25 @@ func TestVariableArrivalRateCal(t *testing.T) {
 			expectedTimes: []time.Duration{time.Millisecond * 5500, time.Millisecond * 11000},
 			et:            mustNewExecutionTuple(newExecutionSegmentFromString("2/3:1"), newExecutionSegmentSequenceFromString("0,1/3,2/3,1")),
 		},
+		{
+			expectedTimes: []time.Duration{time.Millisecond * 1825, time.Millisecond * 2581, time.Millisecond * 3162, time.Millisecond * 3651, time.Millisecond * 4082, time.Millisecond * 4472,
+				time.Millisecond * 4830, time.Millisecond * 5166, time.Millisecond * 5499, time.Millisecond * 5833, time.Millisecond * 6169, time.Millisecond * 6527,
+				time.Millisecond * 6917, time.Millisecond * 7348, time.Millisecond * 7837, time.Millisecond * 8418, time.Millisecond * 9174, time.Millisecond * 10999},
+			et:       mustNewExecutionTuple(nil, nil),
+			timeUnit: time.Second / 3, // three  times as fast
+		},
+		// TODO: extend more
 	}
+
 	for _, testCase := range testCases {
 		et := testCase.et
 		expectedTimes := testCase.expectedTimes
+		config.TimeUnit = types.NewNullDuration(testCase.timeUnit, true)
+		if testCase.timeUnit == 0 {
+			config.TimeUnit = types.NewNullDuration(defaultTimeUnit, true)
+		}
 
-		t.Run(fmt.Sprintf("%v", et), func(t *testing.T) { // TODO implement String on ExecutionTuple
+		t.Run(fmt.Sprintf("%s timeunit %s", et, config.TimeUnit), func(t *testing.T) {
 			var ch = make(chan time.Duration)
 			go config.cal(et, ch)
 			var changes = make([]time.Duration, 0, len(expectedTimes))
