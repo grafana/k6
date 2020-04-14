@@ -35,14 +35,9 @@ import (
 )
 
 const (
-	TickRate        = 1 * time.Millisecond
-	MetricsRate     = 1 * time.Second
-	CollectRate     = 50 * time.Millisecond
-	ThresholdsRate  = 2 * time.Second
-	ShutdownTimeout = 10 * time.Second
-
-	BackoffAmount = 50 * time.Millisecond
-	BackoffMax    = 10 * time.Second
+	metricsRate    = 1 * time.Second
+	collectRate    = 50 * time.Millisecond
+	thresholdsRate = 2 * time.Second
 )
 
 // The Engine is the beating heart of k6.
@@ -114,7 +109,7 @@ func NewEngine(ex lib.ExecutionScheduler, o lib.Options, logger *logrus.Logger) 
 // Init is used to initialize the execution scheduler and all metrics processing
 // in the engine. The first is a costly operation, since it initializes all of
 // the planned VUs and could potentially take a long time. It either returns an
-// error immediately, or it returns test Run() and WindDown() functions.
+// error immediately, or it returns test run() and wait() functions.
 //
 // Things to note:
 //  - The first lambda, Run(), synchronously executes the actual load test.
@@ -223,7 +218,7 @@ func (e *Engine) startBackgroundProcesses( //nolint:funlen
 		go func() {
 			defer processes.Done()
 			defer e.logger.Debug("Engine: Thresholds terminated")
-			ticker := time.NewTicker(ThresholdsRate)
+			ticker := time.NewTicker(thresholdsRate)
 			defer ticker.Stop()
 
 			for {
@@ -262,7 +257,7 @@ func (e *Engine) processMetrics(globalCtx context.Context) {
 		}
 	}()
 
-	ticker := time.NewTicker(CollectRate)
+	ticker := time.NewTicker(collectRate)
 	defer ticker.Stop()
 
 	e.logger.Debug("Metrics processing started...")
@@ -307,7 +302,7 @@ func (e *Engine) IsStopped() bool {
 }
 
 func (e *Engine) runMetricsEmission(ctx context.Context) {
-	ticker := time.NewTicker(MetricsRate)
+	ticker := time.NewTicker(metricsRate)
 	for {
 		select {
 		case <-ticker.C:
@@ -322,7 +317,7 @@ func (e *Engine) emitMetrics() {
 	t := time.Now()
 
 	executionState := e.ExecutionScheduler.GetState()
-	e.processSamples([]stats.SampleContainer{stats.ConnectedSamples{
+	e.Samples <- stats.ConnectedSamples{
 		Samples: []stats.Sample{
 			{
 				Time:   t,
@@ -338,7 +333,7 @@ func (e *Engine) emitMetrics() {
 		},
 		Tags: e.Options.RunTags,
 		Time: t,
-	}})
+	}
 }
 
 func (e *Engine) processThresholds() (shouldAbort bool) {
