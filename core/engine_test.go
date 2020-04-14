@@ -943,3 +943,35 @@ func TestMinIterationDurationInSetupTeardownStage(t *testing.T) {
 		})
 	}
 }
+
+func TestEngineRunsTeardownEvenAfterTestRunIsAborted(t *testing.T) {
+	testMetric := stats.New("teardown_metric", stats.Counter)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	runner := &minirunner.MiniRunner{
+		Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
+			cancel() // we cancel the runCtx immediately after the test starts
+			return nil
+		},
+		TeardownFn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
+			out <- stats.Sample{Metric: testMetric, Value: 1}
+			return nil
+		},
+	}
+
+	e, run, wait := newTestEngine(t, ctx, runner, lib.Options{VUs: null.IntFrom(1), Iterations: null.IntFrom(1)})
+	c := &dummy.Collector{}
+	e.Collectors = []lib.Collector{c}
+
+	assert.NoError(t, run())
+	wait()
+
+	var count float64
+	for _, sample := range c.Samples {
+		if sample.Metric == testMetric {
+			count += sample.Value
+		}
+	}
+	assert.Equal(t, 1.0, count)
+}
