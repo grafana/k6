@@ -517,6 +517,10 @@ type ExecutionTuple struct { // TODO rename
 	once *sync.Once
 }
 
+func (et *ExecutionTuple) String() string {
+	return fmt.Sprintf("%s in %s", et.ES, et.sequence)
+}
+
 func fillSequence(sequence ExecutionSegmentSequence) ExecutionSegmentSequence {
 	if sequence[0].from.Cmp(zeroRat) != 0 {
 		es := newExecutionSegment(zeroRat, sequence[0].from)
