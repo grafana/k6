@@ -189,7 +189,7 @@ func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple
 
 	// Reserve the scaled StartVUs at the beginning
 	steps := []lib.ExecutionStep{{TimeOffset: 0, PlannedVUs: uint64(et.ScaleInt64(vlvc.StartVUs.Int64))}}
-	timeFromStart := time.Duration(0)
+	var timeTillEnd time.Duration
 
 	addStep := func(step lib.ExecutionStep) {
 		if steps[len(steps)-1].PlannedVUs != step.PlannedVUs {
@@ -197,40 +197,72 @@ func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple
 		}
 	}
 
+	start, offsets, _ := et.GetStripedOffsets(et.ES)
+	var localIndex int64 // this is the index of the vu for this execution segment
+	next := func(sign int64) int64 {
+		r := offsets[int(localIndex)%len(offsets)]
+		localIndex += sign
+		return r
+	}
+	i := start + 1 // this is the index for the full execution segment
 	for _, stage := range vlvc.Stages {
 		stageEndVUs := stage.Target.Int64
 		stageDuration := time.Duration(stage.Duration.Duration)
+		timeTillEnd += stageDuration
 
 		stageVUDiff := stageEndVUs - fromVUs
-		if stageDuration != 0 && stageVUDiff != 0 {
-			var sign int64 = 1
-			if stageVUDiff < 0 {
-				sign = -1
+		switch {
+		case stageDuration == 0:
+			addStep(lib.ExecutionStep{
+				TimeOffset: timeTillEnd,
+				PlannedVUs: uint64(et.ScaleInt64(stageEndVUs)),
+			})
+		case stageVUDiff != 0:
+			// Get the index to the start if they are not there
+			if i > fromVUs {
+				for ; i > fromVUs; i -= next(-1) {
+					if localIndex == 0 { // we want ot enter for this index but not actually go below 0
+						break
+					}
+				}
+			} else {
+				for ; i < fromVUs; i += next(1) { // <= test
+				}
 			}
-			// Loop through the potential steps, adding an item to the
-			// result only when there's a change in the number of VUs.
-			for i := sign; i != stageVUDiff; i += sign { // Skip the first step, since we've already added that
-				// VU reservation for gracefully ramping down is handled as a
-				// separate method: reserveVUsForGracefulRampDowns()
-				addStep(lib.ExecutionStep{
-					TimeOffset: timeFromStart + (stageDuration*time.Duration(i))/time.Duration(stageVUDiff),
-					PlannedVUs: uint64(et.ScaleInt64(fromVUs + i)),
-				})
+
+			if i > stageEndVUs { // ramp down
+				// here we don't want to emit for the equal to stageEndVUs as it doesn't go below it
+				// it will just go to it
+				for ; i > stageEndVUs; i -= next(-1) {
+					// VU reservation for gracefully ramping down is handled as a
+					// separate method: reserveVUsForGracefulRampDowns()
+					addStep(lib.ExecutionStep{
+						TimeOffset: timeTillEnd - (stageDuration*time.Duration((stageEndVUs-i)))/time.Duration(stageVUDiff),
+						PlannedVUs: uint64(localIndex),
+					})
+					if localIndex == 0 { // we want ot enter for this index but not actually go below 0
+						break
+					}
+				}
+			} else {
+				// here we want the emit for the last one as this case it actually should emit that
+				// we start it
+				for ; i <= stageEndVUs; i += next(1) {
+					// VU reservation for gracefully ramping down is handled as a
+					// separate method: reserveVUsForGracefulRampDowns()
+					addStep(lib.ExecutionStep{
+						TimeOffset: timeTillEnd - (stageDuration*time.Duration((stageEndVUs-i)))/time.Duration(stageVUDiff),
+						PlannedVUs: uint64(localIndex + 1),
+					})
+				}
 			}
 		}
-
 		fromVUs = stageEndVUs
-		timeFromStart += stageDuration
-
-		addStep(lib.ExecutionStep{
-			TimeOffset: timeFromStart,
-			PlannedVUs: uint64(et.ScaleInt64(stageEndVUs)),
-		})
 	}
 
 	if zeroEnd && steps[len(steps)-1].PlannedVUs != 0 {
 		// If the last PlannedVUs value wasn't 0, add a last step with 0
-		steps = append(steps, lib.ExecutionStep{TimeOffset: timeFromStart, PlannedVUs: 0})
+		steps = append(steps, lib.ExecutionStep{TimeOffset: timeTillEnd, PlannedVUs: 0})
 	}
 	return steps
 }

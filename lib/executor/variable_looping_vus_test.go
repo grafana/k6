@@ -189,19 +189,19 @@ func TestVariableLoopingVUsConfigExecutionPlanExample(t *testing.T) {
 		{TimeOffset: 0 * time.Second, PlannedVUs: 4},
 		{TimeOffset: 1 * time.Second, PlannedVUs: 5},
 		{TimeOffset: 2 * time.Second, PlannedVUs: 6},
-		{TimeOffset: 3 * time.Second, PlannedVUs: 5},
-		{TimeOffset: 4 * time.Second, PlannedVUs: 4},
-		{TimeOffset: 5 * time.Second, PlannedVUs: 3},
-		{TimeOffset: 6 * time.Second, PlannedVUs: 2},
-		{TimeOffset: 7 * time.Second, PlannedVUs: 1},
+		{TimeOffset: 2 * time.Second, PlannedVUs: 5},
+		{TimeOffset: 3 * time.Second, PlannedVUs: 4},
+		{TimeOffset: 4 * time.Second, PlannedVUs: 3},
+		{TimeOffset: 5 * time.Second, PlannedVUs: 2},
+		{TimeOffset: 6 * time.Second, PlannedVUs: 1},
 		{TimeOffset: 8 * time.Second, PlannedVUs: 2},
 		{TimeOffset: 9 * time.Second, PlannedVUs: 3},
 		{TimeOffset: 10 * time.Second, PlannedVUs: 4},
 		{TimeOffset: 11 * time.Second, PlannedVUs: 5},
-		{TimeOffset: 12 * time.Second, PlannedVUs: 4},
-		{TimeOffset: 13 * time.Second, PlannedVUs: 3},
-		{TimeOffset: 14 * time.Second, PlannedVUs: 2},
-		{TimeOffset: 15 * time.Second, PlannedVUs: 1},
+		{TimeOffset: 11 * time.Second, PlannedVUs: 4},
+		{TimeOffset: 12 * time.Second, PlannedVUs: 3},
+		{TimeOffset: 13 * time.Second, PlannedVUs: 2},
+		{TimeOffset: 14 * time.Second, PlannedVUs: 1},
 		{TimeOffset: 16 * time.Second, PlannedVUs: 2},
 		{TimeOffset: 17 * time.Second, PlannedVUs: 3},
 		{TimeOffset: 18 * time.Second, PlannedVUs: 4},
@@ -227,8 +227,8 @@ func TestVariableLoopingVUsConfigExecutionPlanExample(t *testing.T) {
 		{TimeOffset: 0 * time.Second, PlannedVUs: 4},
 		{TimeOffset: 1 * time.Second, PlannedVUs: 5},
 		{TimeOffset: 2 * time.Second, PlannedVUs: 6},
-		{TimeOffset: 33 * time.Second, PlannedVUs: 5},
-		{TimeOffset: 42 * time.Second, PlannedVUs: 4},
+		{TimeOffset: 32 * time.Second, PlannedVUs: 5},
+		{TimeOffset: 41 * time.Second, PlannedVUs: 4},
 		{TimeOffset: 50 * time.Second, PlannedVUs: 1},
 		{TimeOffset: 53 * time.Second, PlannedVUs: 0},
 	}, conf.GetExecutionRequirements(et))
@@ -239,8 +239,8 @@ func TestVariableLoopingVUsConfigExecutionPlanExample(t *testing.T) {
 		{TimeOffset: 0 * time.Second, PlannedVUs: 4},
 		{TimeOffset: 1 * time.Second, PlannedVUs: 5},
 		{TimeOffset: 2 * time.Second, PlannedVUs: 6},
-		{TimeOffset: 33 * time.Second, PlannedVUs: 5},
-		{TimeOffset: 42 * time.Second, PlannedVUs: 4},
+		{TimeOffset: 32 * time.Second, PlannedVUs: 5},
+		{TimeOffset: 41 * time.Second, PlannedVUs: 4},
 		{TimeOffset: 50 * time.Second, PlannedVUs: 1},
 		{TimeOffset: 103 * time.Second, PlannedVUs: 0},
 	}, conf.GetExecutionRequirements(et))
@@ -288,12 +288,12 @@ func TestVariableLoopingVUsConfigExecutionPlanExampleOneThird(t *testing.T) {
 	expRawStepsNoZeroEnd := []lib.ExecutionStep{
 		{TimeOffset: 0 * time.Second, PlannedVUs: 1},
 		{TimeOffset: 1 * time.Second, PlannedVUs: 2},
-		{TimeOffset: 4 * time.Second, PlannedVUs: 1},
-		{TimeOffset: 7 * time.Second, PlannedVUs: 0},
+		{TimeOffset: 3 * time.Second, PlannedVUs: 1},
+		{TimeOffset: 6 * time.Second, PlannedVUs: 0},
 		{TimeOffset: 8 * time.Second, PlannedVUs: 1},
 		{TimeOffset: 11 * time.Second, PlannedVUs: 2},
-		{TimeOffset: 12 * time.Second, PlannedVUs: 1},
-		{TimeOffset: 15 * time.Second, PlannedVUs: 0},
+		{TimeOffset: 11 * time.Second, PlannedVUs: 1},
+		{TimeOffset: 14 * time.Second, PlannedVUs: 0},
 		{TimeOffset: 16 * time.Second, PlannedVUs: 1},
 		{TimeOffset: 20 * time.Second, PlannedVUs: 0},
 	}
@@ -313,7 +313,7 @@ func TestVariableLoopingVUsConfigExecutionPlanExampleOneThird(t *testing.T) {
 	assert.Equal(t, []lib.ExecutionStep{
 		{TimeOffset: 0 * time.Second, PlannedVUs: 1},
 		{TimeOffset: 1 * time.Second, PlannedVUs: 2},
-		{TimeOffset: 42 * time.Second, PlannedVUs: 1},
+		{TimeOffset: 41 * time.Second, PlannedVUs: 1},
 		{TimeOffset: 50 * time.Second, PlannedVUs: 0},
 	}, conf.GetExecutionRequirements(et))
 
@@ -322,7 +322,7 @@ func TestVariableLoopingVUsConfigExecutionPlanExampleOneThird(t *testing.T) {
 	assert.Equal(t, []lib.ExecutionStep{
 		{TimeOffset: 0 * time.Second, PlannedVUs: 1},
 		{TimeOffset: 1 * time.Second, PlannedVUs: 2},
-		{TimeOffset: 42 * time.Second, PlannedVUs: 1},
+		{TimeOffset: 41 * time.Second, PlannedVUs: 1},
 		{TimeOffset: 50 * time.Second, PlannedVUs: 0},
 	}, conf.GetExecutionRequirements(et))
 
@@ -347,7 +347,7 @@ func TestVariableLoopingVUsConfigExecutionPlanExampleOneThird(t *testing.T) {
 	assert.Equal(t, rawStepsZeroEnd, conf.GetExecutionRequirements(et))
 }
 
-func TestVariableLoopingVUsConfigExecutionPlanExecutionTupleTests(t *testing.T) {
+func TestVariableLoopingVUsExecutionTupleTests(t *testing.T) {
 	t.Parallel()
 
 	conf := NewVariableLoopingVUsConfig("test")
@@ -361,6 +361,12 @@ func TestVariableLoopingVUsConfigExecutionPlanExecutionTupleTests(t *testing.T) 
 		{Target: null.IntFrom(4), Duration: types.NullDurationFrom(2 * time.Second)},
 		{Target: null.IntFrom(1), Duration: types.NullDurationFrom(0 * time.Second)},
 		{Target: null.IntFrom(1), Duration: types.NullDurationFrom(3 * time.Second)},
+		{Target: null.IntFrom(5), Duration: types.NullDurationFrom(0 * time.Second)},
+		{Target: null.IntFrom(5), Duration: types.NullDurationFrom(3 * time.Second)},
+		{Target: null.IntFrom(0), Duration: types.NullDurationFrom(0 * time.Second)},
+		{Target: null.IntFrom(2), Duration: types.NullDurationFrom(2 * time.Second)},
+		{Target: null.IntFrom(0), Duration: types.NullDurationFrom(2 * time.Second)},
+		{Target: null.IntFrom(4), Duration: types.NullDurationFrom(4 * time.Second)},
 	}
 	/*
 
@@ -369,13 +375,13 @@ func TestVariableLoopingVUsConfigExecutionPlanExecutionTupleTests(t *testing.T) 
 		8	|
 		7	|
 		6	| +
-		5	|/ \       +
-		4	+   \     / \     +-+
-		3	|    \   /   \   /  |
-		2	|     \ /     \ /   |
-		1	|      +       +    +--+
-		0	+------------------------------------------------------------->
-		    0123456789012345678901234567890
+		5	|/ \       +           +--+
+		4	+   \     / \     +-+  |  |       *
+		3	|    \   /   \   /  |  |  |      /
+		2	|     \ /     \ /   |  |  | +   /
+		1	|      +       +    +--+  |/ \ /
+		0	+-------------------------+---+------------------------------>
+		    01234567890123456789012345678901234567890
 
 	*/
 
@@ -389,23 +395,33 @@ func TestVariableLoopingVUsConfigExecutionPlanExecutionTupleTests(t *testing.T) 
 				{TimeOffset: 0 * time.Second, PlannedVUs: 4},
 				{TimeOffset: 1 * time.Second, PlannedVUs: 5},
 				{TimeOffset: 2 * time.Second, PlannedVUs: 6},
-				{TimeOffset: 3 * time.Second, PlannedVUs: 5},
-				{TimeOffset: 4 * time.Second, PlannedVUs: 4},
-				{TimeOffset: 5 * time.Second, PlannedVUs: 3},
-				{TimeOffset: 6 * time.Second, PlannedVUs: 2},
-				{TimeOffset: 7 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 2 * time.Second, PlannedVUs: 5},
+				{TimeOffset: 3 * time.Second, PlannedVUs: 4},
+				{TimeOffset: 4 * time.Second, PlannedVUs: 3},
+				{TimeOffset: 5 * time.Second, PlannedVUs: 2},
+				{TimeOffset: 6 * time.Second, PlannedVUs: 1},
 				{TimeOffset: 8 * time.Second, PlannedVUs: 2},
 				{TimeOffset: 9 * time.Second, PlannedVUs: 3},
 				{TimeOffset: 10 * time.Second, PlannedVUs: 4},
 				{TimeOffset: 11 * time.Second, PlannedVUs: 5},
-				{TimeOffset: 12 * time.Second, PlannedVUs: 4},
-				{TimeOffset: 13 * time.Second, PlannedVUs: 3},
-				{TimeOffset: 14 * time.Second, PlannedVUs: 2},
-				{TimeOffset: 15 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 11 * time.Second, PlannedVUs: 4},
+				{TimeOffset: 12 * time.Second, PlannedVUs: 3},
+				{TimeOffset: 13 * time.Second, PlannedVUs: 2},
+				{TimeOffset: 14 * time.Second, PlannedVUs: 1},
 				{TimeOffset: 16 * time.Second, PlannedVUs: 2},
 				{TimeOffset: 17 * time.Second, PlannedVUs: 3},
 				{TimeOffset: 18 * time.Second, PlannedVUs: 4},
 				{TimeOffset: 20 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 23 * time.Second, PlannedVUs: 5},
+				{TimeOffset: 26 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 27 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 28 * time.Second, PlannedVUs: 2},
+				{TimeOffset: 28 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 29 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 31 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 32 * time.Second, PlannedVUs: 2},
+				{TimeOffset: 33 * time.Second, PlannedVUs: 3},
+				{TimeOffset: 34 * time.Second, PlannedVUs: 4},
 			},
 		},
 		{
@@ -413,14 +429,19 @@ func TestVariableLoopingVUsConfigExecutionPlanExecutionTupleTests(t *testing.T) 
 			expectedSteps: []lib.ExecutionStep{
 				{TimeOffset: 0 * time.Second, PlannedVUs: 1},
 				{TimeOffset: 1 * time.Second, PlannedVUs: 2},
-				{TimeOffset: 4 * time.Second, PlannedVUs: 1},
-				{TimeOffset: 7 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 3 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 6 * time.Second, PlannedVUs: 0},
 				{TimeOffset: 8 * time.Second, PlannedVUs: 1},
 				{TimeOffset: 11 * time.Second, PlannedVUs: 2},
-				{TimeOffset: 12 * time.Second, PlannedVUs: 1},
-				{TimeOffset: 15 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 11 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 14 * time.Second, PlannedVUs: 0},
 				{TimeOffset: 16 * time.Second, PlannedVUs: 1},
 				{TimeOffset: 20 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 23 * time.Second, PlannedVUs: 2},
+				{TimeOffset: 26 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 28 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 28 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 32 * time.Second, PlannedVUs: 1},
 			},
 		},
 		{
@@ -428,14 +449,19 @@ func TestVariableLoopingVUsConfigExecutionPlanExecutionTupleTests(t *testing.T) 
 			expectedSteps: []lib.ExecutionStep{
 				{TimeOffset: 0 * time.Second, PlannedVUs: 1},
 				{TimeOffset: 1 * time.Second, PlannedVUs: 2},
-				{TimeOffset: 4 * time.Second, PlannedVUs: 1},
-				{TimeOffset: 7 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 3 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 6 * time.Second, PlannedVUs: 0},
 				{TimeOffset: 8 * time.Second, PlannedVUs: 1},
 				{TimeOffset: 11 * time.Second, PlannedVUs: 2},
-				{TimeOffset: 12 * time.Second, PlannedVUs: 1},
-				{TimeOffset: 15 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 11 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 14 * time.Second, PlannedVUs: 0},
 				{TimeOffset: 16 * time.Second, PlannedVUs: 1},
 				{TimeOffset: 20 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 23 * time.Second, PlannedVUs: 2},
+				{TimeOffset: 26 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 28 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 28 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 32 * time.Second, PlannedVUs: 1},
 			},
 		},
 		{
@@ -443,14 +469,19 @@ func TestVariableLoopingVUsConfigExecutionPlanExecutionTupleTests(t *testing.T) 
 			expectedSteps: []lib.ExecutionStep{
 				{TimeOffset: 0 * time.Second, PlannedVUs: 1},
 				{TimeOffset: 1 * time.Second, PlannedVUs: 2},
-				{TimeOffset: 4 * time.Second, PlannedVUs: 1},
-				{TimeOffset: 7 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 3 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 6 * time.Second, PlannedVUs: 0},
 				{TimeOffset: 8 * time.Second, PlannedVUs: 1},
 				{TimeOffset: 11 * time.Second, PlannedVUs: 2},
-				{TimeOffset: 12 * time.Second, PlannedVUs: 1},
-				{TimeOffset: 15 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 11 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 14 * time.Second, PlannedVUs: 0},
 				{TimeOffset: 16 * time.Second, PlannedVUs: 1},
 				{TimeOffset: 20 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 23 * time.Second, PlannedVUs: 2},
+				{TimeOffset: 26 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 28 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 28 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 32 * time.Second, PlannedVUs: 1},
 			},
 		},
 		{
@@ -458,25 +489,36 @@ func TestVariableLoopingVUsConfigExecutionPlanExecutionTupleTests(t *testing.T) 
 			expectedSteps: []lib.ExecutionStep{
 				{TimeOffset: 0 * time.Second, PlannedVUs: 1},
 				{TimeOffset: 1 * time.Second, PlannedVUs: 2},
-				{TimeOffset: 4 * time.Second, PlannedVUs: 1},
-				{TimeOffset: 7 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 3 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 6 * time.Second, PlannedVUs: 0},
 				{TimeOffset: 8 * time.Second, PlannedVUs: 1},
 				{TimeOffset: 11 * time.Second, PlannedVUs: 2},
-				{TimeOffset: 12 * time.Second, PlannedVUs: 1},
-				{TimeOffset: 15 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 11 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 14 * time.Second, PlannedVUs: 0},
 				{TimeOffset: 16 * time.Second, PlannedVUs: 1},
 				{TimeOffset: 20 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 23 * time.Second, PlannedVUs: 2},
+				{TimeOffset: 26 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 28 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 28 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 32 * time.Second, PlannedVUs: 1},
 			},
 		},
 		{
 			et: mustNewExecutionTuple(newExecutionSegmentFromString("0:1/3"), newExecutionSegmentSequenceFromString("0,1/3,2/3,1")),
 			expectedSteps: []lib.ExecutionStep{
 				{TimeOffset: 0 * time.Second, PlannedVUs: 2},
-				{TimeOffset: 5 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 4 * time.Second, PlannedVUs: 1},
 				{TimeOffset: 10 * time.Second, PlannedVUs: 2},
-				{TimeOffset: 13 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 12 * time.Second, PlannedVUs: 1},
 				{TimeOffset: 18 * time.Second, PlannedVUs: 2},
 				{TimeOffset: 20 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 23 * time.Second, PlannedVUs: 2},
+				{TimeOffset: 26 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 27 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 29 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 31 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 34 * time.Second, PlannedVUs: 2},
 			},
 		},
 		{
@@ -484,14 +526,19 @@ func TestVariableLoopingVUsConfigExecutionPlanExecutionTupleTests(t *testing.T) 
 			expectedSteps: []lib.ExecutionStep{
 				{TimeOffset: 0 * time.Second, PlannedVUs: 1},
 				{TimeOffset: 1 * time.Second, PlannedVUs: 2},
-				{TimeOffset: 4 * time.Second, PlannedVUs: 1},
-				{TimeOffset: 7 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 3 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 6 * time.Second, PlannedVUs: 0},
 				{TimeOffset: 8 * time.Second, PlannedVUs: 1},
 				{TimeOffset: 11 * time.Second, PlannedVUs: 2},
-				{TimeOffset: 12 * time.Second, PlannedVUs: 1},
-				{TimeOffset: 15 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 11 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 14 * time.Second, PlannedVUs: 0},
 				{TimeOffset: 16 * time.Second, PlannedVUs: 1},
 				{TimeOffset: 20 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 23 * time.Second, PlannedVUs: 2},
+				{TimeOffset: 26 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 28 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 28 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 32 * time.Second, PlannedVUs: 1},
 			},
 		},
 		{
@@ -499,12 +546,15 @@ func TestVariableLoopingVUsConfigExecutionPlanExecutionTupleTests(t *testing.T) 
 			expectedSteps: []lib.ExecutionStep{
 				{TimeOffset: 0 * time.Second, PlannedVUs: 1},
 				{TimeOffset: 2 * time.Second, PlannedVUs: 2},
-				{TimeOffset: 3 * time.Second, PlannedVUs: 1},
-				{TimeOffset: 6 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 2 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 5 * time.Second, PlannedVUs: 0},
 				{TimeOffset: 9 * time.Second, PlannedVUs: 1},
-				{TimeOffset: 14 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 13 * time.Second, PlannedVUs: 0},
 				{TimeOffset: 17 * time.Second, PlannedVUs: 1},
 				{TimeOffset: 20 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 23 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 26 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 33 * time.Second, PlannedVUs: 1},
 			},
 		},
 	}
