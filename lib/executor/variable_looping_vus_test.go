@@ -22,6 +22,8 @@ package executor
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -514,6 +516,69 @@ func TestVariableLoopingVUsConfigExecutionPlanExecutionTupleTests(t *testing.T) 
 		t.Run(et.String(), func(t *testing.T) {
 			rawStepsNoZeroEnd := conf.getRawExecutionSteps(et, false)
 			assert.Equal(t, expectedSteps, rawStepsNoZeroEnd)
+		})
+	}
+}
+
+func BenchmarkVarriableArrivalRateGetRawExecutionSteps(b *testing.B) {
+	testCases := []struct {
+		seq string
+		seg string
+	}{
+		{},
+		{seg: "0:1"},
+		{seq: "0,0.3,0.5,0.6,0.7,0.8,0.9,1", seg: "0:0.3"},
+		{seq: "0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1", seg: "0:0.1"},
+		{seg: "2/5:4/5"},
+		{seg: "2235/5213:4/5"}, // just wanted it to be ugly ;D
+	}
+
+	stageCases := []struct {
+		name   string
+		stages string
+	}{
+		{
+			name:   "normal",
+			stages: `[{"duration":"5m", "target":5000},{"duration":"5m", "target":5000},{"duration":"5m", "target":10000},{"duration":"5m", "target":10000}]`,
+		}, {
+			name: "rollercoaster",
+			stages: `[{"duration":"5m", "target":5000},{"duration":"5m", "target":0},
+				{"duration":"5m", "target":5000},{"duration":"5m", "target":0},
+				{"duration":"5m", "target":5000},{"duration":"5m", "target":0},
+				{"duration":"5m", "target":5000},{"duration":"5m", "target":0},
+				{"duration":"5m", "target":5000},{"duration":"5m", "target":0},
+				{"duration":"5m", "target":5000},{"duration":"5m", "target":0},
+				{"duration":"5m", "target":5000},{"duration":"5m", "target":0},
+				{"duration":"5m", "target":5000},{"duration":"5m", "target":0},
+				{"duration":"5m", "target":5000},{"duration":"5m", "target":0},
+				{"duration":"5m", "target":5000},{"duration":"5m", "target":0},
+				{"duration":"5m", "target":5000},{"duration":"5m", "target":0}]`,
+		},
+	}
+	for _, tc := range testCases {
+		tc := tc
+		b.Run(fmt.Sprintf("seq:%s;segment:%s", tc.seq, tc.seg), func(b *testing.B) {
+			ess, err := lib.NewExecutionSegmentSequenceFromString(tc.seq)
+			require.NoError(b, err)
+			segment, err := lib.NewExecutionSegmentFromString(tc.seg)
+			require.NoError(b, err)
+			if tc.seg == "" {
+				segment = nil // specifically for the optimization
+			}
+			et, err := lib.NewExecutionTuple(segment, &ess)
+			require.NoError(b, err)
+			for _, stageCase := range stageCases {
+				var st []Stage
+				require.NoError(b, json.Unmarshal([]byte(stageCase.stages), &st))
+				vlvc := VariableLoopingVUsConfig{
+					Stages: st,
+				}
+				b.Run(stageCase.name, func(b *testing.B) {
+					for i := 0; i < b.N; i++ {
+						_ = vlvc.getRawExecutionSteps(et, false)
+					}
+				})
+			}
 		})
 	}
 }
