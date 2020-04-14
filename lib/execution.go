@@ -62,7 +62,7 @@ type ExecutionScheduler interface {
 
 	// Run the ExecutionScheduler, funneling the generated metric samples
 	// through the supplied out channel.
-	Run(lobalCtx, runCtx context.Context, engineOut chan<- stats.SampleContainer) error
+	Run(globalCtx, runCtx context.Context, engineOut chan<- stats.SampleContainer) error
 
 	// Pause a test, or start/resume it. To check if a test is paused, use
 	// GetState().IsPaused().

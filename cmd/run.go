@@ -148,7 +148,7 @@ a commandline interface for interacting with it.`,
 		logger := logrus.StandardLogger()
 
 		// We prepare a bunch of contexts:
-		//  - The runCtx is cancelled as soon as the Engine.Run() method finishes,
+		//  - The runCtx is cancelled as soon as the Engine's run() lambda finishes,
 		//    and can trigger things like the usage report and end of test summary.
 		//    Crucially, metrics processing by the Engine will still work after this
 		//    context is cancelled!
@@ -176,7 +176,7 @@ a commandline interface for interacting with it.`,
 		// This is manually triggered after the Engine's Run() has completed,
 		// and things like a single Ctrl+C don't affect it. We use it to make
 		// sure that the progressbars finish updating with the latest execution
-		// state one last ime, after the test run has finished.
+		// state one last time, after the test run has finished.
 		progressCtx, progressCancel := context.WithCancel(globalCtx)
 		defer progressCancel()
 		initBar = execScheduler.GetInitProgressBar()
@@ -309,7 +309,7 @@ a commandline interface for interacting with it.`,
 			}()
 		}
 
-		// Initialize the engine
+		// Start the test run
 		initBar.Modify(pb.WithConstProgress(0, "Start test"))
 		if err := engineRun(); err != nil {
 			return getExitCodeFromEngine(err)
