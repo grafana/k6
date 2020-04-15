@@ -570,7 +570,7 @@ func TestVariableLoopingVUsExecutionTupleTests(t *testing.T) {
 	}
 }
 
-func TestVarriableLoopingVUsGetRawExecutionStepsCornerCases(t *testing.T) {
+func TestVariableLoopingVUsGetRawExecutionStepsCornerCases(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
@@ -707,10 +707,9 @@ func TestVarriableLoopingVUsGetRawExecutionStepsCornerCases(t *testing.T) {
 			assert.Equal(t, expectedSteps, rawStepsNoZeroEnd)
 		})
 	}
-
 }
 
-func BenchmarkVarriableLoopingVUsGetRawExecutionSteps(b *testing.B) {
+func BenchmarkVariableLoopingVUsGetRawExecutionSteps(b *testing.B) {
 	testCases := []struct {
 		seq string
 		seg string
