@@ -570,6 +570,146 @@ func TestVariableLoopingVUsExecutionTupleTests(t *testing.T) {
 	}
 }
 
+func TestVarriableLoopingVUsGetRawExecutionStepsCornerCases(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name          string
+		expectedSteps []lib.ExecutionStep
+		et            *lib.ExecutionTuple
+		stages        []Stage
+		start         int64
+	}{
+		{
+			name: "going up then down straight away",
+			expectedSteps: []lib.ExecutionStep{
+				{TimeOffset: 0 * time.Second, PlannedVUs: 2},
+				{TimeOffset: 0 * time.Second, PlannedVUs: 5},
+				{TimeOffset: 0 * time.Second, PlannedVUs: 4},
+				{TimeOffset: 1 * time.Second, PlannedVUs: 3},
+			},
+			stages: []Stage{
+				{Target: null.IntFrom(5), Duration: types.NullDurationFrom(0 * time.Second)},
+				{Target: null.IntFrom(3), Duration: types.NullDurationFrom(2 * time.Second)},
+			},
+			start: 2,
+		},
+		{
+			name: "jump up then go up again",
+			expectedSteps: []lib.ExecutionStep{
+				{TimeOffset: 0 * time.Second, PlannedVUs: 3},
+				{TimeOffset: 1 * time.Second, PlannedVUs: 4},
+				{TimeOffset: 2 * time.Second, PlannedVUs: 5},
+			},
+			stages: []Stage{
+				{Target: null.IntFrom(5), Duration: types.NullDurationFrom(2 * time.Second)},
+			},
+			start: 3,
+		},
+		{
+			name: "up down up down",
+			expectedSteps: []lib.ExecutionStep{
+				{TimeOffset: 0 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 1 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 2 * time.Second, PlannedVUs: 2},
+				{TimeOffset: 2 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 3 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 5 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 6 * time.Second, PlannedVUs: 2},
+				{TimeOffset: 6 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 7 * time.Second, PlannedVUs: 0},
+			},
+			stages: []Stage{
+				{Target: null.IntFrom(2), Duration: types.NullDurationFrom(2 * time.Second)},
+				{Target: null.IntFrom(0), Duration: types.NullDurationFrom(2 * time.Second)},
+				{Target: null.IntFrom(2), Duration: types.NullDurationFrom(2 * time.Second)},
+				{Target: null.IntFrom(0), Duration: types.NullDurationFrom(2 * time.Second)},
+			},
+		},
+		{
+			name: "up down up down in half",
+			expectedSteps: []lib.ExecutionStep{
+				{TimeOffset: 0 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 1 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 3 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 5 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 7 * time.Second, PlannedVUs: 0},
+			},
+			et: mustNewExecutionTuple(newExecutionSegmentFromString("0:1/2"), nil),
+			stages: []Stage{
+				{Target: null.IntFrom(2), Duration: types.NullDurationFrom(2 * time.Second)},
+				{Target: null.IntFrom(0), Duration: types.NullDurationFrom(2 * time.Second)},
+				{Target: null.IntFrom(2), Duration: types.NullDurationFrom(2 * time.Second)},
+				{Target: null.IntFrom(0), Duration: types.NullDurationFrom(2 * time.Second)},
+			},
+		},
+		{
+			name: "up down up down in the other half",
+			expectedSteps: []lib.ExecutionStep{
+				{TimeOffset: 0 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 2 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 2 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 6 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 6 * time.Second, PlannedVUs: 0},
+			},
+			et: mustNewExecutionTuple(newExecutionSegmentFromString("1/2:1"), nil),
+			stages: []Stage{
+				{Target: null.IntFrom(2), Duration: types.NullDurationFrom(2 * time.Second)},
+				{Target: null.IntFrom(0), Duration: types.NullDurationFrom(2 * time.Second)},
+				{Target: null.IntFrom(2), Duration: types.NullDurationFrom(2 * time.Second)},
+				{Target: null.IntFrom(0), Duration: types.NullDurationFrom(2 * time.Second)},
+			},
+		},
+		{
+			name: "up down up down in with nothing",
+			expectedSteps: []lib.ExecutionStep{
+				{TimeOffset: 0 * time.Second, PlannedVUs: 0},
+			},
+			et: mustNewExecutionTuple(newExecutionSegmentFromString("2/3:1"), newExecutionSegmentSequenceFromString("0,1/3,2/3,1")),
+			stages: []Stage{
+				{Target: null.IntFrom(2), Duration: types.NullDurationFrom(2 * time.Second)},
+				{Target: null.IntFrom(0), Duration: types.NullDurationFrom(2 * time.Second)},
+				{Target: null.IntFrom(2), Duration: types.NullDurationFrom(2 * time.Second)},
+				{Target: null.IntFrom(0), Duration: types.NullDurationFrom(2 * time.Second)},
+			},
+		},
+		{
+			name: "up down up down in with funky sequence", // panics if there are no localIndex == 0 guards
+			expectedSteps: []lib.ExecutionStep{
+				{TimeOffset: 0 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 1 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 3 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 5 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 7 * time.Second, PlannedVUs: 0},
+			},
+			et: mustNewExecutionTuple(newExecutionSegmentFromString("0:1/3"), newExecutionSegmentSequenceFromString("0,1/3,1/2,2/3,1")),
+			stages: []Stage{
+				{Target: null.IntFrom(2), Duration: types.NullDurationFrom(2 * time.Second)},
+				{Target: null.IntFrom(0), Duration: types.NullDurationFrom(2 * time.Second)},
+				{Target: null.IntFrom(2), Duration: types.NullDurationFrom(2 * time.Second)},
+				{Target: null.IntFrom(0), Duration: types.NullDurationFrom(2 * time.Second)},
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		conf := NewVariableLoopingVUsConfig("test")
+		conf.StartVUs = null.IntFrom(testCase.start)
+		conf.Stages = testCase.stages
+		et := testCase.et
+		if et == nil {
+			et = mustNewExecutionTuple(nil, nil)
+		}
+		expectedSteps := testCase.expectedSteps
+
+		t.Run(testCase.name, func(t *testing.T) {
+			rawStepsNoZeroEnd := conf.getRawExecutionSteps(et, false)
+			assert.Equal(t, expectedSteps, rawStepsNoZeroEnd)
+		})
+	}
+
+}
+
 func BenchmarkVarriableLoopingVUsGetRawExecutionSteps(b *testing.B) {
 	testCases := []struct {
 		seq string
