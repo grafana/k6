@@ -22,6 +22,7 @@ environment:
 # prepare system and project
 install:
   - choco install wixtoolset pandoc -y
+  - go get github.com/josephspurrier/goversioninfo/cmd/goversioninfo
   - refreshenv
   # ensure wix and go are available in PATH
   - set PATH=C:\go\bin;%GOPATH%\bin;%WIX%\bin;%PATH%
@@ -52,6 +53,7 @@ build_script:
   - cd %APPVEYOR_BUILD_FOLDER%
   - pandoc -s -f markdown -t rtf -o packaging\LICENSE.rtf LICENSE.md
   - go version
+  - goversioninfo.exe -icon=packaging\k6.ico packaging\versioninfo.json
   - go build -a -trimpath -ldflags "-s -w" -o packaging\k6.exe
   - cd %APPVEYOR_BUILD_FOLDER%\packaging
   - candle.exe -arch x64 -dVERSION=%VERSION% k6.wxs
