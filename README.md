@@ -28,7 +28,7 @@
 This is how load testing should look in the 21st century.
 
 <p align="center">
-  <img width="600" src="https://cdn.rawgit.com/loadimpact/k6/master/demo.svg">
+  <img width="600" src="./assets/k6-demo.gif">
 </p>
 
 Menu
