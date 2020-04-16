@@ -199,8 +199,12 @@ func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple
 
 	start, offsets, _ := et.GetStripedOffsets(et.ES)
 	var localIndex int64 // this is the index of the vu for this execution segment
-	next := func(sign int64) int64 {
-		r := offsets[int(localIndex)%len(offsets)]
+	next := func(sign int64) (r int64) {
+		if sign == 1 {
+			r = offsets[int(localIndex)%len(offsets)]
+		} else {
+			r = offsets[int(localIndex-1)%len(offsets)]
+		}
 		localIndex += sign
 		return r
 	}
