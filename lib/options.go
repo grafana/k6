@@ -285,6 +285,9 @@ type Options struct {
 
 	// Redirect console logging to a file
 	ConsoleOutput null.String `json:"-" envconfig:"K6_CONSOLE_OUTPUT"`
+
+	// Plugins to load
+	Plugins []string `json:"plugins" envconfig:"K6_PLUGINS"`
 }
 
 // Returns the result of overwriting any fields with any that are set on the argument.

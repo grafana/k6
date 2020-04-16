@@ -82,6 +82,7 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.StringSlice("tag", nil, "add a `tag` to be applied to all samples, as `[name]=[value]`")
 	flags.String("console-output", "", "redirects the console logging to the provided output file")
 	flags.Bool("discard-response-bodies", false, "Read but don't process or save HTTP response bodies")
+	flags.StringSlice("plugin", []string{}, "load a plugin at `path`")
 	return flags
 }
 
@@ -110,6 +111,8 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		TeardownTimeout: types.NullDuration{Duration: types.Duration(10 * time.Second), Valid: false},
 
 		MetricSamplesBufferSize: null.NewInt(1000, false),
+
+		Plugins: getStringSlice(flags, "plugin"),
 	}
 
 	// Using Changed() because GetStringSlice() doesn't differentiate between empty and no value

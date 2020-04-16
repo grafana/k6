@@ -104,6 +104,14 @@ func getNullString(flags *pflag.FlagSet, key string) null.String {
 	return null.NewString(v, flags.Changed(key))
 }
 
+func getStringSlice(flags *pflag.FlagSet, key string) []string {
+	v, err := flags.GetStringSlice(key)
+	if err != nil {
+		panic(err)
+	}
+	return v
+}
+
 func exactArgsWithMsg(n int, msg string) cobra.PositionalArgs {
 	return func(cmd *cobra.Command, args []string) error {
 		if len(args) != n {
