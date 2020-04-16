@@ -116,7 +116,7 @@ a commandline interface for interacting with it.`,
 
 		plugins := []plugin.JavaScriptPlugin{}
 		for _, pluginPath := range cliConf.Plugins {
-			jsPlugin, err := lib.LoadPlugin(pluginPath)
+			jsPlugin, err := lib.LoadJavaScriptPlugin(pluginPath)
 			if err != nil {
 				return err
 			}
