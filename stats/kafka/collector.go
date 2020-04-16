@@ -23,6 +23,7 @@ package kafka
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sync"
 	"time"
 
@@ -46,7 +47,27 @@ type Collector struct {
 
 // New creates an instance of the collector
 func New(conf Config) (*Collector, error) {
-	producer, err := sarama.NewSyncProducer(conf.Brokers, nil)
+	var cfg *sarama.Config
+	if conf.ClientUseTLS {
+		if err := conf.ValidateTLSConfig(); err != nil {
+			return nil, fmt.Errorf("unable use tls with error: %v", err)
+		}
+
+		tlsConfig, err := NewTLSConfig(conf.ClientCertFilePath, conf.ClientKeyFilePath, conf.ClientCAFilePath)
+		if err != nil {
+			return nil, fmt.Errorf("unable use tls with error: %v", err)
+		}
+
+		tlsConfig.InsecureSkipVerify = conf.InsecureSkipVerify
+		// Only set TLS if use
+		if !conf.TestUseTLS {
+			cfg = sarama.NewConfig()
+			cfg.Net.TLS.Enable = true
+			cfg.Net.TLS.Config = tlsConfig
+		}
+	}
+
+	producer, err := sarama.NewSyncProducer(conf.Brokers, cfg)
 	if err != nil {
 		return nil, err
 	}

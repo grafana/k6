@@ -20,6 +20,7 @@
 
 package kafka
 
+import "C"
 import (
 	"time"
 
@@ -40,18 +41,29 @@ type Config struct {
 	Format       null.String        `json:"format" envconfig:"K6_KAFKA_FORMAT"`
 	PushInterval types.NullDuration `json:"push_interval" envconfig:"K6_KAFKA_PUSH_INTERVAL"`
 
+	// TLS Configs.
+	ClientCertFilePath string `json:"cert" envconfig:"K6_KAFKA_CERT"`
+	ClientKeyFilePath  string `json:"key" envconfig:"K6_KAFKA_KEY"`
+	ClientCAFilePath   string `json:"ca" envconfig:"K6_KAFKA_CA"`
+	InsecureSkipVerify bool   `json:"insecure" envconfig:"K6_KAFKA_INSECURE"`
+	ClientUseTLS       bool
+	TestUseTLS         bool
+
 	InfluxDBConfig influxdb.Config `json:"influxdb"`
 }
 
 // config is a duplicate of ConfigFields as we can not mapstructure.Decode into
 // null types so we duplicate the struct with primitive types to Decode into
 type config struct {
-	Brokers      []string `json:"brokers" mapstructure:"brokers" envconfig:"K6_KAFKA_BROKERS"`
-	Topic        string   `json:"topic" mapstructure:"topic" envconfig:"K6_KAFKA_TOPIC"`
-	Format       string   `json:"format" mapstructure:"format" envconfig:"K6_KAFKA_FORMAT"`
-	PushInterval string   `json:"push_interval" mapstructure:"push_interval" envconfig:"K6_KAFKA_PUSH_INTERVAL"`
-
-	InfluxDBConfig influxdb.Config `json:"influxdb" mapstructure:"influxdb"`
+	Brokers            []string        `json:"brokers" mapstructure:"brokers" envconfig:"K6_KAFKA_BROKERS"`
+	Topic              string          `json:"topic" mapstructure:"topic" envconfig:"K6_KAFKA_TOPIC"`
+	Format             string          `json:"format" mapstructure:"format" envconfig:"K6_KAFKA_FORMAT"`
+	PushInterval       string          `json:"push_interval" mapstructure:"push_interval" envconfig:"K6_KAFKA_PUSH_INTERVAL"`
+	ClientCertFilePath string          `json:"cert" mapstructure:"cert" envconfig:"K6_KAFKA_CERT"`
+	ClientKeyFilePath  string          `json:"key" mapstructure:"key" envconfig:"K6_KAFKA_KEY"`
+	ClientCAFilePath   string          `json:"ca" mapstructure:"ca" envconfig:"K6_KAFKA_CA"`
+	InsecureSkipVerify bool            `json:"insecure" mapstructure:"insecure" envconfig:"K6_KAFKA_INSECURE"`
+	InfluxDBConfig     influxdb.Config `json:"influxdb" mapstructure:"influxdb"`
 }
 
 // NewConfig creates a new Config instance with default values for some fields.
@@ -75,6 +87,17 @@ func (c Config) Apply(cfg Config) Config {
 	if cfg.PushInterval.Valid {
 		c.PushInterval = cfg.PushInterval
 	}
+	if cfg.ClientCertFilePath != "" {
+		c.ClientCertFilePath = cfg.ClientCertFilePath
+	}
+	if cfg.ClientKeyFilePath != "" {
+		c.ClientKeyFilePath = cfg.ClientKeyFilePath
+	}
+
+	c.InsecureSkipVerify = cfg.InsecureSkipVerify
+	c.ClientUseTLS = cfg.ClientUseTLS
+	c.TestUseTLS = cfg.TestUseTLS
+
 	return c
 }
 
@@ -116,6 +139,44 @@ func ParseArg(arg string) (Config, error) {
 	c.Brokers = cfg.Brokers
 	c.Topic = null.StringFrom(cfg.Topic)
 	c.Format = null.StringFrom(cfg.Format)
+	c.ClientCertFilePath = cfg.ClientCertFilePath
+	c.ClientKeyFilePath = cfg.ClientKeyFilePath
+	c.ClientCAFilePath = cfg.ClientCAFilePath
+	c.InsecureSkipVerify = cfg.InsecureSkipVerify
+
+	// At least client cert and key must be valid to use TLS
+	if c.ClientCertFilePath != "" && c.ClientKeyFilePath != "" {
+		c.ClientUseTLS = true
+	}
 
 	return c, nil
+}
+
+// ValidateTLSConfig use to validate TLS file paths
+func (c Config) ValidateTLSConfig() error {
+	if c.ClientCertFilePath != "" {
+		fp, err := GetAbsolutelyFilePath(c.ClientCertFilePath)
+		if err != nil {
+			return err
+		}
+		c.ClientCertFilePath = fp
+	}
+
+	if c.ClientKeyFilePath != "" {
+		fp, err := GetAbsolutelyFilePath(c.ClientKeyFilePath)
+		if err != nil {
+			return err
+		}
+		c.ClientKeyFilePath = fp
+	}
+
+	if c.ClientCAFilePath != "" {
+		fp, err := GetAbsolutelyFilePath(c.ClientCAFilePath)
+		if err != nil {
+			return err
+		}
+		c.ClientCAFilePath = fp
+	}
+
+	return nil
 }

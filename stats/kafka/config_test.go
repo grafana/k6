@@ -21,11 +21,11 @@
 package kafka
 
 import (
-	"testing"
-
 	"github.com/loadimpact/k6/stats/influxdb"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v3"
+	"os"
+	"testing"
 )
 
 func TestConfigParseArg(t *testing.T) {
@@ -62,4 +62,38 @@ func TestConfigParseArg(t *testing.T) {
 	assert.Equal(t, null.StringFrom("someTopic"), c.Topic)
 	assert.Equal(t, null.StringFrom("influxdb"), c.Format)
 	assert.Equal(t, expInfluxConfig, c.InfluxDBConfig)
+
+	c, err = ParseArg("brokers={broker2,broker3:9092},topic=someTopic,format=json,cert=cert.pem,key=key.pem,ca=ca.pem,insecure=true")
+	assert.Nil(t, err)
+	assert.Equal(t, []string{"broker2", "broker3:9092"}, c.Brokers)
+	assert.Equal(t, null.StringFrom("someTopic"), c.Topic)
+	assert.Equal(t, null.StringFrom("json"), c.Format)
+	assert.Equal(t, "cert.pem", c.ClientCertFilePath)
+	assert.Equal(t, "key.pem", c.ClientKeyFilePath)
+	assert.Equal(t, "ca.pem", c.ClientCAFilePath)
+	assert.Equal(t, true, c.InsecureSkipVerify)
+}
+
+func TestConfigValidateTLSConfig(t *testing.T) {
+	c, err := ParseArg("brokers={broker2,broker3:9092},topic=someTopic,format=json,cert=cert.pem,key=key.pem,ca=ca.pem,insecure=true")
+	assert.Nil(t, err)
+
+	cert, err := os.Create(c.ClientCertFilePath)
+	assert.Nil(t, err)
+	cert.Close()
+
+	key, err := os.Create(c.ClientKeyFilePath)
+	assert.Nil(t, err)
+	key.Close()
+
+	ca, err := os.Create(c.ClientCAFilePath)
+	assert.Nil(t, err)
+	ca.Close()
+
+	err = c.ValidateTLSConfig()
+	assert.Nil(t, err)
+
+	os.Remove(c.ClientCertFilePath)
+	os.Remove(c.ClientKeyFilePath)
+	os.Remove(c.ClientCAFilePath)
 }
