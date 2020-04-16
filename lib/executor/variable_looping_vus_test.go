@@ -690,6 +690,26 @@ func TestVariableLoopingVUsGetRawExecutionStepsCornerCases(t *testing.T) {
 				{Target: null.IntFrom(0), Duration: types.NullDurationFrom(2 * time.Second)},
 			},
 		},
+		{
+			name: "strange",
+			expectedSteps: []lib.ExecutionStep{
+				{TimeOffset: 0 * time.Second, PlannedVUs: 0},
+				{TimeOffset: 1 * time.Second, PlannedVUs: 1},
+				{TimeOffset: 5 * time.Second, PlannedVUs: 2},
+				{TimeOffset: 8 * time.Second, PlannedVUs: 3},
+				{TimeOffset: 11 * time.Second, PlannedVUs: 4},
+				{TimeOffset: 15 * time.Second, PlannedVUs: 5},
+				{TimeOffset: 18 * time.Second, PlannedVUs: 6},
+				{TimeOffset: 23 * time.Second, PlannedVUs: 7},
+				{TimeOffset: 35 * time.Second, PlannedVUs: 8},
+				{TimeOffset: 44 * time.Second, PlannedVUs: 9},
+			},
+			et: mustNewExecutionTuple(newExecutionSegmentFromString("0:0.3"), newExecutionSegmentSequenceFromString("0,0.3,0.6,0.9,1")),
+			stages: []Stage{
+				{Target: null.IntFrom(20), Duration: types.NullDurationFrom(20 * time.Second)},
+				{Target: null.IntFrom(30), Duration: types.NullDurationFrom(30 * time.Second)},
+			},
+		},
 	}
 
 	for _, testCase := range testCases {
