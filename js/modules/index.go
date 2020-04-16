@@ -42,3 +42,6 @@ var Index = map[string]interface{}{
 	"k6/html":        html.New(),
 	"k6/ws":          ws.New(),
 }
+
+// Index of plugin module implementations.
+var PluginIndex = map[string]interface{}{}

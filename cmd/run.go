@@ -45,6 +45,7 @@ import (
 	"github.com/loadimpact/k6/core"
 	"github.com/loadimpact/k6/core/local"
 	"github.com/loadimpact/k6/js"
+	"github.com/loadimpact/k6/js/modules"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/lib/types"
@@ -119,6 +120,18 @@ a commandline interface for interacting with it.`,
 			jsPlugin, err := lib.LoadJavaScriptPlugin(pluginPath)
 			if err != nil {
 				return err
+			}
+
+			// Run plugin setup and add it to the module tree
+			if err = jsPlugin.Setup(); err != nil {
+				return err
+			}
+
+			// TODO: does this belong here, or is it the module package's responsibility?
+			mods := jsPlugin.GetModules()
+			for path, api := range mods {
+				// TODO: check if module already exists and if we're not overloading it
+				modules.PluginIndex[path] = api
 			}
 
 			plugins = append(plugins, jsPlugin)
@@ -484,6 +497,12 @@ a commandline interface for interacting with it.`,
 					logrus.WithError(err).Error("failed to make summary export file")
 				}
 			}
+		}
+
+		// Teardown plugins
+		for _, jsPlugin := range plugins {
+			// TODO: does it really matter if teardown errors?
+			jsPlugin.Teardown()
 		}
 
 		if conf.Linger.Bool {

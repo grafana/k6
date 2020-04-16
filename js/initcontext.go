@@ -113,13 +113,27 @@ func (i *InitContext) Require(arg string) goja.Value {
 		}
 		return v
 	default:
+		// Try in the plugin store
+		v, err := i.requirePluginModule(arg)
+		if err == nil {
+			return v
+		}
+
 		// Fall back to loading from the filesystem.
-		v, err := i.requireFile(arg)
+		v, err = i.requireFile(arg)
 		if err != nil {
 			common.Throw(i.runtime, err)
 		}
 		return v
 	}
+}
+
+func (i *InitContext) requirePluginModule(name string) (goja.Value, error) {
+	mod, ok := modules.PluginIndex[name]
+	if !ok {
+		return nil, errors.Errorf("unknown plugin module: %s", name)
+	}
+	return i.runtime.ToValue(common.Bind(i.runtime, mod, i.ctxPtr)), nil
 }
 
 func (i *InitContext) requireModule(name string) (goja.Value, error) {
