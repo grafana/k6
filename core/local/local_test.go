@@ -23,6 +23,7 @@ package local
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"net/url"
 	"runtime"
@@ -162,6 +163,112 @@ func TestExecutionSchedulerRunNonDefault(t *testing.T) {
 			for {
 				select {
 				case <-samples:
+				case <-done:
+					return
+				}
+			}
+		})
+	}
+}
+
+func TestExecutionSchedulerRunEnv(t *testing.T) {
+	t.Parallel()
+
+	scriptTemplate := `
+	import { Counter } from "k6/metrics";
+
+	let errors = new Counter("errors");
+
+	export let options = {
+		execution: {
+			executor: {
+				type: "%[1]s",
+				gracefulStop: "0.5s",
+				%[2]s
+			}
+		}
+	}
+
+	export default function () {
+		if (__ENV.TESTVAR !== "%[3]s") {
+		    console.error('Wrong env var value. Expected: %[3]s, actual: ', __ENV.TESTVAR);
+			errors.add(1);
+		}
+	}`
+
+	executorConfigs := map[string]string{
+		"constant-arrival-rate": `
+			rate: 1,
+			timeUnit: "0.5s",
+			duration: "0.5s",
+			preAllocatedVUs: 1,
+			maxVUs: 2,`,
+		"constant-looping-vus": `
+			vus: 1,
+			duration: "0.5s",`,
+		"externally-controlled": `
+			vus: 1,
+			duration: "0.5s",`,
+		"per-vu-iterations": `
+			vus: 1,
+			iterations: 1,`,
+		"shared-iterations": `
+			vus: 1,
+			iterations: 1,`,
+		"variable-arrival-rate": `
+			startRate: 1,
+			timeUnit: "0.5s",
+			preAllocatedVUs: 1,
+			maxVUs: 2,
+			stages: [ { target: 1, duration: "0.5s" } ],`,
+		"variable-looping-vus": `
+			startVUs: 1,
+			stages: [ { target: 1, duration: "0.5s" } ],`,
+	}
+
+	testCases := []struct{ name, script string }{}
+
+	// Generate tests using global env and with env override
+	for ename, econf := range executorConfigs {
+		testCases = append(testCases, struct{ name, script string }{
+			"global/" + ename, fmt.Sprintf(scriptTemplate, ename, econf, "global")})
+		configWithEnvOverride := econf + "env: { TESTVAR: 'overridden' }"
+		testCases = append(testCases, struct{ name, script string }{
+			"override/" + ename, fmt.Sprintf(scriptTemplate, ename, configWithEnvOverride, "overridden")})
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			runner, err := js.New(&loader.SourceData{
+				URL:  &url.URL{Path: "/script.js"},
+				Data: []byte(tc.script)},
+				nil, lib.RuntimeOptions{Env: map[string]string{"TESTVAR": "global"}})
+			require.NoError(t, err)
+
+			logger := logrus.New()
+			logger.SetOutput(testutils.NewTestOutput(t))
+			execScheduler, err := NewExecutionScheduler(runner, logger)
+			require.NoError(t, err)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			done := make(chan struct{})
+			samples := make(chan stats.SampleContainer)
+			go func() {
+				assert.NoError(t, execScheduler.Init(ctx, samples))
+				assert.NoError(t, execScheduler.Run(ctx, ctx, samples))
+				close(done)
+			}()
+			for {
+				select {
+				case sample := <-samples:
+					// TODO: Implement a more robust way of reporting
+					// errors in these high-level functional tests.
+					if _, ok := sample.(stats.Sample); ok {
+						assert.FailNow(t, "received error sample from test")
+					}
 				case <-done:
 					return
 				}
