@@ -116,6 +116,7 @@ a commandline interface for interacting with it.`,
 		}
 
 		plugins := []plugin.JavaScriptPlugin{}
+		pluginNames := []string{}
 		for _, pluginPath := range cliConf.Plugins {
 			jsPlugin, err := lib.LoadJavaScriptPlugin(pluginPath)
 			if err != nil {
@@ -127,14 +128,9 @@ a commandline interface for interacting with it.`,
 				return err
 			}
 
-			// TODO: does this belong here, or is it the module package's responsibility?
-			mods := jsPlugin.GetModules()
-			for path, api := range mods {
-				// TODO: check if module already exists and if we're not overloading it
-				modules.PluginIndex[path] = api
-			}
-
+			modules.RegisterPluginModules(jsPlugin.GetModules())
 			plugins = append(plugins, jsPlugin)
+			pluginNames = append(pluginNames, jsPlugin.Name())
 		}
 
 		// Create the Runner.
@@ -275,6 +271,7 @@ a commandline interface for interacting with it.`,
 			}
 
 			fprintf(stdout, "  execution: %s\n", ui.ValueColor.Sprint("local"))
+			fprintf(stdout, "    plugins: %s\n", ui.ValueColor.Sprint(strings.Join(pluginNames, ", ")))
 			fprintf(stdout, "     output: %s%s\n", ui.ValueColor.Sprint(out), ui.ExtraColor.Sprint(link))
 			fprintf(stdout, "     script: %s\n", ui.ValueColor.Sprint(filename))
 			fprintf(stdout, "\n")
@@ -501,8 +498,7 @@ a commandline interface for interacting with it.`,
 
 		// Teardown plugins
 		for _, jsPlugin := range plugins {
-			// TODO: does it really matter if teardown errors?
-			jsPlugin.Teardown()
+			_ = jsPlugin.Teardown()
 		}
 
 		if conf.Linger.Bool {

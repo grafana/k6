@@ -112,15 +112,16 @@ func (i *InitContext) Require(arg string) goja.Value {
 			common.Throw(i.runtime, err)
 		}
 		return v
-	default:
+	case strings.HasPrefix(arg, "k6-plugin/"):
 		// Try in the plugin store
 		v, err := i.requirePluginModule(arg)
-		if err == nil {
-			return v
+		if err != nil {
+			common.Throw(i.runtime, err)
 		}
-
+		return v
+	default:
 		// Fall back to loading from the filesystem.
-		v, err = i.requireFile(arg)
+		v, err := i.requireFile(arg)
 		if err != nil {
 			common.Throw(i.runtime, err)
 		}

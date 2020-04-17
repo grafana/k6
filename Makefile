@@ -10,8 +10,12 @@ build:
 format:
 	find . -name '*.go' -exec gofmt -s -w {} +
 
+.PHONY: plugin
+plugin:
+	pushd /tmp; go build -buildmode=plugin -o /tmp/leftpad.so github.com/andremedeiros/leftpad; popd
+
 .PHONY: check
-check:
+check: plugin
 	golangci-lint run --out-format=tab --new-from-rev master ./...
 	go test -race -timeout 210s ./...
 

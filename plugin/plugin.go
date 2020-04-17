@@ -20,7 +20,7 @@
 
 package plugin
 
-// A Plugin ...
+// A Plugin is used to extend the javascript VM with functionality implemented in Golang.
 type Plugin interface {
 	// Returns a user-friendly name for the plugin.
 	Name() string
@@ -32,6 +32,7 @@ type Plugin interface {
 	Teardown() error
 }
 
+// A JavaScriptPlugin represents a binding between code that can run in the JavaScript VM and Golang.
 type JavaScriptPlugin interface {
 	Plugin
 

@@ -21,6 +21,8 @@
 package modules
 
 import (
+	"fmt"
+
 	"github.com/loadimpact/k6/js/modules/k6"
 	"github.com/loadimpact/k6/js/modules/k6/crypto"
 	"github.com/loadimpact/k6/js/modules/k6/crypto/x509"
@@ -43,5 +45,14 @@ var Index = map[string]interface{}{
 	"k6/ws":          ws.New(),
 }
 
-// Index of plugin module implementations.
+// PluginIndex holds a map of plugin modules to their respective implementations.
 var PluginIndex = map[string]interface{}{}
+
+// RegisterPluginModules takes care of registering a map of paths that a plugin exposes so they can be
+// loaded from the JavaScript VM.
+func RegisterPluginModules(modules map[string]interface{}) {
+	for path, impl := range modules {
+		importPath := fmt.Sprintf("k6-plugin/%s", path)
+		PluginIndex[importPath] = impl
+	}
+}

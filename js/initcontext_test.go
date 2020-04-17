@@ -39,6 +39,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/loadimpact/k6/js/common"
+	"github.com/loadimpact/k6/js/modules"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
@@ -231,6 +232,45 @@ func TestInitContextRequire(t *testing.T) {
 			}
 			_, err = bi.Default(goja.Undefined())
 			assert.NoError(t, err)
+		})
+	})
+
+	t.Run("Plugins", func(t *testing.T) {
+		t.Run("leftpad", func(t *testing.T) {
+			plugin, err := lib.LoadJavaScriptPlugin("/tmp/leftpad.so")
+			assert.NoError(t, err)
+			assert.Equal(t, "Leftpad", plugin.Name())
+
+			modules.RegisterPluginModules(plugin.GetModules())
+
+			b, err := getSimpleBundle("/script.js", `
+				import { leftpad } from "k6-plugin/leftpad";
+				export default function() {
+				  return leftpad('test', 10, '=');
+				}
+			`)
+			if !assert.NoError(t, err, "bundle error") {
+				return
+			}
+
+			bi, err := b.Instantiate()
+			if !assert.NoError(t, err, "instance error") {
+				return
+			}
+
+			val, err := bi.Default(goja.Undefined())
+			if !assert.NoError(t, err) {
+				return
+			}
+			assert.Equal(t, "======test", val.Export())
+		})
+		t.Run("Nonexistent", func(t *testing.T) {
+			_, err := getSimpleBundle("/script.js", `
+				import { leftpad } from "k6-plugin/nonexistent";
+				export default function() {}
+			`)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "unknown plugin module: k6-plugin/nonexistent")
 		})
 	})
 }
