@@ -238,7 +238,9 @@ func TestInitContextRequire(t *testing.T) {
 	t.Run("Plugins", func(t *testing.T) {
 		t.Run("leftpad", func(t *testing.T) {
 			plugin, err := lib.LoadJavaScriptPlugin("/tmp/leftpad.so")
-			assert.NoError(t, err)
+			if !assert.NoError(t, err) {
+				return
+			}
 			assert.Equal(t, "Leftpad", plugin.Name())
 
 			modules.RegisterPluginModules(plugin.GetModules())
