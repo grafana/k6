@@ -66,12 +66,13 @@ jobs:
       - checkout
       - run:
           name: Build plugin artifact for tests
+          working_directory: /tmp
           command: |
             go version
-            pushd /tmp
+            export GOMAXPROCS=2
+            export PATH=$GOPATH/bin:$PATH
             go get -d github.com/andremedeiros/leftpad
             go build -buildmode=plugin -o /tmp/leftpad.so github.com/andremedeiros/leftpad
-            popd
       - run:
           name: Run tests and code coverage
           command: |
@@ -100,6 +101,15 @@ jobs:
     working_directory: /home/circleci/.go_workspace/src/github.com/loadimpact/k6
     steps:
       - checkout
+      - run:
+          name: Build plugin artifact for tests
+          working_directory: /tmp
+          command: |
+            go version
+            export GOMAXPROCS=2
+            export PATH=$GOPATH/bin:$PATH
+            go get -d github.com/andremedeiros/leftpad
+            go build -buildmode=plugin -o /tmp/leftpad.so github.com/andremedeiros/leftpad
       - run:
           name: Run tests with previous Go version
           command: |
