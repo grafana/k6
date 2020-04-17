@@ -12,6 +12,7 @@ format:
 
 .PHONY: plugin
 plugin:
+	pushd /tmp; go get -d github.com/andremedeiros/leftpad; popd
 	pushd /tmp; go build -buildmode=plugin -o /tmp/leftpad.so github.com/andremedeiros/leftpad; popd
 
 .PHONY: check
