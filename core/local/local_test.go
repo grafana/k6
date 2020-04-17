@@ -30,6 +30,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus"
+	logtest "github.com/sirupsen/logrus/hooks/test"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	null "gopkg.in/guregu/null.v3"
+
 	"github.com/loadimpact/k6/js"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/executor"
@@ -40,11 +46,6 @@ import (
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/stats"
-	"github.com/sirupsen/logrus"
-	logtest "github.com/sirupsen/logrus/hooks/test"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	null "gopkg.in/guregu/null.v3"
 )
 
 func newTestExecutionScheduler(
@@ -94,6 +95,79 @@ func TestExecutionSchedulerRun(t *testing.T) {
 	err := make(chan error, 1)
 	go func() { err <- execScheduler.Run(ctx, ctx, samples) }()
 	assert.NoError(t, <-err)
+}
+
+func TestExecutionSchedulerRunNonDefault(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name, script, expErr string
+	}{
+		{"defaultOK", `export default function () {}`, ""},
+		{"nonDefaultOK", `
+	export let options = {
+		execution: {
+			per_vu_iters: {
+				type: "per-vu-iterations",
+				vus: 1,
+				iterations: 1,
+				exec: "nonDefault",
+			},
+		}
+	}
+	export function nonDefault() {}`, ""},
+		{"nonDefaultErr", `
+	export let options = {
+		execution: {
+			per_vu_iters: {
+				type: "per-vu-iterations",
+				vus: 1,
+				iterations: 1,
+				exec: "nonDefaultErr",
+			},
+		}
+	}
+	export function nonDefault() {}`,
+			"error while initializing executor per_vu_iters: function 'nonDefaultErr' not found in exports"},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			runner, err := js.New(&loader.SourceData{
+				URL: &url.URL{Path: "/script.js"}, Data: []byte(tc.script)},
+				nil, lib.RuntimeOptions{})
+			require.NoError(t, err)
+
+			logger := logrus.New()
+			logger.SetOutput(testutils.NewTestOutput(t))
+			execScheduler, err := NewExecutionScheduler(runner, logger)
+			require.NoError(t, err)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			done := make(chan struct{})
+			samples := make(chan stats.SampleContainer)
+			go func() {
+				err := execScheduler.Init(ctx, samples)
+				if tc.expErr != "" {
+					assert.EqualError(t, err, tc.expErr)
+				} else {
+					assert.NoError(t, err)
+					assert.NoError(t, execScheduler.Run(ctx, ctx, samples))
+				}
+				close(done)
+			}()
+			for {
+				select {
+				case <-samples:
+				case <-done:
+					return
+				}
+			}
+		})
+	}
 }
 
 func TestExecutionSchedulerSetupTeardownRun(t *testing.T) {

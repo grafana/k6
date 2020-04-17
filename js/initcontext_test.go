@@ -229,7 +229,7 @@ func TestInitContextRequire(t *testing.T) {
 			if !assert.NoError(t, err) {
 				return
 			}
-			_, err = bi.Default(goja.Undefined())
+			_, err = bi.Exports["default"](goja.Undefined())
 			assert.NoError(t, err)
 		})
 	})
@@ -401,7 +401,7 @@ func TestRequestWithBinaryFile(t *testing.T) {
 	ctx = common.WithRuntime(ctx, bi.Runtime)
 	*bi.Context = ctx
 
-	v, err := bi.Default(goja.Undefined())
+	v, err := bi.Exports["default"](goja.Undefined())
 	assert.NoError(t, err)
 	assert.NotNil(t, v)
 	assert.Equal(t, true, v.Export())

@@ -315,10 +315,12 @@ func (varr VariableArrivalRate) Run(ctx context.Context, out chan<- stats.Sample
 		}
 	}()
 
+	execFn := varr.GetConfig().GetExec().ValueOrZero()
 	activateVU := func(initVU lib.InitializedVU) lib.ActiveVU {
 		activeVUsWg.Add(1)
 		activeVU := initVU.Activate(&lib.VUActivationParams{
 			RunContext: maxDurationCtx,
+			Exec:       execFn,
 			DeactivateCallback: func() {
 				varr.executionState.ReturnVU(initVU, true)
 				activeVUsWg.Done()

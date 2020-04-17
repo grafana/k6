@@ -28,8 +28,9 @@ import (
 
 // ActiveVU represents an actively running virtual user.
 type ActiveVU interface {
-	// Runs the VU once. The only way to interrupt the execution is to cancel
-	// the context given to InitializedVU.Activate()
+	// Run the configured exported function in the VU once. The only
+	// way to interrupt the execution is to cancel the context given
+	// to InitializedVU.Activate()
 	RunOnce() error
 }
 
@@ -47,9 +48,9 @@ type InitializedVU interface {
 type VUActivationParams struct {
 	RunContext         context.Context
 	DeactivateCallback func()
-	// Env                map[string]string
-	// Tags               map[string]string
-	// Exec               null.String
+	Env                map[string]string
+	Tags               map[string]string
+	Exec               string
 }
 
 // A Runner is a factory for VUs. It should precompute as much as possible upon
@@ -90,4 +91,11 @@ type Runner interface {
 	// values and write it back to the runner.
 	GetOptions() Options
 	SetOptions(opts Options) error
+
+	// GetExports returns the names of exported functions in the script
+	// (excluding setup() and teardown()) that can be used for execution.
+	// This is a bit janky, but it's needed for validation during
+	// ExecutionScheduler.Init(). The empty struct is to avoid a
+	// circular dep or make lib depend on goja :-/
+	GetExports() map[string]struct{}
 }

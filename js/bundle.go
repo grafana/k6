@@ -29,13 +29,14 @@ import (
 	"github.com/loadimpact/k6/lib/consts"
 
 	"github.com/dop251/goja"
+	"github.com/pkg/errors"
+	"github.com/spf13/afero"
+
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/js/compiler"
 	jslib "github.com/loadimpact/k6/js/lib"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/loader"
-	"github.com/pkg/errors"
-	"github.com/spf13/afero"
 )
 
 // A Bundle is a self-contained bundle of scripts and resources.
@@ -44,7 +45,9 @@ type Bundle struct {
 	Filename *url.URL
 	Source   string
 	Program  *goja.Program
-	Options  lib.Options
+	// exported functions, for validation only
+	Exports map[string]struct{}
+	Options lib.Options
 
 	BaseInitContext *InitContext
 
@@ -56,7 +59,8 @@ type Bundle struct {
 type BundleInstance struct {
 	Runtime *goja.Runtime
 	Context *context.Context
-	Default goja.Callable
+	// exported functions, ready for execution
+	Exports map[string]goja.Callable
 }
 
 // NewBundle creates a new bundle from a source file and a filesystem.
@@ -79,6 +83,7 @@ func NewBundle(src *loader.SourceData, filesystems map[string]afero.Fs, rtOpts l
 		Filename: src.URL,
 		Source:   code,
 		Program:  pgm,
+		Exports:  make(map[string]struct{}),
 		BaseInitContext: NewInitContext(rt, c, compatMode, new(context.Context),
 			filesystems, loader.Dir(src.URL)),
 		Env:               rtOpts.Env,
@@ -88,44 +93,9 @@ func NewBundle(src *loader.SourceData, filesystems map[string]afero.Fs, rtOpts l
 		return nil, err
 	}
 
-	// Grab exports.
-	exportsV := rt.Get("exports")
-	if goja.IsNull(exportsV) || goja.IsUndefined(exportsV) {
-		return nil, errors.New("exports must be an object")
-	}
-	exports := exportsV.ToObject(rt)
-
-	// Validate the default function.
-	def := exports.Get("default")
-	if def == nil || goja.IsNull(def) || goja.IsUndefined(def) {
-		return nil, errors.New("script must export a default function")
-	}
-	if _, ok := goja.AssertFunction(def); !ok {
-		return nil, errors.New("default export must be a function")
-	}
-
-	// Extract/validate other exports.
-	for _, k := range exports.Keys() {
-		v := exports.Get(k)
-		switch k {
-		case "default": // Already checked above.
-		case "options":
-			data, err := json.Marshal(v.Export())
-			if err != nil {
-				return nil, err
-			}
-			if err := json.Unmarshal(data, &bundle.Options); err != nil {
-				return nil, err
-			}
-		case "setup":
-			if _, ok := goja.AssertFunction(v); !ok {
-				return nil, errors.New("exported 'setup' must be a function")
-			}
-		case "teardown":
-			if _, ok := goja.AssertFunction(v); !ok {
-				return nil, errors.New("exported 'teardown' must be a function")
-			}
-		}
+	err = bundle.getExports(rt)
+	if err != nil {
+		return nil, err
 	}
 
 	return &bundle, nil
@@ -153,8 +123,8 @@ func NewBundleFromArchive(arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle,
 	if err != nil {
 		return nil, err
 	}
-
-	initctx := NewInitContext(goja.New(), c, compatMode,
+	rt := goja.New()
+	initctx := NewInitContext(rt, c, compatMode,
 		new(context.Context), arc.Filesystems, arc.PwdURL)
 
 	env := arc.Env
@@ -170,14 +140,22 @@ func NewBundleFromArchive(arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle,
 		Filename:          arc.FilenameURL,
 		Source:            string(arc.Data),
 		Program:           pgm,
+		Exports:           make(map[string]struct{}),
 		Options:           arc.Options,
 		BaseInitContext:   initctx,
 		Env:               env,
 		CompatibilityMode: compatMode,
 	}
-	if err := bundle.instantiate(bundle.BaseInitContext.runtime, bundle.BaseInitContext); err != nil {
+
+	if err = bundle.instantiate(rt, bundle.BaseInitContext); err != nil {
 		return nil, err
 	}
+
+	err = bundle.getExports(rt)
+	if err != nil {
+		return nil, err
+	}
+
 	return bundle, nil
 }
 
@@ -202,6 +180,47 @@ func (b *Bundle) makeArchive() *lib.Archive {
 	return arc
 }
 
+// getExports validates and extracts exported objects
+func (b *Bundle) getExports(rt *goja.Runtime) error {
+	exportsV := rt.Get("exports")
+	if goja.IsNull(exportsV) || goja.IsUndefined(exportsV) {
+		return errors.New("exports must be an object")
+	}
+	exports := exportsV.ToObject(rt)
+
+	for _, k := range exports.Keys() {
+		v := exports.Get(k)
+		switch k {
+		case "options":
+			data, err := json.Marshal(v.Export())
+			if err != nil {
+				return err
+			}
+			if err := json.Unmarshal(data, &b.Options); err != nil {
+				return err
+			}
+		case "setup":
+			if _, ok := goja.AssertFunction(v); !ok {
+				return errors.New("exported 'setup' must be a function")
+			}
+		case "teardown":
+			if _, ok := goja.AssertFunction(v); !ok {
+				return errors.New("exported 'teardown' must be a function")
+			}
+		default:
+			if _, ok := goja.AssertFunction(v); ok {
+				b.Exports[k] = struct{}{}
+			}
+		}
+	}
+
+	if len(b.Exports) == 0 {
+		return errors.New("no exported functions in script")
+	}
+
+	return nil
+}
+
 // Instantiate creates a new runtime from this bundle.
 func (b *Bundle) Instantiate() (bi *BundleInstance, instErr error) {
 	// TODO: actually use a real context here, so that the instantiation can be killed
@@ -216,11 +235,18 @@ func (b *Bundle) Instantiate() (bi *BundleInstance, instErr error) {
 		return nil, err
 	}
 
-	// Grab the default function; type is already checked in NewBundle().
+	bi = &BundleInstance{
+		Runtime: rt,
+		Context: ctxPtr,
+		Exports: make(map[string]goja.Callable),
+	}
+
+	// Grab any exported functions that could be executed. These were
+	// already pre-validated in NewBundle(), just get them here.
 	exports := rt.Get("exports").ToObject(rt)
-	def, ok := goja.AssertFunction(exports.Get("default"))
-	if !ok || def == nil {
-		panic("exported default is not a function")
+	for k := range b.Exports {
+		fn, _ := goja.AssertFunction(exports.Get(k))
+		bi.Exports[k] = fn
 	}
 
 	jsOptions := rt.Get("options")
@@ -237,11 +263,7 @@ func (b *Bundle) Instantiate() (bi *BundleInstance, instErr error) {
 		}
 	})
 
-	return &BundleInstance{
-		Runtime: rt,
-		Context: ctxPtr,
-		Default: def,
-	}, instErr
+	return bi, instErr
 }
 
 // Instantiates the bundle into an existing runtime. Not public because it also messes with a bunch
