@@ -41,6 +41,7 @@ type vuHandle struct {
 	returnVU  func(lib.InitializedVU)
 	exec      string
 	env       map[string]string
+	tags      map[string]string
 
 	canStartIter chan struct{}
 
@@ -52,7 +53,7 @@ type vuHandle struct {
 func newStoppedVUHandle(
 	parentCtx context.Context, getVU func() (lib.InitializedVU, error),
 	returnVU func(lib.InitializedVU), exec string, env map[string]string,
-	logger *logrus.Entry,
+	tags map[string]string, logger *logrus.Entry,
 ) *vuHandle {
 	lock := &sync.RWMutex{}
 	ctx, cancel := context.WithCancel(parentCtx)
@@ -63,6 +64,7 @@ func newStoppedVUHandle(
 		returnVU:  returnVU,
 		exec:      exec,
 		env:       env,
+		tags:      tags,
 
 		canStartIter: make(chan struct{}),
 
@@ -166,6 +168,7 @@ mainLoop:
 				Exec:               vh.exec,
 				RunContext:         ctx,
 				Env:                vh.env,
+				Tags:               vh.tags,
 				DeactivateCallback: deactivateVU,
 			})
 		}

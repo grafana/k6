@@ -94,6 +94,7 @@ type ExecutorConfig interface {
 	//
 	// TODO: use interface{} so plain http requests can be specified?
 	GetExec() null.String
+	GetTags() map[string]string
 
 	// Calculates the VU requirements in different stages of the executor's
 	// execution, including any extensions caused by waiting for iterations to

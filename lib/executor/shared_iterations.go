@@ -216,8 +216,10 @@ func (si SharedIterations) Run(ctx context.Context, out chan<- stats.SampleConta
 
 	attemptedIters := new(uint64)
 
-	execFn := si.GetConfig().GetExec().ValueOrZero()
-	env := si.GetConfig().GetEnv()
+	conf := si.GetConfig()
+	execFn := conf.GetExec().ValueOrZero()
+	env := conf.GetEnv()
+	tags := conf.GetTags()
 	handleVU := func(initVU lib.InitializedVU) {
 		ctx, cancel := context.WithCancel(maxDurationCtx)
 		defer cancel()
@@ -226,6 +228,7 @@ func (si SharedIterations) Run(ctx context.Context, out chan<- stats.SampleConta
 			RunContext: ctx,
 			Exec:       execFn,
 			Env:        env,
+			Tags:       tags,
 			DeactivateCallback: func() {
 				si.executionState.ReturnVU(initVU, true)
 				activeVUs.Done()

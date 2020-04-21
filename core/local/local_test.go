@@ -42,7 +42,9 @@ import (
 	"github.com/loadimpact/k6/lib/executor"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/netext"
+	"github.com/loadimpact/k6/lib/netext/httpext"
 	"github.com/loadimpact/k6/lib/testutils"
+	"github.com/loadimpact/k6/lib/testutils/httpmultibin"
 	"github.com/loadimpact/k6/lib/testutils/minirunner"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/loader"
@@ -270,6 +272,113 @@ func TestExecutionSchedulerRunEnv(t *testing.T) {
 						assert.FailNow(t, "received error sample from test")
 					}
 				case <-done:
+					return
+				}
+			}
+		})
+	}
+}
+
+func TestExecutionSchedulerRunCustomTags(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	defer tb.Cleanup()
+	sr := tb.Replacer.Replace
+
+	scriptTemplate := sr(`
+	import http from "k6/http";
+
+	export let options = {
+		execution: {
+			executor: {
+				type: "%s",
+				gracefulStop: "0.5s",
+				%s
+			}
+		}
+	}
+
+	export default function () {
+		http.get("HTTPBIN_IP_URL/");
+	}`)
+
+	executorConfigs := map[string]string{
+		"constant-arrival-rate": `
+			rate: 1,
+			timeUnit: "0.5s",
+			duration: "0.5s",
+			preAllocatedVUs: 1,
+			maxVUs: 2,`,
+		"constant-looping-vus": `
+			vus: 1,
+			duration: "0.5s",`,
+		"externally-controlled": `
+			vus: 1,
+			duration: "0.5s",`,
+		"per-vu-iterations": `
+			vus: 1,
+			iterations: 1,`,
+		"shared-iterations": `
+			vus: 1,
+			iterations: 1,`,
+		"variable-arrival-rate": `
+			startRate: 5,
+			timeUnit: "0.5s",
+			preAllocatedVUs: 1,
+			maxVUs: 2,
+			stages: [ { target: 10, duration: "1s" } ],`,
+		"variable-looping-vus": `
+			startVUs: 1,
+			stages: [ { target: 1, duration: "0.5s" } ],`,
+	}
+
+	testCases := []struct{ name, script string }{}
+
+	// Generate tests using custom tags
+	for ename, econf := range executorConfigs {
+		configWithCustomTag := econf + "tags: { customTag: 'value' }"
+		testCases = append(testCases, struct{ name, script string }{
+			ename, fmt.Sprintf(scriptTemplate, ename, configWithCustomTag)})
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			runner, err := js.New(&loader.SourceData{
+				URL:  &url.URL{Path: "/script.js"},
+				Data: []byte(tc.script)},
+				nil, lib.RuntimeOptions{})
+			require.NoError(t, err)
+
+			logger := logrus.New()
+			logger.SetOutput(testutils.NewTestOutput(t))
+			execScheduler, err := NewExecutionScheduler(runner, logger)
+			require.NoError(t, err)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			done := make(chan struct{})
+			samples := make(chan stats.SampleContainer)
+			go func() {
+				assert.NoError(t, execScheduler.Init(ctx, samples))
+				assert.NoError(t, execScheduler.Run(ctx, ctx, samples))
+				close(done)
+			}()
+			var gotTag bool
+			for {
+				select {
+				case sample := <-samples:
+					if trail, ok := sample.(*httpext.Trail); ok && !gotTag {
+						tags := trail.Tags.CloneTags()
+						if v, ok := tags["customTag"]; ok && v == "value" {
+							gotTag = true
+						}
+					}
+				case <-done:
+					if !gotTag {
+						assert.FailNow(t, "sample with tag wasn't received")
+					}
 					return
 				}
 			}

@@ -196,8 +196,10 @@ func (pvi PerVUIterations) Run(ctx context.Context, out chan<- stats.SampleConta
 	regDurationDone := regDurationCtx.Done()
 	runIteration := getIterationRunner(pvi.executionState, pvi.logger)
 
-	execFn := pvi.GetConfig().GetExec().ValueOrZero()
-	env := pvi.GetConfig().GetEnv()
+	conf := pvi.GetConfig()
+	execFn := conf.GetExec().ValueOrZero()
+	env := conf.GetEnv()
+	tags := conf.GetTags()
 	handleVU := func(initVU lib.InitializedVU) {
 		ctx, cancel := context.WithCancel(maxDurationCtx)
 		defer cancel()
@@ -206,6 +208,7 @@ func (pvi PerVUIterations) Run(ctx context.Context, out chan<- stats.SampleConta
 			RunContext: ctx,
 			Exec:       execFn,
 			Env:        env,
+			Tags:       tags,
 			DeactivateCallback: func() {
 				pvi.executionState.ReturnVU(initVU, true)
 				activeVUs.Done()

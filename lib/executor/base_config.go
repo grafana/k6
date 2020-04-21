@@ -26,8 +26,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/loadimpact/k6/lib/types"
 	null "gopkg.in/guregu/null.v3"
+
+	"github.com/loadimpact/k6/lib/types"
 )
 
 // DefaultGracefulStopValue is the graceful top value for all executors, unless
@@ -46,8 +47,9 @@ type BaseConfig struct {
 	GracefulStop types.NullDuration `json:"gracefulStop"`
 	Env          map[string]string  `json:"env"`
 	Exec         null.String        `json:"exec"` // function name, externally validated
+	Tags         map[string]string  `json:"tags"`
 
-	// TODO: future extensions like tags, distribution, others?
+	// TODO: future extensions like distribution, others?
 }
 
 // NewBaseConfig returns a default base config with the default values
@@ -120,6 +122,11 @@ func (bc BaseConfig) GetEnv() map[string]string {
 // GetExec returns the configured custom exec value, if any.
 func (bc BaseConfig) GetExec() null.String {
 	return bc.Exec
+}
+
+// GetTags returns any custom tags configured for the executor.
+func (bc BaseConfig) GetTags() map[string]string {
+	return bc.Tags
 }
 
 // IsDistributable returns true since by default all executors could be run in
