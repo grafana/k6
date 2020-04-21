@@ -150,46 +150,6 @@ func TestRun(t *testing.T) {
 	wg.Wait()
 }
 
-func TestRunWithTLS(t *testing.T) {
-	broker := sarama.NewMockBroker(t, 1)
-	coordinator := sarama.NewMockBroker(t, 2)
-	seedMeta := new(sarama.MetadataResponse)
-	seedMeta.AddBroker(coordinator.Addr(), coordinator.BrokerID())
-	seedMeta.AddTopicPartition("my_topic", 0, 1, []int32{}, []int32{}, sarama.ErrNoError)
-	broker.Returns(seedMeta)
-
-	err := CreateFakeTLS()
-	assert.Nil(t, err)
-	defer func() {
-		err = RemoveFakeTLS()
-		assert.Nil(t, err)
-	}()
-
-	cfg := Config{
-		Brokers:            []string{broker.Addr()},
-		Topic:              null.NewString("my_topic", false),
-		ClientCertFilePath: FakeCertificateName,
-		ClientKeyFilePath:  FakePrivateKeyName,
-		InsecureSkipVerify: true,
-		ClientUseTLS:       true,
-		TestUseTLS:         true,
-	}
-	config := NewConfig().Apply(cfg)
-	c, err := New(config)
-
-	assert.Nil(t, err)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		c.Run(ctx)
-	}()
-	cancel()
-	wg.Wait()
-}
-
 func TestFormatSamples(t *testing.T) {
 	c := Collector{}
 	c.Config.InfluxDBConfig.ConcurrentWrites = null.IntFrom(10)
@@ -213,6 +173,25 @@ func TestFormatSamples(t *testing.T) {
 
 	assert.Nil(t, err)
 	assert.Equal(t, []string{expJSON1, expJSON2}, fmtdSamples)
+}
+
+func TestValidateTLSConfig(t *testing.T) {
+	err := CreateFakeTLS()
+	assert.Nil(t, err)
+	defer func() {
+		err = RemoveFakeTLS()
+		assert.Nil(t, err)
+	}()
+
+	cfg := Config{
+		ClientCertFilePath: FakeCertificateName,
+		ClientKeyFilePath:  FakePrivateKeyName,
+	}
+	err = cfg.ValidateTLSConfig()
+	assert.Nil(t, err)
+
+	_, err = NewTLSConfig(cfg.ClientCertFilePath, cfg.ClientKeyFilePath, cfg.ClientCAFilePath)
+	assert.Nil(t, err)
 }
 
 func CreateFakeTLS() error {

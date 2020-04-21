@@ -47,7 +47,6 @@ type Config struct {
 	ClientCAFilePath   string `json:"ca" envconfig:"K6_KAFKA_CA"`
 	InsecureSkipVerify bool   `json:"insecure" envconfig:"K6_KAFKA_INSECURE"`
 	ClientUseTLS       bool
-	TestUseTLS         bool
 
 	InfluxDBConfig influxdb.Config `json:"influxdb"`
 }
@@ -96,7 +95,6 @@ func (c Config) Apply(cfg Config) Config {
 
 	c.InsecureSkipVerify = cfg.InsecureSkipVerify
 	c.ClientUseTLS = cfg.ClientUseTLS
-	c.TestUseTLS = cfg.TestUseTLS
 
 	return c
 }
