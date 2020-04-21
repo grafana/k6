@@ -59,12 +59,14 @@ func New(conf Config) (*Collector, error) {
 		}
 
 		tlsConfig.InsecureSkipVerify = conf.InsecureSkipVerify
-		// Only set TLS if use
-		if !conf.TestUseTLS {
-			cfg = sarama.NewConfig()
-			cfg.Net.TLS.Enable = true
-			cfg.Net.TLS.Config = tlsConfig
-		}
+
+		cfg = sarama.NewConfig()
+		cfg.Net.TLS.Enable = true
+		cfg.Net.TLS.Config = tlsConfig
+		cfg.Producer.RequiredAcks = sarama.WaitForAll
+		cfg.Producer.Return.Successes = true
+		cfg.Producer.Return.Errors = true
+		cfg.Producer.Partitioner = sarama.NewRandomPartitioner
 	}
 
 	producer, err := sarama.NewSyncProducer(conf.Brokers, cfg)
