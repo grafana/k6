@@ -20,7 +20,6 @@
 
 package kafka
 
-import "C"
 import (
 	"time"
 
