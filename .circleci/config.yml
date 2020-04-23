@@ -53,9 +53,9 @@ jobs:
           name: Run golangci-lint
           command: |
             export PATH="$GOPATH/bin:$PATH"
-            basecommit=$(echo $CIRCLE_COMPARE_URL | sed -n 's:.*compare/\([^.]*\)\..*$:\1:p')
-            echo -e "$CIRCLE_COMPARE_URL\nbasecommit=$basecommit"
-            golangci-lint run --out-format=tab --new-from-rev "${basecommit-master}" ./...
+            basecommit=$(git log --first-parent --pretty=format:'%H %D' | egrep '/(master|new-schedulers)' | head -1 | cut -d' ' -f1)
+            echo "basecommit=$basecommit"
+            golangci-lint run --out-format=tab --new-from-rev "$basecommit" ./...
 
 
   test:
