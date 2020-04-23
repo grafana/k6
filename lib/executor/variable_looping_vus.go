@@ -187,8 +187,12 @@ func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple
 	// the values are scaled only before we add them to the steps result slice
 	fromVUs := vlvc.StartVUs.Int64
 
+	start, offsets, lcd := et.GetStripedOffsets(et.ES)
+	var index = segmentedIndex{start: start, lcd: lcd, offsets: offsets}
+	index.goTo(vlvc.StartVUs.Int64)
 	// Reserve the scaled StartVUs at the beginning
-	steps := []lib.ExecutionStep{{TimeOffset: 0, PlannedVUs: uint64(et.ScaleInt64(vlvc.StartVUs.Int64))}}
+	steps := []lib.ExecutionStep{{TimeOffset: 0, PlannedVUs: uint64(index.local)}}
+
 	var timeTillEnd time.Duration
 
 	addStep := func(step lib.ExecutionStep) {
@@ -197,18 +201,6 @@ func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple
 		}
 	}
 
-	start, offsets, _ := et.GetStripedOffsets(et.ES)
-	var localIndex int64 // this is the index of the vu for this execution segment
-	next := func(sign int64) (r int64) {
-		if sign == 1 {
-			r = offsets[int(localIndex)%len(offsets)]
-		} else {
-			r = offsets[int(localIndex-1)%len(offsets)]
-		}
-		localIndex += sign
-		return r
-	}
-	i := start + 1 // this is the index for the full execution segment
 	for _, stage := range vlvc.Stages {
 		stageEndVUs := stage.Target.Int64
 		stageDuration := time.Duration(stage.Duration.Duration)
@@ -219,48 +211,38 @@ func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple
 			continue
 		}
 		if stageDuration == 0 {
-			addStep(lib.ExecutionStep{
-				TimeOffset: timeTillEnd,
-				PlannedVUs: uint64(et.ScaleInt64(stageEndVUs)),
-			})
+			index.goTo(stageEndVUs)
+			addStep(lib.ExecutionStep{TimeOffset: timeTillEnd, PlannedVUs: uint64(index.local)})
 			fromVUs = stageEndVUs
 			continue
 		}
-		// Get the index to the start if they are not there
-		if i > fromVUs {
-			for ; i > fromVUs; i -= next(-1) {
-				if localIndex == 0 { // we want ot enter for this index but not actually go below 0
-					break
-				}
-			}
-		} else {
-			for ; i < fromVUs; i += next(1) { // <= test
-			}
-		}
 
-		if i > stageEndVUs { // ramp down
+		if index.global > stageEndVUs { // ramp down
 			// here we don't want to emit for the equal to stageEndVUs as it doesn't go below it
 			// it will just go to it
-			for ; i > stageEndVUs; i -= next(-1) {
+			for ; index.global > stageEndVUs; index.prev() {
+				if index.global > fromVUs {
+					continue
+				}
 				// VU reservation for gracefully ramping down is handled as a
 				// separate method: reserveVUsForGracefulRampDowns()
 				addStep(lib.ExecutionStep{
-					TimeOffset: timeTillEnd - (stageDuration*time.Duration((stageEndVUs-i)))/time.Duration(stageVUDiff),
-					PlannedVUs: uint64(localIndex),
+					TimeOffset: timeTillEnd - time.Duration(int64(stageDuration)*(stageEndVUs-index.global)/stageVUDiff),
+					PlannedVUs: uint64(index.local - 1),
 				})
-				if localIndex == 0 { // we want ot enter for this index but not actually go below 0
-					break
-				}
 			}
 		} else {
 			// here we want the emit for the last one as this case it actually should emit that
 			// we start it
-			for ; i <= stageEndVUs; i += next(1) {
+			for ; index.global <= stageEndVUs; index.next() {
+				if index.global < fromVUs {
+					continue
+				}
 				// VU reservation for gracefully ramping down is handled as a
 				// separate method: reserveVUsForGracefulRampDowns()
 				addStep(lib.ExecutionStep{
-					TimeOffset: timeTillEnd - (stageDuration*time.Duration((stageEndVUs-i)))/time.Duration(stageVUDiff),
-					PlannedVUs: uint64(localIndex + 1),
+					TimeOffset: timeTillEnd - time.Duration(int64(stageDuration)*(stageEndVUs-index.global)/stageVUDiff),
+					PlannedVUs: uint64(index.local),
 				})
 			}
 		}
@@ -272,6 +254,50 @@ func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple
 		steps = append(steps, lib.ExecutionStep{TimeOffset: timeTillEnd, PlannedVUs: 0})
 	}
 	return steps
+}
+
+type segmentedIndex struct { // TODO: rename ... although this is probably the best name so far :D
+	start, lcd    int64
+	offsets       []int64
+	local, global int64
+}
+
+func (s *segmentedIndex) next() {
+	if s.local == 0 {
+		s.global += s.start + 1
+	} else {
+		s.global += s.offsets[int(s.local-1)%len(s.offsets)]
+	}
+	s.local++
+}
+
+func (s *segmentedIndex) prev() {
+	if s.local == 1 {
+		s.global -= s.start + 1
+	} else {
+		s.global -= s.offsets[int(s.local-2)%len(s.offsets)]
+	}
+	s.local--
+}
+
+func (s *segmentedIndex) goTo(value int64) { // TODO optimize
+	var gi int64
+	s.local = (value / s.lcd) * int64(len(s.offsets))
+	s.global = s.local / int64(len(s.offsets)) * s.lcd // TODO optimize ?
+	i := s.start
+	for ; i < value%s.lcd; gi, i = gi+1, i+s.offsets[gi] {
+		s.local++
+	}
+
+	if gi > 0 {
+		s.global += i - s.offsets[gi-1]
+	} else if s.local > 0 {
+		s.global -= s.offsets[len(s.offsets)-1] - s.start
+	}
+
+	if s.local > 0 {
+		s.global++ // this is to fix the fact it starts from 0
+	}
 }
 
 // If the graceful ramp-downs are enabled, we need to reserve any VUs that may

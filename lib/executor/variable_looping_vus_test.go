@@ -79,7 +79,7 @@ func TestVariableLoopingVUsRun(t *testing.T) {
 	sampleTimes := []time.Duration{
 		500 * time.Millisecond,
 		1000 * time.Millisecond,
-		700 * time.Millisecond,
+		800 * time.Millisecond,
 	}
 
 	errCh := make(chan error)
@@ -790,4 +790,195 @@ func BenchmarkVariableLoopingVUsGetRawExecutionSteps(b *testing.B) {
 			}
 		})
 	}
+}
+
+func TestSegmentedIndex(t *testing.T) {
+	// TODO ... more structure ?
+	t.Run("full", func(t *testing.T) {
+		s := segmentedIndex{start: 0, lcd: 1, offsets: []int64{1}}
+
+		s.next()
+		assert.EqualValues(t, 1, s.global)
+		assert.EqualValues(t, 1, s.local)
+
+		s.prev()
+		assert.EqualValues(t, 0, s.global)
+		assert.EqualValues(t, 0, s.local)
+
+		s.next()
+		assert.EqualValues(t, 1, s.global)
+		assert.EqualValues(t, 1, s.local)
+
+		s.next()
+		assert.EqualValues(t, 2, s.global)
+		assert.EqualValues(t, 2, s.local)
+
+		s.next()
+		assert.EqualValues(t, 3, s.global)
+		assert.EqualValues(t, 3, s.local)
+
+		s.prev()
+		assert.EqualValues(t, 2, s.global)
+		assert.EqualValues(t, 2, s.local)
+
+		s.prev()
+		assert.EqualValues(t, 1, s.global)
+		assert.EqualValues(t, 1, s.local)
+
+		s.next()
+		assert.EqualValues(t, 2, s.global)
+		assert.EqualValues(t, 2, s.local)
+	})
+
+	t.Run("half", func(t *testing.T) {
+		s := segmentedIndex{start: 0, lcd: 2, offsets: []int64{2}}
+
+		s.next()
+		assert.EqualValues(t, 1, s.global)
+		assert.EqualValues(t, 1, s.local)
+
+		s.prev()
+		assert.EqualValues(t, 0, s.global)
+		assert.EqualValues(t, 0, s.local)
+
+		s.next()
+		assert.EqualValues(t, 1, s.global)
+		assert.EqualValues(t, 1, s.local)
+
+		s.next()
+		assert.EqualValues(t, 3, s.global)
+		assert.EqualValues(t, 2, s.local)
+
+		s.next()
+		assert.EqualValues(t, 5, s.global)
+		assert.EqualValues(t, 3, s.local)
+
+		s.prev()
+		assert.EqualValues(t, 3, s.global)
+		assert.EqualValues(t, 2, s.local)
+
+		s.prev()
+		assert.EqualValues(t, 1, s.global)
+		assert.EqualValues(t, 1, s.local)
+
+		s.prev()
+		assert.EqualValues(t, 0, s.global)
+		assert.EqualValues(t, 0, s.local)
+
+		s.next()
+		assert.EqualValues(t, 1, s.global)
+		assert.EqualValues(t, 1, s.local)
+	})
+
+	t.Run("the other half", func(t *testing.T) {
+		s := segmentedIndex{start: 1, lcd: 2, offsets: []int64{2}}
+
+		s.next()
+		assert.EqualValues(t, 2, s.global)
+		assert.EqualValues(t, 1, s.local)
+
+		s.prev()
+		assert.EqualValues(t, 0, s.global)
+		assert.EqualValues(t, 0, s.local)
+
+		s.next()
+		assert.EqualValues(t, 2, s.global)
+		assert.EqualValues(t, 1, s.local)
+
+		s.next()
+		assert.EqualValues(t, 4, s.global)
+		assert.EqualValues(t, 2, s.local)
+
+		s.next()
+		assert.EqualValues(t, 6, s.global)
+		assert.EqualValues(t, 3, s.local)
+
+		s.prev()
+		assert.EqualValues(t, 4, s.global)
+		assert.EqualValues(t, 2, s.local)
+
+		s.prev()
+		assert.EqualValues(t, 2, s.global)
+		assert.EqualValues(t, 1, s.local)
+
+		s.prev()
+		assert.EqualValues(t, 0, s.global)
+		assert.EqualValues(t, 0, s.local)
+
+		s.next()
+		assert.EqualValues(t, 2, s.global)
+		assert.EqualValues(t, 1, s.local)
+	})
+
+	t.Run("strange", func(t *testing.T) {
+		s := segmentedIndex{start: 1, lcd: 7, offsets: []int64{4, 3}}
+
+		s.next()
+		assert.EqualValues(t, 2, s.global)
+		assert.EqualValues(t, 1, s.local)
+
+		s.prev()
+		assert.EqualValues(t, 0, s.global)
+		assert.EqualValues(t, 0, s.local)
+
+		s.next()
+		assert.EqualValues(t, 2, s.global)
+		assert.EqualValues(t, 1, s.local)
+
+		s.next()
+		assert.EqualValues(t, 6, s.global)
+		assert.EqualValues(t, 2, s.local)
+
+		s.next()
+		assert.EqualValues(t, 9, s.global)
+		assert.EqualValues(t, 3, s.local)
+
+		s.prev()
+		assert.EqualValues(t, 6, s.global)
+		assert.EqualValues(t, 2, s.local)
+
+		s.prev()
+		assert.EqualValues(t, 2, s.global)
+		assert.EqualValues(t, 1, s.local)
+
+		s.prev()
+		assert.EqualValues(t, 0, s.global)
+		assert.EqualValues(t, 0, s.local)
+
+		s.next()
+		assert.EqualValues(t, 2, s.global)
+		assert.EqualValues(t, 1, s.local)
+
+		s.goTo(6)
+		assert.EqualValues(t, 6, s.global)
+		assert.EqualValues(t, 2, s.local)
+
+		s.goTo(5)
+		assert.EqualValues(t, 2, s.global)
+		assert.EqualValues(t, 1, s.local)
+
+		s.goTo(7)
+		assert.EqualValues(t, 6, s.global)
+		assert.EqualValues(t, 2, s.local)
+
+		s.goTo(8)
+		assert.EqualValues(t, 6, s.global)
+		assert.EqualValues(t, 2, s.local)
+
+		s.goTo(9)
+		assert.EqualValues(t, 9, s.global)
+		assert.EqualValues(t, 3, s.local)
+
+		s.prev()
+		assert.EqualValues(t, 6, s.global)
+		assert.EqualValues(t, 2, s.local)
+
+		s.prev()
+		assert.EqualValues(t, 2, s.global)
+		assert.EqualValues(t, 1, s.local)
+
+		s.prev()
+		assert.EqualValues(t, 0, s.global)
+		assert.EqualValues(t, 0, s.local)
+	})
 }
