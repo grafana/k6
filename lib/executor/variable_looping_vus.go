@@ -183,18 +183,16 @@ func (vlvc VariableLoopingVUsConfig) Validate() []error {
 // More information: https://github.com/loadimpact/k6/issues/997#issuecomment-484416866
 //nolint:funlen
 func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple, zeroEnd bool) []lib.ExecutionStep {
-	// For accurate results, calculations are done with the unscaled values, and
-	// the values are scaled only before we add them to the steps result slice
-	fromVUs := vlvc.StartVUs.Int64
-
-	start, offsets, lcd := et.GetStripedOffsets(et.ES)
-	var index = segmentedIndex{start: start, lcd: lcd, offsets: offsets}
-	index.goTo(vlvc.StartVUs.Int64)
+	var (
+		timeTillEnd         time.Duration
+		fromVUs             = vlvc.StartVUs.Int64
+		start, offsets, lcd = et.GetStripedOffsets(et.ES)
+		index               = segmentedIndex{start: start, lcd: lcd, offsets: offsets}
+	)
+	index.goTo(fromVUs)
+	var steps = make([]lib.ExecutionStep, 0, vlvc.precalculateTheRequiredSteps(et, zeroEnd))
 	// Reserve the scaled StartVUs at the beginning
-	steps := []lib.ExecutionStep{{TimeOffset: 0, PlannedVUs: uint64(index.local)}}
-
-	var timeTillEnd time.Duration
-
+	steps = append(steps, lib.ExecutionStep{TimeOffset: 0, PlannedVUs: uint64(index.local)})
 	addStep := func(step lib.ExecutionStep) {
 		if steps[len(steps)-1].PlannedVUs != step.PlannedVUs {
 			steps = append(steps, step)
@@ -298,6 +296,33 @@ func (s *segmentedIndex) goTo(value int64) { // TODO optimize
 	if s.local > 0 {
 		s.global++ // this is to fix the fact it starts from 0
 	}
+}
+
+func absInt64(a int64) int64 {
+	if a < 0 {
+		return -a
+	}
+	return a
+}
+
+func (vlvc VariableLoopingVUsConfig) precalculateTheRequiredSteps(et *lib.ExecutionTuple, zeroEnd bool) int {
+	p := et.ScaleInt64(vlvc.StartVUs.Int64)
+	var result int64
+	result++ // for the first one
+
+	if zeroEnd {
+		result++ // for the last one - this one can be more then needed
+	}
+	for _, stage := range vlvc.Stages {
+		stageEndVUs := et.ScaleInt64(stage.Target.Int64)
+		if stage.Duration.Duration == 0 {
+			result++
+		} else {
+			result += absInt64(p - stageEndVUs)
+		}
+		p = stageEndVUs
+	}
+	return int(result)
 }
 
 // If the graceful ramp-downs are enabled, we need to reserve any VUs that may
