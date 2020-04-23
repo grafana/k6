@@ -211,6 +211,7 @@ workflows:
       - build-docker-images:
           requires:
             - deps
+            - lint
             - test
           filters:
             tags:
@@ -218,6 +219,7 @@ workflows:
       - build-linux-packages:
           requires:
             - deps
+            - lint
             - test
           filters:
             branches:
