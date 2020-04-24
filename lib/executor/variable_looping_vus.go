@@ -181,21 +181,20 @@ func (vlvc VariableLoopingVUsConfig) Validate() []error {
 //       00000000001111111111222   (t/10)
 //
 // More information: https://github.com/loadimpact/k6/issues/997#issuecomment-484416866
-//nolint:funlen
 func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple, zeroEnd bool) []lib.ExecutionStep {
 	var (
 		timeTillEnd         time.Duration
 		fromVUs             = vlvc.StartVUs.Int64
 		start, offsets, lcd = et.GetStripedOffsets(et.ES)
+		steps               = make([]lib.ExecutionStep, 0, vlvc.precalculateTheRequiredSteps(et, zeroEnd))
 		index               = segmentedIndex{start: start, lcd: lcd, offsets: offsets}
 	)
-	index.goTo(fromVUs)
-	var steps = make([]lib.ExecutionStep, 0, vlvc.precalculateTheRequiredSteps(et, zeroEnd))
+
 	// Reserve the scaled StartVUs at the beginning
-	steps = append(steps, lib.ExecutionStep{TimeOffset: 0, PlannedVUs: uint64(index.scaled)})
-	addStep := func(step lib.ExecutionStep) {
-		if steps[len(steps)-1].PlannedVUs != step.PlannedVUs {
-			steps = append(steps, step)
+	steps = append(steps, lib.ExecutionStep{TimeOffset: 0, PlannedVUs: uint64(index.goTo(fromVUs))})
+	addStep := func(timeOffset time.Duration, plannedVUs uint64) {
+		if steps[len(steps)-1].PlannedVUs != plannedVUs {
+			steps = append(steps, lib.ExecutionStep{TimeOffset: timeOffset, PlannedVUs: plannedVUs})
 		}
 	}
 
@@ -209,8 +208,7 @@ func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple
 			continue
 		}
 		if stageDuration == 0 {
-			index.goTo(stageEndVUs)
-			addStep(lib.ExecutionStep{TimeOffset: timeTillEnd, PlannedVUs: uint64(index.scaled)})
+			addStep(timeTillEnd, uint64(index.goTo(stageEndVUs)))
 			fromVUs = stageEndVUs
 			continue
 		}
@@ -221,19 +219,21 @@ func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple
 			for ; index.unscaled > stageEndVUs; index.prev() {
 				// VU reservation for gracefully ramping down is handled as a
 				// separate method: reserveVUsForGracefulRampDowns()
-				addStep(lib.ExecutionStep{
-					TimeOffset: timeTillEnd - time.Duration(int64(stageDuration)*(stageEndVUs-index.unscaled+1)/stageVUDiff),
-					PlannedVUs: uint64(index.scaled - 1),
-				})
+				addStep( // this is the time that we should go up 1 if we are ramping up
+					// but we are ramping down so we should go 1 down, but because we want to not
+					// stop VUs immediately we stop it on the next unscaled VU's time
+					timeTillEnd-time.Duration(int64(stageDuration)*(stageEndVUs-index.unscaled+1)/stageVUDiff),
+					uint64(index.scaled-1),
+				)
 			}
 		} else {
 			for ; index.unscaled <= stageEndVUs; index.next() {
 				// VU reservation for gracefully ramping down is handled as a
 				// separate method: reserveVUsForGracefulRampDowns()
-				addStep(lib.ExecutionStep{
-					TimeOffset: timeTillEnd - time.Duration(int64(stageDuration)*(stageEndVUs-index.unscaled)/stageVUDiff),
-					PlannedVUs: uint64(index.scaled),
-				})
+				addStep(
+					timeTillEnd-time.Duration(int64(stageDuration)*(stageEndVUs-index.unscaled)/stageVUDiff),
+					uint64(index.scaled),
+				)
 			}
 		}
 		fromVUs = stageEndVUs
@@ -270,7 +270,7 @@ func (s *segmentedIndex) prev() {
 	s.scaled--
 }
 
-func (s *segmentedIndex) goTo(value int64) { // TODO optimize
+func (s *segmentedIndex) goTo(value int64) int64 { // TODO optimize
 	var gi int64
 	s.scaled = (value / s.lcd) * int64(len(s.offsets))
 	s.unscaled = s.scaled / int64(len(s.offsets)) * s.lcd // TODO optimize ?
@@ -288,6 +288,8 @@ func (s *segmentedIndex) goTo(value int64) { // TODO optimize
 	if s.scaled > 0 {
 		s.unscaled++ // this is to fix the fact it starts from 0
 	}
+
+	return s.scaled
 }
 
 func absInt64(a int64) int64 {
