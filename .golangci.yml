@@ -53,9 +53,7 @@ linters:
   disable:
   - gochecknoinits
   - godox
+  - gomodguard
   - wsl
   - gomnd
   fast: false
-
-service:
-  golangci-lint-version: 1.23.x

@@ -45,11 +45,6 @@ var ErrWSInInitContext = common.NewInitContextError("using websockets in the ini
 
 type WS struct{}
 
-type pingDelta struct {
-	ping time.Time
-	pong time.Time
-}
-
 type Socket struct {
 	ctx           context.Context
 	conn          *websocket.Conn
@@ -58,12 +53,11 @@ type Socket struct {
 	done          chan struct{}
 	shutdownOnce  sync.Once
 
-	msgSentTimestamps     []time.Time
-	msgReceivedTimestamps []time.Time
-
 	pingSendTimestamps map[string]time.Time
 	pingSendCounter    int
-	pingTimestamps     []pingDelta
+
+	sampleTags    *stats.SampleTags
+	samplesOutput chan<- stats.SampleContainer
 }
 
 type WSHTTPResponse struct {
@@ -177,6 +171,22 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 	connectionEnd := time.Now()
 	connectionDuration := stats.D(connectionEnd.Sub(start))
 
+	if state.Options.SystemTags.Has(stats.TagIP) && conn.RemoteAddr() != nil {
+		if ip, _, err := net.SplitHostPort(conn.RemoteAddr().String()); err == nil {
+			tags["ip"] = ip
+		}
+	}
+
+	if httpResponse != nil {
+		if state.Options.SystemTags.Has(stats.TagStatus) {
+			tags["status"] = strconv.Itoa(httpResponse.StatusCode)
+		}
+
+		if state.Options.SystemTags.Has(stats.TagSubproto) {
+			tags["subproto"] = httpResponse.Header.Get("Sec-WebSocket-Protocol")
+		}
+	}
+
 	socket := Socket{
 		ctx:                ctx,
 		conn:               conn,
@@ -184,13 +194,18 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 		pingSendTimestamps: make(map[string]time.Time),
 		scheduled:          make(chan goja.Callable),
 		done:               make(chan struct{}),
+		samplesOutput:      state.Samples,
+		sampleTags:         stats.IntoSampleTags(&tags),
 	}
 
-	if state.Options.SystemTags.Has(stats.TagIP) && conn.RemoteAddr() != nil {
-		if ip, _, err := net.SplitHostPort(conn.RemoteAddr().String()); err == nil {
-			tags["ip"] = ip
-		}
-	}
+	stats.PushIfNotDone(ctx, state.Samples, stats.ConnectedSamples{
+		Samples: []stats.Sample{
+			{Metric: metrics.WSSessions, Time: start, Tags: socket.sampleTags, Value: 1},
+			{Metric: metrics.WSConnecting, Time: start, Tags: socket.sampleTags, Value: connectionDuration},
+		},
+		Tags: socket.sampleTags,
+		Time: start,
+	})
 
 	if connErr != nil {
 		// Pass the error to the user script before exiting immediately
@@ -212,13 +227,6 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 	wsResponse.URL = url
 
 	defer func() { _ = conn.Close() }()
-
-	if state.Options.SystemTags.Has(stats.TagStatus) {
-		tags["status"] = strconv.Itoa(httpResponse.StatusCode)
-	}
-	if state.Options.SystemTags.Has(stats.TagSubproto) {
-		tags["subproto"] = httpResponse.Header.Get("Sec-WebSocket-Protocol")
-	}
 
 	// The connection is now open, emit the event
 	socket.handleEvent("open")
@@ -263,7 +271,12 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 			socket.handleEvent("pong")
 
 		case readData := <-readDataChan:
-			socket.msgReceivedTimestamps = append(socket.msgReceivedTimestamps, time.Now())
+			stats.PushIfNotDone(ctx, socket.samplesOutput, stats.Sample{
+				Metric: metrics.WSMessagesReceived,
+				Time:   time.Now(),
+				Tags:   socket.sampleTags,
+				Value:  1,
+			})
 			socket.handleEvent("message", rt.ToValue(string(readData)))
 
 		case readErr := <-readErrChan:
@@ -287,44 +300,12 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 			end := time.Now()
 			sessionDuration := stats.D(end.Sub(start))
 
-			sampleTags := stats.IntoSampleTags(&tags)
-
-			stats.PushIfNotDone(ctx, state.Samples, stats.ConnectedSamples{
-				Samples: []stats.Sample{
-					{Metric: metrics.WSSessions, Time: start, Tags: sampleTags, Value: 1},
-					{Metric: metrics.WSConnecting, Time: start, Tags: sampleTags, Value: connectionDuration},
-					{Metric: metrics.WSSessionDuration, Time: start, Tags: sampleTags, Value: sessionDuration},
-				},
-				Tags: sampleTags,
-				Time: start,
+			stats.PushIfNotDone(ctx, state.Samples, stats.Sample{
+				Metric: metrics.WSSessionDuration,
+				Tags:   socket.sampleTags,
+				Time:   start,
+				Value:  sessionDuration,
 			})
-
-			for _, msgSentTimestamp := range socket.msgSentTimestamps {
-				stats.PushIfNotDone(ctx, state.Samples, stats.Sample{
-					Metric: metrics.WSMessagesSent,
-					Time:   msgSentTimestamp,
-					Tags:   sampleTags,
-					Value:  1,
-				})
-			}
-
-			for _, msgReceivedTimestamp := range socket.msgReceivedTimestamps {
-				stats.PushIfNotDone(ctx, state.Samples, stats.Sample{
-					Metric: metrics.WSMessagesReceived,
-					Time:   msgReceivedTimestamp,
-					Tags:   sampleTags,
-					Value:  1,
-				})
-			}
-
-			for _, pingDelta := range socket.pingTimestamps {
-				stats.PushIfNotDone(ctx, state.Samples, stats.Sample{
-					Metric: metrics.WSPing,
-					Time:   pingDelta.pong,
-					Tags:   sampleTags,
-					Value:  stats.D(pingDelta.pong.Sub(pingDelta.ping)),
-				})
-			}
 
 			return wsResponse, nil
 		}
@@ -357,7 +338,12 @@ func (s *Socket) Send(message string) {
 		s.handleEvent("error", rt.ToValue(err))
 	}
 
-	s.msgSentTimestamps = append(s.msgSentTimestamps, time.Now())
+	stats.PushIfNotDone(s.ctx, s.samplesOutput, stats.Sample{
+		Metric: metrics.WSMessagesSent,
+		Time:   time.Now(),
+		Tags:   s.sampleTags,
+		Value:  1,
+	})
 }
 
 func (s *Socket) Ping() {
@@ -386,7 +372,12 @@ func (s *Socket) trackPong(pingID string) {
 	}
 	pingTimestamp := s.pingSendTimestamps[pingID]
 
-	s.pingTimestamps = append(s.pingTimestamps, pingDelta{pingTimestamp, pongTimestamp})
+	stats.PushIfNotDone(s.ctx, s.samplesOutput, stats.Sample{
+		Metric: metrics.WSPing,
+		Time:   pongTimestamp,
+		Tags:   s.sampleTags,
+		Value:  stats.D(pongTimestamp.Sub(pingTimestamp)),
+	})
 }
 
 func (s *Socket) SetTimeout(fn goja.Callable, timeoutMs int) {
