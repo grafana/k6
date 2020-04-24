@@ -192,7 +192,7 @@ func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple
 	index.goTo(fromVUs)
 	var steps = make([]lib.ExecutionStep, 0, vlvc.precalculateTheRequiredSteps(et, zeroEnd))
 	// Reserve the scaled StartVUs at the beginning
-	steps = append(steps, lib.ExecutionStep{TimeOffset: 0, PlannedVUs: uint64(index.local)})
+	steps = append(steps, lib.ExecutionStep{TimeOffset: 0, PlannedVUs: uint64(index.scaled)})
 	addStep := func(step lib.ExecutionStep) {
 		if steps[len(steps)-1].PlannedVUs != step.PlannedVUs {
 			steps = append(steps, step)
@@ -210,31 +210,29 @@ func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple
 		}
 		if stageDuration == 0 {
 			index.goTo(stageEndVUs)
-			addStep(lib.ExecutionStep{TimeOffset: timeTillEnd, PlannedVUs: uint64(index.local)})
+			addStep(lib.ExecutionStep{TimeOffset: timeTillEnd, PlannedVUs: uint64(index.scaled)})
 			fromVUs = stageEndVUs
 			continue
 		}
 
-		if index.global > stageEndVUs { // ramp down
+		if index.unscaled > stageEndVUs { // ramp down
 			// here we don't want to emit for the equal to stageEndVUs as it doesn't go below it
 			// it will just go to it
-			for ; index.global > stageEndVUs; index.prev() {
+			for ; index.unscaled > stageEndVUs; index.prev() {
 				// VU reservation for gracefully ramping down is handled as a
 				// separate method: reserveVUsForGracefulRampDowns()
 				addStep(lib.ExecutionStep{
-					TimeOffset: timeTillEnd - time.Duration(int64(stageDuration)*(stageEndVUs-index.global+1)/stageVUDiff),
-					PlannedVUs: uint64(index.local - 1),
+					TimeOffset: timeTillEnd - time.Duration(int64(stageDuration)*(stageEndVUs-index.unscaled+1)/stageVUDiff),
+					PlannedVUs: uint64(index.scaled - 1),
 				})
 			}
 		} else {
-			// here we want the emit for the last one as this case it actually should emit that
-			// we start it
-			for ; index.global <= stageEndVUs; index.next() {
+			for ; index.unscaled <= stageEndVUs; index.next() {
 				// VU reservation for gracefully ramping down is handled as a
 				// separate method: reserveVUsForGracefulRampDowns()
 				addStep(lib.ExecutionStep{
-					TimeOffset: timeTillEnd - time.Duration(int64(stageDuration)*(stageEndVUs-index.global)/stageVUDiff),
-					PlannedVUs: uint64(index.local),
+					TimeOffset: timeTillEnd - time.Duration(int64(stageDuration)*(stageEndVUs-index.unscaled)/stageVUDiff),
+					PlannedVUs: uint64(index.scaled),
 				})
 			}
 		}
@@ -249,46 +247,46 @@ func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple
 }
 
 type segmentedIndex struct { // TODO: rename ... although this is probably the best name so far :D
-	start, lcd    int64
-	offsets       []int64
-	local, global int64
+	start, lcd       int64
+	offsets          []int64
+	scaled, unscaled int64
 }
 
 func (s *segmentedIndex) next() {
-	if s.local == 0 {
-		s.global += s.start + 1
+	if s.scaled == 0 {
+		s.unscaled += s.start + 1
 	} else {
-		s.global += s.offsets[int(s.local-1)%len(s.offsets)]
+		s.unscaled += s.offsets[int(s.scaled-1)%len(s.offsets)]
 	}
-	s.local++
+	s.scaled++
 }
 
 func (s *segmentedIndex) prev() {
-	if s.local == 1 {
-		s.global -= s.start + 1
+	if s.scaled == 1 {
+		s.unscaled -= s.start + 1
 	} else {
-		s.global -= s.offsets[int(s.local-2)%len(s.offsets)]
+		s.unscaled -= s.offsets[int(s.scaled-2)%len(s.offsets)]
 	}
-	s.local--
+	s.scaled--
 }
 
 func (s *segmentedIndex) goTo(value int64) { // TODO optimize
 	var gi int64
-	s.local = (value / s.lcd) * int64(len(s.offsets))
-	s.global = s.local / int64(len(s.offsets)) * s.lcd // TODO optimize ?
+	s.scaled = (value / s.lcd) * int64(len(s.offsets))
+	s.unscaled = s.scaled / int64(len(s.offsets)) * s.lcd // TODO optimize ?
 	i := s.start
 	for ; i < value%s.lcd; gi, i = gi+1, i+s.offsets[gi] {
-		s.local++
+		s.scaled++
 	}
 
 	if gi > 0 {
-		s.global += i - s.offsets[gi-1]
-	} else if s.local > 0 {
-		s.global -= s.offsets[len(s.offsets)-1] - s.start
+		s.unscaled += i - s.offsets[gi-1]
+	} else if s.scaled > 0 {
+		s.unscaled -= s.offsets[len(s.offsets)-1] - s.start
 	}
 
-	if s.local > 0 {
-		s.global++ // this is to fix the fact it starts from 0
+	if s.scaled > 0 {
+		s.unscaled++ // this is to fix the fact it starts from 0
 	}
 }
 
