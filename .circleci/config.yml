@@ -21,6 +21,43 @@ jobs:
             dep check
 
 
+  lint:
+    docker:
+      - image: circleci/golang:1.14
+    environment:
+      GOPATH: /home/circleci/.go_workspace
+      GOLANGCI_VERSION: v1.25.0
+    working_directory: /home/circleci/.go_workspace/src/github.com/loadimpact/k6
+    steps:
+      # Workaround for custom env vars not available in cache keys
+      # https://discuss.circleci.com/t/cannot-use-circle-yml-environment-variables-in-cache-keys/10994/8
+      - run: echo $GOLANGCI_VERSION > /tmp/.golangci.version
+      - restore_cache:
+          name: Restore golangci-lint cache
+          key: golangci-lint-{{ arch }}-{{ checksum "/tmp/.golangci.version" }}-{{ .Environment.CACHE_VERSION }}
+          paths:
+            - /home/circleci/.go_workspace/bin/golangci-lint
+      - run:
+          name: Install golangci-lint
+          command: |
+            export PATH="$GOPATH/bin:$PATH"
+            command -v golangci-lint && exit
+            GO111MODULE=on go get github.com/golangci/golangci-lint/cmd/golangci-lint@$GOLANGCI_VERSION
+      - save_cache:
+          name: Save golangci-lint cache
+          key: golangci-lint-{{ arch }}-{{ checksum "/tmp/.golangci.version" }}-{{ .Environment.CACHE_VERSION }}
+          paths:
+            - /home/circleci/.go_workspace/bin/golangci-lint
+      - checkout
+      - run:
+          name: Run golangci-lint
+          command: |
+            export PATH="$GOPATH/bin:$PATH"
+            basecommit=$(git log --first-parent --pretty=format:'%H %D' | egrep '/(master|new-schedulers)' | head -1 | cut -d' ' -f1)
+            echo "basecommit=$basecommit"
+            golangci-lint run --out-format=tab --new-from-rev "$basecommit" ./...
+
+
   test:
     docker:
       - image: circleci/golang:1.14
@@ -152,6 +189,8 @@ jobs:
             curl --fail -H "X-GPG-PASSPHRASE: $GPG_PASSPHRASE" -T dist/k6-v$VERSION-amd64.deb "https://$BINTRAY_USER:$BINTRAY_KEY@api.bintray.com/content/loadimpact/deb/k6/$VERSION/k6-v$VERSION-amd64.deb;deb_distribution=stable;deb_component=main;deb_architecture=amd64;publish=1;override=1"
             # Publishing rpm
             curl --fail -H "X-GPG-PASSPHRASE: $GPG_PASSPHRASE" -T dist/k6-v$VERSION-amd64.rpm "https://$BINTRAY_USER:$BINTRAY_KEY@api.bintray.com/content/loadimpact/rpm/k6/$VERSION/k6-v$VERSION-amd64.rpm?publish=1&override=1"
+
+
 workflows:
   version: 2
   test_and_build:
@@ -160,6 +199,7 @@ workflows:
           filters:
             tags:
               only: /.*/
+      - lint
       - test:
           filters:
             tags:
@@ -171,6 +211,7 @@ workflows:
       - build-docker-images:
           requires:
             - deps
+            - lint
             - test
           filters:
             tags:
@@ -178,6 +219,7 @@ workflows:
       - build-linux-packages:
           requires:
             - deps
+            - lint
             - test
           filters:
             branches:
