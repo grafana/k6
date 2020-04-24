@@ -292,29 +292,28 @@ func (varr VariableArrivalRate) Run(ctx context.Context, out chan<- stats.Sample
 	maxArrivalRatePerSec, _ := getArrivalRatePerSec(getScaledArrivalRate(segment, maxUnscaledRate, timeUnit)).Float64()
 	startTickerPeriod := getTickerPeriod(startArrivalRate)
 
-	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(ctx, duration, gracefulStop)
-	defer cancel()
-
 	// Make sure the log and the progress bar have accurate information
 	varr.logger.WithFields(logrus.Fields{
 		"maxVUs": maxVUs, "preAllocatedVUs": preAllocatedVUs, "duration": duration, "numStages": len(varr.config.Stages),
 		"startTickerPeriod": startTickerPeriod.Duration, "type": varr.config.GetType(),
 	}).Debug("Starting executor run...")
 
+	activeVUsWg := &sync.WaitGroup{}
+	defer activeVUsWg.Wait()
+
+	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(ctx, duration, gracefulStop)
+	defer cancel()
+
 	// Pre-allocate the VUs local shared buffer
 	activeVUs := make(chan lib.ActiveVU, maxVUs)
 	activeVUsCount := uint64(0)
-	// Make sure we put planned and unplanned VUs back in the global buffer
+	// Make sure all VUs aren't executing iterations anymore, for the cancel()
+	// above to deactivate them.
 	defer func() {
-		currActiveVUs := atomic.LoadUint64(&activeVUsCount)
-		for i := uint64(0); i < currActiveVUs; i++ {
-			vu := <-activeVUs
-			varr.executionState.ReturnVU(vu.(lib.InitializedVU), false)
+		for i := uint64(0); i < activeVUsCount; i++ {
+			<-activeVUs
 		}
 	}()
-
-	activeVUsWg := &sync.WaitGroup{}
-	defer activeVUsWg.Wait()
 
 	activateVU := func(initVU lib.InitializedVU) lib.ActiveVU {
 		activeVUsWg.Add(1)
@@ -377,10 +376,7 @@ func (varr VariableArrivalRate) Run(ctx context.Context, out chan<- stats.Sample
 	regDurationDone := regDurationCtx.Done()
 	runIterationBasic := getIterationRunner(varr.executionState, varr.logger)
 	runIteration := func(vu lib.ActiveVU) {
-		ctx, cancel := context.WithCancel(maxDurationCtx)
-		defer cancel()
-
-		runIterationBasic(ctx, vu)
+		runIterationBasic(maxDurationCtx, vu)
 		activeVUs <- vu
 	}
 
