@@ -53,5 +53,6 @@ linters:
   disable:
   - gochecknoinits
   - godox
+  - gomodguard
   - wsl
   fast: false
