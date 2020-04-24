@@ -957,53 +957,6 @@ func TestVUIntegrationTLSConfig(t *testing.T) {
 	}
 }
 
-func TestVUIntegrationHTTP2(t *testing.T) {
-	r1, err := getSimpleRunner("/script.js", `
-			import http from "k6/http";
-			export default function() {
-				let res = http.request("GET", "https://http2.akamai.com/demo");
-				if (res.status != 200) { throw new Error("wrong status: " + res.status) }
-				if (res.proto != "HTTP/2.0") { throw new Error("wrong proto: " + res.proto) }
-			}
-		`)
-	if !assert.NoError(t, err) {
-		return
-	}
-	require.NoError(t, r1.SetOptions(lib.Options{
-		Throw:      null.BoolFrom(true),
-		SystemTags: stats.NewSystemTagSet(stats.TagProto),
-	}))
-
-	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{})
-	if !assert.NoError(t, err) {
-		return
-	}
-
-	runners := map[string]*Runner{"Source": r1, "Archive": r2}
-	for name, r := range runners {
-		t.Run(name, func(t *testing.T) {
-			samples := make(chan stats.SampleContainer, 100)
-			vu, err := r.NewVU(samples)
-			if !assert.NoError(t, err) {
-				return
-			}
-			err = vu.RunOnce(context.Background())
-			assert.NoError(t, err)
-
-			protoFound := false
-			for _, sampleC := range stats.GetBufferedSamples(samples) {
-				for _, sample := range sampleC.GetSamples() {
-					if proto, ok := sample.Tags.Get("proto"); ok {
-						protoFound = true
-						assert.Equal(t, "HTTP/2.0", proto)
-					}
-				}
-			}
-			assert.True(t, protoFound)
-		})
-	}
-}
-
 func TestVUIntegrationOpenFunctionError(t *testing.T) {
 	r, err := getSimpleRunner("/script.js", `
 			export default function() { open("/tmp/foo") }

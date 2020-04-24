@@ -8,7 +8,7 @@ import (
 )
 
 // Version contains the current semantic version of k6.
-var Version = "0.26.1" //nolint:gochecknoglobals
+var Version = "0.26.2" //nolint:gochecknoglobals
 
 // VersionDetails can be set externally as part of the build process
 var VersionDetails = "" // nolint:gochecknoglobals

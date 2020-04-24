@@ -1337,7 +1337,7 @@ func (e *compiledObjectLiteral) emitGetter(putOnStack bool) {
 		e.c.compileExpression(prop.Value).emitGetter(true)
 		switch prop.Kind {
 		case "value":
-			if prop.Key == "__proto__" {
+			if prop.Key == __proto__ {
 				e.c.emit(setProto)
 			} else {
 				e.c.emit(setProp1(prop.Key))

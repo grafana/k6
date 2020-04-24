@@ -35,15 +35,39 @@ func (f *nativeFuncObject) exportType() reflect.Type {
 	return reflect.TypeOf(f.f)
 }
 
-func (f *funcObject) getPropStr(name string) Value {
-	switch name {
-	case "prototype":
+func (f *funcObject) _addProto(n string) Value {
+	if n == "prototype" {
 		if _, exists := f.values["prototype"]; !exists {
 			return f.addPrototype()
 		}
 	}
+	return nil
+}
+
+func (f *funcObject) getPropStr(name string) Value {
+	if v := f._addProto(name); v != nil {
+		return v
+	}
 
 	return f.baseObject.getPropStr(name)
+}
+
+func (f *funcObject) putStr(name string, val Value, throw bool) {
+	f._addProto(name)
+	f.baseObject.putStr(name, val, throw)
+}
+
+func (f *funcObject) put(n Value, val Value, throw bool) {
+	f.putStr(n.String(), val, throw)
+}
+
+func (f *funcObject) deleteStr(name string, throw bool) bool {
+	f._addProto(name)
+	return f.baseObject.deleteStr(name, throw)
+}
+
+func (f *funcObject) delete(n Value, throw bool) bool {
+	return f.deleteStr(n.String(), throw)
 }
 
 func (f *funcObject) addPrototype() Value {
