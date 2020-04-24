@@ -225,7 +225,7 @@ func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple
 				// VU reservation for gracefully ramping down is handled as a
 				// separate method: reserveVUsForGracefulRampDowns()
 				addStep(lib.ExecutionStep{
-					TimeOffset: timeTillEnd - time.Duration(int64(stageDuration)*(stageEndVUs-index.global)/stageVUDiff),
+					TimeOffset: timeTillEnd - time.Duration(int64(stageDuration)*(stageEndVUs-index.global+1)/stageVUDiff),
 					PlannedVUs: uint64(index.local - 1),
 				})
 			}
