@@ -213,13 +213,14 @@ func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple
 			continue
 		}
 
+		// VU reservation for gracefully ramping down is handled as a
+		// separate method: reserveVUsForGracefulRampDowns()
 		if index.unscaled > stageEndVUs { // ramp down
 			// here we don't want to emit for the equal to stageEndVUs as it doesn't go below it
 			// it will just go to it
 			for ; index.unscaled > stageEndVUs; index.prev() {
-				// VU reservation for gracefully ramping down is handled as a
-				// separate method: reserveVUsForGracefulRampDowns()
-				addStep( // this is the time that we should go up 1 if we are ramping up
+				addStep(
+					// this is the time that we should go up 1 if we are ramping up
 					// but we are ramping down so we should go 1 down, but because we want to not
 					// stop VUs immediately we stop it on the next unscaled VU's time
 					timeTillEnd-time.Duration(int64(stageDuration)*(stageEndVUs-index.unscaled+1)/stageVUDiff),
@@ -228,8 +229,6 @@ func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple
 			}
 		} else {
 			for ; index.unscaled <= stageEndVUs; index.next() {
-				// VU reservation for gracefully ramping down is handled as a
-				// separate method: reserveVUsForGracefulRampDowns()
 				addStep(
 					timeTillEnd-time.Duration(int64(stageDuration)*(stageEndVUs-index.unscaled)/stageVUDiff),
 					uint64(index.scaled),
@@ -249,44 +248,63 @@ func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple
 type segmentedIndex struct { // TODO: rename ... although this is probably the best name so far :D
 	start, lcd       int64
 	offsets          []int64
-	scaled, unscaled int64
+	scaled, unscaled int64 // for both the first element(vu) is 1 not 0
 }
 
+// goes to the next scaled index and move the unscaled one accordingly
 func (s *segmentedIndex) next() {
-	if s.scaled == 0 {
-		s.unscaled += s.start + 1
-	} else {
-		s.unscaled += s.offsets[int(s.scaled-1)%len(s.offsets)]
+	if s.scaled == 0 { // the 1 element(VU) is at the start
+		s.unscaled += s.start + 1 // the first element of the start 0, but the here we need it to be 1 so we add 1
+	} else { // if we are not at the first element we need to go through the offsets, looping over them
+		s.unscaled += s.offsets[int(s.scaled-1)%len(s.offsets)] // slice's index start at 0 ours start at 1
 	}
 	s.scaled++
 }
 
+// prev goest to the previous scaled value and sets the unscaled one accordingly
+// calling prev when s.scaled == 0 is undefined
 func (s *segmentedIndex) prev() {
-	if s.scaled == 1 {
-		s.unscaled -= s.start + 1
-	} else {
-		s.unscaled -= s.offsets[int(s.scaled-2)%len(s.offsets)]
+	if s.scaled == 1 { // we are the first need to go to the 0th element which means we need to remove the start
+		s.unscaled -= s.start + 1 // this could've been just settign to 0
+	} else { // not at the first element - need to get the previously added offset so
+		s.unscaled -= s.offsets[int(s.scaled-2)%len(s.offsets)] // slice's index start 0 our start at 1
 	}
 	s.scaled--
 }
 
+// goTo sets the scaled index to it's biggest value for which the corresponding unscaled index is
+// is smaller or equal to value
 func (s *segmentedIndex) goTo(value int64) int64 { // TODO optimize
 	var gi int64
-	s.scaled = (value / s.lcd) * int64(len(s.offsets))
-	s.unscaled = s.scaled / int64(len(s.offsets)) * s.lcd // TODO optimize ?
+	// Because of the cyclical nature of the striping algorithm (with a cycle
+	// length of LCD, the least common denominator), when scaling large values
+	// (i.e. many multiples of the LCD), we can quickly calculate how many times
+	// the cycle repeats.
+	wholeCycles := (value / s.lcd)
+	// So we can set some approximate initial values quickly, since we also know
+	// precisely how many scaled values there are per cycle length.
+	s.scaled = wholeCycles * int64(len(s.offsets))
+	s.unscaled = wholeCycles*s.lcd + s.start + 1 // our indexes are from 1 the start is from 0
+	// Approach the final value using the slow algorithm with the step by step loop
+	// TODO: this can be optimized by another array with size offsets that instead of the offsets
+	// from the previous is the offset from either 0 or start
 	i := s.start
 	for ; i < value%s.lcd; gi, i = gi+1, i+s.offsets[gi] {
 		s.scaled++
+		s.unscaled += s.offsets[gi]
 	}
 
-	if gi > 0 {
-		s.unscaled += i - s.offsets[gi-1]
-	} else if s.scaled > 0 {
-		s.unscaled -= s.offsets[len(s.offsets)-1] - s.start
+	if gi > 0 { // there were more values after the wholecycles
+		// the last offset actually shouldn't have been added
+		s.unscaled -= s.offsets[gi-1]
+	} else if s.scaled > 0 { // we didn't actually have more values after the wholecycles but we still had some
+		// in this case the unscaled value needs to move back by the last offset as it would've been
+		// the one to get it from the value it needs to be to it's current one
+		s.unscaled -= s.offsets[len(s.offsets)-1]
 	}
 
-	if s.scaled > 0 {
-		s.unscaled++ // this is to fix the fact it starts from 0
+	if s.scaled == 0 {
+		s.unscaled = 0 // we would've added the start and 1
 	}
 
 	return s.scaled
