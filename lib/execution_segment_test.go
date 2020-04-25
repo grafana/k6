@@ -1049,7 +1049,7 @@ func TestSegmentedIndex(t *testing.T) {
 
 	t.Run("strange", func(t *testing.T) {
 		t.Parallel()
-		s := SegmentedIndex{start: 1, lcd: 7, offsets: []int64{4, 3}}
+		s := SegmentedIndex{start: 1, lcd: 7, offsets: []int64{4, 3}, jumps: []int64{1, 5}}
 
 		s.Next()
 		assert.EqualValues(t, 2, s.unscaled)
