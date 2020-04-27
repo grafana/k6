@@ -55,5 +55,6 @@ linters:
   - godot
   - godox
   - gomodguard
+  - testpackage
   - wsl
   fast: false
