@@ -1062,23 +1062,28 @@ func TestSumRandomSegmentSequenceMatchesNoSegment(t *testing.T) {
 
 	subtractChildSteps := func(t *testing.T, parent, child []lib.ExecutionStep) {
 		t.Logf("subtractChildSteps()")
-		for i := 0; i < len(child); i++ {
-			t.Logf("	child planned VUs for time offset %s: %d", child[i].TimeOffset, child[i].PlannedVUs)
+		for _, step := range child {
+			t.Logf("	child planned VUs for time offset %s: %d", step.TimeOffset, step.PlannedVUs)
 		}
 		sub := uint64(0)
-		for p, c := 0, 0; p < len(parent); p++ {
-			if parent[p].TimeOffset > child[c].TimeOffset && c != len(child)-1 {
-				t.Errorf("ERR Could not match child offset %s with any parent time offset", child[c].TimeOffset)
+		ci := 0
+		for pi, p := range parent {
+			// We iterate over all parent steps and match them to child steps.
+			// Once we have a match, we remove the child step's plannedVUs from
+			// the parent steps until a new match, when we adjust the subtracted
+			// amount again.
+			if p.TimeOffset > child[ci].TimeOffset && ci != len(child)-1 {
+				t.Errorf("ERR Could not match child offset %s with any parent time offset", child[ci].TimeOffset)
 			}
-			if parent[p].TimeOffset == child[c].TimeOffset {
-				t.Logf("Setting sub to %d at t=%s", child[c].PlannedVUs, child[c].TimeOffset)
-				sub = child[c].PlannedVUs
-				if c != len(child)-1 {
-					c++
+			if p.TimeOffset == child[ci].TimeOffset {
+				t.Logf("Setting sub to %d at t=%s", child[ci].PlannedVUs, child[ci].TimeOffset)
+				sub = child[ci].PlannedVUs
+				if ci != len(child)-1 {
+					ci++
 				}
 			}
-			t.Logf("Subtracting %d VUs (out of %d) at t=%s", sub, parent[p].PlannedVUs, parent[p].TimeOffset)
-			parent[p].PlannedVUs -= sub
+			t.Logf("Subtracting %d VUs (out of %d) at t=%s", sub, p.PlannedVUs, p.TimeOffset)
+			parent[pi].PlannedVUs -= sub
 		}
 	}
 
@@ -1094,8 +1099,8 @@ func TestSumRandomSegmentSequenceMatchesNoSegment(t *testing.T) {
 			require.NoError(t, err)
 			fullRawSteps := c.getRawExecutionSteps(fullSeg, false)
 
-			for j := 0; j < len(fullRawSteps); j++ {
-				t.Logf("original planned VUs for time offset %s: %d", fullRawSteps[j].TimeOffset, fullRawSteps[j].PlannedVUs)
+			for _, step := range fullRawSteps {
+				t.Logf("original planned VUs for time offset %s: %d", step.TimeOffset, step.PlannedVUs)
 			}
 
 			for s := 0; s < len(randomSequence); s++ {
@@ -1105,12 +1110,9 @@ func TestSumRandomSegmentSequenceMatchesNoSegment(t *testing.T) {
 				subtractChildSteps(t, fullRawSteps, segRawSteps)
 			}
 
-			for j := 0; j < len(fullRawSteps); j++ {
-				if fullRawSteps[j].PlannedVUs != 0 {
-					t.Errorf(
-						"ERR Remaining planned VUs for time offset %s are not 0 but %d",
-						fullRawSteps[j].TimeOffset, fullRawSteps[j].PlannedVUs,
-					)
+			for _, step := range fullRawSteps {
+				if step.PlannedVUs != 0 {
+					t.Errorf("ERR Remaining planned VUs for time offset %s are not 0 but %d", step.TimeOffset, step.PlannedVUs)
 				}
 			}
 		})
