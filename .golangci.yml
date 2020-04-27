@@ -52,6 +52,7 @@ linters:
   enable-all: true
   disable:
   - gochecknoinits
+  - godot
   - godox
   - gomodguard
   - wsl
