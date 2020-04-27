@@ -24,6 +24,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/big"
+	"math/rand"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -63,7 +65,7 @@ func TestVariableLoopingVUsRun(t *testing.T) {
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
 	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
-	var ctx, cancel, executor, _ = setupExecutor(
+	ctx, cancel, executor, _ := setupExecutor(
 		t, config, es,
 		simpleRunner(func(ctx context.Context) error {
 			// Sleeping for a weird duration somewhat offset from the
@@ -85,7 +87,7 @@ func TestVariableLoopingVUsRun(t *testing.T) {
 	errCh := make(chan error)
 	go func() { errCh <- executor.Run(ctx, nil) }()
 
-	var result = make([]int64, len(sampleTimes))
+	result := make([]int64, len(sampleTimes))
 	for i, d := range sampleTimes {
 		time.Sleep(d)
 		result[i] = es.GetCurrentlyActiveVUsCount()
@@ -121,7 +123,7 @@ func TestVariableLoopingVUsRampDownNoWobble(t *testing.T) {
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
 	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
-	var ctx, cancel, executor, _ = setupExecutor(
+	ctx, cancel, executor, _ := setupExecutor(
 		t, config, es,
 		simpleRunner(func(ctx context.Context) error {
 			time.Sleep(1 * time.Second)
@@ -139,7 +141,7 @@ func TestVariableLoopingVUsRampDownNoWobble(t *testing.T) {
 	errCh := make(chan error)
 	go func() { errCh <- executor.Run(ctx, nil) }()
 
-	var result = make([]int64, len(sampleTimes)+rampDownSamples)
+	result := make([]int64, len(sampleTimes)+rampDownSamples)
 	for i, d := range sampleTimes {
 		time.Sleep(d)
 		result[i] = es.GetCurrentlyActiveVUsCount()
@@ -1001,4 +1003,118 @@ func TestSegmentedIndex(t *testing.T) {
 		assert.EqualValues(t, 0, s.unscaled)
 		assert.EqualValues(t, 0, s.scaled)
 	})
+}
+
+// TODO: delete in favor of lib.generateRandomSequence() after
+// https://github.com/loadimpact/k6/issues/1302 is done (can't import now due to
+// import loops...)
+func generateRandomSequence(t testing.TB, n, m int64, r *rand.Rand) lib.ExecutionSegmentSequence {
+	var err error
+	ess := lib.ExecutionSegmentSequence(make([]*lib.ExecutionSegment, n))
+	numerators := make([]int64, n)
+	var denominator int64
+	for i := int64(0); i < n; i++ {
+		numerators[i] = 1 + r.Int63n(m)
+		denominator += numerators[i]
+	}
+	from := big.NewRat(0, 1)
+	for i := int64(0); i < n; i++ {
+		to := new(big.Rat).Add(big.NewRat(numerators[i], denominator), from)
+		ess[i], err = lib.NewExecutionSegment(from, to)
+		require.NoError(t, err)
+		from = to
+	}
+
+	return ess
+}
+
+func TestSumRandomSegmentSequenceMatchesNoSegment(t *testing.T) {
+	t.Parallel()
+
+	seed := time.Now().UnixNano()
+	r := rand.New(rand.NewSource(seed))
+	t.Logf("Random source seeded with %d\n", seed)
+
+	const (
+		numTests         = 10
+		maxStages        = 10
+		minStageDuration = 1 * time.Second
+		maxStageDuration = 10 * time.Minute
+		maxVUs           = 300
+		segmentSeqMaxLen = 15
+		maxNumerator     = 300
+	)
+	getTestConfig := func(name string) VariableLoopingVUsConfig {
+		stagesCount := 1 + r.Int31n(maxStages)
+		stages := make([]Stage, stagesCount)
+		for s := int32(0); s < stagesCount; s++ {
+			dur := time.Duration(r.Int63n(int64(maxStageDuration - minStageDuration))).Round(time.Second)
+			stages[s] = Stage{Duration: types.NullDurationFrom(dur), Target: null.IntFrom(r.Int63n(maxVUs))}
+		}
+
+		c := NewVariableLoopingVUsConfig(name)
+		c.GracefulRampDown = types.NullDurationFrom(0)
+		c.GracefulStop = types.NullDurationFrom(0)
+		c.StartVUs = null.IntFrom(r.Int63n(maxVUs))
+		c.Stages = stages
+		return c
+	}
+
+	subtractChildSteps := func(t *testing.T, parent, child []lib.ExecutionStep) {
+		t.Logf("subtractChildSteps()")
+		for _, step := range child {
+			t.Logf("	child planned VUs for time offset %s: %d", step.TimeOffset, step.PlannedVUs)
+		}
+		sub := uint64(0)
+		ci := 0
+		for pi, p := range parent {
+			// We iterate over all parent steps and match them to child steps.
+			// Once we have a match, we remove the child step's plannedVUs from
+			// the parent steps until a new match, when we adjust the subtracted
+			// amount again.
+			if p.TimeOffset > child[ci].TimeOffset && ci != len(child)-1 {
+				t.Errorf("ERR Could not match child offset %s with any parent time offset", child[ci].TimeOffset)
+			}
+			if p.TimeOffset == child[ci].TimeOffset {
+				t.Logf("Setting sub to %d at t=%s", child[ci].PlannedVUs, child[ci].TimeOffset)
+				sub = child[ci].PlannedVUs
+				if ci != len(child)-1 {
+					ci++
+				}
+			}
+			t.Logf("Subtracting %d VUs (out of %d) at t=%s", sub, p.PlannedVUs, p.TimeOffset)
+			parent[pi].PlannedVUs -= sub
+		}
+	}
+
+	for i := 0; i < numTests; i++ {
+		name := fmt.Sprintf("random%02d", i)
+		t.Run(name, func(t *testing.T) {
+			c := getTestConfig(name)
+			ranSeqLen := 2 + r.Int63n(segmentSeqMaxLen-1)
+			t.Logf("Config: %#v, ranSeqLen: %d", c, ranSeqLen)
+			randomSequence := generateRandomSequence(t, ranSeqLen, maxNumerator, r)
+			t.Logf("Random sequence: %s", randomSequence)
+			fullSeg, err := lib.NewExecutionTuple(nil, nil)
+			require.NoError(t, err)
+			fullRawSteps := c.getRawExecutionSteps(fullSeg, false)
+
+			for _, step := range fullRawSteps {
+				t.Logf("original planned VUs for time offset %s: %d", step.TimeOffset, step.PlannedVUs)
+			}
+
+			for s := 0; s < len(randomSequence); s++ {
+				et, err := lib.NewExecutionTuple(randomSequence[s], &randomSequence)
+				require.NoError(t, err)
+				segRawSteps := c.getRawExecutionSteps(et, false)
+				subtractChildSteps(t, fullRawSteps, segRawSteps)
+			}
+
+			for _, step := range fullRawSteps {
+				if step.PlannedVUs != 0 {
+					t.Errorf("ERR Remaining planned VUs for time offset %s are not 0 but %d", step.TimeOffset, step.PlannedVUs)
+				}
+			}
+		})
+	}
 }
