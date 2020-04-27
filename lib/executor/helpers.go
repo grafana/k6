@@ -55,7 +55,7 @@ func getStagesUnscaledMaxTarget(unscaledStartValue int64, stages []Stage) int64 
 // A helper function to avoid code duplication
 func validateStages(stages []Stage) []error {
 	var errors []error
-	if len(stages) == 0 {
+	if len(stages) == 0 { //nolint:nestif
 		errors = append(errors, fmt.Errorf("at least one stage has to be specified"))
 	} else {
 		for i, s := range stages {
