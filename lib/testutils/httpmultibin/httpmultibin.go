@@ -87,6 +87,7 @@ type HTTPMultiBin struct {
 	Mux             *http.ServeMux
 	ServerHTTP      *httptest.Server
 	ServerHTTPS     *httptest.Server
+	ServerHTTP2     *httptest.Server
 	Replacer        *strings.Replacer
 	TLSClientConfig *tls.Config
 	Dialer          *netext.Dialer
@@ -226,6 +227,20 @@ func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 	require.NotNil(t, httpsIP)
 	tlsConfig := GetTLSClientConfig(t, httpsSrv)
 
+	// Initialize the HTTP2 server, with a copy of the https tls config
+	http2Srv := httptest.NewUnstartedServer(mux)
+	err = http2.ConfigureServer(http2Srv.Config, &http2.Server{
+		IdleTimeout: 30,
+	})
+	http2Srv.TLS = &(*tlsConfig) // copy it
+	http2Srv.TLS.NextProtos = []string{http2.NextProtoTLS}
+	require.NoError(t, err)
+	http2Srv.StartTLS()
+	http2URL, err := url.Parse(http2Srv.URL)
+	require.NoError(t, err)
+	http2IP := net.ParseIP(http2URL.Hostname())
+	require.NotNil(t, http2IP)
+
 	// Set up the dialer with shorter timeouts and the custom domains
 	dialer := netext.NewDialer(net.Dialer{
 		Timeout:   2 * time.Second,
@@ -249,6 +264,7 @@ func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 		Mux:         mux,
 		ServerHTTP:  httpSrv,
 		ServerHTTPS: httpsSrv,
+		ServerHTTP2: http2Srv,
 		Replacer: strings.NewReplacer(
 			"HTTPBIN_IP_URL", httpSrv.URL,
 			"HTTPBIN_DOMAIN", httpDomain,
@@ -262,12 +278,19 @@ func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 			"WSSBIN_URL", fmt.Sprintf("wss://%s:%s", httpsDomain, httpsURL.Port()),
 			"HTTPSBIN_IP", httpsIP.String(),
 			"HTTPSBIN_PORT", httpsURL.Port(),
+
+			"HTTP2BIN_IP_URL", http2Srv.URL,
+			"HTTP2BIN_DOMAIN", httpsDomain,
+			"HTTP2BIN_URL", fmt.Sprintf("https://%s:%s", httpsDomain, http2URL.Port()),
+			"HTTP2BIN_IP", http2IP.String(),
+			"HTTP2BIN_PORT", http2URL.Port(),
 		),
 		TLSClientConfig: tlsConfig,
 		Dialer:          dialer,
 		HTTPTransport:   transport,
 		Context:         ctx,
 		Cleanup: func() {
+			http2Srv.Close()
 			httpsSrv.Close()
 			httpSrv.Close()
 			ctxCancel()

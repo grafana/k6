@@ -10,7 +10,7 @@ environment:
   # specific to go
   VERSION: "%APPVEYOR_REPO_TAG_NAME:v=%"
   GOPATH: c:\gopath
-  GOVERSION: 1.14
+  GOVERSION: 1.14.2
   GOMAXPROCS: 2
   CGO_ENABLED: '0'
   GOARCH: amd64

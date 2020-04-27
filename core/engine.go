@@ -317,7 +317,8 @@ func (e *Engine) emitMetrics() {
 	t := time.Now()
 
 	executionState := e.ExecutionScheduler.GetState()
-	e.Samples <- stats.ConnectedSamples{
+	// TODO: optimize and move this, it shouldn't call processSamples() directly
+	e.processSamples([]stats.SampleContainer{stats.ConnectedSamples{
 		Samples: []stats.Sample{
 			{
 				Time:   t,
@@ -333,7 +334,7 @@ func (e *Engine) emitMetrics() {
 		},
 		Tags: e.Options.RunTags,
 		Time: t,
-	}
+	}})
 }
 
 func (e *Engine) processThresholds() (shouldAbort bool) {

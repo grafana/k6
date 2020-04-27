@@ -28,7 +28,7 @@
 This is how load testing should look in the 21st century.
 
 <p align="center">
-  <img width="600" src="https://cdn.rawgit.com/loadimpact/k6/master/demo.svg">
+  <img width="600" src="./assets/k6-demo.gif">
 </p>
 
 Menu
@@ -200,7 +200,7 @@ As shown above, there are several ways to configure the number of simultaneous v
 - Set the test duration by the `--duration`/`-d` CLI flag (or the `K6_DURATION` environment variable and the `duration` script/JSON option). For ease of use, `duration` is specified with human readable values like `1h30m10s` - `k6 run --duration 30s script.js`, `k6 cloud -d 15m10s script.js`, `export K6_DURATION=1h`, etc. If set to `0`, k6 wouldn't stop executing the script unless the user manually stops it.
 - Set the total number of script iterations with the `--iterations`/`-i` CLI flag (or the `K6_ITERATIONS` environment variable and the `iterations` script/JSON option). k6 will stop executing the script whenever the **total** number of iterations (i.e. the number of iterations across all VUs) reaches the specified number. So if you have `k6 run --iterations 10 --vus 10 script.js`, then each VU would make only a single iteration.
 
-For more complex cases, you can specify execution stages. They are a combination of `duration,target-VUs` pairs. These pairs instruct k6 to linearly ramp up, ramp down, or stay at the number of VUs specified for the period specified. Execution stages can be set via the `stages` script/JSON option as an array of `{ duration: ..., target: ... }` pairs, or with the `--stage`/`-s` CLI flags and the `K6_STAGE` environment variable via the `duration:target,duration:target...` syntax.
+For more complex cases, you can specify execution stages. They are a combination of `duration,target-VUs` pairs. These pairs instruct k6 to linearly ramp up, ramp down, or stay at the number of VUs specified for the period specified. Execution stages can be set via the `stages` script/JSON option as an array of `{ duration: ..., target: ... }` pairs, or with the `--stage`/`-s` CLI flags and the `K6_STAGES` environment variable via the `duration:target,duration:target...` syntax.
 
 For example, the following options would have k6 linearly ramping up from 5 to 10 VUs over the period of 3 minutes (k6 starts with `vus` number of VUs, or 1 by default), then staying flat at 10 VUs for 5 minutes, then ramping up from 10 to 35 VUs over the next 10 minutes before finally ramping down to 0 VUs for another 90 seconds.
 
@@ -215,7 +215,7 @@ export let options = {
     ]
 };
 ```
-Alternatively, you can use the CLI flags `--vus 5 --stage 3m:10,5m:10,10m:35,1m30s:0` or set the environment variables `K6_VUS=5 K6_STAGE="3m:10,5m:10,10m:35,1m30s:0"` to achieve the same results.
+Alternatively, you can use the CLI flags `--vus 5 --stage 3m:10,5m:10,10m:35,1m30s:0` or set the environment variables `K6_VUS=5 K6_STAGES="3m:10,5m:10,10m:35,1m30s:0"` to achieve the same results.
 
 For a complete list of supported k6 options, refer to the documentation at [k6.io/docs/using-k6/options](https://k6.io/docs/using-k6/options).
 
