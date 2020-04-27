@@ -197,6 +197,7 @@ func (r *Runner) newVU(id int64, samplesOut chan<- stats.SampleContainer) (*VU, 
 		Console:        r.console,
 		BPool:          bpool.NewBufferPool(100),
 		Samples:        samplesOut,
+		runMutex:       sync.Mutex{},
 	}
 	vu.Runtime.Set("__VU", vu.ID)
 	vu.Runtime.Set("console", common.Bind(vu.Runtime, vu.Console, vu.Context))
@@ -367,6 +368,7 @@ type VU struct {
 
 	Samples chan<- stats.SampleContainer
 
+	runMutex  sync.Mutex
 	setupData goja.Value
 }
 
@@ -376,7 +378,6 @@ var _ lib.InitializedVU = &VU{}
 
 // ActiveVU holds a VU and its activation parameters
 type ActiveVU struct {
-	runMutex *sync.Mutex
 	*VU
 	*lib.VUActivationParams
 }
@@ -394,7 +395,7 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 		}
 	}()
 
-	return &ActiveVU{&sync.Mutex{}, u, params}
+	return &ActiveVU{u, params}
 }
 
 // RunOnce runs the default function once.
