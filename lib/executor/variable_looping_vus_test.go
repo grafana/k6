@@ -1048,7 +1048,7 @@ func TestSumRandomSegmentSequenceMatchesNoSegment(t *testing.T) {
 		stagesCount := 1 + r.Int31n(maxStages)
 		stages := make([]Stage, stagesCount)
 		for s := int32(0); s < stagesCount; s++ {
-			dur := time.Duration(r.Int63n(int64(maxStageDuration - minStageDuration))).Round(time.Second)
+			dur := (minStageDuration + time.Duration(r.Int63n(int64(maxStageDuration-minStageDuration)))).Round(time.Second)
 			stages[s] = Stage{Duration: types.NullDurationFrom(dur), Target: null.IntFrom(r.Int63n(maxVUs))}
 		}
 
