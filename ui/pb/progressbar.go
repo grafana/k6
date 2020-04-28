@@ -245,7 +245,7 @@ func (pb *ProgressBar) Render(maxLeft, widthDelta int) ProgressBarRender {
 	width := Clampf(float64(pb.width+widthDelta), minWidth, DefaultWidth)
 	pb.width = int(width)
 
-	if pb.width > minWidth {
+	if pb.width > minWidth { //nolint:nestif
 		space := pb.width - 2
 		filled := int(float64(space) * progress)
 
