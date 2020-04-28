@@ -237,6 +237,7 @@ func TestExecutionTupleScale(t *testing.T) {
 	require.Equal(t, int64(1), et.ScaleInt64(2))
 	require.Equal(t, int64(1), et.ScaleInt64(3))
 }
+
 func TestBigScale(t *testing.T) {
 	es := new(ExecutionSegment)
 	ess, err := NewExecutionSegmentSequenceFromString("0,7/20,7/10,1")
@@ -431,29 +432,24 @@ func TestExecutionSegmentStringSequences(t *testing.T) {
 
 // Return a randomly distributed sequence of n amount of
 // execution segments whose length totals 1.
-func generateRandomSequence(n int64, r *rand.Rand) (ExecutionSegmentSequence, error) {
+func generateRandomSequence(t testing.TB, n, m int64, r *rand.Rand) ExecutionSegmentSequence {
 	var err error
-	var ess = ExecutionSegmentSequence(make([]*ExecutionSegment, n))
-	var numerators = make([]int64, n)
+	ess := ExecutionSegmentSequence(make([]*ExecutionSegment, n))
+	numerators := make([]int64, n)
 	var denominator int64
 	for i := int64(0); i < n; i++ {
-		for numerators[i] == 0 {
-			numerators[i] = r.Int63n(n)
-			denominator += numerators[i]
-		}
+		numerators[i] = 1 + r.Int63n(m)
+		denominator += numerators[i]
 	}
-	ess[0], err = NewExecutionSegment(big.NewRat(0, 1), big.NewRat(numerators[0], denominator))
-	if err != nil {
-		return nil, err
-	}
-	for i := int64(1); i < n; i++ {
-		ess[i], err = NewExecutionSegment(ess[i-1].to, new(big.Rat).Add(big.NewRat(numerators[i], denominator), ess[i-1].to))
-		if err != nil {
-			return nil, err
-		}
+	from := big.NewRat(0, 1)
+	for i := int64(0); i < n; i++ {
+		to := new(big.Rat).Add(big.NewRat(numerators[i], denominator), from)
+		ess[i], err = NewExecutionSegment(from, to)
+		require.NoError(t, err)
+		from = to
 	}
 
-	return ess, nil
+	return ess
 }
 
 // Ensure that the sum of scaling all execution segments in
@@ -468,8 +464,7 @@ func TestExecutionSegmentScaleConsistency(t *testing.T) {
 	const numTests = 10
 	for i := 0; i < numTests; i++ {
 		scale := rand.Int31n(99) + 2
-		seq, err := generateRandomSequence(r.Int63n(9)+2, r)
-		require.NoError(t, err)
+		seq := generateRandomSequence(t, r.Int63n(9)+2, 100, r)
 
 		t.Run(fmt.Sprintf("%d_%s", scale, seq), func(t *testing.T) {
 			var total int64
@@ -493,8 +488,7 @@ func TestExecutionTupleScaleConsistency(t *testing.T) {
 	const numTests = 10
 	for i := 0; i < numTests; i++ {
 		scale := rand.Int31n(99) + 2
-		seq, err := generateRandomSequence(r.Int63n(9)+2, r)
-		require.NoError(t, err)
+		seq := generateRandomSequence(t, r.Int63n(9)+2, 200, r)
 
 		et, err := NewExecutionTuple(seq[0], &seq)
 		require.NoError(t, err)
@@ -534,8 +528,7 @@ func TestExecutionSegmentScaleNoWobble(t *testing.T) {
 	// Random segments
 	const numTests = 10
 	for i := 0; i < numTests; i++ {
-		seq, err := generateRandomSequence(r.Int63n(9)+2, r)
-		require.NoError(t, err)
+		seq := generateRandomSequence(t, r.Int63n(9)+2, 100, r)
 
 		es := seq[rand.Intn(len(seq))]
 
@@ -628,15 +621,14 @@ func TestSequenceLCD(t *testing.T) {
 }
 
 func BenchmarkGetStripedOffsets(b *testing.B) {
-	var lengths = [...]int64{10, 100}
+	lengths := [...]int64{10, 100}
 	const seed = 777
 	r := rand.New(rand.NewSource(seed))
 
 	for _, length := range lengths {
 		length := length
 		b.Run(fmt.Sprintf("length%d,seed%d", length, seed), func(b *testing.B) {
-			sequence, err := generateRandomSequence(length, r)
-			require.NoError(b, err)
+			sequence := generateRandomSequence(b, length, 100, r)
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				segment := sequence[int(r.Int63())%len(sequence)]
@@ -649,11 +641,11 @@ func BenchmarkGetStripedOffsets(b *testing.B) {
 }
 
 func BenchmarkGetStripedOffsetsEven(b *testing.B) {
-	var lengths = [...]int64{10, 100, 1000}
+	lengths := [...]int64{10, 100, 1000}
 	generateSequence := func(n int64) ExecutionSegmentSequence {
 		var err error
-		var ess = ExecutionSegmentSequence(make([]*ExecutionSegment, n))
-		var numerators = make([]int64, n)
+		ess := ExecutionSegmentSequence(make([]*ExecutionSegment, n))
+		numerators := make([]int64, n)
 		var denominator int64
 		for i := int64(0); i < n; i++ {
 			numerators[i] = 1 // nice and simple :)
@@ -731,7 +723,7 @@ func mustNewExecutionSegmentSequence(str string) *ExecutionSegmentSequence {
 }
 
 func TestNewExecutionTuple(t *testing.T) {
-	var testCases = []struct {
+	testCases := []struct {
 		seg           *ExecutionSegment
 		seq           *ExecutionSegmentSequence
 		scaleTests    map[int64]int64
