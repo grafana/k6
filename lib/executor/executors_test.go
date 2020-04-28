@@ -232,6 +232,46 @@ var configMapTestCases = []configMapTestCase{
 
 			totalReqs := cm.GetFullExecutionRequirements(et)
 			assert.Equal(t, schedReqs, totalReqs)
+
+			et = mustNewExecutionTuple(newExecutionSegmentFromString("0:1/3"), newExecutionSegmentSequenceFromString("0,1/3,2/3,1"))
+			assert.Equal(t, "8 iterations shared among 4 VUs (maxDuration: 1m40s, gracefulStop: 30s)", cm["ishared"].GetDescription(et))
+
+			schedReqs = cm["ishared"].GetExecutionRequirements(et)
+			endOffset, isFinal = lib.GetEndOffset(schedReqs)
+			assert.Equal(t, 130*time.Second, endOffset)
+			assert.Equal(t, true, isFinal)
+			assert.Equal(t, uint64(4), lib.GetMaxPlannedVUs(schedReqs))
+			assert.Equal(t, uint64(4), lib.GetMaxPossibleVUs(schedReqs))
+
+			totalReqs = cm.GetFullExecutionRequirements(et)
+			assert.Equal(t, schedReqs, totalReqs)
+
+			et = mustNewExecutionTuple(newExecutionSegmentFromString("1/3:2/3"), newExecutionSegmentSequenceFromString("0,1/3,2/3,1"))
+			assert.Equal(t, "7 iterations shared among 4 VUs (maxDuration: 1m40s, gracefulStop: 30s)", cm["ishared"].GetDescription(et))
+
+			schedReqs = cm["ishared"].GetExecutionRequirements(et)
+			endOffset, isFinal = lib.GetEndOffset(schedReqs)
+			assert.Equal(t, 130*time.Second, endOffset)
+			assert.Equal(t, true, isFinal)
+			assert.Equal(t, uint64(4), lib.GetMaxPlannedVUs(schedReqs))
+			assert.Equal(t, uint64(4), lib.GetMaxPossibleVUs(schedReqs))
+
+			totalReqs = cm.GetFullExecutionRequirements(et)
+			assert.Equal(t, schedReqs, totalReqs)
+
+			et = mustNewExecutionTuple(newExecutionSegmentFromString("12/13:1"),
+				newExecutionSegmentSequenceFromString("0,1/13,2/13,3/13,4/13,5/13,6/13,7/13,8/13,9/13,10/13,11/13,12/13,1"))
+			assert.Equal(t, "0 iterations shared among 0 VUs (maxDuration: 1m40s, gracefulStop: 30s)", cm["ishared"].GetDescription(et))
+
+			schedReqs = cm["ishared"].GetExecutionRequirements(et)
+			endOffset, isFinal = lib.GetEndOffset(schedReqs)
+			assert.Equal(t, time.Duration(0), endOffset)
+			assert.Equal(t, true, isFinal)
+			assert.Equal(t, uint64(0), lib.GetMaxPlannedVUs(schedReqs))
+			assert.Equal(t, uint64(0), lib.GetMaxPossibleVUs(schedReqs))
+
+			totalReqs = cm.GetFullExecutionRequirements(et)
+			assert.Equal(t, schedReqs, totalReqs)
 		}},
 	},
 	{`{"ishared": {"type": "shared-iterations"}}`, exp{}}, // Has 1 VU & 1 iter default values

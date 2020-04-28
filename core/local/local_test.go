@@ -736,7 +736,8 @@ func TestNewExecutionSchedulerHasWork(t *testing.T) {
 		import http from 'k6/http';
 
 		export let options = {
-			executionSegment: "2/4:3/4",
+			executionSegment: "3/4:1",
+			executionSegmentSequence: "0,1/4,2/4,3/4,1",
 			execution: {
 				shared_iters1: {
 					type: "shared-iterations",
