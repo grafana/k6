@@ -651,7 +651,7 @@ func (et *ExecutionTuple) GetStripedOffsets(segment *ExecutionSegment) (int64, [
 // the sequence.
 func (et *ExecutionTuple) GetNewExecutionTupleBasedOnValue(value int64) *ExecutionTuple {
 	et.once.Do(et.fillCache)
-	if value != 0 && value%et.lcd == 0 { // the value is perfectly dividable so we will get the same tuple
+	if value != 0 && value%et.lcd == 0 { // the value is perfectly divisible so we will get the same tuple
 		return et
 	}
 
