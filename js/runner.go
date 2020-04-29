@@ -396,11 +396,12 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 	go func() {
 		// Wait for the run context to be over
 		<-params.RunContext.Done()
+		// Interrupt the JS runtime
+		u.Runtime.Interrupt(errInterrupt)
 		// Wait for the VU to stop running, if it was, and prevent it from
 		// running again for this activation
 		avu.busy <- struct{}{}
 
-		u.Runtime.Interrupt(errInterrupt)
 		if params.DeactivateCallback != nil {
 			params.DeactivateCallback()
 		}
