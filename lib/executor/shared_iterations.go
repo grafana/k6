@@ -155,6 +155,7 @@ func (sic SharedIterationsConfig) HasWork(et *lib.ExecutionTuple) bool {
 
 // Run executes a specific total number of iterations, which are all shared by
 // the configured VUs.
+// nolint:funlen
 func (si SharedIterations) Run(ctx context.Context, out chan<- stats.SampleContainer) (err error) {
 	numVUs := si.config.GetVUs(si.executionState.ExecutionTuple)
 	iterations := si.config.GetIterations(si.executionState.ExecutionTuple)
