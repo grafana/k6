@@ -28,7 +28,6 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/dop251/goja"
@@ -197,7 +196,6 @@ func (r *Runner) newVU(id int64, samplesOut chan<- stats.SampleContainer) (*VU, 
 		Console:        r.console,
 		BPool:          bpool.NewBufferPool(100),
 		Samples:        samplesOut,
-		runMutex:       sync.Mutex{},
 	}
 	vu.Runtime.Set("__VU", vu.ID)
 	vu.Runtime.Set("console", common.Bind(vu.Runtime, vu.Console, vu.Context))
@@ -368,18 +366,20 @@ type VU struct {
 
 	Samples chan<- stats.SampleContainer
 
-	runMutex  sync.Mutex
 	setupData goja.Value
 }
 
 // Verify that interfaces are implemented
-var _ lib.ActiveVU = &ActiveVU{}
-var _ lib.InitializedVU = &VU{}
+var (
+	_ lib.ActiveVU      = &ActiveVU{}
+	_ lib.InitializedVU = &VU{}
+)
 
 // ActiveVU holds a VU and its activation parameters
 type ActiveVU struct {
 	*VU
 	*lib.VUActivationParams
+	busy chan struct{}
 }
 
 // Activate the VU so it will be able to run code.
@@ -387,21 +387,39 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 	u.Runtime.ClearInterrupt()
 	// u.Env = params.Env
 
+	avu := &ActiveVU{
+		VU:                 u,
+		VUActivationParams: params,
+		busy:               make(chan struct{}, 1),
+	}
+
 	go func() {
+		// Wait for the run context to be over
 		<-params.RunContext.Done()
+		// Wait for the VU to stop running, if it was, and prevent it from
+		// running again for this activation
+		avu.busy <- struct{}{}
+
 		u.Runtime.Interrupt(errInterrupt)
 		if params.DeactivateCallback != nil {
 			params.DeactivateCallback()
 		}
 	}()
 
-	return &ActiveVU{u, params}
+	return avu
 }
 
 // RunOnce runs the default function once.
 func (u *ActiveVU) RunOnce() error {
-	u.runMutex.Lock()
-	defer u.runMutex.Unlock()
+	select {
+	case <-u.RunContext.Done():
+		return nil // we are done, return
+	case u.busy <- struct{}{}:
+		// nothing else can run now, and the VU cannot be deactivated
+	}
+	defer func() {
+		<-u.busy // unlock deactivation again
+	}()
 
 	// Unmarshall the setupData only the first time for each VU so that VUs are isolated but we
 	// still don't use too much CPU in the middle test
