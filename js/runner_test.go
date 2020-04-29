@@ -625,8 +625,8 @@ func TestVURunInterruptDoesntPanic(t *testing.T) {
 				<-ch
 				time.Sleep(time.Millisecond * 1) // NOTE: increase this in case of problems ;)
 				newCancel()
+				wg.Wait()
 			}
-			wg.Wait()
 		})
 	}
 }
