@@ -214,7 +214,7 @@ a commandline interface for interacting with it.`,
 			if cerr != nil {
 				return cerr
 			}
-			if cerr = collector.Init(); err != nil {
+			if cerr = collector.Init(); cerr != nil {
 				return cerr
 			}
 			engine.Collectors = append(engine.Collectors, collector)

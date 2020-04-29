@@ -608,7 +608,7 @@ func (et *ExecutionTuple) fillCache() {
 
 	et.offsetsCache = make([][]int64, len(et.sequence))
 	for i := range et.offsetsCache {
-		et.offsetsCache[i] = make([]int64, 0, wrapper.slice[i].numerator)
+		et.offsetsCache[i] = make([]int64, 0, wrapper.slice[i].numerator+1)
 	}
 
 	var prev = make([]int64, len(et.sequence))
@@ -650,13 +650,17 @@ func (et *ExecutionTuple) GetStripedOffsets(segment *ExecutionSegment) (int64, [
 // original, if that segmetn would've been with length 0 then it is nil, and obviously isn't part of
 // the sequence.
 func (et *ExecutionTuple) GetNewExecutionTupleBasedOnValue(value int64) *ExecutionTuple {
+	et.once.Do(et.fillCache)
+	if value != 0 && value%et.lcd == 0 { // the value is perfectly divisible so we will get the same tuple
+		return et
+	}
+
 	var (
 		newESS  = make(ExecutionSegmentSequence, 0, len(et.sequence)) // this can be smaller
 		newES   *ExecutionSegment
 		esIndex = -1
+		prev    int64
 	)
-	et.once.Do(et.fillCache)
-	var prev int64
 	for i := range et.sequence {
 		offsets := et.offsetsCache[i]
 		newValue := scaleInt64(value, offsets[0], offsets[1:], et.lcd)

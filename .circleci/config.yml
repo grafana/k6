@@ -53,9 +53,7 @@ jobs:
           name: Run golangci-lint
           command: |
             export PATH="$GOPATH/bin:$PATH"
-            basecommit=$(git log --decorate | grep '^commit.*origin/' | sed -n 2p | cut -d' ' -f2)
-            echo "basecommit=$basecommit"
-            golangci-lint run --out-format=tab --new-from-rev "$basecommit" ./...
+            golangci-lint run --out-format=tab --new-from-rev origin/master ./...
 
 
   test:
