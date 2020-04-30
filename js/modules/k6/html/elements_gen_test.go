@@ -298,7 +298,7 @@ var urlTests = []struct {
 }
 
 const testGenElems = `<html><body>
-	<a id="a1" download="file:///path/name" referrerpolicy="no-referrer" rel="open" href="http://test.url" target="__blank" type="text/html" accesskey="w" hreflang="es"></a> 
+	<a id="a1" download="file:///path/name" referrerpolicy="no-referrer" rel="open" href="http://test.url" target="__blank" type="text/html" accesskey="w" hreflang="es"></a>
 	<a id="a2"></a>
 	<a id="a3" href="relpath"></a>
 	<a id="a4" href="/abspath"></a>
@@ -390,7 +390,7 @@ func TestGenElements(t *testing.T) {
 	rt.Set("src", testGenElems)
 	rt.Set("html", common.Bind(rt, &HTML{}, &ctx))
 
-	_, err := common.RunString(rt, "let doc = html.parseHTML(src)")
+	_, err := common.RunString(rt, "var doc = html.parseHTML(src)")
 
 	assert.NoError(t, err)
 	assert.IsType(t, Selection{}, rt.Get("doc").Export())

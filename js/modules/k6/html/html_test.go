@@ -72,7 +72,7 @@ func TestParseHTML(t *testing.T) {
 	// TODO: I literally cannot think of a snippet that makes goquery error.
 	// I'm not sure if it's even possible without like, an invalid reader or something, which would
 	// be impossible to cause from the JS side.
-	_, err := common.RunString(rt, `let doc = html.parseHTML(src)`)
+	_, err := common.RunString(rt, `var doc = html.parseHTML(src)`)
 	assert.NoError(t, err)
 	assert.IsType(t, Selection{}, rt.Get("doc").Export())
 

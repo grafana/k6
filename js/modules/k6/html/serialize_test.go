@@ -74,7 +74,7 @@ func TestSerialize(t *testing.T) {
 	rt.Set("src", testSerializeHTML)
 	rt.Set("html", common.Bind(rt, New(), &ctx))
 
-	_, err := common.RunString(rt, `let doc = html.parseHTML(src)`)
+	_, err := common.RunString(rt, `var doc = html.parseHTML(src)`)
 	assert.NoError(t, err)
 	assert.IsType(t, Selection{}, rt.Get("doc").Export())
 

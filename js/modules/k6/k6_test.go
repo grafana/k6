@@ -94,14 +94,14 @@ func TestRandSeed(t *testing.T) {
 
 	rand := 0.8487305991992138
 	_, err := common.RunString(rt, fmt.Sprintf(`
-		let rnd = Math.random();
+		var rnd = Math.random();
 		if (rnd == %.16f) { throw new Error("wrong random: " + rnd); }
 	`, rand))
 	assert.NoError(t, err)
 
 	_, err = common.RunString(rt, fmt.Sprintf(`
 		k6.randomSeed(12345)
-		let rnd = Math.random();
+		var rnd = Math.random();
 		if (rnd != %.16f) { throw new Error("wrong random: " + rnd); }
 	`, rand))
 	assert.NoError(t, err)
@@ -255,7 +255,7 @@ func TestCheck(t *testing.T) {
 			"b": function() { throw new Error("error B") },
 		})
 		`)
-		assert.EqualError(t, err, "Error: error A at a (<eval>:3:27(6))")
+		assert.EqualError(t, err, "Error: error A at <eval>:3:28(4)")
 
 		bufSamples := stats.GetBufferedSamples(samples)
 		if assert.Len(t, bufSamples, 1) {
@@ -275,8 +275,8 @@ func TestCheck(t *testing.T) {
 	t.Run("Types", func(t *testing.T) {
 		templates := map[string]string{
 			"Literal":      `k6.check(null,{"check": %s})`,
-			"Callable":     `k6.check(null,{"check": ()=>%s})`,
-			"Callable/Arg": `k6.check(%s,{"check":(v)=>v})`,
+			"Callable":     `k6.check(null,{"check": function() { return %s; }})`,
+			"Callable/Arg": `k6.check(%s,{"check": function(v) {return v; }})`,
 		}
 		testdata := map[string]bool{
 			`0`:         false,
