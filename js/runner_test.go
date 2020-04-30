@@ -558,8 +558,6 @@ func TestVURunInterrupt(t *testing.T) {
 	for name, r := range testdata {
 		name, r := name, r
 		t.Run(name, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
-			defer cancel()
 			samples := make(chan stats.SampleContainer, 100)
 			defer close(samples)
 			go func() {
@@ -570,6 +568,8 @@ func TestVURunInterrupt(t *testing.T) {
 			vu, err := r.newVU(1, samples)
 			require.NoError(t, err)
 
+			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+			defer cancel()
 			activeVU := vu.Activate(&lib.VUActivationParams{RunContext: ctx})
 			err = activeVU.RunOnce()
 			assert.Error(t, err)
