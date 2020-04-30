@@ -154,7 +154,7 @@ func TestOptionsSettingToScript(t *testing.T) {
 							throw new Error("expected teardownTimeout to be " + __ENV.expectedTeardownTimeout + " but it was " + options.teardownTimeout);
 						}
 					};`
-			r, err := getSimpleRunnerWithOptions("/script.js", data,
+			r, err := getSimpleRunner("/script.js", data,
 				lib.RuntimeOptions{Env: map[string]string{"expectedTeardownTimeout": "4s"}})
 			require.NoError(t, err)
 
@@ -192,7 +192,7 @@ func TestOptionsPropagationToScript(t *testing.T) {
 			};`
 
 	expScriptOptions := lib.Options{SetupTimeout: types.NullDurationFrom(1 * time.Second)}
-	r1, err := getSimpleRunnerWithOptions("/script.js", data,
+	r1, err := getSimpleRunner("/script.js", data,
 		lib.RuntimeOptions{Env: map[string]string{"expectedSetupTimeout": "1s"}})
 	require.NoError(t, err)
 	require.Equal(t, expScriptOptions, r1.GetOptions())
@@ -465,7 +465,7 @@ func TestRunnerIntegrationImports(t *testing.T) {
 		for name, data := range testdata {
 			name, data := name, data
 			t.Run(name, func(t *testing.T) {
-				r1, err := getSimpleRunnerWithFileFs(data.filename, fmt.Sprintf(`
+				r1, err := getSimpleRunner(data.filename, fmt.Sprintf(`
 					import hi from "%s";
 					export default function() {
 						if (hi != "hi!") { throw new Error("incorrect value"); }
@@ -1441,7 +1441,7 @@ func TestArchiveRunningIntegrity(t *testing.T) {
 		`)
 	require.NoError(t, afero.WriteFile(fs, "/home/somebody/test.json", []byte(`42`), os.ModePerm))
 	require.NoError(t, afero.WriteFile(fs, "/script.js", []byte(data), os.ModePerm))
-	r1, err := getSimpleRunnerWithFileFs("/script.js", data, fs)
+	r1, err := getSimpleRunner("/script.js", data, fs)
 	require.NoError(t, err)
 
 	buf := bytes.NewBuffer(nil)
@@ -1476,7 +1476,7 @@ func TestArchiveNotPanicking(t *testing.T) {
 
 	fs := afero.NewMemMapFs()
 	require.NoError(t, afero.WriteFile(fs, "/non/existent", []byte(`42`), os.ModePerm))
-	r1, err := getSimpleRunnerWithFileFs("/script.js", tb.Replacer.Replace(`
+	r1, err := getSimpleRunner("/script.js", tb.Replacer.Replace(`
 			let fput = open("/non/existent");
 			export default function(data) {
 			}
