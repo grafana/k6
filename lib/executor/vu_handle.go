@@ -37,8 +37,8 @@ import (
 type vuHandle struct {
 	mutex     *sync.RWMutex
 	parentCtx context.Context
-	getVU     func() (lib.VU, error)
-	returnVU  func(lib.VU)
+	getVU     func() (lib.InitializedVU, error)
+	returnVU  func(lib.InitializedVU)
 
 	canStartIter chan struct{}
 
@@ -48,7 +48,8 @@ type vuHandle struct {
 }
 
 func newStoppedVUHandle(
-	parentCtx context.Context, getVU func() (lib.VU, error), returnVU func(lib.VU), logger *logrus.Entry,
+	parentCtx context.Context, getVU func() (lib.InitializedVU, error),
+	returnVU func(lib.InitializedVU), logger *logrus.Entry,
 ) *vuHandle {
 	lock := &sync.RWMutex{}
 	ctx, cancel := context.WithCancel(parentCtx)
@@ -101,15 +102,11 @@ func (vh *vuHandle) hardStop() {
 
 //TODO: simplify this somehow - I feel like there should be a better way to
 //implement this logic... maybe with sync.Cond?
-func (vh *vuHandle) runLoopsIfPossible(runIter func(context.Context, lib.VU)) {
+func (vh *vuHandle) runLoopsIfPossible(runIter func(context.Context, lib.ActiveVU)) {
 	executorDone := vh.parentCtx.Done()
 
-	var vu lib.VU
-	defer func() {
-		if vu != nil {
-			vh.returnVU(vu)
-		}
-	}()
+	var vu lib.ActiveVU
+	var deactivateVU func()
 
 mainLoop:
 	for {
@@ -127,12 +124,9 @@ mainLoop:
 			return
 		default:
 			// We're not running, but the executor isn't done yet, so we wait
-			// for either one of those conditions. But before that, we'll return
-			// our VU to the pool, if we have it.
-			if vu != nil {
-				vh.returnVU(vu)
-				vu = nil
-			}
+			// for either one of those conditions. But before that, clear
+			// the VU reference to ensure we get a fresh one below.
+			vu = nil
 			select {
 			case <-canStartIter:
 				// continue on, we were unblocked...
@@ -154,13 +148,19 @@ mainLoop:
 		default:
 		}
 
-		// Ensure we have a VU
+		// Ensure we have an active VU
 		if vu == nil {
-			freshVU, err := vh.getVU()
+			initVU, err := vh.getVU()
 			if err != nil {
 				return
 			}
-			vu = freshVU
+			deactivateVU = func() {
+				vh.returnVU(initVU)
+			}
+			vu = initVU.Activate(&lib.VUActivationParams{
+				RunContext:         ctx,
+				DeactivateCallback: deactivateVU,
+			})
 		}
 
 		runIter(ctx, vu)

@@ -41,8 +41,9 @@ import (
 
 func getTestVariableArrivalRateConfig() VariableArrivalRateConfig {
 	return VariableArrivalRateConfig{
-		TimeUnit:  types.NullDurationFrom(time.Second),
-		StartRate: null.IntFrom(10),
+		BaseConfig: BaseConfig{GracefulStop: types.NullDurationFrom(1 * time.Second)},
+		TimeUnit:   types.NullDurationFrom(time.Second),
+		StartRate:  null.IntFrom(10),
 		Stages: []Stage{
 			{
 				Duration: types.NullDurationFrom(time.Second * 1),

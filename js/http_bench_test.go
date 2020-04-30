@@ -4,11 +4,12 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"gopkg.in/guregu/null.v3"
+
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/testutils/httpmultibin"
 	"github.com/loadimpact/k6/stats"
-	"github.com/stretchr/testify/assert"
-	"gopkg.in/guregu/null.v3"
 )
 
 func BenchmarkHTTPRequests(b *testing.B) {
@@ -40,13 +41,16 @@ func BenchmarkHTTPRequests(b *testing.B) {
 			<-ch
 		}
 	}()
-	vu, err := r.NewVU(ch)
+	initVU, err := r.NewVU(1, ch)
 	if !assert.NoError(b, err) {
 		return
 	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		err = vu.RunOnce(context.Background())
+		err = vu.RunOnce()
 		assert.NoError(b, err)
 	}
 }

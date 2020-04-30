@@ -22,7 +22,6 @@ package minirunner
 
 import (
 	"context"
-	"sync/atomic"
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
@@ -30,8 +29,9 @@ import (
 
 // Ensure mock implementations conform to the interfaces.
 var (
-	_ lib.Runner = &MiniRunner{}
-	_ lib.VU     = &VU{}
+	_ lib.Runner        = &MiniRunner{}
+	_ lib.InitializedVU = &VU{}
+	_ lib.ActiveVU      = &ActiveVU{}
 )
 
 // MiniRunner partially implements the lib.Runner interface, but instead of
@@ -56,9 +56,8 @@ func (r MiniRunner) MakeArchive() *lib.Archive {
 }
 
 // NewVU returns a new VU with an incremental ID.
-func (r *MiniRunner) NewVU(out chan<- stats.SampleContainer) (lib.VU, error) {
-	nextVUNum := atomic.AddInt64(&r.NextVUID, 1)
-	return &VU{R: r, Out: out, ID: nextVUNum - 1}, nil
+func (r *MiniRunner) NewVU(id int64, out chan<- stats.SampleContainer) (lib.InitializedVU, error) {
+	return &VU{R: r, Out: out, ID: id}, nil
 }
 
 // Setup calls the supplied mock setup() function, if present.
@@ -115,25 +114,59 @@ type VU struct {
 	Iteration int64
 }
 
+// ActiveVU holds a VU and its activation parameters
+type ActiveVU struct {
+	*VU
+	*lib.VUActivationParams
+	busy chan struct{}
+}
+
+// Activate the VU so it will be able to run code.
+func (vu *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
+	avu := &ActiveVU{
+		VU:                 vu,
+		VUActivationParams: params,
+		busy:               make(chan struct{}, 1),
+	}
+
+	go func() {
+		<-params.RunContext.Done()
+
+		// Wait for the VU to stop running, if it was, and prevent it from
+		// running again for this activation
+		avu.busy <- struct{}{}
+
+		if params.DeactivateCallback != nil {
+			params.DeactivateCallback()
+		}
+	}()
+
+	return avu
+}
+
 // RunOnce runs the mock default function once, incrementing its iteration.
-func (vu VU) RunOnce(ctx context.Context) error {
+func (vu *ActiveVU) RunOnce() error {
 	if vu.R.Fn == nil {
 		return nil
 	}
+
+	select {
+	case <-vu.RunContext.Done():
+		return vu.RunContext.Err() // we are done, return
+	case vu.busy <- struct{}{}:
+		// nothing else can run now, and the VU cannot be deactivated
+	}
+	defer func() {
+		<-vu.busy // unlock deactivation again
+	}()
 
 	state := &lib.State{
 		Vu:        vu.ID,
 		Iteration: vu.Iteration,
 	}
-	newctx := lib.WithState(ctx, state)
+	newctx := lib.WithState(vu.RunContext, state)
 
 	vu.Iteration++
 
 	return vu.R.Fn(newctx, vu.Out)
-}
-
-// Reconfigure changes the VU ID.
-func (vu *VU) Reconfigure(id int64) error {
-	vu.ID = id
-	return nil
 }

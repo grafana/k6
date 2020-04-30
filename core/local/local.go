@@ -148,24 +148,20 @@ func (e *ExecutionScheduler) GetExecutionPlan() []lib.ExecutionStep {
 	return e.executionPlan
 }
 
-// initVU is just a helper method that's used to both initialize the planned VUs
+// initVU is a helper method that's used to both initialize the planned VUs
 // in the Init() method, and also passed to executors so they can initialize
 // any unplanned VUs themselves.
-// TODO: actually use the context...
 func (e *ExecutionScheduler) initVU(
-	_ context.Context, logger *logrus.Entry, engineOut chan<- stats.SampleContainer,
-) (lib.VU, error) {
-	vu, err := e.runner.NewVU(engineOut)
-	if err != nil {
-		return nil, fmt.Errorf("error while initializing a VU: '%s'", err)
-	}
-
+	samplesOut chan<- stats.SampleContainer, logger *logrus.Entry,
+) (lib.InitializedVU, error) {
 	// Get the VU ID here, so that the VUs are (mostly) ordered by their
 	// number in the channel buffer
 	vuID := e.state.GetUniqueVUIdentifier()
-	if err := vu.Reconfigure(int64(vuID)); err != nil {
-		return nil, fmt.Errorf("error while reconfiguring VU #%d: '%s'", vuID, err)
+	vu, err := e.runner.NewVU(int64(vuID), samplesOut)
+	if err != nil {
+		return nil, fmt.Errorf("error while initializing VU #%d: '%s'", vuID, err)
 	}
+
 	logger.Debugf("Initialized VU #%d", vuID)
 	return vu, nil
 }
@@ -191,7 +187,8 @@ func (e *ExecutionScheduler) getRunStats() string {
 }
 
 func (e *ExecutionScheduler) initVUsConcurrently(
-	ctx context.Context, engineOut chan<- stats.SampleContainer, count uint64, concurrency int, logger *logrus.Entry,
+	ctx context.Context, samplesOut chan<- stats.SampleContainer, count uint64,
+	concurrency int, logger *logrus.Entry,
 ) chan error {
 	doneInits := make(chan error, count) // poor man's early-return waitgroup
 	limiter := make(chan struct{})
@@ -199,7 +196,7 @@ func (e *ExecutionScheduler) initVUsConcurrently(
 	for i := 0; i < concurrency; i++ {
 		go func() {
 			for range limiter {
-				newVU, err := e.initVU(ctx, logger, engineOut)
+				newVU, err := e.initVU(samplesOut, logger)
 				if err == nil {
 					e.state.AddInitializedVU(newVU)
 				}
@@ -224,7 +221,7 @@ func (e *ExecutionScheduler) initVUsConcurrently(
 
 // Init concurrently initializes all of the planned VUs and then sequentially
 // initializes all of the configured executors.
-func (e *ExecutionScheduler) Init(ctx context.Context, engineOut chan<- stats.SampleContainer) error {
+func (e *ExecutionScheduler) Init(ctx context.Context, samplesOut chan<- stats.SampleContainer) error {
 	logger := e.logger.WithField("phase", "local-execution-scheduler-init")
 
 	vusToInitialize := lib.GetMaxPlannedVUs(e.executionPlan)
@@ -237,7 +234,7 @@ func (e *ExecutionScheduler) Init(ctx context.Context, engineOut chan<- stats.Sa
 	defer cancel()
 
 	e.state.SetExecutionStatus(lib.ExecutionStatusInitVUs)
-	doneInits := e.initVUsConcurrently(subctx, engineOut, vusToInitialize, runtime.NumCPU(), logger)
+	doneInits := e.initVUsConcurrently(subctx, samplesOut, vusToInitialize, runtime.NumCPU(), logger)
 
 	initializedVUs := new(uint64)
 	vusFmt := pb.GetFixedLengthIntFormat(int64(vusToInitialize))
@@ -264,8 +261,8 @@ func (e *ExecutionScheduler) Init(ctx context.Context, engineOut chan<- stats.Sa
 		}
 	}
 
-	e.state.SetInitVUFunc(func(ctx context.Context, logger *logrus.Entry) (lib.VU, error) {
-		return e.initVU(ctx, logger, engineOut)
+	e.state.SetInitVUFunc(func(ctx context.Context, logger *logrus.Entry) (lib.InitializedVU, error) {
+		return e.initVU(samplesOut, logger)
 	})
 
 	e.state.SetExecutionStatus(lib.ExecutionStatusInitExecutors)
