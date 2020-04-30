@@ -165,7 +165,7 @@ func TestRequestAndBatch(t *testing.T) {
 	t.Run("Redirects", func(t *testing.T) {
 		t.Run("tracing", func(t *testing.T) {
 			_, err := common.RunString(rt, sr(`
-			let res = http.get("HTTPBIN_URL/redirect/9");
+			var res = http.get("HTTPBIN_URL/redirect/9");
 			`))
 			assert.NoError(t, err)
 			bufSamples := stats.GetBufferedSamples(samples)
@@ -189,7 +189,7 @@ func TestRequestAndBatch(t *testing.T) {
 		})
 		t.Run("11", func(t *testing.T) {
 			_, err := common.RunString(rt, sr(`
-			let res = http.get("HTTPBIN_URL/redirect/11");
+			var res = http.get("HTTPBIN_URL/redirect/11");
 			if (res.status != 302) { throw new Error("wrong status: " + res.status) }
 			if (res.url != "HTTPBIN_URL/relative-redirect/1") { throw new Error("incorrect URL: " + res.url) }
 			if (res.headers["Location"] != "/get") { throw new Error("incorrect Location header: " + res.headers["Location"]) }
@@ -205,7 +205,7 @@ func TestRequestAndBatch(t *testing.T) {
 				state.Options.MaxRedirects = null.NewInt(10, false)
 
 				_, err := common.RunString(rt, sr(`
-				let res = http.get("HTTPBIN_URL/redirect/11");
+				var res = http.get("HTTPBIN_URL/redirect/11");
 				if (res.status != 302) { throw new Error("wrong status: " + res.status) }
 				if (res.url != "HTTPBIN_URL/relative-redirect/1") { throw new Error("incorrect URL: " + res.url) }
 				if (res.headers["Location"] != "/get") { throw new Error("incorrect Location header: " + res.headers["Location"]) }
@@ -222,7 +222,7 @@ func TestRequestAndBatch(t *testing.T) {
 		})
 		t.Run("requestScopeRedirects", func(t *testing.T) {
 			_, err := common.RunString(rt, sr(`
-			let res = http.get("HTTPBIN_URL/redirect/1", {redirects: 3});
+			var res = http.get("HTTPBIN_URL/redirect/1", {redirects: 3});
 			if (res.status != 200) { throw new Error("wrong status: " + res.status) }
 			if (res.url != "HTTPBIN_URL/get") { throw new Error("incorrect URL: " + res.url) }
 			`))
@@ -230,7 +230,7 @@ func TestRequestAndBatch(t *testing.T) {
 		})
 		t.Run("requestScopeNoRedirects", func(t *testing.T) {
 			_, err := common.RunString(rt, sr(`
-			let res = http.get("HTTPBIN_URL/redirect/1", {redirects: 0});
+			var res = http.get("HTTPBIN_URL/redirect/1", {redirects: 0});
 			if (res.status != 302) { throw new Error("wrong status: " + res.status) }
 			if (res.url != "HTTPBIN_URL/redirect/1") { throw new Error("incorrect URL: " + res.url) }
 			if (res.headers["Location"] != "/get") { throw new Error("incorrect Location header: " + res.headers["Location"]) }
@@ -246,7 +246,7 @@ func TestRequestAndBatch(t *testing.T) {
 				http.Redirect(w, r, sr("HTTPBIN_URL/post"), http.StatusPermanentRedirect)
 			}))
 			_, err := common.RunString(rt, sr(`
-			let res = http.post("HTTPBIN_URL/post-redirect", "pesho", {redirects: 1});
+			var res = http.post("HTTPBIN_URL/post-redirect", "pesho", {redirects: 1});
 
 			if (res.status != 200) { throw new Error("wrong status: " + res.status) }
 			if (res.url != "HTTPBIN_URL/post") { throw new Error("incorrect URL: " + res.url) }
@@ -290,7 +290,7 @@ func TestRequestAndBatch(t *testing.T) {
 	})
 	t.Run("UserAgent", func(t *testing.T) {
 		_, err := common.RunString(rt, sr(`
-			let res = http.get("HTTPBIN_URL/user-agent");
+			var res = http.get("HTTPBIN_URL/user-agent");
 			if (res.json()['user-agent'] != "TestUserAgent") {
 				throw new Error("incorrect user agent: " + res.json()['user-agent'])
 			}
@@ -299,7 +299,7 @@ func TestRequestAndBatch(t *testing.T) {
 
 		t.Run("Override", func(t *testing.T) {
 			_, err := common.RunString(rt, sr(`
-				let res = http.get("HTTPBIN_URL/user-agent", {
+				var res = http.get("HTTPBIN_URL/user-agent", {
 					headers: { "User-Agent": "OtherUserAgent" },
 				});
 				if (res.json()['user-agent'] != "OtherUserAgent") {
@@ -312,7 +312,7 @@ func TestRequestAndBatch(t *testing.T) {
 	t.Run("Compression", func(t *testing.T) {
 		t.Run("gzip", func(t *testing.T) {
 			_, err := common.RunString(rt, sr(`
-				let res = http.get("HTTPSBIN_IP_URL/gzip");
+				var res = http.get("HTTPSBIN_IP_URL/gzip");
 				if (res.json()['gzipped'] != true) {
 					throw new Error("unexpected body data: " + res.json()['gzipped'])
 				}
@@ -321,7 +321,7 @@ func TestRequestAndBatch(t *testing.T) {
 		})
 		t.Run("deflate", func(t *testing.T) {
 			_, err := common.RunString(rt, sr(`
-				let res = http.get("HTTPBIN_URL/deflate");
+				var res = http.get("HTTPBIN_URL/deflate");
 				if (res.json()['deflated'] != true) {
 					throw new Error("unexpected body data: " + res.json()['deflated'])
 				}
@@ -330,7 +330,7 @@ func TestRequestAndBatch(t *testing.T) {
 		})
 		t.Run("zstd", func(t *testing.T) {
 			_, err := common.RunString(rt, sr(`
-				let res = http.get("HTTPSBIN_IP_URL/zstd");
+				var res = http.get("HTTPSBIN_IP_URL/zstd");
 				if (res.json()['compression'] != 'zstd') {
 					throw new Error("unexpected body data: " + res.json()['compression'])
 				}
@@ -339,7 +339,7 @@ func TestRequestAndBatch(t *testing.T) {
 		})
 		t.Run("brotli", func(t *testing.T) {
 			_, err := common.RunString(rt, sr(`
-				let res = http.get("HTTPSBIN_IP_URL/brotli");
+				var res = http.get("HTTPSBIN_IP_URL/brotli");
 				if (res.json()['compression'] != 'br') {
 					throw new Error("unexpected body data: " + res.json()['compression'])
 				}
@@ -348,7 +348,7 @@ func TestRequestAndBatch(t *testing.T) {
 		})
 		t.Run("zstd-br", func(t *testing.T) {
 			_, err := common.RunString(rt, sr(`
-				let res = http.get("HTTPSBIN_IP_URL/zstd-br");
+				var res = http.get("HTTPSBIN_IP_URL/zstd-br");
 				if (res.json()['compression'] != 'zstd, br') {
 					throw new Error("unexpected compression: " + res.json()['compression'])
 				}
@@ -364,7 +364,7 @@ func TestRequestAndBatch(t *testing.T) {
 			}))
 
 			_, err := common.RunString(rt, sr(`
-				let res = http.get("HTTPBIN_URL/customcompression");
+				var res = http.get("HTTPBIN_URL/customcompression");
 				if (res.json()["custom"] != true) {
 					throw new Error("unexpected body data: " + res.body)
 				}
@@ -375,8 +375,8 @@ func TestRequestAndBatch(t *testing.T) {
 	t.Run("CompressionWithAcceptEncodingHeader", func(t *testing.T) {
 		t.Run("gzip", func(t *testing.T) {
 			_, err := common.RunString(rt, sr(`
-				let params = { headers: { "Accept-Encoding": "gzip" } };
-				let res = http.get("HTTPBIN_URL/gzip", params);
+				var params = { headers: { "Accept-Encoding": "gzip" } };
+				var res = http.get("HTTPBIN_URL/gzip", params);
 				if (res.json()['gzipped'] != true) {
 					throw new Error("unexpected body data: " + res.json()['gzipped'])
 				}
@@ -385,8 +385,8 @@ func TestRequestAndBatch(t *testing.T) {
 		})
 		t.Run("deflate", func(t *testing.T) {
 			_, err := common.RunString(rt, sr(`
-				let params = { headers: { "Accept-Encoding": "deflate" } };
-				let res = http.get("HTTPBIN_URL/deflate", params);
+				var params = { headers: { "Accept-Encoding": "deflate" } };
+				var res = http.get("HTTPBIN_URL/deflate", params);
 				if (res.json()['deflated'] != true) {
 					throw new Error("unexpected body data: " + res.json()['deflated'])
 				}
@@ -411,7 +411,7 @@ func TestRequestAndBatch(t *testing.T) {
 	t.Run("HTTP/2", func(t *testing.T) {
 		stats.GetBufferedSamples(samples) // Clean up buffered samples from previous tests
 		_, err := common.RunString(rt, sr(`
-		let res = http.request("GET", "HTTP2BIN_URL/get");
+		var res = http.request("GET", "HTTP2BIN_URL/get");
 		if (res.status != 200) { throw new Error("wrong status: " + res.status) }
 		if (res.proto != "HTTP/2.0") { throw new Error("wrong proto: " + res.proto) }
 		`))
@@ -443,7 +443,7 @@ func TestRequestAndBatch(t *testing.T) {
 		for _, versionTest := range tlsVersionTests {
 			t.Run(versionTest.Name, func(t *testing.T) {
 				_, err := common.RunString(rt, fmt.Sprintf(`
-					let res = http.get("%s");
+					var res = http.get("%s");
 					if (res.tls_version != %s) { throw new Error("wrong TLS version: " + res.tls_version); }
 				`, versionTest.URL, versionTest.Version))
 				assert.NoError(t, err)
@@ -459,7 +459,7 @@ func TestRequestAndBatch(t *testing.T) {
 		for _, cipherSuiteTest := range tlsCipherSuiteTests {
 			t.Run(cipherSuiteTest.Name, func(t *testing.T) {
 				_, err := common.RunString(rt, fmt.Sprintf(`
-					let res = http.get("%s");
+					var res = http.get("%s");
 					if (res.tls_cipher_suite != "%s") { throw new Error("wrong TLS cipher suite: " + res.tls_cipher_suite); }
 				`, cipherSuiteTest.URL, cipherSuiteTest.CipherSuite))
 				assert.NoError(t, err)
@@ -468,7 +468,7 @@ func TestRequestAndBatch(t *testing.T) {
 		}
 		t.Run("ocsp_stapled_good", func(t *testing.T) {
 			_, err := common.RunString(rt, `
-			let res = http.request("GET", "https://www.microsoft.com/");
+			var res = http.request("GET", "https://www.microsoft.com/");
 			if (res.ocsp.status != http.OCSP_STATUS_GOOD) { throw new Error("wrong ocsp stapled response status: " + res.ocsp.status); }
 			`)
 			assert.NoError(t, err)
@@ -495,7 +495,7 @@ func TestRequestAndBatch(t *testing.T) {
 			defer hook.Reset()
 
 			_, err := common.RunString(rt, `
-				let res = http.request("", "", { throw: false });
+				var res = http.request("", "", { throw: false });
 				throw new Error(res.error);
 			`)
 			require.Error(t, err)
@@ -518,7 +518,7 @@ func TestRequestAndBatch(t *testing.T) {
 		for _, literal := range []string{`undefined`, `null`} {
 			t.Run(literal, func(t *testing.T) {
 				_, err := common.RunString(rt, fmt.Sprintf(sr(`
-				let res = http.request("GET", "HTTPBIN_URL/headers", null, %s);
+				var res = http.request("GET", "HTTPBIN_URL/headers", null, %s);
 				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 				`), literal))
 				assert.NoError(t, err)
@@ -532,11 +532,11 @@ func TestRequestAndBatch(t *testing.T) {
 				assert.NoError(t, err)
 				state.CookieJar = cookieJar
 				_, err = common.RunString(rt, sr(`
-				let res = http.request("GET", "HTTPBIN_URL/cookies/set?key=value", null, { redirects: 0 });
+				var res = http.request("GET", "HTTPBIN_URL/cookies/set?key=value", null, { redirects: 0 });
 				if (res.cookies.key[0].value != "value") { throw new Error("wrong cookie value: " + res.cookies.key[0].value); }
-				const props = ["name", "value", "domain", "path", "expires", "max_age", "secure", "http_only"];
-				let cookie = res.cookies.key[0];
-				for (let i = 0; i < props.length; i++) {
+				var props = ["name", "value", "domain", "path", "expires", "max_age", "secure", "http_only"];
+				var cookie = res.cookies.key[0];
+				for (var i = 0; i < props.length; i++) {
 					if (cookie[props[i]] === undefined) {
 						throw new Error("cookie property not found: " + props[i]);
 					}
@@ -554,12 +554,12 @@ func TestRequestAndBatch(t *testing.T) {
 				assert.NoError(t, err)
 				state.CookieJar = cookieJar
 				_, err = common.RunString(rt, sr(`
-				let jar = http.cookieJar();
+				var jar = http.cookieJar();
 				jar.set("HTTPBIN_URL/cookies", "key", "value");
-				let res = http.request("GET", "HTTPBIN_URL/cookies", null, { cookies: { key2: "value2" } });
+				var res = http.request("GET", "HTTPBIN_URL/cookies", null, { cookies: { key2: "value2" } });
 				if (res.json().key != "value") { throw new Error("wrong cookie value: " + res.json().key); }
 				if (res.json().key2 != "value2") { throw new Error("wrong cookie value: " + res.json().key2); }
-				let jarCookies = jar.cookiesForURL("HTTPBIN_URL/cookies");
+				var jarCookies = jar.cookiesForURL("HTTPBIN_URL/cookies");
 				if (jarCookies.key[0] != "value") { throw new Error("wrong cookie value in jar"); }
 				if (jarCookies.key2 != undefined) { throw new Error("unexpected cookie in jar"); }
 				`))
@@ -572,10 +572,10 @@ func TestRequestAndBatch(t *testing.T) {
 				assert.NoError(t, err)
 				state.CookieJar = cookieJar
 				_, err = common.RunString(rt, sr(`
-				let res = http.request("GET", "HTTPBIN_URL/cookies", null, { cookies: { key: "value" } });
+				var res = http.request("GET", "HTTPBIN_URL/cookies", null, { cookies: { key: "value" } });
 				if (res.json().key != "value") { throw new Error("wrong cookie value: " + res.json().key); }
-				let jar = http.cookieJar();
-				let jarCookies = jar.cookiesForURL("HTTPBIN_URL/cookies");
+				var jar = http.cookieJar();
+				var jarCookies = jar.cookiesForURL("HTTPBIN_URL/cookies");
 				if (jarCookies.key != undefined) { throw new Error("unexpected cookie in jar"); }
 				`))
 				assert.NoError(t, err)
@@ -587,11 +587,11 @@ func TestRequestAndBatch(t *testing.T) {
 				assert.NoError(t, err)
 				state.CookieJar = cookieJar
 				_, err = common.RunString(rt, sr(`
-				let jar = http.cookieJar();
+				var jar = http.cookieJar();
 				jar.set("HTTPBIN_URL/cookies", "key", "value");
-				let res = http.request("GET", "HTTPBIN_URL/cookies", null, { cookies: { key: { value: "replaced", replace: true } } });
+				var res = http.request("GET", "HTTPBIN_URL/cookies", null, { cookies: { key: { value: "replaced", replace: true } } });
 				if (res.json().key != "replaced") { throw new Error("wrong cookie value: " + res.json().key); }
-				let jarCookies = jar.cookiesForURL("HTTPBIN_URL/cookies");
+				var jarCookies = jar.cookiesForURL("HTTPBIN_URL/cookies");
 				if (jarCookies.key[0] != "value") { throw new Error("wrong cookie value in jar"); }
 				`))
 				assert.NoError(t, err)
@@ -616,7 +616,7 @@ func TestRequestAndBatch(t *testing.T) {
 					require.NoError(t, err)
 					state.CookieJar = cookieJar
 					_, err = common.RunString(rt, sr(`
-						let res = http.request("GET", "HTTPBIN_URL/redirect-to?url=HTTPSBIN_URL/set-cookie-without-redirect");
+						var res = http.request("GET", "HTTPBIN_URL/redirect-to?url=HTTPSBIN_URL/set-cookie-without-redirect");
 						if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 					`))
 					require.NoError(t, err)
@@ -642,7 +642,7 @@ func TestRequestAndBatch(t *testing.T) {
 					require.NoError(t, err)
 					state.CookieJar = cookieJar
 					_, err = common.RunString(rt, sr(`
-						let res = http.request("GET", "HTTPSBIN_URL/cookies/set?key=value");
+						var res = http.request("GET", "HTTPSBIN_URL/cookies/set?key=value");
 						if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 					`))
 					require.NoError(t, err)
@@ -683,7 +683,7 @@ func TestRequestAndBatch(t *testing.T) {
 					}))
 
 					_, err = common.RunString(rt, sr(`
-						let res = http.request("GET", "HTTPBIN_IP_URL/redirect-to?url=HTTPSBIN_URL/set-cookie-and-redirect");
+						var res = http.request("GET", "HTTPBIN_IP_URL/redirect-to?url=HTTPSBIN_URL/set-cookie-and-redirect");
 						if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 					`))
 					require.NoError(t, err)
@@ -718,9 +718,9 @@ func TestRequestAndBatch(t *testing.T) {
 				assert.NoError(t, err)
 				state.CookieJar = cookieJar
 				_, err = common.RunString(rt, sr(`
-				let jar = http.cookieJar();
+				var jar = http.cookieJar();
 				jar.set("HTTPBIN_URL/cookies", "key", "value", { domain: "HTTPBIN_DOMAIN" });
-				let res = http.request("GET", "HTTPBIN_URL/cookies");
+				var res = http.request("GET", "HTTPBIN_URL/cookies");
 				if (res.json().key != "value") {
 					throw new Error("wrong cookie value 1: " + res.json().key);
 				}
@@ -742,9 +742,9 @@ func TestRequestAndBatch(t *testing.T) {
 				assert.NoError(t, err)
 				state.CookieJar = cookieJar
 				_, err = common.RunString(rt, sr(`
-				let jar = http.cookieJar();
+				var jar = http.cookieJar();
 				jar.set("HTTPBIN_URL/cookies", "key", "value", { path: "/cookies" });
-				let res = http.request("GET", "HTTPBIN_URL/cookies");
+				var res = http.request("GET", "HTTPBIN_URL/cookies");
 				if (res.json().key != "value") {
 					throw new Error("wrong cookie value: " + res.json().key);
 				}
@@ -766,9 +766,9 @@ func TestRequestAndBatch(t *testing.T) {
 				assert.NoError(t, err)
 				state.CookieJar = cookieJar
 				_, err = common.RunString(rt, sr(`
-				let jar = http.cookieJar();
+				var jar = http.cookieJar();
 				jar.set("HTTPBIN_URL/cookies", "key", "value", { expires: "Sun, 24 Jul 1983 17:01:02 GMT" });
-				let res = http.request("GET", "HTTPBIN_URL/cookies");
+				var res = http.request("GET", "HTTPBIN_URL/cookies");
 				if (res.json().key != undefined) {
 					throw new Error("cookie 'key' unexpectedly found");
 				}
@@ -787,9 +787,9 @@ func TestRequestAndBatch(t *testing.T) {
 				assert.NoError(t, err)
 				state.CookieJar = cookieJar
 				_, err = common.RunString(rt, sr(`
-				let jar = http.cookieJar();
+				var jar = http.cookieJar();
 				jar.set("HTTPSBIN_IP_URL/cookies", "key", "value", { secure: true });
-				let res = http.request("GET", "HTTPSBIN_IP_URL/cookies");
+				var res = http.request("GET", "HTTPSBIN_IP_URL/cookies");
 				if (res.json().key != "value") {
 					throw new Error("wrong cookie value: " + res.json().key);
 				}
@@ -803,12 +803,12 @@ func TestRequestAndBatch(t *testing.T) {
 				assert.NoError(t, err)
 				state.CookieJar = cookieJar
 				_, err = common.RunString(rt, sr(`
-				let jar = new http.CookieJar();
+				var jar = new http.CookieJar();
 				jar.set("HTTPBIN_URL/cookies", "key", "value");
-				let res = http.request("GET", "HTTPBIN_URL/cookies", null, { cookies: { key2: "value2" }, jar: jar });
+				var res = http.request("GET", "HTTPBIN_URL/cookies", null, { cookies: { key2: "value2" }, jar: jar });
 				if (res.json().key != "value") { throw new Error("wrong cookie value: " + res.json().key); }
 				if (res.json().key2 != "value2") { throw new Error("wrong cookie value: " + res.json().key2); }
-				let jarCookies = jar.cookiesForURL("HTTPBIN_URL/cookies");
+				var jarCookies = jar.cookiesForURL("HTTPBIN_URL/cookies");
 				if (jarCookies.key[0] != "value") { throw new Error("wrong cookie value in jar: " + jarCookies.key[0]); }
 				if (jarCookies.key2 != undefined) { throw new Error("unexpected cookie in jar"); }
 				`))
@@ -823,7 +823,7 @@ func TestRequestAndBatch(t *testing.T) {
 				urlExpected := sr("http://****:****@HTTPBIN_IP:HTTPBIN_PORT/basic-auth/bob/pass")
 
 				_, err := common.RunString(rt, fmt.Sprintf(`
-				let res = http.request("GET", "%s", null, {});
+				var res = http.request("GET", "%s", null, {});
 				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 				`, url))
 				assert.NoError(t, err)
@@ -835,7 +835,7 @@ func TestRequestAndBatch(t *testing.T) {
 					urlExpected := sr("http://****:****@HTTPBIN_IP:HTTPBIN_PORT/digest-auth/auth/bob/pass")
 
 					_, err := common.RunString(rt, fmt.Sprintf(`
-					let res = http.request("GET", "%s", null, { auth: "digest" });
+					var res = http.request("GET", "%s", null, { auth: "digest" });
 					if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 					if (res.error_code != 0) { throw new Error("wrong error code: " + res.error_code); }
 					`, url))
@@ -851,7 +851,7 @@ func TestRequestAndBatch(t *testing.T) {
 					url := sr("http://bob:pass@HTTPBIN_IP:HTTPBIN_PORT/digest-auth/failure")
 
 					_, err := common.RunString(rt, fmt.Sprintf(`
-					let res = http.request("GET", "%s", null, { auth: "digest", timeout: 1, throw: false });
+					var res = http.request("GET", "%s", null, { auth: "digest", timeout: 1, throw: false });
 					`, url))
 					assert.NoError(t, err)
 				})
@@ -862,7 +862,7 @@ func TestRequestAndBatch(t *testing.T) {
 			for _, literal := range []string{`null`, `undefined`} {
 				t.Run(literal, func(t *testing.T) {
 					_, err := common.RunString(rt, fmt.Sprintf(sr(`
-					let res = http.request("GET", "HTTPBIN_URL/headers", null, { headers: %s });
+					var res = http.request("GET", "HTTPBIN_URL/headers", null, { headers: %s });
 					if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 					`), literal))
 					assert.NoError(t, err)
@@ -872,7 +872,7 @@ func TestRequestAndBatch(t *testing.T) {
 
 			t.Run("object", func(t *testing.T) {
 				_, err := common.RunString(rt, sr(`
-				let res = http.request("GET", "HTTPBIN_URL/headers", null, {
+				var res = http.request("GET", "HTTPBIN_URL/headers", null, {
 					headers: { "X-My-Header": "value" },
 				});
 				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
@@ -884,7 +884,7 @@ func TestRequestAndBatch(t *testing.T) {
 
 			t.Run("Host", func(t *testing.T) {
 				_, err := common.RunString(rt, sr(`
-				let res = http.request("GET", "HTTPBIN_URL/headers", null, {
+				var res = http.request("GET", "HTTPBIN_URL/headers", null, {
 					headers: { "Host": "HTTPBIN_DOMAIN" },
 				});
 				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
@@ -899,7 +899,7 @@ func TestRequestAndBatch(t *testing.T) {
 			for _, literal := range []string{`null`, `undefined`} {
 				t.Run(literal, func(t *testing.T) {
 					_, err := common.RunString(rt, fmt.Sprintf(sr(`
-					let res = http.request("GET", "HTTPBIN_URL/headers", null, { tags: %s });
+					var res = http.request("GET", "HTTPBIN_URL/headers", null, { tags: %s });
 					if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 					`), literal))
 					assert.NoError(t, err)
@@ -909,7 +909,7 @@ func TestRequestAndBatch(t *testing.T) {
 
 			t.Run("object", func(t *testing.T) {
 				_, err := common.RunString(rt, sr(`
-				let res = http.request("GET", "HTTPBIN_URL/headers", null, { tags: { tag: "value" } });
+				var res = http.request("GET", "HTTPBIN_URL/headers", null, { tags: { tag: "value" } });
 				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 				`))
 				assert.NoError(t, err)
@@ -930,7 +930,7 @@ func TestRequestAndBatch(t *testing.T) {
 				state.Tags = map[string]string{"runtag1": "val1", "runtag2": "val2"}
 
 				_, err := common.RunString(rt, sr(`
-				let res = http.request("GET", "HTTPBIN_URL/headers", null, { tags: { method: "test", name: "myName", runtag1: "fromreq" } });
+				var res = http.request("GET", "HTTPBIN_URL/headers", null, { tags: { method: "test", name: "myName", runtag1: "fromreq" } });
 				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 				`))
 				assert.NoError(t, err)
@@ -962,7 +962,7 @@ func TestRequestAndBatch(t *testing.T) {
 
 	t.Run("GET", func(t *testing.T) {
 		_, err := common.RunString(rt, sr(`
-		let res = http.get("HTTPBIN_URL/get?a=1&b=2");
+		var res = http.get("HTTPBIN_URL/get?a=1&b=2");
 		if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 		if (res.json().args.a != "1") { throw new Error("wrong ?a: " + res.json().args.a); }
 		if (res.json().args.b != "2") { throw new Error("wrong ?b: " + res.json().args.b); }
@@ -971,10 +971,10 @@ func TestRequestAndBatch(t *testing.T) {
 		assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/get?a=1&b=2"), "", 200, "")
 
 		t.Run("Tagged", func(t *testing.T) {
-			_, err := common.RunString(rt, `
-			let a = "1";
-			let b = "2";
-			let res = http.get(http.url`+"`"+sr(`HTTPBIN_URL/get?a=${a}&b=${b}`)+"`"+`);
+			_, err := common.RunES6String(rt, `
+			var a = "1";
+			var b = "2";
+			var res = http.get(http.url`+"`"+sr(`HTTPBIN_URL/get?a=${a}&b=${b}`)+"`"+`);
 			if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 			if (res.json().args.a != a) { throw new Error("wrong ?a: " + res.json().args.a); }
 			if (res.json().args.b != b) { throw new Error("wrong ?b: " + res.json().args.b); }
@@ -985,7 +985,7 @@ func TestRequestAndBatch(t *testing.T) {
 	})
 	t.Run("HEAD", func(t *testing.T) {
 		_, err := common.RunString(rt, sr(`
-		let res = http.head("HTTPBIN_URL/get?a=1&b=2");
+		var res = http.head("HTTPBIN_URL/get?a=1&b=2");
 		if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 		if (res.body.length != 0) { throw new Error("HEAD responses shouldn't have a body"); }
 		if (!res.headers["Content-Length"]) { throw new Error("Missing or invalid Content-Length header!"); }
@@ -996,7 +996,7 @@ func TestRequestAndBatch(t *testing.T) {
 
 	t.Run("OPTIONS", func(t *testing.T) {
 		_, err := common.RunString(rt, sr(`
-		let res = http.options("HTTPBIN_URL/?a=1&b=2");
+		var res = http.options("HTTPBIN_URL/?a=1&b=2");
 		if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 		if (!res.headers["Access-Control-Allow-Methods"]) { throw new Error("Missing Access-Control-Allow-Methods header!"); }
 		`))
@@ -1010,7 +1010,7 @@ func TestRequestAndBatch(t *testing.T) {
 	// https://tools.ietf.org/html/rfc7231#section-4.3.5
 	t.Run("DELETE", func(t *testing.T) {
 		_, err := common.RunString(rt, sr(`
-		let res = http.del("HTTPBIN_URL/delete?test=mest");
+		var res = http.del("HTTPBIN_URL/delete?test=mest");
 		if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 		if (res.json().args.test != "mest") { throw new Error("wrong args: " + JSON.stringify(res.json().args)); }
 		`))
@@ -1026,7 +1026,7 @@ func TestRequestAndBatch(t *testing.T) {
 	for method, fn := range postMethods {
 		t.Run(method, func(t *testing.T) {
 			_, err := common.RunString(rt, fmt.Sprintf(sr(`
-				let res = http.%s("HTTPBIN_URL/%s", "data");
+				var res = http.%s("HTTPBIN_URL/%s", "data");
 				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 				if (res.json().data != "data") { throw new Error("wrong data: " + res.json().data); }
 				if (res.json().headers["Content-Type"]) { throw new Error("content type set: " + res.json().headers["Content-Type"]); }
@@ -1036,7 +1036,7 @@ func TestRequestAndBatch(t *testing.T) {
 
 			t.Run("object", func(t *testing.T) {
 				_, err := common.RunString(rt, fmt.Sprintf(sr(`
-				let res = http.%s("HTTPBIN_URL/%s", {a: "a", b: 2});
+				var res = http.%s("HTTPBIN_URL/%s", {a: "a", b: 2});
 				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 				if (res.json().form.a != "a") { throw new Error("wrong a=: " + res.json().form.a); }
 				if (res.json().form.b != "2") { throw new Error("wrong b=: " + res.json().form.b); }
@@ -1046,7 +1046,7 @@ func TestRequestAndBatch(t *testing.T) {
 				assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), method, sr("HTTPBIN_URL/")+strings.ToLower(method), "", 200, "")
 				t.Run("Content-Type", func(t *testing.T) {
 					_, err := common.RunString(rt, fmt.Sprintf(sr(`
-						let res = http.%s("HTTPBIN_URL/%s", {a: "a", b: 2}, {headers: {"Content-Type": "application/x-www-form-urlencoded; charset=utf-8"}});
+						var res = http.%s("HTTPBIN_URL/%s", {a: "a", b: 2}, {headers: {"Content-Type": "application/x-www-form-urlencoded; charset=utf-8"}});
 						if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 						if (res.json().form.a != "a") { throw new Error("wrong a=: " + res.json().form.a); }
 						if (res.json().form.b != "2") { throw new Error("wrong b=: " + res.json().form.b); }
@@ -1061,16 +1061,16 @@ func TestRequestAndBatch(t *testing.T) {
 
 	t.Run("Batch", func(t *testing.T) {
 		t.Run("error", func(t *testing.T) {
-			_, err := common.RunString(rt, `let res = http.batch("https://somevalidurl.com");`)
+			_, err := common.RunString(rt, `var res = http.batch("https://somevalidurl.com");`)
 			require.Error(t, err)
 		})
 		t.Run("GET", func(t *testing.T) {
 			_, err := common.RunString(rt, sr(`
-			let reqs = [
+			var reqs = [
 				["GET", "HTTPBIN_URL/"],
 				["GET", "HTTPBIN_IP_URL/"],
 			];
-			let res = http.batch(reqs);
+			var res = http.batch(reqs);
 			for (var key in res) {
 				if (res[key].status != 200) { throw new Error("wrong status: " + res[key].status); }
 				if (res[key].url != reqs[key][1]) { throw new Error("wrong url: " + res[key].url); }
@@ -1081,7 +1081,7 @@ func TestRequestAndBatch(t *testing.T) {
 			assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_IP_URL/"), "", 200, "")
 
 			t.Run("Tagged", func(t *testing.T) {
-				_, err := common.RunString(rt, sr(`
+				_, err := common.RunES6String(rt, sr(`
 				let fragment = "get";
 				let reqs = [
 					["GET", http.url`+"`"+`HTTPBIN_URL/${fragment}`+"`"+`],
@@ -1100,11 +1100,11 @@ func TestRequestAndBatch(t *testing.T) {
 
 			t.Run("Shorthand", func(t *testing.T) {
 				_, err := common.RunString(rt, sr(`
-				let reqs = [
+				var reqs = [
 					"HTTPBIN_URL/",
 					"HTTPBIN_IP_URL/",
 				];
-				let res = http.batch(reqs);
+				var res = http.batch(reqs);
 				for (var key in res) {
 					if (res[key].status != 200) { throw new Error("wrong status: " + key + ": " + res[key].status); }
 					if (res[key].url != reqs[key]) { throw new Error("wrong url: " + key + ": " + res[key].url); }
@@ -1115,7 +1115,7 @@ func TestRequestAndBatch(t *testing.T) {
 				assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_IP_URL/"), "", 200, "")
 
 				t.Run("Tagged", func(t *testing.T) {
-					_, err := common.RunString(rt, sr(`
+					_, err := common.RunES6String(rt, sr(`
 					let fragment = "get";
 					let reqs = [
 						http.url`+"`"+`HTTPBIN_URL/${fragment}`+"`"+`,
@@ -1135,11 +1135,11 @@ func TestRequestAndBatch(t *testing.T) {
 
 			t.Run("ObjectForm", func(t *testing.T) {
 				_, err := common.RunString(rt, sr(`
-				let reqs = [
+				var reqs = [
 					{ method: "GET", url: "HTTPBIN_URL/" },
 					{ url: "HTTPBIN_IP_URL/", method: "GET"},
 				];
-				let res = http.batch(reqs);
+				var res = http.batch(reqs);
 				for (var key in res) {
 					if (res[key].status != 200) { throw new Error("wrong status: " + key + ": " + res[key].status); }
 					if (res[key].url != reqs[key].url) { throw new Error("wrong url: " + key + ": " + res[key].url + " != " + reqs[key].url); }
@@ -1152,13 +1152,13 @@ func TestRequestAndBatch(t *testing.T) {
 
 			t.Run("ObjectKeys", func(t *testing.T) {
 				_, err := common.RunString(rt, sr(`
-				let reqs = {
+				var reqs = {
 					shorthand: "HTTPBIN_URL/get?r=shorthand",
 					arr: ["GET", "HTTPBIN_URL/get?r=arr", null, {tags: {name: 'arr'}}],
 					obj1: { method: "GET", url: "HTTPBIN_URL/get?r=obj1" },
 					obj2: { url: "HTTPBIN_URL/get?r=obj2", params: {tags: {name: 'obj2'}}, method: "GET"},
 				};
-				let res = http.batch(reqs);
+				var res = http.batch(reqs);
 				for (var key in res) {
 					if (res[key].status != 200) { throw new Error("wrong status: " + key + ": " + res[key].status); }
 					if (res[key].json().args.r != key) { throw new Error("wrong request id: " + key); }
@@ -1177,7 +1177,7 @@ func TestRequestAndBatch(t *testing.T) {
 				rt.Set("someBinFile", []byte(testStr))
 
 				_, err := common.RunString(rt, sr(`
-					let reqs = [
+					var reqs = [
 						["POST", "HTTPBIN_URL/post", "testbody"],
 						["POST", "HTTPBIN_URL/post", someStrFile],
 						["POST", "HTTPBIN_URL/post", someBinFile],
@@ -1203,7 +1203,7 @@ func TestRequestAndBatch(t *testing.T) {
 							},
 						},
 					];
-					let res = http.batch(reqs);
+					var res = http.batch(reqs);
 					for (var key in res) {
 						if (res[key].status != 200) { throw new Error("wrong status: " + key + ": " + res[key].status); }
 						if (res[key].json().data != "testbody" && res[key].json().form.hello != "world!") { throw new Error("wrong response for " + key + ": " + res[key].body); }
@@ -1216,7 +1216,7 @@ func TestRequestAndBatch(t *testing.T) {
 		})
 		t.Run("POST", func(t *testing.T) {
 			_, err := common.RunString(rt, sr(`
-			let res = http.batch([ ["POST", "HTTPBIN_URL/post", { key: "value" }] ]);
+			var res = http.batch([ ["POST", "HTTPBIN_URL/post", { key: "value" }] ]);
 			for (var key in res) {
 				if (res[key].status != 200) { throw new Error("wrong status: " + key + ": " + res[key].status); }
 				if (res[key].json().form.key != "value") { throw new Error("wrong form: " + key + ": " + JSON.stringify(res[key].json().form)); }
@@ -1226,7 +1226,7 @@ func TestRequestAndBatch(t *testing.T) {
 		})
 		t.Run("PUT", func(t *testing.T) {
 			_, err := common.RunString(rt, sr(`
-			let res = http.batch([ ["PUT", "HTTPBIN_URL/put", { key: "value" }] ]);
+			var res = http.batch([ ["PUT", "HTTPBIN_URL/put", { key: "value" }] ]);
 			for (var key in res) {
 				if (res[key].status != 200) { throw new Error("wrong status: " + key + ": " + res[key].status); }
 				if (res[key].json().form.key != "value") { throw new Error("wrong form: " + key + ": " + JSON.stringify(res[key].json().form)); }
@@ -1239,9 +1239,9 @@ func TestRequestAndBatch(t *testing.T) {
 	t.Run("HTTPRequest", func(t *testing.T) {
 		t.Run("EmptyBody", func(t *testing.T) {
 			_, err := common.RunString(rt, sr(`
-				let reqUrl = "HTTPBIN_URL/cookies"
-				let res = http.get(reqUrl);
-				let jar = new http.CookieJar();
+				var reqUrl = "HTTPBIN_URL/cookies"
+				var res = http.get(reqUrl);
+				var jar = new http.CookieJar();
 
 				jar.set("HTTPBIN_URL/cookies", "key", "value");
 				res = http.request("GET", "HTTPBIN_URL/cookies", null, { cookies: { key2: "value2" }, jar: jar });
@@ -1261,7 +1261,7 @@ func TestRequestAndBatch(t *testing.T) {
 		})
 		t.Run("NonEmptyBody", func(t *testing.T) {
 			_, err := common.RunString(rt, sr(`
-				let res = http.post("HTTPBIN_URL/post", {a: "a", b: 2}, {headers: {"Content-Type": "application/x-www-form-urlencoded; charset=utf-8"}});
+				var res = http.post("HTTPBIN_URL/post", {a: "a", b: 2}, {headers: {"Content-Type": "application/x-www-form-urlencoded; charset=utf-8"}});
 				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 				if (res.request["body"] != "a=a&b=2") { throw new Error("http request body was not set properly: " + JSON.stringify(res.request))}
 				`))
@@ -1381,7 +1381,7 @@ func TestRequestCompression(t *testing.T) {
 			}
 			expectedEncoding = strings.Join(algos, ", ")
 			actualEncoding = expectedEncoding
-			_, err := common.RunString(rt, tb.Replacer.Replace(`
+			_, err := common.RunES6String(rt, tb.Replacer.Replace(`
 		http.post("HTTPBIN_URL/compressed-text", `+"`"+text+"`"+`,  {"compression": "`+testCase.compression+`"});
 	`))
 			if testCase.expectedError == "" {
@@ -1400,7 +1400,7 @@ func TestRequestCompression(t *testing.T) {
 
 		logHook.Drain()
 		t.Run("encoding", func(t *testing.T) {
-			_, err := common.RunString(rt, tb.Replacer.Replace(`
+			_, err := common.RunES6String(rt, tb.Replacer.Replace(`
 				http.post("HTTPBIN_URL/compressed-text", `+"`"+text+"`"+`,
 					{"compression": "`+actualEncoding+`",
 					 "headers": {"Content-Encoding": "`+expectedEncoding+`"}
@@ -1412,7 +1412,7 @@ func TestRequestCompression(t *testing.T) {
 		})
 
 		t.Run("encoding and length", func(t *testing.T) {
-			_, err := common.RunString(rt, tb.Replacer.Replace(`
+			_, err := common.RunES6String(rt, tb.Replacer.Replace(`
 				http.post("HTTPBIN_URL/compressed-text", `+"`"+text+"`"+`,
 					{"compression": "`+actualEncoding+`",
 					 "headers": {"Content-Encoding": "`+expectedEncoding+`",
@@ -1426,7 +1426,7 @@ func TestRequestCompression(t *testing.T) {
 
 		expectedEncoding = actualEncoding
 		t.Run("correct encoding", func(t *testing.T) {
-			_, err := common.RunString(rt, tb.Replacer.Replace(`
+			_, err := common.RunES6String(rt, tb.Replacer.Replace(`
 				http.post("HTTPBIN_URL/compressed-text", `+"`"+text+"`"+`,
 					{"compression": "`+actualEncoding+`",
 					 "headers": {"Content-Encoding": "`+actualEncoding+`"}
@@ -1448,7 +1448,7 @@ func TestRequestCompression(t *testing.T) {
 
 		t.Run("content-length is set", func(t *testing.T) {
 			_, err := common.RunString(rt, tb.Replacer.Replace(`
-				let resp = http.post("HTTPBIN_URL/post", "0123456789");
+				var resp = http.post("HTTPBIN_URL/post", "0123456789");
 				if (resp.json().headers["Content-Length"][0] != "10") {
 					throw new Error("content-length not set: " + JSON.stringify(resp.json().headers));
 				}
@@ -1504,29 +1504,29 @@ func TestResponseTypes(t *testing.T) {
 	}
 
 	_, err := common.RunString(rt, replace(`
-		let expText = "EXP_TEXT";
-		let expBinLength = EXP_BIN_LEN;
+		var expText = "EXP_TEXT";
+		var expBinLength = EXP_BIN_LEN;
 
 		// Check default behaviour with a unicode text
-		let respTextImplicit = http.get("HTTPBIN_URL/get-text").body;
+		var respTextImplicit = http.get("HTTPBIN_URL/get-text").body;
 		if (respTextImplicit !== expText) {
 			throw new Error("default response body should be '" + expText + "' but was '" + respTextImplicit + "'");
 		}
 		http.post("HTTPBIN_URL/compare-text", respTextImplicit);
 
 		// Check discarding of responses
-		let respNone = http.get("HTTPBIN_URL/get-text", { responseType: "none" }).body;
+		var respNone = http.get("HTTPBIN_URL/get-text", { responseType: "none" }).body;
 		if (respNone != null) {
 			throw new Error("none response body should be null but was " + respNone);
 		}
 
 		// Check binary transmission of the text response as well
-		let respTextInBin = http.get("HTTPBIN_URL/get-text", { responseType: "binary" }).body;
+		var respTextInBin = http.get("HTTPBIN_URL/get-text", { responseType: "binary" }).body;
 
 		// Hack to convert a utf-8 array to a JS string
-		let strConv = "";
+		var strConv = "";
 		function pad(n) { return n.length < 2 ? "0" + n : n; }
-		for( let i = 0; i < respTextInBin.length; i++ ) {
+		for( var i = 0; i < respTextInBin.length; i++ ) {
 			strConv += ( "%" + pad(respTextInBin[i].toString(16)));
 		}
 		strConv = decodeURIComponent(strConv);
@@ -1536,11 +1536,11 @@ func TestResponseTypes(t *testing.T) {
 		http.post("HTTPBIN_URL/compare-text", respTextInBin);
 
 		// Check binary response
-		let respBin = http.get("HTTPBIN_URL/get-bin", { responseType: "binary" }).body;
+		var respBin = http.get("HTTPBIN_URL/get-bin", { responseType: "binary" }).body;
 		if (respBin.length !== expBinLength) {
 			throw new Error("response body length should be '" + expBinLength + "' but was '" + respBin.length + "'");
 		}
-		for( let i = 0; i < respBin.length; i++ ) {
+		for( var i = 0; i < respBin.length; i++ ) {
 			if ( respBin[i] !== i%256 ) {
 				throw new Error("expected value " + (i%256) + " to be at position " + i + " but it was " + respBin[i]);
 			}
@@ -1553,16 +1553,16 @@ func TestResponseTypes(t *testing.T) {
 	state.Options.DiscardResponseBodies = null.BoolFrom(true)
 
 	_, err = common.RunString(rt, replace(`
-		let expText = "EXP_TEXT";
+		var expText = "EXP_TEXT";
 
 		// Check default behaviour
-		let respDefault = http.get("HTTPBIN_URL/get-text").body;
+		var respDefault = http.get("HTTPBIN_URL/get-text").body;
 		if (respDefault !== null) {
 			throw new Error("default response body should be discarded and null but was " + respDefault);
 		}
 
 		// Check explicit text response
-		let respTextExplicit = http.get("HTTPBIN_URL/get-text", { responseType: "text" }).body;
+		var respTextExplicit = http.get("HTTPBIN_URL/get-text", { responseType: "text" }).body;
 		if (respTextExplicit !== expText) {
 			throw new Error("text response body should be '" + expText + "' but was '" + respTextExplicit + "'");
 		}
@@ -1617,46 +1617,46 @@ func TestErrorCodes(t *testing.T) {
 			name:              "Unroutable",
 			expectedErrorCode: 1101,
 			expectedErrorMsg:  "lookup: no such host",
-			script:            `let res = http.request("GET", "http://sdafsgdhfjg/");`,
+			script:            `var res = http.request("GET", "http://sdafsgdhfjg/");`,
 		},
 
 		{
 			name:              "404",
 			status:            404,
 			expectedErrorCode: 1404,
-			script:            `let res = http.request("GET", "HTTPBIN_URL/status/404");`,
+			script:            `var res = http.request("GET", "HTTPBIN_URL/status/404");`,
 		},
 		{
 			name:              "Unroutable redirect",
 			expectedErrorCode: 1101,
 			expectedErrorMsg:  "lookup: no such host",
 			moreSamples:       1,
-			script:            `let res = http.request("GET", "HTTPBIN_URL/redirect-to?url=http://dafsgdhfjg/");`,
+			script:            `var res = http.request("GET", "HTTPBIN_URL/redirect-to?url=http://dafsgdhfjg/");`,
 		},
 		{
 			name:              "Non location redirect",
 			expectedErrorCode: 1000,
 			expectedErrorMsg:  "302 response missing Location header",
-			script:            `let res = http.request("GET", "HTTPBIN_URL/no-location-redirect");`,
+			script:            `var res = http.request("GET", "HTTPBIN_URL/no-location-redirect");`,
 		},
 		{
 			name:              "Bad location redirect",
 			expectedErrorCode: 1000,
 			expectedErrorMsg:  "failed to parse Location header \"h\\t:/\": ",
-			script:            `let res = http.request("GET", "HTTPBIN_URL/bad-location-redirect");`,
+			script:            `var res = http.request("GET", "HTTPBIN_URL/bad-location-redirect");`,
 		},
 		{
 			name:              "Missing protocol",
 			expectedErrorCode: 1000,
 			expectedErrorMsg:  `unsupported protocol scheme ""`,
-			script:            `let res = http.request("GET", "dafsgdhfjg/");`,
+			script:            `var res = http.request("GET", "dafsgdhfjg/");`,
 		},
 		{
 			name:        "Too many redirects",
 			status:      302,
 			moreSamples: 2,
 			script: `
-			let res = http.get("HTTPBIN_URL/relative-redirect/3", {redirects: 2});
+			var res = http.get("HTTPBIN_URL/relative-redirect/3", {redirects: 2});
 			if (res.url != "HTTPBIN_URL/relative-redirect/1") { throw new Error("incorrect URL: " + res.url) }`,
 		},
 		{
@@ -1666,7 +1666,7 @@ func TestErrorCodes(t *testing.T) {
 			expectedErrorMsg:  `dial: connection refused`,
 			expectedErrorCode: 1212,
 			script: `
-			let res = http.get("HTTPBIN_URL/redirect-to?url=http%3A%2F%2F127.0.0.1%3A1%2Fpesho");
+			var res = http.get("HTTPBIN_URL/redirect-to?url=http%3A%2F%2F127.0.0.1%3A1%2Fpesho");
 			if (res.url != "http://127.0.0.1:1/pesho") { throw new Error("incorrect URL: " + res.url) }`,
 		},
 	}
@@ -1726,7 +1726,7 @@ func TestResponseWaitingAndReceivingTimings(t *testing.T) {
 	}))
 
 	_, err := common.RunString(rt, tb.Replacer.Replace(`
-		let resp = http.get("HTTPBIN_URL/slow-response");
+		var resp = http.get("HTTPBIN_URL/slow-response");
 
 		if (resp.timings.waiting < 1000) {
 			throw new Error("expected waiting time to be over 1000ms but was " + resp.timings.waiting);
@@ -1752,7 +1752,7 @@ func TestResponseTimingsWhenTimeout(t *testing.T) {
 	state.Options.Throw = null.BoolFrom(false)
 
 	_, err := common.RunString(rt, tb.Replacer.Replace(`
-		let resp = http.get("HTTPBIN_URL/delay/10", { timeout: 2500 });
+		var resp = http.get("HTTPBIN_URL/delay/10", { timeout: 2500 });
 
 		if (resp.timings.waiting < 2000) {
 			throw new Error("expected waiting time to be over 2000ms but was " + resp.timings.waiting);
@@ -1774,18 +1774,18 @@ func TestNoResponseBodyMangling(t *testing.T) {
 	state.Options.Throw = null.BoolFrom(true)
 
 	_, err := common.RunString(rt, tb.Replacer.Replace(`
-	    const batchSize = 100;
+	    var batchSize = 100;
 
-		let requests = [];
+		var requests = [];
 
-		for (let i = 0; i < batchSize; i++) {
+		for (var i = 0; i < batchSize; i++) {
 			requests.push(["GET", "HTTPBIN_URL/get?req=" + i, null, { responseType: (i % 2 ? "binary" : "text") }]);
 		}
 
-		let responses = http.batch(requests);
+		var responses = http.batch(requests);
 
-		for (let i = 0; i < batchSize; i++) {
-			let reqNumber = parseInt(responses[i].json().args.req[0], 10);
+		for (var i = 0; i < batchSize; i++) {
+			var reqNumber = parseInt(responses[i].json().args.req[0], 10);
 			if (i !== reqNumber) {
 				throw new Error("Response " + i + " has " + reqNumber + ", expected " + i)
 			}
@@ -1878,7 +1878,7 @@ func TestErrorsWithDecompression(t *testing.T) {
 
 	_, err := common.RunString(rt, tb.Replacer.Replace(`
 		function handleResponseEncodingError (encoding) {
-			let resp = http.get("HTTPBIN_URL/broken-archive?encoding=" + encoding);
+			var resp = http.get("HTTPBIN_URL/broken-archive?encoding=" + encoding);
 			if (resp.error_code != 1701) {
 				throw new Error("Expected error_code 1701 for '" + encoding +"', but got " + resp.error_code);
 			}
@@ -1910,7 +1910,7 @@ func TestDigestAuthWithBody(t *testing.T) {
 	)
 
 	_, err := common.RunString(rt, fmt.Sprintf(`
-		let res = http.post(%q, "super secret body", { auth: "digest" });
+		var res = http.post(%q, "super secret body", { auth: "digest" });
 		if (res.status !== 200) { throw new Error("wrong status: " + res.status); }
 		if (res.error_code !== 0) { throw new Error("wrong error code: " + res.error_code); }
 	`, urlWithCreds))

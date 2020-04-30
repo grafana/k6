@@ -47,7 +47,7 @@ func TestTLS13Support(t *testing.T) {
 	state.Options.Apply(lib.Options{TLSVersion: &lib.TLSVersions{Max: lib.TLSVersion13}})
 
 	_, err := common.RunString(rt, tb.Replacer.Replace(`
-		let resp = http.get("HTTPSBIN_URL/tls-version");
+		var resp = http.get("HTTPSBIN_URL/tls-version");
 		if (resp.body != "tls1.3") {
 			throw new Error("unexpected tls version: " + resp.body);
 		}

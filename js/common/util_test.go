@@ -30,11 +30,11 @@ import (
 
 func TestRunString(t *testing.T) {
 	t.Run("Valid", func(t *testing.T) {
-		_, err := RunString(goja.New(), `let a = 1;`)
+		_, err := RunES6String(goja.New(), `let a = 1;`)
 		assert.NoError(t, err)
 	})
 	t.Run("Invalid", func(t *testing.T) {
-		_, err := RunString(goja.New(), `let a = #;`)
+		_, err := RunES6String(goja.New(), `let a = #;`)
 		assert.NotNil(t, err)
 		assert.Contains(t, err.Error(), "SyntaxError: __string__: Unexpected character '#' (1:8)\n> 1 | let a = #;\n")
 	})

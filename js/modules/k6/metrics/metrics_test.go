@@ -80,7 +80,7 @@ func TestMetrics(t *testing.T) {
 						isTimeString = `, true`
 					}
 					_, err := common.RunString(rt,
-						fmt.Sprintf(`let m = new metrics.%s("my_metric"%s)`, fn, isTimeString),
+						fmt.Sprintf(`var m = new metrics.%s("my_metric"%s)`, fn, isTimeString),
 					)
 					if !assert.NoError(t, err) {
 						return
