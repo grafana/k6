@@ -224,23 +224,12 @@ func (e *ExecutionScheduler) initVUsConcurrently(
 func (e *ExecutionScheduler) Init(ctx context.Context, samplesOut chan<- stats.SampleContainer) error {
 	logger := e.logger.WithField("phase", "local-execution-scheduler-init")
 
-	// Initialize each executor and do some basic validation.
+	// Initialize each executor
 	e.state.SetExecutionStatus(lib.ExecutionStatusInitExecutors)
 	logger.Debugf("Start initializing executors...")
 	errMsg := "error while initializing executor %s: %s"
-	exports := e.runner.GetExports()
 	for _, exec := range e.executors {
 		executorConfig := exec.GetConfig()
-		execFn := executorConfig.GetExec().ValueOrZero()
-		execName := executorConfig.GetName()
-
-		if execFn == "" {
-			execFn = "default"
-		}
-		if _, ok := exports[execFn]; !ok {
-			return fmt.Errorf(errMsg, execName,
-				fmt.Sprintf("function '%s' not found in exports", execFn))
-		}
 		if err := exec.Init(ctx); err != nil {
 			return fmt.Errorf(errMsg, executorConfig.GetName(), err)
 		}

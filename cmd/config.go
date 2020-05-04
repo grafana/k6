@@ -34,6 +34,7 @@ import (
 	null "gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/lib/executor"
 	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/stats/cloud"
@@ -262,17 +263,24 @@ func applyDefault(conf Config) Config {
 	return conf
 }
 
-func deriveAndValidateConfig(conf Config) (result Config, err error) {
+func deriveAndValidateConfig(conf Config, exports map[string]struct{}) (result Config, err error) {
 	result = conf
 	result.Options, err = executor.DeriveExecutionFromShortcuts(conf.Options)
 	if err != nil {
 		return result, err
 	}
-	return result, validateConfig(result)
+	return result, validateConfig(result, exports)
 }
 
-func validateConfig(conf Config) error {
+func validateConfig(conf Config, exports map[string]struct{}) error {
 	errList := conf.Validate()
+
+	for _, ec := range conf.Execution {
+		if err := validateExecutorConfig(ec, exports); err != nil {
+			errList = append(errList, err)
+		}
+	}
+
 	if len(errList) == 0 {
 		return nil
 	}
@@ -283,4 +291,16 @@ func validateConfig(conf Config) error {
 	}
 
 	return errors.New(strings.Join(errMsgParts, "\n"))
+}
+
+func validateExecutorConfig(conf lib.ExecutorConfig, exports map[string]struct{}) error {
+	execFn := conf.GetExec().ValueOrZero()
+	if execFn == "" {
+		execFn = consts.DefaultFn
+	}
+	if _, ok := exports[execFn]; !ok {
+		return fmt.Errorf("executor %s: %s", conf.GetName(),
+			fmt.Sprintf("function '%s' not found in exports", execFn))
+	}
+	return nil
 }

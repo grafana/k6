@@ -105,7 +105,7 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 			return err
 		}
 
-		derivedConf, cerr := deriveAndValidateConfig(conf)
+		derivedConf, cerr := deriveAndValidateConfig(conf, r.GetExports())
 		if cerr != nil {
 			return ExitCode{error: cerr, Code: invalidConfigErrorCode}
 		}
