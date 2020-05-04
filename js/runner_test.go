@@ -612,7 +612,7 @@ func TestVURunInterruptDoesntPanic(t *testing.T) {
 				newCtx, newCancel := context.WithCancel(ctx)
 				vu := initVU.Activate(&lib.VUActivationParams{
 					RunContext:         newCtx,
-					DeactivateCallback: func() { wg.Done() },
+					DeactivateCallback: func(_ lib.InitializedVU) { wg.Done() },
 				})
 				ch := make(chan struct{})
 				go func() {

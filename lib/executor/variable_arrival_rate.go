@@ -315,22 +315,14 @@ func (varr VariableArrivalRate) Run(ctx context.Context, out chan<- stats.Sample
 		}
 	}()
 
-	conf := varr.GetConfig()
-	execFn := conf.GetExec().ValueOrZero()
-	env := conf.GetEnv()
-	tags := conf.GetTags()
+	activationParams := getVUActivationParams(maxDurationCtx, varr.config.BaseConfig,
+		func(u lib.InitializedVU) {
+			varr.executionState.ReturnVU(u, true)
+			activeVUsWg.Done()
+		})
 	activateVU := func(initVU lib.InitializedVU) lib.ActiveVU {
 		activeVUsWg.Add(1)
-		activeVU := initVU.Activate(&lib.VUActivationParams{
-			RunContext: maxDurationCtx,
-			Exec:       execFn,
-			Env:        env,
-			Tags:       tags,
-			DeactivateCallback: func() {
-				varr.executionState.ReturnVU(initVU, true)
-				activeVUsWg.Done()
-			},
-		})
+		activeVU := initVU.Activate(activationParams)
 		varr.executionState.ModCurrentlyActiveVUsCount(+1)
 		atomic.AddUint64(&activeVUsCount, 1)
 		return activeVU

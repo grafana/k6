@@ -47,7 +47,7 @@ type InitializedVU interface {
 // the buffer pool and activates it for use.
 type VUActivationParams struct {
 	RunContext         context.Context
-	DeactivateCallback func()
+	DeactivateCallback func(InitializedVU)
 	Env, Tags          map[string]string
 	Exec               string
 }

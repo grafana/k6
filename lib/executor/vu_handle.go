@@ -39,9 +39,7 @@ type vuHandle struct {
 	parentCtx context.Context
 	getVU     func() (lib.InitializedVU, error)
 	returnVU  func(lib.InitializedVU)
-	exec      string
-	env       map[string]string
-	tags      map[string]string
+	config    *BaseConfig
 
 	canStartIter chan struct{}
 
@@ -52,8 +50,7 @@ type vuHandle struct {
 
 func newStoppedVUHandle(
 	parentCtx context.Context, getVU func() (lib.InitializedVU, error),
-	returnVU func(lib.InitializedVU), exec string, env map[string]string,
-	tags map[string]string, logger *logrus.Entry,
+	returnVU func(lib.InitializedVU), config *BaseConfig, logger *logrus.Entry,
 ) *vuHandle {
 	lock := &sync.RWMutex{}
 	ctx, cancel := context.WithCancel(parentCtx)
@@ -62,9 +59,7 @@ func newStoppedVUHandle(
 		parentCtx: parentCtx,
 		getVU:     getVU,
 		returnVU:  returnVU,
-		exec:      exec,
-		env:       env,
-		tags:      tags,
+		config:    config,
 
 		canStartIter: make(chan struct{}),
 
@@ -113,7 +108,6 @@ func (vh *vuHandle) runLoopsIfPossible(runIter func(context.Context, lib.ActiveV
 	executorDone := vh.parentCtx.Done()
 
 	var vu lib.ActiveVU
-	var deactivateVU func()
 
 mainLoop:
 	for {
@@ -161,16 +155,11 @@ mainLoop:
 			if err != nil {
 				return
 			}
-			deactivateVU = func() {
-				vh.returnVU(initVU)
-			}
-			vu = initVU.Activate(&lib.VUActivationParams{
-				Exec:               vh.exec,
-				RunContext:         ctx,
-				Env:                vh.env,
-				Tags:               vh.tags,
-				DeactivateCallback: deactivateVU,
-			})
+			activationParams := getVUActivationParams(ctx, *vh.config,
+				func(u lib.InitializedVU) {
+					vh.returnVU(u)
+				})
+			vu = initVU.Activate(activationParams)
 		}
 
 		runIter(ctx, vu)

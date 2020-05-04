@@ -427,7 +427,7 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 		avu.busy <- struct{}{}
 
 		if params.DeactivateCallback != nil {
-			params.DeactivateCallback()
+			params.DeactivateCallback(u)
 		}
 	}()
 

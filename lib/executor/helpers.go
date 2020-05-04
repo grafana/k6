@@ -31,6 +31,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/lib/types"
 )
 
@@ -214,4 +215,23 @@ func getTickerPeriod(scaledArrivalRate *big.Rat) types.NullDuration {
 func getArrivalRatePerSec(scaledArrivalRate *big.Rat) *big.Rat {
 	perSecRate := big.NewRat(int64(time.Second), 1)
 	return perSecRate.Mul(perSecRate, scaledArrivalRate)
+}
+
+func getActivationParams(
+	ctx context.Context, conf BaseConfig, deactivateCallback func(lib.InitializedVU),
+) *lib.VUActivationParams {
+	execFn := conf.GetExec().ValueOrZero()
+	env := conf.GetEnv()
+	tags := conf.GetTags()
+	if execFn == "" {
+		execFn = consts.DefaultFn
+	}
+
+	return &lib.VUActivationParams{
+		RunContext:         ctx,
+		Exec:               execFn,
+		Env:                env,
+		Tags:               tags,
+		DeactivateCallback: deactivateCallback,
+	}
 }
