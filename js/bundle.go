@@ -191,7 +191,7 @@ func (b *Bundle) getExports(rt *goja.Runtime) error {
 	for _, k := range exports.Keys() {
 		v := exports.Get(k)
 		switch k {
-		case "options":
+		case consts.Options:
 			data, err := json.Marshal(v.Export())
 			if err != nil {
 				return err
@@ -199,11 +199,11 @@ func (b *Bundle) getExports(rt *goja.Runtime) error {
 			if err := json.Unmarshal(data, &b.Options); err != nil {
 				return err
 			}
-		case "setup":
+		case consts.SetupFn:
 			if _, ok := goja.AssertFunction(v); !ok {
 				return errors.New("exported 'setup' must be a function")
 			}
-		case "teardown":
+		case consts.TeardownFn:
 			if _, ok := goja.AssertFunction(v); !ok {
 				return errors.New("exported 'teardown' must be a function")
 			}

@@ -42,17 +42,14 @@ import (
 
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/stats"
 )
 
 //nolint:gochecknoglobals
-var (
-	errInterrupt  = errors.New("context cancelled")
-	stageSetup    = "setup"
-	stageTeardown = "teardown"
-)
+var errInterrupt = errors.New("context cancelled")
 
 // Ensure Runner implements the lib.Runner interface
 var _ lib.Runner = &Runner{}
@@ -219,7 +216,7 @@ func (r *Runner) Setup(ctx context.Context, out chan<- stats.SampleContainer) er
 	)
 	defer setupCancel()
 
-	v, err := r.runPart(setupCtx, out, stageSetup, nil)
+	v, err := r.runPart(setupCtx, out, consts.SetupFn, nil)
 	if err != nil {
 		return err
 	}
@@ -231,7 +228,7 @@ func (r *Runner) Setup(ctx context.Context, out chan<- stats.SampleContainer) er
 
 	r.setupData, err = json.Marshal(v.Export())
 	if err != nil {
-		return errors.Wrap(err, stageSetup)
+		return errors.Wrap(err, consts.SetupFn)
 	}
 	var tmp interface{}
 	return json.Unmarshal(r.setupData, &tmp)
@@ -257,12 +254,12 @@ func (r *Runner) Teardown(ctx context.Context, out chan<- stats.SampleContainer)
 	var data interface{}
 	if r.setupData != nil {
 		if err := json.Unmarshal(r.setupData, &data); err != nil {
-			return errors.Wrap(err, stageTeardown)
+			return errors.Wrap(err, consts.TeardownFn)
 		}
 	} else {
 		data = goja.Undefined()
 	}
-	_, err := r.runPart(teardownCtx, out, stageTeardown, data)
+	_, err := r.runPart(teardownCtx, out, consts.TeardownFn, data)
 	return err
 }
 
@@ -349,9 +346,9 @@ func (r *Runner) runPart(ctx context.Context, out chan<- stats.SampleContainer, 
 func (r *Runner) timeoutErrorDuration(stage string) time.Duration {
 	d := time.Duration(0)
 	switch stage {
-	case stageSetup:
+	case consts.SetupFn:
 		return time.Duration(r.Bundle.Options.SetupTimeout.Duration)
-	case stageTeardown:
+	case consts.TeardownFn:
 		return time.Duration(r.Bundle.Options.TeardownTimeout.Duration)
 	}
 	return d
