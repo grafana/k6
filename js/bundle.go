@@ -253,7 +253,9 @@ func (b *Bundle) Instantiate() (bi *BundleInstance, instErr error) {
 	var jsOptionsObj *goja.Object
 	if jsOptions == nil || goja.IsNull(jsOptions) || goja.IsUndefined(jsOptions) {
 		jsOptionsObj = rt.NewObject()
-		rt.Set("options", jsOptionsObj)
+		if err := exports.Set("options", jsOptionsObj); err != nil {
+			return nil, err
+		}
 	} else {
 		jsOptionsObj = jsOptions.ToObject(rt)
 	}

@@ -147,6 +147,7 @@ func TestOptionsSettingToScript(t *testing.T) {
 		t.Run(fmt.Sprintf("Variant#%d", i), func(t *testing.T) {
 			t.Parallel()
 			data := variant + `
+					exports.options = options;
 					exports.default = function() {
 						if (!options) {
 							throw new Error("Expected options to be defined!");
