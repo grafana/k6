@@ -129,6 +129,64 @@ func TestVariableArrivalRateRunCorrectRate(t *testing.T) {
 	require.Empty(t, logHook.Drain())
 }
 
+func TestVariableArrivalRateRunUnplannedVUs(t *testing.T) {
+	t.Parallel()
+	et, err := lib.NewExecutionTuple(nil, nil)
+	require.NoError(t, err)
+	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
+	var count int64
+	var ch = make(chan struct{})  // closed when new unplannedVU is started and signal to get to next iterations
+	var ch2 = make(chan struct{}) // closed when a second iteration was started on an old VU in order to test it won't start a second unplanned VU in parallel or at all
+	runner := simpleRunner(func(ctx context.Context) error {
+		cur := atomic.AddInt64(&count, 1)
+		if cur == 1 {
+			<-ch // wait to start again
+		} else if cur == 2 {
+			<-ch2 // wait to start again
+		}
+
+		return nil
+	})
+	var ctx, cancel, executor, logHook = setupExecutor(
+		t, VariableArrivalRateConfig{
+			TimeUnit: types.NullDurationFrom(time.Second),
+			Stages: []Stage{
+				{
+					Duration: types.NullDurationFrom(time.Second * 2),
+					Target:   null.IntFrom(10),
+				},
+			},
+			PreAllocatedVUs: null.IntFrom(1),
+			MaxVUs:          null.IntFrom(3),
+		},
+		es, runner)
+	defer cancel()
+	var engineOut = make(chan stats.SampleContainer, 1000)
+	es.SetInitVUFunc(func(_ context.Context, logger *logrus.Entry) (lib.InitializedVU, error) {
+		cur := atomic.LoadInt64(&count)
+		require.Equal(t, cur, int64(1))
+		time.Sleep(time.Second / 2)
+		close(ch)
+		time.Sleep(time.Millisecond * 10)
+
+		cur = atomic.LoadInt64(&count)
+		require.Equal(t, cur, int64(2))
+		time.Sleep(time.Millisecond * 10)
+
+		cur = atomic.LoadInt64(&count)
+		require.Equal(t, cur, int64(2))
+		close(ch2)
+		time.Sleep(time.Millisecond * 10)
+		cur = atomic.LoadInt64(&count)
+		require.NotEqual(t, cur, int64(2))
+		return runner.NewVU(int64(es.GetUniqueVUIdentifier()), engineOut)
+	})
+	err = executor.Run(ctx, engineOut)
+	assert.NoError(t, err)
+	assert.Empty(t, logHook.Drain())
+	assert.Equal(t, count, int64(9))
+}
+
 func TestVariableArrivalRateRunCorrectRateWithSlowRate(t *testing.T) {
 	t.Parallel()
 	var count int64
