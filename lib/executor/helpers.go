@@ -31,7 +31,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/lib/types"
 )
 
@@ -217,21 +216,14 @@ func getArrivalRatePerSec(scaledArrivalRate *big.Rat) *big.Rat {
 	return perSecRate.Mul(perSecRate, scaledArrivalRate)
 }
 
-func getActivationParams(
+func getVUActivationParams(
 	ctx context.Context, conf BaseConfig, deactivateCallback func(lib.InitializedVU),
 ) *lib.VUActivationParams {
-	execFn := conf.GetExec().ValueOrZero()
-	env := conf.GetEnv()
-	tags := conf.GetTags()
-	if execFn == "" {
-		execFn = consts.DefaultFn
-	}
-
 	return &lib.VUActivationParams{
 		RunContext:         ctx,
-		Exec:               execFn,
-		Env:                env,
-		Tags:               tags,
+		Exec:               conf.GetExec(),
+		Env:                conf.GetEnv(),
+		Tags:               conf.GetTags(),
 		DeactivateCallback: deactivateCallback,
 	}
 }

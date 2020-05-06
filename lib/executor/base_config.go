@@ -28,6 +28,7 @@ import (
 
 	null "gopkg.in/guregu/null.v3"
 
+	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/lib/types"
 )
 
@@ -120,8 +121,12 @@ func (bc BaseConfig) GetEnv() map[string]string {
 }
 
 // GetExec returns the configured custom exec value, if any.
-func (bc BaseConfig) GetExec() null.String {
-	return bc.Exec
+func (bc BaseConfig) GetExec() string {
+	exec := bc.Exec.ValueOrZero()
+	if exec == "" {
+		exec = consts.DefaultFn
+	}
+	return exec
 }
 
 // GetTags returns any custom tags configured for the executor.

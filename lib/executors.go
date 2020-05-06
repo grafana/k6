@@ -30,7 +30,6 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	null "gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/ui/pb"
@@ -93,7 +92,7 @@ type ExecutorConfig interface {
 	// has been specified.
 	//
 	// TODO: use interface{} so plain http requests can be specified?
-	GetExec() null.String
+	GetExec() string
 	GetTags() map[string]string
 
 	// Calculates the VU requirements in different stages of the executor's

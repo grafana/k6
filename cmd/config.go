@@ -34,7 +34,6 @@ import (
 	null "gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/lib/executor"
 	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/stats/cloud"
@@ -294,10 +293,7 @@ func validateConfig(conf Config, exports map[string]struct{}) error {
 }
 
 func validateExecutorConfig(conf lib.ExecutorConfig, exports map[string]struct{}) error {
-	execFn := conf.GetExec().ValueOrZero()
-	if execFn == "" {
-		execFn = consts.DefaultFn
-	}
+	execFn := conf.GetExec()
 	if _, ok := exports[execFn]; !ok {
 		return fmt.Errorf("executor %s: %s", conf.GetName(),
 			fmt.Sprintf("function '%s' not found in exports", execFn))
