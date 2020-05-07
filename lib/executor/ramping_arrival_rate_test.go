@@ -148,11 +148,13 @@ func TestRampingArrivalRateRunUnplannedVUs(t *testing.T) {
 		return nil
 	})
 	var ctx, cancel, executor, logHook = setupExecutor(
-		t, RampingArrivalRateConfig{
+		t, &RampingArrivalRateConfig{
 			TimeUnit: types.NullDurationFrom(time.Second),
 			Stages: []Stage{
 				{
-					Duration: types.NullDurationFrom(time.Second * 2),
+					// the minus one makes it so only 9 iterations will be started instead of 10
+					// as the 10th happens to be just at the end and sometimes doesn't get executed :(
+					Duration: types.NullDurationFrom(time.Second*2 - 1),
 					Target:   null.IntFrom(10),
 				},
 			},
@@ -189,56 +191,51 @@ func TestRampingArrivalRateRunUnplannedVUs(t *testing.T) {
 
 func TestRampingArrivalRateRunCorrectRateWithSlowRate(t *testing.T) {
 	t.Parallel()
-	var count int64
-	now := time.Now()
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
-	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
-	expectedTimes := []time.Duration{
-		time.Millisecond * 3464, time.Millisecond * 4898, time.Second * 6,
-	}
-	ctx, cancel, executor, logHook := setupExecutor(
+	es := lib.NewExecutionState(lib.Options{}, et, 1, 2)
+	var count int64
+	var ch = make(chan struct{}) // closed when new unplannedVU is started and signal to get to next iterations
+	runner := simpleRunner(func(ctx context.Context) error {
+		cur := atomic.AddInt64(&count, 1)
+		if cur == 1 {
+			<-ch // wait to start again
+		}
+
+		return nil
+	})
+	var ctx, cancel, executor, logHook = setupExecutor(
 		t, &RampingArrivalRateConfig{
 			TimeUnit: types.NullDurationFrom(time.Second),
 			Stages: []Stage{
 				{
-					Duration: types.NullDurationFrom(time.Second * 6),
-					Target:   null.IntFrom(1),
-				},
-				{
-					Duration: types.NullDurationFrom(time.Second * 0),
-					Target:   null.IntFrom(0),
-				},
-				{
-					Duration: types.NullDurationFrom(time.Second * 1),
-					Target:   null.IntFrom(0),
+					Duration: types.NullDurationFrom(time.Second * 2),
+					Target:   null.IntFrom(10),
 				},
 			},
-			PreAllocatedVUs: null.IntFrom(10),
-			MaxVUs:          null.IntFrom(20),
+			PreAllocatedVUs: null.IntFrom(1),
+			MaxVUs:          null.IntFrom(3),
 		},
-		es,
-		simpleRunner(func(ctx context.Context) error {
-			current := atomic.AddInt64(&count, 1)
-			if !assert.True(t, int(current) <= len(expectedTimes)) {
-				return nil
-			}
-			expectedTime := expectedTimes[current-1]
-			assert.WithinDuration(t,
-				now.Add(expectedTime),
-				time.Now(),
-				time.Millisecond*100,
-				"%d expectedTime %s", current, expectedTime,
-			)
-			return nil
-		}),
-	)
+		es, runner)
 	defer cancel()
-	engineOut := make(chan stats.SampleContainer, 1000)
+	var engineOut = make(chan stats.SampleContainer, 1000)
+	es.SetInitVUFunc(func(_ context.Context, logger *logrus.Entry) (lib.InitializedVU, error) {
+		t.Log("init")
+		cur := atomic.LoadInt64(&count)
+		require.Equal(t, cur, int64(1))
+		time.Sleep(time.Millisecond * 200)
+		close(ch)
+		time.Sleep(time.Millisecond * 20)
+		cur = atomic.LoadInt64(&count)
+		require.NotEqual(t, cur, int64(1))
+
+		return runner.NewVU(int64(es.GetUniqueVUIdentifier()), engineOut)
+	})
 	err = executor.Run(ctx, engineOut)
-	require.NoError(t, err)
-	require.Equal(t, int64(len(expectedTimes)), count)
-	require.Empty(t, logHook.Drain())
+	assert.NoError(t, err)
+	assert.Empty(t, logHook.Drain())
+	assert.Equal(t, int64(0), es.GetCurrentlyActiveVUsCount())
+	assert.Equal(t, int64(2), es.GetInitializedVUsCount())
 }
 
 func mustNewExecutionTuple(seg *lib.ExecutionSegment, seq *lib.ExecutionSegmentSequence) *lib.ExecutionTuple {
