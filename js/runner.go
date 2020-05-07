@@ -267,14 +267,15 @@ func (r *Runner) GetDefaultGroup() *lib.Group {
 	return r.defaultGroup
 }
 
-// GetExports returns the names of exported functions in the script
-// (excluding setup() and teardown()) that can be used for execution.
-func (r *Runner) GetExports() map[string]struct{} {
-	return r.Bundle.Exports
-}
-
 func (r *Runner) GetOptions() lib.Options {
 	return r.Bundle.Options
+}
+
+// IsExecutable returns whether the given name is an exported and
+// executable function in the script.
+func (r *Runner) IsExecutable(name string) bool {
+	_, exists := r.Bundle.exports[name]
+	return exists
 }
 
 func (r *Runner) SetOptions(opts lib.Options) error {
@@ -460,7 +461,7 @@ func (u *ActiveVU) RunOnce() error {
 		}
 	}
 
-	fn, ok := u.Exports[u.Exec]
+	fn, ok := u.exports[u.Exec]
 	if !ok {
 		// Shouldn't happen; this is validated in ExecutionScheduler.Init()
 		panic(fmt.Sprintf("function '%s' not found in exports", u.Exec))

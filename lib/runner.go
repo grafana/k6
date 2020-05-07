@@ -91,10 +91,7 @@ type Runner interface {
 	GetOptions() Options
 	SetOptions(opts Options) error
 
-	// GetExports returns the names of exported functions in the script
-	// (excluding setup() and teardown()) that can be used for execution.
-	// This is a bit janky, but it's needed for validation during
-	// ExecutionScheduler.Init(). The empty struct is to avoid a
-	// circular dep or make lib depend on goja :-/
-	GetExports() map[string]struct{}
+	// Returns whether the given name is an exported and executable
+	// function in the script.
+	IsExecutable(string) bool
 }

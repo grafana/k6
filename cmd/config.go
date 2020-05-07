@@ -262,20 +262,20 @@ func applyDefault(conf Config) Config {
 	return conf
 }
 
-func deriveAndValidateConfig(conf Config, exports map[string]struct{}) (result Config, err error) {
+func deriveAndValidateConfig(conf Config, isExecutable func(string) bool) (result Config, err error) {
 	result = conf
 	result.Options, err = executor.DeriveExecutionFromShortcuts(conf.Options)
 	if err != nil {
 		return result, err
 	}
-	return result, validateConfig(result, exports)
+	return result, validateConfig(result, isExecutable)
 }
 
-func validateConfig(conf Config, exports map[string]struct{}) error {
+func validateConfig(conf Config, isExecutable func(string) bool) error {
 	errList := conf.Validate()
 
 	for _, ec := range conf.Execution {
-		if err := validateExecutorConfig(ec, exports); err != nil {
+		if err := validateExecutorConfig(ec, isExecutable); err != nil {
 			errList = append(errList, err)
 		}
 	}
@@ -292,9 +292,9 @@ func validateConfig(conf Config, exports map[string]struct{}) error {
 	return errors.New(strings.Join(errMsgParts, "\n"))
 }
 
-func validateExecutorConfig(conf lib.ExecutorConfig, exports map[string]struct{}) error {
+func validateExecutorConfig(conf lib.ExecutorConfig, isExecutable func(string) bool) error {
 	execFn := conf.GetExec()
-	if _, ok := exports[execFn]; !ok {
+	if !isExecutable(execFn) {
 		return fmt.Errorf("executor %s: %s", conf.GetName(),
 			fmt.Sprintf("function '%s' not found in exports", execFn))
 	}

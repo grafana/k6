@@ -144,13 +144,13 @@ func TestDeriveAndValidateConfig(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
-		name    string
-		conf    Config
-		exports map[string]struct{}
-		err     string
+		name   string
+		conf   Config
+		isExec bool
+		err    string
 	}{
-		{"defaultOK", Config{}, map[string]struct{}{"default": {}}, ""},
-		{"defaultErr", Config{}, map[string]struct{}{},
+		{"defaultOK", Config{}, true, ""},
+		{"defaultErr", Config{}, false,
 			"executor default: function 'default' not found in exports"},
 		{"nonDefaultOK", Config{Options: lib.Options{Execution: lib.ExecutorConfigMap{
 			"per_vu_iters": executor.PerVUIterationsConfig{BaseConfig: executor.BaseConfig{
@@ -158,8 +158,7 @@ func TestDeriveAndValidateConfig(t *testing.T) {
 				VUs:         null.IntFrom(1),
 				Iterations:  null.IntFrom(1),
 				MaxDuration: types.NullDurationFrom(time.Second),
-			}}}},
-			map[string]struct{}{"nonDefault": {}}, "",
+			}}}}, true, "",
 		},
 		{"nonDefaultErr", Config{Options: lib.Options{Execution: lib.ExecutorConfigMap{
 			"per_vu_iters": executor.PerVUIterationsConfig{BaseConfig: executor.BaseConfig{
@@ -167,8 +166,7 @@ func TestDeriveAndValidateConfig(t *testing.T) {
 				VUs:         null.IntFrom(1),
 				Iterations:  null.IntFrom(1),
 				MaxDuration: types.NullDurationFrom(time.Second),
-			}}}},
-			map[string]struct{}{"nonDefault": {}},
+			}}}}, false,
 			"executor per_vu_iters: function 'nonDefaultErr' not found in exports",
 		},
 	}
@@ -176,7 +174,8 @@ func TestDeriveAndValidateConfig(t *testing.T) {
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := deriveAndValidateConfig(tc.conf, tc.exports)
+			_, err := deriveAndValidateConfig(tc.conf,
+				func(_ string) bool { return tc.isExec })
 			if tc.err != "" {
 				assert.Contains(t, err.Error(), tc.err)
 			} else {
