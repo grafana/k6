@@ -61,8 +61,8 @@ func setupExecutor(t *testing.T, config lib.ExecutorConfig, es *lib.ExecutionSta
 	et, err := lib.NewExecutionTuple(es.Options.ExecutionSegment, es.Options.ExecutionSegmentSequence)
 	require.NoError(t, err)
 
-	maxVUs := lib.GetMaxPossibleVUs(config.GetExecutionRequirements(et))
-	initializeVUs(ctx, t, logEntry, es, maxVUs)
+	maxPlannedVUs := lib.GetMaxPlannedVUs(config.GetExecutionRequirements(et))
+	initializeVUs(ctx, t, logEntry, es, maxPlannedVUs)
 
 	executor, err := config.NewExecutor(es, logEntry)
 	require.NoError(t, err)
@@ -79,6 +79,6 @@ func initializeVUs(
 	for i := uint64(0); i < number; i++ {
 		vu, err := es.InitializeNewVU(ctx, logEntry)
 		require.NoError(t, err)
-		es.AddInitializedVU(vu)
+		es.ReturnVU(vu, false)
 	}
 }
