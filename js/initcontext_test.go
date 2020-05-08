@@ -40,6 +40,7 @@ import (
 
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/fsext"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
 )
@@ -324,6 +325,17 @@ func TestInitContextOpen(t *testing.T) {
 		_, err := getSimpleBundle("/script.js", `open("/some/dir"); export default function() {}`, fs)
 		assert.EqualError(t, err, fmt.Sprintf("GoError: open() can't be used with directories, path: %q", path))
 	})
+}
+
+func TestWithWindowsAbsolutePathOpenInArchive(t *testing.T) {
+	path := filepath.FromSlash("/C/some/dir/file.json")
+	fs := afero.NewMemMapFs()
+	require.NoError(t, afero.WriteFile(fs, path, []byte("something"), 0644))
+	fs = fsext.NewChangePathFs(fs, fsext.ChangePathFunc(func(name string) (string, error) {
+		return lib.NormalizeAndAnonymizePath(name), nil
+	}))
+	_, err := getSimpleBundle("/somehere/else/script.js", `open("C:/some/dir/file.json"); exports.default = function() {}`, fs)
+	require.NoError(t, err)
 }
 
 func TestRequestWithBinaryFile(t *testing.T) {

@@ -197,7 +197,7 @@ func (i *InitContext) Open(filename string, args ...string) (goja.Value, error) 
 	// the current drive on windows like `\users\noname\...`. Also it makes it more easy to test and
 	// will probably be need for archive execution under windows if always consider '/...' as an
 	// absolute path.
-	if filename[0] != '/' && filename[0] != '\\' && !filepath.IsAbs(filename) {
+	if filename[0] != '/' && filename[0] != '\\' && !filepath.IsAbs(filename) && (len(filename) < 2 || filename[1] != ':') {
 		filename = filepath.Join(i.pwd.Path, filename)
 	}
 	filename = filepath.Clean(filename)
