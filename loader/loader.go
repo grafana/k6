@@ -172,44 +172,44 @@ func Load(
 
 	data, err := afero.ReadFile(filesystems[scheme], pathOnFs)
 
-	if err != nil {
-		if os.IsNotExist(err) {
-			if scheme == "https" {
-				var finalModuleSpecifierURL = &url.URL{}
-
-				switch {
-				case moduleSpecifier.Opaque != "": // This is loader
-					finalModuleSpecifierURL, err = resolveUsingLoaders(moduleSpecifier.Opaque)
-					if err != nil {
-						return nil, err
-					}
-				case moduleSpecifier.Scheme == "":
-					logrus.WithField("url", moduleSpecifier).Warning(
-						"A url was resolved but it didn't have scheme. " +
-							"This will be deprecated in the future and all remote modules will " +
-							"need to explicitly use `https` as scheme")
-					*finalModuleSpecifierURL = *moduleSpecifier
-					finalModuleSpecifierURL.Scheme = scheme
-				default:
-					finalModuleSpecifierURL = moduleSpecifier
-				}
-				var result *SourceData
-				result, err = loadRemoteURL(finalModuleSpecifierURL)
-				if err != nil {
-					return nil, errors.Errorf(httpsSchemeCouldntBeLoadedMsg, originalModuleSpecifier, finalModuleSpecifierURL, err)
-				}
-				result.URL = moduleSpecifier
-				// TODO maybe make an afero.Fs which makes request directly and than use CacheOnReadFs
-				// on top of as with the `file` scheme fs
-				_ = afero.WriteFile(filesystems[scheme], pathOnFs, result.Data, 0644)
-				return result, nil
-			}
-			return nil, errors.Errorf(fileSchemeCouldntBeLoadedMsg, moduleSpecifier)
-		}
+	if err == nil {
+		return &SourceData{URL: moduleSpecifier, Data: data}, nil
+	}
+	if !os.IsNotExist(err) {
 		return nil, err
 	}
+	if scheme == "https" {
+		var finalModuleSpecifierURL = &url.URL{}
 
-	return &SourceData{URL: moduleSpecifier, Data: data}, nil
+		switch {
+		case moduleSpecifier.Opaque != "": // This is loader
+			finalModuleSpecifierURL, err = resolveUsingLoaders(moduleSpecifier.Opaque)
+			if err != nil {
+				return nil, err
+			}
+		case moduleSpecifier.Scheme == "":
+			logrus.WithField("url", moduleSpecifier).Warning(
+				"A url was resolved but it didn't have scheme. " +
+					"This will be deprecated in the future and all remote modules will " +
+					"need to explicitly use `https` as scheme")
+			*finalModuleSpecifierURL = *moduleSpecifier
+			finalModuleSpecifierURL.Scheme = scheme
+		default:
+			finalModuleSpecifierURL = moduleSpecifier
+		}
+		var result *SourceData
+		result, err = loadRemoteURL(finalModuleSpecifierURL)
+		if err != nil {
+			return nil, errors.Errorf(httpsSchemeCouldntBeLoadedMsg, originalModuleSpecifier, finalModuleSpecifierURL, err)
+		}
+		result.URL = moduleSpecifier
+		// TODO maybe make an afero.Fs which makes request directly and than use CacheOnReadFs
+		// on top of as with the `file` scheme fs
+		_ = afero.WriteFile(filesystems[scheme], pathOnFs, result.Data, 0644)
+		return result, nil
+	}
+
+	return nil, errors.Errorf(fileSchemeCouldntBeLoadedMsg, moduleSpecifier)
 }
 
 func resolveUsingLoaders(name string) (*url.URL, error) {
