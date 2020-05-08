@@ -22,8 +22,7 @@ func ReadSource(src, pwd string, filesystems map[string]afero.Fs, stdin io.Reade
 		// TODO: don't do it in this way ...
 		err = afero.WriteFile(filesystems["file"].(fsext.CacheOnReadFs).GetCachingFs(), "/-", data, 0644)
 		if err != nil {
-			return nil, err
-			// return nil, errors.Wrap(err, "caching data read from -")
+			return nil, fmt.Errorf("caching data read from -: %w", err)
 		}
 		return &SourceData{URL: &url.URL{Path: "/-", Scheme: "file"}, Data: data}, err
 	}
