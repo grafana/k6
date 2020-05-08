@@ -151,9 +151,8 @@ func TestLoad(t *testing.T) {
 			require.Error(t, err)
 			assert.Contains(t, err.Error(),
 				fmt.Sprintf(`The moduleSpecifier "%s" couldn't be found on local disk. `,
-					filepath.ToSlash(path)))
+					path))
 		})
-
 	})
 
 	t.Run("Remote", func(t *testing.T) {
