@@ -45,6 +45,7 @@ import (
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
+	"github.com/loadimpact/k6/testhelpers/israce"
 )
 
 func getTemporaryFile(name string) (string, func()) {
@@ -256,8 +257,12 @@ func TestInitContextRequire(t *testing.T) {
 			path, cleanup := getTemporaryFile("leftpad.so")
 			defer cleanup()
 
-			// go build -buildmode=plugin -o /tmp/leftpad.so
-			cmd := exec.Command("go", "build", "-buildmode=plugin", "-o", path, "github.com/loadimpact/k6/samples/leftpad")
+			args := []string{"build", "-buildmode=plugin", "-o", path}
+			if israce.Enabled {
+				args = append(args, "-race")
+			}
+			args = append(args, "github.com/loadimpact/k6/samples/leftpad")
+			cmd := exec.Command("go", args...)
 			if err := cmd.Run(); !assert.NoError(t, err, "compiling sample plugin error") {
 				return
 			}
