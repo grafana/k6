@@ -1,3 +1,4 @@
+// +build !windows
 /*
  *
  * k6 - a next-generation load testing tool
