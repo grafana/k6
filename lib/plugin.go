@@ -1,4 +1,3 @@
-// +build !windows
 /*
  *
  * k6 - a next-generation load testing tool
@@ -24,8 +23,10 @@ package lib
 import (
 	"fmt"
 	goplugin "plugin"
+	"runtime"
 
 	"github.com/loadimpact/k6/plugin"
+	"github.com/pkg/errors"
 )
 
 // LoadJavaScriptPlugin tries to load a dynamic library that should conform to
@@ -51,6 +52,10 @@ func LoadJavaScriptPlugin(path string) (plugin.JavaScriptPlugin, error) {
 }
 
 func loadPlugin(path string) (*goplugin.Plugin, error) {
+	if runtime.GOOS == "windows" {
+		return nil, errors.New("plugins are not supported in Windows")
+	}
+
 	p, err := goplugin.Open(path)
 	if err != nil {
 		err = fmt.Errorf("error while loading plugin: %w", err)
