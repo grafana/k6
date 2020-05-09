@@ -39,6 +39,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"golang.org/x/sync/errgroup"
 	null "gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/api"
@@ -115,22 +116,29 @@ a commandline interface for interacting with it.`,
 			return err
 		}
 
+		g, _ := errgroup.WithContext(context.Background())
+		if err != nil {
+			return err
+		}
+
 		plugins := []plugin.JavaScriptPlugin{}
 		pluginNames := []string{}
 		for _, pluginPath := range cliConf.Plugins {
-			jsPlugin, err := lib.LoadJavaScriptPlugin(pluginPath)
-			if err != nil {
-				return err
+			jsPlugin, pluginErr := lib.LoadJavaScriptPlugin(pluginPath)
+			if pluginErr != nil {
+				return pluginErr
 			}
 
-			// Run plugin setup and add it to the module tree
-			if err = jsPlugin.Setup(); err != nil {
-				return err
-			}
+			// Do the part that actually takes time in a runner group.
+			g.Go(jsPlugin.Setup)
 
 			modules.RegisterPluginModules(jsPlugin.GetModules())
 			plugins = append(plugins, jsPlugin)
 			pluginNames = append(pluginNames, jsPlugin.Name())
+		}
+
+		if err = g.Wait(); err != nil {
+			return err
 		}
 
 		// Create the Runner.

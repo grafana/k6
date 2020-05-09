@@ -4,10 +4,6 @@ import "strings"
 
 type leftpad struct{}
 
-func New() *leftpad {
-	return &leftpad{}
-}
-
 func (*leftpad) Leftpad(s string, l int, padding string) string {
 	if len(s) >= l {
 		return s
@@ -34,11 +30,12 @@ func (*plugin) Teardown() error {
 
 func (*plugin) GetModules() map[string]interface{} {
 	mods := map[string]interface{}{
-		"leftpad": New(),
+		"leftpad": &leftpad{},
 	}
 	return mods
 }
 
 func init() {
 	JavaScriptPlugin = plugin{}
+	_ = JavaScriptPlugin // shut up, linter...
 }

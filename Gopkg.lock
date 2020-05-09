@@ -606,6 +606,14 @@
 
 [[projects]]
   branch = "master"
+  digest = "1:b521f10a2d8fa85c04a8ef4e62f2d1e14d303599a55d64dabf9f5a02f84d35eb"
+  name = "golang.org/x/sync"
+  packages = ["errgroup"]
+  pruneopts = "NUT"
+  revision = "43a5402ce75a95522677f77c619865d66b8c57ab"
+
+[[projects]]
+  branch = "master"
   digest = "1:b1a955501003b967a2c814e41ded50c7b29dfdeb7f266b7987b8ed38f65205d6"
   name = "golang.org/x/sys"
   packages = [
@@ -722,6 +730,7 @@
     "golang.org/x/crypto/ssh/terminal",
     "golang.org/x/net/html",
     "golang.org/x/net/http2",
+    "golang.org/x/sync/errgroup",
     "golang.org/x/text/unicode/norm",
     "golang.org/x/time/rate",
     "gopkg.in/guregu/null.v3",
