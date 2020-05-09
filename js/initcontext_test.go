@@ -30,7 +30,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"testing"
 	"time"
 
@@ -47,6 +46,15 @@ import (
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
 )
+
+func getTemporaryFile(name string) (string, func()) {
+	tf, _ := ioutil.TempFile("", name)
+	cleanup := func() {
+		_ = os.Remove(tf.Name())
+	}
+
+	return tf.Name(), cleanup
+}
 
 func TestInitContextRequire(t *testing.T) {
 	t.Run("Modules", func(t *testing.T) {
@@ -239,26 +247,22 @@ func TestInitContextRequire(t *testing.T) {
 	})
 
 	t.Run("Plugins", func(t *testing.T) {
-		if runtime.GOOS == "windows" {
+		if isWindows {
 			t.Skip("skipping test due to lack of plugin support in windows")
 			return
 		}
 
 		t.Run("leftpad", func(t *testing.T) {
-			tf, err := ioutil.TempFile("", "leftpad.so")
-			if !assert.NoError(t, err, "temporary file error") {
-				return
-			}
-			defer os.Remove(tf.Name())
+			path, cleanup := getTemporaryFile("leftpad.so")
+			defer cleanup()
 
 			// go build -buildmode=plugin -o /tmp/leftpad.so
-			cmd := exec.Command("go", "build", "-buildmode=plugin", "-o", tf.Name(), "github.com/loadimpact/k6/samples/leftpad")
-			err = cmd.Run()
-			if !assert.NoError(t, err, "compiling sample plugin error") {
+			cmd := exec.Command("go", "build", "-buildmode=plugin", "-o", path, "github.com/loadimpact/k6/samples/leftpad")
+			if err := cmd.Run(); !assert.NoError(t, err, "compiling sample plugin error") {
 				return
 			}
 
-			plugin, err := lib.LoadJavaScriptPlugin(tf.Name())
+			plugin, err := lib.LoadJavaScriptPlugin(path)
 			if !assert.NoError(t, err) {
 				return
 			}

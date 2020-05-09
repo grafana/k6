@@ -45,7 +45,7 @@ var Index = map[string]interface{}{
 	"k6/ws":          ws.New(),
 }
 
-// PluginIndex holds a map of plugin modules to their respective implementations.
+// PluginIndex holds an index of plugin module implementations.
 var PluginIndex = map[string]interface{}{}
 
 // RegisterPluginModules takes care of registering a map of paths that a plugin exposes so they can be
