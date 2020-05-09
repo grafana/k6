@@ -27,7 +27,10 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -236,8 +239,26 @@ func TestInitContextRequire(t *testing.T) {
 	})
 
 	t.Run("Plugins", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("skipping test due to lack of plugin support in windows")
+			return
+		}
+
 		t.Run("leftpad", func(t *testing.T) {
-			plugin, err := lib.LoadJavaScriptPlugin("/tmp/leftpad.so")
+			tf, err := ioutil.TempFile("", "leftpad.so")
+			if !assert.NoError(t, err, "temporary file error") {
+				return
+			}
+			defer os.Remove(tf.Name())
+
+			// go build -buildmode=plugin -o /tmp/leftpad.so
+			cmd := exec.Command("go", "build", "-buildmode=plugin", "-o", tf.Name(), "github.com/loadimpact/k6/samples/leftpad")
+			err = cmd.Run()
+			if !assert.NoError(t, err, "compiling sample plugin error") {
+				return
+			}
+
+			plugin, err := lib.LoadJavaScriptPlugin(tf.Name())
 			if !assert.NoError(t, err) {
 				return
 			}
