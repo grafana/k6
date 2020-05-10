@@ -163,7 +163,19 @@ func readDiskConfig(fs afero.Fs) (Config, string, error) {
 	}
 	var conf Config
 	err = json.Unmarshal(data, &conf)
+	err = ValidateDiskConfigOptions(&conf)
+	if err != nil {
+		return Config{}, realConfigFilePath, err
+	}
 	return conf, realConfigFilePath, err
+}
+
+//Function will be called inside readDiskConfig function before returning Config.
+func ValidateDiskConfigOptions(config *Config) error{
+	if config.Options.LogTLSKey.Valid {
+		return errors.New("Use command line argument or environment variable to set LogTLSKey.")
+	}
+	return nil
 }
 
 // Serializes the configuration to a JSON file and writes it in the supplied

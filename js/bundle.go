@@ -127,8 +127,19 @@ func NewBundle(src *loader.SourceData, filesystems map[string]afero.Fs, rtOpts l
 			}
 		}
 	}
-
+	err = ValidateJsScriptOptions(&bundle.Options)
+	if err != nil {
+		return nil, err
+	}
 	return &bundle, nil
+}
+
+
+func ValidateJsScriptOptions(options *lib.Options) error{
+	if options.LogTLSKey.Valid {
+		return errors.New("Use command line argument or environment variable to set LogTLSKey.")
+	}
+	return nil
 }
 
 // NewBundleFromArchive creates a new bundle from an lib.Archive.

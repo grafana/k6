@@ -168,6 +168,9 @@ func (r *Runner) newVU(samplesOut chan<- stats.SampleContainer) (*VU, error) {
 		NameToCertificate:  nameToCert,
 		Renegotiation:      tls.RenegotiateFreelyAsClient,
 	}
+	if r.Bundle.Options.LogTLSKey.Bool {
+		tlsConfig.KeyLogWriter = r.Logger.Out
+	}
 	transport := &http.Transport{
 		Proxy:               http.ProxyFromEnvironment,
 		TLSClientConfig:     tlsConfig,
