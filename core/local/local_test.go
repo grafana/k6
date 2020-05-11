@@ -388,6 +388,7 @@ func TestExecutionSchedulerRunCustomConfigNoCrossover(t *testing.T) {
 
 	script := sr(`
 	import http from "k6/http";
+	import ws from 'k6/ws';
 	import { Counter } from 'k6/metrics';
 
 	let errors = new Counter('errors');
@@ -412,6 +413,15 @@ func TestExecutionSchedulerRunCustomConfigNoCrossover(t *testing.T) {
 				env: { TESTVAR2: 'scenario2' },
 				tags: { testtag2: 'scenario2' },
 			},
+			scenario3: {
+				type: 'per-vu-iterations',
+				vus: 1,
+				iterations: 1,
+				gracefulStop: '0.5s',
+				exec: 's3funcWS',
+				env: { TESTVAR3: 'scenario3' },
+				tags: { testtag3: 'scenario3' },
+			},
 		}
 	}
 
@@ -426,6 +436,7 @@ func TestExecutionSchedulerRunCustomConfigNoCrossover(t *testing.T) {
 	export function s1func() {
 		checkVar('TESTVAR1', 'scenario1');
 		checkVar('TESTVAR2', undefined);
+		checkVar('TESTVAR3', undefined);
 		checkVar('TESTGLOBALVAR', 'global');
 
 		http.get('HTTPBIN_IP_URL/', { tags: { reqtag: 'scenario1' }});
@@ -434,10 +445,39 @@ func TestExecutionSchedulerRunCustomConfigNoCrossover(t *testing.T) {
 	export function s2func() {
 		checkVar('TESTVAR1', undefined);
 		checkVar('TESTVAR2', 'scenario2');
+		checkVar('TESTVAR3', undefined);
 		checkVar('TESTGLOBALVAR', 'global');
 
 		http.get('HTTPBIN_IP_URL/', { tags: { reqtag: 'scenario2' }});
-	}`)
+	}
+
+	export function s3funcWS() {
+		checkVar('TESTVAR1', undefined);
+		checkVar('TESTVAR2', undefined);
+		checkVar('TESTVAR3', 'scenario3');
+		checkVar('TESTGLOBALVAR', 'global');
+
+		const customTags = { wstag: 'scenario3' };
+		const response = ws.connect('WSBIN_URL/ws-echo', { tags: customTags },
+			function (socket) {
+				socket.on('open', function() {
+					socket.send('hello');
+				});
+				socket.on('message', function(msg) {
+					if (msg != 'hello') {
+					    console.error("Expected to receive 'hello' but got '" + msg + "' instead!");
+						errors.add(1);
+					}
+					socket.close()
+				});
+				socket.on('error', function (e) {
+					console.log('ws error: ' + e.error());
+					errors.add(1);
+				});
+			}
+		);
+	}
+`)
 
 	runner, err := js.New(&loader.SourceData{
 		URL:  &url.URL{Path: "/script.js"},
@@ -469,6 +509,9 @@ func TestExecutionSchedulerRunCustomConfigNoCrossover(t *testing.T) {
 		{"testtag1": "scenario1"},
 		{"testtag2": "scenario2"},
 	}
+	expectedConnSampleTags := map[string]string{
+		"testtag3": "scenario3", "wstag": "scenario3",
+	}
 	var gotSampleTags int
 	for {
 		select {
@@ -492,8 +535,16 @@ func TestExecutionSchedulerRunCustomConfigNoCrossover(t *testing.T) {
 					}
 				}
 			}
+			if cs, ok := sample.(stats.ConnectedSamples); ok {
+				for _, s := range cs.Samples {
+					tags := s.Tags.CloneTags()
+					if reflect.DeepEqual(expectedConnSampleTags, tags) {
+						gotSampleTags++
+					}
+				}
+			}
 		case <-done:
-			require.Equal(t, 4, gotSampleTags, "received wrong amount of samples with expected tags")
+			require.Equal(t, 6, gotSampleTags, "received wrong amount of samples with expected tags")
 			return
 		}
 	}

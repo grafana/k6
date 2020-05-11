@@ -34,6 +34,7 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/gorilla/websocket"
+
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
@@ -104,6 +105,9 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 	var header http.Header
 
 	tags := state.Options.RunTags.CloneTags()
+	for k, v := range state.Tags {
+		tags[k] = v
+	}
 
 	// Parse the optional second argument (params)
 	if !goja.IsUndefined(paramsV) && !goja.IsNull(paramsV) {
