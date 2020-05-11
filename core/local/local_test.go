@@ -527,38 +527,37 @@ func TestExecutionSchedulerRunCustomConfigNoCrossover(t *testing.T) {
 	for {
 		select {
 		case sample := <-samples:
-			if s, ok := sample.(stats.Sample); ok && s.Metric.Name == "errors" {
-				assert.FailNow(t, "received error sample from test")
-			}
-			if trail, ok := sample.(*httpext.Trail); ok {
-				tags := trail.Tags.CloneTags()
+			switch s := sample.(type) {
+			case stats.Sample:
+				if s.Metric.Name == "errors" {
+					assert.FailNow(t, "received error sample from test")
+				}
+				if s.Metric.Name == "checks" || s.Metric.Name == "group_duration" {
+					tags := s.Tags.CloneTags()
+					for _, expTags := range expectedPlainSampleTags {
+						if reflect.DeepEqual(expTags, tags) {
+							gotSampleTags++
+						}
+					}
+				}
+			case *httpext.Trail:
+				tags := s.Tags.CloneTags()
 				for _, expTags := range expectedTrailTags {
 					if reflect.DeepEqual(expTags, tags) {
 						gotSampleTags++
 					}
 				}
-			}
-			if netTrail, ok := sample.(*netext.NetTrail); ok {
-				tags := netTrail.Tags.CloneTags()
+			case *netext.NetTrail:
+				tags := s.Tags.CloneTags()
 				for _, expTags := range expectedNetTrailTags {
 					if reflect.DeepEqual(expTags, tags) {
 						gotSampleTags++
 					}
 				}
-			}
-			if cs, ok := sample.(stats.ConnectedSamples); ok {
-				for _, s := range cs.Samples {
-					tags := s.Tags.CloneTags()
+			case stats.ConnectedSamples:
+				for _, sm := range s.Samples {
+					tags := sm.Tags.CloneTags()
 					if reflect.DeepEqual(expectedConnSampleTags, tags) {
-						gotSampleTags++
-					}
-				}
-			}
-			if s, ok := sample.(stats.Sample); ok &&
-				(s.Metric.Name == "checks" || s.Metric.Name == "group_duration") {
-				tags := s.Tags.CloneTags()
-				for _, expTags := range expectedPlainSampleTags {
-					if reflect.DeepEqual(expTags, tags) {
 						gotSampleTags++
 					}
 				}
