@@ -224,19 +224,6 @@ func (e *ExecutionScheduler) initVUsConcurrently(
 func (e *ExecutionScheduler) Init(ctx context.Context, samplesOut chan<- stats.SampleContainer) error {
 	logger := e.logger.WithField("phase", "local-execution-scheduler-init")
 
-	// Initialize each executor
-	e.state.SetExecutionStatus(lib.ExecutionStatusInitExecutors)
-	logger.Debugf("Start initializing executors...")
-	errMsg := "error while initializing executor %s: %s"
-	for _, exec := range e.executors {
-		executorConfig := exec.GetConfig()
-		if err := exec.Init(ctx); err != nil {
-			return fmt.Errorf(errMsg, executorConfig.GetName(), err)
-		}
-		logger.Debugf("Initialized executor %s", executorConfig.GetName())
-	}
-
-	logger.Debugf("Finished initializing executors, start initializing VUs...")
 	vusToInitialize := lib.GetMaxPlannedVUs(e.executionPlan)
 	logger.WithFields(logrus.Fields{
 		"neededVUs":      vusToInitialize,
@@ -277,6 +264,17 @@ func (e *ExecutionScheduler) Init(ctx context.Context, samplesOut chan<- stats.S
 	e.state.SetInitVUFunc(func(ctx context.Context, logger *logrus.Entry) (lib.InitializedVU, error) {
 		return e.initVU(samplesOut, logger)
 	})
+
+	e.state.SetExecutionStatus(lib.ExecutionStatusInitExecutors)
+	logger.Debugf("Finished initializing needed VUs, start initializing executors...")
+	for _, exec := range e.executors {
+		executorConfig := exec.GetConfig()
+
+		if err := exec.Init(ctx); err != nil {
+			return fmt.Errorf("error while initializing executor %s: %s", executorConfig.GetName(), err)
+		}
+		logger.Debugf("Initialized executor %s", executorConfig.GetName())
+	}
 
 	e.state.SetExecutionStatus(lib.ExecutionStatusInitDone)
 	logger.Debugf("Initialization completed")
