@@ -380,6 +380,7 @@ func TestExecutionSchedulerRunCustomTags(t *testing.T) {
 
 // Ensure that custom executor settings are unique per executor and
 // that there's no "crossover"/"pollution" between executors.
+// Also test that custom tags are properly set on checks and groups metrics.
 func TestExecutionSchedulerRunCustomConfigNoCrossover(t *testing.T) {
 	t.Parallel()
 	tb := httpmultibin.NewHTTPMultiBin(t)
@@ -390,6 +391,7 @@ func TestExecutionSchedulerRunCustomConfigNoCrossover(t *testing.T) {
 	import http from "k6/http";
 	import ws from 'k6/ws';
 	import { Counter } from 'k6/metrics';
+	import { check, group } from 'k6';
 
 	let errors = new Counter('errors');
 
@@ -458,24 +460,27 @@ func TestExecutionSchedulerRunCustomConfigNoCrossover(t *testing.T) {
 		checkVar('TESTGLOBALVAR', 'global');
 
 		const customTags = { wstag: 'scenario3' };
-		const response = ws.connect('WSBIN_URL/ws-echo', { tags: customTags },
-			function (socket) {
-				socket.on('open', function() {
-					socket.send('hello');
-				});
-				socket.on('message', function(msg) {
-					if (msg != 'hello') {
-					    console.error("Expected to receive 'hello' but got '" + msg + "' instead!");
+		group('wsgroup', function() {
+			const response = ws.connect('WSBIN_URL/ws-echo', { tags: customTags },
+				function (socket) {
+					socket.on('open', function() {
+						socket.send('hello');
+					});
+					socket.on('message', function(msg) {
+						if (msg != 'hello') {
+						    console.error("Expected to receive 'hello' but got '" + msg + "' instead!");
+							errors.add(1);
+						}
+						socket.close()
+					});
+					socket.on('error', function (e) {
+						console.log('ws error: ' + e.error());
 						errors.add(1);
-					}
-					socket.close()
-				});
-				socket.on('error', function (e) {
-					console.log('ws error: ' + e.error());
-					errors.add(1);
-				});
-			}
-		);
+					});
+				}
+			);
+			check(response, { 'status is 101': (r) => r && r.status === 101 }, customTags);
+		});
 	}
 `)
 
@@ -512,6 +517,10 @@ func TestExecutionSchedulerRunCustomConfigNoCrossover(t *testing.T) {
 	expectedConnSampleTags := map[string]string{
 		"testtag3": "scenario3", "wstag": "scenario3",
 	}
+	expectedPlainSampleTags := []map[string]string{
+		{"testtag3": "scenario3"},
+		{"testtag3": "scenario3", "wstag": "scenario3"},
+	}
 	var gotSampleTags int
 	for {
 		select {
@@ -543,8 +552,17 @@ func TestExecutionSchedulerRunCustomConfigNoCrossover(t *testing.T) {
 					}
 				}
 			}
+			if s, ok := sample.(stats.Sample); ok &&
+				(s.Metric.Name == "checks" || s.Metric.Name == "group_duration") {
+				tags := s.Tags.CloneTags()
+				for _, expTags := range expectedPlainSampleTags {
+					if reflect.DeepEqual(expTags, tags) {
+						gotSampleTags++
+					}
+				}
+			}
 		case <-done:
-			require.Equal(t, 6, gotSampleTags, "received wrong amount of samples with expected tags")
+			require.Equal(t, 8, gotSampleTags, "received wrong amount of samples with expected tags")
 			return
 		}
 	}
