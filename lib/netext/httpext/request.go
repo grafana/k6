@@ -232,6 +232,9 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 	}
 
 	tags := state.Options.RunTags.CloneTags()
+	for k, v := range state.Tags {
+		tags[k] = v
+	}
 	for k, v := range preq.Tags {
 		tags[k] = v
 	}

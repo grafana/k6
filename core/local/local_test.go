@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"reflect"
 	"runtime"
 	"sync/atomic"
 	"testing"
@@ -253,9 +254,7 @@ func TestExecutionSchedulerRunEnv(t *testing.T) {
 			for {
 				select {
 				case sample := <-samples:
-					// TODO: Implement a more robust way of reporting
-					// errors in these high-level functional tests.
-					if _, ok := sample.(stats.Sample); ok {
+					if s, ok := sample.(stats.Sample); ok && s.Metric.Name == "errors" {
 						assert.FailNow(t, "received error sample from test")
 					}
 				case <-done:
@@ -342,7 +341,7 @@ func TestExecutionSchedulerRunCustomTags(t *testing.T) {
 			execScheduler, err := NewExecutionScheduler(runner, logger)
 			require.NoError(t, err)
 
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 			defer cancel()
 
 			done := make(chan struct{})
@@ -352,24 +351,151 @@ func TestExecutionSchedulerRunCustomTags(t *testing.T) {
 				assert.NoError(t, execScheduler.Run(ctx, ctx, samples))
 				close(done)
 			}()
-			var gotTag bool
+			var gotTrailTag, gotNetTrailTag bool
 			for {
 				select {
 				case sample := <-samples:
-					if trail, ok := sample.(*httpext.Trail); ok && !gotTag {
+					if trail, ok := sample.(*httpext.Trail); ok && !gotTrailTag {
 						tags := trail.Tags.CloneTags()
 						if v, ok := tags["customTag"]; ok && v == "value" {
-							gotTag = true
+							gotTrailTag = true
+						}
+					}
+					if netTrail, ok := sample.(*netext.NetTrail); ok && !gotNetTrailTag {
+						tags := netTrail.Tags.CloneTags()
+						if v, ok := tags["customTag"]; ok && v == "value" {
+							gotNetTrailTag = true
 						}
 					}
 				case <-done:
-					if !gotTag {
-						assert.FailNow(t, "sample with tag wasn't received")
+					if !gotTrailTag || !gotNetTrailTag {
+						assert.FailNow(t, "a sample with expected tag wasn't received")
 					}
 					return
 				}
 			}
 		})
+	}
+}
+
+// Ensure that custom executor settings are unique per executor and
+// that there's no "crossover"/"pollution" between executors.
+func TestExecutionSchedulerRunCustomConfigNoCrossover(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	defer tb.Cleanup()
+	sr := tb.Replacer.Replace
+
+	script := sr(`
+	import http from "k6/http";
+	import { Counter } from 'k6/metrics';
+
+	let errors = new Counter('errors');
+
+	export let options = {
+		execution: {
+			scenario1: {
+				type: 'per-vu-iterations',
+				vus: 1,
+				iterations: 1,
+				gracefulStop: '0.5s',
+				exec: 's1func',
+				env: { TESTVAR1: 'scenario1' },
+				tags: { testtag1: 'scenario1' },
+			},
+			scenario2: {
+				type: 'shared-iterations',
+				vus: 1,
+				iterations: 1,
+				gracefulStop: '0.5s',
+				exec: 's2func',
+				env: { TESTVAR2: 'scenario2' },
+				tags: { testtag2: 'scenario2' },
+			},
+		}
+	}
+
+	function checkVar(name, expected) {
+		if (__ENV[name] !== expected) {
+		    console.error('Wrong ' + name + " env var value. Expected: '"
+						+ expected + "', actual: '" + __ENV[name] + "'");
+			errors.add(1);
+		}
+	}
+
+	export function s1func() {
+		checkVar('TESTVAR1', 'scenario1');
+		checkVar('TESTVAR2', undefined);
+		checkVar('TESTGLOBALVAR', 'global');
+
+		http.get('HTTPBIN_IP_URL/', { tags: { reqtag: 'scenario1' }});
+	}
+
+	export function s2func() {
+		checkVar('TESTVAR1', undefined);
+		checkVar('TESTVAR2', 'scenario2');
+		checkVar('TESTGLOBALVAR', 'global');
+
+		http.get('HTTPBIN_IP_URL/', { tags: { reqtag: 'scenario2' }});
+	}`)
+
+	runner, err := js.New(&loader.SourceData{
+		URL:  &url.URL{Path: "/script.js"},
+		Data: []byte(script)},
+		nil, lib.RuntimeOptions{Env: map[string]string{"TESTGLOBALVAR": "global"}})
+	require.NoError(t, err)
+
+	logger := logrus.New()
+	logger.SetOutput(testutils.NewTestOutput(t))
+	execScheduler, err := NewExecutionScheduler(runner, logger)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+
+	done := make(chan struct{})
+	samples := make(chan stats.SampleContainer)
+	go func() {
+		assert.NoError(t, execScheduler.Init(ctx, samples))
+		assert.NoError(t, execScheduler.Run(ctx, ctx, samples))
+		close(done)
+	}()
+
+	expectedTrailTags := []map[string]string{
+		{"testtag1": "scenario1", "reqtag": "scenario1"},
+		{"testtag2": "scenario2", "reqtag": "scenario2"},
+	}
+	expectedNetTrailTags := []map[string]string{
+		{"testtag1": "scenario1"},
+		{"testtag2": "scenario2"},
+	}
+	var gotSampleTags int
+	for {
+		select {
+		case sample := <-samples:
+			if s, ok := sample.(stats.Sample); ok && s.Metric.Name == "errors" {
+				assert.FailNow(t, "received error sample from test")
+			}
+			if trail, ok := sample.(*httpext.Trail); ok {
+				tags := trail.Tags.CloneTags()
+				for _, expTags := range expectedTrailTags {
+					if reflect.DeepEqual(expTags, tags) {
+						gotSampleTags++
+					}
+				}
+			}
+			if netTrail, ok := sample.(*netext.NetTrail); ok {
+				tags := netTrail.Tags.CloneTags()
+				for _, expTags := range expectedNetTrailTags {
+					if reflect.DeepEqual(expTags, tags) {
+						gotSampleTags++
+					}
+				}
+			}
+		case <-done:
+			require.Equal(t, 4, gotSampleTags, "received wrong amount of samples with expected tags")
+			return
+		}
 	}
 }
 
