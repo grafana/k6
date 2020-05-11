@@ -396,6 +396,8 @@ func TestExecutionSchedulerRunCustomConfigNoCrossover(t *testing.T) {
 	let errors = new Counter('errors');
 
 	export let options = {
+		// Required for WS tests
+		hosts: { 'httpbin.local': '127.0.0.1' },
 		execution: {
 			scenario1: {
 				type: 'per-vu-iterations',
