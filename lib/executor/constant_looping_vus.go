@@ -176,16 +176,19 @@ func (clv ConstantLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleCo
 	regDurationDone := regDurationCtx.Done()
 	runIteration := getIterationRunner(clv.executionState, clv.logger)
 
+	activationParams := getVUActivationParams(maxDurationCtx, clv.config.BaseConfig,
+		func(u lib.InitializedVU) {
+			clv.executionState.ReturnVU(u, true)
+			activeVUs.Done()
+		})
 	handleVU := func(initVU lib.InitializedVU) {
 		ctx, cancel := context.WithCancel(maxDurationCtx)
 		defer cancel()
 
-		activationParams := getVUActivationParams(ctx, clv.config.BaseConfig,
-			func(u lib.InitializedVU) {
-				clv.executionState.ReturnVU(u, true)
-				activeVUs.Done()
-			})
-		activeVU := initVU.Activate(activationParams)
+		newParams := *activationParams
+		newParams.RunContext = ctx
+
+		activeVU := initVU.Activate(&newParams)
 
 		for {
 			select {

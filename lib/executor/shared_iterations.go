@@ -216,16 +216,19 @@ func (si SharedIterations) Run(ctx context.Context, out chan<- stats.SampleConta
 
 	attemptedIters := new(uint64)
 
+	activationParams := getVUActivationParams(maxDurationCtx, si.config.BaseConfig,
+		func(u lib.InitializedVU) {
+			si.executionState.ReturnVU(u, true)
+			activeVUs.Done()
+		})
 	handleVU := func(initVU lib.InitializedVU) {
 		ctx, cancel := context.WithCancel(maxDurationCtx)
 		defer cancel()
 
-		activationParams := getVUActivationParams(ctx, si.config.BaseConfig,
-			func(u lib.InitializedVU) {
-				si.executionState.ReturnVU(u, true)
-				activeVUs.Done()
-			})
-		activeVU := initVU.Activate(activationParams)
+		newParams := *activationParams
+		newParams.RunContext = ctx
+
+		activeVU := initVU.Activate(&newParams)
 
 		for {
 			select {
