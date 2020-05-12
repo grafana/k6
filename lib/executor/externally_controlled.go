@@ -339,26 +339,25 @@ type manualVUHandle struct {
 	cancelVU func()
 }
 
-func newManualVUHandle(
-	parentCtx context.Context, state *lib.ExecutionState,
-	localActiveVUsCount *int64, initVU lib.InitializedVU,
-	config *BaseConfig, logger *logrus.Entry,
+func (rs *externallyControlledRunState) newManualVUHandle(
+	initVU lib.InitializedVU, logger *logrus.Entry,
 ) *manualVUHandle {
 	wg := sync.WaitGroup{}
+	state := rs.executor.executionState
 	getVU := func() (lib.InitializedVU, error) {
 		wg.Add(1)
 		state.ModCurrentlyActiveVUsCount(+1)
-		atomic.AddInt64(localActiveVUsCount, +1)
+		atomic.AddInt64(rs.activeVUsCount, +1)
 		return initVU, nil
 	}
 	returnVU := func(_ lib.InitializedVU) {
 		state.ModCurrentlyActiveVUsCount(-1)
-		atomic.AddInt64(localActiveVUsCount, -1)
+		atomic.AddInt64(rs.activeVUsCount, -1)
 		wg.Done()
 	}
-	ctx, cancel := context.WithCancel(parentCtx)
+	ctx, cancel := context.WithCancel(rs.ctx)
 	return &manualVUHandle{
-		vuHandle: newStoppedVUHandle(ctx, getVU, returnVU, config, logger),
+		vuHandle: newStoppedVUHandle(ctx, getVU, returnVU, &rs.executor.config.BaseConfig, logger),
 		initVU:   initVU,
 		wg:       &wg,
 		cancelVU: cancel,
@@ -391,10 +390,7 @@ func (rs *externallyControlledRunState) retrieveStartMaxVUs() error {
 		if vuGetErr != nil {
 			return vuGetErr
 		}
-		vuHandle := newManualVUHandle(
-			rs.ctx, rs.executor.executionState, rs.activeVUsCount, initVU,
-			&rs.executor.config.BaseConfig, rs.executor.logger.WithField("vuNum", i),
-		)
+		vuHandle := rs.newManualVUHandle(initVU, rs.executor.logger.WithField("vuNum", i))
 		go vuHandle.runLoopsIfPossible(rs.runIteration)
 		rs.vuHandles[i] = vuHandle
 	}
@@ -450,11 +446,7 @@ func (rs *externallyControlledRunState) handleConfigChange(oldCfg, newCfg Extern
 		if vuInitErr != nil {
 			return vuInitErr
 		}
-		vuHandle := newManualVUHandle(
-			rs.ctx, executionState, rs.activeVUsCount, initVU,
-			&rs.executor.config.BaseConfig,
-			rs.executor.logger.WithField("vuNum", i),
-		)
+		vuHandle := rs.newManualVUHandle(initVU, rs.executor.logger.WithField("vuNum", i))
 		go vuHandle.runLoopsIfPossible(rs.runIteration)
 		rs.vuHandles = append(rs.vuHandles, vuHandle)
 	}
