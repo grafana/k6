@@ -60,7 +60,7 @@ func NewPerVUIterationsConfig(name string) PerVUIterationsConfig {
 		BaseConfig:  NewBaseConfig(name, perVUIterationsType),
 		VUs:         null.NewInt(1, false),
 		Iterations:  null.NewInt(1, false),
-		MaxDuration: types.NewNullDuration(10*time.Minute, false), //TODO: shorten?
+		MaxDuration: types.NewNullDuration(10*time.Minute, false), // TODO: shorten?
 	}
 }
 
@@ -69,7 +69,7 @@ var _ lib.ExecutorConfig = &PerVUIterationsConfig{}
 
 // GetVUs returns the scaled VUs for the executor.
 func (pvic PerVUIterationsConfig) GetVUs(et *lib.ExecutionTuple) int64 {
-	return et.ES.Scale(pvic.VUs.Int64)
+	return et.Segment.Scale(pvic.VUs.Int64)
 }
 
 // GetIterations returns the UNSCALED iteration count for the executor. It's

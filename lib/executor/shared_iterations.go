@@ -63,7 +63,7 @@ func NewSharedIterationsConfig(name string) SharedIterationsConfig {
 		BaseConfig:  NewBaseConfig(name, sharedIterationsType),
 		VUs:         null.NewInt(1, false),
 		Iterations:  null.NewInt(1, false),
-		MaxDuration: types.NewNullDuration(10*time.Minute, false), //TODO: shorten?
+		MaxDuration: types.NewNullDuration(10*time.Minute, false), // TODO: shorten?
 	}
 }
 
@@ -77,8 +77,12 @@ func (sic SharedIterationsConfig) GetVUs(et *lib.ExecutionTuple) int64 {
 
 // GetIterations returns the scaled iteration count for the executor.
 func (sic SharedIterationsConfig) GetIterations(et *lib.ExecutionTuple) int64 {
-	// Optimize this by probably changing the whole Config API
-	return et.GetNewExecutionTupleBasedOnValue(sic.VUs.Int64).ScaleInt64(sic.Iterations.Int64)
+	// TODO: Optimize this by probably changing the whole Config API
+	newTuple, err := et.GetNewExecutionTupleFromValue(sic.VUs.Int64)
+	if err != nil {
+		return 0
+	}
+	return newTuple.ScaleInt64(sic.Iterations.Int64)
 }
 
 // GetDescription returns a human-readable description of the executor options
@@ -166,9 +170,11 @@ func (sic SharedIterationsConfig) HasWork(et *lib.ExecutionTuple) bool {
 }
 
 // Init values needed for the execution
-func (si *SharedIterations) Init(ctx context.Context) error {
-	si.et = si.BaseExecutor.executionState.ExecutionTuple.GetNewExecutionTupleBasedOnValue(si.config.VUs.Int64)
-	return nil
+func (si *SharedIterations) Init(ctx context.Context) (err error) {
+	// err should always be nil, because Init() won't be called for executors
+	// with no work, as determined by their config's HasWork() method.
+	si.et, err = si.BaseExecutor.executionState.ExecutionTuple.GetNewExecutionTupleFromValue(si.config.VUs.Int64)
+	return
 }
 
 // Run executes a specific total number of iterations, which are all shared by

@@ -48,7 +48,6 @@ func newExecutionSegmentFromString(str string) *lib.ExecutionSegment {
 
 func newExecutionSegmentSequenceFromString(str string) *lib.ExecutionSegmentSequence {
 	r, err := lib.NewExecutionSegmentSequenceFromString(str)
-
 	if err != nil {
 		panic(err)
 	}
@@ -71,7 +70,7 @@ func TestConstantArrivalRateRunNotEnoughAllocatedVUsWarn(t *testing.T) {
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
 	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
-	var ctx, cancel, executor, logHook = setupExecutor(
+	ctx, cancel, executor, logHook := setupExecutor(
 		t, getTestConstantArrivalRateConfig(), es,
 		simpleRunner(func(ctx context.Context) error {
 			time.Sleep(time.Second)
@@ -79,7 +78,7 @@ func TestConstantArrivalRateRunNotEnoughAllocatedVUsWarn(t *testing.T) {
 		}),
 	)
 	defer cancel()
-	var engineOut = make(chan stats.SampleContainer, 1000)
+	engineOut := make(chan stats.SampleContainer, 1000)
 	err = executor.Run(ctx, engineOut)
 	require.NoError(t, err)
 	entries := logHook.Drain()
@@ -98,7 +97,7 @@ func TestConstantArrivalRateRunCorrectRate(t *testing.T) {
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
 	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
-	var ctx, cancel, executor, logHook = setupExecutor(
+	ctx, cancel, executor, logHook := setupExecutor(
 		t, getTestConstantArrivalRateConfig(), es,
 		simpleRunner(func(ctx context.Context) error {
 			atomic.AddInt64(&count, 1)
@@ -119,7 +118,7 @@ func TestConstantArrivalRateRunCorrectRate(t *testing.T) {
 			require.InDelta(t, 50, currentCount, 1)
 		}
 	}()
-	var engineOut = make(chan stats.SampleContainer, 1000)
+	engineOut := make(chan stats.SampleContainer, 1000)
 	err = executor.Run(ctx, engineOut)
 	wg.Wait()
 	require.NoError(t, err)
@@ -127,7 +126,7 @@ func TestConstantArrivalRateRunCorrectRate(t *testing.T) {
 }
 
 func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		segment  *lib.ExecutionSegment
 		sequence *lib.ExecutionSegmentSequence
 		start    time.Duration
@@ -191,17 +190,18 @@ func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
 				ExecutionSegmentSequence: test.sequence,
 			}, et, 10, 50)
 			var count int64
-			var config = getTestConstantArrivalRateConfig()
-			newET := es.ExecutionTuple.GetNewExecutionTupleBasedOnValue(config.MaxVUs.Int64)
+			config := getTestConstantArrivalRateConfig()
+			newET, err := es.ExecutionTuple.GetNewExecutionTupleFromValue(config.MaxVUs.Int64)
+			require.NoError(t, err)
 			rateScaled := newET.ScaleInt64(config.Rate.Int64)
-			var startTime = time.Now()
-			var expectedTimeInt64 = int64(test.start)
-			var ctx, cancel, executor, logHook = setupExecutor(
+			startTime := time.Now()
+			expectedTimeInt64 := int64(test.start)
+			ctx, cancel, executor, logHook := setupExecutor(
 				t, config, es,
 				simpleRunner(func(ctx context.Context) error {
 					current := atomic.AddInt64(&count, 1)
 
-					var expectedTime = test.start
+					expectedTime := test.start
 					if current != 1 {
 						expectedTime = time.Duration(atomic.AddInt64(&expectedTimeInt64,
 							int64(time.Millisecond)*test.steps[(current-2)%int64(len(test.steps))]))
@@ -232,7 +232,7 @@ func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
 				}
 			}()
 			startTime = time.Now()
-			var engineOut = make(chan stats.SampleContainer, 1000)
+			engineOut := make(chan stats.SampleContainer, 1000)
 			err = executor.Run(ctx, engineOut)
 			wg.Wait()
 			require.NoError(t, err)
@@ -244,7 +244,7 @@ func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
 func TestArrivalRateCancel(t *testing.T) {
 	t.Parallel()
 
-	var testCases = map[string]lib.ExecutorConfig{
+	testCases := map[string]lib.ExecutorConfig{
 		"constant": getTestConstantArrivalRateConfig(),
 		"variable": getTestVariableArrivalRateConfig(),
 	}
@@ -252,13 +252,13 @@ func TestArrivalRateCancel(t *testing.T) {
 		config := config
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			var ch = make(chan struct{})
-			var errCh = make(chan error, 1)
-			var weAreDoneCh = make(chan struct{})
+			ch := make(chan struct{})
+			errCh := make(chan error, 1)
+			weAreDoneCh := make(chan struct{})
 			et, err := lib.NewExecutionTuple(nil, nil)
 			require.NoError(t, err)
 			es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
-			var ctx, cancel, executor, logHook = setupExecutor(
+			ctx, cancel, executor, logHook := setupExecutor(
 				t, config, es, simpleRunner(func(ctx context.Context) error {
 					select {
 					case <-ch:
@@ -273,7 +273,7 @@ func TestArrivalRateCancel(t *testing.T) {
 			go func() {
 				defer wg.Done()
 
-				var engineOut = make(chan stats.SampleContainer, 1000)
+				engineOut := make(chan stats.SampleContainer, 1000)
 				errCh <- executor.Run(ctx, engineOut)
 				close(weAreDoneCh)
 			}()

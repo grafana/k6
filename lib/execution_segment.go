@@ -26,7 +26,6 @@ import (
 	"math/big"
 	"sort"
 	"strings"
-	"sync"
 )
 
 // ExecutionSegment represents a (start, end] partition of the total execution
@@ -401,10 +400,10 @@ func (ess ExecutionSegmentSequence) String() string {
 	return strings.Join(result, ",")
 }
 
-// lowest common denominator
+// LCD calculates the lowest common denominator of the sequence.
 // https://en.wikipedia.org/wiki/Least_common_multiple#Using_the_greatest_common_divisor
-func (ess ExecutionSegmentSequence) lcd() int64 {
-	var acc = ess[0].length.Denom().Int64()
+func (ess ExecutionSegmentSequence) LCD() int64 {
+	acc := ess[0].length.Denom().Int64()
 	var n int64
 	for _, seg := range ess[1:] {
 		n = seg.length.Denom().Int64()
@@ -430,199 +429,177 @@ func gcd(a, b int64) int64 {
 	return a
 }
 
-type sortInterfaceWrapper struct { // TODO: rename ? delete ? and replace ?
-	slice []struct { // TODO better name ? maybe  a type of it's own ?
-		numerator     int64
-		originalIndex int
-	}
-	lcd int64
+// IsFull returns whether the sequences is full, that is, whether it starts at 0
+// and ends at 1. Use GetFilledExecutionSegmentSequence() to get a full sequence.
+func (ess ExecutionSegmentSequence) IsFull() bool {
+	return ess != nil && len(ess) != 0 && ess[0].from.Cmp(zeroRat) == 0 && ess[len(ess)-1].to.Cmp(oneRat) == 0
 }
 
-func newWrapper(ess ExecutionSegmentSequence) sortInterfaceWrapper {
-	var result = sortInterfaceWrapper{
-		slice: make([]struct {
-			numerator     int64
-			originalIndex int
-		}, len(ess)),
-		lcd: ess.lcd(),
+// FindSegmentPosition returns the index of the supplied execution segment in
+// the sequence, or an error if the segment isn't present. This shouldn't be
+// used on a nil or empty sequence, it's best to use this method on the result
+// of GetFilledExecutionSegmentSequence().
+func (ess ExecutionSegmentSequence) FindSegmentPosition(segment *ExecutionSegment) (int, error) {
+	from := zeroRat
+	if segment != nil {
+		from = segment.from
 	}
-
-	for i := range ess {
-		result.slice[i].numerator = ess[i].length.Num().Int64() * (result.lcd / ess[i].length.Denom().Int64())
-		result.slice[i].originalIndex = i
-	}
-
-	sort.SliceStable(result.slice, func(i, j int) bool {
-		return result.slice[i].numerator > result.slice[j].numerator
+	index := sort.Search(len(ess), func(i int) bool {
+		return ess[i].from.Cmp(from) >= 0
 	})
+
+	if index < 0 || index >= len(ess) || !ess[index].Equal(segment) {
+		return -1, fmt.Errorf("couldn't find segment %s in sequence %s", segment, ess)
+	}
+	return index, nil
+}
+
+// GetFilledExecutionSegmentSequence makes sure we don't have any gaps in the
+// given execution segment sequence, or a nil one. It makes sure that the whole
+// 0-1 range is filled.
+func GetFilledExecutionSegmentSequence(
+	sequence *ExecutionSegmentSequence, fallback *ExecutionSegment,
+) (result ExecutionSegmentSequence) {
+	if sequence == nil || len(*sequence) == 0 {
+		if fallback == nil || fallback.length.Cmp(oneRat) == 0 {
+			// There is no sequence or a segment, so it means the whole test run
+			// is being planned/executed. So we make sure not to have a nil
+			// sequence, returning a full; "0,1" sequence instead, otherwise we
+			// will need to check for nil everywhere...
+			return ExecutionSegmentSequence{newExecutionSegment(zeroRat, oneRat)}
+		}
+		// We don't have a sequence, but we have a defined segment, so we
+		// fill around it with the missing pieces for a full sequence.
+		result = ExecutionSegmentSequence{fallback}
+	} else {
+		result = *sequence
+	}
+
+	if result[0].from.Cmp(zeroRat) != 0 {
+		es := newExecutionSegment(zeroRat, result[0].from)
+		result = append(ExecutionSegmentSequence{es}, result...)
+	}
+
+	if result[len(result)-1].to.Cmp(oneRat) != 0 {
+		es := newExecutionSegment(result[len(result)-1].to, oneRat)
+		result = append(result, es)
+	}
 	return result
 }
 
-// Imagine you have a number of rational numbers which all add up to 1 (or less) and call them
-// segments.
-// If you want each to get proportional amount of anything you need to give them their numerator
-// count of elements for each denominator amount from the original elements. So for 1/3 you give 1
-// element for each 3 elements. For 3/5 - 3 elements for each 5.
-// If you have for example a sequence of with element with length 3/5 and 1/3 in order to know how
-// to distribute it accurately you need to get the LCD(lowest common denominitor) in this case
-// between 3 and 5 this is 15 and then to transform the numbers to have the same, LCD equal,
-// denominator. So 3/5 becomes 9/15 and 1/3 becomes 5/15. So now for each 15 elements 9 need to go
-// to the 3/5, and 5 need to go to 1/3.
-//
-// We use the below algorithm to split elements between ExecutionSegments by using their length as
-// the rational number. As we would like to get non sequential elements we try to get the maximum
-// distance between them. That is the number of elements divided by the number of elements for any
-// given segment, which concidently is the length of the segment reversed.
-// The algorithm below does the following:
-// 1. Goes through the elements from 0 to the lcd-1
-// 2. For each of element goes through the segments and looks if the amount of already taken
-// elements by the given segment multiplied by that segment length inverted is equal to or less to
-// the current element index. if it is give that element to that segment if not continue with the
-// next element.
-//
-// The code below specifically avoids using big.Rat which complicates the code somewhat.
-// As additional note the sorting of the segments from biggest to smallest helps with the fact that
-// the biggest elements will need to take the most elements and for them it will be the hardest to
-// not get sequential elements.
-func (e sortInterfaceWrapper) stripingAlgorithm(saveIndex func(iteration int64, index int, numerator int64) bool) {
-	var chosenCounts = make([]int64, len(e.slice))
+// ExecutionSegmentSequenceWrapper is a caching layer on top of the execution
+// segment sequence that allows us to make fast and useful calculations, after
+// a somewhat slow initialization.
+type ExecutionSegmentSequenceWrapper struct {
+	ExecutionSegmentSequence       // a filled-out segment sequence
+	lcd                      int64 // pre-calculated least common denominator
 
-outer:
-	for i := int64(0); i < e.lcd; i++ {
-		for index, chosenCount := range chosenCounts {
-			num := chosenCount * e.lcd
-			denom := e.slice[index].numerator
+	// The striped offsets, i.e. the repeating indexes that "belong" to each
+	// execution segment in the sequence.
+	offsets [][]int64
+}
+
+// NewExecutionSegmentSequenceWrapper expects a filled-out execution segment
+// sequence. It pre-calculates the initial caches of and returns a new
+// ExecutionSegmentSequenceWrapper, but doesn't calculate the striped offsets.
+func NewExecutionSegmentSequenceWrapper(ess ExecutionSegmentSequence) *ExecutionSegmentSequenceWrapper {
+	if !ess.IsFull() {
+		panic(fmt.Sprintf("Cannot wrap around a non-full execution segment sequence '%s'", ess))
+	}
+
+	sequenceLength := len(ess)
+	offsets := make([][]int64, sequenceLength)
+	lcd := ess.LCD()
+
+	// This will contain the normalized numerator values (i.e. what they would have
+	// been if all denominators were equal to the LCD), sorted in descending
+	// order (i.e. biggest segments are first), with references to their actual
+	// indexes in the execution segment sequence (i.e. `seq` above).
+	sortedNormalizedIndexes := make([]struct {
+		normNumerator int64
+		originalIndex int
+	}, sequenceLength)
+
+	for i := range ess {
+		normalizedNumerator := ess[i].length.Num().Int64() * (lcd / ess[i].length.Denom().Int64())
+		sortedNormalizedIndexes[i].normNumerator = normalizedNumerator
+		sortedNormalizedIndexes[i].originalIndex = i
+		offsets[i] = make([]int64, 0, normalizedNumerator+1)
+	}
+
+	sort.SliceStable(sortedNormalizedIndexes, func(i, j int) bool {
+		return sortedNormalizedIndexes[i].normNumerator > sortedNormalizedIndexes[j].normNumerator
+	})
+
+	// This is the striping algorithm. Imagine you have a number of rational
+	// numbers which all add up to 1 (or less), and call them segments. If you
+	// want each to get proportional amount of anything, you need to give them
+	// their numerator count of elements for each denominator amount from the
+	// original elements. So, for 1/3, you give 1 element for each 3 elements.
+	// For 3/5 - 3 elements for each 5. If you have, for example, a sequence
+	// with elements with length 3/5 and 1/3, in order to know how to distribute
+	// it accurately, you need to get the LCD(lowest common denominitor). In
+	// this case, between 3 and 5, the LCD is 15. Then to transform the numbers
+	// to have the same, LCD equal, denominator. So 3/5 becomes 9/15 and 1/3
+	// becomes 5/15. So now for each 15 elements 9 need to go to the 3/5, and 5
+	// need to go to 1/3. This is what we did above in sortedNormalizedIndexes.
+	//
+	// We use the algorithm below to split elements between ExecutionSegments by
+	// using their length as the rational number. As we would like to get
+	// non-sequential elements, we try to get the maximum distance between them.
+	// That is the number of elements divided by the number of elements for any
+	// given segment, which concidently is the length of the segment reversed.
+	// The algorithm below does the following:
+	//  1. Goes through the elements from 0 to the lcd-1
+	//  2. For each of element, it goes through the segments and looks if the
+	//     amount of already taken elements by the given segment, multiplied by
+	//     that segment's length inverted, is equal to or less to the current
+	//     element index. If it is, give that element to that segment. If not,
+	//     continue with the next element.
+	// The code below specifically avoids using big.Rat, for performance
+	// reasons, which complicates the code somewhat. As additional note, the
+	// sorting of the segments from biggest to smallest helps with the fact that
+	// the biggest elements will need to take the most elements, and for them it
+	// will be the hardest to not get sequential elements.
+	prev := make([]int64, sequenceLength)
+	chosenCounts := make([]int64, sequenceLength)
+	saveIndex := func(iteration int64, index int, numerator int64) {
+		offsets[index] = append(offsets[index], iteration-prev[index])
+		prev[index] = iteration
+		if int64(len(offsets[index])) == numerator {
+			offsets[index] = append(offsets[index], offsets[index][0]+lcd-iteration)
+		}
+	}
+	for i := int64(0); i < lcd; i++ {
+		for sortedIndex, chosenCount := range chosenCounts {
+			num := chosenCount * lcd
+			denom := sortedNormalizedIndexes[sortedIndex].normNumerator
 			if i > num/denom || (i == num/denom && num%denom == 0) {
-				chosenCounts[index]++
-				if saveIndex(i, e.slice[index].originalIndex, denom) {
-					break outer
-				}
+				chosenCounts[sortedIndex]++
+				saveIndex(i, sortedNormalizedIndexes[sortedIndex].originalIndex, denom)
 				break
 			}
 		}
 	}
+
+	return &ExecutionSegmentSequenceWrapper{ExecutionSegmentSequence: ess, lcd: lcd, offsets: offsets}
 }
 
-// ExecutionTuple is here to represent the combination of ExecutionSegmentSequence and
-// ExecutionSegment and to give easy access to a couple of algorithms based on them in a way that is
-// somewhat perfomant for which it generally needs to cache the results
-type ExecutionTuple struct { // TODO rename
-	ES *ExecutionSegment // TODO unexport this as well?
-
-	esIndex      int
-	sequence     ExecutionSegmentSequence
-	offsetsCache [][]int64
-	lcd          int64
-	// TODO discuss if we just don't want to fillCache in the constructor and not need to use pointer receivers everywhere
-	once *sync.Once
+// LCD returns the (cached) least common denominator of the sequence - no need
+// to calculate it again, since we did it in the constructor.
+func (essw *ExecutionSegmentSequenceWrapper) LCD() int64 {
+	return essw.lcd
 }
 
-func (et *ExecutionTuple) String() string {
-	return fmt.Sprintf("%s in %s", et.ES, et.sequence)
-}
-
-func fillSequence(sequence ExecutionSegmentSequence) ExecutionSegmentSequence {
-	if sequence[0].from.Cmp(zeroRat) != 0 {
-		es := newExecutionSegment(zeroRat, sequence[0].from)
-		sequence = append(ExecutionSegmentSequence{es}, sequence...)
+// ScaleInt64 scales the provided value for the given segment.
+func (essw *ExecutionSegmentSequenceWrapper) ScaleInt64(segmentIndex int, value int64) int64 {
+	start := essw.offsets[segmentIndex][0]
+	offsets := essw.offsets[segmentIndex][1:]
+	result := (value / essw.lcd) * int64(len(offsets))
+	for gi, i := 0, start; i < value%essw.lcd; gi, i = gi+1, i+offsets[gi] {
+		result++
 	}
-
-	if sequence[len(sequence)-1].to.Cmp(oneRat) != 0 {
-		es := newExecutionSegment(sequence[len(sequence)-1].to, oneRat)
-		sequence = append(sequence, es)
-	}
-	return sequence
-}
-
-// NewExecutionTuple returns a new ExecutionTuple for the provided segment and sequence
-func NewExecutionTuple(segment *ExecutionSegment, sequence *ExecutionSegmentSequence) (*ExecutionTuple, error) {
-	et := ExecutionTuple{
-		once: new(sync.Once),
-		ES:   segment,
-	}
-	if sequence == nil || len(*sequence) == 0 {
-		if segment == nil || segment.length.Cmp(oneRat) == 0 {
-			// here we replace it with a not nil as we otherwise will need to check it everywhere
-			et.sequence = ExecutionSegmentSequence{newExecutionSegment(zeroRat, oneRat)}
-		} else {
-			et.sequence = fillSequence(ExecutionSegmentSequence{segment})
-		}
-	} else {
-		et.sequence = fillSequence(*sequence)
-	}
-
-	et.esIndex = et.find(segment)
-	if et.esIndex == -1 {
-		return nil, fmt.Errorf("couldn't find segment %s in sequence %s", segment, sequence)
-	}
-	return &et, nil
-}
-
-func (et *ExecutionTuple) find(segment *ExecutionSegment) int {
-	if segment == nil {
-		if len(et.sequence) == 1 {
-			return 0
-		}
-		return -1
-	}
-	index := sort.Search(len(et.sequence), func(i int) bool {
-		return et.sequence[i].from.Cmp(segment.from) >= 0
-	})
-
-	if index < 0 || index >= len(et.sequence) || !et.sequence[index].Equal(segment) {
-		return -1
-	}
-	return index
-}
-
-// ScaleInt64 scales the provided value based on the ExecutionTuple
-func (et *ExecutionTuple) ScaleInt64(value int64) int64 {
-	if et.esIndex == -1 {
-		return 0
-	}
-	if len(et.sequence) == 1 {
-		return value
-	}
-	et.once.Do(et.fillCache)
-	offsets := et.offsetsCache[et.esIndex]
-	return scaleInt64(value, offsets[0], offsets[1:], et.lcd)
-}
-
-// scaleInt64With scales the provided value based on the ExecutionTuples'
-// sequence and the segment provided
-func (et *ExecutionTuple) scaleInt64With(value int64, es *ExecutionSegment) int64 { //nolint:unused
-	start, offsets, lcd := et.GetStripedOffsets(es)
-	return scaleInt64(value, start, offsets, lcd)
-}
-
-func scaleInt64(value, start int64, offsets []int64, lcd int64) int64 {
-	endValue := (value / lcd) * int64(len(offsets))
-	for gi, i := 0, start; i < value%lcd; gi, i = gi+1, i+offsets[gi] {
-		endValue++
-	}
-	return endValue
-}
-
-func (et *ExecutionTuple) fillCache() {
-	var wrapper = newWrapper(et.sequence)
-
-	et.offsetsCache = make([][]int64, len(et.sequence))
-	for i := range et.offsetsCache {
-		et.offsetsCache[i] = make([]int64, 0, wrapper.slice[i].numerator+1)
-	}
-
-	var prev = make([]int64, len(et.sequence))
-	var saveIndex = func(iteration int64, index int, numerator int64) bool {
-		et.offsetsCache[index] = append(et.offsetsCache[index], iteration-prev[index])
-		prev[index] = iteration
-		if int64(len(et.offsetsCache[index])) == numerator {
-			et.offsetsCache[index] = append(et.offsetsCache[index], et.offsetsCache[index][0]+wrapper.lcd-iteration)
-		}
-		return false
-	}
-
-	wrapper.stripingAlgorithm(saveIndex)
-	et.lcd = wrapper.lcd
+	return result
 }
 
 // GetStripedOffsets returns the stripped offsets for the given segment
@@ -633,52 +610,120 @@ func (et *ExecutionTuple) fillCache() {
 //            into lcd sized chunks
 // - lcd: the LCD of the lengths of all segments in the sequence. This is also the number of
 //        elements after which the algorithm starts to loop and give the same values
-func (et *ExecutionTuple) GetStripedOffsets(segment *ExecutionSegment) (int64, []int64, int64) {
-	et.once.Do(et.fillCache)
-	index := et.find(segment)
-	if index == -1 {
-		return -1, nil, et.lcd
-	}
-	offsets := et.offsetsCache[index]
-	return offsets[0], offsets[1:], et.lcd
+func (essw *ExecutionSegmentSequenceWrapper) GetStripedOffsets(segmentIndex int) (int64, []int64, int64) {
+	offsets := essw.offsets[segmentIndex]
+	return offsets[0], offsets[1:], essw.lcd
 }
 
-// GetNewExecutionTupleBasedOnValue uses the value provided, splits it using the striping offsets
-// between all the segments in the sequence and returns a new ExecutionTuple with a new sequence and
-// segments, such that each new segment in the new sequence has length `Scale(value)/value` while
-// keeping the order. The main segment in the new ExecutionTuple is the correspoding one from the
-// original, if that segmetn would've been with length 0 then it is nil, and obviously isn't part of
-// the sequence.
-func (et *ExecutionTuple) GetNewExecutionTupleBasedOnValue(value int64) *ExecutionTuple {
-	et.once.Do(et.fillCache)
-	if value != 0 && value%et.lcd == 0 { // the value is perfectly divisible so we will get the same tuple
-		return et
+// GetTuple returns an ExecutionTuple for the specified segment index.
+func (essw *ExecutionSegmentSequenceWrapper) GetTuple(segmentIndex int) *ExecutionTuple {
+	return &ExecutionTuple{
+		Sequence:     essw,
+		Segment:      essw.ExecutionSegmentSequence[segmentIndex],
+		SegmentIndex: segmentIndex,
+	}
+}
+
+// GetNewExecutionSegmentSequenceFromValue uses the value provided, splits it
+// between all the segments, using the striping offsets in the sequence,
+// generating a new segment sequence. It then returns a new
+// ExecutionSegmentSequenceWrapper, with the new sequence and segments, such
+// that each new segment in the new sequence has length `Scale(value)/value`
+// while keeping the order.
+//
+// Additionally, the position of a given segment index can be tracked (since
+// empty segments are removed), so that you can reconstruct an ExecutionTuple,
+// if required. If the segment with the trackedIndex is not part of the new
+// sequence, or if a new sequence cannot be generated (for example, for 0
+// values), an error will be returned.
+func (essw *ExecutionSegmentSequenceWrapper) GetNewExecutionSegmentSequenceFromValue(value int64, trackedIndex int) (
+	newSequence *ExecutionSegmentSequenceWrapper, newIndex int, err error,
+) {
+	if value < 1 {
+		return nil, -1, fmt.Errorf("cannot generate new sequence for value %d", value)
 	}
 
-	var (
-		newESS  = make(ExecutionSegmentSequence, 0, len(et.sequence)) // this can be smaller
-		newES   *ExecutionSegment
-		esIndex = -1
-		prev    int64
-	)
-	for i := range et.sequence {
-		offsets := et.offsetsCache[i]
-		newValue := scaleInt64(value, offsets[0], offsets[1:], et.lcd)
+	if value%essw.lcd == 0 { // the value is perfectly divisible so we will get the same tuple
+		return essw, trackedIndex, nil
+	}
+
+	newIndex = -1
+	newESS := make(ExecutionSegmentSequence, 0, len(essw.ExecutionSegmentSequence)) // this can be smaller
+
+	prev := int64(0)
+	for i := range essw.ExecutionSegmentSequence {
+		newValue := essw.ScaleInt64(i, value)
 		if newValue == 0 {
 			continue
 		}
-		var currentES = newExecutionSegment(big.NewRat(prev, value), big.NewRat(prev+newValue, value))
+		currentES := newExecutionSegment(big.NewRat(prev, value), big.NewRat(prev+newValue, value))
 		prev += newValue
-		if i == et.esIndex {
-			newES = currentES
-			esIndex = len(newESS)
+		if i == trackedIndex {
+			newIndex = len(newESS)
 		}
 		newESS = append(newESS, currentES)
 	}
-	return &ExecutionTuple{
-		ES:       newES,
-		sequence: newESS,
-		esIndex:  esIndex,
-		once:     new(sync.Once),
+
+	if newIndex == -1 {
+		return nil, -1, fmt.Errorf(
+			"segment %d (%s) isn't present in the new sequence",
+			trackedIndex, essw.ExecutionSegmentSequence[trackedIndex],
+		)
 	}
+
+	return NewExecutionSegmentSequenceWrapper(newESS), newIndex, nil
+}
+
+// ExecutionTuple is the combination of an ExecutionSegmentSequence(Wrapper) and
+// a specific ExecutionSegment from it. It gives easy access to the efficient
+// scaling and striping algorithms for that specific segment, since the results
+// are cached in the sequence wrapper.
+type ExecutionTuple struct { // TODO rename? make fields private and have getter methods?
+	Sequence     *ExecutionSegmentSequenceWrapper
+	Segment      *ExecutionSegment
+	SegmentIndex int
+}
+
+func (et *ExecutionTuple) String() string {
+	return fmt.Sprintf("%s in %s", et.Segment, et.Sequence)
+}
+
+// NewExecutionTuple returns a new ExecutionTuple for the provided segment and
+// sequence.
+//
+// TODO: don't return a pointer?
+func NewExecutionTuple(segment *ExecutionSegment, sequence *ExecutionSegmentSequence) (*ExecutionTuple, error) {
+	filledSeq := GetFilledExecutionSegmentSequence(sequence, segment)
+	wrapper := NewExecutionSegmentSequenceWrapper(filledSeq)
+	index, err := wrapper.FindSegmentPosition(segment)
+	if err != nil {
+		return nil, err
+	}
+	return &ExecutionTuple{Sequence: wrapper, Segment: segment, SegmentIndex: index}, nil
+}
+
+// ScaleInt64 scales the provided value for our execution segment.
+func (et *ExecutionTuple) ScaleInt64(value int64) int64 {
+	return et.Sequence.ScaleInt64(et.SegmentIndex, value)
+}
+
+// GetStripedOffsets returns the striped offsets for our execution segment.
+func (et *ExecutionTuple) GetStripedOffsets() (int64, []int64, int64) {
+	return et.Sequence.GetStripedOffsets(et.SegmentIndex)
+}
+
+// GetNewExecutionTupleFromValue re-segments the sequence, based on the given
+// value (see GetNewExecutionSegmentSequenceFromValue() above), and either
+// returns the new tuple, or an error if the current segment isn't present in
+// the new sequence.
+func (et *ExecutionTuple) GetNewExecutionTupleFromValue(value int64) (*ExecutionTuple, error) {
+	newSequenceWrapper, newIndex, err := et.Sequence.GetNewExecutionSegmentSequenceFromValue(value, et.SegmentIndex)
+	if err != nil {
+		return nil, err
+	}
+	return &ExecutionTuple{
+		Sequence:     newSequenceWrapper,
+		Segment:      newSequenceWrapper.ExecutionSegmentSequence[newIndex],
+		SegmentIndex: newIndex,
+	}, nil
 }

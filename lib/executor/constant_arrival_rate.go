@@ -189,9 +189,11 @@ type ConstantArrivalRate struct {
 var _ lib.Executor = &ConstantArrivalRate{}
 
 // Init values needed for the execution
-func (car *ConstantArrivalRate) Init(ctx context.Context) error {
-	car.et = car.BaseExecutor.executionState.ExecutionTuple.GetNewExecutionTupleBasedOnValue(car.config.MaxVUs.Int64)
-	return nil
+func (car *ConstantArrivalRate) Init(ctx context.Context) (err error) {
+	// err should always be nil, because Init() won't be called for executors
+	// with no work, as determined by their config's HasWork() method.
+	car.et, err = car.BaseExecutor.executionState.ExecutionTuple.GetNewExecutionTupleFromValue(car.config.MaxVUs.Int64)
+	return
 }
 
 // Run executes a constant number of iterations per second.
@@ -203,7 +205,7 @@ func (car ConstantArrivalRate) Run(ctx context.Context, out chan<- stats.SampleC
 	preAllocatedVUs := car.config.GetPreAllocatedVUs(car.executionState.ExecutionTuple)
 	maxVUs := car.config.GetMaxVUs(car.executionState.ExecutionTuple)
 	// TODO: refactor and simplify
-	arrivalRate := getScaledArrivalRate(car.et.ES, car.config.Rate.Int64, time.Duration(car.config.TimeUnit.Duration))
+	arrivalRate := getScaledArrivalRate(car.et.Segment, car.config.Rate.Int64, time.Duration(car.config.TimeUnit.Duration))
 	tickerPeriod := time.Duration(getTickerPeriod(arrivalRate).Duration)
 	arrivalRatePerSec, _ := getArrivalRatePerSec(arrivalRate).Float64()
 
@@ -287,7 +289,7 @@ func (car ConstantArrivalRate) Run(ctx context.Context, out chan<- stats.SampleC
 	}
 
 	remainingUnplannedVUs := maxVUs - preAllocatedVUs
-	start, offsets, _ := car.et.GetStripedOffsets(car.et.ES)
+	start, offsets, _ := car.et.GetStripedOffsets()
 	startTime = time.Now()
 	timer := time.NewTimer(time.Hour * 24)
 	// here the we need the not scaled one

@@ -53,7 +53,7 @@ func init() {
 type Stage struct {
 	Duration types.NullDuration `json:"duration"`
 	Target   null.Int           `json:"target"` // TODO: maybe rename this to endVUs? something else?
-	//TODO: add a progression function?
+	// TODO: add a progression function?
 }
 
 // VariableLoopingVUsConfig stores the configuration for the stages executor
@@ -78,7 +78,7 @@ var _ lib.ExecutorConfig = &VariableLoopingVUsConfig{}
 
 // GetStartVUs is just a helper method that returns the scaled starting VUs.
 func (vlvc VariableLoopingVUsConfig) GetStartVUs(et *lib.ExecutionTuple) int64 {
-	return et.ES.Scale(vlvc.StartVUs.Int64)
+	return et.Segment.Scale(vlvc.StartVUs.Int64)
 }
 
 // GetGracefulRampDown is just a helper method that returns the graceful
@@ -89,7 +89,7 @@ func (vlvc VariableLoopingVUsConfig) GetGracefulRampDown() time.Duration {
 
 // GetDescription returns a human-readable description of the executor options
 func (vlvc VariableLoopingVUsConfig) GetDescription(et *lib.ExecutionTuple) string {
-	maxVUs := et.ES.Scale(getStagesUnscaledMaxTarget(vlvc.StartVUs.Int64, vlvc.Stages))
+	maxVUs := et.Segment.Scale(getStagesUnscaledMaxTarget(vlvc.StartVUs.Int64, vlvc.Stages))
 	return fmt.Sprintf("Up to %d looping VUs for %s over %d stages%s",
 		maxVUs, sumStagesDuration(vlvc.Stages), len(vlvc.Stages),
 		vlvc.getBaseInfo(fmt.Sprintf("gracefulRampDown: %s", vlvc.GetGracefulRampDown())))
@@ -185,7 +185,7 @@ func (vlvc VariableLoopingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple
 	var (
 		timeTillEnd         time.Duration
 		fromVUs             = vlvc.StartVUs.Int64
-		start, offsets, lcd = et.GetStripedOffsets(et.ES)
+		start, offsets, lcd = et.GetStripedOffsets()
 		steps               = make([]lib.ExecutionStep, 0, vlvc.precalculateTheRequiredSteps(et, zeroEnd))
 		index               = segmentedIndex{start: start, lcd: lcd, offsets: offsets}
 	)
@@ -554,7 +554,8 @@ func (vlv VariableLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleCo
 	// Make sure the log and the progress bar have accurate information
 	vlv.logger.WithFields(logrus.Fields{
 		"type": vlv.config.GetType(), "startVUs": vlv.config.GetStartVUs(vlv.executionState.ExecutionTuple), "maxVUs": maxVUs,
-		"duration": regularDuration, "numStages": len(vlv.config.Stages)},
+		"duration": regularDuration, "numStages": len(vlv.config.Stages),
+	},
 	).Debug("Starting executor run...")
 
 	activeVUsCount := new(int64)
