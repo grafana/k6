@@ -23,7 +23,6 @@ package k6
 import (
 	"context"
 	"math/rand"
-	"strconv"
 	"sync/atomic"
 	"time"
 
@@ -91,18 +90,9 @@ func (*K6) Group(ctx context.Context, name string, fn goja.Callable) (goja.Value
 	ret, err := fn(goja.Undefined())
 	t := time.Now()
 
-	tags := state.Options.RunTags.CloneTags()
+	tags := map[string]string{}
 	for k, v := range state.Tags {
 		tags[k] = v
-	}
-	if state.Options.SystemTags.Has(stats.TagGroup) {
-		tags["group"] = g.Path
-	}
-	if state.Options.SystemTags.Has(stats.TagVU) {
-		tags["vu"] = strconv.FormatInt(state.Vu, 10)
-	}
-	if state.Options.SystemTags.Has(stats.TagIter) {
-		tags["iter"] = strconv.FormatInt(state.Iteration, 10)
 	}
 
 	stats.PushIfNotDone(ctx, state.Samples, stats.Sample{
@@ -124,7 +114,7 @@ func (*K6) Check(ctx context.Context, arg0, checks goja.Value, extras ...goja.Va
 	t := time.Now()
 
 	// Prepare tags, make sure the `group` tag can't be overwritten.
-	commonTags := state.Options.RunTags.CloneTags()
+	commonTags := map[string]string{}
 	for k, v := range state.Tags {
 		commonTags[k] = v
 	}
@@ -136,12 +126,6 @@ func (*K6) Check(ctx context.Context, arg0, checks goja.Value, extras ...goja.Va
 		for _, k := range obj.Keys() {
 			commonTags[k] = obj.Get(k).String()
 		}
-	}
-	if state.Options.SystemTags.Has(stats.TagVU) {
-		commonTags["vu"] = strconv.FormatInt(state.Vu, 10)
-	}
-	if state.Options.SystemTags.Has(stats.TagIter) {
-		commonTags["iter"] = strconv.FormatInt(state.Iteration, 10)
 	}
 
 	succ := true

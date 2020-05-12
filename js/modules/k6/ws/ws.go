@@ -104,7 +104,7 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 	// Leave header to nil by default so we can pass it directly to the Dialer
 	var header http.Header
 
-	tags := state.Options.RunTags.CloneTags()
+	tags := map[string]string{}
 	for k, v := range state.Tags {
 		tags[k] = v
 	}
