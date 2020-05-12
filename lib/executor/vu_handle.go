@@ -155,10 +155,7 @@ mainLoop:
 			if err != nil {
 				return
 			}
-			activationParams := getVUActivationParams(ctx, *vh.config,
-				func(u lib.InitializedVU) {
-					vh.returnVU(u)
-				})
+			activationParams := getVUActivationParams(ctx, *vh.config, vh.returnVU)
 			vu = initVU.Activate(activationParams)
 		}
 
