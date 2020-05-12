@@ -77,24 +77,24 @@ var _ lib.ExecutorConfig = &VariableArrivalRateConfig{}
 
 // GetPreAllocatedVUs is just a helper method that returns the scaled pre-allocated VUs.
 func (varc VariableArrivalRateConfig) GetPreAllocatedVUs(et *lib.ExecutionTuple) int64 {
-	return et.ES.Scale(varc.PreAllocatedVUs.Int64)
+	return et.Segment.Scale(varc.PreAllocatedVUs.Int64)
 }
 
 // GetMaxVUs is just a helper method that returns the scaled max VUs.
 func (varc VariableArrivalRateConfig) GetMaxVUs(et *lib.ExecutionTuple) int64 {
-	return et.ES.Scale(varc.MaxVUs.Int64)
+	return et.Segment.Scale(varc.MaxVUs.Int64)
 }
 
 // GetDescription returns a human-readable description of the executor options
 func (varc VariableArrivalRateConfig) GetDescription(et *lib.ExecutionTuple) string {
-	//TODO: something better? always show iterations per second?
-	maxVUsRange := fmt.Sprintf("maxVUs: %d", et.ES.Scale(varc.PreAllocatedVUs.Int64))
+	// TODO: something better? always show iterations per second?
+	maxVUsRange := fmt.Sprintf("maxVUs: %d", et.Segment.Scale(varc.PreAllocatedVUs.Int64))
 	if varc.MaxVUs.Int64 > varc.PreAllocatedVUs.Int64 {
-		maxVUsRange += fmt.Sprintf("-%d", et.ES.Scale(varc.MaxVUs.Int64))
+		maxVUsRange += fmt.Sprintf("-%d", et.Segment.Scale(varc.MaxVUs.Int64))
 	}
 	maxUnscaledRate := getStagesUnscaledMaxTarget(varc.StartRate.Int64, varc.Stages)
 	maxArrRatePerSec, _ := getArrivalRatePerSec(
-		getScaledArrivalRate(et.ES, maxUnscaledRate, time.Duration(varc.TimeUnit.Duration)),
+		getScaledArrivalRate(et.Segment, maxUnscaledRate, time.Duration(varc.TimeUnit.Duration)),
 	).Float64()
 
 	return fmt.Sprintf("Up to %.2f iterations/s for %s over %d stages%s",
@@ -140,8 +140,8 @@ func (varc VariableArrivalRateConfig) GetExecutionRequirements(et *lib.Execution
 	return []lib.ExecutionStep{
 		{
 			TimeOffset:      0,
-			PlannedVUs:      uint64(et.ES.Scale(varc.PreAllocatedVUs.Int64)),
-			MaxUnplannedVUs: uint64(et.ES.Scale(varc.MaxVUs.Int64 - varc.PreAllocatedVUs.Int64)),
+			PlannedVUs:      uint64(et.Segment.Scale(varc.PreAllocatedVUs.Int64)),
+			MaxUnplannedVUs: uint64(et.Segment.Scale(varc.MaxVUs.Int64 - varc.PreAllocatedVUs.Int64)),
 		},
 		{
 			TimeOffset:      sumStagesDuration(varc.Stages) + time.Duration(varc.GracefulStop.Duration),
@@ -168,7 +168,7 @@ func (varc VariableArrivalRateConfig) HasWork(et *lib.ExecutionTuple) bool {
 
 // VariableArrivalRate tries to execute a specific number of iterations for a
 // specific period.
-//TODO: combine with the ConstantArrivalRate?
+// TODO: combine with the ConstantArrivalRate?
 type VariableArrivalRate struct {
 	*BaseExecutor
 	config VariableArrivalRateConfig
@@ -236,7 +236,7 @@ var _ lib.Executor = &VariableArrivalRate{}
 // the striping algorithm from the lib.ExecutionTuple for additional speed up but this could
 // possibly be refactored if need for this arises.
 func (varc VariableArrivalRateConfig) cal(et *lib.ExecutionTuple, ch chan<- time.Duration) {
-	start, offsets, _ := et.GetStripedOffsets(et.ES)
+	start, offsets, _ := et.GetStripedOffsets()
 	li := -1
 	// TODO: move this to a utility function, or directly what GetStripedOffsets uses once we see everywhere we will use it
 	next := func() int64 {
@@ -279,7 +279,7 @@ func (varc VariableArrivalRateConfig) cal(et *lib.ExecutionTuple, ch chan<- time
 
 // Run executes a variable number of iterations per second.
 func (varr VariableArrivalRate) Run(ctx context.Context, out chan<- stats.SampleContainer) (err error) { //nolint:funlen
-	segment := varr.executionState.ExecutionTuple.ES
+	segment := varr.executionState.ExecutionTuple.Segment
 	gracefulStop := varr.config.GetGracefulStop()
 	duration := sumStagesDuration(varr.config.Stages)
 	preAllocatedVUs := varr.config.GetPreAllocatedVUs(varr.executionState.ExecutionTuple)
@@ -382,9 +382,9 @@ func (varr VariableArrivalRate) Run(ctx context.Context, out chan<- stats.Sample
 
 	remainingUnplannedVUs := maxVUs - preAllocatedVUs
 
-	var timer = time.NewTimer(time.Hour)
-	var start = time.Now()
-	var ch = make(chan time.Duration, 10) // buffer 10 iteration times ahead
+	timer := time.NewTimer(time.Hour)
+	start := time.Now()
+	ch := make(chan time.Duration, 10) // buffer 10 iteration times ahead
 	var prevTime time.Duration
 	go varr.config.cal(varr.executionState.ExecutionTuple, ch)
 	for nextTime := range ch {
@@ -411,7 +411,7 @@ func (varr VariableArrivalRate) Run(ctx context.Context, out chan<- stats.Sample
 			// ideally, we get the VU from the buffer without any issues
 		default:
 			if remainingUnplannedVUs == 0 {
-				//TODO: emit an error metric?
+				// TODO: emit an error metric?
 				varr.logger.Warningf("Insufficient VUs, reached %d active VUs and cannot allocate more", maxVUs)
 				continue
 			}

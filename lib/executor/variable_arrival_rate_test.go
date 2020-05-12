@@ -68,7 +68,7 @@ func TestVariableArrivalRateRunNotEnoughAllocatedVUsWarn(t *testing.T) {
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
 	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
-	var ctx, cancel, executor, logHook = setupExecutor(
+	ctx, cancel, executor, logHook := setupExecutor(
 		t, getTestVariableArrivalRateConfig(), es,
 		simpleRunner(func(ctx context.Context) error {
 			time.Sleep(time.Second)
@@ -76,7 +76,7 @@ func TestVariableArrivalRateRunNotEnoughAllocatedVUsWarn(t *testing.T) {
 		}),
 	)
 	defer cancel()
-	var engineOut = make(chan stats.SampleContainer, 1000)
+	engineOut := make(chan stats.SampleContainer, 1000)
 	err = executor.Run(ctx, engineOut)
 	require.NoError(t, err)
 	entries := logHook.Drain()
@@ -95,7 +95,7 @@ func TestVariableArrivalRateRunCorrectRate(t *testing.T) {
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
 	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
-	var ctx, cancel, executor, logHook = setupExecutor(
+	ctx, cancel, executor, logHook := setupExecutor(
 		t, getTestVariableArrivalRateConfig(), es,
 		simpleRunner(func(ctx context.Context) error {
 			atomic.AddInt64(&count, 1)
@@ -122,7 +122,7 @@ func TestVariableArrivalRateRunCorrectRate(t *testing.T) {
 		currentCount = atomic.SwapInt64(&count, 0)
 		assert.InDelta(t, 50, currentCount, 2)
 	}()
-	var engineOut = make(chan stats.SampleContainer, 1000)
+	engineOut := make(chan stats.SampleContainer, 1000)
 	err = executor.Run(ctx, engineOut)
 	wg.Wait()
 	require.NoError(t, err)
@@ -132,13 +132,14 @@ func TestVariableArrivalRateRunCorrectRate(t *testing.T) {
 func TestVariableArrivalRateRunCorrectRateWithSlowRate(t *testing.T) {
 	t.Parallel()
 	var count int64
-	var now = time.Now()
+	now := time.Now()
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
 	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
-	var expectedTimes = []time.Duration{
-		time.Millisecond * 3464, time.Millisecond * 4898, time.Second * 6}
-	var ctx, cancel, executor, logHook = setupExecutor(
+	expectedTimes := []time.Duration{
+		time.Millisecond * 3464, time.Millisecond * 4898, time.Second * 6,
+	}
+	ctx, cancel, executor, logHook := setupExecutor(
 		t, VariableArrivalRateConfig{
 			TimeUnit: types.NullDurationFrom(time.Second),
 			Stages: []Stage{
@@ -175,7 +176,7 @@ func TestVariableArrivalRateRunCorrectRateWithSlowRate(t *testing.T) {
 		}),
 	)
 	defer cancel()
-	var engineOut = make(chan stats.SampleContainer, 1000)
+	engineOut := make(chan stats.SampleContainer, 1000)
 	err = executor.Run(ctx, engineOut)
 	require.NoError(t, err)
 	require.Equal(t, int64(len(expectedTimes)), count)
@@ -252,9 +253,11 @@ func TestVariableArrivalRateCal(t *testing.T) {
 			et:            mustNewExecutionTuple(newExecutionSegmentFromString("2/3:1"), newExecutionSegmentSequenceFromString("0,1/3,2/3,1")),
 		},
 		{
-			expectedTimes: []time.Duration{time.Millisecond * 1825, time.Millisecond * 2581, time.Millisecond * 3162, time.Millisecond * 3651, time.Millisecond * 4082, time.Millisecond * 4472,
+			expectedTimes: []time.Duration{
+				time.Millisecond * 1825, time.Millisecond * 2581, time.Millisecond * 3162, time.Millisecond * 3651, time.Millisecond * 4082, time.Millisecond * 4472,
 				time.Millisecond * 4830, time.Millisecond * 5166, time.Millisecond * 5499, time.Millisecond * 5833, time.Millisecond * 6169, time.Millisecond * 6527,
-				time.Millisecond * 6917, time.Millisecond * 7348, time.Millisecond * 7837, time.Millisecond * 8418, time.Millisecond * 9174, time.Millisecond * 10999},
+				time.Millisecond * 6917, time.Millisecond * 7348, time.Millisecond * 7837, time.Millisecond * 8418, time.Millisecond * 9174, time.Millisecond * 10999,
+			},
 			et:       mustNewExecutionTuple(nil, nil),
 			timeUnit: time.Second / 3, // three  times as fast
 		},
@@ -270,9 +273,9 @@ func TestVariableArrivalRateCal(t *testing.T) {
 		}
 
 		t.Run(fmt.Sprintf("%s timeunit %s", et, config.TimeUnit), func(t *testing.T) {
-			var ch = make(chan time.Duration)
+			ch := make(chan time.Duration)
 			go config.cal(et, ch)
-			var changes = make([]time.Duration, 0, len(expectedTimes))
+			changes := make([]time.Duration, 0, len(expectedTimes))
 			for c := range ch {
 				changes = append(changes, c)
 			}
@@ -292,7 +295,7 @@ func BenchmarkCal(b *testing.B) {
 	} {
 		t := t
 		b.Run(t.String(), func(b *testing.B) {
-			var config = VariableArrivalRateConfig{
+			config := VariableArrivalRateConfig{
 				TimeUnit:  types.NullDurationFrom(time.Second),
 				StartRate: null.IntFrom(50),
 				Stages: []Stage{
@@ -311,7 +314,7 @@ func BenchmarkCal(b *testing.B) {
 			b.ResetTimer()
 			b.RunParallel(func(pb *testing.PB) {
 				for pb.Next() {
-					var ch = make(chan time.Duration, 20)
+					ch := make(chan time.Duration, 20)
 					go config.cal(et, ch)
 					for c := range ch {
 						_ = c
@@ -328,7 +331,7 @@ func BenchmarkCalRat(b *testing.B) {
 	} {
 		t := t
 		b.Run(t.String(), func(b *testing.B) {
-			var config = VariableArrivalRateConfig{
+			config := VariableArrivalRateConfig{
 				TimeUnit:  types.NullDurationFrom(time.Second),
 				StartRate: null.IntFrom(50),
 				Stages: []Stage{
@@ -347,7 +350,7 @@ func BenchmarkCalRat(b *testing.B) {
 			b.ResetTimer()
 			b.RunParallel(func(pb *testing.PB) {
 				for pb.Next() {
-					var ch = make(chan time.Duration, 20)
+					ch := make(chan time.Duration, 20)
 					go config.calRat(et, ch)
 					for c := range ch {
 						_ = c
@@ -364,7 +367,7 @@ func TestCompareCalImplementation(t *testing.T) {
 	// in my experiment the difference is 1(nanosecond) in 7 case for the whole test
 	// the duration is 1 second for each stage as calRat takes way longer - a longer better test can
 	// be done when/if it's performance is improved
-	var config = VariableArrivalRateConfig{
+	config := VariableArrivalRateConfig{
 		TimeUnit:  types.NullDurationFrom(time.Second),
 		StartRate: null.IntFrom(0),
 		Stages: []Stage{
@@ -408,8 +411,8 @@ func TestCompareCalImplementation(t *testing.T) {
 	}
 
 	et := mustNewExecutionTuple(nil, nil)
-	var chRat = make(chan time.Duration, 20)
-	var ch = make(chan time.Duration, 20)
+	chRat := make(chan time.Duration, 20)
+	ch := make(chan time.Duration, 20)
 	go config.calRat(et, chRat)
 	go config.cal(et, ch)
 	count := 0
@@ -436,7 +439,7 @@ func sqrtRat(x *big.Rat) *big.Rat {
 	var ns, ds big.Int
 	ni, di := x.Num(), x.Denom()
 	z.SetFrac(ns.Rsh(ni, uint(ni.BitLen())/2), ds.Rsh(di, uint(di.BitLen())/2))
-	for i := 10; i > 0; i-- { //TODO: better termination
+	for i := 10; i > 0; i-- { // TODO: better termination
 		a.Sub(a.Mul(&z, &z), x)
 		f, _ := a.Float64()
 		if f == 0 {
@@ -452,7 +455,7 @@ func sqrtRat(x *big.Rat) *big.Rat {
 func (varc VariableArrivalRateConfig) calRat(et *lib.ExecutionTuple, ch chan<- time.Duration) {
 	defer close(ch)
 
-	start, offsets, _ := et.GetStripedOffsets(et.ES)
+	start, offsets, _ := et.GetStripedOffsets()
 	li := -1
 	next := func() int64 {
 		li++
@@ -460,9 +463,9 @@ func (varc VariableArrivalRateConfig) calRat(et *lib.ExecutionTuple, ch chan<- t
 	}
 	iRat := big.NewRat(start+1, 1)
 
-	var carry = big.NewRat(0, 1)
-	var doneSoFar = big.NewRat(0, 1)
-	var endCount = big.NewRat(0, 1)
+	carry := big.NewRat(0, 1)
+	doneSoFar := big.NewRat(0, 1)
+	endCount := big.NewRat(0, 1)
 	curr := varc.StartRate.ValueOrZero()
 	var base time.Duration
 	for _, stage := range varc.Stages {

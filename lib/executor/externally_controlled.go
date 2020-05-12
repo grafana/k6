@@ -143,8 +143,8 @@ func (mec ExternallyControlledConfig) Validate() []error {
 func (mec ExternallyControlledConfig) GetExecutionRequirements(et *lib.ExecutionTuple) []lib.ExecutionStep {
 	startVUs := lib.ExecutionStep{
 		TimeOffset:      0,
-		PlannedVUs:      uint64(et.ES.Scale(mec.MaxVUs.Int64)), // user-configured, VUs to be pre-initialized
-		MaxUnplannedVUs: 0,                                     // intentional, see function comment
+		PlannedVUs:      uint64(et.Segment.Scale(mec.MaxVUs.Int64)), // user-configured, VUs to be pre-initialized
+		MaxUnplannedVUs: 0,                                          // intentional, see function comment
 	}
 
 	maxDuration := time.Duration(mec.Duration.Duration)
@@ -208,9 +208,11 @@ type ExternallyControlled struct {
 }
 
 // Make sure we implement all the interfaces
-var _ lib.Executor = &ExternallyControlled{}
-var _ lib.PausableExecutor = &ExternallyControlled{}
-var _ lib.LiveUpdatableExecutor = &ExternallyControlled{}
+var (
+	_ lib.Executor              = &ExternallyControlled{}
+	_ lib.PausableExecutor      = &ExternallyControlled{}
+	_ lib.LiveUpdatableExecutor = &ExternallyControlled{}
+)
 
 // GetCurrentConfig just returns the executor's current configuration.
 func (mex *ExternallyControlled) GetCurrentConfig() ExternallyControlledConfig {
@@ -313,7 +315,7 @@ func (mex *ExternallyControlled) stopWhenDurationIsReached(ctx context.Context, 
 			checkInterval.Stop()
 			return
 
-		//TODO: something more optimized that sleeps for pauses?
+		// TODO: something more optimized that sleeps for pauses?
 		case <-checkInterval.C:
 			if mex.executionState.GetCurrentTestRunDuration() >= duration {
 				cancel()
@@ -400,7 +402,7 @@ func (rs *externallyControlledRunState) retrieveStartMaxVUs() error {
 }
 
 func (rs *externallyControlledRunState) progresFn() (float64, []string) {
-	//TODO: simulate spinner for the other case or cycle 0-100?
+	// TODO: simulate spinner for the other case or cycle 0-100?
 	currentActiveVUs := atomic.LoadInt64(rs.activeVUsCount)
 	currentMaxVUs := atomic.LoadInt64(rs.maxVUs)
 	vusFmt := pb.GetFixedLengthIntFormat(currentMaxVUs)
