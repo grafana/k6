@@ -159,10 +159,10 @@ a commandline interface for interacting with it.`,
 		//    can start winding down its metrics processing.
 		globalCtx, globalCancel := context.WithCancel(context.Background())
 		defer globalCancel()
-		lingerCtx, lingerCancel := context.WithCancel(globalCtx)
-		defer lingerCancel()
-		runCtx, runCancel := context.WithCancel(lingerCtx)
+		runCtx, runCancel := context.WithCancel(globalCtx)
 		defer runCancel()
+		lingerCtx, lingerCancel := context.WithCancel(context.Background())
+		defer lingerCancel()
 
 		// Create a local execution scheduler wrapping the runner.
 		printBar(initBar, "execution scheduler")
@@ -275,6 +275,7 @@ a commandline interface for interacting with it.`,
 		go func() {
 			sig := <-sigC
 			logger.WithField("sig", sig).Debug("Stopping k6 in response to signal...")
+			runCancel()
 			lingerCancel() // stop the test run, metric processing is cancelled below
 
 			// If we get a second signal, we immediately exit, so something like
@@ -325,6 +326,10 @@ a commandline interface for interacting with it.`,
 			logger.Warn("No script iterations finished, consider making the test duration longer")
 		}
 
+		globalCancel() // signal the Engine that it should wind down
+		logger.Debug("Waiting for engine processes to finish...")
+		engineWait()
+
 		data := ui.SummaryData{
 			Metrics:   engine.Metrics,
 			RootGroup: engine.ExecutionScheduler.GetRunner().GetDefaultGroup(),
@@ -367,9 +372,6 @@ a commandline interface for interacting with it.`,
 				<-lingerCtx.Done()
 			}
 		}
-		globalCancel() // signal the Engine that it should wind down
-		logger.Debug("Waiting for engine processes to finish...")
-		engineWait()
 
 		if engine.IsTainted() {
 			return ExitCode{error: errors.New("some thresholds have failed"), Code: thresholdHaveFailedErrorCode}

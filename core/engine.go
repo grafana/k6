@@ -27,11 +27,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sirupsen/logrus"
+	"gopkg.in/guregu/null.v3"
+
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/stats"
-	"github.com/sirupsen/logrus"
-	"gopkg.in/guregu/null.v3"
 )
 
 const (
@@ -157,12 +158,13 @@ func (e *Engine) startBackgroundProcesses( //nolint:funlen
 	globalCtx, runCtx context.Context, runResult <-chan error, runSubCancel func(),
 ) (wait func()) {
 	processes := new(sync.WaitGroup)
+	metricsCtx, metricsDone := context.WithCancel(context.Background())
 
 	// Spin up all configured collectors
 	for _, collector := range e.Collectors {
 		processes.Add(1)
 		go func(collector lib.Collector) {
-			collector.Run(globalCtx)
+			collector.Run(metricsCtx)
 			processes.Done()
 		}(collector)
 	}
@@ -170,7 +172,10 @@ func (e *Engine) startBackgroundProcesses( //nolint:funlen
 	// Siphon and handle all produced metric samples
 	processes.Add(1)
 	go func() {
-		defer processes.Done()
+		defer func() {
+			metricsDone()
+			processes.Done()
+		}()
 		e.processMetrics(globalCtx)
 	}()
 
@@ -238,7 +243,7 @@ func (e *Engine) startBackgroundProcesses( //nolint:funlen
 	return processes.Wait
 }
 
-func (e *Engine) processMetrics(globalCtx context.Context) {
+func (e *Engine) processMetrics(ctx context.Context) {
 	sampleContainers := []stats.SampleContainer{}
 
 	defer func() {
@@ -270,7 +275,7 @@ func (e *Engine) processMetrics(globalCtx context.Context) {
 			}
 		case sc := <-e.Samples:
 			sampleContainers = append(sampleContainers, sc)
-		case <-globalCtx.Done():
+		case <-ctx.Done():
 			return
 		}
 	}
