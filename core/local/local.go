@@ -234,7 +234,7 @@ func (e *ExecutionScheduler) Init(ctx context.Context, samplesOut chan<- stats.S
 	defer cancel()
 
 	e.state.SetExecutionStatus(lib.ExecutionStatusInitVUs)
-	doneInits := e.initVUsConcurrently(subctx, samplesOut, vusToInitialize, runtime.NumCPU(), logger)
+	doneInits := e.initVUsConcurrently(subctx, samplesOut, vusToInitialize, runtime.GOMAXPROCS(0), logger)
 
 	initializedVUs := new(uint64)
 	vusFmt := pb.GetFixedLengthIntFormat(int64(vusToInitialize))
