@@ -166,6 +166,9 @@ func readDiskConfig(fs afero.Fs) (Config, string, error) {
 	}
 	var conf Config
 	err = json.Unmarshal(data, &conf)
+	if err != nil {
+		return Config{}, realConfigFilePath, err
+	}
 	err = ValidateDiskConfigOptions(&conf)
 	if err != nil {
 		return Config{}, realConfigFilePath, err
