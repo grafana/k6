@@ -137,7 +137,7 @@ func NewBundle(src *loader.SourceData, filesystems map[string]afero.Fs, rtOpts l
 
 func ValidateJsScriptOptions(options *lib.Options) error{
 	if options.LogTLSKey.Valid {
-		return errors.New("Use command line argument or environment variable to set LogTLSKey.")
+		return errors.New("Use command line argument or environment variable to set LogTLSKey. Use of LogTlsKey compromises security and should only be used for debugging.")
 	}
 	return nil
 }

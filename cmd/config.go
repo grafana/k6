@@ -173,7 +173,7 @@ func readDiskConfig(fs afero.Fs) (Config, string, error) {
 //Function will be called inside readDiskConfig function before returning Config.
 func ValidateDiskConfigOptions(config *Config) error{
 	if config.Options.LogTLSKey.Valid {
-		return errors.New("Use command line argument or environment variable to set LogTLSKey.")
+		return errors.New("Use command line argument or environment variable to set LogTLSKey. Use of LogTlsKey compromises security and should only be used for debugging.")
 	}
 	return nil
 }
