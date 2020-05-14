@@ -104,6 +104,9 @@ func (c Config) Apply(cfg Config) Config {
 	if cfg.SummaryExport.Valid {
 		c.SummaryExport = cfg.SummaryExport
 	}
+	if cfg.LogTLSKey.Valid {
+		c.LogTLSKey = cfg.LogTLSKey
+	}
 	c.Collectors.InfluxDB = c.Collectors.InfluxDB.Apply(cfg.Collectors.InfluxDB)
 	c.Collectors.Cloud = c.Collectors.Cloud.Apply(cfg.Collectors.Cloud)
 	c.Collectors.Kafka = c.Collectors.Kafka.Apply(cfg.Collectors.Kafka)
