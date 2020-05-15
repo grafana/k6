@@ -275,8 +275,8 @@ a commandline interface for interacting with it.`,
 		go func() {
 			sig := <-sigC
 			logger.WithField("sig", sig).Debug("Stopping k6 in response to signal...")
-			runCancel()
-			lingerCancel() // stop the test run, metric processing is cancelled below
+			runCancel() // stop the test run, metric processing is cancelled below
+			lingerCancel()
 
 			// If we get a second signal, we immediately exit, so something like
 			// https://github.com/loadimpact/k6/issues/971 never happens again
