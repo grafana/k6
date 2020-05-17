@@ -58,7 +58,7 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.String("http-debug", "", "log all HTTP requests and responses. Excludes body by default. To include body use '--http-debug=full'")
 	flags.Lookup("http-debug").NoOptDefVal = "headers"
 	flags.Bool("insecure-skip-tls-verify", false, "skip verification of TLS certificates")
-	flags.Bool("log-tls-key", false, "logs TLS public key. " +
+	flags.Bool("log-tls-key", false, "logs TLS public key. "+
 		"use of LogTlsKey compromises security and should only be used for debugging.")
 	flags.Bool("no-connection-reuse", false, "disable keep-alive connections")
 	flags.Bool("no-vu-connection-reuse", false, "don't reuse connections between iterations")
