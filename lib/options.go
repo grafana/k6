@@ -225,7 +225,7 @@ type Options struct {
 
 	// Accept invalid or untrusted TLS certificates.
 	InsecureSkipTLSVerify null.Bool `json:"insecureSkipTLSVerify" envconfig:"K6_INSECURE_SKIP_TLS_VERIFY"`
-	LogTLSKey null.Bool `json:"logTLSKey" envconfig:"K6_LOG_TLS_KEY"`
+	LogTLSKey             null.Bool `json:"logTLSKey" envconfig:"K6_LOG_TLS_KEY"`
 
 	// Specify TLS versions and cipher suites, and present client certificates.
 	TLSCipherSuites *TLSCipherSuites `json:"tlsCipherSuites" envconfig:"K6_TLS_CIPHER_SUITES"`
