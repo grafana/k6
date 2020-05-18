@@ -231,14 +231,10 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 		}
 	}
 
-	tags := state.Options.RunTags.CloneTags()
-	for k, v := range state.Tags {
-		tags[k] = v
-	}
+	tags := state.CloneTags()
 	for k, v := range preq.Tags {
 		tags[k] = v
 	}
-
 	if state.Options.SystemTags.Has(stats.TagMethod) {
 		tags["method"] = preq.Req.Method
 	}
@@ -249,15 +245,6 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 	// Only set the name system tag if the user didn't explicitly set it beforehand
 	if _, ok := tags["name"]; !ok && state.Options.SystemTags.Has(stats.TagName) {
 		tags["name"] = preq.URL.Name
-	}
-	if state.Options.SystemTags.Has(stats.TagGroup) {
-		tags["group"] = state.Group.Path
-	}
-	if state.Options.SystemTags.Has(stats.TagVU) {
-		tags["vu"] = strconv.FormatInt(state.Vu, 10)
-	}
-	if state.Options.SystemTags.Has(stats.TagIter) {
-		tags["iter"] = strconv.FormatInt(state.Iteration, 10)
 	}
 
 	// Check rate limit *after* we've prepared a request; no need to wait with that part.
