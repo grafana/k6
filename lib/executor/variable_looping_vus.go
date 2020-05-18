@@ -548,6 +548,9 @@ func (vlv VariableLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleCo
 	maxVUs := lib.GetMaxPlannedVUs(gracefulExecutionSteps)
 	gracefulStop := maxDuration - regularDuration
 
+	activeVUs := &sync.WaitGroup{}
+	defer activeVUs.Wait()
+
 	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(ctx, regularDuration, gracefulStop)
 	defer cancel()
 
@@ -576,9 +579,6 @@ func (vlv VariableLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleCo
 
 	// Actually schedule the VUs and iterations, likely the most complicated
 	// executor among all of them...
-	activeVUs := &sync.WaitGroup{}
-	defer activeVUs.Wait()
-
 	runIteration := getIterationRunner(vlv.executionState, vlv.logger)
 	getVU := func() (lib.InitializedVU, error) {
 		initVU, err := vlv.executionState.GetPlannedVU(vlv.logger, false)
@@ -598,7 +598,9 @@ func (vlv VariableLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleCo
 
 	vuHandles := make([]*vuHandle, maxVUs)
 	for i := uint64(0); i < maxVUs; i++ {
-		vuHandle := newStoppedVUHandle(maxDurationCtx, getVU, returnVU, vlv.logger.WithField("vuNum", i))
+		vuHandle := newStoppedVUHandle(
+			maxDurationCtx, getVU, returnVU, &vlv.config.BaseConfig,
+			vlv.logger.WithField("vuNum", i))
 		go vuHandle.runLoopsIfPossible(runIteration)
 		vuHandles[i] = vuHandle
 	}

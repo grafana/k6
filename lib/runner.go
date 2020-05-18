@@ -28,8 +28,9 @@ import (
 
 // ActiveVU represents an actively running virtual user.
 type ActiveVU interface {
-	// Runs the VU once. The only way to interrupt the execution is to cancel
-	// the context given to InitializedVU.Activate()
+	// Run the configured exported function in the VU once. The only
+	// way to interrupt the execution is to cancel the context given
+	// to InitializedVU.Activate()
 	RunOnce() error
 }
 
@@ -46,10 +47,9 @@ type InitializedVU interface {
 // the buffer pool and activates it for use.
 type VUActivationParams struct {
 	RunContext         context.Context
-	DeactivateCallback func()
-	// Env                map[string]string
-	// Tags               map[string]string
-	// Exec               null.String
+	DeactivateCallback func(InitializedVU)
+	Env, Tags          map[string]string
+	Exec               string
 }
 
 // A Runner is a factory for VUs. It should precompute as much as possible upon
@@ -90,4 +90,8 @@ type Runner interface {
 	// values and write it back to the runner.
 	GetOptions() Options
 	SetOptions(opts Options) error
+
+	// Returns whether the given name is an exported and executable
+	// function in the script.
+	IsExecutable(string) bool
 }

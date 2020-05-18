@@ -137,6 +137,7 @@ func newRuntime(
 		Transport: tb.HTTPTransport,
 		BPool:     bpool.NewBufferPool(1),
 		Samples:   samples,
+		Tags:      map[string]string{"group": root.Path},
 	}
 
 	ctx := new(context.Context)
@@ -924,9 +925,9 @@ func TestRequestAndBatch(t *testing.T) {
 			})
 
 			t.Run("tags-precedence", func(t *testing.T) {
-				oldOpts := state.Options
-				defer func() { state.Options = oldOpts }()
-				state.Options.RunTags = stats.IntoSampleTags(&map[string]string{"runtag1": "val1", "runtag2": "val2"})
+				oldTags := state.Tags
+				defer func() { state.Tags = oldTags }()
+				state.Tags = map[string]string{"runtag1": "val1", "runtag2": "val2"}
 
 				_, err := common.RunString(rt, sr(`
 				let res = http.request("GET", "HTTPBIN_URL/headers", null, { tags: { method: "test", name: "myName", runtag1: "fromreq" } });
@@ -1267,74 +1268,6 @@ func TestRequestAndBatch(t *testing.T) {
 			assert.NoError(t, err)
 		})
 	})
-}
-func TestSystemTags(t *testing.T) {
-	t.Parallel()
-	tb, state, samples, rt, _ := newRuntime(t)
-	defer tb.Cleanup()
-
-	// Handple paths with custom logic
-	tb.Mux.HandleFunc("/wrong-redirect", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Add("Location", "%")
-		w.WriteHeader(http.StatusTemporaryRedirect)
-	})
-
-	httpGet := fmt.Sprintf(`http.get("%s");`, tb.ServerHTTP.URL)
-	httpsGet := fmt.Sprintf(`http.get("%s");`, tb.ServerHTTPS.URL)
-
-	httpURL, err := url.Parse(tb.ServerHTTP.URL)
-	require.NoError(t, err)
-
-	testedSystemTags := []struct{ tag, code, expVal string }{
-		{"proto", httpGet, "HTTP/1.1"},
-		{"status", httpGet, "200"},
-		{"method", httpGet, "GET"},
-		{"url", httpGet, tb.ServerHTTP.URL},
-		{"url", httpsGet, tb.ServerHTTPS.URL},
-		{"ip", httpGet, httpURL.Hostname()},
-		{"name", httpGet, tb.ServerHTTP.URL},
-		{"group", httpGet, ""},
-		{"vu", httpGet, "0"},
-		{"iter", httpGet, "0"},
-		{"tls_version", httpsGet, expectedTLSVersion},
-		{"ocsp_status", httpsGet, "unknown"},
-		{
-			"error",
-			tb.Replacer.Replace(`http.get("http://127.0.0.1:1");`),
-			`dial: connection refused`,
-		},
-		{
-			"error_code",
-			tb.Replacer.Replace(`http.get("http://127.0.0.1:1");`),
-			"1212",
-		},
-	}
-
-	state.Options.Throw = null.BoolFrom(false)
-	state.Options.Apply(lib.Options{TLSVersion: &lib.TLSVersions{Max: lib.TLSVersion13}})
-
-	for num, tc := range testedSystemTags {
-		tc := tc
-		t.Run(fmt.Sprintf("TC %d with only %s", num, tc.tag), func(t *testing.T) {
-			state.Options.SystemTags = stats.ToSystemTagSet([]string{tc.tag})
-
-			_, err := common.RunString(rt, tc.code)
-			assert.NoError(t, err)
-
-			bufSamples := stats.GetBufferedSamples(samples)
-			assert.NotEmpty(t, bufSamples)
-			for _, sampleC := range bufSamples {
-
-				for _, sample := range sampleC.GetSamples() {
-					assert.NotEmpty(t, sample.Tags)
-					for emittedTag, emittedVal := range sample.Tags.CloneTags() {
-						assert.Equal(t, tc.tag, emittedTag)
-						assert.Equal(t, tc.expVal, emittedVal)
-					}
-				}
-			}
-		})
-	}
 }
 
 func TestRequestCompression(t *testing.T) {

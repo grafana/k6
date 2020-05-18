@@ -262,17 +262,24 @@ func applyDefault(conf Config) Config {
 	return conf
 }
 
-func deriveAndValidateConfig(conf Config) (result Config, err error) {
+func deriveAndValidateConfig(conf Config, isExecutable func(string) bool) (result Config, err error) {
 	result = conf
 	result.Options, err = executor.DeriveExecutionFromShortcuts(conf.Options)
 	if err != nil {
 		return result, err
 	}
-	return result, validateConfig(result)
+	return result, validateConfig(result, isExecutable)
 }
 
-func validateConfig(conf Config) error {
+func validateConfig(conf Config, isExecutable func(string) bool) error {
 	errList := conf.Validate()
+
+	for _, ec := range conf.Execution {
+		if err := validateExecutorConfig(ec, isExecutable); err != nil {
+			errList = append(errList, err)
+		}
+	}
+
 	if len(errList) == 0 {
 		return nil
 	}
@@ -283,4 +290,12 @@ func validateConfig(conf Config) error {
 	}
 
 	return errors.New(strings.Join(errMsgParts, "\n"))
+}
+
+func validateExecutorConfig(conf lib.ExecutorConfig, isExecutable func(string) bool) error {
+	execFn := conf.GetExec()
+	if !isExecutable(execFn) {
+		return fmt.Errorf("executor %s: function '%s' not found in exports", conf.GetName(), execFn)
+	}
+	return nil
 }

@@ -134,7 +134,7 @@ a commandline interface for interacting with it.`,
 			return err
 		}
 
-		conf, cerr := deriveAndValidateConfig(conf)
+		conf, cerr := deriveAndValidateConfig(conf, r.IsExecutable)
 		if cerr != nil {
 			return ExitCode{error: cerr, Code: invalidConfigErrorCode}
 		}
@@ -382,9 +382,9 @@ func getExitCodeFromEngine(err error) ExitCode {
 	switch e := errors.Cause(err).(type) {
 	case lib.TimeoutError:
 		switch e.Place() {
-		case "setup":
+		case consts.SetupFn:
 			return ExitCode{error: err, Code: setupTimeoutErrorCode, Hint: e.Hint()}
-		case "teardown":
+		case consts.TeardownFn:
 			return ExitCode{error: err, Code: teardownTimeoutErrorCode, Hint: e.Hint()}
 		default:
 			return ExitCode{error: err, Code: genericTimeoutErrorCode}

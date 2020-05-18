@@ -34,6 +34,7 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/gorilla/websocket"
+
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
@@ -103,7 +104,7 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 	// Leave header to nil by default so we can pass it directly to the Dialer
 	var header http.Header
 
-	tags := state.Options.RunTags.CloneTags()
+	tags := state.CloneTags()
 
 	// Parse the optional second argument (params)
 	if !goja.IsUndefined(paramsV) && !goja.IsNull(paramsV) {
@@ -142,9 +143,6 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 
 	if state.Options.SystemTags.Has(stats.TagURL) {
 		tags["url"] = url
-	}
-	if state.Options.SystemTags.Has(stats.TagGroup) {
-		tags["group"] = state.Group.Path
 	}
 
 	// Pass a custom net.Dial function to websocket.Dialer that will substitute

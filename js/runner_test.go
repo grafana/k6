@@ -31,6 +31,7 @@ import (
 	stdlog "log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"sync"
 	"testing"
@@ -612,7 +613,7 @@ func TestVURunInterruptDoesntPanic(t *testing.T) {
 				newCtx, newCancel := context.WithCancel(ctx)
 				vu := initVU.Activate(&lib.VUActivationParams{
 					RunContext:         newCtx,
-					DeactivateCallback: func() { wg.Done() },
+					DeactivateCallback: func(_ lib.InitializedVU) { wg.Done() },
 				})
 				ch := make(chan struct{})
 				go func() {
@@ -1553,5 +1554,87 @@ func TestStuffNotPanicking(t *testing.T) {
 	case err := <-errC:
 		cancel()
 		require.NoError(t, err)
+	}
+}
+
+func TestSystemTags(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	defer tb.Cleanup()
+
+	// Handle paths with custom logic
+	tb.Mux.HandleFunc("/wrong-redirect", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Location", "%")
+		w.WriteHeader(http.StatusTemporaryRedirect)
+	})
+
+	r, err := getSimpleRunnerWithOptions("/script.js", tb.Replacer.Replace(`
+		var http = require("k6/http");
+
+		exports.http_get = function() {
+			http.get("HTTPBIN_IP_URL");
+		};
+		exports.https_get = function() {
+			http.get("HTTPSBIN_IP_URL");
+		};
+		exports.bad_url_get = function() {
+			http.get("http://127.0.0.1:1");
+		};
+		exports.noop = function() {};
+	`), lib.RuntimeOptions{CompatibilityMode: null.StringFrom("base")})
+	require.NoError(t, err)
+
+	httpURL, err := url.Parse(tb.ServerHTTP.URL)
+	require.NoError(t, err)
+
+	testedSystemTags := []struct{ tag, exec, expVal string }{
+		{"proto", "http_get", "HTTP/1.1"},
+		{"status", "http_get", "200"},
+		{"method", "http_get", "GET"},
+		{"url", "http_get", tb.ServerHTTP.URL},
+		{"url", "https_get", tb.ServerHTTPS.URL},
+		{"ip", "http_get", httpURL.Hostname()},
+		{"name", "http_get", tb.ServerHTTP.URL},
+		{"group", "http_get", ""},
+		{"vu", "http_get", "8"},
+		{"vu", "noop", "9"},
+		{"iter", "http_get", "0"},
+		{"iter", "noop", "0"},
+		{"tls_version", "https_get", "tls1.3"},
+		{"ocsp_status", "https_get", "unknown"},
+		{"error", "bad_url_get", `dial: connection refused`},
+		{"error_code", "bad_url_get", "1212"},
+		//TODO: add more tests
+	}
+
+	samples := make(chan stats.SampleContainer, 100)
+	for num, tc := range testedSystemTags {
+		num, tc := num, tc
+		t.Run(fmt.Sprintf("TC %d with only %s", num, tc.tag), func(t *testing.T) {
+			require.NoError(t, r.SetOptions(r.GetOptions().Apply(lib.Options{
+				Throw:                 null.BoolFrom(false),
+				TLSVersion:            &lib.TLSVersions{Max: lib.TLSVersion13},
+				SystemTags:            stats.ToSystemTagSet([]string{tc.tag}),
+				InsecureSkipTLSVerify: null.BoolFrom(true),
+			})))
+
+			vu, err := r.NewVU(int64(num), samples)
+			require.NoError(t, err)
+			activeVU := vu.Activate(&lib.VUActivationParams{
+				RunContext: context.Background(),
+				Exec:       tc.exec,
+			})
+			require.NoError(t, activeVU.RunOnce())
+
+			bufSamples := stats.GetBufferedSamples(samples)
+			assert.NotEmpty(t, bufSamples)
+			for _, sample := range bufSamples[0].GetSamples() {
+				assert.NotEmpty(t, sample.Tags)
+				for emittedTag, emittedVal := range sample.Tags.CloneTags() {
+					assert.Equal(t, tc.tag, emittedTag)
+					assert.Equal(t, tc.expVal, emittedVal)
+				}
+			}
+		})
 	}
 }

@@ -215,3 +215,15 @@ func getArrivalRatePerSec(scaledArrivalRate *big.Rat) *big.Rat {
 	perSecRate := big.NewRat(int64(time.Second), 1)
 	return perSecRate.Mul(perSecRate, scaledArrivalRate)
 }
+
+func getVUActivationParams(
+	ctx context.Context, conf BaseConfig, deactivateCallback func(lib.InitializedVU),
+) *lib.VUActivationParams {
+	return &lib.VUActivationParams{
+		RunContext:         ctx,
+		Exec:               conf.GetExec(),
+		Env:                conf.GetEnv(),
+		Tags:               conf.GetTags(),
+		DeactivateCallback: deactivateCallback,
+	}
+}

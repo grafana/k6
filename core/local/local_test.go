@@ -23,28 +23,33 @@ package local
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"net/url"
+	"reflect"
 	"runtime"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/sirupsen/logrus"
+	logtest "github.com/sirupsen/logrus/hooks/test"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	null "gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/js"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/executor"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/netext"
+	"github.com/loadimpact/k6/lib/netext/httpext"
 	"github.com/loadimpact/k6/lib/testutils"
+	"github.com/loadimpact/k6/lib/testutils/httpmultibin"
 	"github.com/loadimpact/k6/lib/testutils/minirunner"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/stats"
-	"github.com/sirupsen/logrus"
-	logtest "github.com/sirupsen/logrus/hooks/test"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	null "gopkg.in/guregu/null.v3"
 )
 
 func newTestExecutionScheduler(
@@ -94,6 +99,479 @@ func TestExecutionSchedulerRun(t *testing.T) {
 	err := make(chan error, 1)
 	go func() { err <- execScheduler.Run(ctx, ctx, samples) }()
 	assert.NoError(t, <-err)
+}
+
+func TestExecutionSchedulerRunNonDefault(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name, script, expErr string
+	}{
+		{"defaultOK", `export default function () {}`, ""},
+		{"nonDefaultOK", `
+	export let options = {
+		execution: {
+			per_vu_iters: {
+				type: "per-vu-iterations",
+				vus: 1,
+				iterations: 1,
+				exec: "nonDefault",
+			},
+		}
+	}
+	export function nonDefault() {}`, ""},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			runner, err := js.New(&loader.SourceData{
+				URL: &url.URL{Path: "/script.js"}, Data: []byte(tc.script)},
+				nil, lib.RuntimeOptions{})
+			require.NoError(t, err)
+
+			logger := logrus.New()
+			logger.SetOutput(testutils.NewTestOutput(t))
+			execScheduler, err := NewExecutionScheduler(runner, logger)
+			require.NoError(t, err)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			done := make(chan struct{})
+			samples := make(chan stats.SampleContainer)
+			go func() {
+				err := execScheduler.Init(ctx, samples)
+				if tc.expErr != "" {
+					assert.EqualError(t, err, tc.expErr)
+				} else {
+					assert.NoError(t, err)
+					assert.NoError(t, execScheduler.Run(ctx, ctx, samples))
+				}
+				close(done)
+			}()
+			for {
+				select {
+				case <-samples:
+				case <-done:
+					return
+				}
+			}
+		})
+	}
+}
+
+func TestExecutionSchedulerRunEnv(t *testing.T) {
+	t.Parallel()
+
+	scriptTemplate := `
+	import { Counter } from "k6/metrics";
+
+	let errors = new Counter("errors");
+
+	export let options = {
+		execution: {
+			executor: {
+				type: "%[1]s",
+				gracefulStop: "0.5s",
+				%[2]s
+			}
+		}
+	}
+
+	export default function () {
+		if (__ENV.TESTVAR !== "%[3]s") {
+		    console.error('Wrong env var value. Expected: %[3]s, actual: ', __ENV.TESTVAR);
+			errors.add(1);
+		}
+	}`
+
+	executorConfigs := map[string]string{
+		"constant-arrival-rate": `
+			rate: 1,
+			timeUnit: "0.5s",
+			duration: "0.5s",
+			preAllocatedVUs: 1,
+			maxVUs: 2,`,
+		"constant-looping-vus": `
+			vus: 1,
+			duration: "0.5s",`,
+		"externally-controlled": `
+			vus: 1,
+			duration: "0.5s",`,
+		"per-vu-iterations": `
+			vus: 1,
+			iterations: 1,`,
+		"shared-iterations": `
+			vus: 1,
+			iterations: 1,`,
+		"variable-arrival-rate": `
+			startRate: 1,
+			timeUnit: "0.5s",
+			preAllocatedVUs: 1,
+			maxVUs: 2,
+			stages: [ { target: 1, duration: "0.5s" } ],`,
+		"variable-looping-vus": `
+			startVUs: 1,
+			stages: [ { target: 1, duration: "0.5s" } ],`,
+	}
+
+	testCases := []struct{ name, script string }{}
+
+	// Generate tests using global env and with env override
+	for ename, econf := range executorConfigs {
+		testCases = append(testCases, struct{ name, script string }{
+			"global/" + ename, fmt.Sprintf(scriptTemplate, ename, econf, "global")})
+		configWithEnvOverride := econf + "env: { TESTVAR: 'overridden' }"
+		testCases = append(testCases, struct{ name, script string }{
+			"override/" + ename, fmt.Sprintf(scriptTemplate, ename, configWithEnvOverride, "overridden")})
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			runner, err := js.New(&loader.SourceData{
+				URL:  &url.URL{Path: "/script.js"},
+				Data: []byte(tc.script)},
+				nil, lib.RuntimeOptions{Env: map[string]string{"TESTVAR": "global"}})
+			require.NoError(t, err)
+
+			logger := logrus.New()
+			logger.SetOutput(testutils.NewTestOutput(t))
+			execScheduler, err := NewExecutionScheduler(runner, logger)
+			require.NoError(t, err)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			done := make(chan struct{})
+			samples := make(chan stats.SampleContainer)
+			go func() {
+				assert.NoError(t, execScheduler.Init(ctx, samples))
+				assert.NoError(t, execScheduler.Run(ctx, ctx, samples))
+				close(done)
+			}()
+			for {
+				select {
+				case sample := <-samples:
+					if s, ok := sample.(stats.Sample); ok && s.Metric.Name == "errors" {
+						assert.FailNow(t, "received error sample from test")
+					}
+				case <-done:
+					return
+				}
+			}
+		})
+	}
+}
+
+func TestExecutionSchedulerRunCustomTags(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	defer tb.Cleanup()
+	sr := tb.Replacer.Replace
+
+	scriptTemplate := sr(`
+	import http from "k6/http";
+
+	export let options = {
+		execution: {
+			executor: {
+				type: "%s",
+				gracefulStop: "0.5s",
+				%s
+			}
+		}
+	}
+
+	export default function () {
+		http.get("HTTPBIN_IP_URL/");
+	}`)
+
+	executorConfigs := map[string]string{
+		"constant-arrival-rate": `
+			rate: 1,
+			timeUnit: "0.5s",
+			duration: "0.5s",
+			preAllocatedVUs: 1,
+			maxVUs: 2,`,
+		"constant-looping-vus": `
+			vus: 1,
+			duration: "0.5s",`,
+		"externally-controlled": `
+			vus: 1,
+			duration: "0.5s",`,
+		"per-vu-iterations": `
+			vus: 1,
+			iterations: 1,`,
+		"shared-iterations": `
+			vus: 1,
+			iterations: 1,`,
+		"variable-arrival-rate": `
+			startRate: 5,
+			timeUnit: "0.5s",
+			preAllocatedVUs: 1,
+			maxVUs: 2,
+			stages: [ { target: 10, duration: "1s" } ],`,
+		"variable-looping-vus": `
+			startVUs: 1,
+			stages: [ { target: 1, duration: "0.5s" } ],`,
+	}
+
+	testCases := []struct{ name, script string }{}
+
+	// Generate tests using custom tags
+	for ename, econf := range executorConfigs {
+		configWithCustomTag := econf + "tags: { customTag: 'value' }"
+		testCases = append(testCases, struct{ name, script string }{
+			ename, fmt.Sprintf(scriptTemplate, ename, configWithCustomTag)})
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			runner, err := js.New(&loader.SourceData{
+				URL:  &url.URL{Path: "/script.js"},
+				Data: []byte(tc.script)},
+				nil, lib.RuntimeOptions{})
+			require.NoError(t, err)
+
+			logger := logrus.New()
+			logger.SetOutput(testutils.NewTestOutput(t))
+			execScheduler, err := NewExecutionScheduler(runner, logger)
+			require.NoError(t, err)
+
+			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+			defer cancel()
+
+			done := make(chan struct{})
+			samples := make(chan stats.SampleContainer)
+			go func() {
+				assert.NoError(t, execScheduler.Init(ctx, samples))
+				assert.NoError(t, execScheduler.Run(ctx, ctx, samples))
+				close(done)
+			}()
+			var gotTrailTag, gotNetTrailTag bool
+			for {
+				select {
+				case sample := <-samples:
+					if trail, ok := sample.(*httpext.Trail); ok && !gotTrailTag {
+						tags := trail.Tags.CloneTags()
+						if v, ok := tags["customTag"]; ok && v == "value" {
+							gotTrailTag = true
+						}
+					}
+					if netTrail, ok := sample.(*netext.NetTrail); ok && !gotNetTrailTag {
+						tags := netTrail.Tags.CloneTags()
+						if v, ok := tags["customTag"]; ok && v == "value" {
+							gotNetTrailTag = true
+						}
+					}
+				case <-done:
+					if !gotTrailTag || !gotNetTrailTag {
+						assert.FailNow(t, "a sample with expected tag wasn't received")
+					}
+					return
+				}
+			}
+		})
+	}
+}
+
+// Ensure that custom executor settings are unique per executor and
+// that there's no "crossover"/"pollution" between executors.
+// Also test that custom tags are properly set on checks and groups metrics.
+func TestExecutionSchedulerRunCustomConfigNoCrossover(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	defer tb.Cleanup()
+
+	script := tb.Replacer.Replace(`
+	import http from "k6/http";
+	import ws from 'k6/ws';
+	import { Counter } from 'k6/metrics';
+	import { check, group } from 'k6';
+
+	let errors = new Counter('errors');
+
+	export let options = {
+		// Required for WS tests
+		hosts: { 'httpbin.local': '127.0.0.1' },
+		execution: {
+			scenario1: {
+				type: 'per-vu-iterations',
+				vus: 1,
+				iterations: 1,
+				gracefulStop: '0s',
+				maxDuration: '0.5s',
+				exec: 's1func',
+				env: { TESTVAR1: 'scenario1' },
+				tags: { testtag1: 'scenario1' },
+			},
+			scenario2: {
+				type: 'shared-iterations',
+				vus: 1,
+				iterations: 1,
+				gracefulStop: '0.5s',
+				startTime: '0.5s',
+				maxDuration: '2s',
+				exec: 's2func',
+				env: { TESTVAR2: 'scenario2' },
+				tags: { testtag2: 'scenario2' },
+			},
+			scenario3: {
+				type: 'per-vu-iterations',
+				vus: 1,
+				iterations: 1,
+				gracefulStop: '0.5s',
+				exec: 's3funcWS',
+				env: { TESTVAR3: 'scenario3' },
+				tags: { testtag3: 'scenario3' },
+			},
+		}
+	}
+
+	function checkVar(name, expected) {
+		if (__ENV[name] !== expected) {
+		    console.error('Wrong ' + name + " env var value. Expected: '"
+						+ expected + "', actual: '" + __ENV[name] + "'");
+			errors.add(1);
+		}
+	}
+
+	export function s1func() {
+		checkVar('TESTVAR1', 'scenario1');
+		checkVar('TESTVAR2', undefined);
+		checkVar('TESTVAR3', undefined);
+		checkVar('TESTGLOBALVAR', 'global');
+
+		// Intentionally try to pollute the env
+		__ENV.TESTVAR2 = 'overridden';
+
+		http.get('HTTPBIN_IP_URL/', { tags: { reqtag: 'scenario1' }});
+	}
+
+	export function s2func() {
+		checkVar('TESTVAR1', undefined);
+		checkVar('TESTVAR2', 'scenario2');
+		checkVar('TESTVAR3', undefined);
+		checkVar('TESTGLOBALVAR', 'global');
+
+		http.get('HTTPBIN_IP_URL/', { tags: { reqtag: 'scenario2' }});
+	}
+
+	export function s3funcWS() {
+		checkVar('TESTVAR1', undefined);
+		checkVar('TESTVAR2', undefined);
+		checkVar('TESTVAR3', 'scenario3');
+		checkVar('TESTGLOBALVAR', 'global');
+
+		const customTags = { wstag: 'scenario3' };
+		group('wsgroup', function() {
+			const response = ws.connect('WSBIN_URL/ws-echo', { tags: customTags },
+				function (socket) {
+					socket.on('open', function() {
+						socket.send('hello');
+					});
+					socket.on('message', function(msg) {
+						if (msg != 'hello') {
+						    console.error("Expected to receive 'hello' but got '" + msg + "' instead!");
+							errors.add(1);
+						}
+						socket.close()
+					});
+					socket.on('error', function (e) {
+						console.log('ws error: ' + e.error());
+						errors.add(1);
+					});
+				}
+			);
+			check(response, { 'status is 101': (r) => r && r.status === 101 }, customTags);
+		});
+	}
+`)
+
+	runner, err := js.New(&loader.SourceData{
+		URL:  &url.URL{Path: "/script.js"},
+		Data: []byte(script)},
+		nil, lib.RuntimeOptions{Env: map[string]string{"TESTGLOBALVAR": "global"}})
+	require.NoError(t, err)
+
+	logger := logrus.New()
+	logger.SetOutput(testutils.NewTestOutput(t))
+	execScheduler, err := NewExecutionScheduler(runner, logger)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	done := make(chan struct{})
+	samples := make(chan stats.SampleContainer)
+	go func() {
+		assert.NoError(t, execScheduler.Init(ctx, samples))
+		assert.NoError(t, execScheduler.Run(ctx, ctx, samples))
+		close(done)
+	}()
+
+	expectedTrailTags := []map[string]string{
+		{"testtag1": "scenario1", "reqtag": "scenario1"},
+		{"testtag2": "scenario2", "reqtag": "scenario2"},
+	}
+	expectedNetTrailTags := []map[string]string{
+		{"testtag1": "scenario1"},
+		{"testtag2": "scenario2"},
+	}
+	expectedConnSampleTags := map[string]string{
+		"testtag3": "scenario3", "wstag": "scenario3",
+	}
+	expectedPlainSampleTags := []map[string]string{
+		{"testtag3": "scenario3"},
+		{"testtag3": "scenario3", "wstag": "scenario3"},
+	}
+	var gotSampleTags int
+	for {
+		select {
+		case sample := <-samples:
+			switch s := sample.(type) {
+			case stats.Sample:
+				if s.Metric.Name == "errors" {
+					assert.FailNow(t, "received error sample from test")
+				}
+				if s.Metric.Name == "checks" || s.Metric.Name == "group_duration" {
+					tags := s.Tags.CloneTags()
+					for _, expTags := range expectedPlainSampleTags {
+						if reflect.DeepEqual(expTags, tags) {
+							gotSampleTags++
+						}
+					}
+				}
+			case *httpext.Trail:
+				tags := s.Tags.CloneTags()
+				for _, expTags := range expectedTrailTags {
+					if reflect.DeepEqual(expTags, tags) {
+						gotSampleTags++
+					}
+				}
+			case *netext.NetTrail:
+				tags := s.Tags.CloneTags()
+				for _, expTags := range expectedNetTrailTags {
+					if reflect.DeepEqual(expTags, tags) {
+						gotSampleTags++
+					}
+				}
+			case stats.ConnectedSamples:
+				for _, sm := range s.Samples {
+					tags := sm.Tags.CloneTags()
+					if reflect.DeepEqual(expectedConnSampleTags, tags) {
+						gotSampleTags++
+					}
+				}
+			}
+		case <-done:
+			require.Equal(t, 8, gotSampleTags, "received wrong amount of samples with expected tags")
+			return
+		}
+	}
 }
 
 func TestExecutionSchedulerSetupTeardownRun(t *testing.T) {

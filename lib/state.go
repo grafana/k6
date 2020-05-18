@@ -67,4 +67,14 @@ type State struct {
 	BPool *bpool.BufferPool
 
 	Vu, Iteration int64
+	Tags          map[string]string
+}
+
+// CloneTags makes a copy of the tags map and returns it.
+func (s *State) CloneTags() map[string]string {
+	tags := make(map[string]string, len(s.Tags))
+	for k, v := range s.Tags {
+		tags[k] = v
+	}
+	return tags
 }

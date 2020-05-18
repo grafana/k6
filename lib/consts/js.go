@@ -1,9 +1,7 @@
-// +build !go1.12
-
 /*
  *
  * k6 - a next-generation load testing tool
- * Copyright (C) 2019 Load Impact
+ * Copyright (C) 2020 Load Impact
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,6 +18,12 @@
  *
  */
 
-package http
+package consts
 
-const expectedTLSVersion = "tls1.2"
+// JS constants
+const (
+	DefaultFn  = "default"
+	Options    = "options"
+	SetupFn    = "setup"
+	TeardownFn = "teardown"
+)
