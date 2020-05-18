@@ -84,17 +84,23 @@ func (*K6) Group(ctx context.Context, name string, fn goja.Callable) (goja.Value
 
 	old := state.Group
 	state.Group = g
-	defer func() { state.Group = old }()
+
+	shouldUpdateTag := state.Options.SystemTags.Has(stats.TagGroup)
+	if shouldUpdateTag {
+		state.Tags["group"] = g.Path
+	}
+	defer func() {
+		state.Group = old
+		if shouldUpdateTag {
+			state.Tags["group"] = old.Path
+		}
+	}()
 
 	startTime := time.Now()
 	ret, err := fn(goja.Undefined())
 	t := time.Now()
 
-	tags := map[string]string{}
-	for k, v := range state.Tags {
-		tags[k] = v
-	}
-
+	tags := state.CloneTags()
 	stats.PushIfNotDone(ctx, state.Samples, stats.Sample{
 		Time:   t,
 		Metric: metrics.GroupDuration,
@@ -113,14 +119,8 @@ func (*K6) Check(ctx context.Context, arg0, checks goja.Value, extras ...goja.Va
 	rt := common.GetRuntime(ctx)
 	t := time.Now()
 
-	// Prepare tags, make sure the `group` tag can't be overwritten.
-	commonTags := map[string]string{}
-	for k, v := range state.Tags {
-		commonTags[k] = v
-	}
-	if state.Options.SystemTags.Has(stats.TagGroup) {
-		commonTags["group"] = state.Group.Path
-	}
+	// Prepare the metric tags
+	commonTags := state.CloneTags()
 	if len(extras) > 0 {
 		obj := extras[0].ToObject(rt)
 		for _, k := range obj.Keys() {

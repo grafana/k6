@@ -72,6 +72,7 @@ func TestMetrics(t *testing.T) {
 						Options: lib.Options{SystemTags: stats.NewSystemTagSet(stats.TagGroup)},
 						Group:   root,
 						Samples: samples,
+						Tags:    map[string]string{"group": root.Path},
 					}
 
 					isTimeString := ""
@@ -96,8 +97,10 @@ func TestMetrics(t *testing.T) {
 						"Child": child,
 					}
 					for name, g := range groups {
+						name, g := name, g
 						t.Run(name, func(t *testing.T) {
 							state.Group = g
+							state.Tags["group"] = g.Path
 							for name, val := range values {
 								t.Run(name, func(t *testing.T) {
 									t.Run("Simple", func(t *testing.T) {

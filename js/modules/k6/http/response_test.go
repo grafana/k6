@@ -80,7 +80,7 @@ const jsonData = `{"glossary": {
 	  "GlossSeeAlso": ["GML","XML"]},
 	"GlossSee": "markup"}}}}}`
 
-const invalidJSONData = `{			
+const invalidJSONData = `{
 	"a":"apple",
 	"t":testing"
 }`
@@ -168,7 +168,11 @@ func TestResponse(t *testing.T) {
 			if assert.NoError(t, err) {
 				old := state.Group
 				state.Group = g
-				defer func() { state.Group = old }()
+				state.Tags["group"] = g.Path
+				defer func() {
+					state.Group = old
+					state.Tags["group"] = old.Path
+				}()
 			}
 
 			_, err = common.RunString(rt, sr(`
@@ -217,7 +221,7 @@ func TestResponse(t *testing.T) {
 	        if (value != undefined)
 				{ throw new Error("Expected undefined, but got: " + value); }
 
-			value = res.json("glossary.null") 
+			value = res.json("glossary.null")
 	        if (value != null)
 				{ throw new Error("Expected null, but got: " + value); }
 
@@ -233,8 +237,8 @@ func TestResponse(t *testing.T) {
 	        if (value != true)
 				{ throw new Error("Expected boolean true, but got: " + value); }
 
-			value = res.json("glossary.GlossDiv.GlossList.GlossEntry.GlossDef.title") 
-	        if (value != "example glossary") 
+			value = res.json("glossary.GlossDiv.GlossList.GlossEntry.GlossDef.title")
+	        if (value != "example glossary")
 				{ throw new Error("Expected 'example glossary'', but got: " + value); }
 
 			value =	res.json("glossary.friends.#.first")[0]

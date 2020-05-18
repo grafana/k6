@@ -104,10 +104,7 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 	// Leave header to nil by default so we can pass it directly to the Dialer
 	var header http.Header
 
-	tags := map[string]string{}
-	for k, v := range state.Tags {
-		tags[k] = v
-	}
+	tags := state.CloneTags()
 
 	// Parse the optional second argument (params)
 	if !goja.IsUndefined(paramsV) && !goja.IsNull(paramsV) {
@@ -146,9 +143,6 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 
 	if state.Options.SystemTags.Has(stats.TagURL) {
 		tags["url"] = url
-	}
-	if state.Options.SystemTags.Has(stats.TagGroup) {
-		tags["group"] = state.Group.Path
 	}
 
 	// Pass a custom net.Dial function to websocket.Dialer that will substitute

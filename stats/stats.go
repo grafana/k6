@@ -252,11 +252,12 @@ func (st *SampleTags) UnmarshalJSON(data []byte) error {
 // CloneTags copies the underlying set of a sample tags and
 // returns it. If the receiver is nil, it returns an empty non-nil map.
 func (st *SampleTags) CloneTags() map[string]string {
-	res := map[string]string{}
-	if st != nil {
-		for k, v := range st.tags {
-			res[k] = v
-		}
+	if st == nil {
+		return map[string]string{}
+	}
+	res := make(map[string]string, len(st.tags))
+	for k, v := range st.tags {
+		res[k] = v
 	}
 	return res
 }
