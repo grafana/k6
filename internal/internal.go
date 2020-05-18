@@ -20,6 +20,7 @@
 
 package internal
 
+// StageSetup / StageTeardown placed in internal to solve import cycle.
 const (
 	StageSetup    = "setup"
 	StageTeardown = "teardown"
