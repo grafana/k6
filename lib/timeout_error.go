@@ -3,14 +3,8 @@ package lib
 import (
 	"fmt"
 	"time"
-)
 
-//nolint:gochecknoglobals
-// Keep stages in sync with js/runner.go
-// We set it here to prevent import cycle.
-var (
-	stageSetup    = "setup"
-	stageTeardown = "teardown"
+	"github.com/loadimpact/k6/internal"
 )
 
 // TimeoutError is used when somethings timeouts
@@ -45,9 +39,9 @@ func (t TimeoutError) Hint() string {
 	hint := ""
 
 	switch t.place {
-	case stageSetup:
+	case internal.stageSetup:
 		hint = "You can increase the time limit via the setupTimeout option"
-	case stageTeardown:
+	case internal.stageTeardown:
 		hint = "You can increase the time limit via the teardownTimeout option"
 	}
 	return hint
