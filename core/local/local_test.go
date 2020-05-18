@@ -402,7 +402,8 @@ func TestExecutionSchedulerRunCustomConfigNoCrossover(t *testing.T) {
 				type: 'per-vu-iterations',
 				vus: 1,
 				iterations: 1,
-				gracefulStop: '0.5s',
+				gracefulStop: '0s',
+				maxDuration: '0.5s',
 				exec: 's1func',
 				env: { TESTVAR1: 'scenario1' },
 				tags: { testtag1: 'scenario1' },
@@ -412,6 +413,8 @@ func TestExecutionSchedulerRunCustomConfigNoCrossover(t *testing.T) {
 				vus: 1,
 				iterations: 1,
 				gracefulStop: '0.5s',
+				startTime: '0.5s',
+				maxDuration: '2s',
 				exec: 's2func',
 				env: { TESTVAR2: 'scenario2' },
 				tags: { testtag2: 'scenario2' },
@@ -441,6 +444,9 @@ func TestExecutionSchedulerRunCustomConfigNoCrossover(t *testing.T) {
 		checkVar('TESTVAR2', undefined);
 		checkVar('TESTVAR3', undefined);
 		checkVar('TESTGLOBALVAR', 'global');
+
+		// Intentionally try to pollute the env
+		__ENV.TESTVAR2 = 'overridden';
 
 		http.get('HTTPBIN_IP_URL/', { tags: { reqtag: 'scenario1' }});
 	}
@@ -496,7 +502,7 @@ func TestExecutionSchedulerRunCustomConfigNoCrossover(t *testing.T) {
 	execScheduler, err := NewExecutionScheduler(runner, logger)
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
 	done := make(chan struct{})
