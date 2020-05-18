@@ -21,6 +21,6 @@
 package internal
 
 const (
-	stageSetup    = "setup"
-	stageTeardown = "teardown"
+	StageSetup    = "setup"
+	StageTeardown = "teardown"
 )

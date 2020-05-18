@@ -220,9 +220,9 @@ func (r *Runner) Setup(ctx context.Context, out chan<- stats.SampleContainer) er
 	)
 	defer setupCancel()
 
-	v, err := r.runPart(setupCtx, out, internal.stageSetup, nil)
+	v, err := r.runPart(setupCtx, out, internal.StageSetup, nil)
 	if err != nil {
-		return errors.Wrap(err, internal.stageSetup)
+		return errors.Wrap(err, internal.StageSetup)
 	}
 	// r.setupData = nil is special it means undefined from this moment forward
 	if goja.IsUndefined(v) {
@@ -232,7 +232,7 @@ func (r *Runner) Setup(ctx context.Context, out chan<- stats.SampleContainer) er
 
 	r.setupData, err = json.Marshal(v.Export())
 	if err != nil {
-		return errors.Wrap(err, internal.stageSetup)
+		return errors.Wrap(err, internal.StageSetup)
 	}
 	var tmp interface{}
 	return json.Unmarshal(r.setupData, &tmp)
@@ -258,12 +258,12 @@ func (r *Runner) Teardown(ctx context.Context, out chan<- stats.SampleContainer)
 	var data interface{}
 	if r.setupData != nil {
 		if err := json.Unmarshal(r.setupData, &data); err != nil {
-			return errors.Wrap(err, internal.stageTeardown)
+			return errors.Wrap(err, internal.StageTeardown)
 		}
 	} else {
 		data = goja.Undefined()
 	}
-	_, err := r.runPart(teardownCtx, out, internal.stageTeardown, data)
+	_, err := r.runPart(teardownCtx, out, internal.StageTeardown, data)
 	return err
 }
 
@@ -341,9 +341,9 @@ func (r *Runner) runPart(ctx context.Context, out chan<- stats.SampleContainer, 
 func (r *Runner) timeoutErrorDuration(stage string) time.Duration {
 	d := time.Duration(0)
 	switch stage {
-	case internal.stageSetup:
+	case internal.StageSetup:
 		return time.Duration(r.Bundle.Options.SetupTimeout.Duration)
-	case internal.stageTeardown:
+	case internal.StageTeardown:
 		return time.Duration(r.Bundle.Options.TeardownTimeout.Duration)
 	}
 	return d

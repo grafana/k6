@@ -39,9 +39,9 @@ func (t TimeoutError) Hint() string {
 	hint := ""
 
 	switch t.place {
-	case internal.stageSetup:
+	case internal.StageSetup:
 		hint = "You can increase the time limit via the setupTimeout option"
-	case internal.stageTeardown:
+	case internal.StageTeardown:
 		hint = "You can increase the time limit via the teardownTimeout option"
 	}
 	return hint
