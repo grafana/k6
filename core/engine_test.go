@@ -193,6 +193,7 @@ func TestEngineStopped(t *testing.T) {
 	assert.Equal(t, false, e.IsStopped(), "engine should be running")
 	e.Stop()
 	assert.Equal(t, true, e.IsStopped(), "engine should be stopped")
+	e.Stop() // test that a second stop doesn't panic
 }
 
 func TestEngineCollector(t *testing.T) {

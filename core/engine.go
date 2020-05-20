@@ -60,6 +60,7 @@ type Engine struct {
 	SummaryExport bool
 
 	logger   *logrus.Entry
+	stopOnce sync.Once
 	stopChan chan struct{}
 
 	Metrics     map[string]*stats.Metric
@@ -288,7 +289,9 @@ func (e *Engine) IsTainted() bool {
 
 // Stop closes a signal channel, forcing a running Engine to return
 func (e *Engine) Stop() {
-	close(e.stopChan)
+	e.stopOnce.Do(func() {
+		close(e.stopChan)
+	})
 }
 
 // IsStopped returns a bool indicating whether the Engine has been stopped
