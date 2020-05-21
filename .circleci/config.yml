@@ -108,12 +108,10 @@ jobs:
     working_directory: /home/circleci/.go_workspace/src/github.com/loadimpact/k6
     steps:
       - checkout
-      - setup_remote_docker:
-          version: 17.11.0-ce
+      - setup_remote_docker
       - run:
           name: Setup repo and docker
           command: |
-            git submodule update --init
             docker info
             echo "{\"https://index.docker.io/v1/\":{\"auth\":\"$DOCKER_AUTH\",\"email\":\"$DOCKER_EMAIL\"}}" >~/.dockercfg
       - run:
