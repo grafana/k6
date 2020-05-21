@@ -44,7 +44,7 @@ type configMapTestCase struct {
 	expected exp
 }
 
-//nolint:lll,gochecknoglobals
+//nolint:gochecknoglobals
 var configMapTestCases = []configMapTestCase{
 	{"", exp{parseError: true}},
 	{"1234", exp{parseError: true}},

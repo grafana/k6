@@ -53,7 +53,7 @@ import (
 )
 
 func newTestExecutionScheduler(
-	t *testing.T, runner lib.Runner, logger *logrus.Logger, opts lib.Options, //nolint: golint
+	t *testing.T, runner lib.Runner, logger *logrus.Logger, opts lib.Options,
 ) (ctx context.Context, cancel func(), execScheduler *ExecutionScheduler, samples chan stats.SampleContainer) {
 	if runner == nil {
 		runner = &minirunner.MiniRunner{}
