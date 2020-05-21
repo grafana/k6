@@ -1573,7 +1573,7 @@ func TestSystemTags(t *testing.T) {
 		w.WriteHeader(http.StatusTemporaryRedirect)
 	})
 
-	r, err := getSimpleRunnerWithOptions("/script.js", tb.Replacer.Replace(`
+	r, err := getSimpleRunner("/script.js", tb.Replacer.Replace(`
 		var http = require("k6/http");
 
 		exports.http_get = function() {
