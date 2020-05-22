@@ -315,7 +315,7 @@ a commandline interface for interacting with it.`,
 			return getExitCodeFromEngine(err)
 		}
 		runCancel()
-		logger.Debug("Engine terminated cleanly")
+		logger.Debug("Engine run terminated cleanly")
 
 		progressCancel()
 		progressBarWG.Wait()
