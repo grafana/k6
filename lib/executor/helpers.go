@@ -54,21 +54,22 @@ func getStagesUnscaledMaxTarget(unscaledStartValue int64, stages []Stage) int64 
 // A helper function to avoid code duplication
 func validateStages(stages []Stage) []error {
 	var errors []error
-	if len(stages) == 0 { //nolint:nestif
+	if len(stages) == 0 {
 		errors = append(errors, fmt.Errorf("at least one stage has to be specified"))
-	} else {
-		for i, s := range stages {
-			stageNum := i + 1
-			if !s.Duration.Valid {
-				errors = append(errors, fmt.Errorf("stage %d doesn't have a duration", stageNum))
-			} else if s.Duration.Duration < 0 {
-				errors = append(errors, fmt.Errorf("the duration for stage %d shouldn't be negative", stageNum))
-			}
-			if !s.Target.Valid {
-				errors = append(errors, fmt.Errorf("stage %d doesn't have a target", stageNum))
-			} else if s.Target.Int64 < 0 {
-				errors = append(errors, fmt.Errorf("the target for stage %d shouldn't be negative", stageNum))
-			}
+		return errors
+	}
+
+	for i, s := range stages {
+		stageNum := i + 1
+		if !s.Duration.Valid {
+			errors = append(errors, fmt.Errorf("stage %d doesn't have a duration", stageNum))
+		} else if s.Duration.Duration < 0 {
+			errors = append(errors, fmt.Errorf("the duration for stage %d shouldn't be negative", stageNum))
+		}
+		if !s.Target.Valid {
+			errors = append(errors, fmt.Errorf("stage %d doesn't have a target", stageNum))
+		} else if s.Target.Int64 < 0 {
+			errors = append(errors, fmt.Errorf("the target for stage %d shouldn't be negative", stageNum))
 		}
 	}
 	return errors
