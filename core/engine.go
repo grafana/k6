@@ -282,7 +282,7 @@ func (e *Engine) processMetrics(globalCtx context.Context, processMetricsAfterRu
 		case <-ticker.C:
 			processSamples()
 		case <-processMetricsAfterRun:
-			e.logger.Debug("Processing metrics and threshold after the test run has ended...")
+			e.logger.Debug("Processing metrics and thresholds after the test run has ended...")
 			processSamples()
 			e.processThresholds()
 			processMetricsAfterRun <- struct{}{}
