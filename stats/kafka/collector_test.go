@@ -26,9 +26,10 @@ import (
 	"testing"
 
 	"github.com/Shopify/sarama"
-	"github.com/loadimpact/k6/stats"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v3"
+
+	"github.com/loadimpact/k6/stats"
 )
 
 func TestRun(t *testing.T) {

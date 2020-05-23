@@ -29,7 +29,7 @@ import (
 	"strings"
 	"time"
 
-	null "gopkg.in/guregu/null.v3"
+	"gopkg.in/guregu/null.v3"
 )
 
 // NullDecoder converts data with expected type f to a guregu/null value

@@ -32,9 +32,8 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"golang.org/x/crypto/ssh/terminal"
-
 	"github.com/sirupsen/logrus"
+	"golang.org/x/crypto/ssh/terminal"
 
 	"github.com/loadimpact/k6/core/local"
 	"github.com/loadimpact/k6/lib"

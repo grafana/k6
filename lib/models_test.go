@@ -26,9 +26,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/loadimpact/k6/lib/types"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v3"
+
+	"github.com/loadimpact/k6/lib/types"
 )
 
 func TestStageJSON(t *testing.T) {

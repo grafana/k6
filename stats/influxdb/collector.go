@@ -27,9 +27,10 @@ import (
 	"time"
 
 	client "github.com/influxdata/influxdb1-client/v2"
+	"github.com/sirupsen/logrus"
+
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
-	"github.com/sirupsen/logrus"
 )
 
 // Verify that Collector implements lib.Collector

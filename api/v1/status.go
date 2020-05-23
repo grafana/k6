@@ -21,9 +21,10 @@
 package v1
 
 import (
+	"gopkg.in/guregu/null.v3"
+
 	"github.com/loadimpact/k6/core"
 	"github.com/loadimpact/k6/lib"
-	"gopkg.in/guregu/null.v3"
 )
 
 type Status struct {

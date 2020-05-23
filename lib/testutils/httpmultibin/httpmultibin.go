@@ -40,13 +40,14 @@ import (
 	"github.com/andybalholm/brotli"
 	"github.com/gorilla/websocket"
 	"github.com/klauspost/compress/zstd"
-	"github.com/loadimpact/k6/lib/netext"
-	"github.com/loadimpact/k6/lib/netext/httpext"
 	"github.com/mccutchen/go-httpbin/httpbin"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/http2"
+
+	"github.com/loadimpact/k6/lib/netext"
+	"github.com/loadimpact/k6/lib/netext/httpext"
 )
 
 // GetTLSClientConfig returns a TLS config that trusts the supplied

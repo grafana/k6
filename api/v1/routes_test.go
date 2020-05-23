@@ -26,9 +26,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/loadimpact/k6/api/common"
 	"github.com/loadimpact/k6/core"
-	"github.com/stretchr/testify/assert"
 )
 
 func newRequestWithEngine(engine *core.Engine, method, target string, body io.Reader) *http.Request {

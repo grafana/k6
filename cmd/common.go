@@ -25,11 +25,12 @@ import (
 	"io"
 	"os"
 
-	"github.com/loadimpact/k6/lib/types"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	null "gopkg.in/guregu/null.v3"
+	"gopkg.in/guregu/null.v3"
+
+	"github.com/loadimpact/k6/lib/types"
 )
 
 // Use these when interacting with fs and writing to terminal, makes a command testable

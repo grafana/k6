@@ -23,9 +23,10 @@ package cmd
 import (
 	"context"
 
+	"github.com/spf13/cobra"
+
 	"github.com/loadimpact/k6/api/v1/client"
 	"github.com/loadimpact/k6/ui"
-	"github.com/spf13/cobra"
 )
 
 // statusCmd represents the status command

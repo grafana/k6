@@ -27,10 +27,11 @@ import (
 	"time"
 
 	"github.com/kubernetes/helm/pkg/strvals"
-	"github.com/loadimpact/k6/lib/types"
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
-	null "gopkg.in/guregu/null.v3"
+	"gopkg.in/guregu/null.v3"
+
+	"github.com/loadimpact/k6/lib/types"
 )
 
 type Config struct {

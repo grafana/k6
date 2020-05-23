@@ -22,11 +22,10 @@ package cmd
 
 import (
 	"bytes"
+	"io/ioutil"
 	"os"
 	"regexp"
 	"testing"
-
-	"io/ioutil"
 
 	"github.com/pmezard/go-difflib/difflib"
 	"github.com/spf13/afero"

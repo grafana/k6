@@ -30,7 +30,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/manyminds/api2go/jsonapi"
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/core"
 	"github.com/loadimpact/k6/core/local"
@@ -38,10 +42,6 @@ import (
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/loader"
-	"github.com/manyminds/api2go/jsonapi"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	null "gopkg.in/guregu/null.v3"
 )
 
 func TestSetupData(t *testing.T) {

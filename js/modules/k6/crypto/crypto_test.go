@@ -27,9 +27,10 @@ import (
 	"testing"
 
 	"github.com/dop251/goja"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
-	"github.com/stretchr/testify/assert"
 )
 
 type MockReader struct{}

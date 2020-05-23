@@ -26,10 +26,11 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/loadimpact/k6/lib/fsext"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
+
+	"github.com/loadimpact/k6/lib/fsext"
 )
 
 type errorReader string

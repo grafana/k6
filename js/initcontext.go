@@ -28,13 +28,14 @@ import (
 	"strings"
 
 	"github.com/dop251/goja"
+	"github.com/pkg/errors"
+	"github.com/spf13/afero"
+
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/js/compiler"
 	"github.com/loadimpact/k6/js/modules"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/loader"
-	"github.com/pkg/errors"
-	"github.com/spf13/afero"
 )
 
 type programWithSource struct {

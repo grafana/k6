@@ -23,11 +23,12 @@ package cmd
 import (
 	"context"
 
-	"github.com/loadimpact/k6/api/v1"
-	"github.com/loadimpact/k6/api/v1/client"
-	"github.com/loadimpact/k6/ui"
+	v1 "github.com/loadimpack/k6/api/v1"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+
+	"github.com/loadimpact/k6/api/v1/client"
+	"github.com/loadimpact/k6/ui"
 )
 
 // scaleCmd represents the scale command
