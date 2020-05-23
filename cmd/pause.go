@@ -23,7 +23,7 @@ package cmd
 import (
 	"context"
 
-	v1 "github.com/loadimpack/k6/api/v1"
+	"github.com/loadimpack/k6/api/v1"
 	"github.com/spf13/cobra"
 	"gopkg.in/guregu/null.v3"
 

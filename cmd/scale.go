@@ -23,7 +23,7 @@ package cmd
 import (
 	"context"
 
-	v1 "github.com/loadimpack/k6/api/v1"
+	"github.com/loadimpack/k6/api/v1"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
