@@ -28,7 +28,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/guregu/null.v3"
+	"gopkg.in/guregu/null.v4"
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"

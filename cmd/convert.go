@@ -29,7 +29,7 @@ import (
 	"github.com/loadimpact/k6/converter/har"
 	"github.com/loadimpact/k6/lib"
 	"github.com/spf13/cobra"
-	null "gopkg.in/guregu/null.v3"
+	null "gopkg.in/guregu/null.v4"
 )
 
 var (

@@ -26,7 +26,7 @@ import (
 	"net/url"
 	"testing"
 
-	"gopkg.in/guregu/null.v3"
+	"gopkg.in/guregu/null.v4"
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/loader"

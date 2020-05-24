@@ -31,7 +31,7 @@ import (
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/stats"
 	"github.com/sirupsen/logrus"
-	"gopkg.in/guregu/null.v3"
+	"gopkg.in/guregu/null.v4"
 )
 
 const (

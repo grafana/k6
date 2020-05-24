@@ -29,7 +29,7 @@ import (
 	"strings"
 	"time"
 
-	null "gopkg.in/guregu/null.v3"
+	null "gopkg.in/guregu/null.v4"
 )
 
 // NullDecoder converts data with expected type f to a guregu/null value
@@ -164,7 +164,7 @@ func (d Duration) MarshalJSON() ([]byte, error) {
 }
 
 // NullDuration is a nullable Duration, in the same vein as the nullable types provided by
-// package gopkg.in/guregu/null.v3.
+// package gopkg.in/guregu/null.v4.
 type NullDuration struct {
 	Duration
 	Valid bool

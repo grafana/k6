@@ -24,7 +24,7 @@ import (
 	"strings"
 
 	client "github.com/influxdata/influxdb1-client/v2"
-	null "gopkg.in/guregu/null.v3"
+	null "gopkg.in/guregu/null.v4"
 )
 
 func MakeClient(conf Config) (client.Client, error) {

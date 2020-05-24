@@ -56,8 +56,8 @@
   name = "golang.org/x/time"
 
 [[constraint]]
-  name = "gopkg.in/guregu/null.v3"
-  version = "^3.3.0"
+  name = "gopkg.in/guregu/null.v4"
+  version = "4.0.0"
 
 [[constraint]]
   branch = "master"

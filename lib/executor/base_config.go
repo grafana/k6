@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	null "gopkg.in/guregu/null.v3"
+	null "gopkg.in/guregu/null.v4"
 
 	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/lib/types"

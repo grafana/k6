@@ -28,7 +28,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	null "gopkg.in/guregu/null.v3"
+	null "gopkg.in/guregu/null.v4"
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/types"

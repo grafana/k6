@@ -30,7 +30,7 @@ import (
 	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/stats/statsd/common"
 	"github.com/stretchr/testify/require"
-	null "gopkg.in/guregu/null.v3"
+	null "gopkg.in/guregu/null.v4"
 )
 
 // BaseTest is a helper function to test statsd/datadog collector throughtly

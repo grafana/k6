@@ -5,11 +5,14 @@
 package null
 
 import (
+	"bytes"
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"reflect"
 )
+
+// nullBytes is a JSON null literal
+var nullBytes = []byte("null")
 
 // String is a nullable string. It supports SQL and JSON serialization.
 // It will marshal to null if null. Blank string input will be considered null.
@@ -50,26 +53,18 @@ func NewString(s string, valid bool) String {
 
 // UnmarshalJSON implements json.Unmarshaler.
 // It supports string and null input. Blank string input does not produce a null String.
-// It also supports unmarshalling a sql.NullString.
 func (s *String) UnmarshalJSON(data []byte) error {
-	var err error
-	var v interface{}
-	if err = json.Unmarshal(data, &v); err != nil {
-		return err
-	}
-	switch x := v.(type) {
-	case string:
-		s.String = x
-	case map[string]interface{}:
-		err = json.Unmarshal(data, &s.NullString)
-	case nil:
+	if bytes.Equal(data, nullBytes) {
 		s.Valid = false
 		return nil
-	default:
-		err = fmt.Errorf("json: cannot unmarshal %v into Go value of type null.String", reflect.TypeOf(v).Name())
 	}
-	s.Valid = err == nil
-	return err
+
+	if err := json.Unmarshal(data, &s.String); err != nil {
+		return fmt.Errorf("null: couldn't unmarshal JSON: %w", err)
+	}
+
+	s.Valid = true
+	return nil
 }
 
 // MarshalJSON implements json.Marshaler.
@@ -115,4 +110,9 @@ func (s String) Ptr() *string {
 // IsZero returns true for null strings, for potential future omitempty support.
 func (s String) IsZero() bool {
 	return !s.Valid
+}
+
+// Equal returns true if both strings have the same value or are both null.
+func (s String) Equal(other String) bool {
+	return s.Valid == other.Valid && (!s.Valid || s.String == other.String)
 }

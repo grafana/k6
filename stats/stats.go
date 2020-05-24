@@ -30,7 +30,7 @@ import (
 	"time"
 
 	"github.com/dustin/go-humanize"
-	"gopkg.in/guregu/null.v3"
+	"gopkg.in/guregu/null.v4"
 )
 
 const (

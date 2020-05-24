@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/loadimpact/k6/lib/types"
-	"gopkg.in/guregu/null.v3"
+	"gopkg.in/guregu/null.v4"
 )
 
 // Config is the config for the csv collector

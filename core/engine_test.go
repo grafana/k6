@@ -44,7 +44,7 @@ import (
 	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/stats/dummy"
 	"github.com/sirupsen/logrus"
-	null "gopkg.in/guregu/null.v3"
+	null "gopkg.in/guregu/null.v4"
 )
 
 const isWindows = runtime.GOOS == "windows"

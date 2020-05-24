@@ -27,7 +27,7 @@ import (
 	"testing"
 	"time"
 
-	null "gopkg.in/guregu/null.v3"
+	null "gopkg.in/guregu/null.v4"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

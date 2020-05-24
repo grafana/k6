@@ -25,7 +25,7 @@ import (
 
 	"github.com/loadimpact/k6/stats/influxdb"
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/guregu/null.v3"
+	"gopkg.in/guregu/null.v4"
 )
 
 func TestConfigParseArg(t *testing.T) {

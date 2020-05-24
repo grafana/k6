@@ -24,7 +24,7 @@ import (
 	"fmt"
 	"strings"
 
-	null "gopkg.in/guregu/null.v3"
+	null "gopkg.in/guregu/null.v4"
 )
 
 // CompatibilityMode specifies the JS compatibility mode

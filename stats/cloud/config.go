@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"github.com/loadimpact/k6/lib/types"
-	"gopkg.in/guregu/null.v3"
+	"gopkg.in/guregu/null.v4"
 )
 
 // Config holds all the necessary data and options for sending metrics to the Load Impact cloud.

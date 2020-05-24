@@ -27,7 +27,7 @@ import (
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/guregu/null.v3"
+	"gopkg.in/guregu/null.v4"
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/executor"

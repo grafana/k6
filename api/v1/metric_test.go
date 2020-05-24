@@ -26,7 +26,7 @@ import (
 
 	"github.com/loadimpact/k6/stats"
 	"github.com/stretchr/testify/assert"
-	null "gopkg.in/guregu/null.v3"
+	null "gopkg.in/guregu/null.v4"
 )
 
 func TestNullMetricTypeJSON(t *testing.T) {

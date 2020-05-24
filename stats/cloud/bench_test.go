@@ -40,7 +40,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/guregu/null.v3"
+	"gopkg.in/guregu/null.v4"
 )
 
 // script to clean the logs: `perl -p -e  "s/time=\".*\n//g"`

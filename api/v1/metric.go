@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/loadimpact/k6/stats"
-	"gopkg.in/guregu/null.v3"
+	"gopkg.in/guregu/null.v4"
 )
 
 type NullMetricType struct {

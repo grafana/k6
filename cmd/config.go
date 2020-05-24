@@ -31,7 +31,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/spf13/afero"
 	"github.com/spf13/pflag"
-	null "gopkg.in/guregu/null.v3"
+	null "gopkg.in/guregu/null.v4"
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/executor"
@@ -249,7 +249,7 @@ func getConsolidatedConfig(fs afero.Fs, cliConf Config, runner lib.Runner) (conf
 }
 
 // applyDefault applies the default options value if it is not specified.
-// This happens with types which are not supported by "gopkg.in/guregu/null.v3".
+// This happens with types which are not supported by "gopkg.in/guregu/null.v4".
 //
 // Note that if you add option default value here, also add it in command line argument help text.
 func applyDefault(conf Config) Config {

@@ -1,8 +1,10 @@
 package null
 
 import (
+	"bytes"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"reflect"
@@ -50,37 +52,40 @@ func (f Float) ValueOrZero() float64 {
 // UnmarshalJSON implements json.Unmarshaler.
 // It supports number and null input.
 // 0 will not be considered a null Float.
-// It also supports unmarshalling a sql.NullFloat64.
 func (f *Float) UnmarshalJSON(data []byte) error {
-	var err error
-	var v interface{}
-	if err = json.Unmarshal(data, &v); err != nil {
-		return err
-	}
-	switch x := v.(type) {
-	case float64:
-		f.Float64 = float64(x)
-	case string:
-		str := string(x)
-		if len(str) == 0 {
-			f.Valid = false
-			return nil
-		}
-		f.Float64, err = strconv.ParseFloat(str, 64)
-	case map[string]interface{}:
-		err = json.Unmarshal(data, &f.NullFloat64)
-	case nil:
+	if bytes.Equal(data, nullBytes) {
 		f.Valid = false
 		return nil
-	default:
-		err = fmt.Errorf("json: cannot unmarshal %v into Go value of type null.Float", reflect.TypeOf(v).Name())
 	}
-	f.Valid = err == nil
-	return err
+
+	if err := json.Unmarshal(data, &f.Float64); err != nil {
+		var typeError *json.UnmarshalTypeError
+		if errors.As(err, &typeError) {
+			// special case: accept string input
+			if typeError.Value != "string" {
+				return fmt.Errorf("null: JSON input is invalid type (need float or string): %w", err)
+			}
+			var str string
+			if err := json.Unmarshal(data, &str); err != nil {
+				return fmt.Errorf("null: couldn't unmarshal number string: %w", err)
+			}
+			n, err := strconv.ParseFloat(str, 64)
+			if err != nil {
+				return fmt.Errorf("null: couldn't convert string to float: %w", err)
+			}
+			f.Float64 = n
+			f.Valid = true
+			return nil
+		}
+		return fmt.Errorf("null: couldn't unmarshal JSON: %w", err)
+	}
+
+	f.Valid = true
+	return nil
 }
 
 // UnmarshalText implements encoding.TextUnmarshaler.
-// It will unmarshal to a null Float if the input is a blank or not an integer.
+// It will unmarshal to a null Float if the input is blank.
 // It will return an error if the input is not an integer, blank, or "null".
 func (f *Float) UnmarshalText(text []byte) error {
 	str := string(text)
@@ -90,7 +95,10 @@ func (f *Float) UnmarshalText(text []byte) error {
 	}
 	var err error
 	f.Float64, err = strconv.ParseFloat(string(text), 64)
-	f.Valid = err == nil
+	if err != nil {
+		return fmt.Errorf("null: couldn't unmarshal text: %w", err)
+	}
+	f.Valid = true
 	return err
 }
 
@@ -136,4 +144,13 @@ func (f Float) Ptr() *float64 {
 // A non-null Float with a 0 value will not be considered zero.
 func (f Float) IsZero() bool {
 	return !f.Valid
+}
+
+// Equal returns true if both floats have the same value or are both null.
+// Warning: calculations using floating point numbers can result in different ways
+// the numbers are stored in memory. Therefore, this function is not suitable to
+// compare the result of a calculation. Use this method only to check if the value
+// has changed in comparison to some previous value.
+func (f Float) Equal(other Float) bool {
+	return f.Valid == other.Valid && (!f.Valid || f.Float64 == other.Float64)
 }

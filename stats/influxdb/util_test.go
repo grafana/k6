@@ -25,7 +25,7 @@ import (
 
 	client "github.com/influxdata/influxdb1-client/v2"
 	"github.com/stretchr/testify/assert"
-	null "gopkg.in/guregu/null.v3"
+	null "gopkg.in/guregu/null.v4"
 )
 
 func TestMakeBatchConfig(t *testing.T) {

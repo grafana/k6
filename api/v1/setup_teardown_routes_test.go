@@ -41,7 +41,7 @@ import (
 	"github.com/manyminds/api2go/jsonapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	null "gopkg.in/guregu/null.v3"
+	null "gopkg.in/guregu/null.v4"
 )
 
 func TestSetupData(t *testing.T) {

@@ -657,12 +657,12 @@
   version = "v8.18.2"
 
 [[projects]]
-  digest = "1:b0b604e19e80db4c03aea55950a2956b3057e7ccfb10dc28ac7caa2fd95cf2de"
-  name = "gopkg.in/guregu/null.v3"
+  digest = "1:0d60cb937e8456d017b40e63392cf5fa19950bc4bf6bbabb1db91d2566c28f23"
+  name = "gopkg.in/guregu/null.v4"
   packages = ["."]
   pruneopts = "NUT"
-  revision = "e81d6d8d57747b34d7c5fe0d20ebf57692f04ea9"
-  version = "v3.3.0"
+  revision = "67b85ae3ec28456e45753cef9802e9f4e52524a9"
+  version = "v4.0.0"
 
 [[projects]]
   digest = "1:b92c04db63b4a79baff7afe06e0ee1076383a16834f8b8a90dc04644651f5315"
@@ -724,7 +724,7 @@
     "golang.org/x/net/http2",
     "golang.org/x/text/unicode/norm",
     "golang.org/x/time/rate",
-    "gopkg.in/guregu/null.v3",
+    "gopkg.in/guregu/null.v4",
     "gopkg.in/yaml.v2",
   ]
   solver-name = "gps-cdcl"
