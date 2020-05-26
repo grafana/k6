@@ -96,7 +96,7 @@ func NewBundle(src *loader.SourceData, filesystems map[string]afero.Fs, rtOpts l
 		return nil, err
 	}
 
-	err = bundle.getExports(rt)
+	err = bundle.getExports(rt, true)
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +154,9 @@ func NewBundleFromArchive(arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle,
 		return nil, err
 	}
 
-	err = bundle.getExports(rt)
+	// Grab exported objects, but avoid overwriting options, which would
+	// be initialized from the metadata.json at this point.
+	err = bundle.getExports(rt, false)
 	if err != nil {
 		return nil, err
 	}
@@ -184,7 +186,7 @@ func (b *Bundle) makeArchive() *lib.Archive {
 }
 
 // getExports validates and extracts exported objects
-func (b *Bundle) getExports(rt *goja.Runtime) error {
+func (b *Bundle) getExports(rt *goja.Runtime, options bool) error {
 	exportsV := rt.Get("exports")
 	if goja.IsNull(exportsV) || goja.IsUndefined(exportsV) {
 		return errors.New("exports must be an object")
@@ -199,6 +201,9 @@ func (b *Bundle) getExports(rt *goja.Runtime) error {
 		}
 		switch k {
 		case consts.Options:
+			if !options {
+				continue
+			}
 			data, err := json.Marshal(v.Export())
 			if err != nil {
 				return err

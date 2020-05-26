@@ -512,6 +512,27 @@ func TestNewBundleFromArchive(t *testing.T) {
 		checkArchive(t, arc, extCompatModeRtOpts, "")                            // works when I force the compat mode
 		checkArchive(t, arc, baseCompatModeRtOpts, "Unexpected reserved word")   // failes because of ES6
 	})
+
+	t.Run("script_options_dont_overwrite_metadata", func(t *testing.T) {
+		t.Parallel()
+		code := `export let options = { vus: 12345 }; export default function() { return options.vus; };`
+		arc := &lib.Archive{
+			Type:        "js",
+			FilenameURL: &url.URL{Scheme: "file", Path: "/script"},
+			K6Version:   consts.Version,
+			Data:        []byte(code),
+			Options:     lib.Options{VUs: null.IntFrom(999)},
+			PwdURL:      &url.URL{Scheme: "file", Path: "/"},
+			Filesystems: nil,
+		}
+		b, err := NewBundleFromArchive(arc, lib.RuntimeOptions{})
+		require.NoError(t, err)
+		bi, err := b.Instantiate()
+		require.NoError(t, err)
+		val, err := bi.exports[consts.DefaultFn](goja.Undefined())
+		require.NoError(t, err)
+		assert.Equal(t, int64(999), val.Export())
+	})
 }
 
 func TestOpen(t *testing.T) {
