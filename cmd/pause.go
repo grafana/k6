@@ -26,7 +26,7 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/loadimpack/k6/api/v1"
+	"github.com/loadimpact/k6/api/v1"
 	"github.com/loadimpact/k6/api/v1/client"
 	"github.com/loadimpact/k6/ui"
 )
