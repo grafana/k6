@@ -26,10 +26,11 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/spf13/cobra"
+
 	"github.com/loadimpact/k6/js"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/loader"
-	"github.com/spf13/cobra"
 )
 
 // inspectCmd represents the resume command

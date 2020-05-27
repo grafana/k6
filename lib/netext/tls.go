@@ -23,8 +23,9 @@ package netext
 import (
 	"crypto/tls"
 
-	"github.com/loadimpact/k6/lib"
 	"golang.org/x/crypto/ocsp"
+
+	"github.com/loadimpact/k6/lib"
 )
 
 //nolint: golint

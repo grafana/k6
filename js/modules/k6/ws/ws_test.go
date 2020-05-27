@@ -31,12 +31,13 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/gorilla/websocket"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/testutils/httpmultibin"
 	"github.com/loadimpact/k6/stats"
-	"github.com/stretchr/testify/assert"
 )
 
 func assertSessionMetricsEmitted(t *testing.T, sampleContainers []stats.SampleContainer, subprotocol, url string, status int, group string) {

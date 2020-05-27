@@ -29,8 +29,9 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
-	"github.com/loadimpact/k6/js/common"
 	"github.com/pkg/errors"
+
+	"github.com/loadimpact/k6/js/common"
 )
 
 // HTTPCookieJar is cookiejar.Jar wrapper to be used in js scripts

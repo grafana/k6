@@ -27,6 +27,9 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/kelseyhightower/envconfig"
+	"github.com/pkg/errors"
+	"github.com/spf13/afero"
+
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/loader"
@@ -39,8 +42,6 @@ import (
 	"github.com/loadimpact/k6/stats/kafka"
 	"github.com/loadimpact/k6/stats/statsd"
 	"github.com/loadimpact/k6/stats/statsd/common"
-	"github.com/pkg/errors"
-	"github.com/spf13/afero"
 )
 
 const (

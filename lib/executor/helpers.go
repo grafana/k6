@@ -26,12 +26,11 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/loadimpact/k6/ui/pb"
-
 	"github.com/sirupsen/logrus"
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/types"
+	"github.com/loadimpact/k6/ui/pb"
 )
 
 func sumStagesDuration(stages []Stage) (result time.Duration) {

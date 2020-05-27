@@ -26,8 +26,9 @@ import (
 	"net/http"
 
 	"github.com/julienschmidt/httprouter"
-	"github.com/loadimpact/k6/api/common"
 	"github.com/manyminds/api2go/jsonapi"
+
+	"github.com/loadimpact/k6/api/common"
 )
 
 // NullSetupData is wrapper around null to satisfy jsonapi

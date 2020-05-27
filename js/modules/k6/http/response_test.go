@@ -27,10 +27,11 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib/netext/httpext"
 	"github.com/loadimpact/k6/stats"
-	"github.com/stretchr/testify/assert"
 )
 
 const testGetFormHTML = `

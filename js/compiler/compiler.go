@@ -29,9 +29,10 @@ import (
 	rice "github.com/GeertJohan/go.rice"
 	"github.com/dop251/goja"
 	"github.com/dop251/goja/parser"
-	"github.com/loadimpact/k6/lib"
 	"github.com/mitchellh/mapstructure"
 	"github.com/sirupsen/logrus"
+
+	"github.com/loadimpact/k6/lib"
 )
 
 var (

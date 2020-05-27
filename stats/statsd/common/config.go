@@ -23,8 +23,9 @@ package common
 import (
 	"time"
 
+	"gopkg.in/guregu/null.v3"
+
 	"github.com/loadimpact/k6/lib/types"
-	null "gopkg.in/guregu/null.v3"
 )
 
 // Config defines the statsd configuration

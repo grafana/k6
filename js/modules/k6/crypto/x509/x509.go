@@ -32,8 +32,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/loadimpact/k6/js/common"
 	"github.com/pkg/errors"
+
+	"github.com/loadimpact/k6/js/common"
 )
 
 // X509 certificate functionality

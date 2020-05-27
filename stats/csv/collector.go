@@ -31,10 +31,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/stats"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
+
+	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/stats"
 )
 
 // Collector saving output to csv implements the lib.Collector interface

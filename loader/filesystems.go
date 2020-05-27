@@ -23,8 +23,9 @@ package loader
 import (
 	"runtime"
 
-	"github.com/loadimpact/k6/lib/fsext"
 	"github.com/spf13/afero"
+
+	"github.com/loadimpact/k6/lib/fsext"
 )
 
 // CreateFilesystems creates the correct filesystem map for the current OS

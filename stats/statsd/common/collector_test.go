@@ -23,10 +23,10 @@ package common
 import (
 	"testing"
 
-	"github.com/loadimpact/k6/stats"
-
 	"github.com/stretchr/testify/require"
-	null "gopkg.in/guregu/null.v3"
+	"gopkg.in/guregu/null.v3"
+
+	"github.com/loadimpact/k6/stats"
 )
 
 func TestInitWithoutAddressErrors(t *testing.T) {

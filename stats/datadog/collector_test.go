@@ -24,10 +24,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/stats/statsd/common"
 	"github.com/loadimpact/k6/stats/statsd/common/testutil"
-	"github.com/stretchr/testify/require"
 )
 
 func TestCollector(t *testing.T) {

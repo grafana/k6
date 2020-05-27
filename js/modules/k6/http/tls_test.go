@@ -27,10 +27,11 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"gopkg.in/guregu/null.v3"
+
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
-	"github.com/stretchr/testify/assert"
-	null "gopkg.in/guregu/null.v3"
 )
 
 func TestTLS13Support(t *testing.T) {

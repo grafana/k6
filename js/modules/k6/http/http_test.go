@@ -24,10 +24,11 @@ import (
 	"testing"
 
 	"github.com/dop251/goja"
-	"github.com/loadimpact/k6/js/common"
-	"github.com/loadimpact/k6/lib/netext/httpext"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/loadimpact/k6/js/common"
+	"github.com/loadimpact/k6/lib/netext/httpext"
 )
 
 func TestTagURL(t *testing.T) {

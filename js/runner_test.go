@@ -43,7 +43,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	null "gopkg.in/guregu/null.v3"
+	"gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/core"
 	"github.com/loadimpact/k6/core/local"

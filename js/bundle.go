@@ -26,8 +26,6 @@ import (
 	"net/url"
 	"runtime"
 
-	"github.com/loadimpact/k6/lib/consts"
-
 	"github.com/dop251/goja"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
@@ -36,6 +34,7 @@ import (
 	"github.com/loadimpact/k6/js/compiler"
 	jslib "github.com/loadimpact/k6/js/lib"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/loader"
 )
 

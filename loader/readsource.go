@@ -26,9 +26,10 @@ import (
 	"net/url"
 	"path/filepath"
 
-	"github.com/loadimpact/k6/lib/fsext"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
+
+	"github.com/loadimpact/k6/lib/fsext"
 )
 
 // ReadSource Reads a source file from any supported destination.

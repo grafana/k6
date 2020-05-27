@@ -29,11 +29,10 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/manyminds/api2go/jsonapi"
 	"github.com/sirupsen/logrus"
 
-	"github.com/manyminds/api2go/jsonapi"
-
-	v1 "github.com/loadimpact/k6/api/v1"
+	"github.com/loadimpact/k6/api/v1"
 )
 
 // Client is a simple HTTP client for the REST API.

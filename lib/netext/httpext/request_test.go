@@ -31,12 +31,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/stats"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/stats"
 )
 
 type reader func([]byte) (int, error)

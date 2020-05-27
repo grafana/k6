@@ -23,8 +23,9 @@ package json
 import (
 	"testing"
 
-	"github.com/loadimpact/k6/stats"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/loadimpact/k6/stats"
 )
 
 func TestWrapersWithNilArg(t *testing.T) {

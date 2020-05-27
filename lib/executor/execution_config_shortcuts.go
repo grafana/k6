@@ -21,10 +21,11 @@
 package executor
 
 import (
+	"github.com/sirupsen/logrus"
+	"gopkg.in/guregu/null.v3"
+
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/types"
-	"github.com/sirupsen/logrus"
-	null "gopkg.in/guregu/null.v3"
 )
 
 // ExecutionConflictError is a custom error type used for all of the errors in

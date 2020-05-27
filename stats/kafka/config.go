@@ -24,10 +24,11 @@ import (
 	"time"
 
 	"github.com/kubernetes/helm/pkg/strvals"
-	"github.com/loadimpact/k6/lib/types"
-	"github.com/loadimpact/k6/stats/influxdb"
 	"github.com/mitchellh/mapstructure"
 	"gopkg.in/guregu/null.v3"
+
+	"github.com/loadimpact/k6/lib/types"
+	"github.com/loadimpact/k6/stats/influxdb"
 )
 
 // Config is the config for the kafka collector

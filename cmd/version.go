@@ -23,8 +23,9 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/loadimpact/k6/lib/consts"
 	"github.com/spf13/cobra"
+
+	"github.com/loadimpact/k6/lib/consts"
 )
 
 // versionCmd represents the version command.

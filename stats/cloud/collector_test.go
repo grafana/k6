@@ -33,11 +33,9 @@ import (
 	"testing"
 	"time"
 
-	"gopkg.in/guregu/null.v3"
-
 	"github.com/stretchr/testify/assert"
-
 	"github.com/stretchr/testify/require"
+	"gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"

@@ -29,8 +29,9 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/loadimpact/k6/lib"
 	"github.com/pkg/errors"
+
+	"github.com/loadimpact/k6/lib"
 )
 
 type ResultStatus int

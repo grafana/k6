@@ -25,8 +25,9 @@ import (
 	"time"
 
 	"github.com/julienschmidt/httprouter"
-	"github.com/loadimpact/k6/api/common"
 	"github.com/manyminds/api2go/jsonapi"
+
+	"github.com/loadimpact/k6/api/common"
 )
 
 func HandleGetMetrics(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
