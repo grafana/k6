@@ -114,7 +114,7 @@ func TestInitContextRequire(t *testing.T) {
 			path := filepath.FromSlash("/nonexistent.js")
 			_, err := getSimpleBundle("/script.js", `import "/nonexistent.js"; export default function() {}`)
 			assert.NotNil(t, err)
-			assert.Contains(t, err.Error(), fmt.Sprintf(`"file://%s" couldn't be found on local disk`, filepath.ToSlash(path)))
+			assert.Contains(t, err.Error(), fmt.Sprintf(`"%s" couldn't be found on local disk`, filepath.ToSlash(path)))
 		})
 		t.Run("Invalid", func(t *testing.T) {
 			fs := afero.NewMemMapFs()
