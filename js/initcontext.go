@@ -44,8 +44,8 @@ type programWithSource struct {
 	module *goja.Object
 }
 
-const openCantBeUsedOutsideInitContextMsg = `The "open()" function is only available to init code ` +
-	`(aka the global scope), see https://k6.io/docs/using-k6/test-life-cycle for more information`
+const openCantBeUsedOutsideInitContextMsg = `The "open()" function is only available in the init stage ` +
+	`(i.e. the global scope), see https://k6.io/docs/using-k6/test-life-cycle for more information`
 
 // InitContext provides APIs for use in the init context.
 type InitContext struct {
