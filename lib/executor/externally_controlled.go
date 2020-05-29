@@ -379,7 +379,7 @@ type externallyControlledRunState struct {
 	vuHandles       []*manualVUHandle // handles for manipulating and tracking all of the VUs
 	currentlyPaused bool              // whether the executor is currently paused
 
-	runIteration func(context.Context, lib.ActiveVU) // a helper closure function that runs a single iteration
+	runIteration func(context.Context, lib.ActiveVU) bool // a helper closure function that runs a single iteration
 }
 
 // retrieveStartMaxVUs gets and initializes the (scaled) number of MaxVUs
@@ -456,7 +456,10 @@ func (rs *externallyControlledRunState) handleConfigChange(oldCfg, newCfg Extern
 	if oldActiveVUs < newActiveVUs {
 		for i := oldActiveVUs; i < newActiveVUs; i++ {
 			if !rs.currentlyPaused {
-				rs.vuHandles[i].start()
+				if err := rs.vuHandles[i].start(); err != nil {
+					// TODO: maybe just log it ?
+					return err
+				}
 			}
 		}
 	} else {
@@ -573,7 +576,11 @@ func (mex *ExternallyControlled) Run(parentCtx context.Context, out chan<- stats
 				}
 			} else {
 				for i := int64(0); i < activeVUs; i++ {
-					runState.vuHandles[i].start()
+					if err := runState.vuHandles[i].start(); err != nil {
+						// TODO again ... just log it?
+						pauseEvent.err <- err
+						return err
+					}
 				}
 			}
 			runState.currentlyPaused = pauseEvent.isPaused
