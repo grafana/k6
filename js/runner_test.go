@@ -1032,6 +1032,23 @@ func TestVUIntegrationOpenFunctionError(t *testing.T) {
 	assert.Contains(t, err.Error(), "only available to init code")
 }
 
+func TestVUIntegrationOpenFunctionErrorWhenSneaky(t *testing.T) {
+	r, err := getSimpleRunner("/script.js", `
+			var sneaky = open;
+			exports.default = function() { sneaky("/tmp/foo") }
+		`)
+	assert.NoError(t, err)
+
+	initVU, err := r.NewVU(1, make(chan stats.SampleContainer, 100))
+	assert.NoError(t, err)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+	err = vu.RunOnce()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "only available to init code")
+}
+
 func TestVUIntegrationCookiesReset(t *testing.T) {
 	tb := httpmultibin.NewHTTPMultiBin(t)
 	defer tb.Cleanup()
