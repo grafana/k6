@@ -29,12 +29,14 @@ import (
 	"github.com/manyminds/api2go"
 )
 
+// Error is another name for api2go.Error class.
 type Error api2go.Error
 
 func (e Error) Error() string {
 	return fmt.Sprintf("%s: %s", e.Title, e.Detail)
 }
 
+// ErrorResponse is an Error slice struct.
 type ErrorResponse struct {
 	Errors []Error `json:"errors"`
 }

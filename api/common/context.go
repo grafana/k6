@@ -26,14 +26,19 @@ import (
 	"github.com/loadimpact/k6/core"
 )
 
+// ContextKey is another name for int.
 type ContextKey int
 
-const ctxKeyEngine = ContextKey(1)
+const (
+	ctxKeyEngine ContextKey = 1 << iota
+)
 
+// WithEngine returns one context.Context object.
 func WithEngine(ctx context.Context, engine *core.Engine) context.Context {
 	return context.WithValue(ctx, ctxKeyEngine, engine)
 }
 
+// GetEngine returns one core.Engine instance.
 func GetEngine(ctx context.Context) *core.Engine {
 	return ctx.Value(ctxKeyEngine).(*core.Engine)
 }
