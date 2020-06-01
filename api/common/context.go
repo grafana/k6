@@ -38,7 +38,7 @@ func WithEngine(ctx context.Context, engine *core.Engine) context.Context {
 	return context.WithValue(ctx, ctxKeyEngine, engine)
 }
 
-// GetEngine returns one core.Engine instance.
+// GetEngine returns the wrapped core.Engine instance.
 func GetEngine(ctx context.Context) *core.Engine {
 	return ctx.Value(ctxKeyEngine).(*core.Engine)
 }
