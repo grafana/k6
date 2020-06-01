@@ -26,8 +26,7 @@ import (
 	"github.com/loadimpact/k6/core"
 )
 
-// ContextKey is another name for int.
-type ContextKey int
+type contextKey int
 
 const (
 	ctxKeyEngine ContextKey = 1 << iota
