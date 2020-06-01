@@ -33,7 +33,8 @@ const (
 	ctxKeyEngine ContextKey = 1 << iota
 )
 
-// WithEngine returns one context.Context object.
+// WithEngine returns a new context, derived from the given one and 
+// carrying the given Engine within it.
 func WithEngine(ctx context.Context, engine *core.Engine) context.Context {
 	return context.WithValue(ctx, ctxKeyEngine, engine)
 }
