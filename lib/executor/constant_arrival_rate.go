@@ -290,7 +290,6 @@ func (car ConstantArrivalRate) Run(ctx context.Context, out chan<- stats.SampleC
 
 	remainingUnplannedVUs := maxVUs - preAllocatedVUs
 	start, offsets, _ := car.et.GetStripedOffsets()
-	startTime = time.Now()
 	timer := time.NewTimer(time.Hour * 24)
 	// here the we need the not scaled one
 	notScaledTickerPeriod := time.Duration(
