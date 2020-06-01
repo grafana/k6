@@ -29,7 +29,7 @@ import (
 type contextKey int
 
 const (
-	ctxKeyEngine ContextKey = 1 << iota
+	ctxKeyEngine contextKey = 1 << iota
 )
 
 // WithEngine returns a new context, derived from the given one and 
