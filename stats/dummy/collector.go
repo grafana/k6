@@ -23,8 +23,6 @@ package dummy
 import (
 	"context"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
 )
@@ -49,7 +47,6 @@ func (c *Collector) MakeConfig() interface{} { return nil }
 // Run just blocks until the context is done
 func (c *Collector) Run(ctx context.Context) {
 	<-ctx.Done()
-	logrus.Debugf("finished status: %d", c.RunStatus)
 }
 
 // Collect just appends all of the samples passed to it to the internal sample slice.
