@@ -23,13 +23,13 @@ package cmd
 import (
 	"bytes"
 	"io/ioutil"
-	"os"
 	"regexp"
 	"testing"
 
 	"github.com/pmezard/go-difflib/difflib"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const testHAR = `
@@ -121,24 +121,18 @@ export default function() {
 `
 
 func TestIntegrationConvertCmd(t *testing.T) {
-	var tmpFile, err = ioutil.TempFile("", "")
-	if err != nil {
-		t.Fatalf("Couldn't create temporary file: %s", err)
-	}
-	harFile := tmpFile.Name()
-	defer os.Remove(harFile)
-	tmpFile.Close()
 	t.Run("Correlate", func(t *testing.T) {
+		harFile := "/correlate.har"
 		har, err := ioutil.ReadFile("testdata/example.har")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		expectedTestPlan, err := ioutil.ReadFile("testdata/example.js")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		defaultFs = afero.NewMemMapFs()
 
 		err = afero.WriteFile(defaultFs, harFile, har, 0644)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		buf := &bytes.Buffer{}
 		defaultWriter = buf
@@ -177,6 +171,7 @@ func TestIntegrationConvertCmd(t *testing.T) {
 		}
 	})
 	t.Run("Stdout", func(t *testing.T) {
+		harFile := "/stdout.har"
 		defaultFs = afero.NewMemMapFs()
 		err := afero.WriteFile(defaultFs, harFile, []byte(testHAR), 0644)
 		assert.NoError(t, err)
@@ -189,11 +184,15 @@ func TestIntegrationConvertCmd(t *testing.T) {
 		assert.Equal(t, testHARConvertResult, buf.String())
 	})
 	t.Run("Output file", func(t *testing.T) {
+		harFile := "/output.har"
 		defaultFs = afero.NewMemMapFs()
 		err := afero.WriteFile(defaultFs, harFile, []byte(testHAR), 0644)
 		assert.NoError(t, err)
 
 		err = convertCmd.Flags().Set("output", "/output.js")
+		defer func() {
+			err = convertCmd.Flags().Set("output", "")
+		}()
 		assert.NoError(t, err)
 		err = convertCmd.RunE(convertCmd, []string{harFile})
 		assert.NoError(t, err)
