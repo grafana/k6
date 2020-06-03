@@ -23,6 +23,7 @@ package cmd
 import (
 	"bytes"
 	"io/ioutil"
+	"path/filepath"
 	"regexp"
 	"testing"
 
@@ -122,7 +123,8 @@ export default function() {
 
 func TestIntegrationConvertCmd(t *testing.T) {
 	t.Run("Correlate", func(t *testing.T) {
-		harFile := "/correlate.har"
+		harFile, err := filepath.Abs("correlate.har")
+		require.NoError(t, err)
 		har, err := ioutil.ReadFile("testdata/example.har")
 		require.NoError(t, err)
 
@@ -171,9 +173,10 @@ func TestIntegrationConvertCmd(t *testing.T) {
 		}
 	})
 	t.Run("Stdout", func(t *testing.T) {
-		harFile := "/stdout.har"
+		harFile, err := filepath.Abs("stdout.har")
+		require.NoError(t, err)
 		defaultFs = afero.NewMemMapFs()
-		err := afero.WriteFile(defaultFs, harFile, []byte(testHAR), 0644)
+		err = afero.WriteFile(defaultFs, harFile, []byte(testHAR), 0644)
 		assert.NoError(t, err)
 
 		buf := &bytes.Buffer{}
@@ -184,9 +187,10 @@ func TestIntegrationConvertCmd(t *testing.T) {
 		assert.Equal(t, testHARConvertResult, buf.String())
 	})
 	t.Run("Output file", func(t *testing.T) {
-		harFile := "/output.har"
+		harFile, err := filepath.Abs("output.har")
+		require.NoError(t, err)
 		defaultFs = afero.NewMemMapFs()
-		err := afero.WriteFile(defaultFs, harFile, []byte(testHAR), 0644)
+		err = afero.WriteFile(defaultFs, harFile, []byte(testHAR), 0644)
 		assert.NoError(t, err)
 
 		err = convertCmd.Flags().Set("output", "/output.js")
