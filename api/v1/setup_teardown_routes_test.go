@@ -146,8 +146,8 @@ func TestSetupData(t *testing.T) {
 				VUs:             null.IntFrom(2),
 				Iterations:      null.IntFrom(3),
 				NoSetup:         null.BoolFrom(true),
-				SetupTimeout:    types.NullDurationFrom(1 * time.Second),
-				TeardownTimeout: types.NullDurationFrom(1 * time.Second),
+				SetupTimeout:    types.NullDurationFrom(5 * time.Second),
+				TeardownTimeout: types.NullDurationFrom(5 * time.Second),
 			})
 			execScheduler, err := local.NewExecutionScheduler(runner, logrus.StandardLogger())
 			require.NoError(t, err)

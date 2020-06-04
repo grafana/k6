@@ -341,15 +341,15 @@ func TestExecutionSchedulerRunCustomTags(t *testing.T) {
 			execScheduler, err := NewExecutionScheduler(runner, logger)
 			require.NoError(t, err)
 
-			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 			defer cancel()
 
 			done := make(chan struct{})
 			samples := make(chan stats.SampleContainer)
 			go func() {
-				assert.NoError(t, execScheduler.Init(ctx, samples))
-				assert.NoError(t, execScheduler.Run(ctx, ctx, samples))
-				close(done)
+				defer close(done)
+				require.NoError(t, execScheduler.Init(ctx, samples))
+				require.NoError(t, execScheduler.Run(ctx, ctx, samples))
 			}()
 			var gotTrailTag, gotNetTrailTag bool
 			for {
