@@ -741,7 +741,7 @@ func TestEmittedMetricsWhenScalingDown(t *testing.T) {
 	go func() { errC <- run() }()
 
 	select {
-	case <-time.After(10 * time.Second):
+	case <-time.After(12 * time.Second):
 		t.Fatal("Test timed out")
 	case err := <-errC:
 		require.NoError(t, err)
