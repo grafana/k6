@@ -52,6 +52,11 @@ func TestConstantLoopingVUsRun(t *testing.T) {
 		t, getTestConstantLoopingVUsConfig(), es,
 		simpleRunner(func(ctx context.Context) error {
 			time.Sleep(200 * time.Millisecond)
+			select {
+			case <-ctx.Done():
+				return nil
+			default:
+			}
 			state := lib.GetState(ctx)
 			currIter, _ := result.LoadOrStore(state.Vu, uint64(0))
 			result.Store(state.Vu, currIter.(uint64)+1)
