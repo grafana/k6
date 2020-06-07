@@ -24,7 +24,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"strings"
 	"sync/atomic"
 	"time"
 
@@ -35,14 +34,20 @@ import (
 	"github.com/loadimpact/k6/stats"
 )
 
+// dnsResolver is an interface that fetches dns information
+// about a given address.
+type dnsResolver interface {
+	FetchOne(address string) (net.IP, error)
+}
+
 // Dialer wraps net.Dialer and provides k6 specific functionality -
 // tracing, blacklists and DNS cache and aliases.
 type Dialer struct {
 	net.Dialer
 
-	Resolver  *dnscache.Resolver
+	Resolver  dnsResolver
 	Blacklist []*lib.IPNet
-	Hosts     map[string]net.IP
+	Hosts     map[string]lib.IPPort
 
 	BytesRead    int64
 	BytesWritten int64
@@ -50,9 +55,13 @@ type Dialer struct {
 
 // NewDialer constructs a new Dialer and initializes its cache.
 func NewDialer(dialer net.Dialer) *Dialer {
+	return newDialerWithResolver(dialer, dnscache.New(0))
+}
+
+func newDialerWithResolver(dialer net.Dialer, resolver dnsResolver) *Dialer {
 	return &Dialer{
 		Dialer:   dialer,
-		Resolver: dnscache.New(0),
+		Resolver: resolver,
 	}
 }
 
@@ -68,29 +77,11 @@ func (b BlackListedIPError) Error() string {
 
 // DialContext wraps the net.Dialer.DialContext and handles the k6 specifics
 func (d *Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn, error) {
-	delimiter := strings.LastIndex(addr, ":")
-	host := addr[:delimiter]
-
-	// lookup for domain defined in Hosts option before trying to resolve DNS.
-	ip, ok := d.Hosts[host]
-	if !ok {
-		var err error
-		ip, err = d.Resolver.FetchOne(host)
-		if err != nil {
-			return nil, err
-		}
+	dialAddr, err := d.dialAddr(addr)
+	if err != nil {
+		return nil, err
 	}
-
-	for _, ipnet := range d.Blacklist {
-		if (*net.IPNet)(ipnet).Contains(ip) {
-			return nil, BlackListedIPError{ip: ip, net: ipnet}
-		}
-	}
-	ipStr := ip.String()
-	if strings.ContainsRune(ipStr, ':') {
-		ipStr = "[" + ipStr + "]"
-	}
-	conn, err := d.Dialer.DialContext(ctx, proto, ipStr+":"+addr[delimiter+1:])
+	conn, err := d.Dialer.DialContext(ctx, proto, dialAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -147,6 +138,42 @@ func (d *Dialer) GetTrail(
 		Tags:          tags,
 		Samples:       samples,
 	}
+}
+
+func (d *Dialer) dialAddr(addr string) (string, error) {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return "", err
+	}
+
+	// lookup for domain defined in Hosts option before trying to resolve DNS.
+	remote, ok := d.Hosts[addr]
+	if !ok {
+		remote, ok = d.Hosts[host]
+		if !ok {
+			var err error
+			ip, err := d.Resolver.FetchOne(host)
+			if err != nil {
+				return "", err
+			}
+			remote = lib.NewIPPort(ip)
+		}
+	}
+
+	for _, ipnet := range d.Blacklist {
+		if (*net.IPNet)(ipnet).Contains(remote.IP) {
+			return "", BlackListedIPError{ip: remote.IP, net: ipnet}
+		}
+	}
+
+	var remoteStr string
+	if remote.Port == "" {
+		remoteStr = net.JoinHostPort(remote.IP.String(), port)
+	} else {
+		remoteStr = remote.String()
+	}
+
+	return remoteStr, nil
 }
 
 // NetTrail contains information about the exchanged data size and length of a

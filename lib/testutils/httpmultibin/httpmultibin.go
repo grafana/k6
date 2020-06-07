@@ -248,9 +248,9 @@ func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 		KeepAlive: 10 * time.Second,
 		DualStack: true,
 	})
-	dialer.Hosts = map[string]net.IP{
-		httpDomain:  httpIP,
-		httpsDomain: httpsIP,
+	dialer.Hosts = map[string]lib.IPPort{
+		httpDomain:  lib.NewIPPort(httpIP),
+		httpsDomain: lib.NewIPPort(httpsIP),
 	}
 
 	// Pre-configure the HTTP client transport with the dialer and TLS config (incl. HTTP2 support)

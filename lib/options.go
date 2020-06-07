@@ -175,6 +175,66 @@ func (ipnet *IPNet) UnmarshalText(b []byte) error {
 	return nil
 }
 
+// IPPort stores information about IP and port
+// for a host.
+type IPPort struct {
+	IP   net.IP
+	Port string
+}
+
+// NewIPPort creates a pointer to a new address with an IP object.
+func NewIPPort(ip net.IP) IPPort {
+	return IPPort{IP: ip}
+}
+
+// String returns the string representation of an address with a port.
+// If the IP is V6, and it adds brackets to make it a valid IP address.
+func (p IPPort) String() string {
+	if p.Port == "" {
+		return p.IP.String()
+	}
+	return net.JoinHostPort(p.IP.String(), p.Port)
+}
+
+// MarshalText implements the encoding.TextMarshaler interface.
+// The encoding is the same as returned by String, with one exception:
+// When len(ip) is zero, it returns an empty slice.
+func (p IPPort) MarshalText() ([]byte, error) {
+	if len(p.IP) == 0 {
+		return []byte(""), nil
+	}
+
+	if len(p.IP) != net.IPv4len && len(p.IP) != net.IPv6len {
+		return nil, &net.AddrError{Err: "invalid IP address", Addr: p.IP.String()}
+	}
+
+	return []byte(p.String()), nil
+}
+
+// UnmarshalText implements the encoding.TextUnmarshaler interface.
+// The IP address is expected in a form accepted by ParseIP.
+func (p *IPPort) UnmarshalText(text []byte) error {
+	if len(text) == 0 {
+		return &net.ParseError{Type: "IP address", Text: "<nil>"}
+	}
+
+	s := string(text)
+	ip, port, err := net.SplitHostPort(s)
+	if err != nil {
+		return err
+	}
+
+	x := net.ParseIP(ip)
+	if x == nil {
+		return &net.ParseError{Type: "IP address", Text: s}
+	}
+
+	p.IP = x
+	p.Port = port
+
+	return nil
+}
+
 // ParseCIDR creates an IPNet out of a CIDR string
 func ParseCIDR(s string) (*IPNet, error) {
 	_, ipnet, err := net.ParseCIDR(s)
@@ -250,7 +310,7 @@ type Options struct {
 	BlacklistIPs []*IPNet `json:"blacklistIPs" envconfig:"K6_BLACKLIST_IPS"`
 
 	// Hosts overrides dns entries for given hosts
-	Hosts map[string]net.IP `json:"hosts" envconfig:"K6_HOSTS"`
+	Hosts map[string]IPPort `json:"hosts" envconfig:"K6_HOSTS"`
 
 	// Disable keep-alive connections
 	NoConnectionReuse null.Bool `json:"noConnectionReuse" envconfig:"K6_NO_CONNECTION_REUSE"`

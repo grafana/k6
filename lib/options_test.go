@@ -305,8 +305,8 @@ func TestOptions(t *testing.T) {
 	})
 
 	t.Run("Hosts", func(t *testing.T) {
-		opts := Options{}.Apply(Options{Hosts: map[string]net.IP{
-			"test.loadimpact.com": net.ParseIP("192.0.2.1"),
+		opts := Options{}.Apply(Options{Hosts: map[string]IPPort{
+			"test.loadimpact.com": NewIPPort(net.ParseIP("192.0.2.1")),
 		}})
 		assert.NotNil(t, opts.Hosts)
 		assert.NotEmpty(t, opts.Hosts)
