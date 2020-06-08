@@ -126,7 +126,7 @@ func TestVUHandleSimple(t *testing.T) {
 		fullIterations = 0
 	}
 
-	getVU := func() (lib.InitializedVU, error) {
+	getVU := func() (lib.InitializedVU, error) { //nolint:unparam
 		atomic.AddUint32(&getVUCount, 1)
 
 		return &minirunner.VU{
