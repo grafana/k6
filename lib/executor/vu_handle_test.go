@@ -259,3 +259,75 @@ func TestVUHandleSimple(t *testing.T) {
 		assert.EqualValues(t, 1, atomic.LoadInt64(&fullIterations))
 	})
 }
+
+func BenchmarkVUHandleIterations(b *testing.B) {
+	logHook := &testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.DebugLevel}}
+	testLog := logrus.New()
+	testLog.AddHook(logHook)
+	// testLog.Level = logrus.DebugLevel
+	logEntry := logrus.NewEntry(testLog)
+
+	var (
+		getVUCount      uint32
+		returnVUCount   uint32
+		interruptedIter int64
+		fullIterations  int64
+	)
+	reset := func() {
+		getVUCount = 0
+		returnVUCount = 0
+		interruptedIter = 0
+		fullIterations = 0
+	}
+
+	getVU := func() (lib.InitializedVU, error) {
+		atomic.AddUint32(&getVUCount, 1)
+
+		return &minirunner.VU{
+			R: &minirunner.MiniRunner{
+				Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
+					// TODO: do something
+					return nil
+				},
+			},
+		}, nil
+	}
+
+	returnVU := func(_ lib.InitializedVU) {
+		atomic.AddUint32(&returnVUCount, 1)
+	}
+
+	runIter := func(ctx context.Context, _ lib.ActiveVU) bool {
+		// Do nothing
+		select {
+		case <-ctx.Done():
+			// Don't log errors or emit iterations metrics from cancelled iterations
+			atomic.AddInt64(&interruptedIter, 1)
+			return false
+		default:
+			atomic.AddInt64(&fullIterations, 1)
+			return true
+		}
+	}
+
+	reset()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	vuHandle := newStoppedVUHandle(ctx, getVU, returnVU, &BaseConfig{}, logEntry)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		vuHandle.runLoopsIfPossible(runIter)
+	}()
+	start := time.Now()
+	b.ResetTimer()
+	err := vuHandle.start()
+	require.NoError(b, err)
+	time.Sleep(time.Second)
+	cancel()
+	wg.Wait()
+	b.StopTimer()
+	took := time.Since(start)
+	b.ReportMetric(float64(atomic.LoadInt64(&fullIterations))/float64(took), "iterations/ns")
+}
