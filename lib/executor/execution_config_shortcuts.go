@@ -38,32 +38,32 @@ func (e ExecutionConflictError) Error() string {
 
 var _ error = ExecutionConflictError("")
 
-func getConstantLoopingVUsScenario(duration types.NullDuration, vus null.Int) lib.ExecutorConfigMap {
-	ds := NewConstantLoopingVUsConfig(lib.DefaultExecutorName)
+func getConstantLoopingVUsScenario(duration types.NullDuration, vus null.Int) lib.ScenarioConfigs {
+	ds := NewConstantLoopingVUsConfig(lib.DefaultScenarioName)
 	ds.VUs = vus
 	ds.Duration = duration
-	return lib.ExecutorConfigMap{lib.DefaultExecutorName: ds}
+	return lib.ScenarioConfigs{lib.DefaultScenarioName: ds}
 }
 
-func getVariableLoopingVUsScenario(stages []lib.Stage, startVUs null.Int) lib.ExecutorConfigMap {
-	ds := NewVariableLoopingVUsConfig(lib.DefaultExecutorName)
+func getVariableLoopingVUsScenario(stages []lib.Stage, startVUs null.Int) lib.ScenarioConfigs {
+	ds := NewVariableLoopingVUsConfig(lib.DefaultScenarioName)
 	ds.StartVUs = startVUs
 	for _, s := range stages {
 		if s.Duration.Valid {
 			ds.Stages = append(ds.Stages, Stage{Duration: s.Duration, Target: s.Target})
 		}
 	}
-	return lib.ExecutorConfigMap{lib.DefaultExecutorName: ds}
+	return lib.ScenarioConfigs{lib.DefaultScenarioName: ds}
 }
 
-func getSharedIterationsScenario(iters null.Int, duration types.NullDuration, vus null.Int) lib.ExecutorConfigMap {
-	ds := NewSharedIterationsConfig(lib.DefaultExecutorName)
+func getSharedIterationsScenario(iters null.Int, duration types.NullDuration, vus null.Int) lib.ScenarioConfigs {
+	ds := NewSharedIterationsConfig(lib.DefaultScenarioName)
 	ds.VUs = vus
 	ds.Iterations = iters
 	if duration.Valid {
 		ds.MaxDuration = duration
 	}
-	return lib.ExecutorConfigMap{lib.DefaultExecutorName: ds}
+	return lib.ScenarioConfigs{lib.DefaultScenarioName: ds}
 }
 
 // DeriveScenariosFromShortcuts checks for conflicting options and turns any
@@ -134,8 +134,8 @@ func DeriveScenariosFromShortcuts(opts lib.Options) (lib.Options, error) {
 		}
 		// No execution parameters whatsoever were specified, so we'll create a per-VU iterations config
 		// with 1 VU and 1 iteration.
-		result.Scenarios = lib.ExecutorConfigMap{
-			lib.DefaultExecutorName: NewPerVUIterationsConfig(lib.DefaultExecutorName),
+		result.Scenarios = lib.ScenarioConfigs{
+			lib.DefaultScenarioName: NewPerVUIterationsConfig(lib.DefaultScenarioName),
 		}
 	}
 
