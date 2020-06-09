@@ -362,7 +362,7 @@ var configMapTestCases = []configMapTestCase{
 	{`{"varrival": {"executor": "ramping-arrival-rate", "startRate": 10, "timeUnit": "30s", "preAllocatedVUs": 20,
 		"maxVUs": 50, "stages": [{"duration": "3m", "target": 30}, {"duration": "5m", "target": 10}]}}`,
 		exp{custom: func(t *testing.T, cm lib.ScenarioConfigs) {
-			sched := NewVariableArrivalRateConfig("varrival")
+			sched := NewRampingArrivalRateConfig("varrival")
 			sched.StartRate = null.IntFrom(10)
 			sched.Stages = []Stage{
 				{Target: null.IntFrom(30), Duration: types.NullDurationFrom(180 * time.Second)},

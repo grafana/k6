@@ -37,21 +37,22 @@ import (
 	"github.com/loadimpact/k6/ui/pb"
 )
 
-const variableArrivalRateType = "ramping-arrival-rate"
+const rampingArrivalRateType = "ramping-arrival-rate"
 
 func init() {
 	lib.RegisterExecutorConfigType(
-		variableArrivalRateType,
+		rampingArrivalRateType,
 		func(name string, rawJSON []byte) (lib.ExecutorConfig, error) {
-			config := NewVariableArrivalRateConfig(name)
+			config := NewRampingArrivalRateConfig(name)
 			err := lib.StrictJSONUnmarshal(rawJSON, &config)
 			return config, err
 		},
 	)
 }
 
-// VariableArrivalRateConfig stores config for the variable arrival-rate executor
-type VariableArrivalRateConfig struct {
+// RampingArrivalRateConfig stores config for the ramping (i.e. variable)
+// arrival-rate executor.
+type RampingArrivalRateConfig struct {
 	BaseConfig
 	StartRate null.Int           `json:"startRate"`
 	TimeUnit  types.NullDuration `json:"timeUnit"`
@@ -64,29 +65,29 @@ type VariableArrivalRateConfig struct {
 	MaxVUs          null.Int `json:"maxVUs"`
 }
 
-// NewVariableArrivalRateConfig returns a VariableArrivalRateConfig with default values
-func NewVariableArrivalRateConfig(name string) VariableArrivalRateConfig {
-	return VariableArrivalRateConfig{
-		BaseConfig: NewBaseConfig(name, variableArrivalRateType),
+// NewRampingArrivalRateConfig returns a RampingArrivalRateConfig with default values
+func NewRampingArrivalRateConfig(name string) RampingArrivalRateConfig {
+	return RampingArrivalRateConfig{
+		BaseConfig: NewBaseConfig(name, rampingArrivalRateType),
 		TimeUnit:   types.NewNullDuration(1*time.Second, false),
 	}
 }
 
 // Make sure we implement the lib.ExecutorConfig interface
-var _ lib.ExecutorConfig = &VariableArrivalRateConfig{}
+var _ lib.ExecutorConfig = &RampingArrivalRateConfig{}
 
 // GetPreAllocatedVUs is just a helper method that returns the scaled pre-allocated VUs.
-func (varc VariableArrivalRateConfig) GetPreAllocatedVUs(et *lib.ExecutionTuple) int64 {
+func (varc RampingArrivalRateConfig) GetPreAllocatedVUs(et *lib.ExecutionTuple) int64 {
 	return et.Segment.Scale(varc.PreAllocatedVUs.Int64)
 }
 
 // GetMaxVUs is just a helper method that returns the scaled max VUs.
-func (varc VariableArrivalRateConfig) GetMaxVUs(et *lib.ExecutionTuple) int64 {
+func (varc RampingArrivalRateConfig) GetMaxVUs(et *lib.ExecutionTuple) int64 {
 	return et.Segment.Scale(varc.MaxVUs.Int64)
 }
 
 // GetDescription returns a human-readable description of the executor options
-func (varc VariableArrivalRateConfig) GetDescription(et *lib.ExecutionTuple) string {
+func (varc RampingArrivalRateConfig) GetDescription(et *lib.ExecutionTuple) string {
 	// TODO: something better? always show iterations per second?
 	maxVUsRange := fmt.Sprintf("maxVUs: %d", et.Segment.Scale(varc.PreAllocatedVUs.Int64))
 	if varc.MaxVUs.Int64 > varc.PreAllocatedVUs.Int64 {
@@ -103,7 +104,7 @@ func (varc VariableArrivalRateConfig) GetDescription(et *lib.ExecutionTuple) str
 }
 
 // Validate makes sure all options are configured and valid
-func (varc VariableArrivalRateConfig) Validate() []error {
+func (varc RampingArrivalRateConfig) Validate() []error {
 	errors := varc.BaseConfig.Validate()
 
 	if varc.StartRate.Int64 < 0 {
@@ -136,7 +137,7 @@ func (varc VariableArrivalRateConfig) Validate() []error {
 // maximum waiting time for any iterations to gracefully stop. This is used by
 // the execution scheduler in its VU reservation calculations, so it knows how
 // many VUs to pre-initialize.
-func (varc VariableArrivalRateConfig) GetExecutionRequirements(et *lib.ExecutionTuple) []lib.ExecutionStep {
+func (varc RampingArrivalRateConfig) GetExecutionRequirements(et *lib.ExecutionTuple) []lib.ExecutionStep {
 	return []lib.ExecutionStep{
 		{
 			TimeOffset:      0,
@@ -151,31 +152,31 @@ func (varc VariableArrivalRateConfig) GetExecutionRequirements(et *lib.Execution
 	}
 }
 
-// NewExecutor creates a new VariableArrivalRate executor
-func (varc VariableArrivalRateConfig) NewExecutor(
+// NewExecutor creates a new RampingArrivalRate executor
+func (varc RampingArrivalRateConfig) NewExecutor(
 	es *lib.ExecutionState, logger *logrus.Entry,
 ) (lib.Executor, error) {
-	return VariableArrivalRate{
+	return RampingArrivalRate{
 		BaseExecutor: NewBaseExecutor(varc, es, logger),
 		config:       varc,
 	}, nil
 }
 
 // HasWork reports whether there is any work to be done for the given execution segment.
-func (varc VariableArrivalRateConfig) HasWork(et *lib.ExecutionTuple) bool {
+func (varc RampingArrivalRateConfig) HasWork(et *lib.ExecutionTuple) bool {
 	return varc.GetMaxVUs(et) > 0
 }
 
-// VariableArrivalRate tries to execute a specific number of iterations for a
+// RampingArrivalRate tries to execute a specific number of iterations for a
 // specific period.
 // TODO: combine with the ConstantArrivalRate?
-type VariableArrivalRate struct {
+type RampingArrivalRate struct {
 	*BaseExecutor
-	config VariableArrivalRateConfig
+	config RampingArrivalRateConfig
 }
 
 // Make sure we implement the lib.Executor interface.
-var _ lib.Executor = &VariableArrivalRate{}
+var _ lib.Executor = &RampingArrivalRate{}
 
 // cal calculates the  transtitions between stages and gives the next full value produced by the
 // stages. In this explanation we are talking about events and in practice those events are starting
@@ -235,7 +236,7 @@ var _ lib.Executor = &VariableArrivalRate{}
 // The specific implementation here can only go forward and does incorporate
 // the striping algorithm from the lib.ExecutionTuple for additional speed up but this could
 // possibly be refactored if need for this arises.
-func (varc VariableArrivalRateConfig) cal(et *lib.ExecutionTuple, ch chan<- time.Duration) {
+func (varc RampingArrivalRateConfig) cal(et *lib.ExecutionTuple, ch chan<- time.Duration) {
 	start, offsets, _ := et.GetStripedOffsets()
 	li := -1
 	// TODO: move this to a utility function, or directly what GetStripedOffsets uses once we see everywhere we will use it
@@ -278,7 +279,7 @@ func (varc VariableArrivalRateConfig) cal(et *lib.ExecutionTuple, ch chan<- time
 }
 
 // Run executes a variable number of iterations per second.
-func (varr VariableArrivalRate) Run(ctx context.Context, out chan<- stats.SampleContainer) (err error) { //nolint:funlen
+func (varr RampingArrivalRate) Run(ctx context.Context, out chan<- stats.SampleContainer) (err error) { //nolint:funlen
 	segment := varr.executionState.ExecutionTuple.Segment
 	gracefulStop := varr.config.GetGracefulStop()
 	duration := sumStagesDuration(varr.config.Stages)
