@@ -762,7 +762,7 @@ func TestExecutionSchedulerRuntimeErrors(t *testing.T) {
 func TestExecutionSchedulerEndErrors(t *testing.T) {
 	t.Parallel()
 
-	exec := executor.NewConstantLoopingVUsConfig("we_need_hard_stop")
+	exec := executor.NewConstantVUsConfig("we_need_hard_stop")
 	exec.VUs = null.IntFrom(10)
 	exec.Duration = types.NullDurationFrom(1 * time.Second)
 	exec.GracefulStop = types.NullDurationFrom(0 * time.Second)

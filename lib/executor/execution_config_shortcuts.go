@@ -38,8 +38,8 @@ func (e ExecutionConflictError) Error() string {
 
 var _ error = ExecutionConflictError("")
 
-func getConstantLoopingVUsScenario(duration types.NullDuration, vus null.Int) lib.ScenarioConfigs {
-	ds := NewConstantLoopingVUsConfig(lib.DefaultScenarioName)
+func getConstantVUsScenario(duration types.NullDuration, vus null.Int) lib.ScenarioConfigs {
+	ds := NewConstantVUsConfig(lib.DefaultScenarioName)
 	ds.VUs = vus
 	ds.Duration = duration
 	return lib.ScenarioConfigs{lib.DefaultScenarioName: ds}
@@ -103,7 +103,7 @@ func DeriveScenariosFromShortcuts(opts lib.Options) (lib.Options, error) {
 				"`duration` should be more than 0, for infinite duration use the externally-controlled executor",
 			)
 		}
-		result.Scenarios = getConstantLoopingVUsScenario(opts.Duration, opts.VUs)
+		result.Scenarios = getConstantVUsScenario(opts.Duration, opts.VUs)
 
 	case len(opts.Stages) > 0: // stages isn't nil (not set) and isn't explicitly set to empty
 		if opts.Scenarios != nil {

@@ -35,13 +35,13 @@ import (
 	"github.com/loadimpact/k6/ui/pb"
 )
 
-const constantLoopingVUsType = "constant-vus"
+const constantVUsType = "constant-vus"
 
 func init() {
 	lib.RegisterExecutorConfigType(
-		constantLoopingVUsType,
+		constantVUsType,
 		func(name string, rawJSON []byte) (lib.ExecutorConfig, error) {
-			config := NewConstantLoopingVUsConfig(name)
+			config := NewConstantVUsConfig(name)
 			err := lib.StrictJSONUnmarshal(rawJSON, &config)
 			return config, err
 		},
@@ -52,37 +52,37 @@ func init() {
 // configuration, where 0-duration virtual stages are allowed for instantaneous VU jumps
 const minDuration = 1 * time.Second
 
-// ConstantLoopingVUsConfig stores VUs and duration
-type ConstantLoopingVUsConfig struct {
+// ConstantVUsConfig stores VUs and duration
+type ConstantVUsConfig struct {
 	BaseConfig
 	VUs      null.Int           `json:"vus"`
 	Duration types.NullDuration `json:"duration"`
 }
 
-// NewConstantLoopingVUsConfig returns a ConstantLoopingVUsConfig with default values
-func NewConstantLoopingVUsConfig(name string) ConstantLoopingVUsConfig {
-	return ConstantLoopingVUsConfig{
-		BaseConfig: NewBaseConfig(name, constantLoopingVUsType),
+// NewConstantVUsConfig returns a ConstantVUsConfig with default values
+func NewConstantVUsConfig(name string) ConstantVUsConfig {
+	return ConstantVUsConfig{
+		BaseConfig: NewBaseConfig(name, constantVUsType),
 		VUs:        null.NewInt(1, false),
 	}
 }
 
 // Make sure we implement the lib.ExecutorConfig interface
-var _ lib.ExecutorConfig = &ConstantLoopingVUsConfig{}
+var _ lib.ExecutorConfig = &ConstantVUsConfig{}
 
 // GetVUs returns the scaled VUs for the executor.
-func (clvc ConstantLoopingVUsConfig) GetVUs(et *lib.ExecutionTuple) int64 {
+func (clvc ConstantVUsConfig) GetVUs(et *lib.ExecutionTuple) int64 {
 	return et.Segment.Scale(clvc.VUs.Int64)
 }
 
 // GetDescription returns a human-readable description of the executor options
-func (clvc ConstantLoopingVUsConfig) GetDescription(et *lib.ExecutionTuple) string {
+func (clvc ConstantVUsConfig) GetDescription(et *lib.ExecutionTuple) string {
 	return fmt.Sprintf("%d looping VUs for %s%s",
 		clvc.GetVUs(et), clvc.Duration.Duration, clvc.getBaseInfo())
 }
 
 // Validate makes sure all options are configured and valid
-func (clvc ConstantLoopingVUsConfig) Validate() []error {
+func (clvc ConstantVUsConfig) Validate() []error {
 	errors := clvc.BaseConfig.Validate()
 	if clvc.VUs.Int64 <= 0 {
 		errors = append(errors, fmt.Errorf("the number of VUs should be more than 0"))
@@ -104,7 +104,7 @@ func (clvc ConstantLoopingVUsConfig) Validate() []error {
 // maximum waiting time for any iterations to gracefully stop. This is used by
 // the execution scheduler in its VU reservation calculations, so it knows how
 // many VUs to pre-initialize.
-func (clvc ConstantLoopingVUsConfig) GetExecutionRequirements(et *lib.ExecutionTuple) []lib.ExecutionStep {
+func (clvc ConstantVUsConfig) GetExecutionRequirements(et *lib.ExecutionTuple) []lib.ExecutionStep {
 	return []lib.ExecutionStep{
 		{
 			TimeOffset: 0,
@@ -118,31 +118,31 @@ func (clvc ConstantLoopingVUsConfig) GetExecutionRequirements(et *lib.ExecutionT
 }
 
 // HasWork reports whether there is any work to be done for the given execution segment.
-func (clvc ConstantLoopingVUsConfig) HasWork(et *lib.ExecutionTuple) bool {
+func (clvc ConstantVUsConfig) HasWork(et *lib.ExecutionTuple) bool {
 	return clvc.GetVUs(et) > 0
 }
 
-// NewExecutor creates a new ConstantLoopingVUs executor
-func (clvc ConstantLoopingVUsConfig) NewExecutor(es *lib.ExecutionState, logger *logrus.Entry) (lib.Executor, error) {
-	return ConstantLoopingVUs{
+// NewExecutor creates a new ConstantVUs executor
+func (clvc ConstantVUsConfig) NewExecutor(es *lib.ExecutionState, logger *logrus.Entry) (lib.Executor, error) {
+	return ConstantVUs{
 		BaseExecutor: NewBaseExecutor(clvc, es, logger),
 		config:       clvc,
 	}, nil
 }
 
-// ConstantLoopingVUs maintains a constant number of VUs running for the
+// ConstantVUs maintains a constant number of VUs running for the
 // specified duration.
-type ConstantLoopingVUs struct {
+type ConstantVUs struct {
 	*BaseExecutor
-	config ConstantLoopingVUsConfig
+	config ConstantVUsConfig
 }
 
 // Make sure we implement the lib.Executor interface.
-var _ lib.Executor = &ConstantLoopingVUs{}
+var _ lib.Executor = &ConstantVUs{}
 
 // Run constantly loops through as many iterations as possible on a fixed number
 // of VUs for the specified duration.
-func (clv ConstantLoopingVUs) Run(ctx context.Context, out chan<- stats.SampleContainer) (err error) {
+func (clv ConstantVUs) Run(ctx context.Context, out chan<- stats.SampleContainer) (err error) {
 	numVUs := clv.config.GetVUs(clv.executionState.ExecutionTuple)
 	duration := time.Duration(clv.config.Duration.Duration)
 	gracefulStop := clv.config.GetGracefulStop()
