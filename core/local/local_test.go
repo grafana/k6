@@ -110,9 +110,9 @@ func TestExecutionSchedulerRunNonDefault(t *testing.T) {
 		{"defaultOK", `export default function () {}`, ""},
 		{"nonDefaultOK", `
 	export let options = {
-		execution: {
+		scenarios: {
 			per_vu_iters: {
-				type: "per-vu-iterations",
+				executor: "per-vu-iterations",
 				vus: 1,
 				iterations: 1,
 				exec: "nonDefault",
@@ -170,9 +170,9 @@ func TestExecutionSchedulerRunEnv(t *testing.T) {
 	let errors = new Counter("errors");
 
 	export let options = {
-		execution: {
+		scenarios: {
 			executor: {
-				type: "%[1]s",
+				executor: "%[1]s",
 				gracefulStop: "0.5s",
 				%[2]s
 			}
@@ -193,7 +193,7 @@ func TestExecutionSchedulerRunEnv(t *testing.T) {
 			duration: "0.5s",
 			preAllocatedVUs: 1,
 			maxVUs: 2,`,
-		"constant-looping-vus": `
+		"constant-vus": `
 			vus: 1,
 			duration: "0.5s",`,
 		"externally-controlled": `
@@ -205,13 +205,13 @@ func TestExecutionSchedulerRunEnv(t *testing.T) {
 		"shared-iterations": `
 			vus: 1,
 			iterations: 1,`,
-		"variable-arrival-rate": `
+		"ramping-arrival-rate": `
 			startRate: 1,
 			timeUnit: "0.5s",
 			preAllocatedVUs: 1,
 			maxVUs: 2,
 			stages: [ { target: 1, duration: "0.5s" } ],`,
-		"variable-looping-vus": `
+		"ramping-vus": `
 			startVUs: 1,
 			stages: [ { target: 1, duration: "0.5s" } ],`,
 	}
@@ -275,9 +275,9 @@ func TestExecutionSchedulerRunCustomTags(t *testing.T) {
 	import http from "k6/http";
 
 	export let options = {
-		execution: {
+		scenarios: {
 			executor: {
-				type: "%s",
+				executor: "%s",
 				gracefulStop: "0.5s",
 				%s
 			}
@@ -295,7 +295,7 @@ func TestExecutionSchedulerRunCustomTags(t *testing.T) {
 			duration: "0.5s",
 			preAllocatedVUs: 1,
 			maxVUs: 2,`,
-		"constant-looping-vus": `
+		"constant-vus": `
 			vus: 1,
 			duration: "0.5s",`,
 		"externally-controlled": `
@@ -307,13 +307,13 @@ func TestExecutionSchedulerRunCustomTags(t *testing.T) {
 		"shared-iterations": `
 			vus: 1,
 			iterations: 1,`,
-		"variable-arrival-rate": `
+		"ramping-arrival-rate": `
 			startRate: 5,
 			timeUnit: "0.5s",
 			preAllocatedVUs: 1,
 			maxVUs: 2,
 			stages: [ { target: 10, duration: "1s" } ],`,
-		"variable-looping-vus": `
+		"ramping-vus": `
 			startVUs: 1,
 			stages: [ { target: 1, duration: "0.5s" } ],`,
 	}
@@ -397,9 +397,9 @@ func TestExecutionSchedulerRunCustomConfigNoCrossover(t *testing.T) {
 	export let options = {
 		// Required for WS tests
 		hosts: { 'httpbin.local': '127.0.0.1' },
-		execution: {
+		scenarios: {
 			scenario1: {
-				type: 'per-vu-iterations',
+				executor: 'per-vu-iterations',
 				vus: 1,
 				iterations: 1,
 				gracefulStop: '0s',
@@ -409,7 +409,7 @@ func TestExecutionSchedulerRunCustomConfigNoCrossover(t *testing.T) {
 				tags: { testtag1: 'scenario1' },
 			},
 			scenario2: {
-				type: 'shared-iterations',
+				executor: 'shared-iterations',
 				vus: 1,
 				iterations: 1,
 				gracefulStop: '1s',
@@ -420,7 +420,7 @@ func TestExecutionSchedulerRunCustomConfigNoCrossover(t *testing.T) {
 				tags: { testtag2: 'scenario2' },
 			},
 			scenario3: {
-				type: 'per-vu-iterations',
+				executor: 'per-vu-iterations',
 				vus: 1,
 				iterations: 1,
 				gracefulStop: '1s',
@@ -1210,19 +1210,19 @@ func TestNewExecutionSchedulerHasWork(t *testing.T) {
 		export let options = {
 			executionSegment: "3/4:1",
 			executionSegmentSequence: "0,1/4,2/4,3/4,1",
-			execution: {
+			scenarios: {
 				shared_iters1: {
-					type: "shared-iterations",
+					executor: "shared-iterations",
 					vus: 3,
 					iterations: 3,
 				},
 				shared_iters2: {
-					type: "shared-iterations",
+					executor: "shared-iterations",
 					vus: 4,
 					iterations: 4,
 				},
 				constant_arr_rate: {
-					type: "constant-arrival-rate",
+					executor: "constant-arrival-rate",
 					rate: 3,
 					timeUnit: "1s",
 					duration: "20s",

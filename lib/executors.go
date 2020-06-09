@@ -56,7 +56,7 @@ var (
 //
 // Keep in mind that t(i) may be exactly equal to t(i+i), when there's an abrupt
 // transition in the number of VUs required by an executor. For example, the
-// variable-looping-vus executor may have 0-duration stages, or it may scale up
+// ramping-vus executor may have 0-duration stages, or it may scale up
 // VUs in its last stage right until the end. These immediate transitions cannot
 // be ignored, since the gracefulStop/gracefulRampDown options potentially allow
 // any started iterations to finish.
@@ -338,7 +338,7 @@ type protoExecutorConfig struct {
 // stores the unprocessed JSON so we can parse the full config in the next step
 func (pc *protoExecutorConfig) UnmarshalJSON(b []byte) error {
 	var tmp struct {
-		ConfigType string `json:"type"`
+		ConfigType string `json:"executor"`
 	}
 	err := json.Unmarshal(b, &tmp)
 	*pc = protoExecutorConfig{tmp.ConfigType, b}

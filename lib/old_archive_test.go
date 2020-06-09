@@ -233,7 +233,7 @@ func TestDerivedExecutionDiscarding(t *testing.T) {
 	var emptyConfigMap ExecutorConfigMap
 	var tests = []struct {
 		metadata     string
-		expExecution interface{}
+		expScenarios interface{}
 		expError     string
 	}{
 		{
@@ -241,7 +241,7 @@ func TestDerivedExecutionDiscarding(t *testing.T) {
 				"filename": "/test.js", "pwd": "/",
 				"options": { "execution": { "something": "invalid" } }
 			}`,
-			expExecution: emptyConfigMap,
+			expScenarios: emptyConfigMap,
 		},
 		{
 			metadata: `{
@@ -249,7 +249,7 @@ func TestDerivedExecutionDiscarding(t *testing.T) {
 				"k6version": "0.24.0",
 				"options": { "execution": { "something": "invalid" } }
 			}`,
-			expExecution: emptyConfigMap,
+			expScenarios: emptyConfigMap,
 		},
 		{
 			metadata: `blah`,
@@ -274,7 +274,7 @@ func TestDerivedExecutionDiscarding(t *testing.T) {
 			metadata: `{
 				"filename": "/test.js", "pwd": "/",
 				"k6version": "0.25.0",
-				"options": { "execution": { "something": "invalid" } }
+				"options": { "scenarios": { "something": "invalid" } }
 			}`,
 			expError: "cannot unmarshal string",
 		},
@@ -294,7 +294,7 @@ func TestDerivedExecutionDiscarding(t *testing.T) {
 			require.Contains(t, err.Error(), test.expError)
 		} else {
 			require.NoError(t, err)
-			require.Equal(t, test.expExecution, arc.Options.Execution)
+			require.Equal(t, test.expScenarios, arc.Options.Execution)
 		}
 	}
 }

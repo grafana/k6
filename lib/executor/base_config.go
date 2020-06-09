@@ -43,7 +43,7 @@ const executorNameErr = "the executor name should contain only numbers, latin le
 // BaseConfig contains the common config fields for all executors
 type BaseConfig struct {
 	Name         string             `json:"-"` // set via the JS object key
-	Type         string             `json:"type"`
+	Type         string             `json:"executor"`
 	StartTime    types.NullDuration `json:"startTime"`
 	GracefulStop types.NullDuration `json:"gracefulStop"`
 	Env          map[string]string  `json:"env"`

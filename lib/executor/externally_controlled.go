@@ -326,7 +326,7 @@ func (mex *ExternallyControlled) stopWhenDurationIsReached(ctx context.Context, 
 }
 
 // manualVUHandle is a wrapper around the vuHandle helper, used in the
-// variable-looping-vus executor. Here, instead of using its getVU and returnVU
+// ramping-vus executor. Here, instead of using its getVU and returnVU
 // methods to retrieve and return a VU from the global buffer, we use them to
 // accurately update the local and global active VU counters and to ensure that
 // the pausing and reducing VUs operations wait for VUs to fully finish

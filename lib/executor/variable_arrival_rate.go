@@ -37,7 +37,7 @@ import (
 	"github.com/loadimpact/k6/ui/pb"
 )
 
-const variableArrivalRateType = "variable-arrival-rate"
+const variableArrivalRateType = "ramping-arrival-rate"
 
 func init() {
 	lib.RegisterExecutorConfigType(

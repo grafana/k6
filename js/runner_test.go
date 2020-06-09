@@ -252,9 +252,9 @@ func TestSetupDataIsolation(t *testing.T) {
 		var Counter = require("k6/metrics").Counter;
 
 		exports.options = {
-			execution: {
+			scenarios: {
 				shared_iters: {
-					type: "shared-iterations",
+					executor: "shared-iterations",
 					vus: 5,
 					iterations: 500,
 				},
