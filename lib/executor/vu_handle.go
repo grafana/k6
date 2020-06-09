@@ -195,37 +195,37 @@ func (vh *vuHandle) runLoopsIfPossible(runIter func(context.Context, lib.ActiveV
 			// The whole executor is done, nothing more to do.
 			return
 		default:
-			// We're not running, but the executor isn't done yet, so we wait
-			// for either one of those conditions.
+		}
+		// We're not running, but the executor isn't done yet, so we wait
+		// for either one of those conditions.
+		select {
+		case <-canStartIter:
+			vh.mutex.Lock()
 			select {
-			case <-canStartIter:
-				vh.mutex.Lock()
-				select {
-				case <-vh.canStartIter: // we check again in case of race
-					// reinitialize
-					if vh.activeVU == nil {
-						// we've raced with the ReturnVU: we can continue doing iterations but
-						// a stop has happened and returnVU hasn't managed to run yet ... so we loop
-						// TODO call runtime.GoSched() in the else to give priority to possibly the returnVU goroutine
-						vh.mutex.Unlock()
-						continue
-					}
-
-					vu = vh.activeVU
-					vuCtx = vh.vuCtx
-					cancel = vh.vuCancel
-					atomic.StoreInt32(&vh.change, 0) // clear changes here
-				default:
-					// well we got raced to here by something ... loop again ...
+			case <-vh.canStartIter: // we check again in case of race
+				// reinitialize
+				if vh.activeVU == nil {
+					// we've raced with the ReturnVU: we can continue doing iterations but
+					// a stop has happened and returnVU hasn't managed to run yet ... so we loop
+					// TODO call runtime.GoSched() in the else to give priority to possibly the returnVU goroutine
+					vh.mutex.Unlock()
+					continue
 				}
-				vh.mutex.Unlock()
-			case <-ctx.Done():
-				// hardStop was called, start a fresh iteration to get the new
-				// context and signal channel
-			case <-executorDone:
-				// The whole executor is done, nothing more to do.
-				return
+
+				vu = vh.activeVU
+				vuCtx = vh.vuCtx
+				cancel = vh.vuCancel
+				atomic.StoreInt32(&vh.change, 0) // clear changes here
+			default:
+				// well we got raced to here by something ... loop again ...
 			}
+			vh.mutex.Unlock()
+		case <-ctx.Done():
+			// hardStop was called, start a fresh iteration to get the new
+			// context and signal channel
+		case <-executorDone:
+			// The whole executor is done, nothing more to do.
+			return
 		}
 	}
 }
