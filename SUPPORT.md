@@ -9,4 +9,4 @@ Types of questions and where to ask:
 - Why do you? -- [community.k6.io](https://community.k6.io/) or [Slack](https://k6.io/slack)
 - When will you? -- [community.k6.io](https://community.k6.io/) or [Slack](https://k6.io/slack)
 
-If your questions are about any of the commercial Load Impact services like managed cloud execution and Load Impact Insights, you can contact <support@loadimpact.com> or write in the `#loadimpact` channel in [Slack](https://k6.io/slack).
+If your questions are about any of the commercial Load Impact services like managed cloud execution and k6 cloud output, you can contact <support@loadimpact.com> or write in the `#loadimpact` channel in [Slack](https://k6.io/slack).
