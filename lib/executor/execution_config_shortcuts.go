@@ -45,8 +45,8 @@ func getConstantVUsScenario(duration types.NullDuration, vus null.Int) lib.Scena
 	return lib.ScenarioConfigs{lib.DefaultScenarioName: ds}
 }
 
-func getVariableLoopingVUsScenario(stages []lib.Stage, startVUs null.Int) lib.ScenarioConfigs {
-	ds := NewVariableLoopingVUsConfig(lib.DefaultScenarioName)
+func getRampingVUsScenario(stages []lib.Stage, startVUs null.Int) lib.ScenarioConfigs {
+	ds := NewRampingVUsConfig(lib.DefaultScenarioName)
 	ds.StartVUs = startVUs
 	for _, s := range stages {
 		if s.Duration.Valid {
@@ -111,7 +111,7 @@ func DeriveScenariosFromShortcuts(opts lib.Options) (lib.Options, error) {
 				"using an execution configuration shortcut (`stages`) and `scenarios` simultaneously is not allowed",
 			)
 		}
-		result.Scenarios = getVariableLoopingVUsScenario(opts.Stages, opts.VUs)
+		result.Scenarios = getRampingVUsScenario(opts.Stages, opts.VUs)
 
 	case len(opts.Scenarios) > 0:
 		// Do nothing, scenarios was explicitly specified

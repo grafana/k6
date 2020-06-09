@@ -38,10 +38,10 @@ import (
 	"github.com/loadimpact/k6/lib/types"
 )
 
-func TestVariableLoopingVUsRun(t *testing.T) {
+func TestRampingVUsRun(t *testing.T) {
 	t.Parallel()
 
-	config := VariableLoopingVUsConfig{
+	config := RampingVUsConfig{
 		BaseConfig:       BaseConfig{GracefulStop: types.NullDurationFrom(0)},
 		GracefulRampDown: types.NullDurationFrom(0),
 		StartVUs:         null.IntFrom(5),
@@ -101,10 +101,10 @@ func TestVariableLoopingVUsRun(t *testing.T) {
 
 // Ensure there's no wobble of VUs during graceful ramp-down, without segments.
 // See https://github.com/loadimpact/k6/issues/1296
-func TestVariableLoopingVUsRampDownNoWobble(t *testing.T) {
+func TestRampingVUsRampDownNoWobble(t *testing.T) {
 	t.Parallel()
 
-	config := VariableLoopingVUsConfig{
+	config := RampingVUsConfig{
 		BaseConfig:       BaseConfig{GracefulStop: types.NullDurationFrom(0)},
 		GracefulRampDown: types.NullDurationFrom(1 * time.Second),
 		StartVUs:         null.IntFrom(0),
@@ -170,11 +170,11 @@ func TestVariableLoopingVUsRampDownNoWobble(t *testing.T) {
 	assert.Equal(t, []int64{10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0}, vuChanges)
 }
 
-func TestVariableLoopingVUsConfigExecutionPlanExample(t *testing.T) {
+func TestRampingVUsConfigExecutionPlanExample(t *testing.T) {
 	t.Parallel()
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
-	conf := NewVariableLoopingVUsConfig("test")
+	conf := NewRampingVUsConfig("test")
 	conf.StartVUs = null.IntFrom(4)
 	conf.Stages = []Stage{
 		{Target: null.IntFrom(6), Duration: types.NullDurationFrom(2 * time.Second)},
@@ -270,11 +270,11 @@ func TestVariableLoopingVUsConfigExecutionPlanExample(t *testing.T) {
 	assert.Equal(t, rawStepsZeroEnd, conf.GetExecutionRequirements(et))
 }
 
-func TestVariableLoopingVUsConfigExecutionPlanExampleOneThird(t *testing.T) {
+func TestRampingVUsConfigExecutionPlanExampleOneThird(t *testing.T) {
 	t.Parallel()
 	et, err := lib.NewExecutionTuple(newExecutionSegmentFromString("0:1/3"), nil)
 	require.NoError(t, err)
-	conf := NewVariableLoopingVUsConfig("test")
+	conf := NewRampingVUsConfig("test")
 	conf.StartVUs = null.IntFrom(4)
 	conf.Stages = []Stage{
 		{Target: null.IntFrom(6), Duration: types.NullDurationFrom(2 * time.Second)},
@@ -349,10 +349,10 @@ func TestVariableLoopingVUsConfigExecutionPlanExampleOneThird(t *testing.T) {
 	assert.Equal(t, rawStepsZeroEnd, conf.GetExecutionRequirements(et))
 }
 
-func TestVariableLoopingVUsExecutionTupleTests(t *testing.T) {
+func TestRampingVUsExecutionTupleTests(t *testing.T) {
 	t.Parallel()
 
-	conf := NewVariableLoopingVUsConfig("test")
+	conf := NewRampingVUsConfig("test")
 	conf.StartVUs = null.IntFrom(4)
 	conf.Stages = []Stage{
 		{Target: null.IntFrom(6), Duration: types.NullDurationFrom(2 * time.Second)},
@@ -572,7 +572,7 @@ func TestVariableLoopingVUsExecutionTupleTests(t *testing.T) {
 	}
 }
 
-func TestVariableLoopingVUsGetRawExecutionStepsCornerCases(t *testing.T) {
+func TestRampingVUsGetRawExecutionStepsCornerCases(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
@@ -735,7 +735,7 @@ func TestVariableLoopingVUsGetRawExecutionStepsCornerCases(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		conf := NewVariableLoopingVUsConfig("test")
+		conf := NewRampingVUsConfig("test")
 		conf.StartVUs = null.IntFrom(testCase.start)
 		conf.Stages = testCase.stages
 		et := testCase.et
@@ -751,7 +751,7 @@ func TestVariableLoopingVUsGetRawExecutionStepsCornerCases(t *testing.T) {
 	}
 }
 
-func BenchmarkVariableLoopingVUsGetRawExecutionSteps(b *testing.B) {
+func BenchmarkRampingVUsGetRawExecutionSteps(b *testing.B) {
 	testCases := []struct {
 		seq string
 		seg string
@@ -801,7 +801,7 @@ func BenchmarkVariableLoopingVUsGetRawExecutionSteps(b *testing.B) {
 			for _, stageCase := range stageCases {
 				var st []Stage
 				require.NoError(b, json.Unmarshal([]byte(stageCase.stages), &st))
-				vlvc := VariableLoopingVUsConfig{
+				vlvc := RampingVUsConfig{
 					Stages: st,
 				}
 				b.Run(stageCase.name, func(b *testing.B) {
@@ -1044,7 +1044,7 @@ func TestSumRandomSegmentSequenceMatchesNoSegment(t *testing.T) {
 		segmentSeqMaxLen = 15
 		maxNumerator     = 300
 	)
-	getTestConfig := func(name string) VariableLoopingVUsConfig {
+	getTestConfig := func(name string) RampingVUsConfig {
 		stagesCount := 1 + r.Int31n(maxStages)
 		stages := make([]Stage, stagesCount)
 		for s := int32(0); s < stagesCount; s++ {
@@ -1052,7 +1052,7 @@ func TestSumRandomSegmentSequenceMatchesNoSegment(t *testing.T) {
 			stages[s] = Stage{Duration: types.NullDurationFrom(dur), Target: null.IntFrom(r.Int63n(maxVUs))}
 		}
 
-		c := NewVariableLoopingVUsConfig(name)
+		c := NewRampingVUsConfig(name)
 		c.GracefulRampDown = types.NullDurationFrom(0)
 		c.GracefulStop = types.NullDurationFrom(0)
 		c.StartVUs = null.IntFrom(r.Int63n(maxVUs))

@@ -123,7 +123,7 @@ var configMapTestCases = []configMapTestCase{
 	{`{"varloops": {"executor": "ramping-vus", "startVUs": 20, "gracefulStop": "15s", "gracefulRampDown": "10s",
 		    "startTime": "23s", "stages": [{"duration": "60s", "target": 30}, {"duration": "130s", "target": 10}]}}`,
 		exp{custom: func(t *testing.T, cm lib.ScenarioConfigs) {
-			sched := NewVariableLoopingVUsConfig("varloops")
+			sched := NewRampingVUsConfig("varloops")
 			sched.GracefulStop = types.NullDurationFrom(15 * time.Second)
 			sched.GracefulRampDown = types.NullDurationFrom(10 * time.Second)
 			sched.StartVUs = null.IntFrom(20)
