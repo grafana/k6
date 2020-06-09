@@ -29,7 +29,7 @@ import (
 )
 
 // ExecutionConflictError is a custom error type used for all of the errors in
-// the DeriveExecutionFromShortcuts() function.
+// the DeriveScenariosFromShortcuts() function.
 type ExecutionConflictError string
 
 func (e ExecutionConflictError) Error() string {
@@ -38,14 +38,14 @@ func (e ExecutionConflictError) Error() string {
 
 var _ error = ExecutionConflictError("")
 
-func getConstantLoopingVUsExecution(duration types.NullDuration, vus null.Int) lib.ExecutorConfigMap {
+func getConstantLoopingVUsScenario(duration types.NullDuration, vus null.Int) lib.ExecutorConfigMap {
 	ds := NewConstantLoopingVUsConfig(lib.DefaultExecutorName)
 	ds.VUs = vus
 	ds.Duration = duration
 	return lib.ExecutorConfigMap{lib.DefaultExecutorName: ds}
 }
 
-func getVariableLoopingVUsExecution(stages []lib.Stage, startVUs null.Int) lib.ExecutorConfigMap {
+func getVariableLoopingVUsScenario(stages []lib.Stage, startVUs null.Int) lib.ExecutorConfigMap {
 	ds := NewVariableLoopingVUsConfig(lib.DefaultExecutorName)
 	ds.StartVUs = startVUs
 	for _, s := range stages {
@@ -56,7 +56,7 @@ func getVariableLoopingVUsExecution(stages []lib.Stage, startVUs null.Int) lib.E
 	return lib.ExecutorConfigMap{lib.DefaultExecutorName: ds}
 }
 
-func getSharedIterationsExecution(iters null.Int, duration types.NullDuration, vus null.Int) lib.ExecutorConfigMap {
+func getSharedIterationsScenario(iters null.Int, duration types.NullDuration, vus null.Int) lib.ExecutorConfigMap {
 	ds := NewSharedIterationsConfig(lib.DefaultExecutorName)
 	ds.VUs = vus
 	ds.Iterations = iters
@@ -66,10 +66,10 @@ func getSharedIterationsExecution(iters null.Int, duration types.NullDuration, v
 	return lib.ExecutorConfigMap{lib.DefaultExecutorName: ds}
 }
 
-// DeriveExecutionFromShortcuts checks for conflicting options and turns any
+// DeriveScenariosFromShortcuts checks for conflicting options and turns any
 // shortcut options (i.e. duration, iterations, stages) into the proper
-// long-form executor configuration in the execution property.
-func DeriveExecutionFromShortcuts(opts lib.Options) (lib.Options, error) {
+// long-form scenario/executor configuration in the scenarios property.
+func DeriveScenariosFromShortcuts(opts lib.Options) (lib.Options, error) {
 	result := opts
 
 	switch {
@@ -79,12 +79,12 @@ func DeriveExecutionFromShortcuts(opts lib.Options) (lib.Options, error) {
 				"using multiple execution config shortcuts (`iterations` and `stages`) simultaneously is not allowed",
 			)
 		}
-		if opts.Execution != nil {
+		if opts.Scenarios != nil {
 			return opts, ExecutionConflictError(
-				"using an execution configuration shortcut (`iterations`) and `execution` simultaneously is not allowed",
+				"using an execution configuration shortcut (`iterations`) and `scenarios` simultaneously is not allowed",
 			)
 		}
-		result.Execution = getSharedIterationsExecution(opts.Iterations, opts.Duration, opts.VUs)
+		result.Scenarios = getSharedIterationsScenario(opts.Iterations, opts.Duration, opts.VUs)
 
 	case opts.Duration.Valid:
 		if len(opts.Stages) > 0 { // stages isn't nil (not set) and isn't explicitly set to empty
@@ -92,9 +92,9 @@ func DeriveExecutionFromShortcuts(opts lib.Options) (lib.Options, error) {
 				"using multiple execution config shortcuts (`duration` and `stages`) simultaneously is not allowed",
 			)
 		}
-		if opts.Execution != nil {
+		if opts.Scenarios != nil {
 			return result, ExecutionConflictError(
-				"using an execution configuration shortcut (`duration`) and `execution` simultaneously is not allowed",
+				"using an execution configuration shortcut (`duration`) and `scenarios` simultaneously is not allowed",
 			)
 		}
 		if opts.Duration.Duration <= 0 {
@@ -103,18 +103,18 @@ func DeriveExecutionFromShortcuts(opts lib.Options) (lib.Options, error) {
 				"`duration` should be more than 0, for infinite duration use the externally-controlled executor",
 			)
 		}
-		result.Execution = getConstantLoopingVUsExecution(opts.Duration, opts.VUs)
+		result.Scenarios = getConstantLoopingVUsScenario(opts.Duration, opts.VUs)
 
 	case len(opts.Stages) > 0: // stages isn't nil (not set) and isn't explicitly set to empty
-		if opts.Execution != nil {
+		if opts.Scenarios != nil {
 			return opts, ExecutionConflictError(
-				"using an execution configuration shortcut (`stages`) and `execution` simultaneously is not allowed",
+				"using an execution configuration shortcut (`stages`) and `scenarios` simultaneously is not allowed",
 			)
 		}
-		result.Execution = getVariableLoopingVUsExecution(opts.Stages, opts.VUs)
+		result.Scenarios = getVariableLoopingVUsScenario(opts.Stages, opts.VUs)
 
-	case len(opts.Execution) > 0:
-		// Do nothing, execution was explicitly specified
+	case len(opts.Scenarios) > 0:
+		// Do nothing, scenarios was explicitly specified
 
 	default:
 		// Check if we should emit some warnings
@@ -128,13 +128,13 @@ func DeriveExecutionFromShortcuts(opts lib.Options) (lib.Options, error) {
 			// No someone explicitly set stages to empty
 			logrus.Warnf("`stages` was explicitly set to an empty value, running the script with 1 iteration in 1 VU")
 		}
-		if opts.Execution != nil && len(opts.Execution) == 0 {
+		if opts.Scenarios != nil && len(opts.Scenarios) == 0 {
 			// No shortcut, and someone explicitly set execution to empty
-			logrus.Warnf("`execution` was explicitly set to an empty value, running the script with 1 iteration in 1 VU")
+			logrus.Warnf("`scenarios` was explicitly set to an empty value, running the script with 1 iteration in 1 VU")
 		}
 		// No execution parameters whatsoever were specified, so we'll create a per-VU iterations config
 		// with 1 VU and 1 iteration.
-		result.Execution = lib.ExecutorConfigMap{
+		result.Scenarios = lib.ExecutorConfigMap{
 			lib.DefaultExecutorName: NewPerVUIterationsConfig(lib.DefaultExecutorName),
 		}
 	}

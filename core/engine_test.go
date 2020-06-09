@@ -62,7 +62,7 @@ func newTestEngine( //nolint:golint
 		runCtx, runCancel = context.WithCancel(globalCtx)
 	}
 
-	newOpts, err := executor.DeriveExecutionFromShortcuts(lib.Options{
+	newOpts, err := executor.DeriveScenariosFromShortcuts(lib.Options{
 		MetricSamplesBufferSize: null.NewInt(200, false),
 	}.Apply(runner.GetOptions()).Apply(opts))
 	require.NoError(t, err)

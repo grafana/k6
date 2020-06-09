@@ -43,7 +43,7 @@ import (
 
 func verifyOneIterPerOneVU(t *testing.T, c Config) {
 	// No config anywhere should result in a 1 VU with a 1 iteration config
-	exec := c.Execution[lib.DefaultExecutorName]
+	exec := c.Scenarios[lib.DefaultExecutorName]
 	require.NotEmpty(t, exec)
 	require.IsType(t, executor.PerVUIterationsConfig{}, exec)
 	perVuIters, ok := exec.(executor.PerVUIterationsConfig)
@@ -54,7 +54,7 @@ func verifyOneIterPerOneVU(t *testing.T, c Config) {
 
 func verifySharedIters(vus, iters null.Int) func(t *testing.T, c Config) {
 	return func(t *testing.T, c Config) {
-		exec := c.Execution[lib.DefaultExecutorName]
+		exec := c.Scenarios[lib.DefaultExecutorName]
 		require.NotEmpty(t, exec)
 		require.IsType(t, executor.SharedIterationsConfig{}, exec)
 		sharedIterConfig, ok := exec.(executor.SharedIterationsConfig)
@@ -68,7 +68,7 @@ func verifySharedIters(vus, iters null.Int) func(t *testing.T, c Config) {
 
 func verifyConstLoopingVUs(vus null.Int, duration time.Duration) func(t *testing.T, c Config) {
 	return func(t *testing.T, c Config) {
-		exec := c.Execution[lib.DefaultExecutorName]
+		exec := c.Scenarios[lib.DefaultExecutorName]
 		require.NotEmpty(t, exec)
 		require.IsType(t, executor.ConstantLoopingVUsConfig{}, exec)
 		clvc, ok := exec.(executor.ConstantLoopingVUsConfig)
@@ -82,7 +82,7 @@ func verifyConstLoopingVUs(vus null.Int, duration time.Duration) func(t *testing
 
 func verifyVarLoopingVUs(startVus null.Int, stages []executor.Stage) func(t *testing.T, c Config) {
 	return func(t *testing.T, c Config) {
-		exec := c.Execution[lib.DefaultExecutorName]
+		exec := c.Scenarios[lib.DefaultExecutorName]
 		require.NotEmpty(t, exec)
 		require.IsType(t, executor.VariableLoopingVUsConfig{}, exec)
 		clvc, ok := exec.(executor.VariableLoopingVUsConfig)
@@ -223,7 +223,7 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 		},
 		{opts{cli: []string{"-u", "1", "-i", "6", "-d", "10s"}}, exp{}, func(t *testing.T, c Config) {
 			verifySharedIters(I(1), I(6))(t, c)
-			sharedIterConfig := c.Execution[lib.DefaultExecutorName].(executor.SharedIterationsConfig)
+			sharedIterConfig := c.Scenarios[lib.DefaultExecutorName].(executor.SharedIterationsConfig)
 			assert.Equal(t, time.Duration(sharedIterConfig.MaxDuration.Duration), 10*time.Second)
 		}},
 		// This should get a validation error since VUs are more than the shared iterations
@@ -437,7 +437,7 @@ func runTestCase(
 	require.NoError(t, err)
 
 	derivedConfig := consolidatedConfig
-	derivedConfig.Options, err = executor.DeriveExecutionFromShortcuts(consolidatedConfig.Options)
+	derivedConfig.Options, err = executor.DeriveScenariosFromShortcuts(consolidatedConfig.Options)
 	if testCase.expected.derivationError {
 		require.Error(t, err)
 		return
