@@ -80,12 +80,12 @@ func verifyConstLoopingVUs(vus null.Int, duration time.Duration) func(t *testing
 	}
 }
 
-func verifyVarLoopingVUs(startVus null.Int, stages []executor.Stage) func(t *testing.T, c Config) {
+func verifyRampingVUs(startVus null.Int, stages []executor.Stage) func(t *testing.T, c Config) {
 	return func(t *testing.T, c Config) {
 		exec := c.Scenarios[lib.DefaultScenarioName]
 		require.NotEmpty(t, exec)
-		require.IsType(t, executor.VariableLoopingVUsConfig{}, exec)
-		clvc, ok := exec.(executor.VariableLoopingVUsConfig)
+		require.IsType(t, executor.RampingVUsConfig{}, exec)
+		clvc, ok := exec.(executor.RampingVUsConfig)
 		require.True(t, ok)
 		assert.Equal(t, startVus, clvc.StartVUs)
 		assert.Equal(t, startVus, c.VUs)
@@ -215,11 +215,11 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 		{opts{cli: []string{"-u", "4", "--duration", "60s"}}, exp{}, verifyConstLoopingVUs(I(4), 1*time.Minute)},
 		{
 			opts{cli: []string{"--stage", "20s:10", "-s", "3m:5"}}, exp{},
-			verifyVarLoopingVUs(null.NewInt(1, false), buildStages(20, 10, 180, 5)),
+			verifyRampingVUs(null.NewInt(1, false), buildStages(20, 10, 180, 5)),
 		},
 		{
 			opts{cli: []string{"-s", "1m6s:5", "--vus", "10"}}, exp{},
-			verifyVarLoopingVUs(null.NewInt(10, true), buildStages(66, 5)),
+			verifyRampingVUs(null.NewInt(10, true), buildStages(66, 5)),
 		},
 		{opts{cli: []string{"-u", "1", "-i", "6", "-d", "10s"}}, exp{}, func(t *testing.T, c Config) {
 			verifySharedIters(I(1), I(6))(t, c)
@@ -249,11 +249,11 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 		{opts{env: []string{"K6_VUS=10", "K6_DURATION=20s"}}, exp{}, verifyConstLoopingVUs(I(10), 20*time.Second)},
 		{
 			opts{env: []string{"K6_STAGES=2m30s:11,1h1m:100"}}, exp{},
-			verifyVarLoopingVUs(null.NewInt(1, false), buildStages(150, 11, 3660, 100)),
+			verifyRampingVUs(null.NewInt(1, false), buildStages(150, 11, 3660, 100)),
 		},
 		{
 			opts{env: []string{"K6_STAGES=100s:100,0m30s:0", "K6_VUS=0"}}, exp{},
-			verifyVarLoopingVUs(null.NewInt(0, true), buildStages(100, 100, 30, 0)),
+			verifyRampingVUs(null.NewInt(0, true), buildStages(100, 100, 30, 0)),
 		},
 		// Test if JSON configs work as expected
 		{opts{fs: defaultConfig(`{"iterations": 77, "vus": 7}`)}, exp{}, verifySharedIters(I(7), I(77))},
@@ -282,7 +282,7 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 				runner: &lib.Options{VUs: null.IntFrom(5), Duration: types.NullDurationFrom(50 * time.Second)},
 				cli:    []string{"--stage", "5s:5"},
 			},
-			exp{}, verifyVarLoopingVUs(I(5), buildStages(5, 5)),
+			exp{}, verifyRampingVUs(I(5), buildStages(5, 5)),
 		},
 		{
 			opts{
@@ -290,7 +290,7 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 				runner: &lib.Options{VUs: null.IntFrom(5)},
 			},
 			exp{},
-			verifyVarLoopingVUs(I(5), buildStages(20, 10)),
+			verifyRampingVUs(I(5), buildStages(20, 10)),
 		},
 		{
 			opts{
@@ -309,7 +309,7 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 				cli:    []string{"--stage", "44s:44", "-s", "55s:55"},
 			},
 			exp{},
-			verifyVarLoopingVUs(null.NewInt(33, true), buildStages(44, 44, 55, 55)),
+			verifyRampingVUs(null.NewInt(33, true), buildStages(44, 44, 55, 55)),
 		},
 
 		// TODO: test the future full overwriting of the duration/iterations/stages/execution options
