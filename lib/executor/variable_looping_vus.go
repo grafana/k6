@@ -36,7 +36,7 @@ import (
 	"github.com/loadimpact/k6/ui/pb"
 )
 
-const variableLoopingVUsType = "variable-looping-vus"
+const variableLoopingVUsType = "ramping-vus"
 
 func init() {
 	lib.RegisterExecutorConfigType(

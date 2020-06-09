@@ -256,7 +256,7 @@ a commandline interface for interacting with it.`,
 			executorConfigs := execScheduler.GetExecutorConfigs()
 			maxDuration, _ := lib.GetEndOffset(plan)
 
-			fprintf(stdout, "  execution: %s\n", ui.ValueColor.Sprintf(
+			fprintf(stdout, "  scenarios: %s\n", ui.ValueColor.Sprintf(
 				"(%.2f%%) %d executors, %d max VUs, %s max duration (incl. graceful stop):",
 				conf.ExecutionSegment.FloatLength()*100, len(executorConfigs),
 				lib.GetMaxPossibleVUs(plan), maxDuration),

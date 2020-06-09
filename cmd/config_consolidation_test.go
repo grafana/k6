@@ -243,7 +243,7 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 				},
 			}}, exp{derivationError: true}, nil,
 		},
-		{opts{fs: defaultConfig(`{"execution": {}}`)}, exp{logWarning: true}, verifyOneIterPerOneVU},
+		{opts{fs: defaultConfig(`{"scenarios": {}}`)}, exp{logWarning: true}, verifyOneIterPerOneVU},
 		// Test if environment variable shortcuts are working as expected
 		{opts{env: []string{"K6_VUS=5", "K6_ITERATIONS=15"}}, exp{}, verifySharedIters(I(5), I(15))},
 		{opts{env: []string{"K6_VUS=10", "K6_DURATION=20s"}}, exp{}, verifyConstLoopingVUs(I(10), 20*time.Second)},
@@ -316,8 +316,8 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 		{
 			opts{
 				fs: defaultConfig(`{
-					"execution": { "someKey": {
-						"type": "constant-looping-vus", "vus": 10, "duration": "60s", "gracefulStop": "10s",
+					"scenarios": { "someKey": {
+						"executor": "constant-vus", "vus": 10, "duration": "60s", "gracefulStop": "10s",
 						"startTime": "70s", "env": {"test": "mest"}, "exec": "someFunc"
 					}}}`),
 				env: []string{"K6_ITERATIONS=25"},
