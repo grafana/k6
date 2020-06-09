@@ -548,11 +548,11 @@ func (vlv RampingVUs) Run(ctx context.Context, out chan<- stats.SampleContainer)
 	maxVUs := lib.GetMaxPlannedVUs(gracefulExecutionSteps)
 	gracefulStop := maxDuration - regularDuration
 
-	activeVUs := &sync.WaitGroup{}
-	defer activeVUs.Wait()
-
 	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(ctx, regularDuration, gracefulStop)
 	defer cancel()
+
+	activeVUs := &sync.WaitGroup{}
+	defer activeVUs.Wait()
 
 	// Make sure the log and the progress bar have accurate information
 	vlv.logger.WithFields(logrus.Fields{
@@ -588,6 +588,7 @@ func (vlv RampingVUs) Run(ctx context.Context, out chan<- stats.SampleContainer)
 		} else {
 			activeVUs.Add(1)
 			atomic.AddInt64(activeVUsCount, 1)
+			vlv.executionState.ModCurrentlyActiveVUsCount(+1)
 		}
 		return initVU, err
 	}
@@ -595,6 +596,7 @@ func (vlv RampingVUs) Run(ctx context.Context, out chan<- stats.SampleContainer)
 		vlv.executionState.ReturnVU(initVU, false)
 		atomic.AddInt64(activeVUsCount, -1)
 		activeVUs.Done()
+		vlv.executionState.ModCurrentlyActiveVUsCount(-1)
 	}
 
 	vuHandles := make([]*vuHandle, maxVUs)
@@ -606,9 +608,6 @@ func (vlv RampingVUs) Run(ctx context.Context, out chan<- stats.SampleContainer)
 		vuHandles[i] = vuHandle
 	}
 
-	rawStepEvents := lib.StreamExecutionSteps(ctx, startTime, rawExecutionSteps, true)
-	gracefulLimitEvents := lib.StreamExecutionSteps(ctx, startTime, gracefulExecutionSteps, false)
-
 	// 0 <= currentScheduledVUs <= currentMaxAllowedVUs <= maxVUs
 	var currentScheduledVUs, currentMaxAllowedVUs uint64
 
@@ -616,12 +615,10 @@ func (vlv RampingVUs) Run(ctx context.Context, out chan<- stats.SampleContainer)
 		if newScheduledVUs > currentScheduledVUs {
 			for vuNum := currentScheduledVUs; vuNum < newScheduledVUs; vuNum++ {
 				_ = vuHandles[vuNum].start() // TODO handle error
-				vlv.executionState.ModCurrentlyActiveVUsCount(+1)
 			}
 		} else {
 			for vuNum := newScheduledVUs; vuNum < currentScheduledVUs; vuNum++ {
 				vuHandles[vuNum].gracefulStop()
-				vlv.executionState.ModCurrentlyActiveVUsCount(-1)
 			}
 		}
 		currentScheduledVUs = newScheduledVUs
@@ -636,40 +633,88 @@ func (vlv RampingVUs) Run(ctx context.Context, out chan<- stats.SampleContainer)
 		currentMaxAllowedVUs = newMaxAllowedVUs
 	}
 
-	handleAllRawSteps := func() bool {
-		for {
+	// This is the step that is the actual gracefulStop at the end
+	lastStep := gracefulExecutionSteps[len(gracefulExecutionSteps)-1]
+	// TODO maybe instead of getting only the last step (above) mergeSteps should return the
+	// remaining gracefulExecutionSteps? or maybe we should refactor this even more ...
+	mergedSteps := mergeSteps(rawExecutionSteps, gracefulExecutionSteps[:len(gracefulExecutionSteps)-1])
+	timer := time.NewTimer(time.Hour * 24)
+	for _, step := range mergedSteps {
+		offsetDiff := step.step.TimeOffset - time.Since(startTime)
+		if offsetDiff > 0 { // wait until time of event arrives // TODO have a mininum
+			timer.Reset(offsetDiff)
 			select {
-			case step, ok := <-rawStepEvents:
-				if !ok {
-					return true
-				}
-				handleNewScheduledVUs(step.PlannedVUs)
-			case step := <-gracefulLimitEvents:
-				if step.PlannedVUs > currentMaxAllowedVUs {
-					// Handle the case where a value is read from the
-					// gracefulLimitEvents channel before rawStepEvents
-					handleNewScheduledVUs(step.PlannedVUs)
-				}
-				handleNewMaxAllowedVUs(step.PlannedVUs)
-			case <-ctx.Done():
-				return false
+			case <-maxDurationCtx.Done():
+				return // exit if context is cancelled
+			case <-timer.C:
+				// now we do a step
 			}
+		}
+		if step.raw {
+			handleNewScheduledVUs(step.step.PlannedVUs)
+		} else {
+			handleNewMaxAllowedVUs(step.step.PlannedVUs)
 		}
 	}
 
-	if handleAllRawSteps() {
-		// Handle any remaining graceful stops
-		go func() {
-			for {
-				select {
-				case step := <-gracefulLimitEvents:
-					handleNewMaxAllowedVUs(step.PlannedVUs)
-				case <-maxDurationCtx.Done():
-					return
-				}
+	go func() {
+		offsetDiff := lastStep.TimeOffset - time.Since(startTime)
+		if offsetDiff > 0 { // wait until time of event arrives // TODO have a mininum
+			timer.Reset(offsetDiff)
+			select {
+			case <-maxDurationCtx.Done():
+				return // exit if context is cancelled
+			case <-timer.C:
+				// now we do a step
 			}
-		}()
-	}
+		}
+		handleNewMaxAllowedVUs(lastStep.PlannedVUs)
+	}()
 
 	return nil
+}
+
+type mergedStep struct {
+	raw  bool              // marks if this is a raw step or gracefulStop one
+	step lib.ExecutionStep // the actual step
+}
+
+// merges raw and gracefulStop steps, giving priority to raw ones if time offset is the same
+// TODO ... thinking about it gracefulExecutionSteps in a lot of cases will lead to nothing so maybe
+// we should skip them here?
+// TODO better name ... zip is not correct, and combine seems even worse ... merge is not great as
+// well though
+func mergeSteps(rawExecutionSteps, gracefulExecutionSteps []lib.ExecutionStep) []mergedStep {
+	result := make([]mergedStep, len(rawExecutionSteps)+len(gracefulExecutionSteps))
+
+	i, j := 0, 0
+	for {
+		if i == len(rawExecutionSteps) {
+			for ; j < len(gracefulExecutionSteps); j++ {
+				result[i+j].raw = false
+				result[i+j].step = gracefulExecutionSteps[j]
+			}
+			break
+		}
+
+		if j == len(gracefulExecutionSteps) {
+			for ; i < len(rawExecutionSteps); i++ {
+				result[i+j].raw = true
+				result[i+j].step = rawExecutionSteps[i]
+			}
+			break
+		}
+
+		if rawExecutionSteps[i].TimeOffset > gracefulExecutionSteps[j].TimeOffset {
+			result[i+j].raw = false
+			result[i+j].step = gracefulExecutionSteps[j]
+			j++
+		} else {
+			result[i+j].raw = true
+			result[i+j].step = rawExecutionSteps[i]
+			i++
+		}
+	}
+
+	return result
 }
