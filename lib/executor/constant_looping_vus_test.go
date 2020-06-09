@@ -34,22 +34,22 @@ import (
 	"github.com/loadimpact/k6/lib/types"
 )
 
-func getTestConstantLoopingVUsConfig() ConstantLoopingVUsConfig {
-	return ConstantLoopingVUsConfig{
+func getTestConstantVUsConfig() ConstantVUsConfig {
+	return ConstantVUsConfig{
 		BaseConfig: BaseConfig{GracefulStop: types.NullDurationFrom(1 * time.Second)},
 		VUs:        null.IntFrom(10),
 		Duration:   types.NullDurationFrom(1 * time.Second),
 	}
 }
 
-func TestConstantLoopingVUsRun(t *testing.T) {
+func TestConstantVUsRun(t *testing.T) {
 	t.Parallel()
 	var result sync.Map
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
 	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
 	var ctx, cancel, executor, _ = setupExecutor(
-		t, getTestConstantLoopingVUsConfig(), es,
+		t, getTestConstantVUsConfig(), es,
 		simpleRunner(func(ctx context.Context) error {
 			time.Sleep(200 * time.Millisecond)
 			select {
