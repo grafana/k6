@@ -236,6 +236,8 @@ func TestDerivedExecutionDiscarding(t *testing.T) {
 		expScenarios interface{}
 		expError     string
 	}{
+		// Tests to make sure that "execution" in the options, the old name for
+		// "scenarios" before #1007 was merged, doesn't mess up the options...
 		{
 			metadata: `{
 				"filename": "/test.js", "pwd": "/",
@@ -258,17 +260,10 @@ func TestDerivedExecutionDiscarding(t *testing.T) {
 		{
 			metadata: `{
 				"filename": "/test.js", "pwd": "/",
-				"k6version": "0.24.0"
-			}`,
-			expError: "missing options key",
-		},
-		{
-			metadata: `{
-				"filename": "/test.js", "pwd": "/",
 				"k6version": "0.24.0",
 				"options": "something invalid"
 			}`,
-			expError: "wrong options type in metadata.json",
+			expError: "cannot unmarshal string into Go struct field",
 		},
 		{
 			metadata: `{
@@ -278,7 +273,7 @@ func TestDerivedExecutionDiscarding(t *testing.T) {
 			}`,
 			expError: "cannot unmarshal string",
 		},
-		// TODO: test an actual execution unmarshalling, which is currently
+		// TODO: test an actual scenarios unmarshalling, which is currently
 		// impossible due to import cycles...
 	}
 
@@ -290,7 +285,7 @@ func TestDerivedExecutionDiscarding(t *testing.T) {
 
 		arc, err := ReadArchive(buf)
 		if test.expError != "" {
-			require.Error(t, err)
+			require.Errorf(t, err, "expected error '%s' but got nil", test.expError)
 			require.Contains(t, err.Error(), test.expError)
 		} else {
 			require.NoError(t, err)

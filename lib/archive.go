@@ -108,58 +108,7 @@ func (arc *Archive) getFs(name string) afero.Fs {
 	return fs
 }
 
-// CleanUpWrongMetadataJSON fixes issues with the metadata.json contents before
-// they are unmarshalled in the Archive struct.
-//
-// Currently, the only fix this function performs is the discarding of the
-// derived `execution` config value in the consolidated options that was wrongly
-// saved by k6 in the archive metadata.json files until commit
-// 83193f8a96e06a190325b838b2cc451119d6b836. This basically means k6 v0.24.0 and
-// surrounding master commits. We filter these out by the value of the k6version
-// property, saved in the metadata.json since the previous to the above commit.
-//
-//TODO: delete? now that execution has been renamed to scenarios, this isn't needed
-func CleanUpWrongMetadataJSON(data []byte) ([]byte, error) {
-	var tmpArc map[string]interface{}
-	if err := json.Unmarshal(data, &tmpArc); err != nil {
-		return nil, err
-	}
-
-	k6Version := ""
-	if k6RawVersion, ok := tmpArc["k6version"]; ok {
-		if k6Version, ok = k6RawVersion.(string); !ok {
-			return nil, fmt.Errorf("k6version is present in the archive metadata, but it's not a string")
-		}
-	}
-
-	// TODO: semantically parse the k6version and compare it with the current
-	// one, log a warning if the current k6 version in lib/consts is lower than
-	// the k6 version that generated the archive.
-
-	if k6Version != "" && k6Version != "0.24.0" {
-		return data, nil
-	}
-
-	if rawOptions, ok := tmpArc["options"]; !ok {
-		return nil, fmt.Errorf("missing options key in the archive metadata.json")
-	} else if options, ok := rawOptions.(map[string]interface{}); !ok {
-		return nil, fmt.Errorf("wrong options type in metadata.json")
-	} else if _, hasExecution := options["execution"]; !hasExecution {
-		return data, nil // no need to fix anything
-	} else {
-		delete(options, "execution")
-		tmpArc["options"] = options
-	}
-
-	return json.Marshal(tmpArc)
-}
-
-func (arc *Archive) loadMetadataJSON(data []byte) error {
-	data, err := CleanUpWrongMetadataJSON(data)
-	if err != nil {
-		return err
-	}
-
+func (arc *Archive) loadMetadataJSON(data []byte) (err error) {
 	if err = json.Unmarshal(data, &arc); err != nil {
 		return err
 	}
