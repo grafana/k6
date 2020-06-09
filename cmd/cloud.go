@@ -225,8 +225,19 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 		ticker := time.NewTicker(time.Millisecond * 2000)
 		shouldExitLoop := false
 
-		var startTime time.Time
-		maxDuration := time.Duration(derivedConf.Duration.Duration)
+		var (
+			startTime   time.Time
+			maxDuration time.Duration
+		)
+		if derivedConf.Duration.Valid {
+			maxDuration = time.Duration(derivedConf.Duration.Duration)
+		} else if derivedConf.Stages != nil {
+			maxDuration = lib.SumStagesDuration(derivedConf.Stages)
+		} else if derivedConf.Scenarios != nil {
+			et, _ := lib.NewExecutionTuple(nil, nil)
+			execReqs := derivedConf.Scenarios.GetFullExecutionRequirements(et)
+			maxDuration, _ = lib.GetEndOffset(execReqs)
+		}
 
 	runningLoop:
 		for {

@@ -45,7 +45,7 @@ func TestRampingVUsRun(t *testing.T) {
 		BaseConfig:       BaseConfig{GracefulStop: types.NullDurationFrom(0)},
 		GracefulRampDown: types.NullDurationFrom(0),
 		StartVUs:         null.IntFrom(5),
-		Stages: []Stage{
+		Stages: []lib.Stage{
 			{
 				Duration: types.NullDurationFrom(1 * time.Second),
 				Target:   null.IntFrom(5),
@@ -105,7 +105,7 @@ func TestRampingVUsGracefulStopWaits(t *testing.T) {
 	config := RampingVUsConfig{
 		BaseConfig: BaseConfig{GracefulStop: types.NullDurationFrom(time.Second)},
 		StartVUs:   null.IntFrom(1),
-		Stages: []Stage{
+		Stages: []lib.Stage{
 			{
 				Duration: types.NullDurationFrom(1 * time.Second),
 				Target:   null.IntFrom(1),
@@ -154,7 +154,7 @@ func TestRampingVUsGracefulStopStops(t *testing.T) {
 	config := RampingVUsConfig{
 		BaseConfig: BaseConfig{GracefulStop: types.NullDurationFrom(time.Second)},
 		StartVUs:   null.IntFrom(1),
-		Stages: []Stage{
+		Stages: []lib.Stage{
 			{
 				Duration: types.NullDurationFrom(1 * time.Second),
 				Target:   null.IntFrom(1),
@@ -204,7 +204,7 @@ func TestRampingVUsGracefulRampDown(t *testing.T) {
 		BaseConfig:       BaseConfig{GracefulStop: types.NullDurationFrom(5 * time.Second)},
 		StartVUs:         null.IntFrom(2),
 		GracefulRampDown: types.NullDurationFrom(5 * time.Second),
-		Stages: []Stage{
+		Stages: []lib.Stage{
 			{
 				Duration: types.NullDurationFrom(1 * time.Second),
 				Target:   null.IntFrom(2),
@@ -269,7 +269,7 @@ func TestRampingVUsRampDownNoWobble(t *testing.T) {
 		BaseConfig:       BaseConfig{GracefulStop: types.NullDurationFrom(0)},
 		GracefulRampDown: types.NullDurationFrom(1 * time.Second),
 		StartVUs:         null.IntFrom(0),
-		Stages: []Stage{
+		Stages: []lib.Stage{
 			{
 				Duration: types.NullDurationFrom(3 * time.Second),
 				Target:   null.IntFrom(10),
@@ -340,7 +340,7 @@ func TestRampingVUsConfigExecutionPlanExample(t *testing.T) {
 	require.NoError(t, err)
 	conf := NewRampingVUsConfig("test")
 	conf.StartVUs = null.IntFrom(4)
-	conf.Stages = []Stage{
+	conf.Stages = []lib.Stage{
 		{Target: null.IntFrom(6), Duration: types.NullDurationFrom(2 * time.Second)},
 		{Target: null.IntFrom(1), Duration: types.NullDurationFrom(5 * time.Second)},
 		{Target: null.IntFrom(5), Duration: types.NullDurationFrom(4 * time.Second)},
@@ -440,7 +440,7 @@ func TestRampingVUsConfigExecutionPlanExampleOneThird(t *testing.T) {
 	require.NoError(t, err)
 	conf := NewRampingVUsConfig("test")
 	conf.StartVUs = null.IntFrom(4)
-	conf.Stages = []Stage{
+	conf.Stages = []lib.Stage{
 		{Target: null.IntFrom(6), Duration: types.NullDurationFrom(2 * time.Second)},
 		{Target: null.IntFrom(1), Duration: types.NullDurationFrom(5 * time.Second)},
 		{Target: null.IntFrom(5), Duration: types.NullDurationFrom(4 * time.Second)},
@@ -518,7 +518,7 @@ func TestRampingVUsExecutionTupleTests(t *testing.T) {
 
 	conf := NewRampingVUsConfig("test")
 	conf.StartVUs = null.IntFrom(4)
-	conf.Stages = []Stage{
+	conf.Stages = []lib.Stage{
 		{Target: null.IntFrom(6), Duration: types.NullDurationFrom(2 * time.Second)},
 		{Target: null.IntFrom(1), Duration: types.NullDurationFrom(5 * time.Second)},
 		{Target: null.IntFrom(5), Duration: types.NullDurationFrom(4 * time.Second)},
@@ -743,7 +743,7 @@ func TestRampingVUsGetRawExecutionStepsCornerCases(t *testing.T) {
 		name          string
 		expectedSteps []lib.ExecutionStep
 		et            *lib.ExecutionTuple
-		stages        []Stage
+		stages        []lib.Stage
 		start         int64
 	}{
 		{
@@ -754,7 +754,7 @@ func TestRampingVUsGetRawExecutionStepsCornerCases(t *testing.T) {
 				{TimeOffset: 1 * time.Second, PlannedVUs: 4},
 				{TimeOffset: 2 * time.Second, PlannedVUs: 3},
 			},
-			stages: []Stage{
+			stages: []lib.Stage{
 				{Target: null.IntFrom(5), Duration: types.NullDurationFrom(0 * time.Second)},
 				{Target: null.IntFrom(3), Duration: types.NullDurationFrom(2 * time.Second)},
 			},
@@ -767,7 +767,7 @@ func TestRampingVUsGetRawExecutionStepsCornerCases(t *testing.T) {
 				{TimeOffset: 1 * time.Second, PlannedVUs: 4},
 				{TimeOffset: 2 * time.Second, PlannedVUs: 5},
 			},
-			stages: []Stage{
+			stages: []lib.Stage{
 				{Target: null.IntFrom(5), Duration: types.NullDurationFrom(2 * time.Second)},
 			},
 			start: 3,
@@ -785,7 +785,7 @@ func TestRampingVUsGetRawExecutionStepsCornerCases(t *testing.T) {
 				{TimeOffset: 7 * time.Second, PlannedVUs: 1},
 				{TimeOffset: 8 * time.Second, PlannedVUs: 0},
 			},
-			stages: []Stage{
+			stages: []lib.Stage{
 				{Target: null.IntFrom(2), Duration: types.NullDurationFrom(2 * time.Second)},
 				{Target: null.IntFrom(0), Duration: types.NullDurationFrom(2 * time.Second)},
 				{Target: null.IntFrom(2), Duration: types.NullDurationFrom(2 * time.Second)},
@@ -802,7 +802,7 @@ func TestRampingVUsGetRawExecutionStepsCornerCases(t *testing.T) {
 				{TimeOffset: 8 * time.Second, PlannedVUs: 0},
 			},
 			et: mustNewExecutionTuple(newExecutionSegmentFromString("0:1/2"), nil),
-			stages: []Stage{
+			stages: []lib.Stage{
 				{Target: null.IntFrom(2), Duration: types.NullDurationFrom(2 * time.Second)},
 				{Target: null.IntFrom(0), Duration: types.NullDurationFrom(2 * time.Second)},
 				{Target: null.IntFrom(2), Duration: types.NullDurationFrom(2 * time.Second)},
@@ -819,7 +819,7 @@ func TestRampingVUsGetRawExecutionStepsCornerCases(t *testing.T) {
 				{TimeOffset: 7 * time.Second, PlannedVUs: 0},
 			},
 			et: mustNewExecutionTuple(newExecutionSegmentFromString("1/2:1"), nil),
-			stages: []Stage{
+			stages: []lib.Stage{
 				{Target: null.IntFrom(2), Duration: types.NullDurationFrom(2 * time.Second)},
 				{Target: null.IntFrom(0), Duration: types.NullDurationFrom(2 * time.Second)},
 				{Target: null.IntFrom(2), Duration: types.NullDurationFrom(2 * time.Second)},
@@ -832,7 +832,7 @@ func TestRampingVUsGetRawExecutionStepsCornerCases(t *testing.T) {
 				{TimeOffset: 0 * time.Second, PlannedVUs: 0},
 			},
 			et: mustNewExecutionTuple(newExecutionSegmentFromString("2/3:1"), newExecutionSegmentSequenceFromString("0,1/3,2/3,1")),
-			stages: []Stage{
+			stages: []lib.Stage{
 				{Target: null.IntFrom(2), Duration: types.NullDurationFrom(2 * time.Second)},
 				{Target: null.IntFrom(0), Duration: types.NullDurationFrom(2 * time.Second)},
 				{Target: null.IntFrom(2), Duration: types.NullDurationFrom(2 * time.Second)},
@@ -849,7 +849,7 @@ func TestRampingVUsGetRawExecutionStepsCornerCases(t *testing.T) {
 				{TimeOffset: 8 * time.Second, PlannedVUs: 0},
 			},
 			et: mustNewExecutionTuple(newExecutionSegmentFromString("0:1/3"), newExecutionSegmentSequenceFromString("0,1/3,1/2,2/3,1")),
-			stages: []Stage{
+			stages: []lib.Stage{
 				{Target: null.IntFrom(2), Duration: types.NullDurationFrom(2 * time.Second)},
 				{Target: null.IntFrom(0), Duration: types.NullDurationFrom(2 * time.Second)},
 				{Target: null.IntFrom(2), Duration: types.NullDurationFrom(2 * time.Second)},
@@ -871,7 +871,7 @@ func TestRampingVUsGetRawExecutionStepsCornerCases(t *testing.T) {
 				{TimeOffset: 44 * time.Second, PlannedVUs: 9},
 			},
 			et: mustNewExecutionTuple(newExecutionSegmentFromString("0:0.3"), newExecutionSegmentSequenceFromString("0,0.3,0.6,0.9,1")),
-			stages: []Stage{
+			stages: []lib.Stage{
 				{Target: null.IntFrom(20), Duration: types.NullDurationFrom(20 * time.Second)},
 				{Target: null.IntFrom(30), Duration: types.NullDurationFrom(30 * time.Second)},
 			},
@@ -891,7 +891,7 @@ func TestRampingVUsGetRawExecutionStepsCornerCases(t *testing.T) {
 				{TimeOffset: 9 * time.Second, PlannedVUs: 1},
 				{TimeOffset: 10 * time.Second, PlannedVUs: 0},
 			},
-			stages: []Stage{
+			stages: []lib.Stage{
 				{Target: null.IntFrom(5), Duration: types.NullDurationFrom(5 * time.Second)},
 				{Target: null.IntFrom(0), Duration: types.NullDurationFrom(5 * time.Second)},
 			},
@@ -963,7 +963,7 @@ func BenchmarkRampingVUsGetRawExecutionSteps(b *testing.B) {
 			et, err := lib.NewExecutionTuple(segment, &ess)
 			require.NoError(b, err)
 			for _, stageCase := range stageCases {
-				var st []Stage
+				var st []lib.Stage
 				require.NoError(b, json.Unmarshal([]byte(stageCase.stages), &st))
 				vlvc := RampingVUsConfig{
 					Stages: st,
@@ -1210,10 +1210,10 @@ func TestSumRandomSegmentSequenceMatchesNoSegment(t *testing.T) {
 	)
 	getTestConfig := func(name string) RampingVUsConfig {
 		stagesCount := 1 + r.Int31n(maxStages)
-		stages := make([]Stage, stagesCount)
+		stages := make([]lib.Stage, stagesCount)
 		for s := int32(0); s < stagesCount; s++ {
 			dur := (minStageDuration + time.Duration(r.Int63n(int64(maxStageDuration-minStageDuration)))).Round(time.Second)
-			stages[s] = Stage{Duration: types.NullDurationFrom(dur), Target: null.IntFrom(r.Int63n(maxVUs))}
+			stages[s] = lib.Stage{Duration: types.NullDurationFrom(dur), Target: null.IntFrom(r.Int63n(maxVUs))}
 		}
 
 		c := NewRampingVUsConfig(name)
