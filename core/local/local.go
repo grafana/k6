@@ -62,14 +62,14 @@ func NewExecutionScheduler(runner lib.Runner, logger *logrus.Logger) (*Execution
 	if err != nil {
 		return nil, err
 	}
-	executionPlan := options.Execution.GetFullExecutionRequirements(et)
+	executionPlan := options.Scenarios.GetFullExecutionRequirements(et)
 	maxPlannedVUs := lib.GetMaxPlannedVUs(executionPlan)
 	maxPossibleVUs := lib.GetMaxPossibleVUs(executionPlan)
 
 	executionState := lib.NewExecutionState(options, et, maxPlannedVUs, maxPossibleVUs)
 	maxDuration, _ := lib.GetEndOffset(executionPlan) // we don't care if the end offset is final
 
-	executorConfigs := options.Execution.GetSortedConfigs()
+	executorConfigs := options.Scenarios.GetSortedConfigs()
 	executors := make([]lib.Executor, 0, len(executorConfigs))
 	// Only take executors which have work.
 	for _, sc := range executorConfigs {

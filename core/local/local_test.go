@@ -59,7 +59,7 @@ func newTestExecutionScheduler(
 		runner = &minirunner.MiniRunner{}
 	}
 	ctx, cancel = context.WithCancel(context.Background())
-	newOpts, err := executor.DeriveExecutionFromShortcuts(lib.Options{
+	newOpts, err := executor.DeriveScenariosFromShortcuts(lib.Options{
 		MetricSamplesBufferSize: null.NewInt(200, false),
 	}.Apply(runner.GetOptions()).Apply(opts))
 	require.NoError(t, err)
@@ -773,7 +773,7 @@ func TestExecutionSchedulerEndErrors(t *testing.T) {
 			return errors.New("hi")
 		},
 		Options: lib.Options{
-			Execution: lib.ExecutorConfigMap{exec.GetName(): exec},
+			Scenarios: lib.ExecutorConfigMap{exec.GetName(): exec},
 		},
 	}
 	logger, hook := logtest.NewNullLogger()
@@ -797,7 +797,7 @@ func TestExecutionSchedulerEndIterations(t *testing.T) {
 	t.Parallel()
 	metric := &stats.Metric{Name: "test_metric"}
 
-	options, err := executor.DeriveExecutionFromShortcuts(lib.Options{
+	options, err := executor.DeriveScenariosFromShortcuts(lib.Options{
 		VUs:        null.IntFrom(1),
 		Iterations: null.IntFrom(100),
 	})
@@ -1007,7 +1007,7 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 	runner, err := js.New(&loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script}, nil, lib.RuntimeOptions{})
 	require.NoError(t, err)
 
-	options, err := executor.DeriveExecutionFromShortcuts(runner.GetOptions().Apply(lib.Options{
+	options, err := executor.DeriveScenariosFromShortcuts(runner.GetOptions().Apply(lib.Options{
 		Iterations:      null.IntFrom(2),
 		VUs:             null.IntFrom(1),
 		SystemTags:      &stats.DefaultSystemTagSet,
@@ -1185,7 +1185,7 @@ func TestSetPaused(t *testing.T) {
 
 	t.Run("can't pause unpausable executor", func(t *testing.T) {
 		runner := &minirunner.MiniRunner{}
-		options, err := executor.DeriveExecutionFromShortcuts(lib.Options{
+		options, err := executor.DeriveScenariosFromShortcuts(lib.Options{
 			Iterations: null.IntFrom(2),
 			VUs:        null.IntFrom(1),
 		}.Apply(runner.GetOptions()))

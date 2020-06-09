@@ -264,7 +264,7 @@ func applyDefault(conf Config) Config {
 
 func deriveAndValidateConfig(conf Config, isExecutable func(string) bool) (result Config, err error) {
 	result = conf
-	result.Options, err = executor.DeriveExecutionFromShortcuts(conf.Options)
+	result.Options, err = executor.DeriveScenariosFromShortcuts(conf.Options)
 	if err != nil {
 		return result, err
 	}
@@ -274,8 +274,8 @@ func deriveAndValidateConfig(conf Config, isExecutable func(string) bool) (resul
 func validateConfig(conf Config, isExecutable func(string) bool) error {
 	errList := conf.Validate()
 
-	for _, ec := range conf.Execution {
-		if err := validateExecutorConfig(ec, isExecutable); err != nil {
+	for _, ec := range conf.Scenarios {
+		if err := validateScenarioConfig(ec, isExecutable); err != nil {
 			errList = append(errList, err)
 		}
 	}
@@ -292,7 +292,7 @@ func validateConfig(conf Config, isExecutable func(string) bool) error {
 	return errors.New(strings.Join(errMsgParts, "\n"))
 }
 
-func validateExecutorConfig(conf lib.ExecutorConfig, isExecutable func(string) bool) error {
+func validateScenarioConfig(conf lib.ExecutorConfig, isExecutable func(string) bool) error {
 	execFn := conf.GetExec()
 	if !isExecutable(execFn) {
 		return fmt.Errorf("executor %s: function '%s' not found in exports", conf.GetName(), execFn)

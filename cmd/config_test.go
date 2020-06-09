@@ -152,7 +152,7 @@ func TestDeriveAndValidateConfig(t *testing.T) {
 		{"defaultOK", Config{}, true, ""},
 		{"defaultErr", Config{}, false,
 			"executor default: function 'default' not found in exports"},
-		{"nonDefaultOK", Config{Options: lib.Options{Execution: lib.ExecutorConfigMap{
+		{"nonDefaultOK", Config{Options: lib.Options{Scenarios: lib.ExecutorConfigMap{
 			"per_vu_iters": executor.PerVUIterationsConfig{BaseConfig: executor.BaseConfig{
 				Name: "per_vu_iters", Type: "per-vu-iterations", Exec: null.StringFrom("nonDefault")},
 				VUs:         null.IntFrom(1),
@@ -160,7 +160,7 @@ func TestDeriveAndValidateConfig(t *testing.T) {
 				MaxDuration: types.NullDurationFrom(time.Second),
 			}}}}, true, "",
 		},
-		{"nonDefaultErr", Config{Options: lib.Options{Execution: lib.ExecutorConfigMap{
+		{"nonDefaultErr", Config{Options: lib.Options{Scenarios: lib.ExecutorConfigMap{
 			"per_vu_iters": executor.PerVUIterationsConfig{BaseConfig: executor.BaseConfig{
 				Name: "per_vu_iters", Type: "per-vu-iterations", Exec: null.StringFrom("nonDefaultErr")},
 				VUs:         null.IntFrom(1),
