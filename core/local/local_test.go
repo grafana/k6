@@ -773,7 +773,7 @@ func TestExecutionSchedulerEndErrors(t *testing.T) {
 			return errors.New("hi")
 		},
 		Options: lib.Options{
-			Scenarios: lib.ExecutorConfigMap{exec.GetName(): exec},
+			Scenarios: lib.ScenarioConfigs{exec.GetName(): exec},
 		},
 	}
 	logger, hook := logtest.NewNullLogger()

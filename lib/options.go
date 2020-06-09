@@ -34,10 +34,10 @@ import (
 	"github.com/loadimpact/k6/stats"
 )
 
-// DefaultExecutorName is used as the default key/ID of the executor config entries
+// DefaultScenarioName is used as the default key/ID of the scenario config entries
 // that were created due to the use of the shortcut execution control options (i.e. duration+vus,
 // iterations+vus, or stages)
-const DefaultExecutorName = "default"
+const DefaultScenarioName = "default"
 
 // DefaultSummaryTrendStats are the default trend columns shown in the test summary output
 // nolint: gochecknoglobals
@@ -204,7 +204,7 @@ type Options struct {
 	// We should support specifying execution segments via environment
 	// variables, but we currently can't, because envconfig has this nasty bug
 	// (among others): https://github.com/kelseyhightower/envconfig/issues/113
-	Scenarios                ExecutorConfigMap         `json:"scenarios,omitempty" ignored:"true"`
+	Scenarios                ScenarioConfigs           `json:"scenarios,omitempty" ignored:"true"`
 	ExecutionSegment         *ExecutionSegment         `json:"executionSegment" ignored:"true"`
 	ExecutionSegmentSequence *ExecutionSegmentSequence `json:"executionSegmentSequence" ignored:"true"`
 

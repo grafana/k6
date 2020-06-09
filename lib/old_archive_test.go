@@ -230,7 +230,7 @@ func TestFilenamePwdResolve(t *testing.T) {
 }
 
 func TestDerivedExecutionDiscarding(t *testing.T) {
-	var emptyConfigMap ExecutorConfigMap
+	var emptyConfigMap ScenarioConfigs
 	var tests = []struct {
 		metadata     string
 		expScenarios interface{}
