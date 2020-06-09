@@ -403,7 +403,7 @@ func TestExecutionSchedulerRunCustomConfigNoCrossover(t *testing.T) {
 				vus: 1,
 				iterations: 1,
 				gracefulStop: '0s',
-				maxDuration: '0.5s',
+				maxDuration: '1s',
 				exec: 's1func',
 				env: { TESTVAR1: 'scenario1' },
 				tags: { testtag1: 'scenario1' },
@@ -412,7 +412,7 @@ func TestExecutionSchedulerRunCustomConfigNoCrossover(t *testing.T) {
 				type: 'shared-iterations',
 				vus: 1,
 				iterations: 1,
-				gracefulStop: '0.5s',
+				gracefulStop: '1s',
 				startTime: '0.5s',
 				maxDuration: '2s',
 				exec: 's2func',
@@ -423,7 +423,7 @@ func TestExecutionSchedulerRunCustomConfigNoCrossover(t *testing.T) {
 				type: 'per-vu-iterations',
 				vus: 1,
 				iterations: 1,
-				gracefulStop: '0.5s',
+				gracefulStop: '1s',
 				exec: 's3funcWS',
 				env: { TESTVAR3: 'scenario3' },
 				tags: { testtag3: 'scenario3' },
@@ -505,12 +505,11 @@ func TestExecutionSchedulerRunCustomConfigNoCrossover(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	done := make(chan struct{})
 	samples := make(chan stats.SampleContainer)
 	go func() {
 		assert.NoError(t, execScheduler.Init(ctx, samples))
 		assert.NoError(t, execScheduler.Run(ctx, ctx, samples))
-		close(done)
+		close(samples)
 	}()
 
 	expectedTrailTags := []map[string]string{
@@ -529,49 +528,44 @@ func TestExecutionSchedulerRunCustomConfigNoCrossover(t *testing.T) {
 		{"testtag3": "scenario3", "wstag": "scenario3"},
 	}
 	var gotSampleTags int
-	for {
-		select {
-		case sample := <-samples:
-			switch s := sample.(type) {
-			case stats.Sample:
-				if s.Metric.Name == "errors" {
-					assert.FailNow(t, "received error sample from test")
-				}
-				if s.Metric.Name == "checks" || s.Metric.Name == "group_duration" {
-					tags := s.Tags.CloneTags()
-					for _, expTags := range expectedPlainSampleTags {
-						if reflect.DeepEqual(expTags, tags) {
-							gotSampleTags++
-						}
-					}
-				}
-			case *httpext.Trail:
+	for sample := range samples {
+		switch s := sample.(type) {
+		case stats.Sample:
+			if s.Metric.Name == "errors" {
+				assert.FailNow(t, "received error sample from test")
+			}
+			if s.Metric.Name == "checks" || s.Metric.Name == "group_duration" {
 				tags := s.Tags.CloneTags()
-				for _, expTags := range expectedTrailTags {
+				for _, expTags := range expectedPlainSampleTags {
 					if reflect.DeepEqual(expTags, tags) {
-						gotSampleTags++
-					}
-				}
-			case *netext.NetTrail:
-				tags := s.Tags.CloneTags()
-				for _, expTags := range expectedNetTrailTags {
-					if reflect.DeepEqual(expTags, tags) {
-						gotSampleTags++
-					}
-				}
-			case stats.ConnectedSamples:
-				for _, sm := range s.Samples {
-					tags := sm.Tags.CloneTags()
-					if reflect.DeepEqual(expectedConnSampleTags, tags) {
 						gotSampleTags++
 					}
 				}
 			}
-		case <-done:
-			require.Equal(t, 8, gotSampleTags, "received wrong amount of samples with expected tags")
-			return
+		case *httpext.Trail:
+			tags := s.Tags.CloneTags()
+			for _, expTags := range expectedTrailTags {
+				if reflect.DeepEqual(expTags, tags) {
+					gotSampleTags++
+				}
+			}
+		case *netext.NetTrail:
+			tags := s.Tags.CloneTags()
+			for _, expTags := range expectedNetTrailTags {
+				if reflect.DeepEqual(expTags, tags) {
+					gotSampleTags++
+				}
+			}
+		case stats.ConnectedSamples:
+			for _, sm := range s.Samples {
+				tags := sm.Tags.CloneTags()
+				if reflect.DeepEqual(expectedConnSampleTags, tags) {
+					gotSampleTags++
+				}
+			}
 		}
 	}
+	require.Equal(t, 8, gotSampleTags, "received wrong amount of samples with expected tags")
 }
 
 func TestExecutionSchedulerSetupTeardownRun(t *testing.T) {

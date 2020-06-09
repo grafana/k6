@@ -212,6 +212,7 @@ func runCloudCollectorTestCase(t *testing.T, minSamples int) {
 	expectedTags := stats.IntoSampleTags(&expectedTagMap)
 
 	expSamples := make(chan []Sample)
+	defer close(expSamples)
 	tb.Mux.HandleFunc(fmt.Sprintf("/v1/metrics/%s", collector.referenceID), getSampleChecker(t, expSamples))
 	tb.Mux.HandleFunc(fmt.Sprintf("/v1/tests/%s", collector.referenceID), func(rw http.ResponseWriter, _ *http.Request) {
 		rw.WriteHeader(http.StatusOK) // silence a test warning
@@ -575,6 +576,7 @@ func TestCloudCollectorAggregationPeriodZeroNoBlock(t *testing.T) {
 	assert.Equal(t, types.Duration(5*time.Millisecond), collector.config.AggregationWaitPeriod.Duration)
 
 	expSamples := make(chan []Sample)
+	defer close(expSamples)
 	tb.Mux.HandleFunc(fmt.Sprintf("/v1/metrics/%s", collector.referenceID), getSampleChecker(t, expSamples))
 
 	ctx, cancel := context.WithCancel(context.Background())
