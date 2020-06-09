@@ -45,8 +45,8 @@ type vuHandle struct {
 	initVU       lib.InitializedVU
 	activeVU     lib.ActiveVU
 	canStartIter chan struct{}
-	// This is here only to signal that something has changed it must be added to and read with atomics
-	// and helps to skip checking all the contexts and channels all the time
+	// If change is not 0, it signals that the VU needs to be reinitialized. It must be added to and
+	// read with atomics and helps to skip checking all the contexts and channels all the time.
 	change int32
 
 	ctx, vuCtx       context.Context
