@@ -633,11 +633,7 @@ func (vlv RampingVUs) Run(ctx context.Context, out chan<- stats.SampleContainer)
 		currentMaxAllowedVUs = newMaxAllowedVUs
 	}
 
-	// This is the step that is the actual gracefulStop at the end
-	lastStep := gracefulExecutionSteps[len(gracefulExecutionSteps)-1]
-	// TODO maybe instead of getting only the last step (above) mergeSteps should return the
-	// remaining gracefulExecutionSteps? or maybe we should refactor this even more ...
-	mergedSteps := mergeSteps(rawExecutionSteps, gracefulExecutionSteps[:len(gracefulExecutionSteps)-1])
+	mergedSteps, remaining := mergeSteps(rawExecutionSteps, gracefulExecutionSteps[:len(gracefulExecutionSteps)-1])
 	timer := time.NewTimer(time.Hour * 24)
 	for _, step := range mergedSteps {
 		offsetDiff := step.step.TimeOffset - time.Since(startTime)
@@ -658,17 +654,19 @@ func (vlv RampingVUs) Run(ctx context.Context, out chan<- stats.SampleContainer)
 	}
 
 	go func() {
-		offsetDiff := lastStep.TimeOffset - time.Since(startTime)
-		if offsetDiff > 0 { // wait until time of event arrives // TODO have a mininum
-			timer.Reset(offsetDiff)
-			select {
-			case <-maxDurationCtx.Done():
-				return // exit if context is cancelled
-			case <-timer.C:
-				// now we do a step
+		for _, step := range remaining {
+			offsetDiff := step.TimeOffset - time.Since(startTime)
+			if offsetDiff > 0 { // wait until time of event arrives // TODO have a mininum
+				timer.Reset(offsetDiff)
+				select {
+				case <-maxDurationCtx.Done():
+					return // exit if context is cancelled
+				case <-timer.C:
+					// now we do a step
+				}
 			}
+			handleNewMaxAllowedVUs(step.PlannedVUs)
 		}
-		handleNewMaxAllowedVUs(lastStep.PlannedVUs)
 	}()
 
 	return nil
@@ -680,24 +678,20 @@ type mergedStep struct {
 }
 
 // merges raw and gracefulStop steps, giving priority to raw ones if time offset is the same
+// but also returns the remaining gracefulStop ones onces the raw ones end
 // TODO ... thinking about it gracefulExecutionSteps in a lot of cases will lead to nothing so maybe
 // we should skip them here?
-// TODO better name ... zip is not correct, and combine seems even worse ... merge is not great as
-// well though
-func mergeSteps(rawExecutionSteps, gracefulExecutionSteps []lib.ExecutionStep) []mergedStep {
+// TODO maybe just iterate over this above ? instead of creating new slice
+func mergeSteps(rawExecutionSteps, gracefulExecutionSteps []lib.ExecutionStep) ([]mergedStep, []lib.ExecutionStep) {
 	result := make([]mergedStep, len(rawExecutionSteps)+len(gracefulExecutionSteps))
 
 	i, j := 0, 0
 	for {
 		if i == len(rawExecutionSteps) {
-			for ; j < len(gracefulExecutionSteps); j++ {
-				result[i+j].raw = false
-				result[i+j].step = gracefulExecutionSteps[j]
-			}
-			break
+			return result[:i+j], gracefulExecutionSteps[j:]
 		}
 
-		if j == len(gracefulExecutionSteps) {
+		if j == len(gracefulExecutionSteps) { // TODO this should never happen
 			for ; i < len(rawExecutionSteps); i++ {
 				result[i+j].raw = true
 				result[i+j].step = rawExecutionSteps[i]
@@ -716,5 +710,6 @@ func mergeSteps(rawExecutionSteps, gracefulExecutionSteps []lib.ExecutionStep) [
 		}
 	}
 
-	return result
+	// TODO this should never happen actually
+	return result, nil
 }

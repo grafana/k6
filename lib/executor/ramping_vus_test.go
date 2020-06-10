@@ -197,6 +197,69 @@ func TestRampingVUsGracefulStopStops(t *testing.T) {
 	require.NoError(t, <-errCh)
 }
 
+func TestRampingVUsGracefulRampDown(t *testing.T) {
+	t.Parallel()
+
+	config := RampingVUsConfig{
+		BaseConfig:       BaseConfig{GracefulStop: types.NullDurationFrom(5 * time.Second)},
+		StartVUs:         null.IntFrom(2),
+		GracefulRampDown: types.NullDurationFrom(5 * time.Second),
+		Stages: []Stage{
+			{
+				Duration: types.NullDurationFrom(1 * time.Second),
+				Target:   null.IntFrom(2),
+			},
+			{
+				Duration: types.NullDurationFrom(1 * time.Second),
+				Target:   null.IntFrom(0),
+			},
+		},
+	}
+
+	var (
+		started = make(chan struct{}) // the iteration started
+		stopped = make(chan struct{}) // the iteration stopped
+		stop    = make(chan struct{}) // the itearation should stop
+	)
+
+	et, err := lib.NewExecutionTuple(nil, nil)
+	require.NoError(t, err)
+	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
+	ctx, cancel, executor, _ := setupExecutor(
+		t, config, es,
+		simpleRunner(func(ctx context.Context) error {
+			if lib.GetState(ctx).Vu == 1 { // the first VU will wait here to do stuff
+				close(started)
+				defer close(stopped)
+				select {
+				case <-ctx.Done():
+					t.Fatal("The iterations shouldn't have ended before the context")
+				case <-stop:
+				}
+			} else { // all other (1) VUs will just sleep long enough
+				time.Sleep(2500 * time.Millisecond)
+			}
+			return nil
+		}),
+	)
+	defer cancel()
+	errCh := make(chan error)
+	go func() { errCh <- executor.Run(ctx, nil) }()
+
+	<-started
+	// 500 milliseconds more then the gracefulRampDown + duration
+	time.Sleep(2500 * time.Millisecond)
+	close(stop)
+	<-stopped
+
+	select {
+	case err := <-errCh:
+		require.NoError(t, err)
+	case <-time.After(time.Second): // way too much time
+		t.Fatal("Execution should've ended already")
+	}
+}
+
 // Ensure there's no wobble of VUs during graceful ramp-down, without segments.
 // See https://github.com/loadimpact/k6/issues/1296
 func TestRampingVUsRampDownNoWobble(t *testing.T) {
