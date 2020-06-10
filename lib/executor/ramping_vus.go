@@ -633,37 +633,33 @@ func (vlv RampingVUs) Run(ctx context.Context, out chan<- stats.SampleContainer)
 		currentMaxAllowedVUs = newMaxAllowedVUs
 	}
 
-	mergedSteps, remaining := mergeSteps(rawExecutionSteps, gracefulExecutionSteps[:len(gracefulExecutionSteps)-1])
-	timer := time.NewTimer(time.Hour * 24)
-	for _, step := range mergedSteps {
-		offsetDiff := step.step.TimeOffset - time.Since(startTime)
-		if offsetDiff > 0 { // wait until time of event arrives // TODO have a mininum
-			timer.Reset(offsetDiff)
-			select {
-			case <-maxDurationCtx.Done():
-				return // exit if context is cancelled
-			case <-timer.C:
-				// now we do a step
+	wait := waiter(ctx, startTime)
+	// iterate over rawExecutionSteps and gracefulExecutionSteps in order by TimeOffset
+	// giving rawExecutionSteps precedence.
+	// we stop iterating once rawExecutionSteps are over as we need to run the remaining
+	// gracefulExecutionSteps concurrently while waiting for VUs to stop in order to now wait until
+	// the end of gracefulStop timeouts
+	i, j := 0, 0
+	for i != len(rawExecutionSteps) {
+		if rawExecutionSteps[i].TimeOffset > gracefulExecutionSteps[j].TimeOffset {
+			if wait(gracefulExecutionSteps[j].TimeOffset) {
+				return
 			}
-		}
-		if step.raw {
-			handleNewScheduledVUs(step.step.PlannedVUs)
+			handleNewMaxAllowedVUs(gracefulExecutionSteps[j].PlannedVUs)
+			j++
 		} else {
-			handleNewMaxAllowedVUs(step.step.PlannedVUs)
+			if wait(rawExecutionSteps[i].TimeOffset) {
+				return
+			}
+			handleNewScheduledVUs(rawExecutionSteps[i].PlannedVUs)
+			i++
 		}
 	}
 
-	go func() {
-		for _, step := range remaining {
-			offsetDiff := step.TimeOffset - time.Since(startTime)
-			if offsetDiff > 0 { // wait until time of event arrives // TODO have a mininum
-				timer.Reset(offsetDiff)
-				select {
-				case <-maxDurationCtx.Done():
-					return // exit if context is cancelled
-				case <-timer.C:
-					// now we do a step
-				}
+	go func() { // iterate over the remaining gracefulExecutionSteps
+		for _, step := range gracefulExecutionSteps[j:] {
+			if wait(step.TimeOffset) {
+				return
 			}
 			handleNewMaxAllowedVUs(step.PlannedVUs)
 		}
@@ -672,44 +668,24 @@ func (vlv RampingVUs) Run(ctx context.Context, out chan<- stats.SampleContainer)
 	return nil
 }
 
-type mergedStep struct {
-	raw  bool              // marks if this is a raw step or gracefulStop one
-	step lib.ExecutionStep // the actual step
-}
-
-// merges raw and gracefulStop steps, giving priority to raw ones if time offset is the same
-// but also returns the remaining gracefulStop ones onces the raw ones end
-// TODO ... thinking about it gracefulExecutionSteps in a lot of cases will lead to nothing so maybe
-// we should skip them here?
-// TODO maybe just iterate over this above ? instead of creating new slice
-func mergeSteps(rawExecutionSteps, gracefulExecutionSteps []lib.ExecutionStep) ([]mergedStep, []lib.ExecutionStep) {
-	result := make([]mergedStep, len(rawExecutionSteps)+len(gracefulExecutionSteps))
-
-	i, j := 0, 0
-	for {
-		if i == len(rawExecutionSteps) {
-			return result[:i+j], gracefulExecutionSteps[j:]
-		}
-
-		if j == len(gracefulExecutionSteps) { // TODO this should never happen
-			for ; i < len(rawExecutionSteps); i++ {
-				result[i+j].raw = true
-				result[i+j].step = rawExecutionSteps[i]
+// waiter returns a function that will sleep/wait for the required time since the startTime and then
+// return. If the context was done before that it will return true otherwise it will return false
+// TODO use elsewhere
+// TODO set startTime here?
+// TODO move it to a struct type or something and benchmark if that makes a difference
+func waiter(ctx context.Context, startTime time.Time) func(offset time.Duration) bool {
+	timer := time.NewTimer(time.Hour * 24)
+	return func(offset time.Duration) bool {
+		offsetDiff := offset - time.Since(startTime)
+		if offsetDiff > 0 { // wait until time of event arrives // TODO have a mininum
+			timer.Reset(offsetDiff)
+			select {
+			case <-ctx.Done():
+				return true // exit if context is cancelled
+			case <-timer.C:
+				// now we do a step
 			}
-			break
 		}
-
-		if rawExecutionSteps[i].TimeOffset > gracefulExecutionSteps[j].TimeOffset {
-			result[i+j].raw = false
-			result[i+j].step = gracefulExecutionSteps[j]
-			j++
-		} else {
-			result[i+j].raw = true
-			result[i+j].step = rawExecutionSteps[i]
-			i++
-		}
+		return false
 	}
-
-	// TODO this should never happen actually
-	return result, nil
 }
