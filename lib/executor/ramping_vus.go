@@ -637,7 +637,7 @@ func (vlv RampingVUs) Run(ctx context.Context, out chan<- stats.SampleContainer)
 	// iterate over rawExecutionSteps and gracefulExecutionSteps in order by TimeOffset
 	// giving rawExecutionSteps precedence.
 	// we stop iterating once rawExecutionSteps are over as we need to run the remaining
-	// gracefulExecutionSteps concurrently while waiting for VUs to stop in order to now wait until
+	// gracefulExecutionSteps concurrently while waiting for VUs to stop in order to not wait until
 	// the end of gracefulStop timeouts
 	i, j := 0, 0
 	for i != len(rawExecutionSteps) {
