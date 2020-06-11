@@ -183,7 +183,7 @@ func (scs *ScenarioConfigs) UnmarshalJSON(data []byte) error {
 	result := make(ScenarioConfigs, len(protoConfigs))
 	for k, v := range protoConfigs {
 		if v.configType == "" {
-			return fmt.Errorf("execution config '%s' doesn't have a type value", k)
+			return fmt.Errorf("scenario '%s' doesn't have a specified executor type", k)
 		}
 		config, err := GetParsedExecutorConfig(k, v.configType, v.rawJSON)
 		if err != nil {
@@ -202,7 +202,7 @@ func (scs ScenarioConfigs) Validate() (errors []error) {
 	for name, exec := range scs {
 		if execErr := exec.Validate(); len(execErr) != 0 {
 			errors = append(errors,
-				fmt.Errorf("executor %s has errors: %s", name, ConcatErrors(execErr, ", ")))
+				fmt.Errorf("scenario %s has configuration errors: %s", name, ConcatErrors(execErr, ", ")))
 		}
 	}
 	return errors
