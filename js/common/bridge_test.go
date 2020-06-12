@@ -702,6 +702,7 @@ func BenchmarkProxy(b *testing.B) {
 			}
 		}},
 		{"AddError", "addWithError", bridgeTestAddWithErrorType{}, func(b *testing.B, fn interface{}) {
+			b.Skip()
 			f := fn.(func(int, int) int)
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
@@ -709,6 +710,7 @@ func BenchmarkProxy(b *testing.B) {
 			}
 		}},
 		{"Context", "context", bridgeTestContextType{}, func(b *testing.B, fn interface{}) {
+			b.Skip()
 			f := fn.(func())
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
@@ -716,6 +718,7 @@ func BenchmarkProxy(b *testing.B) {
 			}
 		}},
 		{"ContextAdd", "contextAdd", bridgeTestContextAddType{}, func(b *testing.B, fn interface{}) {
+			b.Skip()
 			f := fn.(func(int, int) int)
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
@@ -723,6 +726,7 @@ func BenchmarkProxy(b *testing.B) {
 			}
 		}},
 		{"ContextAddError", "contextAddWithError", bridgeTestContextAddWithErrorType{}, func(b *testing.B, fn interface{}) {
+			b.Skip()
 			f := fn.(func(int, int) int)
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
@@ -737,6 +741,7 @@ func BenchmarkProxy(b *testing.B) {
 			}
 		}},
 		{"SumContext", "sumWithContext", bridgeTestSumWithContextType{}, func(b *testing.B, fn interface{}) {
+			b.Skip()
 			f := fn.(func(...int) int)
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
@@ -744,6 +749,7 @@ func BenchmarkProxy(b *testing.B) {
 			}
 		}},
 		{"SumError", "sumWithError", bridgeTestSumWithErrorType{}, func(b *testing.B, fn interface{}) {
+			b.Skip()
 			f := fn.(func(...int) int)
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
@@ -751,6 +757,7 @@ func BenchmarkProxy(b *testing.B) {
 			}
 		}},
 		{"SumContextError", "sumWithContextAndError", bridgeTestSumWithContextAndErrorType{}, func(b *testing.B, fn interface{}) {
+			b.Skip()
 			f := fn.(func(...int) int)
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
