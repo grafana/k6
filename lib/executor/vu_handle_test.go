@@ -103,6 +103,82 @@ func TestVUHandleRace(t *testing.T) {
 		"too small of a difference %d + 1 <= %d", fullBefore, fullAfter)
 }
 
+// this test is mostly interesting when -race is enabled
+func TestVUHandleStartStopRace(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	logHook := &testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.DebugLevel}}
+	testLog := logrus.New()
+	testLog.AddHook(logHook)
+	testLog.SetOutput(testutils.NewTestOutput(t))
+	// testLog.Level = logrus.DebugLevel
+	logEntry := logrus.NewEntry(testLog)
+
+	returned := make(chan struct{})
+	getVU := func() (lib.InitializedVU, error) {
+		returned = make(chan struct{})
+		return &minirunner.VU{
+			R: &minirunner.MiniRunner{
+				Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
+					// TODO: do something
+					return nil
+				},
+			},
+		}, nil
+	}
+
+	returnVU := func(_ lib.InitializedVU) {
+		close(returned)
+		// do something
+	}
+	var interruptedIter int64
+	var fullIterations int64
+
+	runIter := func(ctx context.Context, vu lib.ActiveVU) bool {
+		_ = vu.RunOnce()
+		select {
+		case <-ctx.Done():
+			// Don't log errors or emit iterations metrics from cancelled iterations
+			atomic.AddInt64(&interruptedIter, 1)
+			return false
+		default:
+			atomic.AddInt64(&fullIterations, 1)
+			return true
+		}
+	}
+
+	vuHandle := newStoppedVUHandle(ctx, getVU, returnVU, &BaseConfig{}, logEntry)
+	go vuHandle.runLoopsIfPossible(runIter)
+	for i := 0; i < 1000; i++ {
+		err := vuHandle.start()
+		vuHandle.gracefulStop()
+		require.NoError(t, err)
+		select {
+		case <-returned:
+		case <-time.After(500 * time.Millisecond):
+			go panic("returning took too long")
+			time.Sleep(time.Second)
+		}
+	}
+
+	vuHandle.hardStop() // STOP it
+	time.Sleep(time.Millisecond * 5)
+	interruptedBefore := atomic.LoadInt64(&interruptedIter)
+	fullBefore := atomic.LoadInt64(&fullIterations)
+	_ = vuHandle.start()
+	time.Sleep(time.Millisecond * 50) // just to be sure an iteration will squeeze in
+	cancel()
+	time.Sleep(time.Millisecond * 5)
+	interruptedAfter := atomic.LoadInt64(&interruptedIter)
+	fullAfter := atomic.LoadInt64(&fullIterations)
+	assert.True(t, interruptedBefore >= interruptedAfter-1,
+		"too big of a difference %d >= %d - 1", interruptedBefore, interruptedAfter)
+	assert.True(t, fullBefore+1 <= fullAfter,
+		"too small of a difference %d + 1 <= %d", fullBefore, fullAfter)
+}
+
 func TestVUHandleSimple(t *testing.T) {
 	t.Parallel()
 
