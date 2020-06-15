@@ -57,6 +57,7 @@ type vuHandle struct {
 	// If state is not 0, it signals that the VU needs to be reinitialized. It must be added to and
 	// read with atomics and helps to skip checking all the contexts and channels all the time.
 	state int32
+	// stateH []int32 // helper for debugging
 
 	ctx, vuCtx       context.Context
 	cancel, vuCancel func()
@@ -86,59 +87,51 @@ func newStoppedVUHandle(
 
 	// TODO maybe move the repeating parts in a function?
 	vh.returnVU = func(v lib.InitializedVU) {
-		// Don't return the initialized VU back
 		vh.mutex.Lock()
-		select {
-		case <-vh.parentCtx.Done():
-			// we are done just ruturn the VU
+		// the returnVU could be called after those have reinitialize, don't nil them if that is the
+		// case, maybe just don't nil them
+		if vh.state != starting && vh.state != running {
 			vh.initVU = nil
 			vh.activeVU = nil
-			atomic.StoreInt32(&vh.state, stopped) // change this to soemthign that exits ?
-			vh.mutex.Unlock()
-			returnVU(v)
-		default:
-			if vh.state == running { // we raced with start, it won .. lets not just return the VU for no reason
-				vh.mutex.Unlock()
-				return
-			}
-			select {
-			case <-vh.canStartIter:
-				// we can continue with itearting - lets not return the vu
-				vh.activateVU() // we still need to reactivate it to get the new context and cancel
-				atomic.StoreInt32(&vh.state, starting)
-				vh.mutex.Unlock()
-			default: // we actually have to return the vu
-				vh.initVU = nil
-				vh.activeVU = nil
-				atomic.StoreInt32(&vh.state, stopped)
-				vh.mutex.Unlock()
-				returnVU(v)
-			}
 		}
+		vh.mutex.Unlock()
+		returnVU(v)
 	}
 
 	return vh
 }
 
+// start is one of the more complicated ones as it can race with toGracefulStop and has special
+// cases
+// state changes
+// toGracefulStop => running, we have raced with toGracefulStop if it was finished the state
+// would've been stoppped
+// starting, running => nothing, we have done what needs to be done
+// stopped, toHardStop => reactivate everything, it is either stopped or hardStop has uninitialized
+// some stuff and we need to reinitialize them
 func (vh *vuHandle) start() (err error) {
 	vh.mutex.Lock()
 	if vh.state == toGracefulStop { // No point returning the VU just continue as it was
-		atomic.StoreInt32(&vh.state, running)
+		close(vh.canStartIter)
+		vh.changeState(running)
 		vh.mutex.Unlock()
 		return
 	}
 
-	if vh.state != starting && vh.state != running && vh.initVU == nil {
-		vh.logger.Debug("Start")
-		vh.initVU, err = vh.getVU()
-		if err != nil {
-			vh.mutex.Unlock()
-			return err
-		}
-		vh.activateVU()
-		atomic.StoreInt32(&vh.state, starting)
-		close(vh.canStartIter)
+	if vh.state == starting || vh.state == running {
+		vh.mutex.Unlock()
+		return nil
 	}
+
+	vh.logger.Debug("Start")
+	vh.initVU, err = vh.getVU()
+	if err != nil {
+		vh.mutex.Unlock()
+		return err
+	}
+	vh.activateVU()
+	close(vh.canStartIter)
+	vh.changeState(starting)
 	vh.mutex.Unlock()
 	return nil
 }
@@ -149,39 +142,70 @@ func (vh *vuHandle) activateVU() {
 	vh.activeVU = vh.initVU.Activate(getVUActivationParams(vh.vuCtx, *vh.config, vh.returnVU))
 }
 
+// just a helper function for debugging
+func (vh *vuHandle) changeState(newState int32) {
+	// vh.stateH = append(vh.stateH, newState)
+	atomic.StoreInt32(&vh.state, newState)
+}
+
+// gracefulStop
+// state changes
+// stopped,toGracefulStop,toHardStop - nothing to do, skip
+// starting - we couldn't manage to make an iteration since start, so move to stopped and cancel the
+// vuCtx
+// running -> toGracefulStop
 func (vh *vuHandle) gracefulStop() {
 	vh.mutex.Lock()
 
-	if vh.state != toGracefulStop && vh.state != toHardStop && vh.state != stopped {
-		if vh.state == starting { // we raced with starting
-			vh.vuCancel()
-			atomic.StoreInt32(&vh.state, stopped)
-		} else {
-			atomic.StoreInt32(&vh.state, toGracefulStop)
-		}
-		vh.canStartIter = make(chan struct{})
-		vh.logger.Debug("Graceful stop")
+	if vh.state == toGracefulStop || vh.state == toHardStop || vh.state == stopped {
+		vh.mutex.Unlock()
+		return
 	}
+
+	if vh.state == starting { // we raced with starting
+		vh.vuCancel()
+		vh.changeState(stopped)
+	} else {
+		vh.changeState(toGracefulStop)
+	}
+	vh.canStartIter = make(chan struct{})
+	vh.logger.Debug("Graceful stop")
 
 	vh.mutex.Unlock()
 }
 
+// hardStop
+// state changes:
+// stopped, toHardStop -> nothing to do
+// else -> cancel the main context and move to toHardStop, reinitialize the main context
 func (vh *vuHandle) hardStop() {
 	vh.mutex.Lock()
 	vh.logger.Debug("Hard stop")
-	if vh.state != toHardStop && vh.state != stopped {
-		vh.cancel() // cancel the previous context
-		atomic.StoreInt32(&vh.state, toHardStop)
-		vh.initVU = nil
-		vh.ctx, vh.cancel = context.WithCancel(vh.parentCtx) // create a new context
-		vh.canStartIter = make(chan struct{})
+	if vh.state == toHardStop || vh.state == stopped {
+		vh.mutex.Unlock()
+		return
 	}
+
+	vh.cancel() // cancel the previous context
+	vh.changeState(toHardStop)
+	vh.initVU = nil
+	vh.ctx, vh.cancel = context.WithCancel(vh.parentCtx) // create a new context
+	vh.canStartIter = make(chan struct{})
 	vh.mutex.Unlock()
 }
 
+// runLoopsIfPossible this is where all the fun is :D. Unfortunately somewhere we need to check most
+// of the cases and this is where
 func (vh *vuHandle) runLoopsIfPossible(runIter func(context.Context, lib.ActiveVU) bool) {
 	// We can probably initialize here, but it's also easier to just use the slow path in the second
 	// part of the for loop
+	defer func() {
+		// not sure if this is needed, because here the parentCtx is canceled and I would argue it doesn't matter
+		// if we set the correct state
+		vh.mutex.Lock()
+		vh.changeState(stopped)
+		vh.mutex.Unlock()
+	}()
 	var (
 		executorDone = vh.parentCtx.Done()
 		vuCtx        context.Context
@@ -191,64 +215,50 @@ func (vh *vuHandle) runLoopsIfPossible(runIter func(context.Context, lib.ActiveV
 
 	for {
 		state := atomic.LoadInt32(&vh.state)
-		if vu != nil && state == running && runIter(vuCtx, vu) { // fast path
+		if state == running && runIter(vuCtx, vu) { // fast path
 			continue
 		}
 
 		// slow path - something has changed - get what and wait until we can do more iterations
 
+		vh.mutex.Lock()
 		select {
 		case <-executorDone:
 			// The whole executor is done, nothing more to do.
+			vh.mutex.Unlock()
 			return
 		default:
 		}
 
-		vh.mutex.Lock()
 		if vh.state == running { // start raced us to toGracefulStop
 			vh.mutex.Unlock()
 			continue
 		}
 
-		if cancel != nil {
-			cancel() // signal to return the vu before we continue
-		}
 		if vh.state == toGracefulStop || vh.state == toHardStop {
-			vh.state = stopped
+			if cancel != nil {
+				cancel() // signal to return the vu before we continue
+			}
+			// we have *now* stopped
+			vh.changeState(stopped)
 		}
 		canStartIter, ctx := vh.canStartIter, vh.ctx
-		select {
-		case <-executorDone:
-			// The whole executor is done, nothing more to do.
-			vh.mutex.Unlock()
-			return
-		default:
-		}
 		vh.mutex.Unlock()
 
 		// We're not running, but the executor isn't done yet, so we wait
 		// for either one of those conditions.
-
 		select {
 		case <-canStartIter:
 			vh.mutex.Lock()
 			select {
 			case <-vh.canStartIter: // we check again in case of race
 				// reinitialize
-				if vh.activeVU == nil {
-					// we've raced with the ReturnVU: we can continue doing iterations but
-					// a stop has happened and returnVU hasn't managed to run yet ... so we loop
-					// TODO call runtime.GoSched() in the else to give priority to possibly the returnVU goroutine
-					vh.mutex.Unlock()
-					continue
-				}
-
 				vu = vh.activeVU
 				vuCtx = vh.vuCtx
 				cancel = vh.vuCancel
-				atomic.StoreInt32(&vh.state, running) // clear changes here
+				vh.changeState(running) // clear changes here
 				vh.mutex.Unlock()
-			default:
+			default: // TODO find out if this is actually necessary anymore
 				// well we got raced to here by something ... loop again ...
 				vh.mutex.Unlock()
 				continue

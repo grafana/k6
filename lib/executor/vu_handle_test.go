@@ -29,7 +29,10 @@ func TestVUHandleRace(t *testing.T) {
 	// testLog.Level = logrus.DebugLevel
 	logEntry := logrus.NewEntry(testLog)
 
+	var getVUCount int64
+	var returnVUCount int64
 	getVU := func() (lib.InitializedVU, error) {
+		atomic.AddInt64(&getVUCount, 1)
 		return &minirunner.VU{
 			R: &minirunner.MiniRunner{
 				Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
@@ -41,6 +44,7 @@ func TestVUHandleRace(t *testing.T) {
 	}
 
 	returnVU := func(_ lib.InitializedVU) {
+		atomic.AddInt64(&returnVUCount, 1)
 		// do something
 	}
 	var interruptedIter int64
@@ -94,13 +98,14 @@ func TestVUHandleRace(t *testing.T) {
 	_ = vuHandle.start()
 	time.Sleep(time.Millisecond * 50) // just to be sure an iteration will squeeze in
 	cancel()
-	time.Sleep(time.Millisecond * 5)
+	time.Sleep(time.Millisecond * 50)
 	interruptedAfter := atomic.LoadInt64(&interruptedIter)
 	fullAfter := atomic.LoadInt64(&fullIterations)
 	assert.True(t, interruptedBefore >= interruptedAfter-1,
 		"too big of a difference %d >= %d - 1", interruptedBefore, interruptedAfter)
 	assert.True(t, fullBefore+1 <= fullAfter,
 		"too small of a difference %d + 1 <= %d", fullBefore, fullAfter)
+	require.Equal(t, atomic.LoadInt64(&getVUCount), atomic.LoadInt64(&returnVUCount))
 }
 
 // this test is mostly interesting when -race is enabled
@@ -116,10 +121,14 @@ func TestVUHandleStartStopRace(t *testing.T) {
 	// testLog.Level = logrus.DebugLevel
 	logEntry := logrus.NewEntry(testLog)
 
+	var vuID int64 = -1
+
+	var testIterations = 10000
 	returned := make(chan struct{})
 	getVU := func() (lib.InitializedVU, error) {
 		returned = make(chan struct{})
 		return &minirunner.VU{
+			ID: atomic.AddInt64(&vuID, 1),
 			R: &minirunner.MiniRunner{
 				Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
 					// TODO: do something
@@ -129,9 +138,9 @@ func TestVUHandleStartStopRace(t *testing.T) {
 		}, nil
 	}
 
-	returnVU := func(_ lib.InitializedVU) {
+	returnVU := func(v lib.InitializedVU) {
+		require.Equal(t, atomic.LoadInt64(&vuID), v.(*minirunner.VU).ID)
 		close(returned)
-		// do something
 	}
 	var interruptedIter int64
 	var fullIterations int64
@@ -151,13 +160,13 @@ func TestVUHandleStartStopRace(t *testing.T) {
 
 	vuHandle := newStoppedVUHandle(ctx, getVU, returnVU, &BaseConfig{}, logEntry)
 	go vuHandle.runLoopsIfPossible(runIter)
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < testIterations; i++ {
 		err := vuHandle.start()
 		vuHandle.gracefulStop()
 		require.NoError(t, err)
 		select {
 		case <-returned:
-		case <-time.After(500 * time.Millisecond):
+		case <-time.After(50 * time.Millisecond):
 			go panic("returning took too long")
 			time.Sleep(time.Second)
 		}
