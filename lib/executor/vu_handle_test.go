@@ -166,7 +166,7 @@ func TestVUHandleStartStopRace(t *testing.T) {
 		require.NoError(t, err)
 		select {
 		case <-returned:
-		case <-time.After(50 * time.Millisecond):
+		case <-time.After(100 * time.Millisecond):
 			go panic("returning took too long")
 			time.Sleep(time.Second)
 		}

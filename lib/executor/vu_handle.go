@@ -39,6 +39,38 @@ const (
 	toHardStop
 )
 
+/*
+the below is state transition table (https://en.wikipedia.org/wiki/State-transition_table)
+start is the method start
+loop is a loop of runLoopsIfpossible
+grace is the method gracefulStop
+hard is the method hardStop
++-------+-----------------------------------------+
+| input | current         | next state            |
++-------+-----------------------------------------+
+| start | stopped         | start                 |
+| start | start           | start                 |
+| start | running         | running               |
+| start | toGracefulStop  | running               | // stop it from being
+| start | toHardStop      | start                 |
+| loop  | stopped         | stopped               |
+| loop  | starting        | running               |
+| loop  | running         | running               | // usually fast path
+| loop  | toGracefulStop  | stopped               |
+| loop  | toHardStop      | stopped               |
+| grace | stopped         | stopped               |
+| grace | start           | stopped               | // cancel vuContext as we never got to get it in loop
+| grace | running         | toGracfulStop         |
+| grace | toGracefulStop  | toGracefulStop        |
+| grace | toHardSTop      | toHardStop            |
+| hard  | stopped         | stopped               |
+| hard  | start           | toHardStop            | // here because we cancel the contex either way it doesn't matter
+| hard  | running         | toHardStop            |
+| hard  | toGracefulStop  | toHardStop            |
+| hard  | toHardStop      | toHardStop            |
++-------+-----------------+-----------------------+
+*/
+
 // This is a helper type used in executors where we have to dynamically control
 // the number of VUs that are simultaneously running. For the moment, it is used
 // in the RampingVUs and the ExternallyControlled executors.
