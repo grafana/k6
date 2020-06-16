@@ -101,7 +101,7 @@ func NewExecutionScheduler(runner lib.Runner, logger *logrus.Logger) (*Execution
 		logger:  logger,
 		options: options,
 
-		initProgress:    pb.New(pb.WithConstLeft("Init")),
+		initProgress:    pb.New(pb.WithConstLeft(" Init")),
 		executors:       executors,
 		executorConfigs: executorConfigs,
 		executionPlan:   executionPlan,
@@ -339,7 +339,7 @@ func (e *ExecutionScheduler) runExecutor(
 func (e *ExecutionScheduler) Run(globalCtx, runCtx context.Context, engineOut chan<- stats.SampleContainer) error {
 	executorsCount := len(e.executors)
 	logger := e.logger.WithField("phase", "local-execution-scheduler-run")
-	e.initProgress.Modify(pb.WithConstLeft("Run"))
+	e.initProgress.Modify(pb.WithConstLeft(" Run"))
 
 	if e.state.IsPaused() {
 		logger.Debug("Execution is paused, waiting for resume or interrupt...")
