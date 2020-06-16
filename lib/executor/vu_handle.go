@@ -45,30 +45,30 @@ start is the method start
 loop is a loop of runLoopsIfpossible
 grace is the method gracefulStop
 hard is the method hardStop
-+-------+-----------------------------------------+
-| input | current         | next state            |
-+-------+-----------------------------------------+
-| start | stopped         | start                 |
-| start | start           | start                 |
-| start | running         | running               |
-| start | toGracefulStop  | running               | // stop it from being
-| start | toHardStop      | start                 |
-| loop  | stopped         | stopped               |
-| loop  | starting        | running               |
-| loop  | running         | running               | // usually fast path
-| loop  | toGracefulStop  | stopped               |
-| loop  | toHardStop      | stopped               |
-| grace | stopped         | stopped               |
-| grace | start           | stopped               | // cancel vuContext as we never got to get it in loop
-| grace | running         | toGracfulStop         |
-| grace | toGracefulStop  | toGracefulStop        |
-| grace | toHardSTop      | toHardStop            |
-| hard  | stopped         | stopped               |
-| hard  | start           | toHardStop            | // here because we cancel the contex either way it doesn't matter
-| hard  | running         | toHardStop            |
-| hard  | toGracefulStop  | toHardStop            |
-| hard  | toHardStop      | toHardStop            |
-+-------+-----------------+-----------------------+
++-------+-------------------------------------+---------------------------------------------------+
+| input | current         | next state        | notes                                             |
++-------+-------------------------------------+---------------------------------------------------+
+| start | stopped         | starting          | normal                                            |
+| start | starting        | starting          | nothing                                           |
+| start | running         | running           | nothing                                           |
+| start | toGracefulStop  | running           | we raced with the loop stopping, just continue    |
+| start | toHardStop      | starting          | same as stopped really                            |
+| loop  | stopped         | stopped           | we actually are blocked on canStartIter           |
+| loop  | starting        | running           | get new VU and context                            |
+| loop  | running         | running           | usually fast path                                 |
+| loop  | toGracefulStop  | stopped           | cancel the context and make new one               |
+| loop  | toHardStop      | stopped           | cancel the context and make new one               |
+| grace | stopped         | stopped           | nothing                                           |
+| grace | starting        | stopped           | cancel the context to return the VU               |
+| grace | running         | toGracefulStop    | normal one, the actual work is in the loop        |
+| grace | toGracefulStop  | toGracefulStop    | nothing                                           |
+| grace | toHardSTop      | toHardStop        | nothing                                           |
+| hard  | stopped         | stopped           | nothing                                           |
+| hard  | starting        | stopped           | short circuit as in the grace case, not necessary |
+| hard  | running         | toHardStop        | normal, cancel context and reinitialize it        |
+| hard  | toGracefulStop  | toHardStop        | normal, cancel context and reinitialize it        |
+| hard  | toHardStop      | toHardStop        | nothing                                           |
++-------+-----------------+-------------------+----------------------------------------------------+
 */
 
 // This is a helper type used in executors where we have to dynamically control
@@ -91,9 +91,9 @@ type vuHandle struct {
 	state int32
 	// stateH []int32 // helper for debugging
 
-	ctx, vuCtx       context.Context
-	cancel, vuCancel func()
-	logger           *logrus.Entry
+	ctx    context.Context
+	cancel func()
+	logger *logrus.Entry
 }
 
 func newStoppedVUHandle(
@@ -133,45 +133,40 @@ func newStoppedVUHandle(
 	return vh
 }
 
-// start is one of the more complicated ones as it can race with toGracefulStop and has special
-// cases
-// state changes
-// toGracefulStop => running, we have raced with toGracefulStop if it was finished the state
-// would've been stoppped
-// starting, running => nothing, we have done what needs to be done
-// stopped, toHardStop => reactivate everything, it is either stopped or hardStop has uninitialized
-// some stuff and we need to reinitialize them
 func (vh *vuHandle) start() (err error) {
 	vh.mutex.Lock()
-	if vh.state == toGracefulStop { // No point returning the VU just continue as it was
-		close(vh.canStartIter)
-		vh.changeState(running)
-		vh.mutex.Unlock()
-		return
-	}
+	defer vh.mutex.Unlock()
 
 	if vh.state == starting || vh.state == running {
-		vh.mutex.Unlock()
-		return nil
+		return nil // nothing to do
 	}
 
 	vh.logger.Debug("Start")
+	if vh.state == toGracefulStop { // No point returning the VU just continue as it was
+		close(vh.canStartIter)
+		vh.changeState(running)
+		return
+	}
+
 	vh.initVU, err = vh.getVU()
 	if err != nil {
-		vh.mutex.Unlock()
 		return err
 	}
+
 	vh.activateVU()
 	close(vh.canStartIter)
 	vh.changeState(starting)
-	vh.mutex.Unlock()
 	return nil
 }
 
 // this must be called with the mutex locked
 func (vh *vuHandle) activateVU() {
-	vh.vuCtx, vh.vuCancel = context.WithCancel(vh.ctx)
-	vh.activeVU = vh.initVU.Activate(getVUActivationParams(vh.vuCtx, *vh.config, vh.returnVU))
+	select {
+	case <-vh.ctx.Done():
+		vh.ctx, vh.cancel = context.WithCancel(vh.parentCtx)
+	default:
+	}
+	vh.activeVU = vh.initVU.Activate(getVUActivationParams(vh.ctx, *vh.config, vh.returnVU))
 }
 
 // just a helper function for debugging
@@ -180,50 +175,45 @@ func (vh *vuHandle) changeState(newState int32) {
 	atomic.StoreInt32(&vh.state, newState)
 }
 
-// gracefulStop
-// state changes
-// stopped,toGracefulStop,toHardStop - nothing to do, skip
-// starting - we couldn't manage to make an iteration since start, so move to stopped and cancel the
-// vuCtx
-// running -> toGracefulStop
 func (vh *vuHandle) gracefulStop() {
 	vh.mutex.Lock()
+	defer vh.mutex.Unlock()
 
 	if vh.state == toGracefulStop || vh.state == toHardStop || vh.state == stopped {
-		vh.mutex.Unlock()
 		return
 	}
 
+	vh.logger.Debug("Graceful stop")
+
 	if vh.state == starting { // we raced with starting
-		vh.vuCancel()
+		vh.cancel()
+		vh.ctx, vh.cancel = context.WithCancel(vh.parentCtx)
 		vh.changeState(stopped)
 	} else {
 		vh.changeState(toGracefulStop)
 	}
 	vh.canStartIter = make(chan struct{})
-	vh.logger.Debug("Graceful stop")
-
-	vh.mutex.Unlock()
 }
 
-// hardStop
-// state changes:
-// stopped, toHardStop -> nothing to do
-// else -> cancel the main context and move to toHardStop, reinitialize the main context
 func (vh *vuHandle) hardStop() {
 	vh.mutex.Lock()
-	vh.logger.Debug("Hard stop")
+	defer vh.mutex.Unlock()
+
 	if vh.state == toHardStop || vh.state == stopped {
-		vh.mutex.Unlock()
 		return
 	}
 
-	vh.cancel() // cancel the previous context
-	vh.changeState(toHardStop)
+	vh.logger.Debug("Hard stop")
+
+	vh.cancel()
+	vh.ctx, vh.cancel = context.WithCancel(vh.parentCtx)
+	if vh.state == starting { // we raced with starting
+		vh.changeState(stopped)
+	} else {
+		vh.changeState(toHardStop)
+	}
 	vh.initVU = nil
-	vh.ctx, vh.cancel = context.WithCancel(vh.parentCtx) // create a new context
 	vh.canStartIter = make(chan struct{})
-	vh.mutex.Unlock()
 }
 
 // runLoopsIfPossible this is where all the fun is :D. Unfortunately somewhere we need to check most
@@ -240,19 +230,18 @@ func (vh *vuHandle) runLoopsIfPossible(runIter func(context.Context, lib.ActiveV
 	}()
 	var (
 		executorDone = vh.parentCtx.Done()
-		vuCtx        context.Context
+		ctx          context.Context
 		cancel       func()
 		vu           lib.ActiveVU
 	)
 
 	for {
 		state := atomic.LoadInt32(&vh.state)
-		if state == running && runIter(vuCtx, vu) { // fast path
+		if state == running && runIter(ctx, vu) { // fast path
 			continue
 		}
 
 		// slow path - something has changed - get what and wait until we can do more iterations
-
 		vh.mutex.Lock()
 		select {
 		case <-executorDone:
@@ -270,11 +259,15 @@ func (vh *vuHandle) runLoopsIfPossible(runIter func(context.Context, lib.ActiveV
 		if vh.state == toGracefulStop || vh.state == toHardStop {
 			if cancel != nil {
 				cancel() // signal to return the vu before we continue
+				if ctx == vh.ctx {
+					vh.ctx, vh.cancel = context.WithCancel(vh.parentCtx)
+				}
 			}
 			// we have *now* stopped
 			vh.changeState(stopped)
 		}
-		canStartIter, ctx := vh.canStartIter, vh.ctx
+		canStartIter := vh.canStartIter
+		ctx = vh.ctx
 		vh.mutex.Unlock()
 
 		// We're not running, but the executor isn't done yet, so we wait
@@ -286,8 +279,8 @@ func (vh *vuHandle) runLoopsIfPossible(runIter func(context.Context, lib.ActiveV
 			case <-vh.canStartIter: // we check again in case of race
 				// reinitialize
 				vu = vh.activeVU
-				vuCtx = vh.vuCtx
-				cancel = vh.vuCancel
+				ctx = vh.ctx
+				cancel = vh.cancel
 				vh.changeState(running) // clear changes here
 				vh.mutex.Unlock()
 			default: // TODO find out if this is actually necessary anymore
