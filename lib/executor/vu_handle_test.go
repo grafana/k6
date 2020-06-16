@@ -92,7 +92,7 @@ func TestVUHandleRace(t *testing.T) {
 	}()
 	wg.Wait()
 	vuHandle.hardStop() // STOP it
-	time.Sleep(time.Millisecond)
+	time.Sleep(time.Millisecond * 50)
 	interruptedBefore := atomic.LoadInt64(&interruptedIter)
 	fullBefore := atomic.LoadInt64(&fullIterations)
 	_ = vuHandle.start()
