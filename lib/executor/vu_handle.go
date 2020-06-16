@@ -30,10 +30,11 @@ import (
 	"github.com/loadimpact/k6/lib"
 )
 
+type stateType int32
+
 // states
-// there is no specific type as this need to be used with atomic
 const (
-	stopped = iota
+	stopped stateType = iota
 	starting
 	running
 	toGracefulStop
@@ -97,7 +98,7 @@ type vuHandle struct {
 	activeVU     lib.ActiveVU
 	canStartIter chan struct{}
 
-	state int32 // see the table above for meanings
+	state stateType // see the table above for meanings
 	// stateH []int32 // helper for debugging
 
 	ctx    context.Context
@@ -153,9 +154,9 @@ func (vh *vuHandle) start() (err error) {
 }
 
 // just a helper function for debugging
-func (vh *vuHandle) changeState(newState int32) {
+func (vh *vuHandle) changeState(newState stateType) {
 	// vh.stateH = append(vh.stateH, newState)
-	atomic.StoreInt32(&vh.state, newState)
+	atomic.StoreInt32((*int32)(&vh.state), int32(newState))
 }
 
 func (vh *vuHandle) gracefulStop() {
@@ -215,7 +216,7 @@ func (vh *vuHandle) runLoopsIfPossible(runIter func(context.Context, lib.ActiveV
 	)
 
 	for {
-		state := atomic.LoadInt32(&vh.state)
+		state := stateType(atomic.LoadInt32((*int32)(&vh.state)))
 		if state == running && runIter(ctx, vu) { // fast path
 			continue
 		}
