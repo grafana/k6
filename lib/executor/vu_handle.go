@@ -131,25 +131,24 @@ func (vh *vuHandle) start() (err error) {
 	vh.mutex.Lock()
 	defer vh.mutex.Unlock()
 
-	if vh.state == starting || vh.state == running {
+	switch vh.state {
+	case starting, running:
 		return nil // nothing to do
-	}
-
-	vh.logger.Debug("Start")
-	if vh.state == toGracefulStop { // No point returning the VU just continue as it was
+	case toGracefulStop: // we raced with the loop, lets not return the vu just to get it back
+		vh.logger.Debug("Start")
 		close(vh.canStartIter)
 		vh.changeState(running)
-		return
-	}
+	case stopped, toHardStop: // we need to reactivate the VU and remake the context for it
+		vh.logger.Debug("Start")
+		vh.initVU, err = vh.getVU()
+		if err != nil {
+			return err
+		}
 
-	vh.initVU, err = vh.getVU()
-	if err != nil {
-		return err
+		vh.activeVU = vh.initVU.Activate(getVUActivationParams(vh.ctx, *vh.config, vh.returnVU))
+		close(vh.canStartIter)
+		vh.changeState(starting)
 	}
-
-	vh.activeVU = vh.initVU.Activate(getVUActivationParams(vh.ctx, *vh.config, vh.returnVU))
-	close(vh.canStartIter)
-	vh.changeState(starting)
 	return nil
 }
 
@@ -162,20 +161,18 @@ func (vh *vuHandle) changeState(newState int32) {
 func (vh *vuHandle) gracefulStop() {
 	vh.mutex.Lock()
 	defer vh.mutex.Unlock()
-
-	if vh.state == toGracefulStop || vh.state == toHardStop || vh.state == stopped {
-		return
-	}
-
-	vh.logger.Debug("Graceful stop")
-
-	if vh.state == starting { // we raced with starting
+	switch vh.state {
+	case toGracefulStop, toHardStop, stopped:
+		return // nothing to do
+	case starting: // we raced with the loop and apparently it won't do a single iteration
 		vh.cancel()
 		vh.ctx, vh.cancel = context.WithCancel(vh.parentCtx)
 		vh.changeState(stopped)
-	} else {
+	case running:
 		vh.changeState(toGracefulStop)
 	}
+
+	vh.logger.Debug("Graceful stop")
 	vh.canStartIter = make(chan struct{})
 }
 
@@ -183,19 +180,17 @@ func (vh *vuHandle) hardStop() {
 	vh.mutex.Lock()
 	defer vh.mutex.Unlock()
 
-	if vh.state == toHardStop || vh.state == stopped {
-		return
-	}
-
-	vh.logger.Debug("Hard stop")
-
-	vh.cancel()
-	vh.ctx, vh.cancel = context.WithCancel(vh.parentCtx)
-	if vh.state == starting { // we raced with starting
+	switch vh.state {
+	case toHardStop, stopped:
+		return // nothing to do
+	case starting: // we raced with the loop and apparently it won't do a single iteration
 		vh.changeState(stopped)
-	} else {
+	case running, toGracefulStop:
 		vh.changeState(toHardStop)
 	}
+	vh.logger.Debug("Hard stop")
+	vh.cancel()
+	vh.ctx, vh.cancel = context.WithCancel(vh.parentCtx)
 	vh.canStartIter = make(chan struct{})
 }
 
@@ -235,21 +230,25 @@ func (vh *vuHandle) runLoopsIfPossible(runIter func(context.Context, lib.ActiveV
 		default:
 		}
 
-		if vh.state == running { // start raced us to toGracefulStop
+		switch vh.state {
+		case running: // start raced us toGracefulStop
 			vh.mutex.Unlock()
 			continue
-		}
-
-		if vh.state == toGracefulStop || vh.state == toHardStop {
-			if cancel != nil && vh.state == toGracefulStop {
+		case toGracefulStop:
+			if cancel != nil {
 				// we need to cancel the context, to return the vu
 				// and because *we* did, lets reinitialize it
 				cancel()
 				vh.ctx, vh.cancel = context.WithCancel(vh.parentCtx)
 			}
+			fallthrough // to set the state
+		case toHardStop:
 			// we have *now* stopped
 			vh.changeState(stopped)
+		case stopped, starting:
+			// there is nothing to do
 		}
+
 		canStartIter := vh.canStartIter
 		ctx = vh.ctx
 		vh.mutex.Unlock()
