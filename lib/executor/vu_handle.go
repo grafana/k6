@@ -31,6 +31,7 @@ import (
 )
 
 // states
+// there is no specific type as this need to be used with atomic
 const (
 	stopped = iota
 	starting
@@ -40,11 +41,12 @@ const (
 )
 
 /*
-the below is state transition table (https://en.wikipedia.org/wiki/State-transition_table)
-start is the method start
-loop is a loop of runLoopsIfpossible
-grace is the method gracefulStop
-hard is the method hardStop
+the below is a state transition table (https://en.wikipedia.org/wiki/State-transition_table)
+short names for input:
+- start is the method start
+- loop is a loop of runLoopsIfPossible
+- grace is the method gracefulStop
+- hard is the method hardStop
 +-------+-------------------------------------+---------------------------------------------------+
 | input | current         | next state        | notes                                             |
 +-------+-------------------------------------+---------------------------------------------------+
@@ -74,8 +76,16 @@ hard is the method hardStop
 // This is a helper type used in executors where we have to dynamically control
 // the number of VUs that are simultaneously running. For the moment, it is used
 // in the RampingVUs and the ExternallyControlled executors.
-//
-// TODO: something simpler?
+// Notes on the implementation requirements:
+// - it needs to be able to start and stop VUs in thread safe fashion
+// - for each call to getVU there must be 1 (and only 1) call to returnVU
+// - gracefulStop must let an iteration which has started to finish. For reasons of ease of
+// implementation and lack of good evidence it's not required to let a not started iteration to
+// finish in other words if you call start and then gracefulStop, there is no requirement for
+// 1 iteration to have been started.
+// - hardStop must stop an iteration in process
+// - it's not required but preferable, if where possible to not reactivate VUs and to reuse context
+// as this speed ups the execution
 type vuHandle struct {
 	mutex     *sync.Mutex
 	parentCtx context.Context
@@ -86,9 +96,8 @@ type vuHandle struct {
 	initVU       lib.InitializedVU
 	activeVU     lib.ActiveVU
 	canStartIter chan struct{}
-	// If state is not 0, it signals that the VU needs to be reinitialized. It must be added to and
-	// read with atomics and helps to skip checking all the contexts and channels all the time.
-	state int32
+
+	state int32 // see the table above for meanings
 	// stateH []int32 // helper for debugging
 
 	ctx    context.Context
@@ -100,11 +109,10 @@ func newStoppedVUHandle(
 	parentCtx context.Context, getVU func() (lib.InitializedVU, error),
 	returnVU func(lib.InitializedVU), config *BaseConfig, logger *logrus.Entry,
 ) *vuHandle {
-	lock := &sync.Mutex{}
 	ctx, cancel := context.WithCancel(parentCtx)
 
-	vh := &vuHandle{
-		mutex:     lock,
+	return &vuHandle{
+		mutex:     &sync.Mutex{},
 		parentCtx: parentCtx,
 		getVU:     getVU,
 		config:    config,
@@ -112,25 +120,11 @@ func newStoppedVUHandle(
 		canStartIter: make(chan struct{}),
 		state:        stopped,
 
-		ctx:    ctx,
-		cancel: cancel,
-		logger: logger,
+		ctx:      ctx,
+		cancel:   cancel,
+		logger:   logger,
+		returnVU: returnVU,
 	}
-
-	// TODO maybe move the repeating parts in a function?
-	vh.returnVU = func(v lib.InitializedVU) {
-		vh.mutex.Lock()
-		// the returnVU could be called after those have reinitialize, don't nil them if that is the
-		// case, maybe just don't nil them
-		if vh.state != starting && vh.state != running {
-			vh.initVU = nil
-			vh.activeVU = nil
-		}
-		vh.mutex.Unlock()
-		returnVU(v)
-	}
-
-	return vh
 }
 
 func (vh *vuHandle) start() (err error) {
@@ -153,20 +147,10 @@ func (vh *vuHandle) start() (err error) {
 		return err
 	}
 
-	vh.activateVU()
+	vh.activeVU = vh.initVU.Activate(getVUActivationParams(vh.ctx, *vh.config, vh.returnVU))
 	close(vh.canStartIter)
 	vh.changeState(starting)
 	return nil
-}
-
-// this must be called with the mutex locked
-func (vh *vuHandle) activateVU() {
-	select {
-	case <-vh.ctx.Done():
-		vh.ctx, vh.cancel = context.WithCancel(vh.parentCtx)
-	default:
-	}
-	vh.activeVU = vh.initVU.Activate(getVUActivationParams(vh.ctx, *vh.config, vh.returnVU))
 }
 
 // just a helper function for debugging
@@ -212,12 +196,11 @@ func (vh *vuHandle) hardStop() {
 	} else {
 		vh.changeState(toHardStop)
 	}
-	vh.initVU = nil
 	vh.canStartIter = make(chan struct{})
 }
 
-// runLoopsIfPossible this is where all the fun is :D. Unfortunately somewhere we need to check most
-// of the cases and this is where
+// runLoopsIfPossible is where all the fun is :D. Unfortunately somewhere we need to check most
+// of the cases and this is where this happens.
 func (vh *vuHandle) runLoopsIfPossible(runIter func(context.Context, lib.ActiveVU) bool) {
 	// We can probably initialize here, but it's also easier to just use the slow path in the second
 	// part of the for loop
@@ -228,6 +211,7 @@ func (vh *vuHandle) runLoopsIfPossible(runIter func(context.Context, lib.ActiveV
 		vh.changeState(stopped)
 		vh.mutex.Unlock()
 	}()
+
 	var (
 		executorDone = vh.parentCtx.Done()
 		ctx          context.Context
@@ -257,11 +241,11 @@ func (vh *vuHandle) runLoopsIfPossible(runIter func(context.Context, lib.ActiveV
 		}
 
 		if vh.state == toGracefulStop || vh.state == toHardStop {
-			if cancel != nil {
-				cancel() // signal to return the vu before we continue
-				if ctx == vh.ctx {
-					vh.ctx, vh.cancel = context.WithCancel(vh.parentCtx)
-				}
+			if cancel != nil && vh.state == toGracefulStop {
+				// we need to cancel the context, to return the vu
+				// and because *we* did, lets reinitialize it
+				cancel()
+				vh.ctx, vh.cancel = context.WithCancel(vh.parentCtx)
 			}
 			// we have *now* stopped
 			vh.changeState(stopped)
@@ -270,24 +254,20 @@ func (vh *vuHandle) runLoopsIfPossible(runIter func(context.Context, lib.ActiveV
 		ctx = vh.ctx
 		vh.mutex.Unlock()
 
-		// We're not running, but the executor isn't done yet, so we wait
+		// We're are stopped, but the executor isn't done yet, so we wait
 		// for either one of those conditions.
 		select {
-		case <-canStartIter:
+		case <-canStartIter: // we can start again
 			vh.mutex.Lock()
 			select {
 			case <-vh.canStartIter: // we check again in case of race
 				// reinitialize
-				vu = vh.activeVU
-				ctx = vh.ctx
-				cancel = vh.cancel
-				vh.changeState(running) // clear changes here
-				vh.mutex.Unlock()
-			default: // TODO find out if this is actually necessary anymore
+				vu, ctx, cancel = vh.activeVU, vh.ctx, vh.cancel
+				vh.changeState(running)
+			default:
 				// well we got raced to here by something ... loop again ...
-				vh.mutex.Unlock()
-				continue
 			}
+			vh.mutex.Unlock()
 		case <-ctx.Done():
 			// hardStop was called, start a fresh iteration to get the new
 			// context and signal channel
