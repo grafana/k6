@@ -61,6 +61,7 @@ const (
 	genericEngineErrorCode       = 103
 	invalidConfigErrorCode       = 104
 	externalAbortErrorCode       = 105
+	cannotStartRESTAPIErrorCode  = 106
 )
 
 // TODO: fix this, global variables are not very testable...
@@ -220,12 +221,19 @@ a commandline interface for interacting with it.`,
 			engine.Collectors = append(engine.Collectors, collector)
 		}
 
-		// Create an API server.
+		// Spin up the REST API server, if not disabled.
 		if address != "" {
 			initBar.Modify(pb.WithConstProgress(0, "Init API server"))
 			go func() {
-				if aerr := api.ListenAndServe(address, engine); err != nil {
-					logger.WithError(aerr).Warn("Error from API server")
+				logger.Debugf("Starting the REST API server on %s", address)
+				if aerr := api.ListenAndServe(address, engine); aerr != nil {
+					// Only exit k6 if the user has explicitly set the REST API address
+					if cmd.Flags().Lookup("address").Changed {
+						logger.WithError(aerr).Error("Error from API server")
+						os.Exit(cannotStartRESTAPIErrorCode)
+					} else {
+						logger.WithError(aerr).Warn("Error from API server")
+					}
 				}
 			}()
 		}
