@@ -290,7 +290,7 @@ func TestVUHandleSimple(t *testing.T) {
 		}()
 		err := vuHandle.start()
 		require.NoError(t, err)
-		time.Sleep(time.Millisecond * 5)
+		time.Sleep(time.Millisecond * 50)
 		vuHandle.gracefulStop()
 		time.Sleep(time.Millisecond * 1500)
 		assert.EqualValues(t, 1, atomic.LoadUint32(&getVUCount))
@@ -303,7 +303,7 @@ func TestVUHandleSimple(t *testing.T) {
 		cancel()
 		wg.Wait()
 
-		time.Sleep(time.Millisecond * 5)
+		time.Sleep(time.Millisecond * 50)
 		assert.EqualValues(t, 2, atomic.LoadUint32(&getVUCount))
 		assert.EqualValues(t, 2, atomic.LoadUint32(&returnVUCount))
 		assert.EqualValues(t, 1, atomic.LoadInt64(&interruptedIter))
