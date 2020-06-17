@@ -29,7 +29,10 @@ func TestVUHandleRace(t *testing.T) {
 	// testLog.Level = logrus.DebugLevel
 	logEntry := logrus.NewEntry(testLog)
 
+	var getVUCount int64
+	var returnVUCount int64
 	getVU := func() (lib.InitializedVU, error) {
+		atomic.AddInt64(&getVUCount, 1)
 		return &minirunner.VU{
 			R: &minirunner.MiniRunner{
 				Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
@@ -41,6 +44,7 @@ func TestVUHandleRace(t *testing.T) {
 	}
 
 	returnVU := func(_ lib.InitializedVU) {
+		atomic.AddInt64(&returnVUCount, 1)
 		// do something
 	}
 	var interruptedIter int64
@@ -88,7 +92,88 @@ func TestVUHandleRace(t *testing.T) {
 	}()
 	wg.Wait()
 	vuHandle.hardStop() // STOP it
-	time.Sleep(time.Millisecond)
+	time.Sleep(time.Millisecond * 50)
+	interruptedBefore := atomic.LoadInt64(&interruptedIter)
+	fullBefore := atomic.LoadInt64(&fullIterations)
+	_ = vuHandle.start()
+	time.Sleep(time.Millisecond * 50) // just to be sure an iteration will squeeze in
+	cancel()
+	time.Sleep(time.Millisecond * 50)
+	interruptedAfter := atomic.LoadInt64(&interruptedIter)
+	fullAfter := atomic.LoadInt64(&fullIterations)
+	assert.True(t, interruptedBefore >= interruptedAfter-1,
+		"too big of a difference %d >= %d - 1", interruptedBefore, interruptedAfter)
+	assert.True(t, fullBefore+1 <= fullAfter,
+		"too small of a difference %d + 1 <= %d", fullBefore, fullAfter)
+	require.Equal(t, atomic.LoadInt64(&getVUCount), atomic.LoadInt64(&returnVUCount))
+}
+
+// this test is mostly interesting when -race is enabled
+func TestVUHandleStartStopRace(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	logHook := &testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.DebugLevel}}
+	testLog := logrus.New()
+	testLog.AddHook(logHook)
+	testLog.SetOutput(testutils.NewTestOutput(t))
+	// testLog.Level = logrus.DebugLevel
+	logEntry := logrus.NewEntry(testLog)
+
+	var vuID int64 = -1
+
+	var testIterations = 10000
+	returned := make(chan struct{})
+	getVU := func() (lib.InitializedVU, error) {
+		returned = make(chan struct{})
+		return &minirunner.VU{
+			ID: atomic.AddInt64(&vuID, 1),
+			R: &minirunner.MiniRunner{
+				Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
+					// TODO: do something
+					return nil
+				},
+			},
+		}, nil
+	}
+
+	returnVU := func(v lib.InitializedVU) {
+		require.Equal(t, atomic.LoadInt64(&vuID), v.(*minirunner.VU).ID)
+		close(returned)
+	}
+	var interruptedIter int64
+	var fullIterations int64
+
+	runIter := func(ctx context.Context, vu lib.ActiveVU) bool {
+		_ = vu.RunOnce()
+		select {
+		case <-ctx.Done():
+			// Don't log errors or emit iterations metrics from cancelled iterations
+			atomic.AddInt64(&interruptedIter, 1)
+			return false
+		default:
+			atomic.AddInt64(&fullIterations, 1)
+			return true
+		}
+	}
+
+	vuHandle := newStoppedVUHandle(ctx, getVU, returnVU, &BaseConfig{}, logEntry)
+	go vuHandle.runLoopsIfPossible(runIter)
+	for i := 0; i < testIterations; i++ {
+		err := vuHandle.start()
+		vuHandle.gracefulStop()
+		require.NoError(t, err)
+		select {
+		case <-returned:
+		case <-time.After(100 * time.Millisecond):
+			go panic("returning took too long")
+			time.Sleep(time.Second)
+		}
+	}
+
+	vuHandle.hardStop() // STOP it
+	time.Sleep(time.Millisecond * 5)
 	interruptedBefore := atomic.LoadInt64(&interruptedIter)
 	fullBefore := atomic.LoadInt64(&fullIterations)
 	_ = vuHandle.start()
@@ -205,7 +290,7 @@ func TestVUHandleSimple(t *testing.T) {
 		}()
 		err := vuHandle.start()
 		require.NoError(t, err)
-		time.Sleep(time.Millisecond * 5)
+		time.Sleep(time.Millisecond * 50)
 		vuHandle.gracefulStop()
 		time.Sleep(time.Millisecond * 1500)
 		assert.EqualValues(t, 1, atomic.LoadUint32(&getVUCount))
@@ -218,7 +303,7 @@ func TestVUHandleSimple(t *testing.T) {
 		cancel()
 		wg.Wait()
 
-		time.Sleep(time.Millisecond * 5)
+		time.Sleep(time.Millisecond * 50)
 		assert.EqualValues(t, 2, atomic.LoadUint32(&getVUCount))
 		assert.EqualValues(t, 2, atomic.LoadUint32(&returnVUCount))
 		assert.EqualValues(t, 1, atomic.LoadInt64(&interruptedIter))
