@@ -47,7 +47,7 @@ type Dialer struct {
 
 	Resolver  dnsResolver
 	Blacklist []*lib.IPNet
-	Hosts     map[string]lib.IPPort
+	Hosts     map[string]*lib.HostAddress
 
 	BytesRead    int64
 	BytesWritten int64
@@ -156,7 +156,10 @@ func (d *Dialer) dialAddr(addr string) (string, error) {
 			if err != nil {
 				return "", err
 			}
-			remote = lib.NewIPPort(ip)
+			remote, err = lib.NewHostAddress(ip, port)
+			if err != nil {
+				return "", err
+			}
 		}
 	}
 
@@ -166,14 +169,15 @@ func (d *Dialer) dialAddr(addr string) (string, error) {
 		}
 	}
 
-	var remoteStr string
-	if remote.Port == "" {
-		remoteStr = net.JoinHostPort(remote.IP.String(), port)
-	} else {
-		remoteStr = remote.String()
+	if remote.Port == 0 && port != "" {
+		var err error
+		remote, err = lib.NewHostAddress(remote.IP, port)
+		if err != nil {
+			return "", err
+		}
 	}
 
-	return remoteStr, nil
+	return remote.String(), nil
 }
 
 // NetTrail contains information about the exchanged data size and length of a

@@ -242,15 +242,20 @@ func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 	http2IP := net.ParseIP(http2URL.Hostname())
 	require.NotNil(t, http2IP)
 
+	httpDomainValue, err := lib.NewHostAddress(httpIP, "80")
+	require.NoError(t, err)
+	httpsDomainValue, err := lib.NewHostAddress(httpsIP, "443")
+	require.NoError(t, err)
+
 	// Set up the dialer with shorter timeouts and the custom domains
 	dialer := netext.NewDialer(net.Dialer{
 		Timeout:   2 * time.Second,
 		KeepAlive: 10 * time.Second,
 		DualStack: true,
 	})
-	dialer.Hosts = map[string]lib.IPPort{
-		httpDomain:  lib.NewIPPort(httpIP),
-		httpsDomain: lib.NewIPPort(httpsIP),
+	dialer.Hosts = map[string]*lib.HostAddress{
+		httpDomain:  httpDomainValue,
+		httpsDomain: httpsDomainValue,
 	}
 
 	// Pre-configure the HTTP client transport with the dialer and TLS config (incl. HTTP2 support)

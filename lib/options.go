@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"strconv"
 
 	"github.com/pkg/errors"
 	"gopkg.in/guregu/null.v3"
@@ -175,45 +176,50 @@ func (ipnet *IPNet) UnmarshalText(b []byte) error {
 	return nil
 }
 
-// IPPort stores information about IP and port
+// HostAddress stores information about IP and port
 // for a host.
-type IPPort struct {
-	IP   net.IP
-	Port string
-}
+type HostAddress net.TCPAddr
 
-// NewIPPort creates a pointer to a new address with an IP object.
-func NewIPPort(ip net.IP) IPPort {
-	return IPPort{IP: ip}
-}
+// NewHostAddress creates a pointer to a new address with an IP object.
+func NewHostAddress(ip net.IP, portString string) (*HostAddress, error) {
+	var port int
+	if portString != "" {
+		var err error
+		if port, err = strconv.Atoi(portString); err != nil {
+			return nil, err
+		}
 
-// String returns the string representation of an address with a port.
-// If the IP is V6, and it adds brackets to make it a valid IP address.
-func (p IPPort) String() string {
-	if p.Port == "" {
-		return p.IP.String()
 	}
-	return net.JoinHostPort(p.IP.String(), p.Port)
+
+	return &HostAddress{
+		IP:   ip,
+		Port: port,
+	}, nil
+}
+
+// String converts a HostAddress into a string.
+func (h *HostAddress) String() string {
+	return (*net.TCPAddr)(h).String()
 }
 
 // MarshalText implements the encoding.TextMarshaler interface.
 // The encoding is the same as returned by String, with one exception:
 // When len(ip) is zero, it returns an empty slice.
-func (p IPPort) MarshalText() ([]byte, error) {
-	if len(p.IP) == 0 {
+func (h *HostAddress) MarshalText() ([]byte, error) {
+	if len(h.IP) == 0 {
 		return []byte(""), nil
 	}
 
-	if len(p.IP) != net.IPv4len && len(p.IP) != net.IPv6len {
-		return nil, &net.AddrError{Err: "invalid IP address", Addr: p.IP.String()}
+	if len(h.IP) != net.IPv4len && len(h.IP) != net.IPv6len {
+		return nil, &net.AddrError{Err: "invalid IP address", Addr: h.IP.String()}
 	}
 
-	return []byte(p.String()), nil
+	return []byte(h.String()), nil
 }
 
 // UnmarshalText implements the encoding.TextUnmarshaler interface.
 // The IP address is expected in a form accepted by ParseIP.
-func (p *IPPort) UnmarshalText(text []byte) error {
+func (h *HostAddress) UnmarshalText(text []byte) error {
 	if len(text) == 0 {
 		return &net.ParseError{Type: "IP address", Text: "<nil>"}
 	}
@@ -229,8 +235,13 @@ func (p *IPPort) UnmarshalText(text []byte) error {
 		return &net.ParseError{Type: "IP address", Text: s}
 	}
 
-	p.IP = x
-	p.Port = port
+	p, err := strconv.Atoi(port)
+	if err != nil {
+		return &net.ParseError{Type: "IP address", Text: s}
+	}
+
+	h.IP = x
+	h.Port = p
 
 	return nil
 }
@@ -310,7 +321,7 @@ type Options struct {
 	BlacklistIPs []*IPNet `json:"blacklistIPs" envconfig:"K6_BLACKLIST_IPS"`
 
 	// Hosts overrides dns entries for given hosts
-	Hosts map[string]IPPort `json:"hosts" envconfig:"K6_HOSTS"`
+	Hosts map[string]*HostAddress `json:"hosts" envconfig:"K6_HOSTS"`
 
 	// Disable keep-alive connections
 	NoConnectionReuse null.Bool `json:"noConnectionReuse" envconfig:"K6_NO_CONNECTION_REUSE"`
