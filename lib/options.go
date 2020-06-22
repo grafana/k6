@@ -206,7 +206,7 @@ func (h *HostAddress) String() string {
 // The encoding is the same as returned by String, with one exception:
 // When len(ip) is zero, it returns an empty slice.
 func (h *HostAddress) MarshalText() ([]byte, error) {
-	if len(h.IP) == 0 {
+	if h == nil || len(h.IP) == 0 {
 		return []byte(""), nil
 	}
 
@@ -225,24 +225,22 @@ func (h *HostAddress) UnmarshalText(text []byte) error {
 	}
 
 	s := string(text)
-	ip, port, err := net.SplitHostPort(s)
+	host, port, err := net.SplitHostPort(s)
 	if err != nil {
 		return err
 	}
 
-	x := net.ParseIP(ip)
-	if x == nil {
+	ip := net.ParseIP(host)
+	if ip == nil {
 		return &net.ParseError{Type: "IP address", Text: s}
 	}
 
-	p, err := strconv.Atoi(port)
+	nh, err := NewHostAddress(ip, port)
 	if err != nil {
-		return &net.ParseError{Type: "IP address", Text: s}
+		return err
 	}
 
-	h.IP = x
-	h.Port = p
-
+	*h = *nh
 	return nil
 }
 

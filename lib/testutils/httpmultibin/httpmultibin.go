@@ -242,9 +242,9 @@ func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 	http2IP := net.ParseIP(http2URL.Hostname())
 	require.NotNil(t, http2IP)
 
-	httpDomainValue, err := lib.NewHostAddress(httpIP, "80")
+	httpDomainValue, err := lib.NewHostAddress(httpIP, "")
 	require.NoError(t, err)
-	httpsDomainValue, err := lib.NewHostAddress(httpsIP, "443")
+	httpsDomainValue, err := lib.NewHostAddress(httpsIP, "")
 	require.NoError(t, err)
 
 	// Set up the dialer with shorter timeouts and the custom domains

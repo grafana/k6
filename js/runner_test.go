@@ -909,7 +909,7 @@ func TestVUIntegrationHosts(t *testing.T) {
 	r1.SetOptions(lib.Options{
 		Throw: null.BoolFrom(true),
 		Hosts: map[string]*lib.HostAddress{
-			"test.loadimpact.com": {IP: net.ParseIP("127.0.0.1"), Port: 80},
+			"test.loadimpact.com": {IP: net.ParseIP("127.0.0.1")},
 		},
 	})
 

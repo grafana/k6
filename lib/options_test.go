@@ -305,14 +305,15 @@ func TestOptions(t *testing.T) {
 	})
 
 	t.Run("Hosts", func(t *testing.T) {
-		host, err := NewHostAddress(net.ParseIP("192.0.2.1"), "")
+		host, err := NewHostAddress(net.ParseIP("192.0.2.1"), "80")
 		assert.NoError(t, err)
+
 		opts := Options{}.Apply(Options{Hosts: map[string]*HostAddress{
 			"test.loadimpact.com": host,
 		}})
 		assert.NotNil(t, opts.Hosts)
 		assert.NotEmpty(t, opts.Hosts)
-		assert.Equal(t, "192.0.2.1", opts.Hosts["test.loadimpact.com"].String())
+		assert.Equal(t, "192.0.2.1:80", opts.Hosts["test.loadimpact.com"].String())
 	})
 
 	t.Run("Throws", func(t *testing.T) {
