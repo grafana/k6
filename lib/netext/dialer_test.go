@@ -64,10 +64,10 @@ func TestDialerAddr(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "3.4.5.6:9090", addr)
 
-	addr, err = dialer.dialAddr("example-deny-resolver.com:80")
+	_, err = dialer.dialAddr("example-deny-resolver.com:80")
 	assert.EqualError(t, err, "IP (8.9.10.11) is in a blacklisted range (8.9.10.0/24)")
 
-	addr, err = dialer.dialAddr("example-deny-host.com:80")
+	_, err = dialer.dialAddr("example-deny-host.com:80")
 	assert.EqualError(t, err, "IP (8.9.10.11) is in a blacklisted range (8.9.10.0/24)")
 }
 

@@ -188,7 +188,6 @@ func NewHostAddress(ip net.IP, portString string) (*HostAddress, error) {
 		if port, err = strconv.Atoi(portString); err != nil {
 			return nil, err
 		}
-
 	}
 
 	return &HostAddress{
