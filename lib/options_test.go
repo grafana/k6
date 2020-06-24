@@ -485,7 +485,7 @@ func TestCIDRUnmarshal(t *testing.T) {
 	testData := []struct {
 		input          string
 		expectedOutput *IPNet
-		expactFailure  bool
+		expectFailure  bool
 	}{
 		{
 			"10.0.0.0/8",
@@ -514,11 +514,70 @@ func TestCIDRUnmarshal(t *testing.T) {
 			actualIPNet := &IPNet{}
 			err := actualIPNet.UnmarshalText([]byte(data.input))
 
-			if data.expactFailure {
+			if data.expectFailure {
 				require.EqualError(t, err, "Failed to parse CIDR: invalid CIDR address: "+data.input)
 			} else {
 				require.NoError(t, err)
 				assert.Equal(t, data.expectedOutput, actualIPNet)
+			}
+		})
+	}
+}
+
+func TestHostAddressUnmarshal(t *testing.T) {
+	var testData = []struct {
+		input          string
+		expectedOutput *HostAddress
+		expectFailure  string
+	}{
+		{
+			"1.2.3.4",
+			&HostAddress{IP: net.ParseIP("1.2.3.4")},
+			"",
+		},
+		{
+			"1.2.3.4:80",
+			&HostAddress{IP: net.ParseIP("1.2.3.4"), Port: 80},
+			"",
+		},
+		{
+			"1.2.3.4:asdf",
+			nil,
+			"strconv.Atoi: parsing \"asdf\": invalid syntax",
+		},
+		{
+			"2001:0db8:0000:0000:0000:ff00:0042:8329",
+			&HostAddress{IP: net.ParseIP("2001:0db8:0000:0000:0000:ff00:0042:8329")},
+			"",
+		},
+		{
+			"2001:db8::68",
+			&HostAddress{IP: net.ParseIP("2001:db8::68")},
+			"",
+		},
+		{
+			"[2001:db8::68]:80",
+			&HostAddress{IP: net.ParseIP("2001:db8::68"), Port: 80},
+			"",
+		},
+		{
+			"[2001:db8::68]:asdf",
+			nil,
+			"strconv.Atoi: parsing \"asdf\": invalid syntax",
+		},
+	}
+
+	for _, data := range testData {
+		data := data
+		t.Run(data.input, func(t *testing.T) {
+			actualHost := &HostAddress{}
+			err := actualHost.UnmarshalText([]byte(data.input))
+
+			if data.expectFailure != "" {
+				require.EqualError(t, err, data.expectFailure)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, data.expectedOutput, actualHost)
 			}
 		})
 	}

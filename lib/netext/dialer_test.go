@@ -37,16 +37,22 @@ func (r testResolver) FetchOne(host string) (net.IP, error) { return r.hosts[hos
 func TestDialerAddr(t *testing.T) {
 	dialer := newDialerWithResolver(net.Dialer{}, newResolver())
 	dialer.Hosts = map[string]*lib.HostAddress{
-		"example.com":           {IP: net.ParseIP("3.4.5.6")},
-		"example.com:443":       {IP: net.ParseIP("3.4.5.6"), Port: 8443},
-		"example.com:8080":      {IP: net.ParseIP("3.4.5.6"), Port: 9090},
-		"example-deny-host.com": {IP: net.ParseIP("8.9.10.11")},
+		"example.com":                {IP: net.ParseIP("3.4.5.6")},
+		"example.com:443":            {IP: net.ParseIP("3.4.5.6"), Port: 8443},
+		"example.com:8080":           {IP: net.ParseIP("3.4.5.6"), Port: 9090},
+		"example-deny-host.com":      {IP: net.ParseIP("8.9.10.11")},
+		"example-ipv6.com":           {IP: net.ParseIP("2001:db8::68")},
+		"example-ipv6.com:443":       {IP: net.ParseIP("2001:db8::68"), Port: 8443},
+		"example-ipv6-deny-host.com": {IP: net.ParseIP("::1")},
 	}
 
 	ipNet, err := lib.ParseCIDR("8.9.10.0/24")
 	assert.NoError(t, err)
 
-	dialer.Blacklist = []*lib.IPNet{ipNet}
+	ipV6Net, err := lib.ParseCIDR("::1/24")
+	assert.NoError(t, err)
+
+	dialer.Blacklist = []*lib.IPNet{ipNet, ipV6Net}
 
 	addr, err := dialer.dialAddr("example-resolver.com:80")
 	assert.NoError(t, err)
@@ -64,18 +70,33 @@ func TestDialerAddr(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "3.4.5.6:9090", addr)
 
+	addr, err = dialer.dialAddr("example-ipv6.com:80")
+	assert.NoError(t, err)
+	assert.Equal(t, "[2001:db8::68]:80", addr)
+
+	addr, err = dialer.dialAddr("example-ipv6.com:443")
+	assert.NoError(t, err)
+	assert.Equal(t, "[2001:db8::68]:8443", addr)
+
 	_, err = dialer.dialAddr("example-deny-resolver.com:80")
 	assert.EqualError(t, err, "IP (8.9.10.11) is in a blacklisted range (8.9.10.0/24)")
 
 	_, err = dialer.dialAddr("example-deny-host.com:80")
 	assert.EqualError(t, err, "IP (8.9.10.11) is in a blacklisted range (8.9.10.0/24)")
+
+	_, err = dialer.dialAddr("example-ipv6-deny-resolver.com:80")
+	assert.EqualError(t, err, "IP (::1) is in a blacklisted range (::/24)")
+
+	_, err = dialer.dialAddr("example-ipv6-deny-host.com:80")
+	assert.EqualError(t, err, "IP (::1) is in a blacklisted range (::/24)")
 }
 
 func newResolver() testResolver {
 	return testResolver{
 		hosts: map[string]net.IP{
-			"example-resolver.com":      net.ParseIP("1.2.3.4"),
-			"example-deny-resolver.com": net.ParseIP("8.9.10.11"),
+			"example-resolver.com":           net.ParseIP("1.2.3.4"),
+			"example-deny-resolver.com":      net.ParseIP("8.9.10.11"),
+			"example-ipv6-deny-resolver.com": net.ParseIP("::1"),
 		},
 	}
 }

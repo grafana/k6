@@ -21,6 +21,7 @@
 package lib
 
 import (
+	"bytes"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -39,6 +40,8 @@ import (
 // that were created due to the use of the shortcut execution control options (i.e. duration+vus,
 // iterations+vus, or stages)
 const DefaultScenarioName = "default"
+
+const defaultHostPort = 80
 
 // DefaultSummaryTrendStats are the default trend columns shown in the test summary output
 // nolint: gochecknoglobals
@@ -223,15 +226,9 @@ func (h *HostAddress) UnmarshalText(text []byte) error {
 		return &net.ParseError{Type: "IP address", Text: "<nil>"}
 	}
 
-	s := string(text)
-	host, port, err := net.SplitHostPort(s)
+	ip, port, err := splitHostPort(text)
 	if err != nil {
 		return err
-	}
-
-	ip := net.ParseIP(host)
-	if ip == nil {
-		return &net.ParseError{Type: "IP address", Text: s}
 	}
 
 	nh, err := NewHostAddress(ip, port)
@@ -241,6 +238,32 @@ func (h *HostAddress) UnmarshalText(text []byte) error {
 
 	*h = *nh
 	return nil
+}
+
+func splitHostPort(text []byte) (net.IP, string, error) {
+	host := string(text)
+	var port string
+
+	if isHostPort(text) {
+		var err error
+		host, port, err = net.SplitHostPort(host)
+		if err != nil {
+			return nil, "", err
+		}
+	}
+
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return nil, "", &net.ParseError{Type: "IP address", Text: host}
+	}
+
+	return ip, port, nil
+}
+
+func isHostPort(text []byte) bool {
+	return bytes.ContainsRune(text, ':') &&
+		(bytes.ContainsRune(text, '.') || // ipV4
+			(bytes.ContainsRune(text, '[') && bytes.ContainsRune(text, ']'))) // ipV6
 }
 
 // ParseCIDR creates an IPNet out of a CIDR string
