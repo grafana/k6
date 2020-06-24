@@ -581,7 +581,8 @@ func TestReadPump(t *testing.T) {
 			msgChan := make(chan []byte)
 			errChan := make(chan error)
 			closeChan := make(chan int)
-			go readPump(conn, msgChan, errChan, closeChan)
+			s := &Socket{conn: conn}
+			go s.readPump(msgChan, errChan, closeChan)
 
 		readChans:
 			for {
