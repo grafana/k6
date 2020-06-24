@@ -73,8 +73,8 @@ func (mecc ExternallyControlledConfigParams) Validate() (errors []error) {
 
 	if mecc.MaxVUs.Int64 < mecc.VUs.Int64 {
 		errors = append(errors, fmt.Errorf(
-			"the specified maxVUs (%d) should be more than or equal to the the number of active VUs (%d)",
-			mecc.MaxVUs.Int64, mecc.VUs.Int64,
+			"the number of active VUs (%d) must be less than or equal to the number of maxVUs (%d)",
+			mecc.VUs.Int64, mecc.MaxVUs.Int64,
 		))
 	}
 
@@ -479,6 +479,7 @@ func (rs *externallyControlledRunState) handleConfigChange(oldCfg, newCfg Extern
 				executionState.ReturnVU(rs.vuHandles[i].initVU, false)
 			}
 			rs.vuHandles[i] = nil
+			executionState.ModInitializedVUsCount(-1)
 		}
 		rs.vuHandles = rs.vuHandles[:newMaxVUs]
 	}

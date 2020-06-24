@@ -21,15 +21,19 @@
 package v1
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/manyminds/api2go/jsonapi"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/core"
 	"github.com/loadimpact/k6/core/local"
@@ -68,24 +72,40 @@ func TestGetStatus(t *testing.T) {
 	})
 }
 
-// TODO: fix after the externally-controlled executor
-/*
 func TestPatchStatus(t *testing.T) {
 	testdata := map[string]struct {
 		StatusCode int
 		Status     Status
 	}{
-		"nothing":      {200, Status{}},
-		"paused":       {200, Status{Paused: null.BoolFrom(true)}},
-		"max vus":      {200, Status{VUsMax: null.IntFrom(10)}},
-		"too many vus": {400, Status{VUs: null.IntFrom(10), VUsMax: null.IntFrom(0)}},
-		"vus":          {200, Status{VUs: null.IntFrom(10), VUsMax: null.IntFrom(10)}},
+		"nothing":               {200, Status{}},
+		"paused":                {200, Status{Paused: null.BoolFrom(true)}},
+		"max vus":               {200, Status{VUsMax: null.IntFrom(20)}},
+		"max vus below initial": {400, Status{VUsMax: null.IntFrom(5)}},
+		"too many vus":          {400, Status{VUs: null.IntFrom(10), VUsMax: null.IntFrom(0)}},
+		"vus":                   {200, Status{VUs: null.IntFrom(10), VUsMax: null.IntFrom(10)}},
 	}
+
+	scenarios := lib.ScenarioConfigs{}
+	err := json.Unmarshal([]byte(`
+			{"external": {"executor": "externally-controlled",
+			"vus": 0, "maxVUs": 10, "duration": "1s"}}`), &scenarios)
+	require.NoError(t, err)
+	options := lib.Options{Scenarios: scenarios}
 
 	for name, indata := range testdata {
 		t.Run(name, func(t *testing.T) {
-			engine, err := core.NewEngine(nil, lib.Options{})
-			assert.NoError(t, err)
+			execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{Options: options}, logrus.StandardLogger())
+			require.NoError(t, err)
+			engine, err := core.NewEngine(execScheduler, options, logrus.StandardLogger())
+			require.NoError(t, err)
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			run, _, err := engine.Init(ctx, ctx)
+			require.NoError(t, err)
+
+			go func() { _ = run() }()
+			// wait for the executor to initialize to avoid a potential data race below
+			time.Sleep(100 * time.Millisecond)
 
 			body, err := jsonapi.Marshal(indata.Status)
 			if !assert.NoError(t, err) {
@@ -116,4 +136,3 @@ func TestPatchStatus(t *testing.T) {
 		})
 	}
 }
-*/
