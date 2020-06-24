@@ -41,8 +41,6 @@ import (
 // iterations+vus, or stages)
 const DefaultScenarioName = "default"
 
-const defaultHostPort = 80
-
 // DefaultSummaryTrendStats are the default trend columns shown in the test summary output
 // nolint: gochecknoglobals
 var DefaultSummaryTrendStats = []string{"avg", "min", "med", "max", "p(90)", "p(95)"}
