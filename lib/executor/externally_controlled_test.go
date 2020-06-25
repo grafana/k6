@@ -40,17 +40,19 @@ func getTestExternallyControlledConfig() ExternallyControlledConfig {
 		ExternallyControlledConfigParams: ExternallyControlledConfigParams{
 			VUs:      null.IntFrom(2),
 			MaxVUs:   null.IntFrom(10),
-			Duration: types.NullDurationFrom(3 * time.Second),
+			Duration: types.NullDurationFrom(2 * time.Second),
 		},
 	}
 }
 
 func TestExternallyControlledRun(t *testing.T) {
 	t.Parallel()
-	doneIters := new(uint64)
+
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
 	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
+
+	doneIters := new(uint64)
 	var ctx, cancel, executor, _ = setupExecutor(
 		t, getTestExternallyControlledConfig(), es,
 		simpleRunner(func(ctx context.Context) error {
@@ -62,15 +64,16 @@ func TestExternallyControlledRun(t *testing.T) {
 	defer cancel()
 
 	var (
-		wg            sync.WaitGroup
-		errCh         = make(chan error, 1)
-		doneCh        = make(chan struct{})
-		resultVUCount [][]int64
+		wg     sync.WaitGroup
+		errCh  = make(chan error, 1)
+		doneCh = make(chan struct{})
 	)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		es.MarkStarted()
 		errCh <- executor.Run(ctx, nil)
+		es.MarkEnded()
 		close(doneCh)
 	}()
 
@@ -78,12 +81,13 @@ func TestExternallyControlledRun(t *testing.T) {
 		newConfig := ExternallyControlledConfigParams{
 			VUs:      null.IntFrom(int64(vus)),
 			MaxVUs:   null.IntFrom(int64(maxVUs)),
-			Duration: types.NullDurationFrom(3 * time.Second),
+			Duration: types.NullDurationFrom(2 * time.Second),
 		}
 		err := executor.(*ExternallyControlled).UpdateConfig(ctx, newConfig)
 		assert.NoError(t, err)
 	}
 
+	var resultVUCount [][]int64
 	snapshot := func() {
 		resultVUCount = append(resultVUCount,
 			[]int64{es.GetCurrentlyActiveVUsCount(), es.GetInitializedVUsCount()})
@@ -92,29 +96,29 @@ func TestExternallyControlledRun(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		es.MarkStarted()
-		time.Sleep(150 * time.Millisecond) // wait for startup
-		snapshot()
-		time.Sleep(500 * time.Millisecond)
-		updateConfig(4, 10)
-		time.Sleep(100 * time.Millisecond)
-		snapshot()
-		time.Sleep(500 * time.Millisecond)
-		updateConfig(8, 20)
-		time.Sleep(500 * time.Millisecond)
-		snapshot()
-		time.Sleep(500 * time.Millisecond)
-		updateConfig(4, 10)
-		time.Sleep(500 * time.Millisecond)
-		snapshot()
-		time.Sleep(1 * time.Second)
-		snapshot()
-		es.MarkEnded()
+		snapshotTicker := time.NewTicker(500 * time.Millisecond)
+		ticks := 0
+		for {
+			select {
+			case <-snapshotTicker.C:
+				snapshot()
+				switch ticks {
+				case 0, 2:
+					updateConfig(4, 10)
+				case 1:
+					updateConfig(8, 20)
+				}
+				ticks++
+			case <-doneCh:
+				snapshotTicker.Stop()
+				snapshot()
+				return
+			}
+		}
 	}()
 
-	<-doneCh
 	wg.Wait()
 	require.NoError(t, <-errCh)
-	assert.InDelta(t, uint64(75), atomic.LoadUint64(doneIters), 1)
+	assert.Equal(t, uint64(48), atomic.LoadUint64(doneIters))
 	assert.Equal(t, [][]int64{{2, 10}, {4, 10}, {8, 20}, {4, 10}, {0, 0}}, resultVUCount)
 }
