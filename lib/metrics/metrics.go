@@ -26,6 +26,7 @@ import (
 
 //TODO: refactor this, using non thread-safe global variables seems like a bad idea for various reasons...
 
+//nolint:gochecknoglobals
 var (
 	// Engine-emitted.
 	VUs               = stats.New("vus", stats.Gauge)
@@ -52,7 +53,7 @@ var (
 	WSSessions         = stats.New("ws_sessions", stats.Counter)
 	WSMessagesSent     = stats.New("ws_msgs_sent", stats.Counter)
 	WSMessagesReceived = stats.New("ws_msgs_received", stats.Counter)
-	WSPing             = stats.New("ws_ping", stats.Trend)
+	WSPing             = stats.New("ws_ping", stats.Trend, stats.Time)
 	WSSessionDuration  = stats.New("ws_session_duration", stats.Trend, stats.Time)
 	WSConnecting       = stats.New("ws_connecting", stats.Trend, stats.Time)
 
