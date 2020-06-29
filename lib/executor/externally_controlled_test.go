@@ -77,14 +77,18 @@ func TestExternallyControlledRun(t *testing.T) {
 		close(doneCh)
 	}()
 
-	updateConfig := func(vus, maxVUs int) {
+	updateConfig := func(vus, maxVUs int, errMsg string) {
 		newConfig := ExternallyControlledConfigParams{
 			VUs:      null.IntFrom(int64(vus)),
 			MaxVUs:   null.IntFrom(int64(maxVUs)),
 			Duration: types.NullDurationFrom(2 * time.Second),
 		}
 		err := executor.(*ExternallyControlled).UpdateConfig(ctx, newConfig)
-		assert.NoError(t, err)
+		if errMsg != "" {
+			assert.EqualError(t, err, errMsg)
+		} else {
+			assert.NoError(t, err)
+		}
 	}
 
 	var resultVUCount [][]int64
@@ -104,9 +108,15 @@ func TestExternallyControlledRun(t *testing.T) {
 				snapshot()
 				switch ticks {
 				case 0, 2:
-					updateConfig(4, 10)
+					updateConfig(4, 10, "")
 				case 1:
-					updateConfig(8, 20)
+					updateConfig(8, 20, "")
+				case 3:
+					updateConfig(15, 10,
+						"invalid configuration supplied: the number of active VUs (15)"+
+							" must be less than or equal to the number of maxVUs (10)")
+					updateConfig(-1, 10,
+						"invalid configuration supplied: the number of VUs shouldn't be negative")
 				}
 				ticks++
 			case <-doneCh:
