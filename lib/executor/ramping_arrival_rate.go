@@ -305,11 +305,10 @@ func (varr RampingArrivalRate) Run(ctx context.Context, out chan<- stats.SampleC
 
 	returnedVUs := make(chan struct{})
 	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(ctx, duration, gracefulStop)
-	// Pre-allocate the VUs local shared buffer
 
 	defer func() {
 		// Make sure all VUs aren't executing iterations anymore, for the cancel()
-		// above to deactivate them.
+		// below to deactivate them.
 		<-returnedVUs
 		cancel()
 		activeVUsWg.Wait()
@@ -407,6 +406,7 @@ func (varr RampingArrivalRate) Run(ctx context.Context, out chan<- stats.SampleC
 	start := time.Now()
 	ch := make(chan time.Duration, 10) // buffer 10 iteration times ahead
 	var prevTime time.Duration
+	shownWarning := false
 	go varr.config.cal(varr.executionState.ExecutionTuple, ch)
 	for nextTime := range ch {
 		select {
@@ -428,25 +428,31 @@ func (varr RampingArrivalRate) Run(ctx context.Context, out chan<- stats.SampleC
 
 		var vu lib.ActiveVU
 		select {
-		case vu = <-activeVUs:
-			// ideally, we get the VU from the buffer without any issues
-		default:
-			if remainingUnplannedVUs == 0 {
-				// TODO: emit an error metric?
-				varr.logger.Warningf("Insufficient VUs, reached %d active VUs and cannot allocate more", maxVUs)
-				continue
-			}
-
-			select {
-			case makeUnplannedVUCh <- struct{}{}:
-				// this is the only goroutine that touches remainingUnplannedVUs and if we didn't
-				// send on the channel no new unplannedVU will be stared so no need to decrease it
-				remainingUnplannedVUs--
-				vu = <-activeVUs // just get any VU that gets activated, whether it is the unplanned or not doesn't matter
-			case vu = <-activeVUs: // a VU got freed while were waiting to start a new unplanned one
-			}
+		case vu = <-activeVUs: // ideally, we get the VU from the buffer without any issues
+			go runIteration(vu)
+			continue
+		default: // no free VUs currently available
 		}
-		go runIteration(vu)
+		// Since there aren't any free VUs available, consider this iteration
+		// dropped - we aren't going to try to recover it, but
+
+		// TODO: emit a dropped_iteration metric
+
+		// We'll try to start allocating another VU in the background,
+		// non-blockingly, if we have remainingUnplannedVUs...
+		if remainingUnplannedVUs == 0 {
+			if !shownWarning {
+				varr.logger.Warningf("Insufficient VUs, reached %d active VUs and cannot allocate more", maxVUs)
+				shownWarning = true
+			}
+			continue
+		}
+
+		select {
+		case makeUnplannedVUCh <- struct{}{}: // great!
+			remainingUnplannedVUs--
+		default: // we're already allocating a new VU
+		}
 	}
 	return nil
 }

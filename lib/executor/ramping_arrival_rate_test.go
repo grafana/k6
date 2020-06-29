@@ -193,7 +193,7 @@ func TestRampingArrivalRateRunCorrectRateWithSlowRate(t *testing.T) {
 	t.Parallel()
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
-	es := lib.NewExecutionState(lib.Options{}, et, 1, 2)
+	es := lib.NewExecutionState(lib.Options{}, et, 1, 3)
 	var count int64
 	var ch = make(chan struct{}) // closed when new unplannedVU is started and signal to get to next iterations
 	runner := simpleRunner(func(ctx context.Context) error {

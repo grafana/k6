@@ -82,6 +82,6 @@ func initializeVUs(
 		// which is done in es.AddInitializedVU().
 		vu, err := initVU(ctx, logEntry)
 		require.NoError(t, err)
-		es.ReturnVU(vu, false)
+		es.AddInitializedVU(vu)
 	}
 }
