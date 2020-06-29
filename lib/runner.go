@@ -49,7 +49,7 @@ type VUActivationParams struct {
 	RunContext         context.Context
 	DeactivateCallback func(InitializedVU)
 	Env, Tags          map[string]string
-	Exec               string
+	Exec, Scenario     string
 }
 
 // A Runner is a factory for VUs. It should precompute as much as possible upon

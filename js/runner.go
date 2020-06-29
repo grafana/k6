@@ -328,7 +328,7 @@ func (r *Runner) runPart(ctx context.Context, out chan<- stats.SampleContainer, 
 		return goja.Undefined(), err
 	}
 
-	v, _, _, err := vu.runFn(ctx, group, false, nil, fn, vu.Runtime.ToValue(arg))
+	v, _, _, err := vu.runFn(ctx, "", group, false, nil, fn, vu.Runtime.ToValue(arg))
 
 	// deadline is reached so we have timeouted but this might've not been registered correctly
 	if deadline, ok := ctx.Deadline(); ok && time.Now().After(deadline) {
@@ -462,7 +462,7 @@ func (u *ActiveVU) RunOnce() error {
 
 	// Call the exported function.
 	_, isFullIteration, totalTime, err := u.runFn(
-		u.RunContext, u.Runner.defaultGroup, true, u.Tags, fn, u.setupData,
+		u.RunContext, u.Scenario, u.Runner.defaultGroup, true, u.Tags, fn, u.setupData,
 	)
 
 	// If MinIterationDuration is specified and the iteration wasn't cancelled
@@ -478,8 +478,8 @@ func (u *ActiveVU) RunOnce() error {
 }
 
 func (u *VU) runFn(
-	ctx context.Context, group *lib.Group, isDefault bool, customTags map[string]string,
-	fn goja.Callable, args ...goja.Value,
+	ctx context.Context, scenario string, group *lib.Group, isDefault bool,
+	customTags map[string]string, fn goja.Callable, args ...goja.Value,
 ) (goja.Value, bool, time.Duration, error) {
 	cookieJar := u.CookieJar
 	if !u.Runner.Bundle.Options.NoCookiesReset.ValueOrZero() {
@@ -503,6 +503,9 @@ func (u *VU) runFn(
 	}
 	if opts.SystemTags.Has(stats.TagGroup) {
 		tags["group"] = group.Path
+	}
+	if scenario != "" && opts.SystemTags.Has(stats.TagScenario) {
+		tags["scenario"] = scenario
 	}
 
 	state := &lib.State{

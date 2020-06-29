@@ -223,6 +223,7 @@ func getVUActivationParams(
 ) *lib.VUActivationParams {
 	return &lib.VUActivationParams{
 		RunContext:         ctx,
+		Scenario:           conf.Name,
 		Exec:               conf.GetExec(),
 		Env:                conf.GetEnv(),
 		Tags:               conf.GetTags(),
