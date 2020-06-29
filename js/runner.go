@@ -456,7 +456,7 @@ func (u *ActiveVU) RunOnce() error {
 
 	fn, ok := u.exports[u.Exec]
 	if !ok {
-		// Shouldn't happen; this is validated in ExecutionScheduler.Init()
+		// Shouldn't happen; this is validated in cmd.validateScenarioConfig()
 		panic(fmt.Sprintf("function '%s' not found in exports", u.Exec))
 	}
 
