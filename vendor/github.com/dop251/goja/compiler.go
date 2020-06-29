@@ -10,6 +10,7 @@ import (
 
 const (
 	blockLoop = iota
+	blockLoopEnum
 	blockTry
 	blockBranch
 	blockSwitch
@@ -85,7 +86,7 @@ func (c *compiler) leaveBlock() {
 	for _, item := range c.block.breaks {
 		c.p.code[item] = jump(lbl - item)
 	}
-	if c.block.typ == blockLoop {
+	if t := c.block.typ; t == blockLoop || t == blockLoopEnum {
 		for _, item := range c.block.conts {
 			c.p.code[item] = jump(c.block.cont - item)
 		}
