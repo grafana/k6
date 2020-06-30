@@ -124,6 +124,7 @@ func (varc *RampingArrivalRateConfig) Validate() []error {
 	}
 
 	if !varc.MaxVUs.Valid {
+		// TODO: don't change the config while validating
 		varc.MaxVUs.Int64 = varc.PreAllocatedVUs.Int64
 	} else if varc.MaxVUs.Int64 < varc.PreAllocatedVUs.Int64 {
 		errors = append(errors, fmt.Errorf("maxVUs shouldn't be less than preAllocatedVUs"))

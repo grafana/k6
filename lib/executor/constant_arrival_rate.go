@@ -135,6 +135,7 @@ func (carc *ConstantArrivalRateConfig) Validate() []error {
 	}
 
 	if !carc.MaxVUs.Valid {
+		// TODO: don't change the config while validating
 		carc.MaxVUs.Int64 = carc.PreAllocatedVUs.Int64
 	} else if carc.MaxVUs.Int64 < carc.PreAllocatedVUs.Int64 {
 		errors = append(errors, fmt.Errorf("maxVUs shouldn't be less than preAllocatedVUs"))
