@@ -66,8 +66,8 @@ type RampingArrivalRateConfig struct {
 }
 
 // NewRampingArrivalRateConfig returns a RampingArrivalRateConfig with default values
-func NewRampingArrivalRateConfig(name string) RampingArrivalRateConfig {
-	return RampingArrivalRateConfig{
+func NewRampingArrivalRateConfig(name string) *RampingArrivalRateConfig {
+	return &RampingArrivalRateConfig{
 		BaseConfig: NewBaseConfig(name, rampingArrivalRateType),
 		TimeUnit:   types.NewNullDuration(1*time.Second, false),
 	}
@@ -104,7 +104,7 @@ func (varc RampingArrivalRateConfig) GetDescription(et *lib.ExecutionTuple) stri
 }
 
 // Validate makes sure all options are configured and valid
-func (varc RampingArrivalRateConfig) Validate() []error {
+func (varc *RampingArrivalRateConfig) Validate() []error {
 	errors := varc.BaseConfig.Validate()
 
 	if varc.StartRate.Int64 < 0 {
@@ -124,7 +124,8 @@ func (varc RampingArrivalRateConfig) Validate() []error {
 	}
 
 	if !varc.MaxVUs.Valid {
-		errors = append(errors, fmt.Errorf("the number of maxVUs isn't specified"))
+		// TODO: don't change the config while validating
+		varc.MaxVUs.Int64 = varc.PreAllocatedVUs.Int64
 	} else if varc.MaxVUs.Int64 < varc.PreAllocatedVUs.Int64 {
 		errors = append(errors, fmt.Errorf("maxVUs shouldn't be less than preAllocatedVUs"))
 	}
@@ -157,7 +158,7 @@ func (varc RampingArrivalRateConfig) NewExecutor(
 	es *lib.ExecutionState, logger *logrus.Entry,
 ) (lib.Executor, error) {
 	return RampingArrivalRate{
-		BaseExecutor: NewBaseExecutor(varc, es, logger),
+		BaseExecutor: NewBaseExecutor(&varc, es, logger),
 		config:       varc,
 	}, nil
 }

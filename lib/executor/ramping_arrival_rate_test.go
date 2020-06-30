@@ -39,8 +39,8 @@ import (
 	"github.com/loadimpact/k6/stats"
 )
 
-func getTestRampingArrivalRateConfig() RampingArrivalRateConfig {
-	return RampingArrivalRateConfig{
+func getTestRampingArrivalRateConfig() *RampingArrivalRateConfig {
+	return &RampingArrivalRateConfig{
 		BaseConfig: BaseConfig{GracefulStop: types.NullDurationFrom(1 * time.Second)},
 		TimeUnit:   types.NullDurationFrom(time.Second),
 		StartRate:  null.IntFrom(10),
@@ -140,7 +140,7 @@ func TestRampingArrivalRateRunCorrectRateWithSlowRate(t *testing.T) {
 		time.Millisecond * 3464, time.Millisecond * 4898, time.Second * 6,
 	}
 	ctx, cancel, executor, logHook := setupExecutor(
-		t, RampingArrivalRateConfig{
+		t, &RampingArrivalRateConfig{
 			TimeUnit: types.NullDurationFrom(time.Second),
 			Stages: []Stage{
 				{
