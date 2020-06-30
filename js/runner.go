@@ -196,19 +196,6 @@ func (r *Runner) newVU(id int64, samplesOut chan<- stats.SampleContainer) (*VU, 
 		Samples:        samplesOut,
 	}
 
-	opts := vu.Runner.Bundle.Options
-	tags := opts.RunTags.CloneTags()
-
-	if opts.SystemTags.Has(stats.TagVU) {
-		tags["vu"] = strconv.FormatInt(vu.ID, 10)
-	}
-	if opts.SystemTags.Has(stats.TagIter) {
-		tags["iter"] = strconv.FormatInt(vu.Iteration, 10)
-	}
-	if opts.SystemTags.Has(stats.TagGroup) {
-		tags["group"] = r.defaultGroup.Path
-	}
-
 	vu.state = &lib.State{
 		Logger:    vu.Runner.Logger,
 		Options:   vu.Runner.Bundle.Options,
@@ -221,7 +208,7 @@ func (r *Runner) newVU(id int64, samplesOut chan<- stats.SampleContainer) (*VU, 
 		Vu:        vu.ID,
 		Samples:   vu.Samples,
 		Iteration: vu.Iteration,
-		Tags:      tags,
+		Tags:      vu.Runner.Bundle.Options.RunTags.CloneTags(),
 		Group:     r.defaultGroup,
 	}
 	vu.Runtime.Set("__VU", vu.ID)
@@ -575,7 +562,6 @@ func (u *VU) runFn(
 		u.Transport.CloseIdleConnections()
 	}
 
-	// TODO: stats.NewSampleTags can be cached and not do it for each iteration
 	u.state.Samples <- u.Dialer.GetTrail(startTime, endTime, isFullIteration, isDefault, stats.NewSampleTags(u.state.Tags))
 
 	return v, isFullIteration, endTime.Sub(startTime), err
