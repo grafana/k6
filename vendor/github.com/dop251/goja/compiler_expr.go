@@ -309,6 +309,24 @@ func (e *compiledIdentifierExpr) emitGetterOrRef() {
 		if found {
 			e.c.emit(getVar{name: e.name, idx: idx, ref: true})
 		} else {
+			e.c.emit(getVar1Ref(e.name))
+		}
+	}
+}
+
+func (e *compiledIdentifierExpr) emitGetterAndCallee() {
+	e.addSrcMap()
+	if idx, found, noDynamics := e.c.scope.lookupName(e.name); noDynamics {
+		if found {
+			e.c.emit(loadUndef)
+			e.c.emit(getLocal(idx))
+		} else {
+			panic("No dynamics and not found")
+		}
+	} else {
+		if found {
+			e.c.emit(getVar{name: e.name, idx: idx, ref: true, callee: true})
+		} else {
 			e.c.emit(getVar1Callee(e.name))
 		}
 	}
@@ -1423,9 +1441,8 @@ func (e *compiledCallExpr) emitGetter(putOnStack bool) {
 		callee.member.emitGetter(true)
 		e.c.emit(getElemCallee)
 	case *compiledIdentifierExpr:
-		e.c.emit(loadUndef)
 		calleeName = callee.name
-		callee.emitGetterOrRef()
+		callee.emitGetterAndCallee()
 	default:
 		e.c.emit(loadUndef)
 		callee.emitGetter(true)

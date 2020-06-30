@@ -2,8 +2,10 @@ package goja
 
 import (
 	"fmt"
+	"github.com/dop251/goja/parser"
 	"go/ast"
 	"reflect"
+	"strings"
 )
 
 // JsonEncodable allows custom JSON encoding by JSON.stringify()
@@ -21,6 +23,44 @@ type FieldNameMapper interface {
 	// MethodName returns a JavaScript name for the given method in the given type.
 	// If this method returns "" the method becomes hidden.
 	MethodName(t reflect.Type, m reflect.Method) string
+}
+
+type tagFieldNameMapper struct {
+	tagName      string
+	uncapMethods bool
+}
+
+func (tfm tagFieldNameMapper) FieldName(_ reflect.Type, f reflect.StructField) string {
+	tag := f.Tag.Get(tfm.tagName)
+	if idx := strings.IndexByte(tag, ','); idx != -1 {
+		tag = tag[:idx]
+	}
+	if parser.IsIdentifier(tag) {
+		return tag
+	}
+	return ""
+}
+
+func uncapitalize(s string) string {
+	return strings.ToLower(s[0:1]) + s[1:]
+}
+
+func (tfm tagFieldNameMapper) MethodName(_ reflect.Type, m reflect.Method) string {
+	if tfm.uncapMethods {
+		return uncapitalize(m.Name)
+	}
+	return m.Name
+}
+
+type uncapFieldNameMapper struct {
+}
+
+func (u uncapFieldNameMapper) FieldName(_ reflect.Type, f reflect.StructField) string {
+	return uncapitalize(f.Name)
+}
+
+func (u uncapFieldNameMapper) MethodName(_ reflect.Type, m reflect.Method) string {
+	return uncapitalize(m.Name)
 }
 
 type reflectFieldInfo struct {
@@ -511,4 +551,21 @@ func (r *Runtime) typeInfo(t reflect.Type) (info *reflectTypeInfo) {
 func (r *Runtime) SetFieldNameMapper(mapper FieldNameMapper) {
 	r.fieldNameMapper = mapper
 	r.typeInfoCache = nil
+}
+
+// TagFieldNameMapper returns a FieldNameMapper that uses the given tagName for struct fields and optionally
+// uncapitalises (making the first letter lower case) method names.
+// The common tag value syntax is supported (name[,options]), however options are ignored.
+// Setting name to anything other than a valid ECMAScript identifier makes the field hidden.
+func TagFieldNameMapper(tagName string, uncapMethods bool) FieldNameMapper {
+	return tagFieldNameMapper{
+		tagName:      tagName,
+		uncapMethods: uncapMethods,
+	}
+}
+
+// UncapFieldNameMapper returns a FieldNameMapper that uncapitalises struct field and method names
+// making the first letter lower case.
+func UncapFieldNameMapper() FieldNameMapper {
+	return uncapFieldNameMapper{}
 }

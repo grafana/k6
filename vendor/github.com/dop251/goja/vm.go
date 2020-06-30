@@ -19,7 +19,7 @@ type stash struct {
 	values    valueStack
 	extraArgs valueStack
 	names     map[string]uint32
-	obj       objectImpl
+	obj       *Object
 
 	outer *stash
 }
@@ -200,8 +200,8 @@ func (s *valueStack) expand(idx int) {
 
 func (s *stash) put(name string, v Value) bool {
 	if s.obj != nil {
-		if found := s.obj.getStr(name); found != nil {
-			s.obj.putStr(name, v, false)
+		if found := s.obj.self.getStr(name); found != nil {
+			s.obj.self.putStr(name, v, false)
 			return true
 		}
 		return false
@@ -232,7 +232,7 @@ func (s *stash) getByIdx(idx uint32) Value {
 
 func (s *stash) getByName(name string, _ *vm) (v Value, exists bool) {
 	if s.obj != nil {
-		v = s.obj.getStr(name)
+		v = s.obj.self.getStr(name)
 		if v == nil {
 			return nil, false
 			//return valueUnresolved{r: vm.r, ref: name}, false
@@ -258,7 +258,7 @@ func (s *stash) createBinding(name string) {
 
 func (s *stash) deleteBinding(name string) bool {
 	if s.obj != nil {
-		return s.obj.deleteStr(name, false)
+		return s.obj.self.deleteStr(name, false)
 	}
 	if idx, found := s.names[name]; found {
 		s.values[idx] = nil
@@ -1332,9 +1332,9 @@ func (s resolveVar1) exec(vm *vm) {
 	var ref ref
 	for stash := vm.stash; stash != nil; stash = stash.outer {
 		if stash.obj != nil {
-			if stash.obj.hasPropertyStr(name) {
+			if stash.obj.self.hasPropertyStr(name) {
 				ref = &objRef{
-					base: stash.obj,
+					base: stash.obj.self,
 					name: name,
 				}
 				goto end
@@ -1366,8 +1366,8 @@ func (d deleteVar) exec(vm *vm) {
 	ret := true
 	for stash := vm.stash; stash != nil; stash = stash.outer {
 		if stash.obj != nil {
-			if stash.obj.hasPropertyStr(name) {
-				ret = stash.obj.deleteStr(name, false)
+			if stash.obj.self.hasPropertyStr(name) {
+				ret = stash.obj.self.deleteStr(name, false)
 				goto end
 			}
 		} else {
@@ -1416,9 +1416,9 @@ func (s resolveVar1Strict) exec(vm *vm) {
 	var ref ref
 	for stash := vm.stash; stash != nil; stash = stash.outer {
 		if stash.obj != nil {
-			if stash.obj.hasPropertyStr(name) {
+			if stash.obj.self.hasPropertyStr(name) {
 				ref = &objRef{
-					base:   stash.obj,
+					base:   stash.obj.self,
 					name:   name,
 					strict: true,
 				}
@@ -1492,22 +1492,32 @@ func (g getLocal) exec(vm *vm) {
 }
 
 type getVar struct {
-	name string
-	idx  uint32
-	ref  bool
+	name        string
+	idx         uint32
+	ref, callee bool
 }
 
 func (g getVar) exec(vm *vm) {
 	level := int(g.idx >> 24)
-	idx := uint32(g.idx & 0x00FFFFFF)
+	idx := g.idx & 0x00FFFFFF
 	stash := vm.stash
 	name := g.name
 	for i := 0; i < level; i++ {
 		if v, found := stash.getByName(name, vm); found {
+			if g.callee {
+				if stash.obj != nil {
+					vm.push(stash.obj)
+				} else {
+					vm.push(_undefined)
+				}
+			}
 			vm.push(v)
 			goto end
 		}
 		stash = stash.outer
+	}
+	if g.callee {
+		vm.push(_undefined)
 	}
 	if stash != nil {
 		vm.push(stash.getByIdx(idx))
@@ -1539,9 +1549,9 @@ func (r resolveVar) exec(vm *vm) {
 	var ref ref
 	for i := 0; i < level; i++ {
 		if stash.obj != nil {
-			if stash.obj.hasPropertyStr(r.name) {
+			if stash.obj.self.hasPropertyStr(r.name) {
 				ref = &objRef{
-					base:   stash.obj,
+					base:   stash.obj.self,
 					name:   r.name,
 					strict: r.strict,
 				}
@@ -1632,9 +1642,9 @@ func (n getVar1) exec(vm *vm) {
 	vm.pc++
 }
 
-type getVar1Callee string
+type getVar1Ref string
 
-func (n getVar1Callee) exec(vm *vm) {
+func (n getVar1Ref) exec(vm *vm) {
 	name := string(n)
 	var val Value
 	for stash := vm.stash; stash != nil; stash = stash.outer {
@@ -1648,6 +1658,34 @@ func (n getVar1Callee) exec(vm *vm) {
 		if val == nil {
 			val = valueUnresolved{r: vm.r, ref: name}
 		}
+	}
+	vm.push(val)
+	vm.pc++
+}
+
+type getVar1Callee string
+
+func (n getVar1Callee) exec(vm *vm) {
+	name := string(n)
+	var val Value
+	var callee *Object
+	for stash := vm.stash; stash != nil; stash = stash.outer {
+		if v, exists := stash.getByName(name, vm); exists {
+			callee = stash.obj
+			val = v
+			break
+		}
+	}
+	if val == nil {
+		val = vm.r.globalObject.self.getStr(name)
+		if val == nil {
+			val = valueUnresolved{r: vm.r, ref: name}
+		}
+	}
+	if callee != nil {
+		vm.push(callee)
+	} else {
+		vm.push(_undefined)
 	}
 	vm.push(val)
 	vm.pc++
@@ -2376,7 +2414,7 @@ var enterWith _enterWith
 
 func (_enterWith) exec(vm *vm) {
 	vm.newStash()
-	vm.stash.obj = vm.stack[vm.sp-1].ToObject(vm.r).self
+	vm.stash.obj = vm.stack[vm.sp-1].ToObject(vm.r)
 	vm.sp--
 	vm.pc++
 }
