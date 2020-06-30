@@ -54,15 +54,16 @@ func setupExecutor(t *testing.T, config lib.ExecutorConfig, es *lib.ExecutionSta
 	testLog.SetOutput(ioutil.Discard)
 	logEntry := logrus.NewEntry(testLog)
 
-	es.SetInitVUFunc(func(_ context.Context, logger *logrus.Entry) (lib.InitializedVU, error) {
+	initVUFunc := func(_ context.Context, logger *logrus.Entry) (lib.InitializedVU, error) {
 		return runner.NewVU(int64(es.GetUniqueVUIdentifier()), engineOut)
-	})
+	}
+	es.SetInitVUFunc(initVUFunc)
 
 	et, err := lib.NewExecutionTuple(es.Options.ExecutionSegment, es.Options.ExecutionSegmentSequence)
 	require.NoError(t, err)
 
 	maxVUs := lib.GetMaxPossibleVUs(config.GetExecutionRequirements(et))
-	initializeVUs(ctx, t, logEntry, es, maxVUs)
+	initializeVUs(ctx, t, logEntry, es, maxVUs, initVUFunc)
 
 	executor, err := config.NewExecutor(es, logEntry)
 	require.NoError(t, err)
@@ -73,11 +74,13 @@ func setupExecutor(t *testing.T, config lib.ExecutorConfig, es *lib.ExecutionSta
 }
 
 func initializeVUs(
-	ctx context.Context, t testing.TB, logEntry *logrus.Entry, es *lib.ExecutionState, number uint64,
+	ctx context.Context, t testing.TB, logEntry *logrus.Entry, es *lib.ExecutionState, number uint64, initVU lib.InitVUFunc,
 ) {
 	// This is not how the local ExecutionScheduler initializes VUs, but should do the same job
 	for i := uint64(0); i < number; i++ {
-		vu, err := es.InitializeNewVU(ctx, logEntry)
+		// Not calling es.InitializeNewVU() here to avoid a double increment of initializedVUs,
+		// which is done in es.AddInitializedVU().
+		vu, err := initVU(ctx, logEntry)
 		require.NoError(t, err)
 		es.AddInitializedVU(vu)
 	}
