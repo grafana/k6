@@ -130,5 +130,5 @@ func TestExternallyControlledRun(t *testing.T) {
 	wg.Wait()
 	require.NoError(t, <-errCh)
 	assert.Equal(t, uint64(48), atomic.LoadUint64(doneIters))
-	assert.Equal(t, [][]int64{{2, 10}, {4, 10}, {8, 20}, {4, 10}, {0, 0}}, resultVUCount)
+	assert.Equal(t, [][]int64{{2, 10}, {4, 10}, {8, 20}, {4, 10}, {0, 10}}, resultVUCount)
 }

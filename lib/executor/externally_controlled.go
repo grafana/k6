@@ -477,9 +477,10 @@ func (rs *externallyControlledRunState) handleConfigChange(oldCfg, newCfg Extern
 			if i < rs.startMaxVUs {
 				// return the initial planned VUs to the common buffer
 				executionState.ReturnVU(rs.vuHandles[i].initVU, false)
+			} else {
+				executionState.ModInitializedVUsCount(-1)
 			}
 			rs.vuHandles[i] = nil
-			executionState.ModInitializedVUsCount(-1)
 		}
 		rs.vuHandles = rs.vuHandles[:newMaxVUs]
 	}
