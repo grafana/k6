@@ -66,8 +66,8 @@ type ConstantArrivalRateConfig struct {
 }
 
 // NewConstantArrivalRateConfig returns a ConstantArrivalRateConfig with default values
-func NewConstantArrivalRateConfig(name string) ConstantArrivalRateConfig {
-	return ConstantArrivalRateConfig{
+func NewConstantArrivalRateConfig(name string) *ConstantArrivalRateConfig {
+	return &ConstantArrivalRateConfig{
 		BaseConfig: NewBaseConfig(name, constantArrivalRateType),
 		TimeUnit:   types.NewNullDuration(1*time.Second, false),
 	}
@@ -108,7 +108,7 @@ func (carc ConstantArrivalRateConfig) GetDescription(et *lib.ExecutionTuple) str
 }
 
 // Validate makes sure all options are configured and valid
-func (carc ConstantArrivalRateConfig) Validate() []error {
+func (carc *ConstantArrivalRateConfig) Validate() []error {
 	errors := carc.BaseConfig.Validate()
 	if !carc.Rate.Valid {
 		errors = append(errors, fmt.Errorf("the iteration rate isn't specified"))
@@ -135,7 +135,7 @@ func (carc ConstantArrivalRateConfig) Validate() []error {
 	}
 
 	if !carc.MaxVUs.Valid {
-		errors = append(errors, fmt.Errorf("the number of maxVUs isn't specified"))
+		carc.MaxVUs.Int64 = carc.PreAllocatedVUs.Int64
 	} else if carc.MaxVUs.Int64 < carc.PreAllocatedVUs.Int64 {
 		errors = append(errors, fmt.Errorf("maxVUs shouldn't be less than preAllocatedVUs"))
 	}
@@ -167,7 +167,7 @@ func (carc ConstantArrivalRateConfig) NewExecutor(
 	es *lib.ExecutionState, logger *logrus.Entry,
 ) (lib.Executor, error) {
 	return &ConstantArrivalRate{
-		BaseExecutor: NewBaseExecutor(carc, es, logger),
+		BaseExecutor: NewBaseExecutor(&carc, es, logger),
 		config:       carc,
 	}, nil
 }

@@ -349,7 +349,12 @@ var configMapTestCases = []configMapTestCase{
 	},
 	{`{"carrival": {"executor": "constant-arrival-rate", "rate": 10, "duration": "10m", "preAllocatedVUs": 20, "maxVUs": 30}}`, exp{}},
 	{`{"carrival": {"executor": "constant-arrival-rate", "rate": 10, "duration": "10m", "preAllocatedVUs": 20, "maxVUs": 30, "timeUnit": "-1s"}}`, exp{validationError: true}},
-	{`{"carrival": {"executor": "constant-arrival-rate", "rate": 10, "duration": "10m", "preAllocatedVUs": 20}}`, exp{validationError: true}},
+	{`{"carrival": {"executor": "constant-arrival-rate", "rate": 10, "duration": "10m", "preAllocatedVUs": 20}}`,
+		exp{custom: func(t *testing.T, cm lib.ScenarioConfigs) {
+			assert.Empty(t, cm["carrival"].Validate())
+			require.EqualValues(t, 20, cm["carrival"].(*ConstantArrivalRateConfig).MaxVUs.Int64)
+		}},
+	},
 	{`{"carrival": {"executor": "constant-arrival-rate", "rate": 10, "duration": "10m", "maxVUs": 30}}`, exp{validationError: true}},
 	{`{"carrival": {"executor": "constant-arrival-rate", "rate": 10, "preAllocatedVUs": 20, "maxVUs": 30}}`, exp{validationError: true}},
 	{`{"carrival": {"executor": "constant-arrival-rate", "duration": "10m", "preAllocatedVUs": 20, "maxVUs": 30}}`, exp{validationError: true}},
@@ -394,7 +399,12 @@ var configMapTestCases = []configMapTestCase{
 	{`{"varrival": {"executor": "ramping-arrival-rate", "preAllocatedVUs": 20, "maxVUs": 50, "stages": [{"duration": "5m", "target": 10}]}}`, exp{}},
 	{`{"varrival": {"executor": "ramping-arrival-rate", "preAllocatedVUs": -20, "maxVUs": 50, "stages": [{"duration": "5m", "target": 10}]}}`, exp{validationError: true}},
 	{`{"varrival": {"executor": "ramping-arrival-rate", "startRate": -1, "preAllocatedVUs": 20, "maxVUs": 50, "stages": [{"duration": "5m", "target": 10}]}}`, exp{validationError: true}},
-	{`{"varrival": {"executor": "ramping-arrival-rate", "preAllocatedVUs": 20, "stages": [{"duration": "5m", "target": 10}]}}`, exp{validationError: true}},
+	{`{"varrival": {"executor": "ramping-arrival-rate", "preAllocatedVUs": 20, "stages": [{"duration": "5m", "target": 10}]}}`,
+		exp{custom: func(t *testing.T, cm lib.ScenarioConfigs) {
+			assert.Empty(t, cm["varrival"].Validate())
+			require.EqualValues(t, 20, cm["varrival"].(*RampingArrivalRateConfig).MaxVUs.Int64)
+		}},
+	},
 	{`{"varrival": {"executor": "ramping-arrival-rate", "maxVUs": 50, "stages": [{"duration": "5m", "target": 10}]}}`, exp{validationError: true}},
 	{`{"varrival": {"executor": "ramping-arrival-rate", "preAllocatedVUs": 20, "maxVUs": 50}}`, exp{validationError: true}},
 	{`{"varrival": {"executor": "ramping-arrival-rate", "preAllocatedVUs": 20, "maxVUs": 50, "stages": []}}`, exp{validationError: true}},
