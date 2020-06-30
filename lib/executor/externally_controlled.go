@@ -315,9 +315,11 @@ func (mex *ExternallyControlled) stopWhenDurationIsReached(ctx context.Context, 
 			checkInterval.Stop()
 			return
 
-		// TODO: something more optimized that sleeps for pauses?
+		// TODO: something saner and more optimized that sleeps for pauses and
+		// doesn't depend on the global execution state?
 		case <-checkInterval.C:
-			if mex.executionState.GetCurrentTestRunDuration() >= duration {
+			elapsed := mex.executionState.GetCurrentTestRunDuration() - time.Duration(mex.config.StartTime.Duration)
+			if elapsed >= duration {
 				cancel()
 				return
 			}
@@ -408,17 +410,20 @@ func (rs *externallyControlledRunState) progresFn() (float64, []string) {
 
 	right := []string{progVUs, rs.duration.String(), ""}
 
-	spent := rs.executor.executionState.GetCurrentTestRunDuration()
-	if spent > rs.duration {
+	// TODO: use a saner way to calculate the elapsed time, without relying on
+	// the global execution state...
+	elapsed := rs.executor.executionState.GetCurrentTestRunDuration() - time.Duration(
+		rs.executor.config.StartTime.Duration)
+	if elapsed > rs.duration {
 		return 1, right
 	}
 
 	progress := 0.0
 	if rs.duration > 0 {
-		progress = math.Min(1, float64(spent)/float64(rs.duration))
+		progress = math.Min(1, float64(elapsed)/float64(rs.duration))
 	}
 
-	spentDuration := pb.GetFixedLengthDuration(spent, rs.duration)
+	spentDuration := pb.GetFixedLengthDuration(elapsed, rs.duration)
 	progDur := fmt.Sprintf("%s/%s", spentDuration, rs.duration)
 	right[1] = progDur
 
