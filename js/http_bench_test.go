@@ -58,6 +58,7 @@ func BenchmarkHTTPRequests(b *testing.B) {
 	require.NoError(b, err)
 
 	var ch = make(chan stats.SampleContainer, 100)
+	defer close(ch)
 	go func() { // read the channel so it doesn't block
 		for range ch {
 		}
@@ -101,6 +102,7 @@ func BenchmarkHTTPRequestsBase(b *testing.B) {
 	require.NoError(b, err)
 
 	var ch = make(chan stats.SampleContainer, 100)
+	defer close(ch)
 	go func() { // read the channel so it doesn't block
 		for range ch {
 		}
