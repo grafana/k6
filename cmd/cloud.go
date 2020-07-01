@@ -78,7 +78,8 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 
 		filename := args[0]
 		filesystems := loader.CreateFilesystems()
-		src, err := loader.ReadSource(filename, pwd, filesystems, os.Stdin)
+		// TODO: don't use the Global logger
+		src, err := loader.ReadSource(logrus.StandardLogger(), filename, pwd, filesystems, os.Stdin)
 		if err != nil {
 			return err
 		}

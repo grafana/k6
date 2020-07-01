@@ -29,6 +29,7 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 
 	"github.com/loadimpact/k6/js/common"
@@ -154,7 +155,8 @@ func (i *InitContext) requireFile(name string) (goja.Value, error) {
 
 		if pgm.pgm == nil {
 			// Load the sources; the loader takes care of remote loading, etc.
-			data, err := loader.Load(i.filesystems, fileURL, name)
+			// TODO: don't use the Global logger
+			data, err := loader.Load(logrus.StandardLogger(), i.filesystems, fileURL, name)
 			if err != nil {
 				return goja.Undefined(), err
 			}

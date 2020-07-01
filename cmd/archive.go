@@ -23,6 +23,7 @@ package cmd
 import (
 	"os"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -54,7 +55,8 @@ An archive is a fully self-contained test run, and can be executed identically e
 		}
 		filename := args[0]
 		filesystems := loader.CreateFilesystems()
-		src, err := loader.ReadSource(filename, pwd, filesystems, os.Stdin)
+		// TODO: don't use the Global logger
+		src, err := loader.ReadSource(logrus.StandardLogger(), filename, pwd, filesystems, os.Stdin)
 		if err != nil {
 			return err
 		}

@@ -27,10 +27,12 @@ import (
 	"testing"
 
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 
 	"github.com/loadimpact/k6/lib/fsext"
+	"github.com/loadimpact/k6/lib/testutils"
 )
 
 type errorReader string
@@ -42,7 +44,7 @@ func (e errorReader) Read(_ []byte) (int, error) {
 var _ io.Reader = errorReader("")
 
 func TestReadSourceSTDINError(t *testing.T) {
-	_, err := ReadSource("-", "", nil, errorReader("1234"))
+	_, err := ReadSource(nil, "-", "", nil, errorReader("1234"))
 	require.Error(t, err)
 	require.Equal(t, "1234", err.Error())
 }
@@ -51,7 +53,7 @@ func TestReadSourceSTDINCache(t *testing.T) {
 	var data = []byte(`test contents`)
 	var r = bytes.NewReader(data)
 	var fs = afero.NewMemMapFs()
-	sourceData, err := ReadSource("-", "/path/to/pwd",
+	sourceData, err := ReadSource(nil, "-", "/path/to/pwd",
 		map[string]afero.Fs{"file": fsext.NewCacheOnReadFs(nil, fs, 0)}, r)
 	require.NoError(t, err)
 	require.Equal(t, &SourceData{
@@ -63,10 +65,12 @@ func TestReadSourceSTDINCache(t *testing.T) {
 }
 
 func TestReadSourceRelative(t *testing.T) {
+	logger := logrus.New()
+	logger.SetOutput(testutils.NewTestOutput(t))
 	var data = []byte(`test contents`)
 	var fs = afero.NewMemMapFs()
 	require.NoError(t, afero.WriteFile(fs, "/path/to/somewhere/script.js", data, 0644))
-	sourceData, err := ReadSource("../somewhere/script.js", "/path/to/pwd", map[string]afero.Fs{"file": fs}, nil)
+	sourceData, err := ReadSource(logger, "../somewhere/script.js", "/path/to/pwd", map[string]afero.Fs{"file": fs}, nil)
 	require.NoError(t, err)
 	require.Equal(t, &SourceData{
 		URL:  &url.URL{Scheme: "file", Path: "/path/to/somewhere/script.js"},
@@ -74,12 +78,14 @@ func TestReadSourceRelative(t *testing.T) {
 }
 
 func TestReadSourceAbsolute(t *testing.T) {
+	logger := logrus.New()
+	logger.SetOutput(testutils.NewTestOutput(t))
 	var data = []byte(`test contents`)
 	var r = bytes.NewReader(data)
 	var fs = afero.NewMemMapFs()
 	require.NoError(t, afero.WriteFile(fs, "/a/b", data, 0644))
 	require.NoError(t, afero.WriteFile(fs, "/c/a/b", []byte("wrong"), 0644))
-	sourceData, err := ReadSource("/a/b", "/c", map[string]afero.Fs{"file": fs}, r)
+	sourceData, err := ReadSource(logger, "/a/b", "/c", map[string]afero.Fs{"file": fs}, r)
 	require.NoError(t, err)
 	require.Equal(t, &SourceData{
 		URL:  &url.URL{Scheme: "file", Path: "/a/b"},
@@ -87,10 +93,12 @@ func TestReadSourceAbsolute(t *testing.T) {
 }
 
 func TestReadSourceHttps(t *testing.T) {
+	logger := logrus.New()
+	logger.SetOutput(testutils.NewTestOutput(t))
 	var data = []byte(`test contents`)
 	var fs = afero.NewMemMapFs()
 	require.NoError(t, afero.WriteFile(fs, "/github.com/something", data, 0644))
-	sourceData, err := ReadSource("https://github.com/something", "/c",
+	sourceData, err := ReadSource(logger, "https://github.com/something", "/c",
 		map[string]afero.Fs{"file": afero.NewMemMapFs(), "https": fs}, nil)
 	require.NoError(t, err)
 	require.Equal(t, &SourceData{
@@ -99,10 +107,12 @@ func TestReadSourceHttps(t *testing.T) {
 }
 
 func TestReadSourceHttpError(t *testing.T) {
+	logger := logrus.New()
+	logger.SetOutput(testutils.NewTestOutput(t))
 	var data = []byte(`test contents`)
 	var fs = afero.NewMemMapFs()
 	require.NoError(t, afero.WriteFile(fs, "/github.com/something", data, 0644))
-	_, err := ReadSource("http://github.com/something", "/c",
+	_, err := ReadSource(logger, "http://github.com/something", "/c",
 		map[string]afero.Fs{"file": afero.NewMemMapFs(), "https": fs}, nil)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), `only supported schemes for imports are file and https`)
