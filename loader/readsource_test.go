@@ -44,16 +44,20 @@ func (e errorReader) Read(_ []byte) (int, error) {
 var _ io.Reader = errorReader("")
 
 func TestReadSourceSTDINError(t *testing.T) {
-	_, err := ReadSource(nil, "-", "", nil, errorReader("1234"))
+	logger := logrus.New()
+	logger.SetOutput(testutils.NewTestOutput(t))
+	_, err := ReadSource(logger, "-", "", nil, errorReader("1234"))
 	require.Error(t, err)
 	require.Equal(t, "1234", err.Error())
 }
 
 func TestReadSourceSTDINCache(t *testing.T) {
+	logger := logrus.New()
+	logger.SetOutput(testutils.NewTestOutput(t))
 	var data = []byte(`test contents`)
 	var r = bytes.NewReader(data)
 	var fs = afero.NewMemMapFs()
-	sourceData, err := ReadSource(nil, "-", "/path/to/pwd",
+	sourceData, err := ReadSource(logger, "-", "/path/to/pwd",
 		map[string]afero.Fs{"file": fsext.NewCacheOnReadFs(nil, fs, 0)}, r)
 	require.NoError(t, err)
 	require.Equal(t, &SourceData{
