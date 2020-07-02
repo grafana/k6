@@ -228,7 +228,7 @@ func TestRampingArrivalRateRunCorrectRateWithSlowRate(t *testing.T) {
 		require.Equal(t, cur, int64(1))
 		time.Sleep(time.Millisecond * 200)
 		close(ch)
-		time.Sleep(time.Millisecond * 100)
+		time.Sleep(time.Millisecond * 200)
 		cur = atomic.LoadInt64(&count)
 		require.NotEqual(t, cur, int64(1))
 

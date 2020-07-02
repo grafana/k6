@@ -205,7 +205,7 @@ func (car *ConstantArrivalRate) Init(ctx context.Context) error {
 // keep the complexity in one well-architected part (with short methods and few
 // lambdas :D), while having both config frontends still be present for maximum
 // UX benefits. Basically, keep the progress bars and scheduling (i.e. at what
-// time should iteration X begin) different, but keep everyhing else the same.
+// time should iteration X begin) different, but keep everything else the same.
 // This will allow us to implement https://github.com/loadimpact/k6/issues/1386
 // and things like all of the TODOs below in one place only.
 func (car ConstantArrivalRate) Run(ctx context.Context, out chan<- stats.SampleContainer) (err error) { //nolint:funlen
