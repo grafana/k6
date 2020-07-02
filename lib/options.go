@@ -187,6 +187,78 @@ func ParseCIDR(s string) (*IPNet, error) {
 	return &parsedIPNet, nil
 }
 
+// HostnameTrie is a tree-structured list of hostname matches with support
+// for wildcards exclusively at the start of the pattern. Items may only
+// be inserted and searched.
+// Internationalized hostnames are valid.
+type HostnameTrie struct {
+	r        rune
+	children []*HostnameTrie
+	terminal bool // end of a valid match
+}
+
+// NewHostnameTrie returns a valid head node for a HostnameTrie.
+func NewHostnameTrie() *HostnameTrie {
+	return &HostnameTrie{-1, make([]*HostnameTrie, 0), false}
+}
+
+// Insert a string into the given HostnameTrie.
+func (t *HostnameTrie) Insert(s string) {
+	if len(s) == 0 {
+		return
+	}
+
+	rStr := []rune(s) // need to iterate by runes for intl' names
+	last := len(rStr) - 1
+	for _, c := range t.children {
+		if c.r == rStr[last] {
+			c.Insert(string(rStr[:last]))
+			return
+		}
+	}
+
+	n := &HostnameTrie{rStr[last], make([]*HostnameTrie, 0), len(rStr) == 1}
+	t.children = append(t.children, n)
+	n.Insert(string(rStr[:last]))
+}
+
+func (t *HostnameTrie) childContains(s string, match string) (bool, string) {
+	if len(s) == 0 {
+		return false, ""
+	}
+
+	rStr := []rune(s)
+	last := len(rStr) - 1
+
+	switch {
+	case t.r == '*':
+		return true, string(t.r) + match
+	case t.r != rStr[last]:
+		return false, ""
+	case len(s) == 1:
+		return t.terminal, string(t.r) + match
+	default:
+		for _, c := range t.children {
+			if b, m := c.childContains(string(rStr[:last]), string(rStr[:last])+match); b {
+				return b, m
+			}
+		}
+	}
+
+	return false, ""
+}
+
+// Contains returns whether s matches a pattern in the HostnameTrie
+// along with the matching pattern, if one was found.
+func (t *HostnameTrie) Contains(s string) (bool, string) {
+	for _, c := range t.children {
+		if b, m := c.childContains(s, ""); b {
+			return b, m
+		}
+	}
+	return false, ""
+}
+
 type Options struct {
 	// Should the test start in a paused state?
 	Paused null.Bool `json:"paused" envconfig:"K6_PAUSED"`
@@ -241,6 +313,9 @@ type Options struct {
 
 	// Blacklist IP ranges that tests may not contact. Mainly useful in hosted setups.
 	BlacklistIPs []*IPNet `json:"blacklistIPs" envconfig:"K6_BLACKLIST_IPS"`
+
+	// Block hostnames that tests may not contact.
+	BlockedHostnames *HostnameTrie `json:"blockHostnames" envconfig:"K6_BLOCK_HOSTNAMES"`
 
 	// Hosts overrides dns entries for given hosts
 	Hosts map[string]net.IP `json:"hosts" envconfig:"K6_HOSTS"`
@@ -388,6 +463,9 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.BlacklistIPs != nil {
 		o.BlacklistIPs = opts.BlacklistIPs
+	}
+	if opts.BlockedHostnames != nil {
+		o.BlockedHostnames = opts.BlockedHostnames
 	}
 	if opts.Hosts != nil {
 		o.Hosts = opts.Hosts
