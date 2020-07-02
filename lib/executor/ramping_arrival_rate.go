@@ -280,6 +280,15 @@ func (varc RampingArrivalRateConfig) cal(et *lib.ExecutionTuple, ch chan<- time.
 }
 
 // Run executes a variable number of iterations per second.
+//
+// TODO: Split this up and make an independent component that can be reused
+// between the constant and ramping arrival rate executors - that way we can
+// keep the complexity in one well-architected part (with short methods and few
+// lambdas :D), while having both config frontends still be present for maximum
+// UX benefits. Basically, keep the progress bars and scheduling (i.e. at what
+// time should iteration X begin) different, but keep everyhing else the same.
+// This will allow us to implement https://github.com/loadimpact/k6/issues/1386
+// and things like all of the TODOs below in one place only.
 //nolint:funlen,gocognit
 func (varr RampingArrivalRate) Run(ctx context.Context, out chan<- stats.SampleContainer) (err error) {
 	segment := varr.executionState.ExecutionTuple.Segment
@@ -342,11 +351,13 @@ func (varr RampingArrivalRate) Run(ctx context.Context, out chan<- stats.SampleC
 			}
 		}()
 		for range makeUnplannedVUCh {
+			varr.logger.Debug("Starting initialization of an unplanned VU...")
 			initVU, err := varr.executionState.GetUnplannedVU(maxDurationCtx, varr.logger)
 			if err != nil {
 				// TODO figure out how to return it to the Run goroutine
 				varr.logger.WithError(err).Error("Error while allocating unplanned VU")
 			}
+			varr.logger.Debug("The unplanned VU finished initializing successfully!")
 			activeVUs <- activateVU(initVU)
 		}
 	}()
@@ -426,23 +437,22 @@ func (varr RampingArrivalRate) Run(ctx context.Context, out chan<- stats.SampleC
 			}
 		}
 
-		var vu lib.ActiveVU
 		select {
-		case vu = <-activeVUs: // ideally, we get the VU from the buffer without any issues
-			go runIteration(vu)
+		case vu := <-activeVUs: // ideally, we get the VU from the buffer without any issues
+			go runIteration(vu) //TODO: refactor so we dont spin up a goroutine for each iteration
 			continue
 		default: // no free VUs currently available
 		}
 		// Since there aren't any free VUs available, consider this iteration
 		// dropped - we aren't going to try to recover it, but
 
-		// TODO: emit a dropped_iteration metric
+		// TODO: emit a dropped_iterations metric
 
 		// We'll try to start allocating another VU in the background,
 		// non-blockingly, if we have remainingUnplannedVUs...
 		if remainingUnplannedVUs == 0 {
 			if !shownWarning {
-				varr.logger.Warningf("Insufficient VUs, reached %d active VUs and cannot allocate more", maxVUs)
+				varr.logger.Warningf("Insufficient VUs, reached %d active VUs and cannot initialize more", maxVUs)
 				shownWarning = true
 			}
 			continue
