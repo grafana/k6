@@ -22,10 +22,12 @@ package executor
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/sirupsen/logrus"
 
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/ui/pb"
 )
 
@@ -72,4 +74,17 @@ func (bs BaseExecutor) GetLogger() *logrus.Entry {
 // GetProgress just returns the progressbar pointer.
 func (bs BaseExecutor) GetProgress() *pb.ProgressBar {
 	return bs.progress
+}
+
+// getMetricTags returns a tag set that can be used to emit metrics by the
+// executor. The VU ID is optional.
+func (bs BaseExecutor) getMetricTags(vuID *int64) *stats.SampleTags {
+	tags := bs.executionState.Options.RunTags.CloneTags()
+	if bs.executionState.Options.SystemTags.Has(stats.TagScenario) {
+		tags["scenario"] = bs.config.GetName()
+	}
+	if vuID != nil && bs.executionState.Options.SystemTags.Has(stats.TagVU) {
+		tags["vu"] = strconv.FormatInt(*vuID, 10)
+	}
+	return stats.IntoSampleTags(&tags)
 }

@@ -33,6 +33,7 @@ var (
 	VUsMax            = stats.New("vus_max", stats.Gauge)
 	Iterations        = stats.New("iterations", stats.Counter)
 	IterationDuration = stats.New("iteration_duration", stats.Trend, stats.Time)
+	DroppedIterations = stats.New("dropped_iterations", stats.Counter)
 	Errors            = stats.New("errors", stats.Counter)
 
 	// Runner-emitted.

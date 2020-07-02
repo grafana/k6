@@ -32,6 +32,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/ui/pb"
@@ -419,6 +420,7 @@ func (varr RampingArrivalRate) Run(ctx context.Context, out chan<- stats.SampleC
 	ch := make(chan time.Duration, 10) // buffer 10 iteration times ahead
 	var prevTime time.Duration
 	shownWarning := false
+	metricTags := varr.getMetricTags(nil)
 	go varr.config.cal(varr.executionState.ExecutionTuple, ch)
 	for nextTime := range ch {
 		select {
@@ -447,7 +449,10 @@ func (varr RampingArrivalRate) Run(ctx context.Context, out chan<- stats.SampleC
 		// Since there aren't any free VUs available, consider this iteration
 		// dropped - we aren't going to try to recover it, but
 
-		// TODO: emit a dropped_iterations metric
+		stats.PushIfNotDone(ctx, out, stats.Sample{
+			Value: 1, Metric: metrics.DroppedIterations,
+			Tags: metricTags, Time: time.Now(),
+		})
 
 		// We'll try to start allocating another VU in the background,
 		// non-blockingly, if we have remainingUnplannedVUs...

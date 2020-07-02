@@ -33,6 +33,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/ui/pb"
@@ -328,6 +329,7 @@ func (car ConstantArrivalRate) Run(ctx context.Context, out chan<- stats.SampleC
 			)).Duration)
 
 	shownWarning := false
+	metricTags := car.getMetricTags(nil)
 	for li, gi := 0, start; ; li, gi = li+1, gi+offsets[li%len(offsets)] {
 		t := notScaledTickerPeriod*time.Duration(gi) - time.Since(startTime)
 		timer.Reset(t)
@@ -343,7 +345,10 @@ func (car ConstantArrivalRate) Run(ctx context.Context, out chan<- stats.SampleC
 			// Since there aren't any free VUs available, consider this iteration
 			// dropped - we aren't going to try to recover it, but
 
-			// TODO: emit a dropped_iterations metric
+			stats.PushIfNotDone(ctx, out, stats.Sample{
+				Value: 1, Metric: metrics.DroppedIterations,
+				Tags: metricTags, Time: time.Now(),
+			})
 
 			// We'll try to start allocating another VU in the background,
 			// non-blockingly, if we have remainingUnplannedVUs...
