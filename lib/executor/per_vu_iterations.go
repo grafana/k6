@@ -31,6 +31,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/ui/pb"
@@ -209,11 +210,16 @@ func (pvi PerVUIterations) Run(ctx context.Context, out chan<- stats.SampleConta
 		newParams := *activationParams
 		newParams.RunContext = ctx
 
+		vuID := initVU.GetID()
 		activeVU := initVU.Activate(&newParams)
 
 		for i := int64(0); i < iterations; i++ {
 			select {
 			case <-regDurationDone:
+				stats.PushIfNotDone(ctx, out, stats.Sample{
+					Value: float64(iterations - i), Metric: metrics.DroppedIterations,
+					Tags: pvi.getMetricTags(&vuID), Time: time.Now(),
+				})
 				return // don't make more iterations
 			default:
 				// continue looping

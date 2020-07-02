@@ -413,6 +413,11 @@ type ActiveVU struct {
 	busy chan struct{}
 }
 
+// GetID returns the unique VU ID.
+func (u *VU) GetID() int64 {
+	return u.ID
+}
+
 // Activate the VU so it will be able to run code.
 func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 	u.Runtime.ClearInterrupt()

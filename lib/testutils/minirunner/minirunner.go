@@ -127,6 +127,11 @@ type ActiveVU struct {
 	busy chan struct{}
 }
 
+// GetID returns the unique VU ID.
+func (vu *VU) GetID() int64 {
+	return vu.ID
+}
+
 // Activate the VU so it will be able to run code.
 func (vu *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 	avu := &ActiveVU{
