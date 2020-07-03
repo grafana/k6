@@ -27,6 +27,7 @@ import (
 	"net"
 	"reflect"
 	"regexp"
+	"strings"
 
 	"github.com/loadimpact/k6/lib/scheduler"
 	"github.com/loadimpact/k6/lib/types"
@@ -226,9 +227,15 @@ func (t *HostnameTrie) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// UnmarshalText forms a HostnameTrie from a given hostname pattern.
+// UnmarshalText forms a HostnameTrie from a comma-delimited list
+// of hostname patterns.
 func (t *HostnameTrie) UnmarshalText(b []byte) error {
-	return t.Insert(string(b))
+	for _, s := range strings.Split(string(b), ",") {
+		if err := t.Insert(s); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Insert a string into the given HostnameTrie.
