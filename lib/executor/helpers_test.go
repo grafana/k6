@@ -23,8 +23,7 @@ package executor
 import "github.com/loadimpact/k6/stats"
 
 func sumMetricValues(samples chan stats.SampleContainer, metricName string) (sum float64) {
-	bufferedSmaples := stats.GetBufferedSamples(samples)
-	for _, sc := range bufferedSmaples {
+	for _, sc := range stats.GetBufferedSamples(samples) {
 		samples := sc.GetSamples()
 		for _, s := range samples {
 			if s.Metric.Name == metricName {
