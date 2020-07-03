@@ -142,12 +142,12 @@ var _ lib.Executor = &ConstantVUs{}
 
 // Run constantly loops through as many iterations as possible on a fixed number
 // of VUs for the specified duration.
-func (clv ConstantVUs) Run(ctx context.Context, out chan<- stats.SampleContainer) (err error) {
+func (clv ConstantVUs) Run(parentCtx context.Context, out chan<- stats.SampleContainer) (err error) {
 	numVUs := clv.config.GetVUs(clv.executionState.ExecutionTuple)
 	duration := time.Duration(clv.config.Duration.Duration)
 	gracefulStop := clv.config.GetGracefulStop()
 
-	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(ctx, duration, gracefulStop)
+	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(parentCtx, duration, gracefulStop)
 	defer cancel()
 
 	// Make sure the log and the progress bar have accurate information
@@ -167,7 +167,7 @@ func (clv ConstantVUs) Run(ctx context.Context, out chan<- stats.SampleContainer
 		return float64(spent) / float64(duration), right
 	}
 	clv.progress.Modify(pb.WithProgress(progresFn))
-	go trackProgress(ctx, maxDurationCtx, regDurationCtx, clv, progresFn)
+	go trackProgress(parentCtx, maxDurationCtx, regDurationCtx, clv, progresFn)
 
 	// Actually schedule the VUs and iterations...
 	activeVUs := &sync.WaitGroup{}
