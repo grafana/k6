@@ -83,8 +83,10 @@ func (d *Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn,
 	host := addr[:delimiter]
 
 	// check if host is blocked.
-	if blocked, match := d.BlockedHostnames.Contains(host); blocked {
-		return nil, BlockedHostError{hostname: host, match: match}
+	if d.BlockedHostnames != nil {
+		if blocked, match := d.BlockedHostnames.Contains(host); blocked {
+			return nil, BlockedHostError{hostname: host, match: match}
+		}
 	}
 
 	// lookup for domain defined in Hosts option before trying to resolve DNS.

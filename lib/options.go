@@ -26,6 +26,8 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"regexp"
+	"strings"
 
 	"github.com/loadimpact/k6/lib/scheduler"
 	"github.com/loadimpact/k6/lib/types"
@@ -189,37 +191,70 @@ func ParseCIDR(s string) (*IPNet, error) {
 
 // HostnameTrie is a tree-structured list of hostname matches with support
 // for wildcards exclusively at the start of the pattern. Items may only
-// be inserted and searched.
-// Internationalized hostnames are valid.
+// be inserted and searched. Internationalized hostnames are valid.
 type HostnameTrie struct {
 	r        rune
 	children []*HostnameTrie
 	terminal bool // end of a valid match
 }
 
-// NewHostnameTrie returns a valid head node for a HostnameTrie.
-func NewHostnameTrie() *HostnameTrie {
-	return &HostnameTrie{-1, make([]*HostnameTrie, 0), false}
+// describes a valid hostname pattern to block by. Global var to avoid
+// compilation penalty each call to ValidHostname.
+var validHostnamePattern *regexp.Regexp = regexp.MustCompile("^\\*?(\\pL|[0-9\\.])*")
+
+// ValidHostname returns whether the provided hostname pattern
+// has an optional wildcard at the start, and is composed entirely
+// of letters, numbers, or '.'s.
+func ValidHostname(s string) error {
+	if len(validHostnamePattern.FindString(s)) != len(s) {
+		return fmt.Errorf("block-hostname: invalid hostname pattern %s", s)
+	}
+	return nil
+}
+
+// UnmarshalText forms a HostnameTrie from the given comma-delimited
+// hostname patterns list.
+func (t *HostnameTrie) UnmarshalText(b []byte) error {
+	for _, s := range strings.Split(string(b), ",") {
+		if err := t.Insert(s); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Insert a string into the given HostnameTrie.
-func (t *HostnameTrie) Insert(s string) {
+func (t *HostnameTrie) Insert(s string) error {
 	if len(s) == 0 {
-		return
+		return nil
+	}
+
+	if err := ValidHostname(s); err != nil {
+		return err
 	}
 
 	rStr := []rune(s) // need to iterate by runes for intl' names
 	last := len(rStr) - 1
 	for _, c := range t.children {
 		if c.r == rStr[last] {
-			c.Insert(string(rStr[:last]))
-			return
+			return c.Insert(string(rStr[:last]))
 		}
 	}
 
 	n := &HostnameTrie{rStr[last], make([]*HostnameTrie, 0), len(rStr) == 1}
 	t.children = append(t.children, n)
-	n.Insert(string(rStr[:last]))
+	return n.Insert(string(rStr[:last]))
+}
+
+// Contains returns whether s matches a pattern in the HostnameTrie
+// along with the matching pattern, if one was found.
+func (t *HostnameTrie) Contains(s string) (bool, string) {
+	for _, c := range t.children {
+		if b, m := c.childContains(s, ""); b {
+			return b, m
+		}
+	}
+	return false, ""
 }
 
 func (t *HostnameTrie) childContains(s string, match string) (bool, string) {
@@ -231,7 +266,7 @@ func (t *HostnameTrie) childContains(s string, match string) (bool, string) {
 	last := len(rStr) - 1
 
 	switch {
-	case t.r == '*':
+	case t.r == '*': // wildcard encounters validate the string
 		return true, string(t.r) + match
 	case t.r != rStr[last]:
 		return false, ""
@@ -239,23 +274,12 @@ func (t *HostnameTrie) childContains(s string, match string) (bool, string) {
 		return t.terminal, string(t.r) + match
 	default:
 		for _, c := range t.children {
-			if b, m := c.childContains(string(rStr[:last]), string(rStr[:last])+match); b {
+			if b, m := c.childContains(string(rStr[:last]), string(t.r)+match); b {
 				return b, m
 			}
 		}
 	}
 
-	return false, ""
-}
-
-// Contains returns whether s matches a pattern in the HostnameTrie
-// along with the matching pattern, if one was found.
-func (t *HostnameTrie) Contains(s string) (bool, string) {
-	for _, c := range t.children {
-		if b, m := c.childContains(s, ""); b {
-			return b, m
-		}
-	}
 	return false, ""
 }
 
