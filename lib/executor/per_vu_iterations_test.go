@@ -32,7 +32,9 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/types"
+	"github.com/loadimpact/k6/stats"
 )
 
 func getTestPerVUIterationsConfig() PerVUIterationsConfig {
@@ -123,4 +125,34 @@ func TestPerVUIterationsRunVariableVU(t *testing.T) {
 	// while the rest should equally complete their assigned 100 iterations.
 	assert.Equal(t, uint64(16), val)
 	assert.Equal(t, uint64(916), totalIters)
+}
+
+func TestPerVuIterationsEmitDroppedIterations(t *testing.T) {
+	t.Parallel()
+	var count int64
+	et, err := lib.NewExecutionTuple(nil, nil)
+	require.NoError(t, err)
+
+	config := PerVUIterationsConfig{
+		VUs:         null.IntFrom(5),
+		Iterations:  null.IntFrom(20),
+		MaxDuration: types.NullDurationFrom(1 * time.Second),
+	}
+
+	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
+	ctx, cancel, executor, logHook := setupExecutor(
+		t, config, es,
+		simpleRunner(func(ctx context.Context) error {
+			atomic.AddInt64(&count, 1)
+			<-ctx.Done()
+			return nil
+		}),
+	)
+	defer cancel()
+	engineOut := make(chan stats.SampleContainer, 1000)
+	err = executor.Run(ctx, engineOut)
+	require.NoError(t, err)
+	assert.Empty(t, logHook.Drain())
+	assert.Equal(t, int64(5), count)
+	assert.Equal(t, float64(95), sumMetricValues(engineOut, metrics.DroppedIterations.Name))
 }
