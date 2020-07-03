@@ -356,9 +356,10 @@ func (varr RampingArrivalRate) Run(ctx context.Context, out chan<- stats.SampleC
 			if err != nil {
 				// TODO figure out how to return it to the Run goroutine
 				varr.logger.WithError(err).Error("Error while allocating unplanned VU")
+			} else {
+				varr.logger.Debug("The unplanned VU finished initializing successfully!")
+				activeVUs <- activateVU(initVU)
 			}
-			varr.logger.Debug("The unplanned VU finished initializing successfully!")
-			activeVUs <- activateVU(initVU)
 		}
 	}()
 
