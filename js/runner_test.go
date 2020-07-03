@@ -818,6 +818,81 @@ func TestVUIntegrationBlacklistScript(t *testing.T) {
 	}
 }
 
+func TestVUIntegrationBlockHostnamesOption(t *testing.T) {
+	r1, err := getSimpleRunner("/script.js", `
+					import http from "k6/http";
+					export default function() { http.get("https://k6.io/"); }
+				`)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	hostnames := lib.HostnameTrie{}
+	if err := hostnames.Insert("*.io"); !assert.NoError(t, err) {
+		return
+	}
+	require.NoError(t, r1.SetOptions(lib.Options{
+		Throw:            null.BoolFrom(true),
+		BlockedHostnames: &hostnames,
+	}))
+
+	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{})
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	runners := map[string]*Runner{"Source": r1, "Archive": r2}
+
+	for name, r := range runners {
+		r := r
+		t.Run(name, func(t *testing.T) {
+			vu, err := r.NewVU(make(chan stats.SampleContainer, 100))
+			if !assert.NoError(t, err) {
+				return
+			}
+			err = vu.RunOnce(context.Background())
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "hostname (k6.io) is in a blocked pattern (*.io)")
+		})
+	}
+}
+
+func TestVUIntegrationBlockHostnamesScript(t *testing.T) {
+	r1, err := getSimpleRunner("/script.js", `
+					import http from "k6/http";
+
+					export let options = {
+						throw: true,
+						blockHostnames: ["*.io"],
+					};
+
+					export default function() { http.get("https://k6.io/"); }
+				`)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{})
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	runners := map[string]*Runner{"Source": r1, "Archive": r2}
+
+	for name, r := range runners {
+		r := r
+		t.Run(name, func(t *testing.T) {
+			vu, err := r.NewVU(make(chan stats.SampleContainer, 100))
+			if !assert.NoError(t, err) {
+				return
+			}
+			err = vu.RunOnce(context.Background())
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "hostname (k6.io) is in a blocked pattern (*.io)")
+		})
+	}
+}
+
 func TestVUIntegrationHosts(t *testing.T) {
 	tb := httpmultibin.NewHTTPMultiBin(t)
 	defer tb.Cleanup()

@@ -318,6 +318,17 @@ func TestOptions(t *testing.T) {
 		assert.Equal(t, net.IPv4zero, opts.BlacklistIPs[0].IP)
 		assert.Equal(t, net.CIDRMask(1, 1), opts.BlacklistIPs[0].Mask)
 	})
+	t.Run("BlockedHostnames", func(t *testing.T) {
+		hostnames := HostnameTrie{}
+		hostnames.Insert("*")
+		opts := Options{}.Apply(Options{
+			BlockedHostnames: &hostnames,
+		})
+		assert.NotNil(t, opts.BlockedHostnames)
+		assert.NotEmpty(t, opts.BlockedHostnames)
+		matches, _ := opts.BlockedHostnames.Contains("loadimpact.com")
+		assert.True(t, matches)
+	})
 
 	t.Run("Hosts", func(t *testing.T) {
 		opts := Options{}.Apply(Options{Hosts: map[string]net.IP{
