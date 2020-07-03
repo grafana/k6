@@ -34,6 +34,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 )
@@ -295,4 +296,39 @@ func TestArrivalRateCancel(t *testing.T) {
 			require.Empty(t, logHook.Drain())
 		})
 	}
+}
+
+func TestConstantArrivalRateDroppedIterations(t *testing.T) {
+	t.Parallel()
+	var count int64
+	et, err := lib.NewExecutionTuple(nil, nil)
+	require.NoError(t, err)
+
+	config := &ConstantArrivalRateConfig{
+		BaseConfig:      BaseConfig{GracefulStop: types.NullDurationFrom(0 * time.Second)},
+		TimeUnit:        types.NullDurationFrom(time.Second),
+		Rate:            null.IntFrom(20),
+		Duration:        types.NullDurationFrom(1 * time.Second),
+		PreAllocatedVUs: null.IntFrom(10),
+		MaxVUs:          null.IntFrom(10),
+	}
+
+	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
+	ctx, cancel, executor, logHook := setupExecutor(
+		t, config, es,
+		simpleRunner(func(ctx context.Context) error {
+			atomic.AddInt64(&count, 1)
+			<-ctx.Done()
+			return nil
+		}),
+	)
+	defer cancel()
+	engineOut := make(chan stats.SampleContainer, 1000)
+	err = executor.Run(ctx, engineOut)
+	require.NoError(t, err)
+	logs := logHook.Drain()
+	require.Len(t, logs, 1)
+	assert.Contains(t, logs[0].Message, "cannot initialize more")
+	assert.Equal(t, int64(10), count)
+	assert.Equal(t, float64(10), sumMetricValues(engineOut, metrics.DroppedIterations.Name))
 }

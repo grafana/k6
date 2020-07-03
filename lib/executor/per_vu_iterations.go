@@ -152,13 +152,13 @@ var _ lib.Executor = &PerVUIterations{}
 
 // Run executes a specific number of iterations with each configured VU.
 // nolint:funlen
-func (pvi PerVUIterations) Run(ctx context.Context, out chan<- stats.SampleContainer) (err error) {
+func (pvi PerVUIterations) Run(parentCtx context.Context, out chan<- stats.SampleContainer) (err error) {
 	numVUs := pvi.config.GetVUs(pvi.executionState.ExecutionTuple)
 	iterations := pvi.config.GetIterations()
 	duration := time.Duration(pvi.config.MaxDuration.Duration)
 	gracefulStop := pvi.config.GetGracefulStop()
 
-	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(ctx, duration, gracefulStop)
+	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(parentCtx, duration, gracefulStop)
 	defer cancel()
 
 	// Make sure the log and the progress bar have accurate information
@@ -189,7 +189,7 @@ func (pvi PerVUIterations) Run(ctx context.Context, out chan<- stats.SampleConta
 		return float64(currentDoneIters) / float64(totalIters), right
 	}
 	pvi.progress.Modify(pb.WithProgress(progresFn))
-	go trackProgress(ctx, maxDurationCtx, regDurationCtx, pvi, progresFn)
+	go trackProgress(parentCtx, maxDurationCtx, regDurationCtx, pvi, progresFn)
 
 	// Actually schedule the VUs and iterations...
 	activeVUs := &sync.WaitGroup{}
@@ -216,7 +216,7 @@ func (pvi PerVUIterations) Run(ctx context.Context, out chan<- stats.SampleConta
 		for i := int64(0); i < iterations; i++ {
 			select {
 			case <-regDurationDone:
-				stats.PushIfNotDone(ctx, out, stats.Sample{
+				stats.PushIfNotDone(parentCtx, out, stats.Sample{
 					Value: float64(iterations - i), Metric: metrics.DroppedIterations,
 					Tags: pvi.getMetricTags(&vuID), Time: time.Now(),
 				})

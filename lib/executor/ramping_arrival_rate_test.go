@@ -35,6 +35,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 )
@@ -188,8 +189,9 @@ func TestRampingArrivalRateRunUnplannedVUs(t *testing.T) {
 	err = executor.Run(ctx, engineOut)
 	assert.NoError(t, err)
 	assert.Empty(t, logHook.Drain())
-	//TODO: test that the sum of dropped_iteartions and count is 9
-	// assert.Equal(t, count, int64(9))
+
+	droppedIters := sumMetricValues(engineOut, metrics.DroppedIterations.Name)
+	assert.Equal(t, count+int64(droppedIters), int64(9))
 }
 
 func TestRampingArrivalRateRunCorrectRateWithSlowRate(t *testing.T) {
