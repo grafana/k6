@@ -85,7 +85,7 @@ func TestConstantArrivalRateRunNotEnoughAllocatedVUsWarn(t *testing.T) {
 	require.NotEmpty(t, entries)
 	for _, entry := range entries {
 		require.Equal(t,
-			"Insufficient VUs, reached 20 active VUs and cannot allocate more",
+			"Insufficient VUs, reached 20 active VUs and cannot initialize more",
 			entry.Message)
 		require.Equal(t, logrus.WarnLevel, entry.Level)
 	}

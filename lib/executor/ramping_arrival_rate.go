@@ -280,7 +280,17 @@ func (varc RampingArrivalRateConfig) cal(et *lib.ExecutionTuple, ch chan<- time.
 }
 
 // Run executes a variable number of iterations per second.
-func (varr RampingArrivalRate) Run(ctx context.Context, out chan<- stats.SampleContainer) (err error) { //nolint:funlen
+//
+// TODO: Split this up and make an independent component that can be reused
+// between the constant and ramping arrival rate executors - that way we can
+// keep the complexity in one well-architected part (with short methods and few
+// lambdas :D), while having both config frontends still be present for maximum
+// UX benefits. Basically, keep the progress bars and scheduling (i.e. at what
+// time should iteration X begin) different, but keep everyhing else the same.
+// This will allow us to implement https://github.com/loadimpact/k6/issues/1386
+// and things like all of the TODOs below in one place only.
+//nolint:funlen,gocognit
+func (varr RampingArrivalRate) Run(ctx context.Context, out chan<- stats.SampleContainer) (err error) {
 	segment := varr.executionState.ExecutionTuple.Segment
 	gracefulStop := varr.config.GetGracefulStop()
 	duration := sumStagesDuration(varr.config.Stages)
@@ -301,21 +311,19 @@ func (varr RampingArrivalRate) Run(ctx context.Context, out chan<- stats.SampleC
 	}).Debug("Starting executor run...")
 
 	activeVUsWg := &sync.WaitGroup{}
-	defer activeVUsWg.Wait()
 
+	returnedVUs := make(chan struct{})
 	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(ctx, duration, gracefulStop)
-	defer cancel()
 
-	// Pre-allocate the VUs local shared buffer
+	defer func() {
+		// Make sure all VUs aren't executing iterations anymore, for the cancel()
+		// below to deactivate them.
+		<-returnedVUs
+		cancel()
+		activeVUsWg.Wait()
+	}()
 	activeVUs := make(chan lib.ActiveVU, maxVUs)
 	activeVUsCount := uint64(0)
-	// Make sure all VUs aren't executing iterations anymore, for the cancel()
-	// above to deactivate them.
-	defer func() {
-		for i := uint64(0); i < activeVUsCount; i++ {
-			<-activeVUs
-		}
-	}()
 
 	activationParams := getVUActivationParams(maxDurationCtx, varr.config.BaseConfig,
 		func(u lib.InitializedVU) {
@@ -329,6 +337,31 @@ func (varr RampingArrivalRate) Run(ctx context.Context, out chan<- stats.SampleC
 		atomic.AddUint64(&activeVUsCount, 1)
 		return activeVU
 	}
+
+	remainingUnplannedVUs := maxVUs - preAllocatedVUs
+	makeUnplannedVUCh := make(chan struct{})
+	defer close(makeUnplannedVUCh)
+	go func() {
+		defer close(returnedVUs)
+		defer func() {
+			// this is done here as to not have an unplannedVU in the middle of initialization when
+			// starting to return activeVUs
+			for i := uint64(0); i < atomic.LoadUint64(&activeVUsCount); i++ {
+				<-activeVUs
+			}
+		}()
+		for range makeUnplannedVUCh {
+			varr.logger.Debug("Starting initialization of an unplanned VU...")
+			initVU, err := varr.executionState.GetUnplannedVU(maxDurationCtx, varr.logger)
+			if err != nil {
+				// TODO figure out how to return it to the Run goroutine
+				varr.logger.WithError(err).Error("Error while allocating unplanned VU")
+			} else {
+				varr.logger.Debug("The unplanned VU finished initializing successfully!")
+				activeVUs <- activateVU(initVU)
+			}
+		}
+	}()
 
 	// Get the pre-allocated VUs in the local buffer
 	for i := int64(0); i < preAllocatedVUs; i++ {
@@ -381,12 +414,11 @@ func (varr RampingArrivalRate) Run(ctx context.Context, out chan<- stats.SampleC
 		activeVUs <- vu
 	}
 
-	remainingUnplannedVUs := maxVUs - preAllocatedVUs
-
 	timer := time.NewTimer(time.Hour)
 	start := time.Now()
 	ch := make(chan time.Duration, 10) // buffer 10 iteration times ahead
 	var prevTime time.Duration
+	shownWarning := false
 	go varr.config.cal(varr.executionState.ExecutionTuple, ch)
 	for nextTime := range ch {
 		select {
@@ -406,24 +438,32 @@ func (varr RampingArrivalRate) Run(ctx context.Context, out chan<- stats.SampleC
 			}
 		}
 
-		var vu lib.ActiveVU
 		select {
-		case vu = <-activeVUs:
-			// ideally, we get the VU from the buffer without any issues
-		default:
-			if remainingUnplannedVUs == 0 {
-				// TODO: emit an error metric?
-				varr.logger.Warningf("Insufficient VUs, reached %d active VUs and cannot allocate more", maxVUs)
-				continue
-			}
-			initVU, err := varr.executionState.GetUnplannedVU(maxDurationCtx, varr.logger)
-			if err != nil {
-				return err
-			}
-			vu = activateVU(initVU)
-			remainingUnplannedVUs--
+		case vu := <-activeVUs: // ideally, we get the VU from the buffer without any issues
+			go runIteration(vu) //TODO: refactor so we dont spin up a goroutine for each iteration
+			continue
+		default: // no free VUs currently available
 		}
-		go runIteration(vu)
+		// Since there aren't any free VUs available, consider this iteration
+		// dropped - we aren't going to try to recover it, but
+
+		// TODO: emit a dropped_iterations metric
+
+		// We'll try to start allocating another VU in the background,
+		// non-blockingly, if we have remainingUnplannedVUs...
+		if remainingUnplannedVUs == 0 {
+			if !shownWarning {
+				varr.logger.Warningf("Insufficient VUs, reached %d active VUs and cannot initialize more", maxVUs)
+				shownWarning = true
+			}
+			continue
+		}
+
+		select {
+		case makeUnplannedVUCh <- struct{}{}: // great!
+			remainingUnplannedVUs--
+		default: // we're already allocating a new VU
+		}
 	}
 	return nil
 }

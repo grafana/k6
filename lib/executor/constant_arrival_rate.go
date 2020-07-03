@@ -200,7 +200,14 @@ func (car *ConstantArrivalRate) Init(ctx context.Context) error {
 
 // Run executes a constant number of iterations per second.
 //
-// TODO: Reuse the variable arrival rate method?
+// TODO: Split this up and make an independent component that can be reused
+// between the constant and ramping arrival rate executors - that way we can
+// keep the complexity in one well-architected part (with short methods and few
+// lambdas :D), while having both config frontends still be present for maximum
+// UX benefits. Basically, keep the progress bars and scheduling (i.e. at what
+// time should iteration X begin) different, but keep everything else the same.
+// This will allow us to implement https://github.com/loadimpact/k6/issues/1386
+// and things like all of the TODOs below in one place only.
 func (car ConstantArrivalRate) Run(ctx context.Context, out chan<- stats.SampleContainer) (err error) { //nolint:funlen
 	gracefulStop := car.config.GetGracefulStop()
 	duration := time.Duration(car.config.Duration.Duration)
@@ -217,24 +224,20 @@ func (car ConstantArrivalRate) Run(ctx context.Context, out chan<- stats.SampleC
 		"tickerPeriod": tickerPeriod, "type": car.config.GetType(),
 	}).Debug("Starting executor run...")
 
-	// Pre-allocate the VUs local shared buffer
+	activeVUsWg := &sync.WaitGroup{}
+
+	returnedVUs := make(chan struct{})
+	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(ctx, duration, gracefulStop)
+
+	defer func() {
+		// Make sure all VUs aren't executing iterations anymore, for the cancel()
+		// below to deactivate them.
+		<-returnedVUs
+		cancel()
+		activeVUsWg.Wait()
+	}()
 	activeVUs := make(chan lib.ActiveVU, maxVUs)
 	activeVUsCount := uint64(0)
-
-	activeVUsWg := &sync.WaitGroup{}
-	defer activeVUsWg.Wait()
-
-	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(ctx, duration, gracefulStop)
-	defer cancel()
-
-	// Make sure all VUs aren't executing iterations anymore, for the cancel()
-	// above to deactivate them.
-	defer func() {
-		// activeVUsCount is modified only in the loop below, which is done here
-		for i := uint64(0); i < activeVUsCount; i++ {
-			<-activeVUs
-		}
-	}()
 
 	activationParams := getVUActivationParams(maxDurationCtx, car.config.BaseConfig,
 		func(u lib.InitializedVU) {
@@ -248,6 +251,31 @@ func (car ConstantArrivalRate) Run(ctx context.Context, out chan<- stats.SampleC
 		atomic.AddUint64(&activeVUsCount, 1)
 		return activeVU
 	}
+
+	remainingUnplannedVUs := maxVUs - preAllocatedVUs
+	makeUnplannedVUCh := make(chan struct{})
+	defer close(makeUnplannedVUCh)
+	go func() {
+		defer close(returnedVUs)
+		defer func() {
+			// this is done here as to not have an unplannedVU in the middle of initialization when
+			// starting to return activeVUs
+			for i := uint64(0); i < atomic.LoadUint64(&activeVUsCount); i++ {
+				<-activeVUs
+			}
+		}()
+		for range makeUnplannedVUCh {
+			car.logger.Debug("Starting initialization of an unplanned VU...")
+			initVU, err := car.executionState.GetUnplannedVU(maxDurationCtx, car.logger)
+			if err != nil {
+				// TODO figure out how to return it to the Run goroutine
+				car.logger.WithError(err).Error("Error while allocating unplanned VU")
+			} else {
+				car.logger.Debug("The unplanned VU finished initializing successfully!")
+				activeVUs <- activateVU(initVU)
+			}
+		}
+	}()
 
 	// Get the pre-allocated VUs in the local buffer
 	for i := int64(0); i < preAllocatedVUs; i++ {
@@ -289,7 +317,6 @@ func (car ConstantArrivalRate) Run(ctx context.Context, out chan<- stats.SampleC
 		activeVUs <- vu
 	}
 
-	remainingUnplannedVUs := maxVUs - preAllocatedVUs
 	start, offsets, _ := car.et.GetStripedOffsets()
 	timer := time.NewTimer(time.Hour * 24)
 	// here the we need the not scaled one
@@ -300,28 +327,40 @@ func (car ConstantArrivalRate) Run(ctx context.Context, out chan<- stats.SampleC
 				int64(time.Duration(car.config.TimeUnit.Duration)),
 			)).Duration)
 
+	shownWarning := false
 	for li, gi := 0, start; ; li, gi = li+1, gi+offsets[li%len(offsets)] {
 		t := notScaledTickerPeriod*time.Duration(gi) - time.Since(startTime)
 		timer.Reset(t)
 		select {
 		case <-timer.C:
 			select {
-			case vu := <-activeVUs:
-				// ideally, we get the VU from the buffer without any issues
-				go runIteration(vu)
-			default:
-				if remainingUnplannedVUs == 0 {
-					// TODO: emit an error metric?
-					car.logger.Warningf("Insufficient VUs, reached %d active VUs and cannot allocate more", maxVUs)
-					break
-				}
-				initVU, err := car.executionState.GetUnplannedVU(maxDurationCtx, car.logger)
-				if err != nil {
-					return err
-				}
-				remainingUnplannedVUs--
-				go runIteration(activateVU(initVU))
+			case vu := <-activeVUs: // ideally, we get the VU from the buffer without any issues
+				go runIteration(vu) //TODO: refactor so we dont spin up a goroutine for each iteration
+				continue
+			default: // no free VUs currently available
 			}
+
+			// Since there aren't any free VUs available, consider this iteration
+			// dropped - we aren't going to try to recover it, but
+
+			// TODO: emit a dropped_iterations metric
+
+			// We'll try to start allocating another VU in the background,
+			// non-blockingly, if we have remainingUnplannedVUs...
+			if remainingUnplannedVUs == 0 {
+				if !shownWarning {
+					car.logger.Warningf("Insufficient VUs, reached %d active VUs and cannot initialize more", maxVUs)
+					shownWarning = true
+				}
+				continue
+			}
+
+			select {
+			case makeUnplannedVUCh <- struct{}{}: // great!
+				remainingUnplannedVUs--
+			default: // we're already allocating a new VU
+			}
+
 		case <-regDurationCtx.Done():
 			return nil
 		}
