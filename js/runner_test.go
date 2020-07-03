@@ -828,7 +828,7 @@ func TestVUIntegrationBlockHostnamesOption(t *testing.T) {
 	}
 
 	hostnames := lib.HostnameTrie{}
-	if err := hostnames.Insert("*.io"); !assert.NoError(t, err) {
+	if insertErr := hostnames.Insert("*.io"); !assert.NoError(t, insertErr) {
 		return
 	}
 	require.NoError(t, r1.SetOptions(lib.Options{

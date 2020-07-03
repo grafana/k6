@@ -82,7 +82,6 @@ func (d *Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn,
 	delimiter := strings.LastIndex(addr, ":")
 	host := addr[:delimiter]
 
-	// check if host is blocked.
 	if d.BlockedHostnames != nil {
 		if blocked, match := d.BlockedHostnames.Contains(host); blocked {
 			return nil, BlockedHostError{hostname: host, match: match}
