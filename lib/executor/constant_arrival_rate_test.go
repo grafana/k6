@@ -308,7 +308,7 @@ func TestConstantArrivalRateDroppedIterations(t *testing.T) {
 		BaseConfig:      BaseConfig{GracefulStop: types.NullDurationFrom(0 * time.Second)},
 		TimeUnit:        types.NullDurationFrom(time.Second),
 		Rate:            null.IntFrom(20),
-		Duration:        types.NullDurationFrom(1 * time.Second),
+		Duration:        types.NullDurationFrom(950 * time.Millisecond),
 		PreAllocatedVUs: null.IntFrom(10),
 		MaxVUs:          null.IntFrom(10),
 	}
