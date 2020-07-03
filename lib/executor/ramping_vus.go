@@ -533,7 +533,7 @@ var _ lib.Executor = &RampingVUs{}
 // of a less complex way to implement it (besides the old "increment by 100ms
 // and see what happens)... :/ so maybe see how it can be split?
 // nolint:funlen,gocognit
-func (vlv RampingVUs) Run(ctx context.Context, out chan<- stats.SampleContainer) (err error) {
+func (vlv RampingVUs) Run(parentCtx context.Context, out chan<- stats.SampleContainer) (err error) {
 	rawExecutionSteps := vlv.config.getRawExecutionSteps(vlv.executionState.ExecutionTuple, true)
 	regularDuration, isFinal := lib.GetEndOffset(rawExecutionSteps)
 	if !isFinal {
@@ -548,7 +548,7 @@ func (vlv RampingVUs) Run(ctx context.Context, out chan<- stats.SampleContainer)
 	maxVUs := lib.GetMaxPlannedVUs(gracefulExecutionSteps)
 	gracefulStop := maxDuration - regularDuration
 
-	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(ctx, regularDuration, gracefulStop)
+	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(parentCtx, regularDuration, gracefulStop)
 	defer cancel()
 
 	activeVUs := &sync.WaitGroup{}
@@ -575,7 +575,7 @@ func (vlv RampingVUs) Run(ctx context.Context, out chan<- stats.SampleContainer)
 		return float64(spent) / float64(regularDuration), []string{progVUs, progDur}
 	}
 	vlv.progress.Modify(pb.WithProgress(progresFn))
-	go trackProgress(ctx, maxDurationCtx, regDurationCtx, vlv, progresFn)
+	go trackProgress(parentCtx, maxDurationCtx, regDurationCtx, vlv, progresFn)
 
 	// Actually schedule the VUs and iterations, likely the most complicated
 	// executor among all of them...
@@ -633,7 +633,7 @@ func (vlv RampingVUs) Run(ctx context.Context, out chan<- stats.SampleContainer)
 		currentMaxAllowedVUs = newMaxAllowedVUs
 	}
 
-	wait := waiter(ctx, startTime)
+	wait := waiter(parentCtx, startTime)
 	// iterate over rawExecutionSteps and gracefulExecutionSteps in order by TimeOffset
 	// giving rawExecutionSteps precedence.
 	// we stop iterating once rawExecutionSteps are over as we need to run the remaining

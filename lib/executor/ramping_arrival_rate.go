@@ -291,7 +291,7 @@ func (varc RampingArrivalRateConfig) cal(et *lib.ExecutionTuple, ch chan<- time.
 // This will allow us to implement https://github.com/loadimpact/k6/issues/1386
 // and things like all of the TODOs below in one place only.
 //nolint:funlen,gocognit
-func (varr RampingArrivalRate) Run(ctx context.Context, out chan<- stats.SampleContainer) (err error) {
+func (varr RampingArrivalRate) Run(parentCtx context.Context, out chan<- stats.SampleContainer) (err error) {
 	segment := varr.executionState.ExecutionTuple.Segment
 	gracefulStop := varr.config.GetGracefulStop()
 	duration := sumStagesDuration(varr.config.Stages)
@@ -314,7 +314,7 @@ func (varr RampingArrivalRate) Run(ctx context.Context, out chan<- stats.SampleC
 	activeVUsWg := &sync.WaitGroup{}
 
 	returnedVUs := make(chan struct{})
-	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(ctx, duration, gracefulStop)
+	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(parentCtx, duration, gracefulStop)
 
 	defer func() {
 		// Make sure all VUs aren't executing iterations anymore, for the cancel()
@@ -406,7 +406,7 @@ func (varr RampingArrivalRate) Run(ctx context.Context, out chan<- stats.SampleC
 	}
 
 	varr.progress.Modify(pb.WithProgress(progresFn))
-	go trackProgress(ctx, maxDurationCtx, regDurationCtx, varr, progresFn)
+	go trackProgress(parentCtx, maxDurationCtx, regDurationCtx, varr, progresFn)
 
 	regDurationDone := regDurationCtx.Done()
 	runIterationBasic := getIterationRunner(varr.executionState, varr.logger)
@@ -449,7 +449,7 @@ func (varr RampingArrivalRate) Run(ctx context.Context, out chan<- stats.SampleC
 		// Since there aren't any free VUs available, consider this iteration
 		// dropped - we aren't going to try to recover it, but
 
-		stats.PushIfNotDone(ctx, out, stats.Sample{
+		stats.PushIfNotDone(parentCtx, out, stats.Sample{
 			Value: 1, Metric: metrics.DroppedIterations,
 			Tags: metricTags, Time: time.Now(),
 		})
