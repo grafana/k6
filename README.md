@@ -38,7 +38,7 @@ Menu
 - [Install](#install)
 - [Running k6](#running-k6)
 - [Overview](#overview)
-- [Need help or want to contribute?](#need-help-or-want-to-contribute)
+- [Need help or want to contribute?](#contributing)
 
 Features
 --------
