@@ -99,10 +99,13 @@ a commandline interface for interacting with it.`,
 		// TODO: disable in quiet mode?
 		_, _ = BannerColor.Fprintf(stdout, "\n%s\n\n", consts.Banner)
 
-		initBar := pb.New(pb.WithConstLeft("   init"))
+		initBar := pb.New(
+			pb.WithConstLeft(" Init"),
+			pb.WithConstProgress(0, "runner"),
+		)
+		printBar(initBar)
 
 		// Create the Runner.
-		printBar(initBar, "runner")
 		pwd, err := os.Getwd()
 		if err != nil {
 			return err
@@ -124,7 +127,7 @@ a commandline interface for interacting with it.`,
 			return err
 		}
 
-		printBar(initBar, "options")
+		modifyAndPrintBar(initBar, pb.WithConstProgress(0, "options"))
 
 		cliConf, err := getConfig(cmd.Flags())
 		if err != nil {
@@ -166,7 +169,7 @@ a commandline interface for interacting with it.`,
 		defer runCancel()
 
 		// Create a local execution scheduler wrapping the runner.
-		printBar(initBar, "execution scheduler")
+		modifyAndPrintBar(initBar, pb.WithConstProgress(0, "execution scheduler"))
 		execScheduler, err := local.NewExecutionScheduler(r, logger)
 		if err != nil {
 			return err
@@ -189,7 +192,7 @@ a commandline interface for interacting with it.`,
 		}()
 
 		// Create an engine.
-		initBar.Modify(pb.WithConstProgress(0, "Init engine"))
+		modifyAndPrintBar(initBar, pb.WithConstProgress(0, "Init engine"))
 		engine, err := core.NewEngine(execScheduler, conf.Options, logger)
 		if err != nil {
 			return err
@@ -207,11 +210,12 @@ a commandline interface for interacting with it.`,
 			engine.SummaryExport = conf.SummaryExport.String != ""
 		}
 
+		executionPlan := execScheduler.GetExecutionPlan()
 		// Create a collector and assign it to the engine if requested.
-		initBar.Modify(pb.WithConstProgress(0, "Init metric outputs"))
+		modifyAndPrintBar(initBar, pb.WithConstProgress(0, "Init metric outputs"))
 		for _, out := range conf.Out {
 			t, arg := parseCollector(out)
-			collector, cerr := newCollector(t, arg, src, conf, execScheduler.GetExecutionPlan())
+			collector, cerr := newCollector(t, arg, src, conf, executionPlan)
 			if cerr != nil {
 				return cerr
 			}
@@ -223,7 +227,7 @@ a commandline interface for interacting with it.`,
 
 		// Spin up the REST API server, if not disabled.
 		if address != "" {
-			initBar.Modify(pb.WithConstProgress(0, "Init API server"))
+			modifyAndPrintBar(initBar, pb.WithConstProgress(0, "Init API server"))
 			go func() {
 				logger.Debugf("Starting the REST API server on %s", address)
 				if aerr := api.ListenAndServe(address, engine); aerr != nil {
@@ -238,43 +242,9 @@ a commandline interface for interacting with it.`,
 			}()
 		}
 
-		// Write the big banner.
-		{ // TODO: rewrite as Engine.GetTestRunDescription() and move out of here
-			out := "-"
-			link := ""
-
-			for idx, collector := range engine.Collectors {
-				if out != "-" {
-					out = out + "; " + conf.Out[idx]
-				} else {
-					out = conf.Out[idx]
-				}
-
-				if l := collector.Link(); l != "" {
-					link = link + " (" + l + ")"
-				}
-			}
-
-			fprintf(stdout, "   executor: %s\n", ui.ValueColor.Sprint("local"))
-			fprintf(stdout, "     output: %s%s\n", ui.ValueColor.Sprint(out), ui.ExtraColor.Sprint(link))
-			fprintf(stdout, "     script: %s\n", ui.ValueColor.Sprint(filename))
-			fprintf(stdout, "\n")
-
-			plan := execScheduler.GetExecutionPlan()
-			executorConfigs := execScheduler.GetExecutorConfigs()
-			maxDuration, _ := lib.GetEndOffset(plan)
-
-			fprintf(stdout, "  scenarios: %s\n", ui.ValueColor.Sprintf(
-				"(%.2f%%) %d executors, %d max VUs, %s max duration (incl. graceful stop):",
-				conf.ExecutionSegment.FloatLength()*100, len(executorConfigs),
-				lib.GetMaxPossibleVUs(plan), maxDuration),
-			)
-			for _, ec := range executorConfigs {
-				fprintf(stdout, "           * %s: %s\n",
-					ec.GetName(), ec.GetDescription(execScheduler.GetState().ExecutionTuple))
-			}
-			fprintf(stdout, "\n")
-		}
+		printExecutionDescription(
+			"local", filename, "", conf, execScheduler.GetState().ExecutionTuple,
+			executionPlan, engine.Collectors)
 
 		// Trap Interrupts, SIGINTs and SIGTERMs.
 		sigC := make(chan os.Signal, 1)
@@ -294,7 +264,7 @@ a commandline interface for interacting with it.`,
 		}()
 
 		// Initialize the engine
-		initBar.Modify(pb.WithConstProgress(0, "Init VUs"))
+		modifyAndPrintBar(initBar, pb.WithConstProgress(0, "Init VUs"))
 		engineRun, engineWait, err := engine.Init(globalCtx, runCtx)
 		if err != nil {
 			return getExitCodeFromEngine(err)
@@ -318,7 +288,7 @@ a commandline interface for interacting with it.`,
 		}
 
 		// Start the test run
-		initBar.Modify(pb.WithConstProgress(0, "Start test"))
+		modifyAndPrintBar(initBar, pb.WithConstProgress(0, "Start test"))
 		if err := engineRun(); err != nil {
 			return getExitCodeFromEngine(err)
 		}

@@ -37,6 +37,7 @@ import (
 
 	"github.com/loadimpact/k6/core/local"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/ui"
 	"github.com/loadimpact/k6/ui/pb"
 )
 
@@ -79,7 +80,7 @@ func (w *consoleWriter) Write(p []byte) (n int, err error) {
 	return origLen, err
 }
 
-func printBar(bar *pb.ProgressBar, rightText string) {
+func printBar(bar *pb.ProgressBar) {
 	end := "\n"
 	if stdout.IsTTY {
 		// If we're in a TTY, instead of printing the bar and going to the next
@@ -91,7 +92,57 @@ func printBar(bar *pb.ProgressBar, rightText string) {
 	}
 	rendered := bar.Render(0, 0)
 	// Only output the left and middle part of the progress bar
-	fprintf(stdout, "%s %s %s%s", rendered.Left, rendered.Progress(), rightText, end)
+	fprintf(stdout, "%s%s", rendered.String(), end)
+}
+
+func modifyAndPrintBar(bar *pb.ProgressBar, options ...pb.ProgressBarOption) {
+	bar.Modify(options...)
+	printBar(bar)
+}
+
+// Print execution description for both cloud and local execution.
+// TODO: Clean this up as part of #1499 or #1427
+func printExecutionDescription(
+	execution, filename, output string, conf Config, et *lib.ExecutionTuple,
+	execPlan []lib.ExecutionStep, collectors []lib.Collector,
+) {
+	fprintf(stdout, "  execution: %s\n", ui.ValueColor.Sprint(execution))
+	fprintf(stdout, "     script: %s\n", ui.ValueColor.Sprint(filename))
+
+	if execution == "local" {
+		out := "-"
+		link := ""
+
+		for idx, collector := range collectors {
+			if out != "-" {
+				out = out + "; " + conf.Out[idx]
+			} else {
+				out = conf.Out[idx]
+			}
+
+			if l := collector.Link(); l != "" {
+				link = link + " (" + l + ")"
+			}
+		}
+		fprintf(stdout, "     output: %s%s\n", ui.ValueColor.Sprint(out), ui.ExtraColor.Sprint(link))
+	} else {
+		fprintf(stdout, "     output: %s\n", ui.ValueColor.Sprint(output))
+	}
+	fprintf(stdout, "\n")
+
+	maxDuration, _ := lib.GetEndOffset(execPlan)
+	executorConfigs := conf.Scenarios.GetSortedConfigs()
+
+	fprintf(stdout, "  scenarios: %s\n", ui.ValueColor.Sprintf(
+		"(%.2f%%) %d executors, %d max VUs, %s max duration (incl. graceful stop):",
+		conf.ExecutionSegment.FloatLength()*100, len(executorConfigs),
+		lib.GetMaxPossibleVUs(execPlan), maxDuration),
+	)
+	for _, ec := range executorConfigs {
+		fprintf(stdout, "           * %s: %s\n",
+			ec.GetName(), ec.GetDescription(et))
+	}
+	fprintf(stdout, "\n")
 }
 
 //nolint: funlen
