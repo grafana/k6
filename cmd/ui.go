@@ -94,6 +94,11 @@ func printBar(bar *pb.ProgressBar) {
 	fprintf(stdout, "%s%s", rendered.String(), end)
 }
 
+func modifyAndPrintBar(bar *pb.ProgressBar, options ...pb.ProgressBarOption) {
+	bar.Modify(options...)
+	printBar(bar)
+}
+
 //nolint: funlen
 func renderMultipleBars(
 	isTTY, goBack bool, maxLeft, termWidth, widthDelta int, pbs []*pb.ProgressBar,

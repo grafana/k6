@@ -91,15 +91,13 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 			return err
 		}
 
-		progressBar.Modify(pb.WithConstProgress(0, "Getting script options"))
-		printBar(progressBar)
+		modifyAndPrintBar(progressBar, pb.WithConstProgress(0, "Getting script options"))
 		r, err := newRunner(src, runType, filesystems, runtimeOptions)
 		if err != nil {
 			return err
 		}
 
-		progressBar.Modify(pb.WithConstProgress(0, "Consolidating options"))
-		printBar(progressBar)
+		modifyAndPrintBar(progressBar, pb.WithConstProgress(0, "Consolidating options"))
 		cliOpts, err := getOptions(cmd.Flags())
 		if err != nil {
 			return err
@@ -132,8 +130,7 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 			return errors.New("Not logged in, please use `k6 login cloud`.")
 		}
 
-		progressBar.Modify(pb.WithConstProgress(0, "Building the archive"))
-		printBar(progressBar)
+		modifyAndPrintBar(progressBar, pb.WithConstProgress(0, "Building the archive"))
 		arc := r.MakeArchive()
 		// TODO: Fix this
 		// We reuse cloud.Config for parsing options.ext.loadimpact, but this probably shouldn't be
@@ -182,15 +179,13 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 		}
 
 		// Start cloud test run
-		progressBar.Modify(pb.WithConstProgress(0, "Validating script options"))
-		printBar(progressBar)
+		modifyAndPrintBar(progressBar, pb.WithConstProgress(0, "Validating script options"))
 		client := cloud.NewClient(cloudConfig.Token.String, cloudConfig.Host.String, consts.Version)
 		if err := client.ValidateOptions(arc.Options); err != nil {
 			return err
 		}
 
-		progressBar.Modify(pb.WithConstProgress(0, "Uploading archive"))
-		printBar(progressBar)
+		modifyAndPrintBar(progressBar, pb.WithConstProgress(0, "Uploading archive"))
 		refID, err := client.StartCloudTestRun(name, cloudConfig.ProjectID.Int64, arc)
 		if err != nil {
 			return err
@@ -204,11 +199,11 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 		//TODO: print executors information
 		fprintf(stdout, "\n")
 
-		progressBar.Modify(
+		modifyAndPrintBar(
+			progressBar,
 			pb.WithConstLeft(" Run "),
 			pb.WithConstProgress(0, "Initializing the cloud test"),
 		)
-		printBar(progressBar)
 
 		// The quiet option hides the progress bar and disallow aborting the test
 		if quiet {

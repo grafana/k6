@@ -127,8 +127,7 @@ a commandline interface for interacting with it.`,
 			return err
 		}
 
-		initBar.Modify(pb.WithConstProgress(0, "options"))
-		printBar(initBar)
+		modifyAndPrintBar(initBar, pb.WithConstProgress(0, "options"))
 
 		cliConf, err := getConfig(cmd.Flags())
 		if err != nil {
@@ -170,8 +169,7 @@ a commandline interface for interacting with it.`,
 		defer runCancel()
 
 		// Create a local execution scheduler wrapping the runner.
-		initBar.Modify(pb.WithConstProgress(0, "execution scheduler"))
-		printBar(initBar)
+		modifyAndPrintBar(initBar, pb.WithConstProgress(0, "execution scheduler"))
 		execScheduler, err := local.NewExecutionScheduler(r, logger)
 		if err != nil {
 			return err
@@ -194,8 +192,7 @@ a commandline interface for interacting with it.`,
 		}()
 
 		// Create an engine.
-		initBar.Modify(pb.WithConstProgress(0, "Init engine"))
-		printBar(initBar)
+		modifyAndPrintBar(initBar, pb.WithConstProgress(0, "Init engine"))
 		engine, err := core.NewEngine(execScheduler, conf.Options, logger)
 		if err != nil {
 			return err
@@ -214,8 +211,7 @@ a commandline interface for interacting with it.`,
 		}
 
 		// Create a collector and assign it to the engine if requested.
-		initBar.Modify(pb.WithConstProgress(0, "Init metric outputs"))
-		printBar(initBar)
+		modifyAndPrintBar(initBar, pb.WithConstProgress(0, "Init metric outputs"))
 		for _, out := range conf.Out {
 			t, arg := parseCollector(out)
 			collector, cerr := newCollector(t, arg, src, conf, execScheduler.GetExecutionPlan())
@@ -230,8 +226,7 @@ a commandline interface for interacting with it.`,
 
 		// Spin up the REST API server, if not disabled.
 		if address != "" {
-			initBar.Modify(pb.WithConstProgress(0, "Init API server"))
-			printBar(initBar)
+			modifyAndPrintBar(initBar, pb.WithConstProgress(0, "Init API server"))
 			go func() {
 				logger.Debugf("Starting the REST API server on %s", address)
 				if aerr := api.ListenAndServe(address, engine); aerr != nil {
@@ -302,8 +297,7 @@ a commandline interface for interacting with it.`,
 		}()
 
 		// Initialize the engine
-		initBar.Modify(pb.WithConstProgress(0, "Init VUs"))
-		printBar(initBar)
+		modifyAndPrintBar(initBar, pb.WithConstProgress(0, "Init VUs"))
 		engineRun, engineWait, err := engine.Init(globalCtx, runCtx)
 		if err != nil {
 			return getExitCodeFromEngine(err)
@@ -327,8 +321,7 @@ a commandline interface for interacting with it.`,
 		}
 
 		// Start the test run
-		initBar.Modify(pb.WithConstProgress(0, "Start test"))
-		printBar(initBar)
+		modifyAndPrintBar(initBar, pb.WithConstProgress(0, "Start test"))
 		if err := engineRun(); err != nil {
 			return getExitCodeFromEngine(err)
 		}
