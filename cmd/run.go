@@ -241,43 +241,8 @@ a commandline interface for interacting with it.`,
 			}()
 		}
 
-		// Write the big banner.
-		{ // TODO: rewrite as Engine.GetTestRunDescription() and move out of here
-			out := "-"
-			link := ""
-
-			for idx, collector := range engine.Collectors {
-				if out != "-" {
-					out = out + "; " + conf.Out[idx]
-				} else {
-					out = conf.Out[idx]
-				}
-
-				if l := collector.Link(); l != "" {
-					link = link + " (" + l + ")"
-				}
-			}
-
-			fprintf(stdout, "   executor: %s\n", ui.ValueColor.Sprint("local"))
-			fprintf(stdout, "     output: %s%s\n", ui.ValueColor.Sprint(out), ui.ExtraColor.Sprint(link))
-			fprintf(stdout, "     script: %s\n", ui.ValueColor.Sprint(filename))
-			fprintf(stdout, "\n")
-
-			plan := execScheduler.GetExecutionPlan()
-			executorConfigs := execScheduler.GetExecutorConfigs()
-			maxDuration, _ := lib.GetEndOffset(plan)
-
-			fprintf(stdout, "  scenarios: %s\n", ui.ValueColor.Sprintf(
-				"(%.2f%%) %d executors, %d max VUs, %s max duration (incl. graceful stop):",
-				conf.ExecutionSegment.FloatLength()*100, len(executorConfigs),
-				lib.GetMaxPossibleVUs(plan), maxDuration),
-			)
-			for _, ec := range executorConfigs {
-				fprintf(stdout, "           * %s: %s\n",
-					ec.GetName(), ec.GetDescription(execScheduler.GetState().ExecutionTuple))
-			}
-			fprintf(stdout, "\n")
-		}
+		printExecutionDescription("local", filename, "", conf,
+			execScheduler.GetState().ExecutionTuple, engine.Collectors)
 
 		// Trap Interrupts, SIGINTs and SIGTERMs.
 		sigC := make(chan os.Signal, 1)

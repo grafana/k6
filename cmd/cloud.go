@@ -191,13 +191,12 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 			return err
 		}
 
+		et, err := lib.NewExecutionTuple(derivedConf.ExecutionSegment, derivedConf.ExecutionSegmentSequence)
+		if err != nil {
+			return err
+		}
 		testURL := cloud.URLForResults(refID, cloudConfig)
-		fprintf(stdout, "\n\n")
-		fprintf(stdout, "   executor: %s\n", ui.ValueColor.Sprint("cloud"))
-		fprintf(stdout, "     script: %s\n", ui.ValueColor.Sprint(filename))
-		fprintf(stdout, "     output: %s\n", ui.ValueColor.Sprint(testURL))
-		//TODO: print executors information
-		fprintf(stdout, "\n")
+		printExecutionDescription("cloud", filename, testURL, derivedConf, et, nil)
 
 		modifyAndPrintBar(
 			progressBar,
@@ -222,15 +221,9 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 			startTime   time.Time
 			maxDuration time.Duration
 		)
-		if derivedConf.Duration.Valid {
-			maxDuration = time.Duration(derivedConf.Duration.Duration)
-		} else if derivedConf.Stages != nil {
-			maxDuration = lib.SumStagesDuration(derivedConf.Stages)
-		} else if derivedConf.Scenarios != nil {
-			et, _ := lib.NewExecutionTuple(nil, nil)
-			execReqs := derivedConf.Scenarios.GetFullExecutionRequirements(et)
-			maxDuration, _ = lib.GetEndOffset(execReqs)
-		}
+
+		executionPlan := derivedConf.Scenarios.GetFullExecutionRequirements(et)
+		maxDuration, _ = lib.GetEndOffset(executionPlan)
 
 		var progressErr error
 		testProgress := &cloud.TestProgressResponse{}

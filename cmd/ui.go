@@ -37,6 +37,7 @@ import (
 
 	"github.com/loadimpact/k6/core/local"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/ui"
 	"github.com/loadimpact/k6/ui/pb"
 )
 
@@ -97,6 +98,48 @@ func printBar(bar *pb.ProgressBar) {
 func modifyAndPrintBar(bar *pb.ProgressBar, options ...pb.ProgressBarOption) {
 	bar.Modify(options...)
 	printBar(bar)
+}
+
+func printExecutionDescription(execution, filename, output string, conf Config,
+	et *lib.ExecutionTuple, collectors []lib.Collector) {
+	fprintf(stdout, "  execution: %s\n", ui.ValueColor.Sprint(execution))
+	fprintf(stdout, "     script: %s\n", ui.ValueColor.Sprint(filename))
+
+	if execution == "local" {
+		out := "-"
+		link := ""
+
+		for idx, collector := range collectors {
+			if out != "-" {
+				out = out + "; " + conf.Out[idx]
+			} else {
+				out = conf.Out[idx]
+			}
+
+			if l := collector.Link(); l != "" {
+				link = link + " (" + l + ")"
+			}
+		}
+		fprintf(stdout, "     output: %s%s\n", ui.ValueColor.Sprint(out), ui.ExtraColor.Sprint(link))
+	} else {
+		fprintf(stdout, "     output: %s\n", ui.ValueColor.Sprint(output))
+	}
+	fprintf(stdout, "\n")
+
+	executionPlan := conf.Scenarios.GetFullExecutionRequirements(et)
+	maxDuration, _ := lib.GetEndOffset(executionPlan)
+	executorConfigs := conf.Scenarios.GetSortedConfigs()
+
+	fprintf(stdout, "  scenarios: %s\n", ui.ValueColor.Sprintf(
+		"(%.2f%%) %d executors, %d max VUs, %s max duration (incl. graceful stop):",
+		conf.ExecutionSegment.FloatLength()*100, len(executorConfigs),
+		lib.GetMaxPossibleVUs(executionPlan), maxDuration),
+	)
+	for _, ec := range executorConfigs {
+		fprintf(stdout, "           * %s: %s\n",
+			ec.GetName(), ec.GetDescription(et))
+	}
+	fprintf(stdout, "\n")
 }
 
 //nolint: funlen
