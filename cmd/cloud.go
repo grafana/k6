@@ -211,15 +211,16 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 
 		var progressErr error
 		testProgress := &cloud.TestProgressResponse{}
-		percentageFmt := "[" + pb.GetFixedLengthFloatFormat(100, 2) + "%%] %s"
+		percentageFmt := "[" + pb.GetFixedLengthFloatFormat(100, 2) + "%%]"
 		progressBar.Modify(
 			pb.WithProgress(func() (float64, []string) {
 				if testProgress.RunStatus < lib.RunStatusRunning {
 					return 0, []string{testProgress.RunStatusText}
 				}
 				return testProgress.Progress, []string{
-					fmt.Sprintf(percentageFmt, testProgress.Progress*100, testProgress.RunStatusText)}
+					fmt.Sprintf(percentageFmt, testProgress.Progress*100)}
 			}),
+			pb.WithLeft(func() string { return "   " + testProgress.RunStatusText }),
 		)
 
 		ticker := time.NewTicker(time.Millisecond * 2000)
