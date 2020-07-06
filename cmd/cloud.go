@@ -71,6 +71,7 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 			pb.WithConstLeft(" Init"),
 			pb.WithConstProgress(0, "Parsing script"),
 		)
+		printBar(progressBar)
 
 		// Runner
 		pwd, err := os.Getwd()
