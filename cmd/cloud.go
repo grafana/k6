@@ -214,18 +214,13 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 		signal.Notify(sigC, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer signal.Stop(sigC)
 
-		ticker := time.NewTicker(time.Millisecond * 2000)
-		shouldExitLoop := false
-
 		var (
 			startTime   time.Time
 			maxDuration time.Duration
 		)
-
 		executionPlan := derivedConf.Scenarios.GetFullExecutionRequirements(et)
 		maxDuration, _ = lib.GetEndOffset(executionPlan)
 
-		var progressErr error
 		testProgress := &cloud.TestProgressResponse{}
 		progressBar.Modify(
 			pb.WithProgress(func() (float64, []string) {
@@ -246,6 +241,10 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 				return testProgress.Progress, []string{statusText}
 			}),
 		)
+
+		var progressErr error
+		ticker := time.NewTicker(time.Millisecond * 2000)
+		shouldExitLoop := false
 
 	runningLoop:
 		for {
