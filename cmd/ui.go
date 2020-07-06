@@ -100,8 +100,12 @@ func modifyAndPrintBar(bar *pb.ProgressBar, options ...pb.ProgressBarOption) {
 	printBar(bar)
 }
 
-func printExecutionDescription(execution, filename, output string, conf Config,
-	et *lib.ExecutionTuple, collectors []lib.Collector) {
+// Print execution description for both cloud and local execution.
+// TODO: Clean this up as part of #1499 or #1427
+func printExecutionDescription(
+	execution, filename, output string, conf Config, et *lib.ExecutionTuple,
+	execPlan []lib.ExecutionStep, collectors []lib.Collector,
+) {
 	fprintf(stdout, "  execution: %s\n", ui.ValueColor.Sprint(execution))
 	fprintf(stdout, "     script: %s\n", ui.ValueColor.Sprint(filename))
 
@@ -126,14 +130,13 @@ func printExecutionDescription(execution, filename, output string, conf Config,
 	}
 	fprintf(stdout, "\n")
 
-	executionPlan := conf.Scenarios.GetFullExecutionRequirements(et)
-	maxDuration, _ := lib.GetEndOffset(executionPlan)
+	maxDuration, _ := lib.GetEndOffset(execPlan)
 	executorConfigs := conf.Scenarios.GetSortedConfigs()
 
 	fprintf(stdout, "  scenarios: %s\n", ui.ValueColor.Sprintf(
 		"(%.2f%%) %d executors, %d max VUs, %s max duration (incl. graceful stop):",
 		conf.ExecutionSegment.FloatLength()*100, len(executorConfigs),
-		lib.GetMaxPossibleVUs(executionPlan), maxDuration),
+		lib.GetMaxPossibleVUs(execPlan), maxDuration),
 	)
 	for _, ec := range executorConfigs {
 		fprintf(stdout, "           * %s: %s\n",

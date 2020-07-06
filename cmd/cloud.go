@@ -196,7 +196,8 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 			return err
 		}
 		testURL := cloud.URLForResults(refID, cloudConfig)
-		printExecutionDescription("cloud", filename, testURL, derivedConf, et, nil)
+		executionPlan := derivedConf.Scenarios.GetFullExecutionRequirements(et)
+		printExecutionDescription("cloud", filename, testURL, derivedConf, et, executionPlan, nil)
 
 		modifyAndPrintBar(
 			progressBar,
@@ -218,7 +219,6 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 			startTime   time.Time
 			maxDuration time.Duration
 		)
-		executionPlan := derivedConf.Scenarios.GetFullExecutionRequirements(et)
 		maxDuration, _ = lib.GetEndOffset(executionPlan)
 
 		testProgress := &cloud.TestProgressResponse{}
