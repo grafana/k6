@@ -34,6 +34,7 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/gorilla/websocket"
+
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
@@ -103,7 +104,7 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 	// Leave header to nil by default so we can pass it directly to the Dialer
 	var header http.Header
 
-	tags := state.Options.RunTags.CloneTags()
+	tags := state.CloneTags()
 
 	// Parse the optional second argument (params)
 	if !goja.IsUndefined(paramsV) && !goja.IsNull(paramsV) {
@@ -142,9 +143,6 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 
 	if state.Options.SystemTags.Has(stats.TagURL) {
 		tags["url"] = url
-	}
-	if state.Options.SystemTags.Has(stats.TagGroup) {
-		tags["group"] = state.Group.Path
 	}
 
 	// Pass a custom net.Dial function to websocket.Dialer that will substitute
@@ -249,7 +247,7 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 	readErrChan := make(chan error)
 
 	// Wraps a couple of channels around conn.ReadMessage
-	go readPump(conn, readDataChan, readErrChan, readCloseChan)
+	go socket.readPump(readDataChan, readErrChan, readCloseChan)
 
 	// This is the main control loop. All JS code (including error handlers)
 	// should only be executed by this thread to avoid race conditions
@@ -386,7 +384,11 @@ func (s *Socket) SetTimeout(fn goja.Callable, timeoutMs int) {
 	go func() {
 		select {
 		case <-time.After(time.Duration(timeoutMs) * time.Millisecond):
-			s.scheduled <- fn
+			select {
+			case s.scheduled <- fn:
+			case <-s.done:
+				return
+			}
 
 		case <-s.done:
 			return
@@ -404,7 +406,11 @@ func (s *Socket) SetInterval(fn goja.Callable, intervalMs int) {
 		for {
 			select {
 			case <-ticker.C:
-				s.scheduled <- fn
+				select {
+				case s.scheduled <- fn:
+				case <-s.done:
+					return
+				}
 
 			case <-s.done:
 				return
@@ -452,24 +458,35 @@ func (s *Socket) closeConnection(code int) error {
 }
 
 // Wraps conn.ReadMessage in a channel
-func readPump(conn *websocket.Conn, readChan chan []byte, errorChan chan error, closeChan chan int) {
+func (s *Socket) readPump(readChan chan []byte, errorChan chan error, closeChan chan int) {
 	for {
-		_, message, err := conn.ReadMessage()
+		_, message, err := s.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(
 				err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
 				// Report an unexpected closure
-				errorChan <- err
+				select {
+				case errorChan <- err:
+				case <-s.done:
+					return
+				}
 			}
 			code := websocket.CloseGoingAway
 			if e, ok := err.(*websocket.CloseError); ok {
 				code = e.Code
 			}
-			closeChan <- code
+			select {
+			case closeChan <- code:
+			case <-s.done:
+			}
 			return
 		}
 
-		readChan <- message
+		select {
+		case readChan <- message:
+		case <-s.done:
+			return
+		}
 	}
 }
 

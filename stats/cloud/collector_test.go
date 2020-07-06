@@ -33,11 +33,9 @@ import (
 	"testing"
 	"time"
 
-	"gopkg.in/guregu/null.v3"
-
 	"github.com/stretchr/testify/assert"
-
 	"github.com/stretchr/testify/require"
+	"gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
@@ -186,7 +184,7 @@ func runCloudCollectorTestCase(t *testing.T, minSamples int) {
 		Host:       null.StringFrom(tb.ServerHTTP.URL),
 		NoCompress: null.BoolFrom(true),
 	})
-	collector, err := New(config, script, options, "1.0")
+	collector, err := New(config, script, options, []lib.ExecutionStep{}, "1.0")
 	require.NoError(t, err)
 
 	assert.True(t, collector.config.Host.Valid)
@@ -214,6 +212,7 @@ func runCloudCollectorTestCase(t *testing.T, minSamples int) {
 	expectedTags := stats.IntoSampleTags(&expectedTagMap)
 
 	expSamples := make(chan []Sample)
+	defer close(expSamples)
 	tb.Mux.HandleFunc(fmt.Sprintf("/v1/metrics/%s", collector.referenceID), getSampleChecker(t, expSamples))
 	tb.Mux.HandleFunc(fmt.Sprintf("/v1/tests/%s", collector.referenceID), func(rw http.ResponseWriter, _ *http.Request) {
 		rw.WriteHeader(http.StatusOK) // silence a test warning
@@ -343,7 +342,7 @@ func TestCloudCollectorMaxPerPacket(t *testing.T) {
 		Host:       null.StringFrom(tb.ServerHTTP.URL),
 		NoCompress: null.BoolFrom(true),
 	})
-	collector, err := New(config, script, options, "1.0")
+	collector, err := New(config, script, options, []lib.ExecutionStep{}, "1.0")
 	require.NoError(t, err)
 	now := time.Now()
 	tags := stats.IntoSampleTags(&map[string]string{"test": "mest", "a": "b"})
@@ -432,10 +431,11 @@ func TestCloudCollectorStopSendingMetric(t *testing.T) {
 	}
 
 	config := NewConfig().Apply(Config{
-		Host:       null.StringFrom(tb.ServerHTTP.URL),
-		NoCompress: null.BoolFrom(true),
+		Host:                       null.StringFrom(tb.ServerHTTP.URL),
+		NoCompress:                 null.BoolFrom(true),
+		MaxMetricSamplesPerPackage: null.IntFrom(50),
 	})
-	collector, err := New(config, script, options, "1.0")
+	collector, err := New(config, script, options, []lib.ExecutionStep{}, "1.0")
 	require.NoError(t, err)
 	now := time.Now()
 	tags := stats.IntoSampleTags(&map[string]string{"test": "mest", "a": "b"})
@@ -504,8 +504,12 @@ func TestCloudCollectorStopSendingMetric(t *testing.T) {
 	cancel()
 	wg.Wait()
 	require.Equal(t, lib.RunStatusQueued, collector.runStatus)
-	_, ok := <-collector.stopSendingMetricsCh
-	require.False(t, ok)
+	select {
+	case <-collector.stopSendingMetricsCh:
+		// all is fine
+	default:
+		t.Fatal("sending metrics wasn't stopped")
+	}
 	require.Equal(t, max, count)
 
 	nBufferSamples := len(collector.bufferSamples)
@@ -551,7 +555,7 @@ func TestCloudCollectorAggregationPeriodZeroNoBlock(t *testing.T) {
 		Host:       null.StringFrom(tb.ServerHTTP.URL),
 		NoCompress: null.BoolFrom(true),
 	})
-	collector, err := New(config, script, options, "1.0")
+	collector, err := New(config, script, options, []lib.ExecutionStep{}, "1.0")
 	require.NoError(t, err)
 
 	assert.True(t, collector.config.Host.Valid)
@@ -572,6 +576,7 @@ func TestCloudCollectorAggregationPeriodZeroNoBlock(t *testing.T) {
 	assert.Equal(t, types.Duration(5*time.Millisecond), collector.config.AggregationWaitPeriod.Duration)
 
 	expSamples := make(chan []Sample)
+	defer close(expSamples)
 	tb.Mux.HandleFunc(fmt.Sprintf("/v1/metrics/%s", collector.referenceID), getSampleChecker(t, expSamples))
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -609,7 +614,7 @@ func TestCloudCollectorRecvIterLIAllIterations(t *testing.T) {
 		Host:       null.StringFrom(tb.ServerHTTP.URL),
 		NoCompress: null.BoolFrom(true),
 	})
-	collector, err := New(config, script, options, "1.0")
+	collector, err := New(config, script, options, []lib.ExecutionStep{}, "1.0")
 	require.NoError(t, err)
 
 	var gotIterations = false
@@ -724,7 +729,7 @@ func TestNewName(t *testing.T) {
 			}
 			collector, err := New(NewConfig(), script, lib.Options{
 				Duration: types.NullDurationFrom(1 * time.Second),
-			}, "1.0")
+			}, []lib.ExecutionStep{}, "1.0")
 			require.NoError(t, err)
 			require.Equal(t, collector.config.Name.String, testCase.expected)
 		})

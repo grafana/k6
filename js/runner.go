@@ -24,11 +24,11 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/dop251/goja"
@@ -42,17 +42,14 @@ import (
 
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/stats"
 )
 
 //nolint:gochecknoglobals
-var (
-	errInterrupt  = errors.New("context cancelled")
-	stageSetup    = "setup"
-	stageTeardown = "teardown"
-)
+var errInterrupt = errors.New("context cancelled")
 
 // Ensure Runner implements the lib.Runner interface
 var _ lib.Runner = &Runner{}
@@ -114,15 +111,17 @@ func (r *Runner) MakeArchive() *lib.Archive {
 	return r.Bundle.makeArchive()
 }
 
-func (r *Runner) NewVU(samplesOut chan<- stats.SampleContainer) (lib.VU, error) {
-	vu, err := r.newVU(samplesOut)
+// NewVU returns a new initialized VU.
+func (r *Runner) NewVU(id int64, samplesOut chan<- stats.SampleContainer) (lib.InitializedVU, error) {
+	vu, err := r.newVU(id, samplesOut)
 	if err != nil {
 		return nil, err
 	}
-	return lib.VU(vu), nil
+	return lib.InitializedVU(vu), nil
 }
 
-func (r *Runner) newVU(samplesOut chan<- stats.SampleContainer) (*VU, error) {
+// nolint:funlen
+func (r *Runner) newVU(id int64, samplesOut chan<- stats.SampleContainer) (*VU, error) {
 	// Instantiate a new bundle, make a VU out of it.
 	bi, err := r.Bundle.Instantiate()
 	if err != nil {
@@ -185,6 +184,7 @@ func (r *Runner) newVU(samplesOut chan<- stats.SampleContainer) (*VU, error) {
 	}
 
 	vu := &VU{
+		ID:             id,
 		BundleInstance: *bi,
 		Runner:         r,
 		Transport:      transport,
@@ -194,22 +194,33 @@ func (r *Runner) newVU(samplesOut chan<- stats.SampleContainer) (*VU, error) {
 		Console:        r.console,
 		BPool:          bpool.NewBufferPool(100),
 		Samples:        samplesOut,
-		m:              &sync.Mutex{},
 	}
+
+	vu.state = &lib.State{
+		Logger:    vu.Runner.Logger,
+		Options:   vu.Runner.Bundle.Options,
+		Transport: vu.Transport,
+		Dialer:    vu.Dialer,
+		TLSConfig: vu.TLSConfig,
+		CookieJar: cookieJar,
+		RPSLimit:  vu.Runner.RPSLimit,
+		BPool:     vu.BPool,
+		Vu:        vu.ID,
+		Samples:   vu.Samples,
+		Iteration: vu.Iteration,
+		Tags:      vu.Runner.Bundle.Options.RunTags.CloneTags(),
+		Group:     r.defaultGroup,
+	}
+	vu.Runtime.Set("__VU", vu.ID)
 	vu.Runtime.Set("console", common.Bind(vu.Runtime, vu.Console, vu.Context))
+
+	// This is here mostly so if someone tries they get a nice message
+	// instead of "Value is not an object: undefined  ..."
 	common.BindToGlobal(vu.Runtime, map[string]interface{}{
 		"open": func() {
-			common.Throw(vu.Runtime, errors.New(
-				`The "open()" function is only available to init code (aka the global scope), see `+
-					` https://k6.io/docs/using-k6/test-life-cycle for more information`,
-			))
+			common.Throw(vu.Runtime, errors.New(openCantBeUsedOutsideInitContextMsg))
 		},
 	})
-
-	// Give the VU an initial sense of identity.
-	if err := vu.Reconfigure(0); err != nil {
-		return nil, err
-	}
 
 	return vu, nil
 }
@@ -221,9 +232,9 @@ func (r *Runner) Setup(ctx context.Context, out chan<- stats.SampleContainer) er
 	)
 	defer setupCancel()
 
-	v, err := r.runPart(setupCtx, out, stageSetup, nil)
+	v, err := r.runPart(setupCtx, out, consts.SetupFn, nil)
 	if err != nil {
-		return errors.Wrap(err, stageSetup)
+		return err
 	}
 	// r.setupData = nil is special it means undefined from this moment forward
 	if goja.IsUndefined(v) {
@@ -233,7 +244,7 @@ func (r *Runner) Setup(ctx context.Context, out chan<- stats.SampleContainer) er
 
 	r.setupData, err = json.Marshal(v.Export())
 	if err != nil {
-		return errors.Wrap(err, stageSetup)
+		return errors.Wrap(err, consts.SetupFn)
 	}
 	var tmp interface{}
 	return json.Unmarshal(r.setupData, &tmp)
@@ -259,12 +270,12 @@ func (r *Runner) Teardown(ctx context.Context, out chan<- stats.SampleContainer)
 	var data interface{}
 	if r.setupData != nil {
 		if err := json.Unmarshal(r.setupData, &data); err != nil {
-			return errors.Wrap(err, stageTeardown)
+			return errors.Wrap(err, consts.TeardownFn)
 		}
 	} else {
 		data = goja.Undefined()
 	}
-	_, err := r.runPart(teardownCtx, out, stageTeardown, data)
+	_, err := r.runPart(teardownCtx, out, consts.TeardownFn, data)
 	return err
 }
 
@@ -276,6 +287,13 @@ func (r *Runner) GetOptions() lib.Options {
 	return r.Bundle.Options
 }
 
+// IsExecutable returns whether the given name is an exported and
+// executable function in the script.
+func (r *Runner) IsExecutable(name string) bool {
+	_, exists := r.Bundle.exports[name]
+	return exists
+}
+
 func (r *Runner) SetOptions(opts lib.Options) error {
 	r.Bundle.Options = opts
 
@@ -283,6 +301,8 @@ func (r *Runner) SetOptions(opts lib.Options) error {
 	if rps := opts.RPS; rps.Valid {
 		r.RPSLimit = rate.NewLimiter(rate.Limit(rps.Int64), 1)
 	}
+
+	// TODO: validate that all exec values are either nil or valid exported methods (or HTTP requests in the future)
 
 	if opts.ConsoleOutput.Valid {
 		c, err := newFileConsole(opts.ConsoleOutput.String)
@@ -299,7 +319,7 @@ func (r *Runner) SetOptions(opts lib.Options) error {
 // Runs an exported function in its own temporary VU, optionally with an argument. Execution is
 // interrupted if the context expires. No error is returned if the part does not exist.
 func (r *Runner) runPart(ctx context.Context, out chan<- stats.SampleContainer, name string, arg interface{}) (goja.Value, error) {
-	vu, err := r.newVU(out)
+	vu, err := r.newVU(0, out)
 	if err != nil {
 		return goja.Undefined(), err
 	}
@@ -312,24 +332,33 @@ func (r *Runner) runPart(ctx context.Context, out chan<- stats.SampleContainer, 
 		return goja.Undefined(), nil
 	}
 
+	ctx = common.WithRuntime(ctx, vu.Runtime)
+	ctx = lib.WithState(ctx, vu.state)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	go func() {
 		<-ctx.Done()
 		vu.Runtime.Interrupt(errInterrupt)
 	}()
+	*vu.Context = ctx
 
 	group, err := lib.NewGroup(name, r.GetDefaultGroup())
 	if err != nil {
 		return goja.Undefined(), err
 	}
 
-	v, _, _, err := vu.runFn(ctx, group, false, fn, vu.Runtime.ToValue(arg))
+	if r.Bundle.Options.SystemTags.Has(stats.TagGroup) {
+		vu.state.Tags["group"] = group.Path
+	}
+	vu.state.Group = group
+
+	v, _, _, err := vu.runFn(ctx, false, fn, vu.Runtime.ToValue(arg))
 
 	// deadline is reached so we have timeouted but this might've not been registered correctly
 	if deadline, ok := ctx.Deadline(); ok && time.Now().After(deadline) {
 		// we could have an error that is not errInterrupt in which case we should return it instead
 		if err, ok := err.(*goja.InterruptedError); ok && v != nil && err.Value() != errInterrupt {
+			// TODO: silence this error?
 			return v, err
 		}
 		// otherwise we have timeouted
@@ -342,9 +371,9 @@ func (r *Runner) runPart(ctx context.Context, out chan<- stats.SampleContainer, 
 func (r *Runner) timeoutErrorDuration(stage string) time.Duration {
 	d := time.Duration(0)
 	switch stage {
-	case stageSetup:
+	case consts.SetupFn:
 		return time.Duration(r.Bundle.Options.SetupTimeout.Duration)
-	case stageTeardown:
+	case consts.TeardownFn:
 		return time.Duration(r.Bundle.Options.TeardownTimeout.Duration)
 	}
 	return d
@@ -368,49 +397,102 @@ type VU struct {
 
 	setupData goja.Value
 
-	// A VU will track the last context it was called with for cancellation.
-	// Note that interruptTrackedCtx is the context that is currently being tracked, while
-	// interruptCancel cancels an unrelated context that terminates the tracking goroutine
-	// without triggering an interrupt (for if the context changes).
-	// There are cleaner ways of handling the interruption problem, but this is a hot path that
-	// needs to be called thousands of times per second, which rules out anything that spawns a
-	// goroutine per call.
-	interruptTrackedCtx context.Context
-	interruptCancel     context.CancelFunc
-
-	m *sync.Mutex
+	state *lib.State
 }
 
-// Verify that VU implements lib.VU
-var _ lib.VU = &VU{}
+// Verify that interfaces are implemented
+var (
+	_ lib.ActiveVU      = &ActiveVU{}
+	_ lib.InitializedVU = &VU{}
+)
 
-func (u *VU) Reconfigure(id int64) error {
-	u.ID = id
-	u.Iteration = 0
-	u.Runtime.Set("__VU", u.ID)
-	return nil
+// ActiveVU holds a VU and its activation parameters
+type ActiveVU struct {
+	*VU
+	*lib.VUActivationParams
+	busy chan struct{}
 }
 
-func (u *VU) RunOnce(ctx context.Context) error {
-	u.m.Lock()
-	defer u.m.Unlock()
-	// Track the context and interrupt JS execution if it's cancelled.
-	if u.interruptTrackedCtx != ctx {
-		interCtx, interCancel := context.WithCancel(context.Background())
-		if u.interruptCancel != nil {
-			u.interruptCancel()
-		}
-		u.interruptCancel = interCancel
-		u.interruptTrackedCtx = ctx
-		defer interCancel()
-		go func() {
-			select {
-			case <-interCtx.Done():
-			case <-ctx.Done():
-				u.Runtime.Interrupt(errInterrupt)
-			}
-		}()
+// GetID returns the unique VU ID.
+func (u *VU) GetID() int64 {
+	return u.ID
+}
+
+// Activate the VU so it will be able to run code.
+func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
+	u.Runtime.ClearInterrupt()
+
+	if params.Exec == "" {
+		params.Exec = consts.DefaultFn
 	}
+
+	// Override the preset global env with any custom env vars
+	env := make(map[string]string, len(u.env)+len(params.Env))
+	for key, value := range u.env {
+		env[key] = value
+	}
+	for key, value := range params.Env {
+		env[key] = value
+	}
+	u.Runtime.Set("__ENV", env)
+
+	opts := u.Runner.Bundle.Options
+	// TODO: maybe we can cache the original tags only clone them and add (if any) new tags on top ?
+	u.state.Tags = opts.RunTags.CloneTags()
+	for k, v := range params.Tags {
+		u.state.Tags[k] = v
+	}
+	if opts.SystemTags.Has(stats.TagVU) {
+		u.state.Tags["vu"] = strconv.FormatInt(u.ID, 10)
+	}
+	if opts.SystemTags.Has(stats.TagIter) {
+		u.state.Tags["iter"] = strconv.FormatInt(u.Iteration, 10)
+	}
+	if opts.SystemTags.Has(stats.TagGroup) {
+		u.state.Tags["group"] = u.state.Group.Path
+	}
+	if opts.SystemTags.Has(stats.TagScenario) {
+		u.state.Tags["scenario"] = params.Scenario
+	}
+
+	params.RunContext = common.WithRuntime(params.RunContext, u.Runtime)
+	params.RunContext = lib.WithState(params.RunContext, u.state)
+	*u.Context = params.RunContext
+
+	avu := &ActiveVU{
+		VU:                 u,
+		VUActivationParams: params,
+		busy:               make(chan struct{}, 1),
+	}
+
+	go func() {
+		// Wait for the run context to be over
+		<-params.RunContext.Done()
+		// Interrupt the JS runtime
+		u.Runtime.Interrupt(errInterrupt)
+		// Wait for the VU to stop running, if it was, and prevent it from
+		// running again for this activation
+		avu.busy <- struct{}{}
+
+		if params.DeactivateCallback != nil {
+			params.DeactivateCallback(u)
+		}
+	}()
+
+	return avu
+}
+
+// RunOnce runs the configured Exec function once.
+func (u *ActiveVU) RunOnce() error {
+	select {
+	case <-u.RunContext.Done():
+		return u.RunContext.Err() // we are done, return
+	case u.busy <- struct{}{}:
+		// nothing else can run now, and the VU cannot be deactivated
+	}
+	defer func() {
+		<-u.busy // unlock deactivation again
+	}()
 
 	// Unmarshall the setupData only the first time for each VU so that VUs are isolated but we
 	// still don't use too much CPU in the middle test
@@ -426,8 +508,14 @@ func (u *VU) RunOnce(ctx context.Context) error {
 		}
 	}
 
-	// Call the default function.
-	_, isFullIteration, totalTime, err := u.runFn(ctx, u.Runner.defaultGroup, true, u.Default, u.setupData)
+	fn, ok := u.exports[u.Exec]
+	if !ok {
+		// Shouldn't happen; this is validated in cmd.validateScenarioConfig()
+		panic(fmt.Sprintf("function '%s' not found in exports", u.Exec))
+	}
+
+	// Call the exported function.
+	_, isFullIteration, totalTime, err := u.runFn(u.RunContext, true, fn, u.setupData)
 
 	// If MinIterationDuration is specified and the iteration wasn't cancelled
 	// and was less than it, sleep for the remainder
@@ -442,38 +530,25 @@ func (u *VU) RunOnce(ctx context.Context) error {
 }
 
 func (u *VU) runFn(
-	ctx context.Context, group *lib.Group, isDefault bool, fn goja.Callable, args ...goja.Value,
+	ctx context.Context, isDefault bool, fn goja.Callable, args ...goja.Value,
 ) (goja.Value, bool, time.Duration, error) {
-	cookieJar := u.CookieJar
 	if !u.Runner.Bundle.Options.NoCookiesReset.ValueOrZero() {
 		var err error
-		cookieJar, err = cookiejar.New(nil)
+		u.state.CookieJar, err = cookiejar.New(nil)
 		if err != nil {
 			return goja.Undefined(), false, time.Duration(0), err
 		}
 	}
 
-	state := &lib.State{
-		Logger:    u.Runner.Logger,
-		Options:   u.Runner.Bundle.Options,
-		Group:     group,
-		Transport: u.Transport,
-		Dialer:    u.Dialer,
-		TLSConfig: u.TLSConfig,
-		CookieJar: cookieJar,
-		RPSLimit:  u.Runner.RPSLimit,
-		BPool:     u.BPool,
-		Vu:        u.ID,
-		Samples:   u.Samples,
-		Iteration: u.Iteration,
+	opts := &u.Runner.Bundle.Options
+	if opts.SystemTags.Has(stats.TagIter) {
+		u.state.Tags["iter"] = strconv.FormatInt(u.Iteration, 10)
 	}
 
-	newctx := common.WithRuntime(ctx, u.Runtime)
-	newctx = lib.WithState(newctx, state)
-	*u.Context = newctx
-
+	// TODO: this seems like the wrong place for the iteration incrementation
+	// also this means that teardown and setup have __ITER defined
+	// maybe move it to RunOnce ?
 	u.Runtime.Set("__ITER", u.Iteration)
-	iter := u.Iteration
 	u.Iteration++
 
 	startTime := time.Now()
@@ -488,22 +563,11 @@ func (u *VU) runFn(
 		isFullIteration = true
 	}
 
-	tags := state.Options.RunTags.CloneTags()
-	if state.Options.SystemTags.Has(stats.TagVU) {
-		tags["vu"] = strconv.FormatInt(u.ID, 10)
-	}
-	if state.Options.SystemTags.Has(stats.TagIter) {
-		tags["iter"] = strconv.FormatInt(iter, 10)
-	}
-	if state.Options.SystemTags.Has(stats.TagGroup) {
-		tags["group"] = group.Path
-	}
-
 	if u.Runner.Bundle.Options.NoVUConnectionReuse.Bool {
 		u.Transport.CloseIdleConnections()
 	}
 
-	state.Samples <- u.Dialer.GetTrail(startTime, endTime, isFullIteration, isDefault, stats.IntoSampleTags(&tags))
+	u.state.Samples <- u.Dialer.GetTrail(startTime, endTime, isFullIteration, isDefault, stats.NewSampleTags(u.state.Tags))
 
 	return v, isFullIteration, endTime.Sub(startTime), err
 }

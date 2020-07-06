@@ -26,6 +26,10 @@ func isDecimalDigit(chr rune) bool {
 	return '0' <= chr && chr <= '9'
 }
 
+func IsIdentifier(s string) bool {
+	return matchIdentifier.MatchString(s)
+}
+
 func digitValue(chr rune) int {
 	switch {
 	case '0' <= chr && chr <= '9':

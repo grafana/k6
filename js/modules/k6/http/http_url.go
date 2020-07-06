@@ -24,6 +24,7 @@ import (
 	"fmt"
 
 	"github.com/dop251/goja"
+
 	"github.com/loadimpact/k6/lib/netext/httpext"
 )
 

@@ -48,9 +48,10 @@ type Collector struct {
 	config      Config
 	referenceID string
 
-	duration   int64
-	thresholds map[string][]*stats.Threshold
-	client     *Client
+	executionPlan []lib.ExecutionStep
+	duration      int64 // in seconds
+	thresholds    map[string][]*stats.Threshold
+	client        *Client
 
 	anonymous bool
 	runStatus lib.RunStatus
@@ -100,7 +101,9 @@ func MergeFromExternal(external map[string]json.RawMessage, conf *Config) error 
 }
 
 // New creates a new cloud collector
-func New(conf Config, src *loader.SourceData, opts lib.Options, version string) (*Collector, error) {
+func New(
+	conf Config, src *loader.SourceData, opts lib.Options, executionPlan []lib.ExecutionStep, version string,
+) (*Collector, error) {
 	if err := MergeFromExternal(opts.External, &conf); err != nil {
 		return nil, err
 	}
@@ -121,16 +124,9 @@ func New(conf Config, src *loader.SourceData, opts lib.Options, version string) 
 		thresholds[name] = append(thresholds[name], t.Thresholds...)
 	}
 
-	// Sum test duration from options. -1 for unknown duration.
-	var duration int64 = -1
-	if len(opts.Stages) > 0 {
-		duration = sumStages(opts.Stages)
-	} else if opts.Duration.Valid {
-		duration = int64(time.Duration(opts.Duration.Duration).Seconds())
-	}
-
-	if duration == -1 {
-		return nil, errors.New("Tests with unspecified duration are not allowed when using Load Impact Insights")
+	duration, testEnds := lib.GetEndOffset(executionPlan)
+	if !testEnds {
+		return nil, errors.New("tests with unspecified duration are not allowed when outputting data to k6 cloud")
 	}
 
 	if !conf.Token.Valid && conf.DeprecatedToken.Valid {
@@ -143,7 +139,8 @@ func New(conf Config, src *loader.SourceData, opts lib.Options, version string) 
 		thresholds:           thresholds,
 		client:               NewClient(conf.Token.String, conf.Host.String, version),
 		anonymous:            !conf.Token.Valid,
-		duration:             duration,
+		executionPlan:        executionPlan,
+		duration:             int64(duration / time.Second),
 		opts:                 opts,
 		aggrBuckets:          map[int64]aggregationBucket{},
 		stopSendingMetricsCh: make(chan struct{}),
@@ -153,6 +150,12 @@ func New(conf Config, src *loader.SourceData, opts lib.Options, version string) 
 // Init is called between the collector's creation and the call to Run().
 // You should do any lengthy setup here rather than in New.
 func (c *Collector) Init() error {
+	if c.config.PushRefID.Valid {
+		c.referenceID = c.config.PushRefID.String
+		logrus.WithField("referenceId", c.referenceID).Debug("Cloud: directly pushing metrics without init")
+		return nil
+	}
+
 	thresholds := make(map[string][]string)
 
 	for name, t := range c.thresholds {
@@ -160,11 +163,12 @@ func (c *Collector) Init() error {
 			thresholds[name] = append(thresholds[name], threshold.Source)
 		}
 	}
+	maxVUs := lib.GetMaxPossibleVUs(c.executionPlan)
 
 	testRun := &TestRun{
 		Name:       c.config.Name.String,
 		ProjectID:  c.config.ProjectID.Int64,
-		VUsMax:     c.opts.VUsMax.Int64,
+		VUsMax:     int64(maxVUs),
 		Thresholds: thresholds,
 		Duration:   c.duration,
 	}
@@ -295,7 +299,7 @@ func (c *Collector) Collect(sampleContainers []stats.SampleContainer) {
 				newSamples = append(newSamples, NewSampleFromTrail(sc))
 			}
 		case *netext.NetTrail:
-			//TODO: aggregate?
+			// TODO: aggregate?
 			values := map[string]float64{
 				metrics.DataSent.Name:     float64(sc.BytesWritten),
 				metrics.DataReceived.Name: float64(sc.BytesRead),
@@ -313,7 +317,8 @@ func (c *Collector) Collect(sampleContainers []stats.SampleContainer) {
 					Time:   Timestamp(sc.GetTime()),
 					Tags:   sc.GetTags(),
 					Values: values,
-				}})
+				},
+			})
 		default:
 			for _, sample := range sampleContainer.GetSamples() {
 				newSamples = append(newSamples, &Sample{
@@ -511,7 +516,7 @@ func (c *Collector) pushMetrics() {
 	}).Debug("Pushing metrics to cloud")
 
 	for len(buffer) > 0 {
-		var size = len(buffer)
+		size := len(buffer)
 		if size > int(c.config.MaxMetricSamplesPerPackage.Int64) {
 			size = int(c.config.MaxMetricSamplesPerPackage.Int64)
 		}
@@ -529,7 +534,7 @@ func (c *Collector) pushMetrics() {
 }
 
 func (c *Collector) testFinished() {
-	if c.referenceID == "" {
+	if c.referenceID == "" || c.config.PushRefID.Valid {
 		return
 	}
 
@@ -561,15 +566,6 @@ func (c *Collector) testFinished() {
 			"error": err,
 		}).Warn("Failed to send test finished to cloud")
 	}
-}
-
-func sumStages(stages []lib.Stage) int64 {
-	var total time.Duration
-	for _, stage := range stages {
-		total += time.Duration(stage.Duration.Duration)
-	}
-
-	return int64(total.Seconds())
 }
 
 // GetRequiredSystemTags returns which sample tags are needed by this collector

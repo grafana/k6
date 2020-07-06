@@ -26,10 +26,11 @@ import (
 	"io/ioutil"
 	"path/filepath"
 
+	"github.com/spf13/cobra"
+	"gopkg.in/guregu/null.v3"
+
 	"github.com/loadimpact/k6/converter/har"
 	"github.com/loadimpact/k6/lib"
-	"github.com/spf13/cobra"
-	null "gopkg.in/guregu/null.v3"
 )
 
 var (

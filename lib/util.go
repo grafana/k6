@@ -22,20 +22,7 @@ package lib
 
 import (
 	"strings"
-
-	"github.com/loadimpact/k6/lib/types"
 )
-
-// Returns the total sum of time taken by the given set of stages.
-func SumStages(stages []Stage) (d types.NullDuration) {
-	for _, stage := range stages {
-		d.Valid = stage.Duration.Valid
-		if stage.Duration.Valid {
-			d.Duration += stage.Duration.Duration
-		}
-	}
-	return d
-}
 
 // Splits a string in the form "key=value".
 func SplitKV(s string) (key, value string) {

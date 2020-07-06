@@ -30,21 +30,23 @@ import (
 	"testing"
 	"time"
 
+	"github.com/manyminds/api2go/jsonapi"
+	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"gopkg.in/guregu/null.v3"
+
 	"github.com/loadimpact/k6/core"
 	"github.com/loadimpact/k6/core/local"
 	"github.com/loadimpact/k6/js"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/loader"
-	"github.com/manyminds/api2go/jsonapi"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	null "gopkg.in/guregu/null.v3"
 )
 
 func TestSetupData(t *testing.T) {
 	t.Parallel()
-	var testCases = []struct {
+	testCases := []struct {
 		name      string
 		script    []byte
 		setupRuns [][3]string
@@ -142,19 +144,26 @@ func TestSetupData(t *testing.T) {
 			runner.SetOptions(lib.Options{
 				Paused:          null.BoolFrom(true),
 				VUs:             null.IntFrom(2),
-				VUsMax:          null.IntFrom(2),
 				Iterations:      null.IntFrom(3),
-				SetupTimeout:    types.NullDurationFrom(1 * time.Second),
-				TeardownTimeout: types.NullDurationFrom(1 * time.Second),
+				NoSetup:         null.BoolFrom(true),
+				SetupTimeout:    types.NullDurationFrom(5 * time.Second),
+				TeardownTimeout: types.NullDurationFrom(5 * time.Second),
 			})
-			executor := local.New(runner)
-			executor.SetRunSetup(false)
-			engine, err := core.NewEngine(executor, runner.GetOptions())
+			execScheduler, err := local.NewExecutionScheduler(runner, logrus.StandardLogger())
+			require.NoError(t, err)
+			engine, err := core.NewEngine(execScheduler, runner.GetOptions(), logrus.StandardLogger())
 			require.NoError(t, err)
 
-			ctx, cancel := context.WithCancel(context.Background())
+			globalCtx, globalCancel := context.WithCancel(context.Background())
+			runCtx, runCancel := context.WithCancel(globalCtx)
+			run, wait, err := engine.Init(globalCtx, runCtx)
+			defer wait()
+			defer globalCancel()
+
+			require.NoError(t, err)
+
 			errC := make(chan error)
-			go func() { errC <- engine.Run(ctx) }()
+			go func() { errC <- run() }()
 
 			handler := NewHandler()
 
@@ -179,14 +188,14 @@ func TestSetupData(t *testing.T) {
 				checkSetup(setupRun[0], setupRun[1], setupRun[2])
 			}
 
-			engine.Executor.SetPaused(false)
+			require.NoError(t, engine.ExecutionScheduler.SetPaused(false))
 
 			select {
 			case <-time.After(10 * time.Second):
-				cancel()
+				runCancel()
 				t.Fatal("Test timed out")
 			case err := <-errC:
-				cancel()
+				runCancel()
 				require.NoError(t, err)
 			}
 		})

@@ -97,7 +97,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:fda79eedf88d4aedeccb193dfeae71522bd806f5fc07ae70f05187cbbd4b1146"
+  digest = "1:dd49b520ab3ef9766f486a5771c1aef117e77b4d09bd8e2690df02cfc8e607b9"
   name = "github.com/dop251/goja"
   packages = [
     ".",
@@ -107,7 +107,7 @@
     "token",
   ]
   pruneopts = "NUT"
-  revision = "0cd29d81c048b6c79afb6ba6a1305bcb70c28740"
+  revision = "bfd59704b500581bf75771f79cc2579741cf3d2c"
 
 [[projects]]
   branch = "master"
@@ -240,12 +240,12 @@
   version = "v1.6.1"
 
 [[projects]]
-  digest = "1:3b708ebf63bfa9ba3313bedb8526bc0bb284e51474e65e958481476a9d4a12aa"
+  digest = "1:c9c619da0235710875bae079870a396912a475402f9ccd50667f6ad309476259"
   name = "github.com/gorilla/websocket"
   packages = ["."]
   pruneopts = "NUT"
-  revision = "ea4d1f681babbce9545c9c5f3d5194a789c89f5b"
-  version = "v1.2.0"
+  revision = "b65e62901fc1c0d968042419e74789f6af455eb9"
+  version = "v1.4.2"
 
 [[projects]]
   digest = "1:406338ad39ab2e37b7f4452906442a3dbf0eb3379dd1f06aafb5c07e769a5fbb"

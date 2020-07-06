@@ -24,14 +24,15 @@ import (
 	"net/http"
 
 	"github.com/julienschmidt/httprouter"
-	"github.com/loadimpact/k6/api/common"
 	"github.com/manyminds/api2go/jsonapi"
+
+	"github.com/loadimpact/k6/api/common"
 )
 
 func HandleGetGroups(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	engine := common.GetEngine(r.Context())
 
-	root := NewGroup(engine.Executor.GetRunner().GetDefaultGroup(), nil)
+	root := NewGroup(engine.ExecutionScheduler.GetRunner().GetDefaultGroup(), nil)
 	groups := FlattenGroup(root)
 
 	data, err := jsonapi.Marshal(groups)
@@ -47,7 +48,7 @@ func HandleGetGroup(rw http.ResponseWriter, r *http.Request, p httprouter.Params
 
 	engine := common.GetEngine(r.Context())
 
-	root := NewGroup(engine.Executor.GetRunner().GetDefaultGroup(), nil)
+	root := NewGroup(engine.ExecutionScheduler.GetRunner().GetDefaultGroup(), nil)
 	groups := FlattenGroup(root)
 
 	var group *Group

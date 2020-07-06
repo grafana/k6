@@ -33,10 +33,11 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
+	"gopkg.in/guregu/null.v3"
+
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/netext/httpext"
-	null "gopkg.in/guregu/null.v3"
 )
 
 // ErrHTTPForbiddenInInitContext is used when a http requests was made in the init context

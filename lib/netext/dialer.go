@@ -28,11 +28,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/viki-org/dnscache"
+
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/stats"
-
-	"github.com/viki-org/dnscache"
 )
 
 // Dialer wraps net.Dialer and provides k6 specific functionality -

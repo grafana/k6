@@ -21,9 +21,10 @@
 package v1
 
 import (
-	"github.com/loadimpact/k6/lib"
 	"github.com/manyminds/api2go/jsonapi"
 	"github.com/pkg/errors"
+
+	"github.com/loadimpact/k6/lib"
 )
 
 type Check struct {

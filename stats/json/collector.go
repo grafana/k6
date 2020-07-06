@@ -98,8 +98,9 @@ func (c *Collector) Init() error {
 func (c *Collector) SetRunStatus(status lib.RunStatus) {}
 
 func (c *Collector) Run(ctx context.Context) {
+	const timeout = 200
 	logrus.Debug("JSON output: Running!")
-	ticker := time.NewTicker(time.Millisecond * 100)
+	ticker := time.NewTicker(time.Millisecond * timeout)
 	defer func() {
 		_ = c.closeFn()
 	}()
@@ -142,7 +143,6 @@ func (c *Collector) commit() {
 	samples := c.buffer
 	c.buffer = nil
 	c.bufferLock.Unlock()
-	logrus.WithField("filename", c.fname).Debug("JSON: Writing JSON metrics")
 	var start = time.Now()
 	var count int
 	for _, sc := range samples {
@@ -160,8 +160,10 @@ func (c *Collector) commit() {
 			}
 		}
 	}
-	logrus.WithField("filename", c.fname).WithField("t", time.Since(start)).
-		WithField("count", count).Debug("JSON: Wrote JSON metrics")
+	if count > 0 {
+		logrus.WithField("filename", c.fname).WithField("t", time.Since(start)).
+			WithField("count", count).Debug("JSON: Wrote JSON metrics")
+	}
 }
 
 func (c *Collector) Link() string {

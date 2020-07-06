@@ -1,3 +1,23 @@
+/*
+ *
+ * k6 - a next-generation load testing tool
+ * Copyright (C) 2019 Load Impact
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
 package stats
 
 import (
@@ -29,6 +49,7 @@ const (
 	TagError
 	TagErrorCode
 	TagTLSVersion
+	TagScenario
 
 	// System tags not enabled by default.
 	TagIter
@@ -41,7 +62,7 @@ const (
 // Other tags that are not enabled by default include: iter, vu, ocsp_status, ip
 //nolint:gochecknoglobals
 var DefaultSystemTagSet = TagProto | TagSubproto | TagStatus | TagMethod | TagURL | TagName | TagGroup |
-	TagCheck | TagCheck | TagError | TagErrorCode | TagTLSVersion
+	TagCheck | TagCheck | TagError | TagErrorCode | TagTLSVersion | TagScenario
 
 // Add adds a tag to tag set.
 func (i *SystemTagSet) Add(tag SystemTagSet) {

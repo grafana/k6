@@ -27,6 +27,9 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/kelseyhightower/envconfig"
+	"github.com/pkg/errors"
+	"github.com/spf13/afero"
+
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/loader"
@@ -39,8 +42,6 @@ import (
 	"github.com/loadimpact/k6/stats/kafka"
 	"github.com/loadimpact/k6/stats/statsd"
 	"github.com/loadimpact/k6/stats/statsd/common"
-	"github.com/pkg/errors"
-	"github.com/spf13/afero"
 )
 
 const (
@@ -66,7 +67,9 @@ func parseCollector(s string) (t, arg string) {
 }
 
 //TODO: totally refactor this...
-func getCollector(collectorName, arg string, src *loader.SourceData, conf Config) (lib.Collector, error) {
+func getCollector(
+	collectorName, arg string, src *loader.SourceData, conf Config, executionPlan []lib.ExecutionStep,
+) (lib.Collector, error) {
 	switch collectorName {
 	case collectorJSON:
 		return jsonc.New(afero.NewOsFs(), arg)
@@ -89,7 +92,7 @@ func getCollector(collectorName, arg string, src *loader.SourceData, conf Config
 		if arg != "" {
 			config.Name = null.StringFrom(arg)
 		}
-		return cloud.New(config, src, conf.Options, consts.Version)
+		return cloud.New(config, src, conf.Options, executionPlan, consts.Version)
 	case collectorKafka:
 		config := kafka.NewConfig().Apply(conf.Collectors.Kafka)
 		if err := envconfig.Process("", &config); err != nil {
@@ -135,8 +138,10 @@ func getCollector(collectorName, arg string, src *loader.SourceData, conf Config
 	}
 }
 
-func newCollector(collectorName, arg string, src *loader.SourceData, conf Config) (lib.Collector, error) {
-	collector, err := getCollector(collectorName, arg, src, conf)
+func newCollector(
+	collectorName, arg string, src *loader.SourceData, conf Config, executionPlan []lib.ExecutionStep,
+) (lib.Collector, error) {
+	collector, err := getCollector(collectorName, arg, src, conf, executionPlan)
 	if err != nil {
 		return collector, err
 	}

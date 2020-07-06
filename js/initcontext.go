@@ -28,12 +28,14 @@ import (
 	"strings"
 
 	"github.com/dop251/goja"
+	"github.com/pkg/errors"
+	"github.com/spf13/afero"
+
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/js/compiler"
 	"github.com/loadimpact/k6/js/modules"
+	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/loader"
-	"github.com/pkg/errors"
-	"github.com/spf13/afero"
 )
 
 type programWithSource struct {
@@ -41,6 +43,9 @@ type programWithSource struct {
 	src    string
 	module *goja.Object
 }
+
+const openCantBeUsedOutsideInitContextMsg = `The "open()" function is only available in the init stage ` +
+	`(i.e. the global scope), see https://k6.io/docs/using-k6/test-life-cycle for more information`
 
 // InitContext provides APIs for use in the init context.
 type InitContext struct {
@@ -58,12 +63,12 @@ type InitContext struct {
 	// Cache of loaded programs and files.
 	programs map[string]programWithSource
 
-	compatibilityMode compiler.CompatibilityMode
+	compatibilityMode lib.CompatibilityMode
 }
 
 // NewInitContext creates a new initcontext with the provided arguments
 func NewInitContext(
-	rt *goja.Runtime, c *compiler.Compiler, compatMode compiler.CompatibilityMode,
+	rt *goja.Runtime, c *compiler.Compiler, compatMode lib.CompatibilityMode,
 	ctxPtr *context.Context, filesystems map[string]afero.Fs, pwd *url.URL,
 ) *InitContext {
 	return &InitContext{
@@ -81,7 +86,7 @@ func newBoundInitContext(base *InitContext, ctxPtr *context.Context, rt *goja.Ru
 	// we don't copy the exports as otherwise they will be shared and we don't want this.
 	// this means that all the files will be executed again but once again only once per compilation
 	// of the main file.
-	var programs = make(map[string]programWithSource, len(base.programs))
+	programs := make(map[string]programWithSource, len(base.programs))
 	for key, program := range base.programs {
 		programs[key] = programWithSource{
 			src: program.src,
@@ -188,7 +193,11 @@ func (i *InitContext) compileImport(src, filename string) (*goja.Program, error)
 }
 
 // Open implements open() in the init context and will read and return the contents of a file
-func (i *InitContext) Open(filename string, args ...string) (goja.Value, error) {
+func (i *InitContext) Open(ctx context.Context, filename string, args ...string) (goja.Value, error) {
+	if lib.GetState(ctx) != nil {
+		return nil, errors.New(openCantBeUsedOutsideInitContextMsg)
+	}
+
 	if filename == "" {
 		return nil, errors.New("open() can't be used with an empty filename")
 	}

@@ -23,19 +23,20 @@ package lib
 import (
 	"crypto/tls"
 	"encoding/json"
+	"fmt"
 	"net"
-	"os"
 	"reflect"
 	"testing"
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
-	"github.com/loadimpact/k6/lib/scheduler"
-	"github.com/loadimpact/k6/lib/types"
-	"github.com/loadimpact/k6/stats"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	null "gopkg.in/guregu/null.v3"
+	"gopkg.in/guregu/null.v3"
+
+	"github.com/loadimpact/k6/lib/testutils"
+	"github.com/loadimpact/k6/lib/types"
+	"github.com/loadimpact/k6/stats"
 )
 
 func TestOptions(t *testing.T) {
@@ -48,11 +49,6 @@ func TestOptions(t *testing.T) {
 		opts := Options{}.Apply(Options{VUs: null.IntFrom(12345)})
 		assert.True(t, opts.VUs.Valid)
 		assert.Equal(t, int64(12345), opts.VUs.Int64)
-	})
-	t.Run("VUsMax", func(t *testing.T) {
-		opts := Options{}.Apply(Options{VUsMax: null.IntFrom(12345)})
-		assert.True(t, opts.VUsMax.Valid)
-		assert.Equal(t, int64(12345), opts.VUsMax.Int64)
 	})
 	t.Run("Duration", func(t *testing.T) {
 		opts := Options{}.Apply(Options{Duration: types.NullDurationFrom(2 * time.Minute)})
@@ -88,17 +84,7 @@ func TestOptions(t *testing.T) {
 		assert.Equal(t, oneStage, opts.Apply(Options{Stages: oneStage}).Stages)
 		assert.Equal(t, oneStage, Options{}.Apply(opts).Apply(Options{Stages: oneStage}).Apply(Options{Stages: oneStage}).Stages)
 	})
-	t.Run("Execution", func(t *testing.T) {
-		sched := scheduler.NewConstantLoopingVUsConfig("test")
-		sched.VUs = null.IntFrom(123)
-		sched.Duration = types.NullDurationFrom(3 * time.Minute)
-		opts := Options{}.Apply(Options{Execution: scheduler.ConfigMap{"test": sched}})
-		cs, ok := opts.Execution["test"].(scheduler.ConstantLoopingVUsConfig)
-		assert.True(t, ok)
-		assert.Equal(t, int64(123), cs.VUs.Int64)
-		assert.Equal(t, "3m0s", cs.Duration.String())
-	})
-	//TODO: test that any execution option overwrites any other lower-level options
+	// Execution overwriting is tested by the config consolidation test in cmd
 	t.Run("RPS", func(t *testing.T) {
 		opts := Options{}.Apply(Options{RPS: null.IntFrom(12345)})
 		assert.True(t, opts.RPS.Valid)
@@ -146,7 +132,6 @@ func TestOptions(t *testing.T) {
 		}
 
 		t.Run("JSON", func(t *testing.T) {
-
 			t.Run("String", func(t *testing.T) {
 				var opts Options
 				jsonStr := `{"tlsCipherSuites":["TLS_ECDHE_RSA_WITH_RC4_128_SHA"]}`
@@ -401,7 +386,6 @@ func TestOptions(t *testing.T) {
 		assert.True(t, opts.DiscardResponseBodies.Valid)
 		assert.True(t, opts.DiscardResponseBodies.Bool)
 	})
-
 }
 
 func TestOptionsEnv(t *testing.T) {
@@ -415,10 +399,6 @@ func TestOptionsEnv(t *testing.T) {
 			"":    null.Int{},
 			"123": null.IntFrom(123),
 		},
-		{"VUsMax", "K6_VUS_MAX"}: {
-			"":    null.Int{},
-			"123": null.IntFrom(123),
-		},
 		{"Duration", "K6_DURATION"}: {
 			"":    types.NullDuration{},
 			"10s": types.NullDurationFrom(10 * time.Second),
@@ -429,8 +409,10 @@ func TestOptionsEnv(t *testing.T) {
 		},
 		{"Stages", "K6_STAGES"}: {
 			// "": []Stage{},
-			"1s": []Stage{{
-				Duration: types.NullDurationFrom(1 * time.Second)},
+			"1s": []Stage{
+				{
+					Duration: types.NullDurationFrom(1 * time.Second),
+				},
 			},
 			"1s:100": []Stage{
 				{Duration: types.NullDurationFrom(1 * time.Second), Target: null.IntFrom(100)},
@@ -480,11 +462,13 @@ func TestOptionsEnv(t *testing.T) {
 		// External
 	}
 	for field, data := range testdata {
-		os.Clearenv()
+		field, data := field, data
 		t.Run(field.Name, func(t *testing.T) {
 			for str, val := range data {
+				str, val := str, val
 				t.Run(`"`+str+`"`, func(t *testing.T) {
-					assert.NoError(t, os.Setenv(field.Key, str))
+					restore := testutils.SetEnv(t, []string{fmt.Sprintf("%s=%s", field.Key, str)})
+					defer restore()
 					var opts Options
 					assert.NoError(t, envconfig.Process("k6", &opts))
 					assert.Equal(t, val, reflect.ValueOf(opts).FieldByName(field.Name).Interface())
@@ -495,8 +479,7 @@ func TestOptionsEnv(t *testing.T) {
 }
 
 func TestCIDRUnmarshal(t *testing.T) {
-
-	var testData = []struct {
+	testData := []struct {
 		input          string
 		expectedOutput *IPNet
 		expactFailure  bool

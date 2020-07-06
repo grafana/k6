@@ -26,17 +26,24 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/loadimpact/k6/core"
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/stats"
 	"github.com/manyminds/api2go/jsonapi"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	null "gopkg.in/guregu/null.v3"
+	"github.com/stretchr/testify/require"
+	"gopkg.in/guregu/null.v3"
+
+	"github.com/loadimpact/k6/core"
+	"github.com/loadimpact/k6/core/local"
+	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/testutils/minirunner"
+	"github.com/loadimpact/k6/stats"
 )
 
 func TestGetMetrics(t *testing.T) {
-	engine, err := core.NewEngine(nil, lib.Options{})
-	assert.NoError(t, err)
+	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{}, logrus.StandardLogger())
+	require.NoError(t, err)
+	engine, err := core.NewEngine(execScheduler, lib.Options{}, logrus.StandardLogger())
+	require.NoError(t, err)
 
 	engine.Metrics = map[string]*stats.Metric{
 		"my_metric": stats.New("my_metric", stats.Trend, stats.Time),
@@ -74,8 +81,10 @@ func TestGetMetrics(t *testing.T) {
 }
 
 func TestGetMetric(t *testing.T) {
-	engine, err := core.NewEngine(nil, lib.Options{})
-	assert.NoError(t, err)
+	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{}, logrus.StandardLogger())
+	require.NoError(t, err)
+	engine, err := core.NewEngine(execScheduler, lib.Options{}, logrus.StandardLogger())
+	require.NoError(t, err)
 
 	engine.Metrics = map[string]*stats.Metric{
 		"my_metric": stats.New("my_metric", stats.Trend, stats.Time),

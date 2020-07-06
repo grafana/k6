@@ -40,12 +40,14 @@ import (
 
 var BannerColor = color.New(color.FgCyan)
 
+//TODO: remove these global variables
+//nolint:gochecknoglobals
 var (
 	outMutex  = &sync.Mutex{}
 	stdoutTTY = isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsCygwinTerminal(os.Stdout.Fd())
 	stderrTTY = isatty.IsTerminal(os.Stderr.Fd()) || isatty.IsCygwinTerminal(os.Stderr.Fd())
-	stdout    = consoleWriter{colorable.NewColorableStdout(), stdoutTTY, outMutex}
-	stderr    = consoleWriter{colorable.NewColorableStderr(), stderrTTY, outMutex}
+	stdout    = &consoleWriter{colorable.NewColorableStdout(), stdoutTTY, outMutex, nil}
+	stderr    = &consoleWriter{colorable.NewColorableStderr(), stderrTTY, outMutex, nil}
 )
 
 const defaultConfigFileName = "config.json"
@@ -75,6 +77,18 @@ var RootCmd = &cobra.Command{
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		setupLoggers(logFmt)
 		if noColor {
+			// TODO: figure out something else... currently, with the wrappers
+			// below, we're stripping any colors from the output after we've
+			// added them. The problem is that, besides being very inefficient,
+			// this actually also strips other special characters from the
+			// intended output, like the progressbar formatting ones, which
+			// would otherwise be fine (in a TTY).
+			//
+			// It would be much better if we avoid messing with the output and
+			// instead have a parametrized instance of the color library. It
+			// will return colored output if colors are enabled and simply
+			// return the passed input as-is (i.e. be a noop) if colors are
+			// disabled...
 			stdout.Writer = colorable.NewNonColorable(os.Stdout)
 			stderr.Writer = colorable.NewNonColorable(os.Stderr)
 		}
@@ -119,7 +133,7 @@ func rootCmdPersistentFlagSet() *pflag.FlagSet {
 }
 
 func init() {
-	confDir, err := configDir()
+	confDir, err := os.UserConfigDir()
 	if err != nil {
 		logrus.WithError(err).Warn("could not get config directory")
 		confDir = ".config"

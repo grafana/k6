@@ -26,7 +26,7 @@ jobs:
       - image: circleci/golang:1.14
     environment:
       GOPATH: /home/circleci/.go_workspace
-      GOLANGCI_VERSION: v1.25.0
+      GOLANGCI_VERSION: v1.27.0
     working_directory: /home/circleci/.go_workspace/src/github.com/loadimpact/k6
     steps:
       # Workaround for custom env vars not available in cache keys
@@ -108,12 +108,10 @@ jobs:
     working_directory: /home/circleci/.go_workspace/src/github.com/loadimpact/k6
     steps:
       - checkout
-      - setup_remote_docker:
-          version: 17.11.0-ce
+      - setup_remote_docker
       - run:
           name: Setup repo and docker
           command: |
-            git submodule update --init
             docker info
             echo "{\"https://index.docker.io/v1/\":{\"auth\":\"$DOCKER_AUTH\",\"email\":\"$DOCKER_EMAIL\"}}" >~/.dockercfg
       - run:
@@ -138,6 +136,9 @@ jobs:
             if [ "${CIRCLE_BRANCH}" == "master" ]; then
               docker tag loadimpact/k6 loadimpact/k6:master
               docker push loadimpact/k6:master
+            elif [ "${CIRCLE_BRANCH}" == "new-schedulers" ]; then
+              docker tag loadimpact/k6 loadimpact/k6:new-executors
+              docker push loadimpact/k6:new-executors
             elif [[ "${CIRCLE_TAG}" =~ ^v[0-9]+(\.[0-9]+)*$ ]]; then
               docker tag loadimpact/k6 loadimpact/k6:${CIRCLE_TAG:1}
               docker push loadimpact/k6:latest

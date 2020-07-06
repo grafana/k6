@@ -28,13 +28,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/afero"
+	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
-
-	"github.com/spf13/afero"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestMakeHeader(t *testing.T) {

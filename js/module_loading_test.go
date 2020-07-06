@@ -26,11 +26,13 @@ import (
 	"os"
 	"testing"
 
+	"github.com/spf13/afero"
+	"github.com/stretchr/testify/require"
+	"gopkg.in/guregu/null.v3"
+
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/testutils/httpmultibin"
 	"github.com/loadimpact/k6/stats"
-	"github.com/spf13/afero"
-	"github.com/stretchr/testify/require"
 )
 
 func newDevNullSampleChannel() chan stats.SampleContainer {
@@ -86,7 +88,7 @@ func TestLoadOnceGlobalVars(t *testing.T) {
 			return c.C();
 		}
 	`), os.ModePerm))
-			r1, err := getSimpleRunnerWithFileFs("/script.js", `
+			r1, err := getSimpleRunner("/script.js", `
 			import { A } from "./A.js";
 			import { B } from "./B.js";
 
@@ -98,7 +100,7 @@ func TestLoadOnceGlobalVars(t *testing.T) {
 					throw new Error("A() != B()    (" + A() + ") != (" + B() + ")");
 				}
 			}
-		`, fs)
+		`, fs, lib.RuntimeOptions{CompatibilityMode: null.StringFrom("extended")})
 			require.NoError(t, err)
 
 			arc := r1.MakeArchive()
@@ -111,9 +113,13 @@ func TestLoadOnceGlobalVars(t *testing.T) {
 				t.Run(name, func(t *testing.T) {
 					ch := newDevNullSampleChannel()
 					defer close(ch)
-					vu, err := r.NewVU(ch)
+					initVU, err := r.NewVU(1, ch)
+
+					ctx, cancel := context.WithCancel(context.Background())
+					defer cancel()
+					vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 					require.NoError(t, err)
-					err = vu.RunOnce(context.Background())
+					err = vu.RunOnce()
 					require.NoError(t, err)
 				})
 			}
@@ -131,7 +137,7 @@ func TestLoadExportsIsUsableInModule(t *testing.T) {
 			return exports.A() + "B";
 		}
 	`), os.ModePerm))
-	r1, err := getSimpleRunnerWithFileFs("/script.js", `
+	r1, err := getSimpleRunner("/script.js", `
 			import { A, B } from "./A.js";
 
 			export default function(data) {
@@ -143,7 +149,7 @@ func TestLoadExportsIsUsableInModule(t *testing.T) {
 					throw new Error("wrong value of B() " + B());
 				}
 			}
-		`, fs)
+		`, fs, lib.RuntimeOptions{CompatibilityMode: null.StringFrom("extended")})
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
@@ -156,9 +162,12 @@ func TestLoadExportsIsUsableInModule(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ch := newDevNullSampleChannel()
 			defer close(ch)
-			vu, err := r.NewVU(ch)
+			initVU, err := r.NewVU(1, ch)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 			require.NoError(t, err)
-			err = vu.RunOnce(context.Background())
+			err = vu.RunOnce()
 			require.NoError(t, err)
 		})
 	}
@@ -177,7 +186,7 @@ func TestLoadDoesntBreakHTTPGet(t *testing.T) {
 			return http.get("HTTPBIN_URL/get");
 		}
 	`)), os.ModePerm))
-	r1, err := getSimpleRunnerWithFileFs("/script.js", `
+	r1, err := getSimpleRunner("/script.js", `
 			import { A } from "./A.js";
 
 			export default function(data) {
@@ -186,7 +195,7 @@ func TestLoadDoesntBreakHTTPGet(t *testing.T) {
 					throw new Error("wrong status "+ resp.status);
 				}
 			}
-		`, fs)
+		`, fs, lib.RuntimeOptions{CompatibilityMode: null.StringFrom("extended")})
 	require.NoError(t, err)
 
 	require.NoError(t, r1.SetOptions(lib.Options{Hosts: tb.Dialer.Hosts}))
@@ -200,9 +209,12 @@ func TestLoadDoesntBreakHTTPGet(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ch := newDevNullSampleChannel()
 			defer close(ch)
-			vu, err := r.NewVU(ch)
+			initVU, err := r.NewVU(1, ch)
 			require.NoError(t, err)
-			err = vu.RunOnce(context.Background())
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+			err = vu.RunOnce()
 			require.NoError(t, err)
 		})
 	}
@@ -217,7 +229,7 @@ func TestLoadGlobalVarsAreNotSharedBetweenVUs(t *testing.T) {
 			return globalVar;
 		}
 	`), os.ModePerm))
-	r1, err := getSimpleRunnerWithFileFs("/script.js", `
+	r1, err := getSimpleRunner("/script.js", `
 			import { A } from "./A.js";
 
 			export default function(data) {
@@ -228,7 +240,7 @@ func TestLoadGlobalVarsAreNotSharedBetweenVUs(t *testing.T) {
 					throw new Error("wrong value of a " + a);
 				}
 			}
-		`, fs)
+		`, fs, lib.RuntimeOptions{CompatibilityMode: null.StringFrom("extended")})
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
@@ -241,15 +253,21 @@ func TestLoadGlobalVarsAreNotSharedBetweenVUs(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ch := newDevNullSampleChannel()
 			defer close(ch)
-			vu, err := r.NewVU(ch)
+			initVU, err := r.NewVU(1, ch)
 			require.NoError(t, err)
-			err = vu.RunOnce(context.Background())
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+			err = vu.RunOnce()
 			require.NoError(t, err)
 
 			// run a second VU
-			vu, err = r.NewVU(ch)
+			initVU, err = r.NewVU(2, ch)
 			require.NoError(t, err)
-			err = vu.RunOnce(context.Background())
+			ctx, cancel = context.WithCancel(context.Background())
+			defer cancel()
+			vu = initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+			err = vu.RunOnce()
 			require.NoError(t, err)
 		})
 	}
@@ -285,7 +303,7 @@ func TestLoadCycle(t *testing.T) {
 	`), os.ModePerm))
 	data, err := afero.ReadFile(fs, "/main.js")
 	require.NoError(t, err)
-	r1, err := getSimpleRunnerWithFileFs("/main.js", string(data), fs)
+	r1, err := getSimpleRunner("/main.js", string(data), fs, lib.RuntimeOptions{CompatibilityMode: null.StringFrom("extended")})
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
@@ -298,9 +316,12 @@ func TestLoadCycle(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ch := newDevNullSampleChannel()
 			defer close(ch)
-			vu, err := r.NewVU(ch)
+			initVU, err := r.NewVU(1, ch)
 			require.NoError(t, err)
-			err = vu.RunOnce(context.Background())
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+			err = vu.RunOnce()
 			require.NoError(t, err)
 		})
 	}
@@ -331,7 +352,7 @@ func TestLoadCycleBinding(t *testing.T) {
 			}
 	`), os.ModePerm))
 
-	r1, err := getSimpleRunnerWithFileFs("/main.js", `
+	r1, err := getSimpleRunner("/main.js", `
 			import {foo} from './a.js';
 			import {bar} from './b.js';
 			export default function() {
@@ -344,7 +365,7 @@ func TestLoadCycleBinding(t *testing.T) {
 					throw new Error("Wrong value of bar() "+ barMessage);
 				}
 			}
-		`, fs)
+		`, fs, lib.RuntimeOptions{CompatibilityMode: null.StringFrom("extended")})
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
@@ -357,9 +378,12 @@ func TestLoadCycleBinding(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ch := newDevNullSampleChannel()
 			defer close(ch)
-			vu, err := r.NewVU(ch)
+			initVU, err := r.NewVU(1, ch)
 			require.NoError(t, err)
-			err = vu.RunOnce(context.Background())
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+			err = vu.RunOnce()
 			require.NoError(t, err)
 		})
 	}
@@ -387,7 +411,7 @@ func TestBrowserified(t *testing.T) {
 		});
 	`), os.ModePerm))
 
-	r1, err := getSimpleRunnerWithFileFs("/script.js", `
+	r1, err := getSimpleRunner("/script.js", `
 			import {alpha, bravo } from "./browserified.js";
 
 			export default function(data) {
@@ -405,7 +429,7 @@ func TestBrowserified(t *testing.T) {
 					throw new Error("bravo.B() != 'b'    (" + bravo.B() + ") != 'b'");
 				}
 			}
-		`, fs)
+		`, fs, lib.RuntimeOptions{CompatibilityMode: null.StringFrom("extended")})
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
@@ -418,9 +442,12 @@ func TestBrowserified(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ch := make(chan stats.SampleContainer, 100)
 			defer close(ch)
-			vu, err := r.NewVU(ch)
+			initVU, err := r.NewVU(1, ch)
 			require.NoError(t, err)
-			err = vu.RunOnce(context.Background())
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+			err = vu.RunOnce()
 			require.NoError(t, err)
 		})
 	}
@@ -433,13 +460,13 @@ func TestLoadingUnexistingModuleDoesntPanic(t *testing.T) {
 			} catch (err) {
 				b = "correct";
 			}
-			export default function() {
+			exports.default = function() {
 				if (b != "correct") {
 					throw new Error("wrong b "+ JSON.stringify(b));
 				}
 			}`
 	require.NoError(t, afero.WriteFile(fs, "/script.js", []byte(data), 0644))
-	r1, err := getSimpleRunnerWithFileFs("/script.js", data, fs)
+	r1, err := getSimpleRunner("/script.js", data, fs)
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
@@ -456,9 +483,12 @@ func TestLoadingUnexistingModuleDoesntPanic(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ch := newDevNullSampleChannel()
 			defer close(ch)
-			vu, err := r.NewVU(ch)
+			initVU, err := r.NewVU(1, ch)
 			require.NoError(t, err)
-			err = vu.RunOnce(context.Background())
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+			err = vu.RunOnce()
 			require.NoError(t, err)
 		})
 	}

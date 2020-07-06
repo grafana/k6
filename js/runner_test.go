@@ -31,11 +31,19 @@ import (
 	stdlog "log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
-	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/sirupsen/logrus"
+
+	logtest "github.com/sirupsen/logrus/hooks/test"
+	"github.com/spf13/afero"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/core"
 	"github.com/loadimpact/k6/core/local"
@@ -45,35 +53,34 @@ import (
 	k6metrics "github.com/loadimpact/k6/js/modules/k6/metrics"
 	"github.com/loadimpact/k6/js/modules/k6/ws"
 	"github.com/loadimpact/k6/lib"
+	_ "github.com/loadimpact/k6/lib/executor" // TODO: figure out something better
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/testutils/httpmultibin"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/stats/dummy"
-	logtest "github.com/sirupsen/logrus/hooks/test"
-	"github.com/spf13/afero"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	null "gopkg.in/guregu/null.v3"
 )
 
 func TestRunnerNew(t *testing.T) {
 	t.Run("Valid", func(t *testing.T) {
 		r, err := getSimpleRunner("/script.js", `
-			let counter = 0;
-			export default function() { counter++; }
+			var counter = 0;
+			exports.default = function() { counter++; }
 		`)
 		assert.NoError(t, err)
 
 		t.Run("NewVU", func(t *testing.T) {
-			vu, err := r.NewVU(make(chan stats.SampleContainer, 100))
+			initVU, err := r.NewVU(1, make(chan stats.SampleContainer, 100))
 			assert.NoError(t, err)
-			vuc, ok := vu.(*VU)
+			vuc, ok := initVU.(*VU)
 			assert.True(t, ok)
 			assert.Equal(t, int64(0), vuc.Runtime.Get("counter").Export())
 
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 			t.Run("RunOnce", func(t *testing.T) {
-				err = vu.RunOnce(context.Background())
+				err = vu.RunOnce()
 				assert.NoError(t, err)
 				assert.Equal(t, int64(1), vuc.Runtime.Get("counter").Export())
 			})
@@ -87,7 +94,7 @@ func TestRunnerNew(t *testing.T) {
 }
 
 func TestRunnerGetDefaultGroup(t *testing.T) {
-	r1, err := getSimpleRunner("/script.js", `export default function() {};`)
+	r1, err := getSimpleRunner("/script.js", `exports.default = function() {};`)
 	if assert.NoError(t, err) {
 		assert.NotNil(t, r1.GetDefaultGroup())
 	}
@@ -99,7 +106,7 @@ func TestRunnerGetDefaultGroup(t *testing.T) {
 }
 
 func TestRunnerOptions(t *testing.T) {
-	r1, err := getSimpleRunner("/script.js", `export default function() {};`)
+	r1, err := getSimpleRunner("/script.js", `exports.default = function() {};`)
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -129,10 +136,10 @@ func TestOptionsSettingToScript(t *testing.T) {
 
 	optionVariants := []string{
 		"",
-		"let options = null;",
-		"let options = undefined;",
-		"let options = {};",
-		"let options = {teardownTimeout: '1s'};",
+		"var options = null;",
+		"var options = undefined;",
+		"var options = {};",
+		"var options = {teardownTimeout: '1s'};",
 	}
 
 	for i, variant := range optionVariants {
@@ -140,7 +147,7 @@ func TestOptionsSettingToScript(t *testing.T) {
 		t.Run(fmt.Sprintf("Variant#%d", i), func(t *testing.T) {
 			t.Parallel()
 			data := variant + `
-					export default function() {
+					exports.default = function() {
 						if (!options) {
 							throw new Error("Expected options to be defined!");
 						}
@@ -148,7 +155,7 @@ func TestOptionsSettingToScript(t *testing.T) {
 							throw new Error("expected teardownTimeout to be " + __ENV.expectedTeardownTimeout + " but it was " + options.teardownTimeout);
 						}
 					};`
-			r, err := getSimpleRunnerWithOptions("/script.js", data,
+			r, err := getSimpleRunner("/script.js", data,
 				lib.RuntimeOptions{Env: map[string]string{"expectedTeardownTimeout": "4s"}})
 			require.NoError(t, err)
 
@@ -157,9 +164,12 @@ func TestOptionsSettingToScript(t *testing.T) {
 			require.Equal(t, newOptions, r.GetOptions())
 
 			samples := make(chan stats.SampleContainer, 100)
-			vu, err := r.NewVU(samples)
+			initVU, err := r.NewVU(1, samples)
 			if assert.NoError(t, err) {
-				err := vu.RunOnce(context.Background())
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+				vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+				err := vu.RunOnce()
 				assert.NoError(t, err)
 			}
 		})
@@ -169,8 +179,9 @@ func TestOptionsSettingToScript(t *testing.T) {
 func TestOptionsPropagationToScript(t *testing.T) {
 	t.Parallel()
 	data := `
-			export let options = { setupTimeout: "1s", myOption: "test" };
-			export default function() {
+			var options = { setupTimeout: "1s", myOption: "test" };
+			exports.options = options;
+			exports.default = function() {
 				if (options.external) {
 					throw new Error("Unexpected property external!");
 				}
@@ -183,7 +194,7 @@ func TestOptionsPropagationToScript(t *testing.T) {
 			};`
 
 	expScriptOptions := lib.Options{SetupTimeout: types.NullDurationFrom(1 * time.Second)}
-	r1, err := getSimpleRunnerWithOptions("/script.js", data,
+	r1, err := getSimpleRunner("/script.js", data,
 		lib.RuntimeOptions{Env: map[string]string{"expectedSetupTimeout": "1s"}})
 	require.NoError(t, err)
 	require.Equal(t, expScriptOptions, r1.GetOptions())
@@ -194,17 +205,21 @@ func TestOptionsPropagationToScript(t *testing.T) {
 	require.Equal(t, expScriptOptions, r2.GetOptions())
 
 	newOptions := lib.Options{SetupTimeout: types.NullDurationFrom(3 * time.Second)}
-	r2.SetOptions(newOptions)
+	require.NoError(t, r2.SetOptions(newOptions))
 	require.Equal(t, newOptions, r2.GetOptions())
 
 	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range testdata {
+		r := r
 		t.Run(name, func(t *testing.T) {
 			samples := make(chan stats.SampleContainer, 100)
 
-			vu, err := r.NewVU(samples)
+			initVU, err := r.NewVU(1, samples)
 			if assert.NoError(t, err) {
-				err := vu.RunOnce(context.Background())
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+				vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+				err := vu.RunOnce()
 				assert.NoError(t, err)
 			}
 		})
@@ -216,11 +231,11 @@ func TestMetricName(t *testing.T) {
 	defer tb.Cleanup()
 
 	script := tb.Replacer.Replace(`
-		import { Counter } from "k6/metrics";
+		var Counter = require("k6/metrics").Counter;
 
-		let myCounter = new Counter("not ok name @");
+		var myCounter = new Counter("not ok name @");
 
-		export default function(data) {
+		exports.default = function(data) {
 			myCounter.add(1);
 		}
 	`)
@@ -234,22 +249,26 @@ func TestSetupDataIsolation(t *testing.T) {
 	defer tb.Cleanup()
 
 	script := tb.Replacer.Replace(`
-		import { Counter } from "k6/metrics";
+		var Counter = require("k6/metrics").Counter;
 
-		export let options = {
-			vus: 2,
-			vusMax: 10,
-			iterations: 500,
-			teardownTimeout: "1s",
-			setupTimeout: "1s",
+		exports.options = {
+			scenarios: {
+				shared_iters: {
+					executor: "shared-iterations",
+					vus: 5,
+					iterations: 500,
+				},
+			},
+			teardownTimeout: "5s",
+			setupTimeout: "5s",
 		};
-		let myCounter = new Counter("mycounter");
+		var myCounter = new Counter("mycounter");
 
-		export function setup() {
+		exports.setup = function() {
 			return { v: 0 };
 		}
 
-		export default function(data) {
+		exports.default = function(data) {
 			if (data.v !== __ITER) {
 				throw new Error("default: wrong data for iter " + __ITER + ": " + JSON.stringify(data));
 			}
@@ -257,7 +276,7 @@ func TestSetupDataIsolation(t *testing.T) {
 			myCounter.add(1);
 		}
 
-		export function teardown(data) {
+		exports.teardown = function(data) {
 			if (data.v !== 0) {
 				throw new Error("teardown: wrong data: " + data.v);
 			}
@@ -268,15 +287,23 @@ func TestSetupDataIsolation(t *testing.T) {
 	runner, err := getSimpleRunner("/script.js", script)
 	require.NoError(t, err)
 
-	engine, err := core.NewEngine(local.New(runner), runner.GetOptions())
+	options := runner.GetOptions()
+	require.Empty(t, options.Validate())
+
+	execScheduler, err := local.NewExecutionScheduler(runner, logrus.StandardLogger())
+	require.NoError(t, err)
+	engine, err := core.NewEngine(execScheduler, options, logrus.StandardLogger())
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	run, wait, err := engine.Init(ctx, ctx)
 	require.NoError(t, err)
 
 	collector := &dummy.Collector{}
 	engine.Collectors = []lib.Collector{collector}
 
-	ctx, cancel := context.WithCancel(context.Background())
 	errC := make(chan error)
-	go func() { errC <- engine.Run(ctx) }()
+	go func() { errC <- run() }()
 
 	select {
 	case <-time.After(10 * time.Second):
@@ -285,6 +312,7 @@ func TestSetupDataIsolation(t *testing.T) {
 	case err := <-errC:
 		cancel()
 		require.NoError(t, err)
+		wait()
 		require.False(t, engine.IsTainted())
 	}
 	var count int
@@ -308,15 +336,19 @@ func testSetupDataHelper(t *testing.T, data string) {
 
 	testdata := map[string]*Runner{"Source": r1}
 	for name, r := range testdata {
+		r := r
 		t.Run(name, func(t *testing.T) {
 			samples := make(chan stats.SampleContainer, 100)
 
 			if !assert.NoError(t, r.Setup(context.Background(), samples)) {
 				return
 			}
-			vu, err := r.NewVU(samples)
+			initVU, err := r.NewVU(1, samples)
 			if assert.NoError(t, err) {
-				err := vu.RunOnce(context.Background())
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+				vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+				err := vu.RunOnce()
 				assert.NoError(t, err)
 			}
 		})
@@ -325,17 +357,17 @@ func testSetupDataHelper(t *testing.T, data string) {
 
 func TestSetupDataReturnValue(t *testing.T) {
 	testSetupDataHelper(t, `
-	export let options = { setupTimeout: "1s", teardownTimeout: "1s" };
-	export function setup() {
+	exports.options = { setupTimeout: "1s", teardownTimeout: "1s" };
+	exports.setup = function() {
 		return 42;
 	}
-	export default function(data) {
+	exports.default = function(data) {
 		if (data != 42) {
 			throw new Error("default: wrong data: " + JSON.stringify(data))
 		}
 	};
 
-	export function teardown(data) {
+	exports.teardown = function(data) {
 		if (data != 42) {
 			throw new Error("teardown: wrong data: " + JSON.stringify(data))
 		}
@@ -344,14 +376,14 @@ func TestSetupDataReturnValue(t *testing.T) {
 
 func TestSetupDataNoSetup(t *testing.T) {
 	testSetupDataHelper(t, `
-	export let options = { setupTimeout: "1s", teardownTimeout: "1s" };
-	export default function(data) {
+	exports.options = { setupTimeout: "1s", teardownTimeout: "1s" };
+	exports.default = function(data) {
 		if (data !== undefined) {
 			throw new Error("default: wrong data: " + JSON.stringify(data))
 		}
 	};
 
-	export function teardown(data) {
+	exports.teardown = function(data) {
 		if (data !== undefined) {
 			console.log(data);
 			throw new Error("teardown: wrong data: " + JSON.stringify(data))
@@ -362,7 +394,7 @@ func TestSetupDataNoSetup(t *testing.T) {
 func TestConsoleInInitContext(t *testing.T) {
 	r1, err := getSimpleRunner("/script.js", `
 			console.log("1");
-			export default function(data) {
+			exports.default = function(data) {
 			};
 		`)
 	require.NoError(t, err)
@@ -372,9 +404,12 @@ func TestConsoleInInitContext(t *testing.T) {
 		r := r
 		t.Run(name, func(t *testing.T) {
 			samples := make(chan stats.SampleContainer, 100)
-			vu, err := r.NewVU(samples)
+			initVU, err := r.NewVU(1, samples)
 			if assert.NoError(t, err) {
-				err := vu.RunOnce(context.Background())
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+				vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+				err := vu.RunOnce()
 				assert.NoError(t, err)
 			}
 		})
@@ -383,15 +418,15 @@ func TestConsoleInInitContext(t *testing.T) {
 
 func TestSetupDataNoReturn(t *testing.T) {
 	testSetupDataHelper(t, `
-	export let options = { setupTimeout: "1s", teardownTimeout: "1s" };
-	export function setup() { }
-	export default function(data) {
+	exports.options = { setupTimeout: "1s", teardownTimeout: "1s" };
+	exports.setup = function() { }
+	exports.default = function(data) {
 		if (data !== undefined) {
 			throw new Error("default: wrong data: " + JSON.stringify(data))
 		}
 	};
 
-	export function teardown(data) {
+	exports.teardown = function(data) {
 		if (data !== undefined) {
 			throw new Error("teardown: wrong data: " + JSON.stringify(data))
 		}
@@ -406,11 +441,12 @@ func TestRunnerIntegrationImports(t *testing.T) {
 			"k6/metrics",
 			"k6/html",
 		}
+		rtOpts := lib.RuntimeOptions{CompatibilityMode: null.StringFrom("extended")}
 		for _, mod := range modules {
 			mod := mod
 			t.Run(mod, func(t *testing.T) {
 				t.Run("Source", func(t *testing.T) {
-					_, err := getSimpleRunner("/script.js", fmt.Sprintf(`import "%s"; export default function() {}`, mod))
+					_, err := getSimpleRunner("/script.js", fmt.Sprintf(`import "%s"; exports.default = function() {}`, mod), rtOpts)
 					assert.NoError(t, err)
 				})
 			})
@@ -420,7 +456,7 @@ func TestRunnerIntegrationImports(t *testing.T) {
 	t.Run("Files", func(t *testing.T) {
 		fs := afero.NewMemMapFs()
 		require.NoError(t, fs.MkdirAll("/path/to", 0755))
-		require.NoError(t, afero.WriteFile(fs, "/path/to/lib.js", []byte(`export default "hi!";`), 0644))
+		require.NoError(t, afero.WriteFile(fs, "/path/to/lib.js", []byte(`exports.default = "hi!";`), 0644))
 
 		testdata := map[string]struct{ filename, path string }{
 			"Absolute":       {"/path/script.js", "/path/to/lib.js"},
@@ -432,9 +468,9 @@ func TestRunnerIntegrationImports(t *testing.T) {
 		for name, data := range testdata {
 			name, data := name, data
 			t.Run(name, func(t *testing.T) {
-				r1, err := getSimpleRunnerWithFileFs(data.filename, fmt.Sprintf(`
-					import hi from "%s";
-					export default function() {
+				r1, err := getSimpleRunner(data.filename, fmt.Sprintf(`
+					var hi = require("%s").default;
+					exports.default = function() {
 						if (hi != "hi!") { throw new Error("incorrect value"); }
 					}`, data.path), fs)
 				require.NoError(t, err)
@@ -446,9 +482,12 @@ func TestRunnerIntegrationImports(t *testing.T) {
 				for name, r := range testdata {
 					r := r
 					t.Run(name, func(t *testing.T) {
-						vu, err := r.NewVU(make(chan stats.SampleContainer, 100))
+						initVU, err := r.NewVU(1, make(chan stats.SampleContainer, 100))
 						require.NoError(t, err)
-						err = vu.RunOnce(context.Background())
+						ctx, cancel := context.WithCancel(context.Background())
+						defer cancel()
+						vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+						err = vu.RunOnce()
 						require.NoError(t, err)
 					})
 				}
@@ -459,8 +498,8 @@ func TestRunnerIntegrationImports(t *testing.T) {
 
 func TestVURunContext(t *testing.T) {
 	r1, err := getSimpleRunner("/script.js", `
-		export let options = { vus: 10 };
-		export default function() { fn(); }
+		exports.options = { vus: 10 };
+		exports.default = function() { fn(); }
 		`)
 	require.NoError(t, err)
 	r1.SetOptions(r1.GetOptions().Apply(lib.Options{Throw: null.BoolFrom(true)}))
@@ -472,8 +511,9 @@ func TestVURunContext(t *testing.T) {
 
 	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range testdata {
+		r := r
 		t.Run(name, func(t *testing.T) {
-			vu, err := r.newVU(make(chan stats.SampleContainer, 100))
+			vu, err := r.newVU(1, make(chan stats.SampleContainer, 100))
 			if !assert.NoError(t, err) {
 				return
 			}
@@ -493,7 +533,10 @@ func TestVURunContext(t *testing.T) {
 					assert.Equal(t, vu.Transport, state.Transport)
 				}
 			})
-			err = vu.RunOnce(context.Background())
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			activeVU := vu.Activate(&lib.VUActivationParams{RunContext: ctx})
+			err = activeVU.RunOnce()
 			assert.NoError(t, err)
 			assert.True(t, fnCalled, "fn() not called")
 		})
@@ -507,7 +550,7 @@ func TestVURunInterrupt(t *testing.T) {
 	}
 
 	r1, err := getSimpleRunner("/script.js", `
-		export default function() { while(true) {} }
+		exports.default = function() { while(true) {} }
 		`)
 	require.NoError(t, err)
 	require.NoError(t, r1.SetOptions(lib.Options{Throw: null.BoolFrom(true)}))
@@ -518,8 +561,6 @@ func TestVURunInterrupt(t *testing.T) {
 	for name, r := range testdata {
 		name, r := name, r
 		t.Run(name, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-			defer cancel()
 			samples := make(chan stats.SampleContainer, 100)
 			defer close(samples)
 			go func() {
@@ -527,12 +568,15 @@ func TestVURunInterrupt(t *testing.T) {
 				}
 			}()
 
-			vu, err := r.newVU(samples)
+			vu, err := r.newVU(1, samples)
 			require.NoError(t, err)
 
-			err = vu.RunOnce(ctx)
+			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+			defer cancel()
+			activeVU := vu.Activate(&lib.VUActivationParams{RunContext: ctx})
+			err = activeVU.RunOnce()
 			assert.Error(t, err)
-			assert.True(t, strings.HasPrefix(err.Error(), "context cancelled at "))
+			assert.Contains(t, err.Error(), "context cancelled")
 		})
 	}
 }
@@ -544,7 +588,7 @@ func TestVURunInterruptDoesntPanic(t *testing.T) {
 	}
 
 	r1, err := getSimpleRunner("/script.js", `
-		export default function() { while(true) {} }
+		exports.default = function() { while(true) {} }
 		`)
 	require.NoError(t, err)
 	require.NoError(t, r1.SetOptions(lib.Options{Throw: null.BoolFrom(true)}))
@@ -555,42 +599,44 @@ func TestVURunInterruptDoesntPanic(t *testing.T) {
 	for name, r := range testdata {
 		name, r := name, r
 		t.Run(name, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Minute)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 			samples := make(chan stats.SampleContainer, 100)
-			defer close(samples)
 			go func() {
 				for range samples {
 				}
 			}()
 			var wg sync.WaitGroup
 
-			vu, err := r.newVU(samples)
+			initVU, err := r.newVU(1, samples)
 			require.NoError(t, err)
 			for i := 0; i < 1000; i++ {
 				wg.Add(1)
 				newCtx, newCancel := context.WithCancel(ctx)
+				vu := initVU.Activate(&lib.VUActivationParams{
+					RunContext:         newCtx,
+					DeactivateCallback: func(_ lib.InitializedVU) { wg.Done() },
+				})
 				ch := make(chan struct{})
 				go func() {
-					defer wg.Done()
 					close(ch)
-					vuErr := vu.RunOnce(newCtx)
+					vuErr := vu.RunOnce()
 					assert.Error(t, vuErr)
 					assert.Contains(t, vuErr.Error(), "context cancelled")
 				}()
 				<-ch
 				time.Sleep(time.Millisecond * 1) // NOTE: increase this in case of problems ;)
 				newCancel()
+				wg.Wait()
 			}
-			wg.Wait()
 		})
 	}
 }
 
 func TestVUIntegrationGroups(t *testing.T) {
 	r1, err := getSimpleRunner("/script.js", `
-		import { group } from "k6";
-		export default function() {
+		var group = require("k6").group;
+		exports.default = function() {
 			fnOuter();
 			group("my group", function() {
 				fnInner();
@@ -609,7 +655,7 @@ func TestVUIntegrationGroups(t *testing.T) {
 	for name, r := range testdata {
 		r := r
 		t.Run(name, func(t *testing.T) {
-			vu, err := r.newVU(make(chan stats.SampleContainer, 100))
+			vu, err := r.newVU(1, make(chan stats.SampleContainer, 100))
 			if !assert.NoError(t, err) {
 				return
 			}
@@ -634,7 +680,10 @@ func TestVUIntegrationGroups(t *testing.T) {
 				assert.Equal(t, "my group", g.Parent.Name)
 				assert.Equal(t, r.GetDefaultGroup(), g.Parent.Parent)
 			})
-			err = vu.RunOnce(context.Background())
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			activeVU := vu.Activate(&lib.VUActivationParams{RunContext: ctx})
+			err = activeVU.RunOnce()
 			assert.NoError(t, err)
 			assert.True(t, fnOuterCalled, "fnOuter() not called")
 			assert.True(t, fnInnerCalled, "fnInner() not called")
@@ -645,10 +694,10 @@ func TestVUIntegrationGroups(t *testing.T) {
 
 func TestVUIntegrationMetrics(t *testing.T) {
 	r1, err := getSimpleRunner("/script.js", `
-		import { group } from "k6";
-		import { Trend } from "k6/metrics";
-		let myMetric = new Trend("my_metric");
-		export default function() { myMetric.add(5); }
+		var group = require("k6").group;
+		var Trend = require("k6/metrics").Trend;
+		var myMetric = new Trend("my_metric");
+		exports.default = function() { myMetric.add(5); }
 		`)
 	require.NoError(t, err)
 
@@ -657,14 +706,18 @@ func TestVUIntegrationMetrics(t *testing.T) {
 
 	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range testdata {
+		r := r
 		t.Run(name, func(t *testing.T) {
 			samples := make(chan stats.SampleContainer, 100)
-			vu, err := r.newVU(samples)
+			vu, err := r.newVU(1, samples)
 			if !assert.NoError(t, err) {
 				return
 			}
 
-			err = vu.RunOnce(context.Background())
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			activeVU := vu.Activate(&lib.VUActivationParams{RunContext: ctx})
+			err = activeVU.RunOnce()
 			assert.NoError(t, err)
 			sampleCount := 0
 			for i, sampleC := range stats.GetBufferedSamples(samples) {
@@ -716,8 +769,8 @@ func TestVUIntegrationInsecureRequests(t *testing.T) {
 		data := data
 		t.Run(name, func(t *testing.T) {
 			r1, err := getSimpleRunner("/script.js", `
-					import http from "k6/http";
-					export default function() { http.get("https://expired.badssl.com/"); }
+					var http = require("k6/http");;
+					exports.default = function() { http.get("https://expired.badssl.com/"); }
 				`)
 			require.NoError(t, err)
 			require.NoError(t, r1.SetOptions(lib.Options{Throw: null.BoolFrom(true)}.Apply(data.opts)))
@@ -726,14 +779,19 @@ func TestVUIntegrationInsecureRequests(t *testing.T) {
 			require.NoError(t, err)
 			runners := map[string]*Runner{"Source": r1, "Archive": r2}
 			for name, r := range runners {
+				r := r
 				t.Run(name, func(t *testing.T) {
 					r.Logger, _ = logtest.NewNullLogger()
 
-					vu, err := r.NewVU(make(chan stats.SampleContainer, 100))
+					initVU, err := r.NewVU(1, make(chan stats.SampleContainer, 100))
 					if !assert.NoError(t, err) {
 						return
 					}
-					err = vu.RunOnce(context.Background())
+
+					ctx, cancel := context.WithCancel(context.Background())
+					defer cancel()
+					vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+					err = vu.RunOnce()
 					if data.errMsg != "" {
 						require.Error(t, err)
 						assert.Contains(t, err.Error(), data.errMsg)
@@ -748,8 +806,8 @@ func TestVUIntegrationInsecureRequests(t *testing.T) {
 
 func TestVUIntegrationBlacklistOption(t *testing.T) {
 	r1, err := getSimpleRunner("/script.js", `
-					import http from "k6/http";
-					export default function() { http.get("http://10.1.2.3/"); }
+					var http = require("k6/http");;
+					exports.default = function() { http.get("http://10.1.2.3/"); }
 				`)
 	require.NoError(t, err)
 
@@ -770,12 +828,16 @@ func TestVUIntegrationBlacklistOption(t *testing.T) {
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range runners {
+		r := r
 		t.Run(name, func(t *testing.T) {
-			vu, err := r.NewVU(make(chan stats.SampleContainer, 100))
+			initVU, err := r.NewVU(1, make(chan stats.SampleContainer, 100))
 			if !assert.NoError(t, err) {
 				return
 			}
-			err = vu.RunOnce(context.Background())
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+			err = vu.RunOnce()
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "IP (10.1.2.3) is in a blacklisted range (10.0.0.0/8)")
 		})
@@ -784,14 +846,14 @@ func TestVUIntegrationBlacklistOption(t *testing.T) {
 
 func TestVUIntegrationBlacklistScript(t *testing.T) {
 	r1, err := getSimpleRunner("/script.js", `
-					import http from "k6/http";
+					var http = require("k6/http");;
 
-					export let options = {
+					exports.options = {
 						throw: true,
 						blacklistIPs: ["10.0.0.0/8"],
 					};
 
-					export default function() { http.get("http://10.1.2.3/"); }
+					exports.default = function() { http.get("http://10.1.2.3/"); }
 				`)
 	if !assert.NoError(t, err) {
 		return
@@ -807,11 +869,14 @@ func TestVUIntegrationBlacklistScript(t *testing.T) {
 	for name, r := range runners {
 		r := r
 		t.Run(name, func(t *testing.T) {
-			vu, err := r.NewVU(make(chan stats.SampleContainer, 100))
+			initVU, err := r.NewVU(1, make(chan stats.SampleContainer, 100))
 			if !assert.NoError(t, err) {
 				return
 			}
-			err = vu.RunOnce(context.Background())
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+			err = vu.RunOnce()
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "IP (10.1.2.3) is in a blacklisted range (10.0.0.0/8)")
 		})
@@ -824,12 +889,14 @@ func TestVUIntegrationHosts(t *testing.T) {
 
 	r1, err := getSimpleRunner("/script.js",
 		tb.Replacer.Replace(`
-					import { check, fail } from "k6";
-					import http from "k6/http";
-					export default function() {
-						let res = http.get("http://test.loadimpact.com:HTTPBIN_PORT/");
+					var k6 = require("k6");
+					var check = k6.check;
+					var fail = k6.fail;
+					var http = require("k6/http");;
+					exports.default = function() {
+						var res = http.get("http://test.loadimpact.com:HTTPBIN_PORT/");
 						check(res, {
-							"is correct IP": (r) => r.remote_ip === "127.0.0.1"
+							"is correct IP": function(r) { return r.remote_ip === "127.0.0.1" }
 						}) || fail("failed to override dns");
 					}
 				`))
@@ -851,13 +918,17 @@ func TestVUIntegrationHosts(t *testing.T) {
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range runners {
+		r := r
 		t.Run(name, func(t *testing.T) {
-			vu, err := r.NewVU(make(chan stats.SampleContainer, 100))
+			initVU, err := r.NewVU(1, make(chan stats.SampleContainer, 100))
 			if !assert.NoError(t, err) {
 				return
 			}
 
-			err = vu.RunOnce(context.Background())
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+			err = vu.RunOnce()
 			if !assert.NoError(t, err) {
 				return
 			}
@@ -906,8 +977,8 @@ func TestVUIntegrationTLSConfig(t *testing.T) {
 		data := data
 		t.Run(name, func(t *testing.T) {
 			r1, err := getSimpleRunner("/script.js", `
-					import http from "k6/http";
-					export default function() { http.get("https://sha256.badssl.com/"); }
+					var http = require("k6/http");;
+					exports.default = function() { http.get("https://sha256.badssl.com/"); }
 				`)
 			if !assert.NoError(t, err) {
 				return
@@ -921,14 +992,18 @@ func TestVUIntegrationTLSConfig(t *testing.T) {
 
 			runners := map[string]*Runner{"Source": r1, "Archive": r2}
 			for name, r := range runners {
+				r := r
 				t.Run(name, func(t *testing.T) {
 					r.Logger, _ = logtest.NewNullLogger()
 
-					vu, err := r.NewVU(make(chan stats.SampleContainer, 100))
+					initVU, err := r.NewVU(1, make(chan stats.SampleContainer, 100))
 					if !assert.NoError(t, err) {
 						return
 					}
-					err = vu.RunOnce(context.Background())
+					ctx, cancel := context.WithCancel(context.Background())
+					defer cancel()
+					vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+					err = vu.RunOnce()
 					if data.errMsg != "" {
 						require.Error(t, err)
 						assert.Contains(t, err.Error(), data.errMsg)
@@ -943,15 +1018,35 @@ func TestVUIntegrationTLSConfig(t *testing.T) {
 
 func TestVUIntegrationOpenFunctionError(t *testing.T) {
 	r, err := getSimpleRunner("/script.js", `
-			export default function() { open("/tmp/foo") }
+			exports.default = function() { open("/tmp/foo") }
 		`)
 	assert.NoError(t, err)
 
-	vu, err := r.NewVU(make(chan stats.SampleContainer, 100))
+	initVU, err := r.NewVU(1, make(chan stats.SampleContainer, 100))
 	assert.NoError(t, err)
-	err = vu.RunOnce(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+	err = vu.RunOnce()
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "only available to init code")
+	assert.Contains(t, err.Error(), "only available in the init stage")
+}
+
+func TestVUIntegrationOpenFunctionErrorWhenSneaky(t *testing.T) {
+	r, err := getSimpleRunner("/script.js", `
+			var sneaky = open;
+			exports.default = function() { sneaky("/tmp/foo") }
+		`)
+	assert.NoError(t, err)
+
+	initVU, err := r.NewVU(1, make(chan stats.SampleContainer, 100))
+	assert.NoError(t, err)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+	err = vu.RunOnce()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "only available in the init stage")
 }
 
 func TestVUIntegrationCookiesReset(t *testing.T) {
@@ -959,16 +1054,16 @@ func TestVUIntegrationCookiesReset(t *testing.T) {
 	defer tb.Cleanup()
 
 	r1, err := getSimpleRunner("/script.js", tb.Replacer.Replace(`
-			import http from "k6/http";
-			export default function() {
-				let url = "HTTPBIN_URL";
-				let preRes = http.get(url + "/cookies");
+			var http = require("k6/http");;
+			exports.default = function() {
+				var url = "HTTPBIN_URL";
+				var preRes = http.get(url + "/cookies");
 				if (preRes.status != 200) { throw new Error("wrong status (pre): " + preRes.status); }
 				if (preRes.json().k1 || preRes.json().k2) {
 					throw new Error("cookies persisted: " + preRes.body);
 				}
 
-				let res = http.get(url + "/cookies/set?k2=v2&k1=v1");
+				var res = http.get(url + "/cookies/set?k2=v2&k1=v1");
 				if (res.status != 200) { throw new Error("wrong status: " + res.status) }
 				if (res.json().k1 != "v1" || res.json().k2 != "v2") {
 					throw new Error("wrong cookies: " + res.body);
@@ -991,13 +1086,17 @@ func TestVUIntegrationCookiesReset(t *testing.T) {
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range runners {
+		r := r
 		t.Run(name, func(t *testing.T) {
-			vu, err := r.NewVU(make(chan stats.SampleContainer, 100))
+			initVU, err := r.NewVU(1, make(chan stats.SampleContainer, 100))
 			if !assert.NoError(t, err) {
 				return
 			}
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 			for i := 0; i < 2; i++ {
-				err = vu.RunOnce(context.Background())
+				err = vu.RunOnce()
 				assert.NoError(t, err)
 			}
 		})
@@ -1009,11 +1108,11 @@ func TestVUIntegrationCookiesNoReset(t *testing.T) {
 	defer tb.Cleanup()
 
 	r1, err := getSimpleRunner("/script.js", tb.Replacer.Replace(`
-			import http from "k6/http";
-			export default function() {
-				let url = "HTTPBIN_URL";
+			var http = require("k6/http");;
+			exports.default = function() {
+				var url = "HTTPBIN_URL";
 				if (__ITER == 0) {
-					let res = http.get(url + "/cookies/set?k2=v2&k1=v1");
+					var res = http.get(url + "/cookies/set?k2=v2&k1=v1");
 					if (res.status != 200) { throw new Error("wrong status: " + res.status) }
 					if (res.json().k1 != "v1" || res.json().k2 != "v2") {
 						throw new Error("wrong cookies: " + res.body);
@@ -1021,7 +1120,7 @@ func TestVUIntegrationCookiesNoReset(t *testing.T) {
 				}
 
 				if (__ITER == 1) {
-					let res = http.get(url + "/cookies");
+					var res = http.get(url + "/cookies");
 					if (res.status != 200) { throw new Error("wrong status (pre): " + res.status); }
 					if (res.json().k1 != "v1" || res.json().k2 != "v2") {
 						throw new Error("wrong cookies: " + res.body);
@@ -1046,16 +1145,20 @@ func TestVUIntegrationCookiesNoReset(t *testing.T) {
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range runners {
+		r := r
 		t.Run(name, func(t *testing.T) {
-			vu, err := r.NewVU(make(chan stats.SampleContainer, 100))
+			initVU, err := r.NewVU(1, make(chan stats.SampleContainer, 100))
 			if !assert.NoError(t, err) {
 				return
 			}
 
-			err = vu.RunOnce(context.Background())
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+			err = vu.RunOnce()
 			assert.NoError(t, err)
 
-			err = vu.RunOnce(context.Background())
+			err = vu.RunOnce()
 			assert.NoError(t, err)
 		})
 	}
@@ -1063,7 +1166,7 @@ func TestVUIntegrationCookiesNoReset(t *testing.T) {
 
 func TestVUIntegrationVUID(t *testing.T) {
 	r1, err := getSimpleRunner("/script.js", `
-			export default function() {
+			exports.default = function() {
 				if (__VU != 1234) { throw new Error("wrong __VU: " + __VU); }
 			}`,
 	)
@@ -1079,13 +1182,17 @@ func TestVUIntegrationVUID(t *testing.T) {
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range runners {
+		r := r
 		t.Run(name, func(t *testing.T) {
-			vu, err := r.NewVU(make(chan stats.SampleContainer, 100))
+			initVU, err := r.NewVU(1234, make(chan stats.SampleContainer, 100))
 			if !assert.NoError(t, err) {
 				return
 			}
-			assert.NoError(t, vu.Reconfigure(1234))
-			err = vu.RunOnce(context.Background())
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+			err = vu.RunOnce()
 			assert.NoError(t, err)
 		})
 	}
@@ -1156,8 +1263,8 @@ func TestVUIntegrationClientCerts(t *testing.T) {
 	go func() { _ = srv.Serve(listener) }()
 
 	r1, err := getSimpleRunner("/script.js", fmt.Sprintf(`
-			import http from "k6/http";
-			export default function() { http.get("https://%s")}
+			var http = require("k6/http");;
+			exports.default = function() { http.get("https://%s")}
 		`, listener.Addr().String()))
 	if !assert.NoError(t, err) {
 		return
@@ -1175,11 +1282,15 @@ func TestVUIntegrationClientCerts(t *testing.T) {
 
 		runners := map[string]*Runner{"Source": r1, "Archive": r2}
 		for name, r := range runners {
+			r := r
 			t.Run(name, func(t *testing.T) {
 				r.Logger, _ = logtest.NewNullLogger()
-				vu, err := r.NewVU(make(chan stats.SampleContainer, 100))
+				initVU, err := r.NewVU(1, make(chan stats.SampleContainer, 100))
 				if assert.NoError(t, err) {
-					err := vu.RunOnce(context.Background())
+					ctx, cancel := context.WithCancel(context.Background())
+					defer cancel()
+					vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+					err := vu.RunOnce()
 					require.Error(t, err)
 					assert.Contains(t, err.Error(), "remote error: tls: bad certificate")
 				}
@@ -1221,10 +1332,14 @@ func TestVUIntegrationClientCerts(t *testing.T) {
 
 		runners := map[string]*Runner{"Source": r1, "Archive": r2}
 		for name, r := range runners {
+			r := r
 			t.Run(name, func(t *testing.T) {
-				vu, err := r.NewVU(make(chan stats.SampleContainer, 100))
+				initVU, err := r.NewVU(1, make(chan stats.SampleContainer, 100))
 				if assert.NoError(t, err) {
-					err := vu.RunOnce(context.Background())
+					ctx, cancel := context.WithCancel(context.Background())
+					defer cancel()
+					vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+					err := vu.RunOnce()
 					assert.NoError(t, err)
 				}
 			})
@@ -1237,10 +1352,12 @@ func TestHTTPRequestInInitContext(t *testing.T) {
 	defer tb.Cleanup()
 
 	_, err := getSimpleRunner("/script.js", tb.Replacer.Replace(`
-					import { check, fail } from "k6";
-					import http from "k6/http";
-					let res = http.get("HTTPBIN_URL/");
-					export default function() {
+					var k6 = require("k6");
+					var check = k6.check;
+					var fail = k6.fail;
+					var http = require("k6/http");;
+					var res = http.get("HTTPBIN_URL/");
+					exports.default = function() {
 						console.log(test);
 					}
 				`))
@@ -1256,42 +1373,42 @@ func TestInitContextForbidden(t *testing.T) {
 	table := [...][3]string{
 		{
 			"http.request",
-			`import http from "k6/http";
-			 let res = http.get("HTTPBIN_URL");
-			 export default function() { console.log("p"); }`,
+			`var http = require("k6/http");;
+			 var res = http.get("HTTPBIN_URL");
+			 exports.default = function() { console.log("p"); }`,
 			k6http.ErrHTTPForbiddenInInitContext.Error(),
 		},
 		{
 			"http.batch",
-			`import http from "k6/http";
-			 let res = http.batch("HTTPBIN_URL/something", "HTTPBIN_URL/else");
-			 export default function() { console.log("p"); }`,
+			`var http = require("k6/http");;
+			 var res = http.batch("HTTPBIN_URL/something", "HTTPBIN_URL/else");
+			 exports.default = function() { console.log("p"); }`,
 			k6http.ErrBatchForbiddenInInitContext.Error(),
 		},
 		{
 			"http.cookieJar",
-			`import http from "k6/http";
-			 let jar = http.cookieJar();
-			 export default function() { console.log("p"); }`,
+			`var http = require("k6/http");;
+			 var jar = http.cookieJar();
+			 exports.default = function() { console.log("p"); }`,
 			k6http.ErrJarForbiddenInInitContext.Error(),
 		},
 		{
 			"check",
-			`import { check } from "k6";
-			 check("test", {'is test': (test) => test == "test"})
-			 export default function() { console.log("p"); }`,
+			`var check = require("k6").check;
+			 check("test", {'is test': function(test) { return test == "test"}})
+			 exports.default = function() { console.log("p"); }`,
 			k6.ErrCheckInInitContext.Error(),
 		},
 		{
 			"group",
-			`import { group } from "k6";
+			`var group = require("k6").group;
 			 group("group1", function () { console.log("group1");})
-			 export default function() { console.log("p"); }`,
+			 exports.default = function() { console.log("p"); }`,
 			k6.ErrGroupInInitContext.Error(),
 		},
 		{
 			"ws",
-			`import ws from "k6/ws";
+			`var ws = require("k6/ws");
 			 var url = "ws://echo.websocket.org";
 			 var params = { "tags": { "my_tag": "hello" } };
 			 var response = ws.connect(url, params, function (socket) {
@@ -1300,15 +1417,15 @@ func TestInitContextForbidden(t *testing.T) {
 			   })
 		   });
 
-			 export default function() { console.log("p"); }`,
+			 exports.default = function() { console.log("p"); }`,
 			ws.ErrWSInInitContext.Error(),
 		},
 		{
 			"metric",
-			`import { Counter } from "k6/metrics";
-			 let counter = Counter("myCounter");
+			`var Counter = require("k6/metrics").Counter;
+			 var counter = Counter("myCounter");
 			 counter.add(1);
-			 export default function() { console.log("p"); }`,
+			 exports.default = function() { console.log("p"); }`,
 			k6metrics.ErrMetricsAddInInitContext.Error(),
 		},
 	}
@@ -1329,18 +1446,18 @@ func TestInitContextForbidden(t *testing.T) {
 	}
 }
 
-func TestArchiveRunningIntegraty(t *testing.T) {
+func TestArchiveRunningIntegrity(t *testing.T) {
 	tb := httpmultibin.NewHTTPMultiBin(t)
 	defer tb.Cleanup()
 
 	fs := afero.NewMemMapFs()
 	data := tb.Replacer.Replace(`
-			let fput = open("/home/somebody/test.json");
-			export let options = { setupTimeout: "10s", teardownTimeout: "10s" };
-			export function setup() {
+			var fput = open("/home/somebody/test.json");
+			exports.options = { setupTimeout: "10s", teardownTimeout: "10s" };
+			exports.setup = function () {
 				return JSON.parse(fput);
 			}
-			export default function(data) {
+			exports.default = function(data) {
 				if (data != 42) {
 					throw new Error("incorrect answer " + data);
 				}
@@ -1348,7 +1465,7 @@ func TestArchiveRunningIntegraty(t *testing.T) {
 		`)
 	require.NoError(t, afero.WriteFile(fs, "/home/somebody/test.json", []byte(`42`), os.ModePerm))
 	require.NoError(t, afero.WriteFile(fs, "/script.js", []byte(data), os.ModePerm))
-	r1, err := getSimpleRunnerWithFileFs("/script.js", data, fs)
+	r1, err := getSimpleRunner("/script.js", data, fs)
 	require.NoError(t, err)
 
 	buf := bytes.NewBuffer(nil)
@@ -1361,13 +1478,17 @@ func TestArchiveRunningIntegraty(t *testing.T) {
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range runners {
+		r := r
 		t.Run(name, func(t *testing.T) {
 			ch := make(chan stats.SampleContainer, 100)
 			err = r.Setup(context.Background(), ch)
 			require.NoError(t, err)
-			vu, err := r.NewVU(ch)
+			initVU, err := r.NewVU(1, ch)
 			require.NoError(t, err)
-			err = vu.RunOnce(context.Background())
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+			err = vu.RunOnce()
 			require.NoError(t, err)
 		})
 	}
@@ -1379,10 +1500,9 @@ func TestArchiveNotPanicking(t *testing.T) {
 
 	fs := afero.NewMemMapFs()
 	require.NoError(t, afero.WriteFile(fs, "/non/existent", []byte(`42`), os.ModePerm))
-	r1, err := getSimpleRunnerWithFileFs("/script.js", tb.Replacer.Replace(`
-			let fput = open("/non/existent");
-			export default function(data) {
-			}
+	r1, err := getSimpleRunner("/script.js", tb.Replacer.Replace(`
+			var fput = open("/non/existent");
+			exports.default = function(data) {}
 		`), fs)
 	require.NoError(t, err)
 
@@ -1400,25 +1520,25 @@ func TestStuffNotPanicking(t *testing.T) {
 	defer tb.Cleanup()
 
 	r, err := getSimpleRunner("/script.js", tb.Replacer.Replace(`
-			import http from "k6/http";
-			import ws from "k6/ws";
-			import { group } from "k6";
-			import { parseHTML } from "k6/html";
+			var http = require("k6/http");
+			var ws = require("k6/ws");
+			var group = require("k6").group;
+			var parseHTML = require("k6/html").parseHTML;
 
-			export let options = { iterations: 1, vus: 1, vusMax: 1 };
+			exports.options = { iterations: 1, vus: 1, vusMax: 1 };
 
-			export default function() {
-				const doc = parseHTML(http.get("HTTPBIN_URL/html").body);
+			exports.default = function() {
+				var doc = parseHTML(http.get("HTTPBIN_URL/html").body);
 
-				let testCases = [
-					() => group(),
-					() => group("test"),
-					() => group("test", "wat"),
-					() => doc.find('p').each(),
-					() => doc.find('p').each("wat"),
-					() => doc.find('p').map(),
-					() => doc.find('p').map("wat"),
-					() => ws.connect("WSBIN_URL/ws-echo"),
+				var testCases = [
+					function() { return group()},
+					function() { return group("test")},
+					function() { return group("test", "wat")},
+					function() { return doc.find('p').each()},
+					function() { return doc.find('p').each("wat")},
+					function() { return doc.find('p').map()},
+					function() { return doc.find('p').map("wat")},
+					function() { return ws.connect("WSBIN_URL/ws-echo")},
 				];
 
 				testCases.forEach(function(fn, idx) {
@@ -1441,12 +1561,13 @@ func TestStuffNotPanicking(t *testing.T) {
 	require.NoError(t, err)
 
 	ch := make(chan stats.SampleContainer, 1000)
-	vu, err := r.NewVU(ch)
+	initVU, err := r.NewVU(1, ch)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
+	vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 	errC := make(chan error)
-	go func() { errC <- vu.RunOnce(ctx) }()
+	go func() { errC <- vu.RunOnce() }()
 
 	select {
 	case <-time.After(15 * time.Second):
@@ -1455,5 +1576,89 @@ func TestStuffNotPanicking(t *testing.T) {
 	case err := <-errC:
 		cancel()
 		require.NoError(t, err)
+	}
+}
+
+func TestSystemTags(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	defer tb.Cleanup()
+
+	// Handle paths with custom logic
+	tb.Mux.HandleFunc("/wrong-redirect", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Location", "%")
+		w.WriteHeader(http.StatusTemporaryRedirect)
+	})
+
+	r, err := getSimpleRunner("/script.js", tb.Replacer.Replace(`
+		var http = require("k6/http");
+
+		exports.http_get = function() {
+			http.get("HTTPBIN_IP_URL");
+		};
+		exports.https_get = function() {
+			http.get("HTTPSBIN_IP_URL");
+		};
+		exports.bad_url_get = function() {
+			http.get("http://127.0.0.1:1");
+		};
+		exports.noop = function() {};
+	`), lib.RuntimeOptions{CompatibilityMode: null.StringFrom("base")})
+	require.NoError(t, err)
+
+	httpURL, err := url.Parse(tb.ServerHTTP.URL)
+	require.NoError(t, err)
+
+	testedSystemTags := []struct{ tag, exec, expVal string }{
+		{"proto", "http_get", "HTTP/1.1"},
+		{"status", "http_get", "200"},
+		{"method", "http_get", "GET"},
+		{"url", "http_get", tb.ServerHTTP.URL},
+		{"url", "https_get", tb.ServerHTTPS.URL},
+		{"ip", "http_get", httpURL.Hostname()},
+		{"name", "http_get", tb.ServerHTTP.URL},
+		{"group", "http_get", ""},
+		{"vu", "http_get", "8"},
+		{"vu", "noop", "9"},
+		{"iter", "http_get", "0"},
+		{"iter", "noop", "0"},
+		{"tls_version", "https_get", "tls1.3"},
+		{"ocsp_status", "https_get", "unknown"},
+		{"error", "bad_url_get", `dial: connection refused`},
+		{"error_code", "bad_url_get", "1212"},
+		{"scenario", "http_get", "default"},
+		//TODO: add more tests
+	}
+
+	samples := make(chan stats.SampleContainer, 100)
+	for num, tc := range testedSystemTags {
+		num, tc := num, tc
+		t.Run(fmt.Sprintf("TC %d with only %s", num, tc.tag), func(t *testing.T) {
+			require.NoError(t, r.SetOptions(r.GetOptions().Apply(lib.Options{
+				Throw:                 null.BoolFrom(false),
+				TLSVersion:            &lib.TLSVersions{Max: lib.TLSVersion13},
+				SystemTags:            stats.ToSystemTagSet([]string{tc.tag}),
+				InsecureSkipTLSVerify: null.BoolFrom(true),
+			})))
+
+			vu, err := r.NewVU(int64(num), samples)
+			require.NoError(t, err)
+			activeVU := vu.Activate(&lib.VUActivationParams{
+				RunContext: context.Background(),
+				Exec:       tc.exec,
+				Scenario:   "default",
+			})
+			require.NoError(t, activeVU.RunOnce())
+
+			bufSamples := stats.GetBufferedSamples(samples)
+			assert.NotEmpty(t, bufSamples)
+			for _, sample := range bufSamples[0].GetSamples() {
+				assert.NotEmpty(t, sample.Tags)
+				for emittedTag, emittedVal := range sample.Tags.CloneTags() {
+					assert.Equal(t, tc.tag, emittedTag)
+					assert.Equal(t, tc.expVal, emittedVal)
+				}
+			}
+		})
 	}
 }
