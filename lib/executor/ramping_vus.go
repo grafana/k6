@@ -564,7 +564,7 @@ func (vlv RampingVUs) Run(parentCtx context.Context, out chan<- stats.SampleCont
 	activeVUsCount := new(int64)
 	vusFmt := pb.GetFixedLengthIntFormat(int64(maxVUs))
 	regularDurationStr := pb.GetFixedLengthDuration(regularDuration, regularDuration)
-	progresFn := func() (float64, []string) {
+	progressFn := func() (float64, []string) {
 		spent := time.Since(startTime)
 		currentlyActiveVUs := atomic.LoadInt64(activeVUsCount)
 		vus := fmt.Sprintf(vusFmt+"/"+vusFmt+" VUs", currentlyActiveVUs, maxVUs)
@@ -575,8 +575,8 @@ func (vlv RampingVUs) Run(parentCtx context.Context, out chan<- stats.SampleCont
 		progDur := pb.GetFixedLengthDuration(spent, regularDuration) + "/" + regularDurationStr
 		return float64(spent) / float64(regularDuration), []string{progVUs, progDur}
 	}
-	vlv.progress.Modify(pb.WithProgress(progresFn))
-	go trackProgress(parentCtx, maxDurationCtx, regDurationCtx, vlv, progresFn)
+	vlv.progress.Modify(pb.WithProgress(progressFn))
+	go trackProgress(parentCtx, maxDurationCtx, regDurationCtx, vlv, progressFn)
 
 	// Actually schedule the VUs and iterations, likely the most complicated
 	// executor among all of them...

@@ -291,7 +291,7 @@ func (car ConstantArrivalRate) Run(parentCtx context.Context, out chan<- stats.S
 	vusFmt := pb.GetFixedLengthIntFormat(maxVUs)
 	progIters := fmt.Sprintf(
 		pb.GetFixedLengthFloatFormat(arrivalRatePerSec, 0)+" iters/s", arrivalRatePerSec)
-	progresFn := func() (float64, []string) {
+	progressFn := func() (float64, []string) {
 		spent := time.Since(startTime)
 		currActiveVUs := atomic.LoadUint64(&activeVUsCount)
 		vusInBuffer := uint64(len(activeVUs))
@@ -310,8 +310,8 @@ func (car ConstantArrivalRate) Run(parentCtx context.Context, out chan<- stats.S
 
 		return math.Min(1, float64(spent)/float64(duration)), right
 	}
-	car.progress.Modify(pb.WithProgress(progresFn))
-	go trackProgress(parentCtx, maxDurationCtx, regDurationCtx, &car, progresFn)
+	car.progress.Modify(pb.WithProgress(progressFn))
+	go trackProgress(parentCtx, maxDurationCtx, regDurationCtx, &car, progressFn)
 
 	runIterationBasic := getIterationRunner(car.executionState, car.logger)
 	runIteration := func(vu lib.ActiveVU) {

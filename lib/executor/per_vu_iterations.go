@@ -171,7 +171,7 @@ func (pvi PerVUIterations) Run(parentCtx context.Context, out chan<- stats.Sampl
 
 	vusFmt := pb.GetFixedLengthIntFormat(numVUs)
 	itersFmt := pb.GetFixedLengthIntFormat(int64(totalIters))
-	progresFn := func() (float64, []string) {
+	progressFn := func() (float64, []string) {
 		spent := time.Since(startTime)
 		progVUs := fmt.Sprintf(vusFmt+" VUs", numVUs)
 		currentDoneIters := atomic.LoadUint64(doneIters)
@@ -188,8 +188,8 @@ func (pvi PerVUIterations) Run(parentCtx context.Context, out chan<- stats.Sampl
 
 		return float64(currentDoneIters) / float64(totalIters), right
 	}
-	pvi.progress.Modify(pb.WithProgress(progresFn))
-	go trackProgress(parentCtx, maxDurationCtx, regDurationCtx, pvi, progresFn)
+	pvi.progress.Modify(pb.WithProgress(progressFn))
+	go trackProgress(parentCtx, maxDurationCtx, regDurationCtx, pvi, progressFn)
 
 	// Actually schedule the VUs and iterations...
 	activeVUs := &sync.WaitGroup{}

@@ -155,7 +155,7 @@ func (clv ConstantVUs) Run(parentCtx context.Context, out chan<- stats.SampleCon
 		logrus.Fields{"vus": numVUs, "duration": duration, "type": clv.config.GetType()},
 	).Debug("Starting executor run...")
 
-	progresFn := func() (float64, []string) {
+	progressFn := func() (float64, []string) {
 		spent := time.Since(startTime)
 		right := []string{fmt.Sprintf("%d VUs", numVUs)}
 		if spent > duration {
@@ -166,8 +166,8 @@ func (clv ConstantVUs) Run(parentCtx context.Context, out chan<- stats.SampleCon
 			pb.GetFixedLengthDuration(spent, duration), duration))
 		return float64(spent) / float64(duration), right
 	}
-	clv.progress.Modify(pb.WithProgress(progresFn))
-	go trackProgress(parentCtx, maxDurationCtx, regDurationCtx, clv, progresFn)
+	clv.progress.Modify(pb.WithProgress(progressFn))
+	go trackProgress(parentCtx, maxDurationCtx, regDurationCtx, clv, progressFn)
 
 	// Actually schedule the VUs and iterations...
 	activeVUs := &sync.WaitGroup{}
