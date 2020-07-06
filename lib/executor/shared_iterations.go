@@ -200,7 +200,7 @@ func (si SharedIterations) Run(parentCtx context.Context, out chan<- stats.Sampl
 	doneIters := new(uint64)
 	vusFmt := pb.GetFixedLengthIntFormat(numVUs)
 	itersFmt := pb.GetFixedLengthIntFormat(int64(totalIters))
-	progresFn := func() (float64, []string) {
+	progressFn := func() (float64, []string) {
 		spent := time.Since(startTime)
 		progVUs := fmt.Sprintf(vusFmt+" VUs", numVUs)
 		currentDoneIters := atomic.LoadUint64(doneIters)
@@ -212,8 +212,8 @@ func (si SharedIterations) Run(parentCtx context.Context, out chan<- stats.Sampl
 
 		return float64(currentDoneIters) / float64(totalIters), right
 	}
-	si.progress.Modify(pb.WithProgress(progresFn))
-	go trackProgress(parentCtx, maxDurationCtx, regDurationCtx, &si, progresFn)
+	si.progress.Modify(pb.WithProgress(progressFn))
+	go trackProgress(parentCtx, maxDurationCtx, regDurationCtx, &si, progressFn)
 
 	var attemptedIters uint64
 

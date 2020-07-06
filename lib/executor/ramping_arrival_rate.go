@@ -378,7 +378,7 @@ func (varr RampingArrivalRate) Run(parentCtx context.Context, out chan<- stats.S
 	vusFmt := pb.GetFixedLengthIntFormat(maxVUs)
 	itersFmt := pb.GetFixedLengthFloatFormat(maxArrivalRatePerSec, 0) + " iters/s"
 
-	progresFn := func() (float64, []string) {
+	progressFn := func() (float64, []string) {
 		currActiveVUs := atomic.LoadUint64(&activeVUsCount)
 		currentTickerPeriod := atomic.LoadInt64(&tickerPeriod)
 		vusInBuffer := uint64(len(activeVUs))
@@ -405,8 +405,8 @@ func (varr RampingArrivalRate) Run(parentCtx context.Context, out chan<- stats.S
 		return math.Min(1, float64(spent)/float64(duration)), right
 	}
 
-	varr.progress.Modify(pb.WithProgress(progresFn))
-	go trackProgress(parentCtx, maxDurationCtx, regDurationCtx, varr, progresFn)
+	varr.progress.Modify(pb.WithProgress(progressFn))
+	go trackProgress(parentCtx, maxDurationCtx, regDurationCtx, varr, progressFn)
 
 	regDurationDone := regDurationCtx.Done()
 	runIterationBasic := getIterationRunner(varr.executionState, varr.logger)
