@@ -57,7 +57,7 @@ type RampingArrivalRateConfig struct {
 	BaseConfig
 	StartRate null.Int           `json:"startRate"`
 	TimeUnit  types.NullDuration `json:"timeUnit"`
-	Stages    []lib.Stage        `json:"stages"`
+	Stages    []Stage            `json:"stages"`
 
 	// Initialize `PreAllocatedVUs` number of VUs, and if more than that are needed,
 	// they will be dynamically allocated, until `MaxVUs` is reached, which is an
@@ -100,7 +100,7 @@ func (varc RampingArrivalRateConfig) GetDescription(et *lib.ExecutionTuple) stri
 	).Float64()
 
 	return fmt.Sprintf("Up to %.2f iterations/s for %s over %d stages%s",
-		maxArrRatePerSec, lib.SumStagesDuration(varc.Stages),
+		maxArrRatePerSec, sumStagesDuration(varc.Stages),
 		len(varc.Stages), varc.getBaseInfo(maxVUsRange))
 }
 
@@ -147,7 +147,7 @@ func (varc RampingArrivalRateConfig) GetExecutionRequirements(et *lib.ExecutionT
 			MaxUnplannedVUs: uint64(et.Segment.Scale(varc.MaxVUs.Int64 - varc.PreAllocatedVUs.Int64)),
 		},
 		{
-			TimeOffset:      lib.SumStagesDuration(varc.Stages) + time.Duration(varc.GracefulStop.Duration),
+			TimeOffset:      sumStagesDuration(varc.Stages) + time.Duration(varc.GracefulStop.Duration),
 			PlannedVUs:      0,
 			MaxUnplannedVUs: 0,
 		},
@@ -294,7 +294,7 @@ func (varc RampingArrivalRateConfig) cal(et *lib.ExecutionTuple, ch chan<- time.
 func (varr RampingArrivalRate) Run(parentCtx context.Context, out chan<- stats.SampleContainer) (err error) {
 	segment := varr.executionState.ExecutionTuple.Segment
 	gracefulStop := varr.config.GetGracefulStop()
-	duration := lib.SumStagesDuration(varr.config.Stages)
+	duration := sumStagesDuration(varr.config.Stages)
 	preAllocatedVUs := varr.config.GetPreAllocatedVUs(varr.executionState.ExecutionTuple)
 	maxVUs := varr.config.GetMaxVUs(varr.executionState.ExecutionTuple)
 
