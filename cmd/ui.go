@@ -136,7 +136,7 @@ func printExecutionDescription(
 	fprintf(stdout, "  scenarios: %s\n", ui.ValueColor.Sprintf(
 		"(%.2f%%) %d executors, %d max VUs, %s max duration (incl. graceful stop):",
 		conf.ExecutionSegment.FloatLength()*100, len(executorConfigs),
-		lib.GetMaxPossibleVUs(execPlan), maxDuration),
+		lib.GetMaxPossibleVUs(execPlan), maxDuration.Round(100*time.Millisecond)),
 	)
 	for _, ec := range executorConfigs {
 		fprintf(stdout, "           * %s: %s\n",
