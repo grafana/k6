@@ -343,6 +343,7 @@ func (c *Collector) Collect(sampleContainers []stats.SampleContainer) {
 	}
 }
 
+//nolint:funlen,nestif
 func (c *Collector) aggregateHTTPTrails(waitPeriod time.Duration) {
 	c.bufferMutex.Lock()
 	newHTTPTrails := c.bufferHTTPTrails
@@ -368,7 +369,6 @@ func (c *Collector) aggregateHTTPTrails(waitPeriod time.Duration) {
 		if !ok {
 			subBucket = aggregationBucket{}
 			bucket[name] = subBucket
-
 		}
 		// Either use an existing subbucket key or use the trail tags as a new one
 		subSubBucketKey := trailTags
