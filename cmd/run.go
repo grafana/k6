@@ -97,7 +97,7 @@ a commandline interface for interacting with it.`,
 	Args: exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// TODO: disable in quiet mode?
-		_, _ = BannerColor.Fprintf(stdout, "\n%s\n\n", consts.Banner)
+		_, _ = BannerColor.Fprintf(stdout, "\n%s\n\n", consts.Banner())
 
 		initBar := pb.New(
 			pb.WithConstLeft(" Init"),

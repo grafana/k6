@@ -71,7 +71,7 @@ var (
 var RootCmd = &cobra.Command{
 	Use:           "k6",
 	Short:         "a next-generation load generator",
-	Long:          BannerColor.Sprintf("\n%s", consts.Banner),
+	Long:          BannerColor.Sprintf("\n%s", consts.Banner()),
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
