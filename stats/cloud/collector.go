@@ -332,7 +332,6 @@ func (c *Collector) Collect(sampleContainers []stats.SampleContainer) {
 					},
 				})
 			}
-
 		}
 	}
 
