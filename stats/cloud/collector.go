@@ -70,7 +70,7 @@ type Collector struct {
 	// aggregation buckets. This should save us a some time, since it would make the lookups and WaitPeriod
 	// checks basically O(1). And even if for some reason there are occasional metrics with past times that
 	// don't fit in the chosen ring buffer size, we could just send them along to the buffer unaggregated
-	aggrBuckets map[int64]aggregationBucket
+	aggrBuckets map[int64]map[[3]string]aggregationBucket
 
 	stopSendingMetricsCh chan struct{}
 }
@@ -142,7 +142,7 @@ func New(
 		executionPlan:        executionPlan,
 		duration:             int64(duration / time.Second),
 		opts:                 opts,
-		aggrBuckets:          map[int64]aggregationBucket{},
+		aggrBuckets:          map[int64]map[[3]string]aggregationBucket{},
 		stopSendingMetricsCh: make(chan struct{}),
 	}, nil
 }
@@ -332,7 +332,6 @@ func (c *Collector) Collect(sampleContainers []stats.SampleContainer) {
 					},
 				})
 			}
-
 		}
 	}
 
@@ -344,6 +343,7 @@ func (c *Collector) Collect(sampleContainers []stats.SampleContainer) {
 	}
 }
 
+//nolint:funlen,nestif,gocognit
 func (c *Collector) aggregateHTTPTrails(waitPeriod time.Duration) {
 	c.bufferMutex.Lock()
 	newHTTPTrails := c.bufferHTTPTrails
@@ -353,6 +353,10 @@ func (c *Collector) aggregateHTTPTrails(waitPeriod time.Duration) {
 	aggrPeriod := int64(c.config.AggregationPeriod.Duration)
 
 	// Distribute all newly buffered HTTP trails into buckets and sub-buckets
+
+	// this key is here specifically to not incur more allocations then necessary
+	// if you change this code please run the benchmarks and add the results to the commit message
+	var subBucketKey [3]string
 	for _, trail := range newHTTPTrails {
 		trailTags := trail.GetTags()
 		bucketID := trail.GetTime().UnixNano() / aggrPeriod
@@ -360,23 +364,31 @@ func (c *Collector) aggregateHTTPTrails(waitPeriod time.Duration) {
 		// Get or create a time bucket for that trail period
 		bucket, ok := c.aggrBuckets[bucketID]
 		if !ok {
-			bucket = aggregationBucket{}
+			bucket = make(map[[3]string]aggregationBucket)
 			c.aggrBuckets[bucketID] = bucket
 		}
+		subBucketKey[0], _ = trailTags.Get("name")
+		subBucketKey[1], _ = trailTags.Get("group")
+		subBucketKey[2], _ = trailTags.Get("status")
 
-		// Either use an existing subbucket key or use the trail tags as a new one
-		subBucketKey := trailTags
 		subBucket, ok := bucket[subBucketKey]
 		if !ok {
-			for sbTags, sb := range bucket {
+			subBucket = aggregationBucket{}
+			bucket[subBucketKey] = subBucket
+		}
+		// Either use an existing subbucket key or use the trail tags as a new one
+		subSubBucketKey := trailTags
+		subSubBucket, ok := subBucket[subSubBucketKey]
+		if !ok {
+			for sbTags, sb := range subBucket {
 				if trailTags.IsEqual(sbTags) {
-					subBucketKey = sbTags
-					subBucket = sb
+					subSubBucketKey = sbTags
+					subSubBucket = sb
 					break
 				}
 			}
 		}
-		bucket[subBucketKey] = append(subBucket, trail)
+		subBucket[subSubBucketKey] = append(subSubBucket, trail)
 	}
 
 	// Which buckets are still new and we'll wait for trails to accumulate before aggregating
@@ -392,70 +404,72 @@ func (c *Collector) aggregateHTTPTrails(waitPeriod time.Duration) {
 			continue
 		}
 
-		for tags, httpTrails := range subBuckets {
-			trailCount := int64(len(httpTrails))
-			if trailCount < c.config.AggregationMinSamples.Int64 {
-				for _, trail := range httpTrails {
-					newSamples = append(newSamples, NewSampleFromTrail(trail))
-				}
-				continue
-			}
-
-			aggrData := &SampleDataAggregatedHTTPReqs{
-				Time: Timestamp(time.Unix(0, bucketID*aggrPeriod+aggrPeriod/2)),
-				Type: "aggregated_trend",
-				Tags: tags,
-			}
-
-			if c.config.AggregationSkipOutlierDetection.Bool {
-				// Simply add up all HTTP trails, no outlier detection
-				for _, trail := range httpTrails {
-					aggrData.Add(trail)
-				}
-			} else {
-				connDurations := make(durations, trailCount)
-				reqDurations := make(durations, trailCount)
-				for i, trail := range httpTrails {
-					connDurations[i] = trail.ConnDuration
-					reqDurations[i] = trail.Duration
-				}
-
-				var minConnDur, maxConnDur, minReqDur, maxReqDur time.Duration
-				if trailCount < c.config.AggregationOutlierAlgoThreshold.Int64 {
-					// Since there are fewer samples, we'll use the interpolation-enabled and
-					// more precise sorting-based algorithm
-					minConnDur, maxConnDur = connDurations.SortGetNormalBounds(iqrRadius, iqrLowerCoef, iqrUpperCoef, true)
-					minReqDur, maxReqDur = reqDurations.SortGetNormalBounds(iqrRadius, iqrLowerCoef, iqrUpperCoef, true)
-				} else {
-					minConnDur, maxConnDur = connDurations.SelectGetNormalBounds(iqrRadius, iqrLowerCoef, iqrUpperCoef)
-					minReqDur, maxReqDur = reqDurations.SelectGetNormalBounds(iqrRadius, iqrLowerCoef, iqrUpperCoef)
-				}
-
-				for _, trail := range httpTrails {
-					if trail.ConnDuration < minConnDur ||
-						trail.ConnDuration > maxConnDur ||
-						trail.Duration < minReqDur ||
-						trail.Duration > maxReqDur {
-						// Seems like an outlier, add it as a standalone metric
+		for _, subBucket := range subBuckets {
+			for tags, httpTrails := range subBucket {
+				trailCount := int64(len(httpTrails))
+				if trailCount < c.config.AggregationMinSamples.Int64 {
+					for _, trail := range httpTrails {
 						newSamples = append(newSamples, NewSampleFromTrail(trail))
-					} else {
-						// Aggregate the trail
+					}
+					continue
+				}
+
+				aggrData := &SampleDataAggregatedHTTPReqs{
+					Time: Timestamp(time.Unix(0, bucketID*aggrPeriod+aggrPeriod/2)),
+					Type: "aggregated_trend",
+					Tags: tags,
+				}
+
+				if c.config.AggregationSkipOutlierDetection.Bool {
+					// Simply add up all HTTP trails, no outlier detection
+					for _, trail := range httpTrails {
 						aggrData.Add(trail)
 					}
+				} else {
+					connDurations := make(durations, trailCount)
+					reqDurations := make(durations, trailCount)
+					for i, trail := range httpTrails {
+						connDurations[i] = trail.ConnDuration
+						reqDurations[i] = trail.Duration
+					}
+
+					var minConnDur, maxConnDur, minReqDur, maxReqDur time.Duration
+					if trailCount < c.config.AggregationOutlierAlgoThreshold.Int64 {
+						// Since there are fewer samples, we'll use the interpolation-enabled and
+						// more precise sorting-based algorithm
+						minConnDur, maxConnDur = connDurations.SortGetNormalBounds(iqrRadius, iqrLowerCoef, iqrUpperCoef, true)
+						minReqDur, maxReqDur = reqDurations.SortGetNormalBounds(iqrRadius, iqrLowerCoef, iqrUpperCoef, true)
+					} else {
+						minConnDur, maxConnDur = connDurations.SelectGetNormalBounds(iqrRadius, iqrLowerCoef, iqrUpperCoef)
+						minReqDur, maxReqDur = reqDurations.SelectGetNormalBounds(iqrRadius, iqrLowerCoef, iqrUpperCoef)
+					}
+
+					for _, trail := range httpTrails {
+						if trail.ConnDuration < minConnDur ||
+							trail.ConnDuration > maxConnDur ||
+							trail.Duration < minReqDur ||
+							trail.Duration > maxReqDur {
+							// Seems like an outlier, add it as a standalone metric
+							newSamples = append(newSamples, NewSampleFromTrail(trail))
+						} else {
+							// Aggregate the trail
+							aggrData.Add(trail)
+						}
+					}
 				}
-			}
 
-			aggrData.CalcAverages()
+				aggrData.CalcAverages()
 
-			if aggrData.Count > 0 {
-				logrus.WithFields(logrus.Fields{
-					"http_samples": aggrData.Count,
-				}).Debug("Aggregated HTTP metrics")
-				newSamples = append(newSamples, &Sample{
-					Type:   DataTypeAggregatedHTTPReqs,
-					Metric: "http_req_li_all",
-					Data:   aggrData,
-				})
+				if aggrData.Count > 0 {
+					logrus.WithFields(logrus.Fields{
+						"http_samples": aggrData.Count,
+					}).Debug("Aggregated HTTP metrics")
+					newSamples = append(newSamples, &Sample{
+						Type:   DataTypeAggregatedHTTPReqs,
+						Metric: "http_req_li_all",
+						Data:   aggrData,
+					})
+				}
 			}
 		}
 		delete(c.aggrBuckets, bucketID)
@@ -477,15 +491,17 @@ func (c *Collector) flushHTTPTrails() {
 		newSamples = append(newSamples, NewSampleFromTrail(trail))
 	}
 	for _, bucket := range c.aggrBuckets {
-		for _, trails := range bucket {
-			for _, trail := range trails {
-				newSamples = append(newSamples, NewSampleFromTrail(trail))
+		for _, subBucket := range bucket {
+			for _, trails := range subBucket {
+				for _, trail := range trails {
+					newSamples = append(newSamples, NewSampleFromTrail(trail))
+				}
 			}
 		}
 	}
 
 	c.bufferHTTPTrails = nil
-	c.aggrBuckets = map[int64]aggregationBucket{}
+	c.aggrBuckets = map[int64]map[[3]string]aggregationBucket{}
 	c.bufferSamples = append(c.bufferSamples, newSamples...)
 }
 
