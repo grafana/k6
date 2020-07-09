@@ -96,6 +96,9 @@ a commandline interface for interacting with it.`,
   k6 run -o influxdb=http://1.2.3.4:8086/k6`[1:],
 	Args: exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// TODO: don't use a global... or maybe change the logger?
+		logger := logrus.StandardLogger()
+
 		// TODO: disable in quiet mode?
 		_, _ = BannerColor.Fprintf(stdout, "\n%s\n\n", consts.Banner)
 
@@ -112,7 +115,7 @@ a commandline interface for interacting with it.`,
 		}
 		filename := args[0]
 		filesystems := loader.CreateFilesystems()
-		src, err := loader.ReadSource(filename, pwd, filesystems, os.Stdin)
+		src, err := loader.ReadSource(logger, filename, pwd, filesystems, os.Stdin)
 		if err != nil {
 			return err
 		}
@@ -147,9 +150,6 @@ a commandline interface for interacting with it.`,
 		if err = r.SetOptions(conf.Options); err != nil {
 			return err
 		}
-
-		// TODO: don't use a global... or maybe change the logger?
-		logger := logrus.StandardLogger()
 
 		// We prepare a bunch of contexts:
 		//  - The runCtx is cancelled as soon as the Engine's run() lambda finishes,

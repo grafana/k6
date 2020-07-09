@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/loadimpact/k6/js"
@@ -45,7 +46,8 @@ var inspectCmd = &cobra.Command{
 			return err
 		}
 		filesystems := loader.CreateFilesystems()
-		src, err := loader.ReadSource(args[0], pwd, filesystems, os.Stdin)
+		// TODO: don't use the Global logger
+		src, err := loader.ReadSource(logrus.StandardLogger(), args[0], pwd, filesystems, os.Stdin)
 		if err != nil {
 			return err
 		}
