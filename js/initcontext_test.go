@@ -40,6 +40,7 @@ import (
 
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
 )
@@ -229,7 +230,7 @@ func TestInitContextRequire(t *testing.T) {
 			if !assert.NoError(t, err) {
 				return
 			}
-			_, err = bi.exports["default"](goja.Undefined())
+			_, err = bi.exports[consts.DefaultFn](goja.Undefined())
 			assert.NoError(t, err)
 		})
 	})
@@ -401,7 +402,7 @@ func TestRequestWithBinaryFile(t *testing.T) {
 	ctx = common.WithRuntime(ctx, bi.Runtime)
 	*bi.Context = ctx
 
-	v, err := bi.exports["default"](goja.Undefined())
+	v, err := bi.exports[consts.DefaultFn](goja.Undefined())
 	assert.NoError(t, err)
 	assert.NotNil(t, v)
 	assert.Equal(t, true, v.Export())
