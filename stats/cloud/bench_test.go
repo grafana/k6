@@ -55,40 +55,47 @@ func BenchmarkAggregateHTTP(b *testing.B) {
 	require.NoError(b, err)
 	now := time.Now()
 	collector.referenceID = "something"
+	var containersCount = time.Duration(500000)
 
-	for _, tagCount := range []int{1, 5, 10, 100, 1000} {
+	for _, tagCount := range []int{1, 5, 35, 315, 3645} {
 		tagCount := tagCount
 		b.Run(fmt.Sprintf("tags:%d", tagCount), func(b *testing.B) {
-			tags := make([]*stats.SampleTags, tagCount)
-			for i := range tags {
-				tags[i] = stats.IntoSampleTags(&map[string]string{
-					"test": "mest", "a": "b",
-					"url":  fmt.Sprintf("something%d", i),
-					"name": fmt.Sprintf("else%d", i),
-				})
-			}
 			b.ResetTimer()
 			for s := 0; s < b.N; s++ {
-				for j := time.Duration(1); j <= 200; j++ {
-					var container = make([]stats.SampleContainer, 0, 500)
-					for i := time.Duration(1); i <= 500; i++ {
-						container = append(container, &httpext.Trail{
-							Blocked:        i % 200 * 100 * time.Millisecond,
-							Connecting:     i % 200 * 200 * time.Millisecond,
-							TLSHandshaking: i % 200 * 300 * time.Millisecond,
-							Sending:        i * i * 400 * time.Millisecond,
-							Waiting:        500 * time.Millisecond,
-							Receiving:      600 * time.Millisecond,
-
-							EndTime:      now.Add(i * 100),
-							ConnDuration: 500 * time.Millisecond,
-							Duration:     j * i * 1500 * time.Millisecond,
-							Tags:         stats.NewSampleTags(tags[int(i+j)%len(tags)].CloneTags()),
-						})
+				b.StopTimer()
+				var container = make([]stats.SampleContainer, containersCount)
+				for i := time.Duration(1); i <= containersCount; i++ {
+					var status = "200"
+					if int(i)%tagCount%7 == 6 {
+						status = "404"
+					} else if int(i)%tagCount%7 == 5 {
+						status = "500"
 					}
-					collector.Collect(container)
+
+					container[i-1] = &httpext.Trail{
+						Blocked:        i % 200 * 100 * time.Millisecond,
+						Connecting:     i % 200 * 200 * time.Millisecond,
+						TLSHandshaking: i % 200 * 300 * time.Millisecond,
+						Sending:        i % 200 * 400 * time.Millisecond,
+						Waiting:        500 * time.Millisecond,
+						Receiving:      600 * time.Millisecond,
+						EndTime:        now.Add(i % 100 * 100),
+						ConnDuration:   500 * time.Millisecond,
+						Duration:       i % 150 * 1500 * time.Millisecond,
+						Tags: stats.IntoSampleTags(&map[string]string{
+							"test": "mest", "a": "b",
+							"custom": fmt.Sprintf("group%d", int(i)%tagCount%9),
+							"group":  fmt.Sprintf("group%d", int(i)%tagCount%5),
+							"status": status,
+							"url":    fmt.Sprintf("something%d", int(i)%tagCount%11),
+							"name":   fmt.Sprintf("else%d", int(i)%tagCount%11),
+						}),
+					}
 				}
+				collector.Collect(container)
+				b.StartTimer()
 				collector.aggregateHTTPTrails(time.Millisecond * 200)
+				collector.bufferSamples = nil
 			}
 		})
 	}
