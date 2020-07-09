@@ -230,7 +230,7 @@ a commandline interface for interacting with it.`,
 			modifyAndPrintBar(initBar, pb.WithConstProgress(0, "Init API server"))
 			go func() {
 				logger.Debugf("Starting the REST API server on %s", address)
-				if aerr := api.ListenAndServe(address, engine); aerr != nil {
+				if aerr := api.ListenAndServe(address, engine, logger); aerr != nil {
 					// Only exit k6 if the user has explicitly set the REST API address
 					if cmd.Flags().Lookup("address").Changed {
 						logger.WithError(aerr).Error("Error from API server")
