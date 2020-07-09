@@ -38,13 +38,16 @@ import (
 	"github.com/loadimpact/k6/core"
 	"github.com/loadimpact/k6/core/local"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/lib/testutils/minirunner"
 )
 
 func TestGetStatus(t *testing.T) {
-	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{}, logrus.StandardLogger())
+	logger := logrus.New()
+	logger.SetOutput(testutils.NewTestOutput(t))
+	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{}, logger)
 	require.NoError(t, err)
-	engine, err := core.NewEngine(execScheduler, lib.Options{}, logrus.StandardLogger())
+	engine, err := core.NewEngine(execScheduler, lib.Options{}, logger)
 	require.NoError(t, err)
 
 	rw := httptest.NewRecorder()
@@ -84,6 +87,8 @@ func TestPatchStatus(t *testing.T) {
 		"too many vus":          {400, Status{VUs: null.IntFrom(10), VUsMax: null.IntFrom(0)}},
 		"vus":                   {200, Status{VUs: null.IntFrom(10), VUsMax: null.IntFrom(10)}},
 	}
+	logger := logrus.New()
+	logger.SetOutput(testutils.NewTestOutput(t))
 
 	scenarios := lib.ScenarioConfigs{}
 	err := json.Unmarshal([]byte(`
@@ -94,9 +99,9 @@ func TestPatchStatus(t *testing.T) {
 
 	for name, indata := range testdata {
 		t.Run(name, func(t *testing.T) {
-			execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{Options: options}, logrus.StandardLogger())
+			execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{Options: options}, logger)
 			require.NoError(t, err)
-			engine, err := core.NewEngine(execScheduler, options, logrus.StandardLogger())
+			engine, err := core.NewEngine(execScheduler, options, logger)
 			require.NoError(t, err)
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
