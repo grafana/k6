@@ -363,12 +363,15 @@ func (c *Collector) aggregateHTTPTrails(waitPeriod time.Duration) {
 			bucket = make(map[string]aggregationBucket)
 			c.aggrBuckets[bucketID] = bucket
 		}
+		// this key is not in a function or a new variable as this requires a new allocation
+		n, _ := trailTags.Get("name")
+		g, _ := trailTags.Get("group")
+		s, _ := trailTags.Get("status")
 
-		name, _ := trailTags.Get("name") // TODO use constant ?
-		subBucket, ok := bucket[name]
+		subBucket, ok := bucket[n+g+s]
 		if !ok {
 			subBucket = aggregationBucket{}
-			bucket[name] = subBucket
+			bucket[n+g+s] = subBucket
 		}
 		// Either use an existing subbucket key or use the trail tags as a new one
 		subSubBucketKey := trailTags
