@@ -40,6 +40,7 @@ import (
 	"github.com/loadimpact/k6/core/local"
 	"github.com/loadimpact/k6/js"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/loader"
 )
@@ -132,6 +133,8 @@ func TestSetupData(t *testing.T) {
 			},
 		},
 	}
+	logger := logrus.New()
+	logger.SetOutput(testutils.NewTestOutput(t))
 	for _, testCase := range testCases {
 		testCase := testCase
 		t.Run(testCase.name, func(t *testing.T) {
@@ -149,9 +152,9 @@ func TestSetupData(t *testing.T) {
 				SetupTimeout:    types.NullDurationFrom(5 * time.Second),
 				TeardownTimeout: types.NullDurationFrom(5 * time.Second),
 			})
-			execScheduler, err := local.NewExecutionScheduler(runner, logrus.StandardLogger())
+			execScheduler, err := local.NewExecutionScheduler(runner, logger)
 			require.NoError(t, err)
-			engine, err := core.NewEngine(execScheduler, runner.GetOptions(), logrus.StandardLogger())
+			engine, err := core.NewEngine(execScheduler, runner.GetOptions(), logger)
 			require.NoError(t, err)
 
 			globalCtx, globalCancel := context.WithCancel(context.Background())
