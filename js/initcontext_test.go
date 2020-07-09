@@ -40,6 +40,7 @@ import (
 
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
 )
@@ -62,7 +63,7 @@ func TestInitContextRequire(t *testing.T) {
 				return
 			}
 
-			bi, err := b.Instantiate()
+			bi, err := b.Instantiate(0)
 			if !assert.NoError(t, err, "instance error") {
 				return
 			}
@@ -91,7 +92,7 @@ func TestInitContextRequire(t *testing.T) {
 					return
 				}
 
-				bi, err := b.Instantiate()
+				bi, err := b.Instantiate(0)
 				if !assert.NoError(t, err) {
 					return
 				}
@@ -199,7 +200,7 @@ func TestInitContextRequire(t *testing.T) {
 							assert.Contains(t, b.BaseInitContext.programs, "file://"+constPath)
 						}
 
-						_, err = b.Instantiate()
+						_, err = b.Instantiate(0)
 						if !assert.NoError(t, err) {
 							return
 						}
@@ -225,11 +226,11 @@ func TestInitContextRequire(t *testing.T) {
 				return
 			}
 
-			bi, err := b.Instantiate()
+			bi, err := b.Instantiate(0)
 			if !assert.NoError(t, err) {
 				return
 			}
-			_, err = bi.exports["default"](goja.Undefined())
+			_, err = bi.exports[consts.DefaultFn](goja.Undefined())
 			assert.NoError(t, err)
 		})
 	})
@@ -259,7 +260,7 @@ func createAndReadFile(t *testing.T, file string, content []byte, expectedLength
 		return nil, err
 	}
 
-	bi, err := b.Instantiate()
+	bi, err := b.Instantiate(0)
 	if !assert.NoError(t, err) {
 		return nil, err
 	}
@@ -371,7 +372,7 @@ func TestRequestWithBinaryFile(t *testing.T) {
 			`, srv.URL), fs)
 	require.NoError(t, err)
 
-	bi, err := b.Instantiate()
+	bi, err := b.Instantiate(0)
 	assert.NoError(t, err)
 
 	root, err := lib.NewGroup("", nil)
@@ -401,10 +402,23 @@ func TestRequestWithBinaryFile(t *testing.T) {
 	ctx = common.WithRuntime(ctx, bi.Runtime)
 	*bi.Context = ctx
 
-	v, err := bi.exports["default"](goja.Undefined())
+	v, err := bi.exports[consts.DefaultFn](goja.Undefined())
 	assert.NoError(t, err)
 	assert.NotNil(t, v)
 	assert.Equal(t, true, v.Export())
 
 	<-ch
+}
+
+func TestInitContextVU(t *testing.T) {
+	b, err := getSimpleBundle("/script.js", `
+		let vu = __VU;
+		export default function() { return vu; }
+	`)
+	require.NoError(t, err)
+	bi, err := b.Instantiate(5)
+	require.NoError(t, err)
+	v, err := bi.exports[consts.DefaultFn](goja.Undefined())
+	require.NoError(t, err)
+	assert.Equal(t, int64(5), v.Export())
 }

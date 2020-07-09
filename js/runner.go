@@ -123,7 +123,7 @@ func (r *Runner) NewVU(id int64, samplesOut chan<- stats.SampleContainer) (lib.I
 // nolint:funlen
 func (r *Runner) newVU(id int64, samplesOut chan<- stats.SampleContainer) (*VU, error) {
 	// Instantiate a new bundle, make a VU out of it.
-	bi, err := r.Bundle.Instantiate()
+	bi, err := r.Bundle.Instantiate(id)
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +211,6 @@ func (r *Runner) newVU(id int64, samplesOut chan<- stats.SampleContainer) (*VU, 
 		Tags:      vu.Runner.Bundle.Options.RunTags.CloneTags(),
 		Group:     r.defaultGroup,
 	}
-	vu.Runtime.Set("__VU", vu.ID)
 	vu.Runtime.Set("console", common.Bind(vu.Runtime, vu.Console, vu.Context))
 
 	// This is here mostly so if someone tries they get a nice message

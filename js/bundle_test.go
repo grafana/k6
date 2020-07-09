@@ -434,9 +434,9 @@ func TestNewBundleFromArchive(t *testing.T) {
 
 	checkBundle := func(t *testing.T, b *Bundle) {
 		assert.Equal(t, lib.Options{VUs: null.IntFrom(12345)}, b.Options)
-		bi, err := b.Instantiate()
+		bi, err := b.Instantiate(0)
 		require.NoError(t, err)
-		val, err := bi.exports["default"](goja.Undefined())
+		val, err := bi.exports[consts.DefaultFn](goja.Undefined())
 		require.NoError(t, err)
 		assert.Equal(t, "hi!", val.Export())
 	}
@@ -527,7 +527,7 @@ func TestNewBundleFromArchive(t *testing.T) {
 		}
 		b, err := NewBundleFromArchive(arc, lib.RuntimeOptions{})
 		require.NoError(t, err)
-		bi, err := b.Instantiate()
+		bi, err := b.Instantiate(0)
 		require.NoError(t, err)
 		val, err := bi.exports[consts.DefaultFn](goja.Undefined())
 		require.NoError(t, err)
@@ -667,9 +667,9 @@ func TestOpen(t *testing.T) {
 					for source, b := range map[string]*Bundle{"source": sourceBundle, "archive": arcBundle} {
 						b := b
 						t.Run(source, func(t *testing.T) {
-							bi, err := b.Instantiate()
+							bi, err := b.Instantiate(0)
 							require.NoError(t, err)
-							v, err := bi.exports["default"](goja.Undefined())
+							v, err := bi.exports[consts.DefaultFn](goja.Undefined())
 							require.NoError(t, err)
 							assert.Equal(t, "hi", v.Export())
 						})
@@ -701,13 +701,13 @@ func TestBundleInstantiate(t *testing.T) {
 		return
 	}
 
-	bi, err := b.Instantiate()
+	bi, err := b.Instantiate(0)
 	if !assert.NoError(t, err) {
 		return
 	}
 
 	t.Run("Run", func(t *testing.T) {
-		v, err := bi.exports["default"](goja.Undefined())
+		v, err := bi.exports[consts.DefaultFn](goja.Undefined())
 		if assert.NoError(t, err) {
 			assert.Equal(t, true, v.Export())
 		}
@@ -715,7 +715,7 @@ func TestBundleInstantiate(t *testing.T) {
 
 	t.Run("SetAndRun", func(t *testing.T) {
 		bi.Runtime.Set("val", false)
-		v, err := bi.exports["default"](goja.Undefined())
+		v, err := bi.exports[consts.DefaultFn](goja.Undefined())
 		if assert.NoError(t, err) {
 			assert.Equal(t, false, v.Export())
 		}
@@ -732,7 +732,7 @@ func TestBundleInstantiate(t *testing.T) {
 		// Ensure options propagate correctly from outside to the script
 		optOrig := b.Options.VUs
 		b.Options.VUs = null.IntFrom(10)
-		bi2, err := b.Instantiate()
+		bi2, err := b.Instantiate(0)
 		assert.NoError(t, err)
 		jsOptions = bi2.Runtime.Get("options").ToObject(bi2.Runtime)
 		vus = jsOptions.Get("vus").Export()
@@ -764,13 +764,14 @@ func TestBundleEnv(t *testing.T) {
 
 	bundles := map[string]*Bundle{"Source": b1, "Archive": b2}
 	for name, b := range bundles {
+		b := b
 		t.Run(name, func(t *testing.T) {
 			assert.Equal(t, "1", b.Env["TEST_A"])
 			assert.Equal(t, "", b.Env["TEST_B"])
 
-			bi, err := b.Instantiate()
+			bi, err := b.Instantiate(0)
 			if assert.NoError(t, err) {
-				_, err := bi.exports["default"](goja.Undefined())
+				_, err := bi.exports[consts.DefaultFn](goja.Undefined())
 				assert.NoError(t, err)
 			}
 		})
@@ -806,12 +807,11 @@ func TestBundleNotSharable(t *testing.T) {
 		b := b
 		t.Run(name, func(t *testing.T) {
 			for i := 0; i < vus; i++ {
-				bi, err := b.Instantiate()
-				bi.Runtime.Set("__VU", i)
+				bi, err := b.Instantiate(int64(i))
 				require.NoError(t, err)
 				for j := 0; j < iters; j++ {
 					bi.Runtime.Set("__ITER", j)
-					_, err := bi.exports["default"](goja.Undefined())
+					_, err := bi.exports[consts.DefaultFn](goja.Undefined())
 					assert.NoError(t, err)
 				}
 			}
