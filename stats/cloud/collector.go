@@ -70,7 +70,7 @@ type Collector struct {
 	// aggregation buckets. This should save us a some time, since it would make the lookups and WaitPeriod
 	// checks basically O(1). And even if for some reason there are occasional metrics with past times that
 	// don't fit in the chosen ring buffer size, we could just send them along to the buffer unaggregated
-	aggrBuckets map[int64]map[string]aggregationBucket
+	aggrBuckets map[int64]map[[3]string]aggregationBucket
 
 	stopSendingMetricsCh chan struct{}
 }
@@ -142,7 +142,7 @@ func New(
 		executionPlan:        executionPlan,
 		duration:             int64(duration / time.Second),
 		opts:                 opts,
-		aggrBuckets:          map[int64]map[string]aggregationBucket{},
+		aggrBuckets:          map[int64]map[[3]string]aggregationBucket{},
 		stopSendingMetricsCh: make(chan struct{}),
 	}, nil
 }
@@ -343,7 +343,7 @@ func (c *Collector) Collect(sampleContainers []stats.SampleContainer) {
 	}
 }
 
-//nolint:funlen,nestif
+//nolint:funlen,nestif,gocognit
 func (c *Collector) aggregateHTTPTrails(waitPeriod time.Duration) {
 	c.bufferMutex.Lock()
 	newHTTPTrails := c.bufferHTTPTrails
@@ -353,6 +353,10 @@ func (c *Collector) aggregateHTTPTrails(waitPeriod time.Duration) {
 	aggrPeriod := int64(c.config.AggregationPeriod.Duration)
 
 	// Distribute all newly buffered HTTP trails into buckets and sub-buckets
+
+	// this key is here specifically to not incur more allocations then necessary
+	// if you change this code please run the benchmarks and add the results to the commit message
+	var subBucketKey [3]string
 	for _, trail := range newHTTPTrails {
 		trailTags := trail.GetTags()
 		bucketID := trail.GetTime().UnixNano() / aggrPeriod
@@ -360,18 +364,17 @@ func (c *Collector) aggregateHTTPTrails(waitPeriod time.Duration) {
 		// Get or create a time bucket for that trail period
 		bucket, ok := c.aggrBuckets[bucketID]
 		if !ok {
-			bucket = make(map[string]aggregationBucket)
+			bucket = make(map[[3]string]aggregationBucket)
 			c.aggrBuckets[bucketID] = bucket
 		}
-		// this key is not in a function or a new variable as this requires a new allocation
-		n, _ := trailTags.Get("name")
-		g, _ := trailTags.Get("group")
-		s, _ := trailTags.Get("status")
+		subBucketKey[0], _ = trailTags.Get("name")
+		subBucketKey[1], _ = trailTags.Get("group")
+		subBucketKey[2], _ = trailTags.Get("status")
 
-		subBucket, ok := bucket[n+g+s]
+		subBucket, ok := bucket[subBucketKey]
 		if !ok {
 			subBucket = aggregationBucket{}
-			bucket[n+g+s] = subBucket
+			bucket[subBucketKey] = subBucket
 		}
 		// Either use an existing subbucket key or use the trail tags as a new one
 		subSubBucketKey := trailTags
@@ -498,7 +501,7 @@ func (c *Collector) flushHTTPTrails() {
 	}
 
 	c.bufferHTTPTrails = nil
-	c.aggrBuckets = map[int64]map[string]aggregationBucket{}
+	c.aggrBuckets = map[int64]map[[3]string]aggregationBucket{}
 	c.bufferSamples = append(c.bufferSamples, newSamples...)
 }
 
