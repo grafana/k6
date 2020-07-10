@@ -133,7 +133,7 @@ func (e *Engine) Init(globalCtx, runCtx context.Context) (run func() error, wait
 	runSubCtx, runSubCancel := context.WithCancel(runCtx)
 
 	resultCh := make(chan error)
-	processMetricsAfterRun := make(chan struct{})
+	processMetricsAfterRun := make(chan chan struct{})
 	runFn := func() error {
 		e.logger.Debug("Execution scheduler starting...")
 		err := e.ExecutionScheduler.Run(globalCtx, runSubCtx, e.Samples)
@@ -148,8 +148,9 @@ func (e *Engine) Init(globalCtx, runCtx context.Context) (run func() error, wait
 
 		// Make the background jobs process the currently buffered metrics and
 		// run the thresholds, then wait for that to be done.
-		processMetricsAfterRun <- struct{}{}
-		<-processMetricsAfterRun
+		ch := make(chan struct{})
+		processMetricsAfterRun <- ch
+		<-ch
 
 		return err
 	}
@@ -162,7 +163,7 @@ func (e *Engine) Init(globalCtx, runCtx context.Context) (run func() error, wait
 // the provided context is called, to wait for the complete winding down of all
 // started goroutines.
 func (e *Engine) startBackgroundProcesses( //nolint:funlen
-	globalCtx, runCtx context.Context, runResult <-chan error, runSubCancel func(), processMetricsAfterRun chan struct{},
+	globalCtx, runCtx context.Context, runResult <-chan error, runSubCancel func(), processMetricsAfterRun chan chan struct{},
 ) (wait func()) {
 	processes := new(sync.WaitGroup)
 
@@ -246,7 +247,7 @@ func (e *Engine) startBackgroundProcesses( //nolint:funlen
 	return processes.Wait
 }
 
-func (e *Engine) processMetrics(globalCtx context.Context, processMetricsAfterRun chan struct{}) {
+func (e *Engine) processMetrics(globalCtx context.Context, processMetricsAfterRun chan chan struct{}) {
 	sampleContainers := []stats.SampleContainer{}
 
 	defer func() {
@@ -282,11 +283,11 @@ func (e *Engine) processMetrics(globalCtx context.Context, processMetricsAfterRu
 		select {
 		case <-ticker.C:
 			processSamples()
-		case <-processMetricsAfterRun:
+		case ch := <-processMetricsAfterRun:
 			e.logger.Debug("Processing metrics and thresholds after the test run has ended...")
 			processSamples()
 			e.processThresholds()
-			processMetricsAfterRun <- struct{}{}
+			close(ch)
 
 		case sc := <-e.Samples:
 			sampleContainers = append(sampleContainers, sc)
