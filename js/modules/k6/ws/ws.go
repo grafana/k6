@@ -145,12 +145,6 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 		tags["url"] = url
 	}
 
-	// Pass a custom net.Dial function to websocket.Dialer that will substitute
-	// the underlying net.Conn with our own tracked netext.Conn
-	netDial := func(network, address string) (net.Conn, error) {
-		return state.Dialer.DialContext(ctx, network, address)
-	}
-
 	// Overriding the NextProtos to avoid talking http2
 	var tlsConfig *tls.Config
 	if state.TLSConfig != nil {
@@ -160,9 +154,11 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 
 	wsd := websocket.Dialer{
 		HandshakeTimeout: time.Second * 60, // TODO configurable
-		NetDial:          netDial,
-		Proxy:            http.ProxyFromEnvironment,
-		TLSClientConfig:  tlsConfig,
+		// Pass a custom net.DialContext function to websocket.Dialer that will substitute
+		// the underlying net.Conn with our own tracked netext.Conn
+		NetDialContext:  state.Dialer.DialContext,
+		Proxy:           http.ProxyFromEnvironment,
+		TLSClientConfig: tlsConfig,
 	}
 
 	start := time.Now()
