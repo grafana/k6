@@ -248,6 +248,7 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 
 	// we do it here as below we can panic, which translates to an exception in js code
 	defer func() {
+		socket.Close() // just in case
 		end := time.Now()
 		sessionDuration := stats.D(end.Sub(start))
 
@@ -321,7 +322,6 @@ func (s *Socket) handleEvent(event string, args ...goja.Value) {
 	if handlers, ok := s.eventHandlers[event]; ok {
 		for _, handler := range handlers {
 			if _, err := handler(goja.Undefined(), args...); err != nil {
-				_ = s.closeConnection(websocket.CloseGoingAway)
 				common.Throw(common.GetRuntime(s.ctx), err)
 			}
 		}
