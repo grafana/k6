@@ -250,6 +250,19 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 	// Wraps a couple of channels around conn.ReadMessage
 	go socket.readPump(readDataChan, readErrChan, readCloseChan)
 
+	// we do it here as below we can panic, which translates to an exception in js code
+	defer func() {
+		end := time.Now()
+		sessionDuration := stats.D(end.Sub(start))
+
+		stats.PushIfNotDone(ctx, state.Samples, stats.Sample{
+			Metric: metrics.WSSessionDuration,
+			Tags:   socket.sampleTags,
+			Time:   start,
+			Value:  sessionDuration,
+		})
+	}()
+
 	// This is the main control loop. All JS code (including error handlers)
 	// should only be executed by this thread to avoid race conditions
 	for {
@@ -296,16 +309,6 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 
 		case <-socket.done:
 			// This is the final exit point normally triggered by closeConnection
-			end := time.Now()
-			sessionDuration := stats.D(end.Sub(start))
-
-			stats.PushIfNotDone(ctx, state.Samples, stats.Sample{
-				Metric: metrics.WSSessionDuration,
-				Tags:   socket.sampleTags,
-				Time:   start,
-				Value:  sessionDuration,
-			})
-
 			return wsResponse, nil
 		}
 	}
@@ -321,6 +324,7 @@ func (s *Socket) handleEvent(event string, args ...goja.Value) {
 	if handlers, ok := s.eventHandlers[event]; ok {
 		for _, handler := range handlers {
 			if _, err := handler(goja.Undefined(), args...); err != nil {
+				_ = s.closeConnection(websocket.CloseGoingAway)
 				common.Throw(common.GetRuntime(s.ctx), err)
 			}
 		}
