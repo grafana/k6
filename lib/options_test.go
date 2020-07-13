@@ -320,14 +320,24 @@ func TestOptions(t *testing.T) {
 	})
 	t.Run("BlockedHostnames", func(t *testing.T) {
 		hostnames := HostnameTrie{}
-		err := hostnames.Insert("*")
-		assert.Nil(t, err)
+		assert.NoError(t, hostnames.Insert("test.k6.io"))
+		assert.Error(t, hostnames.Insert("inval*d.pattern"))
+		assert.NoError(t, hostnames.Insert("*valid.pattern"))
 		opts := Options{}.Apply(Options{
 			BlockedHostnames: &hostnames,
 		})
 		assert.NotNil(t, opts.BlockedHostnames)
 		assert.NotEmpty(t, opts.BlockedHostnames)
-		matches, _ := opts.BlockedHostnames.Contains("loadimpact.com")
+		matches, _ := opts.BlockedHostnames.Contains("k6.io")
+		assert.False(t, matches)
+		matches, _ = opts.BlockedHostnames.Contains("test.k6.io")
+		assert.True(t, matches)
+		matches, _ = opts.BlockedHostnames.Contains("blocked.valid.pattern")
+		assert.True(t, matches)
+		matches, _ = opts.BlockedHostnames.Contains("example.test.k6.io")
+		assert.False(t, matches)
+		assert.NoError(t, opts.BlockedHostnames.Insert("*.test.k6.io"))
+		matches, _ = opts.BlockedHostnames.Contains("example.test.k6.io")
 		assert.True(t, matches)
 	})
 

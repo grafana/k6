@@ -823,14 +823,10 @@ func TestVUIntegrationBlockHostnamesOption(t *testing.T) {
 					import http from "k6/http";
 					export default function() { http.get("https://k6.io/"); }
 				`)
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	hostnames := lib.HostnameTrie{}
-	if insertErr := hostnames.Insert("*.io"); !assert.NoError(t, insertErr) {
-		return
-	}
+	require.NoError(t, hostnames.Insert("*.io"))
 	require.NoError(t, r1.SetOptions(lib.Options{
 		Throw:            null.BoolFrom(true),
 		BlockedHostnames: &hostnames,
@@ -847,9 +843,7 @@ func TestVUIntegrationBlockHostnamesOption(t *testing.T) {
 		r := r
 		t.Run(name, func(t *testing.T) {
 			vu, err := r.NewVU(make(chan stats.SampleContainer, 100))
-			if !assert.NoError(t, err) {
-				return
-			}
+			require.NoError(t, err)
 			err = vu.RunOnce(context.Background())
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "hostname (k6.io) is in a blocked pattern (*.io)")

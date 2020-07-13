@@ -202,7 +202,8 @@ type HostnameTrie struct {
 // to avoid compilation penalty at runtime.
 // Matches against strings composed entirely of letters, numbers, or '.'s
 // with an optional wildcard at the start.
-var legalHostnamePattern *regexp.Regexp = regexp.MustCompile("^\\*?(\\pL|[0-9\\.])*")
+//nolint:gochecknoglobals
+var legalHostnamePattern *regexp.Regexp = regexp.MustCompile(`^\*?(\pL|[0-9\.])*`)
 
 func legalHostname(s string) error {
 	if len(legalHostnamePattern.FindString(s)) != len(s) {
