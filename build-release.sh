@@ -82,6 +82,7 @@ build_dist win32   zip .exe GOOS=windows GOARCH=386
 build_dist win64   zip .exe GOOS=windows GOARCH=amd64
 build_dist linux32 tgz ""   GOOS=linux   GOARCH=386    CGO_ENABLED=0
 build_dist linux64 tgz ""   GOOS=linux   GOARCH=amd64  CGO_ENABLED=0
+build_dist arm64   tgz ""   GOOS=linux   GOARCH=arm64  CGO_ENABLED=0
 
 echo "-> Generating checksum file..."
 checksum
