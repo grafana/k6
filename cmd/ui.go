@@ -46,7 +46,8 @@ const (
 	maxLeftLength = 30
 	// Amount of padding in chars between rendered progress
 	// bar text and right-side terminal window edge.
-	termPadding = 1
+	termPadding      = 1
+	defaultTermWidth = 80
 )
 
 // A writer that syncs writes with a mutex and, if the output is a TTY, clears before newlines.
@@ -255,7 +256,7 @@ func showProgress(
 	termWidth, _, err := terminal.GetSize(int(os.Stdout.Fd()))
 	if err != nil && stdoutTTY {
 		logger.WithError(err).Warn("error getting terminal size")
-		termWidth = 80 // TODO: something safer, return error?
+		termWidth = defaultTermWidth
 	}
 
 	// Get the longest left side string length, to align progress bars
@@ -331,11 +332,17 @@ func showProgress(
 			return
 		case <-winch:
 			// More responsive progress bar resizing on platforms with SIGWINCH (*nix)
-			termWidth, _, _ = terminal.GetSize(fd)
+			termWidth, _, err = terminal.GetSize(fd)
+			if err != nil {
+				termWidth = defaultTermWidth
+			}
 		case <-ticker.C:
 			// Default ticker-based progress bar resizing
 			if winch == nil {
-				termWidth, _, _ = terminal.GetSize(fd)
+				termWidth, _, err = terminal.GetSize(fd)
+				if err != nil {
+					termWidth = defaultTermWidth
+				}
 			}
 		}
 		renderProgressBars(true)
