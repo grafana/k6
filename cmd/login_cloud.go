@@ -94,7 +94,7 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 					},
 				},
 			}
-			if !terminal.IsTerminal(syscall.Stdin) {
+			if !terminal.IsTerminal(int(syscall.Stdin)) { // nolint: unconvert
 				logger.Warn("Stdin is not a terminal, falling back to plain text input")
 			}
 			vals, err := form.Run(os.Stdin, stdout)
