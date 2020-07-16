@@ -253,10 +253,12 @@ func showProgress(
 		pbs = append(pbs, s.GetProgress())
 	}
 
+	var errTermGetSize bool
 	termWidth, _, err := terminal.GetSize(int(os.Stdout.Fd()))
 	if err != nil && stdoutTTY {
 		logger.WithError(err).Warn("error getting terminal size")
 		termWidth = defaultTermWidth
+		errTermGetSize = true
 	}
 
 	// Get the longest left side string length, to align progress bars
@@ -331,14 +333,16 @@ func showProgress(
 			outMutex.Unlock()
 			return
 		case <-winch:
-			// More responsive progress bar resizing on platforms with SIGWINCH (*nix)
-			termWidth, _, err = terminal.GetSize(fd)
-			if err != nil {
-				termWidth = defaultTermWidth
+			if !errTermGetSize {
+				// More responsive progress bar resizing on platforms with SIGWINCH (*nix)
+				termWidth, _, err = terminal.GetSize(fd)
+				if err != nil {
+					termWidth = defaultTermWidth
+				}
 			}
 		case <-ticker.C:
 			// Default ticker-based progress bar resizing
-			if winch == nil {
+			if !errTermGetSize && winch == nil {
 				termWidth, _, err = terminal.GetSize(fd)
 				if err != nil {
 					termWidth = defaultTermWidth
