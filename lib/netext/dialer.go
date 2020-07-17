@@ -24,7 +24,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"strings"
 	"sync/atomic"
 	"time"
 
@@ -68,16 +67,23 @@ func (b BlackListedIPError) Error() string {
 
 // DialContext wraps the net.Dialer.DialContext and handles the k6 specifics
 func (d *Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn, error) {
-	delimiter := strings.LastIndex(addr, ":")
-	host := addr[:delimiter]
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return nil, err
+	}
 
-	// lookup for domain defined in Hosts option before trying to resolve DNS.
-	ip, ok := d.Hosts[host]
-	if !ok {
-		var err error
-		ip, err = d.Resolver.FetchOne(host)
-		if err != nil {
-			return nil, err
+	ip := net.ParseIP(host)
+	if ip == nil {
+		// It's not an IP address, so lookup the hostname in the Hosts
+		// option before trying to resolve DNS.
+		var ok bool
+		ip, ok = d.Hosts[host]
+		if !ok {
+			var dnsErr error
+			ip, dnsErr = d.Resolver.FetchOne(host)
+			if dnsErr != nil {
+				return nil, dnsErr
+			}
 		}
 	}
 
@@ -86,11 +92,7 @@ func (d *Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn,
 			return nil, BlackListedIPError{ip: ip, net: ipnet}
 		}
 	}
-	ipStr := ip.String()
-	if strings.ContainsRune(ipStr, ':') {
-		ipStr = "[" + ipStr + "]"
-	}
-	conn, err := d.Dialer.DialContext(ctx, proto, ipStr+":"+addr[delimiter+1:])
+	conn, err := d.Dialer.DialContext(ctx, proto, net.JoinHostPort(ip.String(), port))
 	if err != nil {
 		return nil, err
 	}
