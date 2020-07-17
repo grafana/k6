@@ -22,11 +22,14 @@ package cmd
 
 import (
 	"os"
+	"syscall"
 	"time"
 
 	"github.com/mitchellh/mapstructure"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
+	"golang.org/x/crypto/ssh/terminal"
 
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats/influxdb"
@@ -42,6 +45,8 @@ var loginInfluxDBCommand = &cobra.Command{
 This will set the default server used when just "-o influxdb" is passed.`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// TODO: don't use a global... or maybe change the logger?
+		logger := logrus.StandardLogger()
 		fs := afero.NewOsFs()
 		config, configPath, err := readDiskConfig(fs)
 		if err != nil {
@@ -79,6 +84,9 @@ This will set the default server used when just "-o influxdb" is passed.`,
 					Label: "Password",
 				},
 			},
+		}
+		if !terminal.IsTerminal(int(syscall.Stdin)) { // nolint: unconvert
+			logger.Warn("Stdin is not a terminal, falling back to plain text input")
 		}
 		vals, err := form.Run(os.Stdin, stdout)
 		if err != nil {
