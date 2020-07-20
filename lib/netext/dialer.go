@@ -65,47 +65,56 @@ func (b BlackListedIPError) Error() string {
 	return fmt.Sprintf("IP (%s) is in a blacklisted range (%s)", b.ip, b.net)
 }
 
-func resolveHost(host string, hosts map[string]net.IP, resolver *dnscache.Resolver) (net.IP, error) {
-	ip := net.ParseIP(host)
-	if ip == nil {
-		// It's not an IP address, so lookup the hostname in the Hosts
-		// option before trying to resolve DNS.
-		var ok bool
-		ip, ok = hosts[host]
-		if !ok {
-			var dnsErr error
-			ip, dnsErr = resolver.FetchOne(host)
-			if dnsErr != nil {
-				return nil, dnsErr
-			}
-		}
-	}
-	return ip, nil
+// Resolver is implemented by dnscache.Resolver and used by tests to
+// pass a mock resolver.
+type Resolver interface {
+	FetchOne(string) (net.IP, error)
 }
 
 // DialContext wraps the net.Dialer.DialContext and handles the k6 specifics
 func (d *Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn, error) {
-	host, port, err := net.SplitHostPort(addr)
+	address, err := d.checkAndResolveAddress(addr, d.Resolver)
 	if err != nil {
 		return nil, err
 	}
 
-	ip, resErr := resolveHost(host, d.Hosts, d.Resolver)
-	if resErr != nil {
-		return nil, resErr
-	}
-
-	for _, ipnet := range d.Blacklist {
-		if (*net.IPNet)(ipnet).Contains(ip) {
-			return nil, BlackListedIPError{ip: ip, net: ipnet}
-		}
-	}
-	conn, err := d.Dialer.DialContext(ctx, proto, net.JoinHostPort(ip.String(), port))
+	var conn net.Conn
+	conn, err = d.Dialer.DialContext(ctx, proto, address)
 	if err != nil {
 		return nil, err
 	}
 	conn = &Conn{conn, &d.BytesRead, &d.BytesWritten}
 	return conn, err
+}
+
+func (d *Dialer) checkAndResolveAddress(addr string, resolver Resolver) (string, error) {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return "", err
+	}
+
+	ip := net.ParseIP(host)
+	if ip == nil {
+		// It's not an IP address, so lookup the hostname in the Hosts
+		// option before trying to resolve DNS.
+		var ok bool
+		ip, ok = d.Hosts[host]
+		if !ok {
+			var dnsErr error
+			ip, dnsErr = resolver.FetchOne(host)
+			if dnsErr != nil {
+				return "", dnsErr
+			}
+		}
+	}
+
+	for _, ipnet := range d.Blacklist {
+		if (*net.IPNet)(ipnet).Contains(ip) {
+			return "", BlackListedIPError{ip: ip, net: ipnet}
+		}
+	}
+
+	return net.JoinHostPort(ip.String(), port), nil
 }
 
 // GetTrail creates a new NetTrail instance with the Dialer
