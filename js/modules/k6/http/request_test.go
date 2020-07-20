@@ -282,11 +282,7 @@ func TestRequestAndBatch(t *testing.T) {
 			assert.WithinDuration(t, startTime.Add(1*time.Second), endTime, 2*time.Second)
 
 			logEntry := hook.LastEntry()
-			if assert.NotNil(t, logEntry) {
-				assert.Equal(t, logrus.WarnLevel, logEntry.Level)
-				assert.Contains(t, logEntry.Data["error"].(error).Error(), "context deadline exceeded")
-				assert.Equal(t, "Request Failed", logEntry.Message)
-			}
+			assert.Nil(t, logEntry)
 		})
 	})
 	t.Run("UserAgent", func(t *testing.T) {
@@ -485,18 +481,14 @@ func TestRequestAndBatch(t *testing.T) {
 		assert.Contains(t, err.Error(), "unsupported protocol scheme")
 
 		logEntry := hook.LastEntry()
-		if assert.NotNil(t, logEntry) {
-			assert.Equal(t, logrus.WarnLevel, logEntry.Level)
-			assert.Contains(t, logEntry.Data["error"].(error).Error(), "unsupported protocol scheme")
-			assert.Equal(t, "Request Failed", logEntry.Message)
-		}
+		assert.Nil(t, logEntry)
 
 		t.Run("throw=false", func(t *testing.T) {
 			hook := logtest.NewLocal(state.Logger)
 			defer hook.Reset()
 
 			_, err := common.RunString(rt, `
-				var res = http.request("", "", { throw: false });
+				var res = http.request("GET", "some://example.com", null, { throw: false });
 				throw new Error(res.error);
 			`)
 			require.Error(t, err)
