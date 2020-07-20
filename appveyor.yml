@@ -69,7 +69,6 @@ deploy_script:
       if ( $env:APPVEYOR_REPO_TAG -eq "false" ) { Exit-AppveyorBuild }
   # Publishing the msi
   - 'curl --fail -H "X-GPG-PASSPHRASE: %GPG_PASSPHRASE%" -T k6.msi "https://%BINTRAY_USER%:%BINTRAY_KEY%@api.bintray.com/content/loadimpact/windows/k6/%VERSION%/k6-v%VERSION%-amd64.msi?publish=1&override=1"'
-  - 'curl --fail -H "X-GPG-PASSPHRASE: %GPG_PASSPHRASE%" -T k6.msi "https://%BINTRAY_USER%:%BINTRAY_KEY%@api.bintray.com/content/loadimpact/windows/k6/latest/k6-latest-amd64.msi?publish=1&override=1"'
   - ps: |
       # Create Chocolately Package
       mkdir .\k6.portable
