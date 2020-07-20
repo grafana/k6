@@ -191,6 +191,8 @@ func (pvi PerVUIterations) Run(parentCtx context.Context, out chan<- stats.Sampl
 	pvi.progress.Modify(pb.WithProgress(progressFn))
 	go trackProgress(parentCtx, maxDurationCtx, regDurationCtx, pvi, progressFn)
 
+	handleVUsWG := &sync.WaitGroup{}
+	defer handleVUsWG.Wait()
 	// Actually schedule the VUs and iterations...
 	activeVUs := &sync.WaitGroup{}
 	defer activeVUs.Wait()
@@ -203,7 +205,9 @@ func (pvi PerVUIterations) Run(parentCtx context.Context, out chan<- stats.Sampl
 			pvi.executionState.ReturnVU(u, true)
 			activeVUs.Done()
 		})
+
 	handleVU := func(initVU lib.InitializedVU) {
+		defer handleVUsWG.Done()
 		ctx, cancel := context.WithCancel(maxDurationCtx)
 		defer cancel()
 
@@ -236,6 +240,7 @@ func (pvi PerVUIterations) Run(parentCtx context.Context, out chan<- stats.Sampl
 			return err
 		}
 		activeVUs.Add(1)
+		handleVUsWG.Add(1)
 		go handleVU(initializedVU)
 	}
 
