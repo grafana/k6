@@ -65,6 +65,24 @@ func (b BlackListedIPError) Error() string {
 	return fmt.Sprintf("IP (%s) is in a blacklisted range (%s)", b.ip, b.net)
 }
 
+func resolveHost(host string, hosts map[string]net.IP, resolver *dnscache.Resolver) (net.IP, error) {
+	ip := net.ParseIP(host)
+	if ip == nil {
+		// It's not an IP address, so lookup the hostname in the Hosts
+		// option before trying to resolve DNS.
+		var ok bool
+		ip, ok = hosts[host]
+		if !ok {
+			var dnsErr error
+			ip, dnsErr = resolver.FetchOne(host)
+			if dnsErr != nil {
+				return nil, dnsErr
+			}
+		}
+	}
+	return ip, nil
+}
+
 // DialContext wraps the net.Dialer.DialContext and handles the k6 specifics
 func (d *Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn, error) {
 	host, port, err := net.SplitHostPort(addr)
@@ -72,19 +90,9 @@ func (d *Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn,
 		return nil, err
 	}
 
-	ip := net.ParseIP(host)
-	if ip == nil {
-		// It's not an IP address, so lookup the hostname in the Hosts
-		// option before trying to resolve DNS.
-		var ok bool
-		ip, ok = d.Hosts[host]
-		if !ok {
-			var dnsErr error
-			ip, dnsErr = d.Resolver.FetchOne(host)
-			if dnsErr != nil {
-				return nil, dnsErr
-			}
-		}
+	ip, resErr := resolveHost(host, d.Hosts, d.Resolver)
+	if resErr != nil {
+		return nil, resErr
 	}
 
 	for _, ipnet := range d.Blacklist {
