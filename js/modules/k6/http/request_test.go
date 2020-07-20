@@ -489,10 +489,13 @@ func TestRequestAndBatch(t *testing.T) {
 
 			_, err := common.RunString(rt, `
 				var res = http.request("GET", "some://example.com", null, { throw: false });
-				throw new Error(res.error);
+				if (res.error.search('unsupported protocol scheme "some"')  == -1) {
+					throw new Error("wront error:"+ res.error);
+				}
+				throw new Error("another error");
 			`)
 			require.Error(t, err)
-			assert.Contains(t, err.Error(), "unsupported protocol scheme")
+			assert.Contains(t, err.Error(), "another error")
 
 			logEntry := hook.LastEntry()
 			if assert.NotNil(t, logEntry) {
