@@ -164,19 +164,19 @@ func TestRampingArrivalRateRunUnplannedVUs(t *testing.T) {
 		},
 		es, runner)
 	defer cancel()
-	var engineOut = make(chan stats.SampleContainer, 1000)
+	engineOut := make(chan stats.SampleContainer, 1000)
 	es.SetInitVUFunc(func(_ context.Context, logger *logrus.Entry) (lib.InitializedVU, error) {
 		cur := atomic.LoadInt64(&count)
 		require.Equal(t, cur, int64(1))
 		time.Sleep(time.Second / 2)
 
 		close(ch)
-		time.Sleep(time.Millisecond * 50)
+		time.Sleep(time.Millisecond * 150)
 
 		cur = atomic.LoadInt64(&count)
 		require.Equal(t, cur, int64(2))
 
-		time.Sleep(time.Millisecond * 50)
+		time.Sleep(time.Millisecond * 150)
 		cur = atomic.LoadInt64(&count)
 		require.Equal(t, cur, int64(2))
 
