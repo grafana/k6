@@ -490,7 +490,7 @@ func TestRequestAndBatch(t *testing.T) {
 			_, err := common.RunString(rt, `
 				var res = http.request("GET", "some://example.com", null, { throw: false });
 				if (res.error.search('unsupported protocol scheme "some"')  == -1) {
-					throw new Error("wront error:"+ res.error);
+					throw new Error("wrong error:" + res.error);
 				}
 				throw new Error("another error");
 			`)
