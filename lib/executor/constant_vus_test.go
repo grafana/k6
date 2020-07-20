@@ -36,7 +36,7 @@ import (
 
 func getTestConstantVUsConfig() ConstantVUsConfig {
 	return ConstantVUsConfig{
-		BaseConfig: BaseConfig{GracefulStop: types.NullDurationFrom(1 * time.Second)},
+		BaseConfig: BaseConfig{GracefulStop: types.NullDurationFrom(100 * time.Millisecond)},
 		VUs:        null.IntFrom(10),
 		Duration:   types.NullDurationFrom(1 * time.Second),
 	}

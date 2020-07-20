@@ -63,7 +63,8 @@ func TestPerVUIterationsRun(t *testing.T) {
 		}),
 	)
 	defer cancel()
-	err = executor.Run(ctx, nil)
+	engineOut := make(chan stats.SampleContainer, 1000)
+	err = executor.Run(ctx, engineOut)
 	require.NoError(t, err)
 
 	var totalIters uint64
@@ -105,7 +106,8 @@ func TestPerVUIterationsRunVariableVU(t *testing.T) {
 		}),
 	)
 	defer cancel()
-	err = executor.Run(ctx, nil)
+	engineOut := make(chan stats.SampleContainer, 1000)
+	err = executor.Run(ctx, engineOut)
 	require.NoError(t, err)
 
 	val, ok := result.Load(slowVUID)
