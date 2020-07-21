@@ -21,8 +21,10 @@
 package csv
 
 import (
+	"compress/gzip"
 	"context"
 	"fmt"
+	"io/ioutil"
 	"sort"
 	"sync"
 	"testing"
@@ -239,62 +241,128 @@ func TestRun(t *testing.T) {
 	wg.Wait()
 }
 
+func readUnCompressedFile(fileName string, fs afero.Fs) string {
+	csvbytes, err := afero.ReadFile(fs, fileName)
+	if err != nil {
+		return err.Error()
+	}
+
+	return fmt.Sprintf("%s", csvbytes)
+}
+
+func readCompressedFile(fileName string, fs afero.Fs) string {
+	file, err := fs.Open(fileName)
+	if err != nil {
+		return err.Error()
+	}
+
+	gzf, err := gzip.NewReader(file)
+	if err != nil {
+		return err.Error()
+	}
+
+	csvbytes, err := ioutil.ReadAll(gzf)
+	if err != nil {
+		return err.Error()
+	}
+
+	return fmt.Sprintf("%s", csvbytes)
+}
+
 func TestRunCollect(t *testing.T) {
-	testSamples := []stats.SampleContainer{
-		stats.Sample{
-			Time:   time.Unix(1562324643, 0),
-			Metric: stats.New("my_metric", stats.Gauge),
-			Value:  1,
-			Tags: stats.NewSampleTags(map[string]string{
-				"tag1": "val1",
-				"tag2": "val2",
-				"tag3": "val3",
-			}),
+	testData := []struct {
+		samples        []stats.SampleContainer
+		fileName       string
+		fileReaderFunc func(fileName string, fs afero.Fs) string
+		outputContent  string
+	}{
+		{
+			samples: []stats.SampleContainer{
+				stats.Sample{
+					Time:   time.Unix(1562324643, 0),
+					Metric: stats.New("my_metric", stats.Gauge),
+					Value:  1,
+					Tags: stats.NewSampleTags(map[string]string{
+						"tag1": "val1",
+						"tag2": "val2",
+						"tag3": "val3",
+					}),
+				},
+				stats.Sample{
+					Time:   time.Unix(1562324644, 0),
+					Metric: stats.New("my_metric", stats.Gauge),
+					Value:  1,
+					Tags: stats.NewSampleTags(map[string]string{
+						"tag1": "val1",
+						"tag2": "val2",
+						"tag3": "val3",
+						"tag4": "val4",
+					}),
+				},
+			},
+			fileName:       "test",
+			fileReaderFunc: readUnCompressedFile,
+			outputContent:  "metric_name,timestamp,metric_value,tag1,tag3,extra_tags\n" + "my_metric,1562324643,1.000000,val1,val3,\n" + "my_metric,1562324644,1.000000,val1,val3,tag4=val4\n",
 		},
-		stats.Sample{
-			Time:   time.Unix(1562324644, 0),
-			Metric: stats.New("my_metric", stats.Gauge),
-			Value:  1,
-			Tags: stats.NewSampleTags(map[string]string{
-				"tag1": "val1",
-				"tag2": "val2",
-				"tag3": "val3",
-				"tag4": "val4",
-			}),
+		{
+			samples: []stats.SampleContainer{
+				stats.Sample{
+					Time:   time.Unix(1562324643, 0),
+					Metric: stats.New("my_metric", stats.Gauge),
+					Value:  1,
+					Tags: stats.NewSampleTags(map[string]string{
+						"tag1": "val1",
+						"tag2": "val2",
+						"tag3": "val3",
+					}),
+				},
+				stats.Sample{
+					Time:   time.Unix(1562324644, 0),
+					Metric: stats.New("my_metric", stats.Gauge),
+					Value:  1,
+					Tags: stats.NewSampleTags(map[string]string{
+						"tag1": "val1",
+						"tag2": "val2",
+						"tag3": "val3",
+						"tag4": "val4",
+					}),
+				},
+			},
+			fileName:       "test.gz",
+			fileReaderFunc: readCompressedFile,
+			outputContent:  "metric_name,timestamp,metric_value,tag1,tag3,extra_tags\n" + "my_metric,1562324643,1.000000,val1,val3,\n" + "my_metric,1562324644,1.000000,val1,val3,tag4=val4\n",
 		},
 	}
 
-	mem := afero.NewMemMapFs()
-	collector, err := New(
-		mem,
-		stats.TagSet{"tag1": true, "tag2": false, "tag3": true},
-		Config{FileName: null.StringFrom("path"), SaveInterval: types.NewNullDuration(time.Duration(1), true)},
-	)
-	assert.NoError(t, err)
-	assert.NotNil(t, collector)
+	for _, data := range testData {
+		mem := afero.NewMemMapFs()
+		collector, err := New(
+			mem,
+			stats.TagSet{"tag1": true, "tag2": false, "tag3": true},
+			Config{FileName: null.StringFrom(data.fileName), SaveInterval: types.NewNullDuration(time.Duration(1), true)},
+		)
+		assert.NoError(t, err)
+		assert.NotNil(t, collector)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		collector.Run(ctx)
-		wg.Done()
-	}()
-	err = collector.Init()
-	assert.NoError(t, err)
-	collector.Collect(testSamples)
-	time.Sleep(1 * time.Second)
-	cancel()
-	wg.Wait()
-	csvbytes, _ := afero.ReadFile(mem, "path")
-	csvstr := fmt.Sprintf("%s", csvbytes)
-	assert.Equal(t,
-		"metric_name,timestamp,metric_value,tag1,tag3,extra_tags\n"+
-			"my_metric,1562324643,1.000000,val1,val3,\n"+
-			"my_metric,1562324644,1.000000,val1,val3,tag4=val4\n",
-		csvstr)
+		ctx, cancel := context.WithCancel(context.Background())
+
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			collector.Run(ctx)
+			wg.Done()
+		}()
+		err = collector.Init()
+
+		assert.NoError(t, err)
+		collector.Collect(data.samples)
+		time.Sleep(1 * time.Second)
+		cancel()
+		wg.Wait()
+
+		assert.Equal(t, data.outputContent, data.fileReaderFunc(data.fileName, mem))
+	}
 }
-
 func TestNew(t *testing.T) {
 	configs := []struct {
 		cfg  Config
@@ -302,6 +370,14 @@ func TestNew(t *testing.T) {
 	}{
 		{
 			cfg: Config{FileName: null.StringFrom("name"), SaveInterval: types.NewNullDuration(time.Duration(1), true)},
+			tags: stats.TagSet{
+				"tag1": true,
+				"tag2": false,
+				"tag3": true,
+			},
+		},
+		{
+			cfg: Config{FileName: null.StringFrom("name.csv.gz"), SaveInterval: types.NewNullDuration(time.Duration(1), true)},
 			tags: stats.TagSet{
 				"tag1": true,
 				"tag2": false,
@@ -326,9 +402,19 @@ func TestNew(t *testing.T) {
 		fname       string
 		resTags     []string
 		ignoredTags []string
+		closeFn     func() error
 	}{
 		{
 			fname: "name",
+			resTags: []string{
+				"tag1", "tag3",
+			},
+			ignoredTags: []string{
+				"tag2",
+			},
+		},
+		{
+			fname: "name.csv.gz",
 			resTags: []string{
 				"tag1", "tag3",
 			},
@@ -365,6 +451,7 @@ func TestNew(t *testing.T) {
 			sort.Strings(expected.ignoredTags)
 			sort.Strings(collector.ignoredTags)
 			assert.Equal(t, expected.ignoredTags, collector.ignoredTags)
+			assert.NoError(t, collector.closeFn())
 		})
 	}
 }
