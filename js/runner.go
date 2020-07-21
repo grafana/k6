@@ -31,7 +31,6 @@ import (
 	"net/http/cookiejar"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/dop251/goja"
