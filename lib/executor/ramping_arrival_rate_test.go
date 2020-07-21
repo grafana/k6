@@ -181,7 +181,7 @@ func TestRampingArrivalRateRunUnplannedVUs(t *testing.T) {
 		require.Equal(t, cur, int64(2))
 
 		close(ch2)
-		time.Sleep(time.Millisecond * 100)
+		time.Sleep(time.Millisecond * 200)
 		cur = atomic.LoadInt64(&count)
 		require.NotEqual(t, cur, int64(2))
 		return runner.NewVU(int64(es.GetUniqueVUIdentifier()), engineOut)
