@@ -257,9 +257,9 @@ func TestVUHandleSimple(t *testing.T) {
 		}()
 		err := vuHandle.start()
 		require.NoError(t, err)
-		time.Sleep(time.Millisecond * 5)
+		time.Sleep(time.Millisecond * 50)
 		vuHandle.gracefulStop()
-		time.Sleep(time.Millisecond * 5)
+		// time.Sleep(time.Millisecond * 5) // No sleep as we want to always not return the VU
 		err = vuHandle.start()
 		require.NoError(t, err)
 		time.Sleep(time.Millisecond * 1500)
