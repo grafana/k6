@@ -181,7 +181,7 @@ func TestRequestAndBatch(t *testing.T) {
 			}
 
 			assert.Equal(t, 10, reqsCount)
-			assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_URL/get"), sr("HTTPBIN_URL/redirect/9"), 200, "")
+			assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_URL/get"), sr("HTTPBIN_URL/get"), 200, "")
 		})
 
 		t.Run("10", func(t *testing.T) {
@@ -628,7 +628,7 @@ func TestRequestAndBatch(t *testing.T) {
 						stats.GetBufferedSamples(samples),
 						"GET",
 						sr("HTTPSBIN_URL/set-cookie-without-redirect"),
-						sr("HTTPBIN_URL/redirect-to?url=HTTPSBIN_URL/set-cookie-without-redirect"),
+						"",
 						200,
 						"",
 					)
@@ -655,7 +655,7 @@ func TestRequestAndBatch(t *testing.T) {
 						stats.GetBufferedSamples(samples),
 						"GET",
 						sr("HTTPSBIN_URL/cookies"),
-						sr("HTTPSBIN_URL/cookies/set?key=value"),
+						"",
 						200,
 						"",
 					)
@@ -702,7 +702,7 @@ func TestRequestAndBatch(t *testing.T) {
 						stats.GetBufferedSamples(samples),
 						"GET",
 						sr("HTTPBIN_IP_URL/get"),
-						sr("HTTPBIN_IP_URL/redirect-to?url=HTTPSBIN_URL/set-cookie-and-redirect"),
+						"",
 						200,
 						"",
 					)
@@ -828,7 +828,8 @@ func TestRequestAndBatch(t *testing.T) {
 			t.Run("digest", func(t *testing.T) {
 				t.Run("success", func(t *testing.T) {
 					url := sr("http://bob:pass@HTTPBIN_IP:HTTPBIN_PORT/digest-auth/auth/bob/pass")
-					urlExpected := sr("http://****:****@HTTPBIN_IP:HTTPBIN_PORT/digest-auth/auth/bob/pass")
+					urlMasked := sr("http://****:****@HTTPBIN_IP:HTTPBIN_PORT/digest-auth/auth/bob/pass")
+					urlRaw := sr("HTTPBIN_IP_URL/digest-auth/auth/bob/pass")
 
 					_, err := common.RunString(rt, fmt.Sprintf(`
 					var res = http.request("GET", "%s", null, { auth: "digest" });
@@ -839,9 +840,9 @@ func TestRequestAndBatch(t *testing.T) {
 
 					sampleContainers := stats.GetBufferedSamples(samples)
 					assertRequestMetricsEmitted(t, sampleContainers[0:1], "GET",
-						sr("HTTPBIN_IP_URL/digest-auth/auth/bob/pass"), urlExpected, 401, "")
+						urlMasked, "", 401, "")
 					assertRequestMetricsEmitted(t, sampleContainers[1:2], "GET",
-						sr("HTTPBIN_IP_URL/digest-auth/auth/bob/pass"), urlExpected, 200, "")
+						urlRaw, "", 200, "")
 				})
 				t.Run("failure", func(t *testing.T) {
 					url := sr("http://bob:pass@HTTPBIN_IP:HTTPBIN_PORT/digest-auth/failure")
@@ -1912,12 +1913,12 @@ func TestDigestAuthWithBody(t *testing.T) {
 	`, urlWithCreds))
 	require.NoError(t, err)
 
-	expectedURL := tb.Replacer.Replace(
-		"http://HTTPBIN_IP:HTTPBIN_PORT/digest-auth-with-post/auth/testuser/testpwd")
-	expectedName := tb.Replacer.Replace(
+	urlMasked := tb.Replacer.Replace(
 		"http://****:****@HTTPBIN_IP:HTTPBIN_PORT/digest-auth-with-post/auth/testuser/testpwd")
+	urlRaw := tb.Replacer.Replace(
+		"http://HTTPBIN_IP:HTTPBIN_PORT/digest-auth-with-post/auth/testuser/testpwd")
 
 	sampleContainers := stats.GetBufferedSamples(samples)
-	assertRequestMetricsEmitted(t, sampleContainers[0:1], "POST", expectedURL, expectedName, 401, "")
-	assertRequestMetricsEmitted(t, sampleContainers[1:2], "POST", expectedURL, expectedName, 200, "")
+	assertRequestMetricsEmitted(t, sampleContainers[0:1], "POST", urlMasked, "", 401, "")
+	assertRequestMetricsEmitted(t, sampleContainers[1:2], "POST", urlRaw, "", 200, "")
 }

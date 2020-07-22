@@ -232,19 +232,9 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 	}
 
 	tags := state.CloneTags()
+	// Override any global tags with request-specific ones.
 	for k, v := range preq.Tags {
 		tags[k] = v
-	}
-	if state.Options.SystemTags.Has(stats.TagMethod) {
-		tags["method"] = preq.Req.Method
-	}
-	if state.Options.SystemTags.Has(stats.TagURL) {
-		tags["url"] = preq.URL.Clean()
-	}
-
-	// Only set the name system tag if the user didn't explicitly set it beforehand
-	if _, ok := tags["name"]; !ok && state.Options.SystemTags.Has(stats.TagName) {
-		tags["name"] = preq.URL.Name
 	}
 
 	// Check rate limit *after* we've prepared a request; no need to wait with that part.
@@ -254,7 +244,7 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 		}
 	}
 
-	tracerTransport := newTransport(ctx, state, tags)
+	tracerTransport := newTransport(ctx, state, tags, preq.URL)
 	var transport http.RoundTripper = tracerTransport
 
 	if state.Options.HTTPDebug.String != "" {

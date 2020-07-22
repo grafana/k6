@@ -42,6 +42,11 @@ type transport struct {
 
 	lastRequest     *unfinishedRequest
 	lastRequestLock *sync.Mutex
+	// Number of processed requests. It will be >1 when processing
+	// redirects, digest auth, etc.
+	numProcReqs uint16
+	// Original parsed URL, required for tagging purposes.
+	origURL *URL
 }
 
 // unfinishedRequest stores the request and the raw result returned from the
@@ -76,12 +81,14 @@ func newTransport(
 	ctx context.Context,
 	state *lib.State,
 	tags map[string]string,
+	origURL *URL,
 ) *transport {
 	return &transport{
 		ctx:             ctx,
 		state:           state,
 		tags:            tags,
 		lastRequestLock: new(sync.Mutex),
+		origURL:         origURL,
 	}
 }
 
@@ -115,9 +122,28 @@ func (t *transport) measureAndEmitMetrics(unfReq *unfinishedRequest) *finishedRe
 			tags["status"] = "0"
 		}
 	} else {
+		cleanURL := URL{u: unfReq.request.URL, URL: unfReq.request.URL.String()}.Clean()
 		if enabledTags.Has(stats.TagURL) {
-			u := URL{u: unfReq.request.URL, URL: unfReq.request.URL.String()}
-			tags["url"] = u.Clean()
+			// Tag the first request with the original clean URL and
+			// subsequent ones (e.g. part of a redirect chain or digest auth)
+			// with the updated clean URL.
+			if t.origURL != nil && t.numProcReqs == 1 {
+				tags["url"] = t.origURL.Clean()
+			} else {
+				tags["url"] = cleanURL
+			}
+		}
+
+		// Only override the name tag if not specified by the user.
+		if _, ok := tags["name"]; !ok && enabledTags.Has(stats.TagName) {
+			if t.origURL != nil && t.numProcReqs == 1 {
+				tags["name"] = t.origURL.Name
+			} else {
+				tags["name"] = cleanURL
+			}
+		}
+		if enabledTags.Has(stats.TagMethod) {
+			tags["method"] = unfReq.request.Method
 		}
 		if enabledTags.Has(stats.TagStatus) {
 			tags["status"] = strconv.Itoa(unfReq.response.StatusCode)
@@ -203,6 +229,8 @@ func (t *transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		response: resp,
 		err:      err,
 	})
+
+	t.numProcReqs++
 
 	return resp, err
 }
