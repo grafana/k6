@@ -244,7 +244,7 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 		}
 	}
 
-	tracerTransport := newTransport(ctx, state, tags, preq.URL)
+	tracerTransport := newTransport(ctx, state, tags, preq.URL.Name)
 	var transport http.RoundTripper = tracerTransport
 
 	if state.Options.HTTPDebug.String != "" {

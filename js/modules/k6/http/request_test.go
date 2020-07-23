@@ -840,7 +840,7 @@ func TestRequestAndBatch(t *testing.T) {
 
 					sampleContainers := stats.GetBufferedSamples(samples)
 					assertRequestMetricsEmitted(t, sampleContainers[0:1], "GET",
-						urlMasked, "", 401, "")
+						urlRaw, urlMasked, 401, "")
 					assertRequestMetricsEmitted(t, sampleContainers[1:2], "GET",
 						urlRaw, "", 200, "")
 				})
@@ -1919,6 +1919,6 @@ func TestDigestAuthWithBody(t *testing.T) {
 		"http://HTTPBIN_IP:HTTPBIN_PORT/digest-auth-with-post/auth/testuser/testpwd")
 
 	sampleContainers := stats.GetBufferedSamples(samples)
-	assertRequestMetricsEmitted(t, sampleContainers[0:1], "POST", urlMasked, "", 401, "")
+	assertRequestMetricsEmitted(t, sampleContainers[0:1], "POST", urlRaw, urlMasked, 401, "")
 	assertRequestMetricsEmitted(t, sampleContainers[1:2], "POST", urlRaw, "", 200, "")
 }

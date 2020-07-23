@@ -42,11 +42,7 @@ type transport struct {
 
 	lastRequest     *unfinishedRequest
 	lastRequestLock *sync.Mutex
-	// Number of processed requests. It will be >1 when processing
-	// redirects, digest auth, etc.
-	numProcReqs uint16
-	// Original parsed URL, required for tagging purposes.
-	origURL *URL
+	origURLName     string
 }
 
 // unfinishedRequest stores the request and the raw result returned from the
@@ -81,14 +77,14 @@ func newTransport(
 	ctx context.Context,
 	state *lib.State,
 	tags map[string]string,
-	origURL *URL,
+	origURLName string,
 ) *transport {
 	return &transport{
 		ctx:             ctx,
 		state:           state,
 		tags:            tags,
 		lastRequestLock: new(sync.Mutex),
-		origURL:         origURL,
+		origURLName:     origURLName,
 	}
 }
 
@@ -124,24 +120,22 @@ func (t *transport) measureAndEmitMetrics(unfReq *unfinishedRequest) *finishedRe
 	} else {
 		cleanURL := URL{u: unfReq.request.URL, URL: unfReq.request.URL.String()}.Clean()
 		if enabledTags.Has(stats.TagURL) {
-			// Tag the first request with the original clean URL and
-			// subsequent ones (e.g. part of a redirect chain or digest auth)
-			// with the updated clean URL.
-			if t.origURL != nil && t.numProcReqs == 1 {
-				tags["url"] = t.origURL.Clean()
-			} else {
-				tags["url"] = cleanURL
-			}
+			tags["url"] = cleanURL
 		}
 
-		// Only override the name tag if not specified by the user.
 		if _, ok := tags["name"]; !ok && enabledTags.Has(stats.TagName) {
-			if t.origURL != nil && t.numProcReqs == 1 {
-				tags["name"] = t.origURL.Name
+			// If a name tag is already set in the script, use it for all requests
+			// processed by this transport. Otherwise, use the original URL name
+			// to preserve any escaped query string arguments, but only for the
+			// first request in the chain.
+			if t.origURLName != "" {
+				tags["name"] = t.origURLName
+				t.origURLName = ""
 			} else {
 				tags["name"] = cleanURL
 			}
 		}
+
 		if enabledTags.Has(stats.TagMethod) {
 			tags["method"] = unfReq.request.Method
 		}
@@ -229,8 +223,6 @@ func (t *transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		response: resp,
 		err:      err,
 	})
-
-	t.numProcReqs++
 
 	return resp, err
 }
