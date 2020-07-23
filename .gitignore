@@ -10,6 +10,7 @@ test.debug
 
 .vscode
 *.sublime-workspace
+*.log
 .idea
 .vagrant
 
