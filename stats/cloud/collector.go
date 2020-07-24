@@ -527,6 +527,15 @@ type pushJob struct {
 	samples []*Sample
 }
 
+// ceil(a/b)
+func ceilDiv(a, b int) int {
+	r := a / b
+	if a%b != 0 {
+		r++
+	}
+	return r
+}
+
 func (c *Collector) pushMetrics() {
 	c.bufferMutex.Lock()
 	if len(c.bufferSamples) == 0 {
@@ -543,7 +552,7 @@ func (c *Collector) pushMetrics() {
 	}).Debug("Pushing metrics to cloud")
 	start := time.Now()
 
-	numberOfPackages := len(buffer) % int(c.config.MaxMetricSamplesPerPackage.Int64)
+	numberOfPackages := ceilDiv(len(buffer), int(c.config.MaxMetricSamplesPerPackage.Int64))
 	numberOfWorkers := int(c.config.MetricPushParallel.Int64)
 	if numberOfWorkers > numberOfPackages {
 		numberOfWorkers = numberOfPackages
