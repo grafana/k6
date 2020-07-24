@@ -22,6 +22,7 @@ package cloud
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net/url"
 	"testing"
 	"time"
@@ -112,6 +113,22 @@ func BenchmarkMetricMarshal(b *testing.B) {
 				r, err := easyjson.Marshal(samples(s))
 				require.NoError(b, err)
 				b.SetBytes(int64(len(r)))
+			}
+		})
+	}
+}
+
+func BenchmarkMetricMarshalWriter(b *testing.B) {
+	for _, count := range []int{10000, 100000, 500000} {
+		count := count
+		b.Run(fmt.Sprintf("%d", count), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				b.StopTimer()
+				s := generateSamples(count)
+				b.StartTimer()
+				n, err := easyjson.MarshalToWriter(samples(s), ioutil.Discard)
+				require.NoError(b, err)
+				b.SetBytes(int64(n))
 			}
 		})
 	}
