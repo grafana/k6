@@ -42,7 +42,6 @@ type transport struct {
 
 	lastRequest     *unfinishedRequest
 	lastRequestLock *sync.Mutex
-	origURLName     string
 }
 
 // unfinishedRequest stores the request and the raw result returned from the
@@ -77,14 +76,12 @@ func newTransport(
 	ctx context.Context,
 	state *lib.State,
 	tags map[string]string,
-	origURLName string,
 ) *transport {
 	return &transport{
 		ctx:             ctx,
 		state:           state,
 		tags:            tags,
 		lastRequestLock: new(sync.Mutex),
-		origURLName:     origURLName,
 	}
 }
 
@@ -124,16 +121,7 @@ func (t *transport) measureAndEmitMetrics(unfReq *unfinishedRequest) *finishedRe
 		}
 
 		if _, ok := tags["name"]; !ok && enabledTags.Has(stats.TagName) {
-			// If a name tag is already set in the script, use it for all requests
-			// processed by this transport. Otherwise, use the original URL name
-			// to preserve any escaped query string arguments, but only for the
-			// first request in the chain.
-			if t.origURLName != "" {
-				tags["name"] = t.origURLName
-				t.origURLName = ""
-			} else {
-				tags["name"] = cleanURL
-			}
+			tags["name"] = cleanURL
 		}
 
 		if enabledTags.Has(stats.TagMethod) {

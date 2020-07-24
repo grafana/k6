@@ -237,6 +237,13 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 		tags[k] = v
 	}
 
+	// Only set the name system tag if the user didn't explicitly set it beforehand,
+	// and the Name was generated from a tagged template string (via http.url).
+	if _, ok := tags["name"]; !ok && state.Options.SystemTags.Has(stats.TagName) &&
+		preq.URL.Name != preq.URL.CleanURL {
+		tags["name"] = preq.URL.Name
+	}
+
 	// Check rate limit *after* we've prepared a request; no need to wait with that part.
 	if rpsLimit := state.RPSLimit; rpsLimit != nil {
 		if err := rpsLimit.Wait(ctx); err != nil {
@@ -244,7 +251,7 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 		}
 	}
 
-	tracerTransport := newTransport(ctx, state, tags, preq.URL.Name)
+	tracerTransport := newTransport(ctx, state, tags)
 	var transport http.RoundTripper = tracerTransport
 
 	if state.Options.HTTPDebug.String != "" {
