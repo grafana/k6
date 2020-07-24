@@ -553,7 +553,7 @@ func (c *Collector) pushMetrics() {
 	start := time.Now()
 
 	numberOfPackages := ceilDiv(len(buffer), int(c.config.MaxMetricSamplesPerPackage.Int64))
-	numberOfWorkers := int(c.config.MetricPushParallel.Int64)
+	numberOfWorkers := int(c.config.MetricPushConcurrency.Int64)
 	if numberOfWorkers > numberOfPackages {
 		numberOfWorkers = numberOfPackages
 	}
