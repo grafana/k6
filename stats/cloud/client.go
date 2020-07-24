@@ -93,17 +93,17 @@ func (c *Client) NewRequest(method, url string, data interface{}) (*http.Request
 }
 
 func (c *Client) Do(req *http.Request, v interface{}) error {
-	var originalBody []byte
-	var err error
-
 	if req.Body != nil {
-		originalBody, err = ioutil.ReadAll(req.Body)
+		originalBody, err := ioutil.ReadAll(req.Body)
 		if err != nil {
 			return err
 		}
+		if err = req.Body.Close(); err != nil {
+			return err
+		}
 
-		if cerr := req.Body.Close(); cerr != nil {
-			err = cerr
+		req.GetBody = func() (io.ReadCloser, error) {
+			return ioutil.NopCloser(bytes.NewReader(originalBody)), nil
 		}
 	}
 
@@ -111,10 +111,9 @@ func (c *Client) Do(req *http.Request, v interface{}) error {
 	c.prepareHeaders(req)
 
 	for i := 1; i <= c.retries; i++ {
-		if len(originalBody) > 0 {
-			req.Body = ioutil.NopCloser(bytes.NewBuffer(originalBody))
+		if req.GetBody != nil {
+			req.Body, _ = req.GetBody()
 		}
-
 		retry, err := c.do(req, v, i)
 
 		if retry {
@@ -125,7 +124,7 @@ func (c *Client) Do(req *http.Request, v interface{}) error {
 		return err
 	}
 
-	return err
+	return nil
 }
 
 func (c *Client) prepareHeaders(req *http.Request) {

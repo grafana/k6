@@ -26,7 +26,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"mime/multipart"
 	"net/http"
@@ -139,17 +138,12 @@ func (c *Client) PushMetric(referenceID string, noCompress bool, samples []*Samp
 			"content_length": buf.Len(),
 		}
 
-		req.GetBody = func() (io.ReadCloser, error) {
-			return ioutil.NopCloser(bytes.NewReader(buf.Bytes())), nil
-		}
+		req.Body = ioutil.NopCloser(buf)
 	} else {
 		req.Header.Set("Content-Length", strconv.Itoa(len(b)))
-
-		req.GetBody = func() (io.ReadCloser, error) {
-			return ioutil.NopCloser(bytes.NewReader(b)), nil
-		}
+		req.Body = ioutil.NopCloser(bytes.NewReader(b))
 	}
-	req.Body, _ = req.GetBody() // it isn't done automatically by the stdlib
+
 	err = c.Do(req, nil)
 
 	logrus.WithFields(logrus.Fields{
