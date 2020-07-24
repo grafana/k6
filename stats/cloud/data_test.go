@@ -27,6 +27,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mailru/easyjson"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/loadimpact/k6/lib/metrics"
@@ -89,7 +90,7 @@ func TestSampleMarshaling(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		sJSON, err := json.Marshal(tc.s)
+		sJSON, err := easyjson.Marshal(tc.s)
 		if !assert.NoError(t, err) {
 			continue
 		}
@@ -102,7 +103,7 @@ func TestSampleMarshaling(t *testing.T) {
 		assert.Equal(t, tc.s.Metric, newS.Metric)
 		assert.IsType(t, tc.s.Data, newS.Data)
 		// Cannot directly compare tc.s.Data and newS.Data (because of internal time.Time and SampleTags fields)
-		newJSON, err := json.Marshal(newS)
+		newJSON, err := easyjson.Marshal(newS)
 		assert.NoError(t, err)
 		assert.JSONEq(t, string(sJSON), string(newJSON))
 	}

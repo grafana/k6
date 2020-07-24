@@ -66,6 +66,8 @@ github.com/inconshreveable/mousetrap v1.0.0 h1:Z8tu5sraLXCXIcARxBp/8cbvlwVa7Z1NH
 github.com/inconshreveable/mousetrap v1.0.0/go.mod h1:PxqpIevigyE2G7u3NXJIT2ANytuPF1OarO4DADm73n8=
 github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc h1:KpMgaYJRieDkHZJWY3LMafvtqS/U8xX6+lUN+OKpl/Y=
 github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc/go.mod h1:qj24IKcXYK6Iy9ceXlo3Tc+vtHo9lIhSX5JddghvEPo=
+github.com/josharian/intern v1.0.0 h1:vlS4z54oSdjm0bgjRigI+G1HpF+tI+9rE5LLzOg8HmY=
+github.com/josharian/intern v1.0.0/go.mod h1:5DoeVV0s6jJacbCEi61lwdGj/aVlrQvzHFFd8Hwg//Y=
 github.com/julienschmidt/httprouter v1.1.1-0.20180222160526-d18983907793 h1:C70cJzQWvJh+6Rw8q2Qngi8J8uc1BC6FqJneu0f2pr8=
 github.com/julienschmidt/httprouter v1.1.1-0.20180222160526-d18983907793/go.mod h1:SYymIcj16QtmaHHD7aYtjjsJG7VTCxuUUipMqKk8s4w=
 github.com/kardianos/osext v0.0.0-20170510131534-ae77be60afb1 h1:PJPDf8OUfOK1bb/NeTKd4f1QXZItOX389VN3B6qC8ro=
@@ -84,6 +86,8 @@ github.com/labstack/echo v3.2.6+incompatible h1:28U/uXFFKBIP+VQIqq641LuYhMS7Br9Z
 github.com/labstack/echo v3.2.6+incompatible/go.mod h1:0INS7j/VjnFxD4E2wkz67b8cVwCLbBmJyDaka6Cmk1s=
 github.com/labstack/gommon v0.2.2-0.20170925052817-57409ada9da0 h1:7AIW1qc9sYYTZLamTsRKSmVvJDXkZZrIWXHDK4Gq4X0=
 github.com/labstack/gommon v0.2.2-0.20170925052817-57409ada9da0/go.mod h1:/tj9csK2iPSBvn+3NLM9e52usepMtrd5ilFYA+wQNJ4=
+github.com/mailru/easyjson v0.7.4-0.20200812114229-8ab5ff9cd8e4 h1:O+6Lz+j8x3wl6w4uwwNs62EFM0MfLSkRAqI9LUNlcq0=
+github.com/mailru/easyjson v0.7.4-0.20200812114229-8ab5ff9cd8e4/go.mod h1:xzfreul335JAWq5oZzymOObrkdz5UnU4kGfJJLY9Nlc=
 github.com/manyminds/api2go v0.0.0-20180125085803-95be7bd0455e h1:Jg9dDZCJYqtv9GHQ34yDBFgEJLl4Hi4VEkKUyzHXCV8=
 github.com/manyminds/api2go v0.0.0-20180125085803-95be7bd0455e/go.mod h1:Z60vy0EZVSu0bOugCHdcN5ZxFMKSpjRgsnh0XKPFqqk=
 github.com/mattn/go-colorable v0.0.9 h1:UVL0vNpWh04HeJXV0KLcaT7r06gOH2l4OW6ddYRUIY4=

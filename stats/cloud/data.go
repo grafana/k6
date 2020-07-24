@@ -39,11 +39,14 @@ const (
 	DataTypeAggregatedHTTPReqs = "AggregatedPoints"
 )
 
+//go:generate easyjson -pkg -no_std_marshalers .
+
 func toMicroSecond(t time.Time) int64 {
 	return t.UnixNano() / 1000
 }
 
 // Sample is the generic struct that contains all types of data that we send to the cloud.
+//easyjson:json
 type Sample struct {
 	Type   string      `json:"type"`
 	Metric string      `json:"metric"`
@@ -85,6 +88,7 @@ func (ct *Sample) UnmarshalJSON(p []byte) error {
 }
 
 // SampleDataSingle is used in all simple un-aggregated single-value samples.
+//easyjson:json
 type SampleDataSingle struct {
 	Time  int64             `json:"time,string"`
 	Type  stats.MetricType  `json:"type"`
@@ -95,6 +99,7 @@ type SampleDataSingle struct {
 // SampleDataMap is used by samples that contain multiple values, currently
 // that's only iteration metrics (`iter_li_all`) and unaggregated HTTP
 // requests (`http_req_li_all`).
+//easyjson:json
 type SampleDataMap struct {
 	Time   int64              `json:"time,string"`
 	Type   stats.MetricType   `json:"type"`
@@ -127,6 +132,7 @@ func NewSampleFromTrail(trail *httpext.Trail) *Sample {
 }
 
 // SampleDataAggregatedHTTPReqs is used in aggregated samples for HTTP requests.
+//easyjson:json
 type SampleDataAggregatedHTTPReqs struct {
 	Time   int64             `json:"time,string"`
 	Type   string            `json:"type"`
@@ -315,3 +321,6 @@ func (d durations) SelectGetNormalBounds(radius, iqrLowerCoef, iqrUpperCoef floa
 	max = q3 + time.Duration(iqrUpperCoef*iqr)
 	return
 }
+
+//easyjson:json
+type samples []*Sample
