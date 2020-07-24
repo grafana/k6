@@ -98,21 +98,21 @@ func getSampleChecker(t *testing.T, expSamples <-chan []Sample) http.HandlerFunc
 				receivedData, ok := receivedSample.Data.(*SampleDataSingle)
 				assert.True(t, ok)
 				assert.True(t, expData.Tags.IsEqual(receivedData.Tags))
-				assert.True(t, expData.Time.Equal(receivedData.Time))
+				assert.Equal(t, expData.Time, receivedData.Time)
 				assert.Equal(t, expData.Type, receivedData.Type)
 				assert.Equal(t, expData.Value, receivedData.Value)
 			case *SampleDataMap:
 				receivedData, ok := receivedSample.Data.(*SampleDataMap)
 				assert.True(t, ok)
 				assert.True(t, tagEqual(expData.Tags, receivedData.Tags))
-				assert.True(t, expData.Time.Equal(receivedData.Time))
+				assert.Equal(t, expData.Time, receivedData.Time)
 				assert.Equal(t, expData.Type, receivedData.Type)
 				assert.Equal(t, expData.Values, receivedData.Values)
 			case *SampleDataAggregatedHTTPReqs:
 				receivedData, ok := receivedSample.Data.(*SampleDataAggregatedHTTPReqs)
 				assert.True(t, ok)
 				assert.True(t, expData.Tags.IsEqual(receivedData.Tags))
-				assert.True(t, expData.Time.Equal(receivedData.Time))
+				assert.Equal(t, expData.Time, receivedData.Time)
 				assert.Equal(t, expData.Type, receivedData.Type)
 				assert.Equal(t, expData.Values, receivedData.Values)
 			default:
@@ -237,7 +237,7 @@ func runCloudCollectorTestCase(t *testing.T, minSamples int) {
 		Metric: metrics.VUs.Name,
 		Data: &SampleDataSingle{
 			Type:  metrics.VUs.Type,
-			Time:  Timestamp(now),
+			Time:  toMicroSecond(now),
 			Tags:  tags,
 			Value: 1.0,
 		},
@@ -293,7 +293,7 @@ func runCloudCollectorTestCase(t *testing.T, minSamples int) {
 				assert.True(t, aggrData.Tags.IsEqual(expectedTags))
 				assert.Equal(t, collector.config.AggregationMinSamples.Int64, int64(aggrData.Count))
 				assert.Equal(t, "aggregated_trend", aggrData.Type)
-				assert.InDelta(t, now.UnixNano(), time.Time(aggrData.Time).UnixNano(), float64(collector.config.AggregationPeriod.Duration))
+				assert.InDelta(t, now.UnixNano(), aggrData.Time*1000, float64(collector.config.AggregationPeriod.Duration))
 
 				checkAggrMetric(simpleTrail.Duration, aggrData.Values.Duration)
 				checkAggrMetric(simpleTrail.Blocked, aggrData.Values.Blocked)

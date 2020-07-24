@@ -102,7 +102,7 @@ func TestPublishMetric(t *testing.T) {
 			Metric: "metric",
 			Data: &SampleDataSingle{
 				Type:  1,
-				Time:  Timestamp(time.Now()),
+				Time:  toMicroSecond(time.Now()),
 				Value: 1.2,
 			},
 		},

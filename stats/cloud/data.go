@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"math"
 	"sort"
-	"strconv"
 	"time"
 
 	"github.com/loadimpact/k6/lib/metrics"
@@ -33,36 +32,15 @@ import (
 	"github.com/loadimpact/k6/stats"
 )
 
-const DataTypeSingle = "Point"
-const DataTypeMap = "Points"
-const DataTypeAggregatedHTTPReqs = "AggregatedPoints"
+//noling:golint
+const (
+	DataTypeSingle             = "Point"
+	DataTypeMap                = "Points"
+	DataTypeAggregatedHTTPReqs = "AggregatedPoints"
+)
 
-// Timestamp is used for sending times encoded as microsecond UNIX timestamps to the cloud servers
-type Timestamp time.Time
-
-// Equal will return true if the difference between the timestamps is less than 1 microsecond
-func (ct Timestamp) Equal(other Timestamp) bool {
-	diff := time.Time(ct).Sub(time.Time(other))
-	return diff > -time.Microsecond && diff < time.Microsecond
-}
-
-// MarshalJSON encodes the microsecond UNIX timestamps as strings because JavaScripts doesn't have actual integers and tends to round big numbers
-func (ct Timestamp) MarshalJSON() ([]byte, error) {
-	return []byte(`"` + strconv.FormatInt(time.Time(ct).UnixNano()/1000, 10) + `"`), nil
-}
-
-// UnmarshalJSON decodes the string-enclosed microsecond timestamp back into the proper time.Time alias
-func (ct *Timestamp) UnmarshalJSON(p []byte) error {
-	var s string
-	if err := json.Unmarshal(p, &s); err != nil {
-		return err
-	}
-	microSecs, err := strconv.ParseInt(s, 10, 64)
-	if err != nil {
-		return err
-	}
-	*ct = Timestamp(time.Unix(microSecs/1000000, (microSecs%1000000)*1000))
-	return nil
+func toMicroSecond(t time.Time) int64 {
+	return t.UnixNano() / 1000
 }
 
 // Sample is the generic struct that contains all types of data that we send to the cloud.
@@ -108,7 +86,7 @@ func (ct *Sample) UnmarshalJSON(p []byte) error {
 
 // SampleDataSingle is used in all simple un-aggregated single-value samples.
 type SampleDataSingle struct {
-	Time  Timestamp         `json:"time"`
+	Time  int64             `json:"time,string"`
 	Type  stats.MetricType  `json:"type"`
 	Tags  *stats.SampleTags `json:"tags,omitempty"`
 	Value float64           `json:"value"`
@@ -118,7 +96,7 @@ type SampleDataSingle struct {
 // that's only iteration metrics (`iter_li_all`) and unaggregated HTTP
 // requests (`http_req_li_all`).
 type SampleDataMap struct {
-	Time   Timestamp          `json:"time"`
+	Time   int64              `json:"time,string"`
 	Type   stats.MetricType   `json:"type"`
 	Tags   *stats.SampleTags  `json:"tags,omitempty"`
 	Values map[string]float64 `json:"values,omitempty"`
@@ -131,7 +109,7 @@ func NewSampleFromTrail(trail *httpext.Trail) *Sample {
 		Type:   DataTypeMap,
 		Metric: "http_req_li_all",
 		Data: &SampleDataMap{
-			Time: Timestamp(trail.GetTime()),
+			Time: toMicroSecond(trail.GetTime()),
 			Tags: trail.GetTags(),
 			Values: map[string]float64{
 				metrics.HTTPReqs.Name:        1,
@@ -150,7 +128,7 @@ func NewSampleFromTrail(trail *httpext.Trail) *Sample {
 
 // SampleDataAggregatedHTTPReqs is used in aggregated samples for HTTP requests.
 type SampleDataAggregatedHTTPReqs struct {
-	Time   Timestamp         `json:"time"`
+	Time   int64             `json:"time,string"`
 	Type   string            `json:"type"`
 	Count  uint64            `json:"count"`
 	Tags   *stats.SampleTags `json:"tags,omitempty"`
