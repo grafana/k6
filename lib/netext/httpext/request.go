@@ -74,19 +74,17 @@ func (u URL) Clean() string {
 		return u.CleanURL
 	}
 
-	out := u.URL
-
-	if u.u != nil && u.u.User != nil {
-		schemeIndex := strings.Index(out, "://")
-		atIndex := strings.Index(out, "@")
-		if _, passwordOk := u.u.User.Password(); passwordOk {
-			out = out[:schemeIndex+3] + "****:****" + out[atIndex:]
-		} else {
-			out = out[:schemeIndex+3] + "****" + out[atIndex:]
-		}
+	if u.u == nil || u.u.User == nil {
+		return u.URL
 	}
 
-	return out
+	if password, passwordOk := u.u.User.Password(); passwordOk {
+		// here 3 is for the '://' and 4 is because of '://' and ':' between the credentials
+		return u.URL[:len(u.u.Scheme)+3] + "****:****" + u.URL[len(u.u.Scheme)+4+len(u.u.User.Username())+len(password):]
+	}
+
+	// here 3 in both places is for the '://'
+	return u.URL[:len(u.u.Scheme)+3] + "****" + u.URL[len(u.u.Scheme)+3+len(u.u.User.Username()):]
 }
 
 // GetURL returns the internal url.URL
