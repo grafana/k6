@@ -45,6 +45,7 @@ const (
 	ResultStatusPassed ResultStatus = 0
 	ResultStatusFailed ResultStatus = 1
 )
+const expectedGzipRatio = 6 // based on test it is around 6.8, but we don't need to be that accurate
 
 type ThresholdResult map[string]map[string]bool
 
@@ -117,11 +118,10 @@ func (c *Client) PushMetric(referenceID string, noCompress bool, s []*Sample) er
 	if !noCompress {
 		buf := bytes.NewBuffer(nil) // use pool
 		unzippedSize := len(b)
-		//nolint:gomnd
-		buf.Grow(unzippedSize / 5) // probably much smaller
+		buf.Grow(unzippedSize / expectedGzipRatio)
 		gzipStart := time.Now()
 		{
-			g := gzip.NewWriter(buf)
+			g, _ := gzip.NewWriterLevel(buf, gzip.BestSpeed)
 			if _, err = g.Write(b); err != nil {
 				return err
 			}
