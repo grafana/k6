@@ -139,6 +139,11 @@ func New(
 			conf.MetricPushConcurrency.Int64)
 	}
 
+	if !(conf.MaxMetricSamplesPerPackage.Int64 > 0) {
+		return nil, errors.Errorf("metric samples per package must be a possive number but is %d",
+			conf.MaxMetricSamplesPerPackage.Int64)
+	}
+
 	return &Collector{
 		config:               conf,
 		thresholds:           thresholds,
