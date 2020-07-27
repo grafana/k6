@@ -134,6 +134,11 @@ func New(
 		conf.Token = conf.DeprecatedToken
 	}
 
+	if !(conf.MetricPushConcurrency.Int64 > 0) {
+		return nil, errors.Errorf("metrics push concurency must be a possive number but is %d",
+			conf.MetricPushConcurrency.Int64)
+	}
+
 	return &Collector{
 		config:               conf,
 		thresholds:           thresholds,
