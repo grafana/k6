@@ -134,6 +134,16 @@ func New(
 		conf.Token = conf.DeprecatedToken
 	}
 
+	if !(conf.MetricPushConcurrency.Int64 > 0) {
+		return nil, errors.Errorf("metrics push concurrency must be a positive number but is %d",
+			conf.MetricPushConcurrency.Int64)
+	}
+
+	if !(conf.MaxMetricSamplesPerPackage.Int64 > 0) {
+		return nil, errors.Errorf("metric samples per package must be a positive number but is %d",
+			conf.MaxMetricSamplesPerPackage.Int64)
+	}
+
 	return &Collector{
 		config:               conf,
 		thresholds:           thresholds,
@@ -406,6 +416,7 @@ func (c *Collector) aggregateHTTPTrails(waitPeriod time.Duration) {
 
 		for _, subBucket := range subBuckets {
 			for tags, httpTrails := range subBucket {
+				// start := time.Now() // this is in a combination with the log at the end
 				trailCount := int64(len(httpTrails))
 				if trailCount < c.config.AggregationMinSamples.Int64 {
 					for _, trail := range httpTrails {
@@ -461,9 +472,13 @@ func (c *Collector) aggregateHTTPTrails(waitPeriod time.Duration) {
 				aggrData.CalcAverages()
 
 				if aggrData.Count > 0 {
-					logrus.WithFields(logrus.Fields{
-						"http_samples": aggrData.Count,
-					}).Debug("Aggregated HTTP metrics")
+					/*
+						logrus.WithFields(logrus.Fields{
+							"http_samples": aggrData.Count,
+							"ratio":        fmt.Sprintf("%.2f", float64(aggrData.Count)/float64(trailCount)),
+							"t":            time.Since(start),
+						}).Debug("Aggregated HTTP metrics")
+					//*/
 					newSamples = append(newSamples, &Sample{
 						Type:   DataTypeAggregatedHTTPReqs,
 						Metric: "http_req_li_all",
@@ -517,6 +532,20 @@ func (c *Collector) shouldStopSendingMetrics(err error) bool {
 	return false
 }
 
+type pushJob struct {
+	done    chan error
+	samples []*Sample
+}
+
+// ceil(a/b)
+func ceilDiv(a, b int) int {
+	r := a / b
+	if a%b != 0 {
+		r++
+	}
+	return r
+}
+
 func (c *Collector) pushMetrics() {
 	c.bufferMutex.Lock()
 	if len(c.bufferSamples) == 0 {
@@ -527,16 +556,48 @@ func (c *Collector) pushMetrics() {
 	c.bufferSamples = nil
 	c.bufferMutex.Unlock()
 
+	count := len(buffer)
 	logrus.WithFields(logrus.Fields{
-		"samples": len(buffer),
+		"samples": count,
 	}).Debug("Pushing metrics to cloud")
+	start := time.Now()
+
+	numberOfPackages := ceilDiv(len(buffer), int(c.config.MaxMetricSamplesPerPackage.Int64))
+	numberOfWorkers := int(c.config.MetricPushConcurrency.Int64)
+	if numberOfWorkers > numberOfPackages {
+		numberOfWorkers = numberOfPackages
+	}
+
+	ch := make(chan pushJob, numberOfPackages)
+	for i := 0; i < numberOfWorkers; i++ {
+		go func() {
+			for job := range ch {
+				err := c.client.PushMetric(c.referenceID, c.config.NoCompress.Bool, job.samples)
+				job.done <- err
+				if c.shouldStopSendingMetrics(err) {
+					return
+				}
+			}
+		}()
+	}
+
+	jobs := make([]pushJob, 0, numberOfPackages)
 
 	for len(buffer) > 0 {
 		size := len(buffer)
 		if size > int(c.config.MaxMetricSamplesPerPackage.Int64) {
 			size = int(c.config.MaxMetricSamplesPerPackage.Int64)
 		}
-		err := c.client.PushMetric(c.referenceID, c.config.NoCompress.Bool, buffer[:size])
+		job := pushJob{done: make(chan error, 1), samples: buffer[:size]}
+		ch <- job
+		jobs = append(jobs, job)
+		buffer = buffer[size:]
+	}
+
+	close(ch)
+
+	for _, job := range jobs {
+		err := <-job.done
 		if err != nil {
 			if c.shouldStopSendingMetrics(err) {
 				logrus.WithError(err).Warn("Stopped sending metrics to cloud due to an error")
@@ -545,8 +606,11 @@ func (c *Collector) pushMetrics() {
 			}
 			logrus.WithError(err).Warn("Failed to send metrics to cloud")
 		}
-		buffer = buffer[size:]
 	}
+	logrus.WithFields(logrus.Fields{
+		"samples": count,
+		"t":       time.Since(start),
+	}).Debug("Pushing metrics to cloud finished")
 }
 
 func (c *Collector) testFinished() {
