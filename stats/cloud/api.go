@@ -116,7 +116,9 @@ func (c *Client) PushMetric(referenceID string, noCompress bool, s []*Sample) er
 	var additionalFields logrus.Fields
 
 	if !noCompress {
-		buf := bytes.NewBuffer(nil) // use pool
+		buf := c.pushBufferPool.Get().(*bytes.Buffer)
+		buf.Reset()
+		defer c.pushBufferPool.Put(buf)
 		unzippedSize := len(b)
 		buf.Grow(unzippedSize / expectedGzipRatio)
 		gzipStart := time.Now()
