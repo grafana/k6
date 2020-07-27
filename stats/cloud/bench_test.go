@@ -168,6 +168,67 @@ func BenchmarkMetricMarshalGzip(b *testing.B) {
 	}
 }
 
+func BenchmarkMetricMarshalGzipAll(b *testing.B) {
+	for _, count := range []int{10000, 100000, 500000} {
+		for name, level := range map[string]int{
+			"bestspeed": gzip.BestSpeed,
+		} {
+			count := count
+			level := level
+			b.Run(fmt.Sprintf("%d_%s", count, name), func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					b.StopTimer()
+
+					s := generateSamples(count)
+					var buf bytes.Buffer
+					g, err := gzip.NewWriterLevel(&buf, level)
+					require.NoError(b, err)
+					b.StartTimer()
+
+					r, err := easyjson.Marshal(samples(s))
+					require.NoError(b, err)
+					buf.Grow(len(r) / 5)
+					n, err := g.Write(r)
+					require.NoError(b, err)
+					b.SetBytes(int64(n))
+				}
+			})
+		}
+	}
+}
+
+func BenchmarkMetricMarshalGzipAllWriter(b *testing.B) {
+	for _, count := range []int{10000, 100000, 500000} {
+		for name, level := range map[string]int{
+			"bestspeed": gzip.BestSpeed,
+		} {
+			count := count
+			level := level
+			b.Run(fmt.Sprintf("%d_%s", count, name), func(b *testing.B) {
+				var buf bytes.Buffer
+				for i := 0; i < b.N; i++ {
+					b.StopTimer()
+					buf.Reset()
+
+					s := generateSamples(count)
+					g, err := gzip.NewWriterLevel(&buf, level)
+					require.NoError(b, err)
+					pr, pw := io.Pipe()
+					b.StartTimer()
+
+					go func() {
+						_, _ = easyjson.MarshalToWriter(samples(s), pw)
+						_ = pw.Close()
+					}()
+					n, err := io.Copy(g, pr)
+					require.NoError(b, err)
+					b.SetBytes(n)
+				}
+			})
+		}
+	}
+}
+
 func generateSamples(count int) []*Sample {
 	samples := make([]*Sample, count)
 	now := time.Now()
