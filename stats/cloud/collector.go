@@ -135,12 +135,12 @@ func New(
 	}
 
 	if !(conf.MetricPushConcurrency.Int64 > 0) {
-		return nil, errors.Errorf("metrics push concurency must be a possive number but is %d",
+		return nil, errors.Errorf("metrics push concurrency must be a positive number but is %d",
 			conf.MetricPushConcurrency.Int64)
 	}
 
 	if !(conf.MaxMetricSamplesPerPackage.Int64 > 0) {
-		return nil, errors.Errorf("metric samples per package must be a possive number but is %d",
+		return nil, errors.Errorf("metric samples per package must be a positive number but is %d",
 			conf.MaxMetricSamplesPerPackage.Int64)
 	}
 
