@@ -147,7 +147,7 @@ func (d *Dialer) dialAddr(addr string) (string, error) {
 		return "", err
 	}
 
-	// lookup for domain defined in Hosts option before trying to resolve DNS.
+	// lookup for full address defined in Hosts option before trying to resolve DNS.
 	remote, ok := d.Hosts[addr]
 	if !ok {
 		remote, err = d.fetchHostAddress(host, port)
@@ -174,16 +174,19 @@ func (d *Dialer) dialAddr(addr string) (string, error) {
 }
 
 func (d *Dialer) fetchHostAddress(host, port string) (*lib.HostAddress, error) {
+	// lookup for host defined in Hosts option.
 	remote := d.Hosts[host]
 	if remote != nil {
 		return remote, nil
 	}
-	ip, err := d.Resolver.FetchOne(host)
-	if err != nil {
-		return nil, err
-	}
+
+	ip := net.ParseIP(host)
 	if ip == nil {
-		ip = net.ParseIP(host)
+		var err error
+		ip, err = d.Resolver.FetchOne(host)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if ip == nil {
 		return nil, errors.Errorf("lookup %s: no such host", host)
