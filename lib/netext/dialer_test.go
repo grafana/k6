@@ -25,7 +25,7 @@ import (
 	"testing"
 
 	"github.com/loadimpact/k6/lib"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type testResolver struct {
@@ -47,48 +47,47 @@ func TestDialerAddr(t *testing.T) {
 	}
 
 	ipNet, err := lib.ParseCIDR("8.9.10.0/24")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	ipV6Net, err := lib.ParseCIDR("::1/24")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	dialer.Blacklist = []*lib.IPNet{ipNet, ipV6Net}
 
-	addr, err := dialer.dialAddr("example-resolver.com:80")
-	assert.NoError(t, err)
-	assert.Equal(t, "1.2.3.4:80", addr)
+	testCases := []struct {
+		address, expAddress, expErr string
+	}{
+		// IPv4
+		{"example-resolver.com:80", "1.2.3.4:80", ""},
+		{"example.com:80", "3.4.5.6:80", ""},
+		{"example.com:443", "3.4.5.6:8443", ""},
+		{"example.com:8080", "3.4.5.6:9090", ""},
+		{"1.2.3.4:80", "1.2.3.4:80", ""},
+		{"1.2.3.4", "", "address 1.2.3.4: missing port in address"},
+		{"example-deny-resolver.com:80", "", "IP (8.9.10.11) is in a blacklisted range (8.9.10.0/24)"},
+		{"example-deny-host.com:80", "", "IP (8.9.10.11) is in a blacklisted range (8.9.10.0/24)"},
+		{"no-such-host.com:80", "", "lookup no-such-host.com: no such host"},
 
-	addr, err = dialer.dialAddr("example.com:80")
-	assert.NoError(t, err)
-	assert.Equal(t, "3.4.5.6:80", addr)
+		// IPv6
+		{"example-ipv6.com:443", "[2001:db8::68]:8443", ""},
+		{"[2001:db8:aaaa:1::100]:443", "[2001:db8:aaaa:1::100]:443", ""},
+		{"[::1.2.3.4]", "", "address [::1.2.3.4]: missing port in address"},
+		{"example-ipv6-deny-resolver.com:80", "", "IP (::1) is in a blacklisted range (::/24)"},
+		{"example-ipv6-deny-host.com:80", "", "IP (::1) is in a blacklisted range (::/24)"},
+	}
 
-	addr, err = dialer.dialAddr("example.com:443")
-	assert.NoError(t, err)
-	assert.Equal(t, "3.4.5.6:8443", addr)
-
-	addr, err = dialer.dialAddr("example.com:8080")
-	assert.NoError(t, err)
-	assert.Equal(t, "3.4.5.6:9090", addr)
-
-	addr, err = dialer.dialAddr("example-ipv6.com:80")
-	assert.NoError(t, err)
-	assert.Equal(t, "[2001:db8::68]:80", addr)
-
-	addr, err = dialer.dialAddr("example-ipv6.com:443")
-	assert.NoError(t, err)
-	assert.Equal(t, "[2001:db8::68]:8443", addr)
-
-	_, err = dialer.dialAddr("example-deny-resolver.com:80")
-	assert.EqualError(t, err, "IP (8.9.10.11) is in a blacklisted range (8.9.10.0/24)")
-
-	_, err = dialer.dialAddr("example-deny-host.com:80")
-	assert.EqualError(t, err, "IP (8.9.10.11) is in a blacklisted range (8.9.10.0/24)")
-
-	_, err = dialer.dialAddr("example-ipv6-deny-resolver.com:80")
-	assert.EqualError(t, err, "IP (::1) is in a blacklisted range (::/24)")
-
-	_, err = dialer.dialAddr("example-ipv6-deny-host.com:80")
-	assert.EqualError(t, err, "IP (::1) is in a blacklisted range (::/24)")
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.address, func(t *testing.T) {
+			addr, err := dialer.dialAddr(tc.address)
+			if tc.expErr != "" {
+				require.EqualError(t, err, tc.expErr)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tc.expAddress, addr)
+		})
+	}
 }
 
 func newResolver() testResolver {

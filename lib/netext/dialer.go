@@ -27,6 +27,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/viki-org/dnscache"
 
 	"github.com/loadimpact/k6/lib"
@@ -181,6 +182,13 @@ func (d *Dialer) fetchHostAddress(host, port string) (*lib.HostAddress, error) {
 	if err != nil {
 		return nil, err
 	}
+	if ip == nil {
+		ip = net.ParseIP(host)
+	}
+	if ip == nil {
+		return nil, errors.Errorf("lookup %s: no such host", host)
+	}
+
 	return lib.NewHostAddress(ip, port)
 }
 
