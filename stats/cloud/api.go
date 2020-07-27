@@ -26,6 +26,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"mime/multipart"
 	"net/http"
@@ -128,9 +129,9 @@ func (c *Client) PushMetric(referenceID string, noCompress bool, samples []*Samp
 			}
 		}
 		gzipTime := time.Since(gzipStart)
+
 		req.Header.Set("Content-Encoding", "gzip")
 		req.Header.Set("X-Payload-Byte-Count", strconv.Itoa(unzippedSize))
-		req.Header.Set("Content-Length", strconv.Itoa(buf.Len()))
 
 		additionalFields = logrus.Fields{
 			"unzipped_size":  unzippedSize,
@@ -138,10 +139,13 @@ func (c *Client) PushMetric(referenceID string, noCompress bool, samples []*Samp
 			"content_length": buf.Len(),
 		}
 
-		req.Body = ioutil.NopCloser(buf)
-	} else {
-		req.Header.Set("Content-Length", strconv.Itoa(len(b)))
-		req.Body = ioutil.NopCloser(bytes.NewReader(b))
+		b = buf.Bytes()
+	}
+
+	req.Header.Set("Content-Length", strconv.Itoa(len(b)))
+	req.Body = ioutil.NopCloser(bytes.NewReader(b))
+	req.GetBody = func() (io.ReadCloser, error) {
+		return ioutil.NopCloser(bytes.NewReader(b)), nil
 	}
 
 	err = c.Do(req, nil)

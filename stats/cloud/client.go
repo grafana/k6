@@ -93,7 +93,7 @@ func (c *Client) NewRequest(method, url string, data interface{}) (*http.Request
 }
 
 func (c *Client) Do(req *http.Request, v interface{}) error {
-	if req.Body != nil {
+	if req.Body != nil && req.GetBody == nil {
 		originalBody, err := ioutil.ReadAll(req.Body)
 		if err != nil {
 			return err
@@ -105,19 +105,20 @@ func (c *Client) Do(req *http.Request, v interface{}) error {
 		req.GetBody = func() (io.ReadCloser, error) {
 			return ioutil.NopCloser(bytes.NewReader(originalBody)), nil
 		}
+		req.Body, _ = req.GetBody()
 	}
 
 	// TODO(cuonglm): finding away to move this back to NewRequest
 	c.prepareHeaders(req)
 
 	for i := 1; i <= c.retries; i++ {
-		if req.GetBody != nil {
-			req.Body, _ = req.GetBody()
-		}
 		retry, err := c.do(req, v, i)
 
 		if retry {
 			time.Sleep(c.retryInterval)
+			if req.GetBody != nil {
+				req.Body, _ = req.GetBody()
+			}
 			continue
 		}
 
