@@ -97,7 +97,9 @@ func getIterationRunner(
 		default:
 			if err != nil {
 				if s, ok := err.(fmt.Stringer); ok {
-					logger.Error(s.String())
+					// TODO better detection for stack traces
+					// TODO don't count this as a full iteration?
+					logger.WithField("source", "stacktrace").Error(s.String())
 				} else {
 					logger.Error(err.Error())
 				}
