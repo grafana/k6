@@ -31,17 +31,17 @@ import (
 
 // console represents a JS console implemented as a logrus.Logger.
 type console struct {
-	Logger *logrus.Logger
+	logger logrus.FieldLogger
 }
 
 // Creates a console with the standard logrus logger.
 func newConsole() *console {
-	return &console{logrus.StandardLogger()}
+	return &console{logrus.StandardLogger().WithField("source", "console")}
 }
 
 // Creates a console logger with its output set to the file at the provided `filepath`.
 func newFileConsole(filepath string) (*console, error) {
-	f, err := os.OpenFile(filepath, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
+	f, err := os.OpenFile(filepath, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644) //nolint:gosec
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +49,7 @@ func newFileConsole(filepath string) (*console, error) {
 	l := logrus.New()
 	l.SetOutput(f)
 
-	//TODO: refactor to not rely on global variables, albeit external ones
+	// TODO: refactor to not rely on global variables, albeit external ones
 	l.SetFormatter(logrus.StandardLogger().Formatter)
 
 	return &console{l}, nil
@@ -64,13 +64,16 @@ func (c console) log(ctx *context.Context, level logrus.Level, msgobj goja.Value
 		}
 	}
 
-	fields := make(logrus.Fields)
+	// TODO this is not how it works anywhere else
+	// nodejs: https://nodejs.org/api/console.html#console_console_info_data_args
+	// mdn: https://developer.mozilla.org/en-US/docs/Web/API/Console/log
+	fields := make(logrus.Fields, len(args)+1)
 	for i, arg := range args {
 		fields[strconv.Itoa(i)] = arg.String()
 	}
 	msg := msgobj.ToString()
-	e := c.Logger.WithFields(fields)
-	switch level {
+	e := c.logger.WithFields(fields)
+	switch level { //nolint:exhaustive
 	case logrus.DebugLevel:
 		e.Debug(msg)
 	case logrus.InfoLevel:
