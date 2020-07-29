@@ -70,6 +70,7 @@ func TestConsoleContext(t *testing.T) {
 		assert.Equal(t, "b", entry.Message)
 	}
 }
+
 func getSimpleRunner(filename, data string, opts ...interface{}) (*Runner, error) {
 	var (
 		fs     = afero.NewMemMapFs()
@@ -93,6 +94,16 @@ func getSimpleRunner(filename, data string, opts ...interface{}) (*Runner, error
 	)
 }
 
+func extractLogger(fl logrus.FieldLogger) *logrus.Logger {
+	switch e := fl.(type) {
+	case *logrus.Entry:
+		return e.Logger
+	case *logrus.Logger:
+		return e
+	}
+	return nil
+}
+
 func TestConsole(t *testing.T) {
 	levels := map[string]logrus.Level{
 		"log":   logrus.InfoLevel,
@@ -105,10 +116,10 @@ func TestConsole(t *testing.T) {
 		Message string
 		Data    logrus.Fields
 	}{
-		`"string"`:         {Message: "string"},
-		`"string","a","b"`: {Message: "string", Data: logrus.Fields{"0": "a", "1": "b"}},
-		`"string",1,2`:     {Message: "string", Data: logrus.Fields{"0": "1", "1": "2"}},
-		`{}`:               {Message: "[object Object]"},
+		`"string"`:         {Message: "string", Data: logrus.Fields{"source": "console"}},
+		`"string","a","b"`: {Message: "string", Data: logrus.Fields{"0": "a", "1": "b", "source": "console"}},
+		`"string",1,2`:     {Message: "string", Data: logrus.Fields{"0": "1", "1": "2", "source": "console"}},
+		`{}`:               {Message: "[object Object]", Data: logrus.Fields{"source": "console"}},
 	}
 	for name, level := range levels {
 		name, level := name, level
@@ -130,10 +141,11 @@ func TestConsole(t *testing.T) {
 					defer cancel()
 					vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 
-					logger, hook := logtest.NewNullLogger()
+					logger := extractLogger(vu.(*ActiveVU).Console.logger)
+
+					logger.Out = ioutil.Discard
 					logger.Level = logrus.DebugLevel
-					jsVU := vu.(*ActiveVU)
-					jsVU.Console.Logger = logger
+					hook := logtest.NewLocal(logger)
 
 					err = vu.RunOnce()
 					assert.NoError(t, err)
@@ -168,10 +180,10 @@ func TestFileConsole(t *testing.T) {
 			Message string
 			Data    logrus.Fields
 		}{
-			`"string"`:         {Message: "string"},
+			`"string"`:         {Message: "string", Data: logrus.Fields{}},
 			`"string","a","b"`: {Message: "string", Data: logrus.Fields{"0": "a", "1": "b"}},
 			`"string",1,2`:     {Message: "string", Data: logrus.Fields{"0": "1", "1": "2"}},
-			`{}`:               {Message: "[object Object]"},
+			`{}`:               {Message: "[object Object]", Data: logrus.Fields{}},
 		}
 		preExisting = map[string]bool{
 			"log exists":        false,
@@ -186,11 +198,11 @@ func TestFileConsole(t *testing.T) {
 					// whether the file is existed before logging
 					for msg, deleteFile := range preExisting {
 						t.Run(msg, func(t *testing.T) {
-							var f, err = ioutil.TempFile("", "")
+							f, err := ioutil.TempFile("", "")
 							if err != nil {
 								t.Fatalf("Couldn't create temporary file for testing: %s", err)
 							}
-							var logFilename = f.Name()
+							logFilename := f.Name()
 							defer os.Remove(logFilename)
 							// close it as we will want to reopen it and maybe remove it
 							if deleteFile {
@@ -200,8 +212,8 @@ func TestFileConsole(t *testing.T) {
 								}
 							} else {
 								// TODO: handle case where the string was no written in full ?
-								_, err := f.WriteString(preExistingText)
-								f.Close()
+								_, err = f.WriteString(preExistingText)
+								_ = f.Close()
 								if err != nil {
 									t.Fatalf("Error while writing text to preexisting logfile: %s", err)
 								}
@@ -226,9 +238,10 @@ func TestFileConsole(t *testing.T) {
 							ctx, cancel := context.WithCancel(context.Background())
 							defer cancel()
 							vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
-							jsVU := vu.(*ActiveVU)
-							jsVU.Console.Logger.Level = logrus.DebugLevel
-							hook := logtest.NewLocal(jsVU.Console.Logger)
+							logger := extractLogger(vu.(*ActiveVU).Console.logger)
+
+							logger.Level = logrus.DebugLevel
+							hook := logtest.NewLocal(logger)
 
 							err = vu.RunOnce()
 							assert.NoError(t, err)
@@ -259,13 +272,12 @@ func TestFileConsole(t *testing.T) {
 								fileContent, err := ioutil.ReadAll(f)
 								assert.NoError(t, err)
 
-								var expectedStr = entryStr
+								expectedStr := entryStr
 								if !deleteFile {
 									expectedStr = preExistingText + expectedStr
 								}
 								assert.Equal(t, expectedStr, string(fileContent))
 							}
-
 						})
 					}
 				})
