@@ -261,6 +261,7 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 		transport = httpDebugTransport{
 			originalTransport: transport,
 			httpDebugOption:   state.Options.HTTPDebug.String,
+			logger:            state.Logger.WithField("source", "http-debug"),
 		}
 	}
 
