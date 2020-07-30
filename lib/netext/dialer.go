@@ -142,35 +142,9 @@ func (d *Dialer) GetTrail(
 }
 
 func (d *Dialer) dialAddr(addr string) (string, error) {
-	host, port, err := net.SplitHostPort(addr)
+	remote, err := d.findRemote(addr)
 	if err != nil {
 		return "", err
-	}
-
-	// lookup for full address defined in Hosts option before trying to resolve DNS.
-	remote, ok := d.Hosts[addr]
-	if !ok {
-		// lookup for host defined in Hosts option before trying to resolve DNS.
-		remote, ok = d.Hosts[host]
-	}
-
-	if !ok {
-		ip := net.ParseIP(host)
-
-		if ip == nil {
-			ip, err = d.Resolver.FetchOne(host)
-			if err != nil {
-				return "", err
-			}
-		}
-		if ip == nil {
-			return "", errors.Errorf("lookup %s: no such host", host)
-		}
-
-		remote, err = lib.NewHostAddress(ip, port)
-		if err != nil {
-			return "", err
-		}
 	}
 
 	for _, ipnet := range d.Blacklist {
@@ -179,15 +153,52 @@ func (d *Dialer) dialAddr(addr string) (string, error) {
 		}
 	}
 
-	if remote.Port == 0 && port != "" {
+	return remote.String(), nil
+}
+
+func (d *Dialer) findRemote(addr string) (*lib.HostAddress, error) {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return nil, err
+	}
+
+	remote, err := d.preloadRemote(addr, host, port)
+	if err != nil || remote != nil {
+		return remote, err
+	}
+
+	ip := net.ParseIP(host)
+
+	if ip == nil {
+		ip, err = d.Resolver.FetchOne(host)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if ip == nil {
+		return nil, errors.Errorf("lookup %s: no such host", host)
+	}
+
+	return lib.NewHostAddress(ip, port)
+}
+
+func (d *Dialer) preloadRemote(addr, host, port string) (*lib.HostAddress, error) {
+	// lookup for full address defined in Hosts option before trying to resolve DNS.
+	remote := d.Hosts[addr]
+	if remote == nil {
+		// lookup for host defined in Hosts option before trying to resolve DNS.
+		remote = d.Hosts[host]
+	}
+
+	if remote != nil && remote.Port == 0 && port != "" {
 		var err error
 		remote, err = lib.NewHostAddress(remote.IP, port)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 	}
 
-	return remote.String(), nil
+	return remote, nil
 }
 
 // NetTrail contains information about the exchanged data size and length of a
