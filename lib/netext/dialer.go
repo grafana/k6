@@ -150,7 +150,24 @@ func (d *Dialer) dialAddr(addr string) (string, error) {
 	// lookup for full address defined in Hosts option before trying to resolve DNS.
 	remote, ok := d.Hosts[addr]
 	if !ok {
-		remote, err = d.fetchHostAddress(host, port)
+		// lookup for host defined in Hosts option before trying to resolve DNS.
+		remote, ok = d.Hosts[host]
+	}
+
+	if !ok {
+		ip := net.ParseIP(host)
+
+		if ip == nil {
+			ip, err = d.Resolver.FetchOne(host)
+			if err != nil {
+				return "", err
+			}
+		}
+		if ip == nil {
+			return "", errors.Errorf("lookup %s: no such host", host)
+		}
+
+		remote, err = lib.NewHostAddress(ip, port)
 		if err != nil {
 			return "", err
 		}
@@ -171,28 +188,6 @@ func (d *Dialer) dialAddr(addr string) (string, error) {
 	}
 
 	return remote.String(), nil
-}
-
-func (d *Dialer) fetchHostAddress(host, port string) (*lib.HostAddress, error) {
-	// lookup for host defined in Hosts option.
-	remote := d.Hosts[host]
-	if remote != nil {
-		return remote, nil
-	}
-
-	ip := net.ParseIP(host)
-	if ip == nil {
-		var err error
-		ip, err = d.Resolver.FetchOne(host)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if ip == nil {
-		return nil, errors.Errorf("lookup %s: no such host", host)
-	}
-
-	return lib.NewHostAddress(ip, port)
 }
 
 // NetTrail contains information about the exchanged data size and length of a
