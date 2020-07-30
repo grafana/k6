@@ -21,11 +21,14 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"io"
-	"log"
+	"io/ioutil"
+	stdlog "log"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/fatih/color"
@@ -36,6 +39,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/loadimpact/k6/lib/consts"
+	"github.com/loadimpact/k6/log"
 )
 
 var BannerColor = color.New(color.FgCyan)
@@ -58,13 +62,15 @@ var defaultConfigFilePath = defaultConfigFileName // Updated with the user's con
 //nolint:gochecknoglobals
 var configFilePath = os.Getenv("K6_CONFIG") // Overridden by `-c`/`--config` flag!
 
+//nolint:gochecknoglobals
 var (
-	//TODO: have environment variables for configuring these? hopefully after we move away from global vars though...
-	verbose bool
-	quiet   bool
-	noColor bool
-	logFmt  string
-	address string
+	// TODO: have environment variables for configuring these? hopefully after we move away from global vars though...
+	verbose   bool
+	quiet     bool
+	noColor   bool
+	logOutput string
+	logFmt    string
+	address   string
 )
 
 // RootCmd represents the base command when called without any subcommands.
@@ -74,8 +80,13 @@ var RootCmd = &cobra.Command{
 	Long:          BannerColor.Sprintf("\n%s", consts.Banner),
 	SilenceUsage:  true,
 	SilenceErrors: true,
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		setupLoggers(logFmt)
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		logger := logrus.StandardLogger() // don't use the global one to begin with
+		err := setupLoggers(logger, logFmt, logOutput)
+		if err != nil {
+			return err
+		}
+
 		if noColor {
 			// TODO: figure out something else... currently, with the wrappers
 			// below, we're stripping any colors from the output after we've
@@ -92,8 +103,9 @@ var RootCmd = &cobra.Command{
 			stdout.Writer = colorable.NewNonColorable(os.Stdout)
 			stderr.Writer = colorable.NewNonColorable(os.Stderr)
 		}
-		log.SetOutput(logrus.StandardLogger().Writer())
-		logrus.Debugf("k6 version: v%s", consts.FullVersion())
+		stdlog.SetOutput(logger.Writer())
+		logger.Debugf("k6 version: v%s", consts.FullVersion())
+		return nil
 	},
 }
 
@@ -116,14 +128,16 @@ func Execute() {
 
 func rootCmdPersistentFlagSet() *pflag.FlagSet {
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
-	//TODO: figure out a better way to handle the CLI flags - global variables are not very testable... :/
+	// TODO: figure out a better way to handle the CLI flags - global variables are not very testable... :/
 	flags.BoolVarP(&verbose, "verbose", "v", false, "enable debug logging")
 	flags.BoolVarP(&quiet, "quiet", "q", false, "disable progress updates")
 	flags.BoolVar(&noColor, "no-color", false, "disable colored output")
+	flags.StringVar(&logOutput, "log-output", "stderr",
+		"change output to which logs go, possible values are stderr,stdout,none,loki[=host:port]")
 	flags.StringVar(&logFmt, "logformat", "", "log output format")
 	flags.StringVarP(&address, "address", "a", "localhost:6565", "address for the api server")
 
-	//TODO: Fix... This default value needed, so both CLI flags and environment variables work
+	// TODO: Fix... This default value needed, so both CLI flags and environment variables work
 	flags.StringVarP(&configFilePath, "config", "c", configFilePath, "JSON config file")
 	// And we also need to explicitly set the default value for the usage message here, so things
 	// like `K6_CONFIG="blah" k6 run -h` don't produce a weird usage message
@@ -157,7 +171,7 @@ func fprintf(w io.Writer, format string, a ...interface{}) (n int) {
 	return n
 }
 
-// RawFormatter it does nothing with the message just prints it
+// RawFormater it does nothing with the message just prints it
 type RawFormater struct{}
 
 // Format renders a single log entry
@@ -165,22 +179,41 @@ func (f RawFormater) Format(entry *logrus.Entry) ([]byte, error) {
 	return append([]byte(entry.Message), '\n'), nil
 }
 
-func setupLoggers(logFmt string) {
+func setupLoggers(logger *logrus.Logger, logFmt string, logOutput string) error {
 	if verbose {
-		logrus.SetLevel(logrus.DebugLevel)
+		logger.SetLevel(logrus.DebugLevel)
 	}
-	logrus.SetOutput(stderr)
+	switch logOutput {
+	case "stderr":
+		logger.SetOutput(stderr)
+	case "stdout":
+		logger.SetOutput(stdout)
+	case "none":
+		logger.SetOutput(ioutil.Discard)
+	default:
+		if !strings.HasPrefix(logOutput, "loki") {
+			return fmt.Errorf("unsupported log output `%s`", logOutput)
+		}
+		hook, err := log.LokiFromConfigLine(context.Background(), logOutput) // TODO use some context that we can cancel
+		if err != nil {
+			return err
+		}
+		logger.AddHook(hook)
+		logger.SetOutput(ioutil.Discard) // don't output to anywhere else
+		logFmt = "raw"
+		noColor = true // disable color
+	}
 
 	switch logFmt {
 	case "raw":
-		logrus.SetFormatter(&RawFormater{})
-		logrus.Debug("Logger format: RAW")
+		logger.SetFormatter(&RawFormater{})
+		logger.Debug("Logger format: RAW")
 	case "json":
-		logrus.SetFormatter(&logrus.JSONFormatter{})
-		logrus.Debug("Logger format: JSON")
+		logger.SetFormatter(&logrus.JSONFormatter{})
+		logger.Debug("Logger format: JSON")
 	default:
-		logrus.SetFormatter(&logrus.TextFormatter{ForceColors: stderrTTY, DisableColors: noColor})
-		logrus.Debug("Logger format: TEXT")
+		logger.SetFormatter(&logrus.TextFormatter{ForceColors: stderrTTY, DisableColors: noColor})
+		logger.Debug("Logger format: TEXT")
 	}
-
+	return nil
 }
