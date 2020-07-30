@@ -21,7 +21,6 @@
 package lib
 
 import (
-	"bytes"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -239,15 +238,11 @@ func (h *HostAddress) UnmarshalText(text []byte) error {
 }
 
 func splitHostPort(text []byte) (net.IP, string, error) {
-	host := string(text)
-	var port string
-
-	if isHostPort(text) {
-		var err error
-		host, port, err = net.SplitHostPort(host)
-		if err != nil {
-			return nil, "", err
-		}
+	host, port, err := net.SplitHostPort(string(text))
+	if err != nil {
+		// This error means that there is no port.
+		// Make host the full text.
+		host = string(text)
 	}
 
 	ip := net.ParseIP(host)
@@ -256,12 +251,6 @@ func splitHostPort(text []byte) (net.IP, string, error) {
 	}
 
 	return ip, port, nil
-}
-
-func isHostPort(text []byte) bool {
-	return bytes.ContainsRune(text, ':') &&
-		(bytes.ContainsRune(text, '.') || // ipV4
-			(bytes.ContainsRune(text, '[') && bytes.ContainsRune(text, ']'))) // ipV6
 }
 
 // ParseCIDR creates an IPNet out of a CIDR string
