@@ -171,11 +171,11 @@ func fprintf(w io.Writer, format string, a ...interface{}) (n int) {
 	return n
 }
 
-// RawFormater it does nothing with the message just prints it
-type RawFormater struct{}
+// RawFormatter it does nothing with the message just prints it
+type RawFormatter struct{}
 
 // Format renders a single log entry
-func (f RawFormater) Format(entry *logrus.Entry) ([]byte, error) {
+func (f RawFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	return append([]byte(entry.Message), '\n'), nil
 }
 
@@ -206,7 +206,7 @@ func setupLoggers(logger *logrus.Logger, logFmt string, logOutput string) error 
 
 	switch logFmt {
 	case "raw":
-		logger.SetFormatter(&RawFormater{})
+		logger.SetFormatter(&RawFormatter{})
 		logger.Debug("Logger format: RAW")
 	case "json":
 		logger.SetFormatter(&logrus.JSONFormatter{})
