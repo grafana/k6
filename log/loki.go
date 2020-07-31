@@ -41,6 +41,7 @@ type lokiHook struct {
 	labels     [][2]string
 	ch         chan *logrus.Entry
 	limit      int
+	msgMaxSize int
 	levels     []logrus.Level
 	pushPeriod time.Duration
 	client     *http.Client
@@ -57,6 +58,7 @@ func LokiFromConfigLine(ctx context.Context, line string) (logrus.Hook, error) {
 		levels:     logrus.AllLevels,
 		pushPeriod: time.Second * 1,
 		ctx:        ctx,
+		msgMaxSize: 1024 * 1024, // 1mb
 	}
 	if line == "loki" {
 		return h, nil
@@ -98,6 +100,11 @@ func LokiFromConfigLine(ctx context.Context, line string) (logrus.Hook, error) {
 			h.limit, err = strconv.Atoi(value)
 			if err != nil {
 				return nil, fmt.Errorf("couldn't parse the loki limit as a number %w", err)
+			}
+		case "msgMaxSize":
+			h.msgMaxSize, err = strconv.Atoi(value)
+			if err != nil {
+				return nil, fmt.Errorf("couldn't parse the loki msgMaxSize as a number %w", err)
 			}
 		case "level":
 			h.levels, err = getLevels(value)
@@ -282,6 +289,7 @@ func sortAndSplitMsgs(msgs []tmpMsg, bufferTime time.Duration) int {
 
 func (h *lokiHook) createPushMessage(msgs []tmpMsg, cutOffIndex, dropped int) *lokiPushMessage {
 	strms := new(lokiPushMessage)
+	strms.msgMaxSize = h.msgMaxSize
 	for _, msg := range msgs[:cutOffIndex] {
 		strms.add(msg)
 	}
@@ -396,7 +404,8 @@ func (h *lokiHook) Levels() []logrus.Level {
 }
 */
 type lokiPushMessage struct {
-	Streams []*stream `json:"streams"`
+	Streams    []*stream `json:"streams"`
+	msgMaxSize int
 }
 
 func (strms *lokiPushMessage) WriteTo(w io.Writer) (n int64, err error) {
@@ -437,6 +446,15 @@ func (strms *lokiPushMessage) WriteTo(w io.Writer) (n int64, err error) {
 			strconv.AppendInt(nanoseconds[:0], v.t, 10)
 			write(nanoseconds[:])
 			write([]byte(`",`))
+			if len([]rune(v.msg)) > strms.msgMaxSize {
+				difference := int64(len(v.msg) - strms.msgMaxSize)
+				omitMsg := append(strconv.AppendInt([]byte("... omitting "), difference, 10), " characters ..."...)
+				v.msg = strings.Join([]string{
+					string([]rune(v.msg)[:strms.msgMaxSize/2]),
+					string([]rune(v.msg)[len([]rune(v.msg))-strms.msgMaxSize/2:]),
+				}, string(omitMsg))
+			}
+
 			var b []byte
 			b, err = json.Marshal(v.msg)
 			if err != nil {

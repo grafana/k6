@@ -45,10 +45,11 @@ func TestSyslogFromConfigLine(t *testing.T) {
 				limit:      100,
 				pushPeriod: time.Second * 1,
 				levels:     logrus.AllLevels,
+				msgMaxSize: 1024 * 1024,
 			},
 		},
 		{
-			line: "loki=somewhere:1233,label.something=else,label.foo=bar,limit=32,level=debug,pushPeriod=5m32s",
+			line: "loki=somewhere:1233,label.something=else,label.foo=bar,limit=32,level=debug,pushPeriod=5m32s,msgMaxSize=1231",
 			res: lokiHook{
 				ctx:        context.Background(),
 				addr:       "somewhere:1233",
@@ -56,6 +57,7 @@ func TestSyslogFromConfigLine(t *testing.T) {
 				pushPeriod: time.Minute*5 + time.Second*32,
 				levels:     []logrus.Level{logrus.DebugLevel, logrus.InfoLevel, logrus.WarnLevel, logrus.ErrorLevel},
 				labels:     [][2]string{{"something", "else"}, {"foo", "bar"}},
+				msgMaxSize: 1231,
 			},
 		},
 		{
