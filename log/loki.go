@@ -59,6 +59,7 @@ func LokiFromConfigLine(ctx context.Context, line string) (logrus.Hook, error) {
 		pushPeriod: time.Second * 1,
 		ctx:        ctx,
 		msgMaxSize: 1024 * 1024, // 1mb
+		ch:         make(chan *logrus.Entry, 1000),
 	}
 	if line == "loki" {
 		return h, nil
@@ -124,7 +125,7 @@ func LokiFromConfigLine(ctx context.Context, line string) (logrus.Hook, error) {
 
 	h.client = &http.Client{Timeout: h.pushPeriod}
 
-	h.start()
+	go h.loop()
 	return h, nil
 }
 
@@ -138,11 +139,6 @@ func getLevels(level string) ([]logrus.Level, error) {
 		return logrus.AllLevels[i] > lvl
 	})
 	return logrus.AllLevels[:index], nil
-}
-
-func (h *lokiHook) start() {
-	h.ch = make(chan *logrus.Entry, 1000)
-	go h.loop()
 }
 
 // fill one of two equally sized slices with entries and then push it while filling the other one
