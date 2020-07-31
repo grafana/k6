@@ -134,7 +134,7 @@ func rootCmdPersistentFlagSet() *pflag.FlagSet {
 	flags.BoolVar(&noColor, "no-color", false, "disable colored output")
 	flags.StringVar(&logOutput, "log-output", "stderr",
 		"change output to which logs go, possible values are stderr,stdout,none,loki[=host:port]")
-	flags.StringVar(&logFmt, "logformat", "", "log output format")
+	flags.StringVar(&logFmt, "logformat", "", "log output format") // TODO rename to log-format and warn on old usage
 	flags.StringVarP(&address, "address", "a", "localhost:6565", "address for the api server")
 
 	// TODO: Fix... This default value needed, so both CLI flags and environment variables work
