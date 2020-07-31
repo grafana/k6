@@ -110,6 +110,9 @@ func LokiFromConfigLine(ctx context.Context, line string) (logrus.Hook, error) {
 			if err != nil {
 				return nil, fmt.Errorf("couldn't parse the loki msgMaxSize as a number %w", err)
 			}
+			if !(h.msgMaxSize > 0) {
+				return nil, fmt.Errorf("loki msgMaxSize needs to be a posstive number, is %d", h.msgMaxSize)
+			}
 		case "level":
 			h.levels, err = getLevels(value)
 			if err != nil {
