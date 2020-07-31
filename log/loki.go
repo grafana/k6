@@ -23,6 +23,7 @@ package log
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -425,9 +426,14 @@ func (strms *lokiPushMessage) WriteTo(w io.Writer) (n int64, err error) {
 			write([]byte(`["`))
 			strconv.AppendInt(nanoseconds[:0], v.t, 10)
 			write(nanoseconds[:])
-			write([]byte(`","`))
-			write([]byte(v.msg))
-			write([]byte(`"]`))
+			write([]byte(`",`))
+			var b []byte
+			b, err = json.Marshal(v.msg)
+			if err != nil {
+				return n, err
+			}
+			write(b)
+			write([]byte(`]`))
 		}
 		write([]byte(`]}`))
 	}
