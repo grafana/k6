@@ -130,23 +130,14 @@ func LokiFromConfigLine(ctx context.Context, line string) (logrus.Hook, error) {
 
 func getLevels(level string) ([]logrus.Level, error) {
 	// TODO figure out if `tracing`,`fatal` and `panic` should be included
-	levels := []logrus.Level{}
-	switch level {
-	case "debug":
-		levels = append(levels, logrus.DebugLevel)
-		fallthrough
-	case "info":
-		levels = append(levels, logrus.InfoLevel)
-		fallthrough
-	case "warning":
-		levels = append(levels, logrus.WarnLevel)
-		fallthrough
-	case "error":
-		levels = append(levels, logrus.ErrorLevel)
-	default:
-		return nil, fmt.Errorf("unknown log level %s", level)
+	lvl, err := logrus.ParseLevel(level)
+	if err != nil {
+		return nil, fmt.Errorf("unknown log level %s", level) // specifically use a custom error
 	}
-	return levels, nil
+	index := sort.Search(len(logrus.AllLevels), func(i int) bool {
+		return logrus.AllLevels[i] > lvl
+	})
+	return logrus.AllLevels[:index], nil
 }
 
 func (h *lokiHook) start() {
