@@ -150,7 +150,7 @@ func (h *lokiHook) loop() {
 		dropped    int
 		count      int
 		ticker     = time.NewTicker(h.pushPeriod)
-		pushCh     = make(chan chan time.Duration)
+		pushCh     = make(chan chan int64)
 	)
 
 	defer ticker.Stop()
@@ -162,14 +162,14 @@ func (h *lokiHook) loop() {
 			msgsToPush, msgs = msgs, msgsToPush
 			oldCount, oldDropped := count, dropped
 			count, dropped = 0, 0
-			bufferTime := <-ch
+			cutOff := <-ch
 			close(ch) // signal that more buffering can continue
 
 			copy(oldLogs[len(oldLogs):len(oldLogs)+oldCount], msgsToPush[:oldCount])
 			oldLogs = oldLogs[:len(oldLogs)+oldCount]
 
 			t := time.Now()
-			cutOffIndex := sortAndSplitMsgs(oldLogs, bufferTime)
+			cutOffIndex := sortAndSplitMsgs(oldLogs, cutOff)
 			if cutOffIndex == 0 {
 				continue
 			}
@@ -237,13 +237,13 @@ func (h *lokiHook) loop() {
 				t:      entry.Time.UnixNano(),
 			}
 			count++
-		case <-ticker.C:
-			ch := make(chan time.Duration)
+		case t := <-ticker.C:
+			ch := make(chan int64)
 			pushCh <- ch
-			ch <- h.pushPeriod / 2
+			ch <- t.Add(-(h.pushPeriod / 2)).UnixNano()
 			<-ch
 		case <-h.ctx.Done():
-			ch := make(chan time.Duration)
+			ch := make(chan int64)
 			pushCh <- ch
 			ch <- 0
 			<-ch
@@ -252,7 +252,7 @@ func (h *lokiHook) loop() {
 	}
 }
 
-func sortAndSplitMsgs(msgs []tmpMsg, bufferTime time.Duration) int {
+func sortAndSplitMsgs(msgs []tmpMsg, cutOff int64) int {
 	if len(msgs) == 0 {
 		return 0
 	}
@@ -262,10 +262,6 @@ func sortAndSplitMsgs(msgs []tmpMsg, bufferTime time.Duration) int {
 	sort.Slice(msgs, func(i, j int) bool {
 		return msgs[i].t < msgs[j].t
 	})
-
-	// We can technically cutoff during the addMsg phase, which will be even better if we sort after
-	// it as well ... maybe
-	cutOff := time.Now().Add(-bufferTime).UnixNano() // probably better to be configurable
 
 	cutOffIndex := sort.Search(len(msgs), func(i int) bool {
 		return !(msgs[i].t < cutOff)
