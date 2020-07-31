@@ -85,8 +85,7 @@ func LokiFromConfigLine(ctx context.Context, line string) (logrus.Hook, error) {
 			return nil, fmt.Errorf("loki arguments should be in the form `address,key1=value1,key2=value2`, got %s", arg)
 		}
 
-		key := paramParts[0]
-		value := paramParts[1]
+		key, value := paramParts[0], paramParts[1]
 
 		var err error
 		switch key {
@@ -103,7 +102,7 @@ func LokiFromConfigLine(ctx context.Context, line string) (logrus.Hook, error) {
 				return nil, fmt.Errorf("couldn't parse the loki limit as a number %w", err)
 			}
 			if !(h.limit > 0) {
-				return nil, fmt.Errorf("loki limit needs to be a posstive number, is %d", h.limit)
+				return nil, fmt.Errorf("loki limit needs to be a positive number, is %d", h.limit)
 			}
 		case "msgMaxSize":
 			h.msgMaxSize, err = strconv.Atoi(value)
@@ -111,7 +110,7 @@ func LokiFromConfigLine(ctx context.Context, line string) (logrus.Hook, error) {
 				return nil, fmt.Errorf("couldn't parse the loki msgMaxSize as a number %w", err)
 			}
 			if !(h.msgMaxSize > 0) {
-				return nil, fmt.Errorf("loki msgMaxSize needs to be a posstive number, is %d", h.msgMaxSize)
+				return nil, fmt.Errorf("loki msgMaxSize needs to be a positive number, is %d", h.msgMaxSize)
 			}
 		case "level":
 			h.levels, err = getLevels(value)
