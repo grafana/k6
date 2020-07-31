@@ -315,9 +315,9 @@ func (h *lokiHook) push(b bytes.Buffer) error {
 	res, err := h.client.Do(req)
 
 	if res != nil {
-		if res.StatusCode == 400 {
+		if res.StatusCode >= 400 {
 			r, _ := ioutil.ReadAll(res.Body) // maybe limit it to something like the first 1000 characters?
-			return fmt.Errorf("Got 400 from loki: " + string(r))
+			return fmt.Errorf("Got %d from loki: %s", res.StatusCode, string(r))
 		}
 		_, _ = io.Copy(ioutil.Discard, res.Body)
 		_ = res.Body.Close()
