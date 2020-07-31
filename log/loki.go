@@ -308,15 +308,25 @@ func (h *lokiHook) push(b bytes.Buffer) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
+	body := b.Bytes()
+
 	req, err := http.NewRequestWithContext(ctx, "GET", h.addr, &b)
 	if err != nil {
 		return err
 	}
+	req.GetBody = func() (io.ReadCloser, error) {
+		return ioutil.NopCloser(bytes.NewBuffer(body)), nil
+	}
+
 	req.Header.Set("Content-Type", "application/json")
 
 	res, err := h.client.Do(req)
 
 	if res != nil {
+		if res.StatusCode == 400 {
+			r, _ := ioutil.ReadAll(res.Body) // maybe limit it to something like the first 1000 characters?
+			fmt.Println("Got 400 from loki: " + string(r))
+		}
 		_, _ = io.Copy(ioutil.Discard, res.Body)
 		_ = res.Body.Close()
 	}
