@@ -420,6 +420,7 @@ func (strms *lokiPushMessage) WriteTo(w io.Writer) (n int64, err error) {
 	// 10+ 9 for the amount of nanoseconds between 2001 and 2286 also it overflows in the year 2262 ;)
 	var nanoseconds [19]byte
 	write([]byte(`{"streams":[`))
+	var b []byte
 	for i, str := range strms.Streams {
 		if i != 0 {
 			write([]byte(`,`))
@@ -433,9 +434,12 @@ func (strms *lokiPushMessage) WriteTo(w io.Writer) (n int64, err error) {
 			f = true
 			write([]byte(`"`))
 			write([]byte(k))
-			write([]byte(`":"`))
-			write([]byte(v))
-			write([]byte(`"`))
+			write([]byte(`":`))
+			b, err = json.Marshal(v)
+			if err != nil {
+				return n, err
+			}
+			write(b)
 		}
 		write([]byte(`},"values":[`))
 		for j, v := range str.Values {
@@ -455,7 +459,6 @@ func (strms *lokiPushMessage) WriteTo(w io.Writer) (n int64, err error) {
 				}, string(omitMsg))
 			}
 
-			var b []byte
 			b, err = json.Marshal(v.msg)
 			if err != nil {
 				return n, err
