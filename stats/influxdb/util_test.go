@@ -25,6 +25,7 @@ import (
 
 	client "github.com/influxdata/influxdb1-client/v2"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -41,4 +42,38 @@ func TestMakeBatchConfig(t *testing.T) {
 			MakeBatchConfig(Config{DB: null.StringFrom("dbname")}),
 		)
 	})
+}
+
+func TestFieldKinds(t *testing.T) {
+	var fieldKinds map[string]FieldKind
+	var err error
+
+	conf := NewConfig()
+	conf.TagsAsFields = []string{"vu", "iter", "url", "boolField", "floatField", "intField"}
+
+	// Error case 1 (duplicated bool fields)
+	conf.BoolFields = []string{"boolField", "boolField"}
+	_, err = MakeFieldKinds(*conf)
+	require.Error(t, err)
+
+	// Error case 2 (duplicated fields in BoolFields and FloatFields)
+	conf.BoolFields = []string{"boolField"}
+	conf.FloatFields = []string{"boolField"}
+	_, err = MakeFieldKinds(*conf)
+	require.Error(t, err)
+
+	// Error case 3 (duplicated fields in BoolFields and IntFields)
+	conf.FloatFields = []string{"floatField"}
+	conf.IntFields = []string{"boolField"}
+	_, err = MakeFieldKinds(*conf)
+	require.Error(t, err)
+
+	// Normal case
+	conf.IntFields = []string{"intField"}
+	fieldKinds, err = MakeFieldKinds(*conf)
+	require.NoError(t, err)
+
+	require.Equal(t, fieldKinds["boolField"], Bool)
+	require.Equal(t, fieldKinds["floatField"], Float)
+	require.Equal(t, fieldKinds["intField"], Int)
 }

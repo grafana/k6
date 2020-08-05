@@ -50,6 +50,9 @@ type Config struct {
 	Retention    null.String `json:"retention,omitempty" envconfig:"K6_INFLUXDB_RETENTION"`
 	Consistency  null.String `json:"consistency,omitempty" envconfig:"K6_INFLUXDB_CONSISTENCY"`
 	TagsAsFields []string    `json:"tagsAsFields,omitempty" envconfig:"K6_INFLUXDB_TAGS_AS_FIELDS"`
+	BoolFields   []string    `json:"boolFields,omitempty" envconfig:"K6_INFLUXDB_BOOL_FIELDS"`
+	FloatFields  []string    `json:"floatFields,omitempty" envconfig:"K6_INFLUXDB_FLOAT_FIELDS"`
+	IntFields    []string    `json:"intFields,omitempty" envconfig:"K6_INFLUXDB_INT_FIELDS"`
 }
 
 func NewConfig() *Config {
@@ -57,6 +60,9 @@ func NewConfig() *Config {
 		Addr:             null.NewString("http://localhost:8086", false),
 		DB:               null.NewString("k6", false),
 		TagsAsFields:     []string{"vu", "iter", "url"},
+		BoolFields:       []string{},
+		FloatFields:      []string{},
+		IntFields:        []string{},
 		ConcurrentWrites: null.NewInt(10, false),
 		PushInterval:     types.NewNullDuration(time.Second, false),
 	}
@@ -94,6 +100,15 @@ func (c Config) Apply(cfg Config) Config {
 	if len(cfg.TagsAsFields) > 0 {
 		c.TagsAsFields = cfg.TagsAsFields
 	}
+	if len(cfg.BoolFields) > 0 {
+		c.BoolFields = cfg.BoolFields
+	}
+	if len(cfg.FloatFields) > 0 {
+		c.FloatFields = cfg.FloatFields
+	}
+	if len(cfg.IntFields) > 0 {
+		c.IntFields = cfg.IntFields
+	}
 	if cfg.PushInterval.Valid {
 		c.PushInterval = cfg.PushInterval
 	}
@@ -122,6 +137,15 @@ func ParseMap(m map[string]interface{}) (Config, error) {
 	c := Config{}
 	if v, ok := m["tagsAsFields"].(string); ok {
 		m["tagsAsFields"] = []string{v}
+	}
+	if v, ok := m["boolFields"].(string); ok {
+		m["boolFields"] = []string{v}
+	}
+	if v, ok := m["floatFields"].(string); ok {
+		m["floatFields"] = []string{v}
+	}
+	if v, ok := m["intFields"].(string); ok {
+		m["intFields"] = []string{v}
 	}
 	dec, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		DecodeHook: types.NullDecoder,
@@ -192,6 +216,12 @@ func ParseURL(text string) (Config, error) {
 			c.ConcurrentWrites = null.IntFrom(int64(writes))
 		case "tagsAsFields":
 			c.TagsAsFields = vs
+		case "boolFields":
+			c.BoolFields = vs
+		case "floatFields":
+			c.FloatFields = vs
+		case "intFields":
+			c.IntFields = vs
 		default:
 			return c, errors.Errorf("unknown query parameter: %s", k)
 		}

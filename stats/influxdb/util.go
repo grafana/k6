@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	client "github.com/influxdata/influxdb1-client/v2"
+	"github.com/pkg/errors"
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -56,4 +57,38 @@ func MakeBatchConfig(conf Config) client.BatchPointsConfig {
 		RetentionPolicy:  conf.Retention.String,
 		WriteConsistency: conf.Consistency.String,
 	}
+}
+
+func checkDuplicatedTypeDefinitions(fieldKinds map[string]FieldKind, tag string) error {
+	if _, found := fieldKinds[tag]; found {
+		return errors.Errorf("A tag name (%s) shows up more than once in InfluxDB field type configurations.", tag)
+	}
+	return nil
+}
+
+// MakeFieldKinds returns a map[string]fieldKind built from BoolFields, FloadFields and IntFields in a Config
+func MakeFieldKinds(conf Config) (map[string]FieldKind, error) {
+	fieldKinds := make(map[string]FieldKind)
+	for _, tag := range conf.BoolFields {
+		err := checkDuplicatedTypeDefinitions(fieldKinds, tag)
+		if err != nil {
+			return nil, err
+		}
+		fieldKinds[tag] = Bool
+	}
+	for _, tag := range conf.FloatFields {
+		err := checkDuplicatedTypeDefinitions(fieldKinds, tag)
+		if err != nil {
+			return nil, err
+		}
+		fieldKinds[tag] = Float
+	}
+	for _, tag := range conf.IntFields {
+		err := checkDuplicatedTypeDefinitions(fieldKinds, tag)
+		if err != nil {
+			return nil, err
+		}
+		fieldKinds[tag] = Int
+	}
+	return fieldKinds, nil
 }
