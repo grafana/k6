@@ -1,11 +1,31 @@
 package goja
 
 import (
+	"hash/maphash"
 	"math"
 	"reflect"
-	"regexp"
 	"strconv"
+	"unsafe"
+
+	"github.com/dop251/goja/ftoa"
+	"github.com/dop251/goja/unistring"
 )
+
+var (
+	// Not goroutine-safe, do not use for anything other than package level init
+	pkgHasher maphash.Hash
+
+	hashFalse = randomHash()
+	hashTrue  = randomHash()
+	hashNull  = randomHash()
+	hashUndef = randomHash()
+)
+
+// Not goroutine-safe, do not use for anything other than package level init
+func randomHash() uint64 {
+	pkgHasher.WriteByte(0)
+	return pkgHasher.Sum64()
+}
 
 var (
 	valueFalse    Value = valueBool(false)
@@ -14,8 +34,9 @@ var (
 	_NaN          Value = valueFloat(math.NaN())
 	_positiveInf  Value = valueFloat(math.Inf(+1))
 	_negativeInf  Value = valueFloat(math.Inf(-1))
-	_positiveZero Value
-	_negativeZero Value = valueFloat(math.Float64frombits(0 | (1 << 63)))
+	_positiveZero Value = valueInt(0)
+	negativeZero        = math.Float64frombits(0 | (1 << 63))
+	_negativeZero Value = valueFloat(negativeZero)
 	_epsilon            = valueFloat(2.2204460492503130808472633361816e-16)
 	_undefined    Value = valueUndefined{}
 )
@@ -34,7 +55,9 @@ var intCache [256]Value
 
 type Value interface {
 	ToInteger() int64
-	ToString() valueString
+	toString() valueString
+	string() unistring.String
+	ToString() Value
 	String() string
 	ToFloat() float64
 	ToNumber() Value
@@ -46,12 +69,17 @@ type Value interface {
 	Export() interface{}
 	ExportType() reflect.Type
 
-	assertInt() (int64, bool)
-	assertString() (valueString, bool)
-	assertFloat() (float64, bool)
-
 	baseObject(r *Runtime) *Object
+
+	hash(hasher *maphash.Hash) uint64
 }
+
+type valueContainer interface {
+	toValue(*Runtime) Value
+}
+
+type typeError string
+type rangeError string
 
 type valueInt int64
 type valueFloat float64
@@ -60,10 +88,14 @@ type valueNull struct{}
 type valueUndefined struct {
 	valueNull
 }
+type valueSymbol struct {
+	h    uintptr
+	desc valueString
+}
 
 type valueUnresolved struct {
 	r   *Runtime
-	ref string
+	ref unistring.String
 }
 
 type memberUnresolved struct {
@@ -89,7 +121,7 @@ func propGetter(o Value, v Value, r *Runtime) *Object {
 			return obj
 		}
 	}
-	r.typeErrorResult(true, "Getter must be a function: %s", v.ToString())
+	r.typeErrorResult(true, "Getter must be a function: %s", v.toString())
 	return nil
 }
 
@@ -102,16 +134,29 @@ func propSetter(o Value, v Value, r *Runtime) *Object {
 			return obj
 		}
 	}
-	r.typeErrorResult(true, "Setter must be a function: %s", v.ToString())
+	r.typeErrorResult(true, "Setter must be a function: %s", v.toString())
 	return nil
+}
+
+func fToStr(num float64, mode ftoa.FToStrMode, prec int) string {
+	var buf1 [128]byte
+	return string(ftoa.FToStr(num, mode, prec, buf1[:0]))
 }
 
 func (i valueInt) ToInteger() int64 {
 	return int64(i)
 }
 
-func (i valueInt) ToString() valueString {
+func (i valueInt) toString() valueString {
 	return asciiString(i.String())
+}
+
+func (i valueInt) string() unistring.String {
+	return unistring.String(i.String())
+}
+
+func (i valueInt) ToString() Value {
+	return i
 }
 
 func (i valueInt) String() string {
@@ -135,50 +180,35 @@ func (i valueInt) ToNumber() Value {
 }
 
 func (i valueInt) SameAs(other Value) bool {
-	if otherInt, ok := other.assertInt(); ok {
-		return int64(i) == otherInt
-	}
-	return false
+	return i == other
 }
 
 func (i valueInt) Equals(other Value) bool {
-	if o, ok := other.assertInt(); ok {
-		return int64(i) == o
-	}
-	if o, ok := other.assertFloat(); ok {
-		return float64(i) == o
-	}
-	if o, ok := other.assertString(); ok {
+	switch o := other.(type) {
+	case valueInt:
+		return i == o
+	case valueFloat:
+		return float64(i) == float64(o)
+	case valueString:
 		return o.ToNumber().Equals(i)
-	}
-	if o, ok := other.(valueBool); ok {
+	case valueBool:
 		return int64(i) == o.ToInteger()
+	case *Object:
+		return i.Equals(o.toPrimitiveNumber())
 	}
-	if o, ok := other.(*Object); ok {
-		return i.Equals(o.self.toPrimitiveNumber())
-	}
+
 	return false
 }
 
 func (i valueInt) StrictEquals(other Value) bool {
-	if otherInt, ok := other.assertInt(); ok {
-		return int64(i) == otherInt
-	} else if otherFloat, ok := other.assertFloat(); ok {
-		return float64(i) == otherFloat
+	switch o := other.(type) {
+	case valueInt:
+		return i == o
+	case valueFloat:
+		return float64(i) == float64(o)
 	}
+
 	return false
-}
-
-func (i valueInt) assertInt() (int64, bool) {
-	return int64(i), true
-}
-
-func (i valueInt) assertFloat() (float64, bool) {
-	return 0, false
-}
-
-func (i valueInt) assertString() (valueString, bool) {
-	return nil, false
 }
 
 func (i valueInt) baseObject(r *Runtime) *Object {
@@ -193,52 +223,64 @@ func (i valueInt) ExportType() reflect.Type {
 	return reflectTypeInt
 }
 
-func (o valueBool) ToInteger() int64 {
-	if o {
+func (i valueInt) hash(*maphash.Hash) uint64 {
+	return uint64(i)
+}
+
+func (b valueBool) ToInteger() int64 {
+	if b {
 		return 1
 	}
 	return 0
 }
 
-func (o valueBool) ToString() valueString {
-	if o {
+func (b valueBool) toString() valueString {
+	if b {
 		return stringTrue
 	}
 	return stringFalse
 }
 
-func (o valueBool) String() string {
-	if o {
+func (b valueBool) ToString() Value {
+	return b
+}
+
+func (b valueBool) String() string {
+	if b {
 		return "true"
 	}
 	return "false"
 }
 
-func (o valueBool) ToFloat() float64 {
-	if o {
+func (b valueBool) string() unistring.String {
+	return unistring.String(b.String())
+}
+
+func (b valueBool) ToFloat() float64 {
+	if b {
 		return 1.0
 	}
 	return 0
 }
 
-func (o valueBool) ToBoolean() bool {
-	return bool(o)
+func (b valueBool) ToBoolean() bool {
+	return bool(b)
 }
 
-func (o valueBool) ToObject(r *Runtime) *Object {
-	return r.newPrimitiveObject(o, r.global.BooleanPrototype, "Boolean")
+func (b valueBool) ToObject(r *Runtime) *Object {
+	return r.newPrimitiveObject(b, r.global.BooleanPrototype, "Boolean")
 }
 
-func (o valueBool) ToNumber() Value {
-	if o {
+func (b valueBool) ToNumber() Value {
+	if b {
 		return valueInt(1)
 	}
 	return valueInt(0)
 }
 
-func (o valueBool) SameAs(other Value) bool {
+func (b valueBool) SameAs(other Value) bool {
 	if other, ok := other.(valueBool); ok {
-		return o == other
+		return b == other
 	}
 	return false
 }
@@ -256,54 +298,66 @@ func (b valueBool) Equals(other Value) bool {
 
 }
 
-func (o valueBool) StrictEquals(other Value) bool {
+func (b valueBool) StrictEquals(other Value) bool {
 	if other, ok := other.(valueBool); ok {
-		return o == other
+		return b == other
 	}
 	return false
 }
 
-func (o valueBool) assertInt() (int64, bool) {
-	return 0, false
-}
-
-func (o valueBool) assertFloat() (float64, bool) {
-	return 0, false
-}
-
-func (o valueBool) assertString() (valueString, bool) {
-	return nil, false
-}
-
-func (o valueBool) baseObject(r *Runtime) *Object {
+func (b valueBool) baseObject(r *Runtime) *Object {
 	return r.global.BooleanPrototype
 }
 
-func (o valueBool) Export() interface{} {
-	return bool(o)
+func (b valueBool) Export() interface{} {
+	return bool(b)
 }
 
-func (o valueBool) ExportType() reflect.Type {
+func (b valueBool) ExportType() reflect.Type {
 	return reflectTypeBool
+}
+
+func (b valueBool) hash(*maphash.Hash) uint64 {
+	if b {
+		return hashTrue
+	}
+
+	return hashFalse
 }
 
 func (n valueNull) ToInteger() int64 {
 	return 0
 }
 
-func (n valueNull) ToString() valueString {
+func (n valueNull) toString() valueString {
 	return stringNull
+}
+
+func (n valueNull) string() unistring.String {
+	return stringNull.string()
+}
+
+func (n valueNull) ToString() Value {
+	return n
 }
 
 func (n valueNull) String() string {
 	return "null"
 }
 
-func (u valueUndefined) ToString() valueString {
+func (u valueUndefined) toString() valueString {
 	return stringUndefined
 }
 
+func (u valueUndefined) ToString() Value {
+	return u
+}
+
 func (u valueUndefined) String() string {
+	return "undefined"
+}
+
+func (u valueUndefined) string() unistring.String {
 	return "undefined"
 }
 
@@ -323,6 +377,10 @@ func (u valueUndefined) StrictEquals(other Value) bool {
 
 func (u valueUndefined) ToFloat() float64 {
 	return math.NaN()
+}
+
+func (u valueUndefined) hash(*maphash.Hash) uint64 {
+	return hashUndef
 }
 
 func (n valueNull) ToFloat() float64 {
@@ -361,19 +419,7 @@ func (n valueNull) StrictEquals(other Value) bool {
 	return same
 }
 
-func (n valueNull) assertInt() (int64, bool) {
-	return 0, false
-}
-
-func (n valueNull) assertFloat() (float64, bool) {
-	return 0, false
-}
-
-func (n valueNull) assertString() (valueString, bool) {
-	return nil, false
-}
-
-func (n valueNull) baseObject(r *Runtime) *Object {
+func (n valueNull) baseObject(*Runtime) *Object {
 	return nil
 }
 
@@ -385,12 +431,24 @@ func (n valueNull) ExportType() reflect.Type {
 	return reflectTypeNil
 }
 
+func (n valueNull) hash(*maphash.Hash) uint64 {
+	return hashNull
+}
+
 func (p *valueProperty) ToInteger() int64 {
 	return 0
 }
 
-func (p *valueProperty) ToString() valueString {
+func (p *valueProperty) toString() valueString {
 	return stringEmpty
+}
+
+func (p *valueProperty) string() unistring.String {
+	return ""
+}
+
+func (p *valueProperty) ToString() Value {
+	return _undefined
 }
 
 func (p *valueProperty) String() string {
@@ -405,24 +463,12 @@ func (p *valueProperty) ToBoolean() bool {
 	return false
 }
 
-func (p *valueProperty) ToObject(r *Runtime) *Object {
+func (p *valueProperty) ToObject(*Runtime) *Object {
 	return nil
 }
 
 func (p *valueProperty) ToNumber() Value {
 	return nil
-}
-
-func (p *valueProperty) assertInt() (int64, bool) {
-	return 0, false
-}
-
-func (p *valueProperty) assertFloat() (float64, bool) {
-	return 0, false
-}
-
-func (p *valueProperty) assertString() (valueString, bool) {
-	return nil, false
 }
 
 func (p *valueProperty) isWritable() bool {
@@ -461,62 +507,61 @@ func (p *valueProperty) SameAs(other Value) bool {
 	return false
 }
 
-func (p *valueProperty) Equals(other Value) bool {
+func (p *valueProperty) Equals(Value) bool {
 	return false
 }
 
-func (p *valueProperty) StrictEquals(other Value) bool {
+func (p *valueProperty) StrictEquals(Value) bool {
 	return false
 }
 
-func (n *valueProperty) baseObject(r *Runtime) *Object {
+func (p *valueProperty) baseObject(r *Runtime) *Object {
 	r.typeErrorResult(true, "BUG: baseObject() is called on valueProperty") // TODO error message
 	return nil
 }
 
-func (n *valueProperty) Export() interface{} {
+func (p *valueProperty) Export() interface{} {
 	panic("Cannot export valueProperty")
 }
 
-func (n *valueProperty) ExportType() reflect.Type {
+func (p *valueProperty) ExportType() reflect.Type {
 	panic("Cannot export valueProperty")
+}
+
+func (p *valueProperty) hash(*maphash.Hash) uint64 {
+	panic("valueProperty should never be used in maps or sets")
+}
+
+func floatToIntClip(n float64) int64 {
+	switch {
+	case math.IsNaN(n):
+		return 0
+	case n >= math.MaxInt64:
+		return math.MaxInt64
+	case n <= math.MinInt64:
+		return math.MinInt64
+	}
+	return int64(n)
 }
 
 func (f valueFloat) ToInteger() int64 {
-	switch {
-	case math.IsNaN(float64(f)):
-		return 0
-	case math.IsInf(float64(f), 1):
-		return int64(math.MaxInt64)
-	case math.IsInf(float64(f), -1):
-		return int64(math.MinInt64)
-	}
-	return int64(f)
+	return floatToIntClip(float64(f))
 }
 
-func (f valueFloat) ToString() valueString {
+func (f valueFloat) toString() valueString {
 	return asciiString(f.String())
 }
 
-var matchLeading0Exponent = regexp.MustCompile(`([eE][\+\-])0+([1-9])`) // 1e-07 => 1e-7
+func (f valueFloat) string() unistring.String {
+	return unistring.String(f.String())
+}
+
+func (f valueFloat) ToString() Value {
+	return f
+}
 
 func (f valueFloat) String() string {
-	value := float64(f)
-	if math.IsNaN(value) {
-		return "NaN"
-	} else if math.IsInf(value, 0) {
-		if math.Signbit(value) {
-			return "-Infinity"
-		}
-		return "Infinity"
-	} else if f == _negativeZero {
-		return "0"
-	}
-	exponent := math.Log10(math.Abs(value))
-	if exponent >= 21 || exponent < -6 {
-		return matchLeading0Exponent.ReplaceAllString(strconv.FormatFloat(value, 'g', -1, 64), "$1$2")
-	}
-	return strconv.FormatFloat(value, 'f', -1, 64)
+	return fToStr(float64(f), ftoa.ModeStandard, 0)
 }
 
 func (f valueFloat) ToFloat() float64 {
@@ -536,18 +581,20 @@ func (f valueFloat) ToNumber() Value {
 }
 
 func (f valueFloat) SameAs(other Value) bool {
-	if o, ok := other.assertFloat(); ok {
+	switch o := other.(type) {
+	case valueFloat:
 		this := float64(f)
-		if math.IsNaN(this) && math.IsNaN(o) {
+		o1 := float64(o)
+		if math.IsNaN(this) && math.IsNaN(o1) {
 			return true
 		} else {
-			ret := this == o
+			ret := this == o1
 			if ret && this == 0 {
-				ret = math.Signbit(this) == math.Signbit(o)
+				ret = math.Signbit(this) == math.Signbit(o1)
 			}
 			return ret
 		}
-	} else if o, ok := other.assertInt(); ok {
+	case valueInt:
 		this := float64(f)
 		ret := this == float64(o)
 		if ret && this == 0 {
@@ -555,52 +602,34 @@ func (f valueFloat) SameAs(other Value) bool {
 		}
 		return ret
 	}
+
 	return false
 }
 
 func (f valueFloat) Equals(other Value) bool {
-	if o, ok := other.assertFloat(); ok {
-		return float64(f) == o
-	}
-
-	if o, ok := other.assertInt(); ok {
+	switch o := other.(type) {
+	case valueFloat:
+		return f == o
+	case valueInt:
 		return float64(f) == float64(o)
-	}
-
-	if _, ok := other.assertString(); ok {
-		return float64(f) == other.ToFloat()
-	}
-
-	if o, ok := other.(valueBool); ok {
+	case valueString, valueBool:
 		return float64(f) == o.ToFloat()
-	}
-
-	if o, ok := other.(*Object); ok {
-		return f.Equals(o.self.toPrimitiveNumber())
+	case *Object:
+		return f.Equals(o.toPrimitiveNumber())
 	}
 
 	return false
 }
 
 func (f valueFloat) StrictEquals(other Value) bool {
-	if o, ok := other.assertFloat(); ok {
-		return float64(f) == o
-	} else if o, ok := other.assertInt(); ok {
+	switch o := other.(type) {
+	case valueFloat:
+		return f == o
+	case valueInt:
 		return float64(f) == float64(o)
 	}
+
 	return false
-}
-
-func (f valueFloat) assertInt() (int64, bool) {
-	return 0, false
-}
-
-func (f valueFloat) assertFloat() (float64, bool) {
-	return float64(f), true
-}
-
-func (f valueFloat) assertString() (valueString, bool) {
-	return nil, false
 }
 
 func (f valueFloat) baseObject(r *Runtime) *Object {
@@ -615,32 +644,47 @@ func (f valueFloat) ExportType() reflect.Type {
 	return reflectTypeFloat
 }
 
-func (o *Object) ToInteger() int64 {
-	return o.self.toPrimitiveNumber().ToNumber().ToInteger()
+func (f valueFloat) hash(*maphash.Hash) uint64 {
+	if f == _negativeZero {
+		return 0
+	}
+	return math.Float64bits(float64(f))
 }
 
-func (o *Object) ToString() valueString {
-	return o.self.toPrimitiveString().ToString()
+func (o *Object) ToInteger() int64 {
+	return o.toPrimitiveNumber().ToNumber().ToInteger()
+}
+
+func (o *Object) toString() valueString {
+	return o.toPrimitiveString().toString()
+}
+
+func (o *Object) string() unistring.String {
+	return o.toPrimitiveString().string()
+}
+
+func (o *Object) ToString() Value {
+	return o.toPrimitiveString().ToString()
 }
 
 func (o *Object) String() string {
-	return o.self.toPrimitiveString().String()
+	return o.toPrimitiveString().String()
 }
 
 func (o *Object) ToFloat() float64 {
-	return o.self.toPrimitiveNumber().ToFloat()
+	return o.toPrimitiveNumber().ToFloat()
 }
 
 func (o *Object) ToBoolean() bool {
 	return true
 }
 
-func (o *Object) ToObject(r *Runtime) *Object {
+func (o *Object) ToObject(*Runtime) *Object {
 	return o
 }
 
 func (o *Object) ToNumber() Value {
-	return o.self.toPrimitiveNumber().ToNumber()
+	return o.toPrimitiveNumber().ToNumber()
 }
 
 func (o *Object) SameAs(other Value) bool {
@@ -655,21 +699,13 @@ func (o *Object) Equals(other Value) bool {
 		return o == other || o.self.equal(other.self)
 	}
 
-	if _, ok := other.assertInt(); ok {
-		return o.self.toPrimitive().Equals(other)
+	switch o1 := other.(type) {
+	case valueInt, valueFloat, valueString:
+		return o.toPrimitive().Equals(other)
+	case valueBool:
+		return o.Equals(o1.ToNumber())
 	}
 
-	if _, ok := other.assertFloat(); ok {
-		return o.self.toPrimitive().Equals(other)
-	}
-
-	if other, ok := other.(valueBool); ok {
-		return o.Equals(other.ToNumber())
-	}
-
-	if _, ok := other.assertString(); ok {
-		return o.self.toPrimitive().Equals(other)
-	}
 	return false
 }
 
@@ -680,19 +716,7 @@ func (o *Object) StrictEquals(other Value) bool {
 	return false
 }
 
-func (o *Object) assertInt() (int64, bool) {
-	return 0, false
-}
-
-func (o *Object) assertFloat() (float64, bool) {
-	return 0, false
-}
-
-func (o *Object) assertString() (valueString, bool) {
-	return nil, false
-}
-
-func (o *Object) baseObject(r *Runtime) *Object {
+func (o *Object) baseObject(*Runtime) *Object {
 	return o
 }
 
@@ -704,13 +728,19 @@ func (o *Object) ExportType() reflect.Type {
 	return o.self.exportType()
 }
 
+func (o *Object) hash(*maphash.Hash) uint64 {
+	return o.getId()
+}
+
 func (o *Object) Get(name string) Value {
-	return o.self.getStr(name)
+	return o.self.getStr(unistring.NewFromString(name), nil)
 }
 
 func (o *Object) Keys() (keys []string) {
-	for item, f := o.self.enumerate(false, false)(); f != nil; item, f = f() {
-		keys = append(keys, item.name)
+	names := o.self.ownKeys(false, nil)
+	keys = make([]string, 0, len(names))
+	for _, name := range names {
+		keys = append(keys, name.String())
 	}
 
 	return
@@ -720,7 +750,7 @@ func (o *Object) Keys() (keys []string) {
 // configurable: configurable, enumerable: enumerable})
 func (o *Object) DefineDataProperty(name string, value Value, writable, configurable, enumerable Flag) error {
 	return tryFunc(func() {
-		o.self.defineOwnProperty(newStringValue(name), propertyDescr{
+		o.self.defineOwnPropertyStr(unistring.NewFromString(name), PropertyDescriptor{
 			Value:        value,
 			Writable:     writable,
 			Configurable: configurable,
@@ -733,7 +763,7 @@ func (o *Object) DefineDataProperty(name string, value Value, writable, configur
 // configurable: configurable, enumerable: enumerable})
 func (o *Object) DefineAccessorProperty(name string, getter, setter Value, configurable, enumerable Flag) error {
 	return tryFunc(func() {
-		o.self.defineOwnProperty(newStringValue(name), propertyDescr{
+		o.self.defineOwnPropertyStr(unistring.NewFromString(name), PropertyDescriptor{
 			Getter:       getter,
 			Setter:       setter,
 			Configurable: configurable,
@@ -744,7 +774,7 @@ func (o *Object) DefineAccessorProperty(name string, getter, setter Value, confi
 
 func (o *Object) Set(name string, value interface{}) error {
 	return tryFunc(func() {
-		o.self.putStr(name, o.runtime.ToValue(value), true)
+		o.self.setOwnStr(unistring.NewFromString(name), o.runtime.ToValue(value), true)
 	})
 }
 
@@ -779,7 +809,17 @@ func (o valueUnresolved) ToInteger() int64 {
 	return 0
 }
 
-func (o valueUnresolved) ToString() valueString {
+func (o valueUnresolved) toString() valueString {
+	o.throw()
+	return nil
+}
+
+func (o valueUnresolved) string() unistring.String {
+	o.throw()
+	return ""
+}
+
+func (o valueUnresolved) ToString() Value {
 	o.throw()
 	return nil
 }
@@ -799,7 +839,7 @@ func (o valueUnresolved) ToBoolean() bool {
 	return false
 }
 
-func (o valueUnresolved) ToObject(r *Runtime) *Object {
+func (o valueUnresolved) ToObject(*Runtime) *Object {
 	o.throw()
 	return nil
 }
@@ -809,37 +849,22 @@ func (o valueUnresolved) ToNumber() Value {
 	return nil
 }
 
-func (o valueUnresolved) SameAs(other Value) bool {
+func (o valueUnresolved) SameAs(Value) bool {
 	o.throw()
 	return false
 }
 
-func (o valueUnresolved) Equals(other Value) bool {
+func (o valueUnresolved) Equals(Value) bool {
 	o.throw()
 	return false
 }
 
-func (o valueUnresolved) StrictEquals(other Value) bool {
+func (o valueUnresolved) StrictEquals(Value) bool {
 	o.throw()
 	return false
 }
 
-func (o valueUnresolved) assertInt() (int64, bool) {
-	o.throw()
-	return 0, false
-}
-
-func (o valueUnresolved) assertFloat() (float64, bool) {
-	o.throw()
-	return 0, false
-}
-
-func (o valueUnresolved) assertString() (valueString, bool) {
-	o.throw()
-	return nil, false
-}
-
-func (o valueUnresolved) baseObject(r *Runtime) *Object {
+func (o valueUnresolved) baseObject(*Runtime) *Object {
 	o.throw()
 	return nil
 }
@@ -852,6 +877,90 @@ func (o valueUnresolved) Export() interface{} {
 func (o valueUnresolved) ExportType() reflect.Type {
 	o.throw()
 	return nil
+}
+
+func (o valueUnresolved) hash(*maphash.Hash) uint64 {
+	o.throw()
+	return 0
+}
+
+func (s *valueSymbol) ToInteger() int64 {
+	panic(typeError("Cannot convert a Symbol value to a number"))
+}
+
+func (s *valueSymbol) toString() valueString {
+	panic(typeError("Cannot convert a Symbol value to a string"))
+}
+
+func (s *valueSymbol) ToString() Value {
+	return s
+}
+
+func (s *valueSymbol) String() string {
+	return s.desc.String()
+}
+
+func (s *valueSymbol) string() unistring.String {
+	return s.desc.string()
+}
+
+func (s *valueSymbol) ToFloat() float64 {
+	panic(typeError("Cannot convert a Symbol value to a number"))
+}
+
+func (s *valueSymbol) ToNumber() Value {
+	panic(typeError("Cannot convert a Symbol value to a number"))
+}
+
+func (s *valueSymbol) ToBoolean() bool {
+	return true
+}
+
+func (s *valueSymbol) ToObject(r *Runtime) *Object {
+	return s.baseObject(r)
+}
+
+func (s *valueSymbol) SameAs(other Value) bool {
+	if s1, ok := other.(*valueSymbol); ok {
+		return s == s1
+	}
+	return false
+}
+
+func (s *valueSymbol) Equals(o Value) bool {
+	return s.SameAs(o)
+}
+
+func (s *valueSymbol) StrictEquals(o Value) bool {
+	return s.SameAs(o)
+}
+
+func (s *valueSymbol) Export() interface{} {
+	return s.String()
+}
+
+func (s *valueSymbol) ExportType() reflect.Type {
+	return reflectTypeString
+}
+
+func (s *valueSymbol) baseObject(r *Runtime) *Object {
+	return r.newPrimitiveObject(s, r.global.SymbolPrototype, "Symbol")
+}
+
+func (s *valueSymbol) hash(*maphash.Hash) uint64 {
+	return uint64(s.h)
+}
+
+func newSymbol(s valueString) *valueSymbol {
+	r := &valueSymbol{
+		desc: asciiString("Symbol(").concat(s).concat(asciiString(")")),
+	}
+	// This may need to be reconsidered in the future.
+	// Depending on changes in Go's allocation policy and/or introduction of a compacting GC
+	// this may no longer provide sufficient dispersion. The alternative, however, is a globally
+	// synchronised random generator/hasher/sequencer and I don't want to go down that route just yet.
+	r.h = uintptr(unsafe.Pointer(r))
+	return r
 }
 
 func init() {

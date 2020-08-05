@@ -2,6 +2,7 @@ package parser
 
 import (
 	"github.com/dop251/goja/ast"
+	"github.com/dop251/goja/unistring"
 )
 
 type _scope struct {
@@ -12,7 +13,7 @@ type _scope struct {
 	inFunction      bool
 	declarationList []ast.Declaration
 
-	labels []string
+	labels []unistring.String
 }
 
 func (self *_parser) openScope() {
@@ -30,7 +31,7 @@ func (self *_scope) declare(declaration ast.Declaration) {
 	self.declarationList = append(self.declarationList, declaration)
 }
 
-func (self *_scope) hasLabel(name string) bool {
+func (self *_scope) hasLabel(name unistring.String) bool {
 	for _, label := range self.labels {
 		if label == name {
 			return true

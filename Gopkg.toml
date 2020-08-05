@@ -9,6 +9,10 @@
 
 [[constraint]]
   branch = "master"
+  name = "github.com/dop251/goja"
+
+[[constraint]]
+  branch = "master"
   name = "github.com/dustin/go-humanize"
 
 [[constraint]]
