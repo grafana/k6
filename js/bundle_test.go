@@ -117,7 +117,8 @@ func TestNewBundle(t *testing.T) {
 				CompatibilityMode: null.StringFrom(lib.CompatibilityModeExtended.String()),
 			}
 			_, err := getSimpleBundle("/script.js",
-				`export default function() {}; new Set([1, 2, 3, 2, 1]);`, rtOpts)
+				`module.exports.default = function() {}; new Promise(function(resolve, reject){});`, rtOpts)
+
 			assert.NoError(t, err)
 		})
 		t.Run("Base/ok/Minimal", func(t *testing.T) {
@@ -150,11 +151,11 @@ func TestNewBundle(t *testing.T) {
 					`module.exports.default = function() {}; () => {};`,
 					"file:///script.js: Line 1:42 Unexpected token ) (and 1 more errors)",
 				},
-				// ES2015 objects polyfilled by core.js are not supported
+				// some ES2015 objects polyfilled by core.js are not supported
 				{
 					"CoreJS", "base",
-					`module.exports.default = function() {}; new Set([1, 2, 3, 2, 1]);`,
-					"ReferenceError: Set is not defined at file:///script.js:1:45(5)",
+					`module.exports.default = function() {}; new Promise(function(resolve, reject){});`,
+					"ReferenceError: Promise is not defined at file:///script.js:1:45(5)",
 				},
 			}
 
