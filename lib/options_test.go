@@ -137,6 +137,15 @@ func TestOptions(t *testing.T) {
 				jsonStr := `{"tlsCipherSuites":["TLS_ECDHE_RSA_WITH_RC4_128_SHA"]}`
 				assert.NoError(t, json.Unmarshal([]byte(jsonStr), &opts))
 				assert.Equal(t, &TLSCipherSuites{tls.TLS_ECDHE_RSA_WITH_RC4_128_SHA}, opts.TLSCipherSuites)
+
+				t.Run("Roundtrip", func(t *testing.T) {
+					data, err := json.Marshal(opts.TLSCipherSuites)
+					assert.NoError(t, err)
+					assert.Equal(t, `["TLS_ECDHE_RSA_WITH_RC4_128_SHA"]`, string(data))
+					var vers2 TLSCipherSuites
+					assert.NoError(t, json.Unmarshal(data, &vers2))
+					assert.Equal(t, &vers2, opts.TLSCipherSuites)
+				})
 			})
 			t.Run("Not a string", func(t *testing.T) {
 				var opts Options

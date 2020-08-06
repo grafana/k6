@@ -69,8 +69,8 @@ func (v *TLSVersion) UnmarshalJSON(data []byte) error {
 
 // Fields for TLSVersions. Unmarshalling hack.
 type TLSVersionsFields struct {
-	Min TLSVersion `json:"min"` // Minimum allowed version, 0 = any.
-	Max TLSVersion `json:"max"` // Maximum allowed version, 0 = any.
+	Min TLSVersion `json:"min" ignored:"true"` // Minimum allowed version, 0 = any.
+	Max TLSVersion `json:"max" ignored:"true"` // Maximum allowed version, 0 = any.
 }
 
 // Describes a set (min/max) of TLS versions.
@@ -96,8 +96,23 @@ func (v *TLSVersions) isTLS13() bool {
 
 // A list of TLS cipher suites.
 // Marshals and unmarshals from a list of names, eg. "TLS_ECDHE_RSA_WITH_RC4_128_SHA".
-// BUG: This currently doesn't marshal back to JSON properly!!
 type TLSCipherSuites []uint16
+
+// MarshalJSON will return the JSON representation according to supported TLS cipher suites
+func (s *TLSCipherSuites) MarshalJSON() ([]byte, error) {
+	var suiteNames []string
+	for _, id := range *s {
+		if suiteName, ok := SupportedTLSCipherSuitesToString[id]; ok {
+			suiteNames = append(suiteNames, suiteName)
+		} else {
+			return nil, errors.Errorf("Unknown cipher suite id: %d", id)
+		}
+	}
+
+	marshaled, _ := json.Marshal(suiteNames)
+
+	return marshaled, nil
+}
 
 func (s *TLSCipherSuites) UnmarshalJSON(data []byte) error {
 	var suiteNames []string
@@ -235,7 +250,7 @@ type Options struct {
 
 	// Specify TLS versions and cipher suites, and present client certificates.
 	TLSCipherSuites *TLSCipherSuites `json:"tlsCipherSuites" envconfig:"K6_TLS_CIPHER_SUITES"`
-	TLSVersion      *TLSVersions     `json:"tlsVersion" envconfig:"K6_TLS_VERSION"`
+	TLSVersion      *TLSVersions     `json:"tlsVersion" ignored:"true"`
 	TLSAuth         []*TLSAuth       `json:"tlsAuth" envconfig:"K6_TLSAUTH"`
 
 	// Throw warnings (eg. failed HTTP requests) as errors instead of simply logging them.
