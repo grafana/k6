@@ -38,8 +38,10 @@ import (
 type FieldKind int
 
 const (
-	// Int field (default)
-	Int FieldKind = iota
+	// String field (default)
+	String FieldKind = iota
+	// Int field
+	Int
 	// Float field
 	Float
 	// Bool field
@@ -150,24 +152,24 @@ func (c *Collector) commit() {
 
 func (c *Collector) extractTagsToValues(tags map[string]string, values map[string]interface{}) map[string]interface{} {
 tags:
-	for _, tag := range c.Config.TagsAsFields {
+	for tag, kind := range c.fieldKinds {
 		if val, ok := tags[tag]; ok {
-			if kind, convNeeded := c.fieldKinds[tag]; convNeeded {
-				var v interface{}
-				var err error
-				switch kind {
-				case Bool:
-					v, err = strconv.ParseBool(val)
-				case Float:
-					v, err = strconv.ParseFloat(val, 64)
-				case Int:
-					v, err = strconv.ParseInt(val, 10, 64)
-				}
-				if err == nil {
-					values[tag] = v
-					delete(tags, tag)
-					continue tags
-				}
+			var v interface{}
+			var err error
+			switch kind {
+			case String:
+				v = val
+			case Bool:
+				v, err = strconv.ParseBool(val)
+			case Float:
+				v, err = strconv.ParseFloat(val, 64)
+			case Int:
+				v, err = strconv.ParseInt(val, 10, 64)
+			}
+			if err == nil {
+				values[tag] = v
+				delete(tags, tag)
+				continue tags
 			}
 			values[tag] = val
 			delete(tags, tag)

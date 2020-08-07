@@ -66,29 +66,44 @@ func checkDuplicatedTypeDefinitions(fieldKinds map[string]FieldKind, tag string)
 	return nil
 }
 
-// MakeFieldKinds returns a map[string]fieldKind built from BoolFields, FloadFields and IntFields in a Config
+// MakeFieldKinds reads the Config and returns a lookup map of tag names to
+// the field type their values should be converted to.
 func MakeFieldKinds(conf Config) (map[string]FieldKind, error) {
 	fieldKinds := make(map[string]FieldKind)
-	for _, tag := range conf.BoolFields {
-		err := checkDuplicatedTypeDefinitions(fieldKinds, tag)
-		if err != nil {
-			return nil, err
+	for _, tag := range conf.TagsAsFields {
+		s := strings.Split(tag, ":")
+		switch len(s) {
+		case 1:
+			err := checkDuplicatedTypeDefinitions(fieldKinds, tag)
+			if err != nil {
+				return nil, err
+			}
+			fieldKinds[tag] = String
+		case 2:
+			fieldName, fieldType := s[0], s[1]
+
+			err := checkDuplicatedTypeDefinitions(fieldKinds, fieldName)
+			if err != nil {
+				return nil, err
+			}
+
+			switch fieldType {
+			case "string":
+				fieldKinds[fieldName] = String
+			case "bool":
+				fieldKinds[fieldName] = Bool
+			case "float":
+				fieldKinds[fieldName] = Float
+			case "int":
+				fieldKinds[fieldName] = Int
+			default:
+				return nil, errors.Errorf("An invalid type (%s) is specified for an InfluxDB field (%s).",
+					fieldType, fieldName)
+			}
+		default:
+			return nil, errors.Errorf("An InfluxDB field (%s) is in an invalid format.", tag)
 		}
-		fieldKinds[tag] = Bool
 	}
-	for _, tag := range conf.FloatFields {
-		err := checkDuplicatedTypeDefinitions(fieldKinds, tag)
-		if err != nil {
-			return nil, err
-		}
-		fieldKinds[tag] = Float
-	}
-	for _, tag := range conf.IntFields {
-		err := checkDuplicatedTypeDefinitions(fieldKinds, tag)
-		if err != nil {
-			return nil, err
-		}
-		fieldKinds[tag] = Int
-	}
+
 	return fieldKinds, nil
 }
