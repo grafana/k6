@@ -2,14 +2,14 @@
     "FixedFileInfo": {
         "FileVersion": {
             "Major": 0,
-            "Minor": 26,
-            "Patch": 2,
+            "Minor": 27,
+            "Patch": 1,
             "Build": 0
         },
         "ProductVersion": {
             "Major": 0,
-            "Minor": 26,
-            "Patch": 2,
+            "Minor": 27,
+            "Patch": 1,
             "Build": 0
         },
         "FileFlagsMask": "3f",
@@ -22,14 +22,14 @@
         "Comments": "",
         "CompanyName": "Load Impact AB",
         "FileDescription": "A modern load testing tool, using Go and JavaScript",
-        "FileVersion": "0.26.2",
+        "FileVersion": "0.27.1",
         "InternalName": "k6",
         "LegalCopyright": "© Load Impact AB. Licensed under AGPL.",
         "LegalTrademarks": "",
         "OriginalFilename": "k6.exe",
         "PrivateBuild": "",
         "ProductName": "k6 ",
-        "ProductVersion": "0.26.2",
+        "ProductVersion": "0.27.1",
         "SpecialBuild": ""
     },
     "VarFileInfo": {
