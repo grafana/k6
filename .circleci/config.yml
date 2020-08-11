@@ -12,14 +12,7 @@ jobs:
           name: Check dependencies
           command: |
             go version
-            export PATH="$GOPATH/bin:$PATH"
-            mkdir -p "$GOPATH/bin"
-            curl --fail https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
-            dep version
-            dep status
-            case $(dep ensure 2>&1 | head -n 1) in Warning*) false ;; esac
-            dep check
-
+            go mod verify
 
   lint:
     docker:
