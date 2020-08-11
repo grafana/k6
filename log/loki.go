@@ -186,7 +186,7 @@ func (h *lokiHook) loop() {
 			}
 			t1 := time.Since(t)
 
-			strms := h.createPushMessage(oldLogs, cutOffIndex, oldDropped)
+			pushMsg := h.createPushMessage(oldLogs, cutOffIndex, oldDropped)
 			if cutOffIndex > len(oldLogs) {
 				oldLogs = oldLogs[:0]
 
@@ -196,7 +196,7 @@ func (h *lokiHook) loop() {
 			t2 := time.Since(t) - t1
 
 			var b bytes.Buffer
-			_, err := strms.WriteTo(&b)
+			_, err := pushMsg.WriteTo(&b)
 			if err != nil {
 				h.fallbackLogger.WithError(err).Error("Error while marshaling logs for loki")
 
@@ -288,10 +288,10 @@ func sortAndSplitMsgs(msgs []tmpMsg, cutOff int64) int {
 }
 
 func (h *lokiHook) createPushMessage(msgs []tmpMsg, cutOffIndex, dropped int) *lokiPushMessage {
-	strms := new(lokiPushMessage)
-	strms.msgMaxSize = h.msgMaxSize
+	pushMsg := new(lokiPushMessage)
+	pushMsg.maxSize = h.msgMaxSize
 	for _, msg := range msgs[:cutOffIndex] {
-		strms.add(msg)
+		pushMsg.add(msg)
 	}
 	if dropped != 0 {
 		labels := make(map[string]string, 2+len(h.labels))
@@ -307,10 +307,10 @@ func (h *lokiHook) createPushMessage(msgs []tmpMsg, cutOffIndex, dropped int) *l
 				h.limit, h.pushPeriod),
 			t: msgs[cutOffIndex-1].t,
 		}
-		strms.add(msg)
+		pushMsg.add(msg)
 	}
 
-	return strms
+	return pushMsg
 }
 
 func (h *lokiHook) push(b bytes.Buffer) error {
@@ -354,9 +354,9 @@ func mapEqual(a, b map[string]string) bool {
 	return true
 }
 
-func (strms *lokiPushMessage) add(entry tmpMsg) {
+func (pushMsg *lokiPushMessage) add(entry tmpMsg) {
 	var foundStrm *stream
-	for _, strm := range strms.Streams {
+	for _, strm := range pushMsg.Streams {
 		if mapEqual(strm.Stream, entry.labels) {
 			foundStrm = strm
 
@@ -366,7 +366,7 @@ func (strms *lokiPushMessage) add(entry tmpMsg) {
 
 	if foundStrm == nil {
 		foundStrm = &stream{Stream: entry.labels}
-		strms.Streams = append(strms.Streams, foundStrm)
+		pushMsg.Streams = append(pushMsg.Streams, foundStrm)
 	}
 
 	foundStrm.Values = append(foundStrm.Values, logEntry{t: entry.t, msg: entry.msg})
@@ -407,11 +407,11 @@ func (h *lokiHook) Levels() []logrus.Level {
 }
 */
 type lokiPushMessage struct {
-	Streams    []*stream `json:"streams"`
-	msgMaxSize int
+	Streams []*stream `json:"streams"`
+	maxSize int
 }
 
-func (strms *lokiPushMessage) WriteTo(w io.Writer) (n int64, err error) {
+func (pushMsg *lokiPushMessage) WriteTo(w io.Writer) (n int64, err error) {
 	var k int
 	write := func(b []byte) {
 		if err != nil {
@@ -424,7 +424,7 @@ func (strms *lokiPushMessage) WriteTo(w io.Writer) (n int64, err error) {
 	var nanoseconds [19]byte
 	write([]byte(`{"streams":[`))
 	var b []byte
-	for i, str := range strms.Streams {
+	for i, str := range pushMsg.Streams {
 		if i != 0 {
 			write([]byte(`,`))
 		}
@@ -453,12 +453,12 @@ func (strms *lokiPushMessage) WriteTo(w io.Writer) (n int64, err error) {
 			strconv.AppendInt(nanoseconds[:0], v.t, 10)
 			write(nanoseconds[:])
 			write([]byte(`",`))
-			if len([]rune(v.msg)) > strms.msgMaxSize {
-				difference := int64(len(v.msg) - strms.msgMaxSize)
+			if len([]rune(v.msg)) > pushMsg.maxSize {
+				difference := int64(len(v.msg) - pushMsg.maxSize)
 				omitMsg := append(strconv.AppendInt([]byte("... omitting "), difference, 10), " characters ..."...)
 				v.msg = strings.Join([]string{
-					string([]rune(v.msg)[:strms.msgMaxSize/2]),
-					string([]rune(v.msg)[len([]rune(v.msg))-strms.msgMaxSize/2:]),
+					string([]rune(v.msg)[:pushMsg.maxSize/2]),
+					string([]rune(v.msg)[len([]rune(v.msg))-pushMsg.maxSize/2:]),
 				}, string(omitMsg))
 			}
 
