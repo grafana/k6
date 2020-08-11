@@ -191,10 +191,18 @@ func setupLoggers(logger *logrus.Logger, logFmt string, logOutput string) error 
 	case "none":
 		logger.SetOutput(ioutil.Discard)
 	default:
+		fallbackLogger := &logrus.Logger{
+			Out:       os.Stderr,
+			Formatter: new(logrus.TextFormatter),
+			Hooks:     make(logrus.LevelHooks),
+			Level:     logrus.InfoLevel,
+		}
+
 		if !strings.HasPrefix(logOutput, "loki") {
 			return fmt.Errorf("unsupported log output `%s`", logOutput)
 		}
-		hook, err := log.LokiFromConfigLine(context.Background(), logOutput) // TODO use some context that we can cancel
+		// TODO use some context that we can cancel
+		hook, err := log.LokiFromConfigLine(context.Background(), fallbackLogger, logOutput)
 		if err != nil {
 			return err
 		}

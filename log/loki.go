@@ -37,29 +37,32 @@ import (
 )
 
 type lokiHook struct {
-	addr       string
-	labels     [][2]string
-	ch         chan *logrus.Entry
-	limit      int
-	msgMaxSize int
-	levels     []logrus.Level
-	pushPeriod time.Duration
-	client     *http.Client
-	ctx        context.Context
-	profile    bool
+	addr           string
+	labels         [][2]string
+	ch             chan *logrus.Entry
+	limit          int
+	msgMaxSize     int
+	levels         []logrus.Level
+	pushPeriod     time.Duration
+	client         *http.Client
+	ctx            context.Context
+	fallbackLogger logrus.FieldLogger
+	profile        bool
 }
 
 // LokiFromConfigLine returns a new logrus.Hook that pushes logrus.Entrys to loki and is configured
 // through the provided line
-func LokiFromConfigLine(ctx context.Context, line string) (logrus.Hook, error) {
+//nolint:funlen
+func LokiFromConfigLine(ctx context.Context, fallbackLogger logrus.FieldLogger, line string) (logrus.Hook, error) {
 	h := &lokiHook{
-		addr:       "http://127.0.0.1:3100/loki/api/v1/push",
-		limit:      100,
-		levels:     logrus.AllLevels,
-		pushPeriod: time.Second * 1,
-		ctx:        ctx,
-		msgMaxSize: 1024 * 1024, // 1mb
-		ch:         make(chan *logrus.Entry, 1000),
+		addr:           "http://127.0.0.1:3100/loki/api/v1/push",
+		limit:          100,
+		levels:         logrus.AllLevels,
+		pushPeriod:     time.Second * 1,
+		ctx:            ctx,
+		msgMaxSize:     1024 * 1024, // 1mb
+		ch:             make(chan *logrus.Entry, 1000),
+		fallbackLogger: fallbackLogger,
 	}
 	if line == "loki" {
 		return h, nil
@@ -121,6 +124,7 @@ func LokiFromConfigLine(ctx context.Context, line string) (logrus.Hook, error) {
 			if strings.HasPrefix(key, "label.") {
 				labelKey := strings.TrimPrefix(key, "label.")
 				h.labels = append(h.labels, [2]string{labelKey, value})
+
 				continue
 			}
 
@@ -131,6 +135,7 @@ func LokiFromConfigLine(ctx context.Context, line string) (logrus.Hook, error) {
 	h.client = &http.Client{Timeout: h.pushPeriod}
 
 	go h.loop()
+
 	return h, nil
 }
 
@@ -142,6 +147,7 @@ func getLevels(level string) ([]logrus.Level, error) {
 	index := sort.Search(len(logrus.AllLevels), func(i int) bool {
 		return logrus.AllLevels[i] > lvl
 	})
+
 	return logrus.AllLevels[:index], nil
 }
 
@@ -183,6 +189,7 @@ func (h *lokiHook) loop() {
 			strms := h.createPushMessage(oldLogs, cutOffIndex, oldDropped)
 			if cutOffIndex > len(oldLogs) {
 				oldLogs = oldLogs[:0]
+
 				continue
 			}
 			oldLogs = oldLogs[:copy(oldLogs, oldLogs[cutOffIndex:])]
@@ -191,7 +198,8 @@ func (h *lokiHook) loop() {
 			var b bytes.Buffer
 			_, err := strms.WriteTo(&b)
 			if err != nil {
-				fmt.Printf("Error while marshaling logs for loki %s\n", err)
+				h.fallbackLogger.WithError(err).Error("Error while marshaling logs for loki")
+
 				continue
 			}
 			size := b.Len()
@@ -199,13 +207,15 @@ func (h *lokiHook) loop() {
 
 			err = h.push(b)
 			if err != nil {
-				fmt.Printf("Error while sending logs to loki %s\n", err)
+				h.fallbackLogger.WithError(err).Error("Error while sending logs to loki")
+
 				continue
 			}
 			t4 := time.Since(t) - t3 - t2 - t1
 
 			if h.profile {
-				fmt.Printf("sorting=%s, adding=%s marshalling=%s sending=%s count=%d final_size=%d\n",
+				h.fallbackLogger.Infof(
+					"sorting=%s, adding=%s marshalling=%s sending=%s count=%d final_size=%d\n",
 					t1, t2, t3, t4, cutOffIndex, size)
 			}
 		}
@@ -216,6 +226,7 @@ func (h *lokiHook) loop() {
 		case entry := <-h.ch:
 			if count == h.limit {
 				dropped++
+
 				continue
 			}
 
@@ -252,6 +263,7 @@ func (h *lokiHook) loop() {
 			pushCh <- ch
 			ch <- 0
 			<-ch
+
 			return
 		}
 	}
@@ -271,6 +283,7 @@ func sortAndSplitMsgs(msgs []tmpMsg, cutOff int64) int {
 	cutOffIndex := sort.Search(len(msgs), func(i int) bool {
 		return !(msgs[i].t < cutOff)
 	})
+
 	return cutOffIndex
 }
 
@@ -296,6 +309,7 @@ func (h *lokiHook) createPushMessage(msgs []tmpMsg, cutOffIndex, dropped int) *l
 		}
 		strms.add(msg)
 	}
+
 	return strms
 }
 
@@ -317,11 +331,13 @@ func (h *lokiHook) push(b bytes.Buffer) error {
 	if res != nil {
 		if res.StatusCode >= 400 {
 			r, _ := ioutil.ReadAll(res.Body) // maybe limit it to something like the first 1000 characters?
-			return fmt.Errorf("Got %d from loki: %s", res.StatusCode, string(r))
+
+			return fmt.Errorf("got %d from loki: %s", res.StatusCode, string(r))
 		}
 		_, _ = io.Copy(ioutil.Discard, res.Body)
 		_ = res.Body.Close()
 	}
+
 	return err
 }
 
@@ -334,6 +350,7 @@ func mapEqual(a, b map[string]string) bool {
 			return false
 		}
 	}
+
 	return true
 }
 
@@ -342,6 +359,7 @@ func (strms *lokiPushMessage) add(entry tmpMsg) {
 	for _, strm := range strms.Streams {
 		if mapEqual(strm.Stream, entry.labels) {
 			foundStrm = strm
+
 			break
 		}
 	}
@@ -364,6 +382,7 @@ type tmpMsg struct {
 
 func (h *lokiHook) Fire(entry *logrus.Entry) error {
 	h.ch <- entry
+
 	return nil
 }
 
@@ -479,5 +498,6 @@ func (l logEntry) MarshalJSON() ([]byte, error) {
 	b = append(b, '"', ',', '"')
 	b = append(b, l.msg...)
 	b = append(b, '"', ']')
+
 	return b, nil
 }

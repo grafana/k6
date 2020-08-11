@@ -87,7 +87,7 @@ func TestSyslogFromConfigLine(t *testing.T) {
 		t.Run(test.line, func(t *testing.T) {
 			// no parallel because this is way too fast and parallel will only slow it down
 
-			res, err := LokiFromConfigLine(context.Background(), test.line)
+			res, err := LokiFromConfigLine(context.Background(), nil, test.line)
 
 			if test.err {
 				require.Error(t, err)
