@@ -3,8 +3,6 @@ jobs:
   deps:
     docker:
       - image: circleci/golang:1.14
-    environment:
-      GOPATH: /home/circleci/.go_workspace
     working_directory: /home/circleci/.go_workspace/src/github.com/loadimpact/k6
     steps:
       - checkout
@@ -35,7 +33,7 @@ jobs:
           command: |
             export PATH="$GOPATH/bin:$PATH"
             command -v golangci-lint && exit
-            GO111MODULE=on go get github.com/golangci/golangci-lint/cmd/golangci-lint@$GOLANGCI_VERSION
+            go get github.com/golangci/golangci-lint/cmd/golangci-lint@$GOLANGCI_VERSION
       - save_cache:
           name: Save golangci-lint cache
           key: golangci-lint-{{ arch }}-{{ checksum "/tmp/.golangci.version" }}-{{ .Environment.CACHE_VERSION }}
@@ -80,8 +78,6 @@ jobs:
   test-prev-golang:
     docker:
       - image: circleci/golang:1.13
-    environment:
-      GOPATH: /home/circleci/.go_workspace
     working_directory: /home/circleci/.go_workspace/src/github.com/loadimpact/k6
     steps:
       - checkout
@@ -93,8 +89,6 @@ jobs:
   build-docker-images:
     docker:
       - image: circleci/golang:1.14
-    environment:
-      GOPATH: /home/circleci/.go_workspace
     working_directory: /home/circleci/.go_workspace/src/github.com/loadimpact/k6
     steps:
       - checkout
