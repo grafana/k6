@@ -83,7 +83,7 @@ func TestPerVUIterationsRunVariableVU(t *testing.T) {
 	t.Parallel()
 	var (
 		result   sync.Map
-		slowVUID int64
+		slowVUID = int64(1)
 	)
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
@@ -92,12 +92,7 @@ func TestPerVUIterationsRunVariableVU(t *testing.T) {
 		t, getTestPerVUIterationsConfig(), es,
 		simpleRunner(func(ctx context.Context) error {
 			state := lib.GetState(ctx)
-			// Pick one VU randomly and always slow it down.
-			sid := atomic.LoadInt64(&slowVUID)
-			if sid == int64(0) {
-				atomic.StoreInt64(&slowVUID, state.Vu)
-			}
-			if sid == state.Vu {
+			if state.Vu == slowVUID {
 				time.Sleep(200 * time.Millisecond)
 			}
 			currIter, _ := result.LoadOrStore(state.Vu, uint64(0))
@@ -125,8 +120,8 @@ func TestPerVUIterationsRunVariableVU(t *testing.T) {
 
 	// The slow VU should complete 16 iterations given these timings,
 	// while the rest should equally complete their assigned 100 iterations.
-	assert.Equal(t, uint64(16), val)
-	assert.Equal(t, uint64(916), totalIters)
+	assert.Equal(t, uint64(15), val)
+	assert.Equal(t, uint64(915), totalIters)
 }
 
 func TestPerVuIterationsEmitDroppedIterations(t *testing.T) {
