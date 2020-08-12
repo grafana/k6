@@ -10,6 +10,7 @@ jobs:
           name: Check dependencies
           command: |
             go version
+            diff <(go mod vendor -v 2>&1 | grep -v 'go: downloading') vendor/modules.txt
             go mod verify
 
   lint:
