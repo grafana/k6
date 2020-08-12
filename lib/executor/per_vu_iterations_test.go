@@ -118,7 +118,7 @@ func TestPerVUIterationsRunVariableVU(t *testing.T) {
 		return true
 	})
 
-	// The slow VU should complete 16 iterations given these timings,
+	// The slow VU should complete 15 iterations given these timings,
 	// while the rest should equally complete their assigned 100 iterations.
 	assert.Equal(t, uint64(15), val)
 	assert.Equal(t, uint64(915), totalIters)
