@@ -151,7 +151,6 @@ func (c *Collector) commit() {
 }
 
 func (c *Collector) extractTagsToValues(tags map[string]string, values map[string]interface{}) map[string]interface{} {
-tags:
 	for tag, kind := range c.fieldKinds {
 		if val, ok := tags[tag]; ok {
 			var v interface{}
@@ -168,10 +167,9 @@ tags:
 			}
 			if err == nil {
 				values[tag] = v
-				delete(tags, tag)
-				continue tags
+			} else {
+				values[tag] = val
 			}
-			values[tag] = val
 			delete(tags, tag)
 		}
 	}
