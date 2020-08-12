@@ -82,8 +82,7 @@ var RootCmd = &cobra.Command{
 	SilenceErrors: true,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		logger := logrus.StandardLogger() // don't use the global one to begin with
-		cliLogOutput := getNullString(cmd.Flags(), "log-output")
-		if !cliLogOutput.Valid {
+		if !cmd.Flags().Changed("log-output") {
 			if envLogOutput, ok := os.LookupEnv("K6_LOG_OUTPUT"); ok {
 				logOutput = envLogOutput
 			}
