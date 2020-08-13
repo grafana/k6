@@ -24,6 +24,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strconv"
 	"sync/atomic"
 	"time"
 
@@ -78,7 +79,7 @@ func (b BlackListedIPError) Error() string {
 
 // DialContext wraps the net.Dialer.DialContext and handles the k6 specifics
 func (d *Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn, error) {
-	dialAddr, err := d.dialAddr(addr)
+	dialAddr, err := d.getDialAddr(addr)
 	if err != nil {
 		return nil, err
 	}
@@ -141,14 +142,14 @@ func (d *Dialer) GetTrail(
 	}
 }
 
-func (d *Dialer) dialAddr(addr string) (string, error) {
+func (d *Dialer) getDialAddr(addr string) (string, error) {
 	remote, err := d.findRemote(addr)
 	if err != nil {
 		return "", err
 	}
 
 	for _, ipnet := range d.Blacklist {
-		if (*net.IPNet)(ipnet).Contains(remote.IP) {
+		if ipnet.Contains(remote.IP) {
 			return "", BlackListedIPError{ip: remote.IP, net: ipnet}
 		}
 	}
@@ -162,7 +163,7 @@ func (d *Dialer) findRemote(addr string) (*lib.HostAddress, error) {
 		return nil, err
 	}
 
-	remote, err := d.preloadRemote(addr, host, port)
+	remote, err := d.getCachedHost(addr, host, port)
 	if err != nil || remote != nil {
 		return remote, err
 	}
@@ -182,23 +183,25 @@ func (d *Dialer) findRemote(addr string) (*lib.HostAddress, error) {
 	return lib.NewHostAddress(ip, port)
 }
 
-func (d *Dialer) preloadRemote(addr, host, port string) (*lib.HostAddress, error) {
+func (d *Dialer) getCachedHost(addr, host, port string) (*lib.HostAddress, error) {
 	// lookup for full address defined in Hosts option before trying to resolve DNS.
-	remote := d.Hosts[addr]
-	if remote == nil {
-		// lookup for host defined in Hosts option before trying to resolve DNS.
-		remote = d.Hosts[host]
+	if remote, ok := d.Hosts[addr]; ok {
+		return remote, nil
 	}
 
-	if remote != nil && remote.Port == 0 && port != "" {
-		var err error
-		remote, err = lib.NewHostAddress(remote.IP, port)
-		if err != nil {
-			return nil, err
+	// lookup for host defined in Hosts option before trying to resolve DNS.
+	if remote, ok := d.Hosts[host]; ok {
+		if remote.Port == 0 && port != "" {
+			newPort, err := strconv.Atoi(port)
+			if err != nil {
+				return nil, err
+			}
+			remote.Port = newPort
 		}
+		return remote, nil
 	}
 
-	return remote, nil
+	return nil, nil
 }
 
 // NetTrail contains information about the exchanged data size and length of a
