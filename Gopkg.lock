@@ -97,17 +97,20 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:263512bb603cd6b834354bbafaa32fd03b3efed71ddfcd1997c2e4a1655434e4"
+  digest = "1:6931c0a301a6b2180a8edb9f6ea5749cb49bb1fa61171453507eed5e51441932"
   name = "github.com/dop251/goja"
   packages = [
     ".",
     "ast",
     "file",
+    "ftoa",
+    "ftoa/internal/fast",
     "parser",
     "token",
+    "unistring",
   ]
   pruneopts = "NUT"
-  revision = "1f8a2ffe986ff105e41a12cc8b82857c3e1c2d44"
+  revision = "cd0eddb06559f22c75fac4aa45d78ee4f8ff3312"
 
 [[projects]]
   branch = "master"

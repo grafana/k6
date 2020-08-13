@@ -2,10 +2,12 @@ package goja
 
 import (
 	"fmt"
-	"github.com/dop251/goja/ast"
-	"github.com/dop251/goja/file"
 	"sort"
 	"strconv"
+
+	"github.com/dop251/goja/ast"
+	"github.com/dop251/goja/file"
+	"github.com/dop251/goja/unistring"
 )
 
 const (
@@ -40,7 +42,7 @@ type Program struct {
 	code   []instruction
 	values []Value
 
-	funcName string
+	funcName unistring.String
 	src      *SrcFile
 	srcMap   []srcMapItem
 }
@@ -57,7 +59,7 @@ type compiler struct {
 }
 
 type scope struct {
-	names      map[string]uint32
+	names      map[unistring.String]uint32
 	outer      *scope
 	strict     bool
 	eval       bool
@@ -67,13 +69,13 @@ type scope struct {
 	argsNeeded bool
 	thisNeeded bool
 
-	namesMap    map[string]string
+	namesMap    map[unistring.String]unistring.String
 	lastFreeTmp int
 }
 
 type block struct {
 	typ        int
-	label      string
+	label      unistring.String
 	needResult bool
 	cont       int
 	breaks     []int
@@ -112,9 +114,9 @@ func (c *compiler) newScope() {
 	}
 	c.scope = &scope{
 		outer:    c.scope,
-		names:    make(map[string]uint32),
+		names:    make(map[unistring.String]uint32),
 		strict:   strict,
-		namesMap: make(map[string]string),
+		namesMap: make(map[unistring.String]unistring.String),
 	}
 }
 
@@ -177,7 +179,7 @@ func (s *scope) isFunction() bool {
 	return s.outer.isFunction()
 }
 
-func (s *scope) lookupName(name string) (idx uint32, found, noDynamics bool) {
+func (s *scope) lookupName(name unistring.String) (idx uint32, found, noDynamics bool) {
 	var level uint32 = 0
 	noDynamics = true
 	for curScope := s; curScope != nil; curScope = curScope.outer {
@@ -187,7 +189,7 @@ func (s *scope) lookupName(name string) (idx uint32, found, noDynamics bool) {
 		if curScope.dynamic {
 			noDynamics = false
 		} else {
-			var mapped string
+			var mapped unistring.String
 			if m, exists := curScope.namesMap[name]; exists {
 				mapped = m
 			} else {
@@ -211,7 +213,7 @@ func (s *scope) lookupName(name string) (idx uint32, found, noDynamics bool) {
 	return
 }
 
-func (s *scope) bindName(name string) (uint32, bool) {
+func (s *scope) bindName(name unistring.String) (uint32, bool) {
 	if s.lexical {
 		return s.outer.bindName(name)
 	}
@@ -224,7 +226,7 @@ func (s *scope) bindName(name string) (uint32, bool) {
 	return idx, true
 }
 
-func (s *scope) bindNameShadow(name string) (uint32, bool) {
+func (s *scope) bindNameShadow(name unistring.String) (uint32, bool) {
 	if s.lexical {
 		return s.outer.bindName(name)
 	}
@@ -235,7 +237,7 @@ func (s *scope) bindNameShadow(name string) (uint32, bool) {
 		unique = false
 		// shadow the var
 		delete(s.names, name)
-		n := strconv.Itoa(int(idx))
+		n := unistring.String(strconv.Itoa(int(idx)))
 		s.names[n] = idx
 	}
 	idx := uint32(len(s.names))
@@ -447,14 +449,14 @@ func (c *compiler) isStrictStatement(s ast.Statement) bool {
 	return false
 }
 
-func (c *compiler) checkIdentifierName(name string, offset int) {
+func (c *compiler) checkIdentifierName(name unistring.String, offset int) {
 	switch name {
 	case "implements", "interface", "let", "package", "private", "protected", "public", "static", "yield":
 		c.throwSyntaxError(offset, "Unexpected strict mode reserved word")
 	}
 }
 
-func (c *compiler) checkIdentifierLName(name string, offset int) {
+func (c *compiler) checkIdentifierLName(name unistring.String, offset int) {
 	switch name {
 	case "eval", "arguments":
 		c.throwSyntaxError(offset, "Assignment to eval or arguments is not allowed in strict mode")
