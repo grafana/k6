@@ -23,6 +23,7 @@ package influxdb
 import (
 	"context"
 	"errors"
+	"strconv"
 	"sync"
 	"time"
 
@@ -31,6 +32,20 @@ import (
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
+)
+
+// FieldKind defines Enum for tag-to-field type conversion
+type FieldKind int
+
+const (
+	// String field (default)
+	String FieldKind = iota
+	// Int field
+	Int
+	// Float field
+	Float
+	// Bool field
+	Bool
 )
 
 // Verify that Collector implements lib.Collector
@@ -45,6 +60,7 @@ type Collector struct {
 	bufferLock  sync.Mutex
 	wg          sync.WaitGroup
 	semaphoreCh chan struct{}
+	fieldKinds  map[string]FieldKind
 }
 
 func New(conf Config) (*Collector, error) {
@@ -56,12 +72,14 @@ func New(conf Config) (*Collector, error) {
 	if conf.ConcurrentWrites.Int64 <= 0 {
 		return nil, errors.New("influxdb's ConcurrentWrites must be a positive number")
 	}
+	fldKinds, err := MakeFieldKinds(conf)
 	return &Collector{
 		Client:      cl,
 		Config:      conf,
 		BatchConf:   batchConf,
 		semaphoreCh: make(chan struct{}, conf.ConcurrentWrites.Int64),
-	}, nil
+		fieldKinds:  fldKinds,
+	}, err
 }
 
 func (c *Collector) Init() error {
@@ -133,9 +151,25 @@ func (c *Collector) commit() {
 }
 
 func (c *Collector) extractTagsToValues(tags map[string]string, values map[string]interface{}) map[string]interface{} {
-	for _, tag := range c.Config.TagsAsFields {
+	for tag, kind := range c.fieldKinds {
 		if val, ok := tags[tag]; ok {
-			values[tag] = val
+			var v interface{}
+			var err error
+			switch kind {
+			case String:
+				v = val
+			case Bool:
+				v, err = strconv.ParseBool(val)
+			case Float:
+				v, err = strconv.ParseFloat(val, 64)
+			case Int:
+				v, err = strconv.ParseInt(val, 10, 64)
+			}
+			if err == nil {
+				values[tag] = v
+			} else {
+				values[tag] = val
+			}
 			delete(tags, tag)
 		}
 	}
