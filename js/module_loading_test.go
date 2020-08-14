@@ -26,6 +26,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
@@ -36,7 +37,7 @@ import (
 )
 
 func newDevNullSampleChannel() chan stats.SampleContainer {
-	var ch = make(chan stats.SampleContainer, 100)
+	ch := make(chan stats.SampleContainer, 100)
 	go func() {
 		for range ch {
 		}
@@ -45,7 +46,7 @@ func newDevNullSampleChannel() chan stats.SampleContainer {
 }
 
 func TestLoadOnceGlobalVars(t *testing.T) {
-	var testCases = map[string]string{
+	testCases := map[string]string{
 		"module.exports": `
 			var globalVar;
 			if (!globalVar) {
@@ -72,7 +73,6 @@ func TestLoadOnceGlobalVars(t *testing.T) {
 	for name, data := range testCases {
 		cData := data
 		t.Run(name, func(t *testing.T) {
-
 			fs := afero.NewMemMapFs()
 			require.NoError(t, afero.WriteFile(fs, "/C.js", []byte(cData), os.ModePerm))
 
@@ -104,7 +104,7 @@ func TestLoadOnceGlobalVars(t *testing.T) {
 			require.NoError(t, err)
 
 			arc := r1.MakeArchive()
-			r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
+			r2, err := NewFromArchive(logrus.StandardLogger(), arc, lib.RuntimeOptions{})
 			require.NoError(t, err)
 
 			runners := map[string]*Runner{"Source": r1, "Archive": r2}
@@ -153,7 +153,7 @@ func TestLoadExportsIsUsableInModule(t *testing.T) {
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
-	r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
+	r2, err := NewFromArchive(logrus.StandardLogger(), arc, lib.RuntimeOptions{})
 	require.NoError(t, err)
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
@@ -200,7 +200,7 @@ func TestLoadDoesntBreakHTTPGet(t *testing.T) {
 
 	require.NoError(t, r1.SetOptions(lib.Options{Hosts: tb.Dialer.Hosts}))
 	arc := r1.MakeArchive()
-	r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
+	r2, err := NewFromArchive(logrus.StandardLogger(), arc, lib.RuntimeOptions{})
 	require.NoError(t, err)
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
@@ -244,7 +244,7 @@ func TestLoadGlobalVarsAreNotSharedBetweenVUs(t *testing.T) {
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
-	r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
+	r2, err := NewFromArchive(logrus.StandardLogger(), arc, lib.RuntimeOptions{})
 	require.NoError(t, err)
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
@@ -307,7 +307,7 @@ func TestLoadCycle(t *testing.T) {
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
-	r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
+	r2, err := NewFromArchive(logrus.StandardLogger(), arc, lib.RuntimeOptions{})
 	require.NoError(t, err)
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
@@ -325,7 +325,6 @@ func TestLoadCycle(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
-
 }
 
 func TestLoadCycleBinding(t *testing.T) {
@@ -369,7 +368,7 @@ func TestLoadCycleBinding(t *testing.T) {
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
-	r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
+	r2, err := NewFromArchive(logrus.StandardLogger(), arc, lib.RuntimeOptions{})
 	require.NoError(t, err)
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
@@ -433,7 +432,7 @@ func TestBrowserified(t *testing.T) {
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
-	r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
+	r2, err := NewFromArchive(logrus.StandardLogger(), arc, lib.RuntimeOptions{})
 	require.NoError(t, err)
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
@@ -452,6 +451,7 @@ func TestBrowserified(t *testing.T) {
 		})
 	}
 }
+
 func TestLoadingUnexistingModuleDoesntPanic(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	data := `var b;
@@ -470,11 +470,11 @@ func TestLoadingUnexistingModuleDoesntPanic(t *testing.T) {
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
-	var buf = &bytes.Buffer{}
+	buf := &bytes.Buffer{}
 	require.NoError(t, arc.Write(buf))
 	arc, err = lib.ReadArchive(buf)
 	require.NoError(t, err)
-	r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
+	r2, err := NewFromArchive(logrus.StandardLogger(), arc, lib.RuntimeOptions{})
 	require.NoError(t, err)
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}

@@ -35,8 +35,8 @@ type console struct {
 }
 
 // Creates a console with the standard logrus logger.
-func newConsole() *console {
-	return &console{logrus.StandardLogger().WithField("source", "console")}
+func newConsole(logger logrus.FieldLogger) *console {
+	return &console{logger.WithField("source", "console")}
 }
 
 // Creates a console logger with its output set to the file at the provided `filepath`.

@@ -126,7 +126,7 @@ func newRuntime(
 		SystemTags:   &stats.DefaultSystemTagSet,
 		Batch:        null.IntFrom(20),
 		BatchPerHost: null.IntFrom(20),
-		//HTTPDebug:    null.StringFrom("full"),
+		// HTTPDebug:    null.StringFrom("full"),
 	}
 	samples := make(chan stats.SampleContainer, 1000)
 
@@ -240,7 +240,6 @@ func TestRequestAndBatch(t *testing.T) {
 		})
 
 		t.Run("post body", func(t *testing.T) {
-
 			tb.Mux.HandleFunc("/post-redirect", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				require.Equal(t, r.Method, "POST")
 				_, _ = io.Copy(ioutil.Discard, r.Body)
@@ -255,7 +254,6 @@ func TestRequestAndBatch(t *testing.T) {
 			`))
 			assert.NoError(t, err)
 		})
-
 	})
 	t.Run("Timeout", func(t *testing.T) {
 		t.Run("10s", func(t *testing.T) {
@@ -1277,13 +1275,13 @@ func TestRequestCompression(t *testing.T) {
 	// We don't expect any failed requests
 	state.Options.Throw = null.BoolFrom(true)
 
-	var text = `
+	text := `
 	Lorem ipsum dolor sit amet, consectetur adipiscing elit.
 	Maecenas sed pharetra sapien. Nunc laoreet molestie ante ac gravida.
 	Etiam interdum dui viverra posuere egestas. Pellentesque at dolor tristique,
 	mattis turpis eget, commodo purus. Nunc orci aliquam.`
 
-	var decompress = func(algo string, input io.Reader) io.Reader {
+	decompress := func(algo string, input io.Reader) io.Reader {
 		switch algo {
 		case "br":
 			w := brotli.NewReader(input)
@@ -1321,8 +1319,8 @@ func TestRequestCompression(t *testing.T) {
 
 		expectedLength, err := strconv.Atoi(r.Header.Get("Content-Length"))
 		require.NoError(t, err)
-		var algos = strings.Split(actualEncoding, ", ")
-		var compressedBuf = new(bytes.Buffer)
+		algos := strings.Split(actualEncoding, ", ")
+		compressedBuf := new(bytes.Buffer)
 		n, err := io.Copy(compressedBuf, r.Body)
 		require.Equal(t, int(n), expectedLength)
 		require.NoError(t, err)
@@ -1340,7 +1338,7 @@ func TestRequestCompression(t *testing.T) {
 		require.Equal(t, text, buf.String())
 	}))
 
-	var testCases = []struct {
+	testCases := []struct {
 		name          string
 		compression   string
 		expectedError string
@@ -1371,7 +1369,7 @@ func TestRequestCompression(t *testing.T) {
 	for _, testCase := range testCases {
 		testCase := testCase
 		t.Run(testCase.compression, func(t *testing.T) {
-			var algos = strings.Split(testCase.compression, ",")
+			algos := strings.Split(testCase.compression, ",")
 			for i, algo := range algos {
 				algos[i] = strings.TrimSpace(algo)
 			}
@@ -1386,7 +1384,6 @@ func TestRequestCompression(t *testing.T) {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), testCase.expectedError)
 			}
-
 		})
 	}
 
@@ -1433,7 +1430,7 @@ func TestRequestCompression(t *testing.T) {
 			require.Empty(t, logHook.Drain())
 		})
 
-		//TODO: move to some other test?
+		// TODO: move to some other test?
 		t.Run("correct length", func(t *testing.T) {
 			_, err := common.RunString(rt, tb.Replacer.Replace(
 				`http.post("HTTPBIN_URL/post", "0123456789", { "headers": {"Content-Length": "10"}});`,
@@ -1568,7 +1565,7 @@ func TestResponseTypes(t *testing.T) {
 }
 
 func checkErrorCode(t testing.TB, tags *stats.SampleTags, code int, msg string) {
-	var errorMsg, ok = tags.Get("error")
+	errorMsg, ok := tags.Get("error")
 	if msg == "" {
 		assert.False(t, ok)
 	} else {
@@ -1578,7 +1575,7 @@ func checkErrorCode(t testing.TB, tags *stats.SampleTags, code int, msg string) 
 	if code == 0 {
 		assert.False(t, ok)
 	} else {
-		var errorCode, err = strconv.Atoi(errorCodeStr)
+		errorCode, err := strconv.Atoi(errorCodeStr)
 		assert.NoError(t, err)
 		assert.Equal(t, code, errorCode)
 	}
@@ -1600,7 +1597,7 @@ func TestErrorCodes(t *testing.T) {
 		w.WriteHeader(302)
 	}))
 
-	var testCases = []struct {
+	testCases := []struct {
 		name                string
 		status              int
 		moreSamples         int
@@ -1684,7 +1681,7 @@ func TestErrorCodes(t *testing.T) {
 				require.Error(t, err)
 				require.Equal(t, err.Error(), testCase.expectedScriptError)
 			}
-			var cs = stats.GetBufferedSamples(samples)
+			cs := stats.GetBufferedSamples(samples)
 			assert.Len(t, cs, 1+testCase.moreSamples)
 			for _, c := range cs[len(cs)-1:] {
 				assert.NotZero(t, len(c.GetSamples()))

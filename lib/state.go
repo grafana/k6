@@ -45,6 +45,7 @@ type State struct {
 	Options Options
 
 	// Logger. Avoid using the global logger.
+	// TODO change to logrus.FieldLogger when there is time to fix all the tests
 	Logger *logrus.Logger
 
 	// Current group; all emitted metrics are tagged with this.

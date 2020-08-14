@@ -26,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -116,6 +117,7 @@ func TestSetupDataMarshalling(t *testing.T) {
 	`))
 
 	runner, err := js.New(
+		logrus.StandardLogger(),
 		&loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script},
 		nil,
 		lib.RuntimeOptions{},

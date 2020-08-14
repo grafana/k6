@@ -26,6 +26,7 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -233,6 +234,7 @@ func testRuntimeOptionsCase(t *testing.T, tc runtimeOptionsTestCase) {
 	fs := afero.NewMemMapFs()
 	require.NoError(t, afero.WriteFile(fs, "/script.js", jsCode.Bytes(), 0644))
 	runner, err := newRunner(
+		logrus.StandardLogger(),
 		&loader.SourceData{Data: jsCode.Bytes(), URL: &url.URL{Path: "/script.js", Scheme: "file"}},
 		typeJS,
 		map[string]afero.Fs{"file": fs},
@@ -246,6 +248,7 @@ func testRuntimeOptionsCase(t *testing.T, tc runtimeOptionsTestCase) {
 
 	getRunnerErr := func(rtOpts lib.RuntimeOptions) (lib.Runner, error) {
 		return newRunner(
+			logrus.StandardLogger(),
 			&loader.SourceData{
 				Data: archiveBuf.Bytes(),
 				URL:  &url.URL{Path: "/script.js"},

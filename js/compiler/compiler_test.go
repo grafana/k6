@@ -24,13 +24,14 @@ import (
 	"testing"
 
 	"github.com/dop251/goja"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/loadimpact/k6/lib"
 )
 
 func TestTransform(t *testing.T) {
-	c := New()
+	c := New(logrus.StandardLogger())
 	t.Run("blank", func(t *testing.T) {
 		src, _, err := c.Transform("", "test.js")
 		assert.NoError(t, err)
@@ -70,7 +71,7 @@ func TestTransform(t *testing.T) {
 }
 
 func TestCompile(t *testing.T) {
-	c := New()
+	c := New(logrus.StandardLogger())
 	t.Run("ES5", func(t *testing.T) {
 		src := `1+(function() { return 2; })()`
 		pgm, code, err := c.Compile(src, "script.js", "", "", true, lib.CompatibilityModeBase)

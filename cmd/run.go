@@ -125,7 +125,7 @@ a commandline interface for interacting with it.`,
 			return err
 		}
 
-		r, err := newRunner(src, runType, filesystems, runtimeOptions)
+		r, err := newRunner(logger, src, runType, filesystems, runtimeOptions)
 		if err != nil {
 			return err
 		}
@@ -322,16 +322,16 @@ a commandline interface for interacting with it.`,
 		if conf.SummaryExport.ValueOrZero() != "" {
 			f, err := os.Create(conf.SummaryExport.String)
 			if err != nil {
-				logrus.WithError(err).Error("failed to create summary export file")
+				logger.WithError(err).Error("failed to create summary export file")
 			} else {
 				defer func() {
 					if err := f.Close(); err != nil {
-						logrus.WithError(err).Error("failed to close summary export file")
+						logger.WithError(err).Error("failed to close summary export file")
 					}
 				}()
 				s := ui.NewSummary(conf.SummaryTrendStats)
 				if err := s.SummarizeMetricsJSON(f, data); err != nil {
-					logrus.WithError(err).Error("failed to make summary export file")
+					logger.WithError(err).Error("failed to make summary export file")
 				}
 			}
 		}
@@ -432,13 +432,13 @@ func init() {
 
 // Creates a new runner.
 func newRunner(
-	src *loader.SourceData, typ string, filesystems map[string]afero.Fs, rtOpts lib.RuntimeOptions,
+	logger *logrus.Logger, src *loader.SourceData, typ string, filesystems map[string]afero.Fs, rtOpts lib.RuntimeOptions,
 ) (lib.Runner, error) {
 	switch typ {
 	case "":
-		return newRunner(src, detectType(src.Data), filesystems, rtOpts)
+		return newRunner(logger, src, detectType(src.Data), filesystems, rtOpts)
 	case typeJS:
-		return js.New(src, filesystems, rtOpts)
+		return js.New(logger, src, filesystems, rtOpts)
 	case typeArchive:
 		arc, err := lib.ReadArchive(bytes.NewReader(src.Data))
 		if err != nil {
@@ -446,7 +446,7 @@ func newRunner(
 		}
 		switch arc.Type {
 		case typeJS:
-			return js.NewFromArchive(arc, rtOpts)
+			return js.NewFromArchive(logger, arc, rtOpts)
 		default:
 			return nil, errors.Errorf("archive requests unsupported runner: %s", arc.Type)
 		}
