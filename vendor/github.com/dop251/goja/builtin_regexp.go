@@ -450,12 +450,19 @@ func (r *regexpObject) writeEscapedSource(sb *valueStringBuilder) bool {
 	pos := 0
 	lastPos := 0
 	rd := &lenientUtf16Decoder{utf16Reader: r.source.utf16Reader(0)}
+L:
 	for {
 		c, size, err := rd.ReadRune()
 		if err != nil {
 			break
 		}
 		switch c {
+		case '\\':
+			pos++
+			_, size, err = rd.ReadRune()
+			if err != nil {
+				break L
+			}
 		case '/', '\u000a', '\u000d', '\u2028', '\u2029':
 			sb.WriteSubstring(r.source, lastPos, pos)
 			sb.WriteRune('\\')
