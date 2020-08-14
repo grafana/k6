@@ -33,6 +33,7 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -61,6 +62,7 @@ func getSimpleBundle(filename, data string, opts ...interface{}) (*Bundle, error
 		}
 	}
 	return NewBundle(
+		logrus.StandardLogger(),
 		&loader.SourceData{
 			URL:  &url.URL{Path: filename, Scheme: "file"},
 			Data: []byte(data),
@@ -433,9 +435,10 @@ func TestNewBundleFromArchive(t *testing.T) {
 	baseCompatModeRtOpts := lib.RuntimeOptions{CompatibilityMode: null.StringFrom(lib.CompatibilityModeBase.String())}
 	extCompatModeRtOpts := lib.RuntimeOptions{CompatibilityMode: null.StringFrom(lib.CompatibilityModeExtended.String())}
 
+	logger := logrus.StandardLogger()
 	checkBundle := func(t *testing.T, b *Bundle) {
 		assert.Equal(t, lib.Options{VUs: null.IntFrom(12345)}, b.Options)
-		bi, err := b.Instantiate(0)
+		bi, err := b.Instantiate(logger, 0)
 		require.NoError(t, err)
 		val, err := bi.exports[consts.DefaultFn](goja.Undefined())
 		require.NoError(t, err)
@@ -443,7 +446,7 @@ func TestNewBundleFromArchive(t *testing.T) {
 	}
 
 	checkArchive := func(t *testing.T, arc *lib.Archive, rtOpts lib.RuntimeOptions, expError string) {
-		b, err := NewBundleFromArchive(arc, rtOpts)
+		b, err := NewBundleFromArchive(logger, arc, rtOpts)
 		if expError != "" {
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), expError)
@@ -526,9 +529,9 @@ func TestNewBundleFromArchive(t *testing.T) {
 			PwdURL:      &url.URL{Scheme: "file", Path: "/"},
 			Filesystems: nil,
 		}
-		b, err := NewBundleFromArchive(arc, lib.RuntimeOptions{})
+		b, err := NewBundleFromArchive(logger, arc, lib.RuntimeOptions{})
 		require.NoError(t, err)
-		bi, err := b.Instantiate(0)
+		bi, err := b.Instantiate(logger, 0)
 		require.NoError(t, err)
 		val, err := bi.exports[consts.DefaultFn](goja.Undefined())
 		require.NoError(t, err)
@@ -629,6 +632,8 @@ func TestOpen(t *testing.T) {
 		},
 	}
 
+	logger := logrus.StandardLogger()
+
 	for name, fsInit := range fss {
 		fs, prefix, cleanUp := fsInit()
 		defer cleanUp()
@@ -661,14 +666,14 @@ func TestOpen(t *testing.T) {
 					}
 					require.NoError(t, err)
 
-					arcBundle, err := NewBundleFromArchive(sourceBundle.makeArchive(), lib.RuntimeOptions{})
+					arcBundle, err := NewBundleFromArchive(logger, sourceBundle.makeArchive(), lib.RuntimeOptions{})
 
 					require.NoError(t, err)
 
 					for source, b := range map[string]*Bundle{"source": sourceBundle, "archive": arcBundle} {
 						b := b
 						t.Run(source, func(t *testing.T) {
-							bi, err := b.Instantiate(0)
+							bi, err := b.Instantiate(logger, 0)
 							require.NoError(t, err)
 							v, err := bi.exports[consts.DefaultFn](goja.Undefined())
 							require.NoError(t, err)
@@ -701,8 +706,9 @@ func TestBundleInstantiate(t *testing.T) {
 	if !assert.NoError(t, err) {
 		return
 	}
+	logger := logrus.StandardLogger()
 
-	bi, err := b.Instantiate(0)
+	bi, err := b.Instantiate(logger, 0)
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -733,7 +739,7 @@ func TestBundleInstantiate(t *testing.T) {
 		// Ensure options propagate correctly from outside to the script
 		optOrig := b.Options.VUs
 		b.Options.VUs = null.IntFrom(10)
-		bi2, err := b.Instantiate(0)
+		bi2, err := b.Instantiate(logger, 0)
 		assert.NoError(t, err)
 		jsOptions = bi2.Runtime.Get("options").ToObject(bi2.Runtime)
 		vus = jsOptions.Get("vus").Export()
@@ -758,7 +764,8 @@ func TestBundleEnv(t *testing.T) {
 		return
 	}
 
-	b2, err := NewBundleFromArchive(b1.makeArchive(), lib.RuntimeOptions{})
+	logger := logrus.StandardLogger()
+	b2, err := NewBundleFromArchive(logger, b1.makeArchive(), lib.RuntimeOptions{})
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -770,7 +777,7 @@ func TestBundleEnv(t *testing.T) {
 			assert.Equal(t, "1", b.Env["TEST_A"])
 			assert.Equal(t, "", b.Env["TEST_B"])
 
-			bi, err := b.Instantiate(0)
+			bi, err := b.Instantiate(logger, 0)
 			if assert.NoError(t, err) {
 				_, err := bi.exports[consts.DefaultFn](goja.Undefined())
 				assert.NoError(t, err)
@@ -796,8 +803,9 @@ func TestBundleNotSharable(t *testing.T) {
 	if !assert.NoError(t, err) {
 		return
 	}
+	logger := logrus.StandardLogger()
 
-	b2, err := NewBundleFromArchive(b1.makeArchive(), lib.RuntimeOptions{})
+	b2, err := NewBundleFromArchive(logger, b1.makeArchive(), lib.RuntimeOptions{})
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -808,7 +816,7 @@ func TestBundleNotSharable(t *testing.T) {
 		b := b
 		t.Run(name, func(t *testing.T) {
 			for i := 0; i < vus; i++ {
-				bi, err := b.Instantiate(int64(i))
+				bi, err := b.Instantiate(logger, int64(i))
 				require.NoError(t, err)
 				for j := 0; j < iters; j++ {
 					bi.Runtime.Set("__ITER", j)

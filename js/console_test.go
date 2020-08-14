@@ -85,6 +85,7 @@ func getSimpleRunner(filename, data string, opts ...interface{}) (*Runner, error
 		}
 	}
 	return New(
+		logrus.StandardLogger(),
 		&loader.SourceData{
 			URL:  &url.URL{Path: filename, Scheme: "file"},
 			Data: []byte(data),

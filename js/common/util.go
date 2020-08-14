@@ -22,6 +22,7 @@ package common
 
 import (
 	"github.com/dop251/goja"
+	"github.com/sirupsen/logrus"
 
 	"github.com/loadimpact/k6/js/compiler"
 )
@@ -34,7 +35,7 @@ func RunString(rt *goja.Runtime, src string) (goja.Value, error) {
 // RunES6String Runs an ES6 string in the given runtime. Use this rather than writing ES5 in tests.
 func RunES6String(rt *goja.Runtime, src string) (goja.Value, error) {
 	var err error
-	c := compiler.New()
+	c := compiler.New(logrus.StandardLogger()) // TODO drop it ? maybe we will drop babel and this will be less needed
 	src, _, err = c.Transform(src, "__string__")
 	if err != nil {
 		return goja.Undefined(), err
@@ -42,7 +43,7 @@ func RunES6String(rt *goja.Runtime, src string) (goja.Value, error) {
 	return RunString(rt, src)
 }
 
-// Throws a JS error; avoids re-wrapping GoErrors.
+// Throw a JS error; avoids re-wrapping GoErrors.
 func Throw(rt *goja.Runtime, err error) {
 	if e, ok := err.(*goja.Exception); ok {
 		panic(e)

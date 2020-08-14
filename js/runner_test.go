@@ -99,7 +99,7 @@ func TestRunnerGetDefaultGroup(t *testing.T) {
 		assert.NotNil(t, r1.GetDefaultGroup())
 	}
 
-	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{})
+	r2, err := NewFromArchive(logrus.StandardLogger(), r1.MakeArchive(), lib.RuntimeOptions{})
 	if assert.NoError(t, err) {
 		assert.NotNil(t, r2.GetDefaultGroup())
 	}
@@ -111,7 +111,7 @@ func TestRunnerOptions(t *testing.T) {
 		return
 	}
 
-	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{})
+	r2, err := NewFromArchive(logrus.StandardLogger(), r1.MakeArchive(), lib.RuntimeOptions{})
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -199,7 +199,7 @@ func TestOptionsPropagationToScript(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, expScriptOptions, r1.GetOptions())
 
-	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{Env: map[string]string{"expectedSetupTimeout": "3s"}})
+	r2, err := NewFromArchive(logrus.StandardLogger(), r1.MakeArchive(), lib.RuntimeOptions{Env: map[string]string{"expectedSetupTimeout": "3s"}})
 
 	require.NoError(t, err)
 	require.Equal(t, expScriptOptions, r2.GetOptions())
@@ -478,7 +478,7 @@ func TestRunnerIntegrationImports(t *testing.T) {
 					}`, data.path), fs)
 				require.NoError(t, err)
 
-				r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{})
+				r2, err := NewFromArchive(logrus.StandardLogger(), r1.MakeArchive(), lib.RuntimeOptions{})
 				require.NoError(t, err)
 
 				testdata := map[string]*Runner{"Source": r1, "Archive": r2}
@@ -507,7 +507,7 @@ func TestVURunContext(t *testing.T) {
 	require.NoError(t, err)
 	r1.SetOptions(r1.GetOptions().Apply(lib.Options{Throw: null.BoolFrom(true)}))
 
-	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{})
+	r2, err := NewFromArchive(logrus.StandardLogger(), r1.MakeArchive(), lib.RuntimeOptions{})
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -558,7 +558,7 @@ func TestVURunInterrupt(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, r1.SetOptions(lib.Options{Throw: null.BoolFrom(true)}))
 
-	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{})
+	r2, err := NewFromArchive(logrus.StandardLogger(), r1.MakeArchive(), lib.RuntimeOptions{})
 	require.NoError(t, err)
 	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range testdata {
@@ -596,7 +596,7 @@ func TestVURunInterruptDoesntPanic(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, r1.SetOptions(lib.Options{Throw: null.BoolFrom(true)}))
 
-	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{})
+	r2, err := NewFromArchive(logrus.StandardLogger(), r1.MakeArchive(), lib.RuntimeOptions{})
 	require.NoError(t, err)
 	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range testdata {
@@ -651,7 +651,7 @@ func TestVUIntegrationGroups(t *testing.T) {
 		`)
 	require.NoError(t, err)
 
-	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{})
+	r2, err := NewFromArchive(logrus.StandardLogger(), r1.MakeArchive(), lib.RuntimeOptions{})
 	require.NoError(t, err)
 
 	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
@@ -704,7 +704,7 @@ func TestVUIntegrationMetrics(t *testing.T) {
 		`)
 	require.NoError(t, err)
 
-	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{})
+	r2, err := NewFromArchive(logrus.StandardLogger(), r1.MakeArchive(), lib.RuntimeOptions{})
 	require.NoError(t, err)
 
 	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
@@ -778,7 +778,7 @@ func TestVUIntegrationInsecureRequests(t *testing.T) {
 			require.NoError(t, err)
 			require.NoError(t, r1.SetOptions(lib.Options{Throw: null.BoolFrom(true)}.Apply(data.opts)))
 
-			r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{})
+			r2, err := NewFromArchive(logrus.StandardLogger(), r1.MakeArchive(), lib.RuntimeOptions{})
 			require.NoError(t, err)
 			runners := map[string]*Runner{"Source": r1, "Archive": r2}
 			for name, r := range runners {
@@ -824,7 +824,7 @@ func TestVUIntegrationBlacklistOption(t *testing.T) {
 		BlacklistIPs: []*lib.IPNet{cidr},
 	}))
 
-	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{})
+	r2, err := NewFromArchive(logrus.StandardLogger(), r1.MakeArchive(), lib.RuntimeOptions{})
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -862,7 +862,7 @@ func TestVUIntegrationBlacklistScript(t *testing.T) {
 		return
 	}
 
-	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{})
+	r2, err := NewFromArchive(logrus.StandardLogger(), r1.MakeArchive(), lib.RuntimeOptions{})
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -914,7 +914,7 @@ func TestVUIntegrationHosts(t *testing.T) {
 		},
 	})
 
-	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{})
+	r2, err := NewFromArchive(logrus.StandardLogger(), r1.MakeArchive(), lib.RuntimeOptions{})
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -988,7 +988,7 @@ func TestVUIntegrationTLSConfig(t *testing.T) {
 			}
 			require.NoError(t, r1.SetOptions(lib.Options{Throw: null.BoolFrom(true)}.Apply(data.opts)))
 
-			r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{})
+			r2, err := NewFromArchive(logrus.StandardLogger(), r1.MakeArchive(), lib.RuntimeOptions{})
 			if !assert.NoError(t, err) {
 				return
 			}
@@ -1082,7 +1082,7 @@ func TestVUIntegrationCookiesReset(t *testing.T) {
 		Hosts:        tb.Dialer.Hosts,
 	})
 
-	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{})
+	r2, err := NewFromArchive(logrus.StandardLogger(), r1.MakeArchive(), lib.RuntimeOptions{})
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -1141,7 +1141,7 @@ func TestVUIntegrationCookiesNoReset(t *testing.T) {
 		NoCookiesReset: null.BoolFrom(true),
 	})
 
-	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{})
+	r2, err := NewFromArchive(logrus.StandardLogger(), r1.MakeArchive(), lib.RuntimeOptions{})
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -1178,7 +1178,7 @@ func TestVUIntegrationVUID(t *testing.T) {
 	}
 	r1.SetOptions(lib.Options{Throw: null.BoolFrom(true)})
 
-	r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{})
+	r2, err := NewFromArchive(logrus.StandardLogger(), r1.MakeArchive(), lib.RuntimeOptions{})
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -1278,7 +1278,7 @@ func TestVUIntegrationClientCerts(t *testing.T) {
 	}))
 
 	t.Run("Unauthenticated", func(t *testing.T) {
-		r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{})
+		r2, err := NewFromArchive(logrus.StandardLogger(), r1.MakeArchive(), lib.RuntimeOptions{})
 		if !assert.NoError(t, err) {
 			return
 		}
@@ -1328,7 +1328,7 @@ func TestVUIntegrationClientCerts(t *testing.T) {
 	}))
 
 	t.Run("Authenticated", func(t *testing.T) {
-		r2, err := NewFromArchive(r1.MakeArchive(), lib.RuntimeOptions{})
+		r2, err := NewFromArchive(logrus.StandardLogger(), r1.MakeArchive(), lib.RuntimeOptions{})
 		if !assert.NoError(t, err) {
 			return
 		}
@@ -1476,7 +1476,7 @@ func TestArchiveRunningIntegrity(t *testing.T) {
 
 	arc, err := lib.ReadArchive(buf)
 	require.NoError(t, err)
-	r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
+	r2, err := NewFromArchive(logrus.StandardLogger(), arc, lib.RuntimeOptions{})
 	require.NoError(t, err)
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
@@ -1511,7 +1511,7 @@ func TestArchiveNotPanicking(t *testing.T) {
 
 	arc := r1.MakeArchive()
 	arc.Filesystems = map[string]afero.Fs{"file": afero.NewMemMapFs()}
-	r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
+	r2, err := NewFromArchive(logrus.StandardLogger(), arc, lib.RuntimeOptions{})
 	// we do want this to error here as this is where we find out that a given file is not in the
 	// archive
 	require.Error(t, err)
@@ -1630,7 +1630,7 @@ func TestSystemTags(t *testing.T) {
 		{"error", "bad_url_get", `dial: connection refused`},
 		{"error_code", "bad_url_get", "1212"},
 		{"scenario", "http_get", "default"},
-		//TODO: add more tests
+		// TODO: add more tests
 	}
 
 	samples := make(chan stats.SampleContainer, 100)

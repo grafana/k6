@@ -25,6 +25,7 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/loadimpact/k6/js"
@@ -33,7 +34,7 @@ import (
 )
 
 func TestBuildK6Headers(t *testing.T) {
-	var headers = []struct {
+	headers := []struct {
 		values   []Header
 		expected []string
 	}{
@@ -57,7 +58,7 @@ func TestBuildK6RequestObject(t *testing.T) {
 	}
 	v, err := buildK6RequestObject(req)
 	assert.NoError(t, err)
-	_, err = js.New(&loader.SourceData{
+	_, err = js.New(logrus.StandardLogger(), &loader.SourceData{
 		URL:  &url.URL{Path: "/script.js"},
 		Data: []byte(fmt.Sprintf("export default function() { res = http.batch([%v]); }", v)),
 	}, nil, lib.RuntimeOptions{})
@@ -65,7 +66,6 @@ func TestBuildK6RequestObject(t *testing.T) {
 }
 
 func TestBuildK6Body(t *testing.T) {
-
 	bodyText := "ccustemail=ppcano%40gmail.com&size=medium&topping=cheese&delivery=12%3A00&comments="
 
 	req := &Request{

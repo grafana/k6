@@ -28,6 +28,7 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 
 	"github.com/loadimpact/k6/js/common"
@@ -59,14 +60,16 @@ type BundleInstance struct {
 	Runtime *goja.Runtime
 	Context *context.Context
 
-	//TODO: maybe just have a reference to the Bundle? or save and pass rtOpts?
+	// TODO: maybe just have a reference to the Bundle? or save and pass rtOpts?
 	env map[string]string
 
 	exports map[string]goja.Callable
 }
 
 // NewBundle creates a new bundle from a source file and a filesystem.
-func NewBundle(src *loader.SourceData, filesystems map[string]afero.Fs, rtOpts lib.RuntimeOptions) (*Bundle, error) {
+func NewBundle(
+	logger logrus.FieldLogger, src *loader.SourceData, filesystems map[string]afero.Fs, rtOpts lib.RuntimeOptions,
+) (*Bundle, error) {
 	compatMode, err := lib.ValidateCompatibilityMode(rtOpts.CompatibilityMode.String)
 	if err != nil {
 		return nil, err
@@ -74,7 +77,7 @@ func NewBundle(src *loader.SourceData, filesystems map[string]afero.Fs, rtOpts l
 
 	// Compile sources, both ES5 and ES6 are supported.
 	code := string(src.Data)
-	c := compiler.New()
+	c := compiler.New(logger)
 	pgm, _, err := c.Compile(code, src.URL.String(), "", "", true, compatMode)
 	if err != nil {
 		return nil, err
@@ -85,13 +88,13 @@ func NewBundle(src *loader.SourceData, filesystems map[string]afero.Fs, rtOpts l
 		Filename: src.URL,
 		Source:   code,
 		Program:  pgm,
-		BaseInitContext: NewInitContext(rt, c, compatMode, new(context.Context),
+		BaseInitContext: NewInitContext(logger, rt, c, compatMode, new(context.Context),
 			filesystems, loader.Dir(src.URL)),
 		Env:               rtOpts.Env,
 		CompatibilityMode: compatMode,
 		exports:           make(map[string]goja.Callable),
 	}
-	if err = bundle.instantiate(rt, bundle.BaseInitContext, 0); err != nil {
+	if err = bundle.instantiate(logger, rt, bundle.BaseInitContext, 0); err != nil {
 		return nil, err
 	}
 
@@ -104,7 +107,7 @@ func NewBundle(src *loader.SourceData, filesystems map[string]afero.Fs, rtOpts l
 }
 
 // NewBundleFromArchive creates a new bundle from an lib.Archive.
-func NewBundleFromArchive(arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle, error) {
+func NewBundleFromArchive(logger logrus.FieldLogger, arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle, error) {
 	if arc.Type != "js" {
 		return nil, errors.Errorf("expected bundle type 'js', got '%s'", arc.Type)
 	}
@@ -120,13 +123,13 @@ func NewBundleFromArchive(arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle,
 		return nil, err
 	}
 
-	c := compiler.New()
+	c := compiler.New(logger)
 	pgm, _, err := c.Compile(string(arc.Data), arc.FilenameURL.String(), "", "", true, compatMode)
 	if err != nil {
 		return nil, err
 	}
 	rt := goja.New()
-	initctx := NewInitContext(rt, c, compatMode,
+	initctx := NewInitContext(logger, rt, c, compatMode,
 		new(context.Context), arc.Filesystems, arc.PwdURL)
 
 	env := arc.Env
@@ -149,7 +152,7 @@ func NewBundleFromArchive(arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle,
 		exports:           make(map[string]goja.Callable),
 	}
 
-	if err = bundle.instantiate(rt, bundle.BaseInitContext, 0); err != nil {
+	if err = bundle.instantiate(logger, rt, bundle.BaseInitContext, 0); err != nil {
 		return nil, err
 	}
 
@@ -225,7 +228,7 @@ func (b *Bundle) getExports(rt *goja.Runtime, options bool) error {
 }
 
 // Instantiate creates a new runtime from this bundle.
-func (b *Bundle) Instantiate(vuID int64) (bi *BundleInstance, instErr error) {
+func (b *Bundle) Instantiate(logger logrus.FieldLogger, vuID int64) (bi *BundleInstance, instErr error) {
 	// TODO: actually use a real context here, so that the instantiation can be killed
 	// Placeholder for a real context.
 	ctxPtr := new(context.Context)
@@ -234,7 +237,7 @@ func (b *Bundle) Instantiate(vuID int64) (bi *BundleInstance, instErr error) {
 	// runtime, but no state, to allow module-provided types to function within the init context.
 	rt := goja.New()
 	init := newBoundInitContext(b.BaseInitContext, ctxPtr, rt)
-	if err := b.instantiate(rt, init, vuID); err != nil {
+	if err := b.instantiate(logger, rt, init, vuID); err != nil {
 		return nil, err
 	}
 
@@ -272,7 +275,7 @@ func (b *Bundle) Instantiate(vuID int64) (bi *BundleInstance, instErr error) {
 
 // Instantiates the bundle into an existing runtime. Not public because it also messes with a bunch
 // of other things, will potentially thrash data and makes a mess in it if the operation fails.
-func (b *Bundle) instantiate(rt *goja.Runtime, init *InitContext, vuID int64) error {
+func (b *Bundle) instantiate(logger logrus.FieldLogger, rt *goja.Runtime, init *InitContext, vuID int64) error {
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 	rt.SetRandSource(common.NewRandSource())
 
@@ -294,7 +297,7 @@ func (b *Bundle) instantiate(rt *goja.Runtime, init *InitContext, vuID int64) er
 	}
 	rt.Set("__ENV", env)
 	rt.Set("__VU", vuID)
-	rt.Set("console", common.Bind(rt, newConsole(), init.ctxPtr))
+	rt.Set("console", common.Bind(rt, newConsole(logger), init.ctxPtr))
 
 	*init.ctxPtr = common.WithRuntime(context.Background(), rt)
 	unbindInit := common.BindToGlobal(rt, common.Bind(rt, init, init.ctxPtr))

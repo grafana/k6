@@ -46,6 +46,7 @@ import (
 )
 
 func TestInitContextRequire(t *testing.T) {
+	logger := logrus.StandardLogger()
 	t.Run("Modules", func(t *testing.T) {
 		t.Run("Nonexistent", func(t *testing.T) {
 			_, err := getSimpleBundle("/script.js", `import "k6/NONEXISTENT";`)
@@ -63,7 +64,7 @@ func TestInitContextRequire(t *testing.T) {
 				return
 			}
 
-			bi, err := b.Instantiate(0)
+			bi, err := b.Instantiate(logger, 0)
 			if !assert.NoError(t, err, "instance error") {
 				return
 			}
@@ -92,7 +93,7 @@ func TestInitContextRequire(t *testing.T) {
 					return
 				}
 
-				bi, err := b.Instantiate(0)
+				bi, err := b.Instantiate(logger, 0)
 				if !assert.NoError(t, err) {
 					return
 				}
@@ -200,7 +201,7 @@ func TestInitContextRequire(t *testing.T) {
 							assert.Contains(t, b.BaseInitContext.programs, "file://"+constPath)
 						}
 
-						_, err = b.Instantiate(0)
+						_, err = b.Instantiate(logger, 0)
 						if !assert.NoError(t, err) {
 							return
 						}
@@ -226,7 +227,7 @@ func TestInitContextRequire(t *testing.T) {
 				return
 			}
 
-			bi, err := b.Instantiate(0)
+			bi, err := b.Instantiate(logger, 0)
 			if !assert.NoError(t, err) {
 				return
 			}
@@ -260,7 +261,7 @@ func createAndReadFile(t *testing.T, file string, content []byte, expectedLength
 		return nil, err
 	}
 
-	bi, err := b.Instantiate(0)
+	bi, err := b.Instantiate(logrus.StandardLogger(), 0)
 	if !assert.NoError(t, err) {
 		return nil, err
 	}
@@ -268,7 +269,6 @@ func createAndReadFile(t *testing.T, file string, content []byte, expectedLength
 }
 
 func TestInitContextOpen(t *testing.T) {
-
 	testCases := []struct {
 		content []byte
 		file    string
@@ -372,7 +372,7 @@ func TestRequestWithBinaryFile(t *testing.T) {
 			`, srv.URL), fs)
 	require.NoError(t, err)
 
-	bi, err := b.Instantiate(0)
+	bi, err := b.Instantiate(logrus.StandardLogger(), 0)
 	assert.NoError(t, err)
 
 	root, err := lib.NewGroup("", nil)
@@ -416,7 +416,7 @@ func TestInitContextVU(t *testing.T) {
 		export default function() { return vu; }
 	`)
 	require.NoError(t, err)
-	bi, err := b.Instantiate(5)
+	bi, err := b.Instantiate(logrus.StandardLogger(), 5)
 	require.NoError(t, err)
 	v, err := bi.exports[consts.DefaultFn](goja.Undefined())
 	require.NoError(t, err)

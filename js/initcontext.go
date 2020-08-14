@@ -65,11 +65,13 @@ type InitContext struct {
 	programs map[string]programWithSource
 
 	compatibilityMode lib.CompatibilityMode
+
+	logger logrus.FieldLogger
 }
 
 // NewInitContext creates a new initcontext with the provided arguments
 func NewInitContext(
-	rt *goja.Runtime, c *compiler.Compiler, compatMode lib.CompatibilityMode,
+	logger logrus.FieldLogger, rt *goja.Runtime, c *compiler.Compiler, compatMode lib.CompatibilityMode,
 	ctxPtr *context.Context, filesystems map[string]afero.Fs, pwd *url.URL,
 ) *InitContext {
 	return &InitContext{
@@ -80,6 +82,7 @@ func NewInitContext(
 		pwd:               pwd,
 		programs:          make(map[string]programWithSource),
 		compatibilityMode: compatMode,
+		logger:            logger,
 	}
 }
 
@@ -104,6 +107,7 @@ func newBoundInitContext(base *InitContext, ctxPtr *context.Context, rt *goja.Ru
 
 		programs:          programs,
 		compatibilityMode: base.compatibilityMode,
+		logger:            base.logger,
 	}
 }
 
@@ -156,7 +160,7 @@ func (i *InitContext) requireFile(name string) (goja.Value, error) {
 		if pgm.pgm == nil {
 			// Load the sources; the loader takes care of remote loading, etc.
 			// TODO: don't use the Global logger
-			data, err := loader.Load(logrus.StandardLogger(), i.filesystems, fileURL, name)
+			data, err := loader.Load(i.logger, i.filesystems, fileURL, name)
 			if err != nil {
 				return goja.Undefined(), err
 			}
