@@ -324,7 +324,7 @@ func (c *Collector) Collect(sampleContainers []stats.SampleContainer) {
 				Type:   DataTypeMap,
 				Metric: "iter_li_all",
 				Data: &SampleDataMap{
-					Time:   Timestamp(sc.GetTime()),
+					Time:   toMicroSecond(sc.GetTime()),
 					Tags:   sc.GetTags(),
 					Values: values,
 				},
@@ -336,7 +336,7 @@ func (c *Collector) Collect(sampleContainers []stats.SampleContainer) {
 					Metric: sample.Metric.Name,
 					Data: &SampleDataSingle{
 						Type:  sample.Metric.Type,
-						Time:  Timestamp(sample.Time),
+						Time:  toMicroSecond(sample.Time),
 						Tags:  sample.Tags,
 						Value: sample.Value,
 					},
@@ -426,7 +426,7 @@ func (c *Collector) aggregateHTTPTrails(waitPeriod time.Duration) {
 				}
 
 				aggrData := &SampleDataAggregatedHTTPReqs{
-					Time: Timestamp(time.Unix(0, bucketID*aggrPeriod+aggrPeriod/2)),
+					Time: toMicroSecond(time.Unix(0, bucketID*aggrPeriod+aggrPeriod/2)),
 					Type: "aggregated_trend",
 					Tags: tags,
 				}

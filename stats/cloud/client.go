@@ -29,6 +29,7 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -47,10 +48,11 @@ const (
 
 // Client handles communication with Load Impact cloud API.
 type Client struct {
-	client  *http.Client
-	token   string
-	baseURL string
-	version string
+	client         *http.Client
+	token          string
+	baseURL        string
+	version        string
+	pushBufferPool sync.Pool
 
 	retries       int
 	retryInterval time.Duration
@@ -64,6 +66,11 @@ func NewClient(token, host, version string) *Client {
 		version:       version,
 		retries:       MaxRetries,
 		retryInterval: RetryInterval,
+		pushBufferPool: sync.Pool{
+			New: func() interface{} {
+				return &bytes.Buffer{}
+			},
+		},
 	}
 	return c
 }

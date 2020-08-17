@@ -104,6 +104,8 @@ github.com/inconshreveable/mousetrap
 github.com/influxdata/influxdb1-client/models
 github.com/influxdata/influxdb1-client/pkg/escape
 github.com/influxdata/influxdb1-client/v2
+# github.com/josharian/intern v1.0.0
+github.com/josharian/intern
 # github.com/julienschmidt/httprouter v1.1.1-0.20180222160526-d18983907793
 ## explicit
 github.com/julienschmidt/httprouter
@@ -134,6 +136,12 @@ github.com/labstack/echo
 ## explicit
 github.com/labstack/gommon/color
 github.com/labstack/gommon/log
+# github.com/mailru/easyjson v0.7.4-0.20200812114229-8ab5ff9cd8e4
+## explicit
+github.com/mailru/easyjson
+github.com/mailru/easyjson/buffer
+github.com/mailru/easyjson/jlexer
+github.com/mailru/easyjson/jwriter
 # github.com/manyminds/api2go v0.0.0-20180125085803-95be7bd0455e
 ## explicit
 github.com/manyminds/api2go
