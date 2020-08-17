@@ -32,7 +32,7 @@ import (
 	"github.com/loadimpact/k6/stats"
 )
 
-//noling:golint
+// DataType constants
 const (
 	DataTypeSingle             = "Point"
 	DataTypeMap                = "Points"
