@@ -29,6 +29,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v3"
 
+	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/stats"
 )
 
@@ -45,7 +46,7 @@ func TestRun(t *testing.T) {
 		Topic:   null.NewString("my_topic", false),
 	}
 	config := NewConfig().Apply(cfg)
-	c, err := New(config)
+	c, err := New(testutils.NewLogger(t), config)
 
 	assert.Nil(t, err)
 

@@ -51,13 +51,14 @@ type Collector struct {
 	bufferLock   sync.Mutex
 	row          []string
 	saveInterval time.Duration
+	logger       logrus.FieldLogger
 }
 
 // Verify that Collector implements lib.Collector
 var _ lib.Collector = &Collector{}
 
 // New Creates new instance of CSV collector
-func New(fs afero.Fs, tags stats.TagSet, config Config) (*Collector, error) {
+func New(logger logrus.FieldLogger, fs afero.Fs, tags stats.TagSet, config Config) (*Collector, error) {
 	resTags := []string{}
 	ignoredTags := []string{}
 	for tag, flag := range tags {
@@ -83,6 +84,7 @@ func New(fs afero.Fs, tags stats.TagSet, config Config) (*Collector, error) {
 			row:          make([]string, 3+len(resTags)+1),
 			saveInterval: saveInterval,
 			closeFn:      func() error { return nil },
+			logger:       logger,
 		}, nil
 	}
 
@@ -97,6 +99,7 @@ func New(fs afero.Fs, tags stats.TagSet, config Config) (*Collector, error) {
 		ignoredTags:  ignoredTags,
 		row:          make([]string, 3+len(resTags)+1),
 		saveInterval: saveInterval,
+		logger:       logger,
 	}
 
 	if strings.HasSuffix(fname, ".gz") {
@@ -121,7 +124,7 @@ func (c *Collector) Init() error {
 	header := MakeHeader(c.resTags)
 	err := c.csvWriter.Write(header)
 	if err != nil {
-		logrus.WithField("filename", c.fname).Error("CSV: Error writing column names to file")
+		c.logger.WithField("filename", c.fname).Error("CSV: Error writing column names to file")
 	}
 	c.csvWriter.Flush()
 	return nil
@@ -136,7 +139,7 @@ func (c *Collector) Run(ctx context.Context) {
 	defer func() {
 		err := c.closeFn()
 		if err != nil {
-			logrus.WithField("filename", c.fname).Errorf("CSV: Error closing the file: %v", err)
+			c.logger.WithField("filename", c.fname).Errorf("CSV: Error closing the file: %v", err)
 		}
 	}()
 
@@ -176,7 +179,7 @@ func (c *Collector) writeToFile() {
 				row := SampleToRow(&sample, c.resTags, c.ignoredTags, c.row)
 				err := c.csvWriter.Write(row)
 				if err != nil {
-					logrus.WithField("filename", c.fname).Error("CSV: Error writing to file")
+					c.logger.WithField("filename", c.fname).Error("CSV: Error writing to file")
 				}
 			}
 		}

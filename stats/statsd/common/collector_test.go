@@ -26,32 +26,35 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
+	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/stats"
 )
 
 func TestInitWithoutAddressErrors(t *testing.T) {
-	var c = &Collector{
+	c := &Collector{
 		Config: Config{},
 		Type:   "testtype",
+		Logger: testutils.NewLogger(t),
 	}
 	err := c.Init()
 	require.Error(t, err)
 }
 
 func TestInitWithBogusAddressErrors(t *testing.T) {
-	var c = &Collector{
+	c := &Collector{
 		Config: Config{
 			Addr: null.StringFrom("localhost:90000"),
 		},
-		Type: "testtype",
+		Type:   "testtype",
+		Logger: testutils.NewLogger(t),
 	}
 	err := c.Init()
 	require.Error(t, err)
 }
 
 func TestLinkReturnAddress(t *testing.T) {
-	var bogusValue = "bogus value"
-	var c = &Collector{
+	bogusValue := "bogus value"
+	c := &Collector{
 		Config: Config{
 			Addr: null.StringFrom(bogusValue),
 		},
@@ -60,6 +63,6 @@ func TestLinkReturnAddress(t *testing.T) {
 }
 
 func TestGetRequiredSystemTags(t *testing.T) {
-	var c = &Collector{}
+	c := &Collector{}
 	require.Equal(t, stats.SystemTagSet(0), c.GetRequiredSystemTags())
 }

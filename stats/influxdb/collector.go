@@ -56,6 +56,7 @@ type Collector struct {
 	Config    Config
 	BatchConf client.BatchPointsConfig
 
+	logger      logrus.FieldLogger
 	buffer      []stats.Sample
 	bufferLock  sync.Mutex
 	wg          sync.WaitGroup
@@ -63,7 +64,8 @@ type Collector struct {
 	fieldKinds  map[string]FieldKind
 }
 
-func New(conf Config) (*Collector, error) {
+// New returns new influxdb collector
+func New(logger logrus.FieldLogger, conf Config) (*Collector, error) {
 	cl, err := MakeClient(conf)
 	if err != nil {
 		return nil, err
@@ -74,6 +76,7 @@ func New(conf Config) (*Collector, error) {
 	}
 	fldKinds, err := MakeFieldKinds(conf)
 	return &Collector{
+		logger:      logger,
 		Client:      cl,
 		Config:      conf,
 		BatchConf:   batchConf,
@@ -87,14 +90,14 @@ func (c *Collector) Init() error {
 	// usually means we're either a non-admin user to an existing DB or connecting over UDP.
 	_, err := c.Client.Query(client.NewQuery("CREATE DATABASE "+c.BatchConf.Database, "", ""))
 	if err != nil {
-		logrus.WithError(err).Debug("InfluxDB: Couldn't create database; most likely harmless")
+		c.logger.WithError(err).Debug("InfluxDB: Couldn't create database; most likely harmless")
 	}
 
 	return nil
 }
 
 func (c *Collector) Run(ctx context.Context) {
-	logrus.Debug("InfluxDB: Running!")
+	c.logger.Debug("InfluxDB: Running!")
 	ticker := time.NewTicker(time.Duration(c.Config.PushInterval.Duration))
 	for {
 		select {
@@ -133,21 +136,21 @@ func (c *Collector) commit() {
 	defer func() {
 		<-c.semaphoreCh
 	}()
-	logrus.Debug("InfluxDB: Committing...")
-	logrus.WithField("samples", len(samples)).Debug("InfluxDB: Writing...")
+	c.logger.Debug("InfluxDB: Committing...")
+	c.logger.WithField("samples", len(samples)).Debug("InfluxDB: Writing...")
 
 	batch, err := c.batchFromSamples(samples)
 	if err != nil {
 		return
 	}
 
-	logrus.WithField("points", len(batch.Points())).Debug("InfluxDB: Writing...")
+	c.logger.WithField("points", len(batch.Points())).Debug("InfluxDB: Writing...")
 	startTime := time.Now()
 	if err := c.Client.Write(batch); err != nil {
-		logrus.WithError(err).Error("InfluxDB: Couldn't write stats")
+		c.logger.WithError(err).Error("InfluxDB: Couldn't write stats")
 	}
 	t := time.Since(startTime)
-	logrus.WithField("t", t).Debug("InfluxDB: Batch written!")
+	c.logger.WithField("t", t).Debug("InfluxDB: Batch written!")
 }
 
 func (c *Collector) extractTagsToValues(tags map[string]string, values map[string]interface{}) map[string]interface{} {
@@ -179,7 +182,7 @@ func (c *Collector) extractTagsToValues(tags map[string]string, values map[strin
 func (c *Collector) batchFromSamples(samples []stats.Sample) (client.BatchPoints, error) {
 	batch, err := client.NewBatchPoints(c.BatchConf)
 	if err != nil {
-		logrus.WithError(err).Error("InfluxDB: Couldn't make a batch")
+		c.logger.WithError(err).Error("InfluxDB: Couldn't make a batch")
 		return nil, err
 	}
 
@@ -190,7 +193,7 @@ func (c *Collector) batchFromSamples(samples []stats.Sample) (client.BatchPoints
 	cache := map[*stats.SampleTags]cacheItem{}
 	for _, sample := range samples {
 		var tags map[string]string
-		var values = make(map[string]interface{})
+		values := make(map[string]interface{})
 		if cached, ok := cache[sample.Tags]; ok {
 			tags = cached.tags
 			for k, v := range cached.values {
@@ -209,7 +212,7 @@ func (c *Collector) batchFromSamples(samples []stats.Sample) (client.BatchPoints
 			sample.Time,
 		)
 		if err != nil {
-			logrus.WithError(err).Error("InfluxDB: Couldn't make point from sample!")
+			c.logger.WithError(err).Error("InfluxDB: Couldn't make point from sample!")
 			return nil, err
 		}
 		batch.AddPoint(p)
@@ -222,7 +225,6 @@ func (c *Collector) batchFromSamples(samples []stats.Sample) (client.BatchPoints
 func (c *Collector) Format(samples []stats.Sample) ([]string, error) {
 	var metrics []string
 	batch, err := c.batchFromSamples(samples)
-
 	if err != nil {
 		return metrics, err
 	}

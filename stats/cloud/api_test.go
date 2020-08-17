@@ -36,6 +36,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/lib/types"
 )
 
@@ -56,7 +57,7 @@ func TestCreateTestRun(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient("token", server.URL, "1.0")
+	client := NewClient(testutils.NewLogger(t), "token", server.URL, "1.0")
 
 	tr := &TestRun{
 		Name: "test",
@@ -94,7 +95,7 @@ func TestPublishMetric(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient("token", server.URL, "1.0")
+	client := NewClient(testutils.NewLogger(t), "token", server.URL, "1.0")
 
 	samples := []*Sample{
 		{
@@ -118,7 +119,7 @@ func TestFinished(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient("token", server.URL, "1.0")
+	client := NewClient(testutils.NewLogger(t), "token", server.URL, "1.0")
 
 	thresholds := map[string]map[string]bool{
 		"threshold": {
@@ -139,7 +140,7 @@ func TestAuthorizedError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient("token", server.URL, "1.0")
+	client := NewClient(testutils.NewLogger(t), "token", server.URL, "1.0")
 
 	resp, err := client.CreateTestRun(&TestRun{Name: "test"})
 
@@ -157,7 +158,7 @@ func TestDetailsError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient("token", server.URL, "1.0")
+	client := NewClient(testutils.NewLogger(t), "token", server.URL, "1.0")
 
 	resp, err := client.CreateTestRun(&TestRun{Name: "test"})
 
@@ -181,7 +182,7 @@ func TestRetry(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient("token", server.URL, "1.0")
+	client := NewClient(testutils.NewLogger(t), "token", server.URL, "1.0")
 	client.retryInterval = 1 * time.Millisecond
 	resp, err := client.CreateTestRun(&TestRun{Name: "test"})
 
@@ -209,7 +210,7 @@ func TestRetrySuccessOnSecond(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient("token", server.URL, "1.0")
+	client := NewClient(testutils.NewLogger(t), "token", server.URL, "1.0")
 	client.retryInterval = 1 * time.Millisecond
 	resp, err := client.CreateTestRun(&TestRun{Name: "test"})
 
@@ -233,7 +234,7 @@ func TestIdempotencyKey(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient("token", server.URL, "1.0")
+	client := NewClient(testutils.NewLogger(t), "token", server.URL, "1.0")
 	client.retryInterval = 1 * time.Millisecond
 	req, err := client.NewRequest(http.MethodPost, server.URL, nil)
 	assert.NoError(t, err)
