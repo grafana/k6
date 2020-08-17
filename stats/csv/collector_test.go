@@ -34,6 +34,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v3"
 
+	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 )
@@ -180,6 +181,7 @@ func TestSampleToRow(t *testing.T) {
 		})
 	}
 }
+
 func TestCollect(t *testing.T) {
 	testSamples := []stats.SampleContainer{
 		stats.Sample{
@@ -207,6 +209,7 @@ func TestCollect(t *testing.T) {
 
 	mem := afero.NewMemMapFs()
 	collector, err := New(
+		testutils.NewLogger(t),
 		mem,
 		stats.TagSet{"tag1": true, "tag2": false, "tag3": true},
 		Config{FileName: null.StringFrom("name"), SaveInterval: types.NewNullDuration(time.Duration(1), true)},
@@ -221,6 +224,7 @@ func TestCollect(t *testing.T) {
 
 func TestRun(t *testing.T) {
 	collector, err := New(
+		testutils.NewLogger(t),
 		afero.NewMemMapFs(),
 		stats.TagSet{"tag1": true, "tag2": false, "tag3": true},
 		Config{FileName: null.StringFrom("name"), SaveInterval: types.NewNullDuration(time.Duration(1), true)},
@@ -337,6 +341,7 @@ func TestRunCollect(t *testing.T) {
 	for _, data := range testData {
 		mem := afero.NewMemMapFs()
 		collector, err := New(
+			testutils.NewLogger(t),
 			mem,
 			stats.TagSet{"tag1": true, "tag2": false, "tag3": true},
 			Config{FileName: null.StringFrom(data.fileName), SaveInterval: types.NewNullDuration(time.Duration(1), true)},
@@ -363,6 +368,7 @@ func TestRunCollect(t *testing.T) {
 		assert.Equal(t, data.outputContent, data.fileReaderFunc(data.fileName, mem))
 	}
 }
+
 func TestNew(t *testing.T) {
 	configs := []struct {
 		cfg  Config
@@ -441,7 +447,7 @@ func TestNew(t *testing.T) {
 	for i := range configs {
 		config, expected := configs[i], expected[i]
 		t.Run(config.cfg.FileName.String, func(t *testing.T) {
-			collector, err := New(afero.NewMemMapFs(), config.tags, config.cfg)
+			collector, err := New(testutils.NewLogger(t), afero.NewMemMapFs(), config.tags, config.cfg)
 			assert.NoError(t, err)
 			assert.NotNil(t, collector)
 			assert.Equal(t, expected.fname, collector.fname)
@@ -458,6 +464,7 @@ func TestNew(t *testing.T) {
 
 func TestGetRequiredSystemTags(t *testing.T) {
 	collector, err := New(
+		testutils.NewLogger(t),
 		afero.NewMemMapFs(),
 		stats.TagSet{"tag1": true, "tag2": false, "tag3": true},
 		Config{FileName: null.StringFrom("name"), SaveInterval: types.NewNullDuration(time.Duration(1), true)},
@@ -469,6 +476,7 @@ func TestGetRequiredSystemTags(t *testing.T) {
 
 func TestLink(t *testing.T) {
 	collector, err := New(
+		testutils.NewLogger(t),
 		afero.NewMemMapFs(),
 		stats.TagSet{"tag1": true, "tag2": false, "tag3": true},
 		Config{FileName: null.StringFrom("path"), SaveInterval: types.NewNullDuration(time.Duration(1), true)},

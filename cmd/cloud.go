@@ -182,7 +182,7 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 
 		// Start cloud test run
 		modifyAndPrintBar(progressBar, pb.WithConstProgress(0, "Validating script options"))
-		client := cloud.NewClient(cloudConfig.Token.String, cloudConfig.Host.String, consts.Version)
+		client := cloud.NewClient(logger, cloudConfig.Token.String, cloudConfig.Host.String, consts.Version)
 		if err := client.ValidateOptions(arc.Options); err != nil {
 			return err
 		}

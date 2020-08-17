@@ -105,7 +105,7 @@ This will set the default server used when just "-o influxdb" is passed.`,
 			return err
 		}
 
-		coll, err := influxdb.New(conf)
+		coll, err := influxdb.New(logger, conf)
 		if err != nil {
 			return err
 		}

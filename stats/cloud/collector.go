@@ -60,7 +60,8 @@ type Collector struct {
 	bufferHTTPTrails []*httpext.Trail
 	bufferSamples    []*Sample
 
-	opts lib.Options
+	logger logrus.FieldLogger
+	opts   lib.Options
 
 	// TODO: optimize this
 	//
@@ -102,6 +103,7 @@ func MergeFromExternal(external map[string]json.RawMessage, conf *Config) error 
 
 // New creates a new cloud collector
 func New(
+	logger logrus.FieldLogger,
 	conf Config, src *loader.SourceData, opts lib.Options, executionPlan []lib.ExecutionStep, version string,
 ) (*Collector, error) {
 	if err := MergeFromExternal(opts.External, &conf); err != nil {
@@ -130,7 +132,7 @@ func New(
 	}
 
 	if !conf.Token.Valid && conf.DeprecatedToken.Valid {
-		logrus.Warn("K6CLOUD_TOKEN is deprecated and will be removed. Use K6_CLOUD_TOKEN instead.")
+		logger.Warn("K6CLOUD_TOKEN is deprecated and will be removed. Use K6_CLOUD_TOKEN instead.")
 		conf.Token = conf.DeprecatedToken
 	}
 
@@ -147,13 +149,14 @@ func New(
 	return &Collector{
 		config:               conf,
 		thresholds:           thresholds,
-		client:               NewClient(conf.Token.String, conf.Host.String, version),
+		client:               NewClient(logger, conf.Token.String, conf.Host.String, version),
 		anonymous:            !conf.Token.Valid,
 		executionPlan:        executionPlan,
 		duration:             int64(duration / time.Second),
 		opts:                 opts,
 		aggrBuckets:          map[int64]map[[3]string]aggregationBucket{},
 		stopSendingMetricsCh: make(chan struct{}),
+		logger:               logger,
 	}, nil
 }
 
@@ -162,7 +165,7 @@ func New(
 func (c *Collector) Init() error {
 	if c.config.PushRefID.Valid {
 		c.referenceID = c.config.PushRefID.String
-		logrus.WithField("referenceId", c.referenceID).Debug("Cloud: directly pushing metrics without init")
+		c.logger.WithField("referenceId", c.referenceID).Debug("Cloud: directly pushing metrics without init")
 		return nil
 	}
 
@@ -190,13 +193,13 @@ func (c *Collector) Init() error {
 	c.referenceID = response.ReferenceID
 
 	if response.ConfigOverride != nil {
-		logrus.WithFields(logrus.Fields{
+		c.logger.WithFields(logrus.Fields{
 			"override": response.ConfigOverride,
 		}).Debug("Cloud: overriding config options")
 		c.config = c.config.Apply(*response.ConfigOverride)
 	}
 
-	logrus.WithFields(logrus.Fields{
+	c.logger.WithFields(logrus.Fields{
 		"name":        c.config.Name,
 		"projectId":   c.config.ProjectID,
 		"duration":    c.duration,
@@ -473,7 +476,7 @@ func (c *Collector) aggregateHTTPTrails(waitPeriod time.Duration) {
 
 				if aggrData.Count > 0 {
 					/*
-						logrus.WithFields(logrus.Fields{
+						c.logger.WithFields(logrus.Fields{
 							"http_samples": aggrData.Count,
 							"ratio":        fmt.Sprintf("%.2f", float64(aggrData.Count)/float64(trailCount)),
 							"t":            time.Since(start),
@@ -557,7 +560,7 @@ func (c *Collector) pushMetrics() {
 	c.bufferMutex.Unlock()
 
 	count := len(buffer)
-	logrus.WithFields(logrus.Fields{
+	c.logger.WithFields(logrus.Fields{
 		"samples": count,
 	}).Debug("Pushing metrics to cloud")
 	start := time.Now()
@@ -600,14 +603,14 @@ func (c *Collector) pushMetrics() {
 		err := <-job.done
 		if err != nil {
 			if c.shouldStopSendingMetrics(err) {
-				logrus.WithError(err).Warn("Stopped sending metrics to cloud due to an error")
+				c.logger.WithError(err).Warn("Stopped sending metrics to cloud due to an error")
 				close(c.stopSendingMetricsCh)
 				break
 			}
-			logrus.WithError(err).Warn("Failed to send metrics to cloud")
+			c.logger.WithError(err).Warn("Failed to send metrics to cloud")
 		}
 	}
-	logrus.WithFields(logrus.Fields{
+	c.logger.WithFields(logrus.Fields{
 		"samples": count,
 		"t":       time.Since(start),
 	}).Debug("Pushing metrics to cloud finished")
@@ -630,7 +633,7 @@ func (c *Collector) testFinished() {
 		}
 	}
 
-	logrus.WithFields(logrus.Fields{
+	c.logger.WithFields(logrus.Fields{
 		"ref":     c.referenceID,
 		"tainted": testTainted,
 	}).Debug("Sending test finished")
@@ -642,7 +645,7 @@ func (c *Collector) testFinished() {
 
 	err := c.client.TestFinished(c.referenceID, thresholdResults, testTainted, runStatus)
 	if err != nil {
-		logrus.WithFields(logrus.Fields{
+		c.logger.WithFields(logrus.Fields{
 			"error": err,
 		}).Warn("Failed to send test finished to cloud")
 	}

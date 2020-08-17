@@ -33,28 +33,30 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
+	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/stats"
 )
 
 func TestBadConcurrentWrites(t *testing.T) {
 	c := NewConfig()
+	logger := testutils.NewLogger(t)
 	t.Run("0", func(t *testing.T) {
 		c.ConcurrentWrites = null.IntFrom(0)
-		_, err := New(*c)
+		_, err := New(logger, *c)
 		require.Error(t, err)
 		require.Equal(t, err.Error(), "influxdb's ConcurrentWrites must be a positive number")
 	})
 
 	t.Run("-2", func(t *testing.T) {
 		c.ConcurrentWrites = null.IntFrom(-2)
-		_, err := New(*c)
+		_, err := New(logger, *c)
 		require.Error(t, err)
 		require.Equal(t, err.Error(), "influxdb's ConcurrentWrites must be a positive number")
 	})
 
 	t.Run("2", func(t *testing.T) {
 		c.ConcurrentWrites = null.IntFrom(2)
-		_, err := New(*c)
+		_, err := New(logger, *c)
 		require.NoError(t, err)
 	})
 }
@@ -81,7 +83,7 @@ func testCollectorCycle(t testing.TB, handler http.HandlerFunc, body func(testin
 
 	config := NewConfig()
 	config.Addr = null.StringFrom("http://" + l.Addr().String())
-	c, err := New(*config)
+	c, err := New(testutils.NewLogger(t), *config)
 	require.NoError(t, err)
 
 	require.NoError(t, c.Init())
@@ -99,13 +101,14 @@ func testCollectorCycle(t testing.TB, handler http.HandlerFunc, body func(testin
 	cancel()
 	wg.Wait()
 }
+
 func TestCollector(t *testing.T) {
 	var samplesRead int
 	defer func() {
 		require.Equal(t, samplesRead, 20)
 	}()
 	testCollectorCycle(t, func(rw http.ResponseWriter, r *http.Request) {
-		var b = bytes.NewBuffer(nil)
+		b := bytes.NewBuffer(nil)
 		_, _ = io.Copy(b, r.Body)
 		for {
 			s, err := b.ReadString('\n')
@@ -119,7 +122,7 @@ func TestCollector(t *testing.T) {
 
 		rw.WriteHeader(204)
 	}, func(tb testing.TB, c *Collector) {
-		var samples = make(stats.Samples, 10)
+		samples := make(stats.Samples, 10)
 		for i := 0; i < len(samples); i++ {
 			samples[i] = stats.Sample{
 				Metric: stats.New("testGauge", stats.Gauge),
@@ -135,8 +138,8 @@ func TestCollector(t *testing.T) {
 		c.Collect([]stats.SampleContainer{samples})
 		c.Collect([]stats.SampleContainer{samples})
 	})
-
 }
+
 func TestExtractTagsToValues(t *testing.T) {
 	c := NewConfig()
 	c.TagsAsFields = []string{
@@ -146,7 +149,7 @@ func TestExtractTagsToValues(t *testing.T) {
 		"floatField:float",
 		"intField:int",
 	}
-	collector, err := New(*c)
+	collector, err := New(testutils.NewLogger(t), *c)
 	require.NoError(t, err)
 	tags := map[string]string{
 		"stringField":  "string",

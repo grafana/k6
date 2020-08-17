@@ -153,7 +153,7 @@ func (c *Client) PushMetric(referenceID string, noCompress bool, s []*Sample) er
 
 	err = c.Do(req, nil)
 
-	logrus.WithFields(logrus.Fields{
+	c.logger.WithFields(logrus.Fields{
 		"t":         time.Since(start),
 		"json_t":    jsonTime,
 		"part_size": len(s),

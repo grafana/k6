@@ -215,7 +215,7 @@ a commandline interface for interacting with it.`,
 		modifyAndPrintBar(initBar, pb.WithConstProgress(0, "Init metric outputs"))
 		for _, out := range conf.Out {
 			t, arg := parseCollector(out)
-			collector, cerr := newCollector(t, arg, src, conf, executionPlan)
+			collector, cerr := newCollector(logger, t, arg, src, conf, executionPlan)
 			if cerr != nil {
 				return cerr
 			}

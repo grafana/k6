@@ -109,6 +109,7 @@ func newFromBundle(logger *logrus.Logger, b *Bundle) (*Runner, error) {
 	}
 
 	err = r.SetOptions(r.Bundle.Options)
+
 	return r, err
 }
 
