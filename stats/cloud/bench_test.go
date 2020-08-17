@@ -26,16 +26,19 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"net/url"
 	"testing"
 	"time"
 
 	"github.com/mailru/easyjson"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/netext/httpext"
+	"github.com/loadimpact/k6/lib/testutils/httpmultibin"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/stats"
@@ -286,5 +289,53 @@ func generateHTTPExtTrail(now time.Time, i time.Duration, tags *stats.SampleTags
 		ConnDuration:   500 * time.Millisecond,
 		Duration:       i % 150 * 1500 * time.Millisecond,
 		Tags:           tags,
+	}
+}
+
+func BenchmarkHTTPPush(b *testing.B) {
+	script := &loader.SourceData{
+		Data: []byte(""),
+		URL:  &url.URL{Path: "/script.js"},
+	}
+
+	options := lib.Options{
+		Duration: types.NullDurationFrom(1 * time.Second),
+	}
+	tb := httpmultibin.NewHTTPMultiBin(b)
+	tb.Mux.HandleFunc("/v1/tests", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := fmt.Fprint(w, `{
+			"reference_id": "fake",
+		}`)
+		require.NoError(b, err)
+	}))
+	defer tb.Cleanup()
+	tb.Mux.HandleFunc("/v1/metrics/fake",
+		func(w http.ResponseWriter, r *http.Request) {
+			_, err := io.Copy(ioutil.Discard, r.Body)
+			assert.NoError(b, err)
+		},
+	)
+
+	config := NewConfig().Apply(Config{
+		Host:                    null.StringFrom(tb.ServerHTTP.URL),
+		AggregationCalcInterval: types.NullDurationFrom(time.Millisecond * 200),
+		AggregationPeriod:       types.NullDurationFrom(time.Millisecond * 200),
+	})
+	collector, err := New(config, script, options, []lib.ExecutionStep{}, "1.0")
+	require.NoError(b, err)
+	collector.referenceID = "fake"
+
+	for _, count := range []int{1000, 5000, 50000, 100000, 250000} {
+		count := count
+		b.Run(fmt.Sprintf("count:%d", count), func(b *testing.B) {
+			samples := generateSamples(count)
+			b.ResetTimer()
+			for s := 0; s < b.N; s++ {
+				b.StopTimer()
+				toSend := append([]*Sample{}, samples...)
+				b.StartTimer()
+				require.NoError(b, collector.client.PushMetric("fake", false, toSend))
+			}
+		})
 	}
 }
