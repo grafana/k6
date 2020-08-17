@@ -39,7 +39,7 @@ const (
 	DataTypeAggregatedHTTPReqs = "AggregatedPoints"
 )
 
-//go:generate easyjson -pkg -no_std_marshalers .
+//go:generate easyjson -pkg -no_std_marshalers -gen_build_flags -mod=mod .
 
 func toMicroSecond(t time.Time) int64 {
 	return t.UnixNano() / 1000
