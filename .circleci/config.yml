@@ -28,7 +28,7 @@ jobs:
           name: Restore golangci-lint cache
           key: golangci-lint-{{ arch }}-{{ checksum "/tmp/.golangci.version" }}-{{ .Environment.CACHE_VERSION }}
           paths:
-            - /home/circleci/.go_workspace/bin/golangci-lint
+            - /go/bin/golangci-lint
       - run:
           name: Install golangci-lint
           command: |
@@ -38,7 +38,7 @@ jobs:
           name: Save golangci-lint cache
           key: golangci-lint-{{ arch }}-{{ checksum "/tmp/.golangci.version" }}-{{ .Environment.CACHE_VERSION }}
           paths:
-            - /home/circleci/.go_workspace/bin/golangci-lint
+            - /go/bin/golangci-lint
       - checkout
       - run:
           name: Run golangci-lint
