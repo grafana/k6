@@ -102,6 +102,7 @@ func generateTags(i, tagCount int, additionals ...map[string]string) *stats.Samp
 			res[k] = v
 		}
 	}
+
 	return stats.IntoSampleTags(&res)
 }
 
@@ -269,6 +270,7 @@ func generateSamples(count int) []*Sample {
 			samples[i] = NewSampleFromTrail(generateHTTPExtTrail(now, time.Duration(i), tags))
 		}
 	}
+
 	return samples
 }
 
