@@ -43,7 +43,9 @@ jobs:
       - run:
           name: Run golangci-lint
           command: |
-            golangci-lint run --out-format=tab --new-from-rev origin/master ./...
+            BASEREV=$(git merge-base HEAD origin/master)
+            echo "Base revision: $BASEREV"
+            golangci-lint run --out-format=tab --new-from-rev "$BASEREV" ./...
 
 
   test:
