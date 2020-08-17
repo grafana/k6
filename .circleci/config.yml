@@ -17,7 +17,7 @@ jobs:
     docker:
       - image: circleci/golang:1.14
     environment:
-      GOLANGCI_VERSION: v1.27.0
+      GOLANGCI_VERSION: v1.30.0
       GO111MODULE: 'on'
     working_directory: /home/circleci/.go_workspace/src/github.com/loadimpact/k6
     steps:
