@@ -17,8 +17,8 @@ jobs:
     docker:
       - image: circleci/golang:1.14
     environment:
-      GOPATH: /home/circleci/.go_workspace
       GOLANGCI_VERSION: v1.27.0
+      GO111MODULE: 'on'
     working_directory: /home/circleci/.go_workspace/src/github.com/loadimpact/k6
     steps:
       # Workaround for custom env vars not available in cache keys
@@ -32,7 +32,6 @@ jobs:
       - run:
           name: Install golangci-lint
           command: |
-            export PATH="$GOPATH/bin:$PATH"
             command -v golangci-lint && exit
             go get github.com/golangci/golangci-lint/cmd/golangci-lint@$GOLANGCI_VERSION
       - save_cache:
@@ -44,7 +43,6 @@ jobs:
       - run:
           name: Run golangci-lint
           command: |
-            export PATH="$GOPATH/bin:$PATH"
             golangci-lint run --out-format=tab --new-from-rev origin/master ./...
 
 
