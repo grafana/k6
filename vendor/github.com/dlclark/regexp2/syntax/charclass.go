@@ -484,6 +484,29 @@ func (c *CharSet) addRanges(ranges []singleRange) {
 	c.canonicalize()
 }
 
+// Merges everything but the new ranges into our own
+func (c *CharSet) addNegativeRanges(ranges []singleRange) {
+	if c.anything {
+		return
+	}
+
+	var hi rune
+
+	// convert incoming ranges into opposites, assume they are in order
+	for _, r := range ranges {
+		if hi < r.first {
+			c.ranges = append(c.ranges, singleRange{hi, r.first - 1})
+		}
+		hi = r.last + 1
+	}
+
+	if hi < utf8.MaxRune {
+		c.ranges = append(c.ranges, singleRange{hi, utf8.MaxRune})
+	}
+
+	c.canonicalize()
+}
+
 func isValidUnicodeCat(catName string) bool {
 	_, ok := unicodeCategories[catName]
 	return ok
@@ -513,6 +536,53 @@ func (c *CharSet) addSubtraction(sub *CharSet) {
 func (c *CharSet) addRange(chMin, chMax rune) {
 	c.ranges = append(c.ranges, singleRange{first: chMin, last: chMax})
 	c.canonicalize()
+}
+
+func (c *CharSet) addNamedASCII(name string, negate bool) bool {
+	var rs []singleRange
+
+	switch name {
+	case "alnum":
+		rs = []singleRange{singleRange{'0', '9'}, singleRange{'A', 'Z'}, singleRange{'a', 'z'}}
+	case "alpha":
+		rs = []singleRange{singleRange{'A', 'Z'}, singleRange{'a', 'z'}}
+	case "ascii":
+		rs = []singleRange{singleRange{0, 0x7f}}
+	case "blank":
+		rs = []singleRange{singleRange{'\t', '\t'}, singleRange{' ', ' '}}
+	case "cntrl":
+		rs = []singleRange{singleRange{0, 0x1f}, singleRange{0x7f, 0x7f}}
+	case "digit":
+		c.addDigit(false, negate, "")
+	case "graph":
+		rs = []singleRange{singleRange{'!', '~'}}
+	case "lower":
+		rs = []singleRange{singleRange{'a', 'z'}}
+	case "print":
+		rs = []singleRange{singleRange{' ', '~'}}
+	case "punct": //[!-/:-@[-`{-~]
+		rs = []singleRange{singleRange{'!', '/'}, singleRange{':', '@'}, singleRange{'[', '`'}, singleRange{'{', '~'}}
+	case "space":
+		c.addSpace(true, negate)
+	case "upper":
+		rs = []singleRange{singleRange{'A', 'Z'}}
+	case "word":
+		c.addWord(true, negate)
+	case "xdigit":
+		rs = []singleRange{singleRange{'0', '9'}, singleRange{'A', 'F'}, singleRange{'a', 'f'}}
+	default:
+		return false
+	}
+
+	if len(rs) > 0 {
+		if negate {
+			c.addNegativeRanges(rs)
+		} else {
+			c.addRanges(rs)
+		}
+	}
+
+	return true
 }
 
 type singleRangeSorter []singleRange
