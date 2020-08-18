@@ -103,15 +103,67 @@ if num := v.Export().(int64); num != 4 {
 
 Passing Values to JS
 --------------------
-
 Any Go value can be passed to JS using Runtime.ToValue() method. See the method's [documentation](https://godoc.org/github.com/dop251/goja#Runtime.ToValue) for more details.
 
 Exporting Values from JS
 ------------------------
-
 A JS value can be exported into its default Go representation using Value.Export() method.
 
 Alternatively it can be exported into a specific Go variable using Runtime.ExportTo() method.
+
+Calling JS functions from Go
+----------------------------
+There are 2 approaches:
+
+- Using [AssertFunction()](https://godoc.org/github.com/dop251/goja#AssertFunction):
+```go
+vm := New()
+_, err := vm.RunString(`
+function sum(a, b) {
+    return a+b;
+}
+`)
+if err != nil {
+    panic(err)
+}
+sum, ok := AssertFunction(vm.Get("sum"))
+if !ok {
+    panic("Not a function")
+}
+
+res, err := sum(Undefined(), vm.ToValue(40), vm.ToValue(2))
+if err != nil {
+    panic(err)
+}
+fmt.Println(res)
+// Output: 42
+```
+- Using [Runtime.ExportTo()](https://godoc.org/github.com/dop251/goja#Runtime.ExportTo):
+```go
+const SCRIPT = `
+function f(param) {
+    return +param + 2;
+}
+`
+
+vm := New()
+_, err := vm.RunString(SCRIPT)
+if err != nil {
+    panic(err)
+}
+
+var fn func(string) string
+err = vm.ExportTo(vm.Get("f"), &fn)
+if err != nil {
+    panic(err)
+}
+
+fmt.Println(fn("40")) // note, _this_ value in the function will be undefined.
+// Output: 42
+```
+
+The first one is more low level and allows specifying _this_ value, whereas the second one makes the function look like
+a normal Go function.
 
 Mapping struct field and method names
 -------------------------------------
