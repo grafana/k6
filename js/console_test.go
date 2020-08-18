@@ -37,6 +37,7 @@ import (
 
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/stats"
 )
@@ -71,7 +72,7 @@ func TestConsoleContext(t *testing.T) {
 	}
 }
 
-func getSimpleRunner(filename, data string, opts ...interface{}) (*Runner, error) {
+func getSimpleRunner(tb testing.TB, filename, data string, opts ...interface{}) (*Runner, error) {
 	var (
 		fs     = afero.NewMemMapFs()
 		rtOpts = lib.RuntimeOptions{CompatibilityMode: null.NewString("base", true)}
@@ -85,7 +86,7 @@ func getSimpleRunner(filename, data string, opts ...interface{}) (*Runner, error
 		}
 	}
 	return New(
-		logrus.StandardLogger(),
+		testutils.NewLogger(tb),
 		&loader.SourceData{
 			URL:  &url.URL{Path: filename, Scheme: "file"},
 			Data: []byte(data),
@@ -128,7 +129,7 @@ func TestConsole(t *testing.T) {
 			for args, result := range argsets {
 				args, result := args, result
 				t.Run(args, func(t *testing.T) {
-					r, err := getSimpleRunner("/script.js", fmt.Sprintf(
+					r, err := getSimpleRunner(t, "/script.js", fmt.Sprintf(
 						`exports.default = function() { console.%s(%s); }`,
 						name, args,
 					))
@@ -220,7 +221,7 @@ func TestFileConsole(t *testing.T) {
 								}
 
 							}
-							r, err := getSimpleRunner("/script",
+							r, err := getSimpleRunner(t, "/script",
 								fmt.Sprintf(
 									`exports.default = function() { console.%s(%s); }`,
 									name, args,

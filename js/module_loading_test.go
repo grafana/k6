@@ -26,12 +26,12 @@ import (
 	"os"
 	"testing"
 
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/lib/testutils/httpmultibin"
 	"github.com/loadimpact/k6/stats"
 )
@@ -88,7 +88,7 @@ func TestLoadOnceGlobalVars(t *testing.T) {
 			return c.C();
 		}
 	`), os.ModePerm))
-			r1, err := getSimpleRunner("/script.js", `
+			r1, err := getSimpleRunner(t, "/script.js", `
 			import { A } from "./A.js";
 			import { B } from "./B.js";
 
@@ -104,7 +104,7 @@ func TestLoadOnceGlobalVars(t *testing.T) {
 			require.NoError(t, err)
 
 			arc := r1.MakeArchive()
-			r2, err := NewFromArchive(logrus.StandardLogger(), arc, lib.RuntimeOptions{})
+			r2, err := NewFromArchive(testutils.NewLogger(t), arc, lib.RuntimeOptions{})
 			require.NoError(t, err)
 
 			runners := map[string]*Runner{"Source": r1, "Archive": r2}
@@ -137,7 +137,7 @@ func TestLoadExportsIsUsableInModule(t *testing.T) {
 			return exports.A() + "B";
 		}
 	`), os.ModePerm))
-	r1, err := getSimpleRunner("/script.js", `
+	r1, err := getSimpleRunner(t, "/script.js", `
 			import { A, B } from "./A.js";
 
 			export default function(data) {
@@ -153,7 +153,7 @@ func TestLoadExportsIsUsableInModule(t *testing.T) {
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
-	r2, err := NewFromArchive(logrus.StandardLogger(), arc, lib.RuntimeOptions{})
+	r2, err := NewFromArchive(testutils.NewLogger(t), arc, lib.RuntimeOptions{})
 	require.NoError(t, err)
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
@@ -186,7 +186,7 @@ func TestLoadDoesntBreakHTTPGet(t *testing.T) {
 			return http.get("HTTPBIN_URL/get");
 		}
 	`)), os.ModePerm))
-	r1, err := getSimpleRunner("/script.js", `
+	r1, err := getSimpleRunner(t, "/script.js", `
 			import { A } from "./A.js";
 
 			export default function(data) {
@@ -200,7 +200,7 @@ func TestLoadDoesntBreakHTTPGet(t *testing.T) {
 
 	require.NoError(t, r1.SetOptions(lib.Options{Hosts: tb.Dialer.Hosts}))
 	arc := r1.MakeArchive()
-	r2, err := NewFromArchive(logrus.StandardLogger(), arc, lib.RuntimeOptions{})
+	r2, err := NewFromArchive(testutils.NewLogger(t), arc, lib.RuntimeOptions{})
 	require.NoError(t, err)
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
@@ -229,7 +229,7 @@ func TestLoadGlobalVarsAreNotSharedBetweenVUs(t *testing.T) {
 			return globalVar;
 		}
 	`), os.ModePerm))
-	r1, err := getSimpleRunner("/script.js", `
+	r1, err := getSimpleRunner(t, "/script.js", `
 			import { A } from "./A.js";
 
 			export default function(data) {
@@ -244,7 +244,7 @@ func TestLoadGlobalVarsAreNotSharedBetweenVUs(t *testing.T) {
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
-	r2, err := NewFromArchive(logrus.StandardLogger(), arc, lib.RuntimeOptions{})
+	r2, err := NewFromArchive(testutils.NewLogger(t), arc, lib.RuntimeOptions{})
 	require.NoError(t, err)
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
@@ -303,11 +303,11 @@ func TestLoadCycle(t *testing.T) {
 	`), os.ModePerm))
 	data, err := afero.ReadFile(fs, "/main.js")
 	require.NoError(t, err)
-	r1, err := getSimpleRunner("/main.js", string(data), fs, lib.RuntimeOptions{CompatibilityMode: null.StringFrom("extended")})
+	r1, err := getSimpleRunner(t, "/main.js", string(data), fs, lib.RuntimeOptions{CompatibilityMode: null.StringFrom("extended")})
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
-	r2, err := NewFromArchive(logrus.StandardLogger(), arc, lib.RuntimeOptions{})
+	r2, err := NewFromArchive(testutils.NewLogger(t), arc, lib.RuntimeOptions{})
 	require.NoError(t, err)
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
@@ -351,7 +351,7 @@ func TestLoadCycleBinding(t *testing.T) {
 			}
 	`), os.ModePerm))
 
-	r1, err := getSimpleRunner("/main.js", `
+	r1, err := getSimpleRunner(t, "/main.js", `
 			import {foo} from './a.js';
 			import {bar} from './b.js';
 			export default function() {
@@ -368,7 +368,7 @@ func TestLoadCycleBinding(t *testing.T) {
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
-	r2, err := NewFromArchive(logrus.StandardLogger(), arc, lib.RuntimeOptions{})
+	r2, err := NewFromArchive(testutils.NewLogger(t), arc, lib.RuntimeOptions{})
 	require.NoError(t, err)
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
@@ -410,7 +410,7 @@ func TestBrowserified(t *testing.T) {
 		});
 	`), os.ModePerm))
 
-	r1, err := getSimpleRunner("/script.js", `
+	r1, err := getSimpleRunner(t, "/script.js", `
 			import {alpha, bravo } from "./browserified.js";
 
 			export default function(data) {
@@ -432,7 +432,7 @@ func TestBrowserified(t *testing.T) {
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
-	r2, err := NewFromArchive(logrus.StandardLogger(), arc, lib.RuntimeOptions{})
+	r2, err := NewFromArchive(testutils.NewLogger(t), arc, lib.RuntimeOptions{})
 	require.NoError(t, err)
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
@@ -465,8 +465,8 @@ func TestLoadingUnexistingModuleDoesntPanic(t *testing.T) {
 					throw new Error("wrong b "+ JSON.stringify(b));
 				}
 			}`
-	require.NoError(t, afero.WriteFile(fs, "/script.js", []byte(data), 0644))
-	r1, err := getSimpleRunner("/script.js", data, fs)
+	require.NoError(t, afero.WriteFile(fs, "/script.js", []byte(data), 0o644))
+	r1, err := getSimpleRunner(t, "/script.js", data, fs)
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
@@ -474,7 +474,7 @@ func TestLoadingUnexistingModuleDoesntPanic(t *testing.T) {
 	require.NoError(t, arc.Write(buf))
 	arc, err = lib.ReadArchive(buf)
 	require.NoError(t, err)
-	r2, err := NewFromArchive(logrus.StandardLogger(), arc, lib.RuntimeOptions{})
+	r2, err := NewFromArchive(testutils.NewLogger(t), arc, lib.RuntimeOptions{})
 	require.NoError(t, err)
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
