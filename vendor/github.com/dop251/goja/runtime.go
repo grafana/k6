@@ -1240,6 +1240,7 @@ Note that because a wrapper is created every time a property is accessed it may 
  field1 === field2; // true, because the equality operation compares the wrapped values, not the wrappers
  field1[sym] === true; // true
  field2[sym] === undefined; // also true
+ `)
 
 The same applies to values from maps and slices as well.
 
