@@ -13,13 +13,13 @@ import (
 func BenchmarkEmptyIteration(b *testing.B) {
 	b.StopTimer()
 
-	r, err := getSimpleRunner("/script.js", `exports.default = function() { }`)
+	r, err := getSimpleRunner(b, "/script.js", `exports.default = function() { }`)
 	if !assert.NoError(b, err) {
 		return
 	}
 	require.NoError(b, err)
 
-	var ch = make(chan stats.SampleContainer, 100)
+	ch := make(chan stats.SampleContainer, 100)
 	defer close(ch)
 	go func() { // read the channel so it doesn't block
 		for range ch {

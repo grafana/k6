@@ -25,11 +25,11 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/loadimpact/k6/js"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/loader"
 )
 
@@ -58,7 +58,7 @@ func TestBuildK6RequestObject(t *testing.T) {
 	}
 	v, err := buildK6RequestObject(req)
 	assert.NoError(t, err)
-	_, err = js.New(logrus.StandardLogger(), &loader.SourceData{
+	_, err = js.New(testutils.NewLogger(t), &loader.SourceData{
 		URL:  &url.URL{Path: "/script.js"},
 		Data: []byte(fmt.Sprintf("export default function() { res = http.batch([%v]); }", v)),
 	}, nil, lib.RuntimeOptions{})
