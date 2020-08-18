@@ -57,6 +57,21 @@ The __last__ capture is embedded in each group, so `g.String()` will return the 
 | named ascii character class `[[:foo:]]`| yes | no |
 | conditionals `((expr)yes\|no)` | no | yes |
 
+## RE2 compatibility mode
+The default behavior of `regexp2` is to match the .NET regexp engine, however the `RE2` option is provided to change the parsing to increase compatibility with RE2.  Using the `RE2` option when compiling a regexp will not take away any features, but will change the following behaviors:
+* add support for named ascii character classes (e.g. `[[:foo:]]`)
+* add support for python-style capture groups (e.g. `(P<name>re)`)
+
+```go
+re := regexp2.MustCompile(`Your RE2-compatible pattern`, regexp2.RE2)
+if isMatch, _ := re.MatchString(`Something to match`); isMatch {
+    //do something
+}
+```
+
+This feature is a work in progress and I'm open to ideas for more things to put here (maybe more relaxed character escaping rules?).
+
+
 ## Library features that I'm still working on
 - Regex split
 

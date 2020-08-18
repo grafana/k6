@@ -13,7 +13,7 @@ require (
 	github.com/andybalholm/brotli v0.0.0-20190704151324-71eb68cc467c
 	github.com/andybalholm/cascadia v1.0.0 // indirect
 	github.com/daaku/go.zipexe v0.0.0-20150329023125-a5fe2436ffcb // indirect
-	github.com/dlclark/regexp2 v1.1.6 // indirect
+	github.com/dlclark/regexp2 v1.2.1-0.20200807145002-74bac81f00cf // indirect
 	github.com/dop251/goja v0.0.0-20200814103526-379ac97e7e26
 	github.com/dustin/go-humanize v0.0.0-20171111073723-bb3d318650d4
 	github.com/eapache/go-resiliency v1.1.0 // indirect
