@@ -49,12 +49,37 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/js/common"
+	"github.com/loadimpact/k6/js/compiler"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/lib/testutils/httpmultibin"
 	"github.com/loadimpact/k6/stats"
 )
+
+// runES6String Runs an ES6 string in the given runtime. Use this rather than writing ES5 in tests.
+func runES6String(tb testing.TB, rt *goja.Runtime, src string) (goja.Value, error) {
+	var err error
+	c := compiler.New(testutils.NewLogger(tb)) // TODO drop it ? maybe we will drop babel and this will be less needed
+	src, _, err = c.Transform(src, "__string__")
+	if err != nil {
+		return goja.Undefined(), err
+	}
+
+	return common.RunString(rt, src)
+}
+
+func TestRunES6String(t *testing.T) {
+	t.Run("Valid", func(t *testing.T) {
+		_, err := runES6String(t, goja.New(), `let a = 1;`)
+		assert.NoError(t, err)
+	})
+	t.Run("Invalid", func(t *testing.T) {
+		_, err := runES6String(t, goja.New(), `let a = #;`)
+		assert.NotNil(t, err)
+		assert.Contains(t, err.Error(), "SyntaxError: __string__: Unexpected character '#' (1:8)\n> 1 | let a = #;\n")
+	})
+}
 
 func assertRequestMetricsEmitted(t *testing.T, sampleContainers []stats.SampleContainer, method, url, name string, status int, group string) {
 	if name == "" {
@@ -965,7 +990,7 @@ func TestRequestAndBatch(t *testing.T) {
 		assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/get?a=1&b=2"), "", 200, "")
 
 		t.Run("Tagged", func(t *testing.T) {
-			_, err := common.RunES6String(t, rt, `
+			_, err := runES6String(t, rt, `
 			var a = "1";
 			var b = "2";
 			var res = http.get(http.url`+"`"+sr(`HTTPBIN_URL/get?a=${a}&b=${b}`)+"`"+`);
@@ -1075,7 +1100,7 @@ func TestRequestAndBatch(t *testing.T) {
 			assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_IP_URL/"), "", 200, "")
 
 			t.Run("Tagged", func(t *testing.T) {
-				_, err := common.RunES6String(t, rt, sr(`
+				_, err := runES6String(t, rt, sr(`
 				let fragment = "get";
 				let reqs = [
 					["GET", http.url`+"`"+`HTTPBIN_URL/${fragment}`+"`"+`],
@@ -1109,7 +1134,7 @@ func TestRequestAndBatch(t *testing.T) {
 				assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_IP_URL/"), "", 200, "")
 
 				t.Run("Tagged", func(t *testing.T) {
-					_, err := common.RunES6String(t, rt, sr(`
+					_, err := runES6String(t, rt, sr(`
 					let fragment = "get";
 					let reqs = [
 						http.url`+"`"+`HTTPBIN_URL/${fragment}`+"`"+`,
@@ -1375,7 +1400,7 @@ func TestRequestCompression(t *testing.T) {
 			}
 			expectedEncoding = strings.Join(algos, ", ")
 			actualEncoding = expectedEncoding
-			_, err := common.RunES6String(t, rt, tb.Replacer.Replace(`
+			_, err := runES6String(t, rt, tb.Replacer.Replace(`
 		http.post("HTTPBIN_URL/compressed-text", `+"`"+text+"`"+`,  {"compression": "`+testCase.compression+`"});
 	`))
 			if testCase.expectedError == "" {
@@ -1393,7 +1418,7 @@ func TestRequestCompression(t *testing.T) {
 
 		logHook.Drain()
 		t.Run("encoding", func(t *testing.T) {
-			_, err := common.RunES6String(t, rt, tb.Replacer.Replace(`
+			_, err := runES6String(t, rt, tb.Replacer.Replace(`
 				http.post("HTTPBIN_URL/compressed-text", `+"`"+text+"`"+`,
 					{"compression": "`+actualEncoding+`",
 					 "headers": {"Content-Encoding": "`+expectedEncoding+`"}
@@ -1405,7 +1430,7 @@ func TestRequestCompression(t *testing.T) {
 		})
 
 		t.Run("encoding and length", func(t *testing.T) {
-			_, err := common.RunES6String(t, rt, tb.Replacer.Replace(`
+			_, err := runES6String(t, rt, tb.Replacer.Replace(`
 				http.post("HTTPBIN_URL/compressed-text", `+"`"+text+"`"+`,
 					{"compression": "`+actualEncoding+`",
 					 "headers": {"Content-Encoding": "`+expectedEncoding+`",
@@ -1419,7 +1444,7 @@ func TestRequestCompression(t *testing.T) {
 
 		expectedEncoding = actualEncoding
 		t.Run("correct encoding", func(t *testing.T) {
-			_, err := common.RunES6String(t, rt, tb.Replacer.Replace(`
+			_, err := runES6String(t, rt, tb.Replacer.Replace(`
 				http.post("HTTPBIN_URL/compressed-text", `+"`"+text+"`"+`,
 					{"compression": "`+actualEncoding+`",
 					 "headers": {"Content-Encoding": "`+actualEncoding+`"}
