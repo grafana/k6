@@ -13,4 +13,7 @@
   either in the #contributors channel of the k6 slack or in the Github Issue before you get
   started on the implementation.
   
+  If you've already done all of that, you're more than welcome to proceed with your pull request.
+  Thank you again for your contribution! 🙏🏼
+  
 -->
