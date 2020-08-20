@@ -124,7 +124,7 @@ github.com/klauspost/compress/zstd
 github.com/klauspost/compress/zstd/internal/xxhash
 # github.com/klauspost/cpuid v1.3.1
 ## explicit
-# github.com/konsorten/go-windows-terminal-sequences v1.0.1
+# github.com/konsorten/go-windows-terminal-sequences v1.0.3
 github.com/konsorten/go-windows-terminal-sequences
 # github.com/kubernetes/helm v2.9.0+incompatible
 ## explicit
@@ -187,7 +187,7 @@ github.com/rcrowley/go-metrics
 # github.com/serenize/snaker v0.0.0-20171204205717-a683aaf2d516
 ## explicit
 github.com/serenize/snaker
-# github.com/sirupsen/logrus v1.1.2-0.20181101075517-7eeb7b7cbdeb
+# github.com/sirupsen/logrus v1.6.0
 ## explicit
 github.com/sirupsen/logrus
 github.com/sirupsen/logrus/hooks/test
