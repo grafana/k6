@@ -16,7 +16,6 @@ func NewPods(client *kubernetes.Clientset) *Pods {
 	}
 }
 
-
 func (pods *Pods) List(namespace string) ([]string, error) {
 	podList, err := pods.client.CoreV1().Pods(namespace).List(v1.ListOptions{})
 

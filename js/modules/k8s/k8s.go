@@ -30,7 +30,7 @@ import (
 	"path/filepath"
 )
 
-type K8s struct{
+type K8s struct {
 	Pods *Pods
 }
 
