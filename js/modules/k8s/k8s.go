@@ -23,40 +23,48 @@ package k8s
 import (
 	"context"
 	"errors"
+	"path/filepath"
+
 	"github.com/dop251/goja"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
-	"path/filepath"
 )
 
+// K8s client for controlling k8s clusters from k6
 type K8s struct {
 	Pods *Pods
 }
 
+// New creates a new instance of th K8s struct
 func New() *K8s {
 	configPath := filepath.Join(homedir.HomeDir(), ".kube", "config")
 	config, _ := clientcmd.BuildConfigFromFlags("", configPath)
-	clientset, _ := kubernetes.NewForConfig(config)
+	client, _ := kubernetes.NewForConfig(config)
 
 	return &K8s{
-		Pods: NewPods(clientset),
+		Pods: NewPods(client),
 	}
 }
 
+// Fail allows us to test that the module is actually loaded
 func (*K8s) Fail(msg string) (goja.Value, error) {
 	return goja.Undefined(), errors.New(msg)
 }
 
+// List pods in a specific namespace
 func (k8s *K8s) List(ctx context.Context, namespace string) ([]string, error) {
 	return k8s.Pods.List(namespace)
 }
 
+// Kill a specific pod in a specific namespace
 func (k8s *K8s) Kill(ctx context.Context, namespace string, podName string) error {
 	return k8s.Pods.Kill(namespace, podName)
 }
 
+// Status of a pod in a specific namespace
 func (k8s *K8s) Status(ctx context.Context, namespace string, podName string) (string, error) {
 	status, err := k8s.Pods.Status(namespace, podName)
+
 	return status.String(), err
 }

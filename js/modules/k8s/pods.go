@@ -6,24 +6,26 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+// Pods contains all available methods for interacting with k8s pods
 type Pods struct {
 	client *kubernetes.Clientset
 }
 
+// NewPods creates a new instance of the Pods struct
 func NewPods(client *kubernetes.Clientset) *Pods {
 	return &Pods{
 		client,
 	}
 }
 
+// List all pods in a namespace
 func (pods *Pods) List(namespace string) ([]string, error) {
 	podList, err := pods.client.CoreV1().Pods(namespace).List(v1.ListOptions{})
-
 	if err != nil {
 		return nil, err
 	}
 
-	var alivePods []string
+	alivePods := make([]string, 0)
 	for _, pod := range podList.Items {
 		if pod.DeletionTimestamp != nil {
 			continue
@@ -34,21 +36,17 @@ func (pods *Pods) List(namespace string) ([]string, error) {
 	return alivePods, nil
 }
 
+// Kill a pod with a specific name in a specific namespace
 func (pods *Pods) Kill(namespace string, podName string) error {
 	podsInNamespace := pods.client.CoreV1().Pods(namespace)
 	err := podsInNamespace.Delete(podName, &v1.DeleteOptions{})
+
 	return err
 }
 
+// Status of a pod with a specific name in a specific namespace
 func (pods *Pods) Status(namespace string, podName string) (coreV1.PodStatus, error) {
 	pod, err := pods.client.CoreV1().Pods(namespace).Get(podName, v1.GetOptions{})
-	return pod.Status, err
-}
 
-func (pods *Pods) extractPodNames(podList *coreV1.PodList) []string {
-	var output []string
-	for _, pod := range podList.Items {
-		output = append(output, pod.Name)
-	}
-	return output
+	return pod.Status, err
 }
