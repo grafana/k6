@@ -114,7 +114,7 @@ func newBoundInitContext(base *InitContext, ctxPtr *context.Context, rt *goja.Ru
 // Require is called when a module/file needs to be loaded by a script
 func (i *InitContext) Require(arg string) goja.Value {
 	switch {
-	case arg == "k6", strings.HasPrefix(arg, "k6/"):
+	case arg == "k6", strings.HasPrefix(arg, "k6/"), arg == "k8s":
 		// Builtin modules ("k6" or "k6/...") are handled specially, as they don't exist on the
 		// filesystem. This intentionally shadows attempts to name your own modules this.
 		v, err := i.requireModule(arg)

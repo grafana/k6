@@ -56,10 +56,10 @@ require (
 	github.com/rcrowley/go-metrics v0.0.0-20180503174638-e2704e165165 // indirect
 	github.com/serenize/snaker v0.0.0-20171204205717-a683aaf2d516
 	github.com/sirupsen/logrus v1.1.2-0.20181101075517-7eeb7b7cbdeb
-	github.com/spf13/afero v1.1.1
+	github.com/spf13/afero v1.2.2
 	github.com/spf13/cobra v0.0.4-0.20180629152535-a114f312e075
-	github.com/spf13/pflag v1.0.1
-	github.com/stretchr/testify v1.2.2
+	github.com/spf13/pflag v1.0.5
+	github.com/stretchr/testify v1.4.0
 	github.com/tidwall/gjson v1.1.3
 	github.com/tidwall/match v1.0.0 // indirect
 	github.com/tidwall/pretty v0.0.0-20180105212114-65a9db5fad51
@@ -69,15 +69,18 @@ require (
 	github.com/valyala/fasttemplate v0.0.0-20170224212429-dcecefd839c4 // indirect
 	github.com/viki-org/dnscache v0.0.0-20130720023526-c70c1f23c5d8
 	github.com/zyedidia/highlight v0.0.0-20170330143449-201131ce5cf5
-	golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2
+	golang.org/x/crypto v0.0.0-20190820162420-60c769a6c586
 	golang.org/x/net v0.0.0-20200520004742-59133d7f0dd7
 	golang.org/x/text v0.3.2
-	golang.org/x/time v0.0.0-20170927054726-6dc17368e09b
+	golang.org/x/time v0.0.0-20190308202827-9d24e82272b4
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/go-playground/validator.v8 v8.18.2 // indirect
 	gopkg.in/guregu/null.v2 v2.1.2 // indirect
 	gopkg.in/guregu/null.v3 v3.3.0
 	gopkg.in/yaml.v2 v2.3.0
+	k8s.io/api v0.17.0
+	k8s.io/apimachinery v0.17.0
+	k8s.io/client-go v0.17.0
 )
 
 replace (
