@@ -38,6 +38,7 @@ type Config struct {
 	Name            null.String `json:"name" envconfig:"K6_CLOUD_NAME"`
 
 	Host       null.String `json:"host" envconfig:"K6_CLOUD_HOST"`
+	LogsHost   null.String `json:"-" envconfig:"K6_CLOUD_LOGS_HOST"`
 	PushRefID  null.String `json:"pushRefID" envconfig:"K6_CLOUD_PUSH_REF_ID"`
 	WebAppURL  null.String `json:"webAppURL" envconfig:"K6_CLOUD_WEB_APP_URL"`
 	NoCompress null.Bool   `json:"noCompress" envconfig:"K6_CLOUD_NO_COMPRESS"`
@@ -156,6 +157,7 @@ type Config struct {
 func NewConfig() Config {
 	return Config{
 		Host:                       null.NewString("https://ingest.k6.io", false),
+		LogsHost:                   null.NewString("wss://cloudlogs.k6.io/api/v1/tail", false),
 		WebAppURL:                  null.NewString("https://app.k6.io", false),
 		MetricPushInterval:         types.NewNullDuration(1*time.Second, false),
 		MetricPushConcurrency:      null.NewInt(1, false),
@@ -189,6 +191,9 @@ func (c Config) Apply(cfg Config) Config {
 	}
 	if cfg.Host.Valid && cfg.Host.String != "" {
 		c.Host = cfg.Host
+	}
+	if cfg.LogsHost.Valid && cfg.LogsHost.String != "" {
+		c.LogsHost = cfg.LogsHost
 	}
 	if cfg.WebAppURL.Valid {
 		c.WebAppURL = cfg.WebAppURL
