@@ -40,8 +40,8 @@ type K8s struct {
 // New creates a new instance of th K8s struct
 func New() *K8s {
 	configPath := filepath.Join(homedir.HomeDir(), ".kube", "config")
-	_, err := os.Stat(configPath)
-	if os.IsNotExist(err) {
+	info, err := os.Stat(configPath)
+	if os.IsNotExist(err) || info.IsDir() {
 		return nil
 	}
 
