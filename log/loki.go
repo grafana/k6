@@ -302,7 +302,7 @@ func (h *lokiHook) createPushMessage(msgs []tmpMsg, cutOffIndex, dropped int) *l
 
 		msg := tmpMsg{
 			labels: labels,
-			msg: fmt.Sprintf("k6 dropped %d messages because they were above the limit of %d/%s",
+			msg: fmt.Sprintf("k6 dropped %d log messages because they were above the limit of %d messages / %s",
 				dropped, h.limit, h.pushPeriod),
 			t: msgs[cutOffIndex-1].t,
 		}
