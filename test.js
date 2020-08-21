@@ -1,43 +1,76 @@
 import { Rate } from 'k6/metrics';
 import { sleep, check } from 'k6';
+import http from 'k6/http';
 import k8s from 'k8s';
 
-
 const degraded = new Rate('degraded');
+const failed = new Rate('http_req_failed');
 
 export const options = {
-  iterations: 1,
   threshold: {
     degraded: ['rate<=0'],
-    htt_req_duration: ['p(95)<500'],
+    http_req_duration: ['p(95)<500'],
+    http_req_failed: ['rate<0.1']
   },
+  scenarios: {
+    attack: {
+      executor: 'shared-iterations',
+      startTime: '10s',
+      exec: 'attack',
+      vus: 1,
+      iterations: 10,
+    },
+    probe: {
+      executor: 'constant-arrival-rate',
+      rate: 100,  // 200 RPS, since timeUnit is the default 1s
+      duration: '1m',
+      preAllocatedVUs: 50,
+      maxVUs: 100,
+      exec: 'probe'
+    }
+  },
+  ext: {
+    chaos: {
+      hypothesis: `
+        When we inject a pod failure into a deployment while under normal load,
+        the performance of our system will not be degraded more than 10%.
+      `
+    }
+  }
 };
 
 const sleepDuration = 1;
 const namespace = 'default';
 
-export default function () {
+function killPodsByPattern(pods, regex) {
+  const candidates = pods.filter(x =>  regex.test(x));
+  const half_length = Math.floor(candidates.length / 3);
+  const targets = candidates.slice(0,half_length);
 
-  let pods = k8s.list(namespace)
-  let count = pods.length
+  console.log(`Killing ${targets.length} pods out of ${candidates.length}`);
 
-  console.log(`Pod count is ${count}.`)
+  targets.forEach(p => {
+    k8s.kill(namespace, p);
+  });
+}
 
-  let podsToKill = pods.filter(x => x.indexOf('webserver') !== -1)
+export function probe() {
+  const r = http.get('http://10.7.10.201:8080')
+  failed.add(r.status !== 200)
+  sleep(1)
+}
 
-  console.log(`Killing ${podsToKill.length} pods in total`)
-  podsToKill.forEach(p => {
-    k8s.kill(namespace, p)
-  })
+export function attack() {
 
-  console.log(`Sleeping for ${sleepDuration} seconds`)
-  sleep(sleepDuration)
+  let pods = k8s.list(namespace);
+  let count = pods.length;
+
+  killPodsByPattern(pods, /^hello-world/);
+  sleep(sleepDuration);
 
   pods = k8s.list(namespace);
-  console.log(`Pod count is ${count}.`)
 
-  check(null, {
-    'deployment recovered': count === pods.length
-  });
-  degraded.add(count === k8s.list(namespace));
+  const recovered = count === pods.length;
+  check(null, { 'deployment recovered': recovered });
+  degraded.add(!recovered);
 }
