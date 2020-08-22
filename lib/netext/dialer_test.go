@@ -78,14 +78,16 @@ func TestDialerAddr(t *testing.T) {
 
 	for _, tc := range testCases {
 		tc := tc
+
 		t.Run(tc.address, func(t *testing.T) {
 			addr, err := dialer.getDialAddr(tc.address)
+
 			if tc.expErr != "" {
 				require.EqualError(t, err, tc.expErr)
-				return
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tc.expAddress, addr)
 			}
-			require.NoError(t, err)
-			require.Equal(t, tc.expAddress, addr)
 		})
 	}
 }

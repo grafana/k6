@@ -527,7 +527,7 @@ func TestCIDRUnmarshal(t *testing.T) {
 }
 
 func TestHostAddressUnmarshal(t *testing.T) {
-	var testData = []struct {
+	testData := []struct {
 		input          string
 		expectedOutput *HostAddress
 		expectFailure  string

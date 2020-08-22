@@ -232,6 +232,7 @@ func (h *HostAddress) UnmarshalText(text []byte) error {
 	}
 
 	*h = *nh
+
 	return nil
 }
 

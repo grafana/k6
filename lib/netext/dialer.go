@@ -208,6 +208,7 @@ func (d *Dialer) getCachedHost(addr, host, port string) (*lib.HostAddress, error
 
 		newRemote := *remote
 		newRemote.Port = newPort
+
 		return &newRemote, nil
 	}
 
