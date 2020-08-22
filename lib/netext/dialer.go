@@ -191,14 +191,18 @@ func (d *Dialer) getCachedHost(addr, host, port string) (*lib.HostAddress, error
 
 	// lookup for host defined in Hosts option before trying to resolve DNS.
 	if remote, ok := d.Hosts[host]; ok {
-		if remote.Port == 0 && port != "" {
-			newPort, err := strconv.Atoi(port)
-			if err != nil {
-				return nil, err
-			}
-			remote.Port = newPort
+		if remote.Port != 0 || port == "" {
+			return remote, nil
 		}
-		return remote, nil
+
+		newPort, err := strconv.Atoi(port)
+		if err != nil {
+			return nil, err
+		}
+
+		newRemote := *remote
+		newRemote.Port = newPort
+		return &newRemote, nil
 	}
 
 	return nil, nil
