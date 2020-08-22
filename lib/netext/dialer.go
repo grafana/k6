@@ -169,13 +169,19 @@ func (d *Dialer) findRemote(addr string) (*lib.HostAddress, error) {
 	}
 
 	ip := net.ParseIP(host)
-
-	if ip == nil {
-		ip, err = d.Resolver.FetchOne(host)
-		if err != nil {
-			return nil, err
-		}
+	if ip != nil {
+		return lib.NewHostAddress(ip, port)
 	}
+
+	return d.fetchRemoteFromResover(host, port)
+}
+
+func (d *Dialer) fetchRemoteFromResover(host, port string) (*lib.HostAddress, error) {
+	ip, err := d.Resolver.FetchOne(host)
+	if err != nil {
+		return nil, err
+	}
+
 	if ip == nil {
 		return nil, errors.Errorf("lookup %s: no such host", host)
 	}
