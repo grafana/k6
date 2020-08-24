@@ -23,8 +23,10 @@ package k8s
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/dop251/goja"
 	"k8s.io/client-go/kubernetes"
@@ -34,42 +36,74 @@ import (
 
 // K8s client for controlling k8s clusters from k6
 type K8s struct {
-	Pods *Pods
+	ready bool
+	Pods  *Pods
 }
 
 // New creates a new instance of th K8s struct
 func New() *K8s {
-	configPath := filepath.Join(homedir.HomeDir(), ".kube", "config")
-	info, err := os.Stat(configPath)
-	if os.IsNotExist(err) || info.IsDir() {
+	return &K8s{}
+}
+
+// LoadConfig for use with the kubernetes client
+func (k8s *K8s) LoadConfig(configPath string) error {
+	if k8s.ready {
 		return nil
 	}
 
-	config, _ := clientcmd.BuildConfigFromFlags("", configPath)
-	client, _ := kubernetes.NewForConfig(config)
-
-	return &K8s{
-		Pods: NewPods(client),
+	if strings.HasPrefix(configPath, "~/") {
+		configPath = filepath.Join(homedir.HomeDir(), configPath[1:])
 	}
+
+	info, err := os.Stat(configPath)
+
+	if os.IsNotExist(err) || info.IsDir() {
+		return fmt.Errorf("could not find any kubeconfig file at \"%s\"", configPath)
+	}
+
+	config, err := clientcmd.BuildConfigFromFlags("", configPath)
+	if err != nil {
+		return err
+	}
+
+	client, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return err
+	}
+
+	k8s.ready = true
+	k8s.Pods = NewPods(client)
+	return nil
 }
 
 // Fail allows us to test that the module is actually loaded
-func (*K8s) Fail(msg string) (goja.Value, error) {
+func (k8s *K8s) Fail(msg string) (goja.Value, error) {
 	return goja.Undefined(), errors.New(msg)
 }
 
 // List pods in a specific namespace
 func (k8s *K8s) List(ctx context.Context, namespace string) ([]string, error) {
+	if !k8s.ready {
+		return nil, errors.New("load a kubeconfig file using LoadConfig before attempting to use the client")
+	}
 	return k8s.Pods.List(namespace)
 }
 
 // Kill a specific pod in a specific namespace
 func (k8s *K8s) Kill(ctx context.Context, namespace string, podName string) error {
+	if !k8s.ready {
+		return errors.New("load a kubeconfig file using LoadConfig before attempting to use the client")
+	}
+
 	return k8s.Pods.Kill(namespace, podName)
 }
 
 // Status of a pod in a specific namespace
 func (k8s *K8s) Status(ctx context.Context, namespace string, podName string) (string, error) {
+	if !k8s.ready {
+		return "", errors.New("load a kubeconfig file using LoadConfig before attempting to use the client")
+	}
+
 	status, err := k8s.Pods.Status(namespace, podName)
 
 	return status.String(), err
