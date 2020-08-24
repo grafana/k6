@@ -163,7 +163,7 @@ func (d *Dialer) findRemote(addr string) (*lib.HostAddress, error) {
 		return nil, err
 	}
 
-	remote, err := d.getCachedHost(addr, host, port)
+	remote, err := d.getConfiguredHost(addr, host, port)
 	if err != nil || remote != nil {
 		return remote, err
 	}
@@ -189,13 +189,11 @@ func (d *Dialer) fetchRemoteFromResover(host, port string) (*lib.HostAddress, er
 	return lib.NewHostAddress(ip, port)
 }
 
-func (d *Dialer) getCachedHost(addr, host, port string) (*lib.HostAddress, error) {
-	// lookup for full address defined in Hosts option before trying to resolve DNS.
+func (d *Dialer) getConfiguredHost(addr, host, port string) (*lib.HostAddress, error) {
 	if remote, ok := d.Hosts[addr]; ok {
 		return remote, nil
 	}
 
-	// lookup for host defined in Hosts option before trying to resolve DNS.
 	if remote, ok := d.Hosts[host]; ok {
 		if remote.Port != 0 || port == "" {
 			return remote, nil
