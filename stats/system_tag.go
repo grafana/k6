@@ -33,7 +33,7 @@ import (
 type SystemTagSet uint32
 
 // TagSet is a string to bool map (for lookup efficiency) that is used to keep track
-// which system tags and non-system tags should be included with with metrics.
+// of which system tags and non-system tags to include.
 type TagSet map[string]bool
 
 // UnmarshalText converts the tag list to TagSet.
