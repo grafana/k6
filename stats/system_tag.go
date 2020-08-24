@@ -23,6 +23,7 @@ package stats
 import (
 	"bytes"
 	"encoding/json"
+	"sort"
 	"strings"
 )
 
@@ -35,9 +36,54 @@ type SystemTagSet uint32
 // which system tags and non-system tags should be included with with metrics.
 type TagSet map[string]bool
 
-//nolint: golint
+// UnmarshalText converts the tag list to TagSet.
+func (i *TagSet) UnmarshalText(data []byte) error {
+	list := bytes.Split(data, []byte(","))
+	if *i == nil {
+		*i = make(TagSet, len(list))
+	}
+
+	for _, key := range list {
+		key := strings.TrimSpace(string(key))
+		if key == "" {
+			continue
+		}
+		(*i)[key] = true
+	}
+
+	return nil
+}
+
+// MarshalJSON converts the TagSet to a list (JS array).
+func (i *TagSet) MarshalJSON() ([]byte, error) {
+	var tags []string
+	if *i != nil {
+		tags = make([]string, 0, len(*i))
+		for tag := range *i {
+			tags = append(tags, tag)
+		}
+		sort.Strings(tags)
+	}
+
+	return json.Marshal(tags)
+}
+
+// UnmarshalJSON converts the tag list back to expected tag set.
+func (i *TagSet) UnmarshalJSON(data []byte) error {
+	var tags []string
+	if err := json.Unmarshal(data, &tags); err != nil {
+		return err
+	}
+	*i = make(TagSet, len(tags))
+	for _, tag := range tags {
+		(*i)[tag] = true
+	}
+
+	return nil
+}
+
+// Default system tags includes all of the system tags emitted with metrics by default.
 const (
-	// Default system tags includes all of the system tags emitted with metrics by default.
 	TagProto SystemTagSet = 1 << iota
 	TagSubproto
 	TagStatus
@@ -131,6 +177,8 @@ func (i *SystemTagSet) MarshalJSON() ([]byte, error) {
 			tags = append(tags, tag.String())
 		}
 	}
+	sort.Strings(tags)
+
 	return json.Marshal(tags)
 }
 
@@ -149,7 +197,7 @@ func (i *SystemTagSet) UnmarshalJSON(data []byte) error {
 
 // UnmarshalText converts the tag list to SystemTagSet.
 func (i *SystemTagSet) UnmarshalText(data []byte) error {
-	var list = bytes.Split(data, []byte(","))
+	list := bytes.Split(data, []byte(","))
 
 	for _, key := range list {
 		key := strings.TrimSpace(string(key))
