@@ -73,6 +73,7 @@ func (k8s *K8s) LoadConfig(configPath string) error {
 
 	k8s.ready = true
 	k8s.Pods = NewPods(client)
+
 	return nil
 }
 
@@ -86,6 +87,7 @@ func (k8s *K8s) List(ctx context.Context, namespace string) ([]string, error) {
 	if !k8s.ready {
 		return nil, errors.New("load a kubeconfig file using LoadConfig before attempting to use the client")
 	}
+
 	return k8s.Pods.List(namespace)
 }
 
