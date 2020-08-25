@@ -33,10 +33,11 @@ import (
 	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
-	null "gopkg.in/guregu/null.v3"
+	"gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/stats"
 )
@@ -70,29 +71,41 @@ func TestConsoleContext(t *testing.T) {
 		assert.Equal(t, "b", entry.Message)
 	}
 }
-func getSimpleRunner(path, data string) (*Runner, error) {
-	return getSimpleRunnerWithFileFs(path, data, afero.NewMemMapFs())
+
+func getSimpleRunner(tb testing.TB, filename, data string, opts ...interface{}) (*Runner, error) {
+	var (
+		fs     = afero.NewMemMapFs()
+		rtOpts = lib.RuntimeOptions{CompatibilityMode: null.NewString("base", true)}
+	)
+	for _, o := range opts {
+		switch opt := o.(type) {
+		case afero.Fs:
+			fs = opt
+		case lib.RuntimeOptions:
+			rtOpts = opt
+		}
+	}
+	return New(
+		testutils.NewLogger(tb),
+		&loader.SourceData{
+			URL:  &url.URL{Path: filename, Scheme: "file"},
+			Data: []byte(data),
+		},
+		map[string]afero.Fs{"file": fs, "https": afero.NewMemMapFs()},
+		rtOpts,
+	)
 }
 
-func getSimpleRunnerWithOptions(path, data string, options lib.RuntimeOptions) (*Runner, error) {
-	return New(&loader.SourceData{
-		URL:  &url.URL{Path: path, Scheme: "file"},
-		Data: []byte(data),
-	}, map[string]afero.Fs{
-		"file":  afero.NewMemMapFs(),
-		"https": afero.NewMemMapFs()},
-		options)
+func extractLogger(fl logrus.FieldLogger) *logrus.Logger {
+	switch e := fl.(type) {
+	case *logrus.Entry:
+		return e.Logger
+	case *logrus.Logger:
+		return e
+	}
+	return nil
 }
 
-func getSimpleRunnerWithFileFs(path, data string, fileFs afero.Fs) (*Runner, error) {
-	return New(&loader.SourceData{
-		URL:  &url.URL{Path: path, Scheme: "file"},
-		Data: []byte(data),
-	}, map[string]afero.Fs{
-		"file":  fileFs,
-		"https": afero.NewMemMapFs()},
-		lib.RuntimeOptions{})
-}
 func TestConsole(t *testing.T) {
 	levels := map[string]logrus.Level{
 		"log":   logrus.InfoLevel,
@@ -105,10 +118,10 @@ func TestConsole(t *testing.T) {
 		Message string
 		Data    logrus.Fields
 	}{
-		`"string"`:         {Message: "string"},
-		`"string","a","b"`: {Message: "string", Data: logrus.Fields{"0": "a", "1": "b"}},
-		`"string",1,2`:     {Message: "string", Data: logrus.Fields{"0": "1", "1": "2"}},
-		`{}`:               {Message: "[object Object]"},
+		`"string"`:         {Message: "string", Data: logrus.Fields{"source": "console"}},
+		`"string","a","b"`: {Message: "string a b", Data: logrus.Fields{"source": "console"}},
+		`"string",1,2`:     {Message: "string 1 2", Data: logrus.Fields{"source": "console"}},
+		`{}`:               {Message: "[object Object]", Data: logrus.Fields{"source": "console"}},
 	}
 	for name, level := range levels {
 		name, level := name, level
@@ -116,21 +129,27 @@ func TestConsole(t *testing.T) {
 			for args, result := range argsets {
 				args, result := args, result
 				t.Run(args, func(t *testing.T) {
-					r, err := getSimpleRunner("/script.js", fmt.Sprintf(
-						`export default function() { console.%s(%s); }`,
+					r, err := getSimpleRunner(t, "/script.js", fmt.Sprintf(
+						`exports.default = function() { console.%s(%s); }`,
 						name, args,
 					))
 					assert.NoError(t, err)
 
 					samples := make(chan stats.SampleContainer, 100)
-					vu, err := r.newVU(samples)
+					initVU, err := r.newVU(1, samples)
 					assert.NoError(t, err)
 
-					logger, hook := logtest.NewNullLogger()
-					logger.Level = logrus.DebugLevel
-					vu.Console.Logger = logger
+					ctx, cancel := context.WithCancel(context.Background())
+					defer cancel()
+					vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 
-					err = vu.RunOnce(context.Background())
+					logger := extractLogger(vu.(*ActiveVU).Console.logger)
+
+					logger.Out = ioutil.Discard
+					logger.Level = logrus.DebugLevel
+					hook := logtest.NewLocal(logger)
+
+					err = vu.RunOnce()
 					assert.NoError(t, err)
 
 					entry := hook.LastEntry()
@@ -163,10 +182,10 @@ func TestFileConsole(t *testing.T) {
 			Message string
 			Data    logrus.Fields
 		}{
-			`"string"`:         {Message: "string"},
-			`"string","a","b"`: {Message: "string", Data: logrus.Fields{"0": "a", "1": "b"}},
-			`"string",1,2`:     {Message: "string", Data: logrus.Fields{"0": "1", "1": "2"}},
-			`{}`:               {Message: "[object Object]"},
+			`"string"`:         {Message: "string", Data: logrus.Fields{}},
+			`"string","a","b"`: {Message: "string a b", Data: logrus.Fields{}},
+			`"string",1,2`:     {Message: "string 1 2", Data: logrus.Fields{}},
+			`{}`:               {Message: "[object Object]", Data: logrus.Fields{}},
 		}
 		preExisting = map[string]bool{
 			"log exists":        false,
@@ -181,11 +200,11 @@ func TestFileConsole(t *testing.T) {
 					// whether the file is existed before logging
 					for msg, deleteFile := range preExisting {
 						t.Run(msg, func(t *testing.T) {
-							var f, err = ioutil.TempFile("", "")
+							f, err := ioutil.TempFile("", "")
 							if err != nil {
 								t.Fatalf("Couldn't create temporary file for testing: %s", err)
 							}
-							var logFilename = f.Name()
+							logFilename := f.Name()
 							defer os.Remove(logFilename)
 							// close it as we will want to reopen it and maybe remove it
 							if deleteFile {
@@ -195,16 +214,16 @@ func TestFileConsole(t *testing.T) {
 								}
 							} else {
 								// TODO: handle case where the string was no written in full ?
-								_, err := f.WriteString(preExistingText)
-								f.Close()
+								_, err = f.WriteString(preExistingText)
+								_ = f.Close()
 								if err != nil {
 									t.Fatalf("Error while writing text to preexisting logfile: %s", err)
 								}
 
 							}
-							r, err := getSimpleRunner("/script",
+							r, err := getSimpleRunner(t, "/script",
 								fmt.Sprintf(
-									`export default function() { console.%s(%s); }`,
+									`exports.default = function() { console.%s(%s); }`,
 									name, args,
 								))
 							assert.NoError(t, err)
@@ -215,13 +234,18 @@ func TestFileConsole(t *testing.T) {
 							assert.NoError(t, err)
 
 							samples := make(chan stats.SampleContainer, 100)
-							vu, err := r.newVU(samples)
+							initVU, err := r.newVU(1, samples)
 							assert.NoError(t, err)
 
-							vu.Console.Logger.Level = logrus.DebugLevel
-							hook := logtest.NewLocal(vu.Console.Logger)
+							ctx, cancel := context.WithCancel(context.Background())
+							defer cancel()
+							vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+							logger := extractLogger(vu.(*ActiveVU).Console.logger)
 
-							err = vu.RunOnce(context.Background())
+							logger.Level = logrus.DebugLevel
+							hook := logtest.NewLocal(logger)
+
+							err = vu.RunOnce()
 							assert.NoError(t, err)
 
 							// Test if the file was created.
@@ -250,13 +274,12 @@ func TestFileConsole(t *testing.T) {
 								fileContent, err := ioutil.ReadAll(f)
 								assert.NoError(t, err)
 
-								var expectedStr = entryStr
+								expectedStr := entryStr
 								if !deleteFile {
 									expectedStr = preExistingText + expectedStr
 								}
 								assert.Equal(t, expectedStr, string(fileContent))
 							}
-
 						})
 					}
 				})

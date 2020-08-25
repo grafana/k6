@@ -24,12 +24,12 @@ import (
 	"context"
 	gox509 "crypto/x509"
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/dop251/goja"
-	"github.com/loadimpact/k6/js/common"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/loadimpact/k6/js/common"
 )
 
 func makeRuntime() *goja.Runtime {
@@ -49,7 +49,7 @@ type Material struct {
 }
 
 var material = Material{ //nolint:gochecknoglobals
-	dsaCertificate: template(`-----BEGIN CERTIFICATE-----
+	dsaCertificate: `-----BEGIN CERTIFICATE-----
 MIIFnzCCBUSgAwIBAgIJAPOE4rArGHVcMAsGCWCGSAFlAwQDAjCBsTELMAkGA1UE
 BhMCWloxGTAXBgNVBAgMEEtvcHVuY2V6aXMgS3JhaXMxETAPBgNVBAcMCEFzaHRp
 bm9rMRwwGgYDVQQKDBNFeHVtYnJhbiBDb252ZW50aW9uMRkwFwYDVQQLDBBFeHVt
@@ -81,8 +81,8 @@ JqGGJU+MCQZEoTAfBgNVHSMEGDAWgBSSb364iDHRI6/2JqGGJU+MCQZEoTAPBgNV
 HRMBAf8EBTADAQH/MAsGCWCGSAFlAwQDAgNIADBFAiEA1nr63IX9aaGUPeOUC0Bh
 w3Y7mpv5+sVgtoIi8ljxVSICIFCpEl70YjRVIUKL8N/lJwKxisrJ4+Xxg/DIeGP8
 L8GA
------END CERTIFICATE-----`),
-	ecdsaCertificate: template(`-----BEGIN CERTIFICATE-----
+-----END CERTIFICATE-----`,
+	ecdsaCertificate: `-----BEGIN CERTIFICATE-----
 MIIDXjCCAwWgAwIBAgICBNIwCgYIKoZIzj0EAwIwgdsxCzAJBgNVBAYTAlpaMRkw
 FwYDVQQIExBLb3B1bmNlemlzIEtyYWlzMREwDwYDVQQHEwhBc2h0aW5vazEaMBgG
 A1UECRMRMjIxQiBCYWtlciBTdHJlZXQxDjAMBgNVBBETBTk5OTk5MRwwGgYDVQQK
@@ -102,8 +102,8 @@ Ly9wcmVzcy5leGNvdW5jaWwuenqGJ2h0dHA6Ly9sZWFybmluZy5leGNvdW5jaWwu
 enovaW5kZXguaHRtbDAKBggqhkjOPQQDAgNHADBEAiA/X4Y+Zaw4ziqL4grkY+rm
 srWfS/JGxLvN49r68cczSwIgWEXFIHMwE+OhKC6z01mIPe2G2CguYHukWyL+BHtT
 +20=
------END CERTIFICATE-----`),
-	rsaCertificate: template(`-----BEGIN CERTIFICATE-----
+-----END CERTIFICATE-----`,
+	rsaCertificate: `-----BEGIN CERTIFICATE-----
 MIIE6zCCA9OgAwIBAgICBNIwDQYJKoZIhvcNAQELBQAwgdsxCzAJBgNVBAYTAlpa
 MRkwFwYDVQQIExBLb3B1bmNlemlzIEtyYWlzMREwDwYDVQQHEwhBc2h0aW5vazEa
 MBgGA1UECRMRMjIxQiBCYWtlciBTdHJlZXQxDjAMBgNVBBETBTk5OTk5MRwwGgYD
@@ -131,17 +131,13 @@ gzg3dNaCY65aH0cJE/dVwiS/F2XTr1zvr+uBPExgrA21+FSIlHM0Dot+VGKdCLEO
 6HugOCDBdzKF2hsHeI5LvgXUX5zQ0gnsd93+QuxUmiN7QZZs8tDMD/+efo4OWvp/
 xytSVXVn+cECQLg9hVn+Zx3XO2FA0eOzaWEONnUGghT/Ivw06lUxis5tkAoAU93d
 ddBqJe0XUeAX8Zr6EJ82
------END CERTIFICATE-----`),
-	publicKey: template(`-----BEGIN PUBLIC KEY-----
+-----END CERTIFICATE-----`,
+	publicKey: `-----BEGIN PUBLIC KEY-----
 MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDXMLr/Y/vUtIFY75jj0YXfp6lQ
 7iEIbps3BvRE4isTpxs8fXLnLM8LAuJScxiKyrGnj8EMb7LIHkSMBlz6iVj9atY6
 EUEm/VHUnElNquzGyBA50TCfpv6NHPaTvOoB45yQbZ/YB4LO+CsT9eIMDZ4tcU9Z
 +xD10ifJhhIwpZUFIQIDAQAB
------END PUBLIC KEY-----`),
-}
-
-func template(value string) string {
-	return fmt.Sprintf("`%s`", value)
+-----END PUBLIC KEY-----`,
 }
 
 func TestParse(t *testing.T) {
@@ -153,27 +149,27 @@ func TestParse(t *testing.T) {
 	t.Run("DecodeFailure", func(t *testing.T) {
 		_, err := common.RunString(rt, `
 		x509.parse("bad-certificate");`)
-		assert.EqualError(
-			t, err, "GoError: failed to decode certificate PEM file")
+		assert.Contains(
+			t, err.Error(), "GoError: failed to decode certificate PEM file")
 	})
 
 	t.Run("ParseFailure", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
-		const pem = %s;
+		var pem = %q;
 		x509.parse(pem);`, material.publicKey))
 		if assert.Error(t, err) {
-			assert.True(t, strings.HasPrefix(
+			assert.Contains(t,
 				err.Error(),
 				"GoError: failed to parse certificate",
-			))
+			)
 		}
 	})
 
 	t.Run("SignatureAlgorithm", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
-		const pem = %s;
-		const cert = x509.parse(pem);
-		const value = cert.signatureAlgorithm;
+		var pem = %q;
+		var cert = x509.parse(pem);
+		var value = cert.signatureAlgorithm;
 		if (value !== "SHA256-RSA") {
 			throw new Error("Bad signature algorithm: " + value);
 		}`, material.rsaCertificate))
@@ -182,8 +178,8 @@ func TestParse(t *testing.T) {
 
 	t.Run("Subject", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
-		const pem = %s;
-		const cert = x509.parse(pem);
+		var pem = %q;
+		var cert = x509.parse(pem);
 		if (typeof cert.subject !== "object") {
 			throw new Error("Bad subject: " + typeof cert.subject);
 		}`, material.rsaCertificate))
@@ -192,9 +188,9 @@ func TestParse(t *testing.T) {
 
 	t.Run("SubjectCommonName", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
-		const pem = %s;
-		const cert = x509.parse(pem);
-		const value = cert.subject ? cert.subject.commonName : null;
+		var pem = %q;
+		var cert = x509.parse(pem);
+		var value = cert.subject ? cert.subject.commonName : null;
 		if (value !== "excouncil.zz") {
 			throw new Error("Bad subject common name: " + value);
 		}`, material.rsaCertificate))
@@ -203,9 +199,9 @@ func TestParse(t *testing.T) {
 
 	t.Run("SubjectCountry", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
-		const pem = %s;
-		const cert = x509.parse(pem);
-		const value = cert.subject ? cert.subject.country : null;
+		var pem = %q;
+		var cert = x509.parse(pem);
+		var value = cert.subject ? cert.subject.country : null;
 		if (value !== "ZZ") {
 			throw new Error("Bad subject country: " + value);
 		}`, material.rsaCertificate))
@@ -214,9 +210,9 @@ func TestParse(t *testing.T) {
 
 	t.Run("SubjectPostalCode", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
-		const pem = %s;
-		const cert = x509.parse(pem);
-		const value = cert.subject ? cert.subject.postalCode : null;
+		var pem = %q;
+		var cert = x509.parse(pem);
+		var value = cert.subject ? cert.subject.postalCode : null;
 		if (value !== "99999") {
 			throw new Error("Bad subject postal code: " + value);
 		}`, material.rsaCertificate))
@@ -225,9 +221,9 @@ func TestParse(t *testing.T) {
 
 	t.Run("SubjectProvince", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
-		const pem = %s;
-		const cert = x509.parse(pem);
-		const value = cert.subject ? cert.subject.stateOrProvinceName : null;
+		var pem = %q;
+		var cert = x509.parse(pem);
+		var value = cert.subject ? cert.subject.stateOrProvinceName : null;
 		if (value !== "Kopuncezis Krais") {
 			throw new Error("Bad subject province: " + value);
 		}`, material.rsaCertificate))
@@ -236,9 +232,9 @@ func TestParse(t *testing.T) {
 
 	t.Run("SubjectLocality", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
-		const pem = %s;
-		const cert = x509.parse(pem);
-		const value = cert.subject ? cert.subject.localityName : null;
+		var pem = %q;
+		var cert = x509.parse(pem);
+		var value = cert.subject ? cert.subject.localityName : null;
 		if (value !== "Ashtinok") {
 			throw new Error("Bad subject locality: " + value);
 		}`, material.rsaCertificate))
@@ -247,9 +243,9 @@ func TestParse(t *testing.T) {
 
 	t.Run("SubjectStreetAddress", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
-		const pem = %s;
-		const cert = x509.parse(pem);
-		const value = cert.subject ? cert.subject.streetAddress : null;
+		var pem = %q;
+		var cert = x509.parse(pem);
+		var value = cert.subject ? cert.subject.streetAddress : null;
 		if (value !== "221B Baker Street") {
 			throw new Error("Bad subject street address: " + value);
 		}`, material.rsaCertificate))
@@ -258,9 +254,9 @@ func TestParse(t *testing.T) {
 
 	t.Run("SubjectOrganization", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
-		const pem = %s;
-		const cert = x509.parse(pem);
-		const value = cert.subject ? cert.subject.organizationName : null;
+		var pem = %q;
+		var cert = x509.parse(pem);
+		var value = cert.subject ? cert.subject.organizationName : null;
 		if (value !== "Exumbran Convention") {
 			throw new Error("Bad subject organization: " + value);
 		}`, material.rsaCertificate))
@@ -269,9 +265,9 @@ func TestParse(t *testing.T) {
 
 	t.Run("SubjectOrganizationalUnit", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
-		const pem = %s;
-		const cert = x509.parse(pem);
-		const values =
+		var pem = %q;
+		var cert = x509.parse(pem);
+		var values =
 			cert.subject ? cert.subject.organizationalUnitName : null;
 		if (!(
 			values.length === 2 &&
@@ -287,11 +283,11 @@ func TestParse(t *testing.T) {
 
 	t.Run("SubjectNames", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
-		const pem = %s;
-		const cert = x509.parse(pem);
-		const values = cert.subject ? cert.subject.names : null;
-		const strings = values
-			? values.map(entry => entry.type + ": " + entry.value)
+		var pem = %q;
+		var cert = x509.parse(pem);
+		var values = cert.subject ? cert.subject.names : null;
+		var strings = values
+			? values.map(function(entry) { return entry.type + ": " + entry.value})
 			: null;
 		Array.prototype.includes =
 			function (value) { return this.indexOf(value) !== -1 }
@@ -316,8 +312,8 @@ func TestParse(t *testing.T) {
 
 	t.Run("Issuer", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
-		const pem = %s;
-		const cert = x509.parse(pem);
+		var pem = %q;
+		var cert = x509.parse(pem);
 		if (typeof cert.issuer !== "object") {
 			throw new Error("Bad issuer: " + typeof cert.issuer);
 		}`, material.rsaCertificate))
@@ -326,9 +322,9 @@ func TestParse(t *testing.T) {
 
 	t.Run("IssuerCommonName", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
-		const pem = %s;
-		const cert = x509.parse(pem);
-		const value = cert.issuer ? cert.issuer.commonName : null;
+		var pem = %q;
+		var cert = x509.parse(pem);
+		var value = cert.issuer ? cert.issuer.commonName : null;
 		if (value !== "excouncil.zz") {
 			throw new Error("Bad issuer common name: " + value);
 		}`, material.rsaCertificate))
@@ -337,9 +333,9 @@ func TestParse(t *testing.T) {
 
 	t.Run("IssuerCountry", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
-		const pem = %s;
-		const cert = x509.parse(pem);
-		const value = cert.issuer ? cert.issuer.country : null;
+		var pem = %q;
+		var cert = x509.parse(pem);
+		var value = cert.issuer ? cert.issuer.country : null;
 		if (value !== "ZZ") {
 			throw new Error("Bad issuer country: " + value);
 		}`, material.rsaCertificate))
@@ -348,9 +344,9 @@ func TestParse(t *testing.T) {
 
 	t.Run("IssuerProvince", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
-		const pem = %s;
-		const cert = x509.parse(pem);
-		const value = cert.issuer ? cert.issuer.stateOrProvinceName : null;
+		var pem = %q;
+		var cert = x509.parse(pem);
+		var value = cert.issuer ? cert.issuer.stateOrProvinceName : null;
 		if (value !== "Kopuncezis Krais") {
 			throw new Error("Bad issuer province: " + value);
 		}`, material.rsaCertificate))
@@ -359,9 +355,9 @@ func TestParse(t *testing.T) {
 
 	t.Run("IssuerLocality", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
-		const pem = %s;
-		const cert = x509.parse(pem);
-		const value = cert.issuer ? cert.issuer.localityName : null;
+		var pem = %q;
+		var cert = x509.parse(pem);
+		var value = cert.issuer ? cert.issuer.localityName : null;
 		if (value !== "Ashtinok") {
 			throw new Error("Bad issuer locality: " + value);
 		}`, material.rsaCertificate))
@@ -370,9 +366,9 @@ func TestParse(t *testing.T) {
 
 	t.Run("IssuerOrganization", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
-		const pem = %s;
-		const cert = x509.parse(pem);
-		const value = cert.issuer ? cert.issuer.organizationName : null;
+		var pem = %q;
+		var cert = x509.parse(pem);
+		var value = cert.issuer ? cert.issuer.organizationName : null;
 		if (value !== "Exumbran Convention") {
 			throw new Error("Bad issuer organization: " + value);
 		}`, material.rsaCertificate))
@@ -381,11 +377,11 @@ func TestParse(t *testing.T) {
 
 	t.Run("IssuerNames", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
-		const pem = %s;
-		const cert = x509.parse(pem);
-		const values = cert.issuer ? cert.issuer.names : null;
-		const strings = values
-			? values.map(entry => entry.type + ": " + entry.value)
+		var pem = %q;
+		var cert = x509.parse(pem);
+		var values = cert.issuer ? cert.issuer.names : null;
+		var strings = values
+			? values.map(function(entry) { return entry.type + ": " + entry.value})
 			: null;
 		Array.prototype.includes =
 			function (value) { return this.indexOf(value) !== -1 }
@@ -410,9 +406,9 @@ func TestParse(t *testing.T) {
 
 	t.Run("NotBefore", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
-		const pem = %s;
-		const cert = x509.parse(pem);
-		const value = cert.notBefore;
+		var pem = %q;
+		var cert = x509.parse(pem);
+		var value = cert.notBefore;
 		if (value !== "2019-01-01T00:00:00Z") {
 			throw new Error("Bad lower bound: " + value)
 		}`, material.rsaCertificate))
@@ -421,9 +417,9 @@ func TestParse(t *testing.T) {
 
 	t.Run("NotAfter", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
-		const pem = %s;
-		const cert = x509.parse(pem);
-		const value = cert.notAfter;
+		var pem = %q;
+		var cert = x509.parse(pem);
+		var value = cert.notAfter;
 		if (value !== "2020-01-01T00:00:00Z") {
 			throw new Error("Bad upper bound: " + value);
 		}`, material.rsaCertificate))
@@ -432,9 +428,9 @@ func TestParse(t *testing.T) {
 
 	t.Run("AltNames", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
-		const pem = %s;
-		const cert = x509.parse(pem);
-		const values = cert.altNames;
+		var pem = %q;
+		var cert = x509.parse(pem);
+		var values = cert.altNames;
 		if (!(
 			values.length === 8 &&
 			values[0] === "council.exumbran.zz" &&
@@ -453,10 +449,10 @@ func TestParse(t *testing.T) {
 
 	t.Run("FingerPrint", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
-		const pem = %s;
-		const cert = x509.parse(pem);
-		const value = cert.fingerPrint;
-		const expected = [
+		var pem = %q;
+		var cert = x509.parse(pem);
+		var value = cert.fingerPrint;
+		var expected = [
 			85, 119, 3, 199, 150, 144, 202, 145, 178, 46,
 			205, 132, 37, 235, 251, 208, 139, 161, 143, 14
 		]
@@ -468,8 +464,8 @@ func TestParse(t *testing.T) {
 
 	t.Run("PublicKey", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
-		const pem = %s;
-		const cert = x509.parse(pem);
+		var pem = %q;
+		var cert = x509.parse(pem);
 		if (typeof cert.publicKey !== "object") {
 			throw new Error("Bad public key: " + typeof cert.publicKey);
 		}`, material.rsaCertificate))
@@ -478,9 +474,9 @@ func TestParse(t *testing.T) {
 
 	t.Run("RSAPublicKey", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
-		const pem = %s;
-		const cert = x509.parse(pem);
-		const value = cert.publicKey;
+		var pem = %q;
+		var cert = x509.parse(pem);
+		var value = cert.publicKey;
 		if (!(
 			value &&
 			typeof value === "object" &&
@@ -496,9 +492,9 @@ func TestParse(t *testing.T) {
 
 	t.Run("RSAPublicKeyExponent", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
-		const pem = %s;
-		const cert = x509.parse(pem);
-		const value = cert.publicKey ? cert.publicKey.key.e : null;
+		var pem = %q;
+		var cert = x509.parse(pem);
+		var value = cert.publicKey ? cert.publicKey.key.e : null;
 		if (value !== 65537) {
 			throw new Error("Bad RSA public key exponent: " + value);
 		}`, material.rsaCertificate))
@@ -507,10 +503,10 @@ func TestParse(t *testing.T) {
 
 	t.Run("RSAPublicKeyModulus", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
-		const pem = %s;
-		const cert = x509.parse(pem);
-		const value = cert.publicKey ? cert.publicKey.key.n.bytes() : null;
-		const expected = [
+		var pem = %q;
+		var cert = x509.parse(pem);
+		var value = cert.publicKey ? cert.publicKey.key.n.bytes() : null;
+		var expected = [
 			223, 249, 234, 71, 180, 36, 28, 62, 84, 141, 177, 118, 53, 2, 175,
 			45, 167, 89, 155, 216, 103, 86, 32, 216, 42, 92, 84, 125, 183, 102,
 			217, 40, 255, 129, 38, 203, 175, 98, 209, 147, 151, 106, 250, 12,
@@ -538,9 +534,9 @@ func TestParse(t *testing.T) {
 
 	t.Run("DSAPublicKey", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
-		const pem = %s;
-		const cert = x509.parse(pem);
-		const value = cert.publicKey;
+		var pem = %q;
+		var cert = x509.parse(pem);
+		var value = cert.publicKey;
 		if (!(
 			value &&
 			typeof value === "object" &&
@@ -555,9 +551,9 @@ func TestParse(t *testing.T) {
 
 	t.Run("ECDSAPublicKey", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
-		const pem = %s;
-		const cert = x509.parse(pem);
-		const value = cert.publicKey;
+		var pem = %q;
+		var cert = x509.parse(pem);
+		var value = cert.publicKey;
 		if (!(
 			value &&
 			typeof value === "object" &&
@@ -586,8 +582,8 @@ func TestGetAltNames(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
-		const pem = %s;
-		const altNames = x509.getAltNames(pem);
+		var pem = %q;
+		var altNames = x509.getAltNames(pem);
 		if (!(
 			Array.isArray(altNames) &&
 			altNames.length === 8 &&
@@ -620,8 +616,8 @@ func TestGetIssuer(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
-		const pem = %s;
-		const issuer = x509.getIssuer(pem);
+		var pem = %q;
+		var issuer = x509.getIssuer(pem);
 		if (!(
 			typeof issuer === "object" &&
 			issuer.commonName === "excouncil.zz" &&
@@ -652,8 +648,8 @@ func TestGetSubject(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		_, err := common.RunString(rt, fmt.Sprintf(`
-		const pem = %s;
-		const subject = x509.getSubject(pem);
+		var pem = %q;
+		var subject = x509.getSubject(pem);
 		if (!(
 			typeof subject === "object" &&
 			subject.commonName === "excouncil.zz" &&

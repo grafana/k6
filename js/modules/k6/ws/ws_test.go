@@ -31,12 +31,13 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/gorilla/websocket"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/testutils/httpmultibin"
 	"github.com/loadimpact/k6/stats"
-	"github.com/stretchr/testify/assert"
 )
 
 func assertSessionMetricsEmitted(t *testing.T, sampleContainers []stats.SampleContainer, subprotocol, url string, status int, group string) {
@@ -121,7 +122,7 @@ func TestSession(t *testing.T) {
 
 	t.Run("connect_ws", func(t *testing.T) {
 		_, err := common.RunString(rt, sr(`
-		let res = ws.connect("WSBIN_URL/ws-echo", function(socket){
+		var res = ws.connect("WSBIN_URL/ws-echo", function(socket){
 			socket.close()
 		});
 		if (res.status != 101) { throw new Error("connection failed with status: " + res.status); }
@@ -132,7 +133,7 @@ func TestSession(t *testing.T) {
 
 	t.Run("connect_wss", func(t *testing.T) {
 		_, err := common.RunString(rt, sr(`
-		let res = ws.connect("WSSBIN_URL/ws-echo", function(socket){
+		var res = ws.connect("WSSBIN_URL/ws-echo", function(socket){
 			socket.close()
 		});
 		if (res.status != 101) { throw new Error("TLS connection failed with status: " + res.status); }
@@ -143,8 +144,8 @@ func TestSession(t *testing.T) {
 
 	t.Run("open", func(t *testing.T) {
 		_, err := common.RunString(rt, sr(`
-		let opened = false;
-		let res = ws.connect("WSBIN_URL/ws-echo", function(socket){
+		var opened = false;
+		var res = ws.connect("WSBIN_URL/ws-echo", function(socket){
 			socket.on("open", function() {
 				opened = true;
 				socket.close()
@@ -158,7 +159,7 @@ func TestSession(t *testing.T) {
 
 	t.Run("send_receive", func(t *testing.T) {
 		_, err := common.RunString(rt, sr(`
-		let res = ws.connect("WSBIN_URL/ws-echo", function(socket){
+		var res = ws.connect("WSBIN_URL/ws-echo", function(socket){
 			socket.on("open", function() {
 				socket.send("test")
 			})
@@ -180,8 +181,8 @@ func TestSession(t *testing.T) {
 
 	t.Run("interval", func(t *testing.T) {
 		_, err := common.RunString(rt, sr(`
-		let counter = 0;
-		let res = ws.connect("WSBIN_URL/ws-echo", function(socket){
+		var counter = 0;
+		var res = ws.connect("WSBIN_URL/ws-echo", function(socket){
 			socket.setInterval(function () {
 				counter += 1;
 				if (counter > 2) { socket.close(); }
@@ -195,9 +196,9 @@ func TestSession(t *testing.T) {
 
 	t.Run("timeout", func(t *testing.T) {
 		_, err := common.RunString(rt, sr(`
-		let start = new Date().getTime();
-		let ellapsed = new Date().getTime() - start;
-		let res = ws.connect("WSBIN_URL/ws-echo", function(socket){
+		var start = new Date().getTime();
+		var ellapsed = new Date().getTime() - start;
+		var res = ws.connect("WSBIN_URL/ws-echo", function(socket){
 			socket.setTimeout(function () {
 				ellapsed = new Date().getTime() - start;
 				socket.close();
@@ -213,8 +214,8 @@ func TestSession(t *testing.T) {
 
 	t.Run("ping", func(t *testing.T) {
 		_, err := common.RunString(rt, sr(`
-		let pongReceived = false;
-		let res = ws.connect("WSBIN_URL/ws-echo", function(socket){
+		var pongReceived = false;
+		var res = ws.connect("WSBIN_URL/ws-echo", function(socket){
 			socket.on("open", function(data) {
 				socket.ping();
 			});
@@ -237,10 +238,10 @@ func TestSession(t *testing.T) {
 
 	t.Run("multiple_handlers", func(t *testing.T) {
 		_, err := common.RunString(rt, sr(`
-		let pongReceived = false;
-		let otherPongReceived = false;
+		var pongReceived = false;
+		var otherPongReceived = false;
 
-		let res = ws.connect("WSBIN_URL/ws-echo", function(socket){
+		var res = ws.connect("WSBIN_URL/ws-echo", function(socket){
 			socket.on("open", function(data) {
 				socket.ping();
 			});
@@ -271,8 +272,8 @@ func TestSession(t *testing.T) {
 
 	t.Run("client_close", func(t *testing.T) {
 		_, err := common.RunString(rt, sr(`
-		let closed = false;
-		let res = ws.connect("WSBIN_URL/ws-echo", function(socket){
+		var closed = false;
+		var res = ws.connect("WSBIN_URL/ws-echo", function(socket){
 			socket.on("open", function() {
 							socket.close()
 			})
@@ -301,8 +302,8 @@ func TestSession(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := common.RunString(rt, sr(fmt.Sprintf(`
-			let closed = false;
-			let res = ws.connect("WSBIN_URL%s", function(socket){
+			var closed = false;
+			var res = ws.connect("WSBIN_URL%s", function(socket){
 				socket.on("open", function() {
 					socket.send("test");
 				})
@@ -346,7 +347,7 @@ func TestErrors(t *testing.T) {
 
 	t.Run("invalid_url", func(t *testing.T) {
 		_, err := common.RunString(rt, `
-		let res = ws.connect("INVALID", function(socket){
+		var res = ws.connect("INVALID", function(socket){
 			socket.on("open", function() {
 				socket.close();
 			});
@@ -358,7 +359,7 @@ func TestErrors(t *testing.T) {
 	t.Run("invalid_url_message_panic", func(t *testing.T) {
 		// Attempting to send a message to a non-existent socket shouldn't panic
 		_, err := common.RunString(rt, `
-		let res = ws.connect("INVALID", function(socket){
+		var res = ws.connect("INVALID", function(socket){
 			socket.send("new message");
 		});
 		`)
@@ -367,7 +368,7 @@ func TestErrors(t *testing.T) {
 
 	t.Run("error_in_setup", func(t *testing.T) {
 		_, err := common.RunString(rt, sr(`
-		let res = ws.connect("WSBIN_URL/ws-echo-invalid", function(socket){
+		var res = ws.connect("WSBIN_URL/ws-echo-invalid", function(socket){
 			throw new Error("error in setup");
 		});
 		`))
@@ -376,8 +377,8 @@ func TestErrors(t *testing.T) {
 
 	t.Run("send_after_close", func(t *testing.T) {
 		_, err := common.RunString(rt, sr(`
-		let hasError = false;
-		let res = ws.connect("WSBIN_URL/ws-echo-invalid", function(socket){
+		var hasError = false;
+		var res = ws.connect("WSBIN_URL/ws-echo-invalid", function(socket){
 			socket.on("open", function() {
 				socket.close();
 				socket.send("test");
@@ -398,7 +399,7 @@ func TestErrors(t *testing.T) {
 	t.Run("error on close", func(t *testing.T) {
 		_, err := common.RunString(rt, sr(`
 		var closed = false;
-		let res = ws.connect("WSBIN_URL/ws-close", function(socket){
+		var res = ws.connect("WSBIN_URL/ws-close", function(socket){
 			socket.on('open', function open() {
 				socket.setInterval(function timeout() {
 				  socket.ping();
@@ -461,7 +462,7 @@ func TestSystemTags(t *testing.T) {
 		t.Run("only "+expectedTag, func(t *testing.T) {
 			state.Options.SystemTags = stats.ToSystemTagSet([]string{expectedTag})
 			_, err := common.RunString(rt, sr(`
-			let res = ws.connect("WSBIN_URL/ws-echo", function(socket){
+			var res = ws.connect("WSBIN_URL/ws-echo", function(socket){
 				socket.on("open", function() {
 					socket.send("test")
 				})
@@ -525,7 +526,7 @@ func TestTLSConfig(t *testing.T) {
 		}
 
 		_, err := common.RunString(rt, sr(`
-		let res = ws.connect("WSSBIN_URL/ws-close", function(socket){
+		var res = ws.connect("WSSBIN_URL/ws-close", function(socket){
 			socket.close()
 		});
 		if (res.status != 101) { throw new Error("TLS connection failed with status: " + res.status); }
@@ -538,7 +539,7 @@ func TestTLSConfig(t *testing.T) {
 		state.TLSConfig = tb.TLSClientConfig
 
 		_, err := common.RunString(rt, sr(`
-			let res = ws.connect("WSSBIN_URL/ws-close", function(socket){
+			var res = ws.connect("WSSBIN_URL/ws-close", function(socket){
 				socket.close()
 			});
 			if (res.status != 101) {
@@ -580,7 +581,8 @@ func TestReadPump(t *testing.T) {
 			msgChan := make(chan []byte)
 			errChan := make(chan error)
 			closeChan := make(chan int)
-			go readPump(conn, msgChan, errChan, closeChan)
+			s := &Socket{conn: conn}
+			go s.readPump(msgChan, errChan, closeChan)
 
 		readChans:
 			for {

@@ -30,9 +30,10 @@ import (
 	"runtime"
 	"syscall"
 
-	"github.com/loadimpact/k6/lib/netext"
 	"github.com/pkg/errors"
 	"golang.org/x/net/http2"
+
+	"github.com/loadimpact/k6/lib/netext"
 )
 
 // TODO: maybe rename the type errorCode, so we can have errCode variables? and

@@ -21,17 +21,16 @@
 package cmd
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"os"
-	"sync"
 
-	"github.com/loadimpact/k6/lib/types"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	null "gopkg.in/guregu/null.v3"
+	"gopkg.in/guregu/null.v3"
+
+	"github.com/loadimpact/k6/lib/types"
 )
 
 // Use these when interacting with fs and writing to terminal, makes a command testable
@@ -51,23 +50,6 @@ type ExitCode struct {
 	error
 	Code int
 	Hint string
-}
-
-// A writer that syncs writes with a mutex and, if the output is a TTY, clears before newlines.
-type consoleWriter struct {
-	Writer io.Writer
-	IsTTY  bool
-	Mutex  *sync.Mutex
-}
-
-func (w consoleWriter) Write(p []byte) (n int, err error) {
-	if w.IsTTY {
-		p = bytes.Replace(p, []byte{'\n'}, []byte{'\x1b', '[', '0', 'K', '\n'}, -1)
-	}
-	w.Mutex.Lock()
-	n, err = w.Writer.Write(p)
-	w.Mutex.Unlock()
-	return
 }
 
 //TODO: refactor the CLI config so these functions aren't needed - they

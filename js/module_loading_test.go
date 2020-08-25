@@ -26,15 +26,18 @@ import (
 	"os"
 	"testing"
 
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/testutils/httpmultibin"
-	"github.com/loadimpact/k6/stats"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/guregu/null.v3"
+
+	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/testutils"
+	"github.com/loadimpact/k6/lib/testutils/httpmultibin"
+	"github.com/loadimpact/k6/stats"
 )
 
 func newDevNullSampleChannel() chan stats.SampleContainer {
-	var ch = make(chan stats.SampleContainer, 100)
+	ch := make(chan stats.SampleContainer, 100)
 	go func() {
 		for range ch {
 		}
@@ -43,7 +46,7 @@ func newDevNullSampleChannel() chan stats.SampleContainer {
 }
 
 func TestLoadOnceGlobalVars(t *testing.T) {
-	var testCases = map[string]string{
+	testCases := map[string]string{
 		"module.exports": `
 			var globalVar;
 			if (!globalVar) {
@@ -70,7 +73,6 @@ func TestLoadOnceGlobalVars(t *testing.T) {
 	for name, data := range testCases {
 		cData := data
 		t.Run(name, func(t *testing.T) {
-
 			fs := afero.NewMemMapFs()
 			require.NoError(t, afero.WriteFile(fs, "/C.js", []byte(cData), os.ModePerm))
 
@@ -86,7 +88,7 @@ func TestLoadOnceGlobalVars(t *testing.T) {
 			return c.C();
 		}
 	`), os.ModePerm))
-			r1, err := getSimpleRunnerWithFileFs("/script.js", `
+			r1, err := getSimpleRunner(t, "/script.js", `
 			import { A } from "./A.js";
 			import { B } from "./B.js";
 
@@ -98,11 +100,11 @@ func TestLoadOnceGlobalVars(t *testing.T) {
 					throw new Error("A() != B()    (" + A() + ") != (" + B() + ")");
 				}
 			}
-		`, fs)
+		`, fs, lib.RuntimeOptions{CompatibilityMode: null.StringFrom("extended")})
 			require.NoError(t, err)
 
 			arc := r1.MakeArchive()
-			r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
+			r2, err := NewFromArchive(testutils.NewLogger(t), arc, lib.RuntimeOptions{})
 			require.NoError(t, err)
 
 			runners := map[string]*Runner{"Source": r1, "Archive": r2}
@@ -111,9 +113,13 @@ func TestLoadOnceGlobalVars(t *testing.T) {
 				t.Run(name, func(t *testing.T) {
 					ch := newDevNullSampleChannel()
 					defer close(ch)
-					vu, err := r.NewVU(ch)
+					initVU, err := r.NewVU(1, ch)
+
+					ctx, cancel := context.WithCancel(context.Background())
+					defer cancel()
+					vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 					require.NoError(t, err)
-					err = vu.RunOnce(context.Background())
+					err = vu.RunOnce()
 					require.NoError(t, err)
 				})
 			}
@@ -131,7 +137,7 @@ func TestLoadExportsIsUsableInModule(t *testing.T) {
 			return exports.A() + "B";
 		}
 	`), os.ModePerm))
-	r1, err := getSimpleRunnerWithFileFs("/script.js", `
+	r1, err := getSimpleRunner(t, "/script.js", `
 			import { A, B } from "./A.js";
 
 			export default function(data) {
@@ -143,11 +149,11 @@ func TestLoadExportsIsUsableInModule(t *testing.T) {
 					throw new Error("wrong value of B() " + B());
 				}
 			}
-		`, fs)
+		`, fs, lib.RuntimeOptions{CompatibilityMode: null.StringFrom("extended")})
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
-	r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
+	r2, err := NewFromArchive(testutils.NewLogger(t), arc, lib.RuntimeOptions{})
 	require.NoError(t, err)
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
@@ -156,9 +162,12 @@ func TestLoadExportsIsUsableInModule(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ch := newDevNullSampleChannel()
 			defer close(ch)
-			vu, err := r.NewVU(ch)
+			initVU, err := r.NewVU(1, ch)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 			require.NoError(t, err)
-			err = vu.RunOnce(context.Background())
+			err = vu.RunOnce()
 			require.NoError(t, err)
 		})
 	}
@@ -177,7 +186,7 @@ func TestLoadDoesntBreakHTTPGet(t *testing.T) {
 			return http.get("HTTPBIN_URL/get");
 		}
 	`)), os.ModePerm))
-	r1, err := getSimpleRunnerWithFileFs("/script.js", `
+	r1, err := getSimpleRunner(t, "/script.js", `
 			import { A } from "./A.js";
 
 			export default function(data) {
@@ -186,12 +195,12 @@ func TestLoadDoesntBreakHTTPGet(t *testing.T) {
 					throw new Error("wrong status "+ resp.status);
 				}
 			}
-		`, fs)
+		`, fs, lib.RuntimeOptions{CompatibilityMode: null.StringFrom("extended")})
 	require.NoError(t, err)
 
 	require.NoError(t, r1.SetOptions(lib.Options{Hosts: tb.Dialer.Hosts}))
 	arc := r1.MakeArchive()
-	r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
+	r2, err := NewFromArchive(testutils.NewLogger(t), arc, lib.RuntimeOptions{})
 	require.NoError(t, err)
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
@@ -200,9 +209,12 @@ func TestLoadDoesntBreakHTTPGet(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ch := newDevNullSampleChannel()
 			defer close(ch)
-			vu, err := r.NewVU(ch)
+			initVU, err := r.NewVU(1, ch)
 			require.NoError(t, err)
-			err = vu.RunOnce(context.Background())
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+			err = vu.RunOnce()
 			require.NoError(t, err)
 		})
 	}
@@ -217,7 +229,7 @@ func TestLoadGlobalVarsAreNotSharedBetweenVUs(t *testing.T) {
 			return globalVar;
 		}
 	`), os.ModePerm))
-	r1, err := getSimpleRunnerWithFileFs("/script.js", `
+	r1, err := getSimpleRunner(t, "/script.js", `
 			import { A } from "./A.js";
 
 			export default function(data) {
@@ -228,11 +240,11 @@ func TestLoadGlobalVarsAreNotSharedBetweenVUs(t *testing.T) {
 					throw new Error("wrong value of a " + a);
 				}
 			}
-		`, fs)
+		`, fs, lib.RuntimeOptions{CompatibilityMode: null.StringFrom("extended")})
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
-	r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
+	r2, err := NewFromArchive(testutils.NewLogger(t), arc, lib.RuntimeOptions{})
 	require.NoError(t, err)
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
@@ -241,15 +253,21 @@ func TestLoadGlobalVarsAreNotSharedBetweenVUs(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ch := newDevNullSampleChannel()
 			defer close(ch)
-			vu, err := r.NewVU(ch)
+			initVU, err := r.NewVU(1, ch)
 			require.NoError(t, err)
-			err = vu.RunOnce(context.Background())
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+			err = vu.RunOnce()
 			require.NoError(t, err)
 
 			// run a second VU
-			vu, err = r.NewVU(ch)
+			initVU, err = r.NewVU(2, ch)
 			require.NoError(t, err)
-			err = vu.RunOnce(context.Background())
+			ctx, cancel = context.WithCancel(context.Background())
+			defer cancel()
+			vu = initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+			err = vu.RunOnce()
 			require.NoError(t, err)
 		})
 	}
@@ -285,11 +303,11 @@ func TestLoadCycle(t *testing.T) {
 	`), os.ModePerm))
 	data, err := afero.ReadFile(fs, "/main.js")
 	require.NoError(t, err)
-	r1, err := getSimpleRunnerWithFileFs("/main.js", string(data), fs)
+	r1, err := getSimpleRunner(t, "/main.js", string(data), fs, lib.RuntimeOptions{CompatibilityMode: null.StringFrom("extended")})
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
-	r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
+	r2, err := NewFromArchive(testutils.NewLogger(t), arc, lib.RuntimeOptions{})
 	require.NoError(t, err)
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
@@ -298,13 +316,15 @@ func TestLoadCycle(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ch := newDevNullSampleChannel()
 			defer close(ch)
-			vu, err := r.NewVU(ch)
+			initVU, err := r.NewVU(1, ch)
 			require.NoError(t, err)
-			err = vu.RunOnce(context.Background())
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+			err = vu.RunOnce()
 			require.NoError(t, err)
 		})
 	}
-
 }
 
 func TestLoadCycleBinding(t *testing.T) {
@@ -331,7 +351,7 @@ func TestLoadCycleBinding(t *testing.T) {
 			}
 	`), os.ModePerm))
 
-	r1, err := getSimpleRunnerWithFileFs("/main.js", `
+	r1, err := getSimpleRunner(t, "/main.js", `
 			import {foo} from './a.js';
 			import {bar} from './b.js';
 			export default function() {
@@ -344,11 +364,11 @@ func TestLoadCycleBinding(t *testing.T) {
 					throw new Error("Wrong value of bar() "+ barMessage);
 				}
 			}
-		`, fs)
+		`, fs, lib.RuntimeOptions{CompatibilityMode: null.StringFrom("extended")})
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
-	r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
+	r2, err := NewFromArchive(testutils.NewLogger(t), arc, lib.RuntimeOptions{})
 	require.NoError(t, err)
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
@@ -357,9 +377,12 @@ func TestLoadCycleBinding(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ch := newDevNullSampleChannel()
 			defer close(ch)
-			vu, err := r.NewVU(ch)
+			initVU, err := r.NewVU(1, ch)
 			require.NoError(t, err)
-			err = vu.RunOnce(context.Background())
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+			err = vu.RunOnce()
 			require.NoError(t, err)
 		})
 	}
@@ -387,7 +410,7 @@ func TestBrowserified(t *testing.T) {
 		});
 	`), os.ModePerm))
 
-	r1, err := getSimpleRunnerWithFileFs("/script.js", `
+	r1, err := getSimpleRunner(t, "/script.js", `
 			import {alpha, bravo } from "./browserified.js";
 
 			export default function(data) {
@@ -405,11 +428,11 @@ func TestBrowserified(t *testing.T) {
 					throw new Error("bravo.B() != 'b'    (" + bravo.B() + ") != 'b'");
 				}
 			}
-		`, fs)
+		`, fs, lib.RuntimeOptions{CompatibilityMode: null.StringFrom("extended")})
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
-	r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
+	r2, err := NewFromArchive(testutils.NewLogger(t), arc, lib.RuntimeOptions{})
 	require.NoError(t, err)
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
@@ -418,13 +441,17 @@ func TestBrowserified(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ch := make(chan stats.SampleContainer, 100)
 			defer close(ch)
-			vu, err := r.NewVU(ch)
+			initVU, err := r.NewVU(1, ch)
 			require.NoError(t, err)
-			err = vu.RunOnce(context.Background())
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+			err = vu.RunOnce()
 			require.NoError(t, err)
 		})
 	}
 }
+
 func TestLoadingUnexistingModuleDoesntPanic(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	data := `var b;
@@ -433,21 +460,21 @@ func TestLoadingUnexistingModuleDoesntPanic(t *testing.T) {
 			} catch (err) {
 				b = "correct";
 			}
-			export default function() {
+			exports.default = function() {
 				if (b != "correct") {
 					throw new Error("wrong b "+ JSON.stringify(b));
 				}
 			}`
-	require.NoError(t, afero.WriteFile(fs, "/script.js", []byte(data), 0644))
-	r1, err := getSimpleRunnerWithFileFs("/script.js", data, fs)
+	require.NoError(t, afero.WriteFile(fs, "/script.js", []byte(data), 0o644))
+	r1, err := getSimpleRunner(t, "/script.js", data, fs)
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
-	var buf = &bytes.Buffer{}
+	buf := &bytes.Buffer{}
 	require.NoError(t, arc.Write(buf))
 	arc, err = lib.ReadArchive(buf)
 	require.NoError(t, err)
-	r2, err := NewFromArchive(arc, lib.RuntimeOptions{})
+	r2, err := NewFromArchive(testutils.NewLogger(t), arc, lib.RuntimeOptions{})
 	require.NoError(t, err)
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
@@ -456,9 +483,12 @@ func TestLoadingUnexistingModuleDoesntPanic(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ch := newDevNullSampleChannel()
 			defer close(ch)
-			vu, err := r.NewVU(ch)
+			initVU, err := r.NewVU(1, ch)
 			require.NoError(t, err)
-			err = vu.RunOnce(context.Background())
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+			err = vu.RunOnce()
 			require.NoError(t, err)
 		})
 	}

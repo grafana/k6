@@ -42,6 +42,7 @@ import (
 	"github.com/dop251/goja/ast"
 	"github.com/dop251/goja/file"
 	"github.com/dop251/goja/token"
+	"github.com/dop251/goja/unistring"
 )
 
 // A Mode value is a set of flags (or 0). They control optional parser functionality.
@@ -60,9 +61,10 @@ type _parser struct {
 	chrOffset int  // The offset of current character
 	offset    int  // The offset after current character (may be greater than 1)
 
-	idx     file.Idx    // The index of token
-	token   token.Token // The token
-	literal string      // The literal of the token, if any
+	idx           file.Idx    // The index of token
+	token         token.Token // The token
+	literal       string      // The literal of the token, if any
+	parsedLiteral unistring.String
 
 	scope             *_scope
 	insertSemicolon   bool // If we see a newline, then insert an implicit semicolon
@@ -188,7 +190,7 @@ func (self *_parser) parse() (*ast.Program, error) {
 }
 
 func (self *_parser) next() {
-	self.token, self.literal, self.idx = self.scan()
+	self.token, self.literal, self.parsedLiteral, self.idx = self.scan()
 }
 
 func (self *_parser) optionalSemicolon() {

@@ -25,7 +25,7 @@ package lib
 import (
 	"sync"
 
-	"github.com/GeertJohan/go.rice"
+	rice "github.com/GeertJohan/go.rice"
 	"github.com/dop251/goja"
 )
 

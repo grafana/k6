@@ -23,10 +23,12 @@ package cmd
 import (
 	"os"
 
-	"github.com/loadimpact/k6/loader"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
+	"github.com/loadimpact/k6/loader"
 )
 
 var archiveOut = "archive.tar"
@@ -46,6 +48,8 @@ An archive is a fully self-contained test run, and can be executed identically e
   k6 run myarchive.tar`[1:],
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// TODO: don't use the Global logger
+		logger := logrus.StandardLogger()
 		// Runner.
 		pwd, err := os.Getwd()
 		if err != nil {
@@ -53,17 +57,17 @@ An archive is a fully self-contained test run, and can be executed identically e
 		}
 		filename := args[0]
 		filesystems := loader.CreateFilesystems()
-		src, err := loader.ReadSource(filename, pwd, filesystems, os.Stdin)
+		src, err := loader.ReadSource(logger, filename, pwd, filesystems, os.Stdin)
 		if err != nil {
 			return err
 		}
 
-		runtimeOptions, err := getRuntimeOptions(cmd.Flags())
+		runtimeOptions, err := getRuntimeOptions(cmd.Flags(), buildEnvMap(os.Environ()))
 		if err != nil {
 			return err
 		}
 
-		r, err := newRunner(src, runType, filesystems, runtimeOptions)
+		r, err := newRunner(logger, src, runType, filesystems, runtimeOptions)
 		if err != nil {
 			return err
 		}
@@ -77,7 +81,7 @@ An archive is a fully self-contained test run, and can be executed identically e
 			return err
 		}
 
-		if _, cerr := deriveAndValidateConfig(conf); cerr != nil {
+		if _, cerr := deriveAndValidateConfig(conf, r.IsExecutable); cerr != nil {
 			return ExitCode{error: cerr, Code: invalidConfigErrorCode}
 		}
 
@@ -101,7 +105,7 @@ func archiveCmdFlagSet() *pflag.FlagSet {
 	flags.SortFlags = false
 	flags.AddFlagSet(optionFlagSet())
 	flags.AddFlagSet(runtimeOptionFlagSet(false))
-	//TODO: figure out a better way to handle the CLI flags - global variables are not very testable... :/
+	// TODO: figure out a better way to handle the CLI flags - global variables are not very testable... :/
 	flags.StringVarP(&archiveOut, "archive-out", "O", archiveOut, "archive output filename")
 	return flags
 }

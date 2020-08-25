@@ -1,29 +1,28 @@
 package parser
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
 	"unicode"
+	"unicode/utf16"
 	"unicode/utf8"
 
 	"github.com/dop251/goja/file"
 	"github.com/dop251/goja/token"
-	"unicode/utf16"
+	"github.com/dop251/goja/unistring"
 )
-
-type _chr struct {
-	value rune
-	width int
-}
 
 var matchIdentifier = regexp.MustCompile(`^[$_\p{L}][$_\p{L}\d}]*$`)
 
 func isDecimalDigit(chr rune) bool {
 	return '0' <= chr && chr <= '9'
+}
+
+func IsIdentifier(s string) bool {
+	return matchIdentifier.MatchString(s)
 }
 
 func digitValue(chr rune) int {
@@ -55,45 +54,65 @@ func isIdentifierPart(chr rune) bool {
 		chr >= utf8.RuneSelf && (unicode.IsLetter(chr) || unicode.IsDigit(chr))
 }
 
-func (self *_parser) scanIdentifier() (string, error) {
+func (self *_parser) scanIdentifier() (string, unistring.String, bool, error) {
 	offset := self.chrOffset
-	parse := false
+	hasEscape := false
+	isUnicode := false
+	length := 0
 	for isIdentifierPart(self.chr) {
-		if self.chr == '\\' {
+		r := self.chr
+		length++
+		if r == '\\' {
+			hasEscape = true
 			distance := self.chrOffset - offset
 			self.read()
 			if self.chr != 'u' {
-				return "", fmt.Errorf("Invalid identifier escape character: %c (%s)", self.chr, string(self.chr))
+				return "", "", false, fmt.Errorf("Invalid identifier escape character: %c (%s)", self.chr, string(self.chr))
 			}
-			parse = true
 			var value rune
 			for j := 0; j < 4; j++ {
 				self.read()
 				decimal, ok := hex2decimal(byte(self.chr))
 				if !ok {
-					return "", fmt.Errorf("Invalid identifier escape character: %c (%s)", self.chr, string(self.chr))
+					return "", "", false, fmt.Errorf("Invalid identifier escape character: %c (%s)", self.chr, string(self.chr))
 				}
 				value = value<<4 | decimal
 			}
 			if value == '\\' {
-				return "", fmt.Errorf("Invalid identifier escape value: %c (%s)", value, string(value))
+				return "", "", false, fmt.Errorf("Invalid identifier escape value: %c (%s)", value, string(value))
 			} else if distance == 0 {
 				if !isIdentifierStart(value) {
-					return "", fmt.Errorf("Invalid identifier escape value: %c (%s)", value, string(value))
+					return "", "", false, fmt.Errorf("Invalid identifier escape value: %c (%s)", value, string(value))
 				}
 			} else if distance > 0 {
 				if !isIdentifierPart(value) {
-					return "", fmt.Errorf("Invalid identifier escape value: %c (%s)", value, string(value))
+					return "", "", false, fmt.Errorf("Invalid identifier escape value: %c (%s)", value, string(value))
 				}
+			}
+			r = value
+		}
+		if r >= utf8.RuneSelf {
+			isUnicode = true
+			if r > 0xFFFF {
+				length++
 			}
 		}
 		self.read()
 	}
-	literal := string(self.str[offset:self.chrOffset])
-	if parse {
-		return parseStringLiteral(literal)
+
+	literal := self.str[offset:self.chrOffset]
+	var parsed unistring.String
+	if hasEscape || isUnicode {
+		var err error
+		parsed, err = parseStringLiteral1(literal, length, isUnicode)
+		if err != nil {
+			return "", "", false, err
+		}
+	} else {
+		parsed = unistring.String(literal)
 	}
-	return literal, nil
+
+	return literal, parsed, hasEscape, nil
 }
 
 // 7.2
@@ -118,7 +137,52 @@ func isLineTerminator(chr rune) bool {
 	return false
 }
 
-func (self *_parser) scan() (tkn token.Token, literal string, idx file.Idx) {
+func isId(tkn token.Token) bool {
+	switch tkn {
+	case token.KEYWORD,
+		token.BOOLEAN,
+		token.NULL,
+		token.THIS,
+		token.IF,
+		token.IN,
+		token.OF,
+		token.DO,
+
+		token.VAR,
+		token.FOR,
+		token.NEW,
+		token.TRY,
+
+		token.ELSE,
+		token.CASE,
+		token.VOID,
+		token.WITH,
+
+		token.WHILE,
+		token.BREAK,
+		token.CATCH,
+		token.THROW,
+
+		token.RETURN,
+		token.TYPEOF,
+		token.DELETE,
+		token.SWITCH,
+
+		token.DEFAULT,
+		token.FINALLY,
+
+		token.FUNCTION,
+		token.CONTINUE,
+		token.DEBUGGER,
+
+		token.INSTANCEOF:
+
+		return true
+	}
+	return false
+}
+
+func (self *_parser) scan() (tkn token.Token, literal string, parsedLiteral unistring.String, idx file.Idx) {
 
 	self.implicitSemicolon = false
 
@@ -131,30 +195,43 @@ func (self *_parser) scan() (tkn token.Token, literal string, idx file.Idx) {
 		switch chr := self.chr; {
 		case isIdentifierStart(chr):
 			var err error
-			literal, err = self.scanIdentifier()
+			var hasEscape bool
+			literal, parsedLiteral, hasEscape, err = self.scanIdentifier()
 			if err != nil {
 				tkn = token.ILLEGAL
 				break
 			}
-			if len(literal) > 1 {
+			if len(parsedLiteral) > 1 {
 				// Keywords are longer than 1 character, avoid lookup otherwise
 				var strict bool
-				tkn, strict = token.IsKeyword(literal)
+				tkn, strict = token.IsKeyword(string(parsedLiteral))
 
 				switch tkn {
 
 				case 0: // Not a keyword
-					if literal == "true" || literal == "false" {
+					if parsedLiteral == "true" || parsedLiteral == "false" {
+						if hasEscape {
+							tkn = token.ILLEGAL
+							return
+						}
 						self.insertSemicolon = true
 						tkn = token.BOOLEAN
 						return
-					} else if literal == "null" {
+					} else if parsedLiteral == "null" {
+						if hasEscape {
+							tkn = token.ILLEGAL
+							return
+						}
 						self.insertSemicolon = true
 						tkn = token.NULL
 						return
 					}
 
 				case token.KEYWORD:
+					if hasEscape {
+						tkn = token.ILLEGAL
+						return
+					}
 					tkn = token.KEYWORD
 					if strict {
 						// TODO If strict and in strict mode, then this is not a break
@@ -169,10 +246,17 @@ func (self *_parser) scan() (tkn token.Token, literal string, idx file.Idx) {
 					token.RETURN,
 					token.CONTINUE,
 					token.DEBUGGER:
+					if hasEscape {
+						tkn = token.ILLEGAL
+						return
+					}
 					self.insertSemicolon = true
 					return
 
 				default:
+					if hasEscape {
+						tkn = token.ILLEGAL
+					}
 					return
 
 				}
@@ -286,7 +370,7 @@ func (self *_parser) scan() (tkn token.Token, literal string, idx file.Idx) {
 				insertSemicolon = true
 				tkn = token.STRING
 				var err error
-				literal, err = self.scanString(self.chrOffset - 1)
+				literal, parsedLiteral, err = self.scanString(self.chrOffset-1, true)
 				if err != nil {
 					tkn = token.ILLEGAL
 				}
@@ -358,14 +442,6 @@ func (self *_parser) switch6(tkn0, tkn1 token.Token, chr2 rune, tkn2, tkn3 token
 		return tkn2
 	}
 	return tkn0
-}
-
-func (self *_parser) chrAt(index int) _chr {
-	value, width := utf8.DecodeRuneInString(self.str[index:])
-	return _chr{
-		value: value,
-		width: width,
-	}
 }
 
 func (self *_parser) _peek() rune {
@@ -475,19 +551,30 @@ func (self *_parser) scanMantissa(base int) {
 	}
 }
 
-func (self *_parser) scanEscape(quote rune) {
+func (self *_parser) scanEscape(quote rune) (int, bool) {
 
 	var length, base uint32
-	switch self.chr {
-	//case '0', '1', '2', '3', '4', '5', '6', '7':
-	//    Octal:
-	//    length, base, limit = 3, 8, 255
-	case 'a', 'b', 'f', 'n', 'r', 't', 'v', '\\', '"', '\'', '0':
+	chr := self.chr
+	switch chr {
+	case '0', '1', '2', '3', '4', '5', '6', '7':
+		//    Octal:
+		length, base = 3, 8
+	case 'a', 'b', 'f', 'n', 'r', 't', 'v', '\\', '"', '\'':
 		self.read()
-		return
-	case '\r', '\n', '\u2028', '\u2029':
-		self.scanNewline()
-		return
+		return 1, false
+	case '\r':
+		self.read()
+		if self.chr == '\n' {
+			self.read()
+			return 2, false
+		}
+		return 1, false
+	case '\n':
+		self.read()
+		return 1, false
+	case '\u2028', '\u2029':
+		self.read()
+		return 1, true
 	case 'x':
 		self.read()
 		length, base = 2, 16
@@ -496,24 +583,34 @@ func (self *_parser) scanEscape(quote rune) {
 		length, base = 4, 16
 	default:
 		self.read() // Always make progress
-		return
 	}
 
-	var value uint32
-	for ; length > 0 && self.chr != quote && self.chr >= 0; length-- {
-		digit := uint32(digitValue(self.chr))
-		if digit >= base {
-			break
+	if length > 0 {
+		var value uint32
+		for ; length > 0 && self.chr != quote && self.chr >= 0; length-- {
+			digit := uint32(digitValue(self.chr))
+			if digit >= base {
+				break
+			}
+			value = value*base + digit
+			self.read()
 		}
-		value = value*base + digit
-		self.read()
+		chr = rune(value)
 	}
+	if chr >= utf8.RuneSelf {
+		if chr > 0xFFFF {
+			return 2, true
+		}
+		return 1, true
+	}
+	return 1, false
 }
 
-func (self *_parser) scanString(offset int) (string, error) {
+func (self *_parser) scanString(offset int, parse bool) (literal string, parsed unistring.String, err error) {
 	// " ' /
 	quote := rune(self.str[offset])
-
+	length := 0
+	isUnicode := false
 	for self.chr != quote {
 		chr := self.chr
 		if chr == '\n' || chr == '\r' || chr == '\u2028' || chr == '\u2029' || chr < 0 {
@@ -521,14 +618,19 @@ func (self *_parser) scanString(offset int) (string, error) {
 		}
 		self.read()
 		if chr == '\\' {
-			if quote == '/' {
-				if self.chr == '\n' || self.chr == '\r' || self.chr == '\u2028' || self.chr == '\u2029' || self.chr < 0 {
+			if self.chr == '\n' || self.chr == '\r' || self.chr == '\u2028' || self.chr == '\u2029' || self.chr < 0 {
+				if quote == '/' {
 					goto newline
 				}
-				self.read()
+				self.scanNewline()
 			} else {
-				self.scanEscape(quote)
+				l, u := self.scanEscape(quote)
+				length += l
+				if u {
+					isUnicode = true
+				}
 			}
+			continue
 		} else if chr == '[' && quote == '/' {
 			// Allow a slash (/) in a bracket character class ([...])
 			// TODO Fix this, this is hacky...
@@ -536,21 +638,31 @@ func (self *_parser) scanString(offset int) (string, error) {
 		} else if chr == ']' && quote == -1 {
 			quote = '/'
 		}
+		if chr >= utf8.RuneSelf {
+			isUnicode = true
+			if chr > 0xFFFF {
+				length++
+			}
+		}
+		length++
 	}
 
 	// " ' /
 	self.read()
-
-	return string(self.str[offset:self.chrOffset]), nil
+	literal = self.str[offset:self.chrOffset]
+	if parse {
+		parsed, err = parseStringLiteral1(literal[1:len(literal)-1], length, isUnicode)
+	}
+	return
 
 newline:
 	self.scanNewline()
-	err := "String not terminated"
+	errStr := "String not terminated"
 	if quote == '/' {
-		err = "Invalid regular expression: missing /"
-		self.error(self.idxOf(offset), err)
+		errStr = "Invalid regular expression: missing /"
+		self.error(self.idxOf(offset), errStr)
 	}
-	return "", errors.New(err)
+	return "", "", errors.New(errStr)
 }
 
 func (self *_parser) scanNewline() {
@@ -617,21 +729,16 @@ error:
 	return nil, errors.New("Illegal numeric literal")
 }
 
-func parseStringLiteral(literal string) (string, error) {
-	// Best case scenario...
-	if literal == "" {
-		return "", nil
+func parseStringLiteral1(literal string, length int, unicode bool) (unistring.String, error) {
+	var sb strings.Builder
+	var chars []uint16
+	if unicode {
+		chars = make([]uint16, 1, length+1)
+		chars[0] = unistring.BOM
+	} else {
+		sb.Grow(length)
 	}
-
-	// Slightly less-best case scenario...
-	if !strings.ContainsRune(literal, '\\') {
-		return literal, nil
-	}
-
 	str := literal
-	buffer := bytes.NewBuffer(make([]byte, 0, 3*len(literal)/2))
-	var surrogate rune
-S:
 	for len(str) > 0 {
 		switch chr := str[0]; {
 		// We do not explicitly handle the case of the quote
@@ -639,11 +746,20 @@ S:
 		// This assumes we're already passed a partially well-formed literal
 		case chr >= utf8.RuneSelf:
 			chr, size := utf8.DecodeRuneInString(str)
-			buffer.WriteRune(chr)
+			if chr <= 0xFFFF {
+				chars = append(chars, uint16(chr))
+			} else {
+				first, second := utf16.EncodeRune(chr)
+				chars = append(chars, uint16(first), uint16(second))
+			}
 			str = str[size:]
 			continue
 		case chr != '\\':
-			buffer.WriteByte(chr)
+			if unicode {
+				chars = append(chars, uint16(chr))
+			} else {
+				sb.WriteByte(chr)
+			}
 			str = str[1:]
 			continue
 		}
@@ -736,20 +852,32 @@ S:
 			default:
 				value = rune(chr)
 			}
-			if surrogate != 0 {
-				value = utf16.DecodeRune(surrogate, value)
-				surrogate = 0
-			} else {
-				if utf16.IsSurrogate(value) {
-					surrogate = value
-					continue S
-				}
-			}
 		}
-		buffer.WriteRune(value)
+		if unicode {
+			if value <= 0xFFFF {
+				chars = append(chars, uint16(value))
+			} else {
+				first, second := utf16.EncodeRune(value)
+				chars = append(chars, uint16(first), uint16(second))
+			}
+		} else {
+			if value >= utf8.RuneSelf {
+				return "", fmt.Errorf("Unexpected unicode character")
+			}
+			sb.WriteByte(byte(value))
+		}
 	}
 
-	return buffer.String(), nil
+	if unicode {
+		if len(chars) != length+1 {
+			panic(fmt.Errorf("unexpected unicode length while parsing '%s'", literal))
+		}
+		return unistring.FromUtf16(chars), nil
+	}
+	if sb.Len() != length {
+		panic(fmt.Errorf("unexpected length while parsing '%s'", literal))
+	}
+	return unistring.String(sb.String()), nil
 }
 
 func (self *_parser) scanNumericLiteral(decimalPoint bool) (token.Token, string) {

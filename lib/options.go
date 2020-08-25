@@ -27,17 +27,17 @@ import (
 	"net"
 	"reflect"
 
-	"github.com/loadimpact/k6/lib/scheduler"
-	"github.com/loadimpact/k6/lib/types"
-	"github.com/loadimpact/k6/stats"
 	"github.com/pkg/errors"
 	"gopkg.in/guregu/null.v3"
+
+	"github.com/loadimpact/k6/lib/types"
+	"github.com/loadimpact/k6/stats"
 )
 
-// DefaultSchedulerName is used as the default key/ID of the scheduler config entries
+// DefaultScenarioName is used as the default key/ID of the scenario config entries
 // that were created due to the use of the shortcut execution control options (i.e. duration+vus,
 // iterations+vus, or stages)
-const DefaultSchedulerName = "default"
+const DefaultScenarioName = "default"
 
 // DefaultSummaryTrendStats are the default trend columns shown in the test summary output
 // nolint: gochecknoglobals
@@ -193,18 +193,25 @@ type Options struct {
 
 	// Initial values for VUs, max VUs, duration cap, iteration cap, and stages.
 	// See the Runner or Executor interfaces for more information.
-	VUs null.Int `json:"vus" envconfig:"K6_VUS"`
-
-	//TODO: deprecate this? or reuse it in the manual control "scheduler"?
-	VUsMax     null.Int           `json:"vusMax" envconfig:"K6_VUS_MAX"`
+	VUs        null.Int           `json:"vus" envconfig:"K6_VUS"`
 	Duration   types.NullDuration `json:"duration" envconfig:"K6_DURATION"`
 	Iterations null.Int           `json:"iterations" envconfig:"K6_ITERATIONS"`
 	Stages     []Stage            `json:"stages" envconfig:"K6_STAGES"`
 
-	Execution scheduler.ConfigMap `json:"execution,omitempty" envconfig:"-"`
+	// TODO: remove the `ignored:"true"` from the field tags, it's there so that
+	// the envconfig library will ignore those fields.
+	//
+	// We should support specifying execution segments via environment
+	// variables, but we currently can't, because envconfig has this nasty bug
+	// (among others): https://github.com/kelseyhightower/envconfig/issues/113
+	Scenarios                ScenarioConfigs           `json:"scenarios,omitempty" ignored:"true"`
+	ExecutionSegment         *ExecutionSegment         `json:"executionSegment" ignored:"true"`
+	ExecutionSegmentSequence *ExecutionSegmentSequence `json:"executionSegmentSequence" ignored:"true"`
 
 	// Timeouts for the setup() and teardown() functions
+	NoSetup         null.Bool          `json:"noSetup" envconfig:"NO_SETUP"`
 	SetupTimeout    types.NullDuration `json:"setupTimeout" envconfig:"K6_SETUP_TIMEOUT"`
+	NoTeardown      null.Bool          `json:"noTeardown" envconfig:"NO_TEARDOWN"`
 	TeardownTimeout types.NullDuration `json:"teardownTimeout" envconfig:"K6_TEARDOWN_TIMEOUT"`
 
 	// Limit HTTP requests per second.
@@ -300,9 +307,6 @@ func (o Options) Apply(opts Options) Options {
 	if opts.VUs.Valid {
 		o.VUs = opts.VUs
 	}
-	if opts.VUsMax.Valid {
-		o.VUsMax = opts.VUsMax
-	}
 
 	// Specifying duration, iterations, stages, or execution in a "higher" config tier
 	// will overwrite all of the the previous execution settings (if any) from any
@@ -310,14 +314,12 @@ func (o Options) Apply(opts Options) Options {
 	// Still, if more than one of those options is simultaneously specified in the same
 	// config tier, they will be preserved, so the validation after we've consolidated
 	// all of the options can return an error.
-	if opts.Duration.Valid || opts.Iterations.Valid || opts.Stages != nil || opts.Execution != nil {
-		//TODO: uncomment this after we start using the new schedulers
-		/*
-			o.Duration = types.NewNullDuration(0, false)
-			o.Iterations = null.NewInt(0, false)
-			o.Stages = nil
-		*/
-		o.Execution = nil
+	if opts.Duration.Valid || opts.Iterations.Valid || opts.Stages != nil || opts.Scenarios != nil {
+		// TODO: emit a warning or a notice log message if overwrite lower tier config options?
+		o.Duration = types.NewNullDuration(0, false)
+		o.Iterations = null.NewInt(0, false)
+		o.Stages = nil
+		o.Scenarios = nil
 	}
 
 	if opts.Duration.Valid {
@@ -338,11 +340,24 @@ func (o Options) Apply(opts Options) Options {
 	// that happens after the configuration from the different sources is consolidated. It can't
 	// happen here, because something like `K6_ITERATIONS=10 k6 run --vus 5 script.js` wont't
 	// work correctly at this level.
-	if opts.Execution != nil {
-		o.Execution = opts.Execution
+	if opts.Scenarios != nil {
+		o.Scenarios = opts.Scenarios
+	}
+	if opts.ExecutionSegment != nil {
+		o.ExecutionSegment = opts.ExecutionSegment
+	}
+
+	if opts.ExecutionSegmentSequence != nil {
+		o.ExecutionSegmentSequence = opts.ExecutionSegmentSequence
+	}
+	if opts.NoSetup.Valid {
+		o.NoSetup = opts.NoSetup
 	}
 	if opts.SetupTimeout.Valid {
 		o.SetupTimeout = opts.SetupTimeout
+	}
+	if opts.NoTeardown.Valid {
+		o.NoTeardown = opts.NoTeardown
 	}
 	if opts.TeardownTimeout.Valid {
 		o.TeardownTimeout = opts.TeardownTimeout
@@ -434,9 +449,24 @@ func (o Options) Apply(opts Options) Options {
 
 // Validate checks if all of the specified options make sense
 func (o Options) Validate() []error {
-	//TODO: validate all of the other options... that we should have already been validating...
-	//TODO: maybe integrate an external validation lib: https://github.com/avelino/awesome-go#validation
-	return o.Execution.Validate()
+	// TODO: validate all of the other options... that we should have already been validating...
+	// TODO: maybe integrate an external validation lib: https://github.com/avelino/awesome-go#validation
+	var errors []error
+	if o.ExecutionSegmentSequence != nil {
+		var segmentFound bool
+		for _, segment := range *o.ExecutionSegmentSequence {
+			if o.ExecutionSegment.Equal(segment) {
+				segmentFound = true
+				break
+			}
+		}
+		if !segmentFound {
+			errors = append(errors,
+				fmt.Errorf("provided segment %s can't be found in sequence %s",
+					o.ExecutionSegment, o.ExecutionSegmentSequence))
+		}
+	}
+	return append(errors, o.Scenarios.Validate()...)
 }
 
 // ForEachSpecified enumerates all struct fields and calls the supplied function with each

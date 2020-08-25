@@ -1,3 +1,23 @@
+/*
+ *
+ * k6 - a next-generation load testing tool
+ * Copyright (C) 2019 Load Impact
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
 package lib
 
 import (
@@ -9,10 +29,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/loadimpact/k6/lib/fsext"
-	"github.com/loadimpact/k6/lib/scheduler"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
+
+	"github.com/loadimpact/k6/lib/fsext"
 )
 
 func dumpMemMapFsToBuf(fs afero.Fs) (*bytes.Buffer, error) {
@@ -210,18 +230,20 @@ func TestFilenamePwdResolve(t *testing.T) {
 }
 
 func TestDerivedExecutionDiscarding(t *testing.T) {
-	var emptyConfigMap scheduler.ConfigMap
+	var emptyConfigMap ScenarioConfigs
 	var tests = []struct {
 		metadata     string
-		expExecution interface{}
+		expScenarios interface{}
 		expError     string
 	}{
+		// Tests to make sure that "execution" in the options, the old name for
+		// "scenarios" before #1007 was merged, doesn't mess up the options...
 		{
 			metadata: `{
 				"filename": "/test.js", "pwd": "/",
 				"options": { "execution": { "something": "invalid" } }
 			}`,
-			expExecution: emptyConfigMap,
+			expScenarios: emptyConfigMap,
 		},
 		{
 			metadata: `{
@@ -229,7 +251,7 @@ func TestDerivedExecutionDiscarding(t *testing.T) {
 				"k6version": "0.24.0",
 				"options": { "execution": { "something": "invalid" } }
 			}`,
-			expExecution: emptyConfigMap,
+			expScenarios: emptyConfigMap,
 		},
 		{
 			metadata: `blah`,
@@ -238,36 +260,21 @@ func TestDerivedExecutionDiscarding(t *testing.T) {
 		{
 			metadata: `{
 				"filename": "/test.js", "pwd": "/",
-				"k6version": "0.24.0"
-			}`,
-			expError: "missing options key",
-		},
-		{
-			metadata: `{
-				"filename": "/test.js", "pwd": "/",
 				"k6version": "0.24.0",
 				"options": "something invalid"
 			}`,
-			expError: "wrong options type in metadata.json",
+			expError: "cannot unmarshal string into Go struct field",
 		},
 		{
 			metadata: `{
 				"filename": "/test.js", "pwd": "/",
 				"k6version": "0.25.0",
-				"options": { "execution": { "something": "invalid" } }
+				"options": { "scenarios": { "something": "invalid" } }
 			}`,
 			expError: "cannot unmarshal string",
 		},
-		{
-			metadata: `{
-				"filename": "/test.js", "pwd": "/",
-				"k6version": "0.25.0",
-				"options": { "execution": { "default": { "type": "per-vu-iterations" } } }
-			}`,
-			expExecution: scheduler.ConfigMap{
-				DefaultSchedulerName: scheduler.NewPerVUIterationsConfig(DefaultSchedulerName),
-			},
-		},
+		// TODO: test an actual scenarios unmarshalling, which is currently
+		// impossible due to import cycles...
 	}
 
 	for _, test := range tests {
@@ -278,11 +285,11 @@ func TestDerivedExecutionDiscarding(t *testing.T) {
 
 		arc, err := ReadArchive(buf)
 		if test.expError != "" {
-			require.Error(t, err)
+			require.Errorf(t, err, "expected error '%s' but got nil", test.expError)
 			require.Contains(t, err.Error(), test.expError)
 		} else {
 			require.NoError(t, err)
-			require.Equal(t, test.expExecution, arc.Options.Execution)
+			require.Equal(t, test.expScenarios, arc.Options.Scenarios)
 		}
 	}
 }

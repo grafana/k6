@@ -23,8 +23,9 @@ package cloud
 import (
 	"time"
 
-	"github.com/loadimpact/k6/lib/types"
 	"gopkg.in/guregu/null.v3"
+
+	"github.com/loadimpact/k6/lib/types"
 )
 
 // Config holds all the necessary data and options for sending metrics to the Load Impact cloud.
@@ -37,6 +38,7 @@ type Config struct {
 	Name            null.String `json:"name" envconfig:"K6_CLOUD_NAME"`
 
 	Host       null.String `json:"host" envconfig:"K6_CLOUD_HOST"`
+	PushRefID  null.String `json:"pushRefID" envconfig:"K6_CLOUD_PUSH_REF_ID"`
 	WebAppURL  null.String `json:"webAppURL" envconfig:"K6_CLOUD_WEB_APP_URL"`
 	NoCompress null.Bool   `json:"noCompress" envconfig:"K6_CLOUD_NO_COMPRESS"`
 
@@ -44,6 +46,9 @@ type Config struct {
 
 	// The time interval between periodic API calls for sending samples to the cloud ingest service.
 	MetricPushInterval types.NullDuration `json:"metricPushInterval" envconfig:"K6_CLOUD_METRIC_PUSH_INTERVAL"`
+
+	// This is how many concurrent pushes will be done at the same time to the cloud
+	MetricPushConcurrency null.Int `json:"metricPushConcurrency" envconfig:"K6_CLOUD_METRIC_PUSH_CONCURRENCY"`
 
 	// Aggregation docs:
 	//
@@ -153,6 +158,7 @@ func NewConfig() Config {
 		Host:                       null.NewString("https://ingest.k6.io", false),
 		WebAppURL:                  null.NewString("https://app.k6.io", false),
 		MetricPushInterval:         types.NewNullDuration(1*time.Second, false),
+		MetricPushConcurrency:      null.NewInt(1, false),
 		MaxMetricSamplesPerPackage: null.NewInt(100000, false),
 		// Aggregation is disabled by default, since AggregationPeriod has no default value
 		// but if it's enabled manually or from the cloud service, those are the default values it will use:

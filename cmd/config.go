@@ -29,14 +29,12 @@ import (
 	"strings"
 
 	"github.com/kelseyhightower/envconfig"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/spf13/pflag"
-	null "gopkg.in/guregu/null.v3"
+	"gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/scheduler"
-	"github.com/loadimpact/k6/lib/types"
+	"github.com/loadimpact/k6/lib/executor"
 	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/stats/cloud"
 	"github.com/loadimpact/k6/stats/csv"
@@ -82,6 +80,15 @@ type Config struct {
 		Datadog  datadog.Config  `json:"datadog"`
 		CSV      csv.Config      `json:"csv"`
 	} `json:"collectors"`
+}
+
+// Validate checks if all of the specified options make sense
+func (c Config) Validate() []error {
+	errors := c.Options.Validate()
+	//TODO: validate all of the other options... that we should have already been validating...
+	//TODO: maybe integrate an external validation lib: https://github.com/avelino/awesome-go#validation
+
+	return errors
 }
 
 func (c Config) Apply(cfg Config) Config {
@@ -197,97 +204,6 @@ func readEnvConfig() (conf Config, err error) {
 	return conf, nil
 }
 
-type executionConflictConfigError string
-
-func (e executionConflictConfigError) Error() string {
-	return string(e)
-}
-
-var _ error = executionConflictConfigError("")
-
-func getConstantLoopingVUsExecution(duration types.NullDuration, vus null.Int) scheduler.ConfigMap {
-	ds := scheduler.NewConstantLoopingVUsConfig(lib.DefaultSchedulerName)
-	ds.VUs = vus
-	ds.Duration = duration
-	return scheduler.ConfigMap{lib.DefaultSchedulerName: ds}
-}
-
-func getVariableLoopingVUsExecution(stages []lib.Stage, startVUs null.Int) scheduler.ConfigMap {
-	ds := scheduler.NewVariableLoopingVUsConfig(lib.DefaultSchedulerName)
-	ds.StartVUs = startVUs
-	for _, s := range stages {
-		if s.Duration.Valid {
-			ds.Stages = append(ds.Stages, scheduler.Stage{Duration: s.Duration, Target: s.Target})
-		}
-	}
-	return scheduler.ConfigMap{lib.DefaultSchedulerName: ds}
-}
-
-func getSharedIterationsExecution(iterations null.Int, duration types.NullDuration, vus null.Int) scheduler.ConfigMap {
-	ds := scheduler.NewSharedIterationsConfig(lib.DefaultSchedulerName)
-	ds.VUs = vus
-	ds.Iterations = iterations
-	if duration.Valid {
-		ds.MaxDuration = duration
-	}
-	return scheduler.ConfigMap{lib.DefaultSchedulerName: ds}
-}
-
-// This checks for conflicting options and turns any shortcut options (i.e. duration, iterations,
-// stages) into the proper scheduler configuration
-func deriveExecutionConfig(conf Config) (Config, error) {
-	result := conf
-	switch {
-	case conf.Iterations.Valid:
-		if len(conf.Stages) > 0 { // stages isn't nil (not set) and isn't explicitly set to empty
-			//TODO: make this an executionConflictConfigError in the next version
-			logrus.Warn("Specifying both iterations and stages is deprecated and won't be supported in the future k6 versions")
-		}
-
-		result.Execution = getSharedIterationsExecution(conf.Iterations, conf.Duration, conf.VUs)
-		// TODO: maybe add a new flag that will be used as a shortcut to per-VU iterations?
-
-	case conf.Duration.Valid:
-		if len(conf.Stages) > 0 { // stages isn't nil (not set) and isn't explicitly set to empty
-			//TODO: make this an executionConflictConfigError in the next version
-			logrus.Warn("Specifying both duration and stages is deprecated and won't be supported in the future k6 versions")
-		}
-
-		if conf.Duration.Duration <= 0 {
-			//TODO: make this an executionConflictConfigError in the next version
-			msg := "Specifying infinite duration in this way is deprecated and won't be supported in the future k6 versions"
-			logrus.Warn(msg)
-		} else {
-			result.Execution = getConstantLoopingVUsExecution(conf.Duration, conf.VUs)
-		}
-
-	case len(conf.Stages) > 0: // stages isn't nil (not set) and isn't explicitly set to empty
-		result.Execution = getVariableLoopingVUsExecution(conf.Stages, conf.VUs)
-
-	default:
-		if conf.Execution != nil { // If someone set this, regardless if its empty
-			//TODO: remove this warning in the next version
-			logrus.Warn("The execution settings are not functional in this k6 release, they will be ignored")
-		}
-
-		if len(conf.Execution) == 0 { // If unset or set to empty
-			// No execution parameters whatsoever were specified, so we'll create a per-VU iterations config
-			// with 1 VU and 1 iteration. We're choosing the per-VU config, since that one could also
-			// be executed both locally, and in the cloud.
-			result.Execution = scheduler.ConfigMap{
-				lib.DefaultSchedulerName: scheduler.NewPerVUIterationsConfig(lib.DefaultSchedulerName),
-			}
-		}
-	}
-
-	//TODO: validate the config; questions:
-	// - separately validate the duration, iterations and stages for better error messages?
-	// - or reuse the execution validation somehow, at the end? or something mixed?
-	// - here or in getConsolidatedConfig() or somewhere else?
-
-	return result, nil
-}
-
 // Assemble the final consolidated configuration from all of the different sources:
 // - start with the CLI-provided options to get shadowed (non-Valid) defaults in there
 // - add the global file config options
@@ -346,18 +262,24 @@ func applyDefault(conf Config) Config {
 	return conf
 }
 
-func deriveAndValidateConfig(conf Config) (Config, error) {
-	result, err := deriveExecutionConfig(conf)
+func deriveAndValidateConfig(conf Config, isExecutable func(string) bool) (result Config, err error) {
+	result = conf
+	result.Options, err = executor.DeriveScenariosFromShortcuts(conf.Options)
 	if err != nil {
 		return result, err
 	}
-	return result, validateConfig(conf)
+	return result, validateConfig(result, isExecutable)
 }
 
-//TODO: remove ↓
-//nolint:unparam
-func validateConfig(conf Config) error {
+func validateConfig(conf Config, isExecutable func(string) bool) error {
 	errList := conf.Validate()
+
+	for _, ec := range conf.Scenarios {
+		if err := validateScenarioConfig(ec, isExecutable); err != nil {
+			errList = append(errList, err)
+		}
+	}
+
 	if len(errList) == 0 {
 		return nil
 	}
@@ -366,9 +288,14 @@ func validateConfig(conf Config) error {
 	for _, err := range errList {
 		errMsgParts = append(errMsgParts, fmt.Sprintf("\t- %s", err.Error()))
 	}
-	errMsg := errors.New(strings.Join(errMsgParts, "\n"))
 
-	//TODO: actually return the error here instead of warning, so k6 aborts on config validation errors
-	logrus.Warn(errMsg)
+	return errors.New(strings.Join(errMsgParts, "\n"))
+}
+
+func validateScenarioConfig(conf lib.ExecutorConfig, isExecutable func(string) bool) error {
+	execFn := conf.GetExec()
+	if !isExecutable(execFn) {
+		return fmt.Errorf("executor %s: function '%s' not found in exports", conf.GetName(), execFn)
+	}
 	return nil
 }

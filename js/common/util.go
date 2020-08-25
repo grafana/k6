@@ -22,21 +22,14 @@ package common
 
 import (
 	"github.com/dop251/goja"
-	"github.com/loadimpact/k6/js/compiler"
 )
 
-// Runs an ES6 string in the given runtime. Use this rather than writing ES5 in tests.
+// RunString Runs an string in the given runtime. Use this if writing ES5 in tests isn't a problem.
 func RunString(rt *goja.Runtime, src string) (goja.Value, error) {
-	var err error
-	c := compiler.New()
-	src, _, err = c.Transform(src, "__string__")
-	if err != nil {
-		return goja.Undefined(), err
-	}
 	return rt.RunString(src)
 }
 
-// Throws a JS error; avoids re-wrapping GoErrors.
+// Throw a JS error; avoids re-wrapping GoErrors.
 func Throw(rt *goja.Runtime, err error) {
 	if e, ok := err.(*goja.Exception); ok {
 		panic(e)

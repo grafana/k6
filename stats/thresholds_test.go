@@ -26,8 +26,9 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
-	"github.com/loadimpact/k6/lib/types"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/loadimpact/k6/lib/types"
 )
 
 func TestNewThreshold(t *testing.T) {

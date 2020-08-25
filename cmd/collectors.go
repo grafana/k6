@@ -27,6 +27,10 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/kelseyhightower/envconfig"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/afero"
+
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/loader"
@@ -39,8 +43,6 @@ import (
 	"github.com/loadimpact/k6/stats/kafka"
 	"github.com/loadimpact/k6/stats/statsd"
 	"github.com/loadimpact/k6/stats/statsd/common"
-	"github.com/pkg/errors"
-	"github.com/spf13/afero"
 )
 
 const (
@@ -65,11 +67,14 @@ func parseCollector(s string) (t, arg string) {
 	}
 }
 
-//TODO: totally refactor this...
-func getCollector(collectorName, arg string, src *loader.SourceData, conf Config) (lib.Collector, error) {
+// TODO: totally refactor this...
+func getCollector(
+	logger logrus.FieldLogger,
+	collectorName, arg string, src *loader.SourceData, conf Config, executionPlan []lib.ExecutionStep,
+) (lib.Collector, error) {
 	switch collectorName {
 	case collectorJSON:
-		return jsonc.New(afero.NewOsFs(), arg)
+		return jsonc.New(logger, afero.NewOsFs(), arg)
 	case collectorInfluxDB:
 		config := influxdb.NewConfig().Apply(conf.Collectors.InfluxDB)
 		if err := envconfig.Process("", &config); err != nil {
@@ -80,7 +85,8 @@ func getCollector(collectorName, arg string, src *loader.SourceData, conf Config
 			return nil, err
 		}
 		config = config.Apply(urlConfig)
-		return influxdb.New(config)
+
+		return influxdb.New(logger, config)
 	case collectorCloud:
 		config := cloud.NewConfig().Apply(conf.Collectors.Cloud)
 		if err := envconfig.Process("", &config); err != nil {
@@ -89,7 +95,8 @@ func getCollector(collectorName, arg string, src *loader.SourceData, conf Config
 		if arg != "" {
 			config.Name = null.StringFrom(arg)
 		}
-		return cloud.New(config, src, conf.Options, consts.Version)
+
+		return cloud.New(logger, config, src, conf.Options, executionPlan, consts.Version)
 	case collectorKafka:
 		config := kafka.NewConfig().Apply(conf.Collectors.Kafka)
 		if err := envconfig.Process("", &config); err != nil {
@@ -102,19 +109,22 @@ func getCollector(collectorName, arg string, src *loader.SourceData, conf Config
 			}
 			config = config.Apply(cmdConfig)
 		}
-		return kafka.New(config)
+
+		return kafka.New(logger, config)
 	case collectorStatsD:
 		config := common.NewConfig().Apply(conf.Collectors.StatsD)
 		if err := envconfig.Process("k6_statsd", &config); err != nil {
 			return nil, err
 		}
-		return statsd.New(config)
+
+		return statsd.New(logger, config)
 	case collectorDatadog:
 		config := datadog.NewConfig().Apply(conf.Collectors.Datadog)
 		if err := envconfig.Process("k6_datadog", &config); err != nil {
 			return nil, err
 		}
-		return datadog.New(config)
+
+		return datadog.New(logger, config)
 	case collectorCSV:
 		config := csv.NewConfig().Apply(conf.Collectors.CSV)
 		if err := envconfig.Process("", &config); err != nil {
@@ -128,15 +138,19 @@ func getCollector(collectorName, arg string, src *loader.SourceData, conf Config
 
 			config = config.Apply(cmdConfig)
 		}
-		return csv.New(afero.NewOsFs(), conf.SystemTags.Map(), config)
+
+		return csv.New(logger, afero.NewOsFs(), conf.SystemTags.Map(), config)
 
 	default:
 		return nil, errors.Errorf("unknown output type: %s", collectorName)
 	}
 }
 
-func newCollector(collectorName, arg string, src *loader.SourceData, conf Config) (lib.Collector, error) {
-	collector, err := getCollector(collectorName, arg, src, conf)
+func newCollector(
+	logger logrus.FieldLogger,
+	collectorName, arg string, src *loader.SourceData, conf Config, executionPlan []lib.ExecutionStep,
+) (lib.Collector, error) {
+	collector, err := getCollector(logger, collectorName, arg, src, conf, executionPlan)
 	if err != nil {
 		return collector, err
 	}

@@ -27,21 +27,21 @@ import (
 	"testing"
 	"time"
 
-	"github.com/loadimpact/k6/stats"
-
 	"github.com/dop251/goja"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/loadimpact/k6/stats"
 )
 
 func TestFail(t *testing.T) {
 	rt := goja.New()
 	rt.Set("k6", common.Bind(rt, New(), nil))
 	_, err := common.RunString(rt, `k6.fail("blah")`)
-	assert.EqualError(t, err, "GoError: blah")
+	assert.Contains(t, err.Error(), "GoError: blah")
 }
 
 func TestSleep(t *testing.T) {
@@ -94,14 +94,14 @@ func TestRandSeed(t *testing.T) {
 
 	rand := 0.8487305991992138
 	_, err := common.RunString(rt, fmt.Sprintf(`
-		let rnd = Math.random();
+		var rnd = Math.random();
 		if (rnd == %.16f) { throw new Error("wrong random: " + rnd); }
 	`, rand))
 	assert.NoError(t, err)
 
 	_, err = common.RunString(rt, fmt.Sprintf(`
 		k6.randomSeed(12345)
-		let rnd = Math.random();
+		var rnd = Math.random();
 		if (rnd != %.16f) { throw new Error("wrong random: " + rnd); }
 	`, rand))
 	assert.NoError(t, err)
@@ -132,7 +132,7 @@ func TestGroup(t *testing.T) {
 
 	t.Run("Invalid", func(t *testing.T) {
 		_, err := common.RunString(rt, `k6.group("::", function() { throw new Error("nooo") })`)
-		assert.EqualError(t, err, "GoError: group and check names may not contain '::'")
+		assert.Contains(t, err.Error(), "GoError: group and check names may not contain '::'")
 	})
 }
 func TestCheck(t *testing.T) {
@@ -155,6 +155,7 @@ func TestCheck(t *testing.T) {
 				SystemTags: &stats.DefaultSystemTagSet,
 			},
 			Samples: samples,
+			Tags:    map[string]string{"group": root.Path},
 		}, samples
 	}
 	t.Run("Object", func(t *testing.T) {
@@ -210,7 +211,7 @@ func TestCheck(t *testing.T) {
 
 		t.Run("Invalid", func(t *testing.T) {
 			_, err := common.RunString(rt, `k6.check(null, { "::": true })`)
-			assert.EqualError(t, err, "GoError: group and check names may not contain '::'")
+			assert.Contains(t, err.Error(), "GoError: group and check names may not contain '::'")
 		})
 	})
 
@@ -255,7 +256,7 @@ func TestCheck(t *testing.T) {
 			"b": function() { throw new Error("error B") },
 		})
 		`)
-		assert.EqualError(t, err, "Error: error A at a (<eval>:3:27(6))")
+		assert.EqualError(t, err, "Error: error A at <eval>:3:28(4)")
 
 		bufSamples := stats.GetBufferedSamples(samples)
 		if assert.Len(t, bufSamples, 1) {
@@ -275,8 +276,8 @@ func TestCheck(t *testing.T) {
 	t.Run("Types", func(t *testing.T) {
 		templates := map[string]string{
 			"Literal":      `k6.check(null,{"check": %s})`,
-			"Callable":     `k6.check(null,{"check": ()=>%s})`,
-			"Callable/Arg": `k6.check(%s,{"check":(v)=>v})`,
+			"Callable":     `k6.check(null,{"check": function() { return %s; }})`,
+			"Callable/Arg": `k6.check(%s,{"check": function(v) {return v; }})`,
 		}
 		testdata := map[string]bool{
 			`0`:         false,

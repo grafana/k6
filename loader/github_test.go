@@ -24,18 +24,22 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/loadimpact/k6/lib/testutils"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestGithub(t *testing.T) {
+	logger := logrus.New()
+	logger.SetOutput(testutils.NewTestOutput(t))
 	path := "github.com/github/gitignore/Go.gitignore"
 	expectedEndSrc := "https://raw.githubusercontent.com/github/gitignore/master/Go.gitignore"
 	name, loader, parts := pickLoader(path)
 	assert.Equal(t, "github", name)
 	assert.Equal(t, []string{"github", "gitignore", "Go.gitignore"}, parts)
-	src, err := loader(path, parts)
+	src, err := loader(logger, path, parts)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedEndSrc, src)
 
@@ -45,7 +49,7 @@ func TestGithub(t *testing.T) {
 	require.Empty(t, resolvedURL.Scheme)
 	require.Equal(t, path, resolvedURL.Opaque)
 	t.Run("not cached", func(t *testing.T) {
-		data, err := Load(map[string]afero.Fs{"https": afero.NewMemMapFs()}, resolvedURL, path)
+		data, err := Load(logger, map[string]afero.Fs{"https": afero.NewMemMapFs()}, resolvedURL, path)
 		require.NoError(t, err)
 		assert.Equal(t, data.URL, resolvedURL)
 		assert.Equal(t, path, data.URL.String())
@@ -59,7 +63,7 @@ func TestGithub(t *testing.T) {
 		err := afero.WriteFile(fs, "/github.com/github/gitignore/Go.gitignore", testData, 0644)
 		require.NoError(t, err)
 
-		data, err := Load(map[string]afero.Fs{"https": fs}, resolvedURL, path)
+		data, err := Load(logger, map[string]afero.Fs{"https": fs}, resolvedURL, path)
 		require.NoError(t, err)
 		assert.Equal(t, path, data.URL.String())
 		assert.Equal(t, data.Data, testData)

@@ -2,10 +2,12 @@ package goja
 
 import (
 	"fmt"
+	"strconv"
+
 	"github.com/dop251/goja/ast"
 	"github.com/dop251/goja/file"
 	"github.com/dop251/goja/token"
-	"strconv"
+	"github.com/dop251/goja/unistring"
 )
 
 func (c *compiler) compileStatement(v ast.Statement, needResult bool) {
@@ -28,6 +30,8 @@ func (c *compiler) compileStatement(v ast.Statement, needResult bool) {
 		c.compileForStatement(v, needResult)
 	case *ast.ForInStatement:
 		c.compileForInStatement(v, needResult)
+	case *ast.ForOfStatement:
+		c.compileForOfStatement(v, needResult)
 	case *ast.WhileStatement:
 		c.compileWhileStatement(v, needResult)
 	case *ast.BranchStatement:
@@ -63,6 +67,8 @@ func (c *compiler) compileLabeledStatement(v *ast.LabelledStatement, needResult 
 	switch s := v.Statement.(type) {
 	case *ast.ForInStatement:
 		c.compileLabeledForInStatement(s, needResult, label)
+	case *ast.ForOfStatement:
+		c.compileLabeledForOfStatement(s, needResult, label)
 	case *ast.ForStatement:
 		c.compileLabeledForStatement(s, needResult, label)
 	case *ast.WhileStatement:
@@ -122,7 +128,7 @@ func (c *compiler) compileTryStatement(v *ast.TryStatement) {
 					// remap
 					newIdx, exists := m[idx]
 					if !exists {
-						exname := " __tmp" + strconv.Itoa(c.scope.lastFreeTmp)
+						exname := unistring.String(" __tmp" + strconv.Itoa(c.scope.lastFreeTmp))
 						c.scope.lastFreeTmp++
 						newIdx, _ = c.scope.bindName(exname)
 						m[idx] = newIdx
@@ -140,13 +146,10 @@ func (c *compiler) compileTryStatement(v *ast.TryStatement) {
 					code[pc] = setLocalP(remap(uint32(instr)))
 				}
 			}
+			c.p.code[start+1] = pop
 			if catchVarIdx, exists := m[0]; exists {
 				c.p.code[start] = setLocal(catchVarIdx)
-				c.p.code[start+1] = pop
 				catchOffset--
-			} else {
-				c.p.code[start+1] = nil
-				catchOffset++
 			}
 		} else {
 			c.scope.accessed = true
@@ -203,7 +206,7 @@ func (c *compiler) compileDoWhileStatement(v *ast.DoWhileStatement, needResult b
 	c.compileLabeledDoWhileStatement(v, needResult, "")
 }
 
-func (c *compiler) compileLabeledDoWhileStatement(v *ast.DoWhileStatement, needResult bool, label string) {
+func (c *compiler) compileLabeledDoWhileStatement(v *ast.DoWhileStatement, needResult bool, label unistring.String) {
 	c.block = &block{
 		typ:        blockLoop,
 		outer:      c.block,
@@ -230,7 +233,7 @@ func (c *compiler) compileForStatement(v *ast.ForStatement, needResult bool) {
 	c.compileLabeledForStatement(v, needResult, "")
 }
 
-func (c *compiler) compileLabeledForStatement(v *ast.ForStatement, needResult bool, label string) {
+func (c *compiler) compileLabeledForStatement(v *ast.ForStatement, needResult bool, label unistring.String) {
 	c.block = &block{
 		typ:        blockLoop,
 		outer:      c.block,
@@ -302,9 +305,9 @@ func (c *compiler) compileForInStatement(v *ast.ForInStatement, needResult bool)
 	c.compileLabeledForInStatement(v, needResult, "")
 }
 
-func (c *compiler) compileLabeledForInStatement(v *ast.ForInStatement, needResult bool, label string) {
+func (c *compiler) compileLabeledForInStatement(v *ast.ForInStatement, needResult bool, label unistring.String) {
 	c.block = &block{
-		typ:        blockLoop,
+		typ:        blockLoopEnum,
 		outer:      c.block,
 		label:      label,
 		needResult: needResult,
@@ -333,11 +336,47 @@ func (c *compiler) compileLabeledForInStatement(v *ast.ForInStatement, needResul
 	c.emit(enumPop)
 }
 
+func (c *compiler) compileForOfStatement(v *ast.ForOfStatement, needResult bool) {
+	c.compileLabeledForOfStatement(v, needResult, "")
+}
+
+func (c *compiler) compileLabeledForOfStatement(v *ast.ForOfStatement, needResult bool, label unistring.String) {
+	c.block = &block{
+		typ:        blockLoopEnum,
+		outer:      c.block,
+		label:      label,
+		needResult: needResult,
+	}
+
+	c.compileExpression(v.Source).emitGetter(true)
+	c.emit(iterate)
+	if needResult {
+		c.emit(loadUndef)
+	}
+	start := len(c.p.code)
+	c.markBlockStart()
+	c.block.cont = start
+
+	c.emit(nil)
+	c.compileExpression(v.Into).emitSetter(&c.enumGetExpr)
+	c.emit(pop)
+	if needResult {
+		c.emit(pop) // remove last result
+	}
+	c.markBlockStart()
+	c.compileStatement(v.Body, needResult)
+	c.emit(jump(start - len(c.p.code)))
+	c.p.code[start] = iterNext(len(c.p.code) - start)
+	c.leaveBlock()
+	c.markBlockStart()
+	c.emit(enumPop)
+}
+
 func (c *compiler) compileWhileStatement(v *ast.WhileStatement, needResult bool) {
 	c.compileLabeledWhileStatement(v, needResult, "")
 }
 
-func (c *compiler) compileLabeledWhileStatement(v *ast.WhileStatement, needResult bool, label string) {
+func (c *compiler) compileLabeledWhileStatement(v *ast.WhileStatement, needResult bool, label unistring.String) {
 	c.block = &block{
 		typ:        blockLoop,
 		outer:      c.block,
@@ -421,7 +460,7 @@ func (c *compiler) findBranchBlock(st *ast.BranchStatement) *block {
 func (c *compiler) findContinueBlock(label *ast.Identifier) (block *block) {
 	if label != nil {
 		for b := c.block; b != nil; b = b.outer {
-			if b.typ == blockLoop && b.label == label.Name {
+			if (b.typ == blockLoop || b.typ == blockLoopEnum) && b.label == label.Name {
 				block = b
 				break
 			}
@@ -429,7 +468,7 @@ func (c *compiler) findContinueBlock(label *ast.Identifier) (block *block) {
 	} else {
 		// find the nearest loop
 		for b := c.block; b != nil; b = b.outer {
-			if b.typ == blockLoop {
+			if b.typ == blockLoop || b.typ == blockLoopEnum {
 				block = b
 				break
 			}
@@ -452,7 +491,7 @@ func (c *compiler) findBreakBlock(label *ast.Identifier) (block *block) {
 	L:
 		for b := c.block; b != nil; b = b.outer {
 			switch b.typ {
-			case blockLoop, blockSwitch:
+			case blockLoop, blockLoopEnum, blockSwitch:
 				block = b
 				break L
 			}
@@ -477,6 +516,10 @@ func (c *compiler) compileBreak(label *ast.Identifier, idx file.Idx) {
 				break
 			}
 		}
+		if block == nil {
+			c.throwSyntaxError(int(idx)-1, "Undefined label '%s'", label.Name)
+			return
+		}
 	} else {
 		// find the nearest loop or switch
 	L:
@@ -486,22 +529,22 @@ func (c *compiler) compileBreak(label *ast.Identifier, idx file.Idx) {
 				c.emit(halt)
 			case blockWith:
 				c.emit(leaveWith)
-			case blockLoop, blockSwitch:
+			case blockLoop, blockLoopEnum, blockSwitch:
 				block = b
 				break L
 			}
 		}
+		if block == nil {
+			c.throwSyntaxError(int(idx)-1, "Could not find block")
+			return
+		}
 	}
 
-	if block != nil {
-		if len(c.p.code) == c.blockStart && block.needResult {
-			c.emit(loadUndef)
-		}
-		block.breaks = append(block.breaks, len(c.p.code))
-		c.emit(nil)
-	} else {
-		c.throwSyntaxError(int(idx)-1, "Undefined label '%s'", label.Name)
+	if len(c.p.code) == c.blockStart && block.needResult {
+		c.emit(loadUndef)
 	}
+	block.breaks = append(block.breaks, len(c.p.code))
+	c.emit(nil)
 }
 
 func (c *compiler) compileContinue(label *ast.Identifier, idx file.Idx) {
@@ -510,32 +553,36 @@ func (c *compiler) compileContinue(label *ast.Identifier, idx file.Idx) {
 		for b := c.block; b != nil; b = b.outer {
 			if b.typ == blockTry {
 				c.emit(halt)
-			} else if b.typ == blockLoop && b.label == label.Name {
+			} else if (b.typ == blockLoop || b.typ == blockLoopEnum) && b.label == label.Name {
 				block = b
 				break
 			}
+		}
+		if block == nil {
+			c.throwSyntaxError(int(idx)-1, "Undefined label '%s'", label.Name)
+			return
 		}
 	} else {
 		// find the nearest loop
 		for b := c.block; b != nil; b = b.outer {
 			if b.typ == blockTry {
 				c.emit(halt)
-			} else if b.typ == blockLoop {
+			} else if b.typ == blockLoop || b.typ == blockLoopEnum {
 				block = b
 				break
 			}
 		}
+		if block == nil {
+			c.throwSyntaxError(int(idx)-1, "Could not find block")
+			return
+		}
 	}
 
-	if block != nil {
-		if len(c.p.code) == c.blockStart && block.needResult {
-			c.emit(loadUndef)
-		}
-		block.conts = append(block.conts, len(c.p.code))
-		c.emit(nil)
-	} else {
-		c.throwSyntaxError(int(idx)-1, "Undefined label '%s'", label.Name)
+	if len(c.p.code) == c.blockStart && block.needResult {
+		c.emit(loadUndef)
 	}
+	block.conts = append(block.conts, len(c.p.code))
+	c.emit(nil)
 }
 
 func (c *compiler) compileIfStatement(v *ast.IfStatement, needResult bool) {
@@ -587,10 +634,14 @@ func (c *compiler) compileIfStatement(v *ast.IfStatement, needResult bool) {
 		c.p.code[jmp1] = jump(len(c.p.code) - jmp1)
 		c.markBlockStart()
 	} else {
-		c.p.code[jmp] = jne(len(c.p.code) - jmp)
-		c.markBlockStart()
 		if needResult {
+			c.emit(jump(2))
+			c.p.code[jmp] = jne(len(c.p.code) - jmp)
 			c.emit(loadUndef)
+			c.markBlockStart()
+		} else {
+			c.p.code[jmp] = jne(len(c.p.code) - jmp)
+			c.markBlockStart()
 		}
 	}
 }
@@ -603,8 +654,11 @@ func (c *compiler) compileReturnStatement(v *ast.ReturnStatement) {
 		c.emit(loadUndef)
 	}
 	for b := c.block; b != nil; b = b.outer {
-		if b.typ == blockTry {
+		switch b.typ {
+		case blockTry:
 			c.emit(halt)
+		case blockLoopEnum:
+			c.emit(enumPop)
 		}
 	}
 	c.emit(ret)
@@ -680,7 +734,7 @@ func (c *compiler) compileStatements(list []ast.Statement, needResult bool) {
 	}
 }
 
-func (c *compiler) compileGenericLabeledStatement(v ast.Statement, needResult bool, label string) {
+func (c *compiler) compileGenericLabeledStatement(v ast.Statement, needResult bool, label unistring.String) {
 	c.block = &block{
 		typ:        blockBranch,
 		outer:      c.block,

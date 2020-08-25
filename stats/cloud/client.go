@@ -29,9 +29,11 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -47,16 +49,19 @@ const (
 
 // Client handles communication with Load Impact cloud API.
 type Client struct {
-	client  *http.Client
-	token   string
-	baseURL string
-	version string
+	client         *http.Client
+	token          string
+	baseURL        string
+	version        string
+	pushBufferPool sync.Pool
+	logger         logrus.FieldLogger
 
 	retries       int
 	retryInterval time.Duration
 }
 
-func NewClient(token, host, version string) *Client {
+// NewClient return a new client for the cloud API
+func NewClient(logger logrus.FieldLogger, token, host, version string) *Client {
 	c := &Client{
 		client:        &http.Client{Timeout: RequestTimeout},
 		token:         token,
@@ -64,6 +69,12 @@ func NewClient(token, host, version string) *Client {
 		version:       version,
 		retries:       MaxRetries,
 		retryInterval: RetryInterval,
+		pushBufferPool: sync.Pool{
+			New: func() interface{} {
+				return &bytes.Buffer{}
+			},
+		},
+		logger: logger,
 	}
 	return c
 }
@@ -93,39 +104,39 @@ func (c *Client) NewRequest(method, url string, data interface{}) (*http.Request
 }
 
 func (c *Client) Do(req *http.Request, v interface{}) error {
-	var originalBody []byte
-	var err error
-
-	if req.Body != nil {
-		originalBody, err = ioutil.ReadAll(req.Body)
+	if req.Body != nil && req.GetBody == nil {
+		originalBody, err := ioutil.ReadAll(req.Body)
 		if err != nil {
 			return err
 		}
-
-		if cerr := req.Body.Close(); cerr != nil {
-			err = cerr
+		if err = req.Body.Close(); err != nil {
+			return err
 		}
+
+		req.GetBody = func() (io.ReadCloser, error) {
+			return ioutil.NopCloser(bytes.NewReader(originalBody)), nil
+		}
+		req.Body, _ = req.GetBody()
 	}
 
 	// TODO(cuonglm): finding away to move this back to NewRequest
 	c.prepareHeaders(req)
 
 	for i := 1; i <= c.retries; i++ {
-		if len(originalBody) > 0 {
-			req.Body = ioutil.NopCloser(bytes.NewBuffer(originalBody))
-		}
-
 		retry, err := c.do(req, v, i)
 
 		if retry {
 			time.Sleep(c.retryInterval)
+			if req.GetBody != nil {
+				req.Body, _ = req.GetBody()
+			}
 			continue
 		}
 
 		return err
 	}
 
-	return err
+	return nil
 }
 
 func (c *Client) prepareHeaders(req *http.Request) {

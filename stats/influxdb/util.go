@@ -24,7 +24,8 @@ import (
 	"strings"
 
 	client "github.com/influxdata/influxdb1-client/v2"
-	null "gopkg.in/guregu/null.v3"
+	"github.com/pkg/errors"
+	"gopkg.in/guregu/null.v3"
 )
 
 func MakeClient(conf Config) (client.Client, error) {
@@ -56,4 +57,47 @@ func MakeBatchConfig(conf Config) client.BatchPointsConfig {
 		RetentionPolicy:  conf.Retention.String,
 		WriteConsistency: conf.Consistency.String,
 	}
+}
+
+func checkDuplicatedTypeDefinitions(fieldKinds map[string]FieldKind, tag string) error {
+	if _, found := fieldKinds[tag]; found {
+		return errors.Errorf("A tag name (%s) shows up more than once in InfluxDB field type configurations.", tag)
+	}
+	return nil
+}
+
+// MakeFieldKinds reads the Config and returns a lookup map of tag names to
+// the field type their values should be converted to.
+func MakeFieldKinds(conf Config) (map[string]FieldKind, error) {
+	fieldKinds := make(map[string]FieldKind)
+	for _, tag := range conf.TagsAsFields {
+		var fieldName, fieldType string
+		s := strings.SplitN(tag, ":", 2)
+		if len(s) == 1 {
+			fieldName, fieldType = s[0], "string"
+		} else {
+			fieldName, fieldType = s[0], s[1]
+		}
+
+		err := checkDuplicatedTypeDefinitions(fieldKinds, fieldName)
+		if err != nil {
+			return nil, err
+		}
+
+		switch fieldType {
+		case "string":
+			fieldKinds[fieldName] = String
+		case "bool":
+			fieldKinds[fieldName] = Bool
+		case "float":
+			fieldKinds[fieldName] = Float
+		case "int":
+			fieldKinds[fieldName] = Int
+		default:
+			return nil, errors.Errorf("An invalid type (%s) is specified for an InfluxDB field (%s).",
+				fieldType, fieldName)
+		}
+	}
+
+	return fieldKinds, nil
 }

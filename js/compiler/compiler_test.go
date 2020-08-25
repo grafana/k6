@@ -25,10 +25,13 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/testutils"
 )
 
 func TestTransform(t *testing.T) {
-	c := New()
+	c := New(testutils.NewLogger(t))
 	t.Run("blank", func(t *testing.T) {
 		src, _, err := c.Transform("", "test.js")
 		assert.NoError(t, err)
@@ -68,10 +71,10 @@ func TestTransform(t *testing.T) {
 }
 
 func TestCompile(t *testing.T) {
-	c := New()
+	c := New(testutils.NewLogger(t))
 	t.Run("ES5", func(t *testing.T) {
 		src := `1+(function() { return 2; })()`
-		pgm, code, err := c.Compile(src, "script.js", "", "", true, CompatibilityModeBase)
+		pgm, code, err := c.Compile(src, "script.js", "", "", true, lib.CompatibilityModeBase)
 		if !assert.NoError(t, err) {
 			return
 		}
@@ -83,7 +86,7 @@ func TestCompile(t *testing.T) {
 
 		t.Run("Wrap", func(t *testing.T) {
 			pgm, code, err := c.Compile(src, "script.js",
-				"(function(){return ", "})", true, CompatibilityModeBase)
+				"(function(){return ", "})", true, lib.CompatibilityModeBase)
 			if !assert.NoError(t, err) {
 				return
 			}
@@ -102,14 +105,14 @@ func TestCompile(t *testing.T) {
 
 		t.Run("Invalid", func(t *testing.T) {
 			src := `1+(function() { return 2; )()`
-			_, _, err := c.Compile(src, "script.js", "", "", true, CompatibilityModeExtended)
+			_, _, err := c.Compile(src, "script.js", "", "", true, lib.CompatibilityModeExtended)
 			assert.IsType(t, &goja.Exception{}, err)
 			assert.Contains(t, err.Error(), `SyntaxError: script.js: Unexpected token (1:26)
 > 1 | 1+(function() { return 2; )()`)
 		})
 	})
 	t.Run("ES6", func(t *testing.T) {
-		pgm, code, err := c.Compile(`1+(()=>2)()`, "script.js", "", "", true, CompatibilityModeExtended)
+		pgm, code, err := c.Compile(`1+(()=>2)()`, "script.js", "", "", true, lib.CompatibilityModeExtended)
 		if !assert.NoError(t, err) {
 			return
 		}
@@ -120,7 +123,7 @@ func TestCompile(t *testing.T) {
 		}
 
 		t.Run("Wrap", func(t *testing.T) {
-			pgm, code, err := c.Compile(`fn(1+(()=>2)())`, "script.js", "(function(fn){", "})", true, CompatibilityModeExtended)
+			pgm, code, err := c.Compile(`fn(1+(()=>2)())`, "script.js", "(function(fn){", "})", true, lib.CompatibilityModeExtended)
 			if !assert.NoError(t, err) {
 				return
 			}
@@ -141,7 +144,7 @@ func TestCompile(t *testing.T) {
 		})
 
 		t.Run("Invalid", func(t *testing.T) {
-			_, _, err := c.Compile(`1+(=>2)()`, "script.js", "", "", true, CompatibilityModeExtended)
+			_, _, err := c.Compile(`1+(=>2)()`, "script.js", "", "", true, lib.CompatibilityModeExtended)
 			assert.IsType(t, &goja.Exception{}, err)
 			assert.Contains(t, err.Error(), `SyntaxError: script.js: Unexpected token (1:3)
 > 1 | 1+(=>2)()`)
