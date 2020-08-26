@@ -52,9 +52,9 @@ func FullVersion() string {
 // TODO: make these into methods, only the version needs to be a variable
 //nolint:gochecknoglobals
 var Banner = strings.Join([]string{
-	`          /\      |‾‾|  /‾‾/  /‾/   `,
-	`     /\  /  \     |  |_/  /  / /    `,
-	`    /  \/    \    |      |  /  ‾‾\  `,
-	`   /          \   |  |‾\  \ | (_) | `,
-	`  / __________ \  |__|  \__\ \___/ .io`,
+	`          /\      |‾‾| /‾‾/   /‾‾/   `,
+	`     /\  /  \     |  |/  /   /  /    `,
+	`    /  \/    \    |     (   /   ‾‾\  `,
+	`   /          \   |  |\  \ |  (‾)  | `,
+	`  / __________ \  |__| \__\ \_____/ .io`,
 }, "\n")
