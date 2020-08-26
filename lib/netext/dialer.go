@@ -173,10 +173,10 @@ func (d *Dialer) findRemote(addr string) (*lib.HostAddress, error) {
 		return lib.NewHostAddress(ip, port)
 	}
 
-	return d.fetchRemoteFromResover(host, port)
+	return d.fetchRemoteFromResolver(host, port)
 }
 
-func (d *Dialer) fetchRemoteFromResover(host, port string) (*lib.HostAddress, error) {
+func (d *Dialer) fetchRemoteFromResolver(host, port string) (*lib.HostAddress, error) {
 	ip, err := d.Resolver.FetchOne(host)
 	if err != nil {
 		return nil, err
