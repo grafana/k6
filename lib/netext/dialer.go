@@ -28,26 +28,17 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pkg/errors"
-	"github.com/viki-org/dnscache"
-
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/stats"
 )
-
-// dnsResolver is an interface that fetches dns information
-// about a given address.
-type dnsResolver interface {
-	FetchOne(address string) (net.IP, error)
-}
 
 // Dialer wraps net.Dialer and provides k6 specific functionality -
 // tracing, blacklists and DNS cache and aliases.
 type Dialer struct {
 	net.Dialer
 
-	Resolver  dnsResolver
+	Resolver  Resolver
 	Blacklist []*lib.IPNet
 	Hosts     map[string]*lib.HostAddress
 
@@ -55,12 +46,8 @@ type Dialer struct {
 	BytesWritten int64
 }
 
-// NewDialer constructs a new Dialer and initializes its cache.
-func NewDialer(dialer net.Dialer) *Dialer {
-	return newDialerWithResolver(dialer, dnscache.New(0))
-}
-
-func newDialerWithResolver(dialer net.Dialer, resolver dnsResolver) *Dialer {
+// NewDialer constructs a new Dialer with the given DNS resolver.
+func NewDialer(dialer net.Dialer, resolver Resolver) *Dialer {
 	return &Dialer{
 		Dialer:   dialer,
 		Resolver: resolver,
@@ -173,17 +160,9 @@ func (d *Dialer) findRemote(addr string) (*lib.HostAddress, error) {
 		return lib.NewHostAddress(ip, port)
 	}
 
-	return d.fetchRemoteFromResolver(host, port)
-}
-
-func (d *Dialer) fetchRemoteFromResolver(host, port string) (*lib.HostAddress, error) {
-	ip, err := d.Resolver.FetchOne(host)
+	ip, err = d.Resolver.LookupIP(host)
 	if err != nil {
 		return nil, err
-	}
-
-	if ip == nil {
-		return nil, errors.Errorf("lookup %s: no such host", host)
 	}
 
 	return lib.NewHostAddress(ip, port)

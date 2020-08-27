@@ -21,13 +21,16 @@
 package lib
 
 import (
+	"bytes"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"net"
 	"reflect"
 	"strconv"
+	"strings"
 
+	"github.com/kubernetes/helm/pkg/strvals"
 	"github.com/pkg/errors"
 	"gopkg.in/guregu/null.v3"
 
@@ -43,6 +46,155 @@ const DefaultScenarioName = "default"
 // DefaultSummaryTrendStats are the default trend columns shown in the test summary output
 // nolint: gochecknoglobals
 var DefaultSummaryTrendStats = []string{"avg", "min", "med", "max", "p(90)", "p(95)"}
+
+// DNSConfig is the DNS resolver configuration.
+type DNSConfig struct {
+	// If positive, defines how long DNS lookups should be returned from the cache.
+	TTL null.String `json:"ttl"`
+	// Strategy to use when picking a single IP if more than one is returned for a host name.
+	Strategy NullDNSStrategy `json:"strategy"`
+	// FIXME: Valid is unused and is only added to satisfy some logic in
+	// lib.Options.ForEachSpecified(), otherwise it would panic with
+	// `reflect: call of reflect.Value.Bool on zero Value`.
+	Valid bool
+}
+
+// DNSStrategy is the strategy to use when picking a single IP if more than one
+// is returned for a host name.
+//go:generate enumer -type=DNSStrategy -transform=kebab -trimprefix DNS -output dns_strategy_gen.go
+type DNSStrategy uint8
+
+const (
+	// DNSFirst returns the first IP from the response.
+	DNSFirst DNSStrategy = iota + 1
+	// DNSRoundRobin rotates the IP returned on each lookup.
+	DNSRoundRobin
+	// DNSRandom returns a random IP from the response.
+	DNSRandom
+)
+
+// UnmarshalJSON converts JSON data to a valid DNSStrategy
+func (d *DNSStrategy) UnmarshalJSON(data []byte) error {
+	if bytes.Equal(data, []byte(`null`)) {
+		return nil
+	}
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	v, err := DNSStrategyString(s)
+	if err != nil {
+		return err
+	}
+	*d = v
+	return nil
+}
+
+// MarshalJSON returns the JSON representation of d
+func (d DNSStrategy) MarshalJSON() ([]byte, error) {
+	return json.Marshal(d.String())
+}
+
+// NullDNSStrategy is a nullable wrapper around DNSStrategy, required for the
+// current configuration system.
+type NullDNSStrategy struct {
+	DNSStrategy
+	Valid bool
+}
+
+// UnmarshalJSON converts JSON data to a valid NullDNSStratey
+func (d *NullDNSStrategy) UnmarshalJSON(data []byte) error {
+	if bytes.Equal(data, []byte(`null`)) {
+		return nil
+	}
+	if err := json.Unmarshal(data, &d.DNSStrategy); err != nil {
+		return err
+	}
+	d.Valid = true
+	return nil
+}
+
+// MarshalJSON returns the JSON representation of d
+func (d NullDNSStrategy) MarshalJSON() ([]byte, error) {
+	if !d.Valid {
+		return []byte(`null`), nil
+	}
+	return json.Marshal(d.DNSStrategy)
+}
+
+// DefaultDNSConfig returns the default DNS configuration.
+func DefaultDNSConfig() DNSConfig {
+	return DNSConfig{
+		TTL:      null.NewString("5m", false),
+		Strategy: NullDNSStrategy{DNSRandom, false},
+	}
+}
+
+// String implements fmt.Stringer.
+func (c DNSConfig) String() string {
+	out := make([]string, 0, 2)
+	out = append(out, fmt.Sprintf("ttl=%s", c.TTL.String))
+	out = append(out, fmt.Sprintf("strategy=%s", c.Strategy.String()))
+	return strings.Join(out, ",")
+}
+
+// MarshalJSON implements json.Marshaler.
+func (c DNSConfig) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		TTL      null.String     `json:"ttl"`
+		Strategy NullDNSStrategy `json:"strategy"`
+	}{
+		TTL:      c.TTL,
+		Strategy: c.Strategy,
+	})
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (c *DNSConfig) UnmarshalJSON(data []byte) error {
+	var s struct {
+		TTL      null.String     `json:"ttl"`
+		Strategy NullDNSStrategy `json:"strategy"`
+	}
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	c.TTL = s.TTL
+	c.Strategy = s.Strategy
+	return nil
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (c *DNSConfig) UnmarshalText(text []byte) error {
+	if string(text) == DefaultDNSConfig().String() {
+		*c = DefaultDNSConfig()
+		return nil
+	}
+	params, err := strvals.Parse(string(text))
+	if err != nil {
+		return err
+	}
+	return c.unmarshal(params)
+}
+
+func (c *DNSConfig) unmarshal(params map[string]interface{}) error {
+	for k, v := range params {
+		switch k {
+		case "strategy":
+			s, err := DNSStrategyString(v.(string))
+			if err != nil {
+				return err
+			}
+			c.Strategy.DNSStrategy = s
+			c.Strategy.Valid = true
+		case "ttl":
+			ttlv := fmt.Sprintf("%v", v)
+			c.TTL = null.StringFrom(ttlv)
+		default:
+			return fmt.Errorf("unknown DNS configuration field: %s", k)
+		}
+	}
+	return nil
+}
 
 // Describes a TLS version. Serialised to/from JSON as a string, eg. "tls1.2".
 type TLSVersion int
@@ -307,6 +459,9 @@ type Options struct {
 	// Limit HTTP requests per second.
 	RPS null.Int `json:"rps" envconfig:"K6_RPS"`
 
+	// DNS handling configuration.
+	DNS DNSConfig `json:"dns" envconfig:"K6_DNS"`
+
 	// How many HTTP redirects do we follow?
 	MaxRedirects null.Int `json:"maxRedirects" envconfig:"K6_MAX_REDIRECTS"`
 
@@ -532,6 +687,12 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.ConsoleOutput.Valid {
 		o.ConsoleOutput = opts.ConsoleOutput
+	}
+	if opts.DNS.TTL.Valid {
+		o.DNS.TTL = opts.DNS.TTL
+	}
+	if opts.DNS.Strategy.Valid {
+		o.DNS.Strategy = opts.DNS.Strategy
 	}
 
 	return o

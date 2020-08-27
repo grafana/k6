@@ -24,18 +24,14 @@ import (
 	"net"
 	"testing"
 
-	"github.com/loadimpact/k6/lib"
 	"github.com/stretchr/testify/require"
+
+	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/testutils/mockresolver"
 )
 
-type testResolver struct {
-	hosts map[string]net.IP
-}
-
-func (r testResolver) FetchOne(host string) (net.IP, error) { return r.hosts[host], nil }
-
 func TestDialerAddr(t *testing.T) {
-	dialer := newDialerWithResolver(net.Dialer{}, newResolver())
+	dialer := NewDialer(net.Dialer{}, newResolver())
 	dialer.Hosts = map[string]*lib.HostAddress{
 		"example.com":                {IP: net.ParseIP("3.4.5.6")},
 		"example.com:443":            {IP: net.ParseIP("3.4.5.6"), Port: 8443},
@@ -92,12 +88,12 @@ func TestDialerAddr(t *testing.T) {
 	}
 }
 
-func newResolver() testResolver {
-	return testResolver{
-		hosts: map[string]net.IP{
-			"example-resolver.com":           net.ParseIP("1.2.3.4"),
-			"example-deny-resolver.com":      net.ParseIP("8.9.10.11"),
-			"example-ipv6-deny-resolver.com": net.ParseIP("::1"),
-		},
-	}
+func newResolver() *mockresolver.MockResolver {
+	return mockresolver.New(
+		map[string][]net.IP{
+			"example-resolver.com":           {net.ParseIP("1.2.3.4")},
+			"example-deny-resolver.com":      {net.ParseIP("8.9.10.11")},
+			"example-ipv6-deny-resolver.com": {net.ParseIP("::1")},
+		}, nil,
+	)
 }

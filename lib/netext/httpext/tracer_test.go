@@ -40,6 +40,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
@@ -55,7 +56,10 @@ func TestTracer(t *testing.T) {
 
 	transport, ok := srv.Client().Transport.(*http.Transport)
 	assert.True(t, ok)
-	transport.DialContext = netext.NewDialer(net.Dialer{}).DialContext
+	transport.DialContext = netext.NewDialer(
+		net.Dialer{},
+		netext.NewResolver(net.LookupIP, 0, lib.DNSFirst),
+	).DialContext
 
 	var prev int64
 	assertLaterOrZero := func(t *testing.T, val int64, canBeZero bool) {
