@@ -253,7 +253,7 @@ func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 		Timeout:   2 * time.Second,
 		KeepAlive: 10 * time.Second,
 		DualStack: true,
-	})
+	}, 0)
 	dialer.Hosts = map[string]*lib.HostAddress{
 		httpDomain:  httpDomainValue,
 		httpsDomain: httpsDomainValue,

@@ -36,10 +36,21 @@ import (
 	"github.com/loadimpact/k6/stats"
 )
 
-// dnsResolver is an interface that fetches dns information
-// about a given address.
-type dnsResolver interface {
-	FetchOne(address string) (net.IP, error)
+// DNSResolver is an interface that fetches DNS information about a given host.
+type DNSResolver interface {
+	FetchOne(host string) (net.IP, error)
+}
+
+// NoCacheResolver always does a fresh lookup.
+type NoCacheResolver struct{}
+
+// FetchOne does a DNS lookup and returns the first IP resolved for host.
+func (r *NoCacheResolver) FetchOne(host string) (net.IP, error) {
+	ips, err := net.LookupIP(host)
+	if err != nil || len(ips) == 0 {
+		return nil, err
+	}
+	return ips[0], nil
 }
 
 // Dialer wraps net.Dialer and provides k6 specific functionality -
@@ -47,7 +58,7 @@ type dnsResolver interface {
 type Dialer struct {
 	net.Dialer
 
-	Resolver  dnsResolver
+	Resolver  DNSResolver
 	Blacklist []*lib.IPNet
 	Hosts     map[string]*lib.HostAddress
 
@@ -56,11 +67,11 @@ type Dialer struct {
 }
 
 // NewDialer constructs a new Dialer and initializes its cache.
-func NewDialer(dialer net.Dialer) *Dialer {
-	return newDialerWithResolver(dialer, dnscache.New(0))
+func NewDialer(dialer net.Dialer, ttl time.Duration) *Dialer {
+	return newDialerWithResolver(dialer, dnscache.New(ttl))
 }
 
-func newDialerWithResolver(dialer net.Dialer, resolver dnsResolver) *Dialer {
+func newDialerWithResolver(dialer net.Dialer, resolver DNSResolver) *Dialer {
 	return &Dialer{
 		Dialer:   dialer,
 		Resolver: resolver,

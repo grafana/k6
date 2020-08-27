@@ -375,6 +375,49 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 				assert.Equal(t, []string{"avg", "p(90)", "count"}, c.Options.SummaryTrendStats)
 			},
 		},
+		{opts{cli: []string{}}, exp{}, func(t *testing.T, c Config) {
+			assert.Equal(t, &lib.DNSConfig{TTL: null.NewString("inf", false)}, c.Options.DNS)
+		}},
+		{opts{env: []string{"K6_DNS=ttl=5"}}, exp{}, func(t *testing.T, c Config) {
+			assert.Equal(t, &lib.DNSConfig{TTL: null.StringFrom("5")}, c.Options.DNS)
+		}},
+		{opts{cli: []string{"--dns", "ttl=inf"}}, exp{}, func(t *testing.T, c Config) {
+			assert.Equal(t, &lib.DNSConfig{TTL: null.StringFrom("inf")}, c.Options.DNS)
+		}},
+		{opts{cli: []string{"--dns", "ttl=-1"}}, exp{}, func(t *testing.T, c Config) {
+			assert.Equal(t, &lib.DNSConfig{TTL: null.StringFrom("-1")}, c.Options.DNS)
+		}},
+		{opts{cli: []string{"--dns", "ttl=0"}}, exp{}, func(t *testing.T, c Config) {
+			assert.Equal(t, &lib.DNSConfig{TTL: null.StringFrom("0")}, c.Options.DNS)
+		}},
+		{opts{cli: []string{"--dns", "ttl=5s"}}, exp{}, func(t *testing.T, c Config) {
+			assert.Equal(t, &lib.DNSConfig{TTL: null.StringFrom("5s")}, c.Options.DNS)
+		}},
+		{opts{fs: defaultConfig(`{"dns": {"ttl": "0"}}`)}, exp{}, func(t *testing.T, c Config) {
+			assert.Equal(t, &lib.DNSConfig{TTL: null.StringFrom("0")}, c.Options.DNS)
+		}},
+		{
+			opts{
+				fs:  defaultConfig(`{"dns": {"ttl": "0"}}`),
+				env: []string{"K6_DNS=ttl=30"},
+			},
+			exp{}, func(t *testing.T, c Config) {
+				// FIXME: The env var should override the script option!
+				assert.Equal(t, &lib.DNSConfig{TTL: null.StringFrom("0")}, c.Options.DNS)
+			},
+		},
+		{
+			// CLI arg overrides all
+			opts{
+				fs:  defaultConfig(`{"dns": {"ttl": "60"}}`),
+				env: []string{"K6_DNS=ttl=30"},
+				cli: []string{"--dns", "ttl=5"},
+			},
+			exp{}, func(t *testing.T, c Config) {
+				assert.Equal(t, &lib.DNSConfig{TTL: null.StringFrom("5")}, c.Options.DNS)
+			},
+		},
+
 		// TODO: test for differences between flagsets
 		// TODO: more tests in general, especially ones not related to execution parameters...
 	}

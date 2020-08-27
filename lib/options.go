@@ -44,6 +44,10 @@ const DefaultScenarioName = "default"
 // nolint: gochecknoglobals
 var DefaultSummaryTrendStats = []string{"avg", "min", "med", "max", "p(90)", "p(95)"}
 
+type DNSConfig struct {
+	TTL null.String `json:"ttl"`
+}
+
 // Describes a TLS version. Serialised to/from JSON as a string, eg. "tls1.2".
 type TLSVersion int
 
@@ -294,6 +298,9 @@ type Options struct {
 	// Limit HTTP requests per second.
 	RPS null.Int `json:"rps" envconfig:"K6_RPS"`
 
+	// DNS handling configuration.
+	DNS *DNSConfig `json:"dns" ignored:"true"`
+
 	// How many HTTP redirects do we follow?
 	MaxRedirects null.Int `json:"maxRedirects" envconfig:"K6_MAX_REDIRECTS"`
 
@@ -519,6 +526,9 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.ConsoleOutput.Valid {
 		o.ConsoleOutput = opts.ConsoleOutput
+	}
+	if o.DNS != nil && !o.DNS.TTL.Valid && opts.DNS != nil && opts.DNS.TTL.Valid {
+		o.DNS.TTL = opts.DNS.TTL
 	}
 
 	return o

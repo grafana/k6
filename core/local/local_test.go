@@ -974,6 +974,92 @@ func TestExecutionSchedulerIsRunning(t *testing.T) {
 	assert.NoError(t, <-err)
 }
 
+type mockDNSRunner struct {
+	*js.Runner
+	resolver *testutils.MockResolver
+}
+
+// NewVU initializes a new VU replacing its resolver with a MockResolver.
+func (r *mockDNSRunner) NewVU(id int64, out chan<- stats.SampleContainer) (lib.InitializedVU, error) {
+	initVU, err := r.Runner.NewVU(id, out)
+	if err != nil {
+		return nil, err
+	}
+	(initVU.(*js.VU)).Dialer.Resolver = r.resolver
+	return initVU, nil
+}
+
+func TestDNS(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	defer tb.Cleanup()
+	sr := tb.Replacer.Replace
+	script := sr(`
+		import http from "k6/http";
+		import { sleep } from "k6";
+
+		export let options = {
+			vus: 1,
+			duration: "5s",
+			noConnectionReuse: true,
+		}
+
+		export default function () {
+			const res = http.get("http://myhost:HTTPBIN_PORT/", { timeout: 50 });
+			sleep(0.45);  // not an even multiple of 0.5 to minimize races with asserts
+		}`)
+
+	t.Run("cache", func(t *testing.T) {
+		testCases := map[string]struct {
+			opts lib.Options
+		}{
+			"inf": { // IPs are cached indefinitely
+				lib.Options{},
+			},
+			"no": { // every request does a DNS lookup
+				lib.Options{DNS: &lib.DNSConfig{TTL: null.StringFrom("0")}},
+			},
+			"2s": {
+				lib.Options{DNS: &lib.DNSConfig{TTL: null.StringFrom("2s")}},
+			},
+		}
+
+		for name, tc := range testCases {
+			tc := tc
+			t.Run(name, func(t *testing.T) {
+				logger := logrus.New()
+				logger.SetOutput(testutils.NewTestOutput(t))
+				runner, err := js.New(logger, &loader.SourceData{
+					URL: &url.URL{Path: "/script.js"}, Data: []byte(script),
+				}, nil, lib.RuntimeOptions{})
+				require.NoError(t, err)
+
+				mr := &mockDNSRunner{runner, testutils.NewMockResolver(nil)}
+				ctx, cancel, execScheduler, samples := newTestExecutionScheduler(t, mr, logger, tc.opts)
+				defer cancel()
+
+				mr.resolver.Set("myhost", sr("HTTPBIN_IP"))
+				time.AfterFunc(1*time.Second, func() {
+					mr.resolver.Set("myhost", "127.0.0.254")
+				})
+				errCh := make(chan error, 1)
+				go func() { errCh <- execScheduler.Run(ctx, ctx, samples) }()
+
+				for {
+					select {
+					case err := <-errCh:
+						require.NoError(t, err)
+						return
+					case <-time.After(6 * time.Second):
+						t.Fatal("timed out")
+						return
+					}
+				}
+			})
+		}
+	})
+}
+
 func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip()
@@ -1100,7 +1186,7 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 	getDummyTrail := func(group string, emitIterations bool, addExpTags ...string) stats.SampleContainer {
 		expTags := []string{"group", group}
 		expTags = append(expTags, addExpTags...)
-		return netext.NewDialer(net.Dialer{}).GetTrail(time.Now(), time.Now(),
+		return netext.NewDialer(net.Dialer{}, 0).GetTrail(time.Now(), time.Now(),
 			true, emitIterations, getTags(expTags...))
 	}
 

@@ -55,7 +55,7 @@ func TestTracer(t *testing.T) {
 
 	transport, ok := srv.Client().Transport.(*http.Transport)
 	assert.True(t, ok)
-	transport.DialContext = netext.NewDialer(net.Dialer{}).DialContext
+	transport.DialContext = netext.NewDialer(net.Dialer{}, 0).DialContext
 
 	var prev int64
 	assertLaterOrZero := func(t *testing.T, val int64, canBeZero bool) {

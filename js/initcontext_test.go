@@ -392,7 +392,7 @@ func TestRequestWithBinaryFile(t *testing.T) {
 				Timeout:   10 * time.Second,
 				KeepAlive: 60 * time.Second,
 				DualStack: true,
-			})).DialContext,
+			}, 0)).DialContext,
 		},
 		BPool:   bpool.NewBufferPool(1),
 		Samples: make(chan stats.SampleContainer, 500),

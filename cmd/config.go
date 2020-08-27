@@ -29,6 +29,7 @@ import (
 	"strings"
 
 	"github.com/kelseyhightower/envconfig"
+	"github.com/kubernetes/helm/pkg/strvals"
 	"github.com/spf13/afero"
 	"github.com/spf13/pflag"
 	"gopkg.in/guregu/null.v3"
@@ -199,6 +200,20 @@ func readEnvConfig() (conf Config, err error) {
 		envconfig.Process("k6_statsd", &conf.Collectors.StatsD),
 		envconfig.Process("k6_datadog", &conf.Collectors.Datadog),
 	} {
+		// Custom handling of K6_DNS since envconfig doesn't handle struct
+		// pointers nicely. See https://github.com/kelseyhightower/envconfig/issues/113
+		if conf.Options.DNS == nil {
+			conf.Options.DNS = &lib.DNSConfig{}
+		}
+		if dns := os.Getenv("K6_DNS"); dns != "" {
+			params, err := strvals.Parse(dns)
+			if err != nil {
+				return conf, err
+			}
+			if ttl, ok := params["ttl"]; ok {
+				conf.Options.DNS.TTL = null.StringFrom(fmt.Sprintf("%v", ttl))
+			}
+		}
 		return conf, err
 	}
 	return conf, nil

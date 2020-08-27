@@ -41,6 +41,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/viki-org/dnscache"
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/core"
@@ -53,6 +54,7 @@ import (
 	"github.com/loadimpact/k6/lib"
 	_ "github.com/loadimpact/k6/lib/executor" // TODO: figure out something better
 	"github.com/loadimpact/k6/lib/metrics"
+	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/lib/testutils/httpmultibin"
 	"github.com/loadimpact/k6/lib/types"
@@ -1349,6 +1351,73 @@ func TestVUIntegrationClientCerts(t *testing.T) {
 	})
 }
 
+func TestVUIntegrationDNS(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	defer tb.Cleanup()
+	sr := tb.Replacer.Replace
+	mockIP := "127.0.0.254"
+	expErr := fmt.Sprintf(sr(`Get "http://myhost:HTTPBIN_PORT/": dial tcp %s:HTTPBIN_PORT: connect: connection refused`), mockIP)
+
+	testdata := map[string]struct {
+		opts lib.Options
+	}{
+		"inf_cache": { // IPs are cached indefinitely
+			lib.Options{},
+		},
+		"no_cache": { // every request does a DNS lookup
+			lib.Options{DNS: &lib.DNSConfig{TTL: null.StringFrom("0")}},
+		},
+		"2s_cache": {
+			lib.Options{DNS: &lib.DNSConfig{TTL: null.StringFrom("2s")}},
+		},
+	}
+
+	for name, data := range testdata {
+		data := data
+		t.Run(name, func(t *testing.T) {
+			r1, err := getSimpleRunner(t, "/script.js", sr(`
+				var http = require("k6/http");
+				exports.default = function() { http.get("http://myhost:HTTPBIN_PORT/"); }
+			`))
+			require.NoError(t, err)
+			require.NoError(t, r1.SetOptions(lib.Options{
+				Throw:             null.BoolFrom(true),
+				NoConnectionReuse: null.BoolFrom(true),
+			}.Apply(data.opts)))
+
+			r2, err := NewFromArchive(testutils.NewLogger(t), r1.MakeArchive(), lib.RuntimeOptions{})
+			require.NoError(t, err)
+			runners := map[string]*Runner{"Source": r1, "Archive": r2}
+			for name, r := range runners {
+				r := r
+				t.Run(name, func(t *testing.T) {
+					r.Logger, _ = logtest.NewNullLogger()
+					initVU, err := r.NewVU(1, make(chan stats.SampleContainer, 100))
+					require.NoError(t, err)
+					// Replace the VU resolver so that the DNS change can take effect.
+					mockRes := testutils.NewMockResolver(nil)
+					(initVU.(*VU)).Dialer.Resolver = mockRes
+
+					runVU := func(ip string) error {
+						mockRes.Set("myhost", ip)
+						ctx, cancel := context.WithCancel(context.Background())
+						defer cancel()
+						vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+						return vu.RunOnce()
+					}
+
+					assert.NoError(t, runVU(sr("HTTPBIN_IP")))
+					time.Sleep(1 * time.Second)
+					err = runVU(mockIP)
+					require.NotNil(t, err)
+					assert.Contains(t, err.Error(), expErr)
+				})
+			}
+		})
+	}
+}
+
 func TestHTTPRequestInInitContext(t *testing.T) {
 	tb := httpmultibin.NewHTTPMultiBin(t)
 	defer tb.Cleanup()
@@ -1659,6 +1728,53 @@ func TestSystemTags(t *testing.T) {
 				for emittedTag, emittedVal := range sample.Tags.CloneTags() {
 					assert.Equal(t, tc.tag, emittedTag)
 					assert.Equal(t, tc.expVal, emittedVal)
+				}
+			}
+		})
+	}
+}
+
+// Test DNS configuration validation and that the correct resolver is initialized.
+func TestResolverConfig(t *testing.T) {
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	defer tb.Cleanup()
+
+	testCases := []struct {
+		ttl, expErr string
+	}{
+		{"inf", ""},
+		{"-1", "invalid DNS TTL: -1.00s"},
+		{"0", ""},
+		{"5s", ""},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.ttl, func(t *testing.T) {
+			r, err := getSimpleRunner(t, "/script.js", tb.Replacer.Replace(fmt.Sprintf(`
+				var http = require("k6/http");
+				exports.options = { dns: { ttl: "%s" } };
+				exports.default = function() {
+					http.get("HTTPBIN_URL/");
+				}
+			`, tc.ttl)))
+
+			if tc.expErr != "" {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+
+			// We can't run any functional tests since we don't have access to
+			// the stdlib resolver wrapped by dnscache in order to setup the
+			// different scenarios, so this type check is the best we can do.
+			if tc.ttl == "0" {
+				if _, ok := r.Resolver.(*netext.NoCacheResolver); !ok {
+					assert.Fail(t, "expected Resolver to be *netext.NoCacheResolver, got %T", r.Resolver)
+				}
+			} else {
+				if _, ok := r.Resolver.(*dnscache.Resolver); !ok {
+					assert.Fail(t, "expected Resolver to be *dnscache.Resolver, got %T", r.Resolver)
 				}
 			}
 		})

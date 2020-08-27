@@ -44,6 +44,7 @@ import (
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/lib/netext"
+	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/stats"
 )
@@ -60,7 +61,7 @@ type Runner struct {
 	defaultGroup *lib.Group
 
 	BaseDialer net.Dialer
-	Resolver   *dnscache.Resolver
+	Resolver   netext.DNSResolver
 	RPSLimit   *rate.Limiter
 
 	console   *console
@@ -316,6 +317,36 @@ func (r *Runner) SetOptions(opts lib.Options) error {
 		}
 
 		r.console = c
+	}
+
+	if opts.DNS != nil {
+		// FIXME: Resolver probably shouldn't be reset here...
+		// It's done because the js.Runner is created before the full
+		// configuration has been processed, at which point we don't have
+		// access to the DNSConfig, and need to wait for this SetOptions
+		// call that happens after all config has been assembled.
+		// We could make DNSConfig part of RuntimeOptions, but that seems
+		// conceptually wrong since the JS runtime doesn't care about it
+		// (it needs the actual resolver, not the config), and it would
+		// require an additional field on Bundle to pass the config through,
+		// which is arguably worse than this.
+		ttlS := opts.DNS.TTL.String
+		// Treat unitless values as seconds
+		if ttl, err := strconv.ParseFloat(ttlS, 32); err == nil {
+			ttlS = fmt.Sprintf("%.2fs", ttl)
+		}
+		switch ttlS {
+		case "", "+Infs":
+			// use the already initialized infinite cache resolver
+		case "0.00s":
+			r.Resolver = &netext.NoCacheResolver{}
+		default:
+			ttlD, err := types.ParseExtendedDuration(ttlS)
+			if ttlD < 0 || err != nil {
+				return fmt.Errorf("invalid DNS TTL: %s", ttlS)
+			}
+			r.Resolver = dnscache.New(ttlD)
+		}
 	}
 
 	return nil

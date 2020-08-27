@@ -25,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kubernetes/helm/pkg/strvals"
 	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 	"gopkg.in/guregu/null.v3"
@@ -91,6 +92,7 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.StringSlice("tag", nil, "add a `tag` to be applied to all samples, as `[name]=[value]`")
 	flags.String("console-output", "", "redirects the console logging to the provided output file")
 	flags.Bool("discard-response-bodies", false, "Read but don't process or save HTTP response bodies")
+	flags.String("dns", "ttl=inf", "DNS configuration")
 	return flags
 }
 
@@ -233,6 +235,25 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 
 	if redirectConFile != "" {
 		opts.ConsoleOutput = null.StringFrom(redirectConFile)
+	}
+
+	opts.DNS = &lib.DNSConfig{}
+	var valid bool
+	if flags.Changed("dns") {
+		valid = true
+	}
+	dns, err := flags.GetString("dns")
+	if err != nil {
+		return opts, err
+	}
+	if dns != "" {
+		params, err := strvals.Parse(dns)
+		if err != nil {
+			return opts, err
+		}
+		if ttl, ok := params["ttl"]; ok {
+			opts.DNS.TTL = null.NewString(fmt.Sprintf("%v", ttl), valid)
+		}
 	}
 
 	return opts, nil
