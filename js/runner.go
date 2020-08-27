@@ -36,7 +36,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
-	"github.com/viki-org/dnscache"
 	"golang.org/x/net/http2"
 	"golang.org/x/time/rate"
 
@@ -44,6 +43,7 @@ import (
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/lib/netext"
+	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/stats"
 )
@@ -60,8 +60,10 @@ type Runner struct {
 	defaultGroup *lib.Group
 
 	BaseDialer net.Dialer
-	Resolver   *dnscache.Resolver
-	RPSLimit   *rate.Limiter
+	Resolver   netext.Resolver
+	// TODO: Remove ActualResolver, it's a hack to simplify mocking in tests.
+	ActualResolver netext.MultiResolver
+	RPSLimit       *rate.Limiter
 
 	console   *console
 	setupData []byte
@@ -104,8 +106,9 @@ func newFromBundle(logger *logrus.Logger, b *Bundle) (*Runner, error) {
 			KeepAlive: 30 * time.Second,
 			DualStack: true,
 		},
-		console:  newConsole(logger),
-		Resolver: dnscache.New(0),
+		console:        newConsole(logger),
+		Resolver:       netext.NewResolver(net.LookupIP, 0, lib.DefaultDNSConfig().Select.DNSSelect),
+		ActualResolver: net.LookupIP,
 	}
 
 	err = r.SetOptions(r.Bundle.Options)
@@ -319,7 +322,62 @@ func (r *Runner) SetOptions(opts lib.Options) error {
 		r.console = c
 	}
 
+	// FIXME: Resolver probably shouldn't be reset here...
+	// It's done because the js.Runner is created before the full
+	// configuration has been processed, at which point we don't have
+	// access to the DNSConfig, and need to wait for this SetOptions
+	// call that happens after all config has been assembled.
+	// We could make DNSConfig part of RuntimeOptions, but that seems
+	// conceptually wrong since the JS runtime doesn't care about it
+	// (it needs the actual resolver, not the config), and it would
+	// require an additional field on Bundle to pass the config through,
+	// which is arguably worse than this.
+	if err := r.setResolver(opts.DNS); err != nil {
+		return err
+	}
+
 	return nil
+}
+
+func (r *Runner) setResolver(dns lib.DNSConfig) error {
+	ttl, err := parseTTL(dns.TTL.String)
+	if err != nil {
+		return err
+	}
+
+	dnsSel := opts.DNS.Select.DNSSelect
+	if !dnsSel.IsADNSSelect() {
+		dnsSel = lib.DefaultDNSConfig().Select.DNSSelect
+	}
+	r.Resolver = netext.NewResolver(r.ActualResolver, ttl, dnsSel)
+
+	return nil
+}
+
+func parseTTL(ttlS string) (time.Duration, error) {
+	ttl := time.Duration(0)
+	switch ttlS {
+	case "inf":
+		// cache "infinitely"
+		ttl = time.Hour * 24 * 365
+	case "0":
+		// disable cache
+	case "":
+		ttlS = lib.DefaultDNSConfig().TTL.String
+		fallthrough
+	default:
+		origTTLs := ttlS
+		// Treat unitless values as milliseconds
+		if t, err := strconv.ParseFloat(ttlS, 32); err == nil {
+			ttlS = fmt.Sprintf("%.2fms", t)
+		}
+		var err error
+		ttl, err = types.ParseExtendedDuration(ttlS)
+		if ttl < 0 || err != nil {
+			return ttl, fmt.Errorf("invalid DNS TTL: %s", origTTLs)
+		}
+	}
+	return ttl, nil
 }
 
 // Runs an exported function in its own temporary VU, optionally with an argument. Execution is

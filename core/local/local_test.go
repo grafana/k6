@@ -24,6 +24,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/url"
 	"reflect"
@@ -47,6 +48,7 @@ import (
 	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/lib/testutils/httpmultibin"
 	"github.com/loadimpact/k6/lib/testutils/minirunner"
+	"github.com/loadimpact/k6/lib/testutils/mockresolver"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/stats"
@@ -974,6 +976,103 @@ func TestExecutionSchedulerIsRunning(t *testing.T) {
 	assert.NoError(t, <-err)
 }
 
+// TestDNSResolver checks the DNS resolution behavior at the ExecutionScheduler level.
+func TestDNSResolver(t *testing.T) {
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	defer tb.Cleanup()
+	sr := tb.Replacer.Replace
+	script := sr(`
+		import http from "k6/http";
+		import { sleep } from "k6";
+
+		export let options = {
+			vus: 1,
+			iterations: 8,
+			noConnectionReuse: true,
+		}
+
+		export default function () {
+			const res = http.get("http://myhost:HTTPBIN_PORT/", { timeout: 50 });
+			sleep(0.7);  // somewhat uneven multiple of 0.5 to minimize races with asserts
+		}`)
+
+	t.Run("cache", func(t *testing.T) {
+		testCases := map[string]struct {
+			opts          lib.Options
+			expLogEntries int
+		}{
+			"default": { // IPs are cached for 5m
+				lib.Options{DNS: lib.DefaultDNSConfig()}, 0,
+			},
+			"0": { // cache is disabled, every request does a DNS lookup
+				lib.Options{DNS: lib.DNSConfig{
+					TTL:      null.StringFrom("0"),
+					Strategy: lib.NullDNSStrategy{DNSStrategy: lib.DNSFirst, Valid: true},
+				}}, 5,
+			},
+			"1000": { // cache IPs for 1s, check that unitless values are interpreted as ms
+				lib.Options{DNS: lib.DNSConfig{
+					TTL:      null.StringFrom("1000"),
+					Strategy: lib.NullDNSStrategy{DNSStrategy: lib.DNSFirst, Valid: true},
+				}}, 4,
+			},
+			"3s": {
+				lib.Options{DNS: lib.DNSConfig{
+					TTL:      null.StringFrom("3s"),
+					Strategy: lib.NullDNSStrategy{DNSStrategy: lib.DNSFirst, Valid: true},
+				}}, 3,
+			},
+		}
+
+		expErr := sr(`dial tcp 127.0.0.254:HTTPBIN_PORT: connect: connection refused`)
+		if runtime.GOOS == "windows" {
+			expErr = "context deadline exceeded"
+		}
+		for name, tc := range testCases {
+			tc := tc
+			t.Run(name, func(t *testing.T) {
+				logger := logrus.New()
+				logger.SetOutput(ioutil.Discard)
+				logHook := testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.WarnLevel}}
+				logger.AddHook(&logHook)
+
+				runner, err := js.New(logger, &loader.SourceData{
+					URL: &url.URL{Path: "/script.js"}, Data: []byte(script),
+				}, nil, lib.RuntimeOptions{})
+				require.NoError(t, err)
+
+				mr := mockresolver.New(nil, net.LookupIP)
+				runner.ActualResolver = mr.LookupIPAll
+
+				ctx, cancel, execScheduler, samples := newTestExecutionScheduler(t, runner, logger, tc.opts)
+				defer cancel()
+
+				mr.Set("myhost", sr("HTTPBIN_IP"))
+				time.AfterFunc(1700*time.Millisecond, func() {
+					mr.Set("myhost", "127.0.0.254")
+				})
+				defer mr.Unset("myhost")
+
+				errCh := make(chan error, 1)
+				go func() { errCh <- execScheduler.Run(ctx, ctx, samples) }()
+
+				select {
+				case err := <-errCh:
+					require.NoError(t, err)
+					entries := logHook.Drain()
+					require.Len(t, entries, tc.expLogEntries)
+					for _, entry := range entries {
+						require.IsType(t, &url.Error{}, entry.Data["error"])
+						assert.EqualError(t, entry.Data["error"].(*url.Error).Err, expErr)
+					}
+				case <-time.After(10 * time.Second):
+					t.Fatal("timed out")
+				}
+			})
+		}
+	})
+}
+
 func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip()
@@ -1100,7 +1199,10 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 	getDummyTrail := func(group string, emitIterations bool, addExpTags ...string) stats.SampleContainer {
 		expTags := []string{"group", group}
 		expTags = append(expTags, addExpTags...)
-		return netext.NewDialer(net.Dialer{}).GetTrail(time.Now(), time.Now(),
+		return netext.NewDialer(
+			net.Dialer{},
+			netext.NewResolver(net.LookupIP, 0, lib.DNSFirst),
+		).GetTrail(time.Now(), time.Now(),
 			true, emitIterations, getTags(expTags...))
 	}
 

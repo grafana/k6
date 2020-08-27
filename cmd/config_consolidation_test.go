@@ -139,7 +139,7 @@ type file struct {
 func getFS(files []file) afero.Fs {
 	fs := afero.NewMemMapFs()
 	for _, f := range files {
-		must(afero.WriteFile(fs, f.filepath, []byte(f.contents), 0644)) // modes don't matter in the afero.MemMapFs
+		must(afero.WriteFile(fs, f.filepath, []byte(f.contents), 0o644)) // modes don't matter in the afero.MemMapFs
 	}
 	return fs
 }
@@ -214,11 +214,13 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 		{opts{cli: []string{"-u", "3", "-d", "30s"}}, exp{}, verifyConstLoopingVUs(I(3), 30*time.Second)},
 		{opts{cli: []string{"-u", "4", "--duration", "60s"}}, exp{}, verifyConstLoopingVUs(I(4), 1*time.Minute)},
 		{
-			opts{cli: []string{"--stage", "20s:10", "-s", "3m:5"}}, exp{},
+			opts{cli: []string{"--stage", "20s:10", "-s", "3m:5"}},
+			exp{},
 			verifyRampingVUs(null.NewInt(1, false), buildStages(20, 10, 180, 5)),
 		},
 		{
-			opts{cli: []string{"-s", "1m6s:5", "--vus", "10"}}, exp{},
+			opts{cli: []string{"-s", "1m6s:5", "--vus", "10"}},
+			exp{},
 			verifyRampingVUs(null.NewInt(10, true), buildStages(66, 5)),
 		},
 		{opts{cli: []string{"-u", "1", "-i", "6", "-d", "10s"}}, exp{}, func(t *testing.T, c Config) {
@@ -248,11 +250,13 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 		{opts{env: []string{"K6_VUS=5", "K6_ITERATIONS=15"}}, exp{}, verifySharedIters(I(5), I(15))},
 		{opts{env: []string{"K6_VUS=10", "K6_DURATION=20s"}}, exp{}, verifyConstLoopingVUs(I(10), 20*time.Second)},
 		{
-			opts{env: []string{"K6_STAGES=2m30s:11,1h1m:100"}}, exp{},
+			opts{env: []string{"K6_STAGES=2m30s:11,1h1m:100"}},
+			exp{},
 			verifyRampingVUs(null.NewInt(1, false), buildStages(150, 11, 3660, 100)),
 		},
 		{
-			opts{env: []string{"K6_STAGES=100s:100,0m30s:0", "K6_VUS=0"}}, exp{},
+			opts{env: []string{"K6_STAGES=100s:100,0m30s:0", "K6_VUS=0"}},
+			exp{},
 			verifyRampingVUs(null.NewInt(0, true), buildStages(100, 100, 30, 0)),
 		},
 		// Test if JSON configs work as expected
@@ -275,14 +279,16 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 				env: []string{"K6_DURATION=15s"},
 				cli: []string{"--stage", ""},
 			},
-			exp{logWarning: true}, verifyOneIterPerOneVU,
+			exp{logWarning: true},
+			verifyOneIterPerOneVU,
 		},
 		{
 			opts{
 				runner: &lib.Options{VUs: null.IntFrom(5), Duration: types.NullDurationFrom(50 * time.Second)},
 				cli:    []string{"--stage", "5s:5"},
 			},
-			exp{}, verifyRampingVUs(I(5), buildStages(5, 5)),
+			exp{},
+			verifyRampingVUs(I(5), buildStages(5, 5)),
 		},
 		{
 			opts{
@@ -323,7 +329,8 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 				env: []string{"K6_ITERATIONS=25"},
 				cli: []string{"--vus", "12"},
 			},
-			exp{}, verifySharedIters(I(12), I(25)),
+			exp{},
+			verifySharedIters(I(12), I(25)),
 		},
 
 		// TODO: test the externally controlled executor
@@ -375,6 +382,74 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 				assert.Equal(t, []string{"avg", "p(90)", "count"}, c.Options.SummaryTrendStats)
 			},
 		},
+		{opts{cli: []string{}}, exp{}, func(t *testing.T, c Config) {
+			assert.Equal(t, lib.DNSConfig{
+				TTL:    null.NewString("5m", false),
+				Select: lib.NullDNSSelect{DNSSelect: lib.DNSRandom, Valid: false},
+			}, c.Options.DNS)
+		}},
+		{opts{env: []string{"K6_DNS=ttl=5,select=round-robin"}}, exp{}, func(t *testing.T, c Config) {
+			assert.Equal(t, lib.DNSConfig{
+				TTL:    null.StringFrom("5"),
+				Select: lib.NullDNSSelect{DNSSelect: lib.DNSRoundRobin, Valid: true},
+			}, c.Options.DNS)
+		}},
+		{opts{env: []string{"K6_DNS=ttl=inf,select=random,policy=preferIPv6"}}, exp{}, func(t *testing.T, c Config) {
+			assert.Equal(t, lib.DNSConfig{
+				TTL:    null.StringFrom("inf"),
+				Select: lib.NullDNSSelect{DNSSelect: lib.DNSRandom, Valid: true},
+			}, c.Options.DNS)
+		}},
+		// This is functionally invalid, but will error out in validation done in js.parseTTL().
+		{opts{cli: []string{"--dns", "ttl=-1"}}, exp{}, func(t *testing.T, c Config) {
+			assert.Equal(t, lib.DNSConfig{
+				TTL:    null.StringFrom("-1"),
+				Select: lib.NullDNSSelect{DNSSelect: lib.DNSRandom, Valid: false},
+			}, c.Options.DNS)
+		}},
+		{opts{cli: []string{"--dns", "ttl=0,blah=nope"}}, exp{cliReadError: true}, nil},
+		{opts{cli: []string{"--dns", "ttl=0"}}, exp{}, func(t *testing.T, c Config) {
+			assert.Equal(t, lib.DNSConfig{
+				TTL:    null.StringFrom("0"),
+				Select: lib.NullDNSSelect{DNSSelect: lib.DNSRandom, Valid: false},
+			}, c.Options.DNS)
+		}},
+		{opts{cli: []string{"--dns", "ttl=5s,select="}}, exp{cliReadError: true}, nil},
+		{opts{fs: defaultConfig(`{"dns": {"ttl": "0", "select": "round-robin"}}`)}, exp{}, func(t *testing.T, c Config) {
+			assert.Equal(t, lib.DNSConfig{
+				TTL:    null.StringFrom("0"),
+				Select: lib.NullDNSSelect{DNSSelect: lib.DNSRoundRobin, Valid: true},
+			}, c.Options.DNS)
+		}},
+		{
+			opts{
+				fs:  defaultConfig(`{"dns": {"ttl": "0"}}`),
+				env: []string{"K6_DNS=ttl=30"},
+			},
+			exp{},
+			func(t *testing.T, c Config) {
+				assert.Equal(t, lib.DNSConfig{
+					TTL:    null.StringFrom("30"),
+					Select: lib.NullDNSSelect{DNSSelect: lib.DNSRandom, Valid: false},
+				}, c.Options.DNS)
+			},
+		},
+		{
+			// CLI overrides all, falling back to env
+			opts{
+				fs:  defaultConfig(`{"dns": {"ttl": "60", "select": "first"}}`),
+				env: []string{"K6_DNS=ttl=30,select=random"},
+				cli: []string{"--dns", "ttl=5"},
+			},
+			exp{},
+			func(t *testing.T, c Config) {
+				assert.Equal(t, lib.DNSConfig{
+					TTL:    null.StringFrom("5"),
+					Select: lib.NullDNSSelect{DNSSelect: lib.DNSRandom, Valid: true},
+				}, c.Options.DNS)
+			},
+		},
+
 		// TODO: test for differences between flagsets
 		// TODO: more tests in general, especially ones not related to execution parameters...
 	}
