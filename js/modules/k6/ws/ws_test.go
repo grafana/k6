@@ -32,6 +32,7 @@ import (
 	"github.com/dop251/goja"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
@@ -87,7 +88,7 @@ func assertMetricEmitted(t *testing.T, metric *stats.Metric, sampleContainers []
 }
 
 func TestSession(t *testing.T) {
-	//TODO: split and paralelize tests
+	// TODO: split and paralelize tests
 	t.Parallel()
 	tb := httpmultibin.NewHTTPMultiBin(t)
 	defer tb.Cleanup()
@@ -193,6 +194,19 @@ func TestSession(t *testing.T) {
 		assert.NoError(t, err)
 	})
 	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-echo"), 101, "")
+	t.Run("bad interval", func(t *testing.T) {
+		_, err := common.RunString(rt, sr(`
+		var counter = 0;
+		var res = ws.connect("WSBIN_URL/ws-echo", function(socket){
+			socket.setInterval(function () {
+				counter += 1;
+				if (counter > 2) { socket.close(); }
+			}, -1.23);
+		});
+		`))
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "setInterval requires a >0 timeout parameter, received -1.23 ")
+	})
 
 	t.Run("timeout", func(t *testing.T) {
 		_, err := common.RunString(rt, sr(`
@@ -209,6 +223,21 @@ func TestSession(t *testing.T) {
 		}
 		`))
 		assert.NoError(t, err)
+	})
+
+	t.Run("bad timeout", func(t *testing.T) {
+		_, err := common.RunString(rt, sr(`
+		var start = new Date().getTime();
+		var ellapsed = new Date().getTime() - start;
+		var res = ws.connect("WSBIN_URL/ws-echo", function(socket){
+			socket.setTimeout(function () {
+				ellapsed = new Date().getTime() - start;
+				socket.close();
+			}, 0);
+		});
+		`))
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "setTimeout requires a >0 timeout parameter, received 0.00 ")
 	})
 	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-echo"), 101, "")
 
@@ -438,7 +467,7 @@ func TestSystemTags(t *testing.T) {
 	rt := goja.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 
-	//TODO: test for actual tag values after removing the dependency on the
+	// TODO: test for actual tag values after removing the dependency on the
 	// external service demos.kaazing.com (https://github.com/loadimpact/k6/issues/537)
 	testedSystemTags := []string{"group", "status", "subproto", "url", "ip"}
 
