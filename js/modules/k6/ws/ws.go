@@ -381,7 +381,7 @@ func (s *Socket) trackPong(pingID string) {
 	})
 }
 
-// SetTimeout executes the provided function inside the socket's event loop after at least the provoded
+// SetTimeout executes the provided function inside the socket's event loop after at least the provided
 // timeout, which is in ms, has elapsed
 func (s *Socket) SetTimeout(fn goja.Callable, timeoutMs float64) error {
 	// Starts a goroutine, blocks once on the timeout and pushes the callable
