@@ -294,8 +294,10 @@ func TestOptions(t *testing.T) {
 	t.Run("BlacklistIPs", func(t *testing.T) {
 		opts := Options{}.Apply(Options{
 			BlacklistIPs: []*IPNet{{
-				IP:   net.IPv4zero,
-				Mask: net.CIDRMask(1, 1),
+				IPNet: net.IPNet{
+					IP:   net.IPv4zero,
+					Mask: net.CIDRMask(1, 1),
+				},
 			}},
 		})
 		assert.NotNil(t, opts.BlacklistIPs)
@@ -305,12 +307,15 @@ func TestOptions(t *testing.T) {
 	})
 
 	t.Run("Hosts", func(t *testing.T) {
-		opts := Options{}.Apply(Options{Hosts: map[string]net.IP{
-			"test.loadimpact.com": net.ParseIP("192.0.2.1"),
+		host, err := NewHostAddress(net.ParseIP("192.0.2.1"), "80")
+		assert.NoError(t, err)
+
+		opts := Options{}.Apply(Options{Hosts: map[string]*HostAddress{
+			"test.loadimpact.com": host,
 		}})
 		assert.NotNil(t, opts.Hosts)
 		assert.NotEmpty(t, opts.Hosts)
-		assert.Equal(t, "192.0.2.1", opts.Hosts["test.loadimpact.com"].String())
+		assert.Equal(t, "192.0.2.1:80", opts.Hosts["test.loadimpact.com"].String())
 	})
 
 	t.Run("Throws", func(t *testing.T) {
@@ -482,22 +487,22 @@ func TestCIDRUnmarshal(t *testing.T) {
 	testData := []struct {
 		input          string
 		expectedOutput *IPNet
-		expactFailure  bool
+		expectFailure  bool
 	}{
 		{
 			"10.0.0.0/8",
-			&IPNet{
+			&IPNet{IPNet: net.IPNet{
 				IP:   net.IP{10, 0, 0, 0},
 				Mask: net.IPv4Mask(255, 0, 0, 0),
-			},
+			}},
 			false,
 		},
 		{
 			"fc00:1234:5678::/48",
-			&IPNet{
+			&IPNet{IPNet: net.IPNet{
 				IP:   net.ParseIP("fc00:1234:5678::"),
 				Mask: net.CIDRMask(48, 128),
-			},
+			}},
 			false,
 		},
 		{"10.0.0.0", nil, true},
@@ -511,11 +516,70 @@ func TestCIDRUnmarshal(t *testing.T) {
 			actualIPNet := &IPNet{}
 			err := actualIPNet.UnmarshalText([]byte(data.input))
 
-			if data.expactFailure {
+			if data.expectFailure {
 				require.EqualError(t, err, "Failed to parse CIDR: invalid CIDR address: "+data.input)
 			} else {
 				require.NoError(t, err)
 				assert.Equal(t, data.expectedOutput, actualIPNet)
+			}
+		})
+	}
+}
+
+func TestHostAddressUnmarshal(t *testing.T) {
+	testData := []struct {
+		input          string
+		expectedOutput *HostAddress
+		expectFailure  string
+	}{
+		{
+			"1.2.3.4",
+			&HostAddress{IP: net.ParseIP("1.2.3.4")},
+			"",
+		},
+		{
+			"1.2.3.4:80",
+			&HostAddress{IP: net.ParseIP("1.2.3.4"), Port: 80},
+			"",
+		},
+		{
+			"1.2.3.4:asdf",
+			nil,
+			"strconv.Atoi: parsing \"asdf\": invalid syntax",
+		},
+		{
+			"2001:0db8:0000:0000:0000:ff00:0042:8329",
+			&HostAddress{IP: net.ParseIP("2001:0db8:0000:0000:0000:ff00:0042:8329")},
+			"",
+		},
+		{
+			"2001:db8::68",
+			&HostAddress{IP: net.ParseIP("2001:db8::68")},
+			"",
+		},
+		{
+			"[2001:db8::68]:80",
+			&HostAddress{IP: net.ParseIP("2001:db8::68"), Port: 80},
+			"",
+		},
+		{
+			"[2001:db8::68]:asdf",
+			nil,
+			"strconv.Atoi: parsing \"asdf\": invalid syntax",
+		},
+	}
+
+	for _, data := range testData {
+		data := data
+		t.Run(data.input, func(t *testing.T) {
+			actualHost := &HostAddress{}
+			err := actualHost.UnmarshalText([]byte(data.input))
+
+			if data.expectFailure != "" {
+				require.EqualError(t, err, data.expectFailure)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, data.expectedOutput, actualHost)
 			}
 		})
 	}

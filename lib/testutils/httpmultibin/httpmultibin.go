@@ -46,6 +46,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/http2"
 
+	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/lib/netext/httpext"
 )
@@ -242,15 +243,20 @@ func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 	http2IP := net.ParseIP(http2URL.Hostname())
 	require.NotNil(t, http2IP)
 
+	httpDomainValue, err := lib.NewHostAddress(httpIP, "")
+	require.NoError(t, err)
+	httpsDomainValue, err := lib.NewHostAddress(httpsIP, "")
+	require.NoError(t, err)
+
 	// Set up the dialer with shorter timeouts and the custom domains
 	dialer := netext.NewDialer(net.Dialer{
 		Timeout:   2 * time.Second,
 		KeepAlive: 10 * time.Second,
 		DualStack: true,
 	})
-	dialer.Hosts = map[string]net.IP{
-		httpDomain:  httpIP,
-		httpsDomain: httpsIP,
+	dialer.Hosts = map[string]*lib.HostAddress{
+		httpDomain:  httpDomainValue,
+		httpsDomain: httpsDomainValue,
 	}
 
 	// Pre-configure the HTTP client transport with the dialer and TLS config (incl. HTTP2 support)
