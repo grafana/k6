@@ -25,7 +25,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kubernetes/helm/pkg/strvals"
 	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 	"gopkg.in/guregu/null.v3"
@@ -238,22 +237,13 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 	}
 
 	opts.DNS = &lib.DNSConfig{}
-	var valid bool
-	if flags.Changed("dns") {
-		valid = true
-	}
-	dns, err := flags.GetString("dns")
-	if err != nil {
+	if dns, err := flags.GetString("dns"); err != nil {
 		return opts, err
-	}
-	if dns != "" {
-		params, err := strvals.Parse(dns)
-		if err != nil {
+	} else if dns != "" {
+		if err := opts.DNS.Decode(dns); err != nil {
 			return opts, err
 		}
-		if ttl, ok := params["ttl"]; ok {
-			opts.DNS.TTL = null.NewString(fmt.Sprintf("%v", ttl), valid)
-		}
+		opts.DNS.TTL.Valid = flags.Changed("dns")
 	}
 
 	return opts, nil

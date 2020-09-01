@@ -28,6 +28,7 @@ import (
 	"reflect"
 	"strconv"
 
+	"github.com/kubernetes/helm/pkg/strvals"
 	"github.com/pkg/errors"
 	"gopkg.in/guregu/null.v3"
 
@@ -46,6 +47,17 @@ var DefaultSummaryTrendStats = []string{"avg", "min", "med", "max", "p(90)", "p(
 
 type DNSConfig struct {
 	TTL null.String `json:"ttl"`
+}
+
+func (c *DNSConfig) Decode(value string) error {
+	params, err := strvals.Parse(value)
+	if err != nil {
+		return err
+	}
+	if ttl, ok := params["ttl"]; ok {
+		c.TTL = null.StringFrom(fmt.Sprintf("%v", ttl))
+	}
+	return nil
 }
 
 // Describes a TLS version. Serialised to/from JSON as a string, eg. "tls1.2".
@@ -299,7 +311,7 @@ type Options struct {
 	RPS null.Int `json:"rps" envconfig:"K6_RPS"`
 
 	// DNS handling configuration.
-	DNS *DNSConfig `json:"dns" ignored:"true"`
+	DNS *DNSConfig `json:"dns" envconfig:"K6_DNS"`
 
 	// How many HTTP redirects do we follow?
 	MaxRedirects null.Int `json:"maxRedirects" envconfig:"K6_MAX_REDIRECTS"`
