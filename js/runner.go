@@ -331,21 +331,25 @@ func (r *Runner) SetOptions(opts lib.Options) error {
 		// require an additional field on Bundle to pass the config through,
 		// which is arguably worse than this.
 		ttlS := opts.DNS.TTL.String
-		// Treat unitless values as seconds
-		if ttl, err := strconv.ParseFloat(ttlS, 32); err == nil {
-			ttlS = fmt.Sprintf("%.2fs", ttl)
-		}
 		switch ttlS {
-		case "", "+Infs":
+		case "", "inf":
 			// use the already initialized infinite cache resolver
-		case "0.00s":
+		case "0":
 			r.Resolver = &netext.NoCacheResolver{}
 		default:
+			// Treat unitless values as seconds
+			if ttl, err := strconv.ParseFloat(ttlS, 32); err == nil {
+				ttlS = fmt.Sprintf("%.2fs", ttl)
+			}
 			ttlD, err := types.ParseExtendedDuration(ttlS)
 			if ttlD < 0 || err != nil {
-				return fmt.Errorf("invalid DNS TTL: %s", ttlS)
+				return fmt.Errorf("invalid DNS TTL: %s", opts.DNS.TTL.String)
 			}
-			r.Resolver = dnscache.New(ttlD)
+			if ttlD == 0 {
+				r.Resolver = &netext.NoCacheResolver{}
+			} else {
+				r.Resolver = dnscache.New(ttlD)
+			}
 		}
 	}
 

@@ -1743,7 +1743,7 @@ func TestResolverConfig(t *testing.T) {
 		ttl, expErr string
 	}{
 		{"inf", ""},
-		{"-1", "invalid DNS TTL: -1.00s"},
+		{"-1", "invalid DNS TTL: -1"},
 		{"0", ""},
 		{"5s", ""},
 	}
