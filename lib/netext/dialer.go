@@ -23,8 +23,10 @@ package netext
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"net"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -33,24 +35,79 @@ import (
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
+	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 )
 
 // DNSResolver is an interface that fetches DNS information about a given host.
 type DNSResolver interface {
-	FetchOne(host string) (net.IP, error)
+	Fetch(host string) (net.IP, error)
 }
 
-// NoCacheResolver always does a fresh lookup.
-type NoCacheResolver struct{}
+type resolver struct {
+	cache      *dnscache.Resolver
+	strategy   lib.DNSStrategy
+	m          sync.Mutex
+	roundRobin map[string]uint8
+}
 
-// FetchOne does a DNS lookup and returns the first IP resolved for host.
-func (r *NoCacheResolver) FetchOne(host string) (net.IP, error) {
-	ips, err := net.LookupIP(host)
-	if err != nil || len(ips) == 0 {
+// NewDNSResolver returns a new DNS resolver. If ttl is a valid duration,
+// responses will be cached for the specified period, or indefinitely if it's 0.
+// The IP returned from Fetch() will be selected based on the given strategy.
+func NewDNSResolver(ttl types.NullDuration, strategy lib.DNSStrategy) DNSResolver {
+	var cache *dnscache.Resolver
+	if ttl.Valid {
+		cache = dnscache.New(time.Duration(ttl.Duration))
+	}
+	return &resolver{
+		cache:      cache,
+		strategy:   strategy,
+		roundRobin: make(map[string]uint8),
+	}
+}
+
+// Fetch does a DNS lookup or uses the cache if enabled, and returns a single IP
+// selected with the preset strategy.
+func (r *resolver) Fetch(host string) (net.IP, error) {
+	var (
+		ips []net.IP
+		err error
+	)
+	if r.cache != nil {
+		ips, err = r.cache.Fetch(host)
+	} else {
+		ips, err = net.LookupIP(host)
+	}
+	if err != nil {
 		return nil, err
 	}
-	return ips[0], nil
+
+	if len(ips) == 0 {
+		return nil, errors.Errorf("DNS lookup for %s returned 0 IPs", host)
+	}
+
+	return r.selectOne(host, ips), nil
+}
+
+func (r *resolver) selectOne(host string, ips []net.IP) net.IP {
+	switch r.strategy {
+	case lib.DNSFirst:
+		return ips[0]
+	case lib.DNSRoundRobin:
+		r.m.Lock()
+		defer func() {
+			r.roundRobin[host]++
+			r.m.Unlock()
+		}()
+		// TODO: The index approach is not stable and we'll need to track
+		// individual IPs... Do we really want to implement an additional cache
+		// for this, since dnscache does not expose its internal one? If so, we
+		// should scrap dnscache entirely and re-implement it here.
+		return ips[int(r.roundRobin[host])%len(ips)]
+	case lib.DNSRandom:
+		return ips[rand.Intn(len(ips))]
+	}
+	return nil
 }
 
 // Dialer wraps net.Dialer and provides k6 specific functionality -
@@ -66,12 +123,8 @@ type Dialer struct {
 	BytesWritten int64
 }
 
-// NewDialer constructs a new Dialer and initializes its cache.
-func NewDialer(dialer net.Dialer, ttl time.Duration) *Dialer {
-	return newDialerWithResolver(dialer, dnscache.New(ttl))
-}
-
-func newDialerWithResolver(dialer net.Dialer, resolver DNSResolver) *Dialer {
+// NewDialer constructs a new Dialer with the given DNS resolver.
+func NewDialer(dialer net.Dialer, resolver DNSResolver) *Dialer {
 	return &Dialer{
 		Dialer:   dialer,
 		Resolver: resolver,
@@ -184,17 +237,9 @@ func (d *Dialer) findRemote(addr string) (*lib.HostAddress, error) {
 		return lib.NewHostAddress(ip, port)
 	}
 
-	return d.fetchRemoteFromResolver(host, port)
-}
-
-func (d *Dialer) fetchRemoteFromResolver(host, port string) (*lib.HostAddress, error) {
-	ip, err := d.Resolver.FetchOne(host)
+	ip, err = d.Resolver.Fetch(host)
 	if err != nil {
 		return nil, err
-	}
-
-	if ip == nil {
-		return nil, errors.Errorf("lookup %s: no such host", host)
 	}
 
 	return lib.NewHostAddress(ip, port)
@@ -275,4 +320,8 @@ func (c *Conn) Write(b []byte) (int, error) {
 		atomic.AddInt64(c.BytesWritten, int64(n))
 	}
 	return n, err
+}
+
+func init() {
+	rand.Seed(time.Now().UTC().UnixNano())
 }

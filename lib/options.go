@@ -46,7 +46,28 @@ const DefaultScenarioName = "default"
 var DefaultSummaryTrendStats = []string{"avg", "min", "med", "max", "p(90)", "p(95)"}
 
 type DNSConfig struct {
-	TTL null.String `json:"ttl"`
+	TTL      null.String     `json:"ttl"`
+	Strategy NullDNSStrategy `json:"strategy"`
+}
+
+//go:generate enumer -type=DNSStrategy -transform=kebab -trimprefix DNS -output dns_strategy_gen.go
+type DNSStrategy uint8
+
+type NullDNSStrategy struct {
+	DNSStrategy
+	Valid bool
+}
+
+const (
+	DNSFirst DNSStrategy = iota + 1
+	DNSRoundRobin
+	DNSRandom
+)
+
+// nolint: gochecknoglobals
+var DefaultDNSConfig = DNSConfig{
+	TTL:      null.StringFrom("inf"),
+	Strategy: NullDNSStrategy{DNSFirst, true},
 }
 
 func (c *DNSConfig) Decode(value string) error {
@@ -54,10 +75,36 @@ func (c *DNSConfig) Decode(value string) error {
 	if err != nil {
 		return err
 	}
-	if ttl, ok := params["ttl"]; ok {
+	if ttl, ok := params["ttl"]; ok && !c.TTL.Valid {
 		c.TTL = null.StringFrom(fmt.Sprintf("%v", ttl))
 	}
+	validStrat := c.Strategy.Valid
+	c.Strategy = DefaultDNSConfig.Strategy
+	if strat, ok := params["strategy"]; ok && !validStrat {
+		if s, err := DNSStrategyString(strat.(string)); err != nil {
+			return err
+		} else {
+			c.Strategy.DNSStrategy = s
+			c.Strategy.Valid = true
+		}
+	}
 	return nil
+}
+
+func (s NullDNSStrategy) MarshalJSON() ([]byte, error) {
+	return json.Marshal(s.String())
+}
+
+func (s *NullDNSStrategy) UnmarshalJSON(data []byte) error {
+	var str string
+	if err := json.Unmarshal(data, &str); err != nil {
+		return err
+	}
+	var err error
+	if s.DNSStrategy, err = DNSStrategyString(str); err == nil {
+		s.Valid = true
+	}
+	return err
 }
 
 // Describes a TLS version. Serialised to/from JSON as a string, eg. "tls1.2".
@@ -539,8 +586,19 @@ func (o Options) Apply(opts Options) Options {
 	if opts.ConsoleOutput.Valid {
 		o.ConsoleOutput = opts.ConsoleOutput
 	}
-	if o.DNS != nil && !o.DNS.TTL.Valid && opts.DNS != nil && opts.DNS.TTL.Valid {
-		o.DNS.TTL = opts.DNS.TTL
+
+	// FIXME: This should really be in applyDefault(), but in some tests
+	// o.DNS hasn't been initialized yet...
+	if o.DNS == nil {
+		o.DNS = &DefaultDNSConfig
+	}
+	if opts.DNS != nil {
+		if opts.DNS.TTL.Valid {
+			o.DNS.TTL = opts.DNS.TTL
+		}
+		if opts.DNS.Strategy.Valid {
+			o.DNS.Strategy = opts.DNS.Strategy
+		}
 	}
 
 	return o

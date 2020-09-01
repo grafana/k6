@@ -1017,10 +1017,16 @@ func TestDNS(t *testing.T) {
 				lib.Options{},
 			},
 			"no": { // every request does a DNS lookup
-				lib.Options{DNS: &lib.DNSConfig{TTL: null.StringFrom("0")}},
+				lib.Options{DNS: &lib.DNSConfig{
+					TTL:      null.StringFrom("0"),
+					Strategy: lib.DefaultDNSConfig.Strategy,
+				}},
 			},
 			"2s": {
-				lib.Options{DNS: &lib.DNSConfig{TTL: null.StringFrom("2s")}},
+				lib.Options{DNS: &lib.DNSConfig{
+					TTL:      null.StringFrom("2s"),
+					Strategy: lib.DefaultDNSConfig.Strategy,
+				}},
 			},
 		}
 
@@ -1186,7 +1192,10 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 	getDummyTrail := func(group string, emitIterations bool, addExpTags ...string) stats.SampleContainer {
 		expTags := []string{"group", group}
 		expTags = append(expTags, addExpTags...)
-		return netext.NewDialer(net.Dialer{}, 0).GetTrail(time.Now(), time.Now(),
+		return netext.NewDialer(
+			net.Dialer{},
+			netext.NewDNSResolver(types.NullDurationFrom(0), lib.DNSFirst),
+		).GetTrail(time.Now(), time.Now(),
 			true, emitIterations, getTags(expTags...))
 	}
 

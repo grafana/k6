@@ -21,6 +21,7 @@
 package testutils
 
 import (
+	"fmt"
 	"net"
 	"sync"
 )
@@ -28,7 +29,7 @@ import (
 // MockResolver implements netext.DNSResolver, and allows changing the host
 // mapping at runtime.
 type MockResolver struct {
-	m     *sync.Mutex
+	m     sync.RWMutex
 	hosts map[string]net.IP
 }
 
@@ -36,16 +37,16 @@ func NewMockResolver(hosts map[string]net.IP) *MockResolver {
 	if hosts == nil {
 		hosts = make(map[string]net.IP)
 	}
-	return &MockResolver{&sync.Mutex{}, hosts}
+	return &MockResolver{hosts: hosts}
 }
 
-func (r *MockResolver) FetchOne(host string) (net.IP, error) {
-	r.m.Lock()
-	defer r.m.Unlock()
+func (r *MockResolver) Fetch(host string) (net.IP, error) {
+	r.m.RLock()
+	defer r.m.RUnlock()
 	if ip, ok := r.hosts[host]; ok {
 		return ip, nil
 	}
-	return nil, nil
+	return nil, fmt.Errorf("lookup %s: no such host", host)
 }
 
 func (r *MockResolver) Set(host, ip string) {

@@ -36,7 +36,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
-	"github.com/viki-org/dnscache"
 	"golang.org/x/net/http2"
 	"golang.org/x/time/rate"
 
@@ -105,8 +104,11 @@ func newFromBundle(logger *logrus.Logger, b *Bundle) (*Runner, error) {
 			KeepAlive: 30 * time.Second,
 			DualStack: true,
 		},
-		console:  newConsole(logger),
-		Resolver: dnscache.New(0),
+		console: newConsole(logger),
+		Resolver: netext.NewDNSResolver(
+			types.NullDurationFrom(0),
+			lib.DefaultDNSConfig.Strategy.DNSStrategy,
+		),
 	}
 
 	err = r.SetOptions(r.Bundle.Options)
@@ -330,30 +332,37 @@ func (r *Runner) SetOptions(opts lib.Options) error {
 		// (it needs the actual resolver, not the config), and it would
 		// require an additional field on Bundle to pass the config through,
 		// which is arguably worse than this.
-		ttlS := opts.DNS.TTL.String
-		switch ttlS {
-		case "", "inf":
-			// use the already initialized infinite cache resolver
-		case "0":
-			r.Resolver = &netext.NoCacheResolver{}
-		default:
-			// Treat unitless values as seconds
-			if ttl, err := strconv.ParseFloat(ttlS, 32); err == nil {
-				ttlS = fmt.Sprintf("%.2fs", ttl)
-			}
-			ttlD, err := types.ParseExtendedDuration(ttlS)
-			if ttlD < 0 || err != nil {
-				return fmt.Errorf("invalid DNS TTL: %s", opts.DNS.TTL.String)
-			}
-			if ttlD == 0 {
-				r.Resolver = &netext.NoCacheResolver{}
-			} else {
-				r.Resolver = dnscache.New(ttlD)
-			}
+		ttl, err := parseTTL(opts.DNS.TTL.String)
+		if err != nil {
+			return err
 		}
+		r.Resolver = netext.NewDNSResolver(ttl, opts.DNS.Strategy.DNSStrategy)
 	}
 
 	return nil
+}
+
+func parseTTL(ttlS string) (types.NullDuration, error) {
+	ttl := types.NewNullDuration(0, false)
+	switch ttlS {
+	case "", "inf":
+		// cache indefinitely
+		ttl.Valid = true
+	case "0":
+		// disable cache
+	default:
+		origTTLs := ttlS
+		// Treat unitless values as seconds
+		if t, err := strconv.ParseFloat(ttlS, 32); err == nil {
+			ttlS = fmt.Sprintf("%.2fs", t)
+		}
+		ttlD, err := types.ParseExtendedDuration(ttlS)
+		if ttlD < 0 || err != nil {
+			return ttl, fmt.Errorf("invalid DNS TTL: %s", origTTLs)
+		}
+		ttl = types.NewNullDuration(ttlD, ttlD > 0)
+	}
+	return ttl, nil
 }
 
 // Runs an exported function in its own temporary VU, optionally with an argument. Execution is
