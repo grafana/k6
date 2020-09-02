@@ -109,9 +109,7 @@ func (s *TLSCipherSuites) MarshalJSON() ([]byte, error) {
 		}
 	}
 
-	marshaled, _ := json.Marshal(suiteNames)
-
-	return marshaled, nil
+	return json.Marshal(suiteNames)
 }
 
 func (s *TLSCipherSuites) UnmarshalJSON(data []byte) error {
