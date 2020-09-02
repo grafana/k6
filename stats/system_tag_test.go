@@ -29,11 +29,12 @@ import (
 )
 
 func TestSystemTagSetMarshalJSON(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		tagset   SystemTagSet
 		expected string
 	}{
 		{TagIP, `["ip"]`},
+		{TagIP | TagProto | TagGroup, `["group","ip","proto"]`},
 		{0, `null`},
 	}
 
@@ -46,7 +47,7 @@ func TestSystemTagSetMarshalJSON(t *testing.T) {
 }
 
 func TestSystemTagSet_UnmarshalJSON(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		tags []byte
 		sets []SystemTagSet
 	}{
@@ -64,7 +65,7 @@ func TestSystemTagSet_UnmarshalJSON(t *testing.T) {
 }
 
 func TestSystemTagSetTextUnmarshal(t *testing.T) {
-	var testMatrix = map[string]SystemTagSet{
+	testMatrix := map[string]SystemTagSet{
 		"":                      0,
 		"ip":                    TagIP,
 		"ip,proto":              TagIP | TagProto,
@@ -74,7 +75,61 @@ func TestSystemTagSetTextUnmarshal(t *testing.T) {
 	}
 
 	for input, expected := range testMatrix {
-		var set = new(SystemTagSet)
+		set := new(SystemTagSet)
+		err := set.UnmarshalText([]byte(input))
+		require.NoError(t, err)
+		require.Equal(t, expected, *set)
+	}
+}
+
+func TestTagSetMarshalJSON(t *testing.T) {
+	tests := []struct {
+		tagset   TagSet
+		expected string
+	}{
+		{tagset: TagSet{"ip": true, "proto": true, "group": true, "custom": true}, expected: `["custom","group","ip","proto"]`},
+		{tagset: TagSet{}, expected: `[]`},
+	}
+
+	for _, tc := range tests {
+		ts := &tc.tagset
+		got, err := json.Marshal(ts)
+		require.Nil(t, err)
+		require.Equal(t, tc.expected, string(got))
+	}
+}
+
+func TestTagSet_UnmarshalJSON(t *testing.T) {
+	tests := []struct {
+		tags []byte
+		sets TagSet
+	}{
+		{[]byte(`[]`), TagSet{}},
+		{[]byte(`["ip","custom", "proto"]`), TagSet{"ip": true, "proto": true, "custom": true}},
+	}
+
+	for _, tc := range tests {
+		ts := new(TagSet)
+		require.Nil(t, json.Unmarshal(tc.tags, ts))
+		for tag := range tc.sets {
+			assert.True(t, (*ts)[tag])
+		}
+	}
+}
+
+func TestTagSetTextUnmarshal(t *testing.T) {
+	testMatrix := map[string]TagSet{
+		"":                           make(TagSet),
+		"ip":                         {"ip": true},
+		"ip,proto":                   {"ip": true, "proto": true},
+		"   ip  ,  proto  ":          {"ip": true, "proto": true},
+		"   ip  ,   ,  proto  ":      {"ip": true, "proto": true},
+		"   ip  ,,  proto  ,,":       {"ip": true, "proto": true},
+		"   ip  ,custom,  proto  ,,": {"ip": true, "custom": true, "proto": true},
+	}
+
+	for input, expected := range testMatrix {
+		set := new(TagSet)
 		err := set.UnmarshalText([]byte(input))
 		require.NoError(t, err)
 		require.Equal(t, expected, *set)
