@@ -75,17 +75,21 @@ jobs:
             rm -f *.coverage
             bash <(curl --fail -s https://codecov.io/bash)
 
+  #TODO: when we officially move to Go 1.15, re-enable test-prev-golang with 1.14
 
-  test-prev-golang:
+  test-next-golang:
     docker:
-      - image: circleci/golang:1.13
+      - image: circleci/golang:1.15
     working_directory: /home/circleci/.go_workspace/src/github.com/loadimpact/k6
     steps:
       - checkout
       - run:
-          name: Run tests with previous Go version
+          name: Run tests with next Go version
           command: |
-            echo "TODO REENABLE THIS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+            go version
+            export GOMAXPROCS=2
+            export PATH=$GOPATH/bin:$PATH
+            go test -p 2 -race -timeout 800s ./...
 
   build-docker-images:
     docker:
@@ -185,7 +189,7 @@ workflows:
           filters:
             tags:
               only: /.*/
-      - test-prev-golang:
+      - test-next-golang:
           filters:
             tags:
               only: /.*/
