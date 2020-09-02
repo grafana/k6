@@ -100,7 +100,7 @@ a commandline interface for interacting with it.`,
 		logger := logrus.StandardLogger()
 
 		// TODO: disable in quiet mode?
-		_, _ = BannerColor.Fprintf(stdout, "\n%s\n\n", consts.Banner)
+		_, _ = BannerColor.Fprintf(stdout, "\n%s\n\n", consts.Banner())
 
 		initBar := pb.New(
 			pb.WithConstLeft(" Init"),
