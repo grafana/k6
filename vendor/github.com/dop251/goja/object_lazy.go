@@ -235,10 +235,10 @@ func (o *lazyObject) enumerate() iterNextFunc {
 	return obj.enumerate()
 }
 
-func (o *lazyObject) export() interface{} {
+func (o *lazyObject) export(ctx *objectExportCtx) interface{} {
 	obj := o.create(o.val)
 	o.val.self = obj
-	return obj.export()
+	return obj.export(ctx)
 }
 
 func (o *lazyObject) exportType() reflect.Type {

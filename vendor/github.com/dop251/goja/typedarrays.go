@@ -484,7 +484,7 @@ func (a *typedArrayObject) getOwnPropStr(name unistring.String) Value {
 }
 
 func (a *typedArrayObject) getOwnPropIdx(idx valueInt) Value {
-	v := a._getIdx(toInt(int64(idx)))
+	v := a._getIdx(toIntStrict(int64(idx)))
 	if v != nil {
 		return &valueProperty{
 			value:      v,
@@ -512,7 +512,7 @@ func (a *typedArrayObject) getStr(name unistring.String, receiver Value) Value {
 }
 
 func (a *typedArrayObject) getIdx(idx valueInt, receiver Value) Value {
-	prop := a._getIdx(toInt(int64(idx)))
+	prop := a._getIdx(toIntStrict(int64(idx)))
 	if prop == nil {
 		if a.prototype != nil {
 			if receiver == nil {
@@ -548,7 +548,7 @@ func (a *typedArrayObject) setOwnStr(p unistring.String, v Value, throw bool) bo
 }
 
 func (a *typedArrayObject) setOwnIdx(p valueInt, v Value, throw bool) bool {
-	return a._putIdx(toInt(int64(p)), v, throw)
+	return a._putIdx(toIntStrict(int64(p)), v, throw)
 }
 
 func (a *typedArrayObject) setForeignStr(p unistring.String, v, receiver Value, throw bool) (res bool, handled bool) {
@@ -569,7 +569,7 @@ func (a *typedArrayObject) hasOwnPropertyStr(name unistring.String) bool {
 }
 
 func (a *typedArrayObject) hasOwnPropertyIdx(idx valueInt) bool {
-	return a._hasIdx(toInt(int64(idx)))
+	return a._hasIdx(toIntStrict(int64(idx)))
 }
 
 func (a *typedArrayObject) _defineIdxProperty(idx int, desc PropertyDescriptor, throw bool) bool {
@@ -588,7 +588,7 @@ func (a *typedArrayObject) defineOwnPropertyStr(name unistring.String, desc Prop
 }
 
 func (a *typedArrayObject) defineOwnPropertyIdx(name valueInt, desc PropertyDescriptor, throw bool) bool {
-	return a._defineIdxProperty(toInt(int64(name)), desc, throw)
+	return a._defineIdxProperty(toIntStrict(int64(name)), desc, throw)
 }
 
 func (a *typedArrayObject) deleteStr(name unistring.String, throw bool) bool {
@@ -848,7 +848,7 @@ func (o *arrayBufferObject) exportType() reflect.Type {
 	return arrayBufferType
 }
 
-func (o *arrayBufferObject) export() interface{} {
+func (o *arrayBufferObject) export(*objectExportCtx) interface{} {
 	return ArrayBuffer{
 		buf: o,
 	}

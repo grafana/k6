@@ -106,7 +106,7 @@ func (d *dateObject) toPrimitive() Value {
 	return d.toPrimitiveString()
 }
 
-func (d *dateObject) export() interface{} {
+func (d *dateObject) export(*objectExportCtx) interface{} {
 	if d.isSet() {
 		return d.time()
 	}

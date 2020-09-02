@@ -22,8 +22,8 @@ github.com/davecgh/go-spew v1.1.0 h1:ZDRjVQ15GmhC3fiQ8ni8+OwkZQO4DARzQgrnXU1Liz8
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/dlclark/regexp2 v1.2.1-0.20200807145002-74bac81f00cf h1:YzK4awHmRwVVWhdNd4WGZk5/slLv68nv094yqpqjlwQ=
 github.com/dlclark/regexp2 v1.2.1-0.20200807145002-74bac81f00cf/go.mod h1:2pZnwuY/m+8K6iRw6wQdMtk+rH5tNGR1i55kozfMjCc=
-github.com/dop251/goja v0.0.0-20200818110326-5574b5dbd2b9 h1:IvLZvXQ6/ImP768AXulFJP3inzWW8/dCSkpG70bnADo=
-github.com/dop251/goja v0.0.0-20200818110326-5574b5dbd2b9/go.mod h1:Mw6PkjjMXWbTj+nnj4s3QPXq1jaT0s5pC0iFD4+BOAA=
+github.com/dop251/goja v0.0.0-20200831102558-9af81ddcf0e1 h1:/nXYAXRvBtojzc2bKSC5/pdu47O70ExaZ3lGipQFleA=
+github.com/dop251/goja v0.0.0-20200831102558-9af81ddcf0e1/go.mod h1:Mw6PkjjMXWbTj+nnj4s3QPXq1jaT0s5pC0iFD4+BOAA=
 github.com/dustin/go-humanize v0.0.0-20171111073723-bb3d318650d4 h1:qk/FSDDxo05wdJH28W+p5yivv7LuLYLRXPPD8KQCtZs=
 github.com/dustin/go-humanize v0.0.0-20171111073723-bb3d318650d4/go.mod h1:HtrtbFcZ19U5GC7JDqmcUSB87Iq5E25KnS6fMYU6eOk=
 github.com/eapache/go-resiliency v1.1.0 h1:1NtRmCAqadE2FN4ZcN6g90TP3uk8cg9rn9eNK2197aU=

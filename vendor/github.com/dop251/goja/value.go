@@ -164,7 +164,7 @@ func (i valueInt) String() string {
 }
 
 func (i valueInt) ToFloat() float64 {
-	return float64(int64(i))
+	return float64(i)
 }
 
 func (i valueInt) ToBoolean() bool {
@@ -721,7 +721,7 @@ func (o *Object) baseObject(*Runtime) *Object {
 }
 
 func (o *Object) Export() interface{} {
-	return o.self.export()
+	return o.self.export(&objectExportCtx{})
 }
 
 func (o *Object) ExportType() reflect.Type {
@@ -949,6 +949,13 @@ func (s *valueSymbol) baseObject(r *Runtime) *Object {
 
 func (s *valueSymbol) hash(*maphash.Hash) uint64 {
 	return uint64(s.h)
+}
+
+func exportValue(v Value, ctx *objectExportCtx) interface{} {
+	if obj, ok := v.(*Object); ok {
+		return obj.self.export(ctx)
+	}
+	return v.Export()
 }
 
 func newSymbol(s valueString) *valueSymbol {
