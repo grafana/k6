@@ -50,7 +50,7 @@ func (o *objectGoSliceReflect) _getIdx(idx int) Value {
 }
 
 func (o *objectGoSliceReflect) getIdx(idx valueInt, receiver Value) Value {
-	if idx := toInt(int64(idx)); idx >= 0 && idx < o.value.Len() {
+	if idx := toIntStrict(int64(idx)); idx >= 0 && idx < o.value.Len() {
 		return o._getIdx(idx)
 	}
 	return o.objectGoReflect.getStr(idx.string(), receiver)
@@ -86,7 +86,7 @@ func (o *objectGoSliceReflect) getOwnPropStr(name unistring.String) Value {
 }
 
 func (o *objectGoSliceReflect) getOwnPropIdx(idx valueInt) Value {
-	if idx := toInt(int64(idx)); idx >= 0 && idx < o.value.Len() {
+	if idx := toIntStrict(int64(idx)); idx >= 0 && idx < o.value.Len() {
 		return &valueProperty{
 			value:      o._getIdx(idx),
 			writable:   true,
@@ -104,12 +104,11 @@ func (o *objectGoSliceReflect) putIdx(idx int, v Value, throw bool) bool {
 		}
 		o.grow(idx + 1)
 	}
-	val, err := o.val.runtime.toReflectValue(v, o.value.Type().Elem())
+	err := o.val.runtime.toReflectValue(v, o.value.Index(idx), &objectExportCtx{})
 	if err != nil {
 		o.val.runtime.typeErrorResult(throw, "Go type conversion error: %v", err)
 		return false
 	}
-	o.value.Index(idx).Set(val)
 	return true
 }
 
@@ -155,7 +154,7 @@ func (o *objectGoSliceReflect) shrink(size int) {
 }
 
 func (o *objectGoSliceReflect) putLength(v Value, throw bool) bool {
-	newLen := toInt(toLength(v))
+	newLen := toIntStrict(toLength(v))
 	curLen := o.value.Len()
 	if newLen > curLen {
 		if !o.sliceExtensible {
@@ -174,7 +173,7 @@ func (o *objectGoSliceReflect) putLength(v Value, throw bool) bool {
 }
 
 func (o *objectGoSliceReflect) setOwnIdx(idx valueInt, val Value, throw bool) bool {
-	if i := toInt(int64(idx)); i >= 0 {
+	if i := toIntStrict(int64(idx)); i >= 0 {
 		if i >= o.value.Len() {
 			if res, ok := o._setForeignIdx(idx, nil, val, o.val, throw); ok {
 				return res
@@ -235,7 +234,7 @@ func (o *objectGoSliceReflect) hasOwnPropertyStr(name unistring.String) bool {
 }
 
 func (o *objectGoSliceReflect) defineOwnPropertyIdx(idx valueInt, descr PropertyDescriptor, throw bool) bool {
-	if i := toInt(int64(idx)); i >= 0 {
+	if i := toIntStrict(int64(idx)); i >= 0 {
 		if !o.val.runtime.checkHostObjectPropertyDescr(idx.string(), descr, throw) {
 			return false
 		}

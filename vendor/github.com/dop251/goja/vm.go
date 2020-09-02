@@ -160,7 +160,7 @@ func floatToValue(f float64) (result Value) {
 	return valueFloat(f)
 }
 
-func toInt64(v Value) (int64, bool) {
+func assertInt64(v Value) (int64, bool) {
 	num := v.ToNumber()
 	if i, ok := num.(valueInt); ok {
 		return int64(i), true
@@ -688,8 +688,8 @@ func (_mul) exec(vm *vm) {
 
 	var result Value
 
-	if left, ok := toInt64(left); ok {
-		if right, ok := toInt64(right); ok {
+	if left, ok := assertInt64(left); ok {
+		if right, ok := assertInt64(right); ok {
 			if left == 0 && right == -1 || left == -1 && right == 0 {
 				result = _negativeZero
 				goto end
@@ -781,8 +781,8 @@ func (_mod) exec(vm *vm) {
 
 	var result Value
 
-	if leftInt, ok := toInt64(left); ok {
-		if rightInt, ok := toInt64(right); ok {
+	if leftInt, ok := assertInt64(left); ok {
+		if rightInt, ok := assertInt64(right); ok {
 			if rightInt == 0 {
 				result = _NaN
 				goto end
@@ -813,7 +813,7 @@ func (_neg) exec(vm *vm) {
 
 	var result Value
 
-	if i, ok := toInt64(operand); ok {
+	if i, ok := assertInt64(operand); ok {
 		if i == 0 {
 			result = _negativeZero
 		} else {
@@ -847,7 +847,7 @@ var inc _inc
 func (_inc) exec(vm *vm) {
 	v := vm.stack[vm.sp-1]
 
-	if i, ok := toInt64(v); ok {
+	if i, ok := assertInt64(v); ok {
 		v = intToValue(i + 1)
 		goto end
 	}
@@ -866,7 +866,7 @@ var dec _dec
 func (_dec) exec(vm *vm) {
 	v := vm.stack[vm.sp-1]
 
-	if i, ok := toInt64(v); ok {
+	if i, ok := assertInt64(v); ok {
 		v = intToValue(i - 1)
 		goto end
 	}

@@ -490,14 +490,17 @@ func (a *arrayObject) deleteIdx(idx valueInt, throw bool) bool {
 	return a.baseObject.deleteStr(idx.string(), throw)
 }
 
-func (a *arrayObject) export() interface{} {
+func (a *arrayObject) export(ctx *objectExportCtx) interface{} {
+	if v, exists := ctx.get(a); exists {
+		return v
+	}
 	arr := make([]interface{}, a.length)
+	ctx.put(a, arr)
 	for i, v := range a.values {
 		if v != nil {
-			arr[i] = v.Export()
+			arr[i] = exportValue(v, ctx)
 		}
 	}
-
 	return arr
 }
 

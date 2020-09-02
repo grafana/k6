@@ -19,7 +19,8 @@ func (o *objectGoMapReflect) init() {
 }
 
 func (o *objectGoMapReflect) toKey(n Value, throw bool) reflect.Value {
-	key, err := o.val.runtime.toReflectValue(n, o.keyType)
+	key := reflect.New(o.keyType).Elem()
+	err := o.val.runtime.toReflectValue(n, key, &objectExportCtx{})
 	if err != nil {
 		o.val.runtime.typeErrorResult(throw, "map key conversion error: %v", err)
 		return reflect.Value{}
@@ -95,7 +96,8 @@ func (o *objectGoMapReflect) getOwnPropIdx(idx valueInt) Value {
 }
 
 func (o *objectGoMapReflect) toValue(val Value, throw bool) (reflect.Value, bool) {
-	v, err := o.val.runtime.toReflectValue(val, o.valueType)
+	v := reflect.New(o.valueType).Elem()
+	err := o.val.runtime.toReflectValue(val, v, &objectExportCtx{})
 	if err != nil {
 		o.val.runtime.typeErrorResult(throw, "map value conversion error: %v", err)
 		return reflect.Value{}, false

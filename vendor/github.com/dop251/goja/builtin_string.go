@@ -164,7 +164,7 @@ func (r *Runtime) stringproto_charAt(call FunctionCall) Value {
 	if pos < 0 || pos >= int64(s.length()) {
 		return stringEmpty
 	}
-	return newStringValue(string(s.charAt(toInt(pos))))
+	return newStringValue(string(s.charAt(toIntStrict(pos))))
 }
 
 func (r *Runtime) stringproto_charCodeAt(call FunctionCall) Value {
@@ -174,7 +174,7 @@ func (r *Runtime) stringproto_charCodeAt(call FunctionCall) Value {
 	if pos < 0 || pos >= int64(s.length()) {
 		return _NaN
 	}
-	return intToValue(int64(s.charAt(toInt(pos)) & 0xFFFF))
+	return intToValue(int64(s.charAt(toIntStrict(pos)) & 0xFFFF))
 }
 
 func (r *Runtime) stringproto_codePointAt(call FunctionCall) Value {
@@ -185,7 +185,7 @@ func (r *Runtime) stringproto_codePointAt(call FunctionCall) Value {
 	if p < 0 || p >= int64(size) {
 		return _undefined
 	}
-	pos := toInt(p)
+	pos := toIntStrict(p)
 	first := s.charAt(pos)
 	if isUTF16FirstSurrogate(first) {
 		pos++
@@ -256,7 +256,7 @@ func (r *Runtime) stringproto_endsWith(call FunctionCall) Value {
 	} else {
 		pos = l
 	}
-	end := toInt(min(max(pos, 0), l))
+	end := toIntStrict(min(max(pos, 0), l))
 	searchLength := searchStr.length()
 	start := end - searchLength
 	if start < 0 {
@@ -284,7 +284,7 @@ func (r *Runtime) stringproto_includes(call FunctionCall) Value {
 	} else {
 		pos = 0
 	}
-	start := toInt(min(max(pos, 0), int64(s.length())))
+	start := toIntStrict(min(max(pos, 0), int64(s.length())))
 	if s.index(searchStr, start) != -1 {
 		return valueTrue
 	}
@@ -306,7 +306,7 @@ func (r *Runtime) stringproto_indexOf(call FunctionCall) Value {
 		}
 	}
 
-	return intToValue(int64(value.index(target, toInt(pos))))
+	return intToValue(int64(value.index(target, toIntStrict(pos))))
 }
 
 func (r *Runtime) stringproto_lastIndexOf(call FunctionCall) Value {
@@ -330,7 +330,7 @@ func (r *Runtime) stringproto_lastIndexOf(call FunctionCall) Value {
 		}
 	}
 
-	return intToValue(int64(value.lastIndex(target, toInt(pos))))
+	return intToValue(int64(value.lastIndex(target, toIntStrict(pos))))
 }
 
 func (r *Runtime) stringproto_localeCompare(call FunctionCall) Value {
@@ -422,12 +422,12 @@ func (r *Runtime) stringproto_padEnd(call FunctionCall) Value {
 		filler = asciiString(" ")
 		fillerASCII = true
 	}
-	remaining := toInt(maxLength - stringLength)
+	remaining := toIntStrict(maxLength - stringLength)
 	_, stringASCII := s.(asciiString)
 	if fillerASCII && stringASCII {
 		fl := filler.length()
 		var sb strings.Builder
-		sb.Grow(toInt(maxLength))
+		sb.Grow(toIntStrict(maxLength))
 		sb.WriteString(s.String())
 		fs := filler.String()
 		for remaining >= fl {
@@ -440,7 +440,7 @@ func (r *Runtime) stringproto_padEnd(call FunctionCall) Value {
 		return asciiString(sb.String())
 	}
 	var sb unicodeStringBuilder
-	sb.Grow(toInt(maxLength))
+	sb.Grow(toIntStrict(maxLength))
 	sb.WriteString(s)
 	fl := filler.length()
 	for remaining >= fl {
@@ -474,12 +474,12 @@ func (r *Runtime) stringproto_padStart(call FunctionCall) Value {
 		filler = asciiString(" ")
 		fillerASCII = true
 	}
-	remaining := toInt(maxLength - stringLength)
+	remaining := toIntStrict(maxLength - stringLength)
 	_, stringASCII := s.(asciiString)
 	if fillerASCII && stringASCII {
 		fl := filler.length()
 		var sb strings.Builder
-		sb.Grow(toInt(maxLength))
+		sb.Grow(toIntStrict(maxLength))
 		fs := filler.String()
 		for remaining >= fl {
 			sb.WriteString(fs)
@@ -492,7 +492,7 @@ func (r *Runtime) stringproto_padStart(call FunctionCall) Value {
 		return asciiString(sb.String())
 	}
 	var sb unicodeStringBuilder
-	sb.Grow(toInt(maxLength))
+	sb.Grow(toIntStrict(maxLength))
 	fl := filler.length()
 	for remaining >= fl {
 		sb.WriteString(filler)
@@ -520,7 +520,7 @@ func (r *Runtime) stringproto_repeat(call FunctionCall) Value {
 	if numInt == 0 || s.length() == 0 {
 		return stringEmpty
 	}
-	num := toInt(numInt)
+	num := toIntStrict(numInt)
 	if s, ok := s.(asciiString); ok {
 		var sb strings.Builder
 		sb.Grow(len(s) * num)
@@ -784,7 +784,7 @@ func (r *Runtime) stringproto_startsWith(call FunctionCall) Value {
 	if posArg := call.Argument(1); posArg != _undefined {
 		pos = posArg.ToInteger()
 	}
-	start := toInt(min(max(pos, 0), l))
+	start := toIntStrict(min(max(pos, 0), l))
 	searchLength := searchStr.length()
 	if int64(searchLength+start) > l {
 		return valueFalse

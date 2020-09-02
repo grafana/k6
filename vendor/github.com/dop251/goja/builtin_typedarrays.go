@@ -395,14 +395,14 @@ func (r *Runtime) typedArrayProto_copyWithin(call FunctionCall) Value {
 		ta.viewedArrayBuf.ensureNotDetached()
 		l := int64(ta.length)
 		var relEnd int64
-		to := toInt(relToIdx(call.Argument(0).ToInteger(), l))
-		from := toInt(relToIdx(call.Argument(1).ToInteger(), l))
+		to := toIntStrict(relToIdx(call.Argument(0).ToInteger(), l))
+		from := toIntStrict(relToIdx(call.Argument(1).ToInteger(), l))
 		if end := call.Argument(2); end != _undefined {
 			relEnd = end.ToInteger()
 		} else {
 			relEnd = l
 		}
-		final := toInt(relToIdx(relEnd, l))
+		final := toIntStrict(relToIdx(relEnd, l))
 		data := ta.viewedArrayBuf.data
 		offset := ta.offset
 		elemSize := ta.elemSize
@@ -448,14 +448,14 @@ func (r *Runtime) typedArrayProto_fill(call FunctionCall) Value {
 	if ta, ok := r.toObject(call.This).self.(*typedArrayObject); ok {
 		ta.viewedArrayBuf.ensureNotDetached()
 		l := int64(ta.length)
-		k := toInt(relToIdx(call.Argument(1).ToInteger(), l))
+		k := toIntStrict(relToIdx(call.Argument(1).ToInteger(), l))
 		var relEnd int64
 		if endArg := call.Argument(2); endArg != _undefined {
 			relEnd = endArg.ToInteger()
 		} else {
 			relEnd = l
 		}
-		final := toInt(relToIdx(relEnd, l))
+		final := toIntStrict(relToIdx(relEnd, l))
 		value := ta.typedArray.toRaw(call.Argument(0))
 		ta.viewedArrayBuf.ensureNotDetached()
 		for ; k < final; k++ {
@@ -593,7 +593,7 @@ func (r *Runtime) typedArrayProto_includes(call FunctionCall) Value {
 		}
 		if ta.typedArray.typeMatch(searchElement) {
 			se := ta.typedArray.toRaw(searchElement)
-			for k := toInt(n); k < ta.length; k++ {
+			for k := toIntStrict(n); k < ta.length; k++ {
 				if ta.typedArray.getRaw(ta.offset+k) == se {
 					return valueTrue
 				}
@@ -628,7 +628,7 @@ func (r *Runtime) typedArrayProto_indexOf(call FunctionCall) Value {
 		}
 		if !IsNaN(searchElement) && ta.typedArray.typeMatch(searchElement) {
 			se := ta.typedArray.toRaw(searchElement)
-			for k := toInt(n); k < ta.length; k++ {
+			for k := toIntStrict(n); k < ta.length; k++ {
 				if ta.typedArray.getRaw(ta.offset+k) == se {
 					return intToValue(int64(k))
 				}
@@ -703,7 +703,7 @@ func (r *Runtime) typedArrayProto_lastIndexOf(call FunctionCall) Value {
 			} else {
 				fromIndex += length
 				if fromIndex < 0 {
-					fromIndex = -1 // prevent underflow in toInt() on 32-bit platforms
+					fromIndex = -1 // prevent underflow in toIntStrict() on 32-bit platforms
 				}
 			}
 		}
@@ -715,7 +715,7 @@ func (r *Runtime) typedArrayProto_lastIndexOf(call FunctionCall) Value {
 		}
 		if !IsNaN(searchElement) && ta.typedArray.typeMatch(searchElement) {
 			se := ta.typedArray.toRaw(searchElement)
-			for k := toInt(fromIndex); k >= 0; k-- {
+			for k := toIntStrict(fromIndex); k >= 0; k-- {
 				if ta.typedArray.getRaw(ta.offset+k) == se {
 					return intToValue(int64(k))
 				}
@@ -829,7 +829,7 @@ func (r *Runtime) typedArrayProto_reverse(call FunctionCall) Value {
 func (r *Runtime) typedArrayProto_set(call FunctionCall) Value {
 	if ta, ok := r.toObject(call.This).self.(*typedArrayObject); ok {
 		srcObj := r.toObject(call.Argument(0))
-		targetOffset := toInt(call.Argument(1).ToInteger())
+		targetOffset := toIntStrict(call.Argument(1).ToInteger())
 		if targetOffset < 0 {
 			panic(r.newError(r.global.RangeError, "offset should be >= 0"))
 		}
@@ -886,7 +886,7 @@ func (r *Runtime) typedArrayProto_set(call FunctionCall) Value {
 			}
 		} else {
 			targetLen := ta.length
-			srcLen := toInt(toLength(srcObj.self.getStr("length", nil)))
+			srcLen := toIntStrict(toLength(srcObj.self.getStr("length", nil)))
 			if x := srcLen + targetOffset; x < 0 || x > targetLen {
 				panic(r.newError(r.global.RangeError, "Source is too large"))
 			}
@@ -905,14 +905,14 @@ func (r *Runtime) typedArrayProto_slice(call FunctionCall) Value {
 	if ta, ok := r.toObject(call.This).self.(*typedArrayObject); ok {
 		ta.viewedArrayBuf.ensureNotDetached()
 		length := int64(ta.length)
-		start := toInt(relToIdx(call.Argument(0).ToInteger(), length))
+		start := toIntStrict(relToIdx(call.Argument(0).ToInteger(), length))
 		var e int64
 		if endArg := call.Argument(1); endArg != _undefined {
 			e = endArg.ToInteger()
 		} else {
 			e = length
 		}
-		end := toInt(relToIdx(e, length))
+		end := toIntStrict(relToIdx(e, length))
 
 		count := end - start
 		if count < 0 {
@@ -1115,7 +1115,7 @@ func (r *Runtime) typedArrayFrom(ctor, items *Object, mapFn, thisValue Value) *O
 		}
 		return ta.val
 	}
-	length := toInt(toLength(items.self.getStr("length", nil)))
+	length := toIntStrict(toLength(items.self.getStr("length", nil)))
 	ta := r.typedArrayCreate(ctor, []Value{intToValue(int64(length))})
 	if mapFc == nil {
 		for i := 0; i < length; i++ {
@@ -1167,7 +1167,7 @@ func (r *Runtime) _newTypedArrayFromTypedArray(src *typedArrayObject, newTarget 
 	src.viewedArrayBuf.ensureNotDetached()
 	l := src.length
 	dst.viewedArrayBuf.prototype = r.getPrototypeFromCtor(r.toObject(src.viewedArrayBuf.getStr("constructor", nil)), r.global.ArrayBuffer, r.global.ArrayBufferPrototype)
-	dst.viewedArrayBuf.data = allocByteSlice(toInt(int64(l) * int64(dst.elemSize)))
+	dst.viewedArrayBuf.data = allocByteSlice(toIntStrict(int64(l) * int64(dst.elemSize)))
 	if src.defaultCtor == dst.defaultCtor {
 		copy(dst.viewedArrayBuf.data, src.viewedArrayBuf.data[src.offset*src.elemSize:])
 		dst.length = src.length

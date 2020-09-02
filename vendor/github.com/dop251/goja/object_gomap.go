@@ -160,7 +160,7 @@ func (o *objectGoMapSimple) ownKeys(_ bool, accum []Value) []Value {
 	return accum
 }
 
-func (o *objectGoMapSimple) export() interface{} {
+func (o *objectGoMapSimple) export(*objectExportCtx) interface{} {
 	return o.data
 }
 

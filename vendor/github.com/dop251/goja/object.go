@@ -180,6 +180,12 @@ func (p *PropertyDescriptor) complete() {
 	}
 }
 
+type objectExportCacheItem map[reflect.Type]interface{}
+
+type objectExportCtx struct {
+	cache map[objectImpl]interface{}
+}
+
 type objectImpl interface {
 	sortable
 	className() string
@@ -227,7 +233,7 @@ type objectImpl interface {
 	preventExtensions(throw bool) bool
 	enumerate() iterNextFunc
 	enumerateUnfiltered() iterNextFunc
-	export() interface{}
+	export(ctx *objectExportCtx) interface{}
 	exportType() reflect.Type
 	equal(objectImpl) bool
 	ownKeys(all bool, accum []Value) []Value
@@ -262,7 +268,7 @@ type primitiveValueObject struct {
 	pValue Value
 }
 
-func (o *primitiveValueObject) export() interface{} {
+func (o *primitiveValueObject) export(*objectExportCtx) interface{} {
 	return o.pValue.Export()
 }
 
@@ -946,13 +952,18 @@ func (o *baseObject) swap(i, j int64) {
 	o.val.self.setOwnIdx(jj, x, false)
 }
 
-func (o *baseObject) export() interface{} {
-	m := make(map[string]interface{})
-	for _, itemName := range o.ownKeys(false, nil) {
+func (o *baseObject) export(ctx *objectExportCtx) interface{} {
+	if v, exists := ctx.get(o); exists {
+		return v
+	}
+	keys := o.ownKeys(false, nil)
+	m := make(map[string]interface{}, len(keys))
+	ctx.put(o, m)
+	for _, itemName := range keys {
 		itemNameStr := itemName.String()
 		v := o.val.self.getStr(itemName.string(), nil)
 		if v != nil {
-			m[itemNameStr] = v.Export()
+			m[itemNameStr] = exportValue(v, ctx)
 		} else {
 			m[itemNameStr] = nil
 		}
@@ -1448,4 +1459,62 @@ func (o *guardedObject) deleteStr(name unistring.String, throw bool) bool {
 		o.check(name)
 	}
 	return res
+}
+
+func (ctx *objectExportCtx) get(key objectImpl) (interface{}, bool) {
+	if v, exists := ctx.cache[key]; exists {
+		if item, ok := v.(objectExportCacheItem); ok {
+			r, exists := item[key.exportType()]
+			return r, exists
+		} else {
+			return v, true
+		}
+	}
+	return nil, false
+}
+
+func (ctx *objectExportCtx) getTyped(key objectImpl, typ reflect.Type) (interface{}, bool) {
+	if v, exists := ctx.cache[key]; exists {
+		if item, ok := v.(objectExportCacheItem); ok {
+			r, exists := item[typ]
+			return r, exists
+		} else {
+			if reflect.TypeOf(v) == typ {
+				return v, true
+			}
+		}
+	}
+	return nil, false
+}
+
+func (ctx *objectExportCtx) put(key objectImpl, value interface{}) {
+	if ctx.cache == nil {
+		ctx.cache = make(map[objectImpl]interface{})
+	}
+	if item, ok := ctx.cache[key].(objectExportCacheItem); ok {
+		item[key.exportType()] = value
+	} else {
+		ctx.cache[key] = value
+	}
+}
+
+func (ctx *objectExportCtx) putTyped(key objectImpl, typ reflect.Type, value interface{}) {
+	if ctx.cache == nil {
+		ctx.cache = make(map[objectImpl]interface{})
+	}
+	v, exists := ctx.cache[key]
+	if exists {
+		if item, ok := ctx.cache[key].(objectExportCacheItem); ok {
+			item[typ] = value
+		} else {
+			m := make(objectExportCacheItem, 2)
+			m[key.exportType()] = v
+			m[typ] = value
+			ctx.cache[key] = m
+		}
+	} else {
+		m := make(objectExportCacheItem)
+		m[typ] = value
+		ctx.cache[key] = m
+	}
 }

@@ -32,7 +32,7 @@ type boundFuncObject struct {
 	wrapped *Object
 }
 
-func (f *nativeFuncObject) export() interface{} {
+func (f *nativeFuncObject) export(*objectExportCtx) interface{} {
 	return f.f
 }
 
@@ -164,7 +164,7 @@ func (f *funcObject) call(call FunctionCall, newTarget Value) Value {
 	return vm.pop()
 }
 
-func (f *funcObject) export() interface{} {
+func (f *funcObject) export(*objectExportCtx) interface{} {
 	return f.Call
 }
 

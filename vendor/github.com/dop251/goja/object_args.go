@@ -127,12 +127,16 @@ func (a *argumentsObject) defineOwnPropertyStr(name unistring.String, descr Prop
 	return a.baseObject.defineOwnPropertyStr(name, descr, throw)
 }
 
-func (a *argumentsObject) export() interface{} {
+func (a *argumentsObject) export(ctx *objectExportCtx) interface{} {
+	if v, exists := ctx.get(a); exists {
+		return v
+	}
 	arr := make([]interface{}, a.length)
+	ctx.put(a, arr)
 	for i := range arr {
 		v := a.getIdx(valueInt(int64(i)), nil)
 		if v != nil {
-			arr[i] = v.Export()
+			arr[i] = exportValue(v, ctx)
 		}
 	}
 	return arr

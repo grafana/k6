@@ -109,7 +109,10 @@ Exporting Values from JS
 ------------------------
 A JS value can be exported into its default Go representation using Value.Export() method.
 
-Alternatively it can be exported into a specific Go variable using Runtime.ExportTo() method.
+Alternatively it can be exported into a specific Go variable using [Runtime.ExportTo()](https://godoc.org/github.com/dop251/goja#Runtime.ExportTo) method.
+
+Within a single export operation the same Object will be represented by the same Go value (either the same map, slice or
+a pointer to the same struct). This includes circular objects and makes it possible to export them.
 
 Calling JS functions from Go
 ----------------------------
