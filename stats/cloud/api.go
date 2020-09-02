@@ -23,15 +23,20 @@ package cloud
 import (
 	"bytes"
 	"compress/gzip"
-	"encoding/json"
+	"context"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"mime/multipart"
 	"net/http"
 	"strconv"
+	"time"
 
+	"github.com/mailru/easyjson"
 	"github.com/pkg/errors"
 
 	"github.com/loadimpact/k6/lib"
+	"github.com/sirupsen/logrus"
 )
 
 type ResultStatus int
@@ -40,6 +45,7 @@ const (
 	ResultStatusPassed ResultStatus = 0
 	ResultStatusFailed ResultStatus = 1
 )
+const expectedGzipRatio = 6 // based on test it is around 6.8, but we don't need to be that accurate
 
 type ThresholdResult map[string]map[string]bool
 
@@ -88,41 +94,72 @@ func (c *Client) CreateTestRun(testRun *TestRun) (*CreateTestRunResponse, error)
 	return &ctrr, nil
 }
 
-func (c *Client) PushMetric(referenceID string, noCompress bool, samples []*Sample) error {
+// PushMetric pushes the provided metric samples for the given referenceID
+func (c *Client) PushMetric(referenceID string, noCompress bool, s []*Sample) error {
+	start := time.Now()
 	url := fmt.Sprintf("%s/metrics/%s", c.baseURL, referenceID)
 
-	if noCompress {
-		req, err := c.NewRequest("POST", url, samples)
-		if err != nil {
-			return err
-		}
-		return c.Do(req, nil)
-	}
-
-	var buf bytes.Buffer
-	var unzippedSize int
-	if samples != nil {
-		b, err := json.Marshal(&samples)
-		if err != nil {
-			return err
-		}
-		unzippedSize = len(b)
-		g := gzip.NewWriter(&buf)
-		if _, err = g.Write(b); err != nil {
-			return err
-		}
-		if err = g.Close(); err != nil {
-			return err
-		}
-	}
-	req, err := http.NewRequest("POST", url, &buf)
+	jsonStart := time.Now()
+	b, err := easyjson.Marshal(samples(s))
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Content-Encoding", "gzip")
-	req.Header.Set("x-payload-byte-count", strconv.Itoa(unzippedSize))
-	req.Header.Set("x-payload-sample-count", strconv.Itoa(len(samples)))
-	return c.Do(req, nil)
+	jsonTime := time.Since(jsonStart)
+
+	// TODO: change the context, maybe to one with a timeout
+	req, err := http.NewRequestWithContext(context.Background(), "POST", url, nil)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("X-Payload-Sample-Count", strconv.Itoa(len(s)))
+	var additionalFields logrus.Fields
+
+	if !noCompress {
+		buf := c.pushBufferPool.Get().(*bytes.Buffer)
+		buf.Reset()
+		defer c.pushBufferPool.Put(buf)
+		unzippedSize := len(b)
+		buf.Grow(unzippedSize / expectedGzipRatio)
+		gzipStart := time.Now()
+		{
+			g, _ := gzip.NewWriterLevel(buf, gzip.BestSpeed)
+			if _, err = g.Write(b); err != nil {
+				return err
+			}
+			if err = g.Close(); err != nil {
+				return err
+			}
+		}
+		gzipTime := time.Since(gzipStart)
+
+		req.Header.Set("Content-Encoding", "gzip")
+		req.Header.Set("X-Payload-Byte-Count", strconv.Itoa(unzippedSize))
+
+		additionalFields = logrus.Fields{
+			"unzipped_size":  unzippedSize,
+			"gzip_t":         gzipTime,
+			"content_length": buf.Len(),
+		}
+
+		b = buf.Bytes()
+	}
+
+	req.Header.Set("Content-Length", strconv.Itoa(len(b)))
+	req.Body = ioutil.NopCloser(bytes.NewReader(b))
+	req.GetBody = func() (io.ReadCloser, error) {
+		return ioutil.NopCloser(bytes.NewReader(b)), nil
+	}
+
+	err = c.Do(req, nil)
+
+	c.logger.WithFields(logrus.Fields{
+		"t":         time.Since(start),
+		"json_t":    jsonTime,
+		"part_size": len(s),
+	}).WithFields(additionalFields).Debug("Pushed part to cloud")
+
+	return err
 }
 
 func (c *Client) StartCloudTestRun(name string, projectID int64, arc *lib.Archive) (string, error) {

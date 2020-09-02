@@ -24,6 +24,7 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -145,12 +146,6 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 		tags["url"] = url
 	}
 
-	// Pass a custom net.Dial function to websocket.Dialer that will substitute
-	// the underlying net.Conn with our own tracked netext.Conn
-	netDial := func(network, address string) (net.Conn, error) {
-		return state.Dialer.DialContext(ctx, network, address)
-	}
-
 	// Overriding the NextProtos to avoid talking http2
 	var tlsConfig *tls.Config
 	if state.TLSConfig != nil {
@@ -159,13 +154,16 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 	}
 
 	wsd := websocket.Dialer{
-		NetDial:         netDial,
+		HandshakeTimeout: time.Second * 60, // TODO configurable
+		// Pass a custom net.DialContext function to websocket.Dialer that will substitute
+		// the underlying net.Conn with our own tracked netext.Conn
+		NetDialContext:  state.Dialer.DialContext,
 		Proxy:           http.ProxyFromEnvironment,
 		TLSClientConfig: tlsConfig,
 	}
 
 	start := time.Now()
-	conn, httpResponse, connErr := wsd.Dial(url, header)
+	conn, httpResponse, connErr := wsd.DialContext(ctx, url, header)
 	connectionEnd := time.Now()
 	connectionDuration := stats.D(connectionEnd.Sub(start))
 
@@ -249,6 +247,20 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 	// Wraps a couple of channels around conn.ReadMessage
 	go socket.readPump(readDataChan, readErrChan, readCloseChan)
 
+	// we do it here as below we can panic, which translates to an exception in js code
+	defer func() {
+		socket.Close() // just in case
+		end := time.Now()
+		sessionDuration := stats.D(end.Sub(start))
+
+		stats.PushIfNotDone(ctx, state.Samples, stats.Sample{
+			Metric: metrics.WSSessionDuration,
+			Tags:   socket.sampleTags,
+			Time:   start,
+			Value:  sessionDuration,
+		})
+	}()
+
 	// This is the main control loop. All JS code (including error handlers)
 	// should only be executed by this thread to avoid race conditions
 	for {
@@ -285,6 +297,7 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 
 		case scheduledFn := <-socket.scheduled:
 			if _, err := scheduledFn(goja.Undefined()); err != nil {
+				_ = socket.closeConnection(websocket.CloseGoingAway)
 				return nil, err
 			}
 
@@ -295,16 +308,6 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 
 		case <-socket.done:
 			// This is the final exit point normally triggered by closeConnection
-			end := time.Now()
-			sessionDuration := stats.D(end.Sub(start))
-
-			stats.PushIfNotDone(ctx, state.Samples, stats.Sample{
-				Metric: metrics.WSSessionDuration,
-				Tags:   socket.sampleTags,
-				Time:   start,
-				Value:  sessionDuration,
-			})
-
 			return wsResponse, nil
 		}
 	}
@@ -378,12 +381,18 @@ func (s *Socket) trackPong(pingID string) {
 	})
 }
 
-func (s *Socket) SetTimeout(fn goja.Callable, timeoutMs int) {
+// SetTimeout executes the provided function inside the socket's event loop after at least the provided
+// timeout, which is in ms, has elapsed
+func (s *Socket) SetTimeout(fn goja.Callable, timeoutMs float64) error {
 	// Starts a goroutine, blocks once on the timeout and pushes the callable
 	// back to the main loop through the scheduled channel
+	d := time.Duration(timeoutMs * float64(time.Millisecond))
+	if d <= 0 {
+		return fmt.Errorf("setTimeout requires a >0 timeout parameter, received %.2f", timeoutMs)
+	}
 	go func() {
 		select {
-		case <-time.After(time.Duration(timeoutMs) * time.Millisecond):
+		case <-time.After(d):
 			select {
 			case s.scheduled <- fn:
 			case <-s.done:
@@ -394,11 +403,19 @@ func (s *Socket) SetTimeout(fn goja.Callable, timeoutMs int) {
 			return
 		}
 	}()
+
+	return nil
 }
 
-func (s *Socket) SetInterval(fn goja.Callable, intervalMs int) {
+// SetInterval executes the provided function inside the socket's event loop each interval time, which is
+// in ms
+func (s *Socket) SetInterval(fn goja.Callable, intervalMs float64) error {
 	// Starts a goroutine, blocks forever on the ticker and pushes the callable
 	// back to the main loop through the scheduled channel
+	d := time.Duration(intervalMs * float64(time.Millisecond))
+	if d <= 0 {
+		return fmt.Errorf("setInterval requires a >0 timeout parameter, received %.2f", intervalMs)
+	}
 	go func() {
 		ticker := time.NewTicker(time.Duration(intervalMs) * time.Millisecond)
 		defer ticker.Stop()
@@ -417,6 +434,8 @@ func (s *Socket) SetInterval(fn goja.Callable, intervalMs int) {
 			}
 		}
 	}()
+
+	return nil
 }
 
 func (s *Socket) Close(args ...goja.Value) {
@@ -434,6 +453,14 @@ func (s *Socket) closeConnection(code int) error {
 	var err error
 
 	s.shutdownOnce.Do(func() {
+		// this is because handleEvent can panic ... on purpose so we just make sure we
+		// close the connection and the channel
+		defer func() {
+			_ = s.conn.Close()
+
+			// Stop the main control loop
+			close(s.done)
+		}()
 		rt := common.GetRuntime(s.ctx)
 
 		err = s.conn.WriteControl(websocket.CloseMessage,
@@ -447,11 +474,6 @@ func (s *Socket) closeConnection(code int) error {
 
 		// Call the user-defined close handler
 		s.handleEvent("close", rt.ToValue(code))
-
-		_ = s.conn.Close()
-
-		// Stop the main control loop
-		close(s.done)
 	})
 
 	return err

@@ -40,19 +40,22 @@ import (
 
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/lib/netext"
+	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/stats"
 )
 
 func TestInitContextRequire(t *testing.T) {
+	logger := testutils.NewLogger(t)
 	t.Run("Modules", func(t *testing.T) {
 		t.Run("Nonexistent", func(t *testing.T) {
-			_, err := getSimpleBundle("/script.js", `import "k6/NONEXISTENT";`)
-			assert.EqualError(t, err, "GoError: unknown builtin module: k6/NONEXISTENT")
+			_, err := getSimpleBundle(t, "/script.js", `import "k6/NONEXISTENT";`)
+			assert.Contains(t, err.Error(), "GoError: unknown builtin module: k6/NONEXISTENT")
 		})
 
 		t.Run("k6", func(t *testing.T) {
-			b, err := getSimpleBundle("/script.js", `
+			b, err := getSimpleBundle(t, "/script.js", `
 					import k6 from "k6";
 					export let _k6 = k6;
 					export let dummy = "abc123";
@@ -62,7 +65,7 @@ func TestInitContextRequire(t *testing.T) {
 				return
 			}
 
-			bi, err := b.Instantiate()
+			bi, err := b.Instantiate(logger, 0)
 			if !assert.NoError(t, err, "instance error") {
 				return
 			}
@@ -81,7 +84,7 @@ func TestInitContextRequire(t *testing.T) {
 			}
 
 			t.Run("group", func(t *testing.T) {
-				b, err := getSimpleBundle("/script.js", `
+				b, err := getSimpleBundle(t, "/script.js", `
 						import { group } from "k6";
 						export let _group = group;
 						export let dummy = "abc123";
@@ -91,7 +94,7 @@ func TestInitContextRequire(t *testing.T) {
 					return
 				}
 
-				bi, err := b.Instantiate()
+				bi, err := b.Instantiate(logger, 0)
 				if !assert.NoError(t, err) {
 					return
 				}
@@ -112,21 +115,21 @@ func TestInitContextRequire(t *testing.T) {
 	t.Run("Files", func(t *testing.T) {
 		t.Run("Nonexistent", func(t *testing.T) {
 			path := filepath.FromSlash("/nonexistent.js")
-			_, err := getSimpleBundle("/script.js", `import "/nonexistent.js"; export default function() {}`)
+			_, err := getSimpleBundle(t, "/script.js", `import "/nonexistent.js"; export default function() {}`)
 			assert.NotNil(t, err)
 			assert.Contains(t, err.Error(), fmt.Sprintf(`"%s" couldn't be found on local disk`, filepath.ToSlash(path)))
 		})
 		t.Run("Invalid", func(t *testing.T) {
 			fs := afero.NewMemMapFs()
-			assert.NoError(t, afero.WriteFile(fs, "/file.js", []byte{0x00}, 0755))
-			_, err := getSimpleBundle("/script.js", `import "/file.js"; export default function() {}`, fs)
+			assert.NoError(t, afero.WriteFile(fs, "/file.js", []byte{0x00}, 0o755))
+			_, err := getSimpleBundle(t, "/script.js", `import "/file.js"; export default function() {}`, fs)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "SyntaxError: file:///file.js: Unexpected character '\x00' (1:0)\n> 1 | \x00\n")
 		})
 		t.Run("Error", func(t *testing.T) {
 			fs := afero.NewMemMapFs()
-			assert.NoError(t, afero.WriteFile(fs, "/file.js", []byte(`throw new Error("aaaa")`), 0755))
-			_, err := getSimpleBundle("/script.js", `import "/file.js"; export default function() {}`, fs)
+			assert.NoError(t, afero.WriteFile(fs, "/file.js", []byte(`throw new Error("aaaa")`), 0o755))
+			_, err := getSimpleBundle(t, "/script.js", `import "/file.js"; export default function() {}`, fs)
 			assert.EqualError(t, err, "Error: aaaa at file:///file.js:2:7(4)")
 		})
 
@@ -179,19 +182,19 @@ func TestInitContextRequire(t *testing.T) {
 							)
 
 							constsrc := `export let c = 12345;`
-							assert.NoError(t, fs.MkdirAll(filepath.Dir(constPath), 0755))
-							assert.NoError(t, afero.WriteFile(fs, constPath, []byte(constsrc), 0644))
+							assert.NoError(t, fs.MkdirAll(filepath.Dir(constPath), 0o755))
+							assert.NoError(t, afero.WriteFile(fs, constPath, []byte(constsrc), 0o644))
 						}
 
-						assert.NoError(t, fs.MkdirAll(filepath.Dir(data.LibPath), 0755))
-						assert.NoError(t, afero.WriteFile(fs, data.LibPath, []byte(jsLib), 0644))
+						assert.NoError(t, fs.MkdirAll(filepath.Dir(data.LibPath), 0o755))
+						assert.NoError(t, afero.WriteFile(fs, data.LibPath, []byte(jsLib), 0o644))
 
 						data := fmt.Sprintf(`
 								import fn from "%s";
 								let v = fn();
 								export default function() {};`,
 							libName)
-						b, err := getSimpleBundle("/path/to/script.js", data, fs)
+						b, err := getSimpleBundle(t, "/path/to/script.js", data, fs)
 						if !assert.NoError(t, err) {
 							return
 						}
@@ -199,7 +202,7 @@ func TestInitContextRequire(t *testing.T) {
 							assert.Contains(t, b.BaseInitContext.programs, "file://"+constPath)
 						}
 
-						_, err = b.Instantiate()
+						_, err = b.Instantiate(logger, 0)
 						if !assert.NoError(t, err) {
 							return
 						}
@@ -210,8 +213,8 @@ func TestInitContextRequire(t *testing.T) {
 
 		t.Run("Isolation", func(t *testing.T) {
 			fs := afero.NewMemMapFs()
-			assert.NoError(t, afero.WriteFile(fs, "/a.js", []byte(`const myvar = "a";`), 0644))
-			assert.NoError(t, afero.WriteFile(fs, "/b.js", []byte(`const myvar = "b";`), 0644))
+			assert.NoError(t, afero.WriteFile(fs, "/a.js", []byte(`const myvar = "a";`), 0o644))
+			assert.NoError(t, afero.WriteFile(fs, "/b.js", []byte(`const myvar = "b";`), 0o644))
 			data := `
 				import "./a.js";
 				import "./b.js";
@@ -220,16 +223,16 @@ func TestInitContextRequire(t *testing.T) {
 						throw new Error("myvar is set in global scope");
 					}
 				};`
-			b, err := getSimpleBundle("/script.js", data, fs)
+			b, err := getSimpleBundle(t, "/script.js", data, fs)
 			if !assert.NoError(t, err) {
 				return
 			}
 
-			bi, err := b.Instantiate()
+			bi, err := b.Instantiate(logger, 0)
 			if !assert.NoError(t, err) {
 				return
 			}
-			_, err = bi.exports["default"](goja.Undefined())
+			_, err = bi.exports[consts.DefaultFn](goja.Undefined())
 			assert.NoError(t, err)
 		})
 	})
@@ -237,8 +240,8 @@ func TestInitContextRequire(t *testing.T) {
 
 func createAndReadFile(t *testing.T, file string, content []byte, expectedLength int, binary bool) (*BundleInstance, error) {
 	fs := afero.NewMemMapFs()
-	assert.NoError(t, fs.MkdirAll("/path/to", 0755))
-	assert.NoError(t, afero.WriteFile(fs, "/path/to/"+file, content, 0644))
+	assert.NoError(t, fs.MkdirAll("/path/to", 0o755))
+	assert.NoError(t, afero.WriteFile(fs, "/path/to/"+file, content, 0o644))
 
 	binaryArg := ""
 	if binary {
@@ -253,13 +256,13 @@ func createAndReadFile(t *testing.T, file string, content []byte, expectedLength
 		}
 		export default function() {}
 	`, file, binaryArg, expectedLength)
-	b, err := getSimpleBundle("/path/to/script.js", data, fs)
+	b, err := getSimpleBundle(t, "/path/to/script.js", data, fs)
 
 	if !assert.NoError(t, err) {
 		return nil, err
 	}
 
-	bi, err := b.Instantiate()
+	bi, err := b.Instantiate(testutils.NewLogger(t), 0)
 	if !assert.NoError(t, err) {
 		return nil, err
 	}
@@ -267,7 +270,6 @@ func createAndReadFile(t *testing.T, file string, content []byte, expectedLength
 }
 
 func TestInitContextOpen(t *testing.T) {
-
 	testCases := []struct {
 		content []byte
 		file    string
@@ -275,7 +277,7 @@ func TestInitContextOpen(t *testing.T) {
 	}{
 		{[]byte("hello world!"), "ascii", 12},
 		{[]byte("?((¯°·._.• ţ€$ţɨɲǥ µɲɨȼ๏ď€ΣSЫ ɨɲ Ќ6 •._.·°¯))؟•"), "utf", 47},
-		{[]byte{044, 226, 130, 172}, "utf-8", 2}, // $€
+		{[]byte{0o44, 226, 130, 172}, "utf-8", 2}, // $€
 		//{[]byte{00, 36, 32, 127}, "utf-16", 2},   // $€
 	}
 	for _, tc := range testCases {
@@ -313,16 +315,16 @@ func TestInitContextOpen(t *testing.T) {
 
 	t.Run("Nonexistent", func(t *testing.T) {
 		path := filepath.FromSlash("/nonexistent.txt")
-		_, err := getSimpleBundle("/script.js", `open("/nonexistent.txt"); export default function() {}`)
-		assert.EqualError(t, err, fmt.Sprintf("GoError: open %s: file does not exist", path))
+		_, err := getSimpleBundle(t, "/script.js", `open("/nonexistent.txt"); export default function() {}`)
+		assert.Contains(t, err.Error(), fmt.Sprintf("GoError: open %s: file does not exist", path))
 	})
 
 	t.Run("Directory", func(t *testing.T) {
 		path := filepath.FromSlash("/some/dir")
 		fs := afero.NewMemMapFs()
-		assert.NoError(t, fs.MkdirAll(path, 0755))
-		_, err := getSimpleBundle("/script.js", `open("/some/dir"); export default function() {}`, fs)
-		assert.EqualError(t, err, fmt.Sprintf("GoError: open() can't be used with directories, path: %q", path))
+		assert.NoError(t, fs.MkdirAll(path, 0o755))
+		_, err := getSimpleBundle(t, "/script.js", `open("/some/dir"); export default function() {}`, fs)
+		assert.Contains(t, err.Error(), fmt.Sprintf("GoError: open() can't be used with directories, path: %q", path))
 	})
 }
 
@@ -353,10 +355,10 @@ func TestRequestWithBinaryFile(t *testing.T) {
 	defer srv.Close()
 
 	fs := afero.NewMemMapFs()
-	assert.NoError(t, fs.MkdirAll("/path/to", 0755))
-	assert.NoError(t, afero.WriteFile(fs, "/path/to/file.bin", []byte("hi!"), 0644))
+	assert.NoError(t, fs.MkdirAll("/path/to", 0o755))
+	assert.NoError(t, afero.WriteFile(fs, "/path/to/file.bin", []byte("hi!"), 0o644))
 
-	b, err := getSimpleBundle("/path/to/script.js",
+	b, err := getSimpleBundle(t, "/path/to/script.js",
 		fmt.Sprintf(`
 			import http from "k6/http";
 			let binFile = open("/path/to/file.bin", "b");
@@ -371,7 +373,7 @@ func TestRequestWithBinaryFile(t *testing.T) {
 			`, srv.URL), fs)
 	require.NoError(t, err)
 
-	bi, err := b.Instantiate()
+	bi, err := b.Instantiate(testutils.NewLogger(t), 0)
 	assert.NoError(t, err)
 
 	root, err := lib.NewGroup("", nil)
@@ -401,10 +403,23 @@ func TestRequestWithBinaryFile(t *testing.T) {
 	ctx = common.WithRuntime(ctx, bi.Runtime)
 	*bi.Context = ctx
 
-	v, err := bi.exports["default"](goja.Undefined())
+	v, err := bi.exports[consts.DefaultFn](goja.Undefined())
 	assert.NoError(t, err)
 	assert.NotNil(t, v)
 	assert.Equal(t, true, v.Export())
 
 	<-ch
+}
+
+func TestInitContextVU(t *testing.T) {
+	b, err := getSimpleBundle(t, "/script.js", `
+		let vu = __VU;
+		export default function() { return vu; }
+	`)
+	require.NoError(t, err)
+	bi, err := b.Instantiate(testutils.NewLogger(t), 5)
+	require.NoError(t, err)
+	v, err := bi.exports[consts.DefaultFn](goja.Undefined())
+	require.NoError(t, err)
+	assert.Equal(t, int64(5), v.Export())
 }

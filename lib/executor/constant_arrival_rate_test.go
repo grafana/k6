@@ -307,10 +307,10 @@ func TestConstantArrivalRateDroppedIterations(t *testing.T) {
 	config := &ConstantArrivalRateConfig{
 		BaseConfig:      BaseConfig{GracefulStop: types.NullDurationFrom(0 * time.Second)},
 		TimeUnit:        types.NullDurationFrom(time.Second),
-		Rate:            null.IntFrom(20),
+		Rate:            null.IntFrom(10),
 		Duration:        types.NullDurationFrom(950 * time.Millisecond),
-		PreAllocatedVUs: null.IntFrom(10),
-		MaxVUs:          null.IntFrom(10),
+		PreAllocatedVUs: null.IntFrom(5),
+		MaxVUs:          null.IntFrom(5),
 	}
 
 	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
@@ -329,6 +329,6 @@ func TestConstantArrivalRateDroppedIterations(t *testing.T) {
 	logs := logHook.Drain()
 	require.Len(t, logs, 1)
 	assert.Contains(t, logs[0].Message, "cannot initialize more")
-	assert.Equal(t, int64(10), count)
-	assert.Equal(t, float64(10), sumMetricValues(engineOut, metrics.DroppedIterations.Name))
+	assert.Equal(t, int64(5), count)
+	assert.Equal(t, float64(5), sumMetricValues(engineOut, metrics.DroppedIterations.Name))
 }

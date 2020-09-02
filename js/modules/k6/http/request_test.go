@@ -49,12 +49,37 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/js/common"
+	"github.com/loadimpact/k6/js/compiler"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/lib/testutils/httpmultibin"
 	"github.com/loadimpact/k6/stats"
 )
+
+// runES6String Runs an ES6 string in the given runtime. Use this rather than writing ES5 in tests.
+func runES6String(tb testing.TB, rt *goja.Runtime, src string) (goja.Value, error) {
+	var err error
+	c := compiler.New(testutils.NewLogger(tb)) // TODO drop it ? maybe we will drop babel and this will be less needed
+	src, _, err = c.Transform(src, "__string__")
+	if err != nil {
+		return goja.Undefined(), err
+	}
+
+	return common.RunString(rt, src)
+}
+
+func TestRunES6String(t *testing.T) {
+	t.Run("Valid", func(t *testing.T) {
+		_, err := runES6String(t, goja.New(), `let a = 1;`)
+		assert.NoError(t, err)
+	})
+	t.Run("Invalid", func(t *testing.T) {
+		_, err := runES6String(t, goja.New(), `let a = #;`)
+		assert.NotNil(t, err)
+		assert.Contains(t, err.Error(), "SyntaxError: __string__: Unexpected character '#' (1:8)\n> 1 | let a = #;\n")
+	})
+}
 
 func assertRequestMetricsEmitted(t *testing.T, sampleContainers []stats.SampleContainer, method, url, name string, status int, group string) {
 	if name == "" {
@@ -126,7 +151,7 @@ func newRuntime(
 		SystemTags:   &stats.DefaultSystemTagSet,
 		Batch:        null.IntFrom(20),
 		BatchPerHost: null.IntFrom(20),
-		//HTTPDebug:    null.StringFrom("full"),
+		// HTTPDebug:    null.StringFrom("full"),
 	}
 	samples := make(chan stats.SampleContainer, 1000)
 
@@ -240,7 +265,6 @@ func TestRequestAndBatch(t *testing.T) {
 		})
 
 		t.Run("post body", func(t *testing.T) {
-
 			tb.Mux.HandleFunc("/post-redirect", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				require.Equal(t, r.Method, "POST")
 				_, _ = io.Copy(ioutil.Discard, r.Body)
@@ -255,7 +279,6 @@ func TestRequestAndBatch(t *testing.T) {
 			`))
 			assert.NoError(t, err)
 		})
-
 	})
 	t.Run("Timeout", func(t *testing.T) {
 		t.Run("10s", func(t *testing.T) {
@@ -282,11 +305,7 @@ func TestRequestAndBatch(t *testing.T) {
 			assert.WithinDuration(t, startTime.Add(1*time.Second), endTime, 2*time.Second)
 
 			logEntry := hook.LastEntry()
-			if assert.NotNil(t, logEntry) {
-				assert.Equal(t, logrus.WarnLevel, logEntry.Level)
-				assert.Contains(t, logEntry.Data["error"].(error).Error(), "context deadline exceeded")
-				assert.Equal(t, "Request Failed", logEntry.Message)
-			}
+			assert.Nil(t, logEntry)
 		})
 	})
 	t.Run("UserAgent", func(t *testing.T) {
@@ -485,22 +504,21 @@ func TestRequestAndBatch(t *testing.T) {
 		assert.Contains(t, err.Error(), "unsupported protocol scheme")
 
 		logEntry := hook.LastEntry()
-		if assert.NotNil(t, logEntry) {
-			assert.Equal(t, logrus.WarnLevel, logEntry.Level)
-			assert.Contains(t, logEntry.Data["error"].(error).Error(), "unsupported protocol scheme")
-			assert.Equal(t, "Request Failed", logEntry.Message)
-		}
+		assert.Nil(t, logEntry)
 
 		t.Run("throw=false", func(t *testing.T) {
 			hook := logtest.NewLocal(state.Logger)
 			defer hook.Reset()
 
 			_, err := common.RunString(rt, `
-				var res = http.request("", "", { throw: false });
-				throw new Error(res.error);
+				var res = http.request("GET", "some://example.com", null, { throw: false });
+				if (res.error.search('unsupported protocol scheme "some"')  == -1) {
+					throw new Error("wrong error:" + res.error);
+				}
+				throw new Error("another error");
 			`)
 			require.Error(t, err)
-			assert.Contains(t, err.Error(), "unsupported protocol scheme")
+			assert.Contains(t, err.Error(), "another error")
 
 			logEntry := hook.LastEntry()
 			if assert.NotNil(t, logEntry) {
@@ -972,7 +990,7 @@ func TestRequestAndBatch(t *testing.T) {
 		assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/get?a=1&b=2"), "", 200, "")
 
 		t.Run("Tagged", func(t *testing.T) {
-			_, err := common.RunES6String(rt, `
+			_, err := runES6String(t, rt, `
 			var a = "1";
 			var b = "2";
 			var res = http.get(http.url`+"`"+sr(`HTTPBIN_URL/get?a=${a}&b=${b}`)+"`"+`);
@@ -1082,7 +1100,7 @@ func TestRequestAndBatch(t *testing.T) {
 			assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_IP_URL/"), "", 200, "")
 
 			t.Run("Tagged", func(t *testing.T) {
-				_, err := common.RunES6String(rt, sr(`
+				_, err := runES6String(t, rt, sr(`
 				let fragment = "get";
 				let reqs = [
 					["GET", http.url`+"`"+`HTTPBIN_URL/${fragment}`+"`"+`],
@@ -1116,7 +1134,7 @@ func TestRequestAndBatch(t *testing.T) {
 				assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_IP_URL/"), "", 200, "")
 
 				t.Run("Tagged", func(t *testing.T) {
-					_, err := common.RunES6String(rt, sr(`
+					_, err := runES6String(t, rt, sr(`
 					let fragment = "get";
 					let reqs = [
 						http.url`+"`"+`HTTPBIN_URL/${fragment}`+"`"+`,
@@ -1282,13 +1300,13 @@ func TestRequestCompression(t *testing.T) {
 	// We don't expect any failed requests
 	state.Options.Throw = null.BoolFrom(true)
 
-	var text = `
+	text := `
 	Lorem ipsum dolor sit amet, consectetur adipiscing elit.
 	Maecenas sed pharetra sapien. Nunc laoreet molestie ante ac gravida.
 	Etiam interdum dui viverra posuere egestas. Pellentesque at dolor tristique,
 	mattis turpis eget, commodo purus. Nunc orci aliquam.`
 
-	var decompress = func(algo string, input io.Reader) io.Reader {
+	decompress := func(algo string, input io.Reader) io.Reader {
 		switch algo {
 		case "br":
 			w := brotli.NewReader(input)
@@ -1326,8 +1344,8 @@ func TestRequestCompression(t *testing.T) {
 
 		expectedLength, err := strconv.Atoi(r.Header.Get("Content-Length"))
 		require.NoError(t, err)
-		var algos = strings.Split(actualEncoding, ", ")
-		var compressedBuf = new(bytes.Buffer)
+		algos := strings.Split(actualEncoding, ", ")
+		compressedBuf := new(bytes.Buffer)
 		n, err := io.Copy(compressedBuf, r.Body)
 		require.Equal(t, int(n), expectedLength)
 		require.NoError(t, err)
@@ -1345,7 +1363,7 @@ func TestRequestCompression(t *testing.T) {
 		require.Equal(t, text, buf.String())
 	}))
 
-	var testCases = []struct {
+	testCases := []struct {
 		name          string
 		compression   string
 		expectedError string
@@ -1376,13 +1394,13 @@ func TestRequestCompression(t *testing.T) {
 	for _, testCase := range testCases {
 		testCase := testCase
 		t.Run(testCase.compression, func(t *testing.T) {
-			var algos = strings.Split(testCase.compression, ",")
+			algos := strings.Split(testCase.compression, ",")
 			for i, algo := range algos {
 				algos[i] = strings.TrimSpace(algo)
 			}
 			expectedEncoding = strings.Join(algos, ", ")
 			actualEncoding = expectedEncoding
-			_, err := common.RunES6String(rt, tb.Replacer.Replace(`
+			_, err := runES6String(t, rt, tb.Replacer.Replace(`
 		http.post("HTTPBIN_URL/compressed-text", `+"`"+text+"`"+`,  {"compression": "`+testCase.compression+`"});
 	`))
 			if testCase.expectedError == "" {
@@ -1391,7 +1409,6 @@ func TestRequestCompression(t *testing.T) {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), testCase.expectedError)
 			}
-
 		})
 	}
 
@@ -1401,7 +1418,7 @@ func TestRequestCompression(t *testing.T) {
 
 		logHook.Drain()
 		t.Run("encoding", func(t *testing.T) {
-			_, err := common.RunES6String(rt, tb.Replacer.Replace(`
+			_, err := runES6String(t, rt, tb.Replacer.Replace(`
 				http.post("HTTPBIN_URL/compressed-text", `+"`"+text+"`"+`,
 					{"compression": "`+actualEncoding+`",
 					 "headers": {"Content-Encoding": "`+expectedEncoding+`"}
@@ -1413,7 +1430,7 @@ func TestRequestCompression(t *testing.T) {
 		})
 
 		t.Run("encoding and length", func(t *testing.T) {
-			_, err := common.RunES6String(rt, tb.Replacer.Replace(`
+			_, err := runES6String(t, rt, tb.Replacer.Replace(`
 				http.post("HTTPBIN_URL/compressed-text", `+"`"+text+"`"+`,
 					{"compression": "`+actualEncoding+`",
 					 "headers": {"Content-Encoding": "`+expectedEncoding+`",
@@ -1427,7 +1444,7 @@ func TestRequestCompression(t *testing.T) {
 
 		expectedEncoding = actualEncoding
 		t.Run("correct encoding", func(t *testing.T) {
-			_, err := common.RunES6String(rt, tb.Replacer.Replace(`
+			_, err := runES6String(t, rt, tb.Replacer.Replace(`
 				http.post("HTTPBIN_URL/compressed-text", `+"`"+text+"`"+`,
 					{"compression": "`+actualEncoding+`",
 					 "headers": {"Content-Encoding": "`+actualEncoding+`"}
@@ -1438,7 +1455,7 @@ func TestRequestCompression(t *testing.T) {
 			require.Empty(t, logHook.Drain())
 		})
 
-		//TODO: move to some other test?
+		// TODO: move to some other test?
 		t.Run("correct length", func(t *testing.T) {
 			_, err := common.RunString(rt, tb.Replacer.Replace(
 				`http.post("HTTPBIN_URL/post", "0123456789", { "headers": {"Content-Length": "10"}});`,
@@ -1573,7 +1590,7 @@ func TestResponseTypes(t *testing.T) {
 }
 
 func checkErrorCode(t testing.TB, tags *stats.SampleTags, code int, msg string) {
-	var errorMsg, ok = tags.Get("error")
+	errorMsg, ok := tags.Get("error")
 	if msg == "" {
 		assert.False(t, ok)
 	} else {
@@ -1583,7 +1600,7 @@ func checkErrorCode(t testing.TB, tags *stats.SampleTags, code int, msg string) 
 	if code == 0 {
 		assert.False(t, ok)
 	} else {
-		var errorCode, err = strconv.Atoi(errorCodeStr)
+		errorCode, err := strconv.Atoi(errorCodeStr)
 		assert.NoError(t, err)
 		assert.Equal(t, code, errorCode)
 	}
@@ -1605,7 +1622,7 @@ func TestErrorCodes(t *testing.T) {
 		w.WriteHeader(302)
 	}))
 
-	var testCases = []struct {
+	testCases := []struct {
 		name                string
 		status              int
 		moreSamples         int
@@ -1689,7 +1706,7 @@ func TestErrorCodes(t *testing.T) {
 				require.Error(t, err)
 				require.Equal(t, err.Error(), testCase.expectedScriptError)
 			}
-			var cs = stats.GetBufferedSamples(samples)
+			cs := stats.GetBufferedSamples(samples)
 			assert.Len(t, cs, 1+testCase.moreSamples)
 			for _, c := range cs[len(cs)-1:] {
 				assert.NotZero(t, len(c.GetSamples()))

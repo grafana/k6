@@ -34,6 +34,7 @@ import (
 	"github.com/loadimpact/k6/core"
 	"github.com/loadimpact/k6/core/local"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/lib/testutils/minirunner"
 )
 
@@ -45,9 +46,12 @@ func TestGetGroups(t *testing.T) {
 	g2, err := g1.Group("group 2")
 	assert.NoError(t, err)
 
-	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{Group: g0}, logrus.StandardLogger())
+	logger := logrus.New()
+	logger.SetOutput(testutils.NewTestOutput(t))
+
+	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{Group: g0}, logger)
 	require.NoError(t, err)
-	engine, err := core.NewEngine(execScheduler, lib.Options{}, logrus.StandardLogger())
+	engine, err := core.NewEngine(execScheduler, lib.Options{}, logger)
 	require.NoError(t, err)
 
 	t.Run("list", func(t *testing.T) {

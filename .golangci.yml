@@ -51,6 +51,7 @@ linters-settings:
 linters:
   enable-all: true
   disable:
+  - gci
   - gochecknoinits
   - godot
   - godox

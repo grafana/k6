@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/loadimpact/k6/js"
@@ -40,12 +41,14 @@ var inspectCmd = &cobra.Command{
 	Long:  `Inspect a script or archive.`,
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// TODO: don't use the Global logger
+		logger := logrus.StandardLogger()
 		pwd, err := os.Getwd()
 		if err != nil {
 			return err
 		}
 		filesystems := loader.CreateFilesystems()
-		src, err := loader.ReadSource(args[0], pwd, filesystems, os.Stdin)
+		src, err := loader.ReadSource(logger, args[0], pwd, filesystems, os.Stdin)
 		if err != nil {
 			return err
 		}
@@ -71,13 +74,13 @@ var inspectCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			b, err = js.NewBundleFromArchive(arc, runtimeOptions)
+			b, err = js.NewBundleFromArchive(logger, arc, runtimeOptions)
 			if err != nil {
 				return err
 			}
 			opts = b.Options
 		case typeJS:
-			b, err = js.NewBundle(src, filesystems, runtimeOptions)
+			b, err = js.NewBundle(logger, src, filesystems, runtimeOptions)
 			if err != nil {
 				return err
 			}

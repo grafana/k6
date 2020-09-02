@@ -441,6 +441,7 @@ func TestSentReceivedMetrics(t *testing.T) {
 
 	runTest := func(t *testing.T, ts testScript, tc testCase, noConnReuse bool) (float64, float64) {
 		r, err := js.New(
+			testutils.NewLogger(t),
 			&loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: []byte(ts.Code)},
 			nil,
 			lib.RuntimeOptions{},
@@ -574,6 +575,7 @@ func TestRunTags(t *testing.T) {
 	`))
 
 	r, err := js.New(
+		testutils.NewLogger(t),
 		&loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script},
 		nil,
 		lib.RuntimeOptions{},
@@ -665,6 +667,7 @@ func TestSetupTeardownThresholds(t *testing.T) {
 	`))
 
 	runner, err := js.New(
+		testutils.NewLogger(t),
 		&loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script},
 		nil,
 		lib.RuntimeOptions{},
@@ -728,6 +731,7 @@ func TestEmittedMetricsWhenScalingDown(t *testing.T) {
 	`))
 
 	runner, err := js.New(
+		testutils.NewLogger(t),
 		&loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script},
 		nil,
 		lib.RuntimeOptions{},
@@ -811,6 +815,7 @@ func TestMetricsEmission(t *testing.T) {
 				t.Parallel()
 			}
 			runner, err := js.New(
+				testutils.NewLogger(t),
 				&loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: []byte(fmt.Sprintf(`
 				import { sleep } from "k6";
 				import { Counter } from "k6/metrics";
@@ -917,6 +922,7 @@ func TestMinIterationDurationInSetupTeardownStage(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			runner, err := js.New(
+				testutils.NewLogger(t),
 				&loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: []byte(tc.script)},
 				nil,
 				lib.RuntimeOptions{},

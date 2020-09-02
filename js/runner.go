@@ -68,23 +68,28 @@ type Runner struct {
 }
 
 // New returns a new Runner for the provide source
-func New(src *loader.SourceData, filesystems map[string]afero.Fs, rtOpts lib.RuntimeOptions) (*Runner, error) {
-	bundle, err := NewBundle(src, filesystems, rtOpts)
+func New(
+	logger *logrus.Logger, src *loader.SourceData, filesystems map[string]afero.Fs, rtOpts lib.RuntimeOptions,
+) (*Runner, error) {
+	bundle, err := NewBundle(logger, src, filesystems, rtOpts)
 	if err != nil {
 		return nil, err
 	}
-	return NewFromBundle(bundle)
+
+	return newFromBundle(logger, bundle)
 }
 
-func NewFromArchive(arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Runner, error) {
-	bundle, err := NewBundleFromArchive(arc, rtOpts)
+// NewFromArchive returns a new Runner from the source in the provided archive
+func NewFromArchive(logger *logrus.Logger, arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Runner, error) {
+	bundle, err := NewBundleFromArchive(logger, arc, rtOpts)
 	if err != nil {
 		return nil, err
 	}
-	return NewFromBundle(bundle)
+
+	return newFromBundle(logger, bundle)
 }
 
-func NewFromBundle(b *Bundle) (*Runner, error) {
+func newFromBundle(logger *logrus.Logger, b *Bundle) (*Runner, error) {
 	defaultGroup, err := lib.NewGroup("", nil)
 	if err != nil {
 		return nil, err
@@ -92,18 +97,19 @@ func NewFromBundle(b *Bundle) (*Runner, error) {
 
 	r := &Runner{
 		Bundle:       b,
-		Logger:       logrus.StandardLogger(),
+		Logger:       logger,
 		defaultGroup: defaultGroup,
 		BaseDialer: net.Dialer{
 			Timeout:   30 * time.Second,
 			KeepAlive: 30 * time.Second,
 			DualStack: true,
 		},
-		console:  newConsole(),
+		console:  newConsole(logger),
 		Resolver: dnscache.New(0),
 	}
 
 	err = r.SetOptions(r.Bundle.Options)
+
 	return r, err
 }
 
@@ -123,7 +129,7 @@ func (r *Runner) NewVU(id int64, samplesOut chan<- stats.SampleContainer) (lib.I
 // nolint:funlen
 func (r *Runner) newVU(id int64, samplesOut chan<- stats.SampleContainer) (*VU, error) {
 	// Instantiate a new bundle, make a VU out of it.
-	bi, err := r.Bundle.Instantiate()
+	bi, err := r.Bundle.Instantiate(r.Logger, id)
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +217,6 @@ func (r *Runner) newVU(id int64, samplesOut chan<- stats.SampleContainer) (*VU, 
 		Tags:      vu.Runner.Bundle.Options.RunTags.CloneTags(),
 		Group:     r.defaultGroup,
 	}
-	vu.Runtime.Set("__VU", vu.ID)
 	vu.Runtime.Set("console", common.Bind(vu.Runtime, vu.Console, vu.Context))
 
 	// This is here mostly so if someone tries they get a nice message
@@ -342,7 +347,7 @@ func (r *Runner) runPart(ctx context.Context, out chan<- stats.SampleContainer, 
 	}()
 	*vu.Context = ctx
 
-	group, err := lib.NewGroup(name, r.GetDefaultGroup())
+	group, err := r.GetDefaultGroup().Group(name)
 	if err != nil {
 		return goja.Undefined(), err
 	}

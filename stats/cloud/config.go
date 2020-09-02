@@ -47,6 +47,9 @@ type Config struct {
 	// The time interval between periodic API calls for sending samples to the cloud ingest service.
 	MetricPushInterval types.NullDuration `json:"metricPushInterval" envconfig:"K6_CLOUD_METRIC_PUSH_INTERVAL"`
 
+	// This is how many concurrent pushes will be done at the same time to the cloud
+	MetricPushConcurrency null.Int `json:"metricPushConcurrency" envconfig:"K6_CLOUD_METRIC_PUSH_CONCURRENCY"`
+
 	// Aggregation docs:
 	//
 	// If AggregationPeriod is specified and if it is greater than 0, HTTP metric aggregation
@@ -155,6 +158,7 @@ func NewConfig() Config {
 		Host:                       null.NewString("https://ingest.k6.io", false),
 		WebAppURL:                  null.NewString("https://app.k6.io", false),
 		MetricPushInterval:         types.NewNullDuration(1*time.Second, false),
+		MetricPushConcurrency:      null.NewInt(1, false),
 		MaxMetricSamplesPerPackage: null.NewInt(100000, false),
 		// Aggregation is disabled by default, since AggregationPeriod has no default value
 		// but if it's enabled manually or from the cloud service, those are the default values it will use:

@@ -96,6 +96,9 @@ a commandline interface for interacting with it.`,
   k6 run -o influxdb=http://1.2.3.4:8086/k6`[1:],
 	Args: exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// TODO: don't use a global... or maybe change the logger?
+		logger := logrus.StandardLogger()
+
 		// TODO: disable in quiet mode?
 		_, _ = BannerColor.Fprintf(stdout, "\n%s\n\n", consts.Banner())
 
@@ -112,7 +115,7 @@ a commandline interface for interacting with it.`,
 		}
 		filename := args[0]
 		filesystems := loader.CreateFilesystems()
-		src, err := loader.ReadSource(filename, pwd, filesystems, os.Stdin)
+		src, err := loader.ReadSource(logger, filename, pwd, filesystems, os.Stdin)
 		if err != nil {
 			return err
 		}
@@ -122,7 +125,7 @@ a commandline interface for interacting with it.`,
 			return err
 		}
 
-		r, err := newRunner(src, runType, filesystems, runtimeOptions)
+		r, err := newRunner(logger, src, runType, filesystems, runtimeOptions)
 		if err != nil {
 			return err
 		}
@@ -147,9 +150,6 @@ a commandline interface for interacting with it.`,
 		if err = r.SetOptions(conf.Options); err != nil {
 			return err
 		}
-
-		// TODO: don't use a global... or maybe change the logger?
-		logger := logrus.StandardLogger()
 
 		// We prepare a bunch of contexts:
 		//  - The runCtx is cancelled as soon as the Engine's run() lambda finishes,
@@ -215,7 +215,7 @@ a commandline interface for interacting with it.`,
 		modifyAndPrintBar(initBar, pb.WithConstProgress(0, "Init metric outputs"))
 		for _, out := range conf.Out {
 			t, arg := parseCollector(out)
-			collector, cerr := newCollector(t, arg, src, conf, executionPlan)
+			collector, cerr := newCollector(logger, t, arg, src, conf, executionPlan)
 			if cerr != nil {
 				return cerr
 			}
@@ -230,7 +230,7 @@ a commandline interface for interacting with it.`,
 			modifyAndPrintBar(initBar, pb.WithConstProgress(0, "Init API server"))
 			go func() {
 				logger.Debugf("Starting the REST API server on %s", address)
-				if aerr := api.ListenAndServe(address, engine); aerr != nil {
+				if aerr := api.ListenAndServe(address, engine, logger); aerr != nil {
 					// Only exit k6 if the user has explicitly set the REST API address
 					if cmd.Flags().Lookup("address").Changed {
 						logger.WithError(aerr).Error("Error from API server")
@@ -322,16 +322,16 @@ a commandline interface for interacting with it.`,
 		if conf.SummaryExport.ValueOrZero() != "" {
 			f, err := os.Create(conf.SummaryExport.String)
 			if err != nil {
-				logrus.WithError(err).Error("failed to create summary export file")
+				logger.WithError(err).Error("failed to create summary export file")
 			} else {
 				defer func() {
 					if err := f.Close(); err != nil {
-						logrus.WithError(err).Error("failed to close summary export file")
+						logger.WithError(err).Error("failed to close summary export file")
 					}
 				}()
 				s := ui.NewSummary(conf.SummaryTrendStats)
 				if err := s.SummarizeMetricsJSON(f, data); err != nil {
-					logrus.WithError(err).Error("failed to make summary export file")
+					logger.WithError(err).Error("failed to make summary export file")
 				}
 			}
 		}
@@ -432,13 +432,13 @@ func init() {
 
 // Creates a new runner.
 func newRunner(
-	src *loader.SourceData, typ string, filesystems map[string]afero.Fs, rtOpts lib.RuntimeOptions,
+	logger *logrus.Logger, src *loader.SourceData, typ string, filesystems map[string]afero.Fs, rtOpts lib.RuntimeOptions,
 ) (lib.Runner, error) {
 	switch typ {
 	case "":
-		return newRunner(src, detectType(src.Data), filesystems, rtOpts)
+		return newRunner(logger, src, detectType(src.Data), filesystems, rtOpts)
 	case typeJS:
-		return js.New(src, filesystems, rtOpts)
+		return js.New(logger, src, filesystems, rtOpts)
 	case typeArchive:
 		arc, err := lib.ReadArchive(bytes.NewReader(src.Data))
 		if err != nil {
@@ -446,7 +446,7 @@ func newRunner(
 		}
 		switch arc.Type {
 		case typeJS:
-			return js.NewFromArchive(arc, rtOpts)
+			return js.NewFromArchive(logger, arc, rtOpts)
 		default:
 			return nil, errors.Errorf("archive requests unsupported runner: %s", arc.Type)
 		}

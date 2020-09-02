@@ -390,6 +390,7 @@ func (vlvc RampingVUsConfig) reserveVUsForGracefulRampDowns( //nolint:funlen
 	newSteps := []lib.ExecutionStep{}
 
 	lastPlannedVUs := uint64(0)
+	lastDownwardSlopeStepNum := 0
 	for rawStepNum := 0; rawStepNum < rawStepsLen; rawStepNum++ {
 		rawStep := rawSteps[rawStepNum]
 		// Add the first step or any step where the number of planned VUs is
@@ -425,14 +426,28 @@ func (vlvc RampingVUsConfig) reserveVUsForGracefulRampDowns( //nolint:funlen
 		//    offset.
 		//  - We reach the end of the rawSteps, or we don't find any higher or
 		//    equal steps to prevStep in the next gracefulRampDown period. So
-		//    we'll simply try to add an entry into newSteps with the values
-		//    {prevStep.TimeOffset + gracefulRampDown, rawStep.PlannedVUs} and
-		//    we'll continue with traversing the following rawSteps.
+		//    we'll simply add a new entry into newSteps with the values
+		//    {timeOffsetWithTimeout, rawStep.PlannedVUs}, in which
+		//    timeOffsetWithTimeout = (prevStep.TimeOffset + gracefulRampDown),
+		//    after which we'll continue with traversing the following rawSteps.
+		//
+		//  In this last case, we can also keep track of the downward slope. We
+		//  can save the last index we've seen, to optimize future lookaheads by
+		//  starting them from the furhest downward slope step index we've seen so
+		//  far. This can be done because the gracefulRampDown is constant, so
+		//  when we're on a downward slope, raw steps will always fall in the
+		//  gracefulRampDown "shadow" of their preceding steps on the slope.
 
 		skippedToNewRawStep := false
 		timeOffsetWithTimeout := rawStep.TimeOffset + gracefulRampDownPeriod
 
-		for advStepNum := rawStepNum + 1; advStepNum < rawStepsLen; advStepNum++ {
+		advStepStart := rawStepNum + 1
+		if lastDownwardSlopeStepNum > advStepStart {
+			advStepStart = lastDownwardSlopeStepNum
+		}
+
+		wasRampingDown := true
+		for advStepNum := advStepStart; advStepNum < rawStepsLen; advStepNum++ {
 			advStep := rawSteps[advStepNum]
 			if advStep.TimeOffset > timeOffsetWithTimeout {
 				break
@@ -441,6 +456,15 @@ func (vlvc RampingVUsConfig) reserveVUsForGracefulRampDowns( //nolint:funlen
 				rawStepNum = advStepNum - 1
 				skippedToNewRawStep = true
 				break
+			}
+			if wasRampingDown {
+				if rawSteps[advStepNum-1].PlannedVUs > advStep.PlannedVUs {
+					// Still ramping down
+					lastDownwardSlopeStepNum = advStepNum
+				} else {
+					// No longer ramping down
+					wasRampingDown = false
+				}
 			}
 		}
 

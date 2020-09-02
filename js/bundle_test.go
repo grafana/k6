@@ -41,13 +41,14 @@ import (
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/lib/fsext"
+	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/loader"
 )
 
 const isWindows = runtime.GOOS == "windows"
 
-func getSimpleBundle(filename, data string, opts ...interface{}) (*Bundle, error) {
+func getSimpleBundle(tb testing.TB, filename, data string, opts ...interface{}) (*Bundle, error) {
 	var (
 		fs     = afero.NewMemMapFs()
 		rtOpts = lib.RuntimeOptions{}
@@ -61,6 +62,7 @@ func getSimpleBundle(filename, data string, opts ...interface{}) (*Bundle, error
 		}
 	}
 	return NewBundle(
+		testutils.NewLogger(tb),
 		&loader.SourceData{
 			URL:  &url.URL{Path: filename, Scheme: "file"},
 			Data: []byte(data),
@@ -72,40 +74,40 @@ func getSimpleBundle(filename, data string, opts ...interface{}) (*Bundle, error
 
 func TestNewBundle(t *testing.T) {
 	t.Run("Blank", func(t *testing.T) {
-		_, err := getSimpleBundle("/script.js", "")
+		_, err := getSimpleBundle(t, "/script.js", "")
 		assert.EqualError(t, err, "no exported functions in script")
 	})
 	t.Run("Invalid", func(t *testing.T) {
-		_, err := getSimpleBundle("/script.js", "\x00")
+		_, err := getSimpleBundle(t, "/script.js", "\x00")
 		assert.NotNil(t, err)
 		assert.Contains(t, err.Error(), "SyntaxError: file:///script.js: Unexpected character '\x00' (1:0)\n> 1 | \x00\n")
 	})
 	t.Run("Error", func(t *testing.T) {
-		_, err := getSimpleBundle("/script.js", `throw new Error("aaaa");`)
+		_, err := getSimpleBundle(t, "/script.js", `throw new Error("aaaa");`)
 		assert.EqualError(t, err, "Error: aaaa at file:///script.js:1:7(3)")
 	})
 	t.Run("InvalidExports", func(t *testing.T) {
-		_, err := getSimpleBundle("/script.js", `exports = null`)
+		_, err := getSimpleBundle(t, "/script.js", `exports = null`)
 		assert.EqualError(t, err, "exports must be an object")
 	})
 	t.Run("DefaultUndefined", func(t *testing.T) {
-		_, err := getSimpleBundle("/script.js", `export default undefined;`)
+		_, err := getSimpleBundle(t, "/script.js", `export default undefined;`)
 		assert.EqualError(t, err, "no exported functions in script")
 	})
 	t.Run("DefaultNull", func(t *testing.T) {
-		_, err := getSimpleBundle("/script.js", `export default null;`)
+		_, err := getSimpleBundle(t, "/script.js", `export default null;`)
 		assert.EqualError(t, err, "no exported functions in script")
 	})
 	t.Run("DefaultWrongType", func(t *testing.T) {
-		_, err := getSimpleBundle("/script.js", `export default 12345;`)
+		_, err := getSimpleBundle(t, "/script.js", `export default 12345;`)
 		assert.EqualError(t, err, "no exported functions in script")
 	})
 	t.Run("Minimal", func(t *testing.T) {
-		_, err := getSimpleBundle("/script.js", `export default function() {};`)
+		_, err := getSimpleBundle(t, "/script.js", `export default function() {};`)
 		assert.NoError(t, err)
 	})
 	t.Run("stdin", func(t *testing.T) {
-		b, err := getSimpleBundle("-", `export default function() {};`)
+		b, err := getSimpleBundle(t, "-", `export default function() {};`)
 		if assert.NoError(t, err) {
 			assert.Equal(t, "file://-", b.Filename.String())
 			assert.Equal(t, "file:///", b.BaseInitContext.pwd.String())
@@ -116,15 +118,16 @@ func TestNewBundle(t *testing.T) {
 			rtOpts := lib.RuntimeOptions{
 				CompatibilityMode: null.StringFrom(lib.CompatibilityModeExtended.String()),
 			}
-			_, err := getSimpleBundle("/script.js",
-				`export default function() {}; new Set([1, 2, 3, 2, 1]);`, rtOpts)
+			_, err := getSimpleBundle(t, "/script.js",
+				`module.exports.default = function() {}; new Promise(function(resolve, reject){});`, rtOpts)
+
 			assert.NoError(t, err)
 		})
 		t.Run("Base/ok/Minimal", func(t *testing.T) {
 			rtOpts := lib.RuntimeOptions{
 				CompatibilityMode: null.StringFrom(lib.CompatibilityModeBase.String()),
 			}
-			_, err := getSimpleBundle("/script.js",
+			_, err := getSimpleBundle(t, "/script.js",
 				`module.exports.default = function() {};`, rtOpts)
 			assert.NoError(t, err)
 		})
@@ -150,11 +153,11 @@ func TestNewBundle(t *testing.T) {
 					`module.exports.default = function() {}; () => {};`,
 					"file:///script.js: Line 1:42 Unexpected token ) (and 1 more errors)",
 				},
-				// ES2015 objects polyfilled by core.js are not supported
+				// some ES2015 objects polyfilled by core.js are not supported
 				{
 					"CoreJS", "base",
-					`module.exports.default = function() {}; new Set([1, 2, 3, 2, 1]);`,
-					"ReferenceError: Set is not defined at file:///script.js:1:45(5)",
+					`module.exports.default = function() {}; new Promise(function(resolve, reject){});`,
+					"ReferenceError: Promise is not defined at file:///script.js:1:45(5)",
 				},
 			}
 
@@ -162,7 +165,7 @@ func TestNewBundle(t *testing.T) {
 				tc := tc
 				t.Run(tc.name, func(t *testing.T) {
 					rtOpts := lib.RuntimeOptions{CompatibilityMode: null.StringFrom(tc.compatMode)}
-					_, err := getSimpleBundle("/script.js", tc.code, rtOpts)
+					_, err := getSimpleBundle(t, "/script.js", tc.code, rtOpts)
 					assert.EqualError(t, err, tc.expErr)
 				})
 			}
@@ -170,7 +173,7 @@ func TestNewBundle(t *testing.T) {
 	})
 	t.Run("Options", func(t *testing.T) {
 		t.Run("Empty", func(t *testing.T) {
-			_, err := getSimpleBundle("/script.js", `
+			_, err := getSimpleBundle(t, "/script.js", `
 				export let options = {};
 				export default function() {};
 			`)
@@ -185,7 +188,7 @@ func TestNewBundle(t *testing.T) {
 			}
 			for name, data := range invalidOptions {
 				t.Run(name, func(t *testing.T) {
-					_, err := getSimpleBundle("/script.js", fmt.Sprintf(`
+					_, err := getSimpleBundle(t, "/script.js", fmt.Sprintf(`
 						export let options = %s;
 						export default function() {};
 					`, data.Expr))
@@ -195,7 +198,7 @@ func TestNewBundle(t *testing.T) {
 		})
 
 		t.Run("Paused", func(t *testing.T) {
-			b, err := getSimpleBundle("/script.js", `
+			b, err := getSimpleBundle(t, "/script.js", `
 				export let options = {
 					paused: true,
 				};
@@ -206,7 +209,7 @@ func TestNewBundle(t *testing.T) {
 			}
 		})
 		t.Run("VUs", func(t *testing.T) {
-			b, err := getSimpleBundle("/script.js", `
+			b, err := getSimpleBundle(t, "/script.js", `
 				export let options = {
 					vus: 100,
 				};
@@ -217,7 +220,7 @@ func TestNewBundle(t *testing.T) {
 			}
 		})
 		t.Run("Duration", func(t *testing.T) {
-			b, err := getSimpleBundle("/script.js", `
+			b, err := getSimpleBundle(t, "/script.js", `
 				export let options = {
 					duration: "10s",
 				};
@@ -228,7 +231,7 @@ func TestNewBundle(t *testing.T) {
 			}
 		})
 		t.Run("Iterations", func(t *testing.T) {
-			b, err := getSimpleBundle("/script.js", `
+			b, err := getSimpleBundle(t, "/script.js", `
 				export let options = {
 					iterations: 100,
 				};
@@ -239,7 +242,7 @@ func TestNewBundle(t *testing.T) {
 			}
 		})
 		t.Run("Stages", func(t *testing.T) {
-			b, err := getSimpleBundle("/script.js", `
+			b, err := getSimpleBundle(t, "/script.js", `
 				export let options = {
 					stages: [],
 				};
@@ -250,7 +253,7 @@ func TestNewBundle(t *testing.T) {
 			}
 
 			t.Run("Empty", func(t *testing.T) {
-				b, err := getSimpleBundle("/script.js", `
+				b, err := getSimpleBundle(t, "/script.js", `
 					export let options = {
 						stages: [
 							{},
@@ -265,7 +268,7 @@ func TestNewBundle(t *testing.T) {
 				}
 			})
 			t.Run("Target", func(t *testing.T) {
-				b, err := getSimpleBundle("/script.js", `
+				b, err := getSimpleBundle(t, "/script.js", `
 					export let options = {
 						stages: [
 							{target: 10},
@@ -280,7 +283,7 @@ func TestNewBundle(t *testing.T) {
 				}
 			})
 			t.Run("Duration", func(t *testing.T) {
-				b, err := getSimpleBundle("/script.js", `
+				b, err := getSimpleBundle(t, "/script.js", `
 					export let options = {
 						stages: [
 							{duration: "10s"},
@@ -295,7 +298,7 @@ func TestNewBundle(t *testing.T) {
 				}
 			})
 			t.Run("DurationAndTarget", func(t *testing.T) {
-				b, err := getSimpleBundle("/script.js", `
+				b, err := getSimpleBundle(t, "/script.js", `
 					export let options = {
 						stages: [
 							{duration: "10s", target: 10},
@@ -310,7 +313,7 @@ func TestNewBundle(t *testing.T) {
 				}
 			})
 			t.Run("RampUpAndPlateau", func(t *testing.T) {
-				b, err := getSimpleBundle("/script.js", `
+				b, err := getSimpleBundle(t, "/script.js", `
 					export let options = {
 						stages: [
 							{duration: "10s", target: 10},
@@ -328,7 +331,7 @@ func TestNewBundle(t *testing.T) {
 			})
 		})
 		t.Run("MaxRedirects", func(t *testing.T) {
-			b, err := getSimpleBundle("/script.js", `
+			b, err := getSimpleBundle(t, "/script.js", `
 				export let options = {
 					maxRedirects: 10,
 				};
@@ -339,7 +342,7 @@ func TestNewBundle(t *testing.T) {
 			}
 		})
 		t.Run("InsecureSkipTLSVerify", func(t *testing.T) {
-			b, err := getSimpleBundle("/script.js", `
+			b, err := getSimpleBundle(t, "/script.js", `
 				export let options = {
 					insecureSkipTLSVerify: true,
 				};
@@ -360,7 +363,7 @@ func TestNewBundle(t *testing.T) {
 					`
 					script = fmt.Sprintf(script, suiteName)
 
-					b, err := getSimpleBundle("/script.js", script)
+					b, err := getSimpleBundle(t, "/script.js", script)
 					if assert.NoError(t, err) {
 						if assert.Len(t, *b.Options.TLSCipherSuites, 1) {
 							assert.Equal(t, (*b.Options.TLSCipherSuites)[0], suiteID)
@@ -371,7 +374,7 @@ func TestNewBundle(t *testing.T) {
 		})
 		t.Run("TLSVersion", func(t *testing.T) {
 			t.Run("Object", func(t *testing.T) {
-				b, err := getSimpleBundle("/script.js", `
+				b, err := getSimpleBundle(t, "/script.js", `
 					export let options = {
 						tlsVersion: {
 							min: "ssl3.0",
@@ -386,7 +389,7 @@ func TestNewBundle(t *testing.T) {
 				}
 			})
 			t.Run("String", func(t *testing.T) {
-				b, err := getSimpleBundle("/script.js", `
+				b, err := getSimpleBundle(t, "/script.js", `
 					export let options = {
 						tlsVersion: "ssl3.0"
 					};
@@ -399,7 +402,7 @@ func TestNewBundle(t *testing.T) {
 			})
 		})
 		t.Run("Thresholds", func(t *testing.T) {
-			b, err := getSimpleBundle("/script.js", `
+			b, err := getSimpleBundle(t, "/script.js", `
 				export let options = {
 					thresholds: {
 						http_req_duration: ["avg<100"],
@@ -416,8 +419,8 @@ func TestNewBundle(t *testing.T) {
 	})
 }
 
-func getArchive(data string, rtOpts lib.RuntimeOptions) (*lib.Archive, error) {
-	b, err := getSimpleBundle("script.js", data, rtOpts)
+func getArchive(tb testing.TB, data string, rtOpts lib.RuntimeOptions) (*lib.Archive, error) {
+	b, err := getSimpleBundle(tb, "script.js", data, rtOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -432,17 +435,18 @@ func TestNewBundleFromArchive(t *testing.T) {
 	baseCompatModeRtOpts := lib.RuntimeOptions{CompatibilityMode: null.StringFrom(lib.CompatibilityModeBase.String())}
 	extCompatModeRtOpts := lib.RuntimeOptions{CompatibilityMode: null.StringFrom(lib.CompatibilityModeExtended.String())}
 
+	logger := testutils.NewLogger(t)
 	checkBundle := func(t *testing.T, b *Bundle) {
 		assert.Equal(t, lib.Options{VUs: null.IntFrom(12345)}, b.Options)
-		bi, err := b.Instantiate()
+		bi, err := b.Instantiate(logger, 0)
 		require.NoError(t, err)
-		val, err := bi.exports["default"](goja.Undefined())
+		val, err := bi.exports[consts.DefaultFn](goja.Undefined())
 		require.NoError(t, err)
 		assert.Equal(t, "hi!", val.Export())
 	}
 
 	checkArchive := func(t *testing.T, arc *lib.Archive, rtOpts lib.RuntimeOptions, expError string) {
-		b, err := NewBundleFromArchive(arc, rtOpts)
+		b, err := NewBundleFromArchive(logger, arc, rtOpts)
 		if expError != "" {
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), expError)
@@ -454,7 +458,7 @@ func TestNewBundleFromArchive(t *testing.T) {
 
 	t.Run("es6_script_default", func(t *testing.T) {
 		t.Parallel()
-		arc, err := getArchive(es6Code, lib.RuntimeOptions{}) // default options
+		arc, err := getArchive(t, es6Code, lib.RuntimeOptions{}) // default options
 		require.NoError(t, err)
 		require.Equal(t, lib.CompatibilityModeExtended.String(), arc.CompatibilityMode)
 
@@ -465,7 +469,7 @@ func TestNewBundleFromArchive(t *testing.T) {
 
 	t.Run("es6_script_explicit", func(t *testing.T) {
 		t.Parallel()
-		arc, err := getArchive(es6Code, extCompatModeRtOpts)
+		arc, err := getArchive(t, es6Code, extCompatModeRtOpts)
 		require.NoError(t, err)
 		require.Equal(t, lib.CompatibilityModeExtended.String(), arc.CompatibilityMode)
 
@@ -476,7 +480,7 @@ func TestNewBundleFromArchive(t *testing.T) {
 
 	t.Run("es5_script_with_extended", func(t *testing.T) {
 		t.Parallel()
-		arc, err := getArchive(es5Code, lib.RuntimeOptions{})
+		arc, err := getArchive(t, es5Code, lib.RuntimeOptions{})
 		require.NoError(t, err)
 		require.Equal(t, lib.CompatibilityModeExtended.String(), arc.CompatibilityMode)
 
@@ -487,7 +491,7 @@ func TestNewBundleFromArchive(t *testing.T) {
 
 	t.Run("es5_script", func(t *testing.T) {
 		t.Parallel()
-		arc, err := getArchive(es5Code, baseCompatModeRtOpts)
+		arc, err := getArchive(t, es5Code, baseCompatModeRtOpts)
 		require.NoError(t, err)
 		require.Equal(t, lib.CompatibilityModeBase.String(), arc.CompatibilityMode)
 
@@ -498,14 +502,14 @@ func TestNewBundleFromArchive(t *testing.T) {
 
 	t.Run("es6_archive_with_wrong_compat_mode", func(t *testing.T) {
 		t.Parallel()
-		arc, err := getArchive(es6Code, baseCompatModeRtOpts)
+		arc, err := getArchive(t, es6Code, baseCompatModeRtOpts)
 		require.Error(t, err)
 		require.Nil(t, arc)
 	})
 
 	t.Run("messed_up_archive", func(t *testing.T) {
 		t.Parallel()
-		arc, err := getArchive(es6Code, extCompatModeRtOpts)
+		arc, err := getArchive(t, es6Code, extCompatModeRtOpts)
 		require.NoError(t, err)
 		arc.CompatibilityMode = "blah"                                           // intentionally break the archive
 		checkArchive(t, arc, lib.RuntimeOptions{}, "invalid compatibility mode") // fails when it uses the archive one
@@ -525,9 +529,9 @@ func TestNewBundleFromArchive(t *testing.T) {
 			PwdURL:      &url.URL{Scheme: "file", Path: "/"},
 			Filesystems: nil,
 		}
-		b, err := NewBundleFromArchive(arc, lib.RuntimeOptions{})
+		b, err := NewBundleFromArchive(logger, arc, lib.RuntimeOptions{})
 		require.NoError(t, err)
-		bi, err := b.Instantiate()
+		bi, err := b.Instantiate(logger, 0)
 		require.NoError(t, err)
 		val, err := bi.exports[consts.DefaultFn](goja.Undefined())
 		require.NoError(t, err)
@@ -610,8 +614,8 @@ func TestOpen(t *testing.T) {
 	fss := map[string]func() (afero.Fs, string, func()){
 		"MemMapFS": func() (afero.Fs, string, func()) {
 			fs := afero.NewMemMapFs()
-			require.NoError(t, fs.MkdirAll("/path/to", 0755))
-			require.NoError(t, afero.WriteFile(fs, "/path/to/file.txt", []byte(`hi`), 0644))
+			require.NoError(t, fs.MkdirAll("/path/to", 0o755))
+			require.NoError(t, afero.WriteFile(fs, "/path/to/file.txt", []byte(`hi`), 0o644))
 			return fs, "", func() {}
 		},
 		"OsFS": func() (afero.Fs, string, func()) {
@@ -619,14 +623,16 @@ func TestOpen(t *testing.T) {
 			require.NoError(t, err)
 			fs := afero.NewOsFs()
 			filePath := filepath.Join(prefix, "/path/to/file.txt")
-			require.NoError(t, fs.MkdirAll(filepath.Join(prefix, "/path/to"), 0755))
-			require.NoError(t, afero.WriteFile(fs, filePath, []byte(`hi`), 0644))
+			require.NoError(t, fs.MkdirAll(filepath.Join(prefix, "/path/to"), 0o755))
+			require.NoError(t, afero.WriteFile(fs, filePath, []byte(`hi`), 0o644))
 			if isWindows {
 				fs = fsext.NewTrimFilePathSeparatorFs(fs)
 			}
 			return fs, prefix, func() { require.NoError(t, os.RemoveAll(prefix)) }
 		},
 	}
+
+	logger := testutils.NewLogger(t)
 
 	for name, fsInit := range fss {
 		fs, prefix, cleanUp := fsInit()
@@ -653,23 +659,23 @@ func TestOpen(t *testing.T) {
 						export let file = open("` + openPath + `");
 						export default function() { return file };`
 
-					sourceBundle, err := getSimpleBundle(filepath.ToSlash(filepath.Join(prefix, pwd, "script.js")), data, fs)
+					sourceBundle, err := getSimpleBundle(t, filepath.ToSlash(filepath.Join(prefix, pwd, "script.js")), data, fs)
 					if tCase.isError {
 						assert.Error(t, err)
 						return
 					}
 					require.NoError(t, err)
 
-					arcBundle, err := NewBundleFromArchive(sourceBundle.makeArchive(), lib.RuntimeOptions{})
+					arcBundle, err := NewBundleFromArchive(logger, sourceBundle.makeArchive(), lib.RuntimeOptions{})
 
 					require.NoError(t, err)
 
 					for source, b := range map[string]*Bundle{"source": sourceBundle, "archive": arcBundle} {
 						b := b
 						t.Run(source, func(t *testing.T) {
-							bi, err := b.Instantiate()
+							bi, err := b.Instantiate(logger, 0)
 							require.NoError(t, err)
-							v, err := bi.exports["default"](goja.Undefined())
+							v, err := bi.exports[consts.DefaultFn](goja.Undefined())
 							require.NoError(t, err)
 							assert.Equal(t, "hi", v.Export())
 						})
@@ -689,7 +695,7 @@ func TestOpen(t *testing.T) {
 }
 
 func TestBundleInstantiate(t *testing.T) {
-	b, err := getSimpleBundle("/script.js", `
+	b, err := getSimpleBundle(t, "/script.js", `
 		export let options = {
 			vus: 5,
 			teardownTimeout: '1s',
@@ -700,14 +706,15 @@ func TestBundleInstantiate(t *testing.T) {
 	if !assert.NoError(t, err) {
 		return
 	}
+	logger := testutils.NewLogger(t)
 
-	bi, err := b.Instantiate()
+	bi, err := b.Instantiate(logger, 0)
 	if !assert.NoError(t, err) {
 		return
 	}
 
 	t.Run("Run", func(t *testing.T) {
-		v, err := bi.exports["default"](goja.Undefined())
+		v, err := bi.exports[consts.DefaultFn](goja.Undefined())
 		if assert.NoError(t, err) {
 			assert.Equal(t, true, v.Export())
 		}
@@ -715,7 +722,7 @@ func TestBundleInstantiate(t *testing.T) {
 
 	t.Run("SetAndRun", func(t *testing.T) {
 		bi.Runtime.Set("val", false)
-		v, err := bi.exports["default"](goja.Undefined())
+		v, err := bi.exports[consts.DefaultFn](goja.Undefined())
 		if assert.NoError(t, err) {
 			assert.Equal(t, false, v.Export())
 		}
@@ -732,7 +739,7 @@ func TestBundleInstantiate(t *testing.T) {
 		// Ensure options propagate correctly from outside to the script
 		optOrig := b.Options.VUs
 		b.Options.VUs = null.IntFrom(10)
-		bi2, err := b.Instantiate()
+		bi2, err := b.Instantiate(logger, 0)
 		assert.NoError(t, err)
 		jsOptions = bi2.Runtime.Get("options").ToObject(bi2.Runtime)
 		vus = jsOptions.Get("vus").Export()
@@ -752,25 +759,27 @@ func TestBundleEnv(t *testing.T) {
 			if (__ENV.TEST_B !== "") { throw new Error("Invalid TEST_B: " + __ENV.TEST_B); }
 		}
 	`
-	b1, err := getSimpleBundle("/script.js", data, rtOpts)
+	b1, err := getSimpleBundle(t, "/script.js", data, rtOpts)
 	if !assert.NoError(t, err) {
 		return
 	}
 
-	b2, err := NewBundleFromArchive(b1.makeArchive(), lib.RuntimeOptions{})
+	logger := testutils.NewLogger(t)
+	b2, err := NewBundleFromArchive(logger, b1.makeArchive(), lib.RuntimeOptions{})
 	if !assert.NoError(t, err) {
 		return
 	}
 
 	bundles := map[string]*Bundle{"Source": b1, "Archive": b2}
 	for name, b := range bundles {
+		b := b
 		t.Run(name, func(t *testing.T) {
 			assert.Equal(t, "1", b.Env["TEST_A"])
 			assert.Equal(t, "", b.Env["TEST_B"])
 
-			bi, err := b.Instantiate()
+			bi, err := b.Instantiate(logger, 0)
 			if assert.NoError(t, err) {
-				_, err := bi.exports["default"](goja.Undefined())
+				_, err := bi.exports[consts.DefaultFn](goja.Undefined())
 				assert.NoError(t, err)
 			}
 		})
@@ -790,12 +799,13 @@ func TestBundleNotSharable(t *testing.T) {
 			}
 		}
 	`
-	b1, err := getSimpleBundle("/script.js", data)
+	b1, err := getSimpleBundle(t, "/script.js", data)
 	if !assert.NoError(t, err) {
 		return
 	}
+	logger := testutils.NewLogger(t)
 
-	b2, err := NewBundleFromArchive(b1.makeArchive(), lib.RuntimeOptions{})
+	b2, err := NewBundleFromArchive(logger, b1.makeArchive(), lib.RuntimeOptions{})
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -806,12 +816,11 @@ func TestBundleNotSharable(t *testing.T) {
 		b := b
 		t.Run(name, func(t *testing.T) {
 			for i := 0; i < vus; i++ {
-				bi, err := b.Instantiate()
-				bi.Runtime.Set("__VU", i)
+				bi, err := b.Instantiate(logger, int64(i))
 				require.NoError(t, err)
 				for j := 0; j < iters; j++ {
 					bi.Runtime.Set("__ITER", j)
-					_, err := bi.exports["default"](goja.Undefined())
+					_, err := bi.exports[consts.DefaultFn](goja.Undefined())
 					assert.NoError(t, err)
 				}
 			}
@@ -847,12 +856,12 @@ func TestBundleMakeArchive(t *testing.T) {
 		tc := tc
 		t.Run(tc.cm.String(), func(t *testing.T) {
 			fs := afero.NewMemMapFs()
-			_ = fs.MkdirAll("/path/to", 0755)
-			_ = afero.WriteFile(fs, "/path/to/file.txt", []byte(`hi`), 0644)
-			_ = afero.WriteFile(fs, "/path/to/exclaim.js", []byte(tc.exclaim), 0644)
+			_ = fs.MkdirAll("/path/to", 0o755)
+			_ = afero.WriteFile(fs, "/path/to/file.txt", []byte(`hi`), 0o644)
+			_ = afero.WriteFile(fs, "/path/to/exclaim.js", []byte(tc.exclaim), 0o644)
 
 			rtOpts := lib.RuntimeOptions{CompatibilityMode: null.StringFrom(tc.cm.String())}
-			b, err := getSimpleBundle("/path/to/script.js", tc.script, fs, rtOpts)
+			b, err := getSimpleBundle(t, "/path/to/script.js", tc.script, fs, rtOpts)
 			assert.NoError(t, err)
 
 			arc := b.makeArchive()

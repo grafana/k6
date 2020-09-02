@@ -22,12 +22,13 @@ package csv
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/csv"
 	"fmt"
-	"io"
 	"os"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -40,7 +41,7 @@ import (
 
 // Collector saving output to csv implements the lib.Collector interface
 type Collector struct {
-	outfile      io.WriteCloser
+	closeFn      func() error
 	fname        string
 	resTags      []string
 	ignoredTags  []string
@@ -50,20 +51,14 @@ type Collector struct {
 	bufferLock   sync.Mutex
 	row          []string
 	saveInterval time.Duration
+	logger       logrus.FieldLogger
 }
 
 // Verify that Collector implements lib.Collector
 var _ lib.Collector = &Collector{}
 
-// Similar to ioutil.NopCloser, but for writers
-type nopCloser struct {
-	io.Writer
-}
-
-func (nopCloser) Close() error { return nil }
-
 // New Creates new instance of CSV collector
-func New(fs afero.Fs, tags stats.TagSet, config Config) (*Collector, error) {
+func New(logger logrus.FieldLogger, fs afero.Fs, tags stats.TagSet, config Config) (*Collector, error) {
 	resTags := []string{}
 	ignoredTags := []string{}
 	for tag, flag := range tags {
@@ -80,32 +75,48 @@ func New(fs afero.Fs, tags stats.TagSet, config Config) (*Collector, error) {
 	fname := config.FileName.String
 
 	if fname == "" || fname == "-" {
-		logfile := nopCloser{os.Stdout}
+		stdoutWriter := csv.NewWriter(os.Stdout)
 		return &Collector{
-			outfile:      logfile,
 			fname:        "-",
 			resTags:      resTags,
 			ignoredTags:  ignoredTags,
-			csvWriter:    csv.NewWriter(logfile),
+			csvWriter:    stdoutWriter,
 			row:          make([]string, 3+len(resTags)+1),
 			saveInterval: saveInterval,
+			closeFn:      func() error { return nil },
+			logger:       logger,
 		}, nil
 	}
 
-	logfile, err := fs.Create(fname)
+	logFile, err := fs.Create(fname)
 	if err != nil {
 		return nil, err
 	}
 
-	return &Collector{
-		outfile:      logfile,
+	c := Collector{
 		fname:        fname,
 		resTags:      resTags,
 		ignoredTags:  ignoredTags,
-		csvWriter:    csv.NewWriter(logfile),
 		row:          make([]string, 3+len(resTags)+1),
 		saveInterval: saveInterval,
-	}, nil
+		logger:       logger,
+	}
+
+	if strings.HasSuffix(fname, ".gz") {
+		outfile := gzip.NewWriter(logFile)
+		csvWriter := csv.NewWriter(outfile)
+		c.csvWriter = csvWriter
+		c.closeFn = func() error {
+			_ = outfile.Close()
+			return logFile.Close()
+		}
+	} else {
+		csvWriter := csv.NewWriter(logFile)
+		c.csvWriter = csvWriter
+		c.closeFn = logFile.Close
+	}
+
+	return &c, nil
 }
 
 // Init writes column names to csv file
@@ -113,7 +124,7 @@ func (c *Collector) Init() error {
 	header := MakeHeader(c.resTags)
 	err := c.csvWriter.Write(header)
 	if err != nil {
-		logrus.WithField("filename", c.fname).Error("CSV: Error writing column names to file")
+		c.logger.WithField("filename", c.fname).Error("CSV: Error writing column names to file")
 	}
 	c.csvWriter.Flush()
 	return nil
@@ -125,16 +136,19 @@ func (c *Collector) SetRunStatus(status lib.RunStatus) {}
 // Run just blocks until the context is done
 func (c *Collector) Run(ctx context.Context) {
 	ticker := time.NewTicker(c.saveInterval)
+	defer func() {
+		err := c.closeFn()
+		if err != nil {
+			c.logger.WithField("filename", c.fname).Errorf("CSV: Error closing the file: %v", err)
+		}
+	}()
+
 	for {
 		select {
 		case <-ticker.C:
-			c.WriteToFile()
+			c.writeToFile()
 		case <-ctx.Done():
-			c.WriteToFile()
-			err := c.outfile.Close()
-			if err != nil {
-				logrus.WithField("filename", c.fname).Error("CSV: Error closing the file")
-			}
+			c.writeToFile()
 			return
 		}
 	}
@@ -149,8 +163,8 @@ func (c *Collector) Collect(scs []stats.SampleContainer) {
 	}
 }
 
-// WriteToFile Writes samples to the csv file
-func (c *Collector) WriteToFile() {
+// writeToFile Writes samples to the csv file
+func (c *Collector) writeToFile() {
 	c.bufferLock.Lock()
 	samples := c.buffer
 	c.buffer = nil
@@ -165,7 +179,7 @@ func (c *Collector) WriteToFile() {
 				row := SampleToRow(&sample, c.resTags, c.ignoredTags, c.row)
 				err := c.csvWriter.Write(row)
 				if err != nil {
-					logrus.WithField("filename", c.fname).Error("CSV: Error writing to file")
+					c.logger.WithField("filename", c.fname).Error("CSV: Error writing to file")
 				}
 			}
 		}

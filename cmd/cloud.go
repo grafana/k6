@@ -50,10 +50,10 @@ const (
 	cloudTestRunFailedErrorCode       = 99
 )
 
-var (
-	exitOnRunning = os.Getenv("K6_EXIT_ON_RUNNING") != ""
-)
+//nolint:gochecknoglobals
+var exitOnRunning = os.Getenv("K6_EXIT_ON_RUNNING") != ""
 
+//nolint:gochecknoglobals
 var cloudCmd = &cobra.Command{
 	Use:   "cloud",
 	Short: "Run a test on the cloud",
@@ -64,7 +64,7 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
         k6 cloud script.js`[1:],
 	Args: exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		//TODO: disable in quiet mode?
+		// TODO: disable in quiet mode?
 		_, _ = BannerColor.Fprintf(stdout, "\n%s\n\n", consts.Banner())
 
 		progressBar := pb.New(
@@ -81,7 +81,9 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 
 		filename := args[0]
 		filesystems := loader.CreateFilesystems()
-		src, err := loader.ReadSource(filename, pwd, filesystems, os.Stdin)
+		// TODO: don't use the Global logger
+		logger := logrus.StandardLogger()
+		src, err := loader.ReadSource(logger, filename, pwd, filesystems, os.Stdin)
 		if err != nil {
 			return err
 		}
@@ -92,7 +94,7 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 		}
 
 		modifyAndPrintBar(progressBar, pb.WithConstProgress(0, "Getting script options"))
-		r, err := newRunner(src, runType, filesystems, runtimeOptions)
+		r, err := newRunner(logger, src, runType, filesystems, runtimeOptions)
 		if err != nil {
 			return err
 		}
@@ -112,9 +114,9 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 			return ExitCode{error: cerr, Code: invalidConfigErrorCode}
 		}
 
-		//TODO: validate for usage of execution segment
-		//TODO: validate for externally controlled executor (i.e. executors that aren't distributable)
-		//TODO: move those validations to a separate function and reuse validateConfig()?
+		// TODO: validate for usage of execution segment
+		// TODO: validate for externally controlled executor (i.e. executors that aren't distributable)
+		// TODO: move those validations to a separate function and reuse validateConfig()?
 
 		err = r.SetOptions(conf.Options)
 		if err != nil {
@@ -141,7 +143,7 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 		// map[string]interface{} and copy what we need if it isn't set already
 		var tmpCloudConfig map[string]interface{}
 		if val, ok := arc.Options.External["loadimpact"]; ok {
-			var dec = json.NewDecoder(bytes.NewReader(val))
+			dec := json.NewDecoder(bytes.NewReader(val))
 			dec.UseNumber() // otherwise float64 are used
 			if err := dec.Decode(&tmpCloudConfig); err != nil {
 				return err
@@ -180,7 +182,7 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 
 		// Start cloud test run
 		modifyAndPrintBar(progressBar, pb.WithConstProgress(0, "Validating script options"))
-		client := cloud.NewClient(cloudConfig.Token.String, cloudConfig.Host.String, consts.Version)
+		client := cloud.NewClient(logger, cloudConfig.Token.String, cloudConfig.Host.String, consts.Version)
 		if err := client.ValidateOptions(arc.Options); err != nil {
 			return err
 		}
@@ -257,16 +259,16 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 					}
 					printBar(progressBar)
 				} else {
-					logrus.WithError(progressErr).Error("Test progress error")
+					logger.WithError(progressErr).Error("Test progress error")
 				}
 				if shouldExitLoop {
 					break runningLoop
 				}
 			case sig := <-sigC:
-				logrus.WithField("sig", sig).Print("Exiting in response to signal...")
+				logger.WithField("sig", sig).Print("Exiting in response to signal...")
 				err := client.StopCloudTestRun(refID)
 				if err != nil {
-					logrus.WithError(err).Error("Stop cloud test error")
+					logger.WithError(err).Error("Stop cloud test error")
 				}
 				shouldExitLoop = true // Exit after the next GetTestProgress call
 			}
@@ -294,7 +296,7 @@ func cloudCmdFlagSet() *pflag.FlagSet {
 	flags.AddFlagSet(optionFlagSet())
 	flags.AddFlagSet(runtimeOptionFlagSet(false))
 
-	//TODO: Figure out a better way to handle the CLI flags:
+	// TODO: Figure out a better way to handle the CLI flags:
 	// - the default value is specified in this way so we don't overwrire whatever
 	//   was specified via the environment variable
 	// - global variables are not very testable... :/

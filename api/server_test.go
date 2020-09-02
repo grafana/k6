@@ -36,6 +36,7 @@ import (
 	"github.com/loadimpact/k6/core"
 	"github.com/loadimpact/k6/core/local"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/lib/testutils/minirunner"
 )
 
@@ -56,7 +57,7 @@ func TestLogger(t *testing.T) {
 
 					l, hook := logtest.NewNullLogger()
 					l.Level = logrus.DebugLevel
-					NewLogger(l)(negroni.NewResponseWriter(rw), r, testHTTPHandler)
+					newLogger(l)(negroni.NewResponseWriter(rw), r, testHTTPHandler)
 
 					res := rw.Result()
 					assert.Equal(t, http.StatusOK, res.StatusCode)
@@ -77,20 +78,24 @@ func TestLogger(t *testing.T) {
 }
 
 func TestWithEngine(t *testing.T) {
-	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{}, logrus.StandardLogger())
+	logger := logrus.New()
+	logger.SetOutput(testutils.NewTestOutput(t))
+	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{}, logger)
 	require.NoError(t, err)
-	engine, err := core.NewEngine(execScheduler, lib.Options{}, logrus.StandardLogger())
+	engine, err := core.NewEngine(execScheduler, lib.Options{}, logger)
 	require.NoError(t, err)
 
 	rw := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "http://example.com/", nil)
-	WithEngine(engine)(rw, r, func(rw http.ResponseWriter, r *http.Request) {
+	withEngine(engine)(rw, r, func(rw http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, engine, common.GetEngine(r.Context()))
 	})
 }
 
 func TestPing(t *testing.T) {
-	mux := NewHandler()
+	logger := logrus.New()
+	logger.SetOutput(testutils.NewTestOutput(t))
+	mux := newHandler(logger)
 
 	rw := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/ping", nil)

@@ -125,13 +125,14 @@ func TestExecutionSchedulerRunNonDefault(t *testing.T) {
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			runner, err := js.New(&loader.SourceData{
-				URL: &url.URL{Path: "/script.js"}, Data: []byte(tc.script)},
+			logger := logrus.New()
+			logger.SetOutput(testutils.NewTestOutput(t))
+			runner, err := js.New(logger, &loader.SourceData{
+				URL: &url.URL{Path: "/script.js"}, Data: []byte(tc.script),
+			},
 				nil, lib.RuntimeOptions{})
 			require.NoError(t, err)
 
-			logger := logrus.New()
-			logger.SetOutput(testutils.NewTestOutput(t))
 			execScheduler, err := NewExecutionScheduler(runner, logger)
 			require.NoError(t, err)
 
@@ -221,23 +222,26 @@ func TestExecutionSchedulerRunEnv(t *testing.T) {
 	// Generate tests using global env and with env override
 	for ename, econf := range executorConfigs {
 		testCases = append(testCases, struct{ name, script string }{
-			"global/" + ename, fmt.Sprintf(scriptTemplate, ename, econf, "global")})
+			"global/" + ename, fmt.Sprintf(scriptTemplate, ename, econf, "global"),
+		})
 		configWithEnvOverride := econf + "env: { TESTVAR: 'overridden' }"
 		testCases = append(testCases, struct{ name, script string }{
-			"override/" + ename, fmt.Sprintf(scriptTemplate, ename, configWithEnvOverride, "overridden")})
+			"override/" + ename, fmt.Sprintf(scriptTemplate, ename, configWithEnvOverride, "overridden"),
+		})
 	}
 
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			runner, err := js.New(&loader.SourceData{
+			logger := logrus.New()
+			logger.SetOutput(testutils.NewTestOutput(t))
+			runner, err := js.New(logger, &loader.SourceData{
 				URL:  &url.URL{Path: "/script.js"},
-				Data: []byte(tc.script)},
+				Data: []byte(tc.script),
+			},
 				nil, lib.RuntimeOptions{Env: map[string]string{"TESTVAR": "global"}})
 			require.NoError(t, err)
 
-			logger := logrus.New()
-			logger.SetOutput(testutils.NewTestOutput(t))
 			execScheduler, err := NewExecutionScheduler(runner, logger)
 			require.NoError(t, err)
 
@@ -295,9 +299,12 @@ func TestExecutionSchedulerSystemTags(t *testing.T) {
 		http.get("HTTPBIN_IP_URL/");
 	}`)
 
-	runner, err := js.New(&loader.SourceData{
+	logger := logrus.New()
+	logger.SetOutput(testutils.NewTestOutput(t))
+	runner, err := js.New(logger, &loader.SourceData{
 		URL:  &url.URL{Path: "/script.js"},
-		Data: []byte(script)},
+		Data: []byte(script),
+	},
 		nil, lib.RuntimeOptions{})
 	require.NoError(t, err)
 
@@ -305,8 +312,6 @@ func TestExecutionSchedulerSystemTags(t *testing.T) {
 		SystemTags: &stats.DefaultSystemTagSet,
 	})))
 
-	logger := logrus.New()
-	logger.SetOutput(testutils.NewTestOutput(t))
 	execScheduler, err := NewExecutionScheduler(runner, logger)
 	require.NoError(t, err)
 
@@ -424,20 +429,23 @@ func TestExecutionSchedulerRunCustomTags(t *testing.T) {
 	for ename, econf := range executorConfigs {
 		configWithCustomTag := econf + "tags: { customTag: 'value' }"
 		testCases = append(testCases, struct{ name, script string }{
-			ename, fmt.Sprintf(scriptTemplate, ename, configWithCustomTag)})
+			ename, fmt.Sprintf(scriptTemplate, ename, configWithCustomTag),
+		})
 	}
 
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			runner, err := js.New(&loader.SourceData{
+			logger := logrus.New()
+			logger.SetOutput(testutils.NewTestOutput(t))
+
+			runner, err := js.New(logger, &loader.SourceData{
 				URL:  &url.URL{Path: "/script.js"},
-				Data: []byte(tc.script)},
+				Data: []byte(tc.script),
+			},
 				nil, lib.RuntimeOptions{})
 			require.NoError(t, err)
 
-			logger := logrus.New()
-			logger.SetOutput(testutils.NewTestOutput(t))
 			execScheduler, err := NewExecutionScheduler(runner, logger)
 			require.NoError(t, err)
 
@@ -590,15 +598,16 @@ func TestExecutionSchedulerRunCustomConfigNoCrossover(t *testing.T) {
 		});
 	}
 `)
+	logger := logrus.New()
+	logger.SetOutput(testutils.NewTestOutput(t))
 
-	runner, err := js.New(&loader.SourceData{
+	runner, err := js.New(logger, &loader.SourceData{
 		URL:  &url.URL{Path: "/script.js"},
-		Data: []byte(script)},
+		Data: []byte(script),
+	},
 		nil, lib.RuntimeOptions{Env: map[string]string{"TESTGLOBALVAR": "global"}})
 	require.NoError(t, err)
 
-	logger := logrus.New()
-	logger.SetOutput(testutils.NewTestOutput(t))
 	execScheduler, err := NewExecutionScheduler(runner, logger)
 	require.NoError(t, err)
 
@@ -1007,7 +1016,10 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 		counter.add(6, { place: "defaultAfterSleep" });
 	}`)
 
-	runner, err := js.New(&loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script}, nil, lib.RuntimeOptions{})
+	logger := logrus.New()
+	logger.SetOutput(testutils.NewTestOutput(t))
+
+	runner, err := js.New(logger, &loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script}, nil, lib.RuntimeOptions{})
 	require.NoError(t, err)
 
 	options, err := executor.DeriveScenariosFromShortcuts(runner.GetOptions().Apply(lib.Options{
@@ -1019,9 +1031,6 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 	}))
 	require.NoError(t, err)
 	require.NoError(t, runner.SetOptions(options))
-
-	logger := logrus.New()
-	logger.SetOutput(testutils.NewTestOutput(t))
 
 	execScheduler, err := NewExecutionScheduler(runner, logger)
 	require.NoError(t, err)
@@ -1242,7 +1251,11 @@ func TestNewExecutionSchedulerHasWork(t *testing.T) {
 		};
 `)
 
+	logger := logrus.New()
+	logger.SetOutput(testutils.NewTestOutput(t))
+
 	runner, err := js.New(
+		logger,
 		&loader.SourceData{
 			URL:  &url.URL{Path: "/script.js"},
 			Data: script,
@@ -1251,9 +1264,6 @@ func TestNewExecutionSchedulerHasWork(t *testing.T) {
 		lib.RuntimeOptions{},
 	)
 	require.NoError(t, err)
-
-	logger := logrus.New()
-	logger.SetOutput(testutils.NewTestOutput(t))
 
 	execScheduler, err := NewExecutionScheduler(runner, logger)
 	require.NoError(t, err)
