@@ -240,7 +240,7 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 	if dns, err := flags.GetString("dns"); err != nil {
 		return opts, err
 	} else if dns != "" {
-		if err := opts.DNS.Decode(dns); err != nil {
+		if err := opts.DNS.UnmarshalText([]byte(dns)); err != nil {
 			return opts, err
 		}
 		// TODO: This obviously can't work for neither option...

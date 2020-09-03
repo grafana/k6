@@ -70,17 +70,28 @@ var DefaultDNSConfig = DNSConfig{
 	Strategy: NullDNSStrategy{DNSFirst, true},
 }
 
-func (c *DNSConfig) Decode(value string) error {
-	params, err := strvals.Parse(value)
+func (c *DNSConfig) UnmarshalJSON(data []byte) error {
+	params := make(map[string]interface{})
+	if err := json.Unmarshal(data, &params); err != nil {
+		return err
+	}
+	return c.unmarshalDNSConfig(params)
+}
+
+func (c *DNSConfig) UnmarshalText(text []byte) error {
+	params, err := strvals.Parse(string(text))
 	if err != nil {
 		return err
 	}
-	if ttl, ok := params["ttl"]; ok && !c.TTL.Valid {
+	return c.unmarshalDNSConfig(params)
+}
+
+func (c *DNSConfig) unmarshalDNSConfig(params map[string]interface{}) error {
+	if ttl, ok := params["ttl"]; ok {
 		c.TTL = null.StringFrom(fmt.Sprintf("%v", ttl))
 	}
-	validStrat := c.Strategy.Valid
 	c.Strategy = DefaultDNSConfig.Strategy
-	if strat, ok := params["strategy"]; ok && !validStrat {
+	if strat, ok := params["strategy"]; ok {
 		if s, err := DNSStrategyString(strat.(string)); err != nil {
 			return err
 		} else {
