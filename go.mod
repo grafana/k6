@@ -55,7 +55,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/rcrowley/go-metrics v0.0.0-20180503174638-e2704e165165 // indirect
 	github.com/serenize/snaker v0.0.0-20171204205717-a683aaf2d516
-	github.com/sirupsen/logrus v1.1.2-0.20181101075517-7eeb7b7cbdeb
+	github.com/sirupsen/logrus v1.6.0
 	github.com/spf13/afero v1.1.1
 	github.com/spf13/cobra v0.0.4-0.20180629152535-a114f312e075
 	github.com/spf13/pflag v1.0.1

@@ -22,11 +22,14 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
+	"sync"
 	"syscall"
 	"time"
 
@@ -51,7 +54,10 @@ const (
 )
 
 //nolint:gochecknoglobals
-var exitOnRunning = os.Getenv("K6_EXIT_ON_RUNNING") != ""
+var (
+	exitOnRunning = os.Getenv("K6_EXIT_ON_RUNNING") != ""
+	showCloudLogs = true
+)
 
 //nolint:gochecknoglobals
 var cloudCmd = &cobra.Command{
@@ -59,11 +65,26 @@ var cloudCmd = &cobra.Command{
 	Short: "Run a test on the cloud",
 	Long: `Run a test on the cloud.
 
-This will execute the test on the Load Impact cloud service. Use "k6 login cloud" to authenticate.`,
+This will execute the test on the k6 cloud service. Use "k6 login cloud" to authenticate.`,
 	Example: `
         k6 cloud script.js`[1:],
 	Args: exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// TODO: don't use the Global logger
+		logger := logrus.StandardLogger()
+		// we specifically first parse it and return an error if it has bad value and then check if
+		// we are going to set it  ... so we always parse it instead of it breaking the command if
+		// the cli flag is removed
+		if showCloudLogsEnv, ok := os.LookupEnv("K6_SHOW_CLOUD_LOGS"); ok {
+			showCloudLogsValue, err := strconv.ParseBool(showCloudLogsEnv)
+			if err != nil {
+				return fmt.Errorf("parsing K6_SHOW_CLOUD_LOGS returned an error: %w", err)
+			}
+			if !cmd.Flags().Changed("show-logs") {
+				showCloudLogs = showCloudLogsValue
+			}
+
+		}
 		// TODO: disable in quiet mode?
 		_, _ = BannerColor.Fprintf(stdout, "\n%s\n\n", consts.Banner())
 
@@ -81,8 +102,6 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 
 		filename := args[0]
 		filesystems := loader.CreateFilesystems()
-		// TODO: don't use the Global logger
-		logger := logrus.StandardLogger()
 		src, err := loader.ReadSource(logger, filename, pwd, filesystems, os.Stdin)
 		if err != nil {
 			return err
@@ -207,6 +226,16 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 			pb.WithConstProgress(0, "Initializing the cloud test"),
 		)
 
+		progressCtx, progressCancel := context.WithCancel(context.Background())
+		progressBarWG := &sync.WaitGroup{}
+		progressBarWG.Add(1)
+		defer progressBarWG.Wait()
+		defer progressCancel()
+		go func() {
+			showProgress(progressCtx, conf, []*pb.ProgressBar{progressBar}, logger)
+			progressBarWG.Done()
+		}()
+
 		// The quiet option hides the progress bar and disallow aborting the test
 		if quiet {
 			return nil
@@ -247,6 +276,15 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 		var progressErr error
 		ticker := time.NewTicker(time.Millisecond * 2000)
 		shouldExitLoop := false
+		if showCloudLogs {
+			go func() {
+				logger.Debug("Connecting to cloud logs server...")
+				// TODO replace with another context
+				if err := cloudConfig.StreamLogsToLogger(context.Background(), logger, refID, 0); err != nil {
+					logger.WithError(err).Error("error while tailing cloud logs")
+				}
+			}()
+		}
 
 	runningLoop:
 		for {
@@ -257,7 +295,6 @@ This will execute the test on the Load Impact cloud service. Use "k6 login cloud
 					if (testProgress.RunStatus > lib.RunStatusRunning) || (exitOnRunning && testProgress.RunStatus == lib.RunStatusRunning) {
 						shouldExitLoop = true
 					}
-					printBar(progressBar)
 				} else {
 					logger.WithError(progressErr).Error("Test progress error")
 				}
@@ -304,6 +341,10 @@ func cloudCmdFlagSet() *pflag.FlagSet {
 	// We also need to explicitly set the default value for the usage message here, so setting
 	// K6_EXIT_ON_RUNNING=true won't affect the usage message
 	flags.Lookup("exit-on-running").DefValue = "false"
+
+	// read the comments above for explanation why this is done this way and what are the problems
+	flags.BoolVar(&showCloudLogs, "show-logs", showCloudLogs,
+		"enable showing of logs when a test is executed in the cloud")
 
 	return flags
 }
