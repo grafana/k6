@@ -81,6 +81,9 @@ func (w *consoleWriter) Write(p []byte) (n int, err error) {
 }
 
 func printBar(bar *pb.ProgressBar) {
+	if quiet {
+		return
+	}
 	end := "\n"
 	if stdout.IsTTY {
 		// If we're in a TTY, instead of printing the bar and going to the next
