@@ -31,6 +31,7 @@ import (
 	"io/ioutil"
 	"log"
 	"math"
+	"math/rand"
 	"net"
 	"sync"
 	"time"
@@ -43,6 +44,10 @@ import (
 	"github.com/golang/protobuf/proto"
 	"google.golang.org/grpc/reflection"
 )
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
 
 var (
 	tls        = flag.Bool("tls", false, "Connection uses TLS if true, else plain TCP")
@@ -62,6 +67,10 @@ type routeGuideServer struct {
 
 // GetFeature returns the feature at the given point.
 func (s *routeGuideServer) GetFeature(ctx context.Context, point *Point) (*Feature, error) {
+
+	n := rand.Intn(1000)
+	time.Sleep(time.Duration(n) * time.Millisecond)
+
 	for _, feature := range s.savedFeatures {
 		if proto.Equal(feature.Location, point) {
 			return feature, nil
