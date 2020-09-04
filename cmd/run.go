@@ -345,7 +345,8 @@ a commandline interface for interacting with it.`,
 			case <-lingerCtx.Done():
 				// do nothing, we were interrupted by Ctrl+C already
 			default:
-				logger.Info("Linger set; waiting for Ctrl+C...")
+				logger.Debug("Linger set; waiting for Ctrl+C...")
+				fprintf(stdout, "Linger set; waiting for Ctrl+C...")
 				<-lingerCtx.Done()
 				logger.Debug("Ctrl+C received, exiting...")
 			}
