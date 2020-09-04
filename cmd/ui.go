@@ -133,9 +133,14 @@ func printExecutionDescription(
 	maxDuration, _ := lib.GetEndOffset(execPlan)
 	executorConfigs := conf.Scenarios.GetSortedConfigs()
 
+	scenarioDesc := "1 scenario"
+	if len(executorConfigs) > 1 {
+		scenarioDesc = fmt.Sprintf("%d scenarios", len(executorConfigs))
+	}
+
 	fprintf(stdout, "  scenarios: %s\n", ui.ValueColor.Sprintf(
-		"(%.2f%%) %d executors, %d max VUs, %s max duration (incl. graceful stop):",
-		conf.ExecutionSegment.FloatLength()*100, len(executorConfigs),
+		"(%.2f%%) %s, %d max VUs, %s max duration (incl. graceful stop):",
+		conf.ExecutionSegment.FloatLength()*100, scenarioDesc,
 		lib.GetMaxPossibleVUs(execPlan), maxDuration.Round(100*time.Millisecond)),
 	)
 	for _, ec := range executorConfigs {
