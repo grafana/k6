@@ -85,6 +85,10 @@ func printBar(bar *pb.ProgressBar) {
 		return
 	}
 	end := "\n"
+	// TODO: refactor widthDelta away? make the progressbar rendering a bit more
+	// stateless... basically first render the left and right parts, so we know
+	// how long the longest line is, and how much space we have for the progress
+	widthDelta := -defaultTermWidth
 	if stdout.IsTTY {
 		// If we're in a TTY, instead of printing the bar and going to the next
 		// line, erase everything till the end of the line and return to the
@@ -92,8 +96,9 @@ func printBar(bar *pb.ProgressBar) {
 		//
 		// TODO: check for cross platform support
 		end = "\x1b[0K\r"
+		widthDelta = 0
 	}
-	rendered := bar.Render(0, 0)
+	rendered := bar.Render(0, widthDelta)
 	// Only output the left and middle part of the progress bar
 	fprintf(stdout, "%s%s", rendered.String(), end)
 }
@@ -237,7 +242,7 @@ func renderMultipleBars(
 		//TODO: check for cross platform support
 		result[pbsCount+1] = fmt.Sprintf("\r\x1b[J\x1b[%dA", pbsCount+lineBreaks+1)
 	} else {
-		result[pbsCount+1] = lineEnd
+		result[pbsCount+1] = ""
 	}
 
 	return strings.Join(result, ""), longestLine
