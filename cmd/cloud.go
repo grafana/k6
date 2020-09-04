@@ -89,7 +89,7 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 		_, _ = BannerColor.Fprintf(stdout, "\n%s\n\n", consts.Banner())
 
 		progressBar := pb.New(
-			pb.WithConstLeft(" Init"),
+			pb.WithConstLeft("Init"),
 			pb.WithConstProgress(0, "Parsing script"),
 		)
 		printBar(progressBar)
@@ -222,7 +222,7 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 
 		modifyAndPrintBar(
 			progressBar,
-			pb.WithConstLeft(" Run "),
+			pb.WithConstLeft("Run "),
 			pb.WithConstProgress(0, "Initializing the cloud test"),
 		)
 
