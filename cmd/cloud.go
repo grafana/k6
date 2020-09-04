@@ -265,7 +265,9 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 
 				statusText := testProgress.RunStatusText
 
-				if testProgress.RunStatus == lib.RunStatusRunning {
+				if testProgress.RunStatus == lib.RunStatusFinished {
+					testProgress.Progress = 1
+				} else if testProgress.RunStatus == lib.RunStatusRunning {
 					if startTime.IsZero() {
 						startTime = time.Now()
 					}
