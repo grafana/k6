@@ -74,19 +74,17 @@ func (u URL) Clean() string {
 		return u.CleanURL
 	}
 
-	out := u.URL
-
-	if u.u != nil && u.u.User != nil {
-		schemeIndex := strings.Index(out, "://")
-		atIndex := strings.Index(out, "@")
-		if _, passwordOk := u.u.User.Password(); passwordOk {
-			out = out[:schemeIndex+3] + "****:****" + out[atIndex:]
-		} else {
-			out = out[:schemeIndex+3] + "****" + out[atIndex:]
-		}
+	if u.u == nil || u.u.User == nil {
+		return u.URL
 	}
 
-	return out
+	if password, passwordOk := u.u.User.Password(); passwordOk {
+		// here 3 is for the '://' and 4 is because of '://' and ':' between the credentials
+		return u.URL[:len(u.u.Scheme)+3] + "****:****" + u.URL[len(u.u.Scheme)+4+len(u.u.User.Username())+len(password):]
+	}
+
+	// here 3 in both places is for the '://'
+	return u.URL[:len(u.u.Scheme)+3] + "****" + u.URL[len(u.u.Scheme)+3+len(u.u.User.Username()):]
 }
 
 // GetURL returns the internal url.URL
@@ -232,18 +230,15 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 	}
 
 	tags := state.CloneTags()
+	// Override any global tags with request-specific ones.
 	for k, v := range preq.Tags {
 		tags[k] = v
 	}
-	if state.Options.SystemTags.Has(stats.TagMethod) {
-		tags["method"] = preq.Req.Method
-	}
-	if state.Options.SystemTags.Has(stats.TagURL) {
-		tags["url"] = preq.URL.Clean()
-	}
 
-	// Only set the name system tag if the user didn't explicitly set it beforehand
-	if _, ok := tags["name"]; !ok && state.Options.SystemTags.Has(stats.TagName) {
+	// Only set the name system tag if the user didn't explicitly set it beforehand,
+	// and the Name was generated from a tagged template string (via http.url).
+	if _, ok := tags["name"]; !ok && state.Options.SystemTags.Has(stats.TagName) &&
+		preq.URL.Name != preq.URL.CleanURL {
 		tags["name"] = preq.URL.Name
 	}
 
