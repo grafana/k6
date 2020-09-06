@@ -23,6 +23,7 @@ package kafka
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sync"
 	"time"
 
@@ -45,9 +46,31 @@ type Collector struct {
 	lock    sync.Mutex
 }
 
+// NewKafkaProducer creates an kafka producer
+func NewKafkaProducer(conf Config) (sarama.SyncProducer, error) {
+	c := sarama.NewConfig()
+
+	c.Producer.RequiredAcks = sarama.WaitForAll
+	c.Producer.Return.Successes = true
+	c.Producer.Return.Errors = true
+	//Produce to random partition
+	c.Producer.Partitioner = sarama.NewRandomPartitioner
+
+	if conf.TLSSecurity {
+		tls, err := NewTLS(conf.Certificate.String, conf.PrivateKey.String, conf.CertificateAuthority.String, conf.InsecureSkipVerify)
+		if err != nil {
+			return nil, fmt.Errorf("create tls security for kafka has error: %v", err.Error())
+		}
+		c.Net.TLS.Enable = true
+		c.Net.TLS.Config = tls
+	}
+
+	return sarama.NewSyncProducer(conf.Brokers, c)
+}
+
 // New creates an instance of the collector
 func New(logger logrus.FieldLogger, conf Config) (*Collector, error) {
-	producer, err := sarama.NewSyncProducer(conf.Brokers, nil)
+	producer, err := NewKafkaProducer(conf)
 	if err != nil {
 		return nil, err
 	}

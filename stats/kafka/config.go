@@ -21,6 +21,7 @@
 package kafka
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/kubernetes/helm/pkg/strvals"
@@ -42,6 +43,13 @@ type Config struct {
 	PushInterval types.NullDuration `json:"push_interval" envconfig:"K6_KAFKA_PUSH_INTERVAL"`
 
 	InfluxDBConfig influxdb.Config `json:"influxdb"`
+
+	// TLS
+	TLSSecurity          bool        `json:"tls_security" envconfig:"K6_KAFKA_TLS_SECURITY"`
+	Certificate          null.String `json:"certificate" envconfig:"K6_KAFKA_CERTIFICATE"`
+	PrivateKey           null.String `json:"private_key" envconfig:"K6_KAFKA_PRIVATE_KEY"`
+	CertificateAuthority null.String `json:"certificate_authority" envconfig:"K6_KAFKA_CERTIFICATE_AUTHORITY"`
+	InsecureSkipVerify   bool        `json:"insecure_skip_verify" envconfig:"K6_KAFKA_INSECURE_SKIP_VERIFY"`
 }
 
 // config is a duplicate of ConfigFields as we can not mapstructure.Decode into
@@ -53,6 +61,12 @@ type config struct {
 	PushInterval string   `json:"push_interval" mapstructure:"push_interval" envconfig:"K6_KAFKA_PUSH_INTERVAL"`
 
 	InfluxDBConfig influxdb.Config `json:"influxdb" mapstructure:"influxdb"`
+
+	TLSSecurity          bool   `json:"tls_security" mapstructure:"tls_security" envconfig:"K6_KAFKA_TLS_SECURITY"`
+	Certificate          string `json:"certificate" mapstructure:"certificate" envconfig:"K6_KAFKA_CERTIFICATE"`
+	PrivateKey           string `json:"private_key" mapstructure:"private_key" envconfig:"K6_KAFKA_PRIVATE_KEY"`
+	CertificateAuthority string `json:"certificate_authority" mapstructure:"certificate_authority" envconfig:"K6_KAFKA_CERTIFICATE_AUTHORITY"`
+	InsecureSkipVerify   bool   `json:"insecure_skip_verify" mapstructure:"insecure_skip_verify" envconfig:"K6_KAFKA_INSECURE_SKIP_VERIFY"`
 }
 
 // NewConfig creates a new Config instance with default values for some fields.
@@ -63,6 +77,7 @@ func NewConfig() Config {
 	}
 }
 
+// Apply config
 func (c Config) Apply(cfg Config) Config {
 	if len(cfg.Brokers) > 0 {
 		c.Brokers = cfg.Brokers
@@ -75,6 +90,21 @@ func (c Config) Apply(cfg Config) Config {
 	}
 	if cfg.PushInterval.Valid {
 		c.PushInterval = cfg.PushInterval
+	}
+	if cfg.TLSSecurity {
+		c.TLSSecurity = cfg.TLSSecurity
+	}
+	if cfg.Certificate.Valid {
+		c.Certificate = cfg.Certificate
+	}
+	if cfg.PrivateKey.Valid {
+		c.PrivateKey = cfg.PrivateKey
+	}
+	if cfg.CertificateAuthority.Valid {
+		c.CertificateAuthority = cfg.CertificateAuthority
+	}
+	if cfg.InsecureSkipVerify {
+		c.InsecureSkipVerify = cfg.InsecureSkipVerify
 	}
 	return c
 }
@@ -117,6 +147,46 @@ func ParseArg(arg string) (Config, error) {
 	c.Brokers = cfg.Brokers
 	c.Topic = null.StringFrom(cfg.Topic)
 	c.Format = null.StringFrom(cfg.Format)
+	c.TLSSecurity = cfg.TLSSecurity
+	c.Certificate = null.StringFrom(cfg.Certificate)
+	c.PrivateKey = null.StringFrom(cfg.PrivateKey)
+	c.CertificateAuthority = null.StringFrom(cfg.CertificateAuthority)
+	c.InsecureSkipVerify = cfg.InsecureSkipVerify
+
+	return c, nil
+}
+
+//ParseTLSSecurity validate and read tls security config
+func ParseTLSSecurity(c Config) (Config, error) {
+	if !c.Certificate.Valid || !c.PrivateKey.Valid {
+		return c, fmt.Errorf("missing certificate and private key")
+	}
+
+	//Read certificate
+	cPath, err := GetAbsolutelyFilePath(c.Certificate.String)
+	if err != nil {
+		return c, err
+	}
+
+	c.Certificate = null.StringFrom(string(cPath))
+
+	//Read private key
+	pkPath, err := GetAbsolutelyFilePath(c.PrivateKey.String)
+	if err != nil {
+		return c, err
+	}
+
+	c.PrivateKey = null.StringFrom(string(pkPath))
+
+	if c.CertificateAuthority.Valid {
+		//Read certificate authority
+		caPath, err := GetAbsolutelyFilePath(c.CertificateAuthority.String)
+		if err != nil {
+			return c, err
+		}
+
+		c.CertificateAuthority = null.StringFrom(caPath)
+	}
 
 	return c, nil
 }

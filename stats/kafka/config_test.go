@@ -21,6 +21,8 @@
 package kafka
 
 import (
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -63,4 +65,56 @@ func TestConfigParseArg(t *testing.T) {
 	assert.Equal(t, null.StringFrom("someTopic"), c.Topic)
 	assert.Equal(t, null.StringFrom("influxdb"), c.Format)
 	assert.Equal(t, expInfluxConfig, c.InfluxDBConfig)
+
+	c, err = ParseArg("brokers={broker2,broker3:9092},topic=someTopic,format=json,tls_security=true,certificate=cert.pem,private_key=key.pem,certificate_authority=ca.pem,insecure_skip_verify=true")
+	assert.Nil(t, err)
+	assert.Equal(t, []string{"broker2", "broker3:9092"}, c.Brokers)
+	assert.Equal(t, null.StringFrom("someTopic"), c.Topic)
+	assert.Equal(t, null.StringFrom("json"), c.Format)
+	assert.Equal(t, true, c.TLSSecurity)
+	assert.Equal(t, null.StringFrom("cert.pem"), c.Certificate)
+	assert.Equal(t, null.StringFrom("key.pem"), c.PrivateKey)
+	assert.Equal(t, null.StringFrom("ca.pem"), c.CertificateAuthority)
+	assert.Equal(t, true, c.InsecureSkipVerify)
+
+	//Test with security layer
+
+	cert, err := os.Create("cert.pem")
+	assert.Nil(t, err)
+	_, err = cert.WriteString("cert")
+	assert.Nil(t, err)
+	cert.Close()
+
+	key, err := os.Create("key.pem")
+	assert.Nil(t, err)
+	_, err = key.WriteString("private_key")
+	assert.Nil(t, err)
+	key.Close()
+
+	ca, err := os.Create("ca.pem")
+	assert.Nil(t, err)
+	_, err = ca.WriteString("certificate_authority")
+	assert.Nil(t, err)
+	ca.Close()
+
+	defer func() {
+		_ = os.Remove("cert.pem")
+		_ = os.Remove("key.pem")
+		_ = os.Remove("ca.pem")
+	}()
+
+	//Get working directory
+	wd, err := os.Getwd()
+	assert.Nil(t, err)
+
+	c, err = ParseTLSSecurity(c)
+	assert.Nil(t, err)
+	assert.Equal(t, []string{"broker2", "broker3:9092"}, c.Brokers)
+	assert.Equal(t, null.StringFrom("someTopic"), c.Topic)
+	assert.Equal(t, null.StringFrom("json"), c.Format)
+	assert.Equal(t, true, c.TLSSecurity)
+	assert.Equal(t, null.StringFrom(strings.Join([]string{wd, "cert.pem"}, "/")), c.Certificate)
+	assert.Equal(t, null.StringFrom(strings.Join([]string{wd, "key.pem"}, "/")), c.PrivateKey)
+	assert.Equal(t, null.StringFrom(strings.Join([]string{wd, "ca.pem"}, "/")), c.CertificateAuthority)
+	assert.Equal(t, true, c.InsecureSkipVerify)
 }

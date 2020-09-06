@@ -107,6 +107,14 @@ func getCollector(
 			if err != nil {
 				return nil, err
 			}
+			//Parse TLS Security if it is enabled
+			if cmdConfig.TLSSecurity {
+				newConfig, err := kafka.ParseTLSSecurity(cmdConfig)
+				if err != nil {
+					return nil, err
+				}
+				cmdConfig = newConfig
+			}
 			config = config.Apply(cmdConfig)
 		}
 
