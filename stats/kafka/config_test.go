@@ -22,7 +22,7 @@ package kafka
 
 import (
 	"os"
-	"strings"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -113,8 +113,8 @@ func TestConfigParseArg(t *testing.T) {
 	assert.Equal(t, null.StringFrom("someTopic"), c.Topic)
 	assert.Equal(t, null.StringFrom("json"), c.Format)
 	assert.Equal(t, true, c.TLSSecurity)
-	assert.Equal(t, null.StringFrom(strings.Join([]string{wd, "cert.pem"}, "/")), c.Certificate)
-	assert.Equal(t, null.StringFrom(strings.Join([]string{wd, "key.pem"}, "/")), c.PrivateKey)
-	assert.Equal(t, null.StringFrom(strings.Join([]string{wd, "ca.pem"}, "/")), c.CertificateAuthority)
+	assert.Equal(t, null.StringFrom(filepath.Join(wd, "cert.pem")), c.Certificate)
+	assert.Equal(t, null.StringFrom(filepath.Join(wd, "key.pem")), c.PrivateKey)
+	assert.Equal(t, null.StringFrom(filepath.Join(wd, "ca.pem")), c.CertificateAuthority)
 	assert.Equal(t, true, c.InsecureSkipVerify)
 }

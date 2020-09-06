@@ -23,7 +23,7 @@ package kafka
 import (
 	"github.com/stretchr/testify/assert"
 	"os"
-	"strings"
+	"path/filepath"
 	"testing"
 )
 
@@ -118,7 +118,7 @@ func TestGetAbsolutelyFilePath(t *testing.T) {
 	//Relative path
 	path, err := GetAbsolutelyFilePath("util.go")
 	assert.Nil(t, err)
-	want := strings.Join([]string{wd, "util.go"}, "/")
+	want := filepath.Join(wd, "util.go")
 	assert.Equal(t, want, path)
 	//Absolutely path
 	path, err = GetAbsolutelyFilePath(want)
