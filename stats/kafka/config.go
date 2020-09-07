@@ -158,7 +158,7 @@ func ParseArg(arg string) (Config, error) {
 
 //ParseTLSSecurity validate and read tls security config
 func ParseTLSSecurity(c Config) (Config, error) {
-	if !c.Certificate.Valid || !c.PrivateKey.Valid {
+	if c.Certificate.String == "" || c.PrivateKey.String == "" {
 		return c, fmt.Errorf("missing certificate and private key")
 	}
 
@@ -178,7 +178,7 @@ func ParseTLSSecurity(c Config) (Config, error) {
 
 	c.PrivateKey = null.StringFrom(string(pkPath))
 
-	if c.CertificateAuthority.Valid {
+	if c.CertificateAuthority.String != "" {
 		//Read certificate authority
 		caPath, err := GetAbsolutelyFilePath(c.CertificateAuthority.String)
 		if err != nil {

@@ -66,9 +66,9 @@ func TestConfigParseArg(t *testing.T) {
 	assert.Equal(t, null.StringFrom("influxdb"), c.Format)
 	assert.Equal(t, expInfluxConfig, c.InfluxDBConfig)
 
-	c, err = ParseArg("brokers={broker2,broker3:9092},topic=someTopic,format=json,tls_security=true,certificate=cert.pem,private_key=key.pem,certificate_authority=ca.pem,insecure_skip_verify=true")
+	c, err = ParseArg("brokers={broker-2.kafka.com:9093,broker-3.kafka.com:9093},topic=someTopic,format=json,tls_security=true,certificate=cert.pem,private_key=key.pem,certificate_authority=ca.pem,insecure_skip_verify=true")
 	assert.Nil(t, err)
-	assert.Equal(t, []string{"broker2", "broker3:9092"}, c.Brokers)
+	assert.Equal(t, []string{"broker-2.kafka.com:9093", "broker-3.kafka.com:9093"}, c.Brokers)
 	assert.Equal(t, null.StringFrom("someTopic"), c.Topic)
 	assert.Equal(t, null.StringFrom("json"), c.Format)
 	assert.Equal(t, true, c.TLSSecurity)
@@ -109,7 +109,7 @@ func TestConfigParseArg(t *testing.T) {
 
 	c, err = ParseTLSSecurity(c)
 	assert.Nil(t, err)
-	assert.Equal(t, []string{"broker2", "broker3:9092"}, c.Brokers)
+	assert.Equal(t, []string{"broker-2.kafka.com:9093", "broker-3.kafka.com:9093"}, c.Brokers)
 	assert.Equal(t, null.StringFrom("someTopic"), c.Topic)
 	assert.Equal(t, null.StringFrom("json"), c.Format)
 	assert.Equal(t, true, c.TLSSecurity)
