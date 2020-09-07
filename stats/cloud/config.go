@@ -157,7 +157,7 @@ type Config struct {
 func NewConfig() Config {
 	return Config{
 		Host:                       null.NewString("https://ingest.k6.io", false),
-		LogsHost:                   null.NewString("wss://cloudlogs.k6.io/api/v1/tail", false),
+		LogsHost:                   null.NewString("cloudlogs.k6.io", false),
 		WebAppURL:                  null.NewString("https://app.k6.io", false),
 		MetricPushInterval:         types.NewNullDuration(1*time.Second, false),
 		MetricPushConcurrency:      null.NewInt(1, false),
