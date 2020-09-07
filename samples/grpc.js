@@ -1,29 +1,20 @@
 import grpc from 'k6/grpc';
+import { check } from "k6";
 
-export let options = {
-  vus: 100,
-  duration: '10s',
-};
+let client = grpc.newClient();
+client.load([], "samples/grpc_server/route_guide.proto")
 
-grpc.load([], "samples/grpc_server/route_guide.proto")
 
-export default function() {
-    let client = grpc.newClient();
+export default () => {
+    client.connect("localhost:10000")
 
-    if(client.connect("localhost:10000")) {
-        console.error(err)
-        return
-    }
-    const resp = client.invokeRPC("main.RouteGuide/GetFeature", {
+    const response = client.invokeRPC("main.RouteGuide/GetFeature", {
         latitude: 410248224,
         longitude: -747127767
     })
-    // console.log(resp)
-    client.invokeRPC("main.RouteGuide/GetFeature", {
-        latitude: 0,
-        longitude: 0
-    })
 
+    check(response, { "status is OK": (r) => r && r.status === grpc.StatusOK });
 
     client.close()
 }
+

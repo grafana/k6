@@ -23,8 +23,8 @@ package grpc
 import (
 	"context"
 	"fmt"
+	"net"
 	"strings"
-	"sync"
 
 	"github.com/dop251/goja"
 	"github.com/jhump/protoreflect/desc"
@@ -32,7 +32,9 @@ import (
 	"github.com/jhump/protoreflect/dynamic"
 	"github.com/jhump/protoreflect/dynamic/grpcdynamic"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	grpcstats "google.golang.org/grpc/stats"
+	"google.golang.org/grpc/status"
 
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
@@ -41,16 +43,52 @@ import (
 )
 
 // GRPC represents the gRPC protocol module for k6
-type GRPC struct{}
+type GRPC struct {
+	StatusOK                 codes.Code `js:"StatusOK"`
+	StatusCanceled           codes.Code `js:"StatusCanceled"`
+	StatusUnknown            codes.Code `js:"StatusUnknown"`
+	StatusInvalidArgument    codes.Code `js:"StatusInvalidArgument"`
+	StatusDeadlineExceeded   codes.Code `js:"StatusDeadlineExceeded"`
+	StatusNotFound           codes.Code `js:"StatusNotFound"`
+	StatusAlreadyExists      codes.Code `js:"StatusAlreadyExists"`
+	StatusPermissionDenied   codes.Code `js:"StatusPermissionDenied"`
+	StatusResourceExhausted  codes.Code `js:"StatusResourceExhausted"`
+	StatusFailedPrecondition codes.Code `js:"StatusFailedPrecondition"`
+	StatusAborted            codes.Code `js:"StatusAborted"`
+	StatusOutOfRange         codes.Code `js:"StatusOutOfRange"`
+	StatusUnimplemented      codes.Code `js:"StatusUnimplemented"`
+	StatusInternal           codes.Code `js:"StatusInternal"`
+	StatusUnavailable        codes.Code `js:"StatusUnavailable"`
+	StatusDataLoss           codes.Code `js:"StatusDataLoss"`
+	StatusUnauthenticated    codes.Code `js:"StatusUnauthenticated"`
+}
 
 // New creates a new gRPC module
 func New() *GRPC {
-	return &GRPC{}
+	return &GRPC{
+		StatusOK:                 codes.OK,
+		StatusCanceled:           codes.Canceled,
+		StatusUnknown:            codes.Unknown,
+		StatusInvalidArgument:    codes.InvalidArgument,
+		StatusDeadlineExceeded:   codes.DeadlineExceeded,
+		StatusNotFound:           codes.NotFound,
+		StatusAlreadyExists:      codes.AlreadyExists,
+		StatusPermissionDenied:   codes.PermissionDenied,
+		StatusResourceExhausted:  codes.ResourceExhausted,
+		StatusFailedPrecondition: codes.FailedPrecondition,
+		StatusAborted:            codes.Aborted,
+		StatusOutOfRange:         codes.OutOfRange,
+		StatusUnimplemented:      codes.Unimplemented,
+		StatusInternal:           codes.Internal,
+		StatusUnavailable:        codes.Unavailable,
+		StatusDataLoss:           codes.DataLoss,
+		StatusUnauthenticated:    codes.Unauthenticated,
+	}
 }
 
 // Client reprecents a gRPC client that can be used to make RPC requests
 type Client struct {
-	ctx context.Context
+	fds []*desc.FileDescriptor
 
 	sampleTags    *stats.SampleTags
 	samplesOutput chan<- stats.SampleContainer
@@ -58,44 +96,84 @@ type Client struct {
 	conn *grpc.ClientConn
 }
 
-func (*GRPC) NewClient(ctx context.Context /* TODO(rogchap): any options?*/) *Client {
-	return &Client{ctx: ctx}
+func (*GRPC) NewClient(ctx *context.Context /* TODO(rogchap): any options?*/) interface{} {
+	rt := common.GetRuntime(*ctx)
+	return common.Bind(rt, &Client{}, ctx)
 }
-
-// TODO(rogchap): avoid this global; doing this because we can't create an object that has state outside of the vu code block
-var fds []*desc.FileDescriptor
-var once sync.Once
 
 // Load will parse the given proto files and make the file descriptors avaliable to request. This can only be called once;
 // subsequent calls to Load will be a noop.
-func (*GRPC) Load(importPaths []string, filenames ...string) error {
+func (c *Client) Load(importPaths []string, filenames ...string) error {
 	var err error
 
-	once.Do(func() {
-		parser := protoparse.Parser{
-			ImportPaths:      importPaths,
-			InferImportPaths: len(importPaths) == 0,
-		}
+	parser := protoparse.Parser{
+		ImportPaths:      importPaths,
+		InferImportPaths: len(importPaths) == 0,
+	}
 
-		fds, err = parser.ParseFiles(filenames...)
-	})
+	c.fds, err = parser.ParseFiles(filenames...)
 
 	// TODO(rogchap): Would be good to list the available services/methods found as a list of fully qualified names
 	return err
 }
 
-func (c *Client) Connect(addr string) error {
-	// TODO(rogchap): Create a true block dial so we can report on any errors
-	var err error
-	if c.conn, err = grpc.Dial(addr, grpc.WithInsecure(), grpc.WithStatsHandler(c)); err != nil {
+// Connect is a block dial to the gRPC server at the given address (host:port)
+func (c *Client) Connect(ctxPtr *context.Context, addr string) error {
+	// TODO(rogchap): Do check to make sure we are not in init
+	state := lib.GetState(*ctxPtr)
+
+	// pass as a parm option
+	isPlaintext := true
+
+	errc := make(chan error)
+	go func() {
+		opts := []grpc.DialOption{
+			grpc.WithBlock(),
+			grpc.FailOnNonTempDialError(true),
+			grpc.WithStatsHandler(c),
+		}
+
+		if ua := state.Options.UserAgent; ua.Valid {
+			opts = append(opts, grpc.WithUserAgent(ua.ValueOrZero()))
+		}
+
+		// TODO(rogchap); Need to add support for TLS and other credetials
+
+		if isPlaintext {
+			opts = append(opts, grpc.WithInsecure())
+		}
+
+		dialer := func(ctx context.Context, addr string) (net.Conn, error) {
+			return state.Dialer.DialContext(ctx, "tcp", addr)
+		}
+		opts = append(opts, grpc.WithContextDialer(dialer))
+
+		var err error
+		c.conn, err = grpc.Dial(addr, opts...)
+		if err != nil {
+			errc <- err
+			return
+		}
+		close(errc)
+	}()
+
+	select {
+	case err := <-errc:
 		return err
 	}
-	return nil
+
+	// TODO(rogchap): Create a true block dial so we can report on any errors
+	// var err error
+	// if c.conn, err = grpc.Dial(addr, grpc.WithInsecure(), grpc.WithStatsHandler(c)); err != nil {
+	// 	return err
+	// }
+	// return nil
 }
 
-func (c *Client) InvokeRPC(method string, req goja.Value) (*dynamic.Message, error) {
-	rt := common.GetRuntime(c.ctx)
-	state := lib.GetState(c.ctx)
+// InvokeRPC creates and calls a unary RPC by fully qualified method name
+func (c *Client) InvokeRPC(ctx *context.Context, method string, req goja.Value) (*Response, error) {
+	rt := common.GetRuntime(*ctx)
+	state := lib.GetState(*ctx)
 	// TODO(rogchap): check if state is nil
 
 	if state == nil {
@@ -113,7 +191,7 @@ func (c *Client) InvokeRPC(method string, req goja.Value) (*dynamic.Message, err
 
 	var md *desc.MethodDescriptor
 	// TODO(rogchap) maybe we could create a map at load time so that this becomes O(1) rather than O(n) for each iteration?
-	for _, fd := range fds {
+	for _, fd := range c.fds {
 		s := fd.FindService(parts[0])
 		if s == nil {
 			continue
@@ -134,17 +212,22 @@ func (c *Client) InvokeRPC(method string, req goja.Value) (*dynamic.Message, err
 	b, _ := req.ToObject(rt).MarshalJSON()
 	reqdm.UnmarshalJSON(b)
 
-	// TODO(rogchap): Should I use the same context for the request or create a new one?
-	resp, err := s.InvokeRpc(c.ctx, md, reqdm)
+	resp, err := s.InvokeRpc(*ctx, md, reqdm)
+
+	var response Response
 	if err != nil {
-		//TODO(roghcap): deal with error message and status code
-		return nil, err
+		response.Status = status.Code(err)
+		//TODO(roghcap): deal with error message
 	}
 
 	respdm := dynamic.NewMessage(md.GetOutputType())
-	respdm.Merge(resp)
+	if resp != nil {
+		respdm.Merge(resp)
+	}
 
-	return respdm, err
+	//TODO(rogchap): convert message to goja.Value and add to the response
+
+	return &response, nil
 }
 
 // Close will close the client gRPC connection
@@ -162,17 +245,8 @@ func (*Client) TagRPC(ctx context.Context, _ *grpcstats.RPCTagInfo) context.Cont
 }
 
 func (c *Client) HandleRPC(ctx context.Context, stat grpcstats.RPCStats) {
-	dataSent, dataReceived := 0, 0
 
 	switch s := stat.(type) {
-	case *grpcstats.OutPayload:
-		dataSent = s.WireLength
-	case *grpcstats.InHeader:
-		dataReceived = s.WireLength
-	case *grpcstats.InPayload:
-		dataReceived = s.WireLength
-	case *grpcstats.InTrailer:
-		dataReceived = s.WireLength
 	case *grpcstats.End:
 		stats.PushIfNotDone(ctx, c.samplesOutput, stats.ConnectedSamples{
 			Samples: []stats.Sample{
@@ -189,22 +263,6 @@ func (c *Client) HandleRPC(ctx context.Context, stat grpcstats.RPCStats) {
 			},
 		})
 
-	}
-
-	if dataSent > 0 {
-		stats.PushIfNotDone(ctx, c.samplesOutput, stats.Sample{
-			Metric: metrics.DataSent,
-			Tags:   c.sampleTags,
-			Value:  float64(dataSent),
-		})
-	}
-
-	if dataReceived > 0 {
-		stats.PushIfNotDone(ctx, c.samplesOutput, stats.Sample{
-			Metric: metrics.DataReceived,
-			Tags:   c.sampleTags,
-			Value:  float64(dataReceived),
-		})
 	}
 }
 
