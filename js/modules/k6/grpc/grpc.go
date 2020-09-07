@@ -22,6 +22,8 @@ package grpc
 
 import (
 	"context"
+	"crypto/x509"
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -33,6 +35,7 @@ import (
 	"github.com/jhump/protoreflect/dynamic/grpcdynamic"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
 	grpcstats "google.golang.org/grpc/stats"
 	"google.golang.org/grpc/status"
 
@@ -117,13 +120,32 @@ func (c *Client) Load(importPaths []string, filenames ...string) error {
 	return err
 }
 
+type transportCreds struct {
+	credentials.TransportCredentials
+	errc chan<- error
+}
+
+func (t transportCreds) ClientHandshake(ctx context.Context, addr string, in net.Conn) (net.Conn, credentials.AuthInfo, error) {
+	out, auth, err := t.TransportCredentials.ClientHandshake(ctx, addr, in)
+	if err != nil {
+		t.errc <- err
+	}
+	return out, auth, err
+}
+
 // Connect is a block dial to the gRPC server at the given address (host:port)
-func (c *Client) Connect(ctxPtr *context.Context, addr string) error {
+func (c *Client) Connect(ctxPtr *context.Context, addr string, params map[string]interface{}) error {
 	// TODO(rogchap): Do check to make sure we are not in init
 	state := lib.GetState(*ctxPtr)
 
-	// pass as a parm option
-	isPlaintext := true
+	isPlaintext := false
+
+	for k, v := range params {
+		switch k {
+		case "plaintext":
+			isPlaintext, _ = v.(bool)
+		}
+	}
 
 	errc := make(chan error)
 	go func() {
@@ -137,7 +159,28 @@ func (c *Client) Connect(ctxPtr *context.Context, addr string) error {
 			opts = append(opts, grpc.WithUserAgent(ua.ValueOrZero()))
 		}
 
-		// TODO(rogchap); Need to add support for TLS and other credetials
+		if !isPlaintext {
+			tlsCfg := state.TLSConfig
+
+			var err error
+			tlsCfg.RootCAs, err = x509.SystemCertPool()
+			if err != nil {
+				// (rogchap): If there is no System Pool, we could just create our own and still
+				// continue; we only need a Cert Pool if we are adding our own RootCAs so returning
+				// error for now.
+				errc <- err
+				return
+			}
+			//TODO(rogchap): Would be good to add support for custom RootCAs (self signed)
+
+			// (rogchap) we create a wrapper for transport credentials so that we can report
+			// on any TLS errors.
+			creds := transportCreds{
+				credentials.NewTLS(tlsCfg),
+				errc,
+			}
+			opts = append(opts, grpc.WithTransportCredentials(creds))
+		}
 
 		if isPlaintext {
 			opts = append(opts, grpc.WithInsecure())
@@ -161,17 +204,16 @@ func (c *Client) Connect(ctxPtr *context.Context, addr string) error {
 	case err := <-errc:
 		return err
 	}
-
-	// TODO(rogchap): Create a true block dial so we can report on any errors
-	// var err error
-	// if c.conn, err = grpc.Dial(addr, grpc.WithInsecure(), grpc.WithStatsHandler(c)); err != nil {
-	// 	return err
-	// }
-	// return nil
 }
 
 // InvokeRPC creates and calls a unary RPC by fully qualified method name
 func (c *Client) InvokeRPC(ctx *context.Context, method string, req goja.Value) (*Response, error) {
+
+	// TODO(rogchap): Handle all base cases and manage better error messaging
+	if c.conn == nil {
+		return nil, errors.New("No gRPC connection, you must call client.connect() first")
+	}
+
 	rt := common.GetRuntime(*ctx)
 	state := lib.GetState(*ctx)
 	// TODO(rogchap): check if state is nil
