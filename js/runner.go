@@ -25,6 +25,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net"
 	"net/http"
 	"net/http/cookiejar"
@@ -60,7 +61,7 @@ type Runner struct {
 	defaultGroup *lib.Group
 
 	BaseDialer net.Dialer
-	Resolver   netext.DNSResolver
+	Resolver   netext.Resolver
 	RPSLimit   *rate.Limiter
 
 	console   *console
@@ -105,7 +106,7 @@ func newFromBundle(logger *logrus.Logger, b *Bundle) (*Runner, error) {
 			DualStack: true,
 		},
 		console: newConsole(logger),
-		Resolver: netext.NewDNSResolver(
+		Resolver: netext.NewResolver(
 			types.NullDurationFrom(0),
 			lib.DefaultDNSConfig().Strategy.DNSStrategy,
 		),
@@ -336,7 +337,7 @@ func (r *Runner) SetOptions(opts lib.Options) error {
 		if err != nil {
 			return err
 		}
-		r.Resolver = netext.NewDNSResolver(ttl, opts.DNS.Strategy.DNSStrategy)
+		r.Resolver = netext.NewResolver(ttl, opts.DNS.Strategy.DNSStrategy)
 	}
 
 	return nil
@@ -346,8 +347,8 @@ func parseTTL(ttlS string) (types.NullDuration, error) {
 	ttl := types.NewNullDuration(0, false)
 	switch ttlS {
 	case "", "inf":
-		// cache indefinitely
-		ttl.Valid = true
+		// cache "indefinitely"
+		ttl = types.NullDurationFrom(math.MaxInt64)
 	case "0":
 		// disable cache
 	default:

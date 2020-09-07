@@ -26,31 +26,44 @@ import (
 	"sync"
 )
 
-// MockResolver implements netext.DNSResolver, and allows changing the host
+// MockResolver implements netext.Resolver, and allows changing the host
 // mapping at runtime.
 type MockResolver struct {
 	m     sync.RWMutex
-	hosts map[string]net.IP
+	hosts map[string][]net.IP
 }
 
-func NewMockResolver(hosts map[string]net.IP) *MockResolver {
+// NewMockResolver returns a new MockResolver.
+func NewMockResolver(hosts map[string][]net.IP) *MockResolver {
 	if hosts == nil {
-		hosts = make(map[string]net.IP)
+		hosts = make(map[string][]net.IP)
 	}
 	return &MockResolver{hosts: hosts}
 }
 
-func (r *MockResolver) Fetch(host string) (net.IP, error) {
+// LookupIP returns the first IP mapped for host.
+func (r *MockResolver) LookupIP(host string) (net.IP, error) {
+	if ips, err := r.LookupIPAll(host); err != nil {
+		return nil, err
+	} else {
+		return ips[0], nil
+	}
+}
+
+// LookupIPAll returns all IPs mapped for host. It mimics the net.LookupIP
+// signature so that it can be used to mock netext.LookupIP in tests.
+func (r *MockResolver) LookupIPAll(host string) ([]net.IP, error) {
 	r.m.RLock()
 	defer r.m.RUnlock()
-	if ip, ok := r.hosts[host]; ok {
-		return ip, nil
+	if ips, ok := r.hosts[host]; ok {
+		return ips, nil
 	}
 	return nil, fmt.Errorf("lookup %s: no such host", host)
 }
 
+// Sets the host to resolve to ip.
 func (r *MockResolver) Set(host, ip string) {
 	r.m.Lock()
 	defer r.m.Unlock()
-	r.hosts[host] = net.ParseIP(ip)
+	r.hosts[host] = []net.IP{net.ParseIP(ip)}
 }

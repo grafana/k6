@@ -24,6 +24,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/url"
 	"reflect"
@@ -974,23 +975,9 @@ func TestExecutionSchedulerIsRunning(t *testing.T) {
 	assert.NoError(t, <-err)
 }
 
-type mockDNSRunner struct {
-	*js.Runner
-	resolver *testutils.MockResolver
-}
-
-// NewVU initializes a new VU replacing its resolver with a MockResolver.
-func (r *mockDNSRunner) NewVU(id int64, out chan<- stats.SampleContainer) (lib.InitializedVU, error) {
-	initVU, err := r.Runner.NewVU(id, out)
-	if err != nil {
-		return nil, err
-	}
-	(initVU.(*js.VU)).Dialer.Resolver = r.resolver
-	return initVU, nil
-}
-
-func TestDNS(t *testing.T) {
-	t.Parallel()
+// TestDNSResolver checks the DNS resolution behavior at the ExecutionScheduler level.
+// It isn't run in parallel since it modifies the global netext.LookupIP.
+func TestDNSResolver(t *testing.T) {
 	tb := httpmultibin.NewHTTPMultiBin(t)
 	defer tb.Cleanup()
 	sr := tb.Replacer.Replace
@@ -1016,7 +1003,7 @@ func TestDNS(t *testing.T) {
 			"inf": { // IPs are cached indefinitely
 				lib.Options{},
 			},
-			"no": { // every request does a DNS lookup
+			"0": { // every request does a DNS lookup
 				lib.Options{DNS: &lib.DNSConfig{
 					TTL:      null.StringFrom("0"),
 					Strategy: lib.DefaultDNSConfig().Strategy,
@@ -1030,36 +1017,61 @@ func TestDNS(t *testing.T) {
 			},
 		}
 
+		checkLog := func(t *testing.T, entries []logrus.Entry) {
+			for _, entry := range entries {
+				expMsg := sr(`dial tcp 127.0.0.254:HTTPBIN_PORT: connect: connection refused`)
+				require.IsType(t, &url.Error{}, entry.Data["error"])
+				assert.EqualError(t, entry.Data["error"].(*url.Error).Err, expMsg)
+			}
+		}
+
 		for name, tc := range testCases {
 			tc := tc
 			t.Run(name, func(t *testing.T) {
 				logger := logrus.New()
-				logger.SetOutput(testutils.NewTestOutput(t))
+				logger.SetOutput(ioutil.Discard)
+				logHook := testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.WarnLevel}}
+				logger.AddHook(&logHook)
+
 				runner, err := js.New(logger, &loader.SourceData{
 					URL: &url.URL{Path: "/script.js"}, Data: []byte(script),
 				}, nil, lib.RuntimeOptions{})
 				require.NoError(t, err)
 
-				mr := &mockDNSRunner{runner, testutils.NewMockResolver(nil)}
-				ctx, cancel, execScheduler, samples := newTestExecutionScheduler(t, mr, logger, tc.opts)
+				ctx, cancel, execScheduler, samples := newTestExecutionScheduler(t, runner, logger, tc.opts)
 				defer cancel()
 
-				mr.resolver.Set("myhost", sr("HTTPBIN_IP"))
-				time.AfterFunc(1*time.Second, func() {
-					mr.resolver.Set("myhost", "127.0.0.254")
+				mr := testutils.NewMockResolver(nil)
+				defaultLookup := netext.LookupIP
+				netext.LookupIP = mr.LookupIPAll
+				defer func() { netext.LookupIP = defaultLookup }()
+
+				mr.Set("myhost", sr("HTTPBIN_IP"))
+				time.AfterFunc(3*time.Second, func() {
+					mr.Set("myhost", "127.0.0.254")
 				})
+
 				errCh := make(chan error, 1)
 				go func() { errCh <- execScheduler.Run(ctx, ctx, samples) }()
 
-				for {
-					select {
-					case err := <-errCh:
-						require.NoError(t, err)
-						return
-					case <-time.After(6 * time.Second):
-						t.Fatal("timed out")
-						return
+				select {
+				case err := <-errCh:
+					require.NoError(t, err)
+					entries := logHook.Drain()
+					switch name {
+					case "inf":
+						require.Len(t, entries, 0)
+					case "0":
+						require.Len(t, entries, 5)
+						checkLog(t, entries)
+					case "2s":
+						require.Len(t, entries, 2)
+						checkLog(t, entries)
 					}
+					return
+				case <-time.After(6 * time.Second):
+					t.Fatal("timed out")
+					return
 				}
 			})
 		}
@@ -1194,7 +1206,7 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 		expTags = append(expTags, addExpTags...)
 		return netext.NewDialer(
 			net.Dialer{},
-			netext.NewDNSResolver(types.NullDurationFrom(0), lib.DNSFirst),
+			netext.NewResolver(types.NullDurationFrom(0), lib.DNSFirst),
 		).GetTrail(time.Now(), time.Now(),
 			true, emitIterations, getTags(expTags...))
 	}
