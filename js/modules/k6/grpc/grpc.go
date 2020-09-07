@@ -23,6 +23,7 @@ package grpc
 import (
 	"context"
 	"crypto/x509"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -89,9 +90,14 @@ func New() *GRPC {
 	}
 }
 
+var (
+	errInvokeRPCInInitContext = common.NewInitContextError("Invoking RPC methods in the init context is not supported")
+	errConnectInInitContext   = common.NewInitContextError("Connecting to a gRPC server in the init context is not supported")
+)
+
 // Client reprecents a gRPC client that can be used to make RPC requests
 type Client struct {
-	fds []*desc.FileDescriptor
+	mds map[string]*desc.MethodDescriptor
 
 	sampleTags    *stats.SampleTags
 	samplesOutput chan<- stats.SampleContainer
@@ -99,25 +105,42 @@ type Client struct {
 	conn *grpc.ClientConn
 }
 
-func (*GRPC) NewClient(ctx *context.Context /* TODO(rogchap): any options?*/) interface{} {
-	rt := common.GetRuntime(*ctx)
-	return common.Bind(rt, &Client{}, ctx)
+func (*GRPC) NewClient(ctxPtr *context.Context /* TODO(rogchap): any options?*/) interface{} {
+	rt := common.GetRuntime(*ctxPtr)
+	return common.Bind(rt, &Client{}, ctxPtr)
 }
 
 // Load will parse the given proto files and make the file descriptors avaliable to request. This can only be called once;
 // subsequent calls to Load will be a noop.
-func (c *Client) Load(importPaths []string, filenames ...string) error {
-	var err error
+func (c *Client) Load(ctxPtr *context.Context, importPaths []string, filenames ...string) error {
+	if lib.GetState(*ctxPtr) != nil {
+		errors.New("load must be called in the init context")
+	}
 
 	parser := protoparse.Parser{
 		ImportPaths:      importPaths,
 		InferImportPaths: len(importPaths) == 0,
 	}
 
-	c.fds, err = parser.ParseFiles(filenames...)
+	fds, err := parser.ParseFiles(filenames...)
+	if err != nil {
+		return err
+	}
+	c.mds = make(map[string]*desc.MethodDescriptor)
+	for _, fd := range fds {
+		for _, sd := range fd.GetServices() {
+			for _, md := range sd.GetMethods() {
+				var s strings.Builder
+				s.WriteString(sd.GetFullyQualifiedName())
+				s.WriteRune('/')
+				s.WriteString(md.GetName())
+				c.mds[s.String()] = md
+			}
+		}
+	}
 
 	// TODO(rogchap): Would be good to list the available services/methods found as a list of fully qualified names
-	return err
+	return nil
 }
 
 type transportCreds struct {
@@ -135,8 +158,10 @@ func (t transportCreds) ClientHandshake(ctx context.Context, addr string, in net
 
 // Connect is a block dial to the gRPC server at the given address (host:port)
 func (c *Client) Connect(ctxPtr *context.Context, addr string, params map[string]interface{}) error {
-	// TODO(rogchap): Do check to make sure we are not in init
 	state := lib.GetState(*ctxPtr)
+	if state == nil {
+		return errConnectInInitContext
+	}
 
 	isPlaintext := false
 
@@ -207,19 +232,16 @@ func (c *Client) Connect(ctxPtr *context.Context, addr string, params map[string
 }
 
 // InvokeRPC creates and calls a unary RPC by fully qualified method name
-func (c *Client) InvokeRPC(ctx *context.Context, method string, req goja.Value) (*Response, error) {
-
-	// TODO(rogchap): Handle all base cases and manage better error messaging
-	if c.conn == nil {
-		return nil, errors.New("No gRPC connection, you must call client.connect() first")
+func (c *Client) InvokeRPC(ctxPtr *context.Context, method string, req goja.Value, params map[string]interface{}) (*Response, error) {
+	ctx := *ctxPtr
+	rt := common.GetRuntime(ctx)
+	state := lib.GetState(ctx)
+	if state == nil {
+		return nil, errInvokeRPCInInitContext
 	}
 
-	rt := common.GetRuntime(*ctx)
-	state := lib.GetState(*ctx)
-	// TODO(rogchap): check if state is nil
-
-	if state == nil {
-		return nil, fmt.Errorf("state is nil!")
+	if c.conn == nil {
+		return nil, errors.New("No gRPC connection, you must call connect first")
 	}
 
 	tags := state.CloneTags()
@@ -227,22 +249,8 @@ func (c *Client) InvokeRPC(ctx *context.Context, method string, req goja.Value) 
 	c.sampleTags = stats.IntoSampleTags(&tags)
 	c.samplesOutput = state.Samples
 
-	// TODO(rogchap): deal with base cases
 	method = strings.TrimPrefix(method, "/")
-	parts := strings.Split(method, "/")
-
-	var md *desc.MethodDescriptor
-	// TODO(rogchap) maybe we could create a map at load time so that this becomes O(1) rather than O(n) for each iteration?
-	for _, fd := range c.fds {
-		s := fd.FindService(parts[0])
-		if s == nil {
-			continue
-		}
-		md = s.FindMethodByName(parts[1])
-		if md != nil {
-			break
-		}
-	}
+	md := c.mds[method]
 
 	if md == nil {
 		return nil, fmt.Errorf("Method %q not found in file descriptors", method)
@@ -254,7 +262,7 @@ func (c *Client) InvokeRPC(ctx *context.Context, method string, req goja.Value) 
 	b, _ := req.ToObject(rt).MarshalJSON()
 	reqdm.UnmarshalJSON(b)
 
-	resp, err := s.InvokeRpc(*ctx, md, reqdm)
+	resp, err := s.InvokeRpc(ctx, md, reqdm)
 
 	var response Response
 	if err != nil {
@@ -267,7 +275,13 @@ func (c *Client) InvokeRPC(ctx *context.Context, method string, req goja.Value) 
 		respdm.Merge(resp)
 	}
 
-	//TODO(rogchap): convert message to goja.Value and add to the response
+	// (rogchap) there is a lot of marshaling/unmarshaling here, but because this is a dynamic message
+	// we need to marshal to get the JSON representation first. Using a map seems the best way to create
+	// a goja.Value from the raw JSON bytes.
+	raw, _ := respdm.MarshalJSON()
+	msg := make(map[string]interface{})
+	json.Unmarshal(raw, &msg)
+	response.Message = rt.ToValue(msg)
 
 	return &response, nil
 }
@@ -277,7 +291,9 @@ func (c *Client) Close() error {
 	if c == nil || c.conn == nil {
 		return nil
 	}
-	return c.conn.Close()
+	err := c.conn.Close()
+	c.conn = nil
+	return err
 }
 
 /*** stats.Handler interface methods ***/

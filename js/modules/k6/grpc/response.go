@@ -21,12 +21,12 @@
 package grpc
 
 import (
-	"github.com/golang/protobuf/proto"
+	"github.com/dop251/goja"
 	"google.golang.org/grpc/codes"
 )
 
 // Response is a gRPC response that can be used by the goja VM
 type Response struct {
-	Status codes.Code
-	msg    proto.Message `js:"-"`
+	Status  codes.Code
+	Message goja.Value
 }
