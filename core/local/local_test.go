@@ -1019,13 +1019,13 @@ func TestDNS(t *testing.T) {
 			"no": { // every request does a DNS lookup
 				lib.Options{DNS: &lib.DNSConfig{
 					TTL:      null.StringFrom("0"),
-					Strategy: lib.DefaultDNSConfig.Strategy,
+					Strategy: lib.DefaultDNSConfig().Strategy,
 				}},
 			},
 			"2s": {
 				lib.Options{DNS: &lib.DNSConfig{
 					TTL:      null.StringFrom("2s"),
-					Strategy: lib.DefaultDNSConfig.Strategy,
+					Strategy: lib.DefaultDNSConfig().Strategy,
 				}},
 			},
 		}

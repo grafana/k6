@@ -107,7 +107,7 @@ func newFromBundle(logger *logrus.Logger, b *Bundle) (*Runner, error) {
 		console: newConsole(logger),
 		Resolver: netext.NewDNSResolver(
 			types.NullDurationFrom(0),
-			lib.DefaultDNSConfig.Strategy.DNSStrategy,
+			lib.DefaultDNSConfig().Strategy.DNSStrategy,
 		),
 	}
 

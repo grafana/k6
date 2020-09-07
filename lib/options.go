@@ -64,10 +64,11 @@ const (
 	DNSRandom
 )
 
-// nolint: gochecknoglobals
-var DefaultDNSConfig = DNSConfig{
-	TTL:      null.StringFrom("inf"),
-	Strategy: NullDNSStrategy{DNSFirst, true},
+func DefaultDNSConfig() *DNSConfig {
+	return &DNSConfig{
+		TTL:      null.StringFrom("inf"),
+		Strategy: NullDNSStrategy{DNSFirst, true},
+	}
 }
 
 func (c *DNSConfig) UnmarshalJSON(data []byte) error {
@@ -90,7 +91,7 @@ func (c *DNSConfig) unmarshalDNSConfig(params map[string]interface{}) error {
 	if ttl, ok := params["ttl"]; ok {
 		c.TTL = null.StringFrom(fmt.Sprintf("%v", ttl))
 	}
-	c.Strategy = DefaultDNSConfig.Strategy
+	c.Strategy = DefaultDNSConfig().Strategy
 	if strat, ok := params["strategy"]; ok {
 		if s, err := DNSStrategyString(strat.(string)); err != nil {
 			return err
@@ -601,7 +602,7 @@ func (o Options) Apply(opts Options) Options {
 	// FIXME: This should really be in applyDefault(), but in some tests
 	// o.DNS hasn't been initialized yet...
 	if o.DNS == nil {
-		o.DNS = &DefaultDNSConfig
+		o.DNS = DefaultDNSConfig()
 	}
 	if opts.DNS != nil {
 		if opts.DNS.TTL.Valid {
