@@ -28,6 +28,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"time"
 
 	"github.com/dop251/goja"
 	"github.com/jhump/protoreflect/desc"
@@ -37,6 +38,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/metadata"
 	grpcstats "google.golang.org/grpc/stats"
 	"google.golang.org/grpc/status"
 
@@ -105,6 +107,7 @@ type Client struct {
 	conn *grpc.ClientConn
 }
 
+// NewClient creates a new gPRC client to make invoke RPC methods.
 func (*GRPC) NewClient(ctxPtr *context.Context /* TODO(rogchap): any options?*/) interface{} {
 	rt := common.GetRuntime(*ctxPtr)
 	return common.Bind(rt, &Client{}, ctxPtr)
@@ -114,7 +117,7 @@ func (*GRPC) NewClient(ctxPtr *context.Context /* TODO(rogchap): any options?*/)
 // subsequent calls to Load will be a noop.
 func (c *Client) Load(ctxPtr *context.Context, importPaths []string, filenames ...string) error {
 	if lib.GetState(*ctxPtr) != nil {
-		errors.New("load must be called in the init context")
+		return errors.New("load must be called in the init context")
 	}
 
 	parser := protoparse.Parser{
@@ -244,11 +247,6 @@ func (c *Client) InvokeRPC(ctxPtr *context.Context, method string, req goja.Valu
 		return nil, errors.New("No gRPC connection, you must call connect first")
 	}
 
-	tags := state.CloneTags()
-
-	c.sampleTags = stats.IntoSampleTags(&tags)
-	c.samplesOutput = state.Samples
-
 	method = strings.TrimPrefix(method, "/")
 	md := c.mds[method]
 
@@ -256,29 +254,81 @@ func (c *Client) InvokeRPC(ctxPtr *context.Context, method string, req goja.Valu
 		return nil, fmt.Errorf("Method %q not found in file descriptors", method)
 	}
 
-	reqdm := dynamic.NewMessage(md.GetInputType())
-	s := grpcdynamic.NewStub(c.conn)
+	timeout := 60 * time.Second
+	tags := state.CloneTags()
 
+	// TODO(rogchap): handle custom timeout default 60s
+	for k, v := range params {
+		switch k {
+		case "headers":
+			rawHeaders, ok := v.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			for hk, kv := range rawHeaders {
+				// TODO(rogchap): Should we manage a string slice?
+				strVal, ok := kv.(string)
+				if !ok {
+					continue
+				}
+				ctx = metadata.AppendToOutgoingContext(ctx, hk, strVal)
+			}
+		case "tags":
+			rawTags, ok := v.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			for tk, tv := range rawTags {
+				strVal, ok := tv.(string)
+				if !ok {
+					continue
+				}
+				tags[tk] = strVal
+			}
+		case "timeout":
+			if t, ok := v.(float64); ok && t > 0.0 {
+				timeout = time.Duration(t) * time.Millisecond
+			}
+		}
+	}
+
+	// TODO(rogchap): add standard gRPC tags
+	// suggested tags:
+	// * service (would the URL be enough as replacement for service/method?)
+	// * method (this maybe confusing if we use the TagMethod as that is the HTTP Method (GET, POST etc)
+	// * rpc_type: unary, client_streaming, server_streaming, bidirectional_streaming
+	// * request_message: fully qualified name
+	// * response_message: fully qualified name
+
+	c.sampleTags = stats.IntoSampleTags(&tags)
+	c.samplesOutput = state.Samples
+
+	reqdm := dynamic.NewMessage(md.GetInputType())
 	b, _ := req.ToObject(rt).MarshalJSON()
 	reqdm.UnmarshalJSON(b)
 
-	resp, err := s.InvokeRpc(ctx, md, reqdm)
+	reqCtx, cancelFunc := context.WithTimeout(ctx, timeout)
+	defer cancelFunc()
+	s := grpcdynamic.NewStub(c.conn)
+	resp, err := s.InvokeRpc(reqCtx, md, reqdm)
 
+	var msgdm *dynamic.Message
 	var response Response
 	if err != nil {
-		response.Status = status.Code(err)
-		//TODO(roghcap): deal with error message
+		st := status.Convert(err)
+		response.Status = st.Code()
+		msgdm, _ = dynamic.AsDynamicMessage(st.Proto())
 	}
 
-	respdm := dynamic.NewMessage(md.GetOutputType())
 	if resp != nil {
-		respdm.Merge(resp)
+		msgdm = dynamic.NewMessage(md.GetOutputType())
+		msgdm.Merge(resp)
 	}
 
 	// (rogchap) there is a lot of marshaling/unmarshaling here, but because this is a dynamic message
 	// we need to marshal to get the JSON representation first. Using a map seems the best way to create
 	// a goja.Value from the raw JSON bytes.
-	raw, _ := respdm.MarshalJSON()
+	raw, _ := msgdm.MarshalJSON()
 	msg := make(map[string]interface{})
 	json.Unmarshal(raw, &msg)
 	response.Message = rt.ToValue(msg)
@@ -303,7 +353,6 @@ func (*Client) TagRPC(ctx context.Context, _ *grpcstats.RPCTagInfo) context.Cont
 }
 
 func (c *Client) HandleRPC(ctx context.Context, stat grpcstats.RPCStats) {
-
 	switch s := stat.(type) {
 	case *grpcstats.End:
 		stats.PushIfNotDone(ctx, c.samplesOutput, stats.ConnectedSamples{

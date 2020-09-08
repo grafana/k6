@@ -25,7 +25,6 @@ require (
 	github.com/gin-contrib/sse v0.0.0-20170109093832-22d885f9ecc7 // indirect
 	github.com/gin-gonic/gin v1.1.5-0.20170702092826-d459835d2b07 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.2+incompatible // indirect
-	github.com/golang/protobuf v1.4.2
 	github.com/golang/snappy v0.0.0-20170215233205-553a64147049 // indirect
 	github.com/google/go-cmp v0.5.1 // indirect
 	github.com/gorilla/context v0.0.0-20160226214623-1ea25387ff6f // indirect
@@ -87,7 +86,6 @@ require (
 
 replace (
 	github.com/davecgh/go-spew => github.com/davecgh/go-spew v1.1.0
-	github.com/golang/protobuf => github.com/golang/protobuf v1.4.2
 	github.com/stretchr/testify => github.com/stretchr/testify v1.2.1
 	github.com/ugorji/go => github.com/ugorji/go v0.0.0-20180112141927-9831f2c3ac10
 	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20180308185624-c7dcf104e3a7

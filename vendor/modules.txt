@@ -80,8 +80,7 @@ github.com/go-sourcemap/sourcemap/internal/base64vlq
 # github.com/golang/gddo v0.0.0-20190419222130-af0f2af80721
 github.com/golang/gddo/httputil
 github.com/golang/gddo/httputil/header
-# github.com/golang/protobuf v1.4.2 => github.com/golang/protobuf v1.4.2
-## explicit
+# github.com/golang/protobuf v1.4.2
 github.com/golang/protobuf/jsonpb
 github.com/golang/protobuf/proto
 github.com/golang/protobuf/protoc-gen-go/descriptor
@@ -399,7 +398,6 @@ gopkg.in/guregu/null.v3
 ## explicit
 gopkg.in/yaml.v2
 # github.com/davecgh/go-spew => github.com/davecgh/go-spew v1.1.0
-# github.com/golang/protobuf => github.com/golang/protobuf v1.4.2
 # github.com/stretchr/testify => github.com/stretchr/testify v1.2.1
 # github.com/ugorji/go => github.com/ugorji/go v0.0.0-20180112141927-9831f2c3ac10
 # golang.org/x/crypto => golang.org/x/crypto v0.0.0-20180308185624-c7dcf104e3a7
