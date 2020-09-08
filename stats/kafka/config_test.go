@@ -66,7 +66,7 @@ func TestConfigParseArg(t *testing.T) {
 	assert.Equal(t, null.StringFrom("influxdb"), c.Format)
 	assert.Equal(t, expInfluxConfig, c.InfluxDBConfig)
 
-	c, err = ParseArg("brokers={broker-2.kafka.com:9093,broker-3.kafka.com:9093},topic=someTopic,format=json,tls_security=true,certificate=cert.pem,private_key=key.pem,certificate_authority=ca.pem,insecure_skip_verify=true")
+	c, err = ParseArg("brokers={broker-2.kafka.com:9093,broker-3.kafka.com:9093},topic=someTopic,format=json,tls_security=true,certificate=cert.pem,private_key=key.pem,certificate_authority=ca.pem,insecure_skip=true")
 	assert.Nil(t, err)
 	assert.Equal(t, []string{"broker-2.kafka.com:9093", "broker-3.kafka.com:9093"}, c.Brokers)
 	assert.Equal(t, null.StringFrom("someTopic"), c.Topic)
@@ -75,35 +75,41 @@ func TestConfigParseArg(t *testing.T) {
 	assert.Equal(t, null.StringFrom("cert.pem"), c.Certificate)
 	assert.Equal(t, null.StringFrom("key.pem"), c.PrivateKey)
 	assert.Equal(t, null.StringFrom("ca.pem"), c.CertificateAuthority)
-	assert.Equal(t, true, c.InsecureSkipVerify)
+	assert.Equal(t, true, c.InsecureSkip)
 
-	//Test with security layer
+	// Test with security layer
 
 	cert, err := os.Create("cert.pem")
 	assert.Nil(t, err)
 	_, err = cert.WriteString("cert")
 	assert.Nil(t, err)
-	cert.Close()
+	err = cert.Close()
+	assert.Nil(t, err)
 
 	key, err := os.Create("key.pem")
 	assert.Nil(t, err)
 	_, err = key.WriteString("private_key")
 	assert.Nil(t, err)
-	key.Close()
+	err = key.Close()
+	assert.Nil(t, err)
 
 	ca, err := os.Create("ca.pem")
 	assert.Nil(t, err)
 	_, err = ca.WriteString("certificate_authority")
 	assert.Nil(t, err)
-	ca.Close()
+	err = ca.Close()
+	assert.Nil(t, err)
 
 	defer func() {
-		_ = os.Remove("cert.pem")
-		_ = os.Remove("key.pem")
-		_ = os.Remove("ca.pem")
+		err = os.Remove("cert.pem")
+		assert.Nil(t, err)
+		err = os.Remove("key.pem")
+		assert.Nil(t, err)
+		err = os.Remove("ca.pem")
+		assert.Nil(t, err)
 	}()
 
-	//Get working directory
+	// Get working directory
 	wd, err := os.Getwd()
 	assert.Nil(t, err)
 
@@ -116,5 +122,5 @@ func TestConfigParseArg(t *testing.T) {
 	assert.Equal(t, null.StringFrom(filepath.Join(wd, "cert.pem")), c.Certificate)
 	assert.Equal(t, null.StringFrom(filepath.Join(wd, "key.pem")), c.PrivateKey)
 	assert.Equal(t, null.StringFrom(filepath.Join(wd, "ca.pem")), c.CertificateAuthority)
-	assert.Equal(t, true, c.InsecureSkipVerify)
+	assert.Equal(t, true, c.InsecureSkip)
 }

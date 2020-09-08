@@ -53,11 +53,15 @@ func NewKafkaProducer(conf Config) (sarama.SyncProducer, error) {
 	c.Producer.RequiredAcks = sarama.WaitForAll
 	c.Producer.Return.Successes = true
 	c.Producer.Return.Errors = true
-	//Produce to random partition
+	// Produce to random partition
 	c.Producer.Partitioner = sarama.NewRandomPartitioner
 
 	if conf.TLSSecurity {
-		tls, err := NewTLS(conf.Certificate.String, conf.PrivateKey.String, conf.CertificateAuthority.String, conf.InsecureSkipVerify)
+		tls, err := NewTLS(
+			conf.Certificate.String,
+			conf.PrivateKey.String,
+			conf.CertificateAuthority.String,
+			conf.InsecureSkip)
 		if err != nil {
 			return nil, fmt.Errorf("create tls security for kafka has error: %v", err.Error())
 		}
@@ -100,6 +104,7 @@ func (c *Collector) Run(ctx context.Context) {
 			if err != nil {
 				c.logger.WithError(err).Error("Kafka: Failed to close producer.")
 			}
+
 			return
 		}
 	}
@@ -147,8 +152,8 @@ func (c *Collector) formatSamples(samples stats.Samples) ([]string, error) {
 			return nil, err
 		}
 	default:
-		for _, sample := range samples {
-			env := jsonc.WrapSample(&sample)
+		for i := range samples {
+			env := jsonc.WrapSample(&samples[i])
 			metric, err := json.Marshal(env)
 			if err != nil {
 				return nil, err
@@ -173,6 +178,7 @@ func (c *Collector) pushMetrics() {
 	formattedSamples, err := c.formatSamples(samples)
 	if err != nil {
 		c.logger.WithError(err).Error("Kafka: Couldn't format the samples")
+
 		return
 	}
 

@@ -21,10 +21,11 @@
 package kafka
 
 import (
-	"github.com/stretchr/testify/assert"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 const (
@@ -115,12 +116,12 @@ EWRsC1qR8zzRIzw2b5OrE+TrZvp56tTr
 func TestGetAbsolutelyFilePath(t *testing.T) {
 	wd, err := os.Getwd()
 	assert.Nil(t, err)
-	//Relative path
+	// Relative path
 	path, err := GetAbsolutelyFilePath("util.go")
 	assert.Nil(t, err)
 	want := filepath.Join(wd, "util.go")
 	assert.Equal(t, want, path)
-	//Absolutely path
+	// Absolutely path
 	path, err = GetAbsolutelyFilePath(want)
 	assert.Nil(t, err)
 	assert.Equal(t, want, path)
@@ -128,7 +129,10 @@ func TestGetAbsolutelyFilePath(t *testing.T) {
 
 func TestReadFile(t *testing.T) {
 	f, err := os.Create("file.txt")
-	defer os.Remove("file.txt")
+	defer func() {
+		err = os.Remove("file.txt")
+		assert.Nil(t, err)
+	}()
 	assert.Nil(t, err)
 	_, err = f.WriteString("hello-world")
 	assert.Nil(t, err)
@@ -153,8 +157,10 @@ func TestNewTLS(t *testing.T) {
 	assert.Nil(t, err)
 
 	defer func() {
-		os.Remove("cert.pem")
-		os.Remove("key.pem")
+		err = os.Remove("cert.pem")
+		assert.Nil(t, err)
+		err = os.Remove("key.pem")
+		assert.Nil(t, err)
 	}()
 
 	tls, err := NewTLS("cert.pem", "key.pem", "", false)

@@ -48,8 +48,8 @@ type Config struct {
 	TLSSecurity          bool        `json:"tls_security" envconfig:"K6_KAFKA_TLS_SECURITY"`
 	Certificate          null.String `json:"certificate" envconfig:"K6_KAFKA_CERTIFICATE"`
 	PrivateKey           null.String `json:"private_key" envconfig:"K6_KAFKA_PRIVATE_KEY"`
-	CertificateAuthority null.String `json:"certificate_authority" envconfig:"K6_KAFKA_CERTIFICATE_AUTHORITY"`
-	InsecureSkipVerify   bool        `json:"insecure_skip_verify" envconfig:"K6_KAFKA_INSECURE_SKIP_VERIFY"`
+	CertificateAuthority null.String `json:"certificate_authority" envconfig:"K6_KAFKA_CA"`
+	InsecureSkip         bool        `json:"insecure_skip" envconfig:"K6_KAFKA_INSECURE_SKIP"`
 }
 
 // config is a duplicate of ConfigFields as we can not mapstructure.Decode into
@@ -65,8 +65,8 @@ type config struct {
 	TLSSecurity          bool   `json:"tls_security" mapstructure:"tls_security" envconfig:"K6_KAFKA_TLS_SECURITY"`
 	Certificate          string `json:"certificate" mapstructure:"certificate" envconfig:"K6_KAFKA_CERTIFICATE"`
 	PrivateKey           string `json:"private_key" mapstructure:"private_key" envconfig:"K6_KAFKA_PRIVATE_KEY"`
-	CertificateAuthority string `json:"certificate_authority" mapstructure:"certificate_authority" envconfig:"K6_KAFKA_CERTIFICATE_AUTHORITY"`
-	InsecureSkipVerify   bool   `json:"insecure_skip_verify" mapstructure:"insecure_skip_verify" envconfig:"K6_KAFKA_INSECURE_SKIP_VERIFY"`
+	CertificateAuthority string `json:"certificate_authority" mapstructure:"certificate_authority" envconfig:"K6_KAFKA_CA"`
+	InsecureSkip         bool   `json:"insecure_skip" mapstructure:"insecure_skip" envconfig:"K6_KAFKA_INSECURE_SKIP"`
 }
 
 // NewConfig creates a new Config instance with default values for some fields.
@@ -103,9 +103,10 @@ func (c Config) Apply(cfg Config) Config {
 	if cfg.CertificateAuthority.Valid {
 		c.CertificateAuthority = cfg.CertificateAuthority
 	}
-	if cfg.InsecureSkipVerify {
-		c.InsecureSkipVerify = cfg.InsecureSkipVerify
+	if cfg.InsecureSkip {
+		c.InsecureSkip = cfg.InsecureSkip
 	}
+
 	return c
 }
 
@@ -113,7 +114,6 @@ func (c Config) Apply(cfg Config) Config {
 func ParseArg(arg string) (Config, error) {
 	c := Config{}
 	params, err := strvals.Parse(arg)
-
 	if err != nil {
 		return c, err
 	}
@@ -123,8 +123,8 @@ func ParseArg(arg string) (Config, error) {
 	}
 
 	if v, ok := params["influxdb"].(map[string]interface{}); ok {
-		influxConfig, err := influxdb.ParseMap(v)
-		if err != nil {
+		influxConfig, errParse := influxdb.ParseMap(v)
+		if errParse != nil {
 			return c, err
 		}
 		c.InfluxDBConfig = influxConfig
@@ -132,8 +132,8 @@ func ParseArg(arg string) (Config, error) {
 	delete(params, "influxdb")
 
 	if v, ok := params["push_interval"].(string); ok {
-		err := c.PushInterval.UnmarshalText([]byte(v))
-		if err != nil {
+		errUnmarshal := c.PushInterval.UnmarshalText([]byte(v))
+		if errUnmarshal != nil {
 			return c, err
 		}
 	}
@@ -151,35 +151,35 @@ func ParseArg(arg string) (Config, error) {
 	c.Certificate = null.StringFrom(cfg.Certificate)
 	c.PrivateKey = null.StringFrom(cfg.PrivateKey)
 	c.CertificateAuthority = null.StringFrom(cfg.CertificateAuthority)
-	c.InsecureSkipVerify = cfg.InsecureSkipVerify
+	c.InsecureSkip = cfg.InsecureSkip
 
 	return c, nil
 }
 
-//ParseTLSSecurity validate and read tls security config
+// ParseTLSSecurity validate and read tls security config
 func ParseTLSSecurity(c Config) (Config, error) {
 	if c.Certificate.String == "" || c.PrivateKey.String == "" {
 		return c, fmt.Errorf("missing certificate and private key")
 	}
 
-	//Read certificate
+	// Read certificate
 	cPath, err := GetAbsolutelyFilePath(c.Certificate.String)
 	if err != nil {
 		return c, err
 	}
 
-	c.Certificate = null.StringFrom(string(cPath))
+	c.Certificate = null.StringFrom(cPath)
 
-	//Read private key
+	// Read private key
 	pkPath, err := GetAbsolutelyFilePath(c.PrivateKey.String)
 	if err != nil {
 		return c, err
 	}
 
-	c.PrivateKey = null.StringFrom(string(pkPath))
+	c.PrivateKey = null.StringFrom(pkPath)
 
 	if c.CertificateAuthority.String != "" {
-		//Read certificate authority
+		// Read certificate authority
 		caPath, err := GetAbsolutelyFilePath(c.CertificateAuthority.String)
 		if err != nil {
 			return c, err

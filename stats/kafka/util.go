@@ -30,7 +30,7 @@ import (
 	"strings"
 )
 
-//GetAbsolutelyFilePath Gets the local file with absolutely path
+// GetAbsolutelyFilePath Gets the local file with absolutely path
 func GetAbsolutelyFilePath(path string) (string, error) {
 	wd, err := os.Getwd()
 	if err != nil {
@@ -47,7 +47,7 @@ func GetAbsolutelyFilePath(path string) (string, error) {
 		return "", err
 	}
 
-	//
+	// Ensure the path is a file
 	if info.IsDir() {
 		return "", fmt.Errorf("%v is is not a file", path)
 	}
@@ -55,14 +55,17 @@ func GetAbsolutelyFilePath(path string) (string, error) {
 	return path, nil
 }
 
-//ReadFile reads stream from file path
+// ReadFile reads stream from file path
 func ReadFile(path string) ([]byte, error) {
-	f, err := os.Open(path)
+	f, err := os.Open(filepath.Clean(path))
 	if err != nil {
 		return nil, err
 	}
 
-	defer f.Close()
+	defer func() {
+		_ = f.Close()
+	}()
+
 	// validate file's size
 	fileInfo, _ := f.Stat()
 	size := fileInfo.Size()
@@ -72,14 +75,17 @@ func ReadFile(path string) ([]byte, error) {
 	}
 	// load file content to buffer
 	buffer := make([]byte, size)
-	f.Read(buffer)
+	_, err = f.Read(buffer)
+	if err != nil {
+		return nil, err
+	}
 
 	return buffer, nil
 }
 
-//NewTLS Creates TLS Certificate to authenticate with Kafka Cluster (requires PEM format)
+// NewTLS Creates TLS Certificate to authenticate with Kafka Cluster (requires PEM format)
 func NewTLS(tlsClientCert, tlsClientKey, tlsClientCA string, skipVerify bool) (*tls.Config, error) {
-	//Load client certificate
+	// Load client certificate
 	if tlsClientCert == "" || tlsClientKey == "" {
 		return nil, fmt.Errorf("client cert or client key must not be empty")
 	}
@@ -91,11 +97,12 @@ func NewTLS(tlsClientCert, tlsClientKey, tlsClientCA string, skipVerify bool) (*
 
 	tlsConfig := &tls.Config{
 		Certificates: []tls.Certificate{cert},
+		MinVersion:   tls.VersionTLS13,
 	}
 
-	//Load CA certificate
+	// Load CA certificate
 	if tlsClientCA != "" {
-		caCert, err := ioutil.ReadFile(tlsClientCA)
+		caCert, err := ioutil.ReadFile(filepath.Clean(tlsClientCA))
 		if err != nil {
 			return nil, err
 		}
