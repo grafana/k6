@@ -22,7 +22,6 @@ package grpc
 
 import (
 	"context"
-	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -156,17 +155,9 @@ func (c *Client) Connect(ctxPtr *context.Context, addr string, params map[string
 		}
 
 		if !isPlaintext {
-			tlsCfg := state.TLSConfig
+			tlsCfg := state.TLSConfig.Clone()
+			tlsCfg.NextProtos = []string{"h2"}
 
-			var err error
-			tlsCfg.RootCAs, err = x509.SystemCertPool()
-			if err != nil {
-				// (rogchap): If there is no System Pool, we could just create our own and still
-				// continue; we only need a Cert Pool if we are adding our own RootCAs so returning
-				// error for now.
-				errc <- err
-				return
-			}
 			//TODO(rogchap): Would be good to add support for custom RootCAs (self signed)
 
 			// (rogchap) we create a wrapper for transport credentials so that we can report
@@ -187,8 +178,11 @@ func (c *Client) Connect(ctxPtr *context.Context, addr string, params map[string
 		}
 		opts = append(opts, grpc.WithContextDialer(dialer))
 
+		ctx, cancel := context.WithTimeout(*ctxPtr, 60*time.Second)
+		defer cancel()
+
 		var err error
-		c.conn, err = grpc.Dial(addr, opts...)
+		c.conn, err = grpc.DialContext(ctx, addr, opts...)
 		if err != nil {
 			errc <- err
 			return
