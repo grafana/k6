@@ -130,8 +130,7 @@ func TestGetAbsolutelyFilePath(t *testing.T) {
 func TestReadFile(t *testing.T) {
 	f, err := os.Create("file.txt")
 	defer func() {
-		err = os.Remove("file.txt")
-		assert.Nil(t, err)
+		_ = os.Remove("file.txt")
 	}()
 	assert.Nil(t, err)
 	_, err = f.WriteString("hello-world")
@@ -157,10 +156,8 @@ func TestNewTLS(t *testing.T) {
 	assert.Nil(t, err)
 
 	defer func() {
-		err = os.Remove("cert.pem")
-		assert.Nil(t, err)
-		err = os.Remove("key.pem")
-		assert.Nil(t, err)
+		_ = os.Remove("cert.pem")
+		_ = os.Remove("key.pem")
 	}()
 
 	tls, err := NewTLS("cert.pem", "key.pem", "", false)
