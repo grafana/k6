@@ -91,7 +91,7 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.StringSlice("tag", nil, "add a `tag` to be applied to all samples, as `[name]=[value]`")
 	flags.String("console-output", "", "redirects the console logging to the provided output file")
 	flags.Bool("discard-response-bodies", false, "Read but don't process or save HTTP response bodies")
-	flags.String("dns", "ttl=inf,strategy=first", "DNS configuration. Possible ttl values are: 'inf' "+
+	flags.String("dns", lib.DefaultDNSConfigText, "DNS configuration. Possible ttl values are: 'inf' "+
 		"for a persistent cache, '0' to disable the cache,\nor a positive duration, e.g. '1s', '1m', etc. "+
 		"Milliseconds are assumed if no unit is provided.\n"+
 		"Possible values for the strategy to use to select a single IP are: 'first', 'random' or 'round-robin'.\n")
@@ -239,16 +239,12 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		opts.ConsoleOutput = null.StringFrom(redirectConFile)
 	}
 
-	opts.DNS = &lib.DNSConfig{}
 	if dns, err := flags.GetString("dns"); err != nil {
 		return opts, err
 	} else if dns != "" {
 		if err := opts.DNS.UnmarshalText([]byte(dns)); err != nil {
 			return opts, err
 		}
-		// TODO: This obviously can't work for neither option...
-		opts.DNS.TTL.Valid = flags.Changed("dns")
-		opts.DNS.Strategy.Valid = flags.Changed("dns")
 	}
 
 	return opts, nil

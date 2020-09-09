@@ -993,42 +993,35 @@ func TestDNSResolver(t *testing.T) {
 
 		export default function () {
 			const res = http.get("http://myhost:HTTPBIN_PORT/", { timeout: 50 });
-			sleep(0.45);  // not an even multiple of 0.5 to minimize races with asserts
+			sleep(0.7);  // somewhat uneven multiple of 0.5 to minimize races with asserts
 		}`)
 
 	t.Run("cache", func(t *testing.T) {
 		testCases := map[string]struct {
-			opts lib.Options
+			opts          lib.Options
+			expLogEntries int
 		}{
 			"inf": { // IPs are cached indefinitely
-				lib.Options{},
+				lib.Options{}, 0,
 			},
 			"0": { // every request does a DNS lookup
-				lib.Options{DNS: &lib.DNSConfig{
+				lib.Options{DNS: lib.DNSConfig{
 					TTL:      null.StringFrom("0"),
-					Strategy: lib.DefaultDNSConfig().Strategy,
-				}},
+					Strategy: lib.NullDNSStrategy{DNSStrategy: lib.DNSFirst, Valid: true},
+				}}, 5,
 			},
-			"1000ms": { // cache IPs for 1s, test that unitless values are interpreted as ms
-				lib.Options{DNS: &lib.DNSConfig{
+			"1000": { // cache IPs for 1s, check that unitless values are interpreted as ms
+				lib.Options{DNS: lib.DNSConfig{
 					TTL:      null.StringFrom("1000"),
-					Strategy: lib.DefaultDNSConfig().Strategy,
-				}},
+					Strategy: lib.NullDNSStrategy{DNSStrategy: lib.DNSFirst, Valid: true},
+				}}, 4,
 			},
-			"2s": {
-				lib.Options{DNS: &lib.DNSConfig{
-					TTL:      null.StringFrom("2s"),
-					Strategy: lib.DefaultDNSConfig().Strategy,
-				}},
+			"3s": {
+				lib.Options{DNS: lib.DNSConfig{
+					TTL:      null.StringFrom("3s"),
+					Strategy: lib.NullDNSStrategy{DNSStrategy: lib.DNSFirst, Valid: true},
+				}}, 3,
 			},
-		}
-
-		checkLog := func(t *testing.T, entries []logrus.Entry) {
-			for _, entry := range entries {
-				expMsg := sr(`dial tcp 127.0.0.254:HTTPBIN_PORT: connect: connection refused`)
-				require.IsType(t, &url.Error{}, entry.Data["error"])
-				assert.EqualError(t, entry.Data["error"].(*url.Error).Err, expMsg)
-			}
 		}
 
 		for name, tc := range testCases {
@@ -1053,7 +1046,7 @@ func TestDNSResolver(t *testing.T) {
 				defer func() { netext.LookupIP = defaultLookup }()
 
 				mr.Set("myhost", sr("HTTPBIN_IP"))
-				time.AfterFunc(3*time.Second, func() {
+				time.AfterFunc(2*time.Second, func() {
 					mr.Set("myhost", "127.0.0.254")
 				})
 
@@ -1064,23 +1057,14 @@ func TestDNSResolver(t *testing.T) {
 				case err := <-errCh:
 					require.NoError(t, err)
 					entries := logHook.Drain()
-					switch name {
-					case "inf":
-						require.Len(t, entries, 0)
-					case "0":
-						require.Len(t, entries, 5)
-						checkLog(t, entries)
-					case "1000ms":
-						require.Len(t, entries, 3)
-						checkLog(t, entries)
-					case "2s":
-						require.Len(t, entries, 2)
-						checkLog(t, entries)
+					require.Len(t, entries, tc.expLogEntries)
+					for _, entry := range entries {
+						expMsg := sr(`dial tcp 127.0.0.254:HTTPBIN_PORT: connect: connection refused`)
+						require.IsType(t, &url.Error{}, entry.Data["error"])
+						assert.EqualError(t, entry.Data["error"].(*url.Error).Err, expMsg)
 					}
-					return
 				case <-time.After(6 * time.Second):
 					t.Fatal("timed out")
-					return
 				}
 			})
 		}

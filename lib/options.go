@@ -48,6 +48,9 @@ var DefaultSummaryTrendStats = []string{"avg", "min", "med", "max", "p(90)", "p(
 type DNSConfig struct {
 	TTL      null.String     `json:"ttl"`
 	Strategy NullDNSStrategy `json:"strategy"`
+	// FIXME: Valid is unused and is only added to satisfy some logic in lib.Options.ForEachSpecified(),
+	// otherwise it would panic with `reflect: call of reflect.Value.Bool on zero Value`.
+	Valid bool
 }
 
 //go:generate enumer -type=DNSStrategy -transform=kebab -trimprefix DNS -output dns_strategy_gen.go
@@ -64,11 +67,27 @@ const (
 	DNSRandom
 )
 
-func DefaultDNSConfig() *DNSConfig {
-	return &DNSConfig{
-		TTL:      null.StringFrom("inf"),
-		Strategy: NullDNSStrategy{DNSFirst, true},
+const DefaultDNSConfigText = "ttl=inf,strategy=first"
+
+func DefaultDNSConfig() DNSConfig {
+	return DNSConfig{
+		TTL:      null.NewString("inf", false),
+		Strategy: NullDNSStrategy{DNSFirst, false},
 	}
+}
+
+func (c DNSConfig) MarshalJSON() ([]byte, error) {
+	strat := ""
+	if c.Strategy.IsADNSStrategy() {
+		strat = c.Strategy.String()
+	}
+	return json.Marshal(struct {
+		TTL      string `json:"ttl"`
+		Strategy string `json:"strategy"`
+	}{
+		TTL:      c.TTL.String,
+		Strategy: strat,
+	})
 }
 
 func (c *DNSConfig) UnmarshalJSON(data []byte) error {
@@ -80,6 +99,10 @@ func (c *DNSConfig) UnmarshalJSON(data []byte) error {
 }
 
 func (c *DNSConfig) UnmarshalText(text []byte) error {
+	if string(text) == DefaultDNSConfigText {
+		*c = DefaultDNSConfig()
+		return nil
+	}
 	params, err := strvals.Parse(string(text))
 	if err != nil {
 		return err
@@ -88,11 +111,10 @@ func (c *DNSConfig) UnmarshalText(text []byte) error {
 }
 
 func (c *DNSConfig) unmarshalDNSConfig(params map[string]interface{}) error {
-	if ttl, ok := params["ttl"]; ok {
+	if ttl, ok := params["ttl"]; ok && ttl != "" {
 		c.TTL = null.StringFrom(fmt.Sprintf("%v", ttl))
 	}
-	c.Strategy = DefaultDNSConfig().Strategy
-	if strat, ok := params["strategy"]; ok {
+	if strat, ok := params["strategy"]; ok && strat != "" {
 		if s, err := DNSStrategyString(strat.(string)); err != nil {
 			return err
 		} else {
@@ -101,22 +123,6 @@ func (c *DNSConfig) unmarshalDNSConfig(params map[string]interface{}) error {
 		}
 	}
 	return nil
-}
-
-func (s NullDNSStrategy) MarshalJSON() ([]byte, error) {
-	return json.Marshal(s.String())
-}
-
-func (s *NullDNSStrategy) UnmarshalJSON(data []byte) error {
-	var str string
-	if err := json.Unmarshal(data, &str); err != nil {
-		return err
-	}
-	var err error
-	if s.DNSStrategy, err = DNSStrategyString(str); err == nil {
-		s.Valid = true
-	}
-	return err
 }
 
 // Describes a TLS version. Serialised to/from JSON as a string, eg. "tls1.2".
@@ -370,7 +376,7 @@ type Options struct {
 	RPS null.Int `json:"rps" envconfig:"K6_RPS"`
 
 	// DNS handling configuration.
-	DNS *DNSConfig `json:"dns" envconfig:"K6_DNS"`
+	DNS DNSConfig `json:"dns" envconfig:"K6_DNS"`
 
 	// How many HTTP redirects do we follow?
 	MaxRedirects null.Int `json:"maxRedirects" envconfig:"K6_MAX_REDIRECTS"`
@@ -598,19 +604,11 @@ func (o Options) Apply(opts Options) Options {
 	if opts.ConsoleOutput.Valid {
 		o.ConsoleOutput = opts.ConsoleOutput
 	}
-
-	// FIXME: This should really be in applyDefault(), but in some tests
-	// o.DNS hasn't been initialized yet...
-	if o.DNS == nil {
-		o.DNS = DefaultDNSConfig()
+	if opts.DNS.TTL.Valid {
+		o.DNS.TTL = opts.DNS.TTL
 	}
-	if opts.DNS != nil {
-		if opts.DNS.TTL.Valid {
-			o.DNS.TTL = opts.DNS.TTL
-		}
-		if opts.DNS.Strategy.Valid {
-			o.DNS.Strategy = opts.DNS.Strategy
-		}
+	if opts.DNS.Strategy.Valid {
+		o.DNS.Strategy = opts.DNS.Strategy
 	}
 
 	return o

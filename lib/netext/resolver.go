@@ -30,6 +30,8 @@ import (
 	"github.com/loadimpact/k6/lib/types"
 )
 
+// TODO: Figure out a non-global way to expose this for mocking in tests that
+// doesn't involve changing the Resolver interface...
 var LookupIP = net.LookupIP
 
 // Resolver is an interface that returns DNS information about a given host.
@@ -98,6 +100,7 @@ func (r *cacheResolver) LookupIP(host string) (net.IP, error) {
 	defer r.cm.Unlock()
 
 	var ips []net.IP
+	// TODO: Invalidate? When?
 	if d, ok := r.cache[host]; ok && time.Now().UTC().Before(d.lastLookup.Add(r.ttl)) {
 		ips = r.cache[host].ips
 	} else {

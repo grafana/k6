@@ -259,6 +259,12 @@ func applyDefault(conf Config) Config {
 	if conf.Options.SummaryTrendStats == nil {
 		conf.Options.SummaryTrendStats = lib.DefaultSummaryTrendStats
 	}
+	if !conf.DNS.TTL.Valid {
+		conf.DNS.TTL = lib.DefaultDNSConfig().TTL
+	}
+	if !conf.DNS.Strategy.Valid {
+		conf.DNS.Strategy = lib.DefaultDNSConfig().Strategy
+	}
 	return conf
 }
 

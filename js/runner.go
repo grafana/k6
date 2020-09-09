@@ -322,23 +322,21 @@ func (r *Runner) SetOptions(opts lib.Options) error {
 		r.console = c
 	}
 
-	if opts.DNS != nil {
-		// FIXME: Resolver probably shouldn't be reset here...
-		// It's done because the js.Runner is created before the full
-		// configuration has been processed, at which point we don't have
-		// access to the DNSConfig, and need to wait for this SetOptions
-		// call that happens after all config has been assembled.
-		// We could make DNSConfig part of RuntimeOptions, but that seems
-		// conceptually wrong since the JS runtime doesn't care about it
-		// (it needs the actual resolver, not the config), and it would
-		// require an additional field on Bundle to pass the config through,
-		// which is arguably worse than this.
-		ttl, err := parseTTL(opts.DNS.TTL.String)
-		if err != nil {
-			return err
-		}
-		r.Resolver = netext.NewResolver(ttl, opts.DNS.Strategy.DNSStrategy)
+	// FIXME: Resolver probably shouldn't be reset here...
+	// It's done because the js.Runner is created before the full
+	// configuration has been processed, at which point we don't have
+	// access to the DNSConfig, and need to wait for this SetOptions
+	// call that happens after all config has been assembled.
+	// We could make DNSConfig part of RuntimeOptions, but that seems
+	// conceptually wrong since the JS runtime doesn't care about it
+	// (it needs the actual resolver, not the config), and it would
+	// require an additional field on Bundle to pass the config through,
+	// which is arguably worse than this.
+	ttl, err := parseTTL(opts.DNS.TTL.String)
+	if err != nil {
+		return err
 	}
+	r.Resolver = netext.NewResolver(ttl, opts.DNS.Strategy.DNSStrategy)
 
 	return nil
 }

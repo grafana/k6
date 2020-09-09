@@ -376,38 +376,43 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 			},
 		},
 		{opts{cli: []string{}}, exp{}, func(t *testing.T, c Config) {
-			assert.Equal(t, &lib.DNSConfig{
+			assert.Equal(t, lib.DNSConfig{
 				TTL:      null.NewString("inf", false),
 				Strategy: lib.NullDNSStrategy{DNSStrategy: lib.DNSFirst, Valid: false},
 			}, c.Options.DNS)
 		}},
 		{opts{env: []string{"K6_DNS=ttl=5,strategy=round-robin"}}, exp{}, func(t *testing.T, c Config) {
-			assert.Equal(t, &lib.DNSConfig{
+			assert.Equal(t, lib.DNSConfig{
 				TTL:      null.StringFrom("5"),
 				Strategy: lib.NullDNSStrategy{DNSStrategy: lib.DNSRoundRobin, Valid: true},
 			}, c.Options.DNS)
 		}},
 		{opts{env: []string{"K6_DNS=ttl=inf,strategy=random"}}, exp{}, func(t *testing.T, c Config) {
-			assert.Equal(t, &lib.DNSConfig{
+			assert.Equal(t, lib.DNSConfig{
 				TTL:      null.StringFrom("inf"),
 				Strategy: lib.NullDNSStrategy{DNSStrategy: lib.DNSRandom, Valid: true},
 			}, c.Options.DNS)
 		}},
 		{opts{cli: []string{"--dns", "ttl=-1"}}, exp{}, func(t *testing.T, c Config) {
-			assert.Equal(t, &lib.DNSConfig{
+			assert.Equal(t, lib.DNSConfig{
 				TTL:      null.StringFrom("-1"),
-				Strategy: lib.NullDNSStrategy{DNSStrategy: lib.DNSFirst, Valid: true},
+				Strategy: lib.NullDNSStrategy{DNSStrategy: lib.DNSFirst, Valid: false},
 			}, c.Options.DNS)
 		}},
 		{opts{cli: []string{"--dns", "ttl=0"}}, exp{}, func(t *testing.T, c Config) {
-			assert.Equal(t, &lib.DNSConfig{
+			assert.Equal(t, lib.DNSConfig{
 				TTL:      null.StringFrom("0"),
-				Strategy: lib.NullDNSStrategy{DNSStrategy: lib.DNSFirst, Valid: true},
+				Strategy: lib.NullDNSStrategy{DNSStrategy: lib.DNSFirst, Valid: false},
 			}, c.Options.DNS)
 		}},
-		{opts{cli: []string{"--dns", "ttl=5s,strategy="}}, exp{cliReadError: true}, nil},
+		{opts{cli: []string{"--dns", "ttl=5s,strategy="}}, exp{}, func(t *testing.T, c Config) {
+			assert.Equal(t, lib.DNSConfig{
+				TTL:      null.StringFrom("5s"),
+				Strategy: lib.NullDNSStrategy{DNSStrategy: lib.DNSFirst, Valid: false},
+			}, c.Options.DNS)
+		}},
 		{opts{fs: defaultConfig(`{"dns": {"ttl": "0", "strategy": "round-robin"}}`)}, exp{}, func(t *testing.T, c Config) {
-			assert.Equal(t, &lib.DNSConfig{
+			assert.Equal(t, lib.DNSConfig{
 				TTL:      null.StringFrom("0"),
 				Strategy: lib.NullDNSStrategy{DNSStrategy: lib.DNSRoundRobin, Valid: true},
 			}, c.Options.DNS)
@@ -418,21 +423,21 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 				env: []string{"K6_DNS=ttl=30"},
 			},
 			exp{}, func(t *testing.T, c Config) {
-				assert.Equal(t, &lib.DNSConfig{
+				assert.Equal(t, lib.DNSConfig{
 					TTL:      null.StringFrom("30"),
-					Strategy: lib.NullDNSStrategy{DNSStrategy: lib.DNSFirst, Valid: true},
+					Strategy: lib.NullDNSStrategy{DNSStrategy: lib.DNSFirst, Valid: false},
 				}, c.Options.DNS)
 			},
 		},
 		{
-			// FIXME: CLI arg *should* override all
+			// CLI overrides all
 			opts{
 				fs:  defaultConfig(`{"dns": {"ttl": "60", "strategy": "first"}}`),
 				env: []string{"K6_DNS=ttl=30,strategy=random"},
 				cli: []string{"--dns", "ttl=5,strategy=round-robin"},
 			},
 			exp{}, func(t *testing.T, c Config) {
-				assert.Equal(t, &lib.DNSConfig{
+				assert.Equal(t, lib.DNSConfig{
 					TTL:      null.StringFrom("5"),
 					Strategy: lib.NullDNSStrategy{DNSStrategy: lib.DNSRoundRobin, Valid: true},
 				}, c.Options.DNS)
