@@ -19,18 +19,3 @@
  */
 
 package grpc
-
-import (
-	"github.com/dop251/goja"
-	"google.golang.org/grpc/codes"
-)
-
-// Response is a gRPC response that can be used by the goja VM
-type Response struct {
-	Status  codes.Code
-	Message goja.Value
-
-	// TODO(rogchap): add Headers and Trailers
-
-	// TODO(rogchap): add Error
-}

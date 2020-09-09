@@ -36,6 +36,7 @@ import (
 	"github.com/jhump/protoreflect/dynamic"
 	"github.com/jhump/protoreflect/dynamic/grpcdynamic"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
 	grpcstats "google.golang.org/grpc/stats"
@@ -65,10 +66,20 @@ func (*GRPC) NewClient(ctxPtr *context.Context) interface{} {
 	return common.Bind(rt, &Client{}, ctxPtr)
 }
 
+// MethodDesc holds ifromation on any parsed method descriptors that can be used by the goja VM
 type MethodDesc struct {
 	Name            string
 	ClientStreaming bool
 	ServerStreaming bool
+}
+
+// Response is a gRPC response that can be used by the goja VM
+type Response struct {
+	Status   codes.Code
+	Message  goja.Value
+	Headers  map[string][]string
+	Trailers map[string][]string
+	Error    goja.Value
 }
 
 // Load will parse the given proto files and make the file descriptors avaliable to request. This can only be called once;
@@ -286,29 +297,37 @@ func (c *Client) InvokeRPC(ctxPtr *context.Context, method string, req goja.Valu
 
 	reqCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	s := grpcdynamic.NewStub(c.conn)
-	resp, err := s.InvokeRpc(reqCtx, md, reqdm)
 
-	var msgdm *dynamic.Message
+	s := grpcdynamic.NewStub(c.conn)
+	header, trailer := metadata.New(nil), metadata.New(nil)
+	resp, err := s.InvokeRpc(reqCtx, md, reqdm, grpc.Header(&header), grpc.Trailer(&trailer))
+
 	var response Response
+	response.Headers = header
+	response.Trailers = trailer
+
 	if err != nil {
 		st := status.Convert(err)
 		response.Status = st.Code()
-		msgdm, _ = dynamic.AsDynamicMessage(st.Proto())
+		errdm, _ := dynamic.AsDynamicMessage(st.Proto())
+
+		// (rogchap) there is a lot of marshaling/unmarshaling here, but because this is a dynamic message
+		// we need to marshal to get the JSON representation first. Using a map seems the best way to create
+		// a goja.Value from the raw JSON bytes.
+		raw, _ := errdm.MarshalJSON()
+		errMsg := make(map[string]interface{})
+		json.Unmarshal(raw, &errMsg)
+		response.Error = rt.ToValue(errMsg)
 	}
 
 	if resp != nil {
-		msgdm = dynamic.NewMessage(md.GetOutputType())
+		msgdm := dynamic.NewMessage(md.GetOutputType())
 		msgdm.Merge(resp)
+		raw, _ := msgdm.MarshalJSON()
+		msg := make(map[string]interface{})
+		json.Unmarshal(raw, &msg)
+		response.Message = rt.ToValue(msg)
 	}
-
-	// (rogchap) there is a lot of marshaling/unmarshaling here, but because this is a dynamic message
-	// we need to marshal to get the JSON representation first. Using a map seems the best way to create
-	// a goja.Value from the raw JSON bytes.
-	raw, _ := msgdm.MarshalJSON()
-	msg := make(map[string]interface{})
-	json.Unmarshal(raw, &msg)
-	response.Message = rt.ToValue(msg)
 
 	return &response, nil
 }
