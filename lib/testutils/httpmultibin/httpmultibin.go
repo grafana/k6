@@ -45,6 +45,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/http2"
+	"google.golang.org/grpc"
+	grpctest "google.golang.org/grpc/test/grpc_testing"
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/netext"
@@ -90,6 +92,7 @@ type HTTPMultiBin struct {
 	ServerHTTP      *httptest.Server
 	ServerHTTPS     *httptest.Server
 	ServerHTTP2     *httptest.Server
+	ServerGRPC      *grpc.Server
 	Replacer        *strings.Replacer
 	TLSClientConfig *tls.Config
 	Dialer          *netext.Dialer
@@ -229,11 +232,21 @@ func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 	require.NotNil(t, httpsIP)
 	tlsConfig := GetTLSClientConfig(t, httpsSrv)
 
-	// Initialize the HTTP2 server, with a copy of the https tls config
-	http2Srv := httptest.NewUnstartedServer(mux)
-	err = http2.ConfigureServer(http2Srv.Config, &http2.Server{
-		IdleTimeout: 30,
+	// Initialize the gRPC server
+	grpcSrv := grpc.NewServer()
+	grpctest.RegisterTestServiceServer(grpcSrv, &grpctest.UnimplementedTestServiceServer{})
+
+	cmux := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.ProtoMajor == 2 && strings.Contains(r.Header.Get("Content-Type"), "application/grpc") {
+			grpcSrv.ServeHTTP(w, r)
+			return
+		}
+		mux.ServeHTTP(w, r)
 	})
+
+	// Initialize the HTTP2 server, with a copy of the https tls config
+	http2Srv := httptest.NewUnstartedServer(cmux)
+	http2Srv.EnableHTTP2 = true
 	http2Srv.TLS = &(*tlsConfig) // copy it
 	http2Srv.TLS.NextProtos = []string{http2.NextProtoTLS}
 	require.NoError(t, err)
@@ -254,6 +267,7 @@ func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 		KeepAlive: 10 * time.Second,
 		DualStack: true,
 	})
+
 	dialer.Hosts = map[string]*lib.HostAddress{
 		httpDomain:  httpDomainValue,
 		httpsDomain: httpsDomainValue,
@@ -272,6 +286,7 @@ func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 		ServerHTTP:  httpSrv,
 		ServerHTTPS: httpsSrv,
 		ServerHTTP2: http2Srv,
+		ServerGRPC:  grpcSrv,
 		Replacer: strings.NewReplacer(
 			"HTTPBIN_IP_URL", httpSrv.URL,
 			"HTTPBIN_DOMAIN", httpDomain,
@@ -291,12 +306,15 @@ func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 			"HTTP2BIN_URL", fmt.Sprintf("https://%s:%s", httpsDomain, http2URL.Port()),
 			"HTTP2BIN_IP", http2IP.String(),
 			"HTTP2BIN_PORT", http2URL.Port(),
+
+			"GRPCBIN_ADDR", fmt.Sprintf("%s:%s", httpsDomain, http2URL.Port()),
 		),
 		TLSClientConfig: tlsConfig,
 		Dialer:          dialer,
 		HTTPTransport:   transport,
 		Context:         ctx,
 		Cleanup: func() {
+			grpcSrv.Stop()
 			http2Srv.Close()
 			httpsSrv.Close()
 			httpSrv.Close()

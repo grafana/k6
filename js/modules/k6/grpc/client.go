@@ -47,8 +47,8 @@ import (
 )
 
 var (
-	errInvokeRPCInInitContext = common.NewInitContextError("Invoking RPC methods in the init context is not supported")
-	errConnectInInitContext   = common.NewInitContextError("Connecting to a gRPC server in the init context is not supported")
+	errInvokeRPCInInitContext = common.NewInitContextError("invoking RPC methods in the init context is not supported")
+	errConnectInInitContext   = common.NewInitContextError("connecting to a gRPC server in the init context is not supported")
 )
 
 // Client reprecents a gRPC client that can be used to make RPC requests
@@ -133,12 +133,16 @@ func (c *Client) Connect(ctxPtr *context.Context, addr string, params map[string
 		return errConnectInInitContext
 	}
 
-	isPlaintext := false
+	isPlaintext, timeout := false, 60*time.Second
 
 	for k, v := range params {
 		switch k {
 		case "plaintext":
 			isPlaintext, _ = v.(bool)
+		case "timeout":
+			if t, ok := v.(float64); ok && t > 0.0 {
+				timeout = time.Duration(t) * time.Millisecond
+			}
 		}
 	}
 
@@ -178,7 +182,7 @@ func (c *Client) Connect(ctxPtr *context.Context, addr string, params map[string
 		}
 		opts = append(opts, grpc.WithContextDialer(dialer))
 
-		ctx, cancel := context.WithTimeout(*ctxPtr, 60*time.Second)
+		ctx, cancel := context.WithTimeout(*ctxPtr, timeout)
 		defer cancel()
 
 		var err error
@@ -273,8 +277,8 @@ func (c *Client) InvokeRPC(ctxPtr *context.Context, method string, req goja.Valu
 	b, _ := req.ToObject(rt).MarshalJSON()
 	reqdm.UnmarshalJSON(b)
 
-	reqCtx, cancelFunc := context.WithTimeout(ctx, timeout)
-	defer cancelFunc()
+	reqCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
 	s := grpcdynamic.NewStub(c.conn)
 	resp, err := s.InvokeRpc(reqCtx, md, reqdm)
 
