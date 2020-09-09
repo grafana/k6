@@ -104,6 +104,17 @@ func TestClient(t *testing.T) {
 		assert.Contains(t, err.Error(), "connecting to a gRPC server in the init context is not supported")
 	})
 
+	t.Run("invokeRPCInit", func(t *testing.T) {
+		_, err := common.RunString(rt, `
+			var err = client.invokeRPC();
+			throw new Error(err)
+		`)
+		if !assert.Error(t, err) {
+			return
+		}
+		assert.Contains(t, err.Error(), "invoking RPC methods in the init context is not supported")
+	})
+
 	ctx = lib.WithState(ctx, state)
 
 	t.Run("NoConnect", func(t *testing.T) {
@@ -124,6 +135,16 @@ func TestClient(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("InvokeRPCNotFound", func(t *testing.T) {
+		_, err := common.RunString(rt, sr(`
+			client.invokeRPC("foo/bar", {})
+		`))
+		if !assert.Error(t, err) {
+			return
+		}
+		assert.Contains(t, err.Error(), "method \"foo/bar\" not found in file descriptors")
+	})
+
 	t.Run("InvokeRPC", func(t *testing.T) {
 		_, err := common.RunString(rt, sr(`
 			var resp = client.invokeRPC("grpc.testing.TestService/EmptyCall", {})
@@ -136,6 +157,20 @@ func TestClient(t *testing.T) {
 
 	t.Run("LoadNotInit", func(t *testing.T) {
 		_, err := common.RunString(rt, "client.load()")
+		if !assert.Error(t, err) {
+			return
+		}
 		assert.Contains(t, err.Error(), "load must be called in the init context")
+	})
+
+	t.Run("Close", func(t *testing.T) {
+		_, err := common.RunString(rt, `
+			client.close();
+			client.invokeRPC();
+		`)
+		if !assert.Error(t, err) {
+			return
+		}
+		assert.Contains(t, err.Error(), "no gRPC connection")
 	})
 }

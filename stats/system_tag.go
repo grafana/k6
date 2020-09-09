@@ -96,6 +96,8 @@ const (
 	TagErrorCode
 	TagTLSVersion
 	TagScenario
+	TagService
+	TagRPCType
 
 	// System tags not enabled by default.
 	TagIter
@@ -108,7 +110,7 @@ const (
 // Other tags that are not enabled by default include: iter, vu, ocsp_status, ip
 //nolint:gochecknoglobals
 var DefaultSystemTagSet = TagProto | TagSubproto | TagStatus | TagMethod | TagURL | TagName | TagGroup |
-	TagCheck | TagCheck | TagError | TagErrorCode | TagTLSVersion | TagScenario
+	TagCheck | TagCheck | TagError | TagErrorCode | TagTLSVersion | TagScenario | TagService | TagRPCType
 
 // Add adds a tag to tag set.
 func (i *SystemTagSet) Add(tag SystemTagSet) {

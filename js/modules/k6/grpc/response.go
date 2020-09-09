@@ -29,4 +29,8 @@ import (
 type Response struct {
 	Status  codes.Code
 	Message goja.Value
+
+	// TODO(rogchap): add Headers and Trailers
+
+	// TODO(rogchap): add Error
 }

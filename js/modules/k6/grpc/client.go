@@ -26,6 +26,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 	"time"
 
@@ -53,11 +54,8 @@ var (
 
 // Client reprecents a gRPC client that can be used to make RPC requests
 type Client struct {
-	mds map[string]*desc.MethodDescriptor
-
-	sampleTags    *stats.SampleTags
-	samplesOutput chan<- stats.SampleContainer
-
+	mds  map[string]*desc.MethodDescriptor
+	tags map[string]string
 	conn *grpc.ClientConn
 }
 
@@ -220,9 +218,10 @@ func (c *Client) InvokeRPC(ctxPtr *context.Context, method string, req goja.Valu
 		return nil, fmt.Errorf("method %q not found in file descriptors", method)
 	}
 
+	c.tags = state.CloneTags()
 	timeout := 60 * time.Second
-	tags := state.CloneTags()
 
+	ctx = metadata.NewOutgoingContext(ctx, metadata.New(nil))
 	for k, v := range params {
 		switch k {
 		case "headers":
@@ -248,7 +247,7 @@ func (c *Client) InvokeRPC(ctxPtr *context.Context, method string, req goja.Valu
 				if !ok {
 					continue
 				}
-				tags[tk] = strVal
+				c.tags[tk] = strVal
 			}
 		case "timeout":
 			if t, ok := v.(float64); ok && t > 0.0 {
@@ -257,21 +256,29 @@ func (c *Client) InvokeRPC(ctxPtr *context.Context, method string, req goja.Valu
 		}
 	}
 
-	// TODO(rogchap): add standard gRPC tags
-	// suggested tags:
-	// * service (would the URL be enough as replacement for service/method?)
-	// * method (this maybe confusing if we use the TagMethod as that is the HTTP Method (GET, POST etc)
-	// * rpc_type: unary, client_streaming, server_streaming, bidirectional_streaming
-	// * request_message: fully qualified name
-	// * response_message: fully qualified name
-
-	// Only set the name system tag if the user didn't explicitly set it beforehand
-	if _, ok := tags["name"]; !ok && state.Options.SystemTags.Has(stats.TagName) {
-		tags["name"] = method
+	if state.Options.SystemTags.Has(stats.TagURL) {
+		c.tags["url"] = fmt.Sprintf("%s/%s", c.conn.Target(), method)
 	}
 
-	c.sampleTags = stats.IntoSampleTags(&tags)
-	c.samplesOutput = state.Samples
+	parts := strings.Split(method, "/")
+	if state.Options.SystemTags.Has(stats.TagService) {
+		c.tags["service"] = parts[0]
+	}
+	if state.Options.SystemTags.Has(stats.TagMethod) {
+		c.tags["method"] = parts[1]
+	}
+
+	if state.Options.SystemTags.Has(stats.TagRPCType) {
+		// (rogchap) This method only supports unary RPCs
+		// if this is refactored to support streaming then this should
+		// be updated to be based on the method descriptor (IsClientStreaming/IsServerStreaming)
+		c.tags["rpc_type"] = "unary"
+	}
+
+	// Only set the name system tag if the user didn't explicitly set it beforehand
+	if _, ok := c.tags["name"]; !ok && state.Options.SystemTags.Has(stats.TagName) {
+		c.tags["name"] = method
+	}
 
 	reqdm := dynamic.NewMessage(md.GetInputType())
 	b, _ := req.ToObject(rt).MarshalJSON()
@@ -333,18 +340,32 @@ func (*Client) TagRPC(ctx context.Context, _ *grpcstats.RPCTagInfo) context.Cont
 }
 
 func (c *Client) HandleRPC(ctx context.Context, stat grpcstats.RPCStats) {
+	state := lib.GetState(ctx)
+
 	switch s := stat.(type) {
+	case *grpcstats.OutHeader:
+		if state.Options.SystemTags.Has(stats.TagIP) && s.RemoteAddr != nil {
+			if ip, _, err := net.SplitHostPort(s.RemoteAddr.String()); err == nil {
+				c.tags["ip"] = ip
+			}
+		}
 	case *grpcstats.End:
-		stats.PushIfNotDone(ctx, c.samplesOutput, stats.ConnectedSamples{
+
+		if state.Options.SystemTags.Has(stats.TagStatus) {
+			c.tags["status"] = strconv.Itoa(int(status.Code(s.Error)))
+		}
+
+		tags := stats.IntoSampleTags(&c.tags)
+		stats.PushIfNotDone(ctx, state.Samples, stats.ConnectedSamples{
 			Samples: []stats.Sample{
 				{
 					Metric: metrics.GRPCReqDuration,
-					Tags:   c.sampleTags,
+					Tags:   tags,
 					Value:  stats.D(s.EndTime.Sub(s.BeginTime)),
 				},
 				{
 					Metric: metrics.GRPCReqs,
-					Tags:   c.sampleTags,
+					Tags:   tags,
 					Value:  1,
 				},
 			},
