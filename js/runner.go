@@ -353,9 +353,9 @@ func parseTTL(ttlS string) (types.NullDuration, error) {
 		// disable cache
 	default:
 		origTTLs := ttlS
-		// Treat unitless values as seconds
+		// Treat unitless values as milliseconds
 		if t, err := strconv.ParseFloat(ttlS, 32); err == nil {
-			ttlS = fmt.Sprintf("%.2fs", t)
+			ttlS = fmt.Sprintf("%.2fms", t)
 		}
 		ttlD, err := types.ParseExtendedDuration(ttlS)
 		if ttlD < 0 || err != nil {

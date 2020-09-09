@@ -1009,6 +1009,12 @@ func TestDNSResolver(t *testing.T) {
 					Strategy: lib.DefaultDNSConfig().Strategy,
 				}},
 			},
+			"1000ms": { // cache IPs for 1s, test that unitless values are interpreted as ms
+				lib.Options{DNS: &lib.DNSConfig{
+					TTL:      null.StringFrom("1000"),
+					Strategy: lib.DefaultDNSConfig().Strategy,
+				}},
+			},
 			"2s": {
 				lib.Options{DNS: &lib.DNSConfig{
 					TTL:      null.StringFrom("2s"),
@@ -1063,6 +1069,9 @@ func TestDNSResolver(t *testing.T) {
 						require.Len(t, entries, 0)
 					case "0":
 						require.Len(t, entries, 5)
+						checkLog(t, entries)
+					case "1000ms":
+						require.Len(t, entries, 3)
 						checkLog(t, entries)
 					case "2s":
 						require.Len(t, entries, 2)
