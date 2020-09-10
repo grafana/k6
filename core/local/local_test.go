@@ -987,7 +987,7 @@ func TestDNSResolver(t *testing.T) {
 
 		export let options = {
 			vus: 1,
-			duration: "5s",
+			iterations: 8,
 			noConnectionReuse: true,
 		}
 
@@ -1046,7 +1046,7 @@ func TestDNSResolver(t *testing.T) {
 				defer func() { netext.LookupIP = defaultLookup }()
 
 				mr.Set("myhost", sr("HTTPBIN_IP"))
-				time.AfterFunc(2*time.Second, func() {
+				time.AfterFunc(1700*time.Millisecond, func() {
 					mr.Set("myhost", "127.0.0.254")
 				})
 
@@ -1063,7 +1063,7 @@ func TestDNSResolver(t *testing.T) {
 						require.IsType(t, &url.Error{}, entry.Data["error"])
 						assert.EqualError(t, entry.Data["error"].(*url.Error).Err, expMsg)
 					}
-				case <-time.After(6 * time.Second):
+				case <-time.After(10 * time.Second):
 					t.Fatal("timed out")
 				}
 			})
