@@ -31,7 +31,6 @@ import (
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/testutils"
-	"github.com/loadimpact/k6/lib/types"
 )
 
 func TestResolver(t *testing.T) {
@@ -49,13 +48,13 @@ func TestResolver(t *testing.T) {
 
 	t.Run("LookupIP", func(t *testing.T) {
 		testCases := []struct {
-			ttl      types.NullDuration
+			ttl      time.Duration
 			strategy lib.DNSStrategy
 			expIP    []net.IP
 		}{
-			{types.NewNullDuration(time.Duration(0), false), lib.DNSFirst, []net.IP{net.ParseIP("127.0.0.10")}},
-			{types.NewNullDuration(time.Duration(time.Second), true), lib.DNSFirst, []net.IP{net.ParseIP("127.0.0.10")}},
-			{types.NewNullDuration(time.Duration(0), false), lib.DNSRoundRobin, []net.IP{
+			{0, lib.DNSFirst, []net.IP{net.ParseIP("127.0.0.10")}},
+			{time.Second, lib.DNSFirst, []net.IP{net.ParseIP("127.0.0.10")}},
+			{0, lib.DNSRoundRobin, []net.IP{
 				net.ParseIP("127.0.0.10"),
 				net.ParseIP("127.0.0.11"),
 				net.ParseIP("127.0.0.12"),
@@ -72,16 +71,16 @@ func TestResolver(t *testing.T) {
 				require.NoError(t, err)
 				assert.Equal(t, tc.expIP[0], ip)
 
-				if tc.ttl.Valid {
+				if tc.ttl > 0 {
 					require.IsType(t, &cacheResolver{}, r)
 					cr := r.(*cacheResolver)
 					assert.Len(t, cr.cache, 1)
-					assert.Equal(t, time.Duration(tc.ttl.Duration), cr.ttl)
-					lastLookup := cr.cache[host].lastLookup
+					assert.Equal(t, tc.ttl, cr.ttl)
+					firstLookup := cr.cache[host].lastLookup
 					time.Sleep(cr.ttl + time.Duration(100*time.Millisecond))
 					_, err := r.LookupIP(host)
 					require.NoError(t, err)
-					assert.True(t, cr.cache[host].lastLookup.After(lastLookup))
+					assert.True(t, cr.cache[host].lastLookup.After(firstLookup))
 				}
 
 				if tc.strategy == lib.DNSRoundRobin {

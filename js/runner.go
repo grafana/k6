@@ -105,11 +105,8 @@ func newFromBundle(logger *logrus.Logger, b *Bundle) (*Runner, error) {
 			KeepAlive: 30 * time.Second,
 			DualStack: true,
 		},
-		console: newConsole(logger),
-		Resolver: netext.NewResolver(
-			types.NullDurationFrom(0),
-			lib.DefaultDNSConfig().Strategy.DNSStrategy,
-		),
+		console:  newConsole(logger),
+		Resolver: netext.NewResolver(0, lib.DefaultDNSConfig().Strategy.DNSStrategy),
 	}
 
 	err = r.SetOptions(r.Bundle.Options)
@@ -341,12 +338,12 @@ func (r *Runner) SetOptions(opts lib.Options) error {
 	return nil
 }
 
-func parseTTL(ttlS string) (types.NullDuration, error) {
-	ttl := types.NewNullDuration(0, false)
+func parseTTL(ttlS string) (time.Duration, error) {
+	ttl := time.Duration(0)
 	switch ttlS {
 	case "", "inf":
 		// cache "indefinitely"
-		ttl = types.NullDurationFrom(math.MaxInt64)
+		ttl = time.Duration(math.MaxInt64)
 	case "0":
 		// disable cache
 	default:
@@ -355,11 +352,11 @@ func parseTTL(ttlS string) (types.NullDuration, error) {
 		if t, err := strconv.ParseFloat(ttlS, 32); err == nil {
 			ttlS = fmt.Sprintf("%.2fms", t)
 		}
-		ttlD, err := types.ParseExtendedDuration(ttlS)
-		if ttlD < 0 || err != nil {
+		var err error
+		ttl, err = types.ParseExtendedDuration(ttlS)
+		if ttl < 0 || err != nil {
 			return ttl, fmt.Errorf("invalid DNS TTL: %s", origTTLs)
 		}
-		ttl = types.NewNullDuration(ttlD, ttlD > 0)
 	}
 	return ttl, nil
 }

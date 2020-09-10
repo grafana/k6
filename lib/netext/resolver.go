@@ -27,7 +27,6 @@ import (
 	"time"
 
 	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/types"
 )
 
 // TODO: Figure out a non-global way to expose this for mocking in tests that
@@ -57,28 +56,24 @@ type cacheResolver struct {
 	cache map[string]cacheRecord
 }
 
-// NewResolver returns a new DNS resolver. If ttl is a valid duration, responses
+// NewResolver returns a new DNS resolver. If ttl is not 0, responses
 // will be cached per host for the specified period. The IP returned from
 // LookupIP() will be selected based on the given strategy.
-func NewResolver(ttl types.NullDuration, strategy lib.DNSStrategy) Resolver {
-	var r Resolver
+func NewResolver(ttl time.Duration, strategy lib.DNSStrategy) Resolver {
 	res := resolver{
 		strategy:   strategy,
 		rrm:        &sync.Mutex{},
 		roundRobin: make(map[string]uint8),
 	}
-	if ttl.Valid {
-		r = &cacheResolver{
-			resolver: res,
-			ttl:      time.Duration(ttl.Duration),
-			cm:       &sync.Mutex{},
-			cache:    make(map[string]cacheRecord),
-		}
-	} else {
-		r = &res
+	if ttl == 0 {
+		return &res
 	}
-
-	return r
+	return &cacheResolver{
+		resolver: res,
+		ttl:      ttl,
+		cm:       &sync.Mutex{},
+		cache:    make(map[string]cacheRecord),
+	}
 }
 
 // LookupIP returns a single IP resolved for host, selected by the

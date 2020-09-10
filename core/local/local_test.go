@@ -1199,7 +1199,7 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 		expTags = append(expTags, addExpTags...)
 		return netext.NewDialer(
 			net.Dialer{},
-			netext.NewResolver(types.NullDurationFrom(0), lib.DNSFirst),
+			netext.NewResolver(0, lib.DNSFirst),
 		).GetTrail(time.Now(), time.Now(),
 			true, emitIterations, getTags(expTags...))
 	}

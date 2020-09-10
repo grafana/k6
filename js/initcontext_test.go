@@ -43,7 +43,6 @@ import (
 	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/lib/testutils"
-	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 )
 
@@ -395,7 +394,7 @@ func TestRequestWithBinaryFile(t *testing.T) {
 					KeepAlive: 60 * time.Second,
 					DualStack: true,
 				},
-				netext.NewResolver(types.NullDurationFrom(0), lib.DNSFirst),
+				netext.NewResolver(0, lib.DNSFirst),
 			)).DialContext,
 		},
 		BPool:   bpool.NewBufferPool(1),

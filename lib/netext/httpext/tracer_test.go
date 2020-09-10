@@ -43,7 +43,6 @@ import (
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/netext"
-	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 )
 
@@ -59,7 +58,7 @@ func TestTracer(t *testing.T) {
 	assert.True(t, ok)
 	transport.DialContext = netext.NewDialer(
 		net.Dialer{},
-		netext.NewResolver(types.NullDurationFrom(0), lib.DNSFirst),
+		netext.NewResolver(0, lib.DNSFirst),
 	).DialContext
 
 	var prev int64
