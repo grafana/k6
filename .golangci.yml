@@ -55,9 +55,10 @@ linters:
   - gochecknoinits
   - godot
   - godox
+  - goerr113 # most of the errors here are meant for humans
+  - gomnd
   - gomodguard
+  - nlreturn
   - testpackage
   - wsl
-  - gomnd
-  - goerr113 # most of the errors here are meant for humans
   fast: false
