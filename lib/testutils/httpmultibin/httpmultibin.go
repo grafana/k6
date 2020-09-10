@@ -213,27 +213,40 @@ type GRPCStub struct {
 	UnaryCallFunc func(context.Context, *grpctest.SimpleRequest) (*grpctest.SimpleResponse, error)
 }
 
+// EmptyCall implements the interface for the gRPC TestServiceServer
 func (s *GRPCStub) EmptyCall(ctx context.Context, req *grpctest.Empty) (*grpctest.Empty, error) {
 	if s.EmptyCallFunc != nil {
 		return s.EmptyCallFunc(ctx, req)
 	}
+
 	return nil, status.Errorf(codes.Unimplemented, "method EmptyCall not implemented")
 }
+
+// UnaryCall implements the interface for the gRPC TestServiceServer
 func (s *GRPCStub) UnaryCall(ctx context.Context, req *grpctest.SimpleRequest) (*grpctest.SimpleResponse, error) {
 	if s.UnaryCallFunc != nil {
 		return s.UnaryCallFunc(ctx, req)
 	}
+
 	return nil, status.Errorf(codes.Unimplemented, "method UnaryCall not implemented")
 }
+
+// StreamingOutputCall implements the interface for the gRPC TestServiceServer
 func (*GRPCStub) StreamingOutputCall(*grpctest.StreamingOutputCallRequest, grpctest.TestService_StreamingOutputCallServer) error {
 	return status.Errorf(codes.Unimplemented, "method StreamingOutputCall not implemented")
 }
+
+// StreamingInputCall implements the interface for the gRPC TestServiceServer
 func (*GRPCStub) StreamingInputCall(grpctest.TestService_StreamingInputCallServer) error {
 	return status.Errorf(codes.Unimplemented, "method StreamingInputCall not implemented")
 }
+
+// FullDuplexCall implements the interface for the gRPC TestServiceServer
 func (*GRPCStub) FullDuplexCall(grpctest.TestService_FullDuplexCallServer) error {
 	return status.Errorf(codes.Unimplemented, "method FullDuplexCall not implemented")
 }
+
+// HalfDuplexCall implements the interface for the gRPC TestServiceServer
 func (*GRPCStub) HalfDuplexCall(grpctest.TestService_HalfDuplexCallServer) error {
 	return status.Errorf(codes.Unimplemented, "method HalfDuplexCall not implemented")
 }
@@ -316,6 +329,7 @@ func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 	require.NoError(t, http2.ConfigureTransport(transport))
 
 	ctx, ctxCancel := context.WithCancel(context.Background())
+
 	return &HTTPMultiBin{
 		Mux:         mux,
 		ServerHTTP:  httpSrv,

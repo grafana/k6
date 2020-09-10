@@ -190,6 +190,7 @@ func TestClient(t *testing.T) {
 			if req.Payload == nil || string(req.Payload.Body) != "负载测试" {
 				return nil, status.Error(codes.InvalidArgument, "")
 			}
+
 			return &grpc_testing.SimpleResponse{}, nil
 		}
 		_, err := common.RunString(rt, `
@@ -260,7 +261,8 @@ func TestClient(t *testing.T) {
 	t.Run("ResponseHeaders", func(t *testing.T) {
 		tb.GRPCStub.EmptyCallFunc = func(ctx context.Context, _ *grpc_testing.Empty) (*grpc_testing.Empty, error) {
 			md := metadata.Pairs("foo", "bar")
-			grpc.SetHeader(ctx, md)
+			_ = grpc.SetHeader(ctx, md)
+
 			return &grpc_testing.Empty{}, nil
 		}
 		_, err := common.RunString(rt, `
@@ -278,7 +280,8 @@ func TestClient(t *testing.T) {
 	t.Run("ResponseTrailers", func(t *testing.T) {
 		tb.GRPCStub.EmptyCallFunc = func(ctx context.Context, _ *grpc_testing.Empty) (*grpc_testing.Empty, error) {
 			md := metadata.Pairs("foo", "bar")
-			grpc.SetTrailer(ctx, md)
+			_ = grpc.SetTrailer(ctx, md)
+
 			return &grpc_testing.Empty{}, nil
 		}
 		_, err := common.RunString(rt, `

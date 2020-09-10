@@ -48,6 +48,7 @@ import (
 	"github.com/loadimpact/k6/stats"
 )
 
+//nolint: lll
 var (
 	errInvokeRPCInInitContext = common.NewInitContextError("invoking RPC methods in the init context is not supported")
 	errConnectInInitContext   = common.NewInitContextError("connecting to a gRPC server in the init context is not supported")
@@ -63,6 +64,7 @@ type Client struct {
 // NewClient creates a new gPRC client to make invoke RPC methods.
 func (*GRPC) NewClient(ctxPtr *context.Context) interface{} {
 	rt := common.GetRuntime(*ctxPtr)
+
 	return common.Bind(rt, &Client{}, ctxPtr)
 }
 
@@ -82,8 +84,7 @@ type Response struct {
 	Error    goja.Value
 }
 
-// Load will parse the given proto files and make the file descriptors avaliable to request. This can only be called once;
-// subsequent calls to Load will be a noop.
+// Load will parse the given proto files and make the file descriptors avaliable to request.
 func (c *Client) Load(ctxPtr *context.Context, importPaths []string, filenames ...string) ([]MethodDesc, error) {
 	if lib.GetState(*ctxPtr) != nil {
 		return nil, errors.New("load must be called in the init context")
@@ -127,11 +128,14 @@ type transportCreds struct {
 	errc chan<- error
 }
 
-func (t transportCreds) ClientHandshake(ctx context.Context, addr string, in net.Conn) (net.Conn, credentials.AuthInfo, error) {
+func (t transportCreds) ClientHandshake(ctx context.Context,
+	addr string, in net.Conn) (net.Conn, credentials.AuthInfo, error) {
+
 	out, auth, err := t.TransportCredentials.ClientHandshake(ctx, addr, in)
 	if err != nil {
 		t.errc <- err
 	}
+
 	return out, auth, err
 }
 
@@ -171,7 +175,7 @@ func (c *Client) Connect(ctxPtr *context.Context, addr string, params map[string
 			tlsCfg := state.TLSConfig.Clone()
 			tlsCfg.NextProtos = []string{"h2"}
 
-			//TODO(rogchap): Would be good to add support for custom RootCAs (self signed)
+			// TODO(rogchap): Would be good to add support for custom RootCAs (self signed)
 
 			// (rogchap) we create a wrapper for transport credentials so that we can report
 			// on any TLS errors.
@@ -203,14 +207,12 @@ func (c *Client) Connect(ctxPtr *context.Context, addr string, params map[string
 		close(errc)
 	}()
 
-	select {
-	case err := <-errc:
-		return err
-	}
+	return <-errc
 }
 
 // InvokeRPC creates and calls a unary RPC by fully qualified method name
-func (c *Client) InvokeRPC(ctxPtr *context.Context, method string, req goja.Value, params map[string]interface{}) (*Response, error) {
+func (c *Client) InvokeRPC(ctxPtr *context.Context,
+	method string, req goja.Value, params map[string]interface{}) (*Response, error) {
 	ctx := *ctxPtr
 	rt := common.GetRuntime(ctx)
 	state := lib.GetState(ctx)
@@ -292,7 +294,7 @@ func (c *Client) InvokeRPC(ctxPtr *context.Context, method string, req goja.Valu
 
 	reqdm := dynamic.NewMessage(md.GetInputType())
 	b, _ := req.ToObject(rt).MarshalJSON()
-	reqdm.UnmarshalJSON(b)
+	_ = reqdm.UnmarshalJSON(b)
 
 	reqCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -315,7 +317,7 @@ func (c *Client) InvokeRPC(ctxPtr *context.Context, method string, req goja.Valu
 		// a goja.Value from the raw JSON bytes.
 		raw, _ := errdm.MarshalJSON()
 		errMsg := make(map[string]interface{})
-		json.Unmarshal(raw, &errMsg)
+		_ = json.Unmarshal(raw, &errMsg)
 		response.Error = rt.ToValue(errMsg)
 	}
 
@@ -324,7 +326,7 @@ func (c *Client) InvokeRPC(ctxPtr *context.Context, method string, req goja.Valu
 		msgdm.Merge(resp)
 		raw, _ := msgdm.MarshalJSON()
 		msg := make(map[string]interface{})
-		json.Unmarshal(raw, &msg)
+		_ = json.Unmarshal(raw, &msg)
 		response.Message = rt.ToValue(msg)
 	}
 
@@ -338,6 +340,7 @@ func (c *Client) Close() error {
 	}
 	err := c.conn.Close()
 	c.conn = nil
+
 	return err
 }
 

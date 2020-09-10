@@ -96,14 +96,16 @@ const (
 	TagErrorCode
 	TagTLSVersion
 	TagScenario
-	TagService
-	TagRPCType
 
 	// System tags not enabled by default.
 	TagIter
 	TagVU
 	TagOCSPStatus
 	TagIP
+
+	// gRPC specific tags
+	TagService
+	TagRPCType
 )
 
 // DefaultSystemTagSet includes all of the system tags emitted with metrics by default.
