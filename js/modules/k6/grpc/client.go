@@ -266,7 +266,6 @@ func (c *Client) InvokeRPC(ctxPtr *context.Context, method string, req goja.Valu
 			}
 		}
 	}
-
 	if state.Options.SystemTags.Has(stats.TagURL) {
 		c.tags["url"] = fmt.Sprintf("%s/%s", c.conn.Target(), method)
 	}

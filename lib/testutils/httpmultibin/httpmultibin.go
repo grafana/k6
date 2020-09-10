@@ -46,6 +46,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/http2"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	grpctest "google.golang.org/grpc/test/grpc_testing"
 
 	"github.com/loadimpact/k6/lib"
@@ -93,6 +95,7 @@ type HTTPMultiBin struct {
 	ServerHTTPS     *httptest.Server
 	ServerHTTP2     *httptest.Server
 	ServerGRPC      *grpc.Server
+	GRPCStub        *GRPCStub
 	Replacer        *strings.Replacer
 	TLSClientConfig *tls.Config
 	Dialer          *netext.Dialer
@@ -204,6 +207,37 @@ func getZstdBrHandler(t testing.TB) http.Handler {
 	})
 }
 
+// GRPCStub is an easily customisable TestServiceServer
+type GRPCStub struct {
+	EmptyCallFunc func(context.Context, *grpctest.Empty) (*grpctest.Empty, error)
+	UnaryCallFunc func(context.Context, *grpctest.SimpleRequest) (*grpctest.SimpleResponse, error)
+}
+
+func (s *GRPCStub) EmptyCall(ctx context.Context, req *grpctest.Empty) (*grpctest.Empty, error) {
+	if s.EmptyCallFunc != nil {
+		return s.EmptyCallFunc(ctx, req)
+	}
+	return nil, status.Errorf(codes.Unimplemented, "method EmptyCall not implemented")
+}
+func (s *GRPCStub) UnaryCall(ctx context.Context, req *grpctest.SimpleRequest) (*grpctest.SimpleResponse, error) {
+	if s.UnaryCallFunc != nil {
+		return s.UnaryCallFunc(ctx, req)
+	}
+	return nil, status.Errorf(codes.Unimplemented, "method UnaryCall not implemented")
+}
+func (*GRPCStub) StreamingOutputCall(*grpctest.StreamingOutputCallRequest, grpctest.TestService_StreamingOutputCallServer) error {
+	return status.Errorf(codes.Unimplemented, "method StreamingOutputCall not implemented")
+}
+func (*GRPCStub) StreamingInputCall(grpctest.TestService_StreamingInputCallServer) error {
+	return status.Errorf(codes.Unimplemented, "method StreamingInputCall not implemented")
+}
+func (*GRPCStub) FullDuplexCall(grpctest.TestService_FullDuplexCallServer) error {
+	return status.Errorf(codes.Unimplemented, "method FullDuplexCall not implemented")
+}
+func (*GRPCStub) HalfDuplexCall(grpctest.TestService_HalfDuplexCallServer) error {
+	return status.Errorf(codes.Unimplemented, "method HalfDuplexCall not implemented")
+}
+
 // NewHTTPMultiBin returns a fully configured and running HTTPMultiBin
 func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 	// Create a http.ServeMux and set the httpbin handler as the default
@@ -234,7 +268,8 @@ func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 
 	// Initialize the gRPC server
 	grpcSrv := grpc.NewServer()
-	grpctest.RegisterTestServiceServer(grpcSrv, &grpctest.UnimplementedTestServiceServer{})
+	stub := &GRPCStub{}
+	grpctest.RegisterTestServiceServer(grpcSrv, stub)
 
 	cmux := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.ProtoMajor == 2 && strings.Contains(r.Header.Get("Content-Type"), "application/grpc") {
@@ -287,6 +322,7 @@ func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 		ServerHTTPS: httpsSrv,
 		ServerHTTP2: http2Srv,
 		ServerGRPC:  grpcSrv,
+		GRPCStub:    stub,
 		Replacer: strings.NewReplacer(
 			"HTTPBIN_IP_URL", httpSrv.URL,
 			"HTTPBIN_DOMAIN", httpDomain,

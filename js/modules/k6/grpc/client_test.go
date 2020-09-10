@@ -26,6 +26,11 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
+	"google.golang.org/grpc/test/grpc_testing"
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/js/common"
@@ -118,9 +123,9 @@ func TestClient(t *testing.T) {
 	ctx = lib.WithState(ctx, state)
 
 	t.Run("NoConnect", func(t *testing.T) {
-		_, err := common.RunString(rt, sr(`
+		_, err := common.RunString(rt, `
 			client.invokeRPC("grpc.testing.TestService/EmptyCall", {})
-		`))
+		`)
 		if !assert.Error(t, err) {
 			return
 		}
@@ -136,9 +141,9 @@ func TestClient(t *testing.T) {
 	})
 
 	t.Run("InvokeRPCNotFound", func(t *testing.T) {
-		_, err := common.RunString(rt, sr(`
+		_, err := common.RunString(rt, `
 			client.invokeRPC("foo/bar", {})
-		`))
+		`)
 		if !assert.Error(t, err) {
 			return
 		}
@@ -146,12 +151,117 @@ func TestClient(t *testing.T) {
 	})
 
 	t.Run("InvokeRPC", func(t *testing.T) {
-		_, err := common.RunString(rt, sr(`
+		tb.GRPCStub.EmptyCallFunc = func(context.Context, *grpc_testing.Empty) (*grpc_testing.Empty, error) {
+			return &grpc_testing.Empty{}, nil
+		}
+		_, err := common.RunString(rt, `
 			var resp = client.invokeRPC("grpc.testing.TestService/EmptyCall", {})
-			if (resp.status !== grpc.StatusUnimplemented) {
+			if (resp.status !== grpc.StatusOK) {
 				throw new Error("unexpected error status: " + resp.status)
 			}
-		`))
+		`)
+		assert.NoError(t, err)
+	})
+
+	t.Run("RequestMessage", func(t *testing.T) {
+		tb.GRPCStub.UnaryCallFunc = func(_ context.Context, req *grpc_testing.SimpleRequest) (*grpc_testing.SimpleResponse, error) {
+			if req.Payload == nil || string(req.Payload.Body) != "负载测试" {
+				return nil, status.Error(codes.InvalidArgument, "")
+			}
+			return &grpc_testing.SimpleResponse{}, nil
+		}
+		_, err := common.RunString(rt, `
+			var resp = client.invokeRPC("grpc.testing.TestService/UnaryCall", { payload: { body: "6LSf6L295rWL6K+V"} })
+			if (resp.status !== grpc.StatusOK) {
+				throw new Error("server did not receive the correct request message")
+			}
+		`)
+		assert.NoError(t, err)
+	})
+
+	t.Run("RequestHeaders", func(t *testing.T) {
+		tb.GRPCStub.EmptyCallFunc = func(ctx context.Context, _ *grpc_testing.Empty) (*grpc_testing.Empty, error) {
+			md, ok := metadata.FromIncomingContext(ctx)
+			if !ok || len(md["x-load-tester"]) == 0 || md["x-load-tester"][0] != "k6" {
+				return nil, status.Error(codes.FailedPrecondition, "")
+			}
+
+			return &grpc_testing.Empty{}, nil
+		}
+		_, err := common.RunString(rt, `
+			var resp = client.invokeRPC("grpc.testing.TestService/EmptyCall", {}, { headers: { "X-Load-Tester": "k6" } })
+			if (resp.status !== grpc.StatusOK) {
+				throw new Error("failed to send correct headers in the request")
+			}
+		`)
+		assert.NoError(t, err)
+	})
+
+	t.Run("ResponseMessage", func(t *testing.T) {
+		tb.GRPCStub.UnaryCallFunc = func(context.Context, *grpc_testing.SimpleRequest) (*grpc_testing.SimpleResponse, error) {
+			return &grpc_testing.SimpleResponse{
+				Username:   "k6",
+				OauthScope: "水",
+			}, nil
+		}
+		_, err := common.RunString(rt, `
+			var resp = client.invokeRPC("grpc.testing.TestService/UnaryCall", {})
+			if (!resp.message || resp.message.username !== "k6" || resp.message.oauthScope !== "水") {
+				throw new Error("unexpected response message: " + JSON.stringify(resp.message))
+			}
+		`)
+		assert.NoError(t, err)
+	})
+
+	t.Run("ResponseError", func(t *testing.T) {
+		tb.GRPCStub.EmptyCallFunc = func(context.Context, *grpc_testing.Empty) (*grpc_testing.Empty, error) {
+			return nil, status.Error(codes.DataLoss, "foobar")
+		}
+		_, err := common.RunString(rt, `
+			var resp = client.invokeRPC("grpc.testing.TestService/EmptyCall", {})
+			if (resp.status !== grpc.StatusDataLoss) {
+				throw new Error("unexpected error status: " + resp.status)
+			}
+			if (!resp.error || resp.error.message !== "foobar" || resp.error.code !== 15) {
+				throw new Error("unexpected error object: " + JSON.stringify(resp.error))
+			}
+		`)
+		assert.NoError(t, err)
+	})
+
+	t.Run("ResponseHeaders", func(t *testing.T) {
+		tb.GRPCStub.EmptyCallFunc = func(ctx context.Context, _ *grpc_testing.Empty) (*grpc_testing.Empty, error) {
+			md := metadata.Pairs("foo", "bar")
+			grpc.SetHeader(ctx, md)
+			return &grpc_testing.Empty{}, nil
+		}
+		_, err := common.RunString(rt, `
+			var resp = client.invokeRPC("grpc.testing.TestService/EmptyCall", {})
+			if (resp.status !== grpc.StatusOK) {
+				throw new Error("unexpected error status: " + resp.status)
+			}
+			if (!resp.headers || !resp.headers["foo"] || resp.headers["foo"][0] !== "bar") {
+				throw new Error("unexpected headers object: " + JSON.stringify(resp.trailers))
+			}
+		`)
+		assert.NoError(t, err)
+	})
+
+	t.Run("ResponseTrailers", func(t *testing.T) {
+		tb.GRPCStub.EmptyCallFunc = func(ctx context.Context, _ *grpc_testing.Empty) (*grpc_testing.Empty, error) {
+			md := metadata.Pairs("foo", "bar")
+			grpc.SetTrailer(ctx, md)
+			return &grpc_testing.Empty{}, nil
+		}
+		_, err := common.RunString(rt, `
+			var resp = client.invokeRPC("grpc.testing.TestService/EmptyCall", {})
+			if (resp.status !== grpc.StatusOK) {
+				throw new Error("unexpected error status: " + resp.status)
+			}
+			if (!resp.trailers || !resp.trailers["foo"] || resp.trailers["foo"][0] !== "bar") {
+				throw new Error("unexpected trailers object: " + JSON.stringify(resp.trailers))
+			}
+		`)
 		assert.NoError(t, err)
 	})
 
