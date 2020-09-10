@@ -25,6 +25,7 @@ require (
 	github.com/gin-contrib/sse v0.0.0-20170109093832-22d885f9ecc7 // indirect
 	github.com/gin-gonic/gin v1.1.5-0.20170702092826-d459835d2b07 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.2+incompatible // indirect
+	github.com/golang/protobuf v1.4.2 // indirect
 	github.com/golang/snappy v0.0.0-20170215233205-553a64147049 // indirect
 	github.com/google/go-cmp v0.5.1 // indirect
 	github.com/gorilla/context v0.0.0-20160226214623-1ea25387ff6f // indirect
@@ -48,7 +49,8 @@ require (
 	github.com/mccutchen/go-httpbin v1.1.2-0.20190116014521-c5cb2f4802fa
 	github.com/mitchellh/mapstructure v0.0.0-20180220230111-00c29f56e238
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d // indirect
-	github.com/onsi/ginkgo v1.14.0 // indirect
+	github.com/onsi/ginkgo v1.11.0 // indirect
+	github.com/onsi/gomega v1.10.0 // indirect
 	github.com/oxtoacart/bpool v0.0.0-20150712133111-4e1c5567d7c2
 	github.com/pierrec/lz4 v1.0.2-0.20171218195038-2fcda4cb7018 // indirect
 	github.com/pierrec/xxHash v0.1.1 // indirect
@@ -72,7 +74,6 @@ require (
 	github.com/zyedidia/highlight v0.0.0-20170330143449-201131ce5cf5
 	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550
 	golang.org/x/net v0.0.0-20200822124328-c89045814202
-	golang.org/x/sys v0.0.0-20200909081042-eff7692f9009 // indirect
 	golang.org/x/text v0.3.2
 	golang.org/x/time v0.0.0-20170927054726-6dc17368e09b
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
@@ -91,7 +92,6 @@ replace (
 	github.com/ugorji/go => github.com/ugorji/go v0.0.0-20180112141927-9831f2c3ac10
 	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20180308185624-c7dcf104e3a7
 	golang.org/x/net => golang.org/x/net v0.0.0-20181201002055-351d144fa1fc
-	golang.org/x/sys => golang.org/x/sys v0.0.0-20180312081825-c28acc882ebc
 	golang.org/x/text => golang.org/x/text v0.3.0
 	gopkg.in/yaml.v2 => gopkg.in/yaml.v2 v2.1.1
 )
