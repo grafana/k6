@@ -91,7 +91,7 @@ func labelsToLogrusFields(labels map[string]string) logrus.Fields {
 }
 
 func (c *Config) getRequest(referenceID string, start time.Duration) (*url.URL, error) {
-	u, err := url.Parse(c.LogsHost.String)
+	u, err := url.Parse(c.LogsTailURL.String)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't parse cloud logs host %w", err)
 	}
