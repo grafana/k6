@@ -117,15 +117,25 @@ func (c *DNSConfig) UnmarshalText(text []byte) error {
 }
 
 func (c *DNSConfig) unmarshal(params map[string]interface{}) error {
-	if ttl, ok := params["ttl"]; ok && ttl != "" {
-		c.TTL = null.StringFrom(fmt.Sprintf("%v", ttl))
-	}
-	if strat, ok := params["strategy"]; ok && strat != "" {
-		if s, err := DNSStrategyString(strat.(string)); err != nil {
-			return err
-		} else {
-			c.Strategy.DNSStrategy = s
-			c.Strategy.Valid = true
+	for k, v := range params {
+		switch k {
+		case "strategy":
+			if v == "" {
+				continue
+			}
+			if s, err := DNSStrategyString(v.(string)); err != nil {
+				return err
+			} else {
+				c.Strategy.DNSStrategy = s
+				c.Strategy.Valid = true
+			}
+		case "ttl":
+			ttlv := fmt.Sprintf("%v", v)
+			if ttlv != "" {
+				c.TTL = null.StringFrom(ttlv)
+			}
+		default:
+			return fmt.Errorf("unknown DNS configuration field: %s", k)
 		}
 	}
 	return nil

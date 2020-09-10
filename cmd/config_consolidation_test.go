@@ -393,12 +393,14 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 				Strategy: lib.NullDNSStrategy{DNSStrategy: lib.DNSRandom, Valid: true},
 			}, c.Options.DNS)
 		}},
+		// This is functionally invalid, but will error out in validation done in js.parseTTL().
 		{opts{cli: []string{"--dns", "ttl=-1"}}, exp{}, func(t *testing.T, c Config) {
 			assert.Equal(t, lib.DNSConfig{
 				TTL:      null.StringFrom("-1"),
 				Strategy: lib.NullDNSStrategy{DNSStrategy: lib.DNSFirst, Valid: false},
 			}, c.Options.DNS)
 		}},
+		{opts{cli: []string{"--dns", "ttl=0,strat=nope"}}, exp{cliReadError: true}, nil},
 		{opts{cli: []string{"--dns", "ttl=0"}}, exp{}, func(t *testing.T, c Config) {
 			assert.Equal(t, lib.DNSConfig{
 				TTL:      null.StringFrom("0"),
