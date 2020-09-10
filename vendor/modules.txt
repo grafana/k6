@@ -271,7 +271,8 @@ golang.org/x/net/http2/hpack
 golang.org/x/net/idna
 golang.org/x/net/internal/timeseries
 golang.org/x/net/trace
-# golang.org/x/sys v0.0.0-20200519105757-fe76b779f299 => golang.org/x/sys v0.0.0-20180312081825-c28acc882ebc
+# golang.org/x/sys v0.0.0-20200909081042-eff7692f9009 => golang.org/x/sys v0.0.0-20180312081825-c28acc882ebc
+## explicit
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 # golang.org/x/text v0.3.2 => golang.org/x/text v0.3.0

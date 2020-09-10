@@ -72,6 +72,7 @@ require (
 	github.com/zyedidia/highlight v0.0.0-20170330143449-201131ce5cf5
 	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550
 	golang.org/x/net v0.0.0-20200822124328-c89045814202
+	golang.org/x/sys v0.0.0-20200909081042-eff7692f9009 // indirect
 	golang.org/x/text v0.3.2
 	golang.org/x/time v0.0.0-20170927054726-6dc17368e09b
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
