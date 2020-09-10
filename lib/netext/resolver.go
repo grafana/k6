@@ -29,8 +29,10 @@ import (
 	"github.com/loadimpact/k6/lib"
 )
 
+// LookupIP resolves a host name to IPs.
 // TODO: Figure out a non-global way to expose this for mocking in tests that
 // doesn't involve changing the Resolver interface...
+// nolint: gochecknoglobals
 var LookupIP = net.LookupIP
 
 // Resolver is an interface that returns DNS information about a given host.
@@ -61,7 +63,7 @@ type cacheResolver struct {
 // will be cached per host for the specified period. The IP returned from
 // LookupIP() will be selected based on the given strategy.
 func NewResolver(ttl time.Duration, strategy lib.DNSStrategy) Resolver {
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	r := rand.New(rand.NewSource(time.Now().UnixNano())) // nolint: gosec
 	res := resolver{
 		strategy:   strategy,
 		rrm:        &sync.Mutex{},

@@ -45,7 +45,7 @@ func NewMockResolver(hosts map[string][]net.IP) *MockResolver {
 func (r *MockResolver) LookupIP(host string) (net.IP, error) {
 	if ips, err := r.LookupIPAll(host); err != nil {
 		return nil, err
-	} else {
+	} else { // nolint: golint
 		return ips[0], nil
 	}
 }
@@ -61,7 +61,7 @@ func (r *MockResolver) LookupIPAll(host string) ([]net.IP, error) {
 	return nil, fmt.Errorf("lookup %s: no such host", host)
 }
 
-// Sets the host to resolve to ip.
+// Set the host to resolve to ip.
 func (r *MockResolver) Set(host, ip string) {
 	r.m.Lock()
 	defer r.m.Unlock()

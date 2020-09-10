@@ -46,28 +46,40 @@ const DefaultScenarioName = "default"
 // nolint: gochecknoglobals
 var DefaultSummaryTrendStats = []string{"avg", "min", "med", "max", "p(90)", "p(95)"}
 
+// DNSConfig is the DNS resolver configuration.
 type DNSConfig struct {
-	TTL      null.String     `json:"ttl"`
+	// If positive, defines how long DNS lookups should be returned from the cache.
+	TTL null.String `json:"ttl"`
+	// Strategy to use when picking a single IP if more than one is returned for a host name.
 	Strategy NullDNSStrategy `json:"strategy"`
-	// FIXME: Valid is unused and is only added to satisfy some logic in lib.Options.ForEachSpecified(),
-	// otherwise it would panic with `reflect: call of reflect.Value.Bool on zero Value`.
+	// FIXME: Valid is unused and is only added to satisfy some logic in
+	// lib.Options.ForEachSpecified(), otherwise it would panic with
+	// `reflect: call of reflect.Value.Bool on zero Value`.
 	Valid bool
 }
 
+// DNSStrategy is the strategy to use when picking a single IP if more than one
+// is returned for a host name.
 //go:generate enumer -type=DNSStrategy -transform=kebab -trimprefix DNS -output dns_strategy_gen.go
 type DNSStrategy uint8
 
+// NullDNSStrategy is a nullable wrapper around DNSStrategy, required for the
+// current configuration system.
 type NullDNSStrategy struct {
 	DNSStrategy
 	Valid bool
 }
 
 const (
+	// DNSFirst returns the first IP from the response.
 	DNSFirst DNSStrategy = iota + 1
+	// DNSRoundRobin rotates the IP returned on each lookup.
 	DNSRoundRobin
+	// DNSRandom returns a random IP from the response.
 	DNSRandom
 )
 
+// DefaultDNSConfig returns the default DNS configuration.
 func DefaultDNSConfig() DNSConfig {
 	return DNSConfig{
 		TTL:      null.NewString("5m", false),
@@ -75,6 +87,7 @@ func DefaultDNSConfig() DNSConfig {
 	}
 }
 
+// String implements fmt.Stringer.
 func (c DNSConfig) String() string {
 	out := make([]string, 0, 2)
 	out = append(out, fmt.Sprintf("ttl=%s", c.TTL.String))
@@ -82,20 +95,22 @@ func (c DNSConfig) String() string {
 	return strings.Join(out, ",")
 }
 
+// MarshalJSON implements json.Marshaler.
 func (c DNSConfig) MarshalJSON() ([]byte, error) {
-	var strat string
+	var s string
 	if c.Strategy.IsADNSStrategy() {
-		strat = c.Strategy.String()
+		s = c.Strategy.String()
 	}
 	return json.Marshal(struct {
 		TTL      string `json:"ttl"`
 		Strategy string `json:"strategy"`
 	}{
 		TTL:      c.TTL.String,
-		Strategy: strat,
+		Strategy: s,
 	})
 }
 
+// UnmarshalJSON implements json.Unmarshaler.
 func (c *DNSConfig) UnmarshalJSON(data []byte) error {
 	params := make(map[string]interface{})
 	if err := json.Unmarshal(data, &params); err != nil {
@@ -104,6 +119,7 @@ func (c *DNSConfig) UnmarshalJSON(data []byte) error {
 	return c.unmarshal(params)
 }
 
+// UnmarshalText implements encoding.TextUnmarshaler.
 func (c *DNSConfig) UnmarshalText(text []byte) error {
 	if string(text) == DefaultDNSConfig().String() {
 		*c = DefaultDNSConfig()
@@ -125,7 +141,7 @@ func (c *DNSConfig) unmarshal(params map[string]interface{}) error {
 			}
 			if s, err := DNSStrategyString(v.(string)); err != nil {
 				return err
-			} else {
+			} else { // nolint: golint
 				c.Strategy.DNSStrategy = s
 				c.Strategy.Valid = true
 			}

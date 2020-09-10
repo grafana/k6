@@ -76,8 +76,8 @@ func TestResolver(t *testing.T) {
 					assert.Len(t, cr.cache, 1)
 					assert.Equal(t, tc.ttl, cr.ttl)
 					firstLookup := cr.cache[host].lastLookup
-					time.Sleep(cr.ttl + time.Duration(100*time.Millisecond))
-					_, err := r.LookupIP(host)
+					time.Sleep(cr.ttl + 100*time.Millisecond)
+					_, err = r.LookupIP(host)
 					require.NoError(t, err)
 					assert.True(t, cr.cache[host].lastLookup.After(firstLookup))
 				}
