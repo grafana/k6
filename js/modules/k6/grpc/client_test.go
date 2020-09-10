@@ -35,9 +35,27 @@ import (
 
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/testutils/httpmultibin"
 	"github.com/loadimpact/k6/stats"
 )
+
+func assertMetricEmitted(t *testing.T, metric *stats.Metric, sampleContainers []stats.SampleContainer, url string) {
+	seenMetric := false
+
+	for _, sampleContainer := range sampleContainers {
+		for _, sample := range sampleContainer.GetSamples() {
+			surl, ok := sample.Tags.Get("url")
+			assert.True(t, ok)
+			if surl == url {
+				if sample.Metric == metric {
+					seenMetric = true
+				}
+			}
+		}
+	}
+	assert.True(t, seenMetric, "url %s didn't emit %s", url, metric.Name)
+}
 
 func TestClient(t *testing.T) {
 	t.Parallel()
@@ -59,6 +77,7 @@ func TestClient(t *testing.T) {
 		Options: lib.Options{
 			SystemTags: stats.NewSystemTagSet(
 				stats.TagName,
+				stats.TagURL,
 			),
 			UserAgent: null.StringFrom("k6-test"),
 		},
@@ -161,6 +180,9 @@ func TestClient(t *testing.T) {
 			}
 		`)
 		assert.NoError(t, err)
+		samplesBuf := stats.GetBufferedSamples(samples)
+		assertMetricEmitted(t, metrics.GRPCReqDuration, samplesBuf, sr("GRPCBIN_ADDR/grpc.testing.TestService/EmptyCall"))
+		assertMetricEmitted(t, metrics.GRPCReqs, samplesBuf, sr("GRPCBIN_ADDR/grpc.testing.TestService/EmptyCall"))
 	})
 
 	t.Run("RequestMessage", func(t *testing.T) {
@@ -211,6 +233,9 @@ func TestClient(t *testing.T) {
 			}
 		`)
 		assert.NoError(t, err)
+		samplesBuf := stats.GetBufferedSamples(samples)
+		assertMetricEmitted(t, metrics.GRPCReqDuration, samplesBuf, sr("GRPCBIN_ADDR/grpc.testing.TestService/UnaryCall"))
+		assertMetricEmitted(t, metrics.GRPCReqs, samplesBuf, sr("GRPCBIN_ADDR/grpc.testing.TestService/UnaryCall"))
 	})
 
 	t.Run("ResponseError", func(t *testing.T) {
@@ -227,6 +252,9 @@ func TestClient(t *testing.T) {
 			}
 		`)
 		assert.NoError(t, err)
+		samplesBuf := stats.GetBufferedSamples(samples)
+		assertMetricEmitted(t, metrics.GRPCReqDuration, samplesBuf, sr("GRPCBIN_ADDR/grpc.testing.TestService/EmptyCall"))
+		assertMetricEmitted(t, metrics.GRPCReqs, samplesBuf, sr("GRPCBIN_ADDR/grpc.testing.TestService/EmptyCall"))
 	})
 
 	t.Run("ResponseHeaders", func(t *testing.T) {

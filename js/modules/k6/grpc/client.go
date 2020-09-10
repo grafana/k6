@@ -341,22 +341,24 @@ func (c *Client) Close() error {
 	return err
 }
 
-/*** stats.Handler interface methods ***/
-
+// TagConn implements the stats.Handler interface
 func (*Client) TagConn(ctx context.Context, _ *grpcstats.ConnTagInfo) context.Context {
 	// noop
 	return ctx
 }
 
+// HandleConn implements the stats.Handler interface
 func (*Client) HandleConn(context.Context, grpcstats.ConnStats) {
 	// noop
 }
 
+// TagRPC implements the stats.Handler interface
 func (*Client) TagRPC(ctx context.Context, _ *grpcstats.RPCTagInfo) context.Context {
 	// noop
 	return ctx
 }
 
+// HandleRPC implements the stats.Handler interface
 func (c *Client) HandleRPC(ctx context.Context, stat grpcstats.RPCStats) {
 	state := lib.GetState(ctx)
 
