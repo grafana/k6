@@ -27,6 +27,7 @@ import (
 	"net"
 	"reflect"
 	"strconv"
+	"strings"
 
 	"github.com/kubernetes/helm/pkg/strvals"
 	"github.com/pkg/errors"
@@ -67,13 +68,18 @@ const (
 	DNSRandom
 )
 
-const DefaultDNSConfigText = "ttl=inf,strategy=first"
-
 func DefaultDNSConfig() DNSConfig {
 	return DNSConfig{
 		TTL:      null.NewString("inf", false),
 		Strategy: NullDNSStrategy{DNSFirst, false},
 	}
+}
+
+func (c DNSConfig) String() string {
+	out := make([]string, 0, 2)
+	out = append(out, fmt.Sprintf("ttl=%s", c.TTL.String))
+	out = append(out, fmt.Sprintf("strategy=%s", c.Strategy.String()))
+	return strings.Join(out, ",")
 }
 
 func (c DNSConfig) MarshalJSON() ([]byte, error) {
@@ -99,7 +105,7 @@ func (c *DNSConfig) UnmarshalJSON(data []byte) error {
 }
 
 func (c *DNSConfig) UnmarshalText(text []byte) error {
-	if string(text) == DefaultDNSConfigText {
+	if string(text) == DefaultDNSConfig().String() {
 		*c = DefaultDNSConfig()
 		return nil
 	}
