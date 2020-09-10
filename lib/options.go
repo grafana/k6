@@ -77,7 +77,7 @@ func DefaultDNSConfig() DNSConfig {
 }
 
 func (c DNSConfig) MarshalJSON() ([]byte, error) {
-	strat := ""
+	var strat string
 	if c.Strategy.IsADNSStrategy() {
 		strat = c.Strategy.String()
 	}
@@ -95,7 +95,7 @@ func (c *DNSConfig) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &params); err != nil {
 		return err
 	}
-	return c.unmarshalDNSConfig(params)
+	return c.unmarshal(params)
 }
 
 func (c *DNSConfig) UnmarshalText(text []byte) error {
@@ -107,10 +107,10 @@ func (c *DNSConfig) UnmarshalText(text []byte) error {
 	if err != nil {
 		return err
 	}
-	return c.unmarshalDNSConfig(params)
+	return c.unmarshal(params)
 }
 
-func (c *DNSConfig) unmarshalDNSConfig(params map[string]interface{}) error {
+func (c *DNSConfig) unmarshal(params map[string]interface{}) error {
 	if ttl, ok := params["ttl"]; ok && ttl != "" {
 		c.TTL = null.StringFrom(fmt.Sprintf("%v", ttl))
 	}
