@@ -41,6 +41,7 @@ type Resolver interface {
 type resolver struct {
 	strategy   lib.DNSStrategy
 	rrm        *sync.Mutex
+	rand       *rand.Rand
 	roundRobin map[string]uint8
 }
 
@@ -60,9 +61,11 @@ type cacheResolver struct {
 // will be cached per host for the specified period. The IP returned from
 // LookupIP() will be selected based on the given strategy.
 func NewResolver(ttl time.Duration, strategy lib.DNSStrategy) Resolver {
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	res := resolver{
 		strategy:   strategy,
 		rrm:        &sync.Mutex{},
+		rand:       r,
 		roundRobin: make(map[string]uint8),
 	}
 	if ttl == 0 {
@@ -124,7 +127,7 @@ func (r *resolver) selectOne(host string, ips []net.IP) net.IP {
 		// repeated or skipped IPs if the records change during a test run.
 		return ips[int(r.roundRobin[host])%len(ips)]
 	case lib.DNSRandom:
-		return ips[rand.Intn(len(ips))]
+		return ips[r.rand.Intn(len(ips))]
 	}
 	return nil
 }

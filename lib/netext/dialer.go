@@ -23,7 +23,6 @@ package netext
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"net"
 	"strconv"
 	"sync/atomic"
@@ -244,8 +243,4 @@ func (c *Conn) Write(b []byte) (int, error) {
 		atomic.AddInt64(c.BytesWritten, int64(n))
 	}
 	return n, err
-}
-
-func init() {
-	rand.Seed(time.Now().UTC().UnixNano())
 }
