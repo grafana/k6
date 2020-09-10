@@ -186,7 +186,7 @@ func appendPrettyObject(buf, json []byte, i int, open, close byte, pretty bool, 
 		if open == '[' || json[i] == '"' {
 			if n > 0 {
 				buf = append(buf, ',')
-				if width != -1 {
+				if width != -1 && open == '[' {
 					buf = append(buf, ' ')
 				}
 			}
@@ -318,21 +318,25 @@ func hexp(p byte) byte {
 }
 
 // TerminalStyle is for terminals
-var TerminalStyle = &Style{
-	Key:    [2]string{"\x1B[94m", "\x1B[0m"},
-	String: [2]string{"\x1B[92m", "\x1B[0m"},
-	Number: [2]string{"\x1B[93m", "\x1B[0m"},
-	True:   [2]string{"\x1B[96m", "\x1B[0m"},
-	False:  [2]string{"\x1B[96m", "\x1B[0m"},
-	Null:   [2]string{"\x1B[91m", "\x1B[0m"},
-	Append: func(dst []byte, c byte) []byte {
-		if c < ' ' && (c != '\r' && c != '\n' && c != '\t' && c != '\v') {
-			dst = append(dst, "\\u00"...)
-			dst = append(dst, hexp((c>>4)&0xF))
-			return append(dst, hexp((c)&0xF))
-		}
-		return append(dst, c)
-	},
+var TerminalStyle *Style
+
+func init() {
+	TerminalStyle = &Style{
+		Key:    [2]string{"\x1B[94m", "\x1B[0m"},
+		String: [2]string{"\x1B[92m", "\x1B[0m"},
+		Number: [2]string{"\x1B[93m", "\x1B[0m"},
+		True:   [2]string{"\x1B[96m", "\x1B[0m"},
+		False:  [2]string{"\x1B[96m", "\x1B[0m"},
+		Null:   [2]string{"\x1B[91m", "\x1B[0m"},
+		Append: func(dst []byte, c byte) []byte {
+			if c < ' ' && (c != '\r' && c != '\n' && c != '\t' && c != '\v') {
+				dst = append(dst, "\\u00"...)
+				dst = append(dst, hexp((c>>4)&0xF))
+				return append(dst, hexp((c)&0xF))
+			}
+			return append(dst, c)
+		},
+	}
 }
 
 // Color will colorize the json. The style parma is used for customizing
