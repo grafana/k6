@@ -60,7 +60,6 @@ func TestResolver(t *testing.T) {
 				net.ParseIP("127.0.0.12"),
 				net.ParseIP("127.0.0.10"),
 			}},
-			// TODO: Test other scenarios, lib.DNSRandom, etc.
 		}
 
 		for _, tc := range testCases {

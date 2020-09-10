@@ -1001,10 +1001,10 @@ func TestDNSResolver(t *testing.T) {
 			opts          lib.Options
 			expLogEntries int
 		}{
-			"inf": { // IPs are cached indefinitely
+			"default": { // IPs are cached for 5m
 				lib.Options{}, 0,
 			},
-			"0": { // every request does a DNS lookup
+			"0": { // cache is disabled, every request does a DNS lookup
 				lib.Options{DNS: lib.DNSConfig{
 					TTL:      null.StringFrom("0"),
 					Strategy: lib.NullDNSStrategy{DNSStrategy: lib.DNSFirst, Valid: true},

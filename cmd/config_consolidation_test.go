@@ -377,7 +377,7 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 		},
 		{opts{cli: []string{}}, exp{}, func(t *testing.T, c Config) {
 			assert.Equal(t, lib.DNSConfig{
-				TTL:      null.NewString("inf", false),
+				TTL:      null.NewString("5m", false),
 				Strategy: lib.NullDNSStrategy{DNSStrategy: lib.DNSFirst, Valid: false},
 			}, c.Options.DNS)
 		}},
@@ -432,16 +432,16 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 			},
 		},
 		{
-			// CLI overrides all
+			// CLI overrides all, falling back to env
 			opts{
 				fs:  defaultConfig(`{"dns": {"ttl": "60", "strategy": "first"}}`),
 				env: []string{"K6_DNS=ttl=30,strategy=random"},
-				cli: []string{"--dns", "ttl=5,strategy=round-robin"},
+				cli: []string{"--dns", "ttl=5"},
 			},
 			exp{}, func(t *testing.T, c Config) {
 				assert.Equal(t, lib.DNSConfig{
 					TTL:      null.StringFrom("5"),
-					Strategy: lib.NullDNSStrategy{DNSStrategy: lib.DNSRoundRobin, Valid: true},
+					Strategy: lib.NullDNSStrategy{DNSStrategy: lib.DNSRandom, Valid: true},
 				}, c.Options.DNS)
 			},
 		},
