@@ -62,7 +62,9 @@ type Runner struct {
 
 	BaseDialer net.Dialer
 	Resolver   netext.Resolver
-	RPSLimit   *rate.Limiter
+	// TODO: Remove ActualResolver, it's a hack to simplify mocking in tests.
+	ActualResolver netext.MultiResolver
+	RPSLimit       *rate.Limiter
 
 	console   *console
 	setupData []byte
@@ -105,8 +107,9 @@ func newFromBundle(logger *logrus.Logger, b *Bundle) (*Runner, error) {
 			KeepAlive: 30 * time.Second,
 			DualStack: true,
 		},
-		console:  newConsole(logger),
-		Resolver: netext.NewResolver(net.LookupIP, 0, lib.DefaultDNSConfig().Strategy.DNSStrategy),
+		console:        newConsole(logger),
+		Resolver:       netext.NewResolver(net.LookupIP, 0, lib.DefaultDNSConfig().Strategy.DNSStrategy),
+		ActualResolver: net.LookupIP,
 	}
 
 	err = r.SetOptions(r.Bundle.Options)

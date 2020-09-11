@@ -48,6 +48,7 @@ import (
 	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/lib/testutils/httpmultibin"
 	"github.com/loadimpact/k6/lib/testutils/minirunner"
+	"github.com/loadimpact/k6/lib/testutils/mockresolver"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/stats"
@@ -1002,7 +1003,7 @@ func TestDNSResolver(t *testing.T) {
 			expLogEntries int
 		}{
 			"default": { // IPs are cached for 5m
-				lib.Options{}, 0,
+				lib.Options{DNS: lib.DefaultDNSConfig()}, 0,
 			},
 			"0": { // cache is disabled, every request does a DNS lookup
 				lib.Options{DNS: lib.DNSConfig{
@@ -1041,14 +1042,17 @@ func TestDNSResolver(t *testing.T) {
 				}, nil, lib.RuntimeOptions{})
 				require.NoError(t, err)
 
+				mr := mockresolver.New(nil, net.LookupIP)
+				runner.ActualResolver = mr.LookupIPAll
+
 				ctx, cancel, execScheduler, samples := newTestExecutionScheduler(t, runner, logger, tc.opts)
 				defer cancel()
 
-				tb.Resolver.Set("myhost", sr("HTTPBIN_IP"))
+				mr.Set("myhost", sr("HTTPBIN_IP"))
 				time.AfterFunc(1700*time.Millisecond, func() {
-					tb.Resolver.Set("myhost", "127.0.0.254")
+					mr.Set("myhost", "127.0.0.254")
 				})
-				defer tb.Resolver.Unset("myhost")
+				defer mr.Unset("myhost")
 
 				errCh := make(chan error, 1)
 				go func() { errCh <- execScheduler.Run(ctx, ctx, samples) }()
