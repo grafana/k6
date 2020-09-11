@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
+	"github.com/golang/protobuf/proto"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/protoparse"
 	"github.com/jhump/protoreflect/dynamic"
@@ -84,7 +85,7 @@ type Response struct {
 	Error    goja.Value
 }
 
-// Load will parse the given proto files and make the file descriptors avaliable to request.
+// Load will parse the given proto files and make the file descriptors available to request.
 func (c *Client) Load(ctxPtr *context.Context, importPaths []string, filenames ...string) ([]MethodDesc, error) {
 	if lib.GetState(*ctxPtr) != nil {
 		return nil, errors.New("load must be called in the init context")
@@ -130,7 +131,6 @@ type transportCreds struct {
 
 func (t transportCreds) ClientHandshake(ctx context.Context,
 	addr string, in net.Conn) (net.Conn, credentials.AuthInfo, error) {
-
 	out, auth, err := t.TransportCredentials.ClientHandshake(ctx, addr, in)
 	if err != nil {
 		t.errc <- err
@@ -202,6 +202,7 @@ func (c *Client) Connect(ctxPtr *context.Context, addr string, params map[string
 		c.conn, err = grpc.DialContext(ctx, addr, opts...)
 		if err != nil {
 			errc <- err
+
 			return
 		}
 		close(errc)
@@ -303,6 +304,11 @@ func (c *Client) InvokeRPC(ctxPtr *context.Context,
 	header, trailer := metadata.New(nil), metadata.New(nil)
 	resp, err := s.InvokeRpc(reqCtx, md, reqdm, grpc.Header(&header), grpc.Trailer(&trailer))
 
+	return mapToResponse(rt, resp, md.GetOutputType(), header, trailer, err), nil
+}
+
+func mapToResponse(rt *goja.Runtime, msg proto.Message, md *desc.MessageDescriptor,
+	header, trailer metadata.MD, err error) *Response {
 	var response Response
 	response.Headers = header
 	response.Trailers = trailer
@@ -321,16 +327,16 @@ func (c *Client) InvokeRPC(ctxPtr *context.Context,
 		response.Error = rt.ToValue(errMsg)
 	}
 
-	if resp != nil {
-		msgdm := dynamic.NewMessage(md.GetOutputType())
-		msgdm.Merge(resp)
+	if msg != nil {
+		msgdm := dynamic.NewMessage(md)
+		msgdm.Merge(msg)
 		raw, _ := msgdm.MarshalJSON()
 		msg := make(map[string]interface{})
 		_ = json.Unmarshal(raw, &msg)
 		response.Message = rt.ToValue(msg)
 	}
 
-	return &response, nil
+	return &response
 }
 
 // Close will close the client gRPC connection
@@ -393,6 +399,5 @@ func (c *Client) HandleRPC(ctx context.Context, stat grpcstats.RPCStats) {
 				},
 			},
 		})
-
 	}
 }

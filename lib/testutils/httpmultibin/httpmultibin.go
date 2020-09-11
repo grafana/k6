@@ -232,7 +232,8 @@ func (s *GRPCStub) UnaryCall(ctx context.Context, req *grpctest.SimpleRequest) (
 }
 
 // StreamingOutputCall implements the interface for the gRPC TestServiceServer
-func (*GRPCStub) StreamingOutputCall(*grpctest.StreamingOutputCallRequest, grpctest.TestService_StreamingOutputCallServer) error {
+func (*GRPCStub) StreamingOutputCall(*grpctest.StreamingOutputCallRequest,
+	grpctest.TestService_StreamingOutputCallServer) error {
 	return status.Errorf(codes.Unimplemented, "method StreamingOutputCall not implemented")
 }
 
@@ -287,6 +288,7 @@ func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 	cmux := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.ProtoMajor == 2 && strings.Contains(r.Header.Get("Content-Type"), "application/grpc") {
 			grpcSrv.ServeHTTP(w, r)
+
 			return
 		}
 		mux.ServeHTTP(w, r)
