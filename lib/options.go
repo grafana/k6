@@ -83,7 +83,7 @@ const (
 func DefaultDNSConfig() DNSConfig {
 	return DNSConfig{
 		TTL:      null.NewString("5m", false),
-		Strategy: NullDNSStrategy{DNSFirst, false},
+		Strategy: NullDNSStrategy{DNSRandom, false},
 	}
 }
 

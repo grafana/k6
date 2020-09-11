@@ -385,7 +385,7 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 		{opts{cli: []string{}}, exp{}, func(t *testing.T, c Config) {
 			assert.Equal(t, lib.DNSConfig{
 				TTL:      null.NewString("5m", false),
-				Strategy: lib.NullDNSStrategy{DNSStrategy: lib.DNSFirst, Valid: false},
+				Strategy: lib.NullDNSStrategy{DNSStrategy: lib.DNSRandom, Valid: false},
 			}, c.Options.DNS)
 		}},
 		{opts{env: []string{"K6_DNS=ttl=5,strategy=round-robin"}}, exp{}, func(t *testing.T, c Config) {
@@ -404,20 +404,20 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 		{opts{cli: []string{"--dns", "ttl=-1"}}, exp{}, func(t *testing.T, c Config) {
 			assert.Equal(t, lib.DNSConfig{
 				TTL:      null.StringFrom("-1"),
-				Strategy: lib.NullDNSStrategy{DNSStrategy: lib.DNSFirst, Valid: false},
+				Strategy: lib.NullDNSStrategy{DNSStrategy: lib.DNSRandom, Valid: false},
 			}, c.Options.DNS)
 		}},
 		{opts{cli: []string{"--dns", "ttl=0,blah=nope"}}, exp{cliReadError: true}, nil},
 		{opts{cli: []string{"--dns", "ttl=0"}}, exp{}, func(t *testing.T, c Config) {
 			assert.Equal(t, lib.DNSConfig{
 				TTL:      null.StringFrom("0"),
-				Strategy: lib.NullDNSStrategy{DNSStrategy: lib.DNSFirst, Valid: false},
+				Strategy: lib.NullDNSStrategy{DNSStrategy: lib.DNSRandom, Valid: false},
 			}, c.Options.DNS)
 		}},
 		{opts{cli: []string{"--dns", "ttl=5s,strategy="}}, exp{}, func(t *testing.T, c Config) {
 			assert.Equal(t, lib.DNSConfig{
 				TTL:      null.StringFrom("5s"),
-				Strategy: lib.NullDNSStrategy{DNSStrategy: lib.DNSFirst, Valid: false},
+				Strategy: lib.NullDNSStrategy{DNSStrategy: lib.DNSRandom, Valid: false},
 			}, c.Options.DNS)
 		}},
 		{opts{fs: defaultConfig(`{"dns": {"ttl": "0", "strategy": "round-robin"}}`)}, exp{}, func(t *testing.T, c Config) {
@@ -435,7 +435,7 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 			func(t *testing.T, c Config) {
 				assert.Equal(t, lib.DNSConfig{
 					TTL:      null.StringFrom("30"),
-					Strategy: lib.NullDNSStrategy{DNSStrategy: lib.DNSFirst, Valid: false},
+					Strategy: lib.NullDNSStrategy{DNSStrategy: lib.DNSRandom, Valid: false},
 				}, c.Options.DNS)
 			},
 		},
