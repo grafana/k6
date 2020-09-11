@@ -31,7 +31,6 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
-	"github.com/golang/protobuf/proto"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/protoparse"
 	"github.com/jhump/protoreflect/dynamic"
@@ -212,6 +211,7 @@ func (c *Client) Connect(ctxPtr *context.Context, addr string, params map[string
 }
 
 // InvokeRPC creates and calls a unary RPC by fully qualified method name
+//nolint: funlen
 func (c *Client) InvokeRPC(ctxPtr *context.Context,
 	method string, req goja.Value, params map[string]interface{}) (*Response, error) {
 	ctx := *ctxPtr
@@ -304,11 +304,6 @@ func (c *Client) InvokeRPC(ctxPtr *context.Context,
 	header, trailer := metadata.New(nil), metadata.New(nil)
 	resp, err := s.InvokeRpc(reqCtx, md, reqdm, grpc.Header(&header), grpc.Trailer(&trailer))
 
-	return mapToResponse(rt, resp, md.GetOutputType(), header, trailer, err), nil
-}
-
-func mapToResponse(rt *goja.Runtime, msg proto.Message, md *desc.MessageDescriptor,
-	header, trailer metadata.MD, err error) *Response {
 	var response Response
 	response.Headers = header
 	response.Trailers = trailer
@@ -327,16 +322,16 @@ func mapToResponse(rt *goja.Runtime, msg proto.Message, md *desc.MessageDescript
 		response.Error = rt.ToValue(errMsg)
 	}
 
-	if msg != nil {
-		msgdm := dynamic.NewMessage(md)
-		msgdm.Merge(msg)
+	if resp != nil {
+		msgdm := dynamic.NewMessage(md.GetOutputType())
+		msgdm.Merge(resp)
 		raw, _ := msgdm.MarshalJSON()
 		msg := make(map[string]interface{})
 		_ = json.Unmarshal(raw, &msg)
 		response.Message = rt.ToValue(msg)
 	}
 
-	return &response
+	return &response, nil
 }
 
 // Close will close the client gRPC connection
