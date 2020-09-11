@@ -58,7 +58,7 @@ func TestCounterSink(t *testing.T) {
 		for _, s := range samples10 {
 			sink.Add(Sample{Metric: &Metric{}, Value: s, Time: now})
 		}
-		assert.Equal(t, map[string]float64{"count": 145, "rate": 145.0}, sink.Format(1*time.Second))
+		assert.Equal(t, map[string]float64{"count": 145, "rate": 145.0, "rps": 145.0}, sink.Format(1*time.Second))
 	})
 }
 

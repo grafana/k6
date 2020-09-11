@@ -56,9 +56,11 @@ func (c *CounterSink) Add(s Sample) {
 func (c *CounterSink) Calc() {}
 
 func (c *CounterSink) Format(t time.Duration) map[string]float64 {
+	rps := c.Value / (float64(t) / float64(time.Second))
 	return map[string]float64{
 		"count": c.Value,
-		"rate":  c.Value / (float64(t) / float64(time.Second)),
+		"rate":  rps,
+		"rps":   rps,
 	}
 }
 
