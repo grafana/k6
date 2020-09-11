@@ -25,7 +25,6 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"math"
 	"net"
 	"net/http"
 	"net/http/cookiejar"
@@ -350,7 +349,7 @@ func parseTTL(ttlS string) (time.Duration, error) {
 	switch ttlS {
 	case "inf":
 		// cache "indefinitely"
-		ttl = time.Duration(math.MaxInt64)
+		ttl = time.Hour * 24 * 365
 	case "0":
 		// disable cache
 	case "":
