@@ -39,7 +39,6 @@ require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/klauspost/compress v1.7.2
 	github.com/klauspost/cpuid v1.3.1 // indirect
-	github.com/konsorten/go-windows-terminal-sequences v1.0.3 // indirect
 	github.com/kubernetes/helm v2.9.0+incompatible
 	github.com/labstack/echo v3.2.6+incompatible // indirect
 	github.com/labstack/gommon v0.2.2-0.20170925052817-57409ada9da0 // indirect
