@@ -115,9 +115,23 @@ func (t *transport) measureAndEmitMetrics(unfReq *unfinishedRequest) *finishedRe
 			tags["status"] = "0"
 		}
 	} else {
-		if enabledTags.Has(stats.TagURL) {
-			u := URL{u: unfReq.request.URL, URL: unfReq.request.URL.String()}
-			tags["url"] = u.Clean()
+		urlEnabled := enabledTags.Has(stats.TagURL)
+		var setName bool
+		if _, ok := tags["name"]; !ok && enabledTags.Has(stats.TagName) {
+			setName = true
+		}
+		if urlEnabled || setName {
+			cleanURL := URL{u: unfReq.request.URL, URL: unfReq.request.URL.String()}.Clean()
+			if urlEnabled {
+				tags["url"] = cleanURL
+			}
+			if setName {
+				tags["name"] = cleanURL
+			}
+		}
+
+		if enabledTags.Has(stats.TagMethod) {
+			tags["method"] = unfReq.request.Method
 		}
 		if enabledTags.Has(stats.TagStatus) {
 			tags["status"] = strconv.Itoa(unfReq.response.StatusCode)

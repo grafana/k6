@@ -35,7 +35,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh/terminal"
 
-	"github.com/loadimpact/k6/core/local"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/ui"
 	"github.com/loadimpact/k6/ui/pb"
@@ -82,7 +81,14 @@ func (w *consoleWriter) Write(p []byte) (n int, err error) {
 }
 
 func printBar(bar *pb.ProgressBar) {
+	if quiet {
+		return
+	}
 	end := "\n"
+	// TODO: refactor widthDelta away? make the progressbar rendering a bit more
+	// stateless... basically first render the left and right parts, so we know
+	// how long the longest line is, and how much space we have for the progress
+	widthDelta := -defaultTermWidth
 	if stdout.IsTTY {
 		// If we're in a TTY, instead of printing the bar and going to the next
 		// line, erase everything till the end of the line and return to the
@@ -90,8 +96,9 @@ func printBar(bar *pb.ProgressBar) {
 		//
 		// TODO: check for cross platform support
 		end = "\x1b[0K\r"
+		widthDelta = 0
 	}
-	rendered := bar.Render(0, 0)
+	rendered := bar.Render(0, widthDelta)
 	// Only output the left and middle part of the progress bar
 	fprintf(stdout, "%s%s", rendered.String(), end)
 }
@@ -134,9 +141,14 @@ func printExecutionDescription(
 	maxDuration, _ := lib.GetEndOffset(execPlan)
 	executorConfigs := conf.Scenarios.GetSortedConfigs()
 
+	scenarioDesc := "1 scenario"
+	if len(executorConfigs) > 1 {
+		scenarioDesc = fmt.Sprintf("%d scenarios", len(executorConfigs))
+	}
+
 	fprintf(stdout, "  scenarios: %s\n", ui.ValueColor.Sprintf(
-		"(%.2f%%) %d executors, %d max VUs, %s max duration (incl. graceful stop):",
-		conf.ExecutionSegment.FloatLength()*100, len(executorConfigs),
+		"(%.2f%%) %s, %d max VUs, %s max duration (incl. graceful stop):",
+		conf.ExecutionSegment.FloatLength()*100, scenarioDesc,
 		lib.GetMaxPossibleVUs(execPlan), maxDuration.Round(100*time.Millisecond)),
 	)
 	for _, ec := range executorConfigs {
@@ -230,7 +242,7 @@ func renderMultipleBars(
 		//TODO: check for cross platform support
 		result[pbsCount+1] = fmt.Sprintf("\r\x1b[J\x1b[%dA", pbsCount+lineBreaks+1)
 	} else {
-		result[pbsCount+1] = lineEnd
+		result[pbsCount+1] = ""
 	}
 
 	return strings.Join(result, ""), longestLine
@@ -242,15 +254,10 @@ func renderMultipleBars(
 // nolint:funlen
 func showProgress(
 	ctx context.Context, conf Config,
-	execScheduler *local.ExecutionScheduler, logger *logrus.Logger,
+	pbs []*pb.ProgressBar, logger *logrus.Logger,
 ) {
-	if quiet || conf.HTTPDebug.Valid && conf.HTTPDebug.String != "" {
+	if quiet {
 		return
-	}
-
-	pbs := []*pb.ProgressBar{execScheduler.GetInitProgressBar()}
-	for _, s := range execScheduler.GetExecutors() {
-		pbs = append(pbs, s.GetProgress())
 	}
 
 	var errTermGetSize bool
