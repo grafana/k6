@@ -336,7 +336,11 @@ func (r *Runner) SetOptions(opts lib.Options) error {
 	if err != nil {
 		return err
 	}
-	r.Resolver = netext.NewResolver(net.LookupIP, ttl, opts.DNS.Strategy.DNSStrategy)
+	strategy := opts.DNS.Strategy.DNSStrategy
+	if !strategy.IsADNSStrategy() {
+		strategy = lib.DefaultDNSConfig().Strategy.DNSStrategy
+	}
+	r.Resolver = netext.NewResolver(r.ActualResolver, ttl, strategy)
 
 	return nil
 }
@@ -344,11 +348,14 @@ func (r *Runner) SetOptions(opts lib.Options) error {
 func parseTTL(ttlS string) (time.Duration, error) {
 	ttl := time.Duration(0)
 	switch ttlS {
-	case "", "inf":
+	case "inf":
 		// cache "indefinitely"
 		ttl = time.Duration(math.MaxInt64)
 	case "0":
 		// disable cache
+	case "":
+		ttlS = lib.DefaultDNSConfig().TTL.String
+		fallthrough
 	default:
 		origTTLs := ttlS
 		// Treat unitless values as milliseconds

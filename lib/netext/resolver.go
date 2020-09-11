@@ -117,9 +117,13 @@ func (r *cacheResolver) LookupIP(host string) (net.IP, error) {
 }
 
 func (r *resolver) selectOne(host string, ips []net.IP) net.IP {
+	if len(ips) == 0 {
+		return nil
+	}
+	ip := ips[0]
 	switch r.strategy {
 	case lib.DNSFirst:
-		return ips[0]
+		return ip
 	case lib.DNSRoundRobin:
 		r.rrm.Lock()
 		defer func() {
@@ -132,5 +136,5 @@ func (r *resolver) selectOne(host string, ips []net.IP) net.IP {
 	case lib.DNSRandom:
 		return ips[r.rand.Intn(len(ips))]
 	}
-	return nil
+	return ip
 }

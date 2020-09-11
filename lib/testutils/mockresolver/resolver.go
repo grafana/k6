@@ -46,9 +46,10 @@ func New(hosts map[string][]net.IP, fallback func(host string) ([]net.IP, error)
 func (r *MockResolver) LookupIP(host string) (net.IP, error) {
 	if ips, err := r.LookupIPAll(host); err != nil {
 		return nil, err
-	} else { // nolint: golint
+	} else if len(ips) > 0 {
 		return ips[0], nil
 	}
+	return nil, nil
 }
 
 // LookupIPAll returns all IPs mapped for host. It mimics the net.LookupIP
