@@ -126,15 +126,15 @@ func (r *resolver) selectOne(host string, ips []net.IP) net.IP {
 		return ip
 	case lib.DNSRoundRobin:
 		r.rrm.Lock()
-		defer func() {
-			r.roundRobin[host]++
-			r.rrm.Unlock()
-		}()
 		// NOTE: This index approach is not stable and might result in returning
 		// repeated or skipped IPs if the records change during a test run.
-		return ips[int(r.roundRobin[host])%len(ips)]
+		ip = ips[int(r.roundRobin[host])%len(ips)]
+		r.roundRobin[host]++
+		r.rrm.Unlock()
 	case lib.DNSRandom:
-		return ips[r.rand.Intn(len(ips))]
+		r.rrm.Lock()
+		ip = ips[r.rand.Intn(len(ips))]
+		r.rrm.Unlock()
 	}
 	return ip
 }
