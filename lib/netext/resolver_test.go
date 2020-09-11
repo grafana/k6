@@ -30,21 +30,18 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/testutils"
+	"github.com/loadimpact/k6/lib/testutils/mockresolver"
 )
 
 func TestResolver(t *testing.T) {
 	host := "myhost"
-	mr := testutils.NewMockResolver(map[string][]net.IP{
+	mr := mockresolver.New(map[string][]net.IP{
 		host: {
 			net.ParseIP("127.0.0.10"),
 			net.ParseIP("127.0.0.11"),
 			net.ParseIP("127.0.0.12"),
 		},
-	})
-	defaultLookup := LookupIP
-	LookupIP = mr.LookupIPAll
-	defer func() { LookupIP = defaultLookup }()
+	}, nil)
 
 	t.Run("LookupIP", func(t *testing.T) {
 		testCases := []struct {
@@ -65,7 +62,7 @@ func TestResolver(t *testing.T) {
 		for _, tc := range testCases {
 			tc := tc
 			t.Run(fmt.Sprintf("%s_%s", tc.ttl, tc.strategy), func(t *testing.T) {
-				r := NewResolver(tc.ttl, tc.strategy)
+				r := NewResolver(mr.LookupIPAll, tc.ttl, tc.strategy)
 				ip, err := r.LookupIP(host)
 				require.NoError(t, err)
 				assert.Equal(t, tc.expIP[0], ip)
