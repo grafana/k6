@@ -211,7 +211,7 @@ func (c *Client) Connect(ctxPtr *context.Context, addr string, params map[string
 }
 
 // InvokeRPC creates and calls a unary RPC by fully qualified method name
-//nolint: funlen
+//nolint: funlen,gocognit
 func (c *Client) InvokeRPC(ctxPtr *context.Context,
 	method string, req goja.Value, params map[string]interface{}) (*Response, error) {
 	ctx := *ctxPtr
