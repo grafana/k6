@@ -1044,15 +1044,11 @@ func TestDNSResolver(t *testing.T) {
 				ctx, cancel, execScheduler, samples := newTestExecutionScheduler(t, runner, logger, tc.opts)
 				defer cancel()
 
-				mr := testutils.NewMockResolver(nil)
-				defaultLookup := netext.LookupIP
-				netext.LookupIP = mr.LookupIPAll
-				defer func() { netext.LookupIP = defaultLookup }()
-
-				mr.Set("myhost", sr("HTTPBIN_IP"))
+				tb.Resolver.Set("myhost", sr("HTTPBIN_IP"))
 				time.AfterFunc(1700*time.Millisecond, func() {
-					mr.Set("myhost", "127.0.0.254")
+					tb.Resolver.Set("myhost", "127.0.0.254")
 				})
+				defer tb.Resolver.Unset("myhost")
 
 				errCh := make(chan error, 1)
 				go func() { errCh <- execScheduler.Run(ctx, ctx, samples) }()
@@ -1202,7 +1198,7 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 		expTags = append(expTags, addExpTags...)
 		return netext.NewDialer(
 			net.Dialer{},
-			netext.NewResolver(0, lib.DNSFirst),
+			netext.NewResolver(net.LookupIP, 0, lib.DNSFirst),
 		).GetTrail(time.Now(), time.Now(),
 			true, emitIterations, getTags(expTags...))
 	}

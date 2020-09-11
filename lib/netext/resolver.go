@@ -29,11 +29,8 @@ import (
 	"github.com/loadimpact/k6/lib"
 )
 
-// LookupIP resolves a host name to IPs.
-// TODO: Figure out a non-global way to expose this for mocking in tests that
-// doesn't involve changing the Resolver interface...
-// nolint: gochecknoglobals
-var LookupIP = net.LookupIP
+// MultiResolver returns all IP addresses for the given host.
+type MultiResolver func(host string) ([]net.IP, error)
 
 // Resolver is an interface that returns DNS information about a given host.
 type Resolver interface {
@@ -41,6 +38,7 @@ type Resolver interface {
 }
 
 type resolver struct {
+	resolve    MultiResolver
 	strategy   lib.DNSStrategy
 	rrm        *sync.Mutex
 	rand       *rand.Rand
@@ -62,9 +60,10 @@ type cacheResolver struct {
 // NewResolver returns a new DNS resolver. If ttl is not 0, responses
 // will be cached per host for the specified period. The IP returned from
 // LookupIP() will be selected based on the given strategy.
-func NewResolver(ttl time.Duration, strategy lib.DNSStrategy) Resolver {
+func NewResolver(actRes MultiResolver, ttl time.Duration, strategy lib.DNSStrategy) Resolver {
 	r := rand.New(rand.NewSource(time.Now().UnixNano())) // nolint: gosec
 	res := resolver{
+		resolve:    actRes,
 		strategy:   strategy,
 		rrm:        &sync.Mutex{},
 		rand:       r,
@@ -84,7 +83,7 @@ func NewResolver(ttl time.Duration, strategy lib.DNSStrategy) Resolver {
 // LookupIP returns a single IP resolved for host, selected by the
 // configured strategy.
 func (r *resolver) LookupIP(host string) (net.IP, error) {
-	ips, err := LookupIP(host)
+	ips, err := r.resolve(host)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +104,7 @@ func (r *cacheResolver) LookupIP(host string) (net.IP, error) {
 	} else {
 		r.cm.Unlock() // The lookup could take some time, so unlock momentarily.
 		var err error
-		ips, err = LookupIP(host)
+		ips, err = r.resolve(host)
 		if err != nil {
 			return nil, err
 		}

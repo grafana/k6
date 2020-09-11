@@ -18,7 +18,7 @@
  *
  */
 
-package testutils
+package mockresolver
 
 import (
 	"fmt"
@@ -29,16 +29,17 @@ import (
 // MockResolver implements netext.Resolver, and allows changing the host
 // mapping at runtime.
 type MockResolver struct {
-	m     sync.RWMutex
-	hosts map[string][]net.IP
+	m        sync.RWMutex
+	hosts    map[string][]net.IP
+	fallback func(host string) ([]net.IP, error)
 }
 
-// NewMockResolver returns a new MockResolver.
-func NewMockResolver(hosts map[string][]net.IP) *MockResolver {
+// New returns a new MockResolver.
+func New(hosts map[string][]net.IP, fallback func(host string) ([]net.IP, error)) *MockResolver {
 	if hosts == nil {
 		hosts = make(map[string][]net.IP)
 	}
-	return &MockResolver{hosts: hosts}
+	return &MockResolver{hosts: hosts, fallback: fallback}
 }
 
 // LookupIP returns the first IP mapped for host.
@@ -58,6 +59,9 @@ func (r *MockResolver) LookupIPAll(host string) ([]net.IP, error) {
 	if ips, ok := r.hosts[host]; ok {
 		return ips, nil
 	}
+	if r.fallback != nil {
+		return r.fallback(host)
+	}
 	return nil, fmt.Errorf("lookup %s: no such host", host)
 }
 
@@ -66,4 +70,11 @@ func (r *MockResolver) Set(host, ip string) {
 	r.m.Lock()
 	defer r.m.Unlock()
 	r.hosts[host] = []net.IP{net.ParseIP(ip)}
+}
+
+// Unset removes the host.
+func (r *MockResolver) Unset(host string) {
+	r.m.Lock()
+	defer r.m.Unlock()
+	delete(r.hosts, host)
 }

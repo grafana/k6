@@ -27,7 +27,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/testutils"
+	"github.com/loadimpact/k6/lib/testutils/mockresolver"
 )
 
 func TestDialerAddr(t *testing.T) {
@@ -88,12 +88,12 @@ func TestDialerAddr(t *testing.T) {
 	}
 }
 
-func newResolver() *testutils.MockResolver {
-	return testutils.NewMockResolver(
+func newResolver() *mockresolver.MockResolver {
+	return mockresolver.New(
 		map[string][]net.IP{
 			"example-resolver.com":           {net.ParseIP("1.2.3.4")},
 			"example-deny-resolver.com":      {net.ParseIP("8.9.10.11")},
 			"example-ipv6-deny-resolver.com": {net.ParseIP("::1")},
-		},
+		}, nil,
 	)
 }
