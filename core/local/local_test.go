@@ -1024,6 +1024,10 @@ func TestDNSResolver(t *testing.T) {
 			},
 		}
 
+		expErr := sr(`dial tcp 127.0.0.254:HTTPBIN_PORT: connect: connection refused`)
+		if runtime.GOOS == "windows" {
+			expErr = "context deadline exceeded"
+		}
 		for name, tc := range testCases {
 			tc := tc
 			t.Run(name, func(t *testing.T) {
@@ -1059,9 +1063,8 @@ func TestDNSResolver(t *testing.T) {
 					entries := logHook.Drain()
 					require.Len(t, entries, tc.expLogEntries)
 					for _, entry := range entries {
-						expMsg := sr(`dial tcp 127.0.0.254:HTTPBIN_PORT: connect: connection refused`)
 						require.IsType(t, &url.Error{}, entry.Data["error"])
-						assert.EqualError(t, entry.Data["error"].(*url.Error).Err, expMsg)
+						assert.EqualError(t, entry.Data["error"].(*url.Error).Err, expErr)
 					}
 				case <-time.After(10 * time.Second):
 					t.Fatal("timed out")
