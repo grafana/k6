@@ -22,6 +22,7 @@ package grpc
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/dop251/goja"
@@ -102,7 +103,11 @@ func TestClient(t *testing.T) {
 		if !assert.Error(t, err) {
 			return
 		}
-		assert.Contains(t, err.Error(), "no such file or directory")
+
+		// (rogchap) this is a bit of a hack as windows reports a different system error than unix
+		errStr := strings.Replace(err.Error(), "The system cannot find the file specified", "no such file or directory", 1)
+
+		assert.Contains(t, errStr, "no such file or directory")
 	})
 
 	t.Run("Load", func(t *testing.T) {
