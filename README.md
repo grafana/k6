@@ -1,4 +1,4 @@
-<p align="center"><a href="https://k6.io/"><img src="logo.svg" alt="k6" width="220" height="213" /></a></p>
+<p align="center"><a href="https://k6.io/"><img src="assets/logo.svg" alt="k6" width="220" height="213" /></a></p>
 
 <h3 align="center">Like unit testing, for performance</h3>
 <p align="center">A modern load testing tool for developers and testers in the DevOps era.</p>
@@ -20,7 +20,7 @@
 </p>
 
 <br/>
-<img src="github-hr.png" alt="---" />
+<img src="assets/github-hr.png" alt="---" />
 <br/>
 
 **k6** is a modern load testing tool, building on [Load Impact](https://loadimpact.com/)'s years of experience in the load and performance testing industry. It provides a clean, approachable scripting API, [local](https://k6.io/docs/getting-started/running-k6) and [cloud execution](https://k6.io/docs/cloud), and flexible configuration.
@@ -28,7 +28,7 @@
 This is how load testing should look in the 21st century.
 
 <p align="center">
-  <img width="600" src="./assets/k6-demo.gif">
+  <img width="600" src="assets/k6-demo.gif">
 </p>
 
 Menu
