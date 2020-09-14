@@ -99,7 +99,7 @@ func (r *cacheResolver) LookupIP(host string) (net.IP, error) {
 
 	var ips []net.IP
 	// TODO: Invalidate? When?
-	if d, ok := r.cache[host]; ok && time.Now().UTC().Before(d.lastLookup.Add(r.ttl)) {
+	if d, ok := r.cache[host]; ok && time.Now().Before(d.lastLookup.Add(r.ttl)) {
 		ips = r.cache[host].ips
 	} else {
 		r.cm.Unlock() // The lookup could take some time, so unlock momentarily.
@@ -109,7 +109,7 @@ func (r *cacheResolver) LookupIP(host string) (net.IP, error) {
 			return nil, err
 		}
 		r.cm.Lock()
-		r.cache[host] = cacheRecord{ips: ips, lastLookup: time.Now().UTC()}
+		r.cache[host] = cacheRecord{ips: ips, lastLookup: time.Now()}
 	}
 
 	r.cm.Unlock()
