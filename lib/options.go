@@ -73,7 +73,7 @@ const (
 	DNSRandom
 )
 
-// UnmarshalJSON converts JSON data to a valid DNSStratey
+// UnmarshalJSON converts JSON data to a valid DNSStrategy
 func (d *DNSStrategy) UnmarshalJSON(data []byte) error {
 	if bytes.Equal(data, []byte(`null`)) {
 		return nil
