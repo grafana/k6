@@ -139,10 +139,10 @@ func (t transportCreds) ClientHandshake(ctx context.Context,
 }
 
 // Connect is a block dial to the gRPC server at the given address (host:port)
-func (c *Client) Connect(ctxPtr *context.Context, addr string, params map[string]interface{}) error {
+func (c *Client) Connect(ctxPtr *context.Context, addr string, params map[string]interface{}) (bool, error) {
 	state := lib.GetState(*ctxPtr)
 	if state == nil {
-		return errConnectInInitContext
+		return false, errConnectInInitContext
 	}
 
 	isPlaintext, timeout := false, 60*time.Second
@@ -207,7 +207,11 @@ func (c *Client) Connect(ctxPtr *context.Context, addr string, params map[string
 		close(errc)
 	}()
 
-	return <-errc
+	if err := <-errc; err != nil {
+		return false, err
+	}
+
+	return true, nil
 }
 
 // InvokeRPC creates and calls a unary RPC by fully qualified method name

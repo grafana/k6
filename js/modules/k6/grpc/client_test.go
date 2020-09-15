@@ -124,8 +124,7 @@ func TestClient(t *testing.T) {
 
 	t.Run("ConnectInit", func(t *testing.T) {
 		_, err := common.RunString(rt, `
-			var err = client.connect();
-			throw new Error(err)
+			client.connect();
 		`)
 		if !assert.Error(t, err) {
 			return
@@ -158,8 +157,7 @@ func TestClient(t *testing.T) {
 
 	t.Run("Connect", func(t *testing.T) {
 		_, err := common.RunString(rt, sr(`
-			var err = client.connect("GRPCBIN_ADDR"); 
-			if (err) throw new Error("connection failed with error: " + err)
+			client.connect("GRPCBIN_ADDR");
 		`))
 		assert.NoError(t, err)
 	})
