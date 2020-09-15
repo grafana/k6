@@ -181,7 +181,10 @@ func TestMakeRequestTimeout(t *testing.T) {
 	logger := logrus.New()
 	logger.Level = logrus.DebugLevel
 	state := &lib.State{
-		Options:   lib.Options{RunTags: &stats.SampleTags{}},
+		Options: lib.Options{
+			RunTags:    &stats.SampleTags{},
+			SystemTags: &stats.DefaultSystemTagSet,
+		},
 		Transport: srv.Client().Transport,
 		Samples:   samples,
 		Logger:    logger,
@@ -190,7 +193,7 @@ func TestMakeRequestTimeout(t *testing.T) {
 	req, _ := http.NewRequest("GET", srv.URL, nil)
 	var preq = &ParsedHTTPRequest{
 		Req:     req,
-		URL:     &URL{u: req.URL},
+		URL:     &URL{u: req.URL, URL: srv.URL},
 		Body:    new(bytes.Buffer),
 		Timeout: 10 * time.Millisecond,
 	}
@@ -199,6 +202,20 @@ func TestMakeRequestTimeout(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, res)
 	assert.Len(t, samples, 1)
+	sampleCont := <-samples
+	allSamples := sampleCont.GetSamples()
+	require.Len(t, allSamples, 8)
+	expTags := map[string]string{
+		"error":      "context deadline exceeded",
+		"error_code": "1000",
+		"status":     "0",
+		"method":     "GET",
+		"url":        srv.URL,
+		"name":       "",
+	}
+	for _, s := range allSamples {
+		assert.Equal(t, expTags, s.Tags.CloneTags())
+	}
 }
 
 func BenchmarkWrapDecompressionError(b *testing.B) {
