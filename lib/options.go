@@ -21,6 +21,7 @@
 package lib
 
 import (
+	"bytes"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -63,13 +64,6 @@ type DNSConfig struct {
 //go:generate enumer -type=DNSStrategy -transform=kebab -trimprefix DNS -output dns_strategy_gen.go
 type DNSStrategy uint8
 
-// NullDNSStrategy is a nullable wrapper around DNSStrategy, required for the
-// current configuration system.
-type NullDNSStrategy struct {
-	DNSStrategy
-	Valid bool
-}
-
 const (
 	// DNSFirst returns the first IP from the response.
 	DNSFirst DNSStrategy = iota + 1
@@ -78,6 +72,55 @@ const (
 	// DNSRandom returns a random IP from the response.
 	DNSRandom
 )
+
+// UnmarshalJSON converts JSON data to a valid DNSStratey
+func (d *DNSStrategy) UnmarshalJSON(data []byte) error {
+	if bytes.Equal(data, []byte(`null`)) {
+		return nil
+	}
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	v, err := DNSStrategyString(s)
+	if err != nil {
+		return err
+	}
+	*d = v
+	return nil
+}
+
+// MarshalJSON returns the JSON representation of d
+func (d DNSStrategy) MarshalJSON() ([]byte, error) {
+	return json.Marshal(d.String())
+}
+
+// NullDNSStrategy is a nullable wrapper around DNSStrategy, required for the
+// current configuration system.
+type NullDNSStrategy struct {
+	DNSStrategy
+	Valid bool
+}
+
+// UnmarshalJSON converts JSON data to a valid NullDNSStratey
+func (d *NullDNSStrategy) UnmarshalJSON(data []byte) error {
+	if bytes.Equal(data, []byte(`null`)) {
+		return nil
+	}
+	if err := json.Unmarshal(data, &d.DNSStrategy); err != nil {
+		return err
+	}
+	d.Valid = true
+	return nil
+}
+
+// MarshalJSON returns the JSON representation of d
+func (d NullDNSStrategy) MarshalJSON() ([]byte, error) {
+	if !d.Valid {
+		return []byte(`null`), nil
+	}
+	return json.Marshal(d.DNSStrategy)
+}
 
 // DefaultDNSConfig returns the default DNS configuration.
 func DefaultDNSConfig() DNSConfig {
@@ -97,26 +140,27 @@ func (c DNSConfig) String() string {
 
 // MarshalJSON implements json.Marshaler.
 func (c DNSConfig) MarshalJSON() ([]byte, error) {
-	var s string
-	if c.Strategy.IsADNSStrategy() {
-		s = c.Strategy.String()
-	}
 	return json.Marshal(struct {
-		TTL      string `json:"ttl"`
-		Strategy string `json:"strategy"`
+		TTL      null.String     `json:"ttl"`
+		Strategy NullDNSStrategy `json:"strategy"`
 	}{
-		TTL:      c.TTL.String,
-		Strategy: s,
+		TTL:      c.TTL,
+		Strategy: c.Strategy,
 	})
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
 func (c *DNSConfig) UnmarshalJSON(data []byte) error {
-	params := make(map[string]interface{})
-	if err := json.Unmarshal(data, &params); err != nil {
+	var s struct {
+		TTL      null.String     `json:"ttl"`
+		Strategy NullDNSStrategy `json:"strategy"`
+	}
+	if err := json.Unmarshal(data, &s); err != nil {
 		return err
 	}
-	return c.unmarshal(params)
+	c.TTL = s.TTL
+	c.Strategy = s.Strategy
+	return nil
 }
 
 // UnmarshalText implements encoding.TextUnmarshaler.
@@ -136,9 +180,6 @@ func (c *DNSConfig) unmarshal(params map[string]interface{}) error {
 	for k, v := range params {
 		switch k {
 		case "strategy":
-			if v == "" {
-				continue
-			}
 			if s, err := DNSStrategyString(v.(string)); err != nil {
 				return err
 			} else { // nolint: golint
@@ -147,9 +188,7 @@ func (c *DNSConfig) unmarshal(params map[string]interface{}) error {
 			}
 		case "ttl":
 			ttlv := fmt.Sprintf("%v", v)
-			if ttlv != "" {
-				c.TTL = null.StringFrom(ttlv)
-			}
+			c.TTL = null.StringFrom(ttlv)
 		default:
 			return fmt.Errorf("unknown DNS configuration field: %s", k)
 		}

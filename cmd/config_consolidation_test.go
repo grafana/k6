@@ -414,12 +414,7 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 				Strategy: lib.NullDNSStrategy{DNSStrategy: lib.DNSRandom, Valid: false},
 			}, c.Options.DNS)
 		}},
-		{opts{cli: []string{"--dns", "ttl=5s,strategy="}}, exp{}, func(t *testing.T, c Config) {
-			assert.Equal(t, lib.DNSConfig{
-				TTL:      null.StringFrom("5s"),
-				Strategy: lib.NullDNSStrategy{DNSStrategy: lib.DNSRandom, Valid: false},
-			}, c.Options.DNS)
-		}},
+		{opts{cli: []string{"--dns", "ttl=5s,strategy="}}, exp{cliReadError: true}, nil},
 		{opts{fs: defaultConfig(`{"dns": {"ttl": "0", "strategy": "round-robin"}}`)}, exp{}, func(t *testing.T, c Config) {
 			assert.Equal(t, lib.DNSConfig{
 				TTL:      null.StringFrom("0"),
