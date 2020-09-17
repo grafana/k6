@@ -118,7 +118,7 @@ func TestClient(t *testing.T) {
 			return
 		}
 		resp := respV.Export()
-		assert.IsType(t, []MethodDesc{}, resp)
+		assert.IsType(t, []MethodInfo{}, resp)
 		assert.Len(t, resp, 6)
 	})
 
