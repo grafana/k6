@@ -931,6 +931,35 @@ func TestRequestAndBatch(t *testing.T) {
 				})
 			}
 
+			t.Run("name/none", func(t *testing.T) {
+				_, err := common.RunString(rt, sr(`
+					var res = http.request("GET", "HTTPBIN_URL/headers");
+					if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+				`))
+				assert.NoError(t, err)
+				assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), "GET",
+					sr("HTTPBIN_URL/headers"), sr("HTTPBIN_URL/headers"), 200, "")
+			})
+
+			t.Run("name/request", func(t *testing.T) {
+				_, err := common.RunString(rt, sr(`
+					var res = http.request("GET", "HTTPBIN_URL/headers", null, { tags: { name: "myReq" }});
+					if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+				`))
+				assert.NoError(t, err)
+				assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), "GET",
+					sr("HTTPBIN_URL/headers"), "myReq", 200, "")
+			})
+
+			t.Run("name/template", func(t *testing.T) {
+				_, err := runES6String(t, rt, "http.get(http.url`"+sr(`HTTPBIN_URL/anything/${1+1}`)+"`);")
+				assert.NoError(t, err)
+				// There's no /anything endpoint in the go-httpbin library we're using, hence the 404,
+				// but it doesn't matter for this test.
+				assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), "GET",
+					sr("HTTPBIN_URL/anything/2"), sr("HTTPBIN_URL/anything/${}"), 404, "")
+			})
+
 			t.Run("object", func(t *testing.T) {
 				_, err := common.RunString(rt, sr(`
 				var res = http.request("GET", "HTTPBIN_URL/headers", null, { tags: { tag: "value" } });
@@ -1815,6 +1844,51 @@ func TestNoResponseBodyMangling(t *testing.T) {
 		}
 	`))
 	assert.NoError(t, err)
+}
+
+func TestRedirectMetricTags(t *testing.T) {
+	tb, _, samples, rt, _ := newRuntime(t)
+	defer tb.Cleanup()
+
+	tb.Mux.HandleFunc("/redirect/post", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/get", http.StatusMovedPermanently)
+	}))
+
+	sr := tb.Replacer.Replace
+	script := sr(`
+		http.post("HTTPBIN_URL/redirect/post", {data: "some data"});
+	`)
+
+	_, err := common.RunString(rt, script)
+	require.NoError(t, err)
+
+	require.Len(t, samples, 2)
+
+	checkTags := func(sc stats.SampleContainer, expTags map[string]string) {
+		allSamples := sc.GetSamples()
+		assert.Len(t, allSamples, 8)
+		for _, s := range allSamples {
+			assert.Equal(t, expTags, s.Tags.CloneTags())
+		}
+	}
+	expPOSTtags := map[string]string{
+		"group":  "",
+		"method": "POST",
+		"url":    sr("HTTPBIN_URL/redirect/post"),
+		"name":   sr("HTTPBIN_URL/redirect/post"),
+		"status": "301",
+		"proto":  "HTTP/1.1",
+	}
+	expGETtags := map[string]string{
+		"group":  "",
+		"method": "GET",
+		"url":    sr("HTTPBIN_URL/get"),
+		"name":   sr("HTTPBIN_URL/get"),
+		"status": "200",
+		"proto":  "HTTP/1.1",
+	}
+	checkTags(<-samples, expPOSTtags)
+	checkTags(<-samples, expGETtags)
 }
 
 func BenchmarkHandlingOfResponseBodies(b *testing.B) {
