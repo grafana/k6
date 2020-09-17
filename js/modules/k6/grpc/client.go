@@ -68,11 +68,11 @@ func (*GRPC) NewClient(ctxPtr *context.Context) interface{} {
 	return common.Bind(rt, &Client{}, ctxPtr)
 }
 
-// MethodDesc holds ifromation on any parsed method descriptors that can be used by the goja VM
-type MethodDesc struct {
-	Name            string
-	ClientStreaming bool
-	ServerStreaming bool
+// MethodInfo holds ifromation on any parsed method descriptors that can be used by the goja VM
+type MethodInfo struct {
+	FullMethod     string
+	IsClientStream bool
+	IsServerStream bool
 }
 
 // Response is a gRPC response that can be used by the goja VM
@@ -85,7 +85,7 @@ type Response struct {
 }
 
 // Load will parse the given proto files and make the file descriptors available to request.
-func (c *Client) Load(ctxPtr *context.Context, importPaths []string, filenames ...string) ([]MethodDesc, error) {
+func (c *Client) Load(ctxPtr *context.Context, importPaths []string, filenames ...string) ([]MethodInfo, error) {
 	if lib.GetState(*ctxPtr) != nil {
 		return nil, errors.New("load must be called in the init context")
 	}
@@ -100,7 +100,7 @@ func (c *Client) Load(ctxPtr *context.Context, importPaths []string, filenames .
 		return nil, err
 	}
 
-	var rtn []MethodDesc
+	var rtn []MethodInfo
 	c.mds = make(map[string]*desc.MethodDescriptor)
 	for _, fd := range fds {
 		for _, sd := range fd.GetServices() {
@@ -111,10 +111,10 @@ func (c *Client) Load(ctxPtr *context.Context, importPaths []string, filenames .
 				s.WriteString(md.GetName())
 				name := s.String()
 				c.mds[name] = md
-				rtn = append(rtn, MethodDesc{
-					Name:            name,
-					ClientStreaming: md.IsClientStreaming(),
-					ServerStreaming: md.IsServerStreaming(),
+				rtn = append(rtn, MethodInfo{
+					FullMethod:     name,
+					IsClientStream: md.IsClientStreaming(),
+					IsServerStream: md.IsServerStreaming(),
 				})
 			}
 		}
