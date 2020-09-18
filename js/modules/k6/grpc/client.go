@@ -390,11 +390,13 @@ func (c *Client) HandleRPC(ctx context.Context, stat grpcstats.RPCStats) {
 					Metric: metrics.GRPCReqDuration,
 					Tags:   tags,
 					Value:  stats.D(s.EndTime.Sub(s.BeginTime)),
+					Time:   s.BeginTime,
 				},
 				{
 					Metric: metrics.GRPCReqs,
 					Tags:   tags,
 					Value:  1,
+					Time:   s.BeginTime,
 				},
 			},
 		})
