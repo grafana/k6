@@ -327,6 +327,7 @@ type Options struct {
 	TLSCipherSuites *TLSCipherSuites `json:"tlsCipherSuites" envconfig:"K6_TLS_CIPHER_SUITES"`
 	TLSVersion      *TLSVersions     `json:"tlsVersion" ignored:"true"`
 	TLSAuth         []*TLSAuth       `json:"tlsAuth" envconfig:"K6_TLSAUTH"`
+	TLSExtraCAs     []string         `json:"tlsExtraCAs" envconfig:"K6_TLS_EXTRA_CAS"`
 
 	// Throw warnings (eg. failed HTTP requests) as errors instead of simply logging them.
 	Throw null.Bool `json:"throw" envconfig:"K6_THROW"`

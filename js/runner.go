@@ -23,6 +23,7 @@ package js
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -158,6 +159,21 @@ func (r *Runner) newVU(id int64, samplesOut chan<- stats.SampleContainer) (*VU, 
 		}
 	}
 
+	pool, _ := x509.SystemCertPool()
+	if pool == nil {
+		// SystemCertPool is not available on Windows.
+		// x509.SystemCertPool will always fail in that environment.
+		// The error can be ignored, instead, we initialize a new pool.
+		pool = x509.NewCertPool()
+	}
+	if cas := r.Bundle.Options.TLSExtraCAs; cas != nil {
+		for _, pem := range cas {
+			if !pool.AppendCertsFromPEM([]byte(pem)) {
+				return nil, errors.New("there are no CAs to add to the system pool")
+			}
+		}
+	}
+
 	dialer := &netext.Dialer{
 		Dialer:    r.BaseDialer,
 		Resolver:  r.Resolver,
@@ -172,6 +188,7 @@ func (r *Runner) newVU(id int64, samplesOut chan<- stats.SampleContainer) (*VU, 
 		Certificates:       certs,
 		NameToCertificate:  nameToCert,
 		Renegotiation:      tls.RenegotiateFreelyAsClient,
+		RootCAs:            pool,
 	}
 	transport := &http.Transport{
 		Proxy:               http.ProxyFromEnvironment,
