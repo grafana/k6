@@ -12,6 +12,7 @@ require (
 	github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
 	github.com/andybalholm/brotli v0.0.0-20190704151324-71eb68cc467c
 	github.com/andybalholm/cascadia v1.0.0 // indirect
+	github.com/benburkert/dns v0.0.0-20190225204957-d356cf78cdfc
 	github.com/daaku/go.zipexe v0.0.0-20150329023125-a5fe2436ffcb // indirect
 	github.com/dlclark/regexp2 v1.2.1-0.20200807145002-74bac81f00cf // indirect
 	github.com/dop251/goja v0.0.0-20200831102558-9af81ddcf0e1

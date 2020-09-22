@@ -38,7 +38,11 @@ type Resolver interface {
 }
 
 type resolver struct {
-	resolve    MultiResolver
+	resolve MultiResolver
+	selecter
+}
+
+type selecter struct {
 	strategy   lib.DNSStrategy
 	rrm        *sync.Mutex
 	rand       *rand.Rand
@@ -46,8 +50,9 @@ type resolver struct {
 }
 
 type cacheRecord struct {
-	ips        []net.IP
-	lastLookup time.Time
+	ips     []net.IP
+	validTo time.Time
+	*sync.Mutex
 }
 
 type cacheResolver struct {
@@ -63,11 +68,13 @@ type cacheResolver struct {
 func NewResolver(actRes MultiResolver, ttl time.Duration, strategy lib.DNSStrategy) Resolver {
 	r := rand.New(rand.NewSource(time.Now().UnixNano())) // nolint: gosec
 	res := resolver{
-		resolve:    actRes,
-		strategy:   strategy,
-		rrm:        &sync.Mutex{},
-		rand:       r,
-		roundRobin: make(map[string]uint8),
+		resolve: actRes,
+		selecter: selecter{
+			strategy:   strategy,
+			rrm:        &sync.Mutex{},
+			rand:       r,
+			roundRobin: make(map[string]uint8),
+		},
 	}
 	if ttl == 0 {
 		return &res
@@ -99,7 +106,7 @@ func (r *cacheResolver) LookupIP(host string) (net.IP, error) {
 
 	var ips []net.IP
 	// TODO: Invalidate? When?
-	if d, ok := r.cache[host]; ok && time.Now().Before(d.lastLookup.Add(r.ttl)) {
+	if d, ok := r.cache[host]; ok && time.Now().Before(d.validTo) {
 		ips = r.cache[host].ips
 	} else {
 		r.cm.Unlock() // The lookup could take some time, so unlock momentarily.
@@ -109,7 +116,7 @@ func (r *cacheResolver) LookupIP(host string) (net.IP, error) {
 			return nil, err
 		}
 		r.cm.Lock()
-		r.cache[host] = cacheRecord{ips: ips, lastLookup: time.Now()}
+		r.cache[host] = cacheRecord{ips: ips, validTo: time.Now().Add(r.ttl)}
 	}
 
 	r.cm.Unlock()
@@ -137,4 +144,55 @@ func (r *resolver) selectOne(host string, ips []net.IP) net.IP {
 		r.rrm.Unlock()
 	}
 	return ip
+}
+
+func (r *selecter) selectOne(host string, ips []net.IP) net.IP {
+	if len(ips) == 0 {
+		return nil
+	}
+	var ip net.IP
+	switch r.strategy {
+	case lib.DNSFirst:
+		return ips[0]
+	case lib.DNSRoundRobin:
+		r.rrm.Lock()
+		// NOTE: This index approach is not stable and might result in returning
+		// repeated or skipped IPs if the records change during a test run.
+		ip = ips[int(r.roundRobin[host])%len(ips)]
+		r.roundRobin[host]++
+		r.rrm.Unlock()
+	case lib.DNSRandom:
+		r.rrm.Lock()
+		ip = ips[r.rand.Intn(len(ips))]
+		r.rrm.Unlock()
+	}
+	return ip
+}
+
+// DNSCache TODO
+type DNSCache struct {
+	v4 *dnsCache
+	v6 *dnsCache
+}
+
+type dnsCache struct {
+	cache map[string]*cacheRecord
+	sync.RWMutex
+}
+
+func (d *dnsCache) Get(s string) *cacheRecord {
+	d.RLock()
+	cr, ok := d.cache[s]
+	d.RUnlock()
+	if !ok {
+		d.Lock()
+		cr, ok = d.cache[s] // we need to get it again this time with the write lock to be certain it wasn't added
+		if !ok {
+			cr = &cacheRecord{Mutex: &sync.Mutex{}}
+			d.cache[s] = cr
+		}
+		d.Unlock()
+	}
+
+	return cr
 }

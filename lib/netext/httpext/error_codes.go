@@ -79,7 +79,7 @@ const (
 	// errors till 1651 + 13 are other HTTP2 Connection errors with a specific errCode
 
 	// Custom k6 content errors, i.e. when the magic fails
-	//defaultContentError errCode = 1700 // reserved for future use
+	// defaultContentError errCode = 1700 // reserved for future use
 	responseDecompressionErrorCode errCode = 1701
 )
 
@@ -158,6 +158,14 @@ func errorCodeForError(err error) (errCode, string) {
 					}
 					return tcpDialUnknownErrnoCode,
 						fmt.Sprintf("dial: unknown errno %d error with msg `%s`", errno, iErr.Err)
+				}
+			}
+
+			inner := e.Unwrap()
+			if inner != nil && inner != e {
+				code, resultErr := errorCodeForError(inner)
+				if code != defaultErrorCode {
+					return code, resultErr
 				}
 			}
 			return tcpDialErrorCode, err.Error()

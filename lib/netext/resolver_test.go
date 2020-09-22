@@ -74,11 +74,11 @@ func TestResolver(t *testing.T) {
 					cr := r.(*cacheResolver)
 					assert.Len(t, cr.cache, 1)
 					assert.Equal(t, tc.ttl, cr.ttl)
-					firstLookup := cr.cache[host].lastLookup
+					firstLookup := cr.cache[host].validTo
 					time.Sleep(cr.ttl + 100*time.Millisecond)
 					_, err = r.LookupIP(host)
 					require.NoError(t, err)
-					assert.True(t, cr.cache[host].lastLookup.After(firstLookup))
+					assert.True(t, cr.cache[host].validTo.After(firstLookup))
 				}
 
 				if tc.strategy == lib.DNSRoundRobin {

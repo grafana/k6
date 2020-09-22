@@ -1639,7 +1639,7 @@ func TestErrorCodes(t *testing.T) {
 		{
 			name:              "Unroutable",
 			expectedErrorCode: 1101,
-			expectedErrorMsg:  "lookup: no such host",
+			expectedErrorMsg:  "no such host",
 			script:            `var res = http.request("GET", "http://sdafsgdhfjg/");`,
 		},
 
@@ -1652,7 +1652,7 @@ func TestErrorCodes(t *testing.T) {
 		{
 			name:              "Unroutable redirect",
 			expectedErrorCode: 1101,
-			expectedErrorMsg:  "lookup: no such host",
+			expectedErrorMsg:  "no such host",
 			moreSamples:       1,
 			script:            `var res = http.request("GET", "HTTPBIN_URL/redirect-to?url=http://dafsgdhfjg/");`,
 		},

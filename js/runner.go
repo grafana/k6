@@ -161,12 +161,8 @@ func (r *Runner) newVU(id int64, samplesOut chan<- stats.SampleContainer) (*VU, 
 		}
 	}
 
-	dialer := &netext.Dialer{
-		Dialer:    r.BaseDialer,
-		Resolver:  r.Resolver,
-		Blacklist: r.Bundle.Options.BlacklistIPs,
-		Hosts:     r.Bundle.Options.Hosts,
-	}
+	dialer := netext.NewDialer(r.BaseDialer, r.Bundle.Options.BlacklistIPs, r.Bundle.Options.Hosts, r.Bundle.Options.DNS)
+
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: r.Bundle.Options.InsecureSkipTLSVerify.Bool,
 		CipherSuites:       cipherSuites,
@@ -347,6 +343,8 @@ func (r *Runner) SetOptions(opts lib.Options) error {
 func parseTTL(ttlS string) (time.Duration, error) {
 	ttl := time.Duration(0)
 	switch ttlS {
+	case "real":
+		ttl = -1
 	case "inf":
 		// cache "indefinitely"
 		ttl = time.Hour * 24 * 365

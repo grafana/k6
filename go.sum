@@ -16,6 +16,8 @@ github.com/andybalholm/brotli v0.0.0-20190704151324-71eb68cc467c h1:pBKtfXLqKZ+G
 github.com/andybalholm/brotli v0.0.0-20190704151324-71eb68cc467c/go.mod h1:+lx6/Aqd1kLJ1GQfkvOnaZ1WGmLpMpbprPuIOOZX30U=
 github.com/andybalholm/cascadia v1.0.0 h1:hOCXnnZ5A+3eVDX8pvgl4kofXv2ELss0bKcqRySc45o=
 github.com/andybalholm/cascadia v1.0.0/go.mod h1:GsXiBklL0woXo1j/WYWtSYYC4ouU9PqHO0sqidkEA4Y=
+github.com/benburkert/dns v0.0.0-20190225204957-d356cf78cdfc h1:eyDlmf21vuKN61WoxV2cQLDH/PBDyyjIhUI4kT2o1yM=
+github.com/benburkert/dns v0.0.0-20190225204957-d356cf78cdfc/go.mod h1:6ul4nJKqsreAIBK5lUkibcUn2YBU6CvDzlKDH+dtZsQ=
 github.com/daaku/go.zipexe v0.0.0-20150329023125-a5fe2436ffcb h1:tUf55Po0vzOendQ7NWytcdK0VuzQmfAgvGBUOQvN0WA=
 github.com/daaku/go.zipexe v0.0.0-20150329023125-a5fe2436ffcb/go.mod h1:U0vRfAucUOohvdCxt5MWLF+TePIL0xbCkbKIiV8TQCE=
 github.com/davecgh/go-spew v1.1.0 h1:ZDRjVQ15GmhC3fiQ8ni8+OwkZQO4DARzQgrnXU1Liz8=

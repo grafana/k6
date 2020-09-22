@@ -23,13 +23,18 @@ package netext
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"net"
 	"strconv"
+	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
+	"github.com/benburkert/dns"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
+	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 )
 
@@ -44,13 +49,162 @@ type Dialer struct {
 
 	BytesRead    int64
 	BytesWritten int64
+
+	dnsCache DNSCache
+	ttl      time.Duration
+	selecter selecter
 }
 
 // NewDialer constructs a new Dialer with the given DNS resolver.
-func NewDialer(dialer net.Dialer, resolver Resolver) *Dialer {
-	return &Dialer{
-		Dialer:   dialer,
-		Resolver: resolver,
+func NewDialer(
+	dialer net.Dialer, blacklist []*lib.IPNet, hosts map[string]*lib.HostAddress,
+	dnsConfig lib.DNSConfig,
+	// TODO take DNSCache so it's shared between VUs
+) *Dialer {
+	r := rand.New(rand.NewSource(time.Now().UnixNano())) // nolint: gosec
+
+	ttl, err := parseTTL(dnsConfig.TTL.String)
+	if err != nil {
+		panic(err) // TODO fix
+	}
+	strategy := dnsConfig.Strategy.DNSStrategy
+	if !strategy.IsADNSStrategy() {
+		strategy = lib.DefaultDNSConfig().Strategy.DNSStrategy
+	}
+	d := &Dialer{
+		Blacklist: blacklist,
+		Hosts:     hosts,
+		selecter: selecter{
+			strategy:   strategy,
+			rrm:        &sync.Mutex{},
+			rand:       r,
+			roundRobin: make(map[string]uint8),
+		},
+		ttl: ttl,
+		dnsCache: DNSCache{
+			v4: &dnsCache{
+				RWMutex: sync.RWMutex{},
+				cache:   make(map[string]*cacheRecord),
+			},
+			v6: &dnsCache{
+				RWMutex: sync.RWMutex{},
+				cache:   make(map[string]*cacheRecord),
+			},
+		},
+	}
+	dialer.Resolver = &net.Resolver{
+		PreferGo: true,
+		Dial: (&dns.Client{
+			Resolver: d,
+		}).Dial,
+	}
+	if len(d.Blacklist) != 0 {
+		dialer.Control = func(network, address string, c syscall.RawConn) error {
+			ipStr, _, err := net.SplitHostPort(address)
+			if err != nil { // this should never happen
+				return err
+			}
+			ip := net.ParseIP(ipStr)
+
+			for _, ipnet := range d.Blacklist {
+				if ipnet.Contains(ip) {
+					return BlackListedIPError{ip: ip, net: ipnet}
+				}
+			}
+			return nil
+		}
+	}
+	d.Dialer = dialer // TODO fix this possibly by using a pointer or just rewriting this whole configuration
+	return d
+}
+
+// ServeDNS TODO write
+//nolint:funlen,gocognit
+func (d *Dialer) ServeDNS(ctx context.Context, mw dns.MessageWriter, q *dns.Query) {
+	// TODO log errors when we have a logger
+	// TODO rewrite this possibly by updating the library or building our own so that error handling
+	// is better
+	// TODO we technically could get a question for both ... but this doesn't happen currently with
+	// golang's stdlib implementation so ... hopefully this wont' be a problem
+	if len(q.Questions) != 1 && !(q.Questions[0].Type == dns.TypeA || q.Questions[0].Type == dns.TypeAAAA) {
+		m, _ := mw.Recur(ctx) // this error automatically get's set
+		for _, answer := range m.Answers {
+			mw.Answer(answer.Name, answer.TTL, answer.Record)
+		}
+		_ = mw.Reply(ctx) // there is nothing to with that error
+		return
+	}
+
+	question := q.Questions[0]
+	switch question.Type { //nolint: exhaustive
+	case dns.TypeA:
+		res := d.dnsCache.v4.Get(question.Name)
+		ttl := d.ttl
+		fmt.Println("A")
+		res.Lock()
+		if len(res.ips) == 0 || res.validTo.Before(time.Now()) {
+			fmt.Println("A miss", time.Until(res.validTo))
+			m, err := mw.Recur(ctx) // this error automatically get's set
+			if err != nil {
+				res.Unlock() // TODO maybe move to defer
+				return
+			}
+			res.ips = make([]net.IP, 0, len(m.Answers))
+			for _, answer := range m.Answers {
+				if a, ok := answer.Record.(*dns.A); ok {
+					if ttl < 0 {
+						ttl = answer.TTL
+					}
+					res.ips = append(res.ips, a.A)
+				}
+			}
+			if ttl > 0 {
+				res.validTo = time.Now().Add(ttl)
+			}
+		}
+		ip := d.selecter.selectOne(question.Name, res.ips)
+		res.Unlock() // TODO maybe move to a defer
+		fmt.Println(ip)
+		if ip != nil {
+			mw.Answer(question.Name, ttl, &dns.A{A: ip})
+		} else {
+			mw.Status(dns.NXDomain)
+		}
+		_ = mw.Reply(ctx)
+	case dns.TypeAAAA: // TODO DRY
+		fmt.Println("AAAA")
+		res := d.dnsCache.v6.Get(question.Name)
+		ttl := d.ttl
+		res.Lock()
+		if len(res.ips) == 0 || res.validTo.Before(time.Now()) {
+			fmt.Println("AAAA miss", time.Until(res.validTo))
+			m, err := mw.Recur(ctx) // this error automatically get's set
+			if err != nil {
+				res.Unlock() // TODO maybe move to defer
+				return
+			}
+			res.ips = make([]net.IP, 0, len(m.Answers))
+			for _, answer := range m.Answers {
+				if a, ok := answer.Record.(*dns.AAAA); ok {
+					if ttl < 0 {
+						ttl = answer.TTL
+					}
+					res.ips = append(res.ips, a.AAAA)
+				}
+			}
+			if ttl > 0 {
+				res.validTo = time.Now().Add(ttl)
+			}
+		}
+		ip := d.selecter.selectOne(question.Name, res.ips)
+		res.Unlock() // TODO maybe move to a defer
+		fmt.Println(ip)
+		if ip != nil {
+			mw.Answer(question.Name, ttl, &dns.AAAA{AAAA: ip})
+		} else {
+			mw.Status(dns.NXDomain)
+		}
+		_ = mw.Reply(ctx)
 	}
 }
 
@@ -66,11 +220,14 @@ func (b BlackListedIPError) Error() string {
 
 // DialContext wraps the net.Dialer.DialContext and handles the k6 specifics
 func (d *Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn, error) {
-	dialAddr, err := d.getDialAddr(addr)
+	remote, err := d.getConfiguredHost(addr)
 	if err != nil {
 		return nil, err
 	}
-	conn, err := d.Dialer.DialContext(ctx, proto, dialAddr)
+	if remote != nil {
+		addr = remote.String()
+	}
+	conn, err := d.Dialer.DialContext(ctx, proto, addr)
 	if err != nil {
 		return nil, err
 	}
@@ -130,47 +287,21 @@ func (d *Dialer) GetTrail(
 }
 
 func (d *Dialer) getDialAddr(addr string) (string, error) {
-	remote, err := d.findRemote(addr)
+	remote, err := d.getConfiguredHost(addr)
 	if err != nil {
 		return "", err
 	}
-
-	for _, ipnet := range d.Blacklist {
-		if ipnet.Contains(remote.IP) {
-			return "", BlackListedIPError{ip: remote.IP, net: ipnet}
-		}
-	}
-
 	return remote.String(), nil
 }
 
-func (d *Dialer) findRemote(addr string) (*lib.HostAddress, error) {
+func (d *Dialer) getConfiguredHost(addr string) (*lib.HostAddress, error) {
+	if remote, ok := d.Hosts[addr]; ok {
+		return remote, nil
+	}
+
 	host, port, err := net.SplitHostPort(addr)
 	if err != nil {
 		return nil, err
-	}
-
-	remote, err := d.getConfiguredHost(addr, host, port)
-	if err != nil || remote != nil {
-		return remote, err
-	}
-
-	ip := net.ParseIP(host)
-	if ip != nil {
-		return lib.NewHostAddress(ip, port)
-	}
-
-	ip, err = d.Resolver.LookupIP(host)
-	if err != nil {
-		return nil, err
-	}
-
-	return lib.NewHostAddress(ip, port)
-}
-
-func (d *Dialer) getConfiguredHost(addr, host, port string) (*lib.HostAddress, error) {
-	if remote, ok := d.Hosts[addr]; ok {
-		return remote, nil
 	}
 
 	if remote, ok := d.Hosts[host]; ok {
@@ -243,4 +374,32 @@ func (c *Conn) Write(b []byte) (int, error) {
 		atomic.AddInt64(c.BytesWritten, int64(n))
 	}
 	return n, err
+}
+
+func parseTTL(ttlS string) (time.Duration, error) {
+	ttl := time.Duration(0)
+	switch ttlS {
+	case "real":
+		ttl = -1
+	case "inf":
+		// cache "indefinitely"
+		ttl = time.Hour * 24 * 365
+	case "0":
+		// disable cache
+	case "":
+		ttlS = lib.DefaultDNSConfig().TTL.String
+		fallthrough
+	default:
+		origTTLs := ttlS
+		// Treat unitless values as milliseconds
+		if t, err := strconv.ParseFloat(ttlS, 32); err == nil {
+			ttlS = fmt.Sprintf("%.2fms", t)
+		}
+		var err error
+		ttl, err = types.ParseExtendedDuration(ttlS)
+		if ttl < 0 || err != nil {
+			return ttl, fmt.Errorf("invalid DNS TTL: %s", origTTLs)
+		}
+	}
+	return ttl, nil
 }

@@ -25,6 +25,10 @@ github.com/andybalholm/brotli
 # github.com/andybalholm/cascadia v1.0.0
 ## explicit
 github.com/andybalholm/cascadia
+# github.com/benburkert/dns v0.0.0-20190225204957-d356cf78cdfc
+## explicit
+github.com/benburkert/dns
+github.com/benburkert/dns/edns
 # github.com/daaku/go.zipexe v0.0.0-20150329023125-a5fe2436ffcb
 ## explicit
 github.com/daaku/go.zipexe
