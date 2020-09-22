@@ -43,49 +43,86 @@ type lokiHook struct {
 	limit          int
 	msgMaxSize     int
 	levels         []logrus.Level
+	allowedLabels  []string
 	pushPeriod     time.Duration
 	client         *http.Client
 	ctx            context.Context
 	fallbackLogger logrus.FieldLogger
 	profile        bool
+	droppedLabels  map[string]string
+}
+
+func getDefaultLoki() *lokiHook {
+	return &lokiHook{
+		addr:          "http://127.0.0.1:3100/loki/api/v1/push",
+		limit:         100,
+		levels:        logrus.AllLevels,
+		pushPeriod:    time.Second * 1,
+		msgMaxSize:    1024 * 1024, // 1mb
+		ch:            make(chan *logrus.Entry, 1000),
+		allowedLabels: nil,
+	}
 }
 
 // LokiFromConfigLine returns a new logrus.Hook that pushes logrus.Entrys to loki and is configured
 // through the provided line
 //nolint:funlen
 func LokiFromConfigLine(ctx context.Context, fallbackLogger logrus.FieldLogger, line string) (logrus.Hook, error) {
-	h := &lokiHook{
-		addr:           "http://127.0.0.1:3100/loki/api/v1/push",
-		limit:          100,
-		levels:         logrus.AllLevels,
-		pushPeriod:     time.Second * 1,
-		ctx:            ctx,
-		msgMaxSize:     1024 * 1024, // 1mb
-		ch:             make(chan *logrus.Entry, 1000),
-		fallbackLogger: fallbackLogger,
+	h := getDefaultLoki()
+
+	h.ctx = ctx
+	h.fallbackLogger = fallbackLogger
+
+	if line != "loki" {
+		parts := strings.SplitN(line, "=", 2)
+		if parts[0] != "loki" {
+			return nil, fmt.Errorf("loki configuration should be in the form `loki=url-to-push` but is `%s`", line)
+		}
+
+		err := h.parseArgs(strings.Split(parts[1], ","))
+		if err != nil {
+			return nil, err
+		}
 	}
-	if line == "loki" {
-		return h, nil
+	h.droppedLabels = make(map[string]string, 2+len(h.labels))
+	h.droppedLabels["level"] = logrus.WarnLevel.String()
+	for _, params := range h.labels {
+		h.droppedLabels[params[0]] = params[1]
+	}
+	if h.allowedLabels != nil {
+	outer:
+		for key := range h.droppedLabels {
+			for _, label := range h.allowedLabels {
+				if key == label {
+					continue outer
+				}
+			}
+			delete(h.droppedLabels, key)
+		}
 	}
 
-	parts := strings.SplitN(line, "=", 2)
-	if parts[0] != "loki" {
-		return nil, fmt.Errorf("loki configuration should be in the form `loki=url-to-push` but is `%s`", line)
-	}
-	args := strings.Split(parts[1], ",")
+	h.client = &http.Client{Timeout: h.pushPeriod}
+
+	go h.loop()
+
+	return h, nil
+}
+
+func (h *lokiHook) parseArgs(args []string) error {
 	h.addr = args[0]
 	// TODO use something better ... maybe
 	// https://godoc.org/github.com/kubernetes/helm/pkg/strvals
 	// atleast until https://github.com/loadimpact/k6/issues/926?
 	if len(args) == 1 {
-		return h, nil
+		return nil
 	}
 
-	for _, arg := range args[1:] {
+	for i := 1; i < len(args); i++ {
+		arg := args[i]
 		paramParts := strings.SplitN(arg, "=", 2)
 
 		if len(paramParts) != 2 {
-			return nil, fmt.Errorf("loki arguments should be in the form `address,key1=value1,key2=value2`, got %s", arg)
+			return fmt.Errorf("loki arguments should be in the form `address,key1=value1,key2=value2`, got %s", arg)
 		}
 
 		key, value := paramParts[0], paramParts[1]
@@ -95,30 +132,35 @@ func LokiFromConfigLine(ctx context.Context, fallbackLogger logrus.FieldLogger, 
 		case "pushPeriod":
 			h.pushPeriod, err = time.ParseDuration(value)
 			if err != nil {
-				return nil, fmt.Errorf("couldn't parse the loki pushPeriod %w", err)
+				return fmt.Errorf("couldn't parse the loki pushPeriod %w", err)
 			}
 		case "profile":
 			h.profile = true
 		case "limit":
 			h.limit, err = strconv.Atoi(value)
 			if err != nil {
-				return nil, fmt.Errorf("couldn't parse the loki limit as a number %w", err)
+				return fmt.Errorf("couldn't parse the loki limit as a number %w", err)
 			}
 			if !(h.limit > 0) {
-				return nil, fmt.Errorf("loki limit needs to be a positive number, is %d", h.limit)
+				return fmt.Errorf("loki limit needs to be a positive number, is %d", h.limit)
 			}
 		case "msgMaxSize":
 			h.msgMaxSize, err = strconv.Atoi(value)
 			if err != nil {
-				return nil, fmt.Errorf("couldn't parse the loki msgMaxSize as a number %w", err)
+				return fmt.Errorf("couldn't parse the loki msgMaxSize as a number %w", err)
 			}
 			if !(h.msgMaxSize > 0) {
-				return nil, fmt.Errorf("loki msgMaxSize needs to be a positive number, is %d", h.msgMaxSize)
+				return fmt.Errorf("loki msgMaxSize needs to be a positive number, is %d", h.msgMaxSize)
 			}
 		case "level":
 			h.levels, err = getLevels(value)
 			if err != nil {
-				return nil, err
+				return err
+			}
+		case "allowedLabels":
+			h.allowedLabels, i, err = parseArray(key, value, i, args)
+			if err != nil {
+				return err
 			}
 		default:
 			if strings.HasPrefix(key, "label.") {
@@ -128,15 +170,47 @@ func LokiFromConfigLine(ctx context.Context, fallbackLogger logrus.FieldLogger, 
 				continue
 			}
 
-			return nil, fmt.Errorf("unknown loki config key %s", key)
+			return fmt.Errorf("unknown loki config key %s", key)
 		}
 	}
 
-	h.client = &http.Client{Timeout: h.pushPeriod}
+	return nil
+}
 
-	go h.loop()
+func parseArray(key, value string, i int, args []string) ([]string, int, error) {
+	if value == "" {
+		return []string{}, i, nil
+	}
+	var ended bool
+	var result []string
+	if value[0] != '[' {
+		return nil, 0, fmt.Errorf("%s needs to be in the form [value1,value2,...,valueN]", key)
+	}
+	if value[len(value)-1] == ']' {
+		value = value[:len(value)-1]
+		ended = true
+	}
+	value = value[1:]
 
-	return h, nil
+	result = append(result, value)
+	for i++; i < len(args) && !ended; i++ {
+		value = args[i]
+		if value == "" {
+			return nil, 0, fmt.Errorf("array item in %s need to not be empty", key)
+		} else if value[len(value)-1] == ']' {
+			value = value[:len(value)-1]
+			ended = true
+		}
+		if value == "" {
+			return nil, 0, fmt.Errorf("array item in %s need to not be empty", key)
+		}
+		result = append(result, value)
+	}
+	if !ended {
+		return nil, 0, fmt.Errorf("%s needs to be in the form [value1,value2,...,valueN], but it didn't end", key)
+	}
+
+	return result, i - 1, nil
 }
 
 func getLevels(level string) ([]logrus.Level, error) {
@@ -244,12 +318,25 @@ func (h *lokiHook) loop() {
 				labels[params[0]] = params[1]
 			}
 			labels["level"] = entry.Level.String()
+			msg := entry.Message
+			if h.allowedLabels != nil { // TODO we can do this while constructing
+			outer:
+				for key, value := range labels {
+					for _, label := range h.allowedLabels {
+						if label == key {
+							continue outer
+						}
+					}
+					delete(labels, key)
+					msg += " " + key + ":" + value // TODO stringbuilder
+				}
+			}
 			// have the cutoff here ?
 			// if we cutoff here we can cut somewhat on the backbuffers and optimize the inserting
 			// in/creating of the final Streams that we push
 			msgs[count] = tmpMsg{
 				labels: labels,
-				msg:    entry.Message,
+				msg:    msg,
 				t:      entry.Time.UnixNano(),
 			}
 			count++
@@ -294,14 +381,8 @@ func (h *lokiHook) createPushMessage(msgs []tmpMsg, cutOffIndex, dropped int) *l
 		pushMsg.add(msg)
 	}
 	if dropped != 0 {
-		labels := make(map[string]string, 2+len(h.labels))
-		labels["level"] = logrus.WarnLevel.String()
-		for _, params := range h.labels {
-			labels[params[0]] = params[1]
-		}
-
 		msg := tmpMsg{
-			labels: labels,
+			labels: h.droppedLabels,
 			msg: fmt.Sprintf("k6 dropped %d log messages because they were above the limit of %d messages / %s",
 				dropped, h.limit, h.pushPeriod),
 			t: msgs[cutOffIndex-1].t,
