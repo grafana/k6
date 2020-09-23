@@ -1,0 +1,177 @@
+name: Deps, Lint, Test, Build, Publish
+on:
+  # Enable manually triggering this workflow via the API or web UI
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+    tags:
+      - v*
+  pull_request:
+
+env:
+  APP_NAME: "k6"
+  DOCKER_IMAGE_ID: ${{ github.repository }}
+  # Force pure Go DNS resolver, see https://golang.org/pkg/net/#hdr-Name_Resolution
+  # Needed for some of our tests (TestErrorCodes).
+  GODEBUG: netdns=go+1
+
+jobs:
+  deps:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.14.x
+      - name: Check dependencies
+        run: |
+            go version
+            test -z "$(go mod vendor && git status --porcelain)"
+            go mod verify
+
+  lint:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    env:
+        GOLANGCI_VERSION: v1.31
+        GO111MODULE: 'on'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Lint
+        # Why is `go mod vendor` needed here!? If it's not run then
+        # golangci-lint fails because of inconsistent vendoring...
+        run: |
+          go get github.com/golangci/golangci-lint/cmd/golangci-lint@$GOLANGCI_VERSION
+          BASEREV=$(git merge-base HEAD origin/master)
+          echo "Base revision: $BASEREV"
+          export PATH="$HOME/go/bin:$PATH"
+          go mod vendor
+          golangci-lint run --out-format=tab --new-from-rev "$BASEREV" ./...
+
+  test:
+    strategy:
+      matrix:
+        go-version: [1.14.x, 1.15.x]
+        platform: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.platform }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go-version }}
+      - name: Run tests with code coverage
+        run: |
+          go version
+          export GOMAXPROCS=2
+          export PATH=$GOPATH/bin:$PATH
+          echo "mode: set" > coverage.txt
+          for pkg in $(go list ./... | grep -v vendor); do
+              list=$(go list -test -f  '{{ join .Deps  "\n"}}' $pkg | grep github.com/loadimpact/k6 | grep -v vendor || true)
+              if [ -n "$list" ]; then
+                  list=$(echo "$list" | cut -f1 -d ' ' | sort -u | paste -sd, -)
+              fi
+
+              go test -v -race -timeout 800s  --coverpkg="$list" -coverprofile=$(echo $pkg | tr / -).coverage $pkg
+          done
+          grep -h -v "^mode:" *.coverage >> coverage.txt
+          rm -f *.coverage
+          bash <(curl --fail -s https://codecov.io/bash)
+          go tool cover -html=coverage.txt -o coverage.html
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v2
+        with:
+          name: test-coverage-report
+          path: coverage.html
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Build
+        run: docker build -t $DOCKER_IMAGE_ID .
+      - name: Check
+        run: |
+            docker run $DOCKER_IMAGE_ID version
+            docker run $DOCKER_IMAGE_ID --help
+            docker run $DOCKER_IMAGE_ID help
+            docker run $DOCKER_IMAGE_ID run --help
+            docker run $DOCKER_IMAGE_ID inspect --help
+            docker run $DOCKER_IMAGE_ID status --help
+            docker run $DOCKER_IMAGE_ID stats --help
+            docker run $DOCKER_IMAGE_ID scale --help
+            docker run $DOCKER_IMAGE_ID pause --help
+            docker run $DOCKER_IMAGE_ID resume --help
+      - name: Publish
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "REF=${{ github.ref }}"
+          echo "DOCKER_IMAGE_ID=$DOCKER_IMAGE_ID"
+          #
+          # Log into registry
+          echo "${{ secrets.DOCKER_PASS }}" | docker login -u "${{ secrets.DOCKER_USER }}" --password-stdin
+          # Strip git ref prefix from version
+          VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
+          # Strip "v" prefix from tag name
+          [[ "${{ github.ref }}" == "refs/tags/"* ]] && VERSION=$(echo "$VERSION" | sed -e 's/^v//')
+          echo "VERSION=$VERSION"
+          docker tag "$DOCKER_IMAGE_ID" "$DOCKER_IMAGE_ID:$VERSION"
+          docker push "$DOCKER_IMAGE_ID:$VERSION"
+          # We also want to tag the latest stable version as latest
+          if [[ "$VERSION" != "master" ]] && [[ ! "$VERSION" =~ (RC|rc) ]]; then
+            docker tag "$DOCKER_IMAGE_ID" "$DOCKER_IMAGE_ID:latest"
+            docker push "$DOCKER_IMAGE_ID:latest"
+          fi
+
+  release:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    env:
+      FPM_VERSION: "1.11.0"
+    needs: [lint, test]
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.14.x
+      - name: Install fpm
+        run: |
+          sudo apt-get update && sudo apt-get install -y ruby ruby-dev rubygems build-essential
+          sudo gem install --no-document fpm -v $FPM_VERSION
+      - name: Build
+        run: |
+          go version
+          ./build-release.sh
+      - name: Create release
+        run: |
+          set -x
+          assets=()
+          for asset in ./dist/*; do
+            assets+=("-a" "$asset")
+          done
+          tag_name="${GITHUB_REF##*/}"
+          hub release create "${assets[@]}" -m "$tag_name" -m "$(cat ./release\ notes/${tag_name}.md)" "$tag_name"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
