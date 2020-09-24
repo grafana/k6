@@ -31,10 +31,12 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
+	"github.com/golang/protobuf/proto"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/protoparse"
 	"github.com/jhump/protoreflect/dynamic"
 	"github.com/jhump/protoreflect/dynamic/grpcdynamic"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
@@ -401,4 +403,69 @@ func (c *Client) HandleRPC(ctx context.Context, stat grpcstats.RPCStats) {
 			},
 		})
 	}
+
+	// (rogchap) Re-using --http-debug flag as gRPC is technically still HTTP
+	if state.Options.HTTPDebug.String != "" {
+		logger := state.Logger.WithField("source", "http-debug")
+		httpDebugOption := state.Options.HTTPDebug.String
+		debugStat(stat, logger, httpDebugOption)
+	}
+}
+
+func debugStat(stat grpcstats.RPCStats, logger logrus.FieldLogger, httpDebugOption string) {
+	switch s := stat.(type) {
+	case *grpcstats.OutHeader:
+		logger.Infof("Out Header:\nFull Method: %s\nRemote Address: %s\n%s\n",
+			s.FullMethod, s.RemoteAddr, formatMetadata(s.Header))
+	case *grpcstats.OutTrailer:
+		if len(s.Trailer) > 0 {
+			logger.Infof("Out Trailer:\nWire Length: %d\n%s\n", s.WireLength, formatMetadata(s.Trailer))
+		}
+	case *grpcstats.OutPayload:
+		if httpDebugOption == "full" {
+			logger.Infof("Out Payload:\nWire Length: %d\nSent Time: %s\n%s\n\n",
+				s.WireLength, s.SentTime, formatPayload(s.Payload))
+		}
+	case *grpcstats.InHeader:
+		if len(s.Header) > 0 {
+			logger.Infof("In Header:\nWire Length: %d\n%s\n", s.WireLength, formatMetadata(s.Header))
+		}
+	case *grpcstats.InTrailer:
+		if len(s.Trailer) > 0 {
+			logger.Infof("In Trailer:\nWire Length: %d\n%s\n", s.WireLength, formatMetadata(s.Trailer))
+		}
+	case *grpcstats.InPayload:
+		if httpDebugOption == "full" {
+			logger.Infof("In Payload:\nWire Length: %d\nReceived Time: %s\n%s\n\n",
+				s.WireLength, s.RecvTime, formatPayload(s.Payload))
+		}
+
+	}
+}
+
+func formatMetadata(md metadata.MD) string {
+	var sb strings.Builder
+	for k, v := range md {
+		sb.WriteString(k)
+		sb.WriteString(": ")
+		sb.WriteString(strings.Join(v, ", "))
+		sb.WriteRune('\n')
+	}
+	return sb.String()
+}
+
+func formatPayload(payload interface{}) string {
+	msg, ok := payload.(proto.Message)
+	if !ok {
+		return ""
+	}
+	dm, err := dynamic.AsDynamicMessage(msg)
+	if err != nil {
+		return ""
+	}
+	b, err := dm.MarshalTextIndent()
+	if err != nil {
+		return ""
+	}
+	return string(b)
 }
