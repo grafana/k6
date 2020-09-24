@@ -40,10 +40,9 @@ package() {
     echo "- Creating ${NAME}.${FMT} package..."
     case $FMT in
     deb|rpm)
-        fpm --force --verbose --name=k6 --version="$VERSION" \
-            --vendor=k6 --license=AGPLv3 --url="https://k6.io/" \
-            --input-type=dir --output-type="$FMT" \
-            --package="${OUT_DIR}/${NAME}.${FMT}" "${OUT_DIR}/${NAME}/k6=/usr/bin/"
+        # The go-bin-* tools expect the binary in /tmp/
+        [ ! -r /tmp/k6 ] && cp "dist/${NAME}/k6" /tmp/k6
+        "go-bin-${FMT}" generate --file "packaging/${FMT}.json" -a amd64 --version $VERSION -o "dist/k6-v${VERSION}-amd64.${FMT}"
         ;;
     tgz)
         tar -C "${OUT_DIR}" -zcf "${OUT_DIR}/${NAME}.tar.gz" "$NAME"

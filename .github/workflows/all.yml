@@ -145,8 +145,6 @@ jobs:
     defaults:
       run:
         shell: bash
-    env:
-      FPM_VERSION: "1.11.0"
     needs: [lint, test]
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
@@ -156,10 +154,24 @@ jobs:
         uses: actions/setup-go@v2
         with:
           go-version: 1.14.x
-      - name: Install fpm
+      - name: Install package builders
         run: |
-          sudo apt-get update && sudo apt-get install -y ruby ruby-dev rubygems build-essential
-          sudo gem install --no-document fpm -v $FPM_VERSION
+          pushd .
+          tmpdir=$(mktemp -d)
+          cd "$tmpdir"
+          go get github.com/Masterminds/glide
+          go get -d github.com/mh-cbon/go-bin-deb \
+              && (cd $GOPATH/src/github.com/mh-cbon/go-bin-deb \
+              && glide install \
+              && go install)
+          go get -d github.com/mh-cbon/go-bin-rpm \
+              && (cd $GOPATH/src/github.com/mh-cbon/go-bin-rpm \
+              && glide install \
+              && go install)
+          apt-get update -y
+          apt-get install -y fakeroot rpm
+          popd
+          rm -rf "$tmpdir"
       - name: Build
         run: |
           go version
