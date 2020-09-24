@@ -243,8 +243,7 @@ func (h *lokiHook) loop() {
 			cutOff := <-ch
 			close(ch) // signal that more buffering can continue
 
-			copy(oldLogs[len(oldLogs):len(oldLogs)+oldCount], msgsToPush[:oldCount])
-			oldLogs = oldLogs[:len(oldLogs)+oldCount]
+			oldLogs = append(oldLogs, msgsToPush[:oldCount]...)
 
 			t := time.Now()
 			cutOffIndex := sortAndSplitMsgs(oldLogs, cutOff)
