@@ -2,13 +2,13 @@ image: Visual Studio 2017
 clone_folder: 'c:\gopath\src\github.com\%APPVEYOR_REPO_NAME%'
 
 # Do not build feature branch with open Pull Requests
-skip_branch_with_pr: true
+# skip_branch_with_pr: true
 
 environment:
   # improve readability
   VCS_URL: 'https://github.com/%APPVEYOR_REPO_NAME%'
   # specific to go
-  VERSION: "%APPVEYOR_REPO_TAG_NAME:v=%"
+  VERSION: 0.28.0
   GOPATH: c:\gopath
   GOVERSION: 1.14.9
   GOMAXPROCS: 2
@@ -48,8 +48,9 @@ install:
 # build msi artifacts
 build_script:
   # In case of non tag build, mock a version
-  - if "%APPVEYOR_REPO_TAG%" == "false" (set VERSION="0.0.1")
+  # - if "%APPVEYOR_REPO_TAG%" == "false" (set VERSION="0.0.1")
   - cd %APPVEYOR_BUILD_FOLDER%
+  - git checkout v0.28.0
   - pandoc -s -f markdown -t rtf -o packaging\LICENSE.rtf LICENSE.md
   - go version
   - go build -a -trimpath -ldflags "-s -w" -o packaging\k6.exe
@@ -57,16 +58,16 @@ build_script:
   - candle.exe -arch x64 -dVERSION=%VERSION% k6.wxs
   - light.exe -ext WixUIExtension k6.wixobj
 
-test_script:
-  - cd %APPVEYOR_BUILD_FOLDER%
-  - go version
-  - go test -p 1 ./...
+# test_script:
+#   - cd %APPVEYOR_BUILD_FOLDER%
+#   - go version
+#   - go test -p 1 ./...
 
 deploy_script:
   - cd %APPVEYOR_BUILD_FOLDER%\packaging
   # Checking if the build has started by pushed tag
-  - ps: |
-      if ( $env:APPVEYOR_REPO_TAG -eq "false" ) { Exit-AppveyorBuild }
+  # - ps: |
+  #     if ( $env:APPVEYOR_REPO_TAG -eq "false" ) { Exit-AppveyorBuild }
   # Publishing the msi
   - 'curl --fail -H "X-GPG-PASSPHRASE: %GPG_PASSPHRASE%" -T k6.msi "https://%BINTRAY_USER%:%BINTRAY_KEY%@api.bintray.com/content/loadimpact/windows/k6/%VERSION%/k6-v%VERSION%-amd64.msi?publish=1&override=1"'
   - ps: |
@@ -77,7 +78,7 @@ deploy_script:
       Copy-Item -Path .\k6.exe -Destination .\k6.portable\k6.exe
 
       Set-Location -Path .\k6.portable\
-      (Get-Content '.\k6.portable.nuspec' -Raw).Replace("<version>__REPLACE__</version>", "<version>$($env:APPVEYOR_REPO_TAG_NAME.substring(1))</version>") | Out-File '.\k6.portable.nuspec'
+      (Get-Content '.\k6.portable.nuspec' -Raw).Replace("<version>__REPLACE__</version>", "<version>0.28.0</version>") | Out-File '.\k6.portable.nuspec'
       choco pack
   # Publising the chocolatey package
   - 'curl --fail -H "X-GPG-PASSPHRASE: %GPG_PASSPHRASE%" -T .\k6.portable.%VERSION%.nupkg "https://%BINTRAY_USER%:%BINTRAY_KEY%@api.bintray.com/content/loadimpact/choco/k6.portable/%VERSION%/k6.portable.%VERSION%.nupkg?publish=1&override=1"'
