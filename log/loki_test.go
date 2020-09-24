@@ -49,6 +49,7 @@ func TestSyslogFromConfigLine(t *testing.T) {
 				levels:        logrus.AllLevels,
 				msgMaxSize:    1024 * 1024,
 				droppedLabels: map[string]string{"level": "warning"},
+				droppedMsg:    "k6 dropped %d log messages because they were above the limit of %d messages / %s",
 			},
 		},
 		{
@@ -63,6 +64,7 @@ func TestSyslogFromConfigLine(t *testing.T) {
 				msgMaxSize:    1231,
 				allowedLabels: []string{"something"},
 				droppedLabels: map[string]string{"something": "else"},
+				droppedMsg:    "k6 dropped %d log messages because they were above the limit of %d messages / %s foo=bar level=warning",
 			},
 		},
 		{
