@@ -439,7 +439,6 @@ func debugStat(stat grpcstats.RPCStats, logger logrus.FieldLogger, httpDebugOpti
 			logger.Infof("In Payload:\nWire Length: %d\nReceived Time: %s\n%s\n\n",
 				s.WireLength, s.RecvTime, formatPayload(s.Payload))
 		}
-
 	}
 }
 
@@ -451,6 +450,7 @@ func formatMetadata(md metadata.MD) string {
 		sb.WriteString(strings.Join(v, ", "))
 		sb.WriteRune('\n')
 	}
+
 	return sb.String()
 }
 
@@ -467,5 +467,6 @@ func formatPayload(payload interface{}) string {
 	if err != nil {
 		return ""
 	}
+
 	return string(b)
 }
