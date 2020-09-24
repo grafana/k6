@@ -95,6 +95,16 @@ sudo dnf install k6   # use yum instead of dnf for older distros
 docker pull loadimpact/k6
 ```
 
+### asdf-vm
+
+On Linux/OSX, you can install with [asdf-vm](https://asdf-vm.com) by running:
+
+```
+asdf plugin add k6
+asdf install k6 <K6_VERSION>
+asdf global <K6_VERSION>
+```
+
 ### Pre-built binaries & other platforms
 
 If there isn't an official package for your operating system or architecture, or if you don't want to install a custom repository, you can easily grab a pre-built binary from [the GitHub Releases page](https://github.com/loadimpact/k6/releases). Once you download and unpack the release, you can optionally copy the `k6` binary it contains somewhere in your `PATH`, so you are able to run k6 from any location on your system.
