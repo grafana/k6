@@ -95,12 +95,12 @@ docker pull loadimpact/k6
 
 ### asdf-vm
 
-If your kernel is Darwin or Linux, you can install with [asdf-vm](https://asdf-vm.com) by running:
+On Linux/OSX, you can install with [asdf-vm](https://asdf-vm.com) by running:
 
 ```
 asdf plugin-add k6
 asdf install k6 <K6_VERSION>
-asdf global <K&_VERSION>
+asdf global <K6_VERSION>
 ```
 
 ### Pre-built binaries & other platforms
