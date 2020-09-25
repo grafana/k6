@@ -41,8 +41,9 @@ package() {
     case $FMT in
     deb|rpm)
         # The go-bin-* tools expect the binary in /tmp/
-        [ ! -r /tmp/k6 ] && cp "dist/${NAME}/k6" /tmp/k6
-        "go-bin-${FMT}" generate --file "packaging/${FMT}.json" -a amd64 --version $VERSION -o "dist/k6-v${VERSION}-amd64.${FMT}"
+        [ ! -r /tmp/k6 ] && cp "${OUT_DIR}/${NAME}/k6" /tmp/k6
+        "go-bin-${FMT}" generate --file "packaging/${FMT}.json" -a amd64 \
+            --version "${VERSION#v}" -o "${OUT_DIR}/k6-${VERSION}-amd64.${FMT}"
         ;;
     tgz)
         tar -C "${OUT_DIR}" -zcf "${OUT_DIR}/${NAME}.tar.gz" "$NAME"
@@ -70,7 +71,7 @@ checksum() {
 
     echo "--- Generating checksum file..."
     rm -f "${OUT_DIR}/$CHECKSUM_FILE"
-    (cd "$OUT_DIR" && find * -maxdepth 0 -type f | xargs "${CHECKSUM_CMD[@]}" > "$CHECKSUM_FILE")
+    (cd "$OUT_DIR" && find . -maxdepth 1 -type f -printf '%P\n' | sort | xargs "${CHECKSUM_CMD[@]}" > "$CHECKSUM_FILE")
 }
 
 cleanup() {
