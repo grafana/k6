@@ -81,7 +81,7 @@ func LokiFromConfigLine(ctx context.Context, fallbackLogger logrus.FieldLogger, 
 			return nil, fmt.Errorf("loki configuration should be in the form `loki=url-to-push` but is `%s`", line)
 		}
 
-		err := h.parseArgs(strings.Split(parts[1], ","))
+		err := h.parseArgs(line)
 		if err != nil {
 			return nil, err
 		}
@@ -101,27 +101,20 @@ func LokiFromConfigLine(ctx context.Context, fallbackLogger logrus.FieldLogger, 
 	return h, nil
 }
 
-func (h *lokiHook) parseArgs(args []string) error {
-	h.addr = args[0]
-	// TODO use something better ... maybe
-	// https://godoc.org/github.com/kubernetes/helm/pkg/strvals
-	// atleast until https://github.com/loadimpact/k6/issues/926?
-	if len(args) == 1 {
-		return nil
+func (h *lokiHook) parseArgs(line string) error {
+	tokens, err := tokenize(line)
+	if err != nil {
+		return err
 	}
 
-	for i := 1; i < len(args); i++ {
-		arg := args[i]
-		paramParts := strings.SplitN(arg, "=", 2)
-
-		if len(paramParts) != 2 {
-			return fmt.Errorf("loki arguments should be in the form `address,key1=value1,key2=value2`, got %s", arg)
-		}
-
-		key, value := paramParts[0], paramParts[1]
+	for _, token := range tokens {
+		key := token.key
+		value := token.value
 
 		var err error
 		switch key {
+		case "loki":
+			h.addr = value
 		case "pushPeriod":
 			h.pushPeriod, err = time.ParseDuration(value)
 			if err != nil {
@@ -151,10 +144,7 @@ func (h *lokiHook) parseArgs(args []string) error {
 				return err
 			}
 		case "allowedLabels":
-			h.allowedLabels, i, err = parseArray(key, value, i, args)
-			if err != nil {
-				return err
-			}
+			h.allowedLabels = strings.Split(value, ",")
 		default:
 			if strings.HasPrefix(key, "label.") {
 				labelKey := strings.TrimPrefix(key, "label.")
@@ -168,42 +158,6 @@ func (h *lokiHook) parseArgs(args []string) error {
 	}
 
 	return nil
-}
-
-func parseArray(key, value string, i int, args []string) ([]string, int, error) {
-	if value == "" {
-		return []string{}, i, nil
-	}
-	var ended bool
-	var result []string
-	if value[0] != '[' {
-		return nil, 0, fmt.Errorf("%s needs to be in the form [value1,value2,...,valueN]", key)
-	}
-	if value[len(value)-1] == ']' {
-		value = value[:len(value)-1]
-		ended = true
-	}
-	value = value[1:]
-
-	result = append(result, value)
-	for i++; i < len(args) && !ended; i++ {
-		value = args[i]
-		if value == "" {
-			return nil, 0, fmt.Errorf("array item in %s need to not be empty", key)
-		} else if value[len(value)-1] == ']' {
-			value = value[:len(value)-1]
-			ended = true
-		}
-		if value == "" {
-			return nil, 0, fmt.Errorf("array item in %s need to not be empty", key)
-		}
-		result = append(result, value)
-	}
-	if !ended {
-		return nil, 0, fmt.Errorf("%s needs to be in the form [value1,value2,...,valueN], but it didn't end", key)
-	}
-
-	return result, i - 1, nil
 }
 
 func getLevels(level string) ([]logrus.Level, error) {
