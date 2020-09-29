@@ -190,3 +190,46 @@ func TestLogEntryMarshal(t *testing.T) {
 
 	require.Equal(t, expected, s)
 }
+
+func TestFilterLabels(t *testing.T) {
+	cases := []struct {
+		allowedLabels  []string
+		labels         map[string]string
+		expectedLabels map[string]string
+		msg            string
+		result         string
+	}{
+		{
+			allowedLabels:  []string{"a", "b"},
+			labels:         map[string]string{"a": "1", "b": "2", "d": "3", "c": "4", "e": "5"},
+			expectedLabels: map[string]string{"a": "1", "b": "2"},
+			msg:            "some msg",
+			result:         "some msg c=4 d=3 e=5",
+		},
+		{
+			allowedLabels:  []string{"a", "b"},
+			labels:         map[string]string{"d": "3", "c": "4", "e": "5"},
+			expectedLabels: map[string]string{},
+			msg:            "some msg",
+			result:         "some msg c=4 d=3 e=5",
+		},
+		{
+			allowedLabels:  []string{"a", "b"},
+			labels:         map[string]string{"a": "1", "d": "3", "c": "4", "e": "5"},
+			expectedLabels: map[string]string{"a": "1"},
+			msg:            "some msg",
+			result:         "some msg c=4 d=3 e=5",
+		},
+	}
+
+	for i, c := range cases {
+		c := c
+		t.Run(fmt.Sprint(i), func(t *testing.T) {
+			h := &lokiHook{}
+			h.allowedLabels = c.allowedLabels
+			result := h.filterLabels(c.labels, c.msg)
+			assert.Equal(t, c.result, result)
+			assert.Equal(t, c.expectedLabels, c.labels)
+		})
+	}
+}
