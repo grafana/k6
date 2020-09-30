@@ -308,6 +308,7 @@ func (vm *vm) run() {
 		ticks++
 		if ticks > 10000 {
 			runtime.Gosched()
+			vm.r.removeDeadKeys()
 			ticks = 0
 		}
 	}

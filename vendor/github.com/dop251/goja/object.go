@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"runtime"
 	"sort"
+	"sync"
 
 	"github.com/dop251/goja/unistring"
 )
@@ -84,12 +85,27 @@ func (r *weakCollections) remove(c weakCollection) {
 	}
 }
 
-func finalizeObjectWeakRefs(r *weakCollections) {
-	id := r.id()
-	for _, c := range r.colls {
-		c.removeId(id)
-	}
-	r.colls = nil
+func finalizeObjectWeakRefs(r *objectWeakRef) {
+	r.tracker.add(r.id)
+}
+
+type weakRefTracker struct {
+	sync.Mutex
+	list []uint64
+}
+
+func (t *weakRefTracker) add(id uint64) {
+	t.Lock()
+	t.list = append(t.list, id)
+	t.Unlock()
+}
+
+// An object that gets finalized when the corresponding *Object is garbage-collected.
+// It must be ensured that neither the *Object, nor the *Runtime is reachable from this struct,
+// otherwise it will create a circular reference with a Finalizer which will make it not garbage-collectable.
+type objectWeakRef struct {
+	id      uint64
+	tracker *weakRefTracker
 }
 
 type Object struct {
@@ -97,12 +113,7 @@ type Object struct {
 	runtime *Runtime
 	self    objectImpl
 
-	// Contains references to all weak collections that contain this Object.
-	// weakColls has a finalizer that removes the Object's id from all weak collections.
-	// The id is the weakColls pointer value converted to uintptr.
-	// Note, cannot set the finalizer on the *Object itself because it's a part of a
-	// reference cycle.
-	weakColls *weakCollections
+	weakRef *objectWeakRef
 }
 
 type iterNextFunc func() (propIterItem, iterNextFunc)
@@ -1399,15 +1410,19 @@ func (o *Object) defineOwnProperty(n Value, desc PropertyDescriptor, throw bool)
 	}
 }
 
-func (o *Object) getWeakCollRefs() *weakCollections {
-	if o.weakColls == nil {
-		o.weakColls = &weakCollections{
-			objId: o.getId(),
+func (o *Object) getWeakRef() *objectWeakRef {
+	if o.weakRef == nil {
+		if o.runtime.weakRefTracker == nil {
+			o.runtime.weakRefTracker = &weakRefTracker{}
 		}
-		runtime.SetFinalizer(o.weakColls, finalizeObjectWeakRefs)
+		o.weakRef = &objectWeakRef{
+			id:      o.getId(),
+			tracker: o.runtime.weakRefTracker,
+		}
+		runtime.SetFinalizer(o.weakRef, finalizeObjectWeakRefs)
 	}
 
-	return o.weakColls
+	return o.weakRef
 }
 
 func (o *Object) getId() uint64 {
