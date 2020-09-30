@@ -54,7 +54,8 @@ func (t httpDebugTransport) debugRequest(req *http.Request, requestID string) {
 	if err != nil {
 		t.logger.Error(err)
 	}
-	t.logger.WithField("request_id", requestID).Infof("Request:\n%s\n", bytes.ReplaceAll(dump, []byte("\r\n"), []byte{'\n'}))
+	t.logger.WithField("request_id", requestID).Infof("Request:\n%s\n",
+		bytes.ReplaceAll(dump, []byte("\r\n"), []byte{'\n'}))
 }
 
 func (t httpDebugTransport) debugResponse(res *http.Response, requestID string) {
@@ -63,6 +64,7 @@ func (t httpDebugTransport) debugResponse(res *http.Response, requestID string) 
 		if err != nil {
 			t.logger.Error(err)
 		}
-		t.logger.WithField("request_id", requestID).Infof("Response:\n%s\n", bytes.ReplaceAll(dump, []byte("\r\n"), []byte{'\n'}))
+		t.logger.WithField("request_id", requestID).Infof("Response:\n%s\n",
+			bytes.ReplaceAll(dump, []byte("\r\n"), []byte{'\n'}))
 	}
 }
