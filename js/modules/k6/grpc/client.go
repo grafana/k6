@@ -304,6 +304,12 @@ func (c *Client) InvokeRPC(ctxPtr *context.Context,
 	b, _ := req.ToObject(rt).MarshalJSON()
 	_ = reqdm.UnmarshalJSON(b)
 
+	if rpsLimit := state.RPSLimit; rpsLimit != nil {
+		if err := rpsLimit.Wait(ctx); err != nil {
+			return nil, err
+		}
+	}
+
 	reqCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
