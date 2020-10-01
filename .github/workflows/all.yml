@@ -59,12 +59,8 @@ jobs:
   test:
     strategy:
       matrix:
-        go-version: [1.14.x, 1.15.x]
+        go-version: [1.14.x]
         platform: [ubuntu-latest, windows-latest]
-        exclude:
-          # This environment is used in test-coverage.
-          - platform: ubuntu-latest
-            go-version: 1.15.x
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout code
@@ -101,7 +97,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v2
         with:
-          go-version: 1.15.x
+          go-version: ${{ matrix.go-version }}
       - name: Run tests with code coverage
         run: |
           go version
@@ -125,13 +121,15 @@ jobs:
           grep -h -v "^mode:" *.coverage >> coverage.txt
           rm -f *.coverage
       - name: Upload coverage to Codecov
-        run: bash <(curl --fail -s https://codecov.io/bash)
+        run: |
+          platform="${{ matrix.platform }}"
+          bash <(curl --fail -s https://codecov.io/bash) -F "${platform%%-*}"
       - name: Generate coverage HTML report
         run: go tool cover -html=coverage.txt -o coverage.html
       - name: Upload coverage report
         uses: actions/upload-artifact@v2
         with:
-          name: test-coverage-report
+          name: test-coverage-report-${{ matrix.platform }}
           path: coverage.html
 
   configure:
