@@ -35,8 +35,7 @@ import (
 // A Trail represents detailed information about an HTTP request.
 // You'd typically get one from a Tracer.
 type Trail struct {
-	StartTime time.Time
-	EndTime   time.Time
+	EndTime time.Time
 
 	// Total connect time (Connecting + TLSHandshaking)
 	ConnDuration time.Duration
@@ -346,7 +345,6 @@ func (t *Tracer) Done() *Trail {
 	trail.EndTime = done
 	trail.ConnDuration = trail.Connecting + trail.TLSHandshaking
 	trail.Duration = trail.Sending + trail.Waiting + trail.Receiving
-	trail.StartTime = trail.EndTime.Add(-trail.Duration)
 
 	t.protoErrorsMutex.Lock()
 	defer t.protoErrorsMutex.Unlock()
