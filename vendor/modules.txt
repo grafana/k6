@@ -87,8 +87,6 @@ github.com/golang/protobuf/proto
 github.com/golang/snappy
 # github.com/google/go-cmp v0.5.1
 ## explicit
-# github.com/google/uuid v1.1.2
-## explicit
 # github.com/gorilla/context v0.0.0-20160226214623-1ea25387ff6f
 ## explicit
 github.com/gorilla/context
