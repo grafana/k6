@@ -258,7 +258,7 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 				logger.WithError(err).Error("Stop cloud test error")
 			}
 			shouldExitLoop = true // Exit after the next GetTestProgress call
-		
+
 			sig = <-sigC
 			logger.WithField("sig", sig).Error("Aborting k6 in response to signal")
 			globalCancel()
