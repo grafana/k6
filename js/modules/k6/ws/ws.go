@@ -28,6 +28,8 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/http/cookiejar"
+	netURL "net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -41,6 +43,8 @@ import (
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/stats"
 )
+
+const HeaderKeyCookie = "X-Cookie"
 
 // ErrWSInInitContext is returned when websockets are using in the init context
 var ErrWSInInitContext = common.NewInitContextError("using websockets in the init context is not supported")
@@ -104,6 +108,7 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 
 	// Leave header to nil by default so we can pass it directly to the Dialer
 	var header http.Header
+	var jar http.CookieJar
 
 	tags := state.CloneTags()
 
@@ -123,6 +128,26 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 					continue
 				}
 				for _, key := range headersObj.Keys() {
+					if key == HeaderKeyCookie {
+						req, err := http.NewRequest("", url, nil)
+						if err != nil {
+							return nil, err
+						}
+
+						req.Header.Set("Cookie", headersObj.Get(key).String())
+						cookies := req.Cookies()
+						jar, err = cookiejar.New(nil)
+						if err != nil {
+							return nil, err
+						}
+
+						u, err := netURL.Parse(url)
+						if err != nil {
+							return nil, err
+						}
+
+						jar.SetCookies(u, cookies)
+					}
 					header.Set(key, headersObj.Get(key).String())
 				}
 			case "tags":
@@ -160,6 +185,7 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 		NetDialContext:  state.Dialer.DialContext,
 		Proxy:           http.ProxyFromEnvironment,
 		TLSClientConfig: tlsConfig,
+		Jar:             jar,
 	}
 
 	start := time.Now()
