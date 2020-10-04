@@ -44,6 +44,7 @@ import (
 	"github.com/loadimpact/k6/stats"
 )
 
+// HeaderKeyCookie defines key where user can pass cookie for websocket.
 const HeaderKeyCookie = "Cookie"
 
 // ErrWSInInitContext is returned when websockets are using in the init context
@@ -129,7 +130,7 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 				}
 				for _, key := range headersObj.Keys() {
 					if key == HeaderKeyCookie {
-						req, err := http.NewRequest("", url, nil)
+						req, err := http.NewRequest("", url, nil) //nolint:noctx
 						if err != nil {
 							return nil, err
 						}
