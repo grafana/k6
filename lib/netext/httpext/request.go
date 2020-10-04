@@ -326,7 +326,6 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 
 		resp.URL = res.Request.URL.String()
 		resp.Status = res.StatusCode
-		resp.StatusText = res.Status
 		resp.Proto = res.Proto
 
 		if res.TLS != nil {
