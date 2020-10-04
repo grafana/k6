@@ -28,6 +28,9 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/http/cookiejar"
+	netURL "net/url"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -109,8 +112,19 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 
 	// Leave header to nil by default so we can pass it directly to the Dialer
 	var header http.Header
+	var jar http.CookieJar
 
 	tags := state.CloneTags()
+
+	u, err := netURL.Parse(url)
+	if err != nil {
+		return nil, err
+	}
+
+	cookiesMap := make(map[string]http.Cookie)
+	for _, cookie := range state.CookieJar.Cookies(u) {
+		cookiesMap[cookie.Name] = *cookie
+	}
 
 	// Parse the optional second argument (params)
 	if !goja.IsUndefined(paramsV) && !goja.IsNull(paramsV) {
@@ -130,6 +144,43 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 				for _, key := range headersObj.Keys() {
 					header.Set(key, headersObj.Get(key).String())
 				}
+			case "cookies":
+				cookiesV := params.Get(k)
+				if goja.IsUndefined(cookiesV) || goja.IsNull(cookiesV) {
+					continue
+				}
+				cookies := cookiesV.ToObject(rt)
+				if cookies == nil {
+					continue
+				}
+				for _, key := range cookies.Keys() {
+					replace := false
+					value := ""
+					cookieV := cookies.Get(key)
+					if goja.IsUndefined(cookieV) || goja.IsNull(cookieV) {
+						continue
+					}
+					switch cookieV.ExportType() {
+					case reflect.TypeOf(map[string]interface{}{}):
+						cookie := cookieV.ToObject(rt)
+						for _, attr := range cookie.Keys() {
+							switch strings.ToLower(attr) {
+							case "replace":
+								replace = cookie.Get(attr).ToBoolean()
+							case "value":
+								value = cookie.Get(attr).String()
+							}
+						}
+					default:
+						value = cookieV.String()
+					}
+					if _, ok := cookiesMap[key]; !ok || replace {
+						cookiesMap[key] = http.Cookie{
+							Name:  key,
+							Value: value,
+						}
+					}
+				}
 			case "tags":
 				tagsV := params.Get(k)
 				if goja.IsUndefined(tagsV) || goja.IsNull(tagsV) {
@@ -145,6 +196,29 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 			}
 		}
 
+	}
+
+	cookies := make([]*http.Cookie, 0, len(cookiesMap))
+	for _, cookie := range cookiesMap {
+		v := cookie
+		cookies = append(cookies, &v)
+	}
+	if len(cookies) > 0 {
+		jar, err = cookiejar.New(nil)
+		if err != nil {
+			return nil, err
+		}
+
+		// SetCookies looking for http or https scheme. Otherwise it does nothing. This is mini hack to bypass it.
+		oldScheme := u.Scheme
+		switch u.Scheme {
+		case "ws":
+			u.Scheme = "http"
+		case "wss":
+			u.Scheme = "https"
+		}
+		jar.SetCookies(u, cookies)
+		u.Scheme = oldScheme
 	}
 
 	if state.Options.SystemTags.Has(stats.TagURL) {
@@ -165,6 +239,7 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 		NetDialContext:  state.Dialer.DialContext,
 		Proxy:           http.ProxyFromEnvironment,
 		TLSClientConfig: tlsConfig,
+		Jar:             jar,
 	}
 
 	start := time.Now()
