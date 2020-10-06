@@ -1,213 +1,26 @@
+# Golang CircleCI 2.0 configuration file
+#
+# Check https://circleci.com/docs/2.0/language-go/ for more details
 version: 2
 jobs:
-  deps:
+  build:
     docker:
-      - image: circleci/golang:1.14
-    working_directory: /home/circleci/.go_workspace/src/github.com/loadimpact/k6
+      # specify the version
+      - image: circleci/golang:1.9
+
+      # Specify service dependencies here if necessary
+      # CircleCI maintains a library of pre-built images
+      # documented at https://circleci.com/docs/2.0/circleci-images/
+      # - image: circleci/postgres:9.4
+
+    #### TEMPLATE_NOTE: go expects specific checkout path representing url
+    #### expecting it in the form of
+    ####   /go/src/github.com/circleci/go-tool
+    ####   /go/src/bitbucket.org/circleci/go-tool
+    working_directory: /go/src/github.com/{{ORG_NAME}}/{{REPO_NAME}}
     steps:
       - checkout
-      - run:
-          name: Check dependencies
-          command: |
-            go version
-            test -z "$(go mod vendor && git status --porcelain)"
-            go mod verify
 
-  lint:
-    docker:
-      - image: circleci/golang:1.14
-    environment:
-      GOLANGCI_VERSION: v1.30.0
-      GO111MODULE: 'on'
-    working_directory: /home/circleci/.go_workspace/src/github.com/loadimpact/k6
-    steps:
-      # Workaround for custom env vars not available in cache keys
-      # https://discuss.circleci.com/t/cannot-use-circle-yml-environment-variables-in-cache-keys/10994/8
-      - run: echo $GOLANGCI_VERSION > /tmp/.golangci.version
-      - restore_cache:
-          name: Restore golangci-lint cache
-          key: golangci-lint-{{ arch }}-{{ checksum "/tmp/.golangci.version" }}-{{ .Environment.CACHE_VERSION }}
-          paths:
-            - /go/bin/golangci-lint
-      - run:
-          name: Install golangci-lint
-          command: |
-            command -v golangci-lint && exit
-            go get github.com/golangci/golangci-lint/cmd/golangci-lint@$GOLANGCI_VERSION
-      - save_cache:
-          name: Save golangci-lint cache
-          key: golangci-lint-{{ arch }}-{{ checksum "/tmp/.golangci.version" }}-{{ .Environment.CACHE_VERSION }}
-          paths:
-            - /go/bin/golangci-lint
-      - checkout
-      - run:
-          name: Run golangci-lint
-          command: |
-            BASEREV=$(git merge-base HEAD origin/master)
-            echo "Base revision: $BASEREV"
-            golangci-lint run --out-format=tab --new-from-rev "$BASEREV" ./...
-
-
-  test:
-    docker:
-      - image: circleci/golang:1.14
-    environment:
-      GOPATH: /home/circleci/.go_workspace
-    working_directory: /home/circleci/.go_workspace/src/github.com/loadimpact/k6
-    steps:
-      - checkout
-      - run:
-          name: Run tests and code coverage
-          command: |
-            go version
-            export GOMAXPROCS=2
-            export PATH=$GOPATH/bin:$PATH
-            echo "mode: set" > coverage.txt
-            for pkg in $(go list ./... | grep -v vendor); do
-                list=$(go list -test -f  '{{ join .Deps  "\n"}}' $pkg | grep github.com/loadimpact/k6 | grep -v vendor || true)
-                if [ -n "$list" ]; then
-                    list=$(echo "$list" | cut -f1 -d ' ' | sort -u | paste -sd,)
-                fi
-
-                go test -race -timeout 800s  --coverpkg="$list" -coverprofile=$(echo $pkg | tr / -).coverage $pkg
-            done
-            grep -h -v "^mode:" *.coverage >> coverage.txt
-            rm -f *.coverage
-            bash <(curl --fail -s https://codecov.io/bash)
-
-  #TODO: when we officially move to Go 1.15, re-enable test-prev-golang with 1.14
-
-  test-next-golang:
-    docker:
-      - image: circleci/golang:1.15
-    working_directory: /home/circleci/.go_workspace/src/github.com/loadimpact/k6
-    steps:
-      - checkout
-      - run:
-          name: Run tests with next Go version
-          command: |
-            go version
-            export GOMAXPROCS=2
-            export PATH=$GOPATH/bin:$PATH
-            go test -p 2 -race -timeout 800s ./...
-
-  build-docker-images:
-    docker:
-      - image: circleci/golang:1.14
-    working_directory: /home/circleci/.go_workspace/src/github.com/loadimpact/k6
-    steps:
-      - checkout
-      - setup_remote_docker
-      - run:
-          name: Setup repo and docker
-          command: |
-            docker info
-            echo "{\"https://index.docker.io/v1/\":{\"auth\":\"$DOCKER_AUTH\",\"email\":\"$DOCKER_EMAIL\"}}" >~/.dockercfg
-      - run:
-          name: Build application Docker image
-          command: |
-            docker build -t loadimpact/k6 .
-      - run:
-          name: Run tests on generated Docker image
-          command: |
-            docker run loadimpact/k6 --help
-            docker run loadimpact/k6 help
-            docker run loadimpact/k6 run --help
-            docker run loadimpact/k6 inspect --help
-            docker run loadimpact/k6 status --help
-            docker run loadimpact/k6 stats --help
-            docker run loadimpact/k6 scale --help
-            docker run loadimpact/k6 pause --help
-            docker run loadimpact/k6 resume --help
-      - deploy:
-          name: Push application Docker image
-          command: |
-            if [ "${CIRCLE_BRANCH}" == "master" ]; then
-              docker tag loadimpact/k6 loadimpact/k6:master
-              docker push loadimpact/k6:master
-            elif [[ "${CIRCLE_TAG}" =~ ^v[0-9]+(\.[0-9]+)*$ ]]; then
-              docker tag loadimpact/k6 loadimpact/k6:${CIRCLE_TAG:1}
-              docker push loadimpact/k6:latest
-              docker push loadimpact/k6:${CIRCLE_TAG:1}
-            fi
-
-  build-linux-packages:
-    docker:
-      - image: circleci/golang:1.14
-    environment:
-      GOPATH: /home/circleci/.go_workspace
-    working_directory: /home/circleci/.go_workspace/src/github.com/loadimpact/k6
-    steps:
-      - checkout
-      - run:
-          name: Build linux packages
-          command: |
-            export PATH=$GOPATH/bin:$PATH
-
-            go get github.com/Masterminds/glide
-            go get -d github.com/mh-cbon/go-bin-deb \
-              && cd $GOPATH/src/github.com/mh-cbon/go-bin-deb \
-              && glide install \
-              && go install
-
-            go get -d github.com/mh-cbon/go-bin-rpm \
-              && cd $GOPATH/src/github.com/mh-cbon/go-bin-rpm \
-              && glide install \
-              && go install
-
-            sudo apt-get update -y
-            sudo apt-get install -y fakeroot rpm
-
-            cd $GOPATH/src/github.com/loadimpact/k6
-
-            echo "Building k6..."
-            CGO_ENABLED=0 GOARCH=amd64 go build -a -trimpath -ldflags "-s -w -X github.com/loadimpact/k6/lib/consts.VersionDetails=$(date -u +"%FT%T%z")/$(git describe --always --long --dirty)" -o /tmp/k6
-            echo "Done!"
-
-            VERSION=${CIRCLE_TAG:1} ./packaging/gen-packages.sh
-
-      - deploy:
-          name: Publish packages in Bintray
-          command: |
-            export VERSION=${CIRCLE_TAG:1}
-            # Publishing deb
-            curl --fail -H "X-GPG-PASSPHRASE: $GPG_PASSPHRASE" -T dist/k6-v$VERSION-amd64.deb "https://$BINTRAY_USER:$BINTRAY_KEY@api.bintray.com/content/loadimpact/deb/k6/$VERSION/k6-v$VERSION-amd64.deb;deb_distribution=stable;deb_component=main;deb_architecture=amd64;publish=1;override=1"
-            # Publishing rpm
-            curl --fail -H "X-GPG-PASSPHRASE: $GPG_PASSPHRASE" -T dist/k6-v$VERSION-amd64.rpm "https://$BINTRAY_USER:$BINTRAY_KEY@api.bintray.com/content/loadimpact/rpm/k6/$VERSION/k6-v$VERSION-amd64.rpm?publish=1&override=1"
-
-
-workflows:
-  version: 2
-  test_and_build:
-    jobs:
-      - deps:
-          filters:
-            tags:
-              only: /.*/
-      - lint
-      - test:
-          filters:
-            tags:
-              only: /.*/
-      - test-next-golang:
-          filters:
-            tags:
-              only: /.*/
-      - build-docker-images:
-          requires:
-            - deps
-            - lint
-            - test
-          filters:
-            tags:
-              only: /.*/
-      - build-linux-packages:
-          requires:
-            - deps
-            - lint
-            - test
-          filters:
-            branches:
-              ignore: /.*/
-            tags:
-              only: /^v.*/
+      # specify any bash command here prefixed with `run: `
+      - run: go get -v -t -d ./...
+      - run: go test -v ./...
