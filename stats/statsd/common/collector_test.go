@@ -27,12 +27,35 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/lib/testutils"
+	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 )
 
+type config struct {
+	addr, namespace null.String
+	bufferSize      null.Int
+	pushInterval    types.NullDuration
+}
+
+func (c config) GetAddr() null.String {
+	return c.addr
+}
+
+func (c config) GetBufferSize() null.Int {
+	return c.bufferSize
+}
+
+func (c config) GetNamespace() null.String {
+	return c.namespace
+}
+
+func (c config) GetPushInterval() types.NullDuration {
+	return c.pushInterval
+}
+
 func TestInitWithoutAddressErrors(t *testing.T) {
 	c := &Collector{
-		Config: Config{},
+		Config: config{},
 		Type:   "testtype",
 		Logger: testutils.NewLogger(t),
 	}
@@ -42,8 +65,8 @@ func TestInitWithoutAddressErrors(t *testing.T) {
 
 func TestInitWithBogusAddressErrors(t *testing.T) {
 	c := &Collector{
-		Config: Config{
-			Addr: null.StringFrom("localhost:90000"),
+		Config: config{
+			addr: null.StringFrom("localhost:90000"),
 		},
 		Type:   "testtype",
 		Logger: testutils.NewLogger(t),
@@ -55,8 +78,8 @@ func TestInitWithBogusAddressErrors(t *testing.T) {
 func TestLinkReturnAddress(t *testing.T) {
 	bogusValue := "bogus value"
 	c := &Collector{
-		Config: Config{
-			Addr: null.StringFrom(bogusValue),
+		Config: config{
+			addr: null.StringFrom(bogusValue),
 		},
 	}
 	require.Equal(t, bogusValue, c.Link())
