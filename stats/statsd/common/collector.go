@@ -28,10 +28,20 @@ import (
 
 	"github.com/DataDog/datadog-go/statsd"
 	"github.com/sirupsen/logrus"
+	"gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 )
+
+// Config is the common configuration interface for StatsD/Datadog.
+type Config interface {
+	GetAddr() null.String
+	GetBufferSize() null.Int
+	GetNamespace() null.String
+	GetPushInterval() types.NullDuration
+}
 
 var _ lib.Collector = &Collector{}
 
@@ -53,7 +63,7 @@ type Collector struct {
 // Init sets up the collector
 func (c *Collector) Init() (err error) {
 	c.Logger = c.Logger.WithField("type", c.Type)
-	if address := c.Config.Addr.String; address == "" {
+	if address := c.Config.GetAddr().String; address == "" {
 		err = fmt.Errorf(
 			"connection string is invalid. Received: \"%+s\"",
 			address,
@@ -63,14 +73,14 @@ func (c *Collector) Init() (err error) {
 		return err
 	}
 
-	c.client, err = statsd.NewBuffered(c.Config.Addr.String, int(c.Config.BufferSize.Int64))
+	c.client, err = statsd.NewBuffered(c.Config.GetAddr().String, int(c.Config.GetBufferSize().Int64))
 
 	if err != nil {
 		c.Logger.Errorf("Couldn't make buffered client, %s", err)
 		return err
 	}
 
-	if namespace := c.Config.Namespace.String; namespace != "" {
+	if namespace := c.Config.GetNamespace().String; namespace != "" {
 		c.client.Namespace = namespace
 	}
 
@@ -79,13 +89,13 @@ func (c *Collector) Init() (err error) {
 
 // Link returns the address of the client
 func (c *Collector) Link() string {
-	return c.Config.Addr.String
+	return c.Config.GetAddr().String
 }
 
 // Run the collector
 func (c *Collector) Run(ctx context.Context) {
 	c.Logger.Debugf("%s: Running!", c.Type)
-	ticker := time.NewTicker(time.Duration(c.Config.PushInterval.Duration))
+	ticker := time.NewTicker(time.Duration(c.Config.GetPushInterval().Duration))
 	c.startTime = time.Now()
 
 	for {

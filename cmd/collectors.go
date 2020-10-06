@@ -42,7 +42,6 @@ import (
 	jsonc "github.com/loadimpact/k6/stats/json"
 	"github.com/loadimpact/k6/stats/kafka"
 	"github.com/loadimpact/k6/stats/statsd"
-	"github.com/loadimpact/k6/stats/statsd/common"
 )
 
 const (
@@ -112,7 +111,7 @@ func getCollector(
 
 		return kafka.New(logger, config)
 	case collectorStatsD:
-		config := common.NewConfig().Apply(conf.Collectors.StatsD)
+		config := statsd.NewConfig().Apply(conf.Collectors.StatsD)
 		if err := envconfig.Process("k6_statsd", &config); err != nil {
 			return nil, err
 		}

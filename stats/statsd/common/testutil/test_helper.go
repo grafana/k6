@@ -36,9 +36,16 @@ import (
 	"github.com/loadimpact/k6/stats/statsd/common"
 )
 
-// BaseTest is a helper function to test statsd/datadog collector throughtly
+type getCollectorFn func(
+	logger logrus.FieldLogger,
+	addr, namespace null.String,
+	bufferSize null.Int,
+	pushInterval types.NullDuration,
+) (*common.Collector, error)
+
+// BaseTest is a helper function to test statsd/datadog collector
 func BaseTest(t *testing.T,
-	getCollector func(logrus.FieldLogger, common.Config) (*common.Collector, error),
+	getCollector getCollectorFn,
 	checkResult func(t *testing.T, samples []stats.SampleContainer, expectedOutput, output string),
 ) {
 	t.Helper()
@@ -66,14 +73,15 @@ func BaseTest(t *testing.T,
 			}
 		}
 	}()
-	baseConfig := common.NewConfig().Apply(common.Config{
-		Addr:         null.StringFrom(listener.LocalAddr().String()),
-		Namespace:    null.StringFrom(testNamespace),
-		BufferSize:   null.IntFrom(5),
-		PushInterval: types.NullDurationFrom(time.Millisecond * 10),
-	})
 
-	collector, err := getCollector(testutils.NewLogger(t), baseConfig)
+	pushInterval := types.NullDurationFrom(time.Millisecond * 10)
+	collector, err := getCollector(
+		testutils.NewLogger(t),
+		null.StringFrom(listener.LocalAddr().String()),
+		null.StringFrom(testNamespace),
+		null.IntFrom(5),
+		pushInterval,
+	)
 	require.NoError(t, err)
 	require.NoError(t, collector.Init())
 	ctx, cancel := context.WithCancel(context.Background())
@@ -149,7 +157,7 @@ func BaseTest(t *testing.T,
 	}
 	for _, test := range testMatrix {
 		collector.Collect(test.input)
-		time.Sleep((time.Duration)(baseConfig.PushInterval.Duration))
+		time.Sleep((time.Duration)(pushInterval.Duration))
 		output := <-ch
 		checkResult(t, test.input, test.output, output)
 	}
