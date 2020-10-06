@@ -70,7 +70,7 @@ func (c *Compiler) Transform(src, filename string) (code string, srcmap *SourceM
 	return b.Transform(c.logger, src, filename)
 }
 
-// Compile the program in the given CompatibilityMode, optionally running pre and post code.
+// Compile the program in the given CompatibilityMode, wrapping it between pre and post code
 func (c *Compiler) Compile(src, filename, pre, post string,
 	strict bool, compatMode lib.CompatibilityMode) (*goja.Program, string, error) {
 	code := pre + src + post
@@ -81,7 +81,8 @@ func (c *Compiler) Compile(src, filename, pre, post string,
 			if err != nil {
 				return nil, code, err
 			}
-			return c.Compile(code, filename, pre, post, strict, compatMode)
+			// the compatibility mode "decreases" here as we shouldn't transform twice
+			return c.Compile(code, filename, pre, post, strict, lib.CompatibilityModeBase)
 		}
 		return nil, code, err
 	}
