@@ -382,6 +382,9 @@ type Options struct {
 
 	// Redirect console logging to a file
 	ConsoleOutput null.String `json:"-" envconfig:"K6_CONSOLE_OUTPUT"`
+
+	// Specify client IP range from which k6 select by VU_ID % IP_NUM
+	ClientIpRange null.String `json:"clientIpRange,omitemty" envconf:"K6_CLIENT_IP_RANGE"`
 }
 
 // Returns the result of overwriting any fields with any that are set on the argument.
@@ -532,6 +535,9 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.ConsoleOutput.Valid {
 		o.ConsoleOutput = opts.ConsoleOutput
+	}
+	if opts.ClientIpRange.Valid {
+		o.ClientIpRange = opts.ClientIpRange
 	}
 
 	return o
