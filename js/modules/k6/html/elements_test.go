@@ -25,8 +25,9 @@ import (
 	"testing"
 
 	"github.com/dop251/goja"
-	"github.com/loadimpact/k6/js/common"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/loadimpact/k6/js/common"
 )
 
 const testHTMLElems = `
@@ -43,7 +44,7 @@ const testHTMLElems = `
 	<a id="blank_anchor">6</a>
 	<area href="web.address.com"></area>
 	<base href="/rel/path" target="_self"></base>
-	
+
 	<form id="form1" action="action_url" enctype="text/plain" target="_self">
 		<label for="form_btn" id="form_btn_label"></label>
 		<button id="form_btn" name="form_btn" accesskey="b" autofocus disabled></button>
@@ -92,7 +93,7 @@ func TestElements(t *testing.T) {
 	rt.Set("src", testHTMLElems)
 	rt.Set("html", common.Bind(rt, &HTML{}, &ctx))
 
-	_, err := common.RunString(rt, `let doc = html.parseHTML(src)`)
+	_, err := common.RunString(rt, `var doc = html.parseHTML(src)`)
 
 	assert.NoError(t, err)
 	assert.IsType(t, Selection{}, rt.Get("doc").Export())

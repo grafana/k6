@@ -23,8 +23,9 @@ package cloud
 import (
 	"time"
 
-	"github.com/loadimpact/k6/lib/types"
 	"gopkg.in/guregu/null.v3"
+
+	"github.com/loadimpact/k6/lib/types"
 )
 
 // Config holds all the necessary data and options for sending metrics to the Load Impact cloud.
@@ -36,14 +37,19 @@ type Config struct {
 	ProjectID       null.Int    `json:"projectID" envconfig:"K6_CLOUD_PROJECT_ID"`
 	Name            null.String `json:"name" envconfig:"K6_CLOUD_NAME"`
 
-	Host       null.String `json:"host" envconfig:"K6_CLOUD_HOST"`
-	WebAppURL  null.String `json:"webAppURL" envconfig:"K6_CLOUD_WEB_APP_URL"`
-	NoCompress null.Bool   `json:"noCompress" envconfig:"K6_CLOUD_NO_COMPRESS"`
+	Host        null.String `json:"host" envconfig:"K6_CLOUD_HOST"`
+	LogsTailURL null.String `json:"-" envconfig:"K6_CLOUD_LOGS_TAIL_URL"`
+	PushRefID   null.String `json:"pushRefID" envconfig:"K6_CLOUD_PUSH_REF_ID"`
+	WebAppURL   null.String `json:"webAppURL" envconfig:"K6_CLOUD_WEB_APP_URL"`
+	NoCompress  null.Bool   `json:"noCompress" envconfig:"K6_CLOUD_NO_COMPRESS"`
 
 	MaxMetricSamplesPerPackage null.Int `json:"maxMetricSamplesPerPackage" envconfig:"K6_CLOUD_MAX_METRIC_SAMPLES_PER_PACKAGE"`
 
 	// The time interval between periodic API calls for sending samples to the cloud ingest service.
 	MetricPushInterval types.NullDuration `json:"metricPushInterval" envconfig:"K6_CLOUD_METRIC_PUSH_INTERVAL"`
+
+	// This is how many concurrent pushes will be done at the same time to the cloud
+	MetricPushConcurrency null.Int `json:"metricPushConcurrency" envconfig:"K6_CLOUD_METRIC_PUSH_CONCURRENCY"`
 
 	// Aggregation docs:
 	//
@@ -151,8 +157,10 @@ type Config struct {
 func NewConfig() Config {
 	return Config{
 		Host:                       null.NewString("https://ingest.k6.io", false),
+		LogsTailURL:                null.NewString("wss://cloudlogs.k6.io/api/v1/tail", false),
 		WebAppURL:                  null.NewString("https://app.k6.io", false),
 		MetricPushInterval:         types.NewNullDuration(1*time.Second, false),
+		MetricPushConcurrency:      null.NewInt(1, false),
 		MaxMetricSamplesPerPackage: null.NewInt(100000, false),
 		// Aggregation is disabled by default, since AggregationPeriod has no default value
 		// but if it's enabled manually or from the cloud service, those are the default values it will use:
@@ -183,6 +191,9 @@ func (c Config) Apply(cfg Config) Config {
 	}
 	if cfg.Host.Valid && cfg.Host.String != "" {
 		c.Host = cfg.Host
+	}
+	if cfg.LogsTailURL.Valid && cfg.LogsTailURL.String != "" {
+		c.LogsTailURL = cfg.LogsTailURL
 	}
 	if cfg.WebAppURL.Valid {
 		c.WebAppURL = cfg.WebAppURL

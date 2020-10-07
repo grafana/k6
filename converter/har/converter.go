@@ -30,9 +30,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/loadimpact/k6/lib"
 	"github.com/pkg/errors"
 	"github.com/tidwall/pretty"
+
+	"github.com/loadimpact/k6/lib"
 )
 
 // fprint panics when where's an error writing to the supplied io.Writer

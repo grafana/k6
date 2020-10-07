@@ -3,8 +3,6 @@ jobs:
   deps:
     docker:
       - image: circleci/golang:1.14
-    environment:
-      GOPATH: /home/circleci/.go_workspace
     working_directory: /home/circleci/.go_workspace/src/github.com/loadimpact/k6
     steps:
       - checkout
@@ -12,21 +10,15 @@ jobs:
           name: Check dependencies
           command: |
             go version
-            export PATH="$GOPATH/bin:$PATH"
-            mkdir -p "$GOPATH/bin"
-            curl --fail https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
-            dep version
-            dep status
-            case $(dep ensure 2>&1 | head -n 1) in Warning*) false ;; esac
-            dep check
-
+            test -z "$(go mod vendor && git status --porcelain)"
+            go mod verify
 
   lint:
     docker:
       - image: circleci/golang:1.14
     environment:
-      GOPATH: /home/circleci/.go_workspace
-      GOLANGCI_VERSION: v1.25.0
+      GOLANGCI_VERSION: v1.30.0
+      GO111MODULE: 'on'
     working_directory: /home/circleci/.go_workspace/src/github.com/loadimpact/k6
     steps:
       # Workaround for custom env vars not available in cache keys
@@ -36,24 +28,24 @@ jobs:
           name: Restore golangci-lint cache
           key: golangci-lint-{{ arch }}-{{ checksum "/tmp/.golangci.version" }}-{{ .Environment.CACHE_VERSION }}
           paths:
-            - /home/circleci/.go_workspace/bin/golangci-lint
+            - /go/bin/golangci-lint
       - run:
           name: Install golangci-lint
           command: |
-            export PATH="$GOPATH/bin:$PATH"
             command -v golangci-lint && exit
-            GO111MODULE=on go get github.com/golangci/golangci-lint/cmd/golangci-lint@$GOLANGCI_VERSION
+            go get github.com/golangci/golangci-lint/cmd/golangci-lint@$GOLANGCI_VERSION
       - save_cache:
           name: Save golangci-lint cache
           key: golangci-lint-{{ arch }}-{{ checksum "/tmp/.golangci.version" }}-{{ .Environment.CACHE_VERSION }}
           paths:
-            - /home/circleci/.go_workspace/bin/golangci-lint
+            - /go/bin/golangci-lint
       - checkout
       - run:
           name: Run golangci-lint
           command: |
-            export PATH="$GOPATH/bin:$PATH"
-            golangci-lint run --out-format=tab --new-from-rev origin/master ./...
+            BASEREV=$(git merge-base HEAD origin/master)
+            echo "Base revision: $BASEREV"
+            golangci-lint run --out-format=tab --new-from-rev "$BASEREV" ./...
 
 
   test:
@@ -83,17 +75,16 @@ jobs:
             rm -f *.coverage
             bash <(curl --fail -s https://codecov.io/bash)
 
+  #TODO: when we officially move to Go 1.15, re-enable test-prev-golang with 1.14
 
-  test-prev-golang:
+  test-next-golang:
     docker:
-      - image: circleci/golang:1.13
-    environment:
-      GOPATH: /home/circleci/.go_workspace
+      - image: circleci/golang:1.15
     working_directory: /home/circleci/.go_workspace/src/github.com/loadimpact/k6
     steps:
       - checkout
       - run:
-          name: Run tests with previous Go version
+          name: Run tests with next Go version
           command: |
             go version
             export GOMAXPROCS=2
@@ -103,17 +94,13 @@ jobs:
   build-docker-images:
     docker:
       - image: circleci/golang:1.14
-    environment:
-      GOPATH: /home/circleci/.go_workspace
     working_directory: /home/circleci/.go_workspace/src/github.com/loadimpact/k6
     steps:
       - checkout
-      - setup_remote_docker:
-          version: 17.11.0-ce
+      - setup_remote_docker
       - run:
           name: Setup repo and docker
           command: |
-            git submodule update --init
             docker info
             echo "{\"https://index.docker.io/v1/\":{\"auth\":\"$DOCKER_AUTH\",\"email\":\"$DOCKER_EMAIL\"}}" >~/.dockercfg
       - run:
@@ -202,7 +189,7 @@ workflows:
           filters:
             tags:
               only: /.*/
-      - test-prev-golang:
+      - test-next-golang:
           filters:
             tags:
               only: /.*/

@@ -43,7 +43,7 @@ type SourceData struct {
 	URL  *url.URL
 }
 
-type loaderFunc func(path string, parts []string) (string, error)
+type loaderFunc func(logger logrus.FieldLogger, path string, parts []string) (string, error)
 
 //nolint: gochecknoglobals
 var (
@@ -167,12 +167,12 @@ func Dir(old *url.URL) *url.URL {
 // for a given scheme which is they key of the map. If the scheme is https then a request will
 // be made if the files is not found in the map and written to the map.
 func Load(
-	filesystems map[string]afero.Fs, moduleSpecifier *url.URL, originalModuleSpecifier string,
+	logger logrus.FieldLogger, filesystems map[string]afero.Fs, moduleSpecifier *url.URL, originalModuleSpecifier string,
 ) (*SourceData, error) {
-	logrus.WithFields(
+	logger.WithFields(
 		logrus.Fields{
-			"moduleSpecifier":          moduleSpecifier,
-			"original moduleSpecifier": originalModuleSpecifier,
+			"moduleSpecifier":         moduleSpecifier,
+			"originalModuleSpecifier": originalModuleSpecifier,
 		}).Debug("Loading...")
 
 	var pathOnFs string
@@ -207,12 +207,12 @@ func Load(
 
 		switch {
 		case moduleSpecifier.Opaque != "": // This is loader
-			finalModuleSpecifierURL, err = resolveUsingLoaders(moduleSpecifier.Opaque)
+			finalModuleSpecifierURL, err = resolveUsingLoaders(logger, moduleSpecifier.Opaque)
 			if err != nil {
 				return nil, err
 			}
 		case moduleSpecifier.Scheme == "":
-			logrus.Warningf(`The moduleSpecifier "%s" has no scheme but we will try to resolve it as remote module. `+
+			logger.Warningf(`The moduleSpecifier "%s" has no scheme but we will try to resolve it as remote module. `+
 				`This will be deprecated in the future and all remote modules will `+
 				`need to explicitly use "https" as scheme.`, originalModuleSpecifier)
 			*finalModuleSpecifierURL = *moduleSpecifier
@@ -221,7 +221,7 @@ func Load(
 			finalModuleSpecifierURL = moduleSpecifier
 		}
 		var result *SourceData
-		result, err = loadRemoteURL(finalModuleSpecifierURL)
+		result, err = loadRemoteURL(logger, finalModuleSpecifierURL)
 		if err == nil {
 			result.URL = moduleSpecifier
 			// TODO maybe make an afero.Fs which makes request directly and than use CacheOnReadFs
@@ -241,10 +241,10 @@ func Load(
 	return nil, errors.Errorf(fileSchemeCouldntBeLoadedMsg, originalModuleSpecifier)
 }
 
-func resolveUsingLoaders(name string) (*url.URL, error) {
+func resolveUsingLoaders(logger logrus.FieldLogger, name string) (*url.URL, error) {
 	_, loader, loaderArgs := pickLoader(name)
 	if loader != nil {
-		urlString, err := loader(name, loaderArgs)
+		urlString, err := loader(logger, name, loaderArgs)
 		if err != nil {
 			return nil, err
 		}
@@ -254,19 +254,19 @@ func resolveUsingLoaders(name string) (*url.URL, error) {
 	return nil, errNoLoaderMatched
 }
 
-func loadRemoteURL(u *url.URL) (*SourceData, error) {
+func loadRemoteURL(logger logrus.FieldLogger, u *url.URL) (*SourceData, error) {
 	var oldQuery = u.RawQuery
 	if u.RawQuery != "" {
 		u.RawQuery += "&"
 	}
 	u.RawQuery += "_k6=1"
 
-	data, err := fetch(u.String())
+	data, err := fetch(logger, u.String())
 
 	u.RawQuery = oldQuery
 	// If this fails, try to fetch without ?_k6=1 - some sources act weird around unknown GET args.
 	if err != nil {
-		data, err = fetch(u.String())
+		data, err = fetch(logger, u.String())
 		if err != nil {
 			return nil, err
 		}
@@ -289,8 +289,8 @@ func pickLoader(path string) (string, loaderFunc, []string) {
 	return "", nil, nil
 }
 
-func fetch(u string) ([]byte, error) {
-	logrus.WithField("url", u).Debug("Fetching source...")
+func fetch(logger logrus.FieldLogger, u string) ([]byte, error) {
+	logger.WithField("url", u).Debug("Fetching source...")
 	startTime := time.Now()
 	res, err := http.Get(u)
 	if err != nil {
@@ -312,7 +312,7 @@ func fetch(u string) ([]byte, error) {
 		return nil, err
 	}
 
-	logrus.WithFields(logrus.Fields{
+	logger.WithFields(logrus.Fields{
 		"url": u,
 		"t":   time.Since(startTime),
 		"len": len(data),

@@ -2,7 +2,8 @@ package goja
 
 import (
 	"reflect"
-	"strconv"
+
+	"github.com/dop251/goja/unistring"
 )
 
 type objectGoMapSimple struct {
@@ -17,10 +18,6 @@ func (o *objectGoMapSimple) init() {
 	o.extensible = true
 }
 
-func (o *objectGoMapSimple) _get(n Value) Value {
-	return o._getStr(n.String())
-}
-
 func (o *objectGoMapSimple) _getStr(name string) Value {
 	v, exists := o.data[name]
 	if !exists {
@@ -29,37 +26,51 @@ func (o *objectGoMapSimple) _getStr(name string) Value {
 	return o.val.runtime.ToValue(v)
 }
 
-func (o *objectGoMapSimple) get(n Value) Value {
-	return o.getStr(n.String())
-}
-
-func (o *objectGoMapSimple) getProp(n Value) Value {
-	return o.getPropStr(n.String())
-}
-
-func (o *objectGoMapSimple) getPropStr(name string) Value {
-	if v := o._getStr(name); v != nil {
+func (o *objectGoMapSimple) getStr(name unistring.String, receiver Value) Value {
+	if v := o._getStr(name.String()); v != nil {
 		return v
 	}
-	return o.baseObject.getPropStr(name)
+	return o.baseObject.getStr(name, receiver)
 }
 
-func (o *objectGoMapSimple) getStr(name string) Value {
-	if v := o._getStr(name); v != nil {
+func (o *objectGoMapSimple) getOwnPropStr(name unistring.String) Value {
+	if v := o._getStr(name.String()); v != nil {
 		return v
 	}
-	return o.baseObject._getStr(name)
+	return nil
 }
 
-func (o *objectGoMapSimple) getOwnProp(name string) Value {
-	if v := o._getStr(name); v != nil {
-		return v
+func (o *objectGoMapSimple) setOwnStr(name unistring.String, val Value, throw bool) bool {
+	n := name.String()
+	if _, exists := o.data[n]; exists {
+		o.data[n] = val.Export()
+		return true
 	}
-	return o.baseObject.getOwnProp(name)
+	if proto := o.prototype; proto != nil {
+		// we know it's foreign because prototype loops are not allowed
+		if res, ok := proto.self.setForeignStr(name, val, o.val, throw); ok {
+			return res
+		}
+	}
+	// new property
+	if !o.extensible {
+		o.val.runtime.typeErrorResult(throw, "Cannot add property %s, object is not extensible", name)
+		return false
+	} else {
+		o.data[n] = val.Export()
+	}
+	return true
 }
 
-func (o *objectGoMapSimple) put(n Value, val Value, throw bool) {
-	o.putStr(n.String(), val, throw)
+func trueValIfPresent(present bool) Value {
+	if present {
+		return valueTrue
+	}
+	return nil
+}
+
+func (o *objectGoMapSimple) setForeignStr(name unistring.String, val, receiver Value, throw bool) (bool, bool) {
+	return o._setForeignStr(name, trueValIfPresent(o._hasStr(name.String())), val, receiver, throw)
 }
 
 func (o *objectGoMapSimple) _hasStr(name string) bool {
@@ -67,52 +78,23 @@ func (o *objectGoMapSimple) _hasStr(name string) bool {
 	return exists
 }
 
-func (o *objectGoMapSimple) _has(n Value) bool {
-	return o._hasStr(n.String())
+func (o *objectGoMapSimple) hasOwnPropertyStr(name unistring.String) bool {
+	return o._hasStr(name.String())
 }
 
-func (o *objectGoMapSimple) putStr(name string, val Value, throw bool) {
-	if o.extensible || o._hasStr(name) {
-		o.data[name] = val.Export()
-	} else {
-		o.val.runtime.typeErrorResult(throw, "Host object is not extensible")
-	}
-}
-
-func (o *objectGoMapSimple) hasProperty(n Value) bool {
-	if o._has(n) {
-		return true
-	}
-	return o.baseObject.hasProperty(n)
-}
-
-func (o *objectGoMapSimple) hasPropertyStr(name string) bool {
-	if o._hasStr(name) {
-		return true
-	}
-	return o.baseObject.hasOwnPropertyStr(name)
-}
-
-func (o *objectGoMapSimple) hasOwnProperty(n Value) bool {
-	return o._has(n)
-}
-
-func (o *objectGoMapSimple) hasOwnPropertyStr(name string) bool {
-	return o._hasStr(name)
-}
-
-func (o *objectGoMapSimple) _putProp(name string, value Value, writable, enumerable, configurable bool) Value {
-	o.putStr(name, value, false)
-	return value
-}
-
-func (o *objectGoMapSimple) defineOwnProperty(name Value, descr propertyDescr, throw bool) bool {
-	if descr.Getter != nil || descr.Setter != nil {
-		o.val.runtime.typeErrorResult(throw, "Host objects do not support accessor properties")
+func (o *objectGoMapSimple) defineOwnPropertyStr(name unistring.String, descr PropertyDescriptor, throw bool) bool {
+	if !o.val.runtime.checkHostObjectPropertyDescr(name, descr, throw) {
 		return false
 	}
-	o.put(name, descr.Value, throw)
-	return true
+
+	n := name.String()
+	if o.extensible || o._hasStr(n) {
+		o.data[n] = descr.Value.Export()
+		return true
+	}
+
+	o.val.runtime.typeErrorResult(throw, "Cannot define property %s, object is not extensible", n)
+	return false
 }
 
 /*
@@ -133,19 +115,14 @@ func (o *objectGoMapSimple) assertCallable() (call func(FunctionCall) Value, ok 
 }
 */
 
-func (o *objectGoMapSimple) deleteStr(name string, throw bool) bool {
-	delete(o.data, name)
+func (o *objectGoMapSimple) deleteStr(name unistring.String, _ bool) bool {
+	delete(o.data, name.String())
 	return true
-}
-
-func (o *objectGoMapSimple) delete(name Value, throw bool) bool {
-	return o.deleteStr(name.String(), throw)
 }
 
 type gomapPropIter struct {
 	o         *objectGoMapSimple
 	propNames []string
-	recursive bool
 	idx       int
 }
 
@@ -154,40 +131,36 @@ func (i *gomapPropIter) next() (propIterItem, iterNextFunc) {
 		name := i.propNames[i.idx]
 		i.idx++
 		if _, exists := i.o.data[name]; exists {
-			return propIterItem{name: name, enumerable: _ENUM_TRUE}, i.next
+			return propIterItem{name: unistring.NewFromString(name), enumerable: _ENUM_TRUE}, i.next
 		}
-	}
-
-	if i.recursive {
-		return i.o.prototype.self._enumerate(true)()
 	}
 
 	return propIterItem{}, nil
 }
 
-func (o *objectGoMapSimple) enumerate(all, recursive bool) iterNextFunc {
-	return (&propFilterIter{
-		wrapped: o._enumerate(recursive),
-		all:     all,
-		seen:    make(map[string]bool),
-	}).next
-}
-
-func (o *objectGoMapSimple) _enumerate(recursive bool) iterNextFunc {
+func (o *objectGoMapSimple) enumerateUnfiltered() iterNextFunc {
 	propNames := make([]string, len(o.data))
 	i := 0
-	for key, _ := range o.data {
+	for key := range o.data {
 		propNames[i] = key
 		i++
 	}
-	return (&gomapPropIter{
+
+	return o.recursiveIter((&gomapPropIter{
 		o:         o,
 		propNames: propNames,
-		recursive: recursive,
-	}).next
+	}).next)
 }
 
-func (o *objectGoMapSimple) export() interface{} {
+func (o *objectGoMapSimple) ownKeys(_ bool, accum []Value) []Value {
+	// all own keys are enumerable
+	for key := range o.data {
+		accum = append(accum, newStringValue(key))
+	}
+	return accum
+}
+
+func (o *objectGoMapSimple) export(*objectExportCtx) interface{} {
 	return o.data
 }
 
@@ -200,22 +173,4 @@ func (o *objectGoMapSimple) equal(other objectImpl) bool {
 		return o == other
 	}
 	return false
-}
-
-func (o *objectGoMapSimple) sortLen() int64 {
-	return int64(len(o.data))
-}
-
-func (o *objectGoMapSimple) sortGet(i int64) Value {
-	return o.getStr(strconv.FormatInt(i, 10))
-}
-
-func (o *objectGoMapSimple) swap(i, j int64) {
-	ii := strconv.FormatInt(i, 10)
-	jj := strconv.FormatInt(j, 10)
-	x := o.getStr(ii)
-	y := o.getStr(jj)
-
-	o.putStr(ii, y, false)
-	o.putStr(jj, x, false)
 }

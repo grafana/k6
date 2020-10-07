@@ -41,11 +41,12 @@ type Collector struct {
 	Config   Config
 
 	Samples []stats.Sample
+	logger  logrus.FieldLogger
 	lock    sync.Mutex
 }
 
 // New creates an instance of the collector
-func New(conf Config) (*Collector, error) {
+func New(logger logrus.FieldLogger, conf Config) (*Collector, error) {
 	producer, err := sarama.NewSyncProducer(conf.Brokers, nil)
 	if err != nil {
 		return nil, err
@@ -54,6 +55,7 @@ func New(conf Config) (*Collector, error) {
 	return &Collector{
 		Producer: producer,
 		Config:   conf,
+		logger:   logger,
 	}, nil
 }
 
@@ -62,7 +64,7 @@ func (c *Collector) Init() error { return nil }
 
 // Run just blocks until the context is done
 func (c *Collector) Run(ctx context.Context) {
-	logrus.Debug("Kafka: Running!")
+	c.logger.Debug("Kafka: Running!")
 	ticker := time.NewTicker(time.Duration(c.Config.PushInterval.Duration))
 	for {
 		select {
@@ -73,7 +75,7 @@ func (c *Collector) Run(ctx context.Context) {
 
 			err := c.Producer.Close()
 			if err != nil {
-				logrus.WithError(err).Error("Kafka: Failed to close producer.")
+				c.logger.WithError(err).Error("Kafka: Failed to close producer.")
 			}
 			return
 		}
@@ -112,7 +114,7 @@ func (c *Collector) formatSamples(samples stats.Samples) ([]string, error) {
 
 	switch c.Config.Format.String {
 	case "influxdb":
-		i, err := influxdb.New(c.Config.InfluxDBConfig)
+		i, err := influxdb.New(c.logger, c.Config.InfluxDBConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -147,20 +149,20 @@ func (c *Collector) pushMetrics() {
 	// Format the samples
 	formattedSamples, err := c.formatSamples(samples)
 	if err != nil {
-		logrus.WithError(err).Error("Kafka: Couldn't format the samples")
+		c.logger.WithError(err).Error("Kafka: Couldn't format the samples")
 		return
 	}
 
 	// Send the samples
-	logrus.Debug("Kafka: Delivering...")
+	c.logger.Debug("Kafka: Delivering...")
 
 	for _, sample := range formattedSamples {
 		msg := &sarama.ProducerMessage{Topic: c.Config.Topic.String, Value: sarama.StringEncoder(sample)}
 		partition, offset, err := c.Producer.SendMessage(msg)
 		if err != nil {
-			logrus.WithError(err).Error("Kafka: failed to send message.")
+			c.logger.WithError(err).Error("Kafka: failed to send message.")
 		} else {
-			logrus.WithFields(logrus.Fields{
+			c.logger.WithFields(logrus.Fields{
 				"partition": partition,
 				"offset":    offset,
 			}).Debug("Kafka: message sent.")
@@ -168,5 +170,5 @@ func (c *Collector) pushMetrics() {
 	}
 
 	t := time.Since(startTime)
-	logrus.WithField("t", t).Debug("Kafka: Delivered!")
+	c.logger.WithField("t", t).Debug("Kafka: Delivered!")
 }

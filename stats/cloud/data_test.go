@@ -27,68 +27,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mailru/easyjson"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/netext/httpext"
 	"github.com/loadimpact/k6/stats"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
-
-func TestTimestampMarshaling(t *testing.T) {
-	t.Parallel()
-
-	oldTimeFormat, err := time.Parse(
-		time.RFC3339,
-		//1521806137415652223 as a unix nanosecond timestamp
-		"2018-03-23T13:55:37.415652223+02:00",
-	)
-	require.NoError(t, err)
-
-	testCases := []struct {
-		t   time.Time
-		exp string
-	}{
-		{oldTimeFormat, `"1521806137415652"`},
-		{time.Unix(1521806137, 415652223), `"1521806137415652"`},
-		{time.Unix(1521806137, 0), `"1521806137000000"`},
-		{time.Unix(0, 0), `"0"`},
-		{time.Unix(0, 1), `"0"`},
-		{time.Unix(0, 1000), `"1"`},
-		{time.Unix(1, 0), `"1000000"`},
-	}
-
-	for i, tc := range testCases {
-		t.Run(fmt.Sprintf("Test #%d", i), func(t *testing.T) {
-			res, err := json.Marshal(Timestamp(tc.t))
-			require.NoError(t, err)
-			assert.Equal(t, string(res), tc.exp)
-
-			var rev Timestamp
-			require.NoError(t, json.Unmarshal(res, &rev))
-
-			assert.Truef(
-				t,
-				rev.Equal(Timestamp(tc.t)),
-				"Expected the difference to be under a microsecond, but is %s (%d and %d)",
-				tc.t.Sub(time.Time(rev)),
-				tc.t.UnixNano(),
-				time.Time(rev).UnixNano(),
-			)
-
-			assert.False(t, Timestamp(time.Now()).Equal(Timestamp(tc.t)))
-		})
-	}
-
-	var expErr Timestamp
-	assert.Error(t, json.Unmarshal([]byte(`1234`), &expErr))
-	assert.Error(t, json.Unmarshal([]byte(`"1234a"`), &expErr))
-}
 
 func TestSampleMarshaling(t *testing.T) {
 	t.Parallel()
 
 	now := time.Now()
-	expTimestamp := now.UnixNano() / 1000
+	exptoMicroSecond := now.UnixNano() / 1000
 
 	testCases := []struct {
 		s    *Sample
@@ -100,19 +51,19 @@ func TestSampleMarshaling(t *testing.T) {
 				Metric: metrics.VUs.Name,
 				Data: &SampleDataSingle{
 					Type:  metrics.VUs.Type,
-					Time:  Timestamp(now),
+					Time:  toMicroSecond(now),
 					Tags:  stats.IntoSampleTags(&map[string]string{"aaa": "bbb", "ccc": "123"}),
 					Value: 999,
 				},
 			},
-			fmt.Sprintf(`{"type":"Point","metric":"vus","data":{"time":"%d","type":"gauge","tags":{"aaa":"bbb","ccc":"123"},"value":999}}`, expTimestamp),
+			fmt.Sprintf(`{"type":"Point","metric":"vus","data":{"time":"%d","type":"gauge","tags":{"aaa":"bbb","ccc":"123"},"value":999}}`, exptoMicroSecond),
 		},
 		{
 			&Sample{
 				Type:   DataTypeMap,
 				Metric: "iter_li_all",
 				Data: &SampleDataMap{
-					Time: Timestamp(now),
+					Time: toMicroSecond(now),
 					Tags: stats.IntoSampleTags(&map[string]string{"test": "mest"}),
 					Values: map[string]float64{
 						metrics.DataSent.Name:          1234.5,
@@ -121,7 +72,7 @@ func TestSampleMarshaling(t *testing.T) {
 					},
 				},
 			},
-			fmt.Sprintf(`{"type":"Points","metric":"iter_li_all","data":{"time":"%d","type":"counter","tags":{"test":"mest"},"values":{"data_received":6789.1,"data_sent":1234.5,"iteration_duration":10000}}}`, expTimestamp),
+			fmt.Sprintf(`{"type":"Points","metric":"iter_li_all","data":{"time":"%d","type":"counter","tags":{"test":"mest"},"values":{"data_received":6789.1,"data_sent":1234.5,"iteration_duration":10000}}}`, exptoMicroSecond),
 		},
 		{
 			NewSampleFromTrail(&httpext.Trail{
@@ -134,12 +85,12 @@ func TestSampleMarshaling(t *testing.T) {
 				Waiting:        5000,
 				Receiving:      6000,
 			}),
-			fmt.Sprintf(`{"type":"Points","metric":"http_req_li_all","data":{"time":"%d","type":"counter","values":{"http_req_blocked":0.001,"http_req_connecting":0.002,"http_req_duration":0.123,"http_req_receiving":0.006,"http_req_sending":0.004,"http_req_tls_handshaking":0.003,"http_req_waiting":0.005,"http_reqs":1}}}`, expTimestamp),
+			fmt.Sprintf(`{"type":"Points","metric":"http_req_li_all","data":{"time":"%d","type":"counter","values":{"http_req_blocked":0.001,"http_req_connecting":0.002,"http_req_duration":0.123,"http_req_receiving":0.006,"http_req_sending":0.004,"http_req_tls_handshaking":0.003,"http_req_waiting":0.005,"http_reqs":1}}}`, exptoMicroSecond),
 		},
 	}
 
 	for _, tc := range testCases {
-		sJSON, err := json.Marshal(tc.s)
+		sJSON, err := easyjson.Marshal(tc.s)
 		if !assert.NoError(t, err) {
 			continue
 		}
@@ -152,7 +103,7 @@ func TestSampleMarshaling(t *testing.T) {
 		assert.Equal(t, tc.s.Metric, newS.Metric)
 		assert.IsType(t, tc.s.Data, newS.Data)
 		// Cannot directly compare tc.s.Data and newS.Data (because of internal time.Time and SampleTags fields)
-		newJSON, err := json.Marshal(newS)
+		newJSON, err := easyjson.Marshal(newS)
 		assert.NoError(t, err)
 		assert.JSONEq(t, string(sJSON), string(newJSON))
 	}

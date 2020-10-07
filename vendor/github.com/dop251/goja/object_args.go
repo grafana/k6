@@ -1,5 +1,7 @@
 package goja
 
+import "github.com/dop251/goja/unistring"
+
 type argumentsObject struct {
 	baseObject
 	length int
@@ -10,15 +12,16 @@ type mappedProperty struct {
 	v *Value
 }
 
-func (a *argumentsObject) getPropStr(name string) Value {
-	if prop, ok := a.values[name].(*mappedProperty); ok {
-		return *prop.v
-	}
-	return a.baseObject.getPropStr(name)
+func (a *argumentsObject) getStr(name unistring.String, receiver Value) Value {
+	return a.getStrWithOwnProp(a.getOwnPropStr(name), name, receiver)
 }
 
-func (a *argumentsObject) getProp(n Value) Value {
-	return a.getPropStr(n.String())
+func (a *argumentsObject) getOwnPropStr(name unistring.String) Value {
+	if mapped, ok := a.values[name].(*mappedProperty); ok {
+		return *mapped.v
+	}
+
+	return a.baseObject.getOwnPropStr(name)
 }
 
 func (a *argumentsObject) init() {
@@ -26,11 +29,23 @@ func (a *argumentsObject) init() {
 	a._putProp("length", intToValue(int64(a.length)), true, false, true)
 }
 
-func (a *argumentsObject) put(n Value, val Value, throw bool) {
-	a.putStr(n.String(), val, throw)
+func (a *argumentsObject) setOwnStr(name unistring.String, val Value, throw bool) bool {
+	if prop, ok := a.values[name].(*mappedProperty); ok {
+		if !prop.writable {
+			a.val.runtime.typeErrorResult(throw, "Property is not writable: %s", name)
+			return false
+		}
+		*prop.v = val
+		return true
+	}
+	return a.baseObject.setOwnStr(name, val, throw)
 }
 
-func (a *argumentsObject) putStr(name string, val Value, throw bool) {
+func (a *argumentsObject) setForeignStr(name unistring.String, val, receiver Value, throw bool) (bool, bool) {
+	return a._setForeignStr(name, a.getOwnPropStr(name), val, receiver, throw)
+}
+
+/*func (a *argumentsObject) putStr(name string, val Value, throw bool) {
 	if prop, ok := a.values[name].(*mappedProperty); ok {
 		if !prop.writable {
 			a.val.runtime.typeErrorResult(throw, "Property is not writable: %s", name)
@@ -40,9 +55,9 @@ func (a *argumentsObject) putStr(name string, val Value, throw bool) {
 		return
 	}
 	a.baseObject.putStr(name, val, throw)
-}
+}*/
 
-func (a *argumentsObject) deleteStr(name string, throw bool) bool {
+func (a *argumentsObject) deleteStr(name unistring.String, throw bool) bool {
 	if prop, ok := a.values[name].(*mappedProperty); ok {
 		if !a.checkDeleteProp(name, &prop.valueProperty, throw) {
 			return false
@@ -52,16 +67,6 @@ func (a *argumentsObject) deleteStr(name string, throw bool) bool {
 	}
 
 	return a.baseObject.deleteStr(name, throw)
-}
-
-func (a *argumentsObject) delete(n Value, throw bool) bool {
-	return a.deleteStr(n.String(), throw)
-}
-
-type argumentsPropIter1 struct {
-	a         *argumentsObject
-	idx       int
-	recursive bool
 }
 
 type argumentsPropIter struct {
@@ -80,21 +85,13 @@ func (i *argumentsPropIter) next() (propIterItem, iterNextFunc) {
 	return item, i.next
 }
 
-func (a *argumentsObject) _enumerate(recursive bool) iterNextFunc {
-	return (&argumentsPropIter{
-		wrapped: a.baseObject._enumerate(recursive),
-	}).next
-
+func (a *argumentsObject) enumerateUnfiltered() iterNextFunc {
+	return a.recursiveIter((&argumentsPropIter{
+		wrapped: a.ownIter(),
+	}).next)
 }
 
-func (a *argumentsObject) enumerate(all, recursive bool) iterNextFunc {
-	return (&argumentsPropIter{
-		wrapped: a.baseObject.enumerate(all, recursive),
-	}).next
-}
-
-func (a *argumentsObject) defineOwnProperty(n Value, descr propertyDescr, throw bool) bool {
-	name := n.String()
+func (a *argumentsObject) defineOwnPropertyStr(name unistring.String, descr PropertyDescriptor, throw bool) bool {
 	if mapped, ok := a.values[name].(*mappedProperty); ok {
 		existing := &valueProperty{
 			configurable: mapped.configurable,
@@ -103,7 +100,7 @@ func (a *argumentsObject) defineOwnProperty(n Value, descr propertyDescr, throw 
 			value:        mapped.get(a.val),
 		}
 
-		val, ok := a.baseObject._defineOwnProperty(n, existing, descr, throw)
+		val, ok := a.baseObject._defineOwnProperty(name, existing, descr, throw)
 		if !ok {
 			return false
 		}
@@ -127,23 +124,19 @@ func (a *argumentsObject) defineOwnProperty(n Value, descr propertyDescr, throw 
 		return true
 	}
 
-	return a.baseObject.defineOwnProperty(n, descr, throw)
+	return a.baseObject.defineOwnPropertyStr(name, descr, throw)
 }
 
-func (a *argumentsObject) getOwnProp(name string) Value {
-	if mapped, ok := a.values[name].(*mappedProperty); ok {
-		return *mapped.v
+func (a *argumentsObject) export(ctx *objectExportCtx) interface{} {
+	if v, exists := ctx.get(a); exists {
+		return v
 	}
-
-	return a.baseObject.getOwnProp(name)
-}
-
-func (a *argumentsObject) export() interface{} {
 	arr := make([]interface{}, a.length)
-	for i, _ := range arr {
-		v := a.get(intToValue(int64(i)))
+	ctx.put(a, arr)
+	for i := range arr {
+		v := a.getIdx(valueInt(int64(i)), nil)
 		if v != nil {
-			arr[i] = v.Export()
+			arr[i] = exportValue(v, ctx)
 		}
 	}
 	return arr

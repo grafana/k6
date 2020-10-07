@@ -25,14 +25,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
+	"github.com/spf13/pflag"
+	"gopkg.in/guregu/null.v3"
+
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/ui"
-	"github.com/pkg/errors"
-	"github.com/spf13/pflag"
-	null "gopkg.in/guregu/null.v3"
 )
 
 var (
@@ -45,11 +46,19 @@ func optionFlagSet() *pflag.FlagSet {
 	flags := pflag.NewFlagSet("", 0)
 	flags.SortFlags = false
 	flags.Int64P("vus", "u", 1, "number of virtual users")
+
+	// TODO: delete in a few versions
 	flags.Int64P("max", "m", 0, "max available virtual users")
+	_ = flags.MarkDeprecated("max", "the global MaxVUs option is obsolete and doesn't affect the k6 script execution")
+
 	flags.DurationP("duration", "d", 0, "test duration limit")
 	flags.Int64P("iterations", "i", 0, "script total iteration limit (among all VUs)")
 	flags.StringSliceP("stage", "s", nil, "add a `stage`, as `[duration]:[target]`")
+	flags.String("execution-segment", "", "limit execution to the specified segment, e.g. 10%, 1/3, 0.2:2/3")
+	flags.String("execution-segment-sequence", "", "the execution segment sequence") // TODO better description
 	flags.BoolP("paused", "p", false, "start the test in a paused state")
+	flags.Bool("no-setup", false, "don't run setup()")
+	flags.Bool("no-teardown", false, "don't run teardown()")
 	flags.Int64("max-redirects", 10, "follow at most n redirects")
 	flags.Int64("batch", 20, "max parallel batch reqs")
 	flags.Int64("batch-per-host", 6, "max parallel batch reqs per host")
@@ -63,7 +72,8 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.Duration("min-iteration-duration", 0, "minimum amount of time k6 will take executing a single iteration")
 	flags.BoolP("throw", "w", false, "throw warnings (like failed http requests) as errors")
 	flags.StringSlice("blacklist-ip", nil, "blacklist an `ip range` from being called")
-	flags.StringSlice("block-hostname", nil, "block a case-insensitive hostname `pattern`, with optional leading wildcard, from being called")
+	flags.StringSlice("block-hostname", nil, "block a case-insensitive hostname `pattern`,"+
+		" with optional leading wildcard, from being called")
 
 	// The comment about system-tags also applies for summary-trend-stats. The default values
 	// are set in applyDefault().
@@ -89,10 +99,11 @@ func optionFlagSet() *pflag.FlagSet {
 func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 	opts := lib.Options{
 		VUs:                   getNullInt64(flags, "vus"),
-		VUsMax:                getNullInt64(flags, "max"),
 		Duration:              getNullDuration(flags, "duration"),
 		Iterations:            getNullInt64(flags, "iterations"),
 		Paused:                getNullBool(flags, "paused"),
+		NoSetup:               getNullBool(flags, "no-setup"),
+		NoTeardown:            getNullBool(flags, "no-teardown"),
 		MaxRedirects:          getNullInt64(flags, "max-redirects"),
 		Batch:                 getNullInt64(flags, "batch"),
 		BatchPerHost:          getNullInt64(flags, "batch-per-host"),
@@ -107,8 +118,8 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		DiscardResponseBodies: getNullBool(flags, "discard-response-bodies"),
 		// Default values for options without CLI flags:
 		// TODO: find a saner and more dev-friendly and error-proof way to handle options
-		SetupTimeout:    types.NullDuration{Duration: types.Duration(10 * time.Second), Valid: false},
-		TeardownTimeout: types.NullDuration{Duration: types.Duration(10 * time.Second), Valid: false},
+		SetupTimeout:    types.NullDuration{Duration: types.Duration(60 * time.Second), Valid: false},
+		TeardownTimeout: types.NullDuration{Duration: types.Duration(60 * time.Second), Valid: false},
 
 		MetricSamplesBufferSize: null.NewInt(1000, false),
 	}
@@ -130,6 +141,32 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 			}
 			opts.Stages = append(opts.Stages, stage)
 		}
+	}
+
+	if flags.Changed("execution-segment") {
+		executionSegmentStr, err := flags.GetString("execution-segment")
+		if err != nil {
+			return opts, err
+		}
+		segment := new(lib.ExecutionSegment)
+		err = segment.UnmarshalText([]byte(executionSegmentStr))
+		if err != nil {
+			return opts, err
+		}
+		opts.ExecutionSegment = segment
+	}
+
+	if flags.Changed("execution-segment-sequence") {
+		executionSegmentSequenceStr, err := flags.GetString("execution-segment-sequence")
+		if err != nil {
+			return opts, err
+		}
+		segmentSequence := new(lib.ExecutionSegmentSequence)
+		err = segmentSequence.UnmarshalText([]byte(executionSegmentSequenceStr))
+		if err != nil {
+			return opts, err
+		}
+		opts.ExecutionSegmentSequence = segmentSequence
 	}
 
 	if flags.Changed("system-tags") {

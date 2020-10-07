@@ -25,8 +25,9 @@ import (
 	"testing"
 
 	"github.com/dop251/goja"
-	"github.com/loadimpact/k6/js/common"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/loadimpact/k6/js/common"
 )
 
 const testHTMLElem = `
@@ -62,7 +63,7 @@ func TestElement(t *testing.T) {
 	rt.Set("html", common.Bind(rt, &HTML{}, &ctx))
 	// compileProtoElem()
 
-	_, err := common.RunString(rt, `let doc = html.parseHTML(src)`)
+	_, err := common.RunString(rt, `var doc = html.parseHTML(src)`)
 
 	assert.NoError(t, err)
 	assert.IsType(t, Selection{}, rt.Get("doc").Export())

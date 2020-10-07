@@ -1,8 +1,29 @@
+/*
+ *
+ * k6 - a next-generation load testing tool
+ * Copyright (C) 2019 Load Impact
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
 package stats
 
 import (
 	"bytes"
 	"encoding/json"
+	"sort"
 	"strings"
 )
 
@@ -12,12 +33,57 @@ import (
 type SystemTagSet uint32
 
 // TagSet is a string to bool map (for lookup efficiency) that is used to keep track
-// which system tags and non-system tags should be included with with metrics.
+// of which system tags and non-system tags to include.
 type TagSet map[string]bool
 
-//nolint: golint
+// UnmarshalText converts the tag list to TagSet.
+func (i *TagSet) UnmarshalText(data []byte) error {
+	list := bytes.Split(data, []byte(","))
+	if *i == nil {
+		*i = make(TagSet, len(list))
+	}
+
+	for _, key := range list {
+		key := strings.TrimSpace(string(key))
+		if key == "" {
+			continue
+		}
+		(*i)[key] = true
+	}
+
+	return nil
+}
+
+// MarshalJSON converts the TagSet to a list (JS array).
+func (i *TagSet) MarshalJSON() ([]byte, error) {
+	var tags []string
+	if *i != nil {
+		tags = make([]string, 0, len(*i))
+		for tag := range *i {
+			tags = append(tags, tag)
+		}
+		sort.Strings(tags)
+	}
+
+	return json.Marshal(tags)
+}
+
+// UnmarshalJSON converts the tag list back to expected tag set.
+func (i *TagSet) UnmarshalJSON(data []byte) error {
+	var tags []string
+	if err := json.Unmarshal(data, &tags); err != nil {
+		return err
+	}
+	*i = make(TagSet, len(tags))
+	for _, tag := range tags {
+		(*i)[tag] = true
+	}
+
+	return nil
+}
+
+// Default system tags includes all of the system tags emitted with metrics by default.
 const (
-	// Default system tags includes all of the system tags emitted with metrics by default.
 	TagProto SystemTagSet = 1 << iota
 	TagSubproto
 	TagStatus
@@ -29,6 +95,7 @@ const (
 	TagError
 	TagErrorCode
 	TagTLSVersion
+	TagScenario
 
 	// System tags not enabled by default.
 	TagIter
@@ -41,7 +108,7 @@ const (
 // Other tags that are not enabled by default include: iter, vu, ocsp_status, ip
 //nolint:gochecknoglobals
 var DefaultSystemTagSet = TagProto | TagSubproto | TagStatus | TagMethod | TagURL | TagName | TagGroup |
-	TagCheck | TagCheck | TagError | TagErrorCode | TagTLSVersion
+	TagCheck | TagCheck | TagError | TagErrorCode | TagTLSVersion | TagScenario
 
 // Add adds a tag to tag set.
 func (i *SystemTagSet) Add(tag SystemTagSet) {
@@ -110,6 +177,8 @@ func (i *SystemTagSet) MarshalJSON() ([]byte, error) {
 			tags = append(tags, tag.String())
 		}
 	}
+	sort.Strings(tags)
+
 	return json.Marshal(tags)
 }
 
@@ -128,7 +197,7 @@ func (i *SystemTagSet) UnmarshalJSON(data []byte) error {
 
 // UnmarshalText converts the tag list to SystemTagSet.
 func (i *SystemTagSet) UnmarshalText(data []byte) error {
-	var list = bytes.Split(data, []byte(","))
+	list := bytes.Split(data, []byte(","))
 
 	for _, key := range list {
 		key := strings.TrimSpace(string(key))

@@ -31,10 +31,11 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/loadimpact/k6/lib/netext"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/http2"
+
+	"github.com/loadimpact/k6/lib/netext"
 )
 
 func TestDefaultError(t *testing.T) {

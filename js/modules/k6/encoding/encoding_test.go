@@ -25,8 +25,9 @@ import (
 	"testing"
 
 	"github.com/dop251/goja"
-	"github.com/loadimpact/k6/js/common"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/loadimpact/k6/js/common"
 )
 
 func TestEncodingAlgorithms(t *testing.T) {
@@ -43,8 +44,8 @@ func TestEncodingAlgorithms(t *testing.T) {
 	t.Run("Base64", func(t *testing.T) {
 		t.Run("DefaultEnc", func(t *testing.T) {
 			_, err := common.RunString(rt, `
-			const correct = "aGVsbG8gd29ybGQ=";
-			let encoded = encoding.b64encode("hello world");
+			var correct = "aGVsbG8gd29ybGQ=";
+			var encoded = encoding.b64encode("hello world");
 			if (encoded !== correct) {
 				throw new Error("Encoding mismatch: " + encoded);
 			}`)
@@ -52,8 +53,8 @@ func TestEncodingAlgorithms(t *testing.T) {
 		})
 		t.Run("DefaultDec", func(t *testing.T) {
 			_, err := common.RunString(rt, `
-			const correct = "hello world";
-			let decoded = encoding.b64decode("aGVsbG8gd29ybGQ=");
+			var correct = "hello world";
+			var decoded = encoding.b64decode("aGVsbG8gd29ybGQ=");
 			if (decoded !== correct) {
 				throw new Error("Decoding mismatch: " + decoded);
 			}`)
@@ -61,8 +62,8 @@ func TestEncodingAlgorithms(t *testing.T) {
 		})
 		t.Run("DefaultUnicodeEnc", func(t *testing.T) {
 			_, err := common.RunString(rt, `
-			const correct = "44GT44KT44Gr44Gh44Gv5LiW55WM";
-			let encoded = encoding.b64encode("こんにちは世界", "std");
+			var correct = "44GT44KT44Gr44Gh44Gv5LiW55WM";
+			var encoded = encoding.b64encode("こんにちは世界", "std");
 			if (encoded !== correct) {
 				throw new Error("Encoding mismatch: " + encoded);
 			}`)
@@ -70,8 +71,8 @@ func TestEncodingAlgorithms(t *testing.T) {
 		})
 		t.Run("DefaultUnicodeDec", func(t *testing.T) {
 			_, err := common.RunString(rt, `
-			const correct = "こんにちは世界";
-			let decoded = encoding.b64decode("44GT44KT44Gr44Gh44Gv5LiW55WM");
+			var correct = "こんにちは世界";
+			var decoded = encoding.b64decode("44GT44KT44Gr44Gh44Gv5LiW55WM");
 			if (decoded !== correct) {
 				throw new Error("Decoding mismatch: " + decoded);
 			}`)
@@ -79,8 +80,8 @@ func TestEncodingAlgorithms(t *testing.T) {
 		})
 		t.Run("StdEnc", func(t *testing.T) {
 			_, err := common.RunString(rt, `
-			const correct = "aGVsbG8gd29ybGQ=";
-			let encoded = encoding.b64encode("hello world", "std");
+			var correct = "aGVsbG8gd29ybGQ=";
+			var encoded = encoding.b64encode("hello world", "std");
 			if (encoded !== correct) {
 				throw new Error("Encoding mismatch: " + encoded);
 			}`)
@@ -88,8 +89,8 @@ func TestEncodingAlgorithms(t *testing.T) {
 		})
 		t.Run("StdDec", func(t *testing.T) {
 			_, err := common.RunString(rt, `
-			const correct = "hello world";
-			let decoded = encoding.b64decode("aGVsbG8gd29ybGQ=", "std");
+			var correct = "hello world";
+			var decoded = encoding.b64decode("aGVsbG8gd29ybGQ=", "std");
 			if (decoded !== correct) {
 				throw new Error("Decoding mismatch: " + decoded);
 			}`)
@@ -97,8 +98,8 @@ func TestEncodingAlgorithms(t *testing.T) {
 		})
 		t.Run("RawStdEnc", func(t *testing.T) {
 			_, err := common.RunString(rt, `
-			const correct = "aGVsbG8gd29ybGQ";
-			let encoded = encoding.b64encode("hello world", "rawstd");
+			var correct = "aGVsbG8gd29ybGQ";
+			var encoded = encoding.b64encode("hello world", "rawstd");
 			if (encoded !== correct) {
 				throw new Error("Encoding mismatch: " + encoded);
 			}`)
@@ -106,8 +107,8 @@ func TestEncodingAlgorithms(t *testing.T) {
 		})
 		t.Run("RawStdDec", func(t *testing.T) {
 			_, err := common.RunString(rt, `
-			const correct = "hello world";
-			let decoded = encoding.b64decode("aGVsbG8gd29ybGQ", "rawstd");
+			var correct = "hello world";
+			var decoded = encoding.b64decode("aGVsbG8gd29ybGQ", "rawstd");
 			if (decoded !== correct) {
 				throw new Error("Decoding mismatch: " + decoded);
 			}`)
@@ -115,8 +116,8 @@ func TestEncodingAlgorithms(t *testing.T) {
 		})
 		t.Run("URLEnc", func(t *testing.T) {
 			_, err := common.RunString(rt, `
-			const correct = "5bCP6aO85by-Li4=";
-			let encoded = encoding.b64encode("小飼弾..", "url");
+			var correct = "5bCP6aO85by-Li4=";
+			var encoded = encoding.b64encode("小飼弾..", "url");
 			if (encoded !== correct) {
 				throw new Error("Encoding mismatch: " + encoded);
 			}`)
@@ -124,8 +125,8 @@ func TestEncodingAlgorithms(t *testing.T) {
 		})
 		t.Run("URLDec", func(t *testing.T) {
 			_, err := common.RunString(rt, `
-			const correct = "小飼弾..";
-			let decoded = encoding.b64decode("5bCP6aO85by-Li4=", "url");
+			var correct = "小飼弾..";
+			var decoded = encoding.b64decode("5bCP6aO85by-Li4=", "url");
 			if (decoded !== correct) {
 				throw new Error("Decoding mismatch: " + decoded);
 			}`)
@@ -133,8 +134,8 @@ func TestEncodingAlgorithms(t *testing.T) {
 		})
 		t.Run("RawURLEnc", func(t *testing.T) {
 			_, err := common.RunString(rt, `
-			const correct = "5bCP6aO85by-Li4";
-			let encoded = encoding.b64encode("小飼弾..", "rawurl");
+			var correct = "5bCP6aO85by-Li4";
+			var encoded = encoding.b64encode("小飼弾..", "rawurl");
 			if (encoded !== correct) {
 				throw new Error("Encoding mismatch: " + encoded);
 			}`)
@@ -142,8 +143,8 @@ func TestEncodingAlgorithms(t *testing.T) {
 		})
 		t.Run("RawURLDec", func(t *testing.T) {
 			_, err := common.RunString(rt, `
-			const correct = "小飼弾..";
-			let decoded = encoding.b64decode("5bCP6aO85by-Li4", "rawurl");
+			var correct = "小飼弾..";
+			var decoded = encoding.b64decode("5bCP6aO85by-Li4", "rawurl");
 			if (decoded !== correct) {
 				throw new Error("Decoding mismatch: " + decoded);
 			}`)

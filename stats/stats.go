@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/dustin/go-humanize"
+	"github.com/mailru/easyjson/jwriter"
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -168,6 +169,7 @@ func (t ValueType) String() string {
 // copy-on-write semantics and uses pointers for faster comparison
 // between maps, since the same tag set is often used for multiple samples.
 // All methods should not panic, even if they are called on a nil pointer.
+//easyjson:skip
 type SampleTags struct {
 	tags map[string]string
 	json []byte
@@ -241,6 +243,23 @@ func (st *SampleTags) MarshalJSON() ([]byte, error) {
 	return res, nil
 }
 
+// MarshalEasyJSON supports easyjson.Marshaler interface
+func (st *SampleTags) MarshalEasyJSON(w *jwriter.Writer) {
+	w.RawByte('{')
+	first := true
+	for k, v := range st.tags {
+		if first {
+			first = false
+		} else {
+			w.RawByte(',')
+		}
+		w.String(k)
+		w.RawByte(':')
+		w.String(v)
+	}
+	w.RawByte('}')
+}
+
 // UnmarshalJSON deserializes SampleTags from a JSON string.
 func (st *SampleTags) UnmarshalJSON(data []byte) error {
 	if st == nil {
@@ -252,11 +271,12 @@ func (st *SampleTags) UnmarshalJSON(data []byte) error {
 // CloneTags copies the underlying set of a sample tags and
 // returns it. If the receiver is nil, it returns an empty non-nil map.
 func (st *SampleTags) CloneTags() map[string]string {
-	res := map[string]string{}
-	if st != nil {
-		for k, v := range st.tags {
-			res[k] = v
-		}
+	if st == nil {
+		return map[string]string{}
+	}
+	res := make(map[string]string, len(st.tags))
+	for k, v := range st.tags {
+		res[k] = v
 	}
 	return res
 }

@@ -22,15 +22,18 @@ package cmd
 
 import (
 	"os"
+	"syscall"
 
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/afero"
+	"github.com/spf13/cobra"
+	"golang.org/x/crypto/ssh/terminal"
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/stats/cloud"
 	"github.com/loadimpact/k6/ui"
-	"github.com/pkg/errors"
-	"github.com/spf13/afero"
-	"github.com/spf13/cobra"
 )
 
 // loginCloudCommand represents the 'login cloud' command
@@ -51,6 +54,8 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
   k6 login cloud`[1:],
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// TODO: don't use a global... or maybe change the logger?
+		logger := logrus.StandardLogger()
 		fs := afero.NewOsFs()
 
 		k6Conf, err := getConsolidatedConfig(fs, Config{}, nil)
@@ -89,6 +94,9 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 					},
 				},
 			}
+			if !terminal.IsTerminal(int(syscall.Stdin)) { // nolint: unconvert
+				logger.Warn("Stdin is not a terminal, falling back to plain text input")
+			}
 			vals, err := form.Run(os.Stdin, stdout)
 			if err != nil {
 				return err
@@ -96,7 +104,7 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 			email := vals["Email"].(string)
 			password := vals["Password"].(string)
 
-			client := cloud.NewClient("", k6Conf.Collectors.Cloud.Host.String, consts.Version)
+			client := cloud.NewClient(logger, "", k6Conf.Collectors.Cloud.Host.String, consts.Version)
 			res, err := client.Login(email, password)
 			if err != nil {
 				return err

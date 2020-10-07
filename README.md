@@ -38,7 +38,7 @@ Menu
 - [Install](#install)
 - [Running k6](#running-k6)
 - [Overview](#overview)
-- [Need help or want to contribute?](#need-help-or-want-to-contribute)
+- [Need help or want to contribute?](#contributing)
 
 Features
 --------
@@ -47,7 +47,7 @@ Features
 - **Everything as code**: test logic and [configuration options](https://k6.io/docs/using-k6/options) are both in JS for version control friendliness
 - **Automation-friendly**: [checks](https://k6.io/docs/using-k6/checks) (like asserts) and [thresholds](https://k6.io/docs/using-k6/thresholds) for easy and flexible CI configuration!
 - [**HTTP/1.1**](https://k6.io/docs/using-k6/http-requests), [**HTTP/2**](https://k6.io/docs/using-k6/protocols/http-2) and [**WebSocket**](https://k6.io/docs/using-k6/protocols/websockets) protocol support
-- **TLS features**: [client certificates](https://k6.io/docs/using-k6/ssl-tls/ssl-tls-client-certificates), [configurable SSL/TLS versions and ciphers](https://k6.io/docs/using-k6/ssl-tls/ssl-tls-version-and-ciphers)
+- **TLS features**: [client certificates](https://k6.io/docs/using-k6/protocols/ssl-tls/ssl-tls-client-certificates), [configurable SSL/TLS versions and ciphers](https://k6.io/docs/using-k6/protocols/ssl-tls/ssl-tls-version-and-ciphers)
 - **Batteries included**: [Cookies](https://k6.io/docs/using-k6/cookies), [Crypto](https://k6.io/docs/javascript-api/k6-crypto), [Custom metrics](https://k6.io/docs/using-k6/metrics#custom-metrics), [Encodings](https://k6.io/docs/javascript-api/k6-encoding), [Environment variables](https://k6.io/docs/using-k6/environment-variables), JSON, [HTML forms](https://k6.io/docs/using-k6/html/working-with-html-forms), [files](https://k6.io/docs/javascript-api/init-context/open-filepath-mode), [flexible execution control](https://k6.io/docs/getting-started/running-k6#section-stages-ramping-updown-vus), and more.
 - **Built-in HAR converter**: record browser sessions as [`.har` files](https://en.wikipedia.org/wiki/.har) and [directly convert them to k6 scripts](https://k6.io/docs/using-k6/session-recording-har-support)
 - **Flexible metrics storage and visualization**: [InfluxDB](https://k6.io/docs/results-visualization/influxdb-+-grafana) (+Grafana), [JSON](https://k6.io/docs/getting-started/results-output/json) or [k6 Cloud](https://k6.io/docs/cloud/analyzing-results/overview)
@@ -68,7 +68,7 @@ brew install k6
 
 ### Windows
 
-You can manually download and install the [official `.msi` installation package](https://dl.bintray.com/loadimpact/windows/k6-latest-amd64.msi) or, if you use the [chocolatey package manager](https://chocolatey.org/), follow [these instructions](https://bintray.com/repo/buildSettings?repoPath=%2Floadimpact%2Fchoco) to set up the k6 repository.
+You can manually download and install the [official `.msi` installation package](https://dl.bintray.com/loadimpact/windows/k6-v0.27.1-amd64.msi) or, if you use the [chocolatey package manager](https://chocolatey.org/), follow [these instructions](https://bintray.com/repo/buildSettings?repoPath=%2Floadimpact%2Fchoco) to set up the k6 repository.
 
 ### Linux
 

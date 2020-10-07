@@ -26,14 +26,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/loadimpact/k6/js"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/lib/testutils/httpmultibin"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/stats"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestSetupDataMarshalling(t *testing.T) {
@@ -115,6 +117,7 @@ func TestSetupDataMarshalling(t *testing.T) {
 	`))
 
 	runner, err := js.New(
+		testutils.NewLogger(t),
 		&loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script},
 		nil,
 		lib.RuntimeOptions{},
@@ -129,14 +132,17 @@ func TestSetupDataMarshalling(t *testing.T) {
 
 	require.NoError(t, err)
 
-	samples := make(chan stats.SampleContainer, 100)
+	samples := make(chan<- stats.SampleContainer, 100)
 
 	if !assert.NoError(t, runner.Setup(context.Background(), samples)) {
 		return
 	}
-	vu, err := runner.NewVU(samples)
+	initVU, err := runner.NewVU(1, samples)
 	if assert.NoError(t, err) {
-		err := vu.RunOnce(context.Background())
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+		err := vu.RunOnce()
 		assert.NoError(t, err)
 	}
 }

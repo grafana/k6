@@ -24,26 +24,33 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"strings"
+	"strconv"
 	"sync/atomic"
 	"time"
+
+	"github.com/pkg/errors"
+	"github.com/viki-org/dnscache"
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/stats"
-
-	"github.com/viki-org/dnscache"
 )
+
+// dnsResolver is an interface that fetches dns information
+// about a given address.
+type dnsResolver interface {
+	FetchOne(address string) (net.IP, error)
+}
 
 // Dialer wraps net.Dialer and provides k6 specific functionality -
 // tracing, blacklists and DNS cache and aliases.
 type Dialer struct {
 	net.Dialer
 
-	Resolver         *dnscache.Resolver
+	Resolver         dnsResolver
 	Blacklist        []*lib.IPNet
 	BlockedHostnames *lib.HostnameTrie
-	Hosts            map[string]net.IP
+	Hosts            map[string]*lib.HostAddress
 
 	BytesRead    int64
 	BytesWritten int64
@@ -51,9 +58,13 @@ type Dialer struct {
 
 // NewDialer constructs a new Dialer and initializes its cache.
 func NewDialer(dialer net.Dialer) *Dialer {
+	return newDialerWithResolver(dialer, dnscache.New(0))
+}
+
+func newDialerWithResolver(dialer net.Dialer, resolver dnsResolver) *Dialer {
 	return &Dialer{
 		Dialer:   dialer,
-		Resolver: dnscache.New(0),
+		Resolver: resolver,
 	}
 }
 
@@ -79,35 +90,11 @@ func (b BlockedHostError) Error() string {
 
 // DialContext wraps the net.Dialer.DialContext and handles the k6 specifics
 func (d *Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn, error) {
-	delimiter := strings.LastIndex(addr, ":")
-	host := addr[:delimiter]
-
-	if d.BlockedHostnames != nil {
-		if match, blocked := d.BlockedHostnames.Contains(host); blocked {
-			return nil, BlockedHostError{hostname: host, match: match}
-		}
+	dialAddr, err := d.getDialAddr(addr)
+	if err != nil {
+		return nil, err
 	}
-
-	// lookup for domain defined in Hosts option before trying to resolve DNS.
-	ip, ok := d.Hosts[host]
-	if !ok {
-		var err error
-		ip, err = d.Resolver.FetchOne(host)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	for _, ipnet := range d.Blacklist {
-		if (*net.IPNet)(ipnet).Contains(ip) {
-			return nil, BlackListedIPError{ip: ip, net: ipnet}
-		}
-	}
-	ipStr := ip.String()
-	if strings.ContainsRune(ipStr, ':') {
-		ipStr = "[" + ipStr + "]"
-	}
-	conn, err := d.Dialer.DialContext(ctx, proto, ipStr+":"+addr[delimiter+1:])
+	conn, err := d.Dialer.DialContext(ctx, proto, dialAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -164,6 +151,83 @@ func (d *Dialer) GetTrail(
 		Tags:          tags,
 		Samples:       samples,
 	}
+}
+
+func (d *Dialer) getDialAddr(addr string) (string, error) {
+	remote, err := d.findRemote(addr)
+	if err != nil {
+		return "", err
+	}
+
+	for _, ipnet := range d.Blacklist {
+		if ipnet.Contains(remote.IP) {
+			return "", BlackListedIPError{ip: remote.IP, net: ipnet}
+		}
+	}
+
+	return remote.String(), nil
+}
+
+func (d *Dialer) findRemote(addr string) (*lib.HostAddress, error) {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return nil, err
+	}
+
+	if d.BlockedHostnames != nil {
+		if match, blocked := d.BlockedHostnames.Contains(host); blocked {
+			return nil, BlockedHostError{hostname: host, match: match}
+		}
+	}
+
+	remote, err := d.getConfiguredHost(addr, host, port)
+	if err != nil || remote != nil {
+		return remote, err
+	}
+
+	ip := net.ParseIP(host)
+	if ip != nil {
+		return lib.NewHostAddress(ip, port)
+	}
+
+	return d.fetchRemoteFromResolver(host, port)
+}
+
+func (d *Dialer) fetchRemoteFromResolver(host, port string) (*lib.HostAddress, error) {
+	ip, err := d.Resolver.FetchOne(host)
+	if err != nil {
+		return nil, err
+	}
+
+	if ip == nil {
+		return nil, errors.Errorf("lookup %s: no such host", host)
+	}
+
+	return lib.NewHostAddress(ip, port)
+}
+
+func (d *Dialer) getConfiguredHost(addr, host, port string) (*lib.HostAddress, error) {
+	if remote, ok := d.Hosts[addr]; ok {
+		return remote, nil
+	}
+
+	if remote, ok := d.Hosts[host]; ok {
+		if remote.Port != 0 || port == "" {
+			return remote, nil
+		}
+
+		newPort, err := strconv.Atoi(port)
+		if err != nil {
+			return nil, err
+		}
+
+		newRemote := *remote
+		newRemote.Port = newPort
+
+		return &newRemote, nil
+	}
+
+	return nil, nil
 }
 
 // NetTrail contains information about the exchanged data size and length of a

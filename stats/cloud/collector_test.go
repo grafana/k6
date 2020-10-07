@@ -33,16 +33,15 @@ import (
 	"testing"
 	"time"
 
-	"gopkg.in/guregu/null.v3"
-
 	"github.com/stretchr/testify/assert"
-
 	"github.com/stretchr/testify/require"
+	"gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/lib/netext/httpext"
+	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/lib/testutils/httpmultibin"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/loader"
@@ -100,21 +99,21 @@ func getSampleChecker(t *testing.T, expSamples <-chan []Sample) http.HandlerFunc
 				receivedData, ok := receivedSample.Data.(*SampleDataSingle)
 				assert.True(t, ok)
 				assert.True(t, expData.Tags.IsEqual(receivedData.Tags))
-				assert.True(t, expData.Time.Equal(receivedData.Time))
+				assert.Equal(t, expData.Time, receivedData.Time)
 				assert.Equal(t, expData.Type, receivedData.Type)
 				assert.Equal(t, expData.Value, receivedData.Value)
 			case *SampleDataMap:
 				receivedData, ok := receivedSample.Data.(*SampleDataMap)
 				assert.True(t, ok)
 				assert.True(t, tagEqual(expData.Tags, receivedData.Tags))
-				assert.True(t, expData.Time.Equal(receivedData.Time))
+				assert.Equal(t, expData.Time, receivedData.Time)
 				assert.Equal(t, expData.Type, receivedData.Type)
 				assert.Equal(t, expData.Values, receivedData.Values)
 			case *SampleDataAggregatedHTTPReqs:
 				receivedData, ok := receivedSample.Data.(*SampleDataAggregatedHTTPReqs)
 				assert.True(t, ok)
 				assert.True(t, expData.Tags.IsEqual(receivedData.Tags))
-				assert.True(t, expData.Time.Equal(receivedData.Time))
+				assert.Equal(t, expData.Time, receivedData.Time)
 				assert.Equal(t, expData.Type, receivedData.Type)
 				assert.Equal(t, expData.Values, receivedData.Values)
 			default:
@@ -186,7 +185,7 @@ func runCloudCollectorTestCase(t *testing.T, minSamples int) {
 		Host:       null.StringFrom(tb.ServerHTTP.URL),
 		NoCompress: null.BoolFrom(true),
 	})
-	collector, err := New(config, script, options, "1.0")
+	collector, err := New(testutils.NewLogger(t), config, script, options, []lib.ExecutionStep{}, "1.0")
 	require.NoError(t, err)
 
 	assert.True(t, collector.config.Host.Valid)
@@ -214,6 +213,7 @@ func runCloudCollectorTestCase(t *testing.T, minSamples int) {
 	expectedTags := stats.IntoSampleTags(&expectedTagMap)
 
 	expSamples := make(chan []Sample)
+	defer close(expSamples)
 	tb.Mux.HandleFunc(fmt.Sprintf("/v1/metrics/%s", collector.referenceID), getSampleChecker(t, expSamples))
 	tb.Mux.HandleFunc(fmt.Sprintf("/v1/tests/%s", collector.referenceID), func(rw http.ResponseWriter, _ *http.Request) {
 		rw.WriteHeader(http.StatusOK) // silence a test warning
@@ -238,7 +238,7 @@ func runCloudCollectorTestCase(t *testing.T, minSamples int) {
 		Metric: metrics.VUs.Name,
 		Data: &SampleDataSingle{
 			Type:  metrics.VUs.Type,
-			Time:  Timestamp(now),
+			Time:  toMicroSecond(now),
 			Tags:  tags,
 			Value: 1.0,
 		},
@@ -294,7 +294,7 @@ func runCloudCollectorTestCase(t *testing.T, minSamples int) {
 				assert.True(t, aggrData.Tags.IsEqual(expectedTags))
 				assert.Equal(t, collector.config.AggregationMinSamples.Int64, int64(aggrData.Count))
 				assert.Equal(t, "aggregated_trend", aggrData.Type)
-				assert.InDelta(t, now.UnixNano(), time.Time(aggrData.Time).UnixNano(), float64(collector.config.AggregationPeriod.Duration))
+				assert.InDelta(t, now.UnixNano(), aggrData.Time*1000, float64(collector.config.AggregationPeriod.Duration))
 
 				checkAggrMetric(simpleTrail.Duration, aggrData.Values.Duration)
 				checkAggrMetric(simpleTrail.Blocked, aggrData.Values.Blocked)
@@ -314,7 +314,7 @@ func runCloudCollectorTestCase(t *testing.T, minSamples int) {
 func TestCloudCollectorMaxPerPacket(t *testing.T) {
 	t.Parallel()
 	tb := httpmultibin.NewHTTPMultiBin(t)
-	var maxMetricSamplesPerPackage = 20
+	maxMetricSamplesPerPackage := 20
 	tb.Mux.HandleFunc("/v1/tests", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, err := fmt.Fprintf(w, `{
 			"reference_id": "12",
@@ -343,11 +343,11 @@ func TestCloudCollectorMaxPerPacket(t *testing.T) {
 		Host:       null.StringFrom(tb.ServerHTTP.URL),
 		NoCompress: null.BoolFrom(true),
 	})
-	collector, err := New(config, script, options, "1.0")
+	collector, err := New(testutils.NewLogger(t), config, script, options, []lib.ExecutionStep{}, "1.0")
 	require.NoError(t, err)
 	now := time.Now()
 	tags := stats.IntoSampleTags(&map[string]string{"test": "mest", "a": "b"})
-	var gotTheLimit = false
+	gotTheLimit := false
 	var m sync.Mutex
 
 	tb.Mux.HandleFunc(fmt.Sprintf("/v1/metrics/%s", collector.referenceID),
@@ -380,7 +380,7 @@ func TestCloudCollectorMaxPerPacket(t *testing.T) {
 		Value:  1.0,
 	}})
 	for j := time.Duration(1); j <= 200; j++ {
-		var container = make([]stats.SampleContainer, 0, 500)
+		container := make([]stats.SampleContainer, 0, 500)
 		for i := time.Duration(1); i <= 50; i++ {
 			container = append(container, &httpext.Trail{
 				Blocked:        i % 200 * 100 * time.Millisecond,
@@ -432,10 +432,11 @@ func TestCloudCollectorStopSendingMetric(t *testing.T) {
 	}
 
 	config := NewConfig().Apply(Config{
-		Host:       null.StringFrom(tb.ServerHTTP.URL),
-		NoCompress: null.BoolFrom(true),
+		Host:                       null.StringFrom(tb.ServerHTTP.URL),
+		NoCompress:                 null.BoolFrom(true),
+		MaxMetricSamplesPerPackage: null.IntFrom(50),
 	})
-	collector, err := New(config, script, options, "1.0")
+	collector, err := New(testutils.NewLogger(t), config, script, options, []lib.ExecutionStep{}, "1.0")
 	require.NoError(t, err)
 	now := time.Now()
 	tags := stats.IntoSampleTags(&map[string]string{"test": "mest", "a": "b"})
@@ -482,7 +483,7 @@ func TestCloudCollectorStopSendingMetric(t *testing.T) {
 		Value:  1.0,
 	}})
 	for j := time.Duration(1); j <= 200; j++ {
-		var container = make([]stats.SampleContainer, 0, 500)
+		container := make([]stats.SampleContainer, 0, 500)
 		for i := time.Duration(1); i <= 50; i++ {
 			container = append(container, &httpext.Trail{
 				Blocked:        i % 200 * 100 * time.Millisecond,
@@ -504,8 +505,12 @@ func TestCloudCollectorStopSendingMetric(t *testing.T) {
 	cancel()
 	wg.Wait()
 	require.Equal(t, lib.RunStatusQueued, collector.runStatus)
-	_, ok := <-collector.stopSendingMetricsCh
-	require.False(t, ok)
+	select {
+	case <-collector.stopSendingMetricsCh:
+		// all is fine
+	default:
+		t.Fatal("sending metrics wasn't stopped")
+	}
 	require.Equal(t, max, count)
 
 	nBufferSamples := len(collector.bufferSamples)
@@ -551,7 +556,7 @@ func TestCloudCollectorAggregationPeriodZeroNoBlock(t *testing.T) {
 		Host:       null.StringFrom(tb.ServerHTTP.URL),
 		NoCompress: null.BoolFrom(true),
 	})
-	collector, err := New(config, script, options, "1.0")
+	collector, err := New(testutils.NewLogger(t), config, script, options, []lib.ExecutionStep{}, "1.0")
 	require.NoError(t, err)
 
 	assert.True(t, collector.config.Host.Valid)
@@ -572,6 +577,7 @@ func TestCloudCollectorAggregationPeriodZeroNoBlock(t *testing.T) {
 	assert.Equal(t, types.Duration(5*time.Millisecond), collector.config.AggregationWaitPeriod.Duration)
 
 	expSamples := make(chan []Sample)
+	defer close(expSamples)
 	tb.Mux.HandleFunc(fmt.Sprintf("/v1/metrics/%s", collector.referenceID), getSampleChecker(t, expSamples))
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -609,10 +615,10 @@ func TestCloudCollectorRecvIterLIAllIterations(t *testing.T) {
 		Host:       null.StringFrom(tb.ServerHTTP.URL),
 		NoCompress: null.BoolFrom(true),
 	})
-	collector, err := New(config, script, options, "1.0")
+	collector, err := New(testutils.NewLogger(t), config, script, options, []lib.ExecutionStep{}, "1.0")
 	require.NoError(t, err)
 
-	var gotIterations = false
+	gotIterations := false
 	var m sync.Mutex
 	expValues := map[string]float64{
 		"data_received":      100,
@@ -722,9 +728,9 @@ func TestNewName(t *testing.T) {
 			script := &loader.SourceData{
 				URL: testCase.url,
 			}
-			collector, err := New(NewConfig(), script, lib.Options{
+			collector, err := New(testutils.NewLogger(t), NewConfig(), script, lib.Options{
 				Duration: types.NullDurationFrom(1 * time.Second),
-			}, "1.0")
+			}, []lib.ExecutionStep{}, "1.0")
 			require.NoError(t, err)
 			require.Equal(t, collector.config.Name.String, testCase.expected)
 		})

@@ -26,8 +26,9 @@ import (
 	"net/http"
 
 	"github.com/julienschmidt/httprouter"
-	"github.com/loadimpact/k6/api/common"
 	"github.com/manyminds/api2go/jsonapi"
+
+	"github.com/loadimpact/k6/api/common"
 )
 
 // NullSetupData is wrapper around null to satisfy jsonapi
@@ -71,7 +72,7 @@ func handleSetupDataOutput(rw http.ResponseWriter, setupData json.RawMessage) {
 
 // HandleGetSetupData just returns the current JSON-encoded setup data
 func HandleGetSetupData(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	runner := common.GetEngine(r.Context()).Executor.GetRunner()
+	runner := common.GetEngine(r.Context()).ExecutionScheduler.GetRunner()
 	handleSetupDataOutput(rw, runner.GetSetupData())
 }
 
@@ -91,7 +92,7 @@ func HandleSetSetupData(rw http.ResponseWriter, r *http.Request, p httprouter.Pa
 		}
 	}
 
-	runner := common.GetEngine(r.Context()).Executor.GetRunner()
+	runner := common.GetEngine(r.Context()).ExecutionScheduler.GetRunner()
 
 	if len(body) == 0 {
 		runner.SetSetupData(nil)
@@ -105,7 +106,7 @@ func HandleSetSetupData(rw http.ResponseWriter, r *http.Request, p httprouter.Pa
 // HandleRunSetup executes the runner's Setup() method and returns the result
 func HandleRunSetup(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	engine := common.GetEngine(r.Context())
-	runner := engine.Executor.GetRunner()
+	runner := engine.ExecutionScheduler.GetRunner()
 
 	if err := runner.Setup(r.Context(), engine.Samples); err != nil {
 		apiError(rw, "Error executing setup", err.Error(), http.StatusInternalServerError)
@@ -118,7 +119,7 @@ func HandleRunSetup(rw http.ResponseWriter, r *http.Request, p httprouter.Params
 // HandleRunTeardown executes the runner's Teardown() method
 func HandleRunTeardown(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	engine := common.GetEngine(r.Context())
-	runner := common.GetEngine(r.Context()).Executor.GetRunner()
+	runner := common.GetEngine(r.Context()).ExecutionScheduler.GetRunner()
 
 	if err := runner.Teardown(r.Context(), engine.Samples); err != nil {
 		apiError(rw, "Error executing teardown", err.Error(), http.StatusInternalServerError)

@@ -26,9 +26,10 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/loadimpact/k6/lib/netext"
 	"github.com/pkg/errors"
 	"github.com/tidwall/gjson"
+
+	"github.com/loadimpact/k6/lib/netext"
 )
 
 // ResponseType is used in the request to specify how the response body should be treated

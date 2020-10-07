@@ -24,246 +24,256 @@ import (
 	"bytes"
 	"fmt"
 	"net/url"
-	"os"
-	"runtime"
-	"strings"
 	"testing"
 
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/loader"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/guregu/null.v3"
+
+	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/testutils"
+	"github.com/loadimpact/k6/loader"
 )
 
-var envVars []string
-
-func init() {
-	envVars = os.Environ()
+type runtimeOptionsTestCase struct {
+	useSysEnv     bool // Whether to include the system env vars by default (run) or not (cloud/archive/inspect)
+	expErr        bool
+	cliFlags      []string
+	systemEnv     map[string]string
+	expEnv        map[string]string
+	expCompatMode null.String
 }
 
-type EnvVarTest struct {
-	name      string
-	useSysEnv bool // Whether to include the system env vars by default (run) or not (cloud/archive/inspect)
-	systemEnv map[string]string
-	cliOpts   []string
-	expErr    bool
-	expEnv    map[string]string
+//nolint:gochecknoglobals
+var (
+	defaultCompatMode  = null.NewString("extended", false)
+	baseCompatMode     = null.NewString("base", true)
+	extendedCompatMode = null.NewString("extended", true)
+)
+
+var runtimeOptionsTestCases = map[string]runtimeOptionsTestCase{ //nolint:gochecknoglobals
+	"empty env": {
+		useSysEnv: true,
+		// everything else is empty
+		expCompatMode: defaultCompatMode,
+	},
+	"disabled sys env by default": {
+		useSysEnv:     false,
+		systemEnv:     map[string]string{"test1": "val1"},
+		expEnv:        map[string]string{},
+		expCompatMode: defaultCompatMode,
+	},
+	"disabled sys env by default with ext compat mode": {
+		useSysEnv:     false,
+		systemEnv:     map[string]string{"test1": "val1", "K6_COMPATIBILITY_MODE": "extended"},
+		expEnv:        map[string]string{},
+		expCompatMode: extendedCompatMode,
+	},
+	"disabled sys env by cli 1": {
+		useSysEnv:     true,
+		systemEnv:     map[string]string{"test1": "val1", "K6_COMPATIBILITY_MODE": "base"},
+		cliFlags:      []string{"--include-system-env-vars=false"},
+		expEnv:        map[string]string{},
+		expCompatMode: baseCompatMode,
+	},
+	"disabled sys env by cli 2": {
+		useSysEnv:     true,
+		systemEnv:     map[string]string{"K6_INCLUDE_SYSTEM_ENV_VARS": "true", "K6_COMPATIBILITY_MODE": "extended"},
+		cliFlags:      []string{"--include-system-env-vars=0", "--compatibility-mode=base"},
+		expEnv:        map[string]string{},
+		expCompatMode: baseCompatMode,
+	},
+	"disabled sys env by env": {
+		useSysEnv:     true,
+		systemEnv:     map[string]string{"K6_INCLUDE_SYSTEM_ENV_VARS": "false", "K6_COMPATIBILITY_MODE": "extended"},
+		expEnv:        map[string]string{},
+		expCompatMode: extendedCompatMode,
+	},
+	"enabled sys env by env": {
+		useSysEnv:     false,
+		systemEnv:     map[string]string{"K6_INCLUDE_SYSTEM_ENV_VARS": "true", "K6_COMPATIBILITY_MODE": "extended"},
+		expEnv:        map[string]string{"K6_INCLUDE_SYSTEM_ENV_VARS": "true", "K6_COMPATIBILITY_MODE": "extended"},
+		expCompatMode: extendedCompatMode,
+	},
+	"enabled sys env by default": {
+		useSysEnv:     true,
+		systemEnv:     map[string]string{"test1": "val1"},
+		cliFlags:      []string{},
+		expEnv:        map[string]string{"test1": "val1"},
+		expCompatMode: defaultCompatMode,
+	},
+	"enabled sys env by cli 1": {
+		useSysEnv:     false,
+		systemEnv:     map[string]string{"test1": "val1"},
+		cliFlags:      []string{"--include-system-env-vars"},
+		expEnv:        map[string]string{"test1": "val1"},
+		expCompatMode: defaultCompatMode,
+	},
+	"enabled sys env by cli 2": {
+		useSysEnv:     false,
+		systemEnv:     map[string]string{"test1": "val1"},
+		cliFlags:      []string{"--include-system-env-vars=true"},
+		expEnv:        map[string]string{"test1": "val1"},
+		expCompatMode: defaultCompatMode,
+	},
+	"run only system env": {
+		useSysEnv:     true,
+		systemEnv:     map[string]string{"test1": "val1"},
+		cliFlags:      []string{},
+		expEnv:        map[string]string{"test1": "val1"},
+		expCompatMode: defaultCompatMode,
+	},
+	"mixed system and cli env": {
+		useSysEnv:     true,
+		systemEnv:     map[string]string{"test1": "val1", "test2": ""},
+		cliFlags:      []string{"--env", "test3=val3", "-e", "test4", "-e", "test5="},
+		expEnv:        map[string]string{"test1": "val1", "test2": "", "test3": "val3", "test4": "", "test5": ""},
+		expCompatMode: defaultCompatMode,
+	},
+	"mixed system and cli env 2": {
+		useSysEnv:     false,
+		systemEnv:     map[string]string{"test1": "val1", "test2": ""},
+		cliFlags:      []string{"--env", "test3=val3", "-e", "test4", "-e", "test5=", "--include-system-env-vars=1"},
+		expEnv:        map[string]string{"test1": "val1", "test2": "", "test3": "val3", "test4": "", "test5": ""},
+		expCompatMode: defaultCompatMode,
+	},
+	"disabled system env with cli params": {
+		useSysEnv:     false,
+		systemEnv:     map[string]string{"test1": "val1"},
+		cliFlags:      []string{"-e", "test2=overwriten", "-e", "test2=val2"},
+		expEnv:        map[string]string{"test2": "val2"},
+		expCompatMode: defaultCompatMode,
+	},
+	"overwriting system env with cli param": {
+		useSysEnv:     true,
+		systemEnv:     map[string]string{"test1": "val1sys"},
+		cliFlags:      []string{"--env", "test1=val1cli"},
+		expEnv:        map[string]string{"test1": "val1cli"},
+		expCompatMode: defaultCompatMode,
+	},
+	"error wrong compat mode env var value": {
+		systemEnv: map[string]string{"K6_COMPATIBILITY_MODE": "asdf"},
+		expErr:    true,
+	},
+	"error wrong compat mode cli flag value": {
+		cliFlags: []string{"--compatibility-mode", "whatever"},
+		expErr:   true,
+	},
+	"error invalid cli var name 1": {
+		useSysEnv:     true,
+		systemEnv:     map[string]string{},
+		cliFlags:      []string{"--env", "test a=error"},
+		expErr:        true,
+		expEnv:        map[string]string{},
+		expCompatMode: defaultCompatMode,
+	},
+	"error invalid cli var name 2": {
+		useSysEnv:     true,
+		systemEnv:     map[string]string{},
+		cliFlags:      []string{"--env", "1var=error"},
+		expErr:        true,
+		expEnv:        map[string]string{},
+		expCompatMode: defaultCompatMode,
+	},
+	"error invalid cli var name 3": {
+		useSysEnv:     true,
+		systemEnv:     map[string]string{},
+		cliFlags:      []string{"--env", "уникод=unicode-disabled"},
+		expErr:        true,
+		expEnv:        map[string]string{},
+		expCompatMode: defaultCompatMode,
+	},
+	"valid env vars with spaces": {
+		useSysEnv:     true,
+		systemEnv:     map[string]string{"test1": "value 1"},
+		cliFlags:      []string{"--env", "test2=value 2"},
+		expEnv:        map[string]string{"test1": "value 1", "test2": "value 2"},
+		expCompatMode: defaultCompatMode,
+	},
+	"valid env vars with special chars": {
+		useSysEnv:     true,
+		systemEnv:     map[string]string{"test1": "value 1"},
+		cliFlags:      []string{"--env", "test2=value,2", "-e", `test3= ,  ,,, value, ,, 2!'@#,"`},
+		expEnv:        map[string]string{"test1": "value 1", "test2": "value,2", "test3": ` ,  ,,, value, ,, 2!'@#,"`},
+		expCompatMode: defaultCompatMode,
+	},
 }
 
-var envVarTestCases = []EnvVarTest{
-	{
-		"empty env",
-		true,
-		map[string]string{},
-		[]string{},
-		false,
-		map[string]string{},
-	},
-	{
-		"disabled sys env by default",
-		false,
-		map[string]string{"test1": "val1"},
-		[]string{},
-		false,
-		map[string]string{},
-	},
-	{
-		"disabled sys env by cli 1",
-		true,
-		map[string]string{"test1": "val1"},
-		[]string{"--include-system-env-vars=false"},
-		false,
-		map[string]string{},
-	},
-	{
-		"disabled sys env by cli 2",
-		true,
-		map[string]string{"test1": "val1"},
-		[]string{"--include-system-env-vars=0"},
-		false,
-		map[string]string{},
-	},
-	{
-		"enabled sys env by default",
-		true,
-		map[string]string{"test1": "val1"},
-		[]string{},
-		false,
-		map[string]string{"test1": "val1"},
-	},
-	{
-		"enabled sys env by cli 1",
-		false,
-		map[string]string{"test1": "val1"},
-		[]string{"--include-system-env-vars"},
-		false,
-		map[string]string{"test1": "val1"},
-	},
-	{
-		"enabled sys env by cli 2",
-		false,
-		map[string]string{"test1": "val1"},
-		[]string{"--include-system-env-vars=true"},
-		false,
-		map[string]string{"test1": "val1"},
-	},
-	{
-		"run only system env",
-		true,
-		map[string]string{"test1": "val1"},
-		[]string{},
-		false,
-		map[string]string{"test1": "val1"},
-	},
-	{
-		"mixed system and cli env",
-		true,
-		map[string]string{"test1": "val1", "test2": ""},
-		[]string{"--env", "test3=val3", "-e", "test4", "-e", "test5="},
-		false,
-		map[string]string{"test1": "val1", "test2": "", "test3": "val3", "test4": "", "test5": ""},
-	},
-	{
-		"mixed system and cli env 2",
-		false,
-		map[string]string{"test1": "val1", "test2": ""},
-		[]string{"--env", "test3=val3", "-e", "test4", "-e", "test5=", "--include-system-env-vars=1"},
-		false,
-		map[string]string{"test1": "val1", "test2": "", "test3": "val3", "test4": "", "test5": ""},
-	},
-	{
-		"disabled system env with cli params",
-		false,
-		map[string]string{"test1": "val1"},
-		[]string{"-e", "test2=overwriten", "-e", "test2=val2"},
-		false,
-		map[string]string{"test2": "val2"},
-	},
-	{
-		"overwriting system env with cli param",
-		true,
-		map[string]string{"test1": "val1sys"},
-		[]string{"--env", "test1=val1cli"},
-		false,
-		map[string]string{"test1": "val1cli"},
-	},
-	{
-		"error invalid cli var name 1",
-		true,
-		map[string]string{},
-		[]string{"--env", "test a=error"},
-		true,
-		map[string]string{},
-	},
-	{
-		"error invalid cli var name 2",
-		true,
-		map[string]string{},
-		[]string{"--env", "1var=error"},
-		true,
-		map[string]string{},
-	},
-	{
-		"error invalid cli var name 3",
-		true,
-		map[string]string{},
-		[]string{"--env", "уникод=unicode-disabled"},
-		true,
-		map[string]string{},
-	},
-	{
-		"valid env vars with spaces",
-		true,
-		map[string]string{"test1": "value 1"},
-		[]string{"--env", "test2=value 2"},
-		false,
-		map[string]string{"test1": "value 1", "test2": "value 2"},
-	},
-	{
-		"valid env vars with special chars",
-		true,
-		map[string]string{"test1": "value 1"},
-		[]string{"--env", "test2=value,2", "-e", `test3= ,  ,,, value, ,, 2!'@#,"`},
-		false,
-		map[string]string{"test1": "value 1", "test2": "value,2", "test3": ` ,  ,,, value, ,, 2!'@#,"`},
-	},
+func testRuntimeOptionsCase(t *testing.T, tc runtimeOptionsTestCase) {
+	flags := runtimeOptionFlagSet(tc.useSysEnv)
+	require.NoError(t, flags.Parse(tc.cliFlags))
+
+	rtOpts, err := getRuntimeOptions(flags, tc.systemEnv)
+	if tc.expErr {
+		require.Error(t, err)
+		return
+	}
+	require.NoError(t, err)
+	require.EqualValues(t, tc.expEnv, rtOpts.Env)
+	assert.Equal(t, tc.expCompatMode, rtOpts.CompatibilityMode)
+
+	compatMode, err := lib.ValidateCompatibilityMode(rtOpts.CompatibilityMode.String)
+	require.NoError(t, err)
+
+	jsCode := new(bytes.Buffer)
+	if compatMode == lib.CompatibilityModeExtended {
+		fmt.Fprint(jsCode, "export default function() {")
+	} else {
+		fmt.Fprint(jsCode, "module.exports.default = function() {")
+	}
+
+	for key, val := range tc.expEnv {
+		fmt.Fprintf(jsCode,
+			"if (__ENV.%s !== `%s`) { throw new Error('Invalid %s: ' + __ENV.%s); }",
+			key, val, key, key,
+		)
+	}
+	fmt.Fprint(jsCode, "}")
+
+	fs := afero.NewMemMapFs()
+	require.NoError(t, afero.WriteFile(fs, "/script.js", jsCode.Bytes(), 0o644))
+	runner, err := newRunner(
+		testutils.NewLogger(t),
+		&loader.SourceData{Data: jsCode.Bytes(), URL: &url.URL{Path: "/script.js", Scheme: "file"}},
+		typeJS,
+		map[string]afero.Fs{"file": fs},
+		rtOpts,
+	)
+	require.NoError(t, err)
+
+	archive := runner.MakeArchive()
+	archiveBuf := &bytes.Buffer{}
+	require.NoError(t, archive.Write(archiveBuf))
+
+	getRunnerErr := func(rtOpts lib.RuntimeOptions) (lib.Runner, error) {
+		return newRunner(
+			testutils.NewLogger(t),
+			&loader.SourceData{
+				Data: archiveBuf.Bytes(),
+				URL:  &url.URL{Path: "/script.js"},
+			},
+			typeArchive,
+			nil,
+			rtOpts,
+		)
+	}
+
+	_, err = getRunnerErr(lib.RuntimeOptions{})
+	require.NoError(t, err)
+	for key, val := range tc.expEnv {
+		r, err := getRunnerErr(lib.RuntimeOptions{Env: map[string]string{key: "almost " + val}})
+		assert.NoError(t, err)
+		assert.Equal(t, r.MakeArchive().Env[key], "almost "+val)
+	}
 }
 
-func TestEnvVars(t *testing.T) {
-	for _, tc := range envVarTestCases {
-		t.Run(fmt.Sprintf("EnvVar test '%s'", tc.name), func(t *testing.T) {
-			os.Clearenv()
-			for key, val := range tc.systemEnv {
-				require.NoError(t, os.Setenv(key, val))
-			}
-			flags := runtimeOptionFlagSet(tc.useSysEnv)
-			require.NoError(t, flags.Parse(tc.cliOpts))
-
-			rtOpts, err := getRuntimeOptions(flags)
-			if tc.expErr {
-				require.Error(t, err)
-				return
-			}
-			require.NoError(t, err)
-			require.EqualValues(t, tc.expEnv, rtOpts.Env)
-
-			// Clear the env again so real system values don't accidentally pollute the end-to-end test
-			os.Clearenv()
-
-			jsCode := "export default function() {\n"
-			for key, val := range tc.expEnv {
-				jsCode += fmt.Sprintf(
-					"if (__ENV.%s !== `%s`) { throw new Error('Invalid %s: ' + __ENV.%s); }\n",
-					key, val, key, key,
-				)
-			}
-			jsCode += "}"
-
-			// windows requires the environment variables to be loaded to gerenate the rand source
-			if runtime.GOOS == "windows" {
-				for _, e := range envVars {
-					parts := strings.Split(e, "=")
-					os.Setenv(parts[0], parts[1])
-				}
-			}
-
-			fs := afero.NewMemMapFs()
-			require.NoError(t, afero.WriteFile(fs, "/script.js", []byte(jsCode), 0644))
-			runner, err := newRunner(
-				&loader.SourceData{
-					Data: []byte(jsCode),
-					URL:  &url.URL{Path: "/script.js", Scheme: "file"},
-				},
-				typeJS,
-				map[string]afero.Fs{"file": fs},
-				rtOpts,
-			)
-			require.NoError(t, err)
-
-			archive := runner.MakeArchive()
-			archiveBuf := &bytes.Buffer{}
-			assert.NoError(t, archive.Write(archiveBuf))
-
-			getRunnerErr := func(rtOpts lib.RuntimeOptions) (lib.Runner, error) {
-				return newRunner(
-					&loader.SourceData{
-						Data: archiveBuf.Bytes(),
-						URL:  &url.URL{Path: "/script.js"},
-					},
-					typeArchive,
-					nil,
-					rtOpts,
-				)
-			}
-
-			_, err = getRunnerErr(lib.RuntimeOptions{})
-			require.NoError(t, err)
-			for key, val := range tc.expEnv {
-				r, err := getRunnerErr(lib.RuntimeOptions{Env: map[string]string{key: "almost " + val}})
-				assert.NoError(t, err)
-				assert.Equal(t, r.MakeArchive().Env[key], "almost "+val)
-			}
+func TestRuntimeOptions(t *testing.T) {
+	for name, tc := range runtimeOptionsTestCases {
+		tc := tc
+		t.Run(fmt.Sprintf("RuntimeOptions test '%s'", name), func(t *testing.T) {
+			t.Parallel()
+			testRuntimeOptionsCase(t, tc)
 		})
 	}
 }

@@ -27,19 +27,20 @@ import (
 	"net"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 
-	"github.com/loadimpact/k6/lib/scheduler"
-	"github.com/loadimpact/k6/lib/types"
-	"github.com/loadimpact/k6/stats"
 	"github.com/pkg/errors"
 	"gopkg.in/guregu/null.v3"
+
+	"github.com/loadimpact/k6/lib/types"
+	"github.com/loadimpact/k6/stats"
 )
 
-// DefaultSchedulerName is used as the default key/ID of the scheduler config entries
+// DefaultScenarioName is used as the default key/ID of the scenario config entries
 // that were created due to the use of the shortcut execution control options (i.e. duration+vus,
 // iterations+vus, or stages)
-const DefaultSchedulerName = "default"
+const DefaultScenarioName = "default"
 
 // DefaultSummaryTrendStats are the default trend columns shown in the test summary output
 // nolint: gochecknoglobals
@@ -71,8 +72,8 @@ func (v *TLSVersion) UnmarshalJSON(data []byte) error {
 
 // Fields for TLSVersions. Unmarshalling hack.
 type TLSVersionsFields struct {
-	Min TLSVersion `json:"min"` // Minimum allowed version, 0 = any.
-	Max TLSVersion `json:"max"` // Maximum allowed version, 0 = any.
+	Min TLSVersion `json:"min" ignored:"true"` // Minimum allowed version, 0 = any.
+	Max TLSVersion `json:"max" ignored:"true"` // Maximum allowed version, 0 = any.
 }
 
 // Describes a set (min/max) of TLS versions.
@@ -98,8 +99,21 @@ func (v *TLSVersions) isTLS13() bool {
 
 // A list of TLS cipher suites.
 // Marshals and unmarshals from a list of names, eg. "TLS_ECDHE_RSA_WITH_RC4_128_SHA".
-// BUG: This currently doesn't marshal back to JSON properly!!
 type TLSCipherSuites []uint16
+
+// MarshalJSON will return the JSON representation according to supported TLS cipher suites
+func (s *TLSCipherSuites) MarshalJSON() ([]byte, error) {
+	var suiteNames []string
+	for _, id := range *s {
+		if suiteName, ok := SupportedTLSCipherSuitesToString[id]; ok {
+			suiteNames = append(suiteNames, suiteName)
+		} else {
+			return nil, errors.Errorf("Unknown cipher suite id: %d", id)
+		}
+	}
+
+	return json.Marshal(suiteNames)
+}
 
 func (s *TLSCipherSuites) UnmarshalJSON(data []byte) error {
 	var suiteNames []string
@@ -159,10 +173,8 @@ func (c *TLSAuth) Certificate() (*tls.Certificate, error) {
 }
 
 // IPNet is a wrapper around net.IPNet for JSON unmarshalling
-type IPNet net.IPNet
-
-func (ipnet *IPNet) String() string {
-	return (*net.IPNet)(ipnet).String()
+type IPNet struct {
+	net.IPNet
 }
 
 // UnmarshalText populates the IPNet from the given CIDR
@@ -177,6 +189,84 @@ func (ipnet *IPNet) UnmarshalText(b []byte) error {
 	return nil
 }
 
+// HostAddress stores information about IP and port
+// for a host.
+type HostAddress net.TCPAddr
+
+// NewHostAddress creates a pointer to a new address with an IP object.
+func NewHostAddress(ip net.IP, portString string) (*HostAddress, error) {
+	var port int
+	if portString != "" {
+		var err error
+		if port, err = strconv.Atoi(portString); err != nil {
+			return nil, err
+		}
+	}
+
+	return &HostAddress{
+		IP:   ip,
+		Port: port,
+	}, nil
+}
+
+// String converts a HostAddress into a string.
+func (h *HostAddress) String() string {
+	return (*net.TCPAddr)(h).String()
+}
+
+// MarshalText implements the encoding.TextMarshaler interface.
+// The encoding is the same as returned by String, with one exception:
+// When len(ip) is zero, it returns an empty slice.
+func (h *HostAddress) MarshalText() ([]byte, error) {
+	if h == nil || len(h.IP) == 0 {
+		return []byte(""), nil
+	}
+
+	if len(h.IP) != net.IPv4len && len(h.IP) != net.IPv6len {
+		return nil, &net.AddrError{Err: "invalid IP address", Addr: h.IP.String()}
+	}
+
+	return []byte(h.String()), nil
+}
+
+// UnmarshalText implements the encoding.TextUnmarshaler interface.
+// The IP address is expected in a form accepted by ParseIP.
+func (h *HostAddress) UnmarshalText(text []byte) error {
+	if len(text) == 0 {
+		return &net.ParseError{Type: "IP address", Text: "<nil>"}
+	}
+
+	ip, port, err := splitHostPort(text)
+	if err != nil {
+		return err
+	}
+
+	nh, err := NewHostAddress(ip, port)
+	if err != nil {
+		return err
+	}
+
+	*h = *nh
+
+	return nil
+}
+
+func splitHostPort(text []byte) (net.IP, string, error) {
+	host, port, err := net.SplitHostPort(string(text))
+	if err != nil {
+		// This error means that there is no port.
+		// Make host the full text.
+		host = string(text)
+	}
+
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return nil, "", &net.ParseError{Type: "IP address", Text: host}
+	}
+
+	return ip, port, nil
+}
+
 // ParseCIDR creates an IPNet out of a CIDR string
 func ParseCIDR(s string) (*IPNet, error) {
 	_, ipnet, err := net.ParseCIDR(s)
@@ -184,7 +274,7 @@ func ParseCIDR(s string) (*IPNet, error) {
 		return nil, err
 	}
 
-	parsedIPNet := IPNet(*ipnet)
+	parsedIPNet := IPNet{IPNet: *ipnet}
 
 	return &parsedIPNet, nil
 }
@@ -292,18 +382,25 @@ type Options struct {
 
 	// Initial values for VUs, max VUs, duration cap, iteration cap, and stages.
 	// See the Runner or Executor interfaces for more information.
-	VUs null.Int `json:"vus" envconfig:"K6_VUS"`
-
-	//TODO: deprecate this? or reuse it in the manual control "scheduler"?
-	VUsMax     null.Int           `json:"vusMax" envconfig:"K6_VUS_MAX"`
+	VUs        null.Int           `json:"vus" envconfig:"K6_VUS"`
 	Duration   types.NullDuration `json:"duration" envconfig:"K6_DURATION"`
 	Iterations null.Int           `json:"iterations" envconfig:"K6_ITERATIONS"`
 	Stages     []Stage            `json:"stages" envconfig:"K6_STAGES"`
 
-	Execution scheduler.ConfigMap `json:"execution,omitempty" envconfig:"-"`
+	// TODO: remove the `ignored:"true"` from the field tags, it's there so that
+	// the envconfig library will ignore those fields.
+	//
+	// We should support specifying execution segments via environment
+	// variables, but we currently can't, because envconfig has this nasty bug
+	// (among others): https://github.com/kelseyhightower/envconfig/issues/113
+	Scenarios                ScenarioConfigs           `json:"scenarios,omitempty" ignored:"true"`
+	ExecutionSegment         *ExecutionSegment         `json:"executionSegment" ignored:"true"`
+	ExecutionSegmentSequence *ExecutionSegmentSequence `json:"executionSegmentSequence" ignored:"true"`
 
 	// Timeouts for the setup() and teardown() functions
+	NoSetup         null.Bool          `json:"noSetup" envconfig:"NO_SETUP"`
 	SetupTimeout    types.NullDuration `json:"setupTimeout" envconfig:"K6_SETUP_TIMEOUT"`
+	NoTeardown      null.Bool          `json:"noTeardown" envconfig:"NO_TEARDOWN"`
 	TeardownTimeout types.NullDuration `json:"teardownTimeout" envconfig:"K6_TEARDOWN_TIMEOUT"`
 
 	// Limit HTTP requests per second.
@@ -327,7 +424,7 @@ type Options struct {
 
 	// Specify TLS versions and cipher suites, and present client certificates.
 	TLSCipherSuites *TLSCipherSuites `json:"tlsCipherSuites" envconfig:"K6_TLS_CIPHER_SUITES"`
-	TLSVersion      *TLSVersions     `json:"tlsVersion" envconfig:"K6_TLS_VERSION"`
+	TLSVersion      *TLSVersions     `json:"tlsVersion" ignored:"true"`
 	TLSAuth         []*TLSAuth       `json:"tlsAuth" envconfig:"K6_TLSAUTH"`
 
 	// Throw warnings (eg. failed HTTP requests) as errors instead of simply logging them.
@@ -345,7 +442,7 @@ type Options struct {
 	BlockedHostnames *HostnameTrie `json:"blockHostnames" envconfig:"K6_BLOCK_HOSTNAMES"`
 
 	// Hosts overrides dns entries for given hosts
-	Hosts map[string]net.IP `json:"hosts" envconfig:"K6_HOSTS"`
+	Hosts map[string]*HostAddress `json:"hosts" envconfig:"K6_HOSTS"`
 
 	// Disable keep-alive connections
 	NoConnectionReuse null.Bool `json:"noConnectionReuse" envconfig:"K6_NO_CONNECTION_REUSE"`
@@ -402,9 +499,6 @@ func (o Options) Apply(opts Options) Options {
 	if opts.VUs.Valid {
 		o.VUs = opts.VUs
 	}
-	if opts.VUsMax.Valid {
-		o.VUsMax = opts.VUsMax
-	}
 
 	// Specifying duration, iterations, stages, or execution in a "higher" config tier
 	// will overwrite all of the the previous execution settings (if any) from any
@@ -412,14 +506,12 @@ func (o Options) Apply(opts Options) Options {
 	// Still, if more than one of those options is simultaneously specified in the same
 	// config tier, they will be preserved, so the validation after we've consolidated
 	// all of the options can return an error.
-	if opts.Duration.Valid || opts.Iterations.Valid || opts.Stages != nil || opts.Execution != nil {
-		//TODO: uncomment this after we start using the new schedulers
-		/*
-			o.Duration = types.NewNullDuration(0, false)
-			o.Iterations = null.NewInt(0, false)
-			o.Stages = nil
-		*/
-		o.Execution = nil
+	if opts.Duration.Valid || opts.Iterations.Valid || opts.Stages != nil || opts.Scenarios != nil {
+		// TODO: emit a warning or a notice log message if overwrite lower tier config options?
+		o.Duration = types.NewNullDuration(0, false)
+		o.Iterations = null.NewInt(0, false)
+		o.Stages = nil
+		o.Scenarios = nil
 	}
 
 	if opts.Duration.Valid {
@@ -440,11 +532,24 @@ func (o Options) Apply(opts Options) Options {
 	// that happens after the configuration from the different sources is consolidated. It can't
 	// happen here, because something like `K6_ITERATIONS=10 k6 run --vus 5 script.js` wont't
 	// work correctly at this level.
-	if opts.Execution != nil {
-		o.Execution = opts.Execution
+	if opts.Scenarios != nil {
+		o.Scenarios = opts.Scenarios
+	}
+	if opts.ExecutionSegment != nil {
+		o.ExecutionSegment = opts.ExecutionSegment
+	}
+
+	if opts.ExecutionSegmentSequence != nil {
+		o.ExecutionSegmentSequence = opts.ExecutionSegmentSequence
+	}
+	if opts.NoSetup.Valid {
+		o.NoSetup = opts.NoSetup
 	}
 	if opts.SetupTimeout.Valid {
 		o.SetupTimeout = opts.SetupTimeout
+	}
+	if opts.NoTeardown.Valid {
+		o.NoTeardown = opts.NoTeardown
 	}
 	if opts.TeardownTimeout.Valid {
 		o.TeardownTimeout = opts.TeardownTimeout
@@ -539,9 +644,24 @@ func (o Options) Apply(opts Options) Options {
 
 // Validate checks if all of the specified options make sense
 func (o Options) Validate() []error {
-	//TODO: validate all of the other options... that we should have already been validating...
-	//TODO: maybe integrate an external validation lib: https://github.com/avelino/awesome-go#validation
-	return o.Execution.Validate()
+	// TODO: validate all of the other options... that we should have already been validating...
+	// TODO: maybe integrate an external validation lib: https://github.com/avelino/awesome-go#validation
+	var errors []error
+	if o.ExecutionSegmentSequence != nil {
+		var segmentFound bool
+		for _, segment := range *o.ExecutionSegmentSequence {
+			if o.ExecutionSegment.Equal(segment) {
+				segmentFound = true
+				break
+			}
+		}
+		if !segmentFound {
+			errors = append(errors,
+				fmt.Errorf("provided segment %s can't be found in sequence %s",
+					o.ExecutionSegment, o.ExecutionSegmentSequence))
+		}
+	}
+	return append(errors, o.Scenarios.Validate()...)
 }
 
 // ForEachSpecified enumerates all struct fields and calls the supplied function with each

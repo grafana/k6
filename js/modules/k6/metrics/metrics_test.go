@@ -26,11 +26,12 @@ import (
 	"testing"
 
 	"github.com/dop251/goja"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestMetrics(t *testing.T) {
@@ -72,6 +73,7 @@ func TestMetrics(t *testing.T) {
 						Options: lib.Options{SystemTags: stats.NewSystemTagSet(stats.TagGroup)},
 						Group:   root,
 						Samples: samples,
+						Tags:    map[string]string{"group": root.Path},
 					}
 
 					isTimeString := ""
@@ -79,7 +81,7 @@ func TestMetrics(t *testing.T) {
 						isTimeString = `, true`
 					}
 					_, err := common.RunString(rt,
-						fmt.Sprintf(`let m = new metrics.%s("my_metric"%s)`, fn, isTimeString),
+						fmt.Sprintf(`var m = new metrics.%s("my_metric"%s)`, fn, isTimeString),
 					)
 					if !assert.NoError(t, err) {
 						return
@@ -96,8 +98,10 @@ func TestMetrics(t *testing.T) {
 						"Child": child,
 					}
 					for name, g := range groups {
+						name, g := name, g
 						t.Run(name, func(t *testing.T) {
 							state.Group = g
+							state.Tags["group"] = g.Path
 							for name, val := range values {
 								t.Run(name, func(t *testing.T) {
 									t.Run("Simple", func(t *testing.T) {

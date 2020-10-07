@@ -21,11 +21,12 @@ That said, "how do I..."-type questions are often more suited for Slack.
 Contributing code
 -----------------
 
-If you'd like to contribute code to k6, this is the basic procedure. Make sure to follow the [style guide](#style-guide) described below!
+If you'd like to contribute code to k6, this is the basic procedure. Make sure to follow the [style guide](#style-guide) described below.
 
-1. Find an issue you'd like to fix. If there is none already, or you'd like to add a feature, please open one and we can talk about how to do it.
-
-   Remember, there's more to software development than code; if it's not properly planned, stuff gets messy real fast.
+1. Find an issue you'd like to fix. If there is none already, or you'd like to add a feature, please open one and we can talk about how to do it.  Out of respect for your time, please start a discussion regarding any bigger contributions either in a GitHub Issue, in the community forums or in the `#contributors` channel of the k6 slack **before** you get started on the implementation.
+  
+   
+   Remember, there's more to software development than code; if it's not properly planned, stuff gets messy real fast. 
 
 2. Create a fork and open a feature branch - `feature/my-cool-feature` is the classic way to name these, but it really doesn't matter.
 
