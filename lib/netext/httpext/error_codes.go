@@ -23,6 +23,7 @@ package httpext
 import (
 	"crypto/tls"
 	"crypto/x509"
+	stderrors "errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -79,7 +80,7 @@ const (
 	// errors till 1651 + 13 are other HTTP2 Connection errors with a specific errCode
 
 	// Custom k6 content errors, i.e. when the magic fails
-	//defaultContentError errCode = 1700 // reserved for future use
+	// defaultContentError errCode = 1700 // reserved for future use
 	responseDecompressionErrorCode errCode = 1701
 )
 
@@ -107,7 +108,25 @@ func http2ErrCodeOffset(code http2.ErrCode) errCode {
 
 // errorCodeForError returns the errorCode and a specific error message for given error.
 func errorCodeForError(err error) (errCode, string) {
-	switch e := errors.Cause(err).(type) {
+	inner := stderrors.Unwrap(err)
+	if inner != nil && inner != err {
+		code, resultErr := errorCodeForError(inner)
+		if code != defaultErrorCode {
+			return code, resultErr
+		}
+	}
+
+	causeErr := errors.Cause(err)
+
+	inner = stderrors.Unwrap(causeErr)
+	if inner != nil && inner != causeErr {
+		code, resultErr := errorCodeForError(inner)
+		if code != defaultErrorCode {
+			return code, resultErr
+		}
+	}
+
+	switch e := errors.Cause(causeErr).(type) {
 	case K6Error:
 		return e.Code, e.Message
 	case *net.DNSError:
