@@ -404,7 +404,7 @@ func TestOptions(t *testing.T) {
 		opts := Options{}.Apply(Options{ClientIpRange: null.StringFrom("10.10.0.0/16")})
 		assert.True(t, opts.ClientIpRange.Valid)
 		assert.Equal(t, "10.10.0.0/16", opts.ClientIpRange.String)
-		opts := Options{}.Apply(Options{ClientIpRange: null.StringFrom("10.10.0.1-10.10.255.254")})
+		opts = Options{}.Apply(Options{ClientIpRange: null.StringFrom("10.10.0.1-10.10.255.254")})
 		assert.True(t, opts.ClientIpRange.Valid)
 		assert.Equal(t, "10.10.0.1-10.10.255.254", opts.ClientIpRange.String)
 	})
