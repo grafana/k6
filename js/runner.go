@@ -118,10 +118,10 @@ func newFromBundle(logger *logrus.Logger, b *Bundle) (*Runner, error) {
 
 type IpPool struct {
         ip       net.IP
-        hostBase uint64
-        netBase  uint64
-        hostMod  uint64
-        netMod   uint64
+        hostStart uint64
+        netStart  uint64
+        hostRangeNum  uint64
+        netRangeNum   uint64
 }
 
 func GetIpPool(s string) *IpPool {
@@ -160,7 +160,7 @@ func ipPoolFromCidr(s string) *IpPool {
                 fmt.Println("ParseCIDR() failed: ", s)
                 return nil
         }
-        // ip0 (ip start in cidr) >= ip1 (cidr-aligned ip base)
+        // ip0 (range start) >= ip1 (cidr start)
         ip1 := pnet.IP.To16()
         n0 := binary.BigEndian.Uint64(ip0[:8])
         h0 := binary.BigEndian.Uint64(ip0[8:])
@@ -168,36 +168,36 @@ func ipPoolFromCidr(s string) *IpPool {
         h1 := binary.BigEndian.Uint64(ip1[8:])
         ones, bits := pnet.Mask.Size()
         mask := bits - ones
-        hostCnt, netCnt := h0-h1, n0-n1
-        nMod, hMod := uint64(0), uint64(1<<mask)-hostCnt
+        hostPos, netPos := h0-h1, n0-n1
+        netRangeNum, hostRangeNum := uint64(0), uint64(1<<mask)-hostPos
         if mask > 64 {
-                nMod, hMod = uint64(1<<(mask-64))-netCnt, ^uint64(0)-hostCnt
+                netRangeNum, hostRangeNum = uint64(1<<(mask-64))-netPos, ^uint64(0)-hostPos
         }
-        return &IpPool{ip0, h0, n0, hMod, nMod}
+        return &IpPool{ip0, h0, n0, hostRangeNum, netRangeNum}
 }
 
 func (pool *IpPool) GetRandomIP(seed int64) net.IP {
-        var hostAdd, netAdd uint64
+        var hostShift, netShift uint64
         r := rand.New(rand.NewSource(seed))
-        if pool.hostMod > 0 {
-                hostAdd = r.Uint64() % pool.hostMod
+        if pool.hostRangeNum > 0 {
+                hostShift = r.Uint64() % pool.hostRangeNum
         }
         if b := pool.ip.To4(); b != nil {
-                i := pool.hostBase + hostAdd
+                i := pool.hostStart + hostShift
                 return net.IPv4(byte(i>>24), byte(i>>16), byte(i>>8), byte(i))
         }
-        if pool.netMod > 0 {
-                netAdd = r.Uint64() % pool.netMod
+        if pool.netRangeNum > 0 {
+                netShift = r.Uint64() % pool.netRangeNum
         }
         if b := pool.ip.To16(); b != nil {
-                nn := pool.netBase + netAdd
-                nh := pool.hostBase + hostAdd
-                if nh < pool.hostBase {
-                        nn = nn + 1
+                netPos := pool.netStart + netShift
+                hostPos := pool.hostStart + hostShift
+                if hostPos < pool.hostStart {
+                        netPos = netPos + 1
                 }
                 if ip6 := make(net.IP, net.IPv6len); ip6 != nil {
-                        binary.BigEndian.PutUint64(ip6[:8], nn)
-                        binary.BigEndian.PutUint64(ip6[8:], nh)
+                        binary.BigEndian.PutUint64(ip6[:8], netPos)
+                        binary.BigEndian.PutUint64(ip6[8:], hostPos)
                         return ip6
                 }
         }
