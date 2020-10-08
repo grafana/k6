@@ -80,15 +80,15 @@ const (
 	// errors till 1651 + 13 are other HTTP2 Connection errors with a specific errCode
 
 	// Custom k6 content errors, i.e. when the magic fails
-	//defaultContentError errCode = 1700 // reserved for future use
+	// defaultContentError errCode = 1700 // reserved for future use
 	responseDecompressionErrorCode errCode = 1701
 )
 
 const (
-	tcpResetByPeerErrorCodeMsg  = "write: connection reset by peer"
+	tcpResetByPeerErrorCodeMsg  = "%s: connection reset by peer"
 	tcpDialTimeoutErrorCodeMsg  = "dial: i/o timeout"
 	tcpDialRefusedErrorCodeMsg  = "dial: connection refused"
-	tcpBrokenPipeErrorCodeMsg   = "write: broken pipe"
+	tcpBrokenPipeErrorCodeMsg   = "%s: broken pipe"
 	netUnknownErrnoErrorCodeMsg = "%s: unknown errno `%d` on %s with message `%s`"
 	dnsNoSuchHostErrorCodeMsg   = "lookup: no such host"
 	blackListedIPErrorCodeMsg   = "ip is blacklisted"
@@ -143,14 +143,12 @@ func errorCodeForError(err error) (errCode, string) {
 			// TODO: figure out how this happens
 			return defaultNetNonTCPErrorCode, err.Error()
 		}
-		if e.Op == "write" {
-			if sErr, ok := e.Err.(*os.SyscallError); ok {
-				switch sErr.Err {
-				case syscall.ECONNRESET:
-					return tcpResetByPeerErrorCode, tcpResetByPeerErrorCodeMsg
-				case syscall.EPIPE:
-					return tcpBrokenPipeErrorCode, tcpBrokenPipeErrorCodeMsg
-				}
+		if sErr, ok := e.Err.(*os.SyscallError); ok {
+			switch sErr.Err {
+			case syscall.ECONNRESET:
+				return tcpResetByPeerErrorCode, fmt.Sprintf(tcpResetByPeerErrorCodeMsg, e.Op)
+			case syscall.EPIPE:
+				return tcpBrokenPipeErrorCode, fmt.Sprintf(tcpBrokenPipeErrorCodeMsg, e.Op)
 			}
 		}
 		if e.Op == "dial" {
