@@ -26,13 +26,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sirupsen/logrus"
-	"gopkg.in/guregu/null.v3"
-
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/ui/pb"
+	"github.com/sirupsen/logrus"
+	"gopkg.in/guregu/null.v3"
 )
 
 const constantVUsType = "constant-vus"
@@ -182,6 +181,11 @@ func (clv ConstantVUs) Run(parentCtx context.Context, out chan<- stats.SampleCon
 			activeVUs.Done()
 		})
 	handleVU := func(initVU lib.InitializedVU) {
+		defer func() {
+			if r := recover(); r != nil {
+				clv.logger.Errorln(r)
+			}
+		}()
 		ctx, cancel := context.WithCancel(maxDurationCtx)
 		defer cancel()
 
