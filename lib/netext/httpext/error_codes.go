@@ -23,7 +23,7 @@ package httpext
 import (
 	"crypto/tls"
 	"crypto/x509"
-	stderrors "errors"
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -31,7 +31,6 @@ import (
 	"runtime"
 	"syscall"
 
-	"github.com/pkg/errors"
 	"golang.org/x/net/http2"
 
 	"github.com/loadimpact/k6/lib/netext"
@@ -108,17 +107,15 @@ func http2ErrCodeOffset(code http2.ErrCode) errCode {
 
 // errorCodeForError returns the errorCode and a specific error message for given error.
 func errorCodeForError(err error) (errCode, string) {
-	causeErr := errors.Cause(err)
-
-	inner := stderrors.Unwrap(causeErr)
-	if inner != nil && inner != causeErr {
+	inner := errors.Unwrap(err)
+	if inner != nil && inner != err {
 		code, resultErr := errorCodeForError(inner)
 		if code != defaultErrorCode {
 			return code, resultErr
 		}
 	}
 
-	switch e := errors.Cause(causeErr).(type) {
+	switch e := err.(type) {
 	case K6Error:
 		return e.Code, e.Message
 	case *net.DNSError:
