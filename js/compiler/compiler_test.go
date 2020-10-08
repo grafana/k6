@@ -61,7 +61,7 @@ func TestTransform(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, strings.Join([]string{
 			`"use strict";function add(a, b) {`,
-			`    return a + b;`,
+			`  return a + b;`,
 			`};`,
 			``,
 			`var res = add(1, 2);`,
@@ -109,8 +109,7 @@ func TestCompile(t *testing.T) {
 			src := `1+(function() { return 2; )()`
 			_, _, err := c.Compile(src, "script.js", "", "", true, lib.CompatibilityModeExtended)
 			assert.IsType(t, &goja.Exception{}, err)
-			assert.Contains(t, err.Error(), `SyntaxError: script.js: Unexpected token (1:26)
-> 1 | 1+(function() { return 2; )()`)
+			assert.Contains(t, err.Error(), `SyntaxError: /script.js: Unexpected token (1:26)`)
 		})
 	})
 	t.Run("ES6", func(t *testing.T) {
@@ -146,10 +145,9 @@ func TestCompile(t *testing.T) {
 		})
 
 		t.Run("Invalid", func(t *testing.T) {
-			_, _, err := c.Compile(`1+(=>2)()`, "script.js", "", "", true, lib.CompatibilityModeExtended)
+			_, _, err := c.Compile(`1+(=>2)()`, "/script.js", "", "", true, lib.CompatibilityModeExtended)
 			assert.IsType(t, &goja.Exception{}, err)
-			assert.Contains(t, err.Error(), `SyntaxError: script.js: Unexpected token (1:3)
-> 1 | 1+(=>2)()`)
+			assert.Contains(t, err.Error(), `SyntaxError: /script.js: Unexpected token (1:3)`)
 		})
 
 		t.Run("Invalid for goja but not babel", func(t *testing.T) {

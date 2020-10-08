@@ -124,7 +124,7 @@ func TestInitContextRequire(t *testing.T) {
 			assert.NoError(t, afero.WriteFile(fs, "/file.js", []byte{0x00}, 0o755))
 			_, err := getSimpleBundle(t, "/script.js", `import "/file.js"; export default function() {}`, fs)
 			require.Error(t, err)
-			assert.Contains(t, err.Error(), "SyntaxError: file:///file.js: Unexpected character '\x00' (1:0)\n> 1 | \x00\n")
+			assert.Contains(t, err.Error(), "SyntaxError: /file:/file.js: Unexpected character '\x00' (1:0)")
 		})
 		t.Run("Error", func(t *testing.T) {
 			fs := afero.NewMemMapFs()

@@ -80,7 +80,7 @@ func TestNewBundle(t *testing.T) {
 	t.Run("Invalid", func(t *testing.T) {
 		_, err := getSimpleBundle(t, "/script.js", "\x00")
 		assert.NotNil(t, err)
-		assert.Contains(t, err.Error(), "SyntaxError: file:///script.js: Unexpected character '\x00' (1:0)\n> 1 | \x00\n")
+		assert.Contains(t, err.Error(), "SyntaxError: /file:/script.js: Unexpected character '\x00' (1:0)")
 	})
 	t.Run("Error", func(t *testing.T) {
 		_, err := getSimpleBundle(t, "/script.js", `throw new Error("aaaa");`)

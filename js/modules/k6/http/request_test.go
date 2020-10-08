@@ -77,7 +77,7 @@ func TestRunES6String(t *testing.T) {
 	t.Run("Invalid", func(t *testing.T) {
 		_, err := runES6String(t, goja.New(), `let a = #;`)
 		assert.NotNil(t, err)
-		assert.Contains(t, err.Error(), "SyntaxError: __string__: Unexpected character '#' (1:8)\n> 1 | let a = #;\n")
+		assert.Contains(t, err.Error(), "SyntaxError: /__string__: Unexpected token (1:8)")
 	})
 }
 
