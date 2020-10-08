@@ -454,7 +454,7 @@ func (a *float64Array) typeMatch(v Value) bool {
 
 func (a *typedArrayObject) _getIdx(idx int) Value {
 	a.viewedArrayBuf.ensureNotDetached()
-	if idx < a.length {
+	if 0 <= idx && idx < a.length {
 		return a.typedArray.get(idx + a.offset)
 	}
 	return nil

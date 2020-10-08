@@ -751,8 +751,6 @@ func (self *_parser) parseAssignmentExpression() ast.Expression {
 		operator = token.REMAINDER
 	case token.AND_ASSIGN:
 		operator = token.AND
-	case token.AND_NOT_ASSIGN:
-		operator = token.AND_NOT
 	case token.OR_ASSIGN:
 		operator = token.OR
 	case token.EXCLUSIVE_OR_ASSIGN:
