@@ -144,11 +144,15 @@ func errorCodeForError(err error) (errCode, string) {
 			return defaultNetNonTCPErrorCode, err.Error()
 		}
 		if sErr, ok := e.Err.(*os.SyscallError); ok {
-			switch sErr.Err {
+			switch sErr.Unwrap() {
 			case syscall.ECONNRESET:
 				return tcpResetByPeerErrorCode, fmt.Sprintf(tcpResetByPeerErrorCodeMsg, e.Op)
 			case syscall.EPIPE:
 				return tcpBrokenPipeErrorCode, fmt.Sprintf(tcpBrokenPipeErrorCodeMsg, e.Op)
+			}
+			code, msg := getOSSyscallErrorCode(e, sErr)
+			if code != 0 {
+				return code, msg
 			}
 		}
 		if e.Op == "dial" {
