@@ -175,7 +175,7 @@ github.com/pierrec/lz4
 # github.com/pierrec/xxHash v0.1.1
 ## explicit
 github.com/pierrec/xxHash/xxHash32
-# github.com/pkg/errors v0.8.0
+# github.com/pkg/errors v0.9.1
 ## explicit
 github.com/pkg/errors
 # github.com/pmezard/go-difflib v1.0.0
