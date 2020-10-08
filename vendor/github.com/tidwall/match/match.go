@@ -168,25 +168,14 @@ func Allowable(pattern string) (min, max string) {
 		}
 	}
 	return string(minb), string(maxb)
-	/*
-		return
-		if wild {
-			r, n := utf8.DecodeLastRune(maxb)
-			if r != utf8.RuneError {
-				if r < utf8.MaxRune {
-					infinite = true
-				} else {
-					r++
-					if r > 0x7f {
-						b := make([]byte, 4)
-						nn := utf8.EncodeRune(b, r)
-						maxb = append(maxb[:len(maxb)-n], b[:nn]...)
-					} else {
-						maxb = append(maxb[:len(maxb)-n], byte(r))
-					}
-				}
-			}
+}
+
+// IsPattern returns true if the string is a pattern.
+func IsPattern(str string) bool {
+	for i := 0; i < len(str); i++ {
+		if str[i] == '*' || str[i] == '?' {
+			return true
 		}
-		return string(minb), string(maxb), infinite
-	*/
+	}
+	return false
 }
