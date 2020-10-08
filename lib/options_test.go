@@ -407,6 +407,12 @@ func TestOptions(t *testing.T) {
 		opts = Options{}.Apply(Options{ClientIpRange: null.StringFrom("10.10.0.1-10.10.255.254")})
 		assert.True(t, opts.ClientIpRange.Valid)
 		assert.Equal(t, "10.10.0.1-10.10.255.254", opts.ClientIpRange.String)
+		opts = Options{}.Apply(Options{ClientIpRange: null.StringFrom("fd00:0:188::50:0/118")})
+		assert.True(t, opts.ClientIpRange.Valid)
+		assert.Equal(t, "fd00:0:188::50:0/118", opts.ClientIpRange.String)
+		opts = Options{}.Apply(Options{ClientIpRange: null.StringFrom("fd00:1:1:0::1-fd00:1:1:4::3ff")})
+		assert.True(t, opts.ClientIpRange.Valid)
+		assert.Equal(t, "fd00:1:1:0::1-fd00:1:1:4::3ff", opts.ClientIpRange.String)
 	})
 }
 
@@ -470,6 +476,10 @@ func TestOptionsEnv(t *testing.T) {
 			"":    null.String{},
 			"Hi!": null.StringFrom("Hi!"),
 		},
+		{"ClientIpRange", "K6_CLIENT_IP_RANGE"}: {
+			"":	null.String{},
+		//	"Hi!":	null.StringFrom("Hi!"),
+		},
 		{"Throw", "K6_THROW"}: {
 			"":      null.Bool{},
 			"true":  null.BoolFrom(true),
@@ -482,11 +492,6 @@ func TestOptionsEnv(t *testing.T) {
 		},
 		// Thresholds
 		// External
-		{"ClientIpRange", "K6_CLIENT_IP_RANGE"}: {
-			"": null.String{},
-			"10.10.0.1-10.10.255.254": null.StringFrom("10.10.0.1-10.10.255.254"),
-			"10.10.0.0/16": null.StringFrom("10.10.0.0/16"),
-		},
 	}
 	for field, data := range testdata {
 		field, data := field, data
