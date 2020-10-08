@@ -197,3 +197,14 @@ func TestConnReset(t *testing.T) {
 		assert.Nil(t, err)
 	}
 }
+
+func TestDnsResolve(t *testing.T) {
+	// this uses the Unwrap path
+	// this is not happening in our current codebase as the resolution in our code
+	// happens earlier so it doesn't get wrapped, but possibly happens in other cases as well
+	_, err := http.Get("http://s.com") //nolint:bodyclose,noctx
+	code, msg := errorCodeForError(err)
+
+	assert.Equal(t, dnsNoSuchHostErrorCode, code)
+	assert.Equal(t, dnsNoSuchHostErrorCodeMsg, msg)
+}
