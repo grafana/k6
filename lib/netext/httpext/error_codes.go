@@ -85,10 +85,10 @@ const (
 )
 
 const (
-	tcpResetByPeerErrorCodeMsg  = "write: connection reset by peer"
+	tcpResetByPeerErrorCodeMsg  = "%s: connection reset by peer"
 	tcpDialTimeoutErrorCodeMsg  = "dial: i/o timeout"
 	tcpDialRefusedErrorCodeMsg  = "dial: connection refused"
-	tcpBrokenPipeErrorCodeMsg   = "write: broken pipe"
+	tcpBrokenPipeErrorCodeMsg   = "%s: broken pipe"
 	netUnknownErrnoErrorCodeMsg = "%s: unknown errno `%d` on %s with message `%s`"
 	dnsNoSuchHostErrorCodeMsg   = "lookup: no such host"
 	blackListedIPErrorCodeMsg   = "ip is blacklisted"
@@ -108,17 +108,9 @@ func http2ErrCodeOffset(code http2.ErrCode) errCode {
 
 // errorCodeForError returns the errorCode and a specific error message for given error.
 func errorCodeForError(err error) (errCode, string) {
-	inner := stderrors.Unwrap(err)
-	if inner != nil && inner != err {
-		code, resultErr := errorCodeForError(inner)
-		if code != defaultErrorCode {
-			return code, resultErr
-		}
-	}
-
 	causeErr := errors.Cause(err)
 
-	inner = stderrors.Unwrap(causeErr)
+	inner := stderrors.Unwrap(causeErr)
 	if inner != nil && inner != causeErr {
 		code, resultErr := errorCodeForError(inner)
 		if code != defaultErrorCode {
@@ -152,14 +144,12 @@ func errorCodeForError(err error) (errCode, string) {
 			// TODO: figure out how this happens
 			return defaultNetNonTCPErrorCode, err.Error()
 		}
-		if e.Op == "write" {
-			if sErr, ok := e.Err.(*os.SyscallError); ok {
-				switch sErr.Err {
-				case syscall.ECONNRESET:
-					return tcpResetByPeerErrorCode, tcpResetByPeerErrorCodeMsg
-				case syscall.EPIPE:
-					return tcpBrokenPipeErrorCode, tcpBrokenPipeErrorCodeMsg
-				}
+		if sErr, ok := e.Err.(*os.SyscallError); ok {
+			switch sErr.Err {
+			case syscall.ECONNRESET:
+				return tcpResetByPeerErrorCode, fmt.Sprintf(tcpResetByPeerErrorCodeMsg, e.Op)
+			case syscall.EPIPE:
+				return tcpBrokenPipeErrorCode, fmt.Sprintf(tcpBrokenPipeErrorCodeMsg, e.Op)
 			}
 		}
 		if e.Op == "dial" {
