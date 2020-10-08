@@ -29,15 +29,21 @@ import (
 	rice "github.com/GeertJohan/go.rice"
 	"github.com/dop251/goja"
 	"github.com/dop251/goja/parser"
+	jslib "github.com/loadimpact/k6/js/lib"
+	"github.com/loadimpact/k6/lib"
 	"github.com/mitchellh/mapstructure"
 	"github.com/sirupsen/logrus"
-
-	"github.com/loadimpact/k6/lib"
 )
 
 var (
 	DefaultOpts = map[string]interface{}{
-		"presets":       []string{"latest"},
+		// Babel wants a structure like [["env", {}]]
+		// forcealltransforms https://babeljs.io/docs/en/babel-preset-env#forcealltransforms
+		"presets": [][]interface{}{{"env", map[string]interface{}{"forceAllTransforms": true, "useBuiltIns": false}}},
+		"ignore":  []string{"/(node_modules|bower_components)/"},
+		// Potential perf gain
+		// https://babeljs.io/docs/en/options#cloneinputast
+		"cloneInputAst": false,
 		"ast":           false,
 		"sourceMaps":    false,
 		"babelrc":       false,
@@ -45,7 +51,6 @@ var (
 		"retainLines":   true,
 		"highlightCode": false,
 	}
-
 	once        sync.Once // nolint:gochecknoglobals
 	globalBabel *babel    // nolint:gochecknoglobals
 )
@@ -107,6 +112,10 @@ func newBabel() (*babel, error) {
 		babelSrc := conf.MustFindBox("lib").MustString("babel.min.js")
 		vm := goja.New()
 		if _, err = vm.RunString(babelSrc); err != nil {
+			return
+		}
+
+		if _, err := vm.RunProgram(jslib.GetCoreJS()); err != nil {
 			return
 		}
 
