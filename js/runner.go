@@ -162,7 +162,7 @@ func (r *Runner) newVU(id int64, samplesOut chan<- stats.SampleContainer) (*VU, 
 		Dialer:           r.BaseDialer,
 		Resolver:         r.Resolver,
 		Blacklist:        r.Bundle.Options.BlacklistIPs,
-		BlockedHostnames: r.Bundle.Options.BlockedHostnames,
+		BlockedHostnames: r.Bundle.Options.BlockedHostnames.Trie,
 		Hosts:            r.Bundle.Options.Hosts,
 	}
 	tlsConfig := &tls.Config{
