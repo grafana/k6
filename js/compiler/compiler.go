@@ -38,9 +38,16 @@ import (
 var (
 	DefaultOpts = map[string]interface{}{
 		// Babel wants a structure like [["env", {}]]
-		// forcealltransforms https://babeljs.io/docs/en/babel-preset-env#forcealltransforms
-		"presets": [][]interface{}{{"env", map[string]interface{}{"forceAllTransforms": true, "useBuiltIns": false}}},
-		"ignore":  []string{"/(node_modules|bower_components)/"},
+		"presets": [][]interface{}{{"es2015", map[string]interface{}{"exclude": []string{
+			"transform-unicode-regex",
+			"transform-unicode-escapes",
+			"proposal-unicode-property-regex",
+			"transform-regenerator",
+			"transform-async-to-generator",
+			"proposal-dynamic-import",
+			"proposal-async-generator-functions",
+		}}}},
+		"ignore": []string{"/(node_modules|bower_components)/"},
 		// Potential perf gain
 		// https://babeljs.io/docs/en/options#cloneinputast
 		"cloneInputAst": false,
