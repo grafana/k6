@@ -96,10 +96,9 @@ func NewHostnameTrie(source []string) (*HostnameTrie, error) {
 
 // Regex description of hostname pattern to enforce blocks by. Global var
 // to avoid compilation penalty at runtime.
-// Matches against strings composed entirely of letters, numbers, or '.'s
-// with an optional wildcard at the start.
-//nolint:gochecknoglobals
-var legalHostnamePattern *regexp.Regexp = regexp.MustCompile(`^\*?(\pL|[0-9\.])*`)
+// based on regex from https://stackoverflow.com/a/106223/5427244
+//nolint:gochecknoglobals,lll
+var legalHostnamePattern *regexp.Regexp = regexp.MustCompile(`^(\*\.?)?((([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9]))?$`)
 
 func legalHostname(s string) error {
 	if len(legalHostnamePattern.FindString(s)) != len(s) {
@@ -112,12 +111,16 @@ func legalHostname(s string) error {
 // if hostname pattern is illegal.
 func (t *HostnameTrie) insert(s string) error {
 	s = strings.ToLower(s)
-	if len(s) == 0 {
-		return nil
-	}
-
 	if err := legalHostname(s); err != nil {
 		return err
+	}
+
+	return t.childInsert(s)
+}
+
+func (t *HostnameTrie) childInsert(s string) error {
+	if len(s) == 0 {
+		return nil
 	}
 
 	// mask creation of the trie by initializing the root here
@@ -128,11 +131,11 @@ func (t *HostnameTrie) insert(s string) error {
 	rStr := []rune(s) // need to iterate by runes for intl' names
 	last := len(rStr) - 1
 	if c, ok := t.children[rStr[last]]; ok {
-		return c.insert(string(rStr[:last]))
+		return c.childInsert(string(rStr[:last]))
 	}
 
 	t.children[rStr[last]] = &HostnameTrie{children: make(map[rune]*HostnameTrie)}
-	return t.children[rStr[last]].insert(string(rStr[:last]))
+	return t.children[rStr[last]].childInsert(string(rStr[:last]))
 }
 
 // Contains returns whether s matches a pattern in the HostnameTrie
