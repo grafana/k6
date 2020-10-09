@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -74,6 +75,42 @@ func TestDialerAddr(t *testing.T) {
 		{"[::1.2.3.4]", "", "address [::1.2.3.4]: missing port in address"},
 		{"example-ipv6-deny-resolver.com:80", "", "IP (::1) is in a blacklisted range (::/24)"},
 		{"example-ipv6-deny-host.com:80", "", "IP (::1) is in a blacklisted range (::/24)"},
+		{"example-ipv6-deny-host.com:80", "", "IP (::1) is in a blacklisted range (::/24)"},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+
+		t.Run(tc.address, func(t *testing.T) {
+			addr, err := dialer.getDialAddr(tc.address)
+
+			if tc.expErr != "" {
+				require.EqualError(t, err, tc.expErr)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tc.expAddress, addr)
+			}
+		})
+	}
+}
+
+func TestDialerAddrBlockHostnamesStar(t *testing.T) {
+	dialer := newDialerWithResolver(net.Dialer{}, newResolver())
+	dialer.Hosts = map[string]*lib.HostAddress{
+		"example.com": {IP: net.ParseIP("3.4.5.6")},
+	}
+
+	blocked, err := types.NewHostnameTrie([]string{"*"})
+	require.NoError(t, err)
+	dialer.BlockedHostnames = blocked
+	testCases := []struct {
+		address, expAddress, expErr string
+	}{
+		// IPv4
+		{"example.com:80", "", "hostname (example.com) is in a blocked pattern (*)"},
+		{"example.com:443", "", "hostname (example.com) is in a blocked pattern (*)"},
+		{"not.com:30", "", "hostname (not.com) is in a blocked pattern (*)"},
+		{"1.2.3.4:80", "1.2.3.4:80", ""},
 	}
 
 	for _, tc := range testCases {

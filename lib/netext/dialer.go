@@ -175,14 +175,13 @@ func (d *Dialer) findRemote(addr string) (*lib.HostAddress, error) {
 		return nil, err
 	}
 
-	if d.BlockedHostnames != nil {
-		if match, blocked := d.BlockedHostnames.Contains(host); blocked {
-			return nil, BlockedHostError{hostname: host, match: match}
-		}
-	}
-
 	remote, err := d.getConfiguredHost(addr, host, port)
 	if err != nil || remote != nil {
+		if err == nil && d.BlockedHostnames != nil && net.ParseIP(host) == nil {
+			if match, blocked := d.BlockedHostnames.Contains(host); blocked {
+				return nil, BlockedHostError{hostname: host, match: match}
+			}
+		}
 		return remote, err
 	}
 
@@ -191,6 +190,11 @@ func (d *Dialer) findRemote(addr string) (*lib.HostAddress, error) {
 		return lib.NewHostAddress(ip, port)
 	}
 
+	if d.BlockedHostnames != nil {
+		if match, blocked := d.BlockedHostnames.Contains(host); blocked {
+			return nil, BlockedHostError{hostname: host, match: match}
+		}
+	}
 	return d.fetchRemoteFromResolver(host, port)
 }
 
