@@ -892,7 +892,7 @@ func TestVUIntegrationBlockHostnamesOption(t *testing.T) {
 				`)
 	require.NoError(t, err)
 
-	hostnames, err := lib.NewNullHostnameTrie([]string{"*.io"})
+	hostnames, err := types.NewNullHostnameTrie([]string{"*.io"})
 	require.NoError(t, err)
 	require.NoError(t, r1.SetOptions(lib.Options{
 		Throw:            null.BoolFrom(true),

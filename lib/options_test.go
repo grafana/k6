@@ -315,32 +315,11 @@ func TestOptions(t *testing.T) {
 		assert.Equal(t, net.CIDRMask(1, 1), opts.BlacklistIPs[0].Mask)
 	})
 	t.Run("BlockedHostnames", func(t *testing.T) {
-		hostnames := HostnameTrie{}
-		assert.NoError(t, hostnames.insert("test.k6.io"))
-		assert.Error(t, hostnames.insert("inval*d.pattern"))
-		assert.NoError(t, hostnames.insert("*valid.pattern"))
-		opts := Options{}.Apply(Options{
-			BlockedHostnames: NullHostnameTrie{Trie: &hostnames, Valid: true},
-		})
+		blockedHostnames, err := types.NewNullHostnameTrie([]string{"test.k6.io", "*valid.pattern"})
+		require.NoError(t, err)
+		opts := Options{}.Apply(Options{BlockedHostnames: blockedHostnames})
 		assert.NotNil(t, opts.BlockedHostnames)
-		assert.NotEmpty(t, opts.BlockedHostnames)
-		_, matches := opts.BlockedHostnames.Trie.Contains("K6.Io")
-		assert.False(t, matches)
-		match, matches := opts.BlockedHostnames.Trie.Contains("tEsT.k6.Io")
-		assert.True(t, matches)
-		assert.Equal(t, "test.k6.io", match)
-		match, matches = opts.BlockedHostnames.Trie.Contains("TEST.K6.IO")
-		assert.True(t, matches)
-		assert.Equal(t, "test.k6.io", match)
-		match, matches = opts.BlockedHostnames.Trie.Contains("blocked.valId.paTtern")
-		assert.True(t, matches)
-		assert.Equal(t, "*valid.pattern", match)
-		_, matches = opts.BlockedHostnames.Trie.Contains("example.test.k6.io")
-		assert.False(t, matches)
-		assert.NoError(t, opts.BlockedHostnames.Trie.insert("*.test.k6.io"))
-		match, matches = opts.BlockedHostnames.Trie.Contains("example.test.k6.io")
-		assert.True(t, matches)
-		assert.Equal(t, "*.test.k6.io", match)
+		assert.Equal(t, blockedHostnames, opts.BlockedHostnames)
 	})
 
 	t.Run("Hosts", func(t *testing.T) {

@@ -33,6 +33,7 @@ import (
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
+	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 )
 
@@ -49,7 +50,7 @@ type Dialer struct {
 
 	Resolver         dnsResolver
 	Blacklist        []*lib.IPNet
-	BlockedHostnames *lib.HostnameTrie
+	BlockedHostnames *types.HostnameTrie
 	Hosts            map[string]*lib.HostAddress
 
 	BytesRead    int64
