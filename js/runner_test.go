@@ -1664,3 +1664,45 @@ func TestSystemTags(t *testing.T) {
 		})
 	}
 }
+
+func TestGetRamdomIP(t *testing.T) {
+	IpInRange := func (ip net.IP, ipStart string, ipEnd string) bool {
+		start, end := net.ParseIP(ipStart), net.ParseIP(ipEnd)
+		if start == nil || end == nil {
+			return false
+		}
+		if c := ip.To4(); c != nil {
+			a, b := start.To4(), end.To4()
+			return bytes.Compare(c, a) >= 0 && bytes.Compare(c, b) <= 0
+		}
+		if d := ip.To16(); d != nil {
+			a, b := start.To16(), end.To16()
+			return bytes.Compare(d[:8], a[:8]) >= 0 &&
+			bytes.Compare(d[:8], b[:8]) <= 0 &&
+			bytes.Compare(d[8:], a[8:]) >= 0 &&
+			bytes.Compare(d[8:], b[8:]) <= 0
+		}
+		return false
+	}
+        testdata := map[string]struct {
+                seed int64
+                ipRange string
+		ipStart string
+		ipEnd string
+        }{
+		"ipv4 cidr": {12345, "192.168.0.0/16", "192.168.0.0", "192.168.255.255"},
+		"ipv4 range": {34567, "192.168.0.100-192.168.0.200", "192.168.0.100", "192.168.0.200"},
+		"ipv6 cidr": {45637, "fd00::1/112", "fd00::0", "fd00::ffff"},
+		"ipv6 range": {23465, "fd00:4:4:0::1-fd00:4:4:3ff::3ff", "fd00:4:4:0::1", "fd00:4:4:3ff::3ff"},
+        }
+        for name, data := range testdata {
+                data := data
+                t.Run(name, func(t *testing.T) {
+			pool := GetIpPool(data.ipRange)
+			assert.NotNil(t, pool)
+			ip := pool.GetRandomIP(data.seed)
+			assert.NotNil(t, ip)
+			assert.True(t, IpInRange(ip, data.ipStart, data.ipEnd))
+		})
+	}
+}

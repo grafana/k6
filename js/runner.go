@@ -176,6 +176,9 @@ func ipPoolFromCidr(s string) *IpPool {
         return &IpPool{ip0, h0, n0, hostRangeNum, netRangeNum}
 }
 
+// GetRandomIP return a random-by-seed selected IP from an IP pool
+// IPv4 pool is considered as a uniform distribution from start IP to end IP
+// IPv6 poop is considered as two independent uniform distributions: high 64-bit and low 64-bit
 func (pool *IpPool) GetRandomIP(seed int64) net.IP {
         var hostShift, netShift uint64
         r := rand.New(rand.NewSource(seed))
@@ -257,7 +260,13 @@ func (r *Runner) newVU(id int64, samplesOut chan<- stats.SampleContainer) (*VU, 
 	}
 	if r.Bundle.Options.ClientIpRange.Valid {
 		ippool := GetIpPool(r.Bundle.Options.ClientIpRange.ValueOrZero())
+		if ippool == nil {
+			return nil, errors.New("Invaild IP Range")
+		}
 		uAddr := ippool.GetRandomIP(id)
+		if uAddr == nil {
+			return nil, errors.New("Cannot get a random IP")
+		}
 		localTCPAddr := net.TCPAddr {
 			IP: uAddr,
 		}
