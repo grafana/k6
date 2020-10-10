@@ -477,8 +477,11 @@ func TestOptionsEnv(t *testing.T) {
 			"Hi!": null.StringFrom("Hi!"),
 		},
 		{"ClientIpRange", "K6_CLIENT_IP_RANGE"}: {
-			"":	null.String{},
-		//	"Hi!":	null.StringFrom("Hi!"),
+			"": null.String{},
+			"192.168.0.0/16": null.StringFrom("192.168.0.0/16"),
+			"192.168.0.1-192.168.100.254": null.StringFrom("192.168.0.1-192.168.100.254"),
+			"fd00::1/112": null.StringFrom("fd00::1/112"),
+			"fd00:4:4:0::1-fd00:4:4:3ff::3ff": null.StringFrom("fd00:4:4:0::1-fd00:4:4:3ff::3ff"),
 		},
 		{"Throw", "K6_THROW"}: {
 			"":      null.Bool{},
