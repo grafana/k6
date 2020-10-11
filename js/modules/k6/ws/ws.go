@@ -30,6 +30,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	netURL "net/url"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -113,6 +114,16 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 
 	tags := state.CloneTags()
 
+	u, err := netURL.Parse(url)
+	if err != nil {
+		return nil, err
+	}
+
+	cookiesMap := make(map[string]http.Cookie)
+	for _, cookie := range state.CookieJar.Cookies(u) {
+		cookiesMap[cookie.Name] = *cookie
+	}
+
 	// Parse the optional second argument (params)
 	if !goja.IsUndefined(paramsV) && !goja.IsNull(paramsV) {
 		params := paramsV.ToObject(rt)
@@ -129,30 +140,44 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 					continue
 				}
 				for _, key := range headersObj.Keys() {
-					if strings.EqualFold(key, HeaderKeyCookie) {
-						req, err := http.NewRequest("", url, nil) //nolint:noctx
-						if err != nil {
-							return nil, err
+					header.Set(key, headersObj.Get(key).String())
+				}
+			case "cookies":
+				cookiesV := params.Get(k)
+				if goja.IsUndefined(cookiesV) || goja.IsNull(cookiesV) {
+					continue
+				}
+				cookies := cookiesV.ToObject(rt)
+				if cookies == nil {
+					continue
+				}
+				for _, key := range cookies.Keys() {
+					replace := false
+					value := ""
+					cookieV := cookies.Get(key)
+					if goja.IsUndefined(cookieV) || goja.IsNull(cookieV) {
+						continue
+					}
+					switch cookieV.ExportType() {
+					case reflect.TypeOf(map[string]interface{}{}):
+						cookie := cookieV.ToObject(rt)
+						for _, attr := range cookie.Keys() {
+							switch strings.ToLower(attr) {
+							case "replace":
+								replace = cookie.Get(attr).ToBoolean()
+							case "value":
+								value = cookie.Get(attr).String()
+							}
 						}
-
-						req.Header.Set("Cookie", headersObj.Get(key).String())
-						cookies := req.Cookies()
-						jar, err = cookiejar.New(nil)
-						if err != nil {
-							return nil, err
-						}
-
-						u, err := netURL.Parse(url)
-						if err != nil {
-							return nil, err
-						}
-
-						jar.SetCookies(u, cookies)
-						if state.CookieJar != nil {
-							jar.SetCookies(u, state.CookieJar.Cookies(u))
+					default:
+						value = cookieV.String()
+					}
+					if _, ok := cookiesMap[key]; !ok || replace {
+						cookiesMap[key] = http.Cookie{
+							Name:  key,
+							Value: value,
 						}
 					}
-					header.Set(key, headersObj.Get(key).String())
 				}
 			case "tags":
 				tagsV := params.Get(k)
@@ -169,6 +194,29 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 			}
 		}
 
+	}
+
+	cookies := make([]*http.Cookie, 0, len(cookiesMap))
+	for _, cookie := range cookiesMap {
+		v := cookie
+		cookies = append(cookies, &v)
+	}
+	if len(cookies) > 0 {
+		jar, err = cookiejar.New(nil)
+		if err != nil {
+			return nil, err
+		}
+
+		// SetCookies looking for http or https scheme. Otherwise it does nothing. This is mini hack to bypass it.
+		oldScheme := u.Scheme
+		switch u.Scheme {
+		case "ws":
+			u.Scheme = "http"
+		case "wss":
+			u.Scheme = "https"
+		}
+		jar.SetCookies(u, cookies)
+		u.Scheme = oldScheme
 	}
 
 	if state.Options.SystemTags.Has(stats.TagURL) {

@@ -319,7 +319,7 @@ func TestSession(t *testing.T) {
 	t.Run("client_cookie", func(t *testing.T) {
 		_, err := common.RunString(rt, sr(`
 		var params = {
-			headers: { "Cookie": "Session=123;" },
+			cookies: { "Session": "123" },
 		};
 		var res = ws.connect("WSBIN_URL/ws-echo-cookie", params, function(socket){
 			socket.on("message", function (data){
