@@ -46,8 +46,10 @@ func (r reader) Read(a []byte) (int, error) {
 	return ((func([]byte) (int, error))(r))(a)
 }
 
-const badReadMsg = "bad read error for test"
-const badCloseMsg = "bad close error for test"
+const (
+	badReadMsg  = "bad read error for test"
+	badCloseMsg = "bad close error for test"
+)
 
 func badReadBody() io.Reader {
 	return reader(func(_ []byte) (int, error) {
@@ -76,7 +78,7 @@ func badCloseBody() io.ReadCloser {
 }
 
 func TestCompressionBodyError(t *testing.T) {
-	var algos = []CompressionType{CompressionTypeGzip}
+	algos := []CompressionType{CompressionTypeGzip}
 	t.Run("bad read body", func(t *testing.T) {
 		_, _, err := compressBody(algos, ioutil.NopCloser(badReadBody()))
 		require.Error(t, err)
@@ -91,16 +93,16 @@ func TestCompressionBodyError(t *testing.T) {
 }
 
 func TestMakeRequestError(t *testing.T) {
-	var ctx, cancel = context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	t.Run("bad compression algorithm body", func(t *testing.T) {
-		var req, err = http.NewRequest("GET", "https://wont.be.used", nil)
+		req, err := http.NewRequest("GET", "https://wont.be.used", nil)
 
 		require.NoError(t, err)
-		var badCompressionType = CompressionType(13)
+		badCompressionType := CompressionType(13)
 		require.False(t, badCompressionType.IsACompressionType())
-		var preq = &ParsedHTTPRequest{
+		preq := &ParsedHTTPRequest{
 			Req:          req,
 			Body:         new(bytes.Buffer),
 			Compressions: []CompressionType{badCompressionType},
@@ -128,7 +130,7 @@ func TestMakeRequestError(t *testing.T) {
 		}
 		ctx = lib.WithState(ctx, state)
 		req, _ := http.NewRequest("GET", srv.URL, nil)
-		var preq = &ParsedHTTPRequest{
+		preq := &ParsedHTTPRequest{
 			Req:     req,
 			URL:     &URL{u: req.URL},
 			Body:    new(bytes.Buffer),
@@ -178,7 +180,7 @@ func TestResponseStatus(t *testing.T) {
 			req, err := http.NewRequest("GET", server.URL, nil)
 			require.NoError(t, err)
 
-			var preq = &ParsedHTTPRequest{
+			preq := &ParsedHTTPRequest{
 				Req:          req,
 				URL:          &URL{u: req.URL},
 				Body:         new(bytes.Buffer),
@@ -188,7 +190,6 @@ func TestResponseStatus(t *testing.T) {
 
 			res, err := MakeRequest(ctx, preq)
 			require.NoError(t, err)
-			//require.NotNil(t, res)
 			assert.Equal(t, tc.statusCodeExpected, res.Status)
 			assert.Equal(t, tc.statusCodeStringExpected, res.StatusText)
 		})
@@ -244,7 +245,7 @@ func TestMakeRequestTimeout(t *testing.T) {
 	}
 	ctx = lib.WithState(ctx, state)
 	req, _ := http.NewRequest("GET", srv.URL, nil)
-	var preq = &ParsedHTTPRequest{
+	preq := &ParsedHTTPRequest{
 		Req:     req,
 		URL:     &URL{u: req.URL, URL: srv.URL},
 		Body:    new(bytes.Buffer),
