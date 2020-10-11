@@ -129,7 +129,7 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 					continue
 				}
 				for _, key := range headersObj.Keys() {
-					if key == HeaderKeyCookie {
+					if strings.EqualFold(key, HeaderKeyCookie) {
 						req, err := http.NewRequest("", url, nil) //nolint:noctx
 						if err != nil {
 							return nil, err
@@ -148,6 +148,10 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 						}
 
 						jar.SetCookies(u, cookies)
+						if state.CookieJar != nil {
+							jar.SetCookies(u, state.CookieJar.Cookies(u))
+						}
+						continue
 					}
 					header.Set(key, headersObj.Get(key).String())
 				}
