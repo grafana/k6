@@ -142,6 +142,59 @@ func TestMakeRequestError(t *testing.T) {
 	})
 }
 
+func TestResponseStatus(t *testing.T) {
+	testCases := []struct {
+		name                     string
+		statusCode               int
+		statusCodeExpected       int
+		statusCodeStringExpected string
+	}{
+		{"status 200", 200, 200, "200 OK"},
+		{"status 201", 201, 201, "201 Created"},
+		{"status 202", 202, 202, "202 Accepted"},
+		{"status 203", 203, 203, "203 Non-Authoritative Information"},
+		{"status 204", 204, 204, "204 No Content"},
+		{"status 205", 205, 205, "205 Reset Content"},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				//_, err := w.Write([]byte("some body"))
+				//require.NoError(t, err)
+				w.WriteHeader(tc.statusCode)
+			}))
+			defer server.Close()
+			logger := logrus.New()
+			logger.Level = logrus.DebugLevel
+			state := &lib.State{
+				Options:   lib.Options{RunTags: &stats.SampleTags{}},
+				Transport: server.Client().Transport,
+				Logger:    logger,
+				Samples:   make(chan<- stats.SampleContainer, 1),
+			}
+			ctx := lib.WithState(context.Background(), state)
+			req, err := http.NewRequest("GET", server.URL, nil)
+			require.NoError(t, err)
+
+			var preq = &ParsedHTTPRequest{
+				Req:          req,
+				URL:          &URL{u: req.URL},
+				Body:         new(bytes.Buffer),
+				Timeout:      10 * time.Second,
+				ResponseType: ResponseTypeNone,
+			}
+
+			res, err := MakeRequest(ctx, preq)
+			require.NoError(t, err)
+			//require.NotNil(t, res)
+			assert.Equal(t, tc.statusCodeExpected, res.Status)
+			assert.Equal(t, tc.statusCodeStringExpected, res.StatusText)
+		})
+	}
+}
+
 func TestURL(t *testing.T) {
 	t.Run("Clean", func(t *testing.T) {
 		testCases := []struct {
