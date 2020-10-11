@@ -45,9 +45,6 @@ import (
 	"github.com/loadimpact/k6/stats"
 )
 
-// HeaderKeyCookie defines key where user can pass cookie for websocket.
-const HeaderKeyCookie = "Cookie"
-
 // ErrWSInInitContext is returned when websockets are using in the init context
 var ErrWSInInitContext = common.NewInitContextError("using websockets in the init context is not supported")
 
