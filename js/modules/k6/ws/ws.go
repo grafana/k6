@@ -151,6 +151,7 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 						if state.CookieJar != nil {
 							jar.SetCookies(u, state.CookieJar.Cookies(u))
 						}
+
 						continue
 					}
 					header.Set(key, headersObj.Get(key).String())
