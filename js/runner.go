@@ -155,25 +155,36 @@ func ipPoolFromRange(s string) *IpPool {
 }
 
 func ipPoolFromCidr(s string) *IpPool {
-        ip0, pnet, err := net.ParseCIDR(s)
+        ipk, pnet, err := net.ParseCIDR(s)
         if err != nil {
                 fmt.Println("ParseCIDR() failed: ", s)
                 return nil
         }
-        // ip0 (range start) >= ip1 (cidr start)
-        ip1 := pnet.IP.To16()
+        ip0 := pnet.IP.To16()
+        // ipk (ip start in cidr) >= ip0 (cidr-aligned ip base)
+        nk := binary.BigEndian.Uint64(ipk[:8])
+        hk := binary.BigEndian.Uint64(ipk[8:])
         n0 := binary.BigEndian.Uint64(ip0[:8])
         h0 := binary.BigEndian.Uint64(ip0[8:])
-        n1 := binary.BigEndian.Uint64(ip1[:8])
-        h1 := binary.BigEndian.Uint64(ip1[8:])
-        ones, bits := pnet.Mask.Size()
-        mask := bits - ones
-        hostPos, netPos := h0-h1, n0-n1
-        netRangeNum, hostRangeNum := uint64(0), uint64(1<<mask)-hostPos
-        if mask > 64 {
-                netRangeNum, hostRangeNum = uint64(1<<(mask-64))-netPos, ^uint64(0)-hostPos
+        if hk < h0 || nk < n0 {
+                fmt.Println("Wrong PraseCIDR result: ", s)
+                return nil
         }
-        return &IpPool{ip0, h0, n0, hostRangeNum, netRangeNum}
+        hostCnt, netCnt := hk - h0, nk - n0
+        ones, bits := pnet.Mask.Size()
+        nz, hz := 0, bits - ones
+        if hz > 64 {
+                nz, hz = hz - 64, 64
+        }
+        nMod, hMod := (^uint64(0) >> (64-nz)), (^uint64(0) >> (64-hz))
+        if nz < 64 {
+                nMod += 1
+        }
+        if hz < 64 {
+                hMod += 1
+        }
+        nMod, hMod = nMod - netCnt, hMod - hostCnt
+        return &IpPool{ip0, h0, n0, hMod, nMod}
 }
 
 // GetRandomIP return a random-by-seed selected IP from an IP pool
