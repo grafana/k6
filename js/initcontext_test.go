@@ -394,7 +394,7 @@ func TestRequestWithBinaryFile(t *testing.T) {
 					KeepAlive: 60 * time.Second,
 					DualStack: true,
 				},
-				netext.NewResolver(net.LookupIP, 0, lib.DNSFirst),
+				netext.NewResolver(net.LookupIP, 0, lib.DNSFirst, lib.DNSpreferIPv4),
 			)).DialContext,
 		},
 		BPool:   bpool.NewBufferPool(1),

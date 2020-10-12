@@ -97,6 +97,7 @@ func newFromBundle(logger *logrus.Logger, b *Bundle) (*Runner, error) {
 		return nil, err
 	}
 
+	defDNS := lib.DefaultDNSConfig()
 	r := &Runner{
 		Bundle:       b,
 		Logger:       logger,
@@ -106,8 +107,9 @@ func newFromBundle(logger *logrus.Logger, b *Bundle) (*Runner, error) {
 			KeepAlive: 30 * time.Second,
 			DualStack: true,
 		},
-		console:        newConsole(logger),
-		Resolver:       netext.NewResolver(net.LookupIP, 0, lib.DefaultDNSConfig().Select.DNSSelect),
+		console: newConsole(logger),
+		Resolver: netext.NewResolver(
+			net.LookupIP, 0, defDNS.Select.DNSSelect, defDNS.Policy.DNSPolicy),
 		ActualResolver: net.LookupIP,
 	}
 
@@ -345,11 +347,15 @@ func (r *Runner) setResolver(dns lib.DNSConfig) error {
 		return err
 	}
 
-	dnsSel := opts.DNS.Select.DNSSelect
+	dnsSel := dns.Select.DNSSelect
 	if !dnsSel.IsADNSSelect() {
 		dnsSel = lib.DefaultDNSConfig().Select.DNSSelect
 	}
-	r.Resolver = netext.NewResolver(r.ActualResolver, ttl, dnsSel)
+	dnsPol := dns.Policy.DNSPolicy
+	if !dnsPol.IsADNSPolicy() {
+		dnsPol = lib.DefaultDNSConfig().Policy.DNSPolicy
+	}
+	r.Resolver = netext.NewResolver(r.ActualResolver, ttl, dnsSel, dnsPol)
 
 	return nil
 }

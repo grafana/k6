@@ -42,6 +42,9 @@ func TestResolver(t *testing.T) {
 			net.ParseIP("127.0.0.10"),
 			net.ParseIP("127.0.0.11"),
 			net.ParseIP("127.0.0.12"),
+			net.ParseIP("2001:db8::10"),
+			net.ParseIP("2001:db8::11"),
+			net.ParseIP("2001:db8::12"),
 		},
 	}, nil)
 
@@ -49,11 +52,28 @@ func TestResolver(t *testing.T) {
 		testCases := []struct {
 			ttl   time.Duration
 			sel   lib.DNSSelect
+			pol   lib.DNSPolicy
 			expIP []net.IP
 		}{
-			{0, lib.DNSFirst, []net.IP{net.ParseIP("127.0.0.10")}},
-			{time.Second, lib.DNSFirst, []net.IP{net.ParseIP("127.0.0.10")}},
-			{0, lib.DNSRoundRobin, []net.IP{
+			{
+				0, lib.DNSFirst, lib.DNSpreferIPv4,
+				[]net.IP{net.ParseIP("127.0.0.10")},
+			},
+			{
+				time.Second, lib.DNSFirst, lib.DNSpreferIPv4,
+				[]net.IP{net.ParseIP("127.0.0.10")},
+			},
+			{0, lib.DNSRoundRobin, lib.DNSonlyIPv6, []net.IP{
+				net.ParseIP("2001:db8::10"),
+				net.ParseIP("2001:db8::11"),
+				net.ParseIP("2001:db8::12"),
+				net.ParseIP("2001:db8::10"),
+			}},
+			{
+				0, lib.DNSFirst, lib.DNSpreferIPv6,
+				[]net.IP{net.ParseIP("2001:db8::10")},
+			},
+			{0, lib.DNSRoundRobin, lib.DNSpreferIPv4, []net.IP{
 				net.ParseIP("127.0.0.10"),
 				net.ParseIP("127.0.0.11"),
 				net.ParseIP("127.0.0.12"),
@@ -63,8 +83,8 @@ func TestResolver(t *testing.T) {
 
 		for _, tc := range testCases {
 			tc := tc
-			t.Run(fmt.Sprintf("%s_%s", tc.ttl, tc.sel), func(t *testing.T) {
-				r := NewResolver(mr.LookupIPAll, tc.ttl, tc.sel)
+			t.Run(fmt.Sprintf("%s_%s_%s", tc.ttl, tc.sel, tc.pol), func(t *testing.T) {
+				r := NewResolver(mr.LookupIPAll, tc.ttl, tc.sel, tc.pol)
 				ip, err := r.LookupIP(host)
 				require.NoError(t, err)
 				assert.Equal(t, tc.expIP[0], ip)

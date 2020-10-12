@@ -386,18 +386,21 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 			assert.Equal(t, lib.DNSConfig{
 				TTL:    null.NewString("5m", false),
 				Select: lib.NullDNSSelect{DNSSelect: lib.DNSRandom, Valid: false},
+				Policy: lib.NullDNSPolicy{DNSPolicy: lib.DNSpreferIPv4, Valid: false},
 			}, c.Options.DNS)
 		}},
 		{opts{env: []string{"K6_DNS=ttl=5,select=round-robin"}}, exp{}, func(t *testing.T, c Config) {
 			assert.Equal(t, lib.DNSConfig{
 				TTL:    null.StringFrom("5"),
 				Select: lib.NullDNSSelect{DNSSelect: lib.DNSRoundRobin, Valid: true},
+				Policy: lib.NullDNSPolicy{DNSPolicy: lib.DNSpreferIPv4, Valid: false},
 			}, c.Options.DNS)
 		}},
 		{opts{env: []string{"K6_DNS=ttl=inf,select=random,policy=preferIPv6"}}, exp{}, func(t *testing.T, c Config) {
 			assert.Equal(t, lib.DNSConfig{
 				TTL:    null.StringFrom("inf"),
 				Select: lib.NullDNSSelect{DNSSelect: lib.DNSRandom, Valid: true},
+				Policy: lib.NullDNSPolicy{DNSPolicy: lib.DNSpreferIPv6, Valid: true},
 			}, c.Options.DNS)
 		}},
 		// This is functionally invalid, but will error out in validation done in js.parseTTL().
@@ -405,6 +408,7 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 			assert.Equal(t, lib.DNSConfig{
 				TTL:    null.StringFrom("-1"),
 				Select: lib.NullDNSSelect{DNSSelect: lib.DNSRandom, Valid: false},
+				Policy: lib.NullDNSPolicy{DNSPolicy: lib.DNSpreferIPv4, Valid: false},
 			}, c.Options.DNS)
 		}},
 		{opts{cli: []string{"--dns", "ttl=0,blah=nope"}}, exp{cliReadError: true}, nil},
@@ -412,25 +416,32 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 			assert.Equal(t, lib.DNSConfig{
 				TTL:    null.StringFrom("0"),
 				Select: lib.NullDNSSelect{DNSSelect: lib.DNSRandom, Valid: false},
+				Policy: lib.NullDNSPolicy{DNSPolicy: lib.DNSpreferIPv4, Valid: false},
 			}, c.Options.DNS)
 		}},
 		{opts{cli: []string{"--dns", "ttl=5s,select="}}, exp{cliReadError: true}, nil},
-		{opts{fs: defaultConfig(`{"dns": {"ttl": "0", "select": "round-robin"}}`)}, exp{}, func(t *testing.T, c Config) {
-			assert.Equal(t, lib.DNSConfig{
-				TTL:    null.StringFrom("0"),
-				Select: lib.NullDNSSelect{DNSSelect: lib.DNSRoundRobin, Valid: true},
-			}, c.Options.DNS)
-		}},
+		{
+			opts{fs: defaultConfig(`{"dns": {"ttl": "0", "select": "round-robin", "policy": "onlyIPv4"}}`)},
+			exp{},
+			func(t *testing.T, c Config) {
+				assert.Equal(t, lib.DNSConfig{
+					TTL:    null.StringFrom("0"),
+					Select: lib.NullDNSSelect{DNSSelect: lib.DNSRoundRobin, Valid: true},
+					Policy: lib.NullDNSPolicy{DNSPolicy: lib.DNSonlyIPv4, Valid: true},
+				}, c.Options.DNS)
+			},
+		},
 		{
 			opts{
 				fs:  defaultConfig(`{"dns": {"ttl": "0"}}`),
-				env: []string{"K6_DNS=ttl=30"},
+				env: []string{"K6_DNS=ttl=30,policy=any"},
 			},
 			exp{},
 			func(t *testing.T, c Config) {
 				assert.Equal(t, lib.DNSConfig{
 					TTL:    null.StringFrom("30"),
 					Select: lib.NullDNSSelect{DNSSelect: lib.DNSRandom, Valid: false},
+					Policy: lib.NullDNSPolicy{DNSPolicy: lib.DNSany, Valid: true},
 				}, c.Options.DNS)
 			},
 		},
@@ -438,7 +449,7 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 			// CLI overrides all, falling back to env
 			opts{
 				fs:  defaultConfig(`{"dns": {"ttl": "60", "select": "first"}}`),
-				env: []string{"K6_DNS=ttl=30,select=random"},
+				env: []string{"K6_DNS=ttl=30,select=random,policy=any"},
 				cli: []string{"--dns", "ttl=5"},
 			},
 			exp{},
@@ -446,6 +457,7 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 				assert.Equal(t, lib.DNSConfig{
 					TTL:    null.StringFrom("5"),
 					Select: lib.NullDNSSelect{DNSSelect: lib.DNSRandom, Valid: true},
+					Policy: lib.NullDNSPolicy{DNSPolicy: lib.DNSany, Valid: true},
 				}, c.Options.DNS)
 			},
 		},

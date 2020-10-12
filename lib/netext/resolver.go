@@ -40,6 +40,7 @@ type Resolver interface {
 type resolver struct {
 	resolve     MultiResolver
 	selectIndex lib.DNSSelect
+	policy      lib.DNSPolicy
 	rrm         *sync.Mutex
 	rand        *rand.Rand
 	roundRobin  map[string]uint8
@@ -59,12 +60,15 @@ type cacheResolver struct {
 
 // NewResolver returns a new DNS resolver. If ttl is not 0, responses
 // will be cached per host for the specified period. The IP returned from
-// LookupIP() will be selected based on the given sel value.
-func NewResolver(actRes MultiResolver, ttl time.Duration, sel lib.DNSSelect) Resolver {
+// LookupIP() will be selected based on the given sel and pol values.
+func NewResolver(
+	actRes MultiResolver, ttl time.Duration, sel lib.DNSSelect, pol lib.DNSPolicy,
+) Resolver {
 	r := rand.New(rand.NewSource(time.Now().UnixNano())) // nolint: gosec
 	res := resolver{
 		resolve:     actRes,
 		selectIndex: sel,
+		policy:      pol,
 		rrm:         &sync.Mutex{},
 		rand:        r,
 		roundRobin:  make(map[string]uint8),
@@ -80,27 +84,29 @@ func NewResolver(actRes MultiResolver, ttl time.Duration, sel lib.DNSSelect) Res
 	}
 }
 
-// LookupIP returns a single IP resolved for host, selected by the
-// configured select strategy.
+// LookupIP returns a single IP resolved for host, selected according to the
+// configured select and policy options.
 func (r *resolver) LookupIP(host string) (net.IP, error) {
 	ips, err := r.resolve(host)
 	if err != nil {
 		return nil, err
 	}
+
+	ips = r.applyPolicy(ips)
 	return r.selectOne(host, ips), nil
 }
 
-// LookupIP returns a single IP resolved for host, selected by the configured
-// select strategy. Results are cached per host and will be refreshed if the
-// last lookup time exceeds the configured TTL (not the TTL returned in the DNS
-// record).
+// LookupIP returns a single IP resolved for host, selected according to the
+// configured select and policy options. Results are cached per host and will be
+// refreshed if the last lookup time exceeds the configured TTL (not the TTL
+// returned in the DNS record).
 func (r *cacheResolver) LookupIP(host string) (net.IP, error) {
 	r.cm.Lock()
 
 	var ips []net.IP
 	// TODO: Invalidate? When?
-	if d, ok := r.cache[host]; ok && time.Now().Before(d.lastLookup.Add(r.ttl)) {
-		ips = r.cache[host].ips
+	if cr, ok := r.cache[host]; ok && time.Now().Before(cr.lastLookup.Add(r.ttl)) {
+		ips = cr.ips
 	} else {
 		r.cm.Unlock() // The lookup could take some time, so unlock momentarily.
 		var err error
@@ -108,11 +114,13 @@ func (r *cacheResolver) LookupIP(host string) (net.IP, error) {
 		if err != nil {
 			return nil, err
 		}
+		ips = r.applyPolicy(ips)
 		r.cm.Lock()
 		r.cache[host] = cacheRecord{ips: ips, lastLookup: time.Now()}
 	}
 
 	r.cm.Unlock()
+
 	return r.selectOne(host, ips), nil
 }
 
@@ -120,6 +128,7 @@ func (r *resolver) selectOne(host string, ips []net.IP) net.IP {
 	if len(ips) == 0 {
 		return nil
 	}
+
 	var ip net.IP
 	switch r.selectIndex {
 	case lib.DNSFirst:
@@ -136,5 +145,46 @@ func (r *resolver) selectOne(host string, ips []net.IP) net.IP {
 		ip = ips[r.rand.Intn(len(ips))]
 		r.rrm.Unlock()
 	}
+
 	return ip
+}
+
+func (r *resolver) applyPolicy(ips []net.IP) (retIPs []net.IP) {
+	if r.policy == lib.DNSany {
+		return ips
+	}
+	ip4, ip6 := groupByVersion(ips)
+	switch r.policy {
+	case lib.DNSpreferIPv4:
+		retIPs = ip4
+		if len(retIPs) == 0 {
+			retIPs = ip6
+		}
+	case lib.DNSpreferIPv6:
+		retIPs = ip6
+		if len(retIPs) == 0 {
+			retIPs = ip4
+		}
+	case lib.DNSonlyIPv4:
+		retIPs = ip4
+	case lib.DNSonlyIPv6:
+		retIPs = ip6
+	// Already checked above, but added to satisfy 'exhaustive' linter.
+	case lib.DNSany:
+		retIPs = ips
+	}
+
+	return
+}
+
+func groupByVersion(ips []net.IP) (ip4 []net.IP, ip6 []net.IP) {
+	for _, ip := range ips {
+		if ip.To4() != nil {
+			ip4 = append(ip4, ip)
+		} else {
+			ip6 = append(ip6, ip)
+		}
+	}
+
+	return
 }
