@@ -122,7 +122,7 @@ func newBabel() (*babel, error) {
 			return
 		}
 
-		if _, err := vm.RunProgram(jslib.GetCoreJS()); err != nil {
+		if _, corejsErr := vm.RunProgram(jslib.GetCoreJS()); corejsErr != nil {
 			return
 		}
 
