@@ -36,6 +36,7 @@ import (
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/executor"
 	"github.com/loadimpact/k6/stats"
+	"github.com/loadimpact/k6/stats/appinsights"
 	"github.com/loadimpact/k6/stats/cloud"
 	"github.com/loadimpact/k6/stats/csv"
 	"github.com/loadimpact/k6/stats/datadog"
@@ -54,11 +55,8 @@ func configFlagSet() *pflag.FlagSet {
 	flags.Bool("no-usage-report", false, "don't send anonymous stats to the developers")
 	flags.Bool("no-thresholds", false, "don't run thresholds")
 	flags.Bool("no-summary", false, "don't show the summary at the end of the test")
-	flags.String(
-		"summary-export",
-		"",
-		"output the end-of-test summary report to JSON file",
-	)
+	flags.String("summary-export", "", "output the end-of-test summary report to JSON file")
+
 	return flags
 }
 
@@ -73,12 +71,13 @@ type Config struct {
 	SummaryExport null.String `json:"summaryExport" envconfig:"K6_SUMMARY_EXPORT"`
 
 	Collectors struct {
-		InfluxDB influxdb.Config `json:"influxdb"`
-		Kafka    kafka.Config    `json:"kafka"`
-		Cloud    cloud.Config    `json:"cloud"`
-		StatsD   common.Config   `json:"statsd"`
-		Datadog  datadog.Config  `json:"datadog"`
-		CSV      csv.Config      `json:"csv"`
+		InfluxDB    influxdb.Config    `json:"influxdb"`
+		Kafka       kafka.Config       `json:"kafka"`
+		Cloud       cloud.Config       `json:"cloud"`
+		StatsD      common.Config      `json:"statsd"`
+		Datadog     datadog.Config     `json:"datadog"`
+		CSV         csv.Config         `json:"csv"`
+		AppInsights appinsights.Config `json:"appinsights"`
 	} `json:"collectors"`
 }
 
@@ -117,6 +116,7 @@ func (c Config) Apply(cfg Config) Config {
 	c.Collectors.StatsD = c.Collectors.StatsD.Apply(cfg.Collectors.StatsD)
 	c.Collectors.Datadog = c.Collectors.Datadog.Apply(cfg.Collectors.Datadog)
 	c.Collectors.CSV = c.Collectors.CSV.Apply(cfg.Collectors.CSV)
+	c.Collectors.AppInsights = c.Collectors.AppInsights.Apply(cfg.Collectors.AppInsights)
 	return c
 }
 
@@ -219,6 +219,7 @@ func getConsolidatedConfig(fs afero.Fs, cliConf Config, runner lib.Runner) (conf
 	cliConf.Collectors.Kafka = kafka.NewConfig().Apply(cliConf.Collectors.Kafka)
 	cliConf.Collectors.StatsD = common.NewConfig().Apply(cliConf.Collectors.StatsD)
 	cliConf.Collectors.Datadog = datadog.NewConfig().Apply(cliConf.Collectors.Datadog)
+	cliConf.Collectors.AppInsights = appinsights.NewConfig().Apply(cliConf.Collectors.AppInsights)
 
 	fileConf, _, err := readDiskConfig(fs)
 	if err != nil {

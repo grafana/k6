@@ -158,6 +158,8 @@ github.com/mattn/go-isatty
 github.com/mccutchen/go-httpbin/httpbin
 github.com/mccutchen/go-httpbin/httpbin/assets
 github.com/mccutchen/go-httpbin/httpbin/digest
+# github.com/microsoft/ApplicationInsights-Go v0.4.3
+## explicit
 # github.com/mitchellh/mapstructure v0.0.0-20180220230111-00c29f56e238
 ## explicit
 github.com/mitchellh/mapstructure
