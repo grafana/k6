@@ -1669,7 +1669,7 @@ func TestErrorCodes(t *testing.T) {
 			name:              "Unroutable",
 			expectedErrorCode: 1101,
 			expectedErrorMsg:  "lookup: no such host",
-			script:            `var res = http.request("GET", "http://sdafsgdhfjg/");`,
+			script:            `var res = http.request("GET", "http://sdafsgdhfjg.com/");`,
 		},
 
 		{
@@ -1683,7 +1683,7 @@ func TestErrorCodes(t *testing.T) {
 			expectedErrorCode: 1101,
 			expectedErrorMsg:  "lookup: no such host",
 			moreSamples:       1,
-			script:            `var res = http.request("GET", "HTTPBIN_URL/redirect-to?url=http://dafsgdhfjg/");`,
+			script:            `var res = http.request("GET", "HTTPBIN_URL/redirect-to?url=http://dafsgdhfjg.com/");`,
 		},
 		{
 			name:              "Non location redirect",
@@ -1701,7 +1701,7 @@ func TestErrorCodes(t *testing.T) {
 			name:              "Missing protocol",
 			expectedErrorCode: 1000,
 			expectedErrorMsg:  `unsupported protocol scheme ""`,
-			script:            `var res = http.request("GET", "dafsgdhfjg/");`,
+			script:            `var res = http.request("GET", "dafsgdhfjg.com/");`,
 		},
 		{
 			name:        "Too many redirects",
