@@ -164,8 +164,6 @@ func TestResponseStatus(t *testing.T) {
 			tc := tc
 			t.Run(tc.name, func(t *testing.T) {
 				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					//_, err := w.Write([]byte("some body"))
-					//require.NoError(t, err)
 					w.WriteHeader(tc.statusCode)
 				}))
 				defer server.Close()
