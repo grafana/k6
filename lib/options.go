@@ -384,7 +384,7 @@ type Options struct {
 	ConsoleOutput null.String `json:"-" envconfig:"K6_CONSOLE_OUTPUT"`
 
 	// Specify client IP range or CIDR from which each VU binds to one IP (random seeded by VU id)
-	ClientIpRange null.String `json:"clientIpRange" envconfig:"K6_CLIENT_IP_RANGE"`
+	ClientIpRange null.String `json:"-" envconfig:"K6_CLIENT_IP_RANGE"`
 }
 
 // Returns the result of overwriting any fields with any that are set on the argument.
