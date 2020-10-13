@@ -1,3 +1,5 @@
+# code.cloudfoundry.org/clock v0.0.0-20180518195852-02e53af36e6c
+code.cloudfoundry.org/clock
 # github.com/Azure/go-ntlmssp v0.0.0-20180810175552-4a21cbd618b4
 ## explicit
 github.com/Azure/go-ntlmssp
@@ -160,6 +162,8 @@ github.com/mccutchen/go-httpbin/httpbin/assets
 github.com/mccutchen/go-httpbin/httpbin/digest
 # github.com/microsoft/ApplicationInsights-Go v0.4.3
 ## explicit
+github.com/microsoft/ApplicationInsights-Go/appinsights
+github.com/microsoft/ApplicationInsights-Go/appinsights/contracts
 # github.com/mitchellh/mapstructure v0.0.0-20180220230111-00c29f56e238
 ## explicit
 github.com/mitchellh/mapstructure
@@ -186,6 +190,8 @@ github.com/pmezard/go-difflib/difflib
 # github.com/rcrowley/go-metrics v0.0.0-20180503174638-e2704e165165
 ## explicit
 github.com/rcrowley/go-metrics
+# github.com/satori/go.uuid v1.2.0
+github.com/satori/go.uuid
 # github.com/serenize/snaker v0.0.0-20171204205717-a683aaf2d516
 ## explicit
 github.com/serenize/snaker

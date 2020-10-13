@@ -22,45 +22,21 @@ package appinsights
 
 import (
 	"context"
-	"net/http"
-	"sync"
-	"time"
+	"fmt"
 
 	"github.com/sirupsen/logrus"
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
+
+	ai "github.com/microsoft/ApplicationInsights-Go/appinsights"
 )
-
-// Client struct
-type Client struct {
-	client         *http.Client
-	token          string
-	baseURL        string
-	version        string
-	pushBufferPool sync.Pool
-	logger         logrus.FieldLogger
-
-	retries       int
-	retryInterval time.Duration
-}
-
-// NewClient method to instantiate a Client struct
-func NewClient(logger logrus.FieldLogger, token, host string) *Client {
-	c := &Client{
-		client: &http.Client{},
-		token:  token,
-		logger: logger,
-	}
-	return c
-}
 
 // Collector sends result data to the Load Impact cloud service.
 type Collector struct {
-	config      Config
-	referenceID string
+	config Config
 
-	client *Client
+	client ai.TelemetryClient
 
 	logger logrus.FieldLogger
 	opts   lib.Options
@@ -73,7 +49,7 @@ var _ lib.Collector = &Collector{}
 func New(logger logrus.FieldLogger, conf Config) (*Collector, error) {
 	return &Collector{
 		config: conf,
-		client: NewClient(logger, conf.InstrumentationKey.String, conf.InstrumentationKey.String),
+		client: ai.NewTelemetryClient(conf.InstrumentationKey.String),
 		logger: logger,
 	}, nil
 }
@@ -94,19 +70,45 @@ func (c *Collector) Link() string {
 func (c *Collector) Run(ctx context.Context) {
 }
 
+/*
+type JSONSample struct {
+	Time     time.Time         `json:"time"`
+	Value    float64           `json:"value"`
+	Tags     *stats.SampleTags `json:"tags"`
+	Name     string            `json:"name"`
+	Contains string            `json:"contains"`
+}
+*/
+
 // Collect receives a set of samples. This method is never called concurrently, and only while
 // the context for Run() is valid, but should defer as much work as possible to Run().
 func (c *Collector) Collect(sampleContainers []stats.SampleContainer) {
-	checks := 0.0
-	dataReceived := 0.0
 	for _, sampleContainer := range sampleContainers {
 		for _, sample := range sampleContainer.GetSamples() {
-			switch sample.Metric.Name {
-			case "checks":
-				checks += sample.Value
-			case "data_received":
-				dataReceived += sample.Value
+			if &sample == nil {
+				fmt.Println("sample is null")
+
+				continue
 			}
+
+			/*
+				js := JSONSample{
+					Time:     sample.Time,
+					Value:    sample.Value,
+					Tags:     sample.Tags,
+					Name:     sample.Metric.Name,
+					Contains: sample.Metric.Contains.String(),
+				}
+			*/
+
+			c.client.TrackMetric(sample.Metric.Name, sample.Value)
+
+			c.client.Channel().Flush()
+
+			//m, _ := json.Marshal(js)
+
+			//fmt.Printf("sample: %s\n\n", string(m))
+
 		}
 	}
 }
