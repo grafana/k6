@@ -216,7 +216,7 @@ func TestCancelledRequest(t *testing.T) {
 		t.Parallel()
 		tracer := &Tracer{}
 		ctx, cancel := context.WithCancel(httptrace.WithClientTrace(context.Background(), tracer.Trace()))
-		req, err := http.NewRequest("GET", srv.URL+"/delay/10", nil)
+		req, err := http.NewRequest("GET", srv.URL+"/delay/10s", nil)
 		require.NoError(t, err)
 		req = req.WithContext(ctx)
 		go func() {
