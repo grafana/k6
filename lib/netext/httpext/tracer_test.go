@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"math/rand"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -216,17 +215,16 @@ func TestCancelledRequest(t *testing.T) {
 	cancelTest := func(t *testing.T) {
 		t.Parallel()
 		tracer := &Tracer{}
-		req, err := http.NewRequest("GET", srv.URL+"/delay/1", nil)
+		ctx, cancel := context.WithCancel(httptrace.WithClientTrace(context.Background(), tracer.Trace()))
+		req, err := http.NewRequest("GET", srv.URL+"/delay/10", nil)
 		require.NoError(t, err)
-
-		ctx, cancel := context.WithCancel(httptrace.WithClientTrace(req.Context(), tracer.Trace()))
 		req = req.WithContext(ctx)
 		go func() {
-			time.Sleep(time.Duration(rand.Int31n(50)) * time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
 			cancel()
 		}()
 
-		resp, err := srv.Client().Transport.RoundTrip(req)
+		resp, err := srv.Client().Do(req) //nolint:bodyclose
 		_ = tracer.Done()
 		assert.Nil(t, resp)
 		assert.Error(t, err)
