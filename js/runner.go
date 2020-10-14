@@ -29,9 +29,6 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"strconv"
-	"strings"
-	"math/rand"
-	"encoding/binary"
 	"time"
 
 	"github.com/dop251/goja"
@@ -116,108 +113,6 @@ func newFromBundle(logger *logrus.Logger, b *Bundle) (*Runner, error) {
 	return r, err
 }
 
-type IpPool struct {
-        ip       net.IP
-        hostStart uint64
-        netStart  uint64
-        hostRangeNum  uint64
-        netRangeNum   uint64
-}
-
-func GetIpPool(s string) *IpPool {
-        for i := 0; i < len(s); i++ {
-                switch s[i] {
-                case '-':
-                        return ipPoolFromRange(s)
-                case '/':
-                        return ipPoolFromCidr(s)
-                }
-        }
-        return nil
-}
-
-func ipPoolFromRange(s string) *IpPool {
-        ss := strings.SplitN(s, "-", 2)
-        ip0, ip1 := net.ParseIP(ss[0]), net.ParseIP(ss[1]) // len(ParseIP())==16
-        if ip0 == nil || ip1 == nil {
-                fmt.Println("Wrong IP range format, exit.", s)
-                return nil
-        }
-        n0 := binary.BigEndian.Uint64(ip0[:8])
-        h0 := binary.BigEndian.Uint64(ip0[8:])
-        n1 := binary.BigEndian.Uint64(ip1[:8])
-        h1 := binary.BigEndian.Uint64(ip1[8:])
-        if (n0 > n1) || (h0 > h1) {
-                fmt.Println("Negative IP range, exit.", s)
-                return nil
-        }
-        return &IpPool{ip0, h0, n0, h1 - h0 + 1, n1 - n0 + 1}
-}
-
-func ipPoolFromCidr(s string) *IpPool {
-        ipk, pnet, err := net.ParseCIDR(s)
-        if err != nil {
-                fmt.Println("ParseCIDR() failed: ", s)
-                return nil
-        }
-        ip0 := pnet.IP.To16()
-        // ipk (ip start in cidr) >= ip0 (cidr-aligned ip base)
-        nk := binary.BigEndian.Uint64(ipk[:8])
-        hk := binary.BigEndian.Uint64(ipk[8:])
-        n0 := binary.BigEndian.Uint64(ip0[:8])
-        h0 := binary.BigEndian.Uint64(ip0[8:])
-        if hk < h0 || nk < n0 {
-                fmt.Println("Wrong PraseCIDR result: ", s)
-                return nil
-        }
-        hostCnt, netCnt := hk - h0, nk - n0
-        ones, bits := pnet.Mask.Size()
-        nz, hz := 0, bits - ones
-        if hz > 64 {
-                nz, hz = hz - 64, 64
-        }
-        nMod, hMod := (^uint64(0) >> (64-nz)), (^uint64(0) >> (64-hz))
-        if nz < 64 {
-                nMod += 1
-        }
-        if hz < 64 {
-                hMod += 1
-        }
-        nMod, hMod = nMod - netCnt, hMod - hostCnt
-        return &IpPool{ip0, h0, n0, hMod, nMod}
-}
-
-// GetRandomIP return a random-by-seed selected IP from an IP pool
-// IPv4 pool is considered as a uniform distribution from start IP to end IP
-// IPv6 poop is considered as two independent uniform distributions: high 64-bit and low 64-bit
-func (pool *IpPool) GetRandomIP(seed int64) net.IP {
-        var hostShift, netShift uint64
-        r := rand.New(rand.NewSource(seed))
-        if pool.hostRangeNum > 0 {
-                hostShift = r.Uint64() % pool.hostRangeNum
-        }
-        if b := pool.ip.To4(); b != nil {
-                i := pool.hostStart + hostShift
-                return net.IPv4(byte(i>>24), byte(i>>16), byte(i>>8), byte(i))
-        }
-        if pool.netRangeNum > 0 {
-                netShift = r.Uint64() % pool.netRangeNum
-        }
-        if b := pool.ip.To16(); b != nil {
-                netPos := pool.netStart + netShift
-                hostPos := pool.hostStart + hostShift
-                if hostPos < pool.hostStart {
-                        netPos = netPos + 1
-                }
-                if ip6 := make(net.IP, net.IPv6len); ip6 != nil {
-                        binary.BigEndian.PutUint64(ip6[:8], netPos)
-                        binary.BigEndian.PutUint64(ip6[8:], hostPos)
-                        return ip6
-                }
-        }
-        return nil
-}
-
 func (r *Runner) MakeArchive() *lib.Archive {
 	return r.Bundle.makeArchive()
 }
@@ -270,13 +165,13 @@ func (r *Runner) newVU(id int64, samplesOut chan<- stats.SampleContainer) (*VU, 
 		Hosts:     r.Bundle.Options.Hosts,
 	}
 	if r.Bundle.Options.ClientIpRange.Valid {
-		ippool := GetIpPool(r.Bundle.Options.ClientIpRange.ValueOrZero())
-		if ippool == nil {
-			return nil, errors.New("Invaild IP Range")
+		ippool := GetPool(r.Bundle.Options.ClientIpRange.ValueOrZero())
+		if len(ippool) < 1 {
+			return nil, errors.New("Failed to parse IP Range")
 		}
-		uAddr := ippool.GetRandomIP(id)
+		uAddr := ippool.GetIP(id)
 		if uAddr == nil {
-			return nil, errors.New("Cannot get a random IP")
+			return nil, errors.New("Cannot get a IP from IP Pool")
 		}
 		localTCPAddr := net.TCPAddr {
 			IP: uAddr,

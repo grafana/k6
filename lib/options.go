@@ -383,7 +383,7 @@ type Options struct {
 	// Redirect console logging to a file
 	ConsoleOutput null.String `json:"-" envconfig:"K6_CONSOLE_OUTPUT"`
 
-	// Specify client IP range or CIDR from which each VU binds to one IP (random seeded by VU id)
+	// Specify client IP range or CIDR from which VUs bind to
 	ClientIpRange null.String `json:"-" envconfig:"K6_CLIENT_IP_RANGE"`
 }
 

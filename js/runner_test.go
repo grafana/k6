@@ -1705,13 +1705,13 @@ func TestGetRandomIP(t *testing.T) {
 	for name, data := range testdata {
 		data := data
 		t.Run(name, func(t *testing.T) {
-			pool := GetIpPool(data.ipRange)
-			assert.NotNil(t, pool)
-			ip := pool.GetRandomIP(int64(r.Uint64()) % 1048576)
+			block := GetIPBlock(data.ipRange)
+			assert.NotNil(t, block)
+			ip := block.GetRandomIP(int64(r.Uint64()) % 1048576)
 			assert.NotNil(t, ip)
 			assert.True(t, IpInRange(ip, data.ipStart, data.ipEnd))
-			assert.Equal(t, data.hostCount, pool.hostRangeNum)
-			assert.Equal(t, data.netCount, pool.netRangeNum)
+			assert.Equal(t, data.hostCount, block.hostNum)
+			assert.Equal(t, data.netCount, block.netNum)
 		})
 	}
 }
