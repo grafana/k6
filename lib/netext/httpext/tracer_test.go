@@ -227,9 +227,7 @@ func TestCancelledRequest(t *testing.T) {
 
 		resp, err := srv.Client().Do(req) //nolint:bodyclose
 		trace := tracer.Done()
-		if resp != nil {
-			t.Logf("timings %d %d %d", trace.Duration, trace.Waiting, time.Since(start))
-		}
+		t.Logf("timings %d %d %d", trace.Duration/time.Millisecond, trace.Waiting/time.Millisecond, time.Since(start)/time.Millisecond)
 		assert.Nil(t, resp)
 		assert.Error(t, err)
 	}
