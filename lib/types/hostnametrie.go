@@ -118,20 +118,20 @@ func NewHostnameTrie(source []string) (*HostnameTrie, error) {
 // to avoid compilation penalty at runtime.
 // based on regex from https://stackoverflow.com/a/106223/5427244
 //nolint:gochecknoglobals,lll
-var legalHostnamePattern *regexp.Regexp = regexp.MustCompile(`^(\*\.?)?((([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9]))?$`)
+var validHostnamePattern *regexp.Regexp = regexp.MustCompile(`^(\*\.?)?((([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9]))?$`)
 
-func legalHostname(s string) error {
-	if len(legalHostnamePattern.FindString(s)) != len(s) {
+func isValidHostnamePattern(s string) error {
+	if len(validHostnamePattern.FindString(s)) != len(s) {
 		return errors.Errorf("invalid hostname pattern %s", s)
 	}
 	return nil
 }
 
 // insert a hostname pattern into the given HostnameTrie. Returns an error
-// if hostname pattern is illegal.
+// if hostname pattern is valid.
 func (t *HostnameTrie) insert(s string) error {
 	s = strings.ToLower(s)
-	if err := legalHostname(s); err != nil {
+	if err := isValidHostnamePattern(s); err != nil {
 		return err
 	}
 
