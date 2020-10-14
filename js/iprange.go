@@ -1,29 +1,31 @@
 package js
 
 import (
-	"fmt"
-	"strings"
-	"strconv"
-	"net"
-	"time"
-	"math/rand"
 	"encoding/binary"
+	"fmt"
+	"math/rand"
+	"net"
+	"strconv"
+	"strings"
+	"time"
 )
 
 type SelectMode uint
+
 const (
-        LoopIncSelectIP SelectMode = iota // increase one by one, no IP is leaking
-        RandomSelectIP // random
-	ModLenSelectIP // like LoopIncSelect, may leak IP(s) if id is not continous
+	LoopIncSelectIP SelectMode = iota // increase one by one, no IP is leaking
+	RandomSelectIP                    // random
+	ModLenSelectIP                    // like LoopIncSelect, may leak IP(s) if id is not continous
 )
+
 type IPBlock struct {
-        ip        net.IP
-        hostStart uint64
-        netStart  uint64
-        hostN     uint64
-        netN      uint64
-        weight    uint64
-        mode  SelectMode
+	ip        net.IP
+	hostStart uint64
+	netStart  uint64
+	hostN     uint64
+	netN      uint64
+	weight    uint64
+	mode      SelectMode
 }
 type IPPool []IPBlock
 
@@ -59,7 +61,7 @@ func ipBlockFromRange(s string) *IPBlock {
 		fmt.Println("Negative IP range: ", s)
 		return nil
 	}
-	return &IPBlock{ip0, h0, n0, h1-h0+1, n1-n0+1, 1, LoopIncSelectIP}
+	return &IPBlock{ip0, h0, n0, h1 - h0 + 1, n1 - n0 + 1, 1, LoopIncSelectIP}
 }
 
 func ipBlockFromCIDR(s string) *IPBlock {
@@ -79,18 +81,18 @@ func ipBlockFromCIDR(s string) *IPBlock {
 		return nil
 	}
 	ones, bits := pnet.Mask.Size()
-	nz, hz := 0, bits - ones
+	nz, hz := 0, bits-ones
 	if hz > 64 {
-		nz, hz = hz - 64, 64
+		nz, hz = hz-64, 64
 	}
 	// must: 0 <= z <= 64
-	offsetCIDR := func (zbits int, offset uint64) uint64 {
+	offsetCIDR := func(zbits int, offset uint64) uint64 {
 		switch zbits {
 		case 0:
 			return uint64(1)
 		case 64:
 			n := ^uint64(0) - offset
-			if n + 1 > n {
+			if n+1 > n {
 				n = n + 1
 			}
 			return n
@@ -98,9 +100,9 @@ func ipBlockFromCIDR(s string) *IPBlock {
 			return (uint64(1) << zbits) - offset
 		}
 	}
-        hostNum := offsetCIDR(hz, hk-h0)
-        netNum := offsetCIDR(nz, nk-n0)
-        return &IPBlock{ip0, h0, n0, hostNum, netNum, 1, LoopIncSelectIP}
+	hostNum := offsetCIDR(hz, hk-h0)
+	netNum := offsetCIDR(nz, nk-n0)
+	return &IPBlock{ip0, h0, n0, hostNum, netNum, 1, LoopIncSelectIP}
 }
 
 // GetRandomIP return a random IP by seed from an IP block
@@ -108,60 +110,60 @@ func (b IPBlock) GetRandomIP(seed int64) net.IP {
 	r := rand.New(rand.NewSource(seed))
 	h := r.Uint64()
 	n := r.Uint64()
-	return  b.GetModNIndexedIP(h, n)
+	return b.GetModNIndexedIP(h, n)
 }
 
 // GetModNIndexedIP return a IP by indexes from an IP block
 func (b IPBlock) GetModNIndexedIP(hostIndex, netIndex uint64) net.IP {
 	if ip4 := b.ip.To4(); ip4 != nil {
-                i := b.hostStart + hostIndex % b.hostN
-                return net.IPv4(byte(i>>24), byte(i>>16), byte(i>>8), byte(i))
-        }
-        if ip6 := b.ip.To16(); ip6 != nil {
-                netN := b.netStart + netIndex % b.netN
-                hostN := b.hostStart + hostIndex % b.hostN
+		i := b.hostStart + hostIndex%b.hostN
+		return net.IPv4(byte(i>>24), byte(i>>16), byte(i>>8), byte(i))
+	}
+	if ip6 := b.ip.To16(); ip6 != nil {
+		netN := b.netStart + netIndex%b.netN
+		hostN := b.hostStart + hostIndex%b.hostN
 		if hostN < b.hostStart {
-                        netN += 1
-                }
-                if ip := make(net.IP, net.IPv6len); ip != nil {
-                        binary.BigEndian.PutUint64(ip[:8], netN)
-                        binary.BigEndian.PutUint64(ip[8:], hostN)
-                        return ip
-                }
-        }
-        return nil
+			netN += 1
+		}
+		if ip := make(net.IP, net.IPv6len); ip != nil {
+			binary.BigEndian.PutUint64(ip[:8], netN)
+			binary.BigEndian.PutUint64(ip[8:], hostN)
+			return ip
+		}
+	}
+	return nil
 }
 
 // Parse range1[:mode[:weight]][,range2[:mode[:weight]]] and return an IPBlock slice
 func GetPool(ranges string) IPPool {
-        ss := strings.Split(strings.TrimSpace(ranges), ",")
-        pool := make([]IPBlock, 0)
+	ss := strings.Split(strings.TrimSpace(ranges), ",")
+	pool := make([]IPBlock, 0)
 	for _, bs := range ss {
-                rmw := strings.Split(bs, "|") // range:mode:weight
+		rmw := strings.Split(bs, "|") // range:mode:weight
 		sz := len(rmw)
-                if sz < 1 {
-                        continue
-                }
-                r := GetIPBlock(rmw[0])
-                if r == nil {
-                        continue
-                }
-                if sz > 1 {
-                        if mode, err := strconv.Atoi(rmw[1]); err == nil {
+		if sz < 1 {
+			continue
+		}
+		r := GetIPBlock(rmw[0])
+		if r == nil {
+			continue
+		}
+		if sz > 1 {
+			if mode, err := strconv.Atoi(rmw[1]); err == nil {
 				r.mode = SelectMode(mode)
 			}
-                }
-                if sz > 2 {
-                        if weight, err := strconv.ParseUint(rmw[2], 10, 64); err == nil {
-                                r.weight = weight
-                        }
-                }
-                pool = append(pool, *r)
-                for i := 0; i < len(pool) - 1; i++ {
-                        pool[i].weight += r.weight
-                }
-        }
-        return pool
+		}
+		if sz > 2 {
+			if weight, err := strconv.ParseUint(rmw[2], 10, 64); err == nil {
+				r.weight = weight
+			}
+		}
+		pool = append(pool, *r)
+		for i := 0; i < len(pool)-1; i++ {
+			pool[i].weight += r.weight
+		}
+	}
+	return pool
 }
 
 func (pool IPPool) GetIP(id int64) net.IP {
