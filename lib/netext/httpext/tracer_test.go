@@ -233,6 +233,9 @@ func TestCancelledRequest(t *testing.T) {
 
 		resp, err := srv.Client().Transport.RoundTrip(req)
 		trail := tracer.Done()
+		if err == nil {
+			require.Empty(t, trail.Errors)
+		}
 		if resp == nil && err == nil && len(trail.Errors) == 0 {
 			t.Errorf("Expected either a RoundTrip response, error or trail errors but got %#v, %#v and %#v", resp, err, trail.Errors)
 		}
