@@ -128,7 +128,7 @@ func isValidHostnamePattern(s string) error {
 }
 
 // insert a hostname pattern into the given HostnameTrie. Returns an error
-// if hostname pattern is valid.
+// if hostname pattern is invalid.
 func (t *HostnameTrie) insert(s string) error {
 	s = strings.ToLower(s)
 	if err := isValidHostnamePattern(s); err != nil {
