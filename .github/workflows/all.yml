@@ -74,7 +74,7 @@ jobs:
           set -x
           go version
           export GOMAXPROCS=2
-          args=("-p" "2" "-race")
+          args=("-p" "2")
           # Run with less concurrency on Windows to minimize flakiness.
           if [[ "${{ matrix.platform }}" == windows* ]]; then
             unset args[2]
