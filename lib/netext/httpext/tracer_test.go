@@ -216,16 +216,20 @@ func TestCancelledRequest(t *testing.T) {
 		t.Parallel()
 		tracer := &Tracer{}
 		ctx, cancel := context.WithCancel(httptrace.WithClientTrace(context.Background(), tracer.Trace()))
-		req, err := http.NewRequest("GET", srv.URL+"/delay/10s", nil)
+		req, err := http.NewRequest("GET", srv.URL+"/delay/10", nil)
 		require.NoError(t, err)
 		req = req.WithContext(ctx)
+		start := time.Now()
 		go func() {
 			time.Sleep(100 * time.Millisecond)
 			cancel()
 		}()
 
 		resp, err := srv.Client().Do(req) //nolint:bodyclose
-		_ = tracer.Done()
+		trace := tracer.Done()
+		if resp != nil {
+			t.Logf("timings %d %d %d", trace.Duration, trace.Waiting, time.Since(start))
+		}
 		assert.Nil(t, resp)
 		assert.Error(t, err)
 	}
