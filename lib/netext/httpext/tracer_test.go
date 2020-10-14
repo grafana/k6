@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -215,21 +216,21 @@ func TestCancelledRequest(t *testing.T) {
 	cancelTest := func(t *testing.T) {
 		t.Parallel()
 		tracer := &Tracer{}
-		ctx, cancel := context.WithCancel(httptrace.WithClientTrace(context.Background(), tracer.Trace()))
-		req, err := http.NewRequest("GET", srv.URL+"/delay/10", nil)
+		req, err := http.NewRequestWithContext(context.Background(), "GET", srv.URL+"/delay/1", nil)
 		require.NoError(t, err)
+
+		ctx, cancel := context.WithCancel(httptrace.WithClientTrace(req.Context(), tracer.Trace()))
 		req = req.WithContext(ctx)
-		start := time.Now()
 		go func() {
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(time.Duration(rand.Int31n(50)) * time.Millisecond) //nolint:gosec
 			cancel()
 		}()
 
-		resp, err := srv.Client().Do(req) //nolint:bodyclose
-		trace := tracer.Done()
-		t.Logf("timings %d %d %d", trace.Duration/time.Millisecond, trace.Waiting/time.Millisecond, time.Since(start)/time.Millisecond)
-		assert.Nil(t, resp)
-		assert.Error(t, err)
+		resp, err := srv.Client().Transport.RoundTrip(req) //nolint:bodyclose
+		_ = tracer.Done()
+		if resp == nil && err == nil {
+			t.Errorf("Expected either a RoundTrip response or error or trail errors but got %#v and %#v", resp, err)
+		}
 	}
 
 	// This Run will not return until the parallel subtests complete.
