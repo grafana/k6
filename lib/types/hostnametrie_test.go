@@ -37,17 +37,24 @@ func TestHostnameTrieInsert(t *testing.T) {
 func TestHostnameTrieContains(t *testing.T) {
 	trie, err := NewHostnameTrie([]string{"test.k6.io", "*valid.pattern"})
 	require.NoError(t, err)
-	_, matches := trie.Contains("K6.Io")
-	assert.False(t, matches)
-	match, matches := trie.Contains("tEsT.k6.Io")
-	assert.True(t, matches)
-	assert.Equal(t, "test.k6.io", match)
-	match, matches = trie.Contains("TEST.K6.IO")
-	assert.True(t, matches)
-	assert.Equal(t, "test.k6.io", match)
-	match, matches = trie.Contains("blocked.valId.paTtern")
-	assert.True(t, matches)
-	assert.Equal(t, "*valid.pattern", match)
-	_, matches = trie.Contains("example.test.k6.io")
-	assert.False(t, matches)
+	cases := map[string]string{
+		"K6.Io":                 "",
+		"tEsT.k6.Io":            "test.k6.io",
+		"TESt.K6.IO":            "test.k6.io",
+		"blocked.valId.paTtern": "*valid.pattern",
+		"example.test.k6.io":    "",
+	}
+	for key, value := range cases {
+		host, pattern := key, value
+		t.Run(host, func(t *testing.T) {
+			match, matches := trie.Contains(host)
+			if pattern == "" {
+				assert.False(t, matches)
+				assert.Empty(t, match)
+			} else {
+				assert.True(t, matches)
+				assert.Equal(t, pattern, match)
+			}
+		})
+	}
 }
