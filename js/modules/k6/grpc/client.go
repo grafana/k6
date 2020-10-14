@@ -72,11 +72,12 @@ func (*GRPC) NewClient(ctxPtr *context.Context) interface{} {
 	return common.Bind(rt, &Client{}, ctxPtr)
 }
 
-// MethodInfo holds ifromation on any parsed method descriptors that can be used by the goja VM
+// MethodInfo holds information on any parsed method descriptors that can be used by the goja VM
 type MethodInfo struct {
-	FullMethod     string
-	IsClientStream bool
-	IsServerStream bool
+	grpc.MethodInfo
+	Package    string
+	Service    string
+	FullMethod string
 }
 
 // Response is a gRPC response that can be used by the goja VM
@@ -110,15 +111,21 @@ func (c *Client) Load(ctxPtr *context.Context, importPaths []string, filenames .
 		for _, sd := range fd.GetServices() {
 			for _, md := range sd.GetMethods() {
 				var s strings.Builder
+				s.WriteRune('/')
 				s.WriteString(sd.GetFullyQualifiedName())
 				s.WriteRune('/')
 				s.WriteString(md.GetName())
 				name := s.String()
 				c.mds[name] = md
 				rtn = append(rtn, MethodInfo{
-					FullMethod:     name,
-					IsClientStream: md.IsClientStreaming(),
-					IsServerStream: md.IsServerStreaming(),
+					MethodInfo: grpc.MethodInfo{
+						Name:           md.GetName(),
+						IsClientStream: md.IsClientStreaming(),
+						IsServerStream: md.IsServerStreaming(),
+					},
+					Package:    fd.GetPackage(),
+					Service:    sd.GetName(),
+					FullMethod: name,
 				})
 			}
 		}
@@ -233,7 +240,13 @@ func (c *Client) InvokeRPC(ctxPtr *context.Context,
 		return nil, errors.New("no gRPC connection, you must call connect first")
 	}
 
-	method = strings.TrimPrefix(method, "/")
+	if method == "" {
+		return nil, errors.New("method to invoke cannot be empty")
+	}
+
+	if method[0] != '/' {
+		method = "/" + method
+	}
 	md := c.mds[method]
 
 	if md == nil {
@@ -278,10 +291,10 @@ func (c *Client) InvokeRPC(ctxPtr *context.Context,
 		}
 	}
 	if state.Options.SystemTags.Has(stats.TagURL) {
-		c.tags["url"] = fmt.Sprintf("%s/%s", c.conn.Target(), method)
+		c.tags["url"] = fmt.Sprintf("%s%s", c.conn.Target(), method)
 	}
 
-	parts := strings.Split(method, "/")
+	parts := strings.Split(method[1:], "/")
 	if state.Options.SystemTags.Has(stats.TagService) {
 		c.tags["service"] = parts[0]
 	}
@@ -329,9 +342,9 @@ func (c *Client) InvokeRPC(ctxPtr *context.Context,
 
 		// (rogchap) when you access a JSON property in goja, you are actually accessing the underling
 		// Go type (struct, map, slice etc); because these are dynamic messages the Unmarshaled JSON does
-		// not map back to a "real" field or value (as a normal Go type would. If we don't marshal and then
+		// not map back to a "real" field or value (as a normal Go type would). If we don't marshal and then
 		// unmarshal back to a map, you will get "undefined" when accessing JSON properties, even when
-		// JSON.Stringify() shows the object to be correctly present
+		// JSON.Stringify() shows the object to be correctly present.
 		raw, _ := errdm.MarshalJSONPB(&jsonpb.Marshaler{EmitDefaults: true})
 		errMsg := make(map[string]interface{})
 		_ = json.Unmarshal(raw, &errMsg)

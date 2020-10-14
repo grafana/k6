@@ -169,7 +169,7 @@ func TestClient(t *testing.T) {
 		if !assert.Error(t, err) {
 			return
 		}
-		assert.Contains(t, err.Error(), "method \"foo/bar\" not found in file descriptors")
+		assert.Contains(t, err.Error(), "method \"/foo/bar\" not found in file descriptors")
 	})
 
 	t.Run("InvokeRPC", func(t *testing.T) {
