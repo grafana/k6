@@ -32,6 +32,7 @@ import (
 
 	"github.com/dop251/goja"
 	//nolint: staticcheck
+	"github.com/golang/protobuf/jsonpb"
 	"github.com/golang/protobuf/proto"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/protoparse"
@@ -81,10 +82,10 @@ type MethodInfo struct {
 // Response is a gRPC response that can be used by the goja VM
 type Response struct {
 	Status   codes.Code
-	Message  goja.Value
+	Message  interface{}
 	Headers  map[string][]string
 	Trailers map[string][]string
-	Error    goja.Value
+	Error    interface{}
 }
 
 // Load will parse the given proto files and make the file descriptors available to request.
@@ -326,22 +327,39 @@ func (c *Client) InvokeRPC(ctxPtr *context.Context,
 		response.Status = st.Code()
 		errdm, _ := dynamic.AsDynamicMessage(st.Proto())
 
-		// (rogchap) there is a lot of marshaling/unmarshaling here, but because this is a dynamic message
-		// we need to marshal to get the JSON representation first. Using a map seems the best way to create
-		// a goja.Value from the raw JSON bytes.
-		raw, _ := errdm.MarshalJSON()
+		// (rogchap) when you access a JSON property in goja, you are actually accessing the underling
+		// Go type (struct, map, slice etc); because these are dynamic messages the Unmarshaled JSON does
+		// not map back to a "real" field or value (as a normal Go type would. If we don't marshal and then
+		// unmarshal back to a map, you will get "undefined" when accessing JSON properties, even when
+		// JSON.Stringify() shows the object to be correctly present
+		raw, _ := errdm.MarshalJSONPB(&jsonpb.Marshaler{EmitDefaults: true})
 		errMsg := make(map[string]interface{})
 		_ = json.Unmarshal(raw, &errMsg)
-		response.Error = rt.ToValue(errMsg)
+		response.Error = errMsg
 	}
 
 	if resp != nil {
 		msgdm := dynamic.NewMessage(md.GetOutputType())
 		msgdm.Merge(resp)
-		raw, _ := msgdm.MarshalJSON()
+		// (rogchap) there is a lot of marshaling/unmarshaling here, but if we just pass the dynamic message
+		// the default Marshaller would be used, which would strip any zero/default values from the JSON.
+		// eg. given this message:
+		// message Point {
+		//    double x = 1;
+		// 	  double y = 2;
+		// 	  double z = 3;
+		// }
+		// and a value like this:
+		// msg := Point{X: 6, Y: 4, Z: 0}
+		// would result in JSON output:
+		// {"x":6,"y":4}
+		// rather than the desired:
+		// {"x":6,"y":4,"z":0}
+		raw, _ := msgdm.MarshalJSONPB(&jsonpb.Marshaler{EmitDefaults: true})
 		msg := make(map[string]interface{})
 		_ = json.Unmarshal(raw, &msg)
-		response.Message = rt.ToValue(msg)
+		response.Message = msg
+
 	}
 
 	return &response, nil

@@ -225,13 +225,12 @@ func TestClient(t *testing.T) {
 	t.Run("ResponseMessage", func(t *testing.T) {
 		tb.GRPCStub.UnaryCallFunc = func(context.Context, *grpc_testing.SimpleRequest) (*grpc_testing.SimpleResponse, error) {
 			return &grpc_testing.SimpleResponse{
-				Username:   "k6",
 				OauthScope: "水",
 			}, nil
 		}
 		_, err := common.RunString(rt, `
 			var resp = client.invokeRPC("grpc.testing.TestService/UnaryCall", {})
-			if (!resp.message || resp.message.username !== "k6" || resp.message.oauthScope !== "水") {
+			if (!resp.message || resp.message.username !== "" || resp.message.oauthScope !== "水") {
 				throw new Error("unexpected response message: " + JSON.stringify(resp.message))
 			}
 		`)
@@ -250,7 +249,7 @@ func TestClient(t *testing.T) {
 				throw new Error("unexpected error status: " + resp.status)
 			}
 			if (!resp.error || resp.error.message !== "foobar" || resp.error.code !== 15) {
-				throw new Error("unexpected error object: " + JSON.stringify(resp.error))
+				throw new Error("unexpected error object: " + JSON.stringify(resp.error.code))
 			}
 		`)
 		assert.NoError(t, err)
