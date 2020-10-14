@@ -24,6 +24,7 @@ import (
 	"crypto/tls"
 	"net"
 	"net/http/httptrace"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -52,6 +53,7 @@ type Trail struct {
 	// Detailed connection information.
 	ConnReused     bool
 	ConnRemoteAddr net.Addr
+	Errors         []error
 
 	// Populated by SaveSamples()
 	Tags    *stats.SampleTags
@@ -109,6 +111,9 @@ type Tracer struct {
 
 	connReused     bool
 	connRemoteAddr net.Addr
+
+	protoErrorsMutex sync.Mutex
+	protoErrors      []error
 }
 
 // Trace returns a premade ClientTrace that calls all of the Tracer's hooks.
@@ -123,6 +128,13 @@ func (t *Tracer) Trace() *httptrace.ClientTrace {
 		WroteRequest:         t.WroteRequest,
 		GotFirstResponseByte: t.GotFirstResponseByte,
 	}
+}
+
+// Add an error in a thread-safe way
+func (t *Tracer) addError(err error) {
+	t.protoErrorsMutex.Lock()
+	defer t.protoErrorsMutex.Unlock()
+	t.protoErrors = append(t.protoErrors, err)
 }
 
 func now() int64 {
@@ -169,9 +181,9 @@ func (t *Tracer) ConnectDone(network, addr string, err error) {
 	// that only the first call's time is recorded
 	if err == nil {
 		atomic.CompareAndSwapInt64(&t.connectDone, 0, now())
+	} else {
+		t.addError(err)
 	}
-	// if there is an error it either is happy eyeballs related and doesn't matter or it will be
-	// returned by the http call
 }
 
 // TLSHandshakeStart is called when the TLS handshake is started. When
@@ -195,8 +207,9 @@ func (t *Tracer) TLSHandshakeStart() {
 func (t *Tracer) TLSHandshakeDone(state tls.ConnectionState, err error) {
 	if err == nil {
 		atomic.CompareAndSwapInt64(&t.tlsHandshakeDone, 0, now())
+	} else {
+		t.addError(err)
 	}
-	// if there is an error it will be returned by the http call
 }
 
 // GotConn is called after a successful connection is
@@ -252,8 +265,9 @@ func (t *Tracer) GotConn(info httptrace.GotConnInfo) {
 func (t *Tracer) WroteRequest(info httptrace.WroteRequestInfo) {
 	if info.Err == nil {
 		atomic.StoreInt64(&t.wroteRequest, now())
+	} else {
+		t.addError(info.Err)
 	}
-	// if there is an error it will be returned by the http call
 }
 
 // GotFirstResponseByte is called when the first byte of the response
@@ -331,6 +345,12 @@ func (t *Tracer) Done() *Trail {
 	trail.EndTime = done
 	trail.ConnDuration = trail.Connecting + trail.TLSHandshaking
 	trail.Duration = trail.Sending + trail.Waiting + trail.Receiving
+
+	t.protoErrorsMutex.Lock()
+	defer t.protoErrorsMutex.Unlock()
+	if len(t.protoErrors) > 0 {
+		trail.Errors = append([]error{}, t.protoErrors...)
+	}
 
 	return &trail
 }
