@@ -36,7 +36,6 @@ import (
 	"sync"
 	"testing"
 	"time"
-	"math/rand"
 
 	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/spf13/afero"
@@ -1662,56 +1661,6 @@ func TestSystemTags(t *testing.T) {
 					assert.Equal(t, tc.expVal, emittedVal)
 				}
 			}
-		})
-	}
-}
-
-func TestGetRandomIP(t *testing.T) {
-	IpInRange := func(ip net.IP, ipStart string, ipEnd string) bool {
-		start, end := net.ParseIP(ipStart), net.ParseIP(ipEnd)
-		if start == nil || end == nil {
-			return false
-		}
-		if c := ip.To4(); c != nil {
-			a, b := start.To4(), end.To4()
-			return bytes.Compare(c, a) >= 0 && bytes.Compare(c, b) <= 0
-		}
-		if d := ip.To16(); d != nil {
-			a, b := start.To16(), end.To16()
-			return bytes.Compare(d[:8], a[:8]) >= 0 &&
-				bytes.Compare(d[:8], b[:8]) <= 0 &&
-				bytes.Compare(d[8:], a[8:]) >= 0 &&
-				bytes.Compare(d[8:], b[8:]) <= 0
-		}
-		return false
-	}
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	testdata := map[string]struct {
-		hostCount  uint64
-		netCount  uint64
-		ipRange string
-		ipStart string
-		ipEnd   string
-	}{
-		"ipv4 cidr 1":  {65536, 1, "192.168.0.0/16", "192.168.0.0", "192.168.255.255"},
-		"ipv4 cidr 2":  {65526, 1, "192.168.0.10/16", "192.168.10.0", "192.168.255.255"},
-		"ipv4 range 1": {100, 1, "192.168.0.101-192.168.0.200", "192.168.0.101", "192.168.0.200"},
-		"ipv4 range 2": {101, 1, "192.168.0.100-192.168.0.200", "192.168.0.100", "192.168.0.200"},
-		"ipv6 cidr 1":  {65536, 1, "fd00::0/112", "fd00::0", "fd00::ffff"},
-		"ipv6 cidr 2":  {65535, 1, "fd00::1/112", "fd00::1", "fd00::ffff"},
-		"ipv6 range 1": {1024, 256, "fd00:1:1:0::0-fd00:1:1:ff::3ff", "fd00:1:1:0::0", "fd00:1:1:ff::3ff"},
-		"ipv6 range 2": {1023, 254, "fd00:1:1:2::1-fd00:1:1:ff::3ff", "fd00:1:1:2::1", "fd00:1:1:ff::3ff"},
-	}
-	for name, data := range testdata {
-		data := data
-		t.Run(name, func(t *testing.T) {
-			block := GetIPBlock(data.ipRange)
-			assert.NotNil(t, block)
-			ip := block.GetRandomIP(int64(r.Uint64()) % 1048576)
-			assert.NotNil(t, ip)
-			assert.True(t, IpInRange(ip, data.ipStart, data.ipEnd))
-			assert.Equal(t, data.hostCount, block.hostNum)
-			assert.Equal(t, data.netCount, block.netNum)
 		})
 	}
 }
