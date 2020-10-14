@@ -59,7 +59,6 @@ var (
 	WSConnecting       = stats.New("ws_connecting", stats.Trend, stats.Time)
 
 	// gRPC-related
-	GRPCReqs        = stats.New("grpc_reqs", stats.Counter)
 	GRPCReqDuration = stats.New("grpc_req_duration", stats.Trend, stats.Time)
 
 	// Network-related; used for future protocols as well.

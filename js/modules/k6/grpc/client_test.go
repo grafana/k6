@@ -185,7 +185,6 @@ func TestClient(t *testing.T) {
 		assert.NoError(t, err)
 		samplesBuf := stats.GetBufferedSamples(samples)
 		assertMetricEmitted(t, metrics.GRPCReqDuration, samplesBuf, sr("GRPCBIN_ADDR/grpc.testing.TestService/EmptyCall"))
-		assertMetricEmitted(t, metrics.GRPCReqs, samplesBuf, sr("GRPCBIN_ADDR/grpc.testing.TestService/EmptyCall"))
 	})
 
 	t.Run("RequestMessage", func(t *testing.T) {
@@ -239,7 +238,6 @@ func TestClient(t *testing.T) {
 		assert.NoError(t, err)
 		samplesBuf := stats.GetBufferedSamples(samples)
 		assertMetricEmitted(t, metrics.GRPCReqDuration, samplesBuf, sr("GRPCBIN_ADDR/grpc.testing.TestService/UnaryCall"))
-		assertMetricEmitted(t, metrics.GRPCReqs, samplesBuf, sr("GRPCBIN_ADDR/grpc.testing.TestService/UnaryCall"))
 	})
 
 	t.Run("ResponseError", func(t *testing.T) {
@@ -258,7 +256,6 @@ func TestClient(t *testing.T) {
 		assert.NoError(t, err)
 		samplesBuf := stats.GetBufferedSamples(samples)
 		assertMetricEmitted(t, metrics.GRPCReqDuration, samplesBuf, sr("GRPCBIN_ADDR/grpc.testing.TestService/EmptyCall"))
-		assertMetricEmitted(t, metrics.GRPCReqs, samplesBuf, sr("GRPCBIN_ADDR/grpc.testing.TestService/EmptyCall"))
 	})
 
 	t.Run("ResponseHeaders", func(t *testing.T) {
