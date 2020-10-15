@@ -46,6 +46,13 @@ func GetIPBlock(s string) *IPBlock {
 	return ipBlockFromRange(s + "-" + s)
 }
 
+func ipUint64(ip net.IP) (uint64, uint64) {
+	ip128 := ip.To16()
+	net64 := binary.BigEndian.Uint64(ip128[:8])
+	host64 := binary.BigEndian.Uint64(ip128[8:])
+	return net64, host64
+}
+
 func ipBlockFromRange(s string) *IPBlock {
 	ss := strings.SplitN(s, "-", 2)
 	ip0, ip1 := net.ParseIP(ss[0]), net.ParseIP(ss[1]) // len(ParseIP())==16
@@ -53,10 +60,8 @@ func ipBlockFromRange(s string) *IPBlock {
 		fmt.Println("Wrong IP range format: ", s)
 		return nil
 	}
-	n0 := binary.BigEndian.Uint64(ip0[:8])
-	h0 := binary.BigEndian.Uint64(ip0[8:])
-	n1 := binary.BigEndian.Uint64(ip1[:8])
-	h1 := binary.BigEndian.Uint64(ip1[8:])
+	n0, h0 := ipUint64(ip0)
+	n1, h1 := ipUint64(ip1)
 	if (n0 > n1) || (h0 > h1) {
 		fmt.Println("Negative IP range: ", s)
 		return nil
@@ -65,17 +70,14 @@ func ipBlockFromRange(s string) *IPBlock {
 }
 
 func ipBlockFromCIDR(s string) *IPBlock {
-	ipk, pnet, err := net.ParseCIDR(s)
+	ipk, pnet, err := net.ParseCIDR(s) // range start ip, cidr ipnet
 	if err != nil {
 		fmt.Println("ParseCIDR() failed: ", s)
 		return nil
 	}
-	// ipk (ip start in cidr) >= ip0 (cidr-aligned ip base)
-	ip0 := pnet.IP.To16()
-	nk := binary.BigEndian.Uint64(ipk[:8])
-	hk := binary.BigEndian.Uint64(ipk[8:])
-	n0 := binary.BigEndian.Uint64(ip0[:8])
-	h0 := binary.BigEndian.Uint64(ip0[8:])
+	ip0 := pnet.IP.To16() // cidr base ip
+        nk, hk := ipUint64(ipk)
+        n0, h0 := ipUint64(ip0)
 	if hk < h0 || nk < n0 {
 		fmt.Println("Wrong PraseCIDR result: ", s)
 		return nil
@@ -102,7 +104,7 @@ func ipBlockFromCIDR(s string) *IPBlock {
 	}
 	hostNum := offsetCIDR(hz, hk-h0)
 	netNum := offsetCIDR(nz, nk-n0)
-	return &IPBlock{ip0, h0, n0, hostNum, netNum, 1, LoopIncSelectIP}
+	return &IPBlock{ipk, hk, nk, hostNum, netNum, 1, LoopIncSelectIP}
 }
 
 // GetRandomIP return a random IP by seed from an IP block
