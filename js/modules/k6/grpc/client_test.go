@@ -155,6 +155,47 @@ func TestClient(t *testing.T) {
 		assert.Contains(t, err.Error(), "no gRPC connection, you must call connect first")
 	})
 
+	t.Run("UnknownConnectParam", func(t *testing.T) {
+		_, err := common.RunString(rt, sr(`
+			client.connect("GRPCBIN_ADDR", { name: "k6" });
+		`))
+		if !assert.Error(t, err) {
+			return
+		}
+		assert.Contains(t, err.Error(), "unknown connect param: \"name\"")
+	})
+
+	t.Run("ConnectInvalidTimeout", func(t *testing.T) {
+		_, err := common.RunString(rt, sr(`
+			client.connect("GRPCBIN_ADDR", { timeout: "k6" });
+		`))
+		if !assert.Error(t, err) {
+			return
+		}
+		assert.Contains(t, err.Error(), "invalid duration \"k6\"")
+	})
+
+	t.Run("ConnectStringTimeout", func(t *testing.T) {
+		_, err := common.RunString(rt, sr(`
+			client.connect("GRPCBIN_ADDR", { timeout: "1h3s" });
+		`))
+		assert.NoError(t, err)
+	})
+
+	t.Run("ConnectFloatTimeout", func(t *testing.T) {
+		_, err := common.RunString(rt, sr(`
+			client.connect("GRPCBIN_ADDR", { timeout: 3456.3 });
+		`))
+		assert.NoError(t, err)
+	})
+
+	t.Run("ConnectIntegerTimeout", func(t *testing.T) {
+		_, err := common.RunString(rt, sr(`
+			client.connect("GRPCBIN_ADDR", { timeout: 3000 });
+		`))
+		assert.NoError(t, err)
+	})
+
 	t.Run("Connect", func(t *testing.T) {
 		_, err := common.RunString(rt, sr(`
 			client.connect("GRPCBIN_ADDR");
@@ -170,6 +211,57 @@ func TestClient(t *testing.T) {
 			return
 		}
 		assert.Contains(t, err.Error(), "method \"/foo/bar\" not found in file descriptors")
+	})
+
+	t.Run("InvokeRPCInvalidParam", func(t *testing.T) {
+		_, err := common.RunString(rt, `
+			client.invokeRPC("grpc.testing.TestService/EmptyCall", {}, { void: true })
+		`)
+		if !assert.Error(t, err) {
+			return
+		}
+		assert.Contains(t, err.Error(), "unknown param: \"void\"")
+	})
+
+	t.Run("InvokeRPCInvalidTimeoutType", func(t *testing.T) {
+		_, err := common.RunString(rt, `
+			client.invokeRPC("grpc.testing.TestService/EmptyCall", {}, { timeout: true })
+		`)
+		if !assert.Error(t, err) {
+			return
+		}
+		assert.Contains(t, err.Error(), "unable to use type bool as a timeout value")
+	})
+
+	t.Run("InvokeRPCInvalidTimeout", func(t *testing.T) {
+		_, err := common.RunString(rt, `
+			client.invokeRPC("grpc.testing.TestService/EmptyCall", {}, { timeout: "please" })
+		`)
+		if !assert.Error(t, err) {
+			return
+		}
+		assert.Contains(t, err.Error(), " unable to parse \"timeout\"")
+	})
+
+	t.Run("InvokeRPCStringTimeout", func(t *testing.T) {
+		_, err := common.RunString(rt, `
+			client.invokeRPC("grpc.testing.TestService/EmptyCall", {}, { timeout: "1h42m" })
+		`)
+		assert.NoError(t, err)
+	})
+
+	t.Run("InvokeRPCFloatTimeout", func(t *testing.T) {
+		_, err := common.RunString(rt, `
+			client.invokeRPC("grpc.testing.TestService/EmptyCall", {}, { timeout: 400.50 })
+		`)
+		assert.NoError(t, err)
+	})
+
+	t.Run("InvokeRPCIntegerTimeout", func(t *testing.T) {
+		_, err := common.RunString(rt, `
+			client.invokeRPC("grpc.testing.TestService/EmptyCall", {}, { timeout: 2000 })
+		`)
+		assert.NoError(t, err)
 	})
 
 	t.Run("InvokeRPC", func(t *testing.T) {

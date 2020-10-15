@@ -163,9 +163,21 @@ func (c *Client) Connect(ctxPtr *context.Context, addr string, params map[string
 		case "plaintext":
 			isPlaintext, _ = v.(bool)
 		case "timeout":
-			if t, ok := v.(float64); ok && t > 0.0 {
+			var err error
+			switch t := v.(type) {
+			case string:
+				if timeout, err = time.ParseDuration(t); err != nil {
+					return false, fmt.Errorf("unable to parse %q: %v", k, err)
+				}
+			case int64:
+				timeout = time.Duration(float64(t)) * time.Millisecond
+			case float64:
 				timeout = time.Duration(t) * time.Millisecond
+			default:
+				return false, fmt.Errorf("unable to use type %T as a timeout value", v)
 			}
+		default:
+			return false, fmt.Errorf("unknown connect param: %q", k)
 		}
 	}
 
@@ -285,9 +297,21 @@ func (c *Client) InvokeRPC(ctxPtr *context.Context,
 				c.tags[tk] = strVal
 			}
 		case "timeout":
-			if t, ok := v.(float64); ok && t > 0.0 {
+			var err error
+			switch t := v.(type) {
+			case string:
+				if timeout, err = time.ParseDuration(t); err != nil {
+					return nil, fmt.Errorf("unable to parse %q: %v", k, err)
+				}
+			case int64:
+				timeout = time.Duration(float64(t)) * time.Millisecond
+			case float64:
 				timeout = time.Duration(t) * time.Millisecond
+			default:
+				return nil, fmt.Errorf("unable to use type %T as a timeout value", v)
 			}
+		default:
+			return nil, fmt.Errorf("unknown param: %q", k)
 		}
 	}
 	if state.Options.SystemTags.Has(stats.TagURL) {
