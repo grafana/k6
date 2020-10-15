@@ -373,15 +373,10 @@ func parseTTL(ttlS string) (time.Duration, error) {
 		ttlS = types.DefaultDNSConfig().TTL.String
 		fallthrough
 	default:
-		origTTLs := ttlS
-		// Treat unitless values as milliseconds
-		if t, err := strconv.ParseFloat(ttlS, 32); err == nil {
-			ttlS = fmt.Sprintf("%.2fms", t)
-		}
 		var err error
-		ttl, err = types.ParseExtendedDuration(ttlS)
+		ttl, err = types.ParseExtendedDurationMs(ttlS)
 		if ttl < 0 || err != nil {
-			return ttl, fmt.Errorf("invalid DNS TTL: %s", origTTLs)
+			return ttl, fmt.Errorf("invalid DNS TTL: %s", ttlS)
 		}
 	}
 	return ttl, nil

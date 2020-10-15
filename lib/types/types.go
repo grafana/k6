@@ -123,6 +123,16 @@ func ParseExtendedDuration(data string) (result time.Duration, err error) {
 	return time.Duration(days)*24*time.Hour + hours, nil
 }
 
+// ParseExtendedDurationMs wraps ParseExtendedDuration while assuming
+// millisecond values if data is provided with no units.
+// TODO: Merge this into ParseExtendedDuration once it's safe to do so globally.
+func ParseExtendedDurationMs(data string) (result time.Duration, err error) {
+	if t, errp := strconv.ParseFloat(data, 32); errp == nil {
+		data = fmt.Sprintf("%.2fms", t)
+	}
+	return ParseExtendedDuration(data)
+}
+
 // UnmarshalText converts text data to Duration
 func (d *Duration) UnmarshalText(data []byte) error {
 	v, err := ParseExtendedDuration(string(data))
