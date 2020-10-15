@@ -262,7 +262,7 @@ golang.org/x/crypto/md4
 golang.org/x/crypto/ocsp
 golang.org/x/crypto/ripemd160
 golang.org/x/crypto/ssh/terminal
-# golang.org/x/net v0.0.0-20200822124328-c89045814202 => golang.org/x/net v0.0.0-20181201002055-351d144fa1fc
+# golang.org/x/net v0.0.0-20200520004742-59133d7f0dd7 => golang.org/x/net v0.0.0-20181201002055-351d144fa1fc
 ## explicit
 golang.org/x/net/context
 golang.org/x/net/html
