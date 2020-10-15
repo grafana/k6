@@ -41,7 +41,7 @@ import (
 	"github.com/loadimpact/k6/stats/datadog"
 	"github.com/loadimpact/k6/stats/influxdb"
 	"github.com/loadimpact/k6/stats/kafka"
-	"github.com/loadimpact/k6/stats/statsd/common"
+	"github.com/loadimpact/k6/stats/statsd"
 	"github.com/loadimpact/k6/ui"
 )
 
@@ -76,7 +76,7 @@ type Config struct {
 		InfluxDB influxdb.Config `json:"influxdb"`
 		Kafka    kafka.Config    `json:"kafka"`
 		Cloud    cloud.Config    `json:"cloud"`
-		StatsD   common.Config   `json:"statsd"`
+		StatsD   statsd.Config   `json:"statsd"`
 		Datadog  datadog.Config  `json:"datadog"`
 		CSV      csv.Config      `json:"csv"`
 	} `json:"collectors"`
@@ -217,7 +217,7 @@ func getConsolidatedConfig(fs afero.Fs, cliConf Config, runner lib.Runner) (conf
 	cliConf.Collectors.InfluxDB = influxdb.NewConfig().Apply(cliConf.Collectors.InfluxDB)
 	cliConf.Collectors.Cloud = cloud.NewConfig().Apply(cliConf.Collectors.Cloud)
 	cliConf.Collectors.Kafka = kafka.NewConfig().Apply(cliConf.Collectors.Kafka)
-	cliConf.Collectors.StatsD = common.NewConfig().Apply(cliConf.Collectors.StatsD)
+	cliConf.Collectors.StatsD = statsd.NewConfig().Apply(cliConf.Collectors.StatsD)
 	cliConf.Collectors.Datadog = datadog.NewConfig().Apply(cliConf.Collectors.Datadog)
 
 	fileConf, _, err := readDiskConfig(fs)

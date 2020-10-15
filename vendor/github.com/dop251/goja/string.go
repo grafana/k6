@@ -57,7 +57,6 @@ type valueString interface {
 	compareTo(valueString) int
 	reader(start int) io.RuneReader
 	utf16Reader(start int) io.RuneReader
-	runes() []rune
 	utf16Runes() []rune
 	index(valueString, int) int
 	lastIndex(valueString, int) int

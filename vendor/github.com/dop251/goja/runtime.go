@@ -170,6 +170,16 @@ type Runtime struct {
 	vm    *vm
 	hash  *maphash.Hash
 	idSeq uint64
+
+	// Contains a list of ids of finalized weak keys so that the runtime could pick it up and remove from
+	// all weak collections using the weakKeys map. The runtime picks it up either when the topmost function
+	// returns (i.e. the callstack becomes empty) or every 10000 'ticks' (vm instructions).
+	// It is implemented this way to avoid circular references which at the time of writing (go 1.15) causes
+	// the whole structure to become not garbage-collectable.
+	weakRefTracker *weakRefTracker
+
+	// Contains a list of weak collections that contain the key with the id.
+	weakKeys map[uint64]*weakCollections
 }
 
 type StackFrame struct {
@@ -1195,6 +1205,7 @@ func (r *Runtime) RunProgram(p *Program) (result Value, err error) {
 		r.vm.clearStack()
 	} else {
 		r.vm.stack = nil
+		r.leave()
 	}
 	return
 }
@@ -1966,7 +1977,11 @@ func AssertFunction(v Value) (Callable, bool) {
 				if ex != nil {
 					err = ex
 				}
-				obj.runtime.vm.clearStack()
+				vm := obj.runtime.vm
+				vm.clearStack()
+				if len(vm.callStack) == 0 {
+					obj.runtime.leave()
+				}
 				return
 			}, true
 		}
@@ -2182,6 +2197,59 @@ func (r *Runtime) getHash() *maphash.Hash {
 		r.hash = &maphash.Hash{}
 	}
 	return r.hash
+}
+
+func (r *Runtime) addWeakKey(id uint64, coll weakCollection) {
+	keys := r.weakKeys
+	if keys == nil {
+		keys = make(map[uint64]*weakCollections)
+		r.weakKeys = keys
+	}
+	colls := keys[id]
+	if colls == nil {
+		colls = &weakCollections{
+			objId: id,
+		}
+		keys[id] = colls
+	}
+	colls.add(coll)
+}
+
+func (r *Runtime) removeWeakKey(id uint64, coll weakCollection) {
+	keys := r.weakKeys
+	if colls := keys[id]; colls != nil {
+		colls.remove(coll)
+		if len(colls.colls) == 0 {
+			delete(keys, id)
+		}
+	}
+}
+
+// this gets inlined so a CALL is avoided on a critical path
+func (r *Runtime) removeDeadKeys() {
+	if r.weakRefTracker != nil {
+		r.doRemoveDeadKeys()
+	}
+}
+
+func (r *Runtime) doRemoveDeadKeys() {
+	r.weakRefTracker.Lock()
+	list := r.weakRefTracker.list
+	r.weakRefTracker.list = nil
+	r.weakRefTracker.Unlock()
+	for _, id := range list {
+		if colls := r.weakKeys[id]; colls != nil {
+			for _, coll := range colls.colls {
+				coll.removeId(id)
+			}
+			delete(r.weakKeys, id)
+		}
+	}
+}
+
+// called when the top level function returns (i.e. control is passed outside the Runtime).
+func (r *Runtime) leave() {
+	r.removeDeadKeys()
 }
 
 func nilSafe(v Value) Value {

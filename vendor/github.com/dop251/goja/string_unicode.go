@@ -290,10 +290,6 @@ func (s unicodeString) utf16Reader(start int) io.RuneReader {
 	}
 }
 
-func (s unicodeString) runes() []rune {
-	return utf16.Decode(s[1:])
-}
-
 func (s unicodeString) utf16Runes() []rune {
 	runes := make([]rune, len(s)-1)
 	for i, ch := range s[1:] {

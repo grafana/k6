@@ -46,8 +46,10 @@ func (r reader) Read(a []byte) (int, error) {
 	return ((func([]byte) (int, error))(r))(a)
 }
 
-const badReadMsg = "bad read error for test"
-const badCloseMsg = "bad close error for test"
+const (
+	badReadMsg  = "bad read error for test"
+	badCloseMsg = "bad close error for test"
+)
 
 func badReadBody() io.Reader {
 	return reader(func(_ []byte) (int, error) {
@@ -76,7 +78,7 @@ func badCloseBody() io.ReadCloser {
 }
 
 func TestCompressionBodyError(t *testing.T) {
-	var algos = []CompressionType{CompressionTypeGzip}
+	algos := []CompressionType{CompressionTypeGzip}
 	t.Run("bad read body", func(t *testing.T) {
 		_, _, err := compressBody(algos, ioutil.NopCloser(badReadBody()))
 		require.Error(t, err)
@@ -91,16 +93,16 @@ func TestCompressionBodyError(t *testing.T) {
 }
 
 func TestMakeRequestError(t *testing.T) {
-	var ctx, cancel = context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	t.Run("bad compression algorithm body", func(t *testing.T) {
-		var req, err = http.NewRequest("GET", "https://wont.be.used", nil)
+		req, err := http.NewRequest("GET", "https://wont.be.used", nil)
 
 		require.NoError(t, err)
-		var badCompressionType = CompressionType(13)
+		badCompressionType := CompressionType(13)
 		require.False(t, badCompressionType.IsACompressionType())
-		var preq = &ParsedHTTPRequest{
+		preq := &ParsedHTTPRequest{
 			Req:          req,
 			Body:         new(bytes.Buffer),
 			Compressions: []CompressionType{badCompressionType},
@@ -128,7 +130,7 @@ func TestMakeRequestError(t *testing.T) {
 		}
 		ctx = lib.WithState(ctx, state)
 		req, _ := http.NewRequest("GET", srv.URL, nil)
-		var preq = &ParsedHTTPRequest{
+		preq := &ParsedHTTPRequest{
 			Req:     req,
 			URL:     &URL{u: req.URL},
 			Body:    new(bytes.Buffer),
@@ -139,6 +141,58 @@ func TestMakeRequestError(t *testing.T) {
 
 		assert.Nil(t, res)
 		assert.EqualError(t, err, "unsupported response status: 101 Switching Protocols")
+	})
+}
+
+func TestResponseStatus(t *testing.T) {
+	t.Run("response status", func(t *testing.T) {
+		testCases := []struct {
+			name                     string
+			statusCode               int
+			statusCodeExpected       int
+			statusCodeStringExpected string
+		}{
+			{"status 200", 200, 200, "200 OK"},
+			{"status 201", 201, 201, "201 Created"},
+			{"status 202", 202, 202, "202 Accepted"},
+			{"status 203", 203, 203, "203 Non-Authoritative Information"},
+			{"status 204", 204, 204, "204 No Content"},
+			{"status 205", 205, 205, "205 Reset Content"},
+		}
+
+		for _, tc := range testCases {
+			tc := tc
+			t.Run(tc.name, func(t *testing.T) {
+				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(tc.statusCode)
+				}))
+				defer server.Close()
+				logger := logrus.New()
+				logger.Level = logrus.DebugLevel
+				state := &lib.State{
+					Options:   lib.Options{RunTags: &stats.SampleTags{}},
+					Transport: server.Client().Transport,
+					Logger:    logger,
+					Samples:   make(chan<- stats.SampleContainer, 1),
+				}
+				ctx := lib.WithState(context.Background(), state)
+				req, err := http.NewRequest("GET", server.URL, nil)
+				require.NoError(t, err)
+
+				preq := &ParsedHTTPRequest{
+					Req:          req,
+					URL:          &URL{u: req.URL},
+					Body:         new(bytes.Buffer),
+					Timeout:      10 * time.Second,
+					ResponseType: ResponseTypeNone,
+				}
+
+				res, err := MakeRequest(ctx, preq)
+				require.NoError(t, err)
+				assert.Equal(t, tc.statusCodeExpected, res.Status)
+				assert.Equal(t, tc.statusCodeStringExpected, res.StatusText)
+			})
+		}
 	})
 }
 
@@ -181,16 +235,19 @@ func TestMakeRequestTimeout(t *testing.T) {
 	logger := logrus.New()
 	logger.Level = logrus.DebugLevel
 	state := &lib.State{
-		Options:   lib.Options{RunTags: &stats.SampleTags{}},
+		Options: lib.Options{
+			RunTags:    &stats.SampleTags{},
+			SystemTags: &stats.DefaultSystemTagSet,
+		},
 		Transport: srv.Client().Transport,
 		Samples:   samples,
 		Logger:    logger,
 	}
 	ctx = lib.WithState(ctx, state)
 	req, _ := http.NewRequest("GET", srv.URL, nil)
-	var preq = &ParsedHTTPRequest{
+	preq := &ParsedHTTPRequest{
 		Req:     req,
-		URL:     &URL{u: req.URL},
+		URL:     &URL{u: req.URL, URL: srv.URL},
 		Body:    new(bytes.Buffer),
 		Timeout: 10 * time.Millisecond,
 	}
@@ -199,6 +256,20 @@ func TestMakeRequestTimeout(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, res)
 	assert.Len(t, samples, 1)
+	sampleCont := <-samples
+	allSamples := sampleCont.GetSamples()
+	require.Len(t, allSamples, 8)
+	expTags := map[string]string{
+		"error":      "context deadline exceeded",
+		"error_code": "1000",
+		"status":     "0",
+		"method":     "GET",
+		"url":        srv.URL,
+		"name":       srv.URL,
+	}
+	for _, s := range allSamples {
+		assert.Equal(t, expTags, s.Tags.CloneTags())
+	}
 }
 
 func BenchmarkWrapDecompressionError(b *testing.B) {

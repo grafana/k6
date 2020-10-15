@@ -23,14 +23,29 @@ package statsd
 import (
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/guregu/null.v3"
 
+	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
+	"github.com/loadimpact/k6/stats/statsd/common"
 	"github.com/loadimpact/k6/stats/statsd/common/testutil"
 )
 
+func getCollector(
+	logger logrus.FieldLogger, addr, namespace null.String, bufferSize null.Int,
+	pushInterval types.NullDuration) (*common.Collector, error) {
+	return New(logger, Config{
+		Addr:         addr,
+		Namespace:    namespace,
+		BufferSize:   bufferSize,
+		PushInterval: pushInterval,
+	})
+}
+
 func TestCollector(t *testing.T) {
-	testutil.BaseTest(t, New,
+	testutil.BaseTest(t, getCollector,
 		func(t *testing.T, _ []stats.SampleContainer, expectedOutput, output string) {
 			require.Equal(t, expectedOutput, output)
 		})

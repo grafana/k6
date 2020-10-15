@@ -1,11 +1,6 @@
 package goja
 
-import "sync"
-
 type weakMap struct {
-	// need to synchronise access to the data map because it may be accessed
-	// from the finalizer goroutine
-	sync.Mutex
 	data map[uint64]Value
 }
 
@@ -26,57 +21,43 @@ func (wmo *weakMapObject) init() {
 }
 
 func (wm *weakMap) removeId(id uint64) {
-	wm.Lock()
 	delete(wm.data, id)
-	wm.Unlock()
 }
 
 func (wm *weakMap) set(key *Object, value Value) {
-	refs := key.getWeakCollRefs()
-	wm.Lock()
-	wm.data[refs.id()] = value
-	wm.Unlock()
-	refs.add(wm)
+	ref := key.getWeakRef()
+	wm.data[ref.id] = value
+	key.runtime.addWeakKey(ref.id, wm)
 }
 
 func (wm *weakMap) get(key *Object) Value {
-	refs := key.weakColls
-	if refs == nil {
+	ref := key.weakRef
+	if ref == nil {
 		return nil
 	}
-	wm.Lock()
-	ret := wm.data[refs.id()]
-	wm.Unlock()
+	ret := wm.data[ref.id]
 	return ret
 }
 
 func (wm *weakMap) remove(key *Object) bool {
-	refs := key.weakColls
-	if refs == nil {
+	ref := key.weakRef
+	if ref == nil {
 		return false
 	}
-	id := refs.id()
-	wm.Lock()
-	_, exists := wm.data[id]
+	_, exists := wm.data[ref.id]
 	if exists {
-		delete(wm.data, id)
-	}
-	wm.Unlock()
-	if exists {
-		refs.remove(wm)
+		delete(wm.data, ref.id)
+		key.runtime.removeWeakKey(ref.id, wm)
 	}
 	return exists
 }
 
 func (wm *weakMap) has(key *Object) bool {
-	refs := key.weakColls
-	if refs == nil {
+	ref := key.weakRef
+	if ref == nil {
 		return false
 	}
-	id := refs.id()
-	wm.Lock()
-	_, exists := wm.data[id]
-	wm.Unlock()
+	_, exists := wm.data[ref.id]
 	return exists
 }
 

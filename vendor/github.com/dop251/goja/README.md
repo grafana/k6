@@ -21,6 +21,24 @@ Features
  * Sourcemaps.
  * Some ES6 functionality, still work in progress, see https://github.com/dop251/goja/milestone/1?closed=1
  
+Known incompatibilities and caveats
+-----------------------------------
+
+### WeakMap
+WeakMap maintains "hard" references to its values. This means if a value references a key in a WeakMap or a WeakMap
+itself, it will not be garbage-collected until the WeakMap becomes unreferenced. To illustrate this:
+
+```go
+var m = new WeakMap();
+var key = {};
+m.set(key, {key: key});
+// or m.set(key, key);
+key = undefined; // The value will NOT become garbage-collectable at this point
+m = undefined; // But it will at this point.
+```
+
+Note, this does not have any effect on the application logic, but causes a higher-than-expected memory usage.
+
 FAQ
 ---
 

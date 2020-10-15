@@ -136,7 +136,6 @@ func skewTrail(t httpext.Trail, minCoef, maxCoef float64) httpext.Trail {
 	addJitter(&t.Receiving)
 	t.ConnDuration = t.Connecting + t.TLSHandshaking
 	t.Duration = t.Sending + t.Waiting + t.Receiving
-	t.StartTime = t.EndTime.Add(-t.Duration)
 	return t
 }
 

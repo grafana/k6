@@ -778,6 +778,12 @@ func (o *Object) Set(name string, value interface{}) error {
 	})
 }
 
+func (o *Object) Delete(name string) error {
+	return tryFunc(func() {
+		o.self.deleteStr(unistring.NewFromString(name), true)
+	})
+}
+
 // MarshalJSON returns JSON representation of the Object. It is equivalent to JSON.stringify(o).
 // Note, this implements json.Marshaler so that json.Marshal() can be used without the need to Export().
 func (o *Object) MarshalJSON() ([]byte, error) {

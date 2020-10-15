@@ -13,8 +13,8 @@ require (
 	github.com/andybalholm/brotli v0.0.0-20190704151324-71eb68cc467c
 	github.com/andybalholm/cascadia v1.0.0 // indirect
 	github.com/daaku/go.zipexe v0.0.0-20150329023125-a5fe2436ffcb // indirect
-	github.com/dlclark/regexp2 v1.2.1-0.20200807145002-74bac81f00cf // indirect
-	github.com/dop251/goja v0.0.0-20200831102558-9af81ddcf0e1
+	github.com/dlclark/regexp2 v1.4.0 // indirect
+	github.com/dop251/goja v0.0.0-20201007100345-a8e472c705eb
 	github.com/dustin/go-humanize v0.0.0-20171111073723-bb3d318650d4
 	github.com/eapache/go-resiliency v1.1.0 // indirect
 	github.com/eapache/go-xerial-snappy v0.0.0-20160609142408-bb955e01b934 // indirect
@@ -24,7 +24,7 @@ require (
 	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/gin-contrib/sse v0.0.0-20170109093832-22d885f9ecc7 // indirect
 	github.com/gin-gonic/gin v1.1.5-0.20170702092826-d459835d2b07 // indirect
-	github.com/go-sourcemap/sourcemap v2.1.2+incompatible // indirect
+	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
 	github.com/golang/protobuf v1.4.2
 	github.com/golang/snappy v0.0.0-20170215233205-553a64147049 // indirect
 	github.com/google/go-cmp v0.5.1 // indirect
@@ -63,9 +63,8 @@ require (
 	github.com/spf13/cobra v0.0.4-0.20180629152535-a114f312e075
 	github.com/spf13/pflag v1.0.1
 	github.com/stretchr/testify v1.2.2
-	github.com/tidwall/gjson v1.1.3
-	github.com/tidwall/match v1.0.0 // indirect
-	github.com/tidwall/pretty v0.0.0-20180105212114-65a9db5fad51
+	github.com/tidwall/gjson v1.6.1
+	github.com/tidwall/pretty v1.0.2
 	github.com/ugorji/go v1.1.7 // indirect
 	github.com/urfave/negroni v0.3.1-0.20180130044549-22c5532ea862
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
@@ -73,8 +72,8 @@ require (
 	github.com/viki-org/dnscache v0.0.0-20130720023526-c70c1f23c5d8
 	github.com/zyedidia/highlight v0.0.0-20170330143449-201131ce5cf5
 	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550
-	golang.org/x/net v0.0.0-20200822124328-c89045814202
-	golang.org/x/text v0.3.2
+	golang.org/x/net v0.0.0-20200520004742-59133d7f0dd7
+	golang.org/x/text v0.3.3
 	golang.org/x/time v0.0.0-20170927054726-6dc17368e09b
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	google.golang.org/genproto v0.0.0-20200903010400-9bfcb5116336 // indirect

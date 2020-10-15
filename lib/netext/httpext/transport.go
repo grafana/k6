@@ -101,6 +101,26 @@ func (t *transport) measureAndEmitMetrics(unfReq *unfinishedRequest) *finishedRe
 	}
 
 	enabledTags := t.state.Options.SystemTags
+
+	urlEnabled := enabledTags.Has(stats.TagURL)
+	var setName bool
+	if _, ok := tags["name"]; !ok && enabledTags.Has(stats.TagName) {
+		setName = true
+	}
+	if urlEnabled || setName {
+		cleanURL := URL{u: unfReq.request.URL, URL: unfReq.request.URL.String()}.Clean()
+		if urlEnabled {
+			tags["url"] = cleanURL
+		}
+		if setName {
+			tags["name"] = cleanURL
+		}
+	}
+
+	if enabledTags.Has(stats.TagMethod) {
+		tags["method"] = unfReq.request.Method
+	}
+
 	if unfReq.err != nil {
 		result.errorCode, result.errorMsg = errorCodeForError(unfReq.err)
 		if enabledTags.Has(stats.TagError) {
@@ -115,24 +135,6 @@ func (t *transport) measureAndEmitMetrics(unfReq *unfinishedRequest) *finishedRe
 			tags["status"] = "0"
 		}
 	} else {
-		urlEnabled := enabledTags.Has(stats.TagURL)
-		var setName bool
-		if _, ok := tags["name"]; !ok && enabledTags.Has(stats.TagName) {
-			setName = true
-		}
-		if urlEnabled || setName {
-			cleanURL := URL{u: unfReq.request.URL, URL: unfReq.request.URL.String()}.Clean()
-			if urlEnabled {
-				tags["url"] = cleanURL
-			}
-			if setName {
-				tags["name"] = cleanURL
-			}
-		}
-
-		if enabledTags.Has(stats.TagMethod) {
-			tags["method"] = unfReq.request.Method
-		}
 		if enabledTags.Has(stats.TagStatus) {
 			tags["status"] = strconv.Itoa(unfReq.response.StatusCode)
 		}

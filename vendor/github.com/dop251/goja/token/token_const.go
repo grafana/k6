@@ -26,7 +26,6 @@ const (
 	SHIFT_LEFT           // <<
 	SHIFT_RIGHT          // >>
 	UNSIGNED_SHIFT_RIGHT // >>>
-	AND_NOT              // &^
 
 	ADD_ASSIGN       // +=
 	SUBTRACT_ASSIGN  // -=
@@ -40,7 +39,6 @@ const (
 	SHIFT_LEFT_ASSIGN           // <<=
 	SHIFT_RIGHT_ASSIGN          // >>=
 	UNSIGNED_SHIFT_RIGHT_ASSIGN // >>>=
-	AND_NOT_ASSIGN              // &^=
 
 	LOGICAL_AND // &&
 	LOGICAL_OR  // ||
@@ -133,7 +131,6 @@ var token2string = [...]string{
 	SHIFT_LEFT:                  "<<",
 	SHIFT_RIGHT:                 ">>",
 	UNSIGNED_SHIFT_RIGHT:        ">>>",
-	AND_NOT:                     "&^",
 	ADD_ASSIGN:                  "+=",
 	SUBTRACT_ASSIGN:             "-=",
 	MULTIPLY_ASSIGN:             "*=",
@@ -145,7 +142,6 @@ var token2string = [...]string{
 	SHIFT_LEFT_ASSIGN:           "<<=",
 	SHIFT_RIGHT_ASSIGN:          ">>=",
 	UNSIGNED_SHIFT_RIGHT_ASSIGN: ">>>=",
-	AND_NOT_ASSIGN:              "&^=",
 	LOGICAL_AND:                 "&&",
 	LOGICAL_OR:                  "||",
 	INCREMENT:                   "++",
