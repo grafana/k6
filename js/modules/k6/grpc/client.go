@@ -110,12 +110,7 @@ func (c *Client) Load(ctxPtr *context.Context, importPaths []string, filenames .
 	for _, fd := range fds {
 		for _, sd := range fd.GetServices() {
 			for _, md := range sd.GetMethods() {
-				var s strings.Builder
-				s.WriteRune('/')
-				s.WriteString(sd.GetFullyQualifiedName())
-				s.WriteRune('/')
-				s.WriteString(md.GetName())
-				name := s.String()
+				name := fmt.Sprintf("/%s/%s", sd.GetFullyQualifiedName(), md.GetName())
 				c.mds[name] = md
 				rtn = append(rtn, MethodInfo{
 					MethodInfo: grpc.MethodInfo{
