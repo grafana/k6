@@ -7,7 +7,6 @@ import (
 	"net"
 	"strconv"
 	"strings"
-	"time"
 )
 
 type SelectMode uint
@@ -159,21 +158,26 @@ func GetPool(ranges string) IPPool {
 			if weight, err := strconv.ParseUint(rmw[2], 10, 64); err == nil {
 				r.weight = weight
 			}
+		} else {
+			r.weight = r.hostN // not conside r.netN
+		}
+		if len(pool) > 0 {
+			r.weight += pool[len(pool)-1].weight
 		}
 		pool = append(pool, *r)
-		for i := 0; i < len(pool)-1; i++ {
-			pool[i].weight += r.weight
-		}
 	}
 	return pool
 }
 
 func (pool IPPool) GetIP(id int64) net.IP {
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	b := pool[0]
-	k := r.Uint64() % b.weight
-	for i := len(pool) - 1; i > 0; i-- {
-		if k < pool[i].weight {
+	last := len(pool)
+	if last < 1 {
+		return nil
+	}
+	b := pool[last-1]
+	j := uint64(id) % pool[last-1].weight
+	for i := 0; i < last-1; i++ {
+		if j < pool[i].weight {
 			b = pool[i]
 			break
 		}

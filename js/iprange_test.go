@@ -180,18 +180,17 @@ func TestGetPool(t *testing.T) {
 		"mode 1 weight 50": {"1.1.0.0/16|1|50,2.2.2.100-2.2.2.120|1|50", 50, RandomSelectIP},
 		"ipv4 list":        {"192.168.0.1,192.168.0.2,192.168.0.3", 1, LoopIncSelectIP},
 		"ipv6 list":        {"fd00:1:1:2::1,fd00:1:1:ff::2,fd00:1:1:ff::3", 1, LoopIncSelectIP},
-		"ipv4 ipv6 mixed":  {"fd00:1:1:2::1/120|1,192.168.0.0/16|1", 1, RandomSelectIP},
+		"ipv4 ipv6 mixed":  {"fd00:1:1:2::1/120|1|100,192.168.0.0/16|1|100", 100, RandomSelectIP},
 	}
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	for name, data := range testdata {
-		data := data
 		t.Run(name, func(t *testing.T) {
 			p := GetPool(data.ipBlock)
 			assert.NotNil(t, p)
 			for _, b := range p {
 				assert.Equal(t, data.mode, b.mode)
 			}
-			for i, j := len(p)-1, uint64(0); i >= 0; i-- {
+			for i, j := 0, uint64(0); i < len(p); i++ {
 				j += data.weight
 				assert.Equal(t, j, p[i].weight)
 			}
