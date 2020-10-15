@@ -31,7 +31,6 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
-	"github.com/golang/protobuf/jsonpb"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/protoparse"
 	"github.com/jhump/protoreflect/dynamic"
@@ -46,6 +45,8 @@ import (
 
 	//nolint: staticcheck
 	"github.com/golang/protobuf/proto"
+	//nolint: staticcheck
+	"github.com/golang/protobuf/jsonpb"
 
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
