@@ -100,16 +100,13 @@ func (c *Client) Load(ctxPtr *context.Context, importPaths []string, filenames .
 		InferImportPaths: len(importPaths) == 0,
 	}
 
-	fds, err := parser.ParseFiles(filenames...)
+	fds, err := parser.ParseFilesButDoNotLink(filenames...)
 	if err != nil {
 		return nil, err
 	}
 
-	fdset := &descriptorpb.FileDescriptorSet{}
-	for _, fd := range fds {
-		fdset.File = append(fdset.File, fd.AsFileDescriptorProto())
-	}
-	files, err := protodesc.NewFiles(fdset)
+	fdset := &descriptorpb.FileDescriptorSet{File: fds}
+	files, err := protodesc.FileOptions{AllowUnresolvable: true}.NewFiles(fdset)
 	if err != nil {
 		return nil, err
 	}
