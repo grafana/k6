@@ -176,7 +176,7 @@ func (c *Client) Connect(ctxPtr *context.Context, addr string, params map[string
 		}
 	}
 
-	errc := make(chan error)
+	errc := make(chan error, 1)
 	go func() {
 		opts := []grpc.DialOption{
 			grpc.WithBlock(),
