@@ -175,6 +175,11 @@ func (c *Client) Connect(ctxPtr *context.Context, addr string, params map[string
 		}
 	}
 
+	// (rogchap) Even with FailOnNonTempDialError, if there is a TLS error this will timeout
+	// rather than report the error, so we can't rely on WithBlock. By running in a goroutine
+	// we can then wait on the error channel instead, which could happen before the Dial
+	// returns. We only need to close the channel to un-block in a non-error scenario;
+	// otherwise it can be GCd without closing as we return on an error on the channel.
 	errc := make(chan error, 1)
 	go func() {
 		opts := []grpc.DialOption{
@@ -268,25 +273,25 @@ func (c *Client) InvokeRPC(ctxPtr *context.Context,
 		case "headers":
 			rawHeaders, ok := v.(map[string]interface{})
 			if !ok {
-				continue
+				return nil, errors.New("headers must be an object with key-value pairs")
 			}
 			for hk, kv := range rawHeaders {
 				// TODO(rogchap): Should we manage a string slice?
 				strVal, ok := kv.(string)
 				if !ok {
-					continue
+					return nil, fmt.Errorf("header %q value must be a string", hk)
 				}
 				ctx = metadata.AppendToOutgoingContext(ctx, hk, strVal)
 			}
 		case "tags":
 			rawTags, ok := v.(map[string]interface{})
 			if !ok {
-				continue
+				return nil, errors.New("tags must be an object with key-value pairs")
 			}
 			for tk, tv := range rawTags {
 				strVal, ok := tv.(string)
 				if !ok {
-					continue
+					return nil, fmt.Errorf("tag %q value must be a string", tk)
 				}
 				tags[tk] = strVal
 			}
