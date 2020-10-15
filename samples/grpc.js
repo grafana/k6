@@ -6,14 +6,15 @@ client.load([], "samples/grpc_server/route_guide.proto")
 
 
 export default () => {
-    client.connect("localhost:10000", { plaintext: true })
+    client.connect("127.0.0.1:10000", { plaintext: true })
 
-    const response = client.invokeRPC("main.RouteGuide/GetFeature", {
+    const response = client.invoke("main.RouteGuide/GetFeature", {
         latitude: 410248224,
         longitude: -747127767
     })
 
     check(response, { "status is OK": (r) => r && r.status === grpc.StatusOK });
+    console.log(JSON.stringify(response.message))
 
     client.close()
 }

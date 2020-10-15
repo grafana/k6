@@ -31,10 +31,7 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
-	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/protoparse"
-	"github.com/jhump/protoreflect/dynamic"
-	"github.com/jhump/protoreflect/dynamic/grpcdynamic"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -42,11 +39,13 @@ import (
 	"google.golang.org/grpc/metadata"
 	grpcstats "google.golang.org/grpc/stats"
 	"google.golang.org/grpc/status"
-
-	//nolint: staticcheck
-	"github.com/golang/protobuf/proto"
-	//nolint: staticcheck
-	"github.com/golang/protobuf/jsonpb"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/encoding/prototext"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protodesc"
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/types/descriptorpb"
+	"google.golang.org/protobuf/types/dynamicpb"
 
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
@@ -62,7 +61,7 @@ var (
 
 // Client reprecents a gRPC client that can be used to make RPC requests
 type Client struct {
-	mds  map[string]*desc.MethodDescriptor
+	mds  map[string]protoreflect.MethodDescriptor
 	conn *grpc.ClientConn
 }
 
@@ -106,26 +105,41 @@ func (c *Client) Load(ctxPtr *context.Context, importPaths []string, filenames .
 		return nil, err
 	}
 
-	var rtn []MethodInfo
-	c.mds = make(map[string]*desc.MethodDescriptor)
+	fdset := &descriptorpb.FileDescriptorSet{}
 	for _, fd := range fds {
-		for _, sd := range fd.GetServices() {
-			for _, md := range sd.GetMethods() {
-				name := fmt.Sprintf("/%s/%s", sd.GetFullyQualifiedName(), md.GetName())
+		fdset.File = append(fdset.File, fd.AsFileDescriptorProto())
+	}
+	files, err := protodesc.NewFiles(fdset)
+	if err != nil {
+		return nil, err
+	}
+
+	var rtn []MethodInfo
+	c.mds = make(map[string]protoreflect.MethodDescriptor)
+
+	files.RangeFiles(func(fd protoreflect.FileDescriptor) bool {
+		sds := fd.Services()
+		for i := 0; i < sds.Len(); i++ {
+			sd := sds.Get(i)
+			mds := sd.Methods()
+			for j := 0; j < mds.Len(); j++ {
+				md := mds.Get(j)
+				name := fmt.Sprintf("/%s/%s", sd.FullName(), md.Name())
 				c.mds[name] = md
 				rtn = append(rtn, MethodInfo{
 					MethodInfo: grpc.MethodInfo{
-						Name:           md.GetName(),
-						IsClientStream: md.IsClientStreaming(),
-						IsServerStream: md.IsServerStreaming(),
+						Name:           string(md.Name()),
+						IsClientStream: md.IsStreamingClient(),
+						IsServerStream: md.IsStreamingServer(),
 					},
-					Package:    fd.GetPackage(),
-					Service:    sd.GetName(),
+					Package:    string(fd.Package()),
+					Service:    string(sd.Name()),
 					FullMethod: name,
 				})
 			}
 		}
-	}
+		return true
+	})
 
 	return rtn, nil
 }
@@ -239,9 +253,9 @@ func (c *Client) Connect(ctxPtr *context.Context, addr string, params map[string
 	return true, nil
 }
 
-// InvokeRPC creates and calls a unary RPC by fully qualified method name
+// Invoke creates and calls a unary RPC by fully qualified method name
 //nolint: funlen,gocognit,gocyclo
-func (c *Client) InvokeRPC(ctxPtr *context.Context,
+func (c *Client) Invoke(ctxPtr *context.Context,
 	method string, req goja.Value, params map[string]interface{}) (*Response, error) {
 	ctx := *ctxPtr
 	rt := common.GetRuntime(ctx)
@@ -342,9 +356,10 @@ func (c *Client) InvokeRPC(ctxPtr *context.Context,
 
 	ctx = withTags(ctx, tags)
 
-	reqdm := dynamic.NewMessage(md.GetInputType())
+	reqdm := dynamicpb.NewMessage(md.Input())
+	// reqdm := dynamic.NewMessage(md.GetInputType())
 	b, _ := req.ToObject(rt).MarshalJSON()
-	_ = reqdm.UnmarshalJSON(b)
+	_ = protojson.Unmarshal(b, reqdm)
 
 	if rpsLimit := state.RPSLimit; rpsLimit != nil {
 		if err := rpsLimit.Wait(ctx); err != nil {
@@ -355,33 +370,33 @@ func (c *Client) InvokeRPC(ctxPtr *context.Context,
 	reqCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	s := grpcdynamic.NewStub(c.conn)
+	resp := dynamicpb.NewMessage(md.Output())
 	header, trailer := metadata.New(nil), metadata.New(nil)
-	resp, err := s.InvokeRpc(reqCtx, md, reqdm, grpc.Header(&header), grpc.Trailer(&trailer))
+	err := c.conn.Invoke(reqCtx, method, reqdm, resp, grpc.Header(&header), grpc.Trailer(&trailer))
 
 	var response Response
 	response.Headers = header
 	response.Trailers = trailer
 
+	marshaler := protojson.MarshalOptions{EmitUnpopulated: true}
+
 	if err != nil {
-		st := status.Convert(err)
-		response.Status = st.Code()
-		errdm, _ := dynamic.AsDynamicMessage(st.Proto())
+		sterr := status.Convert(err)
+		response.Status = sterr.Code()
 
 		// (rogchap) when you access a JSON property in goja, you are actually accessing the underling
 		// Go type (struct, map, slice etc); because these are dynamic messages the Unmarshaled JSON does
 		// not map back to a "real" field or value (as a normal Go type would). If we don't marshal and then
 		// unmarshal back to a map, you will get "undefined" when accessing JSON properties, even when
 		// JSON.Stringify() shows the object to be correctly present.
-		raw, _ := errdm.MarshalJSONPB(&jsonpb.Marshaler{EmitDefaults: true})
+
+		raw, _ := marshaler.Marshal(sterr.Proto())
 		errMsg := make(map[string]interface{})
 		_ = json.Unmarshal(raw, &errMsg)
 		response.Error = errMsg
 	}
 
 	if resp != nil {
-		msgdm := dynamic.NewMessage(md.GetOutputType())
-		msgdm.Merge(resp)
 		// (rogchap) there is a lot of marshaling/unmarshaling here, but if we just pass the dynamic message
 		// the default Marshaller would be used, which would strip any zero/default values from the JSON.
 		// eg. given this message:
@@ -396,7 +411,7 @@ func (c *Client) InvokeRPC(ctxPtr *context.Context,
 		// {"x":6,"y":4}
 		// rather than the desired:
 		// {"x":6,"y":4,"z":0}
-		raw, _ := msgdm.MarshalJSONPB(&jsonpb.Marshaler{EmitDefaults: true})
+		raw, _ := marshaler.Marshal(resp)
 		msg := make(map[string]interface{})
 		_ = json.Unmarshal(raw, &msg)
 		response.Message = msg
@@ -519,11 +534,12 @@ func formatPayload(payload interface{}) string {
 	if !ok {
 		return ""
 	}
-	dm, err := dynamic.AsDynamicMessage(msg)
-	if err != nil {
-		return ""
+
+	marshaler := prototext.MarshalOptions{
+		Multiline: true,
+		Indent:    "  ",
 	}
-	b, err := dm.MarshalTextIndent()
+	b, err := marshaler.Marshal(msg)
 	if err != nil {
 		return ""
 	}
