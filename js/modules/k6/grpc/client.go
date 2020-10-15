@@ -61,7 +61,6 @@ var (
 // Client reprecents a gRPC client that can be used to make RPC requests
 type Client struct {
 	mds  map[string]*desc.MethodDescriptor
-	tags map[string]string
 	conn *grpc.ClientConn
 }
 
@@ -260,7 +259,7 @@ func (c *Client) InvokeRPC(ctxPtr *context.Context,
 		return nil, fmt.Errorf("method %q not found in file descriptors", method)
 	}
 
-	c.tags = state.CloneTags()
+	tags := state.CloneTags()
 	timeout := 60 * time.Second
 
 	ctx = metadata.NewOutgoingContext(ctx, metadata.New(nil))
@@ -289,7 +288,7 @@ func (c *Client) InvokeRPC(ctxPtr *context.Context,
 				if !ok {
 					continue
 				}
-				c.tags[tk] = strVal
+				tags[tk] = strVal
 			}
 		case "timeout":
 			var err error
@@ -310,28 +309,30 @@ func (c *Client) InvokeRPC(ctxPtr *context.Context,
 		}
 	}
 	if state.Options.SystemTags.Has(stats.TagURL) {
-		c.tags["url"] = fmt.Sprintf("%s%s", c.conn.Target(), method)
+		tags["url"] = fmt.Sprintf("%s%s", c.conn.Target(), method)
 	}
 
 	parts := strings.Split(method[1:], "/")
 	if state.Options.SystemTags.Has(stats.TagService) {
-		c.tags["service"] = parts[0]
+		tags["service"] = parts[0]
 	}
 	if state.Options.SystemTags.Has(stats.TagMethod) {
-		c.tags["method"] = parts[1]
+		tags["method"] = parts[1]
 	}
 
 	if state.Options.SystemTags.Has(stats.TagRPCType) {
 		// (rogchap) This method only supports unary RPCs
 		// if this is refactored to support streaming then this should
 		// be updated to be based on the method descriptor (IsClientStreaming/IsServerStreaming)
-		c.tags["rpc_type"] = "unary"
+		tags["rpc_type"] = "unary"
 	}
 
 	// Only set the name system tag if the user didn't explicitly set it beforehand
-	if _, ok := c.tags["name"]; !ok && state.Options.SystemTags.Has(stats.TagName) {
-		c.tags["name"] = method
+	if _, ok := tags["name"]; !ok && state.Options.SystemTags.Has(stats.TagName) {
+		tags["name"] = method
 	}
+
+	ctx = withTags(ctx, tags)
 
 	reqdm := dynamic.NewMessage(md.GetInputType())
 	b, _ := req.ToObject(rt).MarshalJSON()
@@ -428,28 +429,29 @@ func (*Client) TagRPC(ctx context.Context, _ *grpcstats.RPCTagInfo) context.Cont
 // HandleRPC implements the stats.Handler interface
 func (c *Client) HandleRPC(ctx context.Context, stat grpcstats.RPCStats) {
 	state := lib.GetState(ctx)
+	tags := getTags(ctx)
 
 	switch s := stat.(type) {
 	case *grpcstats.OutHeader:
 		if state.Options.SystemTags.Has(stats.TagIP) && s.RemoteAddr != nil {
 			if ip, _, err := net.SplitHostPort(s.RemoteAddr.String()); err == nil {
-				c.tags["ip"] = ip
+				tags["ip"] = ip
 			}
 		}
 	case *grpcstats.End:
-
 		if state.Options.SystemTags.Has(stats.TagStatus) {
-			c.tags["status"] = strconv.Itoa(int(status.Code(s.Error)))
+			tags["status"] = strconv.Itoa(int(status.Code(s.Error)))
 		}
 
-		tags := stats.IntoSampleTags(&c.tags)
+		mTags := map[string]string(tags)
+		sampleTags := stats.IntoSampleTags(&mTags)
 		stats.PushIfNotDone(ctx, state.Samples, stats.ConnectedSamples{
 			Samples: []stats.Sample{
 				{
 					Metric: metrics.GRPCReqDuration,
-					Tags:   tags,
+					Tags:   sampleTags,
 					Value:  stats.D(s.EndTime.Sub(s.BeginTime)),
-					Time:   s.BeginTime,
+					Time:   s.EndTime,
 				},
 			},
 		})
