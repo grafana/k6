@@ -172,7 +172,7 @@ func TestClient(t *testing.T) {
 		if !assert.Error(t, err) {
 			return
 		}
-		assert.Contains(t, err.Error(), "invalid duration \"k6\"")
+		assert.Contains(t, err.Error(), "unable to parse \"timeout\"")
 	})
 
 	t.Run("ConnectStringTimeout", func(t *testing.T) {

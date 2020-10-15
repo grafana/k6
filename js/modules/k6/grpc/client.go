@@ -31,9 +31,7 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
-	//nolint: staticcheck
 	"github.com/golang/protobuf/jsonpb"
-	"github.com/golang/protobuf/proto"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/protoparse"
 	"github.com/jhump/protoreflect/dynamic"
@@ -45,6 +43,9 @@ import (
 	"google.golang.org/grpc/metadata"
 	grpcstats "google.golang.org/grpc/stats"
 	"google.golang.org/grpc/status"
+
+	//nolint: staticcheck
+	"github.com/golang/protobuf/proto"
 
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
@@ -144,6 +145,7 @@ func (t transportCreds) ClientHandshake(ctx context.Context,
 }
 
 // Connect is a block dial to the gRPC server at the given address (host:port)
+// nolint: funlen
 func (c *Client) Connect(ctxPtr *context.Context, addr string, params map[string]interface{}) (bool, error) {
 	state := lib.GetState(*ctxPtr)
 	if state == nil {
@@ -237,7 +239,7 @@ func (c *Client) Connect(ctxPtr *context.Context, addr string, params map[string
 }
 
 // InvokeRPC creates and calls a unary RPC by fully qualified method name
-//nolint: funlen,gocognit
+//nolint: funlen,gocognit,gocyclo
 func (c *Client) InvokeRPC(ctxPtr *context.Context,
 	method string, req goja.Value, params map[string]interface{}) (*Response, error) {
 	ctx := *ctxPtr
@@ -397,7 +399,6 @@ func (c *Client) InvokeRPC(ctxPtr *context.Context,
 		msg := make(map[string]interface{})
 		_ = json.Unmarshal(raw, &msg)
 		response.Message = msg
-
 	}
 
 	return &response, nil
