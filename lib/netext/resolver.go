@@ -26,7 +26,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/types"
 )
 
 // MultiResolver returns all IP addresses for the given host.
@@ -39,8 +39,8 @@ type Resolver interface {
 
 type resolver struct {
 	resolve     MultiResolver
-	selectIndex lib.DNSSelect
-	policy      lib.DNSPolicy
+	selectIndex types.DNSSelect
+	policy      types.DNSPolicy
 	rrm         *sync.Mutex
 	rand        *rand.Rand
 	roundRobin  map[string]uint8
@@ -62,7 +62,7 @@ type cacheResolver struct {
 // will be cached per host for the specified period. The IP returned from
 // LookupIP() will be selected based on the given sel and pol values.
 func NewResolver(
-	actRes MultiResolver, ttl time.Duration, sel lib.DNSSelect, pol lib.DNSPolicy,
+	actRes MultiResolver, ttl time.Duration, sel types.DNSSelect, pol types.DNSPolicy,
 ) Resolver {
 	r := rand.New(rand.NewSource(time.Now().UnixNano())) // nolint: gosec
 	res := resolver{
@@ -131,16 +131,16 @@ func (r *resolver) selectOne(host string, ips []net.IP) net.IP {
 
 	var ip net.IP
 	switch r.selectIndex {
-	case lib.DNSFirst:
+	case types.DNSFirst:
 		return ips[0]
-	case lib.DNSRoundRobin:
+	case types.DNSRoundRobin:
 		r.rrm.Lock()
 		// NOTE: This index approach is not stable and might result in returning
 		// repeated or skipped IPs if the records change during a test run.
 		ip = ips[int(r.roundRobin[host])%len(ips)]
 		r.roundRobin[host]++
 		r.rrm.Unlock()
-	case lib.DNSRandom:
+	case types.DNSRandom:
 		r.rrm.Lock()
 		ip = ips[r.rand.Intn(len(ips))]
 		r.rrm.Unlock()
@@ -150,27 +150,27 @@ func (r *resolver) selectOne(host string, ips []net.IP) net.IP {
 }
 
 func (r *resolver) applyPolicy(ips []net.IP) (retIPs []net.IP) {
-	if r.policy == lib.DNSany {
+	if r.policy == types.DNSany {
 		return ips
 	}
 	ip4, ip6 := groupByVersion(ips)
 	switch r.policy {
-	case lib.DNSpreferIPv4:
+	case types.DNSpreferIPv4:
 		retIPs = ip4
 		if len(retIPs) == 0 {
 			retIPs = ip6
 		}
-	case lib.DNSpreferIPv6:
+	case types.DNSpreferIPv6:
 		retIPs = ip6
 		if len(retIPs) == 0 {
 			retIPs = ip4
 		}
-	case lib.DNSonlyIPv4:
+	case types.DNSonlyIPv4:
 		retIPs = ip4
-	case lib.DNSonlyIPv6:
+	case types.DNSonlyIPv6:
 		retIPs = ip6
 	// Already checked above, but added to satisfy 'exhaustive' linter.
-	case lib.DNSany:
+	case types.DNSany:
 		retIPs = ips
 	}
 

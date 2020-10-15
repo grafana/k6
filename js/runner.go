@@ -97,7 +97,7 @@ func newFromBundle(logger *logrus.Logger, b *Bundle) (*Runner, error) {
 		return nil, err
 	}
 
-	defDNS := lib.DefaultDNSConfig()
+	defDNS := types.DefaultDNSConfig()
 	r := &Runner{
 		Bundle:       b,
 		Logger:       logger,
@@ -341,21 +341,22 @@ func (r *Runner) SetOptions(opts lib.Options) error {
 	return nil
 }
 
-func (r *Runner) setResolver(dns lib.DNSConfig) error {
+func (r *Runner) setResolver(dns types.DNSConfig) error {
 	ttl, err := parseTTL(dns.TTL.String)
 	if err != nil {
 		return err
 	}
 
-	dnsSel := dns.Select.DNSSelect
-	if !dnsSel.IsADNSSelect() {
-		dnsSel = lib.DefaultDNSConfig().Select.DNSSelect
+	dnsSel := dns.Select
+	if !dnsSel.Valid {
+		dnsSel = types.DefaultDNSConfig().Select
 	}
-	dnsPol := dns.Policy.DNSPolicy
-	if !dnsPol.IsADNSPolicy() {
-		dnsPol = lib.DefaultDNSConfig().Policy.DNSPolicy
+	dnsPol := dns.Policy
+	if !dnsPol.Valid {
+		dnsPol = types.DefaultDNSConfig().Policy
 	}
-	r.Resolver = netext.NewResolver(r.ActualResolver, ttl, dnsSel, dnsPol)
+	r.Resolver = netext.NewResolver(
+		r.ActualResolver, ttl, dnsSel.DNSSelect, dnsPol.DNSPolicy)
 
 	return nil
 }
@@ -369,7 +370,7 @@ func parseTTL(ttlS string) (time.Duration, error) {
 	case "0":
 		// disable cache
 	case "":
-		ttlS = lib.DefaultDNSConfig().TTL.String
+		ttlS = types.DefaultDNSConfig().TTL.String
 		fallthrough
 	default:
 		origTTLs := ttlS

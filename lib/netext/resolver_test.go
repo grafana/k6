@@ -29,8 +29,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/testutils/mockresolver"
+	"github.com/loadimpact/k6/lib/types"
 )
 
 func TestResolver(t *testing.T) {
@@ -51,29 +51,29 @@ func TestResolver(t *testing.T) {
 	t.Run("LookupIP", func(t *testing.T) {
 		testCases := []struct {
 			ttl   time.Duration
-			sel   lib.DNSSelect
-			pol   lib.DNSPolicy
+			sel   types.DNSSelect
+			pol   types.DNSPolicy
 			expIP []net.IP
 		}{
 			{
-				0, lib.DNSFirst, lib.DNSpreferIPv4,
+				0, types.DNSFirst, types.DNSpreferIPv4,
 				[]net.IP{net.ParseIP("127.0.0.10")},
 			},
 			{
-				time.Second, lib.DNSFirst, lib.DNSpreferIPv4,
+				time.Second, types.DNSFirst, types.DNSpreferIPv4,
 				[]net.IP{net.ParseIP("127.0.0.10")},
 			},
-			{0, lib.DNSRoundRobin, lib.DNSonlyIPv6, []net.IP{
+			{0, types.DNSRoundRobin, types.DNSonlyIPv6, []net.IP{
 				net.ParseIP("2001:db8::10"),
 				net.ParseIP("2001:db8::11"),
 				net.ParseIP("2001:db8::12"),
 				net.ParseIP("2001:db8::10"),
 			}},
 			{
-				0, lib.DNSFirst, lib.DNSpreferIPv6,
+				0, types.DNSFirst, types.DNSpreferIPv6,
 				[]net.IP{net.ParseIP("2001:db8::10")},
 			},
-			{0, lib.DNSRoundRobin, lib.DNSpreferIPv4, []net.IP{
+			{0, types.DNSRoundRobin, types.DNSpreferIPv4, []net.IP{
 				net.ParseIP("127.0.0.10"),
 				net.ParseIP("127.0.0.11"),
 				net.ParseIP("127.0.0.12"),
@@ -101,7 +101,7 @@ func TestResolver(t *testing.T) {
 					assert.True(t, cr.cache[host].lastLookup.After(firstLookup))
 				}
 
-				if tc.sel == lib.DNSRoundRobin {
+				if tc.sel == types.DNSRoundRobin {
 					ips := []net.IP{ip}
 					for i := 0; i < 3; i++ {
 						ip, err = r.LookupIP(host)
