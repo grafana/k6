@@ -252,11 +252,19 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 	tracerTransport := newTransport(ctx, state, tags)
 	var transport http.RoundTripper = tracerTransport
 
+	// Combine tags with common log fields
+	combinedLogFields := map[string]interface{}{"source": "http-debug", "vu": state.Vu, "iter": state.Iteration}
+	for k, v := range tags {
+		if _, present := combinedLogFields[k]; !present {
+			combinedLogFields[k] = v
+		}
+	}
+
 	if state.Options.HTTPDebug.String != "" {
 		transport = httpDebugTransport{
 			originalTransport: transport,
 			httpDebugOption:   state.Options.HTTPDebug.String,
-			logger:            state.Logger.WithField("source", "http-debug"),
+			logger:            state.Logger.WithFields(combinedLogFields),
 		}
 	}
 
