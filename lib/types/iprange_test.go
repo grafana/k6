@@ -153,17 +153,18 @@ func TestGettRoundRobinIP(t *testing.T) {
 		"ipv6 range 2": {1023, 254, "fd00:1:1:2::1-fd00:1:1:ff::3ff", "fd00:1:1:2::1", "fd00:1:1:ff::3ff"},
 	}
 	for name, data := range testdata {
+		data := data
 		t.Run(name, func(t *testing.T) {
 			b := GetIPBlock(data.ipBlock)
 			assert.NotNil(t, b)
 			assert.Equal(t, data.hostCount, b.hostN)
 			assert.Equal(t, data.netCount, b.netN)
-			for i = 0; i < 300; i++ {
+			for i = 1; i < 300; i++ {
 				ip := b.GetRoundRobinIP(i, i)
 				assert.NotNil(t, ip)
 				n, h := ipUint64(ip)
-				assert.Equal(t, i % data.hostCount, h - b.hostStart)
-				assert.Equal(t, i % data.netCount, n - b.netStart)
+				assert.Equal(t, i%data.hostCount, h-b.hostStart)
+				assert.Equal(t, i%data.netCount, n-b.netStart)
 				assert.True(t, ipInRange(ip, data.ipStart, data.ipEnd))
 			}
 		})
@@ -176,23 +177,26 @@ func TestGetPool(t *testing.T) {
 		weight  uint64
 		mode    SelectMode
 	}{
-		"mode 0 weight 1":  {"192.168.0.1,1.1.1.1|0,2.2.2.100-2.2.2.200|0|1", 1, LoopIncSelectIP},
-		"mode 1 weight 50": {"1.1.0.0/16|1|50,2.2.2.100-2.2.2.120|1|50", 50, RandomSelectIP},
-		"ipv4 list":        {"192.168.0.1,192.168.0.2,192.168.0.3", 1, LoopIncSelectIP},
-		"ipv6 list":        {"fd00:1:1:2::1,fd00:1:1:ff::2,fd00:1:1:ff::3", 1, LoopIncSelectIP},
-		"ipv4 ipv6 mixed":  {"fd00:1:1:2::1/120|1|100,192.168.0.0/16|1|100", 100, RandomSelectIP},
+		"mode 0 weight 1":  {"192.168.0.1,1.1.1.1|0,2.2.2.100-2.2.2.200|0|1", 1, RoundRobin},
+		"mode 1 weight 50": {"1.1.0.0/16|1|50,2.2.2.100-2.2.2.220|1|50", 50, Random},
+		"ipv4 list":        {"192.168.0.1,192.168.0.2,192.168.0.3", 1, RoundRobin},
+		"ipv6 list":        {"fd00:1:1:2::1,fd00:1:1:ff::2,fd00:1:1:ff::3", 1, RoundRobin},
+		"ipv4 ipv6 mixed":  {"fd00:1:1:2::1/120|1|100,192.168.0.0/16|1|100", 100, Random},
 	}
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	for name, data := range testdata {
+		data := data
 		t.Run(name, func(t *testing.T) {
 			p := GetPool(data.ipBlock)
 			assert.NotNil(t, p)
 			for _, b := range p {
 				assert.Equal(t, data.mode, b.mode)
 			}
-			for i, j := 0, uint64(0); i < len(p); i++ {
+			j := uint64(0)
+			for i := 0; i < len(p); i++ {
 				j += data.weight
-				assert.Equal(t, j, p[i].weight)
+				assert.Equal(t, data.weight, p[i].weight)
+				assert.Equal(t, j, p[i].split)
 			}
 			ip := p.GetIP(r.Uint64() % 1048576)
 			assert.NotNil(t, ip)

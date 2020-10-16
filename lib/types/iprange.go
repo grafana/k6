@@ -12,8 +12,8 @@ import (
 type SelectMode uint
 
 const (
-	LoopIncSelectIP SelectMode = iota // increase one by one, no IP is leaking
-	RandomSelectIP                    // random
+	RoundRobin SelectMode = iota // increase one by one, no IP is leaking
+	Random                       // random
 )
 
 type IPBlock struct {
@@ -65,15 +65,16 @@ func ipBlockFromRange(s string) *IPBlock {
 		fmt.Println("Negative IP range: ", s)
 		return nil
 	}
+	hostNum, netNum := h1-h0+1, n1-n0+1
 	return &IPBlock{
 		ip:        ip0,
 		hostStart: h0,
 		netStart:  n0,
-		hostN:     h1 - h0 + 1,
-		netN:      n1 - n0 + 1,
-		weight:    1,
-		split:     1,
-		mode:      LoopIncSelectIP,
+		hostN:     hostNum,
+		netN:      netNum,
+		weight:    hostNum,
+		split:     hostNum,
+		mode:      RoundRobin,
 	}
 }
 
@@ -110,27 +111,28 @@ func ipBlockFromCIDR(s string) *IPBlock {
 			return (uint64(1) << zbits) - offset
 		}
 	}
+	hostNum, netNum := offsetCIDR(hz, hk-h0), offsetCIDR(nz, nk-n0)
 	return &IPBlock{
 		ip:        ipk,
 		hostStart: hk,
 		netStart:  nk,
-		hostN:     offsetCIDR(hz, hk-h0),
-		netN:      offsetCIDR(nz, nk-n0),
-		weight:    1,
-		split:     1,
-		mode:      LoopIncSelectIP,
+		hostN:     hostNum,
+		netN:      netNum,
+		weight:    hostNum,
+		split:     hostNum,
+		mode:      RoundRobin,
 	}
 }
 
 // GetRandomIP return a random IP by seed from an IP block
 func (b IPBlock) GetRandomIP(seed uint64) net.IP {
 	if ip4 := b.ip.To4(); ip4 != nil {
-		r := rand.New(rand.NewSource(int64(seed%b.weight)))
+		r := rand.New(rand.NewSource(int64(seed % b.weight)))
 		i := b.hostStart + r.Uint64()%b.hostN
 		return net.IPv4(byte(i>>24), byte(i>>16), byte(i>>8), byte(i))
 	}
 	if ip6 := b.ip.To16(); ip6 != nil {
-		r := rand.New(rand.NewSource(int64(seed%b.weight)))
+		r := rand.New(rand.NewSource(int64(seed % b.weight)))
 		netN := b.netStart + r.Uint64()%b.netN
 		hostN := b.hostStart + r.Uint64()%b.hostN
 		if hostN < b.hostStart {
@@ -180,14 +182,17 @@ func GetPool(ranges string) IPPool {
 		if r == nil {
 			continue
 		}
+		r.weight = r.hostN
+		r.mode = RoundRobin
 		if sz > 1 {
-			if mode, err := strconv.Atoi(rmw[1]); err == nil {
+			mode, err := strconv.Atoi(rmw[1])
+			if err == nil {
 				r.mode = SelectMode(mode)
 			}
 		}
-		r.weight = r.hostN
 		if sz > 2 {
-			if weight, err := strconv.ParseUint(rmw[2], 10, 64); err == nil {
+			weight, err := strconv.ParseUint(rmw[2], 10, 64)
+			if err == nil && weight < r.weight {
 				r.weight = weight
 			}
 		}
@@ -208,9 +213,9 @@ func (pool IPPool) GetIP(id uint64) net.IP {
 	for _, b := range pool {
 		if idx < b.split {
 			switch b.mode {
-			case RandomSelectIP:
+			case Random:
 				return b.GetRandomIP(id)
-			case LoopIncSelectIP:
+			case RoundRobin:
 				return b.GetRoundRobinIP(id, id)
 			default:
 				return nil
