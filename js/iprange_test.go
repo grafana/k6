@@ -126,7 +126,7 @@ func TestGetRandomIP(t *testing.T) {
 			assert.Equal(t, data.hostCount, b.hostN)
 			assert.Equal(t, data.netCount, b.netN)
 			for i := 0; i < 300; i++ {
-				ip := b.GetRandomIP(int64(r.Uint64()) % 1048576)
+				ip := b.GetRandomIP(r.Uint64() % 1048576)
 				assert.NotNil(t, ip)
 				assert.True(t, ipInRange(ip, data.ipStart, data.ipEnd))
 			}
@@ -159,7 +159,7 @@ func TestGetModNIndexedIP(t *testing.T) {
 			assert.Equal(t, data.hostCount, b.hostN)
 			assert.Equal(t, data.netCount, b.netN)
 			for i = 0; i < 300; i++ {
-				ip := b.GetModNIndexedIP(i, i)
+				ip := b.GetRoundRobinIP(i, i)
 				assert.NotNil(t, ip)
 				n, h := ipUint64(ip)
 				assert.Equal(t, i % data.hostCount, h - b.hostStart)
@@ -194,7 +194,7 @@ func TestGetPool(t *testing.T) {
 				j += data.weight
 				assert.Equal(t, j, p[i].weight)
 			}
-			ip := p.GetIP(int64(r.Uint64() % 1048576))
+			ip := p.GetIP(r.Uint64() % 1048576)
 			assert.NotNil(t, ip)
 		})
 	}

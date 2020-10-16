@@ -165,8 +165,9 @@ func (r *Runner) newVU(id int64, samplesOut chan<- stats.SampleContainer) (*VU, 
 		Blacklist: r.Bundle.Options.BlacklistIPs,
 		Hosts:     r.Bundle.Options.Hosts,
 	}
-	if len(r.ipPool) > 0 {
-		if uAddr := r.ipPool.GetIP(uint64(id)); uAddr != nil {
+	if len(r.ipPool) > 0 && id > 0 {
+		// just found that VU(id==0) will never send requests
+		if uAddr := r.ipPool.GetIP(uint64(id - 1)); uAddr != nil {
 			dialer.Dialer.LocalAddr = &net.TCPAddr{IP: uAddr }
 		}
 	}
