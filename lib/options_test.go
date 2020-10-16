@@ -314,6 +314,13 @@ func TestOptions(t *testing.T) {
 		assert.Equal(t, net.IPv4zero, opts.BlacklistIPs[0].IP)
 		assert.Equal(t, net.CIDRMask(1, 1), opts.BlacklistIPs[0].Mask)
 	})
+	t.Run("BlockedHostnames", func(t *testing.T) {
+		blockedHostnames, err := types.NewNullHostnameTrie([]string{"test.k6.io", "*valid.pattern"})
+		require.NoError(t, err)
+		opts := Options{}.Apply(Options{BlockedHostnames: blockedHostnames})
+		assert.NotNil(t, opts.BlockedHostnames)
+		assert.Equal(t, blockedHostnames, opts.BlockedHostnames)
+	})
 
 	t.Run("Hosts", func(t *testing.T) {
 		host, err := NewHostAddress(net.ParseIP("192.0.2.1"), "80")

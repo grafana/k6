@@ -47,9 +47,10 @@ const (
 	defaultErrorCode          errCode = 1000
 	defaultNetNonTCPErrorCode errCode = 1010
 	// DNS errors
-	defaultDNSErrorCode    errCode = 1100
-	dnsNoSuchHostErrorCode errCode = 1101
-	blackListedIPErrorCode errCode = 1110
+	defaultDNSErrorCode      errCode = 1100
+	dnsNoSuchHostErrorCode   errCode = 1101
+	blackListedIPErrorCode   errCode = 1110
+	blockedHostnameErrorCode errCode = 1111
 	// tcp errors
 	defaultTCPErrorCode      errCode = 1200
 	tcpBrokenPipeErrorCode   errCode = 1201
@@ -91,6 +92,7 @@ const (
 	netUnknownErrnoErrorCodeMsg = "%s: unknown errno `%d` on %s with message `%s`"
 	dnsNoSuchHostErrorCodeMsg   = "lookup: no such host"
 	blackListedIPErrorCodeMsg   = "ip is blacklisted"
+	blockedHostnameErrorMsg     = "hostname is blocked"
 	http2GoAwayErrorCodeMsg     = "http2: received GoAway with http2 ErrCode %s"
 	http2StreamErrorCodeMsg     = "http2: stream error with http2 ErrCode %s"
 	http2ConnectionErrorCodeMsg = "http2: connection error with http2 ErrCode %s"
@@ -119,6 +121,8 @@ func errorCodeForError(err error) (errCode, string) {
 		}
 	case netext.BlackListedIPError:
 		return blackListedIPErrorCode, blackListedIPErrorCodeMsg
+	case netext.BlockedHostError:
+		return blockedHostnameErrorCode, blockedHostnameErrorMsg
 	case *http2.GoAwayError:
 		return unknownHTTP2GoAwayErrorCode + http2ErrCodeOffset(e.ErrCode),
 			fmt.Sprintf(http2GoAwayErrorCodeMsg, e.ErrCode)

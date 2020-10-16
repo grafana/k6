@@ -33,6 +33,7 @@ import (
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
+	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 )
 
@@ -47,9 +48,10 @@ type dnsResolver interface {
 type Dialer struct {
 	net.Dialer
 
-	Resolver  dnsResolver
-	Blacklist []*lib.IPNet
-	Hosts     map[string]*lib.HostAddress
+	Resolver         dnsResolver
+	Blacklist        []*lib.IPNet
+	BlockedHostnames *types.HostnameTrie
+	Hosts            map[string]*lib.HostAddress
 
 	BytesRead    int64
 	BytesWritten int64
@@ -75,6 +77,16 @@ type BlackListedIPError struct {
 
 func (b BlackListedIPError) Error() string {
 	return fmt.Sprintf("IP (%s) is in a blacklisted range (%s)", b.ip, b.net)
+}
+
+// BlockedHostError is returned when a given hostname is blocked
+type BlockedHostError struct {
+	hostname string
+	match    string
+}
+
+func (b BlockedHostError) Error() string {
+	return fmt.Sprintf("hostname (%s) is in a blocked pattern (%s)", b.hostname, b.match)
 }
 
 // DialContext wraps the net.Dialer.DialContext and handles the k6 specifics
@@ -163,12 +175,18 @@ func (d *Dialer) findRemote(addr string) (*lib.HostAddress, error) {
 		return nil, err
 	}
 
+	ip := net.ParseIP(host)
+	if d.BlockedHostnames != nil && ip == nil {
+		if match, blocked := d.BlockedHostnames.Contains(host); blocked {
+			return nil, BlockedHostError{hostname: host, match: match}
+		}
+	}
+
 	remote, err := d.getConfiguredHost(addr, host, port)
 	if err != nil || remote != nil {
 		return remote, err
 	}
 
-	ip := net.ParseIP(host)
 	if ip != nil {
 		return lib.NewHostAddress(ip, port)
 	}
