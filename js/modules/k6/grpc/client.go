@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
+	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/protoparse"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -89,6 +90,23 @@ type Response struct {
 	Error    interface{}
 }
 
+func walkFileDescriptors(seen map[string]struct{}, fd *desc.FileDescriptor) []*descriptorpb.FileDescriptorProto {
+	var fds []*descriptorpb.FileDescriptorProto
+
+	if _, ok := seen[fd.GetName()]; ok {
+		return fds
+	}
+	seen[fd.GetName()] = struct{}{}
+	fds = append(fds, fd.AsFileDescriptorProto())
+
+	for _, dep := range fd.GetDependencies() {
+		deps := walkFileDescriptors(seen, dep)
+		fds = append(fds, deps...)
+	}
+
+	return fds
+}
+
 // Load will parse the given proto files and make the file descriptors available to request.
 func (c *Client) Load(ctxPtr *context.Context, importPaths []string, filenames ...string) ([]MethodInfo, error) {
 	if lib.GetState(*ctxPtr) != nil {
@@ -111,17 +129,13 @@ func (c *Client) Load(ctxPtr *context.Context, importPaths []string, filenames .
 	}
 
 	fdset := &descriptorpb.FileDescriptorSet{}
+
+	seen := make(map[string]struct{})
 	for _, fd := range fds {
-		fdset.File = append(fdset.File, fd.AsFileDescriptorProto())
-		deps := fd.GetDependencies()
-		for _, dep := range deps {
-			fdset.File = append(fdset.File, dep.AsFileDescriptorProto())
-		}
+		fdset.File = append(fdset.File, walkFileDescriptors(seen, fd)...)
 	}
 
-	// (rogchap) We set AllowUnresolvable so that we don't get parsing errors if the definitions
-	// import file options, which are not required for the RPCs
-	files, err := protodesc.FileOptions{AllowUnresolvable: true}.NewFiles(fdset)
+	files, err := protodesc.NewFiles(fdset)
 	if err != nil {
 		return nil, err
 	}
