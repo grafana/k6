@@ -60,6 +60,7 @@ type Runner struct {
 	defaultGroup *lib.Group
 
 	BaseDialer net.Dialer
+	ipPool     IPPool
 	Resolver   *dnscache.Resolver
 	RPSLimit   *rate.Limiter
 
@@ -164,19 +165,10 @@ func (r *Runner) newVU(id int64, samplesOut chan<- stats.SampleContainer) (*VU, 
 		Blacklist: r.Bundle.Options.BlacklistIPs,
 		Hosts:     r.Bundle.Options.Hosts,
 	}
-	if r.Bundle.Options.ClientIpRange.Valid {
-		ippool := GetPool(r.Bundle.Options.ClientIpRange.ValueOrZero())
-		if len(ippool) < 1 {
-			return nil, errors.New("Failed to parse IP Range")
+	if len(r.ipPool) > 0 {
+		if uAddr := r.ipPool.GetIP(uint64(id)); uAddr != nil {
+			dialer.Dialer.LocalAddr = &net.TCPAddr{IP: uAddr }
 		}
-		uAddr := ippool.GetIP(id)
-		if uAddr == nil {
-			return nil, errors.New("Cannot get a IP from IP Pool")
-		}
-		localTCPAddr := net.TCPAddr {
-			IP: uAddr,
-		}
-		dialer.Dialer.LocalAddr = &localTCPAddr
 	}
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: r.Bundle.Options.InsecureSkipTLSVerify.Bool,
@@ -315,7 +307,9 @@ func (r *Runner) IsExecutable(name string) bool {
 
 func (r *Runner) SetOptions(opts lib.Options) error {
 	r.Bundle.Options = opts
-
+	if opts.ClientIpRange.Valid {
+		r.ipPool = GetPool(opts.ClientIpRange.ValueOrZero())
+	}
 	r.RPSLimit = nil
 	if rps := opts.RPS; rps.Valid {
 		r.RPSLimit = rate.NewLimiter(rate.Limit(rps.Int64), 1)

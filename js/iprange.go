@@ -14,7 +14,6 @@ type SelectMode uint
 const (
 	LoopIncSelectIP SelectMode = iota // increase one by one, no IP is leaking
 	RandomSelectIP                    // random
-	ModLenSelectIP                    // like LoopIncSelect, may leak IP(s) if id is not continous
 )
 
 type IPBlock struct {
@@ -107,15 +106,15 @@ func ipBlockFromCIDR(s string) *IPBlock {
 }
 
 // GetRandomIP return a random IP by seed from an IP block
-func (b IPBlock) GetRandomIP(seed int64) net.IP {
-	r := rand.New(rand.NewSource(seed))
+func (b IPBlock) GetRandomIP(seed uint64) net.IP {
+	r := rand.New(rand.NewSource(int64(seed)))
 	h := r.Uint64()
 	n := r.Uint64()
-	return b.GetModNIndexedIP(h, n)
+	return b.GetRoundRobinIP(h, n)
 }
 
-// GetModNIndexedIP return a IP by indexes from an IP block
-func (b IPBlock) GetModNIndexedIP(hostIndex, netIndex uint64) net.IP {
+// GetRoundRobinIP return a IP by indexes from an IP block
+func (b IPBlock) GetRoundRobinIP(hostIndex, netIndex uint64) net.IP {
 	if ip4 := b.ip.To4(); ip4 != nil {
 		i := b.hostStart + hostIndex%b.hostN
 		return net.IPv4(byte(i>>24), byte(i>>16), byte(i>>8), byte(i))
@@ -169,24 +168,22 @@ func GetPool(ranges string) IPPool {
 	return pool
 }
 
-func (pool IPPool) GetIP(id int64) net.IP {
-	last := len(pool)
-	if last < 1 {
+func (pool IPPool) GetIP(id uint64) net.IP {
+	if len(pool) < 1 {
 		return nil
 	}
-	b := pool[last-1]
-	j := uint64(id) % pool[last-1].weight
-	for i := 0; i < last-1; i++ {
-		if j < pool[i].weight {
-			b = pool[i]
-			break
+	idx := id % pool[len(pool)-1].weight
+	for _, b := range pool {
+		if idx < b.weight {
+			switch b.mode {
+			case RandomSelectIP:
+				return b.GetRandomIP(id)
+			case LoopIncSelectIP:
+				return b.GetRoundRobinIP(id, id)
+			default:
+				return nil
+			}
 		}
-	}
-	switch b.mode {
-	case RandomSelectIP:
-		return b.GetRandomIP(id)
-	case LoopIncSelectIP:
-		return b.GetModNIndexedIP(uint64(id), uint64(id))
 	}
 	return nil
 }
