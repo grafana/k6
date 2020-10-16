@@ -124,12 +124,13 @@ func ipBlockFromCIDR(s string) *IPBlock {
 
 // GetRandomIP return a random IP by seed from an IP block
 func (b IPBlock) GetRandomIP(seed uint64) net.IP {
-	r := rand.New(rand.NewSource(int64(seed)))
 	if ip4 := b.ip.To4(); ip4 != nil {
+		r := rand.New(rand.NewSource(int64(seed%b.weight)))
 		i := b.hostStart + r.Uint64()%b.hostN
 		return net.IPv4(byte(i>>24), byte(i>>16), byte(i>>8), byte(i))
 	}
 	if ip6 := b.ip.To16(); ip6 != nil {
+		r := rand.New(rand.NewSource(int64(seed%b.weight)))
 		netN := b.netStart + r.Uint64()%b.netN
 		hostN := b.hostStart + r.Uint64()%b.hostN
 		if hostN < b.hostStart {
