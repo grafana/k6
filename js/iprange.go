@@ -23,6 +23,7 @@ type IPBlock struct {
 	hostN     uint64
 	netN      uint64
 	weight    uint64
+	split     uint64
 	mode      SelectMode
 }
 type IPPool []IPBlock
@@ -64,7 +65,16 @@ func ipBlockFromRange(s string) *IPBlock {
 		fmt.Println("Negative IP range: ", s)
 		return nil
 	}
-	return &IPBlock{ip0, h0, n0, h1 - h0 + 1, n1 - n0 + 1, 1, LoopIncSelectIP}
+	return &IPBlock{
+		ip:        ip0,
+		hostStart: h0,
+		netStart:  n0,
+		hostN:     h1 - h0 + 1,
+		netN:      n1 - n0 + 1,
+		weight:    1,
+		split:     1,
+		mode:      LoopIncSelectIP,
+	}
 }
 
 func ipBlockFromCIDR(s string) *IPBlock {
@@ -74,8 +84,8 @@ func ipBlockFromCIDR(s string) *IPBlock {
 		return nil
 	}
 	ip0 := pnet.IP.To16() // cidr base ip
-        nk, hk := ipUint64(ipk)
-        n0, h0 := ipUint64(ip0)
+	nk, hk := ipUint64(ipk)
+	n0, h0 := ipUint64(ip0)
 	if hk < h0 || nk < n0 {
 		fmt.Println("Wrong PraseCIDR result: ", s)
 		return nil
@@ -100,28 +110,49 @@ func ipBlockFromCIDR(s string) *IPBlock {
 			return (uint64(1) << zbits) - offset
 		}
 	}
-	hostNum := offsetCIDR(hz, hk-h0)
-	netNum := offsetCIDR(nz, nk-n0)
-	return &IPBlock{ipk, hk, nk, hostNum, netNum, 1, LoopIncSelectIP}
+	return &IPBlock{
+		ip:        ipk,
+		hostStart: hk,
+		netStart:  nk,
+		hostN:     offsetCIDR(hz, hk-h0),
+		netN:      offsetCIDR(nz, nk-n0),
+		weight:    1,
+		split:     1,
+		mode:      LoopIncSelectIP,
+	}
 }
 
 // GetRandomIP return a random IP by seed from an IP block
 func (b IPBlock) GetRandomIP(seed uint64) net.IP {
 	r := rand.New(rand.NewSource(int64(seed)))
-	h := r.Uint64()
-	n := r.Uint64()
-	return b.GetRoundRobinIP(h, n)
+	if ip4 := b.ip.To4(); ip4 != nil {
+		i := b.hostStart + r.Uint64()%b.hostN
+		return net.IPv4(byte(i>>24), byte(i>>16), byte(i>>8), byte(i))
+	}
+	if ip6 := b.ip.To16(); ip6 != nil {
+		netN := b.netStart + r.Uint64()%b.netN
+		hostN := b.hostStart + r.Uint64()%b.hostN
+		if hostN < b.hostStart {
+			netN += 1
+		}
+		if ip := make(net.IP, net.IPv6len); ip != nil {
+			binary.BigEndian.PutUint64(ip[:8], netN)
+			binary.BigEndian.PutUint64(ip[8:], hostN)
+			return ip
+		}
+	}
+	return nil
 }
 
 // GetRoundRobinIP return a IP by indexes from an IP block
 func (b IPBlock) GetRoundRobinIP(hostIndex, netIndex uint64) net.IP {
 	if ip4 := b.ip.To4(); ip4 != nil {
-		i := b.hostStart + hostIndex%b.hostN
+		i := b.hostStart + hostIndex%b.weight
 		return net.IPv4(byte(i>>24), byte(i>>16), byte(i>>8), byte(i))
 	}
 	if ip6 := b.ip.To16(); ip6 != nil {
 		netN := b.netStart + netIndex%b.netN
-		hostN := b.hostStart + hostIndex%b.hostN
+		hostN := b.hostStart + hostIndex%b.weight
 		if hostN < b.hostStart {
 			netN += 1
 		}
@@ -153,15 +184,15 @@ func GetPool(ranges string) IPPool {
 				r.mode = SelectMode(mode)
 			}
 		}
+		r.weight = r.hostN
 		if sz > 2 {
 			if weight, err := strconv.ParseUint(rmw[2], 10, 64); err == nil {
 				r.weight = weight
 			}
-		} else {
-			r.weight = r.hostN // not conside r.netN
 		}
+		r.split = r.weight
 		if len(pool) > 0 {
-			r.weight += pool[len(pool)-1].weight
+			r.split += pool[len(pool)-1].split
 		}
 		pool = append(pool, *r)
 	}
@@ -172,9 +203,9 @@ func (pool IPPool) GetIP(id uint64) net.IP {
 	if len(pool) < 1 {
 		return nil
 	}
-	idx := id % pool[len(pool)-1].weight
+	idx := id % pool[len(pool)-1].split
 	for _, b := range pool {
-		if idx < b.weight {
+		if idx < b.split {
 			switch b.mode {
 			case RandomSelectIP:
 				return b.GetRandomIP(id)
