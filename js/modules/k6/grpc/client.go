@@ -95,17 +95,32 @@ func (c *Client) Load(ctxPtr *context.Context, importPaths []string, filenames .
 		return nil, errors.New("load must be called in the init context")
 	}
 
+	f, err := protoparse.ResolveFilenames(importPaths, filenames...)
+	if err != nil {
+		return nil, err
+	}
+
 	parser := protoparse.Parser{
 		ImportPaths:      importPaths,
 		InferImportPaths: len(importPaths) == 0,
 	}
 
-	fds, err := parser.ParseFilesButDoNotLink(filenames...)
+	fds, err := parser.ParseFiles(f...)
 	if err != nil {
 		return nil, err
 	}
 
-	fdset := &descriptorpb.FileDescriptorSet{File: fds}
+	fdset := &descriptorpb.FileDescriptorSet{}
+	for _, fd := range fds {
+		fdset.File = append(fdset.File, fd.AsFileDescriptorProto())
+		deps := fd.GetDependencies()
+		for _, dep := range deps {
+			fdset.File = append(fdset.File, dep.AsFileDescriptorProto())
+		}
+	}
+
+	// (rogchap) We set AllowUnresolvable so that we don't get parsing errors if the definitions
+	// import file options, which are not required for the RPCs
 	files, err := protodesc.FileOptions{AllowUnresolvable: true}.NewFiles(fdset)
 	if err != nil {
 		return nil, err
