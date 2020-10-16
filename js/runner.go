@@ -42,6 +42,7 @@ import (
 
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/loader"
@@ -60,7 +61,7 @@ type Runner struct {
 	defaultGroup *lib.Group
 
 	BaseDialer net.Dialer
-	ipPool     IPPool
+	ipPool     types.IPPool
 	Resolver   *dnscache.Resolver
 	RPSLimit   *rate.Limiter
 
@@ -309,7 +310,7 @@ func (r *Runner) IsExecutable(name string) bool {
 func (r *Runner) SetOptions(opts lib.Options) error {
 	r.Bundle.Options = opts
 	if opts.ClientIpRange.Valid {
-		r.ipPool = GetPool(opts.ClientIpRange.ValueOrZero())
+		r.ipPool = types.GetPool(opts.ClientIpRange.ValueOrZero())
 	}
 	r.RPSLimit = nil
 	if rps := opts.RPS; rps.Valid {

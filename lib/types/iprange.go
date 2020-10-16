@@ -1,4 +1,4 @@
-package js
+package types
 
 import (
 	"encoding/binary"

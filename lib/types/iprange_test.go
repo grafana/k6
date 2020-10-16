@@ -1,4 +1,4 @@
-package js
+package types
 
 import (
 	"bytes"
@@ -134,7 +134,7 @@ func TestGetRandomIP(t *testing.T) {
 	}
 }
 
-func TestGetModNIndexedIP(t *testing.T) {
+func TestGettRoundRobinIP(t *testing.T) {
 	var i uint64
 	testdata := map[string]struct {
 		hostCount uint64
