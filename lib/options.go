@@ -385,6 +385,9 @@ type Options struct {
 
 	// Redirect console logging to a file
 	ConsoleOutput null.String `json:"-" envconfig:"K6_CONSOLE_OUTPUT"`
+
+	// Specify client IP range or CIDR from which VUs bind to
+	ClientIPRange null.String `json:"-" envconfig:"K6_CLIENT_IP_RANGE"`
 }
 
 // Returns the result of overwriting any fields with any that are set on the argument.
@@ -538,6 +541,9 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.ConsoleOutput.Valid {
 		o.ConsoleOutput = opts.ConsoleOutput
+	}
+	if opts.ClientIPRange.Valid {
+		o.ClientIPRange = opts.ClientIPRange
 	}
 
 	return o

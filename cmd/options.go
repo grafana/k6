@@ -93,6 +93,7 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.StringSlice("tag", nil, "add a `tag` to be applied to all samples, as `[name]=[value]`")
 	flags.String("console-output", "", "redirects the console logging to the provided output file")
 	flags.Bool("discard-response-bodies", false, "Read but don't process or save HTTP response bodies")
+	flags.StringP("ip", "", "", "Client IP Range or CIDR from which each VU selects one by VU id")
 	return flags
 }
 
@@ -116,6 +117,7 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		MinIterationDuration:  getNullDuration(flags, "min-iteration-duration"),
 		Throw:                 getNullBool(flags, "throw"),
 		DiscardResponseBodies: getNullBool(flags, "discard-response-bodies"),
+		ClientIPRange:         getNullString(flags, "ip"),
 		// Default values for options without CLI flags:
 		// TODO: find a saner and more dev-friendly and error-proof way to handle options
 		SetupTimeout:    types.NullDuration{Duration: types.Duration(60 * time.Second), Valid: false},

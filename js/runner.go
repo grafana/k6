@@ -44,6 +44,7 @@ import (
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/lib/netext"
+	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/stats"
 )
@@ -60,6 +61,7 @@ type Runner struct {
 	defaultGroup *lib.Group
 
 	BaseDialer net.Dialer
+	ipPool     types.IPPool
 	Resolver   *dnscache.Resolver
 	RPSLimit   *rate.Limiter
 
@@ -164,6 +166,12 @@ func (r *Runner) newVU(id int64, samplesOut chan<- stats.SampleContainer) (*VU, 
 		Blacklist:        r.Bundle.Options.BlacklistIPs,
 		BlockedHostnames: r.Bundle.Options.BlockedHostnames.Trie,
 		Hosts:            r.Bundle.Options.Hosts,
+	}
+	if len(r.ipPool) > 0 && id > 0 {
+		// just found that VU(id==0) will never send requests
+		if uAddr := r.ipPool.GetIP(uint64(id - 1)); uAddr != nil {
+			dialer.Dialer.LocalAddr = &net.TCPAddr{IP: uAddr}
+		}
 	}
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: r.Bundle.Options.InsecureSkipTLSVerify.Bool,
@@ -302,7 +310,9 @@ func (r *Runner) IsExecutable(name string) bool {
 
 func (r *Runner) SetOptions(opts lib.Options) error {
 	r.Bundle.Options = opts
-
+	if opts.ClientIPRange.Valid {
+		r.ipPool = types.GetPool(opts.ClientIPRange.ValueOrZero())
+	}
 	r.RPSLimit = nil
 	if rps := opts.RPS; rps.Valid {
 		r.RPSLimit = rate.NewLimiter(rate.Limit(rps.Int64), 1)

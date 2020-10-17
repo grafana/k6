@@ -407,6 +407,20 @@ func TestOptions(t *testing.T) {
 		assert.True(t, opts.DiscardResponseBodies.Valid)
 		assert.True(t, opts.DiscardResponseBodies.Bool)
 	})
+	t.Run("ClientIPRange", func(t *testing.T) {
+		opts := Options{}.Apply(Options{ClientIPRange: null.StringFrom("10.10.0.0/16")})
+		assert.True(t, opts.ClientIPRange.Valid)
+		assert.Equal(t, "10.10.0.0/16", opts.ClientIPRange.String)
+		opts = Options{}.Apply(Options{ClientIPRange: null.StringFrom("10.10.0.1-10.10.255.254")})
+		assert.True(t, opts.ClientIPRange.Valid)
+		assert.Equal(t, "10.10.0.1-10.10.255.254", opts.ClientIPRange.String)
+		opts = Options{}.Apply(Options{ClientIPRange: null.StringFrom("fd00:0:188::50:0/118")})
+		assert.True(t, opts.ClientIPRange.Valid)
+		assert.Equal(t, "fd00:0:188::50:0/118", opts.ClientIPRange.String)
+		opts = Options{}.Apply(Options{ClientIPRange: null.StringFrom("fd00:1:1:0::1-fd00:1:1:4::3ff")})
+		assert.True(t, opts.ClientIPRange.Valid)
+		assert.Equal(t, "fd00:1:1:0::1-fd00:1:1:4::3ff", opts.ClientIPRange.String)
+	})
 }
 
 func TestOptionsEnv(t *testing.T) {
@@ -468,6 +482,13 @@ func TestOptionsEnv(t *testing.T) {
 		{"UserAgent", "K6_USER_AGENT"}: {
 			"":    null.String{},
 			"Hi!": null.StringFrom("Hi!"),
+		},
+		{"ClientIPRange", "K6_CLIENT_IP_RANGE"}: {
+			"":                                null.String{},
+			"192.168.0.0/16":                  null.StringFrom("192.168.0.0/16"),
+			"192.168.0.1-192.168.100.254":     null.StringFrom("192.168.0.1-192.168.100.254"),
+			"fd00::1/112":                     null.StringFrom("fd00::1/112"),
+			"fd00:4:4:0::1-fd00:4:4:3ff::3ff": null.StringFrom("fd00:4:4:0::1-fd00:4:4:3ff::3ff"),
 		},
 		{"Throw", "K6_THROW"}: {
 			"":      null.Bool{},
