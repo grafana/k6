@@ -339,6 +339,9 @@ type Options struct {
 	// Blacklist IP ranges that tests may not contact. Mainly useful in hosted setups.
 	BlacklistIPs []*IPNet `json:"blacklistIPs" envconfig:"K6_BLACKLIST_IPS"`
 
+	// Block hostname patterns that tests may not contact.
+	BlockedHostnames types.NullHostnameTrie `json:"blockHostnames" envconfig:"K6_BLOCK_HOSTNAMES"`
+
 	// Hosts overrides dns entries for given hosts
 	Hosts map[string]*HostAddress `json:"hosts" envconfig:"K6_HOSTS"`
 
@@ -493,6 +496,9 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.BlacklistIPs != nil {
 		o.BlacklistIPs = opts.BlacklistIPs
+	}
+	if opts.BlockedHostnames.Valid {
+		o.BlockedHostnames = opts.BlockedHostnames
 	}
 	if opts.Hosts != nil {
 		o.Hosts = opts.Hosts

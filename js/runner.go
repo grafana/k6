@@ -159,10 +159,11 @@ func (r *Runner) newVU(id int64, samplesOut chan<- stats.SampleContainer) (*VU, 
 	}
 
 	dialer := &netext.Dialer{
-		Dialer:    r.BaseDialer,
-		Resolver:  r.Resolver,
-		Blacklist: r.Bundle.Options.BlacklistIPs,
-		Hosts:     r.Bundle.Options.Hosts,
+		Dialer:           r.BaseDialer,
+		Resolver:         r.Resolver,
+		Blacklist:        r.Bundle.Options.BlacklistIPs,
+		BlockedHostnames: r.Bundle.Options.BlockedHostnames.Trie,
+		Hosts:            r.Bundle.Options.Hosts,
 	}
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: r.Bundle.Options.InsecureSkipTLSVerify.Bool,
