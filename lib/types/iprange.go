@@ -3,7 +3,7 @@ package types
 import (
 	"encoding/binary"
 	"fmt"
-	"math/rand"
+	"hash/fnv"
 	"net"
 	"strconv"
 	"strings"
@@ -55,6 +55,15 @@ func GetIPBlock(s string) *IPBlock {
 		}
 	}
 	return ipBlockFromRange(s + "-" + s)
+}
+
+func hashIDToUint64(id uint64) uint64 {
+	a, b := fnv.New64(), make([]byte, 8)
+	binary.LittleEndian.PutUint64(b, id)
+	if _, err := a.Write(b); err != nil {
+		return 0
+	}
+	return a.Sum64()
 }
 
 func ipUint64(ip net.IP) (uint64, uint64) {
@@ -136,17 +145,16 @@ func ipBlockFromCIDR(s string) *IPBlock {
 	}
 }
 
-// GetRandomIP return a random IP by seed from an IP block
-func (b IPBlock) GetRandomIP(seed uint64) net.IP {
+// GetRandomIP return a random IP by ID from an IP block
+func (b IPBlock) GetRandomIP(id uint64) net.IP {
+	r := hashIDToUint64(id % b.weight)
 	if ip4 := b.ip.To4(); ip4 != nil {
-		r := rand.New(rand.NewSource(int64(seed % b.weight)))
-		i := b.hostStart + r.Uint64()%b.hostN
+		i := b.hostStart + r%b.hostN
 		return net.IPv4(byte(i>>24), byte(i>>16), byte(i>>8), byte(i))
 	}
 	if ip6 := b.ip.To16(); ip6 != nil {
-		r := rand.New(rand.NewSource(int64(seed % b.weight)))
-		netN := b.netStart + r.Uint64()%b.netN
-		hostN := b.hostStart + r.Uint64()%b.hostN
+		netN := b.netStart + r%b.netN
+		hostN := b.hostStart + r%b.hostN
 		if hostN < b.hostStart {
 			netN++
 		}

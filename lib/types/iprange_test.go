@@ -2,7 +2,6 @@ package types
 
 import (
 	"bytes"
-	"math/rand"
 	"net"
 	"testing"
 	"time"
@@ -118,7 +117,6 @@ func TestGetRandomIP(t *testing.T) {
 		"ipv6 range 1": {1024, 256, "fd00:1:1:0::0-fd00:1:1:ff::3ff", "fd00:1:1:0::0", "fd00:1:1:ff::3ff"},
 		"ipv6 range 2": {1023, 254, "fd00:1:1:2::1-fd00:1:1:ff::3ff", "fd00:1:1:2::1", "fd00:1:1:ff::3ff"},
 	}
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	for name, d := range testdata {
 		data := d
 		t.Run(name, func(t *testing.T) {
@@ -127,7 +125,8 @@ func TestGetRandomIP(t *testing.T) {
 			assert.Equal(t, data.hostCount, b.hostN)
 			assert.Equal(t, data.netCount, b.netN)
 			for i := 0; i < 300; i++ {
-				ip := b.GetRandomIP(r.Uint64() % 1048576)
+				hv := hashIDToUint64(uint64(time.Now().UnixNano()))
+				ip := b.GetRandomIP(hv % 1048576)
 				assert.NotNil(t, ip)
 				assert.True(t, ipInRange(ip, data.ipStart, data.ipEnd))
 			}
@@ -184,7 +183,6 @@ func TestGetPool(t *testing.T) {
 		"ipv6 list":        {"fd00:1:1:2::1,fd00:1:1:ff::2,fd00:1:1:ff::3", 1, roundRobin},
 		"ipv4 ipv6 mixed":  {"fd00:1:1:2::1/120|1|100,192.168.0.0/16|1|100", 100, random},
 	}
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	for name, d := range testdata {
 		data := d
 		t.Run(name, func(t *testing.T) {
@@ -199,7 +197,8 @@ func TestGetPool(t *testing.T) {
 				assert.Equal(t, data.weight, p[i].weight)
 				assert.Equal(t, j, p[i].split)
 			}
-			ip := p.GetIP(r.Uint64() % 1048576)
+			hv := hashIDToUint64(uint64(time.Now().UnixNano()))
+			ip := p.GetIP(hv % 1048576)
 			assert.NotNil(t, ip)
 		})
 	}
