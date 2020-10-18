@@ -91,7 +91,7 @@ type Response struct {
 }
 
 func walkFileDescriptors(seen map[string]struct{}, fd *desc.FileDescriptor) []*descriptorpb.FileDescriptorProto {
-	var fds []*descriptorpb.FileDescriptorProto
+	fds := []*descriptorpb.FileDescriptorProto{}
 
 	if _, ok := seen[fd.GetName()]; ok {
 		return fds
