@@ -376,15 +376,20 @@ func (c *Client) Invoke(ctxPtr *context.Context,
 	ctx = withTags(ctx, tags)
 
 	reqdm := dynamicpb.NewMessage(md.Input())
-	b, _ := req.ToObject(rt).MarshalJSON()
-	_ = protojson.Unmarshal(b, reqdm)
+	b, err := req.ToObject(rt).MarshalJSON()
+	if err != nil {
+		return nil, fmt.Errorf("unable to serialise request object: %v", err)
+	}
+	if err := protojson.Unmarshal(b, reqdm); err != nil {
+		return nil, fmt.Errorf("unable to serialise request object to protocol buffer: %v", err)
+	}
 
 	reqCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	resp := dynamicpb.NewMessage(md.Output())
 	header, trailer := metadata.New(nil), metadata.New(nil)
-	err := c.conn.Invoke(reqCtx, method, reqdm, resp, grpc.Header(&header), grpc.Trailer(&trailer))
+	err = c.conn.Invoke(reqCtx, method, reqdm, resp, grpc.Header(&header), grpc.Trailer(&trailer))
 
 	var response Response
 	response.Headers = header
