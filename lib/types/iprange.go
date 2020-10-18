@@ -117,7 +117,7 @@ func ipBlockFromCIDR(s string) *IPBlock {
 	if hz > 64 {
 		nz, hz = hz-64, 64
 	}
-	// must: 0 <= z <= 64
+	// must: 0 <= zbits <= 64
 	offsetCIDR := func(zbits int, offset uint64) uint64 {
 		switch zbits {
 		case 0:
@@ -133,6 +133,15 @@ func ipBlockFromCIDR(s string) *IPBlock {
 		}
 	}
 	hostNum, netNum := offsetCIDR(hz, hk-h0), offsetCIDR(nz, nk-n0)
+	// remove head IP like x.x.x.0 from CIDR
+	if hk == h0 && hz > 0 {
+		hk++
+		hostNum--
+	}
+	// remove tail IP like x.x.x.255 from CIDR
+	if hz > 1 {
+		hostNum--
+	}
 	return &IPBlock{
 		ip:        ipk,
 		hostStart: hk,
