@@ -368,13 +368,6 @@ func (c *Client) Invoke(ctxPtr *context.Context,
 		tags["method"] = parts[1]
 	}
 
-	if state.Options.SystemTags.Has(stats.TagRPCType) {
-		// (rogchap) This method only supports unary RPCs
-		// if this is refactored to support streaming then this should
-		// be updated to be based on the method descriptor (IsClientStreaming/IsServerStreaming)
-		tags["rpc_type"] = "unary"
-	}
-
 	// Only set the name system tag if the user didn't explicitly set it beforehand
 	if _, ok := tags["name"]; !ok && state.Options.SystemTags.Has(stats.TagName) {
 		tags["name"] = method
@@ -383,15 +376,8 @@ func (c *Client) Invoke(ctxPtr *context.Context,
 	ctx = withTags(ctx, tags)
 
 	reqdm := dynamicpb.NewMessage(md.Input())
-	// reqdm := dynamic.NewMessage(md.GetInputType())
 	b, _ := req.ToObject(rt).MarshalJSON()
 	_ = protojson.Unmarshal(b, reqdm)
-
-	if rpsLimit := state.RPSLimit; rpsLimit != nil {
-		if err := rpsLimit.Wait(ctx); err != nil {
-			return nil, err
-		}
-	}
 
 	reqCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
