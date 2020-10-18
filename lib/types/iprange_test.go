@@ -56,12 +56,15 @@ func TestIpBlockFromCIDR(t *testing.T) {
 		netCount  uint64
 		ipBlock   string
 	}{
-		"ipv4 cidr 1": {65536, 1, "192.168.0.0/16"},
-		"ipv4 cidr 2": {65526, 1, "192.168.0.10/16"},
-		"ipv6 cidr 1": {256, 1, "fd00::0/120"},
-		"ipv6 cidr 2": {65536, 1, "fd00::0/112"},
-		"ipv6 cidr 3": {253, 1, "fd00::3/120"},
-		"ipv6 cidr 4": {65534, 1, "fd00::2/112"},
+		"ipv4 cidr 1": {65534, 1, "192.168.0.0/16"},
+		"ipv4 cidr 2": {65534, 1, "192.168.0.1/16"},
+		"ipv4 cidr 3": {65525, 1, "192.168.0.10/16"},
+		"ipv6 cidr 1": {254, 1, "fd00::0/120"},
+		"ipv6 cidr 2": {254, 1, "fd00::1/120"},
+		"ipv6 cidr 3": {252, 1, "fd00::3/120"},
+		"ipv6 cidr 4": {65534, 1, "fd00::0/112"},
+		"ipv6 cidr 5": {65534, 1, "fd00::1/112"},
+		"ipv6 cidr 6": {65533, 1, "fd00::2/112"},
 	}
 	for name, d := range testdata {
 		data := d
@@ -82,12 +85,14 @@ func TestGetIPBlock(t *testing.T) {
 	}{
 		"ipv4 range 1": {100, 1, "192.168.0.101-192.168.0.200"},
 		"ipv4 range 2": {101, 1, "192.168.0.100-192.168.0.200"},
-		"ipv4 cidr 1":  {256, 1, "192.168.0.0/24"},
-		"ipv4 cidr 2":  {246, 1, "192.168.0.10/24"},
+		"ipv4 cidr 1":  {254, 1, "192.168.0.0/24"},
+		"ipv4 cidr 2":  {254, 1, "192.168.0.1/24"},
+		"ipv4 cidr 3":  {245, 1, "192.168.0.10/24"},
 		"ipv6 range 1": {1024, 256, "fd00:1:1:0::0-fd00:1:1:ff::3ff"},
 		"ipv6 range 2": {1023, 254, "fd00:1:1:2::1-fd00:1:1:ff::3ff"},
-		"ipv6 cidr 1":  {65536, 1, "fd00::0/112"},
-		"ipv6 cidr 2":  {255, 1, "fd00::1/120"},
+		"ipv6 cidr 1":  {65534, 1, "fd00::0/112"},
+		"ipv6 cidr 2":  {65534, 1, "fd00::1/112"},
+		"ipv6 cidr 3":  {65533, 1, "fd00::2/112"},
 	}
 	for name, d := range testdata {
 		data := d
@@ -108,12 +113,13 @@ func TestGetRandomIP(t *testing.T) {
 		ipStart   string
 		ipEnd     string
 	}{
-		"ipv4 cidr 1":  {65536, 1, "192.168.0.0/16", "192.168.0.0", "192.168.255.255"},
-		"ipv4 cidr 2":  {65526, 1, "192.168.0.10/16", "192.168.0.10", "192.168.255.255"},
+		"ipv4 cidr 1":  {65534, 1, "192.168.0.0/16", "192.168.0.1", "192.168.255.254"},
+		"ipv4 cidr 2":  {65525, 1, "192.168.0.10/16", "192.168.0.10", "192.168.255.254"},
 		"ipv4 range 1": {100, 1, "192.168.0.101-192.168.0.200", "192.168.0.101", "192.168.0.200"},
 		"ipv4 range 2": {101, 1, "192.168.0.100-192.168.0.200", "192.168.0.100", "192.168.0.200"},
-		"ipv6 cidr 1":  {65536, 1, "fd00::0/112", "fd00::0", "fd00::ffff"},
-		"ipv6 cidr 2":  {65535, 1, "fd00::1/112", "fd00::1", "fd00::ffff"},
+		"ipv6 cidr 1":  {65534, 1, "fd00::0/112", "fd00::1", "fd00::fffe"},
+		"ipv6 cidr 2":  {65534, 1, "fd00::1/112", "fd00::1", "fd00::fffe"},
+		"ipv6 cidr 3":  {65532, 1, "fd00::3/112", "fd00::3", "fd00::fffe"},
 		"ipv6 range 1": {1024, 256, "fd00:1:1:0::0-fd00:1:1:ff::3ff", "fd00:1:1:0::0", "fd00:1:1:ff::3ff"},
 		"ipv6 range 2": {1023, 254, "fd00:1:1:2::1-fd00:1:1:ff::3ff", "fd00:1:1:2::1", "fd00:1:1:ff::3ff"},
 	}
@@ -134,7 +140,7 @@ func TestGetRandomIP(t *testing.T) {
 	}
 }
 
-func TestGettroundRobinIP(t *testing.T) {
+func TestGetRoundRobinIP(t *testing.T) {
 	var i uint64
 	testdata := map[string]struct {
 		hostCount uint64
@@ -143,12 +149,14 @@ func TestGettroundRobinIP(t *testing.T) {
 		ipStart   string
 		ipEnd     string
 	}{
-		"ipv4 cidr 1":  {65536, 1, "192.168.0.0/16", "192.168.0.0", "192.168.255.255"},
-		"ipv4 cidr 2":  {65526, 1, "192.168.0.10/16", "192.168.0.10", "192.168.255.255"},
+		"ipv4 cidr 1":  {65534, 1, "192.168.0.0/16", "192.168.0.1", "192.168.255.254"},
+		"ipv4 cidr 2":  {65534, 1, "192.168.0.1/16", "192.168.0.1", "192.168.255.254"},
+		"ipv4 cidr 3":  {65525, 1, "192.168.0.10/16", "192.168.0.10", "192.168.255.254"},
 		"ipv4 range 1": {100, 1, "192.168.0.101-192.168.0.200", "192.168.0.101", "192.168.0.200"},
 		"ipv4 range 2": {101, 1, "192.168.0.100-192.168.0.200", "192.168.0.100", "192.168.0.200"},
-		"ipv6 cidr 1":  {65536, 1, "fd00::0/112", "fd00::0", "fd00::ffff"},
-		"ipv6 cidr 2":  {65535, 1, "fd00::1/112", "fd00::1", "fd00::ffff"},
+		"ipv6 cidr 1":  {65534, 1, "fd00::0/112", "fd00::1", "fd00::fffe"},
+		"ipv6 cidr 2":  {65534, 1, "fd00::1/112", "fd00::1", "fd00::fffe"},
+		"ipv6 cidr 3":  {65532, 1, "fd00::3/112", "fd00::3", "fd00::fffe"},
 		"ipv6 range 1": {1024, 256, "fd00:1:1:0::0-fd00:1:1:ff::3ff", "fd00:1:1:0::0", "fd00:1:1:ff::3ff"},
 		"ipv6 range 2": {1023, 254, "fd00:1:1:2::1-fd00:1:1:ff::3ff", "fd00:1:1:2::1", "fd00:1:1:ff::3ff"},
 	}
@@ -171,17 +179,61 @@ func TestGettroundRobinIP(t *testing.T) {
 	}
 }
 
-func TestGetPool(t *testing.T) {
+func TestGetPoolNoRandomNoWeight(t *testing.T) {
 	testdata := map[string]struct {
 		ipBlock string
 		weight  uint64
 		mode    selectMode
 	}{
-		"mode 0 weight 1":  {"192.168.0.1,1.1.1.1|0,2.2.2.100-2.2.2.200|0|1", 1, roundRobin},
-		"mode 1 weight 50": {"1.1.0.0/16|1|50,2.2.2.100-2.2.2.220|1|50", 50, random},
-		"ipv4 list":        {"192.168.0.1,192.168.0.2,192.168.0.3", 1, roundRobin},
-		"ipv6 list":        {"fd00:1:1:2::1,fd00:1:1:ff::2,fd00:1:1:ff::3", 1, roundRobin},
-		"ipv4 ipv6 mixed":  {"fd00:1:1:2::1/120|1|100,192.168.0.0/16|1|100", 100, random},
+		"IPv4 Single IPs":       {"1.1.1.1, 1.1.2.1, 1.1.3.1, 1.1.4.1", 1, roundRobin},
+		"IPv4 CIDRs":            {"1.1.1.0/24, 2.2.2.0/24, 3.3.0.1/24", 254, roundRobin},
+		"IPv4 Ranges":           {"1.1.1.11-1.1.1.20, 2.2.2.5-2.2.2.14", 10, roundRobin},
+		"IPv4 Ranges and CIDRs": {"1.1.1.1-1.1.1.254, 2.2.2.0/24", 254, roundRobin},
+		"IPv4 IPs and Ranges":   {"1.1.1.1, 1.1.1.2, 3.3.3.3/32", 1, roundRobin},
+		"ipv6 Single IPs":       {"fd00:1:1:2::1, fd00:1:1:ff::2, fd00:1:1:ff::3", 1, roundRobin},
+		"ipv6 CIDRs":            {"fd00::/120, fd00::1/120, fd00::0.0.0.1/120", 254, roundRobin},
+		"ipv6 Ranges":           {"fd00::1 - fd00::a, fd00::5 - fd00::e", 10, roundRobin},
+		"IPv6 Ranges and CIDRs": {"fd00::1-fd00::fe, fd00::1/120", 254, roundRobin},
+		"IPv6 IPs and Ranges":   {"fd00::1, fd00::2, fd00::3-fd00::3", 1, roundRobin},
+		"Mix IPv4 and IPv6":     {"fd00::/120, 192.168.0.0/24", 254, roundRobin},
+	}
+	for name, d := range testdata {
+		data := d
+		t.Run(name, func(t *testing.T) {
+			p := GetPool(data.ipBlock)
+			assert.NotNil(t, p)
+			for _, b := range p {
+				assert.Equal(t, data.mode, b.mode)
+			}
+			j := uint64(0)
+			for i := 0; i < len(p); i++ {
+				j += data.weight
+				assert.Equal(t, data.weight, p[i].weight)
+				assert.Equal(t, j, p[i].split)
+			}
+			hv := hashIDToUint64(uint64(time.Now().UnixNano()))
+			ip := p.GetIP(hv % 1048576)
+			assert.NotNil(t, ip)
+		})
+	}
+}
+
+func TestGetPoolWithWeightAndRandom(t *testing.T) {
+	testdata := map[string]struct {
+		ipBlock string
+		weight  uint64
+		mode    selectMode
+	}{
+		"mode defaut sequential 1":              {"1.1.1.1, 2.2.2.2/32", 1, roundRobin},
+		"mode defaut sequential 2":              {"1.1.1.0/24, 2.2.2.1/24, 3.3.3.0/24", 254, roundRobin},
+		"mode change to random":                 {"1.1.1.0/24|1, 2.2.2.1-2.2.2.254|1, 3.3.3.0/24|1", 254, random},
+		"weight default IPBlock IP number":      {"2.2.2.0/24, 3.3.3.1-3.3.3.254/24", 254, roundRobin},
+		"weight more than IPBlock IP number":    {"2.2.2.2|0|8, 3.3.3.0/30|0|8", 8, roundRobin},
+		"weight less than IPBlock IP number":    {"1.1.1.0/24|0|20", 20, roundRobin},
+		"random weight lesstaking from IPBlock": {"1.1.1.0/24|1|100", 100, random},
+		"random weight overtaking from IPBlock": {"2.2.2.0/28|1|80", 80, random},
+		"ipv6 weight random host only":          {"fd00::/120|1, fd01::101-fd00::1fe|1, fd02::201/120|1|254", 254, random},
+		"random weight ipv4 ipv6 mixed":         {"fd00:1:1:2::1/120|1|100, 192.168.0.0/16|1|100", 100, random},
 	}
 	for name, d := range testdata {
 		data := d

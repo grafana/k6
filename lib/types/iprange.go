@@ -75,7 +75,8 @@ func ipUint64(ip net.IP) (uint64, uint64) {
 
 func ipBlockFromRange(s string) *IPBlock {
 	ss := strings.SplitN(s, "-", 2)
-	ip0, ip1 := net.ParseIP(ss[0]), net.ParseIP(ss[1]) // len(ParseIP())==16
+	ip0Str, ip1Str := strings.TrimSpace(ss[0]), strings.TrimSpace(ss[1])
+	ip0, ip1 := net.ParseIP(ip0Str), net.ParseIP(ip1Str) // len(ParseIP())==16
 	if ip0 == nil || ip1 == nil {
 		fmt.Println("Wrong IP range format: ", s)
 		return nil
@@ -203,26 +204,30 @@ func GetPool(ranges string) IPPool {
 	ss := strings.Split(strings.TrimSpace(ranges), ",")
 	pool := make([]IPBlock, 0)
 	for _, bs := range ss {
-		rmw := strings.Split(bs, "|") // range:mode:weight
+		// range | mode | weight
+		rmw := strings.Split(strings.TrimSpace(bs), "|")
 		sz := len(rmw)
 		if sz < 1 {
 			continue
 		}
-		r := GetIPBlock(rmw[0])
+		rangeStr := strings.TrimSpace(rmw[0])
+		r := GetIPBlock(rangeStr)
 		if r == nil {
 			continue
 		}
 		r.weight = r.hostN
 		r.mode = roundRobin
 		if sz > 1 {
-			mode, err := strconv.Atoi(rmw[1])
+			modeStr := strings.TrimSpace(rmw[1])
+			mode, err := strconv.Atoi(modeStr)
 			if err == nil {
 				r.mode = selectMode(mode)
 			}
 		}
 		if sz > 2 {
-			weight, err := strconv.ParseUint(rmw[2], 10, 64)
-			if err == nil && weight < r.weight {
+			weightStr := strings.TrimSpace(rmw[2])
+			weight, err := strconv.ParseUint(weightStr, 10, 64)
+			if err == nil {
 				r.weight = weight
 			}
 		}
