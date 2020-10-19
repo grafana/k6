@@ -48,6 +48,9 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/dynamicpb"
 
+	//nolint: staticcheck
+	protoV1 "github.com/golang/protobuf/proto"
+
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
@@ -551,7 +554,12 @@ func formatMetadata(md metadata.MD) string {
 func formatPayload(payload interface{}) string {
 	msg, ok := payload.(proto.Message)
 	if !ok {
-		return ""
+		// check to see if we are dealing with a APIv1 message
+		msgV1, ok := payload.(protoV1.Message)
+		if !ok {
+			return ""
+		}
+		msg = protoV1.MessageV2(msgV1)
 	}
 
 	marshaler := prototext.MarshalOptions{

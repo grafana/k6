@@ -21,15 +21,18 @@
 package grpc
 
 import (
+	"bytes"
 	"context"
 	"strings"
 	"testing"
 
 	"github.com/dop251/goja"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	grpcstats "google.golang.org/grpc/stats"
 	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/grpc_testing"
 	"gopkg.in/guregu/null.v3"
@@ -405,4 +408,79 @@ func TestClient(t *testing.T) {
 		}
 		assert.Contains(t, err.Error(), "no gRPC connection")
 	})
+}
+
+func TestDebugStat(t *testing.T) {
+	t.Parallel()
+
+	var tests = [...]struct {
+		name     string
+		stat     grpcstats.RPCStats
+		expected string
+	}{
+		{
+			"OutHeader",
+			&grpcstats.OutHeader{},
+			"Out Header:",
+		},
+		{
+			"OutTrailer",
+			&grpcstats.OutTrailer{
+				Trailer: metadata.MD{
+					"x-trail": []string{"out"},
+				},
+			},
+			"Out Trailer:",
+		},
+		{
+			"OutPayload",
+			&grpcstats.OutPayload{
+				Payload: &grpc_testing.SimpleRequest{
+					FillUsername: true,
+				},
+			},
+			"fill_username:",
+		},
+		{
+			"InHeader",
+			&grpcstats.InHeader{
+				Header: metadata.MD{
+					"x-head": []string{"in"},
+				},
+			},
+			"x-head: in",
+		},
+		{
+			"InTrailer",
+			&grpcstats.InTrailer{
+				Trailer: metadata.MD{
+					"x-trail": []string{"in"},
+				},
+			},
+			"x-trail: in",
+		},
+		{
+			"InPayload",
+			&grpcstats.InPayload{
+				Payload: &grpc_testing.SimpleResponse{
+					Username: "k6-user",
+				},
+			},
+			"username:",
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var b bytes.Buffer
+			logger := logrus.New()
+			logger.Out = &b
+
+			debugStat(tt.stat, logger.WithField("source", "test"), "full")
+			assert.Contains(t, b.String(), tt.expected)
+
+		})
+	}
+
 }
