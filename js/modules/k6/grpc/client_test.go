@@ -413,7 +413,7 @@ func TestClient(t *testing.T) {
 func TestDebugStat(t *testing.T) {
 	t.Parallel()
 
-	var tests = [...]struct {
+	tests := [...]struct {
 		name     string
 		stat     grpcstats.RPCStats
 		expected string
@@ -479,8 +479,6 @@ func TestDebugStat(t *testing.T) {
 
 			debugStat(tt.stat, logger.WithField("source", "test"), "full")
 			assert.Contains(t, b.String(), tt.expected)
-
 		})
 	}
-
 }
