@@ -1007,21 +1007,21 @@ func TestDNSResolver(t *testing.T) {
 			"0": { // cache is disabled, every request does a DNS lookup
 				lib.Options{DNS: types.DNSConfig{
 					TTL:    null.StringFrom("0"),
-					Select: types.NullDNSSelect{DNSSelect: types.DNSFirst, Valid: true},
+					Select: types.NullDNSSelect{DNSSelect: types.DNSfirst, Valid: true},
 					Policy: types.NullDNSPolicy{DNSPolicy: types.DNSpreferIPv4, Valid: false},
 				}}, 5,
 			},
 			"1000": { // cache IPs for 1s, check that unitless values are interpreted as ms
 				lib.Options{DNS: types.DNSConfig{
 					TTL:    null.StringFrom("1000"),
-					Select: types.NullDNSSelect{DNSSelect: types.DNSFirst, Valid: true},
+					Select: types.NullDNSSelect{DNSSelect: types.DNSfirst, Valid: true},
 					Policy: types.NullDNSPolicy{DNSPolicy: types.DNSpreferIPv4, Valid: false},
 				}}, 4,
 			},
 			"3s": {
 				lib.Options{DNS: types.DNSConfig{
 					TTL:    null.StringFrom("3s"),
-					Select: types.NullDNSSelect{DNSSelect: types.DNSFirst, Valid: true},
+					Select: types.NullDNSSelect{DNSSelect: types.DNSfirst, Valid: true},
 					Policy: types.NullDNSPolicy{DNSPolicy: types.DNSpreferIPv4, Valid: false},
 				}}, 3,
 			},
@@ -1204,7 +1204,7 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 		expTags = append(expTags, addExpTags...)
 		return netext.NewDialer(
 			net.Dialer{},
-			netext.NewResolver(net.LookupIP, 0, types.DNSFirst, types.DNSpreferIPv4),
+			netext.NewResolver(net.LookupIP, 0, types.DNSfirst, types.DNSpreferIPv4),
 		).GetTrail(time.Now(), time.Now(),
 			true, emitIterations, getTags(expTags...))
 	}

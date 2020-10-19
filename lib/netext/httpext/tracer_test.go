@@ -58,7 +58,7 @@ func TestTracer(t *testing.T) {
 	assert.True(t, ok)
 	transport.DialContext = netext.NewDialer(
 		net.Dialer{},
-		netext.NewResolver(net.LookupIP, 0, types.DNSFirst, types.DNSpreferIPv4),
+		netext.NewResolver(net.LookupIP, 0, types.DNSfirst, types.DNSpreferIPv4),
 	).DialContext
 
 	var prev int64

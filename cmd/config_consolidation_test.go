@@ -385,21 +385,21 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 		{opts{cli: []string{}}, exp{}, func(t *testing.T, c Config) {
 			assert.Equal(t, types.DNSConfig{
 				TTL:    null.NewString("5m", false),
-				Select: types.NullDNSSelect{DNSSelect: types.DNSRandom, Valid: false},
+				Select: types.NullDNSSelect{DNSSelect: types.DNSrandom, Valid: false},
 				Policy: types.NullDNSPolicy{DNSPolicy: types.DNSpreferIPv4, Valid: false},
 			}, c.Options.DNS)
 		}},
-		{opts{env: []string{"K6_DNS=ttl=5,select=round-robin"}}, exp{}, func(t *testing.T, c Config) {
+		{opts{env: []string{"K6_DNS=ttl=5,select=roundRobin"}}, exp{}, func(t *testing.T, c Config) {
 			assert.Equal(t, types.DNSConfig{
 				TTL:    null.StringFrom("5"),
-				Select: types.NullDNSSelect{DNSSelect: types.DNSRoundRobin, Valid: true},
+				Select: types.NullDNSSelect{DNSSelect: types.DNSroundRobin, Valid: true},
 				Policy: types.NullDNSPolicy{DNSPolicy: types.DNSpreferIPv4, Valid: false},
 			}, c.Options.DNS)
 		}},
 		{opts{env: []string{"K6_DNS=ttl=inf,select=random,policy=preferIPv6"}}, exp{}, func(t *testing.T, c Config) {
 			assert.Equal(t, types.DNSConfig{
 				TTL:    null.StringFrom("inf"),
-				Select: types.NullDNSSelect{DNSSelect: types.DNSRandom, Valid: true},
+				Select: types.NullDNSSelect{DNSSelect: types.DNSrandom, Valid: true},
 				Policy: types.NullDNSPolicy{DNSPolicy: types.DNSpreferIPv6, Valid: true},
 			}, c.Options.DNS)
 		}},
@@ -407,7 +407,7 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 		{opts{cli: []string{"--dns", "ttl=-1"}}, exp{}, func(t *testing.T, c Config) {
 			assert.Equal(t, types.DNSConfig{
 				TTL:    null.StringFrom("-1"),
-				Select: types.NullDNSSelect{DNSSelect: types.DNSRandom, Valid: false},
+				Select: types.NullDNSSelect{DNSSelect: types.DNSrandom, Valid: false},
 				Policy: types.NullDNSPolicy{DNSPolicy: types.DNSpreferIPv4, Valid: false},
 			}, c.Options.DNS)
 		}},
@@ -415,18 +415,18 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 		{opts{cli: []string{"--dns", "ttl=0"}}, exp{}, func(t *testing.T, c Config) {
 			assert.Equal(t, types.DNSConfig{
 				TTL:    null.StringFrom("0"),
-				Select: types.NullDNSSelect{DNSSelect: types.DNSRandom, Valid: false},
+				Select: types.NullDNSSelect{DNSSelect: types.DNSrandom, Valid: false},
 				Policy: types.NullDNSPolicy{DNSPolicy: types.DNSpreferIPv4, Valid: false},
 			}, c.Options.DNS)
 		}},
 		{opts{cli: []string{"--dns", "ttl=5s,select="}}, exp{cliReadError: true}, nil},
 		{
-			opts{fs: defaultConfig(`{"dns": {"ttl": "0", "select": "round-robin", "policy": "onlyIPv4"}}`)},
+			opts{fs: defaultConfig(`{"dns": {"ttl": "0", "select": "roundRobin", "policy": "onlyIPv4"}}`)},
 			exp{},
 			func(t *testing.T, c Config) {
 				assert.Equal(t, types.DNSConfig{
 					TTL:    null.StringFrom("0"),
-					Select: types.NullDNSSelect{DNSSelect: types.DNSRoundRobin, Valid: true},
+					Select: types.NullDNSSelect{DNSSelect: types.DNSroundRobin, Valid: true},
 					Policy: types.NullDNSPolicy{DNSPolicy: types.DNSonlyIPv4, Valid: true},
 				}, c.Options.DNS)
 			},
@@ -440,7 +440,7 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 			func(t *testing.T, c Config) {
 				assert.Equal(t, types.DNSConfig{
 					TTL:    null.StringFrom("30"),
-					Select: types.NullDNSSelect{DNSSelect: types.DNSRandom, Valid: false},
+					Select: types.NullDNSSelect{DNSSelect: types.DNSrandom, Valid: false},
 					Policy: types.NullDNSPolicy{DNSPolicy: types.DNSany, Valid: true},
 				}, c.Options.DNS)
 			},
@@ -456,7 +456,7 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 			func(t *testing.T, c Config) {
 				assert.Equal(t, types.DNSConfig{
 					TTL:    null.StringFrom("5"),
-					Select: types.NullDNSSelect{DNSSelect: types.DNSRandom, Valid: true},
+					Select: types.NullDNSSelect{DNSSelect: types.DNSrandom, Valid: true},
 					Policy: types.NullDNSPolicy{DNSPolicy: types.DNSany, Valid: true},
 				}, c.Options.DNS)
 			},

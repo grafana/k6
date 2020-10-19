@@ -131,16 +131,16 @@ func (r *resolver) selectOne(host string, ips []net.IP) net.IP {
 
 	var ip net.IP
 	switch r.selectIndex {
-	case types.DNSFirst:
+	case types.DNSfirst:
 		return ips[0]
-	case types.DNSRoundRobin:
+	case types.DNSroundRobin:
 		r.rrm.Lock()
 		// NOTE: This index approach is not stable and might result in returning
 		// repeated or skipped IPs if the records change during a test run.
 		ip = ips[int(r.roundRobin[host])%len(ips)]
 		r.roundRobin[host]++
 		r.rrm.Unlock()
-	case types.DNSRandom:
+	case types.DNSrandom:
 		r.rrm.Lock()
 		ip = ips[r.rand.Intn(len(ips))]
 		r.rrm.Unlock()

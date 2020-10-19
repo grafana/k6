@@ -47,7 +47,7 @@ type DNSConfig struct {
 func DefaultDNSConfig() DNSConfig {
 	return DNSConfig{
 		TTL:    null.NewString("5m", false),
-		Select: NullDNSSelect{DNSRandom, false},
+		Select: NullDNSSelect{DNSrandom, false},
 		Policy: NullDNSPolicy{DNSpreferIPv4, false},
 	}
 }
@@ -122,16 +122,18 @@ func (d NullDNSPolicy) MarshalJSON() ([]byte, error) {
 
 // DNSSelect is the strategy to use when picking a single IP if more than one
 // is returned for a host name.
-//go:generate enumer -type=DNSSelect -transform=kebab -trimprefix DNS -output dns_select_gen.go
+//go:generate enumer -type=DNSSelect -trimprefix DNS -output dns_select_gen.go
 type DNSSelect uint8
 
+// These are lower camel cased since enumer doesn't support it as a transform option.
+// See https://github.com/alvaroloes/enumer/pull/60 .
 const (
-	// DNSFirst returns the first IP from the response.
-	DNSFirst DNSSelect = iota + 1
-	// DNSRoundRobin rotates the IP returned on each lookup.
-	DNSRoundRobin
-	// DNSRandom returns a random IP from the response.
-	DNSRandom
+	// DNSfirst returns the first IP from the response.
+	DNSfirst DNSSelect = iota + 1
+	// DNSroundRobin rotates the IP returned on each lookup.
+	DNSroundRobin
+	// DNSrandom returns a random IP from the response.
+	DNSrandom
 )
 
 // UnmarshalJSON converts JSON data to a valid DNSSelect

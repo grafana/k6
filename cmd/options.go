@@ -96,7 +96,7 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.String("dns", types.DefaultDNSConfig().String(), "DNS resolver configuration. Possible ttl values are: 'inf' "+
 		"for a persistent cache, '0' to disable the cache,\nor a positive duration, e.g. '1s', '1m', etc. "+
 		"Milliseconds are assumed if no unit is provided.\n"+
-		"Possible select values to return a single IP are: 'first', 'random' or 'round-robin'.\n"+
+		"Possible select values to return a single IP are: 'first', 'random' or 'roundRobin'.\n"+
 		"Possible policy values are: 'preferIPv4', 'preferIPv6', 'onlyIPv4', 'onlyIPv6' or 'any'.\n")
 	return flags
 }
