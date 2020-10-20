@@ -39,6 +39,7 @@ import (
 	"github.com/loadimpact/k6/stats/cloud"
 	"github.com/loadimpact/k6/stats/csv"
 	"github.com/loadimpact/k6/stats/datadog"
+	"github.com/loadimpact/k6/stats/eventhubs"
 	"github.com/loadimpact/k6/stats/influxdb"
 	"github.com/loadimpact/k6/stats/kafka"
 	"github.com/loadimpact/k6/stats/statsd/common"
@@ -73,12 +74,13 @@ type Config struct {
 	SummaryExport null.String `json:"summaryExport" envconfig:"K6_SUMMARY_EXPORT"`
 
 	Collectors struct {
-		InfluxDB influxdb.Config `json:"influxdb"`
-		Kafka    kafka.Config    `json:"kafka"`
-		Cloud    cloud.Config    `json:"cloud"`
-		StatsD   common.Config   `json:"statsd"`
-		Datadog  datadog.Config  `json:"datadog"`
-		CSV      csv.Config      `json:"csv"`
+		InfluxDB  influxdb.Config  `json:"influxdb"`
+		Kafka     kafka.Config     `json:"kafka"`
+		Cloud     cloud.Config     `json:"cloud"`
+		StatsD    common.Config    `json:"statsd"`
+		Datadog   datadog.Config   `json:"datadog"`
+		CSV       csv.Config       `json:"csv"`
+		EventHubs eventhubs.Config `json:"eventhubs"`
 	} `json:"collectors"`
 }
 
@@ -117,6 +119,7 @@ func (c Config) Apply(cfg Config) Config {
 	c.Collectors.StatsD = c.Collectors.StatsD.Apply(cfg.Collectors.StatsD)
 	c.Collectors.Datadog = c.Collectors.Datadog.Apply(cfg.Collectors.Datadog)
 	c.Collectors.CSV = c.Collectors.CSV.Apply(cfg.Collectors.CSV)
+	c.Collectors.EventHubs = c.Collectors.EventHubs.Apply(cfg.Collectors.EventHubs)
 	return c
 }
 
@@ -219,6 +222,7 @@ func getConsolidatedConfig(fs afero.Fs, cliConf Config, runner lib.Runner) (conf
 	cliConf.Collectors.Kafka = kafka.NewConfig().Apply(cliConf.Collectors.Kafka)
 	cliConf.Collectors.StatsD = common.NewConfig().Apply(cliConf.Collectors.StatsD)
 	cliConf.Collectors.Datadog = datadog.NewConfig().Apply(cliConf.Collectors.Datadog)
+	cliConf.Collectors.EventHubs = eventhubs.NewConfig().Apply(cliConf.Collectors.EventHubs)
 
 	fileConf, _, err := readDiskConfig(fs)
 	if err != nil {

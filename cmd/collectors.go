@@ -38,6 +38,7 @@ import (
 	"github.com/loadimpact/k6/stats/cloud"
 	"github.com/loadimpact/k6/stats/csv"
 	"github.com/loadimpact/k6/stats/datadog"
+	"github.com/loadimpact/k6/stats/eventhubs"
 	"github.com/loadimpact/k6/stats/influxdb"
 	jsonc "github.com/loadimpact/k6/stats/json"
 	"github.com/loadimpact/k6/stats/kafka"
@@ -46,13 +47,14 @@ import (
 )
 
 const (
-	collectorInfluxDB = "influxdb"
-	collectorJSON     = "json"
-	collectorKafka    = "kafka"
-	collectorCloud    = "cloud"
-	collectorStatsD   = "statsd"
-	collectorDatadog  = "datadog"
-	collectorCSV      = "csv"
+	collectorInfluxDB  = "influxdb"
+	collectorJSON      = "json"
+	collectorKafka     = "kafka"
+	collectorCloud     = "cloud"
+	collectorStatsD    = "statsd"
+	collectorDatadog   = "datadog"
+	collectorCSV       = "csv"
+	collectorEventHubs = "eventhubs"
 )
 
 func parseCollector(s string) (t, arg string) {
@@ -140,6 +142,21 @@ func getCollector(
 		}
 
 		return csv.New(logger, afero.NewOsFs(), conf.SystemTags.Map(), config)
+
+	case collectorEventHubs:
+		config := eventhubs.NewConfig().Apply(conf.Collectors.EventHubs)
+		if err := envconfig.Process("", &config); err != nil {
+			return nil, err
+		}
+		if arg != "" {
+			cmdConfig, err := eventhubs.ParseArg(arg)
+			if err != nil {
+				return nil, err
+			}
+			config = config.Apply(cmdConfig)
+		}
+
+		return eventhubs.New(logger, config)
 
 	default:
 		return nil, errors.Errorf("unknown output type: %s", collectorName)
