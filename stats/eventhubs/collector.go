@@ -105,7 +105,13 @@ func (c *Collector) Collect(sampleContainers []stats.SampleContainer) {
 
 			m, _ := json.Marshal(data)
 
+			p := make(map[string]interface{})
+			for key, value := range sample.Tags.CloneTags() {
+				p[key] = value
+			}
+
 			event := eh.NewEvent(m)
+			event.Properties = p
 
 			c.client.Send(ctx, event)
 		}
