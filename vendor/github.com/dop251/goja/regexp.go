@@ -467,7 +467,9 @@ func (r *regexpWrapper) findSubmatchIndexUnicode(s unicodeString, fullUnicode bo
 		posMap, runes, _, _ := buildPosMap(&lenientUtf16Decoder{utf16Reader: s.utf16Reader(0)}, s.length(), 0)
 		res := wrapped.FindReaderSubmatchIndex(&arrayRuneReader{runes: runes})
 		for i, item := range res {
-			res[i] = posMap[item]
+			if item >= 0 {
+				res[i] = posMap[item]
+			}
 		}
 		return res
 	}
