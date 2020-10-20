@@ -30,11 +30,11 @@ github.com/andybalholm/cascadia
 github.com/daaku/go.zipexe
 # github.com/davecgh/go-spew v1.1.1 => github.com/davecgh/go-spew v1.1.0
 github.com/davecgh/go-spew/spew
-# github.com/dlclark/regexp2 v1.4.0
+# github.com/dlclark/regexp2 v1.4.1-0.20201013204808-346446b5b182
 ## explicit
 github.com/dlclark/regexp2
 github.com/dlclark/regexp2/syntax
-# github.com/dop251/goja v0.0.0-20201007100345-a8e472c705eb
+# github.com/dop251/goja v0.0.0-20201008094107-f97e50db25ec
 ## explicit
 github.com/dop251/goja
 github.com/dop251/goja/ast
