@@ -307,6 +307,9 @@ type Options struct {
 	// Limit HTTP requests per second.
 	RPS null.Int `json:"rps" envconfig:"K6_RPS"`
 
+	// DNS handling configuration.
+	DNS types.DNSConfig `json:"dns" envconfig:"K6_DNS"`
+
 	// How many HTTP redirects do we follow?
 	MaxRedirects null.Int `json:"maxRedirects" envconfig:"K6_MAX_REDIRECTS"`
 
@@ -538,6 +541,15 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.ConsoleOutput.Valid {
 		o.ConsoleOutput = opts.ConsoleOutput
+	}
+	if opts.DNS.TTL.Valid {
+		o.DNS.TTL = opts.DNS.TTL
+	}
+	if opts.DNS.Select.Valid {
+		o.DNS.Select = opts.DNS.Select
+	}
+	if opts.DNS.Policy.Valid {
+		o.DNS.Policy = opts.DNS.Policy
 	}
 
 	return o

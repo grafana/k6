@@ -66,7 +66,6 @@ require (
 	github.com/urfave/negroni v0.3.1-0.20180130044549-22c5532ea862
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v0.0.0-20170224212429-dcecefd839c4 // indirect
-	github.com/viki-org/dnscache v0.0.0-20130720023526-c70c1f23c5d8
 	github.com/zyedidia/highlight v0.0.0-20170330143449-201131ce5cf5
 	golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2
 	golang.org/x/net v0.0.0-20200520004742-59133d7f0dd7

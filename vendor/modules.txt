@@ -225,9 +225,6 @@ github.com/valyala/bytebufferpool
 # github.com/valyala/fasttemplate v0.0.0-20170224212429-dcecefd839c4
 ## explicit
 github.com/valyala/fasttemplate
-# github.com/viki-org/dnscache v0.0.0-20130720023526-c70c1f23c5d8
-## explicit
-github.com/viki-org/dnscache
 # github.com/zyedidia/highlight v0.0.0-20170330143449-201131ce5cf5
 ## explicit
 github.com/zyedidia/highlight
