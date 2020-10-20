@@ -249,7 +249,7 @@ func (b *Bundle) Instantiate(logger logrus.FieldLogger, vuID int64) (bi *BundleI
 	}
 
 	// Grab any exported functions that could be executed. These were
-	// already pre-validated in NewBundle(), just get them here.
+	// already pre-validated in cmd.validateScenarioConfig(), just get them here.
 	exports := rt.Get("exports").ToObject(rt)
 	for k := range b.exports {
 		fn, _ := goja.AssertFunction(exports.Get(k))
