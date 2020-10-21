@@ -128,71 +128,32 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 			return err
 		}
 
-		derivedConf, cerr := deriveAndValidateConfig(conf, r.IsExecutable)
-		if cerr != nil {
-			return ExitCode{error: cerr, Code: invalidConfigErrorCode}
+		conf, err = deriveAndValidateConfig(conf, r.IsExecutable)
+		if err != nil {
+			return ExitCode{error: err, Code: invalidConfigErrorCode}
 		}
 
 		// TODO: validate for usage of execution segment
 		// TODO: validate for externally controlled executor (i.e. executors that aren't distributable)
 		// TODO: move those validations to a separate function and reuse validateConfig()?
 
+		cloudConfig, err := fixLoadimpactCloudConfig(&conf)
+		if err != nil {
+			return err
+		}
+
 		err = r.SetOptions(conf.Options)
 		if err != nil {
 			return err
 		}
 
-		// Cloud config
-		cloudConfig := cloud.NewConfig().Apply(derivedConf.Collectors.Cloud)
-		if err = envconfig.Process("", &cloudConfig); err != nil {
-			return err
-		}
 		if !cloudConfig.Token.Valid {
 			return errors.New("Not logged in, please use `k6 login cloud`.")
 		}
 
 		modifyAndPrintBar(progressBar, pb.WithConstProgress(0, "Building the archive"))
 		arc := r.MakeArchive()
-		// TODO: Fix this
-		// We reuse cloud.Config for parsing options.ext.loadimpact, but this probably shouldn't be
-		// done as the idea of options.ext is that they are extensible without touching k6. But in
-		// order for this to happen we shouldn't actually marshall cloud.Config on top of it because
-		// it will be missing some fields that aren't actually mentioned in the struct.
-		// So in order for use to copy the fields that we need for loadimpact's api we unmarshal in
-		// map[string]interface{} and copy what we need if it isn't set already
-		var tmpCloudConfig map[string]interface{}
-		if val, ok := arc.Options.External["loadimpact"]; ok {
-			dec := json.NewDecoder(bytes.NewReader(val))
-			dec.UseNumber() // otherwise float64 are used
-			if err := dec.Decode(&tmpCloudConfig); err != nil {
-				return err
-			}
-		}
-
-		if err := cloud.MergeFromExternal(arc.Options.External, &cloudConfig); err != nil {
-			return err
-		}
-		if tmpCloudConfig == nil {
-			tmpCloudConfig = make(map[string]interface{}, 3)
-		}
-
-		if _, ok := tmpCloudConfig["token"]; !ok && cloudConfig.Token.Valid {
-			tmpCloudConfig["token"] = cloudConfig.Token
-		}
-		if _, ok := tmpCloudConfig["name"]; !ok && cloudConfig.Name.Valid {
-			tmpCloudConfig["name"] = cloudConfig.Name
-		}
-		if _, ok := tmpCloudConfig["projectID"]; !ok && cloudConfig.ProjectID.Valid {
-			tmpCloudConfig["projectID"] = cloudConfig.ProjectID
-		}
-
-		if arc.Options.External == nil {
-			arc.Options.External = make(map[string]json.RawMessage)
-		}
-		arc.Options.External["loadimpact"], err = json.Marshal(tmpCloudConfig)
-		if err != nil {
-			return err
-		}
+		arc.Options = conf.Options // This is here because SetOptions doesn't actually set all options
 
 		name := cloudConfig.Name.String
 		if !cloudConfig.Name.Valid || cloudConfig.Name.String == "" {
@@ -202,7 +163,7 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 		// Start cloud test run
 		modifyAndPrintBar(progressBar, pb.WithConstProgress(0, "Validating script options"))
 		client := cloud.NewClient(logger, cloudConfig.Token.String, cloudConfig.Host.String, consts.Version)
-		if err := client.ValidateOptions(arc.Options); err != nil {
+		if err = client.ValidateOptions(arc.Options); err != nil {
 			return err
 		}
 
@@ -212,13 +173,13 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 			return err
 		}
 
-		et, err := lib.NewExecutionTuple(derivedConf.ExecutionSegment, derivedConf.ExecutionSegmentSequence)
+		et, err := lib.NewExecutionTuple(conf.ExecutionSegment, conf.ExecutionSegmentSequence)
 		if err != nil {
 			return err
 		}
-		testURL := cloud.URLForResults(refID, cloudConfig)
-		executionPlan := derivedConf.Scenarios.GetFullExecutionRequirements(et)
-		printExecutionDescription("cloud", filename, testURL, derivedConf, et, executionPlan, nil)
+		testURL := cloud.URLForResults(refID, *cloudConfig)
+		executionPlan := conf.Scenarios.GetFullExecutionRequirements(et)
+		printExecutionDescription("cloud", filename, testURL, conf, et, executionPlan, nil)
 
 		modifyAndPrintBar(
 			progressBar,
@@ -338,6 +299,56 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 
 		return nil
 	},
+}
+
+func fixLoadimpactCloudConfig(conf *Config) (*cloud.Config, error) {
+	var err error
+	// TODO: Fix this
+	// We reuse cloud.Config for parsing options.ext.loadimpact, but this probably shouldn't be
+	// done as the idea of options.ext is that they are extensible without touching k6. But in
+	// order for this to happen we shouldn't actually marshall cloud.Config on top of it because
+	// it will be missing some fields that aren't actually mentioned in the struct.
+	// So in order for use to copy the fields that we need for loadimpact's api we unmarshal in
+	// map[string]interface{} and copy what we need if it isn't set already
+	var tmpCloudConfig map[string]interface{}
+	if val, ok := conf.Options.External["loadimpact"]; ok {
+		dec := json.NewDecoder(bytes.NewReader(val))
+		dec.UseNumber() // otherwise float64 are used
+		if err = dec.Decode(&tmpCloudConfig); err != nil {
+			return nil, err
+		}
+	}
+	// Cloud config
+	cloudConfig := cloud.NewConfig().Apply(conf.Collectors.Cloud)
+	if err = cloud.MergeFromExternal(conf.Options.External, &cloudConfig); err != nil {
+		return nil, err
+	}
+	if err = envconfig.Process("", &cloudConfig); err != nil {
+		return nil, err
+	}
+	if tmpCloudConfig == nil {
+		tmpCloudConfig = make(map[string]interface{}, 3)
+	}
+
+	if cloudConfig.Token.Valid {
+		tmpCloudConfig["token"] = cloudConfig.Token
+	}
+	if cloudConfig.Name.Valid {
+		tmpCloudConfig["name"] = cloudConfig.Name
+	}
+	if cloudConfig.ProjectID.Valid {
+		tmpCloudConfig["projectID"] = cloudConfig.ProjectID
+	}
+
+	if conf.Options.External == nil {
+		conf.Options.External = make(map[string]json.RawMessage)
+	}
+	conf.Options.External["loadimpact"], err = json.Marshal(tmpCloudConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return &cloudConfig, nil
 }
 
 func cloudCmdFlagSet() *pflag.FlagSet {

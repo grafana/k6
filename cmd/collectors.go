@@ -87,15 +87,15 @@ func getCollector(
 
 		return influxdb.New(logger, config)
 	case collectorCloud:
-		config := cloud.NewConfig().Apply(conf.Collectors.Cloud)
-		if err := envconfig.Process("", &config); err != nil {
+		config, err := fixLoadimpactCloudConfig(&conf)
+		if err != nil {
 			return nil, err
 		}
 		if arg != "" {
 			config.Name = null.StringFrom(arg)
 		}
 
-		return cloud.New(logger, config, src, conf.Options, executionPlan, consts.Version)
+		return cloud.New(logger, *config, src, conf.Options, executionPlan, consts.Version)
 	case collectorKafka:
 		config := kafka.NewConfig().Apply(conf.Collectors.Kafka)
 		if err := envconfig.Process("", &config); err != nil {
