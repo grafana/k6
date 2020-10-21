@@ -39,6 +39,24 @@ Group 0 is embedded in the Match.  Group 0 is an automatically-assigned group th
 
 The __last__ capture is embedded in each group, so `g.String()` will return the same thing as `g.Capture.String()` and  `g.Captures[len(g.Captures)-1].String()`.
 
+If you want to find multiple matches from a single input string you should use the `FindNextMatch` method.  For example, to implement a function similar to `regexp.FindAllString`:
+
+```go
+func regexp2FindAllString(re *regexp2.Regexp, s string) []string {
+	var matches []string
+	m, _ := re.FindStringMatch(s)
+	for m != nil {
+		matches = append(matches, m.String())
+		m, _ = re.FindNextMatch(m)
+	}
+	return matches
+}
+```
+
+`FindNextMatch` is optmized so that it re-uses the underlying string/rune slice.
+
+The internals of `regexp2` always operate on `[]rune` so `Index` and `Length` data in a `Match` always reference a position in `rune`s rather than `byte`s (even if the input was given as a string). This is a dramatic difference between `regexp` and `regexp2`.  It's advisable to use the provided `String()` methods to avoid having to work with indices.
+
 ## Compare `regexp` and `regexp2`
 | Category | regexp | regexp2 |
 | --- | --- | --- |
