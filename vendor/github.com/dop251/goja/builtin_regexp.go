@@ -252,9 +252,14 @@ func compileRegexp(patternStr, flags string) (p *regexpPattern, err error) {
 		}
 		wrapper = (*regexpWrapper)(pattern)
 	} else {
+		if re2Str == "" {
+			err = err1
+			return
+		}
 		wrapper2, err = compileRegexp2(patternStr, multiline, ignoreCase)
 		if err != nil {
-			err = fmt.Errorf("Invalid regular expression (regexp2): %s (%v)", patternStr, err1)
+			err = fmt.Errorf("Invalid regular expression (regexp2): %s (%v)", patternStr, err)
+			return
 		}
 	}
 
