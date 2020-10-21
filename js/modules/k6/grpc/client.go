@@ -63,13 +63,13 @@ var (
 	errConnectInInitContext   = common.NewInitContextError("connecting to a gRPC server in the init context is not supported")
 )
 
-// Client reprecents a gRPC client that can be used to make RPC requests
+// Client represents a gRPC client that can be used to make RPC requests
 type Client struct {
 	mds  map[string]protoreflect.MethodDescriptor
 	conn *grpc.ClientConn
 }
 
-// NewClient creates a new gPRC client to make invoke RPC methods.
+// NewClient creates a new gPRC client to invoke RPC methods.
 func (*GRPC) NewClient(ctxPtr *context.Context) interface{} {
 	rt := common.GetRuntime(*ctxPtr)
 
@@ -78,10 +78,10 @@ func (*GRPC) NewClient(ctxPtr *context.Context) interface{} {
 
 // MethodInfo holds information on any parsed method descriptors that can be used by the goja VM
 type MethodInfo struct {
-	grpc.MethodInfo
-	Package    string
-	Service    string
-	FullMethod string
+	grpc.MethodInfo `json:"-" js:"-"`
+	Package         string
+	Service         string
+	FullMethod      string
 }
 
 // Response is a gRPC response that can be used by the goja VM
@@ -210,9 +210,9 @@ func (c *Client) Connect(ctxPtr *context.Context, addr string, params map[string
 					return false, fmt.Errorf("unable to parse %q: %v", k, err)
 				}
 			case int64:
-				timeout = time.Duration(float64(t)) * time.Millisecond
-			case float64:
 				timeout = time.Duration(t) * time.Millisecond
+			case float64:
+				timeout = time.Duration(t * float64(time.Millisecond))
 			default:
 				return false, fmt.Errorf("unable to use type %T as a timeout value", v)
 			}
@@ -349,9 +349,9 @@ func (c *Client) Invoke(ctxPtr *context.Context,
 					return nil, fmt.Errorf("unable to parse %q: %v", k, err)
 				}
 			case int64:
-				timeout = time.Duration(float64(t)) * time.Millisecond
-			case float64:
 				timeout = time.Duration(t) * time.Millisecond
+			case float64:
+				timeout = time.Duration(t * float64(time.Millisecond))
 			default:
 				return nil, fmt.Errorf("unable to use type %T as a timeout value", v)
 			}
