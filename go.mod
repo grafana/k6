@@ -25,6 +25,7 @@ require (
 	github.com/gin-contrib/sse v0.0.0-20170109093832-22d885f9ecc7 // indirect
 	github.com/gin-gonic/gin v1.1.5-0.20170702092826-d459835d2b07 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
+	github.com/golang/protobuf v1.4.2
 	github.com/golang/snappy v0.0.0-20170215233205-553a64147049 // indirect
 	github.com/google/go-cmp v0.5.1 // indirect
 	github.com/gorilla/context v0.0.0-20160226214623-1ea25387ff6f // indirect
@@ -32,6 +33,7 @@ require (
 	github.com/gorilla/websocket v1.4.2
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
+	github.com/jhump/protoreflect v1.7.0
 	github.com/julienschmidt/httprouter v1.1.1-0.20180222160526-d18983907793
 	github.com/kardianos/osext v0.0.0-20170510131534-ae77be60afb1 // indirect
 	github.com/kelseyhightower/envconfig v1.4.0
@@ -67,10 +69,14 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v0.0.0-20170224212429-dcecefd839c4 // indirect
 	github.com/zyedidia/highlight v0.0.0-20170330143449-201131ce5cf5
-	golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2
+	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550
 	golang.org/x/net v0.0.0-20200520004742-59133d7f0dd7
 	golang.org/x/text v0.3.3
 	golang.org/x/time v0.0.0-20170927054726-6dc17368e09b
+	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
+	google.golang.org/genproto v0.0.0-20200903010400-9bfcb5116336 // indirect
+	google.golang.org/grpc v1.31.1
+	google.golang.org/protobuf v1.24.0
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/go-playground/validator.v8 v8.18.2 // indirect
 	gopkg.in/guregu/null.v2 v2.1.2 // indirect
@@ -80,12 +86,10 @@ require (
 
 replace (
 	github.com/davecgh/go-spew => github.com/davecgh/go-spew v1.1.0
-	github.com/golang/protobuf => github.com/golang/protobuf v1.0.0
 	github.com/stretchr/testify => github.com/stretchr/testify v1.2.1
 	github.com/ugorji/go => github.com/ugorji/go v0.0.0-20180112141927-9831f2c3ac10
 	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20180308185624-c7dcf104e3a7
 	golang.org/x/net => golang.org/x/net v0.0.0-20181201002055-351d144fa1fc
-	golang.org/x/sys => golang.org/x/sys v0.0.0-20180312081825-c28acc882ebc
 	golang.org/x/text => golang.org/x/text v0.3.0
 	gopkg.in/yaml.v2 => gopkg.in/yaml.v2 v2.1.1
 )
