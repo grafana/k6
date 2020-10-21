@@ -95,8 +95,15 @@ func (self *_RegExp_parser) scanGroup() {
 	str := self.str[self.chrOffset:]
 	if len(str) > 1 { // A possibility of (?= or (?!
 		if str[0] == '?' {
-			if str[1] == '=' || str[1] == '!' {
+			ch := str[1]
+			switch {
+			case ch == '=' || ch == '!':
 				self.error(-1, "re2: Invalid (%s) <lookahead>", self.str[self.chrOffset:self.chrOffset+2])
+			case ch == '<':
+				self.error(-1, "re2: Invalid (%s) <lookbehind>", self.str[self.chrOffset:self.chrOffset+2])
+			case ch != ':':
+				self.error(-1, "Invalid group")
+				self.invalid = true
 			}
 		}
 	}
@@ -305,7 +312,6 @@ func (self *_RegExp_parser) scanEscape(inClass bool) {
 	case 'S':
 		if inClass {
 			self.error(self.chrOffset, "S in class")
-			self.invalid = true
 			return
 		} else {
 			self.goRegexp.WriteString("[^" + WhitespaceChars + "]")
@@ -321,9 +327,8 @@ func (self *_RegExp_parser) scanEscape(inClass bool) {
 			if err != nil {
 				self.errors = append(self.errors, err)
 			}
-		} else {
-			// Unescape the character for re2
 		}
+		// Unescape the character for re2
 		self.pass()
 		return
 	}

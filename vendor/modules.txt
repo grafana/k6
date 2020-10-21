@@ -34,7 +34,7 @@ github.com/davecgh/go-spew/spew
 ## explicit
 github.com/dlclark/regexp2
 github.com/dlclark/regexp2/syntax
-# github.com/dop251/goja v0.0.0-20201008094107-f97e50db25ec
+# github.com/dop251/goja v0.0.0-20201020185350-bf18fe8c88fa
 ## explicit
 github.com/dop251/goja
 github.com/dop251/goja/ast
