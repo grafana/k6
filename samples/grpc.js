@@ -1,4 +1,4 @@
-import grpc from 'k6/grpc';
+import grpc from 'k6/protocols/grpc';
 import { check } from "k6";
 
 let client = grpc.newClient();
