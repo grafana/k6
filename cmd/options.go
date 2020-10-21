@@ -94,6 +94,7 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.String("console-output", "", "redirects the console logging to the provided output file")
 	flags.Bool("discard-response-bodies", false, "Read but don't process or save HTTP response bodies")
 	flags.StringP("ip", "", "", "Client IP Range or CIDR from which each VU selects one by VU id")
+	flags.StringP("ip-mode", "", "", "sequential or random mode to select client IP, default sequential")
 	flags.String("dns", types.DefaultDNSConfig().String(), "DNS resolver configuration. Possible ttl values are: 'inf' "+
 		"for a persistent cache, '0' to disable the cache,\nor a positive duration, e.g. '1s', '1m', etc. "+
 		"Milliseconds are assumed if no unit is provided.\n"+
@@ -123,6 +124,7 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		Throw:                 getNullBool(flags, "throw"),
 		DiscardResponseBodies: getNullBool(flags, "discard-response-bodies"),
 		ClientIPRange:         getNullString(flags, "ip"),
+		ClientIPMode:          getNullString(flags, "ip-mode"),
 		// Default values for options without CLI flags:
 		// TODO: find a saner and more dev-friendly and error-proof way to handle options
 		SetupTimeout:    types.NullDuration{Duration: types.Duration(60 * time.Second), Valid: false},

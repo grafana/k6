@@ -421,6 +421,14 @@ func TestOptions(t *testing.T) {
 		assert.True(t, opts.ClientIPRange.Valid)
 		assert.Equal(t, "fd00:1:1:0::1-fd00:1:1:4::3ff", opts.ClientIPRange.String)
 	})
+	t.Run("ClientIPMode", func(t *testing.T) {
+		opts := Options{}.Apply(Options{ClientIPMode: null.StringFrom("")})
+		assert.True(t, opts.ClientIPMode.Valid)
+		opts = Options{}.Apply(Options{ClientIPMode: null.StringFrom("sequential")})
+		assert.True(t, opts.ClientIPMode.Valid)
+		opts = Options{}.Apply(Options{ClientIPMode: null.StringFrom("random")})
+		assert.True(t, opts.ClientIPMode.Valid)
+	})
 }
 
 func TestOptionsEnv(t *testing.T) {

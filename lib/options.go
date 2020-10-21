@@ -391,6 +391,9 @@ type Options struct {
 
 	// Specify client IP range or CIDR from which VUs bind to
 	ClientIPRange null.String `json:"-" envconfig:"K6_CLIENT_IP_RANGE"`
+
+	// Specify sequential or random mode to select client IP
+	ClientIPMode null.String `json:"-" envconfig:"K6_CLIENT_IP_MODE"`
 }
 
 // Returns the result of overwriting any fields with any that are set on the argument.
@@ -547,7 +550,10 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.ClientIPRange.Valid {
 		o.ClientIPRange = opts.ClientIPRange
-  }
+	}
+	if opts.ClientIPMode.Valid {
+		o.ClientIPMode = opts.ClientIPMode
+	}
 	if opts.DNS.TTL.Valid {
 		o.DNS.TTL = opts.DNS.TTL
 	}

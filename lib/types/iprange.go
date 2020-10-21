@@ -10,7 +10,6 @@ import (
 )
 
 // selectMode tells how IP is selected in a IPBlock splited from --ip option
-
 type selectMode uint
 
 const (
@@ -18,27 +17,31 @@ const (
 	random
 )
 
+// IPNum split net.IP 16 bytes into two uint64 numbers
+// IPv6 128bit split to 64bit network + 64bit host
+// IPv4 32bit is included in host 64bit
+type IPNum struct{ host, net uint64 }
+
 // IPBlock represents a continuous segment of IP addresses
-// ip     - the first IP in this address segment. CIDR can skip lower IPs
-// weight - how many IPs will be chosen from this segment. default is all
-// mode   - method to choose IP, sequential(0) or random(1). default is 0
-// hostStart - uint64 conversion of fistIP[8:16]
-// netStart  - uint64 conversion of fistIP[0:8]
-// hostN  - number of IPv4 addrs (IPv6 hosts) in this address segment
-// netN   - number of IPv6 nets in this address segment, always 1 if IPv4
+// ip      - the first IP in this address segment. CIDR can skip lower IPs
+// ipStart - uint64 conversion of fistIP[8:16] and fistIP[0:8]
+// ipCount - number of 64bit hosts (32bit if IPv4) in this address block
+//           number of 64bit nets (always 1 if IPv4) in this address block
+// weight  - how many IPs will be chosen from this segment. default is all
+//           over-number also allowed to get more weight
 type IPBlock struct {
-	ip        net.IP
-	hostStart uint64
-	netStart  uint64
-	hostN     uint64
-	netN      uint64
-	weight    uint64
-	split     uint64
-	mode      selectMode
+	ip      net.IP
+	ipStart IPNum
+	ipCount IPNum
+	weight  uint64
 }
 
 // IPPool represent a slice of IPBlocks
-type IPPool []IPBlock
+// mode - method to choose IP, sequential(0) or random(1). default is 0
+type IPPool struct {
+	Blocks []IPBlock
+	mode   selectMode
+}
 
 // GetIPBlock return a struct of a sequential IP range
 // support single IP, range format by '-' or CIDR by '/'
@@ -89,14 +92,10 @@ func ipBlockFromRange(s string) *IPBlock {
 	}
 	hostNum, netNum := h1-h0+1, n1-n0+1
 	return &IPBlock{
-		ip:        ip0,
-		hostStart: h0,
-		netStart:  n0,
-		hostN:     hostNum,
-		netN:      netNum,
-		weight:    hostNum,
-		split:     hostNum,
-		mode:      roundRobin,
+		ip:      ip0,
+		ipStart: IPNum{host: h0, net: n0},
+		ipCount: IPNum{host: hostNum, net: netNum},
+		weight:  hostNum,
 	}
 }
 
@@ -144,14 +143,10 @@ func ipBlockFromCIDR(s string) *IPBlock {
 		hostNum--
 	}
 	return &IPBlock{
-		ip:        ipk,
-		hostStart: hk,
-		netStart:  nk,
-		hostN:     hostNum,
-		netN:      netNum,
-		weight:    hostNum,
-		split:     hostNum,
-		mode:      roundRobin,
+		ip:      ipk,
+		ipStart: IPNum{host: hk, net: nk},
+		ipCount: IPNum{host: hostNum, net: netNum},
+		weight:  hostNum,
 	}
 }
 
@@ -159,13 +154,13 @@ func ipBlockFromCIDR(s string) *IPBlock {
 func (b IPBlock) GetRandomIP(id uint64) net.IP {
 	r := hashIDToUint64(id % b.weight)
 	if ip4 := b.ip.To4(); ip4 != nil {
-		i := b.hostStart + r%b.hostN
+		i := b.ipStart.host + r%b.ipCount.host
 		return net.IPv4(byte(i>>24), byte(i>>16), byte(i>>8), byte(i))
 	}
 	if ip6 := b.ip.To16(); ip6 != nil {
-		netN := b.netStart + r%b.netN
-		hostN := b.hostStart + r%b.hostN
-		if hostN < b.hostStart {
+		netN := b.ipStart.net + r%b.ipCount.net
+		hostN := b.ipStart.host + r%b.ipCount.host
+		if hostN < b.ipStart.host {
 			netN++
 		}
 		if ip := make(net.IP, net.IPv6len); ip != nil {
@@ -180,13 +175,13 @@ func (b IPBlock) GetRandomIP(id uint64) net.IP {
 // GetRoundRobinIP return a IP by indexes from an IP block
 func (b IPBlock) GetRoundRobinIP(hostIndex, netIndex uint64) net.IP {
 	if ip4 := b.ip.To4(); ip4 != nil {
-		i := b.hostStart + hostIndex%b.weight
+		i := b.ipStart.host + hostIndex%b.weight
 		return net.IPv4(byte(i>>24), byte(i>>16), byte(i>>8), byte(i))
 	}
 	if ip6 := b.ip.To16(); ip6 != nil {
-		netN := b.netStart + netIndex%b.netN
-		hostN := b.hostStart + hostIndex%b.weight
-		if hostN < b.hostStart {
+		netN := b.ipStart.net + netIndex%b.ipCount.net
+		hostN := b.ipStart.host + hostIndex%b.weight
+		if hostN < b.ipStart.host {
 			netN++
 		}
 		if ip := make(net.IP, net.IPv6len); ip != nil {
@@ -198,57 +193,52 @@ func (b IPBlock) GetRoundRobinIP(hostIndex, netIndex uint64) net.IP {
 	return nil
 }
 
-// GetPool return an IPBlock slice with corret weight and mode
-// Possible format is range1[:mode[:weight]][,range2[:mode[:weight]]]
-func GetPool(ranges string) IPPool {
+// GetPool return an IPBlock slice with corret weight
+// ranges - possible format is range1[:mode[:weight]][,range2[:mode[:weight]]]
+// mode   - method to choose IP, sequential(0) or random(1). default is 0
+func GetPool(ranges string, mode int) IPPool {
 	ss := strings.Split(strings.TrimSpace(ranges), ",")
-	pool := make([]IPBlock, 0)
+	pool := IPPool{Blocks: make([]IPBlock, 0), mode: selectMode(mode)}
 	for _, bs := range ss {
-		// range | mode | weight
+		// range | weight
 		rmw := strings.Split(strings.TrimSpace(bs), "|")
 		sz := len(rmw)
 		if sz < 1 {
 			continue
 		}
 		rangeStr := strings.TrimSpace(rmw[0])
-		r := GetIPBlock(rangeStr)
-		if r == nil {
+		b := GetIPBlock(rangeStr)
+		if b == nil {
 			continue
 		}
-		r.weight = r.hostN
-		r.mode = roundRobin
+		b.weight = b.ipCount.host
 		if sz > 1 {
-			modeStr := strings.TrimSpace(rmw[1])
-			mode, err := strconv.Atoi(modeStr)
-			if err == nil {
-				r.mode = selectMode(mode)
-			}
-		}
-		if sz > 2 {
-			weightStr := strings.TrimSpace(rmw[2])
+			weightStr := strings.TrimSpace(rmw[1])
 			weight, err := strconv.ParseUint(weightStr, 10, 64)
 			if err == nil {
-				r.weight = weight
+				b.weight = weight
 			}
 		}
-		r.split = r.weight
-		if len(pool) > 0 {
-			r.split += pool[len(pool)-1].split
-		}
-		pool = append(pool, *r)
+		pool.Blocks = append(pool.Blocks, *b)
 	}
 	return pool
 }
 
 // GetIP return an IP from a pool of IPBlock slice
 func (pool IPPool) GetIP(id uint64) net.IP {
-	if len(pool) < 1 {
+	nblocks := len(pool.Blocks)
+	if nblocks < 1 {
 		return nil
 	}
-	idx := id % pool[len(pool)-1].split
-	for _, b := range pool {
-		if idx < b.split {
-			switch b.mode {
+	weight, total := uint64(0), uint64(0)
+	for i := range pool.Blocks {
+		total += pool.Blocks[i].weight
+	}
+	idx := id % total
+	for _, b := range pool.Blocks {
+		weight += b.weight
+		if idx < weight {
+			switch pool.mode {
 			case random:
 				return b.GetRandomIP(id)
 			case roundRobin:

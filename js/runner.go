@@ -64,7 +64,7 @@ type Runner struct {
 	// TODO: Remove ActualResolver, it's a hack to simplify mocking in tests.
 	ActualResolver netext.MultiResolver
 	RPSLimit       *rate.Limiter
-	ipPool     types.IPPool
+	ipPool         types.IPPool
 
 	console   *console
 	setupData []byte
@@ -171,7 +171,7 @@ func (r *Runner) newVU(id int64, samplesOut chan<- stats.SampleContainer) (*VU, 
 		BlockedHostnames: r.Bundle.Options.BlockedHostnames.Trie,
 		Hosts:            r.Bundle.Options.Hosts,
 	}
-	if len(r.ipPool) > 0 && id > 0 {
+	if len(r.ipPool.Blocks) > 0 && id > 0 {
 		// just found that VU(id==0) will never send requests
 		if uAddr := r.ipPool.GetIP(uint64(id - 1)); uAddr != nil {
 			dialer.Dialer.LocalAddr = &net.TCPAddr{IP: uAddr}
@@ -315,7 +315,13 @@ func (r *Runner) IsExecutable(name string) bool {
 func (r *Runner) SetOptions(opts lib.Options) error {
 	r.Bundle.Options = opts
 	if opts.ClientIPRange.Valid {
-		r.ipPool = types.GetPool(opts.ClientIPRange.ValueOrZero())
+		ipRange := opts.ClientIPRange.ValueOrZero()
+		ipMode := opts.ClientIPMode.ValueOrZero()
+		var mode int
+		if ipMode == "random" {
+			mode = 1
+		}
+		r.ipPool = types.GetPool(ipRange, mode)
 	}
 	r.RPSLimit = nil
 	if rps := opts.RPS; rps.Valid {

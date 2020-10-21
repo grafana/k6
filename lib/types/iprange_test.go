@@ -44,8 +44,8 @@ func TestIpBlockFromRange(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			b := ipBlockFromRange(data.ipBlock)
 			assert.NotNil(t, b)
-			assert.Equal(t, data.hostCount, b.hostN)
-			assert.Equal(t, data.netCount, b.netN)
+			assert.Equal(t, data.hostCount, b.ipCount.host)
+			assert.Equal(t, data.netCount, b.ipCount.net)
 		})
 	}
 }
@@ -71,8 +71,8 @@ func TestIpBlockFromCIDR(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			b := ipBlockFromCIDR(data.ipBlock)
 			assert.NotNil(t, b)
-			assert.Equal(t, data.hostCount, b.hostN)
-			assert.Equal(t, data.netCount, b.netN)
+			assert.Equal(t, data.hostCount, b.ipCount.host)
+			assert.Equal(t, data.netCount, b.ipCount.net)
 		})
 	}
 }
@@ -99,8 +99,8 @@ func TestGetIPBlock(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			b := GetIPBlock(data.ipBlock)
 			assert.NotNil(t, b)
-			assert.Equal(t, data.hostCount, b.hostN)
-			assert.Equal(t, data.netCount, b.netN)
+			assert.Equal(t, data.hostCount, b.ipCount.host)
+			assert.Equal(t, data.netCount, b.ipCount.net)
 		})
 	}
 }
@@ -128,8 +128,8 @@ func TestGetRandomIP(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			b := GetIPBlock(data.ipBlock)
 			assert.NotNil(t, b)
-			assert.Equal(t, data.hostCount, b.hostN)
-			assert.Equal(t, data.netCount, b.netN)
+			assert.Equal(t, data.hostCount, b.ipCount.host)
+			assert.Equal(t, data.netCount, b.ipCount.net)
 			for i := 0; i < 300; i++ {
 				hv := hashIDToUint64(uint64(time.Now().UnixNano()))
 				ip := b.GetRandomIP(hv % 1048576)
@@ -165,14 +165,14 @@ func TestGetRoundRobinIP(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			b := GetIPBlock(data.ipBlock)
 			assert.NotNil(t, b)
-			assert.Equal(t, data.hostCount, b.hostN)
-			assert.Equal(t, data.netCount, b.netN)
+			assert.Equal(t, data.hostCount, b.ipCount.host)
+			assert.Equal(t, data.netCount, b.ipCount.net)
 			for i = 1; i < 300; i++ {
 				ip := b.GetRoundRobinIP(i, i)
 				assert.NotNil(t, ip)
 				n, h := ipUint64(ip)
-				assert.Equal(t, i%data.hostCount, h-b.hostStart)
-				assert.Equal(t, i%data.netCount, n-b.netStart)
+				assert.Equal(t, i%data.hostCount, h-b.ipStart.host)
+				assert.Equal(t, i%data.netCount, n-b.ipStart.net)
 				assert.True(t, ipInRange(ip, data.ipStart, data.ipEnd))
 			}
 		})
@@ -183,33 +183,26 @@ func TestGetPoolNoRandomNoWeight(t *testing.T) {
 	testdata := map[string]struct {
 		ipBlock string
 		weight  uint64
-		mode    selectMode
 	}{
-		"IPv4 Single IPs":       {"1.1.1.1, 1.1.2.1, 1.1.3.1, 1.1.4.1", 1, roundRobin},
-		"IPv4 CIDRs":            {"1.1.1.0/24, 2.2.2.0/24, 3.3.0.1/24", 254, roundRobin},
-		"IPv4 Ranges":           {"1.1.1.11-1.1.1.20, 2.2.2.5-2.2.2.14", 10, roundRobin},
-		"IPv4 Ranges and CIDRs": {"1.1.1.1-1.1.1.254, 2.2.2.0/24", 254, roundRobin},
-		"IPv4 IPs and Ranges":   {"1.1.1.1, 1.1.1.2, 3.3.3.3/32", 1, roundRobin},
-		"ipv6 Single IPs":       {"fd00:1:1:2::1, fd00:1:1:ff::2, fd00:1:1:ff::3", 1, roundRobin},
-		"ipv6 CIDRs":            {"fd00::/120, fd00::1/120, fd00::0.0.0.1/120", 254, roundRobin},
-		"ipv6 Ranges":           {"fd00::1 - fd00::a, fd00::5 - fd00::e", 10, roundRobin},
-		"IPv6 Ranges and CIDRs": {"fd00::1-fd00::fe, fd00::1/120", 254, roundRobin},
-		"IPv6 IPs and Ranges":   {"fd00::1, fd00::2, fd00::3-fd00::3", 1, roundRobin},
-		"Mix IPv4 and IPv6":     {"fd00::/120, 192.168.0.0/24", 254, roundRobin},
+		"IPv4 Single IPs":       {"1.1.1.1, 1.1.2.1, 1.1.3.1, 1.1.4.1", 1},
+		"IPv4 CIDRs":            {"1.1.1.0/24, 2.2.2.0/24, 3.3.0.1/24", 254},
+		"IPv4 Ranges":           {"1.1.1.11-1.1.1.20, 2.2.2.5-2.2.2.14", 10},
+		"IPv4 Ranges and CIDRs": {"1.1.1.1-1.1.1.254, 2.2.2.0/24", 254},
+		"IPv4 IPs and Ranges":   {"1.1.1.1, 1.1.1.2, 3.3.3.3/32", 1},
+		"ipv6 Single IPs":       {"fd00:1:1:2::1, fd00:1:1:ff::2, fd00:1:1:ff::3", 1},
+		"ipv6 CIDRs":            {"fd00::/120, fd00::1/120, fd00::0.0.0.1/120", 254},
+		"ipv6 Ranges":           {"fd00::1 - fd00::a, fd00::5 - fd00::e", 10},
+		"IPv6 Ranges and CIDRs": {"fd00::1-fd00::fe, fd00::1/120", 254},
+		"IPv6 IPs and Ranges":   {"fd00::1, fd00::2, fd00::3-fd00::3", 1},
+		"Mix IPv4 and IPv6":     {"fd00::/120, 192.168.0.0/24", 254},
 	}
 	for name, d := range testdata {
 		data := d
 		t.Run(name, func(t *testing.T) {
-			p := GetPool(data.ipBlock)
+			p := GetPool(data.ipBlock, 0)
 			assert.NotNil(t, p)
-			for _, b := range p {
-				assert.Equal(t, data.mode, b.mode)
-			}
-			j := uint64(0)
-			for i := 0; i < len(p); i++ {
-				j += data.weight
-				assert.Equal(t, data.weight, p[i].weight)
-				assert.Equal(t, j, p[i].split)
+			for _, b := range p.Blocks {
+				assert.Equal(t, data.weight, b.weight)
 			}
 			hv := hashIDToUint64(uint64(time.Now().UnixNano()))
 			ip := p.GetIP(hv % 1048576)
@@ -226,28 +219,23 @@ func TestGetPoolWithWeightAndRandom(t *testing.T) {
 	}{
 		"mode defaut sequential 1":              {"1.1.1.1, 2.2.2.2/32", 1, roundRobin},
 		"mode defaut sequential 2":              {"1.1.1.0/24, 2.2.2.1/24, 3.3.3.0/24", 254, roundRobin},
-		"mode change to random":                 {"1.1.1.0/24|1, 2.2.2.1-2.2.2.254|1, 3.3.3.0/24|1", 254, random},
+		"mode change to random":                 {"1.1.1.0/24|254, 2.2.2.1-2.2.2.254|254, 3.3.3.0/24", 254, random},
 		"weight default IPBlock IP number":      {"2.2.2.0/24, 3.3.3.1-3.3.3.254/24", 254, roundRobin},
-		"weight more than IPBlock IP number":    {"2.2.2.2|0|8, 3.3.3.0/30|0|8", 8, roundRobin},
-		"weight less than IPBlock IP number":    {"1.1.1.0/24|0|20", 20, roundRobin},
-		"random weight lesstaking from IPBlock": {"1.1.1.0/24|1|100", 100, random},
-		"random weight overtaking from IPBlock": {"2.2.2.0/28|1|80", 80, random},
-		"ipv6 weight random host only":          {"fd00::/120|1, fd01::101-fd00::1fe|1, fd02::201/120|1|254", 254, random},
-		"random weight ipv4 ipv6 mixed":         {"fd00:1:1:2::1/120|1|100, 192.168.0.0/16|1|100", 100, random},
+		"weight more than IPBlock IP number":    {"2.2.2.2|8, 3.3.3.0/30|8", 8, roundRobin},
+		"weight less than IPBlock IP number":    {"1.1.1.0/24|20", 20, roundRobin},
+		"random weight lesstaking from IPBlock": {"1.1.1.0/24|100", 100, random},
+		"random weight overtaking from IPBlock": {"2.2.2.0/28|80", 80, random},
+		"ipv6 weight random host only":          {"fd00::/120, fd01::101-fd00::1fe, fd02::201/120|254", 254, random},
+		"random weight ipv4 ipv6 mixed":         {"fd00:1:1:2::1/120|100, 192.168.0.0/16|100", 100, random},
 	}
 	for name, d := range testdata {
 		data := d
 		t.Run(name, func(t *testing.T) {
-			p := GetPool(data.ipBlock)
+			p := GetPool(data.ipBlock, int(data.mode))
 			assert.NotNil(t, p)
-			for _, b := range p {
-				assert.Equal(t, data.mode, b.mode)
-			}
-			j := uint64(0)
-			for i := 0; i < len(p); i++ {
-				j += data.weight
-				assert.Equal(t, data.weight, p[i].weight)
-				assert.Equal(t, j, p[i].split)
+			assert.Equal(t, data.mode, p.mode)
+			for _, b := range p.Blocks {
+				assert.Equal(t, data.weight, b.weight)
 			}
 			hv := hashIDToUint64(uint64(time.Now().UnixNano()))
 			ip := p.GetIP(hv % 1048576)
