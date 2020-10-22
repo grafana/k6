@@ -175,15 +175,12 @@ func (b IPBlock) GetRandomIP(id uint64) net.IP {
 // GetRoundRobinIP return a IP by indexes from an IP block
 func (b IPBlock) GetRoundRobinIP(hostIndex, netIndex uint64) net.IP {
 	if ip4 := b.ip.To4(); ip4 != nil {
-		i := b.ipStart.host + hostIndex%b.weight
+		i := b.ipStart.host + (hostIndex%b.weight)%b.ipCount.host
 		return net.IPv4(byte(i>>24), byte(i>>16), byte(i>>8), byte(i))
 	}
 	if ip6 := b.ip.To16(); ip6 != nil {
 		netN := b.ipStart.net + netIndex%b.ipCount.net
-		hostN := b.ipStart.host + hostIndex%b.weight
-		if hostN < b.ipStart.host {
-			netN++
-		}
+		hostN := b.ipStart.host + (hostIndex%b.weight)%b.ipCount.host
 		if ip := make(net.IP, net.IPv6len); ip != nil {
 			binary.BigEndian.PutUint64(ip[:8], netN)
 			binary.BigEndian.PutUint64(ip[8:], hostN)
