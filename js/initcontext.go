@@ -34,7 +34,7 @@ import (
 
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/js/compiler"
-	"github.com/loadimpact/k6/js/modules"
+	"github.com/loadimpact/k6/js/internal/modules"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/loader"
 )
@@ -115,8 +115,9 @@ func newBoundInitContext(base *InitContext, ctxPtr *context.Context, rt *goja.Ru
 func (i *InitContext) Require(arg string) goja.Value {
 	switch {
 	case arg == "k6", strings.HasPrefix(arg, "k6/"):
-		// Builtin modules ("k6" or "k6/...") are handled specially, as they don't exist on the
-		// filesystem. This intentionally shadows attempts to name your own modules this.
+		// Builtin or external modules ("k6", "k6/*", or "k6/x/*") are handled
+		// specially, as they don't exist on the filesystem. This intentionally
+		// shadows attempts to name your own modules this.
 		v, err := i.requireModule(arg)
 		if err != nil {
 			common.Throw(i.runtime, err)
@@ -133,9 +134,9 @@ func (i *InitContext) Require(arg string) goja.Value {
 }
 
 func (i *InitContext) requireModule(name string) (goja.Value, error) {
-	mod, ok := modules.Index[name]
-	if !ok {
-		return nil, errors.Errorf("unknown builtin module: %s", name)
+	mod := modules.Get(name)
+	if mod == nil {
+		return nil, errors.Errorf("unknown module: %s", name)
 	}
 	return i.runtime.ToValue(common.Bind(i.runtime, mod, i.ctxPtr)), nil
 }

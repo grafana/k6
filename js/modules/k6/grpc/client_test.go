@@ -101,7 +101,7 @@ func TestClient(t *testing.T) {
 
 	t.Run("LoadNotFound", func(t *testing.T) {
 		_, err := common.RunString(rt, `
-			client.load([], "./does_not_exist.proto");	
+			client.load([], "./does_not_exist.proto");
 		`)
 		if !assert.Error(t, err) {
 			return
@@ -115,7 +115,7 @@ func TestClient(t *testing.T) {
 
 	t.Run("Load", func(t *testing.T) {
 		respV, err := common.RunString(rt, `
-			client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");	
+			client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");
 		`)
 		if !assert.NoError(t, err) {
 			return

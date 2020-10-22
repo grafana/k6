@@ -30,10 +30,15 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/loadimpact/k6/js/common"
+	"github.com/loadimpact/k6/js/internal/modules"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/stats"
 )
+
+func init() {
+	modules.Register("k6", New())
+}
 
 type K6 struct{}
 

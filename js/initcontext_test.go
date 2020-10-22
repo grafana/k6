@@ -52,7 +52,7 @@ func TestInitContextRequire(t *testing.T) {
 	t.Run("Modules", func(t *testing.T) {
 		t.Run("Nonexistent", func(t *testing.T) {
 			_, err := getSimpleBundle(t, "/script.js", `import "k6/NONEXISTENT";`)
-			assert.Contains(t, err.Error(), "GoError: unknown builtin module: k6/NONEXISTENT")
+			assert.Contains(t, err.Error(), "GoError: unknown module: k6/NONEXISTENT")
 		})
 
 		t.Run("k6", func(t *testing.T) {

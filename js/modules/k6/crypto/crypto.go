@@ -37,7 +37,12 @@ import (
 	"golang.org/x/crypto/ripemd160"
 
 	"github.com/loadimpact/k6/js/common"
+	"github.com/loadimpact/k6/js/internal/modules"
 )
+
+func init() {
+	modules.Register("k6/crypto", New())
+}
 
 type Crypto struct{}
 
