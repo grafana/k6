@@ -80,16 +80,18 @@ func (c *Collector) Link() string {
 func (c *Collector) Run(ctx context.Context) {
 	c.ctx = ctx
 
-	ticker := time.NewTicker(time.Duration(c.config.PushInterval.Duration))
+	if c.config.BufferEnabled.Bool {
+		ticker := time.NewTicker(time.Duration(c.config.PushInterval.Duration))
 
-	for {
-		select {
-		case <-ticker.C:
-			c.pushMetrics()
-		case <-ctx.Done():
-			c.pushMetrics()
-			c.finish()
-			return
+		for {
+			select {
+			case <-ticker.C:
+				c.pushMetrics()
+			case <-ctx.Done():
+				c.pushMetrics()
+				c.finish()
+				return
+			}
 		}
 	}
 }
@@ -131,7 +133,11 @@ func (c *Collector) Collect(sampleContainers []stats.SampleContainer) {
 			event := eh.NewEvent(m)
 			event.Properties = p
 
-			c.buffer = append(c.buffer, event)
+			if c.config.BufferEnabled.Bool {
+				c.buffer = append(c.buffer, event)
+			} else {
+				c.client.Send(c.ctx, event)
+			}
 		}
 	}
 }
