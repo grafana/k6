@@ -37,10 +37,15 @@ import (
 	"github.com/gorilla/websocket"
 
 	"github.com/loadimpact/k6/js/common"
+	"github.com/loadimpact/k6/js/internal/modules"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/stats"
 )
+
+func init() {
+	modules.Register("k6/ws", New())
+}
 
 // ErrWSInInitContext is returned when websockets are using in the init context
 var ErrWSInInitContext = common.NewInitContextError("using websockets in the init context is not supported")

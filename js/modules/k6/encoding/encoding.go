@@ -25,7 +25,12 @@ import (
 	"encoding/base64"
 
 	"github.com/loadimpact/k6/js/common"
+	"github.com/loadimpact/k6/js/internal/modules"
 )
+
+func init() {
+	modules.Register("k6/encoding", New())
+}
 
 type Encoding struct{}
 
