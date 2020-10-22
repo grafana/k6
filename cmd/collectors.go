@@ -145,15 +145,8 @@ func getCollector(
 
 	case collectorEventHubs:
 		config := eventhubs.NewConfig().Apply(conf.Collectors.EventHubs)
-		if err := envconfig.Process("", &config); err != nil {
+		if err := envconfig.Process("k6_eventhubs", &config); err != nil {
 			return nil, err
-		}
-		if arg != "" {
-			cmdConfig, err := eventhubs.ParseArg(arg)
-			if err != nil {
-				return nil, err
-			}
-			config = config.Apply(cmdConfig)
 		}
 
 		return eventhubs.New(logger, config)

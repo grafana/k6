@@ -24,6 +24,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -38,7 +39,12 @@ import (
 type Collector struct {
 	config Config
 
-	client eh.Hub
+	client *eh.Hub
+
+	ctx context.Context
+
+	buffer     []*eh.Event
+	bufferLock sync.Mutex
 
 	logger logrus.FieldLogger
 	opts   lib.Options
@@ -52,7 +58,8 @@ func New(logger logrus.FieldLogger, conf Config) (*Collector, error) {
 	hub, _ := eh.NewHubFromConnectionString(conf.ConnectionString.String)
 	return &Collector{
 		config: conf,
-		client: *hub,
+		client: hub,
+		buffer: make([]*eh.Event, 0),
 		logger: logger,
 	}, nil
 }
@@ -71,9 +78,23 @@ func (c *Collector) Link() string {
 // Run is called in a goroutine and starts the collector. Should commit samples to the backend
 // at regular intervals and when the context is terminated.
 func (c *Collector) Run(ctx context.Context) {
+	c.ctx = ctx
+
+	ticker := time.NewTicker(time.Duration(c.config.PushInterval.Duration))
+
+	for {
+		select {
+		case <-ticker.C:
+			c.pushMetrics()
+		case <-ctx.Done():
+			c.pushMetrics()
+			c.finish()
+			return
+		}
+	}
 }
 
-type TestEvent struct {
+type HubEvent struct {
 	Time     time.Time         `json:"time"`
 	Value    float64           `json:"value"`
 	Tags     *stats.SampleTags `json:"tags"`
@@ -84,9 +105,6 @@ type TestEvent struct {
 // Collect receives a set of samples. This method is never called concurrently, and only while
 // the context for Run() is valid, but should defer as much work as possible to Run().
 func (c *Collector) Collect(sampleContainers []stats.SampleContainer) {
-
-	ctx := context.Background()
-
 	for _, sampleContainer := range sampleContainers {
 		for _, sample := range sampleContainer.GetSamples() {
 			if &sample == nil {
@@ -95,7 +113,7 @@ func (c *Collector) Collect(sampleContainers []stats.SampleContainer) {
 				continue
 			}
 
-			data := TestEvent{
+			data := HubEvent{
 				Time:     sample.Time,
 				Value:    sample.Value,
 				Tags:     sample.Tags,
@@ -113,15 +131,32 @@ func (c *Collector) Collect(sampleContainers []stats.SampleContainer) {
 			event := eh.NewEvent(m)
 			event.Properties = p
 
-			c.client.Send(ctx, event)
+			c.buffer = append(c.buffer, event)
 		}
 	}
 }
 
 func (c *Collector) pushMetrics() {
+	c.bufferLock.Lock()
+	if len(c.buffer) == 0 {
+		c.bufferLock.Unlock()
+		return
+	}
+	buffer := c.buffer
+	c.buffer = nil
+	c.bufferLock.Unlock()
+
+	fmt.Printf("pushing (%d)......\n", len(buffer))
+
+	c.client.SendBatch(c.ctx, eh.NewEventBatchIterator(buffer...))
 }
 
-func (c *Collector) testFinished() {
+func (c *Collector) finish() {
+	// Close when context is done
+
+	fmt.Printf("done (%d)......\n", len(c.buffer))
+
+	c.client.Close(c.ctx)
 }
 
 // GetRequiredSystemTags returns which sample tags are needed by this collector

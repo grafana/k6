@@ -21,47 +21,34 @@
 package eventhubs
 
 import (
-	"fmt"
-	"strings"
+	"time"
 
+	"github.com/loadimpact/k6/lib/types"
 	"gopkg.in/guregu/null.v3"
 )
 
-// Config struct for AppInsights
+// Config struct for EventHubs
 type Config struct {
-	ConnectionString null.String `json:"connection_string" envconfig:"K6_EVENTHUBS_CONNECTION_STRING"`
+	ConnectionString null.String        `json:"connection_string,omitempty" envconfig:"K6_EVENTHUBS_CONNECTION_STRING"`
+	PushInterval     types.NullDuration `json:"push_interval,omitempty" envconfig:"K6_EVENTHUBS_PUSH_INTERVAL"`
 }
 
 // NewConfig creates a new Config instance with default values for some fields.
 func NewConfig() Config {
-	return Config{}
+	return Config{
+		ConnectionString: null.StringFrom(""),
+		PushInterval:     types.NewNullDuration(1*time.Second, false),
+	}
 }
 
 // Apply saves config non-zero config values from the passed config in the receiver.
 func (c Config) Apply(cfg Config) Config {
+
 	if cfg.ConnectionString.Valid {
 		c.ConnectionString = cfg.ConnectionString
 	}
-	return c
-}
-
-// ParseArg takes an arg string and converts it to a config
-func ParseArg(arg string) (Config, error) {
-	c := Config{}
-
-	pairs := strings.Split(arg, ",")
-	for _, pair := range pairs {
-		r := strings.SplitN(pair, "=", 2)
-		if len(r) != 2 {
-			return c, fmt.Errorf("couldn't parse %q as argument for csv output", arg)
-		}
-		switch r[0] {
-		case "connection_string":
-			c.ConnectionString = null.StringFrom(r[1])
-		default:
-			return c, fmt.Errorf("unknown key %q as argument for csv output", r[0])
-		}
+	if cfg.PushInterval.Valid {
+		c.PushInterval = cfg.PushInterval
 	}
-
-	return c, nil
+	return c
 }
