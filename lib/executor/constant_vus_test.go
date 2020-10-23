@@ -59,7 +59,7 @@ func TestConstantVUsRun(t *testing.T) {
 			state := lib.GetState(ctx)
 			currIter, _ := result.LoadOrStore(state.Vu, uint64(0))
 			result.Store(state.Vu, currIter.(uint64)+1)
-			time.Sleep(200 * time.Millisecond)
+			time.Sleep(210 * time.Millisecond)
 			return nil
 		}),
 	)
