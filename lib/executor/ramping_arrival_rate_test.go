@@ -121,7 +121,7 @@ func TestRampingArrivalRateRunCorrectRate(t *testing.T) {
 
 		time.Sleep(time.Second)
 		currentCount = atomic.SwapInt64(&count, 0)
-		assert.InDelta(t, 50, currentCount, 2)
+		assert.InDelta(t, 50, currentCount, 3)
 	}()
 	engineOut := make(chan stats.SampleContainer, 1000)
 	err = executor.Run(ctx, engineOut)
