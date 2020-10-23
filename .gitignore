@@ -7,7 +7,6 @@
 *.sublime-workspace
 *.log
 .idea
-.vagrant
 
 *.DS_Store
 

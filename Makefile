@@ -1,5 +1,3 @@
-VERSION := 0.2.2
-
 all: build
 
 .PHONY: build
@@ -15,14 +13,6 @@ check:
 	golangci-lint run --out-format=tab --new-from-rev master ./...
 	go test -race -timeout 210s ./...
 
-.PHONY: docs
-docs:
-	jsdoc -c jsdoc.json
-
 .PHONY: container
 container:
-	docker build --rm --pull --no-cache -t loadimpact/k6:$(VERSION) .
-
-.PHONY: push
-push:
-	docker push loadimpact/k6:$(VERSION)
+	docker build --rm --pull --no-cache -t loadimpact/k6 .
