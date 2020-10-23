@@ -3,8 +3,8 @@ import http from 'k6/http';
 
 export default function() {
   const responses = http.batch([
-    "http://test.loadimpact.com",
-    "http://test.loadimpact.com/pi.php"
+    "http://test.k6.io",
+    "http://test.k6.io/pi.php"
   ]);
 
   check(responses[0], {
