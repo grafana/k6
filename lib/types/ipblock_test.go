@@ -105,6 +105,20 @@ func TestIPPool(t *testing.T) {
 				65541: net.ParseIP("192.168.0.101"),
 			},
 		},
+
+		"192.168.0.101,192.168.0.102,192.168.0.103,192.168.0.104,192.168.0.105-192.168.0.105,fd00::2/112": {
+			count: new(big.Int).SetInt64(65541),
+			queries: map[uint64]net.IP{
+				0:     net.ParseIP("192.168.0.101"),
+				1:     net.ParseIP("192.168.0.102"),
+				2:     net.ParseIP("192.168.0.103"),
+				3:     net.ParseIP("192.168.0.104"),
+				4:     net.ParseIP("192.168.0.105"),
+				5:     net.ParseIP("fd00::0"),
+				6:     net.ParseIP("fd00::1"),
+				65541: net.ParseIP("192.168.0.101"),
+			},
+		},
 	}
 	for name, data := range testdata {
 		name, data := name, data

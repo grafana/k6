@@ -158,7 +158,7 @@ func NewIPPool(ranges string) (*IPPool, error) {
 	// bigger than startIndex but it will be true always for the first block which is with
 	// startIndex 0. This can also be fixed by iterating in reverse but this seems better
 	for i := 0; i < len(pool.list)/2; i++ {
-		pool.list[i], pool.list[len(pool.list)/2-i] = pool.list[len(pool.list)/2-i], pool.list[i]
+		pool.list[i], pool.list[len(pool.list)-1-i] = pool.list[len(pool.list)-1-i], pool.list[i]
 	}
 	return pool, nil
 }
