@@ -104,7 +104,7 @@ func LokiFromConfigLine(ctx context.Context, fallbackLogger logrus.FieldLogger, 
 func (h *lokiHook) parseArgs(line string) error {
 	tokens, err := tokenize(line)
 	if err != nil {
-		return err
+		return fmt.Errorf("error while parsing loki configuration %w", err)
 	}
 
 	for _, token := range tokens {
