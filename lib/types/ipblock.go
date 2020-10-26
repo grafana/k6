@@ -34,8 +34,8 @@ type ipBlock struct {
 	ipv6           bool
 }
 
-// ipPoolBlock is almost the same as ipBlock but is put in a IPPool and knows it's start id indest
-// of it's size/count
+// ipPoolBlock is similar to ipBlock but instead of knowing its count/size it knows the first index
+// from which it starts in an IPPool
 type ipPoolBlock struct {
 	firstIP, startIndex *big.Int
 }
