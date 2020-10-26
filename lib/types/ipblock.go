@@ -52,7 +52,7 @@ func getIPBlock(s string) (*ipBlock, error) {
 		return ipBlockFromCIDR(s)
 	default:
 		if net.ParseIP(s) == nil {
-			return nil, fmt.Errorf("%s is not a valid ip, range ip or CIDR", s)
+			return nil, fmt.Errorf("%s is not a valid IP, IP range or CIDR", s)
 		}
 		return ipBlockFromRange(s + "-" + s)
 	}
@@ -77,6 +77,8 @@ func ipBlockFromRange(s string) (*ipBlock, error) {
 }
 
 func ipBlockFromTwoIPs(ip0, ip1 net.IP) *ipBlock {
+	// This code doesn't do any checks on the validity of the arguments, that should be
+	// done before and/or after it is called
 	var block ipBlock
 	block.firstIP = new(big.Int)
 	block.count = new(big.Int)
@@ -95,7 +97,7 @@ func ipBlockFromTwoIPs(ip0, ip1 net.IP) *ipBlock {
 }
 
 func ipBlockFromCIDR(s string) (*ipBlock, error) {
-	_, pnet, err := net.ParseCIDR(s) // range start ip, cidr ipnet
+	_, pnet, err := net.ParseCIDR(s)
 	if err != nil {
 		return nil, fmt.Errorf("parseCIDR() failed parsing %s: %w", s, err)
 	}
@@ -130,8 +132,8 @@ func (b ipBlock) getIP(index *big.Int) net.IP {
 	return net.IP(i.Bytes())
 }
 
-// NewIPPool return an IPBlock slice with corret weight and mode
-// Possible format is range1[:mode[:weight]][,range2[:mode[:weight]]]
+// NewIPPool returns an IPPool slice from the provided string represenation that should be comma
+// separated list of IPs, IP ranges(ip1-ip2) and CIDRs
 func NewIPPool(ranges string) (*IPPool, error) {
 	ss := strings.Split(strings.TrimSpace(ranges), ",")
 	pool := &IPPool{}
@@ -145,25 +147,25 @@ func NewIPPool(ranges string) (*IPPool, error) {
 
 		pool.count.Add(pool.count, r.count)
 		r.count.Set(pool.count)
-		pool.list[i] = *r
+		pool.list[i] = ipPoolBlo
 	}
 	return pool, nil
 }
 
 // GetIP return an IP from a pool of IPBlock slice
-func (pool *IPPool) GetIP(id uint64) net.IP {
-	return pool.GetIPBig(new(big.Int).SetUint64(id))
+func (pool *IPPool) GetIP(index uint64) net.IP {
+	return pool.GetIPBig(new(big.Int).SetUint64(index))
 }
 
-// GetIPBig returns an IP form the pool with the provided id that is big.Int
-func (pool *IPPool) GetIPBig(id *big.Int) net.IP {
-	id = new(big.Int).Rem(id, pool.count)
+// GetIPBig returns an IP from the pool with the provided index that is big.Int
+func (pool *IPPool) GetIPBig(index *big.Int) net.IP {
+	index = new(big.Int).Rem(index, pool.count)
 	for i, b := range pool.list {
-		if id.Cmp(b.count) < 0 {
+		if index.Cmp(b.count) < 0 {
 			if i > 0 {
-				id.Sub(id, pool.list[i-1].count)
+				index.Sub(index, pool.list[i-1].count)
 			}
-			return b.getIP(id)
+			return b.getIP(index)
 		}
 	}
 	return nil
