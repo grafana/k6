@@ -172,7 +172,6 @@ func (pool *IPPool) GetIP(index uint64) net.IP {
 func (pool *IPPool) GetIPBig(index *big.Int) net.IP {
 	index = new(big.Int).Rem(index, pool.count)
 	for _, b := range pool.list {
-		fmt.Println(index, b.startIndex)
 		if index.Cmp(b.startIndex) >= 0 {
 			return b.getIP(index.Sub(index, b.startIndex))
 		}
