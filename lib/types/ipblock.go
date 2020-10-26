@@ -62,8 +62,7 @@ func getIPBlock(s string) (*ipBlock, error) {
 
 func ipBlockFromRange(s string) (*ipBlock, error) {
 	ss := strings.SplitN(s, "-", 2)
-	ip0Str, ip1Str := strings.TrimSpace(ss[0]), strings.TrimSpace(ss[1])
-	ip0, ip1 := net.ParseIP(ip0Str), net.ParseIP(ip1Str)
+	ip0, ip1 := net.ParseIP(ss[0]), net.ParseIP(ss[1])
 	if ip0 == nil || ip1 == nil {
 		return nil, errors.New("wrong IP range format: " + s)
 	}
@@ -137,7 +136,7 @@ func (b ipPoolBlock) getIP(index *big.Int) net.IP {
 // NewIPPool returns an IPPool slice from the provided string representation that should be comma
 // separated list of IPs, IP ranges(ip1-ip2) and CIDRs
 func NewIPPool(ranges string) (*IPPool, error) {
-	ss := strings.Split(strings.TrimSpace(ranges), ",")
+	ss := strings.Split(ranges, ",")
 	pool := &IPPool{}
 	pool.list = make([]ipPoolBlock, len(ss))
 	pool.count = new(big.Int)
