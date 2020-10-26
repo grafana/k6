@@ -329,7 +329,6 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 			case <-globalCtx.Done():
 				break runningLoop
 			}
-
 		}
 
 		if testProgress == nil {
