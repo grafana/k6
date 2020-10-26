@@ -118,3 +118,25 @@ func TestIPPool(t *testing.T) {
 		})
 	}
 }
+
+func TestIpBlockError(t *testing.T) {
+	testdata := map[string]string{
+		"whatever":                       "not a valid IP",
+		"192.168.0.1012":                 "not a valid IP",
+		"192.168.0.10/244":               "invalid CIDR",
+		"fd00::0/244":                    "invalid CIDR",
+		"192.168.0.101-192.168.0.102/32": "wrong IP range format",
+		"192.168.0.101-fd00::1":          "mixed IP range format",
+		"fd00::1-192.168.0.101":          "mixed IP range format",
+		"192.168.0.100-192.168.0.2":      "negative IP range",
+		"fd00:1:1:0::0-fd00:1:0:ff::3ff": "negative IP range",
+	}
+	for name, data := range testdata {
+		name, data := name, data
+		t.Run(name, func(t *testing.T) {
+			_, err := getIPBlock(name)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), data)
+		})
+	}
+}
