@@ -244,8 +244,6 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 			return nil
 		}
 
-		shouldExitLoop := false
-
 		// Trap Interrupts, SIGINTs and SIGTERMs.
 		sigC := make(chan os.Signal, 1)
 		signal.Notify(sigC, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
@@ -257,11 +255,10 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 			if err != nil {
 				logger.WithError(err).Error("Stop cloud test error")
 			}
-			shouldExitLoop = true // Exit after the next GetTestProgress call
+			globalCancel()
 
 			sig = <-sigC
 			logger.WithField("sig", sig).Error("Aborting k6 in response to signal")
-			globalCancel()
 			os.Exit(externalAbortErrorCode)
 		}()
 
@@ -321,7 +318,7 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 				if progressErr == nil {
 					if (newTestProgress.RunStatus > lib.RunStatusRunning) ||
 						(exitOnRunning && newTestProgress.RunStatus == lib.RunStatusRunning) {
-						shouldExitLoop = true
+						globalCtx.Done()
 					}
 					testProgressLock.Lock()
 					testProgress = newTestProgress
@@ -329,10 +326,10 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 				} else {
 					logger.WithError(progressErr).Error("Test progress error")
 				}
-				if shouldExitLoop {
-					break runningLoop
-				}
+			case <-globalCtx.Done():
+				break runningLoop
 			}
+
 		}
 
 		if testProgress == nil {
