@@ -410,8 +410,8 @@ func TestOptions(t *testing.T) {
 	t.Run("ClientIPRanges", func(t *testing.T) {
 		clientIPRanges, err := types.NewIPPool("129.112.232.12,123.12.0.0/32")
 		require.NoError(t, err)
-		opts := Options{}.Apply(Options{ClientIPRanges: types.NullIPPool{Pool: clientIPRanges, Valid: true}})
-		assert.NotNil(t, opts.ClientIPRanges)
+		opts := Options{}.Apply(Options{LocalIPs: types.NullIPPool{Pool: clientIPRanges, Valid: true}})
+		assert.NotNil(t, opts.LocalIPs)
 	})
 }
 
@@ -481,7 +481,7 @@ func TestOptionsEnv(t *testing.T) {
 			"":    null.String{},
 			"Hi!": null.StringFrom("Hi!"),
 		},
-		{"ClientIPRanges", "K6_CLIENT_IPS"}: {
+		{"LocalIPs", "K6_LOCAL_IPS"}: {
 			"":                 types.NullIPPool{},
 			"192.168.220.2":    types.NullIPPool{Pool: mustIPPool("192.168.220.2"), Valid: true},
 			"192.168.220.2/24": types.NullIPPool{Pool: mustIPPool("192.168.220.0/24"), Valid: true},

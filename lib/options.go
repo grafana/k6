@@ -390,7 +390,7 @@ type Options struct {
 	ConsoleOutput null.String `json:"-" envconfig:"K6_CONSOLE_OUTPUT"`
 
 	// Specify client IP ranges and/or CIDR from which VUs will make requests
-	ClientIPRanges types.NullIPPool `json:"-" envconfig:"K6_CLIENT_IPS"`
+	LocalIPs types.NullIPPool `json:"-" envconfig:"K6_LOCAL_IPS"`
 }
 
 // Returns the result of overwriting any fields with any that are set on the argument.
@@ -545,8 +545,8 @@ func (o Options) Apply(opts Options) Options {
 	if opts.ConsoleOutput.Valid {
 		o.ConsoleOutput = opts.ConsoleOutput
 	}
-	if opts.ClientIPRanges.Valid {
-		o.ClientIPRanges = opts.ClientIPRanges
+	if opts.LocalIPs.Valid {
+		o.LocalIPs = opts.LocalIPs
 	}
 	if opts.DNS.TTL.Valid {
 		o.DNS.TTL = opts.DNS.TTL

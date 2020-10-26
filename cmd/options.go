@@ -93,7 +93,7 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.StringSlice("tag", nil, "add a `tag` to be applied to all samples, as `[name]=[value]`")
 	flags.String("console-output", "", "redirects the console logging to the provided output file")
 	flags.Bool("discard-response-bodies", false, "Read but don't process or save HTTP response bodies")
-	flags.String("client-ips", "", "Client IP Ranges and/or CIDRs from which each VU will be making requests")
+	flags.String("local-ips", "", "Client IP Ranges and/or CIDRs from which each VU will be making requests")
 	flags.String("dns", types.DefaultDNSConfig().String(), "DNS resolver configuration. Possible ttl values are: 'inf' "+
 		"for a persistent cache, '0' to disable the cache,\nor a positive duration, e.g. '1s', '1m', etc. "+
 		"Milliseconds are assumed if no unit is provided.\n"+
@@ -206,12 +206,12 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		}
 	}
 
-	ipRangesString, err := flags.GetString("client-ips")
+	localIpsString, err := flags.GetString("local-ips")
 	if err != nil {
 		return opts, err
 	}
-	if flags.Changed("client-ips") {
-		err = opts.ClientIPRanges.UnmarshalText([]byte(ipRangesString))
+	if flags.Changed("local-ips") {
+		err = opts.LocalIPs.UnmarshalText([]byte(localIpsString))
 		if err != nil {
 			return opts, err
 		}

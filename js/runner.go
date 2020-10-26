@@ -170,8 +170,8 @@ func (r *Runner) newVU(id int64, samplesOut chan<- stats.SampleContainer) (*VU, 
 		BlockedHostnames: r.Bundle.Options.BlockedHostnames.Trie,
 		Hosts:            r.Bundle.Options.Hosts,
 	}
-	if r.Bundle.Options.ClientIPRanges.Valid {
-		dialer.Dialer.LocalAddr = &net.TCPAddr{IP: r.Bundle.Options.ClientIPRanges.Pool.GetIP(uint64(id - 1))}
+	if r.Bundle.Options.LocalIPs.Valid {
+		dialer.Dialer.LocalAddr = &net.TCPAddr{IP: r.Bundle.Options.LocalIPs.Pool.GetIP(uint64(id - 1))}
 	}
 
 	tlsConfig := &tls.Config{
