@@ -63,7 +63,6 @@ func ipBlockFromRange(s string) (*ipBlock, error) {
 	ip0Str, ip1Str := strings.TrimSpace(ss[0]), strings.TrimSpace(ss[1])
 	ip0, ip1 := net.ParseIP(ip0Str), net.ParseIP(ip1Str)
 	if ip0 == nil || ip1 == nil {
-		fmt.Println("Wrong IP range format: ", s)
 		return nil, errors.New("wrong IP range format: " + s)
 	}
 	if (ip0.To4() == nil) != (ip1.To4() == nil) { // XOR
@@ -98,7 +97,6 @@ func ipBlockFromTwoIPs(ip0, ip1 net.IP) *ipBlock {
 func ipBlockFromCIDR(s string) (*ipBlock, error) {
 	_, pnet, err := net.ParseCIDR(s) // range start ip, cidr ipnet
 	if err != nil {
-		fmt.Println("ParseCIDR() failed: ", s)
 		return nil, fmt.Errorf("parseCIDR() failed parsing %s: %w", s, err)
 	}
 	ip0 := pnet.IP
