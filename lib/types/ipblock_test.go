@@ -68,10 +68,11 @@ func TestIpBlock(t *testing.T) {
 			b, err := getIPBlock(name)
 			require.NoError(t, err)
 			assert.Equal(t, data.count, b.count)
+			pb := ipPoolBlock{firstIP: b.firstIP}
 			idx := big.NewInt(0)
-			assert.Equal(t, data.firstIP.To16(), b.getIP(idx).To16())
+			assert.Equal(t, data.firstIP.To16(), pb.getIP(idx).To16())
 			idx.Sub(idx.Add(idx, b.count), big.NewInt(1))
-			assert.Equal(t, data.lastIP.To16(), b.getIP(idx).To16())
+			assert.Equal(t, data.lastIP.To16(), pb.getIP(idx).To16())
 		})
 	}
 }

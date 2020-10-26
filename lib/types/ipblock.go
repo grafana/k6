@@ -30,17 +30,19 @@ import (
 
 // ipBlock represents a continuous segment of IP addresses
 type ipBlock struct {
-	// TODO rename count as it is actually the accumulation of the counts up to and including this
-	// on in the pool
-	// maybe add another field, although technically we need count only to find out when to enter this
-	// block not for anything else
 	firstIP, count *big.Int
 	ipv6           bool
 }
 
+// ipPoolBlock is almost the same as ipBlock but is put in a IPPool and knows it's start id indest
+// of it's size/count
+type ipPoolBlock struct {
+	firstIP, startIndex *big.Int
+}
+
 // IPPool represent a slice of IPBlocks
 type IPPool struct {
-	list  []ipBlock
+	list  []ipPoolBlock
 	count *big.Int
 }
 
@@ -122,7 +124,7 @@ func ipBlockFromCIDR(s string) (*ipBlock, error) {
 	return block, nil
 }
 
-func (b ipBlock) getIP(index *big.Int) net.IP {
+func (b ipPoolBlock) getIP(index *big.Int) net.IP {
 	// TODO implement walking ipv6 networks first
 	// that will probably require more math ... including knowing which is the next network and ...
 	// thinking about it - it looks like it's going to be kind of hard or badly defined
@@ -132,12 +134,12 @@ func (b ipBlock) getIP(index *big.Int) net.IP {
 	return net.IP(i.Bytes())
 }
 
-// NewIPPool returns an IPPool slice from the provided string represenation that should be comma
+// NewIPPool returns an IPPool slice from the provided string representation that should be comma
 // separated list of IPs, IP ranges(ip1-ip2) and CIDRs
 func NewIPPool(ranges string) (*IPPool, error) {
 	ss := strings.Split(strings.TrimSpace(ranges), ",")
 	pool := &IPPool{}
-	pool.list = make([]ipBlock, len(ss))
+	pool.list = make([]ipPoolBlock, len(ss))
 	pool.count = new(big.Int)
 	for i, bs := range ss {
 		r, err := getIPBlock(bs)
@@ -145,9 +147,18 @@ func NewIPPool(ranges string) (*IPPool, error) {
 			return nil, err
 		}
 
+		pool.list[i] = ipPoolBlock{
+			firstIP:    r.firstIP,
+			startIndex: new(big.Int).Set(pool.count), // this is how many there are until now
+		}
 		pool.count.Add(pool.count, r.count)
-		r.count.Set(pool.count)
-		pool.list[i] = ipPoolBlo
+	}
+
+	// The list gets reversed here as later it is searched based on when the index we are looking is
+	// bigger than startIndex but it will be true always for the first block which is with
+	// startIndex 0. This can also be fixed by iterating in reverse but this seems better
+	for i := 0; i < len(pool.list)/2; i++ {
+		pool.list[i], pool.list[len(pool.list)/2-i] = pool.list[len(pool.list)/2-i], pool.list[i]
 	}
 	return pool, nil
 }
@@ -160,12 +171,10 @@ func (pool *IPPool) GetIP(index uint64) net.IP {
 // GetIPBig returns an IP from the pool with the provided index that is big.Int
 func (pool *IPPool) GetIPBig(index *big.Int) net.IP {
 	index = new(big.Int).Rem(index, pool.count)
-	for i, b := range pool.list {
-		if index.Cmp(b.count) < 0 {
-			if i > 0 {
-				index.Sub(index, pool.list[i-1].count)
-			}
-			return b.getIP(index)
+	for _, b := range pool.list {
+		fmt.Println(index, b.startIndex)
+		if index.Cmp(b.startIndex) >= 0 {
+			return b.getIP(index.Sub(index, b.startIndex))
 		}
 	}
 	return nil
