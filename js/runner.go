@@ -171,7 +171,11 @@ func (r *Runner) newVU(id int64, samplesOut chan<- stats.SampleContainer) (*VU, 
 		Hosts:            r.Bundle.Options.Hosts,
 	}
 	if r.Bundle.Options.LocalIPs.Valid {
-		dialer.Dialer.LocalAddr = &net.TCPAddr{IP: r.Bundle.Options.LocalIPs.Pool.GetIP(uint64(id - 1))}
+		ipIndex := uint64(id - 1)
+		if id == 0 {
+			ipIndex = 1
+		}
+		dialer.Dialer.LocalAddr = &net.TCPAddr{IP: r.Bundle.Options.LocalIPs.Pool.GetIP(ipIndex)}
 	}
 
 	tlsConfig := &tls.Config{
