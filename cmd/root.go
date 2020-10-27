@@ -119,7 +119,13 @@ var RootCmd = &cobra.Command{
 func Execute() {
 	if err := RootCmd.Execute(); err != nil {
 		code := -1
-		var logger logrus.FieldLogger = logrus.StandardLogger()
+
+		var logger logrus.FieldLogger = &logrus.Logger{
+			Out:       os.Stderr,
+			Formatter: new(logrus.TextFormatter),
+			Hooks:     make(logrus.LevelHooks),
+			Level:     logrus.InfoLevel,
+		}
 		if e, ok := err.(ExitCode); ok {
 			code = e.Code
 			if e.Hint != "" {
