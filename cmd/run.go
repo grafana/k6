@@ -429,14 +429,6 @@ func runCmdFlagSet() *pflag.FlagSet {
 	return flags
 }
 
-func init() {
-	runCmd := getRunCmd()
-	RootCmd.AddCommand(runCmd)
-
-	runCmd.Flags().SortFlags = false
-	runCmd.Flags().AddFlagSet(runCmdFlagSet())
-}
-
 // Creates a new runner.
 func newRunner(
 	logger *logrus.Logger, src *loader.SourceData, typ string, filesystems map[string]afero.Fs, rtOpts lib.RuntimeOptions,

@@ -40,7 +40,3 @@ func getVersionCmd() *cobra.Command {
 	}
 	return versionCmd
 }
-
-func init() {
-	RootCmd.AddCommand(getVersionCmd())
-}

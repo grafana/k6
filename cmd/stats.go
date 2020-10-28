@@ -52,7 +52,3 @@ func getStatsCmd() *cobra.Command {
 	}
 	return statsCmd
 }
-
-func init() {
-	RootCmd.AddCommand(getStatsCmd())
-}

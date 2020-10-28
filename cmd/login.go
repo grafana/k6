@@ -40,17 +40,3 @@ on the commandline.`,
 	}
 	return loginCmd
 }
-
-func init() {
-	loginCmd := getLoginCmd()
-	RootCmd.AddCommand(loginCmd)
-
-	loginCloudCommand := getLoginCloudCommand()
-	loginCmd.AddCommand(loginCloudCommand)
-	loginCloudCommand.Flags().StringP("token", "t", "", "specify `token` to use")
-	loginCloudCommand.Flags().BoolP("show", "s", false, "display saved token and exit")
-	loginCloudCommand.Flags().BoolP("reset", "r", false, "reset token")
-
-	loginInfluxDBCommand := getLoginInfluxDBCommand()
-	loginCmd.AddCommand(loginInfluxDBCommand)
-}

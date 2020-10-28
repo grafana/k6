@@ -60,11 +60,3 @@ func getScaleCmd() *cobra.Command {
 	}
 	return scaleCmd
 }
-
-func init() {
-	scaleCmd := getScaleCmd()
-	RootCmd.AddCommand(scaleCmd)
-
-	scaleCmd.Flags().Int64P("vus", "u", 1, "number of virtual users")
-	scaleCmd.Flags().Int64P("max", "m", 0, "max available virtual users")
-}

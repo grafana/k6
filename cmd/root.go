@@ -73,50 +73,120 @@ var (
 	address   string
 )
 
-// RootCmd represents the base command when called without any subcommands.
-var RootCmd = &cobra.Command{
-	Use:           "k6",
-	Short:         "a next-generation load generator",
-	Long:          BannerColor.Sprintf("\n%s", consts.Banner()),
-	SilenceUsage:  true,
-	SilenceErrors: true,
-	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		logger := logrus.StandardLogger() // don't use the global one to begin with
-		if !cmd.Flags().Changed("log-output") {
-			if envLogOutput, ok := os.LookupEnv("K6_LOG_OUTPUT"); ok {
-				logOutput = envLogOutput
+func getRootCmd() *cobra.Command {
+	// RootCmd represents the base command when called without any subcommands.
+	RootCmd := &cobra.Command{
+		Use:           "k6",
+		Short:         "a next-generation load generator",
+		Long:          BannerColor.Sprintf("\n%s", consts.Banner()),
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			logger := logrus.StandardLogger() // don't use the global one to begin with
+			if !cmd.Flags().Changed("log-output") {
+				if envLogOutput, ok := os.LookupEnv("K6_LOG_OUTPUT"); ok {
+					logOutput = envLogOutput
+				}
 			}
-		}
-		err := setupLoggers(logger, logFmt, logOutput)
-		if err != nil {
-			return err
-		}
+			err := setupLoggers(logger, logFmt, logOutput)
+			if err != nil {
+				return err
+			}
 
-		if noColor {
-			// TODO: figure out something else... currently, with the wrappers
-			// below, we're stripping any colors from the output after we've
-			// added them. The problem is that, besides being very inefficient,
-			// this actually also strips other special characters from the
-			// intended output, like the progressbar formatting ones, which
-			// would otherwise be fine (in a TTY).
-			//
-			// It would be much better if we avoid messing with the output and
-			// instead have a parametrized instance of the color library. It
-			// will return colored output if colors are enabled and simply
-			// return the passed input as-is (i.e. be a noop) if colors are
-			// disabled...
-			stdout.Writer = colorable.NewNonColorable(os.Stdout)
-			stderr.Writer = colorable.NewNonColorable(os.Stderr)
-		}
-		stdlog.SetOutput(logger.Writer())
-		logger.Debugf("k6 version: v%s", consts.FullVersion())
-		return nil
-	},
+			if noColor {
+				// TODO: figure out something else... currently, with the wrappers
+				// below, we're stripping any colors from the output after we've
+				// added them. The problem is that, besides being very inefficient,
+				// this actually also strips other special characters from the
+				// intended output, like the progressbar formatting ones, which
+				// would otherwise be fine (in a TTY).
+				//
+				// It would be much better if we avoid messing with the output and
+				// instead have a parametrized instance of the color library. It
+				// will return colored output if colors are enabled and simply
+				// return the passed input as-is (i.e. be a noop) if colors are
+				// disabled...
+				stdout.Writer = colorable.NewNonColorable(os.Stdout)
+				stderr.Writer = colorable.NewNonColorable(os.Stderr)
+			}
+			stdlog.SetOutput(logger.Writer())
+			logger.Debugf("k6 version: v%s", consts.FullVersion())
+			return nil
+		},
+	}
+	return RootCmd
 }
 
 // Execute adds all child commands to the root command sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
-func Execute() {
+func Execute() { //nolint:funlen
+	RootCmd := getRootCmd()
+	confDir, err := os.UserConfigDir()
+	if err != nil {
+		logrus.WithError(err).Warn("could not get config directory")
+		confDir = ".config"
+	}
+	defaultConfigFilePath = filepath.Join(
+		confDir,
+		"loadimpact",
+		"k6",
+		defaultConfigFileName,
+	)
+
+	RootCmd.PersistentFlags().AddFlagSet(rootCmdPersistentFlagSet())
+
+	archiveCmd := getArchiveCmd()
+	RootCmd.AddCommand(archiveCmd)
+	archiveCmd.Flags().SortFlags = false
+	archiveCmd.Flags().AddFlagSet(archiveCmdFlagSet())
+
+	cloudCmd := getCloudCmd()
+	RootCmd.AddCommand(cloudCmd)
+	cloudCmd.Flags().SortFlags = false
+	cloudCmd.Flags().AddFlagSet(cloudCmdFlagSet())
+
+	RootCmd.AddCommand(getConvertCmd())
+
+	inspectCmd := getInspectCmd()
+	RootCmd.AddCommand(inspectCmd)
+	inspectCmd.Flags().SortFlags = false
+	inspectCmd.Flags().AddFlagSet(runtimeOptionFlagSet(false))
+	inspectCmd.Flags().StringVarP(&runType, "type", "t", runType, "override file `type`, \"js\" or \"archive\"")
+
+	loginCmd := getLoginCmd()
+	RootCmd.AddCommand(loginCmd)
+
+	loginCloudCommand := getLoginCloudCommand()
+	loginCmd.AddCommand(loginCloudCommand)
+	loginCloudCommand.Flags().StringP("token", "t", "", "specify `token` to use")
+	loginCloudCommand.Flags().BoolP("show", "s", false, "display saved token and exit")
+	loginCloudCommand.Flags().BoolP("reset", "r", false, "reset token")
+
+	loginInfluxDBCommand := getLoginInfluxDBCommand()
+	loginCmd.AddCommand(loginInfluxDBCommand)
+
+	RootCmd.AddCommand(getPauseCmd())
+
+	RootCmd.AddCommand(getResumeCmd())
+
+	scaleCmd := getScaleCmd()
+	RootCmd.AddCommand(scaleCmd)
+
+	scaleCmd.Flags().Int64P("vus", "u", 1, "number of virtual users")
+	scaleCmd.Flags().Int64P("max", "m", 0, "max available virtual users")
+
+	runCmd := getRunCmd()
+	RootCmd.AddCommand(runCmd)
+
+	runCmd.Flags().SortFlags = false
+	runCmd.Flags().AddFlagSet(runCmdFlagSet())
+
+	RootCmd.AddCommand(getStatsCmd())
+
+	RootCmd.AddCommand(getStatusCmd())
+
+	RootCmd.AddCommand(getVersionCmd())
+
 	if err := RootCmd.Execute(); err != nil {
 		code := -1
 		var logger logrus.FieldLogger = logrus.StandardLogger()
@@ -149,22 +219,6 @@ func rootCmdPersistentFlagSet() *pflag.FlagSet {
 	flags.Lookup("config").DefValue = defaultConfigFilePath
 	must(cobra.MarkFlagFilename(flags, "config"))
 	return flags
-}
-
-func init() {
-	confDir, err := os.UserConfigDir()
-	if err != nil {
-		logrus.WithError(err).Warn("could not get config directory")
-		confDir = ".config"
-	}
-	defaultConfigFilePath = filepath.Join(
-		confDir,
-		"loadimpact",
-		"k6",
-		defaultConfigFileName,
-	)
-
-	RootCmd.PersistentFlags().AddFlagSet(rootCmdPersistentFlagSet())
 }
 
 // fprintf panics when where's an error writing to the supplied io.Writer

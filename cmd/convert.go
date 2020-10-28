@@ -144,8 +144,3 @@ func getConvertCmd() *cobra.Command {
 	convertCmd.Flags().UintVarP(&maxSleep, "max-sleep", "", 40, "the maximum amount of seconds to sleep after each iteration")
 	return convertCmd
 }
-
-func init() {
-	convertCmd := getConvertCmd()
-	RootCmd.AddCommand(convertCmd)
-}

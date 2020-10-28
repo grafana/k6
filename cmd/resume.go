@@ -56,7 +56,3 @@ func getResumeCmd() *cobra.Command {
 	}
 	return resumeCmd
 }
-
-func init() {
-	RootCmd.AddCommand(getResumeCmd())
-}

@@ -52,7 +52,3 @@ func getStatusCmd() *cobra.Command {
 	}
 	return statusCmd
 }
-
-func init() {
-	RootCmd.AddCommand(getStatusCmd())
-}

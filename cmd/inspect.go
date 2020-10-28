@@ -98,11 +98,3 @@ func getInspectCmd() *cobra.Command {
 	}
 	return inspectCmd
 }
-
-func init() {
-	inspectCmd := getInspectCmd()
-	RootCmd.AddCommand(inspectCmd)
-	inspectCmd.Flags().SortFlags = false
-	inspectCmd.Flags().AddFlagSet(runtimeOptionFlagSet(false))
-	inspectCmd.Flags().StringVarP(&runType, "type", "t", runType, "override file `type`, \"js\" or \"archive\"")
-}
