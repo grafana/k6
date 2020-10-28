@@ -69,7 +69,7 @@ const (
 var runType = os.Getenv("K6_TYPE")
 
 //nolint:funlen,gocognit,gocyclo
-func getRunCmd() *cobra.Command {
+func getRunCmd(ctx context.Context, logger *logrus.Logger) *cobra.Command {
 	// runCmd represents the run command.
 	runCmd := &cobra.Command{
 		Use:   "run",
@@ -98,9 +98,6 @@ a commandline interface for interacting with it.`,
   k6 run -o influxdb=http://1.2.3.4:8086/k6`[1:],
 		Args: exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// TODO: don't use a global... or maybe change the logger?
-			logger := logrus.StandardLogger()
-
 			// TODO: disable in quiet mode?
 			_, _ = BannerColor.Fprintf(stdout, "\n%s\n\n", consts.Banner())
 
@@ -159,7 +156,7 @@ a commandline interface for interacting with it.`,
 			//  - The globalCtx is cancelled only after we're completely done with the
 			//    test execution and any --linger has been cleared, so that the Engine
 			//    can start winding down its metrics processing.
-			globalCtx, globalCancel := context.WithCancel(context.Background())
+			globalCtx, globalCancel := context.WithCancel(ctx)
 			defer globalCancel()
 			lingerCtx, lingerCancel := context.WithCancel(globalCtx)
 			defer lingerCancel()

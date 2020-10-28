@@ -40,17 +40,15 @@ func newConsole(logger logrus.FieldLogger) *console {
 }
 
 // Creates a console logger with its output set to the file at the provided `filepath`.
-func newFileConsole(filepath string) (*console, error) {
-	f, err := os.OpenFile(filepath, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644) //nolint:gosec
+func newFileConsole(filepath string, formatter logrus.Formatter) (*console, error) {
+	f, err := os.OpenFile(filepath, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o644) //nolint:gosec
 	if err != nil {
 		return nil, err
 	}
 
 	l := logrus.New()
 	l.SetOutput(f)
-
-	// TODO: refactor to not rely on global variables, albeit external ones
-	l.SetFormatter(logrus.StandardLogger().Formatter)
+	l.SetFormatter(formatter)
 
 	return &console{l}, nil
 }

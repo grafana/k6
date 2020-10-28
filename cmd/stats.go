@@ -29,7 +29,7 @@ import (
 	"github.com/loadimpact/k6/ui"
 )
 
-func getStatsCmd() *cobra.Command {
+func getStatsCmd(ctx context.Context) *cobra.Command {
 	// statsCmd represents the stats command
 	statsCmd := &cobra.Command{
 		Use:   "stats",
@@ -42,7 +42,7 @@ func getStatsCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			metrics, err := c.Metrics(context.Background())
+			metrics, err := c.Metrics(ctx)
 			if err != nil {
 				return err
 			}

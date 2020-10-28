@@ -60,7 +60,7 @@ var (
 )
 
 //nolint:funlen,gocognit,gocyclo
-func getCloudCmd() *cobra.Command {
+func getCloudCmd(ctx context.Context, logger *logrus.Logger) *cobra.Command {
 	cloudCmd := &cobra.Command{
 		Use:   "cloud",
 		Short: "Run a test on the cloud",
@@ -71,8 +71,6 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
         k6 cloud script.js`[1:],
 		Args: exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// TODO: don't use the Global logger
-			logger := logrus.StandardLogger()
 			// we specifically first parse it and return an error if it has bad value and then check if
 			// we are going to set it  ... so we always parse it instead of it breaking the command if
 			// the cli flag is removed
@@ -199,7 +197,7 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 				name = filepath.Base(filename)
 			}
 
-			globalCtx, globalCancel := context.WithCancel(context.Background())
+			globalCtx, globalCancel := context.WithCancel(ctx)
 			defer globalCancel()
 
 			// Start cloud test run
@@ -298,7 +296,6 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 			if showCloudLogs {
 				go func() {
 					logger.Debug("Connecting to cloud logs server...")
-					// TODO replace with another context
 					if err := cloudConfig.StreamLogsToLogger(globalCtx, logger, refID, 0); err != nil {
 						logger.WithError(err).Error("error while tailing cloud logs")
 					}

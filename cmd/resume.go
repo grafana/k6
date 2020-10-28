@@ -31,7 +31,7 @@ import (
 	"github.com/loadimpact/k6/ui"
 )
 
-func getResumeCmd() *cobra.Command {
+func getResumeCmd(ctx context.Context) *cobra.Command {
 	// resumeCmd represents the resume command
 	resumeCmd := &cobra.Command{
 		Use:   "resume",
@@ -44,7 +44,7 @@ func getResumeCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			status, err := c.SetStatus(context.Background(), v1.Status{
+			status, err := c.SetStatus(ctx, v1.Status{
 				Paused: null.BoolFrom(false),
 			})
 			if err != nil {

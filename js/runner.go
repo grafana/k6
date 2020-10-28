@@ -320,7 +320,7 @@ func (r *Runner) SetOptions(opts lib.Options) error {
 	// TODO: validate that all exec values are either nil or valid exported methods (or HTTP requests in the future)
 
 	if opts.ConsoleOutput.Valid {
-		c, err := newFileConsole(opts.ConsoleOutput.String)
+		c, err := newFileConsole(opts.ConsoleOutput.String, r.Logger.Formatter)
 		if err != nil {
 			return err
 		}

@@ -37,7 +37,7 @@ import (
 )
 
 //nolint:funlen
-func getLoginCloudCommand() *cobra.Command {
+func getLoginCloudCommand(logger logrus.FieldLogger) *cobra.Command {
 	// loginCloudCommand represents the 'login cloud' command
 	loginCloudCommand := &cobra.Command{
 		Use:   "cloud",
@@ -56,8 +56,6 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
   k6 login cloud`[1:],
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// TODO: don't use a global... or maybe change the logger?
-			logger := logrus.StandardLogger()
 			fs := afero.NewOsFs()
 
 			k6Conf, err := getConsolidatedConfig(fs, Config{}, nil)

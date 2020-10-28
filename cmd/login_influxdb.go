@@ -36,8 +36,7 @@ import (
 	"github.com/loadimpact/k6/ui"
 )
 
-//nolint:funlen
-func getLoginInfluxDBCommand() *cobra.Command {
+func getLoginInfluxDBCommand(logger logrus.FieldLogger) *cobra.Command {
 	// loginInfluxDBCommand represents the 'login influxdb' command
 	loginInfluxDBCommand := &cobra.Command{
 		Use:   "influxdb [uri]",
@@ -47,8 +46,6 @@ func getLoginInfluxDBCommand() *cobra.Command {
 This will set the default server used when just "-o influxdb" is passed.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// TODO: don't use a global... or maybe change the logger?
-			logger := logrus.StandardLogger()
 			fs := afero.NewOsFs()
 			config, configPath, err := readDiskConfig(fs)
 			if err != nil {

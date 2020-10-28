@@ -31,7 +31,7 @@ import (
 	"github.com/loadimpact/k6/ui"
 )
 
-func getPauseCmd() *cobra.Command {
+func getPauseCmd(ctx context.Context) *cobra.Command {
 	// pauseCmd represents the pause command
 	pauseCmd := &cobra.Command{
 		Use:   "pause",
@@ -44,7 +44,7 @@ func getPauseCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			status, err := c.SetStatus(context.Background(), v1.Status{
+			status, err := c.SetStatus(ctx, v1.Status{
 				Paused: null.BoolFrom(true),
 			})
 			if err != nil {

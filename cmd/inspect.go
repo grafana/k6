@@ -34,16 +34,14 @@ import (
 	"github.com/loadimpact/k6/loader"
 )
 
-func getInspectCmd() *cobra.Command {
-	// inspectCmd represents the resume command
+func getInspectCmd(logger logrus.FieldLogger) *cobra.Command {
+	// inspectCmd represents the inspect command
 	inspectCmd := &cobra.Command{
 		Use:   "inspect [file]",
 		Short: "Inspect a script or archive",
 		Long:  `Inspect a script or archive.`,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// TODO: don't use the Global logger
-			logger := logrus.StandardLogger()
 			pwd, err := os.Getwd()
 			if err != nil {
 				return err
