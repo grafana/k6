@@ -407,9 +407,21 @@ func TestOptions(t *testing.T) {
 		assert.True(t, opts.DiscardResponseBodies.Valid)
 		assert.True(t, opts.DiscardResponseBodies.Bool)
 	})
+	t.Run("ClientIPRanges", func(t *testing.T) {
+		clientIPRanges, err := types.NewIPPool("129.112.232.12,123.12.0.0/32")
+		require.NoError(t, err)
+		opts := Options{}.Apply(Options{LocalIPs: types.NullIPPool{Pool: clientIPRanges, Valid: true}})
+		assert.NotNil(t, opts.LocalIPs)
+	})
 }
 
 func TestOptionsEnv(t *testing.T) {
+	mustIPPool := func(s string) *types.IPPool {
+		p, err := types.NewIPPool(s)
+		require.NoError(t, err)
+		return p
+	}
+
 	testdata := map[struct{ Name, Key string }]map[string]interface{}{
 		{"Paused", "K6_PAUSED"}: {
 			"":      null.Bool{},
@@ -468,6 +480,11 @@ func TestOptionsEnv(t *testing.T) {
 		{"UserAgent", "K6_USER_AGENT"}: {
 			"":    null.String{},
 			"Hi!": null.StringFrom("Hi!"),
+		},
+		{"LocalIPs", "K6_LOCAL_IPS"}: {
+			"":                 types.NullIPPool{},
+			"192.168.220.2":    types.NullIPPool{Pool: mustIPPool("192.168.220.2"), Valid: true},
+			"192.168.220.2/24": types.NullIPPool{Pool: mustIPPool("192.168.220.0/24"), Valid: true},
 		},
 		{"Throw", "K6_THROW"}: {
 			"":      null.Bool{},
