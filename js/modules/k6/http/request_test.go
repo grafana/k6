@@ -315,20 +315,22 @@ func TestRequestAndBatch(t *testing.T) {
 	})
 	t.Run("UserAgent", func(t *testing.T) {
 		_, err := common.RunString(rt, sr(`
-			var res = http.get("HTTPBIN_URL/user-agent");
-			if (res.json()['user-agent'] != "TestUserAgent") {
-				throw new Error("incorrect user agent: " + res.json()['user-agent'])
+			var res = http.get("HTTPBIN_URL/headers");
+			var headers = res.json()["headers"];
+			if (headers['User-Agent'] != "TestUserAgent") {
+				throw new Error("incorrect user agent: " + headers['User-Agent'])
 			}
 		`))
 		assert.NoError(t, err)
 
 		t.Run("Override", func(t *testing.T) {
 			_, err := common.RunString(rt, sr(`
-				var res = http.get("HTTPBIN_URL/user-agent", {
+				var res = http.get("HTTPBIN_URL/headers", {
 					headers: { "User-Agent": "OtherUserAgent" },
 				});
-				if (res.json()['user-agent'] != "OtherUserAgent") {
-					throw new Error("incorrect user agent: " + res.json()['user-agent'])
+				var headers = res.json()["headers"];
+				if (headers['User-Agent'] != "OtherUserAgent") {
+					throw new Error("incorrect user agent: " + headers['User-Agent'])
 				}
 			`))
 			assert.NoError(t, err)
@@ -336,11 +338,12 @@ func TestRequestAndBatch(t *testing.T) {
 
 		t.Run("Override empty", func(t *testing.T) {
 			_, err := common.RunString(rt, sr(`
-				var res = http.get("HTTPBIN_URL/user-agent", {
+				var res = http.get("HTTPBIN_URL/headers", {
 					headers: { "User-Agent": "" },
 				});
-				if (typeof res.json()['User-Agent'] !== 'undefined') {
-					throw new Error("not undefined user agent: " + res.json()['user-agent'])
+				var headers = res.json()["headers"]
+				if (typeof headers['User-Agent'] !== 'undefined') {
+					throw new Error("not undefined user agent: " +  headers['User-Agent'])
 				}
 			`))
 			assert.NoError(t, err)
@@ -354,9 +357,10 @@ func TestRequestAndBatch(t *testing.T) {
 
 			state.Options.UserAgent = null.NewString("", true)
 			_, err := common.RunString(rt, sr(`
-				var res = http.get("HTTPBIN_URL/user-agent");
-				if (typeof res.json()['User-Agent'] !== 'undefined') {
-					throw new Error("not undefined user agent: " + res.json()['user-agent'])
+				var res = http.get("HTTPBIN_URL/headers");
+				var headers = res.json()["headers"]
+				if (typeof headers['User-Agent'] !== 'undefined') {
+					throw new Error("not undefined user agent: " + headers['User-Agent'])
 				}
 			`))
 			assert.NoError(t, err)
