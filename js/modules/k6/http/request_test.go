@@ -333,6 +333,34 @@ func TestRequestAndBatch(t *testing.T) {
 			`))
 			assert.NoError(t, err)
 		})
+
+		t.Run("Override empty", func(t *testing.T) {
+			_, err := common.RunString(rt, sr(`
+				var res = http.get("HTTPBIN_URL/user-agent", {
+					headers: { "User-Agent": "" },
+				});
+				if (typeof res.json()['User-Agent'] !== 'undefined') {
+					throw new Error("not undefined user agent: " + res.json()['user-agent'])
+				}
+			`))
+			assert.NoError(t, err)
+		})
+
+		t.Run("empty", func(t *testing.T) {
+			oldUserAgent := state.Options.UserAgent
+			defer func() {
+				state.Options.UserAgent = oldUserAgent
+			}()
+
+			state.Options.UserAgent = null.NewString("", true)
+			_, err := common.RunString(rt, sr(`
+				var res = http.get("HTTPBIN_URL/user-agent");
+				if (typeof res.json()['User-Agent'] !== 'undefined') {
+					throw new Error("not undefined user agent: " + res.json()['user-agent'])
+				}
+			`))
+			assert.NoError(t, err)
+		})
 	})
 	t.Run("Compression", func(t *testing.T) {
 		t.Run("gzip", func(t *testing.T) {
