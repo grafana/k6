@@ -234,7 +234,7 @@ func (h *HTTP) parseRequest(
 		}
 	}
 
-	if userAgent := state.Options.UserAgent; userAgent.String != "" {
+	if userAgent := state.Options.UserAgent; userAgent.Valid {
 		result.Req.Header.Set("User-Agent", userAgent.String)
 	}
 
