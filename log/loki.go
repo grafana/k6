@@ -37,20 +37,22 @@ import (
 )
 
 type lokiHook struct {
-	addr           string
-	labels         [][2]string
-	ch             chan *logrus.Entry
-	limit          int
-	msgMaxSize     int
-	levels         []logrus.Level
-	allowedLabels  []string
-	pushPeriod     time.Duration
-	client         *http.Client
 	ctx            context.Context
 	fallbackLogger logrus.FieldLogger
-	profile        bool
-	droppedLabels  map[string]string
-	droppedMsg     string
+	lokiStopped    chan<- struct{}
+
+	addr          string
+	labels        [][2]string
+	ch            chan *logrus.Entry
+	limit         int
+	msgMaxSize    int
+	levels        []logrus.Level
+	allowedLabels []string
+	pushPeriod    time.Duration
+	client        *http.Client
+	profile       bool
+	droppedLabels map[string]string
+	droppedMsg    string
 }
 
 func getDefaultLoki() *lokiHook {
@@ -69,10 +71,13 @@ func getDefaultLoki() *lokiHook {
 // LokiFromConfigLine returns a new logrus.Hook that pushes logrus.Entrys to loki and is configured
 // through the provided line
 //nolint:funlen
-func LokiFromConfigLine(ctx context.Context, fallbackLogger logrus.FieldLogger, line string) (logrus.Hook, error) {
+func LokiFromConfigLine(
+	ctx context.Context, fallbackLogger logrus.FieldLogger, line string, ch chan<- struct{},
+) (logrus.Hook, error) {
 	h := getDefaultLoki()
 
 	h.ctx = ctx
+	h.lokiStopped = ch
 	h.fallbackLogger = fallbackLogger
 
 	if line != "loki" {
@@ -189,6 +194,8 @@ func (h *lokiHook) loop() {
 	defer close(pushCh)
 
 	go func() {
+		defer close(h.lokiStopped)
+
 		oldLogs := make([]tmpMsg, 0, h.limit*2)
 		for ch := range pushCh {
 			msgsToPush, msgs = msgs, msgsToPush
@@ -282,7 +289,7 @@ func (h *lokiHook) loop() {
 		case <-h.ctx.Done():
 			ch := make(chan int64)
 			pushCh <- ch
-			ch <- 0
+			ch <- time.Now().Add(time.Second).UnixNano()
 			<-ch
 
 			return
