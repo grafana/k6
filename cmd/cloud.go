@@ -236,11 +236,6 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 			progressBarWG.Done()
 		}()
 
-		// The quiet option hides the progress bar and disallow aborting the test
-		if quiet {
-			return nil
-		}
-
 		// Trap Interrupts, SIGINTs and SIGTERMs.
 		sigC := make(chan os.Signal, 1)
 		signal.Notify(sigC, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
