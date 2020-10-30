@@ -234,9 +234,7 @@ func (h *HTTP) parseRequest(
 		}
 	}
 
-	if userAgent := state.Options.UserAgent; userAgent.Valid {
-		result.Req.Header.Set("User-Agent", userAgent.String)
-	}
+	result.Req.Header.Set("User-Agent", state.Options.UserAgent.String)
 
 	if state.CookieJar != nil {
 		result.ActiveJar = state.CookieJar
