@@ -319,6 +319,7 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 					if (newTestProgress.RunStatus > lib.RunStatusRunning) ||
 						(exitOnRunning && newTestProgress.RunStatus == lib.RunStatusRunning) {
 						globalCancel()
+						break runningLoop
 					}
 					testProgressLock.Lock()
 					testProgress = newTestProgress
