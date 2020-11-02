@@ -625,7 +625,7 @@ func (u *VU) runFn(
 	defer func() {
 		if r := recover(); r != nil {
 			gojaStack := u.Runtime.CaptureCallStack(20, nil)
-			err = fmt.Errorf("a panic occurred in VU code but was caught, %s", r)
+			err = fmt.Errorf("a panic occurred in VU code but was caught: %s", r)
 			// TODO figure out how to use PanicLevel without panicing .. this might require changing
 			// the logger we use see
 			// https://github.com/sirupsen/logrus/issues/1028
