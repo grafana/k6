@@ -302,8 +302,8 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 				}()
 			}
 
-		runningLoop:
-			for {
+			keepLooping := true
+			for keepLooping {
 				select {
 				case <-ticker.C:
 					newTestProgress, progressErr := client.GetTestProgress(refID)
@@ -311,7 +311,7 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 						if (newTestProgress.RunStatus > lib.RunStatusRunning) ||
 							(exitOnRunning && newTestProgress.RunStatus == lib.RunStatusRunning) {
 							globalCancel()
-							break runningLoop
+							keepLooping = false
 						}
 						testProgressLock.Lock()
 						testProgress = newTestProgress
@@ -320,7 +320,7 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 						logger.WithError(progressErr).Error("Test progress error")
 					}
 				case <-globalCtx.Done():
-					break runningLoop
+					keepLooping = false
 				}
 			}
 
