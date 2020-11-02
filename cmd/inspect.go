@@ -94,5 +94,10 @@ func getInspectCmd(logger logrus.FieldLogger) *cobra.Command {
 			return nil
 		},
 	}
+
+	inspectCmd.Flags().SortFlags = false
+	inspectCmd.Flags().AddFlagSet(runtimeOptionFlagSet(false))
+	inspectCmd.Flags().StringVarP(&runType, "type", "t", runType, "override file `type`, \"js\" or \"archive\"")
+
 	return inspectCmd
 }

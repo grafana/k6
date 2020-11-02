@@ -58,5 +58,9 @@ func getScaleCmd(ctx context.Context) *cobra.Command {
 			return nil
 		},
 	}
+
+	scaleCmd.Flags().Int64P("vus", "u", 1, "number of virtual users")
+	scaleCmd.Flags().Int64P("max", "m", 0, "max available virtual users")
+
 	return scaleCmd
 }

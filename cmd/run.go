@@ -356,6 +356,10 @@ a commandline interface for interacting with it.`,
 			return nil
 		},
 	}
+
+	runCmd.Flags().SortFlags = false
+	runCmd.Flags().AddFlagSet(runCmdFlagSet())
+
 	return runCmd
 }
 

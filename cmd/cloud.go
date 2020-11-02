@@ -339,6 +339,8 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 			return nil
 		},
 	}
+	cloudCmd.Flags().SortFlags = false
+	cloudCmd.Flags().AddFlagSet(cloudCmdFlagSet())
 	return cloudCmd
 }
 
