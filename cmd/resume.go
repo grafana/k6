@@ -26,34 +26,33 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/loadimpact/k6/api/v1"
+	v1 "github.com/loadimpact/k6/api/v1"
 	"github.com/loadimpact/k6/api/v1/client"
 	"github.com/loadimpact/k6/ui"
 )
 
-// resumeCmd represents the resume command
-var resumeCmd = &cobra.Command{
-	Use:   "resume",
-	Short: "Resume a paused test",
-	Long: `Resume a paused test.
+func getResumeCmd(ctx context.Context) *cobra.Command {
+	// resumeCmd represents the resume command
+	resumeCmd := &cobra.Command{
+		Use:   "resume",
+		Short: "Resume a paused test",
+		Long: `Resume a paused test.
 
   Use the global --address flag to specify the URL to the API server.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		c, err := client.New(address)
-		if err != nil {
-			return err
-		}
-		status, err := c.SetStatus(context.Background(), v1.Status{
-			Paused: null.BoolFrom(false),
-		})
-		if err != nil {
-			return err
-		}
-		ui.Dump(stdout, status)
-		return nil
-	},
-}
-
-func init() {
-	RootCmd.AddCommand(resumeCmd)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := client.New(address)
+			if err != nil {
+				return err
+			}
+			status, err := c.SetStatus(ctx, v1.Status{
+				Paused: null.BoolFrom(false),
+			})
+			if err != nil {
+				return err
+			}
+			ui.Dump(stdout, status)
+			return nil
+		},
+	}
+	return resumeCmd
 }

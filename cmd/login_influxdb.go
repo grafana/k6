@@ -36,88 +36,85 @@ import (
 	"github.com/loadimpact/k6/ui"
 )
 
-// loginInfluxDBCommand represents the 'login influxdb' command
-var loginInfluxDBCommand = &cobra.Command{
-	Use:   "influxdb [uri]",
-	Short: "Authenticate with InfluxDB",
-	Long: `Authenticate with InfluxDB.
+func getLoginInfluxDBCommand(logger logrus.FieldLogger) *cobra.Command {
+	// loginInfluxDBCommand represents the 'login influxdb' command
+	loginInfluxDBCommand := &cobra.Command{
+		Use:   "influxdb [uri]",
+		Short: "Authenticate with InfluxDB",
+		Long: `Authenticate with InfluxDB.
 
 This will set the default server used when just "-o influxdb" is passed.`,
-	Args: cobra.MaximumNArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		// TODO: don't use a global... or maybe change the logger?
-		logger := logrus.StandardLogger()
-		fs := afero.NewOsFs()
-		config, configPath, err := readDiskConfig(fs)
-		if err != nil {
-			return err
-		}
-
-		conf := influxdb.NewConfig().Apply(config.Collectors.InfluxDB)
-		if len(args) > 0 {
-			urlConf, err := influxdb.ParseURL(args[0])
+		Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			fs := afero.NewOsFs()
+			config, configPath, err := readDiskConfig(fs)
 			if err != nil {
 				return err
 			}
-			conf = conf.Apply(urlConf)
-		}
 
-		form := ui.Form{
-			Fields: []ui.Field{
-				ui.StringField{
-					Key:     "Addr",
-					Label:   "Address",
-					Default: conf.Addr.String,
+			conf := influxdb.NewConfig().Apply(config.Collectors.InfluxDB)
+			if len(args) > 0 {
+				urlConf, err := influxdb.ParseURL(args[0]) //nolint:govet
+				if err != nil {
+					return err
+				}
+				conf = conf.Apply(urlConf)
+			}
+
+			form := ui.Form{
+				Fields: []ui.Field{
+					ui.StringField{
+						Key:     "Addr",
+						Label:   "Address",
+						Default: conf.Addr.String,
+					},
+					ui.StringField{
+						Key:     "DB",
+						Label:   "Database",
+						Default: conf.DB.String,
+					},
+					ui.StringField{
+						Key:     "Username",
+						Label:   "Username",
+						Default: conf.Username.String,
+					},
+					ui.PasswordField{
+						Key:   "Password",
+						Label: "Password",
+					},
 				},
-				ui.StringField{
-					Key:     "DB",
-					Label:   "Database",
-					Default: conf.DB.String,
-				},
-				ui.StringField{
-					Key:     "Username",
-					Label:   "Username",
-					Default: conf.Username.String,
-				},
-				ui.PasswordField{
-					Key:   "Password",
-					Label: "Password",
-				},
-			},
-		}
-		if !terminal.IsTerminal(int(syscall.Stdin)) { // nolint: unconvert
-			logger.Warn("Stdin is not a terminal, falling back to plain text input")
-		}
-		vals, err := form.Run(os.Stdin, stdout)
-		if err != nil {
-			return err
-		}
+			}
+			if !terminal.IsTerminal(int(syscall.Stdin)) { // nolint: unconvert
+				logger.Warn("Stdin is not a terminal, falling back to plain text input")
+			}
+			vals, err := form.Run(os.Stdin, stdout)
+			if err != nil {
+				return err
+			}
 
-		dec, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-			DecodeHook: types.NullDecoder,
-			Result:     &conf,
-		})
-		if err != nil {
-			return err
-		}
+			dec, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+				DecodeHook: types.NullDecoder,
+				Result:     &conf,
+			})
+			if err != nil {
+				return err
+			}
 
-		if err := dec.Decode(vals); err != nil {
-			return err
-		}
+			if err = dec.Decode(vals); err != nil {
+				return err
+			}
 
-		coll, err := influxdb.New(logger, conf)
-		if err != nil {
-			return err
-		}
-		if _, _, err := coll.Client.Ping(10 * time.Second); err != nil {
-			return err
-		}
+			coll, err := influxdb.New(logger, conf)
+			if err != nil {
+				return err
+			}
+			if _, _, err := coll.Client.Ping(10 * time.Second); err != nil {
+				return err
+			}
 
-		config.Collectors.InfluxDB = conf
-		return writeDiskConfig(fs, configPath, config)
-	},
-}
-
-func init() {
-	loginCmd.AddCommand(loginInfluxDBCommand)
+			config.Collectors.InfluxDB = conf
+			return writeDiskConfig(fs, configPath, config)
+		},
+	}
+	return loginInfluxDBCommand
 }

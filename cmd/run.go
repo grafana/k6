@@ -68,15 +68,17 @@ const (
 //nolint:gochecknoglobals
 var runType = os.Getenv("K6_TYPE")
 
-// runCmd represents the run command.
-var runCmd = &cobra.Command{
-	Use:   "run",
-	Short: "Start a load test",
-	Long: `Start a load test.
+//nolint:funlen,gocognit,gocyclo
+func getRunCmd(ctx context.Context, logger *logrus.Logger) *cobra.Command {
+	// runCmd represents the run command.
+	runCmd := &cobra.Command{
+		Use:   "run",
+		Short: "Start a load test",
+		Long: `Start a load test.
 
 This also exposes a REST API to interact with it. Various k6 subcommands offer
 a commandline interface for interacting with it.`,
-	Example: `
+		Example: `
   # Run a single VU, once.
   k6 run script.js
 
@@ -94,268 +96,271 @@ a commandline interface for interacting with it.`,
 
   # Send metrics to an influxdb server
   k6 run -o influxdb=http://1.2.3.4:8086/k6`[1:],
-	Args: exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		// TODO: don't use a global... or maybe change the logger?
-		logger := logrus.StandardLogger()
+		Args: exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// TODO: disable in quiet mode?
+			_, _ = BannerColor.Fprintf(stdout, "\n%s\n\n", consts.Banner())
 
-		// TODO: disable in quiet mode?
-		_, _ = BannerColor.Fprintf(stdout, "\n%s\n\n", consts.Banner())
+			logger.Debug("Initializing the runner...")
 
-		logger.Debug("Initializing the runner...")
-
-		// Create the Runner.
-		pwd, err := os.Getwd()
-		if err != nil {
-			return err
-		}
-		filename := args[0]
-		filesystems := loader.CreateFilesystems()
-		src, err := loader.ReadSource(logger, filename, pwd, filesystems, os.Stdin)
-		if err != nil {
-			return err
-		}
-
-		runtimeOptions, err := getRuntimeOptions(cmd.Flags(), buildEnvMap(os.Environ()))
-		if err != nil {
-			return err
-		}
-
-		r, err := newRunner(logger, src, runType, filesystems, runtimeOptions)
-		if err != nil {
-			return err
-		}
-
-		logger.Debug("Getting the script options...")
-
-		cliConf, err := getConfig(cmd.Flags())
-		if err != nil {
-			return err
-		}
-		conf, err := getConsolidatedConfig(afero.NewOsFs(), cliConf, r)
-		if err != nil {
-			return err
-		}
-
-		conf, cerr := deriveAndValidateConfig(conf, r.IsExecutable)
-		if cerr != nil {
-			return ExitCode{error: cerr, Code: invalidConfigErrorCode}
-		}
-
-		// Write options back to the runner too.
-		if err = r.SetOptions(conf.Options); err != nil {
-			return err
-		}
-
-		// We prepare a bunch of contexts:
-		//  - The runCtx is cancelled as soon as the Engine's run() lambda finishes,
-		//    and can trigger things like the usage report and end of test summary.
-		//    Crucially, metrics processing by the Engine will still work after this
-		//    context is cancelled!
-		//  - The lingerCtx is cancelled by Ctrl+C, and is used to wait for that
-		//    event when k6 was ran with the --linger option.
-		//  - The globalCtx is cancelled only after we're completely done with the
-		//    test execution and any --linger has been cleared, so that the Engine
-		//    can start winding down its metrics processing.
-		globalCtx, globalCancel := context.WithCancel(context.Background())
-		defer globalCancel()
-		lingerCtx, lingerCancel := context.WithCancel(globalCtx)
-		defer lingerCancel()
-		runCtx, runCancel := context.WithCancel(lingerCtx)
-		defer runCancel()
-
-		// Create a local execution scheduler wrapping the runner.
-		logger.Debug("Initializing the execution scheduler...")
-		execScheduler, err := local.NewExecutionScheduler(r, logger)
-		if err != nil {
-			return err
-		}
-
-		executionState := execScheduler.GetState()
-
-		// This is manually triggered after the Engine's Run() has completed,
-		// and things like a single Ctrl+C don't affect it. We use it to make
-		// sure that the progressbars finish updating with the latest execution
-		// state one last time, after the test run has finished.
-		progressCtx, progressCancel := context.WithCancel(globalCtx)
-		defer progressCancel()
-		initBar := execScheduler.GetInitProgressBar()
-		progressBarWG := &sync.WaitGroup{}
-		progressBarWG.Add(1)
-		go func() {
-			pbs := []*pb.ProgressBar{execScheduler.GetInitProgressBar()}
-			for _, s := range execScheduler.GetExecutors() {
-				pbs = append(pbs, s.GetProgress())
-			}
-			showProgress(progressCtx, conf, pbs, logger)
-			progressBarWG.Done()
-		}()
-
-		// Create an engine.
-		initBar.Modify(pb.WithConstProgress(0, "Init engine"))
-		engine, err := core.NewEngine(execScheduler, conf.Options, logger)
-		if err != nil {
-			return err
-		}
-
-		// TODO: refactor, the engine should have a copy of the config...
-		// Configure the engine.
-		if conf.NoThresholds.Valid {
-			engine.NoThresholds = conf.NoThresholds.Bool
-		}
-		if conf.NoSummary.Valid {
-			engine.NoSummary = conf.NoSummary.Bool
-		}
-		if conf.SummaryExport.Valid {
-			engine.SummaryExport = conf.SummaryExport.String != ""
-		}
-
-		executionPlan := execScheduler.GetExecutionPlan()
-		// Create a collector and assign it to the engine if requested.
-		initBar.Modify(pb.WithConstProgress(0, "Init metric outputs"))
-		for _, out := range conf.Out {
-			t, arg := parseCollector(out)
-			collector, cerr := newCollector(logger, t, arg, src, conf, executionPlan)
-			if cerr != nil {
-				return cerr
-			}
-			if cerr = collector.Init(); cerr != nil {
-				return cerr
-			}
-			engine.Collectors = append(engine.Collectors, collector)
-		}
-
-		// Spin up the REST API server, if not disabled.
-		if address != "" {
-			initBar.Modify(pb.WithConstProgress(0, "Init API server"))
-			go func() {
-				logger.Debugf("Starting the REST API server on %s", address)
-				if aerr := api.ListenAndServe(address, engine, logger); aerr != nil {
-					// Only exit k6 if the user has explicitly set the REST API address
-					if cmd.Flags().Lookup("address").Changed {
-						logger.WithError(aerr).Error("Error from API server")
-						os.Exit(cannotStartRESTAPIErrorCode)
-					} else {
-						logger.WithError(aerr).Warn("Error from API server")
-					}
-				}
-			}()
-		}
-
-		printExecutionDescription(
-			"local", filename, "", conf, execScheduler.GetState().ExecutionTuple,
-			executionPlan, engine.Collectors)
-
-		// Trap Interrupts, SIGINTs and SIGTERMs.
-		sigC := make(chan os.Signal, 1)
-		signal.Notify(sigC, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-		defer signal.Stop(sigC)
-		go func() {
-			sig := <-sigC
-			logger.WithField("sig", sig).Debug("Stopping k6 in response to signal...")
-			lingerCancel() // stop the test run, metric processing is cancelled below
-
-			// If we get a second signal, we immediately exit, so something like
-			// https://github.com/loadimpact/k6/issues/971 never happens again
-			sig = <-sigC
-			logger.WithField("sig", sig).Error("Aborting k6 in response to signal")
-			globalCancel() // not that it matters, given the following command...
-			os.Exit(externalAbortErrorCode)
-		}()
-
-		// Initialize the engine
-		initBar.Modify(pb.WithConstProgress(0, "Init VUs..."))
-		engineRun, engineWait, err := engine.Init(globalCtx, runCtx)
-		if err != nil {
-			return getExitCodeFromEngine(err)
-		}
-
-		// Init has passed successfully, so unless disabled, make sure we send a
-		// usage report after the context is done.
-		if !conf.NoUsageReport.Bool {
-			reportDone := make(chan struct{})
-			go func() {
-				<-runCtx.Done()
-				_ = reportUsage(execScheduler)
-				close(reportDone)
-			}()
-			defer func() {
-				select {
-				case <-reportDone:
-				case <-time.After(3 * time.Second):
-				}
-			}()
-		}
-
-		// Start the test run
-		initBar.Modify(pb.WithConstProgress(0, "Starting test..."))
-		if err := engineRun(); err != nil {
-			return getExitCodeFromEngine(err)
-		}
-		runCancel()
-		logger.Debug("Engine run terminated cleanly")
-
-		progressCancel()
-		progressBarWG.Wait()
-
-		// Warn if no iterations could be completed.
-		if executionState.GetFullIterationCount() == 0 {
-			logger.Warn("No script iterations finished, consider making the test duration longer")
-		}
-
-		data := ui.SummaryData{
-			Metrics:   engine.Metrics,
-			RootGroup: engine.ExecutionScheduler.GetRunner().GetDefaultGroup(),
-			Time:      executionState.GetCurrentTestRunDuration(),
-			TimeUnit:  conf.Options.SummaryTimeUnit.String,
-		}
-		// Print the end-of-test summary.
-		if !conf.NoSummary.Bool {
-			fprintf(stdout, "\n")
-
-			s := ui.NewSummary(conf.SummaryTrendStats)
-			s.SummarizeMetrics(stdout, "", data)
-
-			fprintf(stdout, "\n")
-		}
-
-		if conf.SummaryExport.ValueOrZero() != "" {
-			f, err := os.Create(conf.SummaryExport.String)
+			// Create the Runner.
+			pwd, err := os.Getwd()
 			if err != nil {
-				logger.WithError(err).Error("failed to create summary export file")
-			} else {
-				defer func() {
-					if err := f.Close(); err != nil {
-						logger.WithError(err).Error("failed to close summary export file")
+				return err
+			}
+			filename := args[0]
+			filesystems := loader.CreateFilesystems()
+			src, err := loader.ReadSource(logger, filename, pwd, filesystems, os.Stdin)
+			if err != nil {
+				return err
+			}
+
+			runtimeOptions, err := getRuntimeOptions(cmd.Flags(), buildEnvMap(os.Environ()))
+			if err != nil {
+				return err
+			}
+
+			r, err := newRunner(logger, src, runType, filesystems, runtimeOptions)
+			if err != nil {
+				return err
+			}
+
+			logger.Debug("Getting the script options...")
+
+			cliConf, err := getConfig(cmd.Flags())
+			if err != nil {
+				return err
+			}
+			conf, err := getConsolidatedConfig(afero.NewOsFs(), cliConf, r)
+			if err != nil {
+				return err
+			}
+
+			conf, cerr := deriveAndValidateConfig(conf, r.IsExecutable)
+			if cerr != nil {
+				return ExitCode{error: cerr, Code: invalidConfigErrorCode}
+			}
+
+			// Write options back to the runner too.
+			if err = r.SetOptions(conf.Options); err != nil {
+				return err
+			}
+
+			// We prepare a bunch of contexts:
+			//  - The runCtx is cancelled as soon as the Engine's run() lambda finishes,
+			//    and can trigger things like the usage report and end of test summary.
+			//    Crucially, metrics processing by the Engine will still work after this
+			//    context is cancelled!
+			//  - The lingerCtx is cancelled by Ctrl+C, and is used to wait for that
+			//    event when k6 was ran with the --linger option.
+			//  - The globalCtx is cancelled only after we're completely done with the
+			//    test execution and any --linger has been cleared, so that the Engine
+			//    can start winding down its metrics processing.
+			globalCtx, globalCancel := context.WithCancel(ctx)
+			defer globalCancel()
+			lingerCtx, lingerCancel := context.WithCancel(globalCtx)
+			defer lingerCancel()
+			runCtx, runCancel := context.WithCancel(lingerCtx)
+			defer runCancel()
+
+			// Create a local execution scheduler wrapping the runner.
+			logger.Debug("Initializing the execution scheduler...")
+			execScheduler, err := local.NewExecutionScheduler(r, logger)
+			if err != nil {
+				return err
+			}
+
+			executionState := execScheduler.GetState()
+
+			// This is manually triggered after the Engine's Run() has completed,
+			// and things like a single Ctrl+C don't affect it. We use it to make
+			// sure that the progressbars finish updating with the latest execution
+			// state one last time, after the test run has finished.
+			progressCtx, progressCancel := context.WithCancel(globalCtx)
+			defer progressCancel()
+			initBar := execScheduler.GetInitProgressBar()
+			progressBarWG := &sync.WaitGroup{}
+			progressBarWG.Add(1)
+			go func() {
+				pbs := []*pb.ProgressBar{execScheduler.GetInitProgressBar()}
+				for _, s := range execScheduler.GetExecutors() {
+					pbs = append(pbs, s.GetProgress())
+				}
+				showProgress(progressCtx, conf, pbs, logger)
+				progressBarWG.Done()
+			}()
+
+			// Create an engine.
+			initBar.Modify(pb.WithConstProgress(0, "Init engine"))
+			engine, err := core.NewEngine(execScheduler, conf.Options, logger)
+			if err != nil {
+				return err
+			}
+
+			// TODO: refactor, the engine should have a copy of the config...
+			// Configure the engine.
+			if conf.NoThresholds.Valid {
+				engine.NoThresholds = conf.NoThresholds.Bool
+			}
+			if conf.NoSummary.Valid {
+				engine.NoSummary = conf.NoSummary.Bool
+			}
+			if conf.SummaryExport.Valid {
+				engine.SummaryExport = conf.SummaryExport.String != ""
+			}
+
+			executionPlan := execScheduler.GetExecutionPlan()
+			// Create a collector and assign it to the engine if requested.
+			initBar.Modify(pb.WithConstProgress(0, "Init metric outputs"))
+			for _, out := range conf.Out {
+				t, arg := parseCollector(out)
+				collector, cerr := newCollector(logger, t, arg, src, conf, executionPlan)
+				if cerr != nil {
+					return cerr
+				}
+				if cerr = collector.Init(); cerr != nil {
+					return cerr
+				}
+				engine.Collectors = append(engine.Collectors, collector)
+			}
+
+			// Spin up the REST API server, if not disabled.
+			if address != "" {
+				initBar.Modify(pb.WithConstProgress(0, "Init API server"))
+				go func() {
+					logger.Debugf("Starting the REST API server on %s", address)
+					if aerr := api.ListenAndServe(address, engine, logger); aerr != nil {
+						// Only exit k6 if the user has explicitly set the REST API address
+						if cmd.Flags().Lookup("address").Changed {
+							logger.WithError(aerr).Error("Error from API server")
+							os.Exit(cannotStartRESTAPIErrorCode)
+						} else {
+							logger.WithError(aerr).Warn("Error from API server")
+						}
 					}
 				}()
+			}
+
+			printExecutionDescription(
+				"local", filename, "", conf, execScheduler.GetState().ExecutionTuple,
+				executionPlan, engine.Collectors)
+
+			// Trap Interrupts, SIGINTs and SIGTERMs.
+			sigC := make(chan os.Signal, 1)
+			signal.Notify(sigC, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+			defer signal.Stop(sigC)
+			go func() {
+				sig := <-sigC
+				logger.WithField("sig", sig).Debug("Stopping k6 in response to signal...")
+				lingerCancel() // stop the test run, metric processing is cancelled below
+
+				// If we get a second signal, we immediately exit, so something like
+				// https://github.com/loadimpact/k6/issues/971 never happens again
+				sig = <-sigC
+				logger.WithField("sig", sig).Error("Aborting k6 in response to signal")
+				globalCancel() // not that it matters, given the following command...
+				os.Exit(externalAbortErrorCode)
+			}()
+
+			// Initialize the engine
+			initBar.Modify(pb.WithConstProgress(0, "Init VUs..."))
+			engineRun, engineWait, err := engine.Init(globalCtx, runCtx)
+			if err != nil {
+				return getExitCodeFromEngine(err)
+			}
+
+			// Init has passed successfully, so unless disabled, make sure we send a
+			// usage report after the context is done.
+			if !conf.NoUsageReport.Bool {
+				reportDone := make(chan struct{})
+				go func() {
+					<-runCtx.Done()
+					_ = reportUsage(execScheduler)
+					close(reportDone)
+				}()
+				defer func() {
+					select {
+					case <-reportDone:
+					case <-time.After(3 * time.Second):
+					}
+				}()
+			}
+
+			// Start the test run
+			initBar.Modify(pb.WithConstProgress(0, "Starting test..."))
+			if err := engineRun(); err != nil {
+				return getExitCodeFromEngine(err)
+			}
+			runCancel()
+			logger.Debug("Engine run terminated cleanly")
+
+			progressCancel()
+			progressBarWG.Wait()
+
+			// Warn if no iterations could be completed.
+			if executionState.GetFullIterationCount() == 0 {
+				logger.Warn("No script iterations finished, consider making the test duration longer")
+			}
+
+			data := ui.SummaryData{
+				Metrics:   engine.Metrics,
+				RootGroup: engine.ExecutionScheduler.GetRunner().GetDefaultGroup(),
+				Time:      executionState.GetCurrentTestRunDuration(),
+				TimeUnit:  conf.Options.SummaryTimeUnit.String,
+			}
+			// Print the end-of-test summary.
+			if !conf.NoSummary.Bool {
+				fprintf(stdout, "\n")
+
 				s := ui.NewSummary(conf.SummaryTrendStats)
-				if err := s.SummarizeMetricsJSON(f, data); err != nil {
-					logger.WithError(err).Error("failed to make summary export file")
+				s.SummarizeMetrics(stdout, "", data)
+
+				fprintf(stdout, "\n")
+			}
+
+			if conf.SummaryExport.ValueOrZero() != "" { //nolint:nestif
+				f, err := os.Create(conf.SummaryExport.String)
+				if err != nil {
+					logger.WithError(err).Error("failed to create summary export file")
+				} else {
+					defer func() {
+						if err := f.Close(); err != nil {
+							logger.WithError(err).Error("failed to close summary export file")
+						}
+					}()
+					s := ui.NewSummary(conf.SummaryTrendStats)
+					if err := s.SummarizeMetricsJSON(f, data); err != nil {
+						logger.WithError(err).Error("failed to make summary export file")
+					}
 				}
 			}
-		}
 
-		if conf.Linger.Bool {
-			select {
-			case <-lingerCtx.Done():
-				// do nothing, we were interrupted by Ctrl+C already
-			default:
-				logger.Debug("Linger set; waiting for Ctrl+C...")
-				fprintf(stdout, "Linger set; waiting for Ctrl+C...")
-				<-lingerCtx.Done()
-				logger.Debug("Ctrl+C received, exiting...")
+			if conf.Linger.Bool {
+				select {
+				case <-lingerCtx.Done():
+					// do nothing, we were interrupted by Ctrl+C already
+				default:
+					logger.Debug("Linger set; waiting for Ctrl+C...")
+					fprintf(stdout, "Linger set; waiting for Ctrl+C...")
+					<-lingerCtx.Done()
+					logger.Debug("Ctrl+C received, exiting...")
+				}
 			}
-		}
-		globalCancel() // signal the Engine that it should wind down
-		logger.Debug("Waiting for engine processes to finish...")
-		engineWait()
-		logger.Debug("Everything has finished, exiting k6!")
-		if engine.IsTainted() {
-			return ExitCode{error: errors.New("some thresholds have failed"), Code: thresholdHaveFailedErrorCode}
-		}
-		return nil
-	},
+			globalCancel() // signal the Engine that it should wind down
+			logger.Debug("Waiting for engine processes to finish...")
+			engineWait()
+			logger.Debug("Everything has finished, exiting k6!")
+			if engine.IsTainted() {
+				return ExitCode{error: errors.New("some thresholds have failed"), Code: thresholdHaveFailedErrorCode}
+			}
+			return nil
+		},
+	}
+
+	runCmd.Flags().SortFlags = false
+	runCmd.Flags().AddFlagSet(runCmdFlagSet())
+
+	return runCmd
 }
 
 func getExitCodeFromEngine(err error) ExitCode {
@@ -423,13 +428,6 @@ func runCmdFlagSet() *pflag.FlagSet {
 	flags.StringVarP(&runType, "type", "t", runType, "override file `type`, \"js\" or \"archive\"")
 	flags.Lookup("type").DefValue = ""
 	return flags
-}
-
-func init() {
-	RootCmd.AddCommand(runCmd)
-
-	runCmd.Flags().SortFlags = false
-	runCmd.Flags().AddFlagSet(runCmdFlagSet())
 }
 
 // Creates a new runner.

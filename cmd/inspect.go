@@ -34,71 +34,70 @@ import (
 	"github.com/loadimpact/k6/loader"
 )
 
-// inspectCmd represents the resume command
-var inspectCmd = &cobra.Command{
-	Use:   "inspect [file]",
-	Short: "Inspect a script or archive",
-	Long:  `Inspect a script or archive.`,
-	Args:  cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		// TODO: don't use the Global logger
-		logger := logrus.StandardLogger()
-		pwd, err := os.Getwd()
-		if err != nil {
-			return err
-		}
-		filesystems := loader.CreateFilesystems()
-		src, err := loader.ReadSource(logger, args[0], pwd, filesystems, os.Stdin)
-		if err != nil {
-			return err
-		}
-
-		typ := runType
-		if typ == "" {
-			typ = detectType(src.Data)
-		}
-
-		runtimeOptions, err := getRuntimeOptions(cmd.Flags(), buildEnvMap(os.Environ()))
-		if err != nil {
-			return err
-		}
-
-		var (
-			opts lib.Options
-			b    *js.Bundle
-		)
-		switch typ {
-		case typeArchive:
-			var arc *lib.Archive
-			arc, err = lib.ReadArchive(bytes.NewBuffer(src.Data))
+func getInspectCmd(logger logrus.FieldLogger) *cobra.Command {
+	// inspectCmd represents the inspect command
+	inspectCmd := &cobra.Command{
+		Use:   "inspect [file]",
+		Short: "Inspect a script or archive",
+		Long:  `Inspect a script or archive.`,
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			pwd, err := os.Getwd()
 			if err != nil {
 				return err
 			}
-			b, err = js.NewBundleFromArchive(logger, arc, runtimeOptions)
+			filesystems := loader.CreateFilesystems()
+			src, err := loader.ReadSource(logger, args[0], pwd, filesystems, os.Stdin)
 			if err != nil {
 				return err
 			}
-			opts = b.Options
-		case typeJS:
-			b, err = js.NewBundle(logger, src, filesystems, runtimeOptions)
+
+			typ := runType
+			if typ == "" {
+				typ = detectType(src.Data)
+			}
+
+			runtimeOptions, err := getRuntimeOptions(cmd.Flags(), buildEnvMap(os.Environ()))
 			if err != nil {
 				return err
 			}
-			opts = b.Options
-		}
 
-		data, err := json.MarshalIndent(opts, "", "  ")
-		if err != nil {
-			return err
-		}
-		fmt.Println(string(data))
-		return nil
-	},
-}
+			var (
+				opts lib.Options
+				b    *js.Bundle
+			)
+			switch typ {
+			case typeArchive:
+				var arc *lib.Archive
+				arc, err = lib.ReadArchive(bytes.NewBuffer(src.Data))
+				if err != nil {
+					return err
+				}
+				b, err = js.NewBundleFromArchive(logger, arc, runtimeOptions)
+				if err != nil {
+					return err
+				}
+				opts = b.Options
+			case typeJS:
+				b, err = js.NewBundle(logger, src, filesystems, runtimeOptions)
+				if err != nil {
+					return err
+				}
+				opts = b.Options
+			}
 
-func init() {
-	RootCmd.AddCommand(inspectCmd)
+			data, err := json.MarshalIndent(opts, "", "  ")
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(data))
+			return nil
+		},
+	}
+
 	inspectCmd.Flags().SortFlags = false
 	inspectCmd.Flags().AddFlagSet(runtimeOptionFlagSet(false))
 	inspectCmd.Flags().StringVarP(&runType, "type", "t", runType, "override file `type`, \"js\" or \"archive\"")
+
+	return inspectCmd
 }

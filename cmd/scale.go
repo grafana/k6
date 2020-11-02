@@ -26,41 +26,41 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
-	"github.com/loadimpact/k6/api/v1"
+	v1 "github.com/loadimpact/k6/api/v1"
 	"github.com/loadimpact/k6/api/v1/client"
 	"github.com/loadimpact/k6/ui"
 )
 
-// scaleCmd represents the scale command
-var scaleCmd = &cobra.Command{
-	Use:   "scale",
-	Short: "Scale a running test",
-	Long: `Scale a running test.
+func getScaleCmd(ctx context.Context) *cobra.Command {
+	// scaleCmd represents the scale command
+	scaleCmd := &cobra.Command{
+		Use:   "scale",
+		Short: "Scale a running test",
+		Long: `Scale a running test.
 
   Use the global --address flag to specify the URL to the API server.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		vus := getNullInt64(cmd.Flags(), "vus")
-		max := getNullInt64(cmd.Flags(), "max")
-		if !vus.Valid && !max.Valid {
-			return errors.New("Specify either -u/--vus or -m/--max")
-		}
+		RunE: func(cmd *cobra.Command, args []string) error {
+			vus := getNullInt64(cmd.Flags(), "vus")
+			max := getNullInt64(cmd.Flags(), "max")
+			if !vus.Valid && !max.Valid {
+				return errors.New("Specify either -u/--vus or -m/--max") //nolint:golint
+			}
 
-		c, err := client.New(address)
-		if err != nil {
-			return err
-		}
-		status, err := c.SetStatus(context.Background(), v1.Status{VUs: vus, VUsMax: max})
-		if err != nil {
-			return err
-		}
-		ui.Dump(stdout, status)
-		return nil
-	},
-}
-
-func init() {
-	RootCmd.AddCommand(scaleCmd)
+			c, err := client.New(address)
+			if err != nil {
+				return err
+			}
+			status, err := c.SetStatus(ctx, v1.Status{VUs: vus, VUsMax: max})
+			if err != nil {
+				return err
+			}
+			ui.Dump(stdout, status)
+			return nil
+		},
+	}
 
 	scaleCmd.Flags().Int64P("vus", "u", 1, "number of virtual users")
 	scaleCmd.Flags().Int64P("max", "m", 0, "max available virtual users")
+
+	return scaleCmd
 }
