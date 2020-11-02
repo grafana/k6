@@ -151,40 +151,22 @@ func Execute() {
 
 	RootCmd := getRootCmd(ctx, logger, fallbackLogger)
 
-	archiveCmd := getArchiveCmd(logger)
-	RootCmd.AddCommand(archiveCmd)
-
-	cloudCmd := getCloudCmd(ctx, logger)
-	RootCmd.AddCommand(cloudCmd)
-
-	RootCmd.AddCommand(getConvertCmd())
-
-	inspectCmd := getInspectCmd(logger)
-	RootCmd.AddCommand(inspectCmd)
-
 	loginCmd := getLoginCmd()
-	RootCmd.AddCommand(loginCmd)
-
-	loginCloudCommand := getLoginCloudCommand(logger)
-	loginCmd.AddCommand(loginCloudCommand)
-
-	loginCmd.AddCommand(getLoginInfluxDBCommand(logger))
-
-	RootCmd.AddCommand(getPauseCmd(ctx))
-
-	RootCmd.AddCommand(getResumeCmd(ctx))
-
-	scaleCmd := getScaleCmd(ctx)
-	RootCmd.AddCommand(scaleCmd)
-
-	runCmd := getRunCmd(ctx, logger)
-	RootCmd.AddCommand(runCmd)
-
-	RootCmd.AddCommand(getStatsCmd(ctx))
-
-	RootCmd.AddCommand(getStatusCmd(ctx))
-
-	RootCmd.AddCommand(getVersionCmd())
+	loginCmd.AddCommand(getLoginCloudCommand(logger), getLoginInfluxDBCommand(logger))
+	RootCmd.AddCommand(
+		getArchiveCmd(logger),
+		getCloudCmd(ctx, logger),
+		getConvertCmd(),
+		getInspectCmd(logger),
+		loginCmd,
+		getPauseCmd(ctx),
+		getResumeCmd(ctx),
+		getScaleCmd(ctx),
+		getRunCmd(ctx, logger),
+		getStatsCmd(ctx),
+		getStatusCmd(ctx),
+		getVersionCmd(),
+	)
 
 	if err := RootCmd.Execute(); err != nil {
 		fields := logrus.Fields{}
