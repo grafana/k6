@@ -527,6 +527,7 @@ func TestVURunContext(t *testing.T) {
 				fnCalled = true
 
 				assert.Equal(t, vu.Runtime, common.GetRuntime(*vu.Context), "incorrect runtime in context")
+				assert.Nil(t, common.GetInitEnv(*vu.Context)) // shouldn't get this in the vu context
 
 				state := lib.GetState(*vu.Context)
 				if assert.NotNil(t, state) {
