@@ -70,8 +70,8 @@ var (
 	address string
 )
 
-// This is get all for the main/root k6 command struct
-type command struct {
+// This is to keep all fields needed for the main/root k6 command
+type rootCommand struct {
 	ctx            context.Context
 	logger         *logrus.Logger
 	fallbackLogger logrus.FieldLogger
@@ -83,20 +83,20 @@ type command struct {
 	verbose        bool
 }
 
-func newCommand(ctx context.Context, logger *logrus.Logger, fallbackLogger logrus.FieldLogger) *command {
-	c := &command{
+func newRootCommand(ctx context.Context, logger *logrus.Logger, fallbackLogger logrus.FieldLogger) *rootCommand {
+	c := &rootCommand{
 		ctx:            ctx,
 		logger:         logger,
 		fallbackLogger: fallbackLogger,
 	}
-	// RootCmd represents the base command when called without any subcommands.
+	// the base command when called without any subcommands.
 	c.cmd = &cobra.Command{
 		Use:               "k6",
 		Short:             "a next-generation load generator",
 		Long:              BannerColor.Sprintf("\n%s", consts.Banner()),
 		SilenceUsage:      true,
 		SilenceErrors:     true,
-		PersistentPreRunE: c.persistentPerRunE,
+		PersistentPreRunE: c.persistentPreRunE,
 	}
 
 	confDir, err := os.UserConfigDir()
@@ -115,7 +115,7 @@ func newCommand(ctx context.Context, logger *logrus.Logger, fallbackLogger logru
 	return c
 }
 
-func (c *command) persistentPerRunE(cmd *cobra.Command, args []string) error {
+func (c *rootCommand) persistentPreRunE(cmd *cobra.Command, args []string) error {
 	var err error
 	if !cmd.Flags().Changed("log-output") {
 		if envLogOutput, ok := os.LookupEnv("K6_LOG_OUTPUT"); ok {
@@ -172,7 +172,7 @@ func Execute() {
 		Level:     logrus.InfoLevel,
 	}
 
-	c := newCommand(ctx, logger, fallbackLogger)
+	c := newRootCommand(ctx, logger, fallbackLogger)
 
 	loginCmd := getLoginCmd()
 	loginCmd.AddCommand(getLoginCloudCommand(logger), getLoginInfluxDBCommand(logger))
@@ -217,7 +217,7 @@ func Execute() {
 	}
 }
 
-func (c *command) rootCmdPersistentFlagSet() *pflag.FlagSet {
+func (c *rootCommand) rootCmdPersistentFlagSet() *pflag.FlagSet {
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
 	// TODO: figure out a better way to handle the CLI flags - global variables are not very testable... :/
 	flags.BoolVarP(&c.verbose, "verbose", "v", false, "enable debug logging")
@@ -257,7 +257,7 @@ func (f RawFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 // The returned channel will be closed when the logger has finished flushing and pushing logs after
 // the provided context is closed. It is closed if the logger isn't buffering and sending messages
 // Asynchronously
-func (c *command) setupLoggers() (<-chan struct{}, error) {
+func (c *rootCommand) setupLoggers() (<-chan struct{}, error) {
 	ch := make(chan struct{})
 	close(ch)
 
