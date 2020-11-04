@@ -27,7 +27,7 @@ import (
 )
 
 func init() {
-	modules.Register("k6/protocols/grpc", New())
+	modules.Register("k6/net/grpc", New())
 }
 
 // GRPC represents the gRPC protocol module for k6
