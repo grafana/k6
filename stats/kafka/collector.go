@@ -160,15 +160,6 @@ func (c *Collector) pushMetrics() {
 	for _, sample := range formattedSamples {
 		msg := &sarama.ProducerMessage{Topic: c.Config.Topic.String, Value: sarama.StringEncoder(sample)}
 		msgList = append(msgList, msg)
-// 		partition, offset, err := c.Producer.SendMessage(msg)
-// 		if err != nil {
-// 			c.logger.WithError(err).Error("Kafka: failed to send message.")
-// 		} else {
-// 			c.logger.WithFields(logrus.Fields{
-// 				"partition": partition,
-// 				"offset":    offset,
-// 			}).Debug("Kafka: message sent.")
-// 		}
 	}
 	// Send message in batch
 	c.Producer.SendMessages(msgList)
