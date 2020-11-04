@@ -25,6 +25,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"strconv"
 	"strings"
@@ -116,17 +117,26 @@ func (c *Client) Load(ctxPtr *context.Context, importPaths []string, filenames .
 		return nil, errors.New("load must be called in the init context")
 	}
 
-	f, err := protoparse.ResolveFilenames(importPaths, filenames...)
-	if err != nil {
-		return nil, err
+	initEnv := common.GetInitEnv(*ctxPtr)
+	if initEnv == nil {
+		return nil, errors.New("missing init environment")
+	}
+
+	// If no import paths are specified, use the current working directory
+	if len(importPaths) == 0 {
+		importPaths = append(importPaths, initEnv.CWD.Path)
 	}
 
 	parser := protoparse.Parser{
 		ImportPaths:      importPaths,
-		InferImportPaths: len(importPaths) == 0,
+		InferImportPaths: false,
+		Accessor: protoparse.FileAccessor(func(filename string) (io.ReadCloser, error) {
+			absFilePath := initEnv.GetAbsFilePath(filename)
+			return initEnv.FileSystems["file"].Open(absFilePath)
+		}),
 	}
 
-	fds, err := parser.ParseFiles(f...)
+	fds, err := parser.ParseFiles(filenames...)
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +154,11 @@ func (c *Client) Load(ctxPtr *context.Context, importPaths []string, filenames .
 	}
 
 	var rtn []MethodInfo
-	c.mds = make(map[string]protoreflect.MethodDescriptor)
+	if c.mds == nil {
+		// This allows us to call load() multiple times, without overwriting the
+		// previously loaded definitions.
+		c.mds = make(map[string]protoreflect.MethodDescriptor)
+	}
 
 	files.RangeFiles(func(fd protoreflect.FileDescriptor) bool {
 		sds := fd.Services()

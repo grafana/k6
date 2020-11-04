@@ -49,6 +49,8 @@ const openCantBeUsedOutsideInitContextMsg = `The "open()" function is only avail
 	`(i.e. the global scope), see https://k6.io/docs/using-k6/test-life-cycle for more information`
 
 // InitContext provides APIs for use in the init context.
+//
+// TODO: refactor most/all of this state away, use common.InitEnvironment instead
 type InitContext struct {
 	// Bound runtime; used to instantiate objects.
 	runtime  *goja.Runtime

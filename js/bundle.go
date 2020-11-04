@@ -299,7 +299,15 @@ func (b *Bundle) instantiate(logger logrus.FieldLogger, rt *goja.Runtime, init *
 	rt.Set("__VU", vuID)
 	rt.Set("console", common.Bind(rt, newConsole(logger), init.ctxPtr))
 
-	*init.ctxPtr = common.WithRuntime(context.Background(), rt)
+	// TODO: get rid of the unused ctxPtr, use a real external context (so we
+	// can interrupt), build the common.InitEnvironment earlier and reuse it
+	initenv := &common.InitEnvironment{
+		Logger:      logger,
+		FileSystems: init.filesystems,
+		CWD:         init.pwd,
+	}
+	ctx := common.WithInitEnv(context.Background(), initenv)
+	*init.ctxPtr = common.WithRuntime(ctx, rt)
 	unbindInit := common.BindToGlobal(rt, common.Bind(rt, init, init.ctxPtr))
 	if _, err := rt.RunProgram(b.Program); err != nil {
 		return err
