@@ -155,19 +155,24 @@ func (c *Collector) pushMetrics() {
 
 	// Send the samples
 	c.logger.Debug("Kafka: Delivering...")
-
+	
+	var msgList []*sarama.ProducerMessage
 	for _, sample := range formattedSamples {
 		msg := &sarama.ProducerMessage{Topic: c.Config.Topic.String, Value: sarama.StringEncoder(sample)}
-		partition, offset, err := c.Producer.SendMessage(msg)
-		if err != nil {
-			c.logger.WithError(err).Error("Kafka: failed to send message.")
-		} else {
-			c.logger.WithFields(logrus.Fields{
-				"partition": partition,
-				"offset":    offset,
-			}).Debug("Kafka: message sent.")
-		}
+		msgList = append(msgList, msg)
+// 		partition, offset, err := c.Producer.SendMessage(msg)
+// 		if err != nil {
+// 			c.logger.WithError(err).Error("Kafka: failed to send message.")
+// 		} else {
+// 			c.logger.WithFields(logrus.Fields{
+// 				"partition": partition,
+// 				"offset":    offset,
+// 			}).Debug("Kafka: message sent.")
+// 		}
 	}
+	// Send message in batch
+	c.Producer.SendMessages(msgList)
+
 
 	t := time.Since(startTime)
 	c.logger.WithField("t", t).Debug("Kafka: Delivered!")
