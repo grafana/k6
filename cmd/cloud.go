@@ -226,7 +226,7 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 					if stopErr != nil {
 						logger.WithError(stopErr).Error("Stop cloud test error")
 					} else {
-						logger.Info("Successfully send segnal to stop test to the cloud, now waiting for it to actually stop.")
+						logger.Info("Successfully sent signal to stop the cloud test, now waiting for it to actually stop...")
 					}
 					globalCancel()
 				}()
