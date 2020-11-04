@@ -213,6 +213,29 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 				return err
 			}
 
+			// Trap Interrupts, SIGINTs and SIGTERMs.
+			sigC := make(chan os.Signal, 1)
+			signal.Notify(sigC, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+			defer signal.Stop(sigC)
+			go func() {
+				sig := <-sigC
+				logger.WithField("sig", sig).Print("Stopping cloud test run in response to signal...")
+				// Do this in a separate goroutine so that if it blocks the second signal can stop the execution
+				go func() {
+					stopErr := client.StopCloudTestRun(refID)
+					if stopErr != nil {
+						logger.WithError(stopErr).Error("Stop cloud test error")
+					} else {
+						logger.Info("Successfully sent signal to stop the cloud test, now waiting for it to actually stop...")
+					}
+					globalCancel()
+				}()
+
+				sig = <-sigC
+				logger.WithField("sig", sig).Error("Aborting k6 in response to signal, we won't wait for the test to end.")
+				os.Exit(externalAbortErrorCode)
+			}()
+
 			et, err := lib.NewExecutionTuple(derivedConf.ExecutionSegment, derivedConf.ExecutionSegmentSequence)
 			if err != nil {
 				return err
@@ -235,24 +258,6 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 			go func() {
 				showProgress(progressCtx, conf, []*pb.ProgressBar{progressBar}, logger)
 				progressBarWG.Done()
-			}()
-
-			// Trap Interrupts, SIGINTs and SIGTERMs.
-			sigC := make(chan os.Signal, 1)
-			signal.Notify(sigC, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-			defer signal.Stop(sigC)
-			go func() {
-				sig := <-sigC
-				logger.WithField("sig", sig).Print("Stopping k6 in response to signal...")
-				err := client.StopCloudTestRun(refID)
-				if err != nil {
-					logger.WithError(err).Error("Stop cloud test error")
-				}
-				globalCancel()
-
-				sig = <-sigC
-				logger.WithField("sig", sig).Error("Aborting k6 in response to signal")
-				os.Exit(externalAbortErrorCode)
 			}()
 
 			var (
@@ -302,25 +307,21 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 				}()
 			}
 
-		runningLoop:
-			for {
-				select {
-				case <-ticker.C:
-					newTestProgress, progressErr := client.GetTestProgress(refID)
-					if progressErr == nil {
-						if (newTestProgress.RunStatus > lib.RunStatusRunning) ||
-							(exitOnRunning && newTestProgress.RunStatus == lib.RunStatusRunning) {
-							globalCancel()
-							break runningLoop
-						}
-						testProgressLock.Lock()
-						testProgress = newTestProgress
-						testProgressLock.Unlock()
-					} else {
-						logger.WithError(progressErr).Error("Test progress error")
-					}
-				case <-globalCtx.Done():
-					break runningLoop
+			for range ticker.C {
+				newTestProgress, progressErr := client.GetTestProgress(refID)
+				if progressErr != nil {
+					logger.WithError(progressErr).Error("Test progress error")
+					continue
+				}
+
+				testProgressLock.Lock()
+				testProgress = newTestProgress
+				testProgressLock.Unlock()
+
+				if (newTestProgress.RunStatus > lib.RunStatusRunning) ||
+					(exitOnRunning && newTestProgress.RunStatus == lib.RunStatusRunning) {
+					globalCancel()
+					break
 				}
 			}
 
