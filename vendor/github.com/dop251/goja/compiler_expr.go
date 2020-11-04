@@ -1377,18 +1377,24 @@ func (e *compiledObjectLiteral) emitGetter(putOnStack bool) {
 	e.addSrcMap()
 	e.c.emit(newObject)
 	for _, prop := range e.expr.Value {
+		keyExpr := e.c.compileExpression(prop.Key)
+		cl, ok := keyExpr.(*compiledLiteral)
+		if !ok {
+			e.c.throwSyntaxError(e.offset, "non-literal properties in object literal are not supported yet")
+		}
+		key := cl.val.string()
 		e.c.compileExpression(prop.Value).emitGetter(true)
 		switch prop.Kind {
 		case "value":
-			if prop.Key == __proto__ {
+			if key == __proto__ {
 				e.c.emit(setProto)
 			} else {
-				e.c.emit(setProp1(prop.Key))
+				e.c.emit(setProp1(key))
 			}
 		case "get":
-			e.c.emit(setPropGetter(prop.Key))
+			e.c.emit(setPropGetter(key))
 		case "set":
-			e.c.emit(setPropSetter(prop.Key))
+			e.c.emit(setPropSetter(key))
 		default:
 			panic(fmt.Errorf("Unknown property kind: %s", prop.Kind))
 		}
