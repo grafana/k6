@@ -1,7 +1,7 @@
 import grpc from 'k6/net/grpc';
 import { check } from "k6";
 
-let client = grpc.newClient();
+let client = new grpc.Client();
 client.load([], "samples/grpc_server/route_guide.proto")
 
 

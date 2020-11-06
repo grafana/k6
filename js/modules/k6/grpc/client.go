@@ -70,8 +70,10 @@ type Client struct {
 	conn *grpc.ClientConn
 }
 
-// NewClient creates a new gPRC client to invoke RPC methods.
-func (*GRPC) NewClient(ctxPtr *context.Context) interface{} {
+// XClient represents the Client constructor (e.g. `new grpc.Client()`) and
+// creates a new gPRC client object that can load protobuf definitions, connect
+// to servers and invoke RPC methods.
+func (*GRPC) XClient(ctxPtr *context.Context) interface{} {
 	rt := common.GetRuntime(*ctxPtr)
 
 	return common.Bind(rt, &Client{}, ctxPtr)
