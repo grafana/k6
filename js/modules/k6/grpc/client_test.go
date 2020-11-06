@@ -118,7 +118,7 @@ func TestClient(t *testing.T) {
 
 	t.Run("New", func(t *testing.T) {
 		_, err := common.RunString(rt, `
-			var client = grpc.newClient();
+			var client = new grpc.Client();
 			if (!client) throw new Error("no client created")
 		`)
 		assert.NoError(t, err)
