@@ -43,6 +43,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/test/grpc_testing"
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/core"
@@ -58,6 +59,7 @@ import (
 	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/lib/testutils/httpmultibin"
 	"github.com/loadimpact/k6/lib/types"
+	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/stats/dummy"
 )
@@ -1798,6 +1800,179 @@ func TestVUPanic(t *testing.T) {
 			require.Len(t, entries, 1)
 			assert.Equal(t, logrus.InfoLevel, entries[0].Level)
 			require.Contains(t, entries[0].Message, "here we don't")
+		})
+	}
+}
+
+type multiFileTestCase struct {
+	fses       map[string]afero.Fs
+	rtOpts     lib.RuntimeOptions
+	cwd        string
+	script     string
+	expInitErr bool
+	expVUErr   bool
+	samples    chan stats.SampleContainer
+}
+
+func runMultiFileTestCase(t *testing.T, tc multiFileTestCase, tb *httpmultibin.HTTPMultiBin) {
+	logger := testutils.NewLogger(t)
+	runner, err := New(
+		logger,
+		&loader.SourceData{
+			URL:  &url.URL{Path: tc.cwd + "/script.js", Scheme: "file"},
+			Data: []byte(tc.script),
+		},
+		tc.fses,
+		tc.rtOpts,
+	)
+	if tc.expInitErr {
+		require.Error(t, err)
+		return
+	}
+	require.NoError(t, err)
+
+	options := runner.GetOptions()
+	require.Empty(t, options.Validate())
+
+	vu, err := runner.NewVU(1, tc.samples)
+	require.NoError(t, err)
+
+	jsVU, ok := vu.(*VU)
+	require.True(t, ok)
+	jsVU.state.Dialer = tb.Dialer
+	jsVU.state.TLSConfig = tb.TLSClientConfig
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	activeVU := vu.Activate(&lib.VUActivationParams{RunContext: ctx})
+
+	err = activeVU.RunOnce()
+	if tc.expVUErr {
+		require.Error(t, err)
+	} else {
+		require.NoError(t, err)
+	}
+
+	arc := runner.MakeArchive()
+	runnerFromArc, err := NewFromArchive(logger, arc, tc.rtOpts)
+	require.NoError(t, err)
+	vuFromArc, err := runnerFromArc.NewVU(2, tc.samples)
+	require.NoError(t, err)
+	jsVUFromArc, ok := vuFromArc.(*VU)
+	require.True(t, ok)
+	jsVUFromArc.state.Dialer = tb.Dialer
+	jsVUFromArc.state.TLSConfig = tb.TLSClientConfig
+	activeVUFromArc := jsVUFromArc.Activate(&lib.VUActivationParams{RunContext: ctx})
+	err = activeVUFromArc.RunOnce()
+	if tc.expVUErr {
+		require.Error(t, err)
+		return
+	}
+	require.NoError(t, err)
+}
+
+func TestComplicatedFileImportsForGRPC(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	defer tb.Cleanup()
+
+	tb.GRPCStub.UnaryCallFunc = func(ctx context.Context, sreq *grpc_testing.SimpleRequest) (
+		*grpc_testing.SimpleResponse, error,
+	) {
+		return &grpc_testing.SimpleResponse{
+			Username: "foo",
+		}, nil
+	}
+
+	fs := afero.NewMemMapFs()
+	protoFile, err := ioutil.ReadFile("../vendor/google.golang.org/grpc/test/grpc_testing/test.proto")
+	require.NoError(t, err)
+	require.NoError(t, afero.WriteFile(fs, "/path/to/service.proto", protoFile, 0644))
+	require.NoError(t, afero.WriteFile(fs, "/path/to/same-dir.proto", []byte(
+		`syntax = "proto3";package whatever;import "service.proto";`,
+	), 0644))
+	require.NoError(t, afero.WriteFile(fs, "/path/subdir.proto", []byte(
+		`syntax = "proto3";package whatever;import "to/service.proto";`,
+	), 0644))
+	require.NoError(t, afero.WriteFile(fs, "/path/to/abs.proto", []byte(
+		`syntax = "proto3";package whatever;import "/path/to/service.proto";`,
+	), 0644))
+
+	grpcTestCase := func(expInitErr, expVUErr bool, cwd, loadCode string) multiFileTestCase {
+		script := tb.Replacer.Replace(fmt.Sprintf(`
+			var grpc = require('k6/net/grpc');
+			var client = new grpc.Client();
+
+			%s // load statements
+
+			exports.default = function() {
+				client.connect('GRPCBIN_ADDR', {timeout: '3s'});
+				var resp = client.invoke('grpc.testing.TestService/UnaryCall', {})
+				if (!resp.message || resp.error || resp.message.username !== 'foo') {
+					throw new Error('unexpected response message: ' + JSON.stringify(resp.message))
+				}
+			}
+		`, loadCode))
+
+		return multiFileTestCase{
+			fses:    map[string]afero.Fs{"file": fs, "https": afero.NewMemMapFs()},
+			rtOpts:  lib.RuntimeOptions{CompatibilityMode: null.NewString("base", true)},
+			samples: make(chan stats.SampleContainer, 100),
+			cwd:     cwd, expInitErr: expInitErr, expVUErr: expVUErr, script: script,
+		}
+	}
+
+	testCases := []multiFileTestCase{
+		grpcTestCase(false, true, "/", `/* no grpc loads */`), // exp VU error with no proto files loaded
+
+		// Init errors when the protobuf file can't be loaded
+		grpcTestCase(true, false, "/", `client.load(null, 'service.proto');`),
+		grpcTestCase(true, false, "/", `client.load(null, '/wrong/path/to/service.proto');`),
+		grpcTestCase(true, false, "/", `client.load(['/', '/path/'], 'service.proto');`),
+
+		// Direct imports of service.proto
+		grpcTestCase(false, false, "/", `client.load(null, '/path/to/service.proto');`), // full path should be fine
+		grpcTestCase(false, false, "/path/to/", `client.load([], 'service.proto');`),    // file name from same folder
+		grpcTestCase(false, false, "/", `client.load(['./path//to/'], 'service.proto');`),
+		grpcTestCase(false, false, "/path/", `client.load(['./to/'], 'service.proto');`),
+
+		grpcTestCase(false, false, "/whatever", `client.load(['/path/to/'], 'service.proto');`),  // with import paths
+		grpcTestCase(false, false, "/path", `client.load(['/', '/path/to/'], 'service.proto');`), // with import paths
+		grpcTestCase(false, false, "/whatever", `client.load(['../path/to/'], 'service.proto');`),
+
+		// Import another file that imports "service.proto" directly
+		grpcTestCase(true, false, "/", `client.load([], '/path/to/same-dir.proto');`),
+		grpcTestCase(true, false, "/path/", `client.load([], 'to/same-dir.proto');`),
+		grpcTestCase(true, false, "/", `client.load(['/path/'], 'to/same-dir.proto');`),
+		grpcTestCase(false, false, "/path/to/", `client.load([], 'same-dir.proto');`),
+		grpcTestCase(false, false, "/", `client.load(['/path/to/'], 'same-dir.proto');`),
+		grpcTestCase(false, false, "/whatever", `client.load(['/other', '/path/to/'], 'same-dir.proto');`),
+		grpcTestCase(false, false, "/", `client.load(['./path//to/'], 'same-dir.proto');`),
+		grpcTestCase(false, false, "/path/", `client.load(['./to/'], 'same-dir.proto');`),
+		grpcTestCase(false, false, "/whatever", `client.load(['../path/to/'], 'same-dir.proto');`),
+
+		// Import another file that imports "to/service.proto" directly
+		grpcTestCase(true, false, "/", `client.load([], '/path/to/subdir.proto');`),
+		grpcTestCase(false, false, "/path/", `client.load([], 'subdir.proto');`),
+		grpcTestCase(false, false, "/", `client.load(['/path/'], 'subdir.proto');`),
+		grpcTestCase(false, false, "/", `client.load(['./path/'], 'subdir.proto');`),
+		grpcTestCase(false, false, "/whatever", `client.load(['/other', '/path/'], 'subdir.proto');`),
+		grpcTestCase(false, false, "/whatever", `client.load(['../other', '../path/'], 'subdir.proto');`),
+
+		// Import another file that imports "/path/to/service.proto" directly
+		grpcTestCase(true, false, "/", `client.load(['/path'], '/path/to/abs.proto');`),
+		grpcTestCase(false, false, "/", `client.load([], '/path/to/abs.proto');`),
+		grpcTestCase(false, false, "/whatever", `client.load(['/'], '/path/to/abs.proto');`),
+	}
+
+	for i, tc := range testCases {
+		i, tc := i, tc
+		t.Run(fmt.Sprintf("TestCase_%d", i), func(t *testing.T) {
+			t.Logf(
+				"CWD: %s, expInitErr: %t, expVUErr: %t, script injected with: `%s`",
+				tc.cwd, tc.expInitErr, tc.expVUErr, tc.script,
+			)
+			runMultiFileTestCase(t, tc, tb)
 		})
 	}
 }
