@@ -135,7 +135,8 @@ jobs:
   configure:
     runs-on: ubuntu-latest
     outputs:
-        version: ${{ steps.get_version.outputs.version }}
+      version: ${{ steps.get_version.outputs.version }}
+      version_ci: ${{ steps.get_version.outputs.version_ci }}
     steps:
       - name: Get version
         id: get_version
@@ -143,6 +144,9 @@ jobs:
           VERSION="${GITHUB_REF##*/}"
           echo "VERSION=${VERSION}"
           echo "::set-output name=version::${VERSION}"
+          VERSION_CI="${VERSION#v}-${GITHUB_SHA::7}"
+          echo "VERSION_CI=${VERSION_CI}"
+          echo "::set-output name=version_ci::${VERSION_CI}"
 
   build:
     runs-on: ubuntu-latest
@@ -182,11 +186,11 @@ jobs:
           path: dist/
           retention-days: 7
 
-  publish-docker:
+  build-docker:
     runs-on: ubuntu-latest
     needs: [deps, lint, test, test-cov, configure]
     env:
-      VERSION: ${{ needs.configure.outputs.version }}
+      VERSION_CI: ${{ needs.configure.outputs.version_ci }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -204,21 +208,49 @@ jobs:
             docker run $DOCKER_IMAGE_ID scale --help
             docker run $DOCKER_IMAGE_ID pause --help
             docker run $DOCKER_IMAGE_ID resume --help
-      - name: Publish
-        if: github.event_name != 'pull_request'
+      - name: Publish Docker CI
         run: |
-          echo "REF=${{ github.ref }}"
           echo "DOCKER_IMAGE_ID=$DOCKER_IMAGE_ID"
-          # Log into registry
-          echo "${{ secrets.DOCKER_PASS }}" | docker login -u "${{ secrets.DOCKER_USER }}" --password-stdin
-          VERSION="${VERSION#v}"
-          echo "VERSION=$VERSION"
-          docker tag "$DOCKER_IMAGE_ID" "$DOCKER_IMAGE_ID:$VERSION"
-          docker push "$DOCKER_IMAGE_ID:$VERSION"
+          # Log into GHCR
+          echo "${{ secrets.CR_PAT }}" | docker login https://ghcr.io -u ${{ github.actor }} --password-stdin
+          docker tag "$DOCKER_IMAGE_ID" "ghcr.io/$DOCKER_IMAGE_ID/ci:$VERSION_CI"
+          docker push "ghcr.io/$DOCKER_IMAGE_ID/ci:$VERSION_CI"
+
+  publish-docker:
+    runs-on: ubuntu-latest
+    needs: [build-docker, configure]
+    if: github.event_name != 'pull_request'
+    env:
+      VERSION: ${{ needs.configure.outputs.version }}
+      VERSION_CI: ${{ needs.configure.outputs.version_ci }}
+    steps:
+      - name: Publish Container Registries
+        run: |
+          echo 'Publish Docker'
+          skopeo copy --src-creds ${{ github.actor }}:${{ secrets.CR_PAT }} \
+                      --dest-creds ${{ secrets.DOCKER_USER }}:${{ secrets.DOCKER_PASS }} \
+                      docker://ghcr.io/$DOCKER_IMAGE_ID/ci:$VERSION_CI \
+                      docker://$DOCKER_IMAGE_ID:$VERSION
+
+          echo 'Publish GHCR'
+          skopeo copy --src-creds ${{ github.actor }}:${{ secrets.CR_PAT }} \
+                      --dest-creds ${{ github.actor }}:${{ secrets.CR_PAT }} \
+                      docker://ghcr.io/$DOCKER_IMAGE_ID/ci:$VERSION_CI \
+                      docker://ghcr.io/$DOCKER_IMAGE_ID:$VERSION
+
           # We also want to tag the latest stable version as latest
           if [[ "$VERSION" != "master" ]] && [[ ! "$VERSION" =~ (RC|rc) ]]; then
-            docker tag "$DOCKER_IMAGE_ID" "$DOCKER_IMAGE_ID:latest"
-            docker push "$DOCKER_IMAGE_ID:latest"
+            echo 'Publish Docker (latest)'
+            skopeo copy --src-creds ${{ github.actor }}:${{ secrets.CR_PAT }} \
+                        --dest-creds ${{ secrets.DOCKER_USER }}:${{ secrets.DOCKER_PASS }} \
+                        docker://ghcr.io/$DOCKER_IMAGE_ID/ci:$VERSION_CI \
+                        docker://$DOCKER_IMAGE_ID:latest
+
+            echo 'Publish GHCR (latest)'
+            skopeo copy --src-creds ${{ github.actor }}:${{ secrets.CR_PAT }} \
+                        --dest-creds ${{ github.actor }}:${{ secrets.CR_PAT }} \
+                        docker://ghcr.io/$DOCKER_IMAGE_ID/ci:$VERSION_CI \
+                        docker://ghcr.io/$DOCKER_IMAGE_ID:latest
           fi
 
   publish-github:
