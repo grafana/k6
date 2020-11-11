@@ -316,6 +316,6 @@ jobs:
       VERSION: ${{ needs.configure.outputs.version }}
     steps:
       - name: Set up Homebrew
-        uses: Homebrew/actions/setup-homebrew@cd7c1eba155dc11d77aa3e3e4013836ad96a6894
+        uses: Homebrew/actions/setup-homebrew@2eb78889a50ba021d744837934f1af2d8c4458ec
       - name: Create version bump PR
         run: brew bump-formula-pr k6 --tag="$VERSION" --revision="$GITHUB_SHA"
