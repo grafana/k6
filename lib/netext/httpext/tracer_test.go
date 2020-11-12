@@ -148,9 +148,6 @@ func (c failingConn) Write(b []byte) (int, error) {
 }
 
 func TestTracerNegativeHttpSendingValues(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip()
-	}
 	t.Parallel()
 	srv := httptest.NewTLSServer(httpbin.New().Handler())
 	defer srv.Close()

@@ -1077,9 +1077,6 @@ func TestDNSResolver(t *testing.T) {
 }
 
 func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip()
-	}
 	t.Parallel()
 	script := []byte(`
 	import { Counter } from "k6/metrics";
