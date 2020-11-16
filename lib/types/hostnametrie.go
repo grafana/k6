@@ -83,9 +83,8 @@ func (d NullHostnameTrie) MarshalJSON() ([]byte, error) {
 // for wildcards exclusively at the start of the pattern. Items may only
 // be inserted and searched. Internationalized hostnames are valid.
 type HostnameTrie struct {
+	*trieNode
 	source []string
-
-	children map[rune]*HostnameTrie
 }
 
 // NewNullHostnameTrie returns a NullHostnameTrie encapsulating HostnameTrie or an error if the
@@ -105,6 +104,10 @@ func NewNullHostnameTrie(source []string) (NullHostnameTrie, error) {
 func NewHostnameTrie(source []string) (*HostnameTrie, error) {
 	h := &HostnameTrie{
 		source: source,
+		trieNode: &trieNode{
+			isLeaf:   false,
+			children: make(map[rune]*trieNode),
+		},
 	}
 	for _, s := range h.source {
 		if err := h.insert(s); err != nil {
@@ -135,42 +138,52 @@ func (t *HostnameTrie) insert(s string) error {
 		return err
 	}
 
-	return t.childInsert(s)
-}
-
-func (t *HostnameTrie) childInsert(s string) error {
-	if len(s) == 0 {
-		return nil
-	}
-
-	// mask creation of the trie by initializing the root here
-	if t.children == nil {
-		t.children = make(map[rune]*HostnameTrie)
-	}
-
-	rStr := []rune(s) // need to iterate by runes for intl' names
-	last := len(rStr) - 1
-	if c, ok := t.children[rStr[last]]; ok {
-		return c.childInsert(string(rStr[:last]))
-	}
-
-	t.children[rStr[last]] = &HostnameTrie{children: make(map[rune]*HostnameTrie)}
-	return t.children[rStr[last]].childInsert(string(rStr[:last]))
+	return t.trieNode.insert(s)
 }
 
 // Contains returns whether s matches a pattern in the HostnameTrie
 // along with the matching pattern, if one was found.
 func (t *HostnameTrie) Contains(s string) (matchedPattern string, matchFound bool) {
+	return t.trieNode.contains(s)
+}
+
+type trieNode struct {
+	isLeaf   bool
+	children map[rune]*trieNode
+}
+
+func (t *trieNode) insert(s string) error {
+	if len(s) == 0 {
+		t.isLeaf = true
+		return nil
+	}
+
+	// mask creation of the trie by initializing the root here
+	if t.children == nil {
+		t.children = make(map[rune]*trieNode)
+	}
+
+	rStr := []rune(s) // need to iterate by runes for intl' names
+	last := len(rStr) - 1
+	if c, ok := t.children[rStr[last]]; ok {
+		return c.insert(string(rStr[:last]))
+	}
+
+	t.children[rStr[last]] = &trieNode{children: make(map[rune]*trieNode)}
+	return t.children[rStr[last]].insert(string(rStr[:last]))
+}
+
+func (t *trieNode) contains(s string) (matchedPattern string, matchFound bool) {
 	s = strings.ToLower(s)
 	if len(s) == 0 {
-		if len(t.children) == 0 {
+		if t.isLeaf {
 			return "", true
 		}
 	} else {
 		rStr := []rune(s)
 		last := len(rStr) - 1
 		if c, ok := t.children[rStr[last]]; ok {
-			if match, matched := c.Contains(string(rStr[:last])); matched {
+			if match, matched := c.contains(string(rStr[:last])); matched {
 				return match + string(rStr[last]), true
 			}
 		}
