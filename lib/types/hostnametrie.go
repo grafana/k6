@@ -163,14 +163,16 @@ func (t *HostnameTrie) childInsert(s string) error {
 func (t *HostnameTrie) Contains(s string) (matchedPattern string, matchFound bool) {
 	s = strings.ToLower(s)
 	if len(s) == 0 {
-		return s, len(t.children) == 0
-	}
-
-	rStr := []rune(s)
-	last := len(rStr) - 1
-	if c, ok := t.children[rStr[last]]; ok {
-		if match, matched := c.Contains(string(rStr[:last])); matched {
-			return match + string(rStr[last]), true
+		if len(t.children) == 0 {
+			return "", true
+		}
+	} else {
+		rStr := []rune(s)
+		last := len(rStr) - 1
+		if c, ok := t.children[rStr[last]]; ok {
+			if match, matched := c.Contains(string(rStr[:last])); matched {
+				return match + string(rStr[last]), true
+			}
 		}
 	}
 
