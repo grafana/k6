@@ -71,18 +71,29 @@ func (c *Compiler) Transform(src, filename string) (code string, srcmap *SourceM
 }
 
 // Compile the program in the given CompatibilityMode, wrapping it between pre and post code
-func (c *Compiler) Compile(src, filename, pre, post string,
-	strict bool, compatMode lib.CompatibilityMode) (*goja.Program, string, error) {
+func (c *Compiler) Compile(
+	src, filename, pre, post string, strict bool, compatMode lib.CompatibilityMode,
+) (*goja.Program, string, error) {
+	var babelTransformations int
+	if compatMode == lib.CompatibilityModeExtended {
+		babelTransformations = 2 // this is two because in some cases babel doesn't do enough in 1 iteration
+	}
+	return c.compile(src, filename, pre, post, strict, babelTransformations)
+}
+
+func (c *Compiler) compile(
+	src, filename, pre, post string, strict bool, babelTransformations int,
+) (*goja.Program, string, error) {
 	code := pre + src + post
 	ast, err := parser.ParseFile(nil, filename, code, 0)
 	if err != nil {
-		if compatMode == lib.CompatibilityModeExtended {
+		if babelTransformations > 0 {
+			babelTransformations-- // decrease the number so we don't loop
 			code, _, err = c.Transform(src, filename)
 			if err != nil {
 				return nil, code, err
 			}
-			// the compatibility mode "decreases" here as we shouldn't transform twice
-			return c.Compile(code, filename, pre, post, strict, lib.CompatibilityModeBase)
+			return c.compile(code, filename, pre, post, strict, babelTransformations)
 		}
 		return nil, code, err
 	}
