@@ -6,9 +6,12 @@
 .vscode
 *.sublime-workspace
 *.log
+*.syso
 .idea
 
 *.DS_Store
+
+/versioninfo.json
 
 /vendor/**/.editorconfig
 /vendor/**/*.jpg
