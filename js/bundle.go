@@ -280,7 +280,7 @@ func (b *Bundle) instantiate(logger logrus.FieldLogger, rt *goja.Runtime, init *
 	rt.SetRandSource(common.NewRandSource())
 
 	if init.compatibilityMode == lib.CompatibilityModeExtended {
-		if _, err := rt.RunProgram(jslib.GetCoreJS()); err != nil {
+		if err := jslib.AddPolyfills(rt); err != nil {
 			return err
 		}
 	}
