@@ -71,8 +71,6 @@ func init() {
 		"es7.reflect.has-own-metadata.js",
 		"es7.reflect.metadata.js",
 		"es7.string.match-all.js",
-		"es7.string.pad-end.js",
-		"es7.string.pad-start.js",
 		"es7.string.trim-left.js",
 		"es7.string.trim-right.js",
 		"_export.js",
@@ -112,8 +110,6 @@ func init() {
 		"_set-to-string-tag.js",
 		"_shared.js",
 		"_shared-key.js",
-		"_string-pad.js",
-		"_string-repeat.js",
 		"_string-trim.js",
 		"_string-ws.js",
 		"_to-absolute-index.js",
@@ -193,10 +189,10 @@ func AddPolyfills(rt *goja.Runtime) error {
 require('es7.array.flat-map');
 require('es7.array.flatten'); // this is now called flat, so maybe drop it
 // require('es7.string.at'); // it is in es2020 but is with completely different semantics
-require('es7.string.pad-start');
-require('es7.string.pad-end');
-require('es7.string.trim-left');
-require('es7.string.trim-right');
+//require('es7.string.pad-start'); // in goja
+// require('es7.string.pad-end');  // in goja
+require('es7.string.trim-left'); // this can probably be very easily added ... it is basically alias for trimStart
+require('es7.string.trim-right'); // same as above
 require('es7.string.match-all');
 // require('es7.symbol.async-iterator'); // async
 // require('es7.symbol.observable'); // async

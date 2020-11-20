@@ -323,216 +323,192 @@ func init() {
 		Content: string("var global = require('./_global');\nvar SHARED = '__core-js_shared__';\nvar store = global[SHARED] || (global[SHARED] = {});\nmodule.exports = function (key) {\n  return store[key] || (store[key] = {});\n};\n"),
 	}
 	file1i := &embedded.EmbeddedFile{
-		Filename:    "_string-pad.js",
-		FileModTime: time.Unix(1605865564, 0),
-
-		Content: string("// https://github.com/tc39/proposal-string-pad-start-end\nvar toLength = require('./_to-length');\nvar repeat = require('./_string-repeat');\nvar defined = require('./_defined');\n\nmodule.exports = function (that, maxLength, fillString, left) {\n  var S = String(defined(that));\n  var stringLength = S.length;\n  var fillStr = fillString === undefined ? ' ' : String(fillString);\n  var intMaxLength = toLength(maxLength);\n  if (intMaxLength <= stringLength || fillStr == '') return S;\n  var fillLen = intMaxLength - stringLength;\n  var stringFiller = repeat.call(fillStr, Math.ceil(fillLen / fillStr.length));\n  if (stringFiller.length > fillLen) stringFiller = stringFiller.slice(0, fillLen);\n  return left ? stringFiller + S : S + stringFiller;\n};\n"),
-	}
-	file1j := &embedded.EmbeddedFile{
-		Filename:    "_string-repeat.js",
-		FileModTime: time.Unix(1605865564, 0),
-
-		Content: string("'use strict';\nvar toInteger = require('./_to-integer');\nvar defined = require('./_defined');\n\nmodule.exports = function repeat(count) {\n  var str = String(defined(this));\n  var res = '';\n  var n = toInteger(count);\n  if (n < 0 || n == Infinity) throw RangeError(\"Count can't be negative\");\n  for (;n > 0; (n >>>= 1) && (str += str)) if (n & 1) res += str;\n  return res;\n};\n"),
-	}
-	file1k := &embedded.EmbeddedFile{
 		Filename:    "_string-trim.js",
 		FileModTime: time.Unix(1605865564, 0),
 
 		Content: string("var $export = require('./_export');\nvar defined = require('./_defined');\nvar fails = require('./_fails');\nvar spaces = require('./_string-ws');\nvar space = '[' + spaces + ']';\nvar non = '\\u200b\\u0085';\nvar ltrim = RegExp('^' + space + space + '*');\nvar rtrim = RegExp(space + space + '*$');\n\nvar exporter = function (KEY, exec, ALIAS) {\n  var exp = {};\n  var FORCE = fails(function () {\n    return !!spaces[KEY]() || non[KEY]() != non;\n  });\n  var fn = exp[KEY] = FORCE ? exec(trim) : spaces[KEY];\n  if (ALIAS) exp[ALIAS] = fn;\n  $export($export.P + $export.F * FORCE, 'String', exp);\n};\n\n// 1 -> String#trimLeft\n// 2 -> String#trimRight\n// 3 -> String#trim\nvar trim = exporter.trim = function (string, TYPE) {\n  string = String(defined(string));\n  if (TYPE & 1) string = string.replace(ltrim, '');\n  if (TYPE & 2) string = string.replace(rtrim, '');\n  return string;\n};\n\nmodule.exports = exporter;\n"),
 	}
-	file1l := &embedded.EmbeddedFile{
+	file1j := &embedded.EmbeddedFile{
 		Filename:    "_string-ws.js",
 		FileModTime: time.Unix(1605865564, 0),
 
 		Content: string("module.exports = '\\x09\\x0A\\x0B\\x0C\\x0D\\x20\\xA0\\u1680\\u180E\\u2000\\u2001\\u2002\\u2003' +\n  '\\u2004\\u2005\\u2006\\u2007\\u2008\\u2009\\u200A\\u202F\\u205F\\u3000\\u2028\\u2029\\uFEFF';\n"),
 	}
-	file1m := &embedded.EmbeddedFile{
+	file1k := &embedded.EmbeddedFile{
 		Filename:    "_to-absolute-index.js",
 		FileModTime: time.Unix(1605865564, 0),
 
 		Content: string("var toInteger = require('./_to-integer');\nvar max = Math.max;\nvar min = Math.min;\nmodule.exports = function (index, length) {\n  index = toInteger(index);\n  return index < 0 ? max(index + length, 0) : min(index, length);\n};\n"),
 	}
-	file1n := &embedded.EmbeddedFile{
+	file1l := &embedded.EmbeddedFile{
 		Filename:    "_to-integer.js",
 		FileModTime: time.Unix(1605865564, 0),
 
 		Content: string("// 7.1.4 ToInteger\nvar ceil = Math.ceil;\nvar floor = Math.floor;\nmodule.exports = function (it) {\n  return isNaN(it = +it) ? 0 : (it > 0 ? floor : ceil)(it);\n};\n"),
 	}
-	file1o := &embedded.EmbeddedFile{
+	file1m := &embedded.EmbeddedFile{
 		Filename:    "_to-iobject.js",
 		FileModTime: time.Unix(1605865564, 0),
 
 		Content: string("// to indexed object, toObject with fallback for non-array-like ES3 strings\nvar IObject = require('./_iobject');\nvar defined = require('./_defined');\nmodule.exports = function (it) {\n  return IObject(defined(it));\n};\n"),
 	}
-	file1p := &embedded.EmbeddedFile{
+	file1n := &embedded.EmbeddedFile{
 		Filename:    "_to-length.js",
 		FileModTime: time.Unix(1605865564, 0),
 
 		Content: string("// 7.1.15 ToLength\nvar toInteger = require('./_to-integer');\nvar min = Math.min;\nmodule.exports = function (it) {\n  return it > 0 ? min(toInteger(it), 0x1fffffffffffff) : 0; // pow(2, 53) - 1 == 9007199254740991\n};\n"),
 	}
-	file1q := &embedded.EmbeddedFile{
+	file1o := &embedded.EmbeddedFile{
 		Filename:    "_to-object.js",
 		FileModTime: time.Unix(1605865564, 0),
 
 		Content: string("// 7.1.13 ToObject(argument)\nvar defined = require('./_defined');\nmodule.exports = function (it) {\n  return Object(defined(it));\n};\n"),
 	}
-	file1r := &embedded.EmbeddedFile{
+	file1p := &embedded.EmbeddedFile{
 		Filename:    "_to-primitive.js",
 		FileModTime: time.Unix(1605865564, 0),
 
 		Content: string("// 7.1.1 ToPrimitive(input [, PreferredType])\nvar isObject = require('./_is-object');\n// instead of the ES6 spec version, we didn't implement @@toPrimitive case\n// and the second argument - flag - preferred type is a string\nmodule.exports = function (it, S) {\n  if (!isObject(it)) return it;\n  var fn, val;\n  if (S && typeof (fn = it.toString) == 'function' && !isObject(val = fn.call(it))) return val;\n  if (typeof (fn = it.valueOf) == 'function' && !isObject(val = fn.call(it))) return val;\n  if (!S && typeof (fn = it.toString) == 'function' && !isObject(val = fn.call(it))) return val;\n  throw TypeError(\"Can't convert object to primitive value\");\n};\n"),
 	}
-	file1s := &embedded.EmbeddedFile{
+	file1q := &embedded.EmbeddedFile{
 		Filename:    "_uid.js",
 		FileModTime: time.Unix(1605865564, 0),
 
 		Content: string("var id = 0;\nvar px = Math.random();\nmodule.exports = function (key) {\n  return 'Symbol('.concat(key === undefined ? '' : key, ')_', (++id + px).toString(36));\n};\n"),
 	}
-	file1t := &embedded.EmbeddedFile{
+	file1r := &embedded.EmbeddedFile{
 		Filename:    "_wks.js",
 		FileModTime: time.Unix(1605865564, 0),
 
 		Content: string("var store = require('./_shared')('wks');\nvar uid = require('./_uid');\nvar Symbol = require('./_global').Symbol;\nvar USE_SYMBOL = typeof Symbol == 'function';\n\nvar $exports = module.exports = function (name) {\n  return store[name] || (store[name] =\n    USE_SYMBOL && Symbol[name] || (USE_SYMBOL ? Symbol : uid)('Symbol.' + name));\n};\n\n$exports.store = store;\n"),
 	}
-	file1u := &embedded.EmbeddedFile{
+	file1s := &embedded.EmbeddedFile{
 		Filename:    "core.get-iterator-method.js",
 		FileModTime: time.Unix(1605865564, 0),
 
 		Content: string("var classof = require('./_classof');\nvar ITERATOR = require('./_wks')('iterator');\nvar Iterators = require('./_iterators');\nmodule.exports = require('./_core').getIteratorMethod = function (it) {\n  if (it != undefined) return it[ITERATOR]\n    || it['@@iterator']\n    || Iterators[classof(it)];\n};\n"),
 	}
-	file1v := &embedded.EmbeddedFile{
+	file1t := &embedded.EmbeddedFile{
 		Filename:    "es7.array.flat-map.js",
 		FileModTime: time.Unix(1605865564, 0),
 
 		Content: string("'use strict';\n// https://tc39.github.io/proposal-flatMap/#sec-Array.prototype.flatMap\nvar $export = require('./_export');\nvar flattenIntoArray = require('./_flatten-into-array');\nvar toObject = require('./_to-object');\nvar toLength = require('./_to-length');\nvar aFunction = require('./_a-function');\nvar arraySpeciesCreate = require('./_array-species-create');\n\n$export($export.P, 'Array', {\n  flatMap: function flatMap(callbackfn /* , thisArg */) {\n    var O = toObject(this);\n    var sourceLen, A;\n    aFunction(callbackfn);\n    sourceLen = toLength(O.length);\n    A = arraySpeciesCreate(O, 0);\n    flattenIntoArray(A, O, O, sourceLen, 0, 1, callbackfn, arguments[1]);\n    return A;\n  }\n});\n\nrequire('./_add-to-unscopables')('flatMap');\n"),
 	}
-	file1w := &embedded.EmbeddedFile{
+	file1u := &embedded.EmbeddedFile{
 		Filename:    "es7.array.flatten.js",
 		FileModTime: time.Unix(1605865564, 0),
 
 		Content: string("'use strict';\n// https://tc39.github.io/proposal-flatMap/#sec-Array.prototype.flatten\nvar $export = require('./_export');\nvar flattenIntoArray = require('./_flatten-into-array');\nvar toObject = require('./_to-object');\nvar toLength = require('./_to-length');\nvar toInteger = require('./_to-integer');\nvar arraySpeciesCreate = require('./_array-species-create');\n\n$export($export.P, 'Array', {\n  flatten: function flatten(/* depthArg = 1 */) {\n    var depthArg = arguments[0];\n    var O = toObject(this);\n    var sourceLen = toLength(O.length);\n    var A = arraySpeciesCreate(O, 0);\n    flattenIntoArray(A, O, O, sourceLen, 0, depthArg === undefined ? 1 : toInteger(depthArg));\n    return A;\n  }\n});\n\nrequire('./_add-to-unscopables')('flatten');\n"),
 	}
-	file1x := &embedded.EmbeddedFile{
+	file1v := &embedded.EmbeddedFile{
 		Filename:    "es7.object.define-getter.js",
 		FileModTime: time.Unix(1605865564, 0),
 
 		Content: string("'use strict';\nvar $export = require('./_export');\nvar toObject = require('./_to-object');\nvar aFunction = require('./_a-function');\nvar $defineProperty = require('./_object-dp');\n\n// B.2.2.2 Object.prototype.__defineGetter__(P, getter)\nrequire('./_descriptors') && $export($export.P + require('./_object-forced-pam'), 'Object', {\n  __defineGetter__: function __defineGetter__(P, getter) {\n    $defineProperty.f(toObject(this), P, { get: aFunction(getter), enumerable: true, configurable: true });\n  }\n});\n"),
 	}
-	file1y := &embedded.EmbeddedFile{
+	file1w := &embedded.EmbeddedFile{
 		Filename:    "es7.object.define-setter.js",
 		FileModTime: time.Unix(1605865564, 0),
 
 		Content: string("'use strict';\nvar $export = require('./_export');\nvar toObject = require('./_to-object');\nvar aFunction = require('./_a-function');\nvar $defineProperty = require('./_object-dp');\n\n// B.2.2.3 Object.prototype.__defineSetter__(P, setter)\nrequire('./_descriptors') && $export($export.P + require('./_object-forced-pam'), 'Object', {\n  __defineSetter__: function __defineSetter__(P, setter) {\n    $defineProperty.f(toObject(this), P, { set: aFunction(setter), enumerable: true, configurable: true });\n  }\n});\n"),
 	}
-	file1z := &embedded.EmbeddedFile{
+	file1x := &embedded.EmbeddedFile{
 		Filename:    "es7.object.entries.js",
 		FileModTime: time.Unix(1605865564, 0),
 
 		Content: string("// https://github.com/tc39/proposal-object-values-entries\nvar $export = require('./_export');\nvar $entries = require('./_object-to-array')(true);\n\n$export($export.S, 'Object', {\n  entries: function entries(it) {\n    return $entries(it);\n  }\n});\n"),
 	}
-	file20 := &embedded.EmbeddedFile{
+	file1y := &embedded.EmbeddedFile{
 		Filename:    "es7.object.get-own-property-descriptors.js",
 		FileModTime: time.Unix(1605865564, 0),
 
 		Content: string("// https://github.com/tc39/proposal-object-getownpropertydescriptors\nvar $export = require('./_export');\nvar ownKeys = require('./_own-keys');\nvar toIObject = require('./_to-iobject');\nvar gOPD = require('./_object-gopd');\nvar createProperty = require('./_create-property');\n\n$export($export.S, 'Object', {\n  getOwnPropertyDescriptors: function getOwnPropertyDescriptors(object) {\n    var O = toIObject(object);\n    var getDesc = gOPD.f;\n    var keys = ownKeys(O);\n    var result = {};\n    var i = 0;\n    var key, desc;\n    while (keys.length > i) {\n      desc = getDesc(O, key = keys[i++]);\n      if (desc !== undefined) createProperty(result, key, desc);\n    }\n    return result;\n  }\n});\n"),
 	}
-	file21 := &embedded.EmbeddedFile{
+	file1z := &embedded.EmbeddedFile{
 		Filename:    "es7.object.lookup-getter.js",
 		FileModTime: time.Unix(1605865564, 0),
 
 		Content: string("'use strict';\nvar $export = require('./_export');\nvar toObject = require('./_to-object');\nvar toPrimitive = require('./_to-primitive');\nvar getPrototypeOf = require('./_object-gpo');\nvar getOwnPropertyDescriptor = require('./_object-gopd').f;\n\n// B.2.2.4 Object.prototype.__lookupGetter__(P)\nrequire('./_descriptors') && $export($export.P + require('./_object-forced-pam'), 'Object', {\n  __lookupGetter__: function __lookupGetter__(P) {\n    var O = toObject(this);\n    var K = toPrimitive(P, true);\n    var D;\n    do {\n      if (D = getOwnPropertyDescriptor(O, K)) return D.get;\n    } while (O = getPrototypeOf(O));\n  }\n});\n"),
 	}
-	file22 := &embedded.EmbeddedFile{
+	file20 := &embedded.EmbeddedFile{
 		Filename:    "es7.object.lookup-setter.js",
 		FileModTime: time.Unix(1605865564, 0),
 
 		Content: string("'use strict';\nvar $export = require('./_export');\nvar toObject = require('./_to-object');\nvar toPrimitive = require('./_to-primitive');\nvar getPrototypeOf = require('./_object-gpo');\nvar getOwnPropertyDescriptor = require('./_object-gopd').f;\n\n// B.2.2.5 Object.prototype.__lookupSetter__(P)\nrequire('./_descriptors') && $export($export.P + require('./_object-forced-pam'), 'Object', {\n  __lookupSetter__: function __lookupSetter__(P) {\n    var O = toObject(this);\n    var K = toPrimitive(P, true);\n    var D;\n    do {\n      if (D = getOwnPropertyDescriptor(O, K)) return D.set;\n    } while (O = getPrototypeOf(O));\n  }\n});\n"),
 	}
-	file23 := &embedded.EmbeddedFile{
+	file21 := &embedded.EmbeddedFile{
 		Filename:    "es7.object.values.js",
 		FileModTime: time.Unix(1605865564, 0),
 
 		Content: string("// https://github.com/tc39/proposal-object-values-entries\nvar $export = require('./_export');\nvar $values = require('./_object-to-array')(false);\n\n$export($export.S, 'Object', {\n  values: function values(it) {\n    return $values(it);\n  }\n});\n"),
 	}
-	file24 := &embedded.EmbeddedFile{
+	file22 := &embedded.EmbeddedFile{
 		Filename:    "es7.reflect.define-metadata.js",
 		FileModTime: time.Unix(1605865564, 0),
 
 		Content: string("var metadata = require('./_metadata');\nvar anObject = require('./_an-object');\nvar toMetaKey = metadata.key;\nvar ordinaryDefineOwnMetadata = metadata.set;\n\nmetadata.exp({ defineMetadata: function defineMetadata(metadataKey, metadataValue, target, targetKey) {\n  ordinaryDefineOwnMetadata(metadataKey, metadataValue, anObject(target), toMetaKey(targetKey));\n} });\n"),
 	}
-	file25 := &embedded.EmbeddedFile{
+	file23 := &embedded.EmbeddedFile{
 		Filename:    "es7.reflect.delete-metadata.js",
 		FileModTime: time.Unix(1605865564, 0),
 
 		Content: string("var metadata = require('./_metadata');\nvar anObject = require('./_an-object');\nvar toMetaKey = metadata.key;\nvar getOrCreateMetadataMap = metadata.map;\nvar store = metadata.store;\n\nmetadata.exp({ deleteMetadata: function deleteMetadata(metadataKey, target /* , targetKey */) {\n  var targetKey = arguments.length < 3 ? undefined : toMetaKey(arguments[2]);\n  var metadataMap = getOrCreateMetadataMap(anObject(target), targetKey, false);\n  if (metadataMap === undefined || !metadataMap['delete'](metadataKey)) return false;\n  if (metadataMap.size) return true;\n  var targetMetadata = store.get(target);\n  targetMetadata['delete'](targetKey);\n  return !!targetMetadata.size || store['delete'](target);\n} });\n"),
 	}
-	file26 := &embedded.EmbeddedFile{
+	file24 := &embedded.EmbeddedFile{
 		Filename:    "es7.reflect.get-metadata-keys.js",
 		FileModTime: time.Unix(1605883563, 0),
 
 		Content: string("var Set = require('./es6.set');\nvar from = require('./_array-from-iterable');\nvar metadata = require('./_metadata');\nvar anObject = require('./_an-object');\nvar getPrototypeOf = require('./_object-gpo');\nvar ordinaryOwnMetadataKeys = metadata.keys;\nvar toMetaKey = metadata.key;\n\nvar ordinaryMetadataKeys = function (O, P) {\n  var oKeys = ordinaryOwnMetadataKeys(O, P);\n  var parent = getPrototypeOf(O);\n  if (parent === null) return oKeys;\n  var pKeys = ordinaryMetadataKeys(parent, P);\n  return pKeys.length ? oKeys.length ? from(new Set(oKeys.concat(pKeys))) : pKeys : oKeys;\n};\n\nmetadata.exp({ getMetadataKeys: function getMetadataKeys(target /* , targetKey */) {\n  return ordinaryMetadataKeys(anObject(target), arguments.length < 2 ? undefined : toMetaKey(arguments[1]));\n} });\n"),
 	}
-	file27 := &embedded.EmbeddedFile{
+	file25 := &embedded.EmbeddedFile{
 		Filename:    "es7.reflect.get-metadata.js",
 		FileModTime: time.Unix(1605865564, 0),
 
 		Content: string("var metadata = require('./_metadata');\nvar anObject = require('./_an-object');\nvar getPrototypeOf = require('./_object-gpo');\nvar ordinaryHasOwnMetadata = metadata.has;\nvar ordinaryGetOwnMetadata = metadata.get;\nvar toMetaKey = metadata.key;\n\nvar ordinaryGetMetadata = function (MetadataKey, O, P) {\n  var hasOwn = ordinaryHasOwnMetadata(MetadataKey, O, P);\n  if (hasOwn) return ordinaryGetOwnMetadata(MetadataKey, O, P);\n  var parent = getPrototypeOf(O);\n  return parent !== null ? ordinaryGetMetadata(MetadataKey, parent, P) : undefined;\n};\n\nmetadata.exp({ getMetadata: function getMetadata(metadataKey, target /* , targetKey */) {\n  return ordinaryGetMetadata(metadataKey, anObject(target), arguments.length < 3 ? undefined : toMetaKey(arguments[2]));\n} });\n"),
 	}
-	file28 := &embedded.EmbeddedFile{
+	file26 := &embedded.EmbeddedFile{
 		Filename:    "es7.reflect.get-own-metadata-keys.js",
 		FileModTime: time.Unix(1605865564, 0),
 
 		Content: string("var metadata = require('./_metadata');\nvar anObject = require('./_an-object');\nvar ordinaryOwnMetadataKeys = metadata.keys;\nvar toMetaKey = metadata.key;\n\nmetadata.exp({ getOwnMetadataKeys: function getOwnMetadataKeys(target /* , targetKey */) {\n  return ordinaryOwnMetadataKeys(anObject(target), arguments.length < 2 ? undefined : toMetaKey(arguments[1]));\n} });\n"),
 	}
-	file29 := &embedded.EmbeddedFile{
+	file27 := &embedded.EmbeddedFile{
 		Filename:    "es7.reflect.get-own-metadata.js",
 		FileModTime: time.Unix(1605865564, 0),
 
 		Content: string("var metadata = require('./_metadata');\nvar anObject = require('./_an-object');\nvar ordinaryGetOwnMetadata = metadata.get;\nvar toMetaKey = metadata.key;\n\nmetadata.exp({ getOwnMetadata: function getOwnMetadata(metadataKey, target /* , targetKey */) {\n  return ordinaryGetOwnMetadata(metadataKey, anObject(target)\n    , arguments.length < 3 ? undefined : toMetaKey(arguments[2]));\n} });\n"),
 	}
-	file2a := &embedded.EmbeddedFile{
+	file28 := &embedded.EmbeddedFile{
 		Filename:    "es7.reflect.has-metadata.js",
 		FileModTime: time.Unix(1605865564, 0),
 
 		Content: string("var metadata = require('./_metadata');\nvar anObject = require('./_an-object');\nvar getPrototypeOf = require('./_object-gpo');\nvar ordinaryHasOwnMetadata = metadata.has;\nvar toMetaKey = metadata.key;\n\nvar ordinaryHasMetadata = function (MetadataKey, O, P) {\n  var hasOwn = ordinaryHasOwnMetadata(MetadataKey, O, P);\n  if (hasOwn) return true;\n  var parent = getPrototypeOf(O);\n  return parent !== null ? ordinaryHasMetadata(MetadataKey, parent, P) : false;\n};\n\nmetadata.exp({ hasMetadata: function hasMetadata(metadataKey, target /* , targetKey */) {\n  return ordinaryHasMetadata(metadataKey, anObject(target), arguments.length < 3 ? undefined : toMetaKey(arguments[2]));\n} });\n"),
 	}
-	file2b := &embedded.EmbeddedFile{
+	file29 := &embedded.EmbeddedFile{
 		Filename:    "es7.reflect.has-own-metadata.js",
 		FileModTime: time.Unix(1605865564, 0),
 
 		Content: string("var metadata = require('./_metadata');\nvar anObject = require('./_an-object');\nvar ordinaryHasOwnMetadata = metadata.has;\nvar toMetaKey = metadata.key;\n\nmetadata.exp({ hasOwnMetadata: function hasOwnMetadata(metadataKey, target /* , targetKey */) {\n  return ordinaryHasOwnMetadata(metadataKey, anObject(target)\n    , arguments.length < 3 ? undefined : toMetaKey(arguments[2]));\n} });\n"),
 	}
-	file2c := &embedded.EmbeddedFile{
+	file2a := &embedded.EmbeddedFile{
 		Filename:    "es7.reflect.metadata.js",
 		FileModTime: time.Unix(1605865564, 0),
 
 		Content: string("var $metadata = require('./_metadata');\nvar anObject = require('./_an-object');\nvar aFunction = require('./_a-function');\nvar toMetaKey = $metadata.key;\nvar ordinaryDefineOwnMetadata = $metadata.set;\n\n$metadata.exp({ metadata: function metadata(metadataKey, metadataValue) {\n  return function decorator(target, targetKey) {\n    ordinaryDefineOwnMetadata(\n      metadataKey, metadataValue,\n      (targetKey !== undefined ? anObject : aFunction)(target),\n      toMetaKey(targetKey)\n    );\n  };\n} });\n"),
 	}
-	file2d := &embedded.EmbeddedFile{
+	file2b := &embedded.EmbeddedFile{
 		Filename:    "es7.string.match-all.js",
 		FileModTime: time.Unix(1605865564, 0),
 
 		Content: string("'use strict';\n// https://tc39.github.io/String.prototype.matchAll/\nvar $export = require('./_export');\nvar defined = require('./_defined');\nvar toLength = require('./_to-length');\nvar isRegExp = require('./_is-regexp');\nvar getFlags = require('./_flags');\nvar RegExpProto = RegExp.prototype;\n\nvar $RegExpStringIterator = function (regexp, string) {\n  this._r = regexp;\n  this._s = string;\n};\n\nrequire('./_iter-create')($RegExpStringIterator, 'RegExp String', function next() {\n  var match = this._r.exec(this._s);\n  return { value: match, done: match === null };\n});\n\n$export($export.P, 'String', {\n  matchAll: function matchAll(regexp) {\n    defined(this);\n    if (!isRegExp(regexp)) throw TypeError(regexp + ' is not a regexp!');\n    var S = String(this);\n    var flags = 'flags' in RegExpProto ? String(regexp.flags) : getFlags.call(regexp);\n    var rx = new RegExp(regexp.source, ~flags.indexOf('g') ? flags : 'g' + flags);\n    rx.lastIndex = toLength(regexp.lastIndex);\n    return new $RegExpStringIterator(rx, S);\n  }\n});\n"),
 	}
-	file2e := &embedded.EmbeddedFile{
-		Filename:    "es7.string.pad-end.js",
-		FileModTime: time.Unix(1605865564, 0),
-
-		Content: string("'use strict';\n// https://github.com/tc39/proposal-string-pad-start-end\nvar $export = require('./_export');\nvar $pad = require('./_string-pad');\n\n$export($export.P, 'String', {\n  padEnd: function padEnd(maxLength /* , fillString = ' ' */) {\n    return $pad(this, maxLength, arguments.length > 1 ? arguments[1] : undefined, false);\n  }\n});\n"),
-	}
-	file2f := &embedded.EmbeddedFile{
-		Filename:    "es7.string.pad-start.js",
-		FileModTime: time.Unix(1605865564, 0),
-
-		Content: string("'use strict';\n// https://github.com/tc39/proposal-string-pad-start-end\nvar $export = require('./_export');\nvar $pad = require('./_string-pad');\n\n$export($export.P, 'String', {\n  padStart: function padStart(maxLength /* , fillString = ' ' */) {\n    return $pad(this, maxLength, arguments.length > 1 ? arguments[1] : undefined, true);\n  }\n});\n"),
-	}
-	file2g := &embedded.EmbeddedFile{
+	file2c := &embedded.EmbeddedFile{
 		Filename:    "es7.string.trim-left.js",
 		FileModTime: time.Unix(1605865564, 0),
 
 		Content: string("'use strict';\n// https://github.com/sebmarkbage/ecmascript-string-left-right-trim\nrequire('./_string-trim')('trimLeft', function ($trim) {\n  return function trimLeft() {\n    return $trim(this, 1);\n  };\n}, 'trimStart');\n"),
 	}
-	file2h := &embedded.EmbeddedFile{
+	file2d := &embedded.EmbeddedFile{
 		Filename:    "es7.string.trim-right.js",
 		FileModTime: time.Unix(1605865564, 0),
 
@@ -542,7 +518,7 @@ func init() {
 	// define dirs
 	dir1 := &embedded.EmbeddedDir{
 		Filename:   "",
-		DirModTime: time.Unix(1605884028, 0),
+		DirModTime: time.Unix(1605889417, 0),
 		ChildFiles: []*embedded.EmbeddedFile{
 			file2,  // "_a-function.js"
 			file3,  // "_add-to-unscopables.js"
@@ -596,42 +572,38 @@ func init() {
 			file1f, // "_set-to-string-tag.js"
 			file1g, // "_shared-key.js"
 			file1h, // "_shared.js"
-			file1i, // "_string-pad.js"
-			file1j, // "_string-repeat.js"
-			file1k, // "_string-trim.js"
-			file1l, // "_string-ws.js"
-			file1m, // "_to-absolute-index.js"
-			file1n, // "_to-integer.js"
-			file1o, // "_to-iobject.js"
-			file1p, // "_to-length.js"
-			file1q, // "_to-object.js"
-			file1r, // "_to-primitive.js"
-			file1s, // "_uid.js"
-			file1t, // "_wks.js"
-			file1u, // "core.get-iterator-method.js"
-			file1v, // "es7.array.flat-map.js"
-			file1w, // "es7.array.flatten.js"
-			file1x, // "es7.object.define-getter.js"
-			file1y, // "es7.object.define-setter.js"
-			file1z, // "es7.object.entries.js"
-			file20, // "es7.object.get-own-property-descriptors.js"
-			file21, // "es7.object.lookup-getter.js"
-			file22, // "es7.object.lookup-setter.js"
-			file23, // "es7.object.values.js"
-			file24, // "es7.reflect.define-metadata.js"
-			file25, // "es7.reflect.delete-metadata.js"
-			file26, // "es7.reflect.get-metadata-keys.js"
-			file27, // "es7.reflect.get-metadata.js"
-			file28, // "es7.reflect.get-own-metadata-keys.js"
-			file29, // "es7.reflect.get-own-metadata.js"
-			file2a, // "es7.reflect.has-metadata.js"
-			file2b, // "es7.reflect.has-own-metadata.js"
-			file2c, // "es7.reflect.metadata.js"
-			file2d, // "es7.string.match-all.js"
-			file2e, // "es7.string.pad-end.js"
-			file2f, // "es7.string.pad-start.js"
-			file2g, // "es7.string.trim-left.js"
-			file2h, // "es7.string.trim-right.js"
+			file1i, // "_string-trim.js"
+			file1j, // "_string-ws.js"
+			file1k, // "_to-absolute-index.js"
+			file1l, // "_to-integer.js"
+			file1m, // "_to-iobject.js"
+			file1n, // "_to-length.js"
+			file1o, // "_to-object.js"
+			file1p, // "_to-primitive.js"
+			file1q, // "_uid.js"
+			file1r, // "_wks.js"
+			file1s, // "core.get-iterator-method.js"
+			file1t, // "es7.array.flat-map.js"
+			file1u, // "es7.array.flatten.js"
+			file1v, // "es7.object.define-getter.js"
+			file1w, // "es7.object.define-setter.js"
+			file1x, // "es7.object.entries.js"
+			file1y, // "es7.object.get-own-property-descriptors.js"
+			file1z, // "es7.object.lookup-getter.js"
+			file20, // "es7.object.lookup-setter.js"
+			file21, // "es7.object.values.js"
+			file22, // "es7.reflect.define-metadata.js"
+			file23, // "es7.reflect.delete-metadata.js"
+			file24, // "es7.reflect.get-metadata-keys.js"
+			file25, // "es7.reflect.get-metadata.js"
+			file26, // "es7.reflect.get-own-metadata-keys.js"
+			file27, // "es7.reflect.get-own-metadata.js"
+			file28, // "es7.reflect.has-metadata.js"
+			file29, // "es7.reflect.has-own-metadata.js"
+			file2a, // "es7.reflect.metadata.js"
+			file2b, // "es7.string.match-all.js"
+			file2c, // "es7.string.trim-left.js"
+			file2d, // "es7.string.trim-right.js"
 
 		},
 	}
@@ -642,7 +614,7 @@ func init() {
 	// register embeddedBox
 	embedded.RegisterEmbeddedBox(`core-js`, &embedded.EmbeddedBox{
 		Name: `core-js`,
-		Time: time.Unix(1605884028, 0),
+		Time: time.Unix(1605889417, 0),
 		Dirs: map[string]*embedded.EmbeddedDir{
 			"": dir1,
 		},
@@ -699,42 +671,38 @@ func init() {
 			"_set-to-string-tag.js":                      file1f,
 			"_shared-key.js":                             file1g,
 			"_shared.js":                                 file1h,
-			"_string-pad.js":                             file1i,
-			"_string-repeat.js":                          file1j,
-			"_string-trim.js":                            file1k,
-			"_string-ws.js":                              file1l,
-			"_to-absolute-index.js":                      file1m,
-			"_to-integer.js":                             file1n,
-			"_to-iobject.js":                             file1o,
-			"_to-length.js":                              file1p,
-			"_to-object.js":                              file1q,
-			"_to-primitive.js":                           file1r,
-			"_uid.js":                                    file1s,
-			"_wks.js":                                    file1t,
-			"core.get-iterator-method.js":                file1u,
-			"es7.array.flat-map.js":                      file1v,
-			"es7.array.flatten.js":                       file1w,
-			"es7.object.define-getter.js":                file1x,
-			"es7.object.define-setter.js":                file1y,
-			"es7.object.entries.js":                      file1z,
-			"es7.object.get-own-property-descriptors.js": file20,
-			"es7.object.lookup-getter.js":                file21,
-			"es7.object.lookup-setter.js":                file22,
-			"es7.object.values.js":                       file23,
-			"es7.reflect.define-metadata.js":             file24,
-			"es7.reflect.delete-metadata.js":             file25,
-			"es7.reflect.get-metadata-keys.js":           file26,
-			"es7.reflect.get-metadata.js":                file27,
-			"es7.reflect.get-own-metadata-keys.js":       file28,
-			"es7.reflect.get-own-metadata.js":            file29,
-			"es7.reflect.has-metadata.js":                file2a,
-			"es7.reflect.has-own-metadata.js":            file2b,
-			"es7.reflect.metadata.js":                    file2c,
-			"es7.string.match-all.js":                    file2d,
-			"es7.string.pad-end.js":                      file2e,
-			"es7.string.pad-start.js":                    file2f,
-			"es7.string.trim-left.js":                    file2g,
-			"es7.string.trim-right.js":                   file2h,
+			"_string-trim.js":                            file1i,
+			"_string-ws.js":                              file1j,
+			"_to-absolute-index.js":                      file1k,
+			"_to-integer.js":                             file1l,
+			"_to-iobject.js":                             file1m,
+			"_to-length.js":                              file1n,
+			"_to-object.js":                              file1o,
+			"_to-primitive.js":                           file1p,
+			"_uid.js":                                    file1q,
+			"_wks.js":                                    file1r,
+			"core.get-iterator-method.js":                file1s,
+			"es7.array.flat-map.js":                      file1t,
+			"es7.array.flatten.js":                       file1u,
+			"es7.object.define-getter.js":                file1v,
+			"es7.object.define-setter.js":                file1w,
+			"es7.object.entries.js":                      file1x,
+			"es7.object.get-own-property-descriptors.js": file1y,
+			"es7.object.lookup-getter.js":                file1z,
+			"es7.object.lookup-setter.js":                file20,
+			"es7.object.values.js":                       file21,
+			"es7.reflect.define-metadata.js":             file22,
+			"es7.reflect.delete-metadata.js":             file23,
+			"es7.reflect.get-metadata-keys.js":           file24,
+			"es7.reflect.get-metadata.js":                file25,
+			"es7.reflect.get-own-metadata-keys.js":       file26,
+			"es7.reflect.get-own-metadata.js":            file27,
+			"es7.reflect.has-metadata.js":                file28,
+			"es7.reflect.has-own-metadata.js":            file29,
+			"es7.reflect.metadata.js":                    file2a,
+			"es7.string.match-all.js":                    file2b,
+			"es7.string.trim-left.js":                    file2c,
+			"es7.string.trim-right.js":                   file2d,
 		},
 	})
 }
