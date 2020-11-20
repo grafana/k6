@@ -49,7 +49,6 @@ func init() {
 		"_cof.js",
 		"_collection.js",
 		"_collection-strong.js",
-		"_collection-to-json.js",
 		"_collection-weak.js",
 		"core.get-iterator-method.js",
 		"_core.js",
@@ -57,20 +56,12 @@ func init() {
 		"_ctx.js",
 		"_defined.js",
 		"_descriptors.js",
-		"_dom-create.js",
 		"_enum-bug-keys.js",
 		"es6.map.js",
-		"es6.promise.js",
 		"es6.set.js",
 		"es6.weak-map.js",
 		"es7.array.flat-map.js",
 		"es7.array.flatten.js",
-		"es7.asap.js",
-		"es7.error.is-error.js",
-		"es7.global.js",
-		"es7.map.from.js",
-		"es7.map.of.js",
-		"es7.map.to-json.js",
 		"es7.object.define-getter.js",
 		"es7.object.define-setter.js",
 		"es7.object.entries.js",
@@ -78,9 +69,6 @@ func init() {
 		"es7.object.lookup-getter.js",
 		"es7.object.lookup-setter.js",
 		"es7.object.values.js",
-		"es7.observable.js",
-		"es7.promise.finally.js",
-		"es7.promise.try.js",
 		"es7.reflect.define-metadata.js",
 		"es7.reflect.delete-metadata.js",
 		"es7.reflect.get-metadata.js",
@@ -90,22 +78,11 @@ func init() {
 		"es7.reflect.has-metadata.js",
 		"es7.reflect.has-own-metadata.js",
 		"es7.reflect.metadata.js",
-		"es7.set.from.js",
-		"es7.set.of.js",
-		"es7.set.to-json.js",
-		"es7.string.at.js",
 		"es7.string.match-all.js",
 		"es7.string.pad-end.js",
 		"es7.string.pad-start.js",
 		"es7.string.trim-left.js",
 		"es7.string.trim-right.js",
-		"es7.symbol.async-iterator.js",
-		"es7.symbol.observable.js",
-		"es7.system.global.js",
-		"es7.weak-map.from.js",
-		"es7.weak-map.of.js",
-		"es7.weak-set.from.js",
-		"es7.weak-set.of.js",
 		"_export.js",
 		"_fails.js",
 		"_flags.js",
@@ -114,10 +91,8 @@ func init() {
 		"_global.js",
 		"_has.js",
 		"_hide.js",
-		"_html.js",
 		"_ie8-dom-define.js",
 		"_inherit-if-required.js",
-		"_invoke.js",
 		"_iobject.js",
 		"_is-array-iter.js",
 		"_is-array.js",
@@ -132,8 +107,6 @@ func init() {
 		"_library.js",
 		"_metadata.js",
 		"_meta.js",
-		"_microtask.js",
-		"_new-promise-capability.js",
 		"_object-assign.js",
 		"_object-create.js",
 		"_object-dp.js",
@@ -148,25 +121,18 @@ func init() {
 		"_object-pie.js",
 		"_object-to-array.js",
 		"_own-keys.js",
-		"_perform.js",
-		"_promise-resolve.js",
 		"_property-desc.js",
 		"_redefine-all.js",
 		"_redefine.js",
-		"_set-collection-from.js",
-		"_set-collection-of.js",
 		"_set-proto.js",
 		"_set-species.js",
 		"_set-to-string-tag.js",
 		"_shared.js",
 		"_shared-key.js",
-		"_species-constructor.js",
-		"_string-at.js",
 		"_string-pad.js",
 		"_string-repeat.js",
 		"_string-trim.js",
 		"_string-ws.js",
-		"_task.js",
 		"_to-absolute-index.js",
 		"_to-integer.js",
 		"_to-iobject.js",
@@ -175,8 +141,6 @@ func init() {
 		"_to-primitive.js",
 		"_uid.js",
 		"_validate-collection.js",
-		"_wks-define.js",
-		"_wks-ext.js",
 		"_wks.js",
 	}
 	compiled = make(map[string]*goja.Program, len(list))
@@ -234,17 +198,17 @@ func AddPolyfills(rt *goja.Runtime) error {
 	}()
 
 	_, err := rt.RunScript("core-js.shim.js", `
-require('es6.promise');
+// require('es6.promise'); // async
 require('es7.array.flat-map');
-require('es7.array.flatten');
-require('es7.string.at');
+require('es7.array.flatten'); // this is now called flat, so maybe drop it
+// require('es7.string.at'); // it is in es2020 but is with completely different semantics
 require('es7.string.pad-start');
 require('es7.string.pad-end');
 require('es7.string.trim-left');
 require('es7.string.trim-right');
 require('es7.string.match-all');
-require('es7.symbol.async-iterator');
-require('es7.symbol.observable');
+// require('es7.symbol.async-iterator'); // async
+// require('es7.symbol.observable'); // async
 require('es7.object.get-own-property-descriptors');
 require('es7.object.values');
 require('es7.object.entries');
@@ -252,21 +216,21 @@ require('es7.object.define-getter');
 require('es7.object.define-setter');
 require('es7.object.lookup-getter');
 require('es7.object.lookup-setter');
-require('es7.map.to-json');
-require('es7.set.to-json');
-require('es7.map.of');
-require('es7.set.of');
-require('es7.weak-map.of');
-require('es7.weak-set.of');
-require('es7.map.from');
-require('es7.set.from');
-require('es7.weak-map.from');
-require('es7.weak-set.from');
-require('es7.global');
-require('es7.system.global');
-require('es7.error.is-error');
-require('es7.promise.finally');
-require('es7.promise.try');
+// require('es7.map.to-json'); // All of this are dropped
+// require('es7.set.to-json');
+// require('es7.map.of');
+// require('es7.set.of');
+// require('es7.weak-map.of');
+// require('es7.weak-set.of');
+// require('es7.map.from');
+// require('es7.set.from');
+// require('es7.weak-map.from');
+// require('es7.weak-set.from');
+// require('es7.global'); // is now globalThis, goja has globasl
+// require('es7.system.global'); // dropped .. I think
+// require('es7.error.is-error'); // dropped
+// require('es7.promise.finally'); // async
+// require('es7.promise.try'); // async
 require('es7.reflect.define-metadata');
 require('es7.reflect.delete-metadata');
 require('es7.reflect.get-metadata');
@@ -276,8 +240,8 @@ require('es7.reflect.get-own-metadata-keys');
 require('es7.reflect.has-metadata');
 require('es7.reflect.has-own-metadata');
 require('es7.reflect.metadata');
-require('es7.asap');
-require('es7.observable');
+// require('es7.asap'); // async
+// require('es7.observable'); // async
 	`)
 	if err != nil {
 		return err
@@ -287,7 +251,7 @@ require('es7.observable');
 	var notNeeded []string
 	rice.MustFindBox("core-js").Walk("", func(path string, info os.FileInfo, err error) error {
 		if !info.IsDir() {
-			if _, ok := programs[path]; !ok {
+			if _, ok := modules[path]; !ok {
 				notNeeded = append(notNeeded, path)
 			}
 		}
