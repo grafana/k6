@@ -38,18 +38,13 @@ func init() {
 	var list = []string{
 		"_add-to-unscopables.js",
 		"_a-function.js",
-		"_an-instance.js",
 		"_an-object.js",
 		"_array-from-iterable.js",
 		"_array-includes.js",
-		"_array-methods.js",
 		"_array-species-constructor.js",
 		"_array-species-create.js",
 		"_classof.js",
 		"_cof.js",
-		"_collection.js",
-		"_collection-strong.js",
-		"_collection-weak.js",
 		"core.get-iterator-method.js",
 		"_core.js",
 		"_create-property.js",
@@ -57,9 +52,6 @@ func init() {
 		"_defined.js",
 		"_descriptors.js",
 		"_enum-bug-keys.js",
-		"es6.map.js",
-		"es6.set.js",
-		"es6.weak-map.js",
 		"es7.array.flat-map.js",
 		"es7.array.flatten.js",
 		"es7.object.define-getter.js",
@@ -92,7 +84,6 @@ func init() {
 		"_has.js",
 		"_hide.js",
 		"_ie8-dom-define.js",
-		"_inherit-if-required.js",
 		"_iobject.js",
 		"_is-array-iter.js",
 		"_is-array.js",
@@ -101,13 +92,8 @@ func init() {
 		"_iterators.js",
 		"_iter-call.js",
 		"_iter-create.js",
-		"_iter-define.js",
-		"_iter-detect.js",
-		"_iter-step.js",
 		"_library.js",
 		"_metadata.js",
-		"_meta.js",
-		"_object-assign.js",
 		"_object-create.js",
 		"_object-dp.js",
 		"_object-dps.js",
@@ -122,10 +108,7 @@ func init() {
 		"_object-to-array.js",
 		"_own-keys.js",
 		"_property-desc.js",
-		"_redefine-all.js",
 		"_redefine.js",
-		"_set-proto.js",
-		"_set-species.js",
 		"_set-to-string-tag.js",
 		"_shared.js",
 		"_shared-key.js",
@@ -140,7 +123,6 @@ func init() {
 		"_to-object.js",
 		"_to-primitive.js",
 		"_uid.js",
-		"_validate-collection.js",
 		"_wks.js",
 	}
 	compiled = make(map[string]*goja.Program, len(list))
@@ -162,6 +144,15 @@ func AddPolyfills(rt *goja.Runtime) error {
 	// Cache of loaded programs and files.
 	modules := make(map[string]*goja.Object)
 	rt.Set("require", func(str string) (goja.Value, error) {
+		switch str {
+		case "./es6.set":
+			return rt.RunScript("es6.set.js", "Set")
+		case "./es6.map":
+			return rt.RunScript("es6.map.js", "Map")
+
+		case "./es6.weak-map":
+			return rt.RunScript("es6.weak-map.js", "WeakMap")
+		}
 		// fmt.Println(str)
 		filename := path.Join(pwd, str) + ".js"
 
@@ -258,7 +249,7 @@ require('es7.reflect.metadata');
 		return nil
 	})
 	fmt.Println(notNeeded)
-	*/
+	//*/
 
 	return nil
 }
