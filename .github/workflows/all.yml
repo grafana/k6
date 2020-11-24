@@ -146,8 +146,10 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
-    needs: [deps, lint, test, test-cov]
+    needs: [configure, deps, lint, test, test-cov]
     if: startsWith(github.ref, 'refs/tags/v')
+    env:
+      VERSION: ${{ needs.configure.outputs.version }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -171,6 +173,26 @@ jobs:
               && go install)
           sudo apt-get update -y
           sudo apt-get install -y fakeroot rpm
+      - name: Generate Windows binary metadata
+        run: |
+          (cd && GO111MODULE=on go get github.com/josephspurrier/goversioninfo/cmd/goversioninfo@v1.2.0)
+          IFS=. read -a version <<< "$(echo $VERSION | sed 's:[^0-9\.]::g')"
+          # Need a blank versioninfo.json for the CLI overrides to work.
+          echo '{}' > versioninfo.json
+          goversioninfo -64 \
+            -charset="1200" \
+            -company="Load Impact AB" \
+            -copyright="© Load Impact AB. Licensed under AGPL." \
+            -description="A modern load testing tool, using Go and JavaScript" \
+            -icon=packaging/k6.ico \
+            -internal-name="k6" \
+            -original-name="k6.exe" \
+            -product-name="k6" \
+            -translation="0x0409" \
+            -ver-major="${version[0]}" \
+            -ver-minor="${version[1]}" \
+            -ver-patch="${version[2]}" \
+            -product-version="${VERSION#v}"
       - name: Build
         run: |
           go version
