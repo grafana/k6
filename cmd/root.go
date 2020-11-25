@@ -30,6 +30,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/fatih/color"
 	"github.com/mattn/go-colorable"
@@ -54,7 +55,10 @@ var (
 	stderr    = &consoleWriter{colorable.NewColorableStderr(), stderrTTY, outMutex, nil}
 )
 
-const defaultConfigFileName = "config.json"
+const (
+	defaultConfigFileName   = "config.json"
+	waitRemoteLoggerTimeout = time.Second * 5
+)
 
 //TODO: remove these global variables
 //nolint:gochecknoglobals
@@ -205,15 +209,23 @@ func Execute() {
 		if c.loggerIsRemote {
 			fallbackLogger.WithFields(fields).Error(err)
 			cancel()
-			<-c.loggerStopped // TODO have a timeout?
+			c.waitRemoteLogger()
 		}
 
 		os.Exit(code)
 	}
 
+	cancel()
+	c.waitRemoteLogger()
+}
+
+func (c *rootCommand) waitRemoteLogger() {
 	if c.loggerIsRemote {
-		cancel()
-		<-c.loggerStopped // TODO have a timeout?
+		select {
+		case <-c.loggerStopped:
+		case <-time.After(waitRemoteLoggerTimeout):
+			c.fallbackLogger.Error("Remote logger didn't stop in %s", waitRemoteLoggerTimeout)
+		}
 	}
 }
 
