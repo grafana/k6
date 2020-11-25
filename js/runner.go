@@ -380,7 +380,7 @@ func parseTTL(ttlS string) (time.Duration, error) {
 		fallthrough
 	default:
 		var err error
-		ttl, err = types.ParseExtendedDurationMs(ttlS)
+		ttl, err = types.ParseExtendedDuration(ttlS)
 		if ttl < 0 || err != nil {
 			return ttl, fmt.Errorf("invalid DNS TTL: %s", ttlS)
 		}

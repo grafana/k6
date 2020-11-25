@@ -204,9 +204,11 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 		// Verify some CLI errors
 		{opts{cli: []string{"--blah", "blah"}}, exp{cliParseError: true}, nil},
 		{opts{cli: []string{"--duration", "blah"}}, exp{cliParseError: true}, nil},
+		{opts{cli: []string{"--duration", "1000"}}, exp{cliParseError: true}, nil}, // intentionally unsupported
 		{opts{cli: []string{"--iterations", "blah"}}, exp{cliParseError: true}, nil},
 		{opts{cli: []string{"--execution", ""}}, exp{cliParseError: true}, nil},
 		{opts{cli: []string{"--stage", "10:20s"}}, exp{cliReadError: true}, nil},
+		{opts{cli: []string{"--stage", "1000:20"}}, exp{cliReadError: true}, nil}, // intentionally unsupported
 		// Check if CLI shortcuts generate correct execution values
 		{opts{cli: []string{"--vus", "1", "--iterations", "5"}}, exp{}, verifySharedIters(I(1), I(5))},
 		{opts{cli: []string{"-u", "2", "-i", "6"}}, exp{}, verifySharedIters(I(2), I(6))},
@@ -249,6 +251,7 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 		// Test if environment variable shortcuts are working as expected
 		{opts{env: []string{"K6_VUS=5", "K6_ITERATIONS=15"}}, exp{}, verifySharedIters(I(5), I(15))},
 		{opts{env: []string{"K6_VUS=10", "K6_DURATION=20s"}}, exp{}, verifyConstLoopingVUs(I(10), 20*time.Second)},
+		{opts{env: []string{"K6_VUS=10", "K6_DURATION=10000"}}, exp{}, verifyConstLoopingVUs(I(10), 10*time.Second)},
 		{
 			opts{env: []string{"K6_STAGES=2m30s:11,1h1m:100"}},
 			exp{},
@@ -259,6 +262,7 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 			exp{},
 			verifyRampingVUs(null.NewInt(0, true), buildStages(100, 100, 30, 0)),
 		},
+		{opts{env: []string{"K6_STAGES=1000:100"}}, exp{consolidationError: true}, nil}, // intentionally unsupported
 		// Test if JSON configs work as expected
 		{opts{fs: defaultConfig(`{"iterations": 77, "vus": 7}`)}, exp{}, verifySharedIters(I(7), I(77))},
 		{opts{fs: defaultConfig(`wrong-json`)}, exp{consolidationError: true}, nil},
@@ -272,6 +276,12 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 				fs:  getFS([]file{{"/my/config.file", `{"vus": 8, "duration": "2m"}`}}),
 				cli: []string{"--config", "/my/config.file"},
 			}, exp{}, verifyConstLoopingVUs(I(8), 120*time.Second),
+		},
+		{
+			opts{
+				fs:  getFS([]file{{"/my/config.file", `{"duration": 20000}`}}),
+				cli: []string{"--config", "/my/config.file"},
+			}, exp{}, verifyConstLoopingVUs(null.NewInt(1, false), 20*time.Second),
 		},
 		{
 			opts{
@@ -332,7 +342,24 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 			exp{},
 			verifySharedIters(I(12), I(25)),
 		},
-
+		{
+			opts{
+				fs: defaultConfig(`{"scenarios": { "foo": {
+					"executor": "constant-vus", "vus": 2, "duration": "1d",
+					"gracefulStop": "10000", "startTime": 1000.5
+				}}}`),
+			}, exp{}, func(t *testing.T, c Config) {
+				exec := c.Scenarios["foo"]
+				require.NotEmpty(t, exec)
+				require.IsType(t, executor.ConstantVUsConfig{}, exec)
+				clvc, ok := exec.(executor.ConstantVUsConfig)
+				require.True(t, ok)
+				assert.Equal(t, null.IntFrom(2), clvc.VUs)
+				assert.Equal(t, types.NullDurationFrom(24*time.Hour), clvc.Duration)
+				assert.Equal(t, types.NullDurationFrom(time.Second+500*time.Microsecond), clvc.StartTime)
+				assert.Equal(t, types.NullDurationFrom(10*time.Second), clvc.GracefulStop)
+			},
+		},
 		// TODO: test the externally controlled executor
 		// TODO: test execution-segment
 
