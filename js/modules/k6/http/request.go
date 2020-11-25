@@ -146,7 +146,7 @@ func (h *HTTP) parseRequest(
 	}
 
 	formatFormVal := func(v interface{}) string {
-		//TODO: handle/warn about unsupported/nested values
+		// TODO: handle/warn about unsupported/nested values
 		return fmt.Sprintf("%v", v)
 	}
 
@@ -213,7 +213,7 @@ func (h *HTTP) parseRequest(
 	if body != nil {
 		switch data := body.(type) {
 		case map[string]goja.Value:
-			//TODO: fix forms submission and serialization in k6/html before fixing this..
+			// TODO: fix forms submission and serialization in k6/html before fixing this..
 			newData := map[string]interface{}{}
 			for k, v := range data {
 				newData[k] = v.Export()
@@ -303,11 +303,11 @@ func (h *HTTP) parseRequest(
 					result.ActiveJar = v.jar
 				}
 			case "compression":
-				var algosString = strings.TrimSpace(params.Get(k).ToString().String())
+				algosString := strings.TrimSpace(params.Get(k).ToString().String())
 				if algosString == "" {
 					continue
 				}
-				var algos = strings.Split(algosString, ",")
+				algos := strings.Split(algosString, ",")
 				var err error
 				result.Compressions = make([]httpext.CompressionType, len(algos))
 				for index, algo := range algos {

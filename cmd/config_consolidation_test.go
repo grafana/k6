@@ -124,7 +124,7 @@ func mostFlagSets() []flagSetInit {
 		i, fsi := i, fsi // go...
 		result = append(result, func() *pflag.FlagSet {
 			flags := pflag.NewFlagSet(fmt.Sprintf("superContrivedFlags_%d", i), pflag.ContinueOnError)
-			flags.AddFlagSet(rootCmdPersistentFlagSet())
+			flags.AddFlagSet(new(rootCommand).rootCmdPersistentFlagSet())
 			flags.AddFlagSet(fsi())
 			return flags
 		})
