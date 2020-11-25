@@ -22,10 +22,13 @@ package js
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"path/filepath"
+	"reflect"
 	"strings"
+	"sync"
 
 	"github.com/dop251/goja"
 	"github.com/pkg/errors"
@@ -69,6 +72,9 @@ type InitContext struct {
 	compatibilityMode lib.CompatibilityMode
 
 	logger logrus.FieldLogger
+
+	shares     map[string]interface{}
+	sharesLock *sync.Mutex
 }
 
 // NewInitContext creates a new initcontext with the provided arguments
@@ -85,6 +91,9 @@ func NewInitContext(
 		programs:          make(map[string]programWithSource),
 		compatibilityMode: compatMode,
 		logger:            logger,
+
+		shares:     make(map[string]interface{}),
+		sharesLock: new(sync.Mutex),
 	}
 }
 
@@ -110,7 +119,95 @@ func newBoundInitContext(base *InitContext, ctxPtr *context.Context, rt *goja.Ru
 		programs:          programs,
 		compatibilityMode: base.compatibilityMode,
 		logger:            base.logger,
+
+		shares:     base.shares,
+		sharesLock: base.sharesLock,
 	}
+}
+
+// NewShare ...
+// TODO rename
+func (i *InitContext) NewShare(ctx context.Context, name string, call goja.Callable) goja.Value {
+	i.sharesLock.Lock()
+	defer i.sharesLock.Unlock()
+	value, ok := i.shares[name]
+	rt := common.GetRuntime(ctx)
+	if !ok { //nolint:nestif
+		gojaValue, err := call(goja.Undefined())
+		if err != nil {
+			common.Throw(rt, err)
+		}
+		if gojaValue.ExportType().Kind() == reflect.Slice {
+			// fmt.Println("it's a slice")
+			var tmpArr []interface{}
+			if err = rt.ExportTo(gojaValue, &tmpArr); err != nil {
+				common.Throw(rt, err)
+			}
+
+			arr := make([][]byte, len(tmpArr))
+			for i := range arr {
+				arr[i], err = json.Marshal(tmpArr[i])
+				if err != nil {
+					common.Throw(rt, err)
+				}
+			}
+			value = sharedArray{arr: arr}
+		} else {
+			// fmt.Println("it's an object")
+			value = shared{gojaValue.ToObject(rt)}
+		}
+		i.shares[name] = value
+	}
+	switch value.(type) {
+	case sharedArray:
+		// fmt.Println("wrapping array/slice")
+		// TODO cache this
+		cal, err := rt.RunString(`(function(val) {
+	var arrayHandler = {
+		get: function(target, property, receiver) {
+			// console.log("accessing ", property)
+			switch (property){
+			case "length":
+				return target.length()
+			case Symbol.iterator:
+				return function() {return target.iterator()}
+			/*
+			return function(){
+
+				var index = 0;
+				return {
+					"next": function() {
+						if (index >= target.length()) {
+							return {done: true}
+						}
+						var result = {value:target.get(index)};
+						index++;
+						return result;
+					}
+				}
+			}
+			*/
+			}
+			return target.get(property);
+		}
+	};
+	return new Proxy(val, arrayHandler)
+})`)
+		if err != nil {
+			common.Throw(rt, err)
+		}
+		call, _ := goja.AssertFunction(cal)
+		wrapped, err := call(goja.Undefined(), i.runtime.ToValue(common.Bind(i.runtime, value, i.ctxPtr)))
+		if err != nil {
+			common.Throw(rt, err)
+		}
+
+		return wrapped
+	case shared:
+		// TODO
+	}
+
+	return i.runtime.ToValue(common.Bind(i.runtime, value, i.ctxPtr))
 }
 
 // Require is called when a module/file needs to be loaded by a script
