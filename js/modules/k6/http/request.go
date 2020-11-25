@@ -38,6 +38,7 @@ import (
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/netext/httpext"
+	"github.com/loadimpact/k6/lib/types"
 )
 
 // ErrHTTPForbiddenInInitContext is used when a http requests was made in the init context
@@ -335,7 +336,11 @@ func (h *HTTP) parseRequest(
 			case "auth":
 				result.Auth = params.Get(k).String()
 			case "timeout":
-				result.Timeout = time.Duration(params.Get(k).ToFloat() * float64(time.Millisecond))
+				t, err := types.GetDurationValue(params.Get(k).Export())
+				if err != nil {
+					return nil, fmt.Errorf("invalid timeout value: %w", err)
+				}
+				result.Timeout = t
 			case "throw":
 				result.Throw = params.Get(k).ToBoolean()
 			case "responseType":

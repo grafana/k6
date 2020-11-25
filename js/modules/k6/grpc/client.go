@@ -55,6 +55,7 @@ import (
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
+	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 )
 
@@ -220,17 +221,9 @@ func (c *Client) Connect(ctxPtr *context.Context, addr string, params map[string
 			isPlaintext, _ = v.(bool)
 		case "timeout":
 			var err error
-			switch t := v.(type) {
-			case string:
-				if timeout, err = time.ParseDuration(t); err != nil {
-					return false, fmt.Errorf("unable to parse %q: %v", k, err)
-				}
-			case int64:
-				timeout = time.Duration(t) * time.Millisecond
-			case float64:
-				timeout = time.Duration(t * float64(time.Millisecond))
-			default:
-				return false, fmt.Errorf("unable to use type %T as a timeout value", v)
+			timeout, err = types.GetDurationValue(v)
+			if err != nil {
+				return false, fmt.Errorf("invalid timeout value: %w", err)
 			}
 		default:
 			return false, fmt.Errorf("unknown connect param: %q", k)
@@ -359,17 +352,9 @@ func (c *Client) Invoke(ctxPtr *context.Context,
 			}
 		case "timeout":
 			var err error
-			switch t := v.(type) {
-			case string:
-				if timeout, err = time.ParseDuration(t); err != nil {
-					return nil, fmt.Errorf("unable to parse %q: %v", k, err)
-				}
-			case int64:
-				timeout = time.Duration(t) * time.Millisecond
-			case float64:
-				timeout = time.Duration(t * float64(time.Millisecond))
-			default:
-				return nil, fmt.Errorf("unable to use type %T as a timeout value", v)
+			timeout, err = types.GetDurationValue(v)
+			if err != nil {
+				return nil, fmt.Errorf("invalid timeout value: %w", err)
 			}
 		default:
 			return nil, fmt.Errorf("unknown param: %q", k)
