@@ -96,6 +96,7 @@ func (c *Collector) Run(ctx context.Context) {
 	}
 }
 
+// HubEvent holds data to be sent to EventHubs
 type HubEvent struct {
 	Time     time.Time         `json:"time"`
 	Value    float64           `json:"value"`
