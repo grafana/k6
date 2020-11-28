@@ -22,6 +22,7 @@ package ui
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -123,6 +124,7 @@ func (f PasswordField) GetContents(r io.Reader) (string, error) {
 		return "", errors.New("Cannot read password from the supplied terminal")
 	}
 	password, err := terminal.ReadPassword(int(stdin.Fd()))
+	fmt.Print("\n")
 	if err != nil {
 		// Possibly running on Cygwin/mintty which doesn't emulate
 		// pseudo terminals properly, so fallback to plain text input.
