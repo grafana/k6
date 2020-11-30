@@ -83,6 +83,28 @@ jobs:
           fi
           go test "${args[@]}" -timeout 800s ./...
 
+  tc39:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.15.x
+      - name: Run tests
+        run: |
+          set -x
+          cd js/tc39
+          mkdir -p testdata/test262
+          cd testdata/test262
+          git init
+          git remote add origin https://github.com/tc39/test262.git
+          git fetch origin --depth=1 72154b17fc99a26e79b2586960f059360d4ce43d
+          git reset --hard 72154b17fc99a26e79b2586960f059360d4ce43d
+          cd -
+          go test -timeout 1h
+
   test-cov:
     strategy:
       matrix:
