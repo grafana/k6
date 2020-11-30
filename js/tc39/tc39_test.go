@@ -42,9 +42,7 @@ var (
 		false)
 
 	esIdPrefixWhiteList = []string{
-		/*
-			"sec-array",
-		*/
+		"sec-array",
 		"sec-%typedarray%",
 		"sec-string",
 		"sec-date",
@@ -60,7 +58,11 @@ var (
 		"IsHTMLDDA", // not supported at all
 	}
 	skipList = map[string]bool{
-		"test/built-ins/Promise/all/does-not-invoke-array-setters.js": true, // timezone
+		"test/built-ins/Promise/all/does-not-invoke-array-setters.js":                 true, // timezone
+		"test/built-ins/Array/prototype/concat/arg-length-exceeding-integer-limit.js": true, // takes forever and is broken
+		"test/built-ins/Array/prototype/splice/throws-if-integer-limit-exceeded.js":   true, // takes forever and is broken
+		"test/built-ins/Array/prototype/unshift/clamps-to-integer-limit.js":           true, // takes forever and is broken
+		"test/built-ins/Array/prototype/unshift/throws-if-integer-limit-exceeded.js":  true, // takes forever and is broken
 	}
 )
 
