@@ -311,7 +311,7 @@ jobs:
         run: echo "${env:ProgramFiles(x86)}\Windows Kits\10\bin\x64" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       - name: Convert base64 certificate to PFX
         run: |
-          $bytes = [Convert]::FromBase64String("${{ secrets.CERTIFICATE }}")
+          $bytes = [Convert]::FromBase64String("${{ secrets.WIN_SIGN_CERT }}")
           [IO.File]::WriteAllBytes("k6.pfx", $bytes)
       - name: Sign Windows binary
         run: signtool sign /f k6.pfx /p "${{ secrets.WIN_SIGN_PASS }}" /tr "http://timestamp.digicert.com" /td sha256 /fd sha256 "packaging\k6.exe"
