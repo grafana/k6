@@ -53,6 +53,8 @@ var (
 		"sec-arraybuffer-length",
 		"sec-arraybuffer",
 		"sec-regexp",
+		"sec-variable-statement",
+		"sec-ecmascript-standard-built-in-objects",
 	}
 
 	featuresBlockList = []string{
@@ -300,29 +302,11 @@ func (ctx *tc39TestCtx) runTC39Test(t testing.TB, name, src string, meta *tc39Me
 func shouldBeSkipped(t testing.TB, meta *tc39Meta) {
 	if meta.Es6id == "" && meta.Es5id == "" { //nolint:nestif
 		skip := true
-		/*
-			// t.Logf("%s: Not ES5, skipped", name)
-			if es6WhiteList[name] {
-				skip = false
-			} else {
-				if meta.Es6id != "" {
-					for _, prefix := range es6IdWhiteList {
-						if strings.HasPrefix(meta.Es6id, prefix) &&
-							(len(meta.Es6id) == len(prefix) || meta.Es6id[len(prefix)] == '.') {
-
-							skip = false
-							break
-						}
-					}
-				}
-			}
-		*/
 
 		if skip {
 			if meta.Esid != "" {
 				for _, prefix := range esIDPrefixAllowList {
-					if strings.HasPrefix(meta.Esid, prefix) &&
-						(len(meta.Esid) == len(prefix) || meta.Esid[len(prefix)] == '.') {
+					if strings.HasPrefix(meta.Esid, prefix) {
 						skip = false
 					}
 				}
