@@ -472,17 +472,10 @@ func (ctx *tc39TestCtx) runTC39Tests(name string) {
 		if file.Name()[0] == '.' {
 			continue
 		}
-		newName := path.Join(name, file.Name())
 		if file.IsDir() {
-			if strings.Count(newName, "/") == 1 {
-				ctx.t.Run(newName, func(t *testing.T) {
-					t.Parallel()
-					ctx.runTC39Tests(newName)
-				})
-			} else {
-				ctx.runTC39Tests(newName)
-			}
+			ctx.runTC39Tests(path.Join(name, file.Name()))
 		} else if strings.HasSuffix(file.Name(), ".js") && !strings.HasSuffix(file.Name(), "_FIXTURE.js") {
+			newName := path.Join(name, file.Name())
 			ctx.runTest(newName, func(t *testing.T) {
 				ctx.runTC39File(newName, t)
 			})
