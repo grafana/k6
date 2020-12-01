@@ -229,7 +229,11 @@ func (ctx *tc39TestCtx) runTC39Test(t testing.TB, name, src string, meta *tc39Me
 		if meta.Negative.Type != "" {
 			// vm.vm.prg.dumpCode(t.Logf)
 			failf("%s: Expected error: %v", name, err)
+			return
 		}
+		nameKey := fmt.Sprintf("%s-strict:%v", name, strict)
+		expected, ok := ctx.expectedErrors[nameKey]
+		assert.False(t, ok, "%s passes but and error %q was expected", nameKey, expected)
 		return
 	}
 
@@ -327,7 +331,7 @@ func shouldBeSkipped(t testing.TB, meta *tc39Meta) {
 		for _, feature := range meta.Features {
 			for _, bl := range featuresBlockList {
 				if feature == bl {
-					t.Skipf("Blacklisted feature %s", feature)
+					t.Skipf("Blocklisted feature %s", feature)
 				}
 			}
 		}
@@ -501,32 +505,10 @@ func TestTC39(t *testing.T) {
 
 	t.Run("test262", func(t *testing.T) {
 		ctx.t = t
-		ctx.runTC39Tests("test")
-		/*
-			// ctx.runTC39File("test/language/types/number/8.5.1.js", t)
-			// ctx.runTC39Tests("test/language")
-			ctx.runTC39Tests("test/language/expressions")
-			ctx.runTC39Tests("test/language/arguments-object")
-			ctx.runTC39Tests("test/language/asi")
-			ctx.runTC39Tests("test/language/directive-prologue")
-			ctx.runTC39Tests("test/language/function-code")
-			ctx.runTC39Tests("test/language/eval-code")
-			ctx.runTC39Tests("test/language/global-code")
-			ctx.runTC39Tests("test/language/identifier-resolution")
-			ctx.runTC39Tests("test/language/identifiers")
-			// ctx.runTC39Tests("test/language/literals") // octal sequences in strict mode
-			ctx.runTC39Tests("test/language/punctuators")
-			ctx.runTC39Tests("test/language/reserved-words")
-			ctx.runTC39Tests("test/language/source-text")
-			ctx.runTC39Tests("test/language/statements")
-			ctx.runTC39Tests("test/language/types")
-			ctx.runTC39Tests("test/language/white-space")
-			ctx.runTC39Tests("test/built-ins")
-			ctx.runTC39Tests("test/annexB/built-ins/String/prototype/substr")
-			ctx.runTC39Tests("test/annexB/built-ins/escape")
-			ctx.runTC39Tests("test/annexB/built-ins/unescape")
-			ctx.runTC39Tests("test/annexB/built-ins/RegExp")
-		*/
+		ctx.runTC39Tests("test/language")
+		ctx.runTC39Tests("test/built-ins")
+		ctx.runTC39Tests("test/harness")
+		ctx.runTC39Tests("test/annexB/built-ins")
 
 		ctx.flush()
 	})
