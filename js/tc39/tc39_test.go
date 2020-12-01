@@ -29,9 +29,9 @@ const (
 	tc39BASE = "testdata/test262"
 )
 
-//noling:gochecknoglobals
+//nolint:gochecknoglobals
 var (
-	invalidFormatError = errors.New("Invalid file format")
+	errInvalidFormat = errors.New("invalid file format")
 
 	// ignorableTestError = newSymbol(stringEmpty)
 
@@ -43,7 +43,7 @@ var (
 		});`,
 		false)
 
-	esIdPrefixWhiteList = []string{
+	esIDPrefixAllowList = []string{
 		"sec-array",
 		"sec-%typedarray%",
 		"sec-string",
@@ -55,7 +55,7 @@ var (
 		"sec-regexp",
 	}
 
-	featuresBlackList = []string{
+	featuresBlockList = []string{
 		"BigInt",    // not supported at all
 		"IsHTMLDDA", // not supported at all
 	}
@@ -68,6 +68,7 @@ var (
 	}
 )
 
+//nolint:unused,structcheck
 type tc39Test struct {
 	name string
 	f    func(t *testing.T)
@@ -89,7 +90,7 @@ type tc39TestCtx struct {
 	enableBench    bool
 	benchmark      tc39BenchmarkData
 	benchLock      sync.Mutex
-	testQueue      []tc39Test
+	testQueue      []tc39Test //nolint:unused,structcheck
 	expectedErrors map[string]string
 
 	errorsLock sync.Mutex
@@ -134,13 +135,13 @@ func parseTC39File(name string) (*tc39Meta, string, error) {
 	str := string(b)
 	metaStart := strings.Index(str, "/*---")
 	if metaStart == -1 {
-		return nil, "", invalidFormatError
+		return nil, "", errInvalidFormat
 	}
 
 	metaStart += 5
 	metaEnd := strings.Index(str, "---*/")
 	if metaEnd == -1 || metaEnd <= metaStart {
-		return nil, "", invalidFormatError
+		return nil, "", errInvalidFormat
 	}
 
 	var meta tc39Meta
@@ -224,62 +225,61 @@ func (ctx *tc39TestCtx) runTC39Test(t testing.TB, name, src string, meta *tc39Me
 	}
 	early, err := ctx.runTC39Script(name, src, meta.Includes, vm)
 
-	if err != nil {
-		if meta.Negative.Type == "" {
-			if err, ok := err.(*goja.Exception); ok {
-				if err.Value() == ignorableTestError {
-					t.Skip("Test threw IgnorableTestError")
-				}
-			}
-			failf("%s: %v", name, err)
-			return
-		} else {
-			if meta.Negative.Phase == "early" && !early || meta.Negative.Phase == "runtime" && early {
-				failf("%s: error %v happened at the wrong phase (expected %s)", name, err, meta.Negative.Phase)
-				return
-			}
-			var errType string
-
-			switch err := err.(type) {
-			case *goja.Exception:
-				if o, ok := err.Value().(*goja.Object); ok {
-					if c := o.Get("constructor"); c != nil {
-						if c, ok := c.(*goja.Object); ok {
-							errType = c.Get("name").String()
-						} else {
-							failf("%s: error constructor is not an object (%v)", name, o)
-							return
-						}
-					} else {
-						failf("%s: error does not have a constructor (%v)", name, o)
-						return
-					}
-				} else {
-					failf("%s: error is not an object (%v)", name, err.Value())
-					return
-				}
-			case *goja.CompilerSyntaxError, *parser.Error, parser.ErrorList:
-				errType = "SyntaxError"
-			case *goja.CompilerReferenceError:
-				errType = "ReferenceError"
-			default:
-				failf("%s: error is not a JS error: %v", name, err)
-				return
-			}
-
-			_ = errType
-			if errType != meta.Negative.Type {
-				// vm.vm.prg.dumpCode(t.Logf)
-				failf("%s: unexpected error type (%s), expected (%s)", name, errType, meta.Negative.Type)
-				return
-			}
-		}
-	} else {
+	if err == nil {
 		if meta.Negative.Type != "" {
 			// vm.vm.prg.dumpCode(t.Logf)
 			failf("%s: Expected error: %v", name, err)
+		}
+		return
+	}
+
+	if meta.Negative.Type == "" {
+		if err, ok := err.(*goja.Exception); ok {
+			if err.Value() == ignorableTestError {
+				t.Skip("Test threw IgnorableTestError")
+			}
+		}
+		failf("%s: %v", name, err)
+		return
+	}
+	if meta.Negative.Phase == "early" && !early || meta.Negative.Phase == "runtime" && early {
+		failf("%s: error %v happened at the wrong phase (expected %s)", name, err, meta.Negative.Phase)
+		return
+	}
+	var errType string
+
+	switch err := err.(type) {
+	case *goja.Exception:
+		if o, ok := err.Value().(*goja.Object); ok { //nolint:nestif
+			if c := o.Get("constructor"); c != nil {
+				if c, ok := c.(*goja.Object); ok {
+					errType = c.Get("name").String()
+				} else {
+					failf("%s: error constructor is not an object (%v)", name, o)
+					return
+				}
+			} else {
+				failf("%s: error does not have a constructor (%v)", name, o)
+				return
+			}
+		} else {
+			failf("%s: error is not an object (%v)", name, err.Value())
 			return
 		}
+	case *goja.CompilerSyntaxError, *parser.Error, parser.ErrorList:
+		errType = "SyntaxError"
+	case *goja.CompilerReferenceError:
+		errType = "ReferenceError"
+	default:
+		failf("%s: error is not a JS error: %v", name, err)
+		return
+	}
+
+	_ = errType
+	if errType != meta.Negative.Type {
+		// vm.vm.prg.dumpCode(t.Logf)
+		failf("%s: unexpected error type (%s), expected (%s)", name, errType, meta.Negative.Type)
+		return
 	}
 
 	/*
@@ -293,16 +293,8 @@ func (ctx *tc39TestCtx) runTC39Test(t testing.TB, name, src string, meta *tc39Me
 	*/
 }
 
-func (ctx *tc39TestCtx) runTC39File(name string, t testing.TB) {
-	p := path.Join(ctx.base, name)
-	meta, src, err := parseTC39File(p)
-	if err != nil {
-		// t.Fatalf("Could not parse %s: %v", name, err)
-		t.Errorf("Could not parse %s: %v", name, err)
-		return
-	}
-	// if meta.Es6id == "" && meta.Es5id == "" {
-	if meta.Es6id == "" && meta.Es5id == "" {
+func shouldBeSkipped(t testing.TB, meta *tc39Meta) {
+	if meta.Es6id == "" && meta.Es5id == "" { //nolint:nestif
 		skip := true
 		/*
 			// t.Logf("%s: Not ES5, skipped", name)
@@ -324,7 +316,7 @@ func (ctx *tc39TestCtx) runTC39File(name string, t testing.TB) {
 
 		if skip {
 			if meta.Esid != "" {
-				for _, prefix := range esIdPrefixWhiteList {
+				for _, prefix := range esIDPrefixAllowList {
 					if strings.HasPrefix(meta.Esid, prefix) &&
 						(len(meta.Esid) == len(prefix) || meta.Esid[len(prefix)] == '.') {
 						skip = false
@@ -333,7 +325,7 @@ func (ctx *tc39TestCtx) runTC39File(name string, t testing.TB) {
 			}
 		}
 		for _, feature := range meta.Features {
-			for _, bl := range featuresBlackList {
+			for _, bl := range featuresBlockList {
 				if feature == bl {
 					t.Skipf("Blacklisted feature %s", feature)
 				}
@@ -343,6 +335,18 @@ func (ctx *tc39TestCtx) runTC39File(name string, t testing.TB) {
 			t.Skipf("Not ES6 or ES5 esid: %s", meta.Esid)
 		}
 	}
+}
+
+func (ctx *tc39TestCtx) runTC39File(name string, t testing.TB) {
+	p := path.Join(ctx.base, name)
+	meta, src, err := parseTC39File(p)
+	if err != nil {
+		// t.Fatalf("Could not parse %s: %v", name, err)
+		t.Errorf("Could not parse %s: %v", name, err)
+		return
+	}
+
+	shouldBeSkipped(t, meta)
 
 	var startTime time.Time
 	if ctx.enableBench {
@@ -470,13 +474,11 @@ func (ctx *tc39TestCtx) runTC39Tests(name string) {
 		}
 		if file.IsDir() {
 			ctx.runTC39Tests(path.Join(name, file.Name()))
-		} else {
-			if strings.HasSuffix(file.Name(), ".js") && !strings.HasSuffix(file.Name(), "_FIXTURE.js") {
-				name := path.Join(name, file.Name())
-				ctx.runTest(name, func(t *testing.T) {
-					ctx.runTC39File(name, t)
-				})
-			}
+		} else if strings.HasSuffix(file.Name(), ".js") && !strings.HasSuffix(file.Name(), "_FIXTURE.js") {
+			newName := path.Join(name, file.Name())
+			ctx.runTest(newName, func(t *testing.T) {
+				ctx.runTC39File(newName, t)
+			})
 		}
 	}
 }
