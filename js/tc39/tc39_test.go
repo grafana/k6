@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	tc39BASE = "testdata/test262"
+	tc39BASE = "TestTC39/test262"
 )
 
 //nolint:gochecknoglobals
@@ -499,7 +499,7 @@ func TestTC39(t *testing.T) {
 	ctx.init()
 	// ctx.enableBench = true
 
-	t.Run("tc39", func(t *testing.T) {
+	t.Run("test262", func(t *testing.T) {
 		ctx.t = t
 		ctx.runTC39Tests("test")
 		/*

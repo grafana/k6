@@ -2,8 +2,8 @@
 The point of this repo is to test k6 goja+babel+core.js combo against the tc39 test suite.
 
 Ways to use it:
-1. mkdir testdata
-2. Checkout [test262](https://github.com/tc39/test262) in testdata directory, this was tested
+1. mkdir TestTC39
+2. Checkout [test262](https://github.com/tc39/test262) in TestTC39 directory, this was tested
    against 72154b17fc
 3. Run `go test &> out.log`
 
