@@ -69,6 +69,23 @@ var (
 		"test/built-ins/Array/prototype/unshift/clamps-to-integer-limit.js":           true, // takes forever and is broken
 		"test/built-ins/Array/prototype/unshift/throws-if-integer-limit-exceeded.js":  true, // takes forever and is broken
 	}
+	pathBasedBlock = map[string]bool{ // This completely skips any path matching it without any kind of message
+		"test/annexB/built-ins/Date":                          true,
+		"test/annexB/built-ins/RegExp/prototype/Symbol.split": true,
+		"test/annexB/built-ins/String/prototype/anchor":       true,
+		"test/annexB/built-ins/String/prototype/big":          true,
+		"test/annexB/built-ins/String/prototype/blink":        true,
+		"test/annexB/built-ins/String/prototype/bold":         true,
+		"test/annexB/built-ins/String/prototype/fixed":        true,
+		"test/annexB/built-ins/String/prototype/fontcolor":    true,
+		"test/annexB/built-ins/String/prototype/fontsize":     true,
+		"test/annexB/built-ins/String/prototype/italics":      true,
+		"test/annexB/built-ins/String/prototype/link":         true,
+		"test/annexB/built-ins/String/prototype/small":        true,
+		"test/annexB/built-ins/String/prototype/strike":       true,
+		"test/annexB/built-ins/String/prototype/sub":          true,
+		"test/annexB/built-ins/String/prototype/sup":          true,
+	}
 )
 
 //nolint:unused,structcheck
@@ -466,10 +483,16 @@ func (ctx *tc39TestCtx) runTC39Tests(name string) {
 		if file.Name()[0] == '.' {
 			continue
 		}
+		newName := path.Join(name, file.Name())
+		if pathBasedBlock[newName] {
+			ctx.t.Run(newName, func(t *testing.T) {
+				t.Skipf("Skip %s beause of path based block", newName)
+			})
+			continue
+		}
 		if file.IsDir() {
-			ctx.runTC39Tests(path.Join(name, file.Name()))
+			ctx.runTC39Tests(newName)
 		} else if strings.HasSuffix(file.Name(), ".js") && !strings.HasSuffix(file.Name(), "_FIXTURE.js") {
-			newName := path.Join(name, file.Name())
 			ctx.runTest(newName, func(t *testing.T) {
 				ctx.runTC39File(newName, t)
 			})
