@@ -85,6 +85,18 @@ var (
 		"test/annexB/built-ins/String/prototype/strike":       true,
 		"test/annexB/built-ins/String/prototype/sub":          true,
 		"test/annexB/built-ins/String/prototype/sup":          true,
+
+		// Async/Promise and other totally unsupported functionality
+		"test/built-ins/AsyncArrowFunction":             true,
+		"test/built-ins/AsyncFromSyncIteratorPrototype": true,
+		"test/built-ins/AsyncFunction":                  true,
+		"test/built-ins/AsyncGeneratorFunction":         true,
+		"test/built-ins/AsyncGeneratorPrototype":        true,
+		"test/built-ins/AsyncIteratorPrototype":         true,
+		"test/built-ins/Atomics":                        true,
+		"test/built-ins/BigInt":                         true,
+		"test/built-ins/Promise":                        true,
+		"test/built-ins/SharedArrayBuffer":              true,
 	}
 )
 
