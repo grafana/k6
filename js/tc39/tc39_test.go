@@ -346,7 +346,8 @@ func (ctx *tc39TestCtx) runTC39File(name string, t testing.TB) {
 	if hasRaw || !meta.hasFlag("onlyStrict") {
 		// log.Printf("Running normal test: %s", name)
 		// t.Logf("Running normal test: %s", name)
-		ctx.runTC39Test(t, name, src, meta, false)
+		// ctx.runTC39Test(t, name, src, meta, false) // TODO enable when at least some tests will
+		// run without babel
 	}
 
 	if !hasRaw && !meta.hasFlag("noStrict") {
