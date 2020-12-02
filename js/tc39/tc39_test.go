@@ -3,6 +3,7 @@
 package tc39
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -134,20 +135,19 @@ func parseTC39File(name string) (*tc39Meta, string, error) {
 		return nil, "", err
 	}
 
-	str := string(b)
-	metaStart := strings.Index(str, "/*---")
+	metaStart := bytes.Index(b, []byte("/*---"))
 	if metaStart == -1 {
 		return nil, "", errInvalidFormat
 	}
 
 	metaStart += 5
-	metaEnd := strings.Index(str, "---*/")
+	metaEnd := bytes.Index(b, []byte("---*/"))
 	if metaEnd == -1 || metaEnd <= metaStart {
 		return nil, "", errInvalidFormat
 	}
 
 	var meta tc39Meta
-	err = yaml.Unmarshal([]byte(str[metaStart:metaEnd]), &meta)
+	err = yaml.Unmarshal(b[metaStart:metaEnd], &meta)
 	if err != nil {
 		return nil, "", err
 	}
@@ -156,7 +156,7 @@ func parseTC39File(name string) (*tc39Meta, string, error) {
 		return nil, "", errors.New("negative type is set, but phase isn't")
 	}
 
-	return &meta, str, nil
+	return &meta, string(b), nil
 }
 
 func (*tc39TestCtx) detachArrayBuffer(call goja.FunctionCall) goja.Value {
