@@ -343,17 +343,22 @@ func (ctx *tc39TestCtx) runTC39File(name string, t testing.TB) {
 
 	hasRaw := meta.hasFlag("raw")
 
-	if hasRaw || !meta.hasFlag("onlyStrict") {
-		// log.Printf("Running normal test: %s", name)
-		// t.Logf("Running normal test: %s", name)
-		// ctx.runTC39Test(t, name, src, meta, false) // TODO enable when at least some tests will
-		// run without babel
-	}
+	/*
+		if hasRaw || !meta.hasFlag("onlyStrict") {
+			// log.Printf("Running normal test: %s", name)
+			// t.Logf("Running normal test: %s", name)
+			ctx.runTC39Test(t, name, src, meta, false)
+		}
+	*/
 
 	if !hasRaw && !meta.hasFlag("noStrict") {
 		// log.Printf("Running strict test: %s", name)
 		// t.Logf("Running strict test: %s", name)
 		ctx.runTC39Test(t, name, src, meta, true)
+	} else { // Run test in non strict mode only if we won't run them in strict
+		// TODO uncomment the if above and delete this else so we run both parts when the tests
+		// don't take forever
+		ctx.runTC39Test(t, name, src, meta, false)
 	}
 
 	if ctx.enableBench {
