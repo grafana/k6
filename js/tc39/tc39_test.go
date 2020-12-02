@@ -330,6 +330,9 @@ func (ctx *tc39TestCtx) runTC39Test(t testing.TB, name, src string, meta *tc39Me
 }
 
 func shouldBeSkipped(t testing.TB, meta *tc39Meta) {
+	if meta.hasFlag("async") { // this is totally not supported
+		t.Skipf("Skipping as it has flag async")
+	}
 	if meta.Es6id == "" && meta.Es5id == "" { //nolint:nestif
 		skip := true
 
