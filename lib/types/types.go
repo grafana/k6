@@ -24,6 +24,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math"
 	"reflect"
 	"strconv"
 	"strings"
@@ -97,6 +98,11 @@ func (d Duration) String() string {
 // ParseExtendedDuration is a helper function that allows for string duration
 // values containing days.
 func ParseExtendedDuration(data string) (result time.Duration, err error) {
+	// Assume millisecond values if data is provided with no units
+	if t, errp := strconv.ParseFloat(data, 64); errp == nil {
+		return time.Duration(t * float64(time.Millisecond)), nil
+	}
+
 	dPos := strings.IndexByte(data, 'd')
 	if dPos < 0 {
 		return time.ParseDuration(data)
@@ -123,16 +129,6 @@ func ParseExtendedDuration(data string) (result time.Duration, err error) {
 	return time.Duration(days)*24*time.Hour + hours, nil
 }
 
-// ParseExtendedDurationMs wraps ParseExtendedDuration while assuming
-// millisecond values if data is provided with no units.
-// TODO: Merge this into ParseExtendedDuration once it's safe to do so globally.
-func ParseExtendedDurationMs(data string) (result time.Duration, err error) {
-	if t, errp := strconv.ParseFloat(data, 32); errp == nil {
-		data = fmt.Sprintf("%.2fms", t)
-	}
-	return ParseExtendedDuration(data)
-}
-
 // UnmarshalText converts text data to Duration
 func (d *Duration) UnmarshalText(data []byte) error {
 	v, err := ParseExtendedDuration(string(data))
@@ -157,12 +153,10 @@ func (d *Duration) UnmarshalJSON(data []byte) error {
 		}
 
 		*d = Duration(v)
+	} else if t, errp := strconv.ParseFloat(string(data), 64); errp == nil {
+		*d = Duration(t * float64(time.Millisecond))
 	} else {
-		var v time.Duration
-		if err := json.Unmarshal(data, &v); err != nil {
-			return err
-		}
-		*d = Duration(v)
+		return fmt.Errorf("'%s' is not a valid duration value", string(data))
 	}
 
 	return nil
@@ -232,4 +226,57 @@ func (d NullDuration) ValueOrZero() Duration {
 	}
 
 	return d.Duration
+}
+
+func getInt64(v interface{}) (int64, error) {
+	switch n := v.(type) {
+	case int:
+		return int64(n), nil
+	case int8:
+		return int64(n), nil
+	case int16:
+		return int64(n), nil
+	case int32:
+		return int64(n), nil
+	case int64:
+		return n, nil
+	case uint:
+		return int64(n), nil
+	case uint8:
+		return int64(n), nil
+	case uint16:
+		return int64(n), nil
+	case uint32:
+		return int64(n), nil
+	case uint64:
+		if n > math.MaxInt64 {
+			return 0, fmt.Errorf("%d is too big", n)
+		}
+		return int64(n), nil
+	default:
+		return 0, fmt.Errorf("unable to use type %T as a duration value", v)
+	}
+}
+
+// GetDurationValue is a helper function that can convert a lot of different
+// types to time.Duration.
+//
+// TODO: move to a separate package and check for integer overflows?
+func GetDurationValue(v interface{}) (time.Duration, error) {
+	switch d := v.(type) {
+	case time.Duration:
+		return d, nil
+	case string:
+		return ParseExtendedDuration(d)
+	case float32:
+		return time.Duration(float64(d) * float64(time.Millisecond)), nil
+	case float64:
+		return time.Duration(d * float64(time.Millisecond)), nil
+	default:
+		n, err := getInt64(v)
+		if err != nil {
+			return 0, err
+		}
+		return time.Duration(n) * time.Millisecond, nil
+	}
 }
