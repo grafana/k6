@@ -155,7 +155,16 @@ func (h *HTTP) parseRequest(
 		if !requestContainsFile(data) {
 			bodyQuery := make(url.Values, len(data))
 			for k, v := range data {
-				bodyQuery.Set(k, formatFormVal(v))
+				switch reflect.TypeOf(v).Kind() {
+				// handle json arrays in params
+				case reflect.Slice, reflect.Array:
+					s := reflect.ValueOf(v)
+					for i := 0; i < s.Len(); i++ {
+						bodyQuery.Add(k, formatFormVal(s.Index(i)))
+					}
+				default:
+					bodyQuery.Set(k, formatFormVal(v))
+				}
 			}
 			result.Body = bytes.NewBufferString(bodyQuery.Encode())
 			result.Req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
