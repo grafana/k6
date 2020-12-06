@@ -28,39 +28,28 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pkg/errors"
-	"github.com/viki-org/dnscache"
-
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
+	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 )
-
-// dnsResolver is an interface that fetches dns information
-// about a given address.
-type dnsResolver interface {
-	FetchOne(address string) (net.IP, error)
-}
 
 // Dialer wraps net.Dialer and provides k6 specific functionality -
 // tracing, blacklists and DNS cache and aliases.
 type Dialer struct {
 	net.Dialer
 
-	Resolver  dnsResolver
-	Blacklist []*lib.IPNet
-	Hosts     map[string]*lib.HostAddress
+	Resolver         Resolver
+	Blacklist        []*lib.IPNet
+	BlockedHostnames *types.HostnameTrie
+	Hosts            map[string]*lib.HostAddress
 
 	BytesRead    int64
 	BytesWritten int64
 }
 
-// NewDialer constructs a new Dialer and initializes its cache.
-func NewDialer(dialer net.Dialer) *Dialer {
-	return newDialerWithResolver(dialer, dnscache.New(0))
-}
-
-func newDialerWithResolver(dialer net.Dialer, resolver dnsResolver) *Dialer {
+// NewDialer constructs a new Dialer with the given DNS resolver.
+func NewDialer(dialer net.Dialer, resolver Resolver) *Dialer {
 	return &Dialer{
 		Dialer:   dialer,
 		Resolver: resolver,
@@ -75,6 +64,16 @@ type BlackListedIPError struct {
 
 func (b BlackListedIPError) Error() string {
 	return fmt.Sprintf("IP (%s) is in a blacklisted range (%s)", b.ip, b.net)
+}
+
+// BlockedHostError is returned when a given hostname is blocked
+type BlockedHostError struct {
+	hostname string
+	match    string
+}
+
+func (b BlockedHostError) Error() string {
+	return fmt.Sprintf("hostname (%s) is in a blocked pattern (%s)", b.hostname, b.match)
 }
 
 // DialContext wraps the net.Dialer.DialContext and handles the k6 specifics
@@ -163,27 +162,29 @@ func (d *Dialer) findRemote(addr string) (*lib.HostAddress, error) {
 		return nil, err
 	}
 
+	ip := net.ParseIP(host)
+	if d.BlockedHostnames != nil && ip == nil {
+		if match, blocked := d.BlockedHostnames.Contains(host); blocked {
+			return nil, BlockedHostError{hostname: host, match: match}
+		}
+	}
+
 	remote, err := d.getConfiguredHost(addr, host, port)
 	if err != nil || remote != nil {
 		return remote, err
 	}
 
-	ip := net.ParseIP(host)
 	if ip != nil {
 		return lib.NewHostAddress(ip, port)
 	}
 
-	return d.fetchRemoteFromResolver(host, port)
-}
-
-func (d *Dialer) fetchRemoteFromResolver(host, port string) (*lib.HostAddress, error) {
-	ip, err := d.Resolver.FetchOne(host)
+	ip, err = d.Resolver.LookupIP(host)
 	if err != nil {
 		return nil, err
 	}
 
 	if ip == nil {
-		return nil, errors.Errorf("lookup %s: no such host", host)
+		return nil, fmt.Errorf("lookup %s: no such host", host)
 	}
 
 	return lib.NewHostAddress(ip, port)

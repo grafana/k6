@@ -1,87 +1,101 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 set -eEuo pipefail
 
 eval "$(go env)"
 
-# To override the latest git tag as the version, pass something else as the first arg.
-VERSION=${1:-$(git describe --tags --always --dirty)}
+OUT_DIR="${1-dist}"
+# To override the latest git tag as the version, pass something else as the second arg.
+VERSION=${2:-$(git describe --tags --always --dirty)}
 
-# To overwrite the version details, pass something as the second arg. Empty string disables it.
-VERSION_DETAILS=${2-"$(date -u +"%FT%T%z")/$(git describe --always --long --dirty)"}
+# To overwrite the version details, pass something as the third arg. Empty string disables it.
+VERSION_DETAILS=${3-"$(date -u +"%FT%T%z")/$(git describe --always --long --dirty)"}
 
-make_archive() {
-	local FMT="$1" DIR="$2"
+build() {
+    local ALIAS="$1" SUFFIX="${2}"  # Any other arguments are passed to the go build command as env vars
+    local NAME="k6-${VERSION}-${ALIAS}"
 
-	case $FMT in
-	zip)
-		zip -rq9 "$DIR.zip" "$DIR"
-		;;
-	tgz)
-		tar -zcf "$DIR.tar.gz" "$DIR"
-		;;
-	esac
+    local BUILD_ENV=("${@:3}")
+    local BUILD_ARGS=(-o "${OUT_DIR}/${NAME}/k6${SUFFIX}" -trimpath)
+
+    if [ -n "$VERSION_DETAILS" ]; then
+        BUILD_ARGS+=(-ldflags "-X github.com/loadimpact/k6/lib/consts.VersionDetails=$VERSION_DETAILS")
+    fi
+
+    echo "- Building platform: ${ALIAS} (" "${BUILD_ENV[@]}" "go build" "${BUILD_ARGS[@]}" ")"
+
+    mkdir -p "${OUT_DIR}/${NAME}"
+
+    # Subshell to not mess with the current env vars or CWD
+    (
+        export "${BUILD_ENV[@]}"
+        # Build a binary
+         go build "${BUILD_ARGS[@]}"
+    )
 }
 
-build_dist() {
-	local ALIAS="$1" FMT="${2}" SUFFIX="${3}"  # Any other arguments are passed to the go build command as env vars
-	local DIR="k6-${VERSION}-${ALIAS}"
-
-	local BUILD_ENV=("${@:4}")
-	local BUILD_ARGS=(-o "dist/$DIR/k6${SUFFIX}" -trimpath)
-
-	if [ -n "$VERSION_DETAILS" ]; then
-		BUILD_ARGS+=(-ldflags "-X github.com/loadimpact/k6/lib/consts.VersionDetails=$VERSION_DETAILS")
-	fi
-
-	echo "- Building platform: ${ALIAS} (" "${BUILD_ENV[@]}" "go build" "${BUILD_ARGS[@]}" ")"
-
-	# Clean out any old remnants of failed builds.
-	rm -rf "dist/$DIR"
-	mkdir -p "dist/$DIR"
-
-	# Subshell to not mess with the current env vars or CWD
-	(
-		export "${BUILD_ENV[@]}"
-
-		# Build a binary
-	 	go build "${BUILD_ARGS[@]}"
-
-		# Archive it all, native format depends on the platform.
-		cd dist
-		make_archive "$FMT" "$DIR"
-	)
-
-	# Delete the source files.
-	rm -rf "dist/$DIR"
+package() {
+    local ALIAS="$1" FMT="$2"
+    local NAME="k6-${VERSION}-${ALIAS}"
+    echo "- Creating ${NAME}.${FMT} package..."
+    case $FMT in
+    deb|rpm)
+        # The go-bin-* tools expect the binary in /tmp/
+        [ ! -r /tmp/k6 ] && cp "${OUT_DIR}/${NAME}/k6" /tmp/k6
+        "go-bin-${FMT}" generate --file "packaging/${FMT}.json" -a amd64 \
+            --version "${VERSION#v}" -o "${OUT_DIR}/k6-${VERSION}-amd64.${FMT}"
+        ;;
+    tgz)
+        tar -C "${OUT_DIR}" -zcf "${OUT_DIR}/${NAME}.tar.gz" "$NAME"
+        ;;
+    zip)
+        (cd "${OUT_DIR}" && zip -rq9 - "$NAME") > "${OUT_DIR}/${NAME}.zip"
+        ;;
+    *)
+        echo "Unknown format: $FMT"
+        return 1
+        ;;
+    esac
 }
 
+CHECKSUM_FILE="k6-${VERSION}-checksums.txt"
 checksum() {
-	local CHECKSUM_FILE="k6-${VERSION}-checksums.txt"
+    if command -v sha256sum > /dev/null; then
+        CHECKSUM_CMD=("sha256sum")
+    elif command -v shasum > /dev/null; then
+        CHECKSUM_CMD=("shasum" "-a" "256")
+    else
+        echo "ERROR: unable to find a command to compute sha-256 hash"
+        exit 1
+    fi
 
-	if command -v sha256sum > /dev/null; then
-		CHECKSUM_CMD=("sha256sum")
-	elif command -v shasum > /dev/null; then
-		CHECKSUM_CMD=("shasum" "-a" "256")
-	else
-		echo "ERROR: unable to find a command to compute sha-256 hash"
-		return 1
-	fi
-
-	rm -f "dist/$CHECKSUM_FILE"
-	( cd dist && for x in *; do [ -f "$x" ] && "${CHECKSUM_CMD[@]}" -- "$x" >> "$CHECKSUM_FILE"; done )
+    echo "--- Generating checksum file..."
+    rm -f "${OUT_DIR}/$CHECKSUM_FILE"
+    (cd "$OUT_DIR" && find . -maxdepth 1 -type f -printf '%P\n' | sort | xargs "${CHECKSUM_CMD[@]}" > "$CHECKSUM_FILE")
 }
+
+cleanup() {
+    find "$OUT_DIR" -mindepth 1 -maxdepth 1 -type d -exec rm -rf {} \;
+    echo "--- Cleaned ${OUT_DIR}"
+}
+trap cleanup EXIT
 
 echo "--- Building Release: ${VERSION}"
 
-echo "-> Building platform packages..."
-mkdir -p dist
+mkdir -p "$OUT_DIR"
 
-build_dist mac     zip ""   GOOS=darwin  GOARCH=amd64
-build_dist win32   zip .exe GOOS=windows GOARCH=386
-build_dist win64   zip .exe GOOS=windows GOARCH=amd64
-build_dist linux32 tgz ""   GOOS=linux   GOARCH=386    CGO_ENABLED=0
-build_dist linux64 tgz ""   GOOS=linux   GOARCH=amd64  CGO_ENABLED=0
+build mac     ""   GOOS=darwin  GOARCH=amd64
+build win32   .exe GOOS=windows GOARCH=386
+build win64   .exe GOOS=windows GOARCH=amd64
+build linux32 ""   GOOS=linux   GOARCH=386    CGO_ENABLED=0
+build linux64 ""   GOOS=linux   GOARCH=amd64  CGO_ENABLED=0
 
-echo "-> Generating checksum file..."
+package linux32 tgz
+package linux64 tgz
+package linux64 rpm
+package linux64 deb
+package mac     zip
+package win32   zip
+package win64   zip
+
 checksum

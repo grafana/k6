@@ -133,12 +133,13 @@ func TestIntegrationConvertCmd(t *testing.T) {
 
 		defaultFs = afero.NewMemMapFs()
 
-		err = afero.WriteFile(defaultFs, harFile, har, 0644)
+		err = afero.WriteFile(defaultFs, harFile, har, 0o644)
 		require.NoError(t, err)
 
 		buf := &bytes.Buffer{}
 		defaultWriter = buf
 
+		convertCmd := getConvertCmd()
 		assert.NoError(t, convertCmd.Flags().Set("correlate", "true"))
 		assert.NoError(t, convertCmd.Flags().Set("no-batch", "true"))
 		assert.NoError(t, convertCmd.Flags().Set("enable-status-code-checks", "true"))
@@ -152,7 +153,7 @@ func TestIntegrationConvertCmd(t *testing.T) {
 		assert.NoError(t, convertCmd.Flags().Set("enable-status-code-checks", "false"))
 		assert.NoError(t, convertCmd.Flags().Set("return-on-failed-check", "false"))
 
-		//Sanitizing to avoid windows problems with carriage returns
+		// Sanitizing to avoid windows problems with carriage returns
 		re := regexp.MustCompile(`\r`)
 		expected := re.ReplaceAllString(string(expectedTestPlan), ``)
 		result := re.ReplaceAllString(buf.String(), ``)
@@ -176,12 +177,13 @@ func TestIntegrationConvertCmd(t *testing.T) {
 		harFile, err := filepath.Abs("stdout.har")
 		require.NoError(t, err)
 		defaultFs = afero.NewMemMapFs()
-		err = afero.WriteFile(defaultFs, harFile, []byte(testHAR), 0644)
+		err = afero.WriteFile(defaultFs, harFile, []byte(testHAR), 0o644)
 		assert.NoError(t, err)
 
 		buf := &bytes.Buffer{}
 		defaultWriter = buf
 
+		convertCmd := getConvertCmd()
 		err = convertCmd.RunE(convertCmd, []string{harFile})
 		assert.NoError(t, err)
 		assert.Equal(t, testHARConvertResult, buf.String())
@@ -190,9 +192,10 @@ func TestIntegrationConvertCmd(t *testing.T) {
 		harFile, err := filepath.Abs("output.har")
 		require.NoError(t, err)
 		defaultFs = afero.NewMemMapFs()
-		err = afero.WriteFile(defaultFs, harFile, []byte(testHAR), 0644)
+		err = afero.WriteFile(defaultFs, harFile, []byte(testHAR), 0o644)
 		assert.NoError(t, err)
 
+		convertCmd := getConvertCmd()
 		err = convertCmd.Flags().Set("output", "/output.js")
 		defer func() {
 			err = convertCmd.Flags().Set("output", "")

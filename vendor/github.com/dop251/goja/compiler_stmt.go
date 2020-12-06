@@ -259,15 +259,12 @@ func (c *compiler) compileLabeledForStatement(v *ast.ForStatement, needResult bo
 				if r.ToBoolean() {
 					testConst = true
 				} else {
-					// TODO: Properly implement dummy compilation (no garbage in block, scope, etc..)
-					/*
-						p := c.p
-						c.p = &program{}
-						c.compileStatement(v.Body, false)
-						if v.Update != nil {
-							c.compileExpression(v.Update).emitGetter(false)
-						}
-						c.p = p*/
+					leave := c.enterDummyMode()
+					c.compileStatement(v.Body, false)
+					if v.Update != nil {
+						c.compileExpression(v.Update).emitGetter(false)
+					}
+					leave()
 					goto end
 				}
 			} else {
@@ -398,10 +395,7 @@ func (c *compiler) compileLabeledWhileStatement(v *ast.WhileStatement, needResul
 			if t.ToBoolean() {
 				testTrue = true
 			} else {
-				p := c.p
-				c.p = &Program{}
-				c.compileStatement(v.Body, false)
-				c.p = p
+				c.compileStatementDummy(v.Body)
 				goto end
 			}
 		} else {
@@ -605,11 +599,7 @@ func (c *compiler) compileIfStatement(v *ast.IfStatement, needResult bool) {
 				c.p = p
 			}
 		} else {
-			// TODO: Properly implement dummy compilation (no garbage in block, scope, etc..)
-			p := c.p
-			c.p = &Program{}
-			c.compileStatement(v.Consequent, false)
-			c.p = p
+			c.compileStatementDummy(v.Consequent)
 			if v.Alternate != nil {
 				c.compileStatement(v.Alternate, needResult)
 			} else {

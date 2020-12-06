@@ -124,7 +124,7 @@ func mostFlagSets() []flagSetInit {
 		i, fsi := i, fsi // go...
 		result = append(result, func() *pflag.FlagSet {
 			flags := pflag.NewFlagSet(fmt.Sprintf("superContrivedFlags_%d", i), pflag.ContinueOnError)
-			flags.AddFlagSet(rootCmdPersistentFlagSet())
+			flags.AddFlagSet(new(rootCommand).rootCmdPersistentFlagSet())
 			flags.AddFlagSet(fsi())
 			return flags
 		})
@@ -139,7 +139,7 @@ type file struct {
 func getFS(files []file) afero.Fs {
 	fs := afero.NewMemMapFs()
 	for _, f := range files {
-		must(afero.WriteFile(fs, f.filepath, []byte(f.contents), 0644)) // modes don't matter in the afero.MemMapFs
+		must(afero.WriteFile(fs, f.filepath, []byte(f.contents), 0o644)) // modes don't matter in the afero.MemMapFs
 	}
 	return fs
 }
@@ -204,9 +204,11 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 		// Verify some CLI errors
 		{opts{cli: []string{"--blah", "blah"}}, exp{cliParseError: true}, nil},
 		{opts{cli: []string{"--duration", "blah"}}, exp{cliParseError: true}, nil},
+		{opts{cli: []string{"--duration", "1000"}}, exp{cliParseError: true}, nil}, // intentionally unsupported
 		{opts{cli: []string{"--iterations", "blah"}}, exp{cliParseError: true}, nil},
 		{opts{cli: []string{"--execution", ""}}, exp{cliParseError: true}, nil},
 		{opts{cli: []string{"--stage", "10:20s"}}, exp{cliReadError: true}, nil},
+		{opts{cli: []string{"--stage", "1000:20"}}, exp{cliReadError: true}, nil}, // intentionally unsupported
 		// Check if CLI shortcuts generate correct execution values
 		{opts{cli: []string{"--vus", "1", "--iterations", "5"}}, exp{}, verifySharedIters(I(1), I(5))},
 		{opts{cli: []string{"-u", "2", "-i", "6"}}, exp{}, verifySharedIters(I(2), I(6))},
@@ -214,11 +216,13 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 		{opts{cli: []string{"-u", "3", "-d", "30s"}}, exp{}, verifyConstLoopingVUs(I(3), 30*time.Second)},
 		{opts{cli: []string{"-u", "4", "--duration", "60s"}}, exp{}, verifyConstLoopingVUs(I(4), 1*time.Minute)},
 		{
-			opts{cli: []string{"--stage", "20s:10", "-s", "3m:5"}}, exp{},
+			opts{cli: []string{"--stage", "20s:10", "-s", "3m:5"}},
+			exp{},
 			verifyRampingVUs(null.NewInt(1, false), buildStages(20, 10, 180, 5)),
 		},
 		{
-			opts{cli: []string{"-s", "1m6s:5", "--vus", "10"}}, exp{},
+			opts{cli: []string{"-s", "1m6s:5", "--vus", "10"}},
+			exp{},
 			verifyRampingVUs(null.NewInt(10, true), buildStages(66, 5)),
 		},
 		{opts{cli: []string{"-u", "1", "-i", "6", "-d", "10s"}}, exp{}, func(t *testing.T, c Config) {
@@ -247,14 +251,18 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 		// Test if environment variable shortcuts are working as expected
 		{opts{env: []string{"K6_VUS=5", "K6_ITERATIONS=15"}}, exp{}, verifySharedIters(I(5), I(15))},
 		{opts{env: []string{"K6_VUS=10", "K6_DURATION=20s"}}, exp{}, verifyConstLoopingVUs(I(10), 20*time.Second)},
+		{opts{env: []string{"K6_VUS=10", "K6_DURATION=10000"}}, exp{}, verifyConstLoopingVUs(I(10), 10*time.Second)},
 		{
-			opts{env: []string{"K6_STAGES=2m30s:11,1h1m:100"}}, exp{},
+			opts{env: []string{"K6_STAGES=2m30s:11,1h1m:100"}},
+			exp{},
 			verifyRampingVUs(null.NewInt(1, false), buildStages(150, 11, 3660, 100)),
 		},
 		{
-			opts{env: []string{"K6_STAGES=100s:100,0m30s:0", "K6_VUS=0"}}, exp{},
+			opts{env: []string{"K6_STAGES=100s:100,0m30s:0", "K6_VUS=0"}},
+			exp{},
 			verifyRampingVUs(null.NewInt(0, true), buildStages(100, 100, 30, 0)),
 		},
+		{opts{env: []string{"K6_STAGES=1000:100"}}, exp{consolidationError: true}, nil}, // intentionally unsupported
 		// Test if JSON configs work as expected
 		{opts{fs: defaultConfig(`{"iterations": 77, "vus": 7}`)}, exp{}, verifySharedIters(I(7), I(77))},
 		{opts{fs: defaultConfig(`wrong-json`)}, exp{consolidationError: true}, nil},
@@ -271,18 +279,26 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 		},
 		{
 			opts{
+				fs:  getFS([]file{{"/my/config.file", `{"duration": 20000}`}}),
+				cli: []string{"--config", "/my/config.file"},
+			}, exp{}, verifyConstLoopingVUs(null.NewInt(1, false), 20*time.Second),
+		},
+		{
+			opts{
 				fs:  defaultConfig(`{"stages": [{"duration": "20s", "target": 20}], "vus": 10}`),
 				env: []string{"K6_DURATION=15s"},
 				cli: []string{"--stage", ""},
 			},
-			exp{logWarning: true}, verifyOneIterPerOneVU,
+			exp{logWarning: true},
+			verifyOneIterPerOneVU,
 		},
 		{
 			opts{
 				runner: &lib.Options{VUs: null.IntFrom(5), Duration: types.NullDurationFrom(50 * time.Second)},
 				cli:    []string{"--stage", "5s:5"},
 			},
-			exp{}, verifyRampingVUs(I(5), buildStages(5, 5)),
+			exp{},
+			verifyRampingVUs(I(5), buildStages(5, 5)),
 		},
 		{
 			opts{
@@ -323,9 +339,27 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 				env: []string{"K6_ITERATIONS=25"},
 				cli: []string{"--vus", "12"},
 			},
-			exp{}, verifySharedIters(I(12), I(25)),
+			exp{},
+			verifySharedIters(I(12), I(25)),
 		},
-
+		{
+			opts{
+				fs: defaultConfig(`{"scenarios": { "foo": {
+					"executor": "constant-vus", "vus": 2, "duration": "1d",
+					"gracefulStop": "10000", "startTime": 1000.5
+				}}}`),
+			}, exp{}, func(t *testing.T, c Config) {
+				exec := c.Scenarios["foo"]
+				require.NotEmpty(t, exec)
+				require.IsType(t, executor.ConstantVUsConfig{}, exec)
+				clvc, ok := exec.(executor.ConstantVUsConfig)
+				require.True(t, ok)
+				assert.Equal(t, null.IntFrom(2), clvc.VUs)
+				assert.Equal(t, types.NullDurationFrom(24*time.Hour), clvc.Duration)
+				assert.Equal(t, types.NullDurationFrom(time.Second+500*time.Microsecond), clvc.StartTime)
+				assert.Equal(t, types.NullDurationFrom(10*time.Second), clvc.GracefulStop)
+			},
+		},
 		// TODO: test the externally controlled executor
 		// TODO: test execution-segment
 
@@ -375,6 +409,86 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 				assert.Equal(t, []string{"avg", "p(90)", "count"}, c.Options.SummaryTrendStats)
 			},
 		},
+		{opts{cli: []string{}}, exp{}, func(t *testing.T, c Config) {
+			assert.Equal(t, types.DNSConfig{
+				TTL:    null.NewString("5m", false),
+				Select: types.NullDNSSelect{DNSSelect: types.DNSrandom, Valid: false},
+				Policy: types.NullDNSPolicy{DNSPolicy: types.DNSpreferIPv4, Valid: false},
+			}, c.Options.DNS)
+		}},
+		{opts{env: []string{"K6_DNS=ttl=5,select=roundRobin"}}, exp{}, func(t *testing.T, c Config) {
+			assert.Equal(t, types.DNSConfig{
+				TTL:    null.StringFrom("5"),
+				Select: types.NullDNSSelect{DNSSelect: types.DNSroundRobin, Valid: true},
+				Policy: types.NullDNSPolicy{DNSPolicy: types.DNSpreferIPv4, Valid: false},
+			}, c.Options.DNS)
+		}},
+		{opts{env: []string{"K6_DNS=ttl=inf,select=random,policy=preferIPv6"}}, exp{}, func(t *testing.T, c Config) {
+			assert.Equal(t, types.DNSConfig{
+				TTL:    null.StringFrom("inf"),
+				Select: types.NullDNSSelect{DNSSelect: types.DNSrandom, Valid: true},
+				Policy: types.NullDNSPolicy{DNSPolicy: types.DNSpreferIPv6, Valid: true},
+			}, c.Options.DNS)
+		}},
+		// This is functionally invalid, but will error out in validation done in js.parseTTL().
+		{opts{cli: []string{"--dns", "ttl=-1"}}, exp{}, func(t *testing.T, c Config) {
+			assert.Equal(t, types.DNSConfig{
+				TTL:    null.StringFrom("-1"),
+				Select: types.NullDNSSelect{DNSSelect: types.DNSrandom, Valid: false},
+				Policy: types.NullDNSPolicy{DNSPolicy: types.DNSpreferIPv4, Valid: false},
+			}, c.Options.DNS)
+		}},
+		{opts{cli: []string{"--dns", "ttl=0,blah=nope"}}, exp{cliReadError: true}, nil},
+		{opts{cli: []string{"--dns", "ttl=0"}}, exp{}, func(t *testing.T, c Config) {
+			assert.Equal(t, types.DNSConfig{
+				TTL:    null.StringFrom("0"),
+				Select: types.NullDNSSelect{DNSSelect: types.DNSrandom, Valid: false},
+				Policy: types.NullDNSPolicy{DNSPolicy: types.DNSpreferIPv4, Valid: false},
+			}, c.Options.DNS)
+		}},
+		{opts{cli: []string{"--dns", "ttl=5s,select="}}, exp{cliReadError: true}, nil},
+		{
+			opts{fs: defaultConfig(`{"dns": {"ttl": "0", "select": "roundRobin", "policy": "onlyIPv4"}}`)},
+			exp{},
+			func(t *testing.T, c Config) {
+				assert.Equal(t, types.DNSConfig{
+					TTL:    null.StringFrom("0"),
+					Select: types.NullDNSSelect{DNSSelect: types.DNSroundRobin, Valid: true},
+					Policy: types.NullDNSPolicy{DNSPolicy: types.DNSonlyIPv4, Valid: true},
+				}, c.Options.DNS)
+			},
+		},
+		{
+			opts{
+				fs:  defaultConfig(`{"dns": {"ttl": "0"}}`),
+				env: []string{"K6_DNS=ttl=30,policy=any"},
+			},
+			exp{},
+			func(t *testing.T, c Config) {
+				assert.Equal(t, types.DNSConfig{
+					TTL:    null.StringFrom("30"),
+					Select: types.NullDNSSelect{DNSSelect: types.DNSrandom, Valid: false},
+					Policy: types.NullDNSPolicy{DNSPolicy: types.DNSany, Valid: true},
+				}, c.Options.DNS)
+			},
+		},
+		{
+			// CLI overrides all, falling back to env
+			opts{
+				fs:  defaultConfig(`{"dns": {"ttl": "60", "select": "first"}}`),
+				env: []string{"K6_DNS=ttl=30,select=random,policy=any"},
+				cli: []string{"--dns", "ttl=5"},
+			},
+			exp{},
+			func(t *testing.T, c Config) {
+				assert.Equal(t, types.DNSConfig{
+					TTL:    null.StringFrom("5"),
+					Select: types.NullDNSSelect{DNSSelect: types.DNSrandom, Valid: true},
+					Policy: types.NullDNSPolicy{DNSPolicy: types.DNSany, Valid: true},
+				}, c.Options.DNS)
+			},
+		},
+
 		// TODO: test for differences between flagsets
 		// TODO: more tests in general, especially ones not related to execution parameters...
 	}

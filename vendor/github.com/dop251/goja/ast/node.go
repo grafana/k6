@@ -135,7 +135,7 @@ type (
 	}
 
 	Property struct {
-		Key   unistring.String
+		Key   Expression
 		Kind  string
 		Value Expression
 	}

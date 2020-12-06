@@ -1,0 +1,355 @@
+name: CI
+on:
+  # Enable manually triggering this workflow via the API or web UI
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+    tags:
+      - v*
+  pull_request:
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  APP_NAME: "k6"
+  DOCKER_IMAGE_ID: ${{ github.repository }}
+
+jobs:
+  deps:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.15.x
+      - name: Check dependencies
+        run: |
+            go version
+            test -z "$(go mod vendor && git status --porcelain)"
+            go mod verify
+
+  lint:
+    runs-on: ubuntu-latest
+    env:
+        GOLANGCI_VERSION: v1.31
+        GO111MODULE: 'on'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.15.x
+      - name: Install golangci-lint
+        working-directory: /tmp
+        run: go get github.com/golangci/golangci-lint/cmd/golangci-lint@$GOLANGCI_VERSION
+      - name: Run linters
+        run: |
+          BASEREV=$(git merge-base HEAD origin/master)
+          echo "Base revision: $BASEREV"
+          golangci-lint run --out-format=tab --new-from-rev "$BASEREV" ./...
+
+  test:
+    strategy:
+      matrix:
+        go-version: [1.14.x]
+        platform: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go-version }}
+      - name: Run tests
+        run: |
+          set -x
+          go version
+          export GOMAXPROCS=2
+          args=("-p" "2" "-race")
+          # Run with less concurrency on Windows to minimize flakiness.
+          if [[ "${{ matrix.platform }}" == windows* ]]; then
+            unset args[2]
+            args[1]="1"
+            export GOMAXPROCS=1
+          fi
+          go test "${args[@]}" -timeout 800s ./...
+
+  test-cov:
+    strategy:
+      matrix:
+        go-version: [1.15.x]
+        platform: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.platform }}
+    env:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go-version }}
+      - name: Run tests with code coverage
+        run: |
+          go version
+          export GOMAXPROCS=2
+          args=("-p" "2" "-race")
+          # Run with less concurrency on Windows to minimize flakiness.
+          if [[ "${{ matrix.platform }}" == windows* ]]; then
+            unset args[2]
+            args[1]="1"
+            export GOMAXPROCS=1
+          fi
+          echo "mode: set" > coverage.txt
+          for pkg in $(go list ./... | grep -v vendor); do
+              list=$(go list -test -f  '{{ join .Deps  "\n"}}' $pkg | grep github.com/loadimpact/k6 | grep -v vendor || true)
+              if [ -n "$list" ]; then
+                  list=$(echo "$list" | cut -f1 -d ' ' | sort -u | paste -sd, -)
+              fi
+
+              go test "${args[@]}" -timeout 800s --coverpkg="$list" -coverprofile=$(echo $pkg | tr / -).coverage $pkg
+          done
+          grep -h -v "^mode:" *.coverage >> coverage.txt
+          rm -f *.coverage
+      - name: Upload coverage to Codecov
+        run: |
+          platform="${{ matrix.platform }}"
+          bash <(curl --fail -s https://codecov.io/bash) -F "${platform%%-*}"
+      - name: Generate coverage HTML report
+        run: go tool cover -html=coverage.txt -o coverage.html
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v2
+        with:
+          name: test-coverage-report-${{ matrix.platform }}
+          path: coverage.html
+
+  configure:
+    runs-on: ubuntu-latest
+    outputs:
+        version: ${{ steps.get_version.outputs.version }}
+    steps:
+      - name: Get version
+        id: get_version
+        run: |
+          VERSION="${GITHUB_REF##*/}"
+          echo "VERSION=${VERSION}"
+          echo "::set-output name=version::${VERSION}"
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [configure, deps, lint, test, test-cov]
+    if: startsWith(github.ref, 'refs/tags/v')
+    env:
+      VERSION: ${{ needs.configure.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.15.x
+      - name: Install package builders
+        env:
+          GO111MODULE: 'off'
+        run: |
+          gopath="$(go env GOPATH)"
+          go get github.com/Masterminds/glide
+          go get -d github.com/mh-cbon/go-bin-deb \
+              && (cd "$gopath/src/github.com/mh-cbon/go-bin-deb" \
+              && glide install \
+              && go install)
+          go get -d github.com/mh-cbon/go-bin-rpm \
+              && (cd "$gopath/src/github.com/mh-cbon/go-bin-rpm" \
+              && glide install \
+              && go install)
+          sudo apt-get update -y
+          sudo apt-get install -y fakeroot rpm
+      - name: Generate Windows binary metadata
+        run: |
+          (cd && GO111MODULE=on go get github.com/josephspurrier/goversioninfo/cmd/goversioninfo@v1.2.0)
+          IFS=. read -a version <<< "$(echo $VERSION | sed 's:[^0-9\.]::g')"
+          # Need a blank versioninfo.json for the CLI overrides to work.
+          echo '{}' > versioninfo.json
+          goversioninfo -64 \
+            -charset="1200" \
+            -company="Load Impact AB" \
+            -copyright="© Load Impact AB. Licensed under AGPL." \
+            -description="A modern load testing tool, using Go and JavaScript" \
+            -icon=packaging/k6.ico \
+            -internal-name="k6" \
+            -original-name="k6.exe" \
+            -product-name="k6" \
+            -translation="0x0409" \
+            -ver-major="${version[0]}" \
+            -ver-minor="${version[1]}" \
+            -ver-patch="${version[2]}" \
+            -product-version="${VERSION#v}"
+      - name: Build
+        run: |
+          go version
+          ./build-release.sh
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: binaries
+          path: dist/
+          retention-days: 7
+
+  publish-docker:
+    runs-on: ubuntu-latest
+    needs: [deps, lint, test, test-cov, configure]
+    env:
+      VERSION: ${{ needs.configure.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Build
+        run: docker build -t $DOCKER_IMAGE_ID .
+      - name: Check
+        run: |
+            docker run $DOCKER_IMAGE_ID version
+            docker run $DOCKER_IMAGE_ID --help
+            docker run $DOCKER_IMAGE_ID help
+            docker run $DOCKER_IMAGE_ID run --help
+            docker run $DOCKER_IMAGE_ID inspect --help
+            docker run $DOCKER_IMAGE_ID status --help
+            docker run $DOCKER_IMAGE_ID stats --help
+            docker run $DOCKER_IMAGE_ID scale --help
+            docker run $DOCKER_IMAGE_ID pause --help
+            docker run $DOCKER_IMAGE_ID resume --help
+      - name: Publish
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "REF=${{ github.ref }}"
+          echo "DOCKER_IMAGE_ID=$DOCKER_IMAGE_ID"
+          # Log into registry
+          echo "${{ secrets.DOCKER_PASS }}" | docker login -u "${{ secrets.DOCKER_USER }}" --password-stdin
+          VERSION="${VERSION#v}"
+          echo "VERSION=$VERSION"
+          docker tag "$DOCKER_IMAGE_ID" "$DOCKER_IMAGE_ID:$VERSION"
+          docker push "$DOCKER_IMAGE_ID:$VERSION"
+          # We also want to tag the latest stable version as latest
+          if [[ "$VERSION" != "master" ]] && [[ ! "$VERSION" =~ (RC|rc) ]]; then
+            docker tag "$DOCKER_IMAGE_ID" "$DOCKER_IMAGE_ID:latest"
+            docker push "$DOCKER_IMAGE_ID:latest"
+          fi
+
+  publish-github:
+    runs-on: ubuntu-latest
+    needs: [deps, lint, test, test-cov, configure, build]
+    if: startsWith(github.ref, 'refs/tags/v')
+    env:
+      VERSION: ${{ needs.configure.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Download binaries
+        uses: actions/download-artifact@v2
+        with:
+          name: binaries
+          path: dist
+      - name: Create release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -x
+          assets=()
+          for asset in ./dist/*; do
+            assets+=("-a" "$asset")
+          done
+          hub release create "${assets[@]}" -m "$VERSION" -m "$(cat ./release\ notes/${VERSION}.md)" "$VERSION"
+      - name: Upload packages to Bintray
+        run: |
+          # Publishing deb
+          curl --fail -H "X-GPG-PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}" -T "dist/k6-$VERSION-amd64.deb" \
+            "https://${{ secrets.BINTRAY_USER }}:${{ secrets.BINTRAY_KEY }}@api.bintray.com/content/loadimpact/deb/k6/${VERSION#v}/k6-${VERSION}-amd64.deb;deb_distribution=stable;deb_component=main;deb_architecture=amd64;publish=1;override=1"
+          # Publishing rpm
+          curl --fail -H "X-GPG-PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}" -T "dist/k6-$VERSION-amd64.rpm" \
+            "https://${{ secrets.BINTRAY_USER }}:${{ secrets.BINTRAY_KEY }}@api.bintray.com/content/loadimpact/rpm/k6/${VERSION#v}/k6-${VERSION}-amd64.rpm?publish=1&override=1"
+
+  publish-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: powershell
+    needs: [deps, lint, test, test-cov, configure, build]
+    if: startsWith(github.ref, 'refs/tags/v')
+    env:
+      VERSION: ${{ needs.configure.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Install pandoc
+        uses: crazy-max/ghaction-chocolatey@b6061d587628735be315d74358228b83a7dba9a7
+        with:
+          args: install -y pandoc
+      - name: Install wix tools
+        run: |
+          curl -O wix311-binaries.zip https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip
+          Expand-Archive -Path .\wix311-binaries.zip -DestinationPath .\wix311\
+          echo "$pwd\wix311" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Download binaries
+        uses: actions/download-artifact@v2
+        with:
+          name: binaries
+          path: dist
+      - name: Unzip Windows binary
+        run: |
+          Expand-Archive -Path ".\dist\k6-$env:VERSION-win64.zip" -DestinationPath .\packaging\
+          move .\packaging\k6-$env:VERSION-win64\k6.exe .\packaging\
+          rmdir .\packaging\k6-$env:VERSION-win64\
+      - name: Add signtool to PATH
+        run: echo "${env:ProgramFiles(x86)}\Windows Kits\10\bin\x64" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Convert base64 certificate to PFX
+        run: |
+          $bytes = [Convert]::FromBase64String("${{ secrets.WIN_SIGN_CERT }}")
+          [IO.File]::WriteAllBytes("k6.pfx", $bytes)
+      - name: Sign Windows binary
+        run: signtool sign /f k6.pfx /p "${{ secrets.WIN_SIGN_PASS }}" /tr "http://timestamp.digicert.com" /td sha256 /fd sha256 "packaging\k6.exe"
+      - name: Create MSI package
+        run: |
+          $env:VERSION = $env:VERSION -replace 'v(\d+\.\d+\.\d+).*','$1'
+          pandoc -s -f markdown -t rtf -o packaging\LICENSE.rtf LICENSE.md
+          cd .\packaging
+          candle.exe -arch x64 "-dVERSION=$env:VERSION" k6.wxs
+          light.exe -ext WixUIExtension k6.wixobj
+      - name: Sign MSI package
+        run: signtool sign /f k6.pfx /p "${{ secrets.WIN_SIGN_PASS }}" /tr "http://timestamp.digicert.com" /td sha256 /fd sha256 "packaging\k6.msi"
+      - name: Cleanup signing artifacts
+        run: del k6.pfx
+      - name: Prepare Chocolatey package
+        run: |
+          $env:VERSION = $env:VERSION.TrimStart("v", " ")
+          cd .\packaging
+          (Get-Content '.\k6.portable.nuspec' -Raw).Replace("<version>__REPLACE__</version>", "<version>$env:VERSION</version>") | Out-File '.\k6.portable.nuspec'
+      - name: Create Chocolatey package
+        uses: crazy-max/ghaction-chocolatey@b6061d587628735be315d74358228b83a7dba9a7
+        with:
+          args: pack --verbose --outputdirectory .\packaging .\packaging\k6.portable.nuspec
+      - name: Upload packages to Bintray
+        run: |
+          cd .\packaging
+          $env:VERSION = $env:VERSION.TrimStart("v", " ")
+          curl.exe --fail -H "X-GPG-PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}" -T .\k6.msi "https://${{ secrets.BINTRAY_USER }}:${{ secrets.BINTRAY_KEY }}@api.bintray.com/content/loadimpact/windows/k6/$env:VERSION/k6-v$env:VERSION-amd64.msi?publish=1&override=1"
+          curl.exe --fail -H "X-GPG-PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}" -T .\k6.portable.$env:VERSION.nupkg "https://${{ secrets.BINTRAY_USER }}:${{ secrets.BINTRAY_KEY }}@api.bintray.com/content/loadimpact/choco/k6.portable/$env:VERSION/k6.portable.$env:VERSION.nupkg?publish=1&override=1"
+
+  publish-macos:
+    runs-on: macos-latest
+    needs: [deps, lint, test, test-cov, configure, build]
+    if: startsWith(github.ref, 'refs/tags/v')
+    env:
+      VERSION: ${{ needs.configure.outputs.version }}
+    steps:
+      - name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@2eb78889a50ba021d744837934f1af2d8c4458ec
+      - name: Create version bump PR
+        run: brew bump-formula-pr k6 --tag="$VERSION" --revision="$GITHUB_SHA"

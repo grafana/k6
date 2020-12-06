@@ -7,7 +7,7 @@ import (
 	"fmt"
 )
 
-const _SystemTagSetName = "protosubprotostatusmethodurlnamegroupcheckerrorerror_codetls_versionscenarioitervuocsp_statusip"
+const _SystemTagSetName = "protosubprotostatusmethodurlnamegroupcheckerrorerror_codetls_versionscenarioserviceitervuocsp_statusip"
 
 var _SystemTagSetMap = map[SystemTagSet]string{
 	1:     _SystemTagSetName[0:5],
@@ -22,10 +22,11 @@ var _SystemTagSetMap = map[SystemTagSet]string{
 	512:   _SystemTagSetName[47:57],
 	1024:  _SystemTagSetName[57:68],
 	2048:  _SystemTagSetName[68:76],
-	4096:  _SystemTagSetName[76:80],
-	8192:  _SystemTagSetName[80:82],
-	16384: _SystemTagSetName[82:93],
-	32768: _SystemTagSetName[93:95],
+	4096:  _SystemTagSetName[76:83],
+	8192:  _SystemTagSetName[83:87],
+	16384: _SystemTagSetName[87:89],
+	32768: _SystemTagSetName[89:100],
+	65536: _SystemTagSetName[100:102],
 }
 
 func (i SystemTagSet) String() string {
@@ -35,25 +36,26 @@ func (i SystemTagSet) String() string {
 	return fmt.Sprintf("SystemTagSet(%d)", i)
 }
 
-var _SystemTagSetValues = []SystemTagSet{1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768}
+var _SystemTagSetValues = []SystemTagSet{1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536}
 
 var _SystemTagSetNameToValueMap = map[string]SystemTagSet{
-	_SystemTagSetName[0:5]:   1,
-	_SystemTagSetName[5:13]:  2,
-	_SystemTagSetName[13:19]: 4,
-	_SystemTagSetName[19:25]: 8,
-	_SystemTagSetName[25:28]: 16,
-	_SystemTagSetName[28:32]: 32,
-	_SystemTagSetName[32:37]: 64,
-	_SystemTagSetName[37:42]: 128,
-	_SystemTagSetName[42:47]: 256,
-	_SystemTagSetName[47:57]: 512,
-	_SystemTagSetName[57:68]: 1024,
-	_SystemTagSetName[68:76]: 2048,
-	_SystemTagSetName[76:80]: 4096,
-	_SystemTagSetName[80:82]: 8192,
-	_SystemTagSetName[82:93]: 16384,
-	_SystemTagSetName[93:95]: 32768,
+	_SystemTagSetName[0:5]:     1,
+	_SystemTagSetName[5:13]:    2,
+	_SystemTagSetName[13:19]:   4,
+	_SystemTagSetName[19:25]:   8,
+	_SystemTagSetName[25:28]:   16,
+	_SystemTagSetName[28:32]:   32,
+	_SystemTagSetName[32:37]:   64,
+	_SystemTagSetName[37:42]:   128,
+	_SystemTagSetName[42:47]:   256,
+	_SystemTagSetName[47:57]:   512,
+	_SystemTagSetName[57:68]:   1024,
+	_SystemTagSetName[68:76]:   2048,
+	_SystemTagSetName[76:83]:   4096,
+	_SystemTagSetName[83:87]:   8192,
+	_SystemTagSetName[87:89]:   16384,
+	_SystemTagSetName[89:100]:  32768,
+	_SystemTagSetName[100:102]: 65536,
 }
 
 // SystemTagSetString retrieves an enum value from the enum constants string name.

@@ -33,71 +33,76 @@ import (
 
 var archiveOut = "archive.tar"
 
-// archiveCmd represents the pause command
-var archiveCmd = &cobra.Command{
-	Use:   "archive",
-	Short: "Create an archive",
-	Long: `Create an archive.
+func getArchiveCmd(logger *logrus.Logger) *cobra.Command {
+	// archiveCmd represents the pause command
+	archiveCmd := &cobra.Command{
+		Use:   "archive",
+		Short: "Create an archive",
+		Long: `Create an archive.
 
 An archive is a fully self-contained test run, and can be executed identically elsewhere.`,
-	Example: `
+		Example: `
   # Archive a test run.
   k6 archive -u 10 -d 10s -O myarchive.tar script.js
 
   # Run the resulting archive.
   k6 run myarchive.tar`[1:],
-	Args: cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		// TODO: don't use the Global logger
-		logger := logrus.StandardLogger()
-		// Runner.
-		pwd, err := os.Getwd()
-		if err != nil {
-			return err
-		}
-		filename := args[0]
-		filesystems := loader.CreateFilesystems()
-		src, err := loader.ReadSource(logger, filename, pwd, filesystems, os.Stdin)
-		if err != nil {
-			return err
-		}
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Runner.
+			pwd, err := os.Getwd()
+			if err != nil {
+				return err
+			}
+			filename := args[0]
+			filesystems := loader.CreateFilesystems()
+			src, err := loader.ReadSource(logger, filename, pwd, filesystems, os.Stdin)
+			if err != nil {
+				return err
+			}
 
-		runtimeOptions, err := getRuntimeOptions(cmd.Flags(), buildEnvMap(os.Environ()))
-		if err != nil {
-			return err
-		}
+			runtimeOptions, err := getRuntimeOptions(cmd.Flags(), buildEnvMap(os.Environ()))
+			if err != nil {
+				return err
+			}
 
-		r, err := newRunner(logger, src, runType, filesystems, runtimeOptions)
-		if err != nil {
-			return err
-		}
+			r, err := newRunner(logger, src, runType, filesystems, runtimeOptions)
+			if err != nil {
+				return err
+			}
 
-		cliOpts, err := getOptions(cmd.Flags())
-		if err != nil {
-			return err
-		}
-		conf, err := getConsolidatedConfig(afero.NewOsFs(), Config{Options: cliOpts}, r)
-		if err != nil {
-			return err
-		}
+			cliOpts, err := getOptions(cmd.Flags())
+			if err != nil {
+				return err
+			}
+			conf, err := getConsolidatedConfig(afero.NewOsFs(), Config{Options: cliOpts}, r)
+			if err != nil {
+				return err
+			}
 
-		if _, cerr := deriveAndValidateConfig(conf, r.IsExecutable); cerr != nil {
-			return ExitCode{error: cerr, Code: invalidConfigErrorCode}
-		}
+			if _, cerr := deriveAndValidateConfig(conf, r.IsExecutable); cerr != nil {
+				return ExitCode{error: cerr, Code: invalidConfigErrorCode}
+			}
 
-		err = r.SetOptions(conf.Options)
-		if err != nil {
-			return err
-		}
+			err = r.SetOptions(conf.Options)
+			if err != nil {
+				return err
+			}
 
-		// Archive.
-		arc := r.MakeArchive()
-		f, err := os.Create(archiveOut)
-		if err != nil {
-			return err
-		}
-		return arc.Write(f)
-	},
+			// Archive.
+			arc := r.MakeArchive()
+			f, err := os.Create(archiveOut)
+			if err != nil {
+				return err
+			}
+			return arc.Write(f)
+		},
+	}
+
+	archiveCmd.Flags().SortFlags = false
+	archiveCmd.Flags().AddFlagSet(archiveCmdFlagSet())
+
+	return archiveCmd
 }
 
 func archiveCmdFlagSet() *pflag.FlagSet {
@@ -108,10 +113,4 @@ func archiveCmdFlagSet() *pflag.FlagSet {
 	// TODO: figure out a better way to handle the CLI flags - global variables are not very testable... :/
 	flags.StringVarP(&archiveOut, "archive-out", "O", archiveOut, "archive output filename")
 	return flags
-}
-
-func init() {
-	RootCmd.AddCommand(archiveCmd)
-	archiveCmd.Flags().SortFlags = false
-	archiveCmd.Flags().AddFlagSet(archiveCmdFlagSet())
 }

@@ -312,23 +312,90 @@ func TestRequestAndBatch(t *testing.T) {
 			logEntry := hook.LastEntry()
 			assert.Nil(t, logEntry)
 		})
+		t.Run("10s", func(t *testing.T) {
+			hook := logtest.NewLocal(state.Logger)
+			defer hook.Reset()
+
+			startTime := time.Now()
+			_, err := common.RunString(rt, sr(`
+				http.get("HTTPBIN_URL/delay/10", {
+					timeout: "1s",
+				})
+			`))
+			endTime := time.Now()
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "context deadline exceeded")
+			assert.WithinDuration(t, startTime.Add(1*time.Second), endTime, 2*time.Second)
+
+			logEntry := hook.LastEntry()
+			assert.Nil(t, logEntry)
+		})
 	})
 	t.Run("UserAgent", func(t *testing.T) {
 		_, err := common.RunString(rt, sr(`
-			var res = http.get("HTTPBIN_URL/user-agent");
-			if (res.json()['user-agent'] != "TestUserAgent") {
-				throw new Error("incorrect user agent: " + res.json()['user-agent'])
+			var res = http.get("HTTPBIN_URL/headers");
+			var headers = res.json()["headers"];
+			if (headers['User-Agent'] != "TestUserAgent") {
+				throw new Error("incorrect user agent: " + headers['User-Agent'])
 			}
 		`))
 		assert.NoError(t, err)
 
 		t.Run("Override", func(t *testing.T) {
 			_, err := common.RunString(rt, sr(`
-				var res = http.get("HTTPBIN_URL/user-agent", {
+				var res = http.get("HTTPBIN_URL/headers", {
 					headers: { "User-Agent": "OtherUserAgent" },
 				});
-				if (res.json()['user-agent'] != "OtherUserAgent") {
-					throw new Error("incorrect user agent: " + res.json()['user-agent'])
+				var headers = res.json()["headers"];
+				if (headers['User-Agent'] != "OtherUserAgent") {
+					throw new Error("incorrect user agent: " + headers['User-Agent'])
+				}
+			`))
+			assert.NoError(t, err)
+		})
+
+		t.Run("Override empty", func(t *testing.T) {
+			_, err := common.RunString(rt, sr(`
+				var res = http.get("HTTPBIN_URL/headers", {
+					headers: { "User-Agent": "" },
+				});
+				var headers = res.json()["headers"]
+				if (typeof headers['User-Agent'] !== 'undefined') {
+					throw new Error("not undefined user agent: " +  headers['User-Agent'])
+				}
+			`))
+			assert.NoError(t, err)
+		})
+
+		t.Run("empty", func(t *testing.T) {
+			oldUserAgent := state.Options.UserAgent
+			defer func() {
+				state.Options.UserAgent = oldUserAgent
+			}()
+
+			state.Options.UserAgent = null.NewString("", true)
+			_, err := common.RunString(rt, sr(`
+				var res = http.get("HTTPBIN_URL/headers");
+				var headers = res.json()["headers"]
+				if (typeof headers['User-Agent'] !== 'undefined') {
+					throw new Error("not undefined user agent: " + headers['User-Agent'])
+				}
+			`))
+			assert.NoError(t, err)
+		})
+
+		t.Run("default", func(t *testing.T) {
+			oldUserAgent := state.Options.UserAgent
+			defer func() {
+				state.Options.UserAgent = oldUserAgent
+			}()
+
+			state.Options.UserAgent = null.NewString("Default one", false)
+			_, err := common.RunString(rt, sr(`
+				var res = http.get("HTTPBIN_URL/headers");
+				var headers = res.json()["headers"]
+				if (headers['User-Agent'] != "Default one") {
+					throw new Error("incorrect user agent: " + headers['User-Agent'])
 				}
 			`))
 			assert.NoError(t, err)
@@ -492,12 +559,13 @@ func TestRequestAndBatch(t *testing.T) {
 			})
 		}
 		t.Run("ocsp_stapled_good", func(t *testing.T) {
-			_, err := common.RunString(rt, `
-			var res = http.request("GET", "https://www.microsoft.com/");
+			website := "https://www.wikipedia.org/"
+			_, err := common.RunString(rt, fmt.Sprintf(`
+			var res = http.request("GET", "%s");
 			if (res.ocsp.status != http.OCSP_STATUS_GOOD) { throw new Error("wrong ocsp stapled response status: " + res.ocsp.status); }
-			`)
+			`, website))
 			assert.NoError(t, err)
-			assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), "GET", "https://www.microsoft.com/", "", 200, "")
+			assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), "GET", website, "", 200, "")
 		})
 	})
 	t.Run("Invalid", func(t *testing.T) {
@@ -913,6 +981,31 @@ func TestRequestAndBatch(t *testing.T) {
 				});
 				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 				if (res.json().headers["Host"] != "HTTPBIN_DOMAIN") { throw new Error("wrong Host: " + res.json().headers["Host"]); }
+				`))
+				assert.NoError(t, err)
+				assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/headers"), "", 200, "")
+			})
+
+			t.Run("response_request", func(t *testing.T) {
+				_, err := common.RunString(rt, sr(`
+				var res = http.request("GET", "HTTPBIN_URL/headers", null, {
+					headers: { "host": "HTTPBIN_DOMAIN" },
+				});
+				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+				if (res.request.headers["Host"] != "HTTPBIN_DOMAIN") { throw new Error("wrong Host: " + res.request.headers["Host"]); }
+				`))
+				assert.NoError(t, err)
+				assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/headers"), "", 200, "")
+			})
+
+			t.Run("differentHost", func(t *testing.T) {
+				_, err := common.RunString(rt, sr(`
+				var custHost = 'k6.io';
+				var res = http.request("GET", "HTTPBIN_URL/headers", null, {
+					headers: { "host": custHost },
+				});
+				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+				if (res.request.headers["Host"] != custHost) { throw new Error("wrong Host: " + res.request.headers["Host"]); }
 				`))
 				assert.NoError(t, err)
 				assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/headers"), "", 200, "")
@@ -1669,7 +1762,7 @@ func TestErrorCodes(t *testing.T) {
 			name:              "Unroutable",
 			expectedErrorCode: 1101,
 			expectedErrorMsg:  "lookup: no such host",
-			script:            `var res = http.request("GET", "http://sdafsgdhfjg/");`,
+			script:            `var res = http.request("GET", "http://sdafsgdhfjg.com/");`,
 		},
 
 		{
@@ -1683,7 +1776,7 @@ func TestErrorCodes(t *testing.T) {
 			expectedErrorCode: 1101,
 			expectedErrorMsg:  "lookup: no such host",
 			moreSamples:       1,
-			script:            `var res = http.request("GET", "HTTPBIN_URL/redirect-to?url=http://dafsgdhfjg/");`,
+			script:            `var res = http.request("GET", "HTTPBIN_URL/redirect-to?url=http://dafsgdhfjg.com/");`,
 		},
 		{
 			name:              "Non location redirect",
@@ -1701,7 +1794,7 @@ func TestErrorCodes(t *testing.T) {
 			name:              "Missing protocol",
 			expectedErrorCode: 1000,
 			expectedErrorMsg:  `unsupported protocol scheme ""`,
-			script:            `var res = http.request("GET", "dafsgdhfjg/");`,
+			script:            `var res = http.request("GET", "dafsgdhfjg.com/");`,
 		},
 		{
 			name:        "Too many redirects",

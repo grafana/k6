@@ -43,6 +43,7 @@ import (
 	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/lib/testutils"
+	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 )
 
@@ -51,7 +52,7 @@ func TestInitContextRequire(t *testing.T) {
 	t.Run("Modules", func(t *testing.T) {
 		t.Run("Nonexistent", func(t *testing.T) {
 			_, err := getSimpleBundle(t, "/script.js", `import "k6/NONEXISTENT";`)
-			assert.Contains(t, err.Error(), "GoError: unknown builtin module: k6/NONEXISTENT")
+			assert.Contains(t, err.Error(), "GoError: unknown module: k6/NONEXISTENT")
 		})
 
 		t.Run("k6", func(t *testing.T) {
@@ -388,11 +389,14 @@ func TestRequestWithBinaryFile(t *testing.T) {
 		Logger:  logger,
 		Group:   root,
 		Transport: &http.Transport{
-			DialContext: (netext.NewDialer(net.Dialer{
-				Timeout:   10 * time.Second,
-				KeepAlive: 60 * time.Second,
-				DualStack: true,
-			})).DialContext,
+			DialContext: (netext.NewDialer(
+				net.Dialer{
+					Timeout:   10 * time.Second,
+					KeepAlive: 60 * time.Second,
+					DualStack: true,
+				},
+				netext.NewResolver(net.LookupIP, 0, types.DNSfirst, types.DNSpreferIPv4),
+			)).DialContext,
 		},
 		BPool:   bpool.NewBufferPool(1),
 		Samples: make(chan stats.SampleContainer, 500),

@@ -71,6 +71,8 @@ func getNullInt64(flags *pflag.FlagSet, key string) null.Int {
 }
 
 func getNullDuration(flags *pflag.FlagSet, key string) types.NullDuration {
+	// TODO: use types.ParseExtendedDuration? not sure we should support
+	// unitless durations (i.e. milliseconds) here...
 	v, err := flags.GetDuration(key)
 	if err != nil {
 		panic(err)

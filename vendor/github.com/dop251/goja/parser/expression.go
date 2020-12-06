@@ -189,27 +189,42 @@ func (self *_parser) parseVariableDeclarationList(var_ file.Idx) []ast.Expressio
 	return list
 }
 
-func (self *_parser) parseObjectPropertyKey() (string, unistring.String) {
+func (self *_parser) parseObjectPropertyKey() (string, ast.Expression) {
 	idx, tkn, literal, parsedLiteral := self.idx, self.token, self.literal, self.parsedLiteral
-	var value unistring.String
+	var value ast.Expression
 	self.next()
 	switch tkn {
 	case token.IDENTIFIER:
-		value = parsedLiteral
+		value = &ast.StringLiteral{
+			Idx:     idx,
+			Literal: literal,
+			Value:   unistring.String(literal),
+		}
 	case token.NUMBER:
-		var err error
-		_, err = parseNumberLiteral(literal)
+		num, err := parseNumberLiteral(literal)
 		if err != nil {
 			self.error(idx, err.Error())
 		} else {
-			value = unistring.String(literal)
+			value = &ast.NumberLiteral{
+				Idx:     idx,
+				Literal: literal,
+				Value:   num,
+			}
 		}
 	case token.STRING:
-		value = parsedLiteral
+		value = &ast.StringLiteral{
+			Idx:     idx,
+			Literal: literal,
+			Value:   parsedLiteral,
+		}
 	default:
 		// null, false, class, etc.
 		if isId(tkn) {
-			value = unistring.String(literal)
+			value = &ast.StringLiteral{
+				Idx:     idx,
+				Literal: literal,
+				Value:   unistring.String(literal),
+			}
 		}
 	}
 	return literal, value

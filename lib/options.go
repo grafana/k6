@@ -307,6 +307,9 @@ type Options struct {
 	// Limit HTTP requests per second.
 	RPS null.Int `json:"rps" envconfig:"K6_RPS"`
 
+	// DNS handling configuration.
+	DNS types.DNSConfig `json:"dns" envconfig:"K6_DNS"`
+
 	// How many HTTP redirects do we follow?
 	MaxRedirects null.Int `json:"maxRedirects" envconfig:"K6_MAX_REDIRECTS"`
 
@@ -338,6 +341,9 @@ type Options struct {
 
 	// Blacklist IP ranges that tests may not contact. Mainly useful in hosted setups.
 	BlacklistIPs []*IPNet `json:"blacklistIPs" envconfig:"K6_BLACKLIST_IPS"`
+
+	// Block hostname patterns that tests may not contact.
+	BlockedHostnames types.NullHostnameTrie `json:"blockHostnames" envconfig:"K6_BLOCK_HOSTNAMES"`
 
 	// Hosts overrides dns entries for given hosts
 	Hosts map[string]*HostAddress `json:"hosts" envconfig:"K6_HOSTS"`
@@ -382,6 +388,9 @@ type Options struct {
 
 	// Redirect console logging to a file
 	ConsoleOutput null.String `json:"-" envconfig:"K6_CONSOLE_OUTPUT"`
+
+	// Specify client IP ranges and/or CIDR from which VUs will make requests
+	LocalIPs types.NullIPPool `json:"-" envconfig:"K6_LOCAL_IPS"`
 }
 
 // Returns the result of overwriting any fields with any that are set on the argument.
@@ -494,6 +503,9 @@ func (o Options) Apply(opts Options) Options {
 	if opts.BlacklistIPs != nil {
 		o.BlacklistIPs = opts.BlacklistIPs
 	}
+	if opts.BlockedHostnames.Valid {
+		o.BlockedHostnames = opts.BlockedHostnames
+	}
 	if opts.Hosts != nil {
 		o.Hosts = opts.Hosts
 	}
@@ -532,6 +544,18 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.ConsoleOutput.Valid {
 		o.ConsoleOutput = opts.ConsoleOutput
+	}
+	if opts.LocalIPs.Valid {
+		o.LocalIPs = opts.LocalIPs
+	}
+	if opts.DNS.TTL.Valid {
+		o.DNS.TTL = opts.DNS.TTL
+	}
+	if opts.DNS.Select.Valid {
+		o.DNS.Select = opts.DNS.Select
+	}
+	if opts.DNS.Policy.Valid {
+		o.DNS.Policy = opts.DNS.Policy
 	}
 
 	return o

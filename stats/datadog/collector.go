@@ -21,9 +21,14 @@
 package datadog
 
 import (
+	"time"
+
+	"github.com/sirupsen/logrus"
+	"gopkg.in/guregu/null.v3"
+
+	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/stats/statsd/common"
-	"github.com/sirupsen/logrus"
 )
 
 type tagHandler stats.TagSet
@@ -38,17 +43,51 @@ func (t tagHandler) processTags(tags map[string]string) []string {
 	return res
 }
 
-// Config defines the datadog configuration
+// Config defines the Datadog configuration.
 type Config struct {
-	common.Config
-
-	TagBlacklist stats.TagSet `json:"tagBlacklist,omitempty" envconfig:"TAG_BLACKLIST"`
+	Addr         null.String        `json:"addr,omitempty" envconfig:"K6_DATADOG_ADDR"`
+	BufferSize   null.Int           `json:"bufferSize,omitempty" envconfig:"K6_DATADOG_BUFFER_SIZE"`
+	Namespace    null.String        `json:"namespace,omitempty" envconfig:"K6_DATADOG_NAMESPACE"`
+	PushInterval types.NullDuration `json:"pushInterval,omitempty" envconfig:"K6_DATADOG_PUSH_INTERVAL"`
+	TagBlacklist stats.TagSet       `json:"tagBlacklist,omitempty" envconfig:"K6_DATADOG_TAG_BLACKLIST"`
 }
+
+// GetAddr returns the address of the DogStatsD service.
+func (c Config) GetAddr() null.String {
+	return c.Addr
+}
+
+// GetBufferSize returns the size of the commands buffer.
+func (c Config) GetBufferSize() null.Int {
+	return c.BufferSize
+}
+
+// GetNamespace returns the namespace prepended to all statsd calls.
+func (c Config) GetNamespace() null.String {
+	return c.Namespace
+}
+
+// GetPushInterval returns the time interval between outgoing data batches.
+func (c Config) GetPushInterval() types.NullDuration {
+	return c.PushInterval
+}
+
+var _ common.Config = &Config{}
 
 // Apply saves config non-zero config values from the passed config in the receiver.
 func (c Config) Apply(cfg Config) Config {
-	c.Config = c.Config.Apply(cfg.Config)
-
+	if cfg.Addr.Valid {
+		c.Addr = cfg.Addr
+	}
+	if cfg.BufferSize.Valid {
+		c.BufferSize = cfg.BufferSize
+	}
+	if cfg.Namespace.Valid {
+		c.Namespace = cfg.Namespace
+	}
+	if cfg.PushInterval.Valid {
+		c.PushInterval = cfg.PushInterval
+	}
 	if cfg.TagBlacklist != nil {
 		c.TagBlacklist = cfg.TagBlacklist
 	}
@@ -59,15 +98,18 @@ func (c Config) Apply(cfg Config) Config {
 // NewConfig creates a new Config instance with default values for some fields.
 func NewConfig() Config {
 	return Config{
-		Config:       common.NewConfig(),
+		Addr:         null.NewString("localhost:8125", false),
+		BufferSize:   null.NewInt(20, false),
+		Namespace:    null.NewString("k6.", false),
+		PushInterval: types.NewNullDuration(1*time.Second, false),
 		TagBlacklist: stats.TagSet{},
 	}
 }
 
-// New creates a new statsd connector client
+// New creates a new Datadog connector client
 func New(logger logrus.FieldLogger, conf Config) (*common.Collector, error) {
 	return &common.Collector{
-		Config:      conf.Config,
+		Config:      conf,
 		Type:        "datadog",
 		ProcessTags: tagHandler(conf.TagBlacklist).processTags,
 		Logger:      logger,

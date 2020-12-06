@@ -47,11 +47,13 @@ var (
 	skip                []string
 )
 
-var convertCmd = &cobra.Command{
-	Use:   "convert",
-	Short: "Convert a HAR file to a k6 script",
-	Long:  "Convert a HAR (HTTP Archive) file to a k6 script",
-	Example: `
+//nolint:funlen,gocognit
+func getConvertCmd() *cobra.Command {
+	convertCmd := &cobra.Command{
+		Use:   "convert",
+		Short: "Convert a HAR file to a k6 script",
+		Long:  "Convert a HAR (HTTP Archive) file to a k6 script",
+		Example: `
   # Convert a HAR file to a k6 script.
   k6 convert -O har-session.js session.har
 
@@ -63,72 +65,71 @@ var convertCmd = &cobra.Command{
 
   # Run the k6 script.
   k6 run har-session.js`[1:],
-	Args: cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		// Parse the HAR file
-		filePath, err := filepath.Abs(args[0])
-		if err != nil {
-			return err
-		}
-		r, err := defaultFs.Open(filePath)
-		if err != nil {
-			return err
-		}
-		h, err := har.Decode(r)
-		if err != nil {
-			return err
-		}
-		if err := r.Close(); err != nil {
-			return err
-		}
-
-		// recordings include redirections as separate requests, and we dont want to trigger them twice
-		options := lib.Options{MaxRedirects: null.IntFrom(0)}
-
-		if optionsFilePath != "" {
-			optionsFileContents, err := ioutil.ReadFile(optionsFilePath)
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Parse the HAR file
+			filePath, err := filepath.Abs(args[0])
 			if err != nil {
 				return err
 			}
-			var injectedOptions lib.Options
-			if err := json.Unmarshal(optionsFileContents, &injectedOptions); err != nil {
-				return err
-			}
-			options = options.Apply(injectedOptions)
-		}
-
-		//TODO: refactor...
-		script, err := har.Convert(h, options, minSleep, maxSleep, enableChecks, returnOnFailedCheck, threshold, nobatch, correlate, only, skip)
-		if err != nil {
-			return err
-		}
-
-		// Write script content to stdout or file
-		if output == "" || output == "-" {
-			if _, err := io.WriteString(defaultWriter, script); err != nil {
-				return err
-			}
-		} else {
-			f, err := defaultFs.Create(output)
+			r, err := defaultFs.Open(filePath)
 			if err != nil {
 				return err
 			}
-			if _, err := f.WriteString(script); err != nil {
+			h, err := har.Decode(r)
+			if err != nil {
 				return err
 			}
-			if err := f.Sync(); err != nil {
+			if err = r.Close(); err != nil {
 				return err
 			}
-			if err := f.Close(); err != nil {
-				return err
-			}
-		}
-		return nil
-	},
-}
 
-func init() {
-	RootCmd.AddCommand(convertCmd)
+			// recordings include redirections as separate requests, and we dont want to trigger them twice
+			options := lib.Options{MaxRedirects: null.IntFrom(0)}
+
+			if optionsFilePath != "" {
+				optionsFileContents, err := ioutil.ReadFile(optionsFilePath) //nolint:gosec,govet
+				if err != nil {
+					return err
+				}
+				var injectedOptions lib.Options
+				if err := json.Unmarshal(optionsFileContents, &injectedOptions); err != nil {
+					return err
+				}
+				options = options.Apply(injectedOptions)
+			}
+
+			// TODO: refactor...
+			script, err := har.Convert(h, options, minSleep, maxSleep, enableChecks,
+				returnOnFailedCheck, threshold, nobatch, correlate, only, skip)
+			if err != nil {
+				return err
+			}
+
+			// Write script content to stdout or file
+			if output == "" || output == "-" { //nolint:nestif
+				if _, err := io.WriteString(defaultWriter, script); err != nil {
+					return err
+				}
+			} else {
+				f, err := defaultFs.Create(output)
+				if err != nil {
+					return err
+				}
+				if _, err := f.WriteString(script); err != nil {
+					return err
+				}
+				if err := f.Sync(); err != nil {
+					return err
+				}
+				if err := f.Close(); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+	}
+
 	convertCmd.Flags().SortFlags = false
 	convertCmd.Flags().StringVarP(&output, "output", "O", output, "k6 script output filename (stdout by default)")
 	convertCmd.Flags().StringVarP(&optionsFilePath, "options", "", output, "path to a JSON file with options that would be injected in the output script")
@@ -141,4 +142,5 @@ func init() {
 	convertCmd.Flags().BoolVarP(&correlate, "correlate", "", false, "detect values in responses being used in subsequent requests and try adapt the script accordingly (only redirects and JSON values for now)")
 	convertCmd.Flags().UintVarP(&minSleep, "min-sleep", "", 20, "the minimum amount of seconds to sleep after each iteration")
 	convertCmd.Flags().UintVarP(&maxSleep, "max-sleep", "", 40, "the maximum amount of seconds to sleep after each iteration")
+	return convertCmd
 }

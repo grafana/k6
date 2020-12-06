@@ -72,6 +72,8 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.Duration("min-iteration-duration", 0, "minimum amount of time k6 will take executing a single iteration")
 	flags.BoolP("throw", "w", false, "throw warnings (like failed http requests) as errors")
 	flags.StringSlice("blacklist-ip", nil, "blacklist an `ip range` from being called")
+	flags.StringSlice("block-hostnames", nil, "block a case-insensitive hostname `pattern`,"+
+		" with optional leading wildcard, from being called")
 
 	// The comment about system-tags also applies for summary-trend-stats. The default values
 	// are set in applyDefault().
@@ -91,6 +93,13 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.StringSlice("tag", nil, "add a `tag` to be applied to all samples, as `[name]=[value]`")
 	flags.String("console-output", "", "redirects the console logging to the provided output file")
 	flags.Bool("discard-response-bodies", false, "Read but don't process or save HTTP response bodies")
+	flags.String("local-ips", "", "Client IP Ranges and/or CIDRs from which each VU will be making requests, "+
+		"e.g. '192.168.220.1,192.168.0.10-192.168.0.25', 'fd:1::0/120', etc.")
+	flags.String("dns", types.DefaultDNSConfig().String(), "DNS resolver configuration. Possible ttl values are: 'inf' "+
+		"for a persistent cache, '0' to disable the cache,\nor a positive duration, e.g. '1s', '1m', etc. "+
+		"Milliseconds are assumed if no unit is provided.\n"+
+		"Possible select values to return a single IP are: 'first', 'random' or 'roundRobin'.\n"+
+		"Possible policy values are: 'preferIPv4', 'preferIPv6', 'onlyIPv4', 'onlyIPv6' or 'any'.\n")
 	return flags
 }
 
@@ -187,6 +196,28 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		opts.BlacklistIPs = append(opts.BlacklistIPs, net)
 	}
 
+	blockedHostnameStrings, err := flags.GetStringSlice("block-hostnames")
+	if err != nil {
+		return opts, err
+	}
+	if flags.Changed("block-hostnames") {
+		opts.BlockedHostnames, err = types.NewNullHostnameTrie(blockedHostnameStrings)
+		if err != nil {
+			return opts, err
+		}
+	}
+
+	localIpsString, err := flags.GetString("local-ips")
+	if err != nil {
+		return opts, err
+	}
+	if flags.Changed("local-ips") {
+		err = opts.LocalIPs.UnmarshalText([]byte(localIpsString))
+		if err != nil {
+			return opts, err
+		}
+	}
+
 	if flags.Changed("summary-trend-stats") {
 		trendStats, errSts := flags.GetStringSlice("summary-trend-stats")
 		if errSts != nil {
@@ -233,6 +264,14 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 
 	if redirectConFile != "" {
 		opts.ConsoleOutput = null.StringFrom(redirectConFile)
+	}
+
+	if dns, err := flags.GetString("dns"); err != nil {
+		return opts, err
+	} else if dns != "" {
+		if err := opts.DNS.UnmarshalText([]byte(dns)); err != nil {
+			return opts, err
+		}
 	}
 
 	return opts, nil
