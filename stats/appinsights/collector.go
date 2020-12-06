@@ -70,16 +70,6 @@ func (c *Collector) Link() string {
 func (c *Collector) Run(ctx context.Context) {
 }
 
-/*
-type JSONSample struct {
-	Time     time.Time         `json:"time"`
-	Value    float64           `json:"value"`
-	Tags     *stats.SampleTags `json:"tags"`
-	Name     string            `json:"name"`
-	Contains string            `json:"contains"`
-}
-*/
-
 // Collect receives a set of samples. This method is never called concurrently, and only while
 // the context for Run() is valid, but should defer as much work as possible to Run().
 func (c *Collector) Collect(sampleContainers []stats.SampleContainer) {
@@ -91,24 +81,9 @@ func (c *Collector) Collect(sampleContainers []stats.SampleContainer) {
 				continue
 			}
 
-			/*
-				js := JSONSample{
-					Time:     sample.Time,
-					Value:    sample.Value,
-					Tags:     sample.Tags,
-					Name:     sample.Metric.Name,
-					Contains: sample.Metric.Contains.String(),
-				}
-			*/
-
 			c.client.TrackMetric(sample.Metric.Name, sample.Value)
 
 			c.client.Channel().Flush()
-
-			//m, _ := json.Marshal(js)
-
-			//fmt.Printf("sample: %s\n\n", string(m))
-
 		}
 	}
 }
