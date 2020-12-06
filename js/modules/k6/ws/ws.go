@@ -37,10 +37,15 @@ import (
 	"github.com/gorilla/websocket"
 
 	"github.com/loadimpact/k6/js/common"
+	"github.com/loadimpact/k6/js/internal/modules"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/stats"
 )
+
+func init() {
+	modules.Register("k6/ws", New())
+}
 
 // ErrWSInInitContext is returned when websockets are using in the init context
 var ErrWSInInitContext = common.NewInitContextError("using websockets in the init context is not supported")
@@ -385,7 +390,10 @@ func (s *Socket) trackPong(pingID string) {
 // timeout, which is in ms, has elapsed
 func (s *Socket) SetTimeout(fn goja.Callable, timeoutMs float64) error {
 	// Starts a goroutine, blocks once on the timeout and pushes the callable
-	// back to the main loop through the scheduled channel
+	// back to the main loop through the scheduled channel.
+	//
+	// Intentionally not using the generic GetDurationValue() helper, since this
+	// API is meant to use ms, similar to the original SetTimeout() JS API.
 	d := time.Duration(timeoutMs * float64(time.Millisecond))
 	if d <= 0 {
 		return fmt.Errorf("setTimeout requires a >0 timeout parameter, received %.2f", timeoutMs)
@@ -411,7 +419,10 @@ func (s *Socket) SetTimeout(fn goja.Callable, timeoutMs float64) error {
 // in ms
 func (s *Socket) SetInterval(fn goja.Callable, intervalMs float64) error {
 	// Starts a goroutine, blocks forever on the ticker and pushes the callable
-	// back to the main loop through the scheduled channel
+	// back to the main loop through the scheduled channel.
+	//
+	// Intentionally not using the generic GetDurationValue() helper, since this
+	// API is meant to use ms, similar to the original SetInterval() JS API.
 	d := time.Duration(intervalMs * float64(time.Millisecond))
 	if d <= 0 {
 		return fmt.Errorf("setInterval requires a >0 timeout parameter, received %.2f", intervalMs)

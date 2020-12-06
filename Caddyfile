@@ -1,8 +1,0 @@
-localhost
-
-root external/salt/nginx/www
-browse
-ext .html
-
-# Uncomment to log each request to stdout
-log stdout

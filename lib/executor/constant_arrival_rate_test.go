@@ -163,7 +163,7 @@ func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
 		{
 			segment:  newExecutionSegmentFromString("0:1/3"),
 			sequence: newExecutionSegmentSequenceFromString("0,1/3,2/3,1"),
-			start:    time.Millisecond * 00,
+			start:    time.Millisecond * 0,
 			steps:    []int64{60, 60, 60, 60, 60, 60, 40},
 		},
 		{
@@ -191,8 +191,9 @@ func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
 				ExecutionSegmentSequence: test.sequence,
 			}, et, 10, 50)
 			var count int64
+			seconds := 2
 			config := getTestConstantArrivalRateConfig()
-			config.Duration.Duration = types.Duration(time.Second * 3)
+			config.Duration.Duration = types.Duration(time.Second * time.Duration(seconds))
 			newET, err := es.ExecutionTuple.GetNewExecutionTupleFromValue(config.MaxVUs.Int64)
 			require.NoError(t, err)
 			rateScaled := newET.ScaleInt64(config.Rate.Int64)
@@ -227,7 +228,7 @@ func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
 				// check that we got around the amount of VU iterations as we would expect
 				var currentCount int64
 
-				for i := 0; i < 3; i++ {
+				for i := 0; i < seconds; i++ {
 					time.Sleep(time.Second)
 					currentCount = atomic.LoadInt64(&count)
 					assert.InDelta(t, int64(i+1)*rateScaled, currentCount, 3)

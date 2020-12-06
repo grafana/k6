@@ -38,6 +38,7 @@ import (
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/netext/httpext"
+	"github.com/loadimpact/k6/lib/types"
 )
 
 // ErrHTTPForbiddenInInitContext is used when a http requests was made in the init context
@@ -146,7 +147,7 @@ func (h *HTTP) parseRequest(
 	}
 
 	formatFormVal := func(v interface{}) string {
-		//TODO: handle/warn about unsupported/nested values
+		// TODO: handle/warn about unsupported/nested values
 		return fmt.Sprintf("%v", v)
 	}
 
@@ -213,7 +214,7 @@ func (h *HTTP) parseRequest(
 	if body != nil {
 		switch data := body.(type) {
 		case map[string]goja.Value:
-			//TODO: fix forms submission and serialization in k6/html before fixing this..
+			// TODO: fix forms submission and serialization in k6/html before fixing this..
 			newData := map[string]interface{}{}
 			for k, v := range data {
 				newData[k] = v.Export()
@@ -234,9 +235,7 @@ func (h *HTTP) parseRequest(
 		}
 	}
 
-	if userAgent := state.Options.UserAgent; userAgent.String != "" {
-		result.Req.Header.Set("User-Agent", userAgent.String)
-	}
+	result.Req.Header.Set("User-Agent", state.Options.UserAgent.String)
 
 	if state.CookieJar != nil {
 		result.ActiveJar = state.CookieJar
@@ -288,12 +287,10 @@ func (h *HTTP) parseRequest(
 				}
 				for _, key := range headers.Keys() {
 					str := headers.Get(key).String()
-					switch strings.ToLower(key) {
-					case "host":
+					if strings.ToLower(key) == "host" {
 						result.Req.Host = str
-					default:
-						result.Req.Header.Set(key, str)
 					}
+					result.Req.Header.Set(key, str)
 				}
 			case "jar":
 				jarV := params.Get(k)
@@ -305,11 +302,11 @@ func (h *HTTP) parseRequest(
 					result.ActiveJar = v.jar
 				}
 			case "compression":
-				var algosString = strings.TrimSpace(params.Get(k).ToString().String())
+				algosString := strings.TrimSpace(params.Get(k).ToString().String())
 				if algosString == "" {
 					continue
 				}
-				var algos = strings.Split(algosString, ",")
+				algos := strings.Split(algosString, ",")
 				var err error
 				result.Compressions = make([]httpext.CompressionType, len(algos))
 				for index, algo := range algos {
@@ -337,7 +334,11 @@ func (h *HTTP) parseRequest(
 			case "auth":
 				result.Auth = params.Get(k).String()
 			case "timeout":
-				result.Timeout = time.Duration(params.Get(k).ToFloat() * float64(time.Millisecond))
+				t, err := types.GetDurationValue(params.Get(k).Export())
+				if err != nil {
+					return nil, fmt.Errorf("invalid timeout value: %w", err)
+				}
+				result.Timeout = t
 			case "throw":
 				result.Throw = params.Get(k).ToBoolean()
 			case "responseType":

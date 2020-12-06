@@ -30,9 +30,14 @@ import (
 	"github.com/dop251/goja"
 
 	"github.com/loadimpact/k6/js/common"
+	"github.com/loadimpact/k6/js/internal/modules"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
 )
+
+func init() {
+	modules.Register("k6/metrics", New())
+}
 
 var nameRegexString = "^[\\p{L}\\p{N}\\._ !\\?/&#\\(\\)<>%-]{1,128}$"
 

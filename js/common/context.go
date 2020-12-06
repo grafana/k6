@@ -30,16 +30,33 @@ type ctxKey int
 
 const (
 	ctxKeyRuntime ctxKey = iota
+	ctxKeyInitEnv
 )
 
+// WithRuntime attaches the given goja runtime to the context.
 func WithRuntime(ctx context.Context, rt *goja.Runtime) context.Context {
 	return context.WithValue(ctx, ctxKeyRuntime, rt)
 }
 
+// GetRuntime retrieves the attached goja runtime from the given context.
 func GetRuntime(ctx context.Context) *goja.Runtime {
 	v := ctx.Value(ctxKeyRuntime)
 	if v == nil {
 		return nil
 	}
 	return v.(*goja.Runtime)
+}
+
+// WithInitEnv attaches the given init environment to the context.
+func WithInitEnv(ctx context.Context, initEnv *InitEnvironment) context.Context {
+	return context.WithValue(ctx, ctxKeyInitEnv, initEnv)
+}
+
+// GetInitEnv retrieves the attached init environment struct from the given context.
+func GetInitEnv(ctx context.Context) *InitEnvironment {
+	v := ctx.Value(ctxKeyInitEnv)
+	if v == nil {
+		return nil
+	}
+	return v.(*InitEnvironment)
 }

@@ -96,6 +96,7 @@ type Response struct {
 	RemotePort     int                      `json:"remote_port"`
 	URL            string                   `json:"url"`
 	Status         int                      `json:"status"`
+	StatusText     string                   `json:"status_text"`
 	Proto          string                   `json:"proto"`
 	Headers        map[string]string        `json:"headers"`
 	Cookies        map[string][]*HTTPCookie `json:"cookies"`

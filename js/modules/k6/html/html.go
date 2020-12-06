@@ -31,7 +31,12 @@ import (
 	gohtml "golang.org/x/net/html"
 
 	"github.com/loadimpact/k6/js/common"
+	"github.com/loadimpact/k6/js/internal/modules"
 )
+
+func init() {
+	modules.Register("k6/html", New())
+}
 
 type HTML struct{}
 

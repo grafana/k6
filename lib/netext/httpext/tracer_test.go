@@ -22,6 +22,7 @@ package httpext
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -42,20 +43,81 @@ import (
 
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/netext"
+	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 )
 
-func TestTracer(t *testing.T) {
+const traceDelay = 100 * time.Millisecond
+
+func getTestTracer(t *testing.T) (*Tracer, *httptrace.ClientTrace) {
+	tracer := &Tracer{}
+	ct := tracer.Trace()
 	if runtime.GOOS == "windows" {
-		t.Skip()
+		// HACK: Time resolution is not as accurate on Windows, see:
+		//  https://github.com/golang/go/issues/8687
+		//  https://github.com/golang/go/issues/41087
+		// Which seems to be causing some metrics to have a value of 0,
+		// since e.g. ConnectStart and ConnectDone could register the same time.
+		// So we force delays in the ClientTrace event handlers
+		// to hopefully reduce the chances of this happening.
+		ct = &httptrace.ClientTrace{
+			ConnectStart: func(a, n string) {
+				t.Logf("called ConnectStart at\t\t%v\n", now())
+				time.Sleep(traceDelay)
+				tracer.ConnectStart(a, n)
+			},
+			ConnectDone: func(a, n string, e error) {
+				t.Logf("called ConnectDone at\t\t%v\n", now())
+				time.Sleep(traceDelay)
+				tracer.ConnectDone(a, n, e)
+			},
+			GetConn: func(h string) {
+				t.Logf("called GetConn at\t\t%v\n", now())
+				time.Sleep(traceDelay)
+				tracer.GetConn(h)
+			},
+			GotConn: func(i httptrace.GotConnInfo) {
+				t.Logf("called GotConn at\t\t%v\n", now())
+				time.Sleep(traceDelay)
+				tracer.GotConn(i)
+			},
+			TLSHandshakeStart: func() {
+				t.Logf("called TLSHandshakeStart at\t\t%v\n", now())
+				time.Sleep(traceDelay)
+				tracer.TLSHandshakeStart()
+			},
+			TLSHandshakeDone: func(s tls.ConnectionState, e error) {
+				t.Logf("called TLSHandshakeDone at\t\t%v\n", now())
+				time.Sleep(traceDelay)
+				tracer.TLSHandshakeDone(s, e)
+			},
+			WroteRequest: func(i httptrace.WroteRequestInfo) {
+				t.Logf("called WroteRequest at\t\t%v\n", now())
+				time.Sleep(traceDelay)
+				tracer.WroteRequest(i)
+			},
+			GotFirstResponseByte: func() {
+				t.Logf("called GotFirstResponseByte at\t%v\n", now())
+				time.Sleep(traceDelay)
+				tracer.GotFirstResponseByte()
+			},
+		}
 	}
+
+	return tracer, ct
+}
+
+func TestTracer(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewTLSServer(httpbin.New().Handler())
 	defer srv.Close()
 
 	transport, ok := srv.Client().Transport.(*http.Transport)
 	assert.True(t, ok)
-	transport.DialContext = netext.NewDialer(net.Dialer{}).DialContext
+	transport.DialContext = netext.NewDialer(
+		net.Dialer{},
+		netext.NewResolver(net.LookupIP, 0, types.DNSfirst, types.DNSpreferIPv4),
+	).DialContext
 
 	var prev int64
 	assertLaterOrZero := func(t *testing.T, val int64, canBeZero bool) {
@@ -73,21 +135,23 @@ func TestTracer(t *testing.T) {
 	for tnum, isReuse := range []bool{false, true, true} {
 		t.Run(fmt.Sprintf("Test #%d", tnum), func(t *testing.T) {
 			// Do not enable parallel testing, test relies on sequential execution
-			tracer := &Tracer{}
 			req, err := http.NewRequest("GET", srv.URL+"/get", nil)
 			require.NoError(t, err)
 
-			res, err := transport.RoundTrip(req.WithContext(httptrace.WithClientTrace(context.Background(), tracer.Trace())))
+			tracer, ct := getTestTracer(t)
+			res, err := transport.RoundTrip(req.WithContext(httptrace.WithClientTrace(context.Background(), ct)))
 			require.NoError(t, err)
 
 			_, err = io.Copy(ioutil.Discard, res.Body)
 			assert.NoError(t, err)
 			assert.NoError(t, res.Body.Close())
+			if runtime.GOOS == "windows" {
+				time.Sleep(traceDelay)
+			}
 			trail := tracer.Done()
 			trail.SaveSamples(stats.IntoSampleTags(&map[string]string{"tag": "value"}))
 			samples := trail.GetSamples()
 
-			assert.Empty(t, tracer.protoErrors)
 			assertLaterOrZero(t, tracer.getConn, isReuse)
 			assertLaterOrZero(t, tracer.connectStart, isReuse)
 			assertLaterOrZero(t, tracer.connectDone, isReuse)
@@ -145,9 +209,6 @@ func (c failingConn) Write(b []byte) (int, error) {
 }
 
 func TestTracerNegativeHttpSendingValues(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip()
-	}
 	t.Parallel()
 	srv := httptest.NewTLSServer(httpbin.New().Handler())
 	defer srv.Close()
@@ -207,10 +268,6 @@ func TestTracerError(t *testing.T) {
 				tracer.Trace())))
 
 	assert.Error(t, err)
-
-	assert.Len(t, tracer.protoErrors, 1)
-	assert.Error(t, tracer.protoErrors[0])
-	assert.Equal(t, tracer.protoErrors, tracer.Done().Errors)
 }
 
 func TestCancelledRequest(t *testing.T) {
@@ -221,20 +278,20 @@ func TestCancelledRequest(t *testing.T) {
 	cancelTest := func(t *testing.T) {
 		t.Parallel()
 		tracer := &Tracer{}
-		req, err := http.NewRequest("GET", srv.URL+"/delay/1", nil)
+		req, err := http.NewRequestWithContext(context.Background(), "GET", srv.URL+"/delay/1", nil)
 		require.NoError(t, err)
 
 		ctx, cancel := context.WithCancel(httptrace.WithClientTrace(req.Context(), tracer.Trace()))
 		req = req.WithContext(ctx)
 		go func() {
-			time.Sleep(time.Duration(rand.Int31n(50)) * time.Millisecond)
+			time.Sleep(time.Duration(rand.Int31n(50)) * time.Millisecond) //nolint:gosec
 			cancel()
 		}()
 
-		resp, err := srv.Client().Transport.RoundTrip(req)
-		trail := tracer.Done()
-		if resp == nil && err == nil && len(trail.Errors) == 0 {
-			t.Errorf("Expected either a RoundTrip response, error or trail errors but got %#v, %#v and %#v", resp, err, trail.Errors)
+		resp, err := srv.Client().Transport.RoundTrip(req) //nolint:bodyclose
+		_ = tracer.Done()
+		if resp == nil && err == nil {
+			t.Errorf("Expected either a RoundTrip response or error but got %#v and %#v", resp, err)
 		}
 	}
 

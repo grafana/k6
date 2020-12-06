@@ -58,6 +58,9 @@ var (
 	WSSessionDuration  = stats.New("ws_session_duration", stats.Trend, stats.Time)
 	WSConnecting       = stats.New("ws_connecting", stats.Trend, stats.Time)
 
+	// gRPC-related
+	GRPCReqDuration = stats.New("grpc_req_duration", stats.Trend, stats.Time)
+
 	// Network-related; used for future protocols as well.
 	DataSent     = stats.New("data_sent", stats.Counter, stats.Data)
 	DataReceived = stats.New("data_received", stats.Counter, stats.Data)

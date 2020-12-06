@@ -33,14 +33,17 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/test/grpc_testing"
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/core"
@@ -56,6 +59,7 @@ import (
 	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/lib/testutils/httpmultibin"
 	"github.com/loadimpact/k6/lib/types"
+	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/stats/dummy"
 )
@@ -525,6 +529,7 @@ func TestVURunContext(t *testing.T) {
 				fnCalled = true
 
 				assert.Equal(t, vu.Runtime, common.GetRuntime(*vu.Context), "incorrect runtime in context")
+				assert.Nil(t, common.GetInitEnv(*vu.Context)) // shouldn't get this in the vu context
 
 				state := lib.GetState(*vu.Context)
 				if assert.NotNil(t, state) {
@@ -546,11 +551,6 @@ func TestVURunContext(t *testing.T) {
 }
 
 func TestVURunInterrupt(t *testing.T) {
-	// TODO: figure out why interrupt sometimes fails... data race in goja?
-	if isWindows {
-		t.Skip()
-	}
-
 	r1, err := getSimpleRunner(t, "/script.js", `
 		exports.default = function() { while(true) {} }
 		`)
@@ -578,17 +578,12 @@ func TestVURunInterrupt(t *testing.T) {
 			activeVU := vu.Activate(&lib.VUActivationParams{RunContext: ctx})
 			err = activeVU.RunOnce()
 			assert.Error(t, err)
-			assert.Contains(t, err.Error(), "context cancelled")
+			assert.Contains(t, err.Error(), "context canceled")
 		})
 	}
 }
 
 func TestVURunInterruptDoesntPanic(t *testing.T) {
-	// TODO: figure out why interrupt sometimes fails... data race in goja?
-	if isWindows {
-		t.Skip()
-	}
-
 	r1, err := getSimpleRunner(t, "/script.js", `
 		exports.default = function() { while(true) {} }
 		`)
@@ -624,7 +619,7 @@ func TestVURunInterruptDoesntPanic(t *testing.T) {
 					close(ch)
 					vuErr := vu.RunOnce()
 					assert.Error(t, vuErr)
-					assert.Contains(t, vuErr.Error(), "context cancelled")
+					assert.Contains(t, vuErr.Error(), "context canceled")
 				}()
 				<-ch
 				time.Sleep(time.Millisecond * 1) // NOTE: increase this in case of problems ;)
@@ -881,6 +876,77 @@ func TestVUIntegrationBlacklistScript(t *testing.T) {
 			err = vu.RunOnce()
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "IP (10.1.2.3) is in a blacklisted range (10.0.0.0/8)")
+		})
+	}
+}
+
+func TestVUIntegrationBlockHostnamesOption(t *testing.T) {
+	r1, err := getSimpleRunner(t, "/script.js", `
+					var http = require("k6/http");
+					exports.default = function() { http.get("https://k6.io/"); }
+				`)
+	require.NoError(t, err)
+
+	hostnames, err := types.NewNullHostnameTrie([]string{"*.io"})
+	require.NoError(t, err)
+	require.NoError(t, r1.SetOptions(lib.Options{
+		Throw:            null.BoolFrom(true),
+		BlockedHostnames: hostnames,
+	}))
+
+	r2, err := NewFromArchive(testutils.NewLogger(t), r1.MakeArchive(), lib.RuntimeOptions{})
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	runners := map[string]*Runner{"Source": r1, "Archive": r2}
+
+	for name, r := range runners {
+		r := r
+		t.Run(name, func(t *testing.T) {
+			initVu, err := r.NewVU(1, make(chan stats.SampleContainer, 100))
+			require.NoError(t, err)
+			vu := initVu.Activate(&lib.VUActivationParams{RunContext: context.Background()})
+			err = vu.RunOnce()
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "hostname (k6.io) is in a blocked pattern (*.io)")
+		})
+	}
+}
+
+func TestVUIntegrationBlockHostnamesScript(t *testing.T) {
+	r1, err := getSimpleRunner(t, "/script.js", `
+					var http = require("k6/http");
+
+					exports.options = {
+						throw: true,
+						blockHostnames: ["*.io"],
+					};
+
+					exports.default = function() { http.get("https://k6.io/"); }
+				`)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	r2, err := NewFromArchive(testutils.NewLogger(t), r1.MakeArchive(), lib.RuntimeOptions{})
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	runners := map[string]*Runner{"Source": r1, "Archive": r2}
+
+	for name, r := range runners {
+		r := r
+		t.Run(name, func(t *testing.T) {
+			initVu, err := r.NewVU(0, make(chan stats.SampleContainer, 100))
+			if !assert.NoError(t, err) {
+				return
+			}
+			vu := initVu.Activate(&lib.VUActivationParams{RunContext: context.Background()})
+			err = vu.RunOnce()
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "hostname (k6.io) is in a blocked pattern (*.io)")
 		})
 	}
 }
@@ -1661,6 +1727,242 @@ func TestSystemTags(t *testing.T) {
 					assert.Equal(t, tc.expVal, emittedVal)
 				}
 			}
+		})
+	}
+}
+
+func TestVUPanic(t *testing.T) {
+	r1, err := getSimpleRunner(t, "/script.js", `
+			var group = require("k6").group;
+			exports.default = function() {
+				group("panic here", function() {
+					if (__ITER == 0) {
+						panic("here we panic");
+					}
+					console.log("here we don't");
+				})
+			}`,
+	)
+	require.NoError(t, err)
+
+	r2, err := NewFromArchive(testutils.NewLogger(t), r1.MakeArchive(), lib.RuntimeOptions{})
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	runners := map[string]*Runner{"Source": r1, "Archive": r2}
+	for name, r := range runners {
+		r := r
+		t.Run(name, func(t *testing.T) {
+			initVU, err := r.NewVU(1234, make(chan stats.SampleContainer, 100))
+			if !assert.NoError(t, err) {
+				return
+			}
+
+			logger := logrus.New()
+			logger.SetLevel(logrus.InfoLevel)
+			logger.Out = ioutil.Discard
+			hook := testutils.SimpleLogrusHook{
+				HookedLevels: []logrus.Level{logrus.InfoLevel, logrus.ErrorLevel, logrus.FatalLevel, logrus.PanicLevel},
+			}
+			logger.AddHook(&hook)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+			vu.(*ActiveVU).Runtime.Set("panic", func(str string) { panic(str) })
+			vu.(*ActiveVU).state.Logger = logger
+
+			vu.(*ActiveVU).Console.logger = logger.WithField("source", "console")
+			err = vu.RunOnce()
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "a panic occurred in VU code but was caught: here we panic")
+			entries := hook.Drain()
+			require.Len(t, entries, 1)
+			assert.Equal(t, logrus.ErrorLevel, entries[0].Level)
+			require.True(t, strings.HasPrefix(entries[0].Message, "panic: here we panic"))
+			require.True(t, strings.HasSuffix(entries[0].Message, "Goja stack:\nfile:///script.js:3:4(12)"))
+
+			err = vu.RunOnce()
+			assert.NoError(t, err)
+
+			entries = hook.Drain()
+			require.Len(t, entries, 1)
+			assert.Equal(t, logrus.InfoLevel, entries[0].Level)
+			require.Contains(t, entries[0].Message, "here we don't")
+		})
+	}
+}
+
+type multiFileTestCase struct {
+	fses       map[string]afero.Fs
+	rtOpts     lib.RuntimeOptions
+	cwd        string
+	script     string
+	expInitErr bool
+	expVUErr   bool
+	samples    chan stats.SampleContainer
+}
+
+func runMultiFileTestCase(t *testing.T, tc multiFileTestCase, tb *httpmultibin.HTTPMultiBin) {
+	logger := testutils.NewLogger(t)
+	runner, err := New(
+		logger,
+		&loader.SourceData{
+			URL:  &url.URL{Path: tc.cwd + "/script.js", Scheme: "file"},
+			Data: []byte(tc.script),
+		},
+		tc.fses,
+		tc.rtOpts,
+	)
+	if tc.expInitErr {
+		require.Error(t, err)
+		return
+	}
+	require.NoError(t, err)
+
+	options := runner.GetOptions()
+	require.Empty(t, options.Validate())
+
+	vu, err := runner.NewVU(1, tc.samples)
+	require.NoError(t, err)
+
+	jsVU, ok := vu.(*VU)
+	require.True(t, ok)
+	jsVU.state.Dialer = tb.Dialer
+	jsVU.state.TLSConfig = tb.TLSClientConfig
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	activeVU := vu.Activate(&lib.VUActivationParams{RunContext: ctx})
+
+	err = activeVU.RunOnce()
+	if tc.expVUErr {
+		require.Error(t, err)
+	} else {
+		require.NoError(t, err)
+	}
+
+	arc := runner.MakeArchive()
+	runnerFromArc, err := NewFromArchive(logger, arc, tc.rtOpts)
+	require.NoError(t, err)
+	vuFromArc, err := runnerFromArc.NewVU(2, tc.samples)
+	require.NoError(t, err)
+	jsVUFromArc, ok := vuFromArc.(*VU)
+	require.True(t, ok)
+	jsVUFromArc.state.Dialer = tb.Dialer
+	jsVUFromArc.state.TLSConfig = tb.TLSClientConfig
+	activeVUFromArc := jsVUFromArc.Activate(&lib.VUActivationParams{RunContext: ctx})
+	err = activeVUFromArc.RunOnce()
+	if tc.expVUErr {
+		require.Error(t, err)
+		return
+	}
+	require.NoError(t, err)
+}
+
+func TestComplicatedFileImportsForGRPC(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	defer tb.Cleanup()
+
+	tb.GRPCStub.UnaryCallFunc = func(ctx context.Context, sreq *grpc_testing.SimpleRequest) (
+		*grpc_testing.SimpleResponse, error,
+	) {
+		return &grpc_testing.SimpleResponse{
+			Username: "foo",
+		}, nil
+	}
+
+	fs := afero.NewMemMapFs()
+	protoFile, err := ioutil.ReadFile("../vendor/google.golang.org/grpc/test/grpc_testing/test.proto")
+	require.NoError(t, err)
+	require.NoError(t, afero.WriteFile(fs, "/path/to/service.proto", protoFile, 0644))
+	require.NoError(t, afero.WriteFile(fs, "/path/to/same-dir.proto", []byte(
+		`syntax = "proto3";package whatever;import "service.proto";`,
+	), 0644))
+	require.NoError(t, afero.WriteFile(fs, "/path/subdir.proto", []byte(
+		`syntax = "proto3";package whatever;import "to/service.proto";`,
+	), 0644))
+	require.NoError(t, afero.WriteFile(fs, "/path/to/abs.proto", []byte(
+		`syntax = "proto3";package whatever;import "/path/to/service.proto";`,
+	), 0644))
+
+	grpcTestCase := func(expInitErr, expVUErr bool, cwd, loadCode string) multiFileTestCase {
+		script := tb.Replacer.Replace(fmt.Sprintf(`
+			var grpc = require('k6/net/grpc');
+			var client = new grpc.Client();
+
+			%s // load statements
+
+			exports.default = function() {
+				client.connect('GRPCBIN_ADDR', {timeout: '3s'});
+				var resp = client.invoke('grpc.testing.TestService/UnaryCall', {})
+				if (!resp.message || resp.error || resp.message.username !== 'foo') {
+					throw new Error('unexpected response message: ' + JSON.stringify(resp.message))
+				}
+			}
+		`, loadCode))
+
+		return multiFileTestCase{
+			fses:    map[string]afero.Fs{"file": fs, "https": afero.NewMemMapFs()},
+			rtOpts:  lib.RuntimeOptions{CompatibilityMode: null.NewString("base", true)},
+			samples: make(chan stats.SampleContainer, 100),
+			cwd:     cwd, expInitErr: expInitErr, expVUErr: expVUErr, script: script,
+		}
+	}
+
+	testCases := []multiFileTestCase{
+		grpcTestCase(false, true, "/", `/* no grpc loads */`), // exp VU error with no proto files loaded
+
+		// Init errors when the protobuf file can't be loaded
+		grpcTestCase(true, false, "/", `client.load(null, 'service.proto');`),
+		grpcTestCase(true, false, "/", `client.load(null, '/wrong/path/to/service.proto');`),
+		grpcTestCase(true, false, "/", `client.load(['/', '/path/'], 'service.proto');`),
+
+		// Direct imports of service.proto
+		grpcTestCase(false, false, "/", `client.load(null, '/path/to/service.proto');`), // full path should be fine
+		grpcTestCase(false, false, "/path/to/", `client.load([], 'service.proto');`),    // file name from same folder
+		grpcTestCase(false, false, "/", `client.load(['./path//to/'], 'service.proto');`),
+		grpcTestCase(false, false, "/path/", `client.load(['./to/'], 'service.proto');`),
+
+		grpcTestCase(false, false, "/whatever", `client.load(['/path/to/'], 'service.proto');`),  // with import paths
+		grpcTestCase(false, false, "/path", `client.load(['/', '/path/to/'], 'service.proto');`), // with import paths
+		grpcTestCase(false, false, "/whatever", `client.load(['../path/to/'], 'service.proto');`),
+
+		// Import another file that imports "service.proto" directly
+		grpcTestCase(true, false, "/", `client.load([], '/path/to/same-dir.proto');`),
+		grpcTestCase(true, false, "/path/", `client.load([], 'to/same-dir.proto');`),
+		grpcTestCase(true, false, "/", `client.load(['/path/'], 'to/same-dir.proto');`),
+		grpcTestCase(false, false, "/path/to/", `client.load([], 'same-dir.proto');`),
+		grpcTestCase(false, false, "/", `client.load(['/path/to/'], 'same-dir.proto');`),
+		grpcTestCase(false, false, "/whatever", `client.load(['/other', '/path/to/'], 'same-dir.proto');`),
+		grpcTestCase(false, false, "/", `client.load(['./path//to/'], 'same-dir.proto');`),
+		grpcTestCase(false, false, "/path/", `client.load(['./to/'], 'same-dir.proto');`),
+		grpcTestCase(false, false, "/whatever", `client.load(['../path/to/'], 'same-dir.proto');`),
+
+		// Import another file that imports "to/service.proto" directly
+		grpcTestCase(true, false, "/", `client.load([], '/path/to/subdir.proto');`),
+		grpcTestCase(false, false, "/path/", `client.load([], 'subdir.proto');`),
+		grpcTestCase(false, false, "/", `client.load(['/path/'], 'subdir.proto');`),
+		grpcTestCase(false, false, "/", `client.load(['./path/'], 'subdir.proto');`),
+		grpcTestCase(false, false, "/whatever", `client.load(['/other', '/path/'], 'subdir.proto');`),
+		grpcTestCase(false, false, "/whatever", `client.load(['../other', '../path/'], 'subdir.proto');`),
+
+		// Import another file that imports "/path/to/service.proto" directly
+		grpcTestCase(true, false, "/", `client.load(['/path'], '/path/to/abs.proto');`),
+		grpcTestCase(false, false, "/", `client.load([], '/path/to/abs.proto');`),
+		grpcTestCase(false, false, "/whatever", `client.load(['/'], '/path/to/abs.proto');`),
+	}
+
+	for i, tc := range testCases {
+		i, tc := i, tc
+		t.Run(fmt.Sprintf("TestCase_%d", i), func(t *testing.T) {
+			t.Logf(
+				"CWD: %s, expInitErr: %t, expVUErr: %t, script injected with: `%s`",
+				tc.cwd, tc.expInitErr, tc.expVUErr, tc.script,
+			)
+			runMultiFileTestCase(t, tc, tb)
 		})
 	}
 }

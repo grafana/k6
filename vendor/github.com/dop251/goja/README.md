@@ -108,6 +108,8 @@ Current Status
 Basic Example
 -------------
 
+Run JavaScript and get the result value.
+
 ```go
 vm := goja.New()
 v, err := vm.RunString("2 + 2")

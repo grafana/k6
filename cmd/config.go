@@ -35,6 +35,7 @@ import (
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/executor"
+	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/stats/cloud"
 	"github.com/loadimpact/k6/stats/csv"
@@ -42,7 +43,7 @@ import (
 	"github.com/loadimpact/k6/stats/eventhubs"
 	"github.com/loadimpact/k6/stats/influxdb"
 	"github.com/loadimpact/k6/stats/kafka"
-	"github.com/loadimpact/k6/stats/statsd/common"
+	"github.com/loadimpact/k6/stats/statsd"
 	"github.com/loadimpact/k6/ui"
 )
 
@@ -220,7 +221,7 @@ func getConsolidatedConfig(fs afero.Fs, cliConf Config, runner lib.Runner) (conf
 	cliConf.Collectors.InfluxDB = influxdb.NewConfig().Apply(cliConf.Collectors.InfluxDB)
 	cliConf.Collectors.Cloud = cloud.NewConfig().Apply(cliConf.Collectors.Cloud)
 	cliConf.Collectors.Kafka = kafka.NewConfig().Apply(cliConf.Collectors.Kafka)
-	cliConf.Collectors.StatsD = common.NewConfig().Apply(cliConf.Collectors.StatsD)
+	cliConf.Collectors.StatsD = statsd.NewConfig().Apply(cliConf.Collectors.StatsD)
 	cliConf.Collectors.Datadog = datadog.NewConfig().Apply(cliConf.Collectors.Datadog)
 	cliConf.Collectors.EventHubs = eventhubs.NewConfig().Apply(cliConf.Collectors.EventHubs)
 
@@ -263,6 +264,17 @@ func applyDefault(conf Config) Config {
 	if conf.Options.SummaryTrendStats == nil {
 		conf.Options.SummaryTrendStats = lib.DefaultSummaryTrendStats
 	}
+	defDNS := types.DefaultDNSConfig()
+	if !conf.DNS.TTL.Valid {
+		conf.DNS.TTL = defDNS.TTL
+	}
+	if !conf.DNS.Select.Valid {
+		conf.DNS.Select = defDNS.Select
+	}
+	if !conf.DNS.Policy.Valid {
+		conf.DNS.Policy = defDNS.Policy
+	}
+
 	return conf
 }
 
