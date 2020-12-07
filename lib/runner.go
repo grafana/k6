@@ -32,6 +32,8 @@ type ActiveVU interface {
 	// way to interrupt the execution is to cancel the context given
 	// to InitializedVU.Activate()
 	RunOnce() error
+
+	GetState() *State
 }
 
 // InitializedVU represents a virtual user ready for work. It needs to be

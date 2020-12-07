@@ -42,18 +42,20 @@ func init() {
 
 type K6 struct{}
 
-// ErrGroupInInitContext is returned when group() are using in the init context
+// ErrGroupInInitContext is returned when group() is used in the init context
 var ErrGroupInInitContext = common.NewInitContextError("Using group() in the init context is not supported")
 
-// ErrCheckInInitContext is returned when check() are using in the init context
+// ErrCheckInInitContext is returned when check() is used in the init context
 var ErrCheckInInitContext = common.NewInitContextError("Using check() in the init context is not supported")
 
 func New() *K6 {
 	return &K6{}
 }
 
+// Fail raises an error and interrupts the iteration.
 func (*K6) Fail(msg string) (goja.Value, error) {
-	return goja.Undefined(), errors.New(msg)
+	// TODO: Use an enum for "fail"?
+	return goja.Undefined(), lib.NewIterationInterruptedError("fail", msg)
 }
 
 func (*K6) Sleep(ctx context.Context, secs float64) {

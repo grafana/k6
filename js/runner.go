@@ -601,6 +601,11 @@ func (u *ActiveVU) RunOnce() error {
 	return err
 }
 
+// GetState returns the VU execution state.
+func (u *ActiveVU) GetState() *lib.State {
+	return u.state
+}
+
 func (u *VU) runFn(
 	ctx context.Context, isDefault bool, fn goja.Callable, args ...goja.Value,
 ) (v goja.Value, isFullIteration bool, t time.Duration, err error) {

@@ -26,10 +26,13 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/dop251/goja"
 	"github.com/sirupsen/logrus"
 
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/types"
+	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/ui/pb"
 )
 
@@ -84,6 +87,8 @@ func getIterationRunner(
 ) func(context.Context, lib.ActiveVU) bool {
 	return func(ctx context.Context, vu lib.ActiveVU) bool {
 		err := vu.RunOnce()
+		state := vu.GetState()
+		tags := state.CloneTags()
 
 		// TODO: track (non-ramp-down) errors from script iterations as a metric,
 		// and have a default threshold that will abort the script when the error
@@ -91,19 +96,47 @@ func getIterationRunner(
 
 		select {
 		case <-ctx.Done():
-			// Don't log errors or emit iterations metrics from cancelled iterations
+			// TODO: Do this elsewhere? It might be racy with
+			// Engine.processMetrics() as the channel could be closed at this point.
+			// TODO: Use enum?
+			// TODO: How to distinguish interruptions from signal (^C)?
+			tags["cause"] = "duration"
+			state.Samples <- stats.Sample{
+				Time:   time.Now(),
+				Metric: metrics.InterruptedIterations,
+				Tags:   stats.IntoSampleTags(&tags),
+				Value:  1,
+			}
 			executionState.AddInterruptedIterations(1)
 			return false
 		default:
 			if err != nil {
-				if s, ok := err.(fmt.Stringer); ok {
+				// TODO: Use enum?
+				tags["cause"] = "error"
+
+				// TODO: investigate context cancelled errors
+				switch e := err.(type) {
+				case *goja.Exception:
+					if er, ok := e.Value().Export().(lib.IterationInterruptedError); ok {
+						tags["cause"] = er.Cause()
+					}
+					logger.Error(err.Error())
+				case fmt.Stringer:
 					// TODO better detection for stack traces
-					// TODO don't count this as a full iteration?
-					logger.WithField("source", "stacktrace").Error(s.String())
-				} else {
+					logger.WithField("source", "stacktrace").Error(e.String())
+				default:
 					logger.Error(err.Error())
 				}
-				// TODO: investigate context cancelled errors
+
+				stats.PushIfNotDone(ctx, state.Samples, stats.Sample{
+					Time:   time.Now(),
+					Metric: metrics.InterruptedIterations,
+					Tags:   stats.IntoSampleTags(&tags),
+					Value:  1,
+				})
+				executionState.AddInterruptedIterations(1)
+
+				return false
 			}
 
 			// TODO: move emission of end-of-iteration metrics here?

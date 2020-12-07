@@ -27,6 +27,37 @@ import (
 	"github.com/loadimpact/k6/lib/consts"
 )
 
+// IterationInterruptedError is used when an iteration is interrupted due to
+// one of the following:
+// - normal JS exceptions, throw(), etc., with cause: error
+// - k6.fail() called in script, with cause: fail
+// - the iteration exceeded the gracefulStop or gracefulRampDown duration
+//   and was interrupted by the executor, with cause: duration
+// - a signal is received, e.g. via Ctrl+C, with cause: signal
+type IterationInterruptedError struct {
+	cause, msg string
+}
+
+// NewIterationInterruptedError returns a new error.
+func NewIterationInterruptedError(cause, msg string) IterationInterruptedError {
+	return IterationInterruptedError{cause: cause, msg: msg}
+}
+
+// Cause returns the cause of the interruption.
+func (e IterationInterruptedError) Cause() string {
+	return e.cause
+}
+
+// String returns the error in human readable format.
+func (e IterationInterruptedError) String() string {
+	return fmt.Sprintf("%s: %s", e.cause, e.msg)
+}
+
+// Error implements the error interface.
+func (e IterationInterruptedError) Error() string {
+	return e.String()
+}
+
 // TimeoutError is used when somethings timeouts
 type TimeoutError struct {
 	place string
